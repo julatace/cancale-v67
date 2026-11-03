@@ -1950,7 +1950,9 @@ const SYNC_KEYS = [
   'vinted_invoice_settings','vinted_dark','vinted_stock_vinted',
   'vinted_accounts','vinted_account_labels','vinted_account_emails','vinted_account_phones',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros','vinted_annonces_vendues','vinted_bords_shipped',
-  'vinted_goal','vinted_regime','vrm_micro_options','vinted_tva','vinted_bordereau_formats','vinted_bords_printed','vrm_imprimante','vrm_prenom','vrm_num_prefixe',
+  'vinted_goal','vinted_regime','vrm_micro_options','vinted_tva','vinted_bordereau_formats',
+  // (3 nov.) La place du tampon choisie à la main, par FORME de bordereau (« Toujours ici »).
+  'vrm_tampon_positions','vinted_bords_printed','vrm_imprimante','vrm_prenom','vrm_num_prefixe',
   // (27 oct.) La présentation d'arrivée a été vue (ou passée) : ne revient pas sur un autre appareil.
   'vrm_bienvenue_vue',
   // (2 nov.) La visite en bulles a été vue (ou passée) : elle ne revient ni après
@@ -9982,12 +9984,19 @@ const rotationPage = (page) => { const a = ((Math.round(((page.getRotation() || 
 const tailleAffichee = (page) => { const b = page.getCropBox(), r = rotationPage(page); return r % 180 ? { w: b.height, h: b.width } : { w: b.width, h: b.height }; };
 // Écrit un cartouche dont le coin haut-gauche est en (x, y) de la page affichée.
 // Le texte est tourné de la rotation de la page : il se lit à l'endroit.
-const ecrireCartouche = (PL, page, c, x, y) => {
+// (3 nov., soir) `k` : l'échelle choisie à la main (le cartouche agrandi ou
+// réduit au doigt). `fond` : un FOND BLANC opaque sous le texte, pour la place
+// choisie à la main — posé sur du texte ou un trait (son choix, « même sur du
+// texte »), le N° reste lisible. (La zone libre automatique est déjà blanche :
+// pas de fond, la page n'y change que par le texte du tampon.)
+const ecrireCartouche = (PL, page, c, x, y, k = 1, fond = false) => {
   const b = page.getCropBox(), r = rotationPage(page);
   page.resetPosition();
+  const a = versPdfAffiche(b, r, x, y), z = versPdfAffiche(b, r, x + c.w * k, y + c.h * k);
+  if (fond) page.drawRectangle({ x: Math.min(a.x, z.x), y: Math.min(a.y, z.y), width: Math.abs(z.x - a.x), height: Math.abs(z.y - a.y), color: PL.rgb(1, 1, 1) });
   for (const l of c.lignes) {
-    const p = versPdfAffiche(b, r, x + c.pad, y + l.y);
-    page.drawText(l.texte, { x: p.x, y: p.y, size: l.taille, font: l.font, color: PL.rgb(0, 0, 0), rotate: PL.degrees(r) });
+    const p = versPdfAffiche(b, r, x + c.pad * k, y + l.y * k);
+    page.drawText(l.texte, { x: p.x, y: p.y, size: l.taille * k, font: l.font, color: PL.rgb(0, 0, 0), rotate: PL.degrees(r) });
   }
 };
 // Cherche une fenêtre libre (cartouche + marges) sur une carte de pixels RGBA.
@@ -10027,29 +10036,104 @@ const rendrePremierePage = async (pdf) => {
     return { pixels: ctx.getImageData(0, 0, w, h).data, w, h, s };
   } finally { try { await d.destroy(); } catch (_) {} }
 };
-// ① Où poser le cartouche sur la page affichée ? `choix` = un point choisi à
-// la main ({vx, vy} en fraction de la page), revérifié sur les pixels.
-// Rend { x, y, c } (points, page affichée) ou null.
-const chercherPlaceTampon = async (pdf, bold, reg, numero, titre, choix = null) => {
-  const rendu = await rendrePremierePage(pdf), s = rendu.s;
+// ① Où poser le cartouche sur la page affichée (recherche automatique) ?
+// `rendu` : la page déjà rendue (l'aperçu la réutilise). Rend { x, y, c, v }
+// (points, page affichée ; `v` = l'indice de la variante) ou null.
+const chercherPlaceTampon = async (pdf, bold, reg, numero, titre, rendu = null) => {
+  rendu = rendu || await rendrePremierePage(pdf); const s = rendu.s;
   const marge = { mx: Math.round(TAMPON.mx * s), my: Math.round(TAMPON.my * s) };
-  for (const v of CARTOUCHES) {
-    const c = cartoucheTampon(bold, reg, numero, titre, v); if (!c) continue;
+  for (let v = 0; v < CARTOUCHES.length; v++) {
+    const c = cartoucheTampon(bold, reg, numero, titre, CARTOUCHES[v]); if (!c) continue;
     const bw = Math.ceil(c.w * s), bh = Math.ceil(c.h * s);
-    if (choix && Number.isFinite(choix.vx) && Number.isFinite(choix.vy)) {
-      const x = Math.round(choix.vx * rendu.w - bw / 2), y = Math.round(choix.vy * rendu.h - bh / 2);
-      if (x - marge.mx < 0 || y - marge.my < 0 || x + bw + marge.mx > rendu.w || y + bh + marge.my > rendu.h) continue;
-      // La même règle que la recherche : on la joue sur la fenêtre choisie.
-      const sous = new Uint8ClampedArray((bw + 2 * marge.mx) * (bh + 2 * marge.my) * 4);
-      for (let py = 0; py < bh + 2 * marge.my; py++) sous.set(rendu.pixels.subarray(((y - marge.my + py) * rendu.w + x - marge.mx) * 4, ((y - marge.my + py) * rendu.w + x - marge.mx + bw + 2 * marge.mx) * 4), py * (bw + 2 * marge.mx) * 4);
-      if (trouverZoneBlanche(sous, bw + 2 * marge.mx, bh + 2 * marge.my, bw, bh, marge)) return { x: x / s, y: y / s, c };
-      continue;
-    }
     const p = trouverZoneBlanche(rendu.pixels, rendu.w, rendu.h, bw, bh, marge);
-    if (p) return { x: p.x / s, y: p.y / s, c };
+    if (p) return { x: p.x / s, y: p.y / s, c, v };
   }
   return null;
 };
+// ── LE TAMPON LIBRE (3 nov., 18 h 59) ────────────────────────────────────────
+// Julien : « on doit pouvoir être LIBRE de le mettre où on veut, MÊME SUR DU
+// TEXTE, si l'espace blanc choisi par VRM n'est pas au bon endroit ». Un choix
+// fait à la main = { vx, vy, vw, v } : le coin haut-gauche et la largeur du
+// cartouche en FRACTIONS de la page AFFICHÉE (rotation /Rotate comprise — la
+// page Vestiaire est en 270), `v` la variante de cartouche. Rien n'est refusé :
+// c'est son choix (l'aperçu dit seulement s'il recouvre un code-barres).
+// Taille mini : N° ≥ 9 pt et titre ≥ 5 pt (lisible imprimé).
+const TAMPON_MIN = { n: 9, t: 5 };
+const choixTamponValide = (c) => !!c && [c.vx, c.vy, c.vw].every((x) => Number.isFinite(x)) && c.vw > 0 && c.vw <= 1.0001 && c.vx > -0.0001 && c.vy > -0.0001;
+const echelleMiniTampon = (v) => Math.max(TAMPON_MIN.n / v.tn, TAMPON_MIN.t / v.tt);
+// Le cartouche de la variante `vi` (si le N° ne tient pas dans sa largeur, la
+// largeur est élargie : à la main, la taille se règle ensuite au doigt).
+const cartoucheLibre = (bold, reg, n, t, vi) => {
+  const v = CARTOUCHES[Math.max(0, Math.min(CARTOUCHES.length - 1, vi | 0))];
+  return cartoucheTampon(bold, reg, n, t, v) || cartoucheTampon(bold, reg, n, t, { ...v, l: 600 });
+};
+// Rend { x, y, k, c } (points, page affichée), le cartouche borné à la page.
+const placeLibreTampon = (page, bold, reg, n, t, choix) => {
+  const { w: W, h: H } = tailleAffichee(page), vi = Math.max(0, Math.min(CARTOUCHES.length - 1, choix.v | 0));
+  const c = cartoucheLibre(bold, reg, n, t, vi); if (!c) return null;
+  const kMax = Math.min(W / c.w, H / c.h), kMin = Math.min(echelleMiniTampon(CARTOUCHES[vi]), kMax);
+  const k = Math.max(kMin, Math.min(kMax, (choix.vw * W) / c.w));
+  const x = Math.max(0, Math.min(W - c.w * k, choix.vx * W)), y = Math.max(0, Math.min(H - c.h * k, choix.vy * H));
+  return { x, y, k, c };
+};
+// LA FORME d'un bordereau : transporteur + format de la page tamponnée +
+// orientation (+ « tourné » si /Rotate, + « thermique » quand c'est l'étiquette
+// découpée en 100×150). Une position choisie à la main vaut pour la forme.
+const formeTampon = (type, page, isole = false) => {
+  const { w, h } = tailleAffichee(page), r = rotationPage(page), a = Math.min(w, h), b = Math.max(w, h);
+  const pres = (x, y, e) => Math.abs(a - x) <= e && Math.abs(b - y) <= e;
+  const format = pres(595.28, 841.89, 8) ? 'A4' : pres(283.46, 425.2, 10) ? '10x15' : pres(419.53, 595.28, 8) ? 'A5' : `${Math.round(a / MM_PT)}x${Math.round(b / MM_PT)}mm`;
+  const sens = w > h ? 'paysage' : 'portrait';
+  const t = String(type || 'autre');
+  const nomT = { mondialrelay: 'Mondial Relay', international: 'Mondial Relay international', chronopost: 'Chronopost', colissimo: 'Colissimo', vintedgo: 'Vinted Go', relaiscolis: 'Relais Colis', ups: 'UPS', dpd: 'DPD' }[t] || 'Bordereau';
+  return {
+    cle: `${t}·${format}·${sens}${r ? '·r' + r : ''}${isole ? '·th' : ''}`,
+    nom: `${nomT} ${format.replace('x', '×')}${isole ? ' thermique' : ''}${sens === 'paysage' ? ' paysage' : ''}${r ? ' tourné' : ''}`,
+  };
+};
+// La préférence SYNCHRONISÉE (SYNC_KEYS) : { [forme]: { vx, vy, vw, v, at } }.
+const TAMPON_POSITIONS = 'vrm_tampon_positions';
+const positionsTampon = () => { try { const m = typeof load === 'function' ? load(TAMPON_POSITIONS, {}) : {}; return m && typeof m === 'object' ? m : {}; } catch (_) { return {}; } };
+// La position mémorisée d'une forme (ou null : le choix automatique). C'est
+// aussi ce que « Tout imprimer » appelle pour chaque bordereau du lot.
+const positionTampon = (forme) => { const p = positionsTampon()[forme && forme.cle != null ? forme.cle : forme]; return choixTamponValide(p) ? { vx: p.vx, vy: p.vy, vw: p.vw, v: p.v | 0 } : null; };
+const memoriserPositionTampon = (cle, choix) => { if (typeof save !== 'function') return; const m = { ...positionsTampon() }; if (choix && choixTamponValide(choix)) m[cle] = { vx: +choix.vx.toFixed(5), vy: +choix.vy.toFixed(5), vw: +choix.vw.toFixed(5), v: choix.v | 0, at: new Date().toISOString() }; else delete m[cle]; save(TAMPON_POSITIONS, m); };
+// Les codes-barres et QR de la page RENDUE (pour une puce, jamais un refus) :
+// cases de 6 pt où l'encre couvre 28 à 80 % avec des alternances serrées
+// (barres ou modules : ≥ 0,25 par point, lignes et colonnes ensemble), regroupées ; un groupe de moins de 24×12 pt est écarté
+// (une lettre grasse n'est pas un code). Rend des boîtes en points.
+const zonesCodesTampon = (rendu) => {
+  const { pixels: d, w, h, s } = rendu, t = Math.max(4, Math.round(6 * s)), cw = Math.floor(w / t), ch = Math.floor(h / t);
+  const noir = (x, y) => { const i = (y * w + x) * 4; return 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2] < 128; };
+  const code = new Uint8Array(cw * ch);
+  for (let cy = 0; cy < ch; cy++) for (let cx = 0; cx < cw; cx++) {
+    let n = 0, th = 0, tv = 0;
+    for (let y = cy * t; y < cy * t + t; y++) for (let x = cx * t; x < cx * t + t; x++) {
+      const a = noir(x, y); if (a) n++;
+      if (x > cx * t && a !== noir(x - 1, y)) th++;
+      if (y > cy * t && a !== noir(x, y - 1)) tv++;
+    }
+    const part = n / (t * t), parPt = (th + tv) / t / (t / s);
+    if (part >= 0.28 && part <= 0.8 && parPt >= 0.25) code[cy * cw + cx] = 1;
+  }
+  const vu = new Uint8Array(cw * ch), out = [];
+  for (let i = 0; i < code.length; i++) {
+    if (!code[i] || vu[i]) continue;
+    const pile = [i]; vu[i] = 1; let n = 0, x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1;
+    while (pile.length) {
+      const j = pile.pop(), x = j % cw, y = (j / cw) | 0; n++;
+      x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y);
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]) {
+        const X = x + dx, Y = y + dy, k = Y * cw + X;
+        if (X >= 0 && Y >= 0 && X < cw && Y < ch && code[k] && !vu[k]) { vu[k] = 1; pile.push(k); }
+      }
+    }
+    const bw = (x1 - x0 + 1) * t / s, bh = (y1 - y0 + 1) * t / s;
+    if (n >= 8 && Math.max(bw, bh) >= 24 && Math.min(bw, bh) >= 12) out.push({ x: x0 * t / s, y: y0 * t / s, w: bw, h: bh });
+  }
+  return out;
+};
+const recouvreTampon = (zones, b) => (zones || []).some((z) => b.x < z.x + z.w && b.x + b.w > z.x && b.y < z.y + z.h && b.y + b.h > z.y);
 // ② La page 1 redessinée telle qu'elle s'affiche, à l'échelle 1:1, sur une
 // page plus haute de `TAMPON.bande` : le cartouche va dans la bande, dessous.
 const pageAvecBande = async (PL, pdf, bold, reg, numero, titre) => {
@@ -10083,23 +10167,24 @@ const ajouterFicheColis = (PL, pdf, bold, reg, numero, titre) => {
 };
 // LE chemin unique. Tamponne la page 1 de `pdf` (pdf-lib, déjà la COPIE
 // d'impression). `thermique` : la page doit garder sa taille (pas de bande).
-// `choix` + `strict` : le point choisi à la main dans l'aperçu ; refusé ⇒
-// erreur (l'aperçu le dit) seulement si `strict`, sinon recherche normale.
-// Rend { mode: 'blanc'|'bande'|'fiche'|'rien', raison }. Ne lève jamais
-// (sauf `strict`) : le bordereau s'imprime toujours.
-const tamponnerBordereau = async (PL, pdf, { numero, titre, thermique = false, choix = null, strict = false } = {}) => {
+// `choix` : la place choisie à la main ({ vx, vy, vw, v }, voir « LE TAMPON
+// LIBRE ») — posée telle quelle, même sur du texte, fond blanc dessous.
+// Rend { mode: 'libre'|'blanc'|'bande'|'fiche'|'rien', raison }. Ne lève
+// jamais : le bordereau s'imprime toujours.
+const tamponnerBordereau = async (PL, pdf, { numero, titre, thermique = false, choix = null } = {}) => {
   const n = String(numero == null ? '' : numero).trim(), t = String(titre == null ? '' : titre).trim();
   if (!n && !t) return { mode: 'rien', raison: '' };
   const bold = await pdf.embedFont(PL.StandardFonts.HelveticaBold), reg = await pdf.embedFont(PL.StandardFonts.Helvetica);
+  if (choixTamponValide(choix)) {
+    const page = pdf.getPages()[0], pl = placeLibreTampon(page, bold, reg, n, t, choix);
+    if (pl) { ecrireCartouche(PL, page, pl.c, pl.x, pl.y, pl.k, true); return { mode: 'libre', raison: '', place: { x: pl.x, y: pl.y, w: pl.c.w * pl.k, h: pl.c.h * pl.k } }; }
+  }
   let raison = '';
   try {
-    let place = await chercherPlaceTampon(pdf, bold, reg, n, t, choix);
-    if (!place && choix && strict) throw Object.assign(Error('cette zone contient du texte, une image ou un code, ou le numéro dépasse de la page'), { strict: true });
-    if (!place && choix) place = await chercherPlaceTampon(pdf, bold, reg, n, t, null);
+    const place = await chercherPlaceTampon(pdf, bold, reg, n, t);
     if (place) { ecrireCartouche(PL, pdf.getPages()[0], place.c, place.x, place.y); return { mode: 'blanc', raison: '' }; }
     raison = 'aucun espace libre sur la page';
   } catch (e) {
-    if (e && e.strict) throw Error('Placement refusé : ' + e.message + '.');
     raison = 'aperçu du PDF indisponible (' + String((e && e.message) || e).slice(0, 60) + ')';
   }
   const { w, h } = tailleAffichee(pdf.getPages()[0]);
@@ -10468,7 +10553,7 @@ const placementThermique = (r, sens, avecNum) => {
 };
 // Pose les étiquettes de `page` (zone `z`, déjà reconnue) dans `out`, une page
 // 100×150 chacune. Rend le nombre de pages ajoutées.
-const poserEtiquettesThermiques = async (PL, out, page, z, numero, bold, titre = '') => {
+const poserEtiquettesThermiques = async (PL, out, page, z, numero, bold, titre = '', choisir = null) => {
   const n = numero != null ? String(numero).trim() : '';
   const modes = [];
   const rects = z.etiquettes && z.etiquettes.length ? z.etiquettes : [z];
@@ -10480,7 +10565,9 @@ const poserEtiquettesThermiques = async (PL, out, page, z, numero, bold, titre =
     const p=temp.addPage([ETIQ_TH.w,ETIQ_TH.h]);
     p.drawPage(emb,{x:pl.x,y:pl.y,xScale:pl.s,yScale:pl.s,rotate:PL.degrees(pl.angle)});
     // La page reste 100×150 : pas de bande en thermique (fiche à la suite).
-    modes.push((await tamponnerBordereau(PL, temp, { numero: n, titre, thermique: true })).mode);
+    // La place du tampon : celle choisie (aperçu) ou mémorisée pour la forme.
+    const choix = choisir ? await choisir(temp, { isole: true, k }) : null;
+    modes.push((await tamponnerBordereau(PL, temp, { numero: n, titre, thermique: true, choix })).mode);
     (await out.copyPages(temp,temp.getPageIndices())).forEach(p=>out.addPage(p));
     k++;
   }
@@ -10496,20 +10583,23 @@ const imprimanteChoisie = () => imprMode(load('vrm_imprimante', 'normale'));
 //   sinon ⇒ page originale, tamponnée par `tamponnerBordereau` (zone libre,
 //   sinon bande 1:1, sinon fiche colis — jamais un refus).
 // Rend `{ isole, etiquettes, raison }` — l'écran dit ce qui a vraiment été fait.
-const poserBordereau = async (PL, out, src, { numero, title, pos, thermique }) => {
+// `choisir(doc, { isole, k })` (facultatif) : rend la place choisie à la main
+// pour la page 1 de `doc` (aperçu ou position mémorisée de sa forme), sinon null.
+const poserBordereau = async (PL, out, src, { numero, title, pos, thermique, choisir = null }) => {
   const { StandardFonts } = PL;
   const first = src.getPages()[0];
   const z = thermique ? zoneEtiquette(PL, first) : { ok: false };
   if (thermique && z.ok) {
     if (!out.__vrmGras) out.__vrmGras = await out.embedFont(StandardFonts.HelveticaBold);
-    const { k: n, modes } = await poserEtiquettesThermiques(PL, out, first, z, numero, out.__vrmGras, title);
+    const { k: n, modes } = await poserEtiquettesThermiques(PL, out, first, z, numero, out.__vrmGras, title, choisir);
     const reste = src.getPageIndices().slice(1);
     if (reste.length) (await out.copyPages(src, reste)).forEach((p) => out.addPage(p));
     return { isole: true, etiquettes: n, raison: '', tampons: modes };
   }
   // Page entière (A4 normale, ou thermique sans étiquette repérée) : le même
   // tampon ; la bande n'est permise que si la page agrandie tient sur un A4.
-  const t = await tamponnerBordereau(PL, src, { numero, titre: title, thermique, choix: pos });
+  const choix = pos || (choisir ? await choisir(src, { isole: false, k: 0 }) : null);
+  const t = await tamponnerBordereau(PL, src, { numero, titre: title, thermique, choix });
   (await out.copyPages(src, src.getPageIndices())).forEach((p) => out.addPage(p));
   return { isole: false, etiquettes: 0, raison: thermique ? (z.raison || 'mise en page inconnue') : '', tampons: [t.mode] };
 };
@@ -10561,6 +10651,35 @@ const typeBordereau = (PL, doc) => {
   } catch (_) { return { type: 'autre', cle: 'autre·?', sens: '?', W: 0, H: 0 }; }
 };
 const nomTypeBordereau = (t) => (TYPES_BORDEREAU.find(([k]) => k === t) || [, 'Autre mise en page'])[1];
+
+// ── OÙ POSER LE TAMPON DE CETTE IMPRESSION (3 nov., soir) ───────────────────
+// `apercu` : true ⇒ l'aperçu s'ouvre si la forme n'a pas de position mémorisée ;
+// 'force' ⇒ toujours (« Déplacer le tampon ») ; false ⇒ jamais (un lot : la
+// position mémorisée de chaque forme, sinon le choix automatique). Une même
+// forme n'est demandée qu'une fois par impression. Annuler ⇒ rien ne s'imprime.
+const TAMPON_ANNULE = 'Impression annulée.';
+const estTamponAnnule = (e) => !!(e && (e.tamponAnnule || e.message === TAMPON_ANNULE));
+let _placeurTampon = null;
+const demanderPlacementTampon = (o) => new Promise((resolve) => { if (!_placeurTampon) return resolve(undefined); _placeurTampon({ ...o, resolve }); });
+const choisirTampon = ({ PL, src, numero, titre, apercu = true }) => {
+  let type = 'autre'; try { type = typeBordereau(PL, src).type; } catch (_) {}
+  const deja = {};
+  return async (doc, info = {}) => {
+    const forme = formeTampon(type, doc.getPages()[0], !!info.isole);
+    if (forme.cle in deja) return deja[forme.cle];
+    let choix = positionTampon(forme.cle);
+    const n = String(numero == null ? '' : numero).trim(), t = String(titre == null ? '' : titre).trim();
+    if ((n || t) && (apercu === 'force' || (apercu && !choix)) && _placeurTampon) {
+      libererOngletPdf();
+      const r = await demanderPlacementTampon({ octets: await doc.save(), forme, numero: n, titre: t, choix });
+      if (!r) throw Object.assign(Error(TAMPON_ANNULE), { tamponAnnule: true });
+      if (r.toujours) memoriserPositionTampon(forme.cle, r.choix);
+      choix = r.choix || null;
+    }
+    deja[forme.cle] = choix;
+    return choix;
+  };
+};
 
 // Le lecteur de PDF des APERÇUS (pdf.js), chargé au premier aperçu demandé —
 // jamais avant, et seulement pour dessiner : l'impression n'en a pas besoin.
@@ -10934,7 +11053,8 @@ const annotateAndDownloadBordereauBrut = async (numero, title, pdfArrayBuffer, p
   const thermique = imprMode(opts.imprimante || imprimanteChoisie()) === 'thermique';
   const src = await PDFDocument.load(pdfArrayBuffer);
   const pdf = await PDFDocument.create();
-  const r0 = await poserBordereau(PL, pdf, src, { numero, title, pos, thermique });
+  const choisir = choisirTampon({ PL, src, numero, titre: title, apercu: opts.apercu === undefined ? true : opts.apercu });
+  const r0 = await poserBordereau(PL, pdf, src, { numero, title, pos, thermique, choisir });
   const hasNum = numero != null && String(numero).trim() !== '';
   posePrefsImpression(PL, pdf);
   const bytes = await pdf.save();
@@ -10973,7 +11093,8 @@ const mergeAndDownloadBordereauxBrut = async (items, resolvePos, opts = {}) => {
       // IMPRIMANTE THERMIQUE : l'étiquette seule, sur des pages 100×150. Si on
       // ne SAIT pas où elle est, la page part ENTIÈRE — jamais un code-barres
       // coupé au hasard (`poserBordereau`, la même règle partout).
-      const r1 = await poserBordereau(PL, out, src, { numero: it.numero, title: it.title, pos, thermique });
+      // La position mémorisée de la forme de CE bordereau (`positionTampon`), sinon le choix automatique.
+      const r1 = await poserBordereau(PL, out, src, { numero: it.numero, title: it.title, pos, thermique, choisir: choisirTampon({ PL, src, numero: it.numero, titre: it.title, apercu: false }) });
       for (const t of r1.tampons || []) { if (t === 'fiche') fiches++; else if (t === 'bande') bandes++; }
       if (r1.isole) { isoles++; nEtiquettes += r1.etiquettes; }
       else if (thermique) entiers.push({ titre: it.title || '', raison: r1.raison });
@@ -20197,19 +20318,14 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
   // (`vinted_bordereau_formats`) : un emplacement appris sur Vinted sert aussi
   // sur Leboncoin et inversement (§11, un seul propriétaire de la donnée).
   const [bordResult, setBordResult] = React.useState(null);
-  const [bordPlace, setBordPlace] = React.useState(null);
   const [bordFormats, setBordFormats] = React.useState(() => (typeof load === 'function' ? (load('vinted_bordereau_formats', {}) || {}) : {}));
-  const posForFormat = () => null; // Analyse du PDF courant, jamais une position héritée.
-  const adjustBordPlacement = () => {
-    const r=bordResult;if(!r?.pdfBuf)return;
-    setBordPlace({...r,blobUrl:URL.createObjectURL(new Blob([r.pdfBuf],{type:'application/pdf'}))});
+  const posForFormat = () => null; // la place vient de la forme (`positionTampon`) ou de l'aperçu
+  // « Déplacer le tampon » : l'aperçu s'ouvre toujours, la place choisie s'imprime.
+  const adjustBordPlacement = async () => {
+    const r = bordResult; if (!r?.pdfBuf) return;
+    try { const r2 = await annotateAndDownloadBordereau(r.numero, r.title, r.pdfBuf, null, { apercu: 'force' }); setBordResult({ ...r2, numero: r.numero, title: r.title, pdfBuf: r.pdfBuf, key: r.key, w: r.w, h: r.h }); }
+    catch (err) { libererOngletPdf(); if (!estTamponAnnule(err)) toast('Erreur : ' + String(err)); }
   };
-  const confirmBordPlacement = async (pos) => {
-    const p = bordPlace; if (!p) return;
-    try { const r = await annotateAndDownloadBordereau(p.numero, p.title, p.pdfBuf, pos); setBordResult({ ...r, numero: p.numero, title: p.title, pdfBuf: p.pdfBuf, key: p.key, w: p.w, h: p.h }); } catch (err) { toast('Erreur : ' + String(err)); throw err; }
-    URL.revokeObjectURL(p.blobUrl); setBordPlace(null);
-  };
-  const cancelBordPlacement = () => { if (bordPlace) { URL.revokeObjectURL(bordPlace.blobUrl); setBordPlace(null); } };
   const ventes = lbcVentes.ventes || [];
   const aLabel = (o) => !!(o.label && (o.label.voucherUrl || o.label.qrUrl || o.label.reference));
   // Un COLIS vendeur : vente prouvée (isSeller) OU un bordereau existe (un
@@ -20247,7 +20363,7 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
       const r = await annotateAndDownloadBordereau(n || '', o.title || '', bytes, pos);
       // On garde le PDF SOUS LA MAIN pour permettre de DÉPLACER ensuite (comme Vinted).
       setBordResult({ ...r, numero: n || '', title: o.title || '', pdfBuf: bytes, key, w: width, h: height });
-    } catch (e) { libererOngletPdf(); toast('Impossible de tamponner ce bordereau : ' + String(e)); }
+    } catch (e) { libererOngletPdf(); if (!estTamponAnnule(e)) toast('Impossible de tamponner ce bordereau : ' + String(e)); }
   };
   // Carte d'un colis — même squelette que l'écran Colis Vinted : photo 58 ·
   // N° + titre · transporteur + prix · UNE action principale (🖨 Imprimer) + Colis fait.
@@ -20347,12 +20463,11 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
             <a href={bordResult.url} target="_blank" rel="noreferrer" style={{ display: 'block', background: C.accent, color: C.onAccent, borderRadius: 10, padding: '13px 16px', fontSize: 15, fontWeight: 600, textDecoration: 'none', marginBottom: 8, textAlign: 'center' }}>📄 Ouvrir le bordereau</a>
             <TamponPose r={bordResult}/>
             {bordResult.thermique && <div data-lbc-thermique={bordResult.isoles>0?'isole':'entier'} style={{ fontSize: 12, color: C.muted, lineHeight: 1.45, marginBottom: 8 }}>{bordResult.isoles>0 ? <>Imprimante thermique : <b style={{color:C.text}}>l'étiquette seule, au format 10×15 cm</b>, ton N° en bas.</> : <>Imprimante thermique : je n'ai pas su repérer l'étiquette ({(bordResult.entiers&&bordResult.entiers[0]&&bordResult.entiers[0].raison)||'mise en page inconnue'}) — la page part entière, découpe-la à la main.</>}</div>}
-            {bordResult.pdfBuf && !(bordResult.thermique && bordResult.isoles>0) && <button type="button" onClick={adjustBordPlacement} style={{ width: '100%', border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, cursor: 'pointer', fontSize: 13, fontWeight: 500, padding: '11px', marginBottom: 8, fontFamily: 'inherit' }}>Prévisualiser et ajuster le numéro</button>}
+            {bordResult.pdfBuf && <button type="button" data-imprime="1" data-tampon-deplacer="1" onClick={adjustBordPlacement} style={{ width: '100%', border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, cursor: 'pointer', fontSize: 13, fontWeight: 500, padding: '11px', marginBottom: 8, fontFamily: 'inherit' }}>Déplacer le tampon</button>}
             <button type="button" onClick={() => { if (bordResult.url) URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{ width: '100%', border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, fontWeight: 500, padding: '8px', fontFamily: 'inherit' }}>Fermer</button>
           </div>
         </div>
       )}
-      {bordPlace && <BordPlacer place={bordPlace} onConfirm={confirmBordPlacement} onCancel={cancelBordPlacement} />}
     </div>
   );
 }
@@ -27420,7 +27535,7 @@ async function imprimerBordereauVc({ bordId, num, titre, venteId }) {
     const r = await annotateAndDownloadBordereau(num || '', titre || '', b64ToBytes(b64), null);
     if (venteId) marquerVc('vrm_vc_imprimes', venteId, true);
     return { etat: 'ok', r };
-  } catch (e) { return { etat: 'refus', texte: String((e && e.message) || e) }; }
+  } catch (e) { if (estTamponAnnule(e)) return { etat: 'annule' }; return { etat: 'refus', texte: String((e && e.message) || e) }; }
 }
 // Le bouton « Imprimer » (le geste principal de la ligne et de la carte).
 // `data-imprime` : la visionneuse s'ouvre au clic (« préparation… »).
@@ -27431,7 +27546,7 @@ function BoutonImprimerVc({ v, grand = false, carte = false }) {
   const go = async () => {
     setEtat('lecture'); setLien(null);
     const r = await imprimerBordereauVc({ bordId: v.bordereau.id, num: v.num, titre: v.titre, venteId: v.id });
-    setEtat(r.etat === 'ok' ? '' : r.etat);
+    setEtat(r.etat === 'ok' || r.etat === 'annule' ? '' : r.etat);
     if (r.etat === 'refus') toast(r.texte);
     // iPhone (aucune visionneuse) : le PDF tamponné s'ouvre d'un vrai toucher.
     if (r.etat === 'ok' && r.r && !r.r.ouvert) setLien(r.r);
@@ -35581,7 +35696,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
       const buf = await file.arrayBuffer();
       await annotateAndDownloadBordereau(pair.numero, pair.title, buf);
     } catch (err) {
-      toast('Impossible d\'annoter ce PDF : ' + String(err));
+      if (!estTamponAnnule(err)) toast('Impossible d\'annoter ce PDF : ' + String(err));
     }
   };
 
@@ -40069,51 +40184,166 @@ function TamponPose({ r }) {
     {b > 0 && <div>Pas de place libre sur {b > 1 ? `${b} bordereaux` : 'le bordereau'} : le N° et le titre sont dans une <b style={{ color: C.text }}>bande ajoutée dessous</b>, le bordereau reste à taille réelle.</div>}
   </div>;
 }
-// Placement sur le PDF courant : original et rendu réel, sans réutiliser
-// la géométrie d'un autre bordereau. La validation relit les pixels originaux.
-function BordPlacer({place,onConfirm,onCancel}) {
-  const original=React.useRef(null),apercu=React.useRef(null),sequence=React.useRef(0),pointClavier=React.useRef({vx:.5,vy:.5});
-  const [choix,setChoix]=React.useState(null),[etat,setEtat]=React.useState('charge'),[erreur,setErreur]=React.useState('');
-  const [confirme,setConfirme]=React.useState(false),[modeTampon,setModeTampon]=React.useState('blanc');
-  React.useEffect(()=>{
-    let vivant=true;
-    dessinerPdf(original.current,place.pdfBuf,{largeur:Math.min(460,window.innerWidth-72)}).then(()=>{if(vivant)setEtat('pret');}).catch(()=>{if(vivant){setEtat('erreur');setErreur('Aperçu indisponible. Aucun emplacement validé.');}});
-    return ()=>{vivant=false;sequence.current++;};
-  },[place.pdfBuf]);
-  const verifier=async candidat=>{
-    const id=++sequence.current;setEtat('verification');setErreur('');setChoix(null);
-    try {
-      const PL=await import('pdf-lib'),doc=await PL.PDFDocument.load(place.pdfBuf);
-      const t=await tamponnerBordereau(PL,doc,{numero:place.numero,titre:place.title,choix:candidat,strict:!!candidat});
-      const bytes=await doc.save();if(id!==sequence.current)return;
-      const rendu=document.createElement('canvas');
-      await dessinerPdf(rendu,bytes,{largeur:Math.min(460,window.innerWidth-72)});
-      if(id!==sequence.current||!apercu.current)return;
-      apercu.current.width=rendu.width;apercu.current.height=rendu.height;
-      apercu.current.style.width=rendu.style.width;apercu.current.style.height=rendu.style.height;
-      apercu.current.getContext('2d').drawImage(rendu,0,0);
-      setModeTampon(t.mode);setChoix(candidat||null);setEtat(candidat?'valide':'auto');
-    } catch(e){if(id===sequence.current){setEtat('erreur');setErreur(String(e.message||e));}}
+// ── L'APERÇU DU TAMPON : LE POSER OÙ ON VEUT (3 nov., 18 h 59) ───────────────
+// Julien : « il faut améliorer le positionnement du tampon sur le bordereau :
+// on doit pouvoir être LIBRE de le mettre où on veut, MÊME SUR DU TEXTE, si
+// l'espace blanc choisi par VRM n'est pas au bon endroit ». Une feuille montre
+// la page RENDUE (pdf.js) et le cartouche (N° + titre, rendu lui aussi par
+// pdf.js : ce qu'on voit est ce qui s'imprime) à la place choisie par VRM ;
+// on le glisse (doigt ou souris), on le redimensionne (poignée, pincement,
+// + / − au clavier), on touche la page pour l'y poser. Rien n'est refusé : une
+// puce ambre dit seulement qu'il recouvre un code-barres ou un QR détecté.
+// « Toujours ici » (coché) mémorise la place pour la FORME du bordereau
+// (`vrm_tampon_positions`) ; « Revenir au choix de VRM » l'oublie. Aucune phrase
+// d'explication (sa demande). Ouverte par `demanderPlacementTampon`.
+function PlaceurTampon() {
+  const [q, setQ] = React.useState(null);
+  React.useEffect(() => { _placeurTampon = (o) => setQ(o); return () => { _placeurTampon = null; }; }, []);
+  if (!q) return null;
+  const fin = (r) => { const res = q.resolve; setQ(null); res(r); };
+  return <PlaceurTamponFeuille key={q.forme && q.forme.cle} q={q} fin={fin}/>;
+}
+function PlaceurTamponFeuille({ q, fin }) {
+  const page = React.useRef(null), scene = React.useRef(null);
+  const [etat, setEtat] = React.useState('charge');           // charge · pret · ko
+  const [geo, setGeo] = React.useState(null);                 // { W, H, ppt }
+  const [auto, setAuto] = React.useState(null);               // { x, y, w, v } ou null (fiche)
+  const [imgs, setImgs] = React.useState([]);                 // par variante : { url, cw, ch }
+  const [codes, setCodes] = React.useState([]);
+  const [boite, setBoite] = React.useState(null);             // { x, y, w, v } en points
+  const [libre, setLibre] = React.useState(false);
+  const [toujours, setToujours] = React.useState(true);
+  const [raison, setRaison] = React.useState('');
+  const etatRef = React.useRef({}); etatRef.current = { geo, boite, imgs };
+  React.useEffect(() => {
+    let vivant = true;
+    (async () => {
+      const PL = await import('pdf-lib');
+      const doc = await PL.PDFDocument.load(q.octets);
+      const pg = doc.getPages()[0], { w: W, h: H } = tailleAffichee(pg);
+      const bold = await doc.embedFont(PL.StandardFonts.HelveticaBold), reg = await doc.embedFont(PL.StandardFonts.Helvetica);
+      // Le cartouche de chaque variante, rendu par pdf.js (fond blanc compris).
+      const images = [];
+      for (let v = 0; v < CARTOUCHES.length; v++) {
+        const d2 = await PL.PDFDocument.create(), b2 = await d2.embedFont(PL.StandardFonts.HelveticaBold), r2 = await d2.embedFont(PL.StandardFonts.Helvetica);
+        const c = cartoucheLibre(b2, r2, q.numero, q.titre, v); if (!c) { images.push(null); continue; }
+        const p2 = d2.addPage([c.w, c.h]); ecrireCartouche(PL, p2, c, 0, 0, 1, true);
+        const cv = document.createElement('canvas'); await dessinerPdf(cv, await d2.save(), { largeur: c.w * 3 });
+        images.push({ url: cv.toDataURL('image/png'), cw: c.w, ch: c.h });
+      }
+      const rendu = await rendrePremierePage(doc);
+      const place = await chercherPlaceTampon(doc, bold, reg, q.numero, q.titre, rendu);
+      const zones = zonesCodesTampon(rendu);
+      const dispoW = Math.min(window.innerWidth - 48, 640), dispoH = Math.max(220, window.innerHeight - 300);
+      const largeur = Math.max(160, Math.min(dispoW, dispoH * W / H));
+      await dessinerPdf(page.current, q.octets, { largeur });
+      if (!vivant) return;
+      const a = place ? { x: place.x, y: place.y, w: place.c.w, v: place.v } : null;
+      let b = null, lib = false;
+      if (choixTamponValide(q.choix)) {
+        const pl = placeLibreTampon(pg, bold, reg, q.numero, q.titre, q.choix);
+        if (pl) { b = { x: pl.x, y: pl.y, w: pl.c.w * pl.k, v: q.choix.v | 0 }; lib = true; }
+      }
+      if (!b) b = a || (images[0] ? { x: Math.max(0, (W - images[0].cw) / 2), y: Math.max(0, (H - images[0].ch) / 2), w: Math.min(W, images[0].cw), v: 0 } : null);
+      setGeo({ W, H, ppt: largeur / W }); setAuto(a); setImgs(images); setCodes(zones); setBoite(b); setLibre(lib); setEtat(b ? 'pret' : 'ko');
+    })().catch((e) => { if (vivant) { setEtat('ko'); setRaison(String((e && e.message) || e).slice(0, 120)); } });
+    return () => { vivant = false; };
+  }, [q]);
+  const img = boite && imgs[boite.v];
+  const hDe = (b) => { const im = imgs[b.v]; return im ? b.w * im.ch / im.cw : 0; };
+  // Bornes : dans la page, jamais plus petit que lisible (N° 9 pt, titre 5 pt).
+  const borner = (b, { aimant = true } = {}) => {
+    const { geo: g, imgs: ims } = etatRef.current; const im = ims[b.v]; if (!g || !im) return b;
+    const wMax = Math.min(g.W, g.H * im.cw / im.ch), wMin = Math.min(wMax, im.cw * echelleMiniTampon(CARTOUCHES[b.v]));
+    const w = Math.max(wMin, Math.min(wMax, b.w)), h = w * im.ch / im.cw;
+    let x = Math.max(0, Math.min(g.W - w, b.x)), y = Math.max(0, Math.min(g.H - h, b.y));
+    if (aimant) {   // aimantation douce : à 10 px d'un bord, il s'y colle
+      const a = 10 / g.ppt;
+      if (x < a) x = 0; else if (g.W - (x + w) < a) x = g.W - w;
+      if (y < a) y = 0; else if (g.H - (y + h) < a) y = g.H - h;
+    }
+    return { ...b, x, y, w };
   };
-  const choisir=e=>{
-    if(etat==='charge'||confirme)return;
-    const r=original.current.getBoundingClientRect();
-    pointClavier.current={vx:(e.clientX-r.left)/r.width,vy:(e.clientY-r.top)/r.height};verifier(pointClavier.current);
+  const pointeurs = React.useRef(new Map()), geste = React.useRef(null);
+  const enPoints = (e) => { const r = page.current.getBoundingClientRect(), g = etatRef.current.geo; return { x: (e.clientX - r.left) / g.ppt, y: (e.clientY - r.top) / g.ppt }; };
+  const bas = (e) => {
+    const { geo: g, boite: b } = etatRef.current; if (!g || !b || etat !== 'pret') return;
+    e.preventDefault();
+    try { scene.current.setPointerCapture(e.pointerId); } catch (_) {}
+    pointeurs.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const p = enPoints(e), h = hDe(b);
+    if (pointeurs.current.size >= 2) {
+      const [u, v] = [...pointeurs.current.values()];
+      geste.current = { type: 'pince', d0: Math.hypot(u.x - v.x, u.y - v.y) || 1, w0: b.w, cx: b.x + b.w / 2, cy: b.y + h / 2 };
+      return;
+    }
+    if (e.target && e.target.closest && e.target.closest('[data-tampon-poignee]')) geste.current = { type: 'taille', x0: p.x, w0: b.w };
+    else if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + h) geste.current = { type: 'glisse', dx: p.x - b.x, dy: p.y - b.y };
+    else { geste.current = { type: 'glisse', dx: b.w / 2, dy: h / 2 }; setBoite(borner({ ...b, x: p.x - b.w / 2, y: p.y - h / 2 })); }
+    setLibre(true);
   };
-  const valider=async()=>{setConfirme(true);try{await onConfirm(choix);}catch(e){setErreur(String(e.message||e));setEtat('erreur');}finally{setConfirme(false);}};
-  return createPortal(<div className="vrm-placement-overlay" data-noswipe="1" role="dialog" aria-modal="true" aria-label="Aperçu du numéro sur le bordereau">
-    <FermeAuRetour fermer={onCancel}/>
-    <div className="vrm-placement-panel" style={{background:C.card,color:C.text}}>
-      <h2>Aperçu du bordereau</h2><p style={{color:C.muted}}>Touche un espace blanc dans l’original, puis vérifie le résultat. Le QR code, les textes et leur marge doivent rester libres. Ce choix concerne uniquement ce PDF.</p>
-      <button type="button" disabled={etat==='charge'||etat==='verification'||confirme} onClick={()=>verifier(null)}>Trouver un espace blanc</button>
-      <div className="vrm-placement-pages"><div><b>Original · choisir ici</b><canvas ref={original} onClick={choisir} tabIndex={0} aria-label="Choisir l’emplacement : cliquer ou utiliser les flèches du clavier" onKeyDown={e=>{
-        const d={ArrowLeft:[-.02,0],ArrowRight:[.02,0],ArrowUp:[0,-.02],ArrowDown:[0,.02]}[e.key];
-        if(!d||etat==='charge'||confirme)return;e.preventDefault();
-        pointClavier.current={vx:Math.max(0,Math.min(1,pointClavier.current.vx+d[0])),vy:Math.max(0,Math.min(1,pointClavier.current.vy+d[1]))};verifier(pointClavier.current);
-      }} style={{cursor:'crosshair'}}/></div><div><b>Résultat avant impression</b><canvas ref={apercu} hidden={!['valide','auto'].includes(etat)}/><p role="status">{etat==='charge'?'Chargement…':etat==='verification'?'Vérification de la zone…':['valide','auto'].includes(etat)?(modeTampon==='bande'?'Pas de zone libre : le N° est dans une bande ajoutée sous le bordereau, à taille réelle.':modeTampon==='fiche'?'Pas de zone libre : le N° est sur une fiche colis imprimée juste après.':'Zone blanche vérifiée.'):erreur||'Choisis un emplacement ou lance la recherche automatique.'}</p></div></div>
-      <div className="vrm-placement-actions"><button type="button" disabled={confirme} onClick={onCancel}>Annuler</button><button type="button" data-imprime="1" disabled={confirme||!['valide','auto'].includes(etat)} onClick={valider}>{confirme?'Préparation…':'Valider et ouvrir le PDF'}</button></div>
+  const bouge = (e) => {
+    if (!pointeurs.current.has(e.pointerId)) return;
+    pointeurs.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const G = geste.current, { boite: b } = etatRef.current; if (!G || !b) return;
+    e.preventDefault();
+    if (G.type === 'pince' && pointeurs.current.size >= 2) {
+      const [u, v] = [...pointeurs.current.values()], w = G.w0 * (Math.hypot(u.x - v.x, u.y - v.y) / G.d0);
+      const h = hDe({ ...b, w }); setBoite(borner({ ...b, w, x: G.cx - w / 2, y: G.cy - h / 2 }, { aimant: false }));
+    } else if (G.type === 'taille') { const p = enPoints(e); setBoite(borner({ ...b, w: G.w0 + (p.x - G.x0) }, { aimant: false })); }
+    else if (G.type === 'glisse') { const p = enPoints(e); setBoite(borner({ ...b, x: p.x - G.dx, y: p.y - G.dy })); }
+  };
+  const haut = (e) => { pointeurs.current.delete(e.pointerId); if (!pointeurs.current.size || (geste.current && geste.current.type === 'pince')) geste.current = null; };
+  const clavier = (e) => {
+    const b = etatRef.current.boite; if (!b) return;
+    const pas = e.shiftKey ? 10 : 2, d = { ArrowLeft: [-pas, 0], ArrowRight: [pas, 0], ArrowUp: [0, -pas], ArrowDown: [0, pas] }[e.key];
+    if (d) { e.preventDefault(); setLibre(true); setBoite(borner({ ...b, x: b.x + d[0], y: b.y + d[1] }, { aimant: false })); return; }
+    if (e.key === '+' || e.key === '=' || e.key === '-') { e.preventDefault(); setLibre(true); setBoite(borner({ ...b, w: b.w * (e.key === '-' ? 1 / 1.06 : 1.06) }, { aimant: false })); }
+  };
+  const revenir = () => { setLibre(false); if (auto) setBoite(auto); };
+  const choix = () => (libre && boite && geo ? { vx: boite.x / geo.W, vy: boite.y / geo.H, vw: boite.w / geo.W, v: boite.v } : null);
+  const imprimer = () => fin({ choix: choix(), toujours });
+  const fiche = !libre && !auto;
+  const h = boite ? hDe(boite) : 0;
+  const surCode = !!boite && !fiche && recouvreTampon(codes, { x: boite.x, y: boite.y, w: boite.w, h });
+  const ppt = geo ? geo.ppt : 1;
+  return createPortal(<div data-placeur-tampon={etat} data-raison={raison || undefined} data-forme={q.forme && q.forme.cle} data-noswipe="1" role="dialog" aria-modal="true" aria-label="Place du tampon"
+      className="vrm-tampon-voile" style={{ zIndex: Z_CONFIRMATION }} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); fin(null); } }}>
+    <FermeAuRetour fermer={() => fin(null)}/>
+    <div className="vrm-tampon-feuille" style={{ background: C.card, color: C.text }}>
+      <div className="vrm-tampon-tete">
+        <b>{(q.forme && q.forme.nom) || 'Bordereau'}</b>
+        <Bouton variante="discret" icone="close" aria-label="Fermer" data-tampon-fermer="1" onClick={() => fin(null)}/>
+      </div>
+      <div className="vrm-tampon-zone">
+        <div ref={scene} className="vrm-tampon-scene" data-tampon-scene="1" data-ppt={ppt.toFixed(4)}
+             onPointerDown={bas} onPointerMove={bouge} onPointerUp={haut} onPointerCancel={haut}>
+          <canvas ref={page} className="vrm-tampon-page" aria-hidden="true"/>
+          {etat === 'pret' && img && <div data-tampon-boite="1" data-libre={libre ? '1' : '0'} data-variante={boite.v}
+              data-x={boite.x.toFixed(2)} data-y={boite.y.toFixed(2)} data-w={boite.w.toFixed(2)} data-h={h.toFixed(2)}
+              tabIndex={0} role="slider" aria-label={`Tampon N° ${q.numero || ''}`} aria-valuetext={`${Math.round(boite.x)}, ${Math.round(boite.y)}`} onKeyDown={clavier}
+              className={'vrm-tampon-boite' + (fiche ? ' vrm-tampon-fantome' : '')}
+              style={{ left: boite.x * ppt, top: boite.y * ppt, width: boite.w * ppt, height: h * ppt }}>
+            <img src={img.url} alt="" draggable={false}/>
+            {!fiche && <span className="vrm-tampon-poignee" data-tampon-poignee="1" aria-hidden="true"><i/></span>}
+          </div>}
+        </div>
+      </div>
+      <div className="vrm-tampon-puces">
+        {surCode && <span className="vrm-tampon-puce" data-tampon-code="1" style={{ color: C.warn, background: C.warnSoft }}>Recouvre le code-barres</span>}
+        {fiche && etat === 'pret' && <span className="vrm-tampon-puce" data-tampon-fiche="1" style={{ color: C.muted, background: C.bg }}>Fiche colis</span>}
+        {etat === 'ko' && <span className="vrm-tampon-puce" data-tampon-ko="1" style={{ color: C.muted, background: C.bg }}>Aperçu indisponible</span>}
+      </div>
+      <div className="vrm-tampon-options">
+        <label className="vrm-tampon-case"><input type="checkbox" data-tampon-toujours="1" checked={toujours} onChange={(e) => setToujours(e.target.checked)}/>Toujours ici</label>
+        {libre && <Bouton variante="discret" data-tampon-auto="1" onClick={revenir}>Revenir au choix de VRM</Bouton>}
+      </div>
+      <div className="vrm-tampon-actions">
+        <Bouton variante="secondaire" data-tampon-annuler="1" onClick={() => fin(null)}>Annuler</Bouton>
+        <Bouton variante="primaire" icone="printer" data-imprime="1" data-tampon-imprimer="1" disabled={etat === 'charge'} onClick={imprimer}>Imprimer</Bouton>
+      </div>
     </div>
-  </div>,document.body);
+  </div>, document.body);
 }
 
 // Réponses rapides prêtes à l'emploi : un clic REMPLIT la zone de texte (tu peux
@@ -42806,7 +43036,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }), []);
   const choisirImprimante = (v) => { imprTouchee.current = true; const m = imprMode(v); setImprimante(m); save('vrm_imprimante', m); };
   // Modale de placement du tampon quand un NOUVEAU format apparaît.
-  const [bordPlace, setBordPlace] = useState(null); // { numero, title, pdfBuf, w, h, key, blobUrl }
   // Résultat prêt : { url, filename } -> bouton « Ouvrir » (fiable sur iPhone).
   const [bordResult, setBordResult] = useState(null);
   const accNameOf = (acc) => { const labels = load('vinted_account_labels',{}); return labels[acc.vinted_user_id] || acc.login || `#${acc.vinted_user_id}`; };
@@ -48194,7 +48423,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const pos = posForFormat(width, height);
       const r = await annotateAndDownloadBordereau(numero, title, pdfBuf, pos);
       setBordResult({ ...r, numero, title, pdfBuf, key, w:width, h:height });
-    } catch(err){ libererOngletPdf(); toast('Impossible de lire ce PDF : '+String(err)); }
+    } catch(err){ libererOngletPdf(); if (!estTamponAnnule(err)) toast('Impossible de lire ce PDF : '+String(err)); }
   };
   // ── FACTURE liée à un bordereau (comptes PRO uniquement) ────────────────────
   // La facture vient des emails que l'app reçoit (pipeline Gmail/Apps Script §3) :
@@ -48366,7 +48595,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     Object.defineProperty(a, 'onLocate', { enumerable: true, get: () => (actionsVentes.current.onLocate ? (...x) => actionsVentes.current.onLocate(...x) : undefined) });
     return a;
   }, []);
-  const printBordAndInvoice = async (b) => {
+  const printBordAndInvoice = async (b, opts = {}) => {
     try {
       const lu = await lirePdfLigne(b._row);
       const buf = lu && lu.octets ? lu.octets : null;
@@ -48386,7 +48615,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       //    seulement si on SAIT où elle est (sinon page entière).
       const src = await PDFDocument.load(buf);
       const thermique = imprMode(imprimante) === 'thermique';
-      const r1 = await poserBordereau(PL, out, src, { numero, title, pos, thermique });
+      const r1 = await poserBordereau(PL, out, src, { numero, title, pos, thermique, choisir: choisirTampon({ PL, src, numero, titre: title, apercu: opts.apercu === undefined ? true : opts.apercu }) });
       const thermiqueOK = r1.isole, thermiqueRaison = r1.raison;
       // 2) la facture pro (si elle existe)
       let joined = false;
@@ -48403,7 +48632,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const printed = ouvrirPdfOnglet(url);
       setBordResult({ url, filename, numero, title, pdfBuf: buf, key: bordereauFormatKey(width, height), w:width, h:height, withInvoice: joined, printed,
                       thermique: imprMode(imprimante) === 'thermique', isoles: thermiqueOK ? 1 : 0, entiers: thermiqueOK ? [] : (thermiqueRaison ? [{ titre: title || '', raison: thermiqueRaison }] : []) });
-    } catch(err){ libererOngletPdf(); toast('Erreur impression : '+String(err)); }
+    } catch(err){ libererOngletPdf(); if (!estTamponAnnule(err)) toast('Erreur impression : '+String(err)); }
   };
   // Le N° d'un bordereau reçu par email : celui de l'email, sinon retrouvé via le
   // titre dans les annonces numérotées (si le titre n'est pas ambigu).
@@ -48762,17 +48991,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return ()=>clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[emailBords, only]);
-  // Rouvre le placement pour AJUSTER l'emplacement (depuis « Bordereau prêt »).
-  const adjustBordPlacement = () => {
-    const r=bordResult;if(!r?.pdfBuf)return;
-    setBordPlace({...r,blobUrl:URL.createObjectURL(new Blob([r.pdfBuf],{type:'application/pdf'}))});
+  // « Déplacer le tampon » (depuis « Bordereau prêt ») : l'aperçu s'ouvre toujours.
+  const adjustBordPlacement = async () => {
+    const r = bordResult; if (!r?.pdfBuf) return;
+    try { const r2 = await annotateAndDownloadBordereau(r.numero, r.title, r.pdfBuf, null, { apercu: 'force' }); setBordResult({ ...r2, numero: r.numero, title: r.title, pdfBuf: r.pdfBuf, key: r.key, w: r.w, h: r.h }); }
+    catch (err) { libererOngletPdf(); if (!estTamponAnnule(err)) toast('Erreur : ' + String(err)); }
   };
-  const confirmBordPlacement = async (pos) => {
-    const p = bordPlace; if(!p) return;
-    try { const r = await annotateAndDownloadBordereau(p.numero, p.title, p.pdfBuf, pos); setBordResult({ ...r, numero:p.numero, title:p.title, pdfBuf:p.pdfBuf, key:p.key, w:p.w, h:p.h }); } catch(err){ toast('Erreur : '+String(err)); throw err; }
-    URL.revokeObjectURL(p.blobUrl); setBordPlace(null);
-  };
-  const cancelBordPlacement = () => { if(bordPlace){ URL.revokeObjectURL(bordPlace.blobUrl); setBordPlace(null); } };
 
   const startBordereau = async (numero, title, acc, tx) => {
     bordCtx.current = { numero, title };
@@ -55321,7 +55545,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         </div>, document.body)}
 
       {/* Modale conversation */}
-      {bordPlace && <BordPlacer place={bordPlace} onConfirm={confirmBordPlacement} onCancel={cancelBordPlacement}/>}
 
       {/* Recherche d'un point relais par son nom → carte → confirmer */}
       {relayPicker && (
@@ -55388,9 +55611,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{fontSize:13,color:C.muted,lineHeight:1.45,marginBottom:16}}>{bordResult.batch?<>Tous les bordereaux{bordResult.nInv>0?<> et <b>{bordResult.nInv} facture{bordResult.nInv>1?'s':''}</b> (comptes pro)</>:null} sont <b>à la suite dans un seul PDF</b> (le N° au même endroit sur chacun). {bordResult.printed?<>Ils sont <b>ouverts dans un nouvel onglet</b> : clique sur l'imprimante en haut à droite. Onglet pas ouvert ? Utilise le bouton ci-dessous.</>:<>Ouvre-le puis <b>Imprimer</b> — tu peux tout imprimer d'un coup.</>}</>:bordResult.printed?<>Le bordereau{bordResult.withInvoice?<> (avec <b>la facture</b>)</>:null} est <b>ouvert dans un nouvel onglet</b> : clique sur l'imprimante en haut à droite. Onglet pas ouvert ? Utilise le bouton ci-dessous.</>:<>{bordResult.withInvoice?<>Le PDF contient le <b>bordereau + la facture</b>. </>:null}Ouvre-le puis <b>Partager → Imprimer</b> (ou enregistre-le). Sur iPhone c'est le bouton de partage en bas.</>}</div>
             <a href={bordResult.url} target="_blank" rel="noreferrer"
               style={{display:'block',background:C.accent,color:C.onAccent,borderRadius:10,padding:'13px 16px',fontSize:15,fontWeight:600,textDecoration:'none',marginBottom:8}}>📄 {bordResult.batch?'Ouvrir les bordereaux':bordResult.withInvoice?'Ouvrir bordereau + facture':'Ouvrir le bordereau'}</a>
-            {/* Le placement est recalculé sur chaque PDF, sans position héritée. */}
-            {bordResult.pdfBuf && !bordResult.batch && !(bordResult.thermique && bordResult.isoles>0) && <button type="button" onClick={adjustBordPlacement} style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:500,padding:'11px',marginBottom:8}}>Prévisualiser et ajuster le numéro</button>}
-            {bordResult.batch && !bordResult.thermique && <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.4}}>Chaque PDF est tamponné séparément : zone libre, sinon bande sous le bordereau, sinon fiche colis juste après.</div>}
+            {/* (3 nov.) « Déplacer le tampon » : l'aperçu s'ouvre, la place choisie s'imprime (et se mémorise pour la forme). */}
+            {bordResult.pdfBuf && !bordResult.batch && <button type="button" data-imprime="1" data-tampon-deplacer="1" onClick={adjustBordPlacement} style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:500,padding:'11px',marginBottom:8}}>Déplacer le tampon</button>}
+            {bordResult.batch && !bordResult.thermique && <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.4}}>Chaque PDF est tamponné à la place gardée pour sa forme, sinon dans une zone libre, sinon sur une fiche colis juste après.</div>}
             {/* ── CE QUE L'IMPRESSION THERMIQUE A VRAIMENT FAIT ────────────────
                 LE CHIFFRE, JAMAIS LA PROMESSE. « Ton étiquette est prête » sur
                 un bordereau qu'on n'a pas su découper, c'est le défaut le plus
@@ -55408,7 +55631,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {ent.length>0 && <div>Je n'ai pas su repérer l'étiquette sur {ent.length===1?'ce bordereau':'ces bordereaux'} : {[...new Set(ent.map(e=>e.raison).filter(Boolean))].join(' · ')||'mise en page inconnue'}. {ent.length===1?'Il part':'Ils partent'} en A4 complet — découpe-{ent.length===1?'le':'les'} à la main, comme avant.</div>}
                 </div>
               ); })()}
-            <button type="button" onClick={()=>{ URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{width:'100%',border:'none',background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,fontWeight:500,padding:'8px'}}>Fermer</button>
+            <button type="button" data-bord-fermer="1" onClick={()=>{ URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{width:'100%',border:'none',background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,fontWeight:500,padding:'8px'}}>Fermer</button>
           </div>
         </div>
       )}
@@ -63581,7 +63804,7 @@ export default function App() {
   // vendeur que la base vérifie). Sans invitation acceptée, rien ne change.
   return <>{(MULTI_USER && authState.user)
     ? <PorteConfidentialite key={authState.user.id} session={authState.session} theme={C} onDeconnexion={authSignOut} onVerifier={uid=>{_confidentialiteUid=uid;}}><PorteEquipe key={authState.user.id} uid={authState.user.id}><PorteAbonnement uid={authState.user.id}>{coeur}</PorteAbonnement></PorteEquipe></PorteConfidentialite>
-    : coeur}<VisionneusePdf/></>;
+    : coeur}<VisionneusePdf/><PlaceurTampon/></>;
 }
 
 // ── Le code Discord (revue de sécurité du 21 octobre) ─────────────────────────
