@@ -170,3 +170,18 @@ Déplacé TEL QUEL depuis CLAUDE.md §9 le 2 novembre 2026 (le fichier dépassai
 - **1er nov.** — Données sûres : `main` fusionnée clé par clé (`src/fusionNuage.js`) + PATCH conditionnel sur `data.rev`, `lireTout` sans trou, purge au préfixe exact (`audit-fusion-nuage`, `audit-purge-compte`). → historique sécurité-base-serveur. Geste : aucun.
 - **1er nov.** — Audit des actions X1-X9 (extension **5.307.0**) : deux paires au même titre sous un N° = rouge, Republier verrouillé et quota en base. (plafond par compte fait en 5.312.) → historiques numéros, favoris-messages, leboncoin, vinted-extension. Geste : installer la 5.307.0.
 - **1er nov.** — Ma journée sans redite (cases 2 × 2 au téléphone, « dont N aujourd'hui », une ligne « Colis à vérifier »). → historique interface-stock. Geste : regarder Ma journée au téléphone.
+
+### Lignes de §9 déplacées telles quelles
+- **1er nov.** — VRM pour d'autres vendeurs : 19 défauts corrigés (code Gmail au vendeur qui a PROUVÉ l'adresse, factures Pro au propriétaire seul, textes neutres `audit-vendeur-neutre`). → historique sécurité-base-serveur. Geste : recoller `scripts/gmail-forwarder.gs` + `EMAIL_INBOUND_SECRET`.
+
+### Lignes de §9 déplacées telles quelles
+- **2 nov.** — Passation de la nuit : 11 lots en ligne (PR #932 → #942, extension 5.307.0), 7 audits dans `docs/passation/audits-2026-11-01/`. → `docs/passation/2026-11-02-nuit.md`.
+- **1er nov.** — Audit des parcours A5-A14 (double vente Leboncoin par N°, « Vendus ailleurs » par `cleNum`, « …a échoué » ≠ vente, ventes plus masquables). Reste : « Échec du paiement »/`failed` à aligner à la prochaine extension. → historique divers. Geste : aucun.
+
+### Lignes de §9 déplacées telles quelles
+- **2 nov.** — Colis : le filtre de site vaut pour TOUT l'écran (`voitSite`, `retoursPourSite` : plus de Vinted sous eBay, Julien : « inadmissible ») ; boîte vide du récapitulatif au téléphone retirée ; 190 chemins absolus `/home/user/…` retirés des audits/bancs. Audits : tous verts sauf ceux qui exigent Postgres (6) ou `@babel/parser` (1), absents ici. Geste : regarder Colis au téléphone.
+- **2 nov. (matin)** — Audit du dossier : les 7 chantiers « en cours » de la nuit n'ont JAMAIS été poussés ⇒ perdus, à refaire (nuit §3) ; §9 condensé, §8 recopié du code, ancienne « passation en cours » archivée. Geste : si la session de la nuit est encore ouverte, lui faire pousser ses worktrees.
+
+### Lignes de §9 déplacées telles quelles
+- **2 nov.** — Audit des données (E0c) : eBay aux frais pas lus « au moins » partout, « 1er », Vestiaire/Leboncoin dans « Finalisé par plateforme », pas lu ≠ 0 (base lente, semaine, NaN, Invalid Date), jours au fuseau local (`audit-donnees-ecrans`). → historique divers. Geste : aucun.
+- **2 nov.** — Offres auto : jamais sur une paire vendue ailleurs (**5.308.0**, `src/offresGarde.js`). Geste : installer.
