@@ -30,6 +30,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { jugerBan, requetesBan, nombreEpingle, RAISONS_BAN } from './relaisColis.js';
+import { villeDuPoint as villeDuPointRegle, villesDesPoints as villesDesPointsRegle, pointsSansVille as pointsSansVilleRegle, communesDepuisBan, LIMITE_COMMUNES } from './villeRelais.js';
 import './styles-colis-colonnes.css';
 import PastilleTransporteur from './PastilleTransporteur.jsx';
 import { cleStatTransporteur } from './transporteursVisuels.js';
@@ -50,7 +51,8 @@ function repereEnCache(p) {
   const reqs = requetesBan(p);
   if (!reqs.length) return undefined;
   const c = lireCache()[cleAdr(reqs[0].q)];
-  if (c && c.lat != null) return { lat: c.lat, lon: c.lon };
+  // (3 nov.) Un repère gardé AVANT que la ville du résultat soit notée est recherché une fois.
+  if (c && c.lat != null) return c.villeLue === undefined ? undefined : { lat: c.lat, lon: c.lon };
   if (c && c.echec && Date.now() - c.echec < ECHEC_MS) return { echec: c.raison || 'introuvable' };
   return undefined;
 }
@@ -84,7 +86,7 @@ async function chercherRepereReseau(p) {
     }
   } catch (_) { return 'reseau'; }
   const sur = res && res.lat != null;
-  const c2 = lireCache(); c2[k] = sur ? { lat: res.lat, lon: res.lon } : { echec: Date.now(), raison: (res && res.echec) || 'introuvable' }; ecrireCache(c2);
+  const c2 = lireCache(); c2[k] = sur ? { lat: res.lat, lon: res.lon, villeLue: res.ville || '', cpLu: res.cp || '' } : { echec: Date.now(), raison: (res && res.echec) || 'introuvable' }; ecrireCache(c2);
   return sur ? { lat: res.lat, lon: res.lon } : { echec: (res && res.echec) || 'introuvable' };
 }
 
@@ -335,28 +337,51 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
   );
 }
 // (3 nov., Julien : « si il y a 2 villes sur la carte, je veux que l'on puisse sélectionner une ville »)
-// La ville d'un point = celle LUE dans son adresse (« 35260 Cancale » : code postal + ville), jamais devinée ;
-// un point sans code postal lu n'a pas de ville (il reste dans « Toutes »).
-const normVille = (v) => String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-export function villeDuPoint(p) {
-  const a = String((p && (p.adresse || p.adresseCourte)) || '');
-  const m = /\b(\d{5})\s+([A-Za-zÀ-ÿ' -]+?)\s*$/.exec(a.split(',').pop().trim()) || /\b(\d{5})\s+([A-Za-zÀ-ÿ' -]+)/.exec(a);
-  if (!m) return null;
-  const nom = m[2].trim().replace(/\s+/g, ' ');
-  return nom ? { cle: normVille(nom), nom: nom.replace(/\b([a-zà-ÿ])/g, (c) => c.toUpperCase()) } : null;
+// (3 nov., 18 h 59 : « il ne reconnaît pas les villes ») LA RÈGLE est dans src/villeRelais.js : la ville
+// LUE (avec ou sans code postal — les consignes Vinted Go n'en écrivent jamais), normalisée (casse,
+// accents, tirets, « St », arrondissements) ; un code postal seul ⇒ la table officielle (Base Adresse)
+// ou le géocodage sûr au même code postal ; plusieurs communes ⇒ le code postal seul. Ici : ses deux
+// sources de ce navigateur (communes par code postal, ville des repères trouvés), les mêmes pour la
+// carte sombre de Colis et pour le sélecteur (une seule réponse).
+const CACHE_COMMUNES = 'vrm_cp_communes_v1';
+const lireCommunes = () => { try { const c = JSON.parse(localStorage.getItem(CACHE_COMMUNES) || '{}') || {}; const o = {}; for (const [k, v] of Object.entries(c)) if (v && Array.isArray(v.noms)) o[k] = v.noms; return o; } catch (_) { return {}; } };
+function villeDeLaCarte(p) {
+  const reqs = requetesBan(p);
+  if (!reqs.length) return '';
+  const c = lireCache()[cleAdr(reqs[0].q)];
+  return c && c.lat != null && c.villeLue && /^\d{5}$/.test(String(p.cp || '')) && c.cpLu === String(p.cp) ? c.villeLue : '';
 }
-// Les villes des points à retirer, avec le nombre de colis (comptés) de chacune — seulement s'il y en a ≥ 2.
-export function villesDesPoints(vue) {
-  const m = new Map();
-  for (const p of ((vue && vue.points) || [])) {
-    if (p.inconnu) continue;
-    const v = villeDuPoint(p); if (!v) continue;
-    const n = p.arrives.filter((c) => !c.horsCompte).length;
-    const x = m.get(v.cle) || { cle: v.cle, nom: v.nom, n: 0, points: [] };
-    x.n += n; x.points.push(p.cle); m.set(v.cle, x);
-  }
-  const l = [...m.values()].filter((x) => x.n > 0).sort((a, b) => b.n - a.n || a.nom.localeCompare(b.nom, 'fr'));
-  return l.length >= 2 ? l : [];
+const optionsVille = () => ({ communes: lireCommunes(), villeCarte: villeDeLaCarte });
+export const villeDuPoint = (p) => villeDuPointRegle(p, optionsVille());
+export const villesDesPoints = (vue) => villesDesPointsRegle(vue, optionsVille());
+export const pointsSansVille = (vue) => pointsSansVilleRegle(vue, optionsVille());
+// Les codes postaux SEULS (sans ville lue) des points : leurs communes sont demandées UNE fois à la
+// Base Adresse (`type=municipality`, code postal exact) et gardées dans ce navigateur ; une panne de
+// réseau n'est pas notée. Rend un compteur qui change quand une réponse arrive (re-rendu).
+const COMMUNES_EN_COURS = new Map();
+export function useCommunesCp(vue, actif) {
+  const [tic, setTic] = React.useState(0);
+  const cps = [...new Set(((vue && vue.points) || []).filter((p) => !p.inconnu).map((p) => { const v = villeDuPointRegle(p, {}); return v && v.source === 'cp' ? v.cp : ''; }).filter(Boolean))].sort();
+  const cle = cps.join(',');
+  React.useEffect(() => {
+    if (!actif || !cps.length) return undefined;
+    let vivant = true;
+    (async () => {
+      for (const cp of cps.slice(0, 10)) {
+        if (!vivant) return;
+        if (lireCommunes()[cp]) continue;
+        try {
+          if (!COMMUNES_EN_COURS.has(cp)) COMMUNES_EN_COURS.set(cp, fetch(`https://api-adresse.data.gouv.fr/search/?q=${cp}&type=municipality&postcode=${cp}&limit=${LIMITE_COMMUNES}`, { credentials: 'omit' }).then((r) => (r.ok ? r.json() : null)).finally(() => COMMUNES_EN_COURS.delete(cp)));
+          const j = await COMMUNES_EN_COURS.get(cp);
+          const noms = communesDepuisBan(j, cp);
+          if (noms && noms.length) { try { const c = JSON.parse(localStorage.getItem(CACHE_COMMUNES) || '{}') || {}; c[cp] = { noms, at: Date.now() }; localStorage.setItem(CACHE_COMMUNES, JSON.stringify(c)); } catch (_) {} if (vivant) setTic((t) => t + 1); }
+        } catch (_) { /* réseau : rien n'est noté, on redemandera */ }
+      }
+    })();
+    return () => { vivant = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actif, cle]);
+  return tic;
 }
 // (3 nov., 13 h 02, Julien : « tu dois mieux SÉPARER, tout doit être parfait ») DES SECTIONS, dans cet ordre,
 // chaque colis UNE fois (priorité : aujourd'hui > prêts > code à venir > lieu à confirmer > à vérifier) :
@@ -374,12 +399,17 @@ export function sectionDuColis(x, point) {
   return (x.code || x.qr || x.code2) ? 'prets' : 'avenir';
 }
 function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte, echeance, statut, retirer, ville = '', onVille = null, titreDe = null, enRoute = [] }) {
+  const tousConnus = ((vueTout && vueTout.points) || []).filter((p) => !p.inconnu);
+  const reperes = useReperes(tousConnus, avecCarte && tousConnus.length > 0);
+  useCommunesCp(vueTout, true);
   const villes = villesDesPoints(vueTout);
   const vChoisie = villes.find((v) => v.cle === ville) || null;
-  const vue = vChoisie ? { ...vueTout, points: ((vueTout && vueTout.points) || []).filter((p) => !p.inconnu && vChoisie.points.includes(p.cle)) } : vueTout;
+  // Une ville choisie montre SES points ; un colis sans ville (lieu à confirmer, ou point sans ville
+  // ni code postal lus) n'est JAMAIS caché par ce choix (§5 : un colis caché est un colis perdu).
+  const sansVille = new Set(pointsSansVille(vueTout));
+  const vue = vChoisie ? { ...vueTout, points: ((vueTout && vueTout.points) || []).filter((p) => vChoisie.points.includes(p.cle) || sansVille.has(p.cle)) } : vueTout;
   const points = (vue && vue.points) || [];
   const connus = points.filter((p) => !p.inconnu);
-  const reperes = useReperes(connus, avecCarte && connus.length > 0);
   const [choisi, setChoisi] = React.useState('');
   const [etatFond, setEtatFond] = React.useState('charge');
   const racine = React.useRef(null);
@@ -406,7 +436,7 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte, ec
     const tCommun = rows.length && rows.every((c) => c.transp && !c.trInconnu) && tStats.length === 1 && tStats[0] !== 'pas-lu' ? rows[0].transp : null;
     const ep = nombreEpingle(p);
     const prem = !premiere.has(p.cle); premiere.add(p.cle);
-    const attrs = prem ? { 'data-relais-point': p.cle, 'data-relais-numero': p.numero, 'data-relais-point-arrives': p.nArrives, 'data-relais-point-comptes': p.nComptes, 'data-relais-point-attendus': p.nAttendus, 'data-relais-epingle-n': ep.n,
+    const attrs = prem ? { 'data-relais-point': p.cle, 'data-relais-numero': p.numero, 'data-relais-point-arrives': p.nArrives, 'data-relais-point-comptes': p.nComptes, 'data-relais-point-attendus': p.nAttendus, 'data-relais-epingle-n': ep.n, 'data-relais-ville': (villeDuPoint(p) || {}).cle || '',
       'data-relais-repere': !avecCarte ? 'sans-carte' : repereDe(p, reperes) ? 'oui' : 'non', 'data-relais-pas-carte': avecCarte ? codePasSurCarte(p, reperes) : undefined, 'data-relais-urgent': p.urgent ? '1' : undefined } : { 'data-relais-point-suite': p.cle };
     return (
       <section key={cleSec + ':' + p.cle} className={'vrm-rpf-point' + (choisi === p.cle ? ' is-choisi' : '')} {...attrs}>
@@ -432,7 +462,7 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte, ec
       <div className="vrm-rpf-section-corps">{parPoint(items).map(({ p, items: its }) => cartePoint(p, its, id))}</div>
     </section>) : null;
   return (
-    <div className="vrm-rp vrm-rpf" ref={racine} data-retirer-ville={vChoisie ? vChoisie.cle : ''} data-retirer-par-point={connus.length} data-retirer-comptes={vue ? vue.nComptes : 0} data-retirer-hors={vue ? vue.nHors : 0} data-retirer-sur-carte={surCarte.length} data-retirer-carte={avecCarte ? '1' : '0'}>
+    <div className="vrm-rp vrm-rpf" ref={racine} data-retirer-ville={vChoisie ? vChoisie.cle : ''} data-retirer-sans-ville={sansVille.size} data-retirer-par-point={connus.length} data-retirer-comptes={vue ? vue.nComptes : 0} data-retirer-hors={vue ? vue.nHors : 0} data-retirer-sur-carte={surCarte.length} data-retirer-carte={avecCarte ? '1' : '0'}>
       {avecCarte && surCarte.length > 0 && etatFond !== 'ko' ? <div className="vrm-rpf-carte">
         <FondRelais points={surCarte} selection={choisi} onChoisir={choisir} C={C} hauteur={220} onEtat={setEtatFond} muet/>
         {/* Obligation de licence : l'attribution reste, en tout petit, DANS la carte. */}
