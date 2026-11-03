@@ -2471,8 +2471,8 @@ function PanneauSync({ onFermer, onReglages }) {
       {(i.etat === 'error' || i.etat === 'refus') && <div data-sync-raison style={{ marginTop: 6 }}>Pourquoi : {i.raison || 'la base n’a pas répondu'}.</div>}
       {i.etat === 'error' && <div style={{ color: C.muted, marginTop: 6 }}>Rien n’est perdu : tes changements restent sur cet appareil{sec != null ? ` — nouvel essai dans ${sec} s` : ''}.</div>}
       <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-        {i.etat === 'error' && <button type="button" data-sync-reessayer onClick={() => { reprendreSyncMaintenant(); maj(); }} style={{ border: 'none', background: C.accent, color: '#fff', borderRadius: 12, padding: '7px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Réessayer maintenant</button>}
-        {i.etat === 'refus' && <button type="button" onClick={() => location.reload()} style={{ border: 'none', background: C.accent, color: '#fff', borderRadius: 12, padding: '7px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Recharger la page</button>}
+        {i.etat === 'error' && <button type="button" data-sync-reessayer onClick={() => { reprendreSyncMaintenant(); maj(); }} style={{ border: 'none', background: C.accent, color:C.onAccent, borderRadius: 12, padding: '7px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Réessayer maintenant</button>}
+        {i.etat === 'refus' && <button type="button" onClick={() => location.reload()} style={{ border: 'none', background: C.accent, color:C.onAccent, borderRadius: 12, padding: '7px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Recharger la page</button>}
         <button type="button" onClick={onReglages} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 12, padding: '7px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Paramètres</button>
       </div>
     </div>
@@ -14234,7 +14234,7 @@ function PhotoEditor({ refPhoto, refTitle, onClose, toast }) {
               <input type="file" accept="image/*" onChange={onFile} style={{display:'none'}}/>
             </label>
             <button type="button" onClick={()=>{ setZoom(1); setRot(0); setOff({x:0,y:0}); setBright(1); setContrast(1); }} style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:12,background:C.card,color:C.muted,fontSize:13,fontWeight:600,padding:'11px 13px',cursor:'pointer',fontFamily:'inherit'}}>Réinit.</button>
-            <button type="button" onClick={exportPhoto} disabled={busy} style={{flex:1,border:'none',borderRadius:12,background:C.accent,color:'#fff',fontSize:15,fontWeight:700,padding:'11px',cursor:busy?'default':'pointer',fontFamily:'inherit',opacity:busy?0.6:1}}>{busy?'…':'Enregistrer / Partager'}</button>
+            <button type="button" onClick={exportPhoto} disabled={busy} style={{flex:1,border:'none',borderRadius:12,background:C.accent,color:C.onAccent,fontSize:15,fontWeight:700,padding:'11px',cursor:busy?'default':'pointer',fontFamily:'inherit',opacity:busy?0.6:1}}>{busy?'…':'Enregistrer / Partager'}</button>
           </div>
         )}
       </div>
@@ -16672,7 +16672,7 @@ function BlocNumerosPerimes() {
           Recharge-le. Ce que tu as tapé ici (prix d'achat, colis cochés…) est <b>gardé</b> et remis après le rechargement.
         </div>
         <button type="button" onClick={rechargerEnGardantLesSaisies}
-          style={{ marginTop: 16, width: '100%', border: 'none', background: C.accent, color: '#fff', borderRadius: 12, padding: '12px', fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+          style={{ marginTop: 16, width: '100%', border: 'none', background: C.accent, color:C.onAccent, borderRadius: 12, padding: '12px', fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
           Recharger
         </button>
       </div>
@@ -17899,7 +17899,7 @@ function FicheLbc({ q, compteLbc, onClose, onMarquer }) {
                 style={{ position: 'relative', padding: 0, minHeight: 0, aspectRatio: '1 / 1', borderRadius: 12, overflow: 'hidden', cursor: enCours || fait ? 'default' : 'pointer',
                   border: pris ? `2px solid ${C.accent}` : `1px solid ${C.border}`, background: C.card2 || C.card }}>
                 <PhotoVinted src={u} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: pris ? 1 : 0.38, transition: 'opacity .15s ease' }}/>
-                {pris && <span style={{ position: 'absolute', top: 5, left: 5, minWidth: 20, height: 20, padding: '0 5px', boxSizing: 'border-box', borderRadius: 999, background: C.accent, color: '#fff', fontSize: 12, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{i + 1}</span>}
+                {pris && <span style={{ position: 'absolute', top: 5, left: 5, minWidth: 20, height: 20, padding: '0 5px', boxSizing: 'border-box', borderRadius: 999, background: C.accent, color:C.onAccent, fontSize: 12, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{i + 1}</span>}
                 {i === 0 && <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,.55)', color: '#fff', fontSize: 11, fontWeight: 700, padding: '2px 0', textAlign: 'center' }}>Couverture</span>}
               </button>
             );
@@ -17931,7 +17931,7 @@ function FicheLbc({ q, compteLbc, onClose, onMarquer }) {
           <div data-fiche-confirmer="" style={{ marginTop: 14, border: `1px solid ${C.warn}`, borderRadius: 12, padding: '11px 12px', background: C.card }}>
             <div style={{ fontSize: 13, color: C.text, lineHeight: 1.45 }}><b>Relancer le dépôt ?</b> VRM n'a pas vu la fin du précédent. Si tu l'as publiée toi-même sur Leboncoin, un nouveau dépôt la publierait une seconde fois.</div>
             <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-              <button type="button" data-fiche-relancer="" onClick={() => publier(true)} style={{ flex: 1, padding: '10px 12px', borderRadius: 12, border: 'none', background: C.accent, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Relancer le dépôt</button>
+              <button type="button" data-fiche-relancer="" onClick={() => publier(true)} style={{ flex: 1, padding: '10px 12px', borderRadius: 12, border: 'none', background: C.accent, color:C.onAccent, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Relancer le dépôt</button>
               <button className="vrm-b vrm-b-discret" type="button" onClick={() => setAConfirmer(false)} style={{ flex: 1, padding: '10px 12px', borderRadius: 12, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
             </div>
           </div>
@@ -18906,7 +18906,10 @@ function KpiVentes({ tuiles, note, plateforme, compte = null }) {
   const locaux = {};
   for (const t of tuiles) {
     const num = t.brut != null ? t.brut : (typeof t.val === 'number' ? t.val : null);
-    locaux[ID[t.cle] || t.cle] = { nom: t.lib, court: (t.sub ? `${t.lib} · ${t.sub}` : t.lib).replace(/^[A-ZÀ-Ý](?=[a-zà-ÿ])/, (m) => m.toLowerCase()), type: t.brut != null ? 'eur' : 'n',
+    // (3 nov., finitions) Libellé de case COURT et sans jargon : « CA finalisé » → « Finalisé », « CA payé » →
+    // « Payé » ; le détail (« · 4 ventes ») ne va plus dans la case, où il était tronqué (il reste en infobulle).
+    const libCourt = String(t.lib || '').replace(/^CA\s+/, '');
+    locaux[ID[t.cle] || t.cle] = { nom: t.lib, court: libCourt.charAt(0).toUpperCase() + libCourt.slice(1), type: t.brut != null ? 'eur' : 'n',
       valeur: t.val == null ? null : (num != null ? num : t.val), affiche: t.val == null ? undefined : t.val, quand: 'Depuis le début', titre: t.sub ? `${t.lib} · ${t.sub}` : t.lib, attrs: kv(t) };
   }
   return (
@@ -21945,7 +21948,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
   const eur=n=>n==null?'—':(Math.round(n*100)/100).toFixed(2).replace('.',',')+' €';
   const condLabel = (EBAY_CONDITIONS.find(([v]) => v === cond) || [, 'Occasion'])[1];
   if (!ouvert) return (
-    <button type="button" data-poster="ebay" onClick={() => setOuvert(true)} style={{ marginTop: 10, width: '100%', border: 'none', background: C.accent, color: '#fff', borderRadius: 999, padding: '14px 16px', fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+    <button type="button" data-poster="ebay" onClick={() => setOuvert(true)} style={{ marginTop: 10, width: '100%', border: 'none', background: C.accent, color:C.onAccent, borderRadius: 999, padding: '14px 16px', fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
       <Icon name="tag" size={17}/> Vendre un article sur eBay
     </button>
   );
@@ -21973,7 +21976,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
             : <>Pas reliée à un article : relie-la depuis sa carte dans Annonces.</>}</div>
           {res.offreMsg && <div data-publie-offre={res.offreOk ? 'ok' : 'warn'} data-publie-offre-issue={res.offreIssue || ''} style={{ fontSize: 13, color: res.offreOk ? C.text : C.warn, marginBottom: 10, lineHeight: 1.5 }}>{res.offreMsg}</div>}
           {Array.isArray(res.avertissements) && res.avertissements.length > 0 && <div data-publie-avertissements={res.avertissements.length} style={{ fontSize: 12, color: C.warn, marginBottom: 12, lineHeight: 1.5 }}>eBay signale : {res.avertissements.map((a) => `« ${a} »`).join(' · ')}</div>}
-          <a href={res.url} target="_blank" rel="noreferrer" style={{ display: 'inline-block', border: 'none', background: C.accent, color: '#fff', borderRadius: 999, padding: '12px 20px', fontSize: 15, fontWeight: 700, textDecoration: 'none' }}>Voir l'annonce sur eBay ↗</a>
+          <a href={res.url} target="_blank" rel="noreferrer" style={{ display: 'inline-block', border: 'none', background: C.accent, color:C.onAccent, borderRadius: 999, padding: '12px 20px', fontSize: 15, fontWeight: 700, textDecoration: 'none' }}>Voir l'annonce sur eBay ↗</a>
           <div style={{ marginTop: 12 }}><button type="button" onClick={reset} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 12, padding: '9px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Terminé</button></div>
         </div>
       ) : (<>
@@ -22030,7 +22033,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
                           return <>{ou ? <b data-paire-vendue={k} style={{ color: C.warn }}> · déjà vendue sur {ou}</b> : deja ? <b data-paire-deja-ebay={deja.etat} style={{ color: C.warn }}> · {deja.etat === 'programmee' ? 'déjà programmée sur eBay' : 'déjà en vente sur eBay'}{deja.via ? ` (sous la N°${deja.via}, même photo)` : ''}</b> : null}{jm ? <span data-paire-jumelle={jm.autres.map(cleNum).join(',')}> · même article que la N°{jm.autres.join(', N°')} (même photo)</span> : null}</>; })()}</span>
                       </span>
                     </button>
-                    {!bloqueP && <button type="button" data-publier-un-clic={p.num} onClick={() => publierEnUnClic(p)} disabled={!!autoPub || busy} title="Catégorie, critères et description de Vinted, vérifiés chez eBay — une confirmation avant de publier" style={{ flexShrink: 0, minWidth: 88, minHeight: 44, border: 'none', borderRadius: 12, background: C.accent, color: '#fff', fontSize: 13, fontWeight: 700, cursor: (autoPub || busy) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (autoPub || busy) ? 0.55 : 1, padding: '0 12px' }}>{autoPub && autoPub.id === p.id ? (autoPub.etape === 'verif' ? 'eBay vérifie…' : 'Préparation…') : 'Publier'}</button>}
+                    {!bloqueP && <button type="button" data-publier-un-clic={p.num} onClick={() => publierEnUnClic(p)} disabled={!!autoPub || busy} title="Catégorie, critères et description de Vinted, vérifiés chez eBay — une confirmation avant de publier" style={{ flexShrink: 0, minWidth: 88, minHeight: 44, border: 'none', borderRadius: 12, background: C.accent, color:C.onAccent, fontSize: 13, fontWeight: 700, cursor: (autoPub || busy) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (autoPub || busy) ? 0.55 : 1, padding: '0 12px' }}>{autoPub && autoPub.id === p.id ? (autoPub.etape === 'verif' ? 'eBay vérifie…' : 'Préparation…') : 'Publier'}</button>}
                     </div>
                   ); })}
                 </div>
@@ -22184,7 +22187,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
             {garde && <div data-publier-garde={garde.k} style={{ fontSize: 13, color: garde.k === 'en-cours' ? C.muted : C.warn, lineHeight: 1.5 }}>{garde.t}</div>}
             <div className="vrm-rangee" style={{ display: 'flex', gap: 10 }}>
               <button type="button" onClick={verifier} disabled={verif || busy} style={{ flex: 1, border: 'none', background: C.card2, color: C.text, borderRadius: 999, padding: '14px 16px', fontSize: 15, fontWeight: 700, cursor: (verif || busy) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (verif || busy) ? 0.6 : 1 }}>{verif ? 'eBay vérifie…' : 'Vérifier sans publier'}</button>
-              <button type="button" data-publier-ebay="1" onClick={() => publier()} disabled={busy || verif || !!garde} style={{ flex: 1, border: 'none', background: C.accent, color: '#fff', borderRadius: 999, padding: '14px 16px', fontSize: 15, fontWeight: 700, cursor: (busy || verif || garde) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (busy || verif || garde) ? 0.45 : 1 }}>{busy ? 'Publication…' : 'Publier sur eBay'}</button>
+              <button type="button" data-publier-ebay="1" onClick={() => publier()} disabled={busy || verif || !!garde} style={{ flex: 1, border: 'none', background: C.accent, color:C.onAccent, borderRadius: 999, padding: '14px 16px', fontSize: 15, fontWeight: 700, cursor: (busy || verif || garde) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (busy || verif || garde) ? 0.45 : 1 }}>{busy ? 'Publication…' : 'Publier sur eBay'}</button>
             </div>
           </>)}
           {/* ENREGISTRER EN BROUILLON (5 octobre) : rien ne part chez eBay. Il
@@ -22777,7 +22780,7 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
             Tout est prêt côté clés. Autorise ton compte vendeur sur la page d'eBay — <b>aucun mot de passe ne passe par VRM</b>, tu te connectes chez eBay.
           </div>
           <button type="button" onClick={() => connecter(false)} disabled={busy}
-            style={{ border: 'none', borderRadius: 12, background: C.accent, color: '#fff', padding: '11px 16px', cursor: busy ? 'default' : 'pointer', fontSize: 15, fontWeight: 600, fontFamily: 'inherit', opacity: busy ? 0.6 : 1 }}>
+            style={{ border: 'none', borderRadius: 12, background: C.accent, color:C.onAccent, padding: '11px 16px', cursor: busy ? 'default' : 'pointer', fontSize: 15, fontWeight: 600, fontFamily: 'inherit', opacity: busy ? 0.6 : 1 }}>
             {busy ? 'Ouverture d\'eBay…' : 'Connecter mon compte eBay'}
           </button>
           {connected === null && <div style={{ fontSize: 11, color: C.muted, marginTop: 8 }}>(État du compte non lisible pour l'instant — la base n'a pas répondu.)</div>}
@@ -27100,7 +27103,7 @@ function BoutonImprimerVc({ v, grand = false, carte = false }) {
   return <>
     {carte
       ? <button type="button" data-imprime="1" data-vc-imprimer={v.id} disabled={etat === 'lecture'} onClick={go} title="Bordereau tamponné (titre + N°), puis impression"
-          className="vrm-colis-primaire" style={{flex:'1 1 160px',maxWidth:340,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,border:'none',background:C.accent,color:'#fff',borderRadius:12,padding:'0 16px',minHeight:44,cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit'}}><Icon name="printer" size={16}/>{etat === 'lecture' ? libelle : <><span className="vrm-lib-long">Imprimer le bordereau</span><span className="vrm-lib-court">Imprimer</span></>}</button>
+          className="vrm-colis-primaire" style={{flex:'1 1 160px',maxWidth:340,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,border:'none',background:C.accent,color:C.onAccent,borderRadius:12,padding:'0 16px',minHeight:44,cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit'}}><Icon name="printer" size={16}/>{etat === 'lecture' ? libelle : <><span className="vrm-lib-long">Imprimer le bordereau</span><span className="vrm-lib-court">Imprimer</span></>}</button>
       : <Bouton variante={grand ? 'primaire' : 'secondaire'} icone="printer" data-imprime="1" data-vc-imprimer={v.id} disabled={etat === 'lecture'} onClick={go} title="Bordereau tamponné (titre + N°), puis impression">{etat === 'lecture' ? libelle : grand ? <><span className="vrm-lib-long">Imprimer le bordereau</span><span className="vrm-lib-court">Imprimer</span></> : 'Imprimer le bordereau'}</Bouton>}
     {lien ? <a href={lien.url} target="_blank" rel="noreferrer" data-vc-bordereau-lien="" style={{ color: C.accent, fontWeight: 600, fontSize: 13 }}>Ouvrir le bordereau</a> : null}
     {etat === 'absent' ? <span data-vc-bordereau-etat="absent" style={{ flexBasis: '100%', fontSize: 12, color: C.muted }}>Le bordereau n'est plus rangé — rouvre la vente sur Vestiaire.</span>
@@ -32088,7 +32091,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
                       <div key={c} onClick={() => cellAdd(opened, cell)} style={{ flex: 1, minHeight: 52, borderRadius: 6, border: `1.5px ${cellHi ? 'solid #e5484d' : 'dashed ' + C.border}`, background: cellHi ? '#e5484d18' : C.card, padding: 4, display: 'flex', flexWrap: 'wrap', gap: 3, alignContent: 'flex-start', cursor: 'pointer' }}>
                         {arr.length === 0 && <span style={{ margin: 'auto', color: C.muted, fontSize: 17 }}>＋</span>}
                         {arr.map((n, i) => (
-                          <span key={i} onClick={async (e) => { e.stopPropagation(); if (await askConfirm({ title:`Retirer le N°${n} de cette case ?`, ok:'Retirer', danger:true })) cellRemove(opened, cell, n); }} style={{ background: C.accent, color: '#fff', borderRadius: 6, fontSize: 11, fontWeight: 800, padding: '2px 6px', height: 'fit-content' }}>{n}</span>
+                          <span key={i} onClick={async (e) => { e.stopPropagation(); if (await askConfirm({ title:`Retirer le N°${n} de cette case ?`, ok:'Retirer', danger:true })) cellRemove(opened, cell, n); }} style={{ background: C.accent, color:C.onAccent, borderRadius: 6, fontSize: 11, fontWeight: 800, padding: '2px 6px', height: 'fit-content' }}>{n}</span>
                         ))}
                       </div>
                     );
@@ -38162,7 +38165,7 @@ function ComptaFusion({ compta, onNav }) {
               {anneau.parts.filter(([cle, , v]) => !(cle === 'frais' && !(v > 0))).map(([cle, lib, , p]) => <li key={cle} data-fu-part={cle} data-fu-pct={String(p)}><i className={'is-' + cle}/><span>{lib}</span><b>{p} %</b></li>)}
             </ul>
           </div>
-        ) : <p className="vrm-fu-note" data-fu-anneau-pourquoi="">{!B ? 'Rien à répartir tant que le bénéfice n’est pas calculé.' : B.n === 0 ? 'Aucune vente finalisée ce mois-ci.' : B.nCout < B.n ? 'La répartition s’affiche quand tous les prix d’achat du mois sont saisis.' : 'La répartition s’affiche quand les frais et les cotisations du mois sont connus.'}</p>}
+        ) : <p className="vrm-fu-note" data-fu-anneau-pourquoi="">{!B ? 'Rien à répartir tant que le bénéfice n’est pas calculé.' : B.n === 0 ? '' : B.nCout < B.n ? 'La répartition s’affiche quand tous les prix d’achat du mois sont saisis.' : 'La répartition s’affiche quand les frais et les cotisations du mois sont connus.'}</p>}
       </section>
       <section className="vrm-fu-panneau" aria-label="Bénéfice brut sur tes ventes, six derniers mois" data-fu-mois6={mois6.map((m) => (m.v == null ? '' : Math.round(m.v))).join(',')}>
         <div className="vrm-fu-panneau-tete"><h3>6 derniers mois</h3>{/* (3 nov.) Ces barres sont le BRUT (ventes − prix d'achat) : elles portent son nom (src/beneficeNoms.js), jamais « bénéfice » seul. */}<span data-benef-notion="brut">{NOM_BENEFICE_BRUT.toLowerCase()}</span></div>
@@ -38276,12 +38279,13 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense, sansC
               lecture), à déclarer, URSSAF, ventes finalisées — de la période choisie au-dessus. */}
           <CarteStatsApp page="compta" nu ici="compta" onNav={onNav} sel={{ site: 'toutes', compte: null, periode }} attrs={{ 'data-benef-titre': '', title: `${titreNet} · ${B.libelle}` }}
             attrsDe={(x) => x.place.id === 'benefice' ? { 'data-compta-chiffre': 'gagne', 'data-eur': e2(x.valeur) } : (x.place.id === 'declarer' || x.place.id === 'urssaf') ? { 'data-fu-case': x.place.id, 'data-eur': e2(x.valeur) } : null}/>
-          <p className="vrm-compta-phrase vrm-fu-compta-sous" data-compta-phrase="gagne" title={typeof phrase === 'string' ? phrase : undefined}>
+          {/* (3 nov., finitions) Aucune vente finalisée : plus de phrase sous la carte (la carte dit « — »/0). */}
+          {B.n === 0 && !(B.nCout < B.n) && !B.raison ? null : <p className="vrm-compta-phrase vrm-fu-compta-sous" data-compta-phrase="gagne" title={typeof phrase === 'string' ? phrase : undefined}>
             {/* Le vendu n'est pas redit s'il vaut déjà « à déclarer » (§7 : un nombre, une fois). */}
-            {B.n === 0 ? 'Aucune vente finalisée ce mois-ci' : (B.caDecl != null && Math.round(B.caDecl * 100) === Math.round(B.ca * 100)) ? B.libelle : <>sur {fmt(B.ca)} vendus</>}
+            {B.n === 0 ? null : (B.caDecl != null && Math.round(B.caDecl * 100) === Math.round(B.ca * 100)) ? B.libelle : <>sur {fmt(B.ca)} vendus</>}
             {B.nCout < B.n ? <> · <button type="button" onClick={versSaisiePrix} data-benef-porte="" data-benef-manque="" className="vrm-lien-action">{sansAchat} prix d'achat à saisir</button></> : null}
             {B.raison === 'frais' ? <> · frais eBay pas connus</> : B.raison === 'cotisations' ? <> · CA déclaré pas encore calculé</> : null}
-          </p>
+          </p>}
           {B.depenses === 'jamais' && nuagePret && onSansDepenses ? (
             <div className="vrm-compta-geste"><ChoixDepenses onAucune={onSansDepenses} onAjouter={onAjouterDepense} /></div>
           ) : onAjouterDepense && nuagePret ? (
@@ -39114,7 +39118,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
           <span style={{ flex: '1 1 220px' }} data-compta-sans-compte="">Ce calcul part de tes ventes Vinted : aucun compte Vinted n’est encore relié.</span>
           <Bouton className="vrm-b-petit" onClick={() => onNav && onNav('vintedaccounts')}>Relier mon compte</Bouton>
         </>) : (<>
-        <span style={{ flex: '1 1 220px' }}>Pas encore calculé : ouvre <b>Ventes</b> une fois sur cet appareil.</span>
+        <span style={{ flex: '1 1 220px' }}>Pas encore calculé</span>
         <Bouton className="vrm-b-petit" onClick={() => onNav && onNav('cat_ventes')}>Ouvrir Ventes</Bouton>
         </>)}
       </div>}
@@ -52255,7 +52259,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {listings.items && !listings.error && listings.items.length===0 && !annAConfirmer.length && (
           <EmptyState icon="tag" title="Aucune annonce en ligne"
             desc="Ouvre ta boutique sur vinted.fr une fois, avec l'extension active : tes annonces remonteront ici automatiquement."
-            action={<a href="https://www.vinted.fr/member/general/settings" target="_blank" rel="noreferrer" style={{display:'inline-block',background:C.accent,color:'#fff',textDecoration:'none',fontWeight:600,fontSize:13,padding:'10px 16px',borderRadius:12}}>Ouvrir Vinted ↗</a>}/>
+            action={<a href="https://www.vinted.fr/member/general/settings" target="_blank" rel="noreferrer" style={{display:'inline-block',background:C.accent,color:C.onAccent,textDecoration:'none',fontWeight:600,fontSize:13,padding:'10px 16px',borderRadius:12}}>Ouvrir Vinted ↗</a>}/>
         )}
         {listings.items && !listings.error && listings.items.length===0 && blocMasquees()}
           {blocAEcrire()}
@@ -52559,7 +52563,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 style={{width:'100%',display:'flex',alignItems:'center',gap:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'11px 14px',marginBottom:10,cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
                 <span style={{display:'inline-flex',color:C.muted}}><Icon name="spark" size={15}/></span>
                 <span style={{flex:1,textAlign:'left',fontSize:13,fontWeight:600,color:C.text}}>Conseils & signalements</span>
-                <span style={{fontSize:11,fontWeight:700,color:'#fff',background:C.accent,borderRadius:12,padding:'1px 8px'}}>{n}</span>
+                <span style={{fontSize:11,fontWeight:700,color:C.onAccent,background:C.accent,borderRadius:12,padding:'1px 8px'}}>{n}</span>
                 <span style={{fontSize:13,color:C.muted,transform:tipsOpen?'rotate(90deg)':'none',transition:'transform .2s ease'}}>›</span>
               </button>
             );
@@ -53191,7 +53195,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           );
         })()}
-        </div><div className="vrm-chat-column">{openConv?rendreConversation():<div className="vrm-chat-empty"><Icon name="chat" size={28}/><span>Choisis une conversation</span><small>Messages, offres et suivi de colis.</small></div>}</div>{rendreFicheConv()}</div>
+        </div><div className="vrm-chat-column">{openConv?rendreConversation():<div className="vrm-chat-empty"><Icon name="chat" size={28}/><span>Choisis une conversation</span></div>}</div>{rendreFicheConv()}</div>
         {zoneMessages==='conversations'&&<details className="vrm-quick-settings"><summary>Réponses rapides</summary>
         {/* Réponses rapides : modèles éditables, proposés dans chaque conversation. */}
         <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'10px 12px',marginBottom:12}}>
@@ -53624,7 +53628,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         <div style={{display:'flex',gap:8,justifyContent:'flex-end',flexWrap:'wrap',padding:'12px 18px',borderTop:`1px solid ${C.border}`}}>
                           <button type="button" onClick={()=>setLot(null)} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,padding:'10px 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Fermer</button>
                           <button type="button" data-imprime="1" data-lot-imprimer={nb} disabled={!nb || batchBusy} onClick={()=>batchBordereaux(new Set(lot.coches))}
-                            style={{border:'none',background:C.accent,color:'#fff',borderRadius:12,padding:'10px 16px',fontSize:13,fontWeight:700,cursor:nb?'pointer':'default',opacity:nb&&!batchBusy?1:0.5,fontFamily:'inherit'}}>
+                            style={{border:'none',background:C.accent,color:C.onAccent,borderRadius:12,padding:'10px 16px',fontSize:13,fontWeight:700,cursor:nb?'pointer':'default',opacity:nb&&!batchBusy?1:0.5,fontFamily:'inherit'}}>
                             {batchBusy?'Préparation…':lot.echecs.length?`Réessayer (${nb})`:`Imprimer ${nb} bordereau${nb>1?'x':''}`}
                           </button>
                         </div>
@@ -54092,7 +54096,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           if (!lu || !lu.octets) { libererOngletPdf(); toast(messagePdfManquant(lu)); return; }
                           processBordereau(num, titre, lu.octets);
                         }} title={inv?'Bordereau tamponné + facture pro, puis impression':'Bordereau tamponné, puis impression'}
-                        className="vrm-colis-primaire" style={{flex:'1 1 160px',maxWidth:340,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,border:'none',background:C.accent,color:'#fff',borderRadius:12,padding:'0 16px',minHeight:44,cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit'}}><Icon name="printer" size={16}/><span className="vrm-lib-long">{inv ? 'Imprimer + facture' : 'Imprimer le bordereau'}</span><span className="vrm-lib-court">Imprimer</span></button>
+                        className="vrm-colis-primaire" style={{flex:'1 1 160px',maxWidth:340,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,border:'none',background:C.accent,color:C.onAccent,borderRadius:12,padding:'0 16px',minHeight:44,cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit'}}><Icon name="printer" size={16}/><span className="vrm-lib-long">{inv ? 'Imprimer + facture' : 'Imprimer le bordereau'}</span><span className="vrm-lib-court">Imprimer</span></button>
                       ) : (<>
                         {/* ⚠️ PLUS DE BOUTON « Générer sur Vinted ». C'est l'EXTENSION
                             qui génère le bordereau manquant dès que tu arrives sur
@@ -54420,7 +54424,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   onKeyDown={e=>{ if(e.key==='Enter') searchPlaces(relayPicker.query); }}
                   placeholder="ex : Super U Lyon, Tabac de la Place…"
                   style={{flex:1,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',fontSize:13,fontFamily:'inherit',background:C.card,color:C.text,outline:'none'}}/>
-                <button type="button" onClick={()=>searchPlaces(relayPicker.query)} style={{border:'none',borderRadius:12,background:C.accent,color:'#fff',fontSize:13,fontWeight:600,padding:'0 16px',cursor:'pointer',fontFamily:'inherit'}}>Chercher</button>
+                <button type="button" onClick={()=>searchPlaces(relayPicker.query)} style={{border:'none',borderRadius:12,background:C.accent,color:C.onAccent,fontSize:13,fontWeight:600,padding:'0 16px',cursor:'pointer',fontFamily:'inherit'}}>Chercher</button>
               </div>
               <div style={{display:'flex',gap:6,marginTop:8,flexWrap:'wrap',alignItems:'center'}}>
                 <span style={{fontSize:11,color:C.muted}}>Transporteur :</span>
@@ -55579,7 +55583,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {points.map((p,i)=>(
                 <div key={p.nom} style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,overflow:'hidden'}}>
                   <div style={{display:'flex',gap:10,alignItems:'center',padding:'10px 12px',borderBottom:`1px solid ${C.border}`}}>
-                    <div style={{width:26,height:26,borderRadius:12,background:C.accent,color:'#fff',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:700}}>{i+1}</div>
+                    <div style={{width:26,height:26,borderRadius:12,background:C.accent,color:C.onAccent,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:700}}>{i+1}</div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:13,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:6}}>{p.carrier&&<CarrierBadge carrier={p.carrier} size={18}/>}<span style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.nom}</span></div>
                       {p.adresse && <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.adresse}</div>}
@@ -62651,7 +62655,7 @@ function DemandeCodeDiscord() {
           {e.erreur && <div data-discord-code-erreur="" style={{ fontSize:15, color:C.warn || C.text, marginBottom:10 }}>{e.erreur}</div>}
           <div style={{ display:'flex', gap:8 }}>
             <button className="vrm-b vrm-b-discret" type="button" onClick={fermer} style={{ minHeight:44, flex:1, borderRadius:12, border:`1px solid ${C.border}`, background:'transparent', color:C.text }}>Annuler</button>
-            <button type="button" data-discord-code-valider="" disabled={chiffres.length !== 6 || envoi} onClick={valider} style={{ minHeight:44, flex:1, borderRadius:12, border:'none', background:C.accent, color:'#fff', fontWeight:600, opacity:(chiffres.length !== 6 || envoi) ? .5 : 1 }}>{envoi ? 'Vérification…' : 'Relier Discord'}</button>
+            <button type="button" data-discord-code-valider="" disabled={chiffres.length !== 6 || envoi} onClick={valider} style={{ minHeight:44, flex:1, borderRadius:12, border:'none', background:C.accent, color:C.onAccent, fontWeight:600, opacity:(chiffres.length !== 6 || envoi) ? .5 : 1 }}>{envoi ? 'Vérification…' : 'Relier Discord'}</button>
           </div>
         </>)}
       </div>

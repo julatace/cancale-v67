@@ -171,3 +171,38 @@
 :root:root body .vrm-app-shell .vrm-fu-jour > span { color: rgba(255,255,255,.72) !important; }
 /* Un lien bleu posé sur la carte sombre : en blanc (le bleu y tombait à 2,5:1). */
 :root:root body .vrm-app-shell :is(.vrm-fu-carte, .vrm-fu-tete) :is(a, button.vrm-lien-action) { color: #ffffff !important; }
+
+/* ── 13. « MODIFIER » DE LA TÊTE DE MA JOURNÉE (3 nov., finitions du coordinateur) ──
+   Il tombait sous la semaine : il remonte en haut à droite de la tête, sur la ligne du
+   titre. Seul geste touché sur Ma journée (un autre chantier la refait). */
+:root:root body .vrm-app-shell .vrm-fu-tete { position: relative !important; }
+:root:root body .vrm-app-shell .vrm-fu-tete > .vrm-carte-stats.vrm-fu-carte-nu { position: static !important; }
+:root:root body .vrm-app-shell .vrm-fu-tete > .vrm-carte-stats > .vrm-fu-modifier { top: 39px !important; right: 12px !important; }
+/* La taille par défaut est sur l'échelle (17, le « Body » d'iOS ; 16 n'y est pas) ; un <small>
+   sans classe tombe à 12 (pas 10), un <b> dans un titre 800 ne passe pas à 900. */
+:where(.vrm-app-shell) { font-size: 17px; }
+:where(.vrm-app-shell) small { font-size: 12px; }
+:where(.vrm-app-shell) :is(b, strong) { font-weight: 700; }
+:root:root body .vrm-app-shell .vrm-fu-note:empty { display: none !important; }
+/* Les cases de la carte sombre au téléphone : 17 px, le montant tient (« 178,00 € », « ≥ 327,00 € »). */
+@media (max-width: 430px) {
+  :root:root body .vrm-app-shell .vrm-fu-case b { font-size: 17px !important; letter-spacing: -.02em !important; }
+  :root:root body .vrm-app-shell .vrm-fu-case > span { font-size: 12px !important; }
+}
+:root:root body .vrm-app-shell :is(.vrm-fu-carte-nu) :is(a, button.vrm-lien-action) { color: #ffffff !important; }
+:root:root body .vrm-app-shell .vrm-main .vrm-seg > button:not(#fu) { height: 44px !important; }
+:root:root body .vrm-app-shell :is(.vrm-sync-comptes, .vrm-bilan-sync) a { display: inline-flex !important; align-items: center; min-height: 44px; }
+:root:root body .vrm-app-shell .vrm-main [data-geste="poser-num"] { min-height: 44px !important; }
+/* Compta : la ligne sous le chiffre est posée sur la carte sombre — ses liens en blanc (le bleu y tombait à 2:1). */
+:root:root body .vrm-app-shell .vrm-finance-page .vrm-compta-phrase a { color: #ffffff !important; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: rgba(255,255,255,.4); }
+/* Ordinateur : le sélecteur de site dans la barre du haut prend la largeur de ses mots (rien de rogné). */
+@media (min-width: 768px) {
+  :root:root body .vrm-app-shell .vrm-filtre-site { width: auto !important; max-width: none !important; }
+  :root:root body .vrm-app-shell .vrm-filtre-site > button:not(#fu),
+  :root:root body .vrm-app-shell .vrm-main .vrm-filtre-site > button:not(#fu)[aria-pressed] { flex: 0 0 auto !important; padding: 0 16px !important; overflow: visible !important; }
+}
+/* Statistiques au téléphone : moins d'air au-dessus des rubriques, le premier chiffre dans le premier tiers. */
+@media (max-width: 767px) {
+  :root:root body .vrm-app-shell .vrm-main[data-ecran="dashboard"] > .vrm-rubriques { padding-top: 4px !important; }
+  :root:root body .vrm-app-shell .vrm-main[data-ecran="dashboard"] .vrm-screen-head { margin-bottom: 8px !important; }
+}

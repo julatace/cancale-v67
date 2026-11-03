@@ -27,7 +27,7 @@
 export const MINERAL = Object.freeze({
  bg:'#F2F2F7',surface:'#FFFFFF',card:'#FFFFFF',card2:'#F2F2F7',
  border:'#E5E5EA',text:'#1D1D1F',muted:'#6E6E73',faint:'#6E6E73',
- accent:'#0066CC',accentSoft:'#4A9BEF',onAccent:'#FFFFFF',
+ accent:'#0066CC',accentSoft:'#0066CC',onAccent:'#FFFFFF',
  danger:'#D70015',warn:'#B25000',warnSoft:'#FFF4E5',gold:'#B25000',blue:'#6E6E73',purple:'#6E6E73',
  shadow:'none',
  shadowMd:'0 1px 2px rgba(0,0,0,.04), 0 6px 20px rgba(0,0,0,.05)',
@@ -38,11 +38,12 @@ export const MINERAL = Object.freeze({
  s1:'#0071E3',s2:'#8DB8F2',selection:'#0071E3'
 });
 // Le sombre d'iOS : noir pur, cartes #1C1C1E, cases #2C2C2E, filets #38383A ; le bleu
-// éclairci (#0A84FF), l'ambre clair. Le gris secondaire #98989D tient 4,5:1 sur #2C2C2E.
+// éclairci (#409CFF : 5,8:1 sur #1C1C1E ; texte NOIR dessus, 7:1 — le blanc sur #0A84FF n'y tenait que 3,6:1),
+// l'ambre clair. Le gris secondaire #98989D tient 4,5:1 sur #2C2C2E.
 export const MINERAL_DARK = Object.freeze({
  bg:'#000000',surface:'#1C1C1E',card:'#1C1C1E',card2:'#2C2C2E',
  border:'#38383A',text:'#F5F5F7',muted:'#98989D',faint:'#98989D',
- accent:'#0A84FF',accentSoft:'#64B0FF',onAccent:'#FFFFFF',
+ accent:'#409CFF',accentSoft:'#64B0FF',onAccent:'#000000',
  danger:'#FF6961',warn:'#FFB340',warnSoft:'#2E2412',gold:'#FFB340',blue:'#98989D',purple:'#98989D',
  shadow:'none',shadowMd:'0 0 0 1px rgba(255,255,255,.05)',shadowLg:'0 0 0 1px rgba(255,255,255,.07), 0 16px 48px rgba(0,0,0,.6)',
  ring:'rgba(10,132,255,.28)',glass:'#1C1C1E',bar:'#000000',hair:'rgba(255,255,255,.08)',

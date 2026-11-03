@@ -41,6 +41,8 @@ const titreDe = (x) => {
   return x.def ? x.def.nom : '';
 };
 
+const majuscule = (s) => (typeof s === 'string' && s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+
 export default function CarteStats({ page, sel, sources, regles, reglage, poser, attrsDe = null, onNav = null, nu = false, className = '', FermeAuRetour = null, sous = null, extra = {}, clics = null }) {
   const [ouvert, setOuvert] = React.useState(false);
   const locaux = (sources && sources.locaux) || null;
@@ -74,7 +76,8 @@ export default function CarteStats({ page, sel, sources, regles, reglage, poser,
         cases={V.c.map((x) => ({
           cle: x.place.id + (x.p && typeof x.p === 'string' ? '-' + x.p : ''),
           n: affiche(x, fmt, false),
-          l: x.def ? (x.def.local ? (x.def.court || x.def.nom) : libelleCase(x.def, x.p, g.p, sel)) : '',
+          // (3 nov., finitions) Capitale initiale sur chaque case (« À poster », « Finalisées »).
+          l: majuscule(x.def ? (x.def.local ? (x.def.court || x.def.nom) : libelleCase(x.def, x.p, g.p, sel)) : ''),
           titre: titreDe(x),
           onClick: aller(x),
           attrs: { ...attrsDeValeur(x, page), ...(x.attrs || {}), ...(x.def && x.def.local && x.def.attrs ? x.def.attrs : {}), ...(plus(x) || {}) },

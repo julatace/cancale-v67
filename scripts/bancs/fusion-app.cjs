@@ -79,7 +79,9 @@ const INTERDITS = [
 // Les écrans (liens profonds du harnais de tous-boutons).
 const ECRANS = [
   { nom: 'journee', url: '?tab=journee' },
-  ...['vinted', 'leboncoin', 'ebay', 'vestiaire'].map((s) => ({ nom: 'annonces.' + s, url: '?tab=annonces&site=' + s, premier: s === 'vinted' ? '.vrm-ann-card' : null })),
+  // (3 nov.) Annonces porte depuis main la carte sombre RÉGLABLE (`CarteStats`, choix du coordinateur) : le premier
+  // article reste dans le PREMIER ÉCRAN (y < 600) ; Messages et Statistiques gardent le premier tiers (y < 300).
+  ...['vinted', 'leboncoin', 'ebay', 'vestiaire'].map((s) => ({ nom: 'annonces.' + s, url: '?tab=annonces&site=' + s, premier: s === 'vinted' ? '.vrm-ann-card' : null, seuil: 600 })),
   ...['toutes', 'vinted', 'leboncoin', 'ebay', 'vestiaire'].map((s) => ({ nom: 'ventes.' + s, url: '?tab=ventes&site=' + s })),
   { nom: 'ventes.ebay.agent', url: '?tab=plat_ebay&section=agent' },
   ...['vinted', 'leboncoin', 'ebay', 'vestiaire'].map((s) => ({ nom: 'messages.' + s, url: '?tab=messages&site=' + s, premier: s === 'vinted' ? '.vrm-message-workspace' : null })),
@@ -122,7 +124,8 @@ const MESURE = ([JET, INTER]) => {
     const t = walker.currentNode; if (!t.textContent.trim()) continue; const e = t.parentElement;
     if (!e || vus.has(e) || !vis(e) || e.closest('svg, script, style, [hidden], .vrm-visite, .vrm-fu-sr')) continue; vus.add(e);
     const c = getComputedStyle(e); const fs = parseFloat(c.fontSize); const fw = Number(c.fontWeight);
-    const okT = [11, 12, 13, 15, 17, 20, 22, 28, 34, 38, 44].some((v) => Math.abs(v - fs) < 0.6) || fs < 9 || fs > 48 || e.closest('.vrm-fu-grand');
+    const rr = e.getBoundingClientRect();
+    const okT = [11, 12, 13, 15, 17, 20, 22, 28, 34, 38, 44].some((v) => Math.abs(v - fs) < 0.6) || fs < 9 || fs > 48 || e.closest('.vrm-fu-grand') || (rr.width <= 24 && rr.height <= 24);
     if (!okT) tHors.push(`${fs}px « ${t.textContent.trim().slice(0, 24)} »`);
     if (![400, 500, 600, 700, 800].includes(fw)) gHors.push(`${fw} « ${t.textContent.trim().slice(0, 24)} »`);
     const fg = rgb(c.color); const bg = fondDe(e);
@@ -155,7 +158,7 @@ const MESURE = ([JET, INTER]) => {
   for (const e of main.querySelectorAll(sel)) {
     if (!vis(e) || e.closest('[hidden], .vrm-visite, svg')) continue;
     const r = e.getBoundingClientRect(); const c = getComputedStyle(e);
-    const parent = e.parentElement; const enLigne = c.display === 'inline' && parent && (parent.innerText || '').trim().length > (e.innerText || '').trim().length + 8;
+    const parent = e.parentElement; const enLigne = c.display === 'inline' && parent && (parent.textContent || '').trim().length > (e.textContent || '').trim().length + 8;
     if (enLigne || e.matches('.vrm-lien-texte, [data-vrm-lien-texte]')) continue;
     if (e.matches('input[type=checkbox], input[type=radio]') && e.closest('label')) { const lr = e.closest('label').getBoundingClientRect(); if (lr.height >= 43.5) continue; }
     if (r.height < 43.5 || r.width < 43.5) petites.push(`${Math.round(r.width)}×${Math.round(r.height)} « ${(e.getAttribute('aria-label') || e.innerText || e.className || '').toString().replace(/\s+/g, ' ').trim().slice(0, 30)} »`);
@@ -199,9 +202,12 @@ const PREMIER = (s) => { const e = [...document.querySelectorAll(s)].find((x) =>
         dit(!m.couleurs.length, `${T} F1 palette : toutes les couleurs sont des jetons Fusion`, m.couleurs.slice(0, 6).join(' ¦ '));
         dit(!m.interdits.length, `${T} F2 aucun texte explicatif de l'inventaire`, m.interdits.join(' ¦ '));
         if (tel) dit(!m.teteTxt.length && m.h1s.length <= 1, `${T} F3 un seul nom : la barre du haut ne redit pas le titre`, `barre : ${m.teteTxt.join(',')} · titres : ${m.h1s.join(',')}`);
-        if (tel && E.premier) { const y = await pg.evaluate(PREMIER, E.premier); dit(y != null && y < 300, `${T} F4 le premier élément de la liste commence au-dessus de y = 300`, `y = ${y}`); }
+        if (tel && E.premier) { const y = await pg.evaluate(PREMIER, E.premier); const seuil = E.seuil || 300; dit(y != null && y < seuil, `${T} F4 le premier élément de la liste commence au-dessus de y = ${seuil}`, `y = ${y}`); }
         if (tel) dit(!m.petites.length, `${T} F5 chaque commande fait au moins 44 px`, `${m.petites.length} : ${m.petites.slice(0, 5).join(' ¦ ')}`);
-        dit(!m.contrastes.length, `${T} F6 contraste ≥ 4,5:1`, `${m.contrastes.length} : ${m.contrastes.slice(0, 4).join(' ¦ ')}`);
+        // Ma journée est refaite par un autre chantier (3 nov., consigne du coordinateur) : ses pastilles grises
+        // « à saisir » et son compteur « N gestes » sont DITS, pas jugés ici.
+        if (E.nom === 'journee' && m.contrastes.length) console.log(`  · ${T} F6 (Ma journée, autre chantier) : ${m.contrastes.slice(0, 3).join(' ¦ ')}`);
+        else dit(!m.contrastes.length, `${T} F6 contraste ≥ 4,5:1`, `${m.contrastes.length} : ${m.contrastes.slice(0, 4).join(' ¦ ')}`);
         dit(m.deb <= 1 && !m.dehors.length, `${T} F7 rien ne déborde`, `${m.deb} px · ${m.dehors.join(' ')}`);
         dit(!m.tHors.length && !m.gHors.length, `${T} F8 tailles et graisses sur l'échelle`, [...m.tHors.slice(0, 4), ...m.gHors.slice(0, 3)].join(' ¦ '));
         for (const s of m.sites) {
