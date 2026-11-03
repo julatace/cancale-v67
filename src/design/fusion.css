@@ -638,7 +638,7 @@ html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-screen-head .vrm-scre
 html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-screen-head .vrm-tete-row > div:not(.vrm-screen-head-titre) { display: none !important; }
 html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-screen-head h1 { display: block !important; }
 /* Ce que la maquette ne montre pas */
-html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) :is(.vrm-filtre-site, [data-emballer-ouvrir], [data-tout-generer], [data-tg-bilan], [data-imprimante-reglage], .vrm-colis-note, [data-colis-filtre-note], .vrm-colis-groupe, [data-lot-ouvrir]) { display: none !important; }
+html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) :is(.vrm-filtre-site, [data-emballer-ouvrir], [data-tout-generer], [data-tg-bilan], [data-imprimante-reglage], .vrm-colis-note, [data-colis-filtre-note], .vrm-colis-groupe) { display: none !important; }
 html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-outils { display: none !important; }
 /* Le sélecteur « J'envoie · 3 / Je reçois · 2 » */
 html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-onglets .vrm-seg { margin: 0 0 4px !important; padding: 4px !important; border-radius: 14px !important; background: #E5E5EA !important; border: 0 !important; }
@@ -735,8 +735,8 @@ html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-carte[data-bord
 .vrm-fu-plus:focus-visible { outline: 2px solid var(--fu-bleu); outline-offset: 2px; }
 .vrm-fu-plus[aria-expanded="true"] { background: var(--fu-case); }
 /* Colis : les outils de l'en-tête, rangés tant que « … » n'est pas touché */
-:root:not([data-colis-outils]) body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) :is([data-lot-ouvrir], .vrm-colis-outils, [data-tout-generer], [data-tg-bilan], [data-imprimante-reglage]) { display: none !important; }
-:root[data-colis-outils] body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) :is([data-lot-ouvrir], [data-tout-generer], [data-tg-bilan], [data-imprimante-reglage]) { display: revert !important; }
+:root:not([data-colis-outils]) body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) :is(.vrm-colis-outils, [data-tout-generer], [data-tg-bilan], [data-imprimante-reglage]) { display: none !important; }
+:root[data-colis-outils] body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) :is([data-tout-generer], [data-tg-bilan], [data-imprimante-reglage]) { display: revert !important; }
 :root[data-colis-outils] body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-outils { display: flex !important; }
 html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-screen-head .vrm-tete-row { display: flex !important; align-items: flex-end !important; justify-content: space-between !important; }
 html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-screen-head .vrm-tete-row > div:not(.vrm-screen-head-titre) { display: flex !important; }
