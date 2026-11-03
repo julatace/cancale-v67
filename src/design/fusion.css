@@ -1132,3 +1132,11 @@ html body .vrm-app-shell :is(.vrm-fu-carte, .vrm-fu-carte-nu) > .vrm-fu-modifier
 html body .vrm-carte-feuille :is(.vrm-carte-ok, .vrm-carte-defaut, .vrm-carte-periodes > button) { min-height: 44px !important; }
 html body .vrm-carte-feuille .vrm-carte-choix { min-height: 48px !important; }
 html body .vrm-carte-feuille .vrm-carte-place { min-height: 56px !important; }
+/* (3 nov.) Un repli fermé ne garde aucune place (Chrome laisse sinon la liste occuper l'espace, invisible). */
+.vrm-rpf-verifier:not([open]) > .vrm-rpf-liste { display: none !important; }
+/* Le titre d'un colis à retirer tient sur UNE ligne (ellipse). */
+.vrm-rpf .vrm-rpf-titre { display: block !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; -webkit-line-clamp: unset !important; }
+/* (3 nov.) Sous « À retirer », les cartes courtes (repartis) suivent la liste sans grand vide. */
+html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-retirer { margin-bottom: 0 !important; }
+html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) [data-colis-retraits="outils"] > * { padding-top: 0 !important; }
+html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) [data-colis-retraits="outils"] .vrm-repartis-courts { margin-top: 0 !important; }

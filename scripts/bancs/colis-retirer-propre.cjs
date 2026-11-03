@@ -45,6 +45,9 @@ if (JEU === 'base') {
   TRACKS = [
     track('90000021', 'Phone Cash, 12 rue du Port, 35260 Cancale', null),                                       // code pas encore reçu
     track('90000022', 'Phone Cash, 12 rue du Port, 35260 Cancale', null, { qrB64: 'iVBORw0KGgo=', qrType: 'image/png' }),   // QR seul
+    // « Ton achat t'attend au point relais » (main, 3 nov. : `ligneArrivee`, api/_lib/achat-arrive-relais.js) :
+    // arrivé, lieu connu, code pas encore reçu, pas de n° de suivi, titre de l'article lu dans l'e-mail.
+    { id: 'email_track_vinted_commande_cmd01', data: { type: 'suivi', carrier: 'autre', suivi: '', status: 'available', statusLabel: 'Arrivé au point relais (Vinted)', subject: 'Ton achat t’attend au point relais', receivedAt: ilYa(0.2), emailAt: ilYa(0.2), arriveLe: ilYa(0.2), code: null, code2: null, artTitle: 'Sac seau toile écrue', lieu: 'TABAC DU QUAI, 12 Rue des Mouettes, 22000 Saint-Brieuc', limite: null, consigne: false, conv: '', source: 'vinted-commande', forme: 'relais', cleLigne: 'cmd01', account: 'compte_a' } },
     track('90000003', 'LOCKER 24/7 MARCHE DU PORT, Rue des Rosiers, 22100 Dinan', '333333', { consigne: true, limite: jourDans(0) }),
     track('90000006', 'POINT PRESSE, 3 Rue Haute, 56000 Vannes', '666666'),
     track('90000007', 'POINT PRESSE, 5 Grande Rue, 29200 Brest', '777777', { limite: null }),
@@ -74,7 +77,7 @@ const LIGNES = [
   { id: 'panel_colis_relais', data: RELAIS },
   ...TRACKS,
 ];
-const NB_ATTENDU = { base: 7, zero: 0, un: 1, neuf: 9, trente: 30 }[JEU];
+const NB_ATTENDU = { base: 8, zero: 0, un: 1, neuf: 9, trente: 30 }[JEU];
 // Les phrases que Julien ne veut plus voir (10 h 19) — aucune ne doit s'afficher.
 const INTERDITS = [/Date limite de retrait inconnue/i, /4 à 7 j en général/i, /ne nomme pas le point/i, /dont Vinted ne dit pas encore le point/i, /datent d.il y a/i, /Achats relus/i, /sans suivi Vinted relev/i, /n.envoient aucun e-?mail/i, /Fond : OpenFreeMap/i, /Transporteur pas (lu|encore connu)/i, /Hors du compte/i, /Point pas encore connu/i, /est reparti chez son vendeur/i, /confirmé il y a/i];
 let ko = 0, ok = 0;
@@ -158,7 +161,9 @@ const ouvrir = async (b, vp, sombre) => {
         await pg.waitForFunction(() => { try { return !!JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); } catch (_) { return false; } }, null, { timeout: 20000 }).catch(() => {});
         await pg.locator('[data-colis-onglet-choix="retirer"]').first().click();
         await pg.waitForTimeout(2500);
-        if (process.env.JR_DBG) console.log(await pg.evaluate(() => [...document.querySelectorAll('[data-colis-retraits="outils"] .vrm-achats > *')].filter((e) => e.getBoundingClientRect().height > 0).map((e) => `${e.tagName}.${String(e.className).slice(0, 30)} ${[...e.attributes].filter((a) => a.name.startsWith('data-')).map((a) => a.name).join(' ')} :: ${e.innerText.slice(0, 90).replace(/\n/g, ' ')}`).join('\n')));
+        if (process.env.JR_DBG) console.log(await pg.evaluate(() => [document.querySelector('[data-colis-retraits="outils"]'), document.querySelector('[data-colis-retraits="outils"] .vrm-achats'), ...document.querySelectorAll('[data-colis-retraits="outils"] .vrm-achats > *'), document.querySelector('.vrm-rpf-verifier'), document.querySelector('.vrm-rpf')].filter((e) => e && e.getBoundingClientRect().height > 0).map((e) => `${Math.round(e.getBoundingClientRect().top)}/${Math.round(e.getBoundingClientRect().height)} mt${getComputedStyle(e).marginTop} pt${getComputedStyle(e).paddingTop} ${e.tagName}.${String(e.className).slice(0, 30)} ${[...e.attributes].filter((a) => a.name.startsWith('data-')).map((a) => a.name).join(' ')} :: ${e.innerText.slice(0, 90).replace(/\n/g, ' ')}`).join('\n')));
+        if (process.env.JR_DBG) console.log('GAP2', await pg.evaluate(() => { const q = (x) => { const e = document.querySelector(x); if (!e) return x + ' —'; const c = getComputedStyle(e), r = e.getBoundingClientRect(); return `${x} top${Math.round(r.top)} h${Math.round(r.height)} mt${c.marginTop} mb${c.marginBottom} pt${c.paddingTop} pb${c.paddingBottom}`; }; return ['.vrm-rpf', '.vrm-colis-retirer', '[data-colis-retraits]', '[data-colis-retraits] > *', '.vrm-achats', '.vrm-achats > *', '.vrm-colis-fraicheur', '.vrm-rpf-verifier'].map(q).join('\n'); }));
+        if (process.env.JR_DBG) console.log('GAP', await pg.evaluate(() => { const d = document.querySelector('.vrm-rpf-verifier'); const y0 = d ? d.getBoundingClientRect().bottom : 0; return [...document.querySelectorAll('.vrm-main *')].filter((e) => { const r = e.getBoundingClientRect(); return r.height > 0 && r.top >= y0 - 1 && r.top < y0 + 90 && !e.closest('[data-colis-retraits]'); }).slice(0, 12).map((e) => `${Math.round(e.getBoundingClientRect().top)}/${Math.round(e.getBoundingClientRect().height)} mb${getComputedStyle(e).marginBottom} ${e.tagName}.${String(e.className).slice(0, 40)} ${[...e.attributes].filter((a) => a.name.startsWith('data-')).map((a) => a.name).join(' ')}`).join('\n'); }));
         const m = await pg.evaluate(() => {
           const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
           const main = document.querySelector('.vrm-main');
@@ -198,6 +203,12 @@ const ouvrir = async (b, vp, sombre) => {
           dit(by('9301').code && !by('9301').avenir, 'code connu ⇒ bouton « Code »', JSON.stringify(by('9301')));
           dit(by('90000021').avenir && !by('90000021').code, 'code pas encore lu ⇒ puce « Code à venir »', JSON.stringify(by('90000021')));
           dit(by('90000022').code, 'QR ⇒ bouton « Code »', JSON.stringify(by('90000022')));
+          const cmd = await pg.evaluate(() => { const l = [...document.querySelectorAll('.vrm-rpf [data-cc-carte]')].find((x) => /Sac seau toile/.test(x.innerText)); return l ? { avenir: !!l.querySelector('[data-rp-code-a-venir]'), code: !!l.querySelector('[data-rp-code]'), point: (l.closest('[data-relais-point]') || { getAttribute: () => '' }).getAttribute('data-relais-point') } : null; });
+          dit(!!cmd && cmd.avenir && !cmd.code && /tabacduquai/i.test(cmd.point || ''), '« Ton achat t’attend » : titre de l’e-mail, « Code à venir », dans le relais lu', JSON.stringify(cmd));
+          const titres = await pg.evaluate(() => [...document.querySelectorAll('.vrm-rpf [data-rp-titre]')].filter((t) => t.getBoundingClientRect().height > 0).map((t) => ({ t: t.textContent, h: Math.round(t.getBoundingClientRect().height) })));
+          dit(titres.every((x) => x.h <= 22) && !titres.some((x) => /^Colis Mondial Relay$/.test(x.t)), 'titres sur UNE ligne, jamais « Colis Mondial Relay » (n° court ou achat relié)', JSON.stringify(titres.slice(0, 5)));
+          const trou = await pg.evaluate(() => { const d = document.querySelector('.vrm-rpf-verifier'); const r = document.querySelector('.vrm-repartis-courts'); return d && r ? Math.round(r.getBoundingClientRect().top - d.getBoundingClientRect().bottom) : null; });
+          dit(trou != null && trou < 60, 'pas de grand vide sous « À vérifier » replié', String(trou));
           dit(by('90000003').ech === 'dernier', 'locker au dernier jour ⇒ puce ambre « dernier jour »', JSON.stringify(by('90000003')));
           dit(by('90000007').ech === null, 'échéance inconnue ⇒ aucune puce', JSON.stringify(by('90000007')));
           dit(by('90000006').ech === 'date', 'échéance connue ⇒ « jusqu’au jj/mm »', JSON.stringify(by('90000006')));
