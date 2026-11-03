@@ -1,0 +1,241 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   JETONS FUSION — 3 novembre 2026 (critique #9 : « un système éclaté »)
+   Julien a choisi « Fusion carte sombre » ; ce fichier en fait UN système pour
+   toute l'app, plus seulement pour Ma journée, Ventes, Colis et Compta.
+
+   UNE ÉCHELLE FERMÉE (celle de Dynamic Type d'iOS, que la maquette suit) :
+     tailles   11 · 12 · 13 · 15 · 17 · 20 · 22 · 28 · 34   (+ 38/44 : le grand chiffre)
+     graisses  400 · 500 · 600 · 700 · 800
+     rayons    6 (N°) · 12 (contrôles) · 14 (vignettes, cases) · 20 (cartes)
+               · 24 (carte sombre) · 999 (pilules)
+     ombres    --o-carte (posée) · --o-flottant (menus, feuilles)
+     boutons   principal bleu 44/12 · secondaire 44/12 · pilule 44/999 · icône 44
+   `scripts/fusion-echelle.mjs` ramène les valeurs écrites dans le code sur
+   cette échelle ; le banc `fusion-app` vérifie au RENDU qu'aucune autre ne
+   reste (taille, graisse, couleur). Chargé en TOUT DERNIER (main.jsx).
+   Rien ici ne touche une donnée ni une règle : seulement la forme.
+   ════════════════════════════════════════════════════════════════════════════ */
+:root {
+  --t-11: 11px; --t-12: 12px; --t-13: 13px; --t-15: 15px; --t-17: 17px;
+  --t-20: 20px; --t-22: 22px; --t-28: 28px; --t-34: 34px; --t-38: 38px; --t-44: 44px;
+  --g-400: 400; --g-500: 500; --g-600: 600; --g-700: 700; --g-800: 800;
+  --r-num: 6px; --r-ctrl: 12px; --r-case: 14px; --r-carte: 20px; --r-sombre: 24px; --r-pilule: 999px;
+  --o-carte: 0 1px 2px rgba(0,0,0,.04), 0 6px 20px rgba(0,0,0,.05);
+  --o-flottant: 0 6px 16px rgba(0,0,0,.08), 0 24px 56px rgba(0,0,0,.14);
+  --b-h: 44px;
+  /* Texte secondaire : #6E6E73 (4,5:1 sur le fond gris, 5:1 sur blanc) ; lien bleu
+     lisible sur le gris (#0066CC, 5,6:1) ; remplissage d'iOS pour les contrôles. */
+  --fu-gris2: #6e6e73;
+  --fu-lien: #0066cc;
+  --fu-remplir: rgba(118,118,128,.12);
+  --fu-remplir-fort: rgba(118,118,128,.2);
+}
+:root[data-theme="dark"] {
+  --o-carte: 0 0 0 1px rgba(255,255,255,.05);
+  --o-flottant: 0 0 0 1px rgba(255,255,255,.08), 0 24px 56px rgba(0,0,0,.6);
+  --fu-gris2: #98989d;
+  --fu-lien: #409cff;
+  --fu-remplir: rgba(118,118,128,.24);
+  --fu-remplir-fort: rgba(118,118,128,.32);
+}
+
+/* ── 1. LE FOND : #F2F2F7 (sombre #000) partout, plus seulement sur 4 écrans ── */
+:root body, :root body .vrm-app-shell, :root body .vrm-app-shell .vrm-main { background-color: var(--fu-fond) !important; }
+
+/* ── 2. LE GRAND TITRE : 34/800, -0,03 em, sur CHAQUE écran (#2, #9) ───────── */
+:root:root body .vrm-app-shell .vrm-main :is(.vrm-screen-head h1, .vrm-screen-head h2.vrm-display, .vrm-tache-tete h1, .vrm-market-heading h1, h2.vrm-set-h1) {
+  font: 800 34px/1.1 var(--vrm-police) !important; letter-spacing: -.03em !important; color: var(--fu-encre) !important; margin: 0 !important;
+}
+:root:root body .vrm-app-shell .vrm-main .vrm-set-tete { display: flex !important; margin: 4px 0 16px !important; }
+@media (max-width: 767px) {
+  /* Un titre et ses boutons : le titre prend sa ligne, les boutons passent dessous
+     (les « Semaine · Mois · Année » de Statistiques chevauchaient le titre). */
+  :root:root body .vrm-app-shell .vrm-main .vrm-screen-head .vrm-tete-row > .vrm-screen-head-titre { flex: 1 1 100% !important; min-width: 0; }
+  :root:root body .vrm-app-shell .vrm-main .vrm-screen-head .vrm-tete-row > :nth-child(2) { justify-content: flex-start !important; }
+  :root:root body .vrm-app-shell .vrm-main :is(.vrm-tache-tete, [data-titre-ecran-grand]) { padding: 8px 16px 8px !important; }
+}
+/* La date au-dessus du titre : lisible (#8E8E93 tombait à 2,9:1). */
+:root body .vrm-fu-date-tete { color: var(--fu-gris) !important; }
+
+/* ── 3. LES CARTES : blanches, sans cadre, rayon 20, ombre douce (#1.1) ───── */
+:root:root body .vrm-app-shell .vrm-main .vrm-surface,
+:root:root body .vrm-app-shell .vrm-main :is(.vrm-sv-carte, .vrm-set-groupe, .vrm-set-liste, .vrm-settings-todo, .vrm-msg-list, .vrm-offres-auto, .vrm-noacc .vrm-surface) {
+  background-color: var(--fu-carte) !important; border-color: transparent !important; border-radius: var(--r-carte) !important; box-shadow: var(--o-carte) !important;
+}
+/* Une carte DANS une carte ne s'imbrique pas : la carte intérieure devient une zone. */
+:root:root body .vrm-app-shell .vrm-main .vrm-surface .vrm-surface { background-color: var(--fu-case) !important; box-shadow: none !important; border-radius: var(--r-case) !important; }
+
+/* ── 4. LE SÉLECTEUR DE SITE = UN CONTRÔLE SEGMENTÉ iOS (#8) ──────────────────
+   Une rangée, rien de rogné : chaque segment prend sa part de la largeur ; le
+   segment choisi en aplat blanc (sombre #636366), ombre fine ; texte 13/600.
+   La rangée fait 44 px (cible), les segments 38 px visibles. */
+:root:root body .vrm-app-shell .vrm-filtre-site {
+  display: flex !important; flex-wrap: nowrap !important; gap: 2px !important; overflow: visible !important;
+  box-sizing: border-box !important; width: 100% !important; max-width: 520px; min-height: 50px !important;
+  margin: 6px 0 10px !important; padding: 3px !important; border-radius: var(--r-ctrl) !important; background: var(--fu-remplir) !important;
+  -webkit-mask-image: none !important; mask-image: none !important;
+}
+:root:root body .vrm-app-shell .vrm-filtre-site > button:not(#fu),
+:root:root body .vrm-app-shell .vrm-main .vrm-filtre-site > button:not(#fu)[aria-pressed] {
+  flex: 1 1 0 !important; min-width: 0 !important; min-height: 44px !important; height: 44px !important; padding: 0 4px !important; margin: 0 !important;
+  border: 0 !important; border-radius: 12px !important; background: transparent !important; box-shadow: none !important;
+  color: var(--fu-encre) !important; font: 600 13px/1 var(--vrm-police) !important; letter-spacing: -.01em !important;
+  white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; cursor: pointer;
+  transition: background-color .2s ease, box-shadow .2s ease;
+}
+:root:root body .vrm-app-shell .vrm-filtre-site > button:not(#fu)[aria-pressed="true"],
+:root:root body .vrm-app-shell .vrm-main .vrm-filtre-site > button:not(#fu)[aria-pressed="true"] {
+  background: #ffffff !important; color: #1d1d1f !important; box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 2px 6px rgba(0,0,0,.06) !important;
+}
+:root:root[data-theme="dark"] body .vrm-app-shell .vrm-filtre-site > button:not(#fu)[aria-pressed="true"],
+:root:root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-filtre-site > button:not(#fu)[aria-pressed="true"] { background: #636366 !important; color: #ffffff !important; box-shadow: none !important; }
+:root:root body .vrm-app-shell .vrm-filtre-site > button:not(#fu):focus-visible { outline: 2px solid var(--fu-bleu) !important; outline-offset: 1px; }
+@media (prefers-reduced-motion: reduce) { :root body .vrm-app-shell .vrm-filtre-site > button:not(#fu) { transition: none !important; } }
+:root:root body .vrm-app-shell .vrm-tache-filtres { padding: 0 16px !important; }
+
+/* ── 5. LES AUTRES CONTRÔLES SEGMENTÉS : la même forme (#1.2) ─────────────── */
+:root:root body .vrm-app-shell .vrm-main :is(.vrm-seg, .vrm-messages-sections, .vrm-set-seg) {
+  display: flex !important; gap: 2px !important; padding: 3px !important; min-height: 50px !important; box-sizing: border-box !important;
+  border: 0 !important; border-radius: var(--r-ctrl) !important; background: var(--fu-remplir) !important; box-shadow: none !important;
+}
+:root:root body .vrm-app-shell .vrm-main :is(.vrm-seg, .vrm-messages-sections, .vrm-set-seg) > button:not(#fu) {
+  flex: 1 1 0; min-height: 38px !important; border: 0 !important; border-radius: 12px !important; background: transparent !important; box-shadow: none !important;
+  color: var(--fu-encre) !important; font: 600 13px/1.1 var(--vrm-police) !important;
+}
+:root:root body .vrm-app-shell .vrm-main :is(.vrm-seg, .vrm-messages-sections) > button:not(#fu):is([aria-pressed="true"], [aria-current="page"]),
+:root:root body .vrm-app-shell .vrm-main .vrm-set-seg > button:not(#fu)[aria-selected="true"] {
+  background: #ffffff !important; color: #1d1d1f !important; box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 2px 6px rgba(0,0,0,.06) !important;
+}
+:root:root[data-theme="dark"] body .vrm-app-shell .vrm-main :is(.vrm-seg, .vrm-messages-sections) > button:not(#fu):is([aria-pressed="true"], [aria-current="page"]),
+:root:root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-set-seg > button:not(#fu)[aria-selected="true"] { background: #636366 !important; color: #ffffff !important; box-shadow: none !important; }
+
+/* ── 6. LES FILTRES D'ÉTAT : pilules 13/600, actif en encre pleine (blanc en sombre) ── */
+:root:root body .vrm-app-shell .vrm-main .vrm-filtres:not(.vrm-filtre-site) > button:not(#fu) {
+  min-height: 44px !important; padding: 0 14px !important; border: 0 !important; border-radius: var(--r-pilule) !important;
+  background: var(--fu-remplir) !important; color: var(--fu-encre) !important; font: 600 13px/1 var(--vrm-police) !important; box-shadow: none !important;
+}
+:root:root body .vrm-app-shell .vrm-main .vrm-filtres:not(.vrm-filtre-site) > button:not(#fu)[aria-pressed="true"] { background: #1d1d1f !important; color: #ffffff !important; }
+:root:root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-filtres:not(.vrm-filtre-site) > button:not(#fu)[aria-pressed="true"] { background: #f5f5f7 !important; color: #000000 !important; }
+
+/* ── 7. MENUS ET FEUILLES : une ombre, un rayon ───────────────────────────── */
+:root:root body .vrm-app-shell .vrm-menu-flottant { border: 0 !important; border-radius: 14px !important; box-shadow: var(--o-flottant) !important; background: var(--fu-carte) !important; }
+:root:root body .vrm-app-shell .vrm-menu-flottant[data-outils-annonces] { width: min(340px, calc(100vw - 32px)) !important; padding: 8px !important; box-sizing: border-box; }
+:root:root body .vrm-app-shell .vrm-menu-flottant[data-outils-annonces] > button:not(#fu) { min-height: 44px; width: 100%; }
+:root body .vrm-outils-annonces-haut { display: flex; flex-direction: column; gap: 8px; padding: 0 0 8px; margin: 0 0 6px; border-bottom: 1px solid var(--fu-filet); }
+:root body .vrm-outils-annonces-haut:empty { display: none; }
+:root body .vrm-outils-annonces-haut .vrm-offres-auto { box-shadow: none !important; background: var(--fu-case) !important; margin: 0 !important; }
+
+/* ── 8. LIENS ET TEXTE SECONDAIRE : contraste ≥ 4,5:1 (#3.2) ──────────────── */
+:root:root body .vrm-app-shell .vrm-main .vrm-lien-action { color: var(--fu-lien) !important; }
+
+/* ── 9. ORDINATEUR : les écrans de LECTURE dans une colonne de 760 px (#13) ── */
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
+  :root:root body .vrm-app-shell .vrm-main:is([data-ecran="dashboard"], [data-ecran="settings"], [data-ecran="achats"], [data-ecran="messages"], [data-ecran="compta"], [data-ecran="communaute"]) > :not(.vrm-barre-haut):not(style):not(script) {
+    max-width: 760px !important; margin-left: auto !important; margin-right: auto !important; box-sizing: border-box !important; width: 100% !important;
+  }
+}
+
+/* ── 10. LA BARRE DU HAUT : l'icône de synchronisation reste grise au repos ── */
+:root:root body .vrm-app-shell .vrm-app-header [data-sync-etat="loading"] { color: var(--fu-gris) !important; }
+
+/* ── 11. ANNONCES (#7) : UNE rangée d'outils, puis les filtres, puis la grille ──
+   recherche · tri · Republier (icône) · … ; « Offres automatiques » et « Annonces à
+   compléter » vivent dans « … », « Stock » et « Publier ailleurs » sous la grille. */
+@media (max-width: 767px) {
+  :root:root body .vrm-app-shell .vrm-main .vrm-ann-toolbar {
+    display: grid !important; grid-template-columns: minmax(0, 1fr) auto auto auto !important; gap: 8px !important; align-items: center !important; margin: 0 0 8px !important;
+  }
+  :root:root body .vrm-app-shell .vrm-main .vrm-ann-toolbar > :not(.vrm-ann-search):not(.vrm-ann-tri):not(.vrm-ann-actions):not(.vrm-ann-outils) { grid-column: 1 / -1; }
+  :root:root body .vrm-app-shell .vrm-main .vrm-ann-toolbar > .vrm-ann-actions { display: contents !important; }
+  :root:root body .vrm-app-shell .vrm-main .vrm-ann-toolbar [data-actions-ouvrir] {
+    width: 44px !important; min-width: 44px !important; height: 44px !important; min-height: 44px !important; padding: 0 !important;
+    font-size: 0 !important; justify-content: center !important; border-radius: var(--r-ctrl) !important; background: var(--fu-carte) !important; box-shadow: var(--o-carte) !important;
+  }
+  :root:root body .vrm-app-shell .vrm-main .vrm-ann-toolbar [data-actions-ouvrir] svg { width: 20px; height: 20px; }
+  :root:root body .vrm-app-shell .vrm-main .vrm-ann-toolbar [data-refaire-ouvrir] { grid-column: 1 / -1; order: 10; min-height: 44px !important; }
+  :root:root body .vrm-app-shell .vrm-main .vrm-ann-toolbar > :not(.vrm-ann-search):not(.vrm-ann-tri):not(.vrm-ann-actions):not(.vrm-ann-outils) { order: 11; }
+  :root:root body .vrm-app-shell .vrm-main .vrm-stock-views { margin: 0 0 12px !important; }
+  /* Le titre « Annonces » et ses sites : un peu moins d'air au-dessus de la grille. */
+  :root:root body .vrm-app-shell .vrm-main .vrm-ann-ledger-heading { display: none !important; }
+}
+
+/* Cinq sites (Ventes : Tous · Vinted · Leboncoin · eBay · Vestiaire) : 12 px, rien n'est coupé à 390. */
+:root:root body .vrm-app-shell .vrm-filtre-site:has(> button:not(#fu):nth-child(5)) > button:not(#fu) { font-size: 12px !important; letter-spacing: -.02em !important; padding: 0 2px !important; }
+
+/* ── 12. LES DÉFAUTS DU NAVIGATEUR portent la palette (craft-floor : « browser surfaces ») ──
+   Spécificité nulle (`:where`) : n'importe quelle règle d'un écran l'emporte encore. */
+:where(.vrm-app-shell) a { color: var(--fu-lien); }
+:where(.vrm-app-shell) button { color: inherit; background-color: var(--fu-remplir); }
+:where(.vrm-app-shell) ::selection { background: rgba(0,113,227,.22); }
+/* Les jours de la semaine sur la carte sombre : lisibles (0,5 tombait à 4,1:1). */
+:root:root body .vrm-app-shell .vrm-fu-jour > span { color: rgba(255,255,255,.72) !important; }
+/* Un lien bleu posé sur la carte sombre : en blanc (le bleu y tombait à 2,5:1). */
+:root:root body .vrm-app-shell :is(.vrm-fu-carte, .vrm-fu-tete) :is(a, button.vrm-lien-action) { color: #ffffff !important; }
+
+/* ── 13. « MODIFIER » DE LA TÊTE DE MA JOURNÉE (3 nov., finitions du coordinateur) ──
+   Il tombait sous la semaine : il remonte en haut à droite de la tête, sur la ligne du
+   titre. Seul geste touché sur Ma journée (un autre chantier la refait). */
+:root:root body .vrm-app-shell .vrm-fu-tete { position: relative !important; }
+:root:root body .vrm-app-shell .vrm-fu-tete > .vrm-carte-stats.vrm-fu-carte-nu { position: static !important; }
+:root:root body .vrm-app-shell .vrm-fu-tete > .vrm-carte-stats > .vrm-fu-modifier { top: 39px !important; right: 12px !important; }
+/* La taille par défaut est sur l'échelle (17, le « Body » d'iOS ; 16 n'y est pas) ; un <small>
+   sans classe tombe à 12 (pas 10), un <b> dans un titre 800 ne passe pas à 900. */
+:where(.vrm-app-shell) { font-size: 17px; }
+:where(.vrm-app-shell) small { font-size: 12px; }
+:where(.vrm-app-shell) :is(b, strong) { font-weight: 700; }
+:root:root body .vrm-app-shell .vrm-fu-note:empty { display: none !important; }
+/* Les cases de la carte sombre au téléphone : 17 px, le montant tient (« 178,00 € », « ≥ 327,00 € »). */
+@media (max-width: 430px) {
+  :root:root body .vrm-app-shell .vrm-fu-case b { font-size: 17px !important; letter-spacing: -.02em !important; }
+  :root:root body .vrm-app-shell .vrm-fu-case > span { font-size: 12px !important; }
+}
+:root:root body .vrm-app-shell :is(.vrm-fu-carte-nu) :is(a, button.vrm-lien-action) { color: #ffffff !important; }
+:root:root body .vrm-app-shell .vrm-main .vrm-seg > button:not(#fu) { height: 44px !important; }
+:root:root body .vrm-app-shell :is(.vrm-sync-comptes, .vrm-bilan-sync) a { display: inline-flex !important; align-items: center; min-height: 44px; }
+:root:root body .vrm-app-shell .vrm-main [data-geste="poser-num"] { min-height: 44px !important; }
+/* Compta : la ligne sous le chiffre est posée sur la carte sombre — ses liens en blanc (le bleu y tombait à 2:1). */
+:root:root body .vrm-app-shell .vrm-finance-page .vrm-compta-phrase a { color: #ffffff !important; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: rgba(255,255,255,.4); }
+/* Ordinateur : le sélecteur de site dans la barre du haut prend la largeur de ses mots (rien de rogné). */
+@media (min-width: 768px) {
+  :root:root body .vrm-app-shell .vrm-filtre-site { width: auto !important; max-width: none !important; }
+  :root:root body .vrm-app-shell .vrm-filtre-site > button:not(#fu),
+  :root:root body .vrm-app-shell .vrm-main .vrm-filtre-site > button:not(#fu)[aria-pressed] { flex: 0 0 auto !important; padding: 0 16px !important; overflow: visible !important; }
+}
+/* Statistiques au téléphone : moins d'air au-dessus des rubriques, le premier chiffre dans le premier tiers. */
+@media (max-width: 767px) {
+  :root:root body .vrm-app-shell .vrm-main[data-ecran="dashboard"] > .vrm-rubriques { padding-top: 4px !important; }
+  :root:root body .vrm-app-shell .vrm-main[data-ecran="dashboard"] .vrm-screen-head { margin-bottom: 8px !important; }
+}
+/* Les segmentés partagent la largeur (le 4ᵉ onglet du Stock était coupé : « Ph… ») ; au téléphone, les mots seuls. */
+:root:root body .vrm-app-shell .vrm-main .vrm-seg > button:not(#fu) { flex: 1 1 0 !important; min-width: 0 !important; padding: 0 4px !important; justify-content: center !important; white-space: nowrap; }
+:root:root body .vrm-app-shell .vrm-main .vrm-seg { overflow: visible !important; -webkit-mask-image: none !important; mask-image: none !important; }
+@media (max-width: 430px) { :root:root body .vrm-app-shell .vrm-main [data-stock-vues] > button:not(#fu) > svg { display: none !important; } }
+
+/* ── 14. LE CALENDRIER DE LA CARTE (3 nov., Julien : « fais un calendrier ») ──
+   Dans la feuille « Modifier » : un bouton de période pleine largeur (44 px) ; le calendrier
+   (ChoixPeriode, le même que Ventes/Achats/Statistiques) passe AU-DESSUS de la feuille. */
+:root:root body .vrm-carte-periode-cal { margin: 4px 0 12px; position: relative; }
+:root:root body .vrm-carte-periode-cal .vrm-cal-declencheur { width: 100% !important; min-height: 44px !important; justify-content: space-between !important; border-radius: var(--r-ctrl) !important; background: var(--fu-remplir) !important; border: 0 !important; color: var(--fu-encre) !important; font: 600 15px/1.2 var(--vrm-police) !important; padding: 0 14px !important; box-sizing: border-box; }
+:root:root body .vrm-carte-periode-cal .vrm-cal-pop { position: fixed !important; left: 50% !important; top: 50% !important; right: auto !important; transform: translate(-50%, -50%); z-index: 20002 !important; max-height: calc(100vh - 48px); overflow: auto; }
+body:has(.vrm-carte-voile) .vrm-cal-voile { z-index: 20001 !important; }
+body:has(.vrm-carte-voile) .vrm-cal-feuille { z-index: 20002 !important; }
+:root:root body .vrm-carte-feuille .vrm-carte-periodes.vrm-seg { margin: 4px 0 12px !important; }
+/* La visite en bulles : « Passer » / « Suivant » à 44 px pleins (43 au rendu, arrondis). */
+html body .vrm-visite .vrm-visite-pied :is(button, .vrm-b) { min-height: 46px !important; height: 46px !important; }
+:root:root body .vrm-carte-periode-cal { display: flex; gap: 8px; align-items: center; }
+:root:root body .vrm-carte-periode-cal .vrm-cal-croix { min-height: 44px !important; min-width: 44px !important; height: 44px !important; flex: none; }
+/* La puce transporteur reste sur UNE ligne (« Transporteur inconnu » passait à la ligne et décalait la rangée). */
+html body .vrm-rangee-bord > .vrm-puce-transp, html body .vrm-rangee-bord > .vrm-puce-transp * { white-space: nowrap !important; }
+html body .vrm-rangee-bord > .vrm-puce-transp { overflow: hidden !important; text-overflow: ellipsis !important; }
+:root:root body .vrm-carte-periode-cal > * { flex: 1 1 auto; display: flex; gap: 8px; align-items: center; min-width: 0; }
+:root:root body .vrm-carte-periode-cal .vrm-cal-declencheur { flex: 1 1 auto !important; position: relative; }
+:root:root body .vrm-carte-periode-cal .vrm-cal-declencheur::after { content: ''; width: 7px; height: 7px; margin-left: auto; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: translateY(-2px) rotate(45deg); opacity: .6; flex: none; }
+:root:root body .vrm-carte-periode-cal .vrm-cal { flex: 1 1 auto; margin: 0 !important; }
+:root:root body .vrm-carte-periode-cal .vrm-cal > .vrm-rangee { display: flex !important; width: 100%; }
+:root:root body .vrm-carte-periode-cal .vrm-cal > .vrm-rangee > .vrm-cal-declencheur { flex: 1 1 auto !important; display: flex !important; align-items: center; gap: 8px; }
+
+/* (3 nov.) Cases de la carte : rien de rogné. Le chiffre rétrécit avec sa case (comme le grand),
+   le libellé passe à la ligne plutôt que « En attente ·… ». Ma journée (.is-jour) garde les siens. */
+:root:root body .vrm-fu-case:not(.is-jour) { container-type: inline-size; }
+:root:root body .vrm-fu-case:not(.is-jour) b { font-size: clamp(13px, 19cqi, 22px); overflow: visible; text-overflow: clip; }
+:root:root body .vrm-fu-case:not(.is-jour) > span { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: break-word; }

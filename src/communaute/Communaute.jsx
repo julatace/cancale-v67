@@ -71,7 +71,7 @@ const CENTRE_FRANCE = [2.4, 46.6];
 // le style CLAIR (positron) quel que soit le thème ; le reste de l'écran suit
 // le mode sombre.
 const CARTE_TOUJOURS_CLAIRE = true;
-const FOND_ATTENTE = { clair: '#F2F3F0', sombre: '#0C0C0C' }; // le fond des styles : pas d'éclair au chargement
+const FOND_ATTENTE = { clair: '#F2F2F7', sombre: '#000000' }; // le fond des styles : pas d'éclair au chargement
 function Carte({ cells, moi, sombre, onCellules, onEchec }) {
   const boite = useRef(null), carte = useRef(null), ml = useRef(null), marqueurs = useRef([]), attrib = useRef(null);
   const [pret, setPret] = useState(false), [fond, setFond] = useState('charge');
@@ -449,15 +449,14 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
   // Les feuilles et le toast vivent sur <body> : l'écran est dans une coque
   // zoomée / empilée, où un `position:fixed` resterait sous la barre du bas.
   const portail = (x) => createPortal(<div className="vrm-communaute vrm-cm-portail" data-dark={sombre ? 'true' : 'false'}>{x}</div>, document.body);
-  const entete = <header className="vrm-cm-entete"><div><h2>La carte des revendeurs</h2>
-    <p>Trouve les revendeurs VRM de ta ville et échange avec eux.</p></div></header>;
+  const entete = <header className="vrm-cm-entete"><div><h2>La carte des revendeurs</h2></div></header>;
 
   if (etat === 'charge') return <section className="vrm-communaute" data-dark={sombre ? 'true' : 'false'} data-communaute-etat="charge">{entete}<p role="status" className="vrm-cm-note">Lecture de la carte…</p></section>;
   if (etat !== 'lu') return <section className="vrm-communaute" data-dark={sombre ? 'true' : 'false'} data-communaute-etat={etat}>{entete}
     <div className="vrm-cm-carton">
       {etat === 'non-installe' ? <><b>La carte de la communauté n’est pas encore activée sur ta base.</b><p>Elle s’ouvrira dès que la mise à jour de la base sera faite. Rien n’est perdu, rien n’est partagé d’ici là.</p></>
         : etat === 'abonnement' ? <><b>Ton abonnement n’est pas actif.</b><p>La carte de la communauté est réservée aux abonnés : tu n’es pas montré aux autres tant qu’il n’est pas réglé.</p></>
-        : <><b>{PAS_SU}</b><p>Ça ne veut pas dire que personne n’y est. Réessaie dans un instant.</p><button type="button" onClick={() => lire()} data-cm-reessayer>Réessayer</button></>}
+        : <><b>{PAS_SU}</b><button type="button" onClick={() => lire()} data-cm-reessayer>Réessayer</button></>}
     </div></section>;
 
   const onglets = <div className="vrm-cm-onglets" role="group" aria-label="Communauté">

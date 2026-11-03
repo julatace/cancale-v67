@@ -11,7 +11,29 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import CarteMois from './CarteMois.jsx';
-import { CHIFFRES, NOM_PERIODE, PAGES_CARTE, chiffresProposes, courbeVendu, defDe, horsSelection, libelleCase, periodeDefaut, reglageAEnregistrer, reglageDePage, valeursCarte, valeurChiffre } from './carteChiffres.js';
+import { CHIFFRES, NOM_PERIODE, PAGES_CARTE, PLAGE_IDS, clePeriode, chiffresProposes, courbeVendu, defDe, horsSelection, libelleCase, nomPeriode, periodeDefaut, reglageAEnregistrer, reglageDePage, valeursCarte, valeurChiffre } from './carteChiffres.js';
+import ChoixPeriode from '../ChoixPeriode.jsx';
+import { raccourcisCarte, etiquettePlage, cleJour } from '../periodeCalendrier.js';
+
+// ── LA PÉRIODE D'UNE PLACE ↔ LA VALEUR DU CALENDRIER (3 nov., Julien : « fais un calendrier ») ──
+// Une période NOMMÉE (jour, semaine, mois, trimestre, année) reste un mot : la carte la calcule
+// par ses règles ; une plage libre devient `{ de, a, label }` (bornes [de, a) en heure locale).
+const TOKENS_CAL = ['jour', 'semaine', 'mois', 'trimestre', 'annee'];
+export const valeurDePeriode = (p, maintenant = new Date()) => {
+  if (!p) return null;
+  if (typeof p === 'object') { if (p.hors) return null; const a = new Date(Number(p.a)); a.setDate(a.getDate() - 1); return { from: new Date(Number(p.de)), to: a, label: p.label }; }
+  const r = raccourcisCarte(maintenant).find((x) => x.cle === p);
+  return r ? { ...r.valeur } : null;
+};
+export const periodeDeValeur = (v, permis, maintenant = new Date()) => {
+  if (!v || !v.from) return undefined;
+  const to = v.to || v.from;
+  const r = raccourcisCarte(maintenant).find((x) => TOKENS_CAL.includes(x.cle) && cleJour(x.valeur.from) === cleJour(v.from) && cleJour(x.valeur.to) === cleJour(to));
+  if (r && permis.includes(r.cle)) return r.cle;
+  const de = new Date(v.from); de.setHours(0, 0, 0, 0);
+  const a = new Date(to); a.setHours(0, 0, 0, 0); a.setDate(a.getDate() + 1);
+  return { de: de.getTime(), a: a.getTime(), label: etiquettePlage(v.from, to) };
+};
 
 const centimes = (v, type) => (v == null ? '' : type === 'eur' ? String(Math.round(Number(v) * 100)) : String(v));
 const euros = (v) => `${Math.round(Number(v)).toLocaleString('fr-FR')} €`;
@@ -24,7 +46,8 @@ const affiche = (x, fmt, grand) => {
   // Dans une case : les centimes tant que ça tient (moins de 1 000 €), l'euro rond au-delà (jamais rogné).
   const corps = t === 'eur' ? ((grand || Math.abs(Number(x.valeur)) < 1000) ? fmt(x.valeur) : euros(x.valeur)) : String(x.valeur);
   if (!x.partiel) return corps;
-  return grand ? <><span className="vrm-fu-borne">au moins</span>{corps}</> : <>{'≥ '}{corps}</>;
+  // (3 nov.) Jamais « ≥ » sur une case : le chiffre seul, « au moins » dans son titre (`titreDe`).
+  return grand ? <><span className="vrm-fu-borne">au moins</span>{corps}</> : corps;
 };
 const attrsDeValeur = (x, page) => ({
   'data-carte-chiffre': x.place.id,
@@ -37,9 +60,12 @@ const attrsDeValeur = (x, page) => ({
 const titreDe = (x) => {
   if (x.hors) return `${x.def ? x.def.nom : ''} : ${x.hors}`;
   if (x.partiel && x.manque && x.manque.length) return `Au moins : ${x.manque.join(', ')} pas lu`;
+  if (x.partiel) return `Au moins · ${x.def ? x.def.nom : ''}`;
   if (x.def && x.def.titre) return x.def.titre;
   return x.def ? x.def.nom : '';
 };
+
+const majuscule = (s) => (typeof s === 'string' && s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 
 export default function CarteStats({ page, sel, sources, regles, reglage, poser, attrsDe = null, onNav = null, nu = false, className = '', FermeAuRetour = null, sous = null, extra = {}, clics = null }) {
   const [ouvert, setOuvert] = React.useState(false);
@@ -74,7 +100,9 @@ export default function CarteStats({ page, sel, sources, regles, reglage, poser,
         cases={V.c.map((x) => ({
           cle: x.place.id + (x.p && typeof x.p === 'string' ? '-' + x.p : ''),
           n: affiche(x, fmt, false),
-          l: x.def ? (x.def.local ? (x.def.court || x.def.nom) : libelleCase(x.def, x.p, g.p, sel)) : '',
+          // (3 nov., finitions) Capitale initiale sur chaque case (« À poster », « Finalisées »).
+          // (3 nov.) Le libellé court seul (jamais « … · Vinted » rogné) : le site se dit dans le titre de la case.
+          l: majuscule(x.def ? (x.def.local ? (x.def.court || x.def.nom) : libelleCase({ ...x.def, vinted: false }, x.p, g.p, sel)) : ''),
           titre: titreDe(x),
           onClick: aller(x),
           attrs: { ...attrsDeValeur(x, page), ...(x.attrs || {}), ...(x.def && x.def.local && x.def.attrs ? x.def.attrs : {}), ...(plus(x) || {}) },
@@ -99,7 +127,7 @@ function FeuilleCarte({ page, sel, sources, regles, reglage, poser, locaux, ferm
     const nouvelle = Array.isArray(d && d.periodes) ? { id, p: p || (actuelle && actuelle.id === id && actuelle.p) || periodeDefaut(d) } : { id };
     const L = places.slice();
     // Le même chiffre à la même période ailleurs sur la carte : les deux places s'échangent (§7 : un nombre, une fois).
-    const dejaIci = L.findIndex((x, i) => i !== place && x && x.id === nouvelle.id && (x.p || '') === (nouvelle.p || ''));
+    const dejaIci = L.findIndex((x, i) => i !== place && x && x.id === nouvelle.id && clePeriode(x.p) === clePeriode(nouvelle.p));
     if (dejaIci >= 0) L[dejaIci] = L[place];
     L[place] = nouvelle;
     poser(reglageAEnregistrer(reglage, page, { g: L[0], c: L.slice(1, 4) }));
@@ -133,13 +161,22 @@ function FeuilleCarte({ page, sel, sources, regles, reglage, poser, locaux, ferm
               );
             })}
           </div>
-          {def && Array.isArray(def.periodes) && def.periodes.length > 1 && !periodePage ? (
-            <div className="vrm-carte-periodes" role="group" aria-label="Période">
+          {/* (3 nov.) La période : un CALENDRIER (le même que Ventes, Achats et Statistiques) pour un chiffre
+              qui se calcule sur des dates libres ; sinon ses seules périodes (Mois · Trimestre · Année),
+              en contrôle segmenté sur une rangée — plus de rangée qui défile de côté. */}
+          {def && !def.local && Array.isArray(def.periodes) && def.periodes.length > 1 && !periodePage ? (PLAGE_IDS.includes(actuelle.id) ? (
+            <div className="vrm-carte-periode-cal" data-carte-calendrier={actuelle.id}>
+              <ChoixPeriode value={valeurDePeriode(actuelle.p)} titre="Période du chiffre" vide="Choisir une période"
+                libelle={nomPeriode(actuelle.p || periodeDefaut(def))} raccourcis={raccourcisCarte} Retour={FermeAuRetour}
+                onChange={(v) => choisir(actuelle.id, periodeDeValeur(v, def.periodes) || periodeDefaut(def))}/>
+            </div>
+          ) : (
+            <div className="vrm-carte-periodes vrm-seg" role="group" aria-label="Période">
               {def.periodes.map((p) => (
-                <button key={p} type="button" aria-pressed={actuelle.p === p} data-carte-periode={p} onClick={() => choisir(actuelle.id, p)}>{NOM_PERIODE[p]}</button>
+                <button key={p} type="button" className="vrm-seg-btn" aria-pressed={actuelle.p === p} data-carte-periode={p} onClick={() => choisir(actuelle.id, p)}>{NOM_PERIODE[p]}</button>
               ))}
             </div>
-          ) : null}
+          )) : null}
           <ul className="vrm-carte-liste">
             {ids.map((id) => {
               const d = defDe(id, locaux);

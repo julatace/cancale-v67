@@ -1239,7 +1239,7 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
       // QUE des données (nom du meuble, N° du carton) — rien n'est deviné.
       const bulle = document.createElement('div');
       Object.assign(bulle.style, { position: 'absolute', left: '0', top: '0', pointerEvents: 'none', display: 'none', zIndex: 5, maxWidth: '240px',
-        background: 'rgba(20,22,30,0.78)', color: '#fff', fontSize: '11.5px', fontWeight: '600', lineHeight: '1.35', padding: '5px 9px', borderRadius: '8px',
+        background: 'rgba(20,22,30,0.78)', color: '#fff', fontSize: '12px', fontWeight: '600', lineHeight: '1.35', padding: '5px 9px', borderRadius: '12px',
         backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' });
       bulle.setAttribute('data-bulle-3d', '');
       el.appendChild(bulle);
@@ -1700,7 +1700,7 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
     <div data-noswipe="1" data-stock3d="" tabIndex={0} role="application" onKeyDown={surTouche3D}
       onPointerDown={(e) => { try { if (e.target && e.target.tagName === 'CANVAS') e.currentTarget.focus({ preventScroll: true }); } catch (_) {} }}
       aria-label="Stock en 3D. Glisser : tourner. Molette : zoomer vers le point visé. Clic droit : déplacer. Double-clic : se mettre en face. Flèches : tourner et zoomer. Début : toute la pièce. Échap : désélectionner."
-      style={{ position: 'relative', width: '100%', height: 'min(52vh, 460px)', minHeight: 320, borderRadius: 16, overflow: 'hidden', border: `1px solid ${C.border}`, background: '#e9edf2', boxShadow: C.shadow, outlineOffset: -2 }}>
+      style={{ position: 'relative', width: '100%', height: 'min(52vh, 460px)', minHeight: 320, borderRadius: 14, overflow: 'hidden', border: `1px solid ${C.border}`, background: '#e9edf2', boxShadow: C.shadow, outlineOffset: -2 }}>
       <div ref={mountRef} style={{ width: '100%', height: '100%', touchAction: 'none', userSelect: 'none' }} />
       {loading && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted, fontSize: 13, fontWeight: 700 }}>Chargement de la 3D…</div>}
       {/* ⚠️ LA DÉCO NE MANGE PLUS LE HAUT DE LA PIÈCE.
@@ -1712,13 +1712,13 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
       {!loading && (
         <div data-noswipe="1" style={{ position: 'absolute', top: 8, left: 8, display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' }}>
           <button type="button" onPointerDown={e => e.stopPropagation()} onClick={() => setAmbOpen(v => !v)} title="Changer l'ambiance"
-            style={{ border: '1px solid rgba(255,255,255,0.34)', background: 'rgba(20,22,30,0.55)', color: '#fff', borderRadius: 999, padding: '5px 11px', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+            style={{ border: '1px solid rgba(255,255,255,0.34)', background: 'rgba(20,22,30,0.55)', color: '#fff', borderRadius: 999, padding: '5px 11px', fontSize: 12, fontWeight: 600, cursor: 'pointer', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
             {(GARAGE_AMBIANCES.find(a => a.id === amb) || GARAGE_AMBIANCES[0]).emoji} Ambiance
           </button>
           {ambOpen && GARAGE_AMBIANCES.map(a => (
             <button key={a.id} type="button" onPointerDown={e => e.stopPropagation()}
               onClick={() => { setAmb(a.id); setAmbOpen(false); save('vrm_garage_ambiance', a.id); try { st.current.applyAmbiance && st.current.applyAmbiance(a.id); } catch (_) {} }}
-              style={{ border: `1px solid ${amb === a.id ? '#ffffff' : 'rgba(255,255,255,0.3)'}`, background: amb === a.id ? 'rgba(20,22,30,0.78)' : 'rgba(20,22,30,0.5)', color: '#fff', borderRadius: 999, padding: '5px 11px', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', fontFamily: 'inherit' }}>
+              style={{ border: `1px solid ${amb === a.id ? '#ffffff' : 'rgba(255,255,255,0.3)'}`, background: amb === a.id ? 'rgba(20,22,30,0.78)' : 'rgba(20,22,30,0.5)', color: '#fff', borderRadius: 999, padding: '5px 11px', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', fontFamily: 'inherit' }}>
               {a.emoji} {a.name}
             </button>
           ))}
@@ -1726,7 +1726,7 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
       )}
       {/* Contrôles de vue : tourner à gauche/droite + zoom (fiables sur mobile) */}
       {!loading && (() => {
-        const btn = { width: 38, height: 38, borderRadius: 10, border: '1px solid rgba(0,0,0,0.15)', background: 'rgba(255,255,255,0.92)', color: '#1c1c22', fontSize: 17, fontWeight: 900, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(0,0,0,0.18)', touchAction: 'manipulation', userSelect: 'none', flexShrink: 0 };
+        const btn = { width: 38, height: 38, borderRadius: 12, border: '1px solid rgba(0,0,0,0.15)', background: 'rgba(255,255,255,0.92)', color: '#1c1c22', fontSize: 17, fontWeight: 800, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(0,0,0,0.18)', touchAction: 'manipulation', userSelect: 'none', flexShrink: 0 };
         const stop = (e) => { e.stopPropagation(); };
         const call = (fn, ...a) => { const s = st.current || {}; if (s[fn]) s[fn](...a); };
         return (
@@ -1743,8 +1743,8 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
             <div style={{ display: 'flex', gap: 6, pointerEvents: 'auto' }}>
               <button className="vrm-icon-control" type="button" onPointerDown={stop} onClick={() => call('resetView')} title="Voir toute la pièce" style={btn} aria-label="Voir toute la pièce"><Icon name="home" size={18}/></button>
               <button className="vrm-icon-control" type="button" onPointerDown={stop} onClick={() => call('topView')} title="Vue de dessus (plan)" style={btn} aria-label="Vue de dessus"><Icon name="grid" size={18}/></button>
-              {enDessus && <button type="button" data-revenir-3d="" onPointerDown={stop} onClick={() => { call('revenir3D'); setEnDessus(false); }} title="Revenir à la vue en 3D" style={{ ...btn, width: 'auto', padding: '0 11px', gap: 6, fontSize: 12.5, fontWeight: 700 }} aria-label="Revenir à la vue en 3D">↩ 3D</button>}
-              {sel && <button type="button" onPointerDown={stop} onClick={() => call('flyTo', sel)} title="Se mettre en face du meuble" style={{ ...btn, width: 'auto', padding: '0 11px', gap: 6, fontSize: 12.5, fontWeight: 700 }} aria-label="Se mettre en face du meuble"><Icon name="eye" size={16}/> De face</button>}
+              {enDessus && <button type="button" data-revenir-3d="" onPointerDown={stop} onClick={() => { call('revenir3D'); setEnDessus(false); }} title="Revenir à la vue en 3D" style={{ ...btn, width: 'auto', padding: '0 11px', gap: 6, fontSize: 13, fontWeight: 700 }} aria-label="Revenir à la vue en 3D">↩ 3D</button>}
+              {sel && <button type="button" onPointerDown={stop} onClick={() => call('flyTo', sel)} title="Se mettre en face du meuble" style={{ ...btn, width: 'auto', padding: '0 11px', gap: 6, fontSize: 13, fontWeight: 700 }} aria-label="Se mettre en face du meuble"><Icon name="eye" size={16}/> De face</button>}
             </div>
             <div style={{ display: 'flex', gap: 6, pointerEvents: 'auto', marginLeft: 'auto' }}>
               <button className="vrm-icon-control" type="button" onPointerDown={stop} onClick={() => call('rotateView', -22)} title="Tourner à gauche" style={btn} aria-label="Tourner la vue à gauche">◀</button>
@@ -1791,7 +1791,7 @@ function RoomPerspective({ items, room, hi, sel, onOpen, colorOf, emojiOf, h3dOf
       <div style={{ position: 'absolute', inset: 0, clipPath: `polygon(${flx(Zfar)}px ${farY}px, ${frx(Zfar)}px ${farY}px, ${frx(Znear)}px ${nearY}px, ${flx(Znear)}px ${nearY}px)`, background: '#c9b79a' }} />
       {/* lignes de profondeur (repère visuel) */}
       {Array.from({ length: Math.max(2, Math.min(9, Math.round(room.h))) }).map((_, i, arr) => { const gy = 1 - (i + 1) / (arr.length + 1); const Z = Zof(gy); const y = floorY(Z); return <div key={i} style={{ position: 'absolute', left: flx(Z), width: frx(Z) - flx(Z), top: y, height: 1, background: 'rgba(0,0,0,0.06)' }} />; })}
-      {items.length === 0 && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted, fontSize: 12.5, textAlign: 'center', padding: 20 }}>Ajoute des meubles en mode « ✏️ Éditer », puis reviens ici pour entrer dans ta pièce.</div>}
+      {items.length === 0 && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted, fontSize: 13, textAlign: 'center', padding: 20 }}>Ajoute des meubles en mode « ✏️ Éditer », puis reviens ici pour entrer dans ta pièce.</div>}
       {list.map(it => {
         const gyF = Math.min(1, (it.y + it.h) / room.h), Z = Zof(gyF);
         const Xc = (it.x + it.w / 2) - halfW;
@@ -1803,14 +1803,14 @@ function RoomPerspective({ items, room, hi, sel, onOpen, colorOf, emojiOf, h3dOf
             <div style={{ position: 'absolute', left: '7%', right: '7%', top: -Math.min(12, hpx * 0.16), height: Math.min(12, hpx * 0.16), background: col, filter: 'brightness(1.3)', transform: 'skewX(-34deg)', borderRadius: '3px 3px 0 0', opacity: 0.92 }} />
             <div style={{ width: '100%', height: '100%', background: `linear-gradient(180deg, ${col}, ${col} 62%, rgba(0,0,0,0.22))`, border: `2px solid ${isHi ? '#e5484d' : isSel ? '#fff' : 'rgba(0,0,0,0.28)'}`, borderRadius: 3, boxShadow: isHi ? '0 0 0 4px rgba(229,72,77,0.4)' : '0 5px 10px rgba(0,0,0,0.28)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff', overflow: 'hidden' }}>
               <span style={{ fontSize: Math.max(11, Math.min(26, hpx * 0.42)), lineHeight: 1 }}>{emojiOf(it)}</span>
-              {hpx > 40 && <span style={{ fontSize: 9, fontWeight: 800, textShadow: '0 1px 2px rgba(0,0,0,0.6)', maxWidth: '96%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.name}</span>}
-              {storedCount(it) > 0 && <span style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.55)', borderRadius: 999, fontSize: 9, fontWeight: 900, padding: '1px 5px' }}>{storedCount(it)}</span>}
+              {hpx > 40 && <span style={{ fontSize: 11, fontWeight: 800, textShadow: '0 1px 2px rgba(0,0,0,0.6)', maxWidth: '96%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.name}</span>}
+              {storedCount(it) > 0 && <span style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.55)', borderRadius: 999, fontSize: 11, fontWeight: 800, padding: '1px 5px' }}>{storedCount(it)}</span>}
             </div>
-            {isHi && <div style={{ position: 'absolute', top: -18, left: '50%', transform: 'translateX(-50%)', background: '#e5484d', color: '#fff', fontSize: 10, fontWeight: 900, padding: '1px 7px', borderRadius: 999, whiteSpace: 'nowrap', zIndex: 400 }}>ici 📍</div>}
+            {isHi && <div style={{ position: 'absolute', top: -18, left: '50%', transform: 'translateX(-50%)', background: '#e5484d', color: '#fff', fontSize: 11, fontWeight: 800, padding: '1px 7px', borderRadius: 999, whiteSpace: 'nowrap', zIndex: 400 }}>ici 📍</div>}
           </div>
         );
       })}
-      <span style={{ position: 'absolute', left: 8, bottom: 6, fontSize: 9.5, color: 'rgba(0,0,0,0.42)', fontWeight: 700 }}>👣 Vue depuis l'entrée · touche un meuble</span>
+      <span style={{ position: 'absolute', left: 8, bottom: 6, fontSize: 11, color: 'rgba(0,0,0,0.42)', fontWeight: 700 }}>👣 Vue depuis l'entrée · touche un meuble</span>
     </div>
   );
 }
@@ -1843,7 +1843,7 @@ function PlanSecours({ items, poly, hi, sel, cibles, onOpen, colorOf, emojiOf, s
           );
         })}
       </svg>
-      <span style={{ position: 'absolute', left: 8, bottom: 6, fontSize: 10, color: C.muted, fontWeight: 700 }}>Vue du dessus · touche un meuble</span>
+      <span style={{ position: 'absolute', left: 8, bottom: 6, fontSize: 11, color: C.muted, fontWeight: 700 }}>Vue du dessus · touche un meuble</span>
     </div>
   );
 }

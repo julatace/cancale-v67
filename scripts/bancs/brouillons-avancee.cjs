@@ -260,7 +260,7 @@ const visible = (pg, sel) => pg.evaluate(([s, h]) => {
           await pg.locator('[data-republier-ligne="9102"][data-republier-statut="fait"]').waitFor({ timeout: 4000 }).catch(() => {});
           await pg.locator('[data-republier-prochaine]').waitFor({ timeout: 3000 }).catch(() => {});
           const tFin = await pg.locator(bloc).first().innerText().catch(() => '');
-          dit(/1 sur 2/.test(tFin) && /Prochaine paire dans/.test(tFin) && await visible(pg, '[data-republier-prochaine]') === 'ok', 'paire faite : « 1 sur 2 » et « Prochaine paire dans … », visibles', tFin);
+          dit(/1 sur 2/.test(tFin) && /Prochain article dans/.test(tFin) && await visible(pg, '[data-republier-prochaine]') === 'ok', 'paire faite : « 1 sur 2 » et « Prochaine paire dans … », visibles', tFin);
           await pg.locator('[data-republier-pause]').click().catch(() => {});
           dit(!errs.length, 'aucune erreur d’app', errs.join(' | '));
         } catch (e) { dit(false, 'B : le parcours a levé', e.message.split('\n')[0]); }

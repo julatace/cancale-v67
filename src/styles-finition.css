@@ -41,7 +41,7 @@ html .vrm-app-shell .vrm-atelier-rail:is([data-rail-densite="2"], [data-rail-den
 html .vrm-app-shell .vrm-atelier-rail:is([data-rail-densite="2"], [data-rail-densite="3"], [data-rail-densite="4"]) [data-nav-groupe].vrm-rail-management-group { margin-top: 3px; }
 html .vrm-app-shell .vrm-atelier-rail:is([data-rail-densite="2"], [data-rail-densite="3"], [data-rail-densite="4"]) [data-nav-groupe] .vrm-rail-section-label { font-size: 11px; line-height: 14px; padding-bottom: 2px; }
 html .vrm-app-shell .vrm-atelier-rail[data-rail-densite="3"] .vrm-rail-button { min-height: 30px; }
-html .vrm-app-shell .vrm-atelier-rail[data-rail-densite="4"] .vrm-rail-button { min-height: 28px; font-size: 14px; }
+html .vrm-app-shell .vrm-atelier-rail[data-rail-densite="4"] .vrm-rail-button { min-height: 28px; font-size: 15px; }
 html .vrm-app-shell .vrm-atelier-rail[data-rail-defile] { overflow-y: auto !important; scrollbar-width: thin; }
 html .vrm-app-shell .vrm-atelier-rail[data-rail-defile] > .vrm-rail-scroll { flex: 0 0 auto; overflow: visible; border: 0 !important; }
 html .vrm-app-shell .vrm-atelier-rail[data-rail-defile] > .vrm-rail-pied { border-top: 0 !important; }
@@ -73,21 +73,21 @@ html body .vrm-chat-panel .vrm-chat-send:focus-visible { outline: 2px solid var(
 /* ── 3. LE FIL : en-tête, bulles, pied ─────────────────────────────────────── */
 /* En-tête : un filet sous lui, la personne en 16/600, la paire en 13 gris. */
 html body .vrm-chat-panel .vrm-chat-head { border-bottom: 1px solid var(--vrm-line) !important; gap: 12px; padding: 12px 16px !important; min-height: 64px; box-sizing: border-box; }
-html body .vrm-chat-panel .vrm-chat-head .vrm-chat-head-n { font-size: 16px; font-weight: 600; line-height: 1.25; letter-spacing: -.01em; }
+html body .vrm-chat-panel .vrm-chat-head .vrm-chat-head-n { font-size: 17px; font-weight: 600; line-height: 1.25; letter-spacing: -.01em; }
 html body .vrm-chat-panel .vrm-chat-head .vrm-chat-head-s { font-size: 13px; line-height: 1.35; margin-top: 1px; }
 html body .vrm-chat-panel .vrm-chat-head-ph { width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; }
 html body .vrm-chat-panel .vrm-chat-head .vrm-chat-retirer { min-height: 36px; padding: 0 12px; border-radius: 999px; font-size: 13px; font-weight: 500; gap: 6px; display: inline-flex; align-items: center; }
 html body .vrm-chat-panel .vrm-chat-head .vrm-chat-sync { width: 40px; height: 40px; border-radius: 50%; }
 /* Les notes sous l'en-tête (actualisation, état de la négociation) : un rythme de 8. */
 html body .vrm-chat-panel > .vrm-chat-note { padding: 10px 16px; margin: 0; font-size: 13px; line-height: 1.45; border-bottom: 1px solid var(--vrm-line); }
-html body .vrm-chat-panel .vrm-chat-negociation-etat { padding: 8px 16px !important; font-size: 12.5px; color: var(--vrm-muted); }
+html body .vrm-chat-panel .vrm-chat-negociation-etat { padding: 8px 16px !important; font-size: 13px; color: var(--vrm-muted); }
 html body .vrm-chat-panel .vrm-chat-negociation-etat b { color: var(--vrm-ink); font-weight: 600; }
 /* Bulles : texte 15/1.45, 12×16 de marge, l'heure discrète sous le texte, à droite. */
 html body .vrm-chat-panel .vrm-chat-history { gap: 6px !important; scroll-padding: 16px; }
 html body .vrm-chat-panel .vrm-bulle-l + .vrm-bulle-l { margin-top: 2px; }
 html body .vrm-chat-panel .vrm-bulle-l:not(.vrm-bulle-moi) + .vrm-bulle-moi,
 html body .vrm-chat-panel .vrm-bulle-moi + .vrm-bulle-l:not(.vrm-bulle-moi) { margin-top: 10px; }
-html body .vrm-chat-panel .vrm-bulle-l > .vrm-bulle.vrm-bulle { font-size: 15px !important; line-height: 1.45 !important; padding: 10px 16px 8px !important; border-radius: 18px !important; gap: 2px; }
+html body .vrm-chat-panel .vrm-bulle-l > .vrm-bulle.vrm-bulle { font-size: 15px !important; line-height: 1.45 !important; padding: 10px 16px 8px !important; border-radius: 20px !important; gap: 2px; }
 html body .vrm-chat-panel .vrm-bulle-l:not(.vrm-bulle-moi) > .vrm-bulle.vrm-bulle { border-bottom-left-radius: 6px !important; }
 html body .vrm-chat-panel .vrm-bulle-l.vrm-bulle-moi > .vrm-bulle.vrm-bulle { border-bottom-right-radius: 6px !important; }
 html body .vrm-chat-panel .vrm-bulle-h { font-size: 11px; opacity: .62; letter-spacing: 0; }
@@ -100,25 +100,25 @@ html body .vrm-chat-panel .vrm-chat-jour { align-self: center; font-size: 12px; 
 html body .vrm-chat-panel .vrm-chat-offer-event { border-radius: 14px !important; padding: 10px 14px !important; margin: 6px 0 !important; background: var(--vrm-bg) !important; border: 1px solid var(--vrm-line) !important; }
 html body .vrm-chat-panel .vrm-chat-offer-event[data-offer-status] { background: var(--vrm-bg) !important; background-image: none !important; }
 html body .vrm-chat-panel .vrm-chat-offer-event span { font-size: 13px; font-weight: 600; }
-html body .vrm-chat-panel .vrm-chat-offer-event strong { font-size: 16px; font-weight: 700; }
+html body .vrm-chat-panel .vrm-chat-offer-event strong { font-size: 17px; font-weight: 700; }
 html body .vrm-chat-panel .vrm-chat-offer-event :is(small, time) { font-size: 12px; color: var(--vrm-muted); }
 /* La carte d'offre : boutons à la même hauteur, le secondaire à filet. */
-html body .vrm-chat-panel .vrm-chat-offre-actions > .vrm-chat-btn { font-size: 14px !important; font-weight: 600 !important; }
-html body .vrm-chat-panel .vrm-chat-negociation > summary { min-height: 40px; display: flex; align-items: center; font-size: 13.5px; font-weight: 500; }
+html body .vrm-chat-panel .vrm-chat-offre-actions > .vrm-chat-btn { font-size: 15px !important; font-weight: 600 !important; }
+html body .vrm-chat-panel .vrm-chat-negociation > summary { min-height: 40px; display: flex; align-items: center; font-size: 13px; font-weight: 500; }
 /* La carte de la paire en tête du fil (téléphone) : titre sur une ligne propre. */
 html body .vrm-chat-panel .vrm-chat-paire-n { font-size: 15px !important; }
 html body .vrm-chat-panel .vrm-chat-paire-l { font-size: 13px !important; }
 /* Le pied : un filet au-dessus, pastilles 36 px, champ à filet qui s'allume au focus. */
 html body .vrm-chat-panel .vrm-chat-foot { border-top: 1px solid var(--vrm-line) !important; padding: 12px 16px 14px !important; }
 html body .vrm-chat-panel .vrm-chat-rapides { padding-bottom: 10px !important; scroll-padding-inline: 16px; }
-html body .vrm-chat-panel .vrm-chat-rapides > button { min-height: 36px !important; padding: 0 14px !important; font-size: 13.5px !important; font-weight: 500 !important; white-space: nowrap; }
+html body .vrm-chat-panel .vrm-chat-rapides > button { min-height: 36px !important; padding: 0 14px !important; font-size: 13px !important; font-weight: 500 !important; white-space: nowrap; }
 html body .vrm-chat-panel .vrm-chat-rapides > button:not(:disabled):active { transform: scale(.97); }
 @media (hover: hover) and (pointer: fine) {
   html body .vrm-chat-panel .vrm-chat-rapides > button:not(:disabled):hover { border-color: var(--vrm-muted) !important; }
 }
 html body .vrm-chat-panel .vrm-chat-compose { gap: 8px !important; align-items: flex-end !important; }
 html body .vrm-chat-panel .vrm-chat-compose > textarea {
-  border: 1px solid var(--vrm-line) !important; background: var(--vrm-bg) !important; border-radius: 23px !important;
+  border: 1px solid var(--vrm-line) !important; background: var(--vrm-bg) !important; border-radius: 24px !important;
   min-height: 46px !important; padding: 12px 18px !important; line-height: 20px !important; box-sizing: border-box; outline: none;
   transition: border-color .12s ease;
 }
@@ -187,7 +187,7 @@ html .vrm-app-shell :is(.vrm-msg-time, .vrm-bulle-h, .vrm-chat-offer-event stron
 
 /* ── 8. LES ÉTATS VIDES : un disque neutre, une icône au trait ──────────────── */
 html .vrm-app-shell .vrm-empty-state { border-radius: var(--vrm-r-md, 14px) !important; box-shadow: none !important; padding: 32px 20px !important; }
-html .vrm-app-shell .vrm-empty-state > div:nth-child(2) { font-size: 16px !important; font-weight: 650 !important; letter-spacing: -.01em !important; }
+html .vrm-app-shell .vrm-empty-state > div:nth-child(2) { font-size: 17px !important; font-weight: 600 !important; letter-spacing: -.01em !important; }
 html .vrm-app-shell .vrm-empty-state > div:nth-child(3) { font-size: 13px !important; color: var(--vrm-muted) !important; margin-top: 6px !important; }
 
 /* ── 9. LE FOCUS CLAVIER : un seul anneau, le même partout ─────────────────── */

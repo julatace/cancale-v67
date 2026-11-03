@@ -18,7 +18,7 @@ export default function DiagnosticLeboncoin({lire,couleurs}) {
     } catch (_) {setTexte('Impossible de lire le diagnostic. Réessaie dans un moment.');setSuivi(null);}
     finally {setCharge(false);}
   };
-  const bouton={border:`1px solid ${couleurs.border}`,borderRadius:8,background:couleurs.card,color:couleurs.text,padding:'8px 12px',font:'inherit',cursor:'pointer'};
+  const bouton={border:`1px solid ${couleurs.border}`,borderRadius:12,background:couleurs.card,color:couleurs.text,padding:'8px 12px',font:'inherit',cursor:'pointer'};
   return <details style={{marginBottom:14,fontSize:12,color:couleurs.muted}}>
     <summary style={{cursor:'pointer',padding:'8px 0'}}>Un problème de synchronisation Leboncoin ?</summary>
     <p>Vérifie ce qui est enregistré dans VRM. Le résumé partageable contient uniquement des compteurs et la structure technique reçue.</p>

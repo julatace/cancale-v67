@@ -119,4 +119,4 @@
 .vrm-stats-vitrine .vrm-sv-boost-table { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px 16px; align-items: baseline; }
 .vrm-stats-vitrine .vrm-sv-boost-col { text-align: right; }
 .vrm-stats-vitrine .vrm-sv-boost-val { font-size: 15px; font-weight: 600; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--vrm-ink); }
-@media (max-width: 480px) { .vrm-stats-vitrine .vrm-sv-boost-table { gap: 8px 10px; } .vrm-stats-vitrine .vrm-sv-boost-val { font-size: 13.5px; } }
+@media (max-width: 480px) { .vrm-stats-vitrine .vrm-sv-boost-table { gap: 8px 10px; } .vrm-stats-vitrine .vrm-sv-boost-val { font-size: 13px; } }

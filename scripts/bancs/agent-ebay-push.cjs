@@ -97,7 +97,7 @@ const agent = () => pushes.filter((p) => /pour eBay/.test(`${p.title} ${p.body}`
   { const p = agent()[0] || {};
     console.log(`     téléphone : « ${p.title} » / « ${p.body} »`);
     dit(agent().length === 1, 'UNE notification', String(agent().length));
-    dit(p.title === '🛒 3 paires à regarder pour eBay', 'sans préparation chez eBay : « 🛒 3 paires à regarder pour eBay » — jamais « prêtes »', p.title);
+    dit(p.title === '🛒 3 articles à regarder pour eBay', 'sans préparation chez eBay : « 🛒 3 articles à regarder pour eBay » — jamais « prêtes »', p.title);
     dit(/Rien n.est publi/.test(p.body || ''), 'elle dit que rien n\'est publié sans son oui', p.body);
     dit(p.url === '/?tab=ebay_agent', 'le clic ouvre eBay → À traiter, où vit l\'agent (?tab=ebay_agent)', p.url);
     const iM = journal.indexOf('memo'), iP = journal.findIndex((x) => /^push:agent-ebay/.test(x));
@@ -108,11 +108,11 @@ const agent = () => pushes.filter((p) => /pour eBay/.test(`${p.title} ${p.body}`
   reset({ resume: { v: 1, n: 3, pretes: 1, at: Date.now() - 3600000 } });
   await lancer();
   { const p = agent()[0] || {};
-    dit(p.title === '🛒 3 paires proposées pour eBay · 1 prête à publier', 'la notification suit les préparations : « 3 proposées · 1 prête »', p.title); }
+    dit(p.title === '🛒 3 articles proposés pour eBay · 1 prêt à publier', 'la notification suit les préparations : « 3 proposées · 1 prête »', p.title); }
   reset({ resume: { v: 1, n: 2, pretes: 2, at: Date.now() - 3600000 } });
   await lancer();
   { const p = agent()[0] || {};
-    dit(p.title === '🛒 2 paires prêtes pour eBay — je les publie ?', 'toutes préparées et prêtes : « 🛒 2 paires prêtes pour eBay — je les publie ? »', p.title); }
+    dit(p.title === '🛒 2 articles prêts pour eBay — je les publie ?', 'toutes préparées et prêtes : « 🛒 2 articles prêts pour eBay — je les publie ? »', p.title); }
 
   console.log('\n── B. résumé de plus de 48 h : rien');
   reset({ resume: { v: 1, n: 3, at: Date.now() - 49 * 3600000 } });

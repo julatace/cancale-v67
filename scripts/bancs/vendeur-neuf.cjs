@@ -126,7 +126,8 @@ const JULIEN = /Julien|Cancale|hopcancale|vanessa5723|angeled92/i;
     console.log('— 3. Annonces · eBay');
     const e = ecrans.ebay_annonces;
     dit(!/section « Compte »/.test(e.texte), 'Annonces · eBay ne renvoie plus vers une section « Compte » disparue');
-    dit(e.versComptesEbay && /Paramètres → Comptes eBay/.test(e.texte), 'il mène à Paramètres → Comptes eBay (un geste)', JSON.stringify({ geste: e.versComptesEbay }));
+    // (3 nov.) Le geste est un bouton « Relier eBay » (sans la phrase « Connecte ton compte… » — retirée à la demande de Julien, 3 nov.).
+    dit(e.versComptesEbay && /Relier eBay/.test(e.texte), 'il mène à Paramètres → Comptes eBay (un geste : « Relier eBay »)', JSON.stringify({ geste: e.versComptesEbay }));
     console.log('— 4. La pastille du haut');
     dit(!/Lecture seule/.test(ecrans.journee.pastille) && /Extension/.test(ecrans.journee.pastille), 'avant toute installation : « Extension à installer », pas « Lecture seule »', `« ${ecrans.journee.pastille} »`);
     console.log('— 5. Base injoignable');

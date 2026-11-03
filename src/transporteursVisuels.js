@@ -32,7 +32,7 @@
 import { transporteurDeForme } from '../api/_lib/suivi-colis.js';
 import { normaliserSuivi } from '../api/_lib/etat-colis-email.js';
 
-export const PAS_LU = 'Transporteur pas lu';
+export const PAS_LU = 'Transporteur inconnu';  // (3 nov., critique #15) des mots simples, pas « pas lu »
 
 // `logos` : adresses sur le domaine officiel du transporteur, essayées dans
 // l'ordre (la première qui se charge gagne).

@@ -30,7 +30,7 @@ html body .vrm-app-shell .vrm-day-layout .vrm-jc > .vrm-day-head {
   gap: 8px 16px !important; min-height: 24px; margin: 0 !important; flex-wrap: nowrap !important;
 }
 html body .vrm-app-shell .vrm-day-layout .vrm-jc > .vrm-day-head .vrm-day-k {
-  font-size: 14px !important; font-weight: 600 !important; color: var(--vrm-ink) !important; line-height: 1.4 !important;
+  font-size: 15px !important; font-weight: 600 !important; color: var(--vrm-ink) !important; line-height: 1.4 !important;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
 }
 html body .vrm-app-shell .vrm-day-layout .vrm-jc > .vrm-day-head .vrm-day-lien { font-size: 13px !important; flex-shrink: 0; }
@@ -46,12 +46,12 @@ html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-vide { color: var(--vrm
 /* LE grand chiffre (un seul sur l'écran). */
 html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-hero {
   font-family: var(--vrm-police-mono) !important; font-weight: 500 !important;
-  font-size: 40px !important; line-height: 1.05 !important; letter-spacing: -.03em !important;
+  font-size: 38px !important; line-height: 1.05 !important; letter-spacing: -.03em !important;
   margin: 16px 0 0 !important; padding: 0 !important; color: var(--vrm-ink) !important;
   overflow-wrap: normal !important; white-space: nowrap; min-width: 0; grid-area: auto !important;
 }
 @media (max-width: 767px) {
-  html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-hero { font-size: 36px !important; margin-top: 12px !important; }
+  html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-hero { font-size: 34px !important; margin-top: 12px !important; }
 }
 html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-hero .vrm-jc-eur { font-size: .5em; margin-left: 2px; }
 
@@ -119,7 +119,7 @@ html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-choix { margin-top: 8px
 html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-choix [data-depenses-choix] { gap: 4px 12px !important; font-size: 12px !important; }
 
 /* Cette semaine : le total à droite du titre, puis les barres. */
-html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-total { font-size: 16px; color: var(--vrm-ink); flex-shrink: 0; }
+html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-total { font-size: 17px; color: var(--vrm-ink); flex-shrink: 0; }
 html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-barres { margin-top: 16px !important; }
 
 /* Tendances : les quatre cases dans la même rangée, sans cadres. */

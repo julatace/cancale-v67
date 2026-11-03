@@ -157,7 +157,10 @@ async function regleEcran(pg, nom, tel, errs) {
   // ── C. un chiffre, puis sa ligne (la carte URSSAF du mois n'est plus affichée — retiré à la demande de Julien, 2 nov. 22 h (maquette FusionCompta))
   for (const c of ['gagne']) {
     const r = await pg.evaluate((c) => { const n = document.querySelector(`[data-compta-chiffre="${c}"]`), p = document.querySelector(`[data-compta-phrase="${c}"]`); return { n: !!n, p: !!p, suit: !!(n && p && (n.compareDocumentPosition(p) & Node.DOCUMENT_POSITION_FOLLOWING)), txt: p ? p.innerText.trim() : '', vis: !!(n && n.checkVisibility() && p && p.checkVisibility()) }; }, c);
-    check(r.n && r.p && r.suit && r.vis && r.txt.length > 0, `${nom} — C « ${c} » : un chiffre puis une ligne courte dessous (« ${r.txt.slice(0, 90)} »)`);
+    // (3 nov.) « Aucune vente finalisée ce mois-ci » n'est plus écrit sous la carte (retiré à la demande de Julien, 3 nov.) :
+    // un mois sans vente finalisée n'a pas de ligne ; sinon, un chiffre puis sa ligne, comme avant.
+    const n0 = await pg.evaluate(() => (document.querySelector('[data-benef-n]') || {}).getAttribute?.('data-benef-n'));
+    check((r.n && r.p && r.suit && r.vis && r.txt.length > 0) || (r.n && !r.p && n0 === '0'), `${nom} — C « ${c} » : un chiffre puis une ligne courte dessous (« ${r.txt.slice(0, 90)} »)`);
   }
   // (« la prochaine déclaration avant ce qu'il faut mettre de côté » : la carte n'est plus affichée — retiré à la demande de Julien, 2 nov. 22 h (maquette FusionCompta))
   // ── R. le détail replié

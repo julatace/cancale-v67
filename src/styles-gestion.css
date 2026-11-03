@@ -1,9 +1,9 @@
 /* Finition Gestion : mêmes surfaces, repères et rythmes dans les espaces métier.
    Les zones interactives restent à taille réelle, sans zoom de la page. */
 .vrm-app-shell{
- --gestion-surface:var(--vrm-surface,#FDFEFC);--gestion-soft:var(--vrm-card2,#EAF0EC);
- --gestion-line:var(--vrm-line,#DCE4DF);--gestion-ink:var(--vrm-ink,#0F0F0E);
- --gestion-muted:var(--vrm-muted,#53696D);--gestion-accent:var(--vrm-accent,#0071E3);
+ --gestion-surface:var(--vrm-surface,#FFFFFF);--gestion-soft:var(--vrm-card2,#F2F2F7);
+ --gestion-line:var(--vrm-line,#E5E5EA);--gestion-ink:var(--vrm-ink,#1D1D1F);
+ --gestion-muted:var(--vrm-muted,#636366);--gestion-accent:var(--vrm-accent,#0071E3);
  --gestion-on-accent:#fff;
 }
 :root[data-theme=dark] .vrm-app-shell{--gestion-on-accent:#173A40;}
@@ -12,7 +12,7 @@
    et les couleurs de statut conservent leur sens. */
 .vrm-main .vrm-compte-ligne{
  background:var(--gestion-surface)!important;color:var(--gestion-ink)!important;
- border:1px solid var(--gestion-line);border-radius:10px;box-sizing:border-box;
+ border:1px solid var(--gestion-line);border-radius:12px;box-sizing:border-box;
 }
 .vrm-main .vrm-compte-ligne label,
 .vrm-main .vrm-compte-chevron{color:var(--gestion-muted)!important;}
@@ -20,7 +20,7 @@
 .vrm-main [data-comptes-annonces]>button{color:var(--gestion-accent)!important;}
 .vrm-main :is(.vrm-list-search,.vrm-ann-search){
  background:var(--gestion-surface)!important;border:1px solid var(--gestion-line)!important;
- border-radius:10px!important;color:var(--gestion-muted);box-sizing:border-box;
+ border-radius:12px!important;color:var(--gestion-muted);box-sizing:border-box;
 }
 .vrm-main :is(.vrm-list-search,.vrm-ann-search) input{
  border:0!important;background:transparent!important;color:var(--gestion-ink)!important;
@@ -31,7 +31,7 @@
  box-shadow:0 0 0 3px color-mix(in srgb,var(--gestion-accent) 14%,transparent);
 }
 .vrm-main :is(.vrm-sales-workbar>.vrm-rangee,.vrm-sales-workbar>.vrm-filtres-et-outils>.vrm-rangee,.vrm-sales-filters,.vrm-stock-views)>button[aria-pressed]{
- border-radius:8px!important;border:1px solid var(--gestion-line)!important;
+ border-radius:12px!important;border:1px solid var(--gestion-line)!important;
  background:var(--gestion-surface)!important;color:var(--gestion-muted)!important;
  font-weight:600!important;box-shadow:none!important;
 }
@@ -40,7 +40,7 @@
  color:var(--gestion-on-accent)!important;
 }
 .vrm-main .vrm-shared-workbar>input[type=search]{
- border:1px solid var(--gestion-line)!important;border-radius:10px!important;
+ border:1px solid var(--gestion-line)!important;border-radius:12px!important;
  background:var(--gestion-surface)!important;color:var(--gestion-ink)!important;
 }
 .vrm-main .vrm-shared-workbar>input[type=search]:focus-visible{
@@ -61,49 +61,49 @@
   grid-template-columns:46px minmax(0,1fr) minmax(0,64px) auto 20px;gap:8px;
  }
  .vrm-main .vrm-ledger-sale-state{min-width:0;max-width:64px;}
- .vrm-main .vrm-compte-ligne{border-radius:8px;}
+ .vrm-main .vrm-compte-ligne{border-radius:12px;}
 }
 .vrm-main :is(.vrm-set-liste,.vrm-buy-list,.vrm-ann-grid,.vrm-pickup-point,.vrm-ventes-liste){
- border:1px solid var(--gestion-line)!important;border-radius:8px!important;box-shadow:none!important;
+ border:1px solid var(--gestion-line)!important;border-radius:12px!important;box-shadow:none!important;
 }
 .vrm-main :is(.vrm-set-ligne,.vrm-buy-row,.vrm-inbox-row,.vrm-pickup-card){box-shadow:none!important;}
 .vrm-main :is(.vrm-buy-price,.vrm-finance-result,.vrm-kpi-ventes-case,.vrm-stats-hero){font-variant-numeric:tabular-nums;}
 .vrm-main :is(.vrm-set-titre,.vrm-ledger-heading){color:var(--gestion-muted)!important;}
 .vrm-main .vrm-set-groupe{margin-bottom:18px!important;}
 .vrm-main .vrm-set-ligne{border-radius:0!important;min-height:48px;padding-block:8px!important;}
-.vrm-main .vrm-set-ic{border-radius:5px!important;background:var(--gestion-soft)!important;color:var(--gestion-ink)!important;}
-.vrm-main .vrm-set-h1{font-size:24px!important;letter-spacing:-.65px;margin-bottom:20px!important;}
-.vrm-main .vrm-set-carte{border-radius:8px!important;box-shadow:none!important;}
+.vrm-main .vrm-set-ic{border-radius:6px!important;background:var(--gestion-soft)!important;color:var(--gestion-ink)!important;}
+.vrm-main .vrm-set-h1{font-size:22px!important;letter-spacing:-.65px;margin-bottom:20px!important;}
+.vrm-main .vrm-set-carte{border-radius:12px!important;box-shadow:none!important;}
 .vrm-main .vrm-buy-row{padding-block:9px!important;border-radius:0!important;border-bottom:1px solid var(--gestion-line)!important;}
 .vrm-main .vrm-buy-title{font-weight:600!important;line-height:1.4;}
-.vrm-main .vrm-buy-ph{border-radius:4px!important;overflow:hidden;}
+.vrm-main .vrm-buy-ph{border-radius:6px!important;overflow:hidden;}
 .vrm-main .vrm-pickup-point{margin-bottom:12px!important;background:var(--gestion-surface)!important;}
 .vrm-main .vrm-pickup-point>div:first-child{background:var(--gestion-soft)!important;border-color:var(--gestion-line)!important;padding-block:8px!important;}
 .vrm-main .vrm-pickup-card{border-radius:0!important;border:0!important;border-bottom:1px solid var(--gestion-line)!important;margin-bottom:0!important;background:var(--gestion-surface)!important;}
 .vrm-main .vrm-pickup-card:last-child{border-bottom:0!important;}
-.vrm-main .vrm-pickup-code{border-radius:5px!important;box-shadow:none!important;}
+.vrm-main .vrm-pickup-code{border-radius:6px!important;box-shadow:none!important;}
 .vrm-main .vrm-inbox-row{border-radius:0!important;border:0!important;border-bottom:1px solid var(--gestion-line)!important;background:var(--gestion-surface)!important;min-height:64px!important;padding:10px 12px!important;}
 .vrm-main .vrm-inbox-row.is-current{background:var(--gestion-soft)!important;box-shadow:inset 3px 0 var(--gestion-accent)!important;}
 .vrm-main .vrm-inbox-row:focus-visible{outline:2px solid var(--gestion-accent);outline-offset:-2px;}
 .vrm-main .vrm-chat-paire{border-radius:6px!important;background:var(--gestion-soft)!important;}
-.vrm-main .vrm-chat-paire-ph{width:40px!important;height:48px!important;border-radius:4px!important;}
+.vrm-main .vrm-chat-paire-ph{width:40px!important;height:48px!important;border-radius:6px!important;}
 .vrm-main .vrm-chat-paire-n{font-size:12px!important;line-height:1.4!important;}
 .vrm-main .vrm-lbc-package{border-radius:6px!important;border-color:var(--gestion-line)!important;box-shadow:none!important;}
 .vrm-main .vrm-colis-carte{border-radius:6px!important;box-shadow:none!important;border-color:var(--gestion-line)!important;}
 .vrm-main .vrm-stock-views{gap:4px!important;border-radius:6px!important;}
 .vrm-main .vrm-finance-stock-grid{gap:12px!important;}
-.vrm-main :is(.vrm-stats-hero,.vrm-stats-calcul,.vrm-finance-stock){border-radius:8px!important;box-shadow:none!important;}
+.vrm-main :is(.vrm-stats-hero,.vrm-stats-calcul,.vrm-finance-stock){border-radius:12px!important;box-shadow:none!important;}
 /* L'espace équipe utilise aussi ce fichier lorsqu'il est rendu sans AppCoeur. */
-.vrm-operations{--ops-line:#dce5e1;}
-.vrm-operations .ops-liste{grid-template-columns:1fr;gap:0;border:1px solid var(--ops-line);border-radius:8px;overflow:hidden;}
+.vrm-operations{--ops-line:#E5E5EA;}
+.vrm-operations .ops-liste{grid-template-columns:1fr;gap:0;border:1px solid var(--ops-line);border-radius:12px;overflow:hidden;}
 .vrm-operations .ops-carte{border:0;border-bottom:1px solid var(--ops-line);border-radius:0;padding:14px 16px;box-shadow:none;}
 .vrm-operations .ops-carte:last-child{border-bottom:0;}
 .vrm-operations .ops-carte-tete{margin-bottom:8px;}
-.vrm-operations .ops-carte h3{font-size:14px;}
+.vrm-operations .ops-carte h3{font-size:15px;}
 .vrm-operations .ops-chiffres{margin:8px 0 12px;}
-.vrm-operations .ops-chiffres strong{font-size:16px;}
-.vrm-operations :is(.ops-form,.ops-info,.ops-vide){border-radius:8px;box-shadow:none;}
-.vrm-operations .ops-onglets button[aria-current=page]{background:var(--vrm-ink,#0F0F0E);color:var(--vrm-bg,#FFFFFF);}
+.vrm-operations .ops-chiffres strong{font-size:17px;}
+.vrm-operations :is(.ops-form,.ops-info,.ops-vide){border-radius:12px;box-shadow:none;}
+.vrm-operations .ops-onglets button[aria-current=page]{background:var(--vrm-ink,#1D1D1F);color:var(--vrm-bg,#FFFFFF);}
 /* Le même résumé en ligne sur ordinateur ; les détails sont ouverts au clic. */
 @media(min-width:768px){
  .vrm-main .vrm-ledger-heading{display:flex;justify-content:space-between;padding:10px 48px 10px 66px;background:var(--gestion-soft);font-size:11px;font-weight:600;border-bottom:1px solid var(--gestion-line);}
@@ -119,11 +119,11 @@
  .vrm-main .vrm-ann-grid{grid-template-columns:1fr!important;gap:0!important;}
  .vrm-main .vrm-ann-card{border:0!important;border-radius:0!important;border-bottom:1px solid var(--gestion-line)!important;box-shadow:none!important;}
  .vrm-main .vrm-ann-overview{padding:10px 64px 10px 12px!important;}
- .vrm-main .vrm-ann-overview>a{width:104px!important;height:138px!important;border-radius:10px!important;}
+ .vrm-main .vrm-ann-overview>a{width:104px!important;height:138px!important;border-radius:12px!important;}
  .vrm-main .vrm-ann-ledger-info{display:grid!important;grid-template-columns:minmax(0,1fr) auto;align-content:start;gap:4px 16px!important;}
  .vrm-main .vrm-ann-ledger-info>div{grid-column:1;min-width:0;}
  .vrm-main .vrm-ann-ledger-info>.vrm-ann-price-line{grid-column:2;grid-row:1 / span 3;flex-direction:column;align-items:flex-end!important;gap:6px!important;}
- .vrm-main .vrm-ann-ledger-info [data-prix]{font-size:16px!important;}
+ .vrm-main .vrm-ann-ledger-info [data-prix]{font-size:17px!important;}
 }
 @media(max-width:767px){
  .vrm-main .vrm-inbox-row{min-height:60px!important;padding:8px 10px!important;}
@@ -134,9 +134,9 @@
  .vrm-main .vrm-pickup-card{padding:8px!important;gap:7px!important;}
  .vrm-main .vrm-pickup-point>div:first-child{font-size:12px!important;}
  .vrm-main .vrm-buy-ph{width:60px!important;height:80px!important;}
- .vrm-main .vrm-buy-title{font-size:13.5px!important;}
+ .vrm-main .vrm-buy-title{font-size:13px!important;}
  .vrm-main .vrm-buy-price{font-size:13px!important;}
- .vrm-main .vrm-chat-panel .vrm-bulle{box-shadow:none!important;border-radius:8px!important;}
+ .vrm-main .vrm-chat-panel .vrm-bulle{box-shadow:none!important;border-radius:12px!important;}
  .vrm-main .vrm-chat-panel .vrm-chat-head{padding-block:8px!important;}
  .vrm-operations .ops-carte{padding:12px;}
  .vrm-operations .ops-entete h2{font-size:22px;}
@@ -154,11 +154,11 @@
 /* (1er nov.) Téléphone : la feuille d'une vente couvre le bas de l'écran ; le temps qu'elle est ouverte, la page garde
    une marge de sa hauteur (posée par LigneVenteCompacte) pour que la ligne ouverte remonte au-dessus d'elle. */
 @media(max-width:767px){html[data-feuille-vente] .vrm-app-shell:not(.vrm-ledger-drawer-host)>.vrm-main::after{content:'';display:block;height:var(--vrm-feuille-vente,0px);pointer-events:none;}}
-.vrm-ledger-drawer{pointer-events:auto;position:absolute;right:0;top:0;bottom:0;width:min(460px,100%);display:flex;flex-direction:column;background:var(--gestion-surface);color:var(--gestion-ink);border-left:1px solid var(--gestion-line);box-shadow:-12px 0 40px #14282e20;}
+.vrm-ledger-drawer{pointer-events:auto;position:absolute;right:0;top:0;bottom:0;width:min(460px,100%);display:flex;flex-direction:column;background:var(--gestion-surface);color:var(--gestion-ink);border-left:1px solid var(--gestion-line);box-shadow:-12px 0 40px #1D1D1F20;}
 .vrm-ledger-drawer-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:22px 20px 18px;border-bottom:1px solid var(--gestion-line);background:var(--gestion-soft);}
 .vrm-ledger-drawer-head>div{min-width:0;}
-.vrm-ledger-drawer-head span{font-size:10px;font-weight:600;letter-spacing:.08em;color:var(--gestion-muted);}
-.vrm-ledger-drawer-head h2{font-size:18px;line-height:1.4;margin:8px 0;overflow-wrap:anywhere;}
+.vrm-ledger-drawer-head span{font-size:11px;font-weight:600;letter-spacing:.08em;color:var(--gestion-muted);}
+.vrm-ledger-drawer-head h2{font-size:17px;line-height:1.4;margin:8px 0;overflow-wrap:anywhere;}
 .vrm-ledger-drawer-head p{font-size:12px;margin:0;color:var(--gestion-muted);font-variant-numeric:tabular-nums;}
 .vrm-ledger-drawer-head>button{width:44px;height:44px;flex-shrink:0;border:1px solid var(--gestion-line);border-radius:6px;background:var(--gestion-surface);color:inherit;display:flex;align-items:center;justify-content:center;cursor:pointer;}
 .vrm-ledger-drawer .vrm-main.vrm-ledger-drawer-body{zoom:1!important;flex:1;width:100%!important;min-width:0!important;max-width:none!important;min-height:0!important;padding:18px!important;margin:0!important;overflow:auto!important;background:transparent!important;box-sizing:border-box;}
@@ -177,10 +177,10 @@
  .vrm-main .vrm-sales-workbar{display:grid!important;grid-template-columns:minmax(180px,1fr) auto;gap:8px 12px!important;padding:12px!important;}
  .vrm-main .vrm-sales-workbar>.vrm-sales-search-group{margin-bottom:0!important;}
  .vrm-main .vrm-sales-workbar>.vrm-rangee,.vrm-main .vrm-sales-workbar>.vrm-filtres-et-outils{grid-column:1 / -1;}
- .vrm-main .vrm-ann-toolbar{padding:12px!important;border-radius:8px!important;background:var(--gestion-surface)!important;}
+ .vrm-main .vrm-ann-toolbar{padding:12px!important;border-radius:12px!important;background:var(--gestion-surface)!important;}
 }
 @media(max-width:767px){
- .vrm-ledger-drawer{width:100%;top:auto;max-height:82dvh;border-left:0;border-top:1px solid var(--gestion-line);border-radius:14px 14px 0 0;box-shadow:0 -12px 40px #14282e30;padding-bottom:env(safe-area-inset-bottom);}
+ .vrm-ledger-drawer{width:100%;top:auto;max-height:82dvh;border-left:0;border-top:1px solid var(--gestion-line);border-radius:14px 14px 0 0;box-shadow:0 -12px 40px #1D1D1F30;padding-bottom:env(safe-area-inset-bottom);}
  .vrm-ledger-drawer-head{padding:14px 14px 12px;border-radius:14px 14px 0 0;}
  .vrm-ledger-drawer-head h2{font-size:15px;margin:5px 0;}
  .vrm-ledger-drawer .vrm-main.vrm-ledger-drawer-body{padding:14px!important;}
@@ -208,15 +208,15 @@
 
 /* Une seule présentation du logo officiel, sans recadrage ni filtre. */
 .vrm-brand-asset{object-fit:contain!important;filter:none!important;opacity:1;flex-shrink:0;}
-.vrm-app-shell .vrm-header-logo{width:46px!important;height:46px!important;flex-shrink:0;border-radius:12px;background:#0F0F0E;display:flex;align-items:center;justify-content:center;}
+.vrm-app-shell .vrm-header-logo{width:46px!important;height:46px!important;flex-shrink:0;border-radius:12px;background:#1D1D1F;display:flex;align-items:center;justify-content:center;}
 .vrm-app-shell .vrm-header-logo>img.vrm-logo{width:40px!important;height:40px!important;border-radius:0!important;box-shadow:none!important;}
 .vrm-sidebar-brand img.vrm-logo{border-radius:0!important;box-shadow:none!important;}
-.vrm-brand-auth{background:#0F0F0E;padding:2px;box-sizing:border-box;object-fit:contain!important;}
+.vrm-brand-auth{background:#1D1D1F;padding:2px;box-sizing:border-box;object-fit:contain!important;}
 /* Le panneau doit rester lisible même lorsque la liste est dézoomée. */
 @media(min-width:1024px){
  .vrm-ledger-drawer{width:min(600px,100%);}
  .vrm-ledger-drawer-head h2{font-size:22px;}
- .vrm-ledger-drawer-head p{font-size:14px;}
+ .vrm-ledger-drawer-head p{font-size:15px;}
  .vrm-ledger-drawer-head span{font-size:12px;}
 }
 .vrm-main .vrm-ledger-sale-toggle[aria-expanded=true]{background:var(--gestion-soft)!important;box-shadow:inset 3px 0 var(--gestion-accent);}
@@ -237,10 +237,10 @@
     encore forcés en blanc cassé et vert pâle, faits pour l'ancien bandeau sombre
     — bénéfice et « Je n'ai pas de dépenses à noter » à 1,1:1 en clair. Ils suivent
     maintenant les couleurs du thème, clair comme sombre. */
- .vrm-day-money>.vrm-day-benef-inline{border-top-color:var(--vrm-line,#dce4df)!important;padding-top:10px;margin-top:7px;}
- .vrm-day-money .vrm-day-benef-inline .vrm-display,.vrm-day-money .vrm-day-benef-inline b{color:var(--vrm-ink,#0F0F0E)!important;}
+ .vrm-day-money>.vrm-day-benef-inline{border-top-color:var(--vrm-line,#E5E5EA)!important;padding-top:10px;margin-top:7px;}
+ .vrm-day-money .vrm-day-benef-inline .vrm-display,.vrm-day-money .vrm-day-benef-inline b{color:var(--vrm-ink,#1D1D1F)!important;}
  .vrm-day-money .vrm-day-benef-inline .vrm-lien-action{color:var(--vrm-accent,#0071E3)!important;}
- .vrm-day-benef-inline .vrm-day-k{font-size:10px;letter-spacing:.04em;}
+ .vrm-day-benef-inline .vrm-day-k{font-size:11px;letter-spacing:.04em;}
 }
 
 /* Finition transversale : messages, formulaires et états secondaires. Les tons
@@ -252,7 +252,7 @@
 }
 .vrm-main .vrm-input{
  border-color:var(--gestion-line)!important;background:var(--gestion-surface)!important;
- border-radius:8px!important;line-height:1.45;box-sizing:border-box;max-width:100%;
+ border-radius:12px!important;line-height:1.45;box-sizing:border-box;max-width:100%;
 }
 .vrm-main .vrm-input:focus-visible{
  outline:2px solid var(--gestion-accent);outline-offset:2px;
@@ -267,20 +267,20 @@
  color:var(--gestion-ink)!important;
 }
 .vrm-main .vrm-notice{
- box-shadow:none!important;border-radius:8px!important;padding:12px 14px!important;
+ box-shadow:none!important;border-radius:12px!important;padding:12px 14px!important;
  gap:10px!important;line-height:1.5;
 }
 .vrm-main .vrm-notice>div{overflow-wrap:anywhere;}
 .vrm-main .vrm-notice details>summary{opacity:1!important;min-height:44px;display:flex;align-items:center;}
 .vrm-main .vrm-empty-state{
  background:var(--gestion-surface)!important;border-color:var(--gestion-line)!important;
- padding:28px 20px!important;border-radius:10px!important;box-shadow:none!important;
+ padding:28px 20px!important;border-radius:12px!important;box-shadow:none!important;
 }
 .vrm-main .vrm-empty-state>div:first-child{
  width:40px!important;height:40px!important;font-size:20px!important;
  background:var(--gestion-soft)!important;color:var(--gestion-accent);
 }
-.vrm-main .vrm-empty-state>div:nth-child(2){font-size:14px!important;line-height:1.4;}
+.vrm-main .vrm-empty-state>div:nth-child(2){font-size:15px!important;line-height:1.4;}
 .vrm-main .vrm-empty-state>div:nth-child(3){line-height:1.6!important;}
 .vrm-main .vrm-set-pied{
  font-size:12px!important;line-height:1.6;max-width:68ch;
@@ -290,16 +290,16 @@
 .vrm-main .vrm-set-lib>b{font-weight:600;line-height:1.4;}
 .vrm-main .vrm-set-liste{background:var(--gestion-surface)!important;}
 .vrm-main .vrm-set-ligne:focus-within{background:var(--gestion-soft);}
-.vrm-main .vrm-set-champ:focus-visible{outline:2px solid var(--gestion-accent);outline-offset:2px;border-radius:4px;}
+.vrm-main .vrm-set-champ:focus-visible{outline:2px solid var(--gestion-accent);outline-offset:2px;border-radius:6px;}
 .vrm-main .vrm-set-titre{margin-left:12px;font-size:12px;line-height:1.5;}
 .vrm-main .vrm-set-carte-tete{padding-bottom:12px;border-bottom:1px solid var(--gestion-line);}
-.vrm-feuille{box-shadow:0 12px 48px #14282e24;border:1px solid var(--vrm-hair,#dce5e1);}
+.vrm-feuille{box-shadow:0 12px 48px #1D1D1F24;border:1px solid var(--vrm-hair,#E5E5EA);}
 .vrm-feuille :is(input,textarea,select):focus-visible{outline:2px solid var(--vrm-focus,#0071E3);outline-offset:2px;}
 /* Les messages éphémères sont rendus hors de la coque par React. */
-.vrm-toasts{--message-surface:var(--vrm-surface,#FDFEFC);--message-ink:var(--vrm-ink,#0F0F0E);--message-line:var(--vrm-line,#DCE4DF);}
+.vrm-toasts{--message-surface:var(--vrm-surface,#FFFFFF);--message-ink:var(--vrm-ink,#1D1D1F);--message-line:var(--vrm-line,#E5E5EA);}
 .vrm-toast{
- min-height:48px;border-radius:10px!important;border-color:var(--message-line)!important;
- background:var(--message-surface)!important;box-shadow:0 4px 20px #14282e1f!important;
+ min-height:48px;border-radius:12px!important;border-color:var(--message-line)!important;
+ background:var(--message-surface)!important;box-shadow:0 4px 20px #1D1D1F1f!important;
 }
 .vrm-toast>span:last-child{color:var(--message-ink)!important;min-width:0;overflow-wrap:anywhere;}
 .vrm-toast-icon{display:flex;align-items:center;justify-content:center;flex-shrink:0;width:24px;height:24px;}
@@ -309,13 +309,13 @@
 @media(prefers-reduced-motion:reduce){.vrm-toast{animation:none!important;}}
 .vrm-main .vrm-set-panneau :is(p,small){line-height:1.6;}
 .vrm-main :is(.vrm-reception,.vrm-recus-email){
- background:var(--gestion-surface);border-color:var(--gestion-line);border-radius:8px;
+ background:var(--gestion-surface);border-color:var(--gestion-line);border-radius:12px;
 }
 .vrm-main :is(.vrm-reception-note,.vrm-recus-email p,.vrm-recus-email small){
  color:var(--gestion-muted);opacity:1;line-height:1.6;
 }
 .vrm-main .vrm-reception-entete-liste{background:var(--gestion-soft);}
-.vrm-main .vrm-ann-tools-pop{border-color:var(--gestion-line)!important;border-radius:10px!important;box-shadow:0 8px 28px #14282e20!important;}
+.vrm-main .vrm-ann-tools-pop{border-color:var(--gestion-line)!important;border-radius:12px!important;box-shadow:0 8px 28px #1D1D1F20!important;}
 .vrm-main .vrm-ann-tools-pop button{border-radius:6px;}
 .vrm-main .vrm-ann-tools-pop button:focus-visible{outline:2px solid var(--gestion-accent);outline-offset:-2px;}
 /* (22 oct.) « ⋯ Outils » des Ventes : sous 1 024 px la rangée des filtres défile
@@ -332,8 +332,8 @@
 
 /* Perle : fondus limités aux surfaces, jamais aux informations. */
 .vrm-app-shell .vrm-atelier-rail{background-image:var(--vrm-nav-gradient)!important;}
-.vrm-app-shell .vrm-main{background-image:radial-gradient(ellipse at 5% 0%,#91b1a514,transparent 64%)!important;}
-.vrm-rail-button[aria-current=page]::before,.vrm-rail-button[data-active]::before{background:#CABDA0;}
+.vrm-app-shell .vrm-main{background-image:radial-gradient(ellipse at 5% 0%,#AEAEB214,transparent 64%)!important;}
+.vrm-rail-button[aria-current=page]::before,.vrm-rail-button[data-active]::before{background:#C7C7CC;}
 .vrm-main :is(.vrm-surface,.vrm-day-card,.vrm-set-carte,.vrm-kpi-ventes-grille){border-color:var(--gestion-line)!important;}
 .vrm-main .vrm-set-carte{background:var(--gestion-surface);}
 .vrm-main .vrm-notice[data-tone=info]>span:first-child{background:var(--gestion-accent)!important;}
@@ -351,14 +351,14 @@
 .vrm-repartition-anneau{width:96px;margin:0;}
 .vrm-repartition-anneau svg{display:block;width:100%;height:auto;}
 .vrm-day-performance{min-width:0;}
-.vrm-day-performance h3{font-size:14px;margin:0;}
+.vrm-day-performance h3{font-size:15px;margin:0;}
 .vrm-day-performance .vrm-day-head button{border:0;background:transparent;color:var(--vrm-accent);font:inherit;font-size:12px;min-height:44px;cursor:pointer;}
 .vrm-performance-chiffres{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:12px 0 16px;}
 .vrm-performance-chiffres div{min-width:0;}
 .vrm-performance-chiffres span{display:block;font-size:11px;color:var(--vrm-muted);line-height:1.5;}
 .vrm-performance-chiffres b{display:block;font-size:20px;font-variant-numeric:tabular-nums;margin-top:4px;white-space:nowrap;}
 .vrm-day-performance>details>summary{min-height:44px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px;cursor:pointer;border-top:1px solid var(--vrm-line);}
-.vrm-day-performance>details>summary span{font-size:10px;color:var(--vrm-muted);}
+.vrm-day-performance>details>summary span{font-size:11px;color:var(--vrm-muted);}
 .vrm-day-performance>details>div{border:0!important;padding:12px 0 0!important;box-shadow:none!important;}
 @media(min-width:1024px){.vrm-day-lower>.vrm-day-recent{grid-row:1 / span 2;}.vrm-day-lower>.vrm-day-performance{grid-column:2;grid-row:1;}.vrm-day-lower>.vrm-day-stock{grid-column:2;grid-row:2;}}
 @media(max-width:767px){.vrm-repartition-visuel{grid-template-columns:74px minmax(0,1fr);gap:10px;}.vrm-repartition-anneau{width:74px;}.vrm-repartition-visuel [data-repart-ligne]{grid-template-columns:minmax(0,1fr) auto!important;gap:6px!important;}.vrm-repartition-visuel [data-repart-ligne]>div{display:none;}}
@@ -383,7 +383,7 @@
 /* Présentations retenues : messages, statistiques, achats et retraits.
    Aucun sélecteur de cette passe ne modifie les lignes Ventes ou Annonces. */
 .vrm-chat-panel{--gestion-line:var(--vrm-line);--gestion-surface:var(--vrm-surface);--gestion-soft:var(--vrm-card2);}
-.vrm-message-workspace{gap:0;border:1px solid var(--gestion-line);border-radius:10px;background:var(--gestion-surface);}
+.vrm-message-workspace{gap:0;border:1px solid var(--gestion-line);border-radius:12px;background:var(--gestion-surface);}
 .vrm-message-workspace .vrm-inbox-column{padding:12px 0 0;}
 .vrm-message-workspace .vrm-inbox-column>input{margin-inline:12px;max-width:calc(100% - 24px);box-sizing:border-box;}
 .vrm-message-workspace .vrm-inbox-filters{padding-inline:12px;gap:4px;}
@@ -397,16 +397,16 @@
 .vrm-chat-panel .vrm-bulle{font-size:13px;line-height:1.6;padding:10px 13px;border-radius:10px 10px 10px 3px!important;}
 .vrm-chat-panel .vrm-bulle-moi>.vrm-bulle{border-radius:10px 10px 3px 10px!important;}
 .vrm-chat-panel .vrm-chat-foot{padding:12px!important;}
-.vrm-chat-panel .vrm-chat-compose{border:1px solid var(--gestion-line);border-radius:8px;background:var(--gestion-surface);padding:5px;gap:8px;}
+.vrm-chat-panel .vrm-chat-compose{border:1px solid var(--gestion-line);border-radius:12px;background:var(--gestion-surface);padding:5px;gap:8px;}
 .vrm-chat-panel .vrm-chat-compose textarea{border:0!important;background:transparent!important;resize:vertical;min-width:0;}
 .vrm-chat-panel .vrm-chat-send{border-radius:6px!important;min-height:44px;}
-.vrm-main .vrm-pickup-board .vrm-pickup-point{border-radius:8px!important;}
+.vrm-main .vrm-pickup-board .vrm-pickup-point{border-radius:12px!important;}
 .vrm-main .vrm-pickup-point>div:first-child{padding-block:10px!important;background:var(--gestion-soft)!important;font-size:12px!important;}
 .vrm-main .vrm-pickup-card{padding:10px 12px!important;gap:8px 12px!important;}
-.vrm-main .vrm-pickup-card .vrm-pickup-thumb{width:56px!important;height:74px!important;border-radius:8px!important;}
+.vrm-main .vrm-pickup-card .vrm-pickup-thumb{width:56px!important;height:74px!important;border-radius:12px!important;}
 .vrm-main .vrm-pickup-code{display:grid;grid-template-columns:auto auto;gap:2px 10px;min-height:48px;padding:6px 10px;border:1px solid var(--gestion-line);background:var(--gestion-soft);border-radius:6px!important;}
-.vrm-main .vrm-pickup-code>span{font-size:10px;grid-column:1;}
-.vrm-main .vrm-pickup-code>strong{grid-column:1;font-size:16px!important;line-height:1.4;white-space:nowrap;}
+.vrm-main .vrm-pickup-code>span{font-size:11px;grid-column:1;}
+.vrm-main .vrm-pickup-code>strong{grid-column:1;font-size:17px!important;line-height:1.4;white-space:nowrap;}
 .vrm-main .vrm-pickup-code>small{grid-column:2;grid-row:1 / span 2;display:flex;align-items:center;gap:5px;font-size:11px;}
 .vrm-main .vrm-pickup-code[data-code-long=true]>strong{font-size:13px!important;letter-spacing:0!important;}
 .vrm-main .vrm-pickup-collect{font-size:11px!important;border-radius:6px!important;min-height:44px!important;}
@@ -435,10 +435,10 @@
  .vrm-message-workspace .vrm-inbox-column{padding:0;}
  .vrm-message-workspace .vrm-inbox-filters{padding-inline:0;}
  .vrm-message-workspace .vrm-chat-column{border:0;}
- .vrm-chat-panel .vrm-chat-compose textarea{font-size:16px!important;}
+ .vrm-chat-panel .vrm-chat-compose textarea{font-size:17px!important;}
  .vrm-main .vrm-pickup-card{padding:8px 10px!important;gap:8px!important;}
  .vrm-main .vrm-pickup-code{gap:2px 6px;padding:5px 8px;}
- .vrm-main .vrm-pickup-code>strong{font-size:14px!important;}
+ .vrm-main .vrm-pickup-code>strong{font-size:15px!important;}
  .vrm-main .vrm-buy-row .vrm-buy-title{font-size:12px!important;}
 }
 
@@ -471,5 +471,5 @@
 .vrm-sales-workbar>.vrm-filtres-et-outils>.vrm-outils-ventes>button{min-height:40px;white-space:nowrap;}
 /* (30 oct.) « N° et frais » dans la feuille d'une vente : une rangée repliable comme
    les autres (sans bordure grise, chevron à droite), pas une 4ᵉ forme. */
-.vrm-ledger-drawer-body .vrm-sale-details>summary{border:0!important;background:var(--vrm-b-teinte,rgba(36,78,84,.08))!important;border-radius:10px!important;display:flex!important;align-items:center;justify-content:space-between;gap:8px;}
+.vrm-ledger-drawer-body .vrm-sale-details>summary{border:0!important;background:var(--vrm-b-teinte,rgba(0,0,0,.08))!important;border-radius:12px!important;display:flex!important;align-items:center;justify-content:space-between;gap:8px;}
 .vrm-ledger-drawer-body .vrm-sale-details>summary::after{margin-left:auto!important;}
