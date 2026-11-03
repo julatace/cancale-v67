@@ -48,6 +48,14 @@ const dit = (c, m, d = '') => { if (c) { ok++; console.log('  ✅ ' + m); } else
     const nTitre = (/^(\d+)/.exec(x.court) || [])[1];
     if (nTitre && j.n != null) dit(Number(nTitre) === Number(j.n), '   le nombre du titre est le compteur de la ligne', `${nTitre} ≠ ${j.n}`);
   }
+  // 6. (3 nov., critique #11) La pastille porte le nombre : le titre ne le redit pas.
+  const { titreSansNombre } = await import('file://' + fichier);
+  if (typeof titreSansNombre !== 'function') dit(false, 'titreSansNombre existe');
+  else {
+    for (const [t, n, att] of [['2 annonces à retirer de Leboncoin', 2, 'Annonces à retirer de Leboncoin'], ['6 annonces sans numéro', 6, 'Annonces sans numéro'], ['Colis à vérifier', 3, 'Colis à vérifier'], ['3 e-mails à trier', null, '3 e-mails à trier'], ['12 colis en retard', 2, '12 colis en retard']])
+      dit(titreSansNombre(t, n) === att, `titre sans le nombre de la pastille : « ${t} » (${n}) → « ${att} »`, titreSansNombre(t, n));
+    dit(/titreSansNombre\(/.test(fs.readFileSync(path.join(RACINE, 'src/App.jsx'), 'utf8')), 'Ma journée retire le nombre du titre quand une pastille le porte');
+  }
   const app = fs.readFileSync(path.join(RACINE, 'src/App.jsx'), 'utf8');
   dit(/import \{[^}]*courtFusion[^}]*\} from "\.\/design\/tacheCourte\.js"/.test(app), 'App.jsx importe la forme courte');
   dit(/const decouper = \(j\) => \{\s*const f = courtFusion\(j\);/.test(app), 'Ma journée (`decouper`) passe par la forme courte');
