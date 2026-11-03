@@ -49997,7 +49997,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               court: `${LIBELLE_LITIGE[l.genre] || 'Litige'}${l.num ? ` · N°${l.num}` : ''}`,
               detail: [lim ? `avant le ${lim}` : 'délai non lu', compte].filter(Boolean).join(' · '),
               plein: [l.titre, l.qui, l.raison ? `« ${l.raison} »` : ''].filter(Boolean).join(' · '),
-              tab: l.sens === 'achat' ? 'achats' : 'ventes', prio: l.presse ? 0.1 : 0.6 });
+              tab: l.sens === 'achat' ? 'achats' : 'cat_ventes', prio: l.presse ? 0.1 : 0.6 });
           }
         }
         // (21 oct., 5.204) « Tout est OK » à confirmer sur Vinted avant la date
@@ -50465,7 +50465,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           return (
           <div className={'vrm-day-task is-groupe' + (j.urgent ? ' is-urgent' : '')} key={'litige' + l.cle + i} role="group" data-job="litige" data-litige={l.cle} data-litige-genre={l.genre} data-litige-sens={l.sens}
             data-litige-limite={l.limite || ''} data-litige-num={l.num || ''} data-litige-source={l.source} title={plein}>
-            <button type="button" className="vrm-day-task-ouvrir" aria-label={plein.replace(/\n/g, ' — ')} onClick={()=>{ if (l.tx) poserCible({ type: l.sens === 'achat' ? 'achat' : 'vente', tx: l.tx }, j.tab); if (onNav) onNav(j.tab); }}>
+            <button type="button" className="vrm-day-task-ouvrir" aria-label={plein.replace(/\n/g, ' — ')} onClick={()=>{ if (l.tx) poserCible({ type: l.sens === 'achat' ? 'achat' : 'vente', tx: l.tx }, l.sens === 'achat' ? 'achats' : 'ventes'); if (onNav) onNav(j.tab); }}>
               {corpsTache(j, x)}
             </button>
             <Bouton variante="secondaire" className="vrm-b-petit vrm-day-task-geste" href={l.geste.url} target="_blank" rel="noreferrer" title={l.geste.libelle + ' ↗'} aria-label={l.geste.libelle} data-litige-geste={l.geste.url}>{mot} ↗</Bouton>
@@ -66678,7 +66678,11 @@ function AppCoeur() {
         const go=(tab,cible)=>{ setGsOpen(false); if(cible) poserCible(cible, redirigerOnglet(tab, null, ONGLETS_DEPLACES).tab); setTab(tab); };
         // Un NUMÉRO tapé (« 128 », « B128 », « n128 ») : le bloc « Tout sur le
         // N° » passe devant, par identité (src/rechercheNumero.js).
-        const estNumQ = !!kNumQ;
+        // (3 nov.) Un nombre long (≥ 5 chiffres) qui EST un code de retrait, un n° de suivi
+        // ou de transaction exact : « Tout sur le N°482913 — jamais servi » ne s'affiche pas
+        // par-dessus (le N° reste cherché dès qu'aucune identité exacte ne répond).
+        const identiteExacte = !!(trouve && Object.values(trouve.groupes).some(g => g.some(r => r.exact && r.par !== 'pseudo')));
+        const estNumQ = !!kNumQ && !(identiteExacte && /^\d{5,}$/.test(kNumQ));
         // Revue du 16 octobre : la recherche écrivait le statut BRUT de Vinted
         // (« Le paiement a été validé ») et la date en 15/10/2026, quand la carte
         // de la même vente dit « À expédier · 15 oct. ». Même règle (`etapeVente`,
