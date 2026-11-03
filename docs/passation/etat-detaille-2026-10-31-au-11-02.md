@@ -211,3 +211,6 @@ Déplacé TEL QUEL depuis CLAUDE.md §9 le 2 novembre 2026 (le fichier dépassai
 ### Lignes de §9 déplacées telles quelles
 - **2 nov. (soir)** — Tournée de tous les audits sur `main` : 221/221 verts (SQL sur Postgres 17 ; sur Postgres 18 les empreintes de forme changent car les NOT NULL vont dans `pg_constraint` — 016 corrigée, 014/018-020 déjà appliquées laissées). Revue indépendante ⇒ 5.313.0. Tournée des 257 bancs en cours (branche `claude/tournee-bancs`). Geste : aucun.
 - **2 nov. (soir)** — **Extension 5.313.0** (revue indépendante) : le frein relu dans la file (une paire en attente ne part plus après le refus d'une autre), « limite » n'est plus une restriction 24 h, pas de recréation si l'annonce n'a pas pu être lue, plafond partagé au compte EXACT (`audit-recreer` R1-R5). → historique vinted-extension. Geste : installer la 5.313.0.
+
+### Lignes de §9 déplacées telles quelles
+- **2 nov. (soir)** — Saisies sans réseau gardées sur l'appareil (file d'envoi `src/fileEnvoi.js`, rejouée par la fusion clé par clé au chargement, vidée quand la base ACCEPTE ; « N changements en attente d'envoi » dit une fois) : les prix tapés en 4G faible ne se perdent plus quand l'iPhone ferme l'app. Banc `file-envoi` (rouge sur l'avant). → historique sécurité-base-serveur. Geste : aucun.
