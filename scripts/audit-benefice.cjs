@@ -14,8 +14,11 @@
 //      achat inconnu n'est pas un achat à 0 €, §5) ; « 0 » saisi est connu ;
 //   3. les bornes de période (jour local entier, comme `dansPeriode`) ;
 //   4. le net final : brut − frais − charges − cotisations, et `null` (« — ») si
-//      un prix d'achat manque ou si le CA déclaré n'est pas publié ;
-//   5. les cotisations portent sur la part VINTED du CA déclaré publié ;
+//      un prix d'achat manque, ou s'il n'y a rien à calculer (aucune vente,
+//      aucune dépense — 3 nov.) ;
+//   5. (3 nov.) les cotisations retirées du bénéfice portent sur les MÊMES
+//      ventes que lui (taux × leur montant), plus sur le CA déclaré du mois
+//      (daté au versement : un autre ensemble — « Bénéfice du mois −5 € ») ;
 //   6. le code : `totals` (Ventes) passe par la règle, et Comptabilité ne relit
 //      aucun prix d'achat (pas de second calcul).
 // `--mutation=…` réaffaiblit la règle dans une copie du source : chaque mutation
@@ -205,15 +208,18 @@ essaie('net final complet', () => {
   const compta = { depenses: [{ date: `${ym}-01`, montant: 12.5 }], fixes: [], packs: [], abonnements: [] };
   const ligne = { mois: [{ ym, ca: 300, par: { Vinted: { n: 2, ca: 200 }, Leboncoin: { n: 1, ca: 100 } } }] };
   const P = F.beneficePeriode({ jours, compta, ligneUrssaf: ligne, taux: 13.5, periode: 'mois', maintenant: now.getTime() });
-  const cotis = Math.round(cents(200) * 13.5 / 100) / 100;              // 27 €
+  const cotis = Math.round(cents(150.5) * 13.5 / 100) / 100;            // 20,32 € : les 150,50 € vendus, pas les 300 € déclarés
   const attendu = (cents(100) - cents(40) - cents(5) + cents(50.5) - cents(20.25) - cents(12.5) - cents(cotis)) / 100;
-  dit(P.cotis === cotis, 'les cotisations portent sur la part VINTED du CA déclaré publié (pas Leboncoin)', `${P.cotis} · attendu ${cotis}`);
+  dit(P.cotis === cotis, '(3 nov.) les cotisations du bénéfice portent sur les MÊMES ventes que lui (pas sur le CA déclaré du mois)', `${P.cotis} · attendu ${cotis}`);
+  dit(P.caDecl === 200, 'le CA déclaré (part Vinted, daté au versement) reste lu pour la déclaration', `${P.caDecl}`);
   dit(P.charges === 12.5, 'les charges de la période viennent de la règle des charges de Comptabilité', `${P.charges}`);
   dit(P.netFinal != null && Math.abs(P.netFinal - attendu) < 0.005, 'NET final = brut − frais − charges − cotisations', `${P.netFinal} · attendu ${attendu}`);
   const Q = F.beneficePeriode({ jours, compta, ligneUrssaf: null, taux: 13.5, periode: 'mois', maintenant: now.getTime() });
-  dit(Q.netFinal === null && Q.raison === 'cotisations' && Q.cotis === null, 'CA déclaré pas publié ⇒ cotisations et net « — », raison dite', `${Q.netFinal} · ${Q.raison}`);
+  dit(Q.netFinal === P.netFinal && Q.cotis === cotis && Q.caDecl === null, '(3 nov.) CA déclaré pas publié ⇒ le bénéfice ne l’attend plus (cotisations des ventes comptées)', `${Q.netFinal} · ${Q.raison}`);
   const V = F.beneficePeriode({ jours: {}, compta, ligneUrssaf: ligne, taux: 13.5, periode: 'mois', maintenant: now.getTime() });
-  dit(V.n === 0 && V.brut === 0 && V.netFinal != null, 'aucune vente sur la période : brut 0 (lu, vide), le net reste calculable', `${V.brut} · ${V.netFinal}`);
+  dit(V.n === 0 && V.brut === 0 && V.netFinal === -12.5 && V.cotis === 0, 'aucune vente, des dépenses : le net = −les dépenses (aucune URSSAF des versements du mois)', `${V.brut} · ${V.netFinal}`);
+  const W = F.beneficePeriode({ jours: {}, compta: {}, ligneUrssaf: ligne, taux: 13.5, periode: 'mois', maintenant: now.getTime() });
+  dit(W.netFinal === null && W.raison === 'rien', '(3 nov.) aucune vente ni dépense ⇒ « — » (rien à calculer), jamais 0 ni −URSSAF', `${W.netFinal} · ${W.raison}`);
 });
 
 essaie('Leboncoin et eBay par identité', () => {
