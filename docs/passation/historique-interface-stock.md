@@ -3277,3 +3277,58 @@ avec les articles ». Décisions (rapportées par la session qui pilote) et ce q
   (2) comment déclarer une vente en main propre (CA/URSSAF), (3) s'il veut (b) sur Leboncoin
   (version d'extension), (4) garder le retrait eBay automatique ALLUMÉ maintenant qu'il couvre
   Leboncoin et Vestiaire ; ouvrir « Mes transactions » Leboncoin pour rafraîchir la liste.
+
+### LES QUATRE OUTILS DES ANNONCES : PRIX PARTOUT, DUPLIQUER, HISTOIRE, MODÈLES (3 novembre, branche `claude/annonces-outils`)
+Choix de Julien (3 nov.), dans cet ordre, style Fusion, sans texte explicatif.
+- **Mesuré (lecture seule)** : fiches `vinted_annonce_numeros` = 505, toutes avec `numberedAt` ;
+  `recreeAt/recreeDe` 7, `repriseAt` 17, `min` (prix mini des offres) 13, `buyFromId` 8 ; coffres
+  (`coffre_{uid}_{id}`, 762) portent `firstSavedAt`, `brand`, `etat`, `desc` ; 927 conversations portent
+  `transaction.item_id`, les offres sont des messages `offer_request_message` (`entity.price`,
+  `status_title`, `user_id`, `created_at_ts`) ; reçus d'achat `email_invoice_tx{n°}` ; `lbc_listings`
+  (184 actives, prix en euros, `ref`, `url`) ; `vc_listings` (statut `published`, `prix.valeur`) ;
+  `vinted_prix_historique` (prix changés par Republier, par annonce). Aucune date de publication
+  Vinted dans les annonces lues : la mise en ligne est datée par la PREMIÈRE sauvegarde coffre
+  (« Vue en ligne »), sinon sans date.
+- **1. Prix partout** (`src/prixPartout.js`, `src/PrixPartout.jsx`) : fiche d'un N° (ou carte d'annonce
+  → « Changer le prix », événement `vrm:prix-partout`) ⇒ feuille : nouveau prix (`prixTape`, la règle
+  de `prixLu`), une case par site où CE N° est en ligne PAR IDENTITÉ (Vinted : la fiche en ligne de
+  `toutSurLeNumero`, jamais masquée ni « à confirmer » ; eBay : SKU `VRM-{n°}` ; Leboncoin : lien posé
+  ou référence VRM — jamais le « nXX » d'un titre ; Vestiaire : lien, `ref` VRM ou N° du produit, deux
+  qui se contredisent ⇒ personne), état après envoi (Fait · Refusé + raison · Pas sûr · À faire sur le
+  site + « Ouvrir »). Envois (`envoisPrix`, appelés seulement par « Appliquer », sites cochés, un par
+  un) : eBay = route `revise` avec `confirme:true` et `prixVu` (trois issues, `resultatReviseEbay`) ;
+  Vinted = commande existante `republierVinted` (PUT en place, confirmée, capacité `republiermodif`
+  5.247.0 ; sinon « À faire sur le site »). **Leboncoin et Vestiaire : aucune capacité prouvée pour
+  changer un prix ⇒ toujours « À faire sur le site »** (Vestiaire : pas d'URL d'article lue, le lien
+  ouvre Vestiaire). Aucune version d'extension neuve : la forme d'une modification Leboncoin/Vestiaire
+  n'a jamais été mesurée — à mesurer sur SON geste avant de proposer `lbcprix`/`vcprix` (5.318+).
+  Le prix mini (`min`) n'est jamais changé : s'il dépasse le nouveau prix, une ligne ambre le dit.
+  Journal `vrm_prix_journal` (synchronisé, sites FAITS seulement) pour l'histoire.
+- **2. Dupliquer** (`src/dupliquerFiche.js`, `dupliquerNumero` dans App.jsx) : N° neuf par le VRAI
+  `prochainLibre` sur tous les numéros servis (pool, fiches, ventes corrigées, liens Leboncoin,
+  Vestiaire, fiches neuves, **réservations `panel_num_reserves` — illisibles ⇒ rien**), version de
+  numérotation vérifiée, pool écrit AVANT la fiche ; copie en LISTE BLANCHE (titre, marque, taille,
+  état, description, prix ; aucune photo, aucun identifiant d'annonce/transaction/SKU, ni compte, ni
+  prix d'achat, ni prix mini). Rangée dans `vrm_fiches_neuves` (synchronisée) ; Annonces → « À
+  publier » (N°, titre, « photos à prendre », Copier le texte, Retirer — le N° reste servi) ; sort de
+  la liste quand une annonce porte son N°. ⚠️ Limite : la page de dépôt Vinted réserve SON numéro
+  (5.201) ; pour garder celui de la copie, il faut le poser à la main sur l'annonce publiée.
+- **3. Histoire** (`src/histoireArticle.js`, rendue par `FichePaire`) : achat (+ reçu rangé / pas de
+  reçu / pas lu) → numéroté (`numberedAt`) → rangée → mises en ligne (coffre, republication
+  `recreeAt`, eBay `depuis`, Leboncoin/Vestiaire par identité) → prix (journal + Republier) → offres
+  (par `item_id`, sens par l'auteur, inconnu ⇒ « Offre ») → favoris et vues → vente (preuve :
+  transaction et état) → colis → versement (450) → retour/annulation. Chaque ligne : date LUE (sinon
+  « — »), preuve, lien. Source pas lue ⇒ « passu » ; lue et vide ⇒ « absent ». Lectures en plus
+  (`lireExtraFiche`, projetées, à l'ouverture seulement).
+- **4. Mes modèles** (`src/modelesDescription.js`, `src/ModelesDescription.jsx`) : Paramètres →
+  Annonces → Mes modèles (`vrm_modeles_desc`, synchronisée) ; variables `{taille}` `{marque}` `{N°}`
+  `{titre}` `{prix}` ; une variable sans valeur RESTE écrite. Chips insérées au curseur dans 4
+  descriptions : fiche Leboncoin, eBay Publier, eBay Modifier, brouillon de Republier. Vestiaire :
+  la description n'est pas éditable dans VRM (l'extension reprend celle de Vinted) — pas de chips.
+- **Preuves** : `scripts/audit-annonces-outils.cjs` 45 contrôles (P1-P14, D0-D7, H1-H10, M1-M3, A1-A5),
+  `--prouve` : **43 rouges sur origin/main, 17/17 mutations**. Banc `scripts/bancs/annonces-outils.cjs`
+  (390 tactile clair + sombre, 1512) : feuille du N°118 (Vinted sans extension ⇒ « À faire sur le site »
+  + lien, eBay confirmé au prix vu ⇒ Fait, rien à l'ouverture, 44 px), Dupliquer N°227 ⇒ N°251 sans
+  photo ni identité, histoire datée — vert ; **rouge sur origin/main**. `fiche-paire` remis à l'ordre de
+  l'histoire (vert). Le retour « Tout sur le N° » ne se coupe plus mot à mot (`nowrap`, défaut de main).
+- **Geste de Julien** : essayer « Changer le prix » sur un N° en ligne sur Vinted + eBay ; créer un modèle.

@@ -92,7 +92,7 @@
 
 /* Actions et chronologie de la fiche d'un N°. */
 .vrm-fp-outils { display: flex; gap: 10px; margin: -4px 0 16px; }
-.vrm-fp-outils .vrm-ao-second { flex: 1 1 0; min-height: 48px; background: var(--vrm-surface, #F5F5F3); }
+.vrm-fp-outils .vrm-ao-second { flex: 1 1 0; min-height: 48px; background: var(--vrm-surface, #F5F5F3); color: var(--vrm-ink, #0F0F0E); }
 .vrm-fp-evs { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .vrm-fp-ev { display: flex; gap: 10px; align-items: baseline; font-size: 14px; line-height: 1.35; min-width: 0; }
 .vrm-fp-ev time, .vrm-fp-ev .vrm-fp-ev-sansdate { flex: none; min-width: 52px; font-size: 13px; color: var(--vrm-muted, #56564F); font-variant-numeric: tabular-nums; }
