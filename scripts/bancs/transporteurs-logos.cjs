@@ -175,7 +175,7 @@ const sain = async (pg, ecran) => {
             const nomG = h ? h.getAttribute('data-groupe-transp') : '';
             return { tx: c.getAttribute('data-tx-colis'), carte: c.getAttribute('data-transporteur'), pastilles: P2(act || c),
               apresBouton: !!(p && bouton && (p.compareDocumentPosition(bouton) & Node.DOCUMENT_POSITION_FOLLOWING) && (bouton.matches('[data-imprime], [data-bouton-bord], .vrm-fu-principal, button') || bouton.querySelector('button'))),
-              memeRangee: !!(p && bouton && p.parentElement === bouton.parentElement && (nomG === nomP || (nomG === 'Autres' && /pas lu/i.test(nomP)))) };
+              memeRangee: !!(p && bouton && p.parentElement === bouton.parentElement && (nomG === nomP || (nomG === 'Autres' && /pas lu|inconnu/i.test(nomP)))) };
           });
         });
         const envoyer = await pg.evaluate(() => ({ route: document.querySelectorAll('[data-vc-route]').length }));
