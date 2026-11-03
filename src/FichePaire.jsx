@@ -21,7 +21,7 @@ const quand = (iso) => {
 // (3 nov.) Une ligne d'événement de la chronologie : sa date LUE (sinon « — »),
 // son texte, sa preuve, son lien.
 const Evenement = ({ ev }) => (
-  <li className="vrm-fp-ev" data-fiche-ev={ev.cle} data-fiche-ev-date={ev.at || ''}>
+  <li className="vrm-fp-ev" data-fiche-ev={ev.cle} data-fiche-ev-date={ev.at || ''} data-fiche-tx={ev.tx || undefined}>
     {ev.at ? <time dateTime={ev.at}>{quand(ev.at)}</time> : <span className="vrm-fp-ev-sansdate">—</span>}
     <span className="vrm-fp-ev-txt">{ev.lien ? <a href={ev.lien} target="_blank" rel="noopener noreferrer">{ev.texte}</a> : ev.texte}{ev.preuve ? <small data-fiche-preuve="">{ev.preuve}</small> : null}</span>
   </li>

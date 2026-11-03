@@ -85,7 +85,7 @@ export function histoireArticle(rn, d = {}, o = {}) {
     for (const a of (rn.annonces || [])) {
       const lien = `https://www.vinted.fr/items/${encodeURIComponent(a.id)}`;
       const c = d.coffres == null ? undefined : d.coffres[a.id];
-      if (c === undefined) passu = true;
+      if (d.coffres == null) passu = true;
       const f = fiches ? fiches[a.id] : null;
       if (f && f.recreeAt) ev.push({ at: iso(f.recreeAt), texte: `Republiée sur Vinted${f.recreeDe ? ` (remplace l'annonce ${str(f.recreeDe)})` : ''}`, preuve: `annonce ${a.id}`, lien, cle: 'republie' });
       else if (c && c.firstSavedAt) ev.push({ at: iso(c.firstSavedAt), texte: 'Vue en ligne sur Vinted', preuve: `annonce ${a.id}`, lien, cle: 'en-ligne' });
@@ -123,9 +123,9 @@ export function histoireArticle(rn, d = {}, o = {}) {
   // 7. FAVORIS — le NOMBRE lu sur chaque annonce (jamais qui).
   if (d.stats == null) pose('favoris', 'passu', 'Favoris', [], 'favoris pas lus');
   else {
-    let n = null;
-    for (const id of ids) { const s = d.stats[id]; if (s && Number.isFinite(s.favoris)) n = (n || 0) + s.favoris; }
-    pose('favoris', n != null && n > 0 ? 'fait' : 'absent', n != null ? `${n} favori${n > 1 ? 's' : ''}` : 'Favoris', [], n == null ? (ids.length ? 'nombre pas écrit sur l’annonce' : 'aucune annonce Vinted') : null);
+    let n = null, vues = null;
+    for (const id of ids) { const s = d.stats[id]; if (s && Number.isFinite(s.favoris)) n = (n || 0) + s.favoris; if (s && Number.isFinite(s.vues)) vues = (vues || 0) + s.vues; }
+    pose('favoris', n != null && n > 0 ? 'fait' : 'absent', n != null ? `${n} favori${n > 1 ? 's' : ''}` : 'Favoris', [], n == null ? (ids.length ? 'nombre pas écrit sur l’annonce' : 'aucune annonce Vinted') : (vues != null ? `${vues} vues` : null));
   }
 
   // 8. VENTE — l'étape de `parcoursPaire`, une ligne par vente avec SA preuve.
@@ -136,7 +136,7 @@ export function histoireArticle(rn, d = {}, o = {}) {
     for (const v of ((rn.ventes && rn.ventes.vinted) || [])) {
       if (annulee(v)) continue;
       const m = v.price && v.price.amount != null ? Number(v.price.amount) : null;
-      ev.push({ at: iso(v.date), texte: ['Vinted', eur(m), d.nomCompte ? d.nomCompte(v._uid) : null].filter(Boolean).join(' · '), preuve: `transaction ${v._tx}${str(v.status) ? ' · ' + str(v.status) : ''}`, cle: 'vinted' });
+      ev.push({ at: iso(v.date), texte: ['Vinted', eur(m), d.nomCompte ? d.nomCompte(v._uid) : null].filter(Boolean).join(' · '), preuve: `transaction ${v._tx}${str(v.status) ? ' · ' + str(v.status) : ''}`, cle: 'vinted', tx: v._tx });
     }
     for (const v of ((rn.ventes && rn.ventes.lbc) || [])) if (!(o.lbcAnnulee && o.lbcAnnulee(v))) ev.push({ at: iso(v.dateVente || v.date), texte: ['Leboncoin', v.price != null ? eur(Number(v.price) / 100) : null].filter(Boolean).join(' · '), preuve: `annonce ${str(v.itemId)}`, cle: 'leboncoin' });
     for (const c of ((rn.ventes && rn.ventes.ebay) || [])) if (!o.commandeEbayEngagee || o.commandeEbayEngagee(c)) {
