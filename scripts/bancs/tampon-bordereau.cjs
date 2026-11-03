@@ -74,7 +74,19 @@ if (MUT === 'marges0') tampon = muter(tampon, 'mx: 14, my: 10', 'mx: 0, my: 0', 
 if (MUT === 'bandeThermique') tampon = muter(tampon, 'if (!thermique && tientA4(', 'if (tientA4(', MUT);
 if (MUT === 'sansRotation') tampon = muter(tampon, 'rotate: PL.degrees(r) });', 'rotate: PL.degrees(0) });', MUT);
 if (MUT === 'seuilStrict') tampon = muter(tampon, 'encre: 200, cellule: 3,', 'encre: 248, cellule: 1,', MUT);
-const SCRIPT = `const chargerPdfjs=async()=>window.pdfjsLib;\n${code}\n${tampon}\nwindow.__vrm={poserBordereau};`;
+// (3 nov., soir) LE TAMPON LIBRE : la place choisie à la main, la forme, la
+// mémoire par forme (`choisirTampon`). Absent du code d'avant ⇒ rouge, pas un plantage.
+const opt = (re) => { const x = re.exec(APP); return x ? x[0] : ''; };
+const LIBRE = [opt(/const TYPES_BORDEREAU = \[[\s\S]*?\n\];/), opt(/const typeBordereau = \([\s\S]*?\n\};/),
+  opt(/const TAMPON_ANNULE = [\s\S]*?\nconst choisirTampon = \([\s\S]*?\n\};/)].join('\n');
+if (MUT === 'rotationIgnoree') tampon = muter(tampon, 'const b = page.getCropBox(), r = rotationPage(page);\n  page.resetPosition();\n  const a = versPdfAffiche', 'const b = page.getCropBox(), r = 0;\n  page.resetPosition();\n  const a = versPdfAffiche', MUT);
+if (MUT === 'sansFond') tampon = muter(tampon, 'if (fond) page.drawRectangle(', 'if (false) page.drawRectangle(', MUT);
+if (MUT === 'memoireIgnoree') tampon = muter(tampon, 'const positionTampon = (forme) => {', 'const positionTampon = (forme) => null; const _x_ = (forme) => {', MUT);
+const SCRIPT = `const chargerPdfjs=async()=>window.pdfjsLib;
+let __store={}; const load=(k,d)=>(k in __store?JSON.parse(JSON.stringify(__store[k])):d); const save=(k,v)=>{__store[k]=JSON.parse(JSON.stringify(v));}; const libererOngletPdf=()=>{};
+${code}\n${tampon}\n${LIBRE}
+window.__vrm={poserBordereau};
+try { window.__libre={ choisirTampon, zonesCodesTampon, rendrePremierePage, recouvreTampon, cartoucheLibre, formeTampon, store:()=>__store, vider:()=>{__store={};}, placeur:(f)=>{_placeurTampon=f;} }; } catch (e) { window.__libre=null; }`;
 
 // ── Les PDF fabriqués ───────────────────────────────────────────────────────
 const VERT = PL.rgb(0.92, 1, 0.92), NOIR = PL.rgb(0, 0, 0);
@@ -169,7 +181,126 @@ window.__analyser = async (aB64, bB64, captures) => {
   } finally { await A.destroy(); await B.destroy(); }
 };`;
 
+// Le tampon LIBRE : imprime avec `choix` (posé à la main) ou par `choisirTampon`
+// (`apercu` : la mémoire par forme), rend le PDF, l'issue, et où le N° est écrit.
+const DANS_PAGE_LIBRE = `
+window.__libreImprimer = async (b64, thermique, numero, titre, o) => {
+  const PL = window.PDFLib, octets = Uint8Array.from(atob(b64), c => c.charCodeAt(0)), copie = octets.slice();
+  const src = await PL.PDFDocument.load(octets), out = await PL.PDFDocument.create();
+  const choisir = o.apercu !== undefined ? __libre.choisirTampon({ PL, src, numero, titre, apercu: o.apercu }) : (o.choix ? async () => o.choix : null);
+  let r0 = null, erreur = null;
+  try { r0 = await __vrm.poserBordereau(PL, out, src, { numero, title: titre, pos: null, thermique, choisir }); } catch (e) { erreur = { message: String(e.message || e), annule: !!e.tamponAnnule }; }
+  const intact = octets.length === copie.length && octets.every((x, i) => x === copie[i]);
+  if (erreur) return { erreur, intact };
+  const o2 = await out.save(); let s = ''; for (let i = 0; i < o2.length; i += 0x8000) s += String.fromCharCode.apply(null, o2.subarray(i, i + 0x8000));
+  const d = await pdfjsLib.getDocument({ data: o2.slice(), isEvalSupported: false }).promise;
+  try {
+    const pg = await d.getPage(1), v = pg.getViewport({ scale: 1 });
+    const items = (await pg.getTextContent()).items.map(it => { const m = pdfjsLib.Util.transform(v.transform, it.transform); return { s: it.str, x: m[4], y: m[5], t: Math.hypot(m[2], m[3]), droit: m[0] > 0 && Math.abs(m[1]) < 0.01 * m[0] && Math.abs(m[2]) < 0.01 * m[0] && m[3] < 0 }; });
+    // La largeur du cartouche de la variante, pour l'échelle attendue.
+    const dd = await PL.PDFDocument.create(), c = __libre.cartoucheLibre(await dd.embedFont(PL.StandardFonts.HelveticaBold), await dd.embedFont(PL.StandardFonts.Helvetica), numero, titre, (o.choix && o.choix.v) || 0);
+    return { b64: btoa(s), r0, pages: d.numPages, W: v.width, H: v.height, items, cw: c.w, ch: c.h, intact };
+  } finally { await d.destroy(); }
+};
+// Dans le cadre du tampon : le tampon seul (comparé à la même page blanche
+// tamponnée) ; hors du cadre : la page d'origine (comparée à b, sans tampon).
+window.__libreOpacite = async (aB64, bB64, cB64, box) => {
+  const S = 2, rd = async (x) => { const d = await __charge(x); try { return await __rendre(d, 1, S); } finally { await d.destroy(); } };
+  const A = await rd(aB64), B = await rd(bB64), C = await rd(cB64);
+  const lum = (d, i) => 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+  const bx = box.x * S, by = box.y * S, bw = box.w * S, bh = box.h * S;
+  let dans = 0, cache = 0, encreDessous = 0, hors = 0, horsDiff = 0;
+  for (let y = 0; y < A.h; y++) for (let x = 0; x < A.w; x++) {
+    const i = (y * A.w + x) * 4, dedans = x > bx + 1 && x < bx + bw - 1 && y > by + 1 && y < by + bh - 1, bord = x > bx - 2 && x < bx + bw + 2 && y > by - 2 && y < by + bh + 2;
+    if (dedans) { dans++; if (lum(B.d, i) < 128) encreDessous++; if (Math.abs(lum(A.d, i) - lum(C.d, i)) > 60) cache++; }
+    else if (!bord) { hors++; if (Math.abs(lum(A.d, i) - lum(B.d, i)) > 60) horsDiff++; }
+  }
+  return { dans, cache, encreDessous, hors, horsDiff };
+};
+// La même page, BLANCHE (même taille, même rotation), tamponnée au même choix.
+window.__libreBlanc = async (b64, numero, titre, choix) => {
+  const PL = window.PDFLib, s0 = await PL.PDFDocument.load(Uint8Array.from(atob(b64), c => c.charCodeAt(0))), p0 = s0.getPages()[0];
+  const d = await PL.PDFDocument.create(), p = d.addPage([p0.getSize().width, p0.getSize().height]); p.setRotation(p0.getRotation());
+  const b = await d.save(); let s = ''; for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i]);
+  return (await __libreImprimer(btoa(s), false, numero, titre, { choix })).b64;
+};
+window.__libreCodes = async (b64) => { const PL = window.PDFLib, d = await PL.PDFDocument.load(Uint8Array.from(atob(b64), c => c.charCodeAt(0))); return __libre.zonesCodesTampon(await __libre.rendrePremierePage(d)); };
+`;
 const proche = (a, b, e = 0.6) => Math.abs(a - b) <= e;
+// Où le N° doit tomber : coin haut-gauche (vx·W, vy·H) + marge 3 pt, ligne de base à (3 + 18·0,78)·k ;
+// k borné : N° ≥ 9 pt et titre ≥ 5 pt (variante 0 : 18 pt et 8 pt).
+const attenduN = (r, ch) => { const k = Math.max(Math.max(9 / 18, 5 / 8), Math.min(r.W / r.cw, r.H / r.ch, ch.vw * r.W / r.cw)); return { x: ch.vx * r.W + 3 * k, y: ch.vy * r.H + (3 + 18 * 0.78) * k, t: 18 * k, k }; };
+async function libre(pg, pdfs) {
+  console.log('\n── Le tampon LIBRE (posé à la main, même sur du texte) ──');
+  const dispo = await pg.evaluate(() => !!window.__libre);
+  dit(dispo, 'le tampon libre existe (choisirTampon, zonesCodesTampon, cartoucheLibre)');
+  if (!dispo) return;
+  const b64 = (n) => Buffer.from(pdfs[n]).toString('base64');
+  const imprimer = (n, th, o) => pg.evaluate(([x, t, nu, ti, oo]) => __libreImprimer(x, t, nu, ti, oo), [b64(n), th, NUMERO, TITRE, o]);
+  const N = (r) => r.items.find((x) => /B125/.test(x.s));
+  const posJuste = (t, r, ch) => { const n = N(r), e = attenduN(r, ch); dit(!!n && proche(n.x, e.x, 2) && proche(n.y, e.y, 2) && proche(n.t, e.t, 0.8), `${t} : le N° est à la place choisie (±2 pt)`, n ? `N° à (${n.x.toFixed(1)}, ${n.y.toFixed(1)}) ${n.t.toFixed(1)} pt, attendu (${e.x.toFixed(1)}, ${e.y.toFixed(1)}) ${e.t.toFixed(1)} pt` : 'N° absent'); dit(!!n && n.droit, `${t} : le N° se lit à l'endroit`); };
+  // L1 — sur du TEXTE (A4 couverte d'un bord à l'autre) : posé, fond opaque, rien d'autre ne bouge.
+  const CH = { vx: 0.25, vy: 0.45, vw: 0.4, v: 0 };
+  const r1 = await imprimer('a4-pleine', false, { choix: CH });
+  dit(r1.r0 && r1.r0.tampons[0] === 'libre', 'sur du texte : issue « libre » (rien n\'est refusé)', JSON.stringify(r1.r0 || r1.erreur));
+  dit(r1.pages === 1, 'sur du texte : pas de fiche colis ajoutée', `${r1.pages} pages`);
+  dit(r1.intact, 'le PDF rangé (les octets reçus) n\'est pas modifié');
+  posJuste('sur du texte', r1, CH);
+  {
+    const ref = await pg.evaluate(([x]) => __imprimer(x, false, '', ''), [b64('a4-pleine')]);
+    const blanc = await pg.evaluate(([x, n, t, c]) => __libreBlanc(x, n, t, c), [b64('a4-pleine'), NUMERO, TITRE, CH]);
+    const k = attenduN(r1, CH).k;
+    const { dans, cache, encreDessous, hors, horsDiff } = await pg.evaluate(([a, b, c, bx, by, bw, bh]) => __libreOpacite(a, b, c, { x: bx, y: by, w: bw, h: bh }), [r1.b64, ref.b64, blanc, CH.vx * r1.W, CH.vy * r1.H, r1.cw * k, r1.ch * k]);
+    dit(encreDessous > dans * 0.03, 'sur du texte : il y avait bien du texte sous le tampon', `${encreDessous} px d'encre sur ${dans}`);
+    dit(cache <= dans * 0.01, 'sur du texte : FOND OPAQUE — dans le cadre, seul le tampon se voit (le texte dessous est caché)', `${cache} px du texte d'origine visibles sur ${dans}`);
+    dit(horsDiff <= hors * 0.001, 'sur du texte : hors du cadre, la page est intacte', `${horsDiff} px changés`);
+  }
+  // L2 — page tournée 270 (Vestiaire) : la place est celle de la page AFFICHÉE.
+  const r2 = await imprimer('tournee-270', false, { choix: CH });
+  dit(r2.r0 && r2.r0.tampons[0] === 'libre', 'page /Rotate 270 : issue « libre »', JSON.stringify(r2.r0 || r2.erreur));
+  dit(proche(r2.W, 595.28, 1) && proche(r2.H, 841.89, 1), 'page /Rotate 270 : affichée debout 595×842', `${r2.W}×${r2.H}`);
+  posJuste('page /Rotate 270', r2, CH);
+  // L2b — page tournée 90, posée tout en bas à droite (bornée à la page).
+  const CH2 = { vx: 0.6, vy: 0.8, vw: 0.35, v: 0 };
+  const r2b = await imprimer('tournee-90-pleine', false, { choix: CH2 });
+  posJuste('page /Rotate 90', r2b, CH2);
+  // L3 — thermique, étiquette découpée en 100×150 : posé sur l'étiquette, pas de fiche.
+  const r3 = await imprimer('pleine-10x15', true, { choix: { vx: 0.05, vy: 0.55, vw: 0.6, v: 0 } });
+  dit(r3.r0 && r3.r0.tampons.every((x) => x === 'libre') && proche(r3.W, 283.46, 1) && proche(r3.H, 425.2, 1), 'thermique : posé sur l\'étiquette 100×150, aucune fiche, même taille', JSON.stringify(r3.r0) + ` ${r3.pages} p. ${r3.W}×${r3.H}`);
+  posJuste('thermique', r3, { vx: 0.05, vy: 0.55, vw: 0.6, v: 0 });
+  // L4 — « Toujours ici » : la forme suivante reprend la place ; une autre forme ⇒ choix auto.
+  await pg.evaluate(() => { __libre.vider(); window.__appels = 0; __libre.placeur((q) => { window.__appels++; window.__derniere = q.forme; q.resolve({ choix: { vx: 0.3, vy: 0.5, vw: 0.35, v: 0 }, toujours: true }); }); });
+  const CH4 = { vx: 0.3, vy: 0.5, vw: 0.35, v: 0 };
+  const m1 = await imprimer('a4-quart', false, { apercu: true });
+  const ap1 = await pg.evaluate(() => ({ n: window.__appels, f: window.__derniere, store: __libre.store() }));
+  dit(ap1.n === 1 && m1.r0 && m1.r0.tampons[0] === 'libre', 'forme sans place : l\'aperçu s\'ouvre une fois, la place choisie s\'imprime', JSON.stringify({ appels: ap1.n, r0: m1.r0 }));
+  posJuste('aperçu', m1, CH4);
+  const pos = ap1.store.vrm_tampon_positions || {};
+  dit(ap1.f && pos[ap1.f.cle] && proche(pos[ap1.f.cle].vx, 0.3, 1e-4), '« Toujours ici » : la place est mémorisée pour la FORME (`vrm_tampon_positions`)', JSON.stringify(pos));
+  const m2 = await imprimer('a4-quart', false, { apercu: true });
+  dit((await pg.evaluate(() => window.__appels)) === 1 && m2.r0 && m2.r0.tampons[0] === 'libre', 'même forme ensuite : pas d\'aperçu, la place mémorisée reprend directement');
+  posJuste('même forme', m2, CH4);
+  const m3 = await imprimer('scan', false, { apercu: false });
+  dit(m3.r0 && m3.r0.tampons[0] === 'libre', 'un lot (sans aperçu) : la place mémorisée de la forme', JSON.stringify(m3.r0));
+  posJuste('lot', m3, CH4);
+  const m4 = await imprimer('tournee-270', false, { apercu: false });
+  dit(m4.r0 && m4.r0.tampons[0] === 'blanc', 'une AUTRE forme (A4 couchée tournée) : le choix automatique de VRM', JSON.stringify(m4.r0));
+  // L5 — « Revenir au choix de VRM » oublie la place ; Annuler n'imprime rien.
+  await pg.evaluate(() => { __libre.placeur((q) => { window.__appels++; q.resolve({ choix: null, toujours: true }); }); });
+  const m5 = await imprimer('a4-quart', false, { apercu: 'force' });
+  const st5 = await pg.evaluate(() => __libre.store().vrm_tampon_positions || {});
+  dit(m5.r0 && m5.r0.tampons[0] === 'blanc' && !Object.keys(st5).length, '« Revenir au choix de VRM » : choix automatique, la place est oubliée', JSON.stringify({ r0: m5.r0, st5 }));
+  await pg.evaluate(() => { __libre.placeur((q) => q.resolve(null)); });
+  const m6 = await imprimer('a4-quart', false, { apercu: true });
+  dit(m6.erreur && m6.erreur.annule && m6.intact, 'Annuler : rien ne s\'imprime, le PDF rangé est intact', JSON.stringify(m6.erreur));
+  await pg.evaluate(() => { __libre.placeur(null); });
+  // L6 — la puce « recouvre le code-barres » : le code-barres et le QR sont vus, l'adresse non.
+  const z = await pg.evaluate(([x]) => __libreCodes(x), [b64('a4-quart')]);
+  const rec = (b) => z.some((q) => b.x < q.x + q.w && b.x + b.w > q.x && b.y < q.y + q.h && b.y + b.h > q.y);
+  dit(rec({ x: 100, y: 45, w: 40, h: 20 }), 'le code-barres est détecté', JSON.stringify(z.map((q) => [q.x, q.y, q.w, q.h].map(Math.round))));
+  dit(rec({ x: 235, y: 160, w: 20, h: 20 }), 'le QR est détecté');
+  dit(!rec({ x: 32, y: 134, w: 70, h: 50 }) && !rec({ x: 32, y: 96, w: 100, h: 14 }), 'l\'adresse et le n° de suivi (du texte) ne sont pas pris pour un code');
+}
 async function juger(pg, nom, b64, thermique, attendu) {
   const mode = thermique ? 'thermique' : 'normale';
   const t = `${nom} · ${mode}`;
@@ -223,6 +354,7 @@ async function juger(pg, nom, b64, thermique, attendu) {
     await pg.waitForFunction(() => window.pdfjsLib, null, { timeout: 15000 });
     await pg.addScriptTag({ content: SCRIPT });
     await pg.addScriptTag({ content: DANS_PAGE });
+    await pg.addScriptTag({ content: DANS_PAGE_LIBRE });
     // Le « scan » : une image grise bruitée, des points noirs isolés, une étiquette.
     const pngScan = Buffer.from(await pg.evaluate(() => {
       const c = document.createElement('canvas'); c.width = 1190; c.height = 1684; const x = c.getContext('2d'), im = x.createImageData(c.width, c.height);
@@ -238,9 +370,11 @@ async function juger(pg, nom, b64, thermique, attendu) {
     const pdfs = await fabriquer(pngScan);
     console.log(`Tampon du bordereau${MUT ? ' — MUTATION ' + MUT : ''} (${APP.includes(DEBUT) ? 'code actuel' : 'code d\'avant'}, pdf.js ${PDFJS_DIR ? '3.11 local' : 'du dépôt'})`);
     for (const [nom, octets] of Object.entries(pdfs)) {
+      if (process.env.BANC_SEUL === 'libre') break;
       const b64 = Buffer.from(octets).toString('base64');
       for (const th of [false, true]) await juger(pg, nom, b64, th, ATTENDU[nom][th ? 'thermique' : 'normale']);
     }
+    await libre(pg, pdfs);
     // Les vrais bordereaux, s'ils sont fournis (jamais dans le dépôt).
     if (process.env.BANC_REELS && fs.existsSync(process.env.BANC_REELS)) {
       for (const f of fs.readdirSync(process.env.BANC_REELS).filter((x) => x.endsWith('.pdf')).sort()) {

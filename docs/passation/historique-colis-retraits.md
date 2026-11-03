@@ -2896,3 +2896,62 @@ origin/main (anciens écrans d'avant Colis en onglets), non touchés.
 
 **Geste de Julien** : aucun. Rouvrir Colis → À retirer : un bouton par ville, la consigne Vinted Go
 sous Vannes, « Lieu à confirmer » toujours là quand une ville est choisie.
+## 3 novembre (soir) — Le tampon LIBRE : le poser où on veut, même sur du texte (branche `claude/tampon-libre`)
+
+Julien, 3 nov. 18 h 59 : « il faut améliorer le positionnement du tampon sur le bordereau : on doit
+pouvoir être LIBRE de le mettre où on veut, MÊME SUR DU TEXTE, si l'espace blanc choisi par VRM
+n'est pas au bon endroit ».
+
+**Avant** : l'aperçu `BordPlacer` (ouvert APRÈS l'impression, par « Prévisualiser et ajuster le
+numéro ») ne prenait qu'un point touché, le revérifiait sur les pixels et le REFUSAIT s'il tombait
+sur du texte (`strict`), avec une longue phrase d'explication ; `posForFormat` rendait toujours
+`null` (aucune mémoire) ; la taille n'était pas réglable.
+
+**Livré** (App.jsx, bloc « LE TAMPON DU BORDEREAU » + « OÙ POSER LE TAMPON DE CETTE IMPRESSION » +
+`PlaceurTampon`) :
+- **Choix à la main** = `{ vx, vy, vw, v }` : coin haut-gauche et largeur du cartouche en fractions
+  de la page AFFICHÉE (rotation /Rotate comprise : Vestiaire 270), `v` la variante de cartouche.
+  `tamponnerBordereau(…, { choix })` le pose TEL QUEL (`placeLibreTampon`, issue `libre`), jamais
+  refusé, borné à la page et à la taille lisible (N° ≥ 9 pt, titre ≥ 5 pt), avec un **fond blanc
+  opaque** sous le texte (seulement en libre : la zone libre automatique est déjà blanche). `strict`
+  est retiré.
+- **L'aperçu** (`PlaceurTampon`, feuille en portail, `FermeAuRetour`, z `Z_CONFIRMATION`) s'ouvre AU
+  CLIC « Imprimer » quand la forme n'a pas de place gardée : page rendue par pdf.js, cartouche rendu
+  par pdf.js (ce qu'on voit est ce qui s'imprime) à la place choisie par VRM (sinon « Fiche colis »,
+  cadre fantôme). Glisser (doigt/souris), toucher la page pour l'y poser, poignée 44 px ou pincement
+  pour la taille, flèches et + / − au clavier, aimantation à 10 px des bords. Puce ambre « Recouvre le
+  code-barres » (`zonesCodesTampon` : cases de 6 pt à 28-80 % d'encre et alternances ≥ 0,25/pt,
+  groupes ≥ 24×12 pt — un gros texte gras peut être pris pour un code : ce n'est qu'une puce). Aucun
+  texte explicatif ; « Toujours ici » (coché), « Revenir au choix de VRM », Annuler, Imprimer.
+- **Forme** (`formeTampon`) = transporteur (`typeBordereau`) · format de la page tamponnée (A4, 10×15,
+  A5, sinon mm) · orientation · `r270` si tournée · `th` si étiquette découpée en thermique. Nom lisible
+  en tête de feuille (« Mondial Relay A4 », « Chronopost A4 paysage tourné »).
+- **Mémoire** `vrm_tampon_positions` (SYNC_KEYS) : `{ [forme]: { vx, vy, vw, v, at } }`. « Toujours ici »
+  la range ; « Revenir au choix de VRM » + « Toujours ici » l'efface. `positionTampon(forme)` la rend
+  (le lot « Tout imprimer » la lit : `choisirTampon({ apercu: false })` dans `mergeAndDownloadBordereaux`).
+- **Chemins** : `poserBordereau(…, { choisir })` et `poserEtiquettesThermiques(…, choisir)` demandent la
+  place pour la page À TAMPONNER (la page 1, ou chaque étiquette 100×150 en thermique). Une vente
+  (`processBordereau`), bordereau + facture (`printBordAndInvoice`), Leboncoin, Vestiaire, Stock
+  (`annotateAndDownloadBordereau`, `apercu` vrai par défaut) ; un lot sans aperçu. eBay : aucun chemin
+  d'impression de bordereau dans VRM (étiquettes eBay). Équipe (`imprimerBordereauEquipe`) inchangée.
+  « Déplacer le tampon » (modale du résultat, Colis et Leboncoin, aussi en thermique) rouvre l'aperçu
+  (`apercu: 'force'`). Annuler ⇒ `TAMPON_ANNULE`, rien imprimé, aucun message d'erreur.
+- **Le PDF rangé n'est jamais modifié** (la copie chargée est tamponnée). Fiche colis : dernier recours
+  si rien n'est choisi et qu'aucune zone libre n'existe (inchangé).
+
+**Preuves** : `scripts/bancs/tampon-bordereau.cjs` étendu (section « tampon LIBRE », `BANC_SEUL=libre`) :
+sur une A4 couverte de texte le N° est à ±2 pt de la place choisie, fond opaque (0 px du texte
+d'origine visible dans le cadre, 0 px changé hors du cadre), pages /Rotate 270 et 90 justes, thermique
+sans fiche, « Toujours ici » ⇒ même forme sans aperçu + lot à la même place, autre forme ⇒ auto,
+« Revenir » oublie, Annuler n'imprime rien, octets reçus intacts, code-barres et QR détectés, adresse
+non : **34 verts** ; code d'avant rouge ; mutations `rotationIgnoree` 4, `sansFond` 1,
+`memoireIgnoree` 3 rouges. Formes existantes : vertes (le fond blanc en zone automatique effaçait 4 px
+de bruit du « scan » : fond réservé au libre). `scripts/bancs/tampon-libre.cjs` (NOUVEAU, app construite,
+pdf.js du dépôt servi à la place du CDN, 390 px gestes tactiles CDP + 1512 px souris) : aperçu au clic,
+forme nommée, place auto dans un blanc, glissé sur le code-barres ⇒ puce, sur le texte ⇒ y reste,
+aimantation, poignée / pincement, mini lisible, PDF imprimé = titre à la place et à la taille choisies
+(±2,5 pt), une page, place rangée, second clic sans aperçu au même endroit : **19 + 19 verts** ; code
+d'avant rouge (aperçu absent). Voisins adaptés (ils cliquent « Imprimer » dans l'aperçu) :
+`ventes-bordereau`, `vestiaire-parite`, `lbc-bordereau`. `scripts/tests/bordereau-placement-interface.cjs`
+retiré (il testait `BordPlacer`, supprimé). **Non mesuré** : un vrai iPhone (gestes Safari), une vraie
+impression.

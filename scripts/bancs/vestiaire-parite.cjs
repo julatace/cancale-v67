@@ -250,6 +250,8 @@ const compte = (t, mot) => (String(t).match(new RegExp(mot, 'g')) || []).length;
       await essaie('D. Bordereau tamponné', async () => {
         const avant = ecritures.length;
         await pg.click('[data-vc-imprimer="V1"]');
+        // (3 nov.) Forme jamais vue : l'aperçu du tampon s'ouvre d'abord ; on garde le choix de VRM.
+        if (await pg.waitForSelector('[data-placeur-tampon="pret"],[data-placeur-tampon="ko"]', { timeout: 10000 }).then(() => true, () => false)) await pg.click('[data-tampon-imprimer]').catch(() => {});
         await pg.waitForFunction(() => window.__pdfs && window.__pdfs.length > 0, null, { timeout: 15000 }).catch(async (e) => { if (process.env.BANC_DEBUG) console.log(await pg.evaluate(() => window.__vus.slice(-15).join(' | '))); throw e; });
         const b64 = await pg.evaluate(async () => { const bl = window.__pdfs[window.__pdfs.length - 1]; const u = new Uint8Array(await bl.arrayBuffer()); let s = ''; for (let i = 0; i < u.length; i++) s += String.fromCharCode(u[i]); return btoa(s); });
         const t = await texteDuPdf(b64);

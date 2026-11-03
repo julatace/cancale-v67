@@ -127,18 +127,6 @@ button.vrm-set-ligne:active { background:var(--vrm-set-appui, rgba(0,0,0,.05)); 
 .vrm-settings-todo small{display:block;font-size:12px;margin-top:3px;}
 .vrm-settings-todo button:not(.vrm-b){font:inherit;font-size:12px;min-height:40px;padding:6px 12px;border:1px solid;border-radius:12px;background:transparent;cursor:pointer;}
 .vrm-settings-scope{font-size:11px;margin:4px 0 10px;}
-.vrm-placement-overlay{position:fixed;inset:0;z-index:12000;background:#1C1C1E99;display:grid;place-items:center;padding:16px;}
-.vrm-placement-panel{width:100%;max-width:1050px;max-height:90dvh;overflow:auto;border-radius:14px;padding:20px;box-sizing:border-box;}
-.vrm-placement-panel h2{margin:0;font-size:20px;}
-.vrm-placement-panel p{font-size:13px;line-height:1.5;}
-.vrm-placement-panel button{min-height:44px;padding:8px 14px;font:inherit;font-size:13px;cursor:pointer;border-radius:12px;border:1px solid #8E8E93;background:transparent;color:inherit;}
-.vrm-placement-panel button:disabled{opacity:.5;cursor:default;}
-.vrm-placement-pages{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;}
-.vrm-placement-pages>div{min-width:0;overflow:auto;font-size:12px;}
-.vrm-placement-pages canvas{display:block;max-width:100%;height:auto;border:1px solid #E5E5EA;margin-top:8px;}
-.vrm-placement-pages canvas[hidden]{display:none;}
-.vrm-placement-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;}
-@media(max-width:767px){.vrm-placement-pages{grid-template-columns:1fr;}.vrm-placement-panel{padding:14px;}.vrm-placement-overlay{padding:10px;}}
 .vrm-settings-help details{padding:12px 0;border-bottom:1px solid #E5E5EA;font-size:13px;line-height:1.6;}
 .vrm-settings-help summary{font-weight:600;cursor:pointer;min-height:36px;}
 .vrm-settings-help button:not(.vrm-b){min-height:44px;padding:8px 12px;border:1px solid currentColor;border-radius:12px;background:transparent;color:inherit;font:inherit;cursor:pointer;}
@@ -167,3 +155,24 @@ button.vrm-set-ligne:active { background:var(--vrm-set-appui, rgba(0,0,0,.05)); 
    boutons (src/styles-boutons.css) : fond teinté, aucune bordure. */
 .vrm-connexions-actions a,.vrm-connexion-source button:not(.vrm-b),.vrm-connexions-entete button:not(.vrm-b){display:inline-flex;align-items:center;min-height:44px;padding:0 14px;box-sizing:border-box;border:0;border-radius:12px;background:var(--vrm-b-teinte);color:var(--vrm-b-encre);font:inherit;font-size:13px;font-weight:600;text-decoration:none;cursor:pointer;}
 .vrm-connexions-entete button:disabled{opacity:.6;cursor:default;}
+/* (3 nov.) L'aperçu du tampon : poser le N° + titre où on veut (PlaceurTampon). */
+.vrm-tampon-voile{position:fixed;inset:0;background:rgba(0,0,0,.45);display:grid;place-items:center;padding:16px;}
+.vrm-tampon-feuille{width:100%;max-width:700px;max-height:calc(100dvh - 32px);display:flex;flex-direction:column;border-radius:20px;padding:14px 18px 18px;box-sizing:border-box;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.25);}
+.vrm-tampon-tete{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:44px;font-size:17px;}
+.vrm-tampon-zone{display:flex;justify-content:center;padding:22px;}
+.vrm-tampon-scene{position:relative;touch-action:none;user-select:none;-webkit-user-select:none;cursor:crosshair;line-height:0;}
+.vrm-tampon-page{display:block;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.18),0 0 0 1px rgba(0,0,0,.06);}
+.vrm-tampon-boite{position:absolute;box-sizing:border-box;cursor:move;outline:2px solid var(--vrm-accent,#0071E3);outline-offset:0;touch-action:none;}
+.vrm-tampon-boite:focus-visible{outline-width:3px;}
+.vrm-tampon-boite img{display:block;width:100%;height:100%;pointer-events:none;}
+.vrm-tampon-fantome{opacity:.5;outline-style:dashed;}
+.vrm-tampon-poignee{position:absolute;right:-22px;bottom:-22px;width:44px;height:44px;display:grid;place-items:center;cursor:nwse-resize;}
+.vrm-tampon-poignee i{display:block;width:16px;height:16px;border-radius:50%;background:var(--vrm-accent,#0071E3);border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3);pointer-events:none;}
+.vrm-tampon-puces{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;min-height:28px;}
+.vrm-tampon-puce{display:inline-block;font-size:13px;font-weight:600;line-height:28px;padding:0 12px;border-radius:14px;}
+.vrm-tampon-options{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px 12px;margin-top:6px;}
+.vrm-tampon-case{display:flex;align-items:center;gap:10px;min-height:44px;font-size:15px;cursor:pointer;}
+.vrm-tampon-case input{width:22px;height:22px;margin:0;accent-color:var(--vrm-accent,#0071E3);}
+.vrm-tampon-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:8px;}
+.vrm-tampon-actions>*{flex:0 1 auto;min-width:120px;}
+@media(max-width:767px){.vrm-tampon-voile{padding:0;}.vrm-tampon-feuille{max-width:none;height:100dvh;max-height:none;border-radius:0;padding:max(8px,env(safe-area-inset-top)) 16px max(16px,env(safe-area-inset-bottom));}.vrm-tampon-zone{flex:1;align-items:center;padding:22px 6px;}.vrm-tampon-actions>*{flex:1 1 0;}}
