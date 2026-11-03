@@ -3319,8 +3319,6 @@ avec les articles ». Décisions (rapportées par la session qui pilote) et ce q
   (2) comment déclarer une vente en main propre (CA/URSSAF), (3) s'il veut (b) sur Leboncoin
   (version d'extension), (4) garder le retrait eBay automatique ALLUMÉ maintenant qu'il couvre
   Leboncoin et Vestiaire ; ouvrir « Mes transactions » Leboncoin pour rafraîchir la liste.
-<<<<<<< HEAD
-=======
 
 ### LES QUATRE OUTILS DES ANNONCES : PRIX PARTOUT, DUPLIQUER, HISTOIRE, MODÈLES (3 novembre, branche `claude/annonces-outils`)
 Choix de Julien (3 nov.), dans cet ordre, style Fusion, sans texte explicatif.
@@ -3376,4 +3374,3 @@ Choix de Julien (3 nov.), dans cet ordre, style Fusion, sans texte explicatif.
   photo ni identité, histoire datée — vert ; **rouge sur origin/main**. `fiche-paire` remis à l'ordre de
   l'histoire (vert). Le retour « Tout sur le N° » ne se coupe plus mot à mot (`nowrap`, défaut de main).
 - **Geste de Julien** : essayer « Changer le prix » sur un N° en ligne sur Vinted + eBay ; créer un modèle.
->>>>>>> origin/main
