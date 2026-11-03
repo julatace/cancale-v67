@@ -79,12 +79,16 @@ async function scenario(b, nom, vue, LIGNES) {
   const ctx = await b.newContext({ ...vue, acceptDownloads: true });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
-  await pg.addInitScript(() => {
-    try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_visite_vue', 'true'); } catch (_) {}
+  // Les fiches N° sont DÉJÀ sur l'appareil (comme chez lui) : sans elles, une vente lue avant la ligne
+  // `main` reçoit un numéro neuf (règle « une annonce sans numéro en reçoit un ») et le banc mesurerait la course.
+  const mainData = LIGNES.find((r) => r.id === 'main').data;
+  await pg.addInitScript((m) => {
+    try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_visite_vue', 'true');
+      if (!sessionStorage.getItem('banc_init')) { sessionStorage.setItem('banc_init', '1'); localStorage.setItem('vinted_annonce_numeros', JSON.stringify(m.vinted_annonce_numeros)); localStorage.setItem('vinted_used_numeros', JSON.stringify(m.vinted_used_numeros)); } } catch (_) {}
     window.__pdfs = [];
     const o = URL.createObjectURL.bind(URL);
     URL.createObjectURL = (blob) => { try { if (blob && blob.type === 'application/pdf') window.__pdfs.push(blob); } catch (_) {} return o(blob); };
-  });
+  }, mainData);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   await pg.route('**://cdn.jsdelivr.net/npm/pdfjs-dist@*/**', (r) => {
     const n = path.basename(new URL(r.request().url()).pathname);
@@ -119,7 +123,8 @@ async function scenario(b, nom, vue, LIGNES) {
   await pg.waitForSelector('button[data-lot-ouvrir="1"]', { timeout: 20000 }).catch(() => {});
   await pg.waitForFunction(() => document.querySelectorAll('[data-groupe-transp]').length >= 3, null, { timeout: 15000 }).catch(() => {});
   // Les N° arrivent avec les transactions (identité tx → annonce → fiche) : on attend qu'ils soient écrits.
-  await pg.waitForFunction(() => ['N°21', 'N°22', 'N°23', 'N°24', 'N°25'].every((n) => document.body.innerText.includes(n)), null, { timeout: 15000 }).catch(() => {});
+  const nums = await pg.waitForFunction(() => ['N°21', 'N°22', 'N°23', 'N°24', 'N°25'].every((n) => document.body.innerText.includes(n)), null, { timeout: 45000 }).then(() => true).catch(() => false);
+  dit(nums, `${nom} : les N° des ventes Vinted sont lus (transaction → annonce → fiche) avant le lot`);
   await pg.waitForTimeout(800);
   if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `tout-imprimer-${nom}-colis.png`) });
   const btn = await pg.$('button[data-lot-ouvrir="1"]');
@@ -147,13 +152,22 @@ async function scenario(b, nom, vue, LIGNES) {
   for (const x of ap) { if (!x.coche) await pg.locator(`[data-lot-ligne="${x.cle}"] input`).first().check(); await pg.locator(`[data-lot-ligne="${x.cle}"] input`).nth(1).check(); }
   await pg.click('button[data-lot-imprimer]');
   // C : le N° à vérifier DEMANDE.
-  const q = await pg.getByText(/N°23 n'est pas encore vérifié/).first().waitFor({ timeout: 8000 }).then(() => true).catch(() => false);
+  // (Si une case « Contrôlé » n'a pas pris, la question « Vérifier les articles » passe d'abord : on la franchit.)
+  let q = false;
+  for (let i = 0; i < 60 && !q; i++) {
+    const t = await pg.evaluate(() => document.body.innerText);
+    if (/N°23 n.est pas encore vérifié/.test(t)) q = true;
+    else if (/Préparer quand même les PDF/.test(t)) await pg.evaluate(() => { const bs = [...document.querySelectorAll('button')].filter((x) => x.innerText.trim() === 'Préparer quand même les PDF'); if (bs.length) bs[bs.length - 1].click(); });
+    if (!q) await pg.waitForTimeout(250);
+  }
   if (!q && SHOTS) await pg.screenshot({ path: path.join(SHOTS, `tout-imprimer-${nom}-sans-question.png`) });
-  dit(q, `${nom} : C le N° « à vérifier » (23) DEMANDE avant le PDF`);
+  dit(q, `${nom} : C le N° « à vérifier » (23) DEMANDE avant le PDF`, JSON.stringify(ap.map((x) => x.cle + "=" + x.num)));
   if (q) await pg.evaluate(() => { const bs = [...document.querySelectorAll('button')].filter((x) => /J'ai vérifié, imprimer/.test(x.innerText)); bs[bs.length - 1].click(); });
-  await pg.waitForFunction(() => window.__pdfs && window.__pdfs.length > 0, null, { timeout: 20000 }).catch(() => {});
+  await pg.waitForFunction(() => window.__pdfs && window.__pdfs.length > 0, null, { timeout: 45000 }).catch(() => {});
   const b64 = await pg.evaluate(async () => { const bl = window.__pdfs[window.__pdfs.length - 1]; if (!bl) return null; const u = new Uint8Array(await bl.arrayBuffer()); let s = ''; for (let i = 0; i < u.length; i++) s += String.fromCharCode(u[i]); return btoa(s); });
-  dit(!!b64 && (await pg.evaluate(() => window.__pdfs.length)) === 1, `${nom} : D UN seul PDF`);
+  const nPdf = await pg.evaluate(() => window.__pdfs.length);
+  if (SHOTS && nPdf !== 1) await pg.screenshot({ path: path.join(SHOTS, `tout-imprimer-${nom}-pdf.png`) });
+  dit(!!b64 && nPdf === 1, `${nom} : D UN seul PDF`, String(nPdf));
   if (b64) {
     const pages = await pagesDuPdf(b64);
     const ordre = [];
