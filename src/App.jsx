@@ -40025,10 +40025,10 @@ function CartesRetourRecu({ res: resBrut, site = 'toutes', onRemettre }) {
             </div>
             <div style={{flex:'1 1 150px',minWidth:0}}>
               <span style={{display:'block',fontSize:17,fontWeight:700,color:C.text,lineHeight:1.25}}>Retour reçu ?</span>
-              <span className="vrm-colis-titre" title={l.titre} style={{display:'block',marginTop:3,fontSize:14,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>N°{l.num}{l.titre ? ` · ${l.titre}` : ''}</span>
+              <span className="vrm-colis-titre" title={l.titre} style={{display:'block',marginTop:3,fontSize:15,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>N°{l.num}{l.titre ? ` · ${l.titre}` : ''}</span>
             </div>
             <button type="button" className="vrm-colis-primaire" data-geste="remettre-en-stock" data-remettre-retour={l.cle} onClick={() => onRemettre(l)}
-              style={{flex:'0 0 auto',minHeight:44,border:'none',background:C.accent,color:'#fff',borderRadius:10,padding:'0 16px',fontSize:14,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>Remettre en stock</button>
+              style={{flex:'0 0 auto',minHeight:44,border:'none',background:C.accent,color:'#fff',borderRadius:12,padding:'0 16px',fontSize:15,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>Remettre en stock</button>
           </div>); })}
     </div>);
 }
