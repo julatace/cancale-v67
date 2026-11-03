@@ -9953,13 +9953,15 @@ const tailleAffichee = (page) => { const b = page.getCropBox(), r = rotationPage
 // Écrit un cartouche dont le coin haut-gauche est en (x, y) de la page affichée.
 // Le texte est tourné de la rotation de la page : il se lit à l'endroit.
 // (3 nov., soir) `k` : l'échelle choisie à la main (le cartouche agrandi ou
-// réduit au doigt). Un FOND BLANC opaque est posé sous le texte : posé sur du
-// texte ou un trait (son choix, « même sur du texte »), le N° reste lisible.
-const ecrireCartouche = (PL, page, c, x, y, k = 1) => {
+// réduit au doigt). `fond` : un FOND BLANC opaque sous le texte, pour la place
+// choisie à la main — posé sur du texte ou un trait (son choix, « même sur du
+// texte »), le N° reste lisible. (La zone libre automatique est déjà blanche :
+// pas de fond, la page n'y change que par le texte du tampon.)
+const ecrireCartouche = (PL, page, c, x, y, k = 1, fond = false) => {
   const b = page.getCropBox(), r = rotationPage(page);
   page.resetPosition();
   const a = versPdfAffiche(b, r, x, y), z = versPdfAffiche(b, r, x + c.w * k, y + c.h * k);
-  page.drawRectangle({ x: Math.min(a.x, z.x), y: Math.min(a.y, z.y), width: Math.abs(z.x - a.x), height: Math.abs(z.y - a.y), color: PL.rgb(1, 1, 1) });
+  if (fond) page.drawRectangle({ x: Math.min(a.x, z.x), y: Math.min(a.y, z.y), width: Math.abs(z.x - a.x), height: Math.abs(z.y - a.y), color: PL.rgb(1, 1, 1) });
   for (const l of c.lignes) {
     const p = versPdfAffiche(b, r, x + c.pad * k, y + l.y * k);
     page.drawText(l.texte, { x: p.x, y: p.y, size: l.taille * k, font: l.font, color: PL.rgb(0, 0, 0), rotate: PL.degrees(r) });
@@ -10066,7 +10068,7 @@ const positionTampon = (forme) => { const p = positionsTampon()[forme && forme.c
 const memoriserPositionTampon = (cle, choix) => { if (typeof save !== 'function') return; const m = { ...positionsTampon() }; if (choix && choixTamponValide(choix)) m[cle] = { vx: +choix.vx.toFixed(5), vy: +choix.vy.toFixed(5), vw: +choix.vw.toFixed(5), v: choix.v | 0, at: new Date().toISOString() }; else delete m[cle]; save(TAMPON_POSITIONS, m); };
 // Les codes-barres et QR de la page RENDUE (pour une puce, jamais un refus) :
 // cases de 6 pt où l'encre couvre 28 à 80 % avec des alternances serrées
-// (barres ou modules), regroupées ; un groupe de moins de 24×12 pt est écarté
+// (barres ou modules : ≥ 0,25 par point, lignes et colonnes ensemble), regroupées ; un groupe de moins de 24×12 pt est écarté
 // (une lettre grasse n'est pas un code). Rend des boîtes en points.
 const zonesCodesTampon = (rendu) => {
   const { pixels: d, w, h, s } = rendu, t = Math.max(4, Math.round(6 * s)), cw = Math.floor(w / t), ch = Math.floor(h / t);
@@ -10079,8 +10081,8 @@ const zonesCodesTampon = (rendu) => {
       if (x > cx * t && a !== noir(x - 1, y)) th++;
       if (y > cy * t && a !== noir(x, y - 1)) tv++;
     }
-    const part = n / (t * t), parPt = Math.max(th, tv) / t / (t / s);
-    if (part >= 0.28 && part <= 0.8 && parPt >= 0.3) code[cy * cw + cx] = 1;
+    const part = n / (t * t), parPt = (th + tv) / t / (t / s);
+    if (part >= 0.28 && part <= 0.8 && parPt >= 0.25) code[cy * cw + cx] = 1;
   }
   const vu = new Uint8Array(cw * ch), out = [];
   for (let i = 0; i < code.length; i++) {
@@ -10143,7 +10145,7 @@ const tamponnerBordereau = async (PL, pdf, { numero, titre, thermique = false, c
   const bold = await pdf.embedFont(PL.StandardFonts.HelveticaBold), reg = await pdf.embedFont(PL.StandardFonts.Helvetica);
   if (choixTamponValide(choix)) {
     const page = pdf.getPages()[0], pl = placeLibreTampon(page, bold, reg, n, t, choix);
-    if (pl) { ecrireCartouche(PL, page, pl.c, pl.x, pl.y, pl.k); return { mode: 'libre', raison: '', place: { x: pl.x, y: pl.y, w: pl.c.w * pl.k, h: pl.c.h * pl.k } }; }
+    if (pl) { ecrireCartouche(PL, page, pl.c, pl.x, pl.y, pl.k, true); return { mode: 'libre', raison: '', place: { x: pl.x, y: pl.y, w: pl.c.w * pl.k, h: pl.c.h * pl.k } }; }
   }
   let raison = '';
   try {
@@ -40221,7 +40223,7 @@ function PlaceurTamponFeuille({ q, fin }) {
       for (let v = 0; v < CARTOUCHES.length; v++) {
         const d2 = await PL.PDFDocument.create(), b2 = await d2.embedFont(PL.StandardFonts.HelveticaBold), r2 = await d2.embedFont(PL.StandardFonts.Helvetica);
         const c = cartoucheLibre(b2, r2, q.numero, q.titre, v); if (!c) { images.push(null); continue; }
-        const p2 = d2.addPage([c.w, c.h]); ecrireCartouche(PL, p2, c, 0, 0);
+        const p2 = d2.addPage([c.w, c.h]); ecrireCartouche(PL, p2, c, 0, 0, 1, true);
         const cv = document.createElement('canvas'); await dessinerPdf(cv, await d2.save(), { largeur: c.w * 3 });
         images.push({ url: cv.toDataURL('image/png'), cw: c.w, ch: c.h });
       }
