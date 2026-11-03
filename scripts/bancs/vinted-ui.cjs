@@ -274,6 +274,9 @@ async function sectionAnnonces(b, vp, sombre) {
       } catch (e) { dit(false, `A ${nom} · boost sur une annonce sans N°`, String(e.message).slice(0, 120)); }
     }
     // ── B. Offres automatiques : une ligne courte, le détail derrière ⓘ.
+    // (3 nov., critique #7, à la demande de Julien) La carte vit dans le menu « Outils » d'Annonces :
+    // le banc l'ouvre d'abord (le premier article remonte dans le premier tiers de l'écran).
+    if (!(await pg.$('[data-offres-auto-carte]'))) { await pg.click('.vrm-ann-outils > button').catch(() => {}); await pg.waitForTimeout(400); }
     const o = await pg.evaluate(() => {
       const c = document.querySelector('[data-offres-auto-carte]'); if (!c) return null;
       const ligne = c.querySelector('.vrm-offres-auto-ligne');
