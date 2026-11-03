@@ -28931,8 +28931,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       <StatsDetaillees liveStats={liveStats} panelOff={panelOff} onVoirDorment={onGo ? () => { demanderVue('dorment'); onGo('vinted_annonces'); } : null}/>
       <AnalysesStatistiques panelOff={panelOff}/>
 
-      {/* Le boost est-il rentable ? (21 oct.) — un repère, n'entre dans aucun total. */}
-      <BoostRentable panelOff={panelOff}/>
+      {/* (3 nov.) « Boost rentable ? » : UNE carte, en tête de Statistiques (StatsVitrine). */}
 
       {/* Graphique du CA par date de vente (cliquable) */}
       {caHistoryVente.length>0&&(()=>{
@@ -37684,7 +37683,7 @@ const lireExtrasRepartition = async () => {
     for (const r of items) for (const it of ((r && Array.isArray(r.items)) ? r.items : [])) {
       if (!it || it.id == null) continue;
       const w = mapWardrobeItem(it);
-      idx[w.id] = { brand: w.brand, size: w.size, createdTs: w.createdTs, id: w.id, promoted: w.promoted, views: w.views, favourites: w.favourites };
+      idx[w.id] = { brand: w.brand, size: w.size, createdTs: w.createdTs, id: w.id, promoted: w.promoted, views: w.views, favourites: w.favourites, title: w.title };
     }
   }
   if (AUTH.user?.id !== owner) return {txn:null,items:null,dates:null};
@@ -37799,7 +37798,7 @@ function LegendeBarres({ libelles }) {
 //   · Délai, Ce qui part vite, Par taille : le relevé `vrm_stats_ventes` et la
 //     date de mise en ligne de l'annonce reliée par SA transaction (Vinted) ;
 //   · En ligne : `texteEnLigne` (la coque) et `vrm_stats_stock` (l'écran Annonces) ;
-//   · Boost : `boostRentable` (src/boostRentable.js), ventes de la période.
+//   · Boost : `boostRentable` (src/boostRentable.js), annonces mises en ligne dans la période.
 // « Pas su » s'écrit « — » avec la raison ; une seule couleur d'accent : la
 // barre en cours et la taille la plus vendue (§7). Banc : stats-vitrine.
 function useReleveStats() {
@@ -37883,20 +37882,20 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
       return { k: g.k, plat, nom, site: plat === 'Vinted' ? '' : (SITE_COURT[plat] || plat), n: g.n, eur: g.eur, mediane: d ? d.mediane : null, nDelai: d ? d.nDelai : 0 };
     });
   }, [vendu, b, lp, lv]); // eslint-disable-line react-hooks/exhaustive-deps
-  // Boost : les ventes Vinted de la période seulement.
+  // Boost (3 nov.) : les annonces mises en ligne dans la période, boostées
+  // contre non boostées du MÊME modèle sûr (`boostRentable`, src/boostRentable.js).
   const boost = React.useMemo(() => {
     if (!Array.isArray(ventesCoque) || !extras || !nuage) return null;
     const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
-    let fiches = null, buyByNum = {};
-    try { fiches = load('vinted_annonce_numeros', {}) || {}; buyByNum = load('vinted_buyprice_by_num', {}) || {}; } catch (_) { fiches = null; }
+    let fiches = null;
+    try { fiches = load('vinted_annonce_numeros', {}) || {}; } catch (_) { fiches = null; }
     return boostRentable({
-      ventes: ventesCoque.filter((o) => { const t = Date.parse((o && o.date) || ''); return dansBornes(t, b.de, b.a); }),
-      txn: extras.txn, items: extras.items, fiches,
+      annonces: extras.items, ventes: ventesCoque, txn: extras.txn, fiches, de: b.de, a: b.a,
+      modeleDe: (it) => modeleSur((it && it.brand) || '', (it && it.title) || ''),
+      dateMiseEnLigne: (it) => dateMiseEnLigneMs(it, extras.dates || null),
       estAnnulee: (o) => classifyOrderStatus(o.status) === 'cancelled',
       ecarte: (o) => compteEcarte(o && o._acc && o._acc.vinted_user_id, hAcc, panelOff || {}),
       montantVente: montantCommande,
-      dateMiseEnLigne: (it) => dateMiseEnLigneMs(it, extras.dates || null),
-      prixAchat: (f) => prixAchatDe(f, buyByNum),
     });
   }, [ventesCoque, extras, nuage, panelOff, b]);
 
@@ -38050,32 +38049,37 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
                 </div>
               ), { 'data-sv-carte': 'tailles' })}
         {(() => {
-          const etat = boost == null ? (Array.isArray(ventesCoque) || ventesCoque === null || (extras && extras.items == null) ? 'passu' : 'encours') : boost.etat !== 'lu' ? 'passu' : boost.boostees === 0 ? 'aucun' : 'lu';
-          const droite = etat === 'lu' ? pl(boost.boostees, 'boost lu', 'boosts lus') : null;
-          const corps = etat === 'encours' ? vide('Je lis tes ventes et tes annonces…')
-            : etat === 'passu' ? vide('Ventes ou annonces pas pu être lues : rien n’est comparé.')
-              : etat === 'aucun' ? vide(`Aucune vente boostée connue sur la période. Vinted ne dit « boostée » que pendant le boost : pour la suite, saisis le boost payé dans la fiche de la paire (Annonces).`)
+          // (3 nov.) UNE carte « Boost rentable ? » (l'ancienne carte du volet replié
+          // est retirée) : boostés contre non boostés du même modèle sûr, mis en
+          // ligne sur la période ; couverture dite ; moins de 3 boostés ⇒ rien de comparé.
+          const etat = boost == null ? (Array.isArray(ventesCoque) || ventesCoque === null || (extras && extras.items == null) ? 'passu' : 'encours') : boost.etat !== 'lu' ? 'passu' : boost.assez ? 'lu' : 'pas-assez';
+          const C2 = boost && boost.etat === 'lu' ? boost.comparables : null;
+          const droite = C2 ? `${pl(C2.b, 'boosté')} · ${pl(C2.nb, 'autre')}` : null;
+          const pct = (t) => `${Math.round(t * 100)} %`;
+          const ligneB = (k, lib, vb, vnb, dv) => (
+            <div className="vrm-sv-boost-ligne" data-sv-boost={k} data-v={dv} style={{ display: 'contents' }}>
+              <span className="vrm-sv-tuile-lib" style={{ alignSelf: 'center' }}>{lib}</span>
+              <span className="vrm-display vrm-sv-boost-val" data-cote="b">{vb}</span>
+              <span className="vrm-display vrm-sv-boost-val" data-cote="nb">{vnb}</span>
+            </div>
+          );
+          const corps = etat === 'encours' ? vide('…')
+            : etat === 'passu' ? vide('—', { 'data-sv-boost-passu': '' })
+              : etat === 'pas-assez' ? vide(`Pas assez de données · ${boost.comparables.b}/${SEUIL_BOOST} boostés`, { 'data-sv-boost-pas-assez': String(boost.comparables.b) })
                 : (<>
-                  <div className="vrm-sv-boost">
-                    <div className="vrm-sv-boost-case" data-sv-boost="cout" data-v={boost.avecMontant ? cents(boost.coutBoost) : ''}>
-                      <div className="vrm-sv-tuile-lib">Coût</div>
-                      <div className="vrm-display vrm-sv-tuile-val">{boost.avecMontant ? `${boost.avecMontant < boost.boostees ? 'au moins ' : ''}${fmt(boost.coutBoost)}` : '—'}</div>
-                    </div>
-                    <div className="vrm-sv-boost-case" data-sv-boost="ventes" data-v={boost.boostees}>
-                      <div className="vrm-sv-tuile-lib">Ventes après</div>
-                      <div className="vrm-display vrm-sv-tuile-val">{boost.boostees}</div>
-                    </div>
-                    <div className="vrm-sv-boost-case" data-sv-boost="delai" data-v={boost.delai.b == null ? '' : `${boost.delai.b}/${boost.delai.nonb}`}>
-                      <div className="vrm-sv-tuile-lib">Vendues en</div>
-                      <div className="vrm-display vrm-sv-tuile-val">{boost.delai.b == null ? '—' : `${jours(boost.delai.b)} vs ${jours(boost.delai.nonb)}`}</div>
-                    </div>
+                  <div className="vrm-sv-boost-table">
+                    <span/>
+                    <span className="vrm-sv-tuile-lib vrm-sv-boost-col">Boostés</span>
+                    <span className="vrm-sv-tuile-lib vrm-sv-boost-col">Autres</span>
+                    {ligneB('vendues', 'Vendus', `${boost.vendues.b}/${boost.vendues.nB} · ${pct(boost.vendues.tb)}`, `${boost.vendues.nb}/${boost.vendues.nN} · ${pct(boost.vendues.tnb)}`, `${boost.vendues.b}/${boost.vendues.nB}|${boost.vendues.nb}/${boost.vendues.nN}`)}
+                    {ligneB('delai', 'Délai médian', jours(boost.delai.b), jours(boost.delai.nb), `${boost.delai.b == null ? '' : j10(boost.delai.b)}|${boost.delai.nb == null ? '' : j10(boost.delai.nb)}`)}
+                    {ligneB('prix', 'Prix médian, boost déduit', boost.prix.b == null ? '—' : fmt(boost.prix.b), boost.prix.nb == null ? '—' : fmt(boost.prix.nb), `${cents(boost.prix.b)}|${cents(boost.prix.nb)}`)}
                   </div>
-                  <div className="vrm-sv-note vrm-sv-boost-note">
-                    {boost.avecMontant < boost.boostees ? `Coût saisi pour ${boost.avecMontant} sur ${boost.boostees}. ` : ''}
-                    {boost.delai.b == null ? `Sur ${pl(boost.boostees, 'boost')} seulement : il faut ${SEUIL_BOOST} ventes boostées et ${SEUIL_BOOST} autres de même tranche de prix pour comparer les délais.` : `Délai médian, boostées contre les autres de même tranche de prix (${boost.delai.nb} et ${boost.delai.nnb} ventes datées).`}
+                  <div className="vrm-sv-note vrm-sv-boost-note" data-sv-boost="cout" data-v={cents(boost.cout)} data-couv={`${boost.avecMontant}/${boost.comparables.b}`}>
+                    Coût des boosts : {boost.cout == null ? '—' : `${boost.avecMontant < boost.comparables.b ? 'au moins ' : ''}${fmt(boost.cout)}`} · montant saisi {boost.avecMontant}/{boost.comparables.b}
                   </div>
                 </>);
-          return carte('sv-boost', 'Boost rentable ?', droite, corps, { 'data-sv-carte': 'boost', 'data-sv-etat': etat, 'data-sv-boostees': boost && boost.etat === 'lu' ? boost.boostees : '' });
+          return carte('sv-boost', 'Boost rentable ?', droite, corps, { 'data-sv-carte': 'boost', 'data-sv-etat': etat, 'data-sv-boostees': C2 ? C2.b : '', 'data-sv-autres': C2 ? C2.nb : '' });
         })()}
       </div>
       <div className="vrm-sv-note vrm-sv-pied">
@@ -38386,78 +38390,6 @@ function RepartitionsVentes({ panelOff, apercu = false }) {
         </div>}
         {manque > 0 && <div style={{...sNote,fontSize:11,marginTop:4}}>Sans {manque} compte{manque > 1 ? 's' : ''} dont les ventes n'ont pas pu être lues.</div>}
       </div>
-      </div>
-    </div>
-  );
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// LE BOOST EST-IL RENTABLE ? (21 octobre, fonction retenue le 11 octobre)
-// ══════════════════════════════════════════════════════════════════════════════
-// La règle vit dans src/boostRentable.js (pure, exécutée par
-// scripts/audit-boost-rentable.cjs). Ici on lui donne les MÊMES lectures que
-// « Ce qui se vend » (ventes de la coque, transaction → annonce, dressing,
-// dates de mise en ligne) et les fiches N° (montant « Boost payé » saisi, prix
-// d'achat). Un repère, jamais de la compta : rien n'entre dans un total.
-// Aucune couleur d'alerte ni de réussite (§7) : un repère se lit, il ne juge pas.
-function BoostRentable({ panelOff }) {
-  const { ventes } = useVentesCoque();
-  const [extras, setExtras] = React.useState(undefined);
-  React.useEffect(() => { let mort = false; lireExtrasRepartition().then((x) => { if (!mort) setExtras(x); }).catch(() => { if (!mort) setExtras({ txn: null, items: null, dates: null }); }); return () => { mort = true; }; }, []);
-  const [nuage, setNuage] = React.useState(() => isCloudReady());
-  React.useEffect(() => onCloudReady(() => setNuage(true)), []);
-  const R = React.useMemo(() => {
-    if (!Array.isArray(ventes) || !extras || !nuage) return null;
-    const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
-    let fiches = null, buyByNum = {};
-    try { fiches = load('vinted_annonce_numeros', {}) || {}; buyByNum = load('vinted_buyprice_by_num', {}) || {}; } catch (_) { fiches = null; }
-    return boostRentable({
-      ventes, txn: extras.txn, items: extras.items, fiches,
-      estAnnulee: (o) => classifyOrderStatus(o.status) === 'cancelled',
-      ecarte: (o) => compteEcarte(o && o._acc && o._acc.vinted_user_id, hAcc, panelOff || {}),
-      montantVente: montantCommande,
-      dateMiseEnLigne: (it) => dateMiseEnLigneMs(it, extras.dates || null),
-      prixAchat: (f) => prixAchatDe(f, buyByNum),
-    });
-  }, [ventes, extras, nuage, panelOff]);
-  const sCarte = {padding:18,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,boxShadow:C.shadow};
-  const sNote = {fontSize:13,color:C.muted,lineHeight:1.5};
-  const titre = <div style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15}}>Le boost est-il rentable ?</div>;
-  if (ventes === undefined || extras === undefined || !nuage) return <div data-stats-carte="boost" data-boost-etat="encours" style={sCarte}>{titre}<div style={{...sNote,marginTop:8}}>Je lis tes ventes et tes annonces…</div></div>;
-  if (!R || R.etat !== 'lu') return <div data-stats-carte="boost" data-boost-etat="passu" style={sCarte}>{titre}<div style={{...sNote,marginTop:8}}>Ventes ou annonces pas pu être lues : rien n'est comparé. Rouvre l'écran dans un moment.</div></div>;
-  const jFmt = (j) => (j == null ? '—' : j < 1 ? 'moins d’un jour' : `${Math.round(j)} j`);
-  const nFmt = (v) => (v == null ? '—' : String(Math.round(v * 10) / 10).replace('.', ','));
-  const eFmt = (v) => (v == null ? '—' : fmt(v));
-  const lignes = [
-    { k: 'delai', lib: 'Délai de vente (médiane)', m: R.delai, f: jFmt },
-    { k: 'vues', lib: 'Vues (moyenne)', m: R.vues, f: nFmt },
-    { k: 'favoris', lib: 'Favoris (moyenne)', m: R.favoris, f: nFmt },
-    { k: 'marge', lib: 'Marge, boost déduit (médiane)', m: R.marge, f: eFmt },
-  ];
-  const s = (n, mot) => `${n} ${mot}${n > 1 ? 's' : ''}`;
-  return (
-    <div data-stats-carte="boost" data-boost-etat="lu" data-boost-assez={R.assez ? 'oui' : 'non'} data-boost-b={R.boostees} data-boost-montant={R.avecMontant} data-boost-nb={R.nonBoostees} data-boost-comp={`${R.comparables.b}/${R.comparables.nb}`} style={sCarte}>
-      {titre}
-      {/* (30 oct.) Une ligne, en mots ; le détail (montants saisis, ventes pas reliées) derrière ⓘ. */}
-      <div data-boost-couverture="" data-boost-sans-annonce={R.sansAnnonce || 0} data-boost-inconnues={R.inconnues || 0} style={{...sNote,fontSize:11,marginTop:6,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>
-        {s(R.comparables.b, 'boostée')} · {R.comparables.nb} non boostée{R.comparables.nb > 1 ? 's' : ''} comparées (même tranche de prix)
-        <Pourquoi label="Détail">{s(R.boostees, 'boostée')} vendue{R.boostees > 1 ? 's' : ''}, dont {R.avecMontant} avec le montant du boost saisi · {R.nonBoostees} non boostée{R.nonBoostees > 1 ? 's' : ''}.{(R.inconnues > 0 || R.sansAnnonce > 0) ? ` Pas comptées : ${[R.inconnues > 0 ? `${R.inconnues} sans information de boost` : '', R.sansAnnonce > 0 ? `${R.sansAnnonce} pas reliée${R.sansAnnonce > 1 ? 's' : ''} à leur annonce` : ''].filter(Boolean).join(', ')}.` : ''}</Pourquoi>
-      </div>
-      {!R.assez && <div data-boost-verdict="pas-assez" style={{...sNote,marginTop:10,color:C.text}}>Pas assez de ventes pour juger — il en faut {SEUIL_BOOST} boostées et {SEUIL_BOOST} autres.</div>}
-      {R.assez && <div style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) auto auto',gap:'8px 14px',marginTop:12,paddingTop:12,borderTop:`1px solid ${C.border}`,alignItems:'baseline'}}>
-        <span/>
-        <span style={{fontSize:11,color:C.muted,fontWeight:600,textAlign:'right'}}>Boostées</span>
-        <span style={{fontSize:11,color:C.muted,fontWeight:600,textAlign:'right'}}>Les autres</span>
-        {lignes.map((l) => (
-          <React.Fragment key={l.k}>
-            <span style={{fontSize:13,color:C.text,minWidth:0}}>{l.lib}</span>
-            <span data-boost-val={`${l.k}-b`} className="vrm-display" style={{fontSize:15,fontWeight:600,color:l.m.b == null ? C.muted : C.text,textAlign:'right',fontVariantNumeric:'tabular-nums',whiteSpace:'nowrap'}}>{l.f(l.m.b)}</span>
-            <span data-boost-val={`${l.k}-nb`} className="vrm-display" style={{fontSize:15,fontWeight:600,color:l.m.nonb == null ? C.muted : C.text,textAlign:'right',fontVariantNumeric:'tabular-nums',whiteSpace:'nowrap'}}>{l.f(l.m.nonb)}</span>
-          </React.Fragment>
-        ))}
-      </div>}
-      <div style={{...sNote,fontSize:11,marginTop:10,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>
-        Un repère : rien ici n'entre dans un total. <Pourquoi label="Comment c'est compté">Chaque vente est reliée à son annonce par la transaction, jamais par le titre. Vinted ne dit « boostée » que pendant le boost : une paire boostée puis vendue après la fin du boost compte parmi « les autres » si tu n'as pas saisi son boost payé (la case « boost » de sa fiche, écran Annonces). La marge d'une boostée demande ce montant et son prix d'achat. « — » = moins de {SEUIL_BOOST} ventes connues d'un côté.</Pourquoi>
       </div>
     </div>
   );
