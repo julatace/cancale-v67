@@ -3184,3 +3184,15 @@ lu dans le code). Mutations rouges : `site` 44, `recalc` 73, `zero` 3, `benef` 5
 `scripts/bancs/carte-stats.cjs` (390 tactile clair/sombre, 1512) : Vinted 257 € → tous les sites 297 €
 → Leboncoin 40 €, périmètre qui suit, feuille (portail, 44 px, pas de bénéfice sur Vinted seul),
 réglage gardé au rechargement, Colis au défaut.
+
+**3 nov., après revue (13 h)** — fusion de main (carte sombre réglable `CarteStatsApp` gardée sur Colis/Ma journée ;
+sur « À retirer » la carte dit les colis à retirer) ; « Bénéfice du mois 0 € » venait d'une base d'avant
+`benefice-urssaf` : la fusion rend « — » (`chiffreBenefice`). **« À retirer » en SECTIONS** (Julien, 13 h 02 :
+« tu dois mieux SÉPARER ») : « À retirer aujourd'hui » (jours ≤ 0, ambre discret) · « Prêts à retirer » (code ou
+QR, par point) · « Code à venir » · « Lieu à confirmer » · « À vérifier » (replié) · « En route » (replié, à la fin)
+· « Argent à vérifier » (repartis) ; 28 px d'air ; chaque colis une fois (`sectionDuColis`, priorité aujourd'hui >
+prêts > code à venir > lieu > à vérifier) ; la carte (plan) au-dessus du sélecteur de ville. Titre d'une ligne :
+l'achat relié par identité, sinon `artTitle` (« Ton achat t'attend… », `source:'vinted-commande'`), sinon le n°
+court « n°…8456 ». Bancs réécrits pour la nouvelle mise en page (règles et compteurs gardés) : `colis-colonnes`,
+`postes`, `poste-sans-depart`, `fluidite`, `vestiaire-parite`, `retrait-autre-ville`, `transporteurs-logos` ;
+`audit-journee-court` §6 : le titre GARDE son nombre (`titreSansNombre` n'est plus appelé).
