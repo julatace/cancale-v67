@@ -109,6 +109,8 @@ const dit = (c, m, d) => { n++; if (!c) ko++; console.log(`${c ? '✅' : '❌'} 
   const merge = app.slice(app.indexOf('const mergeAndDownloadBordereauxBrut'), app.indexOf('const mergeAndDownloadBordereaux = '));
   dit(/confirmerNumerosAVerifier\(/.test(merge) && /poserBordereau\(PL, out, src/.test(merge), '2f App : la fusion demande les N° « à vérifier » et tamponne chaque page (`poserBordereau` → `tamponnerBordereau`)');
 
+  dit(/choisir: choisirTampon\(\{ PL, src, numero: it\.numero, titre: it\.title, apercu: false \}\)/.test(merge) && /await mergeAndDownloadBordereaux\(items,/.test(app.slice(app.indexOf('const batchBordereaux = async'), app.indexOf('const batchBordereaux = async') + 12000)), '2g App : chaque bordereau du lot sort à la place gardée pour SA forme (`choisirTampon`, `vrm_tampon_positions`), sans aperçu');
+
   // ── 3. RETOUR → STOCK ─────────────────────────────────────────────────────
   const etats = { 1: { s: 440, ss: '' }, 2: { s: 440, ss: "La livraison n'a pas encore eu lieu - colis déposé en bureau de Poste ou point relais" }, 3: { s: 440, ss: 'Commande livrée ! ' },
     4: { s: 440, ss: '' }, 5: { s: 450, ss: 'Commande livrée ! ' }, 6: { s: 440, ss: 'Bordereau envoyé au vendeur' }, 7: { s: 440, ss: "colis déposé en point relais" } };
