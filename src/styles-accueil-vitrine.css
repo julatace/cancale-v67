@@ -9,7 +9,7 @@
    mot sans réécrire les couches d'avant. Les jetons : src/accueil-jetons.js.
    ════════════════════════════════════════════════════════════════════════════ */
 
-.acc { --acc-bg: #FFFFFF; --acc-surface: #F5F5F3; --acc-surface2: #ECECE8; --acc-encre: #0F0F0E; --acc-doux: #56564F; --acc-filet: #E4E4DF; --acc-accent: #0071E3; --acc-accent-f: #1C3594; }
+.acc { --acc-bg: #FFFFFF; --acc-surface: #F2F2F7; --acc-surface2: #F2F2F7; --acc-encre: #1D1D1F; --acc-doux: #6E6E73; --acc-filet: #E5E5EA; --acc-accent: #0071E3; --acc-accent-f: #0071E3; }
 .acc, .acc :is(h1, h2, h3, b, strong, .acc-btn, .acc-lien, .acc-revoir) {
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', system-ui, 'Segoe UI', sans-serif;
 }
@@ -53,7 +53,7 @@
 
 /* Les trois raccourcis sous le haut de page : des aplats. */
 .acc .acc-benefices > a { background: var(--acc-surface); border: 0; border-radius: 14px; box-shadow: none; }
-.acc .acc-benefice-icon { background: var(--acc-bg); border: 0; border-radius: 10px; color: var(--acc-encre); }
+.acc .acc-benefice-icon { background: var(--acc-bg); border: 0; border-radius: 12px; color: var(--acc-encre); }
 .acc .acc-benefices small { color: var(--acc-doux); }
 .acc .acc-benefices .acc-chev { color: var(--acc-doux); }
 

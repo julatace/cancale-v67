@@ -179,7 +179,8 @@ async function ouvrir(nav, { largeur, sombre, chemin = '/?tab=plat_vestiaire', v
   return { ctx, pg, errs };
 }
 const etat = (pg) => pg.evaluate(() => { const e = document.querySelector('[data-photoroom-cle]'); return e ? e.getAttribute('data-photoroom-cle') : null; });
-const texteCarte = (pg) => pg.evaluate(() => { const e = document.querySelector('[data-photoroom-cle]'); return e ? e.innerText : ''; });
+// (3 nov.) Coût et usages vivent derrière le repli « Coût et aide » (critique #4, à la demande de Julien) : le banc l'ouvre avant de lire.
+const texteCarte = (pg) => pg.evaluate(() => { const e = document.querySelector('[data-photoroom-cle]'); const d = e && e.querySelector('[data-photoroom-aide]'); if (d) d.open = true; return e ? e.innerText : ''; });
 const contientCle = (pg) => pg.evaluate((k) => {
   const t = document.body.innerText + ' ' + [...document.querySelectorAll('input,textarea')].map((x) => x.value).join(' ') + ' ' + document.documentElement.outerHTML;
   return t.includes(k) || t.includes(k.slice(0, 12));

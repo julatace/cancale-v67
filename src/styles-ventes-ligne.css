@@ -11,7 +11,7 @@ html body .vrm-app-shell .vrm-main .vrm-sale-row[data-benef-cols] > button.vrm-l
 html body .vrm-app-shell .vrm-main .vrm-sale-row[data-benef-cols] > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-benef { grid-column: 3; grid-row: 2; align-self: start; }
 html body .vrm-app-shell .vrm-main .vrm-sale-row[data-benef-cols] > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-state { grid-column: 3; grid-row: 3; }
 html body .vrm-app-shell .vrm-main .vrm-sale-row[data-benef-cols] > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-achat { display: none; }
-.vrm-ledger-sale-benef, .vrm-ledger-sale-achat { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; font-size: 14px; font-weight: 600; color: var(--vrm-ink); }
+.vrm-ledger-sale-benef, .vrm-ledger-sale-achat { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 600; color: var(--vrm-ink); }
 .vrm-ledger-sale-benef[data-benef-etat="achat"], .vrm-ledger-sale-benef[data-benef-etat="illisible"], .vrm-ledger-sale-benef[data-benef-etat="prix"] { color: var(--vrm-muted); font-weight: 500; }
 .vrm-ledger-sale-benef .vrm-benef-borne { display: block; font-size: 11px; line-height: 1.2; font-weight: 500; color: var(--vrm-muted); }
 .vrm-ledger-sale-achat[data-achat-etat="manque"] { color: var(--vrm-warn); font-weight: 600; }
@@ -49,5 +49,5 @@ html body .vrm-app-shell .vrm-main .vrm-sale-row[data-depose-attente] { opacity:
   box-shadow: var(--vrm-ombre-flottante, 0 10px 28px rgba(0,0,0,.2)); font-size: 15px;
 }
 .vrm-depose-barre-t { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.vrm-depose-annuler { min-height: 44px; padding: 0 16px; border: 0; border-radius: 10px; background: transparent; color: inherit; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.vrm-depose-annuler { min-height: 44px; padding: 0 16px; border: 0; border-radius: 12px; background: transparent; color: inherit; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
 @media (min-width: 768px) { .vrm-depose-barre { left: auto; right: 24px; bottom: 24px; max-width: 420px; } }

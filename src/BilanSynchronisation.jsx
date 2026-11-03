@@ -71,15 +71,15 @@ export default function BilanSynchronisation({ owner, sources, onNav }) {
   return (
     <details className="vrm-bilan-sync" data-bilan-synchronisation>
       <summary>
-        Bilan des données lues{" "}
+        Données{" "}
         <span>
           {changements
             ? `${changements} changement${changements > 1 ? "s" : ""}`
             : erreurs
-              ? "Lecture à vérifier"
+              ? "À vérifier"
               : "Voir le détail"}
           {erreurs
-            ? ` · ${erreurs} lecture${erreurs > 1 ? "s" : ""} non confirmée${erreurs > 1 ? "s" : ""}`
+            ? ` · ${erreurs} non confirmée${erreurs > 1 ? "s" : ""}`
             : ""}
         </span>
       </summary>

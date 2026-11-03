@@ -1,7 +1,7 @@
 /* ══ Le téléphone, d'après les maquettes du 27 octobre ══════════════════════
    Julien : « applique ça VRM juste pour le téléphone ». Les couleurs sont
-   celles de l'écran de connexion (pétrole #243D43 → #14242B, sauge #B0C5BC /
-   #B7D6C8) ; RIEN ne change au-dessus de 767 px. Aucun JSX, aucun data-*,
+   celles de l'écran de connexion (pétrole #3A3A3C → #1D1D1F, sauge #C7C7CC /
+   #D1D1D6) ; RIEN ne change au-dessus de 767 px. Aucun JSX, aucun data-*,
    aucune règle métier : la tête de Ma journée (bonjour, date, « N choses à
    faire ») réapparaît dans un bandeau pétrole qui prolonge la barre du haut.
    (31 oct., Vitrine) Le pétrole, la sauge et le halo sont retirés : la barre
@@ -34,7 +34,7 @@
     font-weight: 600; color: var(--vrm-muted) !important; white-space: normal;
   }
   .vrm-app-shell .vrm-day-layout .vrm-day-greeting .vrm-day-hello {
-    font-size: 30px !important; line-height: 1.06; white-space: normal;
+    font-size: 28px !important; line-height: 1.06; white-space: normal;
     color: var(--vrm-ink) !important;
   }
   .vrm-app-shell .vrm-day-layout .vrm-day-greeting .vrm-day-todo {
@@ -48,7 +48,7 @@
   /* Les choses à faire : des cartes qu'on lit, pas une liste tassée. */
   .vrm-app-shell .vrm-day-layout .vrm-day-task-list { gap: 8px !important; }
   .vrm-app-shell .vrm-day-layout .vrm-day-task { padding: 12px 14px !important; gap: 12px !important; border-radius: 14px !important; }
-  .vrm-app-shell .vrm-day-layout .vrm-day-task-title { font-size: 14px !important; }
+  .vrm-app-shell .vrm-day-layout .vrm-day-task-title { font-size: 15px !important; }
   .vrm-app-shell .vrm-day-layout .vrm-day-task-note { font-size: 12px !important; }
   .vrm-app-shell .vrm-day-layout .vrm-day-task .vrm-day-task-action { font-size: 12px !important; }
 
@@ -101,7 +101,7 @@
   }
 
   /* Des cartes plus calmes : un trait plutôt qu'une ombre, un rayon unique. */
-  .vrm-app-shell .vrm-main .vrm-surface { box-shadow: none !important; border-radius: 18px !important; }
+  .vrm-app-shell .vrm-main .vrm-surface { box-shadow: none !important; border-radius: 20px !important; }
 }
 @media (max-width: 767px) {
   .vrm-app-shell .vrm-day-k, .vrm-app-shell .vrm-day-layout .vrm-label {

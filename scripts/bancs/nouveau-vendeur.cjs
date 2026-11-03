@@ -165,7 +165,7 @@ const INSPECTE = (pg, tel) => pg.evaluate((tel) => {
   for (const re of [/\bNaN\b/, /\bundefined\b/, /Invalid Date/i, /\[object Object\]/, /(^|[\s:(«])null([\s).,»]|$)/m, /\bInfinity\b/]) { const m = re.exec(texte); if (m) mauvais.push(texte.slice(Math.max(0, m.index - 40), m.index + 40).replace(/\s+/g, ' ')); }
   // §5 : « au moins 0 € » ne se dit jamais (un minimum nul s'écrit « — ») ; et le français.
   const regles = [];
-  for (const re of [/\b0 à relire sur Vinted/, /au moins\s+0(?:,00)?\s*€/, /(^|\n)\s*0(?:,00)?\s*€\s*\n\s*au moins/, /Où sont cet\b/, /\.\s+ouvre\b/, /Bienvenue\s*👋/]) { const m = re.exec(texte); if (m) regles.push(texte.slice(Math.max(0, m.index - 30), m.index + 50).replace(/\s+/g, ' ')); }
+  for (const re of [/\b0 à (?:relire|vérifier) sur Vinted/, /au moins\s+0(?:,00)?\s*€/, /(^|\n)\s*0(?:,00)?\s*€\s*\n\s*au moins/, /Où sont cet\b/, /\.\s+ouvre\b/, /Bienvenue\s*👋/]) { const m = re.exec(texte); if (m) regles.push(texte.slice(Math.max(0, m.index - 30), m.index + 50).replace(/\s+/g, ' ')); }
   // Une ligne qui COMMENCE par « · » (un séparateur passé à la ligne) : le
   // caractère visible qui le PRÉCÈDE est sur une ligne au-dessus. Vaut pour le
   // texte et pour un « · » posé en CSS (::before).

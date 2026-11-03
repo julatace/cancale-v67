@@ -21,7 +21,7 @@
 }
 
 :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche {
-  border-radius: 16px !important;
+  border-radius: 14px !important;
 }
 
 /* La photo, en grand. */
@@ -75,7 +75,7 @@
 .vrm-fiche-etat-haut { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; width: 100%; }
 .vrm-fiche-jauge { display: inline-flex; align-items: flex-end; gap: 2px; flex-shrink: 0; height: 15px; }
 .vrm-fiche-jauge > span { display: block; width: 4px; border-radius: 1.5px; }
-.vrm-fiche-etat-mot { font-size: 13.5px; font-weight: 650; line-height: 1.2; min-width: 0; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.vrm-fiche-etat-mot { font-size: 13px; font-weight: 600; line-height: 1.2; min-width: 0; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
 :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-duo .vrm-fiche-cell { justify-content: flex-start !important; }
 
 /* Ce qui était dans « ⋯ » : à la vue, une bande sous la fiche. */
@@ -145,9 +145,9 @@
   :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-plus-bouton { order: 3; }
   /* Le prix d'achat manquant : le geste à faire, en ambre (fermée comme ouverte). */
   :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-fiche-achat="inconnu"] {
-    border-color: var(--vrm-warn, #B7791F) !important; background: var(--vrm-warn-soft, transparent) !important;
+    border-color: var(--vrm-warn, #B25000) !important; background: var(--vrm-warn-soft, transparent) !important;
   }
-  :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-fiche-achat="inconnu"] .vrm-fiche-etat-haut > span:first-child { color: var(--vrm-warn, #B7791F) !important; }
+  :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-fiche-achat="inconnu"] .vrm-fiche-etat-haut > span:first-child { color: var(--vrm-warn, #B25000) !important; }
   :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-ann-ledger-info { gap: 6px !important; }
   :root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-etat-ligne] { line-height: 1.35; }
   /* « Plus d'actions » : discret, toute la largeur ; 55 px CSS = 44 px au doigt (zoom 0,8). */
@@ -172,12 +172,12 @@
 }
 .vrm-offres-auto-ligne { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 6px 8px 6px 12px; }
 .vrm-offres-auto-icone {
-  flex-shrink: 0; width: 30px; height: 30px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0; width: 30px; height: 30px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center;
   background: var(--vrm-card2); color: var(--vrm-muted);
 }
 .vrm-offres-auto.on .vrm-offres-auto-icone { color: var(--vrm-ink); }
 .vrm-offres-auto-texte { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.vrm-offres-auto-nom { font-size: 13.5px; font-weight: 650; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-offres-auto-nom { font-size: 13px; font-weight: 600; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* (29 oct., revue) Le statut porte la donnée (combien d'annonces ont un mini) : il
    passe à la ligne, jamais coupé en « … ». */
 .vrm-offres-auto-statut { font-size: 12px; color: var(--vrm-muted); line-height: 1.25; overflow-wrap: anywhere; }
@@ -185,7 +185,7 @@
   flex-shrink: 0; width: 44px; height: 44px; min-height: 44px !important; min-width: 44px !important; padding: 0 !important; margin: 0 !important;
   border: 0 !important; background: transparent !important; color: var(--vrm-muted); border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
-  font: 600 12.5px/1 'Inter', system-ui, sans-serif; font-style: italic;
+  font: 600 13px/1 'Inter', system-ui, sans-serif; font-style: italic;
 }
 .vrm-offres-auto-info::before {
   content: ''; position: absolute; width: 22px; height: 22px; border: 1.5px solid currentColor; border-radius: 50%; box-sizing: border-box;
@@ -198,7 +198,7 @@
    bouton dessiné en pilule était déformé en rond par cette compensation. */
 .vrm-offres-auto-switch {
   flex-shrink: 0; position: relative; width: 54px; height: 44px; min-height: 44px; padding: 0 !important; margin: 0 !important;
-  border: 0 !important; border-radius: 10px; background: transparent !important; cursor: pointer;
+  border: 0 !important; border-radius: 12px; background: transparent !important; cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center;
 }
 .vrm-offres-auto-piste {
@@ -212,20 +212,20 @@
 .vrm-offres-auto-switch[aria-checked="true"] .vrm-offres-auto-piste { background: var(--vrm-accent); }
 .vrm-offres-auto-switch[aria-checked="true"] .vrm-offres-auto-piste > span { transform: translateX(18px); }
 .vrm-offres-auto-switch:focus-visible { outline: 2px solid var(--vrm-accent); outline-offset: 1px; }
-.vrm-offres-auto-detail { border-top: 1px solid var(--vrm-line); padding: 10px 14px 12px; font-size: 12.5px; line-height: 1.5; color: var(--vrm-muted); }
+.vrm-offres-auto-detail { border-top: 1px solid var(--vrm-line); padding: 10px 14px 12px; font-size: 13px; line-height: 1.5; color: var(--vrm-muted); }
 .vrm-offres-auto-detail p { margin: 0; }
 .vrm-offres-auto-detail b { color: var(--vrm-ink); font-weight: 600; }
 .vrm-offres-auto-refus { display: flex; flex-direction: column; gap: 5px; margin-top: 10px; }
 .vrm-offres-auto-refus label { font-size: 12px; font-weight: 600; color: var(--vrm-ink); }
 .vrm-offres-auto-refus label span { font-weight: 400; color: var(--vrm-muted); }
 .vrm-offres-auto-refus textarea {
-  width: 100%; box-sizing: border-box; border: 1px solid var(--vrm-line); border-radius: 9px; padding: 8px 10px;
+  width: 100%; box-sizing: border-box; border: 1px solid var(--vrm-line); border-radius: 12px; padding: 8px 10px;
   background: var(--vrm-bg); color: var(--vrm-ink); font: inherit; font-size: 13px; resize: vertical; outline: none;
 }
 .vrm-offres-auto-refus textarea:focus { border-color: var(--vrm-ink); }
 .vrm-offres-auto-ext { border-top: 1px solid var(--vrm-line); padding: 8px 14px 10px; font-size: 12px; line-height: 1.4; }
 @media (max-width: 767px) {
-  .vrm-offres-auto-refus textarea { font-size: 16px; } /* iOS ne zoome pas */
+  .vrm-offres-auto-refus textarea { font-size: 17px; } /* iOS ne zoome pas */
 }
 @media (prefers-reduced-motion: reduce) {
   .vrm-offres-auto-piste, .vrm-offres-auto-piste > span { transition: none !important; }

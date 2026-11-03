@@ -249,7 +249,8 @@ const mesureJournee = (pg) => pg.evaluate(() => {
                 dit(env.pile.plus === Math.max(0, nn - env.pile.photos), 'J2 · le reste en « +k » (k = n − montrées)', `${env.pile.plus} pour n=${nn}, ${env.pile.photos} montrées`);
               } else dit(!env.pile.estPile && env.pile.photos === 1 && env.pile.plus === 0, 'J2 · un seul colis ⇒ une vignette, pas de pile ni de « +k »', JSON.stringify(env.pile));
               if (!SANS) dit(env.pile.imgs === env.pile.photos, 'les photos se chargent (pas de cadre vide)', `${env.pile.imgs}/${env.pile.photos}`);
-              dit(env.pile.w === 44 && env.pile.rayon === '10px', 'vignette 44 px, rayon 10', `${env.pile.w}px ${env.pile.rayon}`);
+              // (échelle fermée, 3 nov.) Le rayon 10 n'est pas sur l'échelle Fusion (6·12·14·20·24) : 12.
+              dit(env.pile.w === 44 && env.pile.rayon === '12px', 'vignette 44 px, rayon 12 (échelle fermée, 3 nov.)', `${env.pile.w}px ${env.pile.rayon}`);
               dit(/^\d+ colis à poster/.test(env.titre.trim()), 'le titre dit le nombre (« 3 colis à poster »)', env.titre);
             }
             if (JEU === 'base' || SANS) {

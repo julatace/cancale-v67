@@ -169,7 +169,8 @@ const compte = (t, s) => String(t || '').split(s).length - 1;
     console.log('── COLIS · la raison commune d\'un bouton grisé est écrite UNE fois (§7)');
     for (const tel of [false, true]) {
       const r = await rendre(b, { tel }); const v = await r.lire();
-      const phrase = tel ? "Depuis ton ordinateur : c'est là que tourne l'extension qui génère les bordereaux." : "Extension VRM pas détectée dans ce navigateur — c'est elle qui génère les bordereaux.";
+      // (3 nov.) Raisons raccourcies (critique #4, à la demande de Julien) : le geste, sans l'explication.
+      const phrase = tel ? "Depuis ton ordinateur" : "Extension VRM pas détectée dans ce navigateur";
       dit(v.tg && v.tg.etat === 'grise', `${tel ? 'téléphone' : 'ordinateur sans extension'} : « Tout générer » reste visible, grisé`, JSON.stringify(v.tg));
       if (tel) {
         dit(compte(v.corpsTout, phrase) === 1, "téléphone : la raison est dans la page une seule fois (repliée, « téléphone épuré » du 27 oct.)", `${compte(v.corpsTout, phrase)} fois`);

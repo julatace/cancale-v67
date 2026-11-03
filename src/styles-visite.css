@@ -8,7 +8,7 @@
   position: fixed; inset: 0; font-family: inherit; -webkit-tap-highlight-color: transparent;
 }
 :root[data-theme="dark"] .vrm-visite {
-  --v-carte: #1c1c1e; --v-encre: #f5f5f7; --v-doux: #a1a1a6; --v-filet: #38383a;
+  --v-carte: #1c1c1e; --v-encre: #f5f5f7; --v-doux: #AEAEB2; --v-filet: #38383a;
   --v-accent: #0A84FF; --v-voile: rgba(0, 0, 0, .5);
 }
 .vrm-visite-voile { position: absolute; inset: 0; background: transparent; }
@@ -40,7 +40,7 @@
 .vrm-visite-points span { width: 6px; height: 6px; border-radius: 50%; background: var(--v-filet); }
 .vrm-visite-points span[data-fait="ici"] { background: var(--v-encre); }
 .vrm-visite-passer, .vrm-visite-suivant {
-  min-height: 44px; min-width: 44px; padding: 0 14px; border-radius: 10px; border: 0;
+  min-height: 44px; min-width: 44px; padding: 0 14px; border-radius: 12px; border: 0;
   font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; white-space: nowrap;
 }
 .vrm-visite-passer { background: transparent; color: var(--v-doux); }
@@ -60,11 +60,5 @@ html .vrm-app-shell .vrm-phrase-ecran { margin: 4px 0 0; font-size: 15px; line-h
 html .vrm-app-shell .vrm-tache .vrm-tache-tete { flex-direction: column; align-items: flex-start; gap: 0; }
 html .vrm-app-shell .vrm-phrase-reglages { margin: -8px 0 16px; }
 html .vrm-app-shell .vrm-day-greeting .vrm-phrase-ecran { flex-basis: 100%; margin-top: 2px; }
-/* Téléphone : le titre que la barre du haut dit déjà se tait, sa PHRASE reste. */
-@media (max-width: 767px) {
-  html body .vrm-app-shell .vrm-screen-head.vrm-screen-head-doublon:has(.vrm-screen-head-sous .vrm-phrase-ecran) { display: block; }
-  html body .vrm-app-shell .vrm-screen-head-doublon .vrm-screen-head-titre:has(.vrm-phrase-ecran) { display: flex; }
-  html .vrm-app-shell .vrm-screen-head-doublon .vrm-screen-head-titre:has(.vrm-phrase-ecran) > :not(.vrm-screen-head-sous) { display: none; }
-  html .vrm-app-shell .vrm-screen-head-doublon .vrm-screen-head-sous { margin-top: 0; }
-  html .vrm-app-shell .vrm-phrase-reglages { margin: 0 0 14px; }
+/* (3 nov.) Le grand titre ne se tait plus au téléphone : c'est la barre du haut qui ne le redit pas. */
 }

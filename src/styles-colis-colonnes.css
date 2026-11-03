@@ -3,34 +3,34 @@
    Téléphone : les mêmes groupes empilés, cartes au doigt (44 px).
    Couleur rare (§7) : l'ambre seulement sur la ligne d'un geste dû. */
 .vrm-cc { display: grid; grid-template-columns: 1fr; gap: 14px; margin: 4px 0 22px; }
-.vrm-cc-col { background: var(--vrm-surface, #F5F5F3); border-radius: 16px; padding: 14px; min-width: 0; display: flex; flex-direction: column; }
+.vrm-cc-col { background: var(--vrm-surface, #FFFFFF); border-radius: 14px; padding: 14px; min-width: 0; display: flex; flex-direction: column; }
 .vrm-cc-tete { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
-.vrm-cc-tete h2 { margin: 0; font-size: 17px !important; font-weight: 700 !important; letter-spacing: -.01em; line-height: 1.2; color: var(--vrm-ink, #0F0F0E); }
-.vrm-cc-compte { font-family: var(--vrm-police-mono, ui-monospace, monospace); font-weight: 500; font-size: 15px; color: var(--vrm-muted, #56564F); font-variant-numeric: tabular-nums; }
+.vrm-cc-tete h2 { margin: 0; font-size: 17px !important; font-weight: 700 !important; letter-spacing: -.01em; line-height: 1.2; color: var(--vrm-ink, #1D1D1F); }
+.vrm-cc-compte { font-family: var(--vrm-police-mono, ui-monospace, monospace); font-weight: 500; font-size: 15px; color: var(--vrm-muted, #6E6E73); font-variant-numeric: tabular-nums; }
 .vrm-cc-liste { display: flex; flex-direction: column; gap: 8px; }
 .vrm-cc-carte {
   display: block; width: 100%; box-sizing: border-box; text-align: left; font: inherit; color: inherit;
   background: var(--vrm-bg, #FFFFFF); border: 0; border-radius: 12px; padding: 10px; min-height: 44px; margin: 0;
 }
 button.vrm-cc-carte { cursor: pointer; }
-button.vrm-cc-carte:hover { box-shadow: 0 0 0 1px var(--vrm-line, #E4E4DF); }
+button.vrm-cc-carte:hover { box-shadow: 0 0 0 1px var(--vrm-line, #E5E5EA); }
 button.vrm-cc-carte:focus-visible { outline: 2px solid var(--vrm-focus, #0071E3); outline-offset: 2px; }
 .vrm-cc-haut { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.vrm-cc-photo { width: 36px; height: 36px; border-radius: 8px; overflow: hidden; flex: none; background: var(--vrm-card2, #ECECE8); display: block; }
+.vrm-cc-photo { width: 36px; height: 36px; border-radius: 12px; overflow: hidden; flex: none; background: var(--vrm-card2, #F2F2F7); display: block; }
 .vrm-cc-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .vrm-cc-photo-vide { display: block; width: 100%; height: 100%; }
 /* (1er nov.) Sans photo : une petite icône de colis neutre, jamais un carré gris vide. */
-.vrm-cc-photo.is-sans { background: transparent; display: flex; align-items: center; justify-content: center; color: var(--vrm-muted, #56564F); }
-.vrm-cc-nom { flex: 1; min-width: 0; font-weight: 700; font-size: 14px; letter-spacing: -.01em; line-height: 1.25; color: var(--vrm-ink, #0F0F0E);
+.vrm-cc-photo.is-sans { background: transparent; display: flex; align-items: center; justify-content: center; color: var(--vrm-muted, #6E6E73); }
+.vrm-cc-nom { flex: 1; min-width: 0; font-weight: 700; font-size: 15px; letter-spacing: -.01em; line-height: 1.25; color: var(--vrm-ink, #1D1D1F);
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 .vrm-cc-bas { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; }
-.vrm-cc-etat { font-size: 12px; line-height: 1.35; color: var(--vrm-muted, #56564F); min-width: 0; overflow-wrap: anywhere; }
-.vrm-cc-etat.is-ambre { color: var(--vrm-warn, #8A5300); font-weight: 700; }
+.vrm-cc-etat { font-size: 12px; line-height: 1.35; color: var(--vrm-muted, #6E6E73); min-width: 0; overflow-wrap: anywhere; }
+.vrm-cc-etat.is-ambre { color: var(--vrm-warn, #B25000); font-weight: 700; }
 .vrm-cc-num { flex: none; font-family: var(--vrm-police-mono, ui-monospace, monospace); font-weight: 500; font-size: 12px; word-spacing: -.3em;
-  background: var(--vrm-surface, #F5F5F3); color: var(--vrm-ink, #0F0F0E); border-radius: 999px; padding: 3px 7px; white-space: nowrap; }
-.vrm-cc-note { font-size: 12px; line-height: 1.4; color: var(--vrm-muted, #56564F); margin: 0 0 8px; }
-.vrm-cc-vide { font-size: 12.5px; color: var(--vrm-muted, #56564F); margin: 4px 2px; }
-.vrm-cc-plus { min-height: 44px; border: 0; background: transparent; color: var(--vrm-ink, #0F0F0E); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; text-align: left; padding: 0 4px; }
+  background: var(--vrm-surface, #FFFFFF); color: var(--vrm-ink, #1D1D1F); border-radius: 999px; padding: 3px 7px; white-space: nowrap; }
+.vrm-cc-note { font-size: 12px; line-height: 1.4; color: var(--vrm-muted, #6E6E73); margin: 0 0 8px; }
+.vrm-cc-vide { font-size: 13px; color: var(--vrm-muted, #6E6E73); margin: 4px 2px; }
+.vrm-cc-plus { min-height: 44px; border: 0; background: transparent; color: var(--vrm-ink, #1D1D1F); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; text-align: left; padding: 0 4px; }
 .vrm-cc-pied { margin-top: 8px; }
 .vrm-cc-pied .vrm-relais-carte { margin-bottom: 0 !important; border: 0 !important; border-radius: 12px !important; background: var(--vrm-bg, #FFFFFF) !important; }
 .vrm-cc-pied .vrm-relais-compacte { padding: 8px; }
@@ -38,7 +38,7 @@ button.vrm-cc-carte:focus-visible { outline: 2px solid var(--vrm-focus, #0071E3)
 
 /* L'en-tête de Colis : sous-titre sous le grand titre, l'action à droite. */
 .vrm-screen-head-titre:has(> .vrm-screen-head-sous) { flex-wrap: wrap; row-gap: 0; }
-.vrm-screen-head-sous { flex-basis: 100%; font-size: 14px; color: var(--vrm-muted, #56564F); margin-top: 6px; line-height: 1.35; }
+.vrm-screen-head-sous { flex-basis: 100%; font-size: 15px; color: var(--vrm-muted, #6E6E73); margin-top: 6px; line-height: 1.35; }
 
 @media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
   .vrm-cc { grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: stretch; margin-top: 8px; }
@@ -50,38 +50,38 @@ button.vrm-cc-carte:focus-visible { outline: 2px solid var(--vrm-focus, #0071E3)
    courte, « N colis · dernier jour demain » (ambre seulement si le geste est
    dû, §7), puis ses colis : photo, nom + taille, code de retrait en grand. */
 .vrm-cc-compte-bloc { display: inline-flex; align-items: baseline; gap: 8px; flex: none; }
-.vrm-cc-hors { font-size: 12px; color: var(--vrm-muted, #56564F); white-space: nowrap; }
+.vrm-cc-hors { font-size: 12px; color: var(--vrm-muted, #6E6E73); white-space: nowrap; }
 .vrm-rp { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .vrm-rp .vrm-relais-fond { border-radius: 12px !important; }
-.vrm-rp-note { font-size: 12px; line-height: 1.4; color: var(--vrm-muted, #56564F); margin: 0 2px; }
-.vrm-rp-attrib { font-size: 10.5px; }
+.vrm-rp-note { font-size: 12px; line-height: 1.4; color: var(--vrm-muted, #6E6E73); margin: 0 2px; }
+.vrm-rp-attrib { font-size: 11px; }
 .vrm-rp-point { display: flex; flex-direction: column; gap: 6px; scroll-margin-top: 72px; border-radius: 12px; }
 .vrm-rp-point.is-choisi { outline: 2px solid var(--vrm-focus, #0071E3); outline-offset: 3px; }
 .vrm-rp-tete { display: flex; align-items: flex-start; gap: 10px; padding: 2px 2px 0; }
-.vrm-rp-numero { flex: none; width: 26px; height: 26px; border-radius: 13px; background: var(--vrm-ink, #0F0F0E); color: var(--vrm-bg, #FFFFFF);
+.vrm-rp-numero { flex: none; width: 26px; height: 26px; border-radius: 14px; background: var(--vrm-ink, #1D1D1F); color: var(--vrm-bg, #FFFFFF);
   font: 600 13px/26px var(--vrm-police-mono, ui-monospace, monospace); text-align: center; font-variant-numeric: tabular-nums; margin-top: 1px; }
 /* (1er nov.) La pastille porte le NOMBRE de colis — la même que l'épingle (même couleur). */
-.vrm-rp-compte { width: auto; min-width: 26px; padding: 0 6px; box-sizing: border-box; background: var(--vrm-bg, #FFFFFF); color: var(--vrm-ink, #0F0F0E); box-shadow: inset 0 0 0 1.5px var(--vrm-line, #E4E4DF); }
-.vrm-rp-compte.is-fort { background: var(--vrm-accent, #2f5bd3); color: #fff; box-shadow: none; }
+.vrm-rp-compte { width: auto; min-width: 26px; padding: 0 6px; box-sizing: border-box; background: var(--vrm-bg, #FFFFFF); color: var(--vrm-ink, #1D1D1F); box-shadow: inset 0 0 0 1.5px var(--vrm-line, #E5E5EA); }
+.vrm-rp-compte.is-fort { background: var(--vrm-accent, #0071E3); color: #fff; box-shadow: none; }
 /* (1er nov.) La pastille = l'épingle de la carte : une icône de colis + le nombre (jamais lu comme un rang). */
 .vrm-rp-epingle { display: inline-flex; align-items: center; justify-content: center; gap: 3px; padding: 0 7px 0 6px; font-variant-numeric: tabular-nums; }
 .vrm-rp-epingle-ic { flex: none; opacity: .75; }
-.vrm-rp-numero.is-vide { background: transparent; color: var(--vrm-muted, #56564F); box-shadow: inset 0 0 0 1.5px var(--vrm-line, #E4E4DF); }
+.vrm-rp-numero.is-vide { background: transparent; color: var(--vrm-muted, #6E6E73); box-shadow: inset 0 0 0 1.5px var(--vrm-line, #E5E5EA); }
 .vrm-rp-ident { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
-.vrm-rp-nom { font-size: 15px; font-weight: 700; line-height: 1.25; color: var(--vrm-ink, #0F0F0E); overflow-wrap: anywhere; }
-.vrm-rp-adresse { font-size: 12.5px; line-height: 1.35; color: var(--vrm-muted, #56564F); overflow-wrap: anywhere; }
-.vrm-rp-resume { font-size: 12.5px; line-height: 1.4; color: var(--vrm-ink, #0F0F0E); }
-.vrm-rp-resume .is-ambre { color: var(--vrm-warn, #8A5300); font-weight: 700; }
-.vrm-rp-pas-carte { font-size: 11.5px; line-height: 1.4; color: var(--vrm-muted, #56564F); }
+.vrm-rp-nom { font-size: 15px; font-weight: 700; line-height: 1.25; color: var(--vrm-ink, #1D1D1F); overflow-wrap: anywhere; }
+.vrm-rp-adresse { font-size: 13px; line-height: 1.35; color: var(--vrm-muted, #6E6E73); overflow-wrap: anywhere; }
+.vrm-rp-resume { font-size: 13px; line-height: 1.4; color: var(--vrm-ink, #1D1D1F); }
+.vrm-rp-resume .is-ambre { color: var(--vrm-warn, #B25000); font-weight: 700; }
+.vrm-rp-pas-carte { font-size: 12px; line-height: 1.4; color: var(--vrm-muted, #6E6E73); }
 .vrm-rp-liste { display: flex; flex-direction: column; gap: 6px; }
 .vrm-rp-code-ligne { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
-.vrm-rp-code { font-family: var(--vrm-police-mono, ui-monospace, monospace); font-size: 20px; font-weight: 600; letter-spacing: .06em; color: var(--vrm-ink, #0F0F0E);
+.vrm-rp-code { font-family: var(--vrm-police-mono, ui-monospace, monospace); font-size: 20px; font-weight: 600; letter-spacing: .06em; color: var(--vrm-ink, #1D1D1F);
   font-variant-numeric: tabular-nums; overflow-wrap: anywhere; line-height: 1.2; }
-.vrm-rp-code2 { font-size: 14px; letter-spacing: .03em; color: var(--vrm-muted, #56564F); }
-.vrm-rp-sans-code { font-size: 12px; color: var(--vrm-muted, #56564F); }
-.vrm-rp-raison { display: block; font-size: 12px; line-height: 1.4; color: var(--vrm-muted, #56564F); margin-top: 6px; }
-.vrm-rp-geste { color: var(--vrm-ink, #0F0F0E); }
-.vrm-rp-attendu { font-size: 12.5px; line-height: 1.4; color: var(--vrm-muted, #56564F); padding: 2px 4px; }
+.vrm-rp-code2 { font-size: 15px; letter-spacing: .03em; color: var(--vrm-muted, #6E6E73); }
+.vrm-rp-sans-code { font-size: 12px; color: var(--vrm-muted, #6E6E73); }
+.vrm-rp-raison { display: block; font-size: 12px; line-height: 1.4; color: var(--vrm-muted, #6E6E73); margin-top: 6px; }
+.vrm-rp-geste { color: var(--vrm-ink, #1D1D1F); }
+.vrm-rp-attendu { font-size: 13px; line-height: 1.4; color: var(--vrm-muted, #6E6E73); padding: 2px 4px; }
 .vrm-rp-carte[data-a-verifier] { opacity: .82; }
 
 /* ── (2 nov.) COLIS CLAIR : un sélecteur, deux listes, chaque colis une fois ──
@@ -90,39 +90,39 @@ button.vrm-cc-carte:focus-visible { outline: 2px solid var(--vrm-focus, #0071E3)
    nombre d'un onglet qui a un geste dû passe en ambre (§7, jamais de rouge). */
 .vrm-colis-onglets { margin: 4px 0 14px; max-width: 520px; }
 .vrm-colis-onglets .vrm-seg-btn { min-height: 44px; }
-.vrm-colis-onglets [data-urgent="1"] .vrm-seg-n { color: var(--vrm-warn, #8A5300); opacity: 1; font-weight: 700; }
-.vrm-colis-note { font-size: 12.5px; line-height: 1.45; color: var(--vrm-muted, #56564F); margin: 0 2px 10px; }
-.vrm-colis-vide { font-size: 13.5px; line-height: 1.5; color: var(--vrm-muted, #56564F); padding: 18px 2px; margin: 0; }
+.vrm-colis-onglets [data-urgent="1"] .vrm-seg-n { color: var(--vrm-warn, #B25000); opacity: 1; font-weight: 700; }
+.vrm-colis-note { font-size: 13px; line-height: 1.45; color: var(--vrm-muted, #6E6E73); margin: 0 2px 10px; }
+.vrm-colis-vide { font-size: 13px; line-height: 1.5; color: var(--vrm-muted, #6E6E73); padding: 18px 2px; margin: 0; }
 .vrm-colis-outils { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
 .vrm-colis-retirer { margin: 0 0 18px; max-width: 760px; }
 .vrm-colis-alerte { display: flex; align-items: center; gap: 8px; width: 100%; box-sizing: border-box; min-height: 44px; margin: 0 0 12px; padding: 8px 12px;
-  border: 0; border-radius: 10px; background: color-mix(in srgb, var(--vrm-warn, #8A5300) 10%, transparent); color: var(--vrm-ink, #0F0F0E);
+  border: 0; border-radius: 12px; background: color-mix(in srgb, var(--vrm-warn, #B25000) 10%, transparent); color: var(--vrm-ink, #1D1D1F);
   font: inherit; font-size: 13px; font-weight: 600; text-align: left; cursor: pointer; }
-.vrm-colis-alerte svg { color: var(--vrm-warn, #8A5300); flex: none; }
+.vrm-colis-alerte svg { color: var(--vrm-warn, #B25000); flex: none; }
 .vrm-colis-alerte span { min-width: 0; overflow-wrap: anywhere; }
 
 /* À retirer : une carte = ce que c'est, puis SES gestes (code nommé et copiable,
    QR, Suivre, J'ai retiré) qui passent à la ligne — jamais un texte écrasé. */
-.vrm-colis-retirer .vrm-rp-point { background: var(--vrm-surface, #F5F5F3); border-radius: 16px; padding: 12px; }
+.vrm-colis-retirer .vrm-rp-point { background: var(--vrm-surface, #FFFFFF); border-radius: 14px; padding: 12px; }
 .vrm-colis-retirer .vrm-rp-carte { padding: 12px; }
 .vrm-rp-quoi { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .vrm-rp-quoi .vrm-cc-nom { flex: none; }
-.vrm-rp-sous { font-size: 12px; line-height: 1.35; color: var(--vrm-muted, #56564F); overflow-wrap: anywhere; }
-.vrm-rp-sous.is-ambre { color: var(--vrm-warn, #8A5300); font-weight: 700; }
+.vrm-rp-sous { font-size: 12px; line-height: 1.35; color: var(--vrm-muted, #6E6E73); overflow-wrap: anywhere; }
+.vrm-rp-sous.is-ambre { color: var(--vrm-warn, #B25000); font-weight: 700; }
 .vrm-rp-gestes { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; min-width: 0; }
 .vrm-rp-gestes > * { flex: 0 0 auto; max-width: 100%; }
 .vrm-rp-gestes .vrm-pickup-code { min-width: 0; }
 .vrm-rp-gestes .vrm-rp-sans-code { flex: 1 1 140px; }
-.vrm-rp-qr { width: 56px; height: 56px; padding: 3px; border: 1.5px solid var(--vrm-line, #E4E4DF); border-radius: 8px; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: pointer; }
+.vrm-rp-qr { width: 56px; height: 56px; padding: 3px; border: 1.5px solid var(--vrm-line, #E5E5EA); border-radius: 12px; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: pointer; }
 .vrm-rp-qr img { width: 100%; height: 100%; object-fit: contain; }
-.vrm-rp-gestes .vrm-pickup-collect { min-height: 44px; margin-left: auto; padding: 0 14px; border: 0; border-radius: 10px; white-space: nowrap;
-  background: var(--vrm-b-teinte, rgba(0,0,0,.06)); color: var(--vrm-b-encre, var(--vrm-ink, #0F0F0E)); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
-.vrm-rp-verifier { box-shadow: inset 3px 0 0 var(--vrm-warn, #8A5300); }
+.vrm-rp-gestes .vrm-pickup-collect { min-height: 44px; margin-left: auto; padding: 0 14px; border: 0; border-radius: 12px; white-space: nowrap;
+  background: var(--vrm-b-teinte, rgba(0,0,0,.06)); color: var(--vrm-b-encre, var(--vrm-ink, #1D1D1F)); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.vrm-rp-verifier { box-shadow: inset 3px 0 0 var(--vrm-warn, #B25000); }
 .vrm-rp-verifier .vrm-rp-carte[data-a-verifier] { opacity: 1; }
 @media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
   .vrm-colis-retirer { max-width: 900px; }
 }
-.vrm-rp-suivi { font-family: var(--vrm-police-mono, ui-monospace, monospace); font-size: 11.5px; letter-spacing: .02em; color: var(--vrm-muted, #56564F); overflow-wrap: anywhere; }
+.vrm-rp-suivi { font-family: var(--vrm-police-mono, ui-monospace, monospace); font-size: 12px; letter-spacing: .02em; color: var(--vrm-muted, #6E6E73); overflow-wrap: anywhere; }
 /* « J'ai retiré » garde sa hauteur (44 px) : la règle commune l'étirait à la hauteur du code. */
 .vrm-main .vrm-rp-gestes .vrm-pickup-collect { align-self: center !important; height: 44px; }
 /* (2 nov.) « J'ai retiré » se LIT en toutes lettres au téléphone (jamais « ✓ » seul) :

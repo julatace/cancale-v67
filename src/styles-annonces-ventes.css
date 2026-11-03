@@ -6,7 +6,7 @@
    Ce fichier est chargé EN DERNIER : il décide de ces deux listes. Les règles
    plus anciennes (minéral, studio, gestion) restent pour le reste de l'app. */
 
-.vrm-app-shell { --av-warn: #A15C00; }
+.vrm-app-shell { --av-warn: #B25000; }
 :root[data-theme=dark] .vrm-app-shell { --av-warn: #FFB23E; }
 
 /* ── Ventes : une ligne = titre, puis date · compte en dessous ─────────────── */
@@ -26,15 +26,15 @@
 
 @media (max-width: 767px) {
   .vrm-app-shell .vrm-main .vrm-sale-row .vrm-ledger-sale-toggle { min-height: 52px; }
-  .vrm-app-shell .vrm-main .vrm-sale-row .vrm-ledger-sale-title { font-size: 12.5px; }
-  .vrm-app-shell .vrm-main .vrm-ledger-sale-sous { font-size: 10.5px; }
-  .vrm-app-shell .vrm-main .vrm-ledger-sale-state { font-size: 10.5px; max-width: 86px; }
+  .vrm-app-shell .vrm-main .vrm-sale-row .vrm-ledger-sale-title { font-size: 13px; }
+  .vrm-app-shell .vrm-main .vrm-ledger-sale-sous { font-size: 11px; }
+  .vrm-app-shell .vrm-main .vrm-ledger-sale-state { font-size: 11px; max-width: 86px; }
   .vrm-app-shell .vrm-main .vrm-ledger-sale-amount { font-size: 13px; }
 }
 
 /* ── Annonces : une carte compacte, le « ⋯ » dans la carte ─────────────────── */
 .vrm-app-shell .vrm-main .vrm-ann-card { position: relative; }
-.vrm-app-shell .vrm-main .vrm-ann-card .vrm-ann-overview > a { width: 64px !important; height: 84px !important; border-radius: 8px !important; }
+.vrm-app-shell .vrm-main .vrm-ann-card .vrm-ann-overview > a { width: 64px !important; height: 84px !important; border-radius: 12px !important; }
 .vrm-app-shell .vrm-main .vrm-ann-card [data-chiffres] {
   border: 0 !important; margin-top: 2px !important; padding: 0 44px 0 0 !important;
   font-size: 12px; align-items: center !important;
@@ -51,7 +51,7 @@
 .vrm-app-shell .vrm-main .vrm-ann-card .vrm-ann-actions > summary {
   position: static !important; width: 44px; height: 44px; min-height: 44px !important;
   margin: 0 !important; padding: 0 !important; display: flex !important;
-  align-items: center; justify-content: center; border-radius: 10px;
+  align-items: center; justify-content: center; border-radius: 12px;
   font-size: 0 !important; color: var(--vrm-muted) !important;
 }
 .vrm-app-shell .vrm-main .vrm-ann-card .vrm-ann-actions > summary > * { display: none !important; }
@@ -127,18 +127,16 @@
    haut ne se répète pas sur téléphone (« Colis » écrit deux fois à 60 px). Les
    actions de sa ligne restent ; une ligne sans action disparaît. */
 @media (max-width: 767px) {
-  .vrm-app-shell .vrm-screen-head-doublon .vrm-screen-head-titre { display: none; }
-  .vrm-app-shell .vrm-screen-head-doublon:not(:has(.vrm-tete-row > :nth-child(2))) { display: none; }
+  /* (3 nov., critique #2) Inversé : c'est la BARRE qui ne redit plus le titre (fusion.css §18),
+     le grand titre de l'écran reste — un seul nom par écran. */
 }
 /* « À quoi ça sert ? » écrit à côté du ⓘ, plus un pictogramme seul sous la carte. */
-.vrm-app-shell .vrm-pourquoi-ecrit > summary { font-size: 12.5px; color: var(--vrm-muted, #6b7a80); cursor: pointer; width: auto; min-width: 0; }
+.vrm-app-shell .vrm-pourquoi-ecrit > summary { font-size: 13px; color: var(--vrm-muted, #6E6E73); cursor: pointer; width: auto; min-width: 0; }
 /* Même règle pour les deux écrans qui ont leur propre en-tête : « Paramètres »
    (la barre du haut le dit) et « Gestion · Organisation » (idem ; sa phrase de
    section et « Actualiser » restent). */
 @media (max-width: 767px) {
-  .vrm-app-shell .vrm-set-tete { display: none; }
-  .vrm-app-shell .ops-entete-doublon .ops-surtitre,
-  .vrm-app-shell .ops-entete-doublon h2 { display: none; }
+  /* (3 nov.) Retiré : le grand titre reste, la barre du haut ne le redit plus. */
 }
 
 /* ── Leboncoin et eBay, même traitement (27 octobre) ─────────────────────────
@@ -152,29 +150,29 @@
 .vrm-app-shell .vrm-main .vrm-ebay-order .vrm-ledger-sale-state { max-width: none; min-width: max-content; flex-shrink: 0; white-space: nowrap; }
 .vrm-app-shell .vrm-main .vrm-ebay-order .vrm-ledger-sale-state[data-ton=action] .vrm-ebay-sale-status { color: var(--av-warn) !important; }
 
-.vrm-fiche-vente-acces{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:12px;border-bottom:1px solid #91a3a44d;font-size:12px;}
+.vrm-fiche-vente-acces{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:12px;border-bottom:1px solid #AEAEB24d;font-size:12px;}
 .vrm-fiche-vente-acces span{flex:1 1 180px;opacity:.75;}
-.vrm-fiche-vente-acces button{min-height:44px;padding:7px 12px;border:1px solid #91a3a477;border-radius:9px;background:transparent;color:inherit;font:inherit;cursor:pointer;}
-.vrm-fiabilite-ventes{margin:10px 0 14px;border:1px solid #91a3a44d;border-radius:10px;padding:10px 12px;font-size:12px;line-height:1.6;color:inherit;}
+.vrm-fiche-vente-acces button{min-height:44px;padding:7px 12px;border:1px solid #AEAEB277;border-radius:12px;background:transparent;color:inherit;font:inherit;cursor:pointer;}
+.vrm-fiabilite-ventes{margin:10px 0 14px;border:1px solid #AEAEB24d;border-radius:12px;padding:10px 12px;font-size:12px;line-height:1.6;color:inherit;}
 .vrm-fiabilite-ventes summary{cursor:pointer;font-weight:600;min-height:30px;}
 .vrm-fiabilite-ventes p{margin:7px 0;opacity:.8;}
 .vrm-fiabilite-ventes ul{margin:7px 0;padding-left:18px;}
 .vrm-suivi-comptes{margin:12px 0;font-size:12px;line-height:1.5;}
 .vrm-suivi-comptes summary{min-height:36px;font-weight:600;cursor:pointer;}
-.vrm-suivi-comptes section{border-top:1px solid #91a3a44d;padding-top:10px;margin-top:10px;}
+.vrm-suivi-comptes section{border-top:1px solid #AEAEB24d;padding-top:10px;margin-top:10px;}
 .vrm-suivi-comptes h4{margin:0 0 7px;}
 .vrm-suivi-comptes dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px 14px;margin:0;}
 .vrm-suivi-comptes dl>div{min-width:0;}
 .vrm-suivi-comptes dd{margin:3px 0 0;opacity:.75;overflow-wrap:anywhere;}
-.vrm-suivi-comptes button{min-height:44px;padding:8px 12px;border:1px solid #91a3a477;border-radius:9px;background:transparent;color:inherit;font:inherit;cursor:pointer;}
+.vrm-suivi-comptes button{min-height:44px;padding:8px 12px;border:1px solid #AEAEB277;border-radius:12px;background:transparent;color:inherit;font:inherit;cursor:pointer;}
 @media(max-width:767px){.vrm-ledger-sale-toggle{min-height:58px!important;gap:8px!important;font-size:12px;}.vrm-ledger-photo-empty{width:30px!important;height:40px!important;flex-shrink:0;}.vrm-ledger-photo-empty img{width:30px!important;height:40px!important;object-fit:cover;}.vrm-ledger-sale-amount{font-size:13px!important;white-space:nowrap;}.vrm-suivi-comptes dl{grid-template-columns:1fr 1fr;}}
-.vrm-preparation-etapes{display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap;padding:10px 18px;font-size:11px;font-weight:600;border-bottom:1px solid #91a3a44d;}
-.vrm-preparation-note{font-size:11.5px;line-height:1.5;margin:8px 18px;opacity:.8;}
-.vrm-preparation-controle{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:10px;flex-shrink:0;min-width:44px;}
+.vrm-preparation-etapes{display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap;padding:10px 18px;font-size:11px;font-weight:600;border-bottom:1px solid #AEAEB24d;}
+.vrm-preparation-note{font-size:12px;line-height:1.5;margin:8px 18px;opacity:.8;}
+.vrm-preparation-controle{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;flex-shrink:0;min-width:44px;}
 .vrm-preparation-controle input{width:18px;height:18px;}
 .vrm-preparation-progression{margin:8px 18px;font-size:12px;}
 .vrm-preparation-progression progress{display:block;width:100%;margin-top:6px;}
-@media(max-width:420px){.vrm-preparation-etapes{gap:6px;font-size:10px;padding-inline:12px;}.vrm-preparation-note{margin-inline:12px;}}
+@media(max-width:420px){.vrm-preparation-etapes{gap:6px;font-size:11px;padding-inline:12px;}.vrm-preparation-note{margin-inline:12px;}}
 .vrm-ledger-photo-empty{width:34px;height:44px;overflow:hidden;display:grid;place-items:center;}
 .vrm-ledger-photo-empty img{width:34px!important;height:44px!important;object-fit:cover;}
 .vrm-ledger-photo-empty>div,.vrm-ledger-photo-empty>span{max-width:100%;max-height:100%;}

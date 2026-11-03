@@ -217,6 +217,47 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         await shot('[data-carte-stats="ventes"]', 'carte-ventes-reglee');
       });
 
+      await essaie('D. le calendrier de la carte (plage libre)', async () => {
+        // (3 nov., Julien : « fais un calendrier ») La période d'un chiffre se choisit dans LE calendrier de
+        // l'app (raccourcis + plage libre) ; une plage du 30 oct. au 1er nov. ⇒ la valeur = la règle sur ces
+        // dates : 8003 (30 oct.), 8002 et 8004 (1er nov.) — 3 ventes ; 8001 (2 nov.) et 8005 (24 oct.) dehors.
+        console.log('── D. Le calendrier : une plage libre');
+        await pg.locator('[data-carte-modifier="ventes"]').first().click();
+        await pg.locator('[data-carte-feuille="ventes"]').waitFor({ timeout: 8000 });
+        await pg.locator('[data-carte-place="0"]').click();
+        const cal = pg.locator('[data-carte-calendrier] [data-periode-ouvrir]');
+        dit(await cal.count() === 1, 'la période du grand chiffre se choisit par UN bouton « calendrier » (plus de rangée qui défile)');
+        dit(await pg.locator('[data-carte-feuille] .vrm-carte-periodes').count() === 0, 'plus de rangée de pilules de période pour ce chiffre');
+        const h = await cal.evaluate((e) => e.getBoundingClientRect().height).catch(() => 0);
+        dit(h >= 43.5, 'le bouton de période fait 44 px', String(h));
+        await cal.click();
+        const raccourcis = await pg.evaluate(() => [...document.querySelectorAll('[data-periode-raccourci]')].map((b) => b.getAttribute('data-periode-raccourci')).join(','));
+        dit(raccourcis === 'jour,semaine,mois,dernier,trimestre,annee', 'raccourcis : Aujourd’hui · Cette semaine · Ce mois · Mois dernier · Ce trimestre · Cette année', raccourcis);
+        const dessus = await pg.evaluate(() => { const c = document.querySelector('.vrm-cal-feuille, .vrm-cal-pop'); if (!c) return false; const r = c.getBoundingClientRect(); const e = document.elementFromPoint(r.left + r.width / 2, r.top + 20); return !!e && !!e.closest('.vrm-cal-feuille, .vrm-cal-pop'); });
+        dit(dessus, 'le calendrier passe AU-DESSUS de la feuille de la carte');
+        await pg.locator('[data-jour="2026-10-30"]').first().click();
+        await pg.locator('[data-jour="2026-11-01"]').first().click();
+        await pg.locator('[data-periode-appliquer]').first().click();
+        await pg.waitForTimeout(400);
+        await pg.locator('[data-carte-fermer]').click();
+        await pg.waitForTimeout(500);
+        const r3 = await carte(pg, 'ventes');
+        dit(r3 && r3.grand && r3.grand.id === 'ventes' && r3.grand.p === 'plage' && r3.grand.v === '3', 'plage du 30 oct. au 1er nov. : 3 ventes (la règle sur ces dates, à la main)', JSON.stringify(r3 && r3.grand));
+        dit(r3 && /^30 oct\.–1 nov\. · Vinted$/.test(r3.perimetre), 'la plage se lit en tête de carte : « 30 oct.–1 nov. · Vinted »', r3 && r3.perimetre);
+        const range = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_carte_stats')); } catch (_) { return null; } });
+        const gp = range && range.pages && range.pages.ventes && range.pages.ventes.g && range.pages.ventes.g.p;
+        dit(gp && typeof gp === 'object' && gp.a - gp.de === 3 * 864e5, 'la plage est rangée (bornes [30 oct., 2 nov.), jours entiers)', JSON.stringify(gp));
+        // Le raccourci « Ce mois » redonne la période nommée (calculée par les règles de l'app).
+        await pg.locator('[data-carte-modifier="ventes"]').first().click();
+        await pg.locator('[data-carte-place="0"]').click();
+        await pg.locator('[data-carte-calendrier] [data-periode-ouvrir]').click();
+        await pg.locator('[data-periode-raccourci="mois"]').first().click();
+        await pg.waitForTimeout(300);
+        await pg.locator('[data-carte-fermer]').click();
+        await pg.waitForTimeout(500);
+        const r4 = await carte(pg, 'ventes');
+        dit(r4 && r4.grand.p === 'mois' && r4.grand.v === '3' && r4.perimetre === 'Novembre · Vinted', '« Ce mois » : la période nommée revient (3 ventes en novembre, « Novembre · Vinted »)', JSON.stringify(r4 && { p: r4.grand.p, v: r4.grand.v, per: r4.perimetre }));
+      });
       await essaie('A. les autres pages', async () => {
         console.log('── A. Les autres pages montent leur carte (défaut gardé)');
         await aller(pg, 'cat_bord', '[data-carte-stats="colis"]');
@@ -239,8 +280,13 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         await shot('[data-carte-stats="annonces"]', 'carte-annonces');
         await aller(pg, 'achats', '[data-carte-stats="achats"]');
         const h = await carte(pg, 'achats');
-        dit(!!h && h.grand.id === 'retirer', 'Achats : à retirer en grand', JSON.stringify(h && h.grand));
+        // (3 nov.) La carte d'Achats parle d'achats : Dépensé du mois en grand, jamais « Vendu · mois ».
+        dit(!!h && h.grand.id === 'depense' && h.cases.map((c) => c.id).join(',') === 'enroute,retirer,recus', 'Achats : dépensé en grand, en route · à retirer · reçus', JSON.stringify(h && { g: h.grand, c: h.cases.map((c) => c.id) }));
+        dit(!!h && !/vendu/i.test(JSON.stringify(h.cases.map((c) => c.t))), 'Achats : aucune case « Vendu »');
         await shot('[data-carte-stats="achats"]', 'carte-achats');
+        // (3 nov.) Rien de rogné dans une case, jamais « ≥ » sur un chiffre de case.
+        const rog = await pg.evaluate(() => [...document.querySelectorAll('.vrm-fu-case:not(.is-jour)')].flatMap((c) => [...c.querySelectorAll('b, :scope > span')].filter((e) => e.scrollWidth > e.clientWidth + 1 || /≥/.test(e.textContent)).map((e) => e.textContent)));
+        dit(!rog.length, 'cases : aucun libellé ni chiffre rogné, aucun « ≥ »', rog.join(' | '));
         const d = await deborde(pg);
         dit(d <= 1, 'aucun débordement horizontal', `${d}px`);
       });

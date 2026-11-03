@@ -125,16 +125,16 @@ function Resultat({ x, nouveau, rp, C }) {
   return <div className="vrm-buy-row vrm-ebay-res" data-ebay-resultat={x.itemId} data-nouveau={nouveau ? 'oui' : 'non'}>
     <div className="vrm-buy-ph" style={{ background: C.card2 || C.bg }}>{x.photo ? <img src={x.photo} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : null}</div>
     <div className="vrm-buy-main" style={{ minWidth: 0 }}>
-      <div className="vrm-buy-title" style={{ color: C.text }} title={x.titre}>{nouveau && <span data-badge-nouveau="" style={{ fontSize: 10.5, fontWeight: 700, color: C.accent, marginRight: 6, textTransform: 'uppercase', letterSpacing: 0.3 }}>nouveau</span>}{x.titre || 'Annonce ' + x.itemId}</div>
+      <div className="vrm-buy-title" style={{ color: C.text }} title={x.titre}>{nouveau && <span data-badge-nouveau="" style={{ fontSize: 11, fontWeight: 700, color: C.accent, marginRight: 6, textTransform: 'uppercase', letterSpacing: 0.3 }}>nouveau</span>}{x.titre || 'Annonce ' + x.itemId}</div>
       <div className="vrm-buy-meta" style={{ color: C.muted, flexWrap: 'wrap' }}>
         <span data-ebay-prix={x.prix} data-ebay-port={x.port == null ? 'inconnu' : x.port} style={{ color: C.text, fontWeight: 600 }}>{x.port == null ? <>{eur(x.prix)} <span style={{ fontWeight: 400, color: C.muted }}>+ port non indiqué</span></> : x.port === 0 ? <>{eur(x.prix)} <span style={{ fontWeight: 400, color: C.muted }}>port compris</span></> : <>{eur(x.total)} <span style={{ fontWeight: 400, color: C.muted }}>({eur(x.prix)} + {eur(x.port)} de port)</span></>}</span>
         {x.etat && <span>· {x.etat}</span>}
         {x.enchere && !x.achatImmediat && <span>· enchère</span>}
         {x.vendeur && <span>· {x.vendeur}{Number.isFinite(x.avis) ? ` (${String(x.avis).replace('.', ',')} %)` : ''}</span>}
       </div>
-      {rp && <div data-ebay-repere={rp.modele} style={{ fontSize: 11.5, color: C.muted, marginTop: 3, lineHeight: 1.4 }}>{phraseRepere(rp)}</div>}
+      {rp && <div data-ebay-repere={rp.modele} style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.4 }}>{phraseRepere(rp)}</div>}
     </div>
-    <div className="vrm-buy-act"><a href={x.url} target="_blank" rel="noreferrer noopener" data-voir-ebay="" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, padding: '0 10px', color: C.text, fontSize: 12.5, fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap' }}>Voir sur eBay ↗</a></div>
+    <div className="vrm-buy-act"><a href={x.url} target="_blank" rel="noreferrer noopener" data-voir-ebay="" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, padding: '0 10px', color: C.text, fontSize: 13, fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap' }}>Voir sur eBay ↗</a></div>
   </div>;
 }
 
@@ -161,20 +161,20 @@ function Liste({ r, nouveaux, repere, C, max = 8, cle }) {
   const filtres = [r.horsBudget ? `${r.horsBudget} au-dessus du budget (port compris)` : '', r.exclus ? `${r.exclus} avec un mot exclu` : '', r.autreDevise ? `${r.autreDevise} dans une autre devise` : ''].filter(Boolean);
   const ecartees = (r.horsBudget || 0) + (r.exclus || 0) + (r.autreDevise || 0);
   return <div data-ebay-liste={cle || ''} data-ebay-nb={items.length}>
-    {!items.length ? <p data-ebay-vide={ecartees ? 'ecartees' : ''} style={{ fontSize: 12.5, color: C.muted, margin: '6px 0' }}>{ecartees
+    {!items.length ? <p data-ebay-vide={ecartees ? 'ecartees' : ''} style={{ fontSize: 13, color: C.muted, margin: '6px 0' }}>{ecartees
       // eBay EN AVAIT : c'est VRM qui les a écartées (le filtre de prix d'eBay
       // ne compte pas le port, VRM l'ajoute ensuite).
       ? <>Aucune annonce gardée : eBay en avait {ecartees}, toutes écartées — {filtres.join(' · ')}.</>
       : <>eBay n’a aucune annonce pour ces critères en ce moment.</>}</p>
-      : <>{commun && <p data-ebay-repere={commun.modele} data-ebay-repere-liste={commun.partiel ? 'partiel' : 'tout'} style={{ fontSize: 11.5, color: C.muted, margin: '0 0 6px', lineHeight: 1.4 }}>{phraseRepere(commun)}</p>}
+      : <>{commun && <p data-ebay-repere={commun.modele} data-ebay-repere-liste={commun.partiel ? 'partiel' : 'tout'} style={{ fontSize: 12, color: C.muted, margin: '0 0 6px', lineHeight: 1.4 }}>{phraseRepere(commun)}</p>}
         <div className="vrm-buy-list" style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10 }}>{vus.map((x, i) => <Resultat key={x.itemId} x={x} nouveau={nouveaux && nouveaux.has(x.itemId)} rp={parLigne[i]} C={C} />)}</div></>}
-    {items.length > max && <button type="button" onClick={() => setTout((v) => !v)} style={{ marginTop: 6, minHeight: 44, border: 'none', background: 'transparent', color: C.text, fontWeight: 600, fontSize: 12.5, cursor: 'pointer', padding: 0 }}>{tout ? 'Voir moins' : `Voir les ${items.length}`}</button>}
-    {items.length > 0 && filtres.length > 0 && <p style={{ fontSize: 11.5, color: C.muted, margin: '6px 0 0' }}>Écartées : {filtres.join(' · ')}.</p>}
+    {items.length > max && <button type="button" onClick={() => setTout((v) => !v)} style={{ marginTop: 6, minHeight: 44, border: 'none', background: 'transparent', color: C.text, fontWeight: 600, fontSize: 13, cursor: 'pointer', padding: 0 }}>{tout ? 'Voir moins' : `Voir les ${items.length}`}</button>}
+    {items.length > 0 && filtres.length > 0 && <p style={{ fontSize: 12, color: C.muted, margin: '6px 0 0' }}>Écartées : {filtres.join(' · ')}.</p>}
   </div>;
 }
 
 export default function RechercheEbay({ headers, theme: C, owner, repere, session }) {
-  const S = { input: { width: '100%', minHeight: 44, padding: '9px 10px', border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, background: C.card, fontFamily: 'inherit', fontSize: 16, boxSizing: 'border-box' }, bouton: { minHeight: 44, padding: '0 14px', border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, background: C.card, fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer' }, label: { display: 'grid', gap: 5, fontSize: 12, color: C.muted } };
+  const S = { input: { width: '100%', minHeight: 44, padding: '9px 10px', border: `1px solid ${C.border}`, borderRadius: 12, color: C.text, background: C.card, fontFamily: 'inherit', fontSize: 17, boxSizing: 'border-box' }, bouton: { minHeight: 44, padding: '0 14px', border: `1px solid ${C.border}`, borderRadius: 12, color: C.text, background: C.card, fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer' }, label: { display: 'grid', gap: 5, fontSize: 12, color: C.muted } };
   const [f, setF] = useState({ mots: '', pointure: '', maximum: '', etat: 'tous', achatImmediat: true, livraisonFR: true });
   const [manuel, setManuel] = useState(undefined);   // undefined rien · 'encours' · {r} · {erreur}
   const [usage, setUsage] = useState(null);           // { appels, octets, quotaEbay, plafondEbayDoc }
@@ -348,7 +348,7 @@ export default function RechercheEbay({ headers, theme: C, owner, repere, sessio
   return <section data-ebay-recherche="" style={{ display: 'grid', gap: 18, marginBottom: 18 }}>
     <div>
       <h3 style={{ margin: '0 0 4px', fontSize: 15, color: C.text }}>Chercher des paires sur eBay</h3>
-      <p style={{ margin: '0 0 10px', fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>Les annonces les plus récentes d’abord. VRM ne fait que lire : pour acheter, tu ouvres l’annonce sur eBay.</p>
+      <p style={{ margin: '0 0 10px', fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Les annonces les plus récentes d’abord. VRM ne fait que lire : pour acheter, tu ouvres l’annonce sur eBay.</p>
       <form onSubmit={chercher} data-ebay-form-recherche="" style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', alignItems: 'end' }}>
         <label style={{ ...S.label, gridColumn: '1 / -1' }}>Modèle, marque…<input aria-label="Mots à chercher" value={f.mots} onChange={(e) => setF({ ...f, mots: e.target.value })} placeholder="ex. salomon xt-6" style={S.input} /></label>
         <label style={S.label}>Pointure<input aria-label="Pointure" inputMode="decimal" value={f.pointure} onChange={(e) => setF({ ...f, pointure: e.target.value })} placeholder="42 ou 42,5" style={S.input} /></label>
@@ -359,7 +359,7 @@ export default function RechercheEbay({ headers, theme: C, owner, repere, sessio
         <button type="submit" disabled={manuel === 'encours' || plafondJour === jourParis()} data-geste="chercher" style={{ ...S.bouton, background: C.text, color: C.card, border: 'none' }}>{manuel === 'encours' ? 'Recherche…' : 'Chercher'}</button>
       </form>
       <div aria-live="polite" style={{ marginTop: 10 }}>
-        {manuel && manuel.erreur && <p data-ebay-recherche-etat="pas-su" style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>{manuel.erreur}</p>}
+        {manuel && manuel.erreur && <p data-ebay-recherche-etat="pas-su" style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>{manuel.erreur}</p>}
         {manuel && manuel.r && <>
           <Liste r={manuel.r} repere={repere} C={C} cle="manuel" />
           {manuel.r.criteres && <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 8 }}>
@@ -372,25 +372,25 @@ export default function RechercheEbay({ headers, theme: C, owner, repere, sessio
 
     <div data-ebay-fil={veilles === undefined ? 'en-cours' : veilles === null ? 'pas-su' : dansFil.length} data-ebay-fil-nouveaux={nbNouveaux}>
       <h3 style={{ margin: '0 0 4px', fontSize: 15, color: C.text }}>Ton fil{nbNouveaux > 0 ? <span style={{ fontSize: 12, fontWeight: 600, color: C.accent }}> · {nbNouveaux} nouvelle{nbNouveaux > 1 ? 's' : ''}</span> : null}</h3>
-      <p style={{ margin: '0 0 10px', fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>Tes recherches enregistrées, relues à l’ouverture de cet onglet puis au plus toutes les 15 minutes tant que VRM est ouvert et visible. « Nouveau » = pas vue depuis ta dernière visite.</p>
-      {veilles === undefined && <p style={{ fontSize: 12.5, color: C.muted }}>Lecture de tes recherches enregistrées…</p>}
-      {veilles === null && <p data-ebay-fil-etat="pas-su" style={{ fontSize: 12.5, color: C.muted }}>Je n’ai pas pu lire tes recherches enregistrées — rien n’est perdu. <button type="button" onClick={() => { lireVeilles(); try { window.dispatchEvent(new Event('vrm:operations-relire')); } catch (_) {} }} style={{ ...S.bouton, marginLeft: 6 }}>Réessayer</button></p>}
-      {veilles && !dansFil.length && <p data-ebay-fil-vide="" style={{ fontSize: 12.5, color: C.muted }}>Ton fil est vide : cherche une paire ci-dessus puis « Ajouter au fil », ou ajoute une recherche plus bas.</p>}
+      <p style={{ margin: '0 0 10px', fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Tes recherches enregistrées, relues à l’ouverture de cet onglet puis au plus toutes les 15 minutes tant que VRM est ouvert et visible. « Nouveau » = pas vue depuis ta dernière visite.</p>
+      {veilles === undefined && <p style={{ fontSize: 13, color: C.muted }}>Lecture de tes recherches enregistrées…</p>}
+      {veilles === null && <p data-ebay-fil-etat="pas-su" style={{ fontSize: 13, color: C.muted }}>Je n’ai pas pu lire tes recherches enregistrées — rien n’est perdu. <button type="button" onClick={() => { lireVeilles(); try { window.dispatchEvent(new Event('vrm:operations-relire')); } catch (_) {} }} style={{ ...S.bouton, marginLeft: 6 }}>Réessayer</button></p>}
+      {veilles && !dansFil.length && <p data-ebay-fil-vide="" style={{ fontSize: 13, color: C.muted }}>Ton fil est vide : cherche une paire ci-dessus puis « Ajouter au fil », ou ajoute une recherche plus bas.</p>}
       {horsFil > 0 && <p data-ebay-hors-fil={horsFil} style={{ fontSize: 12, color: C.muted }}>{horsFil > 1 ? `${horsFil} autres recherches actives ne sont pas relues` : '1 autre recherche active n’est pas relue'} : {MAX_FIL} au plus, les plus récentes d’abord — archive celles qui ne servent plus.</p>}
-      {plafondAuj && <p data-ebay-plafond="" style={{ fontSize: 12.5, color: C.text, lineHeight: 1.5 }}>Tes recherches eBay du jour sont faites : le fil s’arrête jusqu’à minuit (heure de Paris).</p>}
-      {plafondFilAuj && <p data-ebay-plafond-fil="" style={{ fontSize: 12.5, color: C.text, lineHeight: 1.5 }}>Ton fil a fait ses {(ap && ap.plafondFil) || 150} relectures du jour : il s’arrête jusqu’à minuit (heure de Paris). Les recherches restantes sont gardées pour chercher à la main, ci-dessus.</p>}
-      {!filArrete && arret && <p data-ebay-fil-panne={arret.raison} style={{ fontSize: 12.5, color: C.text, lineHeight: 1.5 }}>{arret.message}{arret.raison !== 'session' && arret.raison !== 'session-renouvel' ? ` Prochain essai vers ${heureMs(arret.ici + RELIRE_MS)}, ou « Relire maintenant ».` : ''}</p>}
-      {premieres > 0 && <p data-ebay-fil-premiere={premieres} style={{ fontSize: 11.5, color: C.muted, margin: '0 0 8px' }}>{premieres > 1 ? `Première lecture de ${premieres} recherches` : 'Première lecture d’une recherche'} : rien n’y est marqué « nouveau ».</p>}
+      {plafondAuj && <p data-ebay-plafond="" style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>Tes recherches eBay du jour sont faites : le fil s’arrête jusqu’à minuit (heure de Paris).</p>}
+      {plafondFilAuj && <p data-ebay-plafond-fil="" style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>Ton fil a fait ses {(ap && ap.plafondFil) || 150} relectures du jour : il s’arrête jusqu’à minuit (heure de Paris). Les recherches restantes sont gardées pour chercher à la main, ci-dessus.</p>}
+      {!filArrete && arret && <p data-ebay-fil-panne={arret.raison} style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>{arret.message}{arret.raison !== 'session' && arret.raison !== 'session-renouvel' ? ` Prochain essai vers ${heureMs(arret.ici + RELIRE_MS)}, ou « Relire maintenant ».` : ''}</p>}
+      {premieres > 0 && <p data-ebay-fil-premiere={premieres} style={{ fontSize: 12, color: C.muted, margin: '0 0 8px' }}>{premieres > 1 ? `Première lecture de ${premieres} recherches` : 'Première lecture d’une recherche'} : rien n’y est marqué « nouveau ».</p>}
       <div style={{ display: 'grid', gap: 14 }}>{dansFil.map((v) => { const e = fil[v.id] || {}; const nv = e.r ? nouveauxV(v, e.r) : null; const aff = etatAffiche(e);
         return <article key={v.id} data-ebay-fil-recherche={v.id} data-etat={aff}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
-            <b style={{ fontSize: 13.5, color: C.text }}>{v.titre}</b>
-            <span style={{ fontSize: 11.5, color: C.muted }}>{v.mots}{v.pointure ? ' · ' + v.pointure : ''} · {eur(v.maximum)} max</span>
-            {e.lueA && <span style={{ fontSize: 11.5, color: C.muted, marginLeft: 'auto' }}>lue à {heure(e.lueA)}</span>}
+            <b style={{ fontSize: 13, color: C.text }}>{v.titre}</b>
+            <span style={{ fontSize: 12, color: C.muted }}>{v.mots}{v.pointure ? ' · ' + v.pointure : ''} · {eur(v.maximum)} max</span>
+            {e.lueA && <span style={{ fontSize: 12, color: C.muted, marginLeft: 'auto' }}>lue à {heure(e.lueA)}</span>}
           </div>
-          {e.etat === 'encours' && !e.r && <p style={{ fontSize: 12.5, color: C.muted }}>Recherche sur eBay…</p>}
+          {e.etat === 'encours' && !e.r && <p style={{ fontSize: 13, color: C.muted }}>Recherche sur eBay…</p>}
           {(aff === 'pas-su' || aff === 'plafond') && <p data-ebay-fil-etat={aff} style={{ fontSize: 12, color: C.muted, margin: '0 0 6px' }}>{e.r ? 'Pas relue — ce que tu vois date de la dernière lecture.' : 'Pas lue.'}</p>}
-          {aff === 'criteres' && <p data-ebay-fil-etat="criteres" style={{ fontSize: 12.5, color: C.text, lineHeight: 1.5 }}>Critères refusés : {e.erreur} Modifie cette recherche plus bas (elle ne sera pas relue avant).</p>}
+          {aff === 'criteres' && <p data-ebay-fil-etat="criteres" style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>Critères refusés : {e.erreur} Modifie cette recherche plus bas (elle ne sera pas relue avant).</p>}
           {e.r && <Liste r={e.r} nouveaux={nv} repere={repere} C={C} cle={v.id} />}
         </article>; })}</div>
       {dansFil.length > 0 && !filArrete && <button type="button" onClick={() => relireFil(true)} data-geste="relire-fil" style={{ ...S.bouton, marginTop: 10 }}>Relire maintenant</button>}

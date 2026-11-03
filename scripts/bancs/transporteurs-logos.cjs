@@ -175,7 +175,7 @@ const sain = async (pg, ecran) => {
             const nomG = h ? h.getAttribute('data-groupe-transp') : '';
             return { tx: c.getAttribute('data-tx-colis'), carte: c.getAttribute('data-transporteur'), pastilles: P2(act || c),
               apresBouton: !!(p && bouton && (p.compareDocumentPosition(bouton) & Node.DOCUMENT_POSITION_FOLLOWING) && (bouton.matches('[data-imprime], [data-bouton-bord], .vrm-fu-principal, button') || bouton.querySelector('button'))),
-              memeRangee: !!(p && bouton && p.parentElement === bouton.parentElement && (nomG === nomP || (nomG === 'Autres' && /pas lu/i.test(nomP)))) };
+              memeRangee: !!(p && bouton && p.parentElement === bouton.parentElement && (nomG === nomP || (nomG === 'Autres' && /pas lu|inconnu/i.test(nomP)))) };
           });
         });
         const envoyer = await pg.evaluate(() => ({ route: document.querySelectorAll('[data-vc-route]').length }));
@@ -186,7 +186,7 @@ const sain = async (pg, ecran) => {
           dit(p && p.cle === cle && c.apresBouton && c.memeRangee, `${T} E2 vente ${tx} : la puce à gauche du bouton bordereau, même rangée, sous l'en-tête de son transporteur`, JSON.stringify(c && { p, apres: c.apresBouton, rangee: c.memeRangee }));
         }
         const pasLu = r.find((x) => x.tx === '8003'), p3 = pasLu && pasLu.pastilles[0];
-        dit(p3 && /^Transporteur pas lu$/.test(p3.txt) && p3.imgs.length === 0, `${T} E3 « Transporteur pas lu », sans aucune image`, JSON.stringify(p3));
+        dit(p3 && /^Transporteur inconnu$/.test(p3.txt) && p3.imgs.length === 0, `${T} E3 « Transporteur pas lu », sans aucune image`, JSON.stringify(p3));
         const ch = r.find((x) => x.tx === '8001').pastilles[0];
         const poses = await pg.evaluate(() => [...new Set(window.__logos)]);
         dit(ch && /Chronopost/.test(ch.txt) && poses.includes('https://www.chronopost.fr/favicon.ico') && poses.every((u) => /^https:\/\/(www\.)?(chronopost\.fr|mondialrelay\.fr|vintedgo\.com)\/favicon\.ico$/.test(u)), `${T} E4 logos demandés à leurs domaines officiels seulement`, JSON.stringify(poses));
@@ -225,7 +225,7 @@ const sain = async (pg, ecran) => {
         }
         const vcA1 = r.vc && r.vc.find((x) => x.id === 'A1'), vcA3 = r.vc && r.vc.find((x) => x.id === 'A3');
         dit(vcA1 && vcA1.tr === ATTENDU_VC.A1 && /Chronopost/.test(vcA1.p.txt), `${T} A2 achat Vestiaire en route sous « À retirer », Chronopost`, JSON.stringify(r.vc));
-        dit(vcA3 && vcA3.tr === 'pas-lu' && /Transporteur pas lu/.test(vcA3.p.txt) && !vcA3.p.imgs.length, `${T} A2 achat Vestiaire sans transporteur : « pas lu », sans logo`, JSON.stringify(vcA3));
+        dit(vcA3 && vcA3.tr === 'pas-lu' && /Transporteur inconnu/.test(vcA3.p.txt) && !vcA3.p.imgs.length, `${T} A2 achat Vestiaire sans transporteur : « pas lu », sans logo`, JSON.stringify(vcA3));
         await sain(pg, T + ' À retirer');
         await pg.screenshot({ path: path.join(SHOTS, `transporteurs-retirer-${vp.width}.png`), fullPage: false });
       });

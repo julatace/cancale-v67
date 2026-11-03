@@ -45,7 +45,7 @@
   --vrm-police: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Inter', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --vrm-police-mono: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --vrm-r-sm: 10px; --vrm-r-md: 14px; --vrm-r-lg: 14px;
-  --vrm-ombre-flottante: 0 1px 2px rgba(15,15,14,.06), 0 10px 28px rgba(15,15,14,.12);
+  --vrm-ombre-flottante: 0 1px 2px rgba(0,0,0,.06), 0 10px 28px rgba(0,0,0,.12);
   --vrm-t-title: 34px; --vrm-t-section: 22px;
   --vrm-b-h: 44px;
 }
@@ -104,7 +104,7 @@ html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button > :first-child { flex-shr
 /* Un nom long (« Vestiaire Collective ») passe sur deux lignes plutôt que d'être coupé. */
 html .vrm-app-shell .vrm-atelier-rail .vrm-rail-lib { flex: 1; min-width: 0; line-height: 1.2; overflow-wrap: anywhere; }
 html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button:is([aria-current="page"], [data-active], [aria-expanded="true"]) {
-  background: var(--vrm-surface); color: var(--vrm-ink); border-color: transparent; font-weight: 650;
+  background: var(--vrm-surface); color: var(--vrm-ink); border-color: transparent; font-weight: 600;
 }
 html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button::before { display: none !important; }
 html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button:focus-visible { outline: 2px solid var(--vrm-accent); outline-offset: 1px; }
@@ -158,7 +158,7 @@ html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button:focus-visible { outline: 
   html .vrm-app-shell .vrm-day-layout .vrm-day-greeting .vrm-day-hello {
     font-size: 34px !important; font-weight: 800 !important; letter-spacing: -.025em !important; line-height: 1.05 !important; color: var(--vrm-ink) !important;
   }
-  html .vrm-app-shell .vrm-day-layout .vrm-day-greeting .vrm-day-date { color: var(--vrm-muted) !important; font-weight: 500; font-size: 14px !important; }
+  html .vrm-app-shell .vrm-day-layout .vrm-day-greeting .vrm-day-date { color: var(--vrm-muted) !important; font-weight: 500; font-size: 15px !important; }
   html .vrm-app-shell .vrm-day-layout .vrm-day-greeting .vrm-day-todo { color: var(--vrm-muted) !important; font-size: 15px !important; }
   html .vrm-app-shell .vrm-day-layout .vrm-day-greeting .vrm-day-todo b { color: var(--vrm-ink) !important; }
 
@@ -185,7 +185,7 @@ html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button:focus-visible { outline: 
   html .vrm-app-shell .vrm-main .vrm-ventes-liste > .vrm-ledger-heading { background: transparent !important; }
   /* Sans photo, la vignette garde son aplat « photo vide » (elle était blanche :
      sur le blanc de la page, elle disparaissait). */
-  html .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-ledger-photo-empty { background: var(--vrm-photo, var(--vrm-card2)) !important; border-radius: 8px !important; }
+  html .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-ledger-photo-empty { background: var(--vrm-photo, var(--vrm-card2)) !important; border-radius: 12px !important; }
   html .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row {
     background: transparent !important; border: 0 !important; border-bottom: 1px solid var(--vrm-line) !important;
     border-radius: 0 !important; margin-bottom: 0 !important; padding-inline: 0 !important;
@@ -197,7 +197,7 @@ html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button:focus-visible { outline: 
   /* Le N° d'un colis, lisible téléphone en main pendant qu'on emballe : une
      pastille noire pleine, en chiffres à chasse fixe de 15 px au moins. */
   html .vrm-app-shell .vrm-main .vrm-colis-num:not([title]) {
-    font-size: 16px !important; padding: 4px 12px !important;
+    font-size: 17px !important; padding: 4px 12px !important;
     background: var(--vrm-ink) !important; color: var(--vrm-bg) !important; border-color: var(--vrm-ink) !important;
   }
   html .vrm-app-shell .vrm-main .vrm-colis-num[title] { font-size: 15px !important; }
@@ -208,7 +208,7 @@ html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button:focus-visible { outline: 
 
 /* ── 4. LES TITRES D'ÉCRAN : grands, serrés ──────────────────────────────── */
 html .vrm-screen-head :is(h1, h2) { font-size: var(--vrm-t-title) !important; font-weight: 800 !important; letter-spacing: -.025em !important; line-height: 1.04 !important; }
-html .vrm-market-space .vrm-screen-head :is(h1, h2) { font-size: var(--vrm-t-section) !important; font-weight: 750 !important; letter-spacing: -.018em !important; }
+html .vrm-market-space .vrm-screen-head :is(h1, h2) { font-size: var(--vrm-t-section) !important; font-weight: 700 !important; letter-spacing: -.018em !important; }
 html .vrm-market-heading h1 { font-weight: 800 !important; letter-spacing: -.025em !important; }
 @media (min-width: 768px) {
   html .vrm-app-shell .vrm-day-layout .vrm-day-hello { font-size: 44px !important; font-weight: 800 !important; letter-spacing: -.025em !important; line-height: 1.02 !important; }
@@ -256,7 +256,7 @@ html .vrm-app-shell .vrm-day-layout .vrm-day-recu-n { font-weight: 800 !importan
 :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-plus { padding: 10px 0 4px !important; border-top: 0 !important; }
 :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-titre] { font-weight: 700 !important; letter-spacing: -.01em; }
 :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-prix] { font-weight: 800 !important; letter-spacing: -.02em; }
-:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-cell { background: var(--vrm-surface) !important; border-color: transparent !important; border-radius: 10px !important; }
+:root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-cell { background: var(--vrm-surface) !important; border-color: transparent !important; border-radius: 12px !important; }
 :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-ann-actions { border-top: 0 !important; padding-inline: 0 !important; background: transparent !important; }
 /* Le N° de la fiche : une pastille blanche à chasse fixe POSÉE SUR LA PHOTO, en
    haut à gauche (la maquette « Vitrine ») — l'étiquette du carton. En sombre,
@@ -265,7 +265,7 @@ html .vrm-app-shell .vrm-day-layout .vrm-day-recu-n { font-weight: 800 !importan
    pas : toute la pastille se touche (cible étendue à 44 px affichés au moins,
    la zone principale du téléphone étant à 80 %). */
 :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-num {
-  background: var(--vrm-bg) !important; color: var(--vrm-ink) !important; box-shadow: 0 1px 2px rgba(15,15,14,.12);
+  background: var(--vrm-bg) !important; color: var(--vrm-ink) !important; box-shadow: 0 1px 2px rgba(0,0,0,.12);
 }
 :root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-num {
   background: var(--vrm-ink) !important; color: var(--vrm-bg) !important;
@@ -275,7 +275,7 @@ html .vrm-app-shell .vrm-day-layout .vrm-day-recu-n { font-weight: 800 !importan
      teignait le N° en cobalt ; une pastille d'étiquette s'écrit à l'encre. */
   position: relative; display: flex; align-items: center; min-height: 28px !important; height: 28px; margin: 0 !important; padding: 0 !important;
   background: transparent !important; border: 0 !important; color: inherit !important;
-  font-family: var(--vrm-police-mono) !important; font-size: 14px !important; font-weight: 500 !important; letter-spacing: 0 !important; cursor: pointer;
+  font-family: var(--vrm-police-mono) !important; font-size: 15px !important; font-weight: 500 !important; letter-spacing: 0 !important; cursor: pointer;
 }
 /* Le prix est désormais seul sur sa ligne : la pastille que les couches d'avant
    posaient sur le DERNIER élément de la ligne (le N°, styles-annonces-pro) ne
@@ -299,15 +299,15 @@ html .vrm-app-shell .vrm-day-layout .vrm-day-recu-n { font-weight: 800 !importan
 }
 /* « À confirmer » : un contour ambre. */
 html .vrm-app-shell [data-ann-a-confirmer] {
-  color: var(--vrm-warn) !important; border: 1px solid var(--vrm-warn) !important; background: var(--vrm-bg) !important; border-radius: 8px !important;
+  color: var(--vrm-warn) !important; border: 1px solid var(--vrm-warn) !important; background: var(--vrm-bg) !important; border-radius: 12px !important;
 }
 /* Annonces au téléphone : deux colonnes à grandes photos (190 px). */
 @media (max-width: 600px) {
   :root body .vrm-app-shell .vrm-main .vrm-ann-grid.vrm-fiches.vrm-fiches { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 24px 12px !important; }
   :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-ann-overview > a.vrm-fiche-photo { aspect-ratio: auto !important; height: 190px !important; }
-  :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-titre] { font-size: 14px !important; }
-  :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-prix] { font-size: 18px !important; }
-  :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-ann-price-line > span[data-prix][data-prix] { font-size: 18px !important; }
+  :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-titre] { font-size: 15px !important; }
+  :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-prix] { font-size: 17px !important; }
+  :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-ann-price-line > span[data-prix][data-prix] { font-size: 17px !important; }
   :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-ann-price-line { flex-wrap: wrap; gap: 6px !important; }
   :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-duo { grid-template-columns: minmax(0, 1fr) !important; }
   :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-chiffres { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
@@ -342,7 +342,7 @@ html :is(.vrm-sheet-label, .vrm-sidebar-label, .vrm-achats-kpi-k, .vrm-msg-secti
   text-transform: none !important; letter-spacing: 0 !important;
 }
 html .vrm-app-shell .vrm-main .vrm-set-titre {
-  text-transform: none !important; letter-spacing: 0 !important; font-size: 14px !important; font-weight: 700; color: var(--vrm-ink) !important;
+  text-transform: none !important; letter-spacing: 0 !important; font-size: 15px !important; font-weight: 700; color: var(--vrm-ink) !important;
 }
 html .vrm-app-shell .vrm-achats .vrm-pickup-code > span { text-transform: none !important; letter-spacing: 0 !important; }
 /* Les graduations des courbes : 11 px au moins (elles étaient à 10). */
@@ -354,7 +354,7 @@ html .vrm-app-shell :is(.vrm-b, .vrm-button, .vrm-btn-primary, .vrm-w-btn) { box
 html .vrm-b, html .vrm-app-shell .vrm-main .vrm-b.vrm-b { border-radius: 14px !important; }
 html .vrm-app-shell .vrm-main .vrm-b.vrm-b-primaire { font-weight: 700 !important; }
 html .vrm-app-shell .vrm-seg { border-radius: 14px; }
-html .vrm-app-shell .vrm-seg-btn { border-radius: 11px; }
+html .vrm-app-shell .vrm-seg-btn { border-radius: 12px; }
 html .vrm-app-shell .vrm-seg-btn:is([aria-current="page"], [aria-pressed="true"]),
 html .vrm-app-shell .vrm-seg > button:is([aria-current="page"], [aria-pressed="true"]) { box-shadow: none !important; }
 html .vrm-app-shell .vrm-main .vrm-sales-workbar > .vrm-rangee > button { box-shadow: none !important; }
@@ -373,7 +373,7 @@ html .vrm-app-shell .vrm-main :is(.vrm-ann-search, .vrm-list-search) { border-ra
 html .vrm-app-shell .vrm-stagger > * { animation: none !important; }
 
 /* ── 10. LE SOMBRE : les mêmes marches, sans les teintes « bleu nuit » codées
-   en dur par les couches d'avant (#17262d, #21343e, #253b45…) ─────────────── */
+   en dur par les couches d'avant (#1D1D1F, #2C2C2E, #38383A…) ─────────────── */
 :root[data-theme="dark"] .vrm-app-shell .vrm-main { background-color: var(--vrm-bg) !important; }
 :root[data-theme="dark"] .vrm-app-shell :is(.vrm-day-card, .vrm-day-task, .vrm-day-money, .vrm-day-week) {
   background-color: var(--vrm-surface) !important;
@@ -382,22 +382,22 @@ html .vrm-app-shell .vrm-stagger > * { animation: none !important; }
 :root[data-theme="dark"] .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-statut { background: var(--vrm-card2); color: var(--vrm-ink) !important; }
 
 /* ── 11. LES RESTES DES PALETTES D'AVANT ─────────────────────────────────────
-   Le bleu de septembre (#2458E6, #3D7BFF) et le bleu nuit (#0E1A2B) survivaient
+   Le bleu de septembre (#0071E3, #8DB8F2) et le bleu nuit (#1C1C1E) survivaient
    en valeurs de repli : la ligne de conversation ouverte, la case
    « principale » des finances, la présentation d'arrivée. Ils prennent Vitrine. */
 html .vrm-app-shell .vrm-inbox-row.is-current { box-shadow: inset 3px 0 var(--vrm-ink) !important; }
 html .vrm-app-shell .vrm-finance-metric.is-primary { background: var(--vrm-surface) !important; border-color: transparent !important; }
 html .vrm-app-shell .vrm-finance-metric.is-primary * { color: var(--vrm-ink) !important; }
 .vrm-bienvenue {
-  --b-carte: #FFFFFF; --b-encre: #0F0F0E; --b-doux: #56564F; --b-filet: #E4E4DF; --b-sol: #F5F5F3; --b-accent: #0071E3;
+  --b-carte: #FFFFFF; --b-encre: #1D1D1F; --b-doux: #6E6E73; --b-filet: #E5E5EA; --b-sol: #F2F2F7; --b-accent: #0071E3;
   backdrop-filter: none; -webkit-backdrop-filter: none;
 }
 :root[data-theme="dark"] .vrm-bienvenue {
-  --b-carte: #1A1A18; --b-encre: #F2F2EE; --b-doux: #B0B0A8; --b-filet: #2E2E2B; --b-sol: #0E0E0D; --b-accent: #0A84FF;
+  --b-carte: #1C1C1E; --b-encre: #F5F5F7; --b-doux: #98989D; --b-filet: #38383A; --b-sol: #000000; --b-accent: #0A84FF;
 }
 /* (1er nov.) En sombre, le texte du bouton principal suit `onAccent` de Vitrine
    (encre sombre) : le blanc sur #0A84FF ne se lisait qu'à ~3:1. */
-:root[data-theme="dark"] .vrm-bienvenue-principal { color: #0E0E0D; }
+:root[data-theme="dark"] .vrm-bienvenue-principal { color: #000000; }
 /* Le voile sous une feuille : une ombre de la page, sans flou de verre. */
 .vrm-sheet-voile { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
 
@@ -416,7 +416,7 @@ html body .vrm-app-shell .vrm-colis-carte button.vrm-colis-primaire.vrm-colis-pr
    reste à sa place (en tête de Colis) : un bouton FIXÉ au-dessus de la barre du
    bas couvrirait la dernière ligne (banc coque-mobile) — choix laissé à Julien. */
 @media (max-width: 767px) {
-  html .vrm-app-shell .vrm-main .vrm-colis-lot { width: 100% !important; min-height: 52px !important; border-radius: 14px !important; font-size: 16px !important; font-weight: 700 !important; }
+  html .vrm-app-shell .vrm-main .vrm-colis-lot { width: 100% !important; min-height: 52px !important; border-radius: 14px !important; font-size: 17px !important; font-weight: 700 !important; }
 }
 :root[data-theme] body { background: var(--vrm-bg, #FFFFFF); }
 
@@ -431,8 +431,8 @@ html body .vrm-app-shell .vrm-main :is(.vrm-sales-workbar > .vrm-rangee, .vrm-sa
 }
 
 /* ── 15. LES BOUTONS SECONDAIRES : un aplat neutre, pas un voile de l'accent ─ */
-:root:root { --vrm-b-teinte: #F0F0EC; --vrm-b-teinte-f: #E6E6E0; --vrm-b-encre: var(--vrm-ink, #0F0F0E); }
-:root:root[data-theme="dark"] { --vrm-b-teinte: #252522; --vrm-b-teinte-f: #2E2E2B; }
+:root:root { --vrm-b-teinte: rgba(118,118,128,.12); --vrm-b-teinte-f: rgba(118,118,128,.18); --vrm-b-encre: var(--vrm-ink, #1D1D1F); }
+:root:root[data-theme="dark"] { --vrm-b-teinte: rgba(118,118,128,.24); --vrm-b-teinte-f: rgba(118,118,128,.32); }
 /* Les icônes des cases « à faire » : à l'encre atténuée — le cobalt reste rare. */
 html .vrm-app-shell .vrm-day-layout .vrm-day-bar .vrm-day-bar-ic { color: var(--vrm-muted) !important; }
 /* Les dernières ventes de Ma journée : des aplats, sans cadre. */
@@ -488,7 +488,7 @@ html body .vrm-app-shell .vrm-main .vrm-sale-row > button.vrm-ledger-sale-toggle
 }
 html body .vrm-app-shell .vrm-main .vrm-sale-row .vrm-ledger-sale-nom {
   white-space: normal !important; overflow: visible !important; text-overflow: clip !important; overflow-wrap: anywhere;
-  font-size: 15px !important; font-weight: 650 !important; line-height: 1.3 !important; color: var(--vrm-ink) !important; letter-spacing: -.005em;
+  font-size: 15px !important; font-weight: 600 !important; line-height: 1.3 !important; color: var(--vrm-ink) !important; letter-spacing: -.005em;
 }
 html body .vrm-app-shell .vrm-main .vrm-sale-row .vrm-ledger-sale-sous {
   white-space: normal !important; overflow: visible !important; font-size: 13px !important; color: var(--vrm-muted) !important; font-weight: 500 !important;
@@ -502,7 +502,7 @@ html body .vrm-app-shell .vrm-main .vrm-sale-row > button.vrm-ledger-sale-toggle
   font-size: 13px !important; max-width: 128px !important; white-space: normal !important; overflow: visible !important; color: var(--vrm-muted);
 }
 html body .vrm-app-shell .vrm-main .vrm-sale-row > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-plus {
-  grid-column: 4; grid-row: 1 / span 2; font-size: 24px; line-height: 1; color: var(--vrm-ink); text-align: center; font-weight: 700;
+  grid-column: 4; grid-row: 1 / span 2; font-size: 22px; line-height: 1; color: var(--vrm-ink); text-align: center; font-weight: 700;
 }
 html body .vrm-app-shell .vrm-main .vrm-sale-row > .vrm-ledger-gestes {
   padding: 0 0 14px 76px; margin-top: -4px;
@@ -510,7 +510,7 @@ html body .vrm-app-shell .vrm-main .vrm-sale-row > .vrm-ledger-gestes {
 html body .vrm-app-shell .vrm-main .vrm-sale-row > .vrm-ledger-gestes .vrm-cout-label { font-size: 13px !important; color: var(--vrm-muted) !important; }
 html body .vrm-app-shell .vrm-main .vrm-sale-row > .vrm-ledger-gestes .vrm-cout-rangee { gap: 8px !important; }
 html body .vrm-app-shell .vrm-main .vrm-sale-row > .vrm-ledger-gestes .vrm-cout-rangee > button {
-  min-height: 44px !important; height: auto !important; font-size: 14px !important; padding: 0 14px !important;
+  min-height: 44px !important; height: auto !important; font-size: 15px !important; padding: 0 14px !important;
 }
 html body .vrm-app-shell .vrm-main .vrm-sale-row > .vrm-ledger-gestes .vrm-cout-rangee > button svg { width: 20px !important; height: 20px !important; }
 @media (min-width: 768px) {
@@ -520,11 +520,11 @@ html body .vrm-app-shell .vrm-main .vrm-sale-row > .vrm-ledger-gestes .vrm-cout-
   }
   html body .vrm-app-shell .vrm-main .vrm-sale-row > button.vrm-ledger-sale-toggle > .vrm-ledger-photo-empty { grid-row: 1; width: 80px !important; height: 100px !important; }
   html body .vrm-app-shell .vrm-main .vrm-sale-row > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-title { grid-row: 1; }
-  html body .vrm-app-shell .vrm-main .vrm-sale-row > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-state { grid-column: 3; grid-row: 1; align-self: center; text-align: left; max-width: none !important; font-size: 14px !important; }
-  html body .vrm-app-shell .vrm-main .vrm-sale-row > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-amount { grid-column: 4; grid-row: 1; align-self: center; font-size: 18px !important; }
+  html body .vrm-app-shell .vrm-main .vrm-sale-row > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-state { grid-column: 3; grid-row: 1; align-self: center; text-align: left; max-width: none !important; font-size: 15px !important; }
+  html body .vrm-app-shell .vrm-main .vrm-sale-row > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-amount { grid-column: 4; grid-row: 1; align-self: center; font-size: 17px !important; }
   html body .vrm-app-shell .vrm-main .vrm-sale-row > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-plus { grid-column: 5; grid-row: 1; }
   html body .vrm-app-shell .vrm-main .vrm-sale-row > .vrm-ledger-gestes { padding-left: 96px; }
-  html body .vrm-app-shell .vrm-main .vrm-sale-row .vrm-ledger-sale-nom { font-size: 16px !important; }
+  html body .vrm-app-shell .vrm-main .vrm-sale-row .vrm-ledger-sale-nom { font-size: 17px !important; }
   html body .vrm-app-shell .vrm-main .vrm-ventes-liste > .vrm-ledger-heading { display: none !important; }
 }
 /* Sur ordinateur aussi, les ventes sont des lignes posées sur le blanc (plus
@@ -571,24 +571,24 @@ html body .vrm-app-shell .vrm-lbc-catalog-info { grid-column: 1; }
 html body .vrm-app-shell .vrm-lbc-catalog-info > strong {
   white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; font-size: 15px; font-weight: 700; line-height: 1.3; letter-spacing: -.005em;
 }
-html body .vrm-app-shell .vrm-lbc-catalog-info small { font-size: 12.5px; color: var(--vrm-muted); }
+html body .vrm-app-shell .vrm-lbc-catalog-info small { font-size: 13px; color: var(--vrm-muted); }
 html body .vrm-app-shell .vrm-lbc-catalog-info [data-etat] { font-size: 12px; background: transparent; padding: 0; color: var(--vrm-muted); font-weight: 600; }
 html body .vrm-app-shell .vrm-lbc-catalog-info [data-etat=active]::before { background: var(--vrm-ink); }
-html body .vrm-app-shell .vrm-lbc-catalog li > b { grid-column: 2; grid-row: 2; font-size: 18px; font-weight: 800; letter-spacing: -.02em; }
+html body .vrm-app-shell .vrm-lbc-catalog li > b { grid-column: 2; grid-row: 2; font-size: 17px; font-weight: 800; letter-spacing: -.02em; }
 html body .vrm-app-shell .vrm-lbc-catalog-gestes { grid-column: 1 / -1; flex-wrap: wrap; gap: 6px; }
 html body .vrm-app-shell .vrm-lbc-catalog-gestes :is(a, button) { background: var(--vrm-b-teinte); border-radius: 12px; padding: 0 12px; font-size: 13px; font-weight: 600; }
 @media (max-width: 600px) {
   html body .vrm-app-shell .vrm-lbc-catalog ul { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 12px; }
   html body .vrm-app-shell .vrm-lbc-catalog li > b { grid-column: 1 / -1; grid-row: auto; font-size: 17px; }
-  html body .vrm-app-shell .vrm-lbc-catalog-info > strong { font-size: 14px; }
+  html body .vrm-app-shell .vrm-lbc-catalog-info > strong { font-size: 15px; }
 }
 /* eBay : la photo de la carte plus grande, le titre en entier. */
 html body .vrm-app-shell .vrm-ebay-carte-tete > :first-child { width: 80px !important; height: 100px !important; border-radius: 12px !important; }
 html body .vrm-app-shell .vrm-ebay-carte-tete > div:nth-child(2) > div:first-child {
   display: block !important; -webkit-line-clamp: unset !important; overflow: visible !important; font-size: 15px !important; line-height: 1.3 !important; overflow-wrap: anywhere;
 }
-html body .vrm-app-shell .vrm-ebay-carte-tete > div:nth-child(2) > div:nth-child(2) { font-size: 12.5px !important; }
-html body .vrm-app-shell .vrm-ebay-carte-tete [data-ebay-prix] { font-size: 18px !important; }
+html body .vrm-app-shell .vrm-ebay-carte-tete > div:nth-child(2) > div:nth-child(2) { font-size: 13px !important; }
+html body .vrm-app-shell .vrm-ebay-carte-tete [data-ebay-prix] { font-size: 17px !important; }
 @media (max-width: 600px) {
   html body .vrm-app-shell .vrm-ebay-carte-tete > :first-child { width: 64px !important; height: 80px !important; }
 }
@@ -605,13 +605,13 @@ html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button .vrm-nav-badge-rail { mar
 html .vrm-app-shell .vrm-sheet-row .vrm-nav-badge-feuille { margin-right: 4px; }
 html .vrm-app-shell .vrm-sheet-lib .vrm-sheet-desc { display: block; font-size: 12px; font-weight: 400; color: var(--vrm-muted); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 html .vrm-app-shell .vrm-tache .vrm-tache-tete { padding: 18px 16px 6px; }
-html .vrm-app-shell .vrm-tache .vrm-tache-tete h1 { margin: 0; font-size: 32px; line-height: 1.05; color: var(--vrm-ink); }
+html .vrm-app-shell .vrm-tache .vrm-tache-tete h1 { margin: 0; font-size: 34px; line-height: 1.05; color: var(--vrm-ink); }
 html .vrm-app-shell .vrm-filtre-site { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 6px 0 10px; margin: 0; }
 html .vrm-app-shell .vrm-filtre-site::-webkit-scrollbar { display: none; }
-html .vrm-app-shell .vrm-filtre-site > button[aria-pressed] { flex-shrink: 0; min-height: 44px; padding: 0 18px; font-size: 14px; font-weight: 500; white-space: nowrap; border-radius: 999px !important; }
+html .vrm-app-shell .vrm-filtre-site > button[aria-pressed] { flex-shrink: 0; min-height: 44px; padding: 0 18px; font-size: 15px; font-weight: 500; white-space: nowrap; border-radius: 999px !important; }
 html .vrm-app-shell .vrm-main .vrm-filtre-site > button[aria-pressed="true"] { background: var(--vrm-ink) !important; border-color: var(--vrm-ink) !important; color: var(--vrm-bg) !important; }
 @media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
-  html .vrm-app-shell .vrm-tache .vrm-tache-tete h1 { font-size: 40px; }
+  html .vrm-app-shell .vrm-tache .vrm-tache-tete h1 { font-size: 38px; }
   html .vrm-app-shell .vrm-filtre-site > button[aria-pressed] { min-height: 36px; padding: 0 14px; font-size: 13px; }
 }
 :root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-filtre-site > button[aria-pressed="true"] { background: var(--vrm-ink) !important; color: var(--vrm-bg) !important; }
@@ -622,9 +622,9 @@ html .vrm-app-shell .vrm-main .vrm-filtre-site > button[aria-pressed="true"] { b
    groupes tiennent sans défiler dans 900 px de haut. */
 html .vrm-app-shell .vrm-atelier-rail { padding: 18px 12px 10px; }
 html .vrm-app-shell .vrm-atelier-rail .vrm-sidebar-brand { padding: 0 12px 12px; gap: 10px; align-items: baseline; }
-html .vrm-app-shell .vrm-atelier-rail .vrm-sidebar-mot { font-family: var(--vrm-police); font-size: 21px; font-weight: 800; letter-spacing: -.02em; line-height: 1; color: var(--vrm-ink); }
+html .vrm-app-shell .vrm-atelier-rail .vrm-sidebar-mot { font-family: var(--vrm-police); font-size: 20px; font-weight: 800; letter-spacing: -.02em; line-height: 1; color: var(--vrm-ink); }
 html .vrm-app-shell .vrm-atelier-rail :is(.vrm-rail-platforms, .vrm-rail-management) { gap: 0; padding-top: 0; }
-html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button { min-height: 38px; font-size: 14.5px; padding-top: 2px; padding-bottom: 2px; border-radius: 10px; }
+html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button { min-height: 38px; font-size: 15px; padding-top: 2px; padding-bottom: 2px; border-radius: 12px; }
 html .vrm-app-shell .vrm-atelier-rail [data-nav-groupe].vrm-rail-management-group { margin-top: 9px; }
 html .vrm-app-shell .vrm-atelier-rail [data-nav-groupe] .vrm-rail-section-label { font-size: 12px; line-height: 16px; padding: 0 12px 5px; }
 @media (max-height: 820px) {

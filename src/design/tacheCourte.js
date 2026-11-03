@@ -28,7 +28,7 @@ export const courtFusion = (j) => {
   }
   if (j.id === 'vestiaire-envoyer') return { court: n > 1 ? `${n} ventes Vestiaire à envoyer` : 'Vente Vestiaire à envoyer', detail: /passée/.test(j.sub || '') ? 'Date limite passée' : /demain/.test(j.sub || '') ? "À envoyer d'ici demain" : 'Bordereau sur Vestiaire' };
   if (j.id === 'emails-personne') { const k = (/(\d+)/.exec(t) || [])[1]; return { court: k ? `${k} e-mail${Number(k) > 1 ? 's' : ''} à trier` : 'E-mails à trier', detail: 'Déclare tes adresses' }; }
-  { const m = /(\d+) paires? à regarder pour eBay/.exec(t); if (m) return { court: `${m[1]} article${Number(m[1]) > 1 ? 's' : ''} pour eBay`, detail: '' }; }
+  { const m = /(\d+) (?:paires?|articles?) à regarder pour eBay/.exec(t); if (m) return { court: `${m[1]} article${Number(m[1]) > 1 ? 's' : ''} pour eBay`, detail: '' }; }
   return null;
 };
 

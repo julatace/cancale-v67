@@ -204,6 +204,8 @@ const capture = async (pg, nom) => { if (!CAPTURES) return; fs.mkdirSync(CAPTURE
       // ── V10 : une phrase par écran (le compte neuf, visite déjà vue).
       // (Ma journée, Ventes et Colis : plus de phrase sous le titre — retiré à la demande de Julien, 2 nov. 22 h ;
       // le banc vérifie à la place qu'aucune phrase n'y est rendue.)
+      // (Annonces, Messages, Paramètres : plus de phrase non plus — retiré à la demande de Julien, 3 nov. ;
+      // reste vérifié : au plus un bouton principal visible.)
       const ECRANS = [['annonces', 'annonces'], ['messages', 'messages'], ['settings', 'settings']];
 
       const p10 = await page(nav, { telephone, base: { data: { vrm_bienvenue_vue: { at: 'banc' }, vrm_visite_vue: { at: 'banc' } }, ecritures: 0 }, comptes: [{ vinted_user_id: '777', login: 'vendeuse', owner: SESSION.user.id }] });
@@ -215,7 +217,7 @@ const capture = async (pg, nom) => { if (!CAPTURES) return; fs.mkdirSync(CAPTURE
           const prim = [...document.querySelectorAll('.vrm-main .vrm-b-primaire')].filter((b) => { const r = b.getBoundingClientRect(); return b.getClientRects().length && r.width > 0 && r.top < innerHeight && r.bottom > 0 && !b.closest('[hidden], details:not([open]) > :not(summary)'); }).map((b) => b.innerText.trim().slice(0, 30));
           return { phrase: ph ? ph.innerText.trim() : null, prim };
         }, cle);
-        dit(!!e.phrase && mots(e.phrase) <= MOTS_MAX_PHRASE && !JARGON.test(e.phrase), `${T} V10 ${cle} : une phrase courte sous le titre, sans jargon`, String(e.phrase));
+        dit(!e.phrase, `${T} V10 ${cle} : aucune phrase sous le titre (retiré à la demande de Julien, 3 nov.)`, String(e.phrase));
         dit(e.prim.length <= 1, `${T} V10 ${cle} : au plus un bouton principal visible`, JSON.stringify(e.prim));
         if (CAPTURES && (cle === 'colis' || cle === 'annonces' || cle === 'settings')) await capture(p10.pg, `demo-bulles-${W}-ecran-${cle}`);
       }
