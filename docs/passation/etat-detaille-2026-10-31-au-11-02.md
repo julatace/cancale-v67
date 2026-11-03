@@ -229,3 +229,7 @@ Déplacé TEL QUEL depuis CLAUDE.md §9 le 2 novembre 2026 (le fichier dépassai
 
 ### Lignes de §9 déplacées telles quelles
 - **2 nov. (nuit)** — Comptabilité en 3 questions (Combien j'ai gagné ? · Combien je dois déclarer ? · Le détail replié), un montant écrit une fois, liens à l'encre (contraste), règles inchangées (banc `compta-claire`, 68 rouges sur main). → historique compta. Geste : regarder Compta au téléphone ; dire « Noter ma déclaration » ou « J'ai déclaré ».
+
+### Lignes de §9 déplacées telles quelles
+- **2 nov. (nuit)** — E-mail de vente Vestiaire lu par le serveur (`api/_lib/vestiaire-email.js` : identité = n° du sujet = Réf, « Vous gagnez » en € seulement, date limite à 23:59:59 Paris, fusion dans `vc_ventes` sans écraser l'extension, `audit-vestiaire-email` 25 rouges sur main). Aucun e-mail Vestiaire n'arrive encore (règle iCloud = « vinted »). → historique vestiaire. Geste : règle iCloud « expéditeur contient vestiairecollective » → transférer comme Vinted.
+- **2 nov. (nuit)** — Vestiaire comme Vinted : photo entière (4/5, fond blanc), un N° par annonce Vestiaire (`productId`, `prochainLibre`, rangé dans `main.vrm_vc_numeros`, compté par les numérotations Vinted), ventes et colis sur la ligne/carte Vinted (Colis fait), bordereau tamponné titre + N°, « article » (`audit-numeros-vestiaire`, banc `vestiaire-parite`). Reste : relier un article Vinted+Vestiaire (double N° possible), stock Vestiaire. → historique vestiaire. Geste : regarder Ventes et Colis Vestiaire.
