@@ -54257,7 +54257,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   onClick={(ev)=>{ const r = document.documentElement; const o = !r.hasAttribute('data-colis-outils'); r.toggleAttribute('data-colis-outils', o); ev.currentTarget.setAttribute('aria-expanded', o ? 'true' : 'false'); }}><Icon name="more" size={20}/></button>
                 {/* (3 nov., choix de Julien n° 2) « Tout imprimer » : TOUJOURS visible (il était caché derrière « … » :
                     le banc `lot-bordereaux` ne pouvait plus le toucher) ; un PDF, toutes plateformes, par transporteur. */}
-                {(onglet === 'envoyer' || onglet === 'envoyes') ? <Bouton variante="secondaire" icone="scan" className="vrm-colis-scanner" data-colis-scanner="" onClick={() => setScanOuvert(true)}>Scanner</Bouton> : null}
+                {(onglet === 'envoyer' || onglet === 'envoyes') ? <Bouton variante="secondaire" icone="scan" className="vrm-colis-scanner" data-colis-scanner="" aria-label="Scanner" onClick={() => setScanOuvert(true)}><span className="vrm-colis-scanner-l">Scanner</span></Bouton> : null}
                 {onglet === 'envoyer' && nLot>0 ? <Bouton variante="primaire" icone="printer" data-lot-ouvrir="1" data-imprimer-prets={nLot} onClick={ouvrirLot} disabled={batchBusy}>{batchBusy?'Préparation…':'Tout imprimer'}</Bouton> : null}
               </>}/>
             {/* (2 nov., style « Fusion ») LA CARTE « AUJOURD'HUI ». Le grand chiffre est le
@@ -55243,8 +55243,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         })()}
       </>)}
 
-      {curSub==='bordereaux' && scanOuvert ? <ScannerColis trouver={trouverScan} onDeposer={(x) => deposeScan.demander(x.cle, x, x.num ? `N°${x.num}` : x.titre)} onFermer={() => setScanOuvert(false)} zIndex={Z_CONFIRMATION - 2}><FermeAuRetour fermer={() => setScanOuvert(false)}/></ScannerColis> : null}
-      {curSub==='bordereaux' ? <BarreAnnulerDepose attente={deposeScan.attente} onAnnuler={deposeScan.annuler} zIndex={Z_CONFIRMATION - 1}/> : null}
+      {curSub==='bordereaux' && scanOuvert ? <ScannerColis trouver={trouverScan} onDeposer={(x) => deposeScan.demander(x.cle, x, x.num ? `N°${x.num}` : x.titre)} onFermer={() => setScanOuvert(false)} attente={deposeScan.attente} onAnnuler={deposeScan.annuler} zIndex={Z_CONFIRMATION - 2}><FermeAuRetour fermer={() => setScanOuvert(false)}/></ScannerColis> : null}
+      {curSub==='bordereaux' && !scanOuvert ? <BarreAnnulerDepose attente={deposeScan.attente} onAnnuler={deposeScan.annuler} zIndex={Z_CONFIRMATION - 1}/> : null}
       {/* Modale : relier un achat (depuis Annonces) */}
       {/* Modale : relier un achat (depuis Annonces) */}
       {pickerFor && (

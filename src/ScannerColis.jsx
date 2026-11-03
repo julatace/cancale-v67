@@ -64,7 +64,7 @@ export async function creerLecteur() {
 
 const vibrer = (motif) => { try { if (navigator.vibrate) navigator.vibrate(motif); } catch (_) {} };
 
-export default function ScannerColis({ trouver, onDeposer, onFermer, zIndex = 18000, children = null }) {
+export default function ScannerColis({ trouver, onDeposer, onFermer, attente = null, onAnnuler = null, zIndex = 18000, children = null }) {
   const video = React.useRef(null);
   const [camera, setCamera] = React.useState('demarrage');   // demarrage · active · sans
   const [res, setRes] = React.useState(null);                 // { etat, colis?, n }
@@ -124,10 +124,13 @@ export default function ScannerColis({ trouver, onDeposer, onFermer, zIndex = 18
         <video ref={video} playsInline muted autoPlay aria-hidden="true"/>
         <span className="vrm-scan-viseur" aria-hidden="true"/>
       </div>
-      <div className="vrm-scan-res" role="status" aria-live="assertive" data-scan-resultat={res ? res.etat : ''} data-scan-cle={c ? String(c.cle) : ''} data-scan-n={res ? res.n : 0}>
+      <div className={'vrm-scan-res' + (res && res.etat === 'depose' && attente ? ' a-annuler' : '')} role="status" aria-live="assertive" data-scan-resultat={res ? res.etat : ''} data-scan-cle={c ? String(c.cle) : ''} data-scan-n={res ? res.n : 0}>
         {res ? <>
-          <span className={'vrm-scan-etat is-' + res.etat}>{TXT[res.etat] || 'Pas trouvé'}</span>
+          <span className={'vrm-scan-etat is-' + res.etat}>{res.etat === 'depose' && !(attente && c && attente.cle === String(c.cle)) ? 'Déposé ✓' : (TXT[res.etat] || 'Pas trouvé')}</span>
           {c ? <span className="vrm-scan-quoi">{c.num ? <b>N°{c.num}</b> : null}<span>{c.titre}</span></span> : <span className="vrm-scan-quoi is-n">{res.lu}</span>}
+          {/* « Annuler » (5 s) du dernier « Déposé », DANS la feuille : la barre de l'écran est sous la caméra. */}
+          {res.etat === 'depose' && c && attente && attente.cle === String(c.cle) && onAnnuler
+            ? <button type="button" className="vrm-scan-annuler" data-depose-annuler={attente.cle} onClick={onAnnuler}>Annuler</button> : null}
         </> : null}
       </div>
       <form className="vrm-scan-saisie" onSubmit={valider}>

@@ -29,3 +29,8 @@
 .vrm-scan-saisie button { min-height: 48px; min-width: 64px; border-radius: 14px; border: 0; background: #0a84ff; color: #fff; font-size: 17px; font-weight: 600; font-family: inherit; cursor: pointer; }
 .vrm-scan-saisie button:disabled { opacity: .4; cursor: default; }
 @media (min-width: 768px) { .vrm-scan { left: 50%; right: auto; width: 520px; transform: translateX(-50%); border-left: 1px solid #1c1c1e; border-right: 1px solid #1c1c1e; } }
+.vrm-scan-res.a-annuler { position: relative; padding-right: 112px; }
+.vrm-scan-annuler { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); min-height: 44px; min-width: 92px; border-radius: 12px; border: 0; background: #2c2c2e; color: #fff; font-size: 15px; font-weight: 600; font-family: inherit; cursor: pointer; }
+/* Au téléphone, « Scanner » est l'icône seule (le titre « Colis » garde sa place). */
+@media (max-width: 600px) { .vrm-colis-scanner { min-width: 44px; padding-left: 0 !important; padding-right: 0 !important; justify-content: center; } .vrm-colis-scanner .vrm-colis-scanner-l { display: none; } }
+.vrm-screen-head h1 { word-break: normal; overflow-wrap: normal; }
