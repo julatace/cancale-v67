@@ -28397,6 +28397,19 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   const avgMargin=ca>0?((profit/ca)*100).toFixed(1):null;
   const avgSale=encaissees.length?(ca/encaissees.length):0;
   const avgProfit=encaissees.length?(profit/encaissees.length):0;
+  // ── (3 nov.) « BÉNÉFICE » = LA RÈGLE DE COMPTA, ICI AUSSI (src/beneficeNoms.js) ──
+  // « Bénéfice estimé », « Taux marge » et « Bénéfice moyen » lisaient l'ancien
+  // catalogue (vente − achat, saisi à la main, vide) et disaient « — » dès que
+  // les ventes Vinted étaient lues : un autre chiffre sous le même nom que
+  // Comptabilité. Désormais : le bénéfice de l'ANNÉE (`useBeneficeCalcul`, la
+  // lecture de Compta et de Statistiques), « — » quand la règle dit « pas su » ;
+  // la marge = ce bénéfice ÷ les ventes qu'il compte (`BPa.ca`), jamais un brut.
+  const [comptaD] = useLigneSynchro('vrm_compta', lireComptaSynchro);
+  const { etat: etatBPa, B: BPa } = useBeneficeCalcul(comptaD, 'annee');
+  const CBa = chiffreBenefice(BPa, etatBPa);
+  const margeA = CBa.valeur != null && BPa && BPa.ca > 0 ? Math.round((CBa.valeur / BPa.ca) * 1000) / 10 : null;
+  const beneficeMoyA = CBa.valeur != null && BPa && BPa.n > 0 ? Math.round((CBa.valeur / BPa.n) * 100) / 100 : null;
+  const anneeA = new Date().getFullYear();
 
   const weeklyRecapData=useMemo(()=>{
     const today=new Date();
@@ -28656,8 +28669,9 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   // vraies.
   const stockInconnu = !!(liveStats && liveStats.online > 0
     && !((liveStats.stockValue != null ? liveStats.stockValue : stockValue) > 0));
+  // (3 nov.) Le bénéfice et la marge attendent un prix d'achat seulement quand LA règle le dit (`CBa.raison`).
   const quoiDepuisDebut = stockInconnu
-    ? 'La valeur du stock, le bénéfice et la marge'
+    ? (CBa.raison === 'achats' ? 'La valeur du stock, le bénéfice et la marge' : 'La valeur du stock')
     : 'Le bénéfice et la marge';
   // (16 oct., passe « premium ») : un LIEN discret, pas une ligne orange — la
   // cause est dite une fois par groupe, et le geste est le lien lui-même.
@@ -28723,16 +28737,16 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
               cf. écran Ventes). ⚠️ « prix d'achat manquants » disait la MÊME
               chose que ses deux voisines : une cause, une phrase (le lien
               dessous). */}
-          {[['Bénéfice estimé', liveStats&&liveStats.caEncaisse!=null?'—':fmt(profit), liveStats&&liveStats.caEncaisse!=null?null:'argent reçu uniquement'],
-            ['Taux marge', (liveStats&&liveStats.caEncaisse!=null)||avgMargin===null?'—':`${avgMargin}%`, liveStats&&liveStats.caEncaisse!=null?null:(avgMargin===null?'dès ta première vente':'bénéf / CA')]].map(([l,v,sub],i)=>(
-            <div key={l} style={{padding:'12px 0 0',paddingLeft:i?16:0,borderLeft:i?`1px solid ${C.border}`:'none',minWidth:0}}>
+          {[[NOM_BENEFICE, CBa.valeur==null?'—':fmt(CBa.valeur), `en ${anneeA}`, { 'data-benef-notion':'benefice', 'data-benef-periode':'annee', 'data-benef-valeur':CBa.valeur==null?'':String(Math.round(CBa.valeur*100)), 'data-benef-raison':CBa.raison||'' }],
+            ['Marge', margeA==null?'—':`${String(margeA).replace('.',',')} %`, `en ${anneeA}`, { 'data-marge-notion':'benefice', 'data-marge-valeur':margeA==null?'':String(margeA) }]].map(([l,v,sub,attrs],i)=>(
+            <div key={l} {...attrs} style={{padding:'12px 0 0',paddingLeft:i?16:0,borderLeft:i?`1px solid ${C.border}`:'none',minWidth:0}}>
               <div style={sLib}>{l}</div>
               <div className="vrm-display" style={{...sHero,fontSize:20,letterSpacing:-0.4,marginTop:4,color:v==='—'?C.muted:C.text}}>{v}</div>
               {sub && <div style={{...sNote,fontSize:11,marginTop:2}}>{sub}</div>}
             </div>
           ))}
         </div>
-        {manquePrix && <div style={{marginTop:14}}><LignePrixAchat quoi={quoiDepuisDebut} dans/></div>}
+        {(CBa.raison === 'achats' || (manquePrix && stockInconnu)) && <div style={{marginTop:14}}><LignePrixAchat quoi={quoiDepuisDebut} dans/></div>}
       </div>
       {/* 🎯 OBJECTIF DU MOIS — jauge vers un objectif de CA que tu fixes. */}
       <div className="vrm-finance-goal"><Card>
@@ -28934,7 +28948,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         const cases = [
           ['Multiplicateur moyen (vente ÷ achat)', hv?'—':`×${avgX}`, null, true],
           ['Vente moyenne', venteMoy==null?'—':fmt(venteMoy), hv?`sur ${liveStats.soldTotal} vente${liveStats.soldTotal>1?'s':''}`:null, false],
-          ['Bénéfice moyen par vente', hv?'—':fmt(avgProfit), null, true],
+          [`${NOM_BENEFICE} moyen par vente`, beneficeMoyA==null?'—':fmt(beneficeMoyA), `en ${anneeA}`, beneficeMoyA==null],
           ['CA / jour de vente', hv && liveStats.joursVente>0 ? fmt(liveStats.caEncaisse/liveStats.joursVente) : '—',
             hv && liveStats.joursVente>0 ? `${liveStats.joursVente} jour${liveStats.joursVente>1?'s':''} où tu as vendu` : 'en attente de la synchro Vinted', false],
         ];
@@ -28950,7 +28964,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
                 </div>
               ))}
             </div>
-            {hv && !manquePrix && <div style={{marginTop:6}}><LignePrixAchat quoi="Le multiplicateur et le bénéfice moyen" dans/></div>}
+            {hv && !manquePrix && <div style={{marginTop:6}}><LignePrixAchat quoi="Le multiplicateur" dans/></div>}
           </div>
         );
       })()}
@@ -28968,7 +28982,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           )}
           {bestDayProfit&&(
             <div style={{minWidth:0,padding:'12px 0',borderTop:`1px solid ${C.border}`}}>
-              <div style={sLib}>Meilleur jour bénéfice</div>
+              <div style={sLib} data-benef-notion="brut">Meilleur jour · {NOM_BENEFICE_BRUT.toLowerCase()}</div>
               <div className="vrm-display" style={{...sHero,fontSize:20,letterSpacing:-0.4,marginTop:4}}>{fmt(bestDayProfit[1].profit)}</div>
               <div style={{...sNote,fontSize:11,marginTop:2}}>{bestDayProfit[0]}</div>
             </div>
@@ -29103,7 +29117,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
               <div style={{display:'flex',gap:16,flexWrap:'wrap',fontSize:13}}>
                 <span><b style={{color:C.text}}>{weeklyRecapData.count}</b> <span style={{color:C.muted}}>vente{weeklyRecapData.count>1?'s':''}</span></span>
                 <span><b style={{color:C.accent}}>{fmt(weeklyRecapData.ca)}</b> <span style={{color:C.muted}}>vendu</span></span>
-                <span><b style={{color:C.accent}}>{fmt(weeklyRecapData.profit)}</b> <span style={{color:C.muted}}>bénéfice</span></span>
+                <span><b style={{color:C.accent}}>{fmt(weeklyRecapData.profit)}</b> <span style={{color:C.muted}} data-benef-notion="brut">{NOM_BENEFICE_BRUT.toLowerCase()}</span></span>
               </div>
               {(()=>{ const pc=weeklyRecapData.prevCa||0, c=weeklyRecapData.ca; if(pc<=0&&c<=0) return null; const diff=c-pc; const pct=pc>0?Math.round(diff/pc*100):null; const up=diff>=0; return (
                 <div style={{fontSize:11,color:up?C.accent:C.muted,fontWeight:600,marginTop:6}}>{up?'▲':'▼'} {up?'+':''}{fmt(diff)} vs semaine précédente{pct!=null?` (${up?'+':''}${pct} %)`:''} <span style={{color:C.muted,fontWeight:600}}>— {fmt(pc)} vendus</span></div>
@@ -29125,7 +29139,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
               <div style={{display:'flex',gap:16,flexWrap:'wrap',fontSize:13}}>
                 <span><b style={{color:C.text}}>{monthlyRecapData.count}</b> <span style={{color:C.muted}}>vente{monthlyRecapData.count>1?'s':''}</span></span>
                 <span><b style={{color:C.accent}}>{fmt(monthlyRecapData.ca)}</b> <span style={{color:C.muted}}>vendu</span></span>
-                <span><b style={{color:C.accent}}>{fmt(monthlyRecapData.profit)}</b> <span style={{color:C.muted}}>bénéfice</span></span>
+                <span><b style={{color:C.accent}}>{fmt(monthlyRecapData.profit)}</b> <span style={{color:C.muted}} data-benef-notion="brut">{NOM_BENEFICE_BRUT.toLowerCase()}</span></span>
               </div>
             </div>
             <button className="vrm-icon-control" aria-label="Fermer le bilan du mois" type="button" onClick={()=>{localStorage.setItem('vinted_last_monthly_recap',monthKey);setShowMonthly(false);}}
