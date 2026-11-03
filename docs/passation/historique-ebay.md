@@ -1844,3 +1844,7 @@ aucune fonction `api/` en plus).
   POST non signé attend maintenant 412.
 - Variable : `EBAY_VERIF_TOKEN` (alias accepté `EBAY_VERIFICATION_TOKEN`) ;
   `EBAY_DELETION_URL` doit être l'adresse EXACTE déclarée chez eBay.
+
+
+### RETRAIT AUTOMATIQUE D'eBAY APRÈS UNE VENTE LEBONCOIN / VESTIAIRE ; AGENT eBAY + « TOUJOURS CHEZ MOI » (3 novembre)
+Récit complet : `historique-interface-stock.md`, « LE CYCLE D'UN ARTICLE » (même date). `src/retraitAilleurs.js` (la même rigueur que Vinted, liste des ventes < 48 h, eBay publiée AVANT la vente, identité seulement), journal `ou` dans `api/ebay.js` ; l'agent propose (a) en ligne + (b) « Toujours chez moi » (`chezMoi`, `src/propositionsSites.js`). `audit-cycle-article.cjs` (E·, A·).

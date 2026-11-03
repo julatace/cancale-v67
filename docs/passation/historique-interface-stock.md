@@ -3099,3 +3099,137 @@ Rouges connus, **déjà rouges sur `main`** (mesurés sur `git archive origin/ma
 Restent rouges ici : `mobile` à l'étape « 7 jours » de la période dans « Outils », `compta-simple` E
 (saisie de dépense pendant que le nuage est retenu, 2), `annonces-ventes-brouillon` (16 rouges sur main,
 quelques-uns de plus ici, écrans Annonces/Messages surtout).
+
+### 3 nov. — La carte sombre réglable PAR PAGE (branche `claude/carte-stats`)
+
+Julien, 3 nov. 09 h 54 : « je veux l'onglet avec les statistiques, mais qu'il soit réglable sur
+chaque page comme il est déjà là, mais modifiable en fonction de ce qu'on a sélectionné » ;
+« je veux juste le CA, le bénéfice etc. dans cette case sombre sur chaque onglet ».
+
+**Fait** :
+- `src/design/carteChiffres.js` (pur) : le CATALOGUE (CA vendu, nombre de ventes, panier moyen 30 j,
+  reçu, bénéfice, bénéfice brut, à déclarer, URSSAF, ventes finalisées, à poster, à retirer, argent en
+  attente, disponible, annonces en ligne, qui dorment), ce que chacun SUIT (site, compte, période), le
+  DÉFAUT de chaque page (maquettes Fusion), le réglage rangé `vrm_carte_stats` (`{v:1, pages:{page:{g,c}}}`,
+  synchronisé dans `main`, rattrapé par `onCloudReady`), le PÉRIMÈTRE (« Novembre · Vinted · Bruno »),
+  et `valeursCarte` : chaque valeur TIRÉE DE SA RÈGLE, passée par l'app (`REGLES_CARTE`) —
+  `bilanLignes` (sortie de `bilanVentes` de Ventes, la même fonction) sur les lignes de `ventesFaites`
+  de la coque (`liveStatsVus.venduLignes`), `rythmeVendu` (panier), `beneficeDe` (sortie de
+  `useBeneficeCalcul` : la lecture de Compta) + `chiffreBenefice`/`chiffreBrut`, `beneficeDesJours`,
+  les publications `vrm_colis_aposter` (par site), `vrm_colis_retirer`, `vinted_urssaf_mois` (le reçu,
+  lu comme le widget `recuDuMoisPublie`), `vrm_paires_dorment`, le porte-monnaie et les annonces de
+  liveStats. Trois états : `null` = « — » ; `partiel` = « au moins » + manque NOMMÉ (jamais « au moins
+  0 ») ; `hors` = pas de sens pour la sélection (bénéfice, URSSAF, reçu par site ; un compte Vinted sur
+  eBay) ⇒ « — » et pas proposé dans la feuille.
+- `src/design/CarteStats.jsx` : la carte (`CarteMois`, + `action`, `nu`, `grandAttrs`), « Modifier »
+  (44 px, en haut à droite) ⇒ feuille en portail (`FermeAuRetour`) : 4 places (grand, cases 1-3), la
+  liste des chiffres proposés avec leur valeur, la période du chiffre quand la page n'a pas de filtre
+  de période, « Par défaut », « OK ». Chaque choix est rangé tout de suite. Le même chiffre à la même
+  période n'est jamais deux fois sur la carte (échange des places).
+- Branchement (App.jsx, `CarteStatsApp`, contexte `LiveStatsCarte`) : Ma journée (dans la tête, nue :
+  vendu aujourd'hui · bénéfice du mois · vendu du mois · reçu du mois), Ventes Vinted (vendu du mois
+  Vinted · à poster · en route · à payer ; la plage du calendrier « Outils » l'emporte), Ventes tous les
+  sites, Leboncoin et eBay (`KpiVentes` : ses trois cases deviennent les cases PROPRES de la page,
+  mêmes `data-kpi` ; périmètre « Depuis le début »), Vestiaire, Colis (le site choisi en tête),
+  Compta (dans la carte « Ce que tu as gagné », la période du segment l'emporte), Annonces et Achats
+  (Vinted). La bande « CA finalisé · Disponible · En attente » de l'espace Vinted ne redit plus ces
+  montants (§7) : ils se choisissent dans la carte. Attributs gardés sur LEUR chiffre :
+  `data-fu-vendu-mois`, `data-fu-vendu-jour`, `data-journee-benef…`, `data-compta-chiffre="gagne"`.
+- Statistiques : PAS de carte (l'écran EST les statistiques, ses tuiles et sa période ; une carte
+  redirait ses nombres).
+
+**Écarts dits** : « Vendu » de la carte de Ventes · Vinted est maintenant VINTED seul (avant : toutes
+plateformes sous l'onglet Vinted) — c'est la sélection. Les bancs qui lisent `data-fu-vendu-mois` sur
+un jeu multi-sites liront le vendu Vinted. Messages et Favoris ne sont pas au catalogue : aucune
+source publiée hors de leur écran (trois règles de non-lus coexistent, un chiffre ici pourrait
+contredire Messages).
+
+**Preuves** : `scripts/audit-carte-chiffres.cjs` (203 contrôles : chaque chiffre × site × compte ×
+période = la règle propriétaire ET le calcul à la main ; « — » sans source ; réglage ; branchement
+lu dans le code). Mutations rouges : `site` 44, `recalc` 73, `zero` 3, `benef` 5, `recu` 1, `compte` 18,
+`aumoins` 1. Sur `origin/main` : rouge (module et `bilanLignes`/`beneficeDe` absents). Banc
+`scripts/bancs/carte-stats.cjs` (390 tactile clair/sombre, 1512) : Vinted 257 € → tous les sites 297 €
+→ Leboncoin 40 €, périmètre qui suit, feuille (portail, 44 px, pas de bénéfice sur Vinted seul),
+réglage gardé au rechargement, Colis au défaut.
+
+### LE CYCLE D'UN ARTICLE : « N°x SUPPRIMÉ DE VINTED », PROPOSITIONS eBAY/LEBONCOIN, RETRAIT eBAY APRÈS UNE VENTE AILLEURS (3 novembre, branche `claude/cycle-article`)
+Julien, 3 nov. 9 h 40 : il craint « plein de cas où il peut y avoir une ambiguïté et des erreurs
+avec les articles ». Décisions (rapportées par la session qui pilote) et ce qui est fait :
+- **Mesuré (lecture seule, sa base)** : 505 fiches numérotées, **263 absentes** de tout dressing
+  lu, dont **211 au N° d'archive (B…)** sans transaction rangée (vendues avant les captures) ;
+  10 suppressions vues en 2xx par l'extension, **toutes faites par Republier** (coffre
+  `versBrouillon`) ; **0** supprimée hors VRM sans vente aujourd'hui. Lectures : 47 annonces
+  en ligne, 7 masquées, 8 comptes. Retrait eBay automatique : **ALLUMÉ**. Ventes Leboncoin :
+  16, liste relue le **22 oct.** (périmée pour le retrait automatique, 48 h). Ventes Vestiaire : 1.
+  ⇒ Une règle « absente et pas vendue ⇒ question » aurait posé ~230 questions fausses le premier
+  matin : une absence ne compte que si VRM a **VU** l'annonce en ligne avant (registre synchronisé
+  `vrm_vus_en_ligne`, tenu sur les lectures COMPLÈTES et fraîches, `majVusEnLigne`) ou si
+  l'extension a vu la suppression (2xx). Le registre démarre vide : les suppressions passées ne
+  sont jamais demandées.
+- **1. Supprimé de Vinted sans preuve de vente** (`src/cycleArticle.js`, `etatCycle`, PUR) :
+  vendu prouvé (toutes plateformes, par identité) AVANT « en ligne » (Vinted ne ferme pas
+  toujours une annonce vendue) → en ligne / masquée / à confirmer → republié (même N°, même
+  fichier photo, table de recréation, sur n'importe quel compte : le N° suit, aucune question) →
+  retour remis en stock / retour en cours → « Toujours chez moi » → retiré par VRM (Republier,
+  coffre `versBrouillon` : jamais de question) → lecture COMPLÈTE de moins de 24 h exigée → vu en
+  ligne puis absent ⇒ **« à demander »**. Toute lecture ratée ⇒ « pas su », aucune carte.
+  Sans réponse l'article reste **chez lui** (`chezLui`). Ma journée : une carte par article
+  (`data-job="supprime-vinted"`, photo, « N°x supprimé de Vinted », titre de l'article, trois
+  pilules 44 px **Toujours chez moi · Vendu en main propre · Je m'en sépare**, aucun texte
+  explicatif). Calcul dans la coque (`setCycleCartes`) : d'abord sur les lectures en mémoire ;
+  les lectures lourdes (preuves, recréations, coffre, ventes eBay/Leboncoin/Vestiaire) ne partent
+  que s'il reste une question. Réponses (son clic seul) : `vrm_cycle_decisions[id]` ;
+  « Vendu en main propre » demande le montant (`montantSaisi`, jamais deviné) et marque l'annonce
+  « vendue à la main » (`vinted_annonces_vendues`, le mécanisme existant) ; « Je m'en sépare »
+  confirme puis déclare l'article parti (`vinted_pairs_lost`, par identité, `cleDeclarationPartie`).
+  ⚠️ **Le montant d'une vente en main propre N'ENTRE PAS dans le CA ni l'URSSAF** : aucune règle
+  existante de vente manuelle chiffrée (mesuré : `ventesFaites`/`ventesDeclarables` ne lisent que
+  Vinted, Leboncoin, eBay, Vestiaire) — il est gardé dans la décision, à brancher quand Julien
+  aura dit comment il la déclare (c'est une recette).
+- **2. Ce que VRM propose pour eBay / Leboncoin** (`src/propositionsSites.js`, corrigé par
+  Julien à 9 h 45 : « je ne vois pas comment tu peux me proposer des paires en stock mais pas en
+  ligne si je n'ai pas fait de photo sur Vinted ») : (a) EN LIGNE sur Vinted + (b) supprimé et
+  « Toujours chez moi » (photos et fiche de sa dernière annonce lue). Exclus : déjà sur ce site,
+  vendu, « Je m'en sépare », « Vendu en main propre », lecture incertaine ; sans photo ni fiche :
+  jamais. Branché sur l'**agent eBay** (`propositionAgent` reçoit `chezMoi`) et la liste des
+  paires eBay (`useEbayPaires` ajoute les « chez moi » depuis la fiche, `vinted_item_details`,
+  le coffre). ⚠️ **Leboncoin (b) n'est PAS branché** : la file Leboncoin est calculée par
+  l'extension (`buildLbcData`, annonces en ligne seulement) et la publication part de cette file
+  — il faut une version d'extension (lire `vrm_cycle_decisions`, construire l'annonce depuis le
+  coffre). (a) est déjà la règle de Leboncoin.
+- **3. Vendu sur un site ⇒ annonces des autres sites** : le retrait automatique d'eBay ne
+  couvrait QUE les ventes Vinted. `src/retraitAilleurs.js` (`retraitsEbayAutoAilleursPermis`,
+  la même rigueur) : vente Leboncoin (vendeur, pas annulée, annonce reliée par identité) ou
+  Vestiaire (N° de l'annonce Vestiaire), aucune vente annulée de ce N°, jamais revenue, liste
+  relue < 48 h, N° porté par un seul article, eBay publiée AVANT la vente, pas déjà terminée.
+  Branché dans le passage de la coque (`passageRetraitEbayAuto({ ventes, ailleurs })`) ; la route
+  `api/ebay.js` range le site dans le journal (`ou`), l'écran eBay dit « vendue sur Leboncoin ».
+  Leboncoin et Vinted restent sur SON clic (§3) : la carte « à retirer de Leboncoin » de Ma
+  journée porte maintenant **« Supprimer »** (= « Supprimer de Leboncoin », confirmé, une annonce
+  à la fois, arrêt au premier doute) quand l'extension de ce Chrome sait (`lbcSupprime`) et que
+  l'annonce est désignée par identité (vendue sur Vinted, eBay ou Vestiaire).
+- **Cas ambigus et règle** (tous exécutés par `audit-cycle-article.cjs`) : C1 republiée avec
+  d'autres photos ⇒ le N° suit (reprise / table de recréation), illisible ⇒ pas su ; C2 republiée
+  sur un autre compte ⇒ republiée si même fichier photo ou même N°, **sinon on demande** (aucune
+  identité, jamais le titre — limite connue : le nouvel article prendra un N° neuf) ; C3 masquée ⇒
+  jamais « supprimée » ; C4 lecture partielle, de plus de 24 h, absente, « à confirmer », ventes
+  illisibles ⇒ pas su ; C5 vendue Vinted + Leboncoin ⇒ « vendue » (l'alerte rouge de double vente
+  existante n'est pas touchée) ; C6 vente annulée/retour ⇒ « revenue », remis en stock ⇒ chez lui ;
+  C7 50 articles identiques, un supprimé ⇒ UNE carte, la sienne ; C8 vente Vestiaire sans N°
+  commun ⇒ on demande (et aucun retrait eBay automatique) ; C9 sur eBay puis supprimé de Vinted
+  ⇒ on demande, « chez moi » ⇒ pas reproposé à eBay ; C10 achat retourné après mise en ligne ⇒
+  on demande, « Je m'en sépare ».
+- **Preuves** : `audit-cycle-article.cjs` **56 contrôles**, `--prouve` : **56 rouges sur
+  origin/main**, **16/16 mutations** attrapées. Banc `cycle-supprime.cjs` (390 tactile clair +
+  1512 sombre) : une carte (N°12) parmi 9 cas, 3 pilules 44 px, « Toujours chez moi » range la
+  réponse sans vendre ni sortir l'article ; **18 verts** ; `CYCLE_MUTATION=1` (vente de 7004 non
+  servie) ⇒ rouge. Captures regardées. Voisins verts : identite, numeros-vestiaire,
+  vestiaire-partout, benefice-unique, agent-ebay (77), coherence, places, supprimees, enligne,
+  journee-court, masquees-numeros, fusion-nuage, ebay-deja-vendue, preuve-vente, donnees-ecrans,
+  icones ; banc design-fusion (Ma journée) 40 verts. **Pas lancés ici** : `audit-ebay-retrait-auto`
+  (@babel/parser absent) et `audit-ebay-route` (fast-xml-parser absent). Le bouton « Supprimer »
+  de la carte Leboncoin n'a pas de banc (il faut simuler l'extension).
+- **Geste de Julien** : confirmer (1) l'interprétation des propositions (corrigée à 9 h 45),
+  (2) comment déclarer une vente en main propre (CA/URSSAF), (3) s'il veut (b) sur Leboncoin
+  (version d'extension), (4) garder le retrait eBay automatique ALLUMÉ maintenant qu'il couvre
+  Leboncoin et Vestiaire ; ouvrir « Mes transactions » Leboncoin pour rafraîchir la liste.

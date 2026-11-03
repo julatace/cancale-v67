@@ -188,7 +188,10 @@ function extraire(src, nom) {
   const cheminStats = /const CB = chiffreBenefice\(BP\b/.test(sS) ? 'regle' : /const CB = chiffreBrut\(B\)/.test(sS) ? 'brut'
     : /tuile\('benefice', 'Bénéfice', `\$\{B\.nCout < B\.n \? 'au moins ' : ''\}\$\{fmt\(B\.brut\)\}`/.test(sS) ? 'brut-au-moins' : 'inconnu';
   const cheminCompta = /chiffreBenefice\(B, etat\)\.valeur == null \? '—' : fmt\(chiffreBenefice\(B, etat\)\.valeur\)/.test(sC) ? 'regle'
-    : /B\.netFinal == null \? '—' : fmt\(B\.netFinal\)/.test(sC) ? 'regle' : 'inconnu';
+    : /B\.netFinal == null \? '—' : fmt\(B\.netFinal\)/.test(sC) ? 'regle'
+    // (3 nov.) Compta affiche son bénéfice par la carte sombre réglable (src/design/carteChiffres.js) :
+    // la place « benefice » porte data-compta-chiffre="gagne" et vaut chiffreBenefice(B, etat) de la même lecture.
+    : (/x\.place\.id === 'benefice' \? \{ 'data-compta-chiffre': 'gagne'/.test(sC) && /if \(id === 'benefice'\) \{ const CB = regles\.chiffreBenefice\(Bn, etat\)/.test(require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'design', 'carteChiffres.js'), 'utf8'))) ? 'regle' : 'inconnu';
   const cheminRecap = /profit: beneficeDuMois\(m\.ym\)/.test(sR) && /chiffreBenefice\(B\)\.valeur/.test(sR) ? 'regle' : /profit: null/.test(sR) ? 'tiret' : 'inconnu';
   console.log(`   chemins lus : Ma journée=${cheminJournee} · Statistiques=${cheminStats} · Comptabilité=${cheminCompta} · récap=${cheminRecap}`);
   dit([cheminJournee, cheminStats, cheminCompta, cheminRecap].every((c) => c !== 'inconnu'), 'le chemin de chaque écran se lit dans son code (sinon l’audit est à mettre à jour)');

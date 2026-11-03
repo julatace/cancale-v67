@@ -160,8 +160,8 @@ const famillesInconnues = () => [...base.entries()].filter(([k]) => k.split('|')
     const p = pushes[0] || {};
     console.log(`     ce que lit le téléphone : « ${p.title} » / « ${p.body} »`);
     dit(pushes.length === 1, 'une notification part', `${pushes.length}`);
-    dit(/Achat livré/i.test(p.title || '') && /Veste de banc/.test(p.title || ''), 'le titre nomme l’achat (lu dans le sujet)', JSON.stringify(p.title));
-    dit(/18 oct\. 11:25/.test(p.body || ''), 'le texte porte la date limite LUE dans l’email', JSON.stringify(p.body));
+    dit(/À confirmer/i.test(p.title || '') && /Veste de banc/.test(p.title || ''), 'le titre nomme l’achat (lu dans le sujet)', JSON.stringify(p.title));
+    dit(/18 oct\. 11:25/.test(p.title || ''), 'le titre porte la date limite LUE dans l’email (3 nov. : « ⏳ À confirmer avant le … »)', JSON.stringify(p.title));
     const sansDate = Object.assign({}, emailLivre, { subject: 'Autre paire - Confirmation requise', text: emailLivre.text.replace(/Tu as jusqu’au .+? pour signaler un problème\./, '') });
     pushes.length = 0; await recoit(sansDate);
     const p2 = pushes[0] || {};

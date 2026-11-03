@@ -98,7 +98,36 @@ async function controles() {
   const geste = E.groupesFavoris({ lignes: [L('z', 20, 'zed')], journal: [{ notificationId: 'z', etat: 'saute', raison: 'destinataire_non_prouve', at: T0 }], maintenant: T0 });
   dit(geste[0].ton === 'geste' && geste[0].lignes[0].ouvrir === true, 'à qui écrire pas prouvé ⇒ ambre + « Ouvrir » sur la ligne');
   dit(E.groupesFavoris({ lignes: [L('y', 21, 'yan')], journal: [{ notificationId: 'y', etat: 'saute', raison: 'conversation_existante', at: T0 }], maintenant: T0 })[0].ton === 'neutre', 'conversation existante ⇒ neutre (rien à faire)');
+
+  // 5. (3 nov., écran « Fusion ») Une carte par ARTICLE — forme réelle mesurée :
+  //    pas d'`actor`, « <pseudo> a marqué ton article <titre> comme favori »,
+  //    lien /items/<id>/want_it/new?offering_id=<n>.
+  if (typeof E.articlesFavoris !== 'function') { dit(false, 'la règle par article existe (articlesFavoris)', 'absente'); return; }
+  const R = (id, item, login, ageH) => ({ id, nom: '', body: login ? `${login} a marqué ton article nike air max taille 44 comme favori` : 'Quelqu’un a marqué ton article nike air max taille 44 comme favori', lien: `https://www.vinted.fr/items/${item}/want_it/new?offering_id=7${id}`, date: new Date(T0 - ageH * H).toISOString() });
+  dit(E.pseudoFavori(R('p', 1, 'lea_75', 1)) === 'lea_75' && E.pseudoFavori(R('q', 1, '', 1)) === '' && E.pseudoFavori({ body: 'Camille 0 a ajouté ton article à ses favoris.' }) === '' && E.pseudoFavori({ nom: 'ana', body: 'x' }) === 'ana', 'pseudo : celui que Vinted écrit, sinon RIEN (jamais un nom inventé)');
+  dit(E.titreNotification(R('p', 1, 'lea_75', 1).body) === 'nike air max taille 44', 'titre : lu dans la phrase de Vinted (pour une carte déjà identifiée)');
+  const rl = [R('a', 11, 'ana', 1), R('b', 11, 'bob', 2), R('c', 11, '', 3), R('d', 12, 'dan', 1), R('e', 13, 'eva', 1), R('f', 14, 'fil', 50 * 24), R('g', 15, 'gus', 1)];
+  const rj = { a: { etat: 'envoye', envoyeLe: T0, ecrits: 3 }, d: { etat: 'envoye', envoyeLe: T0 }, g: { etat: 'incertain' } };
+  const vendus = new Set(['13']);
+  const A0 = E.articlesFavoris({ lignes: rl, statut: (x) => rj[x.id] || null, vendue: (x) => vendus.has(E.itemIdFavori(x)), article: (id) => ({ titre: 'Article ' + id, numero: 'N' + id, prix: 50 }), maintenant: T0, periode: '30' });
+  const c = (item) => A0.cartes.find((x) => x.itemId === String(item)) || {};
+  dit(A0.cartes.length === 4 && c(11).personnes.length === 3, 'une carte par article (par /items/<id>), ses favoris dedans ; hors période (50 j) écarté', JSON.stringify(A0.cartes.map((x) => [x.itemId, x.personnes.length])));
+  dit(c(11).puce.code === 'a_envoyer' && c(11).geste === 'envoyer' && c(11).compte.a_envoyer === 2, 'article avec des favoris à envoyer ⇒ « Envoyer »');
+  dit(c(12).puce.code === 'envoye' && c(12).geste === null, 'envoyé sans preuve d’offre ⇒ « Envoyé » (jamais « Offre faite »)');
+  dit(c(11).compte.offre === 1 && E.etatFavori({ job: { etat: 'envoye', envoyeLe: T0, ecrits: 3 } }).offre === true && !E.etatFavori({ job: { etat: 'envoye', envoyeLe: T0, ecrits: 2 } }).offre, 'offre faite = envoyé AVEC ses 3 écritures (prouvé), sinon non');
+  dit(c(13).puce.code === 'vendu' && c(13).geste === null, 'article vendu ⇒ « Vendu », aucun « Envoyer »');
+  dit(c(15).puce.code === 'a_verifier' && c(15).puce.ton === 'geste' && c(15).geste === 'verifier', 'réponse incertaine ⇒ « À vérifier » en ambre');
+  dit(c(11).personnes.map((x) => x.initiale).join('') === 'AB', 'initiales : celles des pseudos lus ; illisible ⇒ vide', JSON.stringify(c(11).personnes.map((x) => x.initiale)));
+  dit(A0.resume.favoris === 6 && A0.resume.articles === 4 && A0.resume.envoyes === 2 && A0.resume.vendus === 1 && A0.resume.attente === 2, 'résumé de la carte sombre : favoris, articles, envoyés, vendus, en attente', JSON.stringify(A0.resume));
+  dit(A0.cartes[0].geste === 'verifier' && A0.cartes[1].geste === 'envoyer', 'ordre : à vérifier, puis à envoyer, puis le reste', A0.cartes.map((x) => x.itemId).join(','));
+  dit(E.articlesFavoris({ lignes: rl, maintenant: T0, periode: 'tout' }).cartes.length === 5 && E.articlesFavoris({ lignes: rl, maintenant: T0, periode: '7' }).resume.favoris === 6, 'période : « Tout » garde l’ancien, « 7 j » le reste');
+  const sansId = E.articlesFavoris({ lignes: [{ id: 'z', nom: '', body: 'x a marqué ton article y comme favori', lien: 'https://www.vinted.fr/inbox/9', date: new Date(T0).toISOString() }], article: () => ({ titre: 'NON' }), maintenant: T0 });
+  dit(sansId.cartes[0].titre === '' && !sansId.cartes[0].numero, 'sans /items/<id> : ni titre ni N° deviné');
+  const ap = E.apercuMessageFavori({ message: 'Salut {username} !', offre: { mode: 'pct', valeur: 10, arrondi: false }, exemple: { pseudo: 'lea_75', prix: 50 }, personnaliser: (m, p) => m.replace('{username}', p), prixOffre: () => '45.00' });
+  dit(ap.texte === 'Salut lea_75 !' && ap.offre === '50 € → 45 €', 'aperçu : le vrai texte sur un vrai favori, l’offre sur un vrai prix', JSON.stringify(ap));
+  dit(!Object.values(E.RAISONS_ECRAN).some((r) => /paire/i.test(r.texte)), 'jamais « paire » dans les raisons (« article »)');
 }
+
 
 function prouve() {
   const avant = (() => { const i = process.argv.indexOf('--avant'); return i > 0 ? process.argv[i + 1] : 'origin/main'; })();
@@ -116,6 +145,10 @@ function prouve() {
     ['plafond d’actions mal rangé', "quota_extension:'limite_heure'", "quota_extension:'limite_heure_x'"],
     ['jargon dans un texte', "limite_heure:{texte:'limite d’actions de l’heure atteinte'", "limite_heure:{texte:'quota 429 de la file atteint'"],
     ['une raison par ligne (plus de groupe par raison)', "const cle=e.code==='pas_envoye'?'pas_envoye:'+e.raison:e.code;", "const cle=e.code==='pas_envoye'?'pas_envoye:'+e.raison+':'+ligne.id:e.code;"],
+    ['offre faite sans preuve', "...(job.ecrits===3?{offre:true}:{})", "...({offre:true})"],
+    ['nom inventé', "  return m?m[1]:'';\n}", "  return m?m[1]:'Client';\n}"],
+    ['article vendu avec « Envoyer »', "if(c.vendu)return {puce:{code:'vendu'", "if(false)return {puce:{code:'vendu'"],
+    ['une carte par favori (plus par article)', "const cle=itemId?'item:'+itemId:'sans:'+ligne.id;", "const cle='sans:'+ligne.id;"],
     ['annonce lue par le texte', "const id=itemIdFavori(ligne),a=id?article(id)||null:null;", "const id=itemIdFavori(ligne)||ligne.body,a=id?article(id)||null:null;"],
   ];
   for (const [nom, de, vers] of MUTATIONS) {
