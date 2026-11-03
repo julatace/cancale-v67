@@ -9915,8 +9915,10 @@ const tamponnerBordereau = async (PL, pdf, { numero, titre, thermique = false, c
     raison = 'aperçu du PDF indisponible (' + String((e && e.message) || e).slice(0, 60) + ')';
   }
   const { w, h } = tailleAffichee(pdf.getPages()[0]);
+  const BANDE_PERMISE = false;
   const tientA4 = (a, b) => (a <= A4_PT.w + 1 && b <= A4_PT.h + 1) || (a <= A4_PT.h + 1 && b <= A4_PT.w + 1);
-  if (!thermique && tientA4(w, h + TAMPON.bande)) {
+  // (3 nov.) BANDE COUPÉE : le 28 oct. Julien a « explicitement refusé une bande ajoutée » (passation 2026-10-28). Sans zone libre, c'est la fiche colis qui suit l'étiquette. Rallumer seulement sur sa demande.
+  if (BANDE_PERMISE && !thermique && tientA4(w, h + TAMPON.bande)) {
     try { if (await pageAvecBande(PL, pdf, bold, reg, n, t)) return { mode: 'bande', raison }; } catch (_) {}
   }
   ajouterFicheColis(PL, pdf, bold, reg, n, t);

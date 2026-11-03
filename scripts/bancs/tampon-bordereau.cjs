@@ -110,10 +110,11 @@ async function fabriquer(pngScan) {
 }
 // L'issue attendue pour chaque forme (null : toute issue, mais un tampon).
 const ATTENDU = {
-  'pleine-10x15': { normale: 'bande', thermique: 'fiche' },
+  // (3 nov.) bande coupée (refus de Julien du 28 oct.) : sans zone libre, la fiche colis aussi en normale.
+  'pleine-10x15': { normale: 'fiche', thermique: 'fiche' },
   'a4-quart': { normale: 'blanc', thermique: null },
   'tournee-270': { normale: 'blanc', thermique: null },
-  'tournee-90-pleine': { normale: 'bande', thermique: 'fiche' },
+  'tournee-90-pleine': { normale: 'fiche', thermique: 'fiche' },
   scan: { normale: 'blanc', thermique: null },
   'gris-clair': { normale: 'blanc', thermique: null },
   'a4-pleine': { normale: 'fiche', thermique: 'fiche' },
