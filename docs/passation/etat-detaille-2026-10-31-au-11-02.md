@@ -199,3 +199,6 @@ Déplacé TEL QUEL depuis CLAUDE.md §9 le 2 novembre 2026 (le fichier dépassai
 
 ### Lignes de §9 déplacées telles quelles
 - **2 nov. (soir)** — **Extension 5.311.0** (sa plainte : « elle insistait, Vinted a détecté l'automatisation » ; « je ne veux pas voir les N° d'Arthur depuis Angèle » ; shop_cancale) : frein après tout refus de Vinted (`vrmFreinRepub`, 30 min / 24 h si `listing_restricted`, l'atelier s'arrête) ; ⚠️ **une lecture PUBLIQUE n'ajoute JAMAIS une annonce** (`<enligne-regle>`, sa décision) et les comptes jamais captés connectés ne sont plus relus ; N° affichés sur Vinted = ceux du compte de l'onglet seulement (`numerosDuCompte`, par `accountId`). → historique vinted-extension. Geste : installer la 5.311.0.
+
+### Lignes de §9 déplacées telles quelles
+- **2 nov. (soir)** — **Extension 5.312.0** : plafond 50/h par COMPTE tous Chrome confondus (`actions_compte_{uid}_{navigateur}`, base muette ⇒ ce Chrome seul) ; Republier LIT TOUJOURS l'annonce sur Vinted d'abord (une lecture, ses champs l'emportent sur une recette ancienne — « elle oubliait la couleur et la taille ») ; brouillons d'un autre compte grisés et nommés, brouillons disparus retirés (`src/brouillonsProposables.js`) ; avancée de Republier figée et toujours visible (banc `brouillons-avancee`). → historique vinted-extension. Geste : installer la 5.312.0.
