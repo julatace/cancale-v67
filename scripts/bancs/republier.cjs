@@ -70,6 +70,10 @@ const PONT = (o) => {
   });
   post({ __vmr: 'ready', version: o.version });
 };
+// (3 nov.) « Vérifier avant de publier » : une feuille peut s'ouvrir (photos, taille…) ;
+// ce banc juge la suite, il répond « Publier quand même » et note ce qu'elle disait.
+const passerVerif = async (pg) => { try { const f = await pg.waitForSelector('[data-verif-sheet]', { timeout: 900 }); if (f) { const codes = await pg.evaluate(() => [...document.querySelectorAll('[data-verif-probleme]')].map((e) => e.getAttribute('data-verif-probleme')).join(',')); console.log('    · feuille de vérification : ' + codes); await pg.click('[data-verif-publier]'); await pg.waitForTimeout(200); } } catch (_) {} };
+
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
 const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/json', '.woff2': 'font/woff2' };
@@ -251,7 +255,7 @@ const projette = (row, sel) => {
         await pg.locator('[data-republier-esp-choix="fixe"]').click();
         await pg.locator('[data-republier] input[inputmode="numeric"]').fill('0');
         await pg.locator('[data-republier-confirme]').check();
-        await pg.locator('[data-republier-lancer]').click();
+        await pg.locator('[data-republier-lancer]').click(); await passerVerif(pg);
         { const b = pg.locator('[data-republier-progression="9103"][data-republier-etape="brouillon"]');
           let vu = false; for (let i = 0; i < 30 && !vu; i++) { vu = await b.count() > 0; if (!vu) await pg.waitForTimeout(50); }
           const txt = vu ? await b.innerText() : '';
@@ -356,7 +360,7 @@ const projette = (row, sel) => {
       });
       await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
       const action = async (k) => { await pg.locator('[data-actions-ouvrir]').first().click(); await pg.locator(`[data-action="${k}"]`).click(); await pg.locator(`[data-republier-action="${k}"]`).waitFor({ state: 'visible', timeout: 4000 }); };
-      const lancer = async () => { await pg.locator('[data-republier-esp-choix="fixe"]').click().catch(() => {}); await pg.locator('[data-republier] input[inputmode="numeric"]').fill('0').catch(() => {}); await pg.locator('[data-republier-confirme]').check(); await pg.locator('[data-republier-lancer]').click(); for (let i = 0; i < 40; i++) { const m = await pg.locator('[data-republier]').getAttribute('data-republier-mode'); if (m === 'fini' || m === 'pause') break; await pg.waitForTimeout(200); } };
+      const lancer = async () => { await pg.locator('[data-republier-esp-choix="fixe"]').click().catch(() => {}); await pg.locator('[data-republier] input[inputmode="numeric"]').fill('0').catch(() => {}); await pg.locator('[data-republier-confirme]').check(); await pg.locator('[data-republier-lancer]').click(); await passerVerif(pg); for (let i = 0; i < 40; i++) { const m = await pg.locator('[data-republier]').getAttribute('data-republier-mode'); if (m === 'fini' || m === 'pause') break; await pg.waitForTimeout(200); } };
       const fermer = async () => { await pg.locator('[data-republier-fermer]').click().catch(() => {}); await pg.waitForTimeout(250); await pg.evaluate(() => { window.__repub = []; }); };
       try {
         await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
@@ -451,7 +455,7 @@ const projette = (row, sel) => {
         const att1 = Number(await pg.locator('[data-republier-ligne="9103"] [data-republier-attente]').getAttribute('data-republier-attente').catch(() => 'NaN'));
         dit(att0 === '0' && att1 >= 60 && att1 <= 120 && /\+[12] min/.test(await pg.locator('[data-republier-ligne="9103"]').innerText()), 'AVANT de lancer, chaque ligne montre son temps tiré (1re : tout de suite, 2e : +1 min …)', `${att0} / ${att1}`);
         await pg.locator('[data-republier-confirme]').check();
-        await pg.locator('[data-republier-lancer]').click();
+        await pg.locator('[data-republier-lancer]').click(); await passerVerif(pg);
         for (let i = 0; i < 20 && (await pg.evaluate(() => (window.__repub || []).length)) < 1; i++) await pg.clock.runFor(100);
         await pg.clock.runFor(1000);
         const prochaineVue = Number(await pg.locator('[data-republier-prochaine]').getAttribute('data-republier-prochaine').catch(() => 'NaN'));
@@ -567,7 +571,7 @@ const projette = (row, sel) => {
         await pg.locator('[data-republier-suivant]').click();
         await pg.locator('[data-republier-suivant]').click();
         await pg.locator('[data-republier-confirme]').check();
-        await pg.locator('[data-republier-lancer]').click();
+        await pg.locator('[data-republier-lancer]').click(); await passerVerif(pg);
         const l = pg.locator('[data-republier-ligne="9102"]');
         for (let i = 0; i < 40 && (await l.getAttribute('data-republier-statut')) !== 'a-refaire'; i++) await pg.waitForTimeout(100);
         dit(await l.getAttribute('data-republier-statut') === 'a-refaire' && /refusé le brouillon/.test(await l.innerText()), 'Republier, brouillon raté : la ligne dit « à refaire » avec SA raison', await l.innerText());
@@ -632,7 +636,7 @@ const projette = (row, sel) => {
         await pg.locator('[data-republier-esp-choix="fixe"]').click().catch(() => {});
         await pg.locator('[data-republier] input[inputmode="numeric"]').fill('0').catch(() => {});
         await pg.locator('[data-republier-confirme]').check();
-        await pg.locator('[data-republier-lancer]').click();
+        await pg.locator('[data-republier-lancer]').click(); await passerVerif(pg);
         const l = pg.locator('[data-republier-ligne="9102"]');
         for (let i = 0; i < 60 && !['incertain', 'echec'].includes(await l.getAttribute('data-republier-statut')); i++) await pg.waitForTimeout(100);
         await pg.waitForTimeout(1200);
