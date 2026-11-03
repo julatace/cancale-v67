@@ -290,7 +290,119 @@ function CarteColisRetirer({ x, Photo, gestes, detail, limiteSurCarte, avecLieu 
   );
 }
 
-export function ColonneRetirer({ vue, C, Photo, gestes = null, detail = null, nomTransporteur = null, avecCarte = true, enRouteSansRelais = 0 }) {
+// ── (3 nov., Julien : « beaucoup trop brouillon ») « À RETIRER » AU STYLE DE « À ENVOYER » ──────────
+// Une carte par point (nom + adresse sur une ligne, la puce du transporteur quand elle est LUE et
+// commune, le nombre) ; dedans UNE ligne par colis : vignette (la photo de l'achat, par identité, sinon
+// une tuile neutre), titre, l'échéance en une puce, « Code » s'il est connu, « J'ai retiré ». Tout le
+// reste (n° de suivi, compte, transporteur, nouvelles, Conversation, Suivre) s'ouvre en touchant la
+// ligne (`detail` + `gestes`, les mêmes qu'avant). « Lieu à confirmer » en carte grise à la fin ;
+// « À vérifier · N » replié, le statut en une puce. Aucune phrase. Mêmes listes, mêmes data-*.
+function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer }) {
+  const [ouvert, setOuvert] = React.useState(false);
+  const ph = x.photo && Photo ? Photo(x.photo) : null;
+  const e = echeance ? echeance(x) : null;
+  const st = statut ? statut(x) : null;
+  const aCode = !!(x.code || x.qr || x.code2);
+  const attrs = { 'data-cc-carte': x.cle, 'data-cc-dans': 'retirer', 'data-site': x.site || 'vinted', 'data-ambre': x.ambre ? '1' : undefined, 'data-a-verifier': x.aVerifier ? '1' : undefined, 'data-hors-compte': x.horsCompte ? '1' : undefined, 'data-sans-lieu': x.sansLieu ? '1' : undefined, 'data-colis-ident': x.cle, 'data-en-verification-tx': String(x.cle || '').startsWith('r:c:') ? String(x.cle).slice(4) : undefined,
+    'data-a-verifier-raison': x.horsCompte && x.raisonCode ? x.raisonCode : undefined, 'data-a-verifier-code': x.horsCompte ? (x.encoreCode || x.code || x.qr ? 'oui' : 'non') : undefined,
+    'data-transporteur': x.transp ? cleStatTransporteur(x.transp) : undefined, 'data-code-retrait': x.code || '' };
+  const basculer = () => setOuvert((o) => !o);
+  return (
+    <div className="vrm-rpf-ligne" {...attrs} data-ouvert={ouvert ? '1' : undefined}>
+      <div className="vrm-rpf-rang" role="button" tabIndex={0} aria-expanded={ouvert} onClick={basculer} onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); basculer(); } }}>
+        <span className={'vrm-rpf-vignette' + (ph ? '' : ' is-sans')} aria-hidden="true" data-sans-photo={ph ? undefined : ''}>
+          {ph || <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round"><path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/></svg>}
+        </span>
+        <span className="vrm-rpf-quoi">
+          <span className="vrm-rpf-titre" title={x.titre}>{x.num ? `N°${x.num} · ` : ''}{x.titre || 'Colis'}</span>
+          {(st || e) ? <span className="vrm-rpf-puces">
+            {st ? <span className="vrm-rpf-puce is-ambre" data-rp-statut="">{st}</span> : null}
+            {e ? <span className={'vrm-rpf-puce' + (e.ambre ? ' is-ambre' : '')} data-rp-echeance={e.code || ''}>{e.t}</span> : null}
+            {!aCode && !x.horsCompte ? <span className="vrm-rpf-puce" data-rp-code-a-venir="">Code à venir</span> : null}
+          </span> : (!aCode && !x.horsCompte ? <span className="vrm-rpf-puces"><span className="vrm-rpf-puce" data-rp-code-a-venir="">Code à venir</span></span> : null)}
+        </span>
+        {aCode ? <button type="button" className="vrm-rpf-code" data-rp-code="" aria-label="Voir le code de retrait" onClick={(ev) => { ev.stopPropagation(); setOuvert(true); }}>Code</button> : null}
+        {retirer ? <button type="button" className="vrm-rpf-retire" data-colis-retire="" aria-label="J’ai retiré ce colis" onClick={(ev) => { ev.stopPropagation(); retirer(x); }}>J’ai retiré</button> : null}
+      </div>
+      {ouvert ? <div className="vrm-rpf-detail" data-rp-detail="">
+        {detail ? <div className="vrm-rpf-detail-txt">{detail(x)}</div> : null}
+        {gestes ? <div className="vrm-rp-gestes" data-code-retrait={x.code || ''}>{gestes(x)}</div> : null}
+      </div> : null}
+    </div>
+  );
+}
+function ColonneRetirerF({ vue, C, Photo, gestes, detail, avecCarte, echeance, statut, retirer }) {
+  const points = (vue && vue.points) || [];
+  const connus = points.filter((p) => !p.inconnu);
+  const inconnu = points.find((p) => p.inconnu) || null;
+  const reperes = useReperes(connus, avecCarte && connus.length > 0);
+  const [choisi, setChoisi] = React.useState('');
+  const [etatFond, setEtatFond] = React.useState('charge');
+  const racine = React.useRef(null);
+  const surCarte = avecCarte ? connus.map((p) => { const r = repereDe(p, reperes); return r ? { ...p, lat: r.lat, lon: r.lon } : null; }).filter(Boolean) : [];
+  const choisir = (cle) => {
+    setChoisi(cle);
+    const el = racine.current && [...racine.current.querySelectorAll('[data-relais-point]')].find((e) => e.getAttribute('data-relais-point') === cle);
+    if (el) { try { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) { el.scrollIntoView(); } }
+  };
+  const aVerifier = points.flatMap((p) => p.arrives.filter((c) => c.horsCompte));
+  const inconnusComptes = inconnu ? inconnu.arrives.filter((c) => !c.horsCompte) : [];
+  const ligne = (x) => <LigneRetraitF key={x.cle || x.id} x={x} Photo={Photo} gestes={gestes} detail={detail} echeance={x.horsCompte ? null : echeance} statut={x.horsCompte ? statut : null} retirer={retirer}/>;
+  if (!points.length) return null;
+  return (
+    <div className="vrm-rp vrm-rpf" ref={racine} data-retirer-par-point={connus.length} data-retirer-comptes={vue ? vue.nComptes : 0} data-retirer-hors={vue ? vue.nHors : 0} data-retirer-sur-carte={surCarte.length} data-retirer-carte={avecCarte ? '1' : '0'}>
+      {avecCarte && surCarte.length > 0 && etatFond !== 'ko' ? <div className="vrm-rpf-carte">
+        <FondRelais points={surCarte} selection={choisi} onChoisir={choisir} C={C} hauteur={220} onEtat={setEtatFond} muet/>
+        {/* Obligation de licence : l'attribution reste, en tout petit, DANS la carte. */}
+        <span className="vrm-rpf-attrib" data-relais-note="">© OpenFreeMap · OpenMapTiles · OpenStreetMap</span>
+      </div> : (avecCarte && surCarte.length > 0 ? <FondRelais points={surCarte} selection={choisi} onChoisir={choisir} C={C} hauteur={220} onEtat={setEtatFond} muet/> : null)}
+      {connus.map((p) => {
+        const comptes = p.arrives.filter((c) => !c.horsCompte);
+        if (!comptes.length && !p.attendus.length) return null;
+        const tStats = [...new Set(comptes.map((c) => cleStatTransporteur(c.transp)))];
+        const tCommun = comptes.length && comptes.every((c) => c.transp && !c.trInconnu) && tStats.length === 1 ? comptes[0].transp : null;
+        const ep = nombreEpingle(p);
+        return (
+          <section key={p.cle} className={'vrm-rpf-point' + (choisi === p.cle ? ' is-choisi' : '')} data-relais-point={p.cle} data-relais-numero={p.numero}
+            data-relais-point-arrives={p.nArrives} data-relais-point-comptes={p.nComptes} data-relais-point-attendus={p.nAttendus} data-relais-epingle-n={ep.n}
+            data-relais-repere={!avecCarte ? 'sans-carte' : repereDe(p, reperes) ? 'oui' : 'non'} data-relais-pas-carte={avecCarte ? codePasSurCarte(p, reperes) : undefined} data-relais-urgent={p.urgent ? '1' : undefined}>
+            <header className="vrm-rpf-tete">
+              <span className="vrm-rpf-ident">
+                <b className="vrm-rpf-nom" data-relais-nom="">{p.nom || p.adresseCourte || 'Point relais'}</b>
+                {p.nom && (p.adresse || p.adresseCourte) ? <span className="vrm-rpf-adr" data-relais-adresse="">{p.adresse || p.adresseCourte}</span> : null}
+              </span>
+              {tCommun ? <span className="vrm-rpf-transp" data-relais-transporteur={tCommun.cle || ''}><PastilleTransporteur t={tCommun} C={C} seul taille={18}/></span> : null}
+              <span className="vrm-rpf-n" data-relais-compte={p.nComptes}>{p.nComptes ? plur(p.nComptes, 'colis', 'colis') : (p.nAttendus ? `${p.nAttendus} en route` : '')}</span>
+            </header>
+            <div className="vrm-rpf-liste">
+              {comptes.map(ligne)}
+              {p.attendus.map((c) => (
+                <div key={c.id} className="vrm-rpf-ligne is-attendu" data-relais-attendu={c.id} data-relais-estimee={c.estimee || ''}>
+                  <div className="vrm-rpf-rang"><span className="vrm-rpf-vignette is-sans" aria-hidden="true"/><span className="vrm-rpf-quoi"><span className="vrm-rpf-titre">{c.titre || 'Achat'}</span><span className="vrm-rpf-puces"><span className="vrm-rpf-puce">{c.estimee ? `vers le ${jourFr(c.estimee)}` : 'en route'}</span></span></span></div>
+                </div>
+              ))}
+            </div>
+          </section>
+        );
+      })}
+      {inconnusComptes.length > 0 && (
+        <section className="vrm-rpf-point is-inconnu" data-relais-point={inconnu.cle} data-relais-point-arrives={inconnu.nArrives} data-relais-point-comptes={inconnu.nComptes}>
+          <header className="vrm-rpf-tete"><span className="vrm-rpf-ident"><b className="vrm-rpf-nom">Lieu à confirmer</b></span><span className="vrm-rpf-n">{plur(inconnu.nComptes, 'colis', 'colis')}</span></header>
+          <div className="vrm-rpf-liste">{inconnusComptes.map(ligne)}</div>
+        </section>
+      )}
+      {aVerifier.length > 0 && (
+        <details className="vrm-rpf-point vrm-rpf-verifier" data-retirer-a-verifier={aVerifier.length}>
+          <summary className="vrm-rpf-tete"><span className="vrm-rpf-ident"><b className="vrm-rpf-nom">À vérifier · {aVerifier.length}</b></span><span className="vrm-rpf-chevron" aria-hidden="true">›</span></summary>
+          <div className="vrm-rpf-liste">{aVerifier.map(ligne)}</div>
+        </details>
+      )}
+    </div>
+  );
+}
+
+export function ColonneRetirer({ vue, C, Photo, gestes = null, detail = null, nomTransporteur = null, avecCarte = true, enRouteSansRelais = 0, fusion = false, echeance = null, statut = null, retirer = null }) {
+  if (fusion) return <ColonneRetirerF vue={vue} C={C} Photo={Photo} gestes={gestes} detail={detail} avecCarte={avecCarte} echeance={echeance} statut={statut} retirer={retirer}/>;
   const points = (vue && vue.points) || [];
   const connus = points.filter((p) => !p.inconnu);
   const inconnu = points.find((p) => p.inconnu) || null;

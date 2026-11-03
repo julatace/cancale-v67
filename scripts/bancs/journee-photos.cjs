@@ -277,7 +277,8 @@ const mesureJournee = (pg) => pg.evaluate(() => {
       { const { ctx, pg, errs } = await ouvrir(b, vp, sombre, 'cat_bord');
         await essaie('colis', async () => {
           await pg.locator('.vrm-colis-onglets').first().waitFor({ timeout: 30000 });
-          await pg.waitForTimeout(2500);
+          await pg.waitForFunction(() => { try { return !!JSON.parse(localStorage.getItem('vrm_colis_aposter') || 'null') && !!JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); } catch (_) { return false; } }, null, { timeout: 20000 }).catch(() => {});
+          await pg.waitForTimeout(1500);
           if (process.env.JP_DBG) console.log('LBC', await pg.evaluate(() => [...document.querySelectorAll('[data-plateforme-colis="leboncoin"] img')].map((i) => [i.src, i.complete, i.naturalWidth])));
           const o = await pg.evaluate(() => ({
             choix: [...document.querySelectorAll('[data-colis-onglet-choix]')].map((e) => ({ v: e.getAttribute('data-colis-onglet-choix'), n: e.getAttribute('data-colis-onglet-n'), txt: e.innerText.replace(/\s+/g, ' ').trim() })),

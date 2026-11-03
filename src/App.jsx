@@ -39725,6 +39725,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const lbcColisFait = (load('vrm_lbc_colis_done', {}) || {});
   // (3 nov.) « Colis fait » d'un colis Leboncoin depuis Colis (même clé que l'écran Colis Leboncoin) : on relit.
   const [, majLbcFait] = React.useReducer((x) => x + 1, 0);
+  // (3 nov.) Colis → À retirer : la liste des achats en route sans point connu, au toucher de sa puce.
+  const [enRouteOuvert, setEnRouteOuvert] = useState(false);
   const colisAutres = useMemo(() => ({
     leboncoin: lbcLu === undefined ? undefined : lbcLu === null ? null : colisLbcAPoster(lbcVentes.ventes || [], lbcColisFait),
     // Les colis de l'écran Colis (`colisVestiaire(vcEtat)`) quand il les a lus ;
@@ -41535,17 +41537,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const r = relaisDe(o); const cl = cleanLieu(r && r.lieu); if (!cl.nom) continue;
         arrives.push({ id: 'v:' + String(o.transaction_id), nom: cl.nom, adresse: cl.adresse, transporteur: (r && r.transporteur) || '', aCode: !!(r && (codeRetrait(r.code) || r.qr)), titre: o.title || '' });
       }
-      const attendus = []; let enRoute = 0;
+      const attendus = []; let enRoute = 0; const sansRelais = [];
       for (const o of (buysBase || [])) {
         if (phaseReception(o) !== 'route') continue;
         enRoute++;
         const e = entreeSuiviAchat(o);
-        if (!e || !e.relais || !e.relais.nom) continue;
+        // (3 nov.) Ceux dont Vinted ne dit pas encore le point : la liste derrière la puce « N en route » de Colis.
+        if (!e || !e.relais || !e.relais.nom) { sansRelais.push({ id: String(o.transaction_id), titre: o.title || '', photo: orderPhoto(o), etat: o.status || '' }); continue; }
         attendus.push({ id: 'v:' + String(o.transaction_id), nom: e.relais.nom, rue: e.relais.rue, cp: e.relais.cp, ville: e.relais.ville, transporteur: e.transporteur || '', estimee: e.estimee || null, titre: o.title || '' });
       }
       // (1er nov.) `attendus` est rendu tel quel : la colonne « À retirer » de
       // Colis les range sous LEURS points avec les colis déjà là (`pointsARetirer`).
-      return { groupes: regrouperRelais({ arrives, attendus }), attendus, enRouteSansRelais: enRoute - attendus.length };
+      return { groupes: regrouperRelais({ arrives, attendus }), attendus, enRouteSansRelais: enRoute - attendus.length, sansRelais };
     } catch (_) { return null; }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pickupUnion, buysBase, indexSuivisAchats]);
@@ -53240,6 +53243,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </>; })() : null}
             </>); };
           const toutLuRet = !notes.retirer && !baseKO && tracking !== null && Array.isArray(buys.items) && !buys.error;
+          // (3 nov., Julien : « beaucoup trop brouillon ») La ligne d'un colis à retirer : l'échéance en UNE puce
+          // (la date limite de CE colis, la même source que son détail — e-mail ou transporteur ; inconnue ⇒ rien),
+          // le statut d'un « à vérifier » en une puce (sa raison, `raisonAVerifier`), « J'ai retiré » (les mêmes
+          // fonctions qu'avant : markCollected / markPickupDone). Aucune règle ne change.
+          const echeanceRetrait = (x) => { const t = (x.src && x.src.t) || null, o = (x.src && x.src.o) || null;
+            const ev = !t && o ? (etatColisVinted(o, Date.now(), transpMap) || {}) : null;
+            const lim = t ? t.limite : (ev && ev.limite); const jl = lim ? joursAvant(lim) : null;
+            if (jl == null || !Number.isFinite(jl)) return null;
+            if (jl <= 0) return { t: jl < 0 ? 'délai dépassé' : 'dernier jour', ambre: true, code: jl < 0 ? 'depasse' : 'dernier' };
+            if (jl === 1) return { t: 'jusqu’à demain', ambre: true, code: 'demain' };
+            const d = new Date(String(lim).slice(0, 10) + 'T12:00:00');
+            return Number.isFinite(d.getTime()) ? { t: `jusqu’au ${d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}`, code: 'date' } : null; };
+          const statutAVerifier = (x) => { const r = String(x.raisonVerif || '') + ' ' + String(x.raisonCode || '');
+            if (/instance|non r[ée]clam|retour|exp[ée]diteur|renvoy/i.test(r)) return 'Retour à l’expéditeur ?';
+            if (/m[eê]me colis|pas encore relu|reli/i.test(r)) return 'À relier';
+            if (/incident|probl|transporteur/i.test(r)) return 'Incident';
+            if (/d[ée]lai|depasse/i.test(r)) return 'Délai dépassé';
+            if (/depuis plus de/i.test(r)) return 'Au relais depuis longtemps';
+            return 'À vérifier'; };
+          const retirerColis = (x) => { const t = (x.src && x.src.t) || null, o = (x.src && x.src.o) || null; if (t) markCollected(t); else if (o) markPickupDone(o); };
           return (<>
             <ScreenHead icon="doc" title="Colis" date={dateJourFr(new Date())} sous={PHRASES_ECRAN.colis ? <span className="vrm-phrase-ecran" data-phrase-ecran="colis">{PHRASES_ECRAN.colis}</span> : null}
               desc="Ce que Vinted attend de toi, capté par l'extension. Le bordereau manquant est généré tout seul quand tu passes sur Vinted, puis déposé ici. Un colis parti disparaît sans rien cocher."
@@ -53258,7 +53281,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 les bordereaux prêts (`lignesLot`, le compte de « Imprimer les N prêts ») ;
                 « déposés » = les « Colis fait » d'aujourd'hui (`gestesDepuis`, la règle de la
                 Tournée) ; « à retirer » = `vrm_colis_retirer`. Aucun nombre recalculé. */}
-            {!baseKO && (() => { const m0 = new Date(); m0.setHours(0, 0, 0, 0); const deposes = gestesDepuis(shipDone, m0.getTime());
+            {/* (3 nov.) Sur « À retirer », la carte sombre parle des colis à retirer : le nombre de Ma journée
+                (`vrm_colis_retirer`), et trois cases des MÊMES listes (`pickupUnion`) : dernier jour (urgents),
+                avec leur code, à vérifier (hors du compte). */}
+            {!baseKO && onglet === 'retirer' ? (
+              <CarteMois className="vrm-fu-ecran vrm-fu-colis" surtitre="Aujourd'hui" data-fu-colis-retirer={nRet == null ? '' : String(nRet)}
+                valeur={nRet == null ? null : <>{retPartiel ? <span className="vrm-fu-borne">au moins</span> : null}{nRet} colis</>}
+                sous={nRet == null ? 'Je lis tes colis…' : nRet === 0 ? 'Rien à aller chercher' : 'à retirer'}
+                cases={[
+                  { cle: 'dernier', n: pickupUnion.urgents || 0, l: 'dernier jour', titre: 'À retirer aujourd’hui ou demain', attrs: { 'data-n': String(pickupUnion.urgents || 0) } },
+                  { cle: 'code', n: pickupUnion.prets || 0, l: 'avec code', titre: 'Le code de retrait est connu', attrs: { 'data-n': String(pickupUnion.prets || 0) } },
+                  { cle: 'verifier', n: (pickupUnion.aVerifier || []).length + (pickupUnion.aConfirmer || []).length, l: 'à vérifier', titre: 'Hors du compte « à retirer »', attrs: { 'data-n': String((pickupUnion.aVerifier || []).length + (pickupUnion.aConfirmer || []).length) } },
+                ]}/>
+            ) : null}
+            {!baseKO && onglet !== 'retirer' && (() => { const m0 = new Date(); m0.setHours(0, 0, 0, 0); const deposes = gestesDepuis(shipDone, m0.getTime());
               return (
               <CarteMois className="vrm-fu-ecran vrm-fu-colis" surtitre="Aujourd'hui" data-fu-colis-envoyer={nEnv == null ? '' : String(nEnv)}
                 valeur={nEnv == null ? null : <>{envPartiel ? <span className="vrm-fu-borne">au moins</span> : null}{nEnv} colis</>}
@@ -53289,6 +53325,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   { v: 'retirer', l: 'À retirer', n: nRet != null ? `${nRet}${retPartiel ? '+' : ''}` : null, data: { 'data-colis-onglet-choix': 'retirer', 'data-colis-onglet-n': nRet != null ? String(nRet) : '', 'data-urgent': urgentRet ? '1' : '0', title: retPartiel && nRet != null ? `Au moins ${nRet} : les e-mails de suivi n'ont pas pu être lus` : undefined } },
                 ]}/>
             </div>
+            {/* (3 nov.) Les puces du haut : « N en route » (achats dont Vinted ne dit pas encore le point — la liste
+                au toucher) et « N comptes à relire » (la fraîcheur des lectures, `FraicheurDonnees` — elle ouvre
+                les comptes). Remplacent les bandeaux de texte du bas de l'écran. */}
+            {(() => {
+              const nRoute = onglet === 'retirer' ? ((groupesRelais && groupesRelais.enRouteSansRelais) || 0) : 0;
+              const ls = liveStats && Number(liveStats.dataAgeJours) > 1 ? liveStats : null;
+              const nRelire = ls ? Math.max(1, (Array.isArray(ls.dataAgeComptes) ? ls.dataAgeComptes.filter((x) => x && x.login).length : 0)) : 0;
+              if (!nRoute && !nRelire) return null;
+              const liste = (groupesRelais && groupesRelais.sansRelais) || [];
+              return (<>
+                <div className="vrm-colis-puces" data-colis-puces="">
+                  {nRoute > 0 ? <button type="button" className="vrm-colis-pill" data-retirer-en-route-sans={nRoute} aria-expanded={enRouteOuvert} onClick={() => setEnRouteOuvert((v) => !v)}>{nRoute} en route</button> : null}
+                  {nRelire > 0 ? <button type="button" className="vrm-colis-pill is-ambre" data-comptes-a-relire={nRelire} title={ls.dataAgeCompte ? `Données de ${ls.dataAgeCompte} : il y a ${ls.dataAgeJours} j` : `Données d'il y a ${ls.dataAgeJours} j`} onClick={() => onNav && onNav('vintedaccounts')}>{nRelire} compte{nRelire > 1 ? 's' : ''} à relire</button> : null}
+                </div>
+                {nRoute > 0 && enRouteOuvert ? <div className="vrm-colis-en-route-liste" data-en-route-liste={liste.length}>
+                  {liste.map((a) => <div key={a.id} className="vrm-rpf-ligne is-attendu" data-en-route-achat={a.id}><div className="vrm-rpf-rang">
+                    <span className={'vrm-rpf-vignette' + (a.photo && !imgMortes.has(a.photo) ? '' : ' is-sans')} aria-hidden="true">{a.photo && !imgMortes.has(a.photo) ? <PhotoVinted src={a.photo} alt="" loading="lazy" onError={() => noterImgMorte(a.photo)}/> : null}</span>
+                    <span className="vrm-rpf-quoi"><span className="vrm-rpf-titre">{a.titre || 'Achat'}</span><span className="vrm-rpf-puces"><span className="vrm-rpf-puce">en route</span></span></span>
+                  </div></div>)}
+                </div> : null}
+              </>);
+            })()}
             {siteColis!=='toutes' && <div data-colis-filtre-note="" style={{fontSize:12,color:C.muted,margin:'0 2px 6px'}}>{vue.colonnes.reduce((t,c)=>t+c.cartes.length,0)} colis {nomSite[siteColis]} sur {vue.total} · <button type="button" className="vrm-lien-action" onClick={()=>setSiteColis('toutes')} style={{border:0,background:'transparent',padding:0,color:C.text,fontWeight:600,cursor:'pointer',fontFamily:'inherit',fontSize:12,minHeight:44}}>tout voir</button></div>}
             {onglet === 'envoyer' && (notes.prets || notes.attente) ? <p className="vrm-colis-note" data-cc-note="envoyer">{[notes.prets, notes.attente].filter(Boolean).join(' ')}</p> : null}
             {onglet === 'envoyer' && nPretsVue > 0 && (
@@ -53311,7 +53369,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   return <p className="vrm-colis-note" data-pickup-sans-compte={n}>{n>1?`${n} colis sont arrivés`:'1 colis est arrivé'} sur une adresse e-mail reliée à aucun de tes comptes Vinted : ils sont ci-dessous. Relie l’adresse pour qu’ils comptent.{' '}
                     <button type="button" className="vrm-lien-action" data-pickup-sans-compte-geste="" onClick={() => onNav && onNav('vintedaccounts')} style={{border:0,background:'transparent',padding:0,minHeight:44,color:C.text,fontWeight:600,cursor:'pointer',fontFamily:'inherit',fontSize:'inherit',textDecoration:'underline'}}>Paramètres → Comptes liés</button></p>; })()}
                 {colRet && colRet.cartes.length > 0
-                  ? <ColonneRetirer vue={parPoint} C={C} Photo={photoCarte} gestes={gestesRetrait} detail={arriveeRetrait} nomTransporteur={(k) => (CARRIERS[k] && CARRIERS[k].name) || ''} avecCarte={ordiColis} enRouteSansRelais={(groupesRelais && groupesRelais.enRouteSansRelais) || 0}/>
+                  ? <ColonneRetirer vue={parPoint} C={C} Photo={photoCarte} gestes={gestesRetrait} detail={arriveeRetrait} nomTransporteur={(k) => (CARRIERS[k] && CARRIERS[k].name) || ''} avecCarte={ordiColis} enRouteSansRelais={(groupesRelais && groupesRelais.enRouteSansRelais) || 0}
+                      fusion echeance={echeanceRetrait} statut={statutAVerifier} retirer={retirerColis}/>
                   : (toutLuRet ? <p className="vrm-colis-vide" data-retraits-vide="">Aucun colis à aller chercher pour l’instant.</p> : null)}
                 {voitSite('vestiaire') ? <AchatsVestiaireEnRoute vc={colisVestiaire(vcEtat)} transporteurDe={transporteurColis}/> : null}
               </section>

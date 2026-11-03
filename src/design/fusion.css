@@ -985,3 +985,67 @@ html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-carte[data-vc-c
   background: var(--fu-case) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238e8e93' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z'/%3E%3Ccircle cx='7.5' cy='7.5' r='1.5'/%3E%3C/svg%3E") center / 20px no-repeat !important; }
 :root body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-bilan-sync[data-vendus-ailleurs] > summary > span { color: var(--fu-encre) !important; background: var(--fu-case) !important; }
 :root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-bilan-sync[data-vendus-ailleurs] > summary > span { color: #f5f5f7 !important; background: #2c2c2e !important; }
+
+/* ══ 23. 3 NOV. — COLIS → « À RETIRER » AU STYLE DE « À ENVOYER » (Julien : « beaucoup trop brouillon ») ══
+   Une carte blanche par point relais ; une ligne par colis (vignette 44/10, titre, puces, « Code »,
+   « J'ai retiré ») ; le détail s'ouvre au toucher. Lieu à confirmer : carte grise ; À vérifier : replié. */
+.vrm-rpf { display: flex; flex-direction: column; gap: 12px; }
+.vrm-rpf-carte { position: relative; border-radius: var(--fu-r-carte, 20px); overflow: hidden; }
+.vrm-rpf-carte .vrm-relais-fond { border-radius: var(--fu-r-carte, 20px) !important; }
+.vrm-rpf-attrib { position: absolute; right: 8px; bottom: 6px; z-index: 2; font: 500 9px/1.2 var(--vrm-police, system-ui); color: #3a3a3c; background: rgba(255,255,255,.75); padding: 2px 5px; border-radius: 4px; pointer-events: none; }
+.vrm-rpf-carte .maplibregl-ctrl-attrib { display: none !important; }
+.vrm-rpf-point { background: var(--fu-carte, #fff); border-radius: var(--fu-r-carte, 20px); box-shadow: var(--fu-ombre); padding: 4px 14px 6px; }
+:root[data-theme="dark"] .vrm-rpf-point { background: #1c1c1e; box-shadow: 0 0 0 1px rgba(255,255,255,.06); }
+.vrm-rpf-point.is-choisi { box-shadow: 0 0 0 2px var(--fu-bleu, #0071e3); }
+.vrm-rpf-point.is-inconnu { background: var(--fu-case, #f2f2f7); box-shadow: none; }
+:root[data-theme="dark"] .vrm-rpf-point.is-inconnu { background: #2c2c2e; }
+.vrm-rpf-tete { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 8px 0; list-style: none; cursor: default; }
+.vrm-rpf-verifier > summary { cursor: pointer; }
+.vrm-rpf-verifier > summary::-webkit-details-marker { display: none; }
+.vrm-rpf-chevron { margin-left: auto; font: 600 20px/1 var(--vrm-police, system-ui); color: var(--fu-gris2, #8e8e93); transition: transform .2s cubic-bezier(.2,.8,.2,1); }
+.vrm-rpf-verifier[open] .vrm-rpf-chevron { transform: rotate(90deg); }
+.vrm-rpf-ident { flex: 1 1 auto; min-width: 0; display: flex; align-items: baseline; gap: 6px; overflow: hidden; white-space: nowrap; }
+.vrm-rpf-nom { font: 700 16px/1.3 var(--vrm-police, system-ui); color: var(--fu-encre, #1d1d1f); flex: none; max-width: 100%; overflow: hidden; text-overflow: ellipsis; letter-spacing: -.01em; }
+.vrm-rpf-adr { font: 500 13px/1.3 var(--vrm-police, system-ui); color: var(--fu-gris, #6e6e73); min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.vrm-rpf-transp { flex: none; display: inline-flex; }
+.vrm-rpf .vrm-puce-transp[data-lu="0"] { display: none !important; }
+.vrm-rpf-n { flex: none; font: 600 13px/1.2 var(--vrm-police, system-ui); color: var(--fu-gris2, #8e8e93); }
+.vrm-rpf-liste { display: flex; flex-direction: column; }
+.vrm-rpf-ligne { border-top: .5px solid rgba(60,60,67,.18); }
+:root[data-theme="dark"] .vrm-rpf-ligne { border-top-color: rgba(84,84,88,.5); }
+.vrm-rpf-rang { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 10px 0; cursor: pointer; -webkit-tap-highlight-color: transparent; outline: none; }
+.vrm-rpf-rang:focus-visible { box-shadow: 0 0 0 2px var(--fu-bleu, #0071e3); border-radius: 12px; }
+.vrm-rpf-ligne.is-attendu .vrm-rpf-rang { cursor: default; }
+.vrm-rpf-vignette { flex: none; width: 44px; height: 44px; border-radius: 10px; overflow: hidden; background: var(--fu-case, #f2f2f7); display: grid; place-items: center; color: var(--fu-gris2, #8e8e93); }
+:root[data-theme="dark"] .vrm-rpf-vignette { background: #2c2c2e; }
+.vrm-rpf-vignette :is(img, picture) { width: 100% !important; height: 100% !important; object-fit: cover !important; display: block; border-radius: 0 !important; }
+.vrm-rpf-quoi { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.vrm-rpf-titre { font: 600 15px/1.3 var(--vrm-police, system-ui); color: var(--fu-encre, #1d1d1f); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-rpf-puces { display: flex; gap: 6px; flex-wrap: wrap; min-width: 0; }
+.vrm-rpf-puce { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 11px; background: var(--fu-case, #f2f2f7); color: var(--fu-gris, #6e6e73); font: 600 12px/1 var(--vrm-police, system-ui); white-space: nowrap; }
+:root[data-theme="dark"] .vrm-rpf-puce { background: #2c2c2e; color: #aeaeb2; }
+.vrm-rpf-puce.is-ambre { background: var(--fu-ambre-fond, #fff4e5); color: var(--fu-ambre-txt, #b25000); }
+:root body .vrm-app-shell .vrm-main :is(.vrm-rpf-code, .vrm-rpf-retire) {
+  flex: none; min-height: 44px; height: 44px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--fu-case, #f2f2f7); color: var(--fu-encre, #1d1d1f);
+  font: 600 14px/1 var(--vrm-police, system-ui); cursor: pointer; white-space: nowrap; transition: transform 140ms cubic-bezier(.23,1,.32,1); }
+:root[data-theme="dark"] body .vrm-app-shell .vrm-main :is(.vrm-rpf-code, .vrm-rpf-retire) { background: #2c2c2e; color: #f5f5f7; }
+:root body .vrm-app-shell .vrm-main :is(.vrm-rpf-code, .vrm-rpf-retire):active { transform: scale(.96); }
+@media (max-width: 420px) { :root body .vrm-app-shell .vrm-main :is(.vrm-rpf-code, .vrm-rpf-retire) { padding: 0 11px; font-size: 13px; } .vrm-rpf-rang { gap: 10px; } }
+.vrm-rpf-detail { padding: 0 0 12px 56px; display: flex; flex-direction: column; gap: 8px; }
+.vrm-rpf-detail .vrm-rp-gestes { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.vrm-rpf-detail [data-colis-retire] { display: none !important; }
+.vrm-rpf-detail-txt { display: flex; flex-direction: column; gap: 3px; font: 500 13px/1.4 var(--vrm-police, system-ui); color: var(--fu-gris, #6e6e73); }
+@media (max-width: 420px) { .vrm-rpf-detail { padding-left: 0; } }
+/* Les puces du haut de Colis (« N en route », « N comptes à relire ») et la liste en route. */
+.vrm-colis-puces { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 2px; }
+:root body .vrm-app-shell .vrm-main .vrm-colis-pill { min-height: 36px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--fu-carte, #fff); color: var(--fu-encre, #1d1d1f); box-shadow: var(--fu-ombre);
+  font: 600 13px/1 var(--vrm-police, system-ui); cursor: pointer; position: relative; }
+:root body .vrm-app-shell .vrm-main .vrm-colis-pill::after { content: ''; position: absolute; inset: -4px 0; }
+:root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-colis-pill { background: #1c1c1e; color: #f5f5f7; }
+:root body .vrm-app-shell .vrm-main .vrm-colis-pill.is-ambre { background: var(--fu-ambre-fond, #fff4e5); color: var(--fu-ambre-txt, #b25000); box-shadow: none; }
+.vrm-colis-en-route-liste { background: var(--fu-carte, #fff); border-radius: var(--fu-r-carte, 20px); box-shadow: var(--fu-ombre); padding: 0 14px; margin: 8px 0 0; }
+:root[data-theme="dark"] .vrm-colis-en-route-liste { background: #1c1c1e; }
+.vrm-colis-en-route-liste > .vrm-rpf-ligne:first-child { border-top: 0; }
+.vrm-rpf-liste > .vrm-rpf-ligne:first-child { border-top: .5px solid rgba(60,60,67,.18); }
+/* Le bandeau de fraîcheur du bas de Colis est devenu la puce « N comptes à relire ». */
+html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-fraicheur { display: none !important; }
