@@ -106,6 +106,7 @@ import {transactionDeLaLigne, indexRecusParTransaction, recuDeLAchat, bilanRecus
 import {codeRetraitTournure} from '../api/_lib/code-retrait-email.js';
 import {etatRetrait, estAVerifier, urgenceTri, lieuDepuisExtrait, limiteRetraitDepuisTexte, LIEU_AU_FUTUR, GARDE_MAX_J, gardeDe} from '../api/_lib/retrait-colis.js';
 import {aConfirmerVisibles, texteLimite, motAConfirmer} from './aConfirmer.js';
+import { relanceProposable, numeroSorti } from './ebayRelance.js';
 // La date limite d'envoi AVEC son heure (22 octobre) : UNE règle pour Colis, Ma
 // journée, Ventes, le rappel du matin, le rappel du soir et le widget (§11).
 import {DELAI_EXPEDITION_J, limiteExpedition, lireDateLimite, echeanceLimite, texteLimiteEnvoi, bordsParTransaction} from '../api/_lib/limite-envoi.js';
@@ -21200,7 +21201,7 @@ async function appelEbay(corps) {
     // refuse de publier ou programmer sous un numéro d'avant la remise à zéro.
     // (Seulement pour ces deux gestes : les autres corps restent exactement ce
     // qu'ils étaient — ils ne posent aucun numéro.)
-    const avecVersion = corps && (corps.action === 'publish' || corps.action === 'programmer');
+    const avecVersion = corps && (corps.action === 'publish' || corps.action === 'programmer' || corps.action === 'relancer');
     const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify(avecVersion ? { ...corps, numerotation: versionNumerotation() } : corps) });
     let j = null; try { j = await r.json(); } catch (_) {}
     return { code: r.status, j };
@@ -24626,8 +24627,30 @@ const URL_ITEM_EBAY = (id) => /^\d{1,19}$/.test(String(id || '')) ? `https://www
 // « Terminée dans la fenêtre » : une fin illisible est GARDÉE (eBay l'a mise
 // dans sa liste des 60 jours — mieux vaut un blanc qu'un faux).
 const dansFenetreInactives = (fin, maintenant) => { const t = Date.parse(fin || ''); return !Number.isFinite(t) || t >= maintenant - INACTIVES_JOURS * 86400000; };
-function EbayInactives({ comptesEbay, tick, vue = '*', connected, ventes, dejaSurEbay, surEbay, annoncesLuesA, dejaDit, paires, enLigne, onSku, retraitsAuto = null }) {
+function EbayInactives({ comptesEbay, tick, vue = '*', connected, ventes, dejaSurEbay, surEbay, annoncesLuesA, dejaDit, paires, enLigne, onSku, retraitsAuto = null, onRelance }) {
   const E = EBAY_SKIN;
+  // (3 nov.) « Remettre en vente » sur SON clic : vérification à blanc (frais),
+  // confirmation, puis la route `relancer` (règle serveur : api/_lib/ebay-relance.js).
+  const [geste, setGeste] = React.useState('');
+  const [infos, setInfos] = React.useState({});
+  const perdues = lireObjet('vinted_pairs_lost');
+  const remettre = async (l, n) => {
+    if (geste) return;
+    const id = String(l.itemId);
+    const dire = (texte, ton) => setInfos((m) => ({ ...m, [id]: { texte, ton } }));
+    setGeste(id); dire('', '');
+    const base = { itemId: id, numero: n, prixVu: String(l.price), ...corpsCompteEbay(l._compte) };
+    const v = await appelEbay({ action: 'relanceverif', ...base });
+    if (!v.j || v.j.ok !== true) { dire((v.j && v.j.error) || "eBay n'a pas répondu — rien n'a été envoyé.", 'ko'); setGeste(''); return; }
+    const fr = v.j.frais && v.j.frais.total != null ? prixEbayTexte(v.j.frais.total, v.j.frais.devise || l.currency) : '—';
+    const ok = await askConfirm({ title: `Remettre en vente N°${n} ?`, desc: `« ${l.title || id} »\n${prixEbayTexte(v.j.prix, l.currency || 'EUR')} · livraison gérée par eBay\nFrais eBay : ${fr}`, ok: 'Remettre en vente', cancel: 'Annuler' });
+    if (!ok) { setGeste(''); return; }
+    const r = await appelEbay({ action: 'relancer', ...base, confirme: true });
+    if (r.j && r.j.ok) { dire(r.j.verifie === false ? 'Remise en vente — à relire chez eBay.' : 'Remise en vente.', 'ok'); if (onRelance) onRelance(); }
+    else if (r.code === 0 || !r.j || r.code === 504 || (r.j && r.j.reason === 'incertain')) dire((r.j && r.j.error) || "eBay n'a pas répondu — regarde sur eBay avant de recommencer.", 'muet');
+    else dire(r.j.error || 'eBay a refusé.', 'ko');
+    setGeste('');
+  };
   // undefined en cours · null registre illisible · { lignes: [{compte, ligne}] }
   const [lu, setLu] = React.useState(undefined);
   const [voirTout, setVoirTout] = React.useState(false);
@@ -24712,13 +24735,17 @@ function EbayInactives({ comptesEbay, tick, vue = '*', connected, ventes, dejaSu
     // ses vraies données « pas reliée · Remettre en vente » — le contraire de ce
     // que VRM venait de faire. Journal illisible ⇒ rien n'est dit (pas su).
     const retraitAuto = retraitsAuto && typeof retraitsAuto.get === 'function' ? retraitsAuto.get(String(l.itemId)) : null;
-    const relancer = !l._ancienne && !vendue && !retraitAuto && !deja && !relancee && !memeEnLigne && !verifManque;
+    // (3 nov.) La règle de l'écran, une fonction pure (`src/ebayRelance.js`) : identité
+    // (N° du SKU), vendue nulle part (verdict lu), toujours chez lui (`vinted_pairs_lost`).
+    const sortie = numeroSorti(n, perdues);
+    const relancer = relanceProposable({ n, ancienne: l._ancienne, vendue, retraitAuto, verifManque, sortie, memeEnLigne, relancee, deja, prix: l.price }).propose;
     const url = URL_ITEM_EBAY(l.itemId);
     const prix = Number(String(l.price || '').replace(',', '.'));
     const etatLigne = vendue ? `vendue sur ${vendue} — ne la remets pas en vente`
       : retraitAuto ? `retirée par VRM${Number.isFinite(Number(retraitAuto.at)) ? ' le ' + new Date(Number(retraitAuto.at)).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : ''} : vendue sur ${retraitAuto.ou || 'Vinted'} — ne la remets pas en vente`
       : memeEnLigne ? 'aussi dans tes annonces en ligne — état à relire chez eBay'
       : relancee ? 'déjà remise en vente sur eBay'
+      : sortie ? 'sortie du stock'
       : deja ? (deja.etat === 'programmee' ? 'déjà programmée de nouveau sur eBay' : 'déjà de nouveau en vente sur eBay')
       : surVinted ? 'encore en ligne sur Vinted' : '';
     return (
@@ -24742,9 +24769,10 @@ function EbayInactives({ comptesEbay, tick, vue = '*', connected, ventes, dejaSu
             {etatLigne ? <span data-inactive-etat="1">{` · ${etatLigne}`}</span> : null}
           </div>
         </div>
-        {url && (relancer
-          ? <a href={url} target="_blank" rel="noreferrer" data-inactive-relancer={url} style={lienS}>Remettre en vente sur eBay ↗</a>
+        {url && (relancer && !(infos[l.itemId] && infos[l.itemId].ton === 'ok')
+          ? <button type="button" data-inactive-relancer={url} disabled={!!geste} onClick={() => remettre(l, n)} style={{ ...lienS, background: 'none', border: 'none', cursor: geste ? 'default' : 'pointer', fontFamily: 'inherit', opacity: geste && geste !== String(l.itemId) ? 0.5 : 1 }}>{geste === String(l.itemId) ? 'eBay…' : 'Remettre en vente'}</button>
           : <a href={url} target="_blank" rel="noreferrer" data-inactive-voir={url} style={lienS}>Voir sur eBay ↗</a>)}
+        {infos[l.itemId] && infos[l.itemId].texte ? <div role="status" data-inactive-resultat={infos[l.itemId].ton} style={{ flexBasis: '100%', fontSize: 12, color: infos[l.itemId].ton === 'ko' ? E.warn : infos[l.itemId].ton === 'ok' ? E.text : E.muted, paddingLeft: 54, lineHeight: 1.45 }}>{infos[l.itemId].texte}</div> : null}
       </div>
     );
   });
@@ -26308,7 +26336,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     {/* (23 octobre) Les annonces terminées SANS vente — lecture seule. */}
     <EbayInactives comptesEbay={comptesEbay} tick={inactivesTick} vue={vueSeule ? vue : '*'} connected={connected}
       ventes={ventesConnues} dejaSurEbay={dejaSurEbay} surEbay={surEbayIds} annoncesLuesA={annoncesLuesA} dejaDit={dits}
-      paires={paires} enLigne={enLigne} onSku={setInactivesSku}
+      paires={paires} enLigne={enLigne} onSku={setInactivesSku} onRelance={() => { resync(); }}
       retraitsAuto={Array.isArray(journalAuto) ? new Map(journalAuto.filter((x) => x && x.itemId != null).map((x) => [String(x.itemId), x])) : null} />
   </>);
   // (16 octobre, revue) « Vendre une paire » vient EN PREMIER, avant les
