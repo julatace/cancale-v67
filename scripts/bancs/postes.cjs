@@ -75,19 +75,29 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
   // va dans « Partis » (replié), sous un intertitre — une ligne en tête le dit
   // (`data-voir-postes`, son nombre). Même règle qu'avant : personne ne disparaît
   // (cartes + postés = la liste d'avant), le compte du haut colle aux cartes.
-  const compte=()=>pg.evaluate(()=>{
+  // (3 nov., nouvelle mise en page) « Partis » est l'onglet « Envoyés » : le compte lit « À envoyer », puis
+  // l'onglet « Envoyés » (les cochés y sont, marqués `data-postes-pas-partis` / `data-postes-recents`).
+  const lireEnvoyer=()=>pg.evaluate(()=>{
     const t=document.body.innerText||'';
     const m=/(\d+)\s*\n?\s*colis à envoyer/.exec(t);
-    const lig=document.querySelector('button[data-voir-postes]');
-    const partis=document.querySelector('[data-colis-partis]');
     return {entete: m?+m[1]:(/Aucun colis à envoyer/.test(t)?0:null),
             cartes: document.querySelectorAll('[data-bord-card]').length,
-            /* (2 nov.) le nombre des cochés est dit sur « Partis » (plus de ligne permanente en tête) */
-            postes: partis&&partis.hasAttribute('data-partis-coches')?+partis.getAttribute('data-partis-coches'):(lig?+lig.getAttribute('data-voir-postes'):0),
-            dansPartis: partis?partis.querySelectorAll('[data-parti="coche"]').length:0,
-            sousIntertitre: [...document.querySelectorAll('[data-colis-partis] [data-postes-pas-partis] [data-parti="coche"], [data-colis-partis] [data-postes-recents] [data-parti="coche"]')].length,
             cartesPostees: [...document.querySelectorAll('[data-bord-card]')].filter(el=>/Pas encore/.test(el.innerText)).length};
   });
+  const lirePartis=()=>pg.evaluate(()=>{
+    const partis=document.querySelector('[data-colis-partis]');
+    return {postes: partis&&partis.hasAttribute('data-partis-coches')?+partis.getAttribute('data-partis-coches'):0,
+            dansPartis: partis?partis.querySelectorAll('[data-parti="coche"]').length:0,
+            sousIntertitre: [...document.querySelectorAll('[data-colis-partis] [data-postes-pas-partis][data-parti="coche"], [data-colis-partis] [data-postes-recents][data-parti="coche"]')].length};
+  });
+  const compte=async()=>{
+    await pg.click('[data-colis-onglet-choix="envoyer"]').catch(()=>{}); await pg.waitForTimeout(150);
+    const e=await lireEnvoyer();
+    await pg.click('[data-colis-onglet-choix="envoyes"]').catch(()=>{}); await pg.waitForTimeout(250);
+    const p=await lirePartis();
+    await pg.click('[data-colis-onglet-choix="envoyer"]').catch(()=>{}); await pg.waitForTimeout(150);
+    return {...e,...p};
+  };
   const stable=async(besoinCartes)=>{
     const t0=Date.now(); let prev='', n=0, s=null;
     while(Date.now()-t0<20000){
@@ -115,15 +125,17 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
   dit(c.entete===a.entete-2 && c.entete===c.cartes, "l'en-tête ne compte plus que les colis qui restent", `${a.entete} -> ${c.entete}`);
   dit(c.cartesPostees===0, 'aucun colis posté ne reste dans la liste de travail (chaque colis une fois)', String(c.cartesPostees));
   // « ↺ Pas encore posté » le remet dans la liste.
-  await pg.evaluate(()=>{const d=document.querySelector('[data-colis-partis]'); if(d) d.open=true;});
+  await pg.click('[data-colis-onglet-choix="envoyes"]').catch(()=>{}); await pg.waitForTimeout(400);
   await pg.evaluate(()=>{const b=document.querySelector('[data-colis-partis] [data-annuler-poste]'); if(b) b.click();});
+  await pg.click('[data-colis-onglet-choix="envoyer"]').catch(()=>{}); await pg.waitForTimeout(300);
   const d=await stable(false);
   await pg.screenshot({path:SC+'/z-postes.png',fullPage:true});
   dit(d.cartes===c.cartes+1 && d.dansPartis===c.dansPartis-1, '« ↺ Pas encore posté » le remet dans la liste, une fois', JSON.stringify(d));
   const ordre=await pg.evaluate(()=>{
     const g=[...document.querySelectorAll('[data-bord-card]')][0]?.parentElement;
     if(!g) return null;
-    return [...g.children].map(el=>el.hasAttribute('data-bord-card') ? 'carte' : el.hasAttribute('data-groupe') ? 'SEP:'+el.getAttribute('data-groupe') : 'AUTRE').join(',');
+    // (3 nov., nouvelle mise en page) l'intertitre de la liste = l'en-tête de SON transporteur (`data-groupe-transp`).
+    return [...g.children].map(el=>el.hasAttribute('data-bord-card') ? 'carte' : el.hasAttribute('data-groupe') ? 'SEP:'+el.getAttribute('data-groupe') : el.hasAttribute('data-groupe-transp') ? 'SEP:'+el.getAttribute('data-groupe-transp') : 'AUTRE').join(',');
   });
   dit((ordre||'').startsWith('SEP'), 'la liste s\'ouvre par un intertitre', ordre);
   dit(errs.length===0, "aucune erreur d'app", errs.slice(0,2).join(' | '));
