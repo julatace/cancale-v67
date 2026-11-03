@@ -14,7 +14,8 @@ const fs=require('fs'),path=require('path'),assert=require('assert/strict'),PL=r
  await p.addScriptTag({path:path.join(process.env.VRM_PDFJS_DIR,'pdf.min.js')});
  await p.addStyleTag({content:fs.readFileSync('src/styles-reglages.css','utf8')});
  await p.evaluate(()=>{pdfjsLib.GlobalWorkerOptions.workerSrc='http://vrm.test/pdf.worker.min.js';window.chargerPdfjs=async()=>pdfjsLib;window.C={card:'#fff',text:'#123',muted:'#456'};window.createPortal=ReactDOM.createPortal;window.FermeAuRetour=()=>null;});
- for(const name of ['trouverZoneBlanche','espaceBlancBordereau','drawBordereauStamp','dessinerPdf'])await p.addScriptTag({content:code.match(new RegExp('const '+name+' = [\\s\\S]*?\\n};'))[0]+`;window.${name}=${name};`});
+ await p.addScriptTag({content:'const MM_PT=72/25.4;'+(s=>s.slice(s.indexOf('// ── LE TAMPON DU BORDEREAU'),s.indexOf('// ── IMPRIMANTE NORMALE OU THERMIQUE')))(code)+';window.tamponnerBordereau=tamponnerBordereau;'});
+ await p.addScriptTag({content:code.match(/const dessinerPdf = [\s\S]*?\n};/)[0]+';window.dessinerPdf=dessinerPdf;'});
  const component=code.slice(code.indexOf('function BordPlacer('),code.indexOf('// Réponses rapides prêtes')).replace("await import('pdf-lib')",'window.PDFLib');
  await p.addScriptTag({content:esbuild.transformSync(component+';window.BordPlacer=BordPlacer;',{loader:'jsx'}).code});
  await p.evaluate(bytes=>{window.confirmations=0;ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(BordPlacer,{place:{pdfBuf:new Uint8Array(bytes),numero:'C125',title:'Test'},onConfirm:async()=>{window.confirmations++;},onCancel:()=>{}}));},bytes);
