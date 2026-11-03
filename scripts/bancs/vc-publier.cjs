@@ -28,6 +28,10 @@ const rows = [
   { id: 'vinted_vc_posted', data: { ids: ['7003'] } },
 ];
 const ACCS = [{ id: 1, vinted_user_id: '111', login: 'compte_test', domain: 'www.vinted.fr', updated_at: auj }];
+// (3 nov.) « Vérifier avant de publier » : une feuille peut s'ouvrir (photos, taille…) ;
+// ce banc juge la suite, il répond « Publier quand même » et note ce qu'elle disait.
+const passerVerif = async (pg) => { try { const f = await pg.waitForSelector('[data-verif-sheet]', { timeout: 900 }); if (f) { const codes = await pg.evaluate(() => [...document.querySelectorAll('[data-verif-probleme]')].map((e) => e.getAttribute('data-verif-probleme')).join(',')); console.log('    · feuille de vérification : ' + codes); await pg.click('[data-verif-publier]'); await pg.waitForTimeout(200); } } catch (_) {} };
+
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
 const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/json', '.woff2': 'font/woff2' };
@@ -129,7 +133,7 @@ const PONT = ({ mode, version, suite = 'fait' }) => {
         await pg.waitForTimeout(900);
         const e1 = await pg.evaluate(() => ({ et: document.querySelector('[data-vc-paire="7001"] [data-vc-etiq]').getAttribute('data-vc-etiq'), ls: localStorage.getItem('vrm_vc_etiquettes') }));
         dit(e1.et === 'choisie' && /"7001":"\/t\/a\/b\.jpg"/.test(e1.ls || ''), 'toucher la photo 2 la note comme étiquette (clé de la photo, synchronisée)', JSON.stringify(e1));
-        await pg.click('[data-vc-preparer="7001"]');
+        await pg.click('[data-vc-preparer="7001"]'); await passerVerif(pg);
         await pg.waitForFunction(() => window.__cmds && window.__cmds.length > 0, null, { timeout: 8000 }).catch(() => {});
         await pg.waitForTimeout(500);
         let cmds = await pg.evaluate(() => window.__cmds);
@@ -155,7 +159,7 @@ const PONT = ({ mode, version, suite = 'fait' }) => {
         await pg.screenshot({ path: path.join(require('os').tmpdir(), 'vc-publier-' + cas.w + '.png'), fullPage: true });
       } else {
         dit(/Mets l'extension à jour|pas détectée/.test(v.raison), nom + ' : la raison est dite', v.raison);
-        await pg.click('[data-vc-preparer="7001"]', { force: true });
+        await pg.click('[data-vc-preparer="7001"]', { force: true }); await passerVerif(pg);
         await pg.waitForTimeout(400);
         dit((await pg.evaluate(() => window.__cmds ? window.__cmds.length : 0)) === 0, 'le clic n\'envoie rien');
       }

@@ -226,3 +226,6 @@ Déplacé TEL QUEL depuis CLAUDE.md §9 le 2 novembre 2026 (le fichier dépassai
 
 ### Lignes de §9 déplacées telles quelles
 - **2 nov. (nuit)** — E-mails et Statistiques plus simples : E-mails = « Oui, tes e-mails arrivent » + À faire + Ce que VRM en a fait ; Stats = 4 chiffres expliqués, compte qui vend le mieux, modèles et tailles, le reste en 2 volets (banc `emails-stats-clairs`, règles inchangées). → historique interface-stock. Geste : regarder Paramètres → E-mails et Statistiques.
+
+### Lignes de §9 déplacées telles quelles
+- **2 nov. (nuit)** — Comptabilité en 3 questions (Combien j'ai gagné ? · Combien je dois déclarer ? · Le détail replié), un montant écrit une fois, liens à l'encre (contraste), règles inchangées (banc `compta-claire`, 68 rouges sur main). → historique compta. Geste : regarder Compta au téléphone ; dire « Noter ma déclaration » ou « J'ai déclaré ».

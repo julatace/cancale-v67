@@ -96,19 +96,20 @@ rows.push({ id:'ebay_orders', data:{ orders:[] } });
 //   paris_kicks 2 ventes (10 j ; 93004 sans date) — 3 + 2 = 5 = la tuile.
 // PAR TAILLE (mois, finalisées) : 41 → 1 (—), 42 → 2 (1 et 3 ⇒ 2 j, la plus vendue), 43 → 1 (10 j).
 // EN LIGNE : 4 annonces, dont 2 depuis 30 j et plus (toutes périodes).
-// BOOST : 93001 et 93002 boostées (montants saisis 2,40 + 1,50 = 3,90 €),
-//   93003 non boostée ; 2 contre 1 ⇒ pas assez pour comparer les délais (« — »).
-//   Semaine : les deux mêmes ; Année : les deux mêmes (aucune autre boostée).
+// BOOST (3 nov., règle refaite : annonces mises en ligne dans la période,
+//   boostées contre non boostées du MÊME modèle sûr) : 93001 et 93002 boostées
+//   (montants saisis), aucune annonce de même modèle sûr des deux côtés ⇒
+//   « Pas assez de données », aucun chiffre comparé, sur les trois périodes.
 const ATT={
   mois:    { vendu:{n:5,eur:25000,prec:8000,ecart:213}, benef:{n:4,ncout:3,brut:11000}, delai:{med:'3',couv:'3/4'},
              barres:'s37…s44', rapides:'1,6.5', comptes:{ '111':{n:3,med:'2'}, '222':{n:2,med:'10'} }, tailles:{ '41':{n:1,med:''}, '42':{n:2,med:'2'}, '43':{n:1,med:'10'} }, plus:'42',
-             boost:{ etat:'lu', b:'2', cout:'390', ventes:'2', delai:'' } },
+             boost:{ etat:'pas-assez' } },
   semaine: { vendu:{n:3,eur:14000,prec:7000,ecart:100}, benef:{n:2,ncout:1,brut:4000}, delai:{med:'6.5',couv:'2/2'},
              comptes:{ '111':{n:2,med:'3'}, '222':{n:1,med:'10'} }, tailles:{ '42':{n:1,med:'3'}, '43':{n:1,med:'10'} },
-             boost:{ etat:'lu', b:'2', cout:'390', ventes:'2', delai:'' } },
+             boost:{ etat:'pas-assez' } },
   annee:   { vendu:{n:8,eur:47500,prec:3500,ecart:1257}, benef:{n:7,ncout:5,brut:20000}, delai:{med:'6',couv:'6/7'},
              comptes:{ '111':{n:5}, '222':{n:3} }, plus:'42',
-             boost:{ etat:'lu', b:'2', cout:'390', ventes:'2', delai:'' } },
+             boost:{ etat:'pas-assez' } },
 };
 // Barres : semaine (lun→dim) 50 (lun), 60 (mar), 0, 30 (jeu, en cours), vendredi → dimanche à venir.
 const BARRES={ semaine:'5000,6000,0,3000,0,0,0', semaineEnCours:'3', mois:'0,8000,0,4500,4000,0,7000,14000', moisEnCours:'7',
@@ -198,7 +199,7 @@ const lire=(pg)=>pg.evaluate(()=>{
     barres:A(br,'data-sv-barres'), barresN:A(br,'data-sv-barres-n'), enCours:A(br,'data-sv-encours'), libs:br?[...br.querySelectorAll('.vrm-sv-barre-lib')].map(x=>x.innerText).join(','):'', cours, autres, accent,
     rapides:[...document.querySelectorAll('[data-sv-rapide]')].map(e=>e.getAttribute('data-mediane')).join(','),
     comptes:lignes('[data-sv-compte]','data-sv-compte'), tailles:lignes('[data-sv-taille]','data-sv-taille'), plus,
-    boost:boost?{ etat:boost.getAttribute('data-sv-etat'), b:boost.getAttribute('data-sv-boostees'), cout:A(q('[data-sv-boost="cout"]'),'data-v'), ventes:A(q('[data-sv-boost="ventes"]'),'data-v'), delai:A(q('[data-sv-boost="delai"]'),'data-v'), texte:boost.innerText.replace(/\s+/g,' ') }:null,
+    boost:boost?{ etat:boost.getAttribute('data-sv-etat'), b:boost.getAttribute('data-sv-boostees'), nb:boost.getAttribute('data-sv-autres'), vendues:A(q('[data-sv-boost="vendues"]'),'data-v'), delai:A(q('[data-sv-boost="delai"]'),'data-v'), texte:boost.innerText.replace(/\s+/g,' ') }:null,
     deb:document.documentElement.scrollWidth-document.documentElement.clientWidth,
   };
 });
@@ -263,7 +264,7 @@ const capture=async(pg,nom)=>{
             dit(Object.keys(r.tailles).join(',')===Object.keys(a.tailles).sort((x,y)=>Number(x)-Number(y)).join(','),`${p} : tailles rangées dans l’ordre des pointures`,Object.keys(r.tailles).join(',')); }
           if(a.plus) dit(r.plus.length===1 && r.plus[0]===a.plus,`${p} : la taille la plus vendue (${a.plus}) seule en cobalt`,JSON.stringify(r.plus));
           const bo=r.boost||{};
-          dit(bo.etat===a.boost.etat && bo.b===a.boost.b && bo.cout===a.boost.cout && bo.ventes===a.boost.ventes && bo.delai===a.boost.delai,`${p} : boost — coût saisi 3,90 €, 2 ventes, délais « — » (pas assez)`,JSON.stringify(bo));
+          dit(bo.etat===a.boost.etat && bo.vendues==null && bo.delai==null && /Pas assez de données/.test(bo.texte||''),`${p} : boost — pas assez de données, aucun chiffre comparé`,JSON.stringify(bo));
           dit(r.deb<=1,`${p} : aucun débordement horizontal`,`${r.deb}px`);
           if(p==='mois') await capture(pg,`stats-vitrine-${T.nom}`);
         }

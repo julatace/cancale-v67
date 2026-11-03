@@ -1,25 +1,26 @@
 // (31 oct.) Messages en volets — les règles PURES de l'écran, testées par
 // `scripts/bancs/messages-volets.cjs`.
 //
-// LA CONTRE-OFFRE PROPOSÉE sur la carte d'offre (« Refuser · 110 € · Accepter »).
-// Une PROPOSITION, jamais un envoi : un tap ne fait que remplir le prix, c'est
-// « Envoyer l'offre » qui part (§3). Règle :
-//   - entre l'offre et le prix affiché : le milieu, arrondi aux 5 € au-dessus
-//     (à l'euro sous 20 €), jamais sous le prix mini qu'il a posé ;
-//   - toujours STRICTEMENT au-dessus de l'offre et sous le prix affiché ;
-//   - prix affiché inconnu : son mini s'il est au-dessus de l'offre, sinon rien ;
-//   - rien de sûr ⇒ `null` (le bouton dit « Contre-offre » sans montant).
-export function contreOffreProposee(offre, prixAffiche, mini) {
+// LA CONTRE-OFFRE EN UN TAP (3 nov., choisie par Julien) — « Proposer X € » sur
+// une offre reçue TROP BASSE. X vient de SON prix mini seulement (posé à côté du
+// N°, par identité) : jamais deviné, jamais un « milieu » calculé. Règle :
+//   - X = le prix mini arrondi à l'euro supérieur ;
+//   - jamais sous le prix mini, jamais au-dessus du prix affiché (un mini qui
+//     s'arrondit au-dessus du prix affiché ⇒ X = le prix affiché, qui reste ≥ mini) ;
+//   - seulement si l'offre est SOUS le mini (sinon c'est « Accepter » qu'on montre) ;
+//   - pas de mini, pas de prix affiché lu, ou un mini au-dessus du prix affiché ⇒
+//     `null` : pas de bouton.
+// Le tap envoie la contre-offre par le chemin existant (extension, plafond
+// d'actions) ; rien ne part sans lui (§3).
+export function contreOffreMini(offre, prixAffiche, mini) {
   const o = Number(offre), p = Number(prixAffiche), m = Number(mini);
-  if (!(o > 0) || !Number.isFinite(o)) return null;
-  const aMini = Number.isFinite(m) && m > 0;
-  if (!(p > 0) || !Number.isFinite(p)) return aMini && m > o ? m : null;
-  if (p <= o) return null;
-  const milieu = (o + p) / 2;
-  const pas = p >= 20 ? 5 : 1;
-  let c = Math.ceil(milieu / pas) * pas;
-  if (!(c < p)) c = Math.ceil(milieu);
-  if (aMini && c < m) c = m;
-  if (!(c > o) || !(c < p)) return aMini && m > o && m < p ? m : null;
+  if (!Number.isFinite(o) || !(o > 0)) return null;
+  if (!Number.isFinite(m) || !(m > 0)) return null;
+  if (!Number.isFinite(p) || !(p > 0)) return null;
+  if (o >= m) return null;
+  if (p < m) return null;
+  const x = Math.min(Math.ceil(Math.round(m * 100) / 100 - 1e-9), p);
+  const c = Math.round(x * 100) / 100;
+  if (c < m || c > p || !(c > o)) return null;
   return c;
 }
