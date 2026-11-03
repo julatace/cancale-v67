@@ -160,3 +160,7 @@ Déplacé TEL QUEL depuis CLAUDE.md §9 le 2 novembre 2026 (le fichier dépassai
 - **1er nov.** — Codes de retrait fiables (extension **5.297.0**, 9 défauts, `audit-codes-retrait`). → historique colis-retraits. Geste : aucun (5.307.0 les contient).
 - **1er nov.** — Consigne Vinted Go : adresse lue dans le suivi du même n° (`lieuCompleteParTransporteur`), jamais devinée (`audit-vintedgo-adresse`). → historique colis-retraits. Geste : aucun.
 - **1er nov.** — Cohérence de chaque bouton (banc `tous-boutons`, 99 écrans) : Échap ferme les feuilles, « Paramètres » partout. → historique interface-stock. Geste : aucun.
+
+### Lignes de §9 déplacées telles quelles
+- **1er nov.** — Capture Vestiaire/Leboncoin fiable (extension **5.299.0**) : une réponse inconnue n'est plus « lue, vide », compte de la page = compte de l'onglet, liste entière (`audit-capture-vc-lbc`). → historiques vestiaire et leboncoin. Geste : app ouverte sur le compte VRM de l'extension, « Mes articles » Vestiaire défilé jusqu'au bout.
+- **1er nov.** — Tournée RETIRÉE de Ma journée (sa demande) : `TOURNEE_SUR_JOURNEE = false`, code gardé. Geste : aucun.

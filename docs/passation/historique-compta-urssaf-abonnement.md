@@ -1792,3 +1792,76 @@ ouverts d'un toucher, `ouvrirDetailCompta` de `_compta.cjs`) ; `audit-suivi-urss
 - **À décider par Julien** : retirer « Net après paiement » de la carte URSSAF (fait, réversible) ; le nom du
   bouton (« Noter ma déclaration » gardé, plutôt que « J'ai déclaré ») ; « ventes finalisées » gardé (le mot
   de Vinted) ; « Documents et réglages » au lieu d'« Avancé ».
+
+---
+
+## 3 novembre — « Bénéfice » : un nom, une règle, sur tous les écrans
+
+**Constat d'une critique (mêmes données de banc)** : le « bénéfice du mois » valait « — » dans Ma journée,
+103 € dans Statistiques et 80,93 € dans Comptabilité. Julien : tout doit être parfait.
+
+**Cause, mesurée (banc `benefice-unique` et `audit-benefice-unique` sur origin/main)** : ce n'était pas une
+copie de règle qui divergeait — le propriétaire est bien unique (`vrm_benefice_jours`, publié par l'écran
+Ventes ; `beneficePeriode` pour le mois) — mais **trois notions sous le même nom**, plus un « — » en dur :
+- Comptabilité « Ton bénéfice » = ventes − prix d'achat − frais − dépenses − URSSAF (`netFinal`), « — » si
+  un prix d'achat manque ;
+- Statistiques, tuile « Bénéfice » = le BRUT (vente − achat), sans dépenses ni URSSAF, et « au moins » quand
+  des prix manquent (faux : une paire au prix inconnu peut être vendue à perte — pas un plancher) ;
+- Ma journée « Bénéfice » = `netFinal`, mais glissait au brut partiel (« Bénéfice brut ») quand le net ne se
+  calculait pas : Compta « — », Ma journée « 66 € », Stats « au moins 65,90 € » sur le même jeu ;
+- le récap comptable mensuel (Documents et réglages) écrivait « — » en dur dans sa colonne « Bénéfice »
+  (`profit: null`), et appelait « Net estimé » le CA − URSSAF (sans aucun prix d'achat) ;
+- l'écran Ventes appelait « Bénéfice » / « Bénéfice net » le brut et le brut − frais (ni dépenses ni URSSAF) ;
+- **défaut de règle** trouvé en route : depuis le 1er nov. une vente Vestiaire au montant sûr entre dans le
+  bénéfice, mais `caBeneficeDuMois` ne sommait que Vinted/Leboncoin/eBay : son URSSAF n'était pas déduite.
+Sur le jeu de l'audit, origin/main affiche « Ma journée 66,40 € · Statistiques 102,00 € · Comptabilité
+66,40 € · récap — » quand l'attendu calculé à la main est 57,72 € — la forme exacte de la critique.
+
+**Fait** :
+- `src/beneficeNoms.js` : trois notions, trois noms — « Bénéfice » (ce qu'il te reste, `beneficePeriode`),
+  « Bénéfice brut » (vente − achat, couverture « N sur M », jamais « au moins »), « Après frais de vente »
+  (brut − boosts et frais). `chiffreBenefice(B, etat)` / `chiffreBrut` / `chiffreApresFrais` donnent la
+  valeur affichée et `data-benef-notion` / `data-benef-valeur` / `data-benef-pourquoi`.
+- Ma journée : la case dit toujours « Bénéfice » = `chiffreBenefice` (le net ou « — »), la couverture et la
+  porte « N prix d'achat › » dessous ; plus de brut glissé sous un libellé qui change.
+- Statistiques : Mois et Année = `useBeneficeCalcul` (la lecture de Comptabilité et de Ma journée, mêmes
+  charges, même CA déclaré) ; Semaine = « Bénéfice brut » (dépenses et URSSAF se comptent au mois) ; « au
+  moins » retiré ; tableau « Bénéfice brut et marge ».
+- Comptabilité : inchangée (propriétaire) ; la ligne brute du détail s'appelle « Bénéfice brut ».
+- Récap mensuel : colonne « Bénéfice » = `beneficePeriode` du mois (borné à maintenant), « — » seulement si
+  pas su (prix manquant, mois plus ancien que la publication) ; « Net estimé » → « CA après URSSAF » ; une
+  phrase dit d'où vient le bénéfice.
+- Ventes : « Bénéfice brut » et « Après frais de vente » (plus de « Bénéfice » ni « Bénéfice net »).
+- `caBeneficeDuMois` : + Vestiaire (les mêmes plateformes des deux côtés).
+- « — » = la règle dit « pas su », partout pareil : un prix d'achat manquant, des frais eBay pas lus, le CA
+  déclaré pas publié, rien publié.
+
+**Preuves** :
+- `scripts/audit-benefice-unique.cjs` (vraies fonctions d'App.jsx dans un vm + le module ; le chemin de
+  chaque écran est LU dans son code) : cas tout connu, prix d'achat manquant, frais eBay pas lus, Vestiaire
+  sûr / pas sûr, vente à cheval (vendue en octobre, versée en novembre), compte exclu, aucune vente du mois,
+  sans dépenses notées. 24 verts ; **15 rouges sur origin/main** (copié dans un `git archive`) ;
+  mutations `stats` 5, `journee` 5, `recap` 6, `vestiaire` 3, `aumoins` 1, `ventes` 1 rouges.
+- `scripts/bancs/benefice-unique.cjs` (1512 et 390 tactile, données inventées) : même valeur rendue sur
+  Ma journée, Statistiques (Mois), Comptabilité et le récap ; même « — » quand un prix manque ; noms des
+  autres notions. 38 verts ; **22 rouges sur le build d'origin/main** ; mutation « tuile au brut » ⇒ 4 rouges.
+  Captures regardées (tuile « Bénéfice 67,77 € · après prix d'achat, frais, dépenses et URSSAF » ; case
+  « Bénéfice — · 2 sur 3 · 1 prix d'achat › »).
+- Bancs remis à la règle (en le disant dedans) : `stats-vitrine` (plus de « au moins »), `benefice-brut-net`
+  (« Après frais de vente »).
+- `audit-benefice` exige `@babel/parser` (absent du conteneur) : lancé avec un bouchon d'analyse hors dépôt
+  (déclarations de premier niveau) — 46 verts, mutations duplique/zero/cotis rouges.
+
+**Mesuré chez Julien (lecture seule, 3 nov. matin)** — valeurs dans le rapport de session seulement.
+
+**Noté, pas fait** : dans Statistiques → « L'argent depuis le début », « Bénéfice estimé », « Taux marge » et
+« Bénéfice moyen par vente » valent « — » dès que les ventes sont lues (calcul de l'ancien catalogue) ; la
+colonne « Bénéfice » par vente de l'écran Ventes est vente − achat − frais (une autre granularité). À
+trancher avec Julien. La branche `claude/design-fusion` réécrit les mêmes lignes de Ma journée et de
+Comptabilité (« Bénéfice brut du mois » sous la même case) : à la fusion, garder `chiffreBenefice`.
+- Tournée des bancs liés (build de cette branche) : `benefice-journee` 62/62, `stats-compta` 58/58,
+  `compta-claire` 98/98, `stats-vitrine` 112/112, `emails-stats-clairs` 53/53, `benefice-brut-net` vert (il
+  lisait une rangée vide — 4 rouges aussi sur origin/main : « Chiffres de la plateforme » replié au téléphone,
+  première `.vrm-summary-strip` qui n'était pas celle du bénéfice ; réparé). `chiffres-croises` : 1 rouge
+  (« VENDU du mois » de Statistiques lu sur `[data-dash-stat="caMois"]`, absent depuis la refonte de
+  Statistiques) — **le même rouge sur origin/main**, sans lien avec le bénéfice, laissé à part.
