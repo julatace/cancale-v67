@@ -2710,3 +2710,111 @@ range dans `vrm_points_relais` (« auto ») pose des positions fausses (un « Ta
 cette liste n'est plus rendue nulle part — à retirer un jour (code mort qui appelle le réseau).
 (2) Un lieu SANS code postal rejoint encore le SEUL autre point du même nom (`regrouperRelais`),
 même dans une autre ville ; avec l'adresse relue, le cas mesuré n'y passe plus.
+
+## 3 novembre — Le tampon du bordereau toujours posé (N° + titre) : zone libre, sinon bande, sinon fiche colis
+
+Julien, 3 nov. 09 h 59 : « le tamponnage du bordereau ne marche pas car il veut absolument trouver un espace
+blanc ; il me dit qu'il n'en trouve pas ».
+
+**Mesuré d'abord** (vraie base, lecture seule ; copies des PDF dans le scratchpad de la session, jamais dans le
+dépôt) : 215 `email_bord_*`, 159 `harvest_*_label_*`, 1 `vc_label_*`. Formes : Chronopost iText 842×595 et
+595×842, Mondial Relay/InPost PDFsharp 595×842, « Bordereau-Vinted » (flux d'objets, étiquette en Form XObject
+425×283 = 150×100 mm couchée, Hermes/An Post), HexaPDF 594×842 (deux images pleine page), FPDF international,
+Vestiaire Chronopost TCPDF 841,89×595,28 **/Rotate 270**. Son réglage : imprimante `normale`.
+Rejoué sur deux vrais PDF avec le code du 28 oct. : InPost passe (normale et thermique) ; **« Bordereau-Vinted »
+en thermique : « aucun espace blanc suffisant »** — l'étiquette mise au 100×150 remplit la page. Causes lues dans
+le code d'avant : (1) aucune issue quand il n'y a pas de blanc (refus = erreur, rien d'imprimé dans un lot) ;
+(2) tout pixel < 248 était de l'encre (fond gris clair, image scannée ⇒ jamais de blanc) ; (3) sur une page
+tournée, le texte était posé couché et la largeur PDF (38 pt) faisait lever « Numéro trop long » ; (4) en
+thermique le titre n'était jamais posé ; (5) un caractère hors WinAnsi (emoji) faisait lever pdf-lib.
+(Le banc `tampon-bordereau` sur le code d'avant : 11 sorties sur 14 refusées « aucun espace blanc suffisant ».)
+
+**Livré — un seul chemin, `tamponnerBordereau` (App.jsx, bloc « LE TAMPON DU BORDEREAU »)**, appelé par
+`poserBordereau` (une vente, un lot, Leboncoin, Vestiaire — `annotateAndDownloadBordereau`), les étiquettes
+thermiques, l'aperçu `BordPlacer` et `imprimerBordereauEquipe`. Trois issues, jamais un échec :
+1. **Zone libre** sur la page AFFICHÉE (rotation comprise) : encre = luminance < 200, par cellules de 3 px (un
+   point isolé n'est pas de l'encre), marges 14 pt à gauche/droite (zone de silence d'un code-barres) et 10 pt
+   en haut/bas, trois tailles de cartouche (N° 18/15/12 pt, titre sur 2 lignes, « … »). Le texte est tourné de
+   la rotation de la page : il se lit à l'endroit.
+2. **Bande** de 40 pt (14 mm) ajoutée SOUS la page affichée, l'original redessiné à 1:1 (Form XObject) —
+   seulement si la page agrandie tient sur un A4 (cas d'une étiquette 10×15 imprimée en A4 : aucune réduction).
+3. **Fiche colis** 10×15 (N° en très gros, titre, « Fiche colis VRM — pas une étiquette de transport »)
+   insérée juste APRÈS la page : A4 déjà pleine, ou **imprimante thermique** (la page doit rester 100×150 ;
+   une bande déborderait sur l'étiquette suivante ou forcerait une réduction de l'étiquette, non mesurable
+   sans vraie imprimante — donc jamais).
+pdf.js injoignable ⇒ bande ou fiche (rien n'est posé à l'aveugle sur la page). Le choix manuel de l'aperçu
+reste revérifié (refus dit dans l'aperçu seulement) ; à l'impression un choix refusé retombe sur la recherche.
+La modale dit quand une fiche ou une bande a été utilisée (`TamponPose`, `data-tampon-pose`).
+⚠️ La passation du 28 oct. écrivait « l'utilisateur a explicitement refusé une bande ajoutée et toute
+réduction » : la bande ici n'est ni une réduction ni posée sur l'étiquette, elle n'existe qu'en imprimante
+normale quand rien d'autre ne tient ; si Julien la refuse, passer `tientA4` à faux ⇒ fiche partout.
+
+**Preuves** : banc `scripts/bancs/tampon-bordereau.cjs` (7 formes fabriquées × normale/thermique, (a) avec et
+(b) sans tampon par le même chemin, jugés sur le rendu pdf.js : texte présent et à l'endroit, pixels changés
+hors zones protégées et hors encre, bande = original intact à 1:1 + 40 pt, fiche = page d'origine intacte +
+100×150 juste après, thermique sans changement de taille) : **110 verts** ; code d'avant **18 rouges** ;
+mutations `marges0` 4, `bandeThermique` 8, `sansRotation` 2, `seuilStrict` 16 rouges. `BANC_REELS=dossier`
+pour rejouer des vrais PDF hors dépôt (fait sur les deux copies : InPost zone libre partout, Vinted/Hermes
+zone libre en A4, fiche en thermique). Voisins verts : `vestiaire-parite` (68), `ventes-bordereau`,
+`audit-impression` (0 rouge ; `--prouve` 4), `tests/bordereau-zone-protegee` réécrit pour la nouvelle règle ;
+`tests/bordereau-rendu-blanc` retiré (remplacé par le banc) ; `tests/bordereau-qr-lecture` et
+`bordereau-placement-interface` adaptés au nouveau chemin mais NON relancés ici (pdf.js 3.11 et jsqr
+introuvables hors réseau) ; `imprimante`, `lbc-bordereau`, `equipe` non lancés pour la même raison ;
+`lot-bordereaux` rouge AUSSI sur `main` (clic « Tout imprimer » qui n'aboutit pas, sans rapport).
+**Non mesuré** : une vraie impression thermique de la fiche et un scan transporteur.
+
+### « Commande mise à jour » : l'achat qui t'attend au point relais (3 nov.)
+Julien (3 nov. matin) : une série d'e-mails Vinted « Commande mise à jour pour <titre> » —
+« Ton achat t'attend au point relais MAISON DE LA PRESSE, 40 RUE DU PORT, 35260 CANCALE » —
+et AUCUN colis à retirer dans VRM : la famille était classée « connu-sans-action » depuis
+le 23 août (« le statut vient de la moisson »).
+**Mesuré (lecture seule)** sur 30 jours : 368 e-mails « Commande mise à jour », dont trois
+tournures d'ACHETEUR arrivé : « t'attend au point relais » (32), « t'attend ici : … Utilise le
+code X » (23, consignes, le code est DANS l'e-mail), « Ton colis a été livré dans le Point Relais
+… aller le récupérer » (34) — 58 colis (conversations) distincts. Les 9 du 2-3 nov. sont à
+Cancale (2 adresses de réception : sa boîte Gmail et un alias iCloud). Le corps gardé ne porte
+pas de n° de transaction ; le lien « Aller sur la conversation » passe par
+`links.vinted.com/t/<base64>` qui décode en `vinted.fr/inbox/<UUID>` — **ce UUID est le
+`conversation_id` de la commande** (`harvest_*_orders_purchased`) et le `user_msg_thread_id`
+de sa transaction (`harvest_*_txn_*`). 47 des 58 conversations sont celles d'une commande
+relevée ; **0 des 9 de Cancale** (commandes pas encore relues par l'extension sur ce compte).
+Les autres tournures (en route, à confirmer sous 24 h, remboursé, annulé, côté vendeur…)
+restent « sans action ».
+**Correctif** :
+- Règle unique `api/_lib/achat-arrive-relais.js` : `lireArriveeAchat` (sujet + 3 tournures,
+  lieu « NOM, RUE, CP VILLE » sans « , France », code seulement si écrit), `conversationVinted`
+  (lien direct ou base64 décodé ; deux conversations ⇒ aucune), `cleArrivee`
+  (`email_track_autre_conv-{UUID}`, sinon empreinte du Message-ID — jamais le titre),
+  `ligneArrivee` (une forme pour le serveur ET l'app ; première arrivée gardée, « retiré » jamais
+  redescendu, code/QR/limite déjà sus gardés), `achatParConversation`, `regrouperArrivees`.
+- `api/email-inbound.js` (0a, avant les transporteurs) : la ligne de colis à retirer
+  (carrier `autre`, `artTitle` = titre du sujet comme LIBELLÉ, `conv`, `source:
+  'vinted-commande'`, arrivée = date de l'e-mail, échéance inconnue) ; lecture ratée / écriture
+  ratée ⇒ 503 ; notification « 📍 Achat arrivé au point relais ».
+- App : `commandeDuColis` relie d'abord par la conversation ; `regrouperArrivees` dans
+  `pickupUnion` : deux lignes menant à la MÊME commande = un colis (celle du transporteur
+  garde son code, Vinted donne le libellé) ; une ligne Vinted SANS commande au même code postal
+  qu'une ligne de transporteur elle aussi sans commande ⇒ « à vérifier » (`doute_meme_relais`,
+  visible, jamais comptée deux fois), seule ⇒ à retirer. `colisKey` d'une ligne sans n° = sa
+  clé de ligne (deux achats au même titre ont le même sujet). `vrm_colis_retirer`, Ma journée
+  et le widget suivent par la publication existante.
+- Les e-mails DÉJÀ reçus : `src/arriveesRelues.js` relit (projection, 21 jours, ≤ 120 lignes ;
+  mesuré 75 lignes / 150 Ko aujourd'hui, la fenêtre se vide d'elle-même puisque les nouveaux
+  sont rangés par le serveur) le corps gardé `email_inconnu_*.brut` (JSON coupé à 2 000, le lien
+  y est) avec la MÊME règle ; une ligne déjà rangée par le serveur gagne ; rien n'est écrit.
+**Preuve** : `scripts/audit-achat-attend-relais.cjs` EXÉCUTE la route (fausse base, forme
+réelle ; e-mails fabriqués JSON et MIME quoted-printable) : 30 verts ; 23 rouges sur origin/main
+29433e61 ; mutations : clé par titre ⇒ 7, repli sur le titre dans `achatParConversation` ⇒ 1 (I6),
+doute retiré ⇒ 1, deux conversations ⇒ la première ⇒ 1. Voisins verts : `email-formes`,
+`retrait`, `identite`, `vestiaire-email`, `fonctions-api`, `coherence` ; `codes-retrait` (D) et
+`transporteurs` (1 mal aiguillé) rouges À L'IDENTIQUE sur origin/main (`@babel/parser` absent).
+Vérifié sur le corps réel d'une consigne Kusmi Tea (lecture seule, hors dépôt) : lieu, code,
+conversation lus.
+**Reste** : (1) l'affichage (Colis refait par `claude/journee-photos`) : une ligne `source:
+'vinted-commande'` porte `artTitle` (libellé), `conv`, `forme`, `consigne`, `code` éventuel ;
+la raison « à vérifier » `doute_meme_relais` est dite par `raisonAVerifier`. (2) Les anciens
+colis sans commande relevée et passés la garde ressortent « à vérifier » (jamais comptés) :
+c'est voulu (un colis caché est un colis perdu). (3) Le journal des e-mails range ces e-mails
+« à vérifier · sans n° de suivi » (règle de `resume-email`, inchangée). (4) Le widget et le
+rappel du matin ne voient que les lignes rangées par le serveur (pas la relecture) : ils
+reprennent la publication de l'app comme avant.

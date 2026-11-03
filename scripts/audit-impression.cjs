@@ -50,13 +50,15 @@ const parts = [
   ligne('MM_PT'), ligne('ETIQ_TH'), ligne('TAILLES_ETIQUETTE'), ligne('TH_MARGE'),
   morceau(/const TYPES_BORDEREAU = \[[\s\S]*?\n\];/, '`TYPES_BORDEREAU`'),
   bloc('relevePage'), bloc('_couperSelon'), bloc('estTailleEtiquette'), bloc('avecSens'), bloc('zoneEtiquette'),
-  bloc('posePrefsImpression'), bloc('drawBordereauStamp'), bloc('placementThermique'), bloc('poserEtiquettesThermiques'),
+  bloc('posePrefsImpression'), bloc('placementThermique'), bloc('poserEtiquettesThermiques'),
   bloc('poserBordereau'), bloc('typeBordereau'),
   // `espaceBlancBordereau` (28 oct.) cherche une zone BLANCHE en dessinant la page
   // avec pdf.js dans un canvas : rien de ça n'existe hors d'un navigateur. Cet
   // audit juge la DÉCOUPE et la taille des pages, pas la place du numéro (le banc
   // `imprimante.cjs` la rend dans Chromium) : une place fixe, vérifiée, suffit ici.
-  'const espaceBlancBordereau = async (pdf, avecTitre = false) => ({ x: 20, y: 20, w: avecTitre ? 160 : 84, h: avecTitre ? 38 : 28, verifie: true });',
+  // (3 nov.) Le tampon (zone libre / bande / fiche) est jugé par le banc
+  // `tampon-bordereau.cjs`, rendu par pdf.js dans Chromium : ici un tampon neutre.
+  'const tamponnerBordereau = async () => ({ mode: \'blanc\', raison: \'\' });',
 ];
 
 let R = null;
