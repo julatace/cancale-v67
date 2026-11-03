@@ -106,6 +106,8 @@ html body .vrm-chat-panel .vrm-chat-offre-actions { display: grid !important; gr
 html body .vrm-chat-panel .vrm-chat-offre-actions > .vrm-chat-btn { min-height: 44px !important; border-radius: 12px !important; border: 1px solid var(--vrm-line) !important; background: var(--vrm-bg) !important; color: var(--vrm-ink) !important; font: 600 15px/1 var(--vrm-police, inherit) !important; box-shadow: none !important; padding: 0 8px !important; white-space: nowrap; }
 html body .vrm-chat-panel .vrm-chat-offre-actions > .vrm-chat-btn-p { background: var(--vrm-ink) !important; color: var(--vrm-bg) !important; border-color: var(--vrm-ink) !important; }
 html body .vrm-chat-panel .vrm-chat-offre-actions > .vrm-chat-btn:disabled { opacity: .5; }
+html body .vrm-chat-panel .vrm-chat-offre-actions:has(> [data-offre-geste="proposer"]) { grid-template-columns: minmax(0, .8fr) minmax(0, 1.4fr) minmax(0, .8fr) !important; }
+html body .vrm-chat-panel .vrm-chat-offre-actions > [data-offre-geste="proposer"] { padding: 0 6px !important; }
 
 /* Le pied : pastilles de réponses rapides, champ, micro, envoyer cobalt rond. */
 html body .vrm-chat-panel .vrm-chat-foot { background: var(--vrm-bg) !important; border-top: 0 !important; padding: 10px 22px 14px !important; }

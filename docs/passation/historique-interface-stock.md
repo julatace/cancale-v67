@@ -3444,3 +3444,32 @@ Choix de Julien (3 nov.), dans cet ordre, style Fusion, sans texte explicatif.
   photo ni identité, histoire datée — vert ; **rouge sur origin/main**. `fiche-paire` remis à l'ordre de
   l'histoire (vert). Le retour « Tout sur le N° » ne se coupe plus mot à mot (`nowrap`, défaut de main).
 - **Geste de Julien** : essayer « Changer le prix » sur un N° en ligne sur Vinted + eBay ; créer un modèle.
+
+
+### Vérifier une annonce avant de la publier (3 novembre)
+Choisie par Julien parmi trois améliorations. Au moment de « Publier sur Leboncoin » (la
+fiche), « Publier sur eBay » (les deux chemins, dont « en un clic »), « Préparer / Publier sur
+Vestiaire » et « Republier » (le lancement du lot), une feuille courte : une ligne par problème
++ le geste qui le corrige ; **« Corriger »** (ferme, rien n'est envoyé) ou **« Publier quand
+même »**. Rien à dire ⇒ aucune feuille, l'envoi part comme avant.
+- Règle pure `src/verifAnnonce.js` (`problemesAnnonce`, `problemesLot`) : moins de 3 photos ;
+  taille absente (pas pour sacs/accessoires/bijoux, `familleArticle`) ; prix sous le prix
+  d'achat CONNU (`prixAchatDe`, jamais deviné) ; titre trop long — limites MESURÉES dans le
+  code : Leboncoin 50 (`LBC_TITRE_MAX`), eBay 80 (champ de mise en vente, `EBAY_TITRE_MAX`),
+  Vinted 100 (refus de `recreerVinted`) ; Vestiaire : aucune limite connue ⇒ pas jugé ;
+  marque absente ; catégorie absente (Leboncoin `categorieLbcDe`, eBay catégorie choisie ;
+  Vestiaire et Vinted : pas lue ⇒ pas jugée). Un champ non lu (`undefined`) n'est jamais jugé.
+  **Aucun prix conseillé** (refusé le 11 oct.) : seuls le prix et SON prix d'achat s'écrivent.
+- La feuille vit dans `ConfirmHost` (`kind: 'verif'`, portail `Z_CONFIRMATION`),
+  `verifierAvantPublication(lignes)`. Republier juge le titre et le prix QUI PARTIRONT
+  (l'aperçu), le nombre de photos du dressing (`photoCount`), taille et marque lues.
+- La file Leboncoin porte maintenant `achat` (le prix d'achat de la fiche du N°).
+- **Preuves** : `audit-verif-annonce.cjs` (règle exécutée + les 4 points d'entrée vérifient
+  AVANT l'envoi) — 12 rouges sur origin/main, `--prouve` 11/11 mutations ; banc
+  `bancs/verif-publication.cjs` (390 et 1512 sombre, données inventées) : 5 problèmes une
+  ligne chacun, rien n'est envoyé avant la réponse, aucun montant autre que 30 € / 45 €,
+  « Corriger » n'envoie rien, « Publier quand même » envoie `lbcPublier` une fois, un article
+  propre part sans feuille — 12 rouges sur le build de main. Bancs `publier`, `vc-publier`,
+  `republier` : la feuille (photos) est passée par « Publier quand même », verts ;
+  `lbc-publier-app` vert sans changement (fiche propre).
+- Geste de Julien : publier un article à une seule photo pour voir la feuille.

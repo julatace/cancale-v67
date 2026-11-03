@@ -1,44 +1,45 @@
-// « LE BOOST EST-IL RENTABLE ? » — la règle, pure (21 octobre).
+// « LE BOOST EST-IL RENTABLE ? » — la règle, pure (21 octobre ; refaite le
+// 3 novembre, choisie par Julien parmi trois améliorations).
 //
-// Fonction retenue par Julien le 11 octobre. Un REPÈRE, jamais de la compta :
-// rien de ce qui sort d'ici n'entre dans un total, un rapport ni un export.
+// Un REPÈRE, jamais de la compta : rien de ce qui sort d'ici n'entre dans un
+// total, un rapport ni un export.
 //
-// MESURÉ AVANT DE CODER (sa base, lecture seule, 21 octobre) :
-//   • `promoted` (boost EN COURS, dans le dressing) : 0 `true` sur 380 annonces,
-//     347 `false`, 33 sans le champ ;
-//   • le champ « Boost payé » de l'écran Annonces (`vinted_annonce_numeros[id].fees`) :
-//     0 fiche sur 478 ;
-//   • le diagnostic de l'extension (`boost_forme`) n'a vu que `bumps`
-//     (`minimum_price.has_free_bumps`) : aucun montant par article ; les
-//     porte-monnaie (`invoice_lines`) ne portent aucune ligne de boost.
-//   ⇒ Aujourd'hui l'écran dira « pas assez de ventes pour juger ». C'est juste.
+// MESURÉ AVANT DE CODER (sa base, lecture seule) :
+//   • 21 oct. : `promoted` (boost EN COURS, dans le dressing) : 0 `true` sur 380
+//     annonces ; aucun montant par article chez Vinted ni dans les porte-monnaie ;
+//   • 3 nov. : le « Boost payé » saisi dans la fiche (`vinted_annonce_numeros
+//     [id].fees`) : 0 fiche sur 1 005 (trois comptes VRM).
+//   ⇒ Aujourd'hui la carte dit « pas assez de données ». C'est juste.
+//
+// LA QUESTION (3 nov.) : les articles boostés se vendent-ils plus, plus vite,
+// plus cher — boost déduit — que les articles NON boostés du MÊME modèle sûr,
+// mis en ligne sur la MÊME période ?
 //
 // LES RÈGLES :
-//   • une vente se relie à SON annonce par la transaction (`txn[tx].item`) —
-//     jamais par le titre (§5). Sans annonce reliée : comptée à part ;
-//   • boostée = l'annonce porte `promoted === true` OU un montant « Boost payé »
-//     saisi (> 0). Non boostée = `promoted === false` ET aucun montant saisi.
-//     `promoted` absent et rien de saisi = « pas su », ni d'un côté ni de l'autre ;
-//   • on ne compare que des paires de MÊME TRANCHE DE PRIX : seules les tranches
-//     où il y a des deux côtés comptent ;
-//   • moins de SEUIL ventes d'un côté ⇒ aucune conclusion, aucun chiffre comparé ;
-//     chaque mesure a en plus sa propre couverture (une mesure dont un côté a
-//     moins de SEUIL valeurs connues vaut `null` = « — ») ;
-//   • la marge d'une boostée exige son montant saisi (sinon le coût du boost est
-//     inconnu ⇒ pas de marge) et son prix d'achat ; celle d'une non boostée, son
-//     prix d'achat.
-export const SEUIL_BOOST = 5;
-export const TRANCHES_BOOST = [
-  { k: 't0', de: 0, a: 30, lib: 'moins de 30 €' },
-  { k: 't1', de: 30, a: 60, lib: '30 à 60 €' },
-  { k: 't2', de: 60, a: 100, lib: '60 à 100 €' },
-  { k: 't3', de: 100, a: Infinity, lib: '100 € et plus' },
-];
-export const trancheBoost = (eur) => {
-  const n = Number(eur);
-  if (!Number.isFinite(n) || n <= 0) return null;
-  return TRANCHES_BOOST.find((t) => n >= t.de && n < t.a) || null;
-};
+//   • la population : les ANNONCES (vendues ou non) mises en ligne dans la
+//     période [de, a[ — une annonce sans date de mise en ligne est comptée à
+//     part (`sansDate`) ;
+//   • boostée = un « Boost payé » saisi (> 0) OU `promoted === true` (Vinted le
+//     dit pendant le boost) ; non boostée = `promoted === false` ET aucun
+//     montant ; `promoted` absent et rien de saisi = « pas su », ni d'un côté ni
+//     de l'autre (`inconnues`) ;
+//   • le modèle : `modeleDe(annonce)` (injecté : `modeleSur` de
+//     src/ceQuiRapporte.js — marque + modèle SÛRS, jamais une identité) ; sans
+//     modèle sûr ⇒ comptée à part (`sansModele`) ;
+//   • on ne compare QUE les modèles qui ont des deux côtés ;
+//   • vendue = une vente (non annulée, compte non écarté) reliée à SON annonce
+//     par la transaction (`txn[tx].item`) — jamais par le titre (§5) ;
+//   • moins de SEUIL_BOOST boostées comparables ⇒ AUCUNE conclusion, aucun
+//     chiffre comparé (`assez: false`) ;
+//   • « vendues » : part des annonces vendues ; « délai » : médiane mise en
+//     ligne → vente des vendues ; « prix » : médiane du prix de vente, BOOST
+//     DÉDUIT pour une boostée (sans montant saisi, son coût est inconnu : elle
+//     ne compte pas dans ce prix, la couverture le dit) ; une mesure sans
+//     aucune valeur d'un côté vaut `null` (« — ») ;
+//   • le coût : la somme des boosts SAISIS des boostées comparables, avec sa
+//     couverture (`avecMontant` sur `comparables.b`).
+export const SEUIL_BOOST = 3;
+const J = 86400000;
 // « 3,50 » · « 3.5 » · 3.5 → 3.5 ; vide, illisible, ≤ 0 → null.
 export const montantBoostSaisi = (v) => {
   if (v == null || String(v).trim() === '') return null;
@@ -50,57 +51,67 @@ const mediane = (xs) => {
   const s = xs.slice().sort((a, b) => a - b);
   return s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2;
 };
-const moyenne = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
+const c2 = (v) => Math.round(v * 100) / 100;
 
-// ventes : les ventes Vinted (o.transaction_id, o.date, o.price…)
-// txn    : { [tx]: { item } } | null (null = pas su)
-// items  : { [itemId]: { id, promoted, views, favourites, createdTs } } | null
-// fiches : vinted_annonce_numeros ({ [itemId]: { fees, buyPrice, numero } }) | null
-// injectés : estAnnulee(o), ecarte(o), montantVente(o), dateMiseEnLigne(it), prixAchat(fiche)
-export function boostRentable({ ventes, txn, items, fiches, estAnnulee, ecarte, montantVente, dateMiseEnLigne, prixAchat }) {
-  if (!Array.isArray(ventes) || txn == null || items == null || fiches == null) return { etat: 'passu' };
-  const garde = ventes.filter((o) => o && !(estAnnulee && estAnnulee(o)) && !(ecarte && ecarte(o)));
-  const R = { etat: 'lu', total: garde.length, sansAnnonce: 0, inconnues: 0, boostees: 0, avecMontant: 0, coutBoost: 0, nonBoostees: 0, horsTranche: 0 };
-  let coutC = 0;   // (31 oct.) la somme des boosts SAISIS des paires vendues, en centimes — couverture `avecMontant` sur `boostees`
-  const lignes = [];
-  for (const o of garde) {
+// annonces : { [itemId]: { id, brand, title, promoted, createdTs } } | null (null = pas su)
+// ventes   : les ventes Vinted (o.transaction_id, o.date, o.price…) | null
+// txn      : { [tx]: { item } } | null
+// fiches   : vinted_annonce_numeros ({ [itemId]: { fees } }) | null
+// de, a    : la période (ms), [de, a[
+// injectés : modeleDe(it) → { cle, nom } | null, dateMiseEnLigne(it) → ms | null,
+//            estAnnulee(o), ecarte(o), montantVente(o)
+export function boostRentable({ annonces, ventes, txn, fiches, de, a, modeleDe, dateMiseEnLigne, estAnnulee, ecarte, montantVente }) {
+  if (annonces == null || !Array.isArray(ventes) || txn == null || fiches == null) return { etat: 'passu' };
+  // La vente de chaque annonce, par SA transaction.
+  const venteDe = new Map();
+  for (const o of ventes) {
+    if (!o || (estAnnulee && estAnnulee(o)) || (ecarte && ecarte(o))) continue;
     const tx = String(o.transaction_id || '');
-    const itemId = tx && txn[tx] && txn[tx].item ? String(txn[tx].item) : '';
-    const it = itemId ? items[itemId] : null;
-    if (!it) { R.sansAnnonce += 1; continue; }
-    const fiche = fiches[itemId] || null;
-    const boost = montantBoostSaisi(fiche && fiche.fees);
-    const cote = (it.promoted === true || boost != null) ? 'b' : (it.promoted === false ? 'nb' : null);
-    if (!cote) { R.inconnues += 1; continue; }
-    if (cote === 'b') { R.boostees += 1; if (boost != null) { R.avecMontant += 1; coutC += Math.round(boost * 100); } } else R.nonBoostees += 1;
-    const prix = Number(montantVente(o));
-    const t = trancheBoost(prix);
-    if (!t) { R.horsTranche += 1; continue; }
-    const enLigne = dateMiseEnLigne ? dateMiseEnLigne(it) : null;
-    const vendu = Date.parse(o.date || '');
-    const delai = (enLigne != null && vendu > 0 && vendu >= enLigne) ? (vendu - enLigne) / 86400000 : null;
-    const achat = prixAchat ? prixAchat(fiche) : null;
-    const coutBoost = cote === 'b' ? boost : 0;
-    const marge = (achat != null && coutBoost != null) ? Math.round((prix - achat - coutBoost) * 100) / 100 : null;
-    lignes.push({ cote, t: t.k, delai, vues: Number.isFinite(it.views) ? it.views : null, favoris: Number.isFinite(it.favourites) ? it.favourites : null, marge });
+    const item = tx && txn[tx] && txn[tx].item ? String(txn[tx].item) : '';
+    if (!item) continue;
+    const t = Date.parse(o.date || '');
+    const prev = venteDe.get(item);
+    if (!prev || (t > 0 && t < prev.t)) venteDe.set(item, { t: t > 0 ? t : null, prix: Number(montantVente(o)) });
   }
-  R.coutBoost = coutC / 100;
-  const parT = {};
-  for (const l of lignes) { const e = parT[l.t] || (parT[l.t] = { b: 0, nb: 0 }); e[l.cote] += 1; }
-  R.tranches = TRANCHES_BOOST.map((t) => ({ k: t.k, lib: t.lib, b: (parT[t.k] || {}).b || 0, nb: (parT[t.k] || {}).nb || 0 })).filter((t) => t.b || t.nb);
-  const communes = new Set(R.tranches.filter((t) => t.b > 0 && t.nb > 0).map((t) => t.k));
-  const comp = lignes.filter((l) => communes.has(l.t));
-  R.comparables = { b: comp.filter((l) => l.cote === 'b').length, nb: comp.filter((l) => l.cote === 'nb').length };
-  R.assez = R.comparables.b >= SEUIL_BOOST && R.comparables.nb >= SEUIL_BOOST;
-  const mesure = (champ, f) => {
-    const vb = comp.filter((l) => l.cote === 'b' && l[champ] != null).map((l) => l[champ]);
-    const vnb = comp.filter((l) => l.cote === 'nb' && l[champ] != null).map((l) => l[champ]);
-    const ok = R.assez && vb.length >= SEUIL_BOOST && vnb.length >= SEUIL_BOOST;
-    return { nb: vb.length, nnb: vnb.length, b: ok ? f(vb) : null, nonb: ok ? f(vnb) : null };
-  };
-  R.delai = mesure('delai', mediane);
-  R.vues = mesure('vues', moyenne);
-  R.favoris = mesure('favoris', moyenne);
-  R.marge = mesure('marge', mediane);
+  const R = { etat: 'lu', total: 0, sansDate: 0, inconnues: 0, sansModele: 0, boostees: 0, nonBoostees: 0 };
+  const lignes = [];
+  for (const id of Object.keys(annonces)) {
+    const it = annonces[id];
+    if (!it) continue;
+    const enLigne = dateMiseEnLigne ? dateMiseEnLigne(it) : null;
+    if (enLigne == null) { R.sansDate += 1; continue; }
+    if (!(enLigne >= de && enLigne < a)) continue;
+    R.total += 1;
+    const boost = montantBoostSaisi(fiches[String(id)] && fiches[String(id)].fees);
+    const cote = (boost != null || it.promoted === true) ? 'b' : (it.promoted === false ? 'nb' : null);
+    if (!cote) { R.inconnues += 1; continue; }
+    if (cote === 'b') R.boostees += 1; else R.nonBoostees += 1;
+    const m = modeleDe ? modeleDe(it) : null;
+    if (!m || !m.cle) { R.sansModele += 1; continue; }
+    const v = venteDe.get(String(id)) || null;
+    const delai = v && v.t != null && v.t >= enLigne ? (v.t - enLigne) / J : null;
+    const prix = v && Number.isFinite(v.prix) && v.prix > 0 ? v.prix : null;
+    lignes.push({ cote, modele: m.cle, nom: m.nom, vendu: !!v, delai, prix, boost: cote === 'b' ? boost : 0 });
+  }
+  const cotes = new Map();
+  for (const l of lignes) { const e = cotes.get(l.modele) || { b: 0, nb: 0, nom: l.nom }; e[l.cote] += 1; cotes.set(l.modele, e); }
+  const communs = new Set([...cotes].filter(([, e]) => e.b > 0 && e.nb > 0).map(([k]) => k));
+  const comp = lignes.filter((l) => communs.has(l.modele));
+  const B = comp.filter((l) => l.cote === 'b'), N = comp.filter((l) => l.cote === 'nb');
+  R.comparables = { b: B.length, nb: N.length };
+  R.modeles = [...communs].map((k) => cotes.get(k).nom).sort();
+  R.assez = B.length >= SEUIL_BOOST;
+  const avecMontant = B.filter((l) => l.boost != null && l.boost > 0);
+  R.avecMontant = avecMontant.length;
+  R.cout = avecMontant.length ? c2(avecMontant.reduce((s, l) => s + l.boost, 0)) : null;
+  if (!R.assez) { R.vendues = R.delai = R.prix = null; return R; }
+  const vb = B.filter((l) => l.vendu), vn = N.filter((l) => l.vendu);
+  R.vendues = { b: vb.length, nb: vn.length, nB: B.length, nN: N.length, tb: vb.length / B.length, tnb: vn.length / N.length };
+  const db = vb.map((l) => l.delai).filter((x) => x != null), dn = vn.map((l) => l.delai).filter((x) => x != null);
+  R.delai = { b: mediane(db), nb: mediane(dn), nb_b: db.length, nb_nb: dn.length };
+  // Le prix de vente d'une boostée, BOOST DÉDUIT : il faut son montant saisi.
+  const pb = vb.filter((l) => l.prix != null && l.boost != null).map((l) => c2(l.prix - l.boost));
+  const pn = vn.map((l) => l.prix).filter((x) => x != null);
+  R.prix = { b: mediane(pb), nb: mediane(pn), nb_b: pb.length, nb_nb: pn.length, sansMontant: vb.filter((l) => l.prix != null && l.boost == null).length };
   return R;
 }

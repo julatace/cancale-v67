@@ -229,13 +229,14 @@ const ouvrir = async (b, vp, sombre) => {
           dit(m.verif && m.verif.n === '3' && !m.verif.ouvert, '« À vérifier · 3 » replié', JSON.stringify(m.verif));
                     dit(m.enRoute === '13', '« En route » (13 sans point) replié à la fin', m.enRoute);
           // Les villes : lues dans l'adresse (CP + ville) ; choisir une ville filtre la liste, la carte sombre suit,
-          // « Lieu à confirmer » ne reste que dans « Toutes » ; le choix est retenu.
+          // (3 nov., 19 h) « Lieu à confirmer » RESTE visible quand une ville est choisie (un colis caché est un
+          // colis perdu) ; le nombre de la ville = ses colis seuls ; le choix est retenu.
           const vil = await pg.evaluate(() => [...document.querySelectorAll('[data-retirer-villes] [data-ville]')].map((b) => ({ v: b.getAttribute('data-ville'), n: b.getAttribute('data-ville-n'), txt: b.textContent })));
           dit(vil.length >= 3 && vil[0].v === '' && vil.some((x) => x.v === 'cancale') && vil.some((x) => x.v === 'vannes'), 'sélecteur « Toutes · Cancale · … » (villes lues dans l’adresse)', JSON.stringify(vil));
           const vC = vil.find((x) => x.v === 'cancale');
           await pg.locator('[data-retirer-villes] [data-ville="cancale"]').first().click(); await pg.waitForTimeout(500);
-          const f = await pg.evaluate(() => ({ lignes: [...document.querySelectorAll('.vrm-rpf [data-cc-carte]:not([data-hors-compte])')].length, inconnu: !!document.querySelector('.vrm-rpf-point.is-inconnu'), carte: (document.querySelector('[data-fu-colis-retirer]') || { getAttribute: () => null }).getAttribute('data-fu-colis-retirer'), memo: localStorage.getItem('vrm_retirer_ville'), pts: [...document.querySelectorAll('.vrm-rpf-point:not(.vrm-rpf-verifier) [data-relais-adresse]')].map((x) => x.textContent) }));
-          dit(vC && f.lignes === Number(vC.n) && f.carte === vC.n && f.pts.every((a) => /Cancale/i.test(a)) && !f.inconnu, 'Cancale choisie : sa liste seule, la carte sombre dit son nombre, pas de « Lieu à confirmer »', JSON.stringify(f));
+          const f = await pg.evaluate(() => ({ lignes: [...document.querySelectorAll('.vrm-rpf .vrm-rpf-point:not(.is-inconnu) [data-cc-carte]:not([data-hors-compte])')].length, nInconnu: [...document.querySelectorAll('.vrm-rpf .vrm-rpf-point.is-inconnu [data-cc-carte]')].length, inconnu: !!document.querySelector('.vrm-rpf-point.is-inconnu'), carte: (document.querySelector('[data-fu-colis-retirer]') || { getAttribute: () => null }).getAttribute('data-fu-colis-retirer'), memo: localStorage.getItem('vrm_retirer_ville'), pts: [...document.querySelectorAll('.vrm-rpf-point:not(.vrm-rpf-verifier) [data-relais-adresse]')].map((x) => x.textContent) }));
+          dit(vC && f.lignes === Number(vC.n) && f.carte === vC.n && f.pts.every((a) => /Cancale/i.test(a)) && f.inconnu && f.nInconnu === 1, 'Cancale choisie : ses points seuls, la carte sombre dit son nombre, « Lieu à confirmer » (1) reste visible', JSON.stringify(f));
           dit(f.memo === 'cancale', 'le choix de ville est retenu', f.memo);
           if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `retirer-ville-cancale-${nom}.png`) });
           await pg.locator('[data-retirer-villes] [data-ville=""]').first().click(); await pg.waitForTimeout(400);

@@ -2818,3 +2818,81 @@ c'est voulu (un colis caché est un colis perdu). (3) Le journal des e-mails ran
 « à vérifier · sans n° de suivi » (règle de `resume-email`, inchangée). (4) Le widget et le
 rappel du matin ne voient que les lignes rangées par le serveur (pas la relecture) : ils
 reprennent la publication de l'app comme avant.
+
+## 3 novembre (soir) — Les villes des colis à retirer : lues, reconnues, jamais devinées (branche `claude/villes-colis`)
+
+Julien (3 nov., 18 h 59) : « pour les colis ce n'est pas encore parfait, il ne reconnaît pas les
+villes, c'est chiant, l'app doit être intelligente ».
+
+**Mesuré sur sa base (lecture seule, 30 jours ; aucune donnée réelle dans le dépôt).**
+Les 47 e-mails « disponible » (`email_track_*`, statut `available`) :
+
+| forme du lieu rangé | e-mails | ville avant | cause |
+|---|---|---|---|
+| consigne **Vinted Go** « Consigne Vinted Go, <enseigne>, 13 Rue … » (19 Kusmi Tea, 3 Speed Queen) | 22 | **aucune** | Vinted Go n'écrit JAMAIS de code postal (e-mail : « … / 13 Rue Saint-Vincent / Vannes, France » ; suivi : « 13 Rue Saint-Vincent, Vannes, FR ») ; `villeDuPoint` ne lisait la ville qu'APRÈS un code postal ⇒ « Vannes » LUE était jetée |
+| Mondial Relay **nom seul** (« TABA'VAP » 6, « PHONE CASH » 2, « LOCKER 24/7 SUPER U » 1) | 9 | par la relecture du texte gardé (2 nov.) seulement | ligne vide entre chaque ligne de l'e-mail ; le texte gardé existe pour les 9 |
+| code postal + ville (Mondial Relay « …, 35260 CANCALE » 8, Chronopost « …, 56000 VANNES » 4) | 12 | oui | — (casse « CANCALE »/« Cancale » déjà ramenée) |
+| aucun lieu (dont « Où vous livrer en cas de point indisponible ? » rangé « arrivé ») | 4 | — | rien à lire : « Lieu à confirmer » (juste) |
+| code postal SANS ville | 0 | — | jamais vu chez lui (forme tenue quand même) |
+
+Les 26 conversations (`panel_colis_relais`) et les ~70 e-mails Vinted « t'attend / livré dans le
+Point Relais » portent TOUS code postal + ville (« Kusmi Tea, 13 Rue Saint-Vincent, 56000 Vannes,
+France ») — ils décrivent les MÊMES points que les e-mails Vinted Go sans code postal.
+Les 18 colis comptés ce soir (`vrm_colis_retirer`) : 8 Maison de la Presse (Cancale), 2 consignes
+Kusmi Tea, 4 arrivées Vinted (Speed Queen ×2, Kusmi ×2), 1 locker Super U (nom seul), Terra Cbd,
+Tabavap (conversation), 1 sans lieu. Les 2 consignes Kusmi n'avaient une ville que par CHANCE (deux
+autres colis du même nom avec code postal présents au même moment, `regrouperRelais`) ; sans eux,
+« Vannes » disparaissait du sélecteur. Et **choisir une ville CACHAIT** « Lieu à confirmer » et tout
+point sans ville. Sur `cleanLieu`, `\b` ignorait les lettres accentuées : « BretonnièRe », « ThÉ ».
+
+**Correctif — une règle, `src/villeRelais.js`** (pure ; le serveur ne range rien par ville : aucune copie) :
+- `normVille` : casse, accents, tirets, apostrophes, « St »/« Ste », CEDEX, arrondissements de
+  Paris/Lyon/Marseille ; un pays ou un nombre n'est pas une ville. `joliNomVille` : la plus lisible des
+  écritures LUES (« Saint-Malo » plutôt que « ST MALO »), jamais un accent ajouté.
+- `villeDuPoint` : la ville LUE, avec ou sans code postal ; code postal seul ⇒ la **table officielle**
+  (Base Adresse, `type=municipality&postcode=` exact, déjà dans la CSP ; `communesDepuisBan`, rangée
+  dans `vrm_cp_communes_v1`) — une commune ⇒ son nom, plusieurs ⇒ **le code postal seul (« 35350 »)** ;
+  table pas encore lue ⇒ la ville du géocodage SÛR au même code postal (`jugerBan` rend maintenant
+  `ville`/`cp` du résultat ; un repère rangé sans eux est recherché une fois) ; sinon « 29000 ».
+- `villesDesPoints` : une ville = un bouton, le nombre = colis COMPTÉS de ses points ; deux homonymes de
+  deux départements = deux boutons ; `pointsSansVille` les nomme.
+- `registrePointsConnus` + `completerParPointConnu` : un lieu sans code postal reprend l'adresse du
+  MÊME point déjà lu (tous les `email_track_*` quel que soit l'état, toutes les conversations, les
+  lectures `transp_*`) — même nom propre, même transporteur et même compte quand les deux sont connus
+  (« autre » = pas su), même rue / même ville quand le lieu les donne — **seulement si ce nom ne désigne
+  qu'UN point connu** ; deux points du même nom ⇒ rien ; un conflit d'adresses (`lieuConflit`) ⇒ rien.
+- `lieuLePlusComplet` / `memePoint` : deux sources du MÊME colis (même n° de suivi — `fusionLignesMemeSuivi`
+  —, ou la conversation de SON achat relié par identité) qui nomment le même point : l'adresse complète
+  gagne ; deux points différents ⇒ rien d'échangé.
+- `regrouperRelais` : un lieu sans code postal ne rejoint plus le même nom dans une AUTRE ville ni à une
+  AUTRE rue (le « reste (2) » du 2-3 nov.).
+- `src/CarteRelais.jsx` : `villeDuPoint`/`villesDesPoints` = la règle + ses deux sources de CE navigateur
+  (la carte sombre de Colis et le sélecteur lisent la même) ; `useCommunesCp` ; les repères de TOUS les
+  points ; une ville choisie garde « Lieu à confirmer » et met un point sans ville dessous, AVEC son nom
+  (les sections disent le nombre de la ville, comme la carte sombre) ; `data-relais-ville` sur chaque point.
+- `src/App.jsx` : registre et complétion dans les cartes « À retirer » (e-mails, conversations, à vérifier,
+  à confirmer) ; `titleCasePR` sans `\b` (majuscule seulement en début de mot).
+
+**Résultat sur ses formes** : 43 des 47 e-mails du mois ont une ville par la règle (avant : 21, et 0
+consigne Vinted Go) ; les 4 restants n'ont aucun lieu écrit ⇒ « Lieu à confirmer ». Ce soir : 17 des 18
+colis comptés ont une ville sans dépendre d'un autre colis (Cancale 9 · Vannes 8) ; le 18e est l'e-mail
+« Où vous livrer en cas de point indisponible ? » (n° 79566801) rangé « arrivé » à tort — classement à
+revoir (hors de ce chantier : le suivi Mondial Relay le dit encore « en route »).
+
+**Preuves** : `scripts/audit-villes-colis.cjs` EXÉCUTE la règle sur des lieux fabriqués de chaque forme
+(A clé de ville · B ville d'un point · C sélecteur · D point connu · E deux sources · F bout à bout · G
+autre ville · H branchement) : 50 verts ; **32 rouges sur origin/main 300d030c** (`--racine`, ancien
+`villeDuPoint` de CarteRelais) ; 7 mutations rouges (CP à plusieurs communes deviné 3 · homonyme pris 3 ·
+ville sans CP jetée 4 · transporteur ignoré 1 · « St » ≠ « Saint » 3 · autre ville rejointe 1 · adresse
+la moins complète 1). Banc NOUVEAU `scripts/bancs/colis-villes.cjs` (390 tactile + 1512) : 46 verts,
+**30 rouges sur le build d'origin/main** (on y voit « Cancale 3 · Saint-Malo 1 · St Malo 1 », ni Vannes
+ni Huelgoat ni 35350, « ThÉ Bleu ») ; mutation « point sans ville caché » ⇒ 2 rouges ; captures regardées.
+`colis-retirer-propre` : son attendu « pas de Lieu à confirmer quand une ville est choisie » est
+INVERSÉ (il doit rester visible) — 117 verts. Verts : `retrait-autre-ville`, `colis-colonnes`,
+`journee-photos`, audits `relais-carte`, `vintedgo-adresse` (regex du branchement mises à la nouvelle
+signature `lieuDeLigne(t, a)`), `colis-retrait`, `codes-retrait`, `retrait-fiable`, `achat-attend-relais`,
+`coherence`, `identite`. `retrait-carte` (3) et `retrait-relais-carte` (6) : rouges À L'IDENTIQUE sur
+origin/main (anciens écrans d'avant Colis en onglets), non touchés.
+
+**Geste de Julien** : aucun. Rouvrir Colis → À retirer : un bouton par ville, la consigne Vinted Go
+sous Vannes, « Lieu à confirmer » toujours là quand une ville est choisie.
