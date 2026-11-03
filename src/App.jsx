@@ -159,7 +159,7 @@ import { achatParIdentite, propositionPrixAchat, propositionsUniques, listeConfi
 import { donneesRecapMois, csvRecapMois, pdfRecapMois, libelleMois, nomFichierRecap } from "./recapMois.js";
 import { CATEGORIES_DEPENSE, idTicket, montantDuTicket, texteMontantSaisie, texteDuTicket } from "./depensesTicket.js";
 import { produitsANumeroter, attribuerNumerosVc, carteNumerosVc } from "./numerosVestiaire.js";
-import { sitesDuNumero, appliquerPrix, noterJournalPrix } from "./prixPartout.js";
+import { sitesDuNumero, appliquerPrix, noterJournalPrix, envoisPrix } from "./prixPartout.js";
 import { champsSource, dupliquerFiche, fichesAPublier, texteAColler } from "./dupliquerFiche.js";
 import { histoireArticle, offresDeConversation } from "./histoireArticle.js";
 import { CLE_MODELES, lireModeles } from "./modelesDescription.js";
@@ -15318,19 +15318,7 @@ const sitesPrixDe = (k, rn, extra) => sitesDuNumero(k, { rn, fiches: load('vinte
   numVc: (id, it) => numeroVcIdentite(id, it, extra ? extra.vcLiens : null),
 });
 // Les envois, appelés UNIQUEMENT par « Appliquer » (src/PrixPartout.jsx).
-const ENVOIS_PRIX = {
-  ebay: async (s, p) => {
-    const r = resultatReviseEbay(await appelEbay({ action: 'revise', itemId: s.id, price: String(p), prixVu: s.prix, confirme: true, ...corpsCompteEbay(s.compte) }));
-    return { etat: r.etat === 'ok' ? 'fait' : r.etat === 'ko' ? 'refuse' : 'incertain', raison: r.msg || null };
-  },
-  vinted: async (s, p) => {
-    if (!s.compte) return { etat: 'refuse', raison: 'compte introuvable' };
-    const r = await vmrCmdSuivi({ cmd: 'republierVinted', uid: s.compte, id: s.id, prix: p, confirme: true }, 60000);
-    if (r.sansReponse) return { etat: 'incertain', raison: TEXTE_SANS_REPONSE };
-    if (r && r.accepte && r.etape === 'fait') return { etat: 'fait', raison: null, ancien: r.ancien, nouveau: r.nouveau };
-    return { etat: 'refuse', raison: (r && (r.raison || r.error)) || "l'extension n'a pas répondu" };
-  },
-};
+const ENVOIS_PRIX = envoisPrix({ appelEbay: (c) => appelEbay(c), resultatReviseEbay: (x) => resultatReviseEbay(x), corpsCompteEbay: (c) => corpsCompteEbay(c), vmrCmdSuivi: (p, t) => vmrCmdSuivi(p, t), sansReponse: TEXTE_SANS_REPONSE });
 // DUPLIQUER : une fiche neuve (`vrm_fiches_neuves`), un N° neuf (`prochainLibre`
 // sur TOUS les numéros servis, réservés compris), aucune photo, aucune identité.
 // Rend { ok, numero } ou { ok:false, raison }. Rien sur « pas su ».

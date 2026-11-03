@@ -135,3 +135,23 @@ export function noterJournalPrix(journal, cle, prix, sites, res, maintenant = ne
   j[cle] = l;
   return j;
 }
+
+// Les envois, construits avec les règles de l'app (§11) : `appelEbay` (route
+// `revise`, confirmée, au prix VU), `resultatReviseEbay` (trois issues),
+// `corpsCompteEbay`, `vmrCmdSuivi` (commande `republierVinted` de l'extension,
+// PUT en place, confirmée) et le texte « pas de réponse ».
+export function envoisPrix(dep) {
+  return {
+    ebay: async (s, p) => {
+      const r = dep.resultatReviseEbay(await dep.appelEbay({ action: 'revise', itemId: s.id, price: String(p), prixVu: s.prix, confirme: true, ...dep.corpsCompteEbay(s.compte) }));
+      return { etat: r.etat === 'ok' ? 'fait' : r.etat === 'ko' ? 'refuse' : 'incertain', raison: r.msg || null };
+    },
+    vinted: async (s, p) => {
+      if (!s.compte) return { etat: 'refuse', raison: 'compte introuvable' };
+      const r = await dep.vmrCmdSuivi({ cmd: 'republierVinted', uid: s.compte, id: s.id, prix: p, confirme: true }, 60000);
+      if (!r || r.sansReponse) return { etat: 'incertain', raison: dep.sansReponse || 'pas de réponse' };
+      if (r.accepte && r.etape === 'fait') return { etat: 'fait', raison: null };
+      return { etat: 'refuse', raison: r.raison || r.error || "l'extension n'a pas répondu" };
+    },
+  };
+}
