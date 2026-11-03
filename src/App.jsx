@@ -55,6 +55,9 @@ import {resumerStockJournee} from './stockJournee.js';
 import {jaugeSeuils,optionsMicro,calendrierUrssaf,phraseRythme,seuilsDe,declarationRevenus,rappelCfe} from './microEntreprise.js';
 import { toutSurLeNumero, lireNumeroCherche } from "./rechercheNumero.js";
 import { repriseNumerosRecreation, tableRecrees } from "./repriseNumero.js";
+import { etatCycle, cartesSupprimees, majVusEnLigne, indexPresentes, montantSaisi as montantCycle, CHOIX as CHOIX_CYCLE, LIBELLE_CHOIX } from "./cycleArticle.js";
+import { chezMoiProposables } from "./propositionsSites.js";
+import { retraitsEbayAutoAilleursPermis, RAISON_RETRAIT_AILLEURS } from "./retraitAilleurs.js";
 import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chevauche, placerSansTraverser, modeCase, capaciteCase, articlesAutresPlateformes, unParArticle, empilerDansCase, retirerDeCase, retirerDePile, ajouterAPile, cartonsDePile, hauteurPile, changerHauteurPile, prochainePlaceMeuble, estPoseSur, caler, proposerPiece, planchesCases, planchesRangees, plateauxMeuble, plateauxReglables, tasserPlateaux } from './stockRegles.js';
 import {formaterMontantEbay} from './montantsEbay.js';
 import {cibleEbay} from "./ebayParcours.js";
@@ -1949,6 +1952,9 @@ const SYNC_KEYS = [
   // Retirer d'eBay, sans demander, une paire PROUVÉE vendue sur Vinted
   // (proposition 8). Éteint par défaut ; la route le relit elle-même.
   'vrm_ebay_retrait_auto',
+  // (3 nov.) Le cycle d'un article (src/cycleArticle.js) : SA réponse à « N°x
+  // supprimé de Vinted » (son clic seul) et la dernière lecture qui l'a vu en ligne.
+  'vrm_cycle_decisions','vrm_vus_en_ligne',
   // Par annonce eBay, le prix Vinted de la dernière baisse faite depuis VRM
   // (proposition 9) : rien n'est reproposé tant qu'il n'a pas bougé.
   'vrm_ebay_baisses',
@@ -3502,6 +3508,24 @@ function masqueesPresentes(masquees, fiches, perdues) {
   return (Array.isArray(masquees) ? masquees : []).filter((it) => it && !annonceDeclareePartie(it.id, fiches, perdues));
 }
 // </masquees-regle>
+// ── LE CYCLE D'UN ARTICLE (3 nov., src/cycleArticle.js) ─────────────────────
+// `vrm_cycle_decisions` = { [idAnnonce]: { choix, numero, at, montant? } } — SA
+// réponse à « N°x supprimé de Vinted », écrite seulement sur SON clic.
+// `vrm_vus_en_ligne` = { [idAnnonce]: iso } — la dernière lecture COMPLÈTE qui
+// l'a vue en ligne (`majVusEnLigne`) : sans elle, une absence ne se demande pas.
+const CYCLE_DECISIONS = 'vrm_cycle_decisions';
+const VUS_EN_LIGNE = 'vrm_vus_en_ligne';
+const lireObjet = (cle) => { try { const v = load(cle, {}); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch (_) { return {}; } };
+// Les entrées d'`etatCycle` pour la liste eBay : seules les annonces en ligne
+// sont connues ici (Set lu), les ventes sont jugées par l'agent (`numerosDejaVendus`).
+function chezMoiEntrees(fiches, online) {
+  const lectures = new Map();
+  for (const id in (fiches || {})) { const u = String((fiches[id] || {}).accountId || ''); if (!lectures.has(u)) lectures.set(u, { enLigne: online }); }
+  const perdues = lireObjet('vinted_pairs_lost');
+  let vendusMain; try { vendusMain = new Set((load('vinted_annonces_vendues', []) || []).map(String)); } catch (_) { vendusMain = new Set(); }
+  return { lectures, presentes: indexPresentes(fiches, lectures, cleNum), recrees: {}, viaVrm: new Set(), ventes: {}, vendusMain,
+    decisions: lireObjet(CYCLE_DECISIONS), declaree: (id) => annonceDeclareePartie(id, fiches, perdues), cle: cleNum };
+}
 // Ce que la dernière lecture a écarté, par compte (pour le DIRE, une fois, §7).
 const _supprRetirees = {};
 // La ligne d'un compte : `ids` · `{}` (aucune) · `null` (la base n'a pas répondu).
@@ -22385,6 +22409,7 @@ function useEbayPaires(comptes) {
   // la liste n'en garde qu'une (le formulaire), mais l'agent ne doit proposer
   // AUCUNE des deux (§5) — clé du N° → combien de paires le portent.
   const [doubles, setDoubles] = React.useState(() => new Map());
+  const [chezMoiS, setChezMoiS] = React.useState(() => new Set());
   React.useEffect(() => onCloudReady(() => setNuage((n) => n + 1)), []);
   React.useEffect(() => { let stop = false; (async () => {
     try {
@@ -22418,12 +22443,17 @@ function useEbayPaires(comptes) {
         for (const r of (Array.isArray(rows) ? rows : [])) { const m = /^coffre_[^_]+_(.+)$/.exec(String(r.id || '')); if (m) coffre[m[1]] = r; }
       } catch (_) { coffre = {}; }
       const norm = (p) => typeof p === 'string' ? p : (p && (p.url || p.full_size_url)) || '';
+      // (3 nov., Julien) + les articles supprimés de Vinted qu'il a dits
+      // « Toujours chez moi » : leur fiche et les photos de leur dernière annonce
+      // lue (src/propositionsSites.js). Annonces en ligne pas lues ⇒ aucun (pas su).
+      const chezMoi = online ? chezMoiProposables(fiches, chezMoiEntrees(fiches, online)) : new Set();
       const vus = new Set(), out = [], parCle = new Map();
       for (const id in fiches) {
         const f = fiches[id] || {}; const n = f.numero != null ? String(f.numero).trim() : '';
-        if (n && online && online.has(String(id))) { const k = cleNum(n); if (k) parCle.set(k, (parCle.get(k) || 0) + 1); }
+        const present = !!(online && (online.has(String(id)) || chezMoi.has(String(id))));
+        if (n && present) { const k = cleNum(n); if (k) parCle.set(k, (parCle.get(k) || 0) + 1); }
         if (!n || vus.has(n)) continue;
-        if (online && !online.has(String(id))) continue;      // en ligne seulement (vendue/retirée écartée)
+        if (online && !present) continue;      // en ligne ou « toujours chez moi » seulement (vendue/retirée écartée)
         if (!online && presents && !presents.has(cleNum(n))) continue; // à défaut : au moins « en stock » si on le sait
         vus.add(n);
         const cover = f.photo || couvMap[String(id)] || null;
@@ -22441,13 +22471,14 @@ function useEbayPaires(comptes) {
         const etatV = String(etatMap[String(id)] || cf.etat || '').trim();
         const tailleV = String(tailleMap[String(id)] || cf.size || '').trim();
         out.push({ id: String(id), num: n, photoK: f.photoK || null, title: titreP, taille: tailleV || extractSize(titreP) || '', tailleVinted: tailleV, marque, etat: etatV, cover, photos, desc, nPhotos: nPhotosMap[String(id)], prix: prixMap[String(id)] ?? null, uid: compteMap[String(id)] || '',
-          catalogId: catMap[String(id)] ?? (details[id] && details[id].catalogId) ?? null, couleur: couleurMap[String(id)] || '', cree: creeMap[String(id)] ?? null });
+          catalogId: catMap[String(id)] ?? (details[id] && details[id].catalogId) ?? null, couleur: couleurMap[String(id)] || '', cree: creeMap[String(id)] ?? null,
+          ...(chezMoi.has(String(id)) ? { chezMoi: true, prix: prixMap[String(id)] ?? (f.price != null && f.price !== '' ? f.price : null), uid: compteMap[String(id)] || String(f.accountId || '') } : {}) });
       }
       out.sort((a, b) => (parseInt(b.num, 10) || 0) - (parseInt(a.num, 10) || 0));
-      if (!stop) { setPaires(out); setDoubles(new Map([...parCle].filter(([, c]) => c > 1))); setPret(true); }
-    } catch (_) { if (!stop) { setPaires([]); setEnLigne(null); setToutesLues(false); setPret(true); } }
+      if (!stop) { setPaires(out); setChezMoiS(chezMoi); setDoubles(new Map([...parCle].filter(([, c]) => c > 1))); setPret(true); }
+    } catch (_) { if (!stop) { setPaires([]); setChezMoiS(new Set()); setEnLigne(null); setToutesLues(false); setPret(true); } }
   })(); return () => { stop = true; }; }, [comptes, nuage]);
-  return { paires, enLigne, toutesLues, pret, doubles };
+  return { paires, enLigne, toutesLues, pret, doubles, chezMoi: chezMoiS };
 }
 
 // Les raisons d'échec de la connexion eBay, dites en clair (la route renvoie
@@ -24300,7 +24331,7 @@ function EbayInactives({ comptesEbay, tick, vue = '*', connected, ventes, dejaSu
     const url = URL_ITEM_EBAY(l.itemId);
     const prix = Number(String(l.price || '').replace(',', '.'));
     const etatLigne = vendue ? `vendue sur ${vendue} — ne la remets pas en vente`
-      : retraitAuto ? `retirée par VRM${Number.isFinite(Number(retraitAuto.at)) ? ' le ' + new Date(Number(retraitAuto.at)).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : ''} : vendue sur Vinted — ne la remets pas en vente`
+      : retraitAuto ? `retirée par VRM${Number.isFinite(Number(retraitAuto.at)) ? ' le ' + new Date(Number(retraitAuto.at)).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : ''} : vendue sur ${retraitAuto.ou || 'Vinted'} — ne la remets pas en vente`
       : memeEnLigne ? 'aussi dans tes annonces en ligne — état à relire chez eBay'
       : relancee ? 'déjà remise en vente sur eBay'
       : deja ? (deja.etat === 'programmee' ? 'déjà programmée de nouveau sur eBay' : 'déjà de nouveau en vente sur eBay')
@@ -24786,7 +24817,7 @@ const DEMANDE_EBAY_BROUILLON = { id: null, at: 0 };
 // `fond` : l'agent en FOND (pas l'écran) — ses lectures acceptent une réponse
 // partagée de quelques secondes (`vrmFond`, src/lecturesPartagees.js).
 function useEtatPublicationEbay(comptes, comptesEbay, fond = false) {
-  const { paires, enLigne: enLigne0, pret, doubles } = useEbayPaires(Array.isArray(comptes) ? comptes : null);
+  const { paires, enLigne: enLigne0, pret, doubles, chezMoi } = useEbayPaires(Array.isArray(comptes) ? comptes : null);
   const [tick, setTick] = React.useState(0);
   const [items, setItems] = React.useState(undefined);
   const [luesA, setLuesA] = React.useState(undefined);
@@ -24870,7 +24901,7 @@ function useEtatPublicationEbay(comptes, comptesEbay, fond = false) {
   return {
     paires: Array.isArray(comptes) && pret ? paires : undefined,
     enLigne: Array.isArray(comptes) && pret ? enLigne0 : undefined,
-    ventes, dejaSurEbay, jumelles, fiches, luesA, brouillons, doubles,
+    ventes, dejaSurEbay, jumelles, fiches, luesA, brouillons, doubles, chezMoi,
     relire: () => setTick((t) => t + 1),
   };
 }
@@ -24972,10 +25003,10 @@ function AgentEbay({ comptes, comptesEbay, onAnnonces }) {
     if (comptesStatut === null) return { etat: 'pas-su', pasSu: ['tes comptes eBay'] };
     if (!relies.length) return { etat: 'sans-ebay' };
     if (deviseCompte !== 'EUR') return { etat: 'devise' };
-    return propositionAgent({ regles, paires: etat.paires, enLigne: etat.enLigne, ventes: etat.ventes, dejaSurEbay: dejaSurEbayEff, jumelles: etat.jumelles,
+    return propositionAgent({ regles, paires: etat.paires, enLigne: etat.enLigne, chezMoi: etat.chezMoi, ventes: etat.ventes, dejaSurEbay: dejaSurEbayEff, jumelles: etat.jumelles,
       achatDe: (p) => prixAchatDe(etat.fiches[p.id], buyByNum), cochee: (p) => mpChoisi(etat.fiches[p.id], 'ebay') === true,
       incertains, brouillons: enBrouillon, doubles: etat.doubles, publieesAujourdhui: jour.publiees, cle: cleNum });
-  }, [comptesStatut, relies, deviseCompte, regles, etat.paires, etat.enLigne, etat.ventes, dejaSurEbayEff, etat.jumelles, etat.fiches, buyByNum, incertains, enBrouillon, etat.doubles, jour.publiees]);
+  }, [comptesStatut, relies, deviseCompte, regles, etat.paires, etat.enLigne, etat.ventes, dejaSurEbayEff, etat.jumelles, etat.fiches, buyByNum, incertains, enBrouillon, etat.doubles, etat.chezMoi, jour.publiees]);
   // ── LA PRÉPARATION : une par une, les proposées seulement, sur le compte choisi ──
   // (revue du 29 oct.) Un JETON par passe : quand les paires ou le prix
   // changent, la passe en cours s'arrête à la paire suivante et une nouvelle
@@ -25284,7 +25315,7 @@ function AgentEbayFondCalcul({ comptes, comptesEbay }) {
     const ref = (regles.compteEbay && comptesEbay.some((c) => c.ref === regles.compteEbay)) ? regles.compteEbay : comptesEbay[0].ref;
     if (marcheEbayDeRef(ref).devise !== 'EUR') { fait.current = true; publierResumeAgent({ etat: 'devise' }); return; }
     const incertains = incertainsAttendusAgent(lireIncertainsAgent(), etat.luesA);
-    const prop = propositionAgent({ regles, paires: etat.paires, enLigne: etat.enLigne, ventes: etat.ventes, dejaSurEbay: etat.dejaSurEbay, jumelles: etat.jumelles,
+    const prop = propositionAgent({ regles, paires: etat.paires, enLigne: etat.enLigne, chezMoi: etat.chezMoi, ventes: etat.ventes, dejaSurEbay: etat.dejaSurEbay, jumelles: etat.jumelles,
       achatDe: (p) => prixAchatDe(etat.fiches[p.id], load('vinted_buyprice_by_num', {}) || {}), cochee: (p) => mpChoisi(etat.fiches[p.id], 'ebay') === true,
       incertains, brouillons: numerosEnBrouillon(etat.brouillons, etat.paires), doubles: etat.doubles, publieesAujourdhui: lireJourAgent().publiees, cle: cleNum });
     if (prop.etat !== 'lu') return;
@@ -25292,7 +25323,7 @@ function AgentEbayFondCalcul({ comptes, comptesEbay }) {
     // Sans préparation chez eBay : le résumé dit « N paires à regarder »,
     // jamais « prêtes » (seul l'écran de l'agent prépare).
     publierResumeAgent(prop);
-  }, [regles, comptesEbay, etat.paires, etat.enLigne, etat.ventes, etat.dejaSurEbay, etat.jumelles, etat.fiches, etat.luesA, etat.brouillons]);
+  }, [regles, comptesEbay, etat.paires, etat.enLigne, etat.ventes, etat.dejaSurEbay, etat.jumelles, etat.fiches, etat.luesA, etat.brouillons, etat.chezMoi]);
   return null;
 }
 const agentEbayFondUtile = () => { const r = load(AGENT_CLE_RESUME, null); return !(r && Date.now() - (Number(r.at) || 0) < 20 * 3600000); };
@@ -34657,7 +34688,12 @@ const lirePreuvesVenteVinted = async (opts = {}) => {
       strict.preuves = det.preuves;
       strict.revenues = det.revenues;
     }
-    return { vendus, strict, sansPreuve, sansPreuveKO, ancienne: preuvesParTransaction(rows).items };
+    // (3 nov., cycle d'un article) Les annonces dont une transaction est REVENUE
+    // (annulée, retour, remboursée — `PAS_UNE_VENTE`) et qui n'ont aucune preuve :
+    // l'article n'est pas « supprimé sans vente », il revient (src/cycleArticle.js).
+    const revenuesItems = new Set();
+    for (const r of rows) { const it = r && r.it != null ? String(r.it) : ''; if (it && !vendus.has(it) && PAS_UNE_VENTE.test(String((r && r.ti) || ''))) revenuesItems.add(it); }
+    return { vendus, strict, sansPreuve, sansPreuveKO, ancienne: preuvesParTransaction(rows).items, revenuesItems };
   } catch (_) { return null; }
 };
 // La preuve stricte pour le retrait automatique exige aussi la fraîcheur et la provenance.
@@ -39838,7 +39874,67 @@ function ListeComptes({ id, valeur, options, onChange, note, skin, attrs }) {
     </div>
   );
 }
-function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', compteConnecte = '', alertes = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false }) {
+function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', compteConnecte = '', alertes = null, cycle = null, onCycle = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false }) {
+  // (3 nov.) Les cartes « supprimé de Vinted » déjà répondues sur cet écran
+  // (elles partent tout de suite, la coque recalcule ensuite) et la réponse en cours.
+  const [cycleRepondus, setCycleRepondus] = useState({});
+  const [cycleEnVol, setCycleEnVol] = useState(null);
+  // (3 nov.) « Supprimer de Leboncoin » depuis la carte « à retirer de Leboncoin » :
+  // une confirmation qui nomme chaque N°, puis une annonce à la fois ; le premier
+  // résultat qui n'est pas « supprimée » arrête tout et se dit.
+  const [lbcSupprEnVol, setLbcSupprEnVol] = useState(false);
+  const supprimerLbcJournee = async (liste) => {
+    const l = (Array.isArray(liste) ? liste : []).filter((r) => r && r.id);
+    if (!l.length || lbcSupprEnVol) return;
+    const ok = await askConfirm({ title: l.length > 1 ? `Supprimer ${l.length} annonces de Leboncoin ?` : `Supprimer le N°${l[0].numero} de Leboncoin ?`,
+      desc: l.map((r) => `N°${r.numero} · ${String(r.titre || '').slice(0, 50)} — vendu sur ${r.ou}`).join('\n'),
+      ok: 'Oui, supprimer de Leboncoin', cancel: 'Annuler', danger: true });
+    if (!ok) return;
+    setLbcSupprEnVol(true);
+    let faites = 0;
+    try {
+      for (const r of l) {
+        let rep = null; try { rep = await vmrCmd({ cmd: 'lbcSupprime', id: String(r.id), confirme: true }, 70000); } catch (_) { rep = null; }
+        if (rep && rep.accepte && rep.etape === 'fait') { faites++; continue; }
+        toast(`N°${r.numero} : ${!rep ? "je ne sais pas si elle est supprimée — regarde l'annonce sur Leboncoin" : rep.accepte === false ? `pas fait — ${rep.raison || 'refusé par l’extension'}` : rep.etape === 'refuse' ? `pas fait — Leboncoin a répondu ${rep.statut}` : `je ne sais pas si elle est supprimée — ${rep.raison || 'pas de réponse de Leboncoin'}`}`, 'err');
+        break;
+      }
+      if (faites) toast(faites > 1 ? `${faites} annonces supprimées de Leboncoin` : `N°${l[0].numero} supprimé de Leboncoin`, 'ok');
+    } finally { setLbcSupprEnVol(false); if (faites && onCycle) onCycle(); }
+  };
+  const repondreCycle = async (c, choix) => {
+    if (!c || cycleEnVol) return;
+    const fiches = load('vinted_annonce_numeros', {}) || {};
+    const at = new Date().toISOString();
+    const decision = { choix, numero: c.numero, at };
+    if (choix === CHOIX_CYCLE.VENDU_MAIN) {
+      const t = await askText({ title: `N°${c.numero} vendu combien ?`, value: '', numeric: true, ok: 'Valider' });
+      if (t == null) return;
+      const m = montantCycle(t);
+      if (m == null) { toast('Montant non compris — rien n’a été noté.', 'err'); return; }
+      decision.montant = m;
+    } else if (choix === CHOIX_CYCLE.SEPARE) {
+      const ok = await askConfirm({ title: `N°${c.numero} n'est plus chez toi ?`, desc: String(c.title || '').slice(0, 80), ok: "Je m'en sépare" });
+      if (!ok) return;
+    }
+    setCycleEnVol(c.id);
+    try {
+      save(CYCLE_DECISIONS, { ...lireObjet(CYCLE_DECISIONS), [c.id]: decision });
+      if (choix === CHOIX_CYCLE.VENDU_MAIN) {
+        const l = (load('vinted_annonces_vendues', []) || []).map(String);
+        if (!l.includes(String(c.id))) save('vinted_annonces_vendues', [...l, String(c.id)]);
+      }
+      if (choix === CHOIX_CYCLE.SEPARE) {
+        const perdues = lireObjet('vinted_pairs_lost');
+        const cle0 = cleDeclarationPartie(c.numero, c.id, fiches);
+        const cle = perdues[cle0] && perdues[cle0].id != null && String(perdues[cle0].id) !== String(c.id) ? `${String(c.numero).trim()}@${c.id}` : cle0;
+        if (cle) save('vinted_pairs_lost', { ...perdues, [cle]: { ...(perdues[cle] || {}), id: String(c.id), at, title: c.title || '', from: 'cycle' } });
+      }
+      setCycleRepondus((m) => ({ ...m, [c.id]: choix }));
+      toast(`N°${c.numero} : ${LIBELLE_CHOIX[choix].toLowerCase()}`, 'ok');
+      if (onCycle) onCycle();
+    } finally { setCycleEnVol(null); }
+  };
   const [datesLbc] = useLigneSynchro('vrm_lbc_dates', lireDatesLbc);
   // L'IDENTITÉ de l'ensemble des comptes liés (triée) : c'est elle que suivent
   // les relectures et le cache — jamais `accounts.length` (un compte retiré et
@@ -43280,6 +43376,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // On ne décide rien à sa place : on la SIGNALE, et c'est toi qui tranches.
   const disparues = useMemo(() => {
     if (!listings.items || !sales.items) return [];
+    const decisionsCycle = lireObjet(CYCLE_DECISIONS);
     const onlineIds = new Set(); const presentAcc = new Set();
     for (const it of listings.items) { onlineIds.add(String(it.id)); const u = String(it._acc?.vinted_user_id || ''); if (u) presentAcc.add(u); }
     // Numéros qui correspondent à une vente (à n'importe quel stade) : ces
@@ -43317,6 +43414,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       //    annonce vendue, il la ferme en « vendue » — et ça se lit par IDENTIFIANT.
       if (venduesVinted.has(String(k))) continue;                   // Vinted dit : vendue
       if (pairsLost[raw]) continue;                                 // déjà déclarée perdue
+      // (3 nov.) Il a répondu « Toujours chez moi » à « N°x supprimé de Vinted »
+      // (Ma journée, src/cycleArticle.js) : une seule voix, la sienne.
+      if ((decisionsCycle[String(k)] || {}).choix === CHOIX_CYCLE.CHEZ_MOI) continue;
       out.push({ id: String(k), e, numero: raw });
     }
     out.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
@@ -49182,7 +49282,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         //    passent ici, après les tuiles (§4.11 : rien ne disparaît en silence).
         if (Array.isArray(alertes)) for (const a of alertes) {
           if (!a || !(a.dv || a.jr)) continue;
-          if (a.dv) jobs.push({id:'double-vente', n:a.n, icon:a.ic||'alert', color:a.dv==='num'?C.danger:C.warn, urgent:true, title:a.text, tab:a.tab, prio:-1, avant:a.avant});
+          if (a.dv) jobs.push({id:'double-vente', n:a.n, icon:a.ic||'alert', color:a.dv==='num'?C.danger:C.warn, urgent:true, title:a.text, tab:a.tab, prio:-1, avant:a.avant, lbcSuppr:Array.isArray(a.lbcSuppr)&&a.lbcSuppr.length?a.lbcSuppr:null});
           else jobs.push({id:a.job||('a-faire-'+a.ic), n:a.n, icon:a.ic||'info', color:a.urssaf&&a.urssaf.proche?C.warn:C.text, title:a.text, sub:a.sub, tab:a.tab, prio:3, urssaf:a.urssaf,
             // (1er nov., « très répétitif ») Le rappel URSSAF en court : « Déclarer
             // l'URSSAF d'octobre » + « Avant le 30 nov. · ≈ 331 € à payer (au moins) ».
@@ -49275,6 +49375,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             if (!retirerVu) { j.court = null; j.title = `${j.title} — ${j.detail}`; j.detail = null; }
           }
           if (!retirerVu && tuiles.retirer) tuiles.retirer = { ...tuiles.retirer, aVerifier: 0 };
+        }
+        // (3 nov.) « N°x supprimé de Vinted » : une carte par article à trancher
+        // (src/cycleArticle.js), avec ses trois réponses. Rien sur « pas su ».
+        if (cycle && Array.isArray(cycle.cartes)) for (const c of cycle.cartes) {
+          if (cycleRepondus[c.id]) continue;
+          jobs.push({ id: 'supprime-vinted', cycle: c, icon: 'tag', color: C.text, court: `N°${c.numero} supprimé de Vinted`, detail: enArticles(String(c.title || '').slice(0, 80)), title: `N°${c.numero} supprimé de Vinted`, sub: c.title, photos: c.photo ? [c.photo] : null, prio: 0.8 });
         }
         jobs.sort((a,b)=>a.prio-b.prio);
         // RÉSULTAT DU JOUR : les paires VENDUES aujourd'hui (pas l'argent viré,
@@ -49517,7 +49623,33 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // (22 oct., chantier URSSAF) LE RAPPEL URSSAF PORTE SON GESTE : « Noter ma
         // déclaration » à côté. Un bouton ne se met pas dans un bouton : la ligne
         // devient un groupe de deux, même forme, mêmes attributs.
-        const tache = (j, i) => { if (!(j.urssaf && Array.isArray(j.urssaf.aNoter) && j.urssaf.aNoter.length > 0)) return tacheSimple(j, i);
+        // (3 nov.) La carte « N°x supprimé de Vinted » : pastille (photo), titre court,
+        // trois pilules — ses réponses, rien d'autre (aucun texte explicatif).
+        const tacheCycle = (j, i) => { const c = j.cycle; const x = decouper(j); return (
+          <div className="vrm-day-task is-groupe vrm-cycle-carte" key={'cycle' + c.id} role="group" data-job="supprime-vinted" data-cycle-id={c.id} data-cycle-num={c.numero} title={`${x.court}${x.detail ? '\n' + x.detail : ''}`}>
+            <div className="vrm-cycle-tete">{corpsTache(j, x)}</div>
+            <div className="vrm-cycle-choix">
+              {[CHOIX_CYCLE.CHEZ_MOI, CHOIX_CYCLE.VENDU_MAIN, CHOIX_CYCLE.SEPARE].map((ch) => (
+                <Bouton key={ch} variante="secondaire" className="vrm-b-petit vrm-day-task-geste" data-cycle-choix={ch} disabled={!!cycleEnVol} onClick={() => repondreCycle(c, ch)}>{LIBELLE_CHOIX[ch]}</Bouton>
+              ))}
+            </div>
+          </div>
+        ); };
+        // (3 nov., Julien : « les deux ») « N à retirer de Leboncoin » porte directement
+        // « Supprimer de Leboncoin » quand l'extension de CE navigateur sait le faire
+        // (`lbcsupprime`) et que l'annonce est désignée par IDENTITÉ. Son clic, confirmé.
+        const saitSupprLbc = !!(__vmrEtat && __vmrEtat.lbcSupprime === true) && vmrExtPresent();
+        const tacheLbc = (j, i) => { const x = decouper(j); const plein = x.detail ? `${x.court}\n${x.detail}` : x.court; return (
+          <div className={'vrm-day-task is-groupe' + (j.urgent ? ' is-urgent' : '')} key={(j.id||'j')+i} role="group" data-job={j.id||undefined} data-n={j.n!=null?j.n:undefined} title={plein}>
+            <button type="button" className="vrm-day-task-ouvrir" aria-label={plein.replace(/\n/g, ' — ')} onClick={()=>{ if (j.avant) j.avant(); if (onNav) onNav(j.tab); }}>
+              {corpsTache(j, x)}
+            </button>
+            <Bouton variante="secondaire" className="vrm-b-petit vrm-day-task-geste" title="Supprimer de Leboncoin" aria-label="Supprimer de Leboncoin" data-lbc-supprimer-journee={j.lbcSuppr.map((r) => r.id).join(' ')} disabled={!!lbcSupprEnVol} onClick={() => supprimerLbcJournee(j.lbcSuppr)}>
+              {lbcSupprEnVol ? '…' : 'Supprimer'}
+            </Bouton>
+          </div>
+        ); };
+        const tache = (j, i) => { if (j.cycle) return tacheCycle(j, i); if (Array.isArray(j.lbcSuppr) && j.lbcSuppr.length && saitSupprLbc) return tacheLbc(j, i); if (!(j.urssaf && Array.isArray(j.urssaf.aNoter) && j.urssaf.aNoter.length > 0)) return tacheSimple(j, i);
           const x = decouper(j); const plein = x.plein ? `${x.court}\n${x.detail ? x.detail + '\n' : ''}${x.plein}` : x.detail ? `${x.court}\n${x.detail}` : x.court;
           return (
           <div className="vrm-day-task is-groupe" key={(j.id||'j')+i} role="group" data-job={j.id||undefined} data-n={j.n!=null?j.n:undefined} data-urssaf-echeance={j.urssaf.dueIso} data-urssaf-apayer={j.urssaf.apayer==null?'':String(j.urssaf.apayer)} data-urssaf-partiel={j.urssaf.partiel?'1':undefined} title={plein}>
@@ -57177,14 +57309,21 @@ const RAISON_RETRAIT_AUTO = {
 //     pendant le passage compte ;
 //   · puis la règle la plus stricte (`retraitsEbayAutoPermis`).
 // Rend `{ lance, raison, permis, ecartes }` (pour l'audit ; la coque n'attend pas).
-async function passageRetraitEbayAuto({ nuageAuDepart, continuer, annonces, commandes, enLigne, toutesLues, vendusVinted, lireNumeros, comptesBloques, maintenant }) {
+// (3 nov.) + `ventes` (le verdict « déjà vendue, toutes plateformes ») et
+// `ailleurs` ({ lbc, vc, revenues }) : une vente Leboncoin ou Vestiaire PROUVÉE
+// par identité retire aussi l'annonce eBay (`retraitsEbayAutoAilleursPermis`,
+// src/retraitAilleurs.js — la même rigueur que pour Vinted). Sans eux : comme avant.
+async function passageRetraitEbayAuto({ nuageAuDepart, continuer, annonces, commandes, enLigne, toutesLues, vendusVinted, lireNumeros, comptesBloques, maintenant, ventes = null, ailleurs = null }) {
   const peut = () => (typeof continuer === 'function' ? !!continuer() : false);
   if (!nuageAuDepart) return { lance: false, raison: 'nuage', permis: [], ecartes: [] };
   if (!peut()) return { lance: false, raison: 'arrete', permis: [], ecartes: [] };
   if (!vendusVinted || !toutesLues) return { lance: false, raison: 'pas-su', permis: [], ecartes: [] };
   const numeros = (typeof lireNumeros === 'function' ? lireNumeros() : null) || {};
-  const dv = doublesVenteEbay({ annonces, commandes, numeros, enLigne: enLigne || null, vendusVinted, programmees: [], ventes: null });
-  const { permis, ecartes } = retraitsEbayAutoPermis({ aRetirerEbay: dv.aRetirerEbay, numeros, vendusVinted, toutesLues, comptesBloques, ...(maintenant ? { maintenant } : {}) });
+  const dv = doublesVenteEbay({ annonces, commandes, numeros, enLigne: enLigne || null, vendusVinted, programmees: [], ventes: ventes || null });
+  const pv = retraitsEbayAutoPermis({ aRetirerEbay: dv.aRetirerEbay, numeros, vendusVinted, toutesLues, comptesBloques, ...(maintenant ? { maintenant } : {}) });
+  const pa = ailleurs ? retraitsEbayAutoAilleursPermis({ aRetirerEbayAilleurs: dv.aRetirerEbayAilleurs, numeros, revenues: ailleurs.revenues, lbc: ailleurs.lbc, vc: ailleurs.vc,
+    cle: cleNum, numEbayLu, clesAnnonce: clesAnnonceLbc, lbcAnnulee, ...(maintenant ? { maintenant } : {}) }) : { permis: [], ecartes: [] };
+  const permis = [...pv.permis, ...pa.permis], ecartes = [...pv.ecartes, ...pa.ecartes];
   if (!permis.length || !peut()) return { lance: false, raison: permis.length ? 'arrete' : 'rien', permis, ecartes };
   await retirerEbayAuto(permis, peut);
   return { lance: true, raison: '', permis, ecartes };
@@ -57229,14 +57368,14 @@ const retirerEbayAuto = async (liste, continuer) => {
       };
       try {
         const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() },
-          body: JSON.stringify({ action: 'retirer', itemId: id, confirme: true, auto: true, sku: skuEbayDe(d.numero) || a.sku, titre: a.title || '', venduLe: d.venduLe || '', ...corpsCompteEbay(a._compte) }) });
+          body: JSON.stringify({ action: 'retirer', itemId: id, confirme: true, auto: true, sku: skuEbayDe(d.numero) || a.sku, titre: a.title || '', venduLe: d.venduLe || '', ou: d.ou || 'Vinted', ...corpsCompteEbay(a._compte) }) });
         const code = r && Number.isFinite(r.status) ? r.status : 0;
         const j = await r.json().catch(() => null);
         if (j && j.ok) {
           n += 1;
           // Le journal est ce qui lui permet de RELIRE ce qui est parti en son
           // nom : s'il n'a pas pu être écrit, on le dit.
-          toast(`N°${d.numero} retirée d'eBay automatiquement : elle est vendue sur Vinted.${j.journal === false ? ' (Pas notée dans l’historique des retraits — la base n’a pas répondu.)' : ''}`, 'ok');
+          toast(`N°${d.numero} retiré d'eBay automatiquement : vendu sur ${d.ou || 'Vinted'}.${j.journal === false ? ' (Pas notée dans l’historique des retraits — la base n’a pas répondu.)' : ''}`, 'ok');
         } else if (j && EBAY_DEJA_TERMINEE.test(String(j.error || ''))) {
           /* déjà close : ne prend pas une des 5 places */
         } else if (!j || code === 504 || (j && j.reason === 'incertain')) { n += 1; incertain(); }
@@ -63564,6 +63703,8 @@ function AppCoeur() {
   const [notifBanner,setNotifBanner]=useState(null); // {ventes, factures} ou null
   const [vintedNotif,setVintedNotif]=useState(null); // {messages, ventes} nouveautés Vinted à l'ouverture
   const [notifItems,setNotifItems]=useState([]); // actions du jour (Ma journée, tableau de bord, Collectif)
+  // (3 nov.) « N°x supprimé de Vinted » (src/cycleArticle.js) : `undefined` en cours · `null` pas su · { cartes, total, pasSu }.
+  const [cycleCartes,setCycleCartes]=useState(undefined);
   const [menuOpen,setMenuOpen]=useState(false);
   const [invoiceSettings,setInvoiceSettings]=useState(()=>load('vinted_invoice_settings',{
     ...ENTREPRISE_VIDE,
@@ -64885,6 +65026,8 @@ function AppCoeur() {
       let postedIds=[];              // tous les ids publiés sur LBC (pour le croisement eBay→LBC)
       let lbcRemoveEbayCount=0;      // vendues sur eBay, encore en ligne ici (§11, même base que le compte Vinted)
       let lbcRemoveVcCount=0;        // (1er nov.) vendues sur Vestiaire, encore en ligne ici
+      // (3 nov.) Les annonces Leboncoin désignées par IDENTITÉ (lien, référence) : la carte de Ma journée porte « Supprimer de Leboncoin ».
+      let lbcSupprEbay=[], lbcSupprVc=[];
       let sortisN=new Set();         // N° dont l'annonce LBC est SORTIE (plus en ligne) — partagé par les deux comptes « à retirer »
       let postedDepuis='';
       try{
@@ -65051,14 +65194,14 @@ function AppCoeur() {
             const vintedRemN=new Set((lbcARetirer||[]).map(r=>cleNum(r.numero)).filter(Boolean));
             const liensE=load('vrm_lbc_liens',{})||{};
             const reE=aRetirerDeLbcEbay({soldEbay:soldEbayN, posted:postedIds, numeros:nums, itemsLbc:lbcItemsLu||null, liens:liensE, vendusLbc:ventesLbcLu?annoncesLbcVendues(ventesLbcLu):null, sortis:sortisN, deja:vintedRemN});
-            lbcRemoveEbayCount=reE?reE.length:0;
+            lbcRemoveEbayCount=reE?reE.length:0; lbcSupprEbay=(reE||[]).filter(r=>r&&r.ident&&r.lbcId);
           }
           // (1er nov., audit A1) Vendue sur Vestiaire, encore en ligne sur Leboncoin : la règle de l'écran Leboncoin.
           const soldVcN=numerosVendusVc(ventesVcN);
           if(soldVcN && soldVcN.size){
             const dejaN=new Set([...(lbcARetirer||[]).map(r=>cleNum(r.numero)).filter(Boolean)]);
             const reV=aRetirerDeLbcEbay({soldEbay:soldVcN, posted:postedIds, numeros:nums, itemsLbc:lbcItemsLu||null, liens:load('vrm_lbc_liens',{})||{}, vendusLbc:ventesLbcLu?annoncesLbcVendues(ventesLbcLu):null, sortis:sortisN, deja:dejaN});
-            lbcRemoveVcCount=reV?reV.length:0;
+            lbcRemoveVcCount=reV?reV.length:0; lbcSupprVc=(reV||[]).filter(r=>r&&r.ident&&r.lbcId);
           }
         }
         // Retrait automatique (proposition 8) : allumé par lui, nuage là AU
@@ -65066,15 +65209,72 @@ function AppCoeur() {
         // lues — puis la règle la plus stricte (`retraitsEbayAutoPermis`), jugée
         // sur les fiches RELUES juste avant (une saisie faite pendant le
         // passage compte). Sinon : rien, et la cloche dit « à retirer ».
-        if(dvE.aRetirerEbay.length) passageRetraitEbayAuto({
-          nuageAuDepart,
-          continuer:()=>!cancelled && load('vrm_ebay_retrait_auto',false)===true,
-          annonces:annE||[], commandes:ords||[], enLigne:enLigneE,
-          toutesLues:!!(lusE && lusE.toutesLues), vendusVinted:vendusE,
-          lireNumeros:()=>load('vinted_annonce_numeros',{})||{},
-          comptesBloques:comptesBloquesVinted(),
-        }).catch(()=>{});   // un passage qui tombe ne retire rien (il reste « à retirer »)
+        // (3 nov.) + les ventes Leboncoin et Vestiaire PROUVÉES par identité
+        // (src/retraitAilleurs.js) : « vendu sur un site ⇒ retiré d'eBay ».
+        if(dvE.aRetirerEbay.length || (dvE.aRetirerEbayAilleurs||[]).length) (async()=>{
+          const pvA=(dvE.aRetirerEbayAilleurs||[]).length?await lirePreuvesVenteVinted().catch(()=>null):null;
+          const lbcRow=(dvE.aRetirerEbayAilleurs||[]).some(d=>d&&d.ou==='Leboncoin')?await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=cap:data->>updatedAt`,{headers:sbAuth()}).then(r=>r.ok?r.json():null,()=>null):null;
+          const vcCap=(dvE.aRetirerEbayAilleurs||[]).some(d=>d&&d.ou==='Vestiaire')?await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_ventes&select=cap:data->>capturedAt`,{headers:sbAuth()}).then(r=>r.ok?r.json():null,()=>null):null;
+          return passageRetraitEbayAuto({
+            nuageAuDepart,
+            continuer:()=>!cancelled && load('vrm_ebay_retrait_auto',false)===true,
+            annonces:annE||[], commandes:ords||[], enLigne:enLigneE,
+            toutesLues:!!(lusE && lusE.toutesLues), vendusVinted:vendusE,
+            lireNumeros:()=>load('vinted_annonce_numeros',{})||{},
+            comptesBloques:comptesBloquesVinted(),
+            ventes:ventesE,
+            ailleurs:{ revenues:pvA&&pvA.revenuesItems?pvA.revenuesItems:null,
+              lbc:ventesLbcLu&&Array.isArray(lbcRow)&&lbcRow[0]?{ ventes:ventesLbcLu, items:lbcItemsLu||null, liens:liensV, cap:lbcRow[0].cap }:null,
+              vc:Array.isArray(ventesVcN)&&Array.isArray(vcCap)&&vcCap[0]?{ ventes:ventesVcN, cap:vcCap[0].cap }:null },
+          });
+        })().catch(()=>{});   // un passage qui tombe ne retire rien (il reste « à retirer »)
       }catch(_){}
+      // ── (3 nov.) LE CYCLE D'UN ARTICLE : « N°x supprimé de Vinted » ─────────
+      // La règle est PURE (src/cycleArticle.js). D'abord sur les lectures déjà
+      // en mémoire ; les lectures lourdes (preuves de vente, recréations, coffre
+      // de Republier, ventes des autres sites) ne partent que s'il reste une
+      // question à poser. Toute lecture ratée ⇒ « pas su » ⇒ aucune carte.
+      // Rien n'est jugé avant le nuage (fiches et décisions venues du navigateur).
+      if(nuageAuDepart) try{
+        const retireesC=annoncesRetirees();
+        const exclusC=new Set([...(load('vinted_accounts_blocked',[])||[]), ...(load('vinted_accounts_hidden',[])||[]), ...retireesC].map(String));
+        const lectures=new Map();
+        await Promise.all((vintedAccounts||[]).filter(a=>a&&!exclusC.has(String(a.vinted_user_id))).map(async a=>{
+          const l=await fetchVintedListings(a,1,{moissonSeule:true}).catch(()=>null);
+          if(!l||!l.ok||l.source!=='harvest') return;
+          const ids=(x)=>new Set((Array.isArray(x)?x:[]).map(it=>String(it&&it.id)).filter(Boolean));
+          lectures.set(String(a.vinted_user_id),{ lu:l.lu, complet:l.complet===true, enLigne:ids(l.items), masquees:ids(l.masquees), aConfirmer:ids(l.aConfirmer), venduesDressing:new Set((l.soldIds||[]).map(String)) });
+        }));
+        if(cancelled) return;
+        const vus0=lireObjet(VUS_EN_LIGNE);
+        const vusN=majVusEnLigne(vus0, nums, lectures);
+        if(vusN) save(VUS_EN_LIGNE, vusN);
+        const perduesC=lireObjet('vinted_pairs_lost');
+        const base={ lectures, presentes:indexPresentes(nums, lectures, cleNum), supprimees:await lireSupprimeesTous(), vus:vusN||vus0,
+          decisions:lireObjet(CYCLE_DECISIONS), declaree:(id)=>annonceDeclareePartie(id, nums, perduesC),
+          vendusMain:new Set((load('vinted_annonces_vendues',[])||[]).map(String)), exclus:exclusC, cle:cleNum };
+        let res=cartesSupprimees(nums, { ...base, recrees:{}, viaVrm:new Set(), ventes:{} });
+        if(res.total>0){
+          const [pv, viaVrm, recrees, ordsC, vcC]=await Promise.all([
+            lirePreuvesVenteVinted().catch(()=>null),
+            lireTout('id=like.coffre_%25&data->versBrouillon->>etat=not.is.null&select=id',{strict:true}).then(r=>Array.isArray(r)?new Set(r.map(x=>(/^coffre_\d+_(\d+)$/.exec(String(x&&x.id||''))||[])[1]).filter(Boolean)):null,()=>null),
+            Promise.all([
+              fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.vinted_brouillon_*&select=id,anc:data->>ancienId,item:data->>itemId`,{headers:sbAuth()}),
+              fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.coffre_*&meta->>recreeDe=not.is.null&select=id,r:meta->>recreeDe`,{headers:sbAuth()}),
+            ]).then(async([rb,rc])=>(rb.ok&&rc.ok)?tableRecrees(await rb.json(), await rc.json()):null,()=>null),
+            lireComptesEbay().then(cE=>!Array.isArray(cE)?null:!cE.length?[]:lireEbayTous('ebay_orders',SEL_EBAY_COMMANDES,'orders',cE,true).then(r=>(!r||r.illisibles.length)?null:r.items)).catch(()=>null),
+            lireVentesVestiaire().then(d=>ventesVcDe(avecNumerosVc(d)),()=>null),
+          ]);
+          let itemsC=lbcItemsLu;
+          const vd=(it)=>numerosDejaVendus({ numeros:nums, enLigne:new Set([...lectures.values()].flatMap(l=>[...l.enLigne])), vendusVinted:pv&&pv.vendus?pv.vendus:null,
+            commandes:ordsC, ventesLbc:ventesLbcLu, itemsLbc:it, liensLbc:load('vrm_lbc_liens',{})||{}, ventesVc:vcC });
+          let verdictC=vd(itemsC===undefined?undefined:itemsC);
+          if(verdictC.lbcSansPaire>0 && itemsC===undefined){ itemsC=await lbcAnnoncesSession().catch(()=>null); verdictC=vd(itemsC||null); }
+          const ventes=(!pv||!pv.vendus||verdictC.pasSu.length||verdictC.enCours)?null:{ ids:pv.vendus, nums:new Set(verdictC.vendus.keys()), revenues:pv.revenuesItems||new Set() };
+          res=cartesSupprimees(nums, { ...base, recrees, viaVrm, ventes });
+        }
+        if(!cancelled) setCycleCartes(res);
+      }catch(_){ if(!cancelled) setCycleCartes(null); }
       if(cancelled) return;
       // ── Centre de notifications : ce qui demande une action, ici et maintenant.
       const items=[];
@@ -65127,9 +65327,9 @@ function AppCoeur() {
       if(vcARetirer>0) items.push({icon:'🟠', ic:'tag', text:`${vcARetirer} paire${vcARetirer>1?'s':''} vendue${vcARetirer>1?'s':''} ${vcARetirerOu}, encore en ligne sur Vestiaire — à retirer de Vestiaire`, n:vcARetirer, tab:'plat_vestiaire', dv:true});
       if(vcDoubles>0) items.push({icon:'🟠', ic:'tag', text:`${vcDoubles} article${vcDoubles>1?'s':''} vendu${vcDoubles>1?'s':''} sur Vestiaire, encore en vente sur Vinted — à retirer de Vinted`, n:vcDoubles, tab:'plat_vestiaire', dv:true, annonces:true});
       if(lbcDoubles>0) items.push({icon:'🟠', ic:'tag', text:`${lbcDoubles} article${lbcDoubles>1?'s':''} vendu${lbcDoubles>1?'s':''} sur Leboncoin, encore en vente sur Vinted — à retirer de Vinted`, n:lbcDoubles, tab:'leboncoin', dv:true, annonces:true});
-      if(lbcRemoveCount>0){ const noms=(lbcARetirer||[]).slice(0,3).map(r=>r.numero?`N°${r.numero}`:'').filter(Boolean); const reste=lbcRemoveCount-noms.length; items.push({icon:'🟠', ic:'tag', text: noms.length ? `${lbcRemoveCount} à retirer de Leboncoin — ${noms.join(', ')}${reste>0?` et ${reste} autre${reste>1?'s':''}`:''} vendue${lbcRemoveCount>1?'s':''} sur Vinted` : `${lbcRemoveCount} à retirer de Leboncoin (vendue${lbcRemoveCount>1?'s':''} sur Vinted)`, n:lbcRemoveCount, tab:'leboncoin', dv:true, lbcRetirer:true, avant:()=>{ DEMANDE_LBC_CIBLE.sel='[data-lbc-retirer]'; DEMANDE_LBC_CIBLE.at=Date.now(); }}); }
-      if(lbcRemoveVcCount>0) items.push({icon:'🟠', ic:'tag', text:`${lbcRemoveVcCount} à retirer de Leboncoin (vendue${lbcRemoveVcCount>1?'s':''} sur Vestiaire)`, n:lbcRemoveVcCount, tab:'leboncoin', dv:true, lbcRetirer:true, avant:()=>{ DEMANDE_LBC_CIBLE.sel='[data-lbc-retirer-vestiaire]'; DEMANDE_LBC_CIBLE.at=Date.now(); }});
-      if(lbcRemoveEbayCount>0) items.push({icon:'🟠', ic:'tag', text:`${lbcRemoveEbayCount} à retirer de Leboncoin (vendue${lbcRemoveEbayCount>1?'s':''} sur eBay)`, n:lbcRemoveEbayCount, tab:'leboncoin', dv:true, lbcRetirer:true, avant:()=>{ DEMANDE_LBC_CIBLE.sel='[data-lbc-retirer-ebay]'; DEMANDE_LBC_CIBLE.at=Date.now(); }});
+      if(lbcRemoveCount>0){ const noms=(lbcARetirer||[]).slice(0,3).map(r=>r.numero?`N°${r.numero}`:'').filter(Boolean); const reste=lbcRemoveCount-noms.length; items.push({icon:'🟠', ic:'tag', text: noms.length ? `${lbcRemoveCount} à retirer de Leboncoin — ${noms.join(', ')}${reste>0?` et ${reste} autre${reste>1?'s':''}`:''} vendue${lbcRemoveCount>1?'s':''} sur Vinted` : `${lbcRemoveCount} à retirer de Leboncoin (vendue${lbcRemoveCount>1?'s':''} sur Vinted)`, n:lbcRemoveCount, tab:'leboncoin', dv:true, lbcRetirer:true, lbcSuppr:(lbcARetirer||[]).filter(r=>r&&r.lbcId).map(r=>({ id:r.lbcId, numero:r.numero, titre:r.titre, ou:'Vinted' })), avant:()=>{ DEMANDE_LBC_CIBLE.sel='[data-lbc-retirer]'; DEMANDE_LBC_CIBLE.at=Date.now(); }}); }
+      if(lbcRemoveVcCount>0) items.push({icon:'🟠', ic:'tag', text:`${lbcRemoveVcCount} à retirer de Leboncoin (vendue${lbcRemoveVcCount>1?'s':''} sur Vestiaire)`, n:lbcRemoveVcCount, tab:'leboncoin', dv:true, lbcRetirer:true, lbcSuppr:lbcSupprVc.map(r=>({ id:r.lbcId, numero:r.numero, titre:r.titre, ou:'Vestiaire' })), avant:()=>{ DEMANDE_LBC_CIBLE.sel='[data-lbc-retirer-vestiaire]'; DEMANDE_LBC_CIBLE.at=Date.now(); }});
+      if(lbcRemoveEbayCount>0) items.push({icon:'🟠', ic:'tag', text:`${lbcRemoveEbayCount} à retirer de Leboncoin (vendue${lbcRemoveEbayCount>1?'s':''} sur eBay)`, n:lbcRemoveEbayCount, tab:'leboncoin', dv:true, lbcRetirer:true, lbcSuppr:lbcSupprEbay.map(r=>({ id:r.lbcId, numero:r.numero, titre:r.titre, ou:'eBay' })), avant:()=>{ DEMANDE_LBC_CIBLE.sel='[data-lbc-retirer-ebay]'; DEMANDE_LBC_CIBLE.at=Date.now(); }});
       // Une vente Leboncoin non reliée ne sonne plus (Julien, 16 oct. : « ça sert à
       // rien de relier une paire vendue ») : l'écran Leboncoin ne la demande que si
       // une paire qui y ressemble est encore en vente sur Vinted.
@@ -65952,7 +66152,7 @@ function AppCoeur() {
             annoncer « 🎉 Tout est à jour ! » pendant la panne, c'est-à-dire
             précisément l'écran qu'il ouvre le matin. Corriger « partout » se
             vérifie au rendu, écran par écran, pas en lisant le code. */}
-        {tab==='journee'&&<Comptabilite key="journee" panelOff={panelOffCoque} accounts={vintedAccounts} only="journee" alertes={notifItems} liveStats={liveStatsVus} onNav={setTab} baseKO={baseKO} accountsReady={accountsLoaded} premierJour={premierJour} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
+        {tab==='journee'&&<Comptabilite key="journee" panelOff={panelOffCoque} accounts={vintedAccounts} only="journee" alertes={notifItems} cycle={cycleCartes} onCycle={()=>setPreuveTick(t=>t+1)} liveStats={liveStatsVus} onNav={setTab} baseKO={baseKO} accountsReady={accountsLoaded} premierJour={premierJour} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
         {/* ⚠️ « Bienvenue 👋 · connecte ton compte Vinted pour commencer » à
             quelqu'un qui a neuf comptes : c'est ce qu'il voyait quand la base
             ne répondait pas. `baseKO` distingue « aucun compte » de « je n'ai
