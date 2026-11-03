@@ -47,7 +47,7 @@ const MODE={
   attente_favori:{texte:'Allumé : un favori attend son délai avant le message.'},
   lecture:{texte:'Allumé : VRM n’a pas pu lire ses données, nouvel essai dans quelques minutes.'},
   a_verifier:{texte:'En attente : un message est à vérifier sur Vinted.',geste:'Regarde-le dans « À vérifier » plus bas.'},
-  garde_absente:{texte:'Rien ne part : VRM n’a pas pu vérifier tes paires vendues ailleurs.',geste:'Ouvre une fois l’écran Annonces de VRM.'},
+  garde_absente:{texte:'Rien ne part : VRM n’a pas pu vérifier tes articles vendus ailleurs.',geste:'Ouvre une fois l’écran Annonces de VRM.'},
   dressing_absent:{texte:'Rien ne part : VRM n’a pas vu ton dressing.',geste:'Ouvre ton dressing sur vinted.fr avec ce compte.'},
   dressing_ancien:{texte:'Rien ne part : ton dressing a été vu il y a plus de 24 h.',geste:'Ouvre ton dressing sur vinted.fr avec ce compte.'},
   dressing_partiel:{texte:'Rien ne part : VRM n’a vu qu’une partie de ton dressing.',geste:'Ouvre ton dressing sur vinted.fr et fais-le défiler jusqu’au bout.'},
@@ -94,8 +94,8 @@ export const RAISONS_ECRAN={
   conversation:{texte:'déjà une conversation avec cette personne'},
   contacte_30j:{texte:'personne déjà contactée ces 30 derniers jours'},
   deja_contacte:{texte:'déjà contactée pour cette annonce'},
-  vendue:{texte:'paire vendue'},
-  reservee:{texte:'paire réservée'},
+  vendue:{texte:'article vendu'},
+  reservee:{texte:'article réservé'},
   en_pause:{texte:'annonce en pause ou masquée'},
   fermee:{texte:'annonce plus en ligne'},
   annonce_absente:{texte:'annonce absente de ton dressing vu par VRM'},
@@ -145,7 +145,11 @@ const INCERTAINES=['reponse_inconnue','incertain'];
 export function etatFavori({job=null,journal=[],vendue=false}={}){
   const j0=Array.isArray(journal)?journal[0]||null:null;
   const envoiJournal=Array.isArray(journal)?journal.find(x=>x?.etat==='envoye'):null;
-  if(job?.etat==='envoye')return {code:'envoye',date:job.envoyeLe||job.traiteLe||envoiJournal?.at||null};
+  // (3 nov.) « Offre faite » se PROUVE : le message est parti avec ses trois écritures
+  // (conversation, offre, message — `ecrits` rendu par l'extension ≥ 5.309). Sans ce
+  // compte, on dit « envoyé », jamais « offre faite » (une offre refusée arrête le favori
+  // depuis la 5.307, mais un envoi plus ancien a pu partir sans elle).
+  if(job?.etat==='envoye')return {code:'envoye',date:job.envoyeLe||job.traiteLe||envoiJournal?.at||null,...(job.ecrits===3?{offre:true}:{})};
   if(envoiJournal)return {code:'envoye',date:envoiJournal.at||null};
   if(job?.etat==='incertain')return {code:'a_verifier'};
   if(['attente','reserve'].includes(job?.etat))return {code:'en_cours',auto:job.auto===true};
@@ -220,4 +224,150 @@ export function resumeOffre(reglages){
   if(m==='euros'&&v)return `Avec une offre à −${nb(v)} €${reglages.arrondi?', arrondie à l’euro':''}.`;
   if(m==='prix'&&v)return `Avec une offre à ${nb(v)} €.`;
   return 'Sans offre de prix.';
+}
+
+// ══ 3 NOVEMBRE — L'ÉCRAN « FUSION » : UNE CARTE PAR ARTICLE ═══════════════════
+// Julien (3 nov., 10 h 16) : « fais une meilleure interface pour les messages aux
+// favoris » — premium, peu de couleur, aucun texte explicatif, des photos,
+// « article » et pas « paire ». La liste devient UNE carte par ARTICLE (identité :
+// l'identifiant /items/<id> du lien, jamais le texte), avec les personnes qui l'ont
+// mis en favori, UN état en une puce et UN geste.
+//
+// Mesuré en lecture seule sur sa base (3 nov.) : les notifications de favori
+// n'ont PAS de champ `actor` (clés : body, id, image{url}, link, updated_at,
+// user_id…) ; `image.url` est la PHOTO DE L'ARTICLE (une adresse par article,
+// jamais un avatar) ; le texte est « <pseudo> a marqué ton article <titre> comme
+// favori » ; le lien « /items/<id>/want_it/new?offering_id=<n> » ; 120 favoris
+// pour 14 articles sur un compte. Vinted ne donne AUCUN avatar : la pile montre
+// l'initiale du pseudo que Vinted écrit lui-même en tête de sa phrase — jamais un
+// nom inventé ; pas de pseudo lisible ⇒ un rond vide.
+
+// Le pseudo tel que Vinted l'écrit (champ `nom` si présent, sinon le premier mot
+// de SA phrase, seulement s'il a la forme d'un pseudo). Affichage seulement : le
+// destinataire d'un message reste prouvé par le serveur, jamais par ce texte.
+const PSEUDO_RE=/^([\p{L}\p{N}._-]{1,40}) (?:a|vient d['’]) ?(?:marqué|ajouté|mis|enregistré)(?=\s|$)/u;
+export function pseudoFavori(ligne){
+  const nom=String(ligne?.nom||'').trim();
+  if(nom)return nom.slice(0,40);
+  const m=PSEUDO_RE.exec(String(ligne?.body||'').trim());
+  return m?m[1]:'';
+}
+// Le titre que Vinted écrit dans sa phrase, pour une carte DÉJÀ identifiée par
+// /items/<id> quand VRM n'a pas l'annonce (jamais pour relier quoi que ce soit).
+export function titreNotification(body){
+  const m=/\bton article (.{2,200}?) (?:comme favori|à ses favoris|en favori|dans ses favoris)\b/i.exec(String(body||''));
+  return m?m[1].trim():'';
+}
+export function initialePseudo(pseudo){
+  const p=String(pseudo||'').replace(/^[._\-\d]+/,'');
+  const c=[...p][0]||[...String(pseudo||'')][0]||'';
+  return c?c.toLocaleUpperCase('fr'):'';
+}
+
+// Les refus qui viennent de Vinted lui-même (une puce « Refusé par Vinted »).
+const REFUS_VINTED=new Set(['vinted_refus','offre_refusee','vinted_frein','vinted_robot']);
+// La puce d'un favori « pas envoyé », en deux ou trois mots.
+const PUCE_RAISON={
+  conversation:'Déjà en conversation',contacte_30j:'Déjà contacté',deja_contacte:'Déjà contacté',
+  vendue:'Vendu',reservee:'Réservé',en_pause:'En pause',fermee:'Plus en ligne',annonce_absente:'Plus en ligne',
+  destinataire:'À ouvrir',expire:'Trop ancien',limite_heure:'Limite de l’heure',
+};
+export function puceRaison(raison){return REFUS_VINTED.has(raison)?'Refusé par Vinted':PUCE_RAISON[raison]||'Pas envoyé';}
+// L'état d'une PERSONNE, en mots (feuille de détail d'un article).
+export function texteEtatPersonne(p){
+  if(p.etat==='envoye')return p.offre?'Offre faite':'Envoyé';
+  if(p.etat==='a_envoyer')return 'À envoyer';
+  if(p.etat==='en_cours')return 'En cours';
+  if(p.etat==='a_verifier')return 'À vérifier';
+  return puceRaison(p.raison);
+}
+
+export const PERIODES_FAVORIS=[['7','7 j'],['30','30 j'],['tout','Tout']];
+export function debutPeriode(periode,maintenant=Date.now()){
+  const j=periode==='7'?7:periode==='30'?30:0;
+  return j?maintenant-j*86400000:-Infinity;
+}
+
+// Les favoris rangés par ARTICLE.
+//   lignes, statut, journal, vendue, article(itemId) → {titre, numero, photo, prix} ;
+//   periode : '7' · '30' · 'tout' (date du favori ; sans date lisible ⇒ comptée dans « Tout » seulement).
+// → { cartes:[…], resume:{favoris, articles, envoyes, vendus, attente} }
+export function articlesFavoris({lignes=[],statut=()=>null,journal=[],vendue=()=>false,article=()=>null,maintenant=Date.now(),periode='tout'}={}){
+  const debut=debutPeriode(periode,maintenant);
+  const parNotif=new Map();
+  for(const x of Array.isArray(journal)?journal:[]){if(!x||x.notificationId==null)continue;const k=String(x.notificationId);if(!parNotif.has(k))parNotif.set(k,[]);parNotif.get(k).push(x);}
+  for(const l of parNotif.values())l.sort((a,b)=>(Number(b.at)||0)-(Number(a.at)||0));
+  const cartes=new Map();
+  for(const ligne of Array.isArray(lignes)?lignes:[]){
+    const t=Date.parse(ligne?.date||'');
+    if(debut>-Infinity&&!(Number.isFinite(t)&&t>=debut))continue;
+    const itemId=itemIdFavori(ligne);
+    const cle=itemId?'item:'+itemId:'sans:'+ligne.id;
+    if(!cartes.has(cle)){
+      let a=null;if(itemId){try{a=article(itemId)||null;}catch{a=null;}}
+      const prix=Number(a?.prix);
+      cartes.set(cle,{cle,itemId,titre:a?.titre||(itemId?titreNotification(ligne.body):''),numero:a?.numero!=null&&a.numero!==''?String(a.numero):'',photo:a?.photo||ligne.photo||null,prix:Number.isFinite(prix)&&prix>0?prix:null,vendu:false,personnes:[],dernier:0});
+    }
+    const c=cartes.get(cle);
+    const estVendue=!!vendue(ligne);if(estVendue)c.vendu=true;
+    const e=etatFavori({job:statut(ligne),journal:parNotif.get(String(ligne.id))||[],vendue:estVendue});
+    const pseudo=pseudoFavori(ligne);
+    const dateEnvoi=e.code==='envoye'&&Number.isFinite(new Date(Number(e.date)||Date.parse(e.date)).getTime())?new Date(Number(e.date)||Date.parse(e.date)).toISOString():null;
+    c.personnes.push({id:ligne.id,pseudo,initiale:initialePseudo(pseudo),etat:e.code,raison:e.raison||null,offre:e.offre===true,
+      detail:e.code==='envoye'?(e.date?heureParis(e.date):'date non lue'):ageFavori(ligne.date,maintenant),dateEnvoi,
+      ouvrir:e.code==='pas_envoye'&&RAISONS_ECRAN[e.raison]?.ouvrir===true});
+    if(!c.photo&&ligne.photo)c.photo=ligne.photo;
+    if(Number.isFinite(t)&&t>c.dernier)c.dernier=t;
+  }
+  const liste=[...cartes.values()].map(c=>{
+    const n={a_envoyer:0,en_cours:0,a_verifier:0,envoye:0,offre:0,pas_envoye:0,refus:0};
+    for(const p of c.personnes){n[p.etat]=(n[p.etat]||0)+1;if(p.offre)n.offre++;if(p.etat==='pas_envoye'&&REFUS_VINTED.has(p.raison))n.refus++;}
+    return {...c,compte:n,...puceArticle(c,n)};
+  });
+  const rang=c=>c.geste==='verifier'?0:c.geste==='envoyer'?1:c.geste==='ouvrir'?2:c.puce.code==='en_cours'?3:4;
+  liste.sort((a,b)=>rang(a)-rang(b)||b.dernier-a.dernier||String(a.cle).localeCompare(String(b.cle)));
+  const resume={favoris:0,articles:liste.length,envoyes:0,vendus:0,attente:0};
+  for(const c of liste){resume.favoris+=c.personnes.length;resume.envoyes+=c.compte.envoye;resume.attente+=c.compte.a_envoyer+c.compte.en_cours;if(c.vendu&&c.itemId)resume.vendus++;}
+  return {cartes:liste,resume};
+}
+
+// UNE puce et UN geste par article. `ton` : 'neutre' · 'geste' (ambre : à toi de jouer).
+export function puceArticle(c,n){
+  if(n.a_verifier)return {puce:{code:'a_verifier',texte:'À vérifier',ton:'geste'},geste:'verifier'};
+  if(n.en_cours)return {puce:{code:'en_cours',texte:'En cours',ton:'neutre'},geste:null};
+  if(n.a_envoyer&&!c.vendu)return {puce:{code:'a_envoyer',texte:n.a_envoyer>1?`${n.a_envoyer} à envoyer`:'1 à envoyer',ton:'neutre'},geste:'envoyer'};
+  if(c.vendu)return {puce:{code:'vendu',texte:'Vendu',ton:'neutre'},geste:null};
+  if(n.refus)return {puce:{code:'refus',texte:'Refusé par Vinted',ton:'neutre'},geste:null};
+  if(n.offre)return {puce:{code:'offre',texte:'Offre faite',ton:'neutre'},geste:null};
+  if(n.envoye)return {puce:{code:'envoye',texte:'Envoyé',ton:'neutre'},geste:null};
+  const ouvrir=c.personnes.find(p=>p.ouvrir);
+  if(ouvrir)return {puce:{code:'ouvrir',texte:'À ouvrir',ton:'geste'},geste:'ouvrir'};
+  const p0=c.personnes.find(p=>p.etat==='pas_envoye');
+  return {puce:{code:'pas_envoye',texte:puceRaison(p0?.raison),ton:'neutre'},geste:null};
+}
+
+// Les filtres de la liste : à faire (un geste) · envoyés · tous.
+export const FILTRES_ARTICLES=[['afaire','À envoyer'],['envoyes','Envoyés'],['tous','Tous']];
+export function filtrerArticles(cartes,filtre){
+  if(filtre==='afaire')return cartes.filter(c=>c.geste==='envoyer'||c.geste==='verifier'||c.geste==='ouvrir'||c.puce.code==='en_cours');
+  if(filtre==='envoyes')return cartes.filter(c=>c.compte.envoye>0);
+  return cartes;
+}
+
+// L'aperçu du message : le VRAI texte, variables remplacées sur un favori réel,
+// et l'offre sur le prix d'un article réel quand VRM le connaît.
+//   personnaliser, prixOffre : les fonctions de src/favorisMessage.js (règle unique).
+export function apercuMessageFavori({message='',offre=null,exemple=null,personnaliser,prixOffre}={}){
+  const texte=message?personnaliser(message,exemple?.pseudo||'',()=>0):'';
+  let offreTxt='';
+  if(offre&&offre.mode){
+    const prix=Number(exemple?.prix);
+    const apres=Number.isFinite(prix)&&prix>0?prixOffre(prix,offre):null;
+    const eur=x=>Number(x).toFixed(2).replace('.',',').replace(/,00$/,'')+' €';
+    if(apres)offreTxt=`${eur(prix)} → ${eur(apres)}`;
+    else if(offre.mode==='pct')offreTxt=`Offre −${offre.valeur} %`;
+    else if(offre.mode==='euros')offreTxt=`Offre −${eur(offre.valeur)}`;
+    else offreTxt=`Offre à ${eur(offre.arrondi?Math.floor(offre.valeur):offre.valeur)}`;
+  }
+  return {texte,offre:offreTxt};
 }

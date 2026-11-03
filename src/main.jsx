@@ -107,6 +107,7 @@ import './styles-compta-claire.css';
 // (2 nov.) Le style « Fusion » (son choix sur les maquettes) : cartes blanches, carte sombre du mois,
 // frises de suivi — en tout dernier, il a le dernier mot sur la forme des écrans qui le portent.
 import './design/fusion.css';
+import './design/favoris.css';
 import { suivreRangeesDefilantes } from './rangeesDefilantes.js';
 if (typeof document !== 'undefined') { if (document.body) suivreRangeesDefilantes(); else document.addEventListener('DOMContentLoaded', suivreRangeesDefilantes); }
 
