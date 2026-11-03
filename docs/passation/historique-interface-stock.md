@@ -3236,6 +3236,48 @@ jetons.css retiré : 21 rouges à 390 clair). Bancs suivis (note « retiré à l
 3 nov. ») : demo-bulles, photoroom-carte, vinted-ui, tout-generer, vendeur-neuf, transporteurs-logos,
 ebay-agent, agent-ebay-push, audit-agent-ebay, brouillons-avancee, garage3d, vestiaire,
 glisser-onglet, compta-claire, tests synchronisation-vinted.
+### 3 nov. — Trois outils choisis par Julien (13 h 02) : « Ce qui rapporte le plus », « Articles qui dorment », recherche par la voix (branche `claude/stats-outils`)
+
+**1. Statistiques → « Ce qui rapporte le plus »** (`src/ceQuiRapporte.js`, carte `src/design/CeQuiRapporte.jsx`,
+style Fusion `src/design/outils-stats.css`) : classement segmenté Modèle · Marque · Taille · Compte · Site, sur les ventes
+finalisées de la PÉRIODE choisie (`lp` de `StatsVitrine`) : bénéfice brut total (tri), moyen par article, marge, nombre
+vendu, médiane du temps pour vendre dite en mots (« la moitié part en moins de 6 j » : `floor(médiane)+1`), couverture
+« prix d'achat connus N/M » en tête et « n/N » sur la ligne ; toucher une ligne ⇒ ses articles (titre, date, compte, prix,
+brut). Jamais « au moins » sur un brut ; groupe sans prix d'achat ⇒ « — ». Le **modèle** n'est qu'une statistique
+(`modeleSur`) : catalogue fermé où chaque modèle porte ses marques ; marque lue sur l'annonce (Vinted `brand`, reliée par
+la transaction) qui contredit ⇒ « Autres » ; numéro seul (« 550 ») sans New Balance lue ⇒ « Autres » ; mots entiers
+(« air max 1 » n'est pas dans « air max 180 »). Mesuré en lecture seule sur la vraie base : `brand` et `size` sont des
+chaînes sur 532/536 annonces, tailles variées (« XL », « M / 38 / 10 ») ; tout n'est pas chaussure ⇒ « article ».
+Le relevé `vrm_stats_ventes` est désormais construit par `releveVentes` (déplacé tel quel du `useEffect` de Ventes, pour
+être EXÉCUTÉ par l'audit) ; seul changement : le prix Vinted lu par `montantCommandeLu` (un prix illisible était 0 €,
+il est `null` et le classement l'écarte, `ecartees`).
+**2. Annonces → « Articles qui dorment »** (`src/quiDorment.js`, `src/design/QuiDorment.jsx`) : unifié avec la vue
+existante « À relancer » / tri « En ligne depuis longtemps » (`annSort==='sleeping'`) — la liste remplace la grille dans
+cette vue ; base `annBase` (règle « en ligne ») ; seuil 30/60/90 j (localStorage `vrm_qd_seuil`), mêmes bornes que
+`stockQuiDort` de Statistiques ; le plus ancien d'abord ; vues/favoris s'ils sont lus ; « Agir » ⇒ Baisser le prix
+(atelier Republier « modifier », article pré-choisi), Republier (« recréer »), Mettre sur Leboncoin (file + fiche
+`FicheLbc` ouverte par `DEMANDE_LBC_FICHE`), Mettre sur eBay (`EbayPublier` ouvert sur l'article, `DEMANDE_EBAY_PAIRE`) ;
+grisés avec la raison quand l'extension ne sait pas. Rien ne part tout seul. Statistiques → « Les articles qui dorment »
+porte « Voir la liste » (`demanderVue('dorment')`). ⚠️ Trouvé : fermer une feuille PUIS changer de section dans le même
+onglet faisait `history.back()` avant le rendu du nouvel écran ⇒ retour à Vinted 1 fois sur 2 ; ici on navigue d'abord
+(la feuille se démonte avec l'écran). Le même motif existe ailleurs (ex. « Conversation » du récapitulatif de vente) : pas touché.
+« Prix à baisser » de Ma journée reste une autre notion (vues sans favori), pas fusionnée.
+**3. Recherche par la voix** (`src/rechercheVocale.js`) : le micro existant (`MicDictee`, Web Speech du navigateur,
+`fr-FR`, aucun son envoyé par VRM) est posé dans la barre (ordinateur et téléphone, 44 px, `nu`) ; « numéro 124 »,
+« N 124 », « cent vingt-quatre », « quatre-vingt-dix-sept » ⇒ 124/97 ; « B 125 », « bé 125 » ⇒ B125 ; sinon le texte.
+Le bouton n'apparaît que si `SpeechRecognition` est une fonction, et disparaît si le micro est refusé (`not-allowed` ou
+permission `denied`). La recherche du Stock passe aussi par `requeteDeLaVoix`.
+
+**Preuves** : `audit-ce-qui-rapporte` (84 contrôles ; jeu fabriqué : deux comptes, 50 articles au même titre, achats
+manquants, annulée, masquée, prix illisible, eBay en livres écarté par `ventesAutresBenefice` extraite d'App.jsx ;
+12/12 mutations rouges ; rouge sur `origin/main`), `audit-qui-dorment` (4/4 mutations, 5 rouges sur main),
+`audit-recherche-vocale` (37 cas, 6/6 mutations, 3 rouges sur main). Banc `scripts/bancs/outils-stats.cjs` (390 tactile
+clair/sombre, 1512, fausse `SpeechRecognition`) : 109 verts, 12 rouges sur main. Non régressés : stats-vitrine,
+carte-stats (81), audits stats-ventes, benefice-unique, carte-chiffres, coherence, icones, identite ; rouges identiques
+à main : stats-detail (14), audit-chiffres, lectures, politique-hotes, vc-recon ; absents ici : `@babel/parser`,
+`fast-xml-parser`, Postgres.
+**Reste** : « Les modèles qui partent vite » groupe encore par `extractModel` (pas le modèle sûr) ; le catalogue de
+modèles est court (à enrichir sur ses ventes réelles).
 **3 nov., après revue (13 h)** — fusion de main (carte sombre réglable `CarteStatsApp` gardée sur Colis/Ma journée ;
 sur « À retirer » la carte dit les colis à retirer) ; « Bénéfice du mois 0 € » venait d'une base d'avant
 `benefice-urssaf` : la fusion rend « — » (`chiffreBenefice`). **« À retirer » en SECTIONS** (Julien, 13 h 02 :
@@ -3348,3 +3390,57 @@ vente finalisée ce mois-ci » sous la carte de Compta.
 Preuves : `carte-stats` D (plage du 30 oct. au 1er nov. = 3 ventes à la main, étiquette, rangement,
 retour à « Ce mois ») ; `audit-carte-chiffres` +5 (rouges sur main : bénéfice sur plage de la place,
 plage gardée au réglage).
+### LES QUATRE OUTILS DES ANNONCES : PRIX PARTOUT, DUPLIQUER, HISTOIRE, MODÈLES (3 novembre, branche `claude/annonces-outils`)
+Choix de Julien (3 nov.), dans cet ordre, style Fusion, sans texte explicatif.
+- **Mesuré (lecture seule)** : fiches `vinted_annonce_numeros` = 505, toutes avec `numberedAt` ;
+  `recreeAt/recreeDe` 7, `repriseAt` 17, `min` (prix mini des offres) 13, `buyFromId` 8 ; coffres
+  (`coffre_{uid}_{id}`, 762) portent `firstSavedAt`, `brand`, `etat`, `desc` ; 927 conversations portent
+  `transaction.item_id`, les offres sont des messages `offer_request_message` (`entity.price`,
+  `status_title`, `user_id`, `created_at_ts`) ; reçus d'achat `email_invoice_tx{n°}` ; `lbc_listings`
+  (184 actives, prix en euros, `ref`, `url`) ; `vc_listings` (statut `published`, `prix.valeur`) ;
+  `vinted_prix_historique` (prix changés par Republier, par annonce). Aucune date de publication
+  Vinted dans les annonces lues : la mise en ligne est datée par la PREMIÈRE sauvegarde coffre
+  (« Vue en ligne »), sinon sans date.
+- **1. Prix partout** (`src/prixPartout.js`, `src/PrixPartout.jsx`) : fiche d'un N° (ou carte d'annonce
+  → « Changer le prix », événement `vrm:prix-partout`) ⇒ feuille : nouveau prix (`prixTape`, la règle
+  de `prixLu`), une case par site où CE N° est en ligne PAR IDENTITÉ (Vinted : la fiche en ligne de
+  `toutSurLeNumero`, jamais masquée ni « à confirmer » ; eBay : SKU `VRM-{n°}` ; Leboncoin : lien posé
+  ou référence VRM — jamais le « nXX » d'un titre ; Vestiaire : lien, `ref` VRM ou N° du produit, deux
+  qui se contredisent ⇒ personne), état après envoi (Fait · Refusé + raison · Pas sûr · À faire sur le
+  site + « Ouvrir »). Envois (`envoisPrix`, appelés seulement par « Appliquer », sites cochés, un par
+  un) : eBay = route `revise` avec `confirme:true` et `prixVu` (trois issues, `resultatReviseEbay`) ;
+  Vinted = commande existante `republierVinted` (PUT en place, confirmée, capacité `republiermodif`
+  5.247.0 ; sinon « À faire sur le site »). **Leboncoin et Vestiaire : aucune capacité prouvée pour
+  changer un prix ⇒ toujours « À faire sur le site »** (Vestiaire : pas d'URL d'article lue, le lien
+  ouvre Vestiaire). Aucune version d'extension neuve : la forme d'une modification Leboncoin/Vestiaire
+  n'a jamais été mesurée — à mesurer sur SON geste avant de proposer `lbcprix`/`vcprix` (5.318+).
+  Le prix mini (`min`) n'est jamais changé : s'il dépasse le nouveau prix, une ligne ambre le dit.
+  Journal `vrm_prix_journal` (synchronisé, sites FAITS seulement) pour l'histoire.
+- **2. Dupliquer** (`src/dupliquerFiche.js`, `dupliquerNumero` dans App.jsx) : N° neuf par le VRAI
+  `prochainLibre` sur tous les numéros servis (pool, fiches, ventes corrigées, liens Leboncoin,
+  Vestiaire, fiches neuves, **réservations `panel_num_reserves` — illisibles ⇒ rien**), version de
+  numérotation vérifiée, pool écrit AVANT la fiche ; copie en LISTE BLANCHE (titre, marque, taille,
+  état, description, prix ; aucune photo, aucun identifiant d'annonce/transaction/SKU, ni compte, ni
+  prix d'achat, ni prix mini). Rangée dans `vrm_fiches_neuves` (synchronisée) ; Annonces → « À
+  publier » (N°, titre, « photos à prendre », Copier le texte, Retirer — le N° reste servi) ; sort de
+  la liste quand une annonce porte son N°. ⚠️ Limite : la page de dépôt Vinted réserve SON numéro
+  (5.201) ; pour garder celui de la copie, il faut le poser à la main sur l'annonce publiée.
+- **3. Histoire** (`src/histoireArticle.js`, rendue par `FichePaire`) : achat (+ reçu rangé / pas de
+  reçu / pas lu) → numéroté (`numberedAt`) → rangée → mises en ligne (coffre, republication
+  `recreeAt`, eBay `depuis`, Leboncoin/Vestiaire par identité) → prix (journal + Republier) → offres
+  (par `item_id`, sens par l'auteur, inconnu ⇒ « Offre ») → favoris et vues → vente (preuve :
+  transaction et état) → colis → versement (450) → retour/annulation. Chaque ligne : date LUE (sinon
+  « — »), preuve, lien. Source pas lue ⇒ « passu » ; lue et vide ⇒ « absent ». Lectures en plus
+  (`lireExtraFiche`, projetées, à l'ouverture seulement).
+- **4. Mes modèles** (`src/modelesDescription.js`, `src/ModelesDescription.jsx`) : Paramètres →
+  Annonces → Mes modèles (`vrm_modeles_desc`, synchronisée) ; variables `{taille}` `{marque}` `{N°}`
+  `{titre}` `{prix}` ; une variable sans valeur RESTE écrite. Chips insérées au curseur dans 4
+  descriptions : fiche Leboncoin, eBay Publier, eBay Modifier, brouillon de Republier. Vestiaire :
+  la description n'est pas éditable dans VRM (l'extension reprend celle de Vinted) — pas de chips.
+- **Preuves** : `scripts/audit-annonces-outils.cjs` 45 contrôles (P1-P14, D0-D7, H1-H10, M1-M3, A1-A5),
+  `--prouve` : **43 rouges sur origin/main, 17/17 mutations**. Banc `scripts/bancs/annonces-outils.cjs`
+  (390 tactile clair + sombre, 1512) : feuille du N°118 (Vinted sans extension ⇒ « À faire sur le site »
+  + lien, eBay confirmé au prix vu ⇒ Fait, rien à l'ouverture, 44 px), Dupliquer N°227 ⇒ N°251 sans
+  photo ni identité, histoire datée — vert ; **rouge sur origin/main**. `fiche-paire` remis à l'ordre de
+  l'histoire (vert). Le retour « Tout sur le N° » ne se coupe plus mot à mot (`nowrap`, défaut de main).
+- **Geste de Julien** : essayer « Changer le prix » sur un N° en ligne sur Vinted + eBay ; créer un modèle.

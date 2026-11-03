@@ -211,3 +211,15 @@ Déplacé TEL QUEL depuis CLAUDE.md §9 le 2 novembre 2026 (le fichier dépassai
 ### Lignes de §9 déplacées telles quelles
 - **2 nov. (soir)** — Tournée de tous les audits sur `main` : 221/221 verts (SQL sur Postgres 17 ; sur Postgres 18 les empreintes de forme changent car les NOT NULL vont dans `pg_constraint` — 016 corrigée, 014/018-020 déjà appliquées laissées). Revue indépendante ⇒ 5.313.0. Tournée des 257 bancs en cours (branche `claude/tournee-bancs`). Geste : aucun.
 - **2 nov. (soir)** — **Extension 5.313.0** (revue indépendante) : le frein relu dans la file (une paire en attente ne part plus après le refus d'une autre), « limite » n'est plus une restriction 24 h, pas de recréation si l'annonce n'a pas pu être lue, plafond partagé au compte EXACT (`audit-recreer` R1-R5). → historique vinted-extension. Geste : installer la 5.313.0.
+
+### Lignes de §9 déplacées telles quelles
+- **2 nov. (soir)** — Saisies sans réseau gardées sur l'appareil (file d'envoi `src/fileEnvoi.js`, rejouée par la fusion clé par clé au chargement, vidée quand la base ACCEPTE ; « N changements en attente d'envoi » dit une fois) : les prix tapés en 4G faible ne se perdent plus quand l'iPhone ferme l'app. Banc `file-envoi` (rouge sur l'avant). → historique sécurité-base-serveur. Geste : aucun.
+
+### Lignes de §9 déplacées telles quelles
+- **2 nov. (nuit)** — **Extensions 5.314.0 / 5.315.0** : annonces Vestiaire lues (forme réelle `{type, published:{product}}`, C10) ; puis « tout Vestiaire » GARDÉ tel que la page le charge (`vc_brut_*`, `vc_pdf_*` pour les bordereaux, secrets retirés, aucune requête de plus, C11). → historique vestiaire. Geste : installer, se promener sur Vestiaire.
+- **2 nov. (nuit)** — **Facture Pro refaite** : « Envoyer la facture à l'acheteur » sur chaque vente Pro PROUVÉE (transaction), mentions légales (EI, 293 B / marge sans TVA / TVA), numéro sans trou au clic (journal, comparer-et-échanger ; l'email ne numérote plus), instantané + avoir, PDF identique app/serveur, envoi depuis la boîte du VENDEUR (SMTP, mot de passe chiffré, §2.9) (`src/facturePro/`, `api/_lib/facture-pro.js`, `audit-facture-pro`, banc `facture-pro`). → historique compta. Geste : voir « Gestes ».
+
+### Lignes de §9 déplacées telles quelles
+- **2 nov. (nuit)** — Transporteur LU (jamais deviné, sinon « Transporteur pas lu ») en logo + nom à côté du bordereau, ventes et achats (`src/transporteursVisuels.js`, `src/PastilleTransporteur.jsx`, banc `transporteurs-logos`) ; achats Vestiaire sortis de « À envoyer ». Reste : n° Mondial Relay dans l'email du bordereau, eBay avant étiquette, stats. → historique colis-retraits. Geste : regarder Colis au téléphone (logos).
+- **2 nov. (nuit)** — Carte des relais immobile (transition des boutons + arrondi MapLibre, banc `carte-stable`) ; parcours d'un nouveau vendeur : 13 défauts corrigés (banc `nouveau-vendeur`). → historique interface-stock. Geste : aucun.
+- **2 nov. (nuit)** — **Extension 5.316.0** : vente Vestiaire complète (photo, titre, montant versé `sellerEarning`, transporteur, suivi, bordereau PDF rapatrié → « Imprimer le bordereau » ; C10, C12). → historique vestiaire.

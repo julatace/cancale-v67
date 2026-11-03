@@ -108,6 +108,7 @@ import './styles-compta-claire.css';
 // frises de suivi — en tout dernier, il a le dernier mot sur la forme des écrans qui le portent.
 import './design/fusion.css';
 import './design/favoris.css';
+import './design/outils-stats.css';
 // (3 nov.) Les jetons Fusion pour TOUTE l'app (échelle fermée, segmentés, cartes) — le tout dernier mot.
 import './design/jetons.css';
 import { suivreRangeesDefilantes } from './rangeesDefilantes.js';

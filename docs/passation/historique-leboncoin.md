@@ -1267,3 +1267,6 @@ Non mesuré : une requête réelle dans les journaux Supabase.
 
 ### « SUPPRIMER DE LEBONCOIN » SUR LA CARTE DE MA JOURNÉE ; (b) « TOUJOURS CHEZ MOI » PAS ENCORE DANS LA FILE (3 novembre)
 Récit complet : `historique-interface-stock.md`, « LE CYCLE D'UN ARTICLE ». La carte « à retirer de Leboncoin » porte « Supprimer » (confirmé, identité, `lbcSupprime`). La file Leboncoin reste celle de l'extension (en ligne seulement) : ajouter les articles « Toujours chez moi » demande une version d'extension (`buildLbcData`).
+
+### 3 nov. — Prix partout, dupliquer, histoire, modèles (`claude/annonces-outils`)
+Récit : `historique-interface-stock.md` (« LES QUATRE OUTILS DES ANNONCES »). Ici : aucun changement de prix depuis VRM (forme jamais mesurée) ⇒ « À faire sur le site » ; chips de modèles dans la fiche Leboncoin.

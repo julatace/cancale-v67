@@ -63,8 +63,15 @@ import {formaterMontantEbay} from './montantsEbay.js';
 import {cibleEbay} from "./ebayParcours.js";
 import {centimes,coutsVente,beneficePaire,champsCharges} from "./beneficePaire.js";
 import CoutsVente from "./CoutsVente.jsx";
+import { feuillesExport, fichiersExport, zipStocke, nomExport } from "./exportDonnees.js";
+import { suggestionsAchat, tousAchatsLibres, filtresAchats, etiquetteLot, liensParAchat, lotDe, prixIndicatifLot, ecritureLot } from "./suggestionsAchat.js";
 import { boostRentable, SEUIL_BOOST } from "./boostRentable.js";
 import { CLE_WIDGETS_JOURNEE, WIDGETS_JOURNEE, NOM_TAILLE, DISPO_JOURNEE_DEFAUT, normaliserDispoJournee, deplacerWidget, retirerWidget, widgetFixe, tailleSuivante, tailleDefautWidget, caseVisible, widgetsAjoutables, dispoAEnregistrer } from "./journeeWidgets.js";
+import { modeleSur, releveVentes } from "./ceQuiRapporte.js";
+import CeQuiRapporte from "./design/CeQuiRapporte.jsx";
+import { requeteDeLaVoix } from "./rechercheVocale.js";
+import { articlesQuiDorment, seuilValide } from "./quiDorment.js";
+import QuiDorment from "./design/QuiDorment.jsx";
 import { rythmeVendu, ecartPct, quandTuVends, margesPar, delaisPar, tranchePrix, TRANCHES_PRIX, stockQuiDort, SEUILS_DORT, rotationStock, tauxVenteMois, tauxAnnulation, PERIODES, bornesPeriode, dansBornes, venduPeriode, barresPeriode, ventesPar, plusRapides } from "./statsVentes.js";
 import "./stats-vitrine.css";
 import {appelerFavorisDirect} from './favorisTransport.js';
@@ -163,6 +170,12 @@ import { achatParIdentite, propositionPrixAchat, propositionsUniques, listeConfi
 import { donneesRecapMois, csvRecapMois, pdfRecapMois, libelleMois, nomFichierRecap } from "./recapMois.js";
 import { CATEGORIES_DEPENSE, idTicket, montantDuTicket, texteMontantSaisie, texteDuTicket } from "./depensesTicket.js";
 import { produitsANumeroter, attribuerNumerosVc, carteNumerosVc } from "./numerosVestiaire.js";
+import { sitesDuNumero, appliquerPrix, noterJournalPrix, envoisPrix } from "./prixPartout.js";
+import { champsSource, dupliquerFiche, fichesAPublier, texteAColler } from "./dupliquerFiche.js";
+import { histoireArticle, offresDeConversation } from "./histoireArticle.js";
+import { CLE_MODELES, lireModeles } from "./modelesDescription.js";
+import { MesModeles, InsererModele } from "./ModelesDescription.jsx";
+import PrixPartout from "./PrixPartout.jsx";
 import { lireFile, noterSaisie, instantane, acquitter, compterEnAttente, nuagePlusRecent, fusionAuChargement, oublierCle, CLE_FILE, HORS_FILE } from "./fileEnvoi.js";
 // La migration qui cloisonne les vendeurs, lue depuis LE fichier (pas recopiée) :
 // deux copies finiraient par diverger, et c'est le genre de texte qu'on colle
@@ -1958,7 +1971,7 @@ const SYNC_KEYS = [
   'vrm_ebay_retrait_auto',
   // (3 nov.) Le cycle d'un article (src/cycleArticle.js) : SA réponse à « N°x
   // supprimé de Vinted » (son clic seul) et la dernière lecture qui l'a vu en ligne.
-  'vrm_cycle_decisions','vrm_vus_en_ligne',
+  'vrm_cycle_decisions','vrm_vus_en_ligne','vrm_fiches_neuves','vrm_prix_journal','vrm_modeles_desc',
   // Par annonce eBay, le prix Vinted de la dernière baisse faite depuis VRM
   // (proposition 9) : rien n'est reproposé tant qu'il n'a pas bougé.
   'vrm_ebay_baisses',
@@ -2645,6 +2658,52 @@ const _clesRelues = new Map();
 const onCleRelue = (k, fn) => { if (!_clesRelues.has(k)) _clesRelues.set(k, new Set()); _clesRelues.get(k).add(fn); return () => { const s = _clesRelues.get(k); if (s) s.delete(fn); }; };
 // L'état d'un écran qui porte une clé synchronisée : `init` est l'initialiseur
 // d'avant (`() => load(k, d)`), rejoué quand la clé change ailleurs.
+// (3 nov.) LES FICHES DUPLIQUÉES À PUBLIER (src/dupliquerFiche.js) : N° neuf,
+// photos à prendre. Une fiche sort de la liste dès qu'une annonce porte son N°
+// (fiche Vinted, lien Leboncoin posé) ; « Retirer » la range (le N° reste servi).
+function FichesNeuves() {
+  const [, maj] = React.useReducer((x) => x + 1, 0);
+  React.useEffect(() => { const off = onCloudReady(maj); window.addEventListener('vrm:save', maj); return () => { if (typeof off === 'function') off(); window.removeEventListener('vrm:save', maj); }; }, []);
+  const portes = new Set();
+  for (const f of Object.values(load('vinted_annonce_numeros', {}) || {})) if (f && f.numero) portes.add(cleNum(f.numero));
+  for (const n of Object.values(load('vrm_lbc_liens', {}) || {})) if (n) portes.add(cleNum(n));
+  for (const n of Object.values(carteNumerosVc(vcCarte('vrm_vc_numeros')))) if (n) portes.add(cleNum(n));
+  const liste = fichesAPublier(load('vrm_fiches_neuves', {}) || {}, portes, cleNum);
+  if (!liste.length) return null;
+  const retirer = async (f) => {
+    if (!(await askConfirm({ title: `Retirer la fiche N°${f.numero} ?`, ok: 'Retirer', cancel: 'Annuler' }))) return;
+    const toutes = { ...(load('vrm_fiches_neuves', {}) || {}) };
+    if (toutes[f.id]) toutes[f.id] = { ...toutes[f.id], retireeAt: new Date().toISOString() };
+    save('vrm_fiches_neuves', toutes); maj();
+  };
+  return (
+    <section className="vrm-ao-neuves" data-fiches-neuves={liste.length} aria-label="À publier">
+      <h3>À publier</h3>
+      {liste.map((f) => (
+        <div key={f.id} className="vrm-ao-neuve" data-fiche-neuve-num={f.numero}>
+          <span className="vrm-ao-neuve-num">N°{f.numero}</span>
+          <span className="vrm-ao-neuve-txt"><b>{f.titre || 'Sans titre'}</b><small>{[f.taille, f.prix != null ? `${String(f.prix).replace('.', ',')} €` : null, 'photos à prendre'].filter(Boolean).join(' · ')}</small></span>
+          <button type="button" className="vrm-ao-second" data-fiche-neuve-copier={f.numero} onClick={async () => { try { await navigator.clipboard.writeText(texteAColler(f)); toast('Texte copié'); } catch (_) { toast('Copie impossible ici'); } }}>Copier</button>
+          <button type="button" className="vrm-ao-second" aria-label={`Retirer la fiche N°${f.numero}`} data-fiche-neuve-retirer={f.numero} onClick={() => retirer(f)}>×</button>
+        </div>
+      ))}
+    </section>
+  );
+}
+// (3 nov.) Mes modèles de description (src/modelesDescription.js), synchronisés.
+const lireModelesRanges = () => lireModeles(load(CLE_MODELES, []));
+function ModelesSetting() {
+  const [modeles, setModeles] = useStateCle(CLE_MODELES, () => lireModelesRanges());
+  React.useEffect(() => onCloudReady(() => setModeles((l) => (l && l.length ? l : lireModelesRanges()))), []);   // eslint-disable-line react-hooks/exhaustive-deps
+  const poser = (l) => { setModeles(l); save(CLE_MODELES, l); };
+  return <MesModeles modeles={modeles} onChange={poser} confirmer={(m) => askConfirm({ title: `Supprimer « ${m.nom} » ?`, ok: 'Supprimer', cancel: 'Annuler', danger: true })}/>;
+}
+// La rangée de chips au-dessus d'une description (Leboncoin, eBay, brouillon de Republier).
+function ChipsModeles({ valeur, surChange, champ, vars }) {
+  const [modeles, setModeles] = React.useState(() => lireModelesRanges());
+  React.useEffect(() => { const f = () => setModeles(lireModelesRanges()); const off = onCloudReady(f); window.addEventListener('vrm:save', f); return () => { if (typeof off === 'function') off(); window.removeEventListener('vrm:save', f); }; }, []);
+  return <InsererModele modeles={modeles} valeur={valeur} surChange={surChange} champ={champ} vars={vars}/>;
+}
 function useStateCle(k, init) {
   const [v, setV] = React.useState(init);
   const initRef = React.useRef(init); initRef.current = init;
@@ -12530,6 +12589,7 @@ function AtelierBrouillon({ it, e, k, draft, onSave, onClose }) {
   const [title, setTitle] = useState(draft && draft.title != null ? draft.title : (it.title || ''));
   const [price, setPrice] = useState(() => { const p = draft?.price!=null?draft.price:draft?.priceInput!=null?draft.priceInput:draft&&Object.prototype.hasOwnProperty.call(draft,'price')?'':prix0; return p == null ? '' : String(p); });
   const [desc,setDesc]=useState(draft?.desc??it.desc??it.description??'');
+  const refDescBr=React.useRef(null);
   const [dimensions,setDimensions]=useState(draft?.dimensions||'');
   const [caracteristiques,setCaracteristiques]=useState(draft?.caracteristiques||[it.brand,it.size].filter(Boolean).join(' · '));
   const [done, setDone] = useState(false);
@@ -12653,7 +12713,7 @@ function AtelierBrouillon({ it, e, k, draft, onSave, onClose }) {
             <textarea value={title} onChange={ev => setTitle(ev.target.value)} rows={2} data-atelier-titre style={{ ...champ, resize: 'vertical' }} /></label>
           <label style={{ display: 'block' }}><span style={maj}>Prix (€)</span>
             <input value={price} onChange={ev => setPrice(ev.target.value)} inputMode="decimal" data-atelier-prix style={{ ...champ, maxWidth: 160 }} /></label>
-          <label style={{display:'block'}}><span style={maj}>Description</span><textarea aria-label="Description du brouillon" value={desc} onChange={ev=>setDesc(ev.target.value)} rows={4} style={champ}/></label>
+          <label style={{display:'block'}}><span style={maj}>Description</span><ChipsModeles valeur={desc} surChange={setDesc} champ={refDescBr} vars={{ titre:title, prix:Number(String(price).replace(',','.')), numero:e&&e.numero, taille:it.size, marque:it.brand }}/><textarea ref={refDescBr} aria-label="Description du brouillon" value={desc} onChange={ev=>setDesc(ev.target.value)} rows={4} style={champ}/></label>
           <label style={{display:'block'}}><span style={maj}>Caractéristiques (marque, modèle, état…)</span><input aria-label="Caractéristiques du brouillon" value={caracteristiques} onChange={ev=>setCaracteristiques(ev.target.value)} style={champ}/></label>
           <label style={{display:'block'}}><span style={maj}>Dimensions — si utile, avec l’unité</span><input aria-label="Dimensions du brouillon" value={dimensions} onChange={ev=>setDimensions(ev.target.value)} placeholder="Ex. 30 × 20 × 10 cm" style={champ}/></label>
           <p style={{fontSize:12,color:C.muted}}>Ces informations sont préparées dans VRM. Pour ajouter des photos ou renseigner les champs du catalogue Vinted, <a href={'https://www.vinted.fr/items/'+it.id+'/edit'} target="_blank" rel="noreferrer">compléter l’annonce sur Vinted ↗</a>.</p>
@@ -14485,11 +14545,22 @@ const Icon = ({ name, size = 24, style }) => {
 // QUE si l'API existe (Safari iPhone ne la fournit pas) : sinon RIEN, jamais un
 // bouton mort (§2.7, une fonction qui ne peut pas tenir se tait). On ne DEVINE
 // pas le texte — on pose ce que le navigateur a reconnu, à lui de corriger.
-const DICTEE_OK = typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
-function MicDictee({ onText, titre = 'Dicter' }) {
+const DICTEE_OK = typeof window !== 'undefined' && typeof (window.SpeechRecognition || window.webkitSpeechRecognition) === 'function';
+// (3 nov.) Le micro REFUSÉ (permission du navigateur, ou service coupé) : le
+// bouton disparaît aussi — partout, pour la session — sans un mot.
+const DICTEE_REFUS = { non: false };
+function MicDictee({ onText, titre = 'Dicter', nu = false }) {
   const [ecoute, setEcoute] = React.useState(false);
+  const [refus, setRefus] = React.useState(DICTEE_REFUS.non);
   const recRef = React.useRef(null);
-  if (!DICTEE_OK) return null;
+  React.useEffect(() => {
+    if (!DICTEE_OK || DICTEE_REFUS.non) return undefined;
+    let mort = false;
+    try { const p = navigator.permissions && navigator.permissions.query ? navigator.permissions.query({ name: 'microphone' }) : null;
+      if (p && p.then) p.then((r) => { if (!mort && r && r.state === 'denied') { DICTEE_REFUS.non = true; setRefus(true); } }).catch(() => {}); } catch (_) {}
+    return () => { mort = true; };
+  }, []);
+  if (!DICTEE_OK || refus) return null;
   const lancer = () => {
     if (ecoute) { try { recRef.current && recRef.current.stop(); } catch (_) {} return; }
     try {
@@ -14497,17 +14568,17 @@ function MicDictee({ onText, titre = 'Dicter' }) {
       const rec = new SR();
       rec.lang = 'fr-FR'; rec.interimResults = false; rec.maxAlternatives = 1;
       rec.onresult = (e) => { const t = e && e.results && e.results[0] && e.results[0][0] && e.results[0][0].transcript; if (t) onText(String(t).trim()); };
-      rec.onerror = () => setEcoute(false);
+      rec.onerror = (e) => { setEcoute(false); if (e && (e.error === 'not-allowed' || e.error === 'service-not-allowed')) { DICTEE_REFUS.non = true; setRefus(true); } };
       rec.onend = () => { setEcoute(false); recRef.current = null; };
       recRef.current = rec; setEcoute(true); rec.start();
     } catch (_) { setEcoute(false); recRef.current = null; }
   };
   return (
-    <button className="vrm-icon-control" type="button" data-mic-dictee onClick={lancer} aria-label={titre} aria-pressed={ecoute}
+    <button className={nu ? 'vrm-micro' : 'vrm-icon-control'} type="button" data-mic-dictee data-micro-ecoute={ecoute ? '1' : '0'} onClick={lancer} aria-label={titre} aria-pressed={ecoute}
       title={ecoute ? 'À l’écoute… parle, puis touche pour arrêter' : titre}
-      style={{flexShrink:0,display:'inline-flex',alignItems:'center',justifyContent:'center',width:38,height:38,borderRadius:12,cursor:'pointer',fontFamily:'inherit',
+      style={nu ? undefined : {flexShrink:0,display:'inline-flex',alignItems:'center',justifyContent:'center',width:38,height:38,borderRadius:12,cursor:'pointer',fontFamily:'inherit',
         border:`1px solid ${ecoute?C.accent:C.border}`,background:ecoute?`${C.accent}18`:C.card,color:ecoute?C.accent:C.muted,transition:'background .15s,color .15s,border-color .15s'}}>
-      <Icon name="mic" size={17}/>
+      <Icon name="mic" size={nu ? 19 : 17}/>
     </button>
   );
 }
@@ -15267,6 +15338,84 @@ function rechercheParNumero(q, numData, comptes) {
 // Où est rangé ce N° : « Mes meubles » d'abord (tenu à la main), puis la pièce
 // du Stock — la règle de « Tout sur le N° », lue aussi par le mode emballage.
 const ouStockNumero = (plan, k) => { const m = ouDansMeubles(k); if (m) return { itemId: 'meuble:' + m.meuble.id, key: String(m.i), itemName: m.meuble.name, nom: m.libelle, roomName: '' }; return plan ? ouEstNumero(plan, k) : null; };
+// ── (3 nov.) LES OUTILS DES ANNONCES : prix partout, dupliquer, histoire ─────
+// Les lectures EN PLUS de `numData` quand la fiche d'un N° (ou la feuille
+// « Changer le prix ») est ouverte : projetées (§4.4), par identité (§5).
+// Chaque source rend `null` si elle n'a pas pu être lue (« pas su »).
+async function lireExtraFiche(rn) {
+  const sb = async (q) => { try { const r = await fetch(`${SUPABASE_URL}/rest/v1/${q}`, { headers: sbAuth() }); if (!r.ok) return null; const j = await r.json(); return Array.isArray(j) ? j : null; } catch (_) { return null; } };
+  const ids = ((rn && rn.annonces) || []).map((a) => String(a.id)).filter((x) => /^\d{4,15}$/.test(x)).slice(0, 20);
+  const fiches = load('vinted_annonce_numeros', {}) || {};
+  const achats = [...new Set(ids.map((id) => fiches[id] && fiches[id].buyFromId).filter((x) => x != null && /^\d{4,20}$/.test(String(x))).map(String))];
+  const ou = ids.map((id) => `id.like.coffre_*_${id}`).join(',');
+  const [cof, conv, rec, lbc, vc] = await Promise.all([
+    ids.length ? sb(`app_data?or=(${ou})&select=id,first:data->>firstSavedAt,saved:data->>savedAt,brand:data->>brand,etat:data->>etat,desc:data->>desc,title:data->>title,size:data->>size,price:data->>price`) : Promise.resolve([]),
+    ids.length ? sb(`app_data?id=like.harvest_*_conv_*&data->payload->conversation->transaction->>item_id=in.(${ids.join(',')})&select=id,messages:data->payload->conversation->messages,item:data->payload->conversation->transaction->>item_id`) : Promise.resolve([]),
+    achats.length ? sb(`app_data?id=in.(${achats.map((a) => 'email_invoice_tx' + a).join(',')})&select=id`) : Promise.resolve([]),
+    lbcListingsSession().catch(() => null),
+    lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens`).catch(() => null),
+  ]);
+  let coffres = null;
+  if (cof) { coffres = {}; for (const r of cof) { const m = /^coffre_(\d+)_(\d+)$/.exec(String(r.id || '')); if (m && ids.includes(m[2])) coffres[m[2]] = { firstSavedAt: r.first || null, brand: r.brand, etat: r.etat, desc: r.desc, title: r.title, size: r.size, price: r.price, uid: m[1] }; } }
+  let offres = null;
+  if (conv) { offres = []; for (const r of conv) { const uid = (/^harvest_(\d+)_conv_/.exec(String(r.id || '')) || [])[1] || null; offres.push(...offresDeConversation({ messages: r.messages, transaction: { item_id: r.item } }, uid)); } }
+  const recus = rec ? new Set(rec.map((r) => String(r.id || '').replace(/^email_invoice_tx/, ''))) : null;
+  const vcL = Array.isArray(vc) ? (vc[0] || {}) : null;
+  return { coffres, offres, recus, lbcItems: lbc ? lbc.items || {} : null, vcItems: vcL ? (vcL.items || {}) : null, vcLiens: vcL ? (vcL.liens || {}) : {} };
+}
+// Le N° d'une annonce Vestiaire, par identité : le lien posé par VRM, la
+// référence « VRM-{n°} », le N° donné au produit — deux qui se contredisent ⇒ personne.
+const numeroVcIdentite = (id, it, liens) => {
+  const ks = new Set();
+  const l = liens ? liens[String(id)] : null; if (l != null && String(l).trim()) ks.add(cleNum(l));
+  if (it && it.ref && /VRM/i.test(String(it.ref))) { const k = refVRMDe(it.ref); if (k) ks.add(k); }
+  const a = carteNumerosVc(vcCarte('vrm_vc_numeros'))[String(id)]; if (a) ks.add(cleNum(a));
+  ks.delete('');
+  return ks.size === 1 ? [...ks][0] : '';
+};
+// Les sites où ce N° est en ligne (src/prixPartout.js), avec les règles d'identité de l'app.
+const sitesPrixDe = (k, rn, extra) => sitesDuNumero(k, { rn, fiches: load('vinted_annonce_numeros', {}) || {}, lbcItems: extra ? extra.lbcItems : null, vcItems: extra ? extra.vcItems : null }, {
+  cleNum, capVinted: extSait('republiermodif'),
+  numLbc: (ad, id) => numeroLbcIdentite({ itemId: id }, { [id]: ad }, load('vrm_lbc_liens', {}) || {}),
+  numVc: (id, it) => numeroVcIdentite(id, it, extra ? extra.vcLiens : null),
+});
+// Les envois, appelés UNIQUEMENT par « Appliquer » (src/PrixPartout.jsx).
+const ENVOIS_PRIX = envoisPrix({ appelEbay: (c) => appelEbay(c), resultatReviseEbay: (x) => resultatReviseEbay(x), corpsCompteEbay: (c) => corpsCompteEbay(c), vmrCmdSuivi: (p, t) => vmrCmdSuivi(p, t), sansReponse: TEXTE_SANS_REPONSE });
+// DUPLIQUER : une fiche neuve (`vrm_fiches_neuves`), un N° neuf (`prochainLibre`
+// sur TOUS les numéros servis, réservés compris), aucune photo, aucune identité.
+// Rend { ok, numero } ou { ok:false, raison }. Rien sur « pas su ».
+async function dupliquerNumero(rn, extra) {
+  if (!numerotationPermise() || !isCloudReady()) return { ok: false, raison: 'numéros pas encore chargés' };
+  if (!(await assurerVersionNumerotation())) return { ok: false, raison: 'recharge l’app' };
+  let jr = null; try { jr = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_num_reserves&select=data`); } catch (_) { jr = null; }
+  if (!Array.isArray(jr)) return { ok: false, raison: 'numéros réservés pas lus' };
+  const fiches = load('vinted_annonce_numeros', {}) || {};
+  const a = ((rn && rn.annonces) || []).find((x) => x.etat === 'en-ligne') || ((rn && rn.annonces) || [])[0] || null;
+  const f = a ? fiches[a.id] : null;
+  const c = a && extra && extra.coffres ? extra.coffres[a.id] : null;
+  const neuveSrc = Object.values(load('vrm_fiches_neuves', {}) || {}).find((x) => x && cleNum(x.numero) === (rn && rn.cle));
+  if (!f && !c && !neuveSrc) return { ok: false, raison: 'aucune fiche à copier' };
+  const champs = neuveSrc && !f && !c ? neuveSrc : champsSource(f, c);
+  const pris = new Set(), prisK = new Set();
+  const add = (v) => { const k = cleNum(v); if (!k) return; prisK.add(k); if (/^\d+$/.test(k)) pris.add(Number(k)); };
+  (load('vinted_used_numeros', []) || []).forEach(add);
+  Object.values(fiches).forEach((e) => add(e && e.numero));
+  Object.values(load('vinted_sale_overrides', {}) || {}).forEach((e) => add(e && e.numero));
+  Object.values(load('vrm_lbc_liens', {}) || {}).forEach(add);
+  Object.values(load('vrm_fiches_neuves', {}) || {}).forEach((e) => add(e && e.numero));
+  ajouterNumerosHorsEcran(pris, prisK);
+  numerosReserves(jr[0] ? jr[0].data : null).cles.forEach(add);
+  const id = 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  let r; try { r = dupliquerFiche(champs, { pris: { int: pris, cles: prisK }, pref: prefixeNumeros(), prochainLibre, cleNum, id }); } catch (e) { return { ok: false, raison: 'numéro pas sûr' }; }
+  // Le pool d'abord (append-only), puis la fiche.
+  const pool = (load('vinted_used_numeros', []) || []).slice();
+  const ep = entreePool(r.fiche.numero);
+  if (ep != null && !pool.some((x) => cleNum(x) === cleNum(ep))) pool.push(ep);
+  save('vinted_used_numeros', pool.sort(triPool));
+  save('vrm_fiches_neuves', { ...(load('vrm_fiches_neuves', {}) || {}), [r.id]: r.fiche });
+  emettreClesRelues(['vinted_used_numeros', 'vrm_fiches_neuves']);
+  return { ok: true, numero: r.fiche.numero, id: r.id, fiche: r.fiche };
+}
 function ToutSurLeNumero({ q, numData, comptes, onNav, onStock, onChercher, onFiche }) {
   const lecture = !numData;
   const { rn, nd, shipDone } = rechercheParNumero(q, numData, comptes);
@@ -17850,6 +17999,7 @@ function FicheLbc({ q, compteLbc, onClose, onMarquer }) {
   const [prix, setPrix] = React.useState(defauts.price);
   const [etat, setEtat] = React.useState(defauts.etat);
   const [desc, setDesc] = React.useState(defauts.description);
+  const refDescLbc = React.useRef(null);
   const [photos, setPhotos] = React.useState(defauts.photos);
   const [envoi, setEnvoi] = React.useState(false);
   const [refus, setRefus] = React.useState(null);
@@ -18011,7 +18161,8 @@ function FicheLbc({ q, compteLbc, onClose, onMarquer }) {
         {toutes.length === 0 && <div style={{ fontSize: 12, color: C.warn, lineHeight: 1.45 }}>Aucune photo captée pour cette annonce : ouvre-la sur Vinted, l'extension lit ses photos au passage. Leboncoin refuse une annonce sans photo.</div>}
 
         <Etiquette droite={`${desc.length}/${LBC_DESC_MAX}`} err={errDe('description')}>Description</Etiquette>
-        <textarea data-fiche-champ="description" value={desc} onChange={(e) => setDesc(e.target.value)} rows={7} disabled={enCours || fait}
+        <ChipsModeles valeur={desc} surChange={setDesc} champ={refDescLbc} vars={{ titre, prix: Number(String(prix).replace(',', '.')), numero: q.numero, taille: q.taille, marque: q.marque }}/>
+        <textarea ref={refDescLbc} data-fiche-champ="description" value={desc} onChange={(e) => setDesc(e.target.value)} rows={7} disabled={enCours || fait}
           style={{ ...champ, resize: 'vertical', lineHeight: 1.45, fontSize: 15, borderColor: errDe('description') ? C.warn : C.border }}/>
         <div style={{ fontSize: 12, color: C.muted, marginTop: 5, lineHeight: 1.4 }}>
           La référence <b style={{ color: C.text }}>{ref}</b> reste dans la description : c'est elle qui relie l'annonce Leboncoin à cet article{refLbcPresente(desc, ref) ? '.' : ' — si tu l\'enlèves, elle est remise à la fin.'}
@@ -21638,6 +21789,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
   const [qty, setQty] = React.useState('1');
   const [cond, setCond] = React.useState('3000');
   const [desc, setDesc] = React.useState('');
+  const refDescEb = React.useRef(null);
   const [photos, setPhotos] = React.useState('');
   const [cat, setCat] = React.useState(null);          // {categoryId, categoryName, required:[]}
   const [asp, setAsp] = React.useState({});
@@ -21807,6 +21959,15 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
     setAnalyse(false);
   };
   React.useEffect(() => { if (autoAnalyse && titre.trim() && !analyse) analyser(); /* eslint-disable-line */ }, [autoAnalyse]);
+  // (3 nov.) Venu d'« Articles qui dorment » → « Mettre sur eBay » : le formulaire
+  // s'ouvre sur CET article (son identifiant Vinted), comme si on l'avait choisi.
+  React.useEffect(() => {
+    const d = DEMANDE_EBAY_PAIRE;
+    if (!d.id || Date.now() - d.at > 60000 || !Array.isArray(paires) || !paires.length) return;
+    const p = paires.find((x) => String(x.id) === String(d.id));
+    d.id = null;
+    if (p) { setOuvert(true); choisirPaire(p); try { setTimeout(() => { if (racine.current && racine.current.scrollIntoView) racine.current.scrollIntoView({ block: 'start', behavior: 'smooth' }); }, 60); } catch (_) {} }
+  }, [paires]); // eslint-disable-line react-hooks/exhaustive-deps
   // Le formulaire, sous la forme d'un BROUILLON (5 octobre) : c'est ce qui est
   // enregistré, et c'est de lui que part l'annonce — `itemDeBrouillon`, la
   // MÊME règle que la liste des brouillons (§11). ebayGere: eBay gère la
@@ -22277,7 +22438,8 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
 
             {/* 5 — DESCRIPTION */}
             <BlocEbay n="5" titre="Description">
-              <textarea value={desc} onChange={e => setDesc(e.target.value)} rows={4} placeholder="État, particularités, authenticité… (le titre est repris si tu laisses vide)" style={{ ...inp, resize: 'vertical', lineHeight: 1.5 }} />
+              <ChipsModeles valeur={desc} surChange={setDesc} champ={refDescEb} vars={{ titre, prix: Number(String(prix).replace(',', '.')), numero: (pairSel && pairSel.num) || numeroBrouillon, taille: pairSel && pairSel.tailleVinted, marque: (pairSel && pairSel.marque) || (asp && (asp.Marque || asp.Brand)) }}/>
+              <textarea ref={refDescEb} value={desc} onChange={e => setDesc(e.target.value)} rows={4} placeholder="État, particularités, authenticité… (le titre est repris si tu laisses vide)" style={{ ...inp, resize: 'vertical', lineHeight: 1.5 }} />
             </BlocEbay>
 
             {/* Vérif à blanc : eBay contrôle tout et donne les frais, sans rien créer. */}
@@ -23293,6 +23455,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
   const descSimple=String(it.detail?.description || '').replace(/<br\s*\/?>/gi,'\n').replace(/<[^>]*>/g,'').replace(/&amp;/g,'&');
   const [titreEdite,setTitreEdite]=React.useState(it.title || '');
   const [descEditee,setDescEditee]=React.useState(descSimple);
+  const refDescEbM=React.useRef(null);
   const [saving, setSaving] = React.useState(false);
   const [msg, setMsg] = React.useState('');
   const [msgTon, setMsgTon] = React.useState('ok');
@@ -23532,7 +23695,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
               <label style={{ fontSize: 12, color: E.muted }}>Stock<br /><input value={qty} onChange={e => setQty(e.target.value)} inputMode="numeric" data-ebay-revise-stock={it.itemId} style={{ ...inpE, width: 72 }} /></label>
               <button type="button" data-ebay-revise-enregistrer={it.itemId} onClick={enregistrer} disabled={saving} style={{ border: 'none', background: E.accent, color: '#fff', borderRadius: 12, padding: '10px 14px', fontSize: 13, fontWeight: 700, cursor: saving ? 'default' : 'pointer', fontFamily: 'inherit', opacity: saving ? 0.6 : 1 }}>{saving ? 'Envoi…' : 'Enregistrer'}</button>
               <label style={{fontSize:12,color:E.muted,flex:'1 1 100%'}}>Titre<input aria-label="Titre de l’annonce eBay" maxLength={80} value={titreEdite} onChange={e=>setTitreEdite(e.target.value)} style={{...inpE,width:'100%',marginTop:4}}/></label>
-              <label style={{fontSize:12,color:E.muted,flex:'1 1 100%'}}>Description<textarea aria-label="Description de l’annonce eBay" value={descEditee} onChange={e=>setDescEditee(e.target.value)} rows={4} style={{...inpE,width:'100%',marginTop:4}}/></label>
+              <label style={{fontSize:12,color:E.muted,flex:'1 1 100%'}}>Description<ChipsModeles valeur={descEditee} surChange={setDescEditee} champ={refDescEbM} vars={{ titre:titreEdite, numero, prix:Number(it.price) }}/><textarea ref={refDescEbM} aria-label="Description de l’annonce eBay" value={descEditee} onChange={e=>setDescEditee(e.target.value)} rows={4} style={{...inpE,width:'100%',marginTop:4}}/></label>
               <button type="button" onClick={enregistrerTexte} disabled={saving} style={btnE}>Enregistrer le texte</button>
               <button className="vrm-b vrm-b-discret" type="button" onClick={() => { setEdit(false); setMsg(''); }} style={{ border: `1px solid ${E.border}`, background: 'transparent', color: E.muted, borderRadius: 12, padding: '10px 12px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
             </div>
@@ -24861,6 +25024,10 @@ function numerosEnBrouillon(brouillons, paires) {
 // La demande d'ouvrir un brouillon dans le formulaire d'eBay → Annonces
 // (« Compléter » de l'agent) : lue au montage de l'écran Annonces.
 const DEMANDE_EBAY_BROUILLON = { id: null, at: 0 };
+// (3 nov.) « Articles qui dorment » → « Mettre sur eBay » / « Mettre sur Leboncoin » :
+// l'article demandé (son identifiant Vinted), consommé UNE fois par l'écran qui s'ouvre.
+const DEMANDE_EBAY_PAIRE = { id: null, at: 0 };
+const DEMANDE_LBC_FICHE = { id: null, at: 0 };
 // `fond` : l'agent en FOND (pas l'écran) — ses lectures acceptent une réponse
 // partagée de quelques secondes (`vrmFond`, src/lecturesPartagees.js).
 function useEtatPublicationEbay(comptes, comptesEbay, fond = false) {
@@ -28701,7 +28868,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           stock qui dort, rotation, annulations — chacun avec sa couverture. */}
       </RepliStats>
       <RepliStats id="vente" titre="Ce qui se vend, ton rythme, le stock qui dort" phrase="Marges par marque, temps de vente, jours et heures où tu vends, paires en ligne depuis longtemps, boost.">
-      <StatsDetaillees liveStats={liveStats} panelOff={panelOff}/>
+      <StatsDetaillees liveStats={liveStats} panelOff={panelOff} onVoirDorment={onGo ? () => { demanderVue('dorment'); onGo('vinted_annonces'); } : null}/>
       <AnalysesStatistiques panelOff={panelOff}/>
 
       {/* Le boost est-il rentable ? (21 oct.) — un repère, n'entre dans aucun total. */}
@@ -32945,7 +33112,7 @@ function StockMeubles() {
           type="search" enterKeyHint="search" autoComplete="off"
           placeholder="N°, marque, taille…" aria-label="Retrouver un article dans le stock"
           style={{ width: '100%', boxSizing: 'border-box', padding: `13px ${DICTEE_OK ? 92 : 40}px 13px 40px`, borderRadius: 12, border: `1.5px solid ${filtre ? C.accent : C.line}`, background: C.card, color: C.text, fontSize: 17, outline: 'none', minHeight: 48 }} />
-        <span style={{ position: 'absolute', right: (q || cibles.length > 0) ? 46 : 5, top: '50%', transform: 'translateY(-50%)' }}><MicDictee titre="Chercher à la voix (« numéro 12 », « nike noire »)" onText={(t) => { setQ(String(t).replace(/[.!?]+$/, '')); setCibles([]); }} /></span>
+        <span style={{ position: 'absolute', right: (q || cibles.length > 0) ? 46 : 5, top: '50%', transform: 'translateY(-50%)' }}><MicDictee titre="Chercher à la voix (« numéro 12 », « nike noire »)" onText={(t) => { setQ(requeteDeLaVoix(t).requete); setCibles([]); }} /></span>
         {(q || cibles.length > 0) && <button type="button" onClick={() => { setQ(''); setCibles([]); }} aria-label="Effacer la recherche" style={{ position: 'absolute', right: 2, top: '50%', transform: 'translateY(-50%)', width: 44, height: 44, background: 'transparent', border: 'none', color: C.muted, fontSize: 20, cursor: 'pointer' }}>×</button>}
       </div>
       {filtre && (
@@ -36236,6 +36403,37 @@ function ProfilFiscalCarte({ onNav }) {
 // neuf repartirait de 0001 et doublerait un numéro déjà donné.
 const ymListe = (n = 12, maintenant = Date.now()) => { const out = []; const d = new Date(maintenant); d.setDate(1); for (let i = 0; i < n; i++) { out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`); d.setMonth(d.getMonth() - 1); } return out; };
 const libelleYm = (ym) => { const [a, m] = String(ym).split('-'); return `${MOIS_COMPTA[Number(m) - 1] || ''} ${a}`; };
+// ── (3 nov.) « EXPORTER MES DONNÉES » (Paramètres, src/exportDonnees.js) ─────
+// Les sources des écrans, telles quelles ; lectures en base PAGINÉES (`lireTout`)
+// et PROJETÉES (jamais `select=data`). Une source ratée ⇒ sa feuille dit « — ».
+// Rien ne part ailleurs : le zip est téléchargé sur l'appareil.
+async function sourcesExportDonnees() {
+  const rel = load('vrm_stats_ventes', null), urs = load('vinted_urssaf_mois', null);
+  const fiches = load('vinted_annonce_numeros', null);
+  const [lignesAchats, comptesV, factures] = await Promise.all([
+    lireTout('id=like.harvest_*_orders_purchased&select=id,orders:data->payload->my_orders').catch(() => null),
+    fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=vinted_user_id,login`, { headers: sbAuth() }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    lireTout('id=like.email_invoice_*&select=id,number:data->>number,status:data->>status,emiseLe:data->>emiseLe,tx:data->>transaction,annuleePar:data->>annuleePar,type:data->>type').catch(() => null),
+  ]);
+  const login = new Map((Array.isArray(comptesV) ? comptesV : []).map((c) => [String(c.vinted_user_id), String(c.login || '')]));
+  const achats = Array.isArray(lignesAchats) ? lignesAchats.flatMap((r) => { const k = /^harvest_(\d+)_orders_purchased$/.exec(String(r && r.id || '')); const uid = k ? k[1] : ''; return (Array.isArray(r && r.orders) ? r.orders : []).map((o) => ({ ...o, compte: login.get(uid) || uid })); }) : null;
+  return {
+    releve: rel && Array.isArray(rel.l) ? rel.l : null,
+    urssaf: urs && Array.isArray(urs.mois) ? urs.mois.map((m) => ({ ym: m.ym, n: m.n != null ? m.n : m.count, ca: m.ca })) : null,
+    aPayer: (ca) => aPayerUrssaf(ca, tauxUrssaf()),
+    declarations: lireDeclarations(),
+    fiches: fiches && typeof fiches === 'object' ? fiches : null,
+    achats, compta: lireComptaSynchro(),
+    factures: Array.isArray(factures) ? factures.filter((f) => f && (f.type === 'facture_pro' || f.number)) : null,
+  };
+}
+async function exporterMesDonnees() {
+  try {
+    const src = await sourcesExportDonnees();
+    const zip = zipStocke(fichiersExport(feuillesExport(src)));
+    telechargerFichier(new Blob([zip], { type: 'application/zip' }), nomExport(), 'application/zip');
+  } catch (e) { toast('Export pas créé : ' + (e && e.message || e)); }
+}
 const telechargerFichier = (contenu, nom, type) => {
   const blob = contenu instanceof Blob ? contenu : new Blob([contenu], { type });
   const url = URL.createObjectURL(blob); const a = document.createElement('a');
@@ -37560,7 +37758,7 @@ function useReleveStats() {
       const [plateforme, compte, id, ts, eur, achat, frais, titre] = r;
       const t = plateforme === 'Vinted' && x.txn && id ? x.txn[String(id)] : null;
       const it = t && t.item && x.items ? x.items[t.item] : null;
-      return { plateforme, compte, id, ts, eur, achat, frais, ...clesVenteStats(titre, it), enLigne: it ? dateMiseEnLigneMs(it, x.dates || null) : null };
+      return { plateforme, compte, id, ts, eur, achat, frais, titre, ...clesVenteStats(titre, it), modeleSur: modeleSur((it && it.brand) || '', titre), enLigne: it ? dateMiseEnLigneMs(it, x.dates || null) : null };
     });
   }, [releve, extras]);
   return { releve, stock, benef, extras, lignes };
@@ -37771,6 +37969,8 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
               </div>
             ), { 'data-sv-carte': 'comptes' })}
       </div>
+      {/* (3 nov.) « Ce qui rapporte le plus » : le relevé de la période, classé (src/ceQuiRapporte.js). */}
+      <CeQuiRapporte lignes={lp} Segmente={Segmente} fmt={fmt} etat={!releve ? 'passu' : 'encours'}/>
       <div className="vrm-sv-rangee vrm-sv-rangee-2">
         {carte('sv-tailles', 'Les tailles qui se vendent', tailles && tailles.groupes.length ? 'ventes · jours pour vendre' : null, !lignes
           ? vide('Pas encore calculé', { 'data-sv-etat': 'passu' })
@@ -37824,7 +38024,7 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
     </div>
   );
 }
-function StatsDetaillees({ liveStats, panelOff }) {
+function StatsDetaillees({ liveStats, panelOff, onVoirDorment = null }) {
   const sCarte = { padding: 18, background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: C.shadow };
   const sTitre = { fontSize: 15, fontWeight: 600, color: C.text, letterSpacing: -0.15 };
   const sLib = { fontSize: 13, color: C.muted, fontWeight: 500 };
@@ -37995,6 +38195,8 @@ function StatsDetaillees({ liveStats, panelOff }) {
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
         <div style={sTitre}>Les articles qui dorment</div>
         {stock && <span style={{ fontSize: 13, color: C.muted }}>{pl(stock.dort.total, 'annonce')} Vinted en ligne</span>}
+        {/* (3 nov.) La LISTE, avec un geste par article : l'écran Annonces (« Articles qui dorment »). */}
+        {onVoirDorment && stock && (stock.dort.seuils[30] || {}).n > 0 && <button type="button" className="vrm-lien-action" data-stats-voir-dorment="" onClick={onVoirDorment} style={{ minHeight: 44 }}>Voir la liste</button>}
       </div>
       {!stock ? <div style={{ ...sNote, marginTop: 8 }}>Pas encore calculé sur cet appareil : ouvre Annonces une fois (il faut toutes tes annonces lues, avec leurs dates).</div> : (<>
         <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column' }}>
@@ -39757,6 +39959,55 @@ function RetoursEnCoursBloc({ res: resBrut, site = 'toutes', nomCompte, plusieur
       {pasSu && <div style={{marginTop:9}}>{pasSu}</div>}
     </div>);
 }
+// ── RELIER UN ACHAT : SUGGESTIONS PUIS TOUS LES ACHATS (3 nov., Julien) ─────
+// 1 à 3 suggestions (marque + taille + couleur, `src/suggestionsAchat.js`), puis
+// « Voir tous les achats » : ceux pas encore reliés (un LOT reste jusqu'à son
+// nombre d'articles), recherche par mot, filtres compte et mois. Rien n'est
+// relié sans SON tap (`onRelier`). Aucun texte explicatif.
+function RelierAchatCorps({ cible, achats, liens, curTx, compteDe, prixDe, onRelier, C }) {
+  const [tous, setTous] = useState(false);
+  const [q, setQ] = useState('');
+  const [compte, setCompte] = useState('');
+  const [mois, setMois] = useState('');
+  const sugg = useMemo(() => (Array.isArray(achats) ? suggestionsAchat({ cible, achats, liens, marqueDe: extractBrand, couleursDe: extractColors, modeleDe: extractModel }) : []), [cible, achats, liens]);
+  const voirTous = tous || (Array.isArray(achats) && !sugg.length);
+  const liste = useMemo(() => (voirTous && Array.isArray(achats) ? tousAchatsLibres({ achats, liens, curTx, q, compte, mois, compteDe, marqueDe: extractBrand }) : []), [voirTous, achats, liens, curTx, q, compte, mois]);
+  const filtres = useMemo(() => (voirTous && Array.isArray(achats) ? filtresAchats(tousAchatsLibres({ achats, liens, curTx }), compteDe) : { mois: [], comptes: [] }), [voirTous, achats, liens, curTx]);
+  if (!Array.isArray(achats)) return <div data-relier-chargement style={{ fontSize: 13, color: C.muted, textAlign: 'center', padding: '20px 0' }}>…</div>;
+  const ligne = (a, attrs) => {
+    const ph = orderPhoto(a), lot = etiquetteLot(a, liens), px = prixDe(a);
+    const d = a.date ? new Date(a.date) : null;
+    return (
+      <div key={a.transaction_id} {...attrs} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 0', borderBottom: `1px solid ${C.border}`, minHeight: 60 }}>
+        <div style={{ width: 44, height: 44, borderRadius: 12, background: C.border, flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{ph ? <PhotoVinted src={ph} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : <Icon name="image" size={18} style={{ color: C.muted, opacity: .55 }}/>}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.title || '—'}</div>
+          <div style={{ fontSize: 12, color: C.muted, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{[lot, d && !isNaN(d) ? d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '', compteDe(a)].filter(Boolean).join(' · ')}</div>
+        </div>
+        <div data-relier-prix style={{ fontSize: 15, fontWeight: 700, color: C.text, flexShrink: 0 }}>{px != null ? prixCourt(px) : '—'}</div>
+        <Bouton variante="secondaire" data-relier-achat={String(a.transaction_id)} onClick={() => onRelier(a)} style={{ flexShrink: 0, minHeight: 44 }}>Relier</Bouton>
+      </div>
+    );
+  };
+  const sel = { minHeight: 44, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, color: C.text, fontSize: 13, fontFamily: 'inherit', padding: '0 8px', flex: '1 1 0', minWidth: 0 };
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      {sugg.length > 0 && <div data-suggestions-achat={sugg.length}>{sugg.map((x) => ligne(x.achat, { 'data-suggestion-achat': String(x.achat.transaction_id), 'data-rang': x.rang }))}</div>}
+      {!voirTous && <Bouton variante="discret" data-voir-tous-achats onClick={() => setTous(true)} style={{ alignSelf: 'flex-start', minHeight: 44, marginTop: 6 }}>Voir tous les achats</Bouton>}
+      {voirTous && (
+        <div data-tous-achats={liste.length} style={{ marginTop: sugg.length ? 10 : 0 }}>
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Titre, marque, n° de transaction" data-tous-achats-recherche
+            style={{ width: '100%', boxSizing: 'border-box', minHeight: 44, padding: '0 11px', border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, color: C.text, fontSize: 17, fontFamily: 'inherit' }}/>
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            {filtres.comptes.length > 1 && <select aria-label="Compte" data-filtre-compte value={compte} onChange={(e) => setCompte(e.target.value)} style={sel}><option value="">Tous les comptes</option>{filtres.comptes.map((c) => <option key={c} value={c}>{c}</option>)}</select>}
+            {filtres.mois.length > 1 && <select aria-label="Mois" data-filtre-mois value={mois} onChange={(e) => setMois(e.target.value)} style={sel}><option value="">Tous les mois</option>{filtres.mois.map((m) => <option key={m} value={m}>{new Date(m + '-15').toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}</option>)}</select>}
+          </div>
+          {liste.length ? liste.slice(0, 200).map((a) => ligne(a, { 'data-achat-libre': String(a.transaction_id) })) : <div style={{ fontSize: 13, color: C.muted, textAlign: 'center', padding: '20px 0' }}>—</div>}
+        </div>
+      )}
+    </div>
+  );
+}
 function AcctTag({ acc, name }) {
   // ⚠️ SEULE LA PASTILLE EST COLORÉE, pas l'étiquette entière. Avec huit
   // comptes, huit étiquettes teintées ajoutaient une famille de couleurs
@@ -41062,6 +41313,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const isHidden = (o) => hiddenSales.has(String(o.transaction_id)) || acctOffOf(o);
   const toggleHidden = () => {};   // (29 oct.) une vente ne se masque plus
   const [annSearch, setAnnSearch] = useVueSession('annonces-recherche', ''); // recherche annonces (titre/marque/N°)
+  // (3 nov.) « Articles qui dorment » : le seuil (30/60/90 j) est un confort de CET
+  // appareil (localStorage) ; le geste choisi sur une ligne (`dortAgir`) ouvre l'écran existant.
+  const [seuilDort, setSeuilDortEtat] = useState(() => { try { return seuilValide(localStorage.getItem('vrm_qd_seuil')); } catch (_) { return 30; } });
+  const setSeuilDort = (v) => { const x = seuilValide(v); setSeuilDortEtat(x); try { localStorage.setItem('vrm_qd_seuil', String(x)); } catch (_) {} };
+  const [dortAgir, setDortAgir] = useState(null);
   const [annSort, setAnnSort] = useVueSession('annonces-tri', 'oldest'); // oldest (défaut) | recent | price_desc | price_asc | favs | views | nonum | boost
   // (27 oct., décision de Julien) Acceptation AUTOMATIQUE des offres ≥ au mini.
   // Éteinte par défaut, synchronisée (`vinted_offres_auto`, rattrapée au nuage).
@@ -44034,8 +44290,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     else if (annSort==='sleeping') {
       // « Qui dorment » : en ligne depuis longtemps -> baisser le prix / republier.
-      arr = arr.map(it=>({it,age:listedAgeDays(it)})).filter(x=>x.age!=null&&x.age>=SLEEP_DAYS)
-               .sort((a,b)=>b.age-a.age).map(x=>x.it);
+      // (3 nov.) LA règle « qui dort » (src/quiDorment.js), au seuil choisi (30/60/90 j).
+      arr = articlesQuiDorment(arr.map(it=>({id:String(it.id),it,age:listedAgeDays(it)})), seuilDort).liste.map(x=>x.it);
     }
     // ── FILTRE PAR COMPTE (sélecteur de l'onglet) + mise en avant du connecté ──
     // Un compte choisi ⇒ seulement SES annonces. « Tous » ⇒ celles du compte
@@ -44049,7 +44305,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (c) arr = [...arr].sort((a,b) => { const ac = uidAnn(a)===c, bc = uidAnn(b)===c; return ac===bc ? 0 : (ac ? -1 : 1); });
     return arr;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [annBase, annAConfirmer, listings.lues, annSearch, annSort, numeros, compteSel, compteConnecte, selEff]);
+  }, [annBase, annAConfirmer, listings.lues, annSearch, annSort, numeros, compteSel, compteConnecte, selEff, seuilDort]);
   // Un seul compte à l'écran ⇒ le nommer sur chaque carte ne distingue rien (§7).
   const annUnCompte = useMemo(() => new Set(annShown.map(x => String(x._acc && x._acc.vinted_user_id || ''))).size <= 1, [annShown]);
   // Comptes bloqués actuellement présents (pour le bandeau d'alerte).
@@ -46365,29 +46621,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // seulement) — Statistiques le CONSOMME, il ne relit aucun prix d'achat
       // (§11). Rangé sur CET appareil seulement (pas dans `main`, qui est lu
       // partout) : Ma journée et Ventes le reposent à chaque lecture complète.
-      // Une ligne : [plateforme, compte, tx|id, ts, vente €, achat € | null,
+      // Une ligne : [plateforme, compte, tx|id, ts, vente € | null (prix illisible : `montantCommandeLu`, 3 nov.), achat € | null,
       // frais € | null, titre].
-      const releve = [];
-      for (const o of sales.items) {
-        if (isHidden(o) || classifyOrderStatus(o.status) !== 'completed') continue;
-        const t = o.date ? Date.parse(o.date) : NaN;
-        if (isNaN(t) || new Date(t).getFullYear() < an0) continue;
-        const e = effEntry(o);
-        const v = montantCommande(o);
-        // (3 nov.) + [8] le N° de la fiche, [9] la date de versement lue ('' pas lue) — le récap du mois.
-        const vers = versements && o.transaction_id != null ? (versements[String(o.transaction_id)] || '') : '';
-        releve.push(['Vinted', String((o._acc && (o._acc.login || o._acc.vinted_user_id)) || ''), String(o.transaction_id || ''), t, v, achatDe(e), chargesVente(e), String(o.title || '').slice(0, 90), String((e && e.numero) || ''), vers ? String(vers) : '']);
-      }
+      // (3 nov.) La construction vit dans `releveVentes` (src/ceQuiRapporte.js),
+      // inchangée, pour que l'audit « Ce qui rapporte » l'EXÉCUTE.
+      // (3 nov.) + [8] le N° de la fiche, [9] la date de versement lue ('' pas lue) — le récap du mois.
       // Le titre d'une vente Leboncoin ou eBay : celui de LA vente, retrouvée par
       // SON identifiant (transaction, commande) — jamais pour relier une paire,
       // seulement pour en lire la marque, le modèle et la taille.
       const titreDe = {};
       for (const v of ((lbcVentes && lbcVentes.ventes) || [])) if (v && v.txId) titreDe['lbc:' + v.txId] = v.title || '';
       for (const c of (ebayCmd || [])) if (c && c.orderId) titreDe['ebay:' + c.orderId] = (Array.isArray(c.lineItems) && c.lineItems[0] && c.lineItems[0].title) || '';
-      for (const x of autresBenefice) {
-        if (!isFinite(x.ts) || new Date(x.ts).getFullYear() < an0) continue;
-        releve.push([x.plateforme, '', x.id, x.ts, x.eur, x.achat, x.frais, String(titreDe[x.id] || '').slice(0, 90), String(x.num || ''), new Date(x.ts).toISOString()]);
-      }
+      const releve = releveVentes({ vinted: sales.items, estMasquee: isHidden, estFinalisee: (o) => classifyOrderStatus(o.status) === 'completed', an0,
+        montant: montantCommandeLu, achat: (o) => achatDe(effEntry(o)), frais: (o) => chargesVente(effEntry(o)),
+        compte: (o) => (o._acc && (o._acc.login || o._acc.vinted_user_id)) || '', autres: autresBenefice, titreDe,
+        numero: (o) => { const e = effEntry(o); return (e && e.numero) || ''; },
+        versement: (o) => (versements && o.transaction_id != null ? (versements[String(o.transaction_id)] || '') : '') });
       const r0 = load('vrm_stats_ventes', null);
       if (!(r0 && JSON.stringify(r0.l) === JSON.stringify(releve))) save('vrm_stats_ventes', { v: 1, l: releve, at: Date.now() });
     } catch (_) {}
@@ -47261,6 +47510,46 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!ok) return;
     for (const [c, p] of choix) appliquerProposition(c, p);
     toast(`${liste.length} prix d'achat enregistré${liste.length > 1 ? 's' : ''}`);
+  };
+
+  // ── (3 nov.) RELIER UN ACHAT : suggestions + tous les achats (src/suggestionsAchat.js) ──
+  // La cible : l'annonce ou la vente du sélecteur (marque, taille, couleur de ses
+  // champs, sinon de son titre ; date de mise en ligne ou de vente).
+  const cibleRelier = useMemo(() => {
+    if (!pickerFor) return null;
+    const v = pickerFor._saleTx ? (sales.items || []).find((o) => String(o.transaction_id) === String(pickerFor._saleTx)) : null;
+    return { titre: pickerFor.title || '', marque: pickerFor.brand_title || pickerFor.brand || '', taille: pickerFor.size_title || pickerFor.size || '',
+      couleur: pickerFor.color1 || pickerFor.couleur || '', dateRef: pickerFor._dateRef || (v && v.date) || pickerFor.created_at_ts || null,
+      curTx: (numeros[pickerFor.id] && numeros[pickerFor.id].buyFromId) || '' };
+  }, [pickerFor, sales.items, numeros]);
+  const liensAchats = useMemo(() => liensParAchat(numeros, saleOv), [numeros, saleOv]);
+  const prixPayeAchat = (a) => {
+    if (lotDe(a).lot) { const v = Number(a && a.price && a.price.amount); return Number.isFinite(v) && v > 0 ? v : null; }
+    const p = propositionPrixAchat({ identite: { achat: a, par: 'choix' }, ventilationDe: ventilationDeTx });
+    if (p) return p.centimes / 100;
+    const v = Number(a && a.price && a.price.amount); return Number.isFinite(v) && v > 0 ? v : null;
+  };
+  // SON tap. Un achat simple : l'écriture de « Relier un achat » (prix payé du
+  // reçu s'il tombe juste — `prixAchatPropose` —, sinon le prix de l'achat).
+  // Un LOT : le prix de CET article est demandé (jamais deviné, jamais pré-rempli ;
+  // le prix du lot ÷ nombre d'articles n'est qu'une indication).
+  const relierAchat = async (a) => {
+    const cible = pickerFor; if (!cible || !a) return;
+    const accNom = accNameOf(a._acc) || '';
+    let w = null;
+    if (lotDe(a).lot) {
+      const l = lotDe(a), ind = prixIndicatifLot(a), px = prixPayeAchat(a);
+      const saisi = await askText({ title: "Prix d'achat de cet article", desc: ind != null ? `${prixCourt(px)} ÷ ${l.n} ≈ ${prixCourt(ind)}` : (px != null ? `Lot · ${prixCourt(px)}` : ''), numeric: true, value: '', ok: 'Relier', cancel: 'Annuler' });
+      if (saisi == null) return;
+      w = ecritureLot(a, saisi, { accNom, photo: orderPhoto(a) || '' });
+      if (!w) { toast("Montant illisible : rien n'a été relié"); return; }
+    } else {
+      const p = propositionPrixAchat({ identite: { achat: a, par: 'choix' }, ventilationDe: ventilationDeTx });
+      if (!p) { choosePick(a); return; }
+      w = ecritureProposition(p, { accNom, photoDe: orderPhoto });
+    }
+    if (cible._saleTx) setSaleOverride(cible._saleTx, w); else updatePair(cible, w);
+    setPickerFor(null);
   };
 
   // Relier un achat à une paire depuis la liste (pas depuis le sélecteur) :
@@ -48698,6 +48987,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   React.useEffect(()=>{
     const appliquer=()=>{
       if(only==='annonces' && prendreVue('republier')) setActionsOpen(true);
+      if(only==='annonces' && prendreVue('dorment')) setAnnSort('sleeping');
       if(only==='messages' && prendreVue('favoris')) setZoneMessages('favoris');
       if(only==='achats' && !modeRetraits && prendreVue('achats')) setAFilter('all');
     };
@@ -50564,7 +50854,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const peutDeposer = !hidden && st!=='cancelled' && aExpedier(o) && !isShipDone(o) && o.transaction_id!=null;
             const libDepose = num ? `N°${num}` : (o.title || '');
             const gesteCout = coutManque ? <CoutAchatVente surLigne propose={propPrix} onUtiliser={propPrix ? ()=>appliquerProposition('v:'+o.transaction_id, propPrix) : null} onSaisir={p=>setSaleOverride(o.transaction_id,{buyPrice:p})}
-                  onRelier={()=>{ const idf = identiteAnnonce(o); openPicker(idf ? { id: idf, title: o.title, photo: photo, price: sell, _acc: o._acc } : { id: '_v'+o.transaction_id, _saleTx: String(o.transaction_id), title: o.title, photo: photo, price: sell, _acc: o._acc }); }}/> : null;
+                  onRelier={()=>{ const idf = identiteAnnonce(o); openPicker(idf ? { id: idf, title: o.title, photo: photo, price: sell, _acc: o._acc, _dateRef: o.date } : { id: '_v'+o.transaction_id, _saleTx: String(o.transaction_id), title: o.title, photo: photo, price: sell, _acc: o._acc, _dateRef: o.date }); }}/> : null;
             const gesteDepose = peutDeposer ? <Bouton variante="secondaire" icone="check" className="vrm-depose-bouton" data-depose-vente={txL} data-sans-glisse="" disabled={deposeIci} aria-label={`Marquer ${libDepose || 'ce colis'} déposé`} onClick={()=>demanderDepose(txL, o, libDepose)}>Déposé</Bouton> : null;
             // ── (1er nov.) LE RÉCAPITULATIF DE LA VENTE — maquette A, « fiche en lignes nettes »
             // (Julien : « applique tout, je veux que ce soit clair »). De haut en bas : la paire
@@ -50637,7 +50927,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <dl>
                     <div className="vrm-recap-ligne"><dt>Prix de vente</dt><dd data-prix-vente={sell!=null?Math.round(sell*100):undefined}>{sell==null ? '—' : autreDevise ? `${String(sell).replace('.',',')} ${cur(devise)}` : eurosRecap(sell)}</dd></div>
                     {fraisConnus != null ? <div className="vrm-recap-ligne" data-recap-frais={fraisConnus.toFixed(2)}><dt>Frais</dt><dd>{eurosRecap(-fraisConnus)}</dd></div> : null}
-                    {st !== 'cancelled' ? <div className="vrm-recap-ligne" data-recap-achat={lb.achat != null ? lb.achat.toFixed(2) : ''}><dt>Prix d’achat</dt><dd>{lb.achat != null ? eurosRecap(-lb.achat) : coutManque ? <CoutAchatVente recap propose={propPrix} onUtiliser={propPrix ? ()=>appliquerProposition('v:'+o.transaction_id, propPrix) : null} onSaisir={p=>setSaleOverride(o.transaction_id,{buyPrice:p})} onRelier={()=>openPicker(saleItem)}/> : '—'}</dd></div> : null}
+                    {st !== 'cancelled' ? <div className="vrm-recap-ligne" data-recap-achat={lb.achat != null ? lb.achat.toFixed(2) : ''}><dt>Prix d’achat</dt><dd>{lb.achat != null ? eurosRecap(-lb.achat) : coutManque ? <CoutAchatVente recap propose={propPrix} onUtiliser={propPrix ? ()=>appliquerProposition('v:'+o.transaction_id, propPrix) : null} onSaisir={p=>setSaleOverride(o.transaction_id,{buyPrice:p})} onRelier={()=>openPicker({ ...saleItem, _dateRef: o.date })}/> : '—'}</dd></div> : null}
                     {st !== 'cancelled' ? <div className="vrm-recap-ligne vrm-recap-benef" data-recap-benef-etat={lb.etat} data-benef-vente={benef!=null?benef.toFixed(2):undefined}><dt>Bénéfice</dt><dd><span className="vrm-recap-valeur">{lb.etat === 'partiel' ? <span className="vrm-recap-borne">au plus </span> : null}<span className="vrm-recap-montant">{benefTexte}</span></span>{benefAide ? <small>{benefAide}</small> : null}</dd></div> : null}
                     {verse != null ? <div className="vrm-recap-ligne vrm-recap-verse" data-recap-verse={finalisee ? (versement ? 'date' : 'oui') : 'non'}><dt>Versé sur ton porte-monnaie</dt><dd>{verse}</dd></div> : null}
                   </dl>
@@ -52856,6 +53146,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             ailleurs, puis une ligne de chiffres TOUS libellés ; la saisie (N°,
             achat) en bas ; le reste dans « ⋯ ». Une seule couleur d'accent,
             rare (§7) : l'ambre ne sert qu'à « dort » et à une marge négative. */}
+        <FichesNeuves/>
+        {annSort==='sleeping' ? (
+          <QuiDorment seuil={seuilDort} onSeuil={setSeuilDort} Segmente={Segmente} fmt={fmt} onAgir={(a)=>setDortAgir(a)}
+            liste={listings.items==null ? null : annShown.map(it=>{ const e=numeros[it.id]||{}; const pr=(it.price&&typeof it.price==='object')?it.price.amount:it.price; const n=Number(String(pr==null?'':pr).replace(',','.'));
+              return { id:String(it.id), it, numero:e.numero?String(e.numero):'', titre:it.title||'', photo:photoArticle(it)||'', prix:isFinite(n)&&n>0?n:null, age:listedAgeDays(it),
+                vues:Number.isFinite(it.views)?it.views:null, favoris:Number.isFinite(it.favourites)?it.favourites:null, compte:annUnCompte?'':((it._acc&&(it._acc.login||it._acc.username))||'') }; })}/>
+        ) : (<>
         <div className="vrm-ledger-heading vrm-ann-ledger-heading" aria-hidden="true"><span>Article · stock</span><span>Prix</span></div>
         <div className="vrm-ann-grid vrm-fiches" style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(min(100%, 300px), 1fr))',gap:16}}>
           {annShown.map(it=>{
@@ -53030,6 +53327,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     })}
                     <button type="button" className="vrm-fiche-geste" onClick={()=>openPicker(item)} style={geste}>Relier un achat</button>
                     <button type="button" className="vrm-fiche-geste" onClick={()=>setPassportFor({it,e,num})} style={geste}>Passeport</button>
+                    {/* (3 nov.) Le prix de CE N° sur tous ses sites, et sa copie (N° neuf). */}
+                    {num && <button type="button" className="vrm-fiche-geste" data-annonce-prix-partout={num} onClick={()=>{ try { window.dispatchEvent(new CustomEvent('vrm:prix-partout',{detail:String(num)})); } catch (_) {} }} style={geste}>Changer le prix</button>}
+                    {num && <button type="button" className="vrm-fiche-geste" data-annonce-histoire={num} onClick={()=>{ try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire',{detail:String(num)})); } catch (_) {} }} style={geste}>Histoire · Dupliquer</button>}
                     <button type="button" className="vrm-fiche-geste" onClick={async ()=>{ if(await askConfirm('Marquer cet article VENDU et le retirer des annonces ?')) markSold(it.id); }} title="Marquer vendue : la retire des annonces tout de suite (sans attendre la synchro Vinted)" style={geste}>Marquer vendue</button>
                     {sugg!=null && sugg < Number(it.price) && <a className="vrm-fiche-geste" href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour baisser le prix" style={{...geste,border:`1px solid ${C.accent}`,background:`${C.accent}14`,color:C.accent}}>Baisser à {sugg} {cur(it.currency)} ↗</a>}
                   </div>
@@ -53047,6 +53347,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             );
           })}
         </div>
+        </>)}
         {listings.items && listings.items.length>0 && (<details className="vrm-ann-stock-tools"><summary aria-label="Stock et ajustements"><span className="vrm-label-full">Stock et ajustements</span><span className="vrm-label-short" aria-hidden="true">Stock</span></summary>
           {/* FRAÎCHEUR : l'extension ne capte que quand tu navigues sur Vinted.
               Si elle n'a rien capté depuis longtemps, on le DIT (avant, l'app
@@ -54965,8 +55266,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {/* Modale : relier un achat (depuis Annonces) */}
       {/* Modale : relier un achat (depuis Annonces) */}
-      {pickerFor && (
-        <div onClick={()=>setPickerFor(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+      {pickerFor && createPortal(
+        <div data-relier-feuille onClick={()=>setPickerFor(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <FermeAuRetour fermer={()=>setPickerFor(null)}/>
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'85vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             {/* ⚠️ ON MONTRE LA PAIRE QU'ON RELIE. La modale couvrait l'écran et
@@ -54991,64 +55292,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
               <button type="button" onClick={()=>setPickerFor(null)} aria-label="Fermer" style={{flexShrink:0,border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer'}}>×</button>
             </div>
-            <div style={{padding:'10px 12px',borderBottom:`1px solid ${C.border}`}}>
-              <input autoFocus value={pickerQ} onChange={e=>setPickerQ(e.target.value)}
-                placeholder="Chercher dans tes achats (titre, marque, taille…)"
-                style={{width:'100%',boxSizing:'border-box',padding:'9px 11px',border:`1px solid ${C.border}`,borderRadius:12,background:C.card,color:C.text,fontSize:13,fontFamily:'inherit'}}/>
-            </div>
-            <div style={{flex:1,overflow:'auto',padding:'8px 12px 12px',display:'flex',flexDirection:'column',gap:8}}>
-              {purchasesPick.loading && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Chargement de tes achats…</div>}
-              {!purchasesPick.loading && (() => {
-                const curId = numeros[pickerFor.id]?.buyFromId;
-                const q = normTitle(pickerQ);
-                const avail = purchasesPick.items
-                  .filter(p => !linkedBuyIds.has(String(p.transaction_id)) || String(p.transaction_id)===String(curId))
-                  .filter(p => !q || normTitle(p.title||'').includes(q));
-                if (avail.length===0) return <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0',lineHeight:1.6}}>
-                  {q ? <>Aucun achat ne correspond à « {pickerQ} ».<br/><span style={{fontSize:12}}>Un achat déjà relié à un autre article n'apparaît pas ici.</span></> : 'Aucun achat disponible.'}
-                </div>;
-                // Les meilleurs candidats (même marque ET même taille) sont
-                // signalés : avec ~700 achats, sans repère on ne sait pas par où
-                // commencer, et le prix d'achat finit par ne jamais être saisi.
-                return avail.map((p, iP) => (
-                  <button key={p.transaction_id} type="button" onClick={()=>choosePick(p)} style={{display:'flex',gap:10,alignItems:'center',padding:8,borderRadius:12,border:`1px solid ${C.border}`,background:C.surface,cursor:'pointer',textAlign:'left'}}>
-                    <div style={{width:44,height:44,borderRadius:12,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{orderPhoto(p)?<PhotoVinted src={orderPhoto(p)} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}</div>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:12,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                        {/* ⚠️ SEUIL 12, PAS 8. À 8 (marque + taille) le badge s'allumait sur des
-    paires sans rapport — « nike » + « 40 » désigne des centaines d'articles.
-    12 exige le MODÈLE en plus (4+4+5), ou un titre identique. Une paire dont
-    le modèle n'est pas reconnu n'est jamais « suggérée » : on ne se prononce
-    pas plutôt que d'induire un faux prix d'achat. */}
-                        {(p._score||0) >= SEUIL_SUGGERE && <span style={{marginRight:5,fontSize:11,fontWeight:600,color:C.accent,background:`${C.accent}14`,border:`1px solid ${C.accent}44`,borderRadius:12,padding:'1px 6px'}}>suggéré</span>}
-                        {p.title}
-                      </div>
-                      <div style={{fontSize:11,color:C.muted,marginTop:2}}><AcctTag acc={p._acc} name={accNameOf(p._acc)}/> {p.date?new Date(p.date).toLocaleDateString('fr-FR'):''}
-                        {/* ⚠️ DIRE POURQUOI. Un badge « suggéré » sans raison se
-                            croit sur parole ; ici on relie de l'argent à une
-                            paire, et un prix d'achat faux ne se voit jamais
-                            (§22). On nomme ce que les deux titres ont en commun
-                            — c'est vérifiable d'un coup d'œil. */}
-                        {(()=>{ const r=refAchat(pickerFor), t=String(p.title||'');
-                          // ⚠️ Les champs de `refAchat` s'appellent marque / taille /
-                          // modele (pas brand / size / model) : se tromper de nom
-                          // ne lève AUCUNE erreur, ça n'affiche simplement rien.
-                          const com=[];
-                          const mq=(extractBrand(t)||'').toLowerCase(), md=extractModel(t), tl=String(extractSize(t)||'').toLowerCase();
-                          if(r.marque&&mq&&mq===r.marque) com.push(r.marque);
-                          if(r.modele&&md&&md===r.modele) com.push(r.modele);
-                          if(r.taille&&tl&&tl===r.taille) com.push('taille '+r.taille);
-                          return com.length ? <span style={{color:C.accent,fontWeight:600}}> · {com.join(' · ')}</span> : null; })()}
-                      </div>
-                    </div>
-                    <div style={{fontSize:15,fontWeight:700,color:C.text,flexShrink:0}}>{p.price?.amount} {cur(p.price?.currency_code)}</div>
-                  </button>
-                ));
-              })()}
+            <div data-relier-achat-corps style={{flex:1,overflow:'auto',padding:'4px 14px 14px'}}>
+              <RelierAchatCorps C={C} cible={cibleRelier} achats={purchasesPick.loading ? null : purchasesPick.items} liens={liensAchats}
+                curTx={numeros[pickerFor.id]?.buyFromId || ''} compteDe={(a)=>accNameOf(a._acc)||''} prixDe={prixPayeAchat} onRelier={relierAchat}/>
             </div>
           </div>
-        </div>
-      )}
+        </div>, document.body)}
 
       {/* Modale conversation */}
       {bordPlace && <BordPlacer place={bordPlace} onConfirm={confirmBordPlacement} onCancel={cancelBordPlacement}/>}
@@ -56566,6 +56815,39 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {lotsOpen && (()=>{ const cands=(listings.items||[]).map(it=>{ const e=numeros[it.id]||{}; const key=String((e&&e.numero)||it.id); const d=drafts[key]||{}; const baseTitre=d.title!=null?d.title:(it.title||''); const bp=d.price!=null?d.price:((it.price&&typeof it.price==='object')?it.price.amount:it.price); const fl=prixAchatDe(e,buyByNum); return { key, id:it.id, titre:baseTitre, prix:(bp==null||bp==='')?null:Number(bp), floor:(fl!=null&&!isNaN(fl))?Number(fl):null }; }); return (
         <AtelierLots candidats={cands} onSave={(key,patch)=>saveDraft(key,patch)} onClose={()=>setLotsOpen(false)} />
       ); })()}
+      {/* (3 nov.) « Articles qui dorment » → UN geste au choix, chacun ouvre l'écran
+          EXISTANT : Modifier prix sur place (Republier → modifier), Republier (recréer),
+          la fiche « Publier sur Leboncoin », « Publier sur eBay ». Rien ne part tout seul. */}
+      {dortAgir && (()=>{
+        const a = dortAgir, it = a.it, e = numeros[it.id] || {};
+        const versRepub = (act) => { setDortAgir(null); setRepubReprise([String(it.id)]); setRepubAction(act); };
+        const choix = [
+          { k:'prix', t:'Baisser le prix', cap:'republiermodif', go:()=>versRepub('modifier') },
+          { k:'republier', t:'Republier', cap:'recreer', go:()=>versRepub('recreer') },
+          // ⚠️ On change d'écran AVANT de fermer la feuille : fermée d'abord, elle
+          // retirait son entrée d'historique (history.back) avant que le nouvel
+          // écran soit rendu, et ce retour ramenait Vinted (mesuré au banc, 1 fois sur 2).
+          // Le nouvel écran démonte la feuille ; la fermeture différée ne sert qu'en secours.
+          { k:'lbc', t:'Mettre sur Leboncoin', bloque: !a.numero ? 'Mets un N° à cet article d’abord.' : '', go:()=>{
+              if (!mpChoisi(e,'lbc')) updatePair(it, { mp: { ...(e.mp||{}), lbc: true } });
+              DEMANDE_LBC_FICHE.id = String(it.id); DEMANDE_LBC_FICHE.at = Date.now(); onNav && onNav('leboncoin'); setTimeout(()=>setDortAgir(null), 400); } },
+          { k:'ebay', t:'Mettre sur eBay', go:()=>{ DEMANDE_EBAY_PAIRE.id = String(it.id); DEMANDE_EBAY_PAIRE.at = Date.now(); onNav && onNav('ebay_annonces'); setTimeout(()=>setDortAgir(null), 400); } },
+        ];
+        return (
+          <SheetShell onClose={()=>setDortAgir(null)} maxWidth={420}>
+            <div className="vrm-qd-menu" data-qd-menu={a.id}>
+              <div className="vrm-qd-menu-tete">
+                <h2 className="vrm-qd-menu-titre">{a.numero ? `N°${a.numero} · ` : ''}{a.titre}</h2>
+                <button type="button" className="vrm-qd-fermer" aria-label="Fermer" onClick={()=>setDortAgir(null)}>✕</button>
+              </div>
+              {choix.map(c=>{ const raison = c.bloque || (c.cap && extSait(c.cap)!=='ok' ? `Demande l'extension VRM ${EXT_CAPACITES[c.cap]} ou plus récente.` : ''); return (
+                <button key={c.k} type="button" className="vrm-qd-choix" data-qd-choix-geste={c.k} aria-disabled={raison?'true':undefined} title={raison||undefined}
+                  onClick={()=>{ if (raison) { toast(raison); return; } c.go(); }}>{c.t}</button>
+              ); })}
+            </div>
+          </SheetShell>
+        );
+      })()}
       {actionsOpen && (()=>{
         const nBr = brVinted.liste ? brVinted.liste.length : 0;
         const nPret = brVinted.liste ? brVinted.liste.filter(b=>b._place==='proposable').length : 0;
@@ -58962,6 +59244,15 @@ function LeboncoinScreen() {
   };
   // 5.182 : la fiche « Publier sur Leboncoin » ouverte (une paire de la file).
   const [fiche, setFiche] = useState(null);
+  // (3 nov.) Venu d'« Articles qui dorment » → « Mettre sur Leboncoin » : la fiche de
+  // CET article s'ouvre dès qu'il est dans la file (par son identifiant, jamais un titre).
+  useEffect(() => {
+    const d = DEMANDE_LBC_FICHE;
+    if (!d.id || Date.now() - d.at > 60000 || !data || !Array.isArray(data.queue)) return;
+    const q = data.queue.find((x) => String(x.id) === String(d.id));
+    d.id = null;
+    if (q) setFiche(q);
+  }, [data]);
   const [repubOuvert, setRepubOuvert] = useState(false);
   const n = data ? Math.max(data.postedCount, data.lbcCount) : 0;
   const lim = data ? (data.limit || null) : null;
@@ -60081,6 +60372,10 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // ⛔ Détourage des photos retiré des Paramètres (17 oct., sa décision) :
       //    il n'existe plus que pour Vestiaire Collective, qui l'exige, sans réglage.
     ]},
+    // (3 nov.) Les textes types insérés en un tap dans une description.
+    { id:'annonces-reglages', titre:'Annonces', items:[
+      { id:'modeles', type:'panneau', nu:true, ic:'pencil', lib:'Mes modèles', val:String(lireModelesRanges().length || ''), data:{ 'data-reglage-modeles':'' }, el:<ModelesSetting/> },
+    ]},
     { id:'notifications', titre:'Notifications', items:[
       { id:'push', type:'panneau', ic:'bell2', lib:'Notifications du téléphone', titreInterne:true,
         desc: nMuetsPush > 0 ? <span style={{color:C.warn,fontWeight:600}}>{nMuetsPush} compte{nMuetsPush>1?'s':''} sans email : pas de notification</span> : null,
@@ -60113,6 +60408,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       urlWidget && { id:'widget', type:'panneau', nu:true, ic:'chart', lib:'Widget iPhone', desc:'Ton lien privé pour Scriptable', el:widget },
     ]},
     { id:'sauvegarde', titre:'Sauvegarde', items:[
+      { id:'donnees', type:'action', ic:'save', lib:'Exporter mes données', onClick:exporterMesDonnees, data:{ 'data-exporter-donnees':'' } },
       { id:'export', type:'action', ic:'save', lib:'Sauvegarde complète', desc:'Réglages, numéros et données captées.', onClick:onExport, data:{ 'data-reglage-sauvegarde':'' } },
       { id:'restaurer', type:'action', ic:'restore', lib:'Restaurer une sauvegarde', onClick:onImport },
     ], pied: (
@@ -63935,8 +64231,19 @@ function AppCoeur() {
   // (1er nov.) LA FICHE COMPLÈTE D'UNE PAIRE (`FichePaire`) : ouverte depuis
   // « Tout sur le N° » ou le mode emballage ; elle lit les MÊMES sources.
   const [ficheNum,setFicheNum]=useState(null);
+  const [neuveRecente,setNeuveRecente]=useState(null);   // (3 nov.) la fiche dupliquée à l'instant (avant l'écriture différée de `save`)
   useEffect(()=>{const ouvrir=e=>{const n=e&&e.detail; if(typeof n!=='string'||!n.trim()||n.length>64)return; setFicheNum(n.trim());};window.addEventListener('vrm:fiche-paire',ouvrir);return()=>window.removeEventListener('vrm:fiche-paire',ouvrir);},[]);
-  const besoinNumData=gsOpen||!!ficheNum;
+  // (3 nov.) « Changer le prix » d'un N° : ouvert depuis la fiche, ou depuis une
+  // ligne d'annonce (événement `vrm:prix-partout`, le N° en détail).
+  const [prixNum,setPrixNum]=useState(null);
+  useEffect(()=>{const ouvrir=e=>{const n=e&&e.detail; if(typeof n!=='string'||!n.trim()||n.length>64)return; setPrixNum(n.trim());};window.addEventListener('vrm:prix-partout',ouvrir);return()=>window.removeEventListener('vrm:prix-partout',ouvrir);},[]);
+  const besoinNumData=gsOpen||!!ficheNum||!!prixNum;
+  // Les lectures en plus (coffre, offres, reçu, Leboncoin, Vestiaire) du N° ouvert.
+  const [ficheExtra,setFicheExtra]=useState(null);
+  const numOutil=ficheNum||prixNum;
+  useEffect(()=>{ if(!numOutil||!numData){ setFicheExtra(null); return undefined; } let vivant=true; setFicheExtra(null);
+    (async()=>{ const { rn }=rechercheParNumero(numOutil, numData, vintedAccounts); const x=await lireExtraFiche(rn); if(vivant) setFicheExtra({ ...x, num: numOutil }); })();
+    return ()=>{ vivant=false; }; /* eslint-disable-next-line */ },[numOutil,numData]);
   useEffect(()=>{ if(!besoinNumData){ setNumData(null); return undefined; } if(numData) return undefined; let vivant=true; (async()=>{
     const sb=async(q)=>{ try{ const r=await fetch(`${SUPABASE_URL}/rest/v1/${q}`,{headers:sbAuth()}); if(!r.ok) return null; const j=await r.json(); return Array.isArray(j)?j:null; }catch(_){ return null; } };
     let versementsLus=null;
@@ -66081,6 +66388,9 @@ function AppCoeur() {
   // tape dedans), sur téléphone dans l'en-tête (la loupe l'ouvre, le clavier
   // monte sans changer d'écran). Échap ou un toucher dehors referme ; la page
   // derrière ne bouge pas.
+  // (3 nov.) La voix : ce que le navigateur a reconnu passe par `requeteDeLaVoix`
+  // (« numéro 124 », « cent vingt-quatre » ⇒ 124 ; « B 125 » ⇒ B125 ; sinon le texte).
+  const dicterRecherche = (t) => { const r = requeteDeLaVoix(t); if (!r.requete) return; setGsQ(r.requete); if (!gsOpen) setGsOpen(true); };
   const champRecherche = (mobile) => (
     <input ref={gsChampRef} type="search" className="vrm-recherche-champ" data-recherche-champ="" enterKeyHint="search" autoComplete="off" spellCheck={false}
       aria-label={mobile ? 'Rechercher une paire : N°, modèle ou marque' : 'Rechercher une paire'} placeholder={mobile ? 'N°, modèle ou marque…' : 'Tape un N°, un modèle, une marque…'}
@@ -66094,6 +66404,7 @@ function AppCoeur() {
       <label className="vrm-barre-recherche" data-barre-recherche="">
         <Icon name="search" size={18}/>
         {champRecherche(false)}
+        <MicDictee nu titre="Chercher à la voix" onText={dicterRecherche}/>
         {gsQ ? <button type="button" className="vrm-recherche-effacer" aria-label="Effacer la recherche" onClick={()=>{ setGsQ(''); try{ gsChampRef.current&&gsChampRef.current.focus(); }catch(_){} }}><Icon name="close" size={14}/></button>
           : <kbd className="vrm-barre-kbd">/</kbd>}
       </label>
@@ -66104,6 +66415,7 @@ function AppCoeur() {
     <div className="vrm-hdr-recherche" data-recherche-zone="" style={{background:C.bg}}>
       <Icon name="search" size={18} style={{color:C.muted,flexShrink:0}}/>
       {champRecherche(true)}
+      <MicDictee nu titre="Chercher à la voix" onText={dicterRecherche}/>
       <button type="button" className="vrm-hdr-recherche-fermer" aria-label="Fermer la recherche" onClick={fermerRecherche} style={{color:C.text}}>Fermer</button>
     </div>
   );
@@ -66266,8 +66578,15 @@ function AppCoeur() {
           const { rn, numeros } = rechercheParNumero(ficheNum, numData, vintedAccounts);
           const nomCompte = (uid) => { const a = (vintedAccounts || []).find(x => String(x.vinted_user_id) === String(uid)); if (!a) return null; const labels = load('vinted_account_labels', {}) || {}; return labels[a.vinted_user_id] || a.login || `#${a.vinted_user_id}`; };
           const shipDone = load('vinted_ship_done', {}) || {};
-          const p = parcoursPaire(rn, { fiches: numeros, saleOv: load('vinted_sale_overrides', {}) || {}, buyByNum: load('vinted_buyprice_by_num', {}) || {},
-            stats: numData ? (numData.stats === undefined ? null : numData.stats) : null, versements: numData ? (numData.versements === undefined ? null : numData.versements) : null, nomCompte }, {
+          // (3 nov.) L'HISTOIRE COMPLÈTE (`histoireArticle`) : le parcours + les
+          // lectures en plus (`ficheExtra`), chaque étape lue et datée par sa donnée.
+          const ex = ficheExtra && ficheExtra.num === ficheNum ? ficheExtra : null;
+          const autresEnLigne = ex && ex.lbcItems != null && ex.vcItems != null ? sitesPrixDe(ficheNum, rn, ex).sites.filter((x) => x.site === 'leboncoin' || x.site === 'vestiaire') : null;
+          const neuve = (neuveRecente && cleNum(neuveRecente.numero) === rn.cle ? neuveRecente : null) || Object.values(load('vrm_fiches_neuves', {}) || {}).find((x) => x && !x.retireeAt && cleNum(x.numero) === rn.cle) || null;
+          const p = histoireArticle(rn, { fiches: numeros, saleOv: load('vinted_sale_overrides', {}) || {}, buyByNum: load('vinted_buyprice_by_num', {}) || {},
+            stats: numData ? (numData.stats === undefined ? null : numData.stats) : null, versements: numData ? (numData.versements === undefined ? null : numData.versements) : null, nomCompte,
+            coffres: ex ? ex.coffres : null, offres: ex ? ex.offres : null, recus: ex ? ex.recus : null, autresEnLigne,
+            journalPrix: (load('vrm_prix_journal', {}) || {})[rn.cle] || [], prixVinted: load('vinted_prix_historique', []) || [] }, {
             etapeVente: (o) => etapeVente(o, { poste: (x) => !!shipDone[String(x.transaction_id)] }),
             venteAnnulee: (o) => classifyOrderStatus(o && o.status) === 'cancelled' || (o && o.transaction_id != null && txnAnnuleeAvantEnvoi(o.transaction_id)),
             montantRecuEbay, commandeEbayEngagee, lbcAnnulee, lbcFinalisee,
@@ -66276,7 +66595,25 @@ function AppCoeur() {
           return <FichePaire p={p} num={ficheNum} lecture={!numData} onFermer={fermer} onRetour={()=>{ fermer(); setGsQ(String((p && p.num) || ficheNum)); setGsOpen(true); }}
             onBordereau={(tx)=>{ fermer(); setGsOpen(false); poserCible({ type: 'colis', tx: String(tx) }, redirigerOnglet('cat_bord', null, ONGLETS_DEPLACES).tab); setTab('cat_bord'); }}
             onEmballer={()=>{ fermer(); setGsOpen(false); DEMANDE_EMBALLAGE.at = Date.now(); setTab('cat_bord'); try { window.dispatchEvent(new Event('vrm:emballer')); } catch (_) {} }}
+            onPrix={(n)=>setPrixNum(String(n))} neuve={neuve}
+            onCopier={async(f)=>{ try { await navigator.clipboard.writeText(texteAColler(f)); toast('Texte copié'); } catch (_) { toast('Copie impossible ici'); } }}
+            onDupliquer={async()=>{ const r=await dupliquerNumero(rn, ex); if(!r.ok){ toast(`Pas dupliqué : ${r.raison}`); return; } toast(`N°${r.numero} créé`); setNeuveRecente(r.fiche); setFicheNum(String(r.numero)); }}
             Photo={(src)=><PhotoVinted src={src} alt="" loading="lazy"/>} Icon={Icon} Retour={FermeAuRetour}/>;
+        })()}
+        {prixNum && (()=>{
+          // (3 nov.) LE PRIX PARTOUT : les sites de CE N° (par identité), un clic.
+          const { rn } = rechercheParNumero(prixNum, numData, vintedAccounts);
+          const ex = ficheExtra && ficheExtra.num === prixNum ? ficheExtra : null;
+          const lecture = !numData || !ex;
+          const { sites, manques } = rn.etat === 'invalide' ? { sites: [], manques: [] } : sitesPrixDe(prixNum, rn, ex || { lbcItems: undefined, vcItems: undefined });
+          const sitesVus = lecture ? sites.filter((x) => x.site === 'vinted' || x.site === 'ebay') : sites;
+          return <PrixPartout key={prixNum} num={rn.cle || prixNum} sites={sitesVus} manques={lecture ? [] : manques} lecture={lecture} Retour={FermeAuRetour}
+            onFermer={()=>setPrixNum(null)}
+            onAppliquer={async({ coches, prix, surEtat })=>{
+              const r = await appliquerPrix({ sites: sitesVus, coches, prix, envoyer: ENVOIS_PRIX, surEtat });
+              if (r.res) save('vrm_prix_journal', noterJournalPrix(load('vrm_prix_journal', {}) || {}, rn.cle, r.prix, sitesVus, r.res));
+              return r;
+            }}/>;
         })()}
         <EcranGardeFou resetKey={tab}>
         {/* ⚠️⚠️ UN SEUL ENDROIT POUR « JE N'ARRIVE PAS À LIRE TES DONNÉES ».

@@ -11,7 +11,8 @@
 .vrm-fp-tete { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 56px; }
 .vrm-fp-retour { display: flex; align-items: center; gap: 8px; min-height: 44px; border: 0; background: transparent; color: inherit; font: inherit; font-size: 20px; font-weight: 600; padding: 0 4px 0 0; cursor: pointer; }
 .vrm-fp-chevron { flex: none; display: block; }
-.vrm-fp-fermer { width: 44px; height: 44px; border-radius: 999px; border: 0; background: var(--vrm-surface, #FFFFFF); color: inherit; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+.vrm-fp-retour { white-space: nowrap; }
+.vrm-fp-fermer { width: 44px; height: 44px; border-radius: 999px; border: 0; background: var(--vrm-surface, #F2F2F7); color: inherit; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
 .vrm-fp-retour:focus-visible, .vrm-fp-fermer:focus-visible, .vrm-fp-b:focus-visible { outline: 2px solid var(--vrm-focus, #0071E3); outline-offset: 2px; }
 .vrm-fp-entete { display: flex; align-items: center; gap: 16px; margin: 6px 0 16px; min-width: 0; }
 .vrm-fp-num {
