@@ -52,7 +52,7 @@ import {resumerStockJournee} from './stockJournee.js';
 import {jaugeSeuils,optionsMicro,calendrierUrssaf,phraseRythme,seuilsDe,declarationRevenus,rappelCfe} from './microEntreprise.js';
 import { toutSurLeNumero, lireNumeroCherche } from "./rechercheNumero.js";
 import { repriseNumerosRecreation, tableRecrees } from "./repriseNumero.js";
-import { etatCycle, cartesSupprimees, majVusEnLigne, indexPresentes, montantSaisi, CHOIX as CHOIX_CYCLE, LIBELLE_CHOIX } from "./cycleArticle.js";
+import { etatCycle, cartesSupprimees, majVusEnLigne, indexPresentes, montantSaisi as montantCycle, CHOIX as CHOIX_CYCLE, LIBELLE_CHOIX } from "./cycleArticle.js";
 import { chezMoiProposables } from "./propositionsSites.js";
 import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chevauche, placerSansTraverser, modeCase, capaciteCase, articlesAutresPlateformes, unParArticle, empilerDansCase, retirerDeCase, retirerDePile, ajouterAPile, cartonsDePile, hauteurPile, changerHauteurPile, prochainePlaceMeuble, estPoseSur, caler, proposerPiece, planchesCases, planchesRangees, plateauxMeuble, plateauxReglables, tasserPlateaux } from './stockRegles.js';
 import {formaterMontantEbay} from './montantsEbay.js';
@@ -34466,7 +34466,12 @@ const lirePreuvesVenteVinted = async (opts = {}) => {
       strict.preuves = det.preuves;
       strict.revenues = det.revenues;
     }
-    return { vendus, strict, sansPreuve, sansPreuveKO, ancienne: preuvesParTransaction(rows).items };
+    // (3 nov., cycle d'un article) Les annonces dont une transaction est REVENUE
+    // (annulée, retour, remboursée — `PAS_UNE_VENTE`) et qui n'ont aucune preuve :
+    // l'article n'est pas « supprimé sans vente », il revient (src/cycleArticle.js).
+    const revenuesItems = new Set();
+    for (const r of rows) { const it = r && r.it != null ? String(r.it) : ''; if (it && !vendus.has(it) && PAS_UNE_VENTE.test(String((r && r.ti) || ''))) revenuesItems.add(it); }
+    return { vendus, strict, sansPreuve, sansPreuveKO, ancienne: preuvesParTransaction(rows).items, revenuesItems };
   } catch (_) { return null; }
 };
 // La preuve stricte pour le retrait automatique exige aussi la fraîcheur et la provenance.
@@ -39460,7 +39465,44 @@ function ListeComptes({ id, valeur, options, onChange, note, skin, attrs }) {
     </div>
   );
 }
-function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', compteConnecte = '', alertes = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false }) {
+function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', compteConnecte = '', alertes = null, cycle = null, onCycle = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false }) {
+  // (3 nov.) Les cartes « supprimé de Vinted » déjà répondues sur cet écran
+  // (elles partent tout de suite, la coque recalcule ensuite) et la réponse en cours.
+  const [cycleRepondus, setCycleRepondus] = useState({});
+  const [cycleEnVol, setCycleEnVol] = useState(null);
+  const repondreCycle = async (c, choix) => {
+    if (!c || cycleEnVol) return;
+    const fiches = load('vinted_annonce_numeros', {}) || {};
+    const at = new Date().toISOString();
+    const decision = { choix, numero: c.numero, at };
+    if (choix === CHOIX_CYCLE.VENDU_MAIN) {
+      const t = await askText({ title: `N°${c.numero} vendu combien ?`, value: '', numeric: true, ok: 'Valider' });
+      if (t == null) return;
+      const m = montantCycle(t);
+      if (m == null) { toast('Montant non compris — rien n’a été noté.', 'err'); return; }
+      decision.montant = m;
+    } else if (choix === CHOIX_CYCLE.SEPARE) {
+      const ok = await askConfirm({ title: `N°${c.numero} n'est plus chez toi ?`, desc: String(c.title || '').slice(0, 80), ok: "Je m'en sépare" });
+      if (!ok) return;
+    }
+    setCycleEnVol(c.id);
+    try {
+      save(CYCLE_DECISIONS, { ...lireObjet(CYCLE_DECISIONS), [c.id]: decision });
+      if (choix === CHOIX_CYCLE.VENDU_MAIN) {
+        const l = (load('vinted_annonces_vendues', []) || []).map(String);
+        if (!l.includes(String(c.id))) save('vinted_annonces_vendues', [...l, String(c.id)]);
+      }
+      if (choix === CHOIX_CYCLE.SEPARE) {
+        const perdues = lireObjet('vinted_pairs_lost');
+        const cle0 = cleDeclarationPartie(c.numero, c.id, fiches);
+        const cle = perdues[cle0] && perdues[cle0].id != null && String(perdues[cle0].id) !== String(c.id) ? `${String(c.numero).trim()}@${c.id}` : cle0;
+        if (cle) save('vinted_pairs_lost', { ...perdues, [cle]: { ...(perdues[cle] || {}), id: String(c.id), at, title: c.title || '', from: 'cycle' } });
+      }
+      setCycleRepondus((m) => ({ ...m, [c.id]: choix }));
+      toast(`N°${c.numero} : ${LIBELLE_CHOIX[choix].toLowerCase()}`, 'ok');
+      if (onCycle) onCycle();
+    } finally { setCycleEnVol(null); }
+  };
   const [datesLbc] = useLigneSynchro('vrm_lbc_dates', lireDatesLbc);
   // L'IDENTITÉ de l'ensemble des comptes liés (triée) : c'est elle que suivent
   // les relectures et le cache — jamais `accounts.length` (un compte retiré et
@@ -48829,6 +48871,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           }
           if (!retirerVu && tuiles.retirer) tuiles.retirer = { ...tuiles.retirer, aVerifier: 0 };
         }
+        // (3 nov.) « N°x supprimé de Vinted » : une carte par article à trancher
+        // (src/cycleArticle.js), avec ses trois réponses. Rien sur « pas su ».
+        if (cycle && Array.isArray(cycle.cartes)) for (const c of cycle.cartes) {
+          if (cycleRepondus[c.id]) continue;
+          jobs.push({ id: 'supprime-vinted', cycle: c, icon: 'tag', color: C.text, court: `N°${c.numero} supprimé de Vinted`, detail: enArticles(String(c.title || '').slice(0, 80)), title: `N°${c.numero} supprimé de Vinted`, sub: c.title, photos: c.photo ? [c.photo] : null, prio: 0.8 });
+        }
         jobs.sort((a,b)=>a.prio-b.prio);
         // RÉSULTAT DU JOUR : les paires VENDUES aujourd'hui (pas l'argent viré,
         // qui arrive plusieurs jours après). Source = les emails de vente, la
@@ -49070,7 +49118,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // (22 oct., chantier URSSAF) LE RAPPEL URSSAF PORTE SON GESTE : « Noter ma
         // déclaration » à côté. Un bouton ne se met pas dans un bouton : la ligne
         // devient un groupe de deux, même forme, mêmes attributs.
-        const tache = (j, i) => { if (!(j.urssaf && Array.isArray(j.urssaf.aNoter) && j.urssaf.aNoter.length > 0)) return tacheSimple(j, i);
+        // (3 nov.) La carte « N°x supprimé de Vinted » : pastille (photo), titre court,
+        // trois pilules — ses réponses, rien d'autre (aucun texte explicatif).
+        const tacheCycle = (j, i) => { const c = j.cycle; const x = decouper(j); return (
+          <div className="vrm-day-task is-groupe vrm-cycle-carte" key={'cycle' + c.id} role="group" data-job="supprime-vinted" data-cycle-id={c.id} data-cycle-num={c.numero} title={`${x.court}${x.detail ? '\n' + x.detail : ''}`}>
+            <div className="vrm-cycle-tete">{corpsTache(j, x)}</div>
+            <div className="vrm-cycle-choix">
+              {[CHOIX_CYCLE.CHEZ_MOI, CHOIX_CYCLE.VENDU_MAIN, CHOIX_CYCLE.SEPARE].map((ch) => (
+                <Bouton key={ch} variante="secondaire" className="vrm-b-petit vrm-day-task-geste" data-cycle-choix={ch} disabled={!!cycleEnVol} onClick={() => repondreCycle(c, ch)}>{LIBELLE_CHOIX[ch]}</Bouton>
+              ))}
+            </div>
+          </div>
+        ); };
+        const tache = (j, i) => { if (j.cycle) return tacheCycle(j, i); if (!(j.urssaf && Array.isArray(j.urssaf.aNoter) && j.urssaf.aNoter.length > 0)) return tacheSimple(j, i);
           const x = decouper(j); const plein = x.plein ? `${x.court}\n${x.detail ? x.detail + '\n' : ''}${x.plein}` : x.detail ? `${x.court}\n${x.detail}` : x.court;
           return (
           <div className="vrm-day-task is-groupe" key={(j.id||'j')+i} role="group" data-job={j.id||undefined} data-n={j.n!=null?j.n:undefined} data-urssaf-echeance={j.urssaf.dueIso} data-urssaf-apayer={j.urssaf.apayer==null?'':String(j.urssaf.apayer)} data-urssaf-partiel={j.urssaf.partiel?'1':undefined} title={plein}>
@@ -63126,6 +63186,8 @@ function AppCoeur() {
   const [notifBanner,setNotifBanner]=useState(null); // {ventes, factures} ou null
   const [vintedNotif,setVintedNotif]=useState(null); // {messages, ventes} nouveautés Vinted à l'ouverture
   const [notifItems,setNotifItems]=useState([]); // actions du jour (Ma journée, tableau de bord, Collectif)
+  // (3 nov.) « N°x supprimé de Vinted » (src/cycleArticle.js) : `undefined` en cours · `null` pas su · { cartes, total, pasSu }.
+  const [cycleCartes,setCycleCartes]=useState(undefined);
   const [menuOpen,setMenuOpen]=useState(false);
   const [invoiceSettings,setInvoiceSettings]=useState(()=>load('vinted_invoice_settings',{
     ...ENTREPRISE_VIDE,
@@ -64637,6 +64699,52 @@ function AppCoeur() {
           comptesBloques:comptesBloquesVinted(),
         }).catch(()=>{});   // un passage qui tombe ne retire rien (il reste « à retirer »)
       }catch(_){}
+      // ── (3 nov.) LE CYCLE D'UN ARTICLE : « N°x supprimé de Vinted » ─────────
+      // La règle est PURE (src/cycleArticle.js). D'abord sur les lectures déjà
+      // en mémoire ; les lectures lourdes (preuves de vente, recréations, coffre
+      // de Republier, ventes des autres sites) ne partent que s'il reste une
+      // question à poser. Toute lecture ratée ⇒ « pas su » ⇒ aucune carte.
+      // Rien n'est jugé avant le nuage (fiches et décisions venues du navigateur).
+      if(nuageAuDepart) try{
+        const retireesC=annoncesRetirees();
+        const exclusC=new Set([...(load('vinted_accounts_blocked',[])||[]), ...(load('vinted_accounts_hidden',[])||[]), ...retireesC].map(String));
+        const lectures=new Map();
+        await Promise.all((vintedAccounts||[]).filter(a=>a&&!exclusC.has(String(a.vinted_user_id))).map(async a=>{
+          const l=await fetchVintedListings(a,1,{moissonSeule:true}).catch(()=>null);
+          if(!l||!l.ok||l.source!=='harvest') return;
+          const ids=(x)=>new Set((Array.isArray(x)?x:[]).map(it=>String(it&&it.id)).filter(Boolean));
+          lectures.set(String(a.vinted_user_id),{ lu:l.lu, complet:l.complet===true, enLigne:ids(l.items), masquees:ids(l.masquees), aConfirmer:ids(l.aConfirmer), venduesDressing:new Set((l.soldIds||[]).map(String)) });
+        }));
+        if(cancelled) return;
+        const vus0=lireObjet(VUS_EN_LIGNE);
+        const vusN=majVusEnLigne(vus0, nums, lectures);
+        if(vusN) save(VUS_EN_LIGNE, vusN);
+        const perduesC=lireObjet('vinted_pairs_lost');
+        const base={ lectures, presentes:indexPresentes(nums, lectures, cleNum), supprimees:await lireSupprimeesTous(), vus:vusN||vus0,
+          decisions:lireObjet(CYCLE_DECISIONS), declaree:(id)=>annonceDeclareePartie(id, nums, perduesC),
+          vendusMain:new Set((load('vinted_annonces_vendues',[])||[]).map(String)), exclus:exclusC, cle:cleNum };
+        let res=cartesSupprimees(nums, { ...base, recrees:{}, viaVrm:new Set(), ventes:{} });
+        if(res.total>0){
+          const [pv, viaVrm, recrees, ordsC, vcC]=await Promise.all([
+            lirePreuvesVenteVinted().catch(()=>null),
+            lireTout('id=like.coffre_%25&data->versBrouillon->>etat=not.is.null&select=id',{strict:true}).then(r=>Array.isArray(r)?new Set(r.map(x=>(/^coffre_\d+_(\d+)$/.exec(String(x&&x.id||''))||[])[1]).filter(Boolean)):null,()=>null),
+            Promise.all([
+              fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.vinted_brouillon_*&select=id,anc:data->>ancienId,item:data->>itemId`,{headers:sbAuth()}),
+              fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.coffre_*&meta->>recreeDe=not.is.null&select=id,r:meta->>recreeDe`,{headers:sbAuth()}),
+            ]).then(async([rb,rc])=>(rb.ok&&rc.ok)?tableRecrees(await rb.json(), await rc.json()):null,()=>null),
+            lireComptesEbay().then(cE=>!Array.isArray(cE)?null:!cE.length?[]:lireEbayTous('ebay_orders',SEL_EBAY_COMMANDES,'orders',cE,true).then(r=>(!r||r.illisibles.length)?null:r.items)).catch(()=>null),
+            lireVentesVestiaire().then(d=>ventesVcDe(avecNumerosVc(d)),()=>null),
+          ]);
+          let itemsC=lbcItemsLu;
+          const vd=(it)=>numerosDejaVendus({ numeros:nums, enLigne:new Set([...lectures.values()].flatMap(l=>[...l.enLigne])), vendusVinted:pv&&pv.vendus?pv.vendus:null,
+            commandes:ordsC, ventesLbc:ventesLbcLu, itemsLbc:it, liensLbc:load('vrm_lbc_liens',{})||{}, ventesVc:vcC });
+          let verdictC=vd(itemsC===undefined?undefined:itemsC);
+          if(verdictC.lbcSansPaire>0 && itemsC===undefined){ itemsC=await lbcAnnoncesSession().catch(()=>null); verdictC=vd(itemsC||null); }
+          const ventes=(!pv||!pv.vendus||verdictC.pasSu.length||verdictC.enCours)?null:{ ids:pv.vendus, nums:new Set(verdictC.vendus.keys()), revenues:pv.revenuesItems||new Set() };
+          res=cartesSupprimees(nums, { ...base, recrees, viaVrm, ventes });
+        }
+        if(!cancelled) setCycleCartes(res);
+      }catch(_){ if(!cancelled) setCycleCartes(null); }
       if(cancelled) return;
       // ── Centre de notifications : ce qui demande une action, ici et maintenant.
       const items=[];
@@ -65504,7 +65612,7 @@ function AppCoeur() {
             annoncer « 🎉 Tout est à jour ! » pendant la panne, c'est-à-dire
             précisément l'écran qu'il ouvre le matin. Corriger « partout » se
             vérifie au rendu, écran par écran, pas en lisant le code. */}
-        {tab==='journee'&&<Comptabilite key="journee" panelOff={panelOffCoque} accounts={vintedAccounts} only="journee" alertes={notifItems} liveStats={liveStatsVus} onNav={setTab} baseKO={baseKO} accountsReady={accountsLoaded} premierJour={premierJour} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
+        {tab==='journee'&&<Comptabilite key="journee" panelOff={panelOffCoque} accounts={vintedAccounts} only="journee" alertes={notifItems} cycle={cycleCartes} onCycle={()=>setPreuveTick(t=>t+1)} liveStats={liveStatsVus} onNav={setTab} baseKO={baseKO} accountsReady={accountsLoaded} premierJour={premierJour} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
         {/* ⚠️ « Bienvenue 👋 · connecte ton compte Vinted pour commencer » à
             quelqu'un qui a neuf comptes : c'est ce qu'il voyait quand la base
             ne répondait pas. `baseKO` distingue « aucun compte » de « je n'ai
