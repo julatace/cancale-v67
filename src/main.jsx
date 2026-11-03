@@ -108,6 +108,7 @@ import './styles-compta-claire.css';
 // frises de suivi — en tout dernier, il a le dernier mot sur la forme des écrans qui le portent.
 import './design/fusion.css';
 import './design/favoris.css';
+import './design/outils-stats.css';
 import { suivreRangeesDefilantes } from './rangeesDefilantes.js';
 if (typeof document !== 'undefined') { if (document.body) suivreRangeesDefilantes(); else document.addEventListener('DOMContentLoaded', suivreRangeesDefilantes); }
 

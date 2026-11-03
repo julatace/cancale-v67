@@ -61,7 +61,8 @@ import {centimes,coutsVente,beneficePaire,champsCharges} from "./beneficePaire.j
 import CoutsVente from "./CoutsVente.jsx";
 import { boostRentable, SEUIL_BOOST } from "./boostRentable.js";
 import { CLE_WIDGETS_JOURNEE, WIDGETS_JOURNEE, NOM_TAILLE, DISPO_JOURNEE_DEFAUT, normaliserDispoJournee, deplacerWidget, retirerWidget, widgetFixe, tailleSuivante, tailleDefautWidget, caseVisible, widgetsAjoutables, dispoAEnregistrer } from "./journeeWidgets.js";
-import { classementRapporte, modeleSur, releveVentes } from "./ceQuiRapporte.js";
+import { modeleSur, releveVentes } from "./ceQuiRapporte.js";
+import CeQuiRapporte from "./design/CeQuiRapporte.jsx";
 import { rythmeVendu, ecartPct, quandTuVends, margesPar, delaisPar, tranchePrix, TRANCHES_PRIX, stockQuiDort, SEUILS_DORT, rotationStock, tauxVenteMois, tauxAnnulation, PERIODES, bornesPeriode, dansBornes, venduPeriode, barresPeriode, ventesPar, plusRapides } from "./statsVentes.js";
 import "./stats-vitrine.css";
 import {appelerFavorisDirect} from './favorisTransport.js';
@@ -37543,6 +37544,8 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
               </div>
             ), { 'data-sv-carte': 'comptes' })}
       </div>
+      {/* (3 nov.) « Ce qui rapporte le plus » : le relevé de la période, classé (src/ceQuiRapporte.js). */}
+      <CeQuiRapporte lignes={lp} Segmente={Segmente} fmt={fmt} etat={!releve ? 'passu' : 'encours'}/>
       <div className="vrm-sv-rangee vrm-sv-rangee-2">
         {carte('sv-tailles', 'Les tailles qui se vendent', tailles && tailles.groupes.length ? 'ventes · jours pour vendre' : null, !lignes
           ? vide('Il se calcule avec le relevé de tes ventes : ouvre Ventes une fois.', { 'data-sv-etat': 'passu' })
@@ -46013,7 +46016,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // seulement) — Statistiques le CONSOMME, il ne relit aucun prix d'achat
       // (§11). Rangé sur CET appareil seulement (pas dans `main`, qui est lu
       // partout) : Ma journée et Ventes le reposent à chaque lecture complète.
-      // Une ligne : [plateforme, compte, tx|id, ts, vente €, achat € | null,
+      // Une ligne : [plateforme, compte, tx|id, ts, vente € | null (prix illisible : `montantCommandeLu`, 3 nov.), achat € | null,
       // frais € | null, titre].
       // (3 nov.) La construction vit dans `releveVentes` (src/ceQuiRapporte.js),
       // inchangée, pour que l'audit « Ce qui rapporte » l'EXÉCUTE.
@@ -46024,7 +46027,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       for (const v of ((lbcVentes && lbcVentes.ventes) || [])) if (v && v.txId) titreDe['lbc:' + v.txId] = v.title || '';
       for (const c of (ebayCmd || [])) if (c && c.orderId) titreDe['ebay:' + c.orderId] = (Array.isArray(c.lineItems) && c.lineItems[0] && c.lineItems[0].title) || '';
       const releve = releveVentes({ vinted: sales.items, estMasquee: isHidden, estFinalisee: (o) => classifyOrderStatus(o.status) === 'completed', an0,
-        montant: montantCommande, achat: (o) => achatDe(effEntry(o)), frais: (o) => chargesVente(effEntry(o)),
+        montant: montantCommandeLu, achat: (o) => achatDe(effEntry(o)), frais: (o) => chargesVente(effEntry(o)),
         compte: (o) => (o._acc && (o._acc.login || o._acc.vinted_user_id)) || '', autres: autresBenefice, titreDe });
       const r0 = load('vrm_stats_ventes', null);
       if (!(r0 && JSON.stringify(r0.l) === JSON.stringify(releve))) save('vrm_stats_ventes', { v: 1, l: releve, at: Date.now() });
