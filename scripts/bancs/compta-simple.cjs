@@ -230,7 +230,10 @@ async function scenarioA(b, vp, sombre) {
     // (le titre replié de la micro-entreprise GARDE l'échéance : `suivi-urssaf.cjs` R l'exige — une décision de l'autre session.)
     // ── accord : « connu pour 1 vente »
     const benef = (await texte(pg, '[data-benef-etat]')) || '';
-    check(!/pour les 1 vente/.test(benef) && /connu pour 1 vente/.test(benef), `A ${nom} — « prix d'achat connu pour 1 vente » (jamais « pour les 1 vente »)`);
+    // (2 nov., 22 h) La phrase de couverture n'est plus sous le chiffre (maquette FusionCompta : « sur X vendus ») —
+    // retiré à la demande de Julien, 2 nov. 22 h. L'accord reste jugé là où il s'écrit (le détail du calcul).
+    const det = (await texte(pg, '[data-benef-ligne="brut"]')) || benef;
+    check(!/pour les 1 vente/.test(det) && !/pour les 1 vente/.test(benef) && /connu pour 1 vente/.test(det), `A ${nom} — « prix d'achat connu pour 1 vente » (jamais « pour les 1 vente »)`);
     // (revue) l'explication du bénéfice se replie ; la couverture reste sur la ligne « brut »
     const calc = await pg.evaluate(() => { const d = document.querySelector('[data-benef-etat] [data-benef-calcul]'); return d ? { open: d.open, txt: /au jour de la vente/.test(d.textContent) } : null; });
     check(!!calc && calc.open === false && calc.txt, `A ${nom} — « Comment c'est calculé » du bénéfice est replié (rien n'est supprimé) : ${JSON.stringify(calc)}`);
@@ -383,7 +386,7 @@ async function scenarioE(b, vp, sombre) {
   const { ctx, pg } = await page(b, vp, sombre, true, errs, { retenu });
   await essaie(`E ${nom}`, async () => {
     await ouvrir(pg, 'compta');
-    await pg.locator('#compta-charges > summary').first().waitFor({ timeout: 40000 });
+    await pg.locator('#compta-charges > summary').first().waitFor({ state: 'attached', timeout: 40000 });
     check((await pg.locator('[data-stats-carte="mois"]').count()) === 0, `E ${nom} — le nuage est bien retenu (statut pas encore lu)`);
     await ouvrirRepli(pg, 'compta-charges');
     await pg.locator('[data-dep-ouvrir]').first().click();
