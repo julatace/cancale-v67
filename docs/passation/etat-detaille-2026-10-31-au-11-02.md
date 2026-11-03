@@ -185,3 +185,7 @@ Déplacé TEL QUEL depuis CLAUDE.md §9 le 2 novembre 2026 (le fichier dépassai
 ### Lignes de §9 déplacées telles quelles
 - **2 nov.** — Audit des données (E0c) : eBay aux frais pas lus « au moins » partout, « 1er », Vestiaire/Leboncoin dans « Finalisé par plateforme », pas lu ≠ 0 (base lente, semaine, NaN, Invalid Date), jours au fuseau local (`audit-donnees-ecrans`). → historique divers. Geste : aucun.
 - **2 nov.** — Offres auto : jamais sur une paire vendue ailleurs (**5.308.0**, `src/offresGarde.js`). Geste : installer.
+
+### Lignes de §9 déplacées telles quelles
+- **2 nov.** — Carte des relais : les consignes Vinted Go revenaient « deux adresses » (pays « France » rangé en ville, ville collée à la rue) ; le serveur retire le pays en lettres, l'app relit les lignes déjà rangées (`lieuTransporteurRepare`, `audit-vintedgo-adresse`). → historique colis-retraits. Geste : rouvrir Colis → À retirer.
+- **2 nov.** — **Mode auto des messages aux favoris** (éteint par défaut, **5.309.0**, `src/favorisAuto.js`, `api/_lib/favoris-auto.js`, `audit-favoris-auto`) : jamais de boucle, VRM demande le geste qui débloque. → historique favoris-messages. Geste : installer la 5.309, ouvrir un favori depuis la cloche, allumer.
