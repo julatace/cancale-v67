@@ -36,7 +36,7 @@ import { numeroDuTitreApresCoupure, lireMarqueur, archiveDe, estArchive } from '
 import { numerosDeVente, annoncesEbayParNumero, annoncesLbcParNumero, annoncesVcEnLigne, doubleVenteApprise, notificationDoubleVente } from './_lib/double-vente.js';
 import { normaliserRegistre, comptesActifs } from './_lib/ebay.js';
 import { arriveLeAuRangement } from './_lib/arrivee-colis.js';
-import { limiteRetraitDepuisTexte, lieuDepuisExtrait, LIEU_AU_FUTUR } from './_lib/retrait-colis.js';
+import { limiteRetraitDepuisTexte, lieuDepuisExtrait, lieuSousEnTete, LIEU_AU_FUTUR } from './_lib/retrait-colis.js';
 import { codeRetraitTournure, nombreSurSaLigne, codeImpossible } from './_lib/code-retrait-email.js';
 import { decoderEntitesHtml } from './_lib/entites-html.js';
 import { transactionDuRecu } from './_lib/recu-achat.js';
@@ -987,60 +987,13 @@ export function parseCarrierEmail(mail, carrier, recuLe = new Date().toISOString
   // Format réel Mondial Relay : « Point Relais » sur sa ligne, puis le nom
   // (Maison de la Presse) et l'adresse (40 Rue du Port / 35260 Cancale)
   // sur les lignes SUIVANTES.
-  {
-    const lines = txt.split('\n').map(l => l.trim());
-    // ⚠️ 30 septembre : les emails « colis disponible » d'un LOCKER Mondial Relay
-    //    (casier 24/7, `consigne` vrai) n'avaient JAMAIS de lieu — mesuré : 5 sur 5
-    //    des Mondial Relay sans lieu étaient des lockers. Même forme que le point
-    //    relais (en-tête sur sa ligne, puis nom et adresse dessous) : on accepte
-    //    donc aussi « Locker », « Locker 24/7 », « Consigne », « Casier ».
-    // ⚠️ « Adresse » seule sur sa ligne AUSSI (Vinted Go, 2 oct. : « Adresse » puis
-    //    « Consigne Vinted Go / Speed Queen - Vannes / 24 Rue Hoche »). `^adresse$`
-    //    strict : « Adresse de livraison » (email d'envoi) ne matche pas.
-    // ⚠️ (23 oct.) « POINT RELAIS® » : le ® en fin de ligne faisait échouer le
-    //    test (mesuré sur le Mondial Relay du 21 octobre : lieu vide, alors que
-    //    « TABA'VAP / 29 Rue Hoche / 56000 Vannes » suivaient). On retire ®™©
-    //    et le gras AVANT de tester l'en-tête.
-    const enTete = (l) => l.replace(/®|™|©|[*_]+/g, ' ').replace(/\s+/g, ' ').trim();
-    const idx = lines.findIndex(l => /^(?:point\s+(?:relais|de\s+retrait)|(?:votre\s+)?locker(?:\s*24\s*\/?\s*7)?|(?:votre\s+)?consigne(?:\s+automatique)?|(?:votre\s+)?casier|adresse)\b[\s:–-]*$/i.test(enTete(l)));
-    if (idx >= 0) {
-      const parts = [];
-      // 4 lignes : nom, rue, code postal + ville (la consigne Vinted Go en a 3
-      // après son en-tête « Adresse » : « Consigne Vinted Go », l'enseigne, la rue).
-      // (1er nov.) Le code postal et la ville se perdaient : la consigne Vinted Go
-      // écrit QUATRE lignes après « Adresse » (« Consigne Vinted Go », l'enseigne,
-      // la rue, « 56000 Vannes ») et la 4e coupait à la ville ; une ligne vide
-      // entre la rue et « CP Ville » (version HTML) coupait aussi. Le lieu rangé
-      // (« Consigne Vinted Go, Kusmi Tea, 13 Rue Saint-Vincent ») n'avait alors
-      // ni code postal ni ville : pas sur la carte, et un second point « Kusmi
-      // Tea » à côté de celui de la conversation. On va jusqu'à la ligne
-      // « CP Ville » (5 lignes au plus), une ligne vide franchie seulement si la
-      // suivante EST cette ligne.
-      const cpVille = (l) => /^\d{5}\s+[A-Za-zÀ-ÿ'’\- ]{2,40}$/.test(String(l || '').replace(/[*_]+/g, ' ').replace(/\s+/g, ' ').trim());
-      for (let i = idx + 1; i < lines.length && parts.length < 5; i++) {
-        const l = lines[i];
-        if (!l) {
-          if (!parts.length) continue;
-          if (parts.some(cpVille)) break;
-          let j = i + 1; while (j < lines.length && !lines[j]) j++;
-          if (j < lines.length && cpVille(lines[j])) { i = j - 1; continue; }
-          break;
-        }
-        if (parts.some(cpVille)) break;
-        if (parts.length >= 4 && !cpVille(l)) break;
-        // (23 oct.) La date limite (« RETRAIT JUSQU'AU 26/10 ») et le pied de
-        // l'e-mail (« Avec 19 000 points de proximité… », l'adresse du siège
-        // MONDIAL RELAY) ne sont pas le lieu : on s'arrête là.
-        if (/horaires|ouvert|lundi|mardi|retrouve|suivez|super\s*pratique|https?:|désabonn|code|colis|retrait|jusqu|avec\s+\d|mondial\s*relay|chronopost|villeneuve\s+d/i.test(l)) break;
-        // (17 oct.) Le gras de la version texte (« *Kusmi Tea* ») n'est pas le lieu.
-        const propre = l.replace(/[*_]+/g, ' ').replace(/\s+/g, ' ').trim();
-        if (propre) parts.push(propre);
-      }
-      if (parts.length) {
-        lieu = parts.join(', ').replace(/®|™|©/g, '').replace(/\s+(super\s*pratique|retrouvez).*$/i, '').replace(/\s{2,}/g, ' ').trim();
-      }
-    }
-  }
+  // ⚠️ 30 septembre : les lockers Mondial Relay (« Locker », « Locker 24/7 »,
+  //    « Consigne », « Casier ») et « Adresse » seule (Vinted Go) ; (23 oct.)
+  //    « POINT RELAIS® » ; (1er nov.) jusqu'à la ligne « CP Ville » ; (2 nov.)
+  //    une ligne vide entre CHAQUE ligne et une rue sans numéro (locker d'une
+  //    autre ville) : la règle vit dans api/_lib/retrait-colis.js (`lieuSousEnTete`),
+  //    la même que l'app relit sur le texte gardé d'un e-mail déjà rangé (§11).
+  { const l = lieuSousEnTete(txt); if (l) lieu = l; }
   if (!lieu) for (const pat of [
     /point\s+relais\s*[:\-]?\s*([^\n]{5,90})/i,
     /(?:disponible|à retirer|retire[rz]?(?:\s+ton\s+colis)?)\s+(?:chez|au|à|dans)\s+([^\n]{5,90})/i,

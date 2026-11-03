@@ -171,6 +171,56 @@ export function lieuDepuisExtrait(extrait) {
   return vus.size === 1 ? [...vus.values()][0] : null;
 }
 
+// LE LIEU SOUS SON EN-TÊTE (« POINT RELAIS® », « LOCKER », « Consigne », « Adresse »
+// seuls sur leur ligne, puis le nom, la rue, « CP Ville » sur les lignes d'après).
+// Sorti d'api/email-inbound.js le 2 nov. (23 h) pour que l'app relise avec la MÊME
+// règle le texte gardé d'un e-mail déjà rangé (§11).
+// (2 nov., 23 h — Julien : « un colis arrivé à Cancale, je veux qu'il soit affiché »)
+// Mesuré : l'e-mail d'un LOCKER Mondial Relay écrit UNE LIGNE VIDE entre chaque
+// ligne et une rue SANS numéro (« LOCKER / LOCKER 24/7 <ENSEIGNE> / Rue de … /
+// <CP> <Ville> ») : la lecture s'arrêtait à la ligne vide après le nom, le lieu
+// rangé n'avait ni rue, ni code postal, ni ville — jamais sur la carte. Une ligne
+// vide est maintenant franchie tant que la ligne « CP Ville » arrive dans les lignes
+// suivantes (5 morceaux au plus, rien du pied d'e-mail avant elle) ; sinon rien de
+// plus qu'avant.
+// La date limite et le pied de l'e-mail (« Avec 19 000 points… », le siège) ne sont pas le lieu.
+const STOP_LIEU = /horaires|ouvert|lundi|mardi|retrouve|suivez|super\s*pratique|https?:|désabonn|code|colis|retrait|jusqu|avec\s+\d|mondial\s*relay|chronopost|villeneuve\s+d/i;
+export function lieuSousEnTete(txt) {
+  const lines = String(txt || '').split('\n').map((l) => l.trim());
+  const enTete = (l) => l.replace(/®|™|©|[*_]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const idx = lines.findIndex((l) => /^(?:point\s+(?:relais|de\s+retrait)|(?:votre\s+)?locker(?:\s*24\s*\/?\s*7)?|(?:votre\s+)?consigne(?:\s+automatique)?|(?:votre\s+)?casier|adresse)\b[\s:–-]*$/i.test(enTete(l)));
+  if (idx < 0) return null;
+  const parts = [];
+  const cpVille = (l) => /^\d{5}\s+[A-Za-zÀ-ÿ'’\- ]{2,40}$/.test(String(l || '').replace(/[*_]+/g, ' ').replace(/\s+/g, ' ').trim());
+  const suivante = (i) => { let j = i + 1; while (j < lines.length && !lines[j]) j++; return j; };
+  for (let i = idx + 1; i < lines.length && parts.length < 5; i++) {
+    const l = lines[i];
+    if (!l) {
+      if (!parts.length) continue;
+      if (parts.some(cpVille)) break;
+      const j = suivante(i);
+      if (j < lines.length && cpVille(lines[j])) { i = j - 1; continue; }
+      // La ligne « CP Ville » arrive dans les lignes suivantes (une ligne vide
+      // entre chacune), sans pied d'e-mail ni date limite avant elle : on continue.
+      let k = j, n = parts.length, ok = false;
+      while (k < lines.length && n < 5) {
+        if (cpVille(lines[k])) { ok = true; break; }
+        if (STOP_LIEU.test(lines[k])) break;
+        n++; k = suivante(k);
+      }
+      if (ok) { i = j - 1; continue; }
+      break;
+    }
+    if (parts.some(cpVille)) break;
+    if (parts.length >= 4 && !cpVille(l)) break;
+    if (STOP_LIEU.test(l)) break;
+    const propre = l.replace(/[*_]+/g, ' ').replace(/\s+/g, ' ').trim();
+    if (propre) parts.push(propre);
+  }
+  if (!parts.length) return null;
+  return parts.join(', ').replace(/®|™|©/g, '').replace(/\s+(super\s*pratique|retrouvez).*$/i, '').replace(/\s{2,}/g, ' ').trim() || null;
+}
+
 // Un « lieu » qui annonce le FUTUR (« … sera disponible dans les prochains jours
 // dans votre Relais Pickup ») n'est pas un lieu : le colis n'est pas encore là.
 export const LIEU_AU_FUTUR = /prochains?\s+jours|prochainement|d[èe]s\s+(?:son|que)/i;

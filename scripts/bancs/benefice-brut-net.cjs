@@ -81,9 +81,16 @@ const lireStrip = async (b, avecAchats) => {
   await brancher(pg, rowsPour(avecAchats));
   await pg.goto(`http://localhost:${PORT}/?tab=cat_ventes`, { waitUntil: 'domcontentloaded' });
   await pg.waitForTimeout(3000);
-  try { if (!(await pg.$('.vrm-summary-strip'))) await pg.getByText('Analyse de tes ventes', { exact: true }).click({ timeout: 4000 }); } catch (_) {}
+  // (3 nov.) Les ventes arrivent parfois après 3 s : on attend le bouton (il n'existe
+  // qu'avec des ventes), puis la rangée — un délai fixe lisait une rangée vide (rouge
+  // aussi sur origin/main).
+  // Au téléphone, « Chiffres de la plateforme » est replié : un toucher l'ouvre.
+  await pg.waitForSelector('details.vrm-platform-summary', { timeout: 20000 }).catch(() => {});
+  await pg.evaluate(() => { const d = document.querySelector('details.vrm-platform-summary'); if (d && !d.open) d.querySelector('summary').click(); });
+  try { if (!(await pg.$('[data-ventes-benef-n]'))) { const bt = pg.getByRole('button', { name: /Analyse de tes ventes/ }).first(); await bt.waitFor({ timeout: 20000 }); await bt.click(); } } catch (_) {}
+  await pg.waitForSelector('[data-ventes-benef-n]', { timeout: 10000 }).catch(() => {});
   await pg.waitForTimeout(600);
-  const strip = await pg.evaluate(() => (document.querySelector('.vrm-summary-strip') || {}).innerText || '');
+  const strip = await pg.evaluate(() => (document.querySelector('[data-ventes-benef-n]') || {}).innerText || '');
   return { strip, errs, ctx };
 };
 
@@ -96,9 +103,12 @@ const lireStrip = async (b, avecAchats) => {
     console.log('── A. des prix d’achat (un boost) → brut et net distincts');
     const A = await lireStrip(b, true);
     dit(!A.errs.length, 'l’écran Ventes se rend sans erreur', A.errs[0]);
-    dit(/Bénéfice brut/i.test(A.strip) && /Bénéfice net/i.test(A.strip), 'deux cartes : « Bénéfice brut » ET « Bénéfice net »', A.strip.replace(/\n/g, ' · ').slice(0, 220));
+    // (3 nov., banc benefice-unique) Le « net » de cet écran ne déduit ni dépenses ni
+    // URSSAF : il s'appelle « Après frais de vente » (« Bénéfice » est la règle de
+    // Comptabilité, src/beneficeNoms.js). Même règle, autre nom.
+    dit(/Bénéfice brut/i.test(A.strip) && /Après frais de vente/i.test(A.strip) && !/Bénéfice net/i.test(A.strip), 'deux cartes : « Bénéfice brut » ET « Après frais de vente »', A.strip.replace(/\n/g, ' · ').slice(0, 220));
     const apres = (t, lib) => { const m = new RegExp(lib + '[^0-9-]*(-?[\\d\\s  ]+)').exec(t.replace(/\n/g, ' ')); return m ? parseInt(m[1].replace(/[\s  ]/g, ''), 10) : NaN; };
-    const brut = apres(A.strip, 'Bénéfice brut'), net = apres(A.strip, 'Bénéfice net');
+    const brut = apres(A.strip, 'Bénéfice brut'), net = apres(A.strip, 'Après frais de vente');
     dit(Number.isFinite(brut) && Number.isFinite(net) && brut > net, 'le brut (vente − achat) dépasse le net (− boosts & frais)', `brut=${brut} net=${net}`);
     dit(/après boosts & frais/i.test(A.strip), 'le net dit ce qui est déduit (boosts & frais)', A.strip.replace(/\n/g, ' · ').slice(0, 220));
     await A.ctx.close();
@@ -107,8 +117,8 @@ const lireStrip = async (b, avecAchats) => {
     console.log('── B. aucun prix d’achat → « Bénéfice · — », pas de split, pas de faux 0');
     const B = await lireStrip(b, false);
     dit(!B.errs.length, 'l’écran Ventes se rend sans erreur (sans prix d’achat)', B.errs[0]);
-    dit(!/Bénéfice brut/i.test(B.strip) && !/Bénéfice net/i.test(B.strip), 'aucun split quand il n’y a pas de prix d’achat (§7)', B.strip.replace(/\n/g, ' · ').slice(0, 200));
-    dit(/Bénéfice/.test(B.strip) && /—/.test(B.strip) && !/Bénéfice[^\n]*\n\s*0/.test(B.strip), 'une carte « Bénéfice · — », jamais un faux 0,00 € (§7)', B.strip.replace(/\n/g, ' · ').slice(0, 200));
+    dit(!/Après frais de vente/i.test(B.strip) && !/Bénéfice net/i.test(B.strip), 'aucun split quand il n’y a pas de prix d’achat (§7)', B.strip.replace(/\n/g, ' · ').slice(0, 200));
+    dit(/Bénéfice brut/i.test(B.strip) && /—/.test(B.strip) && !/Bénéfice brut[^\n]*\n\s*0/i.test(B.strip), 'une carte « Bénéfice brut · — », jamais un faux 0,00 € (§7)', B.strip.replace(/\n/g, ' · ').slice(0, 200));
     await B.ctx.close();
 
     console.log(ko ? `\n❌ bénéfice brut/net : ${ko} rouge(s)` : '\n✅ bénéfice brut/net : tout vert');

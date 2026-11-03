@@ -227,7 +227,7 @@ export function FondRelais({ points, selection, onChoisir, C, etiquette, hauteur
   const ko = etat === 'ko';
   return (
     <div style={{ position: 'relative' }}>
-      <div ref={boite} data-relais-fond={etat} className="vrm-relais-fond" aria-hidden={ko ? 'true' : undefined}
+      <div ref={boite} data-relais-fond={etat} data-relais-cadre={points.length ? [Math.min(...points.map((p) => p.lon)), Math.min(...points.map((p) => p.lat)), Math.max(...points.map((p) => p.lon)), Math.max(...points.map((p) => p.lat))].map((v) => Number(v).toFixed(3)).join(',') : ''} className="vrm-relais-fond" aria-hidden={ko ? 'true' : undefined}
         style={{ width: '100%', height: hauteur, borderRadius: 10, overflow: 'hidden', background: '#eaeef2', ...(ko ? { position: 'absolute', left: 0, top: 0, visibility: 'hidden', pointerEvents: 'none' } : null) }}/>
       {ko && !muet && <div data-relais-carte-ko="" style={{ fontSize: 12, color: 'var(--vrm-muted, #667)', padding: '8px 0' }}>La carte ne s’affiche pas ici pour l’instant — la liste ci-dessous reste juste.</div>}
       {selection ? <span className="vrm-sr">{selection}</span> : null}
@@ -341,7 +341,7 @@ export function ColonneRetirer({ vue, C, Photo, gestes = null, detail = null, no
         return (
           <section key={p.cle} className={'vrm-rp-point' + (choisi === p.cle ? ' is-choisi' : '')} data-relais-point={p.cle} data-relais-numero={p.numero}
             data-relais-point-arrives={p.nArrives} data-relais-point-comptes={p.nComptes} data-relais-point-attendus={p.nAttendus} data-relais-epingle-n={ep.n}
-            data-relais-repere={!avecCarte ? 'sans-carte' : repereDe(p, reperes) ? 'oui' : (raisonCarte && raisonCarte !== EN_COURS ? 'non' : 'cherche')} data-relais-urgent={p.urgent ? '1' : undefined}>
+            data-relais-repere={!avecCarte ? 'sans-carte' : repereDe(p, reperes) ? 'oui' : (raisonCarte && raisonCarte !== EN_COURS ? 'non' : 'cherche')} data-relais-pas-carte={avecCarte ? codePasSurCarte(p, reperes) : undefined} data-relais-urgent={p.urgent ? '1' : undefined}>
             <header className="vrm-rp-tete">
               {carteVisible ? <span className={'vrm-rp-numero vrm-rp-compte vrm-rp-epingle' + (ep.sorte === 'aretirer' && repereDe(p, reperes) ? ' is-fort' : '')} data-relais-pastille={ep.n} data-relais-pastille-sorte={ep.sorte} aria-hidden="true" title="Son épingle sur la carte">{ep.n}</span> : null}
               <span className="vrm-rp-ident">

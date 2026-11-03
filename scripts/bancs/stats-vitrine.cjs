@@ -8,7 +8,8 @@
 // ventes INVENTÉES de forme réelle (le dépôt est public). L'horloge de la page
 // est FIXÉE au jeudi 29 octobre 2026, 15 h : les bornes de période sont donc
 // connues d'avance (jamais « relatif à aujourd'hui », qui changerait de mois).
-//   A. tout lu : Vendu, Bénéfice (« au moins », « N sur M »), Délai médian
+//   A. tout lu : Vendu, Bénéfice (3 nov. : la règle de Comptabilité, « — » si un prix manque ;
+//      « Bénéfice brut » et « N sur M » en semaine — jamais « au moins »), Délai médian
 //      (couverture), En ligne (dont qui dorment), barres (en cours en cobalt),
 //      Ce qui part vite, Par compte (somme = la tuile), Par taille (la plus
 //      vendue en cobalt), Boost (coût saisi, ventes, « pas assez ») — Mois,
@@ -234,7 +235,15 @@ const capture=async(pg,nom)=>{
           dit(new RegExp(`\\+${a.vendu.ecart} %`).test(v.texte||'') && /(^|\s)\d+,\d\d €/.test(v.texte||'') && !/au moins/.test(v.texte||''),`${p} : la tuile écrit le montant et « +${a.vendu.ecart} % », sans « au moins » (tout est lu)`,v.texte);
           const bn=r.benef||{};
           dit(bn.etat==='lu' && bn.n===String(a.benef.n) && bn.ncout===String(a.benef.ncout) && bn.brut===String(a.benef.brut),`${p} : Bénéfice ${a.benef.brut/100} € sur ${a.benef.ncout} ventes sur ${a.benef.n}`,JSON.stringify(bn));
-          dit(/au moins/.test(bn.texte||'') && new RegExp(`${a.benef.ncout} ventes? sur ${a.benef.n}`).test(bn.texte||''),`${p} : cas partiel dit — « au moins » et « ${a.benef.ncout} sur ${a.benef.n} »`,bn.texte);
+          // (3 nov., banc benefice-unique) Un brut partiel n'est pas un plancher (une
+          // paire au prix inconnu peut être à perte) : plus jamais « au moins ». Mois et
+          // année : « Bénéfice » = la règle de Comptabilité ⇒ « — » et ce qui manque ;
+          // semaine : « Bénéfice brut » et sa couverture « N sur M ».
+          const manq=a.benef.n-a.benef.ncout;
+          dit(!/au moins/.test(bn.texte||'') && (p==='semaine'
+              ? /Bénéfice brut/.test(bn.texte||'') && new RegExp(`${a.benef.ncout} ventes? sur ${a.benef.n}`).test(bn.texte||'')
+              : /—/.test(bn.texte||'') && new RegExp(`il manque le prix d.achat de ${manq} ventes? sur ${a.benef.n}`).test(bn.texte||'')),
+            `${p} : cas partiel dit — jamais « au moins » ; ${p==='semaine'?'« Bénéfice brut », « N sur M »':'« — » et le manque nommé'}`,bn.texte);
           const dl=r.delai||{};
           dit(dl.etat==='lu' && dl.mediane===a.delai.med && dl.couv===a.delai.couv,`${p} : délai médian ${a.delai.med} j, sur ${a.delai.couv}`,JSON.stringify(dl));
           const el=r.enligne||{};

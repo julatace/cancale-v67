@@ -1,0 +1,60 @@
+// ════════════════════════════════════════════════════════════════════════════
+//  LE LIEU D'UN COLIS À RETIRER DÉJÀ RANGÉ, RELU DANS LE TEXTE GARDÉ DE SON
+//  E-MAIL (2 nov., 23 h).
+//  Julien : « j'ai un colis arrivé à Cancale, je veux qu'il soit affiché même
+//  s'il n'est pas dans la même ville ». Mesuré (lecture seule) : l'e-mail d'un
+//  locker Mondial Relay écrit une ligne vide entre chaque ligne ; le serveur
+//  avait rangé le seul nom (« LOCKER 24/7 <ENSEIGNE> »), sans rue, code postal
+//  ni ville — le point n'allait jamais sur la carte. La règle du serveur est
+//  corrigée (`lieuSousEnTete`, api/_lib/retrait-colis.js) ; ce module relit avec
+//  la MÊME règle les lignes déjà rangées.
+//  Par IDENTITÉ seulement : le n° de suivi écrit dans le résumé de l'e-mail
+//  (`email_reception_{clé}` → `resume.s`) mène à SON texte (`email_texte_{clé}`).
+//  Un seul lieu lu, qui COMMENCE par le lieu déjà rangé (le même point) ⇒ il le
+//  complète ; deux lieux différents, rien de lu, une lecture ratée ⇒ la ligne
+//  reste telle quelle (jamais un lieu deviné, jamais un colis écarté).
+// ════════════════════════════════════════════════════════════════════════════
+import { lieuSousEnTete } from '../api/_lib/retrait-colis.js';
+
+const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+// Un colis au point relais dont le lieu rangé n'a pas de code postal.
+export const lieuIncomplet = (t) => !!t && t.status === 'available' && !!String(t.suivi || '').trim() && !/\b\d{5}\b/.test(String(t.lieu || ''));
+export const MAX_RELUS = 40;
+
+// lire(query) → tableau de lignes, ou lève (lecture ratée ⇒ rien de changé).
+export async function lieuxRelusDansTextes(lignes, lire) {
+  if (!Array.isArray(lignes) || typeof lire !== 'function') return lignes;
+  const cibles = lignes.filter(lieuIncomplet).slice(0, MAX_RELUS);
+  if (!cibles.length) return lignes;
+  try {
+    const sus = [...new Set(cibles.map((t) => String(t.suivi).trim()))];
+    const recs = await lire(`id=like.email_reception_*&data->resume->>s=in.(${sus.map((s) => `"${encodeURIComponent(s)}"`).join(',')})&select=id,s:data->resume->>s&limit=200`);
+    if (!Array.isArray(recs) || !recs.length) return lignes;
+    const parSuivi = new Map();
+    for (const r of recs) {
+      const m = /^email_reception_([0-9a-f]{16,64})$/.exec(String(r && r.id || ''));
+      const s = String(r && r.s || '').trim();
+      if (!m || !sus.includes(s)) continue;
+      if (!parSuivi.has(s)) parSuivi.set(s, []);
+      parSuivi.get(s).push(m[1]);
+    }
+    const cles = [...new Set([...parSuivi.values()].flat())];
+    if (!cles.length) return lignes;
+    const textes = await lire(`id=in.(${cles.map((c) => `email_texte_${c}`).join(',')})&select=id,texte:data->>texte&limit=${cles.length}`);
+    if (!Array.isArray(textes)) return lignes;
+    const texteDe = new Map(textes.map((x) => [String(x && x.id || '').replace(/^email_texte_/, ''), typeof (x && x.texte) === 'string' ? x.texte : '']));
+    const lus = new Map();
+    for (const [s, cl] of parSuivi) {
+      const l = [...new Set(cl.map((c) => lieuSousEnTete(texteDe.get(c) || '')).filter((x) => x && /\b\d{5}\b/.test(x)))];
+      if (l.length === 1) lus.set(s, l[0]);
+    }
+    if (!lus.size) return lignes;
+    return lignes.map((t) => {
+      if (!lieuIncomplet(t)) return t;
+      const l = lus.get(String(t.suivi).trim());
+      if (!l) return t;
+      if (t.lieu && !norm(l).startsWith(norm(t.lieu))) return t;   // un autre point : on ne choisit pas
+      return { ...t, lieu: l, lieuLuDansTexte: true };
+    });
+  } catch (_) { return lignes; }
+}

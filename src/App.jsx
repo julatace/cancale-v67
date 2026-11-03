@@ -117,6 +117,7 @@ import { noterTicketDiscord, ecouterDiscord, suivreCodeDiscord, etatCodeDiscord,
 import { DESCRIPTION_ORGANISATION } from "./operations/description.js";
 // (31 oct.) Colis → « À retirer » : la carte des points relais (règle pure + carte).
 import { regrouperRelais, pointsARetirer, lieuCompleteParTransporteur } from "./relaisColis.js";
+import { lieuxRelusDansTextes } from "./lieuxRetrait.js";
 import CarteRelaisColis, { ColonneRetirer } from "./CarteRelais.jsx";
 import PastilleTransporteur, { LogoTransporteur } from "./PastilleTransporteur.jsx";
 import { transporteurDuColis, cleStatTransporteur, cleTransporteur } from "./transporteursVisuels.js";
@@ -145,6 +146,7 @@ import FichePaire from "./FichePaire.jsx";
 import { SITES_TACHE, TACHES_SITE, estTacheSite, siteDeTache, sectionDeTache, sousSections, subDeTache, redirigerOnglet, filtreRetenu, retenirFiltre } from "./navigationTache.js";
 import { lireCible, selecteursCible, phraseAbsente } from "./cibleNotif.js";
 import { fusionnerLigne, fusion3, egal as egalStable, CLE_POOL, CLES_FICHES } from "./fusionNuage.js";
+import { NOM_BENEFICE, NOM_BENEFICE_BRUT, NOM_APRES_FRAIS, chiffreBenefice, chiffreBrut, chiffreApresFrais, finDuMois, moisCouvertParPublication } from "./beneficeNoms.js";
 import { produitsANumeroter, attribuerNumerosVc, carteNumerosVc } from "./numerosVestiaire.js";
 import { lireFile, noterSaisie, instantane, acquitter, compterEnAttente, nuagePlusRecent, fusionAuChargement, oublierCle, CLE_FILE, HORS_FILE } from "./fileEnvoi.js";
 // La migration qui cloisonne les vendeurs, lue depuis LE fichier (pas recopiée) :
@@ -4487,8 +4489,12 @@ const fetchEmailTrackingBrut = async () => {
     // (23 oct.) + le n° de suivi écrit dans le SUJET après « # » (Vinted Go :
     // « Ton colis arrive aujourd'hui ! #… ») pour une ligne qui n'en porte pas —
     // une IDENTITÉ, jamais un statut changé (api/_lib/suivi-colis.js, §11).
-    return rows.map(r => avecSuiviDuSujet(reclassifyTrack(r.data))).filter(Boolean)
+    const liste = rows.map(r => avecSuiviDuSujet(reclassifyTrack(r.data))).filter(Boolean)
       .sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0));
+    // (2 nov., 23 h) Un colis au point relais dont le lieu rangé n'a pas d'adresse
+    // (locker d'une autre ville) : relu dans le texte gardé de SON e-mail, même règle
+    // que le serveur (src/lieuxRetrait.js). Lecture ratée ⇒ la liste telle quelle.
+    return await lieuxRelusDansTextes(liste, async (q) => { const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?${q}`, { headers: sbAuth() }); if (!r.ok) throw new Error('lecture'); return r.json(); });
   } catch (_) { return null; }
 };
 const fetchEmailTracking = async (opts = {}) => {
@@ -36870,15 +36876,29 @@ function RecapComptableMensuel() {
   const v = useLigneUrssaf();
   const urssafMois = v ? v.mois : null;
   const TAUX_URSSAF = tauxUrssaf() / 100;
+  // (3 nov.) La colonne « Bénéfice » disait « — » pour TOUS les mois (`profit:
+  // null` en dur) alors que la règle le sait : c'est la MÊME que Comptabilité,
+  // Ma journée et Statistiques (`beneficePeriode` du mois, `chiffreBenefice`).
+  // « — » seulement quand elle dit « pas su » (prix d'achat manquant, mois plus
+  // ancien que la publication, rien publié). « Net estimé » (CA − URSSAF, sans
+  // prix d'achat) n'était pas un bénéfice : il s'appelle « CA après URSSAF ».
+  const [pubB] = useLigneSynchro('vrm_benefice_jours', lireBeneficeJours);
+  const [comptaB] = useLigneSynchro('vrm_compta', lireComptaSynchro);
+  const regimeB = useRegimeFiscal();
+  const beneficeDuMois = (ym) => {
+    if (!pubB || !moisCouvertParPublication(ym)) return null;
+    const B = beneficePeriode({ jours: pubB.jours, compta: comptaB, ligneUrssaf: v, taux: tauxUrssaf(), periode: 'mois', maintenant: Math.min(finDuMois(ym), Date.now()), toutes: Number(pubB.v) >= 2, urssaf: regimeB === undefined || urssafConcerne(regimeB) });
+    return chiffreBenefice(B).valeur;
+  };
   const moisNoms = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
   const moisRecap = !urssafMois ? [] : urssafMois.map((m) => {
     const [y, mo] = String(m.ym || '').split('-');
-    return { ym: m.ym, label: `${moisNoms[Number(mo) - 1] || mo} ${y}`, ca: Number(m.ca) || 0, profit: null, count: m.n,
+    return { ym: m.ym, label: `${moisNoms[Number(mo) - 1] || mo} ${y}`, ca: Number(m.ca) || 0, profit: beneficeDuMois(m.ym), count: m.n,
              urssaf: aPayerUrssaf(m.ca, TAUX_URSSAF * 100), net: netApresUrssafDe(m.ca, TAUX_URSSAF * 100) };
   });
   const exportCompta = () => {
     try {
-      const rows = [['Mois','Ventes','CA finalise','Benefice',`Cotisations+impot ${String(tauxUrssaf()).replace('.',',')}%`,'Net estime']];
+      const rows = [['Mois','Ventes','CA finalise','Benefice',`Cotisations+impot ${String(tauxUrssaf()).replace('.',',')}%`,'CA apres URSSAF']];
       moisRecap.forEach((m) => rows.push([m.label, m.count, m.ca.toFixed(2), m.profit == null ? '' : m.profit.toFixed(2), m.urssaf.toFixed(2), m.net.toFixed(2)]));
       const csv = rows.map((r) => r.join(';')).join('\n');
       telechargerFichier(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }), `vrm-comptabilite-${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8');
@@ -36898,7 +36918,7 @@ function RecapComptableMensuel() {
             <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
               <thead>
                 <tr style={{borderBottom:`1px solid ${C.border}`}}>
-                  {['Mois','Ventes','CA finalisé','Bénéfice',`Cotis.+impôt ${String(tauxUrssaf()).replace('.',',')} %`,'Net estimé'].map(h=>(
+                  {['Mois','Ventes','CA finalisé',NOM_BENEFICE,`Cotis.+impôt ${String(tauxUrssaf()).replace('.',',')} %`,'CA après URSSAF'].map(h=>(
                     <th key={h} style={{textAlign:h==='Mois'?'left':'right',padding:'8px 10px',color:C.muted,fontWeight:600,fontSize:11,textTransform:'uppercase',whiteSpace:'nowrap'}}>{h}</th>
                   ))}
                 </tr>
@@ -36909,7 +36929,7 @@ function RecapComptableMensuel() {
                     <td style={{padding:'8px 10px',fontWeight:600,color:C.text,whiteSpace:'nowrap'}}>{m.label}</td>
                     <td style={{padding:'8px 10px',textAlign:'right'}}>{m.count}</td>
                     <td style={{padding:'8px 10px',textAlign:'right',fontWeight:500,whiteSpace:'nowrap'}}>{fmt(m.ca)}</td>
-                    <td style={{padding:'8px 10px',textAlign:'right',color:m.profit==null?C.muted:C.text,whiteSpace:'nowrap'}}>{m.profit==null?'—':fmt(m.profit)}</td>
+                    <td data-benef-notion="benefice" data-benef-mois={m.ym} data-benef-valeur={m.profit==null?'':String(Math.round(m.profit*100))} style={{padding:'8px 10px',textAlign:'right',color:m.profit==null?C.muted:C.text,whiteSpace:'nowrap'}}>{m.profit==null?'—':fmt(m.profit)}</td>
                     <td style={{padding:'8px 10px',textAlign:'right',color:C.muted,whiteSpace:'nowrap'}}>{fmt(m.urssaf)}</td>
                     <td style={{padding:'8px 10px',textAlign:'right',color:C.text,fontWeight:600,whiteSpace:'nowrap'}}>{fmt(m.net)}</td>
                   </tr>
@@ -36928,7 +36948,7 @@ function RecapComptableMensuel() {
           <div data-recap-regle={urssafMois?'versement':'archive'} style={{fontSize:11,color:C.muted,marginTop:12,lineHeight:1.5}}>
             {urssafMois
               ? <>Ventes <b>finalisées</b>, toutes plateformes, comptées dans le mois où l'argent a été versé (Vinted), de la vente (Leboncoin), de la commande payée (eBay) — ou dans le mois où tu les as déclarées. Annulées et remboursements exclus, ventes masquées comprises ; une vente sans date de versement n'est dans aucun mois.</>
-              : <>Ventes de l'ancienne archive, à leur date de réception — annulées et remboursements exclus.</>} Cotisations estimées à {String(tauxUrssaf()).replace('.',',')} % (taux réglable dans Paramètres → Régime fiscal). La déclaration se fait sur autoentrepreneur.urssaf.fr.
+              : <>Ventes de l'ancienne archive, à leur date de réception — annulées et remboursements exclus.</>} Le bénéfice, lui, est celui de Comptabilité (« Combien j'ai gagné ? ») : ventes au jour de la vente, moins prix d'achat, frais, dépenses et URSSAF ; « — » quand un prix d'achat manque. Cotisations estimées à {String(tauxUrssaf()).replace('.',',')} % (taux réglable dans Paramètres → Régime fiscal). La déclaration se fait sur autoentrepreneur.urssaf.fr.
           </div>
         </details></Card>
       )}
@@ -37155,6 +37175,12 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
   const barres = React.useMemo(() => barresPeriode(vendu, b.type, maintenant), [vendu, b, maintenant]);
   // Bénéfice : les jours publiés compris dans la période (jusqu'à demain minuit).
   const B = React.useMemo(() => benef ? beneficeDesJours(benef.jours, new Date(b.de), new Date(b.a)) : null, [benef, b]);
+  // (3 nov.) « Bénéfice » du mois ou de l'année = la lecture de Comptabilité et
+  // de Ma journée (`useBeneficeCalcul`, mêmes charges, même CA déclaré), jamais
+  // un second calcul. Une semaine n'a ni dépenses ni URSSAF à elle (elles se
+  // comptent au mois) : la tuile dit alors « Bénéfice brut », un autre nom.
+  const [comptaS] = useLigneSynchro('vrm_compta', lireComptaSynchro);
+  const { etat: etatBP, B: BP } = useBeneficeCalcul(comptaS, b.type === 'annee' ? 'annee' : 'mois');
   const dansP = (l) => l && dansBornes(l.ts, b.de, b.a);
   const lp = React.useMemo(() => (lignes ? lignes.filter(dansP) : null), [lignes, b]); // eslint-disable-line react-hooks/exhaustive-deps
   const datesPasSu = extras !== undefined && (!extras || extras.items == null || extras.txn == null);
@@ -37220,14 +37246,29 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
     : tuile('vendu', 'Vendu', `${partielVendu ? 'au moins ' : ''}${fmt(V.eur)}`,
       <>{pl(V.n, 'vente')}{V.ecart != null && !partielVendu ? <span title={`Comparé à ${nomPrec}${auMemePoint ? ', au même jour' : ''} : ${fmt(V.prec.eur)}`}>{` · ${V.ecart > 0 ? '+' : ''}${V.ecart} % par rapport à ${nomPrec}`}</span> : null}{manque.length ? ` · sans ${manque.join(', ')}` : ''}{ncPeriode.length ? ` · ${ncPeriode.length} non comptée${ncPeriode.length > 1 ? 's' : ''}` : ''}</>,
       { 'data-sv-etat': 'lu', 'data-sv-n': V.n, 'data-sv-eur': cents(V.eur), 'data-sv-prec': cents(V.prec.eur), 'data-sv-ecart': V.ecart == null ? '' : V.ecart, 'data-sv-partiel': partielVendu ? '1' : '0', 'data-sv-non-comptees': ncPeriode.length || undefined }, ncPeriode.length ? `Pas dans ce montant : ${phraseNonComptees(ncPeriode)}` : undefined);
-  const tBenef = !B
-    ? tuile('benefice', 'Bénéfice', '—', 'ouvre Ventes une fois : il s’y calcule', { 'data-sv-etat': 'passu' })
-    : B.n === 0
-      ? tuile('benefice', 'Bénéfice', '—', 'aucune vente finalisée', { 'data-sv-etat': 'lu', 'data-sv-n': 0, 'data-sv-ncout': 0, 'data-sv-brut': '' })
-      : B.nCout === 0
-        ? tuile('benefice', 'Bénéfice', '—', `il manque le prix d’achat de tes ${pl(B.n, 'vente')}`, { 'data-sv-etat': 'lu', 'data-sv-n': B.n, 'data-sv-ncout': 0, 'data-sv-brut': '' })
-        : tuile('benefice', 'Bénéfice', `${B.nCout < B.n ? 'au moins ' : ''}${fmt(B.brut)}`, B.nCout < B.n ? `${B.nCout} vente${B.nCout > 1 ? 's' : ''} sur ${B.n} ont leur prix d’achat : il manque celui des autres` : `vente − prix d’achat, sur ${pl(B.n, 'vente finalisée', 'ventes finalisées')}`,
-          { 'data-sv-etat': 'lu', 'data-sv-n': B.n, 'data-sv-ncout': B.nCout, 'data-sv-brut': cents(B.brut) }, 'Brut : vente − prix d’achat, ventes finalisées, sur les seules ventes au prix d’achat connu.');
+  const tBenef = (() => {
+    if (b.type === 'semaine') {
+      const R = chiffreBrut(B);
+      const sous = !B ? 'ouvre Ventes une fois : il s’y calcule'
+        : B.n === 0 ? 'aucune vente finalisée'
+        : B.nCout === 0 ? `il manque le prix d’achat de tes ${pl(B.n, 'vente')}`
+        : R.partiel ? `${B.nCout} vente${B.nCout > 1 ? 's' : ''} sur ${B.n} ${B.nCout > 1 ? 'ont' : 'a'} leur prix d’achat : il manque celui des autres`
+        : `vente − prix d’achat, sur ${pl(B.n, 'vente finalisée', 'ventes finalisées')}`;
+      return tuile('benefice', NOM_BENEFICE_BRUT, R.valeur == null ? '—' : fmt(R.valeur), sous,
+        { 'data-sv-etat': B ? 'lu' : 'passu', 'data-sv-n': B ? B.n : undefined, 'data-sv-ncout': B ? B.nCout : undefined, 'data-sv-brut': R.valeur == null ? '' : cents(R.valeur), ...R.attrs },
+        'Bénéfice brut : vente − prix d’achat, ventes finalisées de la semaine, sur les seules ventes au prix d’achat connu. Dépenses et URSSAF se comptent au mois.');
+    }
+    const CB = chiffreBenefice(BP, etatBP);
+    const manquent = BP ? BP.n - BP.nCout : 0;
+    const sous = !BP ? (etatBP === 'encours' ? 'je le lis…' : 'ouvre Ventes une fois : il s’y calcule')
+      : CB.raison === 'achats' ? `il manque le prix d’achat de ${manquent} vente${manquent > 1 ? 's' : ''} sur ${BP.n}`
+      : CB.raison === 'frais' ? 'des frais eBay ne sont pas encore connus'
+      : CB.raison === 'cotisations' ? 'en attente de ton chiffre déclaré (écran Ventes)'
+      : `${BP.n === 0 ? 'aucune vente finalisée · ' : ''}après prix d’achat, frais${BP.depenses === 'jamais' ? '' : ', dépenses'}${BP.sansCotis ? '' : ' et URSSAF'}${BP.depenses === 'jamais' ? ' · avant tes dépenses' : ''}`;
+    return tuile('benefice', NOM_BENEFICE, CB.valeur == null ? '—' : fmt(CB.valeur), sous,
+      { 'data-sv-etat': BP ? 'lu' : etatBP, 'data-sv-n': BP ? BP.n : undefined, 'data-sv-ncout': BP ? BP.nCout : undefined, 'data-sv-brut': BP && BP.nCout > 0 ? cents(BP.brut) : '', ...CB.attrs },
+      'Bénéfice : tes ventes finalisées moins le prix d’achat des paires, les frais de vente, tes dépenses et l’URSSAF — la même règle que Comptabilité et Ma journée.');
+  })();
   const tDelai = !releve
     ? tuile('delai', 'Temps pour vendre', '—', 'ouvre Ventes une fois : il s’y calcule', { 'data-sv-etat': 'passu' })
     : extras === undefined ? tuile('delai', 'Temps pour vendre', '—', 'je lis tes annonces…', { 'data-sv-etat': 'encours' })
@@ -37455,13 +37496,13 @@ function StatsDetaillees({ liveStats, panelOff }) {
     {/* ── 2. BÉNÉFICE ET MARGE PAR GROUPE ──────────────────────────────── */}
     <section data-stats-carte="marges" data-stats-marges={M ? 'lu' : 'passu'} data-stats-marges-n={M ? M.n : ''} data-stats-marges-ncout={M ? M.nCout : ''} style={sCarte}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-        <div style={sTitre}>Bénéfice et marge</div>
+        <div style={sTitre}>{NOM_BENEFICE_BRUT} et marge</div>
         {M && <span style={{ fontSize: 13, color: C.muted }} data-stats-marges-couverture={`${M.nCout}/${M.n}`}>sur {pl(M.nCout, 'vente')} avec prix d'achat (sur {M.n})</span>}
       </div>
       {!M ? <div style={{ ...sNote, marginTop: 8 }}>Le relevé de tes ventes n'est pas encore sur cet appareil : il se calcule quand Ma journée ou Ventes a lu toutes tes ventes (Vinted, Leboncoin, eBay). Ouvre Ventes une fois.</div> : (<>
-        <Segmente label="Bénéfice par" value={axeMarge} onChange={setAxeMarge} options={Object.entries(AXES_MARGE).map(([v, l]) => ({ v, l, data: { 'data-stats-marge-axe': v } }))} style={{ marginTop: 12 }}/>
+        <Segmente label={`${NOM_BENEFICE_BRUT} par`} value={axeMarge} onChange={setAxeMarge} options={Object.entries(AXES_MARGE).map(([v, l]) => ({ v, l, data: { 'data-stats-marge-axe': v } }))} style={{ marginTop: 12 }}/>
         {M.groupes.length === 0 ? <div style={{ ...sNote, marginTop: 10 }}>Aucune vente finalisée à répartir.</div> : (
-          <div role="table" aria-label={`Bénéfice par ${AXES_MARGE[axeMarge].toLowerCase()}`} style={{ marginTop: 12, display: 'flex', flexDirection: 'column' }}>
+          <div role="table" aria-label={`${NOM_BENEFICE_BRUT} par ${AXES_MARGE[axeMarge].toLowerCase()}`} style={{ marginTop: 12, display: 'flex', flexDirection: 'column' }}>
             <div role="row" style={{ ...ligneTab, fontSize: 11, color: C.muted, paddingBottom: 6, borderBottom: `1px solid ${C.border}` }}>
               <span role="columnheader">{AXES_MARGE[axeMarge]}</span><span role="columnheader" style={{ textAlign: 'right' }}>Ventes</span><span role="columnheader" style={{ textAlign: 'right' }}>Brut</span><span role="columnheader" style={{ textAlign: 'right' }}>Marge</span><span role="columnheader" style={{ textAlign: 'right' }}>Par paire</span>
             </div>
@@ -37479,7 +37520,7 @@ function StatsDetaillees({ liveStats, panelOff }) {
           </div>
         )}
         <div style={{ ...sNote, marginTop: 10 }}>
-          Ventes finalisées, au jour de la vente — les mêmes que « Ton bénéfice » de Comptabilité. Brut = vente − prix d'achat, sur les seules ventes au prix d'achat connu (« 3/5 » : 3 sur 5) ; « — » quand aucun n'est connu. Frais, boosts et charges : dans Comptabilité.{M.sansCle ? ` ${pl(M.sansCle, 'vente')} sans ${AXES_MARGE[axeMarge].toLowerCase()} connu${axeMarge === 'marque' || axeMarge === 'taille' || axeMarge === 'plateforme' ? 'e' : ''}.` : ''}{releve && releve.at ? ` Relevé du ${quand(releve.at)}.` : ''}
+          Ventes finalisées, au jour de la vente — les mêmes que « Ton bénéfice » de Comptabilité. Bénéfice brut = vente − prix d'achat, sur les seules ventes au prix d'achat connu (« 3/5 » : 3 sur 5) ; « — » quand aucun n'est connu. Frais, boosts et charges : dans Comptabilité.{M.sansCle ? ` ${pl(M.sansCle, 'vente')} sans ${AXES_MARGE[axeMarge].toLowerCase()} connu${axeMarge === 'marque' || axeMarge === 'taille' || axeMarge === 'plateforme' ? 'e' : ''}.` : ''}{releve && releve.at ? ` Relevé du ${quand(releve.at)}.` : ''}
         </div>
       </>)}
     </section>
@@ -37817,7 +37858,11 @@ const caVintedDuMois = (m) => {
 const caBeneficeDuMois = (m, toutes) => {
   if (!toutes) return caVintedDuMois(m);
   const par = m && m.par && typeof m.par === 'object' ? m.par : null;
-  if (par && Object.keys(par).length) return ['Vinted', 'Leboncoin', 'eBay'].reduce((t, k) => t + (par[k] ? (Number(par[k].ca) || 0) : 0), 0);
+  // (3 nov.) + Vestiaire : depuis le 1er nov. une vente Vestiaire au montant sûr
+  // entre dans le bénéfice (publication `plateformes`) ET dans le CA déclaré ;
+  // ses cotisations n'étaient pas déduites (le bénéfice comptait la vente, pas
+  // son URSSAF). Les mêmes ventes des deux côtés.
+  if (par && Object.keys(par).length) return ['Vinted', 'Leboncoin', 'eBay', 'Vestiaire'].reduce((t, k) => t + (par[k] ? (Number(par[k].ca) || 0) : 0), 0);
   return Number(m && m.ca) || 0;
 };
 // Le bénéfice d'une période — fonction PURE (exécutée par audit-benefice.cjs).
@@ -38020,7 +38065,8 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense, sansC
           {/* (2 nov., 22 h, maquette FusionCompta « à l'identique ») « Ce que tu as gagné », le
               chiffre, UNE ligne courte (le vendu, le manque nommé et son geste), trois cases. */}
           <div className="vrm-compta-libelle" data-benef-titre="" title={`${titreNet} · ${B.libelle}`}>Ce que tu as gagné</div>
-          <div className="vrm-compta-hero vrm-display" data-compta-chiffre="gagne" data-eur={e2(B.netFinal)} style={{ color: B.netFinal == null ? C.muted : C.text }}>{B.netFinal == null ? '—' : fmt(B.netFinal)}</div>
+          {/* (3 nov.) « Bénéfice » = UNE règle sur tous les écrans (src/beneficeNoms.js, fusionnée de main). */}
+          {(() => { const cb = chiffreBenefice(B, etat); return <div className="vrm-compta-hero vrm-display" data-compta-chiffre="gagne" data-eur={e2(cb.valeur)} {...cb.attrs} style={{ color: cb.valeur == null ? C.muted : C.text }}>{cb.valeur == null ? '—' : fmt(cb.valeur)}</div>; })()}
           <p className="vrm-compta-phrase vrm-fu-compta-sous" data-compta-phrase="gagne" title={typeof phrase === 'string' ? phrase : undefined}>
             {/* Le vendu n'est pas redit s'il vaut déjà « à déclarer » (§7 : un nombre, une fois). */}
             {B.n === 0 ? 'Aucune vente finalisée ce mois-ci' : (B.caDecl != null && Math.round(B.caDecl * 100) === Math.round(B.ca * 100)) ? B.libelle : <>sur {fmt(B.ca)} vendus</>}
@@ -38041,18 +38087,18 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense, sansC
           <details className="vrm-repli vrm-compta-calcul" data-benef-calcul="">
             <summary>Le détail du calcul</summary>
             <div className="vrm-set-liste vrm-compta-lignes" style={{ '--vrm-set-filet': C.border }}>
-              <Ligne lib="Bénéfice sur tes ventes" val={B.nCout > 0 ? B.brut : (B.n === 0 ? 0 : null)}
+              <Ligne lib={NOM_BENEFICE_BRUT} val={chiffreBrut(B).valeur}
                 sous={B.n === 0 ? (B.toutes ? 'aucune vente finalisée sur la période' : 'aucune vente Vinted finalisée sur la période')
                   : B.nCout === B.n ? (B.n === 1 ? "prix de vente − prix d'achat · prix d'achat connu pour 1 vente" : `prix de vente − prix d'achat · prix d'achat connus pour les ${B.n} ventes`)
                   : `prix de vente − prix d'achat · prix d'achat connus pour ${B.nCout} vente${B.nCout > 1 ? 's' : ''} sur ${B.n}`}
-                data={{ 'data-benef-ligne': 'brut' }} />
+                data={{ 'data-benef-ligne': 'brut', ...chiffreBrut(B).attrs }} />
               {B.nCout > 0 && (B.fraisCouverts > 0 || B.fraisInconnus > 0) && <Ligne lib="− boosts et frais de vente" val={B.fraisInconnus > 0 ? null : B.fraisCouverts} sous={B.fraisInconnus > 0 ? `frais eBay pas connus pour ${B.fraisInconnus} vente${B.fraisInconnus > 1 ? 's' : ''}` : 'des mêmes ventes'} data={{ 'data-benef-ligne': 'frais' }} />}
               <Ligne lib="− tes dépenses" val={B.depenses === 'jamais' ? null : B.charges}
                 sous={B.depenses === 'jamais' ? 'aucune dépense notée' : B.depenses === 'aucune' ? 'aucune — tu as indiqué ne pas avoir de dépenses à noter' : 'abonnements, dépenses, packs et coûts fixes de la période'}
                 data={{ 'data-benef-ligne': 'charges' }} />
               {B.sansCotis ? <div className="vrm-set-ligne" data-benef-ligne="cotis" data-benef-sans-cotis=""><span className="vrm-set-lib"><small style={{ color: C.muted, marginTop: 0 }}>Aucune cotisation URSSAF déduite — {regimeFiscal() ? `statut : ${libelleRegime(regimeFiscal())}` : 'ton statut n\'est pas encore choisi (Documents et réglages → Ton statut)'}.</small></span></div> :
               <Ligne lib="− URSSAF" val={B.cotis}
-                sous={B.cotis == null ? 'ton chiffre d\'affaires déclaré se calcule dans l\'écran Ventes' : `${String(tauxUrssaf()).replace('.', ',')} % de l'argent reçu sur la période (${B.toutes ? 'Vinted, Leboncoin, eBay' : 'Vinted'})`}
+                sous={B.cotis == null ? 'ton chiffre d\'affaires déclaré se calcule dans l\'écran Ventes' : `${String(tauxUrssaf()).replace('.', ',')} % de l'argent reçu sur la période (${B.toutes ? 'Vinted, Leboncoin, eBay, Vestiaire' : 'Vinted'})`}
                 data={{ 'data-benef-ligne': 'cotis' }} />}
               <div className="vrm-set-ligne" data-benef-ligne="net"><span className="vrm-set-lib"><b style={{ color: C.text }}>= {titreNet.toLowerCase()}</b></span><span className="vrm-set-lib" style={{ flex: '0 0 auto', textAlign: 'right' }}><small style={{ color: C.muted, marginTop: 0 }}>le chiffre au-dessus</small></span></div>
             </div>
@@ -38123,7 +38169,6 @@ function BeneficeJournee({ onNav, place, edition = false, fusion = false }) {
   const J = pub ? beneficeDesJours(pub.jours, minuit, demain) : null;
   const e2 = (x) => x == null ? '' : String(Math.round(x * 100) / 100);
   const val = (x) => x == null ? '—' : fmt(x);
-  const brutDe = (r) => r ? (r.nCout > 0 ? r.brut : (r.n === 0 ? 0 : null)) : null;
   const sansAchat = B ? B.n - B.nCout : 0;
   const raisonNet = !B ? '' : B.raison === 'achats' ? `il manque le prix d'achat de ${sansAchat} vente${sansAchat > 1 ? 's' : ''}`
     : B.raison === 'frais' ? 'des frais eBay ne sont pas connus'
@@ -38138,9 +38183,14 @@ function BeneficeJournee({ onNav, place, edition = false, fusion = false }) {
   // saisie des prix (§5 : le chiffre faux est la porte pour le corriger). Le
   // détail (brut, frais, charges, cotisations, aujourd'hui) vit dans
   // Comptabilité (« Bénéfice › ») et dans l'infobulle — plus sur cette carte.
-  const avecNet = !!B && B.netFinal != null;
-  const brut = brutDe(B);
-  const valeur = !B ? null : avecNet ? B.netFinal : brut;
+  // (3 nov., « — / 103 € / 80,93 € » sur les mêmes données) La case dit « Bénéfice »,
+  // la MÊME règle que Comptabilité et Statistiques (`chiffreBenefice`,
+  // src/beneficeNoms.js) : le net, ou « — » quand la règle dit « pas su » (un
+  // prix d'achat manque, frais eBay, CA déclaré). Plus de brut partiel glissé
+  // sous un libellé qui change : la couverture et la porte restent dessous.
+  const CB = chiffreBenefice(B, etat);
+  const avecNet = CB.valeur != null;
+  const valeur = CB.valeur;
   let sous = null;
   if (!B) sous = etat === 'encours' ? 'je le lis…' : <button type="button" className="vrm-jc-geste-neutre" onClick={() => { if (onNav) onNav('cat_ventes'); }}>se calcule dans l'écran Ventes ›</button>;
   else if (B.nCout < B.n) sous = <>{B.nCout} sur {B.n} · <button type="button" className="vrm-jc-geste" data-journee-benef-porte="" onClick={versSaisiePrix}>{sansAchat} prix d'achat ›</button></>;
@@ -38151,7 +38201,7 @@ function BeneficeJournee({ onNav, place, edition = false, fusion = false }) {
   // dans ce bénéfice : dit (jamais « au moins » : elles peuvent être à perte).
   const horsVc = pub && Number(pub.horsVestiaire) > 0 ? Number(pub.horsVestiaire) : 0;
   if (B && !sous && horsVc) sous = `sans ${horsVc} vente${horsVc > 1 ? 's' : ''} Vestiaire`;
-  const titre = (B ? `Ton bénéfice · ${B.libelle} — ${avecNet ? raisonNet : `brut : ${raisonNet}`}${J && J.n > 0 && J.nCout > 0 ? ` · aujourd'hui ${val(J.net)} net des ventes` : ''}` : "Ton bénéfice se calcule dans l'écran Ventes") + (horsVc ? ` · Sans ${horsVc} vente${horsVc > 1 ? 's' : ''} Vestiaire : VRM ne sait pas encore ce que Vestiaire te verse.` : '');
+  const titre = (B ? `Ton bénéfice · ${B.libelle} — ${raisonNet}${J && J.n > 0 && J.nCout > 0 ? ` · aujourd'hui ${val(J.net)} ${NOM_APRES_FRAIS.toLowerCase()}` : ''}` : "Ton bénéfice se calcule dans l'écran Ventes") + (horsVc ? ` · Sans ${horsVc} vente${horsVc > 1 ? 's' : ''} Vestiaire : VRM ne sait pas encore ce que Vestiaire te verse.` : '');
   const attrs = {
     'data-journee-benef': '', 'data-journee-benef-etat': etat,
     'data-journee-benef-n': B ? String(B.n) : '', 'data-journee-benef-ncout': B ? String(B.nCout) : '',
@@ -38161,11 +38211,12 @@ function BeneficeJournee({ onNav, place, edition = false, fusion = false }) {
     'data-journee-benef-jour-net': J && J.nCout > 0 ? e2(J.net) : '',
     'data-journee-benef-depenses': depenses,
     'data-journee-benef-hors-vc': horsVc || undefined,
+    ...CB.attrs,
   };
   const corps = (
     <>
-      <a href="?tab=compta" className="vrm-jc-l vrm-jc-l-lien" data-journee-benef-detail="" onClick={allerCompta}>{B && !avecNet ? 'Bénéfice brut' : 'Bénéfice'}<span aria-hidden="true"> ›</span></a>
-      <div className="vrm-jc-v" data-journee-benef-ligne={avecNet ? 'net' : 'brut'}><Montant v={valeur}/></div>
+      <a href="?tab=compta" className="vrm-jc-l vrm-jc-l-lien" data-journee-benef-detail="" onClick={allerCompta}>{NOM_BENEFICE}<span aria-hidden="true"> ›</span></a>
+      <div className="vrm-jc-v" data-journee-benef-ligne="net"><Montant v={valeur}/></div>
       {sous ? <div className="vrm-jc-sous">{sous}</div> : null}
       {depenses === 'jamais' && (
         <div className="vrm-jc-choix"><ChoixDepenses compact onAucune={sansDepenses} onAjouter={ajouterDepense} /></div>
@@ -38183,11 +38234,10 @@ function BeneficeJournee({ onNav, place, edition = false, fusion = false }) {
   // montant, rien d'autre (le détail vit dans Comptabilité, d'un toucher).
   if (fusion) return (
     <button type="button" className="vrm-fu-case is-jour" data-fu-case="benefice" data-journee-benef-detail="" title={titre} {...attrs} onClick={allerCompta}>
-      {/* (3 nov., « rien ne ment ») Un brut sur une partie des ventes n'est pas un plancher
-          (une vente au prix d'achat inconnu peut être à perte) : jamais « ≥ » ; la
-          couverture « sur N » à côté, et « brut » quand le net ne se calcule pas. */}
-      <span>{B && !avecNet ? 'Bénéfice brut du mois' : 'Bénéfice du mois'}</span>
-      <b className={valeur == null ? 'is-vide' : undefined} data-journee-benef-ligne={avecNet ? 'net' : 'brut'}>{valeur == null ? '—' : <>{Math.round(valeur).toLocaleString('fr-FR')}{'\u00a0'}€{B && B.nCout < B.n ? <span className="vrm-fu-couv" data-fu-couverture={`${B.nCout}/${B.n}`}> · {B.nCout} sur {B.n}</span> : null}</>}</b>
+      {/* (3 nov.) La règle de main (src/beneficeNoms.js) : « Bénéfice » = la notion de Compta,
+          « — » quand elle dit « pas su » (jamais un brut partiel, jamais « ≥ »). */}
+      <span>{NOM_BENEFICE} du mois</span>
+      <b className={valeur == null ? 'is-vide' : undefined} data-journee-benef-ligne="net">{valeur == null ? '—' : <>{Math.round(valeur).toLocaleString('fr-FR')}{'\u00a0'}€</>}</b>
     </button>
   );
   return place === 'integre'
@@ -38199,9 +38249,10 @@ function BeneficeJournee({ onNav, place, edition = false, fusion = false }) {
 // quand il se calcule — sinon rien (jamais un brut présenté comme le bénéfice).
 function BeneficeMoisCourt() {
   const [compta] = useLigneSynchro('vrm_compta', lireComptaSynchro);
-  const { B } = useBeneficeCalcul(compta, 'mois');
-  if (!B || B.netFinal == null || B.n === 0) return null;
-  return <span data-fu-benef-mois={String(B.netFinal)}> · bénéfice {Math.round(B.netFinal).toLocaleString('fr-FR')}{'\u00a0'}€</span>;
+  const { B, etat } = useBeneficeCalcul(compta, 'mois');
+  const cb = chiffreBenefice(B, etat);   // (3 nov.) la règle unique de main (src/beneficeNoms.js)
+  if (!B || cb.valeur == null || B.n === 0) return null;
+  return <span data-fu-benef-mois={String(cb.valeur)} {...cb.attrs}> · {NOM_BENEFICE.toLowerCase()} {Math.round(cb.valeur).toLocaleString('fr-FR')}{'\u00a0'}€</span>;
 }
 // (31 oct.) Plus d'interrupteur dans Réglages → Affichage (sa décision) : le
 // bénéfice se masque et se remet DANS Ma journée, en mode « Modifier ».
@@ -49912,22 +49963,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 brut = net (aucun frais capté), une seule carte « Bénéfice » — ne
                 pas écrire deux fois le même nombre (§7). La couverture « sur X/Y »
                 suit le même total partiel que l'ancienne carte (§5). */}
+            {/* (3 nov.) Ces cartes ne déduisent ni tes dépenses ni l'URSSAF : elles ne
+                s'appellent plus « Bénéfice » (le nom de la règle de Comptabilité, de
+                Ma journée et de Statistiques — src/beneficeNoms.js). Brut = vente −
+                achat ; « Après frais de vente » = brut − boosts et frais. */}
             {totals.nbCout===0
-              ? <StatBox compact label="Bénéfice" value="—" color={C.muted} sub={null}
+              ? <StatBox compact label={NOM_BENEFICE_BRUT} value="—" color={C.muted} sub={null}
                   onClick={()=>setFillBuyOpen(true)} title="Saisir les prix d'achat, article par article"/>
               : totals.benefBrut===totals.benefConnu && totals.benefConnu!=null
-                ? <StatBox compact label="Bénéfice" value={fmtE0(totals.benefConnu)} color={totals.benefConnu>=0?C.text:C.danger}
+                ? <StatBox compact label={NOM_BENEFICE_BRUT} value={fmtE0(totals.benefConnu)} color={totals.benefConnu>=0?C.text:C.danger}
                     subColor={totals.nbCout<totals.bN?C.warn:undefined}
                     sub={totals.nbCout<totals.bN
                       ? `sur ${totals.nbCout} vente${totals.nbCout>1?'s':''} sur ${totals.bN} — les autres n'ont pas de prix d'achat`
                       : (totals.margeMoy!=null?`marge ${totals.margeMoy.toFixed(0)} %`:'CA − achat')}/>
                 : <>
-                    <StatBox compact label="Bénéfice brut" value={fmtE0(totals.benefBrut)} color={totals.benefBrut>=0?C.text:C.danger}
+                    <StatBox compact label={NOM_BENEFICE_BRUT} value={fmtE0(totals.benefBrut)} color={totals.benefBrut>=0?C.text:C.danger}
                       subColor={totals.nbCout<totals.bN?C.warn:undefined}
                       sub={totals.nbCout<totals.bN
                         ? `sur ${totals.nbCout} vente${totals.nbCout>1?'s':''} sur ${totals.bN} — avant frais`
                         : 'CA − achat (avant frais)'}/>
-                    <StatBox compact label="Bénéfice net" value={totals.benefConnu==null?'—':fmtE0(totals.benefConnu)} color={totals.benefConnu==null?C.muted:(totals.benefConnu>=0?C.text:C.danger)}
+                    <StatBox compact label={NOM_APRES_FRAIS} value={totals.benefConnu==null?'—':fmtE0(totals.benefConnu)} color={totals.benefConnu==null?C.muted:(totals.benefConnu>=0?C.text:C.danger)}
                       sub={totals.benefConnu==null?`frais eBay pas connus pour ${totals.fraisInconnus} vente${totals.fraisInconnus>1?'s':''}`:totals.margeMoy!=null?`après boosts & frais · marge ${totals.margeMoy.toFixed(0)} %`:'après boosts & frais'}/>
                   </>}
           </div>
