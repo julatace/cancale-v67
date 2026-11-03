@@ -2029,3 +2029,16 @@ Comptabilité −12,50 € exactement, bouton du ticket qui rouvre la photo, san
 message, cibles ≥ 44 px. `scripts/audit-depense-ticket.cjs` (10 verts ; mutations `plus-grand` et `ht`
 rouges). Le banc `stats-compta` est remis aux catégories de Julien (« Envois » au lieu de « Transport »,
 la pastille « Abonnements » n'est plus refusée), en le disant dedans.
+
+### Preuves communes (3 nov., après `git merge origin/main`)
+- **Rouge sur origin/main** (arbres `git archive`, bancs copiés dedans) : `recap-mois` 12 rouges / 0 vert,
+  `depense-ticket` 12 rouges / 0 vert, `audit-prix-achat-propose` rouge (module absent).
+- **Mutations** : récap au bénéfice recalculé à part (vendu − achat − frais) ⇒ `recap-mois` 12 rouges ;
+  photo du ticket jamais envoyée ⇒ `depense-ticket` 16 rouges ; `audit-prix-achat-propose` `titre` 2,
+  `sans-tap` 2, `dossier` 1, `recu` 1, `unique` 1 ; `audit-depense-ticket` `plus-grand` 1, `ht` 1.
+- Verts sur cette branche : `recap-mois` 88, `depense-ticket` 56, `compta-claire` 92, `benefice-unique`
+  38, `audit-benefice-unique` 47, `audit-carte-chiffres` 203, `audit-icones`, `audit-urssaf`,
+  `audit-fonctions-api`, `audit-coherence`. `stats-compta` 54/58 : les 4 mêmes rouges que sur origin/main
+  (« la déclaration URSSAF est dans Compta », « la prochaine échéance ») — sans lien, laissés.
+- Captures regardées : carte « Récap de novembre 2026 » (390), formulaire avec la photo et 12,50 pré-rempli
+  (390), PDF d'essai (données inventées) sobre, une page.
