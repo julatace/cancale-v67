@@ -37154,7 +37154,7 @@ function RecapComptableMensuel() {
   };
   return (
     <>
-      <Card className="vrm-recap-mois" data-recap-mois={ymRecap}>
+      <Card><div className="vrm-recap-mois" data-recap-mois={ymRecap}>
         <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
           <span data-titre-section="" style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15,flex:'1 1 auto'}}>Récap de {libelleMois(ymRecap)}</span>
           <select aria-label="Mois du récap" data-recap-mois-choix="" value={ymRecap} onChange={(e)=>setYmRecap(e.target.value)} style={{height:44,borderRadius:10,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:15,padding:'0 10px',fontFamily:'inherit'}}>
@@ -37165,7 +37165,7 @@ function RecapComptableMensuel() {
           <Bouton variante="primaire" icone="doc" data-recap-pdf="" disabled={!!recapEnCours} onClick={()=>exporterRecap('pdf')} style={{flex:'1 1 140px'}}>{recapEnCours==='pdf'?'…':'PDF'}</Bouton>
           <Bouton variante="secondaire" icone="save" data-recap-csv="" disabled={!!recapEnCours} onClick={()=>exporterRecap('csv')} style={{flex:'1 1 140px'}}>{recapEnCours==='csv'?'…':'Tableur'}</Bouton>
         </div>
-      </Card>
+      </div></Card>
       {/* Récap comptable mensuel */}
       {moisRecap.length>0&&(
         <Card><details className="vrm-repli" data-recap-repli="">

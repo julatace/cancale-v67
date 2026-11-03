@@ -1962,3 +1962,70 @@ reçu juste, reçu faux, autre devise ; un achat un article ; App.jsx : 4 appels
 `onClick`/`onUtiliser` ou après la confirmation groupée, aucun dans le calcul, `photoKey` seule, aucun
 titre lu. **Rouge sur origin/main** (module absent). **Mutations** : `titre` 2 rouges, `sans-tap` 2,
 `dossier` 1, `recu` 1, `unique` 1.
+
+### 2. « Récap de [mois] » — PDF et tableur (`src/recapMois.js`)
+
+**Demande** : Compta → Documents → « Récap de [mois] » ⇒ PDF ET tableur : ventes (date, site, N°, titre,
+vendu, reçu, frais), CA déclaré daté au versement, URSSAF, dépenses, bénéfice, couverture ; mêmes règles
+que l'écran ; logo et entreprise de la fiche de facturation si remplie ; jamais « encaissé ».
+
+**Fait** :
+- `src/recapMois.js` MET EN PAGE, ne calcule rien : bénéfice = `chiffreBenefice(beneficePeriode(mois))`
+  (la colonne « Bénéfice » du récap mensuel, Ma journée, Statistiques) ; CA déclaré et URSSAF = la ligne
+  du mois publiée par Ventes (`vinted_urssaf_mois`) et `aPayerUrssaf` (les cellules du tableau) ;
+  dépenses = `lignesChargesMois` (nouvelle, App.jsx : fixes, dépenses et packs du mois, échéances
+  d'abonnement — son total EST `comptaChargesMois(...).total`) ; ventes = le relevé de Ventes
+  (`vrm_stats_ventes`, les MÊMES ventes que le bénéfice : finalisées, hors masquées, au jour de la vente),
+  auquel s'ajoutent `[8]` le N° de la fiche et `[9]` la date de versement lue (Leboncoin/eBay/Vestiaire :
+  leur date ; `ventesAutresBenefice` rend désormais `num`). « Pas su » = « — », raison en une ligne
+  (« il manque des prix d'achat ») ; couverture « Prix d'achat connus 2/3 » = celle du bénéfice.
+- PDF (pdf-lib, Helvetica, A4) : en-tête avec logo/nom/SIRET/adresse de `vrm_pro_facture` si remplie,
+  « Récap de novembre 2026 », résumé (libellé · montant, filets), ventes, dépenses, totaux ; caractères
+  impossibles retirés, titres longs coupés. Tableur : CSV `;`, BOM, montants « 12,50 ».
+- Écran : carte « Récap de [mois] » en tête de `RecapComptableMensuel` (Documents et réglages), choix du
+  mois (13 derniers), « PDF » et « Tableur ». L'ancien « Récap comptable mensuel » (tableau + CSV) reste.
+
+**Preuves** : banc `scripts/bancs/recap-mois.cjs` (données inventées, 1512 sombre + 390 tactile, A tous
+les prix connus / B un prix manquant) : le PDF lu par pdf.js et le tableur disent le MÊME bénéfice que
+« Combien j'ai gagné ? » et la colonne du récap mensuel (52,31 € ; « — » en B), le même CA déclaré et la
+même URSSAF que le tableau (149,40 € · 18,53 €), les dépenses du mois de Comptabilité (32,50 €), le nombre
+de ventes et la couverture du bénéfice (3 · 3/3, 2/3), jamais « encaissé », une ligne par vente avec site
+et titre, les dépenses listées ; aucun débordement, aucune erreur. **88 verts**. Rouge sur origin/main et
+sous mutation : voir plus bas.
+
+### 3. Boîte à dépenses — le ticket en photo (`src/depensesTicket.js`)
+
+**Demande** : ajouter une dépense en un geste depuis Compta avec la PHOTO du ticket ; montant/date/catégorie
+saisis par lui ; lecture du montant SEULEMENT si gratuite et locale, sinon champ manuel sans paragraphe ;
+catégories Emballage, Achats de stock, Envois, Abonnements, Autre ; les dépenses entrent dans le bénéfice
+par la règle existante (dans leur mois).
+
+**Fait** :
+- Le formulaire « Ajouter une dépense » (Tes dépenses, ouvert aussi par le geste de « Combien j'ai
+  gagné ? ») commence par « Photo du ticket » (`capture="environment"` : l'appareil photo au téléphone),
+  aperçu, « Changer la photo », « Retirer ». Photo réduite dans le navigateur (1100 px, JPEG 0,7).
+- Lecture du montant DANS la page, gratuite : `TextDetector` du navigateur s'il existe, sinon Tesseract
+  5.1.1 en WASM chargé de cdn.jsdelivr.net (déjà autorisé par la CSP : script, connect, wasm) avec ses
+  chemins explicites (worker, cœur, langue `fra`) ; borné à 45 s ; tout échec ⇒ champ vide, sans un mot.
+  `montantDuTicket` ne prend qu'un TOTAL écrit (net à payer, total TTC, total, CB), jamais le sous-total,
+  le HT, la TVA, le rendu ; sans mot de total ⇒ rien. Le montant n'est que PRÉ-REMPLI : « Ajouter » écrit.
+- La photo a SA ligne `depense_ticket_{id}` (comme `achat_hors_photo_{id}`, jamais `main` ni
+  `vrm_compta`) ; la dépense porte `ticket:true` seulement si la base a accepté la photo, sinon elle est
+  gardée sans photo et c'est dit. La ligne de la dépense a un bouton appareil photo qui relit le ticket
+  (une lecture, à la demande) et l'affiche ; supprimer la dépense vide la ligne du ticket.
+- Catégories = `CATEGORIES_DEPENSE` (exemples sous le champ). Libellé facultatif quand il y a une photo
+  (la catégorie le remplace).
+- ⚠️ **À trancher par Julien** : « Achats de stock » en DÉPENSE compte deux fois si la paire porte aussi
+  son prix d'achat (le bénéfice retire le prix d'achat des ventes ET les dépenses du mois). Gardé tel que
+  demandé ; à dire à Julien.
+- ⚠️ Non vérifié ici : le chargement réel de Tesseract depuis jsdelivr (le conteneur n'y a pas accès) ;
+  à essayer sur l'iPhone (Safari n'a pas `TextDetector` : c'est Tesseract qui lira).
+
+**Preuves** : banc `scripts/bancs/depense-ticket.cjs` (1512 sombre + 390 tactile ; détecteur simulé qui lit
+« SOUS-TOTAL 10,42 / TVA 2,08 / TOTAL TTC 12,50 / CB 12,50 », puis aucun détecteur et jsdelivr coupé) :
+catégories de Julien, champ pré-rempli à 12,50 (pas 10,42), rien écrit avant « Ajouter », dépense
+« Envois » 12,50 € `ticket:true`, image seulement dans `depense_ticket_{id}`, bénéfice du mois de
+Comptabilité −12,50 € exactement, bouton du ticket qui rouvre la photo, sans lecture : champ vide et aucun
+message, cibles ≥ 44 px. `scripts/audit-depense-ticket.cjs` (10 verts ; mutations `plus-grand` et `ht`
+rouges). Le banc `stats-compta` est remis aux catégories de Julien (« Envois » au lieu de « Transport »,
+la pastille « Abonnements » n'est plus refusée), en le disant dedans.
