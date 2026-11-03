@@ -37201,7 +37201,7 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
       const sous = !B ? 'ouvre Ventes une fois : il s’y calcule'
         : B.n === 0 ? 'aucune vente finalisée'
         : B.nCout === 0 ? `il manque le prix d’achat de tes ${pl(B.n, 'vente')}`
-        : R.partiel ? `${B.nCout} vente${B.nCout > 1 ? 's' : ''} sur ${B.n} ont leur prix d’achat : il manque celui des autres`
+        : R.partiel ? `${B.nCout} vente${B.nCout > 1 ? 's' : ''} sur ${B.n} ${B.nCout > 1 ? 'ont' : 'a'} leur prix d’achat : il manque celui des autres`
         : `vente − prix d’achat, sur ${pl(B.n, 'vente finalisée', 'ventes finalisées')}`;
       return tuile('benefice', NOM_BENEFICE_BRUT, R.valeur == null ? '—' : fmt(R.valeur), sous,
         { 'data-sv-etat': B ? 'lu' : 'passu', 'data-sv-n': B ? B.n : undefined, 'data-sv-ncout': B ? B.nCout : undefined, 'data-sv-brut': R.valeur == null ? '' : cents(R.valeur), ...R.attrs },
