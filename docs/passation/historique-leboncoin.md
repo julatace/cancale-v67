@@ -1263,3 +1263,7 @@ int). Sur origin/main ces deux audits passent ROUGES (11 et 13). Nouvel audit
 `audit-chemin-json-guillemets.cjs` : aucun identifiant interpolé nu dans un chemin JSON
 (app, extension, serveur — seules les clés fixes `${k}`/`${c}`/`${cle}` sont permises).
 Non mesuré : une requête réelle dans les journaux Supabase.
+
+
+### « SUPPRIMER DE LEBONCOIN » SUR LA CARTE DE MA JOURNÉE ; (b) « TOUJOURS CHEZ MOI » PAS ENCORE DANS LA FILE (3 novembre)
+Récit complet : `historique-interface-stock.md`, « LE CYCLE D'UN ARTICLE ». La carte « à retirer de Leboncoin » porte « Supprimer » (confirmé, identité, `lbcSupprime`). La file Leboncoin reste celle de l'extension (en ligne seulement) : ajouter les articles « Toujours chez moi » demande une version d'extension (`buildLbcData`).
