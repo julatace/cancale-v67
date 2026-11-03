@@ -2710,3 +2710,55 @@ range dans `vrm_points_relais` (« auto ») pose des positions fausses (un « Ta
 cette liste n'est plus rendue nulle part — à retirer un jour (code mort qui appelle le réseau).
 (2) Un lieu SANS code postal rejoint encore le SEUL autre point du même nom (`regrouperRelais`),
 même dans une autre ville ; avec l'adresse relue, le cas mesuré n'y passe plus.
+
+## 3 novembre — Le tampon du bordereau toujours posé (N° + titre) : zone libre, sinon bande, sinon fiche colis
+
+Julien, 3 nov. 09 h 59 : « le tamponnage du bordereau ne marche pas car il veut absolument trouver un espace
+blanc ; il me dit qu'il n'en trouve pas ».
+
+**Mesuré d'abord** (vraie base, lecture seule ; copies des PDF dans le scratchpad de la session, jamais dans le
+dépôt) : 215 `email_bord_*`, 159 `harvest_*_label_*`, 1 `vc_label_*`. Formes : Chronopost iText 842×595 et
+595×842, Mondial Relay/InPost PDFsharp 595×842, « Bordereau-Vinted » (flux d'objets, étiquette en Form XObject
+425×283 = 150×100 mm couchée, Hermes/An Post), HexaPDF 594×842 (deux images pleine page), FPDF international,
+Vestiaire Chronopost TCPDF 841,89×595,28 **/Rotate 270**. Son réglage : imprimante `normale`.
+Rejoué sur deux vrais PDF avec le code du 28 oct. : InPost passe (normale et thermique) ; **« Bordereau-Vinted »
+en thermique : « aucun espace blanc suffisant »** — l'étiquette mise au 100×150 remplit la page. Causes lues dans
+le code d'avant : (1) aucune issue quand il n'y a pas de blanc (refus = erreur, rien d'imprimé dans un lot) ;
+(2) tout pixel < 248 était de l'encre (fond gris clair, image scannée ⇒ jamais de blanc) ; (3) sur une page
+tournée, le texte était posé couché et la largeur PDF (38 pt) faisait lever « Numéro trop long » ; (4) en
+thermique le titre n'était jamais posé ; (5) un caractère hors WinAnsi (emoji) faisait lever pdf-lib.
+(Le banc `tampon-bordereau` sur le code d'avant : 11 sorties sur 14 refusées « aucun espace blanc suffisant ».)
+
+**Livré — un seul chemin, `tamponnerBordereau` (App.jsx, bloc « LE TAMPON DU BORDEREAU »)**, appelé par
+`poserBordereau` (une vente, un lot, Leboncoin, Vestiaire — `annotateAndDownloadBordereau`), les étiquettes
+thermiques, l'aperçu `BordPlacer` et `imprimerBordereauEquipe`. Trois issues, jamais un échec :
+1. **Zone libre** sur la page AFFICHÉE (rotation comprise) : encre = luminance < 200, par cellules de 3 px (un
+   point isolé n'est pas de l'encre), marges 14 pt à gauche/droite (zone de silence d'un code-barres) et 10 pt
+   en haut/bas, trois tailles de cartouche (N° 18/15/12 pt, titre sur 2 lignes, « … »). Le texte est tourné de
+   la rotation de la page : il se lit à l'endroit.
+2. **Bande** de 40 pt (14 mm) ajoutée SOUS la page affichée, l'original redessiné à 1:1 (Form XObject) —
+   seulement si la page agrandie tient sur un A4 (cas d'une étiquette 10×15 imprimée en A4 : aucune réduction).
+3. **Fiche colis** 10×15 (N° en très gros, titre, « Fiche colis VRM — pas une étiquette de transport »)
+   insérée juste APRÈS la page : A4 déjà pleine, ou **imprimante thermique** (la page doit rester 100×150 ;
+   une bande déborderait sur l'étiquette suivante ou forcerait une réduction de l'étiquette, non mesurable
+   sans vraie imprimante — donc jamais).
+pdf.js injoignable ⇒ bande ou fiche (rien n'est posé à l'aveugle sur la page). Le choix manuel de l'aperçu
+reste revérifié (refus dit dans l'aperçu seulement) ; à l'impression un choix refusé retombe sur la recherche.
+La modale dit quand une fiche ou une bande a été utilisée (`TamponPose`, `data-tampon-pose`).
+⚠️ La passation du 28 oct. écrivait « l'utilisateur a explicitement refusé une bande ajoutée et toute
+réduction » : la bande ici n'est ni une réduction ni posée sur l'étiquette, elle n'existe qu'en imprimante
+normale quand rien d'autre ne tient ; si Julien la refuse, passer `tientA4` à faux ⇒ fiche partout.
+
+**Preuves** : banc `scripts/bancs/tampon-bordereau.cjs` (7 formes fabriquées × normale/thermique, (a) avec et
+(b) sans tampon par le même chemin, jugés sur le rendu pdf.js : texte présent et à l'endroit, pixels changés
+hors zones protégées et hors encre, bande = original intact à 1:1 + 40 pt, fiche = page d'origine intacte +
+100×150 juste après, thermique sans changement de taille) : **110 verts** ; code d'avant **18 rouges** ;
+mutations `marges0` 4, `bandeThermique` 8, `sansRotation` 2, `seuilStrict` 16 rouges. `BANC_REELS=dossier`
+pour rejouer des vrais PDF hors dépôt (fait sur les deux copies : InPost zone libre partout, Vinted/Hermes
+zone libre en A4, fiche en thermique). Voisins verts : `vestiaire-parite` (68), `ventes-bordereau`,
+`audit-impression` (0 rouge ; `--prouve` 4), `tests/bordereau-zone-protegee` réécrit pour la nouvelle règle ;
+`tests/bordereau-rendu-blanc` retiré (remplacé par le banc) ; `tests/bordereau-qr-lecture` et
+`bordereau-placement-interface` adaptés au nouveau chemin mais NON relancés ici (pdf.js 3.11 et jsqr
+introuvables hors réseau) ; `imprimante`, `lbc-bordereau`, `equipe` non lancés pour la même raison ;
+`lot-bordereaux` rouge AUSSI sur `main` (clic « Tout imprimer » qui n'aboutit pas, sans rapport).
+**Non mesuré** : une vraie impression thermique de la fiche et un scan transporteur.

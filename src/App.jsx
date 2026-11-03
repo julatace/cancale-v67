@@ -10303,7 +10303,8 @@ const imprimanteChoisie = () => imprMode(load('vrm_imprimante', 'normale'));
 // d'impression (une vente, un lot, Leboncoin) :
 //   thermique + étiquette reconnue ⇒ pages 100×150 (et les pages suivantes du
 //   PDF, une déclaration en douane par exemple, telles quelles) ;
-//   sinon ⇒ page originale, numéro dans un espace blanc vérifié sur ce PDF.
+//   sinon ⇒ page originale, tamponnée par `tamponnerBordereau` (zone libre,
+//   sinon bande 1:1, sinon fiche colis — jamais un refus).
 // Rend `{ isole, etiquettes, raison }` — l'écran dit ce qui a vraiment été fait.
 const poserBordereau = async (PL, out, src, { numero, title, pos, thermique }) => {
   const { StandardFonts } = PL;
@@ -10507,7 +10508,7 @@ const ImprimanteSetting = ({ nu = false }) => {
       <div className="vrm-setting-applique" role="status" style={{color:erreurMode?C.warn:C.text}}>{erreurMode||`Format appliqué sur cet appareil : ${mode==='thermique'?'étiquettes 100 × 150 mm':'papier A4'}.`}</div>
       <GuideReglage titre="Avant d’imprimer" etapes={[
         ['Choisis le papier', 'A4 pour une imprimante classique ; 100 × 150 mm pour une imprimante thermique.'],
-        ['Vérifie le document', 'Ouvre un aperçu reçu sur ta boutique et contrôle que les codes restent lisibles et le numéro dans un espace blanc.'],
+        ['Vérifie le document', 'Ouvre un aperçu reçu sur ta boutique et contrôle que les codes restent lisibles et que le N° et le titre sont posés hors des codes (ou dans la bande, ou sur la fiche colis).'],
         ['Contrôle la fenêtre d’impression', 'Vérifie le papier et l’échelle. L’app prépare le PDF ; le pilote de ton imprimante décide du réglage final.']
       ]}/>
       <div data-imprimante-phrase style={{fontSize:12.5,color:C.muted,marginTop:10,lineHeight:1.5}}>
@@ -10753,7 +10754,9 @@ const annotateAndDownloadBordereauBrut = async (numero, title, pdfArrayBuffer, p
   const filename = `bordereau${hasNum?'-N'+numero:''}${safeTitle?'-'+safeTitle:''}${thermique&&r0.isole?'-thermique':''}.pdf`;
   // Ouvert dans un onglet (ordinateur) ; sinon la modale propose « Ouvrir ».
   const ouvert = ouvrirPdfOnglet(url, filename);
+  const tp = r0.tampons || [];
   return { url, filename, printed: ouvert, ouvert, thermique, isoles: r0.isole ? 1 : 0, etiquettes: r0.etiquettes,
+           fiches: tp.filter((m) => m === 'fiche').length, bandes: tp.filter((m) => m === 'bande').length,
            entiers: thermique && !r0.isole ? [{ titre: title || '', raison: r0.raison }] : [] };
 };
 // Un échec (annulé, PDF illisible) referme la visionneuse « préparation… ».
@@ -10769,7 +10772,7 @@ const mergeAndDownloadBordereauxBrut = async (items, resolvePos, opts = {}) => {
   const { PDFDocument, rgb, StandardFonts } = PL;
   const out = await PDFDocument.create();
   const thermique = imprMode(opts.imprimante || imprimanteChoisie()) === 'thermique';
-  let count = 0, nInv = 0, isoles = 0, nEtiquettes = 0;
+  let count = 0, nInv = 0, isoles = 0, nEtiquettes = 0, fiches = 0, bandes = 0;
   const entiers = [];   // ce qu'on n'a PAS su isoler — l'écran doit le dire
   const reussis = [], rates = [];
   for (const [index, it] of items.entries()) {
@@ -10781,6 +10784,7 @@ const mergeAndDownloadBordereauxBrut = async (items, resolvePos, opts = {}) => {
       // ne SAIT pas où elle est, la page part ENTIÈRE — jamais un code-barres
       // coupé au hasard (`poserBordereau`, la même règle partout).
       const r1 = await poserBordereau(PL, out, src, { numero: it.numero, title: it.title, pos, thermique });
+      for (const t of r1.tampons || []) { if (t === 'fiche') fiches++; else if (t === 'bande') bandes++; }
       if (r1.isole) { isoles++; nEtiquettes += r1.etiquettes; }
       else if (thermique) entiers.push({ titre: it.title || '', raison: r1.raison });
       count++; reussis.push(index);
@@ -10799,7 +10803,7 @@ const mergeAndDownloadBordereauxBrut = async (items, resolvePos, opts = {}) => {
   const filename = `bordereaux-${count}${nInv?'-'+nInv+'factures':''}${thermique?'-thermique':''}-a-la-suite.pdf`;
   // Ouvert dans un onglet (ordinateur) ; sinon la modale propose « Ouvrir ».
   const printed = ouvrirPdfOnglet(url, filename);
-  return { url, filename, count, nInv, printed, ouvert: printed, thermique, isoles, etiquettes: nEtiquettes, entiers, reussis, rates };
+  return { url, filename, count, nInv, printed, ouvert: printed, thermique, isoles, etiquettes: nEtiquettes, entiers, reussis, rates, fiches, bandes };
 };
 // Un échec (annulé, PDF illisible) referme la visionneuse « préparation… ».
 const mergeAndDownloadBordereaux = async (...a) => { try { return await mergeAndDownloadBordereauxBrut(...a); } catch (e) { libererOngletPdf(); throw e; } };
@@ -20009,6 +20013,7 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
             <div style={{ fontSize: 17, fontWeight: 700, color: C.text, marginBottom: 4 }}>Bordereau prêt</div>
             <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.45, marginBottom: 16 }}>{bordResult.printed ? <>Il est <b>ouvert dans un nouvel onglet</b> : clique sur l'imprimante en haut à droite. Onglet pas ouvert ? Utilise le bouton ci-dessous.</> : <>Ouvre-le puis <b>Imprimer</b> (ou enregistre-le). Sur iPhone, le bouton de partage en bas.</>}</div>
             <a href={bordResult.url} target="_blank" rel="noreferrer" style={{ display: 'block', background: C.accent, color: C.onAccent, borderRadius: 10, padding: '13px 16px', fontSize: 15, fontWeight: 600, textDecoration: 'none', marginBottom: 8, textAlign: 'center' }}>📄 Ouvrir le bordereau</a>
+            <TamponPose r={bordResult}/>
             {bordResult.thermique && <div data-lbc-thermique={bordResult.isoles>0?'isole':'entier'} style={{ fontSize: 12, color: C.muted, lineHeight: 1.45, marginBottom: 8 }}>{bordResult.isoles>0 ? <>Imprimante thermique : <b style={{color:C.text}}>l'étiquette seule, au format 10×15 cm</b>, ton N° en bas.</> : <>Imprimante thermique : je n'ai pas su repérer l'étiquette ({(bordResult.entiers&&bordResult.entiers[0]&&bordResult.entiers[0].raison)||'mise en page inconnue'}) — la page part entière, découpe-la à la main.</>}</div>}
             {bordResult.pdfBuf && !(bordResult.thermique && bordResult.isoles>0) && <button type="button" onClick={adjustBordPlacement} style={{ width: '100%', border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, cursor: 'pointer', fontSize: 13, fontWeight: 500, padding: '11px', marginBottom: 8, fontFamily: 'inherit' }}>Prévisualiser et ajuster le numéro</button>}
             <button type="button" onClick={() => { if (bordResult.url) URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{ width: '100%', border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, fontWeight: 500, padding: '8px', fontFamily: 'inherit' }}>Fermer</button>
@@ -39399,6 +39404,15 @@ function LoadError({ onRetry }) {
   </div>;
 }
 
+// Ce que le tampon a dû faire quand la page n'avait pas de zone libre (3 nov.).
+function TamponPose({ r }) {
+  const f = (r && r.fiches) || 0, b = (r && r.bandes) || 0;
+  if (!f && !b) return null;
+  return <div data-tampon-pose={f ? 'fiche' : 'bande'} style={{ fontSize: 12, color: C.muted, lineHeight: 1.45, marginBottom: 8, textAlign: 'left' }}>
+    {f > 0 && <div>Pas de place libre sur {f > 1 ? `${f} étiquettes` : 'l’étiquette'} : le N° et le titre sont sur une <b style={{ color: C.text }}>fiche colis</b> imprimée juste après (ce n’est pas une étiquette de transport).</div>}
+    {b > 0 && <div>Pas de place libre sur {b > 1 ? `${b} bordereaux` : 'le bordereau'} : le N° et le titre sont dans une <b style={{ color: C.text }}>bande ajoutée dessous</b>, le bordereau reste à taille réelle.</div>}
+  </div>;
+}
 // Placement sur le PDF courant : original et rendu réel, sans réutiliser
 // la géométrie d'un autre bordereau. La validation relit les pixels originaux.
 function BordPlacer({place,onConfirm,onCancel}) {
@@ -54315,12 +54329,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               style={{display:'block',background:C.accent,color:C.onAccent,borderRadius:10,padding:'13px 16px',fontSize:15,fontWeight:600,textDecoration:'none',marginBottom:8}}>📄 {bordResult.batch?'Ouvrir les bordereaux':bordResult.withInvoice?'Ouvrir bordereau + facture':'Ouvrir le bordereau'}</a>
             {/* Le placement est recalculé sur chaque PDF, sans position héritée. */}
             {bordResult.pdfBuf && !bordResult.batch && !(bordResult.thermique && bordResult.isoles>0) && <button type="button" onClick={adjustBordPlacement} style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:500,padding:'11px',marginBottom:8}}>Prévisualiser et ajuster le numéro</button>}
-            {bordResult.batch && !bordResult.thermique && <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.4}}>Chaque PDF est vérifié séparément pour trouver un espace blanc. Un emplacement non vérifié n’est pas réutilisé dans le lot.</div>}
+            {bordResult.batch && !bordResult.thermique && <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.4}}>Chaque PDF est tamponné séparément : zone libre, sinon bande sous le bordereau, sinon fiche colis juste après.</div>}
             {/* ── CE QUE L'IMPRESSION THERMIQUE A VRAIMENT FAIT ────────────────
                 LE CHIFFRE, JAMAIS LA PROMESSE. « Ton étiquette est prête » sur
                 un bordereau qu'on n'a pas su découper, c'est le défaut le plus
                 coûteux du projet. On écrit combien ont été réduits à
                 l'étiquette, combien sont partis entiers, et POURQUOI. */}
+            <TamponPose r={bordResult}/>
             {bordResult.thermique && (()=>{ const ent=bordResult.entiers||[]; const iso=bordResult.isoles||0;
               return (
                 <div style={{fontSize:11.5,color:C.muted,marginBottom:8,lineHeight:1.45,textAlign:'left',border:`1px solid ${C.border}`,borderRadius:8,padding:'9px 11px'}}>
@@ -59288,7 +59303,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     ]},
     { id:'impression', titre:'Impression', items:[
       { id:'imprimante', type:'panneau', nu:true, ic:'printer', lib:'Imprimante et bordereaux', desc:'Papier et aperçus', val: imprimanteChoisie() === 'thermique' ? 'Thermique · 10×15' : 'Normale · A4', el:<ImprimanteSetting nu/> },
-    ], pied: <>Le N° se pose dans un espace blanc du PDF, jamais au hasard. <Pourquoi label="Comment le N° est placé">VRM cherche sur chaque page une zone blanche avec une marge autour du numéro ; le document garde sa taille. Sans espace suffisant, le tamponnage est refusé plutôt que placé au hasard. Vérifie dans « Imprimante et bordereaux » → « Voir les aperçus ».</Pourquoi></> },
+    ], pied: <>Le N° et le titre sont toujours posés, jamais sur un code. <Pourquoi label="Comment le N° est placé">VRM cherche d’abord une zone libre sur la page, avec une marge autour des codes-barres. Sinon il ajoute une bande blanche sous le bordereau, à taille réelle, si la page tient encore sur une feuille A4. Sinon (A4 pleine, ou imprimante thermique) le N° et le titre partent sur une petite fiche colis 10 × 15 imprimée juste après. Vérifie dans « Imprimante et bordereaux » → « Voir les aperçus ».</Pourquoi></> },
     { id:'compta', titre:'Compta', items:[
       // (1er nov.) À droite, le statut CHOISI (lu dans `vinted_regime`, jamais deviné) :
       // « À choisir » tant qu'il ne l'a pas posé — avant, il fallait ouvrir pour savoir.
