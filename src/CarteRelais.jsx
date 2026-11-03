@@ -331,7 +331,34 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer }) 
     </div>
   );
 }
-function ColonneRetirerF({ vue, C, Photo, gestes, detail, avecCarte, echeance, statut, retirer }) {
+// (3 nov., Julien : « si il y a 2 villes sur la carte, je veux que l'on puisse sélectionner une ville »)
+// La ville d'un point = celle LUE dans son adresse (« 35260 Cancale » : code postal + ville), jamais devinée ;
+// un point sans code postal lu n'a pas de ville (il reste dans « Toutes »).
+const normVille = (v) => String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+export function villeDuPoint(p) {
+  const a = String((p && (p.adresse || p.adresseCourte)) || '');
+  const m = /\b(\d{5})\s+([A-Za-zÀ-ÿ' -]+?)\s*$/.exec(a.split(',').pop().trim()) || /\b(\d{5})\s+([A-Za-zÀ-ÿ' -]+)/.exec(a);
+  if (!m) return null;
+  const nom = m[2].trim().replace(/\s+/g, ' ');
+  return nom ? { cle: normVille(nom), nom: nom.replace(/\b([a-zà-ÿ])/g, (c) => c.toUpperCase()) } : null;
+}
+// Les villes des points à retirer, avec le nombre de colis (comptés) de chacune — seulement s'il y en a ≥ 2.
+export function villesDesPoints(vue) {
+  const m = new Map();
+  for (const p of ((vue && vue.points) || [])) {
+    if (p.inconnu) continue;
+    const v = villeDuPoint(p); if (!v) continue;
+    const n = p.arrives.filter((c) => !c.horsCompte).length;
+    const x = m.get(v.cle) || { cle: v.cle, nom: v.nom, n: 0, points: [] };
+    x.n += n; x.points.push(p.cle); m.set(v.cle, x);
+  }
+  const l = [...m.values()].filter((x) => x.n > 0).sort((a, b) => b.n - a.n || a.nom.localeCompare(b.nom, 'fr'));
+  return l.length >= 2 ? l : [];
+}
+function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte, echeance, statut, retirer, ville = '', onVille = null }) {
+  const villes = villesDesPoints(vueTout);
+  const vChoisie = villes.find((v) => v.cle === ville) || null;
+  const vue = vChoisie ? { ...vueTout, points: ((vueTout && vueTout.points) || []).filter((p) => !p.inconnu && vChoisie.points.includes(p.cle)) } : vueTout;
   const points = (vue && vue.points) || [];
   const connus = points.filter((p) => !p.inconnu);
   const inconnu = points.find((p) => p.inconnu) || null;
@@ -348,9 +375,13 @@ function ColonneRetirerF({ vue, C, Photo, gestes, detail, avecCarte, echeance, s
   const aVerifier = points.flatMap((p) => p.arrives.filter((c) => c.horsCompte));
   const inconnusComptes = inconnu ? inconnu.arrives.filter((c) => !c.horsCompte) : [];
   const ligne = (x) => <LigneRetraitF key={x.cle || x.id} x={x} Photo={Photo} gestes={gestes} detail={detail} echeance={x.horsCompte ? null : echeance} statut={x.horsCompte ? statut : null} retirer={retirer}/>;
-  if (!points.length) return null;
+  if (!points.length && !villes.length) return null;
   return (
-    <div className="vrm-rp vrm-rpf" ref={racine} data-retirer-par-point={connus.length} data-retirer-comptes={vue ? vue.nComptes : 0} data-retirer-hors={vue ? vue.nHors : 0} data-retirer-sur-carte={surCarte.length} data-retirer-carte={avecCarte ? '1' : '0'}>
+    <div className="vrm-rp vrm-rpf" ref={racine} data-retirer-ville={vChoisie ? vChoisie.cle : ''} data-retirer-par-point={connus.length} data-retirer-comptes={vue ? vue.nComptes : 0} data-retirer-hors={vue ? vue.nHors : 0} data-retirer-sur-carte={surCarte.length} data-retirer-carte={avecCarte ? '1' : '0'}>
+      {villes.length ? <div className="vrm-rpf-villes vrm-seg" role="group" aria-label="Choisir une ville" data-retirer-villes={villes.length}>
+        <button type="button" className="vrm-seg-btn" aria-pressed={!vChoisie} data-ville="" onClick={() => onVille && onVille('')}>Toutes</button>
+        {villes.map((v) => <button key={v.cle} type="button" className="vrm-seg-btn" aria-pressed={!!vChoisie && vChoisie.cle === v.cle} data-ville={v.cle} data-ville-n={v.n} onClick={() => onVille && onVille(v.cle)}>{v.nom} <span className="vrm-seg-n">{v.n}</span></button>)}
+      </div> : null}
       {avecCarte && surCarte.length > 0 && etatFond !== 'ko' ? <div className="vrm-rpf-carte">
         <FondRelais points={surCarte} selection={choisi} onChoisir={choisir} C={C} hauteur={220} onEtat={setEtatFond} muet/>
         {/* Obligation de licence : l'attribution reste, en tout petit, DANS la carte. */}
@@ -401,8 +432,8 @@ function ColonneRetirerF({ vue, C, Photo, gestes, detail, avecCarte, echeance, s
   );
 }
 
-export function ColonneRetirer({ vue, C, Photo, gestes = null, detail = null, nomTransporteur = null, avecCarte = true, enRouteSansRelais = 0, fusion = false, echeance = null, statut = null, retirer = null }) {
-  if (fusion) return <ColonneRetirerF vue={vue} C={C} Photo={Photo} gestes={gestes} detail={detail} avecCarte={avecCarte} echeance={echeance} statut={statut} retirer={retirer}/>;
+export function ColonneRetirer({ vue, C, Photo, gestes = null, detail = null, nomTransporteur = null, avecCarte = true, enRouteSansRelais = 0, fusion = false, echeance = null, statut = null, retirer = null, ville = '', onVille = null }) {
+  if (fusion) return <ColonneRetirerF vue={vue} C={C} Photo={Photo} gestes={gestes} detail={detail} avecCarte={avecCarte} echeance={echeance} statut={statut} retirer={retirer} ville={ville} onVille={onVille}/>;
   const points = (vue && vue.points) || [];
   const connus = points.filter((p) => !p.inconnu);
   const inconnu = points.find((p) => p.inconnu) || null;

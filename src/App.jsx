@@ -118,7 +118,7 @@ import { DESCRIPTION_ORGANISATION } from "./operations/description.js";
 // (31 oct.) Colis → « À retirer » : la carte des points relais (règle pure + carte).
 import { regrouperRelais, pointsARetirer, lieuCompleteParTransporteur } from "./relaisColis.js";
 import { lieuxRelusDansTextes } from "./lieuxRetrait.js";
-import CarteRelaisColis, { ColonneRetirer } from "./CarteRelais.jsx";
+import CarteRelaisColis, { ColonneRetirer, villesDesPoints } from "./CarteRelais.jsx";
 import PastilleTransporteur, { LogoTransporteur } from "./PastilleTransporteur.jsx";
 import { transporteurDuColis, cleStatTransporteur, cleTransporteur } from "./transporteursVisuels.js";
 import { CarteTournee, TourneePleinEcran } from "./Tournee.jsx";
@@ -39727,6 +39727,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [, majLbcFait] = React.useReducer((x) => x + 1, 0);
   // (3 nov.) Colis → À retirer : la liste des achats en route sans point connu, au toucher de sa puce.
   const [enRouteOuvert, setEnRouteOuvert] = useState(false);
+  // (3 nov., Julien : « sélectionner une ville pour voir les colis de cette ville ») Le choix est une
+  // préférence légère de CET appareil (jamais une donnée) : illisible ⇒ « Toutes ».
+  const [villeRetrait, setVilleRetraitEtat] = useState(() => { try { return localStorage.getItem('vrm_retirer_ville') || ''; } catch (_) { return ''; } });
+  const setVilleRetrait = (v) => { setVilleRetraitEtat(v || ''); try { if (v) localStorage.setItem('vrm_retirer_ville', v); else localStorage.removeItem('vrm_retirer_ville'); } catch (_) {} };
   const colisAutres = useMemo(() => ({
     leboncoin: lbcLu === undefined ? undefined : lbcLu === null ? null : colisLbcAPoster(lbcVentes.ventes || [], lbcColisFait),
     // Les colis de l'écran Colis (`colisVestiaire(vcEtat)`) quand il les a lus ;
@@ -50782,6 +50786,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           return <TeteTransporteurs transp={transp} colis={colis} relire={lireTransp}/>;
         })()}
         {aFilter==='attente' && (()=>{
+          // (3 nov.) Sous Colis → À retirer : la fraîcheur se dit par la puce « N comptes à relire » (en haut).
+          if (retraitsOutils) return null;
           const vieux = (accounts||[]).filter(a => a && !acctOff(a.vinted_user_id)).map(a => {
             const j = joursAchatsRelus(String(a.vinted_user_id));
             return j != null ? { a, j } : null;
@@ -51633,6 +51639,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const avecMontant = rendus.filter(r => r.o && montantCommande(r.o) > 0);
           const tot = avecMontant.reduce((t,r) => t + montantCommande(r.o), 0);
           const auMoins = avecMontant.length < rendus.length;
+          // (3 nov., Julien : « beaucoup trop brouillon ») Sous Colis → À retirer : une carte « À faire » courte
+          // par colis reparti — sa photo (l'achat lui-même), « Remboursement à vérifier · 19,64 € », « Ouvrir »
+          // (la conversation de LA commande). Mêmes listes, même montant (`montantCommande`), aucune phrase.
+          if (retraitsOutils) return (
+            <div className="vrm-repartis-courts" data-repartis={rendus.length} data-repartis-total={tot > 0 ? tot.toFixed(2) : ''}>
+              {rendus.map((r, ix) => { const o = r.o, t = r.t; const ph = o ? orderPhoto(o) : null; const m = o ? montantCommande(o) : 0;
+                const href = o ? lienConv(o) : (t && t.suivi ? trackUrl(t.carrier || '', String(t.suivi)) : '');
+                return (
+                  <div key={o ? 'nr' + o.transaction_id : 'nrt' + ((t && t.suivi) || ix)} className="vrm-rpf-ligne vrm-reparti-court" {...(o ? { 'data-reparti-tx': String(o.transaction_id) } : { 'data-reparti-suivi': (t && t.suivi) || '' })}>
+                    <div className="vrm-rpf-rang" style={{cursor:'default'}}>
+                      <span className={'vrm-rpf-vignette' + (ph && !imgMortes.has(ph) ? '' : ' is-sans')} aria-hidden="true">{ph && !imgMortes.has(ph) ? <PhotoVinted src={ph} alt="" loading="lazy" onError={() => noterImgMorte(ph)}/> : null}</span>
+                      <span className="vrm-rpf-quoi"><span className="vrm-rpf-titre">{o ? (o.title || 'Achat') : `${carrierName(t && t.carrier)} · n° ${(t && t.suivi) || ''}`}</span>
+                        <span className="vrm-rpf-puces"><span className="vrm-rpf-puce is-ambre" data-montant="">Remboursement à vérifier{m > 0 ? ` · ${m.toFixed(2).replace('.', ',')} €` : ''}</span></span></span>
+                      {href ? <a className="vrm-rpf-code" href={href} target="_blank" rel="noreferrer" data-reparti-ouvrir="" style={{display:'inline-flex',alignItems:'center',textDecoration:'none'}}>Ouvrir</a> : null}
+                    </div>
+                  </div>); })}
+            </div>
+          );
           return (
             <div className="vrm-achats-bloc" data-repartis={rendus.length} style={{background:C.card,border:`1px solid ${C.border}`}}>
               <div className="vrm-achats-bloc-t" style={{color:C.text}}>
@@ -53249,7 +53273,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // fonctions qu'avant : markCollected / markPickupDone). Aucune règle ne change.
           const echeanceRetrait = (x) => { const t = (x.src && x.src.t) || null, o = (x.src && x.src.o) || null;
             const ev = !t && o ? (etatColisVinted(o, Date.now(), transpMap) || {}) : null;
-            const lim = t ? t.limite : (ev && ev.limite); const jl = lim ? joursAvant(lim) : null;
+            const lim = t ? t.limite : (ev && ev.limite); const jl = Number.isFinite(x.jours) ? x.jours : (lim ? joursAvant(lim) : null);
             if (jl == null || !Number.isFinite(jl)) return null;
             if (jl <= 0) return { t: jl < 0 ? 'délai dépassé' : 'dernier jour', ambre: true, code: jl < 0 ? 'depasse' : 'dernier' };
             if (jl === 1) return { t: 'jusqu’à demain', ambre: true, code: 'demain' };
@@ -53284,7 +53308,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {/* (3 nov.) Sur « À retirer », la carte sombre parle des colis à retirer : le nombre de Ma journée
                 (`vrm_colis_retirer`), et trois cases des MÊMES listes (`pickupUnion`) : dernier jour (urgents),
                 avec leur code, à vérifier (hors du compte). */}
-            {!baseKO && onglet === 'retirer' ? (
+            {!baseKO && onglet === 'retirer' ? (() => {
+              // Une ville choisie : les nombres de SA sélection (les lignes de ses points, les mêmes listes) ;
+              // « Toutes » : ceux de Ma journée (`vrm_colis_retirer`) et de `pickupUnion`.
+              const vs = villesDesPoints(parPoint); const vc = vs.find((v) => v.cle === villeRetrait);
+              if (vc) { const pts = parPoint.points.filter((p) => vc.points.includes(p.cle)); const rows = pts.flatMap((p) => p.arrives); const cpt = rows.filter((c) => !c.horsCompte);
+                const nD = cpt.filter((c) => c.jours != null && c.jours <= 1).length, nC = cpt.filter((c) => c.code || c.qr).length, nV = rows.filter((c) => c.horsCompte).length;
+                return <CarteMois className="vrm-fu-ecran vrm-fu-colis" surtitre={vc.nom} data-fu-colis-retirer={String(cpt.length)} data-fu-ville={vc.cle} valeur={<>{cpt.length} colis</>} sous="à retirer"
+                  cases={[{ cle: 'dernier', n: nD, l: 'dernier jour', attrs: { 'data-n': String(nD) } }, { cle: 'code', n: nC, l: 'avec code', attrs: { 'data-n': String(nC) } }, { cle: 'verifier', n: nV, l: 'à vérifier', attrs: { 'data-n': String(nV) } }]}/>; }
+              return (
               <CarteMois className="vrm-fu-ecran vrm-fu-colis" surtitre="Aujourd'hui" data-fu-colis-retirer={nRet == null ? '' : String(nRet)}
                 valeur={nRet == null ? null : <>{retPartiel ? <span className="vrm-fu-borne">au moins</span> : null}{nRet} colis</>}
                 sous={nRet == null ? 'Je lis tes colis…' : nRet === 0 ? 'Rien à aller chercher' : 'à retirer'}
@@ -53292,8 +53324,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   { cle: 'dernier', n: pickupUnion.urgents || 0, l: 'dernier jour', titre: 'À retirer aujourd’hui ou demain', attrs: { 'data-n': String(pickupUnion.urgents || 0) } },
                   { cle: 'code', n: pickupUnion.prets || 0, l: 'avec code', titre: 'Le code de retrait est connu', attrs: { 'data-n': String(pickupUnion.prets || 0) } },
                   { cle: 'verifier', n: (pickupUnion.aVerifier || []).length + (pickupUnion.aConfirmer || []).length, l: 'à vérifier', titre: 'Hors du compte « à retirer »', attrs: { 'data-n': String((pickupUnion.aVerifier || []).length + (pickupUnion.aConfirmer || []).length) } },
-                ]}/>
-            ) : null}
+                ]}/>); })() : null}
             {!baseKO && onglet !== 'retirer' && (() => { const m0 = new Date(); m0.setHours(0, 0, 0, 0); const deposes = gestesDepuis(shipDone, m0.getTime());
               return (
               <CarteMois className="vrm-fu-ecran vrm-fu-colis" surtitre="Aujourd'hui" data-fu-colis-envoyer={nEnv == null ? '' : String(nEnv)}
@@ -53370,7 +53401,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <button type="button" className="vrm-lien-action" data-pickup-sans-compte-geste="" onClick={() => onNav && onNav('vintedaccounts')} style={{border:0,background:'transparent',padding:0,minHeight:44,color:C.text,fontWeight:600,cursor:'pointer',fontFamily:'inherit',fontSize:'inherit',textDecoration:'underline'}}>Paramètres → Comptes liés</button></p>; })()}
                 {colRet && colRet.cartes.length > 0
                   ? <ColonneRetirer vue={parPoint} C={C} Photo={photoCarte} gestes={gestesRetrait} detail={arriveeRetrait} nomTransporteur={(k) => (CARRIERS[k] && CARRIERS[k].name) || ''} avecCarte={ordiColis} enRouteSansRelais={(groupesRelais && groupesRelais.enRouteSansRelais) || 0}
-                      fusion echeance={echeanceRetrait} statut={statutAVerifier} retirer={retirerColis}/>
+                      fusion echeance={echeanceRetrait} statut={statutAVerifier} retirer={retirerColis} ville={villeRetrait} onVille={setVilleRetrait}/>
                   : (toutLuRet ? <p className="vrm-colis-vide" data-retraits-vide="">Aucun colis à aller chercher pour l’instant.</p> : null)}
                 {voitSite('vestiaire') ? <AchatsVestiaireEnRoute vc={colisVestiaire(vcEtat)} transporteurDe={transporteurColis}/> : null}
               </section>

@@ -1049,3 +1049,6 @@ html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-carte[data-vc-c
 .vrm-rpf-liste > .vrm-rpf-ligne:first-child { border-top: .5px solid rgba(60,60,67,.18); }
 /* Le bandeau de fraîcheur du bas de Colis est devenu la puce « N comptes à relire ». */
 html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-fraicheur { display: none !important; }
+.vrm-repartis-courts { background: var(--fu-carte, #fff); border-radius: var(--fu-r-carte, 20px); box-shadow: var(--fu-ombre); padding: 0 14px; margin: 12px 0 0; }
+:root[data-theme="dark"] .vrm-repartis-courts { background: #1c1c1e; }
+.vrm-repartis-courts > .vrm-rpf-ligne:first-child { border-top: 0; }
