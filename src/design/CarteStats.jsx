@@ -127,7 +127,7 @@ function FeuilleCarte({ page, sel, sources, regles, reglage, poser, locaux, ferm
               const d = x ? defDe(x.id, locaux) : null;
               return (
                 <button key={i} type="button" className="vrm-carte-place" aria-pressed={place === i} data-carte-place={i} onClick={() => setPlace(i)}>
-                  <span>{noms[i]}</span><b>{d ? (d.local ? d.court || d.nom : d.nom) : '—'}</b>
+                  <span>{noms[i]}</span><b>{d ? d.nom : '—'}</b>
                 </button>
               );
             })}
@@ -146,7 +146,7 @@ function FeuilleCarte({ page, sel, sources, regles, reglage, poser, locaux, ferm
               return (
                 <li key={id}>
                   <button type="button" className="vrm-carte-choix" aria-pressed={pris} data-carte-choix={id} onClick={() => choisir(id)}>
-                    <span className="vrm-carte-choix-nom">{d.local ? d.nom : d.nom}{d.vinted && (!sel || sel.site === 'toutes') ? ' · Vinted' : ''}</span>
+                    <span className="vrm-carte-choix-nom">{d.nom}{d.vinted && (!sel || sel.site === 'toutes') ? ' · Vinted' : ''}</span>
                     <span className="vrm-carte-choix-v">{apercu(id)}</span>
                     <span className="vrm-carte-coche" aria-hidden="true">{pris ? '✓' : ''}</span>
                   </button>

@@ -107,6 +107,8 @@ const contexte = async (b, vp, sombre) => {
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);
     const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
     const forme = (r) => (sel && sel !== 'data,updated_at,cap:data->>capturedAt' && !/^id,data/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: cap, cap: r.data.capturedAt });
+    const dans = /[?&]id=in\.\(([^)]*)\)/.exec(u);
+    if (dans) { const ids = dans[1].split(','); return j(LIGNES.filter((r) => ids.includes(r.id)).map(forme)); }
     const eq = /[?&]id=eq\.([^&]*)/.exec(u);
     if (eq) return j(LIGNES.filter((r) => r.id === eq[1]).map(forme));
     const lk = /[?&]id=like\.([^&]*)/.exec(u);
@@ -208,9 +210,8 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         dit(r1 && r1.grand.id === 'ventes' && r1.grand.v === '3' && r1.cases[0].id === 'panier', 'la carte change sous ses yeux : 3 ventes en grand, le panier moyen en case 1', JSON.stringify(r1 && { g: r1.grand, c: r1.cases[0] }));
         const range = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_carte_stats')); } catch (_) { return null; } });
         dit(range && range.pages && range.pages.ventes && range.pages.ventes.g.id === 'ventes' && !range.pages.colis, 'le réglage est rangé pour Ventes seulement (`vrm_carte_stats`, synchronisé)', JSON.stringify(range));
-        await pg.reload({ waitUntil: 'domcontentloaded' });
-        await pg.locator('[data-carte-stats="ventes"]').first().waitFor({ timeout: 30000 });
-        await pg.waitForTimeout(1800);
+        // Recharger l'app (un chargement complet, la même adresse qu'à l'ouverture).
+        await aller(pg, 'cat_ventes', '[data-carte-stats="ventes"]');
         const r2 = await carte(pg, 'ventes');
         dit(r2 && r2.grand.id === 'ventes' && r2.cases[0].id === 'panier' && r2.defaut === '0', 'après rechargement : le réglage est gardé', JSON.stringify(r2 && { g: r2.grand.id, c: r2.cases.map((x) => x.id) }));
         await shot('[data-carte-stats="ventes"]', 'carte-ventes-reglee');
@@ -224,7 +225,7 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         await shot('[data-carte-stats="colis"]', 'carte-colis');
         await aller(pg, 'journee', '[data-carte-stats="journee"]');
         const j = await carte(pg, 'journee');
-        dit(j && j.grand.id === 'vendu' && j.grand.p === 'jour' && j.grand.v === '7000', 'Ma journée : vendu aujourd’hui en grand (70 €)', JSON.stringify(j && j.grand));
+        dit(j && j.grand.id === 'vendu' && j.grand.p === 'jour' && j.grand.v === '11000', 'Ma journée : vendu aujourd’hui en grand, tous les sites (70 € Vinted + 40 € Leboncoin)', JSON.stringify(j && j.grand));
         dit(await pg.locator('[data-carte-stats="journee"] [data-journee-benef][data-benef-notion="benefice"]').count() === 1, 'Ma journée : la case bénéfice porte la règle unique (`chiffreBenefice`)');
         await shot('.vrm-fu-tete', 'carte-journee');
         await aller(pg, 'compta', '[data-carte-stats="compta"]');

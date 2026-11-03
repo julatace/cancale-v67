@@ -957,7 +957,9 @@ html body .vrm-visite .vrm-visite-pied :is(button, .vrm-b) { min-height: 44px !i
 .vrm-carte-place > b { font: 600 14px/1.25 var(--vrm-police); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vrm-carte-place[aria-pressed="true"] { background: var(--fu-sombre, #1d1d1f); color: #fff; box-shadow: none; }
 .vrm-carte-place[aria-pressed="true"] > span { color: rgba(255,255,255,.65); }
-.vrm-carte-periodes { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.vrm-carte-periodes { display: flex; gap: 6px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-top: 4px; padding-bottom: 2px; }
+.vrm-carte-periodes::-webkit-scrollbar { display: none; }
+.vrm-carte-periodes > button { flex: none; }
 .vrm-carte-periodes > button { all: unset; box-sizing: border-box; min-height: 44px; padding: 0 14px; border-radius: 22px; display: grid; place-items: center; background: var(--fu-carte, #fff); box-shadow: inset 0 0 0 1px var(--fu-filet, rgba(0,0,0,.08)); font: 600 13px/1 var(--vrm-police); cursor: pointer; }
 .vrm-carte-periodes > button[aria-pressed="true"] { background: var(--fu-encre, #1d1d1f); color: var(--fu-carte, #fff); box-shadow: none; }
 .vrm-carte-liste { list-style: none; margin: 6px 0 0; padding: 0; border-radius: 14px; overflow: hidden; background: var(--fu-carte, #fff); }
@@ -968,3 +970,8 @@ html body .vrm-visite .vrm-visite-pied :is(button, .vrm-b) { min-height: 44px !i
 .vrm-carte-coche { flex: none; width: 18px; text-align: center; font: 700 15px/1 var(--vrm-police); color: var(--fu-bleu, #0071e3); }
 .vrm-carte-choix:focus-visible, .vrm-carte-place:focus-visible, .vrm-carte-periodes > button:focus-visible, .vrm-carte-ok:focus-visible, .vrm-carte-defaut:focus-visible { outline: 2px solid #0a84ff; outline-offset: 2px; }
 .vrm-carte-defaut { all: unset; box-sizing: border-box; align-self: center; min-height: 44px; padding: 0 14px; display: grid; place-items: center; font: 600 14px/1 var(--vrm-police); color: var(--fu-encre, #1d1d1f); cursor: pointer; margin-top: 6px; }
+/* Sur ordinateur, une règle des boutons de la coque ramenait « Modifier » à 30 px : 44 px partout. */
+html body .vrm-app-shell :is(.vrm-fu-carte, .vrm-fu-carte-nu) > .vrm-fu-modifier { min-height: 44px !important; min-width: 44px !important; height: auto !important; padding: 0 12px !important; }
+html body .vrm-carte-feuille :is(.vrm-carte-ok, .vrm-carte-defaut, .vrm-carte-periodes > button) { min-height: 44px !important; }
+html body .vrm-carte-feuille .vrm-carte-choix { min-height: 48px !important; }
+html body .vrm-carte-feuille .vrm-carte-place { min-height: 56px !important; }
