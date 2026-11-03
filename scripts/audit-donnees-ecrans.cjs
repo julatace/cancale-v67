@@ -237,7 +237,8 @@ const charger = (noms, ctx) => {
 
   console.log('\n── D4 / D5 · Pas lu ne vaut pas rien');
   {
-    dit(/\{accounts\.length===0 && accountsReady===true && !baseKO/.test(APPc), 'Ma journée : « Lie un compte Vinted » seulement quand la liste des comptes est revenue (base lente ≠ aucun compte)');
+    // (3 nov.) la phrase « Lie un compte Vinted » de Ma journée a été retirée à la demande de Julien (textes explicatifs) : absente = conforme ; présente = doit rester gardée.
+    dit(!/Lie un compte Vinted \(Paramètres/.test(APPc) || /\{accounts\.length===0 && accountsReady===true && !baseKO/.test(APPc), 'Ma journée : « Lie un compte Vinted » seulement quand la liste des comptes est revenue (base lente ≠ aucun compte)');
     dit(/if \(!ex\.length && \(accountsReady !== true \|\| \(accounts\.length > 0 && sales\.items == null\)\)\) return/.test(APPc), 'Colis : « Aucun colis à envoyer » seulement sur des ventes LUES');
     dit(/if \(actifsS>0 && nomsVentesKO\.length>=actifsS\) return \(/.test(APPc) && /data-semaine-pas-lue=""/.test(APPc), 'la semaine : aucun compte lu ⇒ « ce n’est pas zéro », jamais sept 0');
     dit(/data-semaine-partiel=\{nomsVentesKO\.length\?'1':undefined\}/.test(APPc), 'une partie des comptes lue ⇒ « au moins »');
