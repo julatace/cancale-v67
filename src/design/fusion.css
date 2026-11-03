@@ -1052,3 +1052,8 @@ html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-fraicheur { dis
 .vrm-repartis-courts { background: var(--fu-carte, #fff); border-radius: var(--fu-r-carte, 20px); box-shadow: var(--fu-ombre); padding: 0 14px; margin: 12px 0 0; }
 :root[data-theme="dark"] .vrm-repartis-courts { background: #1c1c1e; }
 .vrm-repartis-courts > .vrm-rpf-ligne:first-child { border-top: 0; }
+/* (3 nov., Julien : « beaucoup trop brouillon ») Sous Colis → À retirer, plus de bandeaux de texte : l'état du
+   suivi Vinted et la réception des e-mails vivent dans Paramètres → E-mails ; « Suivre un colis par son n° »
+   s'ouvre par le « … » de Colis (les outils). Les colis repartis restent (cartes courtes). */
+html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) [data-colis-retraits="outils"] :is([data-suivi-vinted-etat], .vrm-achats > details) { display: none !important; }
+html:not([data-colis-outils]) body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) [data-colis-retraits="outils"] [data-suivis-manuels] { display: none !important; }

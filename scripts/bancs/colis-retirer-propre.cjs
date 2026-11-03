@@ -158,6 +158,7 @@ const ouvrir = async (b, vp, sombre) => {
         await pg.waitForFunction(() => { try { return !!JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); } catch (_) { return false; } }, null, { timeout: 20000 }).catch(() => {});
         await pg.locator('[data-colis-onglet-choix="retirer"]').first().click();
         await pg.waitForTimeout(2500);
+        if (process.env.JR_DBG) console.log(await pg.evaluate(() => [...document.querySelectorAll('[data-colis-retraits="outils"] .vrm-achats > *')].filter((e) => e.getBoundingClientRect().height > 0).map((e) => `${e.tagName}.${String(e.className).slice(0, 30)} ${[...e.attributes].filter((a) => a.name.startsWith('data-')).map((a) => a.name).join(' ')} :: ${e.innerText.slice(0, 90).replace(/\n/g, ' ')}`).join('\n')));
         const m = await pg.evaluate(() => {
           const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
           const main = document.querySelector('.vrm-main');
