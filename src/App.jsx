@@ -42960,6 +42960,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // On ne décide rien à sa place : on la SIGNALE, et c'est toi qui tranches.
   const disparues = useMemo(() => {
     if (!listings.items || !sales.items) return [];
+    const decisionsCycle = lireObjet(CYCLE_DECISIONS);
     const onlineIds = new Set(); const presentAcc = new Set();
     for (const it of listings.items) { onlineIds.add(String(it.id)); const u = String(it._acc?.vinted_user_id || ''); if (u) presentAcc.add(u); }
     // Numéros qui correspondent à une vente (à n'importe quel stade) : ces
@@ -42997,6 +42998,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       //    annonce vendue, il la ferme en « vendue » — et ça se lit par IDENTIFIANT.
       if (venduesVinted.has(String(k))) continue;                   // Vinted dit : vendue
       if (pairsLost[raw]) continue;                                 // déjà déclarée perdue
+      // (3 nov.) Il a répondu « Toujours chez moi » à « N°x supprimé de Vinted »
+      // (Ma journée, src/cycleArticle.js) : une seule voix, la sienne.
+      if ((decisionsCycle[String(k)] || {}).choix === CHOIX_CYCLE.CHEZ_MOI) continue;
       out.push({ id: String(k), e, numero: raw });
     }
     out.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
