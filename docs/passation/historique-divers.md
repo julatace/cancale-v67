@@ -644,3 +644,64 @@ sont dans aucun total ; la même commande lue deux fois n'est dite qu'une fois.
 - Écrans N5 (« 372 € » trois fois), N11 (Reçu = CA côte à côte) : affichage, pas une donnée fausse — D2/D5.
 - `liveStats.caEncaisse` (Finalisé sur Vinted) reste daté de la vente, sur Vinted seul : c'est dit à l'écran
   (« Vinted seul · au jour de la vente »), règle inchangée.
+
+## 3 novembre — Comptes liés : Vinted, Vestiaire, Leboncoin et eBay sur un seul écran (branche `claude/parite-plateformes`)
+
+Julien (3 nov., 10 h 05) : « pareil, Comptes liés : il doit y avoir les comptes Leboncoin,
+Vestiaire et eBay ; je te laisse tout faire parfaitement ; tout ce qui est fait pour Vinted
+doit être fait pour le reste des apps ».
+
+**Mesuré d'abord sur sa base (lecture seule, 3 nov.)** — où vivent les comptes :
+- Leboncoin : `lbc_accounts.accounts` = 3 entrées pour **2 comptes** (`8442…` et
+  `lbc-account:8442…` sont le même, un particulier ; un compte « pro » vu seulement comme
+  compte lié, sans `sessionAt`) ; `lbc_listings.lectures` n'existe pas encore chez lui ;
+  `lbc_ventes.ventes` (objet) porte `account = lbc-account:…` sur chaque vente.
+- Vestiaire : **`vc_session` n'existe pas** (Vestiaire n'a jamais chargé `/users/me` chez
+  lui) ; toutes les lignes `vc_listings`/`vc_ventes` ont `compte = ''`. Aucun nom n'est
+  jamais gardé (choix du 31 oct.).
+- eBay : `ebay_comptes.comptes` (1 compte principal, `pseudo`, `type`, `site`,
+  `deconnecteLe`) ; `ebay_orders{_clé}.capturedAt` en millisecondes.
+- Les ventes Leboncoin, Vestiaire et eBay entraient TOUTES dans les totaux : aucun
+  équivalent de « comptes sélectionnés » (`vinted_accounts_hidden`) hors Vinted.
+
+**Ce qui est fait**
+1. `api/_lib/comptes-exclus.js` (UNE règle, importée par l'app et le serveur) :
+   `vrm_comptes_exclus = { leboncoin: [id], vestiaire: [id], ebay: [ref] }`, synchronisé,
+   écrit seulement sur son geste. `ventesFaites`, `ventesDeclarables` (compte `exclues`),
+   `ventesAutresBenefice` et `vcHorsBenefice` reçoivent `excluAutre` ; chaque écran qui
+   calcule un total le passe (Compta, CA par période, facturation électronique, Ventes,
+   la coque/Ma journée) ; le bilan de la semaine aussi (`main.vrm_comptes_exclus`, lu par
+   `ship-reminders`) ; les commandes eBay lues par le serveur portent désormais `_compte`.
+   Identité seulement : Leboncoin `account` (`lbc-account:` retiré), eBay `_compte`,
+   Vestiaire `compte` (vide = la carte « non identifié »). Une vente Leboncoin/eBay SANS
+   compte n'est jamais écartée. Seulement les TOTAUX : colis, annonces, alertes restent.
+   Le miroir `api/_lib/ventes-regle.js` est refabriqué par `--recopie`.
+2. Paramètres → Comptes liés (`VintedAccounts`, titre « Comptes liés ») : quatre groupes
+   (Vinted, Vestiaire Collective, Leboncoin, eBay), la MÊME carte (`CarteCompteLie`) :
+   avatar (photo Vinted si connue, sinon initiale), nom tel que lu (sinon `n° …`, jamais
+   deviné ; Vestiaire sans compte : « Compte non identifié »), état (`src/comptesLies.js`,
+   `etatCompteLie` : banni RELEVÉ · délié · ouvert · jamais lu · à relire > 24 h · lu + âge),
+   Pro/Particulier tel que lu, interrupteur « dans les totaux » (Vinted = le masquage
+   existant, avec sa confirmation ; autres = `vrm_comptes_exclus`), action : Vinted /
+   Vestiaire / Leboncoin « Ouvrir » (le site), eBay « Relire » + « Délier » (confirmé,
+   règles d'offre restantes dites) ou « Relier » (OAuth existant). Vinted garde « Gérer »
+   (nom affiché, e-mail, téléphone, note, annonces/messages retirés, suppression ciblée).
+   Retirés (sa demande, « aucun texte explicatif ») : le guide en 3 étapes, la phrase sous
+   le titre, la ligne « Tes comptes : … » (ses nombres restent en `data-comptes-*`).
+   Style Fusion (`src/comptes-lies.css`, jetons `--fu-*`), colonne 760 px.
+3. Lecture : trois états par plateforme ; « pas su » ⇒ « — Réessayer », jamais « aucun
+   compte » ; projections seulement (`a:data->accounts`, `l:data->lectures`, `cap:data->>capturedAt`).
+
+**Preuves** : `scripts/audit-comptes-exclus.cjs` (17 contrôles exécutés ; `--prouve` :
+8 mutations, toutes rouges) ; banc `scripts/bancs/comptes-lies.cjs` (données inventées,
+390 tactile clair/sombre + 1512 : 4 groupes, identité Leboncoin, ouvert/à relire/délié,
+interrupteur rangé, Comptabilité → Vendu 150 € → 100 € quand le second compte Leboncoin
+est écarté) — vert ; 9 rouges sur origin/main ; mutations rouges (identité Leboncoin non
+normalisée : 3 ; `excluAutre` oublié par le CA par période : 1). `type-compte`,
+`audit-urssaf` (contexte complété), `audit-bilan-semaine` (2 rouges de main sur les
+notifications, sans rapport), `audit-coherence` verts.
+
+**Limites** : Vestiaire n'aura de comptes nommés (identifiants) que quand l'extension
+lira `/users/me` (ou `user_id` Stream, 5.317) ; « ouvert » Leboncoin/Vestiaire = la session
+relevée < 12 h par n'importe lequel de ses navigateurs. Geste de Julien : regarder
+Paramètres → Comptes liés ; couper l'interrupteur d'un compte qu'il ne veut pas compter.

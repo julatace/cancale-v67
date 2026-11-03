@@ -86,7 +86,9 @@ import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
 import {colisEbay} from '../api/_lib/ebay-a-expedier.js';
 import {annoncesVcEnLigne,stockVestiaire,retraitsVestiaire,VC_VENTE_ETAPES,VC_ANNONCE_ETATS,etapeMotVc,vcVenteAnnulee,vcVentePartie,numVcVente,numVcAnnonce,montantRecuVc,dateVersementVc,dateVenteVc,ventesVcDe,colisVcAPoster,resumeColisVc,etatAnnonceVcBrut} from '../api/_lib/vestiaire-regle.js';
 import {colisLbcAPoster,lbcColisAPoster,totalColis} from '../api/_lib/colis-sites.js';
-import {CLE_COMPTES_EXCLUS,excluAutreDe,estExclu,basculerExclu,SANS_COMPTE_VC} from '../api/_lib/comptes-exclus.js';
+import {CLE_COMPTES_EXCLUS,excluAutreDe,estExclu,basculerExclu} from '../api/_lib/comptes-exclus.js';
+import {PLATEFORMES_COMPTES,etatCompteLie,ageLecture,comptesLbcLies,comptesVcLies,comptesEbayLies,refDeLigneEbay,nomCompteLie,LIBELLE_ETAT} from './comptesLies.js';
+import './comptes-lies.css';
 import {joursAvant as joursAvantParis} from '../api/_lib/ebay-a-expedier.js';
 import {marcheDuCompte as marcheEbayDuCompte, MARCHE_DEFAUT as MARCHE_EBAY_DEFAUT, lienAnnonce as lienAnnonceMarche, lienCommande as lienCommandeMarche} from '../api/_lib/ebay-marches-table.js';
 import {arriveeColisEmail, arriveeColisVinted, jourLocal, texteArrivee} from '../api/_lib/arrivee-colis.js';
@@ -33652,6 +33654,156 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
 }
 
 
+/* ── COMPTES LIÉS : TOUTES LES PLATEFORMES (3 nov.) ─────────────────────────
+   Julien : « Comptes liés : il doit y avoir les comptes Leboncoin, Vestiaire et
+   eBay ; tout ce qui est fait pour Vinted doit être fait pour le reste ». Une
+   liste groupée par plateforme, la même carte (`CarteCompteLie`) ; les règles
+   sont dans src/comptesLies.js, le choix « dans les totaux » des autres sites
+   dans api/_lib/comptes-exclus.js. Lecture : trois états par plateforme
+   (`undefined` en cours · `null` pas su · lu) — « pas su » n'est jamais « aucun compte ». */
+const URL_SITE_COMPTE = { vinted: 'https://www.vinted.fr/', vestiaire: 'https://fr.vestiairecollective.com/', leboncoin: 'https://www.leboncoin.fr/compte/part/mes-annonces', ebay: 'https://www.ebay.fr/' };
+function useComptesAutresSites() {
+  const [lu, setLu] = React.useState({ leboncoin: undefined, vestiaire: undefined, ebay: undefined });
+  const [tour, setTour] = React.useState(0);
+  React.useEffect(() => {
+    let mort = false;
+    const B = `${SUPABASE_URL}/rest/v1/app_data?`;
+    (async () => {
+      const [acc, lec, ses, vcl, vcv, reg, cap] = await Promise.all([
+        lireBaseRelue(`${B}id=eq.lbc_accounts&select=a:data->accounts`),
+        lireBaseRelue(`${B}id=eq.lbc_listings&select=l:data->lectures`),
+        lireBaseRelue(`${B}id=eq.vc_session&select=id:data->>id,at:data->>at,comptes:data->comptes`),
+        lireBaseRelue(`${B}id=eq.vc_listings&select=cap:data->>capturedAt`),
+        lireBaseRelue(`${B}id=eq.vc_ventes&select=cap:data->>capturedAt,ventes:data->ventes`),
+        lireBaseRelue(`${B}id=eq.ebay_comptes&select=comptes:data->comptes`),
+        lireBaseRelue(`${B}id=like.ebay_orders*&select=id,cap:data->>capturedAt`),
+      ]);
+      if (mort) return;
+      const ouvLbc = Array.isArray(acc) && acc[0] ? compteLbcOuvert(acc[0].a || {}) : '';
+      const leboncoin = (!Array.isArray(acc) || !Array.isArray(lec)) ? null : comptesLbcLies((acc[0] && acc[0].a) || {}, (lec[0] && lec[0].l) || {}, ouvLbc);
+      let vestiaire = null;
+      if (Array.isArray(ses) && Array.isArray(vcl) && Array.isArray(vcv)) {
+        const s = ses[0] || null;
+        const ventes = (vcv[0] && vcv[0].ventes && typeof vcv[0].ventes === 'object') ? Object.values(vcv[0].ventes) : [];
+        vestiaire = comptesVcLies(s, { captures: [vcl[0] && vcl[0].cap, vcv[0] && vcv[0].cap], sansCompte: ventes.some((v) => v && !String(v.compte || '').trim()) }, compteVcOuvert(s));
+      }
+      let ebay = null;
+      if (Array.isArray(reg) && Array.isArray(cap)) {
+        const caps = {};
+        for (const r of cap) { const ref = refDeLigneEbay(r && r.id); if (ref) caps[ref] = r.cap; }
+        ebay = comptesEbayLies({ comptes: reg[0] && reg[0].comptes }, caps);
+      }
+      setLu({ leboncoin, vestiaire, ebay });
+    })();
+    return () => { mort = true; };
+  }, [tour]);
+  React.useEffect(() => {
+    const f = (e) => { const d = e && e.detail; if (d && d.type === 'maj' && /lbc|vestiaire|vc/.test(String(d.quoi || ''))) setTour((t) => t + 1); };
+    const g = () => setTour((t) => t + 1);
+    window.addEventListener('vrm:ext', f); window.addEventListener('vrm:ebay-comptes', g);
+    return () => { window.removeEventListener('vrm:ext', f); window.removeEventListener('vrm:ebay-comptes', g); };
+  }, []);
+  return [lu, () => setTour((t) => t + 1)];
+}
+// UNE carte pour chaque compte, quelle que soit la plateforme. Les attributs
+// `data-compte-*` sont ce que lisent les bancs (jamais un libellé, §6.4).
+function CarteCompteLie({ plateforme, id, nom, photo, etat, age, type, inclus, onInclus, action, secondaire, etatVinted, enfants }) {
+  const libre = LIBELLE_ETAT[etat] || '';
+  return (
+    <div className="vrm-cl-carte" data-compte-lie={plateforme} data-compte-id={id} data-compte-etat={etat} data-compte-inclus={inclus == null ? '' : inclus ? '1' : '0'}>
+      <div className="vrm-cl-tete">
+        <span className="vrm-cl-avatar" data-compte-photo={photo ? 'oui' : 'non'} aria-hidden="true">
+          {photo ? <PhotoVinted src={photo} alt="" loading="lazy"/> : String(nom || '?').replace(/^n° /, '').slice(0, 1).toUpperCase()}
+        </span>
+        <div className="vrm-cl-corps">
+          <div className="vrm-cl-nom vrm-sensible">{nom}</div>
+          <span className={'vrm-cl-etat is-' + etat} {...(etatVinted ? { 'data-etat-compte': etatVinted.etat, 'data-etat-source': etatVinted.source || '', title: etatVinted.hint } : {})}>{libre}</span>
+          {age && etat !== 'ouvert' && etat !== 'jamais' && <span className="vrm-cl-age">{age}</span>}
+          {type && <span className="vrm-cl-type" data-type-compte={type}>{type === 'pro' ? 'Pro' : 'Particulier'}</span>}
+        </div>
+        {inclus != null && (
+          <label className="vrm-cl-inclus" title="Dans les totaux">
+            <input type="checkbox" role="switch" checked={!!inclus} onChange={onInclus} aria-label={`${nom} dans les totaux`} data-compte-inclus-bouton=""/>
+            <span aria-hidden="true"/>
+          </label>
+        )}
+      </div>
+      {(action || secondaire) && <div className="vrm-cl-actions">{action}{secondaire}</div>}
+      {enfants}
+    </div>
+  );
+}
+function GroupeComptes({ plateforme, n, enfants, pasSu, onRelire, attrs }) {
+  const p = PLATEFORMES_COMPTES.find((x) => x.id === plateforme);
+  return (
+    <section className="vrm-cl-groupe" data-comptes-groupe={plateforme} {...(attrs || {})}>
+      <div className="vrm-fu-titre-section"><h2>{p ? p.nom : plateforme}</h2>{n != null && <span>{n}</span>}</div>
+      {pasSu ? <div className="vrm-cl-vide" data-comptes-pas-su={plateforme}>— <button type="button" className="vrm-lien-action" onClick={onRelire}>Réessayer</button></div> : enfants}
+    </section>
+  );
+}
+// Les groupes Vestiaire, Leboncoin et eBay (Vinted est rendu par l'écran, avec ses outils).
+function ComptesAutresSites({ lu, relire }) {
+  const [exclus, setExclus] = useComptesExclus();
+  const maintenant = Date.now();
+  const basculer = (plateforme, id) => { const n = basculerExclu(exclus, plateforme, id); setExclus(n); save(CLE_COMPTES_EXCLUS, n); };
+  const [ebayEnCours, setEbayEnCours] = React.useState({});
+  const ouvrir = (plateforme) => <a className="vrm-b vrm-b-discret vrm-cl-bouton" href={URL_SITE_COMPTE[plateforme]} target="_blank" rel="noreferrer" data-compte-action="ouvrir">Ouvrir</a>;
+  const relireEbay = async (c) => {
+    setEbayEnCours((m) => ({ ...m, [c.ref]: 'relire' }));
+    const { j } = await appelEbay({ action: 'relire', ...corpsCompteEbay(c.ref) });
+    setEbayEnCours((m) => { const n = { ...m }; delete n[c.ref]; return n; });
+    if (!(j && j.ok)) toast((j && j.error) || 'eBay n’a pas répondu — rien n’a changé, réessaie.');
+    signalerComptesEbay(); relire();
+  };
+  const relierEbay = async (c) => {
+    setEbayEnCours((m) => ({ ...m, [c.ref]: 'relier' }));
+    try {
+      const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'authurl', state: 'vrm', ...(c.principal ? {} : { ajout: true }) }) });
+      const j = await r.json();
+      if (j && j.ok && j.url) { window.location.href = j.url; return; }
+      toast((j && j.error) || 'Impossible de démarrer la connexion à eBay — réessaie.');
+    } catch (_) { toast('Impossible de démarrer la connexion à eBay — réessaie.'); }
+    setEbayEnCours((m) => { const n = { ...m }; delete n[c.ref]; return n; });
+  };
+  const delierEbay = async (c) => {
+    const nom = nomCompteLie(c);
+    const tR = texteReglesQuiRestent(await compterReglesEbay(await lireComptesEbay(), c.ref), 'deconnecter');
+    const ok = await askConfirm({ title: `Délier « ${nom} » ?`, desc: `VRM ne lira plus ses annonces ni ses ventes, et ne publiera plus rien dessus. Ses annonces restent en ligne sur eBay.${tR ? `\n\n${tR}` : ''}`, ok: 'Délier', cancel: 'Annuler', danger: true });
+    if (!ok) return;
+    setEbayEnCours((m) => ({ ...m, [c.ref]: 'delier' }));
+    const { j } = await appelEbay({ action: 'deconnecter', confirme: true, ...(c.principal ? {} : { compte: c.cle }) });
+    setEbayEnCours((m) => { const n = { ...m }; delete n[c.ref]; return n; });
+    if (!(j && j.ok)) toast((j && j.error) || 'Je n’ai pas pu le délier — rien n’a changé, réessaie.');
+    signalerComptesEbay(); relire();
+  };
+  const groupe = (plateforme, liste, carte) => (liste === undefined ? null
+    : <GroupeComptes key={plateforme} plateforme={plateforme} n={Array.isArray(liste) && liste.length ? liste.length : null} pasSu={liste === null} onRelire={relire}
+        enfants={liste.length ? liste.map(carte) : <div className="vrm-cl-vide" data-comptes-vide={plateforme}>{ouvrir(plateforme)}</div>}/>);
+  return (<>
+    {groupe('vestiaire', lu.vestiaire, (c) => {
+      const etat = etatCompteLie({ ouvert: c.ouvert, lu: c.lu, maintenant });
+      return <CarteCompteLie key={c.id} plateforme="vestiaire" id={c.id} nom={nomCompteLie(c)} etat={etat} age={ageLecture(c.lu, maintenant)}
+        inclus={!estExclu(exclus, 'vestiaire', c.id)} onInclus={() => basculer('vestiaire', c.id)} action={ouvrir('vestiaire')}/>;
+    })}
+    {groupe('leboncoin', lu.leboncoin, (c) => {
+      const etat = etatCompteLie({ ouvert: c.ouvert, lu: c.lu, maintenant });
+      return <CarteCompteLie key={c.id} plateforme="leboncoin" id={c.id} nom={nomCompteLie(c)} etat={etat} age={ageLecture(c.lu, maintenant)} type={c.type}
+        inclus={!estExclu(exclus, 'leboncoin', c.id)} onInclus={() => basculer('leboncoin', c.id)} action={ouvrir('leboncoin')}/>;
+    })}
+    {groupe('ebay', lu.ebay, (c) => {
+      const etat = etatCompteLie({ delie: c.delie, lu: c.lu, maintenant });
+      const enCours = ebayEnCours[c.ref];
+      const action = c.delie
+        ? <Bouton className="vrm-cl-bouton" data-compte-action="relier" disabled={!!enCours} onClick={() => relierEbay(c)}>{enCours ? '…' : 'Relier'}</Bouton>
+        : <Bouton className="vrm-cl-bouton" data-compte-action="relire" disabled={!!enCours} onClick={() => relireEbay(c)}>{enCours === 'relire' ? '…' : 'Relire'}</Bouton>;
+      const secondaire = c.delie ? null : <Bouton variante="discret" className="vrm-cl-bouton" data-compte-action="delier" disabled={!!enCours} onClick={() => delierEbay(c)}>{enCours === 'delier' ? '…' : 'Délier'}</Bouton>;
+      return <CarteCompteLie key={c.ref} plateforme="ebay" id={c.ref} nom={nomCompteLie(c)} etat={etat} age={ageLecture(c.lu, maintenant)} type={c.type}
+        inclus={c.delie ? null : !estExclu(exclus, 'ebay', c.ref)} onInclus={() => basculer('ebay', c.ref)} action={action} secondaire={secondaire}/>;
+    })}
+  </>);
+}
+
 /* ── Comptes Vinted liés (gestion des comptes uniquement) ───────────────
    Cet écran ne sert plus qu'à GÉRER les comptes liés (les capturés par
    l'extension) : les lister, les renommer, tester la connexion, resynchroniser.
@@ -34083,197 +34235,68 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
     toast('Tous les comptes sont réaffichés — rouvre l\'onglet Annonces');
   };
 
+  // (3 nov.) Les comptes des autres plateformes, sur le même écran (« Comptes liés »).
+  const [autres, relireAutres] = useComptesAutresSites();
+  const ouvertChrome = (() => { const v = vintedDeChrome(); return v && v.uid ? String(v.uid) : ''; })();
+  const santes = accounts.map(acctHealth);
+  const nbActifs = santes.filter(s=>s.etat==='ok').length, nbBannis = santes.filter(s=>s.etat==='bad').length;
+  const carteVinted = (acc) => {
+    const uid = String(acc.vinted_user_id);
+    const h = acctHealth(acc);
+    const ev = etatExt && etatExt[uid];
+    const pro = ev && typeof ev.pro === 'boolean' ? ev.pro : (typeof typesProfil[uid] === 'boolean' ? typesProfil[uid] : null);
+    let etat = etatCompteLie({ banni: h.etat === 'bad' && h.source === 'extension', ouvert: ouvertChrome === uid, lu: lastCap[uid] || null });
+    if (h.etat === 'bad' && h.source !== 'extension' && (etat === 'lu' || etat === 'ouvert')) etat = 'a-relire';
+    const r = reput[uid];
+    const nomAff = accountName(acc);
+    return (
+      <CarteCompteLie key={uid} plateforme="vinted" id={uid} nom={nomAff} photo={photosProfil[uid] || ''} etat={etat} age={ageLecture(lastCap[uid], Date.now())}
+        type={pro == null ? '' : pro ? 'pro' : 'particulier'} inclus={!hiddenAccts.has(uid)} onInclus={() => toggleAcctCompta(acc.vinted_user_id)}
+        etatVinted={{ etat: h.etat === 'bad' ? 'banni' : h.etat === 'exclu' ? 'masque' : 'actif', source: h.source || '', hint: h.hint }}
+        action={<a className="vrm-b vrm-b-discret vrm-cl-bouton" href={`https://www.vinted.fr/member/${encodeURIComponent(uid)}`} target="_blank" rel="noreferrer" data-compte-action="ouvrir">Ouvrir</a>}
+        enfants={(
+          <details data-gerer-compte="" className="vrm-cl-gerer">
+            <summary>Gérer</summary>
+            <div style={{display:'flex',flexDirection:'column',gap:8,paddingBottom:4}}>
+              <input defaultValue={labels[acc.vinted_user_id] || ''} placeholder={acc.login || `#${uid}`} aria-label="Nom affiché"
+                onBlur={(e) => { const v = e.target.value.trim(); const u = { ...labels, [acc.vinted_user_id]: v }; if (!v) delete u[acc.vinted_user_id]; setLabels(u); save('vinted_account_labels', u); }}
+                style={{width:'100%',maxWidth:320,boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',fontSize:15,fontFamily:'inherit',background:C.surface,color:C.text}}/>
+              <input value={acctEmails[uid] || ''} onChange={e=>setAcctEmail(acc.vinted_user_id, e.target.value)} placeholder="Email du compte" aria-label="Email du compte"
+                style={{width:'100%',maxWidth:320,boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',fontSize:15,fontFamily:'inherit',background:C.surface,color:C.text}}/>
+              <input type="tel" inputMode="tel" value={acctPhones[uid] || ''} onChange={e=>setAcctPhone(acc.vinted_user_id, e.target.value)} placeholder="Téléphone du compte" aria-label="Téléphone du compte"
+                style={{width:'100%',maxWidth:320,boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',fontSize:15,fontFamily:'inherit',background:C.surface,color:C.text}}/>
+              {(()=>{ const n=telNorm(acctPhones[uid]); if(n.length<9) return null;
+                const autresT=(accounts||[]).filter(o=>String(o.vinted_user_id)!==uid && telNorm(acctPhones[String(o.vinted_user_id)])===n).map(o=>labels[String(o.vinted_user_id)]||o.login||`#${o.vinted_user_id}`);
+                return autresT.length ? <div style={{fontSize:13,color:C.warn}}>Ce numéro sert aussi sur {autresT.join(', ')}.</div> : null; })()}
+              {r && (r.rating != null || r.count != null) && <div style={{fontSize:13,color:C.muted}}>{r.rating != null ? `${(r.rating*5).toFixed(2)}/5` : ''}{r.rating != null && r.count != null ? ' · ' : ''}{r.count != null ? `${r.count} avis` : ''}{r.neg > 0 ? ` · ${r.neg} négatif${r.neg>1?'s':''}` : ''}</div>}
+              {retireesAnn[uid] && <span data-annonces-retirees={uid} style={{fontSize:13,color:C.muted}}>Annonces retirées · <button type="button" className="vrm-lien-action" onClick={()=>remettreAnnonces(acc)} style={{border:'none',background:'transparent',color:C.accent,fontWeight:600,cursor:'pointer',padding:0,minHeight:44,fontFamily:'inherit',fontSize:'inherit'}}>Les remettre</button></span>}
+              {retiresMsg[uid] && <span data-messages-retires={uid} style={{fontSize:13,color:C.muted}}>Messages retirés · <button type="button" className="vrm-lien-action" onClick={()=>remettreMessages(acc)} style={{border:'none',background:'transparent',color:C.accent,fontWeight:600,cursor:'pointer',padding:0,minHeight:44,fontFamily:'inherit',fontSize:'inherit'}}>Les remettre</button></span>}
+              <Bouton variante="discret" icone="trash" onClick={()=>ouvrirSuppression(acc)}>Supprimer des données…</Bouton>
+            </div>
+          </details>
+        )}/>
+    );
+  };
+
   return (
-    <div style={{padding:'16px 14px 40px'}}>
+    <div className="vrm-cl-ecran vrm-fu-ecran" data-comptes-lies="">
       {onRetour && <Bouton variante="discret" className="vrm-settings-back" onClick={onRetour}>‹ Paramètres</Bouton>}
-      <GuideReglage titre="Relier et vérifier un compte" etapes={[
-        ['Connecte ton compte', 'Ouvre Vinted avec l’extension VRM active, puis actualise cette liste.'],
-        ['Vérifie son identité', 'Contrôle le pseudo et associe l’adresse qui reçoit les emails de ce compte.'],
-        ['Consulte ses données', 'Ses annonces, ventes et messages se trouvent dans les onglets Vinted.']
-      ]}/>
-      {vintedPris && (
-        <div data-vinted-pris={vintedPris.uid} style={{border:`1px solid ${C.warn}`,background:`${C.warn}14`,borderRadius:10,padding:'12px 13px',marginBottom:14}}>
-          <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>
-            Ce compte Vinted est déjà rattaché à un autre compte VRM
-          </div>
-          <div style={{fontSize:12,color:C.muted,lineHeight:1.5}}>
-            Le compte {vintedPris.login ? <b style={{color:C.text}}>{vintedPris.login}</b> : 'Vinted'} ouvert dans ton navigateur appartient déjà à un autre compte VRM. Un compte Vinted ne peut servir que sur <b style={{color:C.text}}>un seul</b> compte VRM : VRM ne captera donc rien pour lui ici. Pour l'utiliser, connecte-toi sur Vinted avec un autre compte, ou ouvre VRM avec le compte qui le possède déjà.
-          </div>
-        </div>
-      )}
+      <ScreenHead icon="link" title="Comptes liés"
+        right={<Bouton icone="sync" className="vrm-b-petit" onClick={()=>{ refreshAccounts(); relireAutres(); }}>{loading ? '…' : 'Actualiser'}</Bouton>}/>
+      {vintedPris && <div className="vrm-cl-alerte" data-vinted-pris={vintedPris.uid}>{vintedPris.login || 'Ce compte Vinted'} est déjà relié à un autre compte VRM — ouvre Vinted sur un autre compte.</div>}
       {nbExclus > 0 && (
-        <div style={{border:`1px solid ${C.warn}`,background:`${C.warn}14`,borderRadius:10,padding:'12px 13px',marginBottom:14}}>
-          <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>
-            {nbExclus} compte{nbExclus>1?'s':''} {nbExclus>1?'sont exclus':'est exclu'} de l'application
-          </div>
-          <div style={{fontSize:12,color:C.muted,lineHeight:1.5,marginBottom:9}}>
-            Leurs annonces, leurs ventes et leurs achats n'apparaissent nulle part — ni dans les onglets, ni dans les totaux.
-            {(retires && retires.logins && retires.logins.length)
-              ? ` Retiré${retires.logins.length>1?'s':''} : ${retires.logins.join(', ')}.` : ''}
-          </div>
+        <div className="vrm-cl-alerte">
+          <span>{nbExclus} compte{nbExclus>1?'s':''} Vinted masqué{nbExclus>1?'s':''}</span>
           <Bouton data-tout-reafficher onClick={toutAfficher} disabled={remise}>{remise ? '…' : 'Tout réafficher'}</Bouton>
         </div>
       )}
-      <ScreenHead icon="link" title="Comptes Vinted liés"
-        desc="Ceux que l'extension Chrome capte quand tu navigues sur Vinted. Annonces, ventes, achats et messages se consultent dans leurs onglets."
-        right={<Bouton icone="sync" className="vrm-b-petit" onClick={refreshAccounts} title="Recharge la liste des comptes captés par l'extension">{loading ? '…' : 'Actualiser'}</Bouton>}/>
-
-      {/* ⚠️ « Aucun compte détecté · installe l'extension » à quelqu'un qui en a
-          NEUF : c'est ce que cet écran affichait quand la base ne répondait pas.
-          Et ce n'était pas seulement faux, c'était une consigne à ne SURTOUT
-          pas suivre — réinstaller l'extension ne répare pas une panne de
-          lecture. Une liste vide parce qu'on n'a pas pu lire n'est pas une
-          liste vide. */}
-      {accounts.length === 0 && (baseKO
-        ? <LignePanne>Je n'ai pas pu lire la liste de tes comptes — elle est vide parce que la lecture a échoué, pas parce qu'aucun compte n'est lié. Rien n'est perdu.</LignePanne>
-        : (
-        <div style={{padding:16,borderRadius:10,background:C.card,border:`1px solid ${C.border}`,fontSize:13,color:C.muted,lineHeight:1.5}}>
-          Aucun compte détecté pour l'instant. Installe l'extension VRM,
-          connecte-toi sur vinted.fr, puis clique sur « Actualiser ».
-        </div>
-      ))}
-
-      {/* Diagnostic global : combien de comptes à jour / à rafraîchir / bloqués. */}
-      {accounts.length > 0 && (()=>{
-        const st = accounts.map(acctHealth);
-        // ⚠️ ON NE COMPTE QUE LES COMPTES QUI SONT DANS L'APP. Les exclus ont
-        //    leur mention à part, en gris : ils ne sont ni « à jour » ni « en
-        //    panne », ils sont ailleurs. Les mêler aux autres, c'était annoncer
-        //    « 2 en panne » pour une panne réelle et un choix assumé.
-        const ok    = st.filter(s=>s.etat==='ok').length;
-        const warn  = st.filter(s=>s.etat==='warn'||s.etat==='inconnu').length;
-        const bad   = st.filter(s=>s.etat==='bad').length;
-        const exclu = st.filter(s=>s.etat==='exclu').length;
-        return (
-          <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center',padding:'9px 12px',border:`1px solid ${C.border}`,borderRadius:10,background:C.card,marginBottom:14,fontSize:13,fontWeight:600}}>
-            <span style={{color:C.text}}>Tes comptes :</span>
-            <span data-comptes-actifs={ok} style={{display:'inline-flex',alignItems:'center',gap:4,color:C.text}}>{ok>0 && <Icon name="check" size={13}/>}{ok} actif{ok>1?'s':''}</span>
-            {warn>0 && <span data-comptes-non-verifies={warn} style={{display:'inline-flex',alignItems:'center',gap:4,color:C.muted,fontWeight:500}}>· {warn} pas encore vérifié{warn>1?'s':''}</span>}
-            {bad>0 && <span data-comptes-bannis={bad} style={{display:'inline-flex',alignItems:'center',gap:4,color:C.warn}}><Icon name="alert" size={13}/>{bad} banni{bad>1?'s':''} par Vinted</span>}
-            {exclu>0 && <span style={{display:'inline-flex',alignItems:'center',gap:4,color:C.muted}}><Icon name="eyeOff" size={13}/>{exclu} masqué{exclu>1?'s':''} — ton choix</span>}
-          </div>
-        );
-      })()}
-
-      {accounts.length > 0 && (
-        <div style={{display:'flex',flexDirection:'column',gap:10}}>
-          {accounts.map(acc => {
-            return (
-              <div key={acc.vinted_user_id} style={{borderRadius:10,border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',padding:'14px 16px',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:10}}>
-                <div style={{display:'flex',alignItems:'center',gap:12,minWidth:0}}>
-                  <span data-compte-photo={photosProfil[String(acc.vinted_user_id)] ? 'oui' : 'non'} style={{width:40,height:40,flexShrink:0,borderRadius:999,overflow:'hidden',background:C.border,color:C.text,display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,fontWeight:700}}>
-                    {photosProfil[String(acc.vinted_user_id)]
-                      ? <PhotoVinted src={photosProfil[String(acc.vinted_user_id)]} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
-                      : accountName(acc).slice(0,1).toUpperCase()}
-                  </span>
-                  <div style={{minWidth:0}}>
-                    {editingLabel === acc.vinted_user_id ? (
-                      <div style={{display:'flex',gap:6,alignItems:'center'}}>
-                        <input autoFocus value={labelDraft} onChange={e=>setLabelDraft(e.target.value)}
-                          onKeyDown={e=>{ if(e.key==='Enter') commitLabel(acc); if(e.key==='Escape') setEditingLabel(null); }}
-                          placeholder={acc.login || `Compte #${acc.vinted_user_id}`}
-                          style={{fontSize:15,fontWeight:600,color:C.text,background:C.surface,border:`1px solid ${C.accent}`,borderRadius:8,padding:'3px 8px',width:170}}/>
-                        <button type="button" onClick={()=>commitLabel(acc)} style={{background:C.accent,color:C.onAccent,border:'none',borderRadius:8,padding:'4px 8px',cursor:'pointer',fontSize:11,fontWeight:500}}>OK</button>
-                      </div>
-                    ) : (
-                      <div style={{display:'flex',gap:6,alignItems:'center',cursor:'pointer'}} onClick={()=>startEditLabel(acc)} title="Cliquer pour renommer">
-                        <div className="vrm-sensible" style={{fontWeight:600,color:C.text,fontSize:15,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{accountName(acc)}</div>
-                        <span style={{color:C.muted,display:'inline-flex'}}><Icon name="pencil" size={12}/></span>
-                      </div>
-                    )}
-                    <div style={{fontSize:11,color:C.muted,marginTop:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                      {acc.login && acc.login !== accountName(acc) ? `@${acc.login} · ` : ''}
-                      {/* ⚠️ « maj » est de l'abréviation d'informaticien (§7), et
-                          l'heure À LA SECONDE ne sert à rien : on lit cette ligne
-                          pour savoir si c'est frais, pas pour horodater. */}
-                      {/* (20 oct., audit sur données réelles) « lié le » lisait
-                          `updated_at` — la date du dernier RENOUVELLEMENT des
-                          jetons (§4.3 : `updated_at` ment) : ses sept comptes,
-                          liés en juillet et août, se disaient « liés le
-                          20/10/2026 ». La date de liaison est `created_at`. */}
-                      {acc.created_at ? `lié le ${new Date(acc.created_at).toLocaleDateString('fr-FR')}` : 'date de liaison inconnue'}
-                    </div>
-                    {(()=>{ const h=acctHealth(acc); return (<>
-                      <div data-etat-compte={h.etat==='bad'?'banni':h.etat==='exclu'?'masque':'actif'} data-etat-source={h.source||''} title={h.hint} style={{display:'inline-flex',alignItems:'center',gap:5,marginTop:4,fontSize:11,fontWeight:600,color:h.color,background:h.etat==='ok'?C.bg:`${h.color}14`,border:`1px solid ${h.etat==='ok'?C.border:h.color+'44'}`,borderRadius:8,padding:'2px 9px'}}><Icon name={h.ic} size={12}/>{h.label}</div>
-                      {h.ago && <span style={{fontSize:11,color:C.muted,marginLeft:8}}>{h.ago}</span>}
-                      {(() => {
-                        // Pro / particulier : ce que l'extension a publié d'abord
-                        // (`panel_comptes_etat`, 5.185), sinon le profil capté —
-                        // la même règle. Pas su ⇒ rien (jamais « particulier » par défaut).
-                        const uid = String(acc.vinted_user_id);
-                        const ev = etatExt && etatExt[uid];
-                        const pro = ev && typeof ev.pro === 'boolean' ? ev.pro : (typeof typesProfil[uid] === 'boolean' ? typesProfil[uid] : null);
-                        if (pro == null) return null;
-                        return <span data-type-compte={pro ? 'pro' : 'particulier'} title={pro ? 'Compte Vinted Pro : Vinted t\'envoie les coordonnées de l\'acheteur, une facture est possible.' : 'Compte particulier : Vinted ne transmet pas les coordonnées de l\'acheteur, aucune facture n\'est faite.'}
-                          style={{display:'inline-flex',alignItems:'center',marginTop:4,marginLeft:8,fontSize:11,fontWeight:600,color:C.text,border:`1px solid ${C.border}`,borderRadius:8,padding:'2px 8px'}}>{pro ? 'Pro' : 'Particulier'}</span>;
-                      })()}
-                    </>); })()}
-                    {(()=>{ const r=reput[String(acc.vinted_user_id)]; if(!r||(r.rating==null&&r.count==null)) return null; const stars=r.rating!=null?(r.rating*5):null; return (
-                      <div style={{fontSize:12,marginTop:3,fontWeight:600,color:C.warn}} title="Note vendeur et nombre d'avis (Vinted)">
-                        {stars!=null?<>⭐ {stars.toFixed(2)}/5</>:''}
-                        {stars!=null&&r.count!=null?' · ':''}
-                        {r.count!=null?<span style={{color:C.muted,fontWeight:500}}>{r.count} avis</span>:''}
-                        {r.neg>0?<span style={{color:C.danger,fontWeight:500}}> · {r.neg} négatif{r.neg>1?'s':''}</span>:''}
-                      </div>
-                    ); })()}
-                  </div>
-                </div>
-                <details data-gerer-compte="" style={{flex:'1 1 100%'}}>
-                  <summary style={{cursor:'pointer',fontSize:12,fontWeight:600,color:C.muted,padding:'2px 0',display:'flex',alignItems:'center'}}>Gérer ce compte</summary>
-                  <div style={{paddingTop:8}}>
-                    <input
-                      value={acctEmails[String(acc.vinted_user_id)] || ''}
-                      onChange={e=>setAcctEmail(acc.vinted_user_id, e.target.value)}
-                      placeholder="Email du compte"
-                      title="L'adresse à laquelle Vinted écrit pour ce compte. Permet d'attribuer automatiquement les emails (ventes, bordereaux) au bon compte."
-                      style={{marginTop:6,width:'100%',maxWidth:280,boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 9px',fontSize:12,fontFamily:'inherit',background:C.surface,color:C.text,outline:'none'}}
-                      onFocus={e=>e.target.style.borderColor=C.accent}
-                      onBlur={e=>e.target.style.borderColor=C.border}
-                    />
-                    <input
-                      type="tel" inputMode="tel"
-                      value={acctPhones[String(acc.vinted_user_id)] || ''}
-                      onChange={e=>setAcctPhone(acc.vinted_user_id, e.target.value)}
-                      placeholder="Téléphone du compte"
-                      title="Le numéro utilisé pour ce compte Vinted. Si tu le mets aussi sur un autre compte, l'app te le signale."
-                      style={{display:'block',marginTop:6,width:'100%',maxWidth:280,boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 9px',fontSize:12,fontFamily:'inherit',background:C.surface,color:C.text,outline:'none'}}
-                      onFocus={e=>e.target.style.borderColor=C.accent}
-                      onBlur={e=>e.target.style.borderColor=C.border}
-                    />
-                    {(()=>{ const n=telNorm(acctPhones[String(acc.vinted_user_id)]); if(n.length<9) return null;
-                      const autres=(accounts||[]).filter(o=>String(o.vinted_user_id)!==String(acc.vinted_user_id) && telNorm(acctPhones[String(o.vinted_user_id)])===n).map(o=>labels[String(o.vinted_user_id)]||o.login||`#${o.vinted_user_id}`);
-                      return autres.length ? <div style={{fontSize:11,color:C.warn,marginTop:3}}>Ce numéro sert aussi sur {autres.join(', ')}.</div> : null; })()}
-                  <div style={{marginTop:8}}>
-                <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-                  {(() => { const off = hiddenAccts.has(String(acc.vinted_user_id)); return (
-                    <button type="button" onClick={()=>toggleAcctCompta(acc.vinted_user_id)} title={off?'Ce compte est MASQUÉ : ses annonces et ses ventes/achats n’apparaissent nulle part (annonces + compta). Idéal pour un compte bloqué ou fermé.':'Ce compte est ACTIF : ses annonces et sa compta sont visibles. Clique pour le masquer partout (compte bloqué/fermé).'}
-                      style={{background:off?'transparent':`${C.accent}14`,border:`1px solid ${off?C.border:C.accent}`,borderRadius:8,padding:'5px 12px',cursor:'pointer',fontSize:11,fontWeight:500,color:off?C.muted:C.accent}}>
-                      {off ? <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="eyeOff" size={12}/>Masqué (annonces + compta)</span>
-                           : <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="check" size={12}/>Actif</span>}
-                    </button>
-                  ); })()}
-                  {retireesAnn[String(acc.vinted_user_id)] && (
-                    <span data-annonces-retirees={String(acc.vinted_user_id)} style={{display:'inline-flex',alignItems:'center',gap:6,fontSize:11,color:C.muted}}>
-                      <Icon name="eyeOff" size={12}/>Annonces retirées
-                      <button type="button" className="vrm-lien-action" onClick={()=>remettreAnnonces(acc)} style={{border:'none',background:'transparent',color:C.accent,fontSize:11,fontWeight:600,cursor:'pointer',padding:0,fontFamily:'inherit'}}>Les remettre</button>
-                    </span>
-                  )}
-                  {retiresMsg[String(acc.vinted_user_id)] && (
-                    <span data-messages-retires={String(acc.vinted_user_id)} style={{display:'inline-flex',alignItems:'center',gap:6,fontSize:11,color:C.muted}}>
-                      <Icon name="eyeOff" size={12}/>Messages retirés
-                      <button type="button" className="vrm-lien-action" onClick={()=>remettreMessages(acc)} style={{border:'none',background:'transparent',color:C.accent,fontSize:11,fontWeight:600,cursor:'pointer',padding:0,fontFamily:'inherit'}}>Les remettre</button>
-                    </span>
-                  )}
-                  <Bouton variante="discret" icone="trash" onClick={()=>ouvrirSuppression(acc)} title="Supprimer les données de ce compte — tu choisis quoi effacer (annonces, ventes, achats, messages, le compte). Récupérable en reconnectant l'extension.">Supprimer des données…</Bouton>
-                </div>
-                  </div>
-                  </div>
-                </details>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      <GroupeComptes plateforme="vinted" n={accounts.length || null} attrs={{ 'data-comptes-actifs': nbActifs, 'data-comptes-bannis': nbBannis }}
+        enfants={accounts.length === 0
+          ? (baseKO
+            ? <LignePanne>Je n'ai pas pu lire la liste de tes comptes — elle est vide parce que la lecture a échoué, pas parce qu'aucun compte n'est lié. Rien n'est perdu.</LignePanne>
+            : <div className="vrm-cl-vide" data-comptes-vide="vinted"><a className="vrm-b vrm-b-discret vrm-cl-bouton" href={URL_SITE_COMPTE.vinted} target="_blank" rel="noreferrer">Ouvrir Vinted</a></div>)
+          : accounts.map(carteVinted)}/>
+      <ComptesAutresSites lu={autres} relire={relireAutres}/>
 
       {/* ── MODALE : SUPPRIMER LES DONNÉES D'UN COMPTE (ciblé, récupérable) ──── */}
       {delCible && (()=>{ const acc = delCible;
