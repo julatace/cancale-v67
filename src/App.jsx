@@ -61,6 +61,7 @@ import {centimes,coutsVente,beneficePaire,champsCharges} from "./beneficePaire.j
 import CoutsVente from "./CoutsVente.jsx";
 import { boostRentable, SEUIL_BOOST } from "./boostRentable.js";
 import { CLE_WIDGETS_JOURNEE, WIDGETS_JOURNEE, NOM_TAILLE, DISPO_JOURNEE_DEFAUT, normaliserDispoJournee, deplacerWidget, retirerWidget, widgetFixe, tailleSuivante, tailleDefautWidget, caseVisible, widgetsAjoutables, dispoAEnregistrer } from "./journeeWidgets.js";
+import { classementRapporte, modeleSur, releveVentes } from "./ceQuiRapporte.js";
 import { rythmeVendu, ecartPct, quandTuVends, margesPar, delaisPar, tranchePrix, TRANCHES_PRIX, stockQuiDort, SEUILS_DORT, rotationStock, tauxVenteMois, tauxAnnulation, PERIODES, bornesPeriode, dansBornes, venduPeriode, barresPeriode, ventesPar, plusRapides } from "./statsVentes.js";
 import "./stats-vitrine.css";
 import {appelerFavorisDirect} from './favorisTransport.js';
@@ -37331,7 +37332,7 @@ function useReleveStats() {
       const [plateforme, compte, id, ts, eur, achat, frais, titre] = r;
       const t = plateforme === 'Vinted' && x.txn && id ? x.txn[String(id)] : null;
       const it = t && t.item && x.items ? x.items[t.item] : null;
-      return { plateforme, compte, id, ts, eur, achat, frais, ...clesVenteStats(titre, it), enLigne: it ? dateMiseEnLigneMs(it, x.dates || null) : null };
+      return { plateforme, compte, id, ts, eur, achat, frais, titre, ...clesVenteStats(titre, it), modeleSur: modeleSur((it && it.brand) || '', titre), enLigne: it ? dateMiseEnLigneMs(it, x.dates || null) : null };
     });
   }, [releve, extras]);
   return { releve, stock, benef, extras, lignes };
@@ -46014,25 +46015,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // partout) : Ma journée et Ventes le reposent à chaque lecture complète.
       // Une ligne : [plateforme, compte, tx|id, ts, vente €, achat € | null,
       // frais € | null, titre].
-      const releve = [];
-      for (const o of sales.items) {
-        if (isHidden(o) || classifyOrderStatus(o.status) !== 'completed') continue;
-        const t = o.date ? Date.parse(o.date) : NaN;
-        if (isNaN(t) || new Date(t).getFullYear() < an0) continue;
-        const e = effEntry(o);
-        const v = montantCommande(o);
-        releve.push(['Vinted', String((o._acc && (o._acc.login || o._acc.vinted_user_id)) || ''), String(o.transaction_id || ''), t, v, achatDe(e), chargesVente(e), String(o.title || '').slice(0, 90)]);
-      }
+      // (3 nov.) La construction vit dans `releveVentes` (src/ceQuiRapporte.js),
+      // inchangée, pour que l'audit « Ce qui rapporte » l'EXÉCUTE.
       // Le titre d'une vente Leboncoin ou eBay : celui de LA vente, retrouvée par
       // SON identifiant (transaction, commande) — jamais pour relier une paire,
       // seulement pour en lire la marque, le modèle et la taille.
       const titreDe = {};
       for (const v of ((lbcVentes && lbcVentes.ventes) || [])) if (v && v.txId) titreDe['lbc:' + v.txId] = v.title || '';
       for (const c of (ebayCmd || [])) if (c && c.orderId) titreDe['ebay:' + c.orderId] = (Array.isArray(c.lineItems) && c.lineItems[0] && c.lineItems[0].title) || '';
-      for (const x of autresBenefice) {
-        if (!isFinite(x.ts) || new Date(x.ts).getFullYear() < an0) continue;
-        releve.push([x.plateforme, '', x.id, x.ts, x.eur, x.achat, x.frais, String(titreDe[x.id] || '').slice(0, 90)]);
-      }
+      const releve = releveVentes({ vinted: sales.items, estMasquee: isHidden, estFinalisee: (o) => classifyOrderStatus(o.status) === 'completed', an0,
+        montant: montantCommande, achat: (o) => achatDe(effEntry(o)), frais: (o) => chargesVente(effEntry(o)),
+        compte: (o) => (o._acc && (o._acc.login || o._acc.vinted_user_id)) || '', autres: autresBenefice, titreDe });
       const r0 = load('vrm_stats_ventes', null);
       if (!(r0 && JSON.stringify(r0.l) === JSON.stringify(releve))) save('vrm_stats_ventes', { v: 1, l: releve, at: Date.now() });
     } catch (_) {}
