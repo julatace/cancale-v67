@@ -167,6 +167,9 @@ async function ouvrirVente(pg, tx) {
       // (20 oct.) Vente « une ligne » (#596-#598) : le bouton vit dans la vente ouverte.
       await ouvrirVente(pg, '9001'); 
       try { await pg.locator('[data-bouton-bord="pdf"][data-tx="9001"]:visible').first().click({ timeout: 5000 }); } catch (e) { dit(false, 'le bouton se clique', String(e.message).slice(0, 90)); }
+      // (3 nov.) Une forme de bordereau jamais vue ouvre d'abord l'aperçu du tampon
+      // (`PlaceurTampon`) : on garde le choix de VRM et on imprime.
+      if (await pg.waitForSelector('[data-placeur-tampon="pret"],[data-placeur-tampon="ko"]', { timeout: 8000 }).then(() => true, () => false)) await pg.locator('[data-tampon-imprimer]').click().catch(() => {});
       await pg.waitForTimeout(2500);
       // 26 oct. : « sur ordi les bordereaux sont bègues et ne s'ouvrent pas ». L'onglet
       // vide réservé au clic cachait la confirmation et se refermait tout seul.

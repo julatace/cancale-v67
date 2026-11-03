@@ -146,6 +146,8 @@ async function rendre(b, version) {
       r.ctx.on('page', (p) => onglets.push(p));
       r.pg.on('download', (d) => telecharges.push(d.suggestedFilename()));
       try { await r.pg.click('[data-imprime-lbc="A1"]', { timeout: 5000 }); } catch (e) { dit(false, 'le bouton « Imprimer » du colis existe', String(e.message).slice(0, 80)); }
+      // (3 nov.) Forme jamais vue : l'aperçu du tampon s'ouvre d'abord ; on garde le choix de VRM.
+      if (await r.pg.waitForSelector('[data-placeur-tampon="pret"],[data-placeur-tampon="ko"]', { timeout: 8000 }).then(() => true, () => false)) await r.pg.click('[data-tampon-imprimer]').catch(() => {});
       await r.pg.waitForTimeout(2500);
       dit(r.appels.length === 1 && r.appels[0] === VOUCHER, 'le pont est appelé avec l’adresse EXACTE du bordereau de CE colis', JSON.stringify(r.appels));
       // 26 oct. : le PDF s'ouvre DANS VRM (visionneuse), plus dans un onglet réservé.

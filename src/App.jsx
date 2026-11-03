@@ -20418,7 +20418,7 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
             <a href={bordResult.url} target="_blank" rel="noreferrer" style={{ display: 'block', background: C.accent, color: C.onAccent, borderRadius: 10, padding: '13px 16px', fontSize: 15, fontWeight: 600, textDecoration: 'none', marginBottom: 8, textAlign: 'center' }}>📄 Ouvrir le bordereau</a>
             <TamponPose r={bordResult}/>
             {bordResult.thermique && <div data-lbc-thermique={bordResult.isoles>0?'isole':'entier'} style={{ fontSize: 12, color: C.muted, lineHeight: 1.45, marginBottom: 8 }}>{bordResult.isoles>0 ? <>Imprimante thermique : <b style={{color:C.text}}>l'étiquette seule, au format 10×15 cm</b>, ton N° en bas.</> : <>Imprimante thermique : je n'ai pas su repérer l'étiquette ({(bordResult.entiers&&bordResult.entiers[0]&&bordResult.entiers[0].raison)||'mise en page inconnue'}) — la page part entière, découpe-la à la main.</>}</div>}
-            {bordResult.pdfBuf && !(bordResult.thermique && bordResult.isoles>0) && <button type="button" data-imprime="1" data-tampon-deplacer="1" onClick={adjustBordPlacement} style={{ width: '100%', border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, cursor: 'pointer', fontSize: 13, fontWeight: 500, padding: '11px', marginBottom: 8, fontFamily: 'inherit' }}>Déplacer le tampon</button>}
+            {bordResult.pdfBuf && <button type="button" data-imprime="1" data-tampon-deplacer="1" onClick={adjustBordPlacement} style={{ width: '100%', border: `1px solid ${C.border}`, borderRadius: 10, background: 'transparent', color: C.text, cursor: 'pointer', fontSize: 13, fontWeight: 500, padding: '11px', marginBottom: 8, fontFamily: 'inherit' }}>Déplacer le tampon</button>}
             <button type="button" onClick={() => { if (bordResult.url) URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{ width: '100%', border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, fontWeight: 500, padding: '8px', fontFamily: 'inherit' }}>Fermer</button>
           </div>
         </div>
@@ -40210,6 +40210,7 @@ function PlaceurTamponFeuille({ q, fin }) {
   const [boite, setBoite] = React.useState(null);             // { x, y, w, v } en points
   const [libre, setLibre] = React.useState(false);
   const [toujours, setToujours] = React.useState(true);
+  const [raison, setRaison] = React.useState('');
   const etatRef = React.useRef({}); etatRef.current = { geo, boite, imgs };
   React.useEffect(() => {
     let vivant = true;
@@ -40242,7 +40243,7 @@ function PlaceurTamponFeuille({ q, fin }) {
       }
       if (!b) b = a || (images[0] ? { x: Math.max(0, (W - images[0].cw) / 2), y: Math.max(0, (H - images[0].ch) / 2), w: Math.min(W, images[0].cw), v: 0 } : null);
       setGeo({ W, H, ppt: largeur / W }); setAuto(a); setImgs(images); setCodes(zones); setBoite(b); setLibre(lib); setEtat(b ? 'pret' : 'ko');
-    })().catch(() => { if (vivant) setEtat('ko'); });
+    })().catch((e) => { if (vivant) { setEtat('ko'); setRaison(String((e && e.message) || e).slice(0, 120)); } });
     return () => { vivant = false; };
   }, [q]);
   const img = boite && imgs[boite.v];
@@ -40303,7 +40304,7 @@ function PlaceurTamponFeuille({ q, fin }) {
   const h = boite ? hDe(boite) : 0;
   const surCode = !!boite && !fiche && recouvreTampon(codes, { x: boite.x, y: boite.y, w: boite.w, h });
   const ppt = geo ? geo.ppt : 1;
-  return createPortal(<div data-placeur-tampon={etat} data-forme={q.forme && q.forme.cle} data-noswipe="1" role="dialog" aria-modal="true" aria-label="Place du tampon"
+  return createPortal(<div data-placeur-tampon={etat} data-raison={raison || undefined} data-forme={q.forme && q.forme.cle} data-noswipe="1" role="dialog" aria-modal="true" aria-label="Place du tampon"
       className="vrm-tampon-voile" style={{ zIndex: Z_CONFIRMATION }} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); fin(null); } }}>
     <FermeAuRetour fermer={() => fin(null)}/>
     <div className="vrm-tampon-feuille" style={{ background: C.card, color: C.text }}>
@@ -55584,9 +55585,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{fontSize:13,color:C.muted,lineHeight:1.45,marginBottom:16}}>{bordResult.batch?<>Tous les bordereaux{bordResult.nInv>0?<> et <b>{bordResult.nInv} facture{bordResult.nInv>1?'s':''}</b> (comptes pro)</>:null} sont <b>à la suite dans un seul PDF</b> (le N° au même endroit sur chacun). {bordResult.printed?<>Ils sont <b>ouverts dans un nouvel onglet</b> : clique sur l'imprimante en haut à droite. Onglet pas ouvert ? Utilise le bouton ci-dessous.</>:<>Ouvre-le puis <b>Imprimer</b> — tu peux tout imprimer d'un coup.</>}</>:bordResult.printed?<>Le bordereau{bordResult.withInvoice?<> (avec <b>la facture</b>)</>:null} est <b>ouvert dans un nouvel onglet</b> : clique sur l'imprimante en haut à droite. Onglet pas ouvert ? Utilise le bouton ci-dessous.</>:<>{bordResult.withInvoice?<>Le PDF contient le <b>bordereau + la facture</b>. </>:null}Ouvre-le puis <b>Partager → Imprimer</b> (ou enregistre-le). Sur iPhone c'est le bouton de partage en bas.</>}</div>
             <a href={bordResult.url} target="_blank" rel="noreferrer"
               style={{display:'block',background:C.accent,color:C.onAccent,borderRadius:10,padding:'13px 16px',fontSize:15,fontWeight:600,textDecoration:'none',marginBottom:8}}>📄 {bordResult.batch?'Ouvrir les bordereaux':bordResult.withInvoice?'Ouvrir bordereau + facture':'Ouvrir le bordereau'}</a>
-            {/* Le placement est recalculé sur chaque PDF, sans position héritée. */}
-            {bordResult.pdfBuf && !bordResult.batch && !(bordResult.thermique && bordResult.isoles>0) && <button type="button" data-imprime="1" data-tampon-deplacer="1" onClick={adjustBordPlacement} style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:500,padding:'11px',marginBottom:8}}>Déplacer le tampon</button>}
-            {bordResult.batch && !bordResult.thermique && <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.4}}>Chaque PDF est tamponné séparément : zone libre, sinon bande sous le bordereau, sinon fiche colis juste après.</div>}
+            {/* (3 nov.) « Déplacer le tampon » : l'aperçu s'ouvre, la place choisie s'imprime (et se mémorise pour la forme). */}
+            {bordResult.pdfBuf && !bordResult.batch && <button type="button" data-imprime="1" data-tampon-deplacer="1" onClick={adjustBordPlacement} style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:10,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:500,padding:'11px',marginBottom:8}}>Déplacer le tampon</button>}
+            {bordResult.batch && !bordResult.thermique && <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.4}}>Chaque PDF est tamponné à la place gardée pour sa forme, sinon dans une zone libre, sinon sur une fiche colis juste après.</div>}
             {/* ── CE QUE L'IMPRESSION THERMIQUE A VRAIMENT FAIT ────────────────
                 LE CHIFFRE, JAMAIS LA PROMESSE. « Ton étiquette est prête » sur
                 un bordereau qu'on n'a pas su découper, c'est le défaut le plus
@@ -55604,7 +55605,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {ent.length>0 && <div>Je n'ai pas su repérer l'étiquette sur {ent.length===1?'ce bordereau':'ces bordereaux'} : {[...new Set(ent.map(e=>e.raison).filter(Boolean))].join(' · ')||'mise en page inconnue'}. {ent.length===1?'Il part':'Ils partent'} en A4 complet — découpe-{ent.length===1?'le':'les'} à la main, comme avant.</div>}
                 </div>
               ); })()}
-            <button type="button" onClick={()=>{ URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{width:'100%',border:'none',background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,fontWeight:500,padding:'8px'}}>Fermer</button>
+            <button type="button" data-bord-fermer="1" onClick={()=>{ URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{width:'100%',border:'none',background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,fontWeight:500,padding:'8px'}}>Fermer</button>
           </div>
         </div>
       )}

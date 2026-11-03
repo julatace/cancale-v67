@@ -39,7 +39,9 @@ const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '  ✅ ' : '
 
 // pdf.js du dépôt (ESM) remis en script classique `window.pdfjsLib`, comme le CDN.
 let esbuild; try { esbuild = require(path.join(NM, 'esbuild')); } catch (_) { esbuild = require('/home/claude/cancale-v67/node_modules/esbuild'); }
-const PDFJS = esbuild.buildSync({ entryPoints: [path.join(NM, 'pdfjs-dist', 'build', 'pdf.min.mjs')], bundle: true, format: 'iife', globalName: 'pdfjsLib', write: false, logLevel: 'error' }).outputFiles[0].text;
+const PDFJS = esbuild.buildSync({ entryPoints: [path.join(NM, 'pdfjs-dist', 'build', 'pdf.min.mjs')], bundle: true, format: 'iife', globalName: 'pdfjsLib', write: false, logLevel: 'error' }).outputFiles[0].text
+  // pdf.js 3.11 (celui de l'app) a `doc.destroy()` ; la version du dépôt ne l'a plus : rendu par la tâche.
+  + ';(function(){var g=pdfjsLib.getDocument,L=Object.assign({},pdfjsLib);L.getDocument=function(o){var t=g(o);return{promise:t.promise.then(function(d){if(typeof d.destroy!=="function")d.destroy=function(){return t.destroy();};return d;}),destroy:function(){return t.destroy();}};};window.pdfjsLib=L;})();';
 const WORKER = fs.readFileSync(path.join(NM, 'pdfjs-dist', 'build', 'pdf.worker.min.mjs'));
 
 const auj = new Date();
@@ -150,7 +152,7 @@ const VARIANTES = [{ tn: 18, tt: 8 }, { tn: 15, tt: 7 }, { tn: 12, tt: 6.5 }];
   await new Promise((o) => srv.listen(PORT, o));
   const nav = await chromium.launch({ executablePath: CHROME, args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   try {
-    for (const vp of [{ width: 390, height: 844, tactile: true }, { width: 1512, height: 950, tactile: false }]) {
+    for (const vp of [{ width: 390, height: 844, tactile: true }, { width: 1512, height: 950, tactile: false }].filter((v) => !process.env.BANC_VP || String(v.width) === process.env.BANC_VP)) {
       console.log(`── ${vp.width} px ${vp.tactile ? '(doigt)' : '(souris)'}`);
       const ctx = await nav.newContext({ viewport: { width: vp.width, height: vp.height }, ...(vp.tactile ? { isMobile: true, hasTouch: true } : {}) });
       const pg = await ctx.newPage();
@@ -185,14 +187,15 @@ const VARIANTES = [{ tn: 18, tt: 8 }, { tn: 15, tt: 7 }, { tn: 12, tt: 6.5 }];
       try { await cliquerImprimer(); } catch (e) { dit(false, 'le bouton « Imprimer » de la vente se clique', String(e.message).slice(0, 100)); await ctx.close(); continue; }
       // 1. L'aperçu.
       const pret = await pg.waitForSelector('[data-placeur-tampon="pret"]', { timeout: 25000 }).then(() => true, () => false);
-      dit(pret, 'forme jamais vue : « Imprimer » ouvre l\'aperçu du tampon (page rendue)', await pg.evaluate(() => (document.querySelector('[data-placeur-tampon]') || {}).outerHTML ? document.querySelector('[data-placeur-tampon]').getAttribute('data-placeur-tampon') : 'absent'));
+      dit(pret, 'forme jamais vue : « Imprimer » ouvre l\'aperçu du tampon (page rendue)', await pg.evaluate(() => (document.querySelector('[data-placeur-tampon]') || {}).outerHTML ? document.querySelector('[data-placeur-tampon]').getAttribute('data-placeur-tampon') + ' ' + (document.querySelector('[data-placeur-tampon]').getAttribute('data-raison') || '') : 'absent'));
       if (!pret) { await pg.screenshot({ path: path.join(CAPT, `tampon-libre-${vp.width}-ko.png`) }); await ctx.close(); continue; }
       const forme = await pg.evaluate(() => document.querySelector('[data-placeur-tampon]').getAttribute('data-forme'));
       dit(/^mondialrelay·A4·portrait$/.test(forme || ''), 'la forme est nommée : transporteur + format + orientation', forme);
       await pg.waitForTimeout(300);
       await pg.screenshot({ path: path.join(CAPT, `tampon-libre-${vp.width}-auto.png`) });
       let b = await lireBoite(pg);
-      dit(b && b.libre === '0' && b.y > 841.89 - 300 - 2, 'le tampon est d\'abord à la place choisie par VRM (dans le blanc du bas)', JSON.stringify(b && { x: b.x, y: b.y, w: b.w }));
+      const sur = (z) => b && b.x < z.x + z.w && b.x + b.w > z.x && b.y < z.y + z.h && b.y + b.h > z.y;
+      dit(b && b.libre === '0' && !sur(ZONES.code) && !sur(ZONES.texte) && !b.code, 'le tampon est d\'abord à la place choisie par VRM (un blanc : ni le texte, ni le code-barres)', JSON.stringify(b && { x: b.x, y: b.y, w: b.w, h: b.h }));
       dit(b && b.toujours, '« Toujours ici » est coché par défaut');
       const txt = await pg.evaluate(() => document.querySelector('[data-placeur-tampon]').innerText);
       dit(!/touche|glisse|déplace|choisis|vérifie|espace blanc/i.test(txt), 'aucun texte explicatif dans l\'aperçu', txt.replace(/\s+/g, ' ').slice(0, 160));
@@ -249,9 +252,9 @@ const VARIANTES = [{ tn: 18, tt: 8 }, { tn: 15, tt: 7 }, { tn: 12, tt: 6.5 }];
       const memo = await pg.evaluate((f) => { try { return (JSON.parse(localStorage.getItem('vrm_tampon_positions') || '{}') || {})[f] || null; } catch (_) { return null; } }, forme);
       dit(memo && Math.abs(memo.vx * 595.28 - b.x) < 0.5 && Math.abs(memo.vy * 841.89 - b.y) < 0.5, '« Toujours ici » : la place est rangée pour la forme (`vrm_tampon_positions`)', JSON.stringify(memo));
       try { await pg.locator('[data-visionneuse-fermer]').click({ timeout: 3000 }); } catch (_) {}
-      await pg.keyboard.press('Escape').catch(() => {});
+      try { await pg.locator('[data-bord-fermer]:visible').first().click({ timeout: 3000 }); } catch (_) {}
       await pg.waitForTimeout(500);
-      try { await cliquerImprimer(); } catch (e) { dit(false, 'le second clic « Imprimer »', String(e.message).slice(0, 100)); }
+      try { await cliquerImprimer(); } catch (e) { dit(false, 'le second clic « Imprimer »', String(e.message).slice(0, 100)); await pg.screenshot({ path: path.join(CAPT, `tampon-libre-${vp.width}-second.png`) }); }
       const vis2 = await pg.waitForSelector('[data-visionneuse-pdf="pret"]', { timeout: 20000 }).then(() => true, () => false);
       const sansApercu = !(await pg.locator('[data-placeur-tampon]').count());
       dit(vis2 && sansApercu, 'même forme ensuite : aucun aperçu, le PDF s\'ouvre directement');
