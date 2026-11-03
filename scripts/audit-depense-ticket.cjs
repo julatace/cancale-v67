@@ -31,7 +31,7 @@ else if (MUT) { console.log('mutation inconnue'); process.exit(2); }
     ['texte vide : rien', '', null],
   ];
   for (const [nom, t, attendu] of cas) { const v = montantDuTicket(t); dit(v === attendu, nom, String(v)); }
-  dit(CATEGORIES_DEPENSE.map((c) => c.k).join('|') === 'Emballage|Achats de stock|Envois|Abonnements|Autre', 'les catégories de Julien');
+  dit(CATEGORIES_DEPENSE.map((c) => c.k).join('|') === 'Emballage|Envois|Abonnements|Autre', 'les catégories de Julien');
   dit(idTicket('a/b c') === 'depense_ticket_abc', 'la ligne du ticket : depense_ticket_{id} nettoyé');
   dit(!/fetch\(|XMLHttpRequest|\/api\//.test(S.replace(/\/\/[^\n]*/g, '')), 'aucune lecture par un service distant (rien envoyé hors de la page)');
   fin();

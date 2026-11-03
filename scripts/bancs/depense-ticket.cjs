@@ -155,7 +155,7 @@ const ouvrirForm=async(pg)=>{
           const v0=await lireBenef(pg);
           await ouvrirForm(pg);
           const cats=await pg.evaluate(()=>[...document.querySelectorAll('[data-dep-cat]')].map(e=>e.getAttribute('data-dep-cat')));
-          dit(JSON.stringify(cats)===JSON.stringify(['Emballage','Achats de stock','Envois','Abonnements','Autre']),'F. les catégories de Julien',cats.join(', '));
+          dit(JSON.stringify(cats)===JSON.stringify(['Emballage','Envois','Abonnements','Autre']),'F. les catégories de Julien',cats.join(', '));
           dit(await pg.locator('[data-dep-ticket]').count()===1,'« Photo du ticket » dans le formulaire');
           const avantEcrits=(opts.corps||[]).length; const compta0=await pg.evaluate(()=>localStorage.getItem('vrm_compta'));
           await pg.setInputFiles('[data-dep-ticket-fichier]',{ name:'ticket.png', mimeType:'image/png', buffer:TICKET });

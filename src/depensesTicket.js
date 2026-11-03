@@ -15,7 +15,7 @@
 
 export const CATEGORIES_DEPENSE = [
   { k: 'Emballage', ex: 'cartons, papier bulle, scotch' },
-  { k: 'Achats de stock', ex: 'un lot de paires, une brocante' },
+  // (3 nov.) « Achats de stock » retiré : le prix d'achat est déjà compté par article (il serait retiré deux fois du bénéfice).
   { k: 'Envois', ex: 'timbres, trajet jusqu’au relais' },
   { k: 'Abonnements', ex: 'Canva, une appli photo' },
   { k: 'Autre', ex: 'ce que tu as payé' },
