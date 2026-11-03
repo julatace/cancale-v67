@@ -181,3 +181,7 @@ Déplacé TEL QUEL depuis CLAUDE.md §9 le 2 novembre 2026 (le fichier dépassai
 ### Lignes de §9 déplacées telles quelles
 - **2 nov.** — Colis : le filtre de site vaut pour TOUT l'écran (`voitSite`, `retoursPourSite` : plus de Vinted sous eBay, Julien : « inadmissible ») ; boîte vide du récapitulatif au téléphone retirée ; 190 chemins absolus `/home/user/…` retirés des audits/bancs. Audits : tous verts sauf ceux qui exigent Postgres (6) ou `@babel/parser` (1), absents ici. Geste : regarder Colis au téléphone.
 - **2 nov. (matin)** — Audit du dossier : les 7 chantiers « en cours » de la nuit n'ont JAMAIS été poussés ⇒ perdus, à refaire (nuit §3) ; §9 condensé, §8 recopié du code, ancienne « passation en cours » archivée. Geste : si la session de la nuit est encore ouverte, lui faire pousser ses worktrees.
+
+### Lignes de §9 déplacées telles quelles
+- **2 nov.** — Audit des données (E0c) : eBay aux frais pas lus « au moins » partout, « 1er », Vestiaire/Leboncoin dans « Finalisé par plateforme », pas lu ≠ 0 (base lente, semaine, NaN, Invalid Date), jours au fuseau local (`audit-donnees-ecrans`). → historique divers. Geste : aucun.
+- **2 nov.** — Offres auto : jamais sur une paire vendue ailleurs (**5.308.0**, `src/offresGarde.js`). Geste : installer.

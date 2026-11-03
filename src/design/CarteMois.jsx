@@ -29,7 +29,10 @@ export function Courbe({ valeurs, largeur = 96, hauteur = 46 }) {
 }
 
 // cases : [{ cle, n, l, titre, onClick, attrs }] — `n` peut être un nœud.
-export default function CarteMois({ surtitre, valeur, sous = null, cases = [], courbe = null, enHaut = null, children = null, className = '', ...attrs }) {
+// (3 nov., carte réglable) `action` : un bouton discret en haut à droite (« Modifier ») ;
+// `nu` : la carte sans fond à elle, posée dans une tête déjà sombre (Ma journée, Compta) ;
+// `grandAttrs` : les attributs du grand chiffre (posés sur le chiffre même, « — » compris).
+export default function CarteMois({ surtitre, valeur, sous = null, cases = [], courbe = null, enHaut = null, children = null, className = '', action = null, nu = false, grandAttrs = null, ...attrs }) {
   const vide = valeur == null || valeur === '';
   // (3 nov., cas extrêmes) Un montant à 5 chiffres (« 35 211,97 € ») ne se coupe jamais
   // en « 35 211,9… » : la taille descend d'un pixel à la fois jusqu'à ce qu'il tienne
@@ -50,12 +53,13 @@ export default function CarteMois({ surtitre, valeur, sous = null, cases = [], c
     return () => ro.disconnect();
   }, [valeur, vide]);
   return (
-    <section className={'vrm-fu-carte' + (className ? ' ' + className : '')} data-fu-carte="" {...attrs}>
+    <section className={(nu ? 'vrm-fu-carte-nu' : 'vrm-fu-carte') + (action ? ' a-action' : '') + (className ? ' ' + className : '')} {...(nu ? {} : { 'data-fu-carte': '' })} {...attrs}>
       {enHaut}
+      {action}
       <div className="vrm-fu-carte-tete">
         <div className="vrm-fu-carte-txt">
           {surtitre ? <span className="vrm-fu-surtitre">{surtitre}</span> : null}
-          <div ref={grandRef} className={'vrm-fu-grand' + (vide ? ' is-vide' : '')}>{vide ? '—' : valeur}</div>
+          <div ref={grandRef} className={'vrm-fu-grand' + (vide ? ' is-vide' : '')} {...(grandAttrs || {})}>{vide ? '—' : valeur}</div>
           {sous ? <div className="vrm-fu-sous">{sous}</div> : null}
         </div>
         {courbe && courbe.length ? <Courbe valeurs={courbe} /> : null}
