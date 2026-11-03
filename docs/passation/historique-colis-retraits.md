@@ -2710,3 +2710,59 @@ range dans `vrm_points_relais` (« auto ») pose des positions fausses (un « Ta
 cette liste n'est plus rendue nulle part — à retirer un jour (code mort qui appelle le réseau).
 (2) Un lieu SANS code postal rejoint encore le SEUL autre point du même nom (`regrouperRelais`),
 même dans une autre ville ; avec l'adresse relue, le cas mesuré n'y passe plus.
+
+### « Commande mise à jour » : l'achat qui t'attend au point relais (3 nov.)
+Julien (3 nov. matin) : une série d'e-mails Vinted « Commande mise à jour pour <titre> » —
+« Ton achat t'attend au point relais MAISON DE LA PRESSE, 40 RUE DU PORT, 35260 CANCALE » —
+et AUCUN colis à retirer dans VRM : la famille était classée « connu-sans-action » depuis
+le 23 août (« le statut vient de la moisson »).
+**Mesuré (lecture seule)** sur 30 jours : 368 e-mails « Commande mise à jour », dont trois
+tournures d'ACHETEUR arrivé : « t'attend au point relais » (32), « t'attend ici : … Utilise le
+code X » (23, consignes, le code est DANS l'e-mail), « Ton colis a été livré dans le Point Relais
+… aller le récupérer » (34) — 58 colis (conversations) distincts. Les 9 du 2-3 nov. sont à
+Cancale (2 adresses de réception : sa boîte Gmail et un alias iCloud). Le corps gardé ne porte
+pas de n° de transaction ; le lien « Aller sur la conversation » passe par
+`links.vinted.com/t/<base64>` qui décode en `vinted.fr/inbox/<UUID>` — **ce UUID est le
+`conversation_id` de la commande** (`harvest_*_orders_purchased`) et le `user_msg_thread_id`
+de sa transaction (`harvest_*_txn_*`). 47 des 58 conversations sont celles d'une commande
+relevée ; **0 des 9 de Cancale** (commandes pas encore relues par l'extension sur ce compte).
+Les autres tournures (en route, à confirmer sous 24 h, remboursé, annulé, côté vendeur…)
+restent « sans action ».
+**Correctif** :
+- Règle unique `api/_lib/achat-arrive-relais.js` : `lireArriveeAchat` (sujet + 3 tournures,
+  lieu « NOM, RUE, CP VILLE » sans « , France », code seulement si écrit), `conversationVinted`
+  (lien direct ou base64 décodé ; deux conversations ⇒ aucune), `cleArrivee`
+  (`email_track_autre_conv-{UUID}`, sinon empreinte du Message-ID — jamais le titre),
+  `ligneArrivee` (une forme pour le serveur ET l'app ; première arrivée gardée, « retiré » jamais
+  redescendu, code/QR/limite déjà sus gardés), `achatParConversation`, `regrouperArrivees`.
+- `api/email-inbound.js` (0a, avant les transporteurs) : la ligne de colis à retirer
+  (carrier `autre`, `artTitle` = titre du sujet comme LIBELLÉ, `conv`, `source:
+  'vinted-commande'`, arrivée = date de l'e-mail, échéance inconnue) ; lecture ratée / écriture
+  ratée ⇒ 503 ; notification « 📍 Achat arrivé au point relais ».
+- App : `commandeDuColis` relie d'abord par la conversation ; `regrouperArrivees` dans
+  `pickupUnion` : deux lignes menant à la MÊME commande = un colis (celle du transporteur
+  garde son code, Vinted donne le libellé) ; une ligne Vinted SANS commande au même code postal
+  qu'une ligne de transporteur elle aussi sans commande ⇒ « à vérifier » (`doute_meme_relais`,
+  visible, jamais comptée deux fois), seule ⇒ à retirer. `colisKey` d'une ligne sans n° = sa
+  clé de ligne (deux achats au même titre ont le même sujet). `vrm_colis_retirer`, Ma journée
+  et le widget suivent par la publication existante.
+- Les e-mails DÉJÀ reçus : `src/arriveesRelues.js` relit (projection, 21 jours, ≤ 120 lignes ;
+  mesuré 75 lignes / 150 Ko aujourd'hui, la fenêtre se vide d'elle-même puisque les nouveaux
+  sont rangés par le serveur) le corps gardé `email_inconnu_*.brut` (JSON coupé à 2 000, le lien
+  y est) avec la MÊME règle ; une ligne déjà rangée par le serveur gagne ; rien n'est écrit.
+**Preuve** : `scripts/audit-achat-attend-relais.cjs` EXÉCUTE la route (fausse base, forme
+réelle ; e-mails fabriqués JSON et MIME quoted-printable) : 30 verts ; 23 rouges sur origin/main
+29433e61 ; mutations : clé par titre ⇒ 7, repli sur le titre dans `achatParConversation` ⇒ 1 (I6),
+doute retiré ⇒ 1, deux conversations ⇒ la première ⇒ 1. Voisins verts : `email-formes`,
+`retrait`, `identite`, `vestiaire-email`, `fonctions-api`, `coherence` ; `codes-retrait` (D) et
+`transporteurs` (1 mal aiguillé) rouges À L'IDENTIQUE sur origin/main (`@babel/parser` absent).
+Vérifié sur le corps réel d'une consigne Kusmi Tea (lecture seule, hors dépôt) : lieu, code,
+conversation lus.
+**Reste** : (1) l'affichage (Colis refait par `claude/journee-photos`) : une ligne `source:
+'vinted-commande'` porte `artTitle` (libellé), `conv`, `forme`, `consigne`, `code` éventuel ;
+la raison « à vérifier » `doute_meme_relais` est dite par `raisonAVerifier`. (2) Les anciens
+colis sans commande relevée et passés la garde ressortent « à vérifier » (jamais comptés) :
+c'est voulu (un colis caché est un colis perdu). (3) Le journal des e-mails range ces e-mails
+« à vérifier · sans n° de suivi » (règle de `resume-email`, inchangée). (4) Le widget et le
+rappel du matin ne voient que les lignes rangées par le serveur (pas la relecture) : ils
+reprennent la publication de l'app comme avant.
