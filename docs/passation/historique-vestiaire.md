@@ -763,7 +763,7 @@ refusée : la ligne `vc_messages` est bien écrite (compteur à jour à 08 h 56)
   `EXT_ATTENDUE` = 5.317.0 ; zip régénéré (un dossier).
 
 ### Preuves (§6)
-- `scripts/audit-vc-messages.cjs` (M1-M9, 38 contrôles ; VRAI vc-inject.js → VRAI vc.js → VRAI background.js
+- `scripts/audit-vc-messages.cjs` (M1-M9, 40 contrôles ; VRAI vc-inject.js → VRAI vc.js → VRAI background.js
   dans `_fond-vm.cjs`, réponses FABRIQUÉES : la forme du fil des notifications et de `/chat/channel/` est
   celle MESURÉE ; celle de Stream est celle de son API REST documentée — jamais vue chez lui, à relire dans
   `vc_messages.forme` après son passage). Code d'avant (`origin/main`) : **33 rouges**. `--prouve` : **16/16
