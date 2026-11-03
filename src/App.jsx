@@ -15396,7 +15396,7 @@ async function dupliquerNumero(rn, extra) {
   save('vinted_used_numeros', pool.sort(triPool));
   save('vrm_fiches_neuves', { ...(load('vrm_fiches_neuves', {}) || {}), [r.id]: r.fiche });
   emettreClesRelues(['vinted_used_numeros', 'vrm_fiches_neuves']);
-  return { ok: true, numero: r.fiche.numero, id: r.id };
+  return { ok: true, numero: r.fiche.numero, id: r.id, fiche: r.fiche };
 }
 function ToutSurLeNumero({ q, numData, comptes, onNav, onStock, onChercher, onFiche }) {
   const lecture = !numData;
@@ -64074,6 +64074,7 @@ function AppCoeur() {
   // (1er nov.) LA FICHE COMPLÈTE D'UNE PAIRE (`FichePaire`) : ouverte depuis
   // « Tout sur le N° » ou le mode emballage ; elle lit les MÊMES sources.
   const [ficheNum,setFicheNum]=useState(null);
+  const [neuveRecente,setNeuveRecente]=useState(null);   // (3 nov.) la fiche dupliquée à l'instant (avant l'écriture différée de `save`)
   useEffect(()=>{const ouvrir=e=>{const n=e&&e.detail; if(typeof n!=='string'||!n.trim()||n.length>64)return; setFicheNum(n.trim());};window.addEventListener('vrm:fiche-paire',ouvrir);return()=>window.removeEventListener('vrm:fiche-paire',ouvrir);},[]);
   // (3 nov.) « Changer le prix » d'un N° : ouvert depuis la fiche, ou depuis une
   // ligne d'annonce (événement `vrm:prix-partout`, le N° en détail).
@@ -66419,7 +66420,7 @@ function AppCoeur() {
           // lectures en plus (`ficheExtra`), chaque étape lue et datée par sa donnée.
           const ex = ficheExtra && ficheExtra.num === ficheNum ? ficheExtra : null;
           const autresEnLigne = ex && ex.lbcItems != null && ex.vcItems != null ? sitesPrixDe(ficheNum, rn, ex).sites.filter((x) => x.site === 'leboncoin' || x.site === 'vestiaire') : null;
-          const neuve = Object.values(load('vrm_fiches_neuves', {}) || {}).find((x) => x && !x.retireeAt && cleNum(x.numero) === rn.cle) || null;
+          const neuve = (neuveRecente && cleNum(neuveRecente.numero) === rn.cle ? neuveRecente : null) || Object.values(load('vrm_fiches_neuves', {}) || {}).find((x) => x && !x.retireeAt && cleNum(x.numero) === rn.cle) || null;
           const p = histoireArticle(rn, { fiches: numeros, saleOv: load('vinted_sale_overrides', {}) || {}, buyByNum: load('vinted_buyprice_by_num', {}) || {},
             stats: numData ? (numData.stats === undefined ? null : numData.stats) : null, versements: numData ? (numData.versements === undefined ? null : numData.versements) : null, nomCompte,
             coffres: ex ? ex.coffres : null, offres: ex ? ex.offres : null, recus: ex ? ex.recus : null, autresEnLigne,
@@ -66434,7 +66435,7 @@ function AppCoeur() {
             onEmballer={()=>{ fermer(); setGsOpen(false); DEMANDE_EMBALLAGE.at = Date.now(); setTab('cat_bord'); try { window.dispatchEvent(new Event('vrm:emballer')); } catch (_) {} }}
             onPrix={(n)=>setPrixNum(String(n))} neuve={neuve}
             onCopier={async(f)=>{ try { await navigator.clipboard.writeText(texteAColler(f)); toast('Texte copié'); } catch (_) { toast('Copie impossible ici'); } }}
-            onDupliquer={async()=>{ const r=await dupliquerNumero(rn, ex); if(!r.ok){ toast(`Pas dupliqué : ${r.raison}`); return; } toast(`N°${r.numero} créé`); setFicheNum(String(r.numero)); }}
+            onDupliquer={async()=>{ const r=await dupliquerNumero(rn, ex); if(!r.ok){ toast(`Pas dupliqué : ${r.raison}`); return; } toast(`N°${r.numero} créé`); setNeuveRecente(r.fiche); setFicheNum(String(r.numero)); }}
             Photo={(src)=><PhotoVinted src={src} alt="" loading="lazy"/>} Icon={Icon} Retour={FermeAuRetour}/>;
         })()}
         {prixNum && (()=>{
