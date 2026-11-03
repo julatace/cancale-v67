@@ -27261,7 +27261,7 @@ function CarteColisVc({ v, imprime, fait }) {
             <span style={{ fontWeight: 600 }}>Vestiaire</span>
           </div>
           <div style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>
-            <span data-colis-dates="">{v.date ? `vendue le ${dateCourteVc(v.date)}` : ''}{urg ? <span data-colis-limite-texte="" style={{ color: j != null && j <= 1 ? C.warn : C.muted, fontWeight: j != null && j <= 1 ? 600 : 500 }}>{v.date ? ' · ' : ''}{urg}</span> : null}</span>
+            <span data-colis-dates="">{v.date ? <span className="vrm-colis-vendue">{`vendue le ${dateCourteVc(v.date)}`}{urg ? ' · ' : ''}</span> : ''}{urg ? <span data-colis-limite-texte="" style={{ color: j != null && j <= 1 ? C.warn : C.muted, fontWeight: j != null && j <= 1 ? 600 : 500 }}>{urg}</span> : null}</span>
             {fait ? <span style={{ color: C.text, fontWeight: 600 }}> · ✓ posté</span> : null}
           </div>
           {/* Le transporteur est écrit UNE fois : la pastille à côté du bouton bordereau. */}
@@ -54157,7 +54157,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             {x.photo && !imgMortes.has(x.photo) ? <PhotoVinted src={x.photo} alt="" loading="lazy" decoding="async" onError={()=>noterImgMorte(x.photo)} style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
                           </div>
                           <div style={{flex:'1 1 150px',minWidth:0}}>
-                            <span className="vrm-colis-titre" title={x.titre} style={{display:'block',fontSize:15,fontWeight:600,lineHeight:1.3,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{x.num ? `N°${x.num} · ` : ''}{x.titre}</span>
+                            <div><span className="vrm-colis-titre" title={x.titre} style={{display:'block',fontSize:15,fontWeight:600,lineHeight:1.3,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{x.num ? `N°${x.num} · ` : ''}{x.titre}</span></div>
                             <span data-colis-envoye-etat="" title={so.aide || undefined} style={{display:'block',marginTop:4,fontSize:13,fontWeight:so.ambre ? 600 : 500,color:so.ambre ? C.warn : C.muted,lineHeight:1.35}}>{so.t}</span>
                           </div>
                         </div>

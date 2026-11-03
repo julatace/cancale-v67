@@ -976,3 +976,5 @@ html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-envoye .vrm-col
 html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-envoye > .vrm-colis-frise { margin: 12px 0 0 !important; }
 html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-envoyes .vrm-colis-grille { gap: 10px !important; }
 html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-envoye .vrm-colis-sec { border: 0 !important; background: var(--fu-case) !important; color: var(--fu-encre) !important; border-radius: 12px !important; }
+/* La carte Vestiaire dit, comme Vinted, l'urgence seule (la date de vente et le n° de suivi sont dans le récapitulatif). */
+html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-carte[data-vc-colis] :is(.vrm-colis-vendue, [data-vc-colis-transport]) { display: none !important; }

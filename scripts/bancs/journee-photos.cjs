@@ -86,7 +86,7 @@ const LISTINGS = AVEC_AUTRES ? [
   { id: 4002, title: 'Veste Carhartt Detroit marron M', price: { amount: '120.0', currency_code: 'EUR' }, photo: ph(8), created_at_ts: sec(70), view_count: 90, favourite_count: 1 },
 ] : [];
 const VC_PHOTO = SANS ? null : 'https://images.vestiairecollective.com/produit/71000001-1_3.jpg';
-const LBC_PHOTO = SANS ? null : 'https://img.leboncoin.fr/api/v1/lbcpb1/images/aa/bb/lbc1.jpg';
+const LBC_PHOTO = SANS ? null : 'https://img.leboncoin.fr/ad-image/lbc1.jpg';
 const LIGNES = [
   { id: 'main', data: { vinted_ship_done: {}, vinted_used_numeros: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] } },
   { id: `harvest_${A}_orders_sold`, data: { capturedAt: cap, payload: { my_orders: VENTES } } },
@@ -278,6 +278,7 @@ const mesureJournee = (pg) => pg.evaluate(() => {
         await essaie('colis', async () => {
           await pg.locator('.vrm-colis-onglets').first().waitFor({ timeout: 30000 });
           await pg.waitForTimeout(2500);
+          if (process.env.JP_DBG) console.log('LBC', await pg.evaluate(() => [...document.querySelectorAll('[data-plateforme-colis="leboncoin"] img')].map((i) => [i.src, i.complete, i.naturalWidth])));
           const o = await pg.evaluate(() => ({
             choix: [...document.querySelectorAll('[data-colis-onglet-choix]')].map((e) => ({ v: e.getAttribute('data-colis-onglet-choix'), n: e.getAttribute('data-colis-onglet-n'), txt: e.innerText.replace(/\s+/g, ' ').trim() })),
             pubEnv: JSON.parse(localStorage.getItem('vrm_colis_aposter') || 'null'), pubRet: JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'),
@@ -308,6 +309,7 @@ const mesureJournee = (pg) => pg.evaluate(() => {
           // « Envoyés »
           await pg.locator('[data-colis-onglet-choix="envoyes"]').first().click();
           await pg.waitForTimeout(900);
+          if (process.env.JP_DBG) console.log(await pg.evaluate(() => [...document.querySelectorAll('[data-plateforme-colis="leboncoin"] img')].map((i) => [i.src, i.complete, i.naturalWidth])));
           if (process.env.JP_DBG) console.log(await pg.evaluate(() => ({ sec: !!document.querySelector('[data-colis-envoyes]'), lect: (document.querySelector('[data-colis-lecture]') || {}).textContent, onglet: (document.querySelector('[data-colis-onglet]') || { getAttribute: () => '' }).getAttribute('data-colis-onglet'), txt: document.querySelector('.vrm-main').innerText.slice(0, 600) })));
           const ev = await pg.evaluate(() => ({
             n: (document.querySelector('[data-colis-onglet-choix="envoyes"]') || { getAttribute: () => null }).getAttribute('data-colis-onglet-n'),
