@@ -38037,6 +38037,112 @@ const titrePeriodeStats = (b) => {
   if (b.type === 'annee') return `${new Date(b.de).getFullYear()} · comparée à ${new Date(b.prevDe).getFullYear()}`;
   return `${maj(new Date(b.de).toLocaleDateString('fr-FR', { month: 'long' }))} · comparé à ${new Date(b.prevDe).toLocaleDateString('fr-FR', { month: 'long' })}`;
 };
+// ── ANNULATIONS PAR COMPTE ET NOTES REÇUES (3 nov.) ─────────────────────────
+// Deux cartes de Statistiques, sur les règles pures `annulationsParCompte`
+// (src/annulationsCompte.js : « annulée » = `classifyOrderStatus`, la règle de
+// `PAS_UNE_VENTE`, sur la période choisie) et `notesParCompte`
+// (src/notesRecues.js : le profil Vinted capté, lecture seule, aucun rappel).
+// Les comptes : ceux que la coque range sur l'appareil (`vinted_accounts`),
+// moins les exclus (masqués, panneau, supprimés pour de bon) — un compte exclu
+// n'apparaît nulle part.
+const lireProfilsNotes = async () => {
+  try {
+    const sel = 'id,uid:data->>uid,at:data->>capturedAt,login:data->payload->user->>login,rep:data->payload->user->>feedback_reputation,n:data->payload->user->>feedback_count,pos:data->payload->user->>positive_feedback_count,neu:data->payload->user->>neutral_feedback_count,neg:data->payload->user->>negative_feedback_count';
+    const [r, f] = await Promise.all([
+      fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_profile&select=${sel}`, { headers: sbAuth() }),
+      // (À venir) la liste des avis, quand l'extension lira /api/v2/user_feedbacks :
+      // tant que la ligne n'existe pas, la liste reste « pas encore lue ».
+      fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_feedbacks&select=id,avis:data->payload->user_feedbacks`, { headers: sbAuth() }),
+    ]);
+    if (!r.ok) return null;
+    const j = await r.json();
+    if (!Array.isArray(j)) return null;
+    const avis = {};
+    try { if (f.ok) { const fj = await f.json(); if (Array.isArray(fj)) for (const x of fj) { const u = ((x && x.id) || '').match(/^harvest_(\d+)_feedbacks$/); if (u && Array.isArray(x.avis)) avis[u[1]] = x.avis; } } } catch (_) {}
+    return j.map((x) => {
+      const uid = String((x && x.uid) || ((x && x.id) || '').match(/^harvest_(\d+)_profile$/)?.[1] || '');
+      return { uid, at: x.at, login: x.login, rep: x.rep, n: x.n, pos: x.pos, neu: x.neu, neg: x.neg, avis: avis[uid] };
+    });
+  } catch (_) { return null; }
+};
+function AnnulationsEtNotes({ b, panelOff }) {
+  const { ventes, ko } = useVentesCoque();
+  const [profils, setProfils] = React.useState(undefined);
+  React.useEffect(() => { let mort = false; lireProfilsNotes().then((x) => { if (!mort) setProfils(x); }); return () => { mort = true; }; }, []);
+  const ecarteUid = React.useMemo(() => {
+    const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+    const sup = lireSupprimes();
+    return (u) => sup.has(String(u)) || compteEcarte(u, hAcc, panelOff || {});
+  }, [panelOff]);
+  const comptes = React.useMemo(() => {
+    let lies = [];
+    try { const a = JSON.parse(localStorage.getItem('vinted_accounts') || 'null'); if (Array.isArray(a)) lies = a; } catch (_) {}
+    const out = new Map();
+    for (const a of lies) { const u = String((a && a.vinted_user_id) || ''); if (u && !ecarteUid(u)) out.set(u, { uid: u, nom: a.login || u }); }
+    if (!out.size) for (const p of (profils || [])) if (p && p.uid && !ecarteUid(p.uid)) out.set(p.uid, { uid: p.uid, nom: p.login || p.uid });
+    return [...out.values()];
+  }, [profils, ecarteUid]);
+  const nomDe = (u) => (comptes.find((c) => c.uid === String(u)) || {}).nom || 'un compte';
+  const A = React.useMemo(() => annulationsParCompte({ ventes, ko, de: b.de, a: b.a, estAnnulee: (o) => classifyOrderStatus(o.status) === 'cancelled', ecarte: ecarteUid }), [ventes, ko, b, ecarteUid]);
+  const N = React.useMemo(() => notesParCompte({ profils, comptes }), [profils, comptes]);
+  const pl = (n, s1, p) => `${n} ${n > 1 ? (p || s1 + 's') : s1}`;
+  const pctTxt = (t) => (t == null ? '—' : `${String(t).replace('.', ',')} %`);
+  const note = (x) => (x == null ? '—' : String(x).replace('.', ','));
+  const jour = (t) => new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+  const carte = (k, titre, droite, corps, attrs) => (
+    <section className="vrm-sv-carte" data-stats-carte={k} {...(attrs || {})}>
+      <div className="vrm-sv-carte-tete"><h2 className="vrm-display vrm-sv-carte-titre">{titre}</h2>{droite ? <span className="vrm-sv-note">{droite}</span> : null}</div>
+      {corps}
+    </section>
+  );
+  const vide = (txt, attrs) => <div className="vrm-sv-vide" {...(attrs || {})}>{txt}</div>;
+  const maxT = A.etat === 'lu' ? Math.max(1, ...A.comptes.map((g) => g.taux || 0)) : 1;
+  const annul = carte('sv-annulations', 'Annulations',
+    A.etat === 'lu' && A.n ? <span data-sv-annul-total={`${A.annulees}/${A.n}`}>{A.partiel ? 'au moins ' : ''}{A.annulees} sur {A.n} · {pctTxt(A.taux)}</span> : null,
+    A.etat === 'encours' ? vide('…', { 'data-sv-annul': 'encours' })
+      : A.etat !== 'lu' ? vide('—', { 'data-sv-annul': 'passu' })
+        : (<div className="vrm-sv-lignes" data-sv-annul="lu">
+          {!A.comptes.length ? vide('Aucune vente Vinted sur la période.') : A.comptes.map((g) => (
+            <details key={g.cle} className="vrm-sv-annul-compte" data-sv-annul-compte={g.uid} data-n={g.n} data-annulees={g.annulees} data-taux={g.taux == null ? '' : g.taux}>
+              <summary className="vrm-sv-annul-ligne">
+                <span className="vrm-sv-nom">{g.compte}</span>
+                <span className="vrm-sv-piste"><span style={{ width: `${g.taux ? Math.max(3, g.taux / maxT * 100) : 0}%` }}/></span>
+                <span className="vrm-sv-chiffre">{g.annulees}/{g.n} · {pctTxt(g.taux)}</span>
+              </summary>
+              {g.liste.length ? g.liste.map((x) => (
+                <a key={x.id} className="vrm-sv-annul-vente" data-sv-annul-vente={x.id} href={x.lien || undefined} target="_blank" rel="noreferrer">
+                  <span className="vrm-sv-annul-titre">{x.titre || `Vente ${x.id}`}</span>
+                  <span className="vrm-sv-chiffre">{jour(x.ts)}{x.eur != null ? ` · ${fmt(x.eur)}` : ''}</span>
+                  <span className="vrm-sv-annul-etat">{x.statut}</span>
+                </a>
+              )) : <div className="vrm-sv-note" style={{ padding: '4px 0 8px' }}>Aucune annulation.</div>}
+            </details>
+          ))}
+          {(A.manquants.length > 0 || A.sansDate > 0) && <div className="vrm-sv-note" data-sv-annul-manque={A.manquants.join(',')} style={{ marginTop: 8 }}>
+            {A.manquants.length ? `${A.manquants.map(nomDe).join(', ')} : pas lu` : ''}{A.manquants.length && A.sansDate ? ' · ' : ''}{A.sansDate ? `${pl(A.sansDate, 'vente')} sans date` : ''}
+          </div>}
+          <div className="vrm-sv-note" data-sv-annul-non-couvertes={A.nonCouvertes.join(',')} style={{ marginTop: 4 }}>{A.nonCouvertes.join(', ')} : pas comptés</div>
+        </div>),
+    { 'data-sv-carte': 'annulations', 'data-sv-etat': A.etat });
+  const notes = carte('sv-notes', 'Notes reçues',
+    N.etat === 'lu' && N.moyenne != null ? <span data-sv-notes-moyenne={N.moyenne} data-sv-notes-total={N.total}>{N.partiel ? 'au moins ' : ''}{pl(N.total, 'avis', 'avis')} · {note(N.moyenne)}/5</span> : null,
+    N.etat === 'encours' ? vide('…', { 'data-sv-notes': 'encours' })
+      : N.etat === 'passu' ? vide('—', { 'data-sv-notes': 'passu' })
+        : (<div className="vrm-sv-lignes" data-sv-notes={N.etat}>
+          {N.comptes.map((c) => (
+            <div key={c.uid} className="vrm-sv-note-ligne" data-sv-notes-compte={c.uid} data-etat={c.etat} data-note={c.note == null ? '' : c.note} data-n={c.n == null ? '' : c.n} data-neg={c.neg == null ? '' : c.neg} data-vieux={c.vieux ? '1' : ''}>
+              <span className="vrm-sv-nom">{c.nom}</span>
+              <span className="vrm-sv-chiffre vrm-sv-note-detail">{c.etat !== 'lu' ? 'pas lu' : <>{pl(c.n, 'avis', 'avis')}{c.neg > 0 ? ` · ${c.neg} négatif${c.neg > 1 ? 's' : ''}` : ''}{c.neu > 0 ? ` · ${c.neu} neutre${c.neu > 1 ? 's' : ''}` : ''}{c.vieux && c.at ? ` · lu le ${jour(c.at)}` : ''}</>}</span>
+              <span className="vrm-display vrm-sv-note-val">{c.etat !== 'lu' ? '—' : note(c.note)}</span>
+            </div>
+          ))}
+          {N.comptes.some((c) => c.liste) ? N.comptes.filter((c) => c.liste && c.liste.sousCinq.length).map((c) => (
+            <div key={'s' + c.uid} className="vrm-sv-note" data-sv-notes-sous5={c.uid} style={{ marginTop: 6 }}>{c.nom} · sous 5 étoiles : {c.liste.sousCinq.slice(0, 5).map((x) => `${x.note}★ ${jour(x.ts)}`).join(' · ')}</div>
+          )) : <div className="vrm-sv-note" data-sv-notes-liste="pas-lue" style={{ marginTop: 8 }}>Avis détaillés : pas encore lus</div>}
+        </div>),
+    { 'data-sv-carte': 'notes', 'data-sv-etat': N.etat });
+  return <div className="vrm-sv-rangee vrm-sv-rangee-2" data-sv-annul-notes="">{annul}{notes}</div>;
+}
 function StatsVitrine({ liveStats, panelOff, periode }) {
   const maintenant = React.useMemo(() => Date.now(), [periode, liveStats]); // eslint-disable-line react-hooks/exhaustive-deps
   const b = React.useMemo(() => bornesPeriode(periode, maintenant), [periode, maintenant]);
@@ -38288,6 +38394,7 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
           return carte('sv-boost', 'Boost rentable ?', droite, corps, { 'data-sv-carte': 'boost', 'data-sv-etat': etat, 'data-sv-boostees': C2 ? C2.b : '', 'data-sv-autres': C2 ? C2.nb : '' });
         })()}
       </div>
+      <AnnulationsEtNotes b={b} panelOff={panelOff}/>
       <div className="vrm-sv-note vrm-sv-pied">
         {/* (3 nov., critique #4) Plus la phrase de définitions (« Vendu : toutes tes plateformes… ») : restent les seuls MANQUES nommés (§5). */}
         {liveStats && liveStats.venduSansDate ? `${pl(liveStats.venduSansDate, 'vente')} Leboncoin sans date` : ''}{liveStats && (liveStats.venduNonComptees || []).length ? <span data-stats-non-comptees={liveStats.venduNonComptees.length}>{`${liveStats.venduSansDate ? ' · ' : ''}Pas dans « vendu » : ${phraseNonComptees(liveStats.venduNonComptees)}`}</span> : null}
