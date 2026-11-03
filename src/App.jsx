@@ -38098,7 +38098,7 @@ function AnnulationsEtNotes({ b, panelOff }) {
   const vide = (txt, attrs) => <div className="vrm-sv-vide" {...(attrs || {})}>{txt}</div>;
   const maxT = A.etat === 'lu' ? Math.max(1, ...A.comptes.map((g) => g.taux || 0)) : 1;
   const annul = carte('sv-annulations', 'Annulations',
-    A.etat === 'lu' && A.n ? <span data-sv-annul-total={`${A.annulees}/${A.n}`}>{A.partiel ? 'au moins ' : ''}{A.annulees} sur {A.n} · {pctTxt(A.taux)}</span> : null,
+    A.etat === 'lu' && A.n ? <span data-sv-annul-total={`${A.annulees}/${A.n}`}>{A.annulees} sur {A.n}{A.partiel ? '' : ` · ${pctTxt(A.taux)}`}</span> : null,
     A.etat === 'encours' ? vide('…', { 'data-sv-annul': 'encours' })
       : A.etat !== 'lu' ? vide('—', { 'data-sv-annul': 'passu' })
         : (<div className="vrm-sv-lignes" data-sv-annul="lu">
