@@ -39,7 +39,7 @@ const il = (n, h = 12) => { const d = new Date(maintenant); d.setHours(h, 0, 0, 
 const A = '111';
 let nPhoto = 0;
 const vente = (id, titre, prix, statut, d, tus, extra = {}) => ({ transaction_id: id, conversation_id: 50000 + id, title: titre, price: { amount: String(prix), currency_code: 'EUR' }, status: statut, transaction_user_status: tus, date: d.toISOString(), photo: { url: `https://images1.vinted.net/t/b${++nPhoto}/f800/${id}.jpeg?s=x` }, ...extra });
-const VENTES = [
+const VENTES_BASE = [
   vente(8001, 'Salomon XT-6 noir taille 38,5', 70, 'Le paiement a été validé', il(0, 11), 'needs_action'),
   vente(8002, 'Adidas Samba OG noir gomme taille 40', 72, 'Le paiement a été validé', il(1, 9), 'needs_action'),
   vente(8003, 'New Balance 550 vert taille 42', 88, 'Le colis est en route', il(3, 10), 'waiting'),
@@ -49,6 +49,19 @@ const VENTES = [
   vente(8008, 'Nike Air Force 1 blanche taille 44', 60, 'Commande finalisée', il(70), 'completed'),
   vente(8006, 'Nike Shox TL noir taille 41', 95, 'Commande annulée', il(1), 'failed'),
 ];
+// ── LES CAS EXTRÊMES (Julien, 3 nov. : « regarde tous les cas de figure du monde ») ──────────────
+// FUSION_JEU = base (défaut) · vide (0 vente) · une (1 vente) · deux-cents (200 ventes) ·
+// longs (titres très longs) · gros (montants à 5 chiffres) · passu (les ventes ne se lisent pas).
+// Sur un jeu extrême, le banc juge ce qui vaut pour tous : rien ne déborde, rien ne ment
+// (« — » quand on ne sait pas, jamais 0 €), aucune erreur ; la frise n'est jugée que sur « base ».
+const JEU = process.env.FUSION_JEU || 'base';
+const LONG = 'Nike Air Jordan 1 Retro High OG « Chicago Lost and Found » édition limitée cuir vieilli boîte d’origine double lacets';
+const VENTES = JEU === 'vide' || JEU === 'passu' ? []
+  : JEU === 'une' ? [VENTES_BASE[0]]
+  : JEU === 'deux-cents' ? Array.from({ length: 200 }, (_, k) => vente(9000 + k, `Article ${k + 1} taille ${36 + (k % 10)}`, 20 + (k % 90), ['Le paiement a été validé', 'Le colis est en route', 'Le colis a été livré', 'Commande finalisée'][k % 4], il(k % 28, 10), ['needs_action', 'waiting', 'waiting', 'completed'][k % 4]))
+  : JEU === 'longs' ? VENTES_BASE.map((v, k) => ({ ...v, title: `${LONG} ${k + 1} taille 42,5` }))
+  : JEU === 'gros' ? VENTES_BASE.map((v) => ({ ...v, price: { amount: String(Number(v.price.amount) * 137 + 0.99), currency_code: 'EUR' } }))
+  : VENTES_BASE;
 // Ce que la frise DOIT cocher (règle de src/recapVente.js, projetée en quatre étapes).
 const ATTENDU = { 8001: 'vendue', 8002: 'vendue', 8003: 'vendue,postee', 8004: 'vendue,postee,livree', 8005: 'vendue,postee,livree,payee', 8006: null };
 const ACCOUNTS = [{ id: 1, vinted_user_id: A, login: 'boutique_test', domain: 'www.vinted.fr', updated_at: maintenant.toISOString() }];
@@ -132,6 +145,7 @@ const ouvrir = async (b, vp, sombre, tab) => {
     const filtres = [...u.matchAll(/[?&]data->>([a-zA-Z_]+)=(not\.)?is\.null/g)];
     const passe = (r) => filtres.every(([, k, non]) => (r.data[k] == null) === !non);
     const eq = /[?&]id=eq\.([^&]*)/.exec(u);
+    if (JEU === 'passu' && /orders_sold|_txn_|email_bord/.test(u)) return route.fulfill({ status: 503, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"message":"indisponible"}' });
     if (eq) return j(LIGNES.filter((r) => r.id === eq[1] && passe(r)).map(forme));
     const lk = /[?&]id=like\.([^&]*)/.exec(u);
     if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(LIGNES.filter((r) => re.test(r.id) && passe(r)).map(forme)); }
@@ -185,7 +199,7 @@ const ECRANS = [
         console.log(`\n— ${E.id} · ${nom}`);
         const { ctx, pg, errs } = await ouvrir(b, vp, sombre, E.tab);
         await essaie(E.id, async () => {
-          await pg.locator(E.attend).first().waitFor({ timeout: 30000 });
+          await pg.locator(JEU === 'base' || JEU === 'longs' || JEU === 'gros' || JEU === 'une' || JEU === 'deux-cents' ? E.attend : '.vrm-main').first().waitFor({ timeout: 30000 });
           await pg.locator('[data-fu-carte]').first().waitFor({ timeout: 15000 }).catch(() => {});
           await pg.waitForTimeout(1800);
           if (MUTATION) await pg.evaluate(() => { const s = document.querySelector('[data-fu-frise="8001"] [data-fu-etape="livree"]'); if (s) s.setAttribute('data-fait', '1'); });
@@ -196,15 +210,20 @@ const ECRANS = [
           dit(!m.petites.length, 'les gestes Fusion font 44 px', m.petites.join(' | '));
           dit(!m.encaisse, 'jamais « encaissé »');
           dit(!m.violet, 'pas de violet');
+          // Rien ne ment : ventes illisibles ⇒ aucune carte ne dit « 0 € » ; texte jamais rogné sans infobulle.
+          const mensonge = await pg.evaluate(() => [...document.querySelectorAll('[data-fu-carte]')].map((c) => c.innerText).join(' | '));
+          if (JEU === 'passu') dit(!/(^|[^\d,])0(,00)?\s?€/.test(mensonge), 'ventes illisibles : aucune carte ne dit « 0 € » (« — »)', mensonge.replace(/\n/g, ' ').slice(0, 200));
+          const rognes = await pg.evaluate(() => [...document.querySelectorAll('.vrm-fu-grand, .vrm-fu-case b, .vrm-fu-vente-prix')].filter((e) => e.scrollWidth > e.clientWidth + 1).map((e) => e.textContent.trim()));
+          dit(!rognes.length, 'aucun montant rogné (grand chiffre, cases, prix)', rognes.join(' | '));
           if (SHOTS) {
-            await pg.screenshot({ path: path.join(SHOTS, `${E.id}-${nom}.png`) });
-            if (vp.width < 600) { await pg.setViewportSize({ width: vp.width, height: 2400 }); await pg.waitForTimeout(500); await pg.screenshot({ path: path.join(SHOTS, `${E.id}-${nom}-long.png`) }); await pg.setViewportSize(vp); }
+            await pg.screenshot({ path: path.join(SHOTS, `${E.id}-${nom}${JEU === 'base' ? '' : '-' + JEU}.png`) });
+            if (vp.width < 600) { await pg.setViewportSize({ width: vp.width, height: 2400 }); await pg.waitForTimeout(500); await pg.screenshot({ path: path.join(SHOTS, `${E.id}-${nom}${JEU === 'base' ? '' : '-' + JEU}-long.png`) }); await pg.setViewportSize(vp); }
           }
           // La puce transporteur : à GAUCHE du bouton, même rangée, 44 px, rayon 12, une ligne.
           const R = m.rangees.filter(Boolean);
-          if (E.id === 'ventes') dit(R.length > 0, 'une rangée « puce + bordereau » au moins', String(R.length));
+          if (E.id === 'ventes' && JEU === 'base') dit(R.length > 0, 'une rangée « puce + bordereau » au moins', String(R.length));
           // Colis (maquette FusionColis, 2 nov. 22 h) : le transporteur est l'en-tête de son groupe, un bouton rond imprime.
-          if (E.id === 'colis') {
+          if (E.id === 'colis' && JEU === 'base') {
             const g = await pg.evaluate(() => ({ groupes: [...document.querySelectorAll('[data-groupe-transp]')].map((x) => x.getAttribute('data-groupe-transp')), ronds: [...document.querySelectorAll('[data-bord-card]:not([data-vc-colis]) .vrm-rangee-bord')].length, rondPret: [...document.querySelectorAll('[data-bord-card]:not([data-vc-colis]) .vrm-rangee-bord [data-imprime]')].filter((b) => { const r = b.getBoundingClientRect(); return Math.round(r.width) === 44 && Math.round(r.height) === 44 && getComputedStyle(b).borderTopLeftRadius === '50%'; }).length }));
             dit(g.groupes.length > 0 && new Set(g.groupes).size === g.groupes.length, 'colis rangés par transporteur, un en-tête par transporteur', g.groupes.join(' | '));
             dit(g.ronds > 0 && g.rondPret > 0, 'un bouton rond par colis, bleu quand le bordereau est là', `${g.rondPret}/${g.ronds}`);
@@ -213,8 +232,8 @@ const ECRANS = [
             const mauvaises = R.filter((r) => !(r.ok && r.memeLigne && r.gauche && r.h === 44 && r.uneLigne && r.rayon === '12px'));
             dit(!mauvaises.length, 'la puce est à gauche du bouton, même ligne, 44 px, rayon 12, libellé sur une ligne', JSON.stringify(mauvaises[0] || R[0]).slice(0, 220));
           }
-          if (SHOTS && R.length) { const el = pg.locator('[data-rangee-bord]').first(); await el.scrollIntoViewIfNeeded(); const carte = el.locator('xpath=ancestor::*[@data-fu-ligne or @data-bord-card or contains(@class,"vrm-recap")][1]'); await ((await carte.count()) ? carte.first() : el).screenshot({ path: path.join(SHOTS, `pastille-${E.id}-${nom}.png`) }); }
-          if (E.id === 'ventes') {
+          if (SHOTS && R.length && JEU === 'base') { const el = pg.locator('[data-rangee-bord]').first(); await el.scrollIntoViewIfNeeded(); const carte = el.locator('xpath=ancestor::*[@data-fu-ligne or @data-bord-card or contains(@class,"vrm-recap")][1]'); await ((await carte.count()) ? carte.first() : el).screenshot({ path: path.join(SHOTS, `pastille-${E.id}-${nom}.png`) }); }
+          if (E.id === 'ventes' && JEU === 'base') {
             for (const [tx, att] of Object.entries(ATTENDU)) {
               const f = m.frises.find((x) => x.cle === tx);
               if (att == null) dit(!f, `vente ${tx} annulée : pas de frise`, f ? f.faits : '');
@@ -234,7 +253,7 @@ const ECRANS = [
             const f1 = m.frises.find((x) => x.cle === '8001');
             dit(f1 && f1.cours === 'postee', '8001 à poster : « Postée » est l’étape en cours', f1 && f1.cours);
           }
-          if (E.id === 'colis') {
+          if (E.id === 'colis' && JEU === 'base') {
             dit(m.frises.length > 0, 'chaque colis porte sa frise', String(m.frises.length));
           }
         });

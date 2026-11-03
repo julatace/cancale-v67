@@ -762,3 +762,11 @@ html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-bilan-syn
 }
 html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-bilan-sync[data-vendus-ailleurs][open] > :not(summary) { margin: 0 14px 12px !important; }
 .vrm-fu-declaration .vrm-fu-decl-lien { display: inline-flex; align-items: center; min-height: 28px; font: 700 16px/1.25 var(--vrm-police); color: inherit; text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 3px; text-decoration-color: rgba(154,74,0,.35); }
+/* (Revue) Un titre ou une ligne de détail de « À faire » ne se coupe jamais : deux lignes au plus,
+   à la fin d'un mot ; la pilule passe à 4,5:1 (bleu d'Apple foncé sur le gris). */
+html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task .vrm-day-task-title,
+html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task .vrm-day-task-note { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; overflow-wrap: anywhere; }
+html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task .vrm-day-task-action, html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task.is-urgent .vrm-day-task-action { color: #0062c4 !important; }
+:root[data-theme="dark"] body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task .vrm-day-task-action { color: #5eb0ff !important; }
+html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-bilan-sync[data-vendus-ailleurs] > summary > span { color: #0062c4 !important; }
+:root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-bilan-sync[data-vendus-ailleurs] > summary > span { color: #5eb0ff !important; }
