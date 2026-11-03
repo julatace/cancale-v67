@@ -152,6 +152,7 @@ import { lireCible, selecteursCible, phraseAbsente } from "./cibleNotif.js";
 import { fusionnerLigne, fusion3, egal as egalStable, CLE_POOL, CLES_FICHES } from "./fusionNuage.js";
 import { NOM_BENEFICE, NOM_BENEFICE_BRUT, NOM_APRES_FRAIS, chiffreBenefice, chiffreBrut, chiffreApresFrais, finDuMois, moisCouvertParPublication } from "./beneficeNoms.js";
 import { achatParIdentite, propositionPrixAchat, propositionsUniques, listeConfirmation, ecritureProposition } from "./prixAchatPropose.js";
+import { donneesRecapMois, csvRecapMois, pdfRecapMois, libelleMois, nomFichierRecap } from "./recapMois.js";
 import { produitsANumeroter, attribuerNumerosVc, carteNumerosVc } from "./numerosVestiaire.js";
 import { lireFile, noterSaisie, instantane, acquitter, compterEnAttente, nuagePlusRecent, fusionAuChargement, oublierCle, CLE_FILE, HORS_FILE } from "./fileEnvoi.js";
 // La migration qui cloisonne les vendeurs, lue depuis LE fichier (pas recopiée) :
@@ -6516,7 +6517,8 @@ const ventesAutresBenefice = ({ lbc, ebay, vestiaire, numeros, achat, numLbc, nu
     const eur = v.price != null ? Number(v.price) / 100 : NaN;
     if (!isFinite(eur) || vus.has('lbc:' + v.txId)) continue;
     vus.add('lbc:' + v.txId);
-    out.push({ plateforme: 'Leboncoin', id: 'lbc:' + v.txId, ts: Date.parse(v.dateVente || ''), eur, achat: achatDuNum(numLbc(v)), frais: 0 });
+    const nL = numLbc(v);
+    out.push({ plateforme: 'Leboncoin', id: 'lbc:' + v.txId, ts: Date.parse(v.dateVente || ''), eur, achat: achatDuNum(nL), frais: 0, num: nL ? String(nL) : '' });
   }
   for (const o of (ebay || [])) {
     if (!o || !o.orderId || String(o.orderPaymentStatus || '').toUpperCase() !== 'PAID' || !commandeEbayEngagee(o)) continue;
@@ -6525,9 +6527,9 @@ const ventesAutresBenefice = ({ lbc, ebay, vestiaire, numeros, achat, numLbc, nu
     if (eur == null || vus.has('ebay:' + o.orderId)) continue;
     vus.add('ebay:' + o.orderId);
     const lignes = Array.isArray(o.lineItems) ? o.lineItems : [];
-    let a = lignes.length ? 0 : null;
-    for (const li of lignes) { const x = achatDuNum(numEbayLigne(o, li)); if (x == null) { a = null; break; } a += x; }
-    out.push({ plateforme: 'eBay', id: 'ebay:' + o.orderId, ts: Date.parse(o.creationDate || ''), eur, achat: a == null ? null : Math.round(a * 100) / 100, frais: 0 });
+    let a = lignes.length ? 0 : null; const nE = [];
+    for (const li of lignes) { const k = numEbayLigne(o, li); if (k) nE.push(String(k)); const x = achatDuNum(k); if (x == null) { a = null; continue; } if (a != null) a += x; }
+    out.push({ plateforme: 'eBay', id: 'ebay:' + o.orderId, ts: Date.parse(o.creationDate || ''), eur, achat: a == null ? null : Math.round(a * 100) / 100, frais: 0, num: nE.join(' + ') });
   }
   // (1er nov., audit A2) VESTIAIRE : une vente terminée ou versée, au montant
   // REÇU sûr (commission déjà retirée : frais = 0), reliée à SA paire par
@@ -6538,7 +6540,7 @@ const ventesAutresBenefice = ({ lbc, ebay, vestiaire, numeros, achat, numLbc, nu
     const eur = montantRecuVc(v).eur;
     if (eur == null) continue;
     vus.add('vestiaire:' + v.id);
-    out.push({ plateforme: 'Vestiaire', id: 'vestiaire:' + v.id, ts: dateVenteVc(v) || NaN, eur, achat: achatDuNum(v.num), frais: 0 });
+    out.push({ plateforme: 'Vestiaire', id: 'vestiaire:' + v.id, ts: dateVenteVc(v) || NaN, eur, achat: achatDuNum(v.num), frais: 0, num: v.num ? String(v.num) : '' });
   }
   return out;
 };
@@ -35646,6 +35648,19 @@ const comptaChargesMois = (data, ym) => {
   const abo = sum(d.abonnements || [], a => chargeAbonnement(a, (m) => m === ym, ym));
   return { abo, total: sum(d.fixes || [], x => x.montant) + sum((d.depenses || []).filter(x => duMois(x.date)), x => x.montant) + sum((d.packs || []).filter(x => duMois(x.date)), x => x.montant) + abo };
 };
+// (3 nov.) Les LIGNES des charges d'un mois — les mêmes que `comptaChargesMois`
+// somme (fixes, dépenses et packs du mois, échéances d'abonnement) : le récap du
+// mois les liste, son total est celui de la règle.
+const lignesChargesMois = (data, ym) => {
+  const d = (data && typeof data === 'object') ? data : {};
+  const duMois = (x) => String(x || '').slice(0, 7) === ym;
+  const L = [];
+  for (const x of (d.fixes || [])) L.push({ date: '', libelle: String(x.label || x.libelle || 'Coût fixe'), montant: Number(x.montant) || 0 });
+  for (const x of (d.depenses || []).filter((x) => duMois(x.date))) L.push({ date: x.date, libelle: [x.libelle, x.cat].filter(Boolean).join(' · '), montant: Number(x.montant) || 0 });
+  for (const x of (d.packs || []).filter((x) => duMois(x.date))) L.push({ date: x.date, libelle: `Pack ${x.plateforme || ''}`.trim(), montant: Number(x.montant) || 0 });
+  for (const a of (d.abonnements || [])) { const m = chargeAbonnement(a, (m) => m === ym, ym); if (m) L.push({ date: '', libelle: String(a.libelle || 'Abonnement'), montant: m }); }
+  return { lignes: L, total: comptaChargesMois(data, ym).total };
+};
 // ── PROFIL FISCAL : le SIREN se vérifie, il ne se bloque pas (16 octobre) ────
 // SIREN = 9 chiffres, SIRET = SIREN + 5 chiffres ; les deux portent une clé de
 // Luhn. On DIT qu'il est invalide (une faute de frappe part sur chaque reçu
@@ -37095,8 +37110,46 @@ function RecapComptableMensuel() {
       telechargerFichier(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }), `vrm-comptabilite-${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8');
     } catch (err) { toast('Erreur export : ' + err.message); }
   };
+  // ── (3 nov.) « RÉCAP DE [MOIS] » : un PDF et un tableur (src/recapMois.js) ──
+  // Les MÊMES chiffres que le tableau ci-dessous et que Comptabilité : le bénéfice
+  // par `beneficeDuMois` (la règle), le CA déclaré et l'URSSAF de la ligne publiée,
+  // les charges de `comptaChargesMois` ; les ventes du relevé de Ventes.
+  const ymNow = ymCourant(Date.now());
+  const moisChoix = [...new Set([ymNow, ...moisRecap.map((m) => m.ym)])].sort().reverse().slice(0, 13);
+  const [ymRecap, setYmRecap] = React.useState(ymNow);
+  const [recapEnCours, setRecapEnCours] = React.useState('');
+  const donneesRecap = async (ym) => {
+    const B = pubB && moisCouvertParPublication(ym) ? beneficePeriode({ jours: pubB.jours, compta: comptaB, ligneUrssaf: v, taux: tauxUrssaf(), periode: 'mois', maintenant: Math.min(finDuMois(ym), Date.now()), toutes: Number(pubB.v) >= 2, urssaf: regimeB === undefined || urssafConcerne(regimeB) }) : null;
+    const m = moisRecap.find((x) => x.ym === ym) || null;
+    const rel = lireReleveVentes();
+    let ent = null; try { ent = await lireReglage('vrm_pro_facture'); } catch (_) { ent = null; }
+    return donneesRecapMois({ ym, releve: rel ? rel.l : null, benefice: chiffreBenefice(B, B ? 'lu' : 'passu'), B, caDeclare: m ? { ca: m.ca, n: m.count } : (urssafMois ? { ca: 0, n: 0 } : null),
+      urssaf: m ? m.urssaf : (urssafMois ? 0 : null), taux: tauxUrssaf(), charges: lignesChargesMois(comptaB, ym), entreprise: ent });
+  };
+  const exporterRecap = async (forme) => {
+    if (recapEnCours) return;
+    setRecapEnCours(forme);
+    try {
+      const d = await donneesRecap(ymRecap);
+      if (forme === 'csv') telechargerFichier(new Blob([csvRecapMois(d)], { type: 'text/csv;charset=utf-8' }), nomFichierRecap(ymRecap, 'csv'), 'text/csv;charset=utf-8');
+      else telechargerFichier(new Blob([await pdfRecapMois(d)], { type: 'application/pdf' }), nomFichierRecap(ymRecap, 'pdf'), 'application/pdf');
+    } catch (err) { toast('Récap pas créé : ' + (err && err.message || err)); }
+    setRecapEnCours('');
+  };
   return (
     <>
+      <Card className="vrm-recap-mois" data-recap-mois={ymRecap}>
+        <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+          <span data-titre-section="" style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15,flex:'1 1 auto'}}>Récap de {libelleMois(ymRecap)}</span>
+          <select aria-label="Mois du récap" data-recap-mois-choix="" value={ymRecap} onChange={(e)=>setYmRecap(e.target.value)} style={{height:44,borderRadius:10,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:15,padding:'0 10px',fontFamily:'inherit'}}>
+            {moisChoix.map((ym)=><option key={ym} value={ym}>{libelleMois(ym)}</option>)}
+          </select>
+        </div>
+        <div style={{display:'flex',gap:8,marginTop:10,flexWrap:'wrap'}}>
+          <Bouton variante="primaire" icone="doc" data-recap-pdf="" disabled={!!recapEnCours} onClick={()=>exporterRecap('pdf')} style={{flex:'1 1 140px'}}>{recapEnCours==='pdf'?'…':'PDF'}</Bouton>
+          <Bouton variante="secondaire" icone="save" data-recap-csv="" disabled={!!recapEnCours} onClick={()=>exporterRecap('csv')} style={{flex:'1 1 140px'}}>{recapEnCours==='csv'?'…':'Tableur'}</Bouton>
+        </div>
+      </Card>
       {/* Récap comptable mensuel */}
       {moisRecap.length>0&&(
         <Card><details className="vrm-repli" data-recap-repli="">
@@ -46024,7 +46077,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (isNaN(t) || new Date(t).getFullYear() < an0) continue;
         const e = effEntry(o);
         const v = montantCommande(o);
-        releve.push(['Vinted', String((o._acc && (o._acc.login || o._acc.vinted_user_id)) || ''), String(o.transaction_id || ''), t, v, achatDe(e), chargesVente(e), String(o.title || '').slice(0, 90)]);
+        // (3 nov.) + [8] le N° de la fiche, [9] la date de versement lue ('' pas lue) — le récap du mois.
+        const vers = versements && o.transaction_id != null ? (versements[String(o.transaction_id)] || '') : '';
+        releve.push(['Vinted', String((o._acc && (o._acc.login || o._acc.vinted_user_id)) || ''), String(o.transaction_id || ''), t, v, achatDe(e), chargesVente(e), String(o.title || '').slice(0, 90), String((e && e.numero) || ''), vers ? String(vers) : '']);
       }
       // Le titre d'une vente Leboncoin ou eBay : celui de LA vente, retrouvée par
       // SON identifiant (transaction, commande) — jamais pour relier une paire,
@@ -46034,13 +46089,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       for (const c of (ebayCmd || [])) if (c && c.orderId) titreDe['ebay:' + c.orderId] = (Array.isArray(c.lineItems) && c.lineItems[0] && c.lineItems[0].title) || '';
       for (const x of autresBenefice) {
         if (!isFinite(x.ts) || new Date(x.ts).getFullYear() < an0) continue;
-        releve.push([x.plateforme, '', x.id, x.ts, x.eur, x.achat, x.frais, String(titreDe[x.id] || '').slice(0, 90)]);
+        releve.push([x.plateforme, '', x.id, x.ts, x.eur, x.achat, x.frais, String(titreDe[x.id] || '').slice(0, 90), String(x.num || ''), new Date(x.ts).toISOString()]);
       }
       const r0 = load('vrm_stats_ventes', null);
       if (!(r0 && JSON.stringify(r0.l) === JSON.stringify(releve))) save('vrm_stats_ventes', { v: 1, l: releve, at: Date.now() });
     } catch (_) {}
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, sales.failedUids, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, autresBenefice, ventesVc]);
+  }, [sales.items, sales.failedUids, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, autresBenefice, ventesVc, versements]);
 
   // ── Achats HORS VINTED (brocante, fournisseur, particulier…) ──────────
   // Paires/objets achetés ailleurs que sur Vinted. Saisie manuelle : désignation,
