@@ -63,6 +63,7 @@ import { boostRentable, SEUIL_BOOST } from "./boostRentable.js";
 import { CLE_WIDGETS_JOURNEE, WIDGETS_JOURNEE, NOM_TAILLE, DISPO_JOURNEE_DEFAUT, normaliserDispoJournee, deplacerWidget, retirerWidget, widgetFixe, tailleSuivante, tailleDefautWidget, caseVisible, widgetsAjoutables, dispoAEnregistrer } from "./journeeWidgets.js";
 import { modeleSur, releveVentes } from "./ceQuiRapporte.js";
 import CeQuiRapporte from "./design/CeQuiRapporte.jsx";
+import { requeteDeLaVoix } from "./rechercheVocale.js";
 import { rythmeVendu, ecartPct, quandTuVends, margesPar, delaisPar, tranchePrix, TRANCHES_PRIX, stockQuiDort, SEUILS_DORT, rotationStock, tauxVenteMois, tauxAnnulation, PERIODES, bornesPeriode, dansBornes, venduPeriode, barresPeriode, ventesPar, plusRapides } from "./statsVentes.js";
 import "./stats-vitrine.css";
 import {appelerFavorisDirect} from './favorisTransport.js';
@@ -14392,10 +14393,21 @@ const Icon = ({ name, size = 24, style }) => {
 // bouton mort (§2.7, une fonction qui ne peut pas tenir se tait). On ne DEVINE
 // pas le texte — on pose ce que le navigateur a reconnu, à lui de corriger.
 const DICTEE_OK = typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
-function MicDictee({ onText, titre = 'Dicter' }) {
+// (3 nov.) Le micro REFUSÉ (permission du navigateur, ou service coupé) : le
+// bouton disparaît aussi — partout, pour la session — sans un mot.
+const DICTEE_REFUS = { non: false };
+function MicDictee({ onText, titre = 'Dicter', nu = false }) {
   const [ecoute, setEcoute] = React.useState(false);
+  const [refus, setRefus] = React.useState(DICTEE_REFUS.non);
   const recRef = React.useRef(null);
-  if (!DICTEE_OK) return null;
+  React.useEffect(() => {
+    if (!DICTEE_OK || DICTEE_REFUS.non) return undefined;
+    let mort = false;
+    try { const p = navigator.permissions && navigator.permissions.query ? navigator.permissions.query({ name: 'microphone' }) : null;
+      if (p && p.then) p.then((r) => { if (!mort && r && r.state === 'denied') { DICTEE_REFUS.non = true; setRefus(true); } }).catch(() => {}); } catch (_) {}
+    return () => { mort = true; };
+  }, []);
+  if (!DICTEE_OK || refus) return null;
   const lancer = () => {
     if (ecoute) { try { recRef.current && recRef.current.stop(); } catch (_) {} return; }
     try {
@@ -14403,17 +14415,17 @@ function MicDictee({ onText, titre = 'Dicter' }) {
       const rec = new SR();
       rec.lang = 'fr-FR'; rec.interimResults = false; rec.maxAlternatives = 1;
       rec.onresult = (e) => { const t = e && e.results && e.results[0] && e.results[0][0] && e.results[0][0].transcript; if (t) onText(String(t).trim()); };
-      rec.onerror = () => setEcoute(false);
+      rec.onerror = (e) => { setEcoute(false); if (e && (e.error === 'not-allowed' || e.error === 'service-not-allowed')) { DICTEE_REFUS.non = true; setRefus(true); } };
       rec.onend = () => { setEcoute(false); recRef.current = null; };
       recRef.current = rec; setEcoute(true); rec.start();
     } catch (_) { setEcoute(false); recRef.current = null; }
   };
   return (
-    <button className="vrm-icon-control" type="button" data-mic-dictee onClick={lancer} aria-label={titre} aria-pressed={ecoute}
+    <button className={nu ? 'vrm-micro' : 'vrm-icon-control'} type="button" data-mic-dictee data-micro-ecoute={ecoute ? '1' : '0'} onClick={lancer} aria-label={titre} aria-pressed={ecoute}
       title={ecoute ? 'À l’écoute… parle, puis touche pour arrêter' : titre}
-      style={{flexShrink:0,display:'inline-flex',alignItems:'center',justifyContent:'center',width:38,height:38,borderRadius:8,cursor:'pointer',fontFamily:'inherit',
+      style={nu ? undefined : {flexShrink:0,display:'inline-flex',alignItems:'center',justifyContent:'center',width:38,height:38,borderRadius:8,cursor:'pointer',fontFamily:'inherit',
         border:`1px solid ${ecoute?C.accent:C.border}`,background:ecoute?`${C.accent}18`:C.card,color:ecoute?C.accent:C.muted,transition:'background .15s,color .15s,border-color .15s'}}>
-      <Icon name="mic" size={17}/>
+      <Icon name="mic" size={nu ? 19 : 17}/>
     </button>
   );
 }
@@ -32791,7 +32803,7 @@ function StockMeubles() {
           type="search" enterKeyHint="search" autoComplete="off"
           placeholder="N°, marque, taille…" aria-label="Retrouver un article dans le stock"
           style={{ width: '100%', boxSizing: 'border-box', padding: `13px ${DICTEE_OK ? 92 : 40}px 13px 40px`, borderRadius: 12, border: `1.5px solid ${filtre ? C.accent : C.line}`, background: C.card, color: C.text, fontSize: 16, outline: 'none', minHeight: 48 }} />
-        <span style={{ position: 'absolute', right: (q || cibles.length > 0) ? 46 : 5, top: '50%', transform: 'translateY(-50%)' }}><MicDictee titre="Chercher à la voix (« numéro 12 », « nike noire »)" onText={(t) => { setQ(String(t).replace(/[.!?]+$/, '')); setCibles([]); }} /></span>
+        <span style={{ position: 'absolute', right: (q || cibles.length > 0) ? 46 : 5, top: '50%', transform: 'translateY(-50%)' }}><MicDictee titre="Chercher à la voix (« numéro 12 », « nike noire »)" onText={(t) => { setQ(requeteDeLaVoix(t).requete); setCibles([]); }} /></span>
         {(q || cibles.length > 0) && <button type="button" onClick={() => { setQ(''); setCibles([]); }} aria-label="Effacer la recherche" style={{ position: 'absolute', right: 2, top: '50%', transform: 'translateY(-50%)', width: 44, height: 44, background: 'transparent', border: 'none', color: C.muted, fontSize: 20, cursor: 'pointer' }}>×</button>}
       </div>
       {filtre && (
@@ -65363,6 +65375,9 @@ function AppCoeur() {
   // tape dedans), sur téléphone dans l'en-tête (la loupe l'ouvre, le clavier
   // monte sans changer d'écran). Échap ou un toucher dehors referme ; la page
   // derrière ne bouge pas.
+  // (3 nov.) La voix : ce que le navigateur a reconnu passe par `requeteDeLaVoix`
+  // (« numéro 124 », « cent vingt-quatre » ⇒ 124 ; « B 125 » ⇒ B125 ; sinon le texte).
+  const dicterRecherche = (t) => { const r = requeteDeLaVoix(t); if (!r.requete) return; setGsQ(r.requete); if (!gsOpen) setGsOpen(true); };
   const champRecherche = (mobile) => (
     <input ref={gsChampRef} type="search" className="vrm-recherche-champ" data-recherche-champ="" enterKeyHint="search" autoComplete="off" spellCheck={false}
       aria-label={mobile ? 'Rechercher une paire : N°, modèle ou marque' : 'Rechercher une paire'} placeholder={mobile ? 'N°, modèle ou marque…' : 'Tape un N°, un modèle, une marque…'}
@@ -65376,6 +65391,7 @@ function AppCoeur() {
       <label className="vrm-barre-recherche" data-barre-recherche="">
         <Icon name="search" size={18}/>
         {champRecherche(false)}
+        <MicDictee nu titre="Chercher à la voix" onText={dicterRecherche}/>
         {gsQ ? <button type="button" className="vrm-recherche-effacer" aria-label="Effacer la recherche" onClick={()=>{ setGsQ(''); try{ gsChampRef.current&&gsChampRef.current.focus(); }catch(_){} }}><Icon name="close" size={14}/></button>
           : <kbd className="vrm-barre-kbd">/</kbd>}
       </label>
@@ -65386,6 +65402,7 @@ function AppCoeur() {
     <div className="vrm-hdr-recherche" data-recherche-zone="" style={{background:C.bg}}>
       <Icon name="search" size={18} style={{color:C.muted,flexShrink:0}}/>
       {champRecherche(true)}
+      <MicDictee nu titre="Chercher à la voix" onText={dicterRecherche}/>
       <button type="button" className="vrm-hdr-recherche-fermer" aria-label="Fermer la recherche" onClick={fermerRecherche} style={{color:C.text}}>Fermer</button>
     </div>
   );

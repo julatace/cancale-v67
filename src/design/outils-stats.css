@@ -84,3 +84,5 @@
 .vrm-micro[data-micro-ecoute="1"] svg { animation: vrm-micro-pouls 1.1s ease-in-out infinite; }
 @keyframes vrm-micro-pouls { 50% { opacity: .55; } }
 @media (prefers-reduced-motion: reduce) { .vrm-micro[data-micro-ecoute="1"] svg { animation: none; } }
+.vrm-barre-recherche .vrm-micro { margin: 0 -10px 0 -6px; }
+.vrm-hdr-recherche .vrm-micro { margin: 0 -6px; }
