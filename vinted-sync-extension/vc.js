@@ -82,7 +82,11 @@
           id: String((x && x.id) || '').slice(0, 40), productId: String((x && x.productId) || '').slice(0, 40), ref: String((x && x.ref) || '').slice(0, 12),
           nonLu: x && (x.nonLu === true || x.nonLu === false) ? x.nonLu : null, date: String((x && x.date) || '').slice(0, 30),
           // 5.295 : l'aperçu du dernier message (texte borné, jamais un nom).
-          apercu: String((x && x.apercu) || '').slice(0, 160), apercuDeMoi: x && (x.apercuDeMoi === true || x.apercuDeMoi === false) ? x.apercuDeMoi : null }));
+          apercu: String((x && x.apercu) || '').slice(0, 160), apercuDeMoi: x && (x.apercuDeMoi === true || x.apercuDeMoi === false) ? x.apercuDeMoi : null,
+          // 5.317 : le titre et la photo de l'ARTICLE (fil des notifications), et d'où vient la ligne.
+          titre: String((x && x.titre) || '').slice(0, 120),
+          photo: /^https:\/\/images\.vestiairecollective\.com\/produit\/[\w.-]{1,60}$/i.test(String((x && x.photo) || '')) ? String(x.photo) : '',
+          source: /^(stream|notifications|canal)$/.test(String((x && x.source) || '')) ? String(x.source) : '' }));
         chrome.runtime.sendMessage(Object.assign({ from: 'cancale-vc', action: 'vcMessages', conversations, offset: Number(d.offset) || 0, total: typeof d.total === 'number' ? d.total : null, lus: Number(d.lus) || 0, page: String(d.page || '').slice(0, 160), forme: (Array.isArray(d.forme) ? d.forme : []).slice(0, 120).map((c) => String(c).slice(0, 120)) }, suite(d)), () => { void chrome.runtime.lastError; });
         return;
       }
@@ -90,7 +94,7 @@
       if (d.kind === 'vcmoi') {
         const id = String(d.id || '');
         if (!/^[\w-]{1,40}$/.test(id)) return;
-        chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'vcMoi', id, forme: (Array.isArray(d.forme) ? d.forme : []).slice(0, 80).map((c) => String(c).slice(0, 120)) }, () => { void chrome.runtime.lastError; });
+        chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'vcMoi', id, source: d.source === 'stream' ? 'stream' : 'users/me', forme: (Array.isArray(d.forme) ? d.forme : []).slice(0, 80).map((c) => String(c).slice(0, 120)) }, () => { void chrome.runtime.lastError; });
         return;
       }
       // 5.295 : UN fil de conversation — le texte des messages, leur date, « de toi » ; jamais un nom.

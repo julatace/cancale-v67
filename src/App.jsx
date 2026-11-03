@@ -184,7 +184,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.316.0';
+const EXT_ATTENDUE = '5.317.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -609,7 +609,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ (30 oct., intégration) `transp`, `lbcsupprime` et `lbcstats` arrivent tous
 //    en 5.291.0 : 5.288 (Leboncoin) et 5.290 (colis) étaient des numéros de
 //    branche, jamais servis ; aucune version publiée ne porte ces fonctions.
-const EXT_CAPACITES = { plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.295.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0' };
+const EXT_CAPACITES = { plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -27432,14 +27432,16 @@ function FilVestiaire({ conv, num, titre, envoi, onFerme }) {
     <PiedSansEnvoi attrs={{ 'data-vc-repondre': cap !== 'ok' ? 'ext-' + cap : 'pas-appris', ...(cap === 'ok' ? { 'data-vc-pas-appris': envoi && envoi.raison ? envoi.raison : '' } : {}) }} lien={lien} texteLien="Répondre sur Vestiaire ↗"
       raison={cap === 'absente' ? <>Pour répondre d'ici, ouvre VRM dans le Chrome où l'extension est installée — sinon réponds sur Vestiaire.</>
         : cap !== 'ok' ? <>Pour répondre d'ici, il faut l'extension <b>{EXT_CAPACITES.vcrepondre}</b> — mets-la à jour depuis <b>Paramètres → État des connexions</b>.</>
-        : <>Pour répondre d'ici, l'extension doit d'abord VOIR comment Vestiaire envoie un message : envoie <b>une</b> réponse toi-même sur Vestiaire, dans ce Chrome. Ensuite, VRM pourra répondre — toujours sur ton clic.{envoi && envoi.raison ? <> (Dernier essai vu : pas encore sûr à refaire — {envoi.raison}.)</> : null}</>}>
+        : envoi && envoi.raison === 'messagerie-stream'
+          ? <span data-vc-envoi-stream="">Vestiaire envoie tes messages par un service de messagerie à part : VRM ne sait pas encore les envoyer d'ici sans risque. Réponds sur Vestiaire — ta réponse apparaîtra ici.</span>
+          : <>Pour répondre d'ici, l'extension doit d'abord VOIR comment Vestiaire envoie un message : envoie <b>une</b> réponse toi-même sur Vestiaire, dans ce Chrome. Ensuite, VRM pourra répondre — toujours sur ton clic.{envoi && envoi.raison ? <> (Dernier essai vu : pas encore sûr à refaire — {envoi.raison}.)</> : null}</>}>
       {resultat}
     </PiedSansEnvoi>
   );
   else if (fil !== undefined) pied = <PiedSansEnvoi lien={lien} texteLien="Ouvrir sur Vestiaire ↗" raison="Sans le texte de la conversation, VRM ne répond pas d'ici."/>;
   return (
     <CadreFil etiquette="Conversation Vestiaire" onFermer={onFerme} attrs={{ 'data-vc-fil-ouvert': conv }}>
-      <TeteFil onFermer={onFerme} nom={num ? `N°${num}` : 'Conversation pas reliée à une paire'} titre={titre || ''} compte="Vestiaire"/>
+      <TeteFil onFermer={onFerme} nom={num ? `N°${num}` : 'Conversation pas reliée à un article VRM'} titre={titre || ''} compte="Vestiaire"/>
       <div className="vrm-chat-history" style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>{corps}</div>
       {pied}
     </CadreFil>
@@ -27457,14 +27459,16 @@ function MessagesVestiaire() {
         lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=liens:data->liens,items:data->items`),
         // 5.295 : les fils lus, en SCALAIRES (§4.4 : jamais le texte de tous les fils d'un coup).
         lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=like.vc_fil_*&select=id,n:meta->>n,da:meta->>dernierAt,ap:meta->>apercu,dm:meta->>dernierDeMoi,pid:meta->>productId,ref:meta->>ref`),
-        lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_envoi&select=appris:data->appris,raison:data->>raison,at:data->>at`),
+        lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_envoi&select=appris:data->appris,raison:data->>raison,at:data->>at,chemin:data->>chemin`),
       ]);
       if (!Array.isArray(jm) || !Array.isArray(jl)) throw new Error('lecture');
       const r = (jm && jm[0]) || {};
       const fils = {};
       for (const x of (Array.isArray(jf) ? jf : [])) { const id = String(x.id || '').replace(/^vc_fil_/, ''); if (id) fils[id] = x; }
       setD({ compteur: r.compteur || null, compteurs: r.compteurs || null, conversations: r.conversations || null, lecture: r.lecture || null, liens: (jl && jl[0] && jl[0].liens) || {}, items: (jl && jl[0] && jl[0].items) || {},
-        fils: Array.isArray(jf) ? fils : null, envoi: Array.isArray(je) ? (je[0] ? { appris: je[0].appris === true, raison: je[0].raison || '', at: je[0].at || '' } : { appris: false, raison: '' }) : null });
+        fils: Array.isArray(jf) ? fils : null, envoi: Array.isArray(je) ? (je[0] ? { appris: je[0].appris === true,
+          // (3 nov.) L'ouverture d'une conversation (`/chat/channel/`) notée à tort comme un essai d'envoi par les 5.295-5.316 : pas un essai.
+          raison: /^\/chat\/channel\/?$/.test(String(je[0].chemin || '')) ? '' : (je[0].raison || ''), at: je[0].at || '' } : { appris: false, raison: '' }) : null });
     } catch (_) { setD(null); }
   }, []);
   React.useEffect(() => { relire(); }, [relire]);
@@ -27491,7 +27495,11 @@ function MessagesVestiaire() {
       const apercu = (f && f.ap) || v.apercu || '';
       const date = (f && f.da) || v.date || v.vuAt || '';
       const deMoi = f && f.ap ? f.dm === 'true' : v.apercuDeMoi === true;
-      return { id, pid: String(pid || ''), nonLu: v.nonLu, apercu, deMoi, date, lu: !!(f && Number(f.n) > 0), num: cleNum((pid && d.liens[pid]) || ref || ''), compte: v.compte || '' };
+      // (3 nov., 5.317) Le titre et la photo de l'ARTICLE lus par l'extension (fil des notifications
+      // Vestiaire) quand la conversation n'est reliée à aucune fiche — affichage seul, jamais une identité.
+      const it = (pid && d.items && d.items[pid]) || null;
+      return { id, pid: String(pid || ''), nonLu: v.nonLu, apercu, deMoi, date, lu: !!(f && Number(f.n) > 0), num: cleNum((pid && d.liens[pid]) || ref || ''), compte: v.compte || '',
+        titreArticle: String(v.titre || (it && it.titre) || ''), photoArticle: urlPhotoVc(v.photo || (it && it.photo) || '') };
     }).sort((a, z) => (z.nonLu === true) - (a.nonLu === true) || String(z.date || '').localeCompare(String(a.date || '')));
     const choisie = liste.find((v) => v.id === ouvert) || null;
     const fcChoisie = choisie ? ficheVestiaireDe(choisie, d.items) : null;
@@ -27512,9 +27520,9 @@ function MessagesVestiaire() {
                   const fv = v.num ? ficheDuNumero(v.num) : null; const t = Date.parse(v.date || '');
                   return (
                     <div key={v.id} data-vc-conv={v.id} data-vc-conv-num={v.num || ''} data-vc-conv-nonlu={v.nonLu === true ? 'oui' : v.nonLu === false ? 'non' : 'passu'} data-vc-conv-lu={v.lu ? 'oui' : 'non'} data-flou={vcFloute(vcOuvert, v.compte) ? '1' : '0'} style={vcFloute(vcOuvert, v.compte) && ouvert !== v.id ? STYLE_FLOU : undefined}>
-                      <LigneConv actif={ouvert === v.id} onClick={() => setOuvert(v.id)} ariaLabel={`Ouvrir la conversation ${v.num ? 'du N°' + v.num : 'pas reliée à une paire'}`}
-                        photo={fv && fv.photo} nom="Vestiaire" quand={isFinite(t) ? t : null} couleurHeure={v.nonLu === true ? C.accent : C.muted}
-                        titre={(fv && fv.titre) || (v.num ? '' : 'Pas reliée à une paire')} num={v.num}
+                      <LigneConv actif={ouvert === v.id} onClick={() => setOuvert(v.id)} ariaLabel={`Ouvrir la conversation ${v.num ? 'du N°' + v.num : 'pas reliée à un article VRM'}`}
+                        photo={(fv && fv.photo) || v.photoArticle} nom="Vestiaire" quand={isFinite(t) ? t : null} couleurHeure={v.nonLu === true ? C.accent : C.muted}
+                        titre={(fv && fv.titre) || v.titreArticle || (v.num ? '' : 'Pas reliée à un article VRM')} num={v.num}
                         extrait={v.apercu || (v.lu ? '' : 'Texte pas encore lu')} toi={!!v.apercu && v.deMoi} couleurExtrait={v.nonLu === true ? C.text : C.muted}
                         apres={v.nonLu == null ? <span className="vrm-msg-etat" title="Vestiaire ne dit pas si elle est lue" style={{ color: C.muted, borderColor: C.border }}>lu ?</span> : null}
                         point={v.nonLu === true ? C.accent : null}/>
@@ -27526,7 +27534,7 @@ function MessagesVestiaire() {
               : <div data-vc-conv-jamais="" style={style}>Le détail des conversations arrive quand tu ouvres ta messagerie sur Vestiaire dans ce Chrome.</div>)}
           </div>
           <div className="vrm-chat-column">{choisie
-            ? <FilVestiaire key={choisie.id} conv={choisie.id} num={choisie.num} titre={(fcChoisie && fcChoisie.titre) || ''} envoi={d.envoi} onFerme={() => setOuvert('')}/>
+            ? <FilVestiaire key={choisie.id} conv={choisie.id} num={choisie.num} titre={(fcChoisie && fcChoisie.titre) || choisie.titreArticle || ''} envoi={d.envoi} onFerme={() => setOuvert('')}/>
             : <div className="vrm-chat-empty"><Icon name="chat" size={28}/><span>Choisis une conversation</span><small>Lis-la et réponds-y depuis VRM.</small></div>}</div>
           {!choisie ? <FicheConvVolet site="vestiaire" etat="aucune"/>
             : <FicheConvVolet site="vestiaire" etat={fcChoisie ? 'reliee' : 'non-reliee'} fc={fcChoisie} raison="Cet article Vestiaire ne porte aucune référence VRM : VRM ne devine pas la paire d’après le titre."/>}

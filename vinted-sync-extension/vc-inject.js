@@ -723,7 +723,7 @@
       if (!(typeof brut === 'string' || typeof brut === 'number')) return;
       const id = String(brut);
       if (!/^[\w-]{1,40}$/.test(id)) return;
-      moiId = id;
+      moiId = id; moiSource = 'users/me';
       post({ kind: 'vcmoi', id, forme: cheminsDeCles(obj).map(sansId).slice(0, 80) });
     } catch (_) {}
   }
@@ -809,6 +809,188 @@
     return null;
   }
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // 5.317 (3 nov.) — LA MESSAGERIE VESTIAIRE PASSE PAR « STREAM »
+  // ══════════════════════════════════════════════════════════════════════════
+  // Julien (3 nov., 10 h 02) : « les messages Vestiaire ne marchent pas, ils ne
+  // sont pas captés, même avec la dernière extension ». MESURÉ dans ce que la
+  // 5.315/5.316 a gardé chez lui (noms de clés et hôtes, lecture seule) :
+  //   · la page `/chat/` charge `apiv2…/chat/user/token` ⇒ `{ userToken: {
+  //     provider: 'stream' } }` puis `POST apiv2…/chat/channel/` ⇒ `{ id:
+  //     '{acheteur}-{article}', type: 'chat_channel', product: '{article}' }` ;
+  //   · les conversations et leurs messages viennent ENSUITE d'un autre hôte,
+  //     `chat.stream-chat.com` (relevé 14 fois dans `vc_recon.hotes`) — un
+  //     service de messagerie (Stream Chat) que la page appelle elle-même ;
+  //   · `vc-inject` ne lisait QUE les réponses de vestiairecollective.com : aucune
+  //     conversation, aucun fil n'a jamais été rangé (`vc_fil_*` : 0 ligne) ;
+  //   · la seule LISTE sur vestiairecollective.com est le fil des notifications
+  //     `notification-feed?category=messages` (une carte par conversation :
+  //     `productLink.meta.data.id` = la conversation, `lastChatMessage`,
+  //     `date`, `status`, `senderId`, `productTitle`, `productPicture`) — que
+  //     `noteMessages` écartait exprès (« jamais le fil des notifications »).
+  // ⇒ On lit, toujours SANS aucune requête de plus (ce que la page charge déjà) :
+  //   · les réponses REST de Stream que la page reçoit (`POST /channels` = la
+  //     liste, `POST /channels/{type}/{id}/query` = une conversation ouverte,
+  //     `POST …/message` = un message que TU viens d'envoyer) : par conversation
+  //     son identifiant, l'article, « non lu » (la ligne `read` du compte
+  //     ouvert), et ses messages (texte, date, « de toi ») — JAMAIS un nom, un
+  //     pseudo ni une photo de personne ;
+  //   · le compte ouvert : Stream reçoit `user_id` dans l'adresse de CHAQUE
+  //     requête de la page (le compte pour lequel Vestiaire a délivré le jeton) —
+  //     seulement s'il a la forme d'un identifiant Vestiaire (des chiffres), et
+  //     jamais à la place d'un `/users/me` lu dans ce document ;
+  //   · le fil des notifications « messages » : une conversation par carte, le
+  //     titre et la photo de l'ARTICLE (jamais ceux de la personne).
+  // Aucune permission ajoutée : c'est la page qui parle à Stream, on regarde ses
+  // réponses ; le fond de l'extension n'appelle jamais Stream.
+  const DE_STREAM = (url) => { try { const u = new URL(url, location.origin); return u.protocol === 'https:' && /(^|\.)(stream-chat\.com|stream-io-api\.com)$/i.test(u.hostname); } catch (_) { return false; } };
+  let moiSource = '';
+  function noteMoiStream(url) {
+    try {
+      if (!DE_STREAM(url)) return;
+      const id = new URL(url, location.origin).searchParams.get('user_id') || '';
+      if (!/^\d{3,15}$/.test(id)) return;
+      if (moiId && moiSource !== 'stream') return;   // `/users/me` lu dans ce document fait foi
+      if (moiId === id) return;
+      moiId = id; moiSource = 'stream';
+      post({ kind: 'vcmoi', id, source: 'stream', forme: [] });
+    } catch (_) {}
+  }
+  const CANAL_ARTICLE = /^\d{3,15}-(\d{3,15})$/;    // mesuré : « {acheteur}-{article} »
+  const idCanal = (ch) => {
+    if (!ch || typeof ch !== 'object') return '';
+    const id = typeof ch.id === 'string' || typeof ch.id === 'number' ? String(ch.id) : (typeof ch.cid === 'string' ? ch.cid.split(':').pop() : '');
+    return ID_CONV.test(id) ? id : '';
+  };
+  const articleCanal = (ch, conv) => {
+    for (const k of ['product', 'productId', 'product_id']) {
+      const v = ch && ch[k];
+      if ((typeof v === 'string' || typeof v === 'number') && /^\d{3,15}$/.test(String(v))) return String(v);
+      if (v && typeof v === 'object' && (typeof v.id === 'string' || typeof v.id === 'number') && /^\d{3,15}$/.test(String(v.id))) return String(v.id);
+    }
+    const m = CANAL_ARTICLE.exec(conv || ''); return m ? m[1] : '';
+  };
+  const SANS_PERSONNE = /name|pseudo|avatar|image|picture|photo|email|phone|address|bio|language|country|city/i;
+  // Un message Stream : son texte (`text`), sa date, son auteur comparé au compte
+  // ouvert. Un message supprimé ou sans texte (photo seule) ne passe pas.
+  function messageStream(e) {
+    if (!e || typeof e !== 'object' || Array.isArray(e)) return null;
+    if (e.type === 'deleted' || e.deleted_at) return null;
+    const t = typeof e.text === 'string' && e.text.trim() ? propreTexte(e.text) : '';
+    if (!t) return null;
+    const id = (typeof e.id === 'string' || typeof e.id === 'number') && /^[\w-]{1,40}$/.test(String(e.id)) ? String(e.id) : '';
+    const auteur = e.user && typeof e.user === 'object' && (typeof e.user.id === 'string' || typeof e.user.id === 'number') ? String(e.user.id) : (typeof e.user_id === 'string' ? e.user_id : '');
+    return { id, t, deMoi: moiId && auteur ? auteur === moiId : null, at: dateMsg(e) };
+  }
+  // « Non lu » : la ligne `read` du COMPTE OUVERT (`unread_messages`) ; compte
+  // pas su, ou aucune ligne ⇒ `null` (pas su), jamais « lu ».
+  function nonLuStream(etat) {
+    if (!moiId || !etat || !Array.isArray(etat.read)) return null;
+    for (const r of etat.read.slice(0, 50)) {
+      const u = r && r.user && (typeof r.user.id === 'string' || typeof r.user.id === 'number') ? String(r.user.id) : (r && typeof r.user_id === 'string' ? r.user_id : '');
+      if (u !== moiId) continue;
+      const n = r.unread_messages;
+      return typeof n === 'number' && isFinite(n) ? n > 0 : null;
+    }
+    return null;
+  }
+  function etatCanalStream(etat) {
+    if (!etat || typeof etat !== 'object' || Array.isArray(etat) || !etat.channel || typeof etat.channel !== 'object') return null;
+    const conv = idCanal(etat.channel);
+    if (!conv) return null;
+    const messages = Array.isArray(etat.messages) ? etat.messages.slice(-200).map(messageStream).filter(Boolean) : null;
+    const dernier = messages && messages.length ? messages[messages.length - 1] : null;
+    const ch = etat.channel;
+    const date = dernier && dernier.at ? dernier.at : dateMsg({ date: ch.last_message_at || ch.updated_at || '' });
+    return { conv, productId: articleCanal(ch, conv), nonLu: nonLuStream(etat), date, apercu: dernier ? coupe(dernier.t, 160) : '', apercuDeMoi: dernier ? dernier.deMoi : null, messages };
+  }
+  const formeStream = (x) => cheminsDeCles(x).map(sansId).filter((c) => !SANS_PERSONNE.test(c.split(':')[0])).slice(0, 80);
+  const pageIci = () => normChemin(sansId(location.pathname));
+  function postConvsStream(etats, lus, forme) {
+    const conversations = etats.map((s) => ({ id: s.conv, productId: s.productId, ref: '', nonLu: s.nonLu, date: s.date, apercu: s.apercu, apercuDeMoi: s.apercuDeMoi, source: 'stream' }));
+    for (const s of etats) convsVues.add(s.conv);
+    // Jamais « la liste entière » : la page ne demande que les conversations récentes.
+    post({ kind: 'vcmessages', conversations, offset: 0, total: null, lus, forme, page: pageIci(), moi: moiId });
+    for (const s of etats) if (s.messages) post({ kind: 'vcfil', conv: s.conv, productId: s.productId, ref: '', messages: s.messages, lus: s.messages.length, forme: [], moi: moiId, page: pageIci() });
+  }
+  function noteStream(url, methode, statut, texte) {
+    try {
+      if (!DE_STREAM(url) || !(statut >= 200 && statut < 300)) return;
+      let u; try { u = new URL(url, location.origin); } catch (_) { return; }
+      const p = u.pathname.replace(/\/+$/, '');
+      const liste = /^\/channels$/i.test(p);
+      const une = /^\/channels\/[\w-]{1,40}\/[\w-]{3,64}\/query$/i.test(p);
+      const envoi = /^\/channels\/[\w-]{1,40}\/([\w-]{3,64})\/message$/i.exec(p);
+      if (!liste && !une && !envoi) return;
+      let obj; try { obj = JSON.parse(texte); } catch (_) { return; }
+      if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return;
+      if (envoi) {
+        const conv = ID_CONV.test(envoi[1]) ? envoi[1] : '';
+        const m = messageStream(obj.message);
+        if (conv && m && convsVues.has(conv)) post({ kind: 'vcfil', conv, productId: '', ref: '', messages: [m], lus: 1, forme: [], moi: moiId, page: pageIci() });
+        return;
+      }
+      if (liste) {
+        // « rien lu » ≠ « liste vide » : `{channels: []}` est une liste vide, autre chose une forme inconnue.
+        if (!Array.isArray(obj.channels)) { post({ kind: 'vcmessages', conversations: [], offset: 0, total: null, lus: 0, forme: [], inconnu: formeStream(obj), page: pageIci(), moi: moiId }); return; }
+        const etats = obj.channels.slice(0, 200).map(etatCanalStream).filter(Boolean);
+        if (obj.channels.length && !etats.length) { post({ kind: 'vcmessages', conversations: [], offset: 0, total: null, lus: 0, forme: [], inconnu: formeStream(obj.channels[0]), page: pageIci(), moi: moiId }); return; }
+        postConvsStream(etats, obj.channels.length, obj.channels.length ? formeStream(obj.channels[0]) : []);
+        return;
+      }
+      const s = etatCanalStream(obj);
+      if (!s) { post({ kind: 'vcmessages', conversations: [], offset: 0, total: null, lus: 0, forme: [], inconnu: formeStream(obj), page: pageIci(), moi: moiId }); return; }
+      postConvsStream([s], 1, formeStream(obj));
+    } catch (_) {}
+  }
+  // Le fil des notifications « messages » de Vestiaire : une carte par
+  // conversation (mesuré). Seules les cartes dont le lien dit `type: 'chat'`.
+  const photoProduitVc = (p) => { try { const u = new URL(p && typeof p === 'object' ? String(p.url || '') : ''); return u.protocol === 'https:' && u.hostname === 'images.vestiairecollective.com' && /^\/produit\/[\w.-]{1,60}$/.test(u.pathname) ? u.href : ''; } catch (_) { return ''; } };
+  function noteFluxMessages(url, texte) {
+    try {
+      let u; try { u = new URL(url, location.origin); } catch (_) { return; }
+      if (!DE_VC(url) || !/\/notification-feed(\/v\d+)?\/?$/i.test(u.pathname)) return;
+      let obj; try { obj = JSON.parse(texte); } catch (_) { return; }
+      if (!obj || !Array.isArray(obj.data)) return;
+      const par = new Map();
+      for (const e of obj.data.slice(0, 200)) {
+        const lien = e && e.productLink && e.productLink.meta;
+        if (!lien || lien.type !== 'chat' || !lien.data) continue;
+        const conv = String(lien.data.id == null ? '' : lien.data.id);
+        if (!ID_CONV.test(conv)) continue;
+        const date = dateMsg({ date: e.date });
+        const prec = par.get(conv);
+        if (prec && prec.date >= date) continue;
+        const auteur = typeof e.senderId === 'string' || typeof e.senderId === 'number' ? String(e.senderId) : '';
+        const deMoi = moiId && auteur ? auteur === moiId : null;
+        // « lu » : la carte est lue (`status: 'read'`) ou c'est TON message ; un autre mot ⇒ pas su.
+        const nonLu = deMoi === true || e.status === 'read' ? false : null;
+        const ap = typeof e.lastChatMessage === 'string' && e.lastChatMessage.trim() ? propreTexte(e.lastChatMessage, 160) : '';
+        const m = CANAL_ARTICLE.exec(conv);
+        par.set(conv, { id: conv, productId: m ? m[1] : '', ref: '', nonLu, date, apercu: ap, apercuDeMoi: ap ? deMoi : null,
+          titre: typeof e.productTitle === 'string' ? coupe(e.productTitle.replace(/\s+/g, ' ').trim(), 120) : '', photo: photoProduitVc(e.productPicture), source: 'notifications' });
+      }
+      if (!par.size) return;
+      for (const id of par.keys()) convsVues.add(id);
+      post({ kind: 'vcmessages', conversations: [...par.values()], offset: 0, total: null, lus: par.size, forme: [], page: '/chat/', moi: moiId });
+    } catch (_) {}
+  }
+  // L'ouverture d'une conversation (`POST apiv2…/chat/channel/`, mesurée) : son
+  // identifiant et son article — jamais l'acheteur ni le vendeur.
+  function noteCanal(url, methode, texte) {
+    try {
+      let u; try { u = new URL(url, location.origin); } catch (_) { return; }
+      if (!DE_VC(url) || !/\/chat\/channel\/?$/i.test(u.pathname)) return;
+      let obj; try { obj = JSON.parse(texte); } catch (_) { return; }
+      const d = obj && obj.data;
+      if (!d || d.type !== 'chat_channel') return;
+      const conv = String(d.id == null ? '' : d.id);
+      if (!ID_CONV.test(conv)) return;
+      convsVues.add(conv);
+      post({ kind: 'vcmessages', conversations: [{ id: conv, productId: articleCanal(d, conv), ref: '', nonLu: null, date: '', apercu: '', apercuDeMoi: null, source: 'canal' }], offset: 0, total: null, lus: 1, forme: [], page: '/chat/', moi: moiId });
+    } catch (_) {}
+  }
+
   // ── APPRENDRE COMMENT LA PAGE ENVOIE UN MESSAGE ─────────────────────────
   const CHEMIN_ENVOI = /(conversation|message|thread|chat|inbox)/i;
   const PAS_ENVOI = /zendesk|partners|support|notification|help|report|block|signal|read|seen|typing|archive|delete|mark/i;
@@ -826,8 +1008,18 @@
   const noterEntetesPage = (url, h) => { try { if (!DE_VC(url) || !/^apiv2\./i.test(hoteDe(url))) return; const e = nomsEntetes(h); if (Object.keys(e).length) entetesApi = e; } catch (_) {} };
   function recetteEnvoi(url, methode, corps, entetes) {
     let u; try { u = new URL(url, location.origin); } catch (_) { return null; }
+    // 5.317 — un message que TU envoies passe par Stream (mesuré : la page n'écrit
+    // rien sur vestiairecollective.com en envoyant). Son corps porte un
+    // identifiant fabriqué par la page et le jeton de Stream voyage dans un
+    // en-tête : rien n'y est sûr à refaire. On le NOTE (pas rejouable, raison
+    // dite) — VRM ne l'envoie jamais à ta place.
+    if (DE_STREAM(url) && /^(POST|PUT)$/i.test(String(methode || '')) && /^\/channels\/[\w-]{1,40}\/[\w-]{3,64}\/message\/?$/i.test(u.pathname))
+      return { methode: String(methode).toUpperCase(), hote: u.hostname, chemin: normChemin(sansId(u.pathname)), rejouable: false, raison: 'messagerie-stream' };
     if (!DE_VC(url) || !/^(POST|PUT)$/i.test(String(methode || ''))) return null;
     if (!CHEMIN_ENVOI.test(u.pathname) || PAS_ENVOI.test(u.pathname)) return null;
+    // 5.317 — ouvrir une conversation ou demander le jeton de la messagerie n'est
+    // PAS un envoi (mesuré : `POST /chat/channel/` notait un faux « essai »).
+    if (/\/chat\/(channel|user)(\/|$)/i.test(u.pathname)) return null;
     const base = { methode: String(methode).toUpperCase(), hote: u.hostname, chemin: normChemin(sansId(u.pathname)) };
     const non = (raison) => ({ ...base, rejouable: false, raison });
     if (typeof corps !== 'string') return non('corps-illisible');
@@ -961,17 +1153,18 @@
       const meth = (init && init.method) || (typeof input === 'object' && input && input.method) || 'GET';
       const ent = (init && init.headers) || (typeof input === 'object' && input && input.headers) || null;
       const corpsEnvoye = init && typeof init.body === 'string' ? init.body : null;
-      try { noterEntetesPage(url, ent); } catch (_) {}
+      try { noterEntetesPage(url, ent); noteMoiStream(url); } catch (_) {}
       const p = origFetch.apply(this, arguments);
       try {
         p.then((res) => {
           try {
             const ct = res.headers && res.headers.get && res.headers.get('content-type');
             noteVu(url, meth, res.status, ct);
-            if (DE_VC(url) && /^(POST|PUT)$/i.test(String(meth))) noteEnvoi(url, meth, res.status, corpsEnvoye, ent);
+            if ((DE_VC(url) || DE_STREAM(url)) && /^(POST|PUT)$/i.test(String(meth))) noteEnvoi(url, meth, res.status, corpsEnvoye, ent);
+            if (DE_STREAM(url) && res.status >= 200 && res.status < 300 && /json/i.test(String(ct || ''))) res.clone().text().then((t) => noteStream(url, meth, res.status, t)).catch(() => {});
             // 5.299 : une réponse d'ERREUR (401, 404, 500…) n'est ni une liste, ni un compte, ni un schéma.
             if (res.status >= 200 && res.status < 300 && /pdf/i.test(String(ct || ''))) res.clone().arrayBuffer().then((o) => notePdf(url, res.status, o)).catch(() => {});
-            if (DE_VC(url) && res.status >= 200 && res.status < 300 && /json/i.test(String(ct || ''))) res.clone().text().then((t) => { noteBrut(url, meth, res.status, t, 'api'); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); noteTimeline(url, t); noteCompteur(url, t); noteMessages(url, t); noteFil(url, t); noteAchats(url, t); notePublication(url, meth, res.status, t); }).catch(() => {});
+            if (DE_VC(url) && res.status >= 200 && res.status < 300 && /json/i.test(String(ct || ''))) res.clone().text().then((t) => { noteBrut(url, meth, res.status, t, 'api'); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); noteTimeline(url, t); noteCompteur(url, t); noteMessages(url, t); noteFluxMessages(url, t); noteCanal(url, meth, t); noteFil(url, t); noteAchats(url, t); notePublication(url, meth, res.status, t); }).catch(() => {});
           } catch (_) {}
         }).catch(() => {});
       } catch (_) {}
@@ -984,7 +1177,7 @@
     OX.prototype.open = function (method, url) { this.__vcUrl = url; this.__vcMeth = method; this.__vcH = null; return origOpen.apply(this, arguments); };
     if (origSetH) OX.prototype.setRequestHeader = function (k, v) { try { (this.__vcH = this.__vcH || {})[String(k)] = String(v); } catch (_) {} return origSetH.apply(this, arguments); };
     OX.prototype.send = function (corpsXhr) {
-      try { noterEntetesPage(this.__vcUrl || '', this.__vcH); this.__vcCorps = typeof corpsXhr === 'string' ? corpsXhr : null; } catch (_) {}
+      try { noterEntetesPage(this.__vcUrl || '', this.__vcH); noteMoiStream(String(this.__vcUrl || '')); this.__vcCorps = typeof corpsXhr === 'string' ? corpsXhr : null; } catch (_) {}
       try {
         this.addEventListener('load', function () {
           try {
@@ -994,9 +1187,10 @@
             // 5.299 : une page qui demande `responseType = 'json'` était ignorée (rien n'était lu).
             let t = null;
             try { t = this.responseType === 'json' ? (this.response == null ? null : JSON.stringify(this.response)) : (this.responseType === '' || this.responseType === 'text') ? this.responseText : null; } catch (_) { t = null; }
-            if (DE_VC(url) && /^(POST|PUT)$/i.test(String(this.__vcMeth || ''))) noteEnvoi(url, this.__vcMeth, this.status, this.__vcCorps, this.__vcH);
+            if ((DE_VC(url) || DE_STREAM(url)) && /^(POST|PUT)$/i.test(String(this.__vcMeth || ''))) noteEnvoi(url, this.__vcMeth, this.status, this.__vcCorps, this.__vcH);
+            if (t && DE_STREAM(url) && this.status >= 200 && this.status < 300 && /json/i.test(String(ct || ''))) noteStream(url, this.__vcMeth, this.status, t);
             if (this.status >= 200 && this.status < 300 && /pdf/i.test(String(ct || '')) && this.response instanceof ArrayBuffer) notePdf(url, this.status, this.response);
-            if (t && this.status >= 200 && this.status < 300 && /json/i.test(String(ct || ''))) { noteBrut(url, this.__vcMeth, this.status, t, 'api'); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); noteTimeline(url, t); noteCompteur(url, t); noteMessages(url, t); noteFil(url, t); noteAchats(url, t); notePublication(url, this.__vcMeth, this.status, t); }
+            if (t && this.status >= 200 && this.status < 300 && /json/i.test(String(ct || ''))) { noteBrut(url, this.__vcMeth, this.status, t, 'api'); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); noteTimeline(url, t); noteCompteur(url, t); noteMessages(url, t); noteFluxMessages(url, t); noteCanal(url, this.__vcMeth, t); noteFil(url, t); noteAchats(url, t); notePublication(url, this.__vcMeth, this.status, t); }
           } catch (_) {}
         });
       } catch (_) {}
