@@ -79,14 +79,17 @@ async function main() {
         await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
 
         // ── Phase 1 : base UP, on ouvre « À retirer » → le cache s'écrit ───────
-        await pg.goto(`http://localhost:${PORT}/?tab=cat_achats`, { waitUntil: 'domcontentloaded' });
-        await pg.waitForTimeout(2500);
+        await pg.goto(`http://localhost:${PORT}/?tab=cat_bord`, { waitUntil: 'domcontentloaded' });
+        // (3 nov.) On attend l'ÉTAT (la copie écrite), jamais un délai fixe : sous
+        // charge l'écran Colis met plus de 2,5 s à publier (le banc était rouge
+        // sur main pour cette seule raison).
+        await pg.waitForFunction(() => { try { return !!localStorage.getItem('vrm_codes_hors_ligne'); } catch (_) { return false; } }, null, { timeout: 20000 }).catch(() => {});
         const cache = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_codes_hors_ligne') || 'null'); } catch (_) { return null; } });
         dit(cache && Array.isArray(cache.codes) && cache.codes.some((x) => x.code === '1234'), `${T} phase 1 (base up) : le code 1234 est gardé en local`, cache ? JSON.stringify(cache.codes) : 'pas de cache');
 
         // ── Phase 2 : base KO, on recharge → BaseInjoignable montre le code ────
         baseDown = true;
-        await pg.goto(`http://localhost:${PORT}/?tab=cat_achats`, { waitUntil: 'domcontentloaded' });
+        await pg.goto(`http://localhost:${PORT}/?tab=cat_bord`, { waitUntil: 'domcontentloaded' });
         // On attend l'ÉTAT (la panne dite), jamais un délai fixe : sous charge,
         // les trois essais de la sonde de schéma dépassent 2,5 s.
         await pg.waitForFunction(() => /joindre tes données/.test(document.body.innerText), null, { timeout: 15000 }).catch(() => {});
@@ -97,6 +100,23 @@ async function main() {
         });
         dit(vu.base, `${T} phase 2 : la base est bien injoignable (BaseInjoignable rendu)`);
         dit(vu.aBloc && /1234/.test(vu.texte), `${T} phase 2 : le code 1234 reste affiché HORS LIGNE`, vu.aBloc ? vu.texte.replace(/\s+/g, ' ').slice(0, 90) : 'bloc absent');
+
+        // ── Phase 3 (3 nov.) : le RÉSEAU COUPÉ (mode avion au point relais) ─────
+        // Plus aucune requête ne part (ni la base, ni le serveur de l'app) : la
+        // page déjà ouverte doit garder les codes, et la page rouverte par le
+        // service worker aussi, s'il l'a gardée.
+        baseDown = false;
+        await pg.goto(`http://localhost:${PORT}/?tab=cat_bord`, { waitUntil: 'domcontentloaded' });
+        await pg.waitForFunction(() => navigator.serviceWorker && navigator.serviceWorker.controller, null, { timeout: 15000 }).catch(() => {});
+        await ctx.setOffline(true);
+        await pg.evaluate(() => { try { window.dispatchEvent(new Event('offline')); } catch (_) {} });
+        let rouvert = true;
+        await pg.reload({ waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => { rouvert = false; });
+        await pg.waitForFunction(() => /1234/.test(document.body.innerText), null, { timeout: 20000 }).catch(() => {});
+        const hl = await pg.evaluate(() => ({ code: /1234/.test(document.body.innerText), bloc: !!document.querySelector('[data-codes-hors-ligne]'), t: document.body.innerText.replace(/\s+/g, ' ').slice(0, 160) })).catch(() => ({ code: false, t: 'page morte' }));
+        await pg.screenshot({ path: path.join(__dirname, 'captures', `codes-hors-ligne-reseau-${vp.width}.png`) }).catch(() => {});
+        dit(rouvert && hl.code, `${T} phase 3 : réseau COUPÉ, app rouverte : le code 1234 est lisible`, hl.t);
+        await ctx.setOffline(false);
         await ctx.close();
       });
     }

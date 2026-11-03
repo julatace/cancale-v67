@@ -16848,6 +16848,33 @@ const rechaufferQr = async (photo) => {
 // Les codes de retrait gardés en local (G9) : lisibles même quand la base ne
 // répond pas (au point relais, réseau faible). Une liste non vide, ou null.
 const codesHorsLigne = () => { try { const c = load('vrm_codes_hors_ligne', null); return (c && Array.isArray(c.codes) && c.codes.length) ? c : null; } catch (_) { return null; } };
+// Les codes de retrait gardés en local (G9), rendus par la coque quand la base
+// ne répond pas ET (3 nov.) par « Ma journée hors ligne » quand le réseau est
+// coupé et qu'aucune photo de la journée n'existe : mesuré au banc
+// (`codes-hors-ligne`, phase 3 réseau coupé), l'écran disait « aucune copie de
+// ta journée » alors que les codes étaient gardés sur l'appareil.
+function BlocCodesHorsLigne() {
+        const c = codesHorsLigne(); if (!c) return null;
+        const h = Math.max(0, Math.round((Date.now() - (c.at || 0)) / 3600000));
+        const quand = h < 1 ? 'à l’instant' : h < 24 ? `il y a ${h} h` : `il y a ${Math.round(h / 24)} j`;
+        return (
+          <div data-codes-hors-ligne style={{marginTop:12,borderRadius:12,border:`1px solid ${C.border}`,background:C.card,padding:'16px 16px 10px'}}>
+            <div style={{fontSize:14,fontWeight:700,color:C.text,marginBottom:3}}>📴 Tes codes de retrait (hors ligne)</div>
+            <div style={{fontSize:11.5,color:C.muted,marginBottom:10}}>Gardés sur cet appareil — dernière mise à jour {quand}. Donne le code au comptoir.</div>
+            {c.codes.map((x, i) => (
+              <div key={i} data-code-hl style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderTop:i>0?`1px solid ${C.border}`:'none'}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{x.titre || x.lieu || (x.carrier ? carrierName(x.carrier) : 'Colis')}</div>
+                  <div style={{fontSize:11,color:C.muted}}>{[x.lieu, x.suivi && `n°${x.suivi}`].filter(Boolean).join(' · ')}</div>
+                </div>
+                {x.code
+                  ? <div style={{flexShrink:0,fontSize:17,fontWeight:800,letterSpacing:1,color:C.text,background:C.card2||`${C.accent}12`,border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 11px'}}>{x.code}</div>
+                  : <div style={{flexShrink:0,fontSize:11,color:C.muted,fontStyle:'italic'}}>QR — besoin d’internet</div>}
+              </div>
+            ))}
+          </div>
+        );
+}
 function BaseInjoignable() {
   // (1er nov.) Les consignes Supabase ne parlent qu'au PROPRIÉTAIRE de
   // l'installation : un autre vendeur lit que VRM est indisponible, pas qu'il
@@ -16930,28 +16957,7 @@ function BaseInjoignable() {
           répond pas — c'est au point relais, réseau faible, qu'il en a besoin.
           Copie locale de la dernière lecture ; le code est l'info utile (un QR
           a besoin du réseau, on le dit). */}
-      {(() => {
-        const c = codesHorsLigne(); if (!c) return null;
-        const h = Math.max(0, Math.round((Date.now() - (c.at || 0)) / 3600000));
-        const quand = h < 1 ? 'à l’instant' : h < 24 ? `il y a ${h} h` : `il y a ${Math.round(h / 24)} j`;
-        return (
-          <div data-codes-hors-ligne style={{marginTop:12,borderRadius:12,border:`1px solid ${C.border}`,background:C.card,padding:'16px 16px 10px'}}>
-            <div style={{fontSize:14,fontWeight:700,color:C.text,marginBottom:3}}>📴 Tes codes de retrait (hors ligne)</div>
-            <div style={{fontSize:11.5,color:C.muted,marginBottom:10}}>Gardés sur cet appareil — dernière mise à jour {quand}. Donne le code au comptoir.</div>
-            {c.codes.map((x, i) => (
-              <div key={i} data-code-hl style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderTop:i>0?`1px solid ${C.border}`:'none'}}>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{x.titre || x.lieu || (x.carrier ? carrierName(x.carrier) : 'Colis')}</div>
-                  <div style={{fontSize:11,color:C.muted}}>{[x.lieu, x.suivi && `n°${x.suivi}`].filter(Boolean).join(' · ')}</div>
-                </div>
-                {x.code
-                  ? <div style={{flexShrink:0,fontSize:17,fontWeight:800,letterSpacing:1,color:C.text,background:C.card2||`${C.accent}12`,border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 11px'}}>{x.code}</div>
-                  : <div style={{flexShrink:0,fontSize:11,color:C.muted,fontStyle:'italic'}}>QR — besoin d’internet</div>}
-              </div>
-            ))}
-          </div>
-        );
-      })()}
+      <BlocCodesHorsLigne/>
     </div>
   );
 }
@@ -17057,6 +17063,7 @@ function JourneeHorsLigne({ uid, tab }) {
     <div data-hors-ligne="sans-photo" style={{padding:'16px 14px 40px'}}>
       {titre}
       <LigneHorsLigne>Hors ligne — aucune copie de ta journée n'est gardée sur cet appareil ; elle se fera à ta prochaine ouverture avec du réseau.</LigneHorsLigne>
+      <BlocCodesHorsLigne/>
     </div>
   );
   const maintenant = Date.now();
