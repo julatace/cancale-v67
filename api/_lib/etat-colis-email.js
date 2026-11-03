@@ -99,7 +99,9 @@ function lire(texte){
  // ⚠️ Étroit exprès : « il sera disponible JUSQU'AU 26/10 » (un colis qui EST là)
  // ne doit pas passer en transit — seul l'avenir de l'ARRIVÉE compte, et un
  // texte qui dit aussi « est disponible / t'attend » reste une arrivée.
- if((FUTUR.test(t)||ARRIVEE_A_VENIR.test(t))&&!/\b(?:est|sont)\s+(?:bien\s+)?(?:disponibles?|arrives?)|\bt'attend|vous\s+attend/.test(t))return 'transit';
+ // (3 nov.) « dès qu'il EST disponible » (une condition) ne fait plus exception : la
+ // règle des phrases (`arriveeDansPhrase`) dit seule si une arrivée est constatée.
+ if((FUTUR.test(t)||ARRIVEE_A_VENIR.test(t))&&!phrases(texte).some(arriveeDansPhrase))return 'transit';
   // (3 nov.) « ARRIVÉ » SEULEMENT SUR UNE PHRASE QUI LE CONSTATE (Julien : « elles
  // disent "arrivé au point relais" alors que le message disait qu'il VA arriver »).
  // Mesuré sur sa base (journal des e-mails, 14 jours) : « Où vous livrer en cas de

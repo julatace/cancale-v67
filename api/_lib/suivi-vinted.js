@@ -191,7 +191,7 @@ export async function notifierSuiviVinted(tx, uid) {
   //    « arrivé » sur le téléphone.
   const relais = etatColisDepuisTexte(dernier.t) === 'available';
   if (!(await pushCategorieActive(relais ? 'colis' : 'suivi'))) return { status: 200, envoye: false, raison: 'preference' };
-  const n = relais ? { ...texteArrivee({ article: commande.title }), tag: `vrm-suivi-${tx}`, url: DESTINATIONS.retrait({ tx }) } : notifSuivi(commande.title, dernier, tx);
+  const n = relais ? { title: texteArrivee({ article: commande.title }).title, body: `Vinted : « ${propre(dernier.t, 100)} »`, tag: `vrm-suivi-${tx}`, url: DESTINATIONS.retrait({ tx }) } : notifSuivi(commande.title, dernier, tx);
   if (!n) return { status: 200, envoye: false, raison: 'sans-etape' };
   // 5. L'arrivée au point relais : déjà annoncée par l'e-mail ou la conversation ?
   const n0 = normaliserSuivi(l.s || '');

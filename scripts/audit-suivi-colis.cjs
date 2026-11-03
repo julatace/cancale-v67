@@ -330,7 +330,7 @@ function chargeApp(noms, injecte) {
     const avant = pushes.length;
     await recoit(vt('Ton colis a été retiré #30000041', 'Bonjour,\nTon colis a été retiré. Bonne journée !', 3));
     const retire = pushes.slice(avant);
-    dit(retire.length === 1 && /✅/.test(retire[0].title) && /30000041/.test(retire[0].body || ''), 'un « retiré » (autre clé, n° du sujet) sonne UNE fois, avec le n°', JSON.stringify(retire.map((p) => [p.title, p.body])));
+    dit(retire.length === 0, 'un « retiré » de son achat ne sonne pas (3 nov. : il l\'a retiré lui-même)', JSON.stringify(retire.map((p) => [p.title, p.body])));
     const ap = pushes.length;
     await recoit(mr('Votre colis 30000041 est disponible 📦', 'Bonjour,\nVotre colis 30000041 vous attend toujours.\nVotre code de retrait est 482913\nPoint Relais\nBar Test\n5 Rue Exemple\n56000 Vannes', 4));
     const apres = pushes.slice(ap).filter((p) => /📍|point de retrait/i.test(`${p.title} ${p.body}`));
@@ -341,9 +341,9 @@ function chargeApp(noms, injecte) {
     const at = pushes.length;
     await recoit(mr('Votre colis 30000042 a été retiré', 'Bonjour,\nVotre colis 30000042 a été retiré. Merci.', 6));
     const r2 = pushes.slice(at);
-    dit(r2.length === 1 && /✅/.test(r2[0].title) && /30000042/.test(r2[0].body || ''), '« en transit » PUIS « retiré » : le retiré sonne (le transit ne consomme plus sa clé), une fois, avec le n°', JSON.stringify(r2.map((p) => p.title)));
+    dit(r2.length === 0, '« en transit » PUIS « retiré » : ni l\'un ni l\'autre ne sonne (3 nov.)', JSON.stringify(r2.map((p) => p.title)));
     await recoit(mr('Votre colis 30000042 a été retiré', 'Bonjour,\nVotre colis 30000042 a été retiré. Merci.', 7));
-    dit(pushes.slice(at).length === 1, 'le même « retiré » reçu deux fois ne sonne qu\'UNE fois');
+    dit(pushes.slice(at).length === 0, 'le même « retiré » reçu deux fois : rien');
     // D. « retour » au même n° : une fois, avec le n°.
     resetBase(); await oublis();
     await recoit(mr("Votre colis 30000044 a été retourné à l'expéditeur", "Bonjour,\nVotre colis 30000044 n'a pas été retiré à temps : il a été retourné à l'expéditeur.", 8));
@@ -379,15 +379,15 @@ function chargeApp(noms, injecte) {
     const r1 = await lancer();
     const p1 = retraitDe();
     const tags = p1.map((p) => p.tag).sort();
-    dit(JSON.stringify(tags) === JSON.stringify(['retrait-a_verifier-09440000000022', 'retrait-dernier-30000021', 'retrait-dernier-VGS12345678027']),
-      'cron : « dernier jour » (dont le n° lu dans le sujet) et « à vérifier » (garde Chronopost passée), jamais le colis retiré ailleurs, coché, ni fini pour l\'app', `HTTP ${r1.code} · ${tags.join(' · ')}`);
+    dit(JSON.stringify(tags) === JSON.stringify(['retrait-dernier-30000021', 'retrait-dernier-VGS12345678027']),
+      'cron : « dernier jour » (dont le n° lu dans le sujet) — « à vérifier » ne sonne plus (3 nov. : un délai passé n\'est pas un fait) — jamais le colis retiré ailleurs, coché, ni fini pour l\'app', `HTTP ${r1.code} · ${tags.join(' · ')}`);
     const d = p1.find((p) => p.tag === 'retrait-dernier-30000021') || {};
-    dit(/^📍 Dernier jour pour retirer /.test(d.title || '') && /30000021/.test(d.body || '') && /Bar Test/.test(`${d.title} ${d.body}`) && /^\/\?tab=cat_bord&cible=retrait(&tx=\d+)?&suivi=30000021$/.test(d.url || ''), '« 📍 Dernier jour pour retirer <lieu> », le n° dans le texte, ouvre Colis → « À retirer », SA carte (31 oct.)', `${d.title} | ${d.body}`);
+    dit(/^📍 Dernier jour · /.test(d.title || '') && /30000021/.test(d.body || '') && /Bar Test/.test(`${d.title} ${d.body}`) && /^\/\?tab=cat_bord&cible=retrait(&tx=\d+)?&suivi=30000021$/.test(d.url || ''), '« 📍 Dernier jour · <lieu> », le n° dans le texte, ouvre Colis → « À retirer », SA carte (31 oct.)', `${d.title} | ${d.body}`);
     const v = p1.find((p) => p.tag === 'retrait-a_verifier-09440000000022') || {};
     // (29 oct.) « sans doute reparti » ne s'écrit plus : un délai dépassé ne prouve
     // rien (mesuré le 29 : 5 « sans doute repartis » sur 5 avaient été RETIRÉS) —
     // seul le transporteur ou Vinted dit « reparti ». Jamais « perdu » non plus.
-    dit(/^Colis à vérifier : n°09440000000022/.test(v.title || '') && !/perdu|sans doute reparti/i.test(`${v.title} ${v.body}`), '« Colis à vérifier : n°… », jamais « perdu » ni « sans doute reparti » (le délai ne prouve rien)', v.title);
+    dit(!v.title, '« Colis à vérifier » (garde passée) ne sonne pas (3 nov.) — il reste dans Colis → à vérifier', v.title || 'aucune');
     const lect = lus.filter((u) => /email_track_|colis_retrait_dedup|id=eq\.main/.test(u) && !/select=owner(&|$)/.test(u));
     dit(lect.length > 0 && lect.every((u) => /owner=eq\./.test(u)), 'cron : toutes les lectures du rappel portent owner=eq.<vendeur>', lect.filter((u) => !/owner=eq\./.test(u)).slice(0, 2).join(' | '));
     dit(!JSON.stringify((r1.corps && r1.corps.bilans) || r1.corps || {}).match(/30000021|Bar Test/), 'cron : la réponse ne contient ni n° ni lieu (des nombres)');
@@ -566,7 +566,7 @@ function chargeApp(noms, injecte) {
     // L'autre sens : un ACHAT (aucun bordereau) retiré sonne toujours, une fois.
     resetBase(); await oublis();
     await recoit(chrono('Votre colis a été retiré', 'Bonjour,\nVotre colis XW123456781FR a été retiré.', 84));
-    dit(pushes.length === 1 && /✅/.test(pushes[0].title) && /cat_achats/.test(pushes[0].url || ''), 'l\'autre sens : un achat retiré sonne « ✅ », vers Achats', JSON.stringify(pushes.map((p) => [p.title, p.url])));
+    dit(pushes.length === 0, 'l\'autre sens : un achat retiré ne sonne pas (3 nov.)', JSON.stringify(pushes.map((p) => [p.title, p.url])));
   });
 
   // (revue du 24 oct., n° 10) « 3 par visite » à l'écran : le chiffre de
