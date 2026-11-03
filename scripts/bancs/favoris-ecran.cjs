@@ -1,33 +1,40 @@
 // ════════════════════════════════════════════════════════════════════════════
-//  BANC — « Messages aux favoris », écran refait (2 novembre 2026)
+//  BANC — « Messages aux favoris », écran « Fusion » (3 novembre 2026)
 //
-//  Julien : « Messages aux favoris : écran refait, plus simple (qui a mis en
-//  favori, message prêt, envoyé ou pas, pourquoi). » Ce banc MONTE le vrai
-//  composant `src/FavorisVinted.jsx` (avec `ModeAutoFavoris`, la feuille, le
-//  moteur d'envoi) dans une page servie localement, avec les vraies feuilles de
-//  style de l'app (celles de src/main.jsx, dans le même ordre) et la palette
-//  claire de src/themeMineral.js. Les réponses de Supabase et de
-//  /api/compte?mode=favoris ont la FORME réelle (select=owner,data, vue.jobs,
-//  vue.auto.journal) ; toutes les données sont INVENTÉES (dépôt public).
+//  Julien (3 nov., 10 h 16) : « fais une meilleure interface pour les messages
+//  aux favoris » — premium, peu de couleur, AUCUN texte explicatif, des photos,
+//  « article » et pas « paire ». Ce banc MONTE le vrai `src/FavorisVinted.jsx`
+//  (ModeAutoFavoris, CarteMois, la feuille d'envoi, le moteur) avec les vraies
+//  feuilles de style (celles de src/main.jsx, dans l'ordre) et la palette de
+//  src/themeMineral.js, en clair ET en sombre, à 390 px tactile et à 1512 px.
+//  Les réponses ont la FORME RÉELLE mesurée en lecture seule le 3 nov. : une
+//  notification de favori n'a PAS d'`actor` ; « <pseudo> a marqué ton article
+//  <titre> comme favori » ; `image.url` = la photo de l'article ; lien
+//  « /items/<id>/want_it/new?offering_id=<n> ». Toutes les données sont INVENTÉES.
 //
-//  Il juge (à 390 px tactile et à 1512 px), sur des data-* et des nombres :
-//   1. le mode auto en tête : allumé, freiné ⇒ « jusqu'à <heure> » + raison +
-//      geste, en une phrase ;
-//   2. le message enregistré visible et modifiable ;
-//   3. une ligne par favori avec photo, pseudo, N° et titre (par identité
-//      /items/<id>), et UN état parmi à envoyer · en cours · à vérifier ·
-//      envoyé (avec la date) · pas envoyé (avec la raison du serveur) ;
-//   4. le geste qui débloque (« Ouvrir » sur la ligne si VRM doit apprendre à
-//      qui écrire) ;
-//   5. aucune phrase répétée sur deux lignes ; aucun mot technique ; aucun
-//      emoji ; cibles ≥ 44 px au doigt ; une seule couleur d'accent ; aucun
-//      débordement horizontal ;
-//   6. « Modifier » ouvre l'écriture du message et « Enregistrer » le sauve
-//      sans rien envoyer.
+//  Il juge, sur des data-* et des nombres :
+//   1. la carte sombre : N favoris de la période, « sur N articles », les cases
+//      envoyés · vendus · en attente ; l'interrupteur du mode auto (freiné ⇒ la
+//      ligne dit jusqu'à quand et pourquoi ; bloqué ⇒ le geste, en ambre) ;
+//   2. « Ton message » : le VRAI texte, variables remplacées par le pseudo d'un
+//      favori réel (jamais « {username} » à l'écran), l'offre dite ;
+//   3. UNE carte par ARTICLE (par /items/<id>) : photo, titre, N°, prix, la pile
+//      des initiales (chacune = la 1re lettre d'un pseudo écrit par Vinted ;
+//      illisible ⇒ rond vide, jamais un nom inventé), UNE puce juste, UN geste ;
+//   4. « Envoyer » choisit les favoris de CET article et ouvre la feuille d'envoi
+//      — RIEN n'est lancé ni envoyé sans « Lancer » (aucun POST `lancer`) ;
+//   5. le détail d'un article (feuille) : une ligne par personne, son état ;
+//   6. aucun mot technique, aucun emoji, jamais « paire », cibles ≥ 44 px au
+//      doigt, aucune couleur saturée hors du bleu d'Apple et de l'ambre, aucun
+//      débordement, colonne ≤ 760 px sur ordinateur ;
+//   7. « Modifier » ouvre le message, « Enregistrer » le sauve sans rien envoyer.
 //
-//  Construit avec esbuild (pas Vite) : `node scripts/bancs/favoris-ecran.cjs`.
-//  Variable RACINE : arbre à juger (défaut : le dépôt de ce banc) — §6.1, on
-//  copie ce banc dans l'arbre d'AVANT et on le lance depuis cet arbre.
+//  FAV_JEU = base (défaut) · vide (0 favori) · un (1 favori) · gros (300 favoris
+//  sur 80 articles) · longs (titres de 160 caractères, pseudos de 40) · sansphoto ·
+//  bloque (mode auto allumé, bloqué : un geste demandé). FAV_THEME = clair · sombre
+//  (défaut : les deux). FAV_MUTANT = envoi · etat · nom (§6.1 : chacune doit
+//  rendre le banc rouge). Variable RACINE : l'arbre à juger.
+//  `node scripts/bancs/favoris-ecran.cjs` (esbuild, pas Vite).
 // ════════════════════════════════════════════════════════════════════════════
 const path = require('path'), fs = require('fs'), os = require('os'), http = require('http');
 const RACINE = process.env.RACINE || path.join(__dirname, '..', '..');
@@ -36,6 +43,9 @@ if (!NM) { console.log('❌ esbuild introuvable (node_modules absent)'); process
 try { require(path.join(__dirname, '_porte-banc.cjs')); } catch (_) {}
 const { chromium } = require(path.join(NM, 'playwright'));
 const esbuild = require(path.join(NM, 'esbuild'));
+const JEU = process.env.FAV_JEU || 'base';
+const THEMES = process.env.FAV_THEME ? [process.env.FAV_THEME] : ['clair', 'sombre'];
+const MUTANT = process.env.FAV_MUTANT || '';
 const SHOTS = process.env.SHOTS || path.join(os.tmpdir(), 'banc-favoris-ecran');
 fs.mkdirSync(SHOTS, { recursive: true });
 
@@ -43,32 +53,84 @@ let ok = 0, ko = 0;
 const dit = (c, m, d) => { if (c) { ok++; console.log('✅ ' + m); } else { ko++; console.log('❌ ' + m + (d ? '  → ' + String(d).slice(0, 400) : '')); } };
 
 const OWNER = '0c0c0c0c-0c0c-4c0c-8c0c-0c0c0c0c0c0c', UID = '4242';
-const MAINT = Date.parse('2026-11-02T15:00:00Z');
-const H = 3600000;
+const MAINT = Date.parse('2026-11-03T15:00:00Z');
+const H = 3600000, J = 24 * H;
 const iso = (t) => new Date(t).toISOString();
-// Favoris inventés : pseudo, annonce, quand.
-const FAV = [
-  ['n1', 'lea_sneakers', 9001, 9 * H], ['n2', 'hugo.b', 9002, 8 * H], ['n3', 'ines_75', 9003, 1 * H],
-  ['n4', 'tom-run', 9004, 3 * H], ['n5', 'zoe_k', 9005, 5 * H], ['n6', 'paulo92', 9006, 6 * H],
-  ['n7', 'emma.vint', 9007, 7 * H], ['n8', 'noe_shop', 9008, 2 * H], ['n9', 'jade.m', 9009, 26 * H],
-  ['n10', 'lina_l', null, 30 * 60000],
-];
-const NOTIFS = FAV.map(([id, login, item, age]) => ({ id, body: `${login} a ajouté ton article à ses favoris.`, actor: { login }, user_id: 1000 + Number(id.slice(1)), link: item ? `/items/${item}/conversation/new?from_notification=true` : '/inbox/123', created_at: iso(MAINT - age) }));
-const TITRES = { 9001: 'Nike Air Max 90 blanche', 9002: 'Adidas Samba noire', 9003: 'New Balance 550 verte', 9004: 'Asics Gel-Lyte III', 9005: 'Jordan 1 Mid bleue', 9006: 'Puma Suede rouge', 9007: 'Vans Old Skool', 9008: 'Converse Chuck 70', 9009: 'Reebok Club C' };
-const ARTICLES = Object.fromEntries(Object.entries(TITRES).map(([id, t], i) => [id, { titre: t, numero: String(101 + i), photo: `https://images1.vinted.net/t/b${id}/f800/photo.jpeg` }]));
-const JOBS = [
-  { id: '9001:1001', notificationId: 'n1', etat: 'envoye', lot: 'l1', traiteLe: MAINT - 4 * H, envoyeLe: MAINT - 4 * H },
-  { id: '9006:1006', notificationId: 'n6', etat: 'incertain', lot: 'l1', raison: 'reponse_inconnue' },
-  { id: '9007:1007', notificationId: 'n7', etat: 'refuse', lot: 'l1', raison: 'quota_extension' },
-];
-const JOURNAL = [
-  { at: MAINT - 7 * H, notificationId: 'n2', nom: 'hugo.b', etat: 'saute', raison: 'conversation_existante' },
-  { at: MAINT - 4 * H, notificationId: 'n5', nom: 'zoe_k', etat: 'saute', raison: 'destinataire_non_prouve' },
-  { at: MAINT - 20 * H, notificationId: 'n9', nom: 'jade.m', etat: 'saute', raison: 'conversation_existante' },
-];
 const PAUSE = MAINT + 5 * H;
-const ATTENDU = { n1: 'envoye', n2: 'pas_envoye', n3: 'a_envoyer', n4: 'pas_envoye', n5: 'pas_envoye', n6: 'a_verifier', n7: 'pas_envoye', n8: 'a_envoyer', n9: 'pas_envoye', n10: 'a_envoyer' };
 const MESSAGE = 'Salut {username}, merci pour ton favori ! Je te fais un prix.';
+// Un favori inventé, à la forme réelle : [id, pseudo, item, âge].
+let FAV, TITRES, PRIX = {}, SANS_PHOTO = new Set(), JOBS = [], JOURNAL = [], VENDUS = [], AUTO_DEMANDE = null, PAUSE_ACTIVE = true;
+if (JEU === 'vide') { FAV = []; TITRES = {}; }
+else if (JEU === 'un') { FAV = [['n1', 'lea_sneakers', 9001, 2 * H]]; TITRES = { 9001: 'Nike Air Max 90 blanche' }; PRIX = { 9001: 65 }; }
+else if (JEU === 'gros') {
+  FAV = []; TITRES = {};
+  for (let a = 0; a < 80; a++) TITRES[9100 + a] = ['Salomon XT-6', 'Nike Air Max 1', 'Sac Longchamp Le Pliage', 'Adidas Samba', 'New Balance 990v6'][a % 5] + ' n° ' + (a + 1);
+  for (let i = 0; i < 300; i++) FAV.push(['g' + i, 'membre_' + i, 9100 + ((i * 7) % 80), (i % 28) * J + (i % 23) * H]);
+  for (let a = 0; a < 80; a += 3) PRIX[9100 + a] = 40 + a;
+  JOBS = FAV.filter((_, i) => i % 9 === 0).map(([id, , item], k) => ({ id: item + ':' + (5000 + k), notificationId: id, etat: 'envoye', lot: 'l1', traiteLe: MAINT - 30 * H, envoyeLe: MAINT - 30 * H, ...(k % 2 ? { ecrits: 3 } : { ecrits: 2 }) }));
+  VENDUS = ['9105', '9110'];
+} else {
+  const L = JEU === 'longs';
+  const p = (x) => (L ? (x + '_' + 'x'.repeat(40)).slice(0, 40) : x);
+  FAV = [
+    ['n1', p('lea_sneakers'), 9001, 9 * H], ['n2', p('hugo.b'), 9002, 8 * H], ['n3', p('ines_75'), 9003, 1 * H],
+    ['n4', p('tom-run'), 9004, 3 * H], ['n5', p('zoe_k'), 9005, 5 * H], ['n6', p('paulo92'), 9006, 6 * H],
+    ['n7', p('emma.vint'), 9007, 7 * H], ['n8', p('noe_shop'), 9008, 2 * H], ['n9', p('jade.m'), 9009, 26 * H],
+    ['n10', p('lina_l'), 9003, 30 * 60000], ['n11', p('max.r'), 9003, 4 * H], ['n12', p('sam_b'), 9001, 3 * H],
+    ['n13', '', 9008, 50 * 60000], ['n14', p('ancien'), 9010, 40 * J],
+  ];
+  const T = { 9001: 'Nike Air Max 90 blanche', 9002: 'Adidas Samba noire', 9003: 'New Balance 550 verte', 9004: 'Asics Gel-Lyte III', 9005: 'Jordan 1 Mid bleue', 9006: 'Puma Suede rouge', 9007: 'Sac Longchamp Le Pliage noir', 9008: 'Converse Chuck 70', 9009: 'Reebok Club C', 9010: 'Vans Old Skool' };
+  TITRES = L ? Object.fromEntries(Object.entries(T).map(([k, v]) => [k, (v + ' édition limitée collaboration très longue description ').repeat(4).slice(0, 160)])) : T;
+  PRIX = { 9001: 65, 9002: 80, 9003: 95, 9005: 120, 9007: 45 };
+  if (JEU === 'sansphoto') SANS_PHOTO = new Set(Object.keys(T).map(Number));
+  JOBS = [
+    { id: '9001:1001', notificationId: 'n1', etat: 'envoye', lot: 'l1', traiteLe: MAINT - 4 * H, envoyeLe: MAINT - 4 * H, ecrits: 3 },
+    { id: '9006:1006', notificationId: 'n6', etat: 'incertain', lot: 'l1', raison: 'reponse_inconnue' },
+    { id: '9007:1007', notificationId: 'n7', etat: 'refuse', lot: 'l1', raison: 'offre_refusee' },
+    { id: '9009:1009', notificationId: 'n9', etat: 'envoye', lot: 'l0', traiteLe: MAINT - 20 * H, envoyeLe: MAINT - 20 * H },
+  ];
+  JOURNAL = [
+    { at: MAINT - 7 * H, notificationId: 'n2', etat: 'saute', raison: 'conversation_existante' },
+    { at: MAINT - 4 * H, notificationId: 'n5', etat: 'saute', raison: 'destinataire_non_prouve' },
+  ];
+  VENDUS = ['9004'];
+  if (JEU === 'bloque') { AUTO_DEMANDE = { code: 'dressing_ancien', at: MAINT - H }; PAUSE_ACTIVE = false; }
+}
+// Le corps tel que Vinted l'écrit ; un pseudo vide ⇒ une phrase sans pseudo lisible.
+const corps = (login, item) => (login ? `${login} a marqué ton article ${(TITRES[item] || 'article').toLowerCase()} comme favori` : `Quelqu’un a marqué ton article ${(TITRES[item] || '').toLowerCase()} comme favori`);
+const NOTIFS = FAV.map(([id, login, item, age], k) => ({ id, body: corps(login, item), user_id: 1000 + k, link: `/items/${item}/want_it/new?offering_id=${7000 + k}`, ...(SANS_PHOTO.has(item) ? {} : { image: { url: `https://images1.vinted.net/t/b${item}/f800/photo.jpeg?s=x` } }), updated_at: iso(MAINT - age) }));
+// Les articles que VRM connaît (Annonces) : titre, N°, photo, prix. 9010 n'y est pas
+// (son titre vient de la phrase de Vinted, jamais d'une ressemblance).
+const ARTICLES = Object.fromEntries(Object.entries(TITRES).filter(([id]) => id !== '9010').map(([id, t], i) => [id, { titre: t, numero: String(101 + i), photo: SANS_PHOTO.has(Number(id)) ? null : `https://images1.vinted.net/t/b${id}/f800/photo.jpeg`, prix: PRIX[id] ?? null }]));
+const AUTO = { reglages: { version: 1, actif: true, attenteMin: 10, attenteMax: 60, heureDebut: 9, heureFin: 21, jours: [1, 2, 3, 4, 5, 6, 7], parJour: 30, parHeure: 12 }, demande: AUTO_DEMANDE, allumeLe: MAINT - 20 * J, ...(PAUSE_ACTIVE ? { pauseJusqua: PAUSE, pauseRaison: 'vinted_frein', etat: 'pause' } : { etat: 'veille' }), envois: [MAINT - 4 * H], journal: JOURNAL, prochain: null };
+
+// ── Ce que l'écran DOIT dire, recalculé ici sans le code jugé ───────────────
+const DANS30 = FAV.filter(([, , , age]) => age <= 30 * J);
+const etatAttendu = (id) => {
+  const j = JOBS.find((x) => x.notificationId === id), jr = JOURNAL.find((x) => x.notificationId === id);
+  const item = String((FAV.find((f) => f[0] === id) || [])[2]);
+  if (j && j.etat === 'envoye') return j.ecrits === 3 ? 'offre' : 'envoye';
+  if (j && j.etat === 'incertain') return 'a_verifier';
+  if (VENDUS.includes(item)) return 'vendu';
+  if (j || jr) return 'pas_envoye:' + ((j && j.raison) || (jr && jr.raison));
+  return 'a_envoyer';
+};
+const ATT = {};
+for (const [id, , item] of DANS30) { (ATT[item] = ATT[item] || []).push(etatAttendu(id)); }
+const puceAttendue = (item) => {
+  const e = ATT[item] || [], vendu = VENDUS.includes(String(item));
+  if (e.includes('a_verifier')) return 'a_verifier';
+  if (e.includes('a_envoyer') && !vendu) return 'a_envoyer';
+  if (vendu) return 'vendu';
+  if (e.some((x) => /offre_refusee|vinted_refus|vinted_frein|vinted_robot/.test(x))) return 'refus';
+  if (e.includes('offre')) return 'offre';
+  if (e.includes('envoye')) return 'envoye';
+  if (e.some((x) => /destinataire_non_prouve/.test(x))) return 'ouvrir';
+  return 'pas_envoye';
+};
+const RESUME = { favoris: DANS30.length, articles: Object.keys(ATT).length, envoyes: DANS30.filter(([id]) => /^(envoye|offre)$/.test(etatAttendu(id))).length, vendus: Object.keys(ATT).filter((x) => VENDUS.includes(String(x))).length, attente: DANS30.filter(([id]) => etatAttendu(id) === 'a_envoyer').length };
+const PSEUDOS_ITEM = {};
+for (const [, login, item] of DANS30) (PSEUDOS_ITEM[item] = PSEUDOS_ITEM[item] || []).push(login);
 
 async function construire() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'favoris-ecran-'));
