@@ -12,7 +12,9 @@ import SynchronisationVinted from './SynchronisationVinted.jsx';
 import {auteurDernierConfirme,suiviNegociationVinted,reponseAttendueVinted,instantVinted} from './suiviMessagerieVinted.js';
 import {retourReponseVinted,cleReponseVinted,creerBrouillonsReponses,etatActionVinted,cleActionOffreVinted} from './reponseVinted.js';
 import {etatOffreVinted,offreVintedEnAttente,cleOffreVinted,appliquerOffresConfirmees,annonceOffreEnVente,offreOuverte} from './offresVinted.js';
-import {contreOffreProposee} from './messagesVolets.js';
+import {contreOffreMini} from './messagesVolets.js';
+// « 105 € » (un montant entier sans « ,00 »), « 44,50 € » sinon — la contre-offre en un tap.
+const eurCourt = (v) => (Number.isInteger(Number(v)) ? `${Number(v)} €` : `${Number(v).toFixed(2).replace('.', ',')} €`);
 import {CONVERSATIONS_RETIREES,cleConversation,conversationRetiree,retirerConversation,remettreConversations,majAuGeste,phraseRetour} from './conversationsRetirees.js';
 import {conversationNonLue,conversationNonLueAncienne,messageRecent} from './messagesNonLus.js';
 import {etatSourceMemoire} from './suiviComptes.js';
@@ -46360,7 +46362,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // répondre et de faire l'offre ». Toujours sur SON clic, par l'extension, au
   // nom du compte connecté dans Chrome (garde stricte, plafond d'actions par heure, une
   // requête à la fois). Accepter fixe le prix, sans confirmer le paiement.
-  const actionOffre = async (quoi, off) => {
+  const actionOffre = async (quoi, off, prixDirect = null) => {
     const oc = openConv;
     if (!oc || !oc.acc || !oc.owner || oc.owner!==AUTH.user?.id || offreBusy || verrouOffre.current) return;
     const cleAction=cleActionOffreVinted(oc.owner,oc.acc.vinted_user_id,oc.convId);
@@ -46374,9 +46376,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       endpoint = `/api/v2/transactions/${off.tx}/offer_requests/${off.oid}/${quoi}`;
     } else {
       const tx = oc.conversation && oc.conversation.transaction && oc.conversation.transaction.id;
-      p = Number(String(prixOffre).replace(',', '.'));
+      // (3 nov.) « Proposer X € » envoie SON montant (`prixDirect`, calculé depuis
+      // son prix mini), sans passer par le champ ; sinon le prix saisi.
+      const saisi = prixDirect != null ? String(prixDirect) : String(prixOffre);
+      p = Number(saisi.replace(',', '.'));
       if (!tx) { setOffreMsg({ err: "Pas d'article rattaché à cette conversation : rien à proposer." }); return; }
-      if(!(p>0) || !Number.isFinite(p) || !/^\d+(?:[,.]\d{1,2})?$/.test(prixOffre.trim())) { setOffreMsg({ err: 'Indique un prix.' }); return; }
+      if(!(p>0) || !Number.isFinite(p) || !/^\d+(?:[,.]\d{1,2})?$/.test(saisi.trim())) { setOffreMsg({ err: 'Indique un prix.' }); return; }
       method = 'POST'; endpoint = `/api/v2/transactions/${tx}/offers`; body = { offer: { price: String(p), currency: 'EUR' } };
     }
     if(conversationRequest.current!==oc.request)return;
@@ -49147,6 +49152,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const minF = itemF!=null ? Number(String((numeros[String(itemF)]||{}).min ?? '').replace(',','.')) : NaN;
                   const auDessusMini = !!(off && isFinite(minF) && minF>0 && off.prix >= minF);
                   const pc=paireDeConv(String(openConv.acc?.vinted_user_id||''),openConv.convId,openConv.conversation);
+                  // (3 nov.) « Proposer X € » : X depuis SON prix mini seulement (`contreOffreMini`).
+                  const contreMini = off && pc && (pc.devise||'EUR')==='EUR' ? contreOffreMini(off.prix, pc.prix, isFinite(minF)&&minF>0?minF:null) : null;
                   const etat = msgRelais ? 'ok' : extSait('messagerie');
                   if (etat !== 'ok' || (!msgRelais && __vmrPlusieurs)) return (
                     <div className="vrm-chat-offre vrm-chat-offre-info" data-offre="indisponible" style={{background:C.bg,border:`1px solid ${C.border}`}}>
@@ -49155,6 +49162,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {__vmrPlusieurs ? textePlusieurs() : etat==='retard' ? `Mets l'extension à jour (${EXT_CAPACITES.messagerie}) pour trancher ou faire une offre d'ici.` : "Les offres se font depuis le Chrome où l'extension est installée."}
                         {!sansExt && <>{' '}<a href={lienVinted} target="_blank" rel="noreferrer" style={{color:C.accent,fontWeight:600}}>Ouvrir sur Vinted</a></>}
                       </div>
+                      {contreMini!=null && <a className="vrm-chat-btn" data-offre-proposer-vinted={String(contreMini)} href={lienVinted} target="_blank" rel="noreferrer" style={{marginTop:8,alignSelf:'flex-start',textDecoration:'none'}}>Proposer {eurCourt(contreMini)} · à faire sur Vinted ↗</a>}
                     </div>
                   );
                   return (
@@ -49167,7 +49175,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           « Envoyer l'offre ». Aucun geste automatique (§3). */}
                       {off && (()=>{
                         const mini = Number.isFinite(minF)&&minF>0 ? minF : null;
-                        const contre = contreOffreProposee(off.prix, pc?.prix, mini);
+                        const contre = contreMini;
                         return (
                         <div className="vrm-chat-offre-l vrm-chat-offre-traiter" data-offre-au-dessus-mini={auDessusMini?String(Math.round(minF)):undefined} data-offre-mini={mini!=null?String(mini):undefined} data-offre-contre={contre!=null?String(contre):undefined}>
                           <div className="vrm-chat-offre-tete">
@@ -49176,7 +49184,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           </div>
                           <div className="vrm-chat-offre-actions">
                             <button type="button" className="vrm-chat-btn" data-offre-geste="refuser" disabled={offreBusy||ro||offreBloquee} onClick={()=>actionOffre('reject', off)} style={{opacity:(offreBusy||offreBloquee)?0.6:1}}>Refuser</button>
-                            <button type="button" className="vrm-chat-btn" data-offre-geste="contre" disabled={!tx||ro||offreBusy||offreBloquee} aria-label={contre!=null?`Contre-proposer ${fmtE(contre)}`:'Contre-proposer'} title={contre!=null?`Prépare une contre-offre de ${fmtE(contre)} — rien ne part avant « Envoyer l'offre »`:"Prépare une contre-offre — rien ne part avant « Envoyer l'offre »"} onClick={()=>{if(contre!=null)setPrixOffre(String(contre));setContreOffreOuverte(true);requestAnimationFrame(()=>prixOffreRef.current?.focus());}}>{contre!=null?fmtE(contre):'Contre-offre'}</button>
+                            {contre!=null
+                              ? <button type="button" className="vrm-chat-btn" data-offre-geste="proposer" data-offre-proposer={String(contre)} disabled={!tx||ro||offreBusy||offreBloquee} aria-label={`Proposer ${eurCourt(contre)}`} onClick={()=>actionOffre('offre', off, contre)} style={{opacity:(offreBusy||offreBloquee)?0.6:1}}>Proposer {eurCourt(contre)}</button>
+                              : <button type="button" className="vrm-chat-btn" data-offre-geste="contre" disabled={!tx||ro||offreBusy||offreBloquee} aria-label="Contre-proposer" onClick={()=>{setContreOffreOuverte(true);requestAnimationFrame(()=>prixOffreRef.current?.focus());}}>Contre-offre</button>}
                             <button type="button" className="vrm-chat-btn vrm-chat-btn-p" data-offre-geste="accepter" disabled={offreBusy||ro||offreBloquee} onClick={()=>actionOffre('accept', off)} style={{opacity:(offreBusy||offreBloquee)?0.6:1}}>Accepter</button>
                           </div>
                         </div>);

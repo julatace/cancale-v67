@@ -13,11 +13,12 @@
 //      l'autre ; une conversation SANS item_id, au même titre, dit « Pas reliée »
 //      et ne montre aucun N° ;
 //   3. la carte d'offre : « Offre de 100 € — ton mini : 105 € » (le mini posé à
-//      côté du N°), Refuser · 110 € · Accepter, dans cet ordre ;
-//   4. aucun envoi sans clic : ouvrir, la contre-offre (qui REMPLIT le prix),
-//      une réponse rapide (qui REMPLIT le champ), et Accepter (qui DEMANDE) —
-//      aucune requête autre qu'une lecture ne part ; annuler la confirmation
-//      n'envoie rien ;
+//      côté du N°), Refuser · Proposer 105 € · Accepter, dans cet ordre (3 nov. :
+//      la contre-offre en un tap, X = SON mini arrondi à l'euro supérieur) ;
+//   4. aucun envoi sans clic : ouvrir, une réponse rapide (qui REMPLIT le champ),
+//      et Accepter (qui DEMANDE) — aucune requête autre qu'une lecture ne part ;
+//      annuler la confirmation n'envoie rien ; PUIS le tap « Proposer 105 € »
+//      envoie UNE offre de 105 € sur SA transaction, au nom de SON compte ;
 //   5. le pied : pastilles de réponses rapides, champ « Écris ta réponse… »,
 //      micro de dictée (reconnaissance du navigateur), Envoyer rond.
 // Captures : <tmp>/messages-volets-1512.png, -390-liste.png, -390-fil.png.
@@ -92,7 +93,7 @@ const PONT = ({ version, fils }) => {
   window.addEventListener('message', (e) => {
     const d = e.data; if (e.source !== window || !d || typeof d !== 'object') return;
     if (d.__vmr === 'ping') post({ __vmr: 'ready', version });
-    if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version, vrm: { ok: true, connecte: true, email: '' }, vinted: { uid: '111', login: 'boutique_test' }, cmds: {} } });
+    if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version, code: version, vrm: { ok: true, connecte: true, email: '' }, vinted: { uid: '111', login: 'boutique_test' }, cmds: {} } });
     if (d.__vmr === 'exec') {
       window.__exec && window.__exec(JSON.stringify({ uid: d.uid, method: d.method, endpoint: d.endpoint, body: d.body }));
       const idc = (/\/conversations\/(\d+)$/.exec(d.endpoint || '') || [])[1];
@@ -161,15 +162,11 @@ const boite = (pg, sel) => pg.evaluate((s) => { const e = document.querySelector
         return { mini: e.getAttribute('data-offre-mini'), contre: e.getAttribute('data-offre-contre'), tete: (e.querySelector('.vrm-chat-offre-tete') || {}).innerText || '', bs }; });
       dit(offre && /Offre de 100,00/.test(offre.tete) && /ton mini\s*:\s*105,00/.test(offre.tete) && offre.mini === '105', 'la carte d’offre : « Offre de 100 € — ton mini : 105 € »', JSON.stringify(offre && offre.tete));
       const ordre = offre ? offre.bs.map((x) => x.g).join(',') : '';
-      dit(ordre === 'refuser,contre,accepter' && offre.bs.every((x) => Math.abs(x.y - offre.bs[0].y) < 2) && offre.bs[0].l < offre.bs[1].l && offre.bs[1].l < offre.bs[2].l && /110,00/.test(offre.bs[1].t) && offre.contre === '110', 'Refuser · 110 € · Accepter, côte à côte et dans cet ordre', JSON.stringify(offre && offre.bs));
+      dit(ordre === 'refuser,proposer,accepter' && offre.bs.every((x) => Math.abs(x.y - offre.bs[0].y) < 2) && offre.bs[0].l < offre.bs[1].l && offre.bs[1].l < offre.bs[2].l && /Proposer 105\s€/.test(offre.bs[1].t) && offre.contre === '105', 'Refuser · Proposer 105 € · Accepter (X = son mini), côte à côte et dans cet ordre', JSON.stringify(offre && offre.bs));
       const pied = await r.pg.evaluate(() => ({ rapides: document.querySelectorAll('.vrm-chat-panel .vrm-chat-rapides button').length, ph: (document.querySelector('.vrm-chat-compose textarea') || {}).placeholder, mic: !!document.querySelector('.vrm-chat-compose [data-mic-dictee]'), dicteeOk: 'SpeechRecognition' in window || 'webkitSpeechRecognition' in window, send: (() => { const s = document.querySelector('.vrm-chat-send'); if (!s) return null; const b = s.getBoundingClientRect(); return { w: Math.round(b.width), h: Math.round(b.height), bg: getComputedStyle(s).backgroundColor, label: s.getAttribute('aria-label') }; })() }));
       dit(pied.rapides >= 3 && pied.ph === 'Écris ta réponse…' && (pied.mic || !pied.dicteeOk) && pied.send && Math.abs(pied.send.w - pied.send.h) <= 1 && pied.send.label === 'Envoyer', 'le pied : pastilles de réponses rapides, « Écris ta réponse… », micro de dictée, Envoyer rond', JSON.stringify(pied));
       // Aucun envoi sans clic.
       dit(gestes(r).length === 0, 'ouvrir le fil n’envoie rien (seules des lectures)', JSON.stringify(gestes(r)));
-      await r.pg.click('[data-offre-geste="contre"]');
-      await r.pg.waitForTimeout(300);
-      const prixVal = await r.pg.locator('input[aria-label="Prix de l\'offre"]').inputValue().catch(() => null);
-      dit(prixVal === '110' && gestes(r).length === 0, 'la contre-offre REMPLIT le prix (110) — rien ne part avant « Envoyer l’offre »', JSON.stringify({ prixVal, g: gestes(r) }));
       await r.pg.locator('.vrm-chat-rapides button').first().click();
       await r.pg.waitForTimeout(200);
       const rep = await r.pg.locator('.vrm-chat-compose textarea').inputValue();
@@ -213,18 +210,29 @@ const boite = (pg, sel) => pg.evaluate((s) => { const e = document.querySelector
       const carte = await r.pg.evaluate(() => { const c = document.querySelector('[data-fil-paire]'); return c ? { item: c.getAttribute('data-fil-paire'), txt: c.innerText } : null; });
       dit(carte && carte.item === '801' && /Salomon XT-6/.test(carte.txt) && /42/.test(carte.txt) && /120\s?€/.test(carte.txt) && /Vinted/.test(carte.txt) && /boutique_test/.test(carte.txt) && /Meuble C/.test(carte.txt) && /N°80/.test(carte.txt) && !/N°81|Meuble D/.test(carte.txt), 'en tête du fil : la paire (titre · taille, prix · site · compte · rangement, N°80)', JSON.stringify(carte));
       const ordre = await r.pg.evaluate(() => [...document.querySelectorAll('.vrm-chat-offre-actions button')].map((x) => x.getAttribute('data-offre-geste')).join(','));
-      dit(ordre === 'refuser,contre,accepter', 'la carte d’offre au téléphone : Refuser · 110 € · Accepter', ordre);
+      dit(ordre === 'refuser,proposer,accepter', 'la carte d’offre au téléphone : Refuser · Proposer 105 € · Accepter', ordre);
+      const bt = await r.pg.evaluate(() => [...document.querySelectorAll('.vrm-chat-offre-actions button')].map((x) => { const b = x.getBoundingClientRect(); return { r: Math.round(b.right), h: Math.round(b.height), t: x.innerText, plein: x.scrollWidth <= x.clientWidth + 1 }; }));
+      dit(bt.length === 3 && bt.every((x) => x.r <= 390 && x.h >= 36 && x.plein), 'les trois boutons tiennent dans 390 px, textes entiers', JSON.stringify(bt));
       const bulles = await r.pg.evaluate(() => [...document.querySelectorAll('.vrm-chat-panel .vrm-bulle')].map((x) => ({ moi: x.getAttribute('data-bulle'), bg: getComputedStyle(x).backgroundColor, h: !!x.querySelector('time') })));
       const moi = bulles.find((x) => x.moi === 'moi'), eux = bulles.find((x) => x.moi === 'acheteur');
       // « Encre pleine » : le fond de SA bulle est la couleur du texte de l'app.
       const encre = await r.pg.evaluate(() => { const d = document.createElement('span'); d.style.color = 'var(--vrm-ink)'; document.body.appendChild(d); const c = getComputedStyle(d).color; d.remove(); return c; });
       dit(moi && eux && moi.bg === encre && eux.bg !== encre && bulles.every((x) => x.h), 'les bulles : lui en encre pleine, l’acheteur en surface, chacune avec son heure', JSON.stringify({ bulles, encre }));
       await r.pg.screenshot({ path: path.join(os.tmpdir(), 'messages-volets-390-fil.png') });
+      // (3 nov.) Le tap « Proposer 105 € » : UNE offre, de 105 €, sur SA transaction.
+      dit(gestes(r).length === 0, 'rien n’est parti avant le tap');
+      await r.pg.click('[data-offre-geste="proposer"]');
+      await r.pg.waitForTimeout(1200);
+      const g = gestes(r);
+      dit(g.length === 1 && g[0].method === 'POST' && g[0].endpoint === '/api/v2/transactions/9501/offers' && g[0].uid === '111' && g[0].body && g[0].body.offer && g[0].body.offer.price === '105', 'le tap « Proposer 105 € » envoie UNE offre de 105 € sur la transaction du fil, au nom de son compte', JSON.stringify(g));
+      const retour = await r.pg.evaluate(() => [...document.querySelectorAll('.vrm-chat-offre [role=status],.vrm-chat-offre [role=alert]')].map((x) => x.innerText).join(' | '));
+      dit(/105/.test(retour) && /envoy/i.test(retour), 'et le dit (« Offre de 105 € envoyée »)', retour);
+      await r.pg.screenshot({ path: path.join(os.tmpdir(), 'messages-volets-390-proposee.png') });
       await r.pg.click('.vrm-chat-back');
       await r.pg.waitForTimeout(500);
       dit(!(await boite(r.pg, '.vrm-chat-panel') || {}).vis && (await boite(r.pg, '[data-conv="501"]') || {}).vis, 'le retour ramène à la liste');
       dit(await r.pg.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'aucun débordement horizontal');
-      dit(gestes(r).length === 0 && r.errs.length === 0, 'aucun geste envoyé, aucune erreur', JSON.stringify({ g: gestes(r), e: r.errs }));
+      dit(gestes(r).length === 1 && r.errs.length === 0, 'aucun autre geste envoyé, aucune erreur', JSON.stringify({ g: gestes(r), e: r.errs }));
     } finally { await r.ctx.close(); }
   } catch (e) {
     dit(false, 'le banc a tourné jusqu’au bout', e.message);
