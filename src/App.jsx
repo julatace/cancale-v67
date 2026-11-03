@@ -18756,7 +18756,7 @@ function KpiVentes({ tuiles, note, plateforme, compte = null }) {
   for (const t of tuiles) {
     const num = t.brut != null ? t.brut : (typeof t.val === 'number' ? t.val : null);
     locaux[ID[t.cle] || t.cle] = { nom: t.lib, court: t.sub ? `${t.lib.toLowerCase()} · ${t.sub}` : t.lib.toLowerCase(), type: t.brut != null ? 'eur' : 'n',
-      valeur: t.val == null ? null : (num != null ? num : t.val), affiche: t.val == null ? undefined : t.val, titre: t.sub ? `${t.lib} · ${t.sub}` : t.lib, attrs: kv(t) };
+      valeur: t.val == null ? null : (num != null ? num : t.val), affiche: t.val == null ? undefined : t.val, quand: 'Depuis le début', titre: t.sub ? `${t.lib} · ${t.sub}` : t.lib, attrs: kv(t) };
   }
   return (
     <div className="vrm-kpi-ventes vrm-fu-ecran vrm-fu-ventes-site" data-ventes-kpi={plateforme}>

@@ -361,7 +361,9 @@ export const valeursCarte = (page, reglage, sources, sel, regles, maintenant = D
   };
   const g = un(R.g);
   const c = R.c.map(un);
-  return { g, c, perimetre: perimetre(g.p === undefined ? null : g.p, sel, maintenant), defaut: R.defaut };
+  // Un grand chiffre propre à la page dit lui-même sa période (« Depuis le début » pour un CA cumulé).
+  const per = g.def && g.def.local && g.def.quand ? [g.def.quand, ...perimetre(null, sel, maintenant).split(' · ').slice(1)].join(' · ') : perimetre(g.p === undefined ? null : g.p, sel, maintenant);
+  return { g, c, perimetre: per, defaut: R.defaut };
 };
 
 // Les chiffres que la feuille propose sur cette page, pour cette sélection :
