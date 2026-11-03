@@ -60,7 +60,7 @@
 html body .vrm-app-shell .vrm-main:has(.vrm-fu-ecran) { background-color: var(--fu-fond) !important; }
 html body .vrm-app-shell:has(.vrm-main .vrm-fu-ecran) { background-color: var(--fu-fond) !important; }
 /* (3 nov.) En sombre, la règle Vitrine `:root[data-theme="dark"] .vrm-app-shell .vrm-main` gagnait :
-   page #0e0e0d, bandes #000 autour — deux noirs côte à côte. Même fond partout. */
+   page #000000, bandes #000 autour — deux noirs côte à côte. Même fond partout. */
 :root[data-theme="dark"] body .vrm-app-shell .vrm-main:has(.vrm-fu-ecran) { background-color: var(--fu-fond) !important; }
 .vrm-fu-ecran { font-variant-numeric: var(--fu-chiffres); }
 

@@ -9,7 +9,7 @@
    Chargée APRÈS Vitrine (main.jsx) ; ne vise que `.vrm-recap`.
    ════════════════════════════════════════════════════════════════════════════ */
 html body .vrm-ledger-drawer.vrm-recap {
-  --recap-ink: var(--vrm-ink, #0F0F0E);
+  --recap-ink: var(--vrm-ink, #1D1D1F);
   --recap-muted: var(--vrm-muted, #5E5E58);
   --recap-line: var(--vrm-line, #E4E4DE);
   --recap-soft: var(--vrm-card2, #F1F1EC);

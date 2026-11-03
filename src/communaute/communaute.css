@@ -194,7 +194,7 @@ form.vrm-cm-discord-moi { display: block !important; }
   --cm-accent-fond: var(--vrm-b-teinte, rgba(36, 78, 84, .08));
   --cm-encre: var(--vrm-ink, #213B41);
   --cm-doux: var(--vrm-muted, #53696D);
-  --cm-carte: var(--vrm-surface, #FDFEFC);
+  --cm-carte: var(--vrm-surface, #FFFFFF);
 }
 .vrm-communaute .vrm-cm-carton { border-color: transparent; box-shadow: none; }
 .vrm-communaute .vrm-cm-primaire,

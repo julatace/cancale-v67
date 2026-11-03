@@ -45,7 +45,7 @@
   --vrm-police: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Inter', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --vrm-police-mono: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --vrm-r-sm: 10px; --vrm-r-md: 14px; --vrm-r-lg: 14px;
-  --vrm-ombre-flottante: 0 1px 2px rgba(15,15,14,.06), 0 10px 28px rgba(15,15,14,.12);
+  --vrm-ombre-flottante: 0 1px 2px rgba(0,0,0,.06), 0 10px 28px rgba(0,0,0,.12);
   --vrm-t-title: 34px; --vrm-t-section: 22px;
   --vrm-b-h: 44px;
 }
@@ -265,7 +265,7 @@ html .vrm-app-shell .vrm-day-layout .vrm-day-recu-n { font-weight: 800 !importan
    pas : toute la pastille se touche (cible étendue à 44 px affichés au moins,
    la zone principale du téléphone étant à 80 %). */
 :root body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-num {
-  background: var(--vrm-bg) !important; color: var(--vrm-ink) !important; box-shadow: 0 1px 2px rgba(15,15,14,.12);
+  background: var(--vrm-bg) !important; color: var(--vrm-ink) !important; box-shadow: 0 1px 2px rgba(0,0,0,.12);
 }
 :root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-num {
   background: var(--vrm-ink) !important; color: var(--vrm-bg) !important;
@@ -389,15 +389,15 @@ html .vrm-app-shell .vrm-inbox-row.is-current { box-shadow: inset 3px 0 var(--vr
 html .vrm-app-shell .vrm-finance-metric.is-primary { background: var(--vrm-surface) !important; border-color: transparent !important; }
 html .vrm-app-shell .vrm-finance-metric.is-primary * { color: var(--vrm-ink) !important; }
 .vrm-bienvenue {
-  --b-carte: #FFFFFF; --b-encre: #0F0F0E; --b-doux: #56564F; --b-filet: #E4E4DF; --b-sol: #F5F5F3; --b-accent: #0071E3;
+  --b-carte: #FFFFFF; --b-encre: #1D1D1F; --b-doux: #6E6E73; --b-filet: #E5E5EA; --b-sol: #F2F2F7; --b-accent: #0071E3;
   backdrop-filter: none; -webkit-backdrop-filter: none;
 }
 :root[data-theme="dark"] .vrm-bienvenue {
-  --b-carte: #1A1A18; --b-encre: #F2F2EE; --b-doux: #B0B0A8; --b-filet: #2E2E2B; --b-sol: #0E0E0D; --b-accent: #0A84FF;
+  --b-carte: #1C1C1E; --b-encre: #F5F5F7; --b-doux: #98989D; --b-filet: #38383A; --b-sol: #000000; --b-accent: #0A84FF;
 }
 /* (1er nov.) En sombre, le texte du bouton principal suit `onAccent` de Vitrine
    (encre sombre) : le blanc sur #0A84FF ne se lisait qu'à ~3:1. */
-:root[data-theme="dark"] .vrm-bienvenue-principal { color: #0E0E0D; }
+:root[data-theme="dark"] .vrm-bienvenue-principal { color: #000000; }
 /* Le voile sous une feuille : une ombre de la page, sans flou de verre. */
 .vrm-sheet-voile { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
 
@@ -431,8 +431,8 @@ html body .vrm-app-shell .vrm-main :is(.vrm-sales-workbar > .vrm-rangee, .vrm-sa
 }
 
 /* ── 15. LES BOUTONS SECONDAIRES : un aplat neutre, pas un voile de l'accent ─ */
-:root:root { --vrm-b-teinte: #F0F0EC; --vrm-b-teinte-f: #E6E6E0; --vrm-b-encre: var(--vrm-ink, #0F0F0E); }
-:root:root[data-theme="dark"] { --vrm-b-teinte: #252522; --vrm-b-teinte-f: #2E2E2B; }
+:root:root { --vrm-b-teinte: rgba(118,118,128,.12); --vrm-b-teinte-f: rgba(118,118,128,.18); --vrm-b-encre: var(--vrm-ink, #1D1D1F); }
+:root:root[data-theme="dark"] { --vrm-b-teinte: rgba(118,118,128,.24); --vrm-b-teinte-f: rgba(118,118,128,.32); }
 /* Les icônes des cases « à faire » : à l'encre atténuée — le cobalt reste rare. */
 html .vrm-app-shell .vrm-day-layout .vrm-day-bar .vrm-day-bar-ic { color: var(--vrm-muted) !important; }
 /* Les dernières ventes de Ma journée : des aplats, sans cadre. */

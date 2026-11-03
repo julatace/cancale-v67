@@ -15,30 +15,37 @@
 // (2 nov., Julien : « copie le style simple et minimaliste d'Apple ») L'accent devient
 // le BLEU D'APPLE (#0071E3 clair, #0A84FF sombre), toujours rare, et la police celle
 // du système (SF Pro sur iPhone et Mac, styles-vitrine.css). Le reste ne change pas.
+// (3 nov., critique #1 — Julien a choisi « Fusion carte sombre ») UNE palette pour toute
+// l'app, celle des maquettes Fusion : fond #F2F2F7, cartes blanches, encre #1D1D1F, gris
+// #6E6E73 ; sombre #000 / #1C1C1E. Plus aucun gris chaud de Vitrine (#F5F5F3, #ECECE8,
+// #0F0F0E, #56564F…) : deux palettes côte à côte faisaient « deux apps collées ».
+// Le texte secondaire (muted ET faint) reste à #6E6E73 en clair : 4,5:1 sur le fond gris,
+// 5:1 sur le blanc (le #8E8E93 d'iOS tombait à 2,9:1). Bleu d'Apple rare, ambre pour un
+// geste à faire, rouge seulement pour deux articles sous un N° (§7).
 export const MINERAL = Object.freeze({
- bg:'#FFFFFF',surface:'#F5F5F3',card:'#F5F5F3',card2:'#ECECE8',
- border:'#E4E4DF',text:'#0F0F0E',muted:'#56564F',faint:'#64645C',
+ bg:'#F2F2F7',surface:'#FFFFFF',card:'#FFFFFF',card2:'#F2F2F7',
+ border:'#E5E5EA',text:'#1D1D1F',muted:'#6E6E73',faint:'#6E6E73',
  accent:'#0071E3',accentSoft:'#4A9BEF',onAccent:'#FFFFFF',
- danger:'#B43E35',warn:'#8A5300',warnSoft:'#FFF1D6',gold:'#8A5300',blue:'#56564F',purple:'#56564F',
+ danger:'#D70015',warn:'#B25000',warnSoft:'#FFF4E5',gold:'#B25000',blue:'#6E6E73',purple:'#6E6E73',
  shadow:'none',
- shadowMd:'0 1px 2px rgba(15,15,14,.06), 0 10px 28px rgba(15,15,14,.10)',
- shadowLg:'0 6px 16px rgba(15,15,14,.08), 0 24px 56px rgba(15,15,14,.16)',
- ring:'rgba(0,113,227,.20)',glass:'#FFFFFF',bar:'#FFFFFF',hair:'rgba(15,15,14,.09)',
- sidebar:'#FFFFFF',chrome:'#FFFFFF',onChrome:'#0F0F0E',chromeMuted:'#56564F',chromeLine:'#E4E4DF',
- chromeGradient:'#FFFFFF',photo:'#ECECE8',
+ shadowMd:'0 1px 2px rgba(0,0,0,.04), 0 6px 20px rgba(0,0,0,.05)',
+ shadowLg:'0 6px 16px rgba(0,0,0,.08), 0 24px 56px rgba(0,0,0,.14)',
+ ring:'rgba(0,113,227,.20)',glass:'#FFFFFF',bar:'#F2F2F7',hair:'rgba(0,0,0,.06)',
+ sidebar:'#F2F2F7',chrome:'#F2F2F7',onChrome:'#1D1D1F',chromeMuted:'#6E6E73',chromeLine:'#E5E5EA',
+ chromeGradient:'#F2F2F7',photo:'#F2F2F7',
  s1:'#0071E3',s2:'#8DB8F2',selection:'#0071E3'
 });
-// Le sombre, dérivé : un noir chaud (pas de « bleu nuit »), trois marches de
-// clarté, le cobalt éclairci pour tenir 4,5:1 (texte FONCÉ dessus), l'ambre clair.
+// Le sombre d'iOS : noir pur, cartes #1C1C1E, cases #2C2C2E, filets #38383A ; le bleu
+// éclairci (#0A84FF), l'ambre clair. Le gris secondaire #98989D tient 4,5:1 sur #2C2C2E.
 export const MINERAL_DARK = Object.freeze({
- bg:'#0E0E0D',surface:'#1A1A18',card:'#1A1A18',card2:'#252522',
- border:'#2E2E2B',text:'#F2F2EE',muted:'#B0B0A8',faint:'#9A9A92',
+ bg:'#000000',surface:'#1C1C1E',card:'#1C1C1E',card2:'#2C2C2E',
+ border:'#38383A',text:'#F5F5F7',muted:'#98989D',faint:'#98989D',
  accent:'#0A84FF',accentSoft:'#64B0FF',onAccent:'#FFFFFF',
- danger:'#FF9188',warn:'#F0B44C',warnSoft:'#2E2412',gold:'#F0B44C',blue:'#B0B0A8',purple:'#B0B0A8',
- shadow:'none',shadowMd:'0 10px 28px rgba(0,0,0,.40)',shadowLg:'0 16px 48px rgba(0,0,0,.50)',
- ring:'rgba(10,132,255,.28)',glass:'#1A1A18',bar:'#1A1A18',hair:'rgba(242,242,238,.10)',
- sidebar:'#0E0E0D',chrome:'#0E0E0D',onChrome:'#F2F2EE',chromeMuted:'#B0B0A8',chromeLine:'#2E2E2B',
- chromeGradient:'#0E0E0D',photo:'#252522',
+ danger:'#FF6961',warn:'#FFB340',warnSoft:'#2E2412',gold:'#FFB340',blue:'#98989D',purple:'#98989D',
+ shadow:'none',shadowMd:'0 0 0 1px rgba(255,255,255,.05)',shadowLg:'0 0 0 1px rgba(255,255,255,.07), 0 16px 48px rgba(0,0,0,.6)',
+ ring:'rgba(10,132,255,.28)',glass:'#1C1C1E',bar:'#000000',hair:'rgba(255,255,255,.08)',
+ sidebar:'#000000',chrome:'#000000',onChrome:'#F5F5F7',chromeMuted:'#98989D',chromeLine:'#38383A',
+ chromeGradient:'#000000',photo:'#2C2C2E',
  s1:'#0A84FF',s2:'#64B0FF',selection:'#0A84FF'
 });
 // Les portails (détails de vente, fenêtres) héritent du document : mêmes jetons

@@ -73,14 +73,14 @@
        rendu), et sa spécificité passe devant la règle `body` du média.
        ⚠️ Et la teinte est celle de `THEMES.dark.bg` (#122329) : le média
        utilisait #0E1116, une TROISIÈME valeur de fond sombre dans le projet. */
-    html[data-theme="dark"]  body{ background:#0E0E0D; background-image:none; }
+    html[data-theme="dark"]  body{ background:#000000; background-image:none; }
     html[data-theme="light"] body{ background:#FFFFFF; background-image:none; }
     /* `color-scheme` habille les champs NATIFS (date, sélecteurs, ascenseurs).
        Il n'était posé nulle part : la date d'« Import des emails » dans
        Réglages s'affichait en boîte blanche au milieu de l'app sombre. */
     html[data-theme="dark"]  { color-scheme: dark; }
     html[data-theme="light"] { color-scheme: light; }
-    @media (prefers-color-scheme: dark){ body{background:#0E0E0D;background-image:none;} }
+    @media (prefers-color-scheme: dark){ body{background:#000000;background-image:none;} }
     *{-webkit-tap-highlight-color:transparent;}
     /* ── COURBES & DURÉES, nommées UNE fois (cohésion : une app « composée »
        réutilise les mêmes ressorts partout au lieu d'en réinventer à chaque
@@ -335,7 +335,7 @@
        Le survol fonce le trait de la carte, c'est tout. */
     .vrm-card{transition:border-color var(--vrm-dur-etat) ease;}
     @media (hover:hover) and (pointer:fine){
-      .vrm-card:hover{border-color:color-mix(in srgb, var(--vrm-ink, #0F0F0E) 22%, transparent) !important;}
+      .vrm-card:hover{border-color:color-mix(in srgb, var(--vrm-ink, #1D1D1F) 22%, transparent) !important;}
     }
 
     /* ── CASCADE D'ENTRÉE ────────────────────────────────────────────────────

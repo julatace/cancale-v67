@@ -1,8 +1,8 @@
 /* Finition Gestion : mêmes surfaces, repères et rythmes dans les espaces métier.
    Les zones interactives restent à taille réelle, sans zoom de la page. */
 .vrm-app-shell{
- --gestion-surface:var(--vrm-surface,#FDFEFC);--gestion-soft:var(--vrm-card2,#EAF0EC);
- --gestion-line:var(--vrm-line,#DCE4DF);--gestion-ink:var(--vrm-ink,#0F0F0E);
+ --gestion-surface:var(--vrm-surface,#FFFFFF);--gestion-soft:var(--vrm-card2,#EAF0EC);
+ --gestion-line:var(--vrm-line,#E5E5EA);--gestion-ink:var(--vrm-ink,#1D1D1F);
  --gestion-muted:var(--vrm-muted,#53696D);--gestion-accent:var(--vrm-accent,#0071E3);
  --gestion-on-accent:#fff;
 }
@@ -103,7 +103,7 @@
 .vrm-operations .ops-chiffres{margin:8px 0 12px;}
 .vrm-operations .ops-chiffres strong{font-size:16px;}
 .vrm-operations :is(.ops-form,.ops-info,.ops-vide){border-radius:8px;box-shadow:none;}
-.vrm-operations .ops-onglets button[aria-current=page]{background:var(--vrm-ink,#0F0F0E);color:var(--vrm-bg,#FFFFFF);}
+.vrm-operations .ops-onglets button[aria-current=page]{background:var(--vrm-ink,#1D1D1F);color:var(--vrm-bg,#FFFFFF);}
 /* Le même résumé en ligne sur ordinateur ; les détails sont ouverts au clic. */
 @media(min-width:768px){
  .vrm-main .vrm-ledger-heading{display:flex;justify-content:space-between;padding:10px 48px 10px 66px;background:var(--gestion-soft);font-size:11px;font-weight:600;border-bottom:1px solid var(--gestion-line);}
@@ -208,10 +208,10 @@
 
 /* Une seule présentation du logo officiel, sans recadrage ni filtre. */
 .vrm-brand-asset{object-fit:contain!important;filter:none!important;opacity:1;flex-shrink:0;}
-.vrm-app-shell .vrm-header-logo{width:46px!important;height:46px!important;flex-shrink:0;border-radius:12px;background:#0F0F0E;display:flex;align-items:center;justify-content:center;}
+.vrm-app-shell .vrm-header-logo{width:46px!important;height:46px!important;flex-shrink:0;border-radius:12px;background:#1D1D1F;display:flex;align-items:center;justify-content:center;}
 .vrm-app-shell .vrm-header-logo>img.vrm-logo{width:40px!important;height:40px!important;border-radius:0!important;box-shadow:none!important;}
 .vrm-sidebar-brand img.vrm-logo{border-radius:0!important;box-shadow:none!important;}
-.vrm-brand-auth{background:#0F0F0E;padding:2px;box-sizing:border-box;object-fit:contain!important;}
+.vrm-brand-auth{background:#1D1D1F;padding:2px;box-sizing:border-box;object-fit:contain!important;}
 /* Le panneau doit rester lisible même lorsque la liste est dézoomée. */
 @media(min-width:1024px){
  .vrm-ledger-drawer{width:min(600px,100%);}
@@ -237,8 +237,8 @@
     encore forcés en blanc cassé et vert pâle, faits pour l'ancien bandeau sombre
     — bénéfice et « Je n'ai pas de dépenses à noter » à 1,1:1 en clair. Ils suivent
     maintenant les couleurs du thème, clair comme sombre. */
- .vrm-day-money>.vrm-day-benef-inline{border-top-color:var(--vrm-line,#dce4df)!important;padding-top:10px;margin-top:7px;}
- .vrm-day-money .vrm-day-benef-inline .vrm-display,.vrm-day-money .vrm-day-benef-inline b{color:var(--vrm-ink,#0F0F0E)!important;}
+ .vrm-day-money>.vrm-day-benef-inline{border-top-color:var(--vrm-line,#E5E5EA)!important;padding-top:10px;margin-top:7px;}
+ .vrm-day-money .vrm-day-benef-inline .vrm-display,.vrm-day-money .vrm-day-benef-inline b{color:var(--vrm-ink,#1D1D1F)!important;}
  .vrm-day-money .vrm-day-benef-inline .vrm-lien-action{color:var(--vrm-accent,#0071E3)!important;}
  .vrm-day-benef-inline .vrm-day-k{font-size:10px;letter-spacing:.04em;}
 }
@@ -296,7 +296,7 @@
 .vrm-feuille{box-shadow:0 12px 48px #14282e24;border:1px solid var(--vrm-hair,#dce5e1);}
 .vrm-feuille :is(input,textarea,select):focus-visible{outline:2px solid var(--vrm-focus,#0071E3);outline-offset:2px;}
 /* Les messages éphémères sont rendus hors de la coque par React. */
-.vrm-toasts{--message-surface:var(--vrm-surface,#FDFEFC);--message-ink:var(--vrm-ink,#0F0F0E);--message-line:var(--vrm-line,#DCE4DF);}
+.vrm-toasts{--message-surface:var(--vrm-surface,#FFFFFF);--message-ink:var(--vrm-ink,#1D1D1F);--message-line:var(--vrm-line,#E5E5EA);}
 .vrm-toast{
  min-height:48px;border-radius:10px!important;border-color:var(--message-line)!important;
  background:var(--message-surface)!important;box-shadow:0 4px 20px #14282e1f!important;

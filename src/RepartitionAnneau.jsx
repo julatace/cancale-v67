@@ -5,7 +5,7 @@ export default function RepartitionAnneau({elements,total,libelle='ventes'}) {
  const valeurs=elements.filter(e=>Number.isFinite(e.n)&&e.n>0);
  const somme=valeurs.reduce((s,e)=>s+e.n,0);const reste=Math.max(0,total-somme);
  const arcs=reste?[...valeurs,{k:'Autres',n:reste}]:valeurs;
- const couleurs=['var(--vrm-accent,#0071E3)','#56564F','#8A8A82','#B4B4AC','#CFCFC8','#6E6E66','#E4E4DF'];
+ const couleurs=['var(--vrm-accent,#0071E3)','#6E6E73','#8E8E93','#AEAEB2','#C7C7CC','#636366','#E5E5EA'];
  let avance=0;const longueur=2*Math.PI*38;
  return <figure className="vrm-repartition-anneau" aria-label={`${total} ${libelle} réparties`}>
   <svg viewBox="0 0 100 100" role="img" aria-label={arcs.map(e=>`${e.k} : ${e.n}`).join(', ')}>

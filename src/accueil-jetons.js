@@ -12,28 +12,28 @@
 // d'accent (le cobalt, sur le bouton principal), plus de pétrole ni d'ardoise.
 export const K = {
   bg: '#FFFFFF',           // fond blanc franc
-  surface: '#F5F5F3',
+  surface: '#F2F2F7',
   card: '#FFFFFF',
-  card2: '#F5F5F3',        // puce / zone intérieure
-  line: 'rgba(15,15,14,0.09)',
-  line2: 'rgba(15,15,14,0.15)',
-  text: '#0F0F0E',         // encre (19:1 sur le blanc)
-  muted: '#56564F',        // 7:1
-  faint: '#56564F',        // jamais sous AA
+  card2: '#F2F2F7',        // puce / zone intérieure
+  line: 'rgba(0,0,0,0.09)',
+  line2: 'rgba(0,0,0,0.15)',
+  text: '#1D1D1F',         // encre (19:1 sur le blanc)
+  muted: '#6E6E73',        // 7:1
+  faint: '#6E6E73',        // jamais sous AA
   cta: '#0071E3',          // cobalt : le bouton principal, texte blanc (8,6:1)
   accent: '#0071E3',
   accentSoft: 'rgba(0,113,227,0.10)',
-  warn: '#8A5300',         // ambre lisible sur clair (texte)
+  warn: '#B25000',         // ambre lisible sur clair (texte)
   warnDot: '#F0B44C',      // la pastille ambre (décor, pas du texte)
   paper: '#FFFFFF',
-  ink: '#0F0F0E',
+  ink: '#1D1D1F',
   // ── L'encre des aplats sombres (le film) ──
-  rail: '#0F0F0E',
-  rail2: '#1A1A18',
-  railText: '#F2F2EE',
-  railMuted: '#B0B0A8',
+  rail: '#1D1D1F',
+  rail2: '#1C1C1E',
+  railText: '#F5F5F7',
+  railMuted: '#98989D',
   railLine: 'rgba(255,255,255,0.08)',
-  railActive: '#252522',
+  railActive: '#2C2C2E',
 };
 
 // Les deux courbes, en CSS (les mêmes que `sortie` et `trajet` du moteur).
@@ -42,7 +42,7 @@ export const COURBE_TRAJET = 'cubic-bezier(0.77, 0, 0.175, 1)';
 
 // Ombres à deux couches sur fond clair (contact net + diffusion large et pâle,
 // teintée encre/bleu — les cartes « décollent » sans noircir).
-export const OMBRE_CARTE = '0 1px 2px rgba(15,15,14,.06), 0 18px 44px rgba(15,15,14,.10)';
+export const OMBRE_CARTE = '0 1px 2px rgba(0,0,0,.06), 0 18px 44px rgba(0,0,0,.10)';
 export const REFLET = 'none';
 
 // La hauteur FINALE de chaque écran dessiné, [ordinateur, compact (< 560 px)].

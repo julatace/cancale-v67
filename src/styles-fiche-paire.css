@@ -5,13 +5,13 @@
    deux paires sous un N° (§5, §7). Cibles 44 px. */
 .vrm-fp {
   position: fixed; inset: 0; z-index: 9000; overflow-y: auto; overscroll-behavior: contain;
-  background: var(--vrm-bg, #FFFFFF); color: var(--vrm-ink, #0F0F0E); font-family: var(--vrm-police, system-ui, sans-serif);
+  background: var(--vrm-bg, #FFFFFF); color: var(--vrm-ink, #1D1D1F); font-family: var(--vrm-police, system-ui, sans-serif);
 }
 .vrm-fp-cadre { box-sizing: border-box; width: 100%; max-width: 640px; margin: 0 auto; padding: max(10px, env(safe-area-inset-top)) 16px max(28px, env(safe-area-inset-bottom)); }
 .vrm-fp-tete { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 56px; }
 .vrm-fp-retour { display: flex; align-items: center; gap: 8px; min-height: 44px; border: 0; background: transparent; color: inherit; font: inherit; font-size: 19px; font-weight: 650; padding: 0 4px 0 0; cursor: pointer; }
 .vrm-fp-chevron { flex: none; display: block; }
-.vrm-fp-fermer { width: 44px; height: 44px; border-radius: 999px; border: 0; background: var(--vrm-surface, #F5F5F3); color: inherit; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+.vrm-fp-fermer { width: 44px; height: 44px; border-radius: 999px; border: 0; background: var(--vrm-surface, #FFFFFF); color: inherit; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
 .vrm-fp-retour:focus-visible, .vrm-fp-fermer:focus-visible, .vrm-fp-b:focus-visible { outline: 2px solid var(--vrm-focus, #0071E3); outline-offset: 2px; }
 .vrm-fp-entete { display: flex; align-items: center; gap: 16px; margin: 6px 0 16px; min-width: 0; }
 .vrm-fp-num {
@@ -21,35 +21,35 @@
 .vrm-fp-num.is-double { color: var(--vrm-danger, #B42318); }
 .vrm-fp-quoi { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .vrm-fp-titre { font-size: 20px; font-weight: 800; letter-spacing: -.02em; line-height: 1.2; overflow-wrap: anywhere; }
-.vrm-fp-sous { font-size: 14px; color: var(--vrm-muted, #56564F); }
-.vrm-fp-photo { flex: none; width: 64px; height: 64px; border-radius: 14px; overflow: hidden; background: var(--vrm-card2, #ECECE8); display: block; }
+.vrm-fp-sous { font-size: 14px; color: var(--vrm-muted, #6E6E73); }
+.vrm-fp-photo { flex: none; width: 64px; height: 64px; border-radius: 14px; overflow: hidden; background: var(--vrm-card2, #F2F2F7); display: block; }
 .vrm-fp-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .vrm-fp-double { margin: -4px 0 14px; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--vrm-danger, #B42318); color: var(--vrm-danger, #B42318); font-weight: 650; font-size: 14px; line-height: 1.4; }
 .vrm-fp-tuiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 18px; }
-.vrm-fp-tuile { background: var(--vrm-surface, #F5F5F3); border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.vrm-fp-tuile > span { font-size: 13px; color: var(--vrm-muted, #56564F); }
+.vrm-fp-tuile { background: var(--vrm-surface, #FFFFFF); border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.vrm-fp-tuile > span { font-size: 13px; color: var(--vrm-muted, #6E6E73); }
 .vrm-fp-tuile > b { font-size: 22px; font-weight: 800; letter-spacing: -.02em; line-height: 1.1; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.vrm-fp-tuile > small { font-size: 11.5px; color: var(--vrm-muted, #56564F); line-height: 1.3; }
+.vrm-fp-tuile > small { font-size: 11.5px; color: var(--vrm-muted, #6E6E73); line-height: 1.3; }
 .vrm-fp-parcours { list-style: none; margin: 0; padding: 0; }
 .vrm-fp-etape { position: relative; display: flex; gap: 14px; padding: 0 0 16px; }
-.vrm-fp-etape:not(:last-child)::before { content: ''; position: absolute; left: 21px; top: 44px; bottom: 0; width: 2px; background: var(--vrm-line, #E4E4DF); }
+.vrm-fp-etape:not(:last-child)::before { content: ''; position: absolute; left: 21px; top: 44px; bottom: 0; width: 2px; background: var(--vrm-line, #E5E5EA); }
 .vrm-fp-pastille { flex: none; width: 44px; height: 44px; border-radius: 999px; display: flex; align-items: center; justify-content: center; box-sizing: border-box; }
-.vrm-fp-etape.is-fait .vrm-fp-pastille { background: var(--vrm-ink, #0F0F0E); color: var(--vrm-bg, #FFFFFF); }
-.vrm-fp-etape:not(.is-fait) .vrm-fp-pastille { border: 2px solid var(--vrm-line, #D6D6D0); color: var(--vrm-muted, #56564F); background: var(--vrm-bg, #FFFFFF); }
+.vrm-fp-etape.is-fait .vrm-fp-pastille { background: var(--vrm-ink, #1D1D1F); color: var(--vrm-bg, #FFFFFF); }
+.vrm-fp-etape:not(.is-fait) .vrm-fp-pastille { border: 2px solid var(--vrm-line, #D1D1D6); color: var(--vrm-muted, #6E6E73); background: var(--vrm-bg, #FFFFFF); }
 .vrm-fp-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; padding-top: 2px; }
 .vrm-fp-ligne1 { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .vrm-fp-ligne1 b { font-size: 17px; font-weight: 750; letter-spacing: -.01em; line-height: 1.3; }
-.vrm-fp-etape:not(.is-fait) .vrm-fp-ligne1 b { color: var(--vrm-muted, #56564F); }
-.vrm-fp-date { flex: none; font-family: var(--vrm-police-mono, ui-monospace, monospace); font-size: 13.5px; color: var(--vrm-muted, #56564F); }
-.vrm-fp-detail { font-size: 14px; color: var(--vrm-muted, #56564F); line-height: 1.4; overflow-wrap: anywhere; }
-.vrm-fp-note { font-size: 12.5px; color: var(--vrm-muted, #56564F); margin: 0 2px 12px; }
-.vrm-fp-vide { font-size: 16px; color: var(--vrm-muted, #56564F); margin: 24px 2px; }
+.vrm-fp-etape:not(.is-fait) .vrm-fp-ligne1 b { color: var(--vrm-muted, #6E6E73); }
+.vrm-fp-date { flex: none; font-family: var(--vrm-police-mono, ui-monospace, monospace); font-size: 13.5px; color: var(--vrm-muted, #6E6E73); }
+.vrm-fp-detail { font-size: 14px; color: var(--vrm-muted, #6E6E73); line-height: 1.4; overflow-wrap: anywhere; }
+.vrm-fp-note { font-size: 12.5px; color: var(--vrm-muted, #6E6E73); margin: 0 2px 12px; }
+.vrm-fp-vide { font-size: 16px; color: var(--vrm-muted, #6E6E73); margin: 24px 2px; }
 .vrm-fp-actions { display: flex; gap: 10px; margin-top: 6px; }
 .vrm-fp-b {
   flex: 1 1 0; min-height: 56px; border-radius: 14px; padding: 0 14px; display: flex; align-items: center; justify-content: center; gap: 10px;
-  border: 1px solid var(--vrm-line, #D6D6D0); background: var(--vrm-bg, #FFFFFF); color: var(--vrm-ink, #0F0F0E); font: inherit; font-size: 16px; font-weight: 700; cursor: pointer;
+  border: 1px solid var(--vrm-line, #D1D1D6); background: var(--vrm-bg, #FFFFFF); color: var(--vrm-ink, #1D1D1F); font: inherit; font-size: 16px; font-weight: 700; cursor: pointer;
 }
-.vrm-fp-b-plein { background: var(--vrm-ink, #0F0F0E); border-color: var(--vrm-ink, #0F0F0E); color: var(--vrm-bg, #FFFFFF); }
+.vrm-fp-b-plein { background: var(--vrm-ink, #1D1D1F); border-color: var(--vrm-ink, #1D1D1F); color: var(--vrm-bg, #FFFFFF); }
 @media (max-width: 380px) { .vrm-fp-tuile > b { font-size: 19px; } }
 /* La règle commune des croix « Fermer… » (marge négative, rayon 10 px) : ici la
    croix est un rond de 44 px posé dans la barre, sans marge. */
