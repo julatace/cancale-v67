@@ -698,3 +698,97 @@ Aucune modification de l'extension (tout ce qu'il faut était déjà rangé par 
   Disent encore « paire » (pas touchés ici) : Messages Vestiaire (« Conversation pas reliée à une paire »,
   « Pas reliée à une paire »), la cloche (« N paires vendues …, encore en ligne sur Vestiaire »), l'écran
   Leboncoin (« La vente Vestiaire désigne cette paire… »), `LIB_KO` (« pas reliée à une paire »).
+
+## 3 novembre — 5.317.0 : les messages Vestiaire enfin captés (la messagerie passe par « Stream »)
+
+Julien (3 nov., 10 h 02) : « les messages Vestiaire ne marchent pas, ils ne sont pas captés, même avec la
+dernière extension » (5.316.0 installée : `vc_envoi.ver` = 5.316.0).
+
+### Ce que la base montrait (lecture seule, 3 nov. vers 10 h, noms de clés et hôtes)
+- `vc_messages` : seulement `compteur` (0 non lu, relevé à 08 h 56) — **aucune** conversation ; **0 ligne
+  `vc_fil_*`** ; **pas de `vc_session`** (Vestiaire ne charge jamais `/users/me` : `compte` vide partout).
+- `vc_brut_*` (capture 5.315) sur la page `/chat/` : `GET apiv2…/chat/user/token` ⇒ `{ data: { userToken: {
+  token, provider: 'stream', expirationDate } } }` ; `POST apiv2…/chat/channel/` ⇒ `{ data: { id:
+  '{acheteur}-{article}', type: 'chat_channel', buyer, seller, product: '{article}' } }` ;
+  `notification-feed?category=messages` (et `/v2`) ⇒ `data[]` de cartes `{ id, date, status: 'read', tapped,
+  category: 'messages', eventType: 'chat_message_new', cardTypeV2: 'chat', senderId, senderName,
+  textBody, productLink: { meta: { type: 'chat', data: { id: '{acheteur}-{article}' } } }, productTitle,
+  productPicture: { url }, profilePicture, lastChatMessage }` (24 cartes, une par conversation) ;
+  `negotiations?role=seller&withEvents=true` (les offres).
+- `vc_recon.hotes` : **`chat.stream-chat.com` × 14** — la page parle à la messagerie Stream (Stream Chat),
+  par fetch/XHR (c'est `noteVu` qui l'a compté : l'enveloppe de `vc-inject` VOIT ces requêtes).
+- `vc_envoi` : `{ appris: false, chemin: '/chat/channel/', raison: 'texte-introuvable' }` — l'OUVERTURE
+  d'une conversation prise pour un essai d'envoi.
+
+### La cause (mesurée)
+1. Les conversations et leurs messages ne viennent PAS de vestiairecollective.com mais de
+   `chat.stream-chat.com` : `vc-inject.js` ne lisait que `DE_VC` ⇒ rien.
+2. La seule liste sur vestiairecollective.com (le fil des notifications « messages ») était écartée exprès
+   (`noteMessages` : `/notification/` exclu ; 5.238 : « jamais le fil des notifications »).
+3. `/users/me` jamais chargé ⇒ compte ouvert inconnu ⇒ « de toi » et « non lu » impossibles à dire.
+4. `POST /chat/channel/` notait un faux « essai d'envoi » (texte-introuvable).
+Ni une autre enveloppe (5.314), ni une WebSocket seule, ni un iframe, ni le compte VRM, ni une écriture
+refusée : la ligne `vc_messages` est bien écrite (compteur à jour à 08 h 56).
+
+### Ce qui est fait (extension 5.317.0)
+- `vc-inject.js` (aucune requête de plus, aucune permission ajoutée — c'est la page qui parle à Stream) :
+  - `noteStream` : réponses 2xx de `*.stream-chat.com` / `*.stream-io-api.com` — `POST /channels` (la liste :
+    `channels[].channel`, `messages`, `read`), `POST /channels/{type}/{id}/query` (une conversation ouverte),
+    `POST /channels/{type}/{id}/message` (un message que TU envoies). Par conversation : identifiant,
+    article (`channel.product`, sinon la forme mesurée `{acheteur}-{article}`), « non lu » = la ligne `read`
+    du COMPTE OUVERT (`unread_messages`, sinon `null`), aperçu ; un FIL par conversation (texte, date,
+    « de toi » = `user.id` du message = compte ouvert ; supprimé ou sans texte ⇒ écarté). Jamais un nom,
+    un avatar ; les réponses Stream ne sont PAS gardées brutes (`vc_brut_*` reste vestiairecollective.com).
+    Forme inconnue ⇒ « forme inconnue » (`inconnu`), `{channels: []}` ⇒ liste vide, 4xx ⇒ rien.
+  - `noteMoiStream` : le compte ouvert = le `user_id` que la page met dans l'adresse de chaque requête Stream
+    (chiffres seulement), jamais à la place d'un `/users/me` lu dans le document ; `vcmoi { source: 'stream' }`
+    ⇒ `vc_session.source = 'stream'`.
+  - `noteFluxMessages` : le fil des notifications « messages » ⇒ une conversation par carte `type: 'chat'`
+    (la plus récente gagne) : aperçu `lastChatMessage`, date, « de toi » par `senderId` si le compte est su,
+    « lu » SEULEMENT si `status: 'read'` ou si c'est ton message (autre mot ⇒ pas su), titre et photo de
+    l'ARTICLE (`productTitle`, `productPicture.url` sur images.vestiairecollective.com/produit/) ; jamais
+    `senderName`, `contactName`, `profilePicture`.
+  - `noteCanal` : `POST /chat/channel/` ⇒ la conversation et son article (sans acheteur ni vendeur).
+  - Recette d'envoi : `/chat/channel/` et `/chat/user/` ne sont plus des « essais » ; un envoi vu sur Stream
+    est noté **pas rejouable, raison `messagerie-stream`** (le corps porte un identifiant fabriqué par la page
+    et le jeton Stream voyage en en-tête : rien n'y est sûr à refaire). « Envoyer sur Vestiaire » reste
+    fermé — Julien répond sur Vestiaire, sa réponse rejoint le fil dans VRM.
+- `vc.js` relaie `titre`, `photo`, `source` des conversations et `source` du compte ; `background.js` les range
+  (`vc_messages.conversations[*].titre/photo/source`, `vc_session.source`) et accepte la recette Stream
+  (pas rejouable seulement ; une rejouable n'est jamais remplacée).
+- App (Messages → Vestiaire) : sans référence VRM, la ligne montre le TITRE et la PHOTO de l'article (affichage
+  seul, jamais une identité) ; « Pas reliée à un article VRM » ; la raison `messagerie-stream` est dite en
+  français ; l'ancien faux essai `/chat/channel/` n'est plus présenté ; `EXT_CAPACITES.vcfil` = 5.317.0.
+- Versions : `CODE_VERSION`, manifeste, `CAPTEUR_VERSION` (lbc-inject.js), `relaisVersion` (lbc-relay.js),
+  `EXT_ATTENDUE` = 5.317.0 ; zip régénéré (un dossier).
+
+### Preuves (§6)
+- `scripts/audit-vc-messages.cjs` (M1-M9, 40 contrôles ; VRAI vc-inject.js → VRAI vc.js → VRAI background.js
+  dans `_fond-vm.cjs`, réponses FABRIQUÉES : la forme du fil des notifications et de `/chat/channel/` est
+  celle MESURÉE ; celle de Stream est celle de son API REST documentée — jamais vue chez lui, à relire dans
+  `vc_messages.forme` après son passage). Code d'avant (`origin/main`) : **33 rouges**. `--prouve` : **16/16
+  mutations tuées** (hôte Stream ignoré, fil des notifications écarté, user_id non numérique accepté,
+  `/users/me` écrasé, non-lu deviné, « lu » deviné, message supprimé gardé, forme inconnue = liste vide,
+  erreur lue, `/chat/channel/` pris pour un envoi, Stream rejouable, fond qui refuse la recette Stream, titre
+  perdu, compte de la page pris sans l'onglet, titre/raison absents de l'app).
+- Banc `scripts/bancs/vestiaire-messages.cjs` : + 3 parcours « messagerie Stream (5.317) » (390 tactile et
+  1512 : titre et photo de l'article, fil lu, raison en français, aucun envoi ; ancien faux essai
+  `/chat/channel/`) — 9 KO sur l'app d'`origin/main`, vert après. Captures regardées.
+- Verts : `audit-vc-conversations`, `audit-capture-vc-lbc`, `audit-lbc-vc-lecture`, `audit-coherence`,
+  `audit-extension-zip`, `audit-fiabilite-annonces`, `audit-vc-publier`, `audit-secrets`,
+  `audit-vestiaire-partout`. Rouge IDENTIQUE sur `origin/main` (pas de ce chantier) : `audit-vc-recon`
+  (2 contrôles « rien ne quitte la page » contredits par la capture brute voulue de la 5.315).
+
+### Limites (dites)
+- Un message arrivé PENDANT que la page est ouverte vient par la WebSocket de Stream, que l'on n'écoute pas :
+  il est rangé au prochain chargement de `/chat/` ou à l'ouverture de la conversation (le compteur de non-lus,
+  lui, est relu par la page).
+- Un message photo seule n'a pas de texte : il n'est pas rangé (comme avant).
+- Si Vestiaire ne passe pas `user_id` dans l'adresse Stream, le compte reste inconnu : « de toi » et
+  « non lu » restent « pas su » (jamais devinés).
+- Répondre depuis VRM n'est pas possible tant que la messagerie est Stream (refus dit, rien ne part).
+
+### Geste de Julien
+Installer la **5.317.0** (remplacer le dossier, ⟳ dans chaque Chrome), puis sur vestiairecollective.com
+(même Chrome) ouvrir la **messagerie** (`/chat/`) et une conversation. Ensuite VRM → Messages → Vestiaire.
+Pour vérifier (lecture seule) : `vc_messages.conversations`, `vc_messages.forme`, `vc_fil_*`, `vc_session.source`.
