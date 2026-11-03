@@ -173,7 +173,7 @@ async function regleEcran(pg, nom, tel, errs) {
   // (2 nov., 22 h : l'écran a moins de montants depuis la maquette FusionCompta — au moins 2.)
   check(montants.length >= 2 && doubles.length === 0, `${nom} — U chaque montant visible écrit une fois (${montants.length} montants${doubles.length ? ', redits : ' + doubles.join(' · ') : ''})`);
   // ── J. aucun jargon visible
-  const jargon = [...(t.match(/\bCA\b|Finalisé(?!e)|\bn\/d\b/g) || []), ...(t.match(/\bbrut\b|encaiss/gi) || [])];
+  const jargon = [...(t.match(/\bCA\b|Finalisé(?!e)|\bn\/d\b/g) || []), ...(t.replace(/bénéfice brut/gi, '').match(/\bbrut\b|encaiss/gi) || [])]; // (3 nov.) « Bénéfice brut » est le NOM d'une notion (src/beneficeNoms.js, bénéfice unique) : permis ; « brut » seul reste du jargon
   check(jargon.length === 0, `${nom} — J aucun jargon visible : ${JSON.stringify(jargon)}`);
   // ── D. débordement
   const deb = await pg.evaluate(() => {
