@@ -47698,7 +47698,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       !!labelsCaptes[tx], !!bordParTx[tx], identiteAnnonce(o), !!(deposeVente.attente && deposeVente.attente.cle === tx),
       // (1er nov.) le récapitulatif de la vente lit aussi ces preuves (frise, versement, suivi)
       versements ? (versements[tx] || '') : versements, (bordParTx[tx] && bordParTx[tx].receivedAt) || '', (bordParTx[tx] && bordParTx[tx].suivi) || '',
-      (labelsCaptes[tx] && labelsCaptes[tx].capturedAt) || '', shipDone[tx] || 0, (etatTxn(tx) || {}).s ?? null, !!onNav, JSON.stringify(e && e.buyFromId ? achatRelie(e) : null)];
+      (labelsCaptes[tx] && labelsCaptes[tx].capturedAt) || '', shipDone[tx] || 0, (etatTxn(tx) || {}).s ?? null, !!onNav, JSON.stringify(e && e.buyFromId ? achatRelie(e) : null),
+      // (3 nov.) le transporteur LU du récapitulatif (e-mails de suivi, lignes du transporteur,
+      // lus APRÈS le premier rendu) : sans lui, une ligne dessinée avant la lecture gardait
+      // « pas lu » pour toujours (banc transporteurs-logos R2, intermittent).
+      (() => { const t = transporteurVente(bordParTx[tx] || null); return (t.cle || '') + '|' + (t.nom || '') + '|' + (t.source || ''); })()];
     // L'état de l'article (« Très bon état ») : celui de SON annonce, trouvée par
     // identité (`txnItem`, la transaction), jamais par titre — sinon rien.
     const annonce = txnItem[tx] != null ? lst.find((it) => it && String(it.id) === String(txnItem[tx])) : null;
@@ -50221,7 +50225,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const bordGeste = !hidden && st !== 'cancelled' && aExpedier(o) && !isShipDone(o) && o.transaction_id != null;
               // (2 nov.) Le transporteur LU de la vente (n° de SON bordereau) : à côté du bouton
               // bordereau tant qu'il y a un colis à envoyer, sinon une ligne des détails (dit une fois).
-              const trRecap = transporteurVente(bordE); try { (window.__trDbg = window.__trDbg || []).push({ tx: txL, suivi: bordE && bordE.suivi, nb: Array.isArray(tracking) ? tracking.length : String(tracking), has: Array.isArray(tracking) ? tracking.filter(x => x && String(x.suivi||'').includes('0410')).map(x => [x.suivi, x.carrier]) : null, transp: transpMap ? 'm' : String(transpMap), only, cle: trRecap.cle }); } catch (_) {}
+              const trRecap = transporteurVente(bordE);
               return <>
                 <header className="vrm-recap-tete">
                   <div className="vrm-sale-photo vrm-recap-photo">{photo ? <PhotoArticleAgrandissable src={photo} titre={o.title}><PhotoVenteSources {...photoSourcesProps} data-photo-vente="detail" style={{width:'100%',height:'100%',objectFit:'cover'}}/></PhotoArticleAgrandissable> : <Icon name="image" size={22} style={{color:C.muted,opacity:.55}}/>}</div>
