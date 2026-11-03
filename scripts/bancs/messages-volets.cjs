@@ -110,7 +110,7 @@ async function rendre(b, tel) {
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   const execs = [];
   await pg.exposeFunction('__exec', (s) => execs.push(JSON.parse(s)));
-  await pg.addInitScript(({ n, m, s }) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_annonce_numeros', JSON.stringify(n)); localStorage.setItem('vrm_meubles', JSON.stringify(m)); localStorage.setItem('vrm_slots', JSON.stringify(s)); } catch (_) {} }, { n: NUMEROS, m: MEUBLES, s: SLOTS });
+  await pg.addInitScript(({ n, m, s, sombre }) => { try { localStorage.setItem('vrm_acces_direct', '1'); if (sombre) localStorage.setItem('vinted_dark', 'true'); localStorage.setItem('vinted_annonce_numeros', JSON.stringify(n)); localStorage.setItem('vrm_meubles', JSON.stringify(m)); localStorage.setItem('vrm_slots', JSON.stringify(s)); } catch (_) {} }, { n: NUMEROS, m: MEUBLES, s: SLOTS, sombre: !!process.env.BANC_SOMBRE });
   await pg.addInitScript(PONT, { version: '5.291.0', fils: { 501: FIL_OFFRE, 502: FIL_SANS } });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
