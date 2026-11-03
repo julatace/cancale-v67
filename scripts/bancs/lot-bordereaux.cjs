@@ -109,7 +109,10 @@ const projette = (row, sel) => {
     // L'APERÇU : le plus récent en haut, l'ancienne décochée avec sa raison.
     const ap = await pg.evaluate(() => [...document.querySelectorAll('[data-lot-ligne]')].map((e) => ({ cle: e.getAttribute('data-lot-ligne'), coche: e.getAttribute('data-coche') === '1', ancienne: !!e.querySelector('[data-lot-ancienne]') })));
     dit(ap.length === 4, 'l’aperçu liste les 4 bordereaux prêts, aucun caché', JSON.stringify(ap.map((x) => x.cle)));
-    dit(ap.length && ap[ap.length - 1].cle === '9004', 'trié par date de vente : la plus ancienne en bas', JSON.stringify(ap.map((x) => x.cle)));
+    // (3 nov., choix de Julien n° 2) L'aperçu suit l'ordre des GROUPES de l'écran (le plus pressé d'abord, par
+    // transporteur) — avant, la date de vente (la plus récente en haut). Jugé contre les cartes rendues.
+    const ecran = await pg.evaluate(() => [...document.querySelectorAll('[data-bord-card][data-tx-colis]')].map((e) => e.getAttribute('data-tx-colis')).filter((x, i, a) => a.indexOf(x) === i));
+    dit(ap.length && JSON.stringify(ap.map((x) => x.cle)) === JSON.stringify(ecran.filter((c) => ap.some((x) => x.cle === c))), 'l’aperçu suit l’ordre des colis de l’écran', JSON.stringify({ apercu: ap.map((x) => x.cle), ecran }));
     const v4 = ap.find((x) => x.cle === '9004');
     dit(v4 && !v4.coche && v4.ancienne, 'la vente d’il y a un mois est DÉCOCHÉE et dit pourquoi (pas d’impression silencieuse d’archives)', JSON.stringify(v4));
     dit(ap.filter((x) => x.coche).length === 3, 'les trois ventes récentes sont cochées', JSON.stringify(ap));

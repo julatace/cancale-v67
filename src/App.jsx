@@ -119,6 +119,8 @@ import { lirePhotoroom, appelPhotoroom, phraseVerif, phraseSansReponse, dateCour
 // décide à qui appartient un email) — jamais une seconde normalisation ici.
 import { normAdresse, ADRESSE_COLLECTRICE, estAdresseCollectrice } from "../api/_lib/proprietaire-email.js";
 import { retoursEnCours, retoursPourSite, remiseEnStock, LIBELLE_ETAPE, ETAPES_RETOUR } from "./retoursStock.js";
+import { rangerParTransporteur, ordreDesGroupes, ordonnerLot } from "./lotTransporteurs.js";
+import { trouverParScan } from "./scanColis.js";
 import { etatVinted, NIVEAU_ETAT_MAX } from "./carteAnnonce.js";
 import ChoixPeriode from "./ChoixPeriode.jsx";
 import { libellePlage, phrasePlage } from "./periodeCalendrier.js";
@@ -142,6 +144,7 @@ const TOURNEE_SUR_JOURNEE = false;
 const JOURNEE_AVEC_WIDGETS = false;
 import { UneLigne } from "./UneLigne.jsx";
 import { GlisserVente, useDeposeDiffere, BarreAnnulerDepose } from "./GlisserDepose.jsx";
+import ScannerColis from "./ScannerColis.jsx";
 import { beneficeLigneVente, texteBenefice, euros as eurosLigne } from "./beneficeLigne.js";
 import { friseVente, phraseVente, eurosRecap, ETATS_HORS_PARCOURS } from "./recapVente.js";
 // (2 nov.) Le style « Fusion » : la carte sombre du mois et la frise de suivi (src/design/).
@@ -14465,6 +14468,8 @@ const ICON_PATHS = {
   euro:    <><path d="M17 6.6A6.6 6.6 0 0 0 8.2 12 6.6 6.6 0 0 0 17 17.4"/><path d="M4.5 10.4h7.8"/><path d="M4.5 13.6h7.8"/></>,
   eye:     <><path d="M2.5 12S6 6.2 12 6.2 21.5 12 21.5 12 18 17.8 12 17.8 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.7"/></>,
   heart:   <><path d="M12 19.6S3.8 14.8 3.8 9.6a4.2 4.2 0 0 1 8.2-1.4 4.2 4.2 0 0 1 8.2 1.4c0 5.2-8.2 10-8.2 10Z"/></>,
+  // (3 nov.) Scanner un code-barres : le viseur et ses barres.
+  scan: <><path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8"/><path d="M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8"/><path d="M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16"/><path d="M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16"/><path d="M8 9v6"/><path d="M11 9v6"/><path d="M13.5 9v6"/><path d="M16 9v6"/></>,
   printer: <><path d="M7 9V4h10v5"/><path d="M7 17.5H5a1.5 1.5 0 0 1-1.5-1.5v-4A1.5 1.5 0 0 1 5 10.5h14a1.5 1.5 0 0 1 1.5 1.5v4a1.5 1.5 0 0 1-1.5 1.5h-2"/><path d="M7 14.5h10V20H7z"/></>,
   camera:  <><path d="M3.5 8.6h3.1l1.3-2.1h8.2l1.3 2.1h3.1v9.4a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5Z"/><circle cx="12" cy="13.2" r="3.2"/></>,
   calendar:<><rect x="3.5" y="5.5" width="17" height="15" rx="2"/><path d="M3.5 10h17"/><path d="M8 3.5v4M16 3.5v4"/></>,
@@ -48365,8 +48370,38 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       return { cle, e, age, imprime, ancienne: age != null && age > VENTE_LOT_MAX_J }; })
     .sort((a, b) => (Date.parse(b.e.o && b.e.o.date) || 0) - (Date.parse(a.e.o && a.e.o.date) || 0));
   const signatureColis = e => empreinteColis({owner:AUTH.user?.id||'',compte:e.o?._acc?.vinted_user_id||e.b?.uid||'',transaction:e.txn||e.key,numero:(e.b?numForBord(e.b):'')||(e.o?effEntry(e.o)?.numero:'')||''});
+  // ── (3 nov., choix de Julien n° 2) « TOUT IMPRIMER », TOUTES PLATEFORMES, PAR TRANSPORTEUR ──
+  // Les lignes du lot : les bordereaux Vinted prêts (`lignesLot`, la règle d'avant), les ventes
+  // Vestiaire dont le bordereau est rangé (`vc_label_*`), les ventes Leboncoin dont le bordereau
+  // existe (lu par l'extension, `lbcpdf`). eBay n'a pas de PDF chez VRM (l'étiquette se prend dans
+  // eBay, §2.8) : jamais dans le lot. L'ordre est celui des GROUPES de l'écran (`colisAEnvoyerRanges`,
+  // `ordonnerLot`) : tous les colis d'un transporteur, puis le suivant.
+  const sigLigneLot = (l) => l.site === 'vinted' ? signatureColis(l.e) : empreinteColis({ owner: AUTH.user?.id || '', compte: l.site, transaction: l.cle, numero: l.num || '' });
+  const lignesLotTous = () => {
+    let ranges = []; try { ranges = colisAEnvoyerRanges(); } catch (_) { ranges = []; }
+    const ordre = ordreDesGroupes(ranges, trNomColis);
+    const rangDe = new Map(ranges.map((x, i) => [x.__autre ? x.key : String(x.txn || x.key), i]));
+    const L = [];
+    if (voitSite('vinted')) for (const l of lignesLot()) { const o = l.e.o, b = l.e.b;
+      L.push({ ...l, site: 'vinted', trNom: trNomColis(l.e), rang: rangDe.get(String(l.cle)),
+        num: (b ? numForBord(b) : '') || (o ? (effEntry(o)?.numero || '') : ''), titre: (o && o.title) || (b && (b.modele || b.article)) || 'Bordereau',
+        photo: o ? orderPhoto(o) : bordPhoto(b), sous: `Vinted · ${o && o._acc ? accNameOf(o._acc) : 'compte inconnu'}` }); }
+    const imprimesVc = vcCarte('vrm_vc_imprimes') || {};
+    const lbcPdf = extSait('lbcpdf') === 'ok';
+    ranges.forEach((x, i) => {
+      if (x.__autre === 'vc' && x.v && x.v.bordereau && x.v.bordereau.id)
+        L.push({ cle: x.key, site: 'vestiaire', v: x.v, trNom: x.trNom, rang: i, age: null, ancienne: false, imprime: imprimesVc[x.v.id] || null,
+          num: x.v.num || '', titre: x.v.titre || 'Article Vestiaire', photo: x.v.photo || null, sous: 'Vestiaire' });
+      else if (x.__autre === 'lbc' && lbcPdf && x.o && x.o.label && x.o.label.voucherUrl) {
+        const f = x.x.itemId ? (load('vinted_annonce_numeros', {}) || {})[x.x.itemId] : null;
+        L.push({ cle: x.key, site: 'leboncoin', lo: x.o, trNom: x.trNom, rang: i, age: null, ancienne: false, imprime: null,
+          num: (f && f.numero != null && String(f.numero).trim()) ? String(f.numero).trim() : '', titre: x.x.titre || x.o.title || '(sans titre)', photo: photoArticle(x.o), sous: 'Leboncoin' });
+      }
+    });
+    return ordonnerLot(L, ordre, (l) => l.trNom);
+  };
   const [progressionLot,setProgressionLot]=useState(null);
-  const lotActuel=React.useRef(null);lotActuel.current={expeditions,signatureColis,pdf:e=>(e.b&&e.b.hasPdf)||(e.txn&&labelsCaptes[e.txn])};
+  const lotActuel=React.useRef(null);lotActuel.current={lignes:lignesLotTous,sig:sigLigneLot};
   // ── (31 oct.) LES CARTES DES QUATRE COLONNES DE COLIS ──────────────────
   // Chaque carte porte le groupe que lui donne une règle EXISTANTE (aucune règle
   // de classement neuve) : `expeditions()` + `pret` + `isShipDone` pour les
@@ -48485,6 +48520,48 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // sur le carton ⇒ ambre, les règles de l'impression), où est la paire (le
   // Stock, par N° : `ouStockNumero`), le transporteur du bordereau s'il est écrit.
   // Le geste final est `marquerColisFait` — celui de « ✓ Colis fait ».
+  // ── (3 nov., choix de Julien n° 1) SCANNER POUR DÉPOSER ───────────────────────────────
+  // Les colis qu'un scan peut désigner, chacun avec SES n° de suivi LUS (jamais un titre) :
+  //  · Vinted : le n° du bordereau (`b.suivi`, e-mail du bordereau) — à envoyer, et déjà
+  //    partis (« Déjà déposé ») ; · Vestiaire : `v.suivi` (à envoyer, et « Colis fait »).
+  // Leboncoin et eBay n'ont aucun n° de suivi lu chez VRM : un scan ne les trouve pas.
+  const colisScannables = () => {
+    const L = [];
+    try {
+      if (voitSite('vinted')) {
+        const vus = new Set();
+        for (const e of expeditions()) { const o = e.o, b = e.b; if (e.txn) vus.add(String(e.txn));
+          L.push({ cle: 'v:' + (e.txn || e.key), site: 'vinted', suivis: b && b.suivi ? [b.suivi] : [], deja: o ? isShipDone(o) : (b ? isBordShippedManual(b) : false), o, b,
+            num: (b ? numForBord(b) : '') || (o ? (effEntry(o)?.numero || '') : ''), titre: (o && o.title) || (b && (b.modele || b.article)) || 'Colis' }); }
+        for (const o of (Array.isArray(sales.items) ? sales.items : [])) { const tx = String(o && o.transaction_id); if (!o || vus.has(tx) || aExpedier(o)) continue;
+          const b = bordsParTxn[tx]; if (!b || !b.suivi) continue;
+          L.push({ cle: 'v:' + tx, site: 'vinted', suivis: [b.suivi], deja: true, o, b, num: numForBord(b) || (effEntry(o)?.numero || ''), titre: o.title || 'Colis' }); }
+      }
+      if (voitSite('vestiaire')) { const cv = colisVestiaire(vcEtat) || {}; const faits = vcCarte('vrm_vc_colis_done') || {};
+        for (const v of (cv.faits || [])) L.push({ cle: 'vc:' + v.id, site: 'vestiaire', suivis: v.suivi ? [v.suivi] : [], deja: true, v, num: v.num || '', titre: v.titre || 'Article Vestiaire' });
+        for (const v of (cv.aEnvoyer || [])) L.push({ cle: 'vc:' + v.id, site: 'vestiaire', suivis: v.suivi ? [v.suivi] : [], deja: !!faits[v.id], v, num: v.num || '', titre: v.titre || 'Article Vestiaire' }); }
+    } catch (_) {}
+    return L;
+  };
+  const [scanOuvert, setScanOuvert] = useState(false);
+  // « Déposé » : LE geste existant (`marquerColisFait` pour Vinted, « Colis fait » Vestiaire),
+  // différé de 5 s avec « Annuler » (`useDeposeDiffere`, celui de Ventes) ; écran quitté ⇒ écrit.
+  const deposeScan = useDeposeDiffere(
+    (x) => { if (!x) return; if (x.site === 'vinted') marquerColisFait(x.o, x.b); else if (x.site === 'vestiaire') marquerVc('vrm_vc_colis_done', x.v.id, true); },
+    undefined,
+    (x) => {
+      if (!x) return;
+      if (x.site === 'vestiaire') { marquerVc('vrm_vc_colis_done', x.v.id, true); return; }
+      const k = x.o && x.o.transaction_id != null ? String(x.o.transaction_id) : '';
+      if (k) { const u = { ...(load('vinted_ship_done', {}) || {}), ...(shipDoneRef.current || {}) }; if (!u[k]) { u[k] = Date.now(); save('vinted_ship_done', u); } }
+      const kb = x.b ? bordKey(x.b) : null;
+      if (kb) save('vinted_bords_shipped', { ...(load('vinted_bords_shipped', {}) || {}), ...(bordsShippedRef.current || {}), [kb]: 1 });
+    });
+  const attenteScan = React.useRef(null); attenteScan.current = deposeScan.attente;
+  // Un colis dont le « Déposé » attend encore ses 5 s est déjà déposé pour un second scan.
+  const trouverScan = (brut) => { const r = trouverParScan(brut, colisScannables());
+    if (r.etat === 'trouve' && attenteScan.current && attenteScan.current.cle === String(r.colis.cle)) return { ...r, etat: 'deja' };
+    return r; };
   const [emballage, setEmballage] = useState(() => {
     if (curSub !== 'bordereaux' || !DEMANDE_EMBALLAGE.at || Date.now() - DEMANDE_EMBALLAGE.at > 60000) return false;
     DEMANDE_EMBALLAGE.at = 0; return true;
@@ -48520,7 +48597,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     });
   };
   const ouvrirLot = () => {
-    const L = lignesLot();
+    const L = lignesLotTous();
     if (!L.length) { toast('Aucun bordereau prêt à imprimer pour l\'instant.'); return; }
     setProgressionLot(null);setLot({ lignes:L,verifications:{},coches:new Set(L.filter(l=>!l.ancienne&&!l.imprime).map(l=>l.cle)),echecs:[] });
   };
@@ -48541,23 +48618,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     //    l'impression — « un bordereau qui n'existe plus ».
     // ⇒ On construit la liste depuis `expeditions()`, filtrée À L'IDENTIQUE du
     //    compteur `avecPdf`. Une seule règle, un seul propriétaire.
-    const ex = expeditions();
     const choisis = cles instanceof Set ? cles : null;
-    const aImprimer = ex.filter(e => ((e.b && e.b.hasPdf) || (e.txn && labelsCaptes[e.txn])) && !(e.o && isShipDone(e.o)))
-      .filter(e => !choisis || choisis.has(e.txn || e.key));
+    // (3 nov.) Les lignes de « Tout imprimer » (toutes plateformes, ordre des transporteurs) ;
+    // pour Vinted, la règle d'avant : PDF présent et colis pas coché parti (`lignesLot`).
+    const aImprimer = lignesLotTous().filter(l => !choisis || choisis.has(l.cle));
     if (!aImprimer.length) { libererOngletPdf(); toast(choisis ? 'Coche au moins un bordereau.' : 'Aucun bordereau prêt à imprimer pour l\'instant.'); return; }
-    const encoreDisponibles = new Set(aImprimer.map(e => e.txn || e.key));
+    const encoreDisponibles = new Set(aImprimer.map(l => l.cle));
     const disparus = choisis ? [...choisis].filter(cle => !encoreDisponibles.has(cle)) : [];
     if (disparus.length) { libererOngletPdf(); toast(`${disparus.length} bordereau(x) sélectionné(s) ne sont plus disponibles à l’expédition. Ferme puis rouvre la sélection pour vérifier la liste. Aucun lot lancé.`); return; }
     const proprietaire=AUTH.user?.id||null;
-    const empreintes=new Map(aImprimer.map(e=>[e.txn||e.key,signatureColis(e)]));
+    const empreintes=new Map(aImprimer.map(l=>[l.cle,sigLigneLot(l)]));
     const verifierContexte=()=>{
       if((AUTH.user?.id||null)!==proprietaire)throw Error('Le compte VRM a changé : aucun nouveau PDF ouvert.');
-      const actuelles=new Map(lotActuel.current.expeditions().filter(e=>lotActuel.current.pdf(e)&&!(e.o&&isShipDone(e.o))).map(e=>[e.txn||e.key,e]));
-      for(const [cle,empreinte] of empreintes){const e=actuelles.get(cle);if(!e||lotActuel.current.signatureColis(e)!==empreinte)throw Error('Un article, son numéro ou son état a changé. Vérifie la sélection avant de préparer les PDF.');}
+      const actuelles=new Map(lotActuel.current.lignes().map(l=>[l.cle,l]));
+      for(const [cle,empreinte] of empreintes){const l=actuelles.get(cle);if(!l||lotActuel.current.sig(l)!==empreinte)throw Error('Un article, son numéro ou son état a changé. Vérifie la sélection avant de préparer les PDF.');}
     };
     setBatchBusy(true);
-    const controle=controlePreparation(aImprimer.map(e=>({cle:e.txn||e.key,signature:signatureColis(e)})),new Set(aImprimer.map(e=>e.txn||e.key)),lot?.verifications||{});
+    const controle=controlePreparation(aImprimer.map(l=>({cle:l.cle,signature:sigLigneLot(l)})),new Set(aImprimer.map(l=>l.cle)),lot?.verifications||{});
     if(controle.reste && !await askConfirm({title:'Vérifier les articles avant impression',desc:`${controle.verifies} sur ${controle.selection} article(s) contrôlé(s). Vérifie la photo, le numéro et le bon compte avant de préparer les PDF. Cette action ne marque aucun colis expédié.`,ok:'Préparer quand même les PDF',cancel:'Revenir aux articles'})){setBatchBusy(false);libererOngletPdf();return;}
     const echecs = [], faits = [];
     setBatchBusy(true);setProgressionLot({etape:'lecture',fait:0,total:aImprimer.length});
@@ -48567,29 +48644,38 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // les embarquer dans la liste coûtait 6 Mo à chaque ouverture de l'écran.
       const items = [];
       let pasLus = 0, sansPdf = 0;
-      for (const [index,e] of aImprimer.entries()) {
+      for (const [index,l] of aImprimer.entries()) {
         verifierContexte();
         setProgressionLot({etape:'lecture',fait:index+1,total:aImprimer.length});
-        const o = e.o, b = e.b;
-        // ⚠️ LE PDF CAPTÉ PAR L'EXTENSION PASSE EN PREMIER (même règle que la
-        //    carte, § per-card) : c'est l'étiquette prise chez Vinted, rattachée
-        //    par n° de transaction ; l'email n'est qu'un secours.
-        const capte = e.txn ? labelsCaptes[e.txn] : null;
-        const lu = await octetsBordereau(capte && capte.row, b && b.hasPdf ? b._row : null);
-        if (lu === null) pasLus++; else if (!lu.octets) sansPdf++;
-        const buf = lu && lu.octets ? lu.octets : null;
-        if (!buf) { echecs.push(e.txn || e.key); continue; }   // pas d'octets : on saute, on n'imprime pas du vide — et on le DIT après
-        faits.push(e.txn || e.key);
-        // Numéro et titre : même dérivation que la carte (identité Vinted, jamais
-        // le titre — §5). Numéro depuis le bordereau si on l'a, sinon la vente.
-        const numero = (b ? numForBord(b) : '') || (o ? (effEntry(o)?.numero || '') : '');
-        const title = o ? o.title : (b ? (b.modele || b.article || '') : '');
-        // Compte pro (une facture existe pour cette vente) → on joint la facture
-        // juste après son bordereau dans le PDF groupé (§41).
-        let invBytes = null;
-        const inv = b ? invForBord(b) : null;
-        if (inv) { const ent = entForBordInvoice(inv); if (ent) { try { invBytes = await buildFacturXBytes(inv, ent); } catch(_) {} } }
-        items.push({ numero, title, pdfBuf: buf, invBytes, cle: e.txn || e.key });
+        let buf = null, invBytes = null;
+        if (l.site === 'vinted') {
+          const e = l.e, b = e.b;
+          // ⚠️ LE PDF CAPTÉ PAR L'EXTENSION PASSE EN PREMIER (même règle que la
+          //    carte, § per-card) : c'est l'étiquette prise chez Vinted, rattachée
+          //    par n° de transaction ; l'email n'est qu'un secours.
+          const capte = e.txn ? labelsCaptes[e.txn] : null;
+          const lu = await octetsBordereau(capte && capte.row, b && b.hasPdf ? b._row : null);
+          if (lu === null) pasLus++; else if (!lu.octets) sansPdf++;
+          buf = lu && lu.octets ? lu.octets : null;
+          // Compte pro (une facture existe pour cette vente) → on joint la facture
+          // juste après son bordereau dans le PDF groupé (§41).
+          const inv = buf && b ? invForBord(b) : null;
+          if (inv) { const ent = entForBordInvoice(inv); if (ent) { try { invBytes = await buildFacturXBytes(inv, ent); } catch(_) {} } }
+        } else if (l.site === 'vestiaire') {
+          // Le PDF rapatrié (`vc_label_{produit}`), lu au clic — comme « Imprimer » de sa carte.
+          const j = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(l.v.bordereau.id)}&select=b64:data->>b64`);
+          const b64 = Array.isArray(j) && j[0] && j[0].b64;
+          if (!Array.isArray(j)) pasLus++; else if (!b64) sansPdf++;
+          if (b64) { try { buf = b64ToBytes(b64); } catch (_) { buf = null; } }
+        } else if (l.site === 'leboncoin') {
+          // Le PDF Leboncoin passe par l'extension (`lbcpdf`), comme « Imprimer » de sa carte.
+          let r0 = null; try { r0 = await vmrPdfLbc(l.lo.label.voucherUrl); } catch (_) { r0 = null; }
+          if (!r0 || !r0.dataUrl) pasLus++; else { try { buf = b64ToBytes(r0.dataUrl.split(',')[1] || ''); } catch (_) { buf = null; } }
+        }
+        if (!buf) { echecs.push(l.cle); continue; }   // pas d'octets : on saute, on n'imprime pas du vide — et on le DIT après
+        faits.push(l.cle);
+        // Numéro et titre : même dérivation que la carte (identité, jamais le titre — §5).
+        items.push({ numero: l.num || '', title: l.titre || '', pdfBuf: buf, invBytes, cle: l.cle, site: l.site, ligne: l });
       }
       if (!items.length) { libererOngletPdf(); toast(pasLus ? "La base n'a pas répondu — réessaie dans un instant." : "Ces bordereaux n'ont plus leur PDF — retélécharge-les depuis les ventes sur Vinted."); setBatchBusy(false); return; }
       setProgressionLot({etape:'fusion',fait:items.length,total:aImprimer.length});
@@ -48604,7 +48690,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // La fusion rend l'identité exacte des PDF réussis et refusés.
       const clesReussies = (r.reussis || []).map(i => items[i].cle);
       (r.rates || []).forEach(i => echecs.push(items[i].cle));
-      if (clesReussies.length) setBordsPrinted(prev => { const u = { ...prev }; const at = new Date().toISOString(); clesReussies.forEach(k => { u[k] = at; }); save('vinted_bords_printed', u); return u; });
+      const reussiesVinted = (r.reussis || []).filter(i => items[i].site === 'vinted').map(i => items[i].cle);
+      if (reussiesVinted.length) setBordsPrinted(prev => { const u = { ...prev }; const at = new Date().toISOString(); reussiesVinted.forEach(k => { u[k] = at; }); save('vinted_bords_printed', u); return u; });
+      (r.reussis || []).filter(i => items[i].site === 'vestiaire').forEach(i => { try { marquerVc('vrm_vc_imprimes', items[i].ligne.v.id, true); } catch (_) {} });
       if (choisis) setLot(x => echecs.length ? { ...x, coches: new Set(echecs), echecs } : null);
       if (pasLus || sansPdf || illisibles) toast(`${imprimes} sur ${aImprimer.length} imprimé${imprimes>1?'s':''} — ${[pasLus?`${pasLus} que la base n'a pas rendu${pasLus>1?'s':''} (réessaie)`:'', sansPdf?`${sansPdf} sans PDF`:'', illisibles?`${illisibles} PDF illisible${illisibles>1?'s':''} (retélécharge-le${illisibles>1?'s':''} depuis la vente sur Vinted)`:''].filter(Boolean).join(', ')}.`);
     } catch(err){ libererOngletPdf(); toast(/Aucun bordereau exploitable/.test(String(err && err.message || err)) ? "Aucun de ces PDF n'a pu être lu — retélécharge-les depuis les ventes sur Vinted." : 'Erreur : ' + String(err)); }
@@ -48774,6 +48862,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //    expédiée selon Leboncoin — `lbcExpediee` — ou cochée « Colis fait »).
   // La frise de chaque colis ne coche que le PROUVÉ (la règle de la carte Colis : imprimé = sa
   // coche, déposé = « Colis fait » ou un statut qui a bougé, en route / livré = les preuves lues).
+  // ── (3 nov.) LES COLIS « À ENVOYER », TOUS SITES — une construction pour l'écran ET pour
+  // « Tout imprimer » (l'ordre des groupes de transporteurs est le même, `src/lotTransporteurs.js`).
+  const colisAEnvoyerBase = () => {
+    const vintedLu = voitSite('vinted') && !sales.loading && !sales.error;
+    const exTout = vintedLu ? expeditions().filter(e => !e.o || matchOrd(e.o)) : [];
+    const lbcParTx = new Map(((lbcVentes && lbcVentes.ventes) || []).map((o) => [String(o && o.txId != null ? o.txId : ''), o]));
+    const autresColis = [
+      ...(voitSite('vestiaire') ? (((colisVestiaire(vcEtat) || {}).aEnvoyer) || []) : []).map((v) => { const tr = transporteurDuColis({ declare: v.transporteur, suivi: v.suivi }); return { __autre: 'vc', key: 'vc:' + v.id, v, tr, trNom: (tr && tr.nom) || 'Autres', dl: joursAvantVc(v.limite) }; }),
+      ...((voitSite('ebay') && colisEb && colisEb.aPoster) || []).map((x) => ({ __autre: 'eb', key: 'e:' + x.compte + ':' + x.orderId, x, tr: transporteurDuColis({ declare: '' }), trNom: 'Autres', dl: x.jours })),
+      ...((siteColis === 'toutes' && colisAutres.leboncoin) || []).map((x) => { const o = lbcParTx.get(String(x.txId)) || {}; const tr = transporteurDuColis({ declare: o.deliveryMethod || o.deliveryLabel || '' }); return { __autre: 'lbc', key: 'l:' + x.txId, x, o, tr, trNom: (tr && tr.nom) || 'Autres', dl: null }; }),
+    ];
+    return { vintedLu, exTout, autresColis };
+  };
+  const trNomColis = (x) => { if (x.__autre) return x.trNom; const t = transporteurVente(x.b); return (t && t.nom) || 'Autres'; };
+  const estPosteColis = (x) => !!(x.o ? isShipDone(x.o) : isBordShippedManual(x.b));
+  // Les colis à envoyer rangés comme l'écran : le plus pressé d'abord, puis par transporteur.
+  const colisAEnvoyerRanges = () => { const { exTout, autresColis } = colisAEnvoyerBase(); return rangerParTransporteur([...exTout.filter(x => !estPosteColis(x)), ...autresColis], { trNom: trNomColis, jours: (x) => x.dl }); };
   const LIMITE_ENVOYES_J = 45;
   const listeEnvoyes = () => {
     const out = [];
@@ -53971,6 +54076,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const cartes = cartesColis();
           const vue = colonnesColis(cartes, siteColis);
           const nPrets = lignesLot().length;
+          const nLot = lignesLotTous().length;
           // (1er nov., capture de Julien : « Vestiaire » absent de Colis alors
           // qu'il y a un compte) Même règle que les filtres d'Annonces, Ventes,
           // Messages et que la rangée de Colis · Leboncoin : un site où il a un
@@ -54149,8 +54255,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     à leur place, un second les range. */}
                 <button type="button" className="vrm-fu-plus" data-colis-outils-bascule="" aria-label="Outils des colis" aria-expanded="false"
                   onClick={(ev)=>{ const r = document.documentElement; const o = !r.hasAttribute('data-colis-outils'); r.toggleAttribute('data-colis-outils', o); ev.currentTarget.setAttribute('aria-expanded', o ? 'true' : 'false'); }}><Icon name="more" size={20}/></button>
-                {onglet === 'envoyer' && nPrets>0 && (siteColis==='toutes'||siteColis==='vinted') ? <Bouton variante="primaire" icone="printer" data-lot-ouvrir="1" data-imprimer-prets={nPrets} onClick={ouvrirLot} disabled={batchBusy}
-                title="Tamponne tous les bordereaux reçus (numéro + titre) et les met à la suite dans un seul PDF">{batchBusy?'Préparation…':`Imprimer ${nPrets===1?'le prêt':`les ${nPrets} prêts`}`}</Bouton> : null}
+                {/* (3 nov., choix de Julien n° 2) « Tout imprimer » : TOUJOURS visible (il était caché derrière « … » :
+                    le banc `lot-bordereaux` ne pouvait plus le toucher) ; un PDF, toutes plateformes, par transporteur. */}
+                {(onglet === 'envoyer' || onglet === 'envoyes') ? <Bouton variante="secondaire" icone="scan" className="vrm-colis-scanner" data-colis-scanner="" onClick={() => setScanOuvert(true)}>Scanner</Bouton> : null}
+                {onglet === 'envoyer' && nLot>0 ? <Bouton variante="primaire" icone="printer" data-lot-ouvrir="1" data-imprimer-prets={nLot} onClick={ouvrirLot} disabled={batchBusy}>{batchBusy?'Préparation…':'Tout imprimer'}</Bouton> : null}
               </>}/>
             {/* (2 nov., style « Fusion ») LA CARTE « AUJOURD'HUI ». Le grand chiffre est le
                 nombre de colis À ENVOYER publié par cet écran (`vrm_colis_aposter`, celui de Ma
@@ -54388,9 +54496,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {/* (31 oct.) « Tout imprimer » est monté dans l'en-tête : « Imprimer les N prêts » (même action, même compte). */}
                 {aGenItems.length>0 && <BoutonToutGenerer items={aGenItems}/>}
                 {lot && (()=>{
-                  const L = lot.lignes || lignesLot();
+                  const L = lot.lignes || lignesLotTous();
                   const nb=L.filter(l=>lot.coches.has(l.cle)).length;
-                  const controle=controlePreparation(L.map(l=>({cle:l.cle,signature:signatureColis(l.e)})),lot.coches,lot.verifications||{});
+                  const controle=controlePreparation(L.map(l=>({cle:l.cle,signature:sigLigneLot(l)})),lot.coches,lot.verifications||{});
                   const basculer = (cle) => setLot(x => { const c = new Set(x.coches); if (c.has(cle)) c.delete(cle); else c.add(cle); return { ...x, coches: c }; });
                   const fmtD = (o) => { const t = Date.parse(o && o.date); return Number.isFinite(t) ? new Date(t).toLocaleDateString('fr-FR', { day:'numeric', month:'short' }) : 'date inconnue'; };
                   return (
@@ -54401,7 +54509,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div style={{background:C.card,color:C.text,borderRadius:12,width:'100%',maxWidth:560,maxHeight:'86vh',display:'flex',flexDirection:'column',boxShadow:C.shadowLg||'0 16px 48px rgba(0,0,0,.2)'}}>
                         <div style={{padding:'16px 18px 10px',borderBottom:`1px solid ${C.border}`}}>
                           <div style={{fontSize:16,fontWeight:700}}>{lot.echecs.length ? `${lot.echecs.length} bordereau${lot.echecs.length>1?'x':''} pas imprimé${lot.echecs.length>1?'s':''}` : 'Bordereaux à imprimer'}</div>
-                          <div className="vrm-aide" style={{fontSize:12,color:C.muted,marginTop:3}}>Le plus récent en haut. Seuls les cochés partent à l'impression, chacun sur sa feuille.</div>
+                          
                         </div>
                         <div className="vrm-preparation-etapes" aria-label="Préparation des colis"><span>1 · {nb} sélectionné(s)</span><span>2 · {controle.verifies}/{nb} article(s) contrôlé(s)</span><span>3 · Préparer les PDF</span></div>
                         <p className="vrm-preparation-note">Compare le numéro et la photo avec l’article physique. Cocher « Article contrôlé » ne marque pas le colis expédié.</p>
@@ -54413,29 +54521,34 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           <span>Décocher ne supprime aucun bordereau.</span>
                         </div>
                         <div style={{overflowY:'auto',minHeight:0,flex:'1 1 auto',padding:'4px 18px'}}>
-                          {L.map(l => {
-                            const o = l.e.o, coche = lot.coches.has(l.cle);
-                            const num = (l.e.b ? numForBord(l.e.b) : '') || (o ? (effEntry(o)?.numero || '') : '');
-                            const photo=o?orderPhoto(o):bordPhoto(l.e.b);
+                          {L.map((l, il) => {
+                            const o = l.e ? l.e.o : null, coche = lot.coches.has(l.cle);
+                            const num = l.num || '';
+                            const photo = l.photo || null;
                             let emplacement='Emplacement non vérifié';
                             if(num){try{const plan=load('vrm_room_plan',null),place=plan?ouEstNumero(normalizePlan(plan),num):null;if(place)emplacement=[place.roomName,place.itemName,place.nom].filter(Boolean).join(' · ');}catch(_){}}
-                            const verifie=lot.verifications?.[l.cle]===signatureColis(l.e);
+                            const verifie=lot.verifications?.[l.cle]===sigLigneLot(l);
+                            // (3 nov.) Un en-tête par transporteur, dans l'ordre du PDF (celui des groupes de l'écran).
+                            const ouvreT = il === 0 || L[il-1].trNom !== l.trNom;
                             return (
-                              <div key={l.cle} data-lot-ligne={l.cle} data-coche={coche?'1':'0'} style={{display:'flex',gap:10,alignItems:'center',padding:'9px 0',borderTop:`1px solid ${C.border}`,cursor:'pointer'}}>
-                                <label className="vrm-preparation-selection"><input type="checkbox" aria-label={`Sélectionner ${(o&&o.title)||'ce bordereau'}`} disabled={batchBusy} checked={coche} onChange={()=>basculer(l.cle)} style={{width:18,height:18,flexShrink:0}}/></label>
+                              <React.Fragment key={l.cle}>
+                              {ouvreT ? <div className="vrm-fu-groupe-transp" data-lot-groupe={l.trNom} style={{marginTop:il?10:4}}><h3>{l.trNom}</h3><span>{L.filter(x=>x.trNom===l.trNom).length}</span></div> : null}
+                              <div data-lot-ligne={l.cle} data-lot-site={l.site} data-lot-transp={l.trNom} data-coche={coche?'1':'0'} style={{display:'flex',gap:10,alignItems:'center',padding:'9px 0',borderTop:`1px solid ${C.border}`,cursor:'pointer'}}>
+                                <label className="vrm-preparation-selection"><input type="checkbox" aria-label={`Sélectionner ${l.titre||'ce bordereau'}`} disabled={batchBusy} checked={coche} onChange={()=>basculer(l.cle)} style={{width:18,height:18,flexShrink:0}}/></label>
                                 <PhotoVente src={photo} size={32} portrait/>
                                 <span style={{flex:1,minWidth:0}}>
-                                  <span style={{display:'block',fontSize:13,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{(o && o.title) || (l.e.b && (l.e.b.modele || l.e.b.article)) || 'Bordereau'}</span>
+                                  <span style={{display:'block',fontSize:13,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{l.titre}</span>
                                   <span style={{display:'block',fontSize:11.5,color:C.muted,marginTop:2}}>
-                                    Vinted · {o && o._acc ? accNameOf(o._acc) : 'compte inconnu'} · vendue le {fmtD(o)}
+                                    {l.sous}{l.site === 'vinted' ? ` · vendue le ${fmtD(o)}` : ''}
                                     {l.ancienne && <b data-lot-ancienne="1" style={{color:C.warn,fontWeight:600}}> · il y a {Math.floor(l.age)} j : Vinted dit encore « à expédier », vérifie avant d'imprimer</b>}
                                     {l.imprime && <span data-lot-imprime="1"> · déjà imprimé</span>}
                                     {lot.echecs.includes(l.cle) && <b style={{color:C.warn,fontWeight:600}}> · PDF pas lu</b>}
                                     <span style={{display:'block',marginTop:3}}>{num?emplacement:'Numéro VRM non confirmé · vérifie l’article avec sa photo.'}</span>
                                   </span>
                                 </span>
-                                <label className="vrm-preparation-controle"><input type="checkbox" aria-label={`Article contrôlé : ${(o&&o.title)||l.cle}`} disabled={!coche||batchBusy} checked={verifie} onChange={e=>{const ok=e.target.checked;setLot(x=>({...x,verifications:{...(x.verifications||{}),[l.cle]:ok?signatureColis(l.e):null}}));}}/>Contrôlé</label>
+                                <label className="vrm-preparation-controle"><input type="checkbox" aria-label={`Article contrôlé : ${l.titre||l.cle}`} disabled={!coche||batchBusy} checked={verifie} onChange={e=>{const ok=e.target.checked;setLot(x=>({...x,verifications:{...(x.verifications||{}),[l.cle]:ok?sigLigneLot(l):null}}));}}/>Contrôlé</label>
                               </div>
+                              </React.Fragment>
                             );
                           })}
                         </div>
@@ -54636,14 +54749,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // les colis Vinted (ci-dessous) et ceux d'eBay, Vestiaire et Leboncoin (`autresColis`, les
           // règles de LEUR site : `colisEbay`, `colisVcAPoster`, `colisLbcAPoster` — celles qui font
           // « À envoyer · N »), mélangés, rangés par transporteur, la même carte pour tous.
-          const vintedLu = voitSite('vinted') && !sales.loading && !sales.error;
-          const exTout = vintedLu ? expeditions().filter(e => !e.o || matchOrd(e.o)) : [];
-          const lbcParTx = new Map(((lbcVentes && lbcVentes.ventes) || []).map((o) => [String(o && o.txId != null ? o.txId : ''), o]));
-          const autresColis = [
-            ...(voitSite('vestiaire') ? (((colisVestiaire(vcEtat) || {}).aEnvoyer) || []) : []).map((v) => { const tr = transporteurDuColis({ declare: v.transporteur, suivi: v.suivi }); return { __autre: 'vc', key: 'vc:' + v.id, v, tr, trNom: (tr && tr.nom) || 'Autres', dl: joursAvantVc(v.limite) }; }),
-            ...((voitSite('ebay') && colisEb && colisEb.aPoster) || []).map((x) => ({ __autre: 'eb', key: 'e:' + x.compte + ':' + x.orderId, x, tr: transporteurDuColis({ declare: '' }), trNom: 'Autres', dl: x.jours })),
-            ...((siteColis === 'toutes' && colisAutres.leboncoin) || []).map((x) => { const o = lbcParTx.get(String(x.txId)) || {}; const tr = transporteurDuColis({ declare: o.deliveryMethod || o.deliveryLabel || '' }); return { __autre: 'lbc', key: 'l:' + x.txId, x, o, tr, trNom: (tr && tr.nom) || 'Autres', dl: null }; }),
-          ];
+          // (3 nov.) La liste est construite par `colisAEnvoyerBase` (la même pour « Tout imprimer »).
+          const { vintedLu, exTout, autresColis } = colisAEnvoyerBase();
           const estPosteT = (x) => !!(x.o ? isShipDone(x.o) : isBordShippedManual(x.b));
           const nbMasquesPostes = exTout.filter(estPosteT).length;
           // (2 nov., colis clair) Plus de phrase permanente « …est dans Partis » : le
@@ -54734,10 +54841,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const trNomDe = (x) => { if (x.__autre) return x.trNom; const t = transporteurVente(x.b); return (t && t.nom) || 'Autres'; };  // (3 nov., critique #15) « Autres », pas le jargon « Transporteur pas lu »
                 // (3 nov.) Tous les sites : le plus pressé d'abord (jours avant la limite ; sans limite à la fin,
                 // tri stable), puis les transporteurs dans l'ordre de leur premier colis.
-                const jr = (x) => (x.dl == null || !Number.isFinite(Number(x.dl))) ? 9999 : Number(x.dl);
-                const tous = [...ex, ...autresColis].map((x, k) => [x, k]).sort((a, b) => jr(a[0]) - jr(b[0]) || a[1] - b[1]).map(([x]) => x);
-                const ordreT = new Map(); tous.forEach((x) => { const k = trNomDe(x); if (!ordreT.has(k)) ordreT.set(k, ordreT.size); });
-                const exT = tous.map((x, k) => [x, k]).sort((a, b) => ordreT.get(trNomDe(a[0])) - ordreT.get(trNomDe(b[0])) || a[1] - b[1]).map(([x]) => x);
+                // (3 nov.) La règle partagée avec « Tout imprimer » (src/lotTransporteurs.js).
+                const tous = [...ex, ...autresColis];
+                const exT = rangerParTransporteur(tous, { trNom: trNomDe, jours: (x) => x.dl });
                 const nParT = {}; tous.forEach((x) => { const k = trNomDe(x); nParT[k] = (nParT[k] || 0) + 1; });
                 const primaireBleu = {flex:'1 1 160px',maxWidth:340,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,border:'none',background:C.accent,color:'#fff',borderRadius:10,padding:'0 16px',minHeight:44,cursor:'pointer',fontSize:14,fontWeight:600,fontFamily:'inherit',textDecoration:'none',boxSizing:'border-box'};
                 const carteAutre = (e) => {
@@ -55137,6 +55243,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         })()}
       </>)}
 
+      {curSub==='bordereaux' && scanOuvert ? <ScannerColis trouver={trouverScan} onDeposer={(x) => deposeScan.demander(x.cle, x, x.num ? `N°${x.num}` : x.titre)} onFermer={() => setScanOuvert(false)} zIndex={Z_CONFIRMATION - 2}><FermeAuRetour fermer={() => setScanOuvert(false)}/></ScannerColis> : null}
+      {curSub==='bordereaux' ? <BarreAnnulerDepose attente={deposeScan.attente} onAnnuler={deposeScan.annuler} zIndex={Z_CONFIRMATION - 1}/> : null}
       {/* Modale : relier un achat (depuis Annonces) */}
       {/* Modale : relier un achat (depuis Annonces) */}
       {pickerFor && (
