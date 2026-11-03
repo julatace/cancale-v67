@@ -3151,3 +3151,55 @@ lu dans le code). Mutations rouges : `site` 44, `recalc` 73, `zero` 3, `benef` 5
 `scripts/bancs/carte-stats.cjs` (390 tactile clair/sombre, 1512) : Vinted 257 € → tous les sites 297 €
 → Leboncoin 40 €, périmètre qui suit, feuille (portail, 44 px, pas de bénéfice sur Vinted seul),
 réglage gardé au rechargement, Colis au défaut.
+
+### 3 nov. — Fusion sur TOUTE l'app (`claude/fusion-app`, critique #1, #2, #4, #7, #8, #9, #14, #15)
+
+Julien a choisi « Fusion carte sombre » ; seuls quatre écrans la portaient (rapport de critique du
+3 nov., hors dépôt). Ce chantier l'étend à toute l'app, SANS changer une règle (chiffres, identité,
+numéros, e-mails) et sans ajouter un mot.
+
+- **#1 Une palette** : `src/themeMineral.js` = les valeurs Fusion (fond #F2F2F7, cartes #FFF, encre
+  #1D1D1F, gris #6E6E73 ; sombre #000/#1C1C1E/#2C2C2E). Accent du TEXTE #0066CC en clair (5,3:1 sur le
+  fond gris ; #0071E3 reste l'aplat `--fu-bleu`), #409CFF en sombre avec texte NOIR dessus (le blanc sur
+  #0A84FF tombait à 3,6:1). Deux passes de remplacement (gris chauds Vitrine, gris « pétrole », ambres
+  #A15C00/#9A4A00/#C25400 → #B25000, anciens bleus) dans `src/` — sauf facture PDF, Stock 3D, Studio
+  photo, carte des relais, logos des transporteurs. Bouton secondaire = remplissage d'iOS
+  `rgba(118,118,128,.12)`, lisible sur blanc ET sur le gris.
+- **#2 Un nom par écran** : au téléphone la barre du haut n'a plus ni logo ni titre centré, sur TOUS les
+  écrans ; le grand titre reste partout (il était caché quand il « doublait » la barre) ; Stock et
+  Communauté reçoivent un titre ; « Paramètres » est un titre 34/800.
+- **#4 Textes** : phrases d'écran (Annonces, Messages, Paramètres) retirées (`src/phrasesEcran.js`) ;
+  Vestiaire (Photoroom : coût/usages derrière « Coût et aide », « Mettre en vente » sans paragraphe),
+  eBay (états vides = une ligne + « Relier eBay »), Statistiques (définitions retirées, manques gardés),
+  Paramètres (2ᵉ ligne des réglages retirée, une alerte reste), Stock, Messages Vestiaire, Colis eBay,
+  Leboncoin, Communauté, états vides « Aucun compte Vinted lié » + « Relier un compte ». Raisons
+  d'extension raccourcies (« Depuis ton ordinateur », « Extension VRM pas détectée dans ce navigateur »).
+- **#7** Annonces : « Offres automatiques » et « Annonces à compléter » dans « Outils » (…), astuce
+  retirée, « Stock et ajustements » / « Publier aussi ailleurs » SOUS la grille, une rangée recherche ·
+  tri · Republier (icône) · … ; Messages : ni « Chiffres », ni « À faire aujourd'hui », « Comptes
+  Vinted » sous la liste.
+- **#8** Le sélecteur de site = contrôle segmenté iOS (une rangée, 44 px, actif blanc / #636366 en
+  sombre, « Tous » au lieu de « Tous les sites », nom complet en `aria-label`).
+- **#9** `src/design/jetons.css` (chargé en dernier) : échelle fermée 11·12·13·15·17·20·22·28·34
+  (+38/44), graisses 400–800, rayons 6·12·14·20·24·999, cartes blanches r20, segmentés, filtres,
+  menus, colonne 760 px pour les écrans de lecture sur ordinateur (`data-ecran` sur `<main>`).
+  `scripts/fusion-echelle.mjs` ramène les valeurs écrites sur l'échelle (`--verifier` en contrôle).
+- **#14/#15** « paire » → « article » (Stock, Statistiques, eBay agent + notification, Republier,
+  Vestiaire, Messages) ; « Transporteur inconnu », « Comptes Vinted · N à vérifier », « Données ·
+  À vérifier », « N à vérifier sur Vinted », « Leboncoin (Leboncoin) » → « Leboncoin », « Pas lu »
+  pour les lectures eBay ratées.
+- **Finitions (coordinateur)** : « Modifier » de la tête de Ma journée en haut à droite (ligne du
+  titre) ; cases de la carte en capitale initiale, « CA finalisé » → « Finalisé », libellé de case
+  court (le détail en infobulle) ; plus de « Aucune vente finalisée ce mois-ci » sous la carte de Compta.
+- **Laissés** : Messages → Favoris (chantier `claude/favoris-fusion`) ; Ma journée hors du bouton
+  Modifier (autre chantier) ; textes réglementaires de Compta « Le détail » ; page publique ;
+  « sans suivi Vinted relevé » de Colis → À retirer.
+
+**Preuves** : banc `scripts/bancs/fusion-app.cjs` (F1 palette calculée ∈ jetons, F2 aucun texte de
+l'inventaire, F3 un nom, F4 premier élément y < 300 — Annonces < 600 depuis la carte réglable —,
+F5 cibles 44, F6 contraste, F7 débordement, F8 échelle, F9 segmenté, F10 erreurs ; 390 clair, 390
+sombre, 1512) : **652 verts** ; rouge sur l'arbre d'avant et par mutation (`FUSION_MUTATION=1`,
+jetons.css retiré : 21 rouges à 390 clair). Bancs suivis (note « retiré à la demande de Julien,
+3 nov. ») : demo-bulles, photoroom-carte, vinted-ui, tout-generer, vendeur-neuf, transporteurs-logos,
+ebay-agent, agent-ebay-push, audit-agent-ebay, brouillons-avancee, garage3d, vestiaire,
+glisser-onglet, compta-claire, tests synchronisation-vinted.
