@@ -921,3 +921,50 @@ html body .vrm-recap-frise-detail { margin: 10px 0 0; font: 500 13px/1.4 var(--v
 :root body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task .vrm-day-task-note { white-space: nowrap !important; overflow: hidden !important; }
 /* (3 nov.) La visite en bulles : ses boutons gardent 44 px même quand une règle de bouton plus forte les tasse. */
 html body .vrm-visite .vrm-visite-pied :is(button, .vrm-b) { min-height: 44px !important; height: 44px !important; box-sizing: border-box !important; }
+
+/* ── 9. LA CARTE RÉGLABLE PAR PAGE (3 nov.) ───────────────────────────────── */
+/* « Modifier » : discret, en haut à droite, 44 px au doigt ; le surtitre lui laisse la place. */
+.vrm-fu-carte.a-action, .vrm-fu-carte-nu.a-action { position: relative; }
+.vrm-fu-modifier {
+  all: unset; box-sizing: border-box; position: absolute; top: 6px; right: 6px; z-index: 2;
+  min-height: 44px; min-width: 44px; padding: 0 12px; border-radius: 12px; display: grid; place-items: center;
+  font: 600 13px/1 var(--vrm-police); color: rgba(255,255,255,.72); cursor: pointer;
+}
+@media (hover: hover) { .vrm-fu-modifier:hover { color: #fff; background: rgba(255,255,255,.08); } }
+.vrm-fu-modifier:focus-visible { outline: 2px solid #0a84ff; outline-offset: 2px; }
+.a-action > .vrm-fu-carte-tete .vrm-fu-surtitre { padding-right: 76px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-fu-carte-nu { position: relative; display: flex; flex-direction: column; gap: 14px; min-width: 0; color: #fff; }
+.vrm-fu-carte-nu .vrm-fu-modifier { top: -10px; right: -8px; }
+.vrm-fu-sous-nom { color: rgba(255,255,255,.7); }
+/* Dans la tête de Ma journée : les chiffres prennent la place des deux cases d'avant. */
+.vrm-fu-tete > .vrm-carte-stats { min-width: 0; }
+@media (min-width: 1024px) {
+  .vrm-fu-tete > .vrm-carte-stats { grid-column: 2; grid-row: 1 / span 2; align-self: end; }
+}
+/* La case de Compta : la carte sombre est la boîte autour, la nôtre s'y pose nue. */
+.vrm-compta-carte > .vrm-carte-stats .vrm-fu-grand { color: #fff; }
+
+/* La feuille « Modifier » */
+.vrm-carte-voile { z-index: 20000; }
+.vrm-carte-feuille { background: var(--fu-fond, #f2f2f7); color: var(--fu-encre, #1d1d1f); }
+.vrm-carte-feuille-tete { border-bottom: 1px solid var(--fu-filet, rgba(0,0,0,.08)); }
+.vrm-carte-feuille-titre { flex: 1; min-width: 0; font: 700 17px/1.25 var(--vrm-police); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-carte-ok { all: unset; box-sizing: border-box; min-height: 44px; padding: 0 16px; border-radius: 12px; display: grid; place-items: center; background: var(--fu-bleu, #0071e3); color: #fff; font: 600 15px/1 var(--vrm-police); cursor: pointer; }
+.vrm-carte-places { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+@media (min-width: 560px) { .vrm-carte-places { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.vrm-carte-place { all: unset; box-sizing: border-box; min-height: 56px; min-width: 0; padding: 8px 12px; border-radius: 14px; background: var(--fu-carte, #fff); display: flex; flex-direction: column; justify-content: center; gap: 2px; cursor: pointer; box-shadow: inset 0 0 0 1px var(--fu-filet, rgba(0,0,0,.08)); }
+.vrm-carte-place > span { font: 500 12px/1.2 var(--vrm-police); color: var(--fu-gris, #6e6e73); }
+.vrm-carte-place > b { font: 600 14px/1.25 var(--vrm-police); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-carte-place[aria-pressed="true"] { background: var(--fu-sombre, #1d1d1f); color: #fff; box-shadow: none; }
+.vrm-carte-place[aria-pressed="true"] > span { color: rgba(255,255,255,.65); }
+.vrm-carte-periodes { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.vrm-carte-periodes > button { all: unset; box-sizing: border-box; min-height: 44px; padding: 0 14px; border-radius: 22px; display: grid; place-items: center; background: var(--fu-carte, #fff); box-shadow: inset 0 0 0 1px var(--fu-filet, rgba(0,0,0,.08)); font: 600 13px/1 var(--vrm-police); cursor: pointer; }
+.vrm-carte-periodes > button[aria-pressed="true"] { background: var(--fu-encre, #1d1d1f); color: var(--fu-carte, #fff); box-shadow: none; }
+.vrm-carte-liste { list-style: none; margin: 6px 0 0; padding: 0; border-radius: 14px; overflow: hidden; background: var(--fu-carte, #fff); }
+.vrm-carte-liste > li + li { border-top: 1px solid var(--fu-filet, rgba(0,0,0,.08)); }
+.vrm-carte-choix { all: unset; box-sizing: border-box; width: 100%; min-height: 48px; padding: 8px 14px; display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.vrm-carte-choix-nom { flex: 1; min-width: 0; font: 500 15px/1.3 var(--vrm-police); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-carte-choix-v { flex: none; font: 500 14px/1.2 var(--vrm-police); color: var(--fu-gris, #6e6e73); font-variant-numeric: tabular-nums; }
+.vrm-carte-coche { flex: none; width: 18px; text-align: center; font: 700 15px/1 var(--vrm-police); color: var(--fu-bleu, #0071e3); }
+.vrm-carte-choix:focus-visible, .vrm-carte-place:focus-visible, .vrm-carte-periodes > button:focus-visible, .vrm-carte-ok:focus-visible, .vrm-carte-defaut:focus-visible { outline: 2px solid #0a84ff; outline-offset: 2px; }
+.vrm-carte-defaut { all: unset; box-sizing: border-box; align-self: center; min-height: 44px; padding: 0 14px; display: grid; place-items: center; font: 600 14px/1 var(--vrm-police); color: var(--fu-encre, #1d1d1f); cursor: pointer; margin-top: 6px; }

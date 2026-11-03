@@ -288,7 +288,7 @@ export const valeurChiffre = (id, place, sources, sel, regles, maintenant = Date
     const L = S.beneficeDe ? S.beneficeDe(p) : null;
     if (!L) return vide('pasSu', { p });
     const { B: Bn, etat } = L;
-    if (id === 'benefice') { const CB = regles.chiffreBenefice(Bn, etat); return { valeur: CB.valeur, partiel: false, manque: [], hors: '', p, raison: CB.valeur == null ? (CB.raison || 'pasSu') : '', attrs: CB.attrs }; }
+    if (id === 'benefice') { const CB = regles.chiffreBenefice(Bn, etat); return { valeur: CB.valeur, partiel: false, manque: [], hors: '', p, raison: CB.valeur == null ? (CB.raison || 'pasSu') : '', attrs: CB.attrs, B: Bn, etat }; }
     if (!Bn) return vide(etat === 'encours' ? 'encours' : 'publication', { p });
     if (id === 'urssaf' && Bn.sansCotis) return vide('hors', { p, hors: 'pas de cotisations pour ton statut' });
     const v = id === 'declarer' ? Bn.caDecl : Bn.cotis;
@@ -367,6 +367,27 @@ export const valeursCarte = (page, reglage, sources, sel, regles, maintenant = D
 // Les chiffres que la feuille propose sur cette page, pour cette sélection :
 // tout le catalogue qui a un sens ici, puis les cases propres de la page.
 export const chiffresProposes = (sel, locaux = null) => [
-  ...IDS_CHIFFRES.filter((id) => !horsSelection(id, sel, locaux)),
+  ...IDS_CHIFFRES.filter((id) => !(locaux && Object.prototype.hasOwnProperty.call(locaux, id)) && !horsSelection(id, sel, locaux)),
   ...Object.keys(locaux || {}),
 ];
+
+// La courbe du grand chiffre « vendu » : le cumul jour par jour depuis le début
+// de la période, par la MÊME règle (`bilanLignes` sur chaque jour, les mêmes
+// lignes filtrées) — la courbe de la carte de Ventes d'avant. `null` ailleurs.
+export const courbeVendu = (sources, sel, p, regles, maintenant = Date.now()) => {
+  if (!(p === 'semaine' || p === 'mois')) return null;
+  const V = sources && sources.vendu;
+  if (!V || !Array.isArray(V.lignes)) return null;
+  const site = (sel && sel.site) || 'toutes';
+  const plateforme = PLATEFORME_DE_SITE[site] || null;
+  const login = sel && sel.compte ? String(sel.compte.login || '') : '';
+  const lignes = V.lignes.filter((l) => (!plateforme || l.plateforme === plateforme) && (!login || (l.plateforme === 'Vinted' && String(l.compte || '') === login)));
+  const B = bornesPeriode(p, regles, maintenant);
+  const out = []; let cumul = 0;
+  for (let d = new Date(B.de); d.getTime() <= maintenant; d.setDate(d.getDate() + 1)) {
+    const f = new Date(d); f.setDate(f.getDate() + 1);
+    cumul += regles.bilanLignes(lignes, d.getTime(), f.getTime() - 1).eur;
+    out.push(cumul);
+  }
+  return out;
+};
