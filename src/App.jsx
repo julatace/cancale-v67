@@ -38087,7 +38087,9 @@ function BeneficeJournee({ onNav, place, edition = false, fusion = false }) {
   const depenses = B ? (comptaPret ? B.depenses : 'passu') : '';
   const sansDepenses = () => repondreSansDepenses(lireComptaSynchro(), (v) => save('vrm_compta', v));
   const ajouterDepense = () => { DEMANDE_DEPENSE.on = true; DEMANDE_DEPENSE.at = Date.now(); if (onNav) onNav('compta'); };
-  if (!on) return null;
+  // (2 nov., 22 h) Dans la tête sombre de Ma journée, la case est TOUJOURS là (maquette) : « — » tant que
+  // le bénéfice n'est pas su ; le choix « masqué » ne vaut plus que pour l'ancienne carte.
+  if (!on && !fusion) return null;
   // Par défaut (jamais choisi) : seulement s'il y a un bénéfice à montrer — une
   // publication ET au moins une vente du mois au prix d'achat connu. Jamais une
   // case de « — » ou « se calcule ailleurs » qu'il n'a pas demandée.
@@ -38156,7 +38158,7 @@ function BeneficeJournee({ onNav, place, edition = false, fusion = false }) {
   // (2 nov., 22 h, maquette FusionJournee) Dans la tête sombre : « Bénéfice du mois » et le
   // montant, rien d'autre (le détail vit dans Comptabilité, d'un toucher).
   if (fusion) return (
-    <button type="button" className="vrm-fu-case is-jour" data-fu-case="benefice" title={titre} {...attrs} onClick={allerCompta}>
+    <button type="button" className="vrm-fu-case is-jour" data-fu-case="benefice" data-journee-benef-detail="" title={titre} {...attrs} onClick={allerCompta}>
       <span>Bénéfice du mois</span>
       <b className={valeur == null ? 'is-vide' : undefined} data-journee-benef-ligne={avecNet ? 'net' : 'brut'}>{valeur == null ? '—' : <>{B && B.nCout < B.n ? <span className="vrm-fu-borne">≥</span> : null}{Math.round(valeur).toLocaleString('fr-FR')}{'\u00a0'}€</>}</b>
     </button>

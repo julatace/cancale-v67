@@ -204,21 +204,23 @@ const lire = (pg) => pg.evaluate((BLOC) => {
         }
         dit(!lu.tombe && errs.length === 0, 'l’écran s’affiche, sans erreur', errs.join(' | ').slice(0, 160));
         dit(lu.deb <= 1, 'aucun débordement horizontal de la page', `${lu.deb} px`);
-        const lisse = lu.chemins.filter((d) => /[CcSsQqTt]/.test(d));
-        dit(lu.jours.length === 7, 'la semaine a ses 7 jours', String(lu.jours.length));
-        dit(lisse.length === 0, 'aucun tracé lissé (des barres, pas une courbe)', lisse.map((d) => d.slice(0, 30)).join(' | '));
-        dit(lu.chemins.length === 0, 'une seule série : aucun trait « reçu » par-dessus', `${lu.chemins.length} tracé(s)`);
-        const passes = lu.jours.filter((j) => j.vendu !== ''), futurs = lu.jours.filter((j) => j.vendu === '');
-        dit(lu.jours.length === 7 && passes.every((j) => j.h != null) && futurs.every((j) => j.h == null), '7 colonnes : une barre par jour passé, rien d’inventé après aujourd’hui', JSON.stringify(lu.jours.map((j) => j.h)));
-        const avecVente = passes.filter((j) => Number(j.vendu) > 0);
-        const croit = avecVente.every((x) => avecVente.every((y) => Number(x.vendu) <= Number(y.vendu) ? x.h <= y.h + 0.5 : x.h >= y.h - 0.5));
-        dit(avecVente.length >= 2 && croit, 'la hauteur de chaque barre suit le montant du jour', JSON.stringify(avecVente.map((j) => [j.vendu, Math.round(j.h)])));
-        dit(passes.length === 4 && passes.every((j) => j.recu !== null), 'chaque jour passé garde son « vendu » et son « reçu » publiés (data-*)', JSON.stringify(passes.map((j) => [j.vendu, j.recu])));
-        dit(lu.deborde.length === 0, 'aucun texte ne sort de sa boîte', lu.deborde.join(' | '));
-        const seuil = SEUIL_LIGNES[vp.width];
-        dit(lu.lignes <= seuil, `au plus ${seuil} lignes de texte dans le bloc des chiffres`, `${lu.lignes} lignes`);
-        dit(lu.grands.length === 1, 'un seul grand chiffre dans le bloc', JSON.stringify(lu.grands));
-        dit(!!lu.vMois && lu.rMois !== null && lu.ca !== null && !!lu.sem, 'les nombres publiés restent portés (vendu, reçu, CA, semaine)', JSON.stringify([lu.vMois, lu.rMois, lu.ca, lu.sem]));
+        // (2 nov., 22 h) Le bloc des chiffres (« Vendu en … », la semaine en barres, Tendances) n'est
+        // plus sur Ma journée — retiré à la demande de Julien, 2 nov. 22 h (maquette FusionJournee).
+        // Ce qui reste JUGÉ, ce sont les CHIFFRES : « Vendu aujourd'hui » dans la tête de Ma journée, et le
+        // vendu du mois, désormais sur la carte du mois de Ventes (même règle, `bilanVentes`).
+        const vendues = VENTES.filter((v) => !/annul/i.test(v.status));
+        const auj = new Date(maintenant); auj.setHours(0, 0, 0, 0);
+        const centsDe = (l) => Math.round(l.reduce((t, v) => t + Number(v.price.amount), 0) * 100);
+        const attJour = centsDe(vendues.filter((v) => new Date(v.date) >= auj));
+        const attMois = centsDe(vendues.filter((v) => { const d = new Date(v.date); return d.getMonth() === maintenant.getMonth() && d.getFullYear() === maintenant.getFullYear(); }));
+        const tete = await pg.evaluate(() => ({ jours: document.querySelectorAll('[data-fu-semaine] > li').length, auj: !!document.querySelector('[data-fu-semaine] > li:last-child[data-auj]'), jour: (document.querySelector('[data-fu-vendu-jour]') || { getAttribute: () => null }).getAttribute('data-fu-vendu-jour') }));
+        dit(tete.jours === 7 && tete.auj, 'la tête de Ma journée a ses 7 jours, aujourd’hui à droite', JSON.stringify(tete));
+        dit(Number(tete.jour) === attJour, 'VENDU aujourd’hui (Ma journée) = attendu', `${tete.jour} · attendu ${attJour}`);
+        await pg.goto(`http://localhost:${PORT}/?tab=cat_ventes`, { waitUntil: 'domcontentloaded' });
+        await pg.waitForSelector('[data-fu-vendu-mois]', { timeout: 20000 }).catch(() => {});
+        const vm = await pg.evaluate(() => (document.querySelector('[data-fu-vendu-mois]') || { getAttribute: () => null }).getAttribute('data-fu-vendu-mois'));
+        dit(Number(vm) === attMois, 'VENDU du mois (carte du mois de Ventes, la règle de « Vendu ») = attendu', `${vm} · attendu ${attMois}`);
+        lu.texte = await pg.evaluate(() => document.body.innerText);
         dit(!/encaiss/i.test(lu.texte), 'jamais « encaissé »');
         await ctx.close();
       });
