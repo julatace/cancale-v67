@@ -35,7 +35,8 @@ import { modifierNeutre } from './_lib/neutre-cas.js';
 import { normaliserEntrant, formeRecue, demasquerRelais } from './_lib/lire-email.js';
 import { sbCle } from './_lib/cle.js';
 import { numeroDuTitreApresCoupure, lireMarqueur, archiveDe, estArchive } from './_lib/numerotation.js';
-import { numerosDeVente, annoncesEbayParNumero, annoncesLbcParNumero, annoncesVcEnLigne, doubleVenteApprise, notificationDoubleVente } from './_lib/double-vente.js';
+import { numerosDeVente, annoncesEbayParNumero, annoncesLbcParNumero, annoncesVcEnLigne, annoncesVintedParNumero, numerosRetiresEbay, doubleVenteApprise, notificationDoubleVente } from './_lib/double-vente.js';
+import { numVcVente } from './_lib/vestiaire-regle.js';
 import { normaliserRegistre, comptesActifs } from './_lib/ebay.js';
 import { arriveLeAuRangement } from './_lib/arrivee-colis.js';
 import { limiteRetraitDepuisTexte, lieuDepuisExtrait, lieuSousEnTete, LIEU_AU_FUTUR } from './_lib/retrait-colis.js';
@@ -758,9 +759,9 @@ const objetJson = (v) => {
 };
 export async function lireAnnoncesAilleurs() {
   const cl = await baseCloisonnee();
-  if (cl === null || (cl && !proprietaireCourant())) return { ebay: null, lbc: null, vc: null };
-  const [mainL, reg, ebayL, lbcL, ventesL, comptesLbc, vcL, vcV] = await Promise.all([
-    lirePagine('id=eq.main&select=mk:data->vrm_numerotation,liens:data->vrm_lbc_liens,fiches:data->vinted_annonce_numeros,liensEbay:data->vrm_ebay_liens'),
+  if (cl === null || (cl && !proprietaireCourant())) return { ebay: null, lbc: null, vc: null, vinted: null, retraitsEbay: null };
+  const [mainL, reg, ebayL, lbcL, ventesL, comptesLbc, vcL, vcV, vL, vP, vS, retL] = await Promise.all([
+    lirePagine('id=eq.main&select=mk:data->vrm_numerotation,liens:data->vrm_lbc_liens,fiches:data->vinted_annonce_numeros,liensEbay:data->vrm_ebay_liens,retirees:data->vrm_annonces_retirees'),
     lirePagine('id=eq.ebay_comptes&select=comptes:data->comptes'),
     lirePagine('id=like.ebay_listings%25&select=id,items:data->items'),
     lirePagine('id=eq.lbc_listings&select=items:data->items'),
@@ -769,7 +770,17 @@ export async function lireAnnoncesAilleurs() {
     // (1er nov., audit A1) Vestiaire : ses annonces (état, liens posés par VRM) et ses ventes.
     lirePagine('id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt'),
     lirePagine('id=eq.vc_ventes&select=ventes:data->ventes'),
+    // (3 nov.) Vinted : dressings captés (projetés : date, compte, annonces), lectures
+    // publiques et suppressions vues — la règle « en ligne » de l'app
+    // (api/_lib/enligne-regle.js, copie refabriquée). Mesuré le 3 nov. : 17 lignes
+    // `harvest_*_listings` de 28 Ko au plus.
+    lirePagine('id=like.harvest_%25_listings&select=id,cap:data->>capturedAt,uid:data->uid,items:data->payload->items'),
+    lirePagine('id=like.harvest_%25_enligne&select=id,cap:data->>capturedAt,complet:data->complet,ids:data->ids,items:data->items'),
+    lirePagine('id=like.harvest_%25_supprimees&select=id,ids:data->ids'),
+    // Le journal du retrait automatique d'eBay (api/ebay.js) : « retiré d'eBay ».
+    lirePagine('id=eq.ebay_retraits_auto&select=items:data->items'),
   ]);
+  const retraitsEbay = retL ? { items: retL[0] && Array.isArray(retL[0].items) ? retL[0].items : [] } : null;
   // Vestiaire ne dépend pas du marqueur 013 (ses annonces sont nées après la
   // coupure) : une lecture ratée ⇒ `null` (il ne dit RIEN).
   let vc = null;
@@ -779,14 +790,24 @@ export async function lireAnnoncesAilleurs() {
     if (lst && lst.items !== undefined && lst.liens !== undefined && vv !== undefined) vc = annoncesVcEnLigne({ items: lst.items || {}, liens: lst.liens || {}, capturedAt: lst.capturedAt }, vv || {}).parNum;
   }
   // Le marqueur 013 : illisible ⇒ aucune traduction possible ⇒ rien.
-  if (!mainL) return { ebay: null, lbc: null, vc };
+  if (!mainL) return { ebay: null, lbc: null, vc, vinted: null, retraitsEbay };
+  const fiches = mainL[0] ? objetJson(mainL[0].fiches) : null;
+  // Vinted : fiches (N° par identifiant d'annonce) et dressings LUS ; « pas su » ⇒ rien.
+  // Les lectures publiques ratées passent « pas su » à la règle (elle sait le traiter).
+  let vinted = null;
+  if (fiches !== undefined && vL && vS) {
+    const retirees = mainL[0] ? objetJson(mainL[0].retirees) : null;
+    const supp = new Map();
+    for (const r of vS) { const k = /^harvest_(\d+)_supprimees$/.exec(String((r && r.id) || '')); const ids = objetJson(r && r.ids); if (k && ids) supp.set(k[1], ids); }
+    const lignesL = vL.filter((r) => /^harvest_\d+_listings$/.test(String((r && r.id) || ''))).map((r) => ({ ...r, items: typeof r.items === 'string' ? (() => { try { return JSON.parse(r.items); } catch (_) { return null; } })() : r.items }));
+    if (retirees !== undefined && lignesL.every((r) => r.items == null || Array.isArray(r.items))) vinted = annoncesVintedParNumero(lignesL, vP ? vP.filter((r) => /^harvest_\d+_enligne$/.test(String((r && r.id) || ''))) : null, supp, fiches || {}, retirees || {});
+  }
   const mk = mainL[0] ? objetJson(mainL[0].mk) : null;
-  if (mk === undefined) return { ebay: null, lbc: null, vc };
+  if (mk === undefined) return { ebay: null, lbc: null, vc, vinted, retraitsEbay };
   const liens = mainL[0] ? objetJson(mainL[0].liens) : null;
   let ebay = null;
   if (reg && ebayL) {
     const ids = comptesActifs(normaliserRegistre(reg[0] || null)).map((c) => 'ebay_listings' + c.suffixe);
-    const fiches = mainL[0] ? objetJson(mainL[0].fiches) : null;
     const liensEbay = mainL[0] ? objetJson(mainL[0].liensEbay) : null;
     // Fiches illisibles : on ne sait pas si un SKU désigne encore sa paire ⇒ rien.
     if (fiches !== undefined && liensEbay !== undefined) ebay = annoncesEbayParNumero(ebayL, ids, mk, fiches || {}, liensEbay || {});
@@ -798,20 +819,39 @@ export async function lireAnnoncesAilleurs() {
     const accounts=comptesLbc[0]?objetJson(comptesLbc[0].accounts):null;
     if (items !== undefined && ventes !== undefined && accounts !== undefined) lbc = annoncesLbcParNumero(items || {}, ventes || {}, liens || {}, mk, accounts||{});
   }
-  return { ebay, lbc, vc };
+  return { ebay, lbc, vc, vinted, retraitsEbay };
 }
-// Une vente Vinted vient d'être apprise : la paire est-elle PROUVÉE en vente
-// ailleurs ? Rien sans N°, rien sur « pas su », rien en rejeu en lot, rien si
-// la catégorie est coupée (on ne lit même pas) ; une seule fois (pushOnce).
-async function notifierDoubleVente(numero, titre) {
+// Une vente vient d'être apprise sur `venduSur` (vinted · vestiaire ; leboncoin et
+// ebay le jour où leur e-mail de vente est appris — aucun n'est arrivé au
+// 3 nov.) : l'article est-il PROUVÉ en ligne ailleurs ? Rien sans N°, rien sur
+// « pas su », rien en rejeu en lot, rien si la famille Ventes est coupée (on ne
+// lit même pas) ; une seule fois par vente (pushOnce). Le retrait eBay
+// automatique n'est JAMAIS lancé d'ici (il vit dans l'app) : s'il a déjà eu lieu,
+// on le dit (« retiré d'eBay »).
+async function notifierDoubleVente(numero, titre, venduSur = 'vinted') {
   try {
     if ((contexteVendeur.getStore() || {}).silence) return;
-    if (!numerosDeVente(numero).length) return;
+    const nums = numerosDeVente(numero);
+    if (!nums.length) return;
     if (!(await pushCategorieActive('doublevente'))) return;
-    const { ebay, lbc, vc } = await lireAnnoncesAilleurs();
-    const notif = notificationDoubleVente(doubleVenteApprise(numero, ebay, lbc, vc), titre);
+    const { ebay, lbc, vc, vinted, retraitsEbay } = await lireAnnoncesAilleurs();
+    const retires = retraitsEbay ? numerosRetiresEbay(retraitsEbay, Date.now() - 48 * 3600e3) : new Set();
+    const notif = notificationDoubleVente(doubleVenteApprise(numero, ebay, lbc, vc, vinted, venduSur), titre, { venduSur, retiresEbay: retires, numeros: nums });
     if (notif) await pushOnce(notif, 'doublevente');
   } catch (_) {}
+}
+// Le N° d'une vente Vestiaire, par IDENTITÉ seulement (lien posé par VRM sur
+// l'annonce, référence VRM-n°, N° donné par VRM — `numVcVente`, la règle de
+// l'app). Lecture ratée ⇒ '' (rien).
+async function numeroVenteVc(v) {
+  const [lst, m] = await Promise.all([
+    lirePagine('id=eq.vc_listings&select=liens:data->liens'),
+    lirePagine('id=eq.main&select=auto:data->vrm_vc_numeros'),
+  ]);
+  if (!lst || !m) return '';
+  const liens = lst[0] ? objetJson(lst[0].liens) : null, auto = m[0] ? objetJson(m[0].auto) : null;
+  if (liens === undefined || auto === undefined) return '';
+  return numVcVente(v, liens || {}, auto || {});
 }
 
 // Prix d'achat d'une paire d'après le TITRE de l'annonce (pour le conseil d'une
@@ -1989,6 +2029,7 @@ export async function traiterEmail(req, res) {
         if (r === null) { marquerEcritureRatee(); await repondre(res, 503, { ok: false, erreur: 'base-injoignable', message: "Je n'ai pas pu ranger cette vente Vestiaire : renvoie l'email." }); return; }
         { const st = contexteVendeur.getStore(); if (st) st.resumeExtra = { article: v.titre }; }
         if (nouvelle) {
+          try { await notifierDoubleVente(await numeroVenteVc(v), v.titre, 'vestiaire'); } catch (_) {}
           try { await pushOnce({ title: 'Vendu sur Vestiaire', body: `${v.titre || 'Ton article'}${v.montant ? ` — tu reçois ${String(v.montant.valeur.toFixed(2)).replace('.', ',')} €` : ''}${v.limite ? ` — à envoyer avant le ${v.limite.slice(8, 10)}/${v.limite.slice(5, 7)}` : ''}.`, tag: `vc-vente-${v.productId}`, url: lienNotif('plat_vestiaire') }, 'vente'); } catch (_) {}
         }
         await logEmail({ type: 'vente-vestiaire', subject, from: mail.from, productId: v.productId, nouvelle });

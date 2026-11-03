@@ -43,7 +43,7 @@ sinon son défaut — toutes allumées par défaut). Fréquence = au plus.
 | 💸 Vendu ! | e-mail Vinted « Ton article s'est vendu » | `💸 Vendu !` · `<article> — <prix> € (<compte>)` | Ventes · la vente (n° de transaction) | transaction (`sale-…`) |
 | Vendu sur Vestiaire | e-mail de vente Vestiaire (nouvelle vente) | `Vendu sur Vestiaire` · `<article> — tu reçois X € — à envoyer avant le JJ/MM.` | Vestiaire | `productId` |
 | 💰 Argent reçu | e-mail « commande finalisée » (versement) | `💰 Argent reçu` · article, montant | Ventes | transaction |
-| ⚠️ Double vente | vente Vinted apprise + N° PROUVÉ encore en ligne sur eBay/Leboncoin/Vestiaire | `⚠️ Vendue sur Vinted — N°X encore en vente sur …` | Annonces · la ligne du doublon | N° + plateforme |
+| ⚠️ Double vente | vente apprise par e-mail (Vinted : « vendu » / bordereau ; Vestiaire : « Votre article vient d'être vendu ») + N° PROUVÉ encore EN LIGNE sur un autre site (eBay, Leboncoin, Vestiaire, Vinted — règle « en ligne » recopiée, `api/_lib/enligne-regle.js`) | `⚠️ N°124 vendu sur Vinted · encore en ligne sur Leboncoin` (+ `· retiré d'eBay` si le retrait automatique l'a fait) · corps = l'article | Annonces · « à retirer » (eBay, Leboncoin) ; Ma journée (Vinted) ; Annonces · Vestiaire | la vente (site + N° + annonces) |
 | 🛒 Agent eBay | cron quotidien, paires prêtes | `🛒 N paires prêtes pour eBay — publier ?` | eBay · agent | jour |
 
 ### Colis à poster
