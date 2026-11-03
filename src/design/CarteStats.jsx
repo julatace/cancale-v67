@@ -21,7 +21,8 @@ const affiche = (x, fmt, grand) => {
   if (x.def && x.def.local && x.def.affiche !== undefined && x.valeur != null) return x.def.affiche;
   if (x.valeur == null) return null;
   const t = (x.def && x.def.type) || 'n';
-  const corps = t === 'eur' ? (grand ? fmt(x.valeur) : euros(x.valeur)) : String(x.valeur);
+  // Dans une case : les centimes tant que ça tient (moins de 1 000 €), l'euro rond au-delà (jamais rogné).
+  const corps = t === 'eur' ? ((grand || Math.abs(Number(x.valeur)) < 1000) ? fmt(x.valeur) : euros(x.valeur)) : String(x.valeur);
   if (!x.partiel) return corps;
   return grand ? <><span className="vrm-fu-borne">au moins</span>{corps}</> : <>{'≥ '}{corps}</>;
 };
