@@ -168,6 +168,12 @@ import { achatParIdentite, propositionPrixAchat, propositionsUniques, listeConfi
 import { donneesRecapMois, csvRecapMois, pdfRecapMois, libelleMois, nomFichierRecap } from "./recapMois.js";
 import { CATEGORIES_DEPENSE, idTicket, montantDuTicket, texteMontantSaisie, texteDuTicket } from "./depensesTicket.js";
 import { produitsANumeroter, attribuerNumerosVc, carteNumerosVc } from "./numerosVestiaire.js";
+import { sitesDuNumero, appliquerPrix, noterJournalPrix, envoisPrix } from "./prixPartout.js";
+import { champsSource, dupliquerFiche, fichesAPublier, texteAColler } from "./dupliquerFiche.js";
+import { histoireArticle, offresDeConversation } from "./histoireArticle.js";
+import { CLE_MODELES, lireModeles } from "./modelesDescription.js";
+import { MesModeles, InsererModele } from "./ModelesDescription.jsx";
+import PrixPartout from "./PrixPartout.jsx";
 import { lireFile, noterSaisie, instantane, acquitter, compterEnAttente, nuagePlusRecent, fusionAuChargement, oublierCle, CLE_FILE, HORS_FILE } from "./fileEnvoi.js";
 // La migration qui cloisonne les vendeurs, lue depuis LE fichier (pas recopiée) :
 // deux copies finiraient par diverger, et c'est le genre de texte qu'on colle
@@ -1963,7 +1969,7 @@ const SYNC_KEYS = [
   'vrm_ebay_retrait_auto',
   // (3 nov.) Le cycle d'un article (src/cycleArticle.js) : SA réponse à « N°x
   // supprimé de Vinted » (son clic seul) et la dernière lecture qui l'a vu en ligne.
-  'vrm_cycle_decisions','vrm_vus_en_ligne',
+  'vrm_cycle_decisions','vrm_vus_en_ligne','vrm_fiches_neuves','vrm_prix_journal','vrm_modeles_desc',
   // Par annonce eBay, le prix Vinted de la dernière baisse faite depuis VRM
   // (proposition 9) : rien n'est reproposé tant qu'il n'a pas bougé.
   'vrm_ebay_baisses',
@@ -2650,6 +2656,52 @@ const _clesRelues = new Map();
 const onCleRelue = (k, fn) => { if (!_clesRelues.has(k)) _clesRelues.set(k, new Set()); _clesRelues.get(k).add(fn); return () => { const s = _clesRelues.get(k); if (s) s.delete(fn); }; };
 // L'état d'un écran qui porte une clé synchronisée : `init` est l'initialiseur
 // d'avant (`() => load(k, d)`), rejoué quand la clé change ailleurs.
+// (3 nov.) LES FICHES DUPLIQUÉES À PUBLIER (src/dupliquerFiche.js) : N° neuf,
+// photos à prendre. Une fiche sort de la liste dès qu'une annonce porte son N°
+// (fiche Vinted, lien Leboncoin posé) ; « Retirer » la range (le N° reste servi).
+function FichesNeuves() {
+  const [, maj] = React.useReducer((x) => x + 1, 0);
+  React.useEffect(() => { const off = onCloudReady(maj); window.addEventListener('vrm:save', maj); return () => { if (typeof off === 'function') off(); window.removeEventListener('vrm:save', maj); }; }, []);
+  const portes = new Set();
+  for (const f of Object.values(load('vinted_annonce_numeros', {}) || {})) if (f && f.numero) portes.add(cleNum(f.numero));
+  for (const n of Object.values(load('vrm_lbc_liens', {}) || {})) if (n) portes.add(cleNum(n));
+  for (const n of Object.values(carteNumerosVc(vcCarte('vrm_vc_numeros')))) if (n) portes.add(cleNum(n));
+  const liste = fichesAPublier(load('vrm_fiches_neuves', {}) || {}, portes, cleNum);
+  if (!liste.length) return null;
+  const retirer = async (f) => {
+    if (!(await askConfirm({ title: `Retirer la fiche N°${f.numero} ?`, ok: 'Retirer', cancel: 'Annuler' }))) return;
+    const toutes = { ...(load('vrm_fiches_neuves', {}) || {}) };
+    if (toutes[f.id]) toutes[f.id] = { ...toutes[f.id], retireeAt: new Date().toISOString() };
+    save('vrm_fiches_neuves', toutes); maj();
+  };
+  return (
+    <section className="vrm-ao-neuves" data-fiches-neuves={liste.length} aria-label="À publier">
+      <h3>À publier</h3>
+      {liste.map((f) => (
+        <div key={f.id} className="vrm-ao-neuve" data-fiche-neuve-num={f.numero}>
+          <span className="vrm-ao-neuve-num">N°{f.numero}</span>
+          <span className="vrm-ao-neuve-txt"><b>{f.titre || 'Sans titre'}</b><small>{[f.taille, f.prix != null ? `${String(f.prix).replace('.', ',')} €` : null, 'photos à prendre'].filter(Boolean).join(' · ')}</small></span>
+          <button type="button" className="vrm-ao-second" data-fiche-neuve-copier={f.numero} onClick={async () => { try { await navigator.clipboard.writeText(texteAColler(f)); toast('Texte copié'); } catch (_) { toast('Copie impossible ici'); } }}>Copier</button>
+          <button type="button" className="vrm-ao-second" aria-label={`Retirer la fiche N°${f.numero}`} data-fiche-neuve-retirer={f.numero} onClick={() => retirer(f)}>×</button>
+        </div>
+      ))}
+    </section>
+  );
+}
+// (3 nov.) Mes modèles de description (src/modelesDescription.js), synchronisés.
+const lireModelesRanges = () => lireModeles(load(CLE_MODELES, []));
+function ModelesSetting() {
+  const [modeles, setModeles] = useStateCle(CLE_MODELES, () => lireModelesRanges());
+  React.useEffect(() => onCloudReady(() => setModeles((l) => (l && l.length ? l : lireModelesRanges()))), []);   // eslint-disable-line react-hooks/exhaustive-deps
+  const poser = (l) => { setModeles(l); save(CLE_MODELES, l); };
+  return <MesModeles modeles={modeles} onChange={poser} confirmer={(m) => askConfirm({ title: `Supprimer « ${m.nom} » ?`, ok: 'Supprimer', cancel: 'Annuler', danger: true })}/>;
+}
+// La rangée de chips au-dessus d'une description (Leboncoin, eBay, brouillon de Republier).
+function ChipsModeles({ valeur, surChange, champ, vars }) {
+  const [modeles, setModeles] = React.useState(() => lireModelesRanges());
+  React.useEffect(() => { const f = () => setModeles(lireModelesRanges()); const off = onCloudReady(f); window.addEventListener('vrm:save', f); return () => { if (typeof off === 'function') off(); window.removeEventListener('vrm:save', f); }; }, []);
+  return <InsererModele modeles={modeles} valeur={valeur} surChange={surChange} champ={champ} vars={vars}/>;
+}
 function useStateCle(k, init) {
   const [v, setV] = React.useState(init);
   const initRef = React.useRef(init); initRef.current = init;
@@ -12535,6 +12587,7 @@ function AtelierBrouillon({ it, e, k, draft, onSave, onClose }) {
   const [title, setTitle] = useState(draft && draft.title != null ? draft.title : (it.title || ''));
   const [price, setPrice] = useState(() => { const p = draft?.price!=null?draft.price:draft?.priceInput!=null?draft.priceInput:draft&&Object.prototype.hasOwnProperty.call(draft,'price')?'':prix0; return p == null ? '' : String(p); });
   const [desc,setDesc]=useState(draft?.desc??it.desc??it.description??'');
+  const refDescBr=React.useRef(null);
   const [dimensions,setDimensions]=useState(draft?.dimensions||'');
   const [caracteristiques,setCaracteristiques]=useState(draft?.caracteristiques||[it.brand,it.size].filter(Boolean).join(' · '));
   const [done, setDone] = useState(false);
@@ -12658,7 +12711,7 @@ function AtelierBrouillon({ it, e, k, draft, onSave, onClose }) {
             <textarea value={title} onChange={ev => setTitle(ev.target.value)} rows={2} data-atelier-titre style={{ ...champ, resize: 'vertical' }} /></label>
           <label style={{ display: 'block' }}><span style={maj}>Prix (€)</span>
             <input value={price} onChange={ev => setPrice(ev.target.value)} inputMode="decimal" data-atelier-prix style={{ ...champ, maxWidth: 160 }} /></label>
-          <label style={{display:'block'}}><span style={maj}>Description</span><textarea aria-label="Description du brouillon" value={desc} onChange={ev=>setDesc(ev.target.value)} rows={4} style={champ}/></label>
+          <label style={{display:'block'}}><span style={maj}>Description</span><ChipsModeles valeur={desc} surChange={setDesc} champ={refDescBr} vars={{ titre:title, prix:Number(String(price).replace(',','.')), numero:e&&e.numero, taille:it.size, marque:it.brand }}/><textarea ref={refDescBr} aria-label="Description du brouillon" value={desc} onChange={ev=>setDesc(ev.target.value)} rows={4} style={champ}/></label>
           <label style={{display:'block'}}><span style={maj}>Caractéristiques (marque, modèle, état…)</span><input aria-label="Caractéristiques du brouillon" value={caracteristiques} onChange={ev=>setCaracteristiques(ev.target.value)} style={champ}/></label>
           <label style={{display:'block'}}><span style={maj}>Dimensions — si utile, avec l’unité</span><input aria-label="Dimensions du brouillon" value={dimensions} onChange={ev=>setDimensions(ev.target.value)} placeholder="Ex. 30 × 20 × 10 cm" style={champ}/></label>
           <p style={{fontSize:12,color:C.muted}}>Ces informations sont préparées dans VRM. Pour ajouter des photos ou renseigner les champs du catalogue Vinted, <a href={'https://www.vinted.fr/items/'+it.id+'/edit'} target="_blank" rel="noreferrer">compléter l’annonce sur Vinted ↗</a>.</p>
@@ -15283,6 +15336,84 @@ function rechercheParNumero(q, numData, comptes) {
 // Où est rangé ce N° : « Mes meubles » d'abord (tenu à la main), puis la pièce
 // du Stock — la règle de « Tout sur le N° », lue aussi par le mode emballage.
 const ouStockNumero = (plan, k) => { const m = ouDansMeubles(k); if (m) return { itemId: 'meuble:' + m.meuble.id, key: String(m.i), itemName: m.meuble.name, nom: m.libelle, roomName: '' }; return plan ? ouEstNumero(plan, k) : null; };
+// ── (3 nov.) LES OUTILS DES ANNONCES : prix partout, dupliquer, histoire ─────
+// Les lectures EN PLUS de `numData` quand la fiche d'un N° (ou la feuille
+// « Changer le prix ») est ouverte : projetées (§4.4), par identité (§5).
+// Chaque source rend `null` si elle n'a pas pu être lue (« pas su »).
+async function lireExtraFiche(rn) {
+  const sb = async (q) => { try { const r = await fetch(`${SUPABASE_URL}/rest/v1/${q}`, { headers: sbAuth() }); if (!r.ok) return null; const j = await r.json(); return Array.isArray(j) ? j : null; } catch (_) { return null; } };
+  const ids = ((rn && rn.annonces) || []).map((a) => String(a.id)).filter((x) => /^\d{4,15}$/.test(x)).slice(0, 20);
+  const fiches = load('vinted_annonce_numeros', {}) || {};
+  const achats = [...new Set(ids.map((id) => fiches[id] && fiches[id].buyFromId).filter((x) => x != null && /^\d{4,20}$/.test(String(x))).map(String))];
+  const ou = ids.map((id) => `id.like.coffre_*_${id}`).join(',');
+  const [cof, conv, rec, lbc, vc] = await Promise.all([
+    ids.length ? sb(`app_data?or=(${ou})&select=id,first:data->>firstSavedAt,saved:data->>savedAt,brand:data->>brand,etat:data->>etat,desc:data->>desc,title:data->>title,size:data->>size,price:data->>price`) : Promise.resolve([]),
+    ids.length ? sb(`app_data?id=like.harvest_*_conv_*&data->payload->conversation->transaction->>item_id=in.(${ids.join(',')})&select=id,messages:data->payload->conversation->messages,item:data->payload->conversation->transaction->>item_id`) : Promise.resolve([]),
+    achats.length ? sb(`app_data?id=in.(${achats.map((a) => 'email_invoice_tx' + a).join(',')})&select=id`) : Promise.resolve([]),
+    lbcListingsSession().catch(() => null),
+    lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens`).catch(() => null),
+  ]);
+  let coffres = null;
+  if (cof) { coffres = {}; for (const r of cof) { const m = /^coffre_(\d+)_(\d+)$/.exec(String(r.id || '')); if (m && ids.includes(m[2])) coffres[m[2]] = { firstSavedAt: r.first || null, brand: r.brand, etat: r.etat, desc: r.desc, title: r.title, size: r.size, price: r.price, uid: m[1] }; } }
+  let offres = null;
+  if (conv) { offres = []; for (const r of conv) { const uid = (/^harvest_(\d+)_conv_/.exec(String(r.id || '')) || [])[1] || null; offres.push(...offresDeConversation({ messages: r.messages, transaction: { item_id: r.item } }, uid)); } }
+  const recus = rec ? new Set(rec.map((r) => String(r.id || '').replace(/^email_invoice_tx/, ''))) : null;
+  const vcL = Array.isArray(vc) ? (vc[0] || {}) : null;
+  return { coffres, offres, recus, lbcItems: lbc ? lbc.items || {} : null, vcItems: vcL ? (vcL.items || {}) : null, vcLiens: vcL ? (vcL.liens || {}) : {} };
+}
+// Le N° d'une annonce Vestiaire, par identité : le lien posé par VRM, la
+// référence « VRM-{n°} », le N° donné au produit — deux qui se contredisent ⇒ personne.
+const numeroVcIdentite = (id, it, liens) => {
+  const ks = new Set();
+  const l = liens ? liens[String(id)] : null; if (l != null && String(l).trim()) ks.add(cleNum(l));
+  if (it && it.ref && /VRM/i.test(String(it.ref))) { const k = refVRMDe(it.ref); if (k) ks.add(k); }
+  const a = carteNumerosVc(vcCarte('vrm_vc_numeros'))[String(id)]; if (a) ks.add(cleNum(a));
+  ks.delete('');
+  return ks.size === 1 ? [...ks][0] : '';
+};
+// Les sites où ce N° est en ligne (src/prixPartout.js), avec les règles d'identité de l'app.
+const sitesPrixDe = (k, rn, extra) => sitesDuNumero(k, { rn, fiches: load('vinted_annonce_numeros', {}) || {}, lbcItems: extra ? extra.lbcItems : null, vcItems: extra ? extra.vcItems : null }, {
+  cleNum, capVinted: extSait('republiermodif'),
+  numLbc: (ad, id) => numeroLbcIdentite({ itemId: id }, { [id]: ad }, load('vrm_lbc_liens', {}) || {}),
+  numVc: (id, it) => numeroVcIdentite(id, it, extra ? extra.vcLiens : null),
+});
+// Les envois, appelés UNIQUEMENT par « Appliquer » (src/PrixPartout.jsx).
+const ENVOIS_PRIX = envoisPrix({ appelEbay: (c) => appelEbay(c), resultatReviseEbay: (x) => resultatReviseEbay(x), corpsCompteEbay: (c) => corpsCompteEbay(c), vmrCmdSuivi: (p, t) => vmrCmdSuivi(p, t), sansReponse: TEXTE_SANS_REPONSE });
+// DUPLIQUER : une fiche neuve (`vrm_fiches_neuves`), un N° neuf (`prochainLibre`
+// sur TOUS les numéros servis, réservés compris), aucune photo, aucune identité.
+// Rend { ok, numero } ou { ok:false, raison }. Rien sur « pas su ».
+async function dupliquerNumero(rn, extra) {
+  if (!numerotationPermise() || !isCloudReady()) return { ok: false, raison: 'numéros pas encore chargés' };
+  if (!(await assurerVersionNumerotation())) return { ok: false, raison: 'recharge l’app' };
+  let jr = null; try { jr = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_num_reserves&select=data`); } catch (_) { jr = null; }
+  if (!Array.isArray(jr)) return { ok: false, raison: 'numéros réservés pas lus' };
+  const fiches = load('vinted_annonce_numeros', {}) || {};
+  const a = ((rn && rn.annonces) || []).find((x) => x.etat === 'en-ligne') || ((rn && rn.annonces) || [])[0] || null;
+  const f = a ? fiches[a.id] : null;
+  const c = a && extra && extra.coffres ? extra.coffres[a.id] : null;
+  const neuveSrc = Object.values(load('vrm_fiches_neuves', {}) || {}).find((x) => x && cleNum(x.numero) === (rn && rn.cle));
+  if (!f && !c && !neuveSrc) return { ok: false, raison: 'aucune fiche à copier' };
+  const champs = neuveSrc && !f && !c ? neuveSrc : champsSource(f, c);
+  const pris = new Set(), prisK = new Set();
+  const add = (v) => { const k = cleNum(v); if (!k) return; prisK.add(k); if (/^\d+$/.test(k)) pris.add(Number(k)); };
+  (load('vinted_used_numeros', []) || []).forEach(add);
+  Object.values(fiches).forEach((e) => add(e && e.numero));
+  Object.values(load('vinted_sale_overrides', {}) || {}).forEach((e) => add(e && e.numero));
+  Object.values(load('vrm_lbc_liens', {}) || {}).forEach(add);
+  Object.values(load('vrm_fiches_neuves', {}) || {}).forEach((e) => add(e && e.numero));
+  ajouterNumerosHorsEcran(pris, prisK);
+  numerosReserves(jr[0] ? jr[0].data : null).cles.forEach(add);
+  const id = 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  let r; try { r = dupliquerFiche(champs, { pris: { int: pris, cles: prisK }, pref: prefixeNumeros(), prochainLibre, cleNum, id }); } catch (e) { return { ok: false, raison: 'numéro pas sûr' }; }
+  // Le pool d'abord (append-only), puis la fiche.
+  const pool = (load('vinted_used_numeros', []) || []).slice();
+  const ep = entreePool(r.fiche.numero);
+  if (ep != null && !pool.some((x) => cleNum(x) === cleNum(ep))) pool.push(ep);
+  save('vinted_used_numeros', pool.sort(triPool));
+  save('vrm_fiches_neuves', { ...(load('vrm_fiches_neuves', {}) || {}), [r.id]: r.fiche });
+  emettreClesRelues(['vinted_used_numeros', 'vrm_fiches_neuves']);
+  return { ok: true, numero: r.fiche.numero, id: r.id, fiche: r.fiche };
+}
 function ToutSurLeNumero({ q, numData, comptes, onNav, onStock, onChercher, onFiche }) {
   const lecture = !numData;
   const { rn, nd, shipDone } = rechercheParNumero(q, numData, comptes);
@@ -17866,6 +17997,7 @@ function FicheLbc({ q, compteLbc, onClose, onMarquer }) {
   const [prix, setPrix] = React.useState(defauts.price);
   const [etat, setEtat] = React.useState(defauts.etat);
   const [desc, setDesc] = React.useState(defauts.description);
+  const refDescLbc = React.useRef(null);
   const [photos, setPhotos] = React.useState(defauts.photos);
   const [envoi, setEnvoi] = React.useState(false);
   const [refus, setRefus] = React.useState(null);
@@ -18027,7 +18159,8 @@ function FicheLbc({ q, compteLbc, onClose, onMarquer }) {
         {toutes.length === 0 && <div style={{ fontSize: 12, color: C.warn, lineHeight: 1.45 }}>Aucune photo captée pour cette annonce : ouvre-la sur Vinted, l'extension lit ses photos au passage. Leboncoin refuse une annonce sans photo.</div>}
 
         <Etiquette droite={`${desc.length}/${LBC_DESC_MAX}`} err={errDe('description')}>Description</Etiquette>
-        <textarea data-fiche-champ="description" value={desc} onChange={(e) => setDesc(e.target.value)} rows={7} disabled={enCours || fait}
+        <ChipsModeles valeur={desc} surChange={setDesc} champ={refDescLbc} vars={{ titre, prix: Number(String(prix).replace(',', '.')), numero: q.numero, taille: q.taille, marque: q.marque }}/>
+        <textarea ref={refDescLbc} data-fiche-champ="description" value={desc} onChange={(e) => setDesc(e.target.value)} rows={7} disabled={enCours || fait}
           style={{ ...champ, resize: 'vertical', lineHeight: 1.45, fontSize: 15, borderColor: errDe('description') ? C.warn : C.border }}/>
         <div style={{ fontSize: 11.5, color: C.muted, marginTop: 5, lineHeight: 1.4 }}>
           La référence <b style={{ color: C.text }}>{ref}</b> reste dans la description : c'est elle qui relie l'annonce Leboncoin à cet article{refLbcPresente(desc, ref) ? '.' : ' — si tu l\'enlèves, elle est remise à la fin.'}
@@ -21651,6 +21784,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
   const [qty, setQty] = React.useState('1');
   const [cond, setCond] = React.useState('3000');
   const [desc, setDesc] = React.useState('');
+  const refDescEb = React.useRef(null);
   const [photos, setPhotos] = React.useState('');
   const [cat, setCat] = React.useState(null);          // {categoryId, categoryName, required:[]}
   const [asp, setAsp] = React.useState({});
@@ -22299,7 +22433,8 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
 
             {/* 5 — DESCRIPTION */}
             <BlocEbay n="5" titre="Description">
-              <textarea value={desc} onChange={e => setDesc(e.target.value)} rows={4} placeholder="État, particularités, authenticité… (le titre est repris si tu laisses vide)" style={{ ...inp, resize: 'vertical', lineHeight: 1.5 }} />
+              <ChipsModeles valeur={desc} surChange={setDesc} champ={refDescEb} vars={{ titre, prix: Number(String(prix).replace(',', '.')), numero: (pairSel && pairSel.num) || numeroBrouillon, taille: pairSel && pairSel.tailleVinted, marque: (pairSel && pairSel.marque) || (asp && (asp.Marque || asp.Brand)) }}/>
+              <textarea ref={refDescEb} value={desc} onChange={e => setDesc(e.target.value)} rows={4} placeholder="État, particularités, authenticité… (le titre est repris si tu laisses vide)" style={{ ...inp, resize: 'vertical', lineHeight: 1.5 }} />
             </BlocEbay>
 
             {/* Vérif à blanc : eBay contrôle tout et donne les frais, sans rien créer. */}
@@ -23315,6 +23450,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
   const descSimple=String(it.detail?.description || '').replace(/<br\s*\/?>/gi,'\n').replace(/<[^>]*>/g,'').replace(/&amp;/g,'&');
   const [titreEdite,setTitreEdite]=React.useState(it.title || '');
   const [descEditee,setDescEditee]=React.useState(descSimple);
+  const refDescEbM=React.useRef(null);
   const [saving, setSaving] = React.useState(false);
   const [msg, setMsg] = React.useState('');
   const [msgTon, setMsgTon] = React.useState('ok');
@@ -23554,7 +23690,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
               <label style={{ fontSize: 11.5, color: E.muted }}>Stock<br /><input value={qty} onChange={e => setQty(e.target.value)} inputMode="numeric" data-ebay-revise-stock={it.itemId} style={{ ...inpE, width: 72 }} /></label>
               <button type="button" data-ebay-revise-enregistrer={it.itemId} onClick={enregistrer} disabled={saving} style={{ border: 'none', background: E.accent, color: '#fff', borderRadius: 8, padding: '10px 14px', fontSize: 13, fontWeight: 700, cursor: saving ? 'default' : 'pointer', fontFamily: 'inherit', opacity: saving ? 0.6 : 1 }}>{saving ? 'Envoi…' : 'Enregistrer'}</button>
               <label style={{fontSize:11.5,color:E.muted,flex:'1 1 100%'}}>Titre<input aria-label="Titre de l’annonce eBay" maxLength={80} value={titreEdite} onChange={e=>setTitreEdite(e.target.value)} style={{...inpE,width:'100%',marginTop:4}}/></label>
-              <label style={{fontSize:11.5,color:E.muted,flex:'1 1 100%'}}>Description<textarea aria-label="Description de l’annonce eBay" value={descEditee} onChange={e=>setDescEditee(e.target.value)} rows={4} style={{...inpE,width:'100%',marginTop:4}}/></label>
+              <label style={{fontSize:11.5,color:E.muted,flex:'1 1 100%'}}>Description<ChipsModeles valeur={descEditee} surChange={setDescEditee} champ={refDescEbM} vars={{ titre:titreEdite, numero, prix:Number(it.price) }}/><textarea ref={refDescEbM} aria-label="Description de l’annonce eBay" value={descEditee} onChange={e=>setDescEditee(e.target.value)} rows={4} style={{...inpE,width:'100%',marginTop:4}}/></label>
               <button type="button" onClick={enregistrerTexte} disabled={saving} style={btnE}>Enregistrer le texte</button>
               <button className="vrm-b vrm-b-discret" type="button" onClick={() => { setEdit(false); setMsg(''); }} style={{ border: `1px solid ${E.border}`, background: 'transparent', color: E.muted, borderRadius: 8, padding: '10px 12px', fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
             </div>
@@ -53297,6 +53433,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             ailleurs, puis une ligne de chiffres TOUS libellés ; la saisie (N°,
             achat) en bas ; le reste dans « ⋯ ». Une seule couleur d'accent,
             rare (§7) : l'ambre ne sert qu'à « dort » et à une marge négative. */}
+        <FichesNeuves/>
         {annSort==='sleeping' ? (
           <QuiDorment seuil={seuilDort} onSeuil={setSeuilDort} Segmente={Segmente} fmt={fmt} onAgir={(a)=>setDortAgir(a)}
             liste={listings.items==null ? null : annShown.map(it=>{ const e=numeros[it.id]||{}; const pr=(it.price&&typeof it.price==='object')?it.price.amount:it.price; const n=Number(String(pr==null?'':pr).replace(',','.'));
@@ -53477,6 +53614,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     })}
                     <button type="button" className="vrm-fiche-geste" onClick={()=>openPicker(item)} style={geste}>Relier un achat</button>
                     <button type="button" className="vrm-fiche-geste" onClick={()=>setPassportFor({it,e,num})} style={geste}>Passeport</button>
+                    {/* (3 nov.) Le prix de CE N° sur tous ses sites, et sa copie (N° neuf). */}
+                    {num && <button type="button" className="vrm-fiche-geste" data-annonce-prix-partout={num} onClick={()=>{ try { window.dispatchEvent(new CustomEvent('vrm:prix-partout',{detail:String(num)})); } catch (_) {} }} style={geste}>Changer le prix</button>}
+                    {num && <button type="button" className="vrm-fiche-geste" data-annonce-histoire={num} onClick={()=>{ try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire',{detail:String(num)})); } catch (_) {} }} style={geste}>Histoire · Dupliquer</button>}
                     <button type="button" className="vrm-fiche-geste" onClick={async ()=>{ if(await askConfirm('Marquer cet article VENDU et le retirer des annonces ?')) markSold(it.id); }} title="Marquer vendue : la retire des annonces tout de suite (sans attendre la synchro Vinted)" style={geste}>Marquer vendue</button>
                     {sugg!=null && sugg < Number(it.price) && <a className="vrm-fiche-geste" href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour baisser le prix" style={{...geste,border:`1px solid ${C.accent}`,background:`${C.accent}14`,color:C.accent}}>Baisser à {sugg} {cur(it.currency)} ↗</a>}
                   </div>
@@ -60155,6 +60295,10 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // ⛔ Détourage des photos retiré des Paramètres (17 oct., sa décision) :
       //    il n'existe plus que pour Vestiaire Collective, qui l'exige, sans réglage.
     ]},
+    // (3 nov.) Les textes types insérés en un tap dans une description.
+    { id:'annonces-reglages', titre:'Annonces', items:[
+      { id:'modeles', type:'panneau', nu:true, ic:'pencil', lib:'Mes modèles', val:String(lireModelesRanges().length || ''), data:{ 'data-reglage-modeles':'' }, el:<ModelesSetting/> },
+    ]},
     { id:'notifications', titre:'Notifications', items:[
       { id:'push', type:'panneau', ic:'bell2', lib:'Notifications du téléphone', titreInterne:true,
         desc: nMuetsPush > 0 ? <span style={{color:C.warn,fontWeight:600}}>{nMuetsPush} compte{nMuetsPush>1?'s':''} sans email : pas de notification</span> : null,
@@ -64011,8 +64155,19 @@ function AppCoeur() {
   // (1er nov.) LA FICHE COMPLÈTE D'UNE PAIRE (`FichePaire`) : ouverte depuis
   // « Tout sur le N° » ou le mode emballage ; elle lit les MÊMES sources.
   const [ficheNum,setFicheNum]=useState(null);
+  const [neuveRecente,setNeuveRecente]=useState(null);   // (3 nov.) la fiche dupliquée à l'instant (avant l'écriture différée de `save`)
   useEffect(()=>{const ouvrir=e=>{const n=e&&e.detail; if(typeof n!=='string'||!n.trim()||n.length>64)return; setFicheNum(n.trim());};window.addEventListener('vrm:fiche-paire',ouvrir);return()=>window.removeEventListener('vrm:fiche-paire',ouvrir);},[]);
-  const besoinNumData=gsOpen||!!ficheNum;
+  // (3 nov.) « Changer le prix » d'un N° : ouvert depuis la fiche, ou depuis une
+  // ligne d'annonce (événement `vrm:prix-partout`, le N° en détail).
+  const [prixNum,setPrixNum]=useState(null);
+  useEffect(()=>{const ouvrir=e=>{const n=e&&e.detail; if(typeof n!=='string'||!n.trim()||n.length>64)return; setPrixNum(n.trim());};window.addEventListener('vrm:prix-partout',ouvrir);return()=>window.removeEventListener('vrm:prix-partout',ouvrir);},[]);
+  const besoinNumData=gsOpen||!!ficheNum||!!prixNum;
+  // Les lectures en plus (coffre, offres, reçu, Leboncoin, Vestiaire) du N° ouvert.
+  const [ficheExtra,setFicheExtra]=useState(null);
+  const numOutil=ficheNum||prixNum;
+  useEffect(()=>{ if(!numOutil||!numData){ setFicheExtra(null); return undefined; } let vivant=true; setFicheExtra(null);
+    (async()=>{ const { rn }=rechercheParNumero(numOutil, numData, vintedAccounts); const x=await lireExtraFiche(rn); if(vivant) setFicheExtra({ ...x, num: numOutil }); })();
+    return ()=>{ vivant=false; }; /* eslint-disable-next-line */ },[numOutil,numData]);
   useEffect(()=>{ if(!besoinNumData){ setNumData(null); return undefined; } if(numData) return undefined; let vivant=true; (async()=>{
     const sb=async(q)=>{ try{ const r=await fetch(`${SUPABASE_URL}/rest/v1/${q}`,{headers:sbAuth()}); if(!r.ok) return null; const j=await r.json(); return Array.isArray(j)?j:null; }catch(_){ return null; } };
     let versementsLus=null;
@@ -66347,8 +66502,15 @@ function AppCoeur() {
           const { rn, numeros } = rechercheParNumero(ficheNum, numData, vintedAccounts);
           const nomCompte = (uid) => { const a = (vintedAccounts || []).find(x => String(x.vinted_user_id) === String(uid)); if (!a) return null; const labels = load('vinted_account_labels', {}) || {}; return labels[a.vinted_user_id] || a.login || `#${a.vinted_user_id}`; };
           const shipDone = load('vinted_ship_done', {}) || {};
-          const p = parcoursPaire(rn, { fiches: numeros, saleOv: load('vinted_sale_overrides', {}) || {}, buyByNum: load('vinted_buyprice_by_num', {}) || {},
-            stats: numData ? (numData.stats === undefined ? null : numData.stats) : null, versements: numData ? (numData.versements === undefined ? null : numData.versements) : null, nomCompte }, {
+          // (3 nov.) L'HISTOIRE COMPLÈTE (`histoireArticle`) : le parcours + les
+          // lectures en plus (`ficheExtra`), chaque étape lue et datée par sa donnée.
+          const ex = ficheExtra && ficheExtra.num === ficheNum ? ficheExtra : null;
+          const autresEnLigne = ex && ex.lbcItems != null && ex.vcItems != null ? sitesPrixDe(ficheNum, rn, ex).sites.filter((x) => x.site === 'leboncoin' || x.site === 'vestiaire') : null;
+          const neuve = (neuveRecente && cleNum(neuveRecente.numero) === rn.cle ? neuveRecente : null) || Object.values(load('vrm_fiches_neuves', {}) || {}).find((x) => x && !x.retireeAt && cleNum(x.numero) === rn.cle) || null;
+          const p = histoireArticle(rn, { fiches: numeros, saleOv: load('vinted_sale_overrides', {}) || {}, buyByNum: load('vinted_buyprice_by_num', {}) || {},
+            stats: numData ? (numData.stats === undefined ? null : numData.stats) : null, versements: numData ? (numData.versements === undefined ? null : numData.versements) : null, nomCompte,
+            coffres: ex ? ex.coffres : null, offres: ex ? ex.offres : null, recus: ex ? ex.recus : null, autresEnLigne,
+            journalPrix: (load('vrm_prix_journal', {}) || {})[rn.cle] || [], prixVinted: load('vinted_prix_historique', []) || [] }, {
             etapeVente: (o) => etapeVente(o, { poste: (x) => !!shipDone[String(x.transaction_id)] }),
             venteAnnulee: (o) => classifyOrderStatus(o && o.status) === 'cancelled' || (o && o.transaction_id != null && txnAnnuleeAvantEnvoi(o.transaction_id)),
             montantRecuEbay, commandeEbayEngagee, lbcAnnulee, lbcFinalisee,
@@ -66357,7 +66519,25 @@ function AppCoeur() {
           return <FichePaire p={p} num={ficheNum} lecture={!numData} onFermer={fermer} onRetour={()=>{ fermer(); setGsQ(String((p && p.num) || ficheNum)); setGsOpen(true); }}
             onBordereau={(tx)=>{ fermer(); setGsOpen(false); poserCible({ type: 'colis', tx: String(tx) }, redirigerOnglet('cat_bord', null, ONGLETS_DEPLACES).tab); setTab('cat_bord'); }}
             onEmballer={()=>{ fermer(); setGsOpen(false); DEMANDE_EMBALLAGE.at = Date.now(); setTab('cat_bord'); try { window.dispatchEvent(new Event('vrm:emballer')); } catch (_) {} }}
+            onPrix={(n)=>setPrixNum(String(n))} neuve={neuve}
+            onCopier={async(f)=>{ try { await navigator.clipboard.writeText(texteAColler(f)); toast('Texte copié'); } catch (_) { toast('Copie impossible ici'); } }}
+            onDupliquer={async()=>{ const r=await dupliquerNumero(rn, ex); if(!r.ok){ toast(`Pas dupliqué : ${r.raison}`); return; } toast(`N°${r.numero} créé`); setNeuveRecente(r.fiche); setFicheNum(String(r.numero)); }}
             Photo={(src)=><PhotoVinted src={src} alt="" loading="lazy"/>} Icon={Icon} Retour={FermeAuRetour}/>;
+        })()}
+        {prixNum && (()=>{
+          // (3 nov.) LE PRIX PARTOUT : les sites de CE N° (par identité), un clic.
+          const { rn } = rechercheParNumero(prixNum, numData, vintedAccounts);
+          const ex = ficheExtra && ficheExtra.num === prixNum ? ficheExtra : null;
+          const lecture = !numData || !ex;
+          const { sites, manques } = rn.etat === 'invalide' ? { sites: [], manques: [] } : sitesPrixDe(prixNum, rn, ex || { lbcItems: undefined, vcItems: undefined });
+          const sitesVus = lecture ? sites.filter((x) => x.site === 'vinted' || x.site === 'ebay') : sites;
+          return <PrixPartout key={prixNum} num={rn.cle || prixNum} sites={sitesVus} manques={lecture ? [] : manques} lecture={lecture} Retour={FermeAuRetour}
+            onFermer={()=>setPrixNum(null)}
+            onAppliquer={async({ coches, prix, surEtat })=>{
+              const r = await appliquerPrix({ sites: sitesVus, coches, prix, envoyer: ENVOIS_PRIX, surEtat });
+              if (r.res) save('vrm_prix_journal', noterJournalPrix(load('vrm_prix_journal', {}) || {}, rn.cle, r.prix, sitesVus, r.res));
+              return r;
+            }}/>;
         })()}
         <EcranGardeFou resetKey={tab}>
         {/* ⚠️⚠️ UN SEUL ENDROIT POUR « JE N'ARRIVE PAS À LIRE TES DONNÉES ».

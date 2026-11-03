@@ -792,3 +792,6 @@ refusée : la ligne `vc_messages` est bien écrite (compteur à jour à 08 h 56)
 Installer la **5.317.0** (remplacer le dossier, ⟳ dans chaque Chrome), puis sur vestiairecollective.com
 (même Chrome) ouvrir la **messagerie** (`/chat/`) et une conversation. Ensuite VRM → Messages → Vestiaire.
 Pour vérifier (lecture seule) : `vc_messages.conversations`, `vc_messages.forme`, `vc_fil_*`, `vc_session.source`.
+
+### 3 nov. — Prix partout, dupliquer, histoire, modèles (`claude/annonces-outils`)
+Récit : `historique-interface-stock.md` (« LES QUATRE OUTILS DES ANNONCES »). Ici : aucun changement de prix ni description éditable depuis VRM ⇒ « À faire sur le site » ; identité = lien, ref VRM ou N° du produit.
