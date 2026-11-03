@@ -81,7 +81,7 @@ export const PAGES_CARTE = {
   colis:     { nom: 'Colis', g: P('aposter'), c: [P('imprimer'), P('deposes'), P('retirer')] },
   compta:    { nom: 'Compta', g: P('benefice', 'mois'), c: [P('declarer', 'mois'), P('urssaf', 'mois'), P('finalisees', 'mois')] },
   annonces:  { nom: 'Annonces', g: P('enligne'), c: [P('dorment'), P('ventes', 'mois'), P('vendu', 'mois')] },
-  achats:    { nom: 'Achats', g: P('retirer'), c: [P('aposter'), P('vendu', 'mois'), P('attente')] },
+  achats:    { nom: 'Achats', g: P('depense'), c: [P('enroute'), P('retirer'), P('recus')] },
 };
 export const PAGES = Object.keys(PAGES_CARTE);
 

@@ -51535,6 +51535,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {!dansPlateforme && (modeRetraits
           ? <ScreenHead icon="qr" title="Colis à retirer" desc="Les colis à aller chercher : code de retrait, date limite, point relais."/>
           : <ScreenHead icon="bag" title="Achats" desc="En route, reçus, et le prix payé."/>)}
+        {/* (3 nov.) LA carte d'Achats parle d'ACHATS (jamais « Vendu · mois ») : Dépensé du mois (la règle de la
+            case « Dépensé » plus bas — hors annulés, `montantCommande` — sur le mois en cours), En route et Reçus
+            (les nombres des onglets, `phaseReception`), À retirer (`vrm_colis_retirer`). Aucun nombre recalculé. */}
+        {dansPlateforme && !modeRetraits && !baseKO && (() => {
+          const lu = Array.isArray(buys.items);
+          const m0 = new Date(); m0.setDate(1);
+          const duMois = { from: m0, to: new Date() };
+          const annule = (o) => /annul|rembours|refus/i.test(o.status || '');
+          const mois = lu ? buysBase.filter((o) => !annule(o) && dansPeriode(o, duMois)) : [];
+          const depense = lu ? mois.reduce((a, o) => a + montantCommande(o), 0) : null;
+          const n = { route: 0, recu: 0 }; if (lu) buysBase.forEach((o) => { const ph = phaseReception(o); if (n[ph] != null) n[ph]++; });
+          return <CarteStatsApp page="achats" liveStats={liveStats} className="vrm-fu-ecran" ici="achats" onNav={onNav} sel={{ site: 'toutes', compte: null, periode: null }}
+            locaux={{
+              depense: { nom: 'Dépensé du mois', court: 'Dépensé', type: 'eur', valeur: depense, attrs: { 'data-n': lu ? String(mois.length) : '' } },
+              enroute: { nom: 'En route', court: 'En route', type: 'n', valeur: lu ? n.route : null, attrs: { 'data-n': lu ? String(n.route) : '' } },
+              recus: { nom: 'Reçus', court: 'Reçus', type: 'n', valeur: lu ? n.recu : null, attrs: { 'data-n': lu ? String(n.recu) : '' } },
+            }}/>;
+        })()}
         {!retraitsOutils && <NoAcc/>}
         {/* ⚠️ LE BANDEAU DE L'EXTENSION VIT AUSSI ICI, PAS SEULEMENT SUR MA
             JOURNÉE. C'est sur CET écran que Julien compte les codes qui
@@ -66172,8 +66190,9 @@ function AppCoeur() {
           {!achats && sec!=='messages' && <VintedResume liveStats={liveStatsVus} baseKO={baseKO} siAJour={sec!=='annonces'} sansMontants sauf={(sec || 'ventes') === 'ventes' ? (liveStatsVus && liveStatsVus.venduManque) : null}/>}
           {!baseKO && (sec==='annonces'||achats) && (() => {
             const uid = compteEffectif(compteSel, compteConnecte, (u) => (comptesChoisissables || []).some((a) => String(a.vinted_user_id) === u));
-            return <div style={{ padding: '12px 16px 0' }}><CarteStatsApp page={achats ? 'achats' : 'annonces'} className="vrm-fu-ecran" ici={achats ? 'achats' : 'annonces'} onNav={setTab}
-              sel={{ site: achats ? 'toutes' : 'vinted', compte: achats ? null : compteCarte(uid, vintedAccounts), periode: null }}/></div>;
+            if (achats) return null; // (3 nov.) la carte d'Achats vit dans l'écran Achats (ses chiffres d'achat)
+            return <div style={{ padding: '12px 16px 0' }}><CarteStatsApp page="annonces" className="vrm-fu-ecran" ici="annonces" onNav={setTab}
+              sel={{ site: 'vinted', compte: compteCarte(uid, vintedAccounts), periode: null }}/></div>;
           })()}
           {/* PARITÉ (26 oct.) : eBay et Leboncoin portent une to-do rangée « À
               faire » en tête de leur espace ; la to-do de Vinted, c'est « Ma

@@ -46,7 +46,8 @@ const affiche = (x, fmt, grand) => {
   // Dans une case : les centimes tant que ça tient (moins de 1 000 €), l'euro rond au-delà (jamais rogné).
   const corps = t === 'eur' ? ((grand || Math.abs(Number(x.valeur)) < 1000) ? fmt(x.valeur) : euros(x.valeur)) : String(x.valeur);
   if (!x.partiel) return corps;
-  return grand ? <><span className="vrm-fu-borne">au moins</span>{corps}</> : <>{'≥ '}{corps}</>;
+  // (3 nov.) Jamais « ≥ » sur une case : le chiffre seul, « au moins » dans son titre (`titreDe`).
+  return grand ? <><span className="vrm-fu-borne">au moins</span>{corps}</> : corps;
 };
 const attrsDeValeur = (x, page) => ({
   'data-carte-chiffre': x.place.id,
@@ -59,6 +60,7 @@ const attrsDeValeur = (x, page) => ({
 const titreDe = (x) => {
   if (x.hors) return `${x.def ? x.def.nom : ''} : ${x.hors}`;
   if (x.partiel && x.manque && x.manque.length) return `Au moins : ${x.manque.join(', ')} pas lu`;
+  if (x.partiel) return `Au moins · ${x.def ? x.def.nom : ''}`;
   if (x.def && x.def.titre) return x.def.titre;
   return x.def ? x.def.nom : '';
 };
@@ -99,7 +101,8 @@ export default function CarteStats({ page, sel, sources, regles, reglage, poser,
           cle: x.place.id + (x.p && typeof x.p === 'string' ? '-' + x.p : ''),
           n: affiche(x, fmt, false),
           // (3 nov., finitions) Capitale initiale sur chaque case (« À poster », « Finalisées »).
-          l: majuscule(x.def ? (x.def.local ? (x.def.court || x.def.nom) : libelleCase(x.def, x.p, g.p, sel)) : ''),
+          // (3 nov.) Le libellé court seul (jamais « … · Vinted » rogné) : le site se dit dans le titre de la case.
+          l: majuscule(x.def ? (x.def.local ? (x.def.court || x.def.nom) : libelleCase({ ...x.def, vinted: false }, x.p, g.p, sel)) : ''),
           titre: titreDe(x),
           onClick: aller(x),
           attrs: { ...attrsDeValeur(x, page), ...(x.attrs || {}), ...(x.def && x.def.local && x.def.attrs ? x.def.attrs : {}), ...(plus(x) || {}) },

@@ -89,7 +89,7 @@ function fichiers(dir) {
 
 const changes = [];
 // Laissés à leurs chantiers (3 nov.) : Favoris (`claude/favoris-fusion`), Comptes liés, Stock 3D.
-const HORS = /(?:^|[\\/])(favoris\.css|FavorisVinted\.jsx|favorisEcran\.js|comptes-lies\.css|Room3D\.jsx)$/;
+const HORS = /(?:^|[\\/])(favoris\.css|FavorisVinted\.jsx|favorisEcran\.js|comptes-lies\.css|Room3D\.jsx|CarteRelais\.jsx)$/;
 for (const f of fichiers(path.join(RACINE, 'src')).filter((x) => !HORS.test(x))) {
   const avant = fs.readFileSync(f, 'utf8');
   const apres = transformer(avant, f.endsWith('.css'));
