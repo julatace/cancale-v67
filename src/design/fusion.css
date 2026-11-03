@@ -1078,3 +1078,4 @@ html:not([data-colis-outils]) body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) [
 :root body .vrm-app-shell .vrm-main .vrm-rpf-point.is-inconnu :is(.vrm-rpf-code, .vrm-rpf-retire, .vrm-rpf-vignette, .vrm-rpf-puce) { background: var(--fu-carte, #fff) !important; }
 :root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-rpf-point.is-inconnu :is(.vrm-rpf-code, .vrm-rpf-retire, .vrm-rpf-vignette, .vrm-rpf-puce) { background: #3a3a3c !important; }
 .vrm-rpf-verifier { padding-bottom: 4px; }
+.vrm-rpf-transp-ligne { display: inline-flex; align-items: center; }
