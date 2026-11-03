@@ -54585,7 +54585,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             return (
                               <React.Fragment key={l.cle}>
                               {ouvreT ? <div className="vrm-fu-groupe-transp" data-lot-groupe={l.trNom} style={{marginTop:il?10:4}}><h3>{l.trNom}</h3><span>{L.filter(x=>x.trNom===l.trNom).length}</span></div> : null}
-                              <div data-lot-ligne={l.cle} data-lot-site={l.site} data-lot-transp={l.trNom} data-coche={coche?'1':'0'} style={{display:'flex',gap:10,alignItems:'center',padding:'9px 0',borderTop:`1px solid ${C.border}`,cursor:'pointer'}}>
+                              <div data-lot-ligne={l.cle} data-lot-site={l.site} data-lot-num={num} data-lot-transp={l.trNom} data-coche={coche?'1':'0'} style={{display:'flex',gap:10,alignItems:'center',padding:'9px 0',borderTop:`1px solid ${C.border}`,cursor:'pointer'}}>
                                 <label className="vrm-preparation-selection"><input type="checkbox" aria-label={`Sélectionner ${l.titre||'ce bordereau'}`} disabled={batchBusy} checked={coche} onChange={()=>basculer(l.cle)} style={{width:18,height:18,flexShrink:0}}/></label>
                                 <PhotoVente src={photo} size={32} portrait/>
                                 <span style={{flex:1,minWidth:0}}>
