@@ -394,17 +394,17 @@ const ligne = (s, id) => s.lignes.find((l) => l.id === id) || {};
       // l'identifiant de l'annonce, ce que VRM a fait : aucun « Remettre en vente ».
       if (lance('R')) await essaie(T + ' R retirée par VRM', async () => {
         const R = ina('120000000030', 'Nike Aquatone noir T44', 'VRM-559', '85.0', jour(5));
-        remettre({ inactives: lue([R, I.sans_sku]), retraits: [{ itemId: '120000000030', sku: 'VRM-559', at: Date.now() - 5 * JOUR, n: '559' }] });
+        remettre({ inactives: lue([R, I.en_vinted]), retraits: [{ itemId: '120000000030', sku: 'VRM-559', at: Date.now() - 5 * JOUR, n: '559' }] });
         const { ctx, pg, errs, envois } = await ouvrir(b, vp);
         await versAnnonces(pg);
         await pg.waitForSelector('[data-ebay-inactive="120000000030"]', { timeout: 15000 }).catch(() => {});
         await pg.waitForTimeout(800);
         const s = await lire(pg);
         const L = Object.fromEntries(s.lignes.map((l) => [l.id, l]));
-        const r = L['120000000030'] || {}, a = L['120000000023'] || {};
+        const r = L['120000000030'] || {}, a = L['120000000021'] || {};   // (3 nov.) une paire RELIÉE : sans N°, plus aucune remise en vente
         dit(r.retraitAuto === '1' && !r.relancer && !!r.voir && /retirée par VRM/.test(r.texte) && /ne la remets pas en vente/.test(r.texte),
           `${T} retirée d'eBay PAR VRM (journal du retrait automatique) ⇒ « retirée par VRM … ne la remets pas en vente », aucun « Remettre en vente »`, JSON.stringify({ ra: r.retraitAuto, relancer: r.relancer, t: (r.texte || '').replace(/\n/g, ' · ').slice(0, 160) }));
-        dit(!a.retraitAuto && !!a.relancer, `${T} l'autre sens : une inactive absente du journal garde son lien`, JSON.stringify({ ra: a.retraitAuto, relancer: a.relancer }));
+        dit(!a.retraitAuto && !!a.relancer, `${T} l'autre sens : une inactive reliée absente du journal garde « Remettre en vente »`, JSON.stringify({ ra: a.retraitAuto, relancer: a.relancer }));
         // (28 oct.) Ventes : compte relié, ventes LUES, aucune ⇒ ne plus lui
         // demander de « relier ton compte » (geste déjà fait).
         await pg.locator('.vrm-mobile-nav [data-nav-entree="ventes"], .vrm-sidebar [data-nav-entree="ventes"]').first().click({ timeout: 8000 });

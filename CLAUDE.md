@@ -491,6 +491,8 @@ sans la fonction.
 | `freinrepub` | `poserFreinRepub` | **5.311.0** (2 nov.) | un refus de Vinted freine la republication de CE compte (30 min ; 24 h si restreint) |
 | `numeroscompte` | `numerosDuCompte` | **5.311.0** (2 nov.) | sur Vinted, seuls les N° du compte connecté dans l'onglet |
 | `republierquestion` | `reglerAvant` | **5.310.0** (2 nov.) | Republier remplit un champ manquant depuis l'annonce elle-même, sinon DEMANDE (valeurs de Vinted) ; un refus nommé n'est jamais renvoyé tel quel |
+| `lbcfil` | `rangerLbcFil` | **5.318.0** (3 nov.) | « lire tes conversations Leboncoin » (texte, date, « de toi », jamais un nom ; rangé seulement quand la page et l'onglet disent le même compte privé) |
+| `lbcrepondre` | `repondreLeboncoin` | **5.318.0** (3 nov.) | « Envoyer sur Leboncoin » sur son clic, au nom du compte connecté dans l'onglet, dans les 50 actions/h — seulement après une recette APPRISE de son propre envoi (`lbc_envoi.appris`) |
 
 ---
 
