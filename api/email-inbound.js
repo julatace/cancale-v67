@@ -23,6 +23,8 @@ import { resumeClassement, texteBorne } from "./_lib/resume-email.js";
 
 import crypto from 'crypto';
 import { sendPushToAll, pushCategorieActive } from './_lib/push.js';
+import { texteArrivee } from './_lib/notif-textes.js';
+import { colisPerdu } from './_lib/etat-colis-email.js';
 import { DESTINATIONS, conversationDeLEmail } from './_lib/lien-notif.js';
 import { stampBordereau } from './_lib/stamp.js';
 
@@ -44,7 +46,7 @@ import { suiviDuSujet, finsDesLignes, sortiParSuivis, SELECT_TRANSP_META, ligneT
 import { modifierCas } from './_lib/suivi-vinted.js';
 import { estEmailVestiaire, lireEmailVenteVc, fusionnerVenteEmailVc } from './_lib/vestiaire-email.js';
 import { lienNotif } from './_lib/lien-notif.js';
-import { lireArriveeAchat, cleArrivee, ligneArrivee } from './_lib/achat-arrive-relais.js';
+import { lireArriveeAchat, cleArrivee, ligneArrivee, conversationVinted } from './_lib/achat-arrive-relais.js';
 import { estConfirmationTransfert, lireConfirmationTransfert, authentifieGoogle, sansLienConfirmation, idCodeGmail } from './_lib/transfert-gmail.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
@@ -1641,12 +1643,10 @@ const RETRAIT_NOTIF_AGE_MAX_MS = 72 * 3600000;
 export function notifRetraitConversation(e, tx) {
   const code = codeNotif(e && e.code);
   if (!code) return null;
-  const lieu = lieuBref(e.lieu);
-  const nom = nomTransporteur(e.transporteur);
-  const parts = [lieu ? `${nom} — à retirer chez ${lieu}` : `${nom} — arrivé au point de retrait`, `Code : ${code}`];
-  const titre = String(e.titre || '').trim().slice(0, 60);
+  // (3 nov.) Le texte de toutes les arrivées (api/_lib/notif-textes.js).
+  const t = texteArrivee({ article: String(e.titre || '').trim(), transporteur: e.transporteur ? nomTransporteur(e.transporteur) : '', lieu: e.lieu, code });
   return {
-    payload: { title: '📍 Colis à retirer', body: (titre ? `${titre} · ` : '') + parts.join('. ') + '.',
+    payload: { title: t.title, body: t.body,
       tag: e.suivi ? `relais-${e.suivi}-code` : `relais-tx${tx}-code`, url: DESTINATIONS.retrait({ tx, suivi: e.suivi }) },
     aussi: [cleCodeRetrait(code)],
   };
@@ -2029,11 +2029,18 @@ export async function traiterEmail(req, res) {
         const recu = (st && st.reception && Array.isArray(st.reception.adresses) && st.reception.adresses.length) ? st.reception.adresses : adresses;
         const ok = await supabaseUpsert([{ id: rowId, data: ligneArrivee(arr, { cleLigne: rowId, subject, emailAt: dateDeLEmail(corpsBrut) || now, recuLe: now, prev, account: acc.login || '', recuSur: recu }) }]);
         if (!ok) { await repondre(res, 503, { ok: false, erreur: 'base-injoignable' }); return; }
-        if (!retire) try { await pushOnce({
-          title: '📍 Achat arrivé au point relais',
-          body: `${court(arr.titre, 60)}${arr.lieu ? ` — ${lieuBref(arr.lieu)}` : ''}${arr.code ? ` — code ${arr.code}` : ' — code pas encore reçu'}.`,
+        // (3 nov.) Sonne SEULEMENT la consigne qui porte son CODE (« t'attend ici …
+        // Utilise le code X ») — partagé avec l'e-mail du transporteur par la clé du
+        // code. « T'attend au point relais » / « livré dans le Point Relais » n'ont pas
+        // de code : mesuré le 3 nov., les 8 e-mails Vinted de 09:17-09:20 précédaient
+        // les 8 e-mails Mondial Relay « disponible » (09:48-09:56) des mêmes colis, qui
+        // portent le code et sonnent — aucune identité commune pour dédoublonner
+        // (l'e-mail Vinted n'a ni n° de suivi ni transaction) : on ne sonne pas deux
+        // fois. La ligne de colis, elle, est rangée (visible dans À retirer).
+        if (!retire && arr.code) try { const t = texteArrivee({ article: arr.titre, lieu: arr.lieu, code: arr.code }); await pushOnce({
+          title: t.title, body: t.body,
           tag: `relais-conv-${arr.conv || rowId}`, url: DESTINATIONS.retrait({}),
-        }, 'colis'); } catch (_) {}
+        }, 'colis', [], [cleCodeRetrait(arr.code)]); } catch (_) {}
         if (st) st.resumeExtra = { code: arr.code, lieu: arr.lieu, article: arr.titre };
         await logEmail({ type: 'suivi', subject, from: mail.from, carrier: 'autre', statut: 'achat arrivé', conv: arr.conv || '' });
         await repondre(res, 200, { ok: true, type: 'suivi', carrier: 'autre', status: retire ? 'delivered' : 'available', arrivee: arr.forme, conv: arr.conv || '', ligne: rowId, lieu: arr.lieu, code: arr.code || '' });
@@ -2184,19 +2191,35 @@ export async function traiterEmail(req, res) {
         }
       }
       // Notif push selon l'étape du colis.
+      // (3 nov.) UNE NOTIFICATION = UN FAIT CONSTATÉ PAR CET E-MAIL. Seuls sonnent :
+      //   · l'ARRIVÉE (« 📍 <article> t'attend · <point> · code ») — quand CET e-mail
+      //     la constate (`etatColisDepuisTexte`, phrase au présent/passé, jamais une
+      //     condition ni un futur) ; pas quand l'état « disponible » est seulement
+      //     GARDÉ d'un e-mail précédent (`garde.conserve`), ni pour un colis qu'il a
+      //     vendu (sortant) ;
+      //   · le colis REPARTI chez l'expéditeur (un geste : vérifier le remboursement).
+      // En transit, en route, livré, retiré par lui-même, retiré par son acheteur :
+      // rien (famille « suivi » retirée — api/_lib/notif-textes.js).
       // (23 oct.) Un colis reparti chez l'expéditeur ne sonne JAMAIS « 📍 à retirer ».
-      const icons = { delivered: '✅', available: '📍', transit: '🚚', info: '📦', retour: '↩️' };
-      const titles = { delivered: 'Colis livré', available: 'Colis arrivé au point de retrait', transit: 'Colis en transit', info: 'Suivi colis', retour: 'Colis reparti chez l’expéditeur' };
-      // (revue du 23 oct., n° 7) Le « retiré » d'un colis qu'il a VENDU : la clé
-      // d'avant (`track-N`, pas de son en plus) et, s'il sonne, ce que c'est —
-      // l'acheteur a retiré son colis, avec Ventes.
-      const venteRetiree = track.status === 'delivered' && sensLigne === 'sortant';
-      if (!sortiAilleurs) try { await pushOnce({
-        title: venteRetiree ? '✅ Ta vente : colis retiré par l’acheteur' : `${icons[track.status]} ${titles[track.status]}`,
-        body: bodyNotifColis(track, carrier),
-        tag: cleNotifColis(track, rowId), url: venteRetiree ? DESTINATIONS.vente({}) : (track.status === 'available' ? DESTINATIONS.retrait({ suivi: track.suivi }) : DESTINATIONS.achat({})),
-      }, (track.status === 'available' || track.status === 'retour') ? 'colis' : 'suivi', [],
+      const arriveeIci = track.status === 'available' && !garde.conserve && sensLigne !== 'sortant';
+      const notifColis = arriveeIci
+        ? texteArrivee({ article: track.artTitle, transporteur: nomTransporteur(carrier), lieu: track.lieu, code: codeNotif(track.code), code2: codeNotif(track.code2), limite: track.limite })
+        : (track.status === 'retour' ? { title: '↩️ Colis reparti chez l’expéditeur', body: bodyNotifColis(track, carrier) } : null);
+      if (!sortiAilleurs && notifColis) try { await pushOnce({
+        title: notifColis.title, body: notifColis.body,
+        tag: cleNotifColis(track, rowId), url: track.status === 'available' ? DESTINATIONS.retrait({ suivi: track.suivi }) : DESTINATIONS.achat({}),
+      }, 'colis', [],
       track.status === 'available' ? [cleCodeRetrait(track.code)] : []); } catch (_) {}
+      // (3 nov.) « Action requise : le colis semble avoir été perdu — <article> »
+      // (Vinted, mesuré les 11 oct. et 2 nov.) : rangé « livré / retiré », il sonnait
+      // « ✅ Colis livré ». C'est une DEMANDE de Vinted : une notification « à
+      // trancher » (famille Messages), une fois par e-mail (son sujet).
+      if (colisPerdu(subject)) try {
+        const art = (String(subject).split(/\s[—–-]\s/).slice(1).join(' — ') || '').trim();
+        const conv = conversationVinted(mail);
+        await pushOnce({ title: `⚠️ Colis peut-être perdu${art ? ` · ${court(art, 50)}` : ''}`, body: 'Vinted te demande une action : ouvre la conversation.',
+          tag: `perdu-${conv || shortHash(subject)}`, url: DESTINATIONS.message({ conv }) }, 'action');
+      } catch (_) {}
       { const st = contexteVendeur.getStore(); if (st) st.resumeExtra = { code: track.code, lieu: track.lieu, limite: track.limite, sens: sensLigne }; }
       await logEmail({ type: 'suivi', subject, from: mail.from, carrier, suivi: track.suivi, statut: track.label });
       await repondre(res, 200, { ok: true, type: 'suivi', carrier, suivi: track.suivi, status: track.status });
@@ -2563,8 +2586,10 @@ export async function traiterEmail(req, res) {
           const limite = ((plat.match(/Tu as jusqu['’]au\s+(.+?)\s+pour signaler/i) || [])[1] || '').trim();
           famille = 'achat livré, à vérifier avant la date limite';
           notif = {
-            title: `📦 Achat livré${article ? ` — ${court(article, 60)}` : ''}`,
-            body: `Vérifie-le${limite ? ` : tu as jusqu'au ${limite} pour signaler un problème` : ' et signale un problème à temps'}${acc.login ? ` (${acc.login})` : ''} — sinon la vente est finalisée.`,
+            // (3 nov.) « Achat livré » se lisait « il est chez moi » alors que Vinted
+            // dit « livré » au point relais : le titre dit le GESTE et l'échéance.
+            title: `⏳ À confirmer${limite ? ` avant le ${court(limite, 30)}` : ''}${article ? ` · ${court(article, 50)}` : ''}`,
+            body: `Vinted dit ta commande livrée : signale un problème avant cette date, sinon la vente est finalisée${acc.login ? ` (${acc.login})` : ''}.`,
             tag: `livre-${key}`, url: DESTINATIONS.achat({}),
           };
         }

@@ -35,6 +35,7 @@ import DiagnosticLeboncoin from './DiagnosticLeboncoin.jsx';
 import {preparerLiaisonOAuth,lireLiaisonOAuth,resultatLiaisonPermis} from './auth/liaisonOAuth.js';
 import ConnexionsCompte from './auth/ConnexionsCompte.jsx';
 import {etatColisDepuisTexte,normaliserSuivi} from '../api/_lib/etat-colis-email.js';
+import {FAMILLES as FAMILLES_NOTIF,familleActive as familleNotifActive} from '../api/_lib/notif-textes.js';
 import {achatDuColis,suivisAchat,entreeIndexAchat} from './liensColis.js';
 import {achatParConversation, regrouperArrivees} from '../api/_lib/achat-arrive-relais.js';
 import {arriveesRelues} from './arriveesRelues.js';
@@ -16874,6 +16875,33 @@ const rechaufferQr = async (photo) => {
 // Les codes de retrait gardés en local (G9) : lisibles même quand la base ne
 // répond pas (au point relais, réseau faible). Une liste non vide, ou null.
 const codesHorsLigne = () => { try { const c = load('vrm_codes_hors_ligne', null); return (c && Array.isArray(c.codes) && c.codes.length) ? c : null; } catch (_) { return null; } };
+// Les codes de retrait gardés en local (G9), rendus par la coque quand la base
+// ne répond pas ET (3 nov.) par « Ma journée hors ligne » quand le réseau est
+// coupé et qu'aucune photo de la journée n'existe : mesuré au banc
+// (`codes-hors-ligne`, phase 3 réseau coupé), l'écran disait « aucune copie de
+// ta journée » alors que les codes étaient gardés sur l'appareil.
+function BlocCodesHorsLigne() {
+        const c = codesHorsLigne(); if (!c) return null;
+        const h = Math.max(0, Math.round((Date.now() - (c.at || 0)) / 3600000));
+        const quand = h < 1 ? 'à l’instant' : h < 24 ? `il y a ${h} h` : `il y a ${Math.round(h / 24)} j`;
+        return (
+          <div data-codes-hors-ligne style={{marginTop:12,borderRadius:12,border:`1px solid ${C.border}`,background:C.card,padding:'16px 16px 10px'}}>
+            <div style={{fontSize:14,fontWeight:700,color:C.text,marginBottom:3}}>📴 Tes codes de retrait (hors ligne)</div>
+            <div style={{fontSize:11.5,color:C.muted,marginBottom:10}}>Gardés sur cet appareil — dernière mise à jour {quand}. Donne le code au comptoir.</div>
+            {c.codes.map((x, i) => (
+              <div key={i} data-code-hl style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderTop:i>0?`1px solid ${C.border}`:'none'}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{x.titre || x.lieu || (x.carrier ? carrierName(x.carrier) : 'Colis')}</div>
+                  <div style={{fontSize:11,color:C.muted}}>{[x.lieu, x.suivi && `n°${x.suivi}`].filter(Boolean).join(' · ')}</div>
+                </div>
+                {x.code
+                  ? <div style={{flexShrink:0,fontSize:17,fontWeight:800,letterSpacing:1,color:C.text,background:C.card2||`${C.accent}12`,border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 11px'}}>{x.code}</div>
+                  : <div style={{flexShrink:0,fontSize:11,color:C.muted,fontStyle:'italic'}}>QR — besoin d’internet</div>}
+              </div>
+            ))}
+          </div>
+        );
+}
 function BaseInjoignable() {
   // (1er nov.) Les consignes Supabase ne parlent qu'au PROPRIÉTAIRE de
   // l'installation : un autre vendeur lit que VRM est indisponible, pas qu'il
@@ -16956,28 +16984,7 @@ function BaseInjoignable() {
           répond pas — c'est au point relais, réseau faible, qu'il en a besoin.
           Copie locale de la dernière lecture ; le code est l'info utile (un QR
           a besoin du réseau, on le dit). */}
-      {(() => {
-        const c = codesHorsLigne(); if (!c) return null;
-        const h = Math.max(0, Math.round((Date.now() - (c.at || 0)) / 3600000));
-        const quand = h < 1 ? 'à l’instant' : h < 24 ? `il y a ${h} h` : `il y a ${Math.round(h / 24)} j`;
-        return (
-          <div data-codes-hors-ligne style={{marginTop:12,borderRadius:12,border:`1px solid ${C.border}`,background:C.card,padding:'16px 16px 10px'}}>
-            <div style={{fontSize:14,fontWeight:700,color:C.text,marginBottom:3}}>📴 Tes codes de retrait (hors ligne)</div>
-            <div style={{fontSize:11.5,color:C.muted,marginBottom:10}}>Gardés sur cet appareil — dernière mise à jour {quand}. Donne le code au comptoir.</div>
-            {c.codes.map((x, i) => (
-              <div key={i} data-code-hl style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderTop:i>0?`1px solid ${C.border}`:'none'}}>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{x.titre || x.lieu || (x.carrier ? carrierName(x.carrier) : 'Colis')}</div>
-                  <div style={{fontSize:11,color:C.muted}}>{[x.lieu, x.suivi && `n°${x.suivi}`].filter(Boolean).join(' · ')}</div>
-                </div>
-                {x.code
-                  ? <div style={{flexShrink:0,fontSize:17,fontWeight:800,letterSpacing:1,color:C.text,background:C.card2||`${C.accent}12`,border:`1px solid ${C.border}`,borderRadius:8,padding:'5px 11px'}}>{x.code}</div>
-                  : <div style={{flexShrink:0,fontSize:11,color:C.muted,fontStyle:'italic'}}>QR — besoin d’internet</div>}
-              </div>
-            ))}
-          </div>
-        );
-      })()}
+      <BlocCodesHorsLigne/>
     </div>
   );
 }
@@ -17083,6 +17090,7 @@ function JourneeHorsLigne({ uid, tab }) {
     <div data-hors-ligne="sans-photo" style={{padding:'16px 14px 40px'}}>
       {titre}
       <LigneHorsLigne>Hors ligne — aucune copie de ta journée n'est gardée sur cet appareil ; elle se fera à ta prochaine ouverture avec du réseau.</LigneHorsLigne>
+      <BlocCodesHorsLigne/>
     </div>
   );
   const maintenant = Date.now();
@@ -59239,26 +59247,10 @@ function LigneVerifCarton({ it, fiche, preuve, onConfirmer, onCorriger, onPlusLa
   );
 }
 
-const PUSH_CATS = [
-  { id:'vente',    def:true,  titre:'💸 Vendu',            desc:"Une paire vient d'être vendue." },
-  { id:'argent',   def:true,  titre:'💰 Argent viré',       desc:'Vinted a versé ton argent.' },
-  { id:'colis',    def:true,  titre:'📍 Colis à retirer',   desc:'Arrivé au relais, avec le code de retrait.' },
-  { id:'expedier', def:true,  titre:'📮 Colis à poster',    desc:"Rappel du matin, avec l'échéance." },
-  { id:'soir',     def:true,  titre:'🌙 Colis de demain',   desc:"La veille vers 20 h : combien de colis poster demain, et lesquels sont en retard." },
-  { id:'offre',    def:true,  titre:'🏷️ Offre reçue',       desc:'Un acheteur propose un prix.' },
-  { id:'offremini',def:true,  titre:'🎯 Offre à accepter',   desc:"Une offre a passé ton prix mini — à accepter en 1 tap." },
-  { id:'urssaf',   def:true,  titre:'🧾 Déclaration URSSAF', desc:'Le 1er du mois, si tu es micro-entrepreneur (ton statut se choisit dans Comptabilité).' },
-  { id:'bilan',    def:true,  titre:'📊 Bilan de la semaine', desc:"Le lundi matin : vendu, reçu, colis à poster, paires qui dorment." },
-  { id:'agentebay', def:true, titre:'🛒 Agent eBay', desc:"Une fois par jour : combien de paires l'agent te propose pour eBay. Rien n'est publié sans ton oui." },
-  { id:'doublevente', def:true, titre:'⚠️ Double vente', desc:"Vendue sur Vinted alors que la même paire (son N°) est encore en vente sur eBay ou Leboncoin — même app fermée." },
-  { id:'favoris',  def:true,  titre:'❤️ Messages aux favoris', desc:"Quand la file d'envoi aux favoris est finie ou s'arrête, avec le bilan." },
-  { id:'action',   def:true,  titre:'⏳ À trancher sur Vinted', desc:"Un acheteur demande d'annuler, ou un de tes achats est livré : tu as une date limite pour répondre ou signaler un problème." },
-  { id:'suivi',   def:false, titre:'🚚 Suivi du colis',    desc:'« En transit », « livré ». Rien à faire.' },
-  { id:'achat',    def:false, titre:'🛍 Achat confirmé',    desc:"Tu viens de l'acheter, tu le sais déjà." },
-  { id:'message',  def:false, titre:'💬 Message',           desc:"Nouveau message d’un acheteur, avec la paire. Arrive ~15 min après le message (c’est le délai de l’email de Vinted)." },
-  { id:'favori',   def:false, titre:'❤️ Nouveau favori',    desc:'Vinted en envoie beaucoup.' },
-  { id:'facture',  def:false, titre:'🧾 Facture',           desc:'Facture préparée ou envoyée.' },
-];
+// (3 nov.) Six familles, un interrupteur chacune (api/_lib/notif-textes.js, la
+// règle que le serveur applique avant d'envoyer). Les anciennes catégories
+// fines restent lues comme réglage d'avant tant qu'une famille n'est pas posée.
+const PUSH_FAMILLES = FAMILLES_NOTIF;
 function PushPrefsSetting({ comptes, onMuets }) {
   // ⚠️ TROIS ÉTATS : `undefined` = en cours de lecture · `null` = la base n'a
   //    pas répondu · un objet = lu. Confondre les deux premiers ferait dire
@@ -59286,12 +59278,12 @@ function PushPrefsSetting({ comptes, onMuets }) {
     })();
     return () => { mort = true; };
   }, []);
-  const actif = (c) => { const v = prefs && prefs[c.id]; return typeof v === 'boolean' ? v : c.def; };
+  const actif = (c) => familleNotifActive(prefs || {}, c.id);
   const pasLu = prefs === null;              // la base n'a pas répondu
   const enCours = prefs === undefined;
   const bascule = async (c) => {
     if (busy || pasLu) return; setBusy(true);
-    const next = { ...(prefs || {}), [c.id]: !actif(c) };
+    const next = { ...(prefs || {}), familles: { ...((prefs && prefs.familles) || {}), [c.id]: !actif(c) } };
     setPrefs(next);
     try {
       await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
@@ -59302,7 +59294,7 @@ function PushPrefsSetting({ comptes, onMuets }) {
     } catch (_) { toast("Réglage non enregistré — réessaie quand tu as du réseau."); }
     setBusy(false);
   };
-  const n = prefs ? PUSH_CATS.filter(actif).length : 0;
+  const n = prefs ? PUSH_FAMILLES.filter(actif).length : 0;
   return (
     <details style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:10,padding:'10px 14px'}} onToggle={(e) => setOuvert(e.currentTarget.open)}>
       <summary style={{cursor:'pointer',listStyle:'none',display:'flex',alignItems:'center',gap:8}}>
@@ -59311,7 +59303,7 @@ function PushPrefsSetting({ comptes, onMuets }) {
           <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.4}}>
             {enCours ? 'Chargement…'
               : pasLu ? <span style={{display:'inline-block',fontSize:11,fontWeight:600,color:C.muted,background:C.bg,border:`1px solid ${C.border}`,borderRadius:999,padding:'2px 9px'}}>{REGLAGE_PAS_LU}</span>
-              : `${n} sur ${PUSH_CATS.length} activée${n>1?'s':''}.`}
+              : `${n} sur ${PUSH_FAMILLES.length} activée${n>1?'s':''}.`}
             {/* §7 (revue du 11 oct.) : déplié, le bloc dessous dit tout — le résumé se tait. */}
             {muets && muets.length > 0 && !ouvert && (
               <div style={{color:C.warn,fontWeight:600,marginTop:3}} data-resume-muets={muets.length}>
@@ -59326,14 +59318,11 @@ function PushPrefsSetting({ comptes, onMuets }) {
         <div style={{marginTop:10}}><BlocComptesMuets muets={muets}/></div>
       )}
       <div style={{marginTop:10,display:'flex',flexDirection:'column',gap:2}}>
-        {PUSH_CATS.map(c => {
+        {PUSH_FAMILLES.map(c => {
           const on = actif(c);
           return (
-            <div key={c.id} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderTop:`1px solid ${C.border}`}}>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:12.5,fontWeight:600,color:C.text}}>{c.titre}</div>
-                <div style={{fontSize:11,color:C.muted,marginTop:1,lineHeight:1.35}}>{c.desc}</div>
-              </div>
+            <div key={c.id} data-famille-notif={c.id} data-on={on?'1':'0'} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderTop:`1px solid ${C.border}`,minHeight:44}}>
+              <div style={{flex:1,minWidth:0,fontSize:13,fontWeight:600,color:C.text}}>{c.titre}</div>
               <Interrupteur on={on} onClick={()=>bascule(c)} disabled={!prefs||busy} label={`${c.titre} : ${on?'activé':'désactivé'}`}/>
             </div>
           );
