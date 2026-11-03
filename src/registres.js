@@ -259,7 +259,7 @@ export async function pdfRegistre(R, { PDFLib = null, entreprise = null, mainten
   if (!R.lignes.length) { txt('Aucune ligne sur la période.', M, y, { c: GRIS }); y -= 14; }
   for (const l of R.lignes) rangee(l);
   const iM = cols.findIndex((c) => c[0] === 'montant');
-  place(16); txt('Total', M, y, { font: fb, t: 8.5 }); txt(eurosTexte(R.total), xs[iM] + largeur(iM), y, { font: fb, t: 8.5, droite: true }); y -= 24;
+  place(16); txt('Total', M, y, { font: fb, t: 8.5 }); txt(`${R.complet ? '' : 'au moins '}${eurosTexte(R.total)}`, xs[iM] + largeur(iM), y, { font: fb, t: 8.5, droite: true }); y -= 24;
   if (R.horsPeriode.length) {
     place(40); txt(R.type === 'recettes' ? `Dans aucune période — à dater (${R.horsPeriode.length})` : `Sans date (${R.horsPeriode.length})`, M, y, { font: fb, t: 11 }); y -= 16;
     entete();

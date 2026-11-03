@@ -36745,8 +36745,10 @@ function RegistresCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accoun
           {R === undefined ? '…' : R === null ? '—' : `${R.n} · ${R.complet ? '' : 'au moins '}${fmt(R.total)}`}
         </span>
       </span>
-      <Bouton variante="secondaire" icone="doc" data-registre-pdf={type} disabled={!R || !!enCours} onClick={() => exporter(R, 'pdf')} style={{ flex: '0 0 auto' }}>{enCours === type + 'pdf' ? '…' : 'PDF'}</Bouton>
-      <Bouton variante="secondaire" icone="save" data-registre-csv={type} disabled={!R || !!enCours} onClick={() => exporter(R, 'csv')} style={{ flex: '0 0 auto' }}>{enCours === type + 'csv' ? '…' : 'Tableur'}</Bouton>
+      <span style={{ display: 'flex', gap: 8, flex: '0 0 auto' }}>
+        <Bouton variante="secondaire" icone="doc" data-registre-pdf={type} disabled={!R || !!enCours} onClick={() => exporter(R, 'pdf')}>{enCours === type + 'pdf' ? '…' : 'PDF'}</Bouton>
+        <Bouton variante="secondaire" icone="save" data-registre-csv={type} disabled={!R || !!enCours} onClick={() => exporter(R, 'csv')}>{enCours === type + 'csv' ? '…' : 'Tableur'}</Bouton>
+      </span>
     </div>
   );
   return (
