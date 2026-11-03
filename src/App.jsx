@@ -133,6 +133,7 @@ import { friseVente, phraseVente, eurosRecap, ETATS_HORS_PARCOURS } from "./reca
 // (2 nov.) Le style « Fusion » : la carte sombre du mois et la frise de suivi (src/design/).
 import CarteMois from "./design/CarteMois.jsx";
 import { courtFusion, enArticles, titreSansNombre } from "./design/tacheCourte.js";
+import { PileVignettes } from "./design/PileVignettes.jsx";
 import Frise from "./design/Frise.jsx";
 import { friseVenteFusion, friseColisFusion, friseVenteLue, ETAPES_VENTE_FUSION } from "./design/friseFusion.js";
 import { etapesTournee, arretsTournee, gestesDepuis } from "./tournee.js";
@@ -48556,7 +48557,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const subL = `${num}${o.title||''}${qui?` · ${qui}`:''}${p.limite==='estimee'?' · date estimée (vente + 7 j)':''}`;
             jobs.push({ id:'colis-limite', n:presses.length, icon:'truck', color:C.warn, urgent:!!p.depasse,
               title: titreL, sub: subL,
-              tab:'cat_bord', prio:p.depasse?0.15:0.6, limiteHeure:p.heure||'' });
+              tab:'cat_bord', prio:p.depasse?0.15:0.6, limiteHeure:p.heure||'',
+              photos: presses.map(t => orderPhoto(t.o)) });
             // (1er nov., « très répétitif ») Pas en retard : la case « À envoyer » le porte
             // en sous-ligne (« dont 3 aujourd'hui ») et la ligne n'est plus redite (§7).
             // En retard (alerte de tête, jamais retirable) : la ligne reste, la case se tait.
@@ -48635,7 +48637,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         //    (le bordereau de retour se fait sur CELUI-LÀ).
         { const ar = (buysBase||[]).filter(o=>ACHAT_A_RENVOYER.test(String(o.status||'')));
           if (ar.length) { const cs=[...new Set(ar.map(o=>o._acc?accNameOf(o._acc):'').filter(Boolean))];
-            jobs.push({id:'a-renvoyer',n:ar.length,icon:'box',color:C.warn,title:`Renvoyer ${ar.length} article${ar.length>1?'s':''} (litige)`,
+            jobs.push({id:'a-renvoyer',n:ar.length,icon:'box',color:C.warn,photos:ar.map(o=>orderPhoto(o)),title:`Renvoyer ${ar.length} article${ar.length>1?'s':''} (litige)`,
               sub:`Étiquette de retour sur Vinted${cs.length===1?` — compte ${cs[0]}`:cs.length>1?` — comptes ${cs.slice(0,3).join(', ')}`:''}`,tab:'achats',prio:0.8}); } }
         // (21 oct., 5.204) « Tout est OK » à confirmer sur Vinted avant la date
         //    limite — sinon Vinted conclut sans lui. Même liste qu'Achats
@@ -48677,7 +48679,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           if (vc && vc.aEnvoyer && vc.aEnvoyer.length) {
             const n = vc.aEnvoyer.length, j = vc.aEnvoyer.map((v) => joursAvantVc(v.limite)).filter((x) => x != null);
             const presse = j.length && Math.min(...j) <= 1;
-            jobs.push({ id: 'vestiaire-envoyer', n, icon: 'box', color: presse ? C.warn : C.text, urgent: !!presse,
+            jobs.push({ id: 'vestiaire-envoyer', n, icon: 'box', color: presse ? C.warn : C.text, urgent: !!presse, photos: vc.aEnvoyer.map((v) => v && v.photo),
               title: `${n} vente${n > 1 ? 's' : ''} Vestiaire à envoyer`,
               sub: presse ? (Math.min(...j) < 0 ? 'Date limite passée — bordereau sur Vestiaire' : 'À envoyer d’ici demain — bordereau sur Vestiaire') : 'Le bordereau se prend sur Vestiaire',
               tab: 'cat_bord', prio: presse ? 0.3 : 1.2 });
@@ -48705,7 +48707,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         //    passent ici, après les tuiles (§4.11 : rien ne disparaît en silence).
         if (Array.isArray(alertes)) for (const a of alertes) {
           if (!a || !(a.dv || a.jr)) continue;
-          if (a.dv) jobs.push({id:'double-vente', n:a.n, icon:a.ic||'alert', color:a.dv==='num'?C.danger:C.warn, urgent:true, title:a.text, tab:a.tab, prio:-1, avant:a.avant});
+          if (a.dv) jobs.push({id:'double-vente', n:a.n, icon:a.ic||'alert', color:a.dv==='num'?C.danger:C.warn, urgent:true, title:a.text, tab:a.tab, prio:-1, avant:a.avant, photos:a.photos});
           else jobs.push({id:a.job||('a-faire-'+a.ic), n:a.n, icon:a.ic||'info', color:a.urssaf&&a.urssaf.proche?C.warn:C.text, title:a.text, sub:a.sub, tab:a.tab, prio:3, urssaf:a.urssaf,
             // (1er nov., « très répétitif ») Le rappel URSSAF en court : « Déclarer
             // l'URSSAF d'octobre » + « Avant le 30 nov. · ≈ 331 € à payer (au moins) ».
@@ -48776,6 +48778,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           ].filter(Boolean).join(' ');
           tuiles.retirer = { ...tuiles.retirer, aVerifier: nv + nc };
           jobs.push({ id: nv ? 'retrait-a-verifier' : 'retrait-en-verification', n: nv || nc, nRelier: nc, icon:'box', color: nv ? C.warn : C.muted,
+            photos: [...av.map(x => x && x.o ? orderPhoto(x.o) : null), ...(pickupUnion.aConfirmer || []).map(o => orderPhoto(o))],
             title: `${nv + nc} colis à vérifier`, court: 'Colis à vérifier', detail: raisons, plein: long,
             tab:'retraits', prio:0.6 });
         }
@@ -48889,6 +48892,33 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           { id:'messages', ic:'chat', l:'Messages', t:tuiles.messages, tab:tuiles.messages && tuiles.messages.versEbay ? 'ebay_messages' : 'cat_msg', pasSu: loading || convs.items == null },
           { id:'prix', ic:'tag', l:'Prix à baisser', t:tuiles.prix, tab:'cat_annonces', pasSu: loading || listings.items == null },
         ];
+        // ── (3 nov., Julien : « les PHOTOS en tout petit, superposées ») LES PHOTOS DE CHAQUE
+        // CASE, PAR IDENTITÉ SEULEMENT (§5) : la photo que porte la vente / l'achat / la
+        // conversation / l'annonce ELLE-MÊME, ou celle reliée par son identifiant (n° de
+        // transaction, n° de suivi ou code de retrait via `cmdParColis`, txId Leboncoin, vente
+        // Vestiaire). Jamais un titre. Les MÊMES listes que les compteurs (aucun nombre ne change) ;
+        // l'ordre est celui de la liste (le plus pressé d'abord).
+        const photosCase = (() => {
+          const out = { envoyer: [], retirer: [], messages: [], prix: [] };
+          try {
+            const lbcParTx = new Map(((lbcVentes && lbcVentes.ventes) || []).map((o) => [String(o && o.txId != null ? o.txId : ''), o]));
+            const presses = [...toShip].sort((a, b) => (a.at == null ? 9e15 : a.at) - (b.at == null ? 9e15 : b.at));
+            out.envoyer = [
+              ...presses.map((t) => orderPhoto(t.o)),
+              ...((colisEb && colisEb.aPoster) || []).map((x) => x.ordre ? photoCommande(x.ordre) : null),
+              ...((colisAutres.vestiaire) || []).map((v) => v && v.photo),
+              ...((colisAutres.leboncoin) || []).map((x) => photoArticle(lbcParTx.get(String(x.txId)))),
+            ];
+            out.retirer = [
+              ...(pickupUnion.emailList || []).map((t) => { const o = pickupUnion.cmdParColis && pickupUnion.cmdParColis.get(colisKey(t)); return o ? orderPhoto(o) : null; }),
+              ...(pickupUnion.extra || []).map((o) => orderPhoto(o)),
+            ];
+            out.messages = (convs.items || []).filter(c => !acctOffOf(c) && conversationNonLue(c) && !conversationRetiree(convRetirees, String((c._acc&&c._acc.vinted_user_id)||''), c))
+              .map((c) => (c.item_photos && c.item_photos[0] && c.item_photos[0].url) || photoArticle({ photos: c.item_photos }) || (c.opposite_user && c.opposite_user.photo && c.opposite_user.photo.url) || null);
+            out.prix = repriceList.map((x) => photoArticle(x.it));
+          } catch (_) {}
+          return out;
+        })();
         // ── (1er nov.) LA TOURNÉE : la journée rangée en étapes ─────────────
         // Aucune règle neuve (src/tournee.js) : les MÊMES listes que les cases
         // « À envoyer » / « À retirer » (`toShip` + eBay, `pickupUnion`, publiées
@@ -48992,7 +49022,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // du bouton (lecteur d'écran) ; aucune règle, aucun compteur, aucune cible ne change.
         const decouper = (j) => {
           const f = courtFusion(j);
-          const avecPastille = !(j.photos && j.photos.length) && Number(j.n) > 0;
+          // (3 nov.) Plus de pastille chiffrée : le titre garde son nombre.
+          const avecPastille = false;
           const sansN = (t) => avecPastille ? titreSansNombre(t, j.n) : t;
           if (f) return { court: sansN(f.court), detail: f.detail, plein: [j.title, j.sub].filter(Boolean).join(' — ') };
           const x = decouperBrut(j);
@@ -49014,18 +49045,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           return { court, detail: det };
         };
         const corpsTache = (j, x) => (<>
-          {j.photos && j.photos.length
-            ? <span className="vrm-day-task-photos" aria-hidden="true">
-                {j.photos.map((ph,k)=>(
-                  <PhotoVinted key={ph} src={ph} alt="" loading="lazy" onError={()=>noterImgMorte(ph)} style={{marginLeft:k?-14:0}}/>
-                ))}
-              </span>
-            : (j.n != null && Number.isFinite(Number(j.n)) && Number(j.n) > 0)
-              /* (2 nov., Fusion) La pastille chiffrée, NEUTRE (encre ; ambre pâle seulement si urgent). */
-              ? <span className={'vrm-fu-pastille' + (j.urgent ? ' is-urgent' : (Number(j.prio) >= 3 ? ' is-secondaire' : '')) + (Number(j.n) > 99 ? ' is-long' : '')} aria-hidden="true" data-fu-pastille={String(j.n)}>{Number(j.n) > 999 ? '999+' : j.n}</span>
-              : <span className={'vrm-fu-pastille is-icone' + (j.urgent ? ' is-urgent' : '')} aria-hidden="true"><Icon name={j.icon} size={20}/></span>}
+          {/* (3 nov., Julien : « les PHOTOS en tout petit, superposées ») La vignette de la ligne :
+              les photos de SES articles (par identité, posées par la règle de la ligne), sinon une
+              tuile neutre et l'icône. Plus de pastille chiffrée colorée : le titre dit le nombre. */}
+          <PileVignettes srcs={j.photos} n={Number(j.n) > 0 ? Number(j.n) : 0} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name={j.icon || 'info'} size={20}/>}/>
           <span className="vrm-day-task-textes">
-            <UneLigne className="vrm-day-task-title" texte={x.court} lignesTel={2}/>
+            <span className="vrm-day-task-title-rang">{j.urgent && !x.detail ? <span className="vrm-fu-point" data-fu-point="" aria-hidden="true"/> : null}<UneLigne className="vrm-day-task-title" texte={x.court} lignesTel={2}/></span>
             {/* (1er nov., « très répétitif ») Le détail tient sur UNE ligne, téléphone compris :
                 coupé à la fin d'un mot, le texte entier dans l'infobulle et le nom du bouton. */}
             {x.detail ? <UneLigne className={'vrm-day-task-note' + (j.urgent ? ' is-urgent' : '')} texte={x.detail} lignesTel={1}/> : null}
@@ -49415,7 +49440,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const nPretsJournee = (tuiles.envoyer && tuiles.envoyer.emballer && tuiles.envoyer.emballer.n) || 0;
               // « Emballer » est le geste de la carte « Colis à poster » : pas une seconde carte.
               const autres = jobsAFaire.filter((j) => j.id !== 'emballer');
-              const libCase = { envoyer: 'Colis à poster', retirer: 'Colis à retirer', messages: 'Messages', prix: 'Prix à baisser' };
+              // (3 nov.) Le nombre revient dans le titre : la vignette montre DE QUOI il s'agit (les photos),
+              // plus un chiffre en pastille colorée (Julien : « les couleurs… j'aime pas trop »).
+              const libCase = (id, n) => ({ envoyer: `${n} colis à poster`, retirer: `${n} colis à retirer`, messages: `${n} message${n > 1 ? 's' : ''}`, prix: `${n} prix à baisser` })[id];
               const gesteCaseF = { envoyer: nPretsJournee > 0 ? 'Imprimer' : 'Voir', retirer: 'Voir', messages: 'Répondre', prix: 'Voir' };
               const nGestes = cases.length + alertesArgent.length + autres.length + (urssafJob ? 1 : 0);
               const carteCase = (x) => {
@@ -49425,9 +49452,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <button key={x.id} type="button" className="vrm-day-task vrm-fu-tache" data-tuile={x.id} data-n={String(x.t.n)} data-case={x.id}
                     data-presses={x.id === 'envoyer' && x.t && x.t.presses ? String(x.t.presses.n) : undefined} data-limite-heure={x.id === 'envoyer' && x.t && x.t.presses ? x.t.presses.heure : undefined} data-a-verifier={x.id === 'retirer' && x.t && x.t.aVerifier ? String(x.t.aVerifier) : undefined}
                     title={titreCase(x)} onClick={()=>{ if (x.id === 'envoyer' && nPretsJournee > 0) _pendingBordPrint = true; if (onNav) onNav(x.tab); }}>
-                    <span className={'vrm-fu-pastille' + (presse ? ' is-urgent' : x.id === 'prix' ? ' is-secondaire' : '')} aria-hidden="true">{x.t.n > 999 ? '999+' : x.t.n}</span>
-                    <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{libCase[x.id] || x.l}</span>{so ? <span className="vrm-day-task-note" data-sous-ligne={so.cle}>{so.texte}</span> : (x.id === 'envoyer' && nPretsJournee > 0) ? <span className="vrm-day-task-note">{nPretsJournee} prêt{nPretsJournee > 1 ? 's' : ''} à imprimer</span> : null}</span>
-                    <span className="vrm-day-task-action"><span className="vrm-day-task-action-mot">{gesteCaseF[x.id] || 'Voir'}</span></span>
+                    <PileVignettes srcs={photosCase[x.id]} n={x.t.n} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name={x.ic} size={20}/>}/>
+                    <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{presse && !(so && so.ambre) ? <span className="vrm-fu-point" data-fu-point="" aria-hidden="true"/> : null}{libCase(x.id, x.t.n) || x.l}</span>{so ? <span className={'vrm-day-task-note' + (so.ambre ? ' is-urgent' : '')} data-sous-ligne={so.cle}>{so.texte}</span> : (x.id === 'envoyer' && nPretsJournee > 0) ? <span className="vrm-day-task-note">{nPretsJournee} prêt{nPretsJournee > 1 ? 's' : ''} à imprimer</span> : null}</span>
+                    <span className={'vrm-day-task-action' + (x.id === 'envoyer' && nPretsJournee > 0 ? ' is-principal' : '')} data-fu-principal={x.id === 'envoyer' && nPretsJournee > 0 ? '' : undefined}><span className="vrm-day-task-action-mot">{gesteCaseF[x.id] || 'Voir'}</span></span>
                   </button>
                 );
               };
@@ -64414,6 +64441,9 @@ function AppCoeur() {
       //    PROUVÉES ; le doute, lui, se règle sur l'écran Leboncoin.
       let lbcRemovePids=[];
       let lbcRemoveCount=0;
+      // (3 nov.) Les photos des annonces à retirer, par IDENTITÉ : l'annonce Leboncoin elle-même
+      // (`lbcId`), sinon la fiche N° de l'annonce Vinted vendue (clé = son identifiant) — jamais un titre.
+      let lbcRemovePhotos=[];
       let postedIds=[];              // tous les ids publiés sur LBC (pour le croisement eBay→LBC)
       let lbcRemoveEbayCount=0;      // vendues sur eBay, encore en ligne ici (§11, même base que le compte Vinted)
       let lbcRemoveVcCount=0;        // (1er nov.) vendues sur Vestiaire, encore en ligne ici
@@ -64502,7 +64532,9 @@ function AppCoeur() {
           const toutesLues=[...lusParCompte.values()].every(v=>v&&v[2]&&Array.isArray(v[2].items));
           if(lbcARetirer && preuveN && items && ventesLbcLu && toutesLues) publierLbcARetirer(lbcARetirer).catch(()=>{});
         } else if(!aJuger && items && ventesLbcLu) publierLbcARetirer([]).catch(()=>{});
-        if(lbcARetirer){ lbcRemovePids=lbcARetirer.map(r=>r.vinted).filter(Boolean); lbcRemoveCount=lbcARetirer.length; }
+        if(lbcARetirer){ lbcRemovePids=lbcARetirer.map(r=>r.vinted).filter(Boolean); lbcRemoveCount=lbcARetirer.length;
+          try{ const parId=new Map(Object.values(items||{}).filter(ad=>ad&&ad.id!=null).map(ad=>[String(ad.id),ad]));
+            lbcRemovePhotos=lbcARetirer.map(r=>photoArticle(r.lbcId?parId.get(String(r.lbcId)):null)||photoArticle(r.vinted?nums[String(r.vinted)]:null)||null); }catch(_){ lbcRemovePhotos=[]; } }
       }catch(_){}
       // Pas su (preuve illisible, nuage pas encore là) ⇒ le compteur se tait : plus
       // de repli sur les ventes déduites par titre.
@@ -64659,7 +64691,7 @@ function AppCoeur() {
       if(vcARetirer>0) items.push({icon:'🟠', ic:'tag', text:`${vcARetirer} paire${vcARetirer>1?'s':''} vendue${vcARetirer>1?'s':''} ${vcARetirerOu}, encore en ligne sur Vestiaire — à retirer de Vestiaire`, n:vcARetirer, tab:'plat_vestiaire', dv:true});
       if(vcDoubles>0) items.push({icon:'🟠', ic:'tag', text:`${vcDoubles} article${vcDoubles>1?'s':''} vendu${vcDoubles>1?'s':''} sur Vestiaire, encore en vente sur Vinted — à retirer de Vinted`, n:vcDoubles, tab:'plat_vestiaire', dv:true, annonces:true});
       if(lbcDoubles>0) items.push({icon:'🟠', ic:'tag', text:`${lbcDoubles} article${lbcDoubles>1?'s':''} vendu${lbcDoubles>1?'s':''} sur Leboncoin, encore en vente sur Vinted — à retirer de Vinted`, n:lbcDoubles, tab:'leboncoin', dv:true, annonces:true});
-      if(lbcRemoveCount>0){ const noms=(lbcARetirer||[]).slice(0,3).map(r=>r.numero?`N°${r.numero}`:'').filter(Boolean); const reste=lbcRemoveCount-noms.length; items.push({icon:'🟠', ic:'tag', text: noms.length ? `${lbcRemoveCount} à retirer de Leboncoin — ${noms.join(', ')}${reste>0?` et ${reste} autre${reste>1?'s':''}`:''} vendue${lbcRemoveCount>1?'s':''} sur Vinted` : `${lbcRemoveCount} à retirer de Leboncoin (vendue${lbcRemoveCount>1?'s':''} sur Vinted)`, n:lbcRemoveCount, tab:'leboncoin', dv:true, lbcRetirer:true, avant:()=>{ DEMANDE_LBC_CIBLE.sel='[data-lbc-retirer]'; DEMANDE_LBC_CIBLE.at=Date.now(); }}); }
+      if(lbcRemoveCount>0){ const noms=(lbcARetirer||[]).slice(0,3).map(r=>r.numero?`N°${r.numero}`:'').filter(Boolean); const reste=lbcRemoveCount-noms.length; items.push({icon:'🟠', ic:'tag', text: noms.length ? `${lbcRemoveCount} à retirer de Leboncoin — ${noms.join(', ')}${reste>0?` et ${reste} autre${reste>1?'s':''}`:''} vendue${lbcRemoveCount>1?'s':''} sur Vinted` : `${lbcRemoveCount} à retirer de Leboncoin (vendue${lbcRemoveCount>1?'s':''} sur Vinted)`, n:lbcRemoveCount, tab:'leboncoin', dv:true, lbcRetirer:true, photos:lbcRemovePhotos, avant:()=>{ DEMANDE_LBC_CIBLE.sel='[data-lbc-retirer]'; DEMANDE_LBC_CIBLE.at=Date.now(); }}); }
       if(lbcRemoveVcCount>0) items.push({icon:'🟠', ic:'tag', text:`${lbcRemoveVcCount} à retirer de Leboncoin (vendue${lbcRemoveVcCount>1?'s':''} sur Vestiaire)`, n:lbcRemoveVcCount, tab:'leboncoin', dv:true, lbcRetirer:true, avant:()=>{ DEMANDE_LBC_CIBLE.sel='[data-lbc-retirer-vestiaire]'; DEMANDE_LBC_CIBLE.at=Date.now(); }});
       if(lbcRemoveEbayCount>0) items.push({icon:'🟠', ic:'tag', text:`${lbcRemoveEbayCount} à retirer de Leboncoin (vendue${lbcRemoveEbayCount>1?'s':''} sur eBay)`, n:lbcRemoveEbayCount, tab:'leboncoin', dv:true, lbcRetirer:true, avant:()=>{ DEMANDE_LBC_CIBLE.sel='[data-lbc-retirer-ebay]'; DEMANDE_LBC_CIBLE.at=Date.now(); }});
       // Une vente Leboncoin non reliée ne sonne plus (Julien, 16 oct. : « ça sert à
