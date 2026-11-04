@@ -189,3 +189,33 @@ export function retoursPourSite(res, site) {
     manques: res.manques.filter(m => (site === 'ebay') === estEbay(m)),
   };
 }
+
+// ── (3 nov., choix de Julien n° 3) « RETOUR REÇU ? » ─────────────────────────
+// La carte ne se montre que pour un retour PROUVÉ dont le colis est REVENU vers
+// lui : la vente est un retour (transaction 440 / « retour » / non réclamée,
+// `etapeRetourVinted` ; eBay : le retour Post-Order) ET le colis de retour a
+// bougé — déposé / en route, « livrée » selon la plateforme, ou remboursé (la
+// plateforme ne rembourse qu'au retour du colis). Un retour seulement « initié »
+// (bordereau pas encore déposé par l'acheteur) n'a pas de carte. Il faut SON N°
+// (identité) : sans N°, rien à remettre « avec son N° » — la ligne reste dans
+// « Retours » (« article pas relié à un N° »). Déjà noté reçu, masqué, ancien
+// (remboursé il y a plus de 45 j, replié) ⇒ pas de carte. Rien n'est déduit :
+// la carte DEMANDE, son tap répond.
+export function retourAReceptionner(l) {
+  if (!l || (l.plateforme !== 'vinted' && l.plateforme !== 'ebay')) return false;
+  if (!l.num || l.recu || l.ancien || l.remis) return false;
+  return l.etape === 'en-route' || l.etape === 'rembourse' || !!l.livreeSelonVinted;
+}
+
+// Les N° des articles remis en stock (pas encore republiés) : ils sont « chez
+// toi » — publiés avec les paires présentes (`vinted_nums_physiques`). Un N°
+// retiré pour conflit (`remis.num === null`) n'y entre pas (VRM ne choisit pas).
+export function numsRemisEnStock(res) {
+  if (!res || res.etat !== 'lu' || !Array.isArray(res.remises)) return [];
+  const out = [];
+  for (const l of res.remises) {
+    const n = l && l.remis && l.remis.num != null ? String(l.remis.num).trim() : '';
+    if (n && !out.includes(n)) out.push(n);
+  }
+  return out;
+}
