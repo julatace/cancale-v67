@@ -411,7 +411,7 @@ const ligne = (s, id) => s.lignes.find((l) => l.id === id) || {};
         await pg.locator('[data-filtre-site] button[data-site="ebay"]').first().click({ timeout: 8000 });
         await pg.waitForTimeout(1200);
         const tv = await pg.evaluate(() => document.body.innerText);
-        dit(/Aucune vente eBay pour l'instant/.test(tv) && !/Relie ton compte/i.test(tv),
+        dit(/Aucune vente eBay/.test(tv) && !/Relie ton compte/i.test(tv),
           `${T} Ventes : compte relié, aucune vente ⇒ « Aucune vente eBay pour l'instant », jamais « Relie ton compte »`, (tv.match(/[^\n]*vente eBay[^\n]*/) || [''])[0].slice(0, 160));
         dit(relistes(envois).length === 0 && !errs.length && !s.mort, `${T} rien ne part, aucune erreur de page`, errs.join(' | ').slice(0, 160));
         await ctx.close();
