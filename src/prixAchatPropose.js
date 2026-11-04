@@ -103,9 +103,14 @@ export function montantPropose(achat, ventilation) {
 // LA proposition pour un article, ou null.
 //   prixConnu : vrai si un prix d'achat est déjà saisi (rien à proposer)
 //   annulee   : la vente est annulée (aucun coût à poser)
-export function propositionPrixAchat({ prixConnu = false, annulee = false, identite = null, ventilationDe = null } = {}) {
+//   estLot    : (achat) → vrai pour un LOT (src/achatsSourcing.js `estLot`) ; défaut :
+//               le titre « Lot … » ou l'instantané d'un article de lot (`lot`).
+// (4 nov.) Un LOT ne propose JAMAIS son prix entier à un de ses articles : le prix
+// de chaque N° se pose par « Répartir » (src/achatsSourcing.js), sur SON clic.
+export function propositionPrixAchat({ prixConnu = false, annulee = false, identite = null, ventilationDe = null, estLot = null } = {}) {
   if (prixConnu || annulee || !identite || !identite.achat) return null;
   const a = identite.achat;
+  if (typeof estLot === 'function' ? estLot(a) : (/^lot\b/i.test(String(a.title || '').trim()) || a.lot === true)) return null;
   const tx = txDe(a);
   const m = montantPropose(a, tx && typeof ventilationDe === 'function' ? ventilationDe(tx) : null);
   if (!m) return null;
