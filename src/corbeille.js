@@ -108,10 +108,19 @@ export function mettreEnCorbeille({ conteneur, corbeille, cle, chemin, type, lib
 }
 
 // Restaure une entrée. Rend { conteneur, corbeille, entree } (entree null ⇒ inconnue / expirée).
-export function restaurer({ conteneur, corbeille, id, maintenant = Date.now() }) {
+// `cleNum` (facultatif) : une fiche à N° ne revient pas si un AUTRE élément du
+// conteneur porte maintenant ce N° (deux paires sous un N°, le seul défaut
+// irréversible §5) — rend { conflit: N° } et rien ne change.
+export function restaurer({ conteneur, corbeille, id, maintenant = Date.now(), cleNum = null }) {
   const L = lireCorbeille(corbeille);
   const e = L.find((x) => x.id === String(id));
   if (!e || expiree(e, maintenant)) return { conteneur, corbeille: L, entree: null };
+  if (cleNum && e.numero && e.chemin && e.chemin.liste) {
+    const [, c] = descendre(conteneur, e.chemin);
+    const k = cleNum(e.numero);
+    const autre = (Array.isArray(c) ? c : []).some((x) => x && !(e.chemin.idCle != null && memeId(x[e.chemin.idCle], e.chemin.id)) && k && cleNum(x.numero) === k);
+    if (autre) return { conteneur, corbeille: L, entree: null, conflit: e.numero };
+  }
   const nv = remettreDans(conteneur, e.chemin, e.avant, e.index);
   return { conteneur: nv, corbeille: L.filter((x) => x.id !== e.id), entree: e };
 }

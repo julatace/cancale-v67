@@ -142,6 +142,10 @@ import { indexMemo as indexRechercheMemo, chercherPartout, destinationResultat }
 import { litigesEnCours, litigeDeVente, requeteEmailsLitiges, texteLimite as texteLimiteLitige, LIBELLE_GENRE as LIBELLE_LITIGE } from "./litiges.js";
 import { rangerParTransporteur, ordreDesGroupes, ordonnerLot } from "./lotTransporteurs.js";
 import { CLE_PREFERES, lirePreferes, basculerPrefere } from "./relaisPreferes.js";
+import { CLE_CORBEILLE, mettreEnCorbeille, restaurer, purger, lireCorbeille, joursRestants, PHRASE_CORBEILLE, NOMS_TYPES } from "./corbeille.js";
+import { identiteVente, marquerCorbeille, restaurerPhoto, viderPhoto } from "./photoColis.js";
+import PhotoColis from "./PhotoColis.jsx";
+import { annoncesSansNumero, numeroter as numeroterSansNumero, numeroAEcrire } from "./annoncesSansNumero.js";
 import { CLE_DEPOT, lireDepots, associerDepot, rangerParDepot, choixPourFamille, nomFamille, familleDepot } from "./depotRelais.js";
 import { trouverParScan } from "./scanColis.js";
 import { ligneLotAutre, cochesParDefaut, selectionImprimable, texteSansBordereau } from "./lotSelection.js";
@@ -2131,6 +2135,55 @@ const askConfirm = (opts) => new Promise((resolve)=>{
   _askListener({ ...o, resolve });
 });
 
+// ── (4 nov., choix de Julien n° 5) LA CORBEILLE — UN helper pour toutes les suppressions DANS VRM ──
+// L'appelant passe le conteneur qu'il tient (sa liste, son objet), la clé rangée et le chemin ;
+// il reçoit le conteneur SANS l'élément (à poser dans son état et à sauvegarder lui-même) et
+// l'entrée part dans `vrm_corbeille` (synchronisée). Rien ici ne touche un site.
+const corbeilleMettre = ({ conteneur, cle, chemin, type, libelle = '', numero = null, apres }) => {
+  const r = mettreEnCorbeille({ conteneur, corbeille: load(CLE_CORBEILLE, []), cle, chemin, type, libelle, numero, apres });
+  if (!r.entree) return null;
+  save(CLE_CORBEILLE, r.corbeille);
+  try { window.dispatchEvent(new CustomEvent('vrm:corbeille', { detail: { cle } })); } catch (_) {}
+  return r;
+};
+// La confirmation d'une suppression qui va à la corbeille : la phrase est la même partout.
+const confirmerCorbeille = (titre, opts = {}) => askConfirm({ title: titre, desc: [opts.desc, PHRASE_CORBEILLE].filter(Boolean).join('\n\n'), ok: opts.ok || 'Mettre à la corbeille', cancel: 'Annuler', danger: true });
+// La photo d'un colis : la ligne garde la photo, marquée ; l'entrée de corbeille la désigne.
+const corbeillePhotoColis = async (ident) => {
+  const at = new Date().toISOString();
+  const w = await marquerCorbeille(STUDIO_BASE, ident, at);
+  if (!w.ok) return w;
+  corbeilleMettre({ conteneur: { [ident]: { ident, at } }, cle: 'colis_photo', chemin: { k: ident }, type: 'photo-colis', libelle: 'Photo du colis' });
+  return { ok: true };
+};
+// Restaurer une entrée : relit la clé rangée, remet l'élément à sa place (même N°, mêmes champs).
+const corbeilleRestaurer = async (id) => {
+  const L = lireCorbeille(load(CLE_CORBEILLE, []));
+  const e = L.find((x) => x.id === id); if (!e) return { ok: false };
+  if (e.type === 'photo-colis') {
+    const w = await restaurerPhoto(STUDIO_BASE, e.chemin.k); if (!w.ok) return w;
+    save(CLE_CORBEILLE, L.filter((x) => x.id !== id));
+    try { window.dispatchEvent(new CustomEvent('vrm:photo-colis', { detail: { ident: e.chemin.k } })); } catch (_) {}
+    return { ok: true, entree: e };
+  }
+  const defaut = e.chemin && e.chemin.liste && e.chemin.sous == null ? [] : {};
+  const r = restaurer({ conteneur: load(e.cle, defaut), corbeille: L, id, cleNum });
+  if (r.conflit) return { ok: false, conflit: r.conflit };
+  if (!r.entree) return { ok: false };
+  try { localStorage.setItem(e.cle, JSON.stringify(r.conteneur)); } catch (_) {}
+  save(e.cle, r.conteneur); save(CLE_CORBEILLE, r.corbeille);
+  try { window.dispatchEvent(new CustomEvent('vrm:corbeille', { detail: { cle: e.cle, restaure: true } })); } catch (_) {}
+  return { ok: true, entree: e };
+};
+// La purge de 30 jours (à l'ouverture de la corbeille et au chargement du nuage).
+const corbeillePurger = async () => {
+  const r = purger(load(CLE_CORBEILLE, []));
+  if (!r.purgees.length) return 0;
+  for (const e of r.purgees) if (e.type === 'photo-colis') { try { await viderPhoto(STUDIO_BASE, e.chemin.k); } catch (_) {} }
+  save(CLE_CORBEILLE, r.corbeille);
+  return r.purgees.length;
+};
+
 // (3 nov.) Avant une publication : rien à dire ⇒ `true` tout de suite ; sinon
 // la feuille de vérification, et SA réponse (« Publier quand même » ⇒ true).
 const verifierAvantPublication = async (lignes, opts = {}) => {
@@ -2584,6 +2637,8 @@ let _cloudReadyListeners = [];
 const markCloudReady = () => { if (_cloudReady) return; _cloudReady = true; try { globalThis.__vrmNuagePret = true; } catch (_) {} _cloudReadyListeners.forEach(fn => { try { fn(); } catch (_) {} }); _cloudReadyListeners = []; };
 const onCloudReady = (fn) => { if (_cloudReady) { try { fn(); } catch (_) {} return () => {}; } _cloudReadyListeners.push(fn); return () => { _cloudReadyListeners = _cloudReadyListeners.filter(f => f !== fn); }; };
 const isCloudReady = () => _cloudReady;
+// (4 nov.) La corbeille purge ce qui a plus de 30 jours, une fois le nuage lu.
+onCloudReady(() => { setTimeout(() => { corbeillePurger().catch(() => {}); }, 4000); });
 
 // Lecture locale (instantanee)
 // ⚠️ UNE DONNÉE ABÎMÉE NE DOIT PAS TUER L'APP. `load` rendait tel quel ce qu'il
@@ -2735,10 +2790,13 @@ function FichesNeuves() {
   const liste = fichesAPublier(load('vrm_fiches_neuves', {}) || {}, portes, cleNum);
   if (!liste.length) return null;
   const retirer = async (f) => {
-    if (!(await askConfirm({ title: `Retirer la fiche N°${f.numero} ?`, ok: 'Retirer', cancel: 'Annuler' }))) return;
+    if (!(await confirmerCorbeille(`Retirer la fiche N°${f.numero} ?`))) return;
     const toutes = { ...(load('vrm_fiches_neuves', {}) || {}) };
-    if (toutes[f.id]) toutes[f.id] = { ...toutes[f.id], retireeAt: new Date().toISOString() };
-    save('vrm_fiches_neuves', toutes); maj();
+    if (!toutes[f.id]) return;
+    // (4 nov.) Retrait doux gardé (la fiche reste rangée, marquée) + son entrée de corbeille : restaurer
+    // remet la fiche d'avant, MÊME N° (le pool ne l'a jamais rendu, §5).
+    const r = corbeilleMettre({ conteneur: toutes, cle: 'vrm_fiches_neuves', chemin: { k: f.id }, type: 'fiche', libelle: f.titre || 'Fiche', numero: f.numero, apres: { ...toutes[f.id], retireeAt: new Date().toISOString() } });
+    save('vrm_fiches_neuves', r ? r.conteneur : { ...toutes, [f.id]: { ...toutes[f.id], retireeAt: new Date().toISOString() } }); maj();
   };
   return (
     <section className="vrm-ao-neuves" data-fiches-neuves={liste.length} aria-label="À publier">
@@ -2754,13 +2812,44 @@ function FichesNeuves() {
     </section>
   );
 }
+// (4 nov., choix n° 5) Paramètres → Corbeille : ce qu'il a supprimé DANS VRM, restaurable 30 jours.
+function CorbeilleSetting() {
+  const [liste, setListe] = useStateCle(CLE_CORBEILLE, () => lireCorbeille(load(CLE_CORBEILLE, [])));
+  const [busy, setBusy] = React.useState('');
+  React.useEffect(() => {
+    const f = () => setListe(lireCorbeille(load(CLE_CORBEILLE, [])));
+    corbeillePurger().then((n) => { if (n) f(); }).catch(() => {});
+    const off = onCloudReady(f); window.addEventListener('vrm:corbeille', f);
+    return () => { if (typeof off === 'function') off(); window.removeEventListener('vrm:corbeille', f); };
+  }, []);   // eslint-disable-line react-hooks/exhaustive-deps
+  const remettre = async (e) => {
+    setBusy(e.id);
+    const r = await corbeilleRestaurer(e.id);
+    setBusy('');
+    if (r && r.ok) { setListe((l) => l.filter((x) => x.id !== e.id)); toast(`${NOMS_TYPES[e.type] || 'Élément'} restauré${e.numero ? ` · N°${e.numero}` : ''}`); }
+    else if (r && r.conflit) toast(`Le N°${r.conflit} est déjà porté par une autre fiche : rien n'est restauré.`);
+    else toast('La restauration a échoué — réessaie.');
+  };
+  if (!liste.length) return <div className="vrm-corbeille is-vide" data-corbeille="0"><p className="vrm-corbeille-vide">Corbeille vide</p></div>;
+  return (
+    <div className="vrm-corbeille" data-corbeille={liste.length}>
+      {liste.map((e) => { const j = joursRestants(e); return (
+        <div key={e.id} className="vrm-corbeille-ligne" data-corbeille-ligne={e.id} data-corbeille-type={e.type} data-corbeille-num={e.numero || ''} data-corbeille-jours={j}>
+          <span className="vrm-corbeille-quoi">
+            <b>{e.libelle || NOMS_TYPES[e.type] || 'Élément'}</b>
+            <small>{[NOMS_TYPES[e.type] || 'Élément', e.numero ? `N°${e.numero}` : '', j > 1 ? `${j} jours` : j === 1 ? 'dernier jour' : ''].filter(Boolean).join(' · ')}</small>
+          </span>
+          <Bouton variante="secondaire" className="vrm-b-petit" data-corbeille-restaurer={e.id} disabled={busy === e.id} onClick={() => remettre(e)}>{busy === e.id ? '…' : 'Restaurer'}</Bouton>
+        </div>); })}
+    </div>);
+}
 // (3 nov.) Mes modèles de description (src/modelesDescription.js), synchronisés.
 const lireModelesRanges = () => lireModeles(load(CLE_MODELES, []));
 function ModelesSetting() {
   const [modeles, setModeles] = useStateCle(CLE_MODELES, () => lireModelesRanges());
   React.useEffect(() => onCloudReady(() => setModeles((l) => (l && l.length ? l : lireModelesRanges()))), []);   // eslint-disable-line react-hooks/exhaustive-deps
   const poser = (l) => { setModeles(l); save(CLE_MODELES, l); };
-  return <MesModeles modeles={modeles} onChange={poser} confirmer={(m) => askConfirm({ title: `Supprimer « ${m.nom} » ?`, ok: 'Supprimer', cancel: 'Annuler', danger: true })}/>;
+  return <MesModeles modeles={modeles} onChange={poser} confirmer={async (m) => { const ok = await confirmerCorbeille(`Supprimer « ${m.nom} » ?`); if (ok) corbeilleMettre({ conteneur: modeles, cle: CLE_MODELES, chemin: { liste: true, idCle: 'id', id: m.id }, type: 'modele', libelle: m.nom }); return ok; }}/>;
 }
 // La rangée de chips au-dessus d'une description (Leboncoin, eBay, brouillon de Republier).
 function ChipsModeles({ valeur, surChange, champ, vars }) {
@@ -11925,10 +12014,9 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
   };
   const supprimer = async () => {
     const b = liste.find(x => x.id === editId); if (!b) return;
-    const ok = await askConfirm({ title: `Supprimer « ${b.title || 'cet achat'} » ?`, desc: `Il sort de tes achats hors plateforme et de ce que tu as dépensé${b.price ? ` (${b.price} €)` : ''}. Ça ne se rattrape pas.`, ok: 'Oui, supprimer', cancel: 'Annuler', danger: true });
+    const ok = await confirmerCorbeille(`Supprimer « ${b.title || 'cet achat'} » ?`, { desc: `Il sort de tes achats hors plateforme et de ce que tu as dépensé${b.price ? ` (${b.price} €)` : ''}.` });
     if (!ok) return;
-    onSupprimer(b.id);
-    if (b.photo) ecrirePhotoAchatHors(b.id, null);
+    onSupprimer(b.id);   // (4 nov.) à la corbeille : sa photo reste rangée pour qu'il revienne entier
     fermer();
   };
   const lab = { fontSize: 12, color: C.muted, fontWeight: 600 };
@@ -27849,6 +27937,8 @@ function LigneVenteVc({ v, fait, enV, flou, i = 0 }) {
             projetée des MÊMES étapes prouvées (`friseVente`) ; le bordereau n'est plus une étape mais
             une ligne de détail sous la frise, datée quand elle l'est. */}
         {etapes ? <RecapFrise etapes={etapes} cle={String(v.id || v.tx || '')}/> : null}
+        {v.id != null ? <PhotoColis ident={identiteVente({ site: 'vestiaire', id: v.id })} base={STUDIO_BASE} Icon={Icon} toast={toast}
+          confirmer={() => confirmerCorbeille('Supprimer la photo du colis ?')} onSupprimer={corbeillePhotoColis}/> : null}
       </section>
       <section className="vrm-recap-argent" aria-label="L'argent">
         <h3 className="vrm-recap-titre">L'argent</h3>
@@ -29375,8 +29465,9 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
     setCatalog(u); save('vinted_catalog',u);
   };
   const remove=async (id)=>{
-    if(!await askConfirm(`Supprimer #${id} ?`)) return;
-    const u=catalog.filter(p=>p.id!==id);
+    if(!await confirmerCorbeille(`Supprimer #${id} ?`)) return;
+    const r=corbeilleMettre({ conteneur: catalog, cle: 'vinted_catalog', chemin: { liste: true, idCle: 'id', id }, type: 'article', libelle: `#${id}` });
+    const u=r?r.conteneur:catalog.filter(p=>p.id!==id);
     setCatalog(u); save('vinted_catalog',u);
     if(onDeleteId) onDeleteId(id);
   };
@@ -29620,8 +29711,9 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
   };
 
   const del=async (sid,pid)=>{
-    if(!await askConfirm('Supprimer cette vente ?')) return;
-    const ns=sales.filter(s=>s.id!==sid); setSales(ns); save('vinted_sales',ns);
+    if(!await confirmerCorbeille('Supprimer cette vente ?')) return;
+    const r=corbeilleMettre({ conteneur: sales, cle: 'vinted_sales', chemin: { liste: true, idCle: 'id', id: sid }, type: 'vente', libelle: `Vente ${pid || ''}`.trim() });
+    const ns=r?r.conteneur:sales.filter(s=>s.id!==sid); setSales(ns); save('vinted_sales',ns);
     const pids=String(pid||'').split('+').map(v=>v.trim()).filter(Boolean);
     const nc=catalog.map(p=>pids.includes(p.id)?{...p,status:'stock'}:p); setCatalog(nc); save('vinted_catalog',nc);
   };
@@ -30053,8 +30145,9 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
     const msg=isAcc
       ? `⚠️ L’article #${inv.productId} a une vente saisie dans ta compta.\nSupprimer cette facture quand même ?`
       : 'Supprimer cette facture ?';
-    if(!await askConfirm(msg)) return;
-    const u=invoices.filter(i=>i.id!==id);
+    if(!await confirmerCorbeille(msg)) return;
+    const r=corbeilleMettre({ conteneur: invoices, cle: 'vinted_invoices', chemin: { liste: true, idCle: 'id', id }, type: 'facture', libelle: inv ? `Facture ${inv.number || inv.productId || ''}`.trim() : 'Facture' });
+    const u=r?r.conteneur:invoices.filter(i=>i.id!==id);
     setInvoices(u); save('vinted_invoices',u);
   };
   
@@ -35946,8 +36039,10 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
   };
 
   const deletePair = async (id)=>{
-    if (!await askConfirm('Supprimer cet article de l\'inventaire ?')) return;
-    persist(inventory.filter(p => p.id !== id));
+    if (!await confirmerCorbeille('Supprimer cet article de l\'inventaire ?')) return;
+    const p0 = inventory.find(p => p.id === id);
+    const r = corbeilleMettre({ conteneur: inventory, cle: 'vinted_inventory', chemin: { liste: true, idCle: 'id', id }, type: 'article', libelle: (p0 && p0.title) || 'Article', numero: p0 && p0.numero });
+    persist(r ? r.conteneur : inventory.filter(p => p.id !== id));
   };
 
   const startEdit = (p) => { setEditing(p.id); setEditDraft({ ...p }); };
@@ -40209,9 +40304,10 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
   };
   const retirer = async (cle, id) => {
     const x = (data[cle] || []).find((y) => y.id === id);
-    if (!(await askConfirm({ title: `Supprimer « ${nomLigneCompta(cle, x)} » ?`, desc: `${x && Number(x.montant) ? fmt(Number(x.montant)) + ' sortent' : 'Elle sort'} de tes charges et de tes rapports.`, ok: 'Supprimer', cancel: 'Annuler', danger: true }))) return;
-    majFraiche((cur) => ({ ...cur, [cle]: (cur[cle] || []).filter(y => y.id !== id) }));
-    if (cle === 'depenses' && x && x.ticket) ecrireTicket(id, null);   // (3 nov.) la ligne du ticket est vidée (un DELETE ne supprime rien)
+    if (!(await confirmerCorbeille(`Supprimer « ${nomLigneCompta(cle, x)} » ?`, { desc: `${x && Number(x.montant) ? fmt(Number(x.montant)) + ' sortent' : 'Elle sort'} de tes charges et de tes rapports.` }))) return;
+    // (4 nov.) À la corbeille (30 jours) : la ligne revient telle quelle, son ticket aussi (il n'est plus vidé).
+    majFraiche((cur) => { const r = corbeilleMettre({ conteneur: cur, cle: 'vrm_compta', chemin: { sous: cle, liste: true, idCle: 'id', id }, type: cle === 'depenses' ? 'depense' : cle === 'packs' ? 'pack' : 'cout', libelle: nomLigneCompta(cle, x) });
+      return r ? r.conteneur : { ...cur, [cle]: (cur[cle] || []).filter(y => y.id !== id) }; });
     toast('Supprimé de tes charges');
   };
   // Export CSV des charges pour le comptable (date · type · libellé · montant).
@@ -41927,7 +42023,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     byName.set(nom.toLowerCase(), { nom, full: input.trim(), lat: hit.lat, lon: hit.lon });
     persistPoints([...byName.values()]);
   };
-  const removeSavedPoint = (nom) => { persistPoints(savedPoints.filter(sp => sp.nom !== nom)); setOpenPoint(null); };
+  const removeSavedPoint = (nom) => { const r = corbeilleMettre({ conteneur: savedPoints, cle: 'vrm_points_relais', chemin: { liste: true, idCle: 'nom', id: nom }, type: 'relais', libelle: nom }); persistPoints(r ? r.conteneur : savedPoints.filter(sp => sp.nom !== nom)); setOpenPoint(null); };
   // Recherche d'un point relais par son NOM (+ ville) : fiable, c'est toi qui
   // nommes le vrai lieu (« Super U Cancale »…). Résultats sur carte, tu confirmes.
   const [relayPicker, setRelayPicker] = useState(null); // {query, loading, results:[], error, carrier}
@@ -47555,7 +47651,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [offBuys, setOffBuys] = useStateCle('vinted_offvinted_buys', () => load('vinted_offvinted_buys', []));
   const addOffBuy = (b) => setOffBuys(prev => { const u = [{ id: 'ob_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), createdAt: new Date().toISOString(), ...b }, ...prev]; save('vinted_offvinted_buys', u); return u; });
   const updOffBuy = (id, patch) => setOffBuys(prev => { const u = prev.map(x => x.id===id ? { ...x, ...patch } : x); save('vinted_offvinted_buys', u); return u; });
-  const delOffBuy = (id) => setOffBuys(prev => { const u = prev.filter(x => x.id!==id); save('vinted_offvinted_buys', u); return u; });
+  const delOffBuy = (id) => setOffBuys(prev => { const b = prev.find(x => x.id === id); const r = corbeilleMettre({ conteneur: prev, cle: 'vinted_offvinted_buys', chemin: { liste: true, idCle: 'id', id }, type: 'achat', libelle: (b && b.title) || 'Achat' }); const u = r ? r.conteneur : prev.filter(x => x.id!==id); save('vinted_offvinted_buys', u); return u; });
   // (le formulaire d'ajout vit dans `AchatsHorsPlateforme`, avec son état)
   // Lien ACHAT → N° : un achat Vinted relié à une annonce numérotée (bouton 🔗,
   // qui pose buyFromId = transaction de l'achat) fait remonter SON numéro ici.
@@ -50501,6 +50597,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         return <ModeEmballage colis={colisEmballage()} lecture={lectureEmb} onFermer={()=>setEmballage(false)} Icon={Icon} Retour={FermeAuRetour}
           Photo={(src)=>imgMortes.has(src) ? null : <PhotoVinted src={src} alt="" loading="lazy" decoding="async" onError={()=>noterImgMorte(src)}/>}
           onFiche={(n)=>{ setEmballage(false); try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: String(n) })); } catch (_) {} }}
+          photoColis={(c)=> c && c.e && c.e.txn ? <PhotoColis compact ident={identiteVente({ site: 'vinted', id: c.e.txn })} base={STUDIO_BASE} Icon={Icon} toast={toast} confirmer={() => confirmerCorbeille('Supprimer la photo du colis ?')} onSupprimer={corbeillePhotoColis}/> : null}
           onMarquer={(liste)=>{ let n=0; for (const x of liste) { if (x && x.e && x.e.o) { marquerColisFait(x.e.o, x.e.b); n++; } } if (n) toast(n>1?`${n} colis marqués postés.`:'Colis marqué posté.'); return n; }}/>;
       })()}
       {/* (4 nov., choix n° 2) Le point de dépôt d'un transporteur : choisi UNE fois parmi les points LUS
@@ -52007,6 +52104,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     </div>); })() : null}
                   {/* (3 nov., critique #6) La frise de la ligne, mêmes 4 étapes et mêmes mots ; « Bordereau » en détail. */}
                   {etapes ? <RecapFrise etapes={etapes} cle={txL}/> : null}
+                  {/* (4 nov., choix n° 3) La photo du colis, par l'identité de la vente (sa ligne, jamais `main`). */}
+                  {o.transaction_id != null && !o._fromEmail && (st !== 'cancelled' || pre.litige) ? <PhotoColis ident={identiteVente({ site: 'vinted', id: o.transaction_id })} base={STUDIO_BASE} Icon={Icon} toast={toast}
+                    confirmer={() => confirmerCorbeille('Supprimer la photo du colis ?')} onSupprimer={corbeillePhotoColis}/> : null}
                 </section>
                 <section className="vrm-recap-argent" aria-label="L'argent">
                   <h3 className="vrm-recap-titre">L'argent</h3>
@@ -55184,7 +55284,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {showQR ? (
                   <>
                     <button className="vrm-icon-control" aria-label="Modifier" type="button" onClick={async ()=>{ const v=await askText({ desc: 'Modifier le message :', value: t }); if(v!=null){ const a=[...quickReplies]; if(v.trim()){a[i]=v.trim();} else {a.splice(i,1);} saveQR(a); } }} title="Modifier" style={{border:'none',background:'transparent',color:C.muted,fontSize:11,cursor:'pointer'}}><Icon name="pencil" size={15}/></button>
-                    <button type="button" onClick={()=>{ const a=[...quickReplies]; a.splice(i,1); saveQR(a); }} title="Supprimer" style={{border:'none',background:'transparent',color:C.danger,fontSize:12,cursor:'pointer'}}>×</button>
+                    <button type="button" data-qr-supprimer={i} onClick={async ()=>{ if (!(await confirmerCorbeille('Supprimer cette réponse rapide ?'))) return; const r = corbeilleMettre({ conteneur: quickReplies, cle: 'vinted_quick_replies', chemin: { liste: true, index: i }, type: 'reponse', libelle: String(t).slice(0, 60) }); if (r) saveQR(r.conteneur); }} title="Supprimer" style={{border:'none',background:'transparent',color:C.danger,fontSize:12,cursor:'pointer'}}>×</button>
                   </>
                 ) : <span style={{color:C.muted,paddingRight:4,display:'inline-flex'}} aria-hidden="true"><Icon name="doc" size={13}/></span>}
               </div>
@@ -58317,7 +58417,10 @@ function relierAnnonceLbc(id, n) {
 // — l'annonce redevient « non reliée » et peut être reliée à la bonne paire.
 function delierAnnonceLbc(id) {
   if (id == null) return;
-  const liens = { ...(load('vrm_lbc_liens', {}) || {}), [String(id)]: '' };
+  const avant = load('vrm_lbc_liens', {}) || {};
+  // (4 nov.) La liaison retirée va à la corbeille (la valeur vide reste posée, comme avant).
+  if (avant[String(id)]) corbeilleMettre({ conteneur: avant, cle: 'vrm_lbc_liens', chemin: { k: String(id) }, type: 'liaison', libelle: `Annonce Leboncoin → N°${avant[String(id)]}`, numero: avant[String(id)], apres: '' });
+  const liens = { ...avant, [String(id)]: '' };
   try { localStorage.setItem('vrm_lbc_liens', JSON.stringify(liens)); } catch (_) {}
   save('vrm_lbc_liens', liens);
 }
@@ -61653,6 +61756,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       urlWidget && { id:'widget', type:'panneau', nu:true, ic:'chart', lib:'Widget iPhone', desc:'Ton lien privé pour Scriptable', el:widget },
     ]},
     { id:'sauvegarde', titre:'Sauvegarde', items:[
+      { id:'corbeille', type:'panneau', nu:true, ic:'trash', lib:'Corbeille', val:String(lireCorbeille(load(CLE_CORBEILLE, [])).length || ''), data:{ 'data-reglage-corbeille':'' }, el:<CorbeilleSetting/> },
       { id:'donnees', type:'action', ic:'save', lib:'Exporter mes données', onClick:exporterMesDonnees, data:{ 'data-exporter-donnees':'' } },
       { id:'export', type:'action', ic:'save', lib:'Sauvegarde complète', desc:'Réglages, numéros et données captées.', onClick:onExport, data:{ 'data-reglage-sauvegarde':'' } },
       { id:'restaurer', type:'action', ic:'restore', lib:'Restaurer une sauvegarde', onClick:onImport },
