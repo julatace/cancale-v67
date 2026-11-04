@@ -2779,6 +2779,20 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       })();
       return true;
     }
+    // 5.319 : tes OFFRES Vestiaire et la recette d'une réponse faite par toi sur la page.
+    if (msg && msg.from === 'cancale-vc' && (msg.action === 'vcOffres' || msg.action === 'vcOffreAppris')) {
+      (async () => {
+        try {
+          let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
+          if (!/(^|\.)vestiairecollective\.com$/i.test(hote)) { sendResponse({ ok: false }); return; }
+          let ok = false;
+          if (msg.action === 'vcOffres') { ok = await rangerVcOffres(msg, await compteVcCapture(sender && sender.tab && sender.tab.id, msg.moi)); await noterVcCapte('offres', ok === true, Array.isArray(msg.offres) ? msg.offres.length : 0, Array.isArray(msg.inconnu) ? { inconnu: true } : null); }
+          else ok = await noterRecetteOffreVc(msg.recette);
+          sendResponse({ ok: ok === true });
+        } catch (e) { sendResponse({ ok: false, error: String(e) }); }
+      })();
+      return true;
+    }
     if (msg && msg.from === 'cancale-vc' && msg.action === 'vcRecon') {
       (async () => {
         try {
@@ -12151,6 +12165,8 @@ async function executerCommande(msg) {
   if (msg && /^(vcPreparer|vcMarque)$/.test(String(msg.cmd || ''))) return await publierVestiaire(msg);
   // 31 oct. (5.295) : répondre dans UNE conversation Vestiaire, sur son clic (voir `repondreVestiaire`).
   if (msg && msg.cmd === 'vcRepondre') return await repondreVestiaire(msg);
+  // 4 nov. (5.319) : répondre à UNE offre Vestiaire, sur son clic (voir `repondreOffreVestiaire`).
+  if (msg && msg.cmd === 'vcOffre') return await repondreOffreVestiaire(msg);
   // 3 nov. (5.318) : répondre dans UNE conversation Leboncoin, sur son clic (voir `repondreLeboncoin`).
   if (msg && msg.cmd === 'lbcRepondre') return await repondreLeboncoin(msg);
   if (!msg || msg.cmd !== 'bordereau') return { accepte: false, code: 'inconnue', raison: 'commande inconnue' };
@@ -15822,6 +15838,184 @@ async function repondreVestiaire(msg) {
       return { accepte: true, etape: 'fait', statut };
     }
     return { accepte: true, etape: 'refuse', statut, raison: `Vestiaire a répondu ${statut} — le message n'est pas parti` };
+  } finally { VC_REPONSE_EN_VOL = false; }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// VESTIAIRE : LES OFFRES REÇUES, ET Y RÉPONDRE SUR SON CLIC (4 novembre, 5.319)
+// ══════════════════════════════════════════════════════════════════════════
+// Julien a choisi « voir les offres reçues sur Vestiaire et y répondre depuis
+// VRM (accepter / refuser / contre-offre) ». MESURÉ (lecture seule, 4 nov.) :
+// la page charge `GET apiv2…/negotiations?role=seller&withEvents=true` — 7
+// négociations chez lui, gestes `offer` / `accept`, par `buyer` / `seller`.
+// La requête de RÉPONSE n'a jamais été vue (aucune `vc_brut_*` ne la porte).
+//  · `vc_offres` : une ligne, `offres` rangées par `n{id}` (une clé qui commence
+//    par une lettre : un segment NU de chiffres est un INDEX pour PostgREST) —
+//    l'article (titre, photo, lien), les prix en centimes, les gestes datés,
+//    « à toi de répondre » ; JAMAIS l'acheteur. Lire-fusionner-réécrire, une
+//    écriture à la fois, lecture ratée ⇒ rien ; une offre ne change jamais de
+//    compte ; le plus récent (dernier geste) gagne.
+//  · la RECETTE de chaque geste (`vrmVcRecetteOffres`, `vc_offres_recette` pour
+//    l'app) : APPRISE de SA réponse faite à la main sur la page, jamais devinée.
+//  · RÉPONDRE (`repondreOffreVestiaire`) : sur SA commande depuis l'app, une
+//    action Vestiaire à la fois (`VC_REPONSE_EN_VOL`), au nom du compte de
+//    l'offre ouvert dans l'onglet, dans les 50 actions/h du compte (`vc:{id}`),
+//    jamais pendant une pause 429/403, jamais sur une offre qui n'est plus à lui.
+const VC_RECETTE_OFFRES = 'vrmVcRecetteOffres';
+const VC_OFFRES_MAX = 300;
+const GESTES_OFFRE = ['accepter', 'refuser', 'contre'];
+const cleOffreVc = (id) => 'n' + String(id);
+let _vcOffresChaine = Promise.resolve();
+function rangerVcOffres(m, compte) {
+  const run = _vcOffresChaine.then(() => rangerVcOffresMaintenant(m, compte)).catch(() => false);
+  _vcOffresChaine = run.then(() => {}, () => {});
+  return run;
+}
+const centsOffreVc = (x) => (typeof x === 'number' && isFinite(x) && x >= 0 && x < 1e9 ? Math.round(x) : null);
+const atOffreVc = (x) => (/^\d{4}-\d{2}-\d{2}T[\w:.+-]{0,24}$/.test(String(x || '')) ? String(x) : '');
+function offreVcPropre(x, compte, now) {
+  if (!x || !/^\d{3,15}$/.test(String(x.id || ''))) return null;
+  const ev = (e) => (e && /^(offer|accept|decline|close)$/.test(String(e.action)) ? { action: String(e.action), par: /^(acheteur|vendeur)$/.test(String(e.par)) ? String(e.par) : '', cents: centsOffreVc(e.cents), at: atOffreVc(e.at) } : null);
+  const evenements = (Array.isArray(x.evenements) ? x.evenements : []).slice(-10).map(ev).filter((e) => e && e.at);
+  const dernier = ev(x.dernier);
+  return { id: String(x.id), produit: /^\d{3,15}$/.test(String(x.produit || '')) ? String(x.produit) : '', compte: compte || '',
+    ouverte: x.ouverte === true, fermee: x.fermee === true, acceptee: x.acceptee === true,
+    aToi: !!(x.aToi === true && x.ouverte === true && dernier && dernier.action === 'offer' && dernier.par === 'acheteur'),
+    titre: coupeVc(x.titre || '', 140), photo: /^https:\/\/images\.vestiairecollective\.com\/produit\/[\w.-]{1,60}$/i.test(String(x.photo || '')) ? String(x.photo) : '',
+    lien: /^https:\/\/fr\.vestiairecollective\.com\/[\w\-/.]{1,300}\.shtml$/i.test(String(x.lien || '')) ? String(x.lien) : '',
+    offre: centsOffreVc(x.offre), net: centsOffreVc(x.net), initial: centsOffreVc(x.initial), min: centsOffreVc(x.min), expire: atOffreVc(x.expire),
+    resteVendeur: typeof x.resteVendeur === 'number' && isFinite(x.resteVendeur) ? Math.max(0, Math.floor(x.resteVendeur)) : null,
+    dernier, evenements, vuAt: now };
+}
+async function rangerVcOffresMaintenant(m, compte) {
+  const neufs = (Array.isArray(m && m.offres) ? m.offres : []).slice(0, 200);
+  const rows = await sbGet('app_data?id=eq.vc_offres&select=data');
+  if (rows === null) return false;                                   // lecture ratée ⇒ rien
+  const cur = (rows && rows[0] && rows[0].data) || {};
+  const offres = Object.assign({}, cur.offres && typeof cur.offres === 'object' && !Array.isArray(cur.offres) ? cur.offres : {});
+  const now = new Date().toISOString();
+  let change = false;
+  for (const x of neufs) {
+    const o = offreVcPropre(x, compte, now);
+    if (!o) continue;
+    const k = cleOffreVc(o.id), p = offres[k];
+    if (p && p.compte && o.compte && p.compte !== o.compte) continue;   // une offre ne change jamais de compte
+    if (p && !o.compte) o.compte = p.compte || '';
+    // Le plus récent gagne : un geste plus ancien ne remplace jamais un geste vu plus tard.
+    const tP = p && p.dernier ? Date.parse(p.dernier.at) || 0 : 0, tO = o.dernier ? Date.parse(o.dernier.at) || 0 : 0;
+    if (p && tO < tP) continue;
+    if (p && p.repondueParVrm && tO === tP) o.repondueParVrm = p.repondueParVrm;
+    const avant = p ? JSON.stringify(Object.assign({}, p, { vuAt: '' })) : '';
+    if (avant !== JSON.stringify(Object.assign({}, o, { vuAt: '' }))) change = true;
+    offres[k] = o;
+  }
+  const garde = Object.fromEntries(Object.entries(offres).sort((a, b) => (Date.parse((b[1].dernier || {}).at || '') || 0) - (Date.parse((a[1].dernier || {}).at || '') || 0)).slice(0, VC_OFFRES_MAX));
+  const lecture = { at: now, page: /^[\w/{}.-]{1,160}$/.test(String((m && m.page) || '')) ? String(m.page) : '', liste: !!(m && m.liste), n: neufs.length, compte: compte || '' };
+  if (Array.isArray(m && m.inconnu)) lecture.inconnu = m.inconnu.slice(0, 60).map(String);
+  const data = { v: 1, offres: garde, lecture, capturedAt: change || !cur.capturedAt ? now : cur.capturedAt };
+  const ok = await supabaseUpsert('app_data', [{ id: 'vc_offres', data }], 'id');
+  if (ok === true) notifierApp({ type: 'maj', quoi: 'vestiaire' });
+  return ok === true;
+}
+// La recette d'UN geste reçue d'une page : refaite champ par champ.
+function nettoyerRecetteOffreVc(r) {
+  if (!r || typeof r !== 'object' || !GESTES_OFFRE.includes(String(r.geste))) return null;
+  const base = { geste: String(r.geste), methode: /^(POST|PUT|PATCH)$/.test(String(r.methode)) ? String(r.methode) : '', hote: /^([a-z0-9-]+\.)*vestiairecollective\.com$/i.test(String(r.hote || '')) ? String(r.hote) : '', chemin: String(r.chemin || '').slice(0, 160) };
+  if (!base.methode || !base.hote) return null;
+  if (r.rejouable !== true) return { ...base, rejouable: false, raison: String(r.raison || 'inconnue').slice(0, 40) };
+  const cleOk = (k) => /^[A-Za-z_][\w-]{0,40}$/.test(String(k));
+  const TROUS = ['{nego}', '{produit}', '{acheteur}', '{prixCents}', '{prix}'];
+  const modele = String(r.modele || '');
+  const sansTrous = TROUS.reduce((t, k) => t.split(k).join(''), modele);
+  if (!/^\/[\w\-/{}.]*$/.test(modele) || /\d{3,}|[{}]/.test(sansTrous) || /\{prix/.test(modele)) return { ...base, rejouable: false, raison: 'modele' };
+  const fixes = [];
+  for (const f of (Array.isArray(r.fixes) ? r.fixes.slice(0, 20) : [])) {
+    if (!Array.isArray(f) || !Array.isArray(f[0]) || !f[0].length || f[0].length > 5 || !f[0].every(cleOk)) return { ...base, rejouable: false, raison: 'fixes' };
+    const v = f[1];
+    if (!(TROUS.includes(v) || v === null || typeof v === 'boolean' || (typeof v === 'string' && /^[A-Za-z_.:-]{1,40}$/.test(v)))) return { ...base, rejouable: false, raison: 'fixes' };
+    fixes.push([f[0].map(String), v, ['string', 'number', 'boolean', 'object'].includes(f[2]) ? f[2] : 'string']);
+  }
+  const vise = (k) => modele.includes(k) || fixes.some((x) => x[1] === k);
+  if (!vise('{nego}') && !vise('{produit}')) return { ...base, rejouable: false, raison: 'offre-introuvable' };
+  if (base.geste === 'contre' && !vise('{prixCents}') && !vise('{prix}')) return { ...base, rejouable: false, raison: 'prix-introuvable' };
+  const entetes = (Array.isArray(r.entetes) ? r.entetes : []).map((x) => String(x).toLowerCase()).filter((x) => /^[a-z0-9-]{1,60}$/.test(x) && !/^(cookie|content-length|host|connection|origin|referer|user-agent|accept-encoding|content-type)$/.test(x)).slice(0, 20);
+  const recherche = /^\?[\w=&.%:-]{0,200}$/.test(String(r.recherche || '')) && !/\d{3,}/.test(String(r.recherche || '')) ? String(r.recherche) : '';
+  return { ...base, rejouable: true, raison: '', modele, recherche, fixes, sansCorps: r.sansCorps === true && !fixes.length, entetes };
+}
+async function noterRecetteOffreVc(brute) {
+  const r = nettoyerRecetteOffreVc(brute);
+  if (!r) return false;
+  const at = new Date().toISOString();
+  let tout = null;
+  try { tout = (await chrome.storage.local.get(VC_RECETTE_OFFRES))[VC_RECETTE_OFFRES] || {}; } catch (_) { return false; }
+  const avant = tout[r.geste] || null;
+  // Une recette rejouable n'est jamais remplacée par un essai qui ne l'est pas : il est NOTÉ à côté.
+  const garde = r.rejouable ? r : (avant && avant.recette && avant.recette.rejouable ? avant.recette : r);
+  tout[r.geste] = { recette: garde, at: r.rejouable ? at : ((avant && avant.at) || at), dernierEssai: { at, rejouable: r.rejouable, raison: r.raison || '' } };
+  try { await chrome.storage.local.set({ [VC_RECETTE_OFFRES]: tout }); } catch (_) { return false; }
+  const pourApp = {};
+  for (const g of GESTES_OFFRE) { const e = tout[g]; if (e && e.recette) pourApp[g] = { appris: e.recette.rejouable === true, raison: e.recette.rejouable ? '' : String(e.recette.raison || ''), at: e.at || '', dernierEssai: e.dernierEssai || null }; }
+  const ok = await supabaseUpsert('app_data', [{ id: 'vc_offres_recette', data: Object.assign(pourApp, { ver: CODE_VERSION, at }) }], 'id');
+  if (ok === true) notifierApp({ type: 'maj', quoi: 'vestiaire' });
+  return ok === true;
+}
+async function repondreOffreVestiaire(msg) {
+  const nego = String((msg && msg.nego) || ''), geste = String((msg && msg.geste) || '');
+  if (!/^\d{3,15}$/.test(nego) || !GESTES_OFFRE.includes(geste)) return { accepte: false, code: 'invalide', raison: 'offre ou geste inconnu' };
+  const prixCents = Number(msg && msg.prixCents);
+  if (geste === 'contre' && !(Number.isInteger(prixCents) && prixCents > 0 && prixCents < 10000000)) return { accepte: false, code: 'invalide', raison: 'prix de la contre-offre invalide' };
+  if (VC_REPONSE_EN_VOL) return { accepte: false, code: 'en-cours', raison: 'une autre action Vestiaire part en ce moment — une à la fois' };
+  VC_REPONSE_EN_VOL = true;
+  try {
+    const pause = await pauseVc();
+    if (pause) return { accepte: false, code: 'vc-pause', raison: `Vestiaire a demandé de ralentir (${pause.statut || 'refus'}) — rien n'est parti, réessaie après ${new Date(pause.jusqua).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` };
+    let tout;
+    try { tout = (await chrome.storage.local.get(VC_RECETTE_OFFRES))[VC_RECETTE_OFFRES] || {}; } catch (_) { return { accepte: false, code: 'lecture', raison: "le stockage de l'extension n'a pas répondu — rien n'est parti" }; }
+    const recette = tout[geste] && tout[geste].recette;
+    if (!recette) return { accepte: false, code: 'pas-appris', raison: "l'extension n'a encore jamais vu ce geste sur Vestiaire — fais-le UNE fois toi-même sur vestiairecollective.com, dans ce Chrome : elle apprend la forme, et VRM pourra ensuite le faire d'ici" };
+    if (recette.rejouable !== true) return { accepte: false, code: 'pas-rejouable', raison: `la façon dont Vestiaire enregistre ce geste n'est pas encore sûre à refaire (${recette.raison || 'forme inconnue'}) — réponds sur Vestiaire, rien n'est parti` };
+    const rows = await sbGet(`app_data?id=eq.vc_offres&select=o:data->offres->${cleOffreVc(nego)}`);
+    if (rows === null) return { accepte: false, code: 'lecture', raison: "la base VRM n'a pas répondu — rien n'est parti" };
+    const o = rows && rows[0] && rows[0].o;
+    if (!o || typeof o !== 'object') return { accepte: false, code: 'inconnue', raison: "l'extension n'a pas encore lu cette offre — ouvre tes offres sur Vestiaire, rien n'est parti" };
+    if (o.aToi !== true) return { accepte: false, code: 'plus-a-toi', raison: "cette offre n'attend plus ta réponse (déjà répondue, expirée ou fermée) — rien n'est parti" };
+    if (o.expire && Date.parse(o.expire) < Date.now()) return { accepte: false, code: 'expiree', raison: "cette offre a expiré sur Vestiaire — rien n'est parti" };
+    if (geste === 'contre' && ((o.offre != null && prixCents <= o.offre) || (o.initial != null && prixCents >= o.initial))) return { accepte: false, code: 'invalide', raison: 'la contre-offre doit être au-dessus de son offre et sous ton prix' };
+    const compteOffre = String(o.compte || '');
+    // Une offre dont on ne sait pas le compte ne parle pour personne.
+    if (!compteOffre) return { accepte: false, code: 'session', raison: "je ne sais pas à quel compte Vestiaire appartient cette offre — recharge tes offres sur Vestiaire (connecté sur ton compte), puis réessaie" };
+    const ot = await ongletVestiaire(compteOffre);
+    if (!ot.ok) return { accepte: false, code: ot.code, raison: ot.raison };
+    const cpt = await compterAction('vc:' + ot.compte, ACTIONS_MAX_HEURE);
+    if (!cpt.ok && cpt.code === 'stockage') return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
+    if (!cpt.ok) return { accepte: false, code: 'plafond', raison: `déjà ${ACTIONS_MAX_HEURE} actions sur ce compte Vestiaire cette heure-ci — réessaie dans ${Math.max(1, Math.ceil((cpt.resteMs || 0) / 60000))} min` };
+    const depuis = Number(cpt.at) || (Date.now() - 5);
+    let rep = null;
+    try { rep = await avecDelai(chrome.tabs.sendMessage(ot.tabId, { from: 'vrm-fond', action: 'vcOffre', nego, geste, prixCents: geste === 'contre' ? prixCents : 0, recette, compte: ot.compte }, { frameId: 0 }), 25000, null); } catch (_) { rep = null; }
+    const statut = (rep && Number(rep.statut)) || 0;
+    if (!rep || rep.ok !== true) {
+      if (rep && rep.code === 'invalide') { await rendreActions('vc:' + ot.compte, depuis, 1); return { accepte: false, code: 'invalide', raison: 'geste refusé par la page — rien n’est parti' }; }
+      noterDiag('vc_offre_muet');
+      return { accepte: true, etape: 'incertain', raison: "l'onglet Vestiaire n'a pas répondu — je ne sais pas si ta réponse est partie : regarde l'offre sur Vestiaire avant de recommencer" };
+    }
+    if (!statut) {
+      await rendreActions('vc:' + ot.compte, depuis, 1);
+      const e = String(rep.erreur || '');
+      if (e === 'autre-compte' || e === 'compte-pas-su') return { accepte: false, code: 'autre-compte', raison: "l'onglet Vestiaire n'est plus (ou pas encore) sur le compte de cette offre — recharge la page Vestiaire sur le bon compte, puis réessaie (rien n'est parti)" };
+      if (e === 'offre-non-vue') return { accepte: false, code: 'offre-non-vue', raison: "l'onglet Vestiaire n'a pas encore affiché cette offre — ouvre tes offres sur Vestiaire dans cet onglet, puis réessaie (rien n'est parti)" };
+      if (e === 'plus-a-toi') return { accepte: false, code: 'plus-a-toi', raison: "sur Vestiaire, cette offre n'attend plus ta réponse — rien n'est parti" };
+      if (e === 'entetes') return { accepte: false, code: 'entetes', raison: "la page Vestiaire n'a pas encore parlé à son serveur depuis son ouverture — recharge tes offres sur Vestiaire, puis réessaie (rien n'est parti)" };
+      if (e && e !== 'reseau') return { accepte: false, code: 'arrete', raison: `rien n'est parti (${e})` };
+      return { accepte: true, etape: 'incertain', raison: "le réseau a coupé pendant l'envoi — regarde l'offre sur Vestiaire avant de recommencer" };
+    }
+    noterDiag('vc_offre_' + statut);
+    if (statut === 429 || statut === 403) { await poserPauseVc(statut); return { accepte: true, etape: 'refuse', statut, raison: `Vestiaire a refusé (${statut}) — VRM se met en pause 30 min sur Vestiaire` }; }
+    if (statut >= 200 && statut < 300) {
+      // « Fait » seulement si Vestiaire RENVOIE l'offre avec TON geste en dernier.
+      if (rep.confirme !== true) return { accepte: true, etape: 'incertain', statut, raison: "Vestiaire a répondu sans montrer ta réponse sur l'offre — regarde-la sur Vestiaire avant de recommencer" };
+      return { accepte: true, etape: 'fait', statut };
+    }
+    return { accepte: true, etape: 'refuse', statut, raison: `Vestiaire a répondu ${statut} — ta réponse n'est pas partie` };
   } finally { VC_REPONSE_EN_VOL = false; }
 }
 

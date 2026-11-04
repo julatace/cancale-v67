@@ -1113,6 +1113,245 @@
   }); } catch (_) {}
 
 
+  // ── 5.319 (4 nov., Julien : « voir les offres reçues sur Vestiaire et y répondre
+  //    depuis VRM ») — LES OFFRES (« négociations »). MESURÉ sur sa base (lecture
+  //    seule, 4 nov.) : la page charge `GET apiv2…/negotiations?role=seller&withEvents=true`
+  //    ⇒ `{ data: [ { id, type: 'negotiation', product: { id, name, brand: { name },
+  //    pictures: [{ path }], path, price: { cents } }, events: [{ action: 'offer' |
+  //    'accept', createdBy: 'buyer' | 'seller', price: { cents }, sellerPvnPrice,
+  //    creationDate }], isOpened, isClosed, isAccepted, initialPrice, minOffer,
+  //    maxOffer, expirationDate, sellerRemainingOffers, buyer, seller } ] }` (les
+  //    événements du plus récent au plus ancien). Rien n'est DEMANDÉ : on lit ce que
+  //    la page charge déjà. ⚠️ JAMAIS la personne : ni le nom, ni le pseudo, ni
+  //    l'avatar, ni l'identifiant de l'acheteur ne sortent (son identifiant reste
+  //    en MÉMOIRE de cette page, pour refaire la requête de la page elle-même).
+  //  · RÉPONDRE (accepter, refuser, contre-offre) : la requête n'a JAMAIS été vue
+  //    chez lui. Elle s'APPREND quand TU réponds toi-même à une offre sur la page
+  //    (une écriture 2xx sur un chemin de négociation dont la réponse montre TON
+  //    geste en dernier) : la « recette » d'UN geste garde la méthode, l'hôte, le
+  //    chemin avec les identifiants remis en `{nego}` / `{produit}` / `{acheteur}`,
+  //    les clés du corps (le prix remis en `{prixCents}` ou `{prix}`, les mots
+  //    tels quels) et les NOMS des en-têtes — jamais une valeur d'en-tête. Une
+  //    valeur qu'on ne sait pas refaire ⇒ « pas rejouable », avec sa raison.
+  //    VRM ne la rejoue que sur TON clic, depuis cet onglet, au nom du compte de
+  //    l'onglet, sur une offre que CETTE page a vue.
+  const negosVues = new Map();   // id → { produit, acheteur, aToi, offreCents, initialCents } — mémoire de la page
+  const ID_NEGO = /^\d{3,15}$/;
+  const centsVc = (p) => (p && typeof p === 'object' && p.cents != null && isFinite(Number(p.cents)) && String(p.currency || 'EUR').toUpperCase() === 'EUR' ? Math.round(Number(p.cents)) : null);
+  const ACTION_OFFRE = (a) => { const s = String(a || '').toLowerCase(); return s === 'offer' || s === 'counter_offer' || s === 'counteroffer' ? 'offer' : s === 'accept' || s === 'accepted' ? 'accept' : /^(decline|declined|refuse|refused|reject|rejected)$/.test(s) ? 'decline' : /^(cancel|cancelled|canceled|expire|expired)$/.test(s) ? 'close' : ''; };
+  const PAR_OFFRE = (c) => { const s = String(c || '').toLowerCase(); return s === 'buyer' ? 'acheteur' : s === 'seller' ? 'vendeur' : ''; };
+  function evenementsNego(n) {
+    const brut = Array.isArray(n.events) ? n.events.slice(0, 40) : [];
+    return brut.map((e) => (e && typeof e === 'object' ? { action: ACTION_OFFRE(e.action), par: PAR_OFFRE(e.createdBy), cents: centsVc(e.price), net: centsVc(e.sellerPvnPrice), at: /^\d{4}-\d{2}-\d{2}T/.test(String(e.creationDate || '')) ? String(e.creationDate).slice(0, 30) : '' } : null))
+      .filter((e) => e && e.action && e.at).sort((a, b) => (Date.parse(a.at) || 0) - (Date.parse(b.at) || 0));
+  }
+  function ficheNego(n) {
+    if (!n || typeof n !== 'object' || Array.isArray(n) || String(n.type || '') !== 'negotiation') return null;
+    const id = String(n.id == null ? '' : n.id);
+    if (!ID_NEGO.test(id)) return null;
+    const prod = n.product && typeof n.product === 'object' ? n.product : {};
+    const produit = /^\d{3,15}$/.test(String(prod.id == null ? '' : prod.id)) ? String(prod.id) : '';
+    const evs = evenementsNego(n);
+    const der = evs[evs.length - 1] || null;
+    const ouverte = n.isOpened === true && n.isClosed !== true;
+    const offreA = [...evs].reverse().find((e) => e.action === 'offer' && e.par === 'acheteur') || null;
+    const marque = prod.brand && typeof prod.brand === 'object' && typeof prod.brand.name === 'string' ? prod.brand.name : '';
+    const nom = typeof prod.name === 'string' ? prod.name : '';
+    const pic = Array.isArray(prod.pictures) && prod.pictures[0] && typeof prod.pictures[0] === 'object' ? prod.pictures[0].path : '';
+    const lien = typeof prod.path === 'string' && /^\/[\w\-/.]{1,300}\.shtml$/i.test(prod.path) ? 'https://fr.vestiairecollective.com' + prod.path : '';
+    const exp = /^\d{4}-\d{2}-\d{2}T/.test(String(n.expirationDate || '')) ? String(n.expirationDate).slice(0, 30) : '';
+    return {
+      id, produit, ouverte, fermee: n.isClosed === true, acceptee: n.isAccepted === true,
+      // « À toi de répondre » : ouverte, et le DERNIER geste est une offre de l'acheteur.
+      aToi: !!(ouverte && der && der.action === 'offer' && der.par === 'acheteur'),
+      titre: coupe(propreTexte([marque, nom].filter(Boolean).join(' '), 140), 140), photo: photoVc(pic), lien,
+      offre: offreA ? offreA.cents : null, net: offreA ? offreA.net : null,
+      initial: centsVc(n.initialPrice) != null ? centsVc(n.initialPrice) : centsVc(prod.price),
+      min: centsVc(n.minOffer), expire: exp,
+      resteVendeur: Number.isFinite(n.sellerRemainingOffers) ? n.sellerRemainingOffers : null,
+      dernier: der ? { action: der.action, par: der.par, cents: der.cents, at: der.at } : null,
+      evenements: evs.slice(-10).map((e) => ({ action: e.action, par: e.par, cents: e.cents, at: e.at })),
+      _acheteur: n.buyer && /^\d{3,15}$/.test(String(n.buyer.id == null ? '' : n.buyer.id)) ? String(n.buyer.id) : '',
+      _vendeur: n.seller && /^\d{3,15}$/.test(String(n.seller.id == null ? '' : n.seller.id)) ? String(n.seller.id) : '',
+    };
+  }
+  // Ce qui sort de la page : la fiche sans l'acheteur ni le vendeur (gardés ici).
+  const ficheSortie = (f) => { const o = Object.assign({}, f); delete o._acheteur; delete o._vendeur; return o; };
+  const retenirNego = (f) => { negosVues.set(f.id, { produit: f.produit, acheteur: f._acheteur, aToi: f.aToi, offreCents: f.offre, initialCents: f.initial }); if (negosVues.size > 400) negosVues.delete(negosVues.keys().next().value); };
+  const CHEMIN_NEGO = /negotiation/i;
+  const PAS_NEGO = /initial-conditions|conditions-view|eligib/i;
+  function noteOffres(url, methode, texte) {
+    try {
+      let u; try { u = new URL(url, location.origin); } catch (_) { return; }
+      if (!DE_VC(url) || !CHEMIN_NEGO.test(u.pathname) || PAS_NEGO.test(u.pathname)) return;
+      // Les offres que TU fais sur l'article d'un autre (rôle acheteur) ne sont pas les tiennes à trancher.
+      if (/(^|[?&])role=buyer(&|$)/i.test(u.search)) return;
+      let obj; try { obj = JSON.parse(texte); } catch (_) { return; }
+      if (!obj || typeof obj !== 'object') return;
+      const d = obj.data;
+      const liste = Array.isArray(d);
+      const brut = liste ? d.slice(0, 200) : (d && typeof d === 'object' ? [d] : null);
+      if (!brut) { post({ kind: 'vcoffres', offres: [], liste: false, inconnu: cheminsDeCles(obj).map(sansId).slice(0, 60), page: pageIci(), moi: moiId }); return; }
+      const fiches = brut.map(ficheNego);
+      // Une liste dont un élément n'a pas la forme mesurée n'est pas « lue en entier ».
+      if (fiches.some((f) => !f)) { post({ kind: 'vcoffres', offres: [], liste: false, inconnu: cheminsDeCles(obj).map(sansId).slice(0, 60), page: pageIci(), moi: moiId }); return; }
+      const miennes = fiches.filter((f) => {
+        if (liste) return /(^|[?&])role=seller(&|$)/i.test(u.search) || /\/selling-offers\//i.test(u.pathname) || (moiId && f._vendeur === moiId);
+        // Une réponse seule : TON article (vendeur = compte ouvert), ou TON geste de vendeur.
+        return (moiId && f._vendeur === moiId) || (!/^GET$/i.test(String(methode || 'GET')) && f.dernier && f.dernier.par === 'vendeur');
+      });
+      for (const f of miennes) retenirNego(f);
+      if (!miennes.length && !liste) return;
+      post({ kind: 'vcoffres', offres: miennes.map(ficheSortie), liste, page: pageIci(), moi: moiId });
+    } catch (_) {}
+  }
+  // ⚠️ La recette d'UN geste, apprise de TA réponse faite sur la page.
+  function recetteOffre(url, methode, corps, entetes, texte) {
+    let u; try { u = new URL(url, location.origin); } catch (_) { return null; }
+    if (!DE_VC(url) || !/^(POST|PUT|PATCH)$/i.test(String(methode || '')) || !CHEMIN_NEGO.test(u.pathname) || PAS_NEGO.test(u.pathname)) return null;
+    let obj; try { obj = JSON.parse(texte); } catch (_) { return null; }
+    const f = obj && obj.data && !Array.isArray(obj.data) ? ficheNego(obj.data) : null;
+    if (!f || !f.dernier || f.dernier.par !== 'vendeur') return null;
+    const evs = f.evenements;
+    const avantAcheteur = evs.slice(0, -1).some((e) => e.action === 'offer' && e.par === 'acheteur');
+    const geste = f.dernier.action === 'accept' ? 'accepter' : f.dernier.action === 'decline' ? 'refuser' : (f.dernier.action === 'offer' && avantAcheteur) ? 'contre' : '';
+    if (!geste) return null;   // une offre que TU proposes d'abord (à un favori) n'est pas une réponse
+    const base = { geste, methode: String(methode).toUpperCase(), hote: u.hostname, chemin: normChemin(sansId(u.pathname)) };
+    const non = (raison) => ({ ...base, rejouable: false, raison });
+    const ids = { '{nego}': f.id, '{produit}': f.produit, '{acheteur}': f._acheteur };
+    const quoi = (v) => { const s = String(v); for (const k of Object.keys(ids)) if (ids[k] && s === ids[k]) return k; return ''; };
+    const segs = u.pathname.split('/');
+    const modeleSegs = [];
+    for (const s of segs) {
+      const q = s ? quoi(s) : '';
+      if (q) { modeleSegs.push(q); continue; }
+      if (/\d{3,}/.test(s)) return non('chemin-ambigu');
+      modeleSegs.push(s);
+    }
+    const modele = modeleSegs.join('/');
+    if (!modele.includes('{nego}') && !modele.includes('{produit}')) { /* l'identité peut être dans le corps */ }
+    if (u.search && /\d{3,}|@/.test(u.search)) return non('adresse-a-parametres');
+    // Le prix de TON geste : celui de l'événement (contre-offre), sinon l'offre de l'acheteur.
+    const prixGeste = f.dernier.cents != null ? f.dernier.cents : f.offre;
+    const fixes = [];
+    let avecPrix = false, sansCorps = false;
+    if (corps == null || corps === '') sansCorps = true;
+    else {
+      if (typeof corps !== 'string') return non('corps-illisible');
+      let c; try { c = JSON.parse(corps); } catch (_) { return non('corps-pas-json'); }
+      if (!c || typeof c !== 'object' || Array.isArray(c)) return non('corps-pas-objet');
+      const feuilles = []; let tableau = false;
+      const marche = (v, ch) => {
+        if (ch.length > 4 || Array.isArray(v)) { tableau = true; return; }
+        if (v && typeof v === 'object') { for (const k of Object.keys(v).slice(0, 30)) marche(v[k], ch.concat(k)); return; }
+        feuilles.push([ch, v]);
+      };
+      marche(c, []);
+      if (tableau) return non('corps-tableau');
+      for (const [ch, v] of feuilles) {
+        const cles = ch.map((k) => cleSure(k));
+        if (cles.includes('{k}')) return non('cle-illisible');
+        const q = (typeof v === 'string' || typeof v === 'number') ? quoi(v) : '';
+        if (q) { fixes.push([cles, q, typeof v]); continue; }
+        if (prixGeste != null && typeof v === 'number' && v === prixGeste) { fixes.push([cles, '{prixCents}', 'number']); avecPrix = true; continue; }
+        if (prixGeste != null && (typeof v === 'number' || (typeof v === 'string' && /^\d{1,6}([.,]\d{1,2})?$/.test(v))) && Math.round(Number(String(v).replace(',', '.')) * 100) === prixGeste) { fixes.push([cles, '{prix}', typeof v]); avecPrix = true; continue; }
+        if (typeof v === 'boolean' || v === null) { fixes.push([cles, v, typeof v]); continue; }
+        if (typeof v === 'string' && /^[A-Za-z_.:-]{1,40}$/.test(v)) { fixes.push([cles, v, 'string']); continue; }
+        return non('valeur-inconnue');
+      }
+    }
+    if (geste === 'contre' && !avecPrix) return non('prix-introuvable');
+    if (!modele.includes('{nego}') && !modele.includes('{produit}') && !fixes.some((x) => x[1] === '{nego}' || x[1] === '{produit}')) return non('offre-introuvable');
+    if (!negosVues.has(f.id)) return non('offre-non-vue');
+    const noms = Object.keys(nomsEntetes(entetes)).filter((k) => !ENTETES_INTERDITS.test(k)).slice(0, 20);
+    return { ...base, rejouable: true, raison: '', modele, recherche: u.search || '', fixes, sansCorps, entetes: noms };
+  }
+  function noteReponseOffre(url, methode, statut, corps, entetes, texte) {
+    try {
+      if (!(statut >= 200 && statut < 300)) return;
+      // La recette AVANT de retenir la réponse : `offre-non-vue` se juge sur ce que la page avait vu.
+      const r = recetteOffre(url, methode, corps, entetes, texte);
+      if (r) post({ kind: 'vcoffreappris', recette: r });
+      noteOffres(url, methode, texte);
+    } catch (_) {}
+  }
+  // ── RÉPONDRE À UNE OFFRE, SUR SON CLIC (l'ordre vient du fond par vc.js) ──
+  let offreEnCours = false;
+  try { window.addEventListener('message', async (event) => {
+    const d = event && event.data;
+    if (event.source !== window || !d || d.__tag !== 'CANCALE_VC_ORDRE' || d.kind !== 'offre') return;
+    const jeton = String(d.jeton || ''), nego = String(d.nego || ''), geste = String(d.geste || '');
+    const r = d.recette;
+    if (!/^[a-z0-9-]{8,64}$/i.test(jeton)) return;
+    const fin = (o) => post(Object.assign({ kind: 'vcoffreresultat', jeton }, o));
+    if (window.top !== window || !/(^|\.)vestiairecollective\.com$/i.test(location.hostname)) return fin({ statut: 0, erreur: 'pas-vestiaire' });
+    if (!ID_NEGO.test(nego) || !/^(accepter|refuser|contre)$/.test(geste)) return fin({ statut: 0, erreur: 'invalide' });
+    const prixDemande = Number(d.prixCents);
+    if (geste === 'contre' && !(Number.isInteger(prixDemande) && prixDemande > 0 && prixDemande < 10000000)) return fin({ statut: 0, erreur: 'invalide' });
+    if (!r || r.rejouable !== true || r.geste !== geste || !/^(POST|PUT|PATCH)$/.test(String(r.methode)) || !/(^|\.)vestiairecollective\.com$/i.test(String(r.hote || ''))
+      || typeof r.modele !== 'string' || !/^\/[\w\-/{}.]*$/.test(r.modele) || !Array.isArray(r.fixes)) return fin({ statut: 0, erreur: 'recette' });
+    if (offreEnCours) return fin({ statut: 0, erreur: 'en-cours' });
+    // Au nom du compte OUVERT DANS CETTE PAGE seulement.
+    if (d.compte !== undefined && (!moiId || String(d.compte) !== moiId)) return fin({ statut: 0, erreur: moiId ? 'autre-compte' : 'compte-pas-su' });
+    const mem = negosVues.get(nego);
+    if (!mem) return fin({ statut: 0, erreur: 'offre-non-vue' });
+    if (!mem.aToi) return fin({ statut: 0, erreur: 'plus-a-toi' });
+    if (geste === 'contre' && mem.offreCents != null && prixDemande <= mem.offreCents) return fin({ statut: 0, erreur: 'invalide' });
+    if (geste === 'contre' && mem.initialCents != null && prixDemande >= mem.initialCents) return fin({ statut: 0, erreur: 'invalide' });
+    const prix = geste === 'contre' ? prixDemande : mem.offreCents;
+    const vals = { '{nego}': nego, '{produit}': mem.produit, '{acheteur}': mem.acheteur };
+    const besoin = (k) => r.modele.includes(k) || r.fixes.some((x) => x && x[1] === k);
+    for (const k of Object.keys(vals)) if (besoin(k) && !vals[k]) return fin({ statut: 0, erreur: 'recette' });
+    if ((besoin('{prixCents}') || besoin('{prix}')) && !(Number.isInteger(prix) && prix > 0)) return fin({ statut: 0, erreur: 'recette' });
+    const h = {};
+    for (const n of (Array.isArray(r.entetes) ? r.entetes : [])) {
+      const k = String(n).toLowerCase();
+      if (ENTETES_INTERDITS.test(k)) continue;
+      if (!entetesApi || entetesApi[k] == null) return fin({ statut: 0, erreur: 'entetes' });
+      h[k] = entetesApi[k];
+    }
+    h.accept = h.accept || 'application/json';
+    let corps = null;
+    if (!r.sansCorps) {
+      corps = {};
+      try {
+        for (const [ch, v, t] of r.fixes) {
+          let x = v;
+          if (v === '{prixCents}') x = prix;
+          else if (v === '{prix}') x = t === 'number' ? prix / 100 : (prix % 100 ? (prix / 100).toFixed(2) : String(prix / 100));
+          else if (typeof v === 'string' && vals[v] !== undefined) x = t === 'number' ? Number(vals[v]) : vals[v];
+          poser(corps, ch.map(String), x);
+        }
+      } catch (_) { return fin({ statut: 0, erreur: 'recette' }); }
+      h['content-type'] = 'application/json';
+    }
+    let chemin = r.modele;
+    for (const k of Object.keys(vals)) chemin = chemin.split(k).join(encodeURIComponent(vals[k] || ''));
+    const adresse = 'https://' + r.hote + chemin + (/^\?[\w=&.%:-]*$/.test(String(r.recherche || '')) ? r.recherche : '');
+    offreEnCours = true;
+    try {
+      let statut = 0, rep = '', erreur = '';
+      try {
+        const res = await origFetch.call(window, adresse, Object.assign({ method: r.methode, credentials: 'include', headers: h }, corps ? { body: JSON.stringify(corps) } : {}));
+        statut = Number(res.status) || 0;
+        try { rep = String(await res.text()).slice(0, 400000); } catch (_) {}
+      } catch (e) { erreur = String((e && e.message) || e).slice(0, 80) || 'reseau'; }
+      // La réponse dit-elle TON geste en dernier ? (sinon : « fait » n'est pas dit)
+      let confirme = null;
+      if (statut >= 200 && statut < 300) {
+        try {
+          const j = JSON.parse(rep); const f = j && j.data && !Array.isArray(j.data) ? ficheNego(j.data) : null;
+          if (f && f.id === nego && f.dernier) {
+            confirme = f.dernier.par === 'vendeur' && f.dernier.action === (geste === 'accepter' ? 'accept' : geste === 'refuser' ? 'decline' : 'offer');
+            retenirNego(f);
+            post({ kind: 'vcoffres', offres: [ficheSortie(f)], liste: false, page: pageIci(), moi: moiId });
+          }
+        } catch (_) {}
+      }
+      fin({ statut, confirme, erreur });
+    } finally { offreEnCours = false; }
+  }); } catch (_) {}
+
   // ── 5.315 (2 nov., Julien : « une extension qui capte TOUT Vestiaire dès que je
   //    vais sur un onglet, pour après pouvoir capter toutes les infos — les ventes,
   //    les bordereaux, etc. ») — LA RÉPONSE ENTIÈRE, GARDÉE TELLE QUELLE.
@@ -1164,7 +1403,7 @@
             if (DE_STREAM(url) && res.status >= 200 && res.status < 300 && /json/i.test(String(ct || ''))) res.clone().text().then((t) => noteStream(url, meth, res.status, t)).catch(() => {});
             // 5.299 : une réponse d'ERREUR (401, 404, 500…) n'est ni une liste, ni un compte, ni un schéma.
             if (res.status >= 200 && res.status < 300 && /pdf/i.test(String(ct || ''))) res.clone().arrayBuffer().then((o) => notePdf(url, res.status, o)).catch(() => {});
-            if (DE_VC(url) && res.status >= 200 && res.status < 300 && /json/i.test(String(ct || ''))) res.clone().text().then((t) => { noteBrut(url, meth, res.status, t, 'api'); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); noteTimeline(url, t); noteCompteur(url, t); noteMessages(url, t); noteFluxMessages(url, t); noteCanal(url, meth, t); noteFil(url, t); noteAchats(url, t); notePublication(url, meth, res.status, t); }).catch(() => {});
+            if (DE_VC(url) && res.status >= 200 && res.status < 300 && /json/i.test(String(ct || ''))) res.clone().text().then((t) => { if (/^(POST|PUT|PATCH)$/i.test(String(meth))) noteReponseOffre(url, meth, res.status, corpsEnvoye, ent, t); else noteOffres(url, meth, t); noteBrut(url, meth, res.status, t, 'api'); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); noteTimeline(url, t); noteCompteur(url, t); noteMessages(url, t); noteFluxMessages(url, t); noteCanal(url, meth, t); noteFil(url, t); noteAchats(url, t); notePublication(url, meth, res.status, t); }).catch(() => {});
           } catch (_) {}
         }).catch(() => {});
       } catch (_) {}
@@ -1190,7 +1429,7 @@
             if ((DE_VC(url) || DE_STREAM(url)) && /^(POST|PUT)$/i.test(String(this.__vcMeth || ''))) noteEnvoi(url, this.__vcMeth, this.status, this.__vcCorps, this.__vcH);
             if (t && DE_STREAM(url) && this.status >= 200 && this.status < 300 && /json/i.test(String(ct || ''))) noteStream(url, this.__vcMeth, this.status, t);
             if (this.status >= 200 && this.status < 300 && /pdf/i.test(String(ct || '')) && this.response instanceof ArrayBuffer) notePdf(url, this.status, this.response);
-            if (t && this.status >= 200 && this.status < 300 && /json/i.test(String(ct || ''))) { noteBrut(url, this.__vcMeth, this.status, t, 'api'); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); noteTimeline(url, t); noteCompteur(url, t); noteMessages(url, t); noteFluxMessages(url, t); noteCanal(url, this.__vcMeth, t); noteFil(url, t); noteAchats(url, t); notePublication(url, this.__vcMeth, this.status, t); }
+            if (t && this.status >= 200 && this.status < 300 && /json/i.test(String(ct || ''))) { if (DE_VC(url) && /^(POST|PUT|PATCH)$/i.test(String(this.__vcMeth || ''))) noteReponseOffre(url, this.__vcMeth, this.status, this.__vcCorps, this.__vcH, t); else if (DE_VC(url)) noteOffres(url, this.__vcMeth, t); noteBrut(url, this.__vcMeth, this.status, t, 'api'); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); noteTimeline(url, t); noteCompteur(url, t); noteMessages(url, t); noteFluxMessages(url, t); noteCanal(url, this.__vcMeth, t); noteFil(url, t); noteAchats(url, t); notePublication(url, this.__vcMeth, this.status, t); }
           } catch (_) {}
         });
       } catch (_) {}
