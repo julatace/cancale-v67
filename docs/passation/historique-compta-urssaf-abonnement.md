@@ -2140,3 +2140,64 @@ Choisie par Julien parmi trois améliorations ; remplace la règle du 21 octobre
 > conditionnel — `suivi-urssaf.cjs` ne capte que les POST, d'où ses 6 rouges « rangé au nuage », identiques sur origin/main
 > (pas de cette branche ; à corriger dans ce banc). Geste de Julien : regarder Comptabilité (la prévision en tête de « Combien je
 > dois déclarer ? », « Ta micro-entreprise » → « Tes seuils »).
+
+## 3-4 nov. — Les deux registres (livre des recettes, registre des achats) et le bénéfice de Statistiques
+
+**Demande** (Julien, chantiers choisis) : les deux registres obligatoires d'une micro-entreprise
+d'achat-revente, en PDF et tableur, depuis Comptabilité ; et les cellules « Bénéfice estimé /
+marge » de Statistiques alignées sur LA règle du bénéfice.
+
+**Mesuré d'abord (lecture seule, sa base)** : 734 achats Vinted captés (`harvest_*_orders_purchased`,
+`price` = objet `{amount, currency_code}`, tous en EUR ; 521 « Transaction finalisée », 185
+« Remboursement … », le reste en cours) ; 5 fiches seulement reliées à un achat (`buyFromId`),
+8 avec un prix saisi sur la fiche ; aucune dépense dans `vrm_compta.depenses` ; aucun `vc_achats` ;
+les achats hors plateforme (`vinted_offvinted_buys`) ne vivent que sur l'appareil (pas dans `main`).
+
+**Ce qui a été fait**
+- `src/registres.js` (règle pure) : `livreDesRecettes` RANGE les lignes de `ventesDeclarables`
+  (aucune règle de vente refaite) : période = le mois que la règle donne (`l.ym`, versement pour
+  Vinted/Vestiaire, vente pour Leboncoin, commande pour eBay) ; « à dater » listées à part, jamais
+  dans un total ; montant illisible ⇒ ligne SANS montant (total « au moins ») ; N° et compte par
+  identité (relevé `vrm_stats_ventes`, `compteDeVente`). Les déclarations « J'ai déclaré » ne
+  déplacent PAS une recette (le livre suit la date réelle du versement, comme Factur-X).
+  `registreDesAchats` : achats Vinted hors annulés/remboursés (`achatAnnule`, la règle de
+  « Dépensé », désormais partagée avec l'écran Achats) + achats hors plateforme ; montant = reçu
+  juste (`montantPropose`) › prix saisis sur les fiches reliées PAR SON CLIC (toutes) › « article
+  seul » (prix Vinted sans port ni frais ⇒ « au moins ») › sans montant (autre devise) ; N° relié =
+  `buyFromId` seulement. PDF (A4 italienne) et tableur depuis la même mise en page.
+- **Décision : les dépenses ne sont PAS des achats de marchandise** — la boîte à dépenses
+  (emballage, envois, abonnements) reste hors du registre des achats ; la catégorie « Achats de
+  stock » avait été retirée le 3 nov. pour ne pas retirer deux fois le prix d'achat.
+- App : `declarablesCompta` (pure) + `useDeclarablesCompta` — la lecture des ventes déclarables de
+  Factur-X, désormais partagée avec la carte `RegistresCarte` (Comptabilité → Documents et
+  réglages, sous le récap du mois) : un sélecteur de période (année, année d'avant, 13 mois), deux
+  rangées (nombre · total, « au moins » si partiel), PDF et Tableur. Aucune phrase d'explication.
+- Statistiques → « L'argent depuis le début » (`Dashboard`) : « Bénéfice estimé » (vieux catalogue,
+  « — » dès que Vinted était lu) ⇒ « Bénéfice » de l'ANNÉE par `useBeneficeCalcul(…, 'annee')` +
+  `chiffreBenefice` ; « Taux marge » ⇒ « Marge » = ce bénéfice ÷ les ventes qu'il compte ;
+  « Bénéfice moyen par vente » idem ; « Meilleur jour bénéfice » et les récaps semaine/mois du
+  catalogue (vente − achat) disent « bénéfice brut » ; la porte « prix d'achat » n'apparaît que si
+  la règle dit `achats`.
+
+**Preuves**
+- `scripts/audit-registres.cjs` EXÉCUTE `declarablesCompta → ventesDeclarables` (vm) et le module :
+  46 verts ; rouge sur origin/main ; 10/10 mutations rouges (date de vente au lieu du versement,
+  compte exclu compté, « à dater » glissé dans la période, sans montant → 0, total toujours
+  « complet », remboursé compté, « article seul » complet, reçu ignoré, compte exclu des achats,
+  lot à moitié saisi présenté « saisi »). Le PDF est relu par pdf.js.
+- Banc `scripts/bancs/registres.cjs` : 84 verts (1512/390, clair/sombre : écran = tableur = PDF,
+  ventes VERSÉES de la période, « au moins » sur les achats « article seul », cibles 44 px) ;
+  rouge sur le build de main (pas de carte). Captures regardées (boutons regroupés au téléphone
+  après la première capture).
+- `audit-benefice-unique` étendu (56 verts ; 6 rouges sur main : la cellule disait « — » quand la
+  règle donnait −7,28 € / −33,72 € ; mutations `tableau`, `marge`, `libelle` rouges) ; banc
+  `benefice-unique` cas D (50 verts ; rouge sur le build de main : « Bénéfice estimé — » contre
+  « −84,16 € » pour l'année). Captures regardées.
+
+**Reste** : la date d'un achat Vinted est le champ `date` de `my_orders` (non vérifié qu'il soit
+celui du paiement plutôt que du dernier changement d'état) ; un achat fait d'un de ses comptes à un
+autre apparaît des deux côtés (recette et achat) ; les achats Vestiaire/Leboncoin/eBay ne sont pas
+captés ; les achats hors plateforme ne sont lus que sur l'appareil où ils ont été saisis.
+**Geste de Julien** : Comptabilité → Documents et réglages → Registres : choisir 2026, télécharger
+les deux PDF et les relire ; relier ses achats aux N° (ou compléter les reçus) pour sortir du
+« au moins ».

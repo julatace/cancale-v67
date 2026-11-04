@@ -3493,3 +3493,17 @@ même »**. Rien à dire ⇒ aucune feuille, l'envoi part comme avant.
 > **Preuves** : `audit-annulations-compte` 10 (exécute la vraie `classifyOrderStatus` extraite d'App.jsx ; 5 mutations rouges),
 > `audit-notes-recues` 10 (5 mutations rouges) ; banc `annulations-notes` 30 verts (390/1512, clair/sombre regardés), 22 rouges
 > sur origin/main ; `stats-vitrine` 112 verts après. Geste de Julien : Statistiques → bas de page.
+
+## 3 novembre (soir) — Frise Vendue → Postée → Livrée → Payée sur les ventes eBay et Vestiaire
+
+La frise de Vinted (`friseVente` → `friseVenteFusion`, `src/design/Frise.jsx`) sur la LIGNE des ventes eBay et
+Vestiaire (Vestiaire : aussi le récapitulatif, mêmes preuves). Les preuves : `src/friseSites.js`.
+eBay — `ebay_orders*` était VIDE chez lui (mesuré en lecture seule le 3 nov.) : forme de l'API `getOrders`.
+Postée = `orderFulfillmentStatus` FULFILLED/SHIPPED ; Payée = argent LIBÉRÉ (`paymentSummary.payments[].
+paymentHolds[]` toutes RELEASED/RELEASE_CONFIRMED, date `releaseDate`) ; ⚠️ `orderPaymentStatus: PAID` = l'acheteur a
+payé AVANT l'envoi, ce n'est pas « Payée » (sinon tout serait coché dès la vente) ; Livrée : l'API ne le dit pas,
+jamais cochée seule. Annulée/remboursée : pas de frise. L'étape en cours passe en ambre quand un geste est à faire
+(« À expédier »). Vestiaire : `etapesVc` « done », « Colis fait », mot de Vestiaire. Feuille « Relier » (Vinted ↔
+Vestiaire) au style Fusion (`src/lien-vestiaire.css`, réutilise `.vrm-ao-*`, voile plus sombre pour se détacher en
+mode sombre). Audit `audit-frise-sites`, banc `lien-vc-frise` (captures 390/1512 regardées). Détail :
+`historique-vestiaire.md`.

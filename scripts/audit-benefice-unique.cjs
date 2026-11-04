@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // AUDIT : « BÉNÉFICE » = UNE RÈGLE SUR TOUS LES ÉCRANS (3 novembre)
-//         node scripts/audit-benefice-unique.cjs [--mutation=stats|journee|recap|vestiaire|aumoins|ventes|urssaf-decl|rien]
+//         node scripts/audit-benefice-unique.cjs [--mutation=stats|journee|recap|vestiaire|aumoins|ventes|urssaf-decl|rien|tableau|marge|libelle]
 // ═══════════════════════════════════════════════════════════════════════════
 // Constat d'une critique, sur les MÊMES données de banc : le bénéfice du mois
 // valait « — » dans Ma journée, 103 € dans Statistiques et 80,93 € dans
@@ -59,6 +59,11 @@ else if (MUT === 'ventes') muter('app', '<StatBox compact label={NOM_APRES_FRAIS
 else if (MUT === 'urssaf-decl') muter('app', 'const cotis = !urssaf ? 0 : aPayerUrssaf(v.ca, taux);', 'const cotis = !urssaf ? 0 : caDecl == null ? null : aPayerUrssaf(caDecl, taux);');
 // (3 nov.) « Rien à calculer » oublié : un mois vide redit 0 € (ou −URSSAF).
 else if (MUT === 'rien') muter('app', 'const rien = v.n === 0 && !(Math.round(charges * 100) > 0);', 'const rien = false;');
+// (3 nov.) Statistiques → « L'argent depuis le début » : la cellule Bénéfice repasse au brut,
+// la marge au brut ÷ ventes, ou l'ancien libellé « Bénéfice estimé » revient.
+else if (MUT === 'tableau') muter('app', 'const CBa = chiffreBenefice(BPa, etatBPa);', 'const CBa = chiffreBrut(BPa);');
+else if (MUT === 'marge') muter('app', 'Math.round((CBa.valeur / BPa.ca) * 1000) / 10', 'Math.round((BPa.brut / BPa.ca) * 1000) / 10');
+else if (MUT === 'libelle') muter('app', '[[NOM_BENEFICE, CBa.valeur==null', "[['Bénéfice estimé', CBa.valeur==null");
 else if (MUT) { console.log('❌ mutation inconnue : ' + MUT); process.exit(2); }
 
 const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
@@ -234,6 +239,41 @@ function extraire(src, nom) {
       dit(cb.valeur === null && B.raison === cas.tiret && (N.absent || cb.raison === cas.tiret), `« — » dit sa raison (« ${cas.tiret} »), la même pour tous les écrans`, `valeur ${eur(cb.valeur)} · raison ${B.raison || '∅'}`);
       dit(B.caDecl != null && B.caDecl > 0, 'le CA déclaré du mois (daté au versement) reste lu, pour la déclaration', `caDecl ${B.caDecl}`);
     }
+  }
+  // ── (3 nov.) Statistiques → « L'argent depuis le début » (`Dashboard`) ──────
+  // Les cellules « Bénéfice estimé / Taux marge » y lisaient l'ancien catalogue
+  // (vente − achat, saisi à la main) et disaient « — » dès que les ventes Vinted
+  // étaient lues. Elles doivent dire LE bénéfice de l'année (la règle de Compta
+  // et de la tuile « année » de Statistiques) et la marge = ce bénéfice ÷ les
+  // ventes qu'il compte.
+  console.log('── Statistiques, « L’argent depuis le début » : le bénéfice et la marge de l’année');
+  {
+    const sD = src('Dashboard');
+    const cheminTableau = /const CBa = chiffreBenefice\(BPa\b/.test(sD) && /useBeneficeCalcul\(comptaD, 'annee'\)/.test(sD) ? 'regle'
+      : /const CBa = chiffreBrut\(BPa\)/.test(sD) ? 'brut'
+      : /\['Bénéfice estimé', liveStats&&liveStats\.caEncaisse!=null\?'—':fmt\(profit\)/.test(sD) ? 'catalogue' : 'inconnu';
+    const cheminMarge = /Math\.round\(\(CBa\.valeur \/ BPa\.ca\) \* 1000\) \/ 10/.test(sD) ? 'regle' : /Math\.round\(\(BPa\.brut \/ BPa\.ca\) \* 1000\) \/ 10/.test(sD) ? 'brut'
+      : /\['Taux marge', \(liveStats&&liveStats\.caEncaisse!=null\)\|\|avgMargin===null\?'—'/.test(sD) ? 'catalogue' : 'inconnu';
+    console.log(`   chemins lus : cellule=${cheminTableau} · marge=${cheminMarge}`);
+    dit(cheminTableau !== 'inconnu' && cheminMarge !== 'inconnu', 'le chemin des deux cellules se lit dans leur code');
+    for (const cas of CAS.filter((c) => ['tout connu', 'un prix d’achat manquant', 'vente à perte réelle'].includes(c.nom))) {
+      const compta = cas.compta || COMPTA, pub = publier(cas.ventes), ligne = ligneUrssaf(cas.ventes);
+      const B = ctx.beneficePeriode({ jours: pub.jours, compta, ligneUrssaf: ligne, taux: 12.4, periode: 'annee', maintenant: MAINTENANT, toutes: true, urssaf: true });
+      const regle = N.chiffreBenefice(B).valeur;
+      // La ligne « Ce que l'année rapporte » d'en face : la tuile « année » de Statistiques (même lecture).
+      const tuileAnnee = cheminStats === 'regle' ? regle : undefined;
+      // Ce que la cellule AFFICHE, selon son chemin. Le catalogue est vide chez lui
+      // (et la cellule disait « — » dès que les ventes Vinted étaient lues).
+      const cellule = cheminTableau === 'regle' ? regle : cheminTableau === 'brut' ? N.chiffreBrut(B).valeur : null;
+      const marge = cheminMarge === 'regle' ? (cellule != null && B.ca > 0 ? Math.round((cellule / B.ca) * 1000) / 10 : null)
+        : cheminMarge === 'brut' ? (B.ca > 0 ? Math.round((B.brut / B.ca) * 1000) / 10 : null) : null;
+      const margeAttendue = regle != null && B.ca > 0 ? Math.round((regle / B.ca) * 1000) / 10 : null;
+      dit(cellule === regle && (tuileAnnee === undefined || tuileAnnee === regle), `${cas.nom} · « Bénéfice » de l’année = la règle de Compta (« — » si pas su)`, `cellule ${eur(cellule)} · règle ${eur(regle)}`);
+      dit(marge === margeAttendue, `${cas.nom} · la marge = ce bénéfice ÷ les ventes comptées`, `${marge} % · attendu ${margeAttendue} %`);
+    }
+    const sDc = sD.replace(/`[^`]*`/g, (x) => x);   // les gabarits gardés : un libellé peut y vivre
+    dit(!/'Bénéfice estimé'|'Taux marge'|Meilleur jour bénéfice|'Bénéfice moyen par vente'/.test(sDc), 'plus de « Bénéfice estimé », « Taux marge » ni « Meilleur jour bénéfice » (un autre nom pour une autre notion)');
+    dit(!/color:C\.muted\}\}>bénéfice<\/span>/.test(sDc), 'les récaps semaine / mois du catalogue (vente − achat) disent « bénéfice brut », jamais « bénéfice » seul');
   }
   console.log('── La déclaration reste datée au versement');
   {
