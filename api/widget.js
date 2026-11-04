@@ -6,6 +6,7 @@ import { comptesActifs, normaliserRegistre } from './_lib/ebay.js';
 import { colisEbay, resumeColisEbay, lireCommandesEbayServeur } from './_lib/ebay-a-expedier.js';
 // (1er nov., audit A4) Les colis Leboncoin et Vestiaire : la règle de Colis.
 import { resumeColisSites } from './_lib/colis-sites.js';
+import { numerosVcAvecLiens } from './_lib/vestiaire-regle.js';
 // La date limite d'envoi (avec son heure) : UNE règle, celle de l'app, du rappel
 // du matin et du rappel du soir (§11, 22 octobre).
 import { bordsParTransaction, compterEcheances, lireDateLimite } from './_lib/limite-envoi.js';
@@ -187,7 +188,7 @@ async function colisAutresSites(fait, m) {
     return resumeColisSites({
       lbc: l === undefined ? null : ((l && l.ventes && typeof l.ventes === 'object') ? l.ventes : {}),
       // (2 nov., soir) « Colis fait » Vestiaire et les N° donnés (main), la règle de Colis.
-      vc: (v === undefined || li === undefined) ? null : { ventes: (v && v.ventes) || null, liens: (li && li.liens) || {}, auto: (m && m.vrm_vc_numeros) || {}, fait: (m && m.vrm_vc_colis_done) || {} },
+      vc: (v === undefined || li === undefined) ? null : { ventes: (v && v.ventes) || null, liens: (li && li.liens) || {}, auto: numerosVcAvecLiens((m && m.vrm_vc_numeros) || {}, m && m.vrm_vc_liens), fait: (m && m.vrm_vc_colis_done) || {} },
       fait,
     });
   } catch (_) { return { leboncoin: null, vestiaire: null }; }
@@ -330,7 +331,7 @@ const atRelay = (s) => /d[ée]pos[ée]/i.test(s || '') && /point\s+relais|bureau
 // achats Vinted « déposé en point relais » : mesuré le 23 oct., « 1 à retirer »
 // (une Salomon sans doute repartie) quand l'app en comptait 7, et AUCUN colis
 // venu d'un e-mail (le Mondial Relay du 21 octobre compris).
-const MAIN_WIDGET = ['vrm_widget_token', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_numeros', 'vinted_pickup_done', 'vinted_bords_hidden', 'vinted_ship_done', 'vinted_bords_shipped', 'vinted_urssaf_mois', 'vrm_colis_retirer', 'vrm_colis_collected', 'vinted_accounts_hidden'];
+const MAIN_WIDGET = ['vrm_widget_token', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_numeros', 'vrm_vc_liens', 'vinted_pickup_done', 'vinted_bords_hidden', 'vinted_ship_done', 'vinted_bords_shipped', 'vinted_urssaf_mois', 'vrm_colis_retirer', 'vrm_colis_collected', 'vinted_accounts_hidden'];
 // (23 oct.) LES COLIS ARRIVÉS PAR E-MAIL APRÈS LA DERNIÈRE PUBLICATION DE L'APP.
 // La liste publiée (`vrm_colis_retirer`) est une photo prise à la dernière
 // ouverture de l'app : un colis arrivé depuis, app fermée, n'y est pas — c'est

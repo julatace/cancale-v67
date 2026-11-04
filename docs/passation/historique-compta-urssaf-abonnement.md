@@ -2111,3 +2111,93 @@ Choisie par Julien parmi trois améliorations ; remplace la règle du 21 octobre
   `stats-vitrine` mis à jour (son jeu n'a pas de modèle commun des deux côtés ⇒ « Pas assez de
   données »), 112 verts.
 - Geste de Julien : saisir le boost payé dans la fiche des articles qu'il booste.
+
+> **3–4 novembre — SEUILS DE L'ANNÉE (« vers quel mois », DAC7 par plateforme) et PRÉVISION URSSAF** (branche `claude/seuils-notes`) :
+> Mesuré avant : la jauge TVA/plafond existait déjà (`jaugeSeuils`, 29 oct.) avec une projection « tu finirais l'année vers X € »
+> (jour par jour, mois en cours compris) ; DAC7 n'existait que pour Vinted compte par compte (Registre annuel). Seuils non
+> re-vérifiés : ceux de l'historique (203 100 · 85 000 · 93 500 vérifiés le 29 oct. ; DAC7 30 ventes ou plus de 2 000 €).
+> **1. `src/seuilsAnnee.js`** (réutilise `caAnnee`/`seuilsDe`, ne recalcule rien ; la ligne publiée `vinted_urssaf_mois`) :
+> `moisAtteinte` = projection LINÉAIRE sur les mois FINIS portant des données (du premier mois publié de l'année au mois
+> d'avant), mois en cours exclu ; `null` (rien d'affiché) si total partiel (plateforme pas lue, ventes à dater, argent illisible),
+> moins de 2 mois finis, seuil déjà dépassé, rythme nul ; `mois: null` = pas atteint cette année. Remplace la phrase « tu
+> finirais l'année vers X € » (deux estimations auraient pu se contredire). Écran : « TVA vers novembre · estimation » sous les
+> jauges. `dac7ParPlateforme` : par plateforme (tous comptes sélectionnés ensemble), `passu` ⇒ « — », centimes (2 000,00 € pile
+> ne l'atteint pas), « atteint si N à dater », jamais « sous » quand des ventes manquent (« au moins »), reste « encore N ventes
+> ou X € » ; mêmes seuils que `SEUIL_VINTED_*` de l'app (l'audit l'exige). Carte `Dac7Plateformes` dans « Tes seuils », sans ambre.
+> ⚠️ Avec Vestiaire « pas lu » (cas fréquent), le CA est partiel ⇒ la projection se tait : c'est voulu.
+> **2. `src/previsionUrssaf.js`** : les règles d'argent sont PASSÉES (`nextUrssafDeadline`, `moisPeriodeUrssaf`,
+> `montantPeriodeUrssaf`, `moisDeclare` de l'app ; l'audit passe celles d'api/_lib/urssaf-regle.js, jugées identiques par
+> audit-rappel-urssaf). Ajoute : statut pas choisi ⇒ « — » + « Choisir mon statut » ; rythme jamais choisi
+> (`vinted_urssaf_freq` absent) ⇒ « — » + Par mois / Par trimestre (jamais « trimestriel » deviné ; mesuré : sa base a
+> `mensuel`, 5 vendeurs sur 7 n'ont ni statut ni rythme) ; registre pas lu ⇒ rien ; échéance toute notée ⇒ la suivante ;
+> mois de la période déjà déclaré retiré avant le calcul (trimestre à moitié noté) ; « au moins » + « N à dater ».
+> ⚠️ Constaté : la carte « Prochaine déclaration » (`CarteUrssafMois`, `[data-stats-carte="mois"]`) est MASQUÉE par la Fusion
+> (fusion.css §15) — la prévision vit donc dans `PrevisionUrssafCarte`, en tête de « Combien je dois déclarer ? »
+> (`vrm-fu-declaration is-calme`) ; `CarteUrssafMois` porte aussi la prévision (même règle) pour le jour où elle revient.
+> **Preuves** : `audit-seuils-annee` 20 (8 mutations rouges : partiel-projete, un-mois, mois-en-cours, dac7-egal, dac7-ou,
+> passu-zero, sous-partiel, seuil-depasse) ; `audit-prevision-urssaf` 11 (5 mutations rouges) ; banc `seuils-prevision` 32 verts
+> (390 tactile/1512, captures claires et sombres regardées), 20 rouges sur origin/main. ⚠️ Banc : `main` s'écrit par PATCH
+> conditionnel — `suivi-urssaf.cjs` ne capte que les POST, d'où ses 6 rouges « rangé au nuage », identiques sur origin/main
+> (pas de cette branche ; à corriger dans ce banc). Geste de Julien : regarder Comptabilité (la prévision en tête de « Combien je
+> dois déclarer ? », « Ta micro-entreprise » → « Tes seuils »).
+
+## 3-4 nov. — Les deux registres (livre des recettes, registre des achats) et le bénéfice de Statistiques
+
+**Demande** (Julien, chantiers choisis) : les deux registres obligatoires d'une micro-entreprise
+d'achat-revente, en PDF et tableur, depuis Comptabilité ; et les cellules « Bénéfice estimé /
+marge » de Statistiques alignées sur LA règle du bénéfice.
+
+**Mesuré d'abord (lecture seule, sa base)** : 734 achats Vinted captés (`harvest_*_orders_purchased`,
+`price` = objet `{amount, currency_code}`, tous en EUR ; 521 « Transaction finalisée », 185
+« Remboursement … », le reste en cours) ; 5 fiches seulement reliées à un achat (`buyFromId`),
+8 avec un prix saisi sur la fiche ; aucune dépense dans `vrm_compta.depenses` ; aucun `vc_achats` ;
+les achats hors plateforme (`vinted_offvinted_buys`) ne vivent que sur l'appareil (pas dans `main`).
+
+**Ce qui a été fait**
+- `src/registres.js` (règle pure) : `livreDesRecettes` RANGE les lignes de `ventesDeclarables`
+  (aucune règle de vente refaite) : période = le mois que la règle donne (`l.ym`, versement pour
+  Vinted/Vestiaire, vente pour Leboncoin, commande pour eBay) ; « à dater » listées à part, jamais
+  dans un total ; montant illisible ⇒ ligne SANS montant (total « au moins ») ; N° et compte par
+  identité (relevé `vrm_stats_ventes`, `compteDeVente`). Les déclarations « J'ai déclaré » ne
+  déplacent PAS une recette (le livre suit la date réelle du versement, comme Factur-X).
+  `registreDesAchats` : achats Vinted hors annulés/remboursés (`achatAnnule`, la règle de
+  « Dépensé », désormais partagée avec l'écran Achats) + achats hors plateforme ; montant = reçu
+  juste (`montantPropose`) › prix saisis sur les fiches reliées PAR SON CLIC (toutes) › « article
+  seul » (prix Vinted sans port ni frais ⇒ « au moins ») › sans montant (autre devise) ; N° relié =
+  `buyFromId` seulement. PDF (A4 italienne) et tableur depuis la même mise en page.
+- **Décision : les dépenses ne sont PAS des achats de marchandise** — la boîte à dépenses
+  (emballage, envois, abonnements) reste hors du registre des achats ; la catégorie « Achats de
+  stock » avait été retirée le 3 nov. pour ne pas retirer deux fois le prix d'achat.
+- App : `declarablesCompta` (pure) + `useDeclarablesCompta` — la lecture des ventes déclarables de
+  Factur-X, désormais partagée avec la carte `RegistresCarte` (Comptabilité → Documents et
+  réglages, sous le récap du mois) : un sélecteur de période (année, année d'avant, 13 mois), deux
+  rangées (nombre · total, « au moins » si partiel), PDF et Tableur. Aucune phrase d'explication.
+- Statistiques → « L'argent depuis le début » (`Dashboard`) : « Bénéfice estimé » (vieux catalogue,
+  « — » dès que Vinted était lu) ⇒ « Bénéfice » de l'ANNÉE par `useBeneficeCalcul(…, 'annee')` +
+  `chiffreBenefice` ; « Taux marge » ⇒ « Marge » = ce bénéfice ÷ les ventes qu'il compte ;
+  « Bénéfice moyen par vente » idem ; « Meilleur jour bénéfice » et les récaps semaine/mois du
+  catalogue (vente − achat) disent « bénéfice brut » ; la porte « prix d'achat » n'apparaît que si
+  la règle dit `achats`.
+
+**Preuves**
+- `scripts/audit-registres.cjs` EXÉCUTE `declarablesCompta → ventesDeclarables` (vm) et le module :
+  46 verts ; rouge sur origin/main ; 10/10 mutations rouges (date de vente au lieu du versement,
+  compte exclu compté, « à dater » glissé dans la période, sans montant → 0, total toujours
+  « complet », remboursé compté, « article seul » complet, reçu ignoré, compte exclu des achats,
+  lot à moitié saisi présenté « saisi »). Le PDF est relu par pdf.js.
+- Banc `scripts/bancs/registres.cjs` : 84 verts (1512/390, clair/sombre : écran = tableur = PDF,
+  ventes VERSÉES de la période, « au moins » sur les achats « article seul », cibles 44 px) ;
+  rouge sur le build de main (pas de carte). Captures regardées (boutons regroupés au téléphone
+  après la première capture).
+- `audit-benefice-unique` étendu (56 verts ; 6 rouges sur main : la cellule disait « — » quand la
+  règle donnait −7,28 € / −33,72 € ; mutations `tableau`, `marge`, `libelle` rouges) ; banc
+  `benefice-unique` cas D (50 verts ; rouge sur le build de main : « Bénéfice estimé — » contre
+  « −84,16 € » pour l'année). Captures regardées.
+
+**Reste** : la date d'un achat Vinted est le champ `date` de `my_orders` (non vérifié qu'il soit
+celui du paiement plutôt que du dernier changement d'état) ; un achat fait d'un de ses comptes à un
+autre apparaît des deux côtés (recette et achat) ; les achats Vestiaire/Leboncoin/eBay ne sont pas
+captés ; les achats hors plateforme ne sont lus que sur l'appareil où ils ont été saisis.
+**Geste de Julien** : Comptabilité → Documents et réglages → Registres : choisir 2026, télécharger
+les deux PDF et les relire ; relier ses achats aux N° (ou compléter les reçus) pour sortir du
+« au moins ».
