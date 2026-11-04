@@ -249,6 +249,8 @@ const VARIANTES = [{ tn: 18, tt: 8 }, { tn: 15, tt: 7 }, { tn: 12, tt: 6.5 }];
       dit(!!l1 && Math.abs(l1.x - eX) <= 2.5 && Math.abs(l1.y - eY) <= 2.5 && Math.abs(l1.t - tt * k) <= 0.6, 'le PDF imprimé porte le titre À LA PLACE ET À LA TAILLE choisies (±2,5 pt)', l1 ? `(${l1.x.toFixed(1)}, ${l1.y.toFixed(1)}) ${l1.t.toFixed(1)} pt, attendu (${eX.toFixed(1)}, ${eY.toFixed(1)}) ${(tt * k).toFixed(1)} pt` : JSON.stringify(pdf && pdf.items.slice(-3)));
       dit(pdf && pdf.pages === 1, 'une seule page : pas de fiche colis', pdf && `${pdf.pages} p.`);
       // 5. Mémorisé pour la forme : le clic suivant imprime directement au même endroit.
+      // (4 nov.) `save` écrit un instant après le geste : on attend l'écriture (rouge intermittent sinon, aussi sur main).
+      await pg.waitForFunction((f) => { try { return !!(JSON.parse(localStorage.getItem('vrm_tampon_positions') || '{}') || {})[f]; } catch (_) { return false; } }, forme, { timeout: 8000 }).catch(() => {});
       const memo = await pg.evaluate((f) => { try { return (JSON.parse(localStorage.getItem('vrm_tampon_positions') || '{}') || {})[f] || null; } catch (_) { return null; } }, forme);
       dit(memo && Math.abs(memo.vx * 595.28 - b.x) < 0.5 && Math.abs(memo.vy * 841.89 - b.y) < 0.5, '« Toujours ici » : la place est rangée pour la forme (`vrm_tampon_positions`)', JSON.stringify(memo));
       try { await pg.locator('[data-visionneuse-fermer]').click({ timeout: 3000 }); } catch (_) {}

@@ -314,7 +314,9 @@ function m9() {
   dit(/envoi && envoi\.raison === 'messagerie-stream'/.test(fil) && /data-vc-envoi-stream/.test(fil), 'M9 · le pied du fil dit pourquoi VRM n’envoie pas (messagerie à part) au lieu d’un code');
   const cap = /const EXT_CAPACITES\s*=\s*\{([^}]*)\}/.exec(APP);
   const man = JSON.parse(fs.readFileSync(path.join(path.dirname(F.inject), 'manifest.json'), 'utf8'));
-  dit(!!cap && new RegExp(`vcfil:\\s*'${man.version.replace(/\./g, '\\.')}'`).test(cap[1]), `M9 · \`EXT_CAPACITES.vcfil\` = ${man.version} (la version qui lit vraiment les fils)`, cap && (/vcfil:\s*'[^']*'/.exec(cap[1]) || [''])[0]);
+  // (4 nov., 5.319) La version d'ARRIVÉE (5.317.0), jamais la dernière publiée (§8) : comparer au manifeste rougissait à chaque montée de version.
+  void man;
+  dit(!!cap && /vcfil:\s*'5\.317\.0'/.test(cap[1]), '`M9 · EXT_CAPACITES.vcfil` = 5.317.0 (la version qui lit vraiment les fils)', cap && (/vcfil:\s*'[^']*'/.exec(cap[1]) || [''])[0]);
 }
 
 (async () => {

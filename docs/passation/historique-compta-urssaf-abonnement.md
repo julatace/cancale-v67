@@ -2274,3 +2274,35 @@ dans « en ligne ailleurs » pour Vestiaire (pas publié dans `vinted_nums_physi
 Leboncoin/Vestiaire hors du tableau des fournisseurs (comme « Dépensé »).
 **Geste de Julien** : Achats → « Lots » → « Répartir » sur un lot ; Achats → « Délai » → « Relier » ses
 reçus pas encore en ligne.
+
+## 4 novembre — Compta → « Porte-monnaie » : le solde LU de chaque compte Vinted (`claude/ext-5319`)
+
+### Mesuré (lecture seule, 4 nov.)
+- `harvest_{uid}_billing` : 11 lignes ; deux formes — `{ main, escrow }` (la page porte-monnaie, 9 comptes) et
+  `{ balance, pending_balance, invoice_lines, history, previous_balance… }` (`/users/{pid}/payouts`, lu par
+  l'extension à CHAQUE visite, 2 comptes) ; une ligne vide (compte supprimé). La dernière réponse gagne (une ligne
+  par compte) : les deux formes portent disponible ET en attente.
+- `harvest_*_releve_*` : AUCUNE ligne (le relevé n'est rangé que si `invoice_lines` n'est pas vide) ; une seule ligne
+  `payout` vue (août, dans le `billing` d'un compte). ⚠️ Constat : une ligne `harvest_{uid}_wreq_api_v2_users_id_payouts`
+  du 13 oct. garde le corps d'un virement EN CLAIR (`bank_account_id`) — les plus récentes sont masquées
+  (« [retiré : donnée personnelle ou bancaire] ») ; à purger (geste SQL de Julien, `DELETE` confirmé).
+- ⇒ Aucune requête ajoutée par l'extension : tout est déjà lu.
+
+### Fait
+- `src/porteMonnaie.js` (règle PURE) : disponible = `main` sinon `balance`, en attente = `escrow` sinon
+  `pending_balance` (jamais mélangés) ; un compte jamais lu ⇒ « — » (jamais 0, jamais déduit des ventes) ; lecture
+  > 24 h ⇒ « à confirmer » ; total des comptes SÉLECTIONNÉS lus, « au moins » s'il en manque (nommés) ; un compte écarté
+  (`vinted_accounts_hidden` / panneau) nommé « Hors total » ; virements = lignes `payout` du relevé et du mois courant
+  (montant positif, « en cours » si `pending`).
+- `src/PorteMonnaie.jsx` + `PorteMonnaieCompta` (App) : repli « Porte-monnaie » dans « Le détail », lectures PROJETÉES
+  (jamais `select=data`).
+- Preuves : `scripts/audit-argent-offres-masquees.cjs` (partie P ; 13/13 mutations tuées dont « solde deviné »,
+  « formes mélangées », « écarté compté »), banc `argent-offres-masquees` (Compta, 390/1512, clair/sombre).
+
+## 4 novembre — Annonces → « Masquées » (masquées par Vinted, par compte)
+- `src/annoncesMasquees.js` + `src/AnnoncesMasquees.jsx` : vue rapide « Masquées N » dans Annonces · Vinted, la liste
+  par compte (photo, N°, titre, prix, « Corriger ↗ » vers `/items/{id}/edit`), lecture > 24 h ⇒ « à confirmer ». Entrée
+  = `masqueesSurEtagere` filtrée comme la grille (une déclarée partie n'y est pas). `<masquees-regle>` et
+  `<enligne-regle>` inchangées (une masquée reste parmi les PRÉSENTES, jamais « en ligne »).
+- Carte sombre : chiffre « Annonces masquées » au catalogue (`masquees`, `liveStats.annMasquees`, lectures < 24 h ;
+  « au moins » sinon), proposé dans « Modifier », pas dans le défaut.

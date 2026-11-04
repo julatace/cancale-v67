@@ -60,6 +60,7 @@ export const CHIFFRES = {
   attente:    { nom: 'Argent en attente', court: 'en attente', type: 'eur', periodes: null, sites: ['toutes', 'vinted'], compte: false, vinted: true, aller: 'cat_ventes' },
   dispo:      { nom: 'Disponible', court: 'disponible', type: 'eur', periodes: null, sites: ['toutes', 'vinted'], compte: true, vinted: true, aller: 'cat_ventes' },
   enligne:    { nom: 'Annonces en ligne', court: 'en ligne', type: 'n', periodes: null, sites: ['toutes', 'vinted'], compte: true, vinted: true, aller: 'annonces' },
+  masquees:   { nom: 'Annonces masquées', court: 'masquées', type: 'n', periodes: null, sites: ['toutes', 'vinted'], compte: true, vinted: true, aller: 'annonces', titre: 'Masquées par Vinted : toujours chez toi, pas en ligne. Une lecture de plus de 24 h est à confirmer (« au moins »).' },
   dorment:    { nom: 'Annonces qui dorment', court: 'qui dorment', type: 'n', periodes: null, sites: ['toutes', 'vinted'], compte: false, vinted: true, aller: 'annonces' },
 };
 export const IDS_CHIFFRES = Object.keys(CHIFFRES);
@@ -346,6 +347,20 @@ export const valeurChiffre = (id, place, sources, sel, regles, maintenant = Date
     if (!uid) return Number.isFinite(L.online) ? { valeur: L.online, partiel: false, manque: [], hors: '', p: null, raison: '' } : vide('pasSu');
     const n = L.annEnLigne && Object.prototype.hasOwnProperty.call(L.annEnLigne, uid) ? L.annEnLigne[uid] : null;
     return Number.isFinite(n) ? { valeur: n, partiel: false, manque: [], hors: '', p: null, raison: '' } : vide('pasSu');
+  }
+  // (4 nov.) Les masquées par Vinted, LUES il y a moins de 24 h ; les autres sont « à
+  // confirmer » ⇒ « au moins ». Un compte jamais lu n'a pas de ligne ⇒ « — » pour lui.
+  if (id === 'masquees') {
+    const L = S.live;
+    const M = L && L.annMasquees && typeof L.annMasquees === 'object' ? L.annMasquees : null;
+    if (!M) return vide('pasSu');
+    const uid = sel && sel.compte ? String(sel.compte.uid || '') : '';
+    const lignes = uid ? (Object.prototype.hasOwnProperty.call(M, uid) ? [M[uid]] : []) : Object.values(M);
+    if (!lignes.length) return vide('pasSu');
+    const frais = lignes.reduce((s, x) => s + (Number(x.frais) || 0), 0), n = lignes.reduce((s, x) => s + (Number(x.n) || 0), 0);
+    const partiel = n > frais;
+    if (partiel && !(frais > 0)) return vide('partiel');
+    return { valeur: frais, partiel, manque: partiel ? ['lectures de plus de 24 h'] : [], hors: '', p: null, raison: '' };
   }
   if (id === 'dorment') {
     const pub = S.dorment;
