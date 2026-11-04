@@ -37294,15 +37294,15 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
               l'année vers X € » (jour par jour, mois en cours compris) : deux
               estimations sur une carte se seraient contredites. */}
           {(() => {
-            const at = [['tva', 'Seuil de TVA', j.seuils.tvaBase, j.tva.etat === 'ok' || j.tva.etat === 'proche'], ['plafond', 'Plafond', j.seuils.plafondVente, j.plafond.etat === 'ok' || j.plafond.etat === 'proche']]
+            const at = [['tva', 'TVA', j.seuils.tvaBase, j.tva.etat === 'ok' || j.tva.etat === 'proche'], ['plafond', 'Plafond', j.seuils.plafondVente, j.plafond.etat === 'ok' || j.plafond.etat === 'proche']]
               .map(([k, lib, seuil, sous]) => ({ k, lib, r: sous ? moisAtteinte({ ligne, now, seuil }) : null }))
               .filter((x) => x.r && x.r.mois != null);
             return at.length ? (
               <div data-micro-projection-texte="" style={{ marginTop: 14, paddingTop: 10, borderTop: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {at.map((x) => (
                   <div key={x.k} data-micro-atteinte={x.k} data-mois={x.r.mois} data-base={x.r.base} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 13 }}>
-                    <span style={{ color: C.muted }}>{x.lib} · au rythme actuel</span>
-                    <span style={{ color: C.text, fontWeight: 600 }}>vers {x.r.nom} <span style={{ color: C.muted, fontWeight: 400 }}>· estimation</span></span>
+                    <span style={{ color: C.text, fontWeight: 600, whiteSpace: 'nowrap' }}>{x.lib} vers {x.r.nom}</span>
+                    <span style={{ color: C.muted, whiteSpace: 'nowrap' }}>estimation</span>
                   </div>
                 ))}
               </div>

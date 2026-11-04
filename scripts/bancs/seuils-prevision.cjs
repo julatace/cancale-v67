@@ -152,7 +152,7 @@ const capture = async (pg, sel, nom) => { if (!CAPT) return; fs.mkdirSync(CAPT, 
       });
       if (CAPT) await essaie('S' + T, async () => {
         const { ctx, pg } = await rendre(b, vp, { main: mainDe({ vinted_dark: true }), sombre: true });
-        await pg.addInitScript(() => { window.__sombre = 1; });
+        await pg.addInitScript(() => { try { localStorage.setItem('vinted_dark', 'true'); } catch (_) {} });
         await aller(pg, 'compta', '[data-compta-urssaf]', 2500); await ouvrirMicro(pg);
         await capture(pg, '[data-prevision-carte]', `prevision-${T}-sombre`); await capture(pg, '[data-micro-seuils]', `seuils-${T}-sombre`);
         await ctx.close();
