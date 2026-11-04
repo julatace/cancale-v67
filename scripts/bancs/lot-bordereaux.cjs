@@ -124,6 +124,11 @@ const projette = (row, sel) => {
       await bouton.click();
       const continuer=pg.getByRole('button',{name:'Préparer quand même les PDF',exact:true});
       await continuer.waitFor();dit(true,'les articles non contrôlés sont signalés avant le PDF');await continuer.click();
+      // (4 nov.) Le type de ces bordereaux n'a pas de place gardée : la feuille du tampon s'ouvre UNE fois, « Imprimer ».
+      const feuille = await pg.waitForSelector('[data-placeur-tampon]:not([data-placeur-tampon="charge"])', { timeout: 20000 }).then(() => true).catch(() => false);
+      const nFeuilles = await pg.evaluate(() => document.querySelectorAll('[data-placeur-tampon]').length);
+      dit(feuille && nFeuilles === 1, 'la feuille du tampon s’ouvre pour ce type de bordereau, une fois', String(nFeuilles));
+      if (feuille) await pg.click('[data-tampon-imprimer]');
       // Le message du lot : celui qui dit « N sur M ».
       const msg = await pg.waitForFunction(() => {
         const t = document.body.innerText; const m = /(\d+) sur (\d+) imprimé[^\n]*/.exec(t); return m ? m[0] : null;
@@ -131,8 +136,8 @@ const projette = (row, sel) => {
       dit(!!msg, 'un lot imprimé en partie le DIT', msg || '(aucun message « N sur M »)');
       const m = /(\d+) sur (\d+)/.exec(msg || '');
       dit(m && m[1] === '1' && m[2] === '3', 'il annonce le nombre RÉELLEMENT imprimé : 1 sur 3 (le PDF abîmé est écarté par la fusion)', msg || '');
-      dit(/1 sans PDF/.test(msg || ''), 'il nomme le bordereau qui n’a plus son PDF', msg || '');
-      const illisible = (msg || '').replace(/1 sur 3 imprimé[s]? — /, '').replace(/1 sans PDF/, '');
+      dit(/1 sans (PDF|bordereau)/.test(msg || '') && /Paire C/.test(msg || ''), 'il nomme le bordereau qui n’a plus son PDF', msg || '');
+      const illisible = (msg || '').replace(/1 sur 3 imprimé[s]? — /, '').replace(/1 sans (PDF|bordereau)[^,]*/, '');
       dit(/\b1\b/.test(illisible), 'et celui que la fusion a écarté — compté, jamais passé sous silence', msg || '');
       await pg.waitForTimeout(600);
       const reprise = await pg.evaluate(() => { const b = document.querySelector('button[data-lot-imprimer]'); return b ? { n: b.getAttribute('data-lot-imprimer'), t: b.innerText } : null; });
