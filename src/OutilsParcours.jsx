@@ -19,7 +19,7 @@ export function HistoriqueModifications({owner,numero}){
  return <details className="vrm-parcours-historique" key={owner} data-historique-local={revision}>
   <summary>Modifications enregistrées sur cet appareil ({lignes.length})</summary>
   <p>Depuis ce navigateur, sur les sept derniers jours. Ce journal ne confirme pas la synchronisation et ne reconstitue pas les changements antérieurs.</p>
-  {!lignes.length?<p>Aucune modification enregistrée ici.</p>:<ol>{lignes.map((l,i)=><li key={i}><time dateTime={l.at}>{new Date(l.at).toLocaleString('fr-FR')}</time><b>{l.label}{l.numero?` · N°${l.numero}`:''}</b><span>{l.avant===''?'Non renseigné':String(l.avant)} → {l.apres===''?'Non renseigné':String(l.apres)}</span></li>)}</ol>}
+  {!lignes.length?<p>Aucune modification enregistrée ici.</p>:<ol>{lignes.map((l,i)=><li key={i}><time dateTime={l.at}>{new Date(l.at).toLocaleString('fr-FR')}</time><b>{l.label}{l.numero?` · N°${l.numero}`:''}</b><span className={l.label==='Prix d’achat'?'vrm-sensible':undefined}>{l.avant===''?'Non renseigné':String(l.avant)} → {l.apres===''?'Non renseigné':String(l.apres)}</span></li>)}</ol>}
  </details>;
 }
 export function CompteurListe({affiches,total}){return <p className="vrm-parcours-compteur" role="status">{Math.min(affiches,total)} sur {total} résultat{total>1?'s':''} affiché{total>1?'s':''}</p>}
