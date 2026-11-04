@@ -65456,13 +65456,14 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
                 <span className="vrm-toutes-photo" data-toutes-photo={l.photo ? '1' : '0'} style={{ width: 64, height: 80, flexShrink: 0, borderRadius: 12, overflow: 'hidden', background: 'var(--vrm-photo, ' + (C.card2 || C.border) + ')', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   {l.photo ? <PhotoVinted src={l.photo} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : <Icon name="image" size={22} style={{ color: C.muted, opacity: .55 }}/>}
                 </span>
-                <span style={{ flex: 1, minWidth: 0 }}>
+                <span className="vrm-toutes-titre" style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ display: 'block', fontSize: 15, fontWeight: 600, lineHeight: 1.3, overflowWrap: 'anywhere' }}>{l.titre}</span>
-                  <span style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <span className="vrm-toutes-meta" style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     <span data-toutes-site="">{NOM[l.site]}</span> · {jour(l.t)}{l.etat ? ' · ' + l.etat : ''}{l.compte ? ' · ' + l.compte : ''}
                   </span>
                 </span>
-                <span style={{ flexShrink: 0, textAlign: 'right' }}>
+                <span className="vrm-toutes-bureau" aria-hidden="true"><span><b>{NOM[l.site]}</b>{l.compte&&<small>{l.compte}</small>}</span><span>{jour(l.t)}</span><span>{l.etat||'État non renseigné'}</span></span>
+                <span className="vrm-toutes-montant" style={{ flexShrink: 0, textAlign: 'right' }}>
                   {l.prix != null && <span data-toutes-prix="" style={{ display: 'block', fontSize: 15, fontWeight: 700 }}>{prix(l)}</span>}
                   {l.num ? <span data-toutes-num={l.num} style={{ display: 'block', fontSize: 12, color: C.muted, fontFamily: 'var(--vrm-mono, ui-monospace, monospace)', marginTop: 2 }}>N°{l.num}</span> : null}
                 </span>

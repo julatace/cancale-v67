@@ -61,4 +61,3 @@ html .vrm-app-shell .vrm-tache .vrm-tache-tete { flex-direction: column; align-i
 html .vrm-app-shell .vrm-phrase-reglages { margin: -8px 0 16px; }
 html .vrm-app-shell .vrm-day-greeting .vrm-phrase-ecran { flex-basis: 100%; margin-top: 2px; }
 /* (3 nov.) Le grand titre ne se tait plus au téléphone : c'est la barre du haut qui ne le redit pas. */
-}
