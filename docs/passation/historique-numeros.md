@@ -1473,3 +1473,14 @@ Audit « actions » (rapport X1-X9). Ce qui change pour les numéros :
 
 ### UNE ANNONCE SUPPRIMÉE DE VINTED : LE N° SUIT OU ON DEMANDE (3 novembre)
 Récit complet : `historique-interface-stock.md`, « LE CYCLE D'UN ARTICLE ». Aucun numéro ne change : republiée (même N°, même photo, table de recréation) ⇒ rien ; sinon une question dans Ma journée ; « Je m'en sépare » passe par `vinted_pairs_lost` (clé `cleDeclarationPartie`). `src/cycleArticle.js`, `audit-cycle-article.cjs`.
+
+## 3 novembre (soir) — Liaison Vinted ↔ Vestiaire : un N° qui disparaît d'une annonce n'est jamais redonné
+
+Détail : `historique-vestiaire.md` (même date). Côté numéros : quand il relie une annonce Vestiaire à un article
+Vinted, le N° qui RESTE est celui de l'article Vinted (déjà écrit sur le carton). Le N° que VRM avait donné à
+l'annonce Vestiaire n'est ni effacé ni redonné : il reste dans `main.vrm_vc_numeros` et dans le pool (append-only,
+compté par `ajouterNumerosHorsEcran` et par `numeroterVestiaire`) ; il apparaît dans « N° à barrer »
+(`BlocBarrerVc`, sur Annonces Vestiaire et Annonces Vinted, à côté de « nouveaux numéros à écrire ») jusqu'à
+« C'est écrit » — le même geste que `doublonsAReattribuer`/`reattribueAEcrire`, mais rangé dans la liaison
+(`de`, `ecrit`) puisque la fiche Vinted, elle, ne change pas. Défaire la liaison rend l'ancien N° à l'annonce
+Vestiaire (aucun N° neuf). Audit : `audit-lien-vc` L3 (le suivant reçoit le plus haut + 1, jamais 61).
