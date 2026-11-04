@@ -105,11 +105,15 @@ const dit = (c, m, d) => { n++; if (!c) ko++; console.log(`${c ? '✅' : '❌'} 
   dit(lot.join(',') === 'x-b,x-e,x-a,x-c,x-f,x-z', '2c le lot : tous les colis d’un transporteur à la suite, groupes dans l’ordre de l’écran, un transporteur absent à la fin', lot.join(','));
   const lotBloc = app.slice(app.indexOf('const lignesLotTous = () =>'), app.indexOf('const [progressionLot,setProgressionLot]'));
   dit(/ordonnerLot\(L, ordre/.test(lotBloc) && /colisAEnvoyerRanges\(\)/.test(lotBloc) && /rangerParTransporteur\(tous, \{ trNom: trNomDe/.test(app), '2d App : l’écran et le lot passent par la MÊME règle d’ordre');
-  dit(/__autre === 'vc'/.test(lotBloc) && /__autre === 'lbc'/.test(lotBloc) && !/__autre === 'eb'/.test(lotBloc), '2e App : Vinted, Vestiaire, Leboncoin dans le lot ; eBay jamais (étiquette dans eBay, §2.8)');
+  // (4 nov.) eBay a désormais une ligne GRISÉE dans l'aperçu (sélection) : jamais cochable,
+  // jamais dans le PDF — la règle vit dans src/lotSelection.js (audit-selection-bordereaux).
+  const selSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'lotSelection.js'), 'utf8');
+  const blocEb = selSrc.slice(selSrc.indexOf("x.__autre === 'eb'"), selSrc.indexOf("x.__autre === 'eb'") + 600);
+  dit(/__autre === 'vc'/.test(lotBloc + selSrc) && /__autre === 'lbc'/.test(lotBloc + selSrc) && /cochable: false/.test(blocEb), '2e App : Vinted, Vestiaire, Leboncoin dans le lot ; eBay jamais (étiquette dans eBay, §2.8)');
   const merge = app.slice(app.indexOf('const mergeAndDownloadBordereauxBrut'), app.indexOf('const mergeAndDownloadBordereaux = '));
   dit(/confirmerNumerosAVerifier\(/.test(merge) && /poserBordereau\(PL, out, src/.test(merge), '2f App : la fusion demande les N° « à vérifier » et tamponne chaque page (`poserBordereau` → `tamponnerBordereau`)');
 
-  dit(/choisir: choisirTampon\(\{ PL, src, numero: it\.numero, titre: it\.title, apercu: false \}\)/.test(merge) && /await mergeAndDownloadBordereaux\(items,/.test(app.slice(app.indexOf('const batchBordereaux = async'), app.indexOf('const batchBordereaux = async') + 12000)), '2g App : chaque bordereau du lot sort à la place gardée pour SA forme (`choisirTampon`, `vrm_tampon_positions`), sans aperçu');
+  dit(/choisir: choisirTampon\(\{ PL, src, numero: it\.numero, titre: it\.title, apercu: /.test(merge) && /await mergeAndDownloadBordereaux\(items,/.test(app.slice(app.indexOf('const batchBordereaux = async'), app.indexOf('const batchBordereaux = async') + 12000)), '2g App : chaque bordereau du lot sort à la place gardée pour SA forme (`choisirTampon`, `vrm_tampon_positions`), sans aperçu');
 
   // ── 3. RETOUR → STOCK ─────────────────────────────────────────────────────
   const etats = { 1: { s: 440, ss: '' }, 2: { s: 440, ss: "La livraison n'a pas encore eu lieu - colis déposé en bureau de Poste ou point relais" }, 3: { s: 440, ss: 'Commande livrée ! ' },

@@ -836,3 +836,61 @@ Reste : la vente en main propre, Leboncoin et eBay n'ont pas ce geste (ils ont d
 des candidats passent par le pont photo (vides au banc).
 Geste de Julien : Vestiaire → Annonces → « Relier à Vinted » sur un article aussi en vente sur Vinted, puis barrer
 l'ancien N° sur le carton et toucher « C'est écrit ».
+
+## 4 novembre — 5.319.0 : les offres Vestiaire dans VRM, et y répondre sur son clic (`claude/ext-5319`)
+
+Julien a choisi « voir les offres reçues sur Vestiaire et y répondre (accepter / refuser / contre-offre) depuis VRM ».
+
+### Mesuré (lecture seule, 4 nov.)
+- `vc_brut_*` (capture 5.315) : `GET apiv2…/negotiations?role=seller&withEvents=true` ⇒ `{ data: [7 négociations] }`,
+  chacune `{ id, type: 'negotiation', product: { id, name, brand.name, pictures[0].path, path (…-{id}.shtml), price },
+  events: [{ action: 'offer'|'accept', createdBy: 'buyer'|'seller', price.cents, sellerPvnPrice, creationDate }]
+  (du plus récent au plus ancien), isOpened, isClosed, isAccepted, initialPrice, minOffer, maxOffer, expirationDate,
+  sellerRemainingOffers, buyer, seller }`. Aussi `POST /products/{id}/negotiations` (une offre que TU fais à un
+  favori, réponse = la négociation) et `GET /users/me/selling-offers/{id}/negotiations`.
+- La requête de RÉPONSE (accepter, refuser, contre-offre) n'a JAMAIS été vue : aucune `vc_brut_*`, aucun chemin dans
+  `vc_recon.chemins` (seulement `GET /negotiations` et `POST /products/{id}/negotiations`). Ses 4 « accept » d'octobre
+  ont été faits avant la capture brute.
+- ⚠️ Constat (pas de ce chantier) : la capture brute 5.315 garde la réponse ENTIÈRE, donc le prénom et le pseudo de
+  l'acheteur des négociations sont en base dans `vc_brut_*` (voulu par la 5.315 ; à décider).
+
+### Fait (extension 5.319.0)
+- `vc-inject.js` : `noteOffres` (GET/POST/PUT/PATCH sur un chemin `negotiation`, hors `initial-conditions`, rôle
+  acheteur écarté) ⇒ `vcoffres` : article (titre « marque + nom », photo `images.vestiairecollective.com/produit/…`,
+  lien `.shtml`), prix en centimes (offre de l'acheteur, ce que tu touches, prix initial, mini), expiration, gestes
+  datés, « à toi » = ouverte ET dernier geste = offre de l'acheteur. JAMAIS l'acheteur : son identifiant reste en
+  MÉMOIRE de la page (`negosVues`) pour refaire la requête de la page. Forme inconnue ⇒ `inconnu` (jamais « vide »).
+- Recette APPRISE (`recetteOffre`) d'une réponse 2xx faite à la main dont la négociation renvoyée montre TON geste en
+  dernier : `accepter` (accept), `refuser` (decline…), `contre` (offre du vendeur après une offre de l'acheteur) ;
+  chemin à trous `{nego}`/`{produit}`/`{acheteur}`, corps à trous `{prixCents}`/`{prix}` + mots fixes, NOMS d'en-têtes ;
+  sinon « pas rejouable » (`valeur-inconnue`, `chemin-ambigu`, `offre-non-vue`, `prix-introuvable`…). Une offre
+  spontanée à un favori n'est pas une réponse (aucune recette).
+- Ordre `offre` (page) : compte de la page = compte attendu, offre vue dans CETTE page et encore à toi, bornes de la
+  contre-offre, en-têtes repris de la page, UNE requête ; `confirme` seulement si la réponse montre TON geste.
+- `background.js` : `vc_offres` (`offres` par `n{id}` — une clé à lettre : un segment de chiffres est un index pour
+  PostgREST), lire-fusionner-réécrire, lecture ratée ⇒ rien, une offre ne change jamais de compte, le plus récent gagne ;
+  `vrmVcRecetteOffres` + `vc_offres_recette` (appris/raison par geste ; une recette rejouable n'est jamais remplacée
+  par un essai qui ne l'est pas) ; commande `vcOffre` (`repondreOffreVestiaire`) : une action Vestiaire à la fois,
+  pause 429/403, recette apprise, offre lue ET à toi ET pas expirée, compte de l'offre connu (jamais prêtée au compte
+  de l'onglet), onglet de CE compte, 50 actions/h (`vc:{id}`), place rendue si rien n'est parti, « fait » seulement
+  confirmé. État : `vcOffre: true`. Capacités `vcoffres` / `vcoffrerepondre` = 5.319.0.
+- App (Messages → Vestiaire) : bloc « Offres » au-dessus des conversations (`src/OffresVestiaire.jsx`, règle
+  `src/offresVestiaire.js`) : photo, N° (référence VRM), titre, offre, prix, « tu touches », « reste … » ; Accepter
+  (2ᵉ toucher « Confirmer : vendre ») · Contre-offre (champ en euros, bornes) · Refuser — chacun SEULEMENT s'il est
+  appris ; sinon « Répondre sur Vestiaire ↗ ». Tes offres envoyées en attente, une ligne chacune. La conversation de
+  l'article porte « offre 200 € ».
+
+### Preuves
+- `scripts/audit-vc-offres.cjs` : VRAI vc-inject.js + vc.js + background.js reliés comme dans Chrome
+  (`tabs.sendMessage` → vc.js → page), 44 contrôles ; origin/main : 25 rouges ; `--prouve` 16/16 mutations tuées
+  (acheteur qui sort, « à toi » deviné, rôle acheteur, forme inconnue = vide, valeur inconnue rejouée, offre non vue,
+  compte de la page, plus à toi, pas appris, plafond, pause, « fait » non confirmé, changement de compte, bornes,
+  compte pas su).
+- `scripts/audit-argent-offres-masquees.cjs` (règle de l'app, partie O) et banc `scripts/bancs/argent-offres-masquees.cjs`
+  (390 tactile / 1512, clair / sombre ; rouge sur main ; captures regardées).
+- ⚠️ La forme de la requête de réponse dans les audits est INVENTÉE (elle est inconnue) : c'est la règle
+  d'apprentissage qui est jugée. À relire dans `vc_offres_recette` après son premier geste à la main.
+
+### Geste de Julien
+Installer la 5.319.0, ouvrir ses offres sur vestiairecollective.com (dans ce Chrome, connecté), puis répondre UNE
+fois à la main à une offre (accepter, refuser ou contre-offre) : VRM saura ensuite ce geste-là.
