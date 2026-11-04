@@ -3473,3 +3473,25 @@ même »**. Rien à dire ⇒ aucune feuille, l'envoi part comme avant.
   `republier` : la feuille (photos) est passée par « Publier quand même », verts ;
   `lbc-publier-app` vert sans changement (fiche propre).
 - Geste de Julien : publier un article à une seule photo pour voir la feuille.
+
+---
+
+## 4 novembre — Ma journée : le journal de la semaine (branche `claude/argent-mois`)
+
+Julien : le lundi (et jusqu'au dimanche), en tête de Ma journée, « Semaine du 27 oct. » — quatre
+chiffres de la semaine passée. AUCUNE notification (il a refusé les rappels ; le bilan du dimanche
+soir existant n'est pas touché).
+- `src/journalSemaine.js` : la semaine = `semainePassee` (api/_lib/bilan-semaine.js, lundi 00:00 →
+  lundi 00:00 à Paris, 169 h au passage à l'heure d'hiver) ; ventes et CA vendu = `bilanLignes` sur
+  les lignes de `ventesFaites` ; « Bénéfice brut » (`beneficeDesJours` + `chiffreBrut` : une semaine
+  n'a ni dépenses ni URSSAF à elle, décision du 3 nov.) avec sa couverture « N sur M prix
+  d'achat » ; colis envoyés = ses gestes « Colis fait » datés dans la semaine (Vinted, Leboncoin,
+  Vestiaire — eBay ne garde aucune date d'envoi : une vente eBay dans la semaine rend le nombre
+  « au moins », eBay nommé).
+- `JournalSemaineCarte`, juste sous la tête sombre ; repliable (44 px), replié pour CETTE semaine
+  seulement (`vrm_journal_replie`, préférence de l'appareil) : la semaine suivante se montre ouverte.
+- Preuves : `audit-journal-semaine` (16 verts, 4 rouges sur origin/main ; mutations semaine 4,
+  colis 2, brut 2, ebay 2, repli 2) ; banc `argent-mois` (B : en tête, valeurs, replié gardé au
+  rechargement, 44 px, pas de débordement).
+- Le même jour : la case « En attente » de Ma journée devient « À venir » (toutes plateformes,
+  `liveStats.aVenir`) — récit dans l'historique compta.

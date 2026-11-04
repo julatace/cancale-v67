@@ -2111,3 +2111,83 @@ Choisie par Julien parmi trois améliorations ; remplace la règle du 21 octobre
   `stats-vitrine` mis à jour (son jeu n'a pas de modèle commun des deux côtés ⇒ « Pas assez de
   données »), 112 verts.
 - Geste de Julien : saisir le boost payé dans la fiche des articles qu'il booste.
+
+---
+
+## 4 novembre — L'argent à venir, comparer deux mois, les frais par site (branche `claude/argent-mois`)
+
+Trois outils choisis par Julien (le quatrième, le journal de la semaine, est dans l'historique
+interface-stock). Une règle pure par outil, un audit qui l'EXÉCUTE, un banc qui la rend.
+
+### 1. « À venir » — ce que les sites te doivent encore (`src/argentAVenir.js`)
+
+**Une seule règle, qui remplace « l'argent en attente »** (Vinted seul, calculé à trois endroits :
+la somme des statuts « en cours » de la LISTE des ventes dans Ma journée et Ventes, le solde bloqué
+du porte-monnaie dans la carte des chiffres, le résumé Vinted et le widget).
+**Mesuré (lecture seule, 4 nov.)** : sur un compte, 3 ventes que la liste dit encore « colis déposé
+en bureau de Poste » ont une TRANSACTION finalisée (450, argent versé) — 220 € de trop dans
+« en attente » (448 € affichés pour 228 € réellement retenus par Vinted). En écartant les 450 et
+les ventes à date de versement lue, la somme par compte tombe sur le solde bloqué lu chez Vinted à
+l'euro près, sur chaque compte dont le porte-monnaie a été lu après les ventes ; les écarts
+restants sont des ventes plus récentes que la lecture du porte-monnaie. Le porte-monnaie ne sert
+donc plus de total (il retarde et ne dit pas QUELLE vente) ; « À virer » (le disponible) reste.
+- **Vinted** : statut ni annulé ni finalisé (`classifyOrderStatus`), transaction ni 450, ni 220,
+  ni ≥ 430 (suspendue, retour, annulée — `TXN_ETATS`), pas de date de versement (450,
+  `fetchVersementsVinted`, désormais lue aussi par la coque). Aucune date prévue.
+  Dates de versement pas lues ⇒ Vinted NOMMÉ, aucune vente Vinted comptée (un versé ne passe
+  jamais pour « à venir »).
+- **Leboncoin** : vente prouvée, ni annulée ni finalisée (`lbcAnnulee`, `lbcFinalisee`).
+- **eBay** : seulement un paiement RETENU par eBay (`paymentSummary.payments[].paymentHolds`,
+  état pas « libéré »), au montant retenu, daté par `expectedReleaseDate` quand eBay l'écrit.
+  ⚠️ Aucune commande eBay en base chez lui le 4 nov. (`ebay_orders` vide) : forme prise dans la
+  documentation de l'API Fulfillment, pas mesurée. Le CA eBay reste daté à la création de la
+  commande (règle existante) : une commande retenue est donc à la fois dans le « reçu » d'eBay et
+  dans « à venir » — à trancher si eBay vend vraiment.
+- **Vestiaire** : ni annulée, ni versée, ni terminée, ni `etapesVc.sellerPayment = done`, au
+  montant reçu SÛR ; date = « paiement estimé » ÉCRIT par Vestiaire (`paiementEstime`, mesuré :
+  « 24 novembre 2026 »), dite « vers le 24 nov. ».
+- Trois états : source pas lue ⇒ en cours ; lecture ratée ⇒ nommée, « au moins » ; montant
+  illisible ⇒ nommé, jamais 0 €.
+- **Où** : calculée UNE fois dans la coque (`liveStats.aVenir`, `aVenirCoque`) ; consommée par
+  Ventes (carte « À venir » en tête : Vinted = sa part, « Tous » = toutes plateformes, une ligne
+  par site et compte), Ma journée (case « À venir » et tendance), le résumé Vinted, la carte des
+  chiffres (`attente`, devenu « Argent à venir », tous les sites, par compte Vinted) et le widget
+  (seulement complète). La case « En attente » de la rangée des totaux de Ventes (statuts « en
+  cours » de la période) est retirée.
+- Preuves : `audit-argent-a-venir` (51 verts ; 12 rouges sur origin/main, dont « l'en attente de
+  Ma journée compte 384,5 € » au lieu de 140,50 € sur le jeu ; mutations tx450 9, versement 6,
+  holds 2, libere 4, vcverse 5, zero 1, site 4 rouges) ; `audit-carte-chiffres` remis à la règle
+  (210 verts).
+
+### 2. « Comparer » — deux mois (Statistiques, `src/comparerMois.js`)
+
+Ce mois face au mois d'avant ou au même mois l'an dernier (`Segmente`, choix gardé sur l'appareil).
+Ventes et CA vendu = lignes de `ventesFaites` + `bilanLignes` ; reçu = la ligne publiée
+`vinted_urssaf_mois` (`recuPublieEntre`, même fraîcheur de 3 jours, mêmes sources nommées) ;
+bénéfice = `beneficeDuMoisPub` (la lecture du récap mensuel, sortie en fonction, `beneficePeriode`
++ `chiffreBenefice`). **Un mois en cours se compare AU MÊME POINT** (la règle de Statistiques :
+« un mois commencé ne se compare pas à un mois entier ») : du 1er à maintenant face au 1er → même
+quantième, même heure. Pour cela : `beneficePeriode` reçoit `jusqua` (les ventes s'arrêtent au
+jour de la coupe inclus, les dépenses restent celles du mois ; absent = inchangé) et Ventes publie
+le reçu JOUR par jour (`recuJours`, mêmes lignes, 14 mois) — une publication plus ancienne ⇒ « — ».
+Écart en € et en % seulement si les deux côtés sont complets ; pas de % contre 0 ni un négatif.
+- Preuves : `audit-comparer-mois` (23 verts, 7 rouges sur origin/main ; mutations coupe 8, partiel,
+  pct0, jours, jusqua 1 chacune) ; `audit-benefice-unique` 47 verts (règle d'avant inchangée).
+
+### 3. « Frais par site » (Statistiques, période choisie, `src/fraisPlateformes.js`)
+
+Mesuré ce que chaque site écrit : Vinted aucune commission vendeur (frais = ce qu'il a saisi sur
+les fiches, déjà dans le relevé `vrm_stats_ventes`, + packs/options Vinted de Comptabilité) ;
+Leboncoin prix final = ce qu'il touche (frais = packs/options saisis) ; eBay `totalMarketplaceFee`
+par commande (base = dû au vendeur, port exclu) ; Vestiaire : la vente rangée ne garde que le versé
+(`sellerEarning`), la commission n'est PAS lue ⇒ « commission pas lue », aucun %. Couverture dite
+« frais lus sur N/M ventes » ; % sur les seules ventes aux frais lus.
+- Preuves : `audit-frais-plateformes` (13 verts, 3 rouges sur origin/main ; 5 mutations rouges).
+- Reste : la commission Vestiaire demande que l'extension range le prix (`sellerPrice`) à côté du
+  versé — hors de ce chantier (l'extension n'est pas touchée).
+
+### Banc commun
+
+`scripts/bancs/argent-mois.cjs` (données inventées, 390 tactile et 1512, clair et sombre) :
+100 verts. Captures regardées (carte « À venir », journal, Comparer, Frais). Rouge sur le build
+d'origin/main (voir le rapport de session).
