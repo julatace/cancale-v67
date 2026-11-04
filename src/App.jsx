@@ -38418,6 +38418,59 @@ function FraisParSiteCarte({ periode, ebayCommandes }) {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// (4 nov.) LE JOURNAL DE LA SEMAINE — en tête de Ma journée, du lundi au dimanche.
+// ═══════════════════════════════════════════════════════════════════════════
+// La semaine PASSÉE en quatre chiffres (src/journalSemaine.js : `semainePassee`,
+// `bilanLignes`, `beneficeDesJours`/`chiffreBrut`, ses gestes « Colis fait »).
+// Repliable, replié pour CETTE semaine seulement (préférence de l'appareil).
+// Aucune notification.
+const lireTableGestes = (cle) => () => { try { const v = load(cle, null); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch (_) { return null; } };
+const lireShipDone = lireTableGestes('vinted_ship_done'), lireLbcDone = lireTableGestes('vrm_lbc_colis_done'), lireVcDone = lireTableGestes('vrm_vc_colis_done');
+const REGLES_JOURNAL = { semainePassee, bilanLignes, beneficeDesJours, chiffreBrut };
+function JournalSemaineCarte({ liveStats }) {
+  const [pub] = useLigneSynchro('vrm_benefice_jours', lireBeneficeJours);
+  const [ship, pret] = useLigneSynchro('vinted_ship_done', lireShipDone);
+  const [lbcF] = useLigneSynchro('vrm_lbc_colis_done', lireLbcDone);
+  const [vcF] = useLigneSynchro('vrm_vc_colis_done', lireVcDone);
+  const vendu = liveStats && !liveStats.venduPasSu && Array.isArray(liveStats.venduLignes)
+    ? { lignes: liveStats.venduLignes, manque: [...(liveStats.venduManque || []), ...(liveStats.venduEnAttente ? ['lecture en cours'] : [])], nonComptees: liveStats.venduNonComptees || [] } : null;
+  const J = journalSemaine({ vendu, joursBenef: pub, colisFaits: pret ? { vinted: ship, lbc: lbcF, vc: vcF } : {}, R: REGLES_JOURNAL });
+  const [replie, setReplieB] = React.useState(() => { try { return repliePourSemaine(localStorage.getItem('vrm_journal_replie'), J.lundi); } catch (_) { return false; } });
+  const basculer = () => { const n = !replie; setReplieB(n); try { if (n) localStorage.setItem('vrm_journal_replie', J.lundi); else localStorage.removeItem('vrm_journal_replie'); } catch (_) {} };
+  const cases = [
+    { cle: 'ventes', l: 'Ventes', x: J.ventes, t: 'n' },
+    { cle: 'vendu', l: 'CA vendu', x: J.vendu, t: 'eur' },
+    { cle: 'brut', l: NOM_BENEFICE_BRUT, x: J.brut, t: 'eur' },
+    { cle: 'colis', l: 'Colis envoyés', x: J.colis, t: 'n' },
+  ];
+  const corps = (c) => c.x.valeur == null ? '—' : c.t === 'eur' ? <Montant v={c.x.valeur}/> : String(c.x.valeur);
+  const sous = (c) => c.x.partiel ? (c.x.couverture ? `${c.x.couverture} prix d’achat` : 'au moins') : null;
+  return (
+    <section className="vrm-journal-semaine vrm-day-card" data-journal-semaine={J.lundi} data-journal-replie={replie ? '1' : '0'} aria-label={J.titre}
+      style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 20, boxShadow: C.shadow || 'none', padding: '4px 16px', marginBottom: 12 }}>
+      <button type="button" aria-expanded={!replie} data-journal-bascule="" onClick={basculer}
+        style={{ width: '100%', minHeight: 44, display: 'flex', alignItems: 'center', gap: 10, background: 'transparent', border: 0, padding: 0, color: C.text, fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer' }}>
+        <span style={{ flex: 1, fontSize: 15, fontWeight: 600 }}>{J.titre}</span>
+        <span aria-hidden="true" style={{ color: C.muted, transform: replie ? 'none' : 'rotate(90deg)', transition: 'transform .2s cubic-bezier(0.23,1,0.32,1)' }}>›</span>
+      </button>
+      {!replie && (
+        <div className="vrm-journal-cases" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(132px, 1fr))', gap: 0, borderTop: `1px solid ${C.border}`, padding: '6px 0 10px' }}>
+          {cases.map((c) => (
+            <div key={c.cle} data-journal-case={c.cle} data-valeur={c.x.valeur == null ? '' : c.t === 'eur' ? String(Math.round(c.x.valeur * 100)) : String(c.x.valeur)} data-partiel={c.x.partiel ? '1' : undefined}
+              title={c.x.partiel && c.x.manque && c.x.manque.length ? `au moins — sans ${c.x.manque.join(', ')}` : c.x.valeur == null ? 'pas su' : undefined}
+              style={{ padding: '8px 0', minWidth: 0 }}>
+              <div style={{ fontSize: 12, color: C.muted, fontWeight: 500 }}>{c.l}</div>
+              <div className="vrm-display" style={{ fontSize: 22, fontWeight: 700, color: c.x.valeur == null ? C.muted : C.text, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{corps(c)}</div>
+              {sous(c) ? <div style={{ fontSize: 11, color: C.muted }}>{sous(c)}</div> : null}
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function StatsDetaillees({ liveStats, panelOff, onVoirDorment = null }) {
   const sCarte = { padding: 18, background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: C.shadow };
   const sTitre = { fontSize: 15, fontWeight: 600, color: C.text, letterSpacing: -0.15 };
@@ -51147,6 +51200,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </section>
               ); })()}
 
+            {/* (4 nov.) La semaine passée, en tête (repliable) : src/journalSemaine.js. */}
+            {!baseKO && !premierJour && <JournalSemaineCarte liveStats={liveStats}/>}
             {!baseKO && !premierJour && <NotifsMuettes onNav={onNav}/>}
 
             {/* « À FAIRE » (maquette) : une carte par geste — pastille chiffrée (encre ; ambre
