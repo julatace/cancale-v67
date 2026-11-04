@@ -55,7 +55,9 @@ function extraire(src, nom) {
 }
 const charger = async (texte, nom) => {
   const tmp = path.join(os.tmpdir(), `${nom}-${process.pid}-${Math.random().toString(36).slice(2)}.mjs`);
-  fs.writeFileSync(tmp, texte);
+  const dossier = path.join(R, nom === 'carte-chiffres' ? 'src/design' : 'src');
+  const executable = texte.replace(/from (['"])(\.{1,2}\/[^'"]+)\1/g, (_, q, spec) => 'from ' + q + require('url').pathToFileURL(path.resolve(dossier, spec)).href + q);
+  fs.writeFileSync(tmp, executable);
   try { return await import('file://' + tmp); } finally { try { fs.unlinkSync(tmp); } catch (_) {} }
 };
 const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');

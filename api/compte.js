@@ -784,7 +784,10 @@ async function appareils(req, res) {
   const u = await vendeurExige(req, res);
   if (!u) return;
   let corps = {};
-  if (req.method === 'POST') { try { corps = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {}); } catch (_) { corps = {}; } }
+  if (req.method === 'POST') {
+    corps = await lireCorpsJson(req);
+    if (!corps || typeof corps !== 'object' || Array.isArray(corps)) return repondre(res, 400, { erreur: 'corps-invalide' });
+  }
   const r = await traiterAppareils({ base: SUPABASE_URL, cle: process.env.SUPABASE_SERVICE_KEY || '', user: u, jeton: jetonDe(req), methode: req.method, corps });
   return repondre(res, r.status, r.body);
 }

@@ -125,8 +125,8 @@ export function argentAVenir({ vinted, lbc, ebay, vestiaire, versements, etatTx,
     if (!garde(id)) continue;
     const compte = String(o._pseudo || o._compte || '');
     const parRetenue = retenues.map((h) => eurEbay(h.holdAmount));
-    const eur = parRetenue.every((x) => x != null) ? Math.round(parRetenue.reduce((t, x) => t + x * 100, 0)) / 100 : R.montantRecuEbay(o).eur;
-    if (eur == null) { nonComptees.push({ id, plateforme: 'eBay', compte, raison: R.montantRecuEbay(o).raison || 'montant retenu illisible' }); continue; }
+    const eur = parRetenue.every((x) => x != null) ? Math.round(parRetenue.reduce((t, x) => t + x * 100, 0)) / 100 : null;
+    if (eur == null) { nonComptees.push({ id, plateforme: 'eBay', compte, raison: 'montant retenu illisible ou dans une autre devise' }); continue; }
     const dates = retenues.map((h) => dateEcriteLue(h.expectedReleaseDate));
     const prevu = dates.every((t) => t != null) ? Math.max(...dates) : null;
     lignes.push({ id, plateforme: 'eBay', compte, eur, prevu, ts: Date.parse(o.creationDate || '') || null });

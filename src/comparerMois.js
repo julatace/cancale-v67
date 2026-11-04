@@ -56,7 +56,7 @@ export const bornesComparees = (ymA, ymB, maintenant = Date.now()) => {
 
 // Le vendu entre deux instants (nombre et montant), par la règle de « Vendu ».
 const venduEntre = (V, b, R) => {
-  if (!V || !Array.isArray(V.lignes)) return { ventes: pasSu('pasSu'), vendu: pasSu('pasSu') };
+  if (!V || V.enAttente || !Array.isArray(V.lignes)) return { ventes: pasSu('pasSu'), vendu: pasSu('pasSu') };
   const r = R.bilanLignes(V.lignes, b.de, b.a - 1);
   const nc = (V.nonComptees || []).filter((x) => x && x.ts != null && x.ts >= b.de && x.ts < b.a);
   const manque = [...new Set([...(V.manque || []), ...nc.map((x) => x.plateforme)])];
