@@ -78,7 +78,7 @@ jobs:
       - name: Vérifier le placement et la lecture des QR après tampon
         run: |
           node scripts/tests/bordereau-zone-protegee.cjs
-          node scripts/tests/bordereau-rendu-blanc.cjs
+          BANC_PDFJS_DIR="$VRM_PDFJS_DIR" node scripts/bancs/tampon-bordereau.cjs
           node scripts/tests/bordereau-qr-lecture.cjs
       - name: Vérifier les politiques SQL sur une base jetable
         run: |
