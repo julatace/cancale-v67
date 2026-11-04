@@ -137,7 +137,7 @@ export default function CarteStats({ owner = '', page, sel, sources, regles, reg
         }))}>
         {prog ? <BarreObjectif prog={prog} fmt={fmt} /> : null}
       </CarteMois>
-      {ouvert ? <FeuilleCarte page={page} sel={sel} sources={sources} regles={regles} reglage={reglage} poser={poser} locaux={locaux} fermer={() => setOuvert(false)} FermeAuRetour={FermeAuRetour} objectif={objectif} poserObjectif={poserObjectif} /> : null}
+      {ouvert ? <FeuilleCarte owner={owner} page={page} sel={sel} sources={sources} regles={regles} reglage={reglage} poser={poser} locaux={locaux} fermer={() => setOuvert(false)} FermeAuRetour={FermeAuRetour} objectif={objectif} poserObjectif={poserObjectif} /> : null}
     </>
   );
 }
@@ -147,7 +147,7 @@ export default function CarteStats({ owner = '', page, sel, sources, regles, reg
 // chiffre qui y va. La période se choisit pour CE chiffre quand la page n'a pas
 // son propre filtre de période. Chaque choix est rangé tout de suite (la carte,
 // derrière, change sous ses yeux) ; « Par défaut » rend la carte des maquettes.
-function FeuilleCarte({ page, sel, sources, regles, reglage, poser, locaux, fermer, FermeAuRetour, objectif = null, poserObjectif = null }) {
+function FeuilleCarte({ owner = '', page, sel, sources, regles, reglage, poser, locaux, fermer, FermeAuRetour, objectif = null, poserObjectif = null }) {
   const R = reglageDePage(reglage, page, locaux);
   const [place, setPlace] = React.useState(0);
   const places = [R.g, ...R.c];
