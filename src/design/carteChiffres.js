@@ -456,3 +456,14 @@ export const courbeVendu = (sources, sel, p, regles, maintenant = Date.now()) =>
   }
   return out;
 };
+
+// ── L'OBJECTIF DU MOIS (4 nov.) ─────────────────────────────────────────────
+// La valeur que la barre compare à l'objectif : LE chiffre « vendu » (CA) ou
+// « ventes » (nombre) du MOIS, tous les sites, tous les comptes — par
+// `valeurChiffre`, la lecture même du grand chiffre (src/objectifMois.js).
+export const SEL_OBJECTIF = { site: 'toutes', compte: null, periode: null };
+export const valeurObjectif = (obj, sources, regles, maintenant = Date.now()) => {
+  if (!obj) return null;
+  const id = obj.type === 'ventes' ? 'ventes' : 'vendu';
+  return valeurChiffre(id, { id, p: 'mois' }, sources, SEL_OBJECTIF, regles, maintenant);
+};

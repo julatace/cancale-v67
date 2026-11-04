@@ -131,3 +131,11 @@ html body .vrm-chat-panel .vrm-chat-send:disabled { opacity: .45 !important; }
    qui marche, en encre pleine — le cobalt reste à Envoyer (§7). */
 html body .vrm-chat-panel [data-pied-envoi="impossible"] .vrm-chat-vinted { background: var(--vrm-ink) !important; color: var(--vrm-bg) !important; min-height: 46px; border-radius: 12px; }
 html body .vrm-chat-panel [data-pied-envoi="impossible"] .vrm-chat-pied-raison b { color: var(--vrm-ink); }
+
+/* (4 nov.) Messages · eBay : « Questions · Tout » sur toute la largeur de la liste,
+   et la navigation « 1 · 2 » entre les questions d'une même annonce, 44 px au doigt. */
+html body [data-messagerie-site="ebay"] .vrm-ebay-q-vue { display: flex !important; width: 100% !important; box-sizing: border-box; }
+html body [data-messagerie-site="ebay"] .vrm-ebay-q-vue > .vrm-seg-btn { flex: 1 1 0 !important; min-width: 0 !important; min-height: 44px !important; padding: 0 12px !important; white-space: nowrap; }
+html body .vrm-ebay-q-nav.vrm-seg { display: flex !important; width: fit-content !important; flex-shrink: 0; }
+html body .vrm-ebay-q-nav.vrm-seg > button.vrm-seg-btn,
+:root:root body .vrm-app-shell .vrm-main .vrm-ebay-q-nav.vrm-seg > button.vrm-seg-btn:not(#fu) { flex: 0 0 auto !important; min-width: 44px !important; min-height: 44px !important; height: auto !important; padding: 0 12px !important; }

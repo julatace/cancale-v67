@@ -3535,3 +3535,27 @@ soir existant n'est pas touché).
   rechargement, 44 px, pas de débordement).
 - Le même jour : la case « En attente » de Ma journée devient « À venir » (toutes plateformes,
   `liveStats.aVenir`) — récit dans l'historique compta.
+### 4 nov. — OBJECTIF DU MOIS DANS LA CARTE SOMBRE ; MESSAGES SORT DE LA COLONNE DE 760 PX (`claude/offres-objectif`)
+- Objectif : UN réglage `vrm_objectif_mois` (synchronisé, `onCloudReady`) — `{ type: 'ca' |
+  'ventes', valeur, cache: { page: bool } }` — et UNE règle (`src/objectifMois.js`) : la
+  valeur est celle du chiffre « vendu » / « ventes » du MOIS, tous sites et comptes, lue par
+  `valeurObjectif` → `valeurChiffre` (VENDU = `ventesFaites`) ; pourcentage jamais arrondi
+  vers le haut ; pas su ⇒ « — » ; partiel ⇒ « au moins » dans le titre. Une barre FINE (4 px)
+  sous les cases (`BarreObjectif`), « Objectif · 297 € / 500 € » ; aucun objectif ⇒ rien.
+  Se fixe dans « Modifier » → « Objectif » (CA vendu | Nombre de ventes, montant, OK ;
+  « Masquer/Montrer sur cette carte », « Retirer ») ; absente par défaut sur Achats et Colis.
+  Mesuré : les deux anciens objectifs (`vrm_ca_objectif` de Statistiques, `vinted_goal` de
+  Ventes, avec sa proposition « Viser X € » calculée sur l'archive Vinted seule) n'étaient
+  posés NULLE PART en base ; Statistiques lit désormais le même réglage et la même valeur
+  (`ObjectifDuMois`), le bloc de Ventes (doublon de la barre sur le même écran) est retiré.
+  Preuves : `audit-objectif-mois.cjs` 33 (rouge sur main, 7/7 mutations) ; banc
+  `offres-objectif` A.
+- Messages : `jetons.css` §9 rangeait l'écran Messages dans la colonne de lecture de 760 px ;
+  les trois volets (maquette du 31 oct.) n'y tenaient pas — le fil tombait à ~100 px, un mot
+  par ligne, à 1512 px sur Vinted, eBay, Vestiaire et Leboncoin (déjà vu, non corrigé, dans
+  « Proposer X € » du 3 nov.). Une autre session a corrigé la même chose en parallèle
+  sur `main` (`:not(:has(.vrm-message-workspace))`) : c'est SA règle qui est gardée à la
+  fusion ; `messages-volets` et `messages-sites` (1512) verts, le banc neuf exige un fil
+  ≥ 380 px. Reste rouge, AVANT ce
+  chantier aussi : `messages-sites` « vestiaire · 390 px — la liste prend toute la largeur ».
+- Geste de Julien : « Modifier » sur une carte → « Objectif ».

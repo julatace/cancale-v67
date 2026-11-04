@@ -14,10 +14,14 @@ export function lireXmlEbay(source,appel) {
   if(typeof source!=='string' || source.length>4*1024*1024 || /<!DOCTYPE|<!ENTITY/i.test(source) || XMLValidator.validate(source)!==true)return null;
   try{return parser.parse(source)[appel+'Response'] || null;}catch(_){return null;}
 }
+// (4 nov.) + `type` (MessageType : « AskSellerQuestion » = une QUESTION d'un
+// acheteur sur une annonce, la seule à laquelle `AddMemberMessageRTQ` répond —
+// src/questionsEbay.js). Jamais l'adresse e-mail de l'expéditeur (`SenderEmail`)
+// ni rien d'autre sur lui que son pseudo, rendu à l'écran et jamais rangé.
 export function messagesEbay(root) {
   return liste(root?.MemberMessage?.MemberMessageExchange).map(e=>{
     const q=e.Question || {},it=e.Item || {};
-    return {id:texte(q.MessageID),itemId:texte(it.ItemID),titre:texte(it.Title),sender:texte(q.SenderID),subject:texte(q.Subject),body:texte(q.Body),responses:liste(e.Response).map(r=>typeof r==='object'?texte(r.Body ?? r.Message ?? r):texte(r)).filter(Boolean),status:texte(e.MessageStatus),date:texte(e.CreationDate)};
+    return {id:texte(q.MessageID),itemId:texte(it.ItemID),titre:texte(it.Title),sender:texte(q.SenderID),subject:texte(q.Subject),body:texte(q.Body),responses:liste(e.Response).map(r=>typeof r==='object'?texte(r.Body ?? r.Message ?? r):texte(r)).filter(Boolean),status:texte(e.MessageStatus),date:texte(e.CreationDate),type:texte(q.MessageType).trim()};
   }).filter(m=>m.id);
 }
 export function offresEbay(root) {
