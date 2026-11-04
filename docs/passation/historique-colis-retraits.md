@@ -3039,6 +3039,40 @@ lot ouvert porte d'autres N° : le garde-fou `verifierContexte` (empreinte N° c
 (#998), le lot passe par `mergeAndDownloadBordereaux` → `choisirTampon({…, apercu:false})` : chaque
 bordereau sort à la place gardée pour SA forme (`vrm_tampon_positions`) — audit `colis-trois` 2g.
 
+## 4 novembre — Le lot de bordereaux : Vestiaire et Leboncoin cochables, le tampon sur une sélection (branche `claude/selection-bordereaux`)
+
+Julien (3 nov., 21 h 08) : « je n'ai pas la possibilité de sélectionner la vente de Vestiaire Co et de Leboncoin quand
+je veux imprimer les bordereaux, c'est un pb ; pareil pour le tamponnage, on doit pouvoir le faire quand tous les
+bordereaux sont sélectionnés ».
+
+**Mesuré dans le code d'avant** : la seule sélection de bordereaux est l'aperçu de « Tout imprimer » (aucune
+sélection dans Ventes). Une vente Vestiaire n'y entrait que si son bordereau était DÉJÀ rangé (`v.bordereau.id`) ;
+une vente Leboncoin que si l'extension de CE navigateur savait lire le PDF (`extSait('lbcpdf') === 'ok'`) ET que
+le lien était lu — au téléphone, jamais. Sinon : pas de ligne du tout, rien à cocher. eBay : absent. **Mesuré en
+base (lecture seule)** : 1 vente Vestiaire à envoyer, bordereau rangé ; les 3 ventes Leboncoin « Paiement
+effectué » ont un lien de bordereau mais leur colis est `finished/delivered` (pas à poster aujourd'hui).
+**Fait** :
+- `src/lotSelection.js` (pur) : `ligneLotAutre` — Vestiaire et Leboncoin ont TOUJOURS leur ligne, cochable ;
+  `pdf` dit si le bordereau est là (Vestiaire : rangé ; Leboncoin : lien lu ET extension ici) ; eBay = ligne grisée
+  « eBay », jamais cochable (§2.8) ; `cochesParDefaut` (avec bordereau, ni ancienne ni déjà imprimée),
+  `selectionImprimable` (jamais eBay), `texteSansBordereau` (« 2 sans bordereau : N°13 Pochette, Golf »).
+- Aperçu : « Sans bordereau » en ambre sur la ligne, « eBay » à la place de « Contrôlé », « Tout sélectionner »
+  sans eBay. Une ligne cochée sans PDF part au lot et le message la NOMME (jamais un vide).
+- Tampon sur une sélection : `choisirTampon` reçoit une mémoire `deja` PARTAGÉE par le lot
+  (`mergeAndDownloadBordereauxBrut`) ⇒ la feuille `PlaceurTampon` s'ouvre UNE fois par forme (transporteur +
+  format + orientation, `formeTampon`), sur le PREMIER bordereau de cette forme dans l'ordre du lot ; la place
+  choisie vaut pour les autres bordereaux de la même forme ; « Toujours ici » la garde (`vrm_tampon_positions`) ;
+  une forme gardée ne redemande plus, sauf « Placer le tampon » (bouton de l'aperçu, `apercu: 'force'`).
+  « Annuler » arrête TOUT le lot (l'erreur n'est plus avalée comme un PDF raté) : aucun PDF.
+**Preuves** : `scripts/audit-selection-bordereaux.cjs` (14, `--prouve` 9/9) ; banc NOUVEAU
+`scripts/bancs/selection-bordereaux.cjs` (Vinted Mondial Relay ×2 + Chronopost, Vestiaire avec et sans bordereau,
+Leboncoin sans extension, eBay ; 390 tactile, 1512 clair, 1512 sombre ; PDF relu par pdf.js) : 54 verts ; rouge sur
+origin/main (11 rouges) ; mutations « place par bordereau » 3, « eBay cochable » 3 rouges. `lot-bordereaux` et
+`tout-imprimer` passent désormais par la feuille (un type sans place gardée) ; `lot-bordereaux` lit « 1 sans
+bordereau : Paire C… ». `fusion-echelle --verifier` vert.
+**Reste** : au téléphone, un bordereau Leboncoin reste « Sans bordereau » (le PDF ne se lit que par l'extension
+de l'ordinateur) ; la course des N° (vente lue avant sa transaction) demeure — le banc sème les N° sur l'appareil.
+
 
 ### Litiges, retours et réclamations avec leur délai (3-4 novembre, branche `claude/litiges-recherche`)
 Demande : une ligne par litige / retour / réclamation en cours, avec la DATE LIMITE (seulement si elle est lue) et LE geste (un lien vers le site, son clic).

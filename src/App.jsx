@@ -56,6 +56,10 @@ import VuesVentes from "./VuesVentes.jsx";
 import BordereauxAuto from "./BordereauxAuto.jsx";
 import {resumerStockJournee} from './stockJournee.js';
 import {jaugeSeuils,optionsMicro,calendrierUrssaf,phraseRythme,seuilsDe,declarationRevenus,rappelCfe} from './microEntreprise.js';
+import { moisAtteinte, dac7ParPlateforme } from './seuilsAnnee.js';
+import { previsionUrssaf } from './previsionUrssaf.js';
+import { annulationsParCompte } from './annulationsCompte.js';
+import { notesParCompte } from './notesRecues.js';
 import { toutSurLeNumero, lireNumeroCherche } from "./rechercheNumero.js";
 import { repriseNumerosRecreation, tableRecrees } from "./repriseNumero.js";
 import { etatCycle, cartesSupprimees, majVusEnLigne, indexPresentes, montantSaisi as montantCycle, CHOIX as CHOIX_CYCLE, LIBELLE_CHOIX } from "./cycleArticle.js";
@@ -138,6 +142,7 @@ import { indexMemo as indexRechercheMemo, chercherPartout, destinationResultat }
 import { litigesEnCours, litigeDeVente, requeteEmailsLitiges, texteLimite as texteLimiteLitige, LIBELLE_GENRE as LIBELLE_LITIGE } from "./litiges.js";
 import { rangerParTransporteur, ordreDesGroupes, ordonnerLot } from "./lotTransporteurs.js";
 import { trouverParScan } from "./scanColis.js";
+import { ligneLotAutre, cochesParDefaut, selectionImprimable, texteSansBordereau } from "./lotSelection.js";
 import { etatVinted, NIVEAU_ETAT_MAX } from "./carteAnnonce.js";
 import ChoixPeriode from "./ChoixPeriode.jsx";
 import { libellePlage, phrasePlage } from "./periodeCalendrier.js";
@@ -10690,9 +10695,10 @@ const TAMPON_ANNULE = 'Impression annulée.';
 const estTamponAnnule = (e) => !!(e && (e.tamponAnnule || e.message === TAMPON_ANNULE));
 let _placeurTampon = null;
 const demanderPlacementTampon = (o) => new Promise((resolve) => { if (!_placeurTampon) return resolve(undefined); _placeurTampon({ ...o, resolve }); });
-const choisirTampon = ({ PL, src, numero, titre, apercu = true }) => {
+// (4 nov.) `deja` partagé par tout un lot : UNE question par forme, la place choisie vaut pour les
+// bordereaux suivants de la même forme (le premier de chaque forme est celui qu'on montre).
+const choisirTampon = ({ PL, src, numero, titre, apercu = true, deja = {} }) => {
   let type = 'autre'; try { type = typeBordereau(PL, src).type; } catch (_) {}
-  const deja = {};
   return async (doc, info = {}) => {
     const forme = formeTampon(type, doc.getPages()[0], !!info.isole);
     if (forme.cle in deja) return deja[forme.cle];
@@ -11114,6 +11120,10 @@ const mergeAndDownloadBordereauxBrut = async (items, resolvePos, opts = {}) => {
   let count = 0, nInv = 0, isoles = 0, nEtiquettes = 0, fiches = 0, bandes = 0;
   const entiers = [];   // ce qu'on n'a PAS su isoler — l'écran doit le dire
   const reussis = [], rates = [];
+  // (4 nov., Julien : « pareil pour le tamponnage, on doit pouvoir le faire quand tous les bordereaux
+  // sont sélectionnés ») `opts.apercu` : true ⇒ la feuille s'ouvre UNE fois par forme sans place gardée ;
+  // 'force' (« Placer le tampon ») ⇒ une fois par forme, toujours ; false ⇒ jamais. Annuler ⇒ rien.
+  const dejaLot = {};
   for (const [index, it] of items.entries()) {
     try {
       const src = await PDFDocument.load(it.pdfBuf);
@@ -11123,7 +11133,7 @@ const mergeAndDownloadBordereauxBrut = async (items, resolvePos, opts = {}) => {
       // ne SAIT pas où elle est, la page part ENTIÈRE — jamais un code-barres
       // coupé au hasard (`poserBordereau`, la même règle partout).
       // La position mémorisée de la forme de CE bordereau (`positionTampon`), sinon le choix automatique.
-      const r1 = await poserBordereau(PL, out, src, { numero: it.numero, title: it.title, pos, thermique, choisir: choisirTampon({ PL, src, numero: it.numero, titre: it.title, apercu: false }) });
+      const r1 = await poserBordereau(PL, out, src, { numero: it.numero, title: it.title, pos, thermique, choisir: choisirTampon({ PL, src, numero: it.numero, titre: it.title, apercu: opts.apercu === undefined ? false : opts.apercu, deja: dejaLot }) });
       for (const t of r1.tampons || []) { if (t === 'fiche') fiches++; else if (t === 'bande') bandes++; }
       if (r1.isole) { isoles++; nEtiquettes += r1.etiquettes; }
       else if (thermique) entiers.push({ titre: it.title || '', raison: r1.raison });
@@ -11132,7 +11142,7 @@ const mergeAndDownloadBordereauxBrut = async (items, resolvePos, opts = {}) => {
       if (it.invBytes) {
         try { const isrc = await PDFDocument.load(it.invBytes); (await out.copyPages(isrc, isrc.getPageIndices())).forEach(p => out.addPage(p)); nInv++; } catch (_) {}
       }
-    } catch (_) { rates.push(index); }
+    } catch (e) { if (estTamponAnnule(e)) throw e; rates.push(index); }
   }
   if (!count) throw new Error('Aucun bordereau exploitable.');
   posePrefsImpression(PL, out);   // une feuille par bordereau (§ recto-verso)
@@ -37410,6 +37420,42 @@ function JaugeBarre({ pct, marques = [], etat, attr }) {
     </div>
   );
 }
+// ── DAC7 PAR PLATEFORME (3 nov.) ── `dac7ParPlateforme` (src/seuilsAnnee.js) sur
+// la ligne publiée : les MÊMES ventes que le CA déclaré (datées au versement,
+// comptes exclus retirés). Ton informatif (historique « 6 octobre ») : aucun
+// ambre, un seuil atteint se dit par le mot ; une plateforme pas lue ⇒ « — » ;
+// il manque des ventes ⇒ « au moins », jamais « sous ».
+function Dac7Plateformes({ ligne, annee }) {
+  const D = React.useMemo(() => dac7ParPlateforme({ ligne, annee }), [ligne, annee]);
+  if (!D || !D.plateformes.length) return null;
+  const eur = (c) => eurMicro(c / 100);
+  return (
+    <div data-dac7="" data-dac7-annee={annee} style={{ marginTop: 16, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 13, marginBottom: 4 }}>
+        <span style={{ fontWeight: 600, color: C.text }}>DAC7</span>
+        <span style={{ color: C.muted }}>30 ventes ou plus de 2 000 €</span>
+      </div>
+      {D.plateformes.map((p) => {
+        const pct = p.etat !== 'lu' ? 0 : Math.min(100, Math.max(p.n / 30, p.centimes / 200000) * 100);
+        const droite = p.etat !== 'lu' ? '—'
+          : p.verdict === 'atteint' ? <b style={{ color: C.text }}>atteint</b>
+          : p.verdict === 'atteintSi' ? <>atteint si {p.nAd} à dater</>
+          : p.verdict === 'sous' ? <>encore {p.reste.n} vente{p.reste.n > 1 ? 's' : ''} ou {eur(p.reste.centimes)}</>
+          : <>au moins</>;
+        return (
+          <div key={p.plateforme} data-dac7-plateforme={p.plateforme} data-etat={p.etat} data-n={p.n == null ? '' : p.n} data-cts={p.centimes == null ? '' : p.centimes} data-verdict={p.verdict || ''} data-a-dater={p.nAd || ''} style={{ padding: '8px 0', borderTop: `1px solid ${C.border}` }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, flexWrap: 'wrap', fontSize: 13 }}>
+              <span style={{ color: C.text, fontWeight: 600 }}>{p.plateforme}</span>
+              <span style={{ color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{p.etat !== 'lu' ? '—' : <>{p.partiel ? 'au moins ' : ''}{p.n} vente{p.n > 1 ? 's' : ''} · {eur(p.centimes)}</>}</span>
+            </div>
+            {p.etat === 'lu' ? <div style={{ marginTop: 6 }}><JaugeBarre attr={{ 'data-dac7-jauge': p.plateforme }} pct={pct} etat="ok" /></div> : null}
+            <div style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>{droite}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
   const freq = useFreqUrssaf();
   const [opts, optsPret] = useLigneSynchro('vrm_micro_options', lireOptionsMicro);
@@ -37558,11 +37604,27 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
             <JaugeBarre attr={{ 'data-micro-jauge': 'plafond' }} pct={j.plafond.pct} etat={j.plafond.etat} />
             <div data-micro-plafond-texte="" style={{ fontSize: 13, color: j.plafond.etat === 'ok' ? C.muted : C.text, marginTop: 6, lineHeight: 1.5 }}>{plafTxt}</div>
           </div>
-          {j.projection != null ? (
-            <div data-micro-projection-texte="" style={{ fontSize: 13, color: (j.projTva || j.projPlafond) ? C.text : C.muted, marginTop: 14, paddingTop: 10, borderTop: `1px solid ${C.border}`, lineHeight: 1.5 }}>
-              À ce rythme, tu finirais l'année vers <b>{eurRond(j.projection)}</b>{j.projPlafond ? <> : au-dessus du plafond de {eurRond(j.seuils.plafondVente)}.</> : j.projTva ? <> : au-dessus du seuil de TVA — anticipe ({eurRond(j.seuils.tvaBase)}).</> : '.'} Une estimation, pas une prévision.
-            </div>
-          ) : null}
+          {/* (3 nov.) « Vers quel mois » : projection LINÉAIRE sur les mois finis
+              (`moisAtteinte`, src/seuilsAnnee.js) — seulement si le total est complet
+              et porte au moins 2 mois finis ; sinon rien. Remplace « tu finirais
+              l'année vers X € » (jour par jour, mois en cours compris) : deux
+              estimations sur une carte se seraient contredites. */}
+          {(() => {
+            const at = [['tva', 'TVA', j.seuils.tvaBase, j.tva.etat === 'ok' || j.tva.etat === 'proche'], ['plafond', 'Plafond', j.seuils.plafondVente, j.plafond.etat === 'ok' || j.plafond.etat === 'proche']]
+              .map(([k, lib, seuil, sous]) => ({ k, lib, r: sous ? moisAtteinte({ ligne, now, seuil }) : null }))
+              .filter((x) => x.r && x.r.mois != null);
+            return at.length ? (
+              <div data-micro-projection-texte="" style={{ marginTop: 14, paddingTop: 10, borderTop: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {at.map((x) => (
+                  <div key={x.k} data-micro-atteinte={x.k} data-mois={x.r.mois} data-base={x.r.base} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 13 }}>
+                    <span style={{ color: C.text, fontWeight: 600, whiteSpace: 'nowrap' }}>{x.lib} vers {x.r.nom}</span>
+                    <span style={{ color: C.muted, whiteSpace: 'nowrap' }}>estimation</span>
+                  </div>
+                ))}
+              </div>
+            ) : null;
+          })()}
+          <Dac7Plateformes ligne={ligne} annee={j.annee} />
           <Pourquoi label="D'où viennent ces seuils">Seuils {j.annee} de la vente de marchandises, vérifiés le {j.seuils.verifie} : franchise de TVA {eurRond(j.seuils.tvaBase)} (seuil majoré {eurRond(j.seuils.tvaMajore)}), plafond du régime micro {eurRond(j.seuils.plafondVente)}. Le chiffre est ce que tes plateformes t'ont versé dans l'année (toutes plateformes), hors comptes que tu as retirés.</Pourquoi>
         </div>
       </Card>
@@ -37765,8 +37827,18 @@ function CarteUrssafMois({ liveStats, onNav }) {
   // (`montantPeriodeUrssaf`, §11) : des ventes sans date de versement, ou une
   // ligne publiée avant la fin de la période ⇒ le montant est un MINIMUM (§5).
   const montantEcheance = montantPeriodeUrssaf(urssafDue, v, TAUX_URSSAF * 100);
-  const urssafPeriodCA = montantEcheance.ca;
-  const echeancePartiel = montantEcheance.partiel ? 1 : 0;
+  // (3 nov.) LA PRÉVISION de la prochaine échéance (`previsionUrssaf`,
+  // src/previsionUrssaf.js) : les MÊMES règles d'argent (passées en argument),
+  // plus — un rythme jamais choisi ⇒ « — » et le geste (jamais « trimestriel »
+  // deviné) ; un mois de la période déjà noté « déclaré » n'est pas recompté ;
+  // « au moins » + le nombre de ventes à dater. Registre pas encore lu ⇒ la
+  // lecture d'avant (`montantEcheance`), sans rien retirer.
+  const rythmeChoisi = (() => { const r = load('vinted_urssaf_freq', null); return r === 'mensuel' || r === 'trimestriel' ? r : null; })();
+  const prev = previsionUrssaf({ regime: 'micro', rythme: rythmeChoisi, now: new Date(), ligne: v, declare: registreDecl, taux: TAUX_URSSAF * 100,
+    regle: { nextUrssafDeadline, moisPeriodeUrssaf, montantPeriodeUrssaf, moisDeclare } });
+  const prevIci = (prev.etat === 'lu' || prev.etat === 'passu') && urssafDue && prev.label === urssafDue.label ? prev : null;
+  const urssafPeriodCA = prevIci ? prevIci.ca : montantEcheance.ca;
+  const echeancePartiel = (prevIci ? prevIci.partiel : montantEcheance.partiel) ? 1 : 0;
   const Mt = ({ v: x }) => <span style={{whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums'}}>{fmt(x)}</span>;
   const sTitre = {fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15};
   const sLib = {fontSize:13,color:C.muted,fontWeight:500};
@@ -37829,9 +37901,15 @@ function CarteUrssafMois({ liveStats, onNav }) {
         <div data-compta-echeance="">
           <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10,flexWrap:'wrap'}}>
             <span className="vrm-compta-libelle" style={{flex:1,margin:0}}>Prochaine déclaration</span>
-            <span data-urssaf-rythme={urssafFreq} style={{fontSize:13,color:C.muted}}>{urssafFreq==='mensuel'?'chaque mois':'chaque trimestre'}</span>
+            {rythmeChoisi ? <span data-urssaf-rythme={urssafFreq} style={{fontSize:13,color:C.muted}}>{urssafFreq==='mensuel'?'chaque mois':'chaque trimestre'}</span> : null}
           </div>
-          {urssafDue ? (()=>{
+          {prev.etat === 'rythme' ? (
+            <div data-prevision-urssaf="rythme" style={{background:C.card2||C.bg,borderRadius:12,padding:'12px 14px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:'8px 12px',flexWrap:'wrap'}}>
+              <span className="vrm-display" style={{fontSize:22,fontWeight:700,color:C.muted}}>—</span>
+              <Segmente label="Rythme de déclaration" value={null} onChange={(f) => save('vinted_urssaf_freq', f)}
+                options={[{ v: 'mensuel', l: 'Par mois', data: { 'data-prevision-rythme': 'mensuel' } }, { v: 'trimestriel', l: 'Par trimestre', data: { 'data-prevision-rythme': 'trimestriel' } }]} />
+            </div>
+          ) : urssafDue ? (()=>{
             // (22 oct.) « C'EST DÉCLARÉ » ICI, À CÔTÉ DU LIEN : le rappel envoie sur
             // cet écran, et le geste n'existait que dans Ventes → Outils → Rapport
             // comptable. Le bouton ouvre CE formulaire-là sur le mois à noter (un
@@ -37864,6 +37942,13 @@ function CarteUrssafMois({ liveStats, onNav }) {
                       <span style={{fontSize:15,fontWeight:700,color:C.text,letterSpacing:-0.2,whiteSpace:'nowrap'}}>{suivante.dueDate.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})}</span>
                       <span data-echeance-suivante-jours={suivante.daysLeft} style={{fontSize:13,fontWeight:600,whiteSpace:'nowrap'}}>dans {suivante.daysLeft} j</span>
                     </div>
+                    {prev.etat === 'lu' && prev.label === suivante.label ? (
+                      <div data-prevision-urssaf="lu" data-prevision-label={prev.label} data-prevision-ca={String(prev.ca)} data-prevision-apayer={String(prev.apayer)} data-prevision-partiel={prev.partiel ? '1' : ''} data-prevision-adater={prev.aDater || ''}
+                        style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:'2px 10px',flexWrap:'wrap',marginTop:6}}>
+                        <span>À payer ≈</span>
+                        <span style={{color:C.text,fontWeight:700,fontVariantNumeric:'tabular-nums'}}>{prev.partiel ? 'au moins ' : ''}<Mt v={prev.apayer}/>{prev.aDater > 0 ? <span style={{color:C.muted,fontWeight:400}}> · {prev.aDater} à dater</span> : null}</span>
+                      </div>
+                    ) : null}
                     <div style={{marginTop:4}}>Pour <b style={{color:C.text,fontWeight:600}}>{suivante.label}</b>{_startOfDay(new Date()) <= _startOfDay(suivante.periodEnd) ? (urssafFreq==='mensuel' ? <>, le mois en cours : ce qu'il faut mettre de côté est juste en dessous</> : <>, la période en cours</>) : null}.</div>
                   </>) : null}
                   <div style={{marginTop:suivante?6:0}}><span style={{textTransform:'capitalize'}}>{urssafDue.label}</span> : déclaration notée ✓</div>
@@ -37871,7 +37956,7 @@ function CarteUrssafMois({ liveStats, onNav }) {
               );
             }
             return (
-              <div style={{background:C.card2||C.bg,borderRadius:12,padding:'14px 14px 12px',border:(late||soon)?`1px solid ${col}55`:`1px solid transparent`}}>
+              <div data-prevision-urssaf={prevIci ? prevIci.etat : 'avant'} data-prevision-label={urssafDue.label} data-prevision-ca={prevIci && prevIci.ca != null ? String(prevIci.ca) : ''} data-prevision-partiel={prevIci && prevIci.partiel ? '1' : ''} style={{background:C.card2||C.bg,borderRadius:12,padding:'14px 14px 12px',border:(late||soon)?`1px solid ${col}55`:`1px solid transparent`}}>
                 <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:'2px 10px',flexWrap:'wrap'}}>
                   <span style={{fontSize:15,fontWeight:700,color:col,letterSpacing:-0.2,whiteSpace:'nowrap'}}>{urssafDue.dueDate.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})}</span>
                   <span style={{fontSize:13,fontWeight:600,color:(late||soon)?col:C.muted,whiteSpace:'nowrap'}}>{late?`en retard de ${-urssafDue.daysLeft} j`:urssafDue.daysLeft===0?"aujourd'hui !":`dans ${urssafDue.daysLeft} j`}</span>
@@ -37884,6 +37969,8 @@ function CarteUrssafMois({ liveStats, onNav }) {
                       sur le même écran (septembre : 0,00 € ici, 4 224,77 € là). */}
                   <span>À déclarer (argent reçu)</span><span data-echeance-ca={urssafPeriodCA==null?'':String(urssafPeriodCA)} data-echeance-de={urssafDue.periodStart.toISOString()} data-echeance-a={urssafDue.periodEnd.toISOString()} data-echeance-partiel={echeancePartiel||undefined} style={{color:urssafPeriodCA==null?C.muted:C.text,fontWeight:500,textAlign:'right'}}>{urssafPeriodCA==null?'—':<>{echeancePartiel>0?'au moins ':''}<Mt v={urssafPeriodCA}/></>}</span>
                   <span>À payer ≈</span><span data-echeance-apayer={urssafPeriodCA==null?'':String(aPayerUrssaf(urssafPeriodCA, TAUX_URSSAF*100))} style={{color:urssafPeriodCA==null?C.muted:C.text,fontWeight:700,textAlign:'right'}}>{urssafPeriodCA==null?'—':<>{echeancePartiel>0?'au moins ':''}<Mt v={aPayerUrssaf(urssafPeriodCA, TAUX_URSSAF*100)}/></>}</span>
+                  {prevIci && prevIci.aDater > 0 ? <><span>À dater</span><span data-prevision-adater={prevIci.aDater} style={{color:C.text,textAlign:'right'}}>{prevIci.aDater} vente{prevIci.aDater>1?'s':''}</span></> : null}
+                  {prevIci && prevIci.declares.length > 0 ? <><span>Déjà déclaré</span><span data-prevision-declares={prevIci.declares.join(',')} style={{color:C.muted,textAlign:'right'}}>{prevIci.declares.map(ym=>new Date(Number(ym.slice(0,4)),Number(ym.slice(5,7))-1,1).toLocaleDateString('fr-FR',{month:'long'})).join(', ')}</span></> : null}
                 </div>
                 {(
                 <div style={{display:'flex',alignItems:'center',gap:'6px 12px',flexWrap:'wrap',marginTop:12}}>
@@ -38266,6 +38353,114 @@ const titrePeriodeStats = (b) => {
   if (b.type === 'annee') return `${new Date(b.de).getFullYear()} · comparée à ${new Date(b.prevDe).getFullYear()}`;
   return `${maj(new Date(b.de).toLocaleDateString('fr-FR', { month: 'long' }))} · comparé à ${new Date(b.prevDe).toLocaleDateString('fr-FR', { month: 'long' })}`;
 };
+// ── ANNULATIONS PAR COMPTE ET NOTES REÇUES (3 nov.) ─────────────────────────
+// Deux cartes de Statistiques, sur les règles pures `annulationsParCompte`
+// (src/annulationsCompte.js : « annulée » = `classifyOrderStatus`, la règle de
+// `PAS_UNE_VENTE`, sur la période choisie) et `notesParCompte`
+// (src/notesRecues.js : le profil Vinted capté, lecture seule, aucun rappel).
+// Les comptes : ceux que la coque range sur l'appareil (`vinted_accounts`),
+// moins les exclus (masqués, panneau, supprimés pour de bon) — un compte exclu
+// n'apparaît nulle part.
+const lireProfilsNotes = async () => {
+  try {
+    const sel = 'id,uid:data->>uid,at:data->>capturedAt,login:data->payload->user->>login,rep:data->payload->user->>feedback_reputation,n:data->payload->user->>feedback_count,pos:data->payload->user->>positive_feedback_count,neu:data->payload->user->>neutral_feedback_count,neg:data->payload->user->>negative_feedback_count';
+    const [r, f] = await Promise.all([
+      fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_profile&select=${sel}`, { headers: sbAuth() }),
+      // (À venir) la liste des avis, quand l'extension lira /api/v2/user_feedbacks :
+      // tant que la ligne n'existe pas, la liste reste « pas encore lue ».
+      fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_feedbacks&select=id,avis:data->payload->user_feedbacks`, { headers: sbAuth() }),
+    ]);
+    if (!r.ok) return null;
+    const j = await r.json();
+    if (!Array.isArray(j)) return null;
+    const avis = {};
+    try { if (f.ok) { const fj = await f.json(); if (Array.isArray(fj)) for (const x of fj) { const u = ((x && x.id) || '').match(/^harvest_(\d+)_feedbacks$/); if (u && Array.isArray(x.avis)) avis[u[1]] = x.avis; } } } catch (_) {}
+    return j.map((x) => {
+      const uid = String((x && x.uid) || ((x && x.id) || '').match(/^harvest_(\d+)_profile$/)?.[1] || '');
+      return { uid, at: x.at, login: x.login, rep: x.rep, n: x.n, pos: x.pos, neu: x.neu, neg: x.neg, avis: avis[uid] };
+    });
+  } catch (_) { return null; }
+};
+function AnnulationsEtNotes({ b, panelOff }) {
+  const { ventes, ko } = useVentesCoque();
+  const [profils, setProfils] = React.useState(undefined);
+  React.useEffect(() => { let mort = false; lireProfilsNotes().then((x) => { if (!mort) setProfils(x); }); return () => { mort = true; }; }, []);
+  const ecarteUid = React.useMemo(() => {
+    const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+    const sup = lireSupprimes();
+    return (u) => sup.has(String(u)) || compteEcarte(u, hAcc, panelOff || {});
+  }, [panelOff]);
+  const comptes = React.useMemo(() => {
+    let lies = [];
+    try { const a = JSON.parse(localStorage.getItem('vinted_accounts') || 'null'); if (Array.isArray(a)) lies = a; } catch (_) {}
+    const out = new Map();
+    for (const a of lies) { const u = String((a && a.vinted_user_id) || ''); if (u && !ecarteUid(u)) out.set(u, { uid: u, nom: a.login || u }); }
+    if (!out.size) for (const p of (profils || [])) if (p && p.uid && !ecarteUid(p.uid)) out.set(p.uid, { uid: p.uid, nom: p.login || p.uid });
+    return [...out.values()];
+    // `ventes` : la coque publie ses ventes APRÈS avoir rangé la liste des comptes
+    // (`vinted_accounts`, sans événement) — relue à ce moment-là.
+  }, [profils, ecarteUid, ventes]); // eslint-disable-line react-hooks/exhaustive-deps
+  const nomDe = (u) => (comptes.find((c) => c.uid === String(u)) || {}).nom || 'un compte';
+  const A = React.useMemo(() => annulationsParCompte({ ventes, ko, de: b.de, a: b.a, estAnnulee: (o) => classifyOrderStatus(o.status) === 'cancelled', ecarte: ecarteUid }), [ventes, ko, b, ecarteUid]);
+  const N = React.useMemo(() => notesParCompte({ profils, comptes }), [profils, comptes]);
+  const pl = (n, s1, p) => `${n} ${n > 1 ? (p || s1 + 's') : s1}`;
+  const pctTxt = (t) => (t == null ? '—' : `${String(t).replace('.', ',')} %`);
+  const note = (x) => (x == null ? '—' : String(x).replace('.', ','));
+  const jour = (t) => new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+  const carte = (k, titre, droite, corps, attrs) => (
+    <section className="vrm-sv-carte" data-stats-carte={k} {...(attrs || {})}>
+      <div className="vrm-sv-carte-tete"><h2 className="vrm-display vrm-sv-carte-titre">{titre}</h2>{droite ? <span className="vrm-sv-note">{droite}</span> : null}</div>
+      {corps}
+    </section>
+  );
+  const vide = (txt, attrs) => <div className="vrm-sv-vide" {...(attrs || {})}>{txt}</div>;
+  const maxT = A.etat === 'lu' ? Math.max(1, ...A.comptes.map((g) => g.taux || 0)) : 1;
+  const annul = carte('sv-annulations', 'Annulations',
+    A.etat === 'lu' && A.n ? <span data-sv-annul-total={`${A.annulees}/${A.n}`}>{A.annulees} sur {A.n}{A.partiel ? '' : ` · ${pctTxt(A.taux)}`}</span> : null,
+    A.etat === 'encours' ? vide('…', { 'data-sv-annul': 'encours' })
+      : A.etat !== 'lu' ? vide('—', { 'data-sv-annul': 'passu' })
+        : (<div className="vrm-sv-lignes" data-sv-annul="lu">
+          {!A.comptes.length ? vide('Aucune vente Vinted sur la période.') : A.comptes.map((g) => (
+            <details key={g.cle} className="vrm-sv-annul-compte" data-sv-annul-compte={g.uid} data-n={g.n} data-annulees={g.annulees} data-taux={g.taux == null ? '' : g.taux}>
+              <summary className="vrm-sv-annul-ligne">
+                <span className="vrm-sv-nom">{g.compte}</span>
+                <span className="vrm-sv-piste"><span style={{ width: `${g.taux ? Math.max(3, g.taux / maxT * 100) : 0}%` }}/></span>
+                <span className="vrm-sv-chiffre">{g.annulees}/{g.n} · {pctTxt(g.taux)}</span>
+              </summary>
+              {g.liste.length ? g.liste.map((x) => (
+                <a key={x.id} className="vrm-sv-annul-vente" data-sv-annul-vente={x.id} href={x.lien || undefined} target="_blank" rel="noreferrer">
+                  <span className="vrm-sv-annul-titre">{x.titre || `Vente ${x.id}`}</span>
+                  <span className="vrm-sv-chiffre">{jour(x.ts)}{x.eur != null ? ` · ${fmt(x.eur)}` : ''}</span>
+                  <span className="vrm-sv-annul-etat">{x.statut}</span>
+                </a>
+              )) : <div className="vrm-sv-note" style={{ padding: '4px 0 8px' }}>Aucune annulation.</div>}
+            </details>
+          ))}
+          {(A.manquants.length > 0 || A.sansDate > 0) && <div className="vrm-sv-note" data-sv-annul-manque={A.manquants.join(',')} style={{ marginTop: 8 }}>
+            {A.manquants.length ? `${A.manquants.map(nomDe).join(', ')} : pas lu` : ''}{A.manquants.length && A.sansDate ? ' · ' : ''}{A.sansDate ? `${pl(A.sansDate, 'vente')} sans date` : ''}
+          </div>}
+          <div className="vrm-sv-note" data-sv-annul-non-couvertes={A.nonCouvertes.join(',')} style={{ marginTop: 4 }}>{A.nonCouvertes.join(', ')} : pas comptés</div>
+        </div>),
+    { 'data-sv-carte': 'annulations', 'data-sv-etat': A.etat });
+  const notes = carte('sv-notes', 'Notes reçues',
+    N.etat === 'lu' && N.moyenne != null ? <span data-sv-notes-moyenne={N.moyenne} data-sv-notes-total={N.total}>{N.partiel ? 'au moins ' : ''}{pl(N.total, 'avis', 'avis')} · {note(N.moyenne)}/5</span> : null,
+    N.etat === 'encours' ? vide('…', { 'data-sv-notes': 'encours' })
+      : N.etat === 'passu' ? vide('—', { 'data-sv-notes': 'passu' })
+        : (<div className="vrm-sv-lignes" data-sv-notes={N.etat}>
+          {N.comptes.map((c) => (
+            <div key={c.uid} className="vrm-sv-note-ligne" data-sv-notes-compte={c.uid} data-etat={c.etat} data-note={c.note == null ? '' : c.note} data-n={c.n == null ? '' : c.n} data-neg={c.neg == null ? '' : c.neg} data-vieux={c.vieux ? '1' : ''}>
+              <span className="vrm-sv-nom">{c.nom}</span>
+              <span className="vrm-sv-chiffre vrm-sv-note-detail">{c.etat !== 'lu' ? 'pas lu' : <>{pl(c.n, 'avis', 'avis')}{c.neg > 0 ? ` · ${c.neg} négatif${c.neg > 1 ? 's' : ''}` : ''}{c.neu > 0 ? ` · ${c.neu} neutre${c.neu > 1 ? 's' : ''}` : ''}{c.vieux && c.at ? ` · lu le ${jour(c.at)}` : ''}</>}</span>
+              <span className="vrm-display vrm-sv-note-val">{c.etat !== 'lu' ? '—' : note(c.note)}</span>
+            </div>
+          ))}
+          {N.comptes.some((c) => c.liste) ? N.comptes.filter((c) => c.liste && c.liste.sousCinq.length).map((c) => (
+            <div key={'s' + c.uid} className="vrm-sv-note" data-sv-notes-sous5={c.uid} style={{ marginTop: 6 }}>{c.nom} · sous 5 étoiles : {c.liste.sousCinq.slice(0, 5).map((x) => `${x.note}★ ${jour(x.ts)}`).join(' · ')}</div>
+          )) : <div className="vrm-sv-note" data-sv-notes-liste="pas-lue" style={{ marginTop: 8 }}>Avis détaillés : pas encore lus</div>}
+        </div>),
+    { 'data-sv-carte': 'notes', 'data-sv-etat': N.etat });
+  return <div className="vrm-sv-rangee vrm-sv-rangee-2" data-sv-annul-notes="">{annul}{notes}</div>;
+}
 function StatsVitrine({ liveStats, panelOff, periode }) {
   const maintenant = React.useMemo(() => Date.now(), [periode, liveStats]); // eslint-disable-line react-hooks/exhaustive-deps
   const b = React.useMemo(() => bornesPeriode(periode, maintenant), [periode, maintenant]);
@@ -38517,6 +38712,7 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
           return carte('sv-boost', 'Boost rentable ?', droite, corps, { 'data-sv-carte': 'boost', 'data-sv-etat': etat, 'data-sv-boostees': C2 ? C2.b : '', 'data-sv-autres': C2 ? C2.nb : '' });
         })()}
       </div>
+      <AnnulationsEtNotes b={b} panelOff={panelOff}/>
       <div className="vrm-sv-note vrm-sv-pied">
         {/* (3 nov., critique #4) Plus la phrase de définitions (« Vendu : toutes tes plateformes… ») : restent les seuls MANQUES nommés (§5). */}
         {liveStats && liveStats.venduSansDate ? `${pl(liveStats.venduSansDate, 'vente')} Leboncoin sans date` : ''}{liveStats && (liveStats.venduNonComptees || []).length ? <span data-stats-non-comptees={liveStats.venduNonComptees.length}>{`${liveStats.venduSansDate ? ' · ' : ''}Pas dans « vendu » : ${phraseNonComptees(liveStats.venduNonComptees)}`}</span> : null}
@@ -38976,6 +39172,37 @@ function useBeneficeCalcul(compta, periode) {
 //     en pointillé (« pas su », jamais 0).
 // L'anneau ne se dessine que si le NET du mois se calcule (tous les prix d'achat,
 // frais et cotisations connus) : ses parts somment alors au vendu du mois.
+// ── (3 nov.) LA PRÉVISION URSSAF, VISIBLE EN STYLE FUSION ─────────────────
+// La carte « Prochaine déclaration » (`CarteUrssafMois`) est masquée par la
+// Fusion (fusion.css §15) : la prévision de la prochaine échéance vit ICI, en
+// tête de « Combien je dois déclarer ? ». Une règle : `previsionUrssaf`
+// (src/previsionUrssaf.js) avec les règles d'argent de l'app. Aucune phrase :
+// la période, le montant (« au moins » si partiel), la date, « N à dater ».
+function PrevisionUrssafCarte() {
+  const regime = useRegimeFiscal();
+  const ligne = useLigneUrssaf();
+  const [regLu, regPret] = useLigneSynchro('vrm_urssaf_declare', lireDeclarations);
+  const [rythme, setRythme] = React.useState(() => load('vinted_urssaf_freq', null));
+  React.useEffect(() => onCloudReady(() => setRythme(load('vinted_urssaf_freq', null))), []);
+  React.useEffect(() => { const h = (e) => { if (e && e.detail && e.detail.k === 'vinted_urssaf_freq') setRythme(load('vinted_urssaf_freq', null)); }; window.addEventListener('vrm:save', h); return () => window.removeEventListener('vrm:save', h); }, []);
+  const P = previsionUrssaf({ regime, rythme, now: new Date(), ligne, declare: regPret ? regLu : null, taux: tauxUrssaf(),
+    regle: { nextUrssafDeadline, moisPeriodeUrssaf, montantPeriodeUrssaf, moisDeclare } });
+  if (P.etat === 'encours' || P.etat === 'horsMicro' || P.etat === 'aucune') return null;
+  const vers = () => { try { const e = document.querySelector('[data-statut-carte]'); if (e) e.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_) {} };
+  const date = P.dueDate ? new Date(P.dueDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' }) : '';
+  return (
+    <section className="vrm-fu-declaration is-calme vrm-fu-prevision" data-prevision-carte={P.etat} data-prevision-label={P.label || ''} data-prevision-ca={P.ca == null ? '' : String(P.ca)} data-prevision-apayer={P.apayer == null ? '' : String(P.apayer)} data-prevision-partiel={P.partiel ? '1' : ''} data-prevision-adater={P.aDater || ''} data-prevision-encours={P.enCours ? '1' : ''} aria-label="Prochaine échéance URSSAF">
+      <div>
+        <b className="vrm-fu-prevision-montant">{P.etat === 'lu' ? <>{P.partiel ? <small>au moins </small> : null}{fmt(P.apayer)}</> : '—'}</b>
+        <span>{P.etat === 'statut' ? 'URSSAF' : P.etat === 'rythme' ? 'URSSAF · rythme' : <>URSSAF · <span style={{ display: 'inline', textTransform: 'capitalize' }}>{P.label}</span> · avant le {date}{P.aDater > 0 ? ` · ${P.aDater} à dater` : ''}</>}</span>
+      </div>
+      {P.etat === 'statut' ? <button type="button" className="vrm-fu-encre-btn" data-prevision-geste="statut" onClick={vers}>Choisir mon statut</button>
+        : P.etat === 'rythme' ? <Segmente label="Rythme de déclaration" value={null} onChange={(f) => save('vinted_urssaf_freq', f)}
+          options={[{ v: 'mensuel', l: 'Par mois', data: { 'data-prevision-rythme': 'mensuel' } }, { v: 'trimestriel', l: 'Par trimestre', data: { 'data-prevision-rythme': 'trimestriel' } }]} />
+        : null}
+    </section>
+  );
+}
 function ComptaFusion({ compta, onNav }) {
   const { pub, etat, B } = useBeneficeCalcul(compta, 'mois');
   const ligneUrssaf = useLigneUrssaf();
@@ -40062,6 +40289,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
         <div className="vrm-compta-q-tete">
           <h2 className="vrm-compta-question" data-compta-question="declarer"><span className="vrm-compta-q-n" aria-hidden="true">2</span>Combien je dois déclarer ?</h2>
         </div>
+        <PrevisionUrssafCarte />
         <StatutFiscal partie="declarer" liveStats={liveStats} onNav={onNav} />
       </section>
 
@@ -49168,20 +49396,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const rangDe = new Map(ranges.map((x, i) => [x.__autre ? x.key : String(x.txn || x.key), i]));
     const L = [];
     if (voitSite('vinted')) for (const l of lignesLot()) { const o = l.e.o, b = l.e.b;
-      L.push({ ...l, site: 'vinted', trNom: trNomColis(l.e), rang: rangDe.get(String(l.cle)),
+      L.push({ ...l, site: 'vinted', pdf: true, cochable: true, trNom: trNomColis(l.e), rang: rangDe.get(String(l.cle)),
         num: (b ? numForBord(b) : '') || (o ? (effEntry(o)?.numero || '') : ''), titre: (o && o.title) || (b && (b.modele || b.article)) || 'Bordereau',
         photo: o ? orderPhoto(o) : bordPhoto(b), sous: `Vinted · ${o && o._acc ? accNameOf(o._acc) : 'compte inconnu'}` }); }
+    // (4 nov., Julien : « je n'ai pas la possibilité de sélectionner la vente de Vestiaire Co et de
+    // Leboncoin ») Chaque colis des autres sites a SA ligne (`ligneLotAutre`, src/lotSelection.js) :
+    // Vestiaire et Leboncoin cochables même sans PDF (le lot les nomme « sans bordereau »), eBay grisé.
     const imprimesVc = vcCarte('vrm_vc_imprimes') || {};
     const lbcPdf = extSait('lbcpdf') === 'ok';
+    const numD = load('vinted_annonce_numeros', {}) || {};
+    const numLbc = (x) => { const f = x.x && x.x.itemId ? numD[x.x.itemId] : null; return (f && f.numero != null && String(f.numero).trim()) ? String(f.numero).trim() : ''; };
     ranges.forEach((x, i) => {
-      if (x.__autre === 'vc' && x.v && x.v.bordereau && x.v.bordereau.id)
-        L.push({ cle: x.key, site: 'vestiaire', v: x.v, trNom: x.trNom, rang: i, age: null, ancienne: false, imprime: imprimesVc[x.v.id] || null,
-          num: x.v.num || '', titre: x.v.titre || 'Article Vestiaire', photo: x.v.photo || null, sous: 'Vestiaire' });
-      else if (x.__autre === 'lbc' && lbcPdf && x.o && x.o.label && x.o.label.voucherUrl) {
-        const f = x.x.itemId ? (load('vinted_annonce_numeros', {}) || {})[x.x.itemId] : null;
-        L.push({ cle: x.key, site: 'leboncoin', lo: x.o, trNom: x.trNom, rang: i, age: null, ancienne: false, imprime: null,
-          num: (f && f.numero != null && String(f.numero).trim()) ? String(f.numero).trim() : '', titre: x.x.titre || x.o.title || '(sans titre)', photo: photoArticle(x.o), sous: 'Leboncoin' });
-      }
+      if (!x.__autre) return;
+      const extra = x.__autre === 'lbc' ? { photo: photoArticle(x.o || {}) } : x.__autre === 'eb' ? { num: x.x && x.x.ordre ? (numLigneEbay(x.x.ordre, (x.x.ordre.lineItems || [])[0]) || '') : '', photo: x.x && x.x.ordre ? photoCommande(x.x.ordre) : null } : {};
+      const l = ligneLotAutre({ ...x, ...extra }, i, { imprimesVc, lbcPdf, numLbc });
+      if (l) L.push(l);
     });
     return ordonnerLot(L, ordre, (l) => l.trNom);
   };
@@ -49399,9 +49628,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const ouvrirLot = () => {
     const L = lignesLotTous();
     if (!L.length) { toast('Aucun bordereau prêt à imprimer pour l\'instant.'); return; }
-    setProgressionLot(null);setLot({ lignes:L,verifications:{},coches:new Set(L.filter(l=>!l.ancienne&&!l.imprime).map(l=>l.cle)),echecs:[] });
+    setProgressionLot(null);setLot({ lignes:L,verifications:{},coches:cochesParDefaut(L),echecs:[] });
   };
-  const batchBordereaux = async (cles) => {
+  const batchBordereaux = async (cles, placer = false) => {
     if (batchBusy) return;
     // ⚠️⚠️ « TOUT IMPRIMER » IMPRIME EXACTEMENT CE QUE LE BOUTON COMPTE (§11).
     // Julien, 21 sept. : « le bouton tout imprimer imprime des bordereaux qui
@@ -49421,7 +49650,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const choisis = cles instanceof Set ? cles : null;
     // (3 nov.) Les lignes de « Tout imprimer » (toutes plateformes, ordre des transporteurs) ;
     // pour Vinted, la règle d'avant : PDF présent et colis pas coché parti (`lignesLot`).
-    const aImprimer = lignesLotTous().filter(l => !choisis || choisis.has(l.cle));
+    // (4 nov.) Jamais une ligne non cochable (eBay : l'étiquette se prend dans eBay).
+    const aImprimer = selectionImprimable(lignesLotTous(), choisis);
     if (!aImprimer.length) { libererOngletPdf(); toast(choisis ? 'Coche au moins un bordereau.' : 'Aucun bordereau prêt à imprimer pour l\'instant.'); return; }
     const encoreDisponibles = new Set(aImprimer.map(l => l.cle));
     const disparus = choisis ? [...choisis].filter(cle => !encoreDisponibles.has(cle)) : [];
@@ -49443,7 +49673,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // Les PDF sont téléchargés MAINTENANT, et seulement ceux à imprimer :
       // les embarquer dans la liste coûtait 6 Mo à chaque ouverture de l'écran.
       const items = [];
-      let pasLus = 0, sansPdf = 0;
+      let pasLus = 0, sansPdf = 0; const sansLignes = [];
       for (const [index,l] of aImprimer.entries()) {
         verifierContexte();
         setProgressionLot({etape:'lecture',fait:index+1,total:aImprimer.length});
@@ -49455,18 +49685,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           //    par n° de transaction ; l'email n'est qu'un secours.
           const capte = e.txn ? labelsCaptes[e.txn] : null;
           const lu = await octetsBordereau(capte && capte.row, b && b.hasPdf ? b._row : null);
-          if (lu === null) pasLus++; else if (!lu.octets) sansPdf++;
+          if (lu === null) pasLus++; else if (!lu.octets) { sansPdf++; sansLignes.push(l); }
           buf = lu && lu.octets ? lu.octets : null;
           // Compte pro (une facture existe pour cette vente) → on joint la facture
           // juste après son bordereau dans le PDF groupé (§41).
           const inv = buf && b ? invForBord(b) : null;
           if (inv) { const ent = entForBordInvoice(inv); if (ent) { try { invBytes = await buildFacturXBytes(inv, ent); } catch(_) {} } }
+        } else if (l.site === 'vestiaire' && !(l.v && l.v.bordereau && l.v.bordereau.id)) {
+          sansPdf++; sansLignes.push(l);   // (4 nov.) cochée sans bordereau rangé : nommée « sans bordereau »
         } else if (l.site === 'vestiaire') {
           // Le PDF rapatrié (`vc_label_{produit}`), lu au clic — comme « Imprimer » de sa carte.
           const j = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(l.v.bordereau.id)}&select=b64:data->>b64`);
           const b64 = Array.isArray(j) && j[0] && j[0].b64;
-          if (!Array.isArray(j)) pasLus++; else if (!b64) sansPdf++;
+          if (!Array.isArray(j)) pasLus++; else if (!b64) { sansPdf++; sansLignes.push(l); }
           if (b64) { try { buf = b64ToBytes(b64); } catch (_) { buf = null; } }
+        } else if (l.site === 'leboncoin' && !l.pdf) {
+          sansPdf++; sansLignes.push(l);   // (4 nov.) pas de lien de bordereau, ou pas d'extension ici pour le lire
         } else if (l.site === 'leboncoin') {
           // Le PDF Leboncoin passe par l'extension (`lbcpdf`), comme « Imprimer » de sa carte.
           let r0 = null; try { r0 = await vmrPdfLbc(l.lo.label.voucherUrl); } catch (_) { r0 = null; }
@@ -49477,9 +49711,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // Numéro et titre : même dérivation que la carte (identité, jamais le titre — §5).
         items.push({ numero: l.num || '', title: l.titre || '', pdfBuf: buf, invBytes, cle: l.cle, site: l.site, ligne: l });
       }
-      if (!items.length) { libererOngletPdf(); toast(pasLus ? "La base n'a pas répondu — réessaie dans un instant." : "Ces bordereaux n'ont plus leur PDF — retélécharge-les depuis les ventes sur Vinted."); setBatchBusy(false); return; }
+      if (!items.length) { libererOngletPdf(); toast(pasLus ? "La base n'a pas répondu — réessaie dans un instant." : (sansLignes.length ? texteSansBordereau(sansLignes) + '.' : "Ces bordereaux n'ont plus leur PDF — retélécharge-les depuis les ventes sur Vinted.")); setBatchBusy(false); return; }
       setProgressionLot({etape:'fusion',fait:items.length,total:aImprimer.length});
-      const r = await mergeAndDownloadBordereaux(items, (w, h) => posForFormat(w, h, false), { autoprint:true,imprimante,avantOuverture:verifierContexte });
+      const r = await mergeAndDownloadBordereaux(items, (w, h) => posForFormat(w, h, false), { autoprint:true,imprimante,avantOuverture:verifierContexte, apercu: placer ? 'force' : true });
       setBordResult({ ...r, batch:true,attendus:aImprimer.length });setProgressionLot({etape:'termine',fait:r.count,total:aImprimer.length});
       // Un lot imprimé en partie ne se présente pas comme complet (§5). Le
       // nombre imprimé est celui que la fusion a VRAIMENT gardé (`r.count`) :
@@ -49494,8 +49728,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (reussiesVinted.length) setBordsPrinted(prev => { const u = { ...prev }; const at = new Date().toISOString(); reussiesVinted.forEach(k => { u[k] = at; }); save('vinted_bords_printed', u); return u; });
       (r.reussis || []).filter(i => items[i].site === 'vestiaire').forEach(i => { try { marquerVc('vrm_vc_imprimes', items[i].ligne.v.id, true); } catch (_) {} });
       if (choisis) setLot(x => echecs.length ? { ...x, coches: new Set(echecs), echecs } : null);
-      if (pasLus || sansPdf || illisibles) toast(`${imprimes} sur ${aImprimer.length} imprimé${imprimes>1?'s':''} — ${[pasLus?`${pasLus} que la base n'a pas rendu${pasLus>1?'s':''} (réessaie)`:'', sansPdf?`${sansPdf} sans PDF`:'', illisibles?`${illisibles} PDF illisible${illisibles>1?'s':''} (retélécharge-le${illisibles>1?'s':''} depuis la vente sur Vinted)`:''].filter(Boolean).join(', ')}.`);
-    } catch(err){ libererOngletPdf(); toast(/Aucun bordereau exploitable/.test(String(err && err.message || err)) ? "Aucun de ces PDF n'a pu être lu — retélécharge-les depuis les ventes sur Vinted." : 'Erreur : ' + String(err)); }
+      if (pasLus || sansPdf || illisibles) toast(`${imprimes} sur ${aImprimer.length} imprimé${imprimes>1?'s':''} — ${[pasLus?`${pasLus} que la base n'a pas rendu${pasLus>1?'s':''} (réessaie)`:'', sansPdf?texteSansBordereau(sansLignes):'', illisibles?`${illisibles} PDF illisible${illisibles>1?'s':''} (retélécharge-le${illisibles>1?'s':''} depuis la vente sur Vinted)`:''].filter(Boolean).join(', ')}.`);
+    } catch(err){ libererOngletPdf(); if (!estTamponAnnule(err)) toast(/Aucun bordereau exploitable/.test(String(err && err.message || err)) ? "Aucun de ces PDF n'a pu être lu — retélécharge-les depuis les ventes sur Vinted." : 'Erreur : ' + String(err)); }
     setBatchBusy(false);
   };
   // Deep-link « Tout imprimer » depuis l'extension (?print=bord) : dès que les
@@ -55375,7 +55609,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {batchBusy&&progressionLot&&<div className="vrm-preparation-progression" role="status">{progressionLot.etape==='lecture'?`Lecture des PDF : ${progressionLot.fait}/${progressionLot.total}`:'Préparation du document groupé…'}<progress {...(progressionLot.etape==='lecture'?{value:progressionLot.fait,max:progressionLot.total}:{})}/></div>}
                         <div style={{display:'flex',gap:12,flexWrap:'wrap',padding:'10px 18px',fontSize:12,color:C.muted}}>
                           <span role="status">{nb} sélectionné{nb>1?'s':''} sur {L.length}</span>
-                          <button type="button" disabled={batchBusy} onClick={()=>setLot(x=>({...x,coches:new Set(L.map(l=>l.cle))}))}>Tout sélectionner</button>
+                          <button type="button" disabled={batchBusy} onClick={()=>setLot(x=>({...x,coches:new Set(L.filter(l=>l.cochable!==false).map(l=>l.cle))}))}>Tout sélectionner</button>
                           <button type="button" disabled={batchBusy} onClick={()=>setLot(x=>({...x,coches:new Set()}))}>Tout décocher</button>
                           <span>Décocher ne supprime aucun bordereau.</span>
                         </div>
@@ -55392,31 +55626,35 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             return (
                               <React.Fragment key={l.cle}>
                               {ouvreT ? <div className="vrm-fu-groupe-transp" data-lot-groupe={l.trNom} style={{marginTop:il?10:4}}><h3>{l.trNom}</h3><span>{L.filter(x=>x.trNom===l.trNom).length}</span></div> : null}
-                              <div data-lot-ligne={l.cle} data-lot-site={l.site} data-lot-num={num} data-lot-transp={l.trNom} data-coche={coche?'1':'0'} style={{display:'flex',gap:10,alignItems:'center',padding:'9px 0',borderTop:`1px solid ${C.border}`,cursor:'pointer'}}>
-                                <label className="vrm-preparation-selection"><input type="checkbox" aria-label={`Sélectionner ${l.titre||'ce bordereau'}`} disabled={batchBusy} checked={coche} onChange={()=>basculer(l.cle)} style={{width:18,height:18,flexShrink:0}}/></label>
+                              <div data-lot-ligne={l.cle} data-lot-site={l.site} data-lot-num={num} data-lot-transp={l.trNom} data-coche={coche?'1':'0'} data-lot-pdf={l.pdf===false?'0':'1'} data-lot-cochable={l.cochable===false?'0':'1'} style={{display:'flex',gap:10,alignItems:'center',padding:'9px 0',borderTop:`1px solid ${C.border}`,cursor:l.cochable===false?'default':'pointer',opacity:l.cochable===false?0.55:1}}>
+                                <label className="vrm-preparation-selection"><input type="checkbox" aria-label={l.cochable===false?`${l.titre||'Commande'} : eBay`:`Sélectionner ${l.titre||'ce bordereau'}`} disabled={batchBusy||l.cochable===false} checked={coche&&l.cochable!==false} onChange={()=>{ if(l.cochable!==false) basculer(l.cle); }} style={{width:18,height:18,flexShrink:0}}/></label>
                                 <PhotoVente src={photo} size={32} portrait/>
                                 <span style={{flex:1,minWidth:0}}>
                                   <span style={{display:'block',fontSize:13,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{l.titre}</span>
                                   <span style={{display:'block',fontSize:12,color:C.muted,marginTop:2}}>
                                     {l.sous}{l.site === 'vinted' ? ` · vendue le ${fmtD(o)}` : ''}
+                                    {l.pdf === false && l.cochable !== false ? <b data-lot-sans-bordereau="1" style={{color:C.warn,fontWeight:600}}> · Sans bordereau</b> : null}
                                     {l.ancienne && <b data-lot-ancienne="1" style={{color:C.warn,fontWeight:600}}> · il y a {Math.floor(l.age)} j : Vinted dit encore « à expédier », vérifie avant d'imprimer</b>}
                                     {l.imprime && <span data-lot-imprime="1"> · déjà imprimé</span>}
                                     {lot.echecs.includes(l.cle) && <b style={{color:C.warn,fontWeight:600}}> · PDF pas lu</b>}
                                     <span style={{display:'block',marginTop:3}}>{num?emplacement:'Numéro VRM non confirmé · vérifie l’article avec sa photo.'}</span>
                                   </span>
                                 </span>
-                                <label className="vrm-preparation-controle"><input type="checkbox" aria-label={`Article contrôlé : ${l.titre||l.cle}`} disabled={!coche||batchBusy} checked={verifie} onChange={e=>{const ok=e.target.checked;setLot(x=>({...x,verifications:{...(x.verifications||{}),[l.cle]:ok?sigLigneLot(l):null}}));}}/>Contrôlé</label>
+                                {l.cochable === false ? <span className="vrm-preparation-controle" data-lot-ebay="1" style={{fontSize:12,color:C.muted,fontWeight:600}}>eBay</span> : <label className="vrm-preparation-controle"><input type="checkbox" aria-label={`Article contrôlé : ${l.titre||l.cle}`} disabled={!coche||batchBusy} checked={verifie} onChange={e=>{const ok=e.target.checked;setLot(x=>({...x,verifications:{...(x.verifications||{}),[l.cle]:ok?sigLigneLot(l):null}}));}}/>Contrôlé</label>}
                               </div>
                               </React.Fragment>
                             );
                           })}
                         </div>
                         <div style={{display:'flex',gap:8,justifyContent:'flex-end',flexWrap:'wrap',padding:'12px 18px',borderTop:`1px solid ${C.border}`}}>
-                          <button type="button" onClick={()=>setLot(null)} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,padding:'10px 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Fermer</button>
+                          <button type="button" onClick={()=>setLot(null)} style={{order:-2,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,padding:'10px 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Fermer</button>
                           <button type="button" data-imprime="1" data-lot-imprimer={nb} disabled={!nb || batchBusy} onClick={()=>batchBordereaux(new Set(lot.coches))}
                             style={{border:'none',background:C.accent,color:C.onAccent,borderRadius:12,padding:'10px 16px',fontSize:13,fontWeight:700,cursor:nb?'pointer':'default',opacity:nb&&!batchBusy?1:0.5,fontFamily:'inherit'}}>
                             {batchBusy?'Préparation…':lot.echecs.length?`Réessayer (${nb})`:`Imprimer ${nb} bordereau${nb>1?'x':''}`}
                           </button>
+                          {/* (4 nov.) « Placer le tampon » : la feuille de chaque type de bordereau du lot s'ouvre, même déjà gardé. */}
+                          <button type="button" data-imprime="1" data-lot-placer={nb} disabled={!nb || batchBusy} onClick={()=>batchBordereaux(new Set(lot.coches), true)}
+                            style={{order:-1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,padding:'10px 14px',fontSize:13,fontWeight:600,cursor:nb?'pointer':'default',opacity:nb&&!batchBusy?1:0.5,fontFamily:'inherit'}}>Placer le tampon</button>
                         </div>
                       </div>
                     </div>

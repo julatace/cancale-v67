@@ -173,6 +173,8 @@ async function scenario(b, nom, vue, LIGNES) {
       if (window.__pdfs && window.__pdfs.length) return 'pdf';
       const clic = (l) => { const bs = [...document.querySelectorAll('button')].filter((x) => x.innerText.trim() === l && x.offsetParent); if (bs.length) { bs[bs.length - 1].click(); return true; } return false; };
       if (clic("J'ai vérifié, imprimer") || clic('Préparer quand même les PDF')) return 'clic';
+      // (4 nov.) La feuille du tampon (un type sans place gardée) : « Imprimer » à la place choisie par VRM.
+      const f = document.querySelector('[data-placeur-tampon]:not([data-placeur-tampon="charge"]) [data-tampon-imprimer]'); if (f) { f.click(); return 'clic'; }
       return 'attente';
     });
     if (etat === 'pdf') break;
