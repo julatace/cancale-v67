@@ -3473,3 +3473,23 @@ même »**. Rien à dire ⇒ aucune feuille, l'envoi part comme avant.
   `republier` : la feuille (photos) est passée par « Publier quand même », verts ;
   `lbc-publier-app` vert sans changement (fiche propre).
 - Geste de Julien : publier un article à une seule photo pour voir la feuille.
+
+> **3–4 novembre — STATISTIQUES : ANNULATIONS PAR COMPTE ET NOTES REÇUES** (branche `claude/seuils-notes`) — deux cartes en bas
+> de `StatsVitrine` (`AnnulationsEtNotes`), suivent la période choisie.
+> **Annulations** (`src/annulationsCompte.js`) : « annulée » = `classifyOrderStatus(status) === 'cancelled'` (la règle de
+> `PAS_UNE_VENTE`), passée par l'app ; jamais déduite d'une absence ; population = ventes Vinted de la coque datées à la vente
+> dans la période ; compte en panne ⇒ aucun chiffre, NOMMÉ, et pas de taux global (un taux partiel ne se donne pas) ; compte
+> exclu nulle part ; vente sans date à part ; Leboncoin, eBay, Vestiaire « pas comptés » (aucune règle d'annulation lue pour
+> eux — à faire : eBay `cancelStatus.cancelState`). Toucher un compte déplie ses annulations ; chacune ouvre SA vente
+> (conversation, sinon transaction — jamais un titre). Avant : un seul taux Vinted global, toutes périodes (`tauxAnnulation`).
+> **Notes** (`src/notesRecues.js`) : MESURÉ en base (lecture seule) — le profil `harvest_{uid}_profile` porte
+> `feedback_reputation` (0…1), `feedback_count`, `positive/neutral/negative_feedback_count` ; `feedback_reputation` n'est PAS
+> une moyenne (0,98 pour 7 avis tous positifs) : affiché ×5 comme « note Vinted ». La LISTE des avis n'est PAS captée (la seule
+> ligne `user_feedbacks` est un ENVOI `wreq`) ⇒ « Avis détaillés : pas encore lus » ; à capter par l'extension :
+> `GET /api/v2/user_feedbacks?user_id={uid}&page=1&per_page=20&by=all`, rangé `harvest_{uid}_feedbacks`
+> (`payload.user_feedbacks[]`, forme non mesurée — `lireAvis` ne garde qu'une note entière 1–5 et une date). Moyenne
+> pondérée par le nombre d'avis ; profil > 7 j ⇒ « lu le … » ; compte jamais capté ⇒ « pas lu » (jamais 0). Aucun rappel
+> d'évaluation (refusé le 11 oct. ; l'audit le vérifie). eBay et Leboncoin : rien de capté.
+> **Preuves** : `audit-annulations-compte` 10 (exécute la vraie `classifyOrderStatus` extraite d'App.jsx ; 5 mutations rouges),
+> `audit-notes-recues` 10 (5 mutations rouges) ; banc `annulations-notes` 30 verts (390/1512, clair/sombre regardés), 22 rouges
+> sur origin/main ; `stats-vitrine` 112 verts après. Geste de Julien : Statistiques → bas de page.
