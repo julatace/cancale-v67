@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.317.0';
+const CODE_VERSION = '5.318.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -2801,6 +2801,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           // juste de quoi savoir si la capture a pu lire quelque chose. Sans ça,
           // « 0 annonce » et « je n'ai rien pu lire » sont le même silence.
 
+          // 5.318 (3 nov.) : UN FIL de conversation Leboncoin (texte, date, « de toi » —
+          // jamais un nom), et la RECETTE d'un envoi fait par lui sur la page.
+          if (msg.action === 'lbcFil' || msg.action === 'lbcEnvoiAppris') {
+            const tabId = sender?.tab?.id;
+            if (tabId == null || sender?.frameId > 0 || !/^https:\/\/(?:[a-z0-9-]+\.)*leboncoin\.fr\//i.test(sender?.tab?.url || '')) { sendResponse({ ok: false }); return; }
+            const ok = msg.action === 'lbcFil' ? await rangerLbcFil(msg, await compteLbcCapture(tabId, msg.moi)) : await noterRecetteLbc(msg.recette);
+            sendResponse({ ok: ok === true }); return;
+          }
           if(msg.action==='lbcSessionPrivee'){
             const ownerReception=(await loadSession())?.user_id;
             if(!ownerReception){sendResponse({ok:false});return;}
@@ -11806,7 +11814,7 @@ async function etatPourApp() {
   //    présence comme `pause` et `vivant`).
   // 29 oct. : `lbcSupprime` — elle sait aussi SUPPRIMER une annonce Leboncoin
   //    sur commande confirmée (même règle : le bouton n'apparaît qu'à elle).
-  return Object.assign({ ok: true, version, code: CODE_VERSION, ext, vrm, vinted: uid && !vintedPasSu ? { uid: String(uid), login: login || '' } : null, cmds: cmdsVus, lbcPause: true, lbcSupprime: true, vcRepondre: true },
+  return Object.assign({ ok: true, version, code: CODE_VERSION, ext, vrm, vinted: uid && !vintedPasSu ? { uid: String(uid), login: login || '' } : null, cmds: cmdsVus, lbcPause: true, lbcSupprime: true, vcRepondre: true, lbcRepondre: true },
     vintedPasSu ? { vintedPasSu: true } : {},
     pause && pause !== PAUSE_PAS_SUE ? { pause: { jusqua: Number(pause.jusqua) || 0 } } : {},
     nav ? { nav } : {});
@@ -12143,6 +12151,8 @@ async function executerCommande(msg) {
   if (msg && /^(vcPreparer|vcMarque)$/.test(String(msg.cmd || ''))) return await publierVestiaire(msg);
   // 31 oct. (5.295) : répondre dans UNE conversation Vestiaire, sur son clic (voir `repondreVestiaire`).
   if (msg && msg.cmd === 'vcRepondre') return await repondreVestiaire(msg);
+  // 3 nov. (5.318) : répondre dans UNE conversation Leboncoin, sur son clic (voir `repondreLeboncoin`).
+  if (msg && msg.cmd === 'lbcRepondre') return await repondreLeboncoin(msg);
   if (!msg || msg.cmd !== 'bordereau') return { accepte: false, code: 'inconnue', raison: 'commande inconnue' };
   const uid = String(msg.uid || ''), tx = String(msg.tx || '');
   if (!/^\d+$/.test(uid) || !/^\d+$/.test(tx)) return { accepte: false, code: 'invalide', raison: 'vente incomplète' };
@@ -15813,6 +15823,179 @@ async function repondreVestiaire(msg) {
     }
     return { accepte: true, etape: 'refuse', statut, raison: `Vestiaire a répondu ${statut} — le message n'est pas parti` };
   } finally { VC_REPONSE_EN_VOL = false; }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// LEBONCOIN : LIRE UN FIL ET RÉPONDRE, SUR SON CLIC (3 novembre, 5.318)
+// ══════════════════════════════════════════════════════════════════════════
+// Julien a choisi « répondre aux messages Leboncoin depuis VRM ». Jusqu'ici
+// l'extension ne relevait que le NOMBRE de non-lus (`storeLbcMessages`). La
+// forme de Vestiaire (5.295), à l'identique :
+//  · UN FIL par conversation (`lbc_fil_{conv}` : le texte des messages, leur
+//    date, « de toi » — jamais un nom), rangé seulement quand la page ET
+//    l'onglet disent le MÊME compte privé (`compteLbcCapture`) ; lire-fusionner-
+//    réécrire, une écriture à la fois, lecture ratée ⇒ rien ;
+//  · la RECETTE d'un envoi : APPRISE quand TU envoies un message sur
+//    leboncoin.fr dans ce Chrome (lbc-inject.js) — jamais devinée. `lbc_envoi`
+//    dit à l'app si elle est apprise ; tant qu'elle ne l'est pas, rien ne part ;
+//  · RÉPONDRE (`repondreLeboncoin`) : sur SA commande depuis l'app seulement,
+//    UNE à la fois, au nom du compte Leboncoin CONNECTÉ dans l'onglet (celui du
+//    fil, identité privée), dans le plafond de 50 actions/heure du compte
+//    (`compterAction`, `lbc:{id}`), jamais pendant une pause posée par un
+//    429/403 de Leboncoin.
+// ⚠️ NON MESURÉ : la forme des réponses de messagerie de Leboncoin (seul le
+//    compteur `…/hal/{id}/counter` a été vu). Si la page envoie par un autre
+//    canal (temps réel), aucune recette n'est apprise : « Envoyer » reste fermé.
+const LBC_RECETTE = 'vrmLbcRecette';
+const LBC_PAUSE_MSG = 'vrmPauseLbcMsg';
+const LBC_PAUSE_MSG_MS = 30 * 60000;
+const LBC_FIL_MAX = 300;
+const ID_CONV_LBC = /^[\w-]{3,64}$/;
+let LBC_REPONSE_EN_VOL = false;
+// Le compte d'une capture : la page (le compte privé lu dans CE document) et
+// l'onglet (`vrmLbcTransport`, source privée, pas ambigu) disent le même ; sinon ''.
+async function compteLbcCapture(tabId, moi) {
+  const page = /^[0-9a-z_-]{1,64}$/i.test(String(moi || '')) ? String(moi) : '';
+  if (!page || tabId == null) return '';
+  try {
+    const c = ((await chrome.storage.local.get('vrmLbcTransport')).vrmLbcTransport || {})[tabId];
+    if (!c || c.source !== 'prive' || c.ambigue || !c.compte) return '';
+    return idCompteLbc(c.compte) === page ? page : '';
+  } catch (_) { return ''; }
+}
+const _lbcFilChaines = new Map();
+function rangerLbcFil(m, compte, deVrm) {
+  const cle = String((m && m.conv) || '');
+  const avant = _lbcFilChaines.get(cle) || Promise.resolve();
+  const run = avant.then(() => rangerLbcFilMaintenant(m, compte, deVrm), () => rangerLbcFilMaintenant(m, compte, deVrm)).catch(() => false);
+  const fin = run.then(() => {}, () => {});
+  _lbcFilChaines.set(cle, fin);
+  fin.then(() => { if (_lbcFilChaines.get(cle) === fin) _lbcFilChaines.delete(cle); });
+  return run;
+}
+async function rangerLbcFilMaintenant(m, compte, deVrm) {
+  const conv = String((m && m.conv) || '');
+  if (!ID_CONV_LBC.test(conv)) return false;
+  // Un fil sans compte prouvé n'est pas rangé : on ne saurait pas au nom de qui répondre.
+  if (!compte && deVrm !== true) return false;
+  const id = `lbc_fil_${conv}`;
+  const rows = await sbGet(`app_data?id=eq.${encodeURIComponent(id)}&select=data`);
+  if (rows === null) return false;                                   // lecture ratée ⇒ rien
+  const cur = (rows && rows[0] && rows[0].data) || null;
+  if (cur && cur.compte && compte && cur.compte !== compte) return false;   // un fil ne change jamais de compte
+  const neufs = (Array.isArray(m.messages) ? m.messages : []).slice(0, 200).map((x) => ({
+    id: /^[\w-]{1,64}$/.test(String((x && x.id) || '')) ? String(x.id) : '', t: coupeVc((x && x.t) || '', 2000),
+    deMoi: deVrm === true ? true : (x && (x.deMoi === true || x.deMoi === false) ? x.deMoi : null), at: /^\d{4}-\d{2}-\d{2}T/.test(String((x && x.at) || '')) ? String(x.at).slice(0, 30) : '',
+    ...(deVrm === true ? { envoyeParVrm: true } : {}) })).filter((x) => x.t);
+  const { liste, change } = fusionMessagesVc(cur && cur.messages, neufs);
+  const compteFil = (cur && cur.compte) || compte || '';
+  if (cur && !change && (cur.compte || '') === compteFil) return true;
+  const garde = liste.slice(-LBC_FIL_MAX);
+  const dernier = garde[garde.length - 1] || null;
+  const now = new Date().toISOString();
+  const data = { v: 1, conv, compte: compteFil, messages: garde, n: garde.length, dernierAt: (dernier && dernier.at) || '', apercu: dernier ? coupeVc(dernier.t, 160) : '', dernierDeMoi: dernier ? dernier.deMoi : null,
+    page: /^\/[\w/.-]{0,160}$/.test(String(m.page || '')) ? String(m.page) : ((cur && cur.page) || ''), forme: Array.isArray(m.forme) && m.forme.length ? m.forme.slice(0, 80).map(String) : ((cur && cur.forme) || []), capturedAt: now };
+  const ok = await supabaseUpsert('app_data', [{ id, data }], 'id');
+  if (ok === true) notifierApp({ type: 'maj', quoi: 'lbc' });
+  return ok === true;
+}
+// La recette reçue d'une page : refaite champ par champ (rien d'autre ne passe).
+function nettoyerRecetteLbc(r) {
+  if (!r || typeof r !== 'object') return null;
+  const base = { methode: /^(POST|PUT)$/.test(String(r.methode)) ? String(r.methode) : '', hote: /^([a-z0-9-]+\.)*leboncoin\.fr$/i.test(String(r.hote || '')) ? String(r.hote) : '', chemin: String(r.chemin || '').slice(0, 160) };
+  if (!base.methode || !base.hote) return null;
+  if (r.rejouable !== true) return { ...base, rejouable: false, raison: String(r.raison || 'inconnue').slice(0, 40) };
+  const cleOk = (k) => /^[A-Za-z_][\w-]{0,40}$/.test(String(k));
+  const modele = String(r.modele || '');
+  const sansTrous = modele.replace('{conv}', '').replace('{moi}', '');
+  if (!/^\/[\w\-/{}.]*$/.test(modele) || (modele.split('{conv}').length - 1) > 1 || (modele.split('{moi}').length - 1) > 1 || /[{}]/.test(sansTrous) || /\d{3,}/.test(sansTrous)) return { ...base, rejouable: false, raison: 'modele' };
+  const cleTexte = Array.isArray(r.cleTexte) ? r.cleTexte.map(String) : [];
+  if (!cleTexte.length || cleTexte.length > 5 || !cleTexte.every(cleOk)) return { ...base, rejouable: false, raison: 'cle-texte' };
+  const fixes = [];
+  for (const f of (Array.isArray(r.fixes) ? r.fixes.slice(0, 20) : [])) {
+    if (!Array.isArray(f) || !Array.isArray(f[0]) || !f[0].length || !f[0].every(cleOk)) return { ...base, rejouable: false, raison: 'fixes' };
+    const v = f[1];
+    if (!(v === '{conv}' || v === '{moi}' || v === null || typeof v === 'boolean' || (typeof v === 'string' && /^[A-Za-z_.:-]{1,40}$/.test(v)))) return { ...base, rejouable: false, raison: 'fixes' };
+    fixes.push([f[0].map(String), v, ['string', 'number', 'boolean', 'object'].includes(f[2]) ? f[2] : 'string']);
+  }
+  if (!modele.includes('{conv}') && !fixes.some((f) => f[1] === '{conv}')) return { ...base, rejouable: false, raison: 'sans-conversation' };
+  const entetes = (Array.isArray(r.entetes) ? r.entetes : []).map((x) => String(x).toLowerCase()).filter((x) => /^[a-z0-9-]{1,60}$/.test(x) && !/^(cookie|content-length|host|connection|origin|referer|user-agent|accept-encoding|content-type)$/.test(x)).slice(0, 20);
+  const recherche = /^\?[\w=&.%-]{0,200}$/.test(String(r.recherche || '')) && !/\d{3,}/.test(String(r.recherche || '')) ? String(r.recherche) : '';
+  return { ...base, rejouable: true, raison: '', modele, recherche, cleTexte, fixes, entetes };
+}
+async function noterRecetteLbc(brute) {
+  const r = nettoyerRecetteLbc(brute);
+  if (!r) return false;
+  const at = new Date().toISOString();
+  let avant = null;
+  try { avant = (await chrome.storage.local.get(LBC_RECETTE))[LBC_RECETTE] || null; } catch (_) { return false; }
+  // Une recette rejouable n'est jamais remplacée par un essai qui ne l'est pas.
+  const garde = r.rejouable ? r : (avant && avant.recette && avant.recette.rejouable ? avant.recette : r);
+  const data = { recette: garde, at: r.rejouable ? at : ((avant && avant.at) || at), dernierEssai: { at, rejouable: r.rejouable, raison: r.raison || '', chemin: r.chemin }, ver: CODE_VERSION };
+  try { await chrome.storage.local.set({ [LBC_RECETTE]: data }); } catch (_) { return false; }
+  const ok = await supabaseUpsert('app_data', [{ id: 'lbc_envoi', data: { appris: !!garde.rejouable, raison: garde.rejouable ? '' : garde.raison, chemin: garde.chemin, methode: garde.methode, at: data.at, dernierEssai: data.dernierEssai, ver: CODE_VERSION } }], 'id');
+  if (ok === true) notifierApp({ type: 'maj', quoi: 'lbc' });
+  return ok === true;
+}
+async function pauseLbcMsg() {
+  try { const p = (await chrome.storage.local.get(LBC_PAUSE_MSG))[LBC_PAUSE_MSG]; return p && Number(p.jusqua) > Date.now() ? p : null; } catch (_) { return null; }
+}
+async function poserPauseLbcMsg(statut) {
+  try { await chrome.storage.local.set({ [LBC_PAUSE_MSG]: { jusqua: Date.now() + LBC_PAUSE_MSG_MS, statut: Number(statut) || 0, depuis: Date.now() } }); } catch (_) {}
+}
+async function repondreLeboncoin(msg) {
+  const conv = String((msg && msg.conv) || '');
+  const texte = typeof (msg && msg.texte) === 'string' ? msg.texte.replace(/\r\n?/g, '\n').trim() : '';
+  if (!ID_CONV_LBC.test(conv)) return { accepte: false, code: 'invalide', raison: 'conversation inconnue' };
+  if (!texte || texte.length > 2000) return { accepte: false, code: 'invalide', raison: texte ? 'message trop long (2 000 caractères au plus)' : 'message vide' };
+  if (LBC_REPONSE_EN_VOL) return { accepte: false, code: 'en-cours', raison: 'un autre message Leboncoin part en ce moment — un à la fois' };
+  LBC_REPONSE_EN_VOL = true;
+  try {
+    const pause = await pauseLbcMsg();
+    if (pause) return { accepte: false, code: 'lbc-pause', raison: `Leboncoin a demandé de ralentir (${pause.statut || 'refus'}) — rien n'est parti, réessaie après ${new Date(pause.jusqua).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` };
+    let rec;
+    try { rec = (await chrome.storage.local.get(LBC_RECETTE))[LBC_RECETTE] || null; } catch (_) { return { accepte: false, code: 'lecture', raison: "le stockage de l'extension n'a pas répondu — rien n'est parti" }; }
+    const recette = rec && rec.recette;
+    if (!recette) return { accepte: false, code: 'pas-appris', raison: "l'extension n'a encore jamais vu comment Leboncoin envoie un message — envoie UNE réponse toi-même sur leboncoin.fr, dans ce Chrome : elle apprend la forme, et VRM pourra ensuite répondre" };
+    if (recette.rejouable !== true) return { accepte: false, code: 'pas-rejouable', raison: `la façon dont Leboncoin envoie un message n'est pas encore sûre à refaire (${recette.raison || 'forme inconnue'}) — réponds sur Leboncoin, rien n'est parti` };
+    const rows = await sbGet(`app_data?id=eq.lbc_fil_${encodeURIComponent(conv)}&select=compte:data->>compte`);
+    if (rows === null) return { accepte: false, code: 'lecture', raison: "la base VRM n'a pas répondu — rien n'est parti" };
+    if (!rows.length) return { accepte: false, code: 'inconnue', raison: "l'extension n'a pas encore lu cette conversation — ouvre-la une fois sur leboncoin.fr, rien n'est parti" };
+    const compte = idCompteLbc((rows[0] && rows[0].compte) || '');
+    if (!/^[0-9a-z_-]{1,64}$/i.test(compte)) return { accepte: false, code: 'compte', raison: "je ne sais pas sur quel compte Leboncoin est cette conversation — rien n'est parti" };
+    // L'onglet CONNECTÉ sur le compte du fil (identité privée) — jamais un autre, jamais un onglet ouvert par nous.
+    const o = await ongletLbcDuCompte(compte);
+    if (!o.ok && o.code) return { accepte: false, code: o.code, raison: o.raison };
+    if (!o.ok && o.autres && o.autres.length) return { accepte: false, code: 'autre-compte', raison: "Leboncoin est connecté sur un autre compte que celui de cette conversation dans ce Chrome — connecte-toi sur le bon compte, puis réessaie" };
+    if (!o.ok) return { accepte: false, code: 'lbc-absent', raison: "ouvre leboncoin.fr dans ce Chrome, connecté sur le compte de cette conversation, puis réessaie — l'envoi part de cet onglet" };
+    const cpt = await compterAction('lbc:' + compte, ACTIONS_MAX_HEURE);
+    if (!cpt.ok && cpt.code === 'stockage') return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
+    if (!cpt.ok) return { accepte: false, code: 'plafond', raison: `déjà ${ACTIONS_MAX_HEURE} actions sur ce compte Leboncoin cette heure-ci — réessaie dans ${Math.max(1, Math.ceil((cpt.resteMs || 0) / 60000))} min` };
+    const depuis = Number(cpt.at) || (Date.now() - 5);
+    let rep = null;
+    try { rep = await avecDelai(chrome.tabs.sendMessage(o.tabId, { from: 'vrm-fond', action: 'lbcRepondre', conv, texte, recette, compte }, { frameId: 0 }), 25000, null); } catch (_) { rep = null; }
+    const statut = (rep && Number(rep.statut)) || 0;
+    if (!rep || rep.ok !== true) {
+      if (rep && rep.code === 'invalide') { await rendreActions('lbc:' + compte, depuis, 1); return { accepte: false, code: 'invalide', raison: 'message refusé par la page — rien n’est parti' }; }
+      noterDiag('lbc_repondre_muet');
+      return { accepte: true, etape: 'incertain', raison: "l'onglet Leboncoin n'a pas répondu — je ne sais pas si le message est parti : regarde la conversation sur Leboncoin avant de renvoyer" };
+    }
+    if (!statut) {
+      await rendreActions('lbc:' + compte, depuis, 1);
+      const e = String(rep.erreur || '');
+      if (e === 'autre-compte' || e === 'compte-pas-su') return { accepte: false, code: 'autre-compte', raison: "l'onglet Leboncoin n'est plus (ou pas encore) sur le compte de cette conversation — recharge leboncoin.fr sur le bon compte, puis réessaie (rien n'est parti)" };
+      if (e === 'entetes') return { accepte: false, code: 'entetes', raison: "la page Leboncoin n'a pas encore parlé à sa messagerie depuis son ouverture — recharge tes messages Leboncoin, puis réessaie (rien n'est parti)" };
+      if (e && e !== 'reseau') return { accepte: false, code: 'arrete', raison: `rien n'est parti (${e})` };
+      return { accepte: true, etape: 'incertain', raison: "le réseau a coupé pendant l'envoi — regarde la conversation sur Leboncoin avant de renvoyer" };
+    }
+    noterDiag('lbc_repondre_' + statut);
+    if (statut === 429 || statut === 403) { await poserPauseLbcMsg(statut); return { accepte: true, etape: 'refuse', statut, raison: `Leboncoin a refusé (${statut}) — VRM se met en pause 30 min sur la messagerie Leboncoin` }; }
+    if (statut >= 200 && statut < 300) {
+      await rangerLbcFil({ conv, messages: [{ id: rep.idMsg || '', t: texte, deMoi: true, at: new Date().toISOString() }] }, compte, true);
+      return { accepte: true, etape: 'fait', statut };
+    }
+    return { accepte: true, etape: 'refuse', statut, raison: `Leboncoin a répondu ${statut} — le message n'est pas parti` };
+  } finally { LBC_REPONSE_EN_VOL = false; }
 }
 
 async function buildLbcData() {
