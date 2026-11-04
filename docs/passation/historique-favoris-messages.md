@@ -2184,3 +2184,38 @@ conversation → carte d'offre), le bouton du milieu devient **« Proposer X €
 - ⚠️ Vu en passant (pas touché, défaut de main) : à 1512 px, Messages en trois volets dans
   la colonne de 760 px du style Fusion ne laisse que ~110 px au fil (`messages-volets-1512`).
 - Geste de Julien : sur une offre sous son mini, toucher « Proposer X € ».
+
+### 4 nov. — STATISTIQUES DES OFFRES (`claude/offres-objectif`)
+Julien (chantier choisi) : par compte, offres reçues, acceptées (par lui ou le moteur),
+refusées, contre-offres, remise moyenne accordée, et ce que les offres ont « coûté ».
+- **Mesuré (lecture seule, sa base, 4 nov.)** — deux sources, deux populations :
+  · conversations `harvest_{uid}_conv_{id}` : 1 411 lignes, 807 avec une offre ; 918 offres
+    (`offer_request_message`, une par `offer_request_id`, TOUTES de l'acheteur côté vendeur) :
+    243 acceptées (20), 651 refusées (30), 22 annulées (40), 3 en attente (10). Une
+    CONTRE-OFFRE de Vinted = la demande refusée PUIS un `offer_message` de LUI plus haut :
+    568 mesurées, toutes après un 30. ⚠️ La capture des conversations s'est ARRÊTÉE
+    (dernière lecture 29 oct. sur un compte, 17-18 oct. sur les autres ; offres les plus
+    récentes le 18 oct.) : novembre n'est pas lu.
+  · transactions `harvest_{uid}_txn_{tx}` (fraîches, 3 nov.) : `offer.price` = prix conclu,
+    `offer.is_system` faux = négocié, `order.items[0].price` = prix affiché. Octobre : 80
+    ventes prouvées, 56 conclues par offre, 618,15 € de remises ; septembre 63/93, 621,63 €.
+  · le moteur `autoAccepterOffres` (ALLUMÉ chez lui, `vinted_offres_auto: true`) ne garde
+    AUCUN journal en base (seulement `logActivity` local et des compteurs de diag) ⇒ « qui a
+    accepté » est « — », toujours.
+- Règle : `src/statsOffres.js` (`offresDeConversation`, `venteParOffre`, `statsOffres`) ;
+  carte « Les offres » de Statistiques (`src/design/CarteOffres.jsx`) : coût des offres,
+  remise moyenne, ventes par offre (couverture « ventes lues N/M »), une ligne par compte
+  (reçues · acceptées · refusées · contre · coût), « lu jusqu'au … » quand la période dépasse
+  la dernière lecture (« au moins »), « — » si rien n'est lu (jamais « au moins 0 »),
+  « Acceptées par le moteur : — ». Un lot (plusieurs paires) et une autre devise sortent de
+  la couverture. La population des ventes = celle du « vendu » (`ventesFaites` : les lignes
+  Vinted portent désormais `tx` et `uid`, miroir `api/_lib/ventes-regle.js` modifié à
+  l'identique — `--recopie` impossible ici, Babel absent : à relancer quand il l'est).
+- Lecture : trois requêtes PROJETÉES (conversations à offre côté vendeur filtrées par la
+  base, `capturedAt` de toutes les conversations, transactions), ~1,2 Mo de messages, une
+  fois par 10 min, seulement quand la carte paraît (`IntersectionObserver`).
+- Preuves : `audit-stats-offres.cjs` 28 (rouge sur main ; 9/9 mutations : contre, moteur,
+  aumoins0, lecture, lot, sys, acheteur, periode, centimes) ; banc `offres-objectif` B.
+- Geste de Julien : aucun — mais tant que la capture des conversations Vinted est arrêtée,
+  les offres reçues d'une période récente restent « — » (les remises des ventes, elles, sont
+  lues).
