@@ -38,7 +38,7 @@ function CarteOffre({ o, recettes, cap, numDe, envoyer, Photo }) {
           <span className="vrm-of-sous">
             <span className="vrm-of-bloc">prix {euros(o.initial)}</span>
             {o.net != null ? <> · <span className="vrm-of-bloc">tu touches {euros(o.net)}</span></> : null}
-            {o.expire != null ? <> · <span className="vrm-of-bloc" data-vc-offre-reste="">{resteAvant(o.expire)}</span></> : null}
+            {o.expire != null ? <> · <span className="vrm-of-bloc" data-vc-offre-reste="">reste {resteAvant(o.expire)}</span></> : null}
           </span>
         </span>
         <span className="vrm-of-prix" data-vc-offre-cents={o.offre == null ? '' : String(o.offre)}>{euros(o.offre)}</span>
