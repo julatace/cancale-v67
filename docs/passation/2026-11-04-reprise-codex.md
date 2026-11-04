@@ -112,3 +112,10 @@ conservant les assertions d'un seul rechargement et de CSS réellement chargé.
 Google : le nom du consentement dépend de Google Cloud, pas du bouton VRM.
 Aucun accès admin configuré : aucune marque OAuth modifiée à distance.
 Procédure et callback conservé dans `docs/connexion-google-marque-vrm.md`.
+
+Les parcours complets ont aussi révélé deux tests d'interface restés sur une
+ancienne structure de main : liste d'emails maintenant repliée, en-tête du fil
+maintenant partagé dans TeteFil. Tests raccordés aux composants actuels, sans
+retirer les assertions de concurrence, de réponse périmée, de conservation du
+fil, de reprise après erreur ni d'isolation. Réception 390/1512 et fil 320/390/1512
+passent localement.
