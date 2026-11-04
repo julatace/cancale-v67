@@ -3038,3 +3038,50 @@ lot ouvert porte d'autres N° : le garde-fou `verifierContexte` (empreinte N° c
 `tout-imprimer` attend la fin de ces lectures avant d'ouvrir le lot. Après la fusion du tampon libre
 (#998), le lot passe par `mergeAndDownloadBordereaux` → `choisirTampon({…, apercu:false})` : chaque
 bordereau sort à la place gardée pour SA forme (`vrm_tampon_positions`) — audit `colis-trois` 2g.
+
+## 4 novembre — Le lot de bordereaux : Vestiaire et Leboncoin cochables, le tampon sur une sélection (branche `claude/selection-bordereaux`)
+
+Julien (3 nov., 21 h 08) : « je n'ai pas la possibilité de sélectionner la vente de Vestiaire Co et de Leboncoin quand
+je veux imprimer les bordereaux, c'est un pb ; pareil pour le tamponnage, on doit pouvoir le faire quand tous les
+bordereaux sont sélectionnés ».
+
+**Mesuré dans le code d'avant** : la seule sélection de bordereaux est l'aperçu de « Tout imprimer » (aucune
+sélection dans Ventes). Une vente Vestiaire n'y entrait que si son bordereau était DÉJÀ rangé (`v.bordereau.id`) ;
+une vente Leboncoin que si l'extension de CE navigateur savait lire le PDF (`extSait('lbcpdf') === 'ok'`) ET que
+le lien était lu — au téléphone, jamais. Sinon : pas de ligne du tout, rien à cocher. eBay : absent. **Mesuré en
+base (lecture seule)** : 1 vente Vestiaire à envoyer, bordereau rangé ; les 3 ventes Leboncoin « Paiement
+effectué » ont un lien de bordereau mais leur colis est `finished/delivered` (pas à poster aujourd'hui).
+**Fait** :
+- `src/lotSelection.js` (pur) : `ligneLotAutre` — Vestiaire et Leboncoin ont TOUJOURS leur ligne, cochable ;
+  `pdf` dit si le bordereau est là (Vestiaire : rangé ; Leboncoin : lien lu ET extension ici) ; eBay = ligne grisée
+  « eBay », jamais cochable (§2.8) ; `cochesParDefaut` (avec bordereau, ni ancienne ni déjà imprimée),
+  `selectionImprimable` (jamais eBay), `texteSansBordereau` (« 2 sans bordereau : N°13 Pochette, Golf »).
+- Aperçu : « Sans bordereau » en ambre sur la ligne, « eBay » à la place de « Contrôlé », « Tout sélectionner »
+  sans eBay. Une ligne cochée sans PDF part au lot et le message la NOMME (jamais un vide).
+- Tampon sur une sélection : `choisirTampon` reçoit une mémoire `deja` PARTAGÉE par le lot
+  (`mergeAndDownloadBordereauxBrut`) ⇒ la feuille `PlaceurTampon` s'ouvre UNE fois par forme (transporteur +
+  format + orientation, `formeTampon`), sur le PREMIER bordereau de cette forme dans l'ordre du lot ; la place
+  choisie vaut pour les autres bordereaux de la même forme ; « Toujours ici » la garde (`vrm_tampon_positions`) ;
+  une forme gardée ne redemande plus, sauf « Placer le tampon » (bouton de l'aperçu, `apercu: 'force'`).
+  « Annuler » arrête TOUT le lot (l'erreur n'est plus avalée comme un PDF raté) : aucun PDF.
+**Preuves** : `scripts/audit-selection-bordereaux.cjs` (14, `--prouve` 9/9) ; banc NOUVEAU
+`scripts/bancs/selection-bordereaux.cjs` (Vinted Mondial Relay ×2 + Chronopost, Vestiaire avec et sans bordereau,
+Leboncoin sans extension, eBay ; 390 tactile, 1512 clair, 1512 sombre ; PDF relu par pdf.js) : 54 verts ; rouge sur
+origin/main (11 rouges) ; mutations « place par bordereau » 3, « eBay cochable » 3 rouges. `lot-bordereaux` et
+`tout-imprimer` passent désormais par la feuille (un type sans place gardée) ; `lot-bordereaux` lit « 1 sans
+bordereau : Paire C… ». `fusion-echelle --verifier` vert.
+**Reste** : au téléphone, un bordereau Leboncoin reste « Sans bordereau » (le PDF ne se lit que par l'extension
+de l'ordinateur) ; la course des N° (vente lue avant sa transaction) demeure — le banc sème les N° sur l'appareil.
+
+
+### Litiges, retours et réclamations avec leur délai (3-4 novembre, branche `claude/litiges-recherche`)
+Demande : une ligne par litige / retour / réclamation en cours, avec la DATE LIMITE (seulement si elle est lue) et LE geste (un lien vers le site, son clic).
+- **Mesuré (lecture seule, 3 nov.)** :
+  - e-mails Vinted gardés `email_inconnu_*` (« aucune règle ne le reconnaît ») : « Action requise : problème avec la commande « … » » (5, sept., au VENDEUR, AUCUNE date : « Nous avons suspendu la commande jusqu'à ce que tu le fasses » ; « sous 5 jours ouvrés » est le délai de l'acheteur) ; « L'acheteur souhaite annuler son achat ! » (3, oct., aucune date) ; « Retourne ta commande d'ici le 14 oct. : … » (3, à l'ACHETEUR, date dans le SUJET, sans conversation) ; « Demande de remboursement » (7, `vinted@vinted.fr`, compte bloqué — pas un litige de commande, écarté) ;
+  - identité : le lien `links.vinted.com/t/<base64>` → `/inbox/<id>` = `conversation_id` de la commande (= `user_msg_thread_id` de la transaction) : **5/5 litiges et 3/3 annulations retrouvent leur commande** ; les 3 annulations sont aujourd'hui remboursées (closes) ;
+  - transactions 440 (10) / 430 (2) : aucune date limite (champs : status, status_title, available_actions, suspending_complaint_id, shipment) ; listes : 1 achat « Transaction suspendue » (18 oct.) ;
+  - eBay : **0 commande en base**, aucun retour jamais observé ; Vestiaire : 1 vente `ACTION_NEEDED` (= à expédier), aucun litige observé.
+- **Règle pure** `src/litiges.js` (`litigesEnCours`, `litigeDEmail`, `limiteDuJour`, `conversationDuCorps`, `litigeDeVente`) : commande reliée PAR SA CONVERSATION (une seule, sinon personne), jamais le titre ; date seulement LUE (sujet « d'ici le … » — année de réception, ou suivante ; fin de journée Paris — ou eBay `sellerResponseDue.respondByDate`, d'après la doc, non mesuré), sinon « délai non lu » ; clos PROUVÉ par la commande (finalisée, remboursée, annulée ; annulation sur une vente déjà partie) ; e-mail sans commande de plus de 30 j ou date dépassée ⇒ `ancien` (replié, pas sur Ma journée) ; commande + e-mail = une ligne ; trois états, manques nommés. `api/_lib/ebay-apres-vente.js` lit `limite`.
+- **Écrans** : Ma journée → « À faire » : une carte par identité (`data-job="litige"`, `data-litige*`), photo de la commande, « Litige · N°12 », « avant le 4 nov. » ou « délai non lu », pilule = LIEN (« Répondre ↗ », « Trancher ↗ », « Renvoyer ↗ », « Suivre ↗ », « Répondre sur eBay ») ; pressée (< 48 h, date lue) = ambre ; la carte ouvre SA vente. Le retour d'achat sans e-mail reste dit par « Renvoyer … (litige) » (pas de redite). Récapitulatif de la vente : `data-recap-litige` + le lien. E-mails lus en projection une fois / 10 min (`requeteEmailsLitiges`, `EMAILS_LITIGES_CACHE`).
+- **Preuves** : `audit-litiges.cjs` 46 contrôles (vraie règle + vraie lecture eBay), rouge sur main (règle absente), `--prouve` 10/10 (titre, délai deviné, clos ignoré, pas su tu, année, deux conversations, ancien, dépassée, base64, annulation partie) ; banc `bancs/litiges-recherche.cjs` (390 tactile / 1512, clair / sombre) vert, captures regardées.
+- **Reste** : le serveur (`api/email-inbound.js`) ne range ni ne notifie encore « Action requise : problème avec la commande » (relu par l'app depuis `email_inconnu_*`) ; litiges Vestiaire et forme réelle d'un retour eBay jamais observés ; `conversationVinted` de `api/_lib/achat-arrive-relais.js` utilise `Buffer` (absent du navigateur) : la relecture `arriveesRelues` ne décode pas les liens base64 côté app — à vérifier.

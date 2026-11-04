@@ -1270,3 +1270,57 @@ Récit complet : `historique-interface-stock.md`, « LE CYCLE D'UN ARTICLE ». L
 
 ### 3 nov. — Prix partout, dupliquer, histoire, modèles (`claude/annonces-outils`)
 Récit : `historique-interface-stock.md` (« LES QUATRE OUTILS DES ANNONCES »). Ici : aucun changement de prix depuis VRM (forme jamais mesurée) ⇒ « À faire sur le site » ; chips de modèles dans la fiche Leboncoin.
+
+
+### Messages Leboncoin : lire un fil et répondre depuis VRM, sur son clic (3 novembre, extension 5.318.0)
+Chantier choisi par Julien. Jusqu'ici l'extension ne relevait que le NOMBRE de non-lus
+(`storeLbcMessages`, `lbcmsg`). La forme de Vestiaire (5.295), à l'identique.
+- **Capteur** (`lbc-inject.js`) : un FIL (`…/conversations/{id}` ou
+  `…/conversations/{id}/messages|items` sur leboncoin.fr) ⇒ kind `lbcfil` : texte,
+  date, « de toi » (clé booléenne, ou auteur = compte privé de CE document) — jamais
+  le nom, l'avatar, le « partner » de l'autre (clés écartées de la forme aussi).
+  ⚠️ Rien ne part sans compte privé lu dans le document (`comptePriveDoc`), ni si le
+  `/hal/{id}/` du chemin dit un autre compte. La RECETTE d'un envoi (kind
+  `lbcenvoiappris`) s'APPREND d'une écriture 2xx de la messagerie faite PAR LA PAGE :
+  méthode, hôte leboncoin.fr, chemin avec SON compte en `{moi}` et une conversation
+  VUE dans l'onglet en `{conv}` (tout autre identifiant ⇒ `chemin-ambigu`), clé du
+  texte, mots fixes, `{moi}`/`{conv}` dans le corps, NOMS des en-têtes — jamais ton
+  texte ni une valeur d'en-tête ; sinon « pas rejouable » avec la raison. L'ordre
+  `repondre` (CANCALE_LBC_ORDRE) rejoue la recette depuis la page, avec les en-têtes
+  que la page vient d'envoyer à SA messagerie (`entetesMsg`, en mémoire), et seulement
+  si le compte demandé est celui de la page (`autre-compte` · `compte-pas-su` ·
+  `entetes` · `recette` ⇒ rien ne part).
+- **Relais** (`lbc-relay.js`) : `lbcfil` et `lbcenvoiappris` bornés et transmis ;
+  `lbcRepondre` du fond ⇒ ordre à la page, réponse `lbcenvoiresultat` (muet 20 s).
+- **Fond** (`background.js`) : `rangerLbcFil` (`lbc_fil_{conv}` : messages, compte,
+  n, dernierAt, apercu, dernierDeMoi, page ; lire-fusionner-réécrire, une écriture à la
+  fois, lecture ratée ⇒ rien, un fil ne change jamais de compte) — rangé seulement si
+  la page ET l'onglet (`vrmLbcTransport`, source privée) disent le même compte
+  (`compteLbcCapture`) ; `noterRecetteLbc` (`vrmLbcRecette`, `lbc_envoi.appris`) ;
+  `repondreLeboncoin` (commande `lbcRepondre` de l'APP seulement) : une à la fois, pause
+  `vrmPauseLbcMsg` 30 min sur 429/403, recette rejouable exigée, fil lu, onglet
+  connecté sur le compte du fil (`ongletLbcDuCompte` — aucun onglet ouvert à sa place),
+  `compterAction('lbc:{id}')` dans les 50/h (place rendue si rien n'est parti), le
+  message envoyé rejoint le fil (« envoyé depuis VRM »). État : `lbcRepondre: true`.
+- **App** : Messages · Leboncoin liste aussi les conversations lues (`lbc_fil_*` en
+  scalaires `meta`, `data-lbc-conv`) ; `FilLeboncoin` : bulles, « Toi », « Envoyer »
+  seulement avec `extSait('lbcrepondre') === 'ok'` ET `lbc_envoi.appris` ; sinon
+  « Répondre sur Leboncoin ↗ » vers la page où le fil a été VU. Capacités `lbcfil` et
+  `lbcrepondre` à 5.318.0. La messagerie en trois volets n'est plus serrée dans la
+  colonne de 760 px (`jetons.css` §9, `fusion.css` #13 : `:not(:has(.vrm-message-workspace))`) —
+  le fil n'avait plus que ~100 px sur ordinateur.
+- **Preuves** : `audit-lbc-repondre.cjs` (vrai `lbc-inject.js` dans Chromium + vrai
+  `background.js` dans `_fond-vm`) **31 contrôles, 17 rouges sur origin/main** ;
+  mutations `compte`, `plafond`, `clic` (un message de la PAGE déclenche un envoi)
+  toutes rouges. `audit-relais-lbc-kinds` (exemples `lbcfil`, `lbcenvoiappris`),
+  `audit-lbc-messages` (inchangé : sans compte privé, le texte ne sort toujours pas),
+  banc `lbc-repondre.cjs` 390/1512 clair et sombre + pas-appris, extension en retard,
+  refus 429 : vert, captures regardées ; `lbc-messages`, `vestiaire-messages`,
+  `messages-volets` verts.
+- ⚠️ **NON MESURÉ** : la forme des réponses de messagerie Leboncoin et la façon dont la
+  page ENVOIE (seul le compteur `…/hal/{id}/counter` a été vu). Si Leboncoin envoie par
+  son canal temps réel (`realtime/credentials` existe), aucune recette ne s'apprend :
+  « Envoyer » reste fermé et le pied mène à Leboncoin. Le fil lui-même ne se remplit que
+  si une réponse de forme reconnaissable passe dans un onglet où le compte privé est lu.
+- **Julien** : installer la 5.318.0 ; sur leboncoin.fr (connecté, dans ce Chrome),
+  ouvrir une conversation puis envoyer UNE réponse à la main : la recette s'apprend.

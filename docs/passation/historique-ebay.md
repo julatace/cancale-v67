@@ -1852,6 +1852,59 @@ Récit complet : `historique-interface-stock.md`, « LE CYCLE D'UN ARTICLE » (m
 ### 3 nov. — Prix partout, dupliquer, histoire, modèles (`claude/annonces-outils`)
 Récit : `historique-interface-stock.md` (« LES QUATRE OUTILS DES ANNONCES »). Ici : le prix part par `revise` confirmé au prix vu ; chips de modèles dans Publier et Modifier.
 
+
+### eBay → Inactives : « Remettre en vente » depuis VRM, sur son clic (3 novembre)
+Chantier choisi par Julien (« relancer les invendus eBay »). La décision du 23 octobre
+(« lecture seule, VRM ne remet rien en vente ») est levée PAR LUI : la remise en vente
+part de VRM, sur SON clic, confirmée — jamais seule.
+- **Route** (`api/ebay.js`, aucune fonction ajoutée, plan Hobby) : deux actions,
+  règle dans `api/_lib/ebay-relance.js` (fonctions pures) :
+  · `relanceverif` : l'annonce RELUE chez eBay (`GetItem`), jugée, la paire cherchée
+    sur TOUS ses comptes eBay (`dejaChezEbay`, en ligne ET programmées), puis
+    `VerifyRelistFixedPriceItem` pour les FRAIS (lus par nom, `fraisParNom`) — rien
+    n'est créé ;
+  · `relancer` : la même chose, `confirme:true` EXIGÉ (exactement `true`), la version
+    de numérotation de l'écran (013, `numerotationRefus`), puis `RelistFixedPriceItem`
+    avec l'identifiant SEUL (`<Item><ItemID>…</ItemID></Item>`) : eBay recopie
+    l'annonce, même prix, même livraison gérée par eBay, même SKU — VRM n'envoie
+    aucun champ (§2.8 : ni prix, ni `ShippingDetails`, ni `FreeShipping`). Relue
+    après coup (`verifie` : SKU, prix, pas de livraison gratuite). Sans Ack ⇒ 504
+    « incertain », jamais « fait ».
+  · Refus (rien ne part) : annonce encore active (409 `en-ligne`), vendue
+    (`QuantitySold` > 0, 409 `vendue`), `QuantitySold` absent (503 pas su), déjà
+    relancée (`RelistedItemID`), SANS SKU (409 `sans-identite` — mieux vaut un blanc),
+    SKU d'une autre paire (numérotation 013 avec la date de publication : « VRM-21 »
+    d'avant la coupure = B21), prix chez eBay ≠ prix vu au centime (409 `prix-change`),
+    devise ≠ compte, livraison gratuite (`FreeShipping` ou port fixe 0,00 €, 409
+    `livraison-gratuite`), variantes, paire déjà en ligne/programmée sur un compte.
+  · `relanceverif`/`relancer` sont dans `creeAnnonce` (marché du compte exigé).
+- **Écran** (`EbayInactives`) : la règle de proposition est une fonction pure,
+  `src/ebayRelance.js` (`relanceProposable`, `numeroSorti`) : N° lu dans le SKU
+  (une inactive SANS N° n'est plus proposée — « Voir sur eBay » seul), vendue nulle
+  part (verdict LU), pas déclarée partie du stock (`vinted_pairs_lost`, clé `N°` ou
+  `N°@annonce`), pas retirée par VRM, pas déjà de retour sur eBay, capture du jour.
+  « Remettre en vente » est un BOUTON (`button[data-inactive-relancer]`) : vérification
+  à blanc → feuille « Remettre en vente N°x ? » (titre, prix, « livraison gérée par
+  eBay », frais eBay) → `relancer` ; résultat sur la ligne (`data-inactive-resultat`),
+  puis relecture eBay. Phrase « la remise en vente se fait sur eBay » retirée.
+- **Preuves** : `audit-ebay-relance.cjs` (vraie route, faux eBay au format XML Trading,
+  fausse base filtrée par vendeur) **33 contrôles, 25 rouges sur origin/main** (copie
+  `git archive`, lancé depuis elle) ; mutations `confirme`, `vendue`, `gratuite`,
+  `champs` toutes rouges. Le banc `ebay-inactives.cjs` mis à jour (bouton au lieu du
+  lien, ligne sans N° = « Voir » seul) + le geste complet (vérifier → Annuler : rien ;
+  → Oui : UNE commande `confirme:true`, N°21 au prix vu) : 92 verts ; 2 rouges
+  préexistants sur main (« Aucune vente eBay pour l'instant » : texte raccourci par un
+  autre chantier). Captures regardées (390 et 1512).
+- ⚠️ `fast-xml-parser` absent du conteneur : l'audit pose un bouchon de module (il lève
+  s'il est appelé) — `audit-ebay-route.cjs` ne se charge pas ici pour la même raison.
+- ⚠️ **NON MESURÉ — rien n'a été envoyé à eBay** : la forme de `GetItem` d'une annonce
+  terminée (`ListingStatus`, `QuantitySold`, `ShippingDetails` d'une annonce en
+  livraison gérée) vient de la doc ; les frais d'insertion d'une remise en vente sont
+  ceux qu'eBay rend à la vérification (dits dans la feuille).
+- **Reste** : la vente « ailleurs » n'est jugée que par l'écran (le serveur ne connaît
+  pas les ventes Vinted/Leboncoin/Vestiaire) ; le serveur juge eBay (vendue, déjà en
+  ligne sur un de ses comptes).
+- **Julien** : sur une inactive reliée, toucher « Remettre en vente », lire les frais.
 ### 4 nov. — QUESTIONS eBAY DEPUIS VRM, UNE PAR ANNONCE (`claude/offres-objectif`)
 Mesuré dans le code : VRM lisait DÉJÀ les échanges eBay (Trading `GetMemberMessages`,
 90 jours, `api/_lib/ebay-gestion.js`) et y répondait (`AddMemberMessageRTQ`, `confirme:true`

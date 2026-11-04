@@ -13,6 +13,10 @@
 //   · le jeton de connexion temps réel ne sort jamais, même pas ses clés ;
 //   · les comptes liés partent SANS email ;
 //   · un UUID dans un chemin devient `{uuid}` (il partait à moitié en clair).
+// (3 nov., 5.318) Julien a choisi de lire et répondre depuis VRM : le texte d'un fil
+// part désormais en `lbcfil` (texte, date, « de toi », jamais un nom) SEULEMENT quand
+// le compte privé de la page est lu — ce que ce contrôle ne sert pas (il reste vrai
+// ici) ; `audit-lbc-repondre.cjs` juge l'autre cas.
 // Sur le code d'avant : le compteur ne partait pas, et le texte de la
 // conversation partait en entier (preuve par le comportement, §6.1).
 const { chromium } = require(require('path').join(__dirname, '..', 'node_modules', 'playwright'));

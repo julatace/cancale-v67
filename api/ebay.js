@@ -32,6 +32,7 @@ import { vendeurExige, baseCloisonnee } from './_lib/session.js';
 import { accesVendeur } from './_lib/abonnement.js';
 import { creerRechercheEbay } from './_lib/ebay-recherche.js';
 import { traiterSuppressionEbay } from './_lib/ebay-suppression.js';
+import { lireItemRelance, jugerRelance, xmlRelance, ID_ANNONCE_EBAY } from './_lib/ebay-relance.js';
 import { sbCle } from './_lib/cle.js';
 import { keysReady, canConsent, ruName, authUrl, appToken, jetonApplication, oublierJetonApplication, hasRefresh, accessToken, storeData, lireReglageVendeur, lireDonnee, lireResumeCommandes, modifierDonnee,
   lireComptes, comptesActifs, rangerConnexion, apprendrePrincipal, apprendreTypes, resoudreCompte, deconnecterCompte, suffixeCompte, normaliserRegistre, cleCompteDe,
@@ -1933,6 +1934,56 @@ async function handleCallback(req, res) {
 }
 
 // L'édition complète garde les contrôles de stock/identité et relit les règles natives.
+// ── REMETTRE EN VENTE UNE INACTIVE (3 novembre — chantier choisi par Julien) ──
+// La règle est dans `api/_lib/ebay-relance.js`. Deux actions :
+//   · `relanceverif` : l'annonce RELUE chez eBay (GetItem), jugée, la paire
+//     cherchée sur TOUS ses comptes eBay (`dejaChezEbay`), puis la vérification
+//     à blanc d'eBay (`VerifyRelistFixedPriceItem`) pour ses FRAIS — rien n'est
+//     créé ;
+//   · `relancer` : la même chose, `confirme:true` EXIGÉ (posé par l'app après
+//     SON clic), la version de numérotation de l'écran (013), puis
+//     `RelistFixedPriceItem` avec l'identifiant SEUL : même prix, même
+//     livraison, même SKU. Relue après coup (`verifie`).
+// Un résultat sans réponse lisible d'eBay est « incertain » (504) : l'annonce a
+// pu repartir — la prochaine relecture le dira, rien n'est renvoyé à l'aveugle.
+async function handleRelance(b, ctx, seulementVerifier) {
+  if (!seulementVerifier && b.confirme !== true) return { status: 400, body: { ok: false, reason: 'confirmation', error: 'Remise en vente non confirmée — rien n\'a été envoyé à eBay.' } };
+  const itemId = String(b.itemId || '');
+  if (!ID_ANNONCE_EBAY.test(itemId)) return { status: 400, body: { ok: false, reason: 'invalide', error: 'Annonce inconnue — rien n\'a été envoyé à eBay.' } };
+  const voulu = cleNum(b.numero);
+  if (!voulu || !NUM_OK.test(voulu)) return { status: 400, body: { ok: false, reason: 'numero', error: 'Numéro de paire illisible — rien n\'a été envoyé à eBay.' } };
+  if (prixLu(b.prixVu) == null) return { status: 400, body: { ok: false, reason: 'prix', error: PRIX_ILLISIBLE } };
+  const num = await numerotationVendeur(ctx.owner);
+  if (!num.ok) return { status: 503, body: { ok: false, reason: 'numerotation-pas-su', error: 'Je n\'ai pas pu relire ta numérotation — rien n\'a été envoyé à eBay.' } };
+  if (!seulementVerifier) { const ref = numerotationRefus(b, num); if (ref) return ref; }
+  const at = await jetonDe(ctx);
+  if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
+  const g = await tradingCall(at.token, 'GetItem', `<ItemID>${itemId}</ItemID><DetailLevel>ReturnAll</DetailLevel>`);
+  if (sansAck(g)) return { status: 503, body: { ok: false, reason: 'pas-su', error: 'eBay n\'a pas rendu cette annonce — rien n\'a été remis en vente.' } };
+  if (!g.ok) return { status: 502, body: { ok: false, reason: 'pas-su', error: g.err || 'eBay n\'a pas rendu cette annonce — rien n\'a été remis en vente.' } };
+  const j = jugerRelance(lireItemRelance(g.xml), { itemId, numero: voulu, prixVu: b.prixVu }, { mk: num.mk, devise: marcheCourant().devise });
+  if (!j.ok) return { status: j.status, body: j.body };
+  const deja = await dejaChezEbay(ctx, at.token, j.sku, 'remis en vente', num.mk);
+  if (deja) return deja;
+  const corps = xmlRelance(itemId);
+  if (seulementVerifier) {
+    const v = await tradingCall(at.token, 'VerifyRelistFixedPriceItem', corps);
+    if (sansAck(v) || !v.ok) return { status: 200, body: { ok: true, num: j.num, sku: j.sku, prix: j.prix, frais: null, verifie: false, error: v && v.err ? v.err : undefined } };
+    return { status: 200, body: { ok: true, num: j.num, sku: j.sku, prix: j.prix, frais: fraisParNom(v.xml), verifie: true } };
+  }
+  const r = await tradingCall(at.token, 'RelistFixedPriceItem', corps);
+  if (sansAck(r)) return { status: 504, body: { ok: false, reason: 'incertain', error: 'eBay n\'a pas répondu clairement — je ne sais pas si elle est repartie. Rafraîchis depuis eBay avant de recommencer.' } };
+  if (!r.ok) return { status: r.status >= 400 ? r.status : 422, body: { ok: false, reason: 'refus', error: r.err || 'eBay a refusé la remise en vente.' } };
+  const neuf = lireBalise(r.xml, 'ItemID');
+  // La RELECTURE : ce qu'eBay tient vraiment (SKU et prix) sur la nouvelle annonce.
+  let verifie = null;
+  if (ID_ANNONCE_EBAY.test(neuf)) {
+    const g2 = await tradingCall(at.token, 'GetItem', `<ItemID>${neuf}</ItemID><DetailLevel>ReturnAll</DetailLevel>`);
+    const l2 = g2 && g2.ok ? lireItemRelance(g2.xml) : null;
+    if (l2 && l2.itemId === neuf) verifie = l2.sku === j.sku && Math.round(Number(l2.prix) * 100) === Math.round(j.prix * 100) && l2.gratuite !== true;
+  }
+  return { status: 200, body: { ok: true, itemId: neuf || null, ancien: itemId, url: neuf ? lienAnnonce(marcheCourant(), neuf) : null, sku: j.sku, num: j.num, prix: j.prix, frais: fraisParNom(r.xml), verifie, compte: ctx.compte.pseudo || '' } };
+}
 async function handleModifierAnnonceGestion(b,ctx){
  if(b.price==null)return gestionEbay.modifierAnnonce(b,ctx);
  if(!ID_EBAY.test(String(b.itemId || '')) || !/^\d+(?:[.,]\d{1,2})?$/.test(String(b.price)) || !(Number(String(b.price).replace(',','.'))>0))return {status:400,body:{ok:false,error:'Annonce ou prix invalide.'}};
@@ -2122,6 +2173,9 @@ async function handleApp(req, res) {
       // (9 octobre) La règle d'offre : c'est eBay qui accepte, au seuil fixé.
       regleoffre: (ctx) => handleRegleOffre(b, ctx),
       regleoffrelire: (ctx) => handleRegleOffreLire(b, ctx),
+      // (3 nov.) Remettre en vente une inactive : vérifier (frais), puis relancer sur SON clic.
+      relanceverif: (ctx) => handleRelance(b, ctx, true),
+      relancer: (ctx) => handleRelance(b, ctx, false),
     };
     if (!Object.prototype.hasOwnProperty.call(ACTIONS, action)) { res.status(400).json({ ok: false, error: 'action inconnue' }); return; }
     const rc = await resoudreCompte(b.compte, owner);
@@ -2133,7 +2187,7 @@ async function handleApp(req, res) {
     // illisible) ou pas géré par VRM est REFUSÉ : jamais publié en France à la
     // place.
     const marche=marcheDuCompte(rc.compte);
-    const creeAnnonce=new Set(['publish','pubverify','pubinfo','programmer']);
+    const creeAnnonce=new Set(['publish','pubverify','pubinfo','programmer','relanceverif','relancer']);
     if(creeAnnonce.has(action)&&(!marche||rc.compte.siteInconnu)){
       res.status(!marche?409:503).json({ok:false,reason:!marche?'marche-non-gere':'marche-pas-su',error:!marche
         ?'Ce compte eBay est inscrit sur un site eBay que VRM ne gère pas encore (VRM gère eBay.fr, eBay.co.uk, eBay.com, eBay.de, eBay.it, eBay.es) — rien n\'a été envoyé.'

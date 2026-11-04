@@ -36,7 +36,7 @@ import { normaliserEntrant, formeRecue, demasquerRelais } from './_lib/lire-emai
 import { sbCle } from './_lib/cle.js';
 import { numeroDuTitreApresCoupure, lireMarqueur, archiveDe, estArchive } from './_lib/numerotation.js';
 import { numerosDeVente, annoncesEbayParNumero, annoncesLbcParNumero, annoncesVcEnLigne, annoncesVintedParNumero, numerosRetiresEbay, doubleVenteApprise, notificationDoubleVente } from './_lib/double-vente.js';
-import { numVcVente } from './_lib/vestiaire-regle.js';
+import { numVcVente, numerosVcAvecLiens } from './_lib/vestiaire-regle.js';
 import { normaliserRegistre, comptesActifs } from './_lib/ebay.js';
 import { arriveLeAuRangement } from './_lib/arrivee-colis.js';
 import { limiteRetraitDepuisTexte, lieuDepuisExtrait, lieuSousEnTete, LIEU_AU_FUTUR } from './_lib/retrait-colis.js';
@@ -761,7 +761,7 @@ export async function lireAnnoncesAilleurs() {
   const cl = await baseCloisonnee();
   if (cl === null || (cl && !proprietaireCourant())) return { ebay: null, lbc: null, vc: null, vinted: null, retraitsEbay: null };
   const [mainL, reg, ebayL, lbcL, ventesL, comptesLbc, vcL, vcV, vL, vP, vS, retL] = await Promise.all([
-    lirePagine('id=eq.main&select=mk:data->vrm_numerotation,liens:data->vrm_lbc_liens,fiches:data->vinted_annonce_numeros,liensEbay:data->vrm_ebay_liens,retirees:data->vrm_annonces_retirees'),
+    lirePagine('id=eq.main&select=mk:data->vrm_numerotation,liens:data->vrm_lbc_liens,fiches:data->vinted_annonce_numeros,liensEbay:data->vrm_ebay_liens,retirees:data->vrm_annonces_retirees,vcAuto:data->vrm_vc_numeros,vcLiensMain:data->vrm_vc_liens'),
     lirePagine('id=eq.ebay_comptes&select=comptes:data->comptes'),
     lirePagine('id=like.ebay_listings%25&select=id,items:data->items'),
     lirePagine('id=eq.lbc_listings&select=items:data->items'),
@@ -787,7 +787,11 @@ export async function lireAnnoncesAilleurs() {
   if (vcL && vcV) {
     const lst = vcL[0] ? { items: objetJson(vcL[0].items), liens: objetJson(vcL[0].liens), capturedAt: vcL[0].capturedAt } : null;
     const vv = vcV[0] ? objetJson(vcV[0].ventes) : null;
-    if (lst && lst.items !== undefined && lst.liens !== undefined && vv !== undefined) vc = annoncesVcEnLigne({ items: lst.items || {}, liens: lst.liens || {}, capturedAt: lst.capturedAt }, vv || {}).parNum;
+    // (3 nov.) + les N° que VRM a donnés aux annonces Vestiaire et la liaison
+    // Vinted ↔ Vestiaire posée par son clic (`main`) : la même identité que l'app.
+    const m0 = mainL && mainL[0] ? mainL[0] : null;
+    const autoVc = numerosVcAvecLiens((m0 && objetJson(m0.vcAuto)) || {}, (m0 && objetJson(m0.vcLiensMain)) || {});
+    if (lst && lst.items !== undefined && lst.liens !== undefined && vv !== undefined) vc = annoncesVcEnLigne({ items: lst.items || {}, liens: lst.liens || {}, capturedAt: lst.capturedAt, auto: autoVc }, vv || {}).parNum;
   }
   // Le marqueur 013 : illisible ⇒ aucune traduction possible ⇒ rien.
   if (!mainL) return { ebay: null, lbc: null, vc, vinted: null, retraitsEbay };
@@ -846,12 +850,14 @@ async function notifierDoubleVente(numero, titre, venduSur = 'vinted') {
 async function numeroVenteVc(v) {
   const [lst, m] = await Promise.all([
     lirePagine('id=eq.vc_listings&select=liens:data->liens'),
-    lirePagine('id=eq.main&select=auto:data->vrm_vc_numeros'),
+    lirePagine('id=eq.main&select=auto:data->vrm_vc_numeros,liensMain:data->vrm_vc_liens'),
   ]);
   if (!lst || !m) return '';
   const liens = lst[0] ? objetJson(lst[0].liens) : null, auto = m[0] ? objetJson(m[0].auto) : null;
   if (liens === undefined || auto === undefined) return '';
-  return numVcVente(v, liens || {}, auto || {});
+  // (3 nov.) La liaison Vinted ↔ Vestiaire posée par son clic (`vrm_vc_liens`).
+  const liensMain = m[0] ? objetJson(m[0].liensMain) : null;
+  return numVcVente(v, liens || {}, numerosVcAvecLiens(auto || {}, liensMain || {}));
 }
 
 // Prix d'achat d'une paire d'après le TITRE de l'annonce (pour le conseil d'une

@@ -886,7 +886,8 @@ html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-va-titre 
    centrée (la carte sombre ne s'étire plus sur 1 150 px) ; Ventes perd ses en-têtes de
    colonnes (« Article / État / Prix… ») que les cartes ne suivent pas. */
 @media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
-  html body .vrm-app-shell .vrm-main:has(.vrm-fu-ecran) > :not(.vrm-barre-haut):not(style):not(script) { max-width: 760px !important; margin-left: auto !important; margin-right: auto !important; box-sizing: border-box !important; width: 100% !important; }
+  /* (3 nov.) Sauf la messagerie en volets (liste · fil · fiche) : à 760 px le fil n'avait plus que 100 px. */
+  html body .vrm-app-shell .vrm-main:has(.vrm-fu-ecran):not(:has(.vrm-message-workspace)) > :not(.vrm-barre-haut):not(style):not(script) { max-width: 760px !important; margin-left: auto !important; margin-right: auto !important; box-sizing: border-box !important; width: 100% !important; }
 }
 html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) :is(.vrm-ledger-heading, [data-ventes-entete-cols]) { display: none !important; }
 
@@ -1207,3 +1208,7 @@ html body .vrm-app-shell .vrm-main .vrm-day-layout .vrm-cycle-carte > .vrm-cycle
 @media (max-width: 600px) {
   html body .vrm-app-shell .vrm-main .vrm-day-layout .vrm-cycle-carte > .vrm-cycle-choix { flex: 1 1 100%; }
 }
+/* (3 nov.) La prévision de la prochaine échéance URSSAF (PrevisionUrssafCarte). */
+.vrm-fu-prevision { margin: 0 0 14px; }
+.vrm-fu-prevision .vrm-fu-prevision-montant { font: 700 22px/1.2 var(--vrm-police); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.vrm-fu-prevision .vrm-fu-prevision-montant small { font: 500 13px/1 var(--vrm-police); color: var(--fu-gris); margin-right: 2px; }
