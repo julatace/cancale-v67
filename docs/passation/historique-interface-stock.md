@@ -3513,3 +3513,55 @@ jamais cochée seule. Annulée/remboursée : pas de frise. L'étape en cours pas
 Vestiaire) au style Fusion (`src/lien-vestiaire.css`, réutilise `.vrm-ao-*`, voile plus sombre pour se détacher en
 mode sombre). Audit `audit-frise-sites`, banc `lien-vc-frise` (captures 390/1512 regardées). Détail :
 `historique-vestiaire.md`.
+
+---
+
+## 4 novembre — Ma journée : le journal de la semaine (branche `claude/argent-mois`)
+
+Julien : le lundi (et jusqu'au dimanche), en tête de Ma journée, « Semaine du 27 oct. » — quatre
+chiffres de la semaine passée. AUCUNE notification (il a refusé les rappels ; le bilan du dimanche
+soir existant n'est pas touché).
+- `src/journalSemaine.js` : la semaine = `semainePassee` (api/_lib/bilan-semaine.js, lundi 00:00 →
+  lundi 00:00 à Paris, 169 h au passage à l'heure d'hiver) ; ventes et CA vendu = `bilanLignes` sur
+  les lignes de `ventesFaites` ; « Bénéfice brut » (`beneficeDesJours` + `chiffreBrut` : une semaine
+  n'a ni dépenses ni URSSAF à elle, décision du 3 nov.) avec sa couverture « N sur M prix
+  d'achat » ; colis envoyés = ses gestes « Colis fait » datés dans la semaine (Vinted, Leboncoin,
+  Vestiaire — eBay ne garde aucune date d'envoi : une vente eBay dans la semaine rend le nombre
+  « au moins », eBay nommé).
+- `JournalSemaineCarte`, juste sous la tête sombre ; repliable (44 px), replié pour CETTE semaine
+  seulement (`vrm_journal_replie`, préférence de l'appareil) : la semaine suivante se montre ouverte.
+- Preuves : `audit-journal-semaine` (16 verts, 4 rouges sur origin/main ; mutations semaine 4,
+  colis 2, brut 2, ebay 2, repli 2) ; banc `argent-mois` (B : en tête, valeurs, replié gardé au
+  rechargement, 44 px, pas de débordement).
+- Le même jour : la case « En attente » de Ma journée devient « À venir » (toutes plateformes,
+  `liveStats.aVenir`) — récit dans l'historique compta.
+### 4 nov. — OBJECTIF DU MOIS DANS LA CARTE SOMBRE ; MESSAGES SORT DE LA COLONNE DE 760 PX (`claude/offres-objectif`)
+- Objectif : UN réglage `vrm_objectif_mois` (synchronisé, `onCloudReady`) — `{ type: 'ca' |
+  'ventes', valeur, cache: { page: bool } }` — et UNE règle (`src/objectifMois.js`) : la
+  valeur est celle du chiffre « vendu » / « ventes » du MOIS, tous sites et comptes, lue par
+  `valeurObjectif` → `valeurChiffre` (VENDU = `ventesFaites`) ; pourcentage jamais arrondi
+  vers le haut ; pas su ⇒ « — » ; partiel ⇒ « au moins » dans le titre. Une barre FINE (4 px)
+  sous les cases (`BarreObjectif`), « Objectif · 297 € / 500 € » ; aucun objectif ⇒ rien.
+  Se fixe dans « Modifier » → « Objectif » (CA vendu | Nombre de ventes, montant, OK ;
+  « Masquer/Montrer sur cette carte », « Retirer ») ; absente par défaut sur Achats et Colis.
+  Mesuré : les deux anciens objectifs (`vrm_ca_objectif` de Statistiques, `vinted_goal` de
+  Ventes, avec sa proposition « Viser X € » calculée sur l'archive Vinted seule) n'étaient
+  posés NULLE PART en base ; Statistiques lit désormais le même réglage et la même valeur
+  (`ObjectifDuMois`), le bloc de Ventes (doublon de la barre sur le même écran) est retiré.
+  Preuves : `audit-objectif-mois.cjs` 33 (rouge sur main, 7/7 mutations) ; banc
+  `offres-objectif` A.
+- Messages : `jetons.css` §9 rangeait l'écran Messages dans la colonne de lecture de 760 px ;
+  les trois volets (maquette du 31 oct.) n'y tenaient pas — le fil tombait à ~100 px, un mot
+  par ligne, à 1512 px sur Vinted, eBay, Vestiaire et Leboncoin (déjà vu, non corrigé, dans
+  « Proposer X € » du 3 nov.). Une autre session a corrigé la même chose en parallèle
+  sur `main` (`:not(:has(.vrm-message-workspace))`) : c'est SA règle qui est gardée à la
+  fusion ; `messages-volets` et `messages-sites` (1512) verts, le banc neuf exige un fil
+  ≥ 380 px. Reste rouge, AVANT ce
+  chantier aussi : `messages-sites` « vestiaire · 390 px — la liste prend toute la largeur ».
+- Geste de Julien : « Modifier » sur une carte → « Objectif ».
+**4 nov. — Achats : trois entrées « Fournisseurs · Délai · Lots »** sous la carte sombre d'Achats (pilules
+Fusion, 44 px, une ligne au téléphone), chacune une feuille en portail (`src/AchatsOutils.jsx`,
+`src/styles-achats-outils.css`, réutilise `.vrm-ao-*`) : tableau des fournisseurs triable, médiane du
+délai réception → mise en ligne avec la liste « Reçus, pas encore en ligne » (Relier · Mettre en ligne),
+« Répartir » un lot (« Reste X € » en ambre). Aucun texte explicatif. Banc `achats-sourcing` (120, 390/1512
+clair/sombre). Règles et mesures : `historique-compta-urssaf-abonnement.md` (« 4 nov. — Achats »).

@@ -37,7 +37,7 @@ export const WIDGETS_JOURNEE = {
   afaire:   { nom: 'À faire', desc: 'Les actions du jour', tailles: ['pleine', 'grand', 'moyen'], fixe: true, carte: false },
   vendu:    { nom: 'Vendu et reçu', desc: 'Vendu ce mois et aujourd’hui, reçu ce mois (et ton bénéfice, si tu l’affiches)', tailles: ['moyen', 'grand', 'pleine'] },
   semaine:  { nom: 'Cette semaine', desc: 'La courbe vendu et reçu de la semaine', tailles: ['moyen', 'grand', 'pleine'] },
-  attente:  { nom: 'Argent en attente', desc: 'En attente chez Vinted et disponible à virer', tailles: ['moyen', 'grand', 'pleine'] },
+  attente:  { nom: 'Argent à venir', desc: 'Ce que tes sites te doivent encore, et ce qui est à virer', tailles: ['moyen', 'grand', 'pleine'] },
   recentes: { nom: 'Dernières ventes', desc: 'Les photos de tes dernières ventes', tailles: ['grand', 'pleine'], carte: false },
   stock:    { nom: 'Stock actuel', desc: 'Annonces en ligne et prix d’achat renseignés', tailles: ['moyen', 'grand', 'pleine'] },
   jours14:  { nom: '14 derniers jours', desc: 'Vendu et reçu, jour par jour', tailles: ['moyen', 'grand', 'pleine'] },

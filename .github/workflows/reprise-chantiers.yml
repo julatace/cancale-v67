@@ -1,0 +1,50 @@
+name: Reprise des chantiers VRM
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: reprise-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  regles:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Vérifier les calculs, le handler et les changements de session
+        run: |
+          node --test scripts/tests/finance-reprise.test.mjs scripts/tests/appareils-route.test.mjs scripts/tests/deconnexion-proprietaire.test.mjs
+          for audit in argent-a-venir comparer-mois frais-plateformes journal-semaine objectif-mois questions-ebay stats-offres achats-sourcing comptes-securite selection-bordereaux; do
+            node "scripts/audit-$audit.cjs"
+          done
+  ecrans:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        banc: [argent-mois, offres-objectif, achats-sourcing, comptes-securite, bureau-chargement]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Installer Chromium
+        run: |
+          npx playwright install --with-deps chromium
+          echo "VRM_CHROMIUM_PATH=$(node -e 'console.log(require("playwright").chromium.executablePath())')" >> "$GITHUB_ENV"
+      - name: Vérifier les écrans sur données fictives
+        env:
+          NODE_OPTIONS: --require=./scripts/bancs/_porte-banc.cjs
+        run: node scripts/bancs/${{ matrix.banc }}.cjs

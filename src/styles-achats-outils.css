@@ -1,0 +1,80 @@
+/* ── ACHATS : FOURNISSEURS · DÉLAI · LOTS (4 nov.) — style « Fusion » ─────────
+   Les feuilles reprennent `vrm-ao-*` (styles-annonces-outils.css). Jetons
+   `--fu-*` (fusion.css), clair et sombre. Une seule couleur : le bleu du bouton
+   principal ; l'ambre pour « reste » (un geste à faire). */
+.vrm-aso-outils { display: flex; gap: 8px; margin: 0 0 14px; }
+.vrm-aso-outil {
+  flex: 1 1 auto; min-width: 0; min-height: 44px; padding: 0 12px; border: 0; border-radius: 999px; cursor: pointer;
+  background: var(--fu-carte, #fff); color: var(--fu-encre, #1d1d1f); box-shadow: var(--fu-ombre);
+  font: inherit; font-size: 15px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap;
+}
+.vrm-aso-outil span { overflow: hidden; text-overflow: ellipsis; }
+.vrm-aso-outil small { font-size: 13px; font-weight: 600; color: var(--fu-gris, #6e6e73); font-variant-numeric: tabular-nums; }
+.vrm-aso-outil:focus-visible, .vrm-aso-seg button:focus-visible, .vrm-aso-num:focus-visible, .vrm-aso-choisir:focus-visible { outline: 2px solid var(--fu-bleu, #0071e3); outline-offset: 2px; }
+
+.vrm-aso-feuille { max-width: 560px; }
+.vrm-aso-seg { display: flex; gap: 4px; padding: 3px; margin: 0 0 12px; background: var(--fu-piste, #e5e5ea); border-radius: 12px; overflow-x: auto; scrollbar-width: none; }
+.vrm-aso-seg::-webkit-scrollbar { display: none; }
+.vrm-aso-seg button {
+  flex: 1 0 auto; min-height: 44px; padding: 0 12px; border: 0; border-radius: 12px; background: transparent; color: var(--fu-encre, #1d1d1f);
+  font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.vrm-aso-seg button[aria-pressed="true"] { background: var(--fu-carte, #fff); box-shadow: 0 1px 2px rgba(0,0,0,.12); font-weight: 700; }
+:root[data-theme="dark"] .vrm-aso-seg button[aria-pressed="true"] { background: #636366; color: #fff; box-shadow: none; }
+
+.vrm-aso-couv { margin: 0 4px 12px; font-size: 13px; color: var(--fu-gris, #6e6e73); font-variant-numeric: tabular-nums; line-height: 1.45; }
+.vrm-aso-bloc { white-space: nowrap; }
+.vrm-aso-liste { list-style: none; margin: 0 0 12px; padding: 0 12px; background: var(--fu-carte, #fff); border-radius: 20px; box-shadow: var(--fu-ombre); }
+.vrm-aso-ligne { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 0; min-height: 60px; box-sizing: border-box; }
+.vrm-aso-ligne + .vrm-aso-ligne { border-top: 1px solid var(--fu-filet, rgba(0,0,0,.06)); }
+.vrm-aso-ligne.is-achat { grid-template-columns: 48px minmax(0, 1fr) auto; }
+.vrm-aso-ligne.is-choix { display: block; padding: 0; }
+.vrm-aso-rang { font-size: 13px; font-weight: 600; color: var(--fu-gris3, #aeaeb2); text-align: center; font-variant-numeric: tabular-nums; }
+.vrm-aso-centre { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.vrm-aso-nom { font-size: 15px; font-weight: 700; color: var(--fu-encre, #1d1d1f); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: -.01em; }
+.vrm-aso-nom.is-gris { color: var(--fu-gris, #6e6e73); }
+.vrm-aso-sous { font-size: 13px; color: var(--fu-gris, #6e6e73); font-variant-numeric: tabular-nums; line-height: 1.35; overflow-wrap: anywhere; }
+.vrm-aso-droite { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.vrm-aso-montant { font-size: 17px; font-weight: 800; letter-spacing: -.02em; color: var(--fu-encre, #1d1d1f); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vrm-aso-benef { font-size: 13px; font-weight: 600; color: var(--fu-encre, #1d1d1f); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vrm-aso-benef[data-vide] { color: var(--fu-gris3, #aeaeb2); }
+.vrm-aso-photo { width: 48px; height: 48px; border-radius: 12px; overflow: hidden; background: var(--fu-case, #f2f2f7); display: block; flex: none; }
+.vrm-aso-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.vrm-aso-btn { border: 0; cursor: pointer; font-family: inherit; }
+.vrm-aso-num { border: 0; background: none; padding: 0; min-height: 44px; color: var(--fu-encre, #1d1d1f); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.vrm-aso-sous .vrm-aso-num { min-height: 0; }
+.vrm-aso-sous-feuille { grid-column: 1 / -1; }
+
+.vrm-aso-carte { background: var(--fu-carte, #fff); border-radius: 20px; box-shadow: var(--fu-ombre); padding: 16px; margin: 0 0 16px; }
+.vrm-aso-grand { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.vrm-aso-grand b { font-size: 38px; font-weight: 800; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.vrm-aso-grand span { font-size: 15px; color: var(--fu-gris, #6e6e73); font-variant-numeric: tabular-nums; }
+.vrm-aso-mois { list-style: none; margin: 10px 0 0; padding: 0; }
+.vrm-aso-mois li { display: grid; grid-template-columns: minmax(0, 1fr) auto 36px; gap: 10px; align-items: baseline; padding: 8px 0; border-top: 1px solid var(--fu-filet, rgba(0,0,0,.06)); font-size: 15px; font-variant-numeric: tabular-nums; }
+.vrm-aso-mois li b { font-weight: 700; }
+.vrm-aso-mois li small { font-size: 13px; color: var(--fu-gris, #6e6e73); text-align: right; }
+.vrm-aso-carte .vrm-aso-couv { margin: 10px 0 0; }
+.vrm-aso-h3 { margin: 4px 4px 8px; font-size: 20px; font-weight: 800; letter-spacing: -.02em; display: flex; align-items: baseline; gap: 8px; }
+.vrm-aso-n { font-size: 15px; font-weight: 700; color: var(--fu-gris, #6e6e73); font-variant-numeric: tabular-nums; }
+.vrm-aso-plus { display: block; width: 100%; margin: 0 0 12px; min-height: 48px; }
+
+.vrm-aso-choix { margin: 0 0 12px; }
+.vrm-aso-cherche { display: flex; gap: 8px; margin: 8px 0; }
+.vrm-aso-cherche input {
+  flex: 1; min-width: 0; min-height: 44px; box-sizing: border-box; border: 0; border-radius: 12px; padding: 0 12px;
+  background: var(--fu-case, #f2f2f7); color: var(--fu-encre, #1d1d1f); font: inherit; font-size: 17px;
+}
+.vrm-aso-choisir { all: unset; box-sizing: border-box; width: 100%; min-height: 60px; display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 12px; align-items: center; padding: 8px 0; cursor: pointer; }
+
+.vrm-aso-lot-tete { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 12px; align-items: center; margin: 0 4px 12px; }
+.vrm-aso-parts .vrm-aso-part { padding-left: 16px; }
+.vrm-aso-champ { display: flex; align-items: baseline; gap: 4px; flex: none; width: 112px; }
+.vrm-aso-champ input {
+  width: 100%; min-width: 0; min-height: 44px; box-sizing: border-box; border: 0; border-radius: 12px; padding: 0 10px; text-align: right;
+  background: var(--fu-case, #f2f2f7); color: var(--fu-encre, #1d1d1f); font: inherit; font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.vrm-aso-champ input[aria-invalid="true"] { box-shadow: inset 0 0 0 2px var(--fu-ambre, #ff9f0a); }
+.vrm-aso-champ b { font-size: 15px; font-weight: 600; color: var(--fu-gris, #6e6e73); }
+.vrm-aso-reste { margin: 0 4px 12px; padding: 10px 14px; border-radius: 14px; background: var(--fu-ambre-fond, #fff4e5); color: var(--fu-ambre-txt, #b25000); font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.vrm-aso-reste.is-juste { background: var(--fu-case, #f2f2f7); color: var(--fu-encre, #1d1d1f); }
+.vrm-aso-annuler { display: block; width: 100%; margin-top: 10px; min-height: 48px; }

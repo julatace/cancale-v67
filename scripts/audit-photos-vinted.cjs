@@ -139,6 +139,11 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
     // La liste FERMÉE des <img> qui ne peuvent PAS montrer une photo Vinted.
     // Clé : « fonction englobante :: source » ; une source inconnue est rouge.
     const PERMIS = {
+      'PhotoOffreVc :: url': 'URL filtrée par urlPhotoVc : HTTPS images.vestiairecollective.com seulement, aucun identifiant dans l’URL ; ce n’est pas une photo Vinted',
+      'ComptaPro :: ticketVu.src': 'ticket photographié puis compressé en data:image/jpeg dans choisirTicket, ou lu comme octets du ticket ; aucune URL d’annonce',
+      'ComptaPro :: dPhoto': 'aperçu du fichier choisi, compressé en data:image/jpeg par le navigateur ; aucune URL distante',
+      'PlaceurTamponFeuille :: img.url': 'page PDF rendue dans un canvas local puis toDataURL : aperçu du bordereau, aucune URL Vinted',
+      'LogoTransporteur :: url': 'logosDuTransporteur : dictionnaire fermé des logos officiels des transporteurs, sans CDN Vinted, no-referrer et repli en cas d’erreur',
       'StudioPhoto :: ph.img': 'photo prise par le vendeur dans le studio, data:image/jpeg fabriquée par le canvas (jamais une adresse Vinted)',
       'StudioPhoto :: ph.detoure': 'la même photo détourée dans le navigateur, data:image/webp|png (jamais une adresse Vinted)',
       'BrandIcon :: source': 'logos locaux : dictionnaire fermé /brands/{vinted,leboncoin,ebay}.svg',
@@ -148,6 +153,7 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
       'Photo :: url': 'AnnoncesLeboncoin (catalogue, 22 oct., main) : `ad.images[0]` d’une annonce LEBONCOIN lue par l’extension (CDN de Leboncoin) — jamais une adresse Vinted ; https seulement, repli « — » si elle ne charge pas',
       'OsmMap :: tileUrl(t.x, t.y)': 'tuiles de carte OpenStreetMap',
       'AbonnementRequis :: "/vrm-logo-96.png"': 'logo de l’app (fichier du site, logo officiel)',
+      'DemarrageVRM :: "/vrm-icon-v4-192.png"': 'icône officielle locale au démarrage, aucune URL distante',
       'PorteConfidentialite :: "/vrm-icon-v4-192.png"': 'icône de l’app v4 (fichier du site)',
       'AbonnementRequis :: "/vrm-logo-v4-192.png"': 'logo de l’app v4 (fichier du site, logo officiel)',
       'Accueil :: "/vrm-logo-v4-192.png"': 'logo de l’app v4 (fichier du site, logo officiel)',

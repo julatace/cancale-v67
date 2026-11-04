@@ -78,6 +78,8 @@ const proche = (a, b) => (a == null && b == null) || (a != null && b != null && 
 (async () => {
   console.log('── Le module, les règles d’App.jsx, la lecture du widget');
   let M = null;
+  // (4 nov.) Le module importe `../argentAVenir.js` : chargé depuis un fichier temporaire, l'import relatif pointe vers src/.
+  if (MODULE) MODULE = MODULE.replace(/from '\.\.\/([^']+)'/g, (m, f) => `from 'file://${path.join(R, 'src', f)}'`);
   if (MODULE) { try { M = await charger(MODULE, 'carte-chiffres'); } catch (e) { dit(false, 'src/design/carteChiffres.js se charge', e.message); } }
   dit(!!M && typeof M.valeursCarte === 'function' && typeof M.valeurChiffre === 'function', 'le module de la carte existe (src/design/carteChiffres.js)');
   const N = await charger(lire('src/beneficeNoms.js'), 'benefice-noms');
@@ -254,7 +256,12 @@ const proche = (a, b) => (a == null && b == null) || (a != null && b != null && 
   const apKO = sourcesDe({ colisAPoster: { total: 5, vinted: 5, ebay: null, leboncoin: 0, vestiaire: 0 } });
   dit(V('aposter', { site: 'toutes' }, apKO).partiel && V('aposter', { site: 'ebay' }, apKO).valeur == null, 'eBay pas lu : « au moins 5 » sur tous les sites, « — » sur eBay');
   dit(V('retirer', { site: 'toutes' }).valeur === 4 && V('retirer', { site: 'vinted' }).valeur == null, 'à retirer = vrm_colis_retirer ; « — » sur un site seul (la publication ne le sépare pas)');
-  dit(V('attente', { site: 'toutes' }).valeur === 210.4 && V('attente', { site: 'ebay' }).valeur == null, 'argent en attente = le porte-monnaie Vinted ; « — » sur eBay');
+  // (4 nov.) « Argent à venir » : la règle `argentAVenir` publiée par la coque (`live.aVenir`),
+  // toutes plateformes — plus le porte-monnaie Vinted seul (règle détaillée : audit-argent-a-venir).
+  dit(V('attente', { site: 'toutes' }).valeur == null, 'argent à venir sans la règle publiée : « — », jamais le solde du porte-monnaie');
+  const AV = { lignes: [{ plateforme: 'Vinted', compte: 'vendeuse_a', eur: 70 }, { plateforme: 'eBay', compte: 'e', eur: 30.5 }], nonComptees: [], manque: [], enCours: false, n: 2, total: 100.5, parCompte: [] };
+  const srcAV = sourcesDe({ live: { ...LIVE, aVenir: AV } });
+  dit(V('attente', { site: 'toutes' }, srcAV).valeur === 100.5 && V('attente', { site: 'ebay' }, srcAV).valeur === 30.5 && V('attente', { site: 'vinted' }, srcAV).valeur === 70, 'argent à venir = la règle, par site (eBay compris)');
   dit(V('dispo', { site: 'vinted', compte: COMPTES.bruno }).valeur === 13.1 && V('dispo', { site: 'vinted' }).valeur === 33.1, 'disponible : celui du compte choisi, sinon le total');
   dit(V('enligne', { site: 'vinted', compte: COMPTES.alice }).valeur === 40 && V('enligne', { site: 'vinted' }).valeur === 57, 'annonces en ligne : celles du compte choisi, sinon toutes');
   dit(V('enligne', { site: 'vinted', compte: { uid: '99', login: 'zoe' } }).valeur == null, 'un compte jamais lu : « — », pas 0');

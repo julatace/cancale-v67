@@ -36,6 +36,7 @@ import {suivreReceptionLeboncoin,lireReceptionLeboncoin} from './rafraichissemen
 import { STYLE_FLOU, compteLbcOuvert, lbcFloute, compteVcOuvert, vcFloute } from './flouCompte.js';
 import DiagnosticLeboncoin from './DiagnosticLeboncoin.jsx';
 import {preparerLiaisonOAuth,lireLiaisonOAuth,resultatLiaisonPermis} from './auth/liaisonOAuth.js';
+import { SqueletteChargement } from "./Chargement.jsx";
 import ConnexionsCompte from './auth/ConnexionsCompte.jsx';
 import {etatColisDepuisTexte,normaliserSuivi} from '../api/_lib/etat-colis-email.js';
 import {FAMILLES as FAMILLES_NOTIF,familleActive as familleNotifActive} from '../api/_lib/notif-textes.js';
@@ -69,12 +70,19 @@ import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chev
 import {formaterMontantEbay} from './montantsEbay.js';
 import {cibleEbay} from "./ebayParcours.js";
 import {centimes,coutsVente,beneficePaire,champsCharges} from "./beneficePaire.js";
+import {argentAVenir,aVenirPour,texteDatePrevue} from './argentAVenir.js';
+import {comparerMois,ymEnFace} from './comparerMois.js';
+import {fraisParPlateforme,texteCouverture} from './fraisPlateformes.js';
+import {journalSemaine,repliePourSemaine} from './journalSemaine.js';
+import {semainePassee} from '../api/_lib/bilan-semaine.js';
 import CoutsVente from "./CoutsVente.jsx";
 import { feuillesExport, fichiersExport, zipStocke, nomExport } from "./exportDonnees.js";
 import { poserLienVc, defaireLienVc, numerosABarrer, marquerBarre, lienDe, produitDeVinted, vcReliable, suggestionsLienVc } from "./lienVestiaire.js";
 import FeuilleLienVc from "./LienVestiaire.jsx";
 import { preuvesFriseVc, preuvesFriseEbay } from "./friseSites.js";
 import { suggestionsAchat, tousAchatsLibres, filtresAchats, etiquetteLot, liensParAchat, lotDe, prixIndicatifLot, ecritureLot } from "./suggestionsAchat.js";
+import AchatsOutils from "./AchatsOutils.jsx";
+import { fournisseurs as fournisseursAchats, trierFournisseurs, articlesParAchat, delaisMiseEnLigne, dateReception, estLot as estLotAchat, nombreLot, totalARepartir, ecrituresRepartition, annulationRepartition, ecritureLienAchat, prixAchatCentimes, achatSansCout } from "./achatsSourcing.js";
 import { boostRentable, SEUIL_BOOST } from "./boostRentable.js";
 import { CLE_WIDGETS_JOURNEE, WIDGETS_JOURNEE, NOM_TAILLE, DISPO_JOURNEE_DEFAUT, normaliserDispoJournee, deplacerWidget, retirerWidget, widgetFixe, tailleSuivante, tailleDefautWidget, caseVisible, widgetsAjoutables, dispoAEnregistrer } from "./journeeWidgets.js";
 import { modeleSur, releveVentes } from "./ceQuiRapporte.js";
@@ -112,6 +120,10 @@ import {colisLbcAPoster,lbcColisAPoster,totalColis,colisLbcVendeur} from '../api
 import {CLE_COMPTES_EXCLUS,excluAutreDe,estExclu,basculerExclu,compteDeVente} from '../api/_lib/comptes-exclus.js';
 import {PLATEFORMES_COMPTES,etatCompteLie,ageLecture,comptesLbcLies,comptesVcLies,comptesEbayLies,refDeLigneEbay,nomCompteLie,LIBELLE_ETAT} from './comptesLies.js';
 import './comptes-lies.css';
+import './comptes-securite.css';
+import { CLE_MONTANTS_CACHES, lireMontantsCaches, installerMasque } from './montantsCaches.js';
+import { deconnecterPartout, texteConfirmationPartout, ligneJournal, filtrerJournal, comptesDuJournal, FILTRES_TYPE } from './securiteCompte.js';
+import { pucesComptes, choixPourSite, memoriserChoix, lireChoixComptes, CLE_CHOIX_COMPTES } from './compteChoix.js';
 import {joursAvant as joursAvantParis} from '../api/_lib/ebay-a-expedier.js';
 import {marcheDuCompte as marcheEbayDuCompte, MARCHE_DEFAUT as MARCHE_EBAY_DEFAUT, lienAnnonce as lienAnnonceMarche, lienCommande as lienCommandeMarche} from '../api/_lib/ebay-marches-table.js';
 import {arriveeColisEmail, arriveeColisVinted, jourLocal, texteArrivee} from '../api/_lib/arrivee-colis.js';
@@ -173,7 +185,10 @@ import { friseVente, phraseVente, eurosRecap, ETATS_HORS_PARCOURS } from "./reca
 // (2 nov.) Le style « Fusion » : la carte sombre du mois et la frise de suivi (src/design/).
 import CarteMois from "./design/CarteMois.jsx";
 import CarteStats from "./design/CarteStats.jsx";
-import { CLE_CARTE_STATS } from "./design/carteChiffres.js";
+import CarteOffres from "./design/CarteOffres.jsx";
+import { statsOffres } from "./statsOffres.js";
+import { CLE_CARTE_STATS, recuPublieEntre, valeurObjectif } from "./design/carteChiffres.js";
+import { CLE_OBJECTIF, lireObjectif, lireSaisieObjectif, objectifAEnregistrer, progressionObjectif } from "./objectifMois.js";
 import { courtFusion, enArticles } from "./design/tacheCourte.js";
 import { PileVignettes } from "./design/PileVignettes.jsx";
 import Frise from "./design/Frise.jsx";
@@ -2002,6 +2017,9 @@ const SYNC_KEYS = [
   // (3 nov.) Le cycle d'un article (src/cycleArticle.js) : SA réponse à « N°x
   // supprimé de Vinted » (son clic seul) et la dernière lecture qui l'a vu en ligne.
   'vrm_cycle_decisions','vrm_vus_en_ligne','vrm_fiches_neuves','vrm_prix_journal','vrm_modeles_desc',
+  // (4 nov.) Les achats qu'il a DÉCLARÉS lots, et ses répartitions d'un lot sur ses N°
+  // (l'état d'avant gardé pour « Annuler ») — src/achatsSourcing.js, écrits sur SON clic.
+  'vrm_lots_declares','vrm_repartitions_lots',
   // Par annonce eBay, le prix Vinted de la dernière baisse faite depuis VRM
   // (proposition 9) : rien n'est reproposé tant qu'il n'a pas bougé.
   'vrm_ebay_baisses',
@@ -2087,6 +2105,10 @@ const SYNC_KEYS = [
   // maquettes, rattrapé par `onCloudReady` seulement s'il est resté au défaut
   // (`useReglageCarte`). Aucun chiffre dedans (src/design/carteChiffres.js).
   'vrm_carte_stats',
+  // (4 novembre) L'OBJECTIF DU MOIS — un CA vendu ou un nombre de ventes, posé par
+  // lui (src/objectifMois.js) ; la barre de la carte sombre, Statistiques et Ventes
+  // lisent CE réglage (plus `vrm_ca_objectif` ni `vinted_goal`, jamais posés en base).
+  'vrm_objectif_mois',
   // Comptabilité d'entreprise (onglet Comptabilité) : dépenses ponctuelles,
   // coûts fixes mensuels, packs de photos payants. OWNED par l'app (§11),
   // synchronisé entre appareils, jamais écrit par l'extension.
@@ -6976,7 +6998,8 @@ const ventesFaites = ({ vinted, lbc, ebay, vestiaire, cachee, excluAutre } = {})
     const eurV = montantCommandeLu(o);
     if (eurV == null) { nonComptees.push({ plateforme: 'Vinted', raison: 'prix pas lu', ts: t }); continue; }
     // (31 oct.) `compte` : le compte qui a vendu (Statistiques → « Par compte »), le même nom que le relevé des ventes.
-    lignes.push({ plateforme: 'Vinted', ts: t, eur: eurV, compte: String((o._acc && (o._acc.login || o._acc.vinted_user_id)) || '') });
+    // (4 nov.) `tx` et `uid` : l'identité de la vente et de son compte, pour les statistiques des offres (src/statsOffres.js).
+    lignes.push({ plateforme: 'Vinted', ts: t, eur: eurV, compte: String((o._acc && (o._acc.login || o._acc.vinted_user_id)) || ''), uid: String((o._acc && o._acc.vinted_user_id) || ''), tx: tx != null ? String(tx) : '' });
   }
   for (const v of (lbc || [])) {
     if (!v || v.isSeller !== true || !v.txId || lbcAnnulee(v)) continue;
@@ -15793,6 +15816,38 @@ function CibleNotif({ tab, sub }) {
     </p>
   );
 }
+// ── CACHER LES MONTANTS (4 nov.) ─────────────────────────────────────────────
+// Un œil dans la tête : allumé, chaque montant en € de l'écran devient « ••• »
+// (src/montantsCaches.js — UN point, le texte rendu, pas écran par écran).
+// Mémorisé sur CET appareil seulement (`vrm_montants_caches`, jamais synchronisé :
+// cacher ses chiffres dans un café ne doit pas les cacher sur l'ordinateur).
+const lireMontantsCachesIci = () => { try { return lireMontantsCaches(localStorage.getItem(CLE_MONTANTS_CACHES)); } catch (_) { return false; } };
+let _montantsCaches = lireMontantsCachesIci();
+let _retirerMasque = null;
+const _montantsSubs = new Set();
+const appliquerMontantsCaches = () => {
+  if (typeof document === 'undefined') return;
+  try { if (_montantsCaches) document.documentElement.setAttribute('data-montants-caches', '1'); else document.documentElement.removeAttribute('data-montants-caches'); } catch (_) {}
+  if (_montantsCaches && !_retirerMasque && document.body) _retirerMasque = installerMasque(document.body);
+  if (!_montantsCaches && _retirerMasque) { const r = _retirerMasque; _retirerMasque = null; r(); }
+};
+const basculerMontants = () => {
+  _montantsCaches = !_montantsCaches;
+  try { if (_montantsCaches) localStorage.setItem(CLE_MONTANTS_CACHES, '1'); else localStorage.removeItem(CLE_MONTANTS_CACHES); } catch (_) {}
+  appliquerMontantsCaches();
+  _montantsSubs.forEach((f) => { try { f(_montantsCaches); } catch (_) {} });
+};
+function BoutonMontants() {
+  const [cache, setCache] = React.useState(_montantsCaches);
+  React.useEffect(() => { _montantsSubs.add(setCache); appliquerMontantsCaches(); return () => { _montantsSubs.delete(setCache); }; }, []);
+  return (
+    <button className="vrm-hbtn" type="button" data-bouton-montants="" data-montants-caches={cache ? '1' : '0'} data-montant-visible=""
+      aria-pressed={cache} aria-label={cache ? 'Montrer les montants' : 'Cacher les montants'} title={cache ? 'Montrer les montants' : 'Cacher les montants'}
+      onClick={basculerMontants}>
+      <Icon name={cache ? 'eyeOff' : 'eye'} size={21}/>
+    </button>
+  );
+}
 function ScreenHead({ icon, title, desc, right, principal, sous, date = '' }) {
   const line = typeof icon === 'string' && ICON_PATHS[icon];
   const Titre = React.useContext(DansEspacePlateforme) ? 'h2' : 'h1';
@@ -19508,6 +19563,51 @@ function ResumePlateforme({children,title='Chiffres de la plateforme',className=
 // le virement se fait là-bas, en deux clics, sur le compte connecté dans le
 // navigateur. ⚠️ L'adresse de la page (`/wallet/balance`) n'est pas mesurée ici.
 const PORTE_MONNAIE_VINTED = 'https://www.vinted.fr/wallet/balance';
+// ── (4 nov.) L'ARGENT À VENIR, LA CARTE ──────────────────────────────────────
+// Rien n'est calculé ici : `A` = `argentAVenir` (src/argentAVenir.js), publié par
+// la coque. Une ligne par site et par compte ; la date prévue seulement quand le
+// site l'écrit (eBay, Vestiaire) ; « au moins » et le manque NOMMÉ si une lecture
+// manque ; une vente au montant illisible est nommée, jamais 0 €.
+const NOM_SITE_AVENIR = { Vinted: 'Vinted', eBay: 'eBay', Vestiaire: 'Vestiaire', Leboncoin: 'Leboncoin' };
+function ArgentAVenirCarte({ A, plateforme = null }) {
+  if (!A || A.enCours) return null;
+  // Sur une plateforme (Ventes · Vinted) : sa part seulement, par la même règle.
+  const T = aVenirPour(A, { plateforme });
+  const groupes = A.parCompte.filter((g) => !plateforme || g.plateforme === plateforme);
+  if (!groupes.length && !T.partiel) return null;
+  const nc = (A.nonComptees || []).filter((x) => !plateforme || x.plateforme === plateforme);
+  const manque = T.manque.filter((m) => !nc.some((x) => x.plateforme === m) || A.manque.includes(m));
+  return (
+    <section className="vrm-a-venir" data-a-venir={T.valeur == null ? '' : String(Math.round(T.valeur * 100))} data-a-venir-n={String(T.n)} data-a-venir-site={plateforme || 'toutes'} data-a-venir-partiel={T.partiel ? '1' : undefined}
+      style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 20, padding: '14px 16px', marginBottom: 12, boxShadow: C.shadow || 'none' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+        <span style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600, color: C.text }}>À venir</span>
+        <span className="vrm-display" style={{ fontSize: 22, fontWeight: 700, color: C.text, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }} title={T.partiel ? `Au moins — sans ${T.manque.join(', ')}` : undefined}>
+          {T.partiel ? <span style={{ fontSize: 13, fontWeight: 500, color: C.muted }}>au moins </span> : null}{T.valeur == null ? '—' : fmt(T.valeur)}
+        </span>
+      </div>
+      <div role="list" style={{ marginTop: 6 }}>
+        {groupes.map((g) => (
+          <div role="listitem" key={g.plateforme + '|' + g.compte} data-a-venir-ligne={g.plateforme} data-a-venir-compte={g.compte} data-a-venir-eur={String(Math.round(g.eur * 100))} data-a-venir-prevu={g.prevu != null ? new Date(g.prevu).toISOString().slice(0, 10) : ''}
+            style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 44, borderTop: `1px solid ${C.border}` }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 15, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{NOM_SITE_AVENIR[g.plateforme] || g.plateforme}{g.compte && g.plateforme === 'Vinted' ? <span style={{ fontWeight: 400, color: C.muted }}> · {g.compte}</span> : null}</div>
+              <div style={{ fontSize: 13, color: C.muted }}>{g.n} vente{g.n > 1 ? 's' : ''}{g.prevu != null ? ` · ${texteDatePrevue(g.prevu)}` : ''}</div>
+            </div>
+            <span style={{ fontSize: 15, fontWeight: 600, color: C.text, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{fmt(g.eur)}</span>
+          </div>
+        ))}
+      </div>
+      {(manque.length > 0 || nc.length > 0) && (
+        <div data-a-venir-manque={manque.join(',')} data-a-venir-nc={String(nc.length)} style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, marginTop: 2, fontSize: 13, color: C.muted, lineHeight: 1.45 }}>
+          {manque.length > 0 ? <>Sans {manque.join(', ')} (pas lu)</> : null}
+          {manque.length > 0 && nc.length > 0 ? ' · ' : null}
+          {nc.length > 0 ? <>{nc.length} vente{nc.length > 1 ? 's' : ''} au montant pas lu ({[...new Set(nc.map((x) => x.plateforme))].join(', ')})</> : null}
+        </div>
+      )}
+    </section>
+  );
+}
 function RetirerArgent({ liveStats }) {
   const [ouvert, setOuvert] = useState(false);
   const liste = liveStats && Array.isArray(liveStats.walletParCompte) ? liveStats.walletParCompte.filter((x) => x.dispo != null) : null;
@@ -19550,7 +19650,9 @@ function VintedResume({ liveStats, baseKO, siAJour = true, sauf = null, sansMont
   if (baseKO) return null;
   const ca = liveStats && liveStats.caEncaisse != null ? liveStats.caEncaisse : null;
   const dispo = liveStats && liveStats.walletDispo != null ? liveStats.walletDispo : null;
-  const att = liveStats && liveStats.walletAttente != null ? liveStats.walletAttente : null;
+  // (4 nov.) La part Vinted de l'argent à venir (`liveStats.aVenir`, une règle), plus le solde bloqué seul.
+  const attV = aVenirPour(liveStats && liveStats.aVenir, { plateforme: 'Vinted' });
+  const att = attV.valeur;
   const dAge = liveStats && liveStats.dataAgeJours != null ? liveStats.dataAgeJours : null;
   const box = { flex:'1 1 90px', minWidth:0 };
   const eti = { fontSize:11, color:C.muted, textTransform:'uppercase', letterSpacing:0.7, fontWeight:600 };
@@ -19562,7 +19664,7 @@ function VintedResume({ liveStats, baseKO, siAJour = true, sauf = null, sansMont
       <div className="vrm-summary-strip" style={{display:'flex',gap:14,flexWrap:'wrap',border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 15px',boxShadow:C.shadow||'none'}}>
         <div style={box}><div style={eti}>CA finalisé</div><div className="vrm-display" style={{fontSize:20,fontWeight:700,color:C.text}}>{ca==null?'—':fmt(ca)}</div></div>
         <div style={box}><div style={eti}>Disponible</div><div className="vrm-display" style={{fontSize:20,fontWeight:700,color:C.text}}>{dispo==null?'—':fmt(dispo)}</div></div>
-        <div style={box}><div style={eti}>En attente</div><div className="vrm-display" style={{fontSize:20,fontWeight:700,color:C.muted}}>{att==null?'—':fmt(att)}</div></div>
+        <div style={box}><div style={eti}>À venir</div><div className="vrm-display" style={{fontSize:20,fontWeight:700,color:C.muted}} title={attV.partiel?`au moins — sans ${attV.manque.join(', ')}`:undefined}>{att==null?'—':fmt(att)}</div></div>
       </div>
     </div></ResumePlateforme>}
     {/* (18 oct.) Hors du repli : sur téléphone le résumé est replié, et une capture
@@ -28556,9 +28658,6 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   // (31 oct., maquette) La période de la page : Semaine · Mois · Année — une règle (`bornesPeriode`) pour tout le bloc du haut.
   const [periodeStats,setPeriodeStats]=useState('mois');
 
-  const [objectif,setObjectif]=useState(()=>+(load('vrm_ca_objectif',0))||0); // objectif de CA du mois
-  const [objEdit,setObjEdit]=useState(false);
-  const [objTmp,setObjTmp]=useState('');
 
   // Paires réellement présentes dans le garage (mémorisé)
   const garageVals=useMemo(()=>
@@ -28756,17 +28855,6 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
     const total=arr.reduce((s,p)=>s+p.ca,0);
     return {arr,total};
   },[liveStats,lbcVentes,ebayCa,ebayCommandes,ventesVc]);
-  // CA du mois courant (par date de VENTE, §5) pour la jauge d'objectif.
-  // ⚠️ Elle sommait l'ANCIENNE archive (`sales`, vide depuis juillet 2026) : la
-  //    jauge restait à 0 € quoi qu'il vende. Elle lit maintenant « vendu ce
-  //    mois », la règle de Ma journée (`liveStats.caMois`, §11) ; l'archive ne
-  //    sert plus qu'en repli tant que les ventes ne sont pas lues.
-  const caMoisCourant=useMemo(()=>{
-    if (liveStats && liveStats.caMois!=null) return liveStats.caMois;
-    if (liveStats && liveStats.venduPasSu) return null;     // pas su : jamais l'archive vide (0 €)
-    const now=new Date(); const ym=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-    return sales.reduce((s,v)=>{ const p=(v.saleDate||'').trim().split('/'); return (p.length===3 && `${p[2]}-${p[1]}`===ym) ? s+(+v.sellPrice||0) : s; },0);
-  },[sales, liveStats]);
 
   // Paires ajoutées par jour (basé sur addedAt JJ/MM/AAAA).
   // On ignore la date d'init "01/01/2024" qui regroupe tout l'historique importé,
@@ -28895,6 +28983,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
     <div className="vrm-finance-page vrm-statistiques-premium" style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
       <ScreenHead icon="chart" title="Statistiques" right={<Segmente label="Période" className="vrm-sv-periode" value={periodeStats} onChange={setPeriodeStats} options={Object.entries(PERIODES).map(([v,l])=>({v,l,data:{'data-sv-choix':v}}))}/>}/>
       <StatsVitrine liveStats={liveStats} panelOff={panelOff} periode={periodeStats}/>
+      <ComparerMoisCarte liveStats={liveStats}/>
+      <FraisParSiteCarte periode={periodeStats} ebayCommandes={ebayCommandes}/>
       {/* (2 nov., « beaucoup d'incompréhension » — Julien) En haut, les chiffres qui
           comptent pour la période ; tout le reste est rangé en deux volets repliés,
           ouverts d'un geste et gardés ouverts sur cet appareil. Aucune règle ne change. */}
@@ -28944,32 +29034,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         </div>
         {(CBa.raison === 'achats' || (manquePrix && stockInconnu)) && <div style={{marginTop:14}}><LignePrixAchat quoi={quoiDepuisDebut} dans/></div>}
       </div>
-      {/* 🎯 OBJECTIF DU MOIS — jauge vers un objectif de CA que tu fixes. */}
-      <div className="vrm-finance-goal"><Card>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:objectif>0&&!objEdit?8:2}}>
-          <div style={{fontSize:13,fontWeight:600,color:C.text}}>Objectif du mois</div>
-          <Bouton variante={objEdit?'discret':'secondaire'} className="vrm-b-petit" onClick={()=>{ setObjTmp(objectif>0?String(objectif):''); setObjEdit(e=>!e); }}>{objEdit?'Annuler':(objectif>0?'Modifier':'Fixer')}</Bouton>
-        </div>
-        {objEdit ? (
-          <div style={{display:'flex',gap:8,alignItems:'center',marginTop:8}}>
-            <input aria-label="Objectif de chiffre d’affaires du mois" type="number" min="0" step="0.01" inputMode="decimal" value={objTmp} onChange={e=>setObjTmp(e.target.value)} placeholder="ex. 2000" style={{flex:1,minWidth:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:12,padding:'11px 12px',fontSize:15,fontFamily:'inherit',outline:'none'}}/>
-            <Bouton variante="primaire" onClick={()=>{ const n=Number(objTmp); if(!Number.isFinite(n)||n<0){toast('Indique un objectif valide.');return;} setObjectif(n); save('vrm_ca_objectif',n); setObjEdit(false); }}>OK</Bouton>
-          </div>
-        ) : objectif>0 && caMoisCourant==null ? (
-          <div style={{fontSize:13,color:C.muted,marginTop:6,lineHeight:1.5}}>— · ventes pas pu être lues, la jauge revient dès qu'elles le sont.</div>
-        ) : objectif>0 ? (()=>{ const pct=Math.min(100,Math.round(caMoisCourant/objectif*100)); const done=caMoisCourant>=objectif; return (
-          <>
-            <div style={{display:'flex',alignItems:'baseline',gap:8}}>
-              <span className="vrm-display" style={{fontSize:28,fontWeight:800,color:C.text}}>{fmt(caMoisCourant)}</span>
-              <span style={{fontSize:13,color:C.muted}}>/ {fmt(objectif)}</span>
-            </div>
-            <div role="progressbar" aria-label="Progression vers l’objectif du mois" aria-valuemin={0} aria-valuemax={objectif} aria-valuenow={Math.min(caMoisCourant,objectif)} aria-valuetext={`${fmt(caMoisCourant)} sur ${fmt(objectif)}`} style={{height:12,background:C.card2||C.bg,borderRadius:999,overflow:'hidden',marginTop:8}}><div style={{width:`${Math.max(2,pct)}%`,height:'100%',background:C.accent,borderRadius:999,transition:'width .3s ease'}}/></div>
-            <div style={{fontSize:13,color:C.muted,marginTop:6}}>{done?'Objectif atteint':`${pct}% de ton objectif`} · vendu ce mois, toutes plateformes, ventes en cours comprises</div>
-          </>
-        ); })() : (
-          <div style={{fontSize:13,color:C.muted,marginTop:6,lineHeight:1.5}}>Fixe un montant à atteindre ce mois-ci.</div>
-        )}
-      </Card></div>
+      {/* 🎯 OBJECTIF DU MOIS (4 nov.) — le MÊME réglage et la MÊME règle que la barre de la carte sombre. */}
+      <div className="vrm-finance-goal"><Card><ObjectifDuMois liveStats={liveStats}/></Card></div>
 
       {/* (16 oct.) Les deux volets repliés vivent dans UNE carte, l'un sous
           l'autre — ils flottaient entre deux cartes avec des marges inégales. */}
@@ -38031,6 +38097,14 @@ function CarteUrssafMois({ liveStats, onNav }) {
 // Le récap comptable mensuel : la MÊME ligne publiée, mois par mois (§11).
 // ⚠️ Le bénéfice n'est pas calculable ici (les prix d'achat vivent sur l'écran
 // Annonces) : « — », jamais un zéro qui passerait pour un vrai chiffre.
+// (4 nov.) LE BÉNÉFICE D'UN MOIS DONNÉ — une lecture pour le récap mensuel et
+// « Comparer deux mois » (§11) : `beneficePeriode` du mois, borné à maintenant ;
+// `null` si la publication ne couvre pas ce mois (jamais « 0 »). `jusqua` : les
+// ventes s'arrêtent à ce jour (un mois en cours comparé au même point).
+const beneficeDuMoisPub = ({ pub, compta, ligneUrssaf, regime }, ym, jusqua = null) => {
+  if (!pub || !moisCouvertParPublication(ym)) return null;
+  return beneficePeriode({ jours: pub.jours, compta, ligneUrssaf, taux: tauxUrssaf(), periode: 'mois', maintenant: Math.min(finDuMois(ym), Date.now()), toutes: Number(pub.v) >= 2, urssaf: regime === undefined || urssafConcerne(regime), jusqua });
+};
 function RecapComptableMensuel() {
   const v = useLigneUrssaf();
   const urssafMois = v ? v.mois : null;
@@ -38045,9 +38119,8 @@ function RecapComptableMensuel() {
   const [comptaB] = useLigneSynchro('vrm_compta', lireComptaSynchro);
   const regimeB = useRegimeFiscal();
   const beneficeDuMois = (ym) => {
-    if (!pubB || !moisCouvertParPublication(ym)) return null;
-    const B = beneficePeriode({ jours: pubB.jours, compta: comptaB, ligneUrssaf: v, taux: tauxUrssaf(), periode: 'mois', maintenant: Math.min(finDuMois(ym), Date.now()), toutes: Number(pubB.v) >= 2, urssaf: regimeB === undefined || urssafConcerne(regimeB) });
-    return chiffreBenefice(B).valeur;
+    const B = beneficeDuMoisPub({ pub: pubB, compta: comptaB, ligneUrssaf: v, regime: regimeB }, ym);
+    return B ? chiffreBenefice(B).valeur : null;
   };
   const moisNoms = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
   const moisRecap = !urssafMois ? [] : urssafMois.map((m) => {
@@ -38072,7 +38145,7 @@ function RecapComptableMensuel() {
   const [ymRecap, setYmRecap] = React.useState(ymNow);
   const [recapEnCours, setRecapEnCours] = React.useState('');
   const donneesRecap = async (ym) => {
-    const B = pubB && moisCouvertParPublication(ym) ? beneficePeriode({ jours: pubB.jours, compta: comptaB, ligneUrssaf: v, taux: tauxUrssaf(), periode: 'mois', maintenant: Math.min(finDuMois(ym), Date.now()), toutes: Number(pubB.v) >= 2, urssaf: regimeB === undefined || urssafConcerne(regimeB) }) : null;
+    const B = beneficeDuMoisPub({ pub: pubB, compta: comptaB, ligneUrssaf: v, regime: regimeB }, ym);
     const m = moisRecap.find((x) => x.ym === ym) || null;
     const rel = lireReleveVentes();
     let ent = null; try { ent = await lireReglage('vrm_pro_facture'); } catch (_) { ent = null; }
@@ -38211,6 +38284,42 @@ const lireExtrasRepartition = async () => {
   if (AUTH.user?.id !== owner) return {txn:null,items:null,dates:null};
   _repartCache = { owner, at: Date.now(), txn, items: idx, dates };
   return _repartCache;
+};
+// ── LES OFFRES, POUR STATISTIQUES (4 nov., src/statsOffres.js) ─────────────
+// Trois lectures PROJETÉES (§4.4, jamais `select=data`), une fois par dix
+// minutes, seulement quand la carte « Les offres » paraît à l'écran (les
+// messages des conversations à offre pèsent ~1,2 Mo) :
+//   · les conversations dont un message est une offre (`cs.`), côté vendeur ;
+//   · la dernière lecture de CHAQUE compte (`capturedAt` de toutes ses
+//     conversations : la capture s'est arrêtée — ce qui suit n'est pas lu) ;
+//   · les transactions : prix conclu, `is_system`, nombre de paires, prix affiché.
+// Une lecture ratée ⇒ `null` (« — »), jamais une liste vide.
+let _offresCache = null;
+const OFFRES_STATS_CONV = 'id=like.harvest_%25_conv_%25&data->payload->conversation->messages=cs.' + encodeURIComponent(JSON.stringify([{ entity_type: 'offer_request_message' }]))
+  + '&data->payload->conversation->transaction->>current_user_side=eq.seller&select=id,opp:data->payload->conversation->opposite_user->>id,side:data->payload->conversation->transaction->>current_user_side,msgs:data->payload->conversation->messages';
+const OFFRES_STATS_LECTURES = 'id=like.harvest_%25_conv_%25&select=id,cap:data->>capturedAt';
+const OFFRES_STATS_TXN = 'id=like.harvest_%25_txn_%25&select=tx:meta->>id,sys:data->payload->transaction->offer->>is_system,op:data->payload->transaction->offer->price->>amount,oc:data->payload->transaction->offer->price->>currency_code,ic:data->payload->transaction->order->>item_count,ip:data->payload->transaction->order->items->0->price->>amount,icur:data->payload->transaction->order->items->0->price->>currency_code';
+const lireOffresStats = async () => {
+  const owner = AUTH.user?.id;
+  if (!owner) return { convs: null, lectures: null, txn: null };
+  if (_offresCache?.owner === owner && Date.now() - _offresCache.at < 10 * 60 * 1000) return _offresCache;
+  const [rc, rl, rt] = await Promise.all([
+    lireTout(OFFRES_STATS_CONV, { strict: true }).catch(() => null),
+    lireTout(OFFRES_STATS_LECTURES, { strict: true }).catch(() => null),
+    lireTout(OFFRES_STATS_TXN, { strict: true }).catch(() => null),
+  ]);
+  const uidDe = (id) => { const m = /^harvest_(\d+)_conv_\d+$/.exec(String(id || '')); return m ? m[1] : null; };
+  const convs = Array.isArray(rc) && Array.isArray(rl) ? rc.map((r) => ({ compte: uidDe(r.id), side: r.side, opp: r.opp, messages: Array.isArray(r.msgs) ? r.msgs : [] })).filter((c) => c.compte) : null;
+  let lectures = null;
+  if (convs && Array.isArray(rl)) {
+    lectures = {};
+    for (const r of rl) { const u = uidDe(r.id); const t = Date.parse(r.cap || ''); if (u && Number.isFinite(t) && !(lectures[u] >= t)) lectures[u] = t; }
+  }
+  let txn = null;
+  if (Array.isArray(rt)) { txn = {}; for (const r of rt) if (r && r.tx) txn[String(r.tx)] = { sys: r.sys, op: r.op, oc: r.oc, ic: r.ic, ip: r.ip, icur: r.icur }; }
+  if (AUTH.user?.id !== owner) return { convs: null, lectures: null, txn: null };
+  _offresCache = { owner, at: Date.now(), convs, lectures, txn };
+  return _offresCache;
 };
 const nomPays = (cc) => {
   try { if (typeof Intl !== 'undefined' && Intl.DisplayNames) { const n = new Intl.DisplayNames(['fr'], { type: 'region' }).of(cc); if (n && n !== cc) return n; } } catch (_) {}
@@ -38529,6 +38638,37 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
     });
   }, [ventesCoque, extras, nuage, panelOff, b]);
 
+  // (4 nov.) LES OFFRES (src/statsOffres.js) : lues quand la carte paraît
+  // (lecture projetée, ~1,2 Mo de messages, une fois par dix minutes).
+  const refOffres = React.useRef(null);
+  const [offresBrut, setOffresBrut] = React.useState(undefined);
+  React.useEffect(() => {
+    let mort = false;
+    const go = () => { lireOffresStats().then((x) => { if (!mort) setOffresBrut(x); }).catch(() => { if (!mort) setOffresBrut({ convs: null, lectures: null, txn: null }); }); };
+    const el = refOffres.current;
+    if (!el || typeof IntersectionObserver === 'undefined') { go(); return () => { mort = true; }; }
+    const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { io.disconnect(); go(); } }, { rootMargin: '300px' });
+    io.observe(el);
+    return () => { mort = true; io.disconnect(); };
+  }, []);
+  const offres = React.useMemo(() => {
+    if (offresBrut === undefined || vendu === undefined) return null;
+    const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+    const ecarte = (uid) => compteEcarte(uid, hAcc, panelOff || {});
+    const convs = Array.isArray(offresBrut.convs) ? offresBrut.convs.filter((c) => !ecarte(c.compte)) : null;
+    const lectures = offresBrut.lectures ? Object.fromEntries(Object.entries(offresBrut.lectures).filter(([u]) => !ecarte(u))) : {};
+    const ventes = Array.isArray(vendu) ? vendu.filter((l) => l.plateforme === 'Vinted') : null;
+    return statsOffres({ convs, lectures, ventes, txn: offresBrut.txn, de: b.de, a: b.a, maintenant });
+  }, [offresBrut, vendu, panelOff, b, maintenant]);
+  const nomCompteOffres = (uid) => {
+    const labels = load('vinted_account_labels', {}) || {};
+    if (labels[uid]) return labels[uid];
+    const l = Array.isArray(vendu) ? vendu.find((x) => x.uid === uid && x.compte && x.compte !== uid) : null;
+    if (l) return l.compte;
+    const a = (load('vinted_accounts', []) || []).find((x) => String(x && x.vinted_user_id) === String(uid));
+    return (a && a.login) || `#${uid}`;
+  };
+
   const pl = (n, s, p) => `${n} ${n > 1 ? (p || s + 's') : s}`;
   // Un délai s'écrit à la demi-journée près (la médiane de 3 et 10 est 6,5 j, jamais « 7 »).
   const j10 = (j) => Math.round(j * 10) / 10, jTxt = (j) => String(j10(j)).replace('.', ',');
@@ -38661,6 +38801,8 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
       </div>
       {/* (3 nov.) « Ce qui rapporte le plus » : le relevé de la période, classé (src/ceQuiRapporte.js). */}
       <CeQuiRapporte lignes={lp} Segmente={Segmente} fmt={fmt} etat={!releve ? 'passu' : 'encours'}/>
+      {/* (4 nov.) Les offres de la période, par compte (src/statsOffres.js). */}
+      <div ref={refOffres}><CarteOffres S={offres} etat={offresBrut === undefined || vendu === undefined ? 'encours' : 'passu'} fmt={fmt} nomDe={nomCompteOffres}/></div>
       <div className="vrm-sv-rangee vrm-sv-rangee-2">
         {carte('sv-tailles', 'Les tailles qui se vendent', tailles && tailles.groupes.length ? 'ventes · jours pour vendre' : null, !lignes
           ? vide('Pas encore calculé', { 'data-sv-etat': 'passu' })
@@ -38720,6 +38862,172 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
     </div>
   );
 }
+// ═══════════════════════════════════════════════════════════════════════════
+// (4 nov.) COMPARER DEUX MOIS — Statistiques, sous le choix de période.
+// ═══════════════════════════════════════════════════════════════════════════
+// Rien n'est calculé ici (src/comparerMois.js) : ventes et CA vendu = lignes de
+// `ventesFaites` + `bilanLignes` ; reçu = la ligne publiée `vinted_urssaf_mois`
+// (`recuPublieEntre`) ; bénéfice = `beneficeDuMoisPub` (`beneficePeriode`,
+// `chiffreBenefice`). Un mois en cours se compare AU MÊME POINT. « — » = pas su.
+const nomColonneMois = (ym, b, memePoint, maintenant) => {
+  const [y, m] = String(ym).split('-').map(Number);
+  const an = y !== new Date(maintenant).getFullYear() ? ` ${y}` : '';
+  if (!memePoint) return `${MOIS_COURTS[m - 1]}${an}`;
+  const fin = new Date(Math.max(b.de, b.a - 1)).getDate();
+  return `1–${fin} ${MOIS_COURTS[m - 1]}${an}`;
+};
+const signeEur = (v) => (v > 0 ? '+' : v < 0 ? '−' : '') + fmt(Math.abs(v));
+const signePct = (v) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${String(Math.abs(v)).replace('.', ',')} %`;
+function ComparerMoisCarte({ liveStats }) {
+  const [mode, setModeB] = React.useState(() => { try { return localStorage.getItem('vrm_comparer_mode') === 'an' ? 'an' : 'precedent'; } catch (_) { return 'precedent'; } });
+  const setMode = (v) => { setModeB(v); try { localStorage.setItem('vrm_comparer_mode', v); } catch (_) {} };
+  const [pub] = useLigneSynchro('vrm_benefice_jours', lireBeneficeJours);
+  const [compta] = useLigneSynchro('vrm_compta', lireComptaSynchro);
+  const ligneUrssaf = useLigneUrssaf();
+  const regime = useRegimeFiscal();
+  const maintenant = Date.now();
+  const vendu = liveStats && !liveStats.venduPasSu && Array.isArray(liveStats.venduLignes)
+    ? { lignes: liveStats.venduLignes, manque: [...(liveStats.venduManque || []), ...(liveStats.venduEnAttente ? ['lecture en cours'] : [])], nonComptees: liveStats.venduNonComptees || [] } : null;
+  const K = comparerMois({ ymA: ymCourant(maintenant), mode, maintenant, vendu,
+    recuDe: (b) => recuPublieEntre(ligneUrssaf, b, maintenant),
+    beneficeDe: ({ ym, jusqua }) => { const B = beneficeDuMoisPub({ pub, compta, ligneUrssaf, regime }, ym, jusqua); return B ? chiffreBenefice(B, 'lu') : { valeur: null, raison: pub ? 'mois pas couvert' : 'publication' }; },
+    R: { bilanLignes } });
+  if (!K) return null;
+  const colA = nomColonneMois(K.ymA, K.bornes.A, K.memePoint, maintenant), colB = nomColonneMois(K.ymB, K.bornes.B, K.memePoint, maintenant);
+  const val = (x, type) => x.valeur == null ? '—' : type === 'eur' ? fmt(x.valeur) : String(x.valeur);
+  const cents = (x, type) => x == null ? '' : type === 'eur' ? String(Math.round(x * 100)) : String(x);
+  // 390 px : le libellé garde sa place (« Bénéfice », « CA vendu ») — trois colonnes de chiffres étroites.
+  const grille = { display: 'grid', gridTemplateColumns: 'minmax(64px,1fr) minmax(0,80px) minmax(0,80px) minmax(0,74px)', columnGap: 6, alignItems: 'center' };
+  return (
+    <section className="vrm-comparer" data-comparer={K.mode} data-comparer-a={K.ymA} data-comparer-b={K.ymB} data-comparer-meme-point={K.memePoint ? '1' : '0'}
+      style={{ padding: 18, background: C.card, border: `1px solid ${C.border}`, borderRadius: 20, boxShadow: C.shadow || 'none' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
+        <span data-titre-section="" style={{ flex: '1 1 auto', fontSize: 15, fontWeight: 600, color: C.text }}>Comparer</span>
+        <Segmente label="Comparer avec" value={K.mode} onChange={setMode} options={[{ v: 'precedent', l: 'Mois d’avant', data: { 'data-comparer-choix': 'precedent' } }, { v: 'an', l: 'Il y a un an', data: { 'data-comparer-choix': 'an' } }]}/>
+      </div>
+      <div role="row" style={{ ...grille, fontSize: 12, color: C.muted, fontWeight: 600, padding: '4px 0' }}>
+        <span/>
+        <span style={{ textAlign: 'right' }} data-comparer-col="a">{colA}</span>
+        <span style={{ textAlign: 'right' }} data-comparer-col="b">{colB}</span>
+        <span style={{ textAlign: 'right' }}>Écart</span>
+      </div>
+      {K.lignes.map((L) => (
+        <div role="row" key={L.cle} data-comparer-ligne={L.cle} data-a={cents(L.a.valeur, L.type)} data-b={cents(L.b.valeur, L.type)} data-ecart={cents(L.ecart, L.type)} data-pct={L.pct == null ? '' : String(L.pct)}
+          data-a-partiel={L.a.partiel ? '1' : undefined} data-b-partiel={L.b.partiel ? '1' : undefined}
+          style={{ ...grille, minHeight: 44, borderTop: `1px solid ${C.border}`, fontVariantNumeric: 'tabular-nums' }}>
+          <span style={{ fontSize: 15, color: C.text, fontWeight: 500, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{L.nom}</span>
+          {[L.a, L.b].map((x, i) => (
+            <span key={i} style={{ textAlign: 'right', minWidth: 0 }} title={x.partiel ? `au moins — sans ${x.manque.join(', ')}` : x.valeur == null ? 'pas su' : undefined}>
+              <span style={{ display: 'block', fontSize: 15, fontWeight: i === 0 ? 600 : 400, color: i === 0 ? C.text : C.muted, whiteSpace: 'nowrap' }}>{val(x, L.type)}</span>
+              {x.partiel ? <span style={{ display: 'block', fontSize: 11, color: C.muted }}>au moins</span> : null}
+            </span>
+          ))}
+          <span style={{ textAlign: 'right', minWidth: 0, whiteSpace: 'nowrap' }}>
+            <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: C.text }}>{L.ecart == null ? '—' : L.type === 'eur' ? signeEur(L.ecart) : (L.ecart > 0 ? '+' : L.ecart < 0 ? '−' : '') + Math.abs(L.ecart)}</span>
+            {L.pct != null ? <span style={{ display: 'block', fontSize: 11, color: C.muted }}>{signePct(L.pct)}</span> : null}
+          </span>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// (4 nov.) CE QUE COÛTE CHAQUE SITE — Statistiques, sur la période choisie.
+// ═══════════════════════════════════════════════════════════════════════════
+// Rien n'est calculé ici (src/fraisPlateformes.js) : le relevé de Ventes
+// (`vrm_stats_ventes`, frais saisis sur les fiches), les commandes eBay
+// (`totalMarketplaceFee`), les packs et options de Comptabilité. La couverture
+// est dite là où le site a une commission à lire.
+const lireReleveFrais = () => { try { const v = load('vrm_stats_ventes', null); return v && Array.isArray(v.l) ? v : null; } catch (_) { return null; } };
+function FraisParSiteCarte({ periode, ebayCommandes }) {
+  const [releve] = useLigneSynchro('vrm_stats_ventes', lireReleveFrais);
+  const [compta] = useLigneSynchro('vrm_compta', lireComptaSynchro);
+  const excluAutre = useExcluAutre();
+  const b = bornesPeriode(periode, Date.now());
+  const F = fraisParPlateforme({ releve: releve ? releve.l : null, ebay: Array.isArray(ebayCommandes) ? ebayCommandes : null, packs: compta && compta.packs, de: b.de, a: b.a, excluAutre, R: { commandeEbayEngagee } });
+  if (!F.sites.length) return null;
+  const grille = { display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,96px) minmax(0,64px)', columnGap: 10, alignItems: 'center' };
+  return (
+    <section className="vrm-frais-sites" data-frais-sites={b.type} data-frais-total={String(Math.round(F.total * 100))} data-frais-partiel={F.partiel ? '1' : undefined}
+      style={{ padding: 18, background: C.card, border: `1px solid ${C.border}`, borderRadius: 20, boxShadow: C.shadow || 'none' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 6 }}>
+        <span data-titre-section="" style={{ flex: 1, fontSize: 15, fontWeight: 600, color: C.text }}>Frais par site</span>
+        <span style={{ fontSize: 12, color: C.muted, fontWeight: 600, width: 64, textAlign: 'right' }}>% vendu</span>
+      </div>
+      {F.sites.map((x) => {
+        const cov = texteCouverture(x);
+        return (
+          <div key={x.plateforme} role="row" data-frais-site={x.plateforme} data-frais-eur={x.frais == null ? '' : String(Math.round(x.frais * 100))} data-frais-pct={x.pct == null ? '' : String(x.pct)}
+            data-frais-lus={x.couverture ? `${x.couverture.lus}/${x.couverture.n}` : ''} data-frais-options={String(Math.round(x.options * 100))}
+            title={x.options > 0 ? `dont ${fmt(x.options)} d’options et packs (${x.nOptions})` : undefined}
+            style={{ ...grille, minHeight: 44, borderTop: `1px solid ${C.border}`, fontVariantNumeric: 'tabular-nums' }}>
+            <span style={{ minWidth: 0 }}>
+              <span style={{ display: 'block', fontSize: 15, fontWeight: 500, color: C.text }}>{x.plateforme}</span>
+              <span style={{ display: 'block', fontSize: 12, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{x.passu ? 'pas lu' : `${x.n} vente${x.n > 1 ? 's' : ''}${cov ? ` · ${cov}` : ''}`}</span>
+            </span>
+            <span style={{ textAlign: 'right', fontSize: 15, fontWeight: 600, color: C.text, whiteSpace: 'nowrap' }}>{x.frais == null ? '—' : fmt(x.frais)}</span>
+            <span style={{ textAlign: 'right', fontSize: 13, color: C.muted, whiteSpace: 'nowrap' }}>{x.pct == null ? '—' : `${String(x.pct).replace('.', ',')} %`}</span>
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// (4 nov.) LE JOURNAL DE LA SEMAINE — en tête de Ma journée, du lundi au dimanche.
+// ═══════════════════════════════════════════════════════════════════════════
+// La semaine PASSÉE en quatre chiffres (src/journalSemaine.js : `semainePassee`,
+// `bilanLignes`, `beneficeDesJours`/`chiffreBrut`, ses gestes « Colis fait »).
+// Repliable, replié pour CETTE semaine seulement (préférence de l'appareil).
+// Aucune notification.
+const lireTableGestes = (cle) => () => { try { const v = load(cle, null); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch (_) { return null; } };
+const lireShipDone = lireTableGestes('vinted_ship_done'), lireLbcDone = lireTableGestes('vrm_lbc_colis_done'), lireVcDone = lireTableGestes('vrm_vc_colis_done');
+const REGLES_JOURNAL = { semainePassee, bilanLignes, beneficeDesJours, chiffreBrut };
+function JournalSemaineCarte({ liveStats }) {
+  const [pub] = useLigneSynchro('vrm_benefice_jours', lireBeneficeJours);
+  const [ship, pret] = useLigneSynchro('vinted_ship_done', lireShipDone);
+  const [lbcF] = useLigneSynchro('vrm_lbc_colis_done', lireLbcDone);
+  const [vcF] = useLigneSynchro('vrm_vc_colis_done', lireVcDone);
+  const vendu = liveStats && !liveStats.venduPasSu && Array.isArray(liveStats.venduLignes)
+    ? { lignes: liveStats.venduLignes, manque: [...(liveStats.venduManque || []), ...(liveStats.venduEnAttente ? ['lecture en cours'] : [])], nonComptees: liveStats.venduNonComptees || [] } : null;
+  const J = journalSemaine({ vendu, joursBenef: pub, colisFaits: pret ? { vinted: ship, lbc: lbcF, vc: vcF } : {}, R: REGLES_JOURNAL });
+  const [replie, setReplieB] = React.useState(() => { try { return repliePourSemaine(localStorage.getItem('vrm_journal_replie'), J.lundi); } catch (_) { return false; } });
+  const basculer = () => { const n = !replie; setReplieB(n); try { if (n) localStorage.setItem('vrm_journal_replie', J.lundi); else localStorage.removeItem('vrm_journal_replie'); } catch (_) {} };
+  const cases = [
+    { cle: 'ventes', l: 'Ventes', x: J.ventes, t: 'n' },
+    { cle: 'vendu', l: 'CA vendu', x: J.vendu, t: 'eur' },
+    { cle: 'brut', l: NOM_BENEFICE_BRUT, x: J.brut, t: 'eur' },
+    { cle: 'colis', l: 'Colis envoyés', x: J.colis, t: 'n' },
+  ];
+  const corps = (c) => c.x.valeur == null ? '—' : c.t === 'eur' ? <Montant v={c.x.valeur}/> : String(c.x.valeur);
+  const sous = (c) => c.x.partiel ? (c.x.couverture ? `${c.x.couverture} prix d’achat` : 'au moins') : null;
+  return (
+    <section className="vrm-journal-semaine" data-journal-semaine={J.lundi} data-journal-replie={replie ? '1' : '0'} aria-label={J.titre}
+      style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 20, boxShadow: C.shadow || 'none', padding: '4px 16px', marginBottom: 12 }}>
+      <button type="button" aria-expanded={!replie} data-journal-bascule="" onClick={basculer}
+        style={{ width: '100%', minHeight: 44, display: 'flex', alignItems: 'center', gap: 10, background: 'transparent', border: 0, padding: 0, color: C.text, fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer' }}>
+        <span style={{ flex: 1, fontSize: 15, fontWeight: 600, color: C.text }}>{J.titre}</span>
+        <span aria-hidden="true" style={{ color: C.muted, fontSize: 17, lineHeight: 1, transform: replie ? 'none' : 'rotate(90deg)', transition: 'transform .2s cubic-bezier(0.23,1,0.32,1)' }}>›</span>
+      </button>
+      {!replie && (
+        <div className="vrm-journal-cases" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(132px, 1fr))', gap: 0, borderTop: `1px solid ${C.border}`, padding: '6px 0 10px' }}>
+          {cases.map((c) => (
+            <div key={c.cle} data-journal-case={c.cle} data-valeur={c.x.valeur == null ? '' : c.t === 'eur' ? String(Math.round(c.x.valeur * 100)) : String(c.x.valeur)} data-partiel={c.x.partiel ? '1' : undefined}
+              title={c.x.partiel && c.x.manque && c.x.manque.length ? `au moins — sans ${c.x.manque.join(', ')}` : c.x.valeur == null ? 'pas su' : undefined}
+              style={{ padding: '8px 0', minWidth: 0 }}>
+              <div style={{ fontSize: 12, color: C.muted, fontWeight: 500 }}>{c.l}</div>
+              <div className="vrm-display" style={{ fontSize: 22, fontWeight: 700, color: c.x.valeur == null ? C.muted : C.text, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{corps(c)}</div>
+              {sous(c) ? <div style={{ fontSize: 11, color: C.muted }}>{sous(c)}</div> : null}
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function StatsDetaillees({ liveStats, panelOff, onVoirDorment = null }) {
   const sCarte = { padding: 18, background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: C.shadow };
   const sTitre = { fontSize: 15, fontWeight: 600, color: C.text, letterSpacing: -0.15 };
@@ -39113,9 +39421,14 @@ const caBeneficeDuMois = (m, toutes) => {
 // Le bénéfice d'une période — fonction PURE (exécutée par audit-benefice.cjs).
 // `jours` = la publication de Ventes, `compta` = les charges, `ligneUrssaf` = le
 // CA déclaré publié (ou null), `taux` = le taux de cotisations.
-const beneficePeriode = ({ jours, compta, ligneUrssaf, taux, periode, maintenant = Date.now(), toutes = false, urssaf = true }) => {
+// (4 nov.) `jusqua` (ms, optionnel) : les VENTES s'arrêtent au jour de `jusqua` inclus (« Comparer deux mois »
+// au même point d'un mois en cours) ; les dépenses restent celles des mois de la
+// période. Absent : la règle d'avant, inchangée.
+const beneficePeriode = ({ jours, compta, ligneUrssaf, taux, periode, maintenant = Date.now(), toutes = false, urssaf = true, jusqua = null }) => {
   const de = debutPeriode(maintenant, periode), a = decalerPeriode(de, periode, 1);
-  const v = beneficeDesJours(jours, de, a);
+  // La publication est au JOUR : la coupe garde le jour entier où elle tombe.
+  const finJ = jusqua != null ? (() => { const d = new Date(jusqua); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + 1); return d; })() : null;
+  const v = beneficeDesJours(jours, de, finJ && finJ < a ? finJ : a);
   // Les mois de la période, jusqu'au mois en cours (une charge à venir n'est pas une charge).
   const yms = [];
   for (let d = new Date(de); d < a && d.getTime() <= maintenant; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) yms.push(ymCourant(d.getTime()));
@@ -39573,6 +39886,68 @@ function useReglageCarte() {
   const poser = React.useCallback((r) => { setV(r); save(CLE_CARTE_STATS, r); }, []);
   return [v, poser];
 }
+// L'objectif du mois (4 nov.) : le réglage synchronisé, lu par `lireObjectif`
+// (aucun objectif ⇒ null ⇒ rien n'apparaît). Rattrapage nuage seulement si rien
+// n'a été rangé sur cet appareil (§5).
+const lireObjectifRange = () => { try { return load(CLE_OBJECTIF, null); } catch (_) { return null; } };
+function useObjectifMois() {
+  const [brut, setBrut] = React.useState(lireObjectifRange);
+  React.useEffect(() => onCloudReady(() => setBrut((cur) => cur == null ? lireObjectifRange() : cur)), []);
+  React.useEffect(() => {
+    const f = (e) => { const k = e && e.detail && e.detail.k; if (k === CLE_OBJECTIF) setBrut(lireObjectifRange()); };
+    const g = (e) => { if (e && e.key === CLE_OBJECTIF) setBrut(lireObjectifRange()); };
+    window.addEventListener('vrm:save', f); window.addEventListener('storage', g);
+    return () => { window.removeEventListener('vrm:save', f); window.removeEventListener('storage', g); };
+  }, []);
+  const poser = React.useCallback((r) => { if (!r) return; setBrut(r); save(CLE_OBJECTIF, r); }, []);
+  const obj = React.useMemo(() => lireObjectif(brut), [brut]);
+  return [obj, poser, brut];
+}
+// Le bloc « Objectif du mois » de Statistiques (4 nov.) : le MÊME réglage
+// (`useObjectifMois`) et la MÊME valeur que la barre de la carte sombre
+// (`valeurObjectif` sur les sources de la carte) — aucune seconde somme.
+function ObjectifDuMois({ liveStats }) {
+  const [obj, poser, brut] = useObjectifMois();
+  const liveCoque = React.useContext(LiveStatsCarte);
+  const sources = useSourcesCarte(liveStats || liveCoque);
+  const [edit, setEdit] = React.useState(false);
+  const [type, setType] = React.useState(obj ? obj.type : 'ca');
+  const [saisie, setSaisie] = React.useState('');
+  const prog = obj ? progressionObjectif(obj, valeurObjectif(obj, sources, REGLES_CARTE)) : null;
+  const lu = lireSaisieObjectif(type, saisie);
+  const eur = prog && prog.type === 'ca';
+  const montre = (v) => (eur ? fmt(v) : `${v} vente${v > 1 ? 's' : ''}`);
+  return (
+    <div data-objectif-bloc={obj ? obj.type : ''}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: prog && !edit ? 8 : 2 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Objectif du mois</div>
+        <Bouton variante={edit ? 'discret' : 'secondaire'} className="vrm-b-petit" data-objectif-modifier="" onClick={() => { setType(obj ? obj.type : 'ca'); setSaisie(obj ? String(obj.valeur).replace('.', ',') : ''); setEdit((e) => !e); }}>{edit ? 'Annuler' : (obj ? 'Modifier' : 'Fixer')}</Bouton>
+      </div>
+      {edit ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+          <Segmente label="Type d’objectif" value={type} onChange={setType} options={[{ v: 'ca', l: 'CA vendu', data: { 'data-objectif-type': 'ca' } }, { v: 'ventes', l: 'Nombre de ventes', data: { 'data-objectif-type': 'ventes' } }]}/>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input aria-label={type === 'ca' ? 'Objectif en euros' : 'Objectif en nombre de ventes'} type="text" inputMode={type === 'ca' ? 'decimal' : 'numeric'} value={saisie} onChange={(e) => setSaisie(e.target.value)} placeholder={type === 'ca' ? '2 000' : '40'} data-objectif-saisie=""
+              style={{ flex: 1, minWidth: 0, border: `1px solid ${C.border}`, background: C.card, color: C.text, borderRadius: 12, padding: '11px 12px', fontSize: 15, fontFamily: 'inherit', outline: 'none' }}/>
+            <span style={{ fontSize: 13, color: C.muted }}>{type === 'ca' ? '€' : 'ventes'}</span>
+            <Bouton variante="primaire" disabled={lu == null} data-objectif-ok="" onClick={() => { const n = objectifAEnregistrer(brut, { type, valeur: lu }); if (n) { poser(n); setEdit(false); } }}>OK</Bouton>
+          </div>
+          {obj ? <Bouton variante="discret" data-objectif-retirer="" onClick={() => { poser(objectifAEnregistrer(brut, null)); setEdit(false); }} style={{ alignSelf: 'flex-start' }}>Retirer</Bouton> : null}
+        </div>
+      ) : prog ? (
+        <div data-objectif-valeur={prog.valeur == null ? '' : (eur ? String(Math.round(prog.valeur * 100)) : String(prog.valeur))} data-objectif-pct={prog.pct == null ? '' : prog.pct} data-objectif-partiel={prog.partiel ? '1' : undefined}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+            <span className="vrm-display" style={{ fontSize: 28, fontWeight: 800, color: C.text }} title={prog.partiel ? `Au moins · ${prog.manque.join(', ')} pas lu` : undefined}>{prog.valeur == null ? '—' : montre(prog.valeur)}</span>
+            <span style={{ fontSize: 13, color: C.muted }}>/ {montre(prog.objectif)}</span>
+          </div>
+          <div role="progressbar" aria-label="Objectif du mois" aria-valuemin={0} aria-valuemax={100} aria-valuenow={prog.pct == null ? undefined : prog.pct} style={{ height: 6, background: C.card2 || C.bg, borderRadius: 999, overflow: 'hidden', marginTop: 8 }}>
+            {prog.pct ? <div style={{ width: `${prog.pct}%`, height: '100%', background: C.accent, borderRadius: 999, transition: 'width .3s ease' }}/> : null}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 const lirePub = (cle) => () => { try { const v = load(cle, null); return v && typeof v === 'object' ? v : null; } catch (_) { return null; } };
 const lireColisAPoster = lirePub('vrm_colis_aposter'), lireColisARetirer = lirePub('vrm_colis_retirer'), lirePairesDorment = lirePub('vrm_paires_dorment');
 // Les sources : `liveStats` = celui de la coque (`liveStatsVus` : les lignes de
@@ -39602,10 +39977,11 @@ const REGLES_CARTE = { bilanLignes, rythmeVendu, chiffreBenefice, chiffreBrut, b
 // `ici` : l'onglet où l'on est (une case n'y renvoie pas).
 function CarteStatsApp({ page, liveStats, sel = null, locaux = null, ici = null, attrs = null, ...rest }) {
   const [reglage, poser] = useReglageCarte();
+  const [objectif, poserObjectif] = useObjectifMois();
   const liveCoque = React.useContext(LiveStatsCarte);
   const base = useSourcesCarte(liveStats || liveCoque);
   const sources = locaux ? { ...base, locaux } : base;
-  return <CarteStats page={page} sel={sel || { site: 'toutes', compte: null, periode: null }} sources={sources} regles={REGLES_CARTE} reglage={reglage} poser={poser} FermeAuRetour={FermeAuRetour} extra={{ ici, attrs }} {...rest}/>;
+  return <CarteStats page={page} sel={sel || { site: 'toutes', compte: null, periode: null }} sources={sources} regles={REGLES_CARTE} reglage={reglage} poser={poser} objectif={objectif} poserObjectif={poserObjectif} FermeAuRetour={FermeAuRetour} extra={{ ici, attrs }} {...rest}/>;
 }
 // Le compte choisi, dit pour la carte : { uid, login, nom } ou null (tous).
 const compteCarte = (uid, accounts) => {
@@ -40741,32 +41117,7 @@ function AcctTag({ acc, name }) {
 // Squelettes de chargement : un rectangle gris animé, plus agréable qu'un texte
 // « Chargement… » figé. `variant` = 'card' (grille d'annonces) ou 'row' (listes).
 function Skeleton({ variant='row', count=6 }) {
-  const bg = C.border;
-  const shimmer = { background:`linear-gradient(90deg, ${bg}55 25%, ${bg}aa 37%, ${bg}55 63%)`, backgroundSize:'400% 100%', animation:'cancaleSkeleton 1.4s ease infinite', borderRadius:8 };
-  if (variant==='card') {
-    return <div className="vrm-skeleton" role="status" aria-label="Chargement des articles" aria-busy="true" style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(160px, 1fr))',gap:14}}>
-      {Array.from({length:count}).map((_,i)=>(
-        <div key={i} style={{borderRadius:12,overflow:'hidden',background:C.surface,border:`1px solid ${C.border}`,boxShadow:C.shadow||'none'}}>
-          <div style={{...shimmer,width:'100%',aspectRatio:'3/4',borderRadius:0}}/>
-          <div style={{padding:'8px 10px 10px',display:'flex',flexDirection:'column',gap:6}}>
-            <div style={{...shimmer,height:14,width:'55%'}}/>
-            <div style={{...shimmer,height:11,width:'80%'}}/>
-          </div>
-        </div>
-      ))}
-    </div>;
-  }
-  return <div className="vrm-skeleton" role="status" aria-label="Chargement de la liste" aria-busy="true" style={{display:'flex',flexDirection:'column',gap:10}}>
-    {Array.from({length:count}).map((_,i)=>(
-      <div key={i} style={{display:'flex',gap:12,alignItems:'center',padding:'11px 13px',border:`1px solid ${C.border}`,borderRadius:12,background:C.surface,boxShadow:C.shadow||'none'}}>
-        <div style={{...shimmer,width:56,height:76,borderRadius:12,flexShrink:0}}/>
-        <div style={{flex:1,display:'flex',flexDirection:'column',gap:6}}>
-          <div style={{...shimmer,height:13,width:'45%'}}/>
-          <div style={{...shimmer,height:11,width:'70%'}}/>
-        </div>
-      </div>
-    ))}
-  </div>;
+  return <SqueletteChargement variant={variant} count={count}/>;
 }
 
 // État d'erreur de chargement, avec un bouton « Réessayer ».
@@ -41056,6 +41407,29 @@ function SelecteurCompte({ accounts, sel, setSel, connecte, messages = false }) 
 // un élément déjà formé (la note du sélecteur Vinted porte son attribut).
 function ListeComptes({ id, valeur, options, onChange, note, skin, attrs }) {
   const K = skin || C;
+  // (4 nov., « changer de compte en un tap ») UNE RANGÉE DE PUCES « Tous ·
+  // compte1 · compte2… » (src/compteChoix.js) : un tap, plus de liste à ouvrir.
+  // Elle pilote la MÊME valeur qu'avant (`onChange`, l'état de la coque) ; la
+  // liste native reste dessous, invisible et hors du parcours au clavier, pour
+  // les lecteurs d'écran de secours et les bancs qui la choisissent.
+  const puces = pucesComptes(options, valeur);
+  if (puces.length) return (
+    <div {...(attrs || {})} className="vrm-compte-choix vrm-compte-puces-hote" data-compte-puces={id} style={{ background: skin ? K.bg : 'transparent' }}>
+      <div className="vrm-compte-puces" role="radiogroup" aria-label="Compte">
+        {puces.map((p) => (
+          <button key={p.val} type="button" role="radio" aria-checked={p.actif} data-compte-puce={p.val} data-actif={p.actif ? '1' : '0'}
+            className={'vrm-compte-puce' + (p.actif ? ' is-actif' : '')} onClick={() => { if (!p.actif) onChange(p.val); }}>{p.nom}</button>
+        ))}
+      </div>
+      <select id={id} className="vrm-compte-select-cache" tabIndex={-1} aria-hidden="true" value={puces.find((p) => p.actif).val} onChange={(e) => onChange(e.target.value)}>
+        <option value="*">Tous les comptes</option>
+        {(options || []).map((o) => <option key={o.val} value={o.val}>{o.nom}</option>)}
+      </select>
+      {/* La puce allumée dit déjà le compte : la note ne s'affiche plus (aucun texte
+          explicatif), elle reste lue par les lecteurs d'écran. */}
+      {note ? <span className="vrm-compte-select-cache">{note}</span> : null}
+    </div>
+  );
   // (16 oct.) Une rangée sobre façon réglage iOS : « Compte » à gauche, la valeur
   // en liste native à droite (sans cadre lourd), chevron discret. La note, s'il y
   // en a une, passe dessous en légende.
@@ -42496,6 +42870,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //    une lecture morte qui faisait croire à une identité.
   // Trois états chacun : `undefined` en cours · `null` pas su · lu.
   const [photosTxAchats,setPhotosTxAchats]=useState({});
+  // (4 nov.) Ce que SA transaction dit de chaque achat (src/achatsSourcing.js) :
+  // le pseudo du vendeur (côté acheteur seulement), le nombre d'articles, l'état
+  // et la date de l'envoi (« Commande livrée » = 400). En mémoire seulement : le
+  // pseudo d'un tiers n'est rangé nulle part. undefined en cours · lu.
+  const [infosTxAchats,setInfosTxAchats]=useState(undefined);
   const [suivisVinted,setSuivisVinted]=useState(undefined);
   const [suivisManuels,setSuivisManuels]=useState(undefined);
   const indexSuivisAchats = useMemo(() => {
@@ -44100,9 +44479,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // (api/widget.js) au lieu de le recalculer sur les emails (§11, 17 oct.).
       const recu = {};
       for (const ymR of new Set(lignes.filter(l => l && l.ts).map(l => ymDeTs(l.ts)))) recu[ymR] = r2(recuDuMois(lignes, ymR));
+      // (4 nov.) Le même reçu, JOUR par jour (jour local, les 14 derniers mois) :
+      // « Comparer deux mois » au même point d'un mois en cours (Statistiques).
+      // Les mêmes lignes, la même date de versement ; un jour sans versement n'y est pas.
+      const recuJours = {};
+      const j0 = new Date(); j0.setDate(1); j0.setMonth(j0.getMonth() - 14); const t0 = j0.getTime();
+      for (const l of lignes) if (l && l.ts && l.ts >= t0) { const k = jourClef(new Date(l.ts)); recuJours[k] = r2((recuJours[k] || 0) + l.eur); }
       const avant = load('vinted_urssaf_mois', null);
-      const charge = { mois: liste, aDater: ad, ecartees: ecartees.length, sources, declare: declarables.declare, recu, nonComptees };
-      const memeChose = avant && JSON.stringify({ mois: avant.mois, aDater: avant.aDater, ecartees: avant.ecartees, sources: avant.sources, declare: avant.declare, recu: avant.recu, nonComptees: avant.nonComptees }) === JSON.stringify(charge);
+      const charge = { mois: liste, aDater: ad, ecartees: ecartees.length, sources, declare: declarables.declare, recu, recuJours, nonComptees };
+      const memeChose = avant && JSON.stringify({ mois: avant.mois, aDater: avant.aDater, ecartees: avant.ecartees, sources: avant.sources, declare: avant.declare, recu: avant.recu, recuJours: avant.recuJours, nonComptees: avant.nonComptees }) === JSON.stringify(charge);
       // ⚠️ (1er nov., audit A8) `at` = l'heure d'une LECTURE complète, pas d'un
       // changement. Le widget refuse une ligne de plus de 3 jours ou d'un autre
       // mois (`recuDuMoisPublie`) : sans nouvel argent, l'app ne republiait rien
@@ -46608,13 +46993,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     let stop=false;
     (async()=>{
       const demandes=demandesSuivis.split(',');
-      const resultat={};
+      const resultat={}, infos={};
       for(let i=0;i<demandes.length;i+=100){
-        const ids=demandes.slice(i,i+100);const rows=await lireTout(`id=in.(${ids.join(',')})&select=id,tx:data->payload->transaction->>id,photo:data->payload->transaction->item_photo`,{strict:true});
+        const ids=demandes.slice(i,i+100);const rows=await lireTout(`id=in.(${ids.join(',')})&select=id,tx:data->payload->transaction->>id,photo:data->payload->transaction->item_photo,side:data->payload->transaction->>user_side,vendeur:data->payload->transaction->seller->>login,nb:data->payload->transaction->>items_count,livSt:data->payload->transaction->shipment->>status,livAt:data->payload->transaction->shipment->>status_updated_at`,{strict:true});
         if(rows===null||stop)return;
-        for(const r of rows){if(!ids.includes(r.id))continue;const tx=String(r.tx||r.id.split('_txn_')[1]||'');if(tx)resultat[tx]={photo:photoArticle({photo:r.photo})};}
+        for(const r of rows){if(!ids.includes(r.id))continue;const tx=String(r.tx||r.id.split('_txn_')[1]||'');if(tx){resultat[tx]={photo:photoArticle({photo:r.photo})};infos[tx]={vendeur:r.side==='buyer'&&r.vendeur?String(r.vendeur):'',nb:r.side==='buyer'&&r.nb!=null?Number(r.nb):null,livSt:r.side==='buyer'&&r.livSt!=null?String(r.livSt):'',livAt:r.side==='buyer'?(r.livAt||''):''};}}
       }
       if(!stop)setPhotosTxAchats(prev=>JSON.stringify(prev)===JSON.stringify(resultat)?prev:resultat);
+      if(!stop)setInfosTxAchats(prev=>prev&&JSON.stringify(prev)===JSON.stringify(infos)?prev:infos);
     })();return()=>{stop=true;};
   },[demandesSuivis]);
   // ── LA LIGNE DE SUIVI VINTED ET LES N° AJOUTÉS À LA MAIN (23 oct.) ────────
@@ -47629,9 +48015,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ── Analyse de perf (façon outil pro) ──────────────────────────────
   // Objectif de CA mensuel (synchronisé). L'utilisateur le fixe, la barre suit le
   // CA finalisé du mois en cours.
-  const [goal, setGoal] = useState(() => Number(load('vinted_goal', 0)) || 0);
-  const [goalEdit, setGoalEdit] = useState(false);
-  const saveGoal = (v) => { const n = Math.max(0, Math.round(Number(v)||0)); setGoal(n); save('vinted_goal', n); };
+
   // Métriques : temps de vente moyen (jours entre la numérotation de l'annonce et
   // la vente), taux d'écoulement (vendues / (vendues + en ligne)), meilleure
   // marque (bénéfice moyen par paire), et CA du mois en cours.
@@ -48349,6 +48733,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (le lien qu'IL a posé, ou le fichier photo exact) : VRM propose le montant
   // payé (reçu juste, sinon l'article seul). Rien n'est écrit sans son tap.
   // Un achat ne se propose qu'à UN article (ventes au plus récent d'abord).
+  // (4 nov.) Un LOT (titre « Lot … », plusieurs articles dans SA transaction, ou
+  // déclaré par lui) : jamais son prix entier proposé à un article (src/achatsSourcing.js).
+  const [lotsDeclares, setLotsDeclares] = useStateCle('vrm_lots_declares', () => load('vrm_lots_declares', {}) || {});
+  const [repartitionsLots, setRepartitionsLots] = useStateCle('vrm_repartitions_lots', () => load('vrm_repartitions_lots', {}) || {});
+  const infosAchatsLues = infosTxAchats !== undefined ? infosTxAchats : (demandesSuivis === '' && Array.isArray(buys.items) ? {} : undefined);
+  const nArticlesTx = useMemo(() => { const m = {}; for (const [tx, i] of Object.entries(infosAchatsLues || {})) if (i && i.nb != null) m[tx] = i.nb; return m; }, [infosAchatsLues]);
+  const estLotApp = (a) => estLotAchat(a, { nArticlesTx, declares: lotsDeclares });
+  const estLotPropose = (a) => estLotApp(a) || !!(a && a.lot === true);
   const achatsIdentite = fillBuyAchats.items || buys.items || null;
   const ventilationDeTx = (tx) => { const r = indexRecusAchat.get(String(tx)); return r ? ventilationRecuAchat(r.texte) : null; };
   const propositionsPrix = useMemo(() => {
@@ -48360,7 +48752,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const lie = e && e.buyFromId ? achatRelie(e) : null;
       const pris = new Set(linkedBuyIds); if (e && e.buyFromId) pris.delete(String(e.buyFromId));
       const identite = achatParIdentite({ lie, photo, venteTx, venteDate, achats: achatsIdentite, cleDePhoto, pris });
-      return propositionPrixAchat({ prixConnu, annulee, identite, ventilationDe: ventilationDeTx });
+      return propositionPrixAchat({ prixConnu, annulee, identite, ventilationDe: ventilationDeTx, estLot: estLotPropose });
     };
     const ventes = [...(sales.items || [])].sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
     for (const o of ventes) {
@@ -48377,7 +48769,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const nums = new Map(lignes.map((l) => [l.cle, l.numero]));
     return { m, numero: (c) => nums.get(c) || '' };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, numeros, saleOv, buyByNum, achatsIdentite, indexRecusAchat, linkedBuyIds]);
+  }, [sales.items, numeros, saleOv, buyByNum, achatsIdentite, indexRecusAchat, linkedBuyIds, nArticlesTx, lotsDeclares]);
   const propositionVente = (tx) => propositionsPrix.m.get('v:' + tx) || null;
   // Ventes et la saisie en série lisent les achats captés (relecture de l'extension
   // seulement, `harvestOnly`) ; les reçus ne partent que s'il y a une proposition.
@@ -48426,7 +48818,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const cible = pickerFor; if (!cible || !a) return;
     const accNom = accNameOf(a._acc) || '';
     let w = null;
-    if (lotDe(a).lot) {
+    if (lotDe(a).lot || estLotApp(a)) {
       const l = lotDe(a), ind = prixIndicatifLot(a), px = prixPayeAchat(a);
       const saisi = await askText({ title: "Prix d'achat de cet article", desc: ind != null ? `${prixCourt(px)} ÷ ${l.n} ≈ ${prixCourt(ind)}` : (px != null ? `Lot · ${prixCourt(px)}` : ''), numeric: true, value: '', ok: 'Relier', cancel: 'Annuler' });
       if (saisi == null) return;
@@ -48457,6 +48849,136 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       save('vinted_annonce_numeros', u); return u;
     });
   };
+
+  // ── (4 nov.) ACHATS : FOURNISSEURS · DÉLAI · LOTS (src/achatsSourcing.js, src/AchatsOutils.jsx) ──
+  // Les lectures existantes passées aux règles pures ; aucune règle ici. Un achat
+  // n'est relié à un article QUE par `buyFromId` (ou le N° d'un achat hors
+  // plateforme) ; le bénéfice d'une vente est celui de `beneficeLigneVente` (Vinted)
+  // ou de `ventesAutresBenefice` (Leboncoin, eBay, Vestiaire, par identité).
+  const [asoOuvert, setAsoOuvert] = useState('');
+  useEffect(() => {   // une feuille ouverte a besoin des annonces (en ligne, date de mise en ligne)
+    if ((asoOuvert === 'delai' || asoOuvert === 'lots') && accounts.length && listings.items === null && !listings.loading) loadListings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [asoOuvert, accounts.length]);
+  const articlesAchats = useMemo(() => articlesParAchat({ fiches: numeros, saleOv }), [numeros, saleOv]);
+  const asoFournisseurs = useMemo(() => {
+    if (curSub !== 'achats' || asoOuvert !== 'fournisseurs') return undefined;
+    if (!Array.isArray(buys.items) || !Array.isArray(sales.items) || infosAchatsLues === undefined) return buys.error || sales.error ? null : undefined;
+    const ventes = [];
+    for (const o of sales.items) {
+      if (isHidden(o) || classifyOrderStatus(o.status) !== 'completed' || o.transaction_id == null) continue;
+      const e = effEntry(o); if (!e) continue;
+      const devise = o.price && o.price.currency_code;
+      const lb = devise && devise !== 'EUR' ? { benefice: null, etat: 'prix' } : beneficeLigneVente(o.price && o.price.amount, e);
+      ventes.push({ id: 'vinted:' + o.transaction_id, entree: e, benefice: { valeur: lb.benefice, partiel: lb.etat === 'partiel' } });
+    }
+    for (const x of (Array.isArray(autresBenefice) ? autresBenefice : [])) {
+      if (!x || !x.num || /\+/.test(x.num)) continue;                 // une commande eBay à plusieurs N° : pas attribuée
+      const f = ficheUniqueDuNumero(numeros, cleNum(x.num)); if (!f) continue;
+      ventes.push({ id: x.id, entree: f, benefice: { valeur: x.achat != null ? Math.round((x.eur - x.achat - (x.frais || 0)) * 100) / 100 : null, partiel: false } });
+    }
+    const r = fournisseursAchats({ achats: buysBase, hors: offBuys, fiches: numeros, saleOv, ventes, cleNum,
+      vendeurDe: (tx) => (infosAchatsLues && infosAchatsLues[tx] && infosAchatsLues[tx].vendeur) || '',
+      sourceDe: (b) => libelleSourceAchat(b && b.source), prixHors: prixAchatHorsNombre });
+    return { ...r, partielSites: !Array.isArray(autresBenefice), trier: (t) => trierFournisseurs(r.lignes, t) };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [curSub, asoOuvert, buys.items, buys.error, sales.items, sales.error, infosAchatsLues, numeros, saleOv, buyByNum, offBuys, autresBenefice, hiddenSales, hiddenAccts]);
+  // Les articles d'un achat, avec ce que les annonces en disent (en ligne, vendu, mise en ligne).
+  const enLigneLu = Array.isArray(listings.items) && !(Array.isArray(listings.ko) && listings.ko.some((u) => !acctOff(u)));
+  const articlesLus = (tx) => {
+    const autres = new Set(autresPresents().map((a) => cleNum(a.numero)));
+    const parId = new Map((listings.items || []).map((it) => [String(it.id), it]));
+    return (articlesAchats.get(String(tx)) || []).map((a) => {
+      if (a.cle.startsWith('v:')) return { ...a, misEnLigne: null, enLigne: false, vendu: true };
+      const k = a.cle.slice(2), it = parId.get(k);
+      const enLigne = !enLigneLu ? null : (presentesAnnonceIds.has(k) || (a.numero && autres.has(cleNum(a.numero))) ? true : false);
+      const vendu = annoncesVendues.has(k) || annoncesVendues.has(String(k));
+      return { ...a, misEnLigne: dateMiseEnLigneMs(it || { id: k }, listingDates), enLigne, vendu };
+    });
+  };
+  const asoDelai = useMemo(() => {
+    if (curSub !== 'achats' || asoOuvert !== 'delai') return undefined;
+    if (!Array.isArray(buys.items) || infosAchatsLues === undefined) return buys.error ? null : undefined;
+    const r = delaisMiseEnLigne({ achats: buysBase, enLigneLu, articlesDe: articlesLus,
+      receptionDe: (a) => dateReception(a, { infosTx: infosAchatsLues, recuClic: pickupDone }),
+      estRecu: (a) => phaseReception(a) === 'recu' });
+    if (Array.isArray(r.pasEnLigne)) r.pasEnLigne = r.pasEnLigne.map((x) => ({ ...x, titre: x.achat.title || '', photo: orderPhoto(x.achat) || (photosTxAchats[x.tx] && photosTxAchats[x.tx].photo) || '' }));
+    return r;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [curSub, asoOuvert, buys.items, buys.error, infosAchatsLues, pickupDone, articlesAchats, listings.items, listings.ko, listingDates, presentesAnnonceIds, annoncesVendues, photosTxAchats]);
+  // Les N° libres (fiche numérotée, aucun achat relié) : ce qu'il peut relier d'un tap.
+  const asoFichesLibres = useMemo(() => {
+    if (curSub !== 'achats' || !asoOuvert) return [];
+    const out = [];
+    const horsNums = new Set((offBuys || []).map((b) => (b && b.numero != null ? cleNum(b.numero) : '')).filter(Boolean));   // N° d'un achat hors plateforme : déjà relié
+    for (const [k, e] of Object.entries(numeros || {})) {
+      if (!e || !String(e.numero || '').trim() || e.buyFromId || horsNums.has(cleNum(e.numero))) continue;
+      out.push({ cle: k, numero: String(e.numero).trim(), titre: e.title || '', photo: e.photo || '' });
+    }
+    return out.sort((a, b) => (Number(b.numero) || 0) - (Number(a.numero) || 0));
+  }, [curSub, asoOuvert, numeros, offBuys]);
+  const asoLots = useMemo(() => {
+    if (curSub !== 'achats' || asoOuvert !== 'lots') return undefined;
+    if (!Array.isArray(buys.items) || infosAchatsLues === undefined) return buys.error ? null : undefined;
+    const out = [];
+    for (const a of buysBase) {
+      const tx = String(a.transaction_id || ''); if (!tx || achatSansCout(a)) continue;
+      const liens = articlesAchats.get(tx) || [];
+      if (!estLotApp(a) && liens.length < 2) continue;
+      const articles = liens.map((x) => {
+        const entree = x.cle.startsWith('f:') ? numeros[x.cle.slice(2)] : saleOv[x.cle.slice(2)];
+        return { ...x, entree: entree || {}, titre: (entree && entree.title) || '' };
+      });
+      out.push({ tx, achat: a, titre: a.title || '', photo: orderPhoto(a) || (photosTxAchats[tx] && photosTxAchats[tx].photo) || '', articles,
+        nLot: nombreLot(a, { nArticlesTx, declares: lotsDeclares }), totalArticle: totalARepartir(a, 'article'),
+        totalPaye: totalARepartir(a, 'paye', ventilationDeTx(tx)), journal: repartitionsLots[tx] || null });
+    }
+    return out.sort((x, y) => new Date(y.achat.date || 0) - new Date(x.achat.date || 0));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [curSub, asoOuvert, buys.items, buys.error, infosAchatsLues, articlesAchats, numeros, saleOv, lotsDeclares, repartitionsLots, indexRecusAchat, photosTxAchats]);
+  const asoDeclarables = useMemo(() => {
+    if (curSub !== 'achats' || asoOuvert !== 'lots') return [];
+    return buysBase.filter((a) => a && a.transaction_id != null && !achatSansCout(a) && !estLotApp(a))
+      .sort((x, y) => new Date(y.date || 0) - new Date(x.date || 0)).slice(0, 200)
+      .map((a) => ({ tx: String(a.transaction_id), titre: a.title || '', photo: orderPhoto(a) || '', prix: prixAchatCentimes(a), date: a.date ? new Date(a.date).toLocaleDateString('fr-FR') : '' }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [curSub, asoOuvert, buysBase, lotsDeclares, nArticlesTx]);
+  // Les écritures — chacune sur SON clic.
+  const poserPatchAchat = (cle, patch) => {
+    if (cle.startsWith('v:')) setSaleOverride(cle.slice(2), patch);
+    else setNumeros((prev) => { const k = cle.slice(2); const u = { ...prev, [k]: { ...(prev[k] || {}), ...patch } }; save('vinted_annonce_numeros', u); return u; });
+  };
+  const asoRelier = (tx, f) => {
+    const a = buysBase.find((o) => String(o.transaction_id) === String(tx)); if (!a || !f) return;
+    const lot = estLotApp(a);
+    const p = lot ? null : propositionPrixAchat({ identite: { achat: a, par: 'choix' }, ventilationDe: ventilationDeTx, estLot: estLotApp });
+    const patch = ecritureLienAchat(numeros[f.cle] || {}, a, { lot, montant: p ? p.centimes : prixAchatCentimes(a), accNom: a._acc ? accNameOf(a._acc) : '', photo: orderPhoto(a) || '' });
+    if (!patch) return;
+    poserPatchAchat('f:' + f.cle, patch);
+    toast(`N°${f.numero} relié`);
+  };
+  const asoRepartir = async ({ lot, saisies, inclus }) => {
+    const ok = await askConfirm({ title: `Répartir ${lot.titre ? '« ' + lot.titre + ' »' : 'ce lot'} ?`,
+      desc: lot.articles.map((x, i) => `${x.numero ? 'N°' + x.numero : 'Sans N°'} · ${String(saisies[i] || '').trim()} €`).join('\n'), ok: 'Enregistrer', cancel: 'Annuler' });
+    if (!ok) return false;
+    const w = ecrituresRepartition({ achat: lot.achat, articles: lot.articles, saisies, inclus, ventilation: ventilationDeTx(lot.tx), confirme: true,
+      at: new Date().toISOString(), accNom: lot.achat._acc ? accNameOf(lot.achat._acc) : '', photo: orderPhoto(lot.achat) || '' });
+    if (!w) { toast("La somme ne tombe pas juste : rien n'a été enregistré"); return false; }
+    for (const x of w.ecritures) poserPatchAchat(x.cle, x.patch);
+    setRepartitionsLots((prev) => { const u = { ...prev, [lot.tx]: lot.journal ? { ...w.journal, avant: lot.journal.avant } : w.journal }; save('vrm_repartitions_lots', u); return u; });
+    toast(`${w.ecritures.length} prix d'achat enregistrés`);
+    return true;
+  };
+  const asoAnnuler = async (lot) => {
+    if (!lot || !lot.journal) return false;
+    const ok = await askConfirm({ title: 'Annuler la répartition ?', desc: 'Les prix d’achat d’avant reviennent.', ok: 'Annuler la répartition', cancel: 'Garder' });
+    if (!ok) return false;
+    for (const x of annulationRepartition(lot.journal)) poserPatchAchat(x.cle, x.patch);
+    setRepartitionsLots((prev) => { const u = { ...prev }; delete u[lot.tx]; save('vrm_repartitions_lots', u); return u; });
+    toast('Répartition annulée');
+    return true;
+  };
+  const asoDeclarerLot = (tx, oui) => setLotsDeclares((prev) => { const u = { ...prev }; if (oui) u[String(tx)] = true; else delete u[String(tx)]; save('vrm_lots_declares', u); return u; });
 
   // ── URGENCE DES COLIS — UNE SEULE DÉFINITION ────────────────────────────
   // Le calcul vivait dans le bloc de rendu du bandeau rouge ; le bandeau du
@@ -50514,8 +51036,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // date ESTIMÉE dépassée n'en est pas une (revue du 22 oct., `retard`
         // de api/_lib/limite-envoi.js) — la ligne « colis-limite » la dit.
         const late = toShip.filter(t=>t.retard).length;
-        const inRoute = (sales.items||[]).filter(o=>!isHidden(o) && classifyOrderStatus(o.status)==='pending');
-        let inRouteSum=0; for(const o of inRoute){ const v=o.price?.amount!=null?Number(o.price.amount):0; if(v>0) inRouteSum+=v; }
         const loading = accounts.length>0 && sales.items===null && buys.items===null && listings.items===null && convs.items===null;
         // ⚠️⚠️ TROIS ÉTATS, JAMAIS DEUX. « aucun compte » se dit seulement quand
         //    on a VRAIMENT regardé : `accountsReady` (la lecture est revenue) et
@@ -51363,25 +51883,33 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         })() : null;
         // L'argent en attente : UNE lecture, pour sa carte et pour la tendance
         // « En attente » (qui ne le redit que si la carte n'est pas là, §7).
-        const escrowJ=(walletEscrow&&walletEscrow.total>0)?walletEscrow:null;
-        const valAttente=escrowJ?escrowJ.total:inRouteSum;
+        // (4 nov.) L'ARGENT À VENIR : la règle de la coque (`liveStats.aVenir`,
+        // src/argentAVenir.js), toutes plateformes — plus le seul Vinted (solde
+        // bloqué ou somme des statuts « en cours » de la liste). Une case pour la
+        // carte ET pour la tendance « À venir » (qui ne le redit que si la carte
+        // n'est pas là, §7). « À virer » reste le porte-monnaie Vinted (déjà versé).
+        const escrowJ=(walletEscrow&&walletEscrow.accounts>0)?walletEscrow:null;
+        const aVenirJ = aVenirPour(liveStats && liveStats.aVenir);
+        const valAttente = aVenirJ.valeur;
         W.attente = (!baseKO && !premierJour) ? (()=>{
-          const escrow=escrowJ;
           const val=valAttente;
-          if(loading||val<=0) return null;
-          const avecDispo = !!(escrow && escrow.dispo > 0);
+          if(loading||val==null||!(val>0||aVenirJ.partiel)) return null;
+          const avecDispo = !!(escrowJ && escrowJ.dispo > 0);
+          const A = liveStats.aVenir;
+          const sites = [...new Set(A.lignes.map(l=>l.plateforme))];
           return (
-          <div data-argent-attente={Math.round(val*100)} className="vrm-day-wallet vrm-day-card" style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',gridTemplateColumns:avecDispo?'minmax(0,1fr) minmax(0,1fr)':'minmax(0,1fr)'}}>
+          <div data-argent-attente={Math.round(val*100)} data-a-venir-partiel={aVenirJ.partiel?'1':undefined} className="vrm-day-wallet vrm-day-card" style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',gridTemplateColumns:avecDispo?'minmax(0,1fr) minmax(0,1fr)':'minmax(0,1fr)'}}
+            title={aVenirJ.partiel ? `Au moins — sans ${aVenirJ.manque.join(', ')}` : undefined}>
             <div style={{minWidth:0}}>
-              <div className="vrm-day-k" style={{color:C.muted,display:'flex',alignItems:'center',gap:6}}><Icon name="wallet" size={14}/>En attente</div>
-              <div className="vrm-display vrm-day-wallet-n" style={{color:C.text}}><Montant v={val} prefixe={escrow?'':'≈ '}/></div>
-              <div className="vrm-day-note" style={{color:C.muted}}>{inRoute.length} vente{inRoute.length>1?'s':''} en cours{escrow?'':' · estimation'}</div>
+              <div className="vrm-day-k" style={{color:C.muted,display:'flex',alignItems:'center',gap:6}}><Icon name="wallet" size={14}/>À venir</div>
+              <div className="vrm-display vrm-day-wallet-n" style={{color:C.text}}>{aVenirJ.partiel?<span className="vrm-fu-borne">au moins </span>:null}<Montant v={val}/></div>
+              <div className="vrm-day-note" style={{color:C.muted}}>{aVenirJ.n} vente{aVenirJ.n>1?'s':''}{sites.length>1?` · ${sites.length} sites`:sites.length===1&&sites[0]!=='Vinted'?` · ${sites[0]}`:''}</div>
             </div>
             {avecDispo && (
               <div style={{minWidth:0,borderLeft:`1px solid ${C.border}`,paddingLeft:16}}>
                 <div className="vrm-day-k" style={{color:C.muted}}>À virer</div>
-                <div className="vrm-display vrm-day-wallet-n" style={{color:C.text}}><Montant v={escrow.dispo} dec={2}/></div>
-                <div className="vrm-day-note" style={{color:C.muted}}>déjà disponibles{escrow.accounts>1?` · ${escrow.accounts} porte-monnaie`:''}{escrow.plusVieuxJours>7?` · lu il y a ${escrow.plusVieuxJours} j`:''}</div>
+                <div className="vrm-display vrm-day-wallet-n" style={{color:C.text}}><Montant v={escrowJ.dispo} dec={2}/></div>
+                <div className="vrm-day-note" style={{color:C.muted}}>{escrowJ.accounts>1?`${escrowJ.accounts} porte-monnaie`:'porte-monnaie Vinted'}{escrowJ.plusVieuxJours>7?` · lu il y a ${escrowJ.plusVieuxJours} j`:''}</div>
               </div>
             )}
           </div>
@@ -51485,7 +52013,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             { id: 'dort', l: `En ligne depuis ${SLEEP_DAYS} j +`, n: dort ? String(dort.n) : '—', sous: dort ? <>{e0(dort.valeur)} affichés</> : (listingDatesLu === null || listings.error ? 'pas lu' : datesOk && stockDort ? 'aucune date' : 'je lis…'), titre: dort ? `${dort.n} annonce${dort.n > 1 ? 's' : ''} en ligne depuis ${SLEEP_DAYS} jours et plus, ${fmt(dort.valeur)} affichés${stockDort.datesConnues < stockDort.total ? ` · ${stockDort.datesConnues} sur ${stockDort.total} datées` : ''}` : (listingDatesLu === null || listings.error ? 'dates de mise en ligne pas lues' : datesOk && stockDort ? 'aucune date de mise en ligne connue' : 'je lis tes annonces…'), v: dort ? dort.n : null },
             avecAttente
               ? { id: 'panier', l: 'Panier moyen 30 j', n: R.panier30.moyen == null ? '—' : <Montant v={R.panier30.moyen}/>, sous: null, titre: R.panier30.n ? `sur ${R.panier30.n} vente${R.panier30.n > 1 ? 's' : ''} en 30 jours` : 'aucune vente en 30 jours', v: R.panier30.moyen }
-              : { id: 'attente', l: 'En attente', n: loading ? '—' : <Montant v={valAttente} prefixe={escrowJ ? '' : '≈ '}/>, sous: escrowJ ? null : 'estimation', titre: escrowJ ? 'chez Vinted' : `${inRoute.length} vente${inRoute.length > 1 ? 's' : ''} en cours · estimation`, v: valAttente },
+              : { id: 'attente', l: 'À venir', n: loading || valAttente == null ? '—' : <Montant v={valAttente}/>, sous: aVenirJ.partiel ? 'au moins' : null, titre: aVenirJ.partiel ? `au moins — sans ${aVenirJ.manque.join(', ')}` : `${aVenirJ.n} vente${aVenirJ.n > 1 ? 's' : ''} pas encore versée${aVenirJ.n > 1 ? 's' : ''}`, v: valAttente },
           // (1er nov.) Une tendance SANS BASE (« — aucune date », « pas de moyenne »)
           // n'est pas un chiffre : elle ne prend pas une case. Statistiques la dit,
           // avec sa raison (rythme, stock qui dort) — la carte y mène.
@@ -51567,6 +52095,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </section>
               ); })()}
 
+            {/* (4 nov.) La semaine passée, en tête (repliable) : src/journalSemaine.js. */}
+            {!baseKO && !premierJour && <JournalSemaineCarte liveStats={liveStats}/>}
             {!baseKO && !premierJour && <NotifsMuettes onNav={onNav}/>}
 
             {/* « À FAIRE » (maquette) : une carte par geste — pastille chiffrée (encre ; ambre
@@ -52103,7 +52633,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 (avec le détail par compte et l'avertissement d'incomplétude) est
                 descendue dans « Analyse » — mais le montant lui-même est ce que
                 Julien vient regarder : il prend sa place dans la rangée. */}
-            {totals.nbAttente>0 && <StatBox compact label="En attente" value={fmtE0(totals.enAttente)} sub={`${totals.nbAttente} en cours`}/>}
+            {/* (4 nov.) « En attente » (la somme des statuts « en cours » de la liste, Vinted
+                seul) n'est plus ici : l'argent à venir a UNE règle et UNE carte, plus bas. */}
             {/* ⚠️ PAS DE « 💰 En attente » ICI : la carte dépliable juste au-dessus
                 affiche déjà ce montant, avec le détail par compte et l'avertissement
                 d'incomplétude. On lisait donc « ≈ 807 € · 25 ventes en cours » puis,
@@ -52199,145 +52730,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               )}/>
           );
         })()}
-        {/* 💶 Argent en route : ventes en cours (pas encore validées par
-            l'acheteur) → l'argent que Vinted va te verser bientôt. Visibilité
-            trésorerie sans ouvrir Vinted. Source = statut des ventes. */}
-        {(()=>{
-          const inRoute=(sales.items||[]).filter(o=>!isHidden(o) && classifyOrderStatus(o.status)==='pending');
-          if(!inRoute.length) return null;
-          let sum=0; for(const o of inRoute){ const v=o.price?.amount!=null?Number(o.price.amount):0; if(v>0) sum+=v; }
-          if(sum<=0) return null;
-          // ⚠️ LE VRAI CHIFFRE VIENT DE VINTED, pas d'une addition maison.
-          // Vinted expose le solde BLOQUÉ (escrow) de chaque porte-monnaie,
-          // capté par l'extension. Additionner les ventes « pas encore
-          // finalisées » donnait un tout autre montant (mesuré : 1204 €
-          // affichés contre 86 € réellement bloqués) — beaucoup de ventes
-          // anciennes gardent ce statut alors que l'argent a déjà été versé.
-          const reel = (walletEscrow && walletEscrow.total > 0) ? walletEscrow : null;
-          return (
-            <div style={{position:'relative',overflow:'hidden',border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'11px 14px 11px 16px',marginBottom:10}}>
-              {/* Surface NEUTRE + une barre de 3 px : la couleur signale, elle
-                  n'inonde plus le bloc. Le montant, lui, garde l'accent — c'est
-                  lui l'information, pas le fond. */}
-              <span aria-hidden="true" style={{position:'absolute',left:0,top:0,bottom:0,width:3,background:C.accent}}/>
-              {/* La carte est CLIQUABLE : Julien veut voir d'où sort le total,
-                  compte par compte — un chiffre agrégé qu'on ne peut pas ouvrir
-                  est invérifiable, donc invendable. */}
-              <button type="button" onClick={()=>setDetailAttente(v=>!v)} aria-expanded={detailAttente} disabled={!reel}
-                style={{width:'100%',border:'none',background:'transparent',padding:0,textAlign:'left',fontFamily:'inherit',cursor:reel?'pointer':'default'}}>
-                <div style={{display:'flex',alignItems:'center',gap:11}}>
-                  <span style={{color:C.accent,display:'flex',flexShrink:0}}><Icon name="wallet" size={20}/></span>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:11,color:C.muted,fontWeight:500,textTransform:'uppercase',letterSpacing:0.4}}>{reel?'Argent en attente':'Argent en attente (estimation)'}{reel?<span style={{textTransform:'none',letterSpacing:0,fontWeight:600,color:C.accent}}> · {detailAttente?'masquer le détail ▲':'voir le détail ▼'}</span>:null}</div>
-                    <div style={{fontSize:22,fontWeight:700,color:C.accent,lineHeight:1.1}}>{reel?'':'≈ '}{(reel?reel.total:sum).toFixed(0)} €</div>
-                  </div>
-                  <div style={{textAlign:'right',flexShrink:0}}>
-                    <div style={{fontSize:20,fontWeight:700,color:C.text}}>{inRoute.length}</div>
-                    <div style={{fontSize:11,color:C.muted}}>vente{inRoute.length>1?'s':''} en cours</div>
-                  </div>
-                </div>
-              </button>
-              {/* LE DÉCOMPTE : une ligne par compte, avec sa fraîcheur. Les comptes
-                  sans porte-monnaie lu figurent AUSSI, à 0, pour qu'on voie
-                  immédiatement pourquoi le total est plus bas que la réalité. */}
-              {reel && detailAttente && (()=>{
-                const lignes = (reel.parCompte||[]).map(l=>({...l, nom: accName((accounts||[]).find(a=>String(a.vinted_user_id)===l.uid) || {vinted_user_id:l.uid})}));
-                const lus = reel.avecSolde || new Set();
-                const absents = (accounts||[]).filter(a=>{ const u=String(a.vinted_user_id||''); return u && !lus.has(u) && !acctOff(u); });
-                return (
-                  <div style={{marginTop:10,borderTop:`1px solid ${C.border}`,paddingTop:8}}>
-                    {lignes.map(l=>(
-                      <div key={l.uid} style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',padding:'5px 0'}}>
-                        <div style={{flex:'1 1 130px',minWidth:0}}>
-                          <div style={{fontSize:12,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{l.nom}</div>
-                          <div style={{fontSize:11,color:C.muted,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                            {l.jours==null?'':l.jours<1?'lu aujourd’hui':`lu il y a ${l.jours} j`}{l.dispo>0?` · ${l.dispo.toFixed(2).replace('.',',')} € disponibles`:''}
-                          </div>
-                        </div>
-                        <span style={{flexShrink:0,fontSize:13,fontWeight:700,color:l.attente?C.accent:C.muted}}>{l.attente!=null?`${l.attente.toFixed(2).replace('.',',')} €`:'—'}</span>
-                      </div>
-                    ))}
-                    {/* ⚠️ RÈGLE DE JULIEN, VÉRIFIÉE : l'argent en attente est la SOMME DES
-                        VENTES EN COURS. Mesuré compte par compte contre le solde Vinted —
-                        `angeled92` tombe à l'euro près (91,00 € = 91,00 €, 4 ventes). Donc
-                        pour un compte dont le porte-monnaie n'a jamais été lu, on n'affiche
-                        plus « ? » : on calcule. C'est une ESTIMATION et c'est écrit, mais
-                        c'est infiniment plus utile qu'un trou.
-                        ⚠️ Là où le solde Vinted EST connu, il fait foi : quand il dépasse la
-                        somme des ventes (359 € contre 283 €), l'écart mesure exactement les
-                        ventes qui ne sont pas encore captées — on ne le maquille pas. */}
-                    {absents.map(a=>{
-                      const u=String(a.vinted_user_id||'');
-                      const mes=inRoute.filter(o=>String(o._acc?.vinted_user_id||'')===u);
-                      let s=0; for(const o of mes){ const v=o.price?.amount!=null?Number(o.price.amount):0; if(v>0) s+=v; }
-                      return (
-                        <div key={a.vinted_user_id} style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',padding:'5px 0',opacity:0.85}}>
-                          <div style={{flex:'1 1 130px',minWidth:0}}>
-                            <div style={{fontSize:12,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{accName(a)}</div>
-                            <div style={{fontSize:11,color:C.warn,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                              {mes.length?`estimé sur ${mes.length} vente${mes.length>1?'s':''} en cours — connecte-toi à ce compte pour le solde exact`:'solde jamais lu — connecte-toi une fois à ce compte sur Vinted'}
-                            </div>
-                          </div>
-                          <span style={{flexShrink:0,fontSize:13,fontWeight:700,color:s?C.warn:C.muted}}>{s?`≈ ${s.toFixed(2).replace('.',',')} €`:'?'}</span>
-                        </div>
-                      );
-                    })}
-                    {(()=>{
-                      let est=0;
-                      for(const a of absents){ const u=String(a.vinted_user_id||'');
-                        for(const o of inRoute) if(String(o._acc?.vinted_user_id||'')===u){ const v=o.price?.amount!=null?Number(o.price.amount):0; if(v>0) est+=v; } }
-                      return (
-                        <div style={{borderTop:`1px solid ${C.border}`,marginTop:6,paddingTop:7}}>
-                          <div style={{display:'flex',alignItems:'center',gap:8}}>
-                            <div style={{flex:1,fontSize:12,fontWeight:700,color:C.text}}>Total lu chez Vinted</div>
-                            <span style={{fontSize:15,fontWeight:700,color:C.accent}}>{reel.total.toFixed(2).replace('.',',')} €</span>
-                          </div>
-                          {est>0 && (
-                            <div style={{display:'flex',alignItems:'center',gap:8,marginTop:4}}>
-                              <div style={{flex:1,fontSize:12,fontWeight:700,color:C.text}}>+ estimé sur les autres comptes</div>
-                              <span style={{fontSize:15,fontWeight:700,color:C.warn}}>≈ {est.toFixed(2).replace('.',',')} €</span>
-                            </div>
-                          )}
-                          {est>0 && (
-                            <div style={{display:'flex',alignItems:'center',gap:8,marginTop:6,borderTop:`1px dashed ${C.border}`,paddingTop:6}}>
-                              <div style={{flex:1,fontSize:13,fontWeight:700,color:C.text}}>Total probable</div>
-                              <span style={{fontSize:15,fontWeight:700,color:C.accent}}>≈ {(reel.total+est).toFixed(2).replace('.',',')} €</span>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                );
-              })()}
-              <div style={{fontSize:12,color:C.muted,marginTop:6,lineHeight:1.4}}>{reel
-                ? <>Retenu par Vinted, pas encore virable · {reel.accounts} porte-monnaie lu{reel.accounts>1?'s':''}{reel.dispo>0?<> · <b>{reel.dispo.toFixed(2).replace('.',',')} €</b> disponibles à virer</>:null}</>
-                : <>Estimation sur tes ventes en cours, en attendant que l'extension lise les porte-monnaie.</>}</div>
-              {/* ⚠️ CE TOTAL EST PARTIEL TANT QUE TOUS LES PORTE-MONNAIE N'ONT PAS
-                  ÉTÉ LUS. Julien : « j'ai 323 € en attente sur un seul compte, ce
-                  n'est pas possible que le total soit 504 € avec sept comptes » —
-                  il a raison, et le total n'était pas faux, il était INCOMPLET.
-                  On NOMME donc les comptes manquants au lieu de laisser croire à
-                  un chiffre complet. Un total partiel qui se présente comme
-                  complet est pire qu'un total absent. */}
-              {(()=>{
-                const lus = (reel && reel.avecSolde) || new Set();
-                const manquants = (accounts||[]).filter(a=>{ const u=String(a.vinted_user_id||''); return u && !lus.has(u) && !acctOff(u); });
-                if (!manquants.length) return null;
-                return (
-                  <div data-attente-incomplet={manquants.length} style={{marginTop:8,padding:'8px 10px',borderLeft:`3px solid ${C.warn}`,background:`${C.warn}10`,borderRadius:12,fontSize:12,color:C.text,lineHeight:1.45}}>
-                    <b>Total incomplet</b> — sans {manquants.length} compte{manquants.length>1?'s':''} sur {(accounts||[]).length} : <span style={{opacity:0.9}}>{manquants.map(a=>accName(a)).join(", ")}</span>.
-                    {/* ⚠️ NE PAS redire « ouvre ton porte-monnaie » : depuis la 5.20 la
-                        moisson active lit `payouts` toute seule pour le compte CONNECTÉ
-                        (vérifié : 6 soldes captés en 2 minutes sans ouvrir un seul
-                        porte-monnaie). Le seul geste utile est de se connecter au compte. */}
-                    <div style={{marginTop:2,opacity:0.85}}>Connecte-toi une fois à {manquants.length>1?'chacun':'ce compte'} sur Vinted : l'extension lit le solde toute seule.</div>
-                  </div>
-                );
-              })()}
-            </div>
-          );
-        })()}
+        {/* (4 nov.) L'ARGENT À VENIR, toutes plateformes, compte par compte : la
+            règle de la coque (`liveStats.aVenir`, src/argentAVenir.js). Elle
+            remplace « l'argent en attente » d'avant (Vinted seul, solde bloqué ou
+            somme des statuts « en cours » de la liste — 220 € de ventes déjà
+            versées comptées, mesuré le 4 nov.). */}
+        {/* Elle est montée en tête de Ventes (la coque), à côté de « Retirer mon argent ». */}
         {/* ── VENTES PAR JOUR ────────────────────────────────────────────────
             Demande de Julien : « un endroit où on puisse voir les ventes par
             jour, pareil un calendrier de tel jour à tel jour ; ici ce n'est pas
@@ -52461,67 +52859,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <Bouton variante="discret" onClick={()=>{ setVFilter('annulees'); try { document.querySelector('.vrm-sales-workbar')?.scrollIntoView({block:'start',behavior:'smooth'}); } catch(_) {} }}>Voir les annulées</Bouton>
           </div>
         )}
-        {/* Objectif de CA mensuel */}
-        {/* CA du mois : EXACTEMENT le chiffre du tableau de bord (emails de vente,
-            source complète). Avant, cette barre utilisait un calcul local basé sur
-            les ventes moissonnées → l'objectif affichait un CA différent de la
-            tuile « CA du mois » de l'accueil. Une seule source, un seul nombre. */}
-        {accounts.length>0 && (()=>{ const caM = (liveStats && liveStats.caMois!=null) ? liveStats.caMois : perf.caMois; const pct = goal>0 ? Math.min(100, (caM/goal)*100) : 0; return (
-          <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'11px 13px',marginBottom:12}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:goal>0?8:0,flexWrap:'wrap',gap:6}}>
-              <div style={{fontSize:13,fontWeight:600,color:C.text}}>Objectif du mois</div>
-              {goalEdit ? (
-                <div style={{display:'flex',gap:6,alignItems:'center'}}>
-                  <input autoFocus type="number" defaultValue={goal||''} placeholder="0" onKeyDown={e=>{ if(e.key==='Enter'){ saveGoal(e.target.value); setGoalEdit(false);} if(e.key==='Escape') setGoalEdit(false); }}
-                    onBlur={e=>{ saveGoal(e.target.value); setGoalEdit(false); }} style={{width:90,border:`1px solid ${C.accent}`,borderRadius:12,padding:'3px 8px',fontSize:13,fontWeight:500,background:C.bg,color:C.text,outline:'none'}}/>
-                  <span style={{fontSize:12,color:C.muted}}>€</span>
-                </div>
-              ) : (
-                <Bouton variante="secondaire" className="vrm-b-petit" onClick={()=>setGoalEdit(true)} title={goal>0?'Changer l\'objectif':undefined}>
-                  {goal>0 ? `${caM.toFixed(0)} / ${goal} €` : 'Fixer un objectif'}
-                </Bouton>
-              )}
-            </div>
-            {/* ⚠️ UN OBJECTIF QU'IL FAUT INVENTER NE SE FIXE JAMAIS (mesuré le
-                23 août : `vinted_goal` non défini). On le PROPOSE, calculé sur
-                SON historique — la moyenne des 3 derniers mois complets, arrondie
-                à la dizaine. Un clic suffit ; on n'écrit rien tout seul. */}
-            {goal<=0 && (()=>{
-              const parMois = {};
-              for (const o of (sales.items || [])) {
-                if (classifyOrderStatus(o.status) === 'cancelled') continue;
-                const d = new Date(o.date); if (isNaN(d)) continue;
-                const k = cleJourLocal(d.getTime()).slice(0, 7);
-                parMois[k] = (parMois[k] || 0) + ((o.price && o.price.amount != null) ? Number(o.price.amount) || 0 : 0);
-              }
-              const moisEnCours = dateLocaleISO().slice(0, 7);
-              const complets = Object.entries(parMois).filter(([k]) => k < moisEnCours).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 3);
-              if (complets.length < 2) return null;   // pas assez d'historique : on ne propose rien
-              const moy = complets.reduce((s2, [, v]) => s2 + v, 0) / complets.length;
-              const prop = Math.max(10, Math.round(moy / 10) * 10);
-              return (
-                <div style={{marginTop:8,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-                  <div style={{flex:'1 1 150px',minWidth:0,fontSize:11,color:C.muted,lineHeight:1.4}}>
-                    Tes {complets.length} derniers mois complets : <b style={{color:C.text}}>{Math.round(moy)} €</b> en moyenne.
-                  </div>
-                  <Bouton variante="secondaire" className="vrm-b-petit" icone="target" onClick={()=>saveGoal(prop)} style={{flexShrink:0}}>Viser {prop} €</Bouton>
-                </div>
-              );
-            })()}
-            {goal>0 && (
-              <div style={{height:8,borderRadius:12,background:C.border,overflow:'hidden'}}>
-                <div style={{height:'100%',width:`${pct}%`,background:C.accent,borderRadius:12,transition:'width .4s'}}/>
-              </div>
-            )}
-            {goal>0 && (()=>{
-              if(pct>=100) return <div style={{fontSize:12,color:C.text,fontWeight:600,marginTop:5}}>Objectif atteint</div>;
-              const reste=goal-caM;
-              const avg=totals.nb>0?totals.ca/totals.nb:null; // prix de vente moyen finalisé
-              const nb=avg&&avg>0?Math.ceil(reste/avg):null;
-              return <div style={{fontSize:11,color:C.muted,marginTop:5}}><b style={{color:C.text}}>{reste.toFixed(0)} €</b> restants ce mois-ci{nb!=null?<> — soit <b style={{color:C.accent}}>~{nb} paire{nb>1?'s':''}</b> à {avg.toFixed(0)} € (ton prix moyen)</>:''}</div>;
-            })()}
-          </div>
-        ); })()}
+        {/* (4 nov.) L'objectif du mois vit dans la carte sombre de cet écran (une barre
+            fine, `vrm_objectif_mois`, src/objectifMois.js) : l'ancien bloc (`vinted_goal`,
+            jamais posé en base, et sa proposition calculée sur l'archive Vinted seule)
+            redisait le même nombre sur le même écran (§7, §11). */}
         {/* Graphique de tendance 6 mois : CA + bénéfice net */}
         {monthlyChart.total>0 && (()=>{
           // GRAPHIQUE DE TENDANCE — refait proprement :
@@ -52601,6 +52942,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               recus: { nom: 'Reçus', court: 'Reçus', type: 'n', valeur: lu ? n.recu : null, attrs: { 'data-n': lu ? String(n.recu) : '' } },
             }}/>;
         })()}
+        {/* (4 nov.) Fournisseurs · Délai · Lots (src/AchatsOutils.jsx) : trois feuilles, rien n'est écrit sans son clic. */}
+        {!modeRetraits && !baseKO && <AchatsOutils fournisseurs={asoFournisseurs} delai={asoDelai} lots={asoLots} achatsDeclarables={asoDeclarables} fichesLibres={asoFichesLibres}
+          onOuvrir={setAsoOuvert} onRelier={asoRelier} onRepartir={asoRepartir} onAnnulerRepartition={asoAnnuler} onDeclarerLot={asoDeclarerLot}
+          onFiche={(n)=>{ try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: String(n) })); } catch (_) {} }}
+          Retour={FermeAuRetour} Photo={(src)=><PhotoVinted src={src} alt="" loading="lazy"/>}/>}
         {!retraitsOutils && <NoAcc/>}
         {/* ⚠️ LE BANDEAU DE L'EXTENSION VIT AUSSI ICI, PAS SEULEMENT SUR MA
             JOURNÉE. C'est sur CET écran que Julien compte les codes qui
@@ -58891,6 +59237,12 @@ const numLigneEbay = (o, li) => numEbayLu(li && li.sku, li && (li.legacyItemId |
 const commandeEbayEngagee = (o) => !!o
   && !(/CANCEL/i.test(String((o.cancelStatus && o.cancelStatus.cancelState) || '')) && !/REJECT/i.test(String((o.cancelStatus && o.cancelStatus.cancelState) || '')))
   && !/FAILED|FULLY_REFUNDED/i.test(String(o.orderPaymentStatus || ''));
+// (4 nov.) L'argent à venir avec les règles PROPRIÉTAIRES de l'app (§11) : le
+// module ne recopie aucune d'elles, il les reçoit ici.
+const REGLES_A_VENIR = { classer: (st) => classifyOrderStatus(st), montantVinted: (o) => montantCommandeLu(o), lbcAnnulee: (v) => lbcAnnulee(v), lbcFinalisee: (v) => lbcFinalisee(v),
+  commandeEbayEngagee: (o) => commandeEbayEngagee(o), montantRecuEbay: (o) => montantRecuEbay(o), etapeVc: (v) => etapeMotVc(v), vcAnnulee: (v) => vcVenteAnnulee(v),
+  montantRecuVc: (v) => montantRecuVc(v), dateVersementVc: (v) => dateVersementVc(v) };
+const aVenirCoque = (x) => argentAVenir({ ...x, etatTx: TXN_ETATS_LU === false ? null : etatTxn, R: REGLES_A_VENIR });
 // `programmees` (5 octobre) : les annonces PROGRAMMÉES sur eBay
 // (`ebay_programmees.items`, et celles que VRM vient de programmer). Une paire
 // prouvée vendue sur Vinted qui y figure ⇒ `aAnnulerEbay` : « programmée sur
@@ -61644,6 +61996,10 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       AUTH.user && { id:'email', type:'nav', ic:'mail', lib:'Changer mon email', onClick:()=>{ setAcct({ mode:'email', val:'', err:'', busy:false }); } },
       AUTH.user && { id:'motdepasse', type:'nav', ic:'key', lib:'Changer mon mot de passe', onClick:()=>{ setAcct({ mode:'pw', val:'', err:'', busy:false }); } },
       // Double vérification (TOTP) — facultative, sur SON clic (16 octobre).
+      // (4 nov.) Les appareils où VRM est ouvert, et « Se déconnecter partout ».
+      AUTH.user && { id:'appareils', type:'panneau', ic:'key', lib:'Appareils connectés', el:<AppareilsConnectes/> },
+      // (4 nov.) Tout ce que VRM a envoyé en son nom, lu de ce qui est noté en base.
+      AUTH.user && { id:'journal-vrm', type:'panneau', ic:'clock', lib:'Ce que VRM a fait', el:<JournalVrm/> },
       AUTH.user && { id:'double', type:'panneau', nu:true, ic:'key', lib:'Double vérification', val: Array.isArray(AUTH.session && AUTH.session.totp) ? (AUTH.session.totp.length > 1 ? `Activée · ${AUTH.session.totp.length} appareils` : AUTH.session.totp.length ? 'Activée' : 'Désactivée') : '', el:<DoubleVerification/> },
     ]},
     AUTH.user && { id:'sortir', titre:null, items:[
@@ -62184,6 +62540,138 @@ function DoubleVerification({ onEtat } = {}) {
   );
 }
 
+// ── SÉCURITÉ DU COMPTE VRM (4 nov.) — src/securiteCompte.js ──────────────────
+// « Se déconnecter partout », « Appareils connectés », « Ce que VRM a fait ».
+const appelSecurite = async (mode, init) => {
+  try {
+    const r = await fetch(`/api/compte?mode=${mode}`, { ...(init || {}), headers: { ...enTeteSession(), ...((init && init.body) ? { 'Content-Type': 'application/json' } : {}) }, signal: AbortSignal.timeout(20000) });
+    const j = await r.json().catch(() => null);
+    return { status: r.status, j };
+  } catch (_) { return { status: 0, j: null }; }
+};
+const quandCourt = (v) => {
+  const t = typeof v === 'number' ? v : Date.parse(String(v || ''));
+  if (!Number.isFinite(t)) return '—';
+  const m = Math.round((Date.now() - t) / 60000);
+  if (m < 2) return 'à l’instant';
+  if (m < 60) return `il y a ${m} min`;
+  if (m < 24 * 60) return `il y a ${Math.round(m / 60)} h`;
+  return new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+};
+const seDeconnecterPartout = async () => {
+  const owner = AUTH.user?.id;
+  if (!owner) return;
+  const ext = !vmrExtPresent() ? 'inconnue' : extSait('liaison') === 'ok' ? 'liaison' : 'ancienne';
+  const ok = await askConfirm({ title: 'Se déconnecter partout ?', desc: texteConfirmationPartout({ extension: ext }), ok: 'Se déconnecter partout', cancel: 'Annuler', danger: true });
+  if (!ok || AUTH.user?.id !== owner) return;
+  const r = await deconnecterPartout({ fetch: (...a) => fetch(...a), url: SUPABASE_URL, apikey: SUPABASE_KEY, jeton: AUTH.session && AUTH.session.access_token });
+  if (AUTH.user?.id !== owner) return;
+  if (r === 'injoignable') { toast("⚠️ Le service de connexion n'a pas répondu — rien n'a été fermé. Réessaie dans un instant.", 'err'); return; }
+  if (r === 'refuse') toast('Ta session ici avait expiré : reconnecte-toi, puis recommence pour fermer les autres appareils.', 'info');
+  else toast('✓ VRM est fermé sur tous tes appareils.', 'ok');
+  setTimeout(() => { if (AUTH.user?.id !== owner) return; try { authSignOut(); } catch (_) {} location.reload(); }, 1600);
+};
+function AppareilsConnectes() {
+  // `undefined` en cours · `{ erreur, message }` pas su · `{ appareils }` lu.
+  const [etat, setEtat] = React.useState(undefined);
+  const [enVol, setEnVol] = React.useState(null);
+  const lire = React.useCallback(async () => {
+    const { status, j } = await appelSecurite('appareils');
+    setEtat(status === 200 && j && Array.isArray(j.appareils) ? { appareils: j.appareils } : { erreur: (j && j.erreur) || 'reseau', message: (j && j.message) || "Je n'ai pas pu lire tes appareils — réessaie dans un instant." });
+  }, []);
+  React.useEffect(() => { lire(); }, [lire]);
+  const fermer = async (a) => {
+    const owner = AUTH.user?.id;
+    if (!owner) return;
+    const ok = await askConfirm({ title: `Déconnecter ${a.appareil} ?`, desc: 'VRM s’y fermera dans l’heure au plus.', ok: 'Déconnecter', cancel: 'Annuler', danger: true });
+    if (!ok || AUTH.user?.id !== owner) return;
+    setEnVol(a.id);
+    const { status, j } = await appelSecurite('appareils', { method: 'POST', body: JSON.stringify({ session: a.id }) });
+    if (AUTH.user?.id !== owner) return;
+    setEnVol(null);
+    if (status === 200 && j?.ok === true && j.ferme === a.id) { toast(`✓ ${a.appareil} déconnecté.`, 'ok'); lire(); }
+    else toast('⚠️ ' + ((j && j.message) || "Je n'ai pas pu déconnecter cet appareil."), 'err');
+  };
+  return (
+    <div data-appareils={etat === undefined ? 'lecture' : etat.erreur ? 'pas-su' : String(etat.appareils.length)}>
+      {etat === undefined ? <div className="vrm-sec-liste"><div className="vrm-sec-vide">…</div></div>
+        : etat.erreur ? <div className="vrm-sec-liste"><div className="vrm-sec-ligne" data-appareils-erreur={etat.erreur}><div className="vrm-sec-corps"><span className="vrm-sec-sous" style={{ whiteSpace: 'normal' }}>{etat.message}</span></div><button type="button" className="vrm-sec-bouton" onClick={() => { setEtat(undefined); lire(); }}>Réessayer</button></div></div>
+        : (
+        <div className="vrm-sec-liste">
+          {etat.appareils.map((a) => (
+            <div key={a.id} className="vrm-sec-ligne" data-appareil={a.ici ? 'ici' : 'autre'}>
+              <div className="vrm-sec-corps">
+                <span className="vrm-sec-titre">{a.appareil}</span>
+                <span className="vrm-sec-sous">{quandCourt(a.actifLe)}</span>
+              </div>
+              {a.ici ? <span className="vrm-sec-etat is-ici">Cet appareil</span>
+                : <button type="button" className="vrm-sec-bouton" data-appareil-fermer={a.id} disabled={enVol === a.id} onClick={() => fermer(a)}>{enVol === a.id ? '…' : 'Déconnecter'}</button>}
+            </div>
+          ))}
+        </div>
+      )}
+      <div style={{ marginTop: 16 }}>
+        <Bouton variante="secondaire" data-deconnexion-partout="" onClick={seDeconnecterPartout} style={{ width: '100%' }}>Se déconnecter partout</Bouton>
+      </div>
+    </div>
+  );
+}
+function JournalVrm() {
+  const [etat, setEtat] = React.useState(undefined);
+  const [compte, setCompte] = React.useState('*');
+  const [type, setType] = React.useState('tous');
+  const [n, setN] = React.useState(60);
+  const lire = React.useCallback(async () => {
+    const { status, j } = await appelSecurite('journal');
+    setEtat(status === 200 && j && Array.isArray(j.evenements) ? j : { erreur: true });
+  }, []);
+  React.useEffect(() => { lire(); }, [lire]);
+  const fiches = load('vinted_annonce_numeros', {}) || {};
+  const labels = load('vinted_account_labels', {}) || {};
+  const comptesV = (() => { try { return JSON.parse(localStorage.getItem('vinted_accounts') || '[]') || []; } catch (_) { return []; } })();
+  const nomCompte = (uid) => labels[uid] || (comptesV.find((a) => String(a && a.vinted_user_id) === String(uid)) || {}).login || null;
+  const numeroDeItem = (id) => (fiches[id] && fiches[id].numero) || null;
+  if (etat === undefined) return <div className="vrm-sec-liste"><div className="vrm-sec-vide">…</div></div>;
+  if (etat.erreur) return <div className="vrm-sec-liste" data-journal="pas-su"><div className="vrm-sec-ligne"><div className="vrm-sec-corps"><span className="vrm-sec-sous" style={{ whiteSpace: 'normal' }}>Je n'ai pas pu lire le journal — réessaie dans un instant.</span></div><button type="button" className="vrm-sec-bouton" onClick={() => { setEtat(undefined); lire(); }}>Réessayer</button></div></div>;
+  const comptesJ = comptesDuJournal(etat.evenements);
+  const vus = filtrerJournal(etat.evenements, { compte, type });
+  const jours = [];
+  for (const e of vus.slice(0, n)) {
+    const j = e.at ? new Date(e.at).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }) : 'En cours';
+    if (!jours.length || jours[jours.length - 1].j !== j) jours.push({ j, l: [] });
+    jours[jours.length - 1].l.push(e);
+  }
+  return (
+    <div data-journal={String(vus.length)}>
+      <div className="vrm-sec-filtres vrm-compte-puces" role="radiogroup" aria-label="Type">
+        {FILTRES_TYPE.map(([id, lib]) => <button key={id} type="button" role="radio" aria-checked={type === id} data-journal-type={id} className={'vrm-compte-puce' + (type === id ? ' is-actif' : '')} onClick={() => setType(id)}>{lib}</button>)}
+      </div>
+      {comptesJ.length >= 2 && <ListeComptes id="vrm-journal-compte" valeur={compte} onChange={setCompte} options={comptesJ.map((c) => ({ val: c, nom: nomCompte(c) || (c === 'principal' ? 'eBay principal' : c) }))}/>}
+      {!vus.length && <div className="vrm-sec-liste"><div className="vrm-sec-vide" data-journal-vide="">Rien pour l’instant.</div></div>}
+      {jours.map((g) => (
+        <div key={g.j}>
+          <div className="vrm-sec-jour">{g.j}</div>
+          <div className="vrm-sec-liste">
+            {g.l.map((e, i) => { const L = ligneJournal(e, { numeroDeItem, nomCompte }); return (
+              <div key={i} className="vrm-sec-ligne" data-journal-ligne={e.type} data-journal-resultat={e.resultat}>
+                <div className="vrm-sec-corps">
+                  <span className="vrm-sec-titre">{L.titre}{L.article ? <> · {L.article}</> : null}</span>
+                  <span className="vrm-sec-sous">{e.at ? new Date(e.at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : ''}{L.compte ? ` · ${L.compte}` : ''}</span>
+                </div>
+                <span className={'vrm-sec-etat' + (L.aVerifier ? ' is-verifier' : '')}>{L.resultat}</span>
+              </div>
+            ); })}
+          </div>
+        </div>
+      ))}
+      {vus.length > n && <div style={{ marginTop: 12 }}><Bouton variante="secondaire" onClick={() => setN((x) => x + 100)} style={{ width: '100%' }}>Voir plus</Bouton></div>}
+      <div className="vrm-sec-trous" data-journal-trous="">
+        {(etat.pasLu || []).length ? <p data-journal-pas-lu={etat.pasLu.join(',')}>Pas pu lire : {etat.pasLu.map((x) => ({ favoris: 'favoris', ebayAgent: 'actions eBay', ebayRetraits: 'retraits eBay', brouillons: 'republications', bordereaux: 'bordereaux' }[x] || x)).join(', ')}.</p> : null}
+        {(etat.nonJournalise || []).map((x) => <p key={x.id} data-journal-non={x.id}>{x.texte}</p>)}
+      </div>
+    </div>
+  );
+}
 function FermerCompte() {
   const [ouvert, setOuvert] = React.useState(false);
   // `undefined` en cours · `null` pas su · l'objet du serveur (`proprietaire`).
@@ -65201,12 +65689,16 @@ function AppCoeur() {
   // pas suivre en douce sur une autre plateforme) ; conservé d'un sous-onglet à
   // l'autre d'une même plateforme (choisir le compte une fois, le voir sur
   // Annonces PUIS Ventes PUIS Messages).
-  const [compteSel,setCompteSel]=useState('');
   // (31 oct.) Le compte choisi suit le SITE, pas l'onglet : choisi dans Ventes ·
   // Vinted, il reste choisi dans Annonces · Vinted (comme d'une section à
-  // l'autre de l'ancien onglet Vinted) ; il revient à « tous » sur un autre site.
+  // l'autre de l'ancien onglet Vinted).
+  // (4 nov.) Et il est MÉMORISÉ sur l'appareil, PAR SITE (src/compteChoix.js) :
+  // un autre site retrouve SON choix, jamais celui-ci (la règle du 31 oct. tient).
   const siteCourant=estTacheSite(tab)?siteDeTache(tab,platSub):({plat_vinted:'vinted',plat_leboncoin:'leboncoin',plat_ebay:'ebay',plat_vestiaire:'vestiaire'}[tab]||tab);
-  React.useEffect(()=>{ setCompteSel(''); },[siteCourant]);
+  const lireCarteChoix=()=>{ try{ return lireChoixComptes(localStorage.getItem(CLE_CHOIX_COMPTES)); }catch(_){ return {}; } };
+  const [compteSel,setCompteSelBrut]=useState(()=>choixPourSite(lireCarteChoix(),siteCourant));
+  const setCompteSel=(v)=>{ const n=typeof v==='function'?v(compteSel):v; setCompteSelBrut(n); try{ localStorage.setItem(CLE_CHOIX_COMPTES,JSON.stringify(memoriserChoix(lireCarteChoix(),siteCourant,n))); }catch(_){} };
+  React.useEffect(()=>{ setCompteSelBrut(choixPourSite(lireCarteChoix(),siteCourant)); },[siteCourant]);
   React.useEffect(()=>{ if(estTacheSite(tab)) retenirFiltre(tab, siteDeTache(tab,platSub)); },[tab,platSub]);
   // Le compte Vinted ouvert dans CE Chrome (l'extension le lit dans son cookie) :
   // c'est celui qu'il est en train de traiter, il est choisi d'office (📍, ses
@@ -66635,6 +67127,13 @@ function AppCoeur() {
   // (1er nov., audit A2) Les ventes Vestiaire entrent dans « vendu » (montant sûr) ou sont nommées.
   const ventesVcCoque = useVentesVestiaire();
   const excluAutreCoque = useExcluAutre();
+  // (4 nov.) L'ARGENT À VENIR, toutes plateformes (`argentAVenir`, src/argentAVenir.js) :
+  // UNE règle, calculée ici une fois et publiée dans `liveStats.aVenir` pour la carte
+  // des chiffres, Ma journée, Ventes et le widget. Les dates de versement Vinted
+  // (450) et l'état de chaque transaction (TXN_ETATS, rempli par la même lecture)
+  // écartent les ventes déjà versées que la LISTE dit encore « en cours ».
+  const [versementsCoque, setVersementsCoque] = useState(undefined);
+  useEffect(() => { let mort = false; fetchVersementsVinted().then((m) => { if (!mort) setVersementsCoque(m); }).catch(() => { if (!mort) setVersementsCoque(null); }); return () => { mort = true; }; }, [ventesCoque]);
   const liveStatsVus = useMemo(() => {
     if (!liveStats) return liveStats;
     if (ventesCoque === null) return { ...liveStats, ...VENDU_PAS_SU };
@@ -66663,10 +67162,13 @@ function AppCoeur() {
         // rythme de Statistiques : la même population que « vendu », jamais une
         // seconde règle (§11).
         venduLignes: v.lignes,
-        venduManque, venduEnAttente: lbcCoqueLu === undefined || ebayCommandes === undefined || ventesVcCoque === undefined };
+        venduManque, venduEnAttente: lbcCoqueLu === undefined || ebayCommandes === undefined || ventesVcCoque === undefined,
+        aVenir: aVenirCoque({ vinted: ventesCoque, lbc: lbcCoqueLu === undefined ? undefined : lbcCoqueLu === true ? ((lbcVentes && lbcVentes.ventes) || []) : null,
+          ebay: ebayCommandes, vestiaire: ventesVcCoque, versements: versementsCoque, cachee: (o) => ecarte(o && o._acc && o._acc.vinted_user_id), excluAutre: excluAutreCoque,
+          manqueVinted: ventesKO.filter(uid => !ecarte(uid)).map(loginDe) }) };
     } catch (_) { return liveStats; }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [liveStats, ventesCoque, ventesKO, lbcVentes, lbcCoqueLu, ebayCommandes, panelOffCoque, nuagePret, masquesTick, jourCle, vintedAccounts, datesLbcTick, ventesVcCoque, excluAutreCoque]);
+  }, [liveStats, ventesCoque, ventesKO, lbcVentes, lbcCoqueLu, ebayCommandes, panelOffCoque, nuagePret, masquesTick, jourCle, vintedAccounts, datesLbcTick, ventesVcCoque, excluAutreCoque, versementsCoque]);
   // Le widget : écrit quand ce qu'il afficherait CHANGE (pas à chaque rendu),
   // et SEULEMENT un « vendu » complet : sources pas encore revenues, illisibles
   // ou un compte manquant ⇒ on n'écrit pas, l'iPhone garde la dernière photo
@@ -66677,6 +67179,10 @@ function AppCoeur() {
     if (liveStatsVus.venduPasSu || liveStatsVus.venduEnAttente || (liveStatsVus.venduManque || []).length || liveStatsVus.caMois == null) return;
     // (1er nov.) Des ventes du mois dont l'argent ne se lit pas : le widget dit « au moins ».
     const { onlinePasSu, ...base0 } = widgetBase;
+    // (4 nov.) « En attente » du widget = l'argent à venir (la règle de la coque),
+    // seulement complet ; sinon la valeur d'avant reste (jamais un minimum présenté complet).
+    const aV = aVenirPour(liveStatsVus.aVenir);
+    if (aV.valeur != null && !aV.partiel) base0.enAttente = Math.round(aV.valeur);
     const data = { ...base0, caMois: Math.round(liveStatsVus.caMois || 0), ventesMois: liveStatsVus.ventesMois || 0, caMoisNonComptees: liveStatsVus.venduNonCompteesMois || 0, ...(onlinePasSu ? { onlineRaison: onlinePasSu } : { onlineAt: new Date().toISOString().slice(0, 10) }) };
     const cle = JSON.stringify(data);
     if (cle === widgetEcrit.current) return;
@@ -67357,6 +67863,7 @@ function AppCoeur() {
           {sous && <div className="vrm-tache-sous" data-tache-sous={t+'.'+site}><PlatSubNav sub={sec} setSub={(x)=>{ setEbayCible(null); setPlatSub(subDeTache(site,x)); }} sections={sous}/></div>}
         </div>
         {site==='toutes' && t==='ventes' && !baseKO && <div style={{padding:'12px 16px 0'}}><CarteStatsApp page="ventes-toutes" className="vrm-fu-ecran" ici="cat_ventes" onNav={setTab} sel={{ site: 'toutes', compte: null, periode: null }}/></div>}
+        {site==='toutes' && t==='ventes' && !baseKO && <div className="vrm-a-venir-hote" style={{padding:'12px 16px 0'}}><ArgentAVenirCarte A={liveStatsVus && liveStatsVus.aVenir}/></div>}
         {site==='toutes'
           ? (baseKO ? <div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>
             : <VentesToutes sites={sitesPresents} ventesVinted={ventesCoque} ventesKO={ventesKO} comptes={vintedAccounts} panelOff={panelOffCoque} lbcVentes={lbcVentes} lbcLu={lbcCoqueLu} ebayTous={ebayCmdTous}
@@ -67377,6 +67884,7 @@ function AppCoeur() {
           {/* (3 nov.) Les montants du haut (CA finalisé, disponible, en attente) se choisissent
               désormais dans LA carte sombre de chaque page (« Modifier ») : la bande ne les redit plus
               (§7) ; la ligne de fraîcheur reste. */}
+          {(sec==='ventes'||sec==='annonces'||sec==='achats'||sec==='messages') && <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte} messages={sec==='messages'}/>}
           {!achats && sec!=='messages' && <VintedResume liveStats={liveStatsVus} baseKO={baseKO} siAJour={sec!=='annonces'} sansMontants sauf={(sec || 'ventes') === 'ventes' ? (liveStatsVus && liveStatsVus.venduManque) : null}/>}
           {!baseKO && (sec==='annonces'||achats) && (() => {
             const uid = compteEffectif(compteSel, compteConnecte, (u) => (comptesChoisissables || []).some((a) => String(a.vinted_user_id) === u));
@@ -67410,9 +67918,10 @@ function AppCoeur() {
           {/* Filtre par compte (Julien, 6 oct.) — Ventes / Annonces / Achats /
               Messages. Les Colis ne sont pas filtrés (« pour les colis pas
               forcément »). Un seul compte ⇒ la rangée ne s'affiche pas. */}
-          {(sec==='ventes'||sec==='annonces'||sec==='achats'||sec==='messages') && <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte} messages={sec==='messages'}/>}
+          {/* (4 nov.) Le sélecteur monte EN HAUT de l'écran (un tap, au-dessus de la carte). */}
           {/* Sous la navigation, pas entre le résumé et elle (revue du 17 oct.). */}
           {sec==='ventes' && !baseKO && <div className="vrm-retirer-hote" style={{padding:'10px 16px 0'}}><RetirerArgent liveStats={liveStatsVus}/></div>}
+          {sec==='ventes' && !baseKO && <div className="vrm-a-venir-hote" style={{padding:'10px 16px 0'}}><ArgentAVenirCarte A={liveStatsVus && liveStatsVus.aVenir} plateforme="Vinted"/></div>}
           <Comptabilite key={'pv_'+sec} accounts={vintedAccounts} only={sec==='apercu'?'ventes':sec} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum} compteSel={compteSel} compteConnecte={compteConnecte} dansPlateforme vueAchats={achats?'achats':undefined}/>
         </section>); };
   const rendreLeboncoin=(sec)=>{ return (<section className="vrm-market-space" aria-label="Leboncoin">
@@ -67737,6 +68246,8 @@ function AppCoeur() {
                 écrans (Julien, 5 octobre). Voir `EtatActions`. */}
             {MULTI_USER && <EtatActions onNav={setTab} ordi={ordi} sombre={eD}/>}
             <PastilleStream/>
+            {/* (4 nov.) L'œil : cache TOUS les montants en € de l'écran (src/montantsCaches.js). */}
+            <BoutonMontants/>
             {!ordi && <button className="vrm-hbtn" type="button" data-recherche-zone="" data-recherche-loupe="" onClick={()=>{ if(gsOpen) fermerRecherche(); else ouvrirRecherche(); }} title="Rechercher" aria-label="Rechercher une paire" aria-expanded={gsOpen} aria-controls="vrm-recherche-resultats">
               <Icon name="search" size={21}/>
             </button>}

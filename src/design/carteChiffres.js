@@ -25,6 +25,8 @@
 // `hors` = le chiffre n'a pas de sens pour cette sélection (« — », et la
 // feuille ne le propose pas). Exécuté par scripts/audit-carte-chiffres.cjs.
 
+import { aVenirPour } from '../argentAVenir.js';
+
 export const CLE_CARTE_STATS = 'vrm_carte_stats';
 
 export const SITES = ['toutes', 'vinted', 'vestiaire', 'leboncoin', 'ebay'];
@@ -57,7 +59,10 @@ export const CHIFFRES = {
   finalisees: { nom: 'Ventes finalisées', court: 'finalisées', type: 'n', periodes: TOUTES_PERIODES, sites: ['toutes'], compte: false, aller: 'compta' },
   aposter:    { nom: 'À poster', court: 'à poster', type: 'n', periodes: null, sites: SITES, compte: false, aller: 'cat_bord' },
   retirer:    { nom: 'À retirer', court: 'à retirer', type: 'n', periodes: null, sites: ['toutes'], compte: false, aller: 'cat_bord' },
-  attente:    { nom: 'Argent en attente', court: 'en attente', type: 'eur', periodes: null, sites: ['toutes', 'vinted'], compte: false, vinted: true, aller: 'cat_ventes' },
+  // (4 nov.) « Argent à venir » : ce que TES SITES te doivent encore (src/argentAVenir.js,
+  // `liveStats.aVenir`) — toutes plateformes, par compte Vinted. L'id reste `attente`
+  // (les réglages rangés le gardent) ; il ne lit plus le seul porte-monnaie Vinted.
+  attente:    { nom: 'Argent à venir', court: 'à venir', type: 'eur', periodes: null, sites: SITES, compte: true, aller: 'cat_ventes' },
   dispo:      { nom: 'Disponible', court: 'disponible', type: 'eur', periodes: null, sites: ['toutes', 'vinted'], compte: true, vinted: true, aller: 'cat_ventes' },
   enligne:    { nom: 'Annonces en ligne', court: 'en ligne', type: 'n', periodes: null, sites: ['toutes', 'vinted'], compte: true, vinted: true, aller: 'annonces' },
   masquees:   { nom: 'Annonces masquées', court: 'masquées', type: 'n', periodes: null, sites: ['toutes', 'vinted'], compte: true, vinted: true, aller: 'annonces', titre: 'Masquées par Vinted : toujours chez toi, pas en ligne. Une lecture de plus de 24 h est à confirmer (« au moins »).' },
@@ -232,6 +237,37 @@ export const recuPublie = (publie, ym, maintenant = Date.now()) => {
   return { valeur: recu, partiel: manque.length > 0, manque, raison: '' };
 };
 
+// (4 nov.) Le reçu ENTRE deux instants (« Comparer deux mois ») : la même ligne
+// publiée, la même fraîcheur (3 jours), les mêmes sources nommées. Un mois ENTIER
+// lit `recu[ym]` ; une coupe (mois en cours au même point) lit `recuJours` (jour
+// local) — absent (publication d'une app plus ancienne) ⇒ « — ».
+const jourLocal = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+export const recuPublieEntre = (publie, { de, a, ym, complet }, maintenant = Date.now()) => {
+  if (!publie || typeof publie !== 'object' || !Array.isArray(publie.mois)) return { valeur: null, raison: 'absente' };
+  const at = Number(publie.at);
+  if (!isFinite(at) || at <= 0) return { valeur: null, raison: 'illisible' };
+  if (maintenant - at > RECU_MAX_AGE_MS) return { valeur: null, raison: 'ancienne' };
+  const src = publie.sources && typeof publie.sources === 'object' ? publie.sources : null;
+  if (!src) return { valeur: null, raison: 'illisible' };
+  let valeur;
+  if (complet) {
+    if (!publie.recu || typeof publie.recu !== 'object' || Array.isArray(publie.recu)) return { valeur: null, raison: 'ancienne-app' };
+    valeur = publie.recu[ym] == null ? 0 : Number(publie.recu[ym]);
+  } else {
+    if (!publie.recuJours || typeof publie.recuJours !== 'object' || Array.isArray(publie.recuJours)) return { valeur: null, raison: 'ancienne-app' };
+    const k0 = jourLocal(de), k1 = jourLocal(a);
+    // Jour local : le jour de la coupe compte entier (la publication est au jour).
+    valeur = Object.entries(publie.recuJours).reduce((t, [k, v]) => (k >= k0 && k <= k1 ? t + Math.round(Number(v) * 100) : t), 0) / 100;
+  }
+  if (!isFinite(valeur) || valeur < 0) return { valeur: null, raison: 'illisible' };
+  const manque = Object.entries(src).filter(([, v]) => v === 'pasSu').map(([k]) => k);
+  const nc = publie.nonComptees && typeof publie.nonComptees === 'object' ? publie.nonComptees : null;
+  if (nc && Number(nc.n) > 0) for (const k of Object.keys(nc.par || {})) { const s = String(k).split('|')[0]; if (s && !manque.includes(s)) manque.push(s); }
+  if (nc && Number(nc.n) > 0 && !Object.keys(nc.par || {}).length) manque.push('ventes au montant pas lu');
+  if (manque.length && !(valeur > 0)) return { valeur: null, partiel: true, manque, raison: 'partiel' };
+  return { valeur, partiel: manque.length > 0, manque, raison: '' };
+};
+
 // ── LES VALEURS ─────────────────────────────────────────────────────────────
 // `sources` (ce que l'app a déjà, rien de relu ici) :
 //   vendu      : { lignes (ventesFaites) | null, manque: [noms], enAttente, nonComptees }
@@ -338,7 +374,10 @@ export const valeurChiffre = (id, place, sources, sel, regles, maintenant = Date
     const L = S.live;
     if (!L) return vide('pasSu');
     const uid = sel && sel.compte ? String(sel.compte.uid || '') : '';
-    if (id === 'attente') return L.walletAttente == null ? vide('pasSu') : { valeur: L.walletAttente, partiel: false, manque: [], hors: '', p: null, raison: '' };
+    if (id === 'attente') {
+      const A = aVenirPour(L.aVenir || null, { plateforme, login });
+      return A.valeur == null ? vide(A.raison || 'pasSu', { manque: A.manque }) : { valeur: A.valeur, partiel: A.partiel, manque: A.manque, hors: '', p: null, raison: '' };
+    }
     if (id === 'dispo') {
       if (!uid) return L.walletDispo == null ? vide('pasSu') : { valeur: L.walletDispo, partiel: false, manque: [], hors: '', p: null, raison: '' };
       const x = Array.isArray(L.walletParCompte) ? L.walletParCompte.find((w) => String(w.uid) === uid) : null;
@@ -416,4 +455,15 @@ export const courbeVendu = (sources, sel, p, regles, maintenant = Date.now()) =>
     out.push(cumul);
   }
   return out;
+};
+
+// ── L'OBJECTIF DU MOIS (4 nov.) ─────────────────────────────────────────────
+// La valeur que la barre compare à l'objectif : LE chiffre « vendu » (CA) ou
+// « ventes » (nombre) du MOIS, tous les sites, tous les comptes — par
+// `valeurChiffre`, la lecture même du grand chiffre (src/objectifMois.js).
+export const SEL_OBJECTIF = { site: 'toutes', compte: null, periode: null };
+export const valeurObjectif = (obj, sources, regles, maintenant = Date.now()) => {
+  if (!obj) return null;
+  const id = obj.type === 'ventes' ? 'ventes' : 'vendu';
+  return valeurChiffre(id, { id, p: 'mois' }, sources, SEL_OBJECTIF, regles, maintenant);
 };

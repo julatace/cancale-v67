@@ -1,0 +1,27 @@
+.vrm-demarrage { min-height: 100dvh; display: grid; place-items: center; box-sizing: border-box; padding: 24px; background: var(--vrm-bg, #f2f2f7); color: var(--vrm-ink, #1d1d1f); }
+.vrm-demarrage-carte { width: min(280px, 100%); text-align: center; }
+.vrm-demarrage-carte img { display: block; margin: 0 auto 18px; border-radius: 14px; }
+.vrm-demarrage-carte h1 { margin: 0; font-size: 24px; letter-spacing: -.04em; }
+.vrm-demarrage-carte p { margin: 8px 0 24px; font-size: 14px; color: var(--vrm-muted, #6e6e73); }
+.vrm-demarrage-rail { display: block; height: 3px; overflow: hidden; border-radius: 99px; background: var(--vrm-line, #e5e5ea); }
+.vrm-demarrage-rail > span { display: block; width: 35%; height: 100%; border-radius: inherit; background: var(--vrm-accent, #0066cc); animation: vrm-attente 1.4s ease-in-out infinite; }
+:root[data-theme="dark"] .vrm-demarrage { background: #000; color: #f5f5f7; }
+:root[data-theme="dark"] .vrm-demarrage-carte p { color: #98989d; }
+:root[data-theme="dark"] .vrm-demarrage-rail { background: #38383a; }
+.vrm-skeleton { width: 100%; box-sizing: border-box; gap: 10px; }
+.vrm-skeleton.is-lignes { display: flex; flex-direction: column; }
+.vrm-skeleton-element { min-width: 0; display: flex; gap: 12px; align-items: center; padding: 11px 13px; border: 1px solid var(--vrm-line); border-radius: 12px; background: var(--vrm-surface); }
+.vrm-skeleton-photo { display: block; flex: none; width: 56px; height: 76px; border-radius: 12px; }
+.vrm-skeleton-texte { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 8px; }
+.vrm-skeleton-titre { display: block; width: 45%; height: 13px; border-radius: 6px; }
+.vrm-skeleton-detail { display: block; width: 70%; height: 11px; border-radius: 6px; }
+.vrm-skeleton-reflet { background: var(--vrm-line, #e5e5ea); animation: vrm-reflet 1.5s ease-in-out infinite alternate; }
+.vrm-skeleton.is-cartes { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(160px, 100%), 1fr)); gap: 14px; }
+.vrm-skeleton.is-cartes .vrm-skeleton-element { display: block; padding: 0; overflow: hidden; }
+.vrm-skeleton.is-cartes .vrm-skeleton-photo { width: 100%; height: auto; aspect-ratio: 3 / 4; border-radius: 0; }
+.vrm-skeleton.is-cartes .vrm-skeleton-texte { padding: 8px 10px 10px; }
+@keyframes vrm-attente { from { transform: translateX(-110%); } to { transform: translateX(390%); } }
+@keyframes vrm-reflet { from { opacity: .45; } to { opacity: .8; } }
+@media (prefers-reduced-motion: reduce) {
+  .vrm-demarrage-rail > span, .vrm-skeleton-reflet { animation: none !important; transform: none; opacity: .65; }
+}

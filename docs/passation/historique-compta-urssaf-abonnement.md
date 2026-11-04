@@ -2202,6 +2202,79 @@ captés ; les achats hors plateforme ne sont lus que sur l'appareil où ils ont 
 les deux PDF et les relire ; relier ses achats aux N° (ou compléter les reçus) pour sortir du
 « au moins ».
 
+## 4 nov. — Achats : Fournisseurs · Délai de mise en ligne · Lots répartis (branche `claude/achats-sourcing`)
+
+Trois outils choisis par Julien, sous la carte de l'écran **Achats** (trois entrées sobres « Fournisseurs ·
+Délai · Lots », chacune ouvre une feuille, portail + `FermeAuRetour`, Échap ferme). Règles pures :
+`src/achatsSourcing.js` ; écran : `src/AchatsOutils.jsx`, `src/styles-achats-outils.css` (jetons Fusion,
+réutilise `.vrm-ao-*`). Aucune écriture en base pendant le travail, aucune donnée réelle dans le dépôt.
+
+**Mesuré en base (lecture seule, 4 nov.)** — `my_orders` achetés : clés `title, price, status,
+conversation_id, transaction_user_status, date, transaction_id` (734), `photo` (359), `photo_url` (4) ;
+**aucun vendeur, aucun nombre d'articles**. Le pseudo du vendeur n'existe que dans la transaction
+(`harvest_{uid}_txn_{tx}` → `payload.transaction.seller.login`, `user_side`, `items_count`,
+`shipment.status` / `status_updated_at`) : 42 transactions côté acheteur captées, **37 des 728 achats**
+distincts ont un pseudo lisible (transaction ou conversation) ; 2 portent `items_count` 2. « Commande
+livrée ! » = `shipment.status` 400 (29 achats) : c'est la date de réception LUE. 4 transactions d'achat
+sont lues côté vendeur (achats entre ses propres comptes) : leur pseudo n'est pas pris (`user_side` doit
+être `buyer`).
+
+1. **Fournisseurs** — un fournisseur = le pseudo lu dans SA transaction, sinon « Vinted » (jamais
+   deviné) ; hors plateforme = la source qu'il a saisie (casse ignorée). Par fournisseur : achats,
+   Dépensé (prix de la COMMANDE, remboursés/annulés dehors, autre devise comptée « prix illisible »),
+   « reliés N/M » (achats avec au moins un article relié par `buyFromId`, ou par le N° d'un achat hors
+   plateforme s'il n'en désigne qu'un), revendus (ventes finalisées reliées), bénéfice = somme des
+   bénéfices CONNUS (Vinted : `beneficeLigneVente` ; Leboncoin/eBay/Vestiaire : `ventesAutresBenefice`,
+   une commande eBay à plusieurs N° n'est pas attribuée), « au plus » gardé, « — » si aucun ; « k/n »
+   à côté quand une partie seulement est connue. Couverture en tête : « Pseudo lu N/M » (achats Vinted non remboursés). Triable
+   (Dépensé · Achats · Revendus · Bénéfice · Nom ; un « — » va en dernier). Le pseudo reste EN MÉMOIRE
+   (`infosTxAchats`, lu en scalaires avec la photo de la transaction, Achats seulement) : rien n'est
+   rangé, exporté ni écrit.
+2. **Délai achat → mise en ligne** — réception = « Commande livrée » (400) de SA transaction, sinon
+   « Récupéré » touché par lui (`vinted_pickup_done[tx]`) ; jamais la date de l'achat. Mise en ligne = la
+   PREMIÈRE date connue des articles reliés (`dateMiseEnLigneMs` : `created_at_ts` de l'annonce, sinon
+   `vinted_listing_dates`). Jours entiers, médiane par mois de réception. Exclus et comptés à part : sans
+   date de réception, sans date de mise en ligne, en ligne AVANT réception. « Reçus, pas encore en
+   ligne » : reçu (date lue ou Vinted « finalisé »), aucun article relié en ligne (Vinted présent, ou
+   publié ailleurs via `vinted_nums_physiques.autres`) ni vendu ; un article à l'état pas su ⇒ pas listé ;
+   annonces pas lues sur un compte ⇒ la liste vaut « — ». Gestes : « Relier » (liste des N° sans achat
+   relié, ni N° d'un achat hors plateforme ; son tap pose `buyFromId` + instantané, et le prix proposé
+   — reçu juste sinon l'article — seulement si la fiche n'a pas déjà SON prix) ; « Mettre en ligne »
+   (vinted.fr/items/new) ; le N° ouvre la fiche.
+3. **Lots répartis** — un lot = titre « Lot … », `items_count` > 1 dans SA transaction, ou déclaré
+   par lui (« Ajouter un lot », `vrm_lots_declares`, synchronisé). « Répartir » : un montant par N°
+   relié, préremplissage = PROPOSITION de parts égales au centime (jamais écrite), « Article » ou
+   « Payé » (port/frais inclus, seulement si le reçu tombe juste) ; somme ≠ total ⇒ « Reste X € » en
+   ambre et Enregistrer grisé ; Enregistrer ⇒ confirmation qui liste N° et montants ⇒ `buyPrice` de
+   chaque fiche (ou correction de vente) + `buyFrom.lot/prixLot/inclus` ; le journal garde l'état
+   d'AVANT (`vrm_repartitions_lots`, synchronisé) ⇒ « Annuler la répartition » le rend. « Relier un N° »
+   depuis la feuille. Le lot n'est compté qu'une fois : Dépensé / « Dépensé du mois » / Fournisseurs
+   lisent la commande ; le registre des achats (`src/registres.js`) en fait UNE ligne (reçu juste, sinon
+   la somme des N° saisis = le total réparti). **`prixAchatPropose` ne propose plus jamais le prix ENTIER
+   d'un lot à un de ses articles** (`estLot`, nouveau paramètre ; avant : un N° relié à un « Lot 3
+   articles » de 60 € se voyait proposer 60 €) ; « Relier un achat » demande le prix d'un article de lot
+   aussi pour un lot lu dans la transaction ou déclaré.
+
+**Preuves** : `scripts/audit-achats-sourcing.cjs` — 46 contrôles qui EXÉCUTENT les règles (50 achats et
+50 ventes au même titre : aucun relié ; lot 100 € réparti sur 5 : une ligne de 100 € au registre ;
+réception jamais devinée ; rien sans `confirme`…), **19/19 mutations attrapées** (`--prouve` : lien par
+titre, relié par titre, double compte du lot, pas su compté 0, pseudo deviné, remboursé compté,
+réception devinée, exclus silencieux, en ligne pas su = non, liste sans lecture, écriture sans clic,
+somme fausse acceptée, parts égales imposées, annulation perdue, port sans reçu, prix entier d'un lot,
+prix saisi écrasé, proposition du prix entier d'un lot). Sur `origin/main` : 0/1 (module absent) et,
+module copié, P1-P2 rouges (prixAchatPropose proposait le lot entier). Banc `scripts/bancs/achats-sourcing.cjs`
+— **120 contrôles**, 390 tactile clair/sombre et 1512 clair/sombre, scénario inventé servi par
+`_minipgrest` (projections réelles) ; 0/4 sur `origin/main`. Captures regardées (`z-aso-*.png`).
+`fusion-echelle --verifier` vert.
+
+**Reste** : le pseudo n'est lu que pour ~5 % des achats (transactions captées) — le reste est « Vinted »
+tant que l'extension n'a pas lu leur transaction ; la date de mise en ligne d'un article VENDU n'est
+souvent pas connue (annonce plus en ligne) ⇒ exclu et compté ; Vestiaire/Leboncoin ne comptent pas
+dans « en ligne ailleurs » pour Vestiaire (pas publié dans `vinted_nums_physiques`) ; achats
+Leboncoin/Vestiaire hors du tableau des fournisseurs (comme « Dépensé »).
+**Geste de Julien** : Achats → « Lots » → « Répartir » sur un lot ; Achats → « Délai » → « Relier » ses
+reçus pas encore en ligne.
+
 ## 4 novembre — Compta → « Porte-monnaie » : le solde LU de chaque compte Vinted (`claude/ext-5319`)
 
 ### Mesuré (lecture seule, 4 nov.)
@@ -2233,3 +2306,83 @@ les deux PDF et les relire ; relier ses achats aux N° (ou compléter les reçus
   `<enligne-regle>` inchangées (une masquée reste parmi les PRÉSENTES, jamais « en ligne »).
 - Carte sombre : chiffre « Annonces masquées » au catalogue (`masquees`, `liveStats.annMasquees`, lectures < 24 h ;
   « au moins » sinon), proposé dans « Modifier », pas dans le défaut.
+
+---
+
+## 4 novembre — L'argent à venir, comparer deux mois, les frais par site (branche `claude/argent-mois`)
+
+Trois outils choisis par Julien (le quatrième, le journal de la semaine, est dans l'historique
+interface-stock). Une règle pure par outil, un audit qui l'EXÉCUTE, un banc qui la rend.
+
+### 1. « À venir » — ce que les sites te doivent encore (`src/argentAVenir.js`)
+
+**Une seule règle, qui remplace « l'argent en attente »** (Vinted seul, calculé à trois endroits :
+la somme des statuts « en cours » de la LISTE des ventes dans Ma journée et Ventes, le solde bloqué
+du porte-monnaie dans la carte des chiffres, le résumé Vinted et le widget).
+**Mesuré (lecture seule, 4 nov.)** : sur un compte, 3 ventes que la liste dit encore « colis déposé
+en bureau de Poste » ont une TRANSACTION finalisée (450, argent versé) — 220 € de trop dans
+« en attente » (448 € affichés pour 228 € réellement retenus par Vinted). En écartant les 450 et
+les ventes à date de versement lue, la somme par compte tombe sur le solde bloqué lu chez Vinted à
+l'euro près, sur chaque compte dont le porte-monnaie a été lu après les ventes ; les écarts
+restants sont des ventes plus récentes que la lecture du porte-monnaie. Le porte-monnaie ne sert
+donc plus de total (il retarde et ne dit pas QUELLE vente) ; « À virer » (le disponible) reste.
+- **Vinted** : statut ni annulé ni finalisé (`classifyOrderStatus`), transaction ni 450, ni 220,
+  ni ≥ 430 (suspendue, retour, annulée — `TXN_ETATS`), pas de date de versement (450,
+  `fetchVersementsVinted`, désormais lue aussi par la coque). Aucune date prévue.
+  Dates de versement pas lues ⇒ Vinted NOMMÉ, aucune vente Vinted comptée (un versé ne passe
+  jamais pour « à venir »).
+- **Leboncoin** : vente prouvée, ni annulée ni finalisée (`lbcAnnulee`, `lbcFinalisee`).
+- **eBay** : seulement un paiement RETENU par eBay (`paymentSummary.payments[].paymentHolds`,
+  état pas « libéré »), au montant retenu, daté par `expectedReleaseDate` quand eBay l'écrit.
+  ⚠️ Aucune commande eBay en base chez lui le 4 nov. (`ebay_orders` vide) : forme prise dans la
+  documentation de l'API Fulfillment, pas mesurée. Le CA eBay reste daté à la création de la
+  commande (règle existante) : une commande retenue est donc à la fois dans le « reçu » d'eBay et
+  dans « à venir » — à trancher si eBay vend vraiment.
+- **Vestiaire** : ni annulée, ni versée, ni terminée, ni `etapesVc.sellerPayment = done`, au
+  montant reçu SÛR ; date = « paiement estimé » ÉCRIT par Vestiaire (`paiementEstime`, mesuré :
+  « 24 novembre 2026 »), dite « vers le 24 nov. ».
+- Trois états : source pas lue ⇒ en cours ; lecture ratée ⇒ nommée, « au moins » ; montant
+  illisible ⇒ nommé, jamais 0 €.
+- **Où** : calculée UNE fois dans la coque (`liveStats.aVenir`, `aVenirCoque`) ; consommée par
+  Ventes (carte « À venir » en tête : Vinted = sa part, « Tous » = toutes plateformes, une ligne
+  par site et compte), Ma journée (case « À venir » et tendance), le résumé Vinted, la carte des
+  chiffres (`attente`, devenu « Argent à venir », tous les sites, par compte Vinted) et le widget
+  (seulement complète). La case « En attente » de la rangée des totaux de Ventes (statuts « en
+  cours » de la période) est retirée.
+- Preuves : `audit-argent-a-venir` (51 verts ; 12 rouges sur origin/main, dont « l'en attente de
+  Ma journée compte 384,5 € » au lieu de 140,50 € sur le jeu ; mutations tx450 9, versement 6,
+  holds 2, libere 4, vcverse 5, zero 1, site 4 rouges) ; `audit-carte-chiffres` remis à la règle
+  (210 verts).
+
+### 2. « Comparer » — deux mois (Statistiques, `src/comparerMois.js`)
+
+Ce mois face au mois d'avant ou au même mois l'an dernier (`Segmente`, choix gardé sur l'appareil).
+Ventes et CA vendu = lignes de `ventesFaites` + `bilanLignes` ; reçu = la ligne publiée
+`vinted_urssaf_mois` (`recuPublieEntre`, même fraîcheur de 3 jours, mêmes sources nommées) ;
+bénéfice = `beneficeDuMoisPub` (la lecture du récap mensuel, sortie en fonction, `beneficePeriode`
++ `chiffreBenefice`). **Un mois en cours se compare AU MÊME POINT** (la règle de Statistiques :
+« un mois commencé ne se compare pas à un mois entier ») : du 1er à maintenant face au 1er → même
+quantième, même heure. Pour cela : `beneficePeriode` reçoit `jusqua` (les ventes s'arrêtent au
+jour de la coupe inclus, les dépenses restent celles du mois ; absent = inchangé) et Ventes publie
+le reçu JOUR par jour (`recuJours`, mêmes lignes, 14 mois) — une publication plus ancienne ⇒ « — ».
+Écart en € et en % seulement si les deux côtés sont complets ; pas de % contre 0 ni un négatif.
+- Preuves : `audit-comparer-mois` (23 verts, 7 rouges sur origin/main ; mutations coupe 8, partiel,
+  pct0, jours, jusqua 1 chacune) ; `audit-benefice-unique` 47 verts (règle d'avant inchangée).
+
+### 3. « Frais par site » (Statistiques, période choisie, `src/fraisPlateformes.js`)
+
+Mesuré ce que chaque site écrit : Vinted aucune commission vendeur (frais = ce qu'il a saisi sur
+les fiches, déjà dans le relevé `vrm_stats_ventes`, + packs/options Vinted de Comptabilité) ;
+Leboncoin prix final = ce qu'il touche (frais = packs/options saisis) ; eBay `totalMarketplaceFee`
+par commande (base = dû au vendeur, port exclu) ; Vestiaire : la vente rangée ne garde que le versé
+(`sellerEarning`), la commission n'est PAS lue ⇒ « commission pas lue », aucun %. Couverture dite
+« frais lus sur N/M ventes » ; % sur les seules ventes aux frais lus.
+- Preuves : `audit-frais-plateformes` (13 verts, 3 rouges sur origin/main ; 5 mutations rouges).
+- Reste : la commission Vestiaire demande que l'extension range le prix (`sellerPrice`) à côté du
+  versé — hors de ce chantier (l'extension n'est pas touchée).
+
+### Banc commun
+
+`scripts/bancs/argent-mois.cjs` (données inventées, 390 tactile et 1512, clair et sombre) :
+100 verts. Captures regardées (carte « À venir », journal, Comparer, Frais). **52 rouges** sur le
+build d'origin/main (8d01ecc9).

@@ -2,6 +2,7 @@ import { cleVapid, abonnementAJour } from './vapid.js';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import Accueil from './Accueil.jsx';
+import { DemarrageVRM } from './Chargement.jsx';
 import { ecouterPlantages, ecouterViolationsCsp, noterPlantage } from './plantages.js';
 // Le journal des plantages écoute dès le démarrage : une erreur AVANT que l'app
 // soit montée est justement celle qu'aucun écran ne montre (src/plantages.js).
@@ -112,6 +113,7 @@ import './design/outils-stats.css';
 import './design/argent-offres.css';
 // (3 nov.) Les jetons Fusion pour TOUTE l'app (échelle fermée, segmentés, cartes) — le tout dernier mot.
 import './design/jetons.css';
+import './styles-bureau.css';
 import { suivreRangeesDefilantes } from './rangeesDefilantes.js';
 if (typeof document !== 'undefined') { if (document.body) suivreRangeesDefilantes(); else document.addEventListener('DOMContentLoaded', suivreRangeesDefilantes); }
 
@@ -177,7 +179,7 @@ const filmDemande = /[?&]film(=|&|$)/.test(window.location.search || '');
 // même le premier rendu, pour ne pas ajouter un aller-retour à son ouverture.
 if (!filmDemande && versApp()) { try { import('./App.jsx'); } catch (_) {} }
 
-const FondApp = () => <div style={{ minHeight: '100vh', background: '#000000' }} />;
+const FondApp = DemarrageVRM;
 function Racine() {
   const [vue, setVue] = React.useState(() => (versApp() ? 'app' : 'accueil'));
   React.useEffect(() => {

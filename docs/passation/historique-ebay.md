@@ -1905,3 +1905,26 @@ part de VRM, sur SON clic, confirmée — jamais seule.
   pas les ventes Vinted/Leboncoin/Vestiaire) ; le serveur juge eBay (vendue, déjà en
   ligne sur un de ses comptes).
 - **Julien** : sur une inactive reliée, toucher « Remettre en vente », lire les frais.
+### 4 nov. — QUESTIONS eBAY DEPUIS VRM, UNE PAR ANNONCE (`claude/offres-objectif`)
+Mesuré dans le code : VRM lisait DÉJÀ les échanges eBay (Trading `GetMemberMessages`,
+90 jours, `api/_lib/ebay-gestion.js`) et y répondait (`AddMemberMessageRTQ`, `confirme:true`
+exigé AVANT le jeton, la question relue chez eBay comme « AskSellerQuestion » juste avant,
+journal `executerAvecJournal`, retrait du compteur de Ma journée). Ce qui manquait :
+- la liste mêlait tous les échanges et offrait « Envoyer » sur ceux auxquels le serveur
+  refuse de répondre (message de transaction ⇒ 409 APRÈS son clic) ;
+- rien ne regroupait les questions d'une même annonce.
+Fait : `messagesEbay` rend `type` (MessageType ; jamais `SenderEmail`) ; `src/questionsEbay.js`
+(`estQuestion` = AskSellerQuestion + ItemID, `questionsParAnnonce` : une ligne par annonce,
+la plus ANCIENNE question sans réponse ouverte d'abord, `ordreQuestions`). Messages · eBay
+s'ouvre sur « Questions » (« Tout » garde la liste d'avant) ; la ligne porte la photo et le
+N° par l'ItemID puis le SKU `VRM-{n°}` (`paireEbayDe`, jamais le titre), « 2 questions » ;
+le fil navigue « 1 · 2 » entre les questions de l'annonce ; « Envoyer » n'existe que sur une
+question (sinon « Ouvrir sur eBay ↗ »). Aucun pseudo ni texte rangé en base (le résumé de
+Ma journée reste sans donnée personnelle).
+Preuves : `audit-questions-ebay.cjs` 22 — EXÉCUTE la vraie gestion contre un faux serveur
+Trading au vrai format XML (analyseur minimal posé dans un node_modules temporaire,
+fast-xml-parser absent ici), rouge sur main, 8/8 mutations (type, confirme, relu, groupe,
+ordre, email, echappe, envoyer) ; banc `offres-objectif` C (390/1512, clair/sombre : envoi
+seulement après SA confirmation, `repondre` + `confirme:true` sur CETTE question).
+`messages-sites` : le banc juge la liste « Tout » (un clic ajouté), `e1` porte son `type`.
+Geste de Julien : ouvrir Messages → eBay.

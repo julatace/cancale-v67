@@ -133,7 +133,7 @@
    à 760 px le fil n'avait plus que ~100 px de large. */
 @media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
   :root:root body .vrm-app-shell .vrm-main:is([data-ecran="dashboard"], [data-ecran="settings"], [data-ecran="achats"], [data-ecran="messages"], [data-ecran="compta"], [data-ecran="communaute"]):not(:has(.vrm-message-workspace)) > :not(.vrm-barre-haut):not(style):not(script) {
-    max-width: 760px !important; margin-left: auto !important; margin-right: auto !important; box-sizing: border-box !important; width: 100% !important;
+    max-width: var(--vrm-largeur-contenu, 760px) !important; margin-left: auto !important; margin-right: auto !important; box-sizing: border-box !important; width: 100% !important;
   }
 }
 
