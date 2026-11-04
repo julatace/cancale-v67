@@ -42,6 +42,11 @@ export function retoursEbay(data){
       itemId:String(it.itemId || ''),titre:String(it.itemTitle || ''),quantite:Number(it.returnQuantity) || null,
       motif:String(ci.reason || ''),commentaire:String(ci.comments?.content || ''),date:dateDe(ci.creationDate),
       remboursementPrevu:somme(s.estimatedRefundAmount),rembourse:somme(s.actualRefundAmount),
+      // (3 nov., litiges) La date à laquelle eBay attend la réponse du vendeur
+      // (`sellerResponseDue.respondByDate`, documentation Post-Order v2 — NON
+      // mesurée : aucun retour eBay en base). Absente ou illisible ⇒ null
+      // (« délai non lu »), jamais devinée.
+      limite:dateDe(m.sellerResponseDue && m.sellerResponseDue.respondByDate),
     };
   }).filter(r=>idRetour(r.returnId));
 }
