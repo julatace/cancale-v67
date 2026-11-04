@@ -3513,3 +3513,10 @@ jamais cochée seule. Annulée/remboursée : pas de frise. L'étape en cours pas
 Vestiaire) au style Fusion (`src/lien-vestiaire.css`, réutilise `.vrm-ao-*`, voile plus sombre pour se détacher en
 mode sombre). Audit `audit-frise-sites`, banc `lien-vc-frise` (captures 390/1512 regardées). Détail :
 `historique-vestiaire.md`.
+
+**4 nov. — Achats : trois entrées « Fournisseurs · Délai · Lots »** sous la carte sombre d'Achats (pilules
+Fusion, 44 px, une ligne au téléphone), chacune une feuille en portail (`src/AchatsOutils.jsx`,
+`src/styles-achats-outils.css`, réutilise `.vrm-ao-*`) : tableau des fournisseurs triable, médiane du
+délai réception → mise en ligne avec la liste « Reçus, pas encore en ligne » (Relier · Mettre en ligne),
+« Répartir » un lot (« Reste X € » en ambre). Aucun texte explicatif. Banc `achats-sourcing` (120, 390/1512
+clair/sombre). Règles et mesures : `historique-compta-urssaf-abonnement.md` (« 4 nov. — Achats »).

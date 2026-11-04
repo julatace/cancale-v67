@@ -2201,3 +2201,76 @@ captés ; les achats hors plateforme ne sont lus que sur l'appareil où ils ont 
 **Geste de Julien** : Comptabilité → Documents et réglages → Registres : choisir 2026, télécharger
 les deux PDF et les relire ; relier ses achats aux N° (ou compléter les reçus) pour sortir du
 « au moins ».
+
+## 4 nov. — Achats : Fournisseurs · Délai de mise en ligne · Lots répartis (branche `claude/achats-sourcing`)
+
+Trois outils choisis par Julien, sous la carte de l'écran **Achats** (trois entrées sobres « Fournisseurs ·
+Délai · Lots », chacune ouvre une feuille, portail + `FermeAuRetour`, Échap ferme). Règles pures :
+`src/achatsSourcing.js` ; écran : `src/AchatsOutils.jsx`, `src/styles-achats-outils.css` (jetons Fusion,
+réutilise `.vrm-ao-*`). Aucune écriture en base pendant le travail, aucune donnée réelle dans le dépôt.
+
+**Mesuré en base (lecture seule, 4 nov.)** — `my_orders` achetés : clés `title, price, status,
+conversation_id, transaction_user_status, date, transaction_id` (734), `photo` (359), `photo_url` (4) ;
+**aucun vendeur, aucun nombre d'articles**. Le pseudo du vendeur n'existe que dans la transaction
+(`harvest_{uid}_txn_{tx}` → `payload.transaction.seller.login`, `user_side`, `items_count`,
+`shipment.status` / `status_updated_at`) : 42 transactions côté acheteur captées, **37 des 728 achats**
+distincts ont un pseudo lisible (transaction ou conversation) ; 2 portent `items_count` 2. « Commande
+livrée ! » = `shipment.status` 400 (29 achats) : c'est la date de réception LUE. 4 transactions d'achat
+sont lues côté vendeur (achats entre ses propres comptes) : leur pseudo n'est pas pris (`user_side` doit
+être `buyer`).
+
+1. **Fournisseurs** — un fournisseur = le pseudo lu dans SA transaction, sinon « Vinted » (jamais
+   deviné) ; hors plateforme = la source qu'il a saisie (casse ignorée). Par fournisseur : achats,
+   Dépensé (prix de la COMMANDE, remboursés/annulés dehors, autre devise comptée « prix illisible »),
+   « reliés N/M » (achats avec au moins un article relié par `buyFromId`, ou par le N° d'un achat hors
+   plateforme s'il n'en désigne qu'un), revendus (ventes finalisées reliées), bénéfice = somme des
+   bénéfices CONNUS (Vinted : `beneficeLigneVente` ; Leboncoin/eBay/Vestiaire : `ventesAutresBenefice`,
+   une commande eBay à plusieurs N° n'est pas attribuée), « au plus » gardé, « — » si aucun ; « k/n »
+   à côté quand une partie seulement est connue. Couverture en tête : « Pseudo lu 37/690 ». Triable
+   (Dépensé · Achats · Revendus · Bénéfice · Nom ; un « — » va en dernier). Le pseudo reste EN MÉMOIRE
+   (`infosTxAchats`, lu en scalaires avec la photo de la transaction, Achats seulement) : rien n'est
+   rangé, exporté ni écrit.
+2. **Délai achat → mise en ligne** — réception = « Commande livrée » (400) de SA transaction, sinon
+   « Récupéré » touché par lui (`vinted_pickup_done[tx]`) ; jamais la date de l'achat. Mise en ligne = la
+   PREMIÈRE date connue des articles reliés (`dateMiseEnLigneMs` : `created_at_ts` de l'annonce, sinon
+   `vinted_listing_dates`). Jours entiers, médiane par mois de réception. Exclus et comptés à part : sans
+   date de réception, sans date de mise en ligne, en ligne AVANT réception. « Reçus, pas encore en
+   ligne » : reçu (date lue ou Vinted « finalisé »), aucun article relié en ligne (Vinted présent, ou
+   publié ailleurs via `vinted_nums_physiques.autres`) ni vendu ; un article à l'état pas su ⇒ pas listé ;
+   annonces pas lues sur un compte ⇒ la liste vaut « — ». Gestes : « Relier » (liste des N° sans achat
+   relié, ni N° d'un achat hors plateforme ; son tap pose `buyFromId` + instantané, et le prix proposé
+   — reçu juste sinon l'article — seulement si la fiche n'a pas déjà SON prix) ; « Mettre en ligne »
+   (vinted.fr/items/new) ; le N° ouvre la fiche.
+3. **Lots répartis** — un lot = titre « Lot … », `items_count` > 1 dans SA transaction, ou déclaré
+   par lui (« Ajouter un lot », `vrm_lots_declares`, synchronisé). « Répartir » : un montant par N°
+   relié, préremplissage = PROPOSITION de parts égales au centime (jamais écrite), « Article » ou
+   « Payé » (port/frais inclus, seulement si le reçu tombe juste) ; somme ≠ total ⇒ « Reste X € » en
+   ambre et Enregistrer grisé ; Enregistrer ⇒ confirmation qui liste N° et montants ⇒ `buyPrice` de
+   chaque fiche (ou correction de vente) + `buyFrom.lot/prixLot/inclus` ; le journal garde l'état
+   d'AVANT (`vrm_repartitions_lots`, synchronisé) ⇒ « Annuler la répartition » le rend. « Relier un N° »
+   depuis la feuille. Le lot n'est compté qu'une fois : Dépensé / « Dépensé du mois » / Fournisseurs
+   lisent la commande ; le registre des achats (`src/registres.js`) en fait UNE ligne (reçu juste, sinon
+   la somme des N° saisis = le total réparti). **`prixAchatPropose` ne propose plus jamais le prix ENTIER
+   d'un lot à un de ses articles** (`estLot`, nouveau paramètre ; avant : un N° relié à un « Lot 3
+   articles » de 60 € se voyait proposer 60 €) ; « Relier un achat » demande le prix d'un article de lot
+   aussi pour un lot lu dans la transaction ou déclaré.
+
+**Preuves** : `scripts/audit-achats-sourcing.cjs` — 46 contrôles qui EXÉCUTENT les règles (50 achats et
+50 ventes au même titre : aucun relié ; lot 100 € réparti sur 5 : une ligne de 100 € au registre ;
+réception jamais devinée ; rien sans `confirme`…), **19/19 mutations attrapées** (`--prouve` : lien par
+titre, relié par titre, double compte du lot, pas su compté 0, pseudo deviné, remboursé compté,
+réception devinée, exclus silencieux, en ligne pas su = non, liste sans lecture, écriture sans clic,
+somme fausse acceptée, parts égales imposées, annulation perdue, port sans reçu, prix entier d'un lot,
+prix saisi écrasé, proposition du prix entier d'un lot). Sur `origin/main` : 0/1 (module absent) et,
+module copié, P1-P2 rouges (prixAchatPropose proposait le lot entier). Banc `scripts/bancs/achats-sourcing.cjs`
+— **120 contrôles**, 390 tactile clair/sombre et 1512 clair/sombre, scénario inventé servi par
+`_minipgrest` (projections réelles) ; 0/4 sur `origin/main`. Captures regardées (`z-aso-*.png`).
+`fusion-echelle --verifier` vert.
+
+**Reste** : le pseudo n'est lu que pour ~5 % des achats (transactions captées) — le reste est « Vinted »
+tant que l'extension n'a pas lu leur transaction ; la date de mise en ligne d'un article VENDU n'est
+souvent pas connue (annonce plus en ligne) ⇒ exclu et compté ; Vestiaire/Leboncoin ne comptent pas
+dans « en ligne ailleurs » pour Vestiaire (pas publié dans `vinted_nums_physiques`) ; achats
+Leboncoin/Vestiaire hors du tableau des fournisseurs (comme « Dépensé »).
+**Geste de Julien** : Achats → « Lots » → « Répartir » sur un lot ; Achats → « Délai » → « Relier » ses
+reçus pas encore en ligne.
