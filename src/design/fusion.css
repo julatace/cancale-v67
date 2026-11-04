@@ -1185,3 +1185,7 @@ html body .vrm-app-shell .vrm-main .vrm-day-layout .vrm-cycle-carte > .vrm-cycle
 @media (max-width: 600px) {
   html body .vrm-app-shell .vrm-main .vrm-day-layout .vrm-cycle-carte > .vrm-cycle-choix { flex: 1 1 100%; }
 }
+/* (3 nov.) La prévision de la prochaine échéance URSSAF (PrevisionUrssafCarte). */
+.vrm-fu-prevision { margin: 0 0 14px; }
+.vrm-fu-prevision .vrm-fu-prevision-montant { font: 700 22px/1.2 var(--vrm-police); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.vrm-fu-prevision .vrm-fu-prevision-montant small { font: 500 13px/1 var(--vrm-police); color: var(--fu-gris); margin-right: 2px; }
