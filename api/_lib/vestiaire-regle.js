@@ -71,6 +71,21 @@ export const numAutoVc = (auto, id) => {
   const e = id != null && objet(auto) ? auto[String(id)] : null;
   return e == null ? '' : (typeof e === 'object' ? String(e.numero == null ? '' : e.numero) : String(e));
 };
+// (3 nov.) LA LIAISON POSÉE PAR SON CLIC (`main.vrm_vc_liens`, src/lienVestiaire.js) :
+// { [productId]: { numero, item, de, at, ecrit } } — l'annonce Vestiaire est le
+// MÊME article que l'annonce Vinted `item`, elle porte SON N° (`numero`). Elle
+// prend la place du N° que VRM avait donné au produit (`auto`), qui n'est jamais
+// effacé (il reste servi, jamais redonné) : défaire la liaison le rend.
+// Une entrée illisible est ignorée (rien n'est deviné).
+export function numerosVcAvecLiens(auto, liensMain) {
+  const out = { ...(objet(auto) || {}) };
+  for (const [id, e] of Object.entries(objet(liensMain) || {})) {
+    if (!objet(e) || !/^[\w-]{1,40}$/.test(String(id))) continue;
+    const n = cleNum(e.numero == null ? '' : String(e.numero));
+    if (n) out[String(id)] = { numero: String(e.numero), lie: true };
+  }
+  return out;
+}
 export const numVcVente = (v, liens, auto) => cleNum((v && v.productId && objet(liens) && liens[v.productId]) || (v && v.ref) || (v && v.productId ? numAutoVc(auto, v.productId) : '') || '');
 export const numVcAnnonce = (id, it, liens, auto) => cleNum((id != null && objet(liens) && liens[String(id)]) || (it && it.ref) || numAutoVc(auto, id) || '');
 

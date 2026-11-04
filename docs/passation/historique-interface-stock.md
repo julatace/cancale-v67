@@ -3473,3 +3473,23 @@ même »**. Rien à dire ⇒ aucune feuille, l'envoi part comme avant.
   `republier` : la feuille (photos) est passée par « Publier quand même », verts ;
   `lbc-publier-app` vert sans changement (fiche propre).
 - Geste de Julien : publier un article à une seule photo pour voir la feuille.
+
+
+### Recherche unique (3-4 novembre, branche `claude/litiges-recherche`)
+Une seule loupe (là où sont « Tout sur le N° » et le micro) qui trouve : N° (bloc existant, `cleNum`), **pseudo de l'acheteur** (`email_sale_*` : pseudo + n° de transaction du MÊME e-mail), **n° de suivi** (bordereau de la vente `email_bord_*`, e-mails transporteur `email_track_*`), **code de retrait** (exact), **n° de transaction** (≥ 5 chiffres), **titre** (mots, sans accents, tout ordre). Règle pure `src/rechercheUnique.js` (`indexRecherche`, `indexMemo`, `chercherPartout`, `destinationResultat`) : le titre ne fait que CHERCHER (deux jumelles = deux lignes, chacune ouvre SA transaction) ; un pseudo/suivi ne s'attache à une vente que par le n° de transaction écrit à côté. Résultats groupés Ventes · Achats · Colis, chaque ligne dit par quoi elle est trouvée (pastille) et ouvre l'écran existant (`poserCible` vente / achat / retrait). Lectures en scalaires (`lireTout`). Un nombre ≥ 5 chiffres qui est une identité exacte n'affiche plus « Tout sur le N°… jamais servi ». Plus de texte d'aide dans le panneau vide. **Téléphone : plein écran dès la frappe** (demande du 3 nov. ; champ vide ⇒ rien ne s'ouvre, le « grand écran blanc » du 31 oct. reste évité) ; `recherche-en-place.cjs` juge B et E à cette règle au téléphone, ordinateur inchangé.
+- Preuves : `audit-recherche-unique.cjs` 24 contrôles (dont 10 500 entrées : index ≈ 350 ms une fois, ≈ 14 ms par frappe), rouge sur main, `--prouve` 8/8 ; banc `litiges-recherche.cjs` (pseudo, suivi, titre, code, ouverture de Colis, ≥ 44 px, 390/1512 clair/sombre).
+- Reste : eBay (n° de commande, acheteur), Leboncoin et Vestiaire pas encore dans l'index.
+
+## 3 novembre (soir) — Frise Vendue → Postée → Livrée → Payée sur les ventes eBay et Vestiaire
+
+La frise de Vinted (`friseVente` → `friseVenteFusion`, `src/design/Frise.jsx`) sur la LIGNE des ventes eBay et
+Vestiaire (Vestiaire : aussi le récapitulatif, mêmes preuves). Les preuves : `src/friseSites.js`.
+eBay — `ebay_orders*` était VIDE chez lui (mesuré en lecture seule le 3 nov.) : forme de l'API `getOrders`.
+Postée = `orderFulfillmentStatus` FULFILLED/SHIPPED ; Payée = argent LIBÉRÉ (`paymentSummary.payments[].
+paymentHolds[]` toutes RELEASED/RELEASE_CONFIRMED, date `releaseDate`) ; ⚠️ `orderPaymentStatus: PAID` = l'acheteur a
+payé AVANT l'envoi, ce n'est pas « Payée » (sinon tout serait coché dès la vente) ; Livrée : l'API ne le dit pas,
+jamais cochée seule. Annulée/remboursée : pas de frise. L'étape en cours passe en ambre quand un geste est à faire
+(« À expédier »). Vestiaire : `etapesVc` « done », « Colis fait », mot de Vestiaire. Feuille « Relier » (Vinted ↔
+Vestiaire) au style Fusion (`src/lien-vestiaire.css`, réutilise `.vrm-ao-*`, voile plus sombre pour se détacher en
+mode sombre). Audit `audit-frise-sites`, banc `lien-vc-frise` (captures 390/1512 regardées). Détail :
+`historique-vestiaire.md`.

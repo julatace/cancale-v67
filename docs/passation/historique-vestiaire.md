@@ -796,6 +796,47 @@ Pour vérifier (lecture seule) : `vc_messages.conversations`, `vc_messages.forme
 ### 3 nov. — Prix partout, dupliquer, histoire, modèles (`claude/annonces-outils`)
 Récit : `historique-interface-stock.md` (« LES QUATRE OUTILS DES ANNONCES »). Ici : aucun changement de prix ni description éditable depuis VRM ⇒ « À faire sur le site » ; identité = lien, ref VRM ou N° du produit.
 
+## 3 novembre (soir) — Un seul N° pour un article en ligne sur Vinted ET Vestiaire ; la frise sur les ventes Vestiaire (branche `claude/lien-vc`)
+
+Reste du 2 nov. : un article en vente sur Vinted et sur Vestiaire, sans publication depuis VRM ni référence
+VRM-n°, avait DEUX N° (aucune identité ne reliait les deux annonces).
+
+- **La liaison est une identité posée par SON clic** : `main.vrm_vc_liens` = { [productId Vestiaire]: { numero,
+  item (annonce Vinted), de (N° que VRM avait donné à l'annonce Vestiaire), at, ecrit } } — synchronisée
+  (`SYNC_KEYS`, fusion générique clé par clé). Règle pure `src/lienVestiaire.js` (poser, défaire, à barrer,
+  suggestions) ; lecture partagée `numerosVcAvecLiens(auto, liens)` dans `api/_lib/vestiaire-regle.js` : la liaison
+  prend la place du N° donné (`auto`), jamais celle d'un lien de publication ou d'une référence VRM-n° (ces annonces
+  ne proposent pas « Relier » : `vcReliable`).
+- **Gestes** : « Relier à Vinted » sur chaque annonce Vestiaire au N° donné par VRM ; « Relier à Vestiaire » sur la
+  fiche d'une annonce Vinted numérotée (Annonces → Plus d'actions) ; une seule feuille (`HoteLienVc`, événement
+  `vrm:lien-vc`, `src/LienVestiaire.jsx`) : suggestions par ressemblance (marque — connue des deux côtés, ou lue d'un
+  côté et écrite dans le titre de l'autre — + taille des deux côtés ou d'aucun ; sans taille, couleur commune
+  exigée ; modèle connu différent écarté ; jamais la photo, jamais la marque seule), puis TOUS les articles non
+  reliés, filtrables (titre ou N°). Rien n'est écrit avant son toucher ET sa confirmation (« Un seul N° : N°12 ·
+  N°61 → N°12 sur le carton »). « Délier » (confirmé) rend l'état d'avant.
+- **Branché partout** : `numerosVcEffectifs()` (useVcLocal, avecNumerosVc, `numeroVcIdentite` de Changer le prix,
+  Vendus ailleurs), `numeroterVestiaire` (une annonce reliée ne reçoit jamais de N° neuf), widget, rappels (bilan,
+  colis), e-mail entrant (N° d'une vente Vestiaire ; « encore en ligne sur Vestiaire » passe désormais AUSSI les N°
+  donnés par VRM — avant, le serveur ne les lisait pas). La double vente par identité (`annoncesVcEnLigne`,
+  `retraitsVestiaire`, `numerosDejaVendus`) suit sans code neuf.
+- **Frise sur la ligne de vente Vestiaire** (et le récapitulatif, mêmes preuves) : `src/friseSites.js`
+  `preuvesFriseVc`. Forme MESURÉE en lecture seule (3 nov., 1 vente) : `etapesVc` = { sellerSale, sellerShipment,
+  sellerConformity, sellerDelivery, sellerPayment } en « done » / « pending » / « upcoming » — seul « done » coche ;
+  « Colis fait » coche Postée ; le mot de Vestiaire (`etapeMotVc`) aussi. Avant, la frise n'était que dans le
+  récapitulatif et n'utilisait pas `etapesVc`.
+
+Preuves : `audit-lien-vc` 44 verts, 11/11 mutations (dont « clic-auto », « sans-confirmation »,
+« numerotation-aveugle », « widget-aveugle ») ; sur `origin/main` avec la seule règle copiée : 12 rouges.
+`audit-frise-sites` 17 verts, 6/6 mutations. Banc `lien-vc-frise` (390 clair tactile, 1512 sombre) : 62 verts,
+18 rouges sur main ; captures regardées (feuille, confirmation, « N° à barrer », frises). `vestiaire-parite` 68
+verts. Rouges identiques sur main (pas de ce chantier) : `vestiaire-fiches` (« à envoyer demain » au lieu de
+« avant le »), `ebay-comptes`.
+
+Reste : la vente en main propre, Leboncoin et eBay n'ont pas ce geste (ils ont déjà leurs liens) ; les photos Vinted
+des candidats passent par le pont photo (vides au banc).
+Geste de Julien : Vestiaire → Annonces → « Relier à Vinted » sur un article aussi en vente sur Vinted, puis barrer
+l'ancien N° sur le carton et toucher « C'est écrit ».
+
 ## 4 novembre — 5.319.0 : les offres Vestiaire dans VRM, et y répondre sur son clic (`claude/ext-5319`)
 
 Julien a choisi « voir les offres reçues sur Vestiaire et y répondre (accepter / refuser / contre-offre) depuis VRM ».
