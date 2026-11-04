@@ -1,0 +1,36 @@
+/* (3 nov.) Scanner pour déposer — feuille plein écran, style Fusion (fond noir, cartes #1C1C1E). */
+.vrm-scan { position: fixed; inset: 0; background: #000; color: #fff; display: flex; flex-direction: column; gap: 14px;
+  padding: max(14px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; }
+.vrm-scan-tete { display: flex; align-items: center; justify-content: space-between; min-height: 44px; }
+.vrm-scan-tete h2 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
+.vrm-scan-fermer { width: 44px; height: 44px; border-radius: 24px; border: 0; background: #1c1c1e; color: #fff; cursor: pointer; display: grid; place-items: center; padding: 0; }
+.vrm-scan-vue { position: relative; flex: 1 1 auto; min-height: 220px; border-radius: 20px; overflow: hidden; background: #111; }
+.vrm-scan-vue video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.vrm-scan-viseur { position: absolute; left: 8%; right: 8%; top: 32%; bottom: 32%; border-radius: 14px; box-shadow: 0 0 0 9999px rgba(0,0,0,.35); border: 2px solid rgba(255,255,255,.85); transition: border-color .15s ease; }
+.vrm-scan-vue.is-depose .vrm-scan-viseur { border-color: #30d158; animation: vrmScanOk .5s ease-out; }
+.vrm-scan-vue:is(.is-inconnu, .is-ambigu, .is-vide) .vrm-scan-viseur { border-color: #ff9f0a; animation: vrmScanNon .35s ease-in-out; }
+.vrm-scan-vue.is-deja .vrm-scan-viseur { border-color: #8e8e93; }
+@keyframes vrmScanOk { 0% { transform: scale(1); } 40% { transform: scale(1.04); } 100% { transform: scale(1); } }
+@keyframes vrmScanNon { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+@media (prefers-reduced-motion: reduce) { .vrm-scan-viseur { animation: none !important; } }
+.vrm-scan-res { min-height: 64px; border-radius: 14px; background: #1c1c1e; padding: 12px 14px; display: flex; flex-direction: column; justify-content: center; gap: 3px; box-sizing: border-box; }
+.vrm-scan-res:empty { background: transparent; }
+.vrm-scan-etat { font-size: 17px; font-weight: 700; }
+.vrm-scan-etat.is-depose { color: #30d158; }
+.vrm-scan-etat:is(.is-inconnu, .is-ambigu, .is-vide) { color: #ff9f0a; }
+.vrm-scan-etat.is-deja { color: #aeaeb2; }
+.vrm-scan-quoi { display: flex; gap: 8px; font-size: 15px; color: #d1d1d6; min-width: 0; }
+.vrm-scan-quoi > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.vrm-scan-quoi.is-n { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.vrm-scan-saisie { display: flex; gap: 8px; }
+.vrm-scan-saisie input { flex: 1 1 auto; min-width: 0; min-height: 48px; border-radius: 14px; border: 0; background: #1c1c1e; color: #fff; padding: 0 14px; font-size: 17px; font-family: inherit; letter-spacing: .02em; }
+.vrm-scan-saisie input::placeholder { color: #8e8e93; }
+.vrm-scan-saisie button { min-height: 48px; min-width: 64px; border-radius: 14px; border: 0; background: #0a84ff; color: #fff; font-size: 17px; font-weight: 600; font-family: inherit; cursor: pointer; }
+.vrm-scan-saisie button:disabled { opacity: .4; cursor: default; }
+@media (min-width: 768px) { .vrm-scan { left: 50%; right: auto; width: 520px; transform: translateX(-50%); border-left: 1px solid #1c1c1e; border-right: 1px solid #1c1c1e; } }
+.vrm-scan-res.a-annuler { position: relative; padding-right: 112px; }
+.vrm-scan-annuler { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); min-height: 44px; min-width: 92px; border-radius: 12px; border: 0; background: #2c2c2e; color: #fff; font-size: 15px; font-weight: 600; font-family: inherit; cursor: pointer; }
+/* Au téléphone, « Scanner » est l'icône seule (le titre « Colis » garde sa place). */
+@media (max-width: 600px) { .vrm-colis-scanner { min-width: 44px; padding-left: 0 !important; padding-right: 0 !important; justify-content: center; } .vrm-colis-scanner .vrm-colis-scanner-l { display: none; } }
+.vrm-screen-head h1 { word-break: normal; overflow-wrap: normal; }
