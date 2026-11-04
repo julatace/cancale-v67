@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.318.0';
+const CODE_VERSION = '5.319.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -4579,6 +4579,61 @@ async function storeReleve(uid, payload, domain) {
 // échantillon et ON ARRÊTE (`vrmReleveMuet`). Boucler sur un endpoint qui
 // ignore nos paramètres, ce serait des requêtes pour rien dans l'empreinte du
 // compte, et c'est exactement ce que §5.52 a dû retirer après 73 échecs.
+// ══════════════════════════════════════════════════════════════════════════════
+// 5.319 (4 nov.) — LES AVIS REÇUS (note 1…5 et date), EN LECTURE SEULE
+// ══════════════════════════════════════════════════════════════════════════════
+// L'app sait lire les avis (`lireAvis`, src/notesRecues.js : `rating` entier
+// 1…5, `created_at` ou `created_at_ts`, `feedback`, `id`). Ici : la PREMIÈRE
+// page (`/api/v2/user_feedbacks?user_id=…&page=1&per_page=20&by=all`), pour le
+// compte CONNECTÉ dans l'onglet seulement (`gardeLecture`), dans le budget de
+// LECTURE (20/h) et sous la réserve de l'argent et des colis (classe « suivi »),
+// une fois par 24 h et par compte. ⚠️ La FORME n'a jamais été mesurée : une
+// réponse sans tableau `user_feedbacks` n'écrit RIEN (échantillon des NOMS de
+// clés seulement) ; chaque avis est réduit à id, note, date, texte — jamais la
+// personne (ni nom, ni photo, ni identifiant). Aucun rappel d'évaluation.
+const AVIS_RETRY_MS = 24 * 60 * 60 * 1000;
+function avisPropre(f) {
+  if (!f || typeof f !== 'object') return null;
+  const r = Number(f.rating);
+  const o = { id: f.id != null && /^[\w-]{1,40}$/.test(String(f.id)) ? String(f.id) : '', rating: Number.isFinite(r) ? r : null };
+  if (typeof f.created_at === 'string' && /^\d{4}-\d{2}-\d{2}/.test(f.created_at)) o.created_at = f.created_at.slice(0, 40);
+  if (Number.isFinite(Number(f.created_at_ts)) && f.created_at_ts !== null && f.created_at_ts !== '') o.created_at_ts = Number(f.created_at_ts);
+  if (typeof f.feedback === 'string') o.feedback = f.feedback.slice(0, 600);
+  return o;
+}
+async function capterAvis(uid) {
+  try {
+    if (!uid) return false;
+    const accts = await getStoredAccounts();
+    const acc = accts.find(a => String(a.vinted_user_id) === String(uid));
+    if (!acc) return false;
+    let memo = {};
+    try { memo = (await chrome.storage.local.get('vrmAvisFaits')).vrmAvisFaits || {}; } catch (_) { return false; }
+    if (memo[String(uid)] && Date.now() - Number(memo[String(uid)]) < AVIS_RETRY_MS) return false;
+    // L'identifiant de PROFIL (comme le dressing et le porte-monnaie, §7), lu en scalaire.
+    let pid = null;
+    try { const pr = await sbGet(`app_data?id=eq.harvest_${uid}_profile&select=pid:data->payload->user->>id`); pid = (pr && pr[0] && pr[0].pid) || null; } catch (_) {}
+    const qui = /^\d{1,15}$/.test(String(pid || '')) ? String(pid) : (/^\d{1,15}$/.test(String(uid)) ? String(uid) : '');
+    if (!qui) return false;
+    const refus = await gardeLecture(uid, acc, 'suivi');
+    if (refus) return false;
+    memo[String(uid)] = Date.now();
+    try { await chrome.storage.local.set({ vrmAvisFaits: memo }); } catch (_) {}
+    const rep = await vintedGet(acc, `/api/v2/user_feedbacks?user_id=${encodeURIComponent(qui)}&page=1&per_page=20&by=all`);
+    if (!rep || !rep.ok || !rep.json) { noterDiag(`avis_refuse_${rep ? rep.status : 0}`); return false; }
+    const liste = rep.json && Array.isArray(rep.json.user_feedbacks) ? rep.json.user_feedbacks : null;
+    if (!liste) {
+      noterDiag('avis_forme_inconnue');
+      try { echantillonRate('avis_forme', String(uid), JSON.stringify(Object.keys(rep.json || {})).slice(0, 300)); } catch (_) {}
+      return false;
+    }
+    const user_feedbacks = liste.slice(0, 20).map(avisPropre).filter(Boolean);
+    const pag = rep.json.pagination && typeof rep.json.pagination === 'object' ? { total_entries: Number(rep.json.pagination.total_entries) || null, total_pages: Number(rep.json.pagination.total_pages) || null } : null;
+    const ok = await supabaseUpsert('app_data', [{ id: `harvest_${uid}_feedbacks`, data: { type: 'feedbacks', uid: String(uid), domain: acc.domain || 'www.vinted.fr', capturedAt: new Date().toISOString(), nItems: user_feedbacks.length, payload: { user_feedbacks, ...(pag ? { pagination: pag } : {}) } } }], 'id');
+    noterDiag(ok === false ? 'avis_ecriture_ratee' : 'avis_ecrits');
+    return ok !== false;
+  } catch (_) { return false; }
+}
 async function capterReleves(uid) {
   try {
     if (!uid) return 0;
@@ -8608,6 +8663,8 @@ async function visiteVinted() {
     // lecture prioritaire (classe « suivi », 6 par heure au plus).
     await capterSuivisAchats(uid);
     await envoyerNotifsSuivi();
+    // 5.319 : les avis reçus (première page), une fois par 24 h — lecture seule, classe « suivi ».
+    await capterAvis(uid);
     // ⚠️ 5.167 (11 octobre) — CE QUI EST EN LIGNE SUR SES AUTRES COMPTES : leur
     // dressing PUBLIC, relu avec la session du compte connecté (au plus 3 comptes
     // par visite, aucun relu depuis moins de 30 min, budget de lecture ordinaire).
