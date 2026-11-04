@@ -2,10 +2,9 @@
    Les feuilles reprennent `vrm-ao-*` (styles-annonces-outils.css). Jetons
    `--fu-*` (fusion.css), clair et sombre. Une seule couleur : le bleu du bouton
    principal ; l'ambre pour « reste » (un geste à faire). */
-.vrm-aso-outils { display: flex; gap: 8px; margin: 0 0 14px; overflow-x: auto; scrollbar-width: none; padding: 2px 0; }
-.vrm-aso-outils::-webkit-scrollbar { display: none; }
+.vrm-aso-outils { display: flex; gap: 8px; margin: 0 0 14px; }
 .vrm-aso-outil {
-  flex: 1 1 0; min-width: 0; min-height: 44px; padding: 0 14px; border: 0; border-radius: 999px; cursor: pointer;
+  flex: 1 1 auto; min-width: 0; min-height: 44px; padding: 0 12px; border: 0; border-radius: 999px; cursor: pointer;
   background: var(--fu-carte, #fff); color: var(--fu-encre, #1d1d1f); box-shadow: var(--fu-ombre);
   font: inherit; font-size: 15px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap;
 }

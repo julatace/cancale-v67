@@ -276,7 +276,7 @@ function FeuilleLots({ lots, achatsDeclarables, onDeclarer, onOuvrir, onFermer, 
             ))}
           </ul>
         </div>
-      ) : <button type="button" className="vrm-ao-second vrm-aso-plus" data-aso-ajouter-lot="" onClick={() => setAjout(true)}>C'est un lot</button>}
+      ) : <button type="button" className="vrm-ao-second vrm-aso-plus" data-aso-ajouter-lot="" onClick={() => setAjout(true)}>Ajouter un lot</button>}
     </Feuille>
   );
 }
