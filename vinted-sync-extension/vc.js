@@ -121,6 +121,35 @@
         if (f) { envoisEnAttente.delete(d.jeton); f({ ok: true, statut: Number(d.statut) || 0, cles: (Array.isArray(d.cles) ? d.cles : []).slice(0, 60).map((c) => String(c).slice(0, 120)), idMsg: /^[\w-]{1,40}$/.test(String(d.idMsg || '')) ? String(d.idMsg) : '', erreur: String(d.erreur || '').slice(0, 80) }); }
         return;
       }
+      // 5.319 : tes OFFRES Vestiaire (« négociations ») — l'article, les prix, les gestes ;
+      // jamais l'acheteur (ni nom, ni pseudo, ni identifiant : il reste dans la page).
+      if (d.kind === 'vcoffres') {
+        const cents = (x) => (typeof x === 'number' && isFinite(x) && x >= 0 && x < 1e9 ? Math.round(x) : null);
+        const at = (x) => (/^\d{4}-\d{2}-\d{2}T[\w:.+-]{0,24}$/.test(String(x || '')) ? String(x) : '');
+        const ev = (e) => (e && typeof e === 'object' ? { action: /^(offer|accept|decline|close)$/.test(String(e.action)) ? String(e.action) : '', par: /^(acheteur|vendeur)$/.test(String(e.par)) ? String(e.par) : '', cents: cents(e.cents), at: at(e.at) } : null);
+        const offres = (Array.isArray(d.offres) ? d.offres : []).slice(0, 200).map((x) => (x && typeof x === 'object' ? {
+          id: /^\d{3,15}$/.test(String(x.id || '')) ? String(x.id) : '', produit: /^\d{3,15}$/.test(String(x.produit || '')) ? String(x.produit) : '',
+          ouverte: x.ouverte === true, fermee: x.fermee === true, acceptee: x.acceptee === true, aToi: x.aToi === true,
+          titre: String(x.titre || '').slice(0, 140),
+          photo: /^https:\/\/images\.vestiairecollective\.com\/produit\/[\w.-]{1,60}$/i.test(String(x.photo || '')) ? String(x.photo) : '',
+          lien: /^https:\/\/fr\.vestiairecollective\.com\/[\w\-/.]{1,300}\.shtml$/i.test(String(x.lien || '')) ? String(x.lien) : '',
+          offre: cents(x.offre), net: cents(x.net), initial: cents(x.initial), min: cents(x.min), expire: at(x.expire),
+          resteVendeur: typeof x.resteVendeur === 'number' && isFinite(x.resteVendeur) ? Math.max(0, Math.floor(x.resteVendeur)) : null,
+          dernier: ev(x.dernier), evenements: (Array.isArray(x.evenements) ? x.evenements : []).slice(0, 10).map(ev).filter((e) => e && e.action) } : null)).filter((x) => x && x.id);
+        chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'vcOffres', offres, liste: d.liste === true, page: String(d.page || '').slice(0, 160), moi: moiDe(d), inconnu: inconnuDe(d) }, () => { void chrome.runtime.lastError; });
+        return;
+      }
+      if (d.kind === 'vcoffreappris') {
+        const r = d.recette;
+        if (!r || typeof r !== 'object') return;
+        chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'vcOffreAppris', recette: r }, () => { void chrome.runtime.lastError; });
+        return;
+      }
+      if (d.kind === 'vcoffreresultat' && typeof d.jeton === 'string') {
+        const f = envoisEnAttente.get(d.jeton);
+        if (f) { envoisEnAttente.delete(d.jeton); f({ ok: true, statut: Number(d.statut) || 0, confirme: d.confirme === true ? true : d.confirme === false ? false : null, erreur: String(d.erreur || '').slice(0, 80) }); }
+        return;
+      }
       // 5.239 : tes ACHATS Vestiaire — scalaires seulement, jamais le vendeur ni ton adresse.
       if (d.kind === 'vcachats') {
         const achats = (Array.isArray(d.achats) ? d.achats : []).slice(0, 200).map((x) => ({
@@ -171,6 +200,20 @@
       envoisEnAttente.set(jeton, (r) => { clearTimeout(t); sendResponse(r); });
       // 5.299 : le compte au nom duquel le fond veut parler — la page refuse si ce n'est pas le sien.
       window.postMessage(Object.assign({ __tag: 'CANCALE_VC_ORDRE', kind: 'repondre', jeton, conv, texte, recette: msg.recette }, /^[\w-]{1,40}$/.test(String(msg.compte || '')) ? { compte: String(msg.compte) } : {}), '*');
+      return true;
+    });
+  } catch (_) {}
+  // ── 5.319 : RÉPONDRE À UNE OFFRE, SUR SON CLIC — même chemin que `vcRepondre`.
+  try {
+    chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+      if (!msg || msg.from !== 'vrm-fond' || msg.action !== 'vcOffre') return;
+      if (!sender || sender.id !== chrome.runtime.id || window.top !== window) return;
+      const nego = String(msg.nego || ''), geste = String(msg.geste || '');
+      if (!/^\d{3,15}$/.test(nego) || !/^(accepter|refuser|contre)$/.test(geste)) { sendResponse({ ok: false, code: 'invalide' }); return; }
+      const jeton = (self.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).slice(2, 12));
+      const t = setTimeout(() => { if (envoisEnAttente.delete(jeton)) sendResponse({ ok: false, code: 'muet' }); }, 20000);
+      envoisEnAttente.set(jeton, (r) => { clearTimeout(t); sendResponse(r); });
+      window.postMessage(Object.assign({ __tag: 'CANCALE_VC_ORDRE', kind: 'offre', jeton, nego, geste, prixCents: Number(msg.prixCents) || 0, recette: msg.recette }, /^[\w-]{1,40}$/.test(String(msg.compte || '')) ? { compte: String(msg.compte) } : {}), '*');
       return true;
     });
   } catch (_) {}

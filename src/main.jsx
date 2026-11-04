@@ -109,6 +109,7 @@ import './styles-compta-claire.css';
 import './design/fusion.css';
 import './design/favoris.css';
 import './design/outils-stats.css';
+import './design/argent-offres.css';
 // (3 nov.) Les jetons Fusion pour TOUTE l'app (échelle fermée, segmentés, cartes) — le tout dernier mot.
 import './design/jetons.css';
 import { suivreRangeesDefilantes } from './rangeesDefilantes.js';
