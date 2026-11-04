@@ -94,7 +94,7 @@ export function BarreObjectif({ prog, fmt }) {
   );
 }
 
-export default function CarteStats({ page, sel, sources, regles, reglage, poser, attrsDe = null, onNav = null, nu = false, className = '', FermeAuRetour = null, sous = null, extra = {}, clics = null, objectif = null, poserObjectif = null }) {
+export default function CarteStats({ owner = '', page, sel, sources, regles, reglage, poser, attrsDe = null, onNav = null, nu = false, className = '', FermeAuRetour = null, sous = null, extra = {}, clics = null, objectif = null, poserObjectif = null }) {
   const [ouvert, setOuvert] = React.useState(false);
   const locaux = (sources && sources.locaux) || null;
   const V = valeursCarte(page, reglage, sources, sel, regles);
@@ -196,7 +196,7 @@ function FeuilleCarte({ page, sel, sources, regles, reglage, poser, locaux, ferm
               en contrôle segmenté sur une rangée — plus de rangée qui défile de côté. */}
           {def && !def.local && Array.isArray(def.periodes) && def.periodes.length > 1 && !periodePage ? (PLAGE_IDS.includes(actuelle.id) ? (
             <div className="vrm-carte-periode-cal" data-carte-calendrier={actuelle.id}>
-              <ChoixPeriode value={valeurDePeriode(actuelle.p)} titre="Période du chiffre" vide="Choisir une période"
+              <ChoixPeriode owner={owner} value={valeurDePeriode(actuelle.p)} titre="Période du chiffre" vide="Choisir une période"
                 libelle={nomPeriode(actuelle.p || periodeDefaut(def))} raccourcis={raccourcisCarte} Retour={FermeAuRetour}
                 onChange={(v) => choisir(actuelle.id, periodeDeValeur(v, def.periodes) || periodeDefaut(def))}/>
             </div>

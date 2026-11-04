@@ -21,7 +21,7 @@ jobs:
       - run: npm ci
       - name: Vérifier les calculs, le handler et les changements de session
         run: |
-          node --test scripts/tests/finance-reprise.test.mjs scripts/tests/appareils-route.test.mjs scripts/tests/deconnexion-proprietaire.test.mjs
+          node --test scripts/tests/finance-reprise.test.mjs scripts/tests/appareils-route.test.mjs scripts/tests/deconnexion-proprietaire.test.mjs scripts/tests/parcours-quotidien.test.mjs
           for audit in argent-a-venir comparer-mois frais-plateformes journal-semaine objectif-mois questions-ebay stats-offres achats-sourcing comptes-securite selection-bordereaux; do
             node "scripts/audit-$audit.cjs"
           done
@@ -31,7 +31,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        banc: [argent-mois, offres-objectif, achats-sourcing, comptes-securite, bureau-chargement]
+        banc: [argent-mois, offres-objectif, achats-sourcing, comptes-securite, bureau-chargement, parcours-quotidien]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
