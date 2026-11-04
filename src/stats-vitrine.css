@@ -120,3 +120,15 @@
 .vrm-stats-vitrine .vrm-sv-boost-col { text-align: right; }
 .vrm-stats-vitrine .vrm-sv-boost-val { font-size: 15px; font-weight: 600; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--vrm-ink); }
 @media (max-width: 480px) { .vrm-stats-vitrine .vrm-sv-boost-table { gap: 8px 10px; } .vrm-stats-vitrine .vrm-sv-boost-val { font-size: 13px; } }
+/* (3 nov.) Annulations par compte et notes reçues */
+.vrm-stats-vitrine .vrm-sv-annul-compte { border-bottom: 1px solid var(--vrm-line); }
+.vrm-stats-vitrine .vrm-sv-annul-compte:last-of-type { border-bottom: 0; }
+.vrm-stats-vitrine .vrm-sv-annul-ligne { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(40px, 1fr) auto; gap: 12px; align-items: center; min-height: 44px; cursor: pointer; list-style: none; }
+.vrm-stats-vitrine .vrm-sv-annul-ligne::-webkit-details-marker { display: none; }
+.vrm-stats-vitrine .vrm-sv-annul-vente { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 8px 0 8px 12px; min-height: 44px; box-sizing: border-box; text-decoration: none; color: inherit; border-top: 1px solid var(--vrm-line); }
+.vrm-stats-vitrine .vrm-sv-annul-titre { font-size: 13px; color: var(--vrm-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.vrm-stats-vitrine .vrm-sv-annul-etat { grid-column: 1 / -1; font-size: 12px; color: var(--vrm-muted); }
+.vrm-stats-vitrine .vrm-sv-note-ligne { display: grid; grid-template-columns: minmax(0, 1fr) auto 44px; gap: 12px; align-items: center; min-height: 44px; border-bottom: 1px solid var(--vrm-line); }
+.vrm-stats-vitrine .vrm-sv-note-ligne:last-of-type { border-bottom: 0; }
+.vrm-stats-vitrine .vrm-sv-note-detail { color: var(--vrm-muted); font-size: 12px; }
+.vrm-stats-vitrine .vrm-sv-note-val { font-size: 17px; font-weight: 700; color: var(--vrm-ink); text-align: right; font-variant-numeric: tabular-nums; }
