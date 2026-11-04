@@ -156,7 +156,8 @@ import { friseVente, phraseVente, eurosRecap, ETATS_HORS_PARCOURS } from "./reca
 // (2 nov.) Le style « Fusion » : la carte sombre du mois et la frise de suivi (src/design/).
 import CarteMois from "./design/CarteMois.jsx";
 import CarteStats from "./design/CarteStats.jsx";
-import { CLE_CARTE_STATS } from "./design/carteChiffres.js";
+import { CLE_CARTE_STATS, valeurObjectif } from "./design/carteChiffres.js";
+import { CLE_OBJECTIF, lireObjectif, lireSaisieObjectif, objectifAEnregistrer, progressionObjectif } from "./objectifMois.js";
 import { courtFusion, enArticles } from "./design/tacheCourte.js";
 import { PileVignettes } from "./design/PileVignettes.jsx";
 import Frise from "./design/Frise.jsx";
@@ -2066,6 +2067,10 @@ const SYNC_KEYS = [
   // maquettes, rattrapé par `onCloudReady` seulement s'il est resté au défaut
   // (`useReglageCarte`). Aucun chiffre dedans (src/design/carteChiffres.js).
   'vrm_carte_stats',
+  // (4 novembre) L'OBJECTIF DU MOIS — un CA vendu ou un nombre de ventes, posé par
+  // lui (src/objectifMois.js) ; la barre de la carte sombre, Statistiques et Ventes
+  // lisent CE réglage (plus `vrm_ca_objectif` ni `vinted_goal`, jamais posés en base).
+  'vrm_objectif_mois',
   // Comptabilité d'entreprise (onglet Comptabilité) : dépenses ponctuelles,
   // coûts fixes mensuels, packs de photos payants. OWNED par l'app (§11),
   // synchronisé entre appareils, jamais écrit par l'extension.
@@ -28364,9 +28369,6 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   // (31 oct., maquette) La période de la page : Semaine · Mois · Année — une règle (`bornesPeriode`) pour tout le bloc du haut.
   const [periodeStats,setPeriodeStats]=useState('mois');
 
-  const [objectif,setObjectif]=useState(()=>+(load('vrm_ca_objectif',0))||0); // objectif de CA du mois
-  const [objEdit,setObjEdit]=useState(false);
-  const [objTmp,setObjTmp]=useState('');
 
   // Paires réellement présentes dans le garage (mémorisé)
   const garageVals=useMemo(()=>
@@ -28551,17 +28553,6 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
     const total=arr.reduce((s,p)=>s+p.ca,0);
     return {arr,total};
   },[liveStats,lbcVentes,ebayCa,ebayCommandes,ventesVc]);
-  // CA du mois courant (par date de VENTE, §5) pour la jauge d'objectif.
-  // ⚠️ Elle sommait l'ANCIENNE archive (`sales`, vide depuis juillet 2026) : la
-  //    jauge restait à 0 € quoi qu'il vende. Elle lit maintenant « vendu ce
-  //    mois », la règle de Ma journée (`liveStats.caMois`, §11) ; l'archive ne
-  //    sert plus qu'en repli tant que les ventes ne sont pas lues.
-  const caMoisCourant=useMemo(()=>{
-    if (liveStats && liveStats.caMois!=null) return liveStats.caMois;
-    if (liveStats && liveStats.venduPasSu) return null;     // pas su : jamais l'archive vide (0 €)
-    const now=new Date(); const ym=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-    return sales.reduce((s,v)=>{ const p=(v.saleDate||'').trim().split('/'); return (p.length===3 && `${p[2]}-${p[1]}`===ym) ? s+(+v.sellPrice||0) : s; },0);
-  },[sales, liveStats]);
 
   // Paires ajoutées par jour (basé sur addedAt JJ/MM/AAAA).
   // On ignore la date d'init "01/01/2024" qui regroupe tout l'historique importé,
@@ -28738,32 +28729,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         </div>
         {manquePrix && <div style={{marginTop:14}}><LignePrixAchat quoi={quoiDepuisDebut} dans/></div>}
       </div>
-      {/* 🎯 OBJECTIF DU MOIS — jauge vers un objectif de CA que tu fixes. */}
-      <div className="vrm-finance-goal"><Card>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:objectif>0&&!objEdit?8:2}}>
-          <div style={{fontSize:13,fontWeight:600,color:C.text}}>Objectif du mois</div>
-          <Bouton variante={objEdit?'discret':'secondaire'} className="vrm-b-petit" onClick={()=>{ setObjTmp(objectif>0?String(objectif):''); setObjEdit(e=>!e); }}>{objEdit?'Annuler':(objectif>0?'Modifier':'Fixer')}</Bouton>
-        </div>
-        {objEdit ? (
-          <div style={{display:'flex',gap:8,alignItems:'center',marginTop:8}}>
-            <input aria-label="Objectif de chiffre d’affaires du mois" type="number" min="0" step="0.01" inputMode="decimal" value={objTmp} onChange={e=>setObjTmp(e.target.value)} placeholder="ex. 2000" style={{flex:1,minWidth:0,border:`1px solid ${C.border}`,background:C.card,color:C.text,borderRadius:12,padding:'11px 12px',fontSize:15,fontFamily:'inherit',outline:'none'}}/>
-            <Bouton variante="primaire" onClick={()=>{ const n=Number(objTmp); if(!Number.isFinite(n)||n<0){toast('Indique un objectif valide.');return;} setObjectif(n); save('vrm_ca_objectif',n); setObjEdit(false); }}>OK</Bouton>
-          </div>
-        ) : objectif>0 && caMoisCourant==null ? (
-          <div style={{fontSize:13,color:C.muted,marginTop:6,lineHeight:1.5}}>— · ventes pas pu être lues, la jauge revient dès qu'elles le sont.</div>
-        ) : objectif>0 ? (()=>{ const pct=Math.min(100,Math.round(caMoisCourant/objectif*100)); const done=caMoisCourant>=objectif; return (
-          <>
-            <div style={{display:'flex',alignItems:'baseline',gap:8}}>
-              <span className="vrm-display" style={{fontSize:28,fontWeight:800,color:C.text}}>{fmt(caMoisCourant)}</span>
-              <span style={{fontSize:13,color:C.muted}}>/ {fmt(objectif)}</span>
-            </div>
-            <div role="progressbar" aria-label="Progression vers l’objectif du mois" aria-valuemin={0} aria-valuemax={objectif} aria-valuenow={Math.min(caMoisCourant,objectif)} aria-valuetext={`${fmt(caMoisCourant)} sur ${fmt(objectif)}`} style={{height:12,background:C.card2||C.bg,borderRadius:999,overflow:'hidden',marginTop:8}}><div style={{width:`${Math.max(2,pct)}%`,height:'100%',background:C.accent,borderRadius:999,transition:'width .3s ease'}}/></div>
-            <div style={{fontSize:13,color:C.muted,marginTop:6}}>{done?'Objectif atteint':`${pct}% de ton objectif`} · vendu ce mois, toutes plateformes, ventes en cours comprises</div>
-          </>
-        ); })() : (
-          <div style={{fontSize:13,color:C.muted,marginTop:6,lineHeight:1.5}}>Fixe un montant à atteindre ce mois-ci.</div>
-        )}
-      </Card></div>
+      {/* 🎯 OBJECTIF DU MOIS (4 nov.) — le MÊME réglage et la MÊME règle que la barre de la carte sombre. */}
+      <div className="vrm-finance-goal"><Card><ObjectifDuMois liveStats={liveStats}/></Card></div>
 
       {/* (16 oct.) Les deux volets repliés vivent dans UNE carte, l'un sous
           l'autre — ils flottaient entre deux cartes avec des marges inégales. */}
@@ -39041,6 +39008,68 @@ function useReglageCarte() {
   const poser = React.useCallback((r) => { setV(r); save(CLE_CARTE_STATS, r); }, []);
   return [v, poser];
 }
+// L'objectif du mois (4 nov.) : le réglage synchronisé, lu par `lireObjectif`
+// (aucun objectif ⇒ null ⇒ rien n'apparaît). Rattrapage nuage seulement si rien
+// n'a été rangé sur cet appareil (§5).
+const lireObjectifRange = () => { try { return load(CLE_OBJECTIF, null); } catch (_) { return null; } };
+function useObjectifMois() {
+  const [brut, setBrut] = React.useState(lireObjectifRange);
+  React.useEffect(() => onCloudReady(() => setBrut((cur) => cur == null ? lireObjectifRange() : cur)), []);
+  React.useEffect(() => {
+    const f = (e) => { const k = e && e.detail && e.detail.k; if (k === CLE_OBJECTIF) setBrut(lireObjectifRange()); };
+    const g = (e) => { if (e && e.key === CLE_OBJECTIF) setBrut(lireObjectifRange()); };
+    window.addEventListener('vrm:save', f); window.addEventListener('storage', g);
+    return () => { window.removeEventListener('vrm:save', f); window.removeEventListener('storage', g); };
+  }, []);
+  const poser = React.useCallback((r) => { if (!r) return; setBrut(r); save(CLE_OBJECTIF, r); }, []);
+  const obj = React.useMemo(() => lireObjectif(brut), [brut]);
+  return [obj, poser, brut];
+}
+// Le bloc « Objectif du mois » de Statistiques (4 nov.) : le MÊME réglage
+// (`useObjectifMois`) et la MÊME valeur que la barre de la carte sombre
+// (`valeurObjectif` sur les sources de la carte) — aucune seconde somme.
+function ObjectifDuMois({ liveStats }) {
+  const [obj, poser, brut] = useObjectifMois();
+  const liveCoque = React.useContext(LiveStatsCarte);
+  const sources = useSourcesCarte(liveStats || liveCoque);
+  const [edit, setEdit] = React.useState(false);
+  const [type, setType] = React.useState(obj ? obj.type : 'ca');
+  const [saisie, setSaisie] = React.useState('');
+  const prog = obj ? progressionObjectif(obj, valeurObjectif(obj, sources, REGLES_CARTE)) : null;
+  const lu = lireSaisieObjectif(type, saisie);
+  const eur = prog && prog.type === 'ca';
+  const montre = (v) => (eur ? fmt(v) : `${v} vente${v > 1 ? 's' : ''}`);
+  return (
+    <div data-objectif-bloc={obj ? obj.type : ''}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: prog && !edit ? 8 : 2 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Objectif du mois</div>
+        <Bouton variante={edit ? 'discret' : 'secondaire'} className="vrm-b-petit" data-objectif-modifier="" onClick={() => { setType(obj ? obj.type : 'ca'); setSaisie(obj ? String(obj.valeur).replace('.', ',') : ''); setEdit((e) => !e); }}>{edit ? 'Annuler' : (obj ? 'Modifier' : 'Fixer')}</Bouton>
+      </div>
+      {edit ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+          <Segmente label="Type d’objectif" value={type} onChange={setType} options={[{ v: 'ca', l: 'CA vendu', data: { 'data-objectif-type': 'ca' } }, { v: 'ventes', l: 'Nombre de ventes', data: { 'data-objectif-type': 'ventes' } }]}/>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input aria-label={type === 'ca' ? 'Objectif en euros' : 'Objectif en nombre de ventes'} type="text" inputMode={type === 'ca' ? 'decimal' : 'numeric'} value={saisie} onChange={(e) => setSaisie(e.target.value)} placeholder={type === 'ca' ? '2 000' : '40'} data-objectif-saisie=""
+              style={{ flex: 1, minWidth: 0, border: `1px solid ${C.border}`, background: C.card, color: C.text, borderRadius: 12, padding: '11px 12px', fontSize: 15, fontFamily: 'inherit', outline: 'none' }}/>
+            <span style={{ fontSize: 13, color: C.muted }}>{type === 'ca' ? '€' : 'ventes'}</span>
+            <Bouton variante="primaire" disabled={lu == null} data-objectif-ok="" onClick={() => { const n = objectifAEnregistrer(brut, { type, valeur: lu }); if (n) { poser(n); setEdit(false); } }}>OK</Bouton>
+          </div>
+          {obj ? <Bouton variante="discret" data-objectif-retirer="" onClick={() => { poser(objectifAEnregistrer(brut, null)); setEdit(false); }} style={{ alignSelf: 'flex-start' }}>Retirer</Bouton> : null}
+        </div>
+      ) : prog ? (
+        <div data-objectif-valeur={prog.valeur == null ? '' : (eur ? String(Math.round(prog.valeur * 100)) : String(prog.valeur))} data-objectif-pct={prog.pct == null ? '' : prog.pct} data-objectif-partiel={prog.partiel ? '1' : undefined}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+            <span className="vrm-display" style={{ fontSize: 28, fontWeight: 800, color: C.text }} title={prog.partiel ? `Au moins · ${prog.manque.join(', ')} pas lu` : undefined}>{prog.valeur == null ? '—' : montre(prog.valeur)}</span>
+            <span style={{ fontSize: 13, color: C.muted }}>/ {montre(prog.objectif)}</span>
+          </div>
+          <div role="progressbar" aria-label="Objectif du mois" aria-valuemin={0} aria-valuemax={100} aria-valuenow={prog.pct == null ? undefined : prog.pct} style={{ height: 6, background: C.card2 || C.bg, borderRadius: 999, overflow: 'hidden', marginTop: 8 }}>
+            {prog.pct ? <div style={{ width: `${prog.pct}%`, height: '100%', background: C.accent, borderRadius: 999, transition: 'width .3s ease' }}/> : null}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 const lirePub = (cle) => () => { try { const v = load(cle, null); return v && typeof v === 'object' ? v : null; } catch (_) { return null; } };
 const lireColisAPoster = lirePub('vrm_colis_aposter'), lireColisARetirer = lirePub('vrm_colis_retirer'), lirePairesDorment = lirePub('vrm_paires_dorment');
 // Les sources : `liveStats` = celui de la coque (`liveStatsVus` : les lignes de
@@ -39070,10 +39099,11 @@ const REGLES_CARTE = { bilanLignes, rythmeVendu, chiffreBenefice, chiffreBrut, b
 // `ici` : l'onglet où l'on est (une case n'y renvoie pas).
 function CarteStatsApp({ page, liveStats, sel = null, locaux = null, ici = null, attrs = null, ...rest }) {
   const [reglage, poser] = useReglageCarte();
+  const [objectif, poserObjectif] = useObjectifMois();
   const liveCoque = React.useContext(LiveStatsCarte);
   const base = useSourcesCarte(liveStats || liveCoque);
   const sources = locaux ? { ...base, locaux } : base;
-  return <CarteStats page={page} sel={sel || { site: 'toutes', compte: null, periode: null }} sources={sources} regles={REGLES_CARTE} reglage={reglage} poser={poser} FermeAuRetour={FermeAuRetour} extra={{ ici, attrs }} {...rest}/>;
+  return <CarteStats page={page} sel={sel || { site: 'toutes', compte: null, periode: null }} sources={sources} regles={REGLES_CARTE} reglage={reglage} poser={poser} objectif={objectif} poserObjectif={poserObjectif} FermeAuRetour={FermeAuRetour} extra={{ ici, attrs }} {...rest}/>;
 }
 // Le compte choisi, dit pour la carte : { uid, login, nom } ou null (tous).
 const compteCarte = (uid, accounts) => {
@@ -47032,9 +47062,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ── Analyse de perf (façon outil pro) ──────────────────────────────
   // Objectif de CA mensuel (synchronisé). L'utilisateur le fixe, la barre suit le
   // CA finalisé du mois en cours.
-  const [goal, setGoal] = useState(() => Number(load('vinted_goal', 0)) || 0);
-  const [goalEdit, setGoalEdit] = useState(false);
-  const saveGoal = (v) => { const n = Math.max(0, Math.round(Number(v)||0)); setGoal(n); save('vinted_goal', n); };
+
   // Métriques : temps de vente moyen (jours entre la numérotation de l'annonce et
   // la vente), taux d'écoulement (vendues / (vendues + en ligne)), meilleure
   // marque (bénéfice moyen par paire), et CA du mois en cours.
@@ -51820,67 +51848,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <Bouton variante="discret" onClick={()=>{ setVFilter('annulees'); try { document.querySelector('.vrm-sales-workbar')?.scrollIntoView({block:'start',behavior:'smooth'}); } catch(_) {} }}>Voir les annulées</Bouton>
           </div>
         )}
-        {/* Objectif de CA mensuel */}
-        {/* CA du mois : EXACTEMENT le chiffre du tableau de bord (emails de vente,
-            source complète). Avant, cette barre utilisait un calcul local basé sur
-            les ventes moissonnées → l'objectif affichait un CA différent de la
-            tuile « CA du mois » de l'accueil. Une seule source, un seul nombre. */}
-        {accounts.length>0 && (()=>{ const caM = (liveStats && liveStats.caMois!=null) ? liveStats.caMois : perf.caMois; const pct = goal>0 ? Math.min(100, (caM/goal)*100) : 0; return (
-          <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'11px 13px',marginBottom:12}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:goal>0?8:0,flexWrap:'wrap',gap:6}}>
-              <div style={{fontSize:13,fontWeight:600,color:C.text}}>Objectif du mois</div>
-              {goalEdit ? (
-                <div style={{display:'flex',gap:6,alignItems:'center'}}>
-                  <input autoFocus type="number" defaultValue={goal||''} placeholder="0" onKeyDown={e=>{ if(e.key==='Enter'){ saveGoal(e.target.value); setGoalEdit(false);} if(e.key==='Escape') setGoalEdit(false); }}
-                    onBlur={e=>{ saveGoal(e.target.value); setGoalEdit(false); }} style={{width:90,border:`1px solid ${C.accent}`,borderRadius:12,padding:'3px 8px',fontSize:13,fontWeight:500,background:C.bg,color:C.text,outline:'none'}}/>
-                  <span style={{fontSize:12,color:C.muted}}>€</span>
-                </div>
-              ) : (
-                <Bouton variante="secondaire" className="vrm-b-petit" onClick={()=>setGoalEdit(true)} title={goal>0?'Changer l\'objectif':undefined}>
-                  {goal>0 ? `${caM.toFixed(0)} / ${goal} €` : 'Fixer un objectif'}
-                </Bouton>
-              )}
-            </div>
-            {/* ⚠️ UN OBJECTIF QU'IL FAUT INVENTER NE SE FIXE JAMAIS (mesuré le
-                23 août : `vinted_goal` non défini). On le PROPOSE, calculé sur
-                SON historique — la moyenne des 3 derniers mois complets, arrondie
-                à la dizaine. Un clic suffit ; on n'écrit rien tout seul. */}
-            {goal<=0 && (()=>{
-              const parMois = {};
-              for (const o of (sales.items || [])) {
-                if (classifyOrderStatus(o.status) === 'cancelled') continue;
-                const d = new Date(o.date); if (isNaN(d)) continue;
-                const k = cleJourLocal(d.getTime()).slice(0, 7);
-                parMois[k] = (parMois[k] || 0) + ((o.price && o.price.amount != null) ? Number(o.price.amount) || 0 : 0);
-              }
-              const moisEnCours = dateLocaleISO().slice(0, 7);
-              const complets = Object.entries(parMois).filter(([k]) => k < moisEnCours).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 3);
-              if (complets.length < 2) return null;   // pas assez d'historique : on ne propose rien
-              const moy = complets.reduce((s2, [, v]) => s2 + v, 0) / complets.length;
-              const prop = Math.max(10, Math.round(moy / 10) * 10);
-              return (
-                <div style={{marginTop:8,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-                  <div style={{flex:'1 1 150px',minWidth:0,fontSize:11,color:C.muted,lineHeight:1.4}}>
-                    Tes {complets.length} derniers mois complets : <b style={{color:C.text}}>{Math.round(moy)} €</b> en moyenne.
-                  </div>
-                  <Bouton variante="secondaire" className="vrm-b-petit" icone="target" onClick={()=>saveGoal(prop)} style={{flexShrink:0}}>Viser {prop} €</Bouton>
-                </div>
-              );
-            })()}
-            {goal>0 && (
-              <div style={{height:8,borderRadius:12,background:C.border,overflow:'hidden'}}>
-                <div style={{height:'100%',width:`${pct}%`,background:C.accent,borderRadius:12,transition:'width .4s'}}/>
-              </div>
-            )}
-            {goal>0 && (()=>{
-              if(pct>=100) return <div style={{fontSize:12,color:C.text,fontWeight:600,marginTop:5}}>Objectif atteint</div>;
-              const reste=goal-caM;
-              const avg=totals.nb>0?totals.ca/totals.nb:null; // prix de vente moyen finalisé
-              const nb=avg&&avg>0?Math.ceil(reste/avg):null;
-              return <div style={{fontSize:11,color:C.muted,marginTop:5}}><b style={{color:C.text}}>{reste.toFixed(0)} €</b> restants ce mois-ci{nb!=null?<> — soit <b style={{color:C.accent}}>~{nb} paire{nb>1?'s':''}</b> à {avg.toFixed(0)} € (ton prix moyen)</>:''}</div>;
-            })()}
-          </div>
-        ); })()}
+        {/* (4 nov.) L'objectif du mois vit dans la carte sombre de cet écran (une barre
+            fine, `vrm_objectif_mois`, src/objectifMois.js) : l'ancien bloc (`vinted_goal`,
+            jamais posé en base, et sa proposition calculée sur l'archive Vinted seule)
+            redisait le même nombre sur le même écran (§7, §11). */}
         {/* Graphique de tendance 6 mois : CA + bénéfice net */}
         {monthlyChart.total>0 && (()=>{
           // GRAPHIQUE DE TENDANCE — refait proprement :

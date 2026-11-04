@@ -111,6 +111,14 @@ button.vrm-fu-case:focus-visible { outline: 2px solid #0a84ff; outline-offset: 2
   .vrm-fu-case b { font-size: 22px; }
 }
 @media (max-width: 360px) { .vrm-fu-grand { font-size: 34px; } .vrm-fu-case { padding: 9px 9px; } .vrm-fu-case b { font-size: 17px; } }
+/* (4 nov.) L'objectif du mois : une barre fine sous les cases, rien d'autre. */
+.vrm-fu-objectif { display: flex; flex-direction: column; gap: 6px; }
+.vrm-fu-objectif-ligne { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font: 500 12px/1.3 var(--vrm-police); color: rgba(255,255,255,.65); }
+.vrm-fu-objectif-ligne > b { font: 600 13px/1.3 var(--vrm-police); color: #fff; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vrm-fu-objectif-sur { color: rgba(255,255,255,.65); font-weight: 500; }
+.vrm-fu-objectif-piste { height: 4px; border-radius: 999px; background: rgba(255,255,255,.14); overflow: hidden; }
+.vrm-fu-objectif-piste > span { display: block; height: 100%; border-radius: 999px; background: #0a84ff; transition: width .4s cubic-bezier(.23,1,.32,1); }
+@media (prefers-reduced-motion: reduce) { .vrm-fu-objectif-piste > span { transition: none; } }
 
 /* ── 2. LA FRISE ──────────────────────────────────────────────────────────── */
 .vrm-fu-frise { list-style: none; margin: 0; padding: 0; display: flex; gap: 5px; min-width: 0; }
@@ -1127,6 +1135,16 @@ html:not([data-colis-outils]) body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) [
 .vrm-carte-coche { flex: none; width: 18px; text-align: center; font: 700 15px/1 var(--vrm-police); color: var(--fu-bleu, #0071e3); }
 .vrm-carte-choix:focus-visible, .vrm-carte-place:focus-visible, .vrm-carte-periodes > button:focus-visible, .vrm-carte-ok:focus-visible, .vrm-carte-defaut:focus-visible { outline: 2px solid #0a84ff; outline-offset: 2px; }
 .vrm-carte-defaut { all: unset; box-sizing: border-box; align-self: center; min-height: 44px; padding: 0 14px; display: grid; place-items: center; font: 600 15px/1 var(--vrm-police); color: var(--fu-encre, #1d1d1f); cursor: pointer; margin-top: 6px; }
+/* (4 nov.) « Objectif » dans la feuille */
+.vrm-carte-objectif { margin-top: 6px; border-radius: 14px; background: var(--fu-carte, #fff); overflow: hidden; }
+.vrm-carte-objectif-corps { display: flex; flex-direction: column; gap: 8px; padding: 0 14px 12px; }
+.vrm-carte-objectif-saisie { display: flex; align-items: center; gap: 8px; }
+.vrm-carte-objectif-saisie > input { flex: 1; min-width: 0; min-height: 44px; box-sizing: border-box; padding: 0 12px; border-radius: 12px; border: 1px solid var(--fu-filet, rgba(0,0,0,.08)); background: var(--fu-fond, #f2f2f7); color: inherit; font: 500 17px/1 var(--vrm-police); font-variant-numeric: tabular-nums; outline: none; }
+.vrm-carte-objectif-saisie > input:focus-visible { outline: 2px solid #0a84ff; outline-offset: 1px; }
+.vrm-carte-objectif-saisie > span { font: 500 15px/1 var(--vrm-police); color: var(--fu-gris, #6e6e73); }
+.vrm-carte-objectif-saisie > .vrm-carte-ok:disabled { opacity: .4; cursor: default; }
+.vrm-carte-objectif-gestes { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.vrm-carte-objectif-gestes > .vrm-carte-defaut { margin-top: 0; }
 /* Sur ordinateur, une règle des boutons de la coque ramenait « Modifier » à 30 px : 44 px partout. */
 html body .vrm-app-shell :is(.vrm-fu-carte, .vrm-fu-carte-nu) > .vrm-fu-modifier { min-height: 44px !important; min-width: 44px !important; height: auto !important; padding: 0 12px !important; }
 html body .vrm-carte-feuille :is(.vrm-carte-ok, .vrm-carte-defaut, .vrm-carte-periodes > button) { min-height: 44px !important; }

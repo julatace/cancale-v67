@@ -11,7 +11,8 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import CarteMois from './CarteMois.jsx';
-import { CHIFFRES, NOM_PERIODE, PAGES_CARTE, PLAGE_IDS, clePeriode, chiffresProposes, courbeVendu, defDe, horsSelection, libelleCase, nomPeriode, periodeDefaut, reglageAEnregistrer, reglageDePage, valeursCarte, valeurChiffre } from './carteChiffres.js';
+import { CHIFFRES, NOM_PERIODE, PAGES_CARTE, PLAGE_IDS, clePeriode, chiffresProposes, courbeVendu, defDe, horsSelection, libelleCase, nomPeriode, periodeDefaut, reglageAEnregistrer, reglageDePage, valeursCarte, valeurChiffre, valeurObjectif } from './carteChiffres.js';
+import { TYPES_OBJECTIF, lireSaisieObjectif, objectifAEnregistrer, objectifSurPage, progressionObjectif } from '../objectifMois.js';
 import ChoixPeriode from '../ChoixPeriode.jsx';
 import { raccourcisCarte, etiquettePlage, cleJour } from '../periodeCalendrier.js';
 
@@ -67,7 +68,33 @@ const titreDe = (x) => {
 
 const majuscule = (s) => (typeof s === 'string' && s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 
-export default function CarteStats({ page, sel, sources, regles, reglage, poser, attrsDe = null, onNav = null, nu = false, className = '', FermeAuRetour = null, sous = null, extra = {}, clics = null }) {
+// ── LA BARRE DE L'OBJECTIF (4 nov.) ─────────────────────────────────────────
+// Fine, sous les cases : « Objectif » à gauche, « 1 240 / 2 000 € » à droite,
+// la piste remplie au pourcentage. Pas su ⇒ « — » et piste vide ; partiel ⇒
+// « au moins » dans le titre (§5). Aucun objectif ⇒ la barre n'existe pas.
+export function BarreObjectif({ prog, fmt }) {
+  if (!prog) return null;
+  const eur = prog.type === 'ca';
+  const montre = (v) => (eur ? `${Math.round(Number(v)).toLocaleString('fr-FR')} €` : String(v));
+  const cible = montre(prog.objectif);
+  const titre = prog.valeur == null ? 'Objectif du mois : pas su'
+    : `${prog.partiel ? 'Au moins ' : ''}${eur ? fmt(prog.valeur) : prog.valeur} sur ${eur ? fmt(prog.objectif) : prog.objectif}${prog.partiel && prog.manque.length ? ` · ${prog.manque.join(', ')} pas lu` : ''}`;
+  return (
+    <div className="vrm-fu-objectif" data-objectif={prog.type} data-objectif-cible={eur ? String(Math.round(prog.objectif * 100)) : String(prog.objectif)}
+      data-objectif-valeur={prog.valeur == null ? '' : (eur ? String(Math.round(prog.valeur * 100)) : String(prog.valeur))}
+      data-objectif-pct={prog.pct == null ? '' : String(prog.pct)} data-objectif-partiel={prog.partiel ? '1' : undefined} data-objectif-atteint={prog.atteint ? '1' : undefined} title={titre}>
+      <div className="vrm-fu-objectif-ligne">
+        <span>Objectif</span>
+        <b>{prog.valeur == null ? '—' : <>{montre(prog.valeur)}<span className="vrm-fu-objectif-sur"> / {cible}</span></>}</b>
+      </div>
+      <div className="vrm-fu-objectif-piste" role="progressbar" aria-label="Objectif du mois" aria-valuemin={0} aria-valuemax={100} aria-valuenow={prog.pct == null ? undefined : prog.pct}>
+        {prog.pct ? <span style={{ width: `${prog.pct}%` }} /> : null}
+      </div>
+    </div>
+  );
+}
+
+export default function CarteStats({ page, sel, sources, regles, reglage, poser, attrsDe = null, onNav = null, nu = false, className = '', FermeAuRetour = null, sous = null, extra = {}, clics = null, objectif = null, poserObjectif = null }) {
   const [ouvert, setOuvert] = React.useState(false);
   const locaux = (sources && sources.locaux) || null;
   const V = valeursCarte(page, reglage, sources, sel, regles);
@@ -82,6 +109,7 @@ export default function CarteStats({ page, sel, sources, regles, reglage, poser,
     return () => onNav(t);
   };
   const g = V.g;
+  const prog = objectifSurPage(objectif, page) ? progressionObjectif(objectif, valeurObjectif(objectif, sources, regles)) : null;
   const courbe = g.place.id === 'vendu' && !g.hors ? courbeVendu(sources, sel, g.p, regles) : null;
   const modifier = (
     <button type="button" className="vrm-fu-modifier" data-carte-modifier={page} aria-label="Choisir les chiffres de la carte" onClick={() => setOuvert(true)}>Modifier</button>
@@ -106,8 +134,10 @@ export default function CarteStats({ page, sel, sources, regles, reglage, poser,
           titre: titreDe(x),
           onClick: aller(x),
           attrs: { ...attrsDeValeur(x, page), ...(x.attrs || {}), ...(x.def && x.def.local && x.def.attrs ? x.def.attrs : {}), ...(plus(x) || {}) },
-        }))} />
-      {ouvert ? <FeuilleCarte page={page} sel={sel} sources={sources} regles={regles} reglage={reglage} poser={poser} locaux={locaux} fermer={() => setOuvert(false)} FermeAuRetour={FermeAuRetour} /> : null}
+        }))}>
+        {prog ? <BarreObjectif prog={prog} fmt={fmt} /> : null}
+      </CarteMois>
+      {ouvert ? <FeuilleCarte page={page} sel={sel} sources={sources} regles={regles} reglage={reglage} poser={poser} locaux={locaux} fermer={() => setOuvert(false)} FermeAuRetour={FermeAuRetour} objectif={objectif} poserObjectif={poserObjectif} /> : null}
     </>
   );
 }
@@ -117,7 +147,7 @@ export default function CarteStats({ page, sel, sources, regles, reglage, poser,
 // chiffre qui y va. La période se choisit pour CE chiffre quand la page n'a pas
 // son propre filtre de période. Chaque choix est rangé tout de suite (la carte,
 // derrière, change sous ses yeux) ; « Par défaut » rend la carte des maquettes.
-function FeuilleCarte({ page, sel, sources, regles, reglage, poser, locaux, fermer, FermeAuRetour }) {
+function FeuilleCarte({ page, sel, sources, regles, reglage, poser, locaux, fermer, FermeAuRetour, objectif = null, poserObjectif = null }) {
   const R = reglageDePage(reglage, page, locaux);
   const [place, setPlace] = React.useState(0);
   const places = [R.g, ...R.c];
@@ -192,12 +222,56 @@ function FeuilleCarte({ page, sel, sources, regles, reglage, poser, locaux, ferm
               );
             })}
           </ul>
+          {poserObjectif ? <ObjectifFeuille page={page} objectif={objectif} poserObjectif={poserObjectif} /> : null}
           <button type="button" className="vrm-carte-defaut" data-carte-defaut-remettre="" onClick={() => { poser(reglageAEnregistrer(reglage, page, null)); setPlace(0); }}>Par défaut</button>
         </div>
       </div>
     </div>
   );
   return typeof document !== 'undefined' ? createPortal(contenu, document.body) : contenu;
+}
+
+// ── « Objectif » DANS LA FEUILLE (4 nov.) ───────────────────────────────────
+// CA vendu ou Nombre de ventes (son choix), un montant, « OK » ; « Sur cette
+// carte » (montrée ou non ici) et « Retirer ». Rien n'est enregistré tant qu'il
+// n'a pas touché « OK » ; une saisie illisible n'enregistre rien.
+function ObjectifFeuille({ page, objectif, poserObjectif }) {
+  const [ouvert, setOuvert] = React.useState(false);
+  const [type, setType] = React.useState(objectif ? objectif.type : 'ca');
+  const [saisie, setSaisie] = React.useState(objectif ? String(objectif.valeur).replace('.', ',') : '');
+  const lu = lireSaisieObjectif(type, saisie);
+  const valider = () => { if (lu == null) return; const n = objectifAEnregistrer(objectif, { type, valeur: lu }); if (n) { poserObjectif(n); setOuvert(false); } };
+  const ici = objectifSurPage(objectif, page);
+  return (
+    <div className="vrm-carte-objectif" data-carte-objectif={objectif ? objectif.type : ''} data-carte-objectif-ici={objectif ? (ici ? '1' : '0') : undefined}>
+      <button type="button" className="vrm-carte-choix" aria-expanded={ouvert} data-carte-objectif-ouvrir="" onClick={() => setOuvert(!ouvert)}>
+        <span className="vrm-carte-choix-nom">Objectif</span>
+        <span className="vrm-carte-choix-v">{objectif ? (objectif.type === 'ca' ? `${Math.round(objectif.valeur).toLocaleString('fr-FR')} €` : `${objectif.valeur} ventes`) : '—'}</span>
+        <span className="vrm-carte-coche" aria-hidden="true">{ouvert ? '−' : '+'}</span>
+      </button>
+      {ouvert ? (
+        <div className="vrm-carte-objectif-corps">
+          <div className="vrm-carte-periodes vrm-seg" role="group" aria-label="Type d’objectif">
+            {Object.entries(TYPES_OBJECTIF).map(([k, d]) => (
+              <button key={k} type="button" className="vrm-seg-btn" aria-pressed={type === k} data-carte-objectif-type={k} onClick={() => setType(k)}>{d.nom}</button>
+            ))}
+          </div>
+          <div className="vrm-carte-objectif-saisie">
+            <input type="text" inputMode={type === 'ca' ? 'decimal' : 'numeric'} aria-label={type === 'ca' ? 'Objectif en euros' : 'Objectif en nombre de ventes'} data-carte-objectif-saisie=""
+              value={saisie} onChange={(e) => setSaisie(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') valider(); }} placeholder={type === 'ca' ? '2 000' : '40'} />
+            <span aria-hidden="true">{type === 'ca' ? '€' : 'ventes'}</span>
+            <button type="button" className="vrm-carte-ok" data-carte-objectif-ok="" disabled={lu == null} onClick={valider}>OK</button>
+          </div>
+          {objectif ? (
+            <div className="vrm-carte-objectif-gestes">
+              <button type="button" className="vrm-carte-defaut" aria-pressed={ici} data-carte-objectif-page={ici ? '1' : '0'} onClick={() => { const n = objectifAEnregistrer(objectif, { page, cacher: ici }); if (n) poserObjectif(n); }}>{ici ? 'Masquer sur cette carte' : 'Montrer sur cette carte'}</button>
+              <button type="button" className="vrm-carte-defaut" data-carte-objectif-retirer="" onClick={() => { poserObjectif(objectifAEnregistrer(objectif, null)); setSaisie(''); setOuvert(false); }}>Retirer</button>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 export { CHIFFRES, horsSelection };
