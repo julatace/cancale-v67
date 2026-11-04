@@ -126,6 +126,7 @@ import { normAdresse, ADRESSE_COLLECTRICE, estAdresseCollectrice } from "../api/
 import { retoursEnCours, retoursPourSite, remiseEnStock, retourAReceptionner, numsRemisEnStock, LIBELLE_ETAPE, ETAPES_RETOUR } from "./retoursStock.js";
 import { rangerParTransporteur, ordreDesGroupes, ordonnerLot } from "./lotTransporteurs.js";
 import { trouverParScan } from "./scanColis.js";
+import { ligneLotAutre, cochesParDefaut, selectionImprimable, texteSansBordereau } from "./lotSelection.js";
 import { etatVinted, NIVEAU_ETAT_MAX } from "./carteAnnonce.js";
 import ChoixPeriode from "./ChoixPeriode.jsx";
 import { libellePlage, phrasePlage } from "./periodeCalendrier.js";
@@ -10664,9 +10665,10 @@ const TAMPON_ANNULE = 'Impression annulée.';
 const estTamponAnnule = (e) => !!(e && (e.tamponAnnule || e.message === TAMPON_ANNULE));
 let _placeurTampon = null;
 const demanderPlacementTampon = (o) => new Promise((resolve) => { if (!_placeurTampon) return resolve(undefined); _placeurTampon({ ...o, resolve }); });
-const choisirTampon = ({ PL, src, numero, titre, apercu = true }) => {
+// (4 nov.) `deja` partagé par tout un lot : UNE question par forme, la place choisie vaut pour les
+// bordereaux suivants de la même forme (le premier de chaque forme est celui qu'on montre).
+const choisirTampon = ({ PL, src, numero, titre, apercu = true, deja = {} }) => {
   let type = 'autre'; try { type = typeBordereau(PL, src).type; } catch (_) {}
-  const deja = {};
   return async (doc, info = {}) => {
     const forme = formeTampon(type, doc.getPages()[0], !!info.isole);
     if (forme.cle in deja) return deja[forme.cle];
@@ -11088,6 +11090,10 @@ const mergeAndDownloadBordereauxBrut = async (items, resolvePos, opts = {}) => {
   let count = 0, nInv = 0, isoles = 0, nEtiquettes = 0, fiches = 0, bandes = 0;
   const entiers = [];   // ce qu'on n'a PAS su isoler — l'écran doit le dire
   const reussis = [], rates = [];
+  // (4 nov., Julien : « pareil pour le tamponnage, on doit pouvoir le faire quand tous les bordereaux
+  // sont sélectionnés ») `opts.apercu` : true ⇒ la feuille s'ouvre UNE fois par forme sans place gardée ;
+  // 'force' (« Placer le tampon ») ⇒ une fois par forme, toujours ; false ⇒ jamais. Annuler ⇒ rien.
+  const dejaLot = {};
   for (const [index, it] of items.entries()) {
     try {
       const src = await PDFDocument.load(it.pdfBuf);
@@ -11097,7 +11103,7 @@ const mergeAndDownloadBordereauxBrut = async (items, resolvePos, opts = {}) => {
       // ne SAIT pas où elle est, la page part ENTIÈRE — jamais un code-barres
       // coupé au hasard (`poserBordereau`, la même règle partout).
       // La position mémorisée de la forme de CE bordereau (`positionTampon`), sinon le choix automatique.
-      const r1 = await poserBordereau(PL, out, src, { numero: it.numero, title: it.title, pos, thermique, choisir: choisirTampon({ PL, src, numero: it.numero, titre: it.title, apercu: false }) });
+      const r1 = await poserBordereau(PL, out, src, { numero: it.numero, title: it.title, pos, thermique, choisir: choisirTampon({ PL, src, numero: it.numero, titre: it.title, apercu: opts.apercu === undefined ? false : opts.apercu, deja: dejaLot }) });
       for (const t of r1.tampons || []) { if (t === 'fiche') fiches++; else if (t === 'bande') bandes++; }
       if (r1.isole) { isoles++; nEtiquettes += r1.etiquettes; }
       else if (thermique) entiers.push({ titre: it.title || '', raison: r1.raison });
@@ -11106,7 +11112,7 @@ const mergeAndDownloadBordereauxBrut = async (items, resolvePos, opts = {}) => {
       if (it.invBytes) {
         try { const isrc = await PDFDocument.load(it.invBytes); (await out.copyPages(isrc, isrc.getPageIndices())).forEach(p => out.addPage(p)); nInv++; } catch (_) {}
       }
-    } catch (_) { rates.push(index); }
+    } catch (e) { if (estTamponAnnule(e)) throw e; rates.push(index); }
   }
   if (!count) throw new Error('Aucun bordereau exploitable.');
   posePrefsImpression(PL, out);   // une feuille par bordereau (§ recto-verso)
@@ -48796,20 +48802,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const rangDe = new Map(ranges.map((x, i) => [x.__autre ? x.key : String(x.txn || x.key), i]));
     const L = [];
     if (voitSite('vinted')) for (const l of lignesLot()) { const o = l.e.o, b = l.e.b;
-      L.push({ ...l, site: 'vinted', trNom: trNomColis(l.e), rang: rangDe.get(String(l.cle)),
+      L.push({ ...l, site: 'vinted', pdf: true, cochable: true, trNom: trNomColis(l.e), rang: rangDe.get(String(l.cle)),
         num: (b ? numForBord(b) : '') || (o ? (effEntry(o)?.numero || '') : ''), titre: (o && o.title) || (b && (b.modele || b.article)) || 'Bordereau',
         photo: o ? orderPhoto(o) : bordPhoto(b), sous: `Vinted · ${o && o._acc ? accNameOf(o._acc) : 'compte inconnu'}` }); }
+    // (4 nov., Julien : « je n'ai pas la possibilité de sélectionner la vente de Vestiaire Co et de
+    // Leboncoin ») Chaque colis des autres sites a SA ligne (`ligneLotAutre`, src/lotSelection.js) :
+    // Vestiaire et Leboncoin cochables même sans PDF (le lot les nomme « sans bordereau »), eBay grisé.
     const imprimesVc = vcCarte('vrm_vc_imprimes') || {};
     const lbcPdf = extSait('lbcpdf') === 'ok';
+    const numD = load('vinted_annonce_numeros', {}) || {};
+    const numLbc = (x) => { const f = x.x && x.x.itemId ? numD[x.x.itemId] : null; return (f && f.numero != null && String(f.numero).trim()) ? String(f.numero).trim() : ''; };
     ranges.forEach((x, i) => {
-      if (x.__autre === 'vc' && x.v && x.v.bordereau && x.v.bordereau.id)
-        L.push({ cle: x.key, site: 'vestiaire', v: x.v, trNom: x.trNom, rang: i, age: null, ancienne: false, imprime: imprimesVc[x.v.id] || null,
-          num: x.v.num || '', titre: x.v.titre || 'Article Vestiaire', photo: x.v.photo || null, sous: 'Vestiaire' });
-      else if (x.__autre === 'lbc' && lbcPdf && x.o && x.o.label && x.o.label.voucherUrl) {
-        const f = x.x.itemId ? (load('vinted_annonce_numeros', {}) || {})[x.x.itemId] : null;
-        L.push({ cle: x.key, site: 'leboncoin', lo: x.o, trNom: x.trNom, rang: i, age: null, ancienne: false, imprime: null,
-          num: (f && f.numero != null && String(f.numero).trim()) ? String(f.numero).trim() : '', titre: x.x.titre || x.o.title || '(sans titre)', photo: photoArticle(x.o), sous: 'Leboncoin' });
-      }
+      if (!x.__autre) return;
+      const extra = x.__autre === 'lbc' ? { photo: photoArticle(x.o || {}) } : x.__autre === 'eb' ? { num: x.x && x.x.ordre ? (numLigneEbay(x.x.ordre, (x.x.ordre.lineItems || [])[0]) || '') : '', photo: x.x && x.x.ordre ? photoCommande(x.x.ordre) : null } : {};
+      const l = ligneLotAutre({ ...x, ...extra }, i, { imprimesVc, lbcPdf, numLbc });
+      if (l) L.push(l);
     });
     return ordonnerLot(L, ordre, (l) => l.trNom);
   };
@@ -49027,9 +49034,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const ouvrirLot = () => {
     const L = lignesLotTous();
     if (!L.length) { toast('Aucun bordereau prêt à imprimer pour l\'instant.'); return; }
-    setProgressionLot(null);setLot({ lignes:L,verifications:{},coches:new Set(L.filter(l=>!l.ancienne&&!l.imprime).map(l=>l.cle)),echecs:[] });
+    setProgressionLot(null);setLot({ lignes:L,verifications:{},coches:cochesParDefaut(L),echecs:[] });
   };
-  const batchBordereaux = async (cles) => {
+  const batchBordereaux = async (cles, placer = false) => {
     if (batchBusy) return;
     // ⚠️⚠️ « TOUT IMPRIMER » IMPRIME EXACTEMENT CE QUE LE BOUTON COMPTE (§11).
     // Julien, 21 sept. : « le bouton tout imprimer imprime des bordereaux qui
@@ -49049,7 +49056,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const choisis = cles instanceof Set ? cles : null;
     // (3 nov.) Les lignes de « Tout imprimer » (toutes plateformes, ordre des transporteurs) ;
     // pour Vinted, la règle d'avant : PDF présent et colis pas coché parti (`lignesLot`).
-    const aImprimer = lignesLotTous().filter(l => !choisis || choisis.has(l.cle));
+    // (4 nov.) Jamais une ligne non cochable (eBay : l'étiquette se prend dans eBay).
+    const aImprimer = selectionImprimable(lignesLotTous(), choisis);
     if (!aImprimer.length) { libererOngletPdf(); toast(choisis ? 'Coche au moins un bordereau.' : 'Aucun bordereau prêt à imprimer pour l\'instant.'); return; }
     const encoreDisponibles = new Set(aImprimer.map(l => l.cle));
     const disparus = choisis ? [...choisis].filter(cle => !encoreDisponibles.has(cle)) : [];
@@ -49071,7 +49079,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // Les PDF sont téléchargés MAINTENANT, et seulement ceux à imprimer :
       // les embarquer dans la liste coûtait 6 Mo à chaque ouverture de l'écran.
       const items = [];
-      let pasLus = 0, sansPdf = 0;
+      let pasLus = 0, sansPdf = 0; const sansLignes = [];
       for (const [index,l] of aImprimer.entries()) {
         verifierContexte();
         setProgressionLot({etape:'lecture',fait:index+1,total:aImprimer.length});
@@ -49083,18 +49091,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           //    par n° de transaction ; l'email n'est qu'un secours.
           const capte = e.txn ? labelsCaptes[e.txn] : null;
           const lu = await octetsBordereau(capte && capte.row, b && b.hasPdf ? b._row : null);
-          if (lu === null) pasLus++; else if (!lu.octets) sansPdf++;
+          if (lu === null) pasLus++; else if (!lu.octets) { sansPdf++; sansLignes.push(l); }
           buf = lu && lu.octets ? lu.octets : null;
           // Compte pro (une facture existe pour cette vente) → on joint la facture
           // juste après son bordereau dans le PDF groupé (§41).
           const inv = buf && b ? invForBord(b) : null;
           if (inv) { const ent = entForBordInvoice(inv); if (ent) { try { invBytes = await buildFacturXBytes(inv, ent); } catch(_) {} } }
+        } else if (l.site === 'vestiaire' && !(l.v && l.v.bordereau && l.v.bordereau.id)) {
+          sansPdf++; sansLignes.push(l);   // (4 nov.) cochée sans bordereau rangé : nommée « sans bordereau »
         } else if (l.site === 'vestiaire') {
           // Le PDF rapatrié (`vc_label_{produit}`), lu au clic — comme « Imprimer » de sa carte.
           const j = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(l.v.bordereau.id)}&select=b64:data->>b64`);
           const b64 = Array.isArray(j) && j[0] && j[0].b64;
-          if (!Array.isArray(j)) pasLus++; else if (!b64) sansPdf++;
+          if (!Array.isArray(j)) pasLus++; else if (!b64) { sansPdf++; sansLignes.push(l); }
           if (b64) { try { buf = b64ToBytes(b64); } catch (_) { buf = null; } }
+        } else if (l.site === 'leboncoin' && !l.pdf) {
+          sansPdf++; sansLignes.push(l);   // (4 nov.) pas de lien de bordereau, ou pas d'extension ici pour le lire
         } else if (l.site === 'leboncoin') {
           // Le PDF Leboncoin passe par l'extension (`lbcpdf`), comme « Imprimer » de sa carte.
           let r0 = null; try { r0 = await vmrPdfLbc(l.lo.label.voucherUrl); } catch (_) { r0 = null; }
@@ -49105,9 +49117,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // Numéro et titre : même dérivation que la carte (identité, jamais le titre — §5).
         items.push({ numero: l.num || '', title: l.titre || '', pdfBuf: buf, invBytes, cle: l.cle, site: l.site, ligne: l });
       }
-      if (!items.length) { libererOngletPdf(); toast(pasLus ? "La base n'a pas répondu — réessaie dans un instant." : "Ces bordereaux n'ont plus leur PDF — retélécharge-les depuis les ventes sur Vinted."); setBatchBusy(false); return; }
+      if (!items.length) { libererOngletPdf(); toast(pasLus ? "La base n'a pas répondu — réessaie dans un instant." : (sansLignes.length ? texteSansBordereau(sansLignes) + '.' : "Ces bordereaux n'ont plus leur PDF — retélécharge-les depuis les ventes sur Vinted.")); setBatchBusy(false); return; }
       setProgressionLot({etape:'fusion',fait:items.length,total:aImprimer.length});
-      const r = await mergeAndDownloadBordereaux(items, (w, h) => posForFormat(w, h, false), { autoprint:true,imprimante,avantOuverture:verifierContexte });
+      const r = await mergeAndDownloadBordereaux(items, (w, h) => posForFormat(w, h, false), { autoprint:true,imprimante,avantOuverture:verifierContexte, apercu: placer ? 'force' : true });
       setBordResult({ ...r, batch:true,attendus:aImprimer.length });setProgressionLot({etape:'termine',fait:r.count,total:aImprimer.length});
       // Un lot imprimé en partie ne se présente pas comme complet (§5). Le
       // nombre imprimé est celui que la fusion a VRAIMENT gardé (`r.count`) :
@@ -49122,8 +49134,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (reussiesVinted.length) setBordsPrinted(prev => { const u = { ...prev }; const at = new Date().toISOString(); reussiesVinted.forEach(k => { u[k] = at; }); save('vinted_bords_printed', u); return u; });
       (r.reussis || []).filter(i => items[i].site === 'vestiaire').forEach(i => { try { marquerVc('vrm_vc_imprimes', items[i].ligne.v.id, true); } catch (_) {} });
       if (choisis) setLot(x => echecs.length ? { ...x, coches: new Set(echecs), echecs } : null);
-      if (pasLus || sansPdf || illisibles) toast(`${imprimes} sur ${aImprimer.length} imprimé${imprimes>1?'s':''} — ${[pasLus?`${pasLus} que la base n'a pas rendu${pasLus>1?'s':''} (réessaie)`:'', sansPdf?`${sansPdf} sans PDF`:'', illisibles?`${illisibles} PDF illisible${illisibles>1?'s':''} (retélécharge-le${illisibles>1?'s':''} depuis la vente sur Vinted)`:''].filter(Boolean).join(', ')}.`);
-    } catch(err){ libererOngletPdf(); toast(/Aucun bordereau exploitable/.test(String(err && err.message || err)) ? "Aucun de ces PDF n'a pu être lu — retélécharge-les depuis les ventes sur Vinted." : 'Erreur : ' + String(err)); }
+      if (pasLus || sansPdf || illisibles) toast(`${imprimes} sur ${aImprimer.length} imprimé${imprimes>1?'s':''} — ${[pasLus?`${pasLus} que la base n'a pas rendu${pasLus>1?'s':''} (réessaie)`:'', sansPdf?texteSansBordereau(sansLignes):'', illisibles?`${illisibles} PDF illisible${illisibles>1?'s':''} (retélécharge-le${illisibles>1?'s':''} depuis la vente sur Vinted)`:''].filter(Boolean).join(', ')}.`);
+    } catch(err){ libererOngletPdf(); if (!estTamponAnnule(err)) toast(/Aucun bordereau exploitable/.test(String(err && err.message || err)) ? "Aucun de ces PDF n'a pu être lu — retélécharge-les depuis les ventes sur Vinted." : 'Erreur : ' + String(err)); }
     setBatchBusy(false);
   };
   // Deep-link « Tout imprimer » depuis l'extension (?print=bord) : dès que les
@@ -54962,7 +54974,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         {batchBusy&&progressionLot&&<div className="vrm-preparation-progression" role="status">{progressionLot.etape==='lecture'?`Lecture des PDF : ${progressionLot.fait}/${progressionLot.total}`:'Préparation du document groupé…'}<progress {...(progressionLot.etape==='lecture'?{value:progressionLot.fait,max:progressionLot.total}:{})}/></div>}
                         <div style={{display:'flex',gap:12,flexWrap:'wrap',padding:'10px 18px',fontSize:12,color:C.muted}}>
                           <span role="status">{nb} sélectionné{nb>1?'s':''} sur {L.length}</span>
-                          <button type="button" disabled={batchBusy} onClick={()=>setLot(x=>({...x,coches:new Set(L.map(l=>l.cle))}))}>Tout sélectionner</button>
+                          <button type="button" disabled={batchBusy} onClick={()=>setLot(x=>({...x,coches:new Set(L.filter(l=>l.cochable!==false).map(l=>l.cle))}))}>Tout sélectionner</button>
                           <button type="button" disabled={batchBusy} onClick={()=>setLot(x=>({...x,coches:new Set()}))}>Tout décocher</button>
                           <span>Décocher ne supprime aucun bordereau.</span>
                         </div>
@@ -54979,20 +54991,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             return (
                               <React.Fragment key={l.cle}>
                               {ouvreT ? <div className="vrm-fu-groupe-transp" data-lot-groupe={l.trNom} style={{marginTop:il?10:4}}><h3>{l.trNom}</h3><span>{L.filter(x=>x.trNom===l.trNom).length}</span></div> : null}
-                              <div data-lot-ligne={l.cle} data-lot-site={l.site} data-lot-num={num} data-lot-transp={l.trNom} data-coche={coche?'1':'0'} style={{display:'flex',gap:10,alignItems:'center',padding:'9px 0',borderTop:`1px solid ${C.border}`,cursor:'pointer'}}>
-                                <label className="vrm-preparation-selection"><input type="checkbox" aria-label={`Sélectionner ${l.titre||'ce bordereau'}`} disabled={batchBusy} checked={coche} onChange={()=>basculer(l.cle)} style={{width:18,height:18,flexShrink:0}}/></label>
+                              <div data-lot-ligne={l.cle} data-lot-site={l.site} data-lot-num={num} data-lot-transp={l.trNom} data-coche={coche?'1':'0'} data-lot-pdf={l.pdf===false?'0':'1'} data-lot-cochable={l.cochable===false?'0':'1'} style={{display:'flex',gap:10,alignItems:'center',padding:'9px 0',borderTop:`1px solid ${C.border}`,cursor:l.cochable===false?'default':'pointer',opacity:l.cochable===false?0.55:1}}>
+                                <label className="vrm-preparation-selection"><input type="checkbox" aria-label={l.cochable===false?`${l.titre||'Commande'} : eBay`:`Sélectionner ${l.titre||'ce bordereau'}`} disabled={batchBusy||l.cochable===false} checked={coche&&l.cochable!==false} onChange={()=>{ if(l.cochable!==false) basculer(l.cle); }} style={{width:18,height:18,flexShrink:0}}/></label>
                                 <PhotoVente src={photo} size={32} portrait/>
                                 <span style={{flex:1,minWidth:0}}>
                                   <span style={{display:'block',fontSize:13,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{l.titre}</span>
                                   <span style={{display:'block',fontSize:12,color:C.muted,marginTop:2}}>
                                     {l.sous}{l.site === 'vinted' ? ` · vendue le ${fmtD(o)}` : ''}
+                                    {l.pdf === false && l.cochable !== false ? <b data-lot-sans-bordereau="1" style={{color:C.warn,fontWeight:600}}> · Sans bordereau</b> : null}
                                     {l.ancienne && <b data-lot-ancienne="1" style={{color:C.warn,fontWeight:600}}> · il y a {Math.floor(l.age)} j : Vinted dit encore « à expédier », vérifie avant d'imprimer</b>}
                                     {l.imprime && <span data-lot-imprime="1"> · déjà imprimé</span>}
                                     {lot.echecs.includes(l.cle) && <b style={{color:C.warn,fontWeight:600}}> · PDF pas lu</b>}
                                     <span style={{display:'block',marginTop:3}}>{num?emplacement:'Numéro VRM non confirmé · vérifie l’article avec sa photo.'}</span>
                                   </span>
                                 </span>
-                                <label className="vrm-preparation-controle"><input type="checkbox" aria-label={`Article contrôlé : ${l.titre||l.cle}`} disabled={!coche||batchBusy} checked={verifie} onChange={e=>{const ok=e.target.checked;setLot(x=>({...x,verifications:{...(x.verifications||{}),[l.cle]:ok?sigLigneLot(l):null}}));}}/>Contrôlé</label>
+                                {l.cochable === false ? <span className="vrm-preparation-controle" data-lot-ebay="1" style={{fontSize:12,color:C.muted,fontWeight:600}}>eBay</span> : <label className="vrm-preparation-controle"><input type="checkbox" aria-label={`Article contrôlé : ${l.titre||l.cle}`} disabled={!coche||batchBusy} checked={verifie} onChange={e=>{const ok=e.target.checked;setLot(x=>({...x,verifications:{...(x.verifications||{}),[l.cle]:ok?sigLigneLot(l):null}}));}}/>Contrôlé</label>}
                               </div>
                               </React.Fragment>
                             );
@@ -55000,6 +55013,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         </div>
                         <div style={{display:'flex',gap:8,justifyContent:'flex-end',flexWrap:'wrap',padding:'12px 18px',borderTop:`1px solid ${C.border}`}}>
                           <button type="button" onClick={()=>setLot(null)} style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,padding:'10px 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Fermer</button>
+                          {/* (4 nov.) « Placer le tampon » : la feuille de chaque type de bordereau du lot s'ouvre, même déjà gardé. */}
+                          <button type="button" data-imprime="1" data-lot-placer={nb} disabled={!nb || batchBusy} onClick={()=>batchBordereaux(new Set(lot.coches), true)}
+                            style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,padding:'10px 14px',fontSize:13,fontWeight:600,cursor:nb?'pointer':'default',opacity:nb&&!batchBusy?1:0.5,fontFamily:'inherit'}}>Placer le tampon</button>
                           <button type="button" data-imprime="1" data-lot-imprimer={nb} disabled={!nb || batchBusy} onClick={()=>batchBordereaux(new Set(lot.coches))}
                             style={{border:'none',background:C.accent,color:C.onAccent,borderRadius:12,padding:'10px 16px',fontSize:13,fontWeight:700,cursor:nb?'pointer':'default',opacity:nb&&!batchBusy?1:0.5,fontFamily:'inherit'}}>
                             {batchBusy?'Préparation…':lot.echecs.length?`Réessayer (${nb})`:`Imprimer ${nb} bordereau${nb>1?'x':''}`}
