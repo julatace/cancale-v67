@@ -13,6 +13,7 @@ const TB = require('./tous-boutons.cjs');
       for (const tab of (process.env.BUREAU_ONGLETS||'journee,dashboard,settings,annonces,ventes,achats,messages').split(',')) {
         await pg.goto(`http://localhost:${TB.PORT}/?tab=${tab}`,{waitUntil:'domcontentloaded'});
         await TB.attendreCoque(pg);
+        if(process.env.BUREAU_MUTATION==='fil-etroit') await pg.addStyleTag({content:'html body .vrm-message-workspace{grid-template-columns:300px minmax(0,1fr) 280px!important}html body .vrm-message-workspace>.vrm-msg-fiche{display:flex!important}'});
         await pg.waitForTimeout(450);
         const box = await pg.evaluate(() => {
           const main=document.querySelector('.vrm-main');
@@ -37,6 +38,8 @@ const TB = require('./tous-boutons.cjs');
           assert.equal(meta,'contents','les informations des ventes ont leurs colonnes');
           await pg.locator('.vrm-barre-haut-droite').getByRole('button',{name:'Vinted',exact:true}).click();
           await pg.locator('.vrm-sale-row > .vrm-ledger-sale-toggle').first().waitFor();
+          const titre=await pg.locator('.vrm-sale-row .vrm-ledger-sale-title').first().evaluate(e=>({width:e.getBoundingClientRect().width,height:e.getBoundingClientRect().height,clip:getComputedStyle(e).clip}));
+          assert.ok(titre.width>100&&titre.height>10&&titre.clip==='auto','le vrai titre reste visible en colonnes');
           const chevauchement=await pg.locator('.vrm-sale-row > .vrm-ledger-sale-toggle').evaluateAll(rows=>rows.some(row=>{
             const nodes=[...row.children].filter(e=>getComputedStyle(e).display!=='none'&&getComputedStyle(e).visibility!=='hidden');
             const r=nodes.map(e=>e.getBoundingClientRect()).filter(r=>r.width&&r.height);
