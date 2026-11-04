@@ -48,7 +48,7 @@ import {verifierConfidentialite} from './_lib/confidentialite.js';
 //    vérifiée, dans une table que le vendeur peut lire mais pas écrire
 //    (supabase/migrations/005-abonnements.sql). Sinon on s'abonnerait soi-même
 //    depuis la console du navigateur.
-import { utilisateurDe, jetonDe, vendeurExige, baseCloisonnee } from './_lib/session.js';
+import { utilisateurDe, jetonDe, vendeurExige, baseCloisonnee, lireCommeVendeur } from './_lib/session.js';
 import { stripeApi, stripePret, stripeModeTest, signatureValide, finPeriode } from './_lib/stripe.js';
 import { lireMentions, mentionsManquantes } from './_lib/mentions-legales.js';
 import { sbCle } from './_lib/cle.js';
@@ -64,6 +64,8 @@ import { debutDiscord, retourDiscord, attenteDiscord } from './_lib/discord.js';
 import { routeOperations } from './_lib/operations.js';
 import {routeFavoris} from './_lib/favoris.js';
 import {effacerFavorisDe} from './_lib/favoris-confidentialite.js';
+import { traiterAppareils, lireJournal } from './_lib/securite-compte.js';
+import { PROPRIETAIRE_NEUTRE } from './_lib/proprietaire-email.js';
 
 export const config = { api: { bodyParser: false } };
 
@@ -775,6 +777,28 @@ async function fermerSession(jeton) {
 
 const REESSAIE = "Je n'ai pas pu préparer la connexion de l'extension. Réessaie dans un instant.";
 
+// ── APPAREILS CONNECTÉS / JOURNAL (4 nov., api/_lib/securite-compte.js) ─────
+// L'identifiant vient du JETON vérifié par Supabase (`vendeurExige`), jamais
+// de la requête : un vendeur ne voit, ni ne ferme, que SES sessions.
+async function appareils(req, res) {
+  const u = await vendeurExige(req, res);
+  if (!u) return;
+  let corps = {};
+  if (req.method === 'POST') { try { corps = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {}); } catch (_) { corps = {}; } }
+  const r = await traiterAppareils({ base: SUPABASE_URL, cle: process.env.SUPABASE_SERVICE_KEY || '', user: u, jeton: jetonDe(req), methode: req.method, corps });
+  return repondre(res, r.status, r.body);
+}
+async function journalVrm(req, res) {
+  const u = await vendeurExige(req, res);
+  if (!u) return;
+  const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
+  const lireService = SERVICE ? async (chemin) => {
+    try { const r = await fetch(`${SUPABASE_URL}/rest/v1/${chemin}`, { headers: sbCle(SERVICE), signal: AbortSignal.timeout(12000) }); if (!r.ok) return null; const j = await r.json(); return Array.isArray(j) ? j : null; } catch (_) { return null; }
+  } : null;
+  const j = await lireJournal({ userId: u.id, lireVendeur: (c) => lireCommeVendeur(req, c), lireService, neutre: PROPRIETAIRE_NEUTRE });
+  return repondre(res, 200, { ok: true, ...j });
+}
+
 async function sessionExtension(req, res) {
   const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
   // Sans clé de service, impossible de fabriquer quoi que ce soit : on le dit
@@ -1207,5 +1231,8 @@ export default async function handler(req, res) {
   if (mode === 'entreprise') return m === 'GET' ? entreprise(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   if (mode === 'discord-deja') return m === 'GET' ? discordDeja(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   if (mode === 'fermer') return m === 'POST' ? fermerCompte(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
+  // (4 nov.) Paramètres → Mon compte : « Appareils connectés » et « Ce que VRM a fait ».
+  if (mode === 'appareils') return (m === 'GET' || m === 'POST') ? appareils(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
+  if (mode === 'journal') return m === 'GET' ? journalVrm(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   return repondre(res, 404, { erreur: 'mode inconnu' });
 }

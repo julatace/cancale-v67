@@ -1,0 +1,220 @@
+// ── APPAREILS CONNECTÉS ET JOURNAL DE CE QUE VRM A FAIT (4 nov.) ─────────────
+// Deux modes de `api/compte.js` (12 fonctions au plus : aucune route neuve).
+//
+// 1. `mode=appareils` — les sessions VRM du vendeur (`auth.sessions`, lisible
+//    seulement par la clé de service, via les fonctions de la migration 024).
+//    ⚠️ CLOISONNEMENT : l'identifiant passé aux fonctions est celui du JETON
+//    vérifié par Supabase (`vendeurExige`), jamais un champ de la requête ; les
+//    lignes rendues sont refiltrées ici sur cet identifiant (une fonction mal
+//    réécrite ne ferait pas fuir un autre vendeur) ; l'adresse IP n'est jamais
+//    lue ni rendue ; le navigateur est RÉSUMÉ (« iPhone · Safari »).
+//    Fermer une session : seulement une session de SA liste, jamais celle de
+//    l'appareil qui demande (pour lui, c'est « Se déconnecter »).
+// 2. `mode=journal` — ce que VRM a envoyé en son nom, agrégé de ce qui est DÉJÀ
+//    noté en base (aucune source inventée, rien n'est écrit) : file des messages
+//    aux favoris (sa part seulement), journal de l'agent eBay, retraits eBay
+//    automatiques, brouillons de Republier, bordereaux récupérés.
+
+import { createHash } from 'node:crypto';
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// ── Le navigateur, résumé ───────────────────────────────────────────────────
+export function resumerAppareil(ua) {
+  const s = String(ua || '');
+  if (!s) return 'Appareil inconnu';
+  const appareil = /iPhone/i.test(s) ? 'iPhone'
+    : /iPad/i.test(s) ? 'iPad'
+    : /Android/i.test(s) ? 'Android'
+    : /Macintosh|Mac OS X/i.test(s) ? 'Mac'
+    : /Windows/i.test(s) ? 'Windows'
+    : /CrOS/i.test(s) ? 'Chromebook'
+    : /Linux/i.test(s) ? 'Linux'
+    : /node|undici|vercel/i.test(s) ? 'Serveur VRM'
+    : 'Appareil inconnu';
+  const nav = /EdgiOS|EdgA|Edg\//.test(s) ? 'Edge'
+    : /OPR\/|Opera/.test(s) ? 'Opera'
+    : /FxiOS|Firefox\//.test(s) ? 'Firefox'
+    : /CriOS|Chrome\//.test(s) ? 'Chrome'
+    : /Safari\//.test(s) && /Version\//.test(s) ? 'Safari'
+    : /AppleWebKit/.test(s) && /(iPhone|iPad)/.test(s) ? 'App iPhone'
+    : '';
+  return nav ? `${appareil} · ${nav}` : appareil;
+}
+
+// L'identifiant de la session de CET appareil, lu dans le jeton déjà vérifié
+// par Supabase (`vendeurExige`) : sert seulement à dire « cet appareil ».
+export function sessionDuJeton(jeton) {
+  try {
+    const p = String(jeton || '').split('.')[1];
+    if (!p) return '';
+    const j = JSON.parse(Buffer.from(p.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8'));
+    return UUID.test(String(j && j.session_id || '')) ? String(j.session_id) : '';
+  } catch (_) { return ''; }
+}
+
+// Les lignes de `vrm_sessions_de`, pour l'écran. `null` (pas su) reste `null`.
+export function listeAppareils(lignes, { userId, ici }) {
+  if (!Array.isArray(lignes)) return null;
+  return lignes
+    .filter((l) => l && UUID.test(String(l.id || '')) && (l.user_id == null || String(l.user_id) === String(userId)))
+    .map((l) => ({
+      id: String(l.id),
+      appareil: resumerAppareil(l.user_agent),
+      creeLe: l.cree_le || null,
+      actifLe: l.actif_le || l.cree_le || null,
+      ici: !!ici && String(l.id) === String(ici),
+    }))
+    .sort((a, b) => (b.ici - a.ici) || String(b.actifLe || '').localeCompare(String(a.actifLe || '')));
+}
+
+// ── Appel des fonctions de la base (clé de service) ─────────────────────────
+async function rpc(base, cle, nom, corps, f) {
+  try {
+    const r = await f(`${base}/rest/v1/rpc/${nom}`, {
+      method: 'POST',
+      headers: { apikey: cle, Authorization: `Bearer ${cle}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(corps),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (r.status === 404) return { absente: true };
+    if (!r.ok) return null;
+    return { valeur: await r.json() };
+  } catch (_) { return null; }
+}
+
+// GET ⇒ { ok, appareils } · POST { session } ⇒ { ok, ferme }.
+// `deps` : { base, cle, user:{id}, jeton, methode, corps, fetch }.
+export async function traiterAppareils(deps) {
+  const { base, cle, user, jeton, methode, corps } = deps;
+  const f = deps.fetch || fetch;
+  if (!user || !UUID.test(String(user.id || ''))) return { status: 401, body: { erreur: 'session' } };
+  if (!cle) return { status: 503, body: { erreur: 'non-configure', message: "La liste des appareils n'est pas branchée sur le serveur." } };
+  const ici = sessionDuJeton(jeton);
+  const lire = async () => {
+    const r = await rpc(base, cle, 'vrm_sessions_de', { p_user: user.id }, f);
+    if (!r) return { status: 503, body: { erreur: 'base', message: "Je n'ai pas pu lire tes appareils — réessaie dans un instant." } };
+    if (r.absente) return { status: 503, body: { erreur: 'pas-installe', message: "La liste des appareils n'est pas encore installée sur ta base (migration 024)." } };
+    const appareils = listeAppareils(r.valeur, { userId: user.id, ici });
+    if (!appareils) return { status: 503, body: { erreur: 'base', message: "Je n'ai pas pu lire tes appareils — réessaie dans un instant." } };
+    return { status: 200, body: { ok: true, appareils } };
+  };
+  if (methode === 'GET') return lire();
+  if (methode !== 'POST') return { status: 405, body: { erreur: 'GET ou POST' } };
+  const id = String((corps && corps.session) || '');
+  if (!UUID.test(id)) return { status: 400, body: { erreur: 'session-invalide' } };
+  if (id === ici) return { status: 409, body: { erreur: 'ici', message: 'C’est cet appareil : utilise « Se déconnecter ».' } };
+  // Seulement une session de SA liste (relue maintenant, sous SON identifiant).
+  const l = await lire();
+  if (l.status !== 200) return l;
+  if (!l.body.appareils.some((a) => a.id === id)) return { status: 404, body: { erreur: 'inconnue', message: 'Cet appareil n’est plus connecté.' } };
+  const r = await rpc(base, cle, 'vrm_fermer_session', { p_user: user.id, p_id: id }, f);
+  if (!r || r.absente) return { status: 503, body: { erreur: 'base', message: "Je n'ai pas pu déconnecter cet appareil — réessaie dans un instant." } };
+  const n = Number(r.valeur);
+  if (n !== 1) return { status: 404, body: { erreur: 'inconnue', message: 'Cet appareil n’est plus connecté.' } };
+  return { status: 200, body: { ok: true, ferme: id } };
+}
+
+// ── LE JOURNAL ──────────────────────────────────────────────────────────────
+// Un événement : { at (ms), type, site, compte, cle:{item|sku|tx}, resultat, source }.
+// `resultat` : 'ok' · 'refuse' · 'pause' · 'verifier' · 'en_cours'.
+export const TYPES_JOURNAL = {
+  favori: 'Message à un favori',
+  favori_offre: 'Message et offre à un favori',
+  republication: 'Republication',
+  ebay_retrait: 'Retrait eBay automatique',
+  ebay_action: 'Action eBay',
+  bordereau: 'Bordereau récupéré',
+};
+// Ce qu'aucune ligne de la base ne note — dit tel quel à l'écran.
+export const NON_JOURNALISE = [
+  ['offres', 'Offres acceptées, refusées ou contre-offres sur Vinted : pas notées en base.'],
+  ['lbc', 'Suppressions et réponses Leboncoin : pas notées en base.'],
+  ['vestiaire', 'Réponses Vestiaire : pas notées en base.'],
+  ['relance', 'Remises en vente eBay : pas notées en base.'],
+  ['republications', 'Republications : notées depuis le 28 oct. seulement.'],
+];
+
+const ms = (v) => {
+  if (v == null || v === '') return null;
+  const n = typeof v === 'number' ? v : (/^\d+$/.test(String(v)) ? Number(v) : Date.parse(String(v)));
+  return Number.isFinite(n) && n > 0 ? n : null;
+};
+const ACTIONS_EBAY = {
+  expedier: 'Expédition notée', messageacheteur: 'Message à un acheteur', repondre: 'Réponse à un message', repondreoffre: 'Réponse à une offre',
+  modifierannonce: 'Annonce modifiée', terminerannonce: 'Annonce retirée', evaluer: 'Évaluation laissée', deciderretour: 'Décision sur un retour',
+  rembourserretour: 'Remboursement', decannulation: 'Décision sur une annulation', promouvoir: 'Promotion', changertaux: 'Taux de promotion', arreterpromo: 'Promotion arrêtée',
+  agentpublie: 'Annonce publiée',
+};
+
+// `sources` : { favoris:[{compte, jobs:[]}], ebayAgent:[{compte, items:[]}], ebayRetraits:[{compte, items:[]}],
+//               brouillons:[row.data], bordereaux:[{uid, tx, item, capturedAt}] }
+// Une source `null` = pas lue (dite par l'écran), `[]` = lue, rien.
+export function evenementsJournal(sources) {
+  const s = sources || {};
+  const out = [];
+  for (const f of s.favoris || []) for (const j of (f && Array.isArray(f.jobs) ? f.jobs : [])) {
+    const etat = String(j && j.etat || '');
+    const resultat = etat === 'envoye' || etat === 'verifie' ? 'ok' : etat === 'refuse' ? 'refuse' : etat === 'incertain' ? 'verifier' : etat === 'reserve' ? 'en_cours' : null;
+    if (!resultat) continue;          // en attente, annulé, ignoré : rien n'est parti
+    const at = ms(j.envoyeLe) || ms(j.traiteLe);
+    if (!at && resultat !== 'en_cours') continue;
+    out.push({ at, type: j.offre || j.pourcentage ? 'favori_offre' : 'favori', site: 'vinted', compte: f.compte || null, cle: { item: j.itemId ? String(j.itemId) : null }, resultat, source: 'favoris' });
+  }
+  for (const b of s.brouillons || []) {
+    if (!b || b.parVRM !== true) continue;
+    const publie = b.etat === 'publie';
+    const at = ms(publie ? (b.publieLe || b.at) : b.at);
+    if (!at) continue;
+    out.push({ at, type: 'republication', site: 'vinted', compte: b.uid ? String(b.uid) : null, cle: { item: b.itemId ? String(b.itemId) : (b.ancienId ? String(b.ancienId) : null), ancien: b.ancienId ? String(b.ancienId) : null }, resultat: publie ? 'ok' : 'pause', source: 'brouillons' });
+  }
+  for (const g of s.ebayRetraits || []) for (const x of (g && Array.isArray(g.items) ? g.items : [])) {
+    const at = ms(x && x.at); if (!at) continue;
+    out.push({ at, type: 'ebay_retrait', site: 'ebay', compte: g.compte || null, cle: { sku: x.sku ? String(x.sku) : null, item: null }, resultat: 'ok', source: 'ebay_retraits_auto' });
+  }
+  for (const g of s.ebayAgent || []) for (const x of (g && Array.isArray(g.items) ? g.items : [])) {
+    const at = ms(x && x.at); if (!at) continue;
+    const e = String(x.etat || '');
+    const resultat = e === 'reussi' ? 'ok' : e === 'echec' || e === 'refuse' ? 'refuse' : e === 'en_cours' ? 'verifier' : 'verifier';
+    const ref = String(x.ref || '');
+    out.push({ at, type: 'ebay_action', action: ACTIONS_EBAY[x.action] || 'Action eBay', site: 'ebay', compte: g.compte || null, cle: { sku: /^VRM-/i.test(ref) ? ref : null, item: null }, resultat, source: 'ebay_agent_journal' });
+  }
+  for (const l of s.bordereaux || []) {
+    const at = ms(l && l.capturedAt); if (!at) continue;
+    out.push({ at, type: 'bordereau', site: 'vinted', compte: l.uid ? String(l.uid) : null, cle: { item: l.item && /^\d+$/.test(String(l.item)) ? String(l.item) : null, tx: l.tx ? String(l.tx) : null }, resultat: 'ok', source: 'bordereaux' });
+  }
+  return out.sort((a, b) => (b.at || Infinity) - (a.at || Infinity));
+}
+
+// ── La lecture (côté serveur) ───────────────────────────────────────────────
+// `lireVendeur(chemin)` lit AU NOM du vendeur (son jeton : RLS ne rend que SES
+// lignes). `lireService(chemin)` lit avec la clé de service — utilisé pour la
+// SEULE file des favoris (rangée sous le propriétaire neutre), filtrée sur
+// `proprietaires` ⊇ [lui] et réduite à `groupes[lui]`.
+const hache = (uid) => createHash('sha256').update(String(uid)).digest('hex');
+export async function lireJournal({ userId, lireVendeur, lireService, neutre }) {
+  const sources = {}; const pasLu = [];
+  const comptes = await lireVendeur('vinted_accounts?select=vinted_user_id');
+  const parHache = new Map();
+  if (Array.isArray(comptes)) for (const c of comptes) if (c && c.vinted_user_id != null) parHache.set(hache(c.vinted_user_id), String(c.vinted_user_id));
+  // Favoris
+  if (lireService && neutre) {
+    const rows = await lireService(`app_data?owner=eq.${neutre}&id=like.favoris_file_*&data->proprietaires=cs.${encodeURIComponent(JSON.stringify([userId]))}&select=id,groupe:data->groupes->${encodeURIComponent(userId)}&limit=100`);
+    if (Array.isArray(rows)) sources.favoris = rows.filter((r) => /^favoris_file_[a-f0-9]{64}$/.test(String(r && r.id || ''))).map((r) => ({ compte: parHache.get(String(r.id).slice(13)) || null, jobs: r.groupe && Array.isArray(r.groupe.jobs) ? r.groupe.jobs.map((j) => ({ etat: j.etat, envoyeLe: j.envoyeLe, traiteLe: j.traiteLe, itemId: j.itemId, offre: j.offre ? true : undefined, pourcentage: j.pourcentage })) : [] }));
+    else { sources.favoris = null; pasLu.push('favoris'); }
+  } else { sources.favoris = null; pasLu.push('favoris'); }
+  const lignes = async (nom, chemin, map) => {
+    // Double barrière : RLS (son jeton) ET le filtre explicite sur son identifiant.
+    const r = await lireVendeur(chemin.replace('app_data?', `app_data?owner=eq.${userId}&`));
+    if (!Array.isArray(r)) { sources[nom] = null; pasLu.push(nom); return; }
+    sources[nom] = r.map(map);
+  };
+  const compteEbay = (id, prefixe) => { const k = String(id).slice(prefixe.length).replace(/^_/, ''); return k || 'principal'; };
+  await lignes('ebayAgent', 'app_data?id=like.ebay_agent_journal*&select=id,items:data->items&limit=50', (r) => ({ compte: compteEbay(r.id, 'ebay_agent_journal'), items: Array.isArray(r.items) ? r.items : [] }));
+  await lignes('ebayRetraits', 'app_data?id=like.ebay_retraits_auto*&select=id,items:data->items&limit=50', (r) => ({ compte: compteEbay(r.id, 'ebay_retraits_auto'), items: Array.isArray(r.items) ? r.items : [] }));
+  await lignes('brouillons', 'app_data?id=like.vinted_brouillon_*&select=uid:data->>uid,etat:data->>etat,at:data->>at,publieLe:data->>publieLe,itemId:data->>itemId,ancienId:data->>ancienId,parVRM:data->parVRM&limit=500', (r) => r);
+  // ⚠️ Jamais `select=data` : la ligne d'un bordereau porte son PDF (§4.4).
+  await lignes('bordereaux', 'app_data?id=like.harvest_*_label_*&select=id,uid:data->>uid,tx:data->>tx,item:data->>item,capturedAt:data->>capturedAt&limit=500', (r) => (/_label_\d+$/.test(String(r && r.id || '')) ? r : null));
+  if (Array.isArray(sources.bordereaux)) sources.bordereaux = sources.bordereaux.filter(Boolean);
+  return { evenements: evenementsJournal(sources), pasLu, nonJournalise: NON_JOURNALISE.map(([id, texte]) => ({ id, texte })) };
+}
