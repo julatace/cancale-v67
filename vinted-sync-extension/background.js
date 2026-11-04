@@ -11885,7 +11885,7 @@ async function etatPourApp() {
   //    présence comme `pause` et `vivant`).
   // 29 oct. : `lbcSupprime` — elle sait aussi SUPPRIMER une annonce Leboncoin
   //    sur commande confirmée (même règle : le bouton n'apparaît qu'à elle).
-  return Object.assign({ ok: true, version, code: CODE_VERSION, ext, vrm, vinted: uid && !vintedPasSu ? { uid: String(uid), login: login || '' } : null, cmds: cmdsVus, lbcPause: true, lbcSupprime: true, vcRepondre: true, lbcRepondre: true },
+  return Object.assign({ ok: true, version, code: CODE_VERSION, ext, vrm, vinted: uid && !vintedPasSu ? { uid: String(uid), login: login || '' } : null, cmds: cmdsVus, lbcPause: true, lbcSupprime: true, vcRepondre: true, lbcRepondre: true, vcOffre: true },
     vintedPasSu ? { vintedPasSu: true } : {},
     pause && pause !== PAUSE_PAS_SUE ? { pause: { jusqua: Number(pause.jusqua) || 0 } } : {},
     nav ? { nav } : {});
