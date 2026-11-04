@@ -75,6 +75,12 @@ import CeQuiRapporte from "./design/CeQuiRapporte.jsx";
 import { requeteDeLaVoix } from "./rechercheVocale.js";
 import { articlesQuiDorment, seuilValide } from "./quiDorment.js";
 import QuiDorment from "./design/QuiDorment.jsx";
+import OffresVestiaire from "./OffresVestiaire.jsx";
+import { offresVestiaire, euros } from "./offresVestiaire.js";
+import PorteMonnaie from "./PorteMonnaie.jsx";
+import { porteMonnaieParCompte } from "./porteMonnaie.js";
+import AnnoncesMasquees from "./AnnoncesMasquees.jsx";
+import { masqueesParCompte } from "./annoncesMasquees.js";
 import { rythmeVendu, ecartPct, quandTuVends, margesPar, delaisPar, tranchePrix, TRANCHES_PRIX, stockQuiDort, SEUILS_DORT, rotationStock, tauxVenteMois, tauxAnnulation, PERIODES, bornesPeriode, dansBornes, venduPeriode, barresPeriode, ventesPar, plusRapides } from "./statsVentes.js";
 import "./stats-vitrine.css";
 import {appelerFavorisDirect} from './favorisTransport.js';
@@ -28162,6 +28168,12 @@ function FilVestiaire({ conv, num, titre, envoi, onFerme }) {
     </CadreFil>
   );
 }
+// (4 nov., 5.319) La photo d'un article dans une offre Vestiaire (adresse images.vestiairecollective.com vérifiée).
+function PhotoOffreVc({ src, className }) {
+  const [ko, setKo] = useState(false);
+  const url = urlPhotoVc(src);
+  return url && !ko ? <img src={url} className={className} alt="" loading="lazy" onError={() => setKo(true)}/> : <span className={className} aria-hidden="true"/>;
+}
 function MessagesVestiaire() {
   const [d, setD] = React.useState(undefined);   // undefined en cours · null pas su · objet
   const vcOuvert = useCompteVcOuvert();
@@ -28169,18 +28181,22 @@ function MessagesVestiaire() {
   const relire = React.useCallback(async () => {
     try {
       // (1er nov.) Relues une fois sur un échec passager (`lireBaseRelue`).
-      const [jm, jl, jf, je] = await Promise.all([
+      const [jm, jl, jf, je, jo, jr] = await Promise.all([
         lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_messages&select=compteur:data->compteur,compteurs:data->compteurs,conversations:data->conversations,lecture:data->lecture`),
         lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=liens:data->liens,items:data->items`),
         // 5.295 : les fils lus, en SCALAIRES (§4.4 : jamais le texte de tous les fils d'un coup).
         lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=like.vc_fil_*&select=id,n:meta->>n,da:meta->>dernierAt,ap:meta->>apercu,dm:meta->>dernierDeMoi,pid:meta->>productId,ref:meta->>ref`),
         lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_envoi&select=appris:data->appris,raison:data->>raison,at:data->>at,chemin:data->>chemin`),
+        // 5.319 : les offres reçues (`vc_offres`) et ce que VRM sait y répondre (`vc_offres_recette`).
+        lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_offres&select=offres:data->offres,lecture:data->lecture,capturedAt:data->>capturedAt`),
+        lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_offres_recette&select=accepter:data->accepter,refuser:data->refuser,contre:data->contre`),
       ]);
       if (!Array.isArray(jm) || !Array.isArray(jl)) throw new Error('lecture');
       const r = (jm && jm[0]) || {};
       const fils = {};
       for (const x of (Array.isArray(jf) ? jf : [])) { const id = String(x.id || '').replace(/^vc_fil_/, ''); if (id) fils[id] = x; }
       setD({ compteur: r.compteur || null, compteurs: r.compteurs || null, conversations: r.conversations || null, lecture: r.lecture || null, liens: (jl && jl[0] && jl[0].liens) || {}, items: (jl && jl[0] && jl[0].items) || {},
+        offres: Array.isArray(jo) ? (jo[0] || {}) : null, recettesOffres: Array.isArray(jr) ? (jr[0] || {}) : null,
         fils: Array.isArray(jf) ? fils : null, envoi: Array.isArray(je) ? (je[0] ? { appris: je[0].appris === true,
           // (3 nov.) L'ouverture d'une conversation (`/chat/channel/`) notée à tort comme un essai d'envoi par les 5.295-5.316 : pas un essai.
           raison: /^\/chat\/channel\/?$/.test(String(je[0].chemin || '')) ? '' : (je[0].raison || ''), at: je[0].at || '' } : { appris: false, raison: '' }) : null });
@@ -28218,6 +28234,7 @@ function MessagesVestiaire() {
     }).sort((a, z) => (z.nonLu === true) - (a.nonLu === true) || String(z.date || '').localeCompare(String(a.date || '')));
     const choisie = liste.find((v) => v.id === ouvert) || null;
     const fcChoisie = choisie ? ficheVestiaireDe(choisie, d.items) : null;
+    const offresEtat = offresVestiaire(d.offres);
     corps = (
       <div data-vc-messages="lu" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div data-vc-messages-nonlus={n == null ? 'passu' : String(n)} style={style}>
@@ -28225,6 +28242,8 @@ function MessagesVestiaire() {
             : <><b style={{ color: C.text }}>{n === 0 ? 'Aucun message non lu' : `${n} message${n > 1 ? 's' : ''} non lu${n > 1 ? 's' : ''}`}</b>{nl.comptes > 1 ? <span data-vc-messages-comptes={nl.comptes}> · {nl.comptes} comptes</span> : null}</>}
           {' '}<a data-vc-messages-ouvrir="" href={lien} target="_blank" rel="noreferrer" className="vrm-lien-action" style={{ color: C.accent, fontWeight: 600, display: 'inline-flex', alignItems: 'center', minHeight: 44 }}>{page ? 'Ouvrir la messagerie' : 'Ouvrir Vestiaire'}</a>
         </div>
+        <OffresVestiaire etat={offresEtat} recettes={d.recettesOffres} cap={extSait('vcoffrerepondre')} numDe={(pid) => cleNum((pid && d.liens[pid]) || '')}
+          envoyer={async (m) => { const r = await vmrCmd(m, 45000); relire(); return r; }} Photo={PhotoOffreVc}/>
         <div className="vrm-message-workspace">
           <div className="vrm-inbox-column">
             {liste.length ? <>
@@ -28238,7 +28257,7 @@ function MessagesVestiaire() {
                         photo={(fv && fv.photo) || v.photoArticle} nom="Vestiaire" quand={isFinite(t) ? t : null} couleurHeure={v.nonLu === true ? C.accent : C.muted}
                         titre={(fv && fv.titre) || v.titreArticle || (v.num ? '' : 'Pas reliée à un article VRM')} num={v.num}
                         extrait={v.apercu || (v.lu ? '' : 'Texte pas encore lu')} toi={!!v.apercu && v.deMoi} couleurExtrait={v.nonLu === true ? C.text : C.muted}
-                        apres={v.nonLu == null ? <span className="vrm-msg-etat" title="Vestiaire ne dit pas si elle est lue" style={{ color: C.muted, borderColor: C.border }}>lu ?</span> : null}
+                        apres={<>{offresEtat.etat === 'lu' && v.pid && offresEtat.parProduit[v.pid] ? <span className="vrm-of-tag" data-vc-conv-offre={offresEtat.parProduit[v.pid].id}>offre {euros(offresEtat.parProduit[v.pid].offre)}</span> : null}{v.nonLu == null ? <span className="vrm-msg-etat" title="Vestiaire ne dit pas si elle est lue" style={{ color: C.muted, borderColor: C.border }}>lu ?</span> : null}</>}
                         point={v.nonLu === true ? C.accent : null}/>
                     </div>
                   );
@@ -39487,6 +39506,35 @@ function GrilleJournee({ dispo, poser, rendus, edition, setEdition, peutModifier
     </>
   );
 }
+// ══════════════════════════════════════════════════════════════════════════════
+// COMPTA · PORTE-MONNAIE (4 nov.) — le solde LU de chaque compte Vinted (disponible ·
+// en attente), sa date de lecture, « — » si jamais lu ; les comptes écartés nommés à
+// part ; les virements vers la banque quand le relevé les donne. La règle :
+// src/porteMonnaie.js. Lectures PROJETÉES (jamais `select=data`).
+// ══════════════════════════════════════════════════════════════════════════════
+function PorteMonnaieCompta({ accounts, panelOff }) {
+  const [lu, setLu] = React.useState(undefined);
+  const relire = React.useCallback(async () => {
+    const [b, r] = await Promise.all([
+      lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_billing&select=id,cap:data->>capturedAt,main:data->payload->main,escrow:data->payload->escrow,balance:data->payload->balance,pending:data->payload->pending_balance,lignes:data->payload->invoice_lines`),
+      lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_releve_*&select=id,lignes:data->lignes`),
+    ]);
+    setLu({ billing: Array.isArray(b) ? b : null, releves: Array.isArray(r) ? r : null });
+  }, []);
+  React.useEffect(() => { relire(); }, [relire]);
+  const [tick, setTick] = React.useState(0);
+  React.useEffect(() => onCloudReady(() => setTick((t) => t + 1)), []);
+  React.useEffect(() => { const f = (e) => { const k = e && e.detail && e.detail.k; if (k === 'vinted_accounts_hidden') setTick((t) => t + 1); }; window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f); }, []);
+  const pm = React.useMemo(() => {
+    if (lu === undefined) return { etat: 'encours' };
+    const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+    const noms = load('vinted_account_labels', {}) || {};
+    const comptes = (accounts || []).filter((a) => a && a.vinted_user_id != null).map((a) => ({ uid: String(a.vinted_user_id), nom: noms[String(a.vinted_user_id)] || a.login || String(a.vinted_user_id) }));
+    return porteMonnaieParCompte({ billing: lu.billing, releves: lu.releves, comptes, ecarte: (uid) => compteEcarte(uid, hAcc, panelOff || {}) });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lu, accounts, panelOff, tick]);
+  return <PorteMonnaie pm={pm}/>;
+}
 function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts, comptesLus = false }) {
   const [data, setData] = React.useState(() => {
     try { const d = load('vrm_compta', null); return d && typeof d === 'object' ? { ...COMPTA_DEFAUT, ...d } : { ...COMPTA_DEFAUT }; }
@@ -39766,6 +39814,10 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
         <div className="vrm-compta-replis">
           <ComptaRepli id="compta-ca" titre={TITRE_CARTE_CA} resume="Tes ventes par période : le jour de la vente, puis le jour où l'argent t'est versé">
             <CaParPeriodeCarte dansRepli lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />
+          </ComptaRepli>
+          {/* (4 nov.) Le porte-monnaie de chaque compte Vinted, LU par l'extension (jamais déduit des ventes). */}
+          <ComptaRepli id="compta-porte-monnaie" titre="Porte-monnaie" resume="Disponible et en attente, compte par compte">
+            <PorteMonnaieCompta accounts={accounts} panelOff={panelOff}/>
           </ComptaRepli>
 
           <ComptaRepli id="compta-charges" titre="Tes dépenses" resume={(depenses.length || abonnements.length || packs.length || fixes.length)
@@ -53422,13 +53474,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           </div>}
 
-        {listings.items?.length>0 && <div className="vrm-stock-views vrm-filtres" role="group" aria-label="Vues rapides des annonces">
+        {(listings.items?.length>0 || annMasquees.length>0) && <div className="vrm-stock-views vrm-filtres" role="group" aria-label="Vues rapides des annonces">
           <button type="button" aria-pressed={annSort==='oldest'&&!annSearch.trim()} onClick={()=>{setAnnSort('oldest');setAnnSearch('');}}>Tout le stock</button>
           <button type="button" aria-pressed={annSort==='nonum'} onClick={()=>setAnnSort('nonum')}>Sans numéro</button>
           {annStats.sleeping>0 && <button type="button" aria-pressed={annSort==='sleeping'} onClick={()=>setAnnSort('sleeping')}>À relancer</button>}
+          {/* (4 nov.) Les annonces masquées par Vinted, compte par compte (toujours chez toi, pas « en ligne »). */}
+          {(annMasquees.length>0 || annSort==='masquees') && <button type="button" data-vue-masquees={annMasquees.length} aria-pressed={annSort==='masquees'} onClick={()=>setAnnSort('masquees')}>Masquées<span className="vrm-of-n">{annMasquees.length}</span></button>}
         </div>}
         {(annSearch.trim() || annSort!=='oldest') && <div className="vrm-filter-recap" role="status">
-          <span>{annShown.length} annonce{annShown.length>1?'s':''} dans cette sélection</span>
+          <span>{(()=>{ const k = annSort==='masquees' ? annMasquees.length : annShown.length; return `${k} annonce${k>1?'s':''} dans cette sélection`; })()}</span>
           <button type="button" onClick={()=>{setAnnSearch('');setAnnSort('oldest');}}>Réinitialiser les annonces</button>
         </div>}
 
@@ -53600,7 +53654,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             achat) en bas ; le reste dans « ⋯ ». Une seule couleur d'accent,
             rare (§7) : l'ambre ne sert qu'à « dort » et à une marge négative. */}
         <FichesNeuves/>
-        {annSort==='sleeping' ? (
+        {annSort==='masquees' ? (
+          <AnnoncesMasquees Photo={PhotoVinted} res={listings.masquees==null ? (listings.loading ? undefined : null) : masqueesParCompte(annMasquees, { numeroDe:(id)=>(numeros[id]||{}).numero||'', nomDe:(a)=>a?accNameOf(a):'' })}/>
+        ) : annSort==='sleeping' ? (
           <QuiDorment seuil={seuilDort} onSeuil={setSeuilDort} Segmente={Segmente} fmt={fmt} onAgir={(a)=>setDortAgir(a)}
             liste={listings.items==null ? null : annShown.map(it=>{ const e=numeros[it.id]||{}; const pr=(it.price&&typeof it.price==='object')?it.price.amount:it.price; const n=Number(String(pr==null?'':pr).replace(',','.'));
               return { id:String(it.id), it, numero:e.numero?String(e.numero):'', titre:it.title||'', photo:photoArticle(it)||'', prix:isFinite(n)&&n>0?n:null, age:listedAgeDays(it),
@@ -65749,7 +65805,8 @@ function AppCoeur() {
       perAccRef.current={ cle:cleCalc, perAcc };
       // Un signal arrivé PENDANT ce calcul : il a pu lire avant la suppression.
       if(comptesSignales.current) setAnnoncesTick(t=>t+1);
-      const annLues={}, annEnLigne={}, annSuppr={}, annNoms={}, annActivite={}, annAConfirmer=[];
+      const annLues={}, annEnLigne={}, annSuppr={}, annNoms={}, annActivite={}, annAConfirmer=[], annMasquees={};
+      const perduesMq=load('vinted_pairs_lost',{})||{};
       // (1er nov., audit point 8) Les comptes actifs dont les annonces n'ont PAS
       // pu être lues : `online` n'est alors qu'une partie — jamais publié.
       const annKO=[];
@@ -65819,6 +65876,9 @@ function AppCoeur() {
           // 5.167 : « à confirmer » (compte pas relu depuis 24 h) — jamais compté en
           // ligne, dit à part, comme sur l'écran Annonces (§11).
           for(const it of (list.aConfirmer||[])){ if(!soldIds.has(String(it.id))) annAConfirmer.push({ ...it, _acc:a }); }
+          // (4 nov.) Les masquées par Vinted (la règle de l'écran : src/annoncesMasquees.js) — pour la carte sombre.
+          { const mq=masqueesParCompte((list.masquees||[]).filter(it=>it&&!soldIds.has(String(it.id))&&!annonceDeclareePartie(it.id, numeros, perduesMq)).map(it=>({ ...it, _acc:a })));
+            if(mq.etat==='lu') annMasquees[uidL]={ n:mq.n, frais:mq.nFrais }; }
           annNoms[uidL]=(load('vinted_account_labels',{})||{})[uidL]||a.login||`#${uidL}`;
         } else annKO.push(String(a.vinted_user_id));
         // (29 oct.) Les conversations retirées de la liste ne font plus le point
@@ -65894,7 +65954,7 @@ function AppCoeur() {
       }catch(_){/* pas su ⇒ null ⇒ rien d'affiché */}
       if(!stop && ok){
       setLiveStats({caMois,caEncaisse,prixPasLu,caFinaliseParJour,nMasque,caMasque:Math.round(caMasque*100)/100,enCours,online,unread,unreadConvs,stockValue,pairesStock,ventesJour,caJour,ventesMois,soldTotal,joursVente:joursVenteSet.size,caParCompte,caParMois,ventesParMois,dataAgeJours,dataAgeCompte,dataAgeComptes,
-        annLues,annEnLigne,annSuppr,annNoms,annActivite,annAConfirmer,
+        annLues,annEnLigne,annSuppr,annNoms,annActivite,annAConfirmer,annMasquees,
         walletDispo:(walletEsc&&walletEsc.accounts>0)?walletEsc.dispo:null,
         walletAttente:(walletEsc&&walletEsc.accounts>0)?walletEsc.total:null,
         walletComptes:(walletEsc&&walletEsc.accounts)||0,
