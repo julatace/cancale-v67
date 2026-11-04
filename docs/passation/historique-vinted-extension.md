@@ -1008,3 +1008,21 @@ dans `audit-recreer` (R1-R5), rouge sur la 5.312.0, vert en 5.313.0.
 
 ### 3 nov. — Prix partout, dupliquer, histoire, modèles (`claude/annonces-outils`)
 Récit : `historique-interface-stock.md` (« LES QUATRE OUTILS DES ANNONCES »). Ici : aucune version neuve : le prix Vinted passe par `republierVinted` (capacité `republiermodif`) ; sans elle « À faire sur le site ».
+
+## 4 novembre — Extension 5.319.0 (`claude/ext-5319`)
+
+- Offres Vestiaire lues et réponse sur son clic (`vcoffres`, `vcoffrerepondre`) : récit dans `historique-vestiaire.md`.
+- **Avis Vinted reçus** (`avis`, `capterAvis`, demande du coordinateur) : à la visite, APRÈS l'argent et les colis,
+  UNE lecture `GET /api/v2/user_feedbacks?user_id={id de PROFIL}&page=1&per_page=20&by=all` (l'identifiant de profil
+  lu en scalaire dans `harvest_{uid}_profile`, comme le dressing et le porte-monnaie ; à défaut l'uid), compte connecté
+  seulement (`gardeLecture`, classe « suivi » : sous la réserve de l'argent et des colis, budget de LECTURE 20/h),
+  une fois par 24 h et par compte (`vrmAvisFaits`). Rangé dans `harvest_{uid}_feedbacks` :
+  `payload.user_feedbacks[] = { id, rating, created_at, created_at_ts, feedback }` (+ `pagination` si donnée) — jamais
+  la personne. ⚠️ Forme JAMAIS mesurée : sans tableau `user_feedbacks`, RIEN n'est écrit (diag `avis_forme_inconnue`,
+  échantillon des NOMS de clés). Aucun rappel d'évaluation. `scripts/audit-avis-vinted.cjs` (16 contrôles, rouge sur
+  main ; mutations garde/forme/personne/24 h tuées à la main).
+- Porte-monnaie : AUCUNE requête ajoutée — `/api/v2/users/{pid}/payouts` est déjà lu à chaque visite et la page
+  « porte-monnaie » est déjà captée (`harvest_{uid}_billing`, deux formes). Récit : `historique-compta-urssaf-abonnement.md`.
+- `audit-vc-messages` M9 jugeait `EXT_CAPACITES.vcfil` = version du manifeste (rouge à chaque montée) : il juge
+  désormais la version d'ARRIVÉE (5.317.0).
+- Versions : `CODE_VERSION`, manifeste, `CAPTEUR_VERSION`, `relaisVersion`, `EXT_ATTENDUE` = 5.319.0 ; zip régénéré.
