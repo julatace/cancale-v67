@@ -62227,7 +62227,6 @@ function AppareilsConnectes() {
         <div className="vrm-sec-liste">
           {etat.appareils.map((a) => (
             <div key={a.id} className="vrm-sec-ligne" data-appareil={a.ici ? 'ici' : 'autre'}>
-              <Icon name={/iPhone|Android|iPad/.test(a.appareil) ? 'scan' : 'grid'} size={20} style={{ color: C.muted, flexShrink: 0 }}/>
               <div className="vrm-sec-corps">
                 <span className="vrm-sec-titre">{a.appareil}</span>
                 <span className="vrm-sec-sous">{quandCourt(a.actifLe)}</span>

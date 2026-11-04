@@ -40,12 +40,15 @@ export function masquerTexte(t) {
 export function masquerSuite(textes, voisins) {
   const t = (Array.isArray(textes) ? textes : []).map((x) => String(x == null ? '' : x));
   const out = t.map(masquerTexte);
+  // Les nœuds d'espaces seuls (« {n}{' '}€ » en JSX) sont transparents.
+  const blanc = (x) => !/\S/.test(x);
   for (let i = 0; i + 1 < t.length; i++) {
-    if (voisins && voisins[i] === false) continue;
-    if (!RE_DEBUT_EURO.test(t[i + 1])) continue;
-    if (!RE_FIN_NOMBRE.test(out[i])) continue;
+    if (blanc(t[i]) || !RE_FIN_NOMBRE.test(out[i])) continue;
+    let j = i + 1, lie = !(voisins && voisins[i] === false);
+    while (lie && j < t.length && blanc(t[j])) { if (voisins && voisins[j] === false) lie = false; j++; }
+    if (!lie || j >= t.length || !RE_DEBUT_EURO.test(t[j])) continue;
     out[i] = out[i].replace(RE_FIN_NOMBRE, MASQUE);
-    out[i + 1] = out[i + 1].replace(RE_DEBUT_EURO, '');
+    out[j] = out[j].replace(RE_DEBUT_EURO, '');
   }
   return out;
 }
