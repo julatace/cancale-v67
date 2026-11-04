@@ -179,6 +179,7 @@ async function scenario(b, nom, vue, LIGNES, sombre) {
   const d1 = await imprimer('button[data-lot-imprimer]', { deplacer: true });
   dit(d1.formes.length === 2 && new Set(d1.formes).size === 2 && /mondialrelay/.test(d1.formes[0] + d1.formes[1]) && /chronopost/.test(d1.formes[0] + d1.formes[1]), `${nom} : D une feuille par TYPE (Mondial Relay 10×15, Chronopost A4), une fois chacun`, JSON.stringify(d1.formes));
   dit(d1.pdf === 1, `${nom} : D un PDF`, String(d1.pdf));
+  await pg.waitForFunction(() => { try { return Object.keys(JSON.parse(localStorage.getItem('vrm_tampon_positions') || '{}')).length > 0; } catch (_) { return false; } }, null, { timeout: 8000 }).catch(() => {});
   const pos = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_tampon_positions') || '{}'); } catch (_) { return null; } });
   const kMr = Object.keys(pos || {}).filter((k) => /^mondialrelay/.test(k));
   dit(kMr.length === 1, `${nom} : D « Toujours ici » garde la place du type déplacé (\`vrm_tampon_positions\`)`, JSON.stringify(Object.keys(pos || {})));
