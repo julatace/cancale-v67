@@ -237,6 +237,10 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         await pg.locator('.vrm-chat-panel [data-q-nav]').first().waitFor({ timeout: 8000 });
         const nav = await pg.evaluate(() => [...document.querySelectorAll('[data-q-aller]')].map((x) => x.getAttribute('data-q-aller') + (x.getAttribute('aria-pressed') === 'true' ? '*' : '')).join(','));
         dit(nav === 'q1*,q2', 'le fil : 1 · 2, la question 1 ouverte', nav);
+        const petitsNav = await pg.evaluate(() => [...document.querySelectorAll('[data-q-aller], [data-ebay-vue]')].filter((x) => x.getBoundingClientRect().height > 0).map((x) => x.getBoundingClientRect()).filter((r) => r.height < 43.5 || r.width < 43.5).map((r) => `${Math.round(r.width)}x${Math.round(r.height)}`).join(' '));
+        dit(petitsNav === '', '« Questions · Tout » et « 1 · 2 » : 44 px au doigt', String(petitsNav));
+        const fil = await pg.evaluate(() => { const p = document.querySelector('.vrm-chat-panel'); return p ? Math.round(p.getBoundingClientRect().width) : 0; });
+        dit(fil >= (vp.width < 600 ? 389 : 380), 'le fil a la place de se lire (jamais un mot par ligne)', String(fil));
         await pg.locator('.vrm-chat-compose textarea').first().fill('Taille normale, prends ta taille habituelle.');
         if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `ebay-question-fil-${nom}.png`) });
         dit(!ebayEcrits.length, 'écrire ne part pas : rien n’est envoyé sans son clic');
