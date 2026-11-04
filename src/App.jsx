@@ -47968,12 +47968,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const asoFichesLibres = useMemo(() => {
     if (curSub !== 'achats' || !asoOuvert) return [];
     const out = [];
+    const horsNums = new Set((offBuys || []).map((b) => (b && b.numero != null ? cleNum(b.numero) : '')).filter(Boolean));   // N° d'un achat hors plateforme : déjà relié
     for (const [k, e] of Object.entries(numeros || {})) {
-      if (!e || !String(e.numero || '').trim() || e.buyFromId) continue;
+      if (!e || !String(e.numero || '').trim() || e.buyFromId || horsNums.has(cleNum(e.numero))) continue;
       out.push({ cle: k, numero: String(e.numero).trim(), titre: e.title || '', photo: e.photo || '' });
     }
     return out.sort((a, b) => (Number(b.numero) || 0) - (Number(a.numero) || 0));
-  }, [curSub, asoOuvert, numeros]);
+  }, [curSub, asoOuvert, numeros, offBuys]);
   const asoLots = useMemo(() => {
     if (curSub !== 'achats' || asoOuvert !== 'lots') return undefined;
     if (!Array.isArray(buys.items) || infosAchatsLues === undefined) return buys.error ? null : undefined;
