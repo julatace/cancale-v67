@@ -3494,6 +3494,12 @@ même »**. Rien à dire ⇒ aucune feuille, l'envoi part comme avant.
 > `audit-notes-recues` 10 (5 mutations rouges) ; banc `annulations-notes` 30 verts (390/1512, clair/sombre regardés), 22 rouges
 > sur origin/main ; `stats-vitrine` 112 verts après. Geste de Julien : Statistiques → bas de page.
 
+
+### Recherche unique (3-4 novembre, branche `claude/litiges-recherche`)
+Une seule loupe (là où sont « Tout sur le N° » et le micro) qui trouve : N° (bloc existant, `cleNum`), **pseudo de l'acheteur** (`email_sale_*` : pseudo + n° de transaction du MÊME e-mail), **n° de suivi** (bordereau de la vente `email_bord_*`, e-mails transporteur `email_track_*`), **code de retrait** (exact), **n° de transaction** (≥ 5 chiffres), **titre** (mots, sans accents, tout ordre). Règle pure `src/rechercheUnique.js` (`indexRecherche`, `indexMemo`, `chercherPartout`, `destinationResultat`) : le titre ne fait que CHERCHER (deux jumelles = deux lignes, chacune ouvre SA transaction) ; un pseudo/suivi ne s'attache à une vente que par le n° de transaction écrit à côté. Résultats groupés Ventes · Achats · Colis, chaque ligne dit par quoi elle est trouvée (pastille) et ouvre l'écran existant (`poserCible` vente / achat / retrait). Lectures en scalaires (`lireTout`). Un nombre ≥ 5 chiffres qui est une identité exacte n'affiche plus « Tout sur le N°… jamais servi ». Plus de texte d'aide dans le panneau vide. **Téléphone : plein écran dès la frappe** (demande du 3 nov. ; champ vide ⇒ rien ne s'ouvre, le « grand écran blanc » du 31 oct. reste évité) ; `recherche-en-place.cjs` juge B et E à cette règle au téléphone, ordinateur inchangé.
+- Preuves : `audit-recherche-unique.cjs` 24 contrôles (dont 10 500 entrées : index ≈ 350 ms une fois, ≈ 14 ms par frappe), rouge sur main, `--prouve` 8/8 ; banc `litiges-recherche.cjs` (pseudo, suivi, titre, code, ouverture de Colis, ≥ 44 px, 390/1512 clair/sombre).
+- Reste : eBay (n° de commande, acheteur), Leboncoin et Vestiaire pas encore dans l'index.
+
 ## 3 novembre (soir) — Frise Vendue → Postée → Livrée → Payée sur les ventes eBay et Vestiaire
 
 La frise de Vinted (`friseVente` → `friseVenteFusion`, `src/design/Frise.jsx`) sur la LIGNE des ventes eBay et
