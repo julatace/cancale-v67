@@ -251,9 +251,9 @@ function ObjectifFeuille({ page, objectif, poserObjectif }) {
       </button>
       {ouvert ? (
         <div className="vrm-carte-objectif-corps">
-          <div className="vrm-carte-periodes vrm-seg" role="group" aria-label="Type d’objectif">
+          <div className="vrm-carte-objectif-types" role="group" aria-label="Type d’objectif">
             {Object.entries(TYPES_OBJECTIF).map(([k, d]) => (
-              <button key={k} type="button" className="vrm-seg-btn" aria-pressed={type === k} data-carte-objectif-type={k} onClick={() => setType(k)}>{d.nom}</button>
+              <button key={k} type="button" aria-pressed={type === k} data-carte-objectif-type={k} onClick={() => setType(k)}>{d.nom}</button>
             ))}
           </div>
           <div className="vrm-carte-objectif-saisie">

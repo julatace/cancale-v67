@@ -45,7 +45,7 @@ const EBAY_ANNONCES = [
   { itemId: '2001', sku: 'VRM-80', title: TITRE, price: '120.00', currency: 'EUR', photo: 'https://i.ebayimg.com/images/g/a/s-l500.jpg', observateurs: 11 },
 ];
 const EBAY_MESSAGES = [
-  { id: 'e1', itemId: '2001', titre: TITRE, sender: 'acheteur_e', subject: 'Question sur l’annonce', body: 'Elle taille comment ?', responses: ['Taille normale.'], status: 'Unanswered', date: iso(2) },
+  { id: 'e1', itemId: '2001', titre: TITRE, sender: 'acheteur_e', subject: 'Question sur l’annonce', body: 'Elle taille comment ?', responses: ['Taille normale.'], status: 'Unanswered', date: iso(2), type: 'AskSellerQuestion' },
   { id: 'e2', itemId: '', titre: TITRE, sender: 'acheteuse_f', subject: 'Question', body: 'La boîte est incluse ?', responses: [], status: 'Unanswered', date: iso(1) },
 ];
 const VC_FIL = [
@@ -130,6 +130,8 @@ async function ouvrir(b, tel, site, { appris = true } = {}) {
   await pg.goto(`http://localhost:${PORT}/?tab=messages&site=${site}`, { waitUntil: 'domcontentloaded' });
   await pg.waitForSelector(`[data-messagerie-site="${site}"] .vrm-inbox-row`, { timeout: 20000 }).catch(() => {});
   await pg.waitForTimeout(1200);
+  // (4 nov.) Messages · eBay s'ouvre sur « Questions » (une ligne par annonce) ; ce banc juge la liste « Tout ».
+  if (site === 'ebay') { await pg.click('[data-ebay-vue="tout"]').catch(() => {}); await pg.waitForTimeout(300); }
   return { ctx, pg, errs, ecritures };
 }
 const boite = (pg, sel) => pg.evaluate((s) => { const e = document.querySelector(s); if (!e) return null; const b = e.getBoundingClientRect(); const cs = getComputedStyle(e); return { l: b.left, r: b.right, t: b.top, w: b.width, h: b.height, vis: cs.display !== 'none' && cs.visibility !== 'hidden' && b.width > 0 && b.height > 0 }; }, sel);

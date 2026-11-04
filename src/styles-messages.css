@@ -40,6 +40,18 @@ html body .vrm-msg-fiche { display: none; }
   }
   /* Sur ordinateur, la paire vit dans la fiche : la carte en tête du fil ne la redit pas (§7). */
   html body .vrm-message-workspace .vrm-chat-panel .vrm-chat-paire { display: none !important; }
+  /* (4 nov.) La colonne de l'écran est bornée (760 px, style Fusion) : trois volets
+     n'y tiennent pas — le fil tombait à ~100 px (un mot par ligne, mesuré à 1512 px
+     sur les quatre sites). Sous 900 px de large, deux volets : la liste et le fil,
+     la paire revient en tête du fil (comme au téléphone). */
+  html body :is([data-messagerie], [data-messagerie-site]):has(.vrm-message-workspace) { container-type: inline-size; }
+}
+@media (min-width: 1024px) {
+  @container (max-width: 900px) {
+    html body .vrm-message-workspace { grid-template-columns: minmax(260px, 300px) minmax(0, 1fr) !important; }
+    html body .vrm-message-workspace > .vrm-msg-fiche { display: none !important; }
+    html body .vrm-message-workspace .vrm-chat-panel .vrm-chat-paire { display: flex !important; }
+  }
 }
 
 /* ── La liste (toutes tailles) : lignes séparées d'un filet, photo ronde ── */
@@ -131,3 +143,10 @@ html body .vrm-chat-panel .vrm-chat-send:disabled { opacity: .45 !important; }
    qui marche, en encre pleine — le cobalt reste à Envoyer (§7). */
 html body .vrm-chat-panel [data-pied-envoi="impossible"] .vrm-chat-vinted { background: var(--vrm-ink) !important; color: var(--vrm-bg) !important; min-height: 46px; border-radius: 12px; }
 html body .vrm-chat-panel [data-pied-envoi="impossible"] .vrm-chat-pied-raison b { color: var(--vrm-ink); }
+
+/* (4 nov.) Messages · eBay : « Questions · Tout » sur toute la largeur de la liste,
+   et la navigation « 1 · 2 » entre les questions d'une même annonce, 44 px au doigt. */
+html body [data-messagerie-site="ebay"] .vrm-ebay-q-vue { display: flex !important; width: 100% !important; box-sizing: border-box; }
+html body [data-messagerie-site="ebay"] .vrm-ebay-q-vue > .vrm-seg-btn { flex: 1 1 0 !important; min-width: 0 !important; min-height: 44px !important; padding: 0 12px !important; white-space: nowrap; }
+html body [data-messagerie-site="ebay"] .vrm-ebay-q-nav { display: flex !important; width: fit-content !important; flex-shrink: 0; }
+html body [data-messagerie-site="ebay"] .vrm-ebay-q-nav > .vrm-seg-btn { min-width: 44px !important; min-height: 44px !important; padding: 0 12px !important; }

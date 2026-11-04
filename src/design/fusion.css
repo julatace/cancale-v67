@@ -1136,7 +1136,12 @@ html:not([data-colis-outils]) body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) [
 .vrm-carte-choix:focus-visible, .vrm-carte-place:focus-visible, .vrm-carte-periodes > button:focus-visible, .vrm-carte-ok:focus-visible, .vrm-carte-defaut:focus-visible { outline: 2px solid #0a84ff; outline-offset: 2px; }
 .vrm-carte-defaut { all: unset; box-sizing: border-box; align-self: center; min-height: 44px; padding: 0 14px; display: grid; place-items: center; font: 600 15px/1 var(--vrm-police); color: var(--fu-encre, #1d1d1f); cursor: pointer; margin-top: 6px; }
 /* (4 nov.) « Objectif » dans la feuille */
-.vrm-carte-objectif { margin-top: 6px; border-radius: 14px; background: var(--fu-carte, #fff); overflow: hidden; }
+.vrm-carte-objectif { margin-top: 6px; border-radius: 14px; background: var(--fu-carte, #fff); overflow: hidden; flex-shrink: 0; }
+.vrm-carte-objectif-types { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 14px; background: var(--fu-fond, #f2f2f7); }
+.vrm-carte-objectif-types > button { all: unset; box-sizing: border-box; min-height: 44px; padding: 0 10px; border-radius: 12px; display: grid; place-items: center; text-align: center; font: 600 13px/1.2 var(--vrm-police); color: var(--fu-gris, #6e6e73); cursor: pointer; }
+.vrm-carte-objectif-types > button[aria-pressed="true"] { background: var(--fu-carte, #fff); color: var(--fu-encre, #1d1d1f); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.vrm-carte-objectif-types > button:focus-visible { outline: 2px solid #0a84ff; outline-offset: 2px; }
+:root[data-theme="dark"] .vrm-carte-objectif-types > button[aria-pressed="true"] { background: #3a3a3c; color: #fff; box-shadow: none; }
 .vrm-carte-objectif-corps { display: flex; flex-direction: column; gap: 8px; padding: 0 14px 12px; }
 .vrm-carte-objectif-saisie { display: flex; align-items: center; gap: 8px; }
 .vrm-carte-objectif-saisie > input { flex: 1; min-width: 0; min-height: 44px; box-sizing: border-box; padding: 0 12px; border-radius: 12px; border: 1px solid var(--fu-filet, rgba(0,0,0,.08)); background: var(--fu-fond, #f2f2f7); color: inherit; font: 500 17px/1 var(--vrm-police); font-variant-numeric: tabular-nums; outline: none; }
