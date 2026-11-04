@@ -61,3 +61,10 @@ et le menu « … » dans la carte compacte de Colis. L'ouverture originale rest
 réservée au récapitulatif de vente ; la carte compacte garde un seul bouton
 flottant. Test explicite sur le composant et reprise du scénario « Colis fait »
 (aller dans Envoyés puis annuler), sans force-click.
+
+## Simplification des retraits et emails
+
+- Retraits : bouton d’ouverture explicite, chevron, titre complet dans le détail ; Code et J’ai retiré restent des actions indépendantes. Aucun changement des règles de collecte ni des rapprochements.
+- Réception : un seul message et une seule action de réessai lors d’un premier échec ; avertissement conservé si des données anciennes sont encore affichées.
+- Texte des emails : réessai individuel sans recharger le journal ; texte toujours échappé, réponse tardive ignorée après démontage.
+- Validation : retraits 117 contrôles ; espace emails 57 ; synthèse réception téléphone et ordinateur ; réessai du texte avec erreur simulée puis succès et HTML inactif. Données fictives uniquement.

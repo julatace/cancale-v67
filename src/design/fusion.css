@@ -1212,3 +1212,9 @@ html body .vrm-app-shell .vrm-main .vrm-day-layout .vrm-cycle-carte > .vrm-cycle
 .vrm-fu-prevision { margin: 0 0 14px; }
 .vrm-fu-prevision .vrm-fu-prevision-montant { font: 700 22px/1.2 var(--vrm-police); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
 .vrm-fu-prevision .vrm-fu-prevision-montant small { font: 500 13px/1 var(--vrm-police); color: var(--fu-gris); margin-right: 2px; }
+
+/* Retraits : une ouverture explicite, des actions séparées et accessibles au clavier. */
+.vrm-rpf-ouvrir { display:flex; align-items:center; gap:10px; flex:1 1 0; min-width:0; min-height:44px; padding:0; border:0; background:transparent; color:inherit; text-align:left; cursor:pointer; font:inherit; }
+.vrm-rpf-ouvrir:focus-visible { outline:2px solid var(--fu-bleu,#0071e3); outline-offset:3px; border-radius:8px; }
+.vrm-rpf-chevron { flex:none; color:var(--fu-gris,#6e6e73); font-size:18px; }
+.vrm-rpf-titre-complet { overflow-wrap:anywhere; font-size:13px; line-height:1.4; }

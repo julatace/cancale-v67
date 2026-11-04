@@ -301,6 +301,7 @@ function CarteColisRetirer({ x, Photo, gestes, detail, limiteSurCarte, avecLieu 
 // « À vérifier · N » replié, le statut en une puce. Aucune phrase. Mêmes listes, mêmes data-*.
 function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C = null, avecTransp = false, titreDe = null }) {
   const [ouvert, setOuvert] = React.useState(false);
+  const detailId = React.useId();
   const ph = x.photo && Photo ? Photo(x.photo) : null;
   const e = echeance ? echeance(x) : null;
   const st = statut ? statut(x) : null;
@@ -313,7 +314,8 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
     <div className="vrm-rpf-ligne" {...attrs} data-ouvert={ouvert ? '1' : undefined}>
       {/* Le code de CE colis, lisible par les autres écrans et les bancs (`data-code-retrait`) ; affiché au toucher. */}
       {x.code ? <span hidden data-code-retrait={x.code}/> : null}
-      <div className="vrm-rpf-rang" role="button" tabIndex={0} aria-expanded={ouvert} onClick={basculer} onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); basculer(); } }}>
+      <div className="vrm-rpf-rang">
+        <button type="button" className="vrm-rpf-ouvrir" aria-expanded={ouvert} aria-controls={detailId} onClick={basculer}>
         <span className={'vrm-rpf-vignette' + (ph ? '' : ' is-sans')} aria-hidden="true" data-sans-photo={ph ? undefined : ''}>
           {ph || <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round"><path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/></svg>}
         </span>
@@ -326,10 +328,13 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
             {!aCode && !x.horsCompte ? <span className="vrm-rpf-puce" data-rp-code-a-venir="">Code à venir</span> : null}
           </span> : (!aCode && !x.horsCompte ? <span className="vrm-rpf-puces"><span className="vrm-rpf-puce" data-rp-code-a-venir="">Code à venir</span></span> : null)}
         </span>
+        <span className="vrm-rpf-chevron" aria-hidden="true">{ouvert ? '⌃' : '⌄'}</span>
+        </button>
         {aCode ? <button type="button" className="vrm-rpf-code" data-rp-code="" aria-label="Voir le code de retrait" onClick={(ev) => { ev.stopPropagation(); setOuvert(true); }}>Code</button> : null}
         {retirer ? <button type="button" className="vrm-rpf-retire" data-colis-retire="" aria-label="J’ai retiré ce colis" onClick={(ev) => { ev.stopPropagation(); retirer(x); }}>J’ai retiré</button> : null}
       </div>
-      {ouvert ? <div className="vrm-rpf-detail" data-rp-detail="">
+      {ouvert ? <div className="vrm-rpf-detail" id={detailId} data-rp-detail="">
+        <strong className="vrm-rpf-titre-complet">{x.num ? `N°${x.num} · ` : ''}{(titreDe && titreDe(x)) || x.titre || 'Colis'}</strong>
         {detail ? <div className="vrm-rpf-detail-txt">{detail(x)}</div> : null}
         {gestes ? <div className="vrm-rp-gestes">{gestes(x)}</div> : null}
       </div> : null}

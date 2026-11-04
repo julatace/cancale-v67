@@ -175,7 +175,7 @@ const ouvrir = async (b, vp, sombre) => {
             idents: lignes.map((l) => l.getAttribute('data-cc-carte')),
             comptes: lignes.filter((l) => !l.hasAttribute('data-hors-compte')).length,
             points: [...document.querySelectorAll('.vrm-rpf-section:not(.is-repli) .vrm-rpf-point')].map((p) => ({ cle: p.getAttribute('data-relais-point'), nom: (p.querySelector('.vrm-rpf-nom') || {}).textContent, adr: (p.querySelector('[data-relais-adresse]') || {}).textContent || '', h: (() => { const a = p.querySelector('.vrm-rpf-nom'), d = p.querySelector('[data-relais-adresse]'); return !d ? 0 : Math.abs(a.getBoundingClientRect().top - d.getBoundingClientRect().top) + Math.abs(a.getBoundingClientRect().height - d.getBoundingClientRect().height) > 8 ? 99 : 0; })(), n: p.querySelectorAll('[data-cc-carte]').length, inconnu: p.classList.contains('is-inconnu') })),
-            rangs: lignes.filter(vis).map((l) => { const r = l.querySelector('.vrm-rpf-rang'); const v = l.querySelector('.vrm-rpf-vignette'); return { id: l.getAttribute('data-cc-carte'), code: !!l.querySelector('[data-rp-code]'), avenir: !!l.querySelector('[data-rp-code-a-venir]'), retire: !!l.querySelector('.vrm-rpf-rang [data-colis-retire]'), ech: (l.querySelector('[data-rp-echeance]') || { getAttribute: () => null }).getAttribute('data-rp-echeance'), statut: (l.querySelector('[data-rp-statut]') || {}).textContent || '', vw: v ? Math.round(v.getBoundingClientRect().width) : 0, boutons: [...l.querySelectorAll('.vrm-rpf-rang button')].map((x) => Math.round(x.getBoundingClientRect().height)), detail: !!l.querySelector('[data-rp-detail]') }; }),
+            rangs: lignes.filter(vis).map((l) => { const r = l.querySelector('.vrm-rpf-ouvrir'); const v = l.querySelector('.vrm-rpf-vignette'); return { id: l.getAttribute('data-cc-carte'), code: !!l.querySelector('[data-rp-code]'), avenir: !!l.querySelector('[data-rp-code-a-venir]'), retire: !!l.querySelector('.vrm-rpf-rang [data-colis-retire]'), ech: (l.querySelector('[data-rp-echeance]') || { getAttribute: () => null }).getAttribute('data-rp-echeance'), statut: (l.querySelector('[data-rp-statut]') || {}).textContent || '', vw: v ? Math.round(v.getBoundingClientRect().width) : 0, boutons: [...l.querySelectorAll('.vrm-rpf-rang button')].map((x) => Math.round(x.getBoundingClientRect().height)), detail: !!l.querySelector('[data-rp-detail]') }; }),
             sections: [...document.querySelectorAll('[data-rp-section]')].map((x) => x.getAttribute('data-rp-section')),
             dansSection: Object.fromEntries([...document.querySelectorAll('.vrm-rpf [data-cc-carte]')].map((l) => [l.getAttribute('data-cc-carte'), (l.closest('[data-rp-section]') || { getAttribute: () => '' }).getAttribute('data-rp-section')])),
             air: (() => { const t = [...document.querySelectorAll('[data-rp-section]')]; return t.slice(1).map((x, i) => Math.round(x.getBoundingClientRect().top - t[i].getBoundingClientRect().bottom)); })(),
@@ -248,7 +248,7 @@ const ouvrir = async (b, vp, sombre) => {
           const st = await pg.evaluate(() => [...document.querySelectorAll('.vrm-rpf-verifier [data-rp-statut]')].map((x) => x.textContent));
           dit(st.length === 3 && st.includes('Retour à l’expéditeur ?'), 'À vérifier : statut en puce (« Fin d’instance » ⇒ « Retour à l’expéditeur ? »)', st.join(' | '));
           // Le détail au toucher.
-          await pg.locator('[data-cc-carte*="9301"] .vrm-rpf-rang').first().click();
+          await pg.locator('[data-cc-carte*="9301"] .vrm-rpf-ouvrir').first().click();
           await pg.waitForTimeout(300);
           const det = await pg.evaluate(() => { const l = document.querySelector('[data-cc-carte*="9301"]'); const d = l && l.querySelector('[data-rp-detail]'); return d ? { code: !!d.querySelector('[data-code-retrait="012345"], .vrm-rp-gestes'), txt: d.innerText.slice(0, 200) } : null; });
           dit(!!det && det.code, 'toucher la ligne ouvre son détail (code, gestes)', JSON.stringify(det));
@@ -258,7 +258,7 @@ const ouvrir = async (b, vp, sombre) => {
           dit(nl === 13, 'ouvrir « En route » montre les 13 achats', String(nl));
           await pg.locator('[data-rp-section="route"] > summary').first().click();
           await pg.evaluate(() => { const d = document.querySelector('.vrm-rpf-verifier'); if (d) d.open = false; });
-          await pg.locator('[data-cc-carte*="9301"] .vrm-rpf-rang').first().click();
+          await pg.locator('[data-cc-carte*="9301"] .vrm-rpf-ouvrir').first().click();
           await pg.waitForTimeout(300);
         }
         if (SHOTS) {

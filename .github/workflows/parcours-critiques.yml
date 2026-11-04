@@ -38,7 +38,9 @@ jobs:
       - name: Vérifier le périmètre des numéros Vinted
         run: node scripts/tests/numeros-vinted-perimetre-interface.cjs
       - name: Vérifier l’espace emails
-        run: node scripts/tests/espace-emails-interface.cjs
+        run: |
+          node scripts/tests/espace-emails-interface.cjs
+          node scripts/tests/journal-email-reessai.cjs
       - name: Vérifier le guide de transfert
         run: node scripts/tests/transfert-guide-interface.cjs
       - name: Vérifier la réception multi-comptes
