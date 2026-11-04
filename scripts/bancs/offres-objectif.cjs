@@ -243,6 +243,12 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         dit(fil >= (vp.width < 600 ? 389 : 380), 'le fil a la place de se lire (jamais un mot par ligne)', String(fil));
         await pg.locator('.vrm-chat-compose textarea').first().fill('Taille normale, prends ta taille habituelle.');
         await pg.waitForFunction(() => [...document.querySelectorAll('link[rel=stylesheet]')].every(l => !!l.sheet), null, { timeout: 8000 });
+        // Le remplissage active le bouton : attendre SA transition CSS réelle,
+        // pas une durée arbitraire ni la première couleur de l'état désactivé.
+        await pg.locator('.vrm-chat-send').first().evaluate(async b => {
+          void getComputedStyle(b).backgroundColor;
+          await Promise.allSettled(b.getAnimations().map(a => a.finished));
+        });
         const contraste = await pg.locator('.vrm-chat-send').first().evaluate(b => {
           const s = getComputedStyle(b), rgb = v => (v.match(/[\d.]+/g) || []).map(Number);
           const lum = v => rgb(v).slice(0, 3).map(x => x / 255).map(x => x <= .04045 ? x / 12.92 : ((x + .055) / 1.055) ** 2.4).reduce((t, x, i) => t + x * [.2126, .7152, .0722][i], 0);
