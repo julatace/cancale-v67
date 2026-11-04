@@ -62583,14 +62583,17 @@ const quandCourt = (v) => {
   return new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
 };
 const seDeconnecterPartout = async () => {
+  const owner = AUTH.user?.id;
+  if (!owner) return;
   const ext = !vmrExtPresent() ? 'inconnue' : extSait('liaison') === 'ok' ? 'liaison' : 'ancienne';
   const ok = await askConfirm({ title: 'Se déconnecter partout ?', desc: texteConfirmationPartout({ extension: ext }), ok: 'Se déconnecter partout', cancel: 'Annuler', danger: true });
-  if (!ok) return;
+  if (!ok || AUTH.user?.id !== owner) return;
   const r = await deconnecterPartout({ fetch: (...a) => fetch(...a), url: SUPABASE_URL, apikey: SUPABASE_KEY, jeton: AUTH.session && AUTH.session.access_token });
+  if (AUTH.user?.id !== owner) return;
   if (r === 'injoignable') { toast("⚠️ Le service de connexion n'a pas répondu — rien n'a été fermé. Réessaie dans un instant.", 'err'); return; }
   if (r === 'refuse') toast('Ta session ici avait expiré : reconnecte-toi, puis recommence pour fermer les autres appareils.', 'info');
   else toast('✓ VRM est fermé sur tous tes appareils.', 'ok');
-  setTimeout(() => { try { authSignOut(); } catch (_) {} location.reload(); }, 1600);
+  setTimeout(() => { if (AUTH.user?.id !== owner) return; try { authSignOut(); } catch (_) {} location.reload(); }, 1600);
 };
 function AppareilsConnectes() {
   // `undefined` en cours · `{ erreur, message }` pas su · `{ appareils }` lu.
@@ -62602,12 +62605,15 @@ function AppareilsConnectes() {
   }, []);
   React.useEffect(() => { lire(); }, [lire]);
   const fermer = async (a) => {
+    const owner = AUTH.user?.id;
+    if (!owner) return;
     const ok = await askConfirm({ title: `Déconnecter ${a.appareil} ?`, desc: 'VRM s’y fermera dans l’heure au plus.', ok: 'Déconnecter', cancel: 'Annuler', danger: true });
-    if (!ok) return;
+    if (!ok || AUTH.user?.id !== owner) return;
     setEnVol(a.id);
     const { status, j } = await appelSecurite('appareils', { method: 'POST', body: JSON.stringify({ session: a.id }) });
+    if (AUTH.user?.id !== owner) return;
     setEnVol(null);
-    if (status === 200) { toast(`✓ ${a.appareil} déconnecté.`, 'ok'); lire(); }
+    if (status === 200 && j?.ok === true && j.ferme === a.id) { toast(`✓ ${a.appareil} déconnecté.`, 'ok'); lire(); }
     else toast('⚠️ ' + ((j && j.message) || "Je n'ai pas pu déconnecter cet appareil."), 'err');
   };
   return (

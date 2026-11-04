@@ -22,19 +22,19 @@ test("seul le profil du compte connecté est autorisé, jamais l’account_id à
   });
   vm.runInContext(fn("numerosPermisDansPage"), ctx);
   const autorise = (url) => ctx.numerosPermisDansPage({ tab: { url } });
-  assert.equal(await autorise("https://www.vinted.fr/member/111-moi"), true);
+  assert.equal(await autorise("https://www.vinted.fr/member/111-moi"), "900");
   for (const url of [
     "https://www.vinted.fr/member/222-autre",
     "https://www.vinted.fr/member/900",
     "https://evil.test/member/111",
     "http://www.vinted.fr/member/111",
   ])
-    assert.equal(await autorise(url), false);
+    assert.equal(await autorise(url), "");
   profil = null;
-  assert.equal(await autorise("https://www.vinted.fr/member/111-moi"), false);
+  assert.equal(await autorise("https://www.vinted.fr/member/111-moi"), "");
   profil = "111";
   uid = null;
-  assert.equal(await autorise("https://www.vinted.fr/member/111-moi"), false);
+  assert.equal(await autorise("https://www.vinted.fr/member/111-moi"), "");
 });
 test("la commande de numéros ne lit ni ne renvoie les numéros sur un profil étranger", async () => {
   const a = source.indexOf("          if (msg.action === 'numeros') {"),

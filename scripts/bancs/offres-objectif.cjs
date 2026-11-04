@@ -242,6 +242,14 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         const fil = await pg.evaluate(() => { const p = document.querySelector('.vrm-chat-panel'); return p ? Math.round(p.getBoundingClientRect().width) : 0; });
         dit(fil >= (vp.width < 600 ? 389 : 380), 'le fil a la place de se lire (jamais un mot par ligne)', String(fil));
         await pg.locator('.vrm-chat-compose textarea').first().fill('Taille normale, prends ta taille habituelle.');
+        await pg.waitForFunction(() => [...document.querySelectorAll('link[rel=stylesheet]')].every(l => !!l.sheet), null, { timeout: 8000 });
+        const contraste = await pg.locator('.vrm-chat-send').first().evaluate(b => {
+          const s = getComputedStyle(b), rgb = v => (v.match(/[\d.]+/g) || []).map(Number);
+          const lum = v => rgb(v).slice(0, 3).map(x => x / 255).map(x => x <= .04045 ? x / 12.92 : ((x + .055) / 1.055) ** 2.4).reduce((t, x, i) => t + x * [.2126, .7152, .0722][i], 0);
+          const a = lum(s.color), c = lum(s.backgroundColor), bg = rgb(s.backgroundColor);
+          return { ratio: (Math.max(a, c) + .05) / (Math.min(a, c) + .05), couleur: s.color, fond: s.backgroundColor, opaque: bg.length === 3 || bg[3] === 1, actif: !b.disabled };
+        });
+        dit(contraste.actif && contraste.opaque && contraste.ratio >= 3, 'Envoyer actif : icône contrastée sur un fond opaque', JSON.stringify(contraste));
         if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `ebay-question-fil-${nom}.png`) });
         dit(!ebayEcrits.length, 'écrire ne part pas : rien n’est envoyé sans son clic');
         await pg.locator('.vrm-chat-send').first().click();

@@ -69,3 +69,23 @@ banques de rendu `argent-mois`, `offres-objectif`, `achats-sourcing`,
 `comptes-securite` (téléphone/ordinateur, clair/sombre). Workflow dédié
 `.github/workflows/reprise-chantiers.yml`, en plus des parcours critiques.
 Le résultat des tests ne prouve pas une collecte réelle sur l'appareil de Julien.
+
+### Dernière revue d'intégration
+
+- Déconnexion globale : l'utilisateur courant est relu après confirmation,
+  après le réseau et dans le rappel différé. Une réponse de A ne déconnecte
+  jamais B. La déconnexion individuelle valide aussi l'accusé exact du serveur.
+- Contrôles précédemment rouges sur main remis en phase avec leurs vrais
+  contrats : identifiant (et non booléen) renvoyé par le garde des numéros,
+  lecture Leboncoin propriétaire, source Vestiaire séparée, `codeGmail:null`.
+  Les assertions contre les comptes étrangers restent présentes.
+- Le test Gmail vérifie maintenant le transfert du code Google à VRM, avec
+  accusé, sans ouvrir le lien ni archiver l'email de validation. Téléchargements
+  régénérés depuis la source unique ; le script Google installé n'est pas modifié.
+- L'audit photos documente cinq sources non-Vinted déjà présentes dans main
+  (Vestiaire filtré, logos transporteurs fermés, canvas PDF, ticket local), sans
+  autoriser un nouveau `<img>` arbitraire.
+- Résultats locaux : parcours critiques 9/9, banc argent 100/100,
+  offres/objectif 96/96 avant ajout du contrôle de contraste, achats 120/120,
+  comptes/sécurité tout vert. Captures examinées. Les tests d'isolation des
+  déconnexions et les cas financiers passent, et échouent avant correction.

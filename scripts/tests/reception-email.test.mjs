@@ -34,7 +34,7 @@ test('la route refuse les visiteurs et filtre avec l’identité validée, pas u
  }finally{global.fetch=initial;}
 });
 
-test('les adresses déclarées sans email ne sont jamais déclarées en panne',async()=>{const donnees=[...rows,{owner:'A',id:'vrm_email_owners',data:{adresses:{'perso@example.test':{owner:'A'}}}}];const r=await lire('A',base(donnees));assert.deepEqual(r.adresses,[{adresse:'perso@example.test',declaree:true,comptes:[],derniereReception:null}]);});
+test('les adresses déclarées sans email ne sont jamais déclarées en panne',async()=>{const donnees=[...rows,{owner:'A',id:'vrm_email_owners',data:{adresses:{'perso@example.test':{owner:'A'}}}}];const r=await lire('A',base(donnees));assert.deepEqual(r.adresses,[{adresse:'perso@example.test',declaree:true,comptes:[],derniereReception:null,codeGmail:null}]);});
 
 test('plusieurs comptes et emails restent distincts ; seul le compte explicitement banni reçoit le badge',async()=>{
  const data=[{owner:'A',id:'main',data:{vinted_account_emails:{'11':'un@example.test','22':'deux@example.test','33':'pasdeclare@example.test'}}},{owner:'A',id:'vrm_email_owners',data:{adresses:{'un@example.test':{},'deux@example.test':{}}}},{owner:'A',id:'panel_comptes_etat',data:{comptes:{'11':{etat:'actif'},'22':{etat:'banni',at:'2026-10-21T10:00:00Z'},'33':{etat:'passu'}}}},{owner:'A',vinted_user_id:'11',login:'vendeur-un'},{owner:'A',vinted_user_id:'22',login:'vendeur-deux'},...['un','deux'].map((x,i)=>({owner:'A',id:'email_reception_'+i,data:{adresses:[x+'@example.test'],etat:'integre',at:'2026-10-21T12:00:00Z'}}))];
