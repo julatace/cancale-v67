@@ -216,7 +216,7 @@ const charger = async (texte, nom) => {
   dit(/const aVenirCoque = \(x\) => argentAVenir\(/.test(A0) && /etatTx: TXN_ETATS_LU === false \? null : etatTxn/.test(A0), 'avec les règles d’App.jsx et l’état des transactions');
   dit(/fetchVersementsVinted\(\)\.then\(\(m\) => \{ if \(!mort\) setVersementsCoque\(m\)/.test(A0), 'la coque lit les dates de versement (450)');
   dit(/const aVenirJ = aVenirPour\(liveStats && liveStats\.aVenir\);/.test(A0), 'Ma journée (carte et tendance) lit la règle');
-  dit(/<ArgentAVenirCarte A=\{liveStats && liveStats\.aVenir\}\/>/.test(A0), 'Ventes monte la carte « À venir »');
+  dit(/sec==='ventes' && !baseKO && <div className="vrm-a-venir-hote"[^\n]*<ArgentAVenirCarte A=\{liveStatsVus && liveStatsVus\.aVenir\} plateforme="Vinted"\/>/.test(A0) && /site==='toutes' && t==='ventes' && !baseKO && <div className="vrm-a-venir-hote"[^\n]*<ArgentAVenirCarte A=\{liveStatsVus && liveStatsVus\.aVenir\}\/>/.test(A0), 'Ventes (Vinted, et tous les sites) monte la carte « À venir » en tête');
   dit(!/Argent en attente \(estimation\)/.test(A0), 'plus d’« estimation » sur les statuts de la liste dans Ventes');
   dit(/const attV = aVenirPour\(liveStats && liveStats\.aVenir, \{ plateforme: 'Vinted' \}\);/.test(A0), 'le résumé Vinted lit la part Vinted de la règle');
   dit(/const aV = aVenirPour\(liveStatsVus\.aVenir\);\s*if \(aV\.valeur != null && !aV\.partiel\) base0\.enAttente/.test(A0), 'le widget prend la règle, seulement complète');

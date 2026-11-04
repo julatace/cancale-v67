@@ -19484,14 +19484,16 @@ const PORTE_MONNAIE_VINTED = 'https://www.vinted.fr/wallet/balance';
 // site l'écrit (eBay, Vestiaire) ; « au moins » et le manque NOMMÉ si une lecture
 // manque ; une vente au montant illisible est nommée, jamais 0 €.
 const NOM_SITE_AVENIR = { Vinted: 'Vinted', eBay: 'eBay', Vestiaire: 'Vestiaire', Leboncoin: 'Leboncoin' };
-function ArgentAVenirCarte({ A }) {
+function ArgentAVenirCarte({ A, plateforme = null }) {
   if (!A || A.enCours) return null;
-  const T = aVenirPour(A);
-  if (T.valeur == null && !T.partiel) return null;
-  if (!(A.n > 0) && !A.partiel) return null;
-  const nc = A.nonComptees || [];
+  // Sur une plateforme (Ventes · Vinted) : sa part seulement, par la même règle.
+  const T = aVenirPour(A, { plateforme });
+  const groupes = A.parCompte.filter((g) => !plateforme || g.plateforme === plateforme);
+  if (!groupes.length && !T.partiel) return null;
+  const nc = (A.nonComptees || []).filter((x) => !plateforme || x.plateforme === plateforme);
+  const manque = T.manque.filter((m) => !nc.some((x) => x.plateforme === m) || A.manque.includes(m));
   return (
-    <section className="vrm-a-venir" data-a-venir={T.valeur == null ? '' : String(Math.round(T.valeur * 100))} data-a-venir-n={String(A.n)} data-a-venir-partiel={T.partiel ? '1' : undefined}
+    <section className="vrm-a-venir" data-a-venir={T.valeur == null ? '' : String(Math.round(T.valeur * 100))} data-a-venir-n={String(T.n)} data-a-venir-site={plateforme || 'toutes'} data-a-venir-partiel={T.partiel ? '1' : undefined}
       style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 20, padding: '14px 16px', marginBottom: 12, boxShadow: C.shadow || 'none' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
         <span style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600, color: C.text }}>À venir</span>
@@ -19500,7 +19502,7 @@ function ArgentAVenirCarte({ A }) {
         </span>
       </div>
       <div role="list" style={{ marginTop: 6 }}>
-        {A.parCompte.map((g) => (
+        {groupes.map((g) => (
           <div role="listitem" key={g.plateforme + '|' + g.compte} data-a-venir-ligne={g.plateforme} data-a-venir-compte={g.compte} data-a-venir-eur={String(Math.round(g.eur * 100))} data-a-venir-prevu={g.prevu != null ? new Date(g.prevu).toISOString().slice(0, 10) : ''}
             style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 44, borderTop: `1px solid ${C.border}` }}>
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -19511,10 +19513,10 @@ function ArgentAVenirCarte({ A }) {
           </div>
         ))}
       </div>
-      {(A.manque.length > 0 || nc.length > 0) && (
-        <div data-a-venir-manque={A.manque.join(',')} data-a-venir-nc={String(nc.length)} style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, marginTop: 2, fontSize: 13, color: C.muted, lineHeight: 1.45 }}>
-          {A.manque.length > 0 ? <>Sans {A.manque.join(', ')} (pas lu)</> : null}
-          {A.manque.length > 0 && nc.length > 0 ? ' · ' : null}
+      {(manque.length > 0 || nc.length > 0) && (
+        <div data-a-venir-manque={manque.join(',')} data-a-venir-nc={String(nc.length)} style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, marginTop: 2, fontSize: 13, color: C.muted, lineHeight: 1.45 }}>
+          {manque.length > 0 ? <>Sans {manque.join(', ')} (pas lu)</> : null}
+          {manque.length > 0 && nc.length > 0 ? ' · ' : null}
           {nc.length > 0 ? <>{nc.length} vente{nc.length > 1 ? 's' : ''} au montant pas lu ({[...new Set(nc.map((x) => x.plateforme))].join(', ')})</> : null}
         </div>
       )}
@@ -51835,7 +51837,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             remplace « l'argent en attente » d'avant (Vinted seul, solde bloqué ou
             somme des statuts « en cours » de la liste — 220 € de ventes déjà
             versées comptées, mesuré le 4 nov.). */}
-        {!baseKO && <ArgentAVenirCarte A={liveStats && liveStats.aVenir}/>}
+        {/* Elle est montée en tête de Ventes (la coque), à côté de « Retirer mon argent ». */}
         {/* ── VENTES PAR JOUR ────────────────────────────────────────────────
             Demande de Julien : « un endroit où on puisse voir les ventes par
             jour, pareil un calendrier de tel jour à tel jour ; ici ce n'est pas
@@ -66850,6 +66852,7 @@ function AppCoeur() {
           {sous && <div className="vrm-tache-sous" data-tache-sous={t+'.'+site}><PlatSubNav sub={sec} setSub={(x)=>{ setEbayCible(null); setPlatSub(subDeTache(site,x)); }} sections={sous}/></div>}
         </div>
         {site==='toutes' && t==='ventes' && !baseKO && <div style={{padding:'12px 16px 0'}}><CarteStatsApp page="ventes-toutes" className="vrm-fu-ecran" ici="cat_ventes" onNav={setTab} sel={{ site: 'toutes', compte: null, periode: null }}/></div>}
+        {site==='toutes' && t==='ventes' && !baseKO && <div className="vrm-a-venir-hote" style={{padding:'12px 16px 0'}}><ArgentAVenirCarte A={liveStatsVus && liveStatsVus.aVenir}/></div>}
         {site==='toutes'
           ? (baseKO ? <div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>
             : <VentesToutes sites={sitesPresents} ventesVinted={ventesCoque} ventesKO={ventesKO} comptes={vintedAccounts} panelOff={panelOffCoque} lbcVentes={lbcVentes} lbcLu={lbcCoqueLu} ebayTous={ebayCmdTous}
@@ -66906,6 +66909,7 @@ function AppCoeur() {
           {(sec==='ventes'||sec==='annonces'||sec==='achats'||sec==='messages') && <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte} messages={sec==='messages'}/>}
           {/* Sous la navigation, pas entre le résumé et elle (revue du 17 oct.). */}
           {sec==='ventes' && !baseKO && <div className="vrm-retirer-hote" style={{padding:'10px 16px 0'}}><RetirerArgent liveStats={liveStatsVus}/></div>}
+          {sec==='ventes' && !baseKO && <div className="vrm-a-venir-hote" style={{padding:'10px 16px 0'}}><ArgentAVenirCarte A={liveStatsVus && liveStatsVus.aVenir} plateforme="Vinted"/></div>}
           <Comptabilite key={'pv_'+sec} accounts={vintedAccounts} only={sec==='apercu'?'ventes':sec} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum} compteSel={compteSel} compteConnecte={compteConnecte} dansPlateforme vueAchats={achats?'achats':undefined}/>
         </section>); };
   const rendreLeboncoin=(sec)=>{ return (<section className="vrm-market-space" aria-label="Leboncoin">
