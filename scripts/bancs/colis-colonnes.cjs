@@ -340,7 +340,8 @@ async function main() {
         dit(!partisFaux.length && !partisIci.length, `${T} « Partis » = l'onglet « Envoyés » : chaque colis parti y est UNE fois (coché posté compris), aucun dans « À envoyer »`, JSON.stringify([partisFaux, partisIci]));
         await pg.click('[data-colis-onglet-choix="envoyer"]'); await pg.waitForTimeout(500);
         const nPrets = Object.values(GROUPE_ENV).filter((g) => g === 'pret').length;
-        dit(!!L.bouton && L.bouton.n === nPrets && new RegExp(`\\b${nPrets}\\b`).test(L.bouton.txt) && /prêts?/.test(L.bouton.txt), `${T} « Imprimer les N prêts » = les prêts`, JSON.stringify(L.bouton));
+        // (3 nov., choix n° 2) « Tout imprimer » : le lot compte les prêts (ici Vinted seul), le libellé ne redit pas N.
+        dit(!!L.bouton && L.bouton.n === nPrets && /Tout imprimer/.test(L.bouton.txt), `${T} « Tout imprimer » = les prêts`, JSON.stringify(L.bouton));
         dit(L.emballer, `${T} « Emballer » reste accessible`, '');
         // (2 nov., n° 3, 4 et 5) Le haut d'« À envoyer », avant la première carte.
         await pg.evaluate(() => { window.scrollTo(0, 0); const m = document.querySelector('.vrm-main'); if (m) m.scrollTop = 0; });
