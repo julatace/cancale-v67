@@ -2226,7 +2226,7 @@ sont lues côté vendeur (achats entre ses propres comptes) : leur pseudo n'est 
    plateforme s'il n'en désigne qu'un), revendus (ventes finalisées reliées), bénéfice = somme des
    bénéfices CONNUS (Vinted : `beneficeLigneVente` ; Leboncoin/eBay/Vestiaire : `ventesAutresBenefice`,
    une commande eBay à plusieurs N° n'est pas attribuée), « au plus » gardé, « — » si aucun ; « k/n »
-   à côté quand une partie seulement est connue. Couverture en tête : « Pseudo lu 37/690 ». Triable
+   à côté quand une partie seulement est connue. Couverture en tête : « Pseudo lu N/M » (achats Vinted non remboursés). Triable
    (Dépensé · Achats · Revendus · Bénéfice · Nom ; un « — » va en dernier). Le pseudo reste EN MÉMOIRE
    (`infosTxAchats`, lu en scalaires avec la photo de la transaction, Achats seulement) : rien n'est
    rangé, exporté ni écrit.

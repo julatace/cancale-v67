@@ -55,7 +55,7 @@ const MUT = (process.argv.find((a) => a.startsWith('--mutation=')) || '').split(
 if (MUT) {
   const d = fs.mkdtempSync(path.join(os.tmpdir(), 'achsrc-'));
   fs.mkdirSync(path.join(d, 'src'));
-  for (const f of ['achatsSourcing.js', 'prixAchatPropose.js']) fs.copyFileSync(path.join(R, 'src', f), path.join(d, 'src', f));
+  for (const f of ['achatsSourcing.js', 'prixAchatPropose.js', 'registres.js']) fs.copyFileSync(path.join(R, 'src', f), path.join(d, 'src', f));
   const f = path.join(d, 'src', MUTS[MUT] ? 'achatsSourcing.js' : 'prixAchatPropose.js');
   const [de, vers] = TOUTES[MUT]; const s = fs.readFileSync(f, 'utf8');
   if (!s.includes(de)) { console.log('motif introuvable : ' + MUT); process.exit(2); }
@@ -67,8 +67,8 @@ const dit = (c, m, d = '') => { if (c) ok++; else ko++; console.log((c ? '✅ ' 
 const url = (f) => require('url').pathToFileURL(path.join(SRC, f)).href;
 
 (async () => {
-  let S, P;
-  try { S = await import(url('achatsSourcing.js')); P = await import(url('prixAchatPropose.js')); }
+  let S, P, RG;
+  try { S = await import(url('achatsSourcing.js')); P = await import(url('prixAchatPropose.js')); RG = await import(url('registres.js')); }
   catch (e) { dit(false, 'src/achatsSourcing.js se charge', e.message); console.log(`\n${ok} contrôle(s) OK, ${ko} en échec`); process.exit(1); }
   const J = 86400e3, T0 = Date.parse('2026-10-01T10:00:00Z');
   const ach = (tx, o = {}) => ({ transaction_id: tx, title: 'Adidas Spezial noir taille 42', date: new Date(T0).toISOString(), price: { amount: '30.0', currency_code: 'EUR' }, status: 'Commande finalisée', ...o });
@@ -182,6 +182,14 @@ const url = (f) => require('url').pathToFileURL(path.join(SRC, f)).href;
     dit(ps && ps.buyPrice === undefined, 'L15 un prix déjà saisi par lui n’est pas écrasé');
     const pn = S.ecritureLienAchat({}, ach(4000006), { montant: 3290 });
     dit(pn && pn.buyPrice === '32,90', 'L16 achat simple, prix vide : le montant proposé (son clic) est posé');
+    // Le registre des achats (src/registres.js) lit la répartition par SA règle : une ligne, le lot une fois.
+    const fichesR = Object.fromEntries(w.ecritures.filter((x) => x.cle.startsWith('f:')).map((x, i) => [x.cle.slice(2), { numero: String(i + 1), ...x.patch }]));
+    const ov = w.ecritures.find((x) => x.cle.startsWith('v:'));
+    const lotDate = { ...lot, date: '2026-10-01T10:00:00Z' };
+    const reg = RG.registreDesAchats({ achats: [lotDate], fiches: { ...fichesR, z: { numero: '5', buyPrice: ov.patch.buyPrice, buyFromId: '4000001' } }, periode: '2026-10' });
+    dit(reg && reg.lignes.length === 1 && reg.lignes[0].montant === 100 && reg.lignes[0].source === 'saisi', 'L17 registre des achats : le lot réparti = UNE ligne de 100 € (ses N° saisis), jamais 100 € × 5', JSON.stringify(reg && reg.lignes.map((l) => [l.montant, l.source, l.num])));
+    const fr = S.fournisseurs({ achats: [lotDate], fiches: fichesR, vendeurDe: () => 'g' });
+    dit(fr.lignes[0].depense === 10000 && fr.lignes[0].achats === 1, 'L18 Fournisseurs après répartition : Dépensé 100 € une fois');
   }
 
   console.log('\n── P. prixAchatPropose : jamais le prix entier d’un lot');
