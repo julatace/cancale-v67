@@ -2279,5 +2279,5 @@ par commande (base = dû au vendeur, port exclu) ; Vestiaire : la vente rangée 
 ### Banc commun
 
 `scripts/bancs/argent-mois.cjs` (données inventées, 390 tactile et 1512, clair et sombre) :
-100 verts. Captures regardées (carte « À venir », journal, Comparer, Frais). Rouge sur le build
-d'origin/main (voir le rapport de session).
+100 verts. Captures regardées (carte « À venir », journal, Comparer, Frais). **52 rouges** sur le
+build d'origin/main (8d01ecc9).
