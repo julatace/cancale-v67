@@ -12,7 +12,7 @@ function fixture() {
   return {c,timers,confirm:()=>confirmer(true),done:()=>terminer('ok'),calls:()=>appels,logouts:()=>sorties};
 }
 test('une confirmation ouverte par A ne déconnecte pas B après une bascule', async()=>{
- const f=fixture(), p=f.c.lancer();f.c.AUTH.user.id='B';f.confirm();await p;assert.equal(f.calls(),0);
+ const f=fixture(), p=f.c.lancer();f.c.AUTH.user.id='B';f.confirm();await new Promise(r=>setImmediate(r));if(f.calls())f.done();await p;assert.equal(f.calls(),0);
 });
 test('un retour tardif de la déconnexion de A ne ferme pas la session de B', async()=>{
  const f=fixture(), p=f.c.lancer();f.confirm();await new Promise(r=>setImmediate(r));assert.equal(f.calls(),1);f.c.AUTH.user.id='B';f.done();await p;assert.equal(f.timers.length,0);assert.equal(f.logouts(),0);
