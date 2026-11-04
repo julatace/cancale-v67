@@ -1,0 +1,48 @@
+/* ══ COMPTES ET SÉCURITÉ (4 nov.) ═══════════════════════════════════════════
+   1. Les puces « Tous · compte1 · compte2 » (src/compteChoix.js) : une rangée qui
+      défile, une puce allumée en ENCRE (pas en bleu : l'accent reste rare, §7),
+      44 px au doigt.
+   2. « Ce que VRM a fait » (journal) et « Appareils connectés » : des lignes à
+      filets dans une carte blanche, neutres ; ambre seulement pour « à vérifier ».
+   ═════════════════════════════════════════════════════════════════════════ */
+.vrm-compte-puces-hote { position: relative; }
+.vrm-compte-puces {
+  display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 2px 0;
+  -ms-overflow-style: none; scroll-snap-type: x proximity;
+}
+.vrm-compte-puces::-webkit-scrollbar { display: none; }
+html body .vrm-app-shell .vrm-compte-puces .vrm-compte-puce {
+  flex: none; scroll-snap-align: start; min-height: 36px; padding: 0 14px; border: 0; border-radius: 999px;
+  background: var(--fu-remplir, rgba(118,118,128,.12)); color: var(--fu-encre, inherit);
+  font: 600 13px/1 var(--vrm-police); white-space: nowrap; cursor: pointer; letter-spacing: -.005em;
+  max-width: 220px; overflow: hidden; text-overflow: ellipsis;
+}
+html body .vrm-app-shell .vrm-compte-puces .vrm-compte-puce.is-actif { background: var(--fu-encre, #1d1d1f); color: var(--fu-carte, #fff); }
+html body .vrm-app-shell .vrm-compte-puces .vrm-compte-puce:focus-visible { outline: 2px solid var(--fu-bleu, #0071e3); outline-offset: 2px; }
+@media (pointer: coarse) { html body .vrm-app-shell .vrm-compte-puces .vrm-compte-puce { min-height: 44px; padding: 0 16px; font-size: 15px; } }
+.vrm-compte-select-cache {
+  position: absolute !important; left: 0; bottom: 0; width: 1px !important; height: 1px !important; opacity: 0.001;
+  overflow: hidden; pointer-events: none; border: 0; padding: 0; margin: 0;
+}
+
+/* ── Le journal et les appareils ─────────────────────────────────────────── */
+.vrm-sec-liste { background: var(--fu-carte, #fff); border-radius: 20px; box-shadow: var(--fu-ombre, none); overflow: hidden; }
+.vrm-sec-ligne { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 10px 16px; box-sizing: border-box; }
+.vrm-sec-ligne + .vrm-sec-ligne { border-top: 1px solid var(--vrm-set-filet, rgba(0,0,0,.08)); }
+.vrm-sec-corps { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.vrm-sec-titre { font: 600 15px/1.3 var(--vrm-police); color: var(--fu-encre, inherit); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-sec-sous { font: 500 13px/1.35 var(--vrm-police); color: var(--fu-gris2, #6e6e73); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-sec-etat { flex: none; padding: 2px 8px; border-radius: 999px; font: 600 12px/1.4 var(--vrm-police); background: var(--fu-case, rgba(118,118,128,.12)); color: var(--fu-gris, #6e6e73); white-space: nowrap; }
+.vrm-sec-etat.is-verifier { background: var(--fu-ambre-fond, #fff4e0); color: var(--fu-ambre-txt, #8a5a00); }
+.vrm-sec-etat.is-ici { background: var(--fu-encre, #1d1d1f); color: var(--fu-carte, #fff); }
+.vrm-sec-jour { font: 600 13px/1.3 var(--vrm-police); color: var(--fu-gris, #6e6e73); margin: 16px 4px 6px; text-transform: none; }
+.vrm-sec-filtres { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 2px 0 10px; }
+.vrm-sec-filtres::-webkit-scrollbar { display: none; }
+.vrm-sec-trous { margin: 16px 4px 0; display: flex; flex-direction: column; gap: 4px; }
+.vrm-sec-trous p { margin: 0; font: 500 13px/1.4 var(--vrm-police); color: var(--fu-gris2, #6e6e73); }
+.vrm-sec-vide { padding: 14px 16px; font: 500 15px/1.4 var(--vrm-police); color: var(--fu-gris, #6e6e73); }
+html body .vrm-app-shell .vrm-sec-ligne .vrm-sec-bouton { flex: none; min-height: 44px; padding: 0 14px; border-radius: 12px; border: 0; background: var(--fu-case, rgba(118,118,128,.12)); color: var(--fu-encre, inherit); font: 600 13px/1 var(--vrm-police); cursor: pointer; }
+html body .vrm-app-shell .vrm-sec-ligne .vrm-sec-bouton:disabled { opacity: .5; cursor: default; }
+
+/* ── L'œil de la tête : allumé = montants cachés ─────────────────────────── */
+.vrm-hbtn[data-montants-caches="1"] { color: var(--fu-encre, inherit); }

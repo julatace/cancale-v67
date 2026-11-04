@@ -119,6 +119,10 @@ import {colisLbcAPoster,lbcColisAPoster,totalColis,colisLbcVendeur} from '../api
 import {CLE_COMPTES_EXCLUS,excluAutreDe,estExclu,basculerExclu,compteDeVente} from '../api/_lib/comptes-exclus.js';
 import {PLATEFORMES_COMPTES,etatCompteLie,ageLecture,comptesLbcLies,comptesVcLies,comptesEbayLies,refDeLigneEbay,nomCompteLie,LIBELLE_ETAT} from './comptesLies.js';
 import './comptes-lies.css';
+import './comptes-securite.css';
+import { CLE_MONTANTS_CACHES, lireMontantsCaches, installerMasque } from './montantsCaches.js';
+import { deconnecterPartout, texteConfirmationPartout, ligneJournal, filtrerJournal, comptesDuJournal, FILTRES_TYPE } from './securiteCompte.js';
+import { pucesComptes, choixPourSite, memoriserChoix, lireChoixComptes, CLE_CHOIX_COMPTES } from './compteChoix.js';
 import {joursAvant as joursAvantParis} from '../api/_lib/ebay-a-expedier.js';
 import {marcheDuCompte as marcheEbayDuCompte, MARCHE_DEFAUT as MARCHE_EBAY_DEFAUT, lienAnnonce as lienAnnonceMarche, lienCommande as lienCommandeMarche} from '../api/_lib/ebay-marches-table.js';
 import {arriveeColisEmail, arriveeColisVinted, jourLocal, texteArrivee} from '../api/_lib/arrivee-colis.js';
@@ -15903,6 +15907,38 @@ function CibleNotif({ tab, sub }) {
       <span>{phraseAbsente(absente)}</span>
       <button type="button" onClick={() => setAbsente(null)} aria-label="Fermer ce message">OK</button>
     </p>
+  );
+}
+// ── CACHER LES MONTANTS (4 nov.) ─────────────────────────────────────────────
+// Un œil dans la tête : allumé, chaque montant en € de l'écran devient « ••• »
+// (src/montantsCaches.js — UN point, le texte rendu, pas écran par écran).
+// Mémorisé sur CET appareil seulement (`vrm_montants_caches`, jamais synchronisé :
+// cacher ses chiffres dans un café ne doit pas les cacher sur l'ordinateur).
+const lireMontantsCachesIci = () => { try { return lireMontantsCaches(localStorage.getItem(CLE_MONTANTS_CACHES)); } catch (_) { return false; } };
+let _montantsCaches = lireMontantsCachesIci();
+let _retirerMasque = null;
+const _montantsSubs = new Set();
+const appliquerMontantsCaches = () => {
+  if (typeof document === 'undefined') return;
+  try { if (_montantsCaches) document.documentElement.setAttribute('data-montants-caches', '1'); else document.documentElement.removeAttribute('data-montants-caches'); } catch (_) {}
+  if (_montantsCaches && !_retirerMasque && document.body) _retirerMasque = installerMasque(document.body);
+  if (!_montantsCaches && _retirerMasque) { const r = _retirerMasque; _retirerMasque = null; r(); }
+};
+const basculerMontants = () => {
+  _montantsCaches = !_montantsCaches;
+  try { if (_montantsCaches) localStorage.setItem(CLE_MONTANTS_CACHES, '1'); else localStorage.removeItem(CLE_MONTANTS_CACHES); } catch (_) {}
+  appliquerMontantsCaches();
+  _montantsSubs.forEach((f) => { try { f(_montantsCaches); } catch (_) {} });
+};
+function BoutonMontants() {
+  const [cache, setCache] = React.useState(_montantsCaches);
+  React.useEffect(() => { _montantsSubs.add(setCache); appliquerMontantsCaches(); return () => { _montantsSubs.delete(setCache); }; }, []);
+  return (
+    <button className="vrm-hbtn" type="button" data-bouton-montants="" data-montants-caches={cache ? '1' : '0'} data-montant-visible=""
+      aria-pressed={cache} aria-label={cache ? 'Montrer les montants' : 'Cacher les montants'} title={cache ? 'Montrer les montants' : 'Cacher les montants'}
+      onClick={basculerMontants}>
+      <Icon name={cache ? 'eyeOff' : 'eye'} size={21}/>
+    </button>
   );
 }
 function ScreenHead({ icon, title, desc, right, principal, sous, date = '' }) {
@@ -41497,6 +41533,29 @@ function SelecteurCompte({ accounts, sel, setSel, connecte, messages = false }) 
 // un élément déjà formé (la note du sélecteur Vinted porte son attribut).
 function ListeComptes({ id, valeur, options, onChange, note, skin, attrs }) {
   const K = skin || C;
+  // (4 nov., « changer de compte en un tap ») UNE RANGÉE DE PUCES « Tous ·
+  // compte1 · compte2… » (src/compteChoix.js) : un tap, plus de liste à ouvrir.
+  // Elle pilote la MÊME valeur qu'avant (`onChange`, l'état de la coque) ; la
+  // liste native reste dessous, invisible et hors du parcours au clavier, pour
+  // les lecteurs d'écran de secours et les bancs qui la choisissent.
+  const puces = pucesComptes(options, valeur);
+  if (puces.length) return (
+    <div {...(attrs || {})} className="vrm-compte-choix vrm-compte-puces-hote" data-compte-puces={id} style={{ background: skin ? K.bg : 'transparent' }}>
+      <div className="vrm-compte-puces" role="radiogroup" aria-label="Compte">
+        {puces.map((p) => (
+          <button key={p.val} type="button" role="radio" aria-checked={p.actif} data-compte-puce={p.val} data-actif={p.actif ? '1' : '0'}
+            className={'vrm-compte-puce' + (p.actif ? ' is-actif' : '')} onClick={() => { if (!p.actif) onChange(p.val); }}>{p.nom}</button>
+        ))}
+      </div>
+      <select id={id} className="vrm-compte-select-cache" tabIndex={-1} aria-hidden="true" value={puces.find((p) => p.actif).val} onChange={(e) => onChange(e.target.value)}>
+        <option value="*">Tous les comptes</option>
+        {(options || []).map((o) => <option key={o.val} value={o.val}>{o.nom}</option>)}
+      </select>
+      {/* La puce allumée dit déjà le compte : la note ne s'affiche plus (aucun texte
+          explicatif), elle reste lue par les lecteurs d'écran. */}
+      {note ? <span className="vrm-compte-select-cache">{note}</span> : null}
+    </div>
+  );
   // (16 oct.) Une rangée sobre façon réglage iOS : « Compte » à gauche, la valeur
   // en liste native à droite (sans cadre lourd), chevron discret. La note, s'il y
   // en a une, passe dessous en légende.
@@ -62118,6 +62177,10 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       AUTH.user && { id:'email', type:'nav', ic:'mail', lib:'Changer mon email', onClick:()=>{ setAcct({ mode:'email', val:'', err:'', busy:false }); } },
       AUTH.user && { id:'motdepasse', type:'nav', ic:'key', lib:'Changer mon mot de passe', onClick:()=>{ setAcct({ mode:'pw', val:'', err:'', busy:false }); } },
       // Double vérification (TOTP) — facultative, sur SON clic (16 octobre).
+      // (4 nov.) Les appareils où VRM est ouvert, et « Se déconnecter partout ».
+      AUTH.user && { id:'appareils', type:'panneau', ic:'key', lib:'Appareils connectés', el:<AppareilsConnectes/> },
+      // (4 nov.) Tout ce que VRM a envoyé en son nom, lu de ce qui est noté en base.
+      AUTH.user && { id:'journal-vrm', type:'panneau', ic:'clock', lib:'Ce que VRM a fait', el:<JournalVrm/> },
       AUTH.user && { id:'double', type:'panneau', nu:true, ic:'key', lib:'Double vérification', val: Array.isArray(AUTH.session && AUTH.session.totp) ? (AUTH.session.totp.length > 1 ? `Activée · ${AUTH.session.totp.length} appareils` : AUTH.session.totp.length ? 'Activée' : 'Désactivée') : '', el:<DoubleVerification/> },
     ]},
     AUTH.user && { id:'sortir', titre:null, items:[
@@ -62658,6 +62721,132 @@ function DoubleVerification({ onEtat } = {}) {
   );
 }
 
+// ── SÉCURITÉ DU COMPTE VRM (4 nov.) — src/securiteCompte.js ──────────────────
+// « Se déconnecter partout », « Appareils connectés », « Ce que VRM a fait ».
+const appelSecurite = async (mode, init) => {
+  try {
+    const r = await fetch(`/api/compte?mode=${mode}`, { ...(init || {}), headers: { ...enTeteSession(), ...((init && init.body) ? { 'Content-Type': 'application/json' } : {}) }, signal: AbortSignal.timeout(20000) });
+    const j = await r.json().catch(() => null);
+    return { status: r.status, j };
+  } catch (_) { return { status: 0, j: null }; }
+};
+const quandCourt = (v) => {
+  const t = typeof v === 'number' ? v : Date.parse(String(v || ''));
+  if (!Number.isFinite(t)) return '—';
+  const m = Math.round((Date.now() - t) / 60000);
+  if (m < 2) return 'à l’instant';
+  if (m < 60) return `il y a ${m} min`;
+  if (m < 24 * 60) return `il y a ${Math.round(m / 60)} h`;
+  return new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+};
+const seDeconnecterPartout = async () => {
+  const ext = !vmrExtPresent() ? 'inconnue' : extSait('liaison') === 'ok' ? 'liaison' : 'ancienne';
+  const ok = await askConfirm({ title: 'Se déconnecter partout ?', desc: texteConfirmationPartout({ extension: ext }), ok: 'Se déconnecter partout', cancel: 'Annuler', danger: true });
+  if (!ok) return;
+  const r = await deconnecterPartout({ fetch: (...a) => fetch(...a), url: SUPABASE_URL, apikey: SUPABASE_KEY, jeton: AUTH.session && AUTH.session.access_token });
+  if (r === 'injoignable') { toast("⚠️ Le service de connexion n'a pas répondu — rien n'a été fermé. Réessaie dans un instant.", 'err'); return; }
+  if (r === 'refuse') toast('Ta session ici avait expiré : reconnecte-toi, puis recommence pour fermer les autres appareils.', 'info');
+  else toast('✓ VRM est fermé sur tous tes appareils.', 'ok');
+  setTimeout(() => { try { authSignOut(); } catch (_) {} location.reload(); }, 1600);
+};
+function AppareilsConnectes() {
+  // `undefined` en cours · `{ erreur, message }` pas su · `{ appareils }` lu.
+  const [etat, setEtat] = React.useState(undefined);
+  const [enVol, setEnVol] = React.useState(null);
+  const lire = React.useCallback(async () => {
+    const { status, j } = await appelSecurite('appareils');
+    setEtat(status === 200 && j && Array.isArray(j.appareils) ? { appareils: j.appareils } : { erreur: (j && j.erreur) || 'reseau', message: (j && j.message) || "Je n'ai pas pu lire tes appareils — réessaie dans un instant." });
+  }, []);
+  React.useEffect(() => { lire(); }, [lire]);
+  const fermer = async (a) => {
+    const ok = await askConfirm({ title: `Déconnecter ${a.appareil} ?`, desc: 'VRM s’y fermera dans l’heure au plus.', ok: 'Déconnecter', cancel: 'Annuler', danger: true });
+    if (!ok) return;
+    setEnVol(a.id);
+    const { status, j } = await appelSecurite('appareils', { method: 'POST', body: JSON.stringify({ session: a.id }) });
+    setEnVol(null);
+    if (status === 200) { toast(`✓ ${a.appareil} déconnecté.`, 'ok'); lire(); }
+    else toast('⚠️ ' + ((j && j.message) || "Je n'ai pas pu déconnecter cet appareil."), 'err');
+  };
+  return (
+    <div data-appareils={etat === undefined ? 'lecture' : etat.erreur ? 'pas-su' : String(etat.appareils.length)}>
+      {etat === undefined ? <div className="vrm-sec-liste"><div className="vrm-sec-vide">…</div></div>
+        : etat.erreur ? <div className="vrm-sec-liste"><div className="vrm-sec-ligne" data-appareils-erreur={etat.erreur}><div className="vrm-sec-corps"><span className="vrm-sec-sous" style={{ whiteSpace: 'normal' }}>{etat.message}</span></div><button type="button" className="vrm-sec-bouton" onClick={() => { setEtat(undefined); lire(); }}>Réessayer</button></div></div>
+        : (
+        <div className="vrm-sec-liste">
+          {etat.appareils.map((a) => (
+            <div key={a.id} className="vrm-sec-ligne" data-appareil={a.ici ? 'ici' : 'autre'}>
+              <div className="vrm-sec-corps">
+                <span className="vrm-sec-titre">{a.appareil}</span>
+                <span className="vrm-sec-sous">{quandCourt(a.actifLe)}</span>
+              </div>
+              {a.ici ? <span className="vrm-sec-etat is-ici">Cet appareil</span>
+                : <button type="button" className="vrm-sec-bouton" data-appareil-fermer={a.id} disabled={enVol === a.id} onClick={() => fermer(a)}>{enVol === a.id ? '…' : 'Déconnecter'}</button>}
+            </div>
+          ))}
+        </div>
+      )}
+      <div style={{ marginTop: 16 }}>
+        <Bouton variante="secondaire" data-deconnexion-partout="" onClick={seDeconnecterPartout} style={{ width: '100%' }}>Se déconnecter partout</Bouton>
+      </div>
+    </div>
+  );
+}
+function JournalVrm() {
+  const [etat, setEtat] = React.useState(undefined);
+  const [compte, setCompte] = React.useState('*');
+  const [type, setType] = React.useState('tous');
+  const [n, setN] = React.useState(60);
+  const lire = React.useCallback(async () => {
+    const { status, j } = await appelSecurite('journal');
+    setEtat(status === 200 && j && Array.isArray(j.evenements) ? j : { erreur: true });
+  }, []);
+  React.useEffect(() => { lire(); }, [lire]);
+  const fiches = load('vinted_annonce_numeros', {}) || {};
+  const labels = load('vinted_account_labels', {}) || {};
+  const comptesV = (() => { try { return JSON.parse(localStorage.getItem('vinted_accounts') || '[]') || []; } catch (_) { return []; } })();
+  const nomCompte = (uid) => labels[uid] || (comptesV.find((a) => String(a && a.vinted_user_id) === String(uid)) || {}).login || null;
+  const numeroDeItem = (id) => (fiches[id] && fiches[id].numero) || null;
+  if (etat === undefined) return <div className="vrm-sec-liste"><div className="vrm-sec-vide">…</div></div>;
+  if (etat.erreur) return <div className="vrm-sec-liste" data-journal="pas-su"><div className="vrm-sec-ligne"><div className="vrm-sec-corps"><span className="vrm-sec-sous" style={{ whiteSpace: 'normal' }}>Je n'ai pas pu lire le journal — réessaie dans un instant.</span></div><button type="button" className="vrm-sec-bouton" onClick={() => { setEtat(undefined); lire(); }}>Réessayer</button></div></div>;
+  const comptesJ = comptesDuJournal(etat.evenements);
+  const vus = filtrerJournal(etat.evenements, { compte, type });
+  const jours = [];
+  for (const e of vus.slice(0, n)) {
+    const j = e.at ? new Date(e.at).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }) : 'En cours';
+    if (!jours.length || jours[jours.length - 1].j !== j) jours.push({ j, l: [] });
+    jours[jours.length - 1].l.push(e);
+  }
+  return (
+    <div data-journal={String(vus.length)}>
+      <div className="vrm-sec-filtres vrm-compte-puces" role="radiogroup" aria-label="Type">
+        {FILTRES_TYPE.map(([id, lib]) => <button key={id} type="button" role="radio" aria-checked={type === id} data-journal-type={id} className={'vrm-compte-puce' + (type === id ? ' is-actif' : '')} onClick={() => setType(id)}>{lib}</button>)}
+      </div>
+      {comptesJ.length >= 2 && <ListeComptes id="vrm-journal-compte" valeur={compte} onChange={setCompte} options={comptesJ.map((c) => ({ val: c, nom: nomCompte(c) || (c === 'principal' ? 'eBay principal' : c) }))}/>}
+      {!vus.length && <div className="vrm-sec-liste"><div className="vrm-sec-vide" data-journal-vide="">Rien pour l’instant.</div></div>}
+      {jours.map((g) => (
+        <div key={g.j}>
+          <div className="vrm-sec-jour">{g.j}</div>
+          <div className="vrm-sec-liste">
+            {g.l.map((e, i) => { const L = ligneJournal(e, { numeroDeItem, nomCompte }); return (
+              <div key={i} className="vrm-sec-ligne" data-journal-ligne={e.type} data-journal-resultat={e.resultat}>
+                <div className="vrm-sec-corps">
+                  <span className="vrm-sec-titre">{L.titre}{L.article ? <> · {L.article}</> : null}</span>
+                  <span className="vrm-sec-sous">{e.at ? new Date(e.at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : ''}{L.compte ? ` · ${L.compte}` : ''}</span>
+                </div>
+                <span className={'vrm-sec-etat' + (L.aVerifier ? ' is-verifier' : '')}>{L.resultat}</span>
+              </div>
+            ); })}
+          </div>
+        </div>
+      ))}
+      {vus.length > n && <div style={{ marginTop: 12 }}><Bouton variante="secondaire" onClick={() => setN((x) => x + 100)} style={{ width: '100%' }}>Voir plus</Bouton></div>}
+      <div className="vrm-sec-trous" data-journal-trous="">
+        {(etat.pasLu || []).length ? <p data-journal-pas-lu={etat.pasLu.join(',')}>Pas pu lire : {etat.pasLu.map((x) => ({ favoris: 'favoris', ebayAgent: 'actions eBay', ebayRetraits: 'retraits eBay', brouillons: 'republications', bordereaux: 'bordereaux' }[x] || x)).join(', ')}.</p> : null}
+        {(etat.nonJournalise || []).map((x) => <p key={x.id} data-journal-non={x.id}>{x.texte}</p>)}
+      </div>
+    </div>
+  );
+}
 function FermerCompte() {
   const [ouvert, setOuvert] = React.useState(false);
   // `undefined` en cours · `null` pas su · l'objet du serveur (`proprietaire`).
@@ -65675,12 +65864,16 @@ function AppCoeur() {
   // pas suivre en douce sur une autre plateforme) ; conservé d'un sous-onglet à
   // l'autre d'une même plateforme (choisir le compte une fois, le voir sur
   // Annonces PUIS Ventes PUIS Messages).
-  const [compteSel,setCompteSel]=useState('');
   // (31 oct.) Le compte choisi suit le SITE, pas l'onglet : choisi dans Ventes ·
   // Vinted, il reste choisi dans Annonces · Vinted (comme d'une section à
-  // l'autre de l'ancien onglet Vinted) ; il revient à « tous » sur un autre site.
+  // l'autre de l'ancien onglet Vinted).
+  // (4 nov.) Et il est MÉMORISÉ sur l'appareil, PAR SITE (src/compteChoix.js) :
+  // un autre site retrouve SON choix, jamais celui-ci (la règle du 31 oct. tient).
   const siteCourant=estTacheSite(tab)?siteDeTache(tab,platSub):({plat_vinted:'vinted',plat_leboncoin:'leboncoin',plat_ebay:'ebay',plat_vestiaire:'vestiaire'}[tab]||tab);
-  React.useEffect(()=>{ setCompteSel(''); },[siteCourant]);
+  const lireCarteChoix=()=>{ try{ return lireChoixComptes(localStorage.getItem(CLE_CHOIX_COMPTES)); }catch(_){ return {}; } };
+  const [compteSel,setCompteSelBrut]=useState(()=>choixPourSite(lireCarteChoix(),siteCourant));
+  const setCompteSel=(v)=>{ const n=typeof v==='function'?v(compteSel):v; setCompteSelBrut(n); try{ localStorage.setItem(CLE_CHOIX_COMPTES,JSON.stringify(memoriserChoix(lireCarteChoix(),siteCourant,n))); }catch(_){} };
+  React.useEffect(()=>{ setCompteSelBrut(choixPourSite(lireCarteChoix(),siteCourant)); },[siteCourant]);
   React.useEffect(()=>{ if(estTacheSite(tab)) retenirFiltre(tab, siteDeTache(tab,platSub)); },[tab,platSub]);
   // Le compte Vinted ouvert dans CE Chrome (l'extension le lit dans son cookie) :
   // c'est celui qu'il est en train de traiter, il est choisi d'office (📍, ses
@@ -67866,6 +68059,7 @@ function AppCoeur() {
           {/* (3 nov.) Les montants du haut (CA finalisé, disponible, en attente) se choisissent
               désormais dans LA carte sombre de chaque page (« Modifier ») : la bande ne les redit plus
               (§7) ; la ligne de fraîcheur reste. */}
+          {(sec==='ventes'||sec==='annonces'||sec==='achats'||sec==='messages') && <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte} messages={sec==='messages'}/>}
           {!achats && sec!=='messages' && <VintedResume liveStats={liveStatsVus} baseKO={baseKO} siAJour={sec!=='annonces'} sansMontants sauf={(sec || 'ventes') === 'ventes' ? (liveStatsVus && liveStatsVus.venduManque) : null}/>}
           {!baseKO && (sec==='annonces'||achats) && (() => {
             const uid = compteEffectif(compteSel, compteConnecte, (u) => (comptesChoisissables || []).some((a) => String(a.vinted_user_id) === u));
@@ -67899,7 +68093,7 @@ function AppCoeur() {
           {/* Filtre par compte (Julien, 6 oct.) — Ventes / Annonces / Achats /
               Messages. Les Colis ne sont pas filtrés (« pour les colis pas
               forcément »). Un seul compte ⇒ la rangée ne s'affiche pas. */}
-          {(sec==='ventes'||sec==='annonces'||sec==='achats'||sec==='messages') && <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte} messages={sec==='messages'}/>}
+          {/* (4 nov.) Le sélecteur monte EN HAUT de l'écran (un tap, au-dessus de la carte). */}
           {/* Sous la navigation, pas entre le résumé et elle (revue du 17 oct.). */}
           {sec==='ventes' && !baseKO && <div className="vrm-retirer-hote" style={{padding:'10px 16px 0'}}><RetirerArgent liveStats={liveStatsVus}/></div>}
           {sec==='ventes' && !baseKO && <div className="vrm-a-venir-hote" style={{padding:'10px 16px 0'}}><ArgentAVenirCarte A={liveStatsVus && liveStatsVus.aVenir} plateforme="Vinted"/></div>}
@@ -68227,6 +68421,8 @@ function AppCoeur() {
                 écrans (Julien, 5 octobre). Voir `EtatActions`. */}
             {MULTI_USER && <EtatActions onNav={setTab} ordi={ordi} sombre={eD}/>}
             <PastilleStream/>
+            {/* (4 nov.) L'œil : cache TOUS les montants en € de l'écran (src/montantsCaches.js). */}
+            <BoutonMontants/>
             {!ordi && <button className="vrm-hbtn" type="button" data-recherche-zone="" data-recherche-loupe="" onClick={()=>{ if(gsOpen) fermerRecherche(); else ouvrirRecherche(); }} title="Rechercher" aria-label="Rechercher une paire" aria-expanded={gsOpen} aria-controls="vrm-recherche-resultats">
               <Icon name="search" size={21}/>
             </button>}
