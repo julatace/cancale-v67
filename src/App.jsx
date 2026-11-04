@@ -38854,6 +38854,37 @@ function useBeneficeCalcul(compta, periode) {
 //     en pointillé (« pas su », jamais 0).
 // L'anneau ne se dessine que si le NET du mois se calcule (tous les prix d'achat,
 // frais et cotisations connus) : ses parts somment alors au vendu du mois.
+// ── (3 nov.) LA PRÉVISION URSSAF, VISIBLE EN STYLE FUSION ─────────────────
+// La carte « Prochaine déclaration » (`CarteUrssafMois`) est masquée par la
+// Fusion (fusion.css §15) : la prévision de la prochaine échéance vit ICI, en
+// tête de « Combien je dois déclarer ? ». Une règle : `previsionUrssaf`
+// (src/previsionUrssaf.js) avec les règles d'argent de l'app. Aucune phrase :
+// la période, le montant (« au moins » si partiel), la date, « N à dater ».
+function PrevisionUrssafCarte() {
+  const regime = useRegimeFiscal();
+  const ligne = useLigneUrssaf();
+  const [regLu, regPret] = useLigneSynchro('vrm_urssaf_declare', lireDeclarations);
+  const [rythme, setRythme] = React.useState(() => load('vinted_urssaf_freq', null));
+  React.useEffect(() => onCloudReady(() => setRythme(load('vinted_urssaf_freq', null))), []);
+  React.useEffect(() => { const h = (e) => { if (e && e.detail && e.detail.k === 'vinted_urssaf_freq') setRythme(load('vinted_urssaf_freq', null)); }; window.addEventListener('vrm:save', h); return () => window.removeEventListener('vrm:save', h); }, []);
+  const P = previsionUrssaf({ regime, rythme, now: new Date(), ligne, declare: regPret ? regLu : null, taux: tauxUrssaf(),
+    regle: { nextUrssafDeadline, moisPeriodeUrssaf, montantPeriodeUrssaf, moisDeclare } });
+  if (P.etat === 'encours' || P.etat === 'horsMicro' || P.etat === 'aucune') return null;
+  const vers = () => { try { const e = document.querySelector('[data-statut-carte]'); if (e) e.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_) {} };
+  const date = P.dueDate ? new Date(P.dueDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' }) : '';
+  return (
+    <section className="vrm-fu-declaration is-calme vrm-fu-prevision" data-prevision-carte={P.etat} data-prevision-label={P.label || ''} data-prevision-ca={P.ca == null ? '' : String(P.ca)} data-prevision-apayer={P.apayer == null ? '' : String(P.apayer)} data-prevision-partiel={P.partiel ? '1' : ''} data-prevision-adater={P.aDater || ''} data-prevision-encours={P.enCours ? '1' : ''} aria-label="Prochaine échéance URSSAF">
+      <div>
+        <b className="vrm-fu-prevision-montant">{P.etat === 'lu' ? <>{P.partiel ? <small>au moins </small> : null}{fmt(P.apayer)}</> : '—'}</b>
+        <span>{P.etat === 'statut' ? 'URSSAF' : P.etat === 'rythme' ? 'URSSAF · rythme' : <>URSSAF · <span style={{ display: 'inline', textTransform: 'capitalize' }}>{P.label}</span> · avant le {date}{P.aDater > 0 ? ` · ${P.aDater} à dater` : ''}</>}</span>
+      </div>
+      {P.etat === 'statut' ? <button type="button" className="vrm-fu-encre-btn" data-prevision-geste="statut" onClick={vers}>Choisir mon statut</button>
+        : P.etat === 'rythme' ? <Segmente label="Rythme de déclaration" value={null} onChange={(f) => save('vinted_urssaf_freq', f)}
+          options={[{ v: 'mensuel', l: 'Par mois', data: { 'data-prevision-rythme': 'mensuel' } }, { v: 'trimestriel', l: 'Par trimestre', data: { 'data-prevision-rythme': 'trimestriel' } }]} />
+        : null}
+    </section>
+  );
+}
 function ComptaFusion({ compta, onNav }) {
   const { pub, etat, B } = useBeneficeCalcul(compta, 'mois');
   const ligneUrssaf = useLigneUrssaf();
@@ -39911,6 +39942,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
         <div className="vrm-compta-q-tete">
           <h2 className="vrm-compta-question" data-compta-question="declarer"><span className="vrm-compta-q-n" aria-hidden="true">2</span>Combien je dois déclarer ?</h2>
         </div>
+        <PrevisionUrssafCarte />
         <StatutFiscal partie="declarer" liveStats={liveStats} onNav={onNav} />
       </section>
 
