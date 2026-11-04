@@ -8,10 +8,10 @@
 // et la ligne servie fait foi. Horloge : 3 novembre 2026, 10 h (Paris).
 //   A. complet : CA 2026 80 500 € ⇒ seuil de TVA « vers novembre » (8 000 €/mois
 //      sur 10 mois finis), aucun « vers » pour le plafond ; DAC7 : Vinted et
-//      Leboncoin atteints, eBay « encore 27 ventes », Vestiaire pas lu « — » ;
+//      Leboncoin atteints, eBay « encore 27 ventes », Vestiaire « sous » ;
 //      prochaine échéance (mensuel) : octobre 8 000 € ⇒ 992,00 € (12,4 %).
 //   B. 2 ventes Vinted à dater : prévision « au moins » + « 2 à dater », plus
-//      aucune projection de mois.
+//      aucune projection de mois ; Vestiaire pas lu ⇒ DAC7 « — ».
 //   C. rythme jamais choisi : « — » + le choix ; « Par mois » est rangé au nuage.
 //   D. octobre déjà déclaré : la prévision passe à novembre (au moins 500 €).
 require('./_porte-banc.cjs');
@@ -29,7 +29,7 @@ for (let m = 1; m <= 10; m++) mois.push({ ym: `2026-${String(m).padStart(2, '0')
   par: m === 1 ? { Vinted: { n: 4, ca: 6000 }, Leboncoin: { n: 1, ca: 1950 }, eBay: { n: 3, ca: 50 } } : { Vinted: { n: 4, ca: 6000 }, Leboncoin: { n: 1, ca: 2000 } } });
 mois.push({ ym: '2026-11', ca: 500, n: 1, par: { Vinted: { n: 1, ca: 500 } } });
 const LIGNE = (extra = {}) => ({ at: Date.parse('2026-11-03T08:00:00Z'), mois: mois.slice().reverse(), aDater: { n: 0, ca: 0, par: {} }, ecartees: 0,
-  sources: { Vinted: 'lu', Leboncoin: 'lu', eBay: 'lu', Vestiaire: 'pasSu' }, declare: 'lu', nonComptees: { n: 0, par: {} }, ...extra });
+  sources: { Vinted: 'lu', Leboncoin: 'lu', eBay: 'lu', Vestiaire: 'lu' }, declare: 'lu', nonComptees: { n: 0, par: {} }, ...extra });
 const ROWS = [{ id: 'lbc_ventes', data: { ventes: {} } }, { id: 'ebay_orders', data: { orders: [] } }];
 const mainDe = (extra = {}, ligne = LIGNE()) => ({ vinted_regime: 'micro', vinted_urssaf_taux: 12.4, vinted_urssaf_freq: 'mensuel', vinted_urssaf_mois: ligne, vrm_urssaf_declare: {}, ...extra });
 let ko = 0, ok = 0;
@@ -82,6 +82,8 @@ async function rendre(b, vp, opts) {
     const panne = () => route.fulfill({ status: 522, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<html>522</html>' });
     if (route.request().method() !== 'GET') {
       try { const corps = JSON.parse(route.request().postData() || 'null'); for (const x of [].concat(corps || [])) if (x && x.id === 'main' && x.data && typeof x.data === 'object') opts.main = x.data; } catch (_) {}
+      // (1er nov.) `main` s'écrit par PATCH conditionnel (sur `data.rev`) : on le garde et on rend la ligne.
+      if (route.request().method() === 'PATCH' && /id=eq\.main/.test(u)) { try { const c = JSON.parse(route.request().postData() || 'null'); if (c && c.data && typeof c.data === 'object') opts.main = c.data; } catch (_) {} return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify([{ id: 'main', data: opts.main }]) }); }
       return route.fulfill({ status: 201, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '[]' });
     }
     // Base CLOISONNÉE (la production l'est) : sinon l'app n'envoie rien au nuage
@@ -114,12 +116,12 @@ const touche = async (pg, sel, vp) => { const l = pg.locator(sel + ':visible').f
 
 const lire = (pg) => pg.evaluate(() => {
   const q = (s) => document.querySelector(s), at = (e, a) => (e ? e.getAttribute(a) : null);
-  const p = q('[data-prevision-urssaf]');
+  const p = q('[data-prevision-carte]');
   return {
     n: { echeance: document.querySelectorAll('[data-compta-echeance]').length, seuils: document.querySelectorAll('[data-micro-seuils]').length },
     atteinte: [...document.querySelectorAll('[data-micro-atteinte]')].map((e) => `${e.getAttribute('data-micro-atteinte')}:${e.getAttribute('data-mois')}`).join(','),
     dac7: Object.fromEntries([...document.querySelectorAll('[data-dac7-plateforme]')].map((e) => [e.getAttribute('data-dac7-plateforme'), { etat: at(e, 'data-etat'), n: at(e, 'data-n'), cts: at(e, 'data-cts'), v: at(e, 'data-verdict'), t: e.innerText.replace(/\s+/g, ' ') }])),
-    prev: p ? { etat: at(p, 'data-prevision-urssaf'), label: at(p, 'data-prevision-label'), ca: at(p, 'data-prevision-ca'), partiel: at(p, 'data-prevision-partiel'), apayer: at(p, 'data-prevision-apayer') || at(q('[data-echeance-apayer]'), 'data-echeance-apayer'), adater: at(q('[data-prevision-adater]'), 'data-prevision-adater'), texte: p.innerText.replace(/\s+/g, ' ') } : null,
+    prev: p ? { etat: at(p, 'data-prevision-carte'), label: at(p, 'data-prevision-label'), ca: at(p, 'data-prevision-ca'), partiel: at(p, 'data-prevision-partiel'), apayer: at(p, 'data-prevision-apayer'), adater: at(p, 'data-prevision-adater'), texte: p.innerText.replace(/\s+/g, ' '), visible: p.getBoundingClientRect().height > 0 } : null,
     deb: document.documentElement.scrollWidth - document.documentElement.clientWidth,
   };
 });
@@ -137,15 +139,14 @@ const capture = async (pg, sel, nom) => { if (!CAPT) return; fs.mkdirSync(CAPT, 
         const { ctx, pg, errs } = await rendre(b, vp, opts);
         await aller(pg, 'compta', '[data-compta-urssaf]', 2500); await ouvrirMicro(pg);
         const r = await lire(pg);
-        console.log('DEBUG', await pg.evaluate(() => { const e = document.querySelector('[data-compta-echeance]'); const r = e.getBoundingClientRect(); let x = e, ch = []; while (x && x !== document.body) { const cs = getComputedStyle(x); if (cs.display === 'none' || cs.visibility === 'hidden' || x.tagName === 'DETAILS' && !x.open) ch.push(x.tagName + '.' + x.className + '[' + cs.display + ']'); x = x.parentElement; } return JSON.stringify({ r: [r.width, r.height], ch }); }));
         dit(r.atteinte === 'tva:10', `A ${T} : seuil de TVA « vers novembre » ; aucun mois pour le plafond`, r.atteinte + ' ' + JSON.stringify(r.n));
         const d = r.dac7;
         dit(d.Vinted && d.Vinted.v === 'atteint' && d.Vinted.n === '41' && d.Leboncoin && d.Leboncoin.v === 'atteint' && d.Leboncoin.cts === '1995000', `A ${T} : DAC7 Vinted (41 ventes) et Leboncoin (19 950 €) atteints`, JSON.stringify(d));
         dit(d.eBay && d.eBay.v === 'sous' && /encore 27 ventes/.test(d.eBay.t), `A ${T} : DAC7 eBay sous les seuils, « encore 27 ventes ou … »`, d.eBay && d.eBay.t);
-        dit(d.Vestiaire && d.Vestiaire.etat === 'passu' && d.Vestiaire.n === '' && /—/.test(d.Vestiaire.t), `A ${T} : Vestiaire pas lu ⇒ « — », jamais 0`, JSON.stringify(d.Vestiaire));
-        dit(r.prev && r.prev.etat === 'lu' && r.prev.label === 'octobre 2026' && r.prev.ca === '8000' && r.prev.apayer === '992' && !r.prev.partiel, `A ${T} : prochaine échéance octobre : 8 000 € reçus ⇒ 992,00 € (12,4 %)`, JSON.stringify(r.prev));
+        dit(d.Vestiaire && d.Vestiaire.etat === 'lu' && d.Vestiaire.n === '0' && d.Vestiaire.v === 'sous', `A ${T} : Vestiaire lu, aucune vente ⇒ sous les seuils`, JSON.stringify(d.Vestiaire));
+        dit(r.prev && r.prev.etat === 'lu' && r.prev.label === 'octobre 2026' && r.prev.ca === '8000' && r.prev.apayer === '992' && !r.prev.partiel && r.prev.visible, `A ${T} : (visible) prochaine échéance octobre : 8 000 € reçus ⇒ 992,00 € (12,4 %)`, JSON.stringify(r.prev));
         dit(r.deb <= 1, `A ${T} : aucun débordement horizontal`, String(r.deb));
-        await capture(pg, '[data-compta-echeance]', `prevision-${T}`); await capture(pg, '[data-micro-seuils]', `seuils-${T}`);
+        await capture(pg, '[data-prevision-carte]', `prevision-${T}`); await capture(pg, '[data-micro-seuils]', `seuils-${T}`);
         dit(errs.length === 0, `A ${T} : aucune erreur d’app`, errs.join(' | ').slice(0, 200));
         await ctx.close();
       });
@@ -153,15 +154,17 @@ const capture = async (pg, sel, nom) => { if (!CAPT) return; fs.mkdirSync(CAPT, 
         const { ctx, pg } = await rendre(b, vp, { main: mainDe({ vinted_dark: true }), sombre: true });
         await pg.addInitScript(() => { window.__sombre = 1; });
         await aller(pg, 'compta', '[data-compta-urssaf]', 2500); await ouvrirMicro(pg);
-        await capture(pg, '[data-compta-echeance]', `prevision-${T}-sombre`); await capture(pg, '[data-micro-seuils]', `seuils-${T}-sombre`);
+        await capture(pg, '[data-prevision-carte]', `prevision-${T}-sombre`); await capture(pg, '[data-micro-seuils]', `seuils-${T}-sombre`);
         await ctx.close();
       });
       await essaie('B' + T, async () => {
-        const { ctx, pg, errs } = await rendre(b, vp, { main: mainDe({}, LIGNE({ aDater: { n: 2, ca: 120, par: { Vinted: { n: 2, ca: 120 } } } })) });
+        const { ctx, pg, errs } = await rendre(b, vp, { main: mainDe({}, LIGNE({ aDater: { n: 2, ca: 120, par: { Vinted: { n: 2, ca: 120 } } }, sources: { Vinted: 'lu', Leboncoin: 'lu', eBay: 'lu', Vestiaire: 'pasSu' } })) });
         await aller(pg, 'compta', '[data-compta-urssaf]', 2500); await ouvrirMicro(pg);
         const r = await lire(pg);
         dit(r.prev && r.prev.partiel === '1' && r.prev.adater === '2' && /au moins/.test(r.prev.texte), `B ${T} : 2 ventes à dater ⇒ « au moins » + « 2 ventes » à dater`, JSON.stringify(r.prev));
         dit(r.atteinte === '', `B ${T} : total partiel ⇒ aucun « vers [mois] »`, r.atteinte);
+        const vc = r.dac7.Vestiaire || {};
+        dit(vc.etat === 'passu' && vc.n === '' && /—/.test(vc.t), `B ${T} : DAC7 Vestiaire pas lu ⇒ « — », jamais 0`, JSON.stringify(vc));
         dit(errs.length === 0, `B ${T} : aucune erreur d’app`, errs.join(' | ').slice(0, 200));
         await ctx.close();
       });
@@ -172,9 +175,9 @@ const capture = async (pg, sel, nom) => { if (!CAPT) return; fs.mkdirSync(CAPT, 
         await aller(pg, 'compta', '[data-compta-urssaf]', 2500);
         let r = await lire(pg);
         dit(r.prev && r.prev.etat === 'rythme' && !/€/.test(r.prev.texte), `C ${T} : rythme jamais choisi ⇒ « — » et le choix, aucun montant`, JSON.stringify(r.prev));
-        await capture(pg, '[data-compta-echeance]', `prevision-rythme-${T}`);
+        await capture(pg, '[data-prevision-carte]', `prevision-rythme-${T}`);
         await touche(pg, '[data-prevision-rythme="mensuel"]', vp);
-        await pg.waitForTimeout(1600);
+        for (let i = 0; i < 40 && !(opts.main && opts.main.vinted_urssaf_freq === 'mensuel'); i++) await pg.waitForTimeout(250);
         r = await lire(pg);
         dit(opts.main && opts.main.vinted_urssaf_freq === 'mensuel' && r.prev && r.prev.etat === 'lu' && r.prev.label === 'octobre 2026', `C ${T} : « Par mois » rangé au nuage, la prévision s’affiche`, JSON.stringify({ f: opts.main && opts.main.vinted_urssaf_freq, p: r.prev }));
         dit(errs.length === 0, `C ${T} : aucune erreur d’app`, errs.join(' | ').slice(0, 200));
