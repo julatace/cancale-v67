@@ -36,6 +36,7 @@ import {suivreReceptionLeboncoin,lireReceptionLeboncoin} from './rafraichissemen
 import { STYLE_FLOU, compteLbcOuvert, lbcFloute, compteVcOuvert, vcFloute } from './flouCompte.js';
 import DiagnosticLeboncoin from './DiagnosticLeboncoin.jsx';
 import {preparerLiaisonOAuth,lireLiaisonOAuth,resultatLiaisonPermis} from './auth/liaisonOAuth.js';
+import { SqueletteChargement } from "./Chargement.jsx";
 import ConnexionsCompte from './auth/ConnexionsCompte.jsx';
 import {etatColisDepuisTexte,normaliserSuivi} from '../api/_lib/etat-colis-email.js';
 import {FAMILLES as FAMILLES_NOTIF,familleActive as familleNotifActive} from '../api/_lib/notif-textes.js';
@@ -41116,32 +41117,7 @@ function AcctTag({ acc, name }) {
 // Squelettes de chargement : un rectangle gris animé, plus agréable qu'un texte
 // « Chargement… » figé. `variant` = 'card' (grille d'annonces) ou 'row' (listes).
 function Skeleton({ variant='row', count=6 }) {
-  const bg = C.border;
-  const shimmer = { background:`linear-gradient(90deg, ${bg}55 25%, ${bg}aa 37%, ${bg}55 63%)`, backgroundSize:'400% 100%', animation:'cancaleSkeleton 1.4s ease infinite', borderRadius:8 };
-  if (variant==='card') {
-    return <div className="vrm-skeleton" role="status" aria-label="Chargement des articles" aria-busy="true" style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(160px, 1fr))',gap:14}}>
-      {Array.from({length:count}).map((_,i)=>(
-        <div key={i} style={{borderRadius:12,overflow:'hidden',background:C.surface,border:`1px solid ${C.border}`,boxShadow:C.shadow||'none'}}>
-          <div style={{...shimmer,width:'100%',aspectRatio:'3/4',borderRadius:0}}/>
-          <div style={{padding:'8px 10px 10px',display:'flex',flexDirection:'column',gap:6}}>
-            <div style={{...shimmer,height:14,width:'55%'}}/>
-            <div style={{...shimmer,height:11,width:'80%'}}/>
-          </div>
-        </div>
-      ))}
-    </div>;
-  }
-  return <div className="vrm-skeleton" role="status" aria-label="Chargement de la liste" aria-busy="true" style={{display:'flex',flexDirection:'column',gap:10}}>
-    {Array.from({length:count}).map((_,i)=>(
-      <div key={i} style={{display:'flex',gap:12,alignItems:'center',padding:'11px 13px',border:`1px solid ${C.border}`,borderRadius:12,background:C.surface,boxShadow:C.shadow||'none'}}>
-        <div style={{...shimmer,width:56,height:76,borderRadius:12,flexShrink:0}}/>
-        <div style={{flex:1,display:'flex',flexDirection:'column',gap:6}}>
-          <div style={{...shimmer,height:13,width:'45%'}}/>
-          <div style={{...shimmer,height:11,width:'70%'}}/>
-        </div>
-      </div>
-    ))}
-  </div>;
+  return <SqueletteChargement variant={variant} count={count}/>;
 }
 
 // État d'erreur de chargement, avec un bouton « Réessayer ».

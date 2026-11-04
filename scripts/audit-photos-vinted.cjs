@@ -153,6 +153,7 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
       'Photo :: url': 'AnnoncesLeboncoin (catalogue, 22 oct., main) : `ad.images[0]` d’une annonce LEBONCOIN lue par l’extension (CDN de Leboncoin) — jamais une adresse Vinted ; https seulement, repli « — » si elle ne charge pas',
       'OsmMap :: tileUrl(t.x, t.y)': 'tuiles de carte OpenStreetMap',
       'AbonnementRequis :: "/vrm-logo-96.png"': 'logo de l’app (fichier du site, logo officiel)',
+      'DemarrageVRM :: "/vrm-icon-v4-192.png"': 'icône officielle locale au démarrage, aucune URL distante',
       'PorteConfidentialite :: "/vrm-icon-v4-192.png"': 'icône de l’app v4 (fichier du site)',
       'AbonnementRequis :: "/vrm-logo-v4-192.png"': 'logo de l’app v4 (fichier du site, logo officiel)',
       'Accueil :: "/vrm-logo-v4-192.png"': 'logo de l’app v4 (fichier du site, logo officiel)',

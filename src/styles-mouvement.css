@@ -41,3 +41,8 @@
 @keyframes vrm-case-tombe { from { transform: translateY(var(--vrm-tombe, -100%)); } to { transform: none; } }
 .vrm-case-tombe { animation: vrm-case-tombe .35s cubic-bezier(.3,1.25,.5,1) both; z-index: 2; }
 @media (prefers-reduced-motion: reduce) { .vrm-case-tombe { animation: none; } }
+
+/* Menus courts : aucun délai ajouté à l'action, aucun état de transformation conservé. */
+.vrm-menu-flottant { animation: vrm-menu-entree .12s ease-out; }
+@keyframes vrm-menu-entree { from { opacity: .6; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .vrm-menu-flottant { animation: none !important; } }

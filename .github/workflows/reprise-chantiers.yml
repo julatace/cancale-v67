@@ -31,7 +31,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        banc: [argent-mois, offres-objectif, achats-sourcing, comptes-securite]
+        banc: [argent-mois, offres-objectif, achats-sourcing, comptes-securite, bureau-chargement]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

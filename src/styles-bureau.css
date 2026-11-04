@@ -1,0 +1,29 @@
+/* Le bureau utilise la place disponible ; les règles téléphone restent intactes. */
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
+  .vrm-app-shell { --vrm-largeur-contenu: 1360px; --vrm-largeur-journee: 1360px; }
+  .vrm-app-shell .vrm-main[data-ecran="settings"] { --vrm-largeur-contenu: 1120px; }
+  .vrm-app-shell .vrm-main > :not(.vrm-barre-haut) { min-width: 0; }
+}
+@media (min-width: 1280px) {
+  :root:root body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1.1fr) minmax(340px, 1fr) !important;
+    align-items: start;
+    column-gap: 24px;
+    row-gap: 20px;
+  }
+  :root:root body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee > * { min-width: 0; grid-column: 1 / -1; }
+  :root:root body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee > .vrm-fu-tete { grid-column: 1; grid-row: 1; margin: 0 !important; }
+  :root:root body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee > .vrm-journal-semaine { grid-column: 1; grid-row: 2; margin: 0 !important; }
+  :root:root body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee > .vrm-fu-afaire { grid-column: 2; grid-row: 1 / span 3; margin: 0 !important; }
+  :root:root body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task-list { margin: 0 !important; }
+  :root:root body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-fu-titre-section { margin-top: 0 !important; }
+}
+/* Une transition de contenu, sans déplacer toute la zone de travail. */
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
+  .vrm-app-shell .vrm-main.vrm-ecran-anime { animation: vrm-bureau-entree .18s ease; }
+}
+@keyframes vrm-bureau-entree { from { opacity: .9; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .vrm-app-shell .vrm-main.vrm-ecran-anime { animation: none !important; }
+}

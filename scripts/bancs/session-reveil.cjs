@@ -128,14 +128,16 @@ async function main() {
         let navigations = 0;
         pg.on('domcontentloaded', () => { navigations++; });
         await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
-        await pg.waitForTimeout(7000);
+        // Attendre la coque réellement rendue, pas une longueur de texte qui
+        // dépend du libellé des boutons et de la largeur du téléphone.
+        await pg.waitForSelector('.vrm-app-shell .vrm-main', { timeout: 20000 });
         const txt = await pg.evaluate(() => document.body.innerText);
         console.log('     (texte rendu : ' + JSON.stringify(txt.slice(0, 160)) + ')');
         const tombe = /pas pu s'afficher|Unable to preload|Recharger/i.test(txt);
         dit(etatSrv.cssRefus === 1, 'D. le CSS d\'un ancien déploiement a bien été refusé une fois', `${etatSrv.cssRefus}`);
         dit(navigations === 2, 'D. la page s\'est rechargée UNE fois (pas zéro, pas en boucle)', `${navigations} chargement(s)`);
         const css = await pg.evaluate(() => [...document.styleSheets].some((f) => { try { return /\/assets\/App-.*\.css/.test(f.href || '') && f.cssRules.length > 0; } catch (_) { return false; } }));
-        dit(!tombe && txt.length > 300 && css, 'D. l\'app s\'affiche AVEC sa feuille de style après le rechargement', `${txt.length} caractères, feuille de style ${css ? 'chargée' : 'ABSENTE (page sans mise en forme)'}`);
+        dit(!tombe && await pg.locator('.vrm-app-shell .vrm-main').isVisible() && css, 'D. l\'app s\'affiche AVEC sa feuille de style après le rechargement', `${txt.length} caractères, feuille de style ${css ? 'chargée' : 'ABSENTE (page sans mise en forme)'}`);
         etatSrv.cssPerime = false;
         await ctx.close();
       }

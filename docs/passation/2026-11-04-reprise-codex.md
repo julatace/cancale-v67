@@ -89,3 +89,26 @@ Le résultat des tests ne prouve pas une collecte réelle sur l'appareil de Juli
   offres/objectif 96/96 avant ajout du contrôle de contraste, achats 120/120,
   comptes/sécurité tout vert. Captures examinées. Les tests d'isolation des
   déconnexions et les cas financiers passent, et échouent avant correction.
+
+## Bureau et chargements (demande suivante)
+
+Le téléphone est validé par Julien : conserver sa disposition. Les plafonds
+720/760 px du bureau comprimaient les statistiques et laissaient la place vide.
+Ils lisent maintenant une largeur de bureau (1360 px, réglages 1120 px), avec
+résumé et actions côte à côte à partir de 1280 px. Les règles de téléphone ne
+sont pas élargies. Captures examinées à 1280, 1512 et 1920 px.
+
+Le fallback noir de l'import de l'app devient un écran VRM accessible ; les
+squelettes des listes sont communs. Animations courtes, réduction des mouvements
+respectée. Le banc `bureau-chargement.cjs` bloque le vrai bundle pour contrôler
+le chargement puis l'arrivée dans l'app, et vérifie les quatre écrans à six
+largeurs, avec des comptes fictifs. Aucun appel marchand réel.
+
+Le banc de récupération d'un CSS périmé contrôlait une longueur arbitraire de
+texte (>300 caractères), qui échouait avec une app affichée et son CSS chargé
+(280 caractères). Il attend maintenant la coque visible du vrai écran, tout en
+conservant les assertions d'un seul rechargement et de CSS réellement chargé.
+
+Google : le nom du consentement dépend de Google Cloud, pas du bouton VRM.
+Aucun accès admin configuré : aucune marque OAuth modifiée à distance.
+Procédure et callback conservé dans `docs/connexion-google-marque-vrm.md`.
