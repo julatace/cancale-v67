@@ -38114,7 +38114,9 @@ function AnnulationsEtNotes({ b, panelOff }) {
     for (const a of lies) { const u = String((a && a.vinted_user_id) || ''); if (u && !ecarteUid(u)) out.set(u, { uid: u, nom: a.login || u }); }
     if (!out.size) for (const p of (profils || [])) if (p && p.uid && !ecarteUid(p.uid)) out.set(p.uid, { uid: p.uid, nom: p.login || p.uid });
     return [...out.values()];
-  }, [profils, ecarteUid]);
+    // `ventes` : la coque publie ses ventes APRÈS avoir rangé la liste des comptes
+    // (`vinted_accounts`, sans événement) — relue à ce moment-là.
+  }, [profils, ecarteUid, ventes]); // eslint-disable-line react-hooks/exhaustive-deps
   const nomDe = (u) => (comptes.find((c) => c.uid === String(u)) || {}).nom || 'un compte';
   const A = React.useMemo(() => annulationsParCompte({ ventes, ko, de: b.de, a: b.a, estAnnulee: (o) => classifyOrderStatus(o.status) === 'cancelled', ecarte: ecarteUid }), [ventes, ko, b, ecarteUid]);
   const N = React.useMemo(() => notesParCompte({ profils, comptes }), [profils, comptes]);
