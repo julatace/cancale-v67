@@ -13,7 +13,11 @@
 //   C. les résultats arrivent À LA FRAPPE (une marque ⇒ des lignes ; un N° ⇒
 //      le bloc « Tout sur le N° », par identité) ;
 //   D. Échap ferme le panneau ; la page n'a pas bougé ;
-//   E. un toucher dehors ferme le panneau ;
+//   E. un toucher dehors ferme le panneau (téléphone : « Fermer ») ;
+// ⚠️ (3 nov., recherche unique, demande « au téléphone : plein écran ») : au
+//    TÉLÉPHONE, dès qu'il tape, les résultats prennent tout l'écran sous l'en-tête
+//    (champ vide : rien ne s'ouvre, jamais le grand écran blanc du 31 oct.) ; B et
+//    E le jugent à cette règle au téléphone, inchangés sur ordinateur.
 //   F. les lignes du panneau font ≥ 44 px ; aucun débordement ; aucune erreur.
 // BANC_MUTATION=plein : le panneau redevient un écran plein (CSS) ⇒ B doit rougir.
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
@@ -152,8 +156,9 @@ const etat = (pg) => pg.evaluate(() => {
         dit(e2.panneau && /Adidas/.test(e2.txt), `${T} C : « adid » ⇒ les paires Adidas, à la frappe`, e2.txt.slice(0, 120).replace(/\n/g, ' · '));
         dit(!/Nike Air Max/.test(e2.txt), `${T} C : et pas la Nike`, '');
         // B. pas d'écran plein, contenu derrière
-        dit(e2.couvrants.length === 0, `${T} B : aucune couche fixe ne couvre la fenêtre`, e2.couvrants.join(' | '));
-        dit(e2.pH > 0 && e2.pH < vp.height * 0.8, `${T} B : le panneau est un déroulant (${e2.pH} px sur ${vp.height})`, String(e2.pH));
+        if (!tel) dit(e2.couvrants.length === 0, `${T} B : aucune couche fixe ne couvre la fenêtre`, e2.couvrants.join(' | '));
+        if (!tel) dit(e2.pH > 0 && e2.pH < vp.height * 0.8, `${T} B : le panneau est un déroulant (${e2.pH} px sur ${vp.height})`, String(e2.pH));
+        else dit(e2.pH >= vp.height * 0.85, `${T} B : au téléphone, les résultats prennent l'écran sous l'en-tête (${e2.pH} px sur ${vp.height})`, String(e2.pH));
         dit(e2.defile === e0.defile, `${T} B : la page derrière n'a pas bougé (défilement ${e0.defile} → ${e2.defile})`);
         await pg.locator('[data-recherche-champ]').fill('');
         await pg.keyboard.type('128', { delay: 40 });
@@ -174,9 +179,10 @@ const etat = (pg) => pg.evaluate(() => {
         const e5 = await etat(pg);
         dit(e5.panneau, `${T} E : rouvert`);
         const pt = tel ? { x: 20, y: vp.height - 120 } : { x: vp.width - 120, y: vp.height - 60 };
-        await pg.mouse.click(pt.x, pt.y); await pg.waitForTimeout(400);
+        if (tel) await pg.locator('button[aria-label="Fermer la recherche"]').first().tap(); else await pg.mouse.click(pt.x, pt.y);
+        await pg.waitForTimeout(400);
         const e6 = await etat(pg);
-        dit(!e6.panneau, `${T} E : un toucher dehors ferme le panneau`);
+        dit(!e6.panneau, `${T} E : ${tel ? '« Fermer »' : 'un toucher dehors'} ferme le panneau`);
       });
       dit(errs.length === 0, `${T} F : aucune erreur de page`, errs.join(' | ').slice(0, 200));
       await ctx.close();

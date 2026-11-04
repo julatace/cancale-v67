@@ -18,6 +18,10 @@
 //      semaine : « Bénéfice brut ».
 // Sur le code d'avant : Statistiques montre le brut (« au moins » en B), le
 // récap écrit « — » en dur, Ma journée glisse au brut partiel.
+//   D. (3 nov.) Statistiques → « L'argent depuis le début » : la cellule
+//      « Bénéfice » (ex-« Bénéfice estimé », qui disait « — » dès que les ventes
+//      Vinted étaient lues) = la tuile « Bénéfice » de l'ANNÉE (la règle de
+//      Compta) ; la marge dit « — » exactement quand le bénéfice le dit.
 const path=require('path');
 let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
@@ -56,7 +60,7 @@ for(const v of VENTES) if(v[5]) rows.push({ id:`harvest_${v[0]}_txn_${v[1]}`, da
 rows.push({ id:'lbc_ventes', data:{ ventes:{} } });
 rows.push({ id:'ebay_orders', data:{ orders:[] } });
 const OV_PARTIEL={ '91002':{ buyPrice:'20', fees:'2' }, '91003':{ buyPrice:'15' } };
-const OV_COMPLET={ ...OV_PARTIEL, '91004':{ buyPrice:'30' } };
+const OV_COMPLET={ ...OV_PARTIEL, '91004':{ buyPrice:'30' }, '91001':{ buyPrice:'18' }, '91006':{ buyPrice:'12' } };   // (3 nov.) + les ventes des mois d'avant : le bénéfice de l'ANNÉE se calcule (cas D)
 const COMPTA={ depenses:[], packs:[], abonnements:[], fixes:[{ id:'f1', label:'Local inventé', montant:20 }] };
 
 function projette(row,select){
@@ -153,6 +157,19 @@ const lireC=async(pg)=>{ await aller(pg,'compta','[data-benef-etat]',2500); awai
     return { valeur: td?td.getAttribute('data-benef-valeur'):null, cellule:cell, entetes:ths }; },ym(maintenant));
   return { ...c, recap };
 };
+// Statistiques → « L'argent depuis le début » : ouvert d'un toucher, comme Julien.
+const lireArgent=async(pg)=>{
+  await aller(pg,'dashboard','[data-stats-repli="argent"]',2000);
+  const ouvert=await pg.evaluate(()=>{ const d=document.querySelector('[data-stats-repli="argent"]'); return !!(d&&d.open); });
+  if(!ouvert) await pg.click('[data-stats-repli="argent"] > summary').catch(()=>{});
+  await pg.waitForSelector('[data-stats-carte="hero"]',{timeout:10000}).catch(()=>{});
+  await pg.waitForTimeout(500);
+  return pg.evaluate(()=>{ const h=document.querySelector('[data-stats-carte="hero"]'); if(!h) return null;
+    const cases=[...h.querySelectorAll('div[style*="padding: 12px 0px 0px"], [data-benef-notion], [data-marge-notion]')].filter(e=>e.children.length>=2);
+    const lib=(e)=>(e.children[0]||{}).innerText||''; const val=(e)=>(e.children[1]||{}).innerText||'';
+    const b=cases.find(e=>/^Bénéfice/i.test(lib(e).trim())), m=cases.find(e=>/marge/i.test(lib(e)));
+    return { lib:b?lib(b).trim():null, val:b?val(b).trim():null, attr:b?b.getAttribute('data-benef-valeur'):null, mlib:m?lib(m).trim():null, mval:m?val(m).trim():null, texte:h.innerText }; });
+};
 const cents=(s)=>{ if(s==null) return null; const t=String(s).replace(/\s| | /g,'').replace('€',''); if(t===''||t==='—') return ''; const n=Number(t.replace(',','.').replace(/[^0-9.\-−]/g,'').replace('−','-')); return isFinite(n)?String(Math.round(n*100)):null; };
 
 (async()=>{
@@ -181,6 +198,16 @@ const cents=(s)=>{ if(s==null) return null; const t=String(s).replace(/\s| | 
           dit(!!c&&!!c.recap&&!c.recap.entetes.some(t=>/net estimé/i.test(t)),'le récap n’appelle plus « Net estimé » le CA après URSSAF',c&&c.recap&&c.recap.entetes.join('|'));
           dit(!!s && !/au moins/.test(s.texte),'jamais « au moins » sur la tuile du bénéfice',s&&s.texte.replace(/\n/g,' | '));
           if(lettre==='B') dit(await pg.locator('[data-benef-porte]').count()>0,'la porte « Compléter les prix d’achat » est là');
+          {
+            console.log('── D. Statistiques, « L’argent depuis le début »');
+            const sa=await lireS(pg,'annee'); const ar=await lireArgent(pg);
+            console.log(`   tuile année ${JSON.stringify(sa&&{lib:sa.lib,val:sa.val})} · cellule ${JSON.stringify(ar&&{lib:ar.lib,val:ar.val,marge:ar.mval})}`);
+            const vA=sa?cents(sa.val):null, vCel=ar?cents(ar.val):null;
+            dit(!!ar && /^Bénéfice$/.test(ar.lib||'') && vA!==null && vCel===vA,'la cellule « Bénéfice » = la tuile « Bénéfice » de l’année (la règle de Compta)',`${ar&&ar.lib} ${ar&&ar.val} · année ${sa&&sa.val}`);
+            dit(!!ar && !!ar.mval && ((vCel==='')===(ar.mval==='—')),'la marge dit « — » exactement quand le bénéfice le dit',`${ar&&ar.mval}`);
+            dit(!!ar && !/Bénéfice estimé|Taux marge/.test(ar.texte),'plus de « Bénéfice estimé » ni de « Taux marge »');
+            if(process.env.BANC_CAPTURE) await pg.locator('[data-stats-carte="hero"]').screenshot({path:path.join(process.env.BANC_CAPTURE,`benefice-unique-argent-${lettre}-${T.nom}.png`)}).catch(()=>{});
+          }
           if(process.env.BANC_CAPTURE){ await aller(pg,'dashboard','[data-sv-tuile="benefice"]',1500); await pg.locator('.vrm-sv-tuiles').screenshot({path:path.join(process.env.BANC_CAPTURE,`benefice-unique-stats-${lettre}-${T.nom}.png`)}).catch(()=>{});
             await aller(pg,'journee','[data-journee-benef]',1500); await pg.locator('[data-journee-benef]').first().screenshot({path:path.join(process.env.BANC_CAPTURE,`benefice-unique-journee-${lettre}-${T.nom}.png`)}).catch(()=>{}); }
           if(lettre==='A'){
