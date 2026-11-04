@@ -3559,3 +3559,9 @@ soir existant n'est pas touché).
   ≥ 380 px. Reste rouge, AVANT ce
   chantier aussi : `messages-sites` « vestiaire · 390 px — la liste prend toute la largeur ».
 - Geste de Julien : « Modifier » sur une carte → « Objectif ».
+**4 nov. — Achats : trois entrées « Fournisseurs · Délai · Lots »** sous la carte sombre d'Achats (pilules
+Fusion, 44 px, une ligne au téléphone), chacune une feuille en portail (`src/AchatsOutils.jsx`,
+`src/styles-achats-outils.css`, réutilise `.vrm-ao-*`) : tableau des fournisseurs triable, médiane du
+délai réception → mise en ligne avec la liste « Reçus, pas encore en ligne » (Relier · Mettre en ligne),
+« Répartir » un lot (« Reste X € » en ambre). Aucun texte explicatif. Banc `achats-sourcing` (120, 390/1512
+clair/sombre). Règles et mesures : `historique-compta-urssaf-abonnement.md` (« 4 nov. — Achats »).

@@ -80,6 +80,8 @@ import { poserLienVc, defaireLienVc, numerosABarrer, marquerBarre, lienDe, produ
 import FeuilleLienVc from "./LienVestiaire.jsx";
 import { preuvesFriseVc, preuvesFriseEbay } from "./friseSites.js";
 import { suggestionsAchat, tousAchatsLibres, filtresAchats, etiquetteLot, liensParAchat, lotDe, prixIndicatifLot, ecritureLot } from "./suggestionsAchat.js";
+import AchatsOutils from "./AchatsOutils.jsx";
+import { fournisseurs as fournisseursAchats, trierFournisseurs, articlesParAchat, delaisMiseEnLigne, dateReception, estLot as estLotAchat, nombreLot, totalARepartir, ecrituresRepartition, annulationRepartition, ecritureLienAchat, prixAchatCentimes, achatSansCout } from "./achatsSourcing.js";
 import { boostRentable, SEUIL_BOOST } from "./boostRentable.js";
 import { CLE_WIDGETS_JOURNEE, WIDGETS_JOURNEE, NOM_TAILLE, DISPO_JOURNEE_DEFAUT, normaliserDispoJournee, deplacerWidget, retirerWidget, widgetFixe, tailleSuivante, tailleDefautWidget, caseVisible, widgetsAjoutables, dispoAEnregistrer } from "./journeeWidgets.js";
 import { modeleSur, releveVentes } from "./ceQuiRapporte.js";
@@ -2010,6 +2012,9 @@ const SYNC_KEYS = [
   // (3 nov.) Le cycle d'un article (src/cycleArticle.js) : SA réponse à « N°x
   // supprimé de Vinted » (son clic seul) et la dernière lecture qui l'a vu en ligne.
   'vrm_cycle_decisions','vrm_vus_en_ligne','vrm_fiches_neuves','vrm_prix_journal','vrm_modeles_desc',
+  // (4 nov.) Les achats qu'il a DÉCLARÉS lots, et ses répartitions d'un lot sur ses N°
+  // (l'état d'avant gardé pour « Annuler ») — src/achatsSourcing.js, écrits sur SON clic.
+  'vrm_lots_declares','vrm_repartitions_lots',
   // Par annonce eBay, le prix Vinted de la dernière baisse faite depuis VRM
   // (proposition 9) : rien n'est reproposé tant qu'il n'a pas bougé.
   'vrm_ebay_baisses',
@@ -42830,6 +42835,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //    une lecture morte qui faisait croire à une identité.
   // Trois états chacun : `undefined` en cours · `null` pas su · lu.
   const [photosTxAchats,setPhotosTxAchats]=useState({});
+  // (4 nov.) Ce que SA transaction dit de chaque achat (src/achatsSourcing.js) :
+  // le pseudo du vendeur (côté acheteur seulement), le nombre d'articles, l'état
+  // et la date de l'envoi (« Commande livrée » = 400). En mémoire seulement : le
+  // pseudo d'un tiers n'est rangé nulle part. undefined en cours · lu.
+  const [infosTxAchats,setInfosTxAchats]=useState(undefined);
   const [suivisVinted,setSuivisVinted]=useState(undefined);
   const [suivisManuels,setSuivisManuels]=useState(undefined);
   const indexSuivisAchats = useMemo(() => {
@@ -46948,13 +46958,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     let stop=false;
     (async()=>{
       const demandes=demandesSuivis.split(',');
-      const resultat={};
+      const resultat={}, infos={};
       for(let i=0;i<demandes.length;i+=100){
-        const ids=demandes.slice(i,i+100);const rows=await lireTout(`id=in.(${ids.join(',')})&select=id,tx:data->payload->transaction->>id,photo:data->payload->transaction->item_photo`,{strict:true});
+        const ids=demandes.slice(i,i+100);const rows=await lireTout(`id=in.(${ids.join(',')})&select=id,tx:data->payload->transaction->>id,photo:data->payload->transaction->item_photo,side:data->payload->transaction->>user_side,vendeur:data->payload->transaction->seller->>login,nb:data->payload->transaction->>items_count,livSt:data->payload->transaction->shipment->>status,livAt:data->payload->transaction->shipment->>status_updated_at`,{strict:true});
         if(rows===null||stop)return;
-        for(const r of rows){if(!ids.includes(r.id))continue;const tx=String(r.tx||r.id.split('_txn_')[1]||'');if(tx)resultat[tx]={photo:photoArticle({photo:r.photo})};}
+        for(const r of rows){if(!ids.includes(r.id))continue;const tx=String(r.tx||r.id.split('_txn_')[1]||'');if(tx){resultat[tx]={photo:photoArticle({photo:r.photo})};infos[tx]={vendeur:r.side==='buyer'&&r.vendeur?String(r.vendeur):'',nb:r.side==='buyer'&&r.nb!=null?Number(r.nb):null,livSt:r.side==='buyer'&&r.livSt!=null?String(r.livSt):'',livAt:r.side==='buyer'?(r.livAt||''):''};}}
       }
       if(!stop)setPhotosTxAchats(prev=>JSON.stringify(prev)===JSON.stringify(resultat)?prev:resultat);
+      if(!stop)setInfosTxAchats(prev=>prev&&JSON.stringify(prev)===JSON.stringify(infos)?prev:infos);
     })();return()=>{stop=true;};
   },[demandesSuivis]);
   // ── LA LIGNE DE SUIVI VINTED ET LES N° AJOUTÉS À LA MAIN (23 oct.) ────────
@@ -48687,6 +48698,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (le lien qu'IL a posé, ou le fichier photo exact) : VRM propose le montant
   // payé (reçu juste, sinon l'article seul). Rien n'est écrit sans son tap.
   // Un achat ne se propose qu'à UN article (ventes au plus récent d'abord).
+  // (4 nov.) Un LOT (titre « Lot … », plusieurs articles dans SA transaction, ou
+  // déclaré par lui) : jamais son prix entier proposé à un article (src/achatsSourcing.js).
+  const [lotsDeclares, setLotsDeclares] = useStateCle('vrm_lots_declares', () => load('vrm_lots_declares', {}) || {});
+  const [repartitionsLots, setRepartitionsLots] = useStateCle('vrm_repartitions_lots', () => load('vrm_repartitions_lots', {}) || {});
+  const infosAchatsLues = infosTxAchats !== undefined ? infosTxAchats : (demandesSuivis === '' && Array.isArray(buys.items) ? {} : undefined);
+  const nArticlesTx = useMemo(() => { const m = {}; for (const [tx, i] of Object.entries(infosAchatsLues || {})) if (i && i.nb != null) m[tx] = i.nb; return m; }, [infosAchatsLues]);
+  const estLotApp = (a) => estLotAchat(a, { nArticlesTx, declares: lotsDeclares });
+  const estLotPropose = (a) => estLotApp(a) || !!(a && a.lot === true);
   const achatsIdentite = fillBuyAchats.items || buys.items || null;
   const ventilationDeTx = (tx) => { const r = indexRecusAchat.get(String(tx)); return r ? ventilationRecuAchat(r.texte) : null; };
   const propositionsPrix = useMemo(() => {
@@ -48698,7 +48717,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const lie = e && e.buyFromId ? achatRelie(e) : null;
       const pris = new Set(linkedBuyIds); if (e && e.buyFromId) pris.delete(String(e.buyFromId));
       const identite = achatParIdentite({ lie, photo, venteTx, venteDate, achats: achatsIdentite, cleDePhoto, pris });
-      return propositionPrixAchat({ prixConnu, annulee, identite, ventilationDe: ventilationDeTx });
+      return propositionPrixAchat({ prixConnu, annulee, identite, ventilationDe: ventilationDeTx, estLot: estLotPropose });
     };
     const ventes = [...(sales.items || [])].sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
     for (const o of ventes) {
@@ -48715,7 +48734,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const nums = new Map(lignes.map((l) => [l.cle, l.numero]));
     return { m, numero: (c) => nums.get(c) || '' };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, numeros, saleOv, buyByNum, achatsIdentite, indexRecusAchat, linkedBuyIds]);
+  }, [sales.items, numeros, saleOv, buyByNum, achatsIdentite, indexRecusAchat, linkedBuyIds, nArticlesTx, lotsDeclares]);
   const propositionVente = (tx) => propositionsPrix.m.get('v:' + tx) || null;
   // Ventes et la saisie en série lisent les achats captés (relecture de l'extension
   // seulement, `harvestOnly`) ; les reçus ne partent que s'il y a une proposition.
@@ -48764,7 +48783,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const cible = pickerFor; if (!cible || !a) return;
     const accNom = accNameOf(a._acc) || '';
     let w = null;
-    if (lotDe(a).lot) {
+    if (lotDe(a).lot || estLotApp(a)) {
       const l = lotDe(a), ind = prixIndicatifLot(a), px = prixPayeAchat(a);
       const saisi = await askText({ title: "Prix d'achat de cet article", desc: ind != null ? `${prixCourt(px)} ÷ ${l.n} ≈ ${prixCourt(ind)}` : (px != null ? `Lot · ${prixCourt(px)}` : ''), numeric: true, value: '', ok: 'Relier', cancel: 'Annuler' });
       if (saisi == null) return;
@@ -48795,6 +48814,136 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       save('vinted_annonce_numeros', u); return u;
     });
   };
+
+  // ── (4 nov.) ACHATS : FOURNISSEURS · DÉLAI · LOTS (src/achatsSourcing.js, src/AchatsOutils.jsx) ──
+  // Les lectures existantes passées aux règles pures ; aucune règle ici. Un achat
+  // n'est relié à un article QUE par `buyFromId` (ou le N° d'un achat hors
+  // plateforme) ; le bénéfice d'une vente est celui de `beneficeLigneVente` (Vinted)
+  // ou de `ventesAutresBenefice` (Leboncoin, eBay, Vestiaire, par identité).
+  const [asoOuvert, setAsoOuvert] = useState('');
+  useEffect(() => {   // une feuille ouverte a besoin des annonces (en ligne, date de mise en ligne)
+    if ((asoOuvert === 'delai' || asoOuvert === 'lots') && accounts.length && listings.items === null && !listings.loading) loadListings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [asoOuvert, accounts.length]);
+  const articlesAchats = useMemo(() => articlesParAchat({ fiches: numeros, saleOv }), [numeros, saleOv]);
+  const asoFournisseurs = useMemo(() => {
+    if (curSub !== 'achats' || asoOuvert !== 'fournisseurs') return undefined;
+    if (!Array.isArray(buys.items) || !Array.isArray(sales.items) || infosAchatsLues === undefined) return buys.error || sales.error ? null : undefined;
+    const ventes = [];
+    for (const o of sales.items) {
+      if (isHidden(o) || classifyOrderStatus(o.status) !== 'completed' || o.transaction_id == null) continue;
+      const e = effEntry(o); if (!e) continue;
+      const devise = o.price && o.price.currency_code;
+      const lb = devise && devise !== 'EUR' ? { benefice: null, etat: 'prix' } : beneficeLigneVente(o.price && o.price.amount, e);
+      ventes.push({ id: 'vinted:' + o.transaction_id, entree: e, benefice: { valeur: lb.benefice, partiel: lb.etat === 'partiel' } });
+    }
+    for (const x of (Array.isArray(autresBenefice) ? autresBenefice : [])) {
+      if (!x || !x.num || /\+/.test(x.num)) continue;                 // une commande eBay à plusieurs N° : pas attribuée
+      const f = ficheUniqueDuNumero(numeros, cleNum(x.num)); if (!f) continue;
+      ventes.push({ id: x.id, entree: f, benefice: { valeur: x.achat != null ? Math.round((x.eur - x.achat - (x.frais || 0)) * 100) / 100 : null, partiel: false } });
+    }
+    const r = fournisseursAchats({ achats: buysBase, hors: offBuys, fiches: numeros, saleOv, ventes, cleNum,
+      vendeurDe: (tx) => (infosAchatsLues && infosAchatsLues[tx] && infosAchatsLues[tx].vendeur) || '',
+      sourceDe: (b) => libelleSourceAchat(b && b.source), prixHors: prixAchatHorsNombre });
+    return { ...r, partielSites: !Array.isArray(autresBenefice), trier: (t) => trierFournisseurs(r.lignes, t) };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [curSub, asoOuvert, buys.items, buys.error, sales.items, sales.error, infosAchatsLues, numeros, saleOv, buyByNum, offBuys, autresBenefice, hiddenSales, hiddenAccts]);
+  // Les articles d'un achat, avec ce que les annonces en disent (en ligne, vendu, mise en ligne).
+  const enLigneLu = Array.isArray(listings.items) && !(Array.isArray(listings.ko) && listings.ko.some((u) => !acctOff(u)));
+  const articlesLus = (tx) => {
+    const autres = new Set(autresPresents().map((a) => cleNum(a.numero)));
+    const parId = new Map((listings.items || []).map((it) => [String(it.id), it]));
+    return (articlesAchats.get(String(tx)) || []).map((a) => {
+      if (a.cle.startsWith('v:')) return { ...a, misEnLigne: null, enLigne: false, vendu: true };
+      const k = a.cle.slice(2), it = parId.get(k);
+      const enLigne = !enLigneLu ? null : (presentesAnnonceIds.has(k) || (a.numero && autres.has(cleNum(a.numero))) ? true : false);
+      const vendu = annoncesVendues.has(k) || annoncesVendues.has(String(k));
+      return { ...a, misEnLigne: dateMiseEnLigneMs(it || { id: k }, listingDates), enLigne, vendu };
+    });
+  };
+  const asoDelai = useMemo(() => {
+    if (curSub !== 'achats' || asoOuvert !== 'delai') return undefined;
+    if (!Array.isArray(buys.items) || infosAchatsLues === undefined) return buys.error ? null : undefined;
+    const r = delaisMiseEnLigne({ achats: buysBase, enLigneLu, articlesDe: articlesLus,
+      receptionDe: (a) => dateReception(a, { infosTx: infosAchatsLues, recuClic: pickupDone }),
+      estRecu: (a) => phaseReception(a) === 'recu' });
+    if (Array.isArray(r.pasEnLigne)) r.pasEnLigne = r.pasEnLigne.map((x) => ({ ...x, titre: x.achat.title || '', photo: orderPhoto(x.achat) || (photosTxAchats[x.tx] && photosTxAchats[x.tx].photo) || '' }));
+    return r;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [curSub, asoOuvert, buys.items, buys.error, infosAchatsLues, pickupDone, articlesAchats, listings.items, listings.ko, listingDates, presentesAnnonceIds, annoncesVendues, photosTxAchats]);
+  // Les N° libres (fiche numérotée, aucun achat relié) : ce qu'il peut relier d'un tap.
+  const asoFichesLibres = useMemo(() => {
+    if (curSub !== 'achats' || !asoOuvert) return [];
+    const out = [];
+    const horsNums = new Set((offBuys || []).map((b) => (b && b.numero != null ? cleNum(b.numero) : '')).filter(Boolean));   // N° d'un achat hors plateforme : déjà relié
+    for (const [k, e] of Object.entries(numeros || {})) {
+      if (!e || !String(e.numero || '').trim() || e.buyFromId || horsNums.has(cleNum(e.numero))) continue;
+      out.push({ cle: k, numero: String(e.numero).trim(), titre: e.title || '', photo: e.photo || '' });
+    }
+    return out.sort((a, b) => (Number(b.numero) || 0) - (Number(a.numero) || 0));
+  }, [curSub, asoOuvert, numeros, offBuys]);
+  const asoLots = useMemo(() => {
+    if (curSub !== 'achats' || asoOuvert !== 'lots') return undefined;
+    if (!Array.isArray(buys.items) || infosAchatsLues === undefined) return buys.error ? null : undefined;
+    const out = [];
+    for (const a of buysBase) {
+      const tx = String(a.transaction_id || ''); if (!tx || achatSansCout(a)) continue;
+      const liens = articlesAchats.get(tx) || [];
+      if (!estLotApp(a) && liens.length < 2) continue;
+      const articles = liens.map((x) => {
+        const entree = x.cle.startsWith('f:') ? numeros[x.cle.slice(2)] : saleOv[x.cle.slice(2)];
+        return { ...x, entree: entree || {}, titre: (entree && entree.title) || '' };
+      });
+      out.push({ tx, achat: a, titre: a.title || '', photo: orderPhoto(a) || (photosTxAchats[tx] && photosTxAchats[tx].photo) || '', articles,
+        nLot: nombreLot(a, { nArticlesTx, declares: lotsDeclares }), totalArticle: totalARepartir(a, 'article'),
+        totalPaye: totalARepartir(a, 'paye', ventilationDeTx(tx)), journal: repartitionsLots[tx] || null });
+    }
+    return out.sort((x, y) => new Date(y.achat.date || 0) - new Date(x.achat.date || 0));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [curSub, asoOuvert, buys.items, buys.error, infosAchatsLues, articlesAchats, numeros, saleOv, lotsDeclares, repartitionsLots, indexRecusAchat, photosTxAchats]);
+  const asoDeclarables = useMemo(() => {
+    if (curSub !== 'achats' || asoOuvert !== 'lots') return [];
+    return buysBase.filter((a) => a && a.transaction_id != null && !achatSansCout(a) && !estLotApp(a))
+      .sort((x, y) => new Date(y.date || 0) - new Date(x.date || 0)).slice(0, 200)
+      .map((a) => ({ tx: String(a.transaction_id), titre: a.title || '', photo: orderPhoto(a) || '', prix: prixAchatCentimes(a), date: a.date ? new Date(a.date).toLocaleDateString('fr-FR') : '' }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [curSub, asoOuvert, buysBase, lotsDeclares, nArticlesTx]);
+  // Les écritures — chacune sur SON clic.
+  const poserPatchAchat = (cle, patch) => {
+    if (cle.startsWith('v:')) setSaleOverride(cle.slice(2), patch);
+    else setNumeros((prev) => { const k = cle.slice(2); const u = { ...prev, [k]: { ...(prev[k] || {}), ...patch } }; save('vinted_annonce_numeros', u); return u; });
+  };
+  const asoRelier = (tx, f) => {
+    const a = buysBase.find((o) => String(o.transaction_id) === String(tx)); if (!a || !f) return;
+    const lot = estLotApp(a);
+    const p = lot ? null : propositionPrixAchat({ identite: { achat: a, par: 'choix' }, ventilationDe: ventilationDeTx, estLot: estLotApp });
+    const patch = ecritureLienAchat(numeros[f.cle] || {}, a, { lot, montant: p ? p.centimes : prixAchatCentimes(a), accNom: a._acc ? accNameOf(a._acc) : '', photo: orderPhoto(a) || '' });
+    if (!patch) return;
+    poserPatchAchat('f:' + f.cle, patch);
+    toast(`N°${f.numero} relié`);
+  };
+  const asoRepartir = async ({ lot, saisies, inclus }) => {
+    const ok = await askConfirm({ title: `Répartir ${lot.titre ? '« ' + lot.titre + ' »' : 'ce lot'} ?`,
+      desc: lot.articles.map((x, i) => `${x.numero ? 'N°' + x.numero : 'Sans N°'} · ${String(saisies[i] || '').trim()} €`).join('\n'), ok: 'Enregistrer', cancel: 'Annuler' });
+    if (!ok) return false;
+    const w = ecrituresRepartition({ achat: lot.achat, articles: lot.articles, saisies, inclus, ventilation: ventilationDeTx(lot.tx), confirme: true,
+      at: new Date().toISOString(), accNom: lot.achat._acc ? accNameOf(lot.achat._acc) : '', photo: orderPhoto(lot.achat) || '' });
+    if (!w) { toast("La somme ne tombe pas juste : rien n'a été enregistré"); return false; }
+    for (const x of w.ecritures) poserPatchAchat(x.cle, x.patch);
+    setRepartitionsLots((prev) => { const u = { ...prev, [lot.tx]: lot.journal ? { ...w.journal, avant: lot.journal.avant } : w.journal }; save('vrm_repartitions_lots', u); return u; });
+    toast(`${w.ecritures.length} prix d'achat enregistrés`);
+    return true;
+  };
+  const asoAnnuler = async (lot) => {
+    if (!lot || !lot.journal) return false;
+    const ok = await askConfirm({ title: 'Annuler la répartition ?', desc: 'Les prix d’achat d’avant reviennent.', ok: 'Annuler la répartition', cancel: 'Garder' });
+    if (!ok) return false;
+    for (const x of annulationRepartition(lot.journal)) poserPatchAchat(x.cle, x.patch);
+    setRepartitionsLots((prev) => { const u = { ...prev }; delete u[lot.tx]; save('vrm_repartitions_lots', u); return u; });
+    toast('Répartition annulée');
+    return true;
+  };
+  const asoDeclarerLot = (tx, oui) => setLotsDeclares((prev) => { const u = { ...prev }; if (oui) u[String(tx)] = true; else delete u[String(tx)]; save('vrm_lots_declares', u); return u; });
 
   // ── URGENCE DES COLIS — UNE SEULE DÉFINITION ────────────────────────────
   // Le calcul vivait dans le bloc de rendu du bandeau rouge ; le bandeau du
@@ -52758,6 +52907,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               recus: { nom: 'Reçus', court: 'Reçus', type: 'n', valeur: lu ? n.recu : null, attrs: { 'data-n': lu ? String(n.recu) : '' } },
             }}/>;
         })()}
+        {/* (4 nov.) Fournisseurs · Délai · Lots (src/AchatsOutils.jsx) : trois feuilles, rien n'est écrit sans son clic. */}
+        {!modeRetraits && !baseKO && <AchatsOutils fournisseurs={asoFournisseurs} delai={asoDelai} lots={asoLots} achatsDeclarables={asoDeclarables} fichesLibres={asoFichesLibres}
+          onOuvrir={setAsoOuvert} onRelier={asoRelier} onRepartir={asoRepartir} onAnnulerRepartition={asoAnnuler} onDeclarerLot={asoDeclarerLot}
+          onFiche={(n)=>{ try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: String(n) })); } catch (_) {} }}
+          Retour={FermeAuRetour} Photo={(src)=><PhotoVinted src={src} alt="" loading="lazy"/>}/>}
         {!retraitsOutils && <NoAcc/>}
         {/* ⚠️ LE BANDEAU DE L'EXTENSION VIT AUSSI ICI, PAS SEULEMENT SUR MA
             JOURNÉE. C'est sur CET écran que Julien compte les codes qui
