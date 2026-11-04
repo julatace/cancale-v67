@@ -106,6 +106,7 @@ import {transactionDeLaLigne, indexRecusParTransaction, recuDeLAchat, bilanRecus
 import {codeRetraitTournure} from '../api/_lib/code-retrait-email.js';
 import {etatRetrait, estAVerifier, urgenceTri, lieuDepuisExtrait, limiteRetraitDepuisTexte, LIEU_AU_FUTUR, GARDE_MAX_J, gardeDe} from '../api/_lib/retrait-colis.js';
 import {aConfirmerVisibles, texteLimite, motAConfirmer} from './aConfirmer.js';
+import { relanceProposable, numeroSorti } from './ebayRelance.js';
 // La date limite d'envoi AVEC son heure (22 octobre) : UNE règle pour Colis, Ma
 // journée, Ventes, le rappel du matin, le rappel du soir et le widget (§11).
 import {DELAI_EXPEDITION_J, limiteExpedition, lireDateLimite, echeanceLimite, texteLimiteEnvoi, bordsParTransaction} from '../api/_lib/limite-envoi.js';
@@ -220,7 +221,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.317.0';
+const EXT_ATTENDUE = '5.318.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -645,7 +646,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ (30 oct., intégration) `transp`, `lbcsupprime` et `lbcstats` arrivent tous
 //    en 5.291.0 : 5.288 (Leboncoin) et 5.290 (colis) étaient des numéros de
 //    branche, jamais servis ; aucune version publiée ne porte ces fonctions.
-const EXT_CAPACITES = { plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0' };
+const EXT_CAPACITES = { plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -21211,7 +21212,7 @@ async function appelEbay(corps) {
     // refuse de publier ou programmer sous un numéro d'avant la remise à zéro.
     // (Seulement pour ces deux gestes : les autres corps restent exactement ce
     // qu'ils étaient — ils ne posent aucun numéro.)
-    const avecVersion = corps && (corps.action === 'publish' || corps.action === 'programmer');
+    const avecVersion = corps && (corps.action === 'publish' || corps.action === 'programmer' || corps.action === 'relancer');
     const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify(avecVersion ? { ...corps, numerotation: versionNumerotation() } : corps) });
     let j = null; try { j = await r.json(); } catch (_) {}
     return { code: r.status, j };
@@ -24637,8 +24638,30 @@ const URL_ITEM_EBAY = (id) => /^\d{1,19}$/.test(String(id || '')) ? `https://www
 // « Terminée dans la fenêtre » : une fin illisible est GARDÉE (eBay l'a mise
 // dans sa liste des 60 jours — mieux vaut un blanc qu'un faux).
 const dansFenetreInactives = (fin, maintenant) => { const t = Date.parse(fin || ''); return !Number.isFinite(t) || t >= maintenant - INACTIVES_JOURS * 86400000; };
-function EbayInactives({ comptesEbay, tick, vue = '*', connected, ventes, dejaSurEbay, surEbay, annoncesLuesA, dejaDit, paires, enLigne, onSku, retraitsAuto = null }) {
+function EbayInactives({ comptesEbay, tick, vue = '*', connected, ventes, dejaSurEbay, surEbay, annoncesLuesA, dejaDit, paires, enLigne, onSku, retraitsAuto = null, onRelance }) {
   const E = EBAY_SKIN;
+  // (3 nov.) « Remettre en vente » sur SON clic : vérification à blanc (frais),
+  // confirmation, puis la route `relancer` (règle serveur : api/_lib/ebay-relance.js).
+  const [geste, setGeste] = React.useState('');
+  const [infos, setInfos] = React.useState({});
+  const perdues = lireObjet('vinted_pairs_lost');
+  const remettre = async (l, n) => {
+    if (geste) return;
+    const id = String(l.itemId);
+    const dire = (texte, ton) => setInfos((m) => ({ ...m, [id]: { texte, ton } }));
+    setGeste(id); dire('', '');
+    const base = { itemId: id, numero: n, prixVu: String(l.price), ...corpsCompteEbay(l._compte) };
+    const v = await appelEbay({ action: 'relanceverif', ...base });
+    if (!v.j || v.j.ok !== true) { dire((v.j && v.j.error) || "eBay n'a pas répondu — rien n'a été envoyé.", 'ko'); setGeste(''); return; }
+    const fr = v.j.frais && v.j.frais.total != null ? prixEbayTexte(v.j.frais.total, v.j.frais.devise || l.currency) : '—';
+    const ok = await askConfirm({ title: `Remettre en vente N°${n} ?`, desc: `« ${l.title || id} »\n${prixEbayTexte(v.j.prix, l.currency || 'EUR')} · livraison gérée par eBay\nFrais eBay : ${fr}`, ok: 'Remettre en vente', cancel: 'Annuler' });
+    if (!ok) { setGeste(''); return; }
+    const r = await appelEbay({ action: 'relancer', ...base, confirme: true });
+    if (r.j && r.j.ok) { dire(r.j.verifie === false ? 'Remise en vente — à relire chez eBay.' : 'Remise en vente.', 'ok'); if (onRelance) onRelance(); }
+    else if (r.code === 0 || !r.j || r.code === 504 || (r.j && r.j.reason === 'incertain')) dire((r.j && r.j.error) || "eBay n'a pas répondu — regarde sur eBay avant de recommencer.", 'muet');
+    else dire(r.j.error || 'eBay a refusé.', 'ko');
+    setGeste('');
+  };
   // undefined en cours · null registre illisible · { lignes: [{compte, ligne}] }
   const [lu, setLu] = React.useState(undefined);
   const [voirTout, setVoirTout] = React.useState(false);
@@ -24723,13 +24746,17 @@ function EbayInactives({ comptesEbay, tick, vue = '*', connected, ventes, dejaSu
     // ses vraies données « pas reliée · Remettre en vente » — le contraire de ce
     // que VRM venait de faire. Journal illisible ⇒ rien n'est dit (pas su).
     const retraitAuto = retraitsAuto && typeof retraitsAuto.get === 'function' ? retraitsAuto.get(String(l.itemId)) : null;
-    const relancer = !l._ancienne && !vendue && !retraitAuto && !deja && !relancee && !memeEnLigne && !verifManque;
+    // (3 nov.) La règle de l'écran, une fonction pure (`src/ebayRelance.js`) : identité
+    // (N° du SKU), vendue nulle part (verdict lu), toujours chez lui (`vinted_pairs_lost`).
+    const sortie = numeroSorti(n, perdues);
+    const relancer = relanceProposable({ n, ancienne: l._ancienne, vendue, retraitAuto, verifManque, sortie, memeEnLigne, relancee, deja, prix: l.price }).propose;
     const url = URL_ITEM_EBAY(l.itemId);
     const prix = Number(String(l.price || '').replace(',', '.'));
     const etatLigne = vendue ? `vendue sur ${vendue} — ne la remets pas en vente`
       : retraitAuto ? `retirée par VRM${Number.isFinite(Number(retraitAuto.at)) ? ' le ' + new Date(Number(retraitAuto.at)).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : ''} : vendue sur ${retraitAuto.ou || 'Vinted'} — ne la remets pas en vente`
       : memeEnLigne ? 'aussi dans tes annonces en ligne — état à relire chez eBay'
       : relancee ? 'déjà remise en vente sur eBay'
+      : sortie ? 'sortie du stock'
       : deja ? (deja.etat === 'programmee' ? 'déjà programmée de nouveau sur eBay' : 'déjà de nouveau en vente sur eBay')
       : surVinted ? 'encore en ligne sur Vinted' : '';
     return (
@@ -24753,9 +24780,10 @@ function EbayInactives({ comptesEbay, tick, vue = '*', connected, ventes, dejaSu
             {etatLigne ? <span data-inactive-etat="1">{` · ${etatLigne}`}</span> : null}
           </div>
         </div>
-        {url && (relancer
-          ? <a href={url} target="_blank" rel="noreferrer" data-inactive-relancer={url} style={lienS}>Remettre en vente sur eBay ↗</a>
+        {url && (relancer && !(infos[l.itemId] && infos[l.itemId].ton === 'ok')
+          ? <button type="button" data-inactive-relancer={url} disabled={!!geste} onClick={() => remettre(l, n)} style={{ ...lienS, background: 'none', border: 'none', cursor: geste ? 'default' : 'pointer', fontFamily: 'inherit', opacity: geste && geste !== String(l.itemId) ? 0.5 : 1 }}>{geste === String(l.itemId) ? 'eBay…' : 'Remettre en vente'}</button>
           : <a href={url} target="_blank" rel="noreferrer" data-inactive-voir={url} style={lienS}>Voir sur eBay ↗</a>)}
+        {infos[l.itemId] && infos[l.itemId].texte ? <div role="status" data-inactive-resultat={infos[l.itemId].ton} style={{ flexBasis: '100%', fontSize: 12, color: infos[l.itemId].ton === 'ko' ? E.warn : infos[l.itemId].ton === 'ok' ? E.text : E.muted, paddingLeft: 54, lineHeight: 1.45 }}>{infos[l.itemId].texte}</div> : null}
       </div>
     );
   });
@@ -24796,7 +24824,7 @@ function EbayInactives({ comptesEbay, tick, vue = '*', connected, ventes, dejaSu
       {anciennes.length > 0 && <div data-inactives-note="ancienne" style={petit}>{anciennes.length === 1
         ? `Lue ${quandCap(anciennes[0].cap)}${plusieurs ? ` (${nomCompteEbay(anciennes[0].compte)})` : ''} — pas relue depuis : elle a pu changer sur eBay. La remise en vente se fait sur eBay.`
         : `Lues ${anciennes.map((x) => `${quandCap(x.cap)} (${nomCompteEbay(x.compte)})`).join(', ')} — pas relues depuis : elles ont pu changer sur eBay. La remise en vente se fait sur eBay.`}</div>}
-      {etat === 'lu' && !anciennes.length && <div data-inactives-fenetre="1" style={petit}>Terminées sans vente ces {INACTIVES_JOURS} derniers jours · la remise en vente se fait sur eBay.</div>}
+      {etat === 'lu' && !anciennes.length && <div data-inactives-fenetre="1" style={petit}>Terminées sans vente ces {INACTIVES_JOURS} derniers jours.</div>}
       {jamais.length > 0 && lues.length > 0 && <div data-inactives-note="partielle" style={petit}>{sousEtatJamais === 'non-rendue' ? 'Pas encore rendue par eBay' : 'Pas encore lue'} pour {nomsDe(jamais)}{sousEtatJamais === 'non-rendue' ? '' : ' — elle se lit avec la relecture eBay'}.</div>}
       {attenteVerif > 0 && !verifDiteAilleurs && <div data-inactives-verif-texte="1" style={{ fontSize: 12, color: E.warn, lineHeight: 1.5, marginBottom: 4 }}>Je n'ai pas encore pu vérifier si {attenteVerif > 1 ? `${attenteVerif} de ces articles sont vendus` : 'un de ces articles est vendu'} ailleurs{nonDits.length ? ` (${nonDits.join(', ')})` : ''} : « Remettre en vente » revient dès que c'est vérifié.</div>}
       {rendues}
@@ -26319,7 +26347,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     {/* (23 octobre) Les annonces terminées SANS vente — lecture seule. */}
     <EbayInactives comptesEbay={comptesEbay} tick={inactivesTick} vue={vueSeule ? vue : '*'} connected={connected}
       ventes={ventesConnues} dejaSurEbay={dejaSurEbay} surEbay={surEbayIds} annoncesLuesA={annoncesLuesA} dejaDit={dits}
-      paires={paires} enLigne={enLigne} onSku={setInactivesSku}
+      paires={paires} enLigne={enLigne} onSku={setInactivesSku} onRelance={() => { resync(); }}
       retraitsAuto={Array.isArray(journalAuto) ? new Map(journalAuto.filter((x) => x && x.itemId != null).map((x) => [String(x.itemId), x])) : null} />
   </>);
   // (16 octobre, revue) « Vendre une paire » vient EN PREMIER, avant les
@@ -58923,6 +58951,80 @@ function RepublierLeboncoin({ liste, exclues, onClose, onFini }) {
   );
 }
 
+// ── LEBONCOIN : UN FIL, ET RÉPONDRE SUR SON CLIC (3 nov., extension 5.318) ──
+// Le fil (`lbc_fil_{conv}`) : le texte des messages, leur date, « de toi » —
+// jamais le nom de la personne. « Envoyer » n'existe qu'avec
+// `extSait('lbcrepondre') === 'ok'` ET une recette APPRISE de son propre envoi
+// (`lbc_envoi.appris`) ; sinon le pied mène à Leboncoin. Part de l'onglet
+// leboncoin.fr connecté sur le compte du fil, une à la fois, dans les 50 actions/h.
+const etiquetteResultatLbc = (r) => {
+  if (!r) return { ton: 'muet', texte: "L'extension n'a pas répondu — je ne sais pas si le message est parti. Regarde la conversation sur Leboncoin avant de renvoyer." };
+  if (r.accepte === true && r.etape === 'fait') return { ton: 'ok', texte: 'Envoyé sur Leboncoin.' };
+  if (r.accepte === true && r.etape === 'incertain') return { ton: 'muet', texte: r.raison || 'Je ne sais pas si le message est parti — regarde sur Leboncoin avant de renvoyer.' };
+  if (r.accepte === true && r.etape === 'refuse') return { ton: 'ko', texte: r.raison || "Leboncoin a refusé : le message n'est pas parti." };
+  return { ton: 'ko', texte: (r.raison ? r.raison.charAt(0).toUpperCase() + r.raison.slice(1) : "Rien n'est parti.") + (/[.!]$/.test(r.raison || '') ? '' : '.') };
+};
+function FilLeboncoin({ conv, nom, envoi, onFerme }) {
+  const [fil, setFil] = React.useState(undefined);   // undefined en cours · null pas su · objet
+  const [texte, setTexte] = React.useState('');
+  const [enCours, setEnCours] = React.useState(false);
+  const [res, setRes] = React.useState(null);
+  const relire = React.useCallback(async () => {
+    const j = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_fil_${encodeURIComponent(conv)}&select=messages:data->messages,page:data->>page`);
+    if (!Array.isArray(j)) { setFil(null); return; }
+    setFil(j[0] ? { messages: Array.isArray(j[0].messages) ? j[0].messages : [], page: j[0].page || '' } : { messages: null, page: '' });
+  }, [conv]);
+  React.useEffect(() => { relire(); }, [relire]);
+  React.useEffect(() => {
+    const f = (e) => { const x = e && e.detail; if (x && x.type === 'maj' && x.quoi === 'lbc') relire(); };
+    window.addEventListener('vrm:ext', f); return () => window.removeEventListener('vrm:ext', f);
+  }, [relire]);
+  const cap = extSait('lbcrepondre');
+  const peut = cap === 'ok' && envoi && envoi.appris === true;
+  const envoyer = async () => {
+    const t = texte.trim();
+    if (!t || enCours || !peut) return;
+    setEnCours(true); setRes(null);
+    let r = null; try { r = await vmrCmd({ cmd: 'lbcRepondre', conv, texte: t }, 45000); } catch (_) { r = null; }
+    setEnCours(false); setRes(etiquetteResultatLbc(r));
+    if (r && r.accepte === true && r.etape === 'fait') { setTexte(''); relire(); }
+  };
+  const style = { fontSize: 13, color: C.muted, lineHeight: 1.55, textAlign: 'center', padding: '20px 0' };
+  let corps;
+  if (fil === undefined) corps = <div data-lbc-fil-etat="charge" style={style}>…</div>;
+  else if (fil === null) corps = <div data-lbc-fil-etat="pas-su" style={style}>Conversation illisible pour l'instant.</div>;
+  else if (!fil.messages || !fil.messages.length) corps = <div data-lbc-fil-etat="vide" style={style}>—</div>;
+  else corps = (
+    <div data-lbc-fil-etat="lu" data-lbc-fil-n={fil.messages.length} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {fil.messages.slice(-80).map((m, i) => (
+        <BulleConv key={m.id || i} moi={m.deMoi === true} qui={m.deMoi === true ? 'Toi' : ''} texte={m.t} quand={Date.parse(m.at || '') || null} avecDate traduire={m.deMoi !== true ? m.t : ''}
+          attrs={{ 'data-lbc-msg': m.deMoi === true ? 'moi' : m.deMoi === false ? 'autre' : 'passu' }}/>
+      ))}
+    </div>
+  );
+  // La page où le fil a été VU (sur leboncoin.fr), sinon la messagerie — jamais une adresse devinée.
+  const page = fil && /^\/messages[\w/.-]*$/.test(fil.page || '') ? fil.page : '/messages';
+  const lien = `https://www.leboncoin.fr${page}`;
+  const resultat = res && <div role="status" data-lbc-resultat={res.ton} style={{ fontSize: 13, color: res.ton === 'ko' ? C.warn : res.ton === 'ok' ? C.text : C.muted, lineHeight: 1.5, marginBottom: 8 }}>{res.texte}</div>;
+  let pied;
+  if (fil && fil.messages && fil.messages.length && peut) pied = (
+    <div className="vrm-chat-foot" data-lbc-repondre="pret" style={{ borderTop: `1px solid ${C.border}`, background: C.card }}>
+      {resultat}
+      <RapidesConv liste={reponsesRapidesPartagees()} onChoisir={(t) => setTexte(String(t).slice(0, 2000))} desactive={enCours}/>
+      <ComposeConv valeur={texte} onChange={(t) => setTexte(String(t).slice(0, 2000))} onEnvoyer={envoyer} enCours={enCours} etiquette="Ta réponse sur Leboncoin" libelleEnvoyer="Envoyer"
+        envoiBloque={!texte.trim() || enCours} attrsEnvoyer={{ 'data-lbc-envoyer': '' }}/>
+    </div>
+  );
+  else pied = <PiedSansEnvoi attrs={{ 'data-lbc-repondre': cap !== 'ok' ? 'ext-' + cap : (envoi && envoi.appris ? 'sans-fil' : 'pas-appris') }} lien={lien} texteLien="Répondre sur Leboncoin ↗"
+    raison={cap === 'retard' ? <>Extension <b>{EXT_CAPACITES.lbcrepondre}</b></> : null}>{resultat}</PiedSansEnvoi>;
+  return (
+    <CadreFil etiquette="Conversation Leboncoin" onFermer={onFerme} attrs={{ 'data-lbc-fil-ouvert': conv }}>
+      <TeteFil onFermer={onFerme} nom={nom || 'Leboncoin'} titre="" compte="Leboncoin"/>
+      <div className="vrm-chat-history" style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>{corps}</div>
+      {pied}
+    </CadreFil>
+  );
+}
 // ── MESSAGES LEBONCOIN (29 oct., « fais un peu plus de cohérence ») ──────
 // La même forme que Messages Vinted : deux zones, « Conversations » et
 // « ♡ Favoris reçus » (Julien : « messages aux favoris, tout pareil » — sur
@@ -58949,20 +59051,31 @@ function MessagesLeboncoin() {
 function ConversationsLeboncoin() {
   const [d, setD] = useState(undefined);
   const [ouvert, setOuvert] = useState('');   // le compte dont le fil est ouvert (1er nov.)
+  const [ouvertConv, setOuvertConv] = useState('');   // (3 nov.) la conversation ouverte
+  const [tickLbc, setTickLbc] = useState(0);
   useEffect(() => { let stop = false; (async () => {
     try {
       // (1er nov.) Projetées (§4.4) et relues une fois sur un échec passager
       // (`lireBaseRelue`) : un jeton qui expire ne fait plus dire « pas pu lire ».
-      const [jm, ja] = await Promise.all([
+      const [jm, ja, jf, je] = await Promise.all([
         lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_messages&select=compteurs:data->compteurs,comptes:data->comptes`),
         lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_accounts&select=a:data->accounts`),
+        // (3 nov., 5.318) Les fils lus, en SCALAIRES (§4.4 : jamais le texte de tous les fils d'un coup).
+        lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=like.lbc_fil_*&select=id,n:meta->>n,da:meta->>dernierAt,ap:meta->>apercu,dm:meta->>dernierDeMoi,compte:meta->>compte`),
+        lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_envoi&select=appris:data->appris,raison:data->>raison,at:data->>at`),
       ]);
       if (!Array.isArray(jm)) { if (!stop) setD(null); return; }
       const m = jm[0] || {};
       const acc = (Array.isArray(ja) && ja[0] && ja[0].a && typeof ja[0].a === 'object') ? ja[0].a : {};
-      if (!stop) setD({ compteurs: (m.compteurs && typeof m.compteurs === 'object') ? m.compteurs : {}, comptes: (m.comptes && typeof m.comptes === 'object') ? m.comptes : {}, acc });
+      const fils = Array.isArray(jf) ? jf.map((x) => ({ ...x, conv: String(x.id || '').replace(/^lbc_fil_/, '') })).filter((x) => x.conv && Number(x.n) > 0) : null;
+      const envoi = Array.isArray(je) ? (je[0] ? { appris: je[0].appris === true, raison: je[0].raison || '' } : { appris: false, raison: '' }) : null;
+      if (!stop) setD({ compteurs: (m.compteurs && typeof m.compteurs === 'object') ? m.compteurs : {}, comptes: (m.comptes && typeof m.comptes === 'object') ? m.comptes : {}, acc, fils, envoi });
     } catch (_) { if (!stop) setD(null); }
-  })(); return () => { stop = true; }; }, []);
+  })(); return () => { stop = true; }; }, [tickLbc]);
+  React.useEffect(() => {
+    const f = (e) => { const x = e && e.detail; if (x && x.type === 'maj' && x.quoi === 'lbc') setTickLbc((t) => t + 1); };
+    window.addEventListener('vrm:ext', f); return () => window.removeEventListener('vrm:ext', f);
+  }, []);
   const cap = extSait('lbcmsg');
   // (31 oct.) Le compte Leboncoin OUVERT mis en avant, les autres estompés (§11).
   const lbcOuvert = useCompteLbcOuvert();
@@ -58982,7 +59095,8 @@ function ConversationsLeboncoin() {
   const lignes = ids.map((id) => ({ id, nom: nomDe(id), type: typeDe(id), c: d.compteurs[id] || d.compteurs['lbc-account:' + id] || null }));
   const releves = lignes.filter((l) => l.c);
   const pasLus = lignes.filter((l) => !l.c);
-  if (!releves.length) {
+  const fils = Array.isArray(d.fils) ? d.fils.slice().sort((a, z) => String(z.da || '').localeCompare(String(a.da || ''))) : [];
+  if (!releves.length && !fils.length) {
     return (
       <div data-messages-lbc="jamais" style={{ fontSize: 13, color: C.text, lineHeight: 1.55 }}>
         <div style={{ fontWeight: 600, marginBottom: 4 }}>Pas encore de messages relevés</div>
@@ -58996,6 +59110,7 @@ function ConversationsLeboncoin() {
     );
   }
   const total = releves.reduce((a, l) => a + (Number(l.c.unread) || 0), 0);
+  const filChoisi = fils.find((f) => f.conv === ouvertConv) || null;
   // (1er nov.) La présentation de Messages · Vinted (liste · fil · fiche). Ce que
   // Leboncoin donne ne change pas : un NOMBRE par compte, jamais le texte ni
   // l'annonce d'un message. Le fil le DIT et mène à Leboncoin ; la fiche dit
@@ -59019,7 +59134,7 @@ function ConversationsLeboncoin() {
               const flou = lbcFloute(lbcOuvert, l.id);
               return (
                 <div key={l.id} data-compte-lbc={l.id} data-flou={flou ? '1' : '0'} style={flou ? STYLE_FLOU : undefined}>
-                  <LigneConv actif={ouvert === l.id} onClick={() => setOuvert(l.id)} ariaLabel={`${l.nom} : ${l.c ? nonLus(Number(l.c.unread) || 0) : 'pas encore lu'}`}
+                  <LigneConv actif={ouvert === l.id} onClick={() => { setOuvertConv(''); setOuvert(l.id); }} ariaLabel={`${l.nom} : ${l.c ? nonLus(Number(l.c.unread) || 0) : 'pas encore lu'}`}
                     nom={l.nom} compte={l.type} quand={isFinite(t) ? t : null} couleurHeure={C.muted}
                     extrait={l.c ? nonLus(Number(l.c.unread) || 0) : '—'} couleurExtrait={l.c && l.c.unread > 0 ? C.text : C.muted}
                     apres={vieux ? <span className="vrm-msg-etat" title="Ouvre leboncoin.fr sur ce compte pour le mettre à jour" style={{ color: C.muted, borderColor: C.border }}>à relire</span> : null}
@@ -59031,11 +59146,27 @@ function ConversationsLeboncoin() {
           {/* Un compte « pas encore lu » : le geste est dit UNE fois, sous la liste
               (§7) — pas sur chaque ligne. */}
           {pasLus.length ? <div data-messages-lbc-geste="" style={{ fontSize: 12, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>{pasLus.length > 1 ? `${pasLus.length} comptes n'ont pas encore été lus` : `${pasLus[0].nom} n'a pas encore été lu`} : connecte-toi une fois {pasLus.length > 1 ? 'à chacun' : 'à ce compte'} sur leboncoin.fr, avec l'extension, et son nombre de messages arrivera ici.</div> : null}
+          {/* (3 nov., 5.318) Les conversations LUES par l'extension : texte, date, « de toi ». */}
+          {fils.length ? (
+            <div className="vrm-msg-list" data-lbc-convs={fils.length} style={{ marginTop: 10 }}>
+              {fils.slice(0, 40).map((f) => {
+                const t = Date.parse(f.da || ''); const flou = lbcFloute(lbcOuvert, f.compte);
+                return (
+                  <div key={f.conv} data-lbc-conv={f.conv} data-flou={flou ? '1' : '0'} style={flou && ouvertConv !== f.conv ? STYLE_FLOU : undefined}>
+                    <LigneConv actif={ouvertConv === f.conv} onClick={() => { setOuvert(''); setOuvertConv(f.conv); }} ariaLabel={`Ouvrir la conversation Leboncoin de ${nomDe(f.compte)}`}
+                      nom={nomDe(f.compte)} compte={typeDe(f.compte)} quand={isFinite(t) ? t : null} couleurHeure={C.muted}
+                      extrait={f.ap || ''} toi={!!f.ap && f.dm === 'true'} couleurExtrait={C.muted}/>
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
           {/* Sous la liste, le lien reste discret : le geste « Répondre sur Leboncoin » est dans le fil (§7, l'accent est rare). */}
           <a href="https://www.leboncoin.fr/messages" target="_blank" rel="noreferrer" data-ouvrir-messages-lbc="" className="vrm-lien-action" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, marginTop: 6, color: C.text, fontSize: 13, fontWeight: 600 }}>Ouvrir mes messages Leboncoin ↗</a>
-          <div style={{ fontSize: 11, color: C.muted, marginTop: 4, lineHeight: 1.5 }}>On répond sur Leboncoin : Leboncoin ne donne à VRM que le nombre de non-lus, pas les messages.</div>
         </div>
-        <div className="vrm-chat-column">{choisi ? (
+        <div className="vrm-chat-column">{filChoisi ? (
+          <FilLeboncoin key={filChoisi.conv} conv={filChoisi.conv} nom={nomDe(filChoisi.compte)} envoi={d.envoi} onFerme={() => setOuvertConv('')}/>
+        ) : choisi ? (
           <CadreFil etiquette="Messages Leboncoin" onFermer={() => setOuvert('')} attrs={{ 'data-lbc-fil': choisi.id }}>
             <TeteFil onFermer={() => setOuvert('')} nom={choisi.nom} titre={choisi.type ? 'compte ' + choisi.type : ''} compte="Leboncoin"/>
             <div className="vrm-chat-history" style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -59047,8 +59178,8 @@ function ConversationsLeboncoin() {
             </div>
             <PiedSansEnvoi raison="Pour lire et répondre, ouvre ta messagerie Leboncoin." lien="https://www.leboncoin.fr/messages" texteLien="Répondre sur Leboncoin ↗"/>
           </CadreFil>
-        ) : <div className="vrm-chat-empty"><Icon name="chat" size={28}/><span>Choisis un compte</span><small>Leboncoin donne le nombre de non-lus, pas les messages.</small></div>}</div>
-        <FicheConvVolet site="leboncoin" etat={choisi ? 'non-reliee' : 'aucune'} raison="Leboncoin ne dit pas à VRM de quelle annonce parle un message : VRM ne devine pas la paire."/>
+        ) : <div className="vrm-chat-empty"><Icon name="chat" size={28}/><span>{fils.length ? 'Choisis une conversation' : 'Choisis un compte'}</span></div>}</div>
+        <FicheConvVolet site="leboncoin" etat={choisi || filChoisi ? 'non-reliee' : 'aucune'} raison="Leboncoin ne dit pas à VRM de quelle annonce parle un message : VRM ne devine pas la paire."/>
       </div>
     </div>
   );
