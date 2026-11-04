@@ -1,3 +1,4 @@
+import {lireBordereauVestiaire} from './bordereauVestiaire.js';
 import {lireParcours,garderParcours,noterChangements,viderParcours,motifRecherche,restaurerVue} from './parcoursQuotidien.js';
 import {RecapSelection,CompteurListe,HistoriqueModifications} from './OutilsParcours.jsx';
 import {creerGardeLectures,garderConversationsNonLues} from './lecturesVinted.js';
@@ -11123,6 +11124,7 @@ const annotateAndDownloadBordereauBrut = async (numero, title, pdfArrayBuffer, p
   const safeTitle = (title||'').replace(/[^\w\-]+/g,'_').slice(0,40);
   const filename = `bordereau${hasNum?'-N'+numero:''}${safeTitle?'-'+safeTitle:''}${thermique&&r0.isole?'-thermique':''}.pdf`;
   // Ouvert dans un onglet (ordinateur) ; sinon la modale propose « Ouvrir ».
+  try { if(opts.avantOuverture)await opts.avantOuverture(); } catch(e) { URL.revokeObjectURL(url); throw e; }
   const ouvert = ouvrirPdfOnglet(url, filename);
   const tp = r0.tampons || [];
   return { url, filename, printed: ouvert, ouvert, thermique, isoles: r0.isole ? 1 : 0, etiquettes: r0.etiquettes,
@@ -27826,36 +27828,51 @@ const marquerVc = (cle, id, oui) => {
   if (oui) u[String(id)] = Date.now(); else delete u[String(id)];
   vcPoser(cle, u);
 };
-async function imprimerBordereauVc({ bordId, num, titre, venteId }) {
-  const j = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(bordId)}&select=b64:data->>b64`);
-  const b64 = Array.isArray(j) && j[0] && j[0].b64;
-  if (!b64) { libererOngletPdf(); return { etat: Array.isArray(j) ? 'absent' : 'passu' }; }
+async function imprimerBordereauVc({ bordId, num, titre, venteId, original = false }) {
+  const owner=AUTH.user?.id||'';
+  const verifier=()=>{if(!owner||AUTH.user?.id!==owner||readSession()?.user?.id!==owner)throw Error('Le compte VRM a changé. Rouvre la vente dans le bon compte.');};
   try {
-    const r = await annotateAndDownloadBordereau(num || '', titre || '', b64ToBytes(b64), null);
-    if (venteId) marquerVc('vrm_vc_imprimes', venteId, true);
-    return { etat: 'ok', r };
-  } catch (e) { if (estTamponAnnule(e)) return { etat: 'annule' }; return { etat: 'refus', texte: String((e && e.message) || e) }; }
+    const lu=await lireBordereauVestiaire({id:bordId,owner,ownerActuel:()=>AUTH.user?.id||'',lire:id=>lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}&select=b64:data->>b64`)});
+    verifier();if(lu.etat!=='ok'){libererOngletPdf();return lu;}
+    const bytes=b64ToBytes(lu.b64);
+    if(original){
+      const PL=await import('pdf-lib');await PL.PDFDocument.load(bytes);verifier();
+      const url=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));
+      const r={url,filename:'bordereau-vestiaire-original.pdf',ouvert:ouvrirPdfOnglet(url,'bordereau-vestiaire-original.pdf','Bordereau Vestiaire · original sans tampon')};
+      return{etat:'ok',r};
+    }
+    const r=await annotateAndDownloadBordereau(num||'',titre||'',bytes,null,{avantOuverture:verifier});
+    verifier();if(venteId)marquerVc('vrm_vc_imprimes',venteId,true);
+    return{etat:'ok',r};
+  }catch(e){libererOngletPdf();if(estTamponAnnule(e))return{etat:'annule'};return{etat:'refus',texte:String(e?.message||e)};}
 }
 // Le bouton « Imprimer » (le geste principal de la ligne et de la carte).
 // `data-imprime` : la visionneuse s'ouvre au clic (« préparation… »).
-function BoutonImprimerVc({ v, grand = false, carte = false }) {
+function BoutonImprimerVc({ v, grand = false, carte = false, lectureSeule = false }) {
   const [etat, setEtat] = useState('');
   const [lien, setLien] = useState(null);
+  const [erreur,setErreur]=useState('');const enCours=React.useRef(false);const owner=AUTH.user?.id||'';
+  React.useEffect(()=>()=>{if(lien?.url)URL.revokeObjectURL(lien.url);},[lien]);
   if (!v || !v.bordereau || !v.bordereau.id) return null;
-  const go = async () => {
-    setEtat('lecture'); setLien(null);
-    const r = await imprimerBordereauVc({ bordId: v.bordereau.id, num: v.num, titre: v.titre, venteId: v.id });
-    setEtat(r.etat === 'ok' || r.etat === 'annule' ? '' : r.etat);
-    if (r.etat === 'refus') toast(r.texte);
-    // iPhone (aucune visionneuse) : le PDF tamponné s'ouvre d'un vrai toucher.
-    if (r.etat === 'ok' && r.r && !r.r.ouvert) setLien(r.r);
+  const go = async (original=false) => {
+    if(enCours.current)return;enCours.current=true;setEtat('lecture');setErreur('');setLien(null);
+    try {
+      const r=await imprimerBordereauVc({bordId:v.bordereau.id,num:v.num,titre:v.titre,venteId:v.id,original});
+      if(AUTH.user?.id!==owner)return;
+      setEtat(r.etat==='ok'||r.etat==='annule'?'':r.etat);
+      if(r.etat==='refus')setErreur(r.texte||'Impossible d’ouvrir ce bordereau. Réessaie.');
+      if(r.etat==='ok'&&r.r&&!r.r.ouvert)setLien(r.r);
+    }catch(e){if(AUTH.user?.id===owner){setEtat('refus');setErreur(String(e?.message||e));}libererOngletPdf();}
+    finally{enCours.current=false;if(AUTH.user?.id===owner)setEtat(e=>e==='lecture'?'':e);}
   };
   const libelle = etat === 'lecture' ? 'Lecture du bordereau…' : 'Imprimer';
   return <>
-    {carte
-      ? <button type="button" data-imprime="1" data-vc-imprimer={v.id} disabled={etat === 'lecture'} onClick={go} title="Bordereau tamponné (titre + N°), puis impression"
+    {!lectureSeule&&(carte
+      ? <button type="button" data-imprime="1" data-vc-imprimer={v.id} disabled={etat === 'lecture'} onClick={()=>go(false)} title="Bordereau tamponné (titre + N°), puis impression"
           className="vrm-colis-primaire" style={{flex:'1 1 160px',maxWidth:340,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,border:'none',background:C.accent,color:C.onAccent,borderRadius:12,padding:'0 16px',minHeight:44,cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit'}}><Icon name="printer" size={16}/>{etat === 'lecture' ? libelle : <><span className="vrm-lib-long">Imprimer le bordereau</span><span className="vrm-lib-court">Imprimer</span></>}</button>
-      : <Bouton variante={grand ? 'primaire' : 'secondaire'} icone="printer" data-imprime="1" data-vc-imprimer={v.id} disabled={etat === 'lecture'} onClick={go} title="Bordereau tamponné (titre + N°), puis impression">{etat === 'lecture' ? libelle : grand ? <><span className="vrm-lib-long">Imprimer le bordereau</span><span className="vrm-lib-court">Imprimer</span></> : 'Imprimer le bordereau'}</Bouton>}
+      : <Bouton variante={grand ? 'primaire' : 'secondaire'} icone="printer" data-imprime="1" data-vc-imprimer={v.id} disabled={etat === 'lecture'} onClick={()=>go(false)} title="Bordereau tamponné (titre + N°), puis impression">{etat === 'lecture' ? libelle : grand ? <><span className="vrm-lib-long">Imprimer le bordereau</span><span className="vrm-lib-court">Imprimer</span></> : 'Imprimer le bordereau'}</Bouton>)}
+    <button type="button" data-imprime="1" data-vc-original={v.id} disabled={etat==='lecture'} onClick={()=>go(true)} className="vrm-lien-action" style={{minHeight:44,color:C.accent,background:'transparent',border:0,font:'inherit',fontSize:13,cursor:'pointer'}}>Ouvrir le PDF d’origine</button>
+    {erreur&&<span role="alert" data-vc-bordereau-erreur="" style={{flexBasis:'100%',fontSize:12,color:C.warn}}>{erreur}</span>}
     {lien ? <a href={lien.url} target="_blank" rel="noreferrer" data-vc-bordereau-lien="" style={{ color: C.accent, fontWeight: 600, fontSize: 13 }}>Ouvrir le bordereau</a> : null}
     {etat === 'absent' ? <span data-vc-bordereau-etat="absent" style={{ flexBasis: '100%', fontSize: 12, color: C.muted }}>Le bordereau n'est plus rangé — rouvre la vente sur Vestiaire.</span>
       : etat === 'passu' ? <span data-vc-bordereau-etat="passu" style={{ flexBasis: '100%', fontSize: 12, color: C.muted }}>La base n'a pas répondu — réessaie.</span> : null}
@@ -27976,6 +27993,7 @@ function LigneVenteVc({ v, fait, enV, flou, i = 0 }) {
       </section>
       <section className="vrm-recap-gestes" aria-label="Actions">
         {v.aExpedier && !fait && v.bordereau ? <div className="vrm-recap-principal vrm-rangee-bord" data-rangee-bord=""><PastilleTransporteur t={trV} C={C} data-recap-transporteur=""/><BoutonImprimerVc v={v} grand/></div> : null}
+        {!(v.aExpedier&&!fait)&&v.bordereau?.id?<BoutonImprimerVc v={v} lectureSeule/>:null}
         <div className="vrm-recap-grille">
           {v.aExpedier ? <Bouton variante="secondaire" icone="check" data-geste="fait" data-vc-fait={v.id} onClick={() => marquerVc('vrm_vc_colis_done', v.id, !fait)}>{fait ? '↺ Pas encore' : 'Colis fait'}</Bouton> : null}
           {v.num ? <Bouton variante="secondaire" icone="doc" data-recap-fiche={v.num} aria-label={`Fiche N°${v.num}`} onClick={() => { fermer(); window.dispatchEvent(new CustomEvent('vrm:fiche-article', { detail: v.num })); }}>Fiche de l’article</Bouton> : null}

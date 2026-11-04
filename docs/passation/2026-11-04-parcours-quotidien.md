@@ -36,3 +36,22 @@ existants, sans nouveau rapprochement par titre, règle financière ou envoi mar
 Tests synthétiques uniquement. Aucun secret ou texte de message journalisé.
 Aucune promesse de journal synchronisé, compatibilité navigateur non vérifiée,
 ni modification de Google Cloud. Extension inchangée.
+
+## Blocage prioritaire : bordereau Vestiaire
+
+Julien signale qu'il ne peut pas ouvrir le bordereau d'une vente. La lecture
+était hors du try/catch et le bouton n'avait pas de finally : rejet/attente
+pouvait le laisser en état « lecture ». Lecture bornée à 20 s, propriétaire
+contrôlé avant/après, erreur visible et remise en état du bouton, verrou contre
+les doubles clics. Le tamponnage relit aussi le propriétaire juste avant
+l'ouverture du PDF, puis avant le marquage imprimé.
+
+Un geste distinct « Ouvrir le PDF d’origine » lit et valide le vrai PDF sans
+le modifier, sans tampon ni marquage imprimé. Le bouton normal conserve le
+chemin de tamponnage et les confirmations. Aucun bordereau n'est choisi par
+ressemblance. Absence, échec de lecture et fichier refusé restent distincts.
+
+Tests : lecteur (absence, rejet, délai, changement de compte) ; bouton et
+contrôleur réels en React à 390/1512, vrai PDF synthétique pour l'ouverture
+originale, reprise après erreur, double clic et réponse périmée. Aucun compte
+réel ni PDF de client disponible dans cet environnement.
