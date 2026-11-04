@@ -145,10 +145,7 @@ const MENSONGES = [
     //    lettres.
     const champs = await pg.evaluate(() => Array.from(document.querySelectorAll('input,textarea,select'))
       .map((e) => String(e.value == null ? '' : e.value)).filter(Boolean));
-    // (2 nov.) Les panneaux sont des sous-écrans CACHÉS mais montés (1er nov.) :
-    // leur texte (`innerText` d'un élément caché = son texte brut) se lit aussi.
-    const caches = await pg.evaluate(() => Array.from(document.querySelectorAll('[data-sous-ecran][hidden]')).map((e) => e.innerText || '').join('\n'));
-    const txt = (await pg.evaluate(() => document.body.innerText || '')) + '\n' + caches + '\n' + champs.join('\n');
+    const txt = (await pg.evaluate(() => document.body.innerText || '')) + '\n' + champs.join('\n');
     // (17 oct.) Le nom de l'entreprise est dans l'EN-TÊTE de toutes les pages
     // (`data-nom-entreprise`, exprès) : le corps de l'écran se lit sans lui.
     const corps = (await pg.evaluate(() => { const c = document.body.cloneNode(true); c.querySelectorAll('[data-nom-entreprise]').forEach((e) => e.remove()); document.body.appendChild(c); c.style.position = 'absolute'; const t = c.innerText || ''; c.remove(); return t; })) + '\n' + champs.join('\n');
@@ -159,10 +156,6 @@ const MENSONGES = [
   // Le geste qui détruit : basculer UNE notification. Sur le code d'avant, il
   // réécrivait `push_prefs` avec une seule clé.
   const basculer = async (pg) => {
-    // (2 nov.) Depuis le 1er nov., chaque panneau des Paramètres est un SOUS-ÉCRAN
-    // (monté mais caché) : on l'ouvre par sa rangée, comme Julien, avant le clic.
-    const id = await pg.evaluate(() => { const x = document.querySelector('button[aria-label*="Suivi du colis"]'); const s = x && x.closest('[data-sous-ecran]'); return s ? s.getAttribute('data-sous-ecran') : null; });
-    if (id) { try { await pg.locator(`[data-sous-ouvrir="${id}"]`).first().click({ timeout: 2500 }); await pg.waitForTimeout(500); } catch (_) {} }
     const b2 = pg.locator('button[aria-label*="Suivi du colis"]');
     if (await b2.count()) { try { await b2.first().click({ timeout: 2500 }); } catch (_) {} }
   };

@@ -761,41 +761,6 @@ const zero = (j) => gestes(j).length === 0;   // 5.266 : lire la liste des coule
     let v = 0; try { v = await f.ctx.lireVerrouRecreer('9101'); } catch (_) {}
     dit(r.etape === 'incertain' && v > 0, "brouillon sans réponse claire : 30 min sans nouvelle tentative de cette annonce", JSON.stringify({ e: r.etape, verrou: !!v })); }
 
-  // R — (2 nov., revue indépendante) quatre trous du frein et de la lecture vivante.
-  { // R1. Le frein posé PENDANT l'attente dans la file (une autre paire refusée) : rien ne part, les places sont rendues.
-    const f = monter({ src: process.env.BG_SRC || undefined });
-    let lacher; const tient = new Promise((ok) => { lacher = ok; });
-    const bloque = f.ctx.avecVinted(async () => { await tient; });
-    const p = f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: 54, titre: 'Nike', confirme: true });
-    for (let i = 0; i < 50; i++) await new Promise((ok) => setTimeout(ok, 5));
-    await f.ctx.chrome.storage.local.set({ vrmFreinRepub: { '111': { jusqua: Date.now() + 1800000, restreint: false, status: 400, at: Date.now() } } });
-    lacher(); await bloque;
-    let r = {}; try { r = await p; } catch (e) { r = { erreur: e.message }; }
-    const ecrits = f.j.vinted.filter((v) => v.methode !== 'GET' && !LECTURE.test(v.chemin)).length;
-    const n = ((f.store.vrmActions || {})['111'] || []).length;
-    dit(r.code === 'frein-refus' && ecrits === 0 && n === 0, "frein posé pendant l'attente dans la file : aucune photo, aucun brouillon, aucune suppression, places rendues", JSON.stringify({ code: r.code, etape: r.etape, ecrits, actions: n })); }
-  { // R2. « limite de 20 photos » est un refus ordinaire (30 min) ; seul le signal de Vinted vaut 24 h.
-    const f = monter({ src: process.env.BG_SRC || undefined });
-    const a = await f.ctx.poserFreinRepub('111', { status: 400, json: { message: 'Tu as atteint la limite de 20 photos', code: 99 } });
-    await f.ctx.chrome.storage.local.set({ vrmFreinRepub: {} });
-    const b = await f.ctx.poserFreinRepub('111', { status: 403, json: { code: 'listing_restricted', message: 'x' } });
-    dit(a && a.restreint === false && b && b.restreint === true, "« limite de 20 photos » : 30 min ; « listing_restricted » : 24 h (jamais « Vinted limite ton compte » sur un refus ordinaire)", JSON.stringify({ a: a && a.restreint, b: b && b.restreint })); }
-  { // R3. Lecture vivante refusée (Vinted 503) avec une recette complète : la vérification « existe encore ? » part quand même — rien n'est créé à l'aveugle.
-    const { f, r } = await run({ lecture: { status: 503, body: {} } });
-    const lu = f.j.vinted.filter((v) => v.methode === 'GET' && /item_upload\/items\/9101$/.test(v.chemin)).length;
-    dit(creations(f.j).length === 0 && suppressions(f.j).length === 0 && lu >= 2, "lecture de l'annonce refusée (503) : relue avant tout geste, aucun brouillon, aucune suppression", JSON.stringify({ c: creations(f.j).length, s: suppressions(f.j).length, lu, code: r.code, etape: r.etape })); }
-  { // R4. Le plafond partagé ne compte QUE ce compte (« _ » de LIKE : le compte 1111 n'est pas le 111).
-    const t = Date.now();
-    const f = monter({ src: process.env.BG_SRC || undefined, extra: { 'actions_compte_1111_aaaaaaaaaaaaaaaa': { uid: '1111', nav: 'aaaaaaaaaaaaaaaa', ts: [t - 1000, t - 2000, t - 3000] }, 'actions_compte_111_bbbbbbbbbbbbbbbb': { uid: '111', nav: 'bbbbbbbbbbbbbbbb', ts: [t - 1000] } } });
-    let a = null; try { a = typeof f.ctx.actionsAutresNavigateurs === 'function' ? await f.ctx.actionsAutresNavigateurs('111') : null; } catch (e) { a = { erreur: e.message }; }
-    dit(a && a.n === 1, "plafond partagé : seules les actions du compte 111 comptent (pas celles du compte 1111)", JSON.stringify(a)); }
-  { // R5. Modifier en place sous frein : aucune action de l'heure consommée.
-    const f = monter({ src: process.env.BG_SRC || undefined });
-    await f.ctx.chrome.storage.local.set({ vrmFreinRepub: { '111': { jusqua: Date.now() + 1800000, restreint: false, status: 400, at: Date.now() } } });
-    let r = {}; try { r = await f.ctx.republierVinted({ cmd: 'republierVinted', uid: '111', id: '9101', baissePct: 5, confirme: true }); } catch (e) { r = { erreur: e.message }; }
-    const n = ((f.store.vrmActions || {})['111'] || []).length;
-    dit(r.code === 'frein-refus' && n === 0 && zero(f.j), "modifier le prix sous frein : refusé, aucune requête, aucune action de l'heure consommée", JSON.stringify({ code: r.code, actions: n })); }
-
   // L — côté app : une annonce et SA recréation au même N° (la suppression de
   //     l'ancienne a échoué) ne déclenchent AUCUNE renumérotation automatique
   //     (le carton porte ce N°) ; deux paires sans lien, si.

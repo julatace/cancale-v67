@@ -982,26 +982,3 @@ Mesuré (diagnostic `panel_diag_capture`, compteurs cumulés) : `brouillon_publi
   actions acceptées sur l'avant, 50 après.
 - Intègre le chantier d'agent `claude/brouillons-avancee` (brouillons proposables par compte
   et lecture complète, file de Republier figée au lancement, bloc d'avancée fixe).
-
-## 2 novembre (soir) — 5.313.0 : le frein tenu dans la file (revue indépendante de la 5.311-5.312)
-
-Une relecture sans les notes de la session a trouvé cinq trous ; chacun a son contrôle
-dans `audit-recreer` (R1-R5), rouge sur la 5.312.0, vert en 5.313.0.
-- **R1** Le frein n'était lu qu'à l'ENTRÉE : une paire qui attendait dans la file pendant
-  qu'une autre était refusée partait quand même (photos, brouillon, suppression de
-  l'ancienne, brouillon laissé hors ligne — mesuré : 4 envois). Il est relu au début de
-  chaque tâche de la file (`recreerVinted`, `publierBrouillon`, `refaireBrouillon`,
-  `republierVinted`) ; rien ne part, les places réservées sont rendues.
-- **R2** `refusRestreint` prenait « limite »/« limité » du message pour une restriction
-  (24 h, « Vinted limite les mises en ligne ») : seul le signal (`restrict`, `suspend`)
-  compte ; un refus ordinaire freine 30 min.
-- **R3** Une lecture vivante refusée (budget, 5xx) sautait la vérification « l'annonce
-  existe encore ? » : elle n'est sautée que si l'annonce a été VUE (`codes`, ou `vu` :
-  200 de forme inconnue). Et si Vinted ne répond pas à cette vérification non plus,
-  rien n'est créé (« VRM ne sait pas si elle existe encore »).
-- **R4** Le plafond partagé lisait `like.actions_compte_{uid}_*` : en SQL `_` vaut
-  n'importe quel caractère (le compte 1111 comptait pour le 111). Filtré par
-  l'identifiant exact. Le faux PostgREST des audits (`_fond-vm.cjs`) traite
-  maintenant `_` comme Postgres.
-- **R5** Modifier le prix sous frein consommait une action de l'heure : le frein est lu
-  avant de compter.

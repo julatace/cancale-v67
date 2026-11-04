@@ -499,11 +499,11 @@ sans la fonction.
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
-**Extension servie : 5.313.0** (2 nov.). **À lire en premier : `docs/passation/2026-11-02-liste.md`.** **Production** : https://vrm.center,
+**Extension servie : 5.312.0** (2 nov. ; la 5.311.0 n'a jamais été servie seule). **À lire en premier : `docs/passation/2026-11-02-liste.md`.** **Production** : https://vrm.center,
 vérifier par `curl https://vrm.center/api/sante`.
 
 ### Gestes encore attendus de Julien
-- Installer l'extension **5.313.0** (remplacer le dossier, puis ⟳ dans CHAQUE Chrome).
+- Installer l'extension **5.312.0** (remplacer le dossier, puis ⟳ dans CHAQUE Chrome).
 - Sur leboncoin.fr, ouvrir « Mes annonces » sur CHACUN de ses comptes Leboncoin.
 - Recoller `scripts/gmail-forwarder.gs` (avec sa clé) dans la boîte qui fait tourner le
   script, puis poser `EMAIL_INBOUND_SECRET` sur Vercel (l'ancien script lit encore la
@@ -528,9 +528,6 @@ vérifier par `curl https://vrm.center/api/sante`.
 
 ### Décisions et chantiers (octobre–novembre 2026)
 Une ligne par chantier. Le récit complet des lignes du 31 oct. au 2 nov. est, mot pour mot, dans `docs/passation/etat-detaille-2026-10-31-au-11-02.md`.
-- **2 nov. (soir)** — Saisies sans réseau gardées sur l'appareil (file d'envoi `src/fileEnvoi.js`, rejouée par la fusion clé par clé au chargement, vidée quand la base ACCEPTE ; « N changements en attente d'envoi » dit une fois) : les prix tapés en 4G faible ne se perdent plus quand l'iPhone ferme l'app. Banc `file-envoi` (rouge sur l'avant). → historique sécurité-base-serveur. Geste : aucun.
-- **2 nov. (soir)** — Tournée de tous les audits sur `main` : 221/221 verts (SQL sur Postgres 17 ; sur Postgres 18 les empreintes de forme changent car les NOT NULL vont dans `pg_constraint` — 016 corrigée, 014/018-020 déjà appliquées laissées). Revue indépendante ⇒ 5.313.0. Tournée des 257 bancs en cours (branche `claude/tournee-bancs`). Geste : aucun.
-- **2 nov. (soir)** — **Extension 5.313.0** (revue indépendante) : le frein relu dans la file (une paire en attente ne part plus après le refus d'une autre), « limite » n'est plus une restriction 24 h, pas de recréation si l'annonce n'a pas pu être lue, plafond partagé au compte EXACT (`audit-recreer` R1-R5). → historique vinted-extension. Geste : installer la 5.313.0.
 - **2 nov. (soir)** — Sécurité : la politique CSP complète passe **en vigueur** (`vercel.json`, était en surveillance ; 2 violations relevées, aucune de VRM) ; banc `csp` vert. → historique sécurité. Geste : sur iPhone et ordinateur, vérifier que la carte de la Communauté s'affiche, qu'un bordereau s'ouvre, et Réglages → Imprimante → « Voir les aperçus ».
 - **2 nov. (soir)** — eBay : la notification « suppression de compte » est vérifiée (signature, sinon 412) puis appliquée (coordonnées d'acheteur effacées, montants gardés ; panne ⇒ 503, eBay renvoie) (`api/_lib/ebay-suppression.js`, `audit-ebay-suppression`). → historique ebay. Geste : aucun.
 - **2 nov. (soir)** — Favoris : écran simplifié (mode auto en une phrase + un geste, « Ton message », une ligne par favori rangée par état ; `src/favorisEcran.js`, `audit-favoris-ecran`, banc `favoris-ecran`). Geste : regarder Messages → Favoris reçus.
@@ -581,6 +578,27 @@ Une ligne par chantier. Le récit complet des lignes du 31 oct. au 2 nov. est, m
   `docs/passation/historique-*.md`.
 - **30 oct.** — Intégration v30, extension **5.291.0** (5.288/5.290 étaient des numéros de
   branche) : `docs/passation/2026-10-30.md`.
+- **29 oct.** — Leboncoin comme Vinted (5.288→5.291) : liste « Mes annonces » complète qui
+  fait sortir les disparues, « à retirer de Leboncoin » par identité, « Supprimer de
+  Leboncoin » (confirmé, 10/h), Republier Leboncoin, favoris en NOMBRES seulement. → leboncoin.
+- **29 oct.** — Statut chez le transporteur lu par le SERVEUR (Mondial Relay, Chronopost,
+  Vinted Go), l'extension en secours. → colis-retraits.
+- **29 oct.** — Messages : une offre sur une annonce plus en vente ne reste pas en tête
+  (`src/offresVinted.js`) ; « Retirer de la liste ». ⚠️ depuis le 18 oct. aucune requête
+  `/api/v2/conversations/…` ne part de la page : l'extension mesure la nouvelle route. → favoris-messages.
+- **29 oct.** — Écrans Vinted : grandes photos, état en jauge, calendrier de périodes,
+  pastille Actions. → interface.
+- **29 oct.** — Comptabilité simple (ordre seul changé), micro-entreprise repliée, suivi
+  URSSAF (mensuel/trimestriel), cotisations dans Ma journée, déclaration de revenus
+  (cases 5KO/5TA), CFE, rappel 3 jours avant l'échéance. → compta.
+- **29 oct.** — Reçu d'achat par email relié à SON achat par n° (`api/_lib/recu-achat.js`) ;
+  le mot est « reçu », pas « facture » (`NOM_RECU_ACHAT`). → compta / colis.
+- **29 oct.** — Agent eBay qui DEMANDE (jamais sans son oui) ; eBay → Achats : recherche
+  et fil (jeton d'application). → ebay.
+- **29 oct.** — Clé Photoroom par vendeur, chiffrée, sur l'écran Vestiaire (pas dans
+  Paramètres). → vestiaire.
+- **29 oct.** — Plafond d'actions **50/h** (sa décision) ; Republier comme Vintex (5.277-5.285).
+  → vinted-extension.
 - **Avant le 20 oct.** — `docs/passation/etat-detaille-2026-10-31-au-11-02.md` (fin) et `docs/journal-2026.md`.
 
 ---

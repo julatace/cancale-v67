@@ -300,7 +300,7 @@ const projette = (row, sel) => {
           dit(photo && photo.height>=plancher && photo.width>=premier.width-2, `la première photo occupe toute la largeur de la fiche, en grand (≥ ${plancher} px)`, photo && `${Math.round(photo.width)}×${Math.round(photo.height)} (fiche ${Math.round(premier.width)})`);
         }
 
-      } catch(e) { dit(false, 'recherche et retour au stock', e.message.slice(0,600)); }
+      } catch(e) { dit(false, 'recherche et retour au stock', e.message.slice(0,120)); }
       // ── « RIEN LU » ≠ « RIEN » : un échec de lecture des emails de vente ne doit
       //    PAS effacer `vinted_annonces_email_sold` (clé synchronisée). Sinon une
       //    paire déjà vendue redevient « en ligne » → reproposée ailleurs → DOUBLE

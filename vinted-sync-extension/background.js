@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.313.0';
+const CODE_VERSION = '5.312.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -9133,10 +9133,7 @@ const REFUS_REPUB_MS = 7 * 86400000;
 const FREIN_REPUB = 'vrmFreinRepub';
 const FREIN_REPUB_MS = 30 * 60 * 1000;
 const FREIN_RESTREINT_MS = 24 * 3600 * 1000;
-// (2 nov., revue) Le SIGNAL de Vinted (un code : `listing_restricted`, « restricted »,
-// « suspended »), jamais un mot courant du message : « limite de 20 photos » ou
-// « titre limité à 100 caractères » est un refus ordinaire (30 min), pas 24 h.
-const refusRestreint = (rc) => { try { return /restrict|suspend/i.test(JSON.stringify((rc && rc.json) || '')); } catch (_) { return false; } };
+const refusRestreint = (rc) => { try { return /restrict|limit[ée]|bloqu|suspend/i.test(JSON.stringify((rc && rc.json) || '')); } catch (_) { return false; } };
 async function lireFreinRepub(uid) {
   try { const m = (await chrome.storage.local.get(FREIN_REPUB))[FREIN_REPUB] || {}; const f = m[String(uid)]; return f && Number(f.jusqua) > Date.now() ? f : null; } catch (_) { return null; }
 }
@@ -9621,10 +9618,9 @@ async function republierVinted(msg) {
   const accts = await getStoredAccounts();
   const acc = accts.find((a) => String(a.vinted_user_id) === uid);
   if (!acc) return { accepte: false, code: 'absente', raison: 'compte introuvable' };
-  { const fr = await lireFreinRepub(uid); if (fr) { noterDiag('frein_repub_tenu'); return { accepte: false, code: 'frein-refus', jusqua: fr.jusqua, raison: phraseFreinRepub(fr) }; } }
-  const recuP = {};
-  const stop = await gardeStricte(uid, acc, { recu: recuP });
+  const stop = await gardeStricte(uid, acc);
   if (stop) return { accepte: false, code: stop.code, raison: stop.error };
+  { const fr = await lireFreinRepub(uid); if (fr) { noterDiag('frein_repub_tenu'); return { accepte: false, code: 'frein-refus', jusqua: fr.jusqua, raison: phraseFreinRepub(fr) }; } }
   // 1. SAUVEGARDE COFFRE vérifiée (filet : de quoi tout refaire si besoin).
   let coffre; try { coffre = await sbGet(`app_data?id=eq.coffre_${uid}_${id}&select=data`); } catch (_) { coffre = null; }
   if (coffre === null) return { accepte: false, code: 'coffre-lecture', raison: "je n'ai pas pu vérifier la sauvegarde — on ne touche à rien" };
@@ -9639,9 +9635,6 @@ async function republierVinted(msg) {
   // 3. PUT en place, dans la file Vinted (une requête à la fois). Jamais de
   //    suppression, jamais de création : le pire cas est un prix refusé.
   return await avecVinted(async () => {
-    // (2 nov., revue) Le frein relu À SON TOUR : un refus d'une autre paire a pu le
-    // poser pendant l'attente dans la file. Rien n'est envoyé, le geste est rendu.
-    { const fr = await lireFreinRepub(uid); if (fr) { if (recuP.at) await rendreActions(uid, recuP.at, 1); noterDiag('frein_repub_tenu_file'); return { accepte: false, code: 'frein-refus', jusqua: fr.jusqua, raison: phraseFreinRepub(fr) }; } }
     const r = await vintedPage(acc, 'PUT', `/api/v2/item_upload/items/${id}`, built.corps);
     if (r && r.sansPage) return { accepte: false, code: 'onglet-vinted', raison: raisonSansPage(r) };
     if (!r || !r.ok) { await poserFreinRepub(uid, r); return { accepte: true, etape: 'echec', raison: `Vinted a refusé la modification (${(r && r.status) || 0}) — ton annonce est inchangée`, ancien: built.ancien, nouveau: built.nouveau }; }
@@ -10104,11 +10097,9 @@ async function publierBrouillon(msg) {
   if (verrou) return { accepte: false, code: 'incertaine', raison: `une mise en ligne de ce brouillon est partie il y a ${Math.max(1, Math.round((Date.now() - verrou) / 60000))} min sans réponse claire — regarde ton dressing avant de réessayer` };
   const jour = await gardeJourRepub(uid);
   if (jour) return { accepte: false, code: jour.code, raison: jour.raison };
-  const recuB = {};
-  const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, recu: recuB });
+  const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES });
   if (stop) return { accepte: false, code: stop.code, raison: stop.error };
   return await avecVinted(async () => {
-    { const fr = await lireFreinRepub(uid); if (fr) { if (recuB.at) await rendreActions(uid, recuB.at, 1); noterDiag('frein_repub_tenu_file'); return { accepte: false, code: 'frein-refus', jusqua: fr.jusqua, raison: phraseFreinRepub(fr) }; } }
     // Revérifié À SON TOUR dans la file : une mise en ligne planifiée a pu passer avant.
     { let e2; try { e2 = await sbGet(`app_data?id=eq.vinted_brouillon_${id}&select=etat:data->>etat`); } catch (_) { e2 = null; }
       if (e2 && e2[0] && e2[0].etat === 'publie') return { accepte: false, code: 'deja', raison: 'ce brouillon vient d’être mis en ligne par VRM — rien n’a été renvoyé' };
@@ -10257,11 +10248,9 @@ async function refaireBrouillon(msg) {
   const enLigneApres = vb.publier === true && vb.supprime === true;
   const jour = await gardeJourRepub(uid);
   if (jour) return { accepte: false, code: jour.code, raison: jour.raison };
-  const recuR = {};
-  const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, recu: recuR });
+  const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES });
   if (stop) return { accepte: false, code: stop.code, raison: stop.error };
   return await avecVinted(async () => {
-    { const fr = await lireFreinRepub(uid); if (fr) { if (recuR.at) await rendreActions(uid, recuR.at, 1); noterDiag('frein_repub_tenu_file'); return { accepte: false, code: 'frein-refus', jusqua: fr.jusqua, raison: phraseFreinRepub(fr) }; } }
     suiviRepub(id);
     const temp = uuidRecreer();
     const tp = await televerserPhotosRecreer(acc, urls, [], reglagesPhotoSurs(vb.reglages), temp, (k, n) => etapeRepub(id, 'photos', { fait: k, total: n }));
@@ -10447,7 +10436,7 @@ async function apprendreRecetteVinted(acc, uid, id) {
     const it = j && (j.item && typeof j.item === 'object' ? j.item : j);
     const cles = it ? Object.keys(it).slice(0, 40).map((k) => k.replace(/[^a-z0-9_]/gi, '')).join('_').slice(0, 180) : 'vide';
     noterDiag('recette_forme_' + cles);
-    return { raison: 'sa réponse ne contient pas ces informations sous une forme que VRM connaît (c’est noté pour la prochaine version)', vu: true };   // l'annonce a répondu (200) : elle existe
+    return { raison: 'sa réponse ne contient pas ces informations sous une forme que VRM connaît (c’est noté pour la prochaine version)' };
   }
   if (!(c.color_ids && c.color_ids.length)) {
     const it = j && (j.item && typeof j.item === 'object' ? j.item : j);
@@ -10618,9 +10607,6 @@ async function recreerVinted(msg) {
   const tRes = Number(recu.at) || tAvant;     // l'horodatage EXACT de SES places (X8)
   let envoyes = 0, confie = false;
   return await avecVinted(async () => { try {
-    // (2 nov., revue) Le frein relu À SON TOUR dans la file : une autre paire a pu
-    // être refusée pendant l'attente. Rien n'est envoyé ; le `finally` rend les places.
-    { const fr = await lireFreinRepub(uid); if (fr) { noterDiag('frein_repub_tenu_file'); return { accepte: false, code: 'frein-refus', jusqua: fr.jusqua, raison: phraseFreinRepub(fr) }; } }
     suiviRepub(id);
     // (29 oct., « fait tout comme vintex ») L'ORDRE MESURÉ chez Vintex, sur deux
     // republications acceptées du premier coup, toutes ses requêtes parties de
@@ -10643,15 +10629,9 @@ async function recreerVinted(msg) {
     //    l'onglet Vinted est là : sans lui, rien ne part.
     etapeRepub(id, 'lecture');
     // (2 nov., 5.311) Déjà LUE au début (et son contenu utilisé) : pas de seconde lecture.
-    // (2 nov., revue) Sautée seulement si la lecture vivante a VRAIMENT vu l'annonce
-    // (`codes`, ou `vu` : réponse 200 de forme inconnue) : une lecture refusée (budget,
-    // 5xx) rend un objet sans l'un ni l'autre — la vérification 404/410 doit partir.
-    const rl = (appris && (appris.codes || appris.vu)) ? null : await vintedPage(acc, 'GET', `/api/v2/item_upload/items/${id}`, null, { timeoutMs: 30000 });
+    const rl = appris ? null : await vintedPage(acc, 'GET', `/api/v2/item_upload/items/${id}`, null, { timeoutMs: 30000 });
     if (rl && rl.sansPage) return { accepte: false, code: 'onglet-vinted', raison: raisonSansPage(rl) };
     if (rl && (rl.status === 404 || rl.status === 410)) { noterDiag('recreer_annonce_absente'); return { accepte: true, etape: 'echec', raison: "Vinted dit que cette annonce n'existe plus (elle a peut-être été supprimée ou vendue) — VRM ne recrée rien. Regarde ton dressing." }; }
-    // (2 nov., revue) Ni la lecture vivante ni celle-ci n'ont vu l'annonce (Vinted 5xx,
-    // pas de réponse) : VRM ne sait pas si elle existe encore — il ne crée rien à l'aveugle.
-    if (rl && !rl.ok) { noterDiag(`recreer_lecture_ko_${Number(rl.status) || 0}`); return { accepte: true, etape: 'echec', raison: `Vinted n'a pas répondu en lisant cette annonce (${Number(rl.status) || 'pas de réponse'}) — VRM ne sait pas si elle existe encore, rien n'a été créé ni supprimé. Réessaie dans quelques minutes.` }; }
     // 2. Les photos, une par une, depuis la page.
     await pauseRepub('lecture');
     const temp = uuidRecreer();
@@ -11014,10 +10994,7 @@ async function actionsAutresNavigateurs(uid) {
   if (!Array.isArray(rows)) return null;
   const t = Date.now(); let n = 0; const toutes = [];
   for (const r of rows) {
-    // (2 nov., revue) Dans LIKE, « _ » vaut n'importe quel caractère : « …_123_* »
-    // ramenait aussi le compte 1234. Seules les lignes EXACTEMENT de ce compte comptent.
-    if (!r || !new RegExp(`^${ACTIONS_PARTAGEES}${uid}_[0-9a-f]{16}$`).test(String(r.id || ''))) continue;
-    if (String(r.id) === `${ACTIONS_PARTAGEES}${uid}_${moi}`) continue;
+    if (!r || String(r.id || '') === `${ACTIONS_PARTAGEES}${uid}_${moi}`) continue;
     for (const x of (Array.isArray(r.ts) ? r.ts : [])) { const v = Number(x); if (Number.isFinite(v) && t - v < 3600000 && v <= t + 60000) { n++; toutes.push(v); } }
   }
   return { n, toutes };

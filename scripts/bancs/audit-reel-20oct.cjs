@@ -133,9 +133,8 @@ const texte = (pg) => pg.evaluate(() => document.body.innerText || '');
       dit(/80,00\s*€/.test(hero), 'B. … le finalisé compte la vente masquée d’avant (80 € = 50 + 30)', hero.split('\n').slice(0, 2).join(' | '));
     });
     await essaie('C leboncoin', async () => {
-      // (2 nov.) Plus aucun espace de site n'est monté (navigation par tâche, 31 oct.) :
-      // le lien profond `?tab=plat_…&section=…` mène à la tâche filtrée sur le site.
-      await aller(pg, 'plat_leboncoin&section=annonces');
+      await aller(pg, 'plat_leboncoin');
+      await section(pg, 'annonces');
       const t = await texte(pg);
       const m = t.match(/(\d+) vendues? sur Vinted — à retirer de Leboncoin/);
       dit(m && m[1] === '1', 'C. une paire vendue = UNE ligne « à retirer de Leboncoin »', m ? m[0] : 'bloc absent');
@@ -144,12 +143,13 @@ const texte = (pg) => pg.evaluate(() => document.body.innerText || '');
       dit(/voir sur Leboncoin/.test(t), 'C. … et c\'est la ligne avec son lien Leboncoin qui reste');
     });
     await essaie('D ebay annonces', async () => {
-      await aller(pg, 'plat_ebay&section=annonces');
+      await aller(pg, 'plat_ebay');
+      await section(pg, 'annonces');
       const d = await pg.evaluate(() => [...document.querySelectorAll('[data-sku-douteux]')].map((e) => e.getAttribute('data-sku-douteux')));
       const t = await texte(pg);
       dit(d.includes('VRM-48'), 'D. un SKU dont aucune fiche ne porte le N° est « à vérifier · pas reliée »', JSON.stringify(d));
       dit(!/\bN°48\b/.test(t), 'D. … il n\'est jamais affiché comme la paire N°48');
-      await aller(pg, 'plat_ebay&section=compte');   // ⇒ Paramètres · eBay
+      await section(pg, 'compte');
       const st = await pg.evaluate(() => { const e = document.querySelector('[data-ebay-statut]'); return e ? e.getAttribute('data-ebay-statut') : null; });
       dit(st === 'passu', 'E. route eBay muette ⇒ « pas pu vérifier », pas « eBay pas configuré »', String(st));
       dit(!/pas encore configuré/.test(await texte(pg)), 'E. … aucune consigne « ajoute tes clés dans Vercel »');
@@ -182,7 +182,8 @@ const texte = (pg) => pg.evaluate(() => document.body.innerText || '');
       await aller(v2.pg, 'cat_bord', 5500);
       const t = await texte(v2.pg);
       dit(/Les données du compte compte_b datent d'il y a 6 j/.test(t) && !(await v2.pg.$('[data-fraicheur-comptes]')), 'G (autre sens). un seul compte en retard : la phrase d\'avant, qui le nomme');
-      await aller(v2.pg, 'plat_ebay&section=compte');
+      await aller(v2.pg, 'plat_ebay');
+      await section(v2.pg, 'compte');
       const st = await v2.pg.evaluate(() => { const e = document.querySelector('[data-ebay-statut]'); return e ? e.getAttribute('data-ebay-statut') : null; });
       dit(st === 'non-configure', 'E (autre sens). la route dit `ready:false` ⇒ « pas encore configuré » reste dit', String(st));
     });
