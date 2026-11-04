@@ -162,7 +162,7 @@ import { friseVente, phraseVente, eurosRecap, ETATS_HORS_PARCOURS } from "./reca
 // (2 nov.) Le style « Fusion » : la carte sombre du mois et la frise de suivi (src/design/).
 import CarteMois from "./design/CarteMois.jsx";
 import CarteStats from "./design/CarteStats.jsx";
-import { CLE_CARTE_STATS } from "./design/carteChiffres.js";
+import { CLE_CARTE_STATS, recuPublieEntre } from "./design/carteChiffres.js";
 import { courtFusion, enArticles } from "./design/tacheCourte.js";
 import { PileVignettes } from "./design/PileVignettes.jsx";
 import Frise from "./design/Frise.jsx";
@@ -28767,6 +28767,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
     <div className="vrm-finance-page vrm-statistiques-premium" style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
       <ScreenHead icon="chart" title="Statistiques" right={<Segmente label="Période" className="vrm-sv-periode" value={periodeStats} onChange={setPeriodeStats} options={Object.entries(PERIODES).map(([v,l])=>({v,l,data:{'data-sv-choix':v}}))}/>}/>
       <StatsVitrine liveStats={liveStats} panelOff={panelOff} periode={periodeStats}/>
+      <ComparerMoisCarte liveStats={liveStats}/>
+      <FraisParSiteCarte periode={periodeStats} ebayCommandes={ebayCommandes}/>
       {/* (2 nov., « beaucoup d'incompréhension » — Julien) En haut, les chiffres qui
           comptent pour la période ; tout le reste est rangé en deux volets repliés,
           ouverts d'un geste et gardés ouverts sur cet appareil. Aucune règle ne change. */}
@@ -37717,6 +37719,14 @@ function CarteUrssafMois({ liveStats, onNav }) {
 // Le récap comptable mensuel : la MÊME ligne publiée, mois par mois (§11).
 // ⚠️ Le bénéfice n'est pas calculable ici (les prix d'achat vivent sur l'écran
 // Annonces) : « — », jamais un zéro qui passerait pour un vrai chiffre.
+// (4 nov.) LE BÉNÉFICE D'UN MOIS DONNÉ — une lecture pour le récap mensuel et
+// « Comparer deux mois » (§11) : `beneficePeriode` du mois, borné à maintenant ;
+// `null` si la publication ne couvre pas ce mois (jamais « 0 »). `jusqua` : les
+// ventes s'arrêtent à ce jour (un mois en cours comparé au même point).
+const beneficeDuMoisPub = ({ pub, compta, ligneUrssaf, regime }, ym, jusqua = null) => {
+  if (!pub || !moisCouvertParPublication(ym)) return null;
+  return beneficePeriode({ jours: pub.jours, compta, ligneUrssaf, taux: tauxUrssaf(), periode: 'mois', maintenant: Math.min(finDuMois(ym), Date.now()), toutes: Number(pub.v) >= 2, urssaf: regime === undefined || urssafConcerne(regime), jusqua });
+};
 function RecapComptableMensuel() {
   const v = useLigneUrssaf();
   const urssafMois = v ? v.mois : null;
@@ -37731,9 +37741,8 @@ function RecapComptableMensuel() {
   const [comptaB] = useLigneSynchro('vrm_compta', lireComptaSynchro);
   const regimeB = useRegimeFiscal();
   const beneficeDuMois = (ym) => {
-    if (!pubB || !moisCouvertParPublication(ym)) return null;
-    const B = beneficePeriode({ jours: pubB.jours, compta: comptaB, ligneUrssaf: v, taux: tauxUrssaf(), periode: 'mois', maintenant: Math.min(finDuMois(ym), Date.now()), toutes: Number(pubB.v) >= 2, urssaf: regimeB === undefined || urssafConcerne(regimeB) });
-    return chiffreBenefice(B).valeur;
+    const B = beneficeDuMoisPub({ pub: pubB, compta: comptaB, ligneUrssaf: v, regime: regimeB }, ym);
+    return B ? chiffreBenefice(B).valeur : null;
   };
   const moisNoms = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
   const moisRecap = !urssafMois ? [] : urssafMois.map((m) => {
@@ -37758,7 +37767,7 @@ function RecapComptableMensuel() {
   const [ymRecap, setYmRecap] = React.useState(ymNow);
   const [recapEnCours, setRecapEnCours] = React.useState('');
   const donneesRecap = async (ym) => {
-    const B = pubB && moisCouvertParPublication(ym) ? beneficePeriode({ jours: pubB.jours, compta: comptaB, ligneUrssaf: v, taux: tauxUrssaf(), periode: 'mois', maintenant: Math.min(finDuMois(ym), Date.now()), toutes: Number(pubB.v) >= 2, urssaf: regimeB === undefined || urssafConcerne(regimeB) }) : null;
+    const B = beneficeDuMoisPub({ pub: pubB, compta: comptaB, ligneUrssaf: v, regime: regimeB }, ym);
     const m = moisRecap.find((x) => x.ym === ym) || null;
     const rel = lireReleveVentes();
     let ent = null; try { ent = await lireReglage('vrm_pro_facture'); } catch (_) { ent = null; }
@@ -38297,6 +38306,118 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
     </div>
   );
 }
+// ═══════════════════════════════════════════════════════════════════════════
+// (4 nov.) COMPARER DEUX MOIS — Statistiques, sous le choix de période.
+// ═══════════════════════════════════════════════════════════════════════════
+// Rien n'est calculé ici (src/comparerMois.js) : ventes et CA vendu = lignes de
+// `ventesFaites` + `bilanLignes` ; reçu = la ligne publiée `vinted_urssaf_mois`
+// (`recuPublieEntre`) ; bénéfice = `beneficeDuMoisPub` (`beneficePeriode`,
+// `chiffreBenefice`). Un mois en cours se compare AU MÊME POINT. « — » = pas su.
+const nomColonneMois = (ym, b, memePoint, maintenant) => {
+  const [y, m] = String(ym).split('-').map(Number);
+  const an = y !== new Date(maintenant).getFullYear() ? ` ${y}` : '';
+  if (!memePoint) return `${MOIS_COURTS[m - 1]}${an}`;
+  const fin = new Date(Math.max(b.de, b.a - 1)).getDate();
+  return `1–${fin} ${MOIS_COURTS[m - 1]}${an}`;
+};
+const signeEur = (v) => (v > 0 ? '+' : v < 0 ? '−' : '') + fmt(Math.abs(v));
+const signePct = (v) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${String(Math.abs(v)).replace('.', ',')} %`;
+function ComparerMoisCarte({ liveStats }) {
+  const [mode, setModeB] = React.useState(() => { try { return localStorage.getItem('vrm_comparer_mode') === 'an' ? 'an' : 'precedent'; } catch (_) { return 'precedent'; } });
+  const setMode = (v) => { setModeB(v); try { localStorage.setItem('vrm_comparer_mode', v); } catch (_) {} };
+  const [pub] = useLigneSynchro('vrm_benefice_jours', lireBeneficeJours);
+  const [compta] = useLigneSynchro('vrm_compta', lireComptaSynchro);
+  const ligneUrssaf = useLigneUrssaf();
+  const regime = useRegimeFiscal();
+  const maintenant = Date.now();
+  const vendu = liveStats && !liveStats.venduPasSu && Array.isArray(liveStats.venduLignes)
+    ? { lignes: liveStats.venduLignes, manque: [...(liveStats.venduManque || []), ...(liveStats.venduEnAttente ? ['lecture en cours'] : [])], nonComptees: liveStats.venduNonComptees || [] } : null;
+  const K = comparerMois({ ymA: ymCourant(maintenant), mode, maintenant, vendu,
+    recuDe: (b) => recuPublieEntre(ligneUrssaf, b, maintenant),
+    beneficeDe: ({ ym, jusqua }) => { const B = beneficeDuMoisPub({ pub, compta, ligneUrssaf, regime }, ym, jusqua); return B ? chiffreBenefice(B, 'lu') : { valeur: null, raison: pub ? 'mois pas couvert' : 'publication' }; },
+    R: { bilanLignes } });
+  if (!K) return null;
+  const colA = nomColonneMois(K.ymA, K.bornes.A, K.memePoint, maintenant), colB = nomColonneMois(K.ymB, K.bornes.B, K.memePoint, maintenant);
+  const val = (x, type) => x.valeur == null ? '—' : type === 'eur' ? fmt(x.valeur) : String(x.valeur);
+  const cents = (x, type) => x == null ? '' : type === 'eur' ? String(Math.round(x * 100)) : String(x);
+  const grille = { display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,92px) minmax(0,92px) minmax(0,84px)', columnGap: 8, alignItems: 'center' };
+  return (
+    <section className="vrm-comparer" data-comparer={K.mode} data-comparer-a={K.ymA} data-comparer-b={K.ymB} data-comparer-meme-point={K.memePoint ? '1' : '0'}
+      style={{ padding: 18, background: C.card, border: `1px solid ${C.border}`, borderRadius: 20, boxShadow: C.shadow || 'none' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
+        <span data-titre-section="" style={{ flex: '1 1 auto', fontSize: 15, fontWeight: 600, color: C.text }}>Comparer</span>
+        <Segmente label="Comparer avec" value={K.mode} onChange={setMode} options={[{ v: 'precedent', l: 'Mois d’avant', data: { 'data-comparer-choix': 'precedent' } }, { v: 'an', l: 'Il y a un an', data: { 'data-comparer-choix': 'an' } }]}/>
+      </div>
+      <div role="row" style={{ ...grille, fontSize: 12, color: C.muted, fontWeight: 600, padding: '4px 0' }}>
+        <span/>
+        <span style={{ textAlign: 'right' }} data-comparer-col="a">{colA}</span>
+        <span style={{ textAlign: 'right' }} data-comparer-col="b">{colB}</span>
+        <span style={{ textAlign: 'right' }}>Écart</span>
+      </div>
+      {K.lignes.map((L) => (
+        <div role="row" key={L.cle} data-comparer-ligne={L.cle} data-a={cents(L.a.valeur, L.type)} data-b={cents(L.b.valeur, L.type)} data-ecart={cents(L.ecart, L.type)} data-pct={L.pct == null ? '' : String(L.pct)}
+          data-a-partiel={L.a.partiel ? '1' : undefined} data-b-partiel={L.b.partiel ? '1' : undefined}
+          style={{ ...grille, minHeight: 44, borderTop: `1px solid ${C.border}`, fontVariantNumeric: 'tabular-nums' }}>
+          <span style={{ fontSize: 15, color: C.text, fontWeight: 500, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{L.nom}</span>
+          {[L.a, L.b].map((x, i) => (
+            <span key={i} style={{ textAlign: 'right', minWidth: 0 }} title={x.partiel ? `au moins — sans ${x.manque.join(', ')}` : x.valeur == null ? 'pas su' : undefined}>
+              <span style={{ display: 'block', fontSize: 15, fontWeight: i === 0 ? 600 : 400, color: i === 0 ? C.text : C.muted, whiteSpace: 'nowrap' }}>{val(x, L.type)}</span>
+              {x.partiel ? <span style={{ display: 'block', fontSize: 11, color: C.muted }}>au moins</span> : null}
+            </span>
+          ))}
+          <span style={{ textAlign: 'right', minWidth: 0, whiteSpace: 'nowrap' }}>
+            <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: C.text }}>{L.ecart == null ? '—' : L.type === 'eur' ? signeEur(L.ecart) : (L.ecart > 0 ? '+' : L.ecart < 0 ? '−' : '') + Math.abs(L.ecart)}</span>
+            {L.pct != null ? <span style={{ display: 'block', fontSize: 11, color: C.muted }}>{signePct(L.pct)}</span> : null}
+          </span>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// (4 nov.) CE QUE COÛTE CHAQUE SITE — Statistiques, sur la période choisie.
+// ═══════════════════════════════════════════════════════════════════════════
+// Rien n'est calculé ici (src/fraisPlateformes.js) : le relevé de Ventes
+// (`vrm_stats_ventes`, frais saisis sur les fiches), les commandes eBay
+// (`totalMarketplaceFee`), les packs et options de Comptabilité. La couverture
+// est dite là où le site a une commission à lire.
+const lireReleveFrais = () => { try { const v = load('vrm_stats_ventes', null); return v && Array.isArray(v.l) ? v : null; } catch (_) { return null; } };
+function FraisParSiteCarte({ periode, ebayCommandes }) {
+  const [releve] = useLigneSynchro('vrm_stats_ventes', lireReleveFrais);
+  const [compta] = useLigneSynchro('vrm_compta', lireComptaSynchro);
+  const excluAutre = useExcluAutre();
+  const b = bornesPeriode(periode, Date.now());
+  const F = fraisParPlateforme({ releve: releve ? releve.l : null, ebay: Array.isArray(ebayCommandes) ? ebayCommandes : null, packs: compta && compta.packs, de: b.de, a: b.a, excluAutre, R: { commandeEbayEngagee } });
+  if (!F.sites.length) return null;
+  const grille = { display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,96px) minmax(0,64px)', columnGap: 10, alignItems: 'center' };
+  return (
+    <section className="vrm-frais-sites" data-frais-sites={b.type} data-frais-total={String(Math.round(F.total * 100))} data-frais-partiel={F.partiel ? '1' : undefined}
+      style={{ padding: 18, background: C.card, border: `1px solid ${C.border}`, borderRadius: 20, boxShadow: C.shadow || 'none' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 6 }}>
+        <span data-titre-section="" style={{ flex: 1, fontSize: 15, fontWeight: 600, color: C.text }}>Frais par site</span>
+        <span style={{ fontSize: 12, color: C.muted, fontWeight: 600, width: 64, textAlign: 'right' }}>% vendu</span>
+      </div>
+      {F.sites.map((x) => {
+        const cov = texteCouverture(x);
+        return (
+          <div key={x.plateforme} role="row" data-frais-site={x.plateforme} data-frais-eur={x.frais == null ? '' : String(Math.round(x.frais * 100))} data-frais-pct={x.pct == null ? '' : String(x.pct)}
+            data-frais-lus={x.couverture ? `${x.couverture.lus}/${x.couverture.n}` : ''} data-frais-options={String(Math.round(x.options * 100))}
+            title={x.options > 0 ? `dont ${fmt(x.options)} d’options et packs (${x.nOptions})` : undefined}
+            style={{ ...grille, minHeight: 44, borderTop: `1px solid ${C.border}`, fontVariantNumeric: 'tabular-nums' }}>
+            <span style={{ minWidth: 0 }}>
+              <span style={{ display: 'block', fontSize: 15, fontWeight: 500, color: C.text }}>{x.plateforme}</span>
+              <span style={{ display: 'block', fontSize: 12, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{x.passu ? 'pas lu' : `${x.n} vente${x.n > 1 ? 's' : ''}${cov ? ` · ${cov}` : ''}`}</span>
+            </span>
+            <span style={{ textAlign: 'right', fontSize: 15, fontWeight: 600, color: C.text, whiteSpace: 'nowrap' }}>{x.frais == null ? '—' : fmt(x.frais)}</span>
+            <span style={{ textAlign: 'right', fontSize: 13, color: C.muted, whiteSpace: 'nowrap' }}>{x.pct == null ? '—' : `${String(x.pct).replace('.', ',')} %`}</span>
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
 function StatsDetaillees({ liveStats, panelOff, onVoirDorment = null }) {
   const sCarte = { padding: 18, background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: C.shadow };
   const sTitre = { fontSize: 15, fontWeight: 600, color: C.text, letterSpacing: -0.15 };
@@ -38690,9 +38811,14 @@ const caBeneficeDuMois = (m, toutes) => {
 // Le bénéfice d'une période — fonction PURE (exécutée par audit-benefice.cjs).
 // `jours` = la publication de Ventes, `compta` = les charges, `ligneUrssaf` = le
 // CA déclaré publié (ou null), `taux` = le taux de cotisations.
-const beneficePeriode = ({ jours, compta, ligneUrssaf, taux, periode, maintenant = Date.now(), toutes = false, urssaf = true }) => {
+// (4 nov.) `jusqua` (ms, optionnel) : les VENTES s'arrêtent au jour de `jusqua` inclus (« Comparer deux mois »
+// au même point d'un mois en cours) ; les dépenses restent celles des mois de la
+// période. Absent : la règle d'avant, inchangée.
+const beneficePeriode = ({ jours, compta, ligneUrssaf, taux, periode, maintenant = Date.now(), toutes = false, urssaf = true, jusqua = null }) => {
   const de = debutPeriode(maintenant, periode), a = decalerPeriode(de, periode, 1);
-  const v = beneficeDesJours(jours, de, a);
+  // La publication est au JOUR : la coupe garde le jour entier où elle tombe.
+  const finJ = jusqua != null ? (() => { const d = new Date(jusqua); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + 1); return d; })() : null;
+  const v = beneficeDesJours(jours, de, finJ && finJ < a ? finJ : a);
   // Les mois de la période, jusqu'au mois en cours (une charge à venir n'est pas une charge).
   const yms = [];
   for (let d = new Date(de); d < a && d.getTime() <= maintenant; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) yms.push(ymCourant(d.getTime()));
@@ -43611,9 +43737,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // (api/widget.js) au lieu de le recalculer sur les emails (§11, 17 oct.).
       const recu = {};
       for (const ymR of new Set(lignes.filter(l => l && l.ts).map(l => ymDeTs(l.ts)))) recu[ymR] = r2(recuDuMois(lignes, ymR));
+      // (4 nov.) Le même reçu, JOUR par jour (jour local, les 14 derniers mois) :
+      // « Comparer deux mois » au même point d'un mois en cours (Statistiques).
+      // Les mêmes lignes, la même date de versement ; un jour sans versement n'y est pas.
+      const recuJours = {};
+      const j0 = new Date(); j0.setDate(1); j0.setMonth(j0.getMonth() - 14); const t0 = j0.getTime();
+      for (const l of lignes) if (l && l.ts && l.ts >= t0) { const k = jourClef(new Date(l.ts)); recuJours[k] = r2((recuJours[k] || 0) + l.eur); }
       const avant = load('vinted_urssaf_mois', null);
-      const charge = { mois: liste, aDater: ad, ecartees: ecartees.length, sources, declare: declarables.declare, recu, nonComptees };
-      const memeChose = avant && JSON.stringify({ mois: avant.mois, aDater: avant.aDater, ecartees: avant.ecartees, sources: avant.sources, declare: avant.declare, recu: avant.recu, nonComptees: avant.nonComptees }) === JSON.stringify(charge);
+      const charge = { mois: liste, aDater: ad, ecartees: ecartees.length, sources, declare: declarables.declare, recu, recuJours, nonComptees };
+      const memeChose = avant && JSON.stringify({ mois: avant.mois, aDater: avant.aDater, ecartees: avant.ecartees, sources: avant.sources, declare: avant.declare, recu: avant.recu, recuJours: avant.recuJours, nonComptees: avant.nonComptees }) === JSON.stringify(charge);
       // ⚠️ (1er nov., audit A8) `at` = l'heure d'une LECTURE complète, pas d'un
       // changement. Le widget refuse une ligne de plus de 3 jours ou d'un autre
       // mois (`recuDuMoisPublie`) : sans nouvel argent, l'app ne republiait rien

@@ -236,6 +236,37 @@ export const recuPublie = (publie, ym, maintenant = Date.now()) => {
   return { valeur: recu, partiel: manque.length > 0, manque, raison: '' };
 };
 
+// (4 nov.) Le reçu ENTRE deux instants (« Comparer deux mois ») : la même ligne
+// publiée, la même fraîcheur (3 jours), les mêmes sources nommées. Un mois ENTIER
+// lit `recu[ym]` ; une coupe (mois en cours au même point) lit `recuJours` (jour
+// local) — absent (publication d'une app plus ancienne) ⇒ « — ».
+const jourLocal = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+export const recuPublieEntre = (publie, { de, a, ym, complet }, maintenant = Date.now()) => {
+  if (!publie || typeof publie !== 'object' || !Array.isArray(publie.mois)) return { valeur: null, raison: 'absente' };
+  const at = Number(publie.at);
+  if (!isFinite(at) || at <= 0) return { valeur: null, raison: 'illisible' };
+  if (maintenant - at > RECU_MAX_AGE_MS) return { valeur: null, raison: 'ancienne' };
+  const src = publie.sources && typeof publie.sources === 'object' ? publie.sources : null;
+  if (!src) return { valeur: null, raison: 'illisible' };
+  let valeur;
+  if (complet) {
+    if (!publie.recu || typeof publie.recu !== 'object' || Array.isArray(publie.recu)) return { valeur: null, raison: 'ancienne-app' };
+    valeur = publie.recu[ym] == null ? 0 : Number(publie.recu[ym]);
+  } else {
+    if (!publie.recuJours || typeof publie.recuJours !== 'object' || Array.isArray(publie.recuJours)) return { valeur: null, raison: 'ancienne-app' };
+    const k0 = jourLocal(de), k1 = jourLocal(a);
+    // Jour local : le jour de la coupe compte entier (la publication est au jour).
+    valeur = Object.entries(publie.recuJours).reduce((t, [k, v]) => (k >= k0 && k <= k1 ? t + Math.round(Number(v) * 100) : t), 0) / 100;
+  }
+  if (!isFinite(valeur) || valeur < 0) return { valeur: null, raison: 'illisible' };
+  const manque = Object.entries(src).filter(([, v]) => v === 'pasSu').map(([k]) => k);
+  const nc = publie.nonComptees && typeof publie.nonComptees === 'object' ? publie.nonComptees : null;
+  if (nc && Number(nc.n) > 0) for (const k of Object.keys(nc.par || {})) { const s = String(k).split('|')[0]; if (s && !manque.includes(s)) manque.push(s); }
+  if (nc && Number(nc.n) > 0 && !Object.keys(nc.par || {}).length) manque.push('ventes au montant pas lu');
+  if (manque.length && !(valeur > 0)) return { valeur: null, partiel: true, manque, raison: 'partiel' };
+  return { valeur, partiel: manque.length > 0, manque, raison: '' };
+};
+
 // ── LES VALEURS ─────────────────────────────────────────────────────────────
 // `sources` (ce que l'app a déjà, rien de relu ici) :
 //   vendu      : { lignes (ventesFaites) | null, manque: [noms], enAttente, nonComptees }
