@@ -55,3 +55,9 @@ Tests : lecteur (absence, rejet, délai, changement de compte) ; bouton et
 contrôleur réels en React à 390/1512, vrai PDF synthétique pour l'ouverture
 originale, reprise après erreur, double clic et réponse périmée. Aucun compte
 réel ni PDF de client disponible dans cet environnement.
+
+Le contrôle de parité a détecté une collision entre la deuxième action de PDF
+et le menu « … » dans la carte compacte de Colis. L'ouverture originale reste
+réservée au récapitulatif de vente ; la carte compacte garde un seul bouton
+flottant. Test explicite sur le composant et reprise du scénario « Colis fait »
+(aller dans Envoyés puis annuler), sans force-click.
