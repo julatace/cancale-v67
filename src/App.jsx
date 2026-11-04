@@ -106,6 +106,8 @@ import {colisLbcAPoster,lbcColisAPoster,totalColis,colisLbcVendeur} from '../api
 import {CLE_COMPTES_EXCLUS,excluAutreDe,estExclu,basculerExclu,compteDeVente} from '../api/_lib/comptes-exclus.js';
 import {PLATEFORMES_COMPTES,etatCompteLie,ageLecture,comptesLbcLies,comptesVcLies,comptesEbayLies,refDeLigneEbay,nomCompteLie,LIBELLE_ETAT} from './comptesLies.js';
 import './comptes-lies.css';
+import './comptes-securite.css';
+import { pucesComptes, choixPourSite, memoriserChoix, lireChoixComptes, CLE_CHOIX_COMPTES } from './compteChoix.js';
 import {joursAvant as joursAvantParis} from '../api/_lib/ebay-a-expedier.js';
 import {marcheDuCompte as marcheEbayDuCompte, MARCHE_DEFAUT as MARCHE_EBAY_DEFAUT, lienAnnonce as lienAnnonceMarche, lienCommande as lienCommandeMarche} from '../api/_lib/ebay-marches-table.js';
 import {arriveeColisEmail, arriveeColisVinted, jourLocal, texteArrivee} from '../api/_lib/arrivee-colis.js';
@@ -40998,6 +41000,27 @@ function SelecteurCompte({ accounts, sel, setSel, connecte, messages = false }) 
 // un élément déjà formé (la note du sélecteur Vinted porte son attribut).
 function ListeComptes({ id, valeur, options, onChange, note, skin, attrs }) {
   const K = skin || C;
+  // (4 nov., « changer de compte en un tap ») UNE RANGÉE DE PUCES « Tous ·
+  // compte1 · compte2… » (src/compteChoix.js) : un tap, plus de liste à ouvrir.
+  // Elle pilote la MÊME valeur qu'avant (`onChange`, l'état de la coque) ; la
+  // liste native reste dessous, invisible et hors du parcours au clavier, pour
+  // les lecteurs d'écran de secours et les bancs qui la choisissent.
+  const puces = pucesComptes(options, valeur);
+  if (puces.length) return (
+    <div {...(attrs || {})} className="vrm-compte-choix vrm-compte-puces-hote" data-compte-puces={id} style={{ background: skin ? K.bg : 'transparent' }}>
+      <div className="vrm-compte-puces" role="radiogroup" aria-label="Compte">
+        {puces.map((p) => (
+          <button key={p.val} type="button" role="radio" aria-checked={p.actif} data-compte-puce={p.val} data-actif={p.actif ? '1' : '0'}
+            className={'vrm-compte-puce' + (p.actif ? ' is-actif' : '')} onClick={() => { if (!p.actif) onChange(p.val); }}>{p.nom}</button>
+        ))}
+      </div>
+      <select id={id} className="vrm-compte-select-cache" tabIndex={-1} aria-hidden="true" value={puces.find((p) => p.actif).val} onChange={(e) => onChange(e.target.value)}>
+        <option value="*">Tous les comptes</option>
+        {(options || []).map((o) => <option key={o.val} value={o.val}>{o.nom}</option>)}
+      </select>
+      {note ? (typeof note === 'string' ? <span className="vrm-compte-note" style={{ color: K.muted }}>{note}</span> : <span className="vrm-compte-note">{note}</span>) : null}
+    </div>
+  );
   // (16 oct.) Une rangée sobre façon réglage iOS : « Compte » à gauche, la valeur
   // en liste native à droite (sans cadre lourd), chevron discret. La note, s'il y
   // en a une, passe dessous en légende.
@@ -65129,12 +65152,16 @@ function AppCoeur() {
   // pas suivre en douce sur une autre plateforme) ; conservé d'un sous-onglet à
   // l'autre d'une même plateforme (choisir le compte une fois, le voir sur
   // Annonces PUIS Ventes PUIS Messages).
-  const [compteSel,setCompteSel]=useState('');
   // (31 oct.) Le compte choisi suit le SITE, pas l'onglet : choisi dans Ventes ·
   // Vinted, il reste choisi dans Annonces · Vinted (comme d'une section à
-  // l'autre de l'ancien onglet Vinted) ; il revient à « tous » sur un autre site.
+  // l'autre de l'ancien onglet Vinted).
+  // (4 nov.) Et il est MÉMORISÉ sur l'appareil, PAR SITE (src/compteChoix.js) :
+  // un autre site retrouve SON choix, jamais celui-ci (la règle du 31 oct. tient).
   const siteCourant=estTacheSite(tab)?siteDeTache(tab,platSub):({plat_vinted:'vinted',plat_leboncoin:'leboncoin',plat_ebay:'ebay',plat_vestiaire:'vestiaire'}[tab]||tab);
-  React.useEffect(()=>{ setCompteSel(''); },[siteCourant]);
+  const lireCarteChoix=()=>{ try{ return lireChoixComptes(localStorage.getItem(CLE_CHOIX_COMPTES)); }catch(_){ return {}; } };
+  const [compteSel,setCompteSelBrut]=useState(()=>choixPourSite(lireCarteChoix(),siteCourant));
+  const setCompteSel=(v)=>{ const n=typeof v==='function'?v(compteSel):v; setCompteSelBrut(n); try{ localStorage.setItem(CLE_CHOIX_COMPTES,JSON.stringify(memoriserChoix(lireCarteChoix(),siteCourant,n))); }catch(_){} };
+  React.useEffect(()=>{ setCompteSelBrut(choixPourSite(lireCarteChoix(),siteCourant)); },[siteCourant]);
   React.useEffect(()=>{ if(estTacheSite(tab)) retenirFiltre(tab, siteDeTache(tab,platSub)); },[tab,platSub]);
   // Le compte Vinted ouvert dans CE Chrome (l'extension le lit dans son cookie) :
   // c'est celui qu'il est en train de traiter, il est choisi d'office (📍, ses
@@ -67301,6 +67328,7 @@ function AppCoeur() {
           {/* (3 nov.) Les montants du haut (CA finalisé, disponible, en attente) se choisissent
               désormais dans LA carte sombre de chaque page (« Modifier ») : la bande ne les redit plus
               (§7) ; la ligne de fraîcheur reste. */}
+          {(sec==='ventes'||sec==='annonces'||sec==='achats'||sec==='messages') && <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte} messages={sec==='messages'}/>}
           {!achats && sec!=='messages' && <VintedResume liveStats={liveStatsVus} baseKO={baseKO} siAJour={sec!=='annonces'} sansMontants sauf={(sec || 'ventes') === 'ventes' ? (liveStatsVus && liveStatsVus.venduManque) : null}/>}
           {!baseKO && (sec==='annonces'||achats) && (() => {
             const uid = compteEffectif(compteSel, compteConnecte, (u) => (comptesChoisissables || []).some((a) => String(a.vinted_user_id) === u));
@@ -67334,7 +67362,7 @@ function AppCoeur() {
           {/* Filtre par compte (Julien, 6 oct.) — Ventes / Annonces / Achats /
               Messages. Les Colis ne sont pas filtrés (« pour les colis pas
               forcément »). Un seul compte ⇒ la rangée ne s'affiche pas. */}
-          {(sec==='ventes'||sec==='annonces'||sec==='achats'||sec==='messages') && <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte} messages={sec==='messages'}/>}
+          {/* (4 nov.) Le sélecteur monte EN HAUT de l'écran (un tap, au-dessus de la carte). */}
           {/* Sous la navigation, pas entre le résumé et elle (revue du 17 oct.). */}
           {sec==='ventes' && !baseKO && <div className="vrm-retirer-hote" style={{padding:'10px 16px 0'}}><RetirerArgent liveStats={liveStatsVus}/></div>}
           <Comptabilite key={'pv_'+sec} accounts={vintedAccounts} only={sec==='apercu'?'ventes':sec} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum} compteSel={compteSel} compteConnecte={compteConnecte} dansPlateforme vueAchats={achats?'achats':undefined}/>
