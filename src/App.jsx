@@ -38342,7 +38342,8 @@ function ComparerMoisCarte({ liveStats }) {
   const colA = nomColonneMois(K.ymA, K.bornes.A, K.memePoint, maintenant), colB = nomColonneMois(K.ymB, K.bornes.B, K.memePoint, maintenant);
   const val = (x, type) => x.valeur == null ? '—' : type === 'eur' ? fmt(x.valeur) : String(x.valeur);
   const cents = (x, type) => x == null ? '' : type === 'eur' ? String(Math.round(x * 100)) : String(x);
-  const grille = { display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,92px) minmax(0,92px) minmax(0,84px)', columnGap: 8, alignItems: 'center' };
+  // 390 px : le libellé garde sa place (« Bénéfice », « CA vendu ») — trois colonnes de chiffres étroites.
+  const grille = { display: 'grid', gridTemplateColumns: 'minmax(64px,1fr) minmax(0,80px) minmax(0,80px) minmax(0,74px)', columnGap: 6, alignItems: 'center' };
   return (
     <section className="vrm-comparer" data-comparer={K.mode} data-comparer-a={K.ymA} data-comparer-b={K.ymB} data-comparer-meme-point={K.memePoint ? '1' : '0'}
       style={{ padding: 18, background: C.card, border: `1px solid ${C.border}`, borderRadius: 20, boxShadow: C.shadow || 'none' }}>
@@ -38449,12 +38450,12 @@ function JournalSemaineCarte({ liveStats }) {
   const corps = (c) => c.x.valeur == null ? '—' : c.t === 'eur' ? <Montant v={c.x.valeur}/> : String(c.x.valeur);
   const sous = (c) => c.x.partiel ? (c.x.couverture ? `${c.x.couverture} prix d’achat` : 'au moins') : null;
   return (
-    <section className="vrm-journal-semaine vrm-day-card" data-journal-semaine={J.lundi} data-journal-replie={replie ? '1' : '0'} aria-label={J.titre}
+    <section className="vrm-journal-semaine" data-journal-semaine={J.lundi} data-journal-replie={replie ? '1' : '0'} aria-label={J.titre}
       style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 20, boxShadow: C.shadow || 'none', padding: '4px 16px', marginBottom: 12 }}>
       <button type="button" aria-expanded={!replie} data-journal-bascule="" onClick={basculer}
         style={{ width: '100%', minHeight: 44, display: 'flex', alignItems: 'center', gap: 10, background: 'transparent', border: 0, padding: 0, color: C.text, fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer' }}>
-        <span style={{ flex: 1, fontSize: 15, fontWeight: 600 }}>{J.titre}</span>
-        <span aria-hidden="true" style={{ color: C.muted, transform: replie ? 'none' : 'rotate(90deg)', transition: 'transform .2s cubic-bezier(0.23,1,0.32,1)' }}>›</span>
+        <span style={{ flex: 1, fontSize: 15, fontWeight: 600, color: C.text }}>{J.titre}</span>
+        <span aria-hidden="true" style={{ color: C.muted, fontSize: 17, lineHeight: 1, transform: replie ? 'none' : 'rotate(90deg)', transition: 'transform .2s cubic-bezier(0.23,1,0.32,1)' }}>›</span>
       </button>
       {!replie && (
         <div className="vrm-journal-cases" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(132px, 1fr))', gap: 0, borderTop: `1px solid ${C.border}`, padding: '6px 0 10px' }}>
