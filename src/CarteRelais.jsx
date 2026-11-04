@@ -34,6 +34,7 @@ import { villeDuPoint as villeDuPointRegle, villesDesPoints as villesDesPointsRe
 import './styles-colis-colonnes.css';
 import PastilleTransporteur from './PastilleTransporteur.jsx';
 import { cleStatTransporteur } from './transporteursVisuels.js';
+import { clePoint, estPrefere, preferesEnTete, mesRelais, horairesLus } from './relaisPreferes.js';
 
 // (1er nov., « plus fiable ») v2 : la règle a changé (rue + ville sans code
 // postal, ville collée à la rue, résultat ambigu refusé) — les échecs notés
@@ -398,7 +399,15 @@ export function sectionDuColis(x, point) {
   if (!point || point.inconnu) return 'lieu';
   return (x.code || x.qr || x.code2) ? 'prets' : 'avenir';
 }
-function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte, echeance, statut, retirer, ville = '', onVille = null, titreDe = null, enRoute = [] }) {
+// (4 nov., choix de Julien n° 1) L'étoile d'un point : ses relais préférés passent en haut.
+function EtoileRelais({ p, preferes, onPrefere }) {
+  if (!onPrefere || !clePoint(p)) return null;
+  const oui = estPrefere(preferes, p);
+  return <button type="button" className={'vrm-rpf-etoile' + (oui ? ' is-oui' : '')} data-relais-etoile={clePoint(p)} data-relais-prefere={oui ? '1' : '0'} aria-pressed={oui} aria-label={oui ? 'Retirer de mes relais' : 'Ajouter à mes relais'} onClick={() => onPrefere(p)}>
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 3.6l2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z" fill={oui ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/></svg>
+  </button>;
+}
+function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte, echeance, statut, retirer, ville = '', onVille = null, titreDe = null, enRoute = [], preferes = null, onPrefere = null, pointsVinted = [] }) {
   const tousConnus = ((vueTout && vueTout.points) || []).filter((p) => !p.inconnu);
   const reperes = useReperes(tousConnus, avecCarte && tousConnus.length > 0);
   useCommunesCp(vueTout, true);
@@ -408,7 +417,8 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte, ec
   // ni code postal lus) n'est JAMAIS caché par ce choix (§5 : un colis caché est un colis perdu).
   const sansVille = new Set(pointsSansVille(vueTout));
   const vue = vChoisie ? { ...vueTout, points: ((vueTout && vueTout.points) || []).filter((p) => vChoisie.points.includes(p.cle) || sansVille.has(p.cle)) } : vueTout;
-  const points = (vue && vue.points) || [];
+  const points = preferesEnTete((vue && vue.points) || [], preferes);
+  const mes = preferes ? mesRelais(preferes, (vueTout && vueTout.points) || [], pointsVinted) : [];
   const connus = points.filter((p) => !p.inconnu);
   const [choisi, setChoisi] = React.useState('');
   const [etatFond, setEtatFond] = React.useState('charge');
@@ -447,8 +457,10 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte, ec
           <span className="vrm-rpf-ident">
             <b className="vrm-rpf-nom" data-relais-nom="">{p.nom || p.adresseCourte || 'Point relais'}</b>
             {p.nom && (p.adresse || p.adresseCourte) ? <span className="vrm-rpf-adr" data-relais-adresse="">{p.adresse || p.adresseCourte}</span> : null}
+            {estPrefere(preferes, p) && horairesLus(p, pointsVinted) ? <span className="vrm-rpf-adr" data-relais-horaires="">{horairesLus(p, pointsVinted)}</span> : null}
           </span>
           <span className="vrm-rpf-meta">
+            <EtoileRelais p={p} preferes={preferes} onPrefere={onPrefere}/>
             {tCommun ? <span className="vrm-rpf-transp" data-relais-transporteur={tCommun.cle || ''}><PastilleTransporteur t={tCommun} C={C} seul taille={18}/></span> : null}
             <span className="vrm-rpf-n" data-relais-compte={rows.length}>{plur(rows.length, 'colis', 'colis')}</span>
           </span>
@@ -475,6 +487,17 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte, ec
         <button type="button" className="vrm-seg-btn" aria-pressed={!vChoisie} data-ville="" onClick={() => onVille && onVille('')}>Toutes</button>
         {villes.map((v) => <button key={v.cle} type="button" className="vrm-seg-btn" aria-pressed={!!vChoisie && vChoisie.cle === v.cle} data-ville={v.cle} data-ville-n={v.n} onClick={() => onVille && onVille(v.cle)}>{v.nom} <span className="vrm-seg-n">{v.n}</span></button>)}
       </div> : null}
+      {mes.length ? <section className="vrm-rpf-section vrm-rpf-mes" data-mes-relais={mes.length}>
+        {titre('Mes relais', mes.length, 'mes')}
+        {mes.map((m) => <div key={m.cle} className="vrm-rpf-mes-un" data-mes-relais-un={m.cle} data-mes-relais-n={m.n}>
+          <span className="vrm-rpf-ident"><b className="vrm-rpf-nom">{m.nom || m.adresse || 'Point relais'}</b>
+            {m.nom && m.adresse ? <span className="vrm-rpf-adr">{m.adresse}</span> : null}
+            {m.horaires ? <span className="vrm-rpf-adr" data-mes-relais-horaires="">{m.horaires}</span> : null}</span>
+          <span className="vrm-rpf-meta">{m.n ? <span className="vrm-rpf-n">{plur(m.n, 'colis', 'colis')}</span> : null}
+            <button type="button" className="vrm-rpf-etoile is-oui" data-relais-etoile={m.cle} data-relais-prefere="1" aria-pressed="true" aria-label="Retirer de mes relais" onClick={() => onPrefere && onPrefere({ cleDirecte: m.cle })}>
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 3.6l2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z" fill="currentColor" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/></svg></button></span>
+        </div>)}
+      </section> : null}
       {section('aujourdhui', 'À retirer aujourd’hui', parSection.aujourdhui, { ambre: true })}
       {section('prets', 'Prêts à retirer', parSection.prets)}
       {section('avenir', 'Code à venir', parSection.avenir)}
@@ -512,8 +535,8 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte, ec
   );
 }
 
-export function ColonneRetirer({ vue, C, Photo, gestes = null, detail = null, nomTransporteur = null, avecCarte = true, enRouteSansRelais = 0, fusion = false, echeance = null, statut = null, retirer = null, ville = '', onVille = null, titreDe = null, enRoute = [] }) {
-  if (fusion) return <ColonneRetirerF vue={vue} C={C} Photo={Photo} gestes={gestes} detail={detail} avecCarte={avecCarte} echeance={echeance} statut={statut} retirer={retirer} ville={ville} onVille={onVille} titreDe={titreDe} enRoute={enRoute}/>;
+export function ColonneRetirer({ vue, C, Photo, gestes = null, detail = null, nomTransporteur = null, avecCarte = true, enRouteSansRelais = 0, fusion = false, echeance = null, statut = null, retirer = null, ville = '', onVille = null, titreDe = null, enRoute = [], preferes = null, onPrefere = null, pointsVinted = [] }) {
+  if (fusion) return <ColonneRetirerF vue={vue} C={C} Photo={Photo} gestes={gestes} detail={detail} avecCarte={avecCarte} echeance={echeance} statut={statut} retirer={retirer} ville={ville} onVille={onVille} titreDe={titreDe} enRoute={enRoute} preferes={preferes} onPrefere={onPrefere} pointsVinted={pointsVinted}/>;
   const points = (vue && vue.points) || [];
   const connus = points.filter((p) => !p.inconnu);
   const inconnu = points.find((p) => p.inconnu) || null;

@@ -148,3 +148,12 @@ button.vrm-cc-carte:focus-visible { outline: 2px solid var(--vrm-focus, #0071E3)
 @media (min-width: 768px) {
   .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-actions > .vrm-transporteur { grid-column: 1 / -1; grid-row: 2; justify-self: start; margin-top: 4px; border-color: transparent !important; padding: 0 2px !important; min-height: 24px !important; }
 }
+
+/* (4 nov.) Mes relais préférés : l'étoile (neutre, l'accent seulement quand elle est posée) et la rangée du haut. */
+.vrm-rpf-etoile { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; margin: -10px -8px -10px 0; padding: 0; border: 0; background: transparent; color: var(--vrm-muted, #8e8e93); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.vrm-rpf-etoile.is-oui { color: var(--fu-bleu, #0071E3); }
+.vrm-rpf-mes-un { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border-radius: var(--fu-r-carte, 20px); background: var(--fu-carte, #FFFFFF); box-shadow: var(--fu-ombre); }
+:root[data-theme="dark"] .vrm-rpf-mes-un { background: #1c1c1e; box-shadow: 0 0 0 1px rgba(255,255,255,.06); }
+.vrm-rpf-mes-un + .vrm-rpf-mes-un { margin-top: 8px; }
+.vrm-rpf-mes .vrm-rpf-ident { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.vrm-rpf-mes .vrm-rpf-meta { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }

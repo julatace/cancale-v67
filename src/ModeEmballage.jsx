@@ -28,7 +28,7 @@ function Case({ libelle, coche, onBascule, cle }) {
   );
 }
 
-export default function ModeEmballage({ colis, lecture = null, onFermer, onMarquer, Photo, Icon, Retour, onFiche }) {
+export default function ModeEmballage({ colis, lecture = null, onFermer, onMarquer, Photo, Icon, Retour, onFiche, photoColis = null }) {
   const vivants = Array.isArray(colis) ? colis : [];
   const [seance, setSeance] = React.useState(() => lireSeance());
   const [i, setI] = React.useState(0);
@@ -132,6 +132,7 @@ export default function ModeEmballage({ colis, lecture = null, onFermer, onMarqu
         <div className="vrm-emb-cases" role="group" aria-label="Avant de passer au suivant">
           {CASES_EMBALLAGE.map((q) => <Case key={q.cle} cle={q.cle} libelle={q.cle === 'colle' && c.transporteur ? `Bordereau ${c.transporteur} collé` : q.libelle} coche={!!cases[q.cle]} onBascule={() => basculer(q.cle)}/>)}
         </div>
+        {photoColis ? photoColis(c) : null}
         {onFiche && c.num ? <button type="button" className="vrm-emb-lien" data-emb-fiche={c.num} onClick={() => onFiche(c.num)}>Toute l'histoire du N°{c.num} ›</button> : null}
       </div>
     );

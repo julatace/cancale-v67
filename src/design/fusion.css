@@ -662,6 +662,16 @@ html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-onglets .vrm-se
 .vrm-fu-groupe-tuile > [data-transporteur-logo] { width: 22px !important; height: 22px !important; border-radius: 6px !important; box-shadow: none !important; }
 .vrm-fu-groupe-transp h3 { margin: 0; flex: 1 1 auto; min-width: 0; font: 700 17px/1.2 var(--vrm-police); letter-spacing: -.01em; color: var(--fu-encre); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vrm-fu-groupe-transp > span:last-child { font: 600 13px/1.2 var(--vrm-police); color: var(--fu-gris); flex: none; }
+/* (4 nov.) Colis rangés par point de dépôt : le nom du point, son adresse, « N colis », et le geste. */
+.vrm-fu-groupe-depot .vrm-fu-groupe-tuile { background: transparent; color: var(--fu-gris); }
+.vrm-fu-depot-ident { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.vrm-fu-depot-ident h3 { flex: none; }
+.vrm-fu-depot-ident small { font: 400 13px/1.3 var(--vrm-police); color: var(--fu-gris); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-fu-groupe-depot > span:not(.vrm-fu-groupe-tuile):not(.vrm-fu-depot-ident) { font: 600 13px/1.2 var(--vrm-police); color: var(--fu-gris); flex: none; }
+.vrm-fu-depot-choisir { flex: none; min-height: 44px; padding: 0 12px; border: 0; border-radius: 999px; background: var(--fu-case, #f2f2f7); color: var(--fu-encre); font: 600 13px/1 var(--vrm-police); cursor: pointer; }
+.vrm-fu-groupe-depot.is-choisir .vrm-fu-depot-choisir { color: var(--fu-bleu, #0071e3); }
+:root[data-theme="dark"] .vrm-fu-depot-choisir { background: #2c2c2e; }
+.vrm-colis-mode-depot { margin: 0 0 6px; }
 /* La carte d'un colis */
 html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-carte[data-bord-card] { padding: 14px !important; border-radius: 20px !important; }
 html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-carte[data-bord-card] > :first-child { align-items: center !important; }
