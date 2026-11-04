@@ -141,6 +141,8 @@ import { retoursEnCours, retoursPourSite, remiseEnStock, retourAReceptionner, nu
 import { indexMemo as indexRechercheMemo, chercherPartout, destinationResultat } from "./rechercheUnique.js";
 import { litigesEnCours, litigeDeVente, requeteEmailsLitiges, texteLimite as texteLimiteLitige, LIBELLE_GENRE as LIBELLE_LITIGE } from "./litiges.js";
 import { rangerParTransporteur, ordreDesGroupes, ordonnerLot } from "./lotTransporteurs.js";
+import { CLE_PREFERES, lirePreferes, basculerPrefere } from "./relaisPreferes.js";
+import { CLE_DEPOT, lireDepots, associerDepot, rangerParDepot, choixPourFamille, nomFamille, familleDepot } from "./depotRelais.js";
 import { trouverParScan } from "./scanColis.js";
 import { ligneLotAutre, cochesParDefaut, selectionImprimable, texteSansBordereau } from "./lotSelection.js";
 import { etatVinted, NIVEAU_ETAT_MAX } from "./carteAnnonce.js";
@@ -2097,6 +2099,10 @@ const SYNC_KEYS = [
   // OWNED par l'app, synchronisé (il range sur l'ordi, cherche sur le téléphone),
   // jamais écrit par l'extension. Le NUMÉRO reste l'identité (§5), jamais le titre.
   'vrm_meubles','vrm_slots',
+  // (4 nov.) Ses relais préférés (étoile sur Colis → À retirer, src/relaisPreferes.js),
+  // le point où il dépose chaque type de transporteur (src/depotRelais.js) et la
+  // corbeille de 30 jours de ce qu'il supprime DANS VRM (src/corbeille.js).
+  'vrm_relais_preferes','vrm_depot_transporteurs','vrm_corbeille',
 ];
 // Réponses rapides par défaut aux messages Vinted (copiables en 1 clic, éditables).
 const DEFAULT_QUICK_REPLIES = [
@@ -41860,6 +41866,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Points relais HABITUELS, pré-enregistrés : la carte s'affiche en permanence,
   // les badges apparaissent à l'arrivée des colis. Synchronisé.
   const [savedPoints, setSavedPoints] = useStateCle('vrm_points_relais', () => load('vrm_points_relais', []));
+  // (4 nov., choix n° 1 et 2) Ses relais préférés et ses points de dépôt par transporteur : des
+  // CHOIX synchronisés, rattrapés par `onCloudReady` seulement s'ils sont restés vides (§5).
+  const [relaisPref, setRelaisPref] = useStateCle(CLE_PREFERES, () => lirePreferes(load(CLE_PREFERES, {})));
+  const [depots, setDepots] = useStateCle(CLE_DEPOT, () => lireDepots(load(CLE_DEPOT, {})));
+  useEffect(() => onCloudReady(() => { setRelaisPref((m) => (m && Object.keys(m).length ? m : lirePreferes(load(CLE_PREFERES, {})))); setDepots((m) => (m && Object.keys(m).length ? m : lireDepots(load(CLE_DEPOT, {})))); }), []);   // eslint-disable-line react-hooks/exhaustive-deps
+  const basculerRelaisPrefere = (p) => setRelaisPref((m) => {
+    let u; if (p && p.cleDirecte) { u = { ...lirePreferes(m) }; delete u[p.cleDirecte]; } else u = basculerPrefere(m, p);
+    save(CLE_PREFERES, u); return u; });
+  const [choixDepot, setChoixDepot] = useState(null);   // la famille dont il choisit le point de dépôt
+  const poserDepot = (famille, point) => setDepots((m) => { const u = associerDepot(m, famille, point); save(CLE_DEPOT, u); return u; });
   const persistPoints = (u) => { setSavedPoints(u); save('vrm_points_relais', u); };
   // Points relais OFFICIELS de Vinted, captés par l'extension (source complète,
   // pas OpenStreetMap). S'affichent d'office sur la carte, sans taper de ville.
@@ -49422,6 +49438,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ventes Vinted, `colisEbay`, `colisVestiaire`, `pickupUnion` pour les
   // retraits, `venteStage` pour les partis. `colonnesColis` les range.
   const [siteColis, setSiteColis] = useState(() => (SITES_COLIS.includes(siteColisDemande) && siteColisDemande !== 'leboncoin') ? siteColisDemande : 'toutes');
+  // (4 nov.) « À envoyer » rangé par transporteur ou par point de dépôt : une commodité de CET appareil.
+  const [modeDepot, setModeDepotRaw] = useState(() => { try { return localStorage.getItem('vrm_colis_par_depot') === '1'; } catch (_) { return false; } });
+  const setModeDepot = (v) => { setModeDepotRaw(v); try { localStorage.setItem('vrm_colis_par_depot', v ? '1' : '0'); } catch (_) {} };
   // (2 nov., Julien : « des données Vinted dans eBay, inadmissible ») Le filtre de
   // site vaut pour TOUT Colis, pas seulement les colonnes : un bloc d'un site ne
   // s'affiche que sous « Tous les sites » ou sous SON site. Seul le rouge « deux
@@ -50484,6 +50503,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           onFiche={(n)=>{ setEmballage(false); try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: String(n) })); } catch (_) {} }}
           onMarquer={(liste)=>{ let n=0; for (const x of liste) { if (x && x.e && x.e.o) { marquerColisFait(x.e.o, x.e.b); n++; } } if (n) toast(n>1?`${n} colis marqués postés.`:'Colis marqué posté.'); return n; }}/>;
       })()}
+      {/* (4 nov., choix n° 2) Le point de dépôt d'un transporteur : choisi UNE fois parmi les points LUS
+          (la liste de Vinted, ses relais préférés). Portail, au-dessus de tout (§7). */}
+      {choixDepot && createPortal(<SheetShell onClose={() => setChoixDepot(null)} z={Z_CONFIRMATION - 3}>
+        {(() => { const f = choixDepot; const lst = choixPourFamille(f, { carriers: (dropOffs && dropOffs.carriers) || [], preferes: relaisPref }); const cur = depots[f];
+          return <div data-depot-feuille={f} data-depot-choix-n={lst.length}>
+            <h2 style={{fontSize:20,fontWeight:700,margin:'0 0 12px',color:C.text}}>{nomFamille(f)}</h2>
+            {dropOffs === null ? <div style={{fontSize:13,color:C.muted,padding:'8px 0'}}>Je lis tes points de dépôt…</div> : null}
+            {lst.map((pt) => { const oui = !!(cur && cur.cle === pt.cle); return (
+              <button key={pt.cle} type="button" data-depot-point={pt.cle} aria-pressed={oui} onClick={() => { poserDepot(f, pt); setChoixDepot(null); }}
+                style={{display:'flex',alignItems:'center',gap:12,width:'100%',textAlign:'left',border:0,borderTop:`1px solid ${C.border}`,background:'transparent',color:C.text,padding:'12px 2px',minHeight:56,cursor:'pointer',fontFamily:'inherit'}}>
+                <span style={{flex:1,minWidth:0}}><span style={{display:'block',fontSize:15,fontWeight:600}}>{pt.nom || pt.adresse}</span>
+                  {pt.nom && pt.adresse ? <span style={{display:'block',fontSize:13,color:C.muted,marginTop:2}}>{pt.adresse}</span> : null}
+                  {pt.horaires ? <span data-depot-horaires="" style={{display:'block',fontSize:13,color:C.muted,marginTop:2}}>{pt.horaires}</span> : null}</span>
+                {oui ? <Icon name="check" size={18}/> : (pt.km != null ? <span style={{fontSize:13,color:C.muted}}>{String(Math.round(pt.km * 10) / 10).replace('.', ',')} km</span> : null)}
+              </button>); })}
+            {dropOffs !== null && !lst.length ? <div data-depot-aucun="" style={{fontSize:13,color:C.muted,padding:'8px 0'}}>Aucun point lu pour ce transporteur.</div> : null}
+            {cur ? <Bouton variante="discret" data-depot-retirer={f} onClick={() => { poserDepot(f, null); setChoixDepot(null); }} style={{marginTop:10}}>Ne plus regrouper</Bouton> : null}
+          </div>; })()}
+      </SheetShell>, document.body)}
       {/* Le titre de l'écran est porté par <ScreenHead> plus bas, dans chaque
           section : ce <h2> le répétait juste au-dessus (« Annonces » puis
           « Annonces en ligne »). Un seul titre par écran. */}
@@ -55460,7 +55498,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <button type="button" className="vrm-lien-action" data-pickup-sans-compte-geste="" onClick={() => onNav && onNav('vintedaccounts')} style={{border:0,background:'transparent',padding:0,minHeight:44,color:C.text,fontWeight:600,cursor:'pointer',fontFamily:'inherit',fontSize:'inherit',textDecoration:'underline'}}>Paramètres → Comptes liés</button></p>; })()}
                 {colRet && (colRet.cartes.length > 0 || ((groupesRelais && groupesRelais.enRouteSansRelais) || 0) > 0)
                   ? <ColonneRetirer vue={parPoint} C={C} Photo={photoCarte} gestes={gestesRetrait} detail={arriveeRetrait} nomTransporteur={(k) => (CARRIERS[k] && CARRIERS[k].name) || ''} avecCarte={ordiColis} enRouteSansRelais={(groupesRelais && groupesRelais.enRouteSansRelais) || 0}
-                      fusion echeance={echeanceRetrait} statut={statutAVerifier} retirer={retirerColis} ville={villeRetrait} onVille={setVilleRetrait} titreDe={titreRetrait} enRoute={(groupesRelais && groupesRelais.sansRelais) || []}/>
+                      fusion echeance={echeanceRetrait} statut={statutAVerifier} retirer={retirerColis} ville={villeRetrait} onVille={setVilleRetrait} titreDe={titreRetrait} enRoute={(groupesRelais && groupesRelais.sansRelais) || []}
+                      preferes={relaisPref} onPrefere={basculerRelaisPrefere} pointsVinted={pointsVinted}/>
                   : (toutLuRet ? <p className="vrm-colis-vide" data-retraits-vide="">Aucun colis à aller chercher pour l’instant.</p> : null)}
                 {voitSite('vestiaire') ? <AchatsVestiaireEnRoute vc={colisVestiaire(vcEtat)} transporteurDe={transporteurColis}/> : null}
               </section>
@@ -55930,7 +55969,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   trois colis visibles au lieu de six, sur l'écran où il travaille
                   quand il prépare ses cartons. `minmax(min(430px,100%), 1fr)` —
                   le `min()` évite qu'une piste de 430 px déborde un téléphone. */}
-              <div className="vrm-colis-grille" data-colis-lignes="1" style={{display:'flex',flexDirection:'column',gap:6}}>
+              {(ex.length + autresColis.length) > 0 ? <Segmente className="vrm-colis-mode-depot" label="Ranger les colis" value={modeDepot ? 'depot' : 'transp'} onChange={(v) => setModeDepot(v === 'depot')}
+                options={[{ v: 'transp', l: 'Transporteur', data: { 'data-colis-mode': 'transp' } }, { v: 'depot', l: 'Point de dépôt', data: { 'data-colis-mode': 'depot' } }]}/> : null}
+                            <div className="vrm-colis-grille" data-colis-lignes="1" style={{display:'flex',flexDirection:'column',gap:6}}>
               {(()=>{
                 // (2 nov., 22 h, maquette FusionColis) LES COLIS RANGÉS PAR TRANSPORTEUR : un en-tête
                 // (la tuile du logo, son nom, « N colis »), les colis dessous dans l'ordre d'avant
@@ -55940,8 +55981,32 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 // tri stable), puis les transporteurs dans l'ordre de leur premier colis.
                 // (3 nov.) La règle partagée avec « Tout imprimer » (src/lotTransporteurs.js).
                 const tous = [...ex, ...autresColis];
-                const exT = rangerParTransporteur(tous, { trNom: trNomDe, jours: (x) => x.dl });
+                const exT0 = rangerParTransporteur(tous, { trNom: trNomDe, jours: (x) => x.dl });
+                // (4 nov., choix de Julien n° 2) « Point de dépôt » : les MÊMES colis, rangés sous le point où
+                // il dépose leur transporteur (src/depotRelais.js) ; sans point associé ⇒ « Point de dépôt à
+                // choisir », en bas, jamais caché. L'ordre dans chaque groupe reste celui d'au-dessus.
+                const depGroupes = modeDepot ? rangerParDepot(exT0, { trDe: (x) => (x.__autre ? x.tr : transporteurVente(x.b)), reglage: depots }) : null;
+                const exT = depGroupes ? depGroupes.flatMap((g) => g.items) : exT0;
+                const grpDe = new Map(); if (depGroupes) depGroupes.forEach((g) => g.items.forEach((x) => grpDe.set(x, g)));
+                const cleGroupe = (x) => (depGroupes ? grpDe.get(x).cle : trNomDe(x));
                 const nParT = {}; tous.forEach((x) => { const k = trNomDe(x); nParT[k] = (nParT[k] || 0) + 1; });
+                const enTeteGroupe = (e, trG) => {
+                  if (!depGroupes) return (
+                    <div data-groupe-transp={trNomDe(e)} className="vrm-fu-groupe-transp" style={{gridColumn:'1 / -1'}}>
+                      <span className="vrm-fu-groupe-tuile" aria-hidden="true">{trG && trG.cle ? <LogoTransporteur cle={trG.cle} taille={22}/> : <Icon name="box" size={16}/>}</span>
+                      <h3>{trNomDe(e)}</h3>
+                      <span>{nParT[trNomDe(e)]} colis</span>
+                    </div>);
+                  const g = grpDe.get(e);
+                  return (
+                    <div data-groupe-depot={g.cle} data-groupe-depot-n={g.items.length} data-groupe-depot-choisir={g.aChoisir ? '1' : '0'} className={'vrm-fu-groupe-transp vrm-fu-groupe-depot' + (g.aChoisir ? ' is-choisir' : '')} style={{gridColumn:'1 / -1'}}>
+                      <span className="vrm-fu-groupe-tuile" aria-hidden="true"><Icon name="pin" size={16}/></span>
+                      <span className="vrm-fu-depot-ident"><h3>{g.nom}</h3>{g.adresse ? <small>{g.adresse}</small> : null}</span>
+                      <span>{g.items.length} colis</span>
+                      {(g.aChoisir ? g.familles.filter((f) => f !== 'inconnu') : g.familles.slice(0, 1)).map((f) => (
+                        <button key={f} type="button" className="vrm-fu-depot-choisir" data-depot-choisir={f} onClick={() => setChoixDepot(f)}>{g.aChoisir ? nomFamille(f) : 'Changer'}</button>))}
+                    </div>);
+                };
                 const primaireBleu = {flex:'1 1 160px',maxWidth:340,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,border:'none',background:C.accent,color:'#fff',borderRadius:12,padding:'0 16px',minHeight:44,cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit',textDecoration:'none',boxSizing:'border-box'};
                 const carteAutre = (e) => {
                   if (e.__autre === 'vc') return <CarteColisVc v={e.v} imprime={!!(vcCarte('vrm_vc_imprimes') || {})[e.v.id]} fait={null}/>;
@@ -55974,17 +56039,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       style={{...sec,border:`1px solid ${C.border}`,background:'transparent',color:C.muted}}>✓ Colis fait</button>}/>;
                 };
                 return exT.map((e,ix)=>{
-                const ouvreT = ix === 0 || trNomDe(exT[ix-1]) !== trNomDe(e);
+                const ouvreT = ix === 0 || cleGroupe(exT[ix-1]) !== cleGroupe(e);
                 const trG = e.__autre ? e.tr : transporteurVente(e.b);
                 if (e.__autre) return (
                   <React.Fragment key={e.key}>
-                    {ouvreT && (
-                      <div data-groupe-transp={trNomDe(e)} className="vrm-fu-groupe-transp" style={{gridColumn:'1 / -1'}}>
-                        <span className="vrm-fu-groupe-tuile" aria-hidden="true">{trG && trG.cle ? <LogoTransporteur cle={trG.cle} taille={22}/> : <Icon name="box" size={16}/>}</span>
-                        <h3>{trNomDe(e)}</h3>
-                        <span>{nParT[trNomDe(e)]} colis</span>
-                      </div>
-                    )}
+                    {ouvreT && enTeteGroupe(e, trG)}
                     {carteAutre(e)}
                   </React.Fragment>);
                 const o=e.o, b=e.b;
@@ -56031,13 +56090,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 // bordereau ») : le résumé en colonnes qui les nommait est retiré.
                 return (
                   <React.Fragment key={e.key}>
-                  {ouvreT && (
-                    <div data-groupe-transp={trNomDe(e)} className="vrm-fu-groupe-transp" style={{gridColumn:'1 / -1'}}>
-                      <span className="vrm-fu-groupe-tuile" aria-hidden="true">{trG && trG.cle ? <LogoTransporteur cle={trG.cle} taille={22}/> : <Icon name="box" size={16}/>}</span>
-                      <h3>{trNomDe(e)}</h3>
-                      <span>{nParT[trNomDe(e)]} colis</span>
-                    </div>
-                  )}
+                  {ouvreT && enTeteGroupe(e, trG)}
                   <div data-bord-card data-groupe-carte={grp} data-transporteur={cleStatTransporteur(trV)} data-tx-colis={e.txn||''} data-colis-ident={'v:'+(e.txn||e.key)} data-limite={e.lim&&e.lim.limite||''} data-limite-heure={e.lim&&e.lim.heure||''} data-jours={dl==null?'':String(dl)} className="vrm-colis-carte" style={{padding:'14px',border:`1px solid ${dl!=null&&dl<0?C.warn+'66':C.border}`,background:C.card,borderRadius:12,opacity:posted?0.55:1}}>
                     <div style={{display:'flex',gap:12,alignItems:'flex-start'}}>
                       <div className="vrm-colis-photo" style={{width:64,height:80,borderRadius:12,background:C.card2||C.bg,border:`1px solid ${C.border}`,boxSizing:'border-box',flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
