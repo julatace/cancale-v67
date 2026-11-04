@@ -41052,7 +41052,9 @@ function ListeComptes({ id, valeur, options, onChange, note, skin, attrs }) {
         <option value="*">Tous les comptes</option>
         {(options || []).map((o) => <option key={o.val} value={o.val}>{o.nom}</option>)}
       </select>
-      {note ? (typeof note === 'string' ? <span className="vrm-compte-note" style={{ color: K.muted }}>{note}</span> : <span className="vrm-compte-note">{note}</span>) : null}
+      {/* La puce allumée dit déjà le compte : la note ne s'affiche plus (aucun texte
+          explicatif), elle reste lue par les lecteurs d'écran. */}
+      {note ? <span className="vrm-compte-select-cache">{note}</span> : null}
     </div>
   );
   // (16 oct.) Une rangée sobre façon réglage iOS : « Compte » à gauche, la valeur
