@@ -99,7 +99,7 @@ import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
 import {colisEbay} from '../api/_lib/ebay-a-expedier.js';
 import {annoncesVcEnLigne,stockVestiaire,retraitsVestiaire,VC_VENTE_ETAPES,VC_ANNONCE_ETATS,etapeMotVc,vcVenteAnnulee,vcVentePartie,numVcVente,numVcAnnonce,numerosVcAvecLiens,montantRecuVc,dateVersementVc,dateVenteVc,ventesVcDe,colisVcAPoster,resumeColisVc,etatAnnonceVcBrut} from '../api/_lib/vestiaire-regle.js';
 import {colisLbcAPoster,lbcColisAPoster,totalColis,colisLbcVendeur} from '../api/_lib/colis-sites.js';
-import {CLE_COMPTES_EXCLUS,excluAutreDe,estExclu,basculerExclu} from '../api/_lib/comptes-exclus.js';
+import {CLE_COMPTES_EXCLUS,excluAutreDe,estExclu,basculerExclu,compteDeVente} from '../api/_lib/comptes-exclus.js';
 import {PLATEFORMES_COMPTES,etatCompteLie,ageLecture,comptesLbcLies,comptesVcLies,comptesEbayLies,refDeLigneEbay,nomCompteLie,LIBELLE_ETAT} from './comptesLies.js';
 import './comptes-lies.css';
 import {joursAvant as joursAvantParis} from '../api/_lib/ebay-a-expedier.js';
@@ -179,6 +179,7 @@ import { fusionnerLigne, fusion3, egal as egalStable, CLE_POOL, CLES_FICHES } fr
 import { NOM_BENEFICE, NOM_BENEFICE_BRUT, NOM_APRES_FRAIS, chiffreBenefice, chiffreBrut, chiffreApresFrais, finDuMois, moisCouvertParPublication } from "./beneficeNoms.js";
 import { achatParIdentite, propositionPrixAchat, propositionsUniques, listeConfirmation, ecritureProposition } from "./prixAchatPropose.js";
 import { donneesRecapMois, csvRecapMois, pdfRecapMois, libelleMois, nomFichierRecap } from "./recapMois.js";
+import { livreDesRecettes, registreDesAchats, csvRegistre, pdfRegistre, nomFichierRegistre, achatAnnule } from "./registres.js";
 import { CATEGORIES_DEPENSE, idTicket, montantDuTicket, texteMontantSaisie, texteDuTicket } from "./depensesTicket.js";
 import { produitsANumeroter, attribuerNumerosVc, carteNumerosVc } from "./numerosVestiaire.js";
 import { sitesDuNumero, appliquerPrix, noterJournalPrix, envoisPrix } from "./prixPartout.js";
@@ -28559,6 +28560,19 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   const avgMargin=ca>0?((profit/ca)*100).toFixed(1):null;
   const avgSale=encaissees.length?(ca/encaissees.length):0;
   const avgProfit=encaissees.length?(profit/encaissees.length):0;
+  // ── (3 nov.) « BÉNÉFICE » = LA RÈGLE DE COMPTA, ICI AUSSI (src/beneficeNoms.js) ──
+  // « Bénéfice estimé », « Taux marge » et « Bénéfice moyen » lisaient l'ancien
+  // catalogue (vente − achat, saisi à la main, vide) et disaient « — » dès que
+  // les ventes Vinted étaient lues : un autre chiffre sous le même nom que
+  // Comptabilité. Désormais : le bénéfice de l'ANNÉE (`useBeneficeCalcul`, la
+  // lecture de Compta et de Statistiques), « — » quand la règle dit « pas su » ;
+  // la marge = ce bénéfice ÷ les ventes qu'il compte (`BPa.ca`), jamais un brut.
+  const [comptaD] = useLigneSynchro('vrm_compta', lireComptaSynchro);
+  const { etat: etatBPa, B: BPa } = useBeneficeCalcul(comptaD, 'annee');
+  const CBa = chiffreBenefice(BPa, etatBPa);
+  const margeA = CBa.valeur != null && BPa && BPa.ca > 0 ? Math.round((CBa.valeur / BPa.ca) * 1000) / 10 : null;
+  const beneficeMoyA = CBa.valeur != null && BPa && BPa.n > 0 ? Math.round((CBa.valeur / BPa.n) * 100) / 100 : null;
+  const anneeA = new Date().getFullYear();
 
   const weeklyRecapData=useMemo(()=>{
     const today=new Date();
@@ -28818,8 +28832,9 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
   // vraies.
   const stockInconnu = !!(liveStats && liveStats.online > 0
     && !((liveStats.stockValue != null ? liveStats.stockValue : stockValue) > 0));
+  // (3 nov.) Le bénéfice et la marge attendent un prix d'achat seulement quand LA règle le dit (`CBa.raison`).
   const quoiDepuisDebut = stockInconnu
-    ? 'La valeur du stock, le bénéfice et la marge'
+    ? (CBa.raison === 'achats' ? 'La valeur du stock, le bénéfice et la marge' : 'La valeur du stock')
     : 'Le bénéfice et la marge';
   // (16 oct., passe « premium ») : un LIEN discret, pas une ligne orange — la
   // cause est dite une fois par groupe, et le geste est le lien lui-même.
@@ -28885,16 +28900,16 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
               cf. écran Ventes). ⚠️ « prix d'achat manquants » disait la MÊME
               chose que ses deux voisines : une cause, une phrase (le lien
               dessous). */}
-          {[['Bénéfice estimé', liveStats&&liveStats.caEncaisse!=null?'—':fmt(profit), liveStats&&liveStats.caEncaisse!=null?null:'argent reçu uniquement'],
-            ['Taux marge', (liveStats&&liveStats.caEncaisse!=null)||avgMargin===null?'—':`${avgMargin}%`, liveStats&&liveStats.caEncaisse!=null?null:(avgMargin===null?'dès ta première vente':'bénéf / CA')]].map(([l,v,sub],i)=>(
-            <div key={l} style={{padding:'12px 0 0',paddingLeft:i?16:0,borderLeft:i?`1px solid ${C.border}`:'none',minWidth:0}}>
+          {[[NOM_BENEFICE, CBa.valeur==null?'—':fmt(CBa.valeur), `en ${anneeA}`, { 'data-benef-notion':'benefice', 'data-benef-periode':'annee', 'data-benef-valeur':CBa.valeur==null?'':String(Math.round(CBa.valeur*100)), 'data-benef-raison':CBa.raison||'' }],
+            ['Marge', margeA==null?'—':`${String(margeA).replace('.',',')} %`, `en ${anneeA}`, { 'data-marge-notion':'benefice', 'data-marge-valeur':margeA==null?'':String(margeA) }]].map(([l,v,sub,attrs],i)=>(
+            <div key={l} {...attrs} style={{padding:'12px 0 0',paddingLeft:i?16:0,borderLeft:i?`1px solid ${C.border}`:'none',minWidth:0}}>
               <div style={sLib}>{l}</div>
               <div className="vrm-display" style={{...sHero,fontSize:20,letterSpacing:-0.4,marginTop:4,color:v==='—'?C.muted:C.text}}>{v}</div>
               {sub && <div style={{...sNote,fontSize:11,marginTop:2}}>{sub}</div>}
             </div>
           ))}
         </div>
-        {manquePrix && <div style={{marginTop:14}}><LignePrixAchat quoi={quoiDepuisDebut} dans/></div>}
+        {(CBa.raison === 'achats' || (manquePrix && stockInconnu)) && <div style={{marginTop:14}}><LignePrixAchat quoi={quoiDepuisDebut} dans/></div>}
       </div>
       {/* 🎯 OBJECTIF DU MOIS — jauge vers un objectif de CA que tu fixes. */}
       <div className="vrm-finance-goal"><Card>
@@ -29096,7 +29111,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         const cases = [
           ['Multiplicateur moyen (vente ÷ achat)', hv?'—':`×${avgX}`, null, true],
           ['Vente moyenne', venteMoy==null?'—':fmt(venteMoy), hv?`sur ${liveStats.soldTotal} vente${liveStats.soldTotal>1?'s':''}`:null, false],
-          ['Bénéfice moyen par vente', hv?'—':fmt(avgProfit), null, true],
+          [`${NOM_BENEFICE} moyen par vente`, beneficeMoyA==null?'—':fmt(beneficeMoyA), `en ${anneeA}`, beneficeMoyA==null],
           ['CA / jour de vente', hv && liveStats.joursVente>0 ? fmt(liveStats.caEncaisse/liveStats.joursVente) : '—',
             hv && liveStats.joursVente>0 ? `${liveStats.joursVente} jour${liveStats.joursVente>1?'s':''} où tu as vendu` : 'en attente de la synchro Vinted', false],
         ];
@@ -29112,7 +29127,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
                 </div>
               ))}
             </div>
-            {hv && !manquePrix && <div style={{marginTop:6}}><LignePrixAchat quoi="Le multiplicateur et le bénéfice moyen" dans/></div>}
+            {hv && !manquePrix && <div style={{marginTop:6}}><LignePrixAchat quoi="Le multiplicateur" dans/></div>}
           </div>
         );
       })()}
@@ -29130,7 +29145,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           )}
           {bestDayProfit&&(
             <div style={{minWidth:0,padding:'12px 0',borderTop:`1px solid ${C.border}`}}>
-              <div style={sLib}>Meilleur jour bénéfice</div>
+              <div style={sLib} data-benef-notion="brut">Meilleur jour · {NOM_BENEFICE_BRUT.toLowerCase()}</div>
               <div className="vrm-display" style={{...sHero,fontSize:20,letterSpacing:-0.4,marginTop:4}}>{fmt(bestDayProfit[1].profit)}</div>
               <div style={{...sNote,fontSize:11,marginTop:2}}>{bestDayProfit[0]}</div>
             </div>
@@ -29265,7 +29280,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
               <div style={{display:'flex',gap:16,flexWrap:'wrap',fontSize:13}}>
                 <span><b style={{color:C.text}}>{weeklyRecapData.count}</b> <span style={{color:C.muted}}>vente{weeklyRecapData.count>1?'s':''}</span></span>
                 <span><b style={{color:C.accent}}>{fmt(weeklyRecapData.ca)}</b> <span style={{color:C.muted}}>vendu</span></span>
-                <span><b style={{color:C.accent}}>{fmt(weeklyRecapData.profit)}</b> <span style={{color:C.muted}}>bénéfice</span></span>
+                <span><b style={{color:C.accent}}>{fmt(weeklyRecapData.profit)}</b> <span style={{color:C.muted}} data-benef-notion="brut">{NOM_BENEFICE_BRUT.toLowerCase()}</span></span>
               </div>
               {(()=>{ const pc=weeklyRecapData.prevCa||0, c=weeklyRecapData.ca; if(pc<=0&&c<=0) return null; const diff=c-pc; const pct=pc>0?Math.round(diff/pc*100):null; const up=diff>=0; return (
                 <div style={{fontSize:11,color:up?C.accent:C.muted,fontWeight:600,marginTop:6}}>{up?'▲':'▼'} {up?'+':''}{fmt(diff)} vs semaine précédente{pct!=null?` (${up?'+':''}${pct} %)`:''} <span style={{color:C.muted,fontWeight:600}}>— {fmt(pc)} vendus</span></div>
@@ -29287,7 +29302,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
               <div style={{display:'flex',gap:16,flexWrap:'wrap',fontSize:13}}>
                 <span><b style={{color:C.text}}>{monthlyRecapData.count}</b> <span style={{color:C.muted}}>vente{monthlyRecapData.count>1?'s':''}</span></span>
                 <span><b style={{color:C.accent}}>{fmt(monthlyRecapData.ca)}</b> <span style={{color:C.muted}}>vendu</span></span>
-                <span><b style={{color:C.accent}}>{fmt(monthlyRecapData.profit)}</b> <span style={{color:C.muted}}>bénéfice</span></span>
+                <span><b style={{color:C.accent}}>{fmt(monthlyRecapData.profit)}</b> <span style={{color:C.muted}} data-benef-notion="brut">{NOM_BENEFICE_BRUT.toLowerCase()}</span></span>
               </div>
             </div>
             <button className="vrm-icon-control" aria-label="Fermer le bilan du mois" type="button" onClick={()=>{localStorage.setItem('vinted_last_monthly_recap',monthKey);setShowMonthly(false);}}
@@ -36788,13 +36803,147 @@ const telechargerFichier = (contenu, nom, type) => {
   a.href = url; a.download = nom; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 4000);
 };
-function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts }) {
+// ── (3 nov.) LES VENTES DÉCLARABLES DE COMPTABILITÉ — une lecture, deux cartes ──
+// Factur-X et les registres (livre des recettes) lisent les MÊMES ventes, par la
+// MÊME règle (`ventesDeclarables`, datées au versement) et les MÊMES comptes
+// écartés (`compteEcarte`, `excluAutre`). Pure : `scripts/audit-registres.cjs`
+// l'EXÉCUTE. Les ventes Vinted ne passent que si les dates de versement sont
+// lues (sinon une vente serait datée à tort).
+const declarablesCompta = ({ ventes, ko, lbc = [], ebay = [], vestiaire = [], rates = [], versements, hTx, hAcc, panelOff, excluAutre, loginDe = (u) => String(u) }) => {
+  const ecarte = (uid) => compteEcarte(uid, hAcc, panelOff || {});
+  const uidDe = (o) => o && o._acc && o._acc.vinted_user_id;
+  const decl = ventesDeclarables({ vinted: versements ? ventes : [], lbc, ebay, vestiaire, masquee: (o) => hTx.has(String(o && o.transaction_id)), exclu: (o) => ecarte(uidDe(o)), excluAutre, versements: versements || {} });
+  // (1er nov., audits A2/A10) Vestiaire pas lu, et les ventes dont l'argent ne
+  // se lit pas : NOMMÉES dans ce qui manque (jamais un total partiel complet).
+  const ncER = phraseNonComptees((decl.ecartees || []).filter((x) => x && x.manque));
+  const manque = [...(ko || []).filter((uid) => !ecarte(uid)).map(loginDe), ...rates, ...(ncER ? [ncER] : [])];
+  return { decl, manque };
+};
+function useDeclarablesCompta({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts }) {
   const excluAutre = useExcluAutre();
   const { ventes, ko } = useVentesCoque();
   const [datesLbc] = useLigneSynchro('vrm_lbc_dates', lireDatesLbc);
   const ventesVcER = useVentesVestiaire();
   const [versements, setVersements] = React.useState(undefined);
   React.useEffect(() => { let mort = false; fetchVersementsVinted().then((m) => { if (!mort) setVersements(m); }).catch(() => { if (!mort) setVersements(null); }); return () => { mort = true; }; }, []);
+  const [tick, setTick] = React.useState(0);
+  React.useEffect(() => { const f = (e) => { const k = e && e.detail && e.detail.k; if (k === 'vinted_sales_hidden' || k === 'vinted_accounts_hidden') setTick((t) => t + 1); }; window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f); }, []);
+  const calc = React.useMemo(() => {
+    if (ventes === undefined) return { etat: 'encours' };
+    if (!Array.isArray(ventes)) return { etat: 'passu' };
+    const hTx = new Set(VENTES_MASQUEES_AUCUNE().map(String));
+    const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+    const loginDe = (uid) => { const a = (accounts || []).find((x) => String(x.vinted_user_id) === String(uid)); return (a && a.login) || String(uid); };
+    const lbc = lbcCoqueLu === true ? avecDatesLbc(((lbcVentes && lbcVentes.ventes) || []), datesLbc) : [];
+    const ebay = Array.isArray(ebayCommandes) ? ebayCommandes : [];
+    const rates = [...(lbcCoqueLu === null ? ['Leboncoin'] : []), ...(ebayCommandes === null ? ['eBay'] : []), ...(ventesVcER === null ? ['Vestiaire'] : [])];
+    const { decl, manque } = declarablesCompta({ ventes, ko, lbc, ebay, vestiaire: ventesVcER || [], rates, versements, hTx, hAcc, panelOff, excluAutre, loginDe });
+    return { etat: 'lu', decl, manque, attente: lbcCoqueLu === undefined || ebayCommandes === undefined || versements === undefined || ventesVcER === undefined };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ventes, ko, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, versements, accounts, tick, datesLbc, ventesVcER, excluAutre]);
+  return { calc, versements };
+}
+// ── (3 nov.) LES REGISTRES : LIVRE DES RECETTES ET REGISTRE DES ACHATS ──────
+// Les règles vivent dans src/registres.js. Les recettes = `useDeclarablesCompta`
+// (la MÊME lecture que Factur-X, datée au versement) ; le N° et le compte d'une
+// vente viennent du relevé de Ventes (`vrm_stats_ventes`, par identité) et de
+// la vente elle-même. Les achats sont lus comme « Exporter mes données » :
+// paginés (`lireTout`), PROJETÉS (jamais `select=data`), avec leur reçu relié
+// par SON n° de transaction. Une lecture ratée ⇒ « — » et le manque nommé.
+const lireAchatsRegistre = async () => {
+  const [lignes, comptesV] = await Promise.all([
+    lireTout('id=like.harvest_*_orders_purchased&select=id,orders:data->payload->my_orders').catch(() => null),
+    fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=vinted_user_id,login`, { headers: sbAuth() }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+  ]);
+  if (!Array.isArray(lignes)) return null;
+  const login = new Map((Array.isArray(comptesV) ? comptesV : []).map((c) => [String(c.vinted_user_id), String(c.login || '')]));
+  return lignes.flatMap((r) => { const k = /^harvest_(\d+)_orders_purchased$/.exec(String((r && r.id) || '')); const uid = k ? k[1] : ''; return (Array.isArray(r && r.orders) ? r.orders : []).map((o) => ({ ...o, _uid: uid, compte: login.get(uid) || uid })); });
+};
+function RegistresCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts }) {
+  const { calc, versements } = useDeclarablesCompta({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts });
+  const ventesVcER = useVentesVestiaire();
+  const an = new Date().getFullYear();
+  const periodes = React.useMemo(() => [String(an), String(an - 1), ...ymListe(13)], [an]);
+  const [periode, setPeriode] = React.useState(String(an));
+  // Achats : undefined en cours · null pas su · tableau lu. Reçus : idem (un reçu pas lu ⇒ « article seul »).
+  const [achats, setAchats] = React.useState(undefined);
+  const [recus, setRecus] = React.useState(undefined);
+  React.useEffect(() => {
+    let mort = false;
+    lireAchatsRegistre().then((a) => { if (!mort) setAchats(a); }).catch(() => { if (!mort) setAchats(null); });
+    fetchEmailAchats().then((r) => { if (!mort) setRecus(recusAchatDe(r)); }).catch(() => { if (!mort) setRecus(null); });
+    return () => { mort = true; };
+  }, []);
+  const [enCours, setEnCours] = React.useState('');
+  const recettes = React.useMemo(() => {
+    if (calc.etat !== 'lu') return calc.etat === 'passu' ? null : undefined;
+    const rel = lireReleveVentes();
+    const parId = new Map();
+    for (const l of ((rel && rel.l) || [])) if (Array.isArray(l)) parId.set(l[0] === 'Vinted' ? 'vinted:' + l[2] : String(l[2]), l);
+    const compteAutre = new Map();
+    for (const v of ((lbcVentes && lbcVentes.ventes) || [])) if (v && v.txId) compteAutre.set('lbc:' + v.txId, compteDeVente('leboncoin', v) || '');
+    for (const o of (Array.isArray(ebayCommandes) ? ebayCommandes : [])) if (o && o.orderId) compteAutre.set('ebay:' + o.orderId, compteDeVente('ebay', o) || '');
+    for (const v of (ventesVcER || [])) if (v && v.id) { const c = compteDeVente('vestiaire', v); compteAutre.set('vestiaire:' + v.id, c && c !== '-' ? c : ''); }
+    const parLigne = new Map(calc.decl.lignes.filter((l) => l && l.o).map((l) => [String(l.id), l.o]));
+    const compteDe = (id) => { const o = parLigne.get(id); if (o && o._acc) return o._acc.login || String(o._acc.vinted_user_id || ''); const r = parId.get(id); return (r && r[1]) || compteAutre.get(id) || ''; };
+    const numDe = (id) => { const r = parId.get(id); return (r && r[8]) || ''; };
+    return livreDesRecettes({ decl: calc.decl, periode, numDe, compteDe, manque: [...calc.manque, ...(versements === null ? ['dates de versement Vinted'] : [])] });
+  }, [calc, periode, versements, lbcVentes, ebayCommandes, ventesVcER]);
+  const registreAchats = React.useMemo(() => {
+    if (achats === undefined) return undefined;
+    const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+    const delies = load('vrm_recus_delies', {}) || {};
+    const index = indexRecusParTransaction(Array.isArray(recus) ? recus.filter((r) => !(r && r.id && delies[r.id])) : recus, (r) => ventilationRecuAchat(r && r.texte).trouve);
+    let fiches = null; try { fiches = load('vinted_annonce_numeros', {}) || {}; } catch (_) { fiches = null; }
+    return registreDesAchats({ achats, hors: load('vinted_offvinted_buys', []) || [], fiches, periode,
+      ventilationDe: (tx) => { const r = index.get(String(tx)); return r ? ventilationRecuAchat(r.texte) : null; },
+      exclu: (o) => compteEcarte(o && o._uid, hAcc, panelOff || {}), montantHors: prixAchatHorsNombre, sourceHors: libelleSourceAchat,
+      manque: recus === null ? ['reçus d’achat'] : [] });
+  }, [achats, recus, periode, panelOff]);
+  const exporter = async (R, forme) => {
+    if (!R || enCours) return;
+    setEnCours(R.type + forme);
+    try {
+      let ent = null; try { ent = await lireReglage('vrm_pro_facture'); } catch (_) { ent = null; }
+      const entreprise = ent && String(ent.nom || '').trim() ? { nom: String(ent.nom).trim(), siret: String(ent.siret || '').trim() } : null;
+      if (forme === 'csv') telechargerFichier(new Blob([csvRegistre(R, { entreprise })], { type: 'text/csv;charset=utf-8' }), nomFichierRegistre(R, 'csv'), 'text/csv;charset=utf-8');
+      else telechargerFichier(new Blob([await pdfRegistre(R, { entreprise })], { type: 'application/pdf' }), nomFichierRegistre(R, 'pdf'), 'application/pdf');
+    } catch (err) { toast('Registre pas créé : ' + ((err && err.message) || err)); }
+    setEnCours('');
+  };
+  const ligne = (type, nom, R) => (
+    <div className="vrm-registre" data-registre={type} data-registre-etat={R === undefined ? 'encours' : R === null ? 'passu' : 'lu'}
+      data-registre-n={R ? R.n : ''} data-registre-total={R ? String(Math.round(R.total * 100)) : ''} data-registre-sans-montant={R ? R.sansMontant : ''}
+      data-registre-partiel={R ? (R.complet ? '0' : '1') : ''} data-registre-hors={R ? R.horsPeriode.length : ''}
+      style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '12px 0', borderTop: `1px solid ${C.border}` }}>
+      <span style={{ flex: '1 1 160px', minWidth: 0 }}>
+        <span style={{ display: 'block', fontSize: 15, fontWeight: 600, color: C.text }}>{nom}</span>
+        <span className="vrm-display" style={{ display: 'block', fontSize: 13, color: C.muted, fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>
+          {R === undefined ? '…' : R === null ? '—' : `${R.n} · ${R.complet ? '' : 'au moins '}${fmt(R.total)}`}
+        </span>
+      </span>
+      <span style={{ display: 'flex', gap: 8, flex: '0 0 auto' }}>
+        <Bouton variante="secondaire" icone="doc" data-registre-pdf={type} disabled={!R || !!enCours} onClick={() => exporter(R, 'pdf')}>{enCours === type + 'pdf' ? '…' : 'PDF'}</Bouton>
+        <Bouton variante="secondaire" icone="save" data-registre-csv={type} disabled={!R || !!enCours} onClick={() => exporter(R, 'csv')}>{enCours === type + 'csv' ? '…' : 'Tableur'}</Bouton>
+      </span>
+    </div>
+  );
+  return (
+    <Card><div className="vrm-registres" data-registres={periode}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
+        <span data-titre-section="" style={{ fontSize: 15, fontWeight: 600, color: C.text, letterSpacing: -0.15, flex: '1 1 auto' }}>Registres</span>
+        <select aria-label="Période des registres" data-registres-periode="" value={periode} onChange={(e) => setPeriode(e.target.value)} style={{ height: 44, borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 15, padding: '0 10px', fontFamily: 'inherit' }}>
+          {periodes.map((p) => <option key={p} value={p}>{p.length === 4 ? p : libelleYm(p)}</option>)}
+        </select>
+      </div>
+      {ligne('recettes', 'Livre des recettes', recettes)}
+      {ligne('achats', 'Registre des achats', registreAchats)}
+    </div></Card>
+  );
+}
+function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts }) {
+  // (3 nov.) Les ventes déclarables : la lecture partagée avec les registres (`useDeclarablesCompta`).
+  const { calc, versements } = useDeclarablesCompta({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts });
   // Le profil fiscal : relu à l'ouverture, et suivi quand la carte « Profil
   // fiscal » juste au-dessus l'écrit (même ligne, §11).
   const [cfg, setCfg] = React.useState(undefined);
@@ -36809,8 +36958,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
   const [regime, setRegime] = useStateCle('vinted_regime', () => load('vinted_regime', null));
   const [nuage, setNuage] = React.useState(() => isCloudReady());
   React.useEffect(() => onCloudReady(() => { setNuage(true); setRegime(load('vinted_regime', null)); }), []);
-  const [tick, setTick] = React.useState(0);
-  React.useEffect(() => { const f = (e) => { const k = e && e.detail && e.detail.k; if (k === 'vinted_regime') setRegime(load('vinted_regime', null)); if (k === 'vinted_sales_hidden' || k === 'vinted_accounts_hidden') setTick((t) => t + 1); }; window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f); }, []);
+  React.useEffect(() => { const f = (e) => { const k = e && e.detail && e.detail.k; if (k === 'vinted_regime') setRegime(load('vinted_regime', null)); }; window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f); }, []);
   const etat = etatFacturation({ cfg, regime, verifier: verifierSiren });
   const mois = React.useMemo(() => ymListe(12), []);
   const [ym, setYm] = React.useState(mois[0]);
@@ -36846,30 +36994,6 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
   const envoiDe = (num) => (spdp && spdp.envois && num && spdp.envois[num.numero]) || null;
   const noterEnvoiLocal = (numero, envoi) => { if (!envoi) return; setSpdp((cur) => (cur && cur.envois ? { ...cur, envois: { ...cur.envois, [numero]: envoi } } : cur)); };
 
-  const calc = React.useMemo(() => {
-    if (ventes === undefined) return { etat: 'encours' };
-    if (!Array.isArray(ventes)) return { etat: 'passu' };
-    const hTx = new Set(VENTES_MASQUEES_AUCUNE().map(String));
-    const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
-    const ecarte = (uid) => compteEcarte(uid, hAcc, panelOff || {});
-    const uidDe = (o) => o && o._acc && o._acc.vinted_user_id;
-    const lbc = lbcCoqueLu === true ? avecDatesLbc(((lbcVentes && lbcVentes.ventes) || []), datesLbc) : [];
-    const ebay = Array.isArray(ebayCommandes) ? ebayCommandes : [];
-    const decl = ventesDeclarables({ vinted: versements ? ventes : [], lbc, ebay, vestiaire: ventesVcER || [], masquee: (o) => hTx.has(String(o && o.transaction_id)), exclu: (o) => ecarte(uidDe(o)), excluAutre, versements: versements || {} });
-    const loginDe = (uid) => { const a = (accounts || []).find((x) => String(x.vinted_user_id) === String(uid)); return (a && a.login) || String(uid); };
-    // (1er nov., audits A2/A10) Vestiaire pas lu, et les ventes dont l'argent ne
-    // se lit pas : NOMMÉES dans ce qui manque (jamais un total partiel complet).
-    const ncER = phraseNonComptees((decl.ecartees || []).filter((x) => x && x.manque));
-    const manque = [
-      ...(ko || []).filter((uid) => !ecarte(uid)).map(loginDe),
-      ...(lbcCoqueLu === null ? ['Leboncoin'] : []),
-      ...(ebayCommandes === null ? ['eBay'] : []),
-      ...(ventesVcER === null ? ['Vestiaire'] : []),
-      ...(ncER ? [ncER] : []),
-    ];
-    return { etat: 'lu', decl, manque, attente: lbcCoqueLu === undefined || ebayCommandes === undefined || versements === undefined || ventesVcER === undefined };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ventes, ko, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, versements, accounts, tick, datesLbc, ventesVcER, excluAutre]);
   const recap = calc.etat === 'lu' ? recapEReporting({ lignes: calc.decl.lignes, aDater: versements ? calc.decl.aDater : [], ym, ymDe: ymDeTs, manque: calc.manque, attente: calc.attente, versementsLus: versements !== null }) : null;
 
   const fx = (data && data.facturx) || {};
@@ -40084,6 +40208,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
           </Card>
 
           <RecapComptableMensuel />
+          <RegistresCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />
           <div className="vrm-compta-grille" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 460px), 1fr))', gap: 16, alignItems: 'start' }}>
             {/* PACKS ET OPTIONS PAYÉS (Leboncoin, eBay…) — § « packs de photos pris
                 en compte du bénéfice ». ⚠️ Mesuré le 16 octobre : AUCUNE plateforme ne
@@ -52107,7 +52232,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const lu = Array.isArray(buys.items);
           const m0 = new Date(); m0.setDate(1);
           const duMois = { from: m0, to: new Date() };
-          const annule = (o) => /annul|rembours|refus/i.test(o.status || '');
+          const annule = achatAnnule;   // (3 nov.) la règle de « Dépensé », partagée avec le registre des achats (src/registres.js)
           const mois = lu ? buysBase.filter((o) => !annule(o) && dansPeriode(o, duMois)) : [];
           const depense = lu ? mois.reduce((a, o) => a + montantCommande(o), 0) : null;
           const n = { route: 0, recu: 0 }; if (lu) buysBase.forEach((o) => { const ph = phaseReception(o); if (n[ph] != null) n[ph]++; });
@@ -52254,7 +52379,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {buysBase.length>0 && aFilter!=='attente' && (()=>{
           const dans = buysBase.filter(o=>matchOrd(o));
           const M = (o)=>montantCommande(o);
-          const annule = (o)=>/annul|rembours|refus/i.test(o.status||'');
+          const annule = achatAnnule;
           const enRoute = (o)=>!annule(o) && phaseReception(o)==='route';
           const somme = (l)=>l.reduce((a,o)=>a+M(o),0);
           const vrais = dans.filter(o=>!annule(o));
