@@ -247,3 +247,6 @@ Déplacé TEL QUEL depuis CLAUDE.md §9 le 2 novembre 2026 (le fichier dépassai
 
 ### Lignes de §9 déplacées telles quelles
 - **3 nov.** — E-mails Vinted « Commande mise à jour » qui disent l'achat ARRIVÉ (« t'attend au point relais », « t'attend ici … code », « livré dans le Point Relais ») ⇒ colis à retirer (58 en 30 j étaient « sans action ») ; identité = UUID de conversation lu dans le lien (`links.vinted.com/t/<base64>` → `/inbox/<UUID>`), jamais le titre ; doublon avec l'e-mail transporteur = un colis ; e-mails déjà reçus relus (`src/arriveesRelues.js`). `api/_lib/achat-arrive-relais.js`, `audit-achat-attend-relais` (23 rouges sur main). → historique colis-retraits. Geste : aucun.
+
+### Lignes de §9 déplacées telles quelles
+- **3 nov.** — Carte sombre RÉGLABLE par page (sa demande : « le CA, le bénéfice etc. dans cette case sombre sur chaque onglet, modifiable selon la sélection ») : grand chiffre + 3 cases choisis par page (`vrm_carte_stats` synchronisée), suivent site/compte/période, valeurs = règles propriétaires seulement (`src/design/carteChiffres.js`, `CarteStats.jsx`, `audit-carte-chiffres` 203, banc `carte-stats`). Reste : « Modifier » dans la tête de Ma journée, libellés en minuscules. → historique interface-stock. Geste : toucher « Modifier » sur une carte.
