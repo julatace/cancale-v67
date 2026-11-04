@@ -878,7 +878,8 @@ html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-va-titre 
    centrée (la carte sombre ne s'étire plus sur 1 150 px) ; Ventes perd ses en-têtes de
    colonnes (« Article / État / Prix… ») que les cartes ne suivent pas. */
 @media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
-  html body .vrm-app-shell .vrm-main:has(.vrm-fu-ecran) > :not(.vrm-barre-haut):not(style):not(script) { max-width: 760px !important; margin-left: auto !important; margin-right: auto !important; box-sizing: border-box !important; width: 100% !important; }
+  /* (3 nov.) Sauf la messagerie en volets (liste · fil · fiche) : à 760 px le fil n'avait plus que 100 px. */
+  html body .vrm-app-shell .vrm-main:has(.vrm-fu-ecran):not(:has(.vrm-message-workspace)) > :not(.vrm-barre-haut):not(style):not(script) { max-width: 760px !important; margin-left: auto !important; margin-right: auto !important; box-sizing: border-box !important; width: 100% !important; }
 }
 html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) :is(.vrm-ledger-heading, [data-ventes-entete-cols]) { display: none !important; }
 

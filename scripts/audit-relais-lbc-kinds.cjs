@@ -47,6 +47,9 @@ const exemple = {
   lbccomptes: { comptes: [{ id: '1', name: 'x', pro: false }] },
   lbcsessionprivee: { url: 'u', preuve: { a: 1 } },
   lbcblocage: { famille: 'transactions', raison: 'taille' },
+  // 5.318 (3 nov.) : un fil, la recette d'un envoi fait par lui.
+  lbcfil: { conv: 'a1b2c3d4-0000', messages: [{ id: 'm1', t: 'Bonjour', deMoi: false, at: '2026-11-03T08:00:00Z' }], moi: 'abc', page: '/messages' },
+  lbcenvoiappris: { recette: { methode: 'POST', hote: 'api.leboncoin.fr', rejouable: false, raison: 'x' } },
 };
 
 let ecoute = null; const envois = [];
