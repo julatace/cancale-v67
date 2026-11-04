@@ -120,3 +120,25 @@
 .vrm-stats-vitrine .vrm-sv-boost-col { text-align: right; }
 .vrm-stats-vitrine .vrm-sv-boost-val { font-size: 15px; font-weight: 600; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--vrm-ink); }
 @media (max-width: 480px) { .vrm-stats-vitrine .vrm-sv-boost-table { gap: 8px 10px; } .vrm-stats-vitrine .vrm-sv-boost-val { font-size: 13px; } }
+
+/* ── LES OFFRES (4 nov.) : trois chiffres, puis une ligne par compte. Neutre. ── */
+.vrm-stats-vitrine .vrm-of-tuiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
+.vrm-stats-vitrine .vrm-of-tuile { background: var(--vrm-surface); border-radius: 12px; padding: 12px; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.vrm-stats-vitrine .vrm-of-lib { font-size: 11px; color: var(--vrm-muted); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-stats-vitrine .vrm-of-tuile > b { font-size: 20px; font-weight: 700; letter-spacing: -.02em; color: var(--vrm-ink); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.25; }
+.vrm-stats-vitrine .vrm-of-tuile > b[data-vide] { color: var(--vrm-muted); }
+.vrm-stats-vitrine .vrm-of-table { display: flex; flex-direction: column; }
+.vrm-stats-vitrine .vrm-of-ligne { display: grid; grid-template-columns: minmax(0, 1.6fr) repeat(5, minmax(0, 1fr)); gap: 8px; align-items: baseline; padding: 9px 0; border-top: 1px solid var(--vrm-line); font-size: 13px; color: var(--vrm-ink); font-variant-numeric: tabular-nums; }
+.vrm-stats-vitrine .vrm-of-ligne > span:not(.vrm-of-nom) { text-align: right; white-space: nowrap; }
+.vrm-stats-vitrine .vrm-of-entete { border-top: 0; padding-top: 0; font-size: 11px; color: var(--vrm-muted); font-weight: 500; }
+.vrm-stats-vitrine .vrm-of-nom { min-width: 0; display: flex; flex-direction: column; }
+.vrm-stats-vitrine .vrm-of-nom > b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-stats-vitrine .vrm-of-nom > small { font-size: 11px; color: var(--vrm-muted); }
+.vrm-stats-vitrine .vrm-of-moteur { margin-top: 8px; }
+@media (max-width: 640px) {
+  .vrm-stats-vitrine .vrm-of-tuile > b { font-size: 17px; }
+  .vrm-stats-vitrine .vrm-of-ligne { grid-template-columns: repeat(5, minmax(0, 1fr)); row-gap: 4px; }
+  .vrm-stats-vitrine .vrm-of-ligne > .vrm-of-nom { grid-column: 1 / -1; flex-direction: row; gap: 8px; align-items: baseline; }
+  .vrm-stats-vitrine .vrm-of-ligne > span:not(.vrm-of-nom) { text-align: left; }
+  .vrm-stats-vitrine .vrm-of-entete > .vrm-of-nom { display: none; }
+}

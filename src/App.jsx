@@ -156,6 +156,8 @@ import { friseVente, phraseVente, eurosRecap, ETATS_HORS_PARCOURS } from "./reca
 // (2 nov.) Le style « Fusion » : la carte sombre du mois et la frise de suivi (src/design/).
 import CarteMois from "./design/CarteMois.jsx";
 import CarteStats from "./design/CarteStats.jsx";
+import CarteOffres from "./design/CarteOffres.jsx";
+import { statsOffres } from "./statsOffres.js";
 import { CLE_CARTE_STATS, valeurObjectif } from "./design/carteChiffres.js";
 import { CLE_OBJECTIF, lireObjectif, lireSaisieObjectif, objectifAEnregistrer, progressionObjectif } from "./objectifMois.js";
 import { courtFusion, enArticles } from "./design/tacheCourte.js";
@@ -6958,7 +6960,8 @@ const ventesFaites = ({ vinted, lbc, ebay, vestiaire, cachee, excluAutre } = {})
     const eurV = montantCommandeLu(o);
     if (eurV == null) { nonComptees.push({ plateforme: 'Vinted', raison: 'prix pas lu', ts: t }); continue; }
     // (31 oct.) `compte` : le compte qui a vendu (Statistiques → « Par compte »), le même nom que le relevé des ventes.
-    lignes.push({ plateforme: 'Vinted', ts: t, eur: eurV, compte: String((o._acc && (o._acc.login || o._acc.vinted_user_id)) || '') });
+    // (4 nov.) `tx` et `uid` : l'identité de la vente et de son compte, pour les statistiques des offres (src/statsOffres.js).
+    lignes.push({ plateforme: 'Vinted', ts: t, eur: eurV, compte: String((o._acc && (o._acc.login || o._acc.vinted_user_id)) || ''), uid: String((o._acc && o._acc.vinted_user_id) || ''), tx: tx != null ? String(tx) : '' });
   }
   for (const v of (lbc || [])) {
     if (!v || v.isSeller !== true || !v.txId || lbcAnnulee(v)) continue;
@@ -37787,6 +37790,42 @@ const lireExtrasRepartition = async () => {
   _repartCache = { owner, at: Date.now(), txn, items: idx, dates };
   return _repartCache;
 };
+// ── LES OFFRES, POUR STATISTIQUES (4 nov., src/statsOffres.js) ─────────────
+// Trois lectures PROJETÉES (§4.4, jamais `select=data`), une fois par dix
+// minutes, seulement quand la carte « Les offres » paraît à l'écran (les
+// messages des conversations à offre pèsent ~1,2 Mo) :
+//   · les conversations dont un message est une offre (`cs.`), côté vendeur ;
+//   · la dernière lecture de CHAQUE compte (`capturedAt` de toutes ses
+//     conversations : la capture s'est arrêtée — ce qui suit n'est pas lu) ;
+//   · les transactions : prix conclu, `is_system`, nombre de paires, prix affiché.
+// Une lecture ratée ⇒ `null` (« — »), jamais une liste vide.
+let _offresCache = null;
+const OFFRES_STATS_CONV = 'id=like.harvest_%25_conv_%25&data->payload->conversation->messages=cs.' + encodeURIComponent(JSON.stringify([{ entity_type: 'offer_request_message' }]))
+  + '&data->payload->conversation->transaction->>current_user_side=eq.seller&select=id,opp:data->payload->conversation->opposite_user->>id,side:data->payload->conversation->transaction->>current_user_side,msgs:data->payload->conversation->messages';
+const OFFRES_STATS_LECTURES = 'id=like.harvest_%25_conv_%25&select=id,cap:data->>capturedAt';
+const OFFRES_STATS_TXN = 'id=like.harvest_%25_txn_%25&select=tx:meta->>id,sys:data->payload->transaction->offer->>is_system,op:data->payload->transaction->offer->price->>amount,oc:data->payload->transaction->offer->price->>currency_code,ic:data->payload->transaction->order->>item_count,ip:data->payload->transaction->order->items->0->price->>amount,icur:data->payload->transaction->order->items->0->price->>currency_code';
+const lireOffresStats = async () => {
+  const owner = AUTH.user?.id;
+  if (!owner) return { convs: null, lectures: null, txn: null };
+  if (_offresCache?.owner === owner && Date.now() - _offresCache.at < 10 * 60 * 1000) return _offresCache;
+  const [rc, rl, rt] = await Promise.all([
+    lireTout(OFFRES_STATS_CONV, { strict: true }).catch(() => null),
+    lireTout(OFFRES_STATS_LECTURES, { strict: true }).catch(() => null),
+    lireTout(OFFRES_STATS_TXN, { strict: true }).catch(() => null),
+  ]);
+  const uidDe = (id) => { const m = /^harvest_(\d+)_conv_\d+$/.exec(String(id || '')); return m ? m[1] : null; };
+  const convs = Array.isArray(rc) && Array.isArray(rl) ? rc.map((r) => ({ compte: uidDe(r.id), side: r.side, opp: r.opp, messages: Array.isArray(r.msgs) ? r.msgs : [] })).filter((c) => c.compte) : null;
+  let lectures = null;
+  if (convs && Array.isArray(rl)) {
+    lectures = {};
+    for (const r of rl) { const u = uidDe(r.id); const t = Date.parse(r.cap || ''); if (u && Number.isFinite(t) && !(lectures[u] >= t)) lectures[u] = t; }
+  }
+  let txn = null;
+  if (Array.isArray(rt)) { txn = {}; for (const r of rt) if (r && r.tx) txn[String(r.tx)] = { sys: r.sys, op: r.op, oc: r.oc, ic: r.ic, ip: r.ip, icur: r.icur }; }
+  if (AUTH.user?.id !== owner) return { convs: null, lectures: null, txn: null };
+  _offresCache = { owner, at: Date.now(), convs, lectures, txn };
+  return _offresCache;
+};
 const nomPays = (cc) => {
   try { if (typeof Intl !== 'undefined' && Intl.DisplayNames) { const n = new Intl.DisplayNames(['fr'], { type: 'region' }).of(cc); if (n && n !== cc) return n; } } catch (_) {}
   return cc;
@@ -37996,6 +38035,37 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
     });
   }, [ventesCoque, extras, nuage, panelOff, b]);
 
+  // (4 nov.) LES OFFRES (src/statsOffres.js) : lues quand la carte paraît
+  // (lecture projetée, ~1,2 Mo de messages, une fois par dix minutes).
+  const refOffres = React.useRef(null);
+  const [offresBrut, setOffresBrut] = React.useState(undefined);
+  React.useEffect(() => {
+    let mort = false;
+    const go = () => { lireOffresStats().then((x) => { if (!mort) setOffresBrut(x); }).catch(() => { if (!mort) setOffresBrut({ convs: null, lectures: null, txn: null }); }); };
+    const el = refOffres.current;
+    if (!el || typeof IntersectionObserver === 'undefined') { go(); return () => { mort = true; }; }
+    const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { io.disconnect(); go(); } }, { rootMargin: '300px' });
+    io.observe(el);
+    return () => { mort = true; io.disconnect(); };
+  }, []);
+  const offres = React.useMemo(() => {
+    if (offresBrut === undefined || vendu === undefined) return null;
+    const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+    const ecarte = (uid) => compteEcarte(uid, hAcc, panelOff || {});
+    const convs = Array.isArray(offresBrut.convs) ? offresBrut.convs.filter((c) => !ecarte(c.compte)) : null;
+    const lectures = offresBrut.lectures ? Object.fromEntries(Object.entries(offresBrut.lectures).filter(([u]) => !ecarte(u))) : {};
+    const ventes = Array.isArray(vendu) ? vendu.filter((l) => l.plateforme === 'Vinted') : null;
+    return statsOffres({ convs, lectures, ventes, txn: offresBrut.txn, de: b.de, a: b.a, maintenant });
+  }, [offresBrut, vendu, panelOff, b, maintenant]);
+  const nomCompteOffres = (uid) => {
+    const labels = load('vinted_account_labels', {}) || {};
+    if (labels[uid]) return labels[uid];
+    const l = Array.isArray(vendu) ? vendu.find((x) => x.uid === uid && x.compte && x.compte !== uid) : null;
+    if (l) return l.compte;
+    const a = (load('vinted_accounts', []) || []).find((x) => String(x && x.vinted_user_id) === String(uid));
+    return (a && a.login) || `#${uid}`;
+  };
+
   const pl = (n, s, p) => `${n} ${n > 1 ? (p || s + 's') : s}`;
   // Un délai s'écrit à la demi-journée près (la médiane de 3 et 10 est 6,5 j, jamais « 7 »).
   const j10 = (j) => Math.round(j * 10) / 10, jTxt = (j) => String(j10(j)).replace('.', ',');
@@ -38128,6 +38198,8 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
       </div>
       {/* (3 nov.) « Ce qui rapporte le plus » : le relevé de la période, classé (src/ceQuiRapporte.js). */}
       <CeQuiRapporte lignes={lp} Segmente={Segmente} fmt={fmt} etat={!releve ? 'passu' : 'encours'}/>
+      {/* (4 nov.) Les offres de la période, par compte (src/statsOffres.js). */}
+      <div ref={refOffres}><CarteOffres S={offres} etat={offresBrut === undefined || vendu === undefined ? 'encours' : 'passu'} fmt={fmt} nomDe={nomCompteOffres}/></div>
       <div className="vrm-sv-rangee vrm-sv-rangee-2">
         {carte('sv-tailles', 'Les tailles qui se vendent', tailles && tailles.groupes.length ? 'ventes · jours pour vendre' : null, !lignes
           ? vide('Pas encore calculé', { 'data-sv-etat': 'passu' })

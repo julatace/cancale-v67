@@ -243,7 +243,8 @@ export const ventesFaites = ({ vinted, lbc, ebay, vestiaire, cachee, excluAutre 
     const eurV = montantCommandeLu(o);
     if (eurV == null) { nonComptees.push({ plateforme: 'Vinted', raison: 'prix pas lu', ts: t }); continue; }
     // (31 oct.) `compte` : le compte qui a vendu (Statistiques → « Par compte »), le même nom que le relevé des ventes.
-    lignes.push({ plateforme: 'Vinted', ts: t, eur: eurV, compte: String((o._acc && (o._acc.login || o._acc.vinted_user_id)) || '') });
+    // (4 nov.) `tx` et `uid` : l'identité de la vente et de son compte, pour les statistiques des offres (src/statsOffres.js).
+    lignes.push({ plateforme: 'Vinted', ts: t, eur: eurV, compte: String((o._acc && (o._acc.login || o._acc.vinted_user_id)) || ''), uid: String((o._acc && o._acc.vinted_user_id) || ''), tx: tx != null ? String(tx) : '' });
   }
   for (const v of (lbc || [])) {
     if (!v || v.isSeller !== true || !v.txId || lbcAnnulee(v)) continue;
