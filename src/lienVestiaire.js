@@ -107,13 +107,18 @@ export function suggestionsLienVc({ cible, candidats, marqueDe, couleursDe, mode
       modele: typeof modeleDe === 'function' ? modeleDe(titre) : null,
     };
   };
+  // La marque : connue des deux côtés et la même ; ou connue d'UN côté (le champ
+  // « marque » de Vinted, ex. « Gucci » qu'aucune liste de l'app ne connaît) et
+  // écrite en mot entier dans le titre de l'autre. Inconnue des deux ⇒ rien.
+  const sansAccent = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const ecrite = (titre, marque) => !!marque && new RegExp('(^|[^a-z0-9])' + sansAccent(marque).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($|[^a-z0-9])').test(sansAccent(titre));
+  const memeMarque = (a, ta, b, tb) => (a.marque && b.marque) ? a.marque === b.marque : a.marque ? ecrite(tb, a.marque) : b.marque ? ecrite(ta, b.marque) : false;
   const c = lire(cible);
-  if (!c.marque) return [];
   const out = [];
   for (const x of candidats) {
     if (!x || x.id == null) continue;
     const k = lire(x);
-    if (k.marque !== c.marque) continue;
+    if (!memeMarque(c, cible.titre, k, x.titre)) continue;
     if (!!k.taille !== !!c.taille) continue;
     if (c.taille && k.taille !== c.taille) continue;
     if (c.modele && k.modele && c.modele !== k.modele) continue;

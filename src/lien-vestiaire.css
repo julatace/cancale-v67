@@ -31,3 +31,6 @@
   flex: none; min-height: 44px; padding: 0 12px; border-radius: 999px; border: 0; background: var(--fu-case, #f2f2f7);
   color: var(--fu-encre, #1d1d1f); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
 }
+/* La feuille se détache de la page (en sombre, fond et page sont tous deux noirs). */
+.vrm-ao-voile[data-lien-vc] { background: rgba(0,0,0,.5); }
+.vrm-lvc-feuille { box-shadow: 0 -1px 0 var(--fu-filet, rgba(0,0,0,.06)), 0 12px 40px rgba(0,0,0,.35); outline: 1px solid var(--fu-filet, rgba(0,0,0,.06)); }

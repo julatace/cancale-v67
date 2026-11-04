@@ -245,6 +245,10 @@ const corps = (src, nom) => { const i = src.indexOf(`function ${nom}(`); if (i <
     const u = suggestionsLienVc({ cible: { titre: 'Sac Gucci' }, candidats: sacs, marqueDe, couleursDe }).map((x) => x.id);
     dit(u.length === 0, 'L8 · sans taille ni couleur : jamais la marque seule', u.join(','));
     dit(suggestionsLienVc({ cible: { titre: 'Sac sans marque' }, candidats: sacs, marqueDe, couleursDe }).length === 0, 'L8 · marque inconnue : rien');
+    const h = [{ id: 'h1', titre: 'Evelyne beige', marque: 'Hermès' }, { id: 'h2', titre: 'Evelyne beige', marque: 'Celine' }];
+    const hs = suggestionsLienVc({ cible: { titre: 'Sac Hermes Evelyne beige' }, candidats: h, marqueDe, couleursDe }).map((x) => x.id);
+    dit(hs.join(',') === 'h1', 'L8 · marque lue d’UN côté (champ Vinted) et écrite en toutes lettres dans le titre de l’autre', hs.join(','));
+    dit(suggestionsLienVc({ cible: { titre: 'Sac Evelyne beige' }, candidats: h, marqueDe, couleursDe }).length === 0, 'L8 · …absente du titre : rien');
   });
 
   // ── L9 — tous les lecteurs ──────────────────────────────────────────────────
