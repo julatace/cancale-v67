@@ -2819,6 +2819,81 @@ c'est voulu (un colis caché est un colis perdu). (3) Le journal des e-mails ran
 rappel du matin ne voient que les lignes rangées par le serveur (pas la relecture) : ils
 reprennent la publication de l'app comme avant.
 
+## 3 novembre (soir) — Scanner pour déposer · Tout imprimer par transporteur · Retour → stock (branche `claude/colis-scan`)
+
+Choix de Julien (3 nov.), dans cet ordre, style Fusion, sans texte explicatif.
+
+### 1. Scanner pour déposer
+**Mesuré (lecture seule)** : `email_bord_*` = 215 lignes, `suivi` rempli 94 fois (forme Chronopost
+seulement) ; les bordereaux captés par l'extension (`harvest_*_label_*`, 159) ne portent AUCUN n° ; les
+transactions non plus (`shipment` = id/statut) ; les lignes de suivi Vinted (`harvest_*_suivi_*`, 20)
+sont toutes des ACHATS. Le contenu d'un vrai code-barres, lu par zbar sur les deux bordereaux réels du
+scratchpad (hors dépôt) : InPost/Mondial Relay = Code 128 à 26 chiffres « 56 82579787 0101… » (n°
+d'expédition imprimé « V2 82579787 » = chiffres 3 à 10) ; Vinted/Hermes = « 55 15193563 0101… » (« V1
+15193563 », même place). Chronopost : pas mesuré.
+**Fait** :
+- `src/scanColis.js` (pur) : `candidatsDuScan` (valeur brute ; 26 chiffres ⇒ chiffres 3-10 ; UN seul n°
+  Chronopost posé dans un code plus long), `trouverParScan` (égalité EXACTE sur les n° LUS du colis ;
+  0 ⇒ « Pas trouvé », 2 colis ⇒ rien, déjà déposé ⇒ « Déjà déposé »), `filtreRepetition` (2,5 s).
+- `src/ScannerColis.jsx` + `src/design/scanner.css` : feuille noire plein écran (portail, `FermeAuRetour`,
+  Échap), caméra arrière ouverte UNE fois pour toute la série, `BarcodeDetector` du navigateur s'il sait
+  le Code 128, sinon ZXing JavaScript pur (`@zxing/library@0.20.0`, cdn.jsdelivr.net — autorisé par
+  `script-src`, l'image est lue DANS la page) ; viseur vert / ambre (secousse) / gris ; `navigator.vibrate`
+  là où il existe ; clavier toujours là (« N° de suivi » + OK) ; « Annuler » (5 s) DANS la feuille.
+- App : bouton « Scanner » (icône seule au téléphone) dans Colis → À envoyer et Envoyés ;
+  `colisScannables` (Vinted : `b.suivi` du bordereau, à envoyer et déjà partis ; Vestiaire : `v.suivi`) ;
+  « Déposé » = `marquerColisFait` (Vinted) / « Colis fait » Vestiaire, différé par `useDeposeDiffere`
+  (le geste de Ventes) ; un second scan écrit le premier ; écran quitté ⇒ écrit.
+⚠️ **Non vérifié d'ici** : le repli ZXing (réseau fermé) et la caméra réelle de l'iPhone (Safari n'a pas
+`BarcodeDetector` : c'est le repli qui lira). **Limite mesurée** : un colis dont le n° n'est pas lu
+(Mondial Relay : l'e-mail du bordereau ne le donne pas encore, Leboncoin, eBay) répond « Pas trouvé » —
+tant que `parseBordereauEmail` ne lit pas les n° à 8 chiffres, le scan trouve surtout les Chronopost.
+
+### 2. « Tout imprimer » par transporteur, toutes plateformes
+**Pourquoi `lot-bordereaux` était rouge sur `main`** : depuis la maquette FusionColis (2 nov.), le bouton
+`[data-lot-ouvrir]` était CACHÉ par `src/design/fusion.css` tant que « … » n'était pas ouvert — le clic
+de Playwright attendait un élément visible (30 s). Le bouton est maintenant toujours visible (« Tout
+imprimer », À envoyer).
+- `src/lotTransporteurs.js` (pur) : `rangerParTransporteur` (l'ordre de l'écran : le plus pressé d'abord,
+  puis les transporteurs dans l'ordre de leur premier colis — l'écran l'utilise désormais),
+  `ordreDesGroupes`, `ordonnerLot`.
+- App : `colisAEnvoyerBase` / `colisAEnvoyerRanges` (la liste de l'écran, une construction) ;
+  `lignesLotTous` = Vinted (`lignesLot`, la règle d'avant) + Vestiaire (bordereau rangé `vc_label_*`) +
+  Leboncoin (bordereau existant, extension `lbcpdf`) — jamais eBay (§2.8) — rangées dans l'ordre des
+  groupes de l'écran ; l'aperçu porte un en-tête par transporteur ; `batchBordereaux` lit chaque PDF par
+  sa voie (Vinted capté puis e-mail, `vc_label` projeté, `vmrPdfLbc`), la fusion existante
+  (`mergeAndDownloadBordereaux` : `confirmerNumerosAVerifier`, `poserBordereau` → `tamponnerBordereau`,
+  fiche colis si besoin) ; « Imprimé » posé pour Vinted et Vestiaire.
+
+### 3. Retour → stock : « Retour reçu ? »
+**Mesuré (lecture seule)** : transactions 440 = 10 (ss vide 4, « Bordereau envoyé au vendeur » 2,
+« colis déposé » 2, « Commande livrée ! » 2) ; 430 « non réclamée – retournée » 1. Les formes de
+`etapeRetourVinted` tiennent.
+- `retourAReceptionner` (src/retoursStock.js) : une carte seulement pour un retour PROUVÉ (440 / retour /
+  non réclamée ; eBay Post-Order) dont le colis est REVENU (déposé/en route, « livré » selon la plateforme,
+  ou remboursé), avec SON N° (identité), pas déjà reçu/remis/ancien. `numsRemisEnStock` : les N° remis
+  (pas un N° retiré pour conflit).
+- `CartesRetourRecu` (Colis → **Envoyés**, en tête ; le bloc « Retours » y descend aussi, sans sa phrase
+  d'explication ; la vente d'un retour n'est plus redite dans la liste) : photo, « Retour reçu ? »,
+  « N°x · titre », UN bouton « Remettre en stock ». Le tap (`remettreDepuisCarte`) écrit `vinted_retours_recus`
+  ET `vinted_retours_remis` avec SON N° (`remiseEnStock`), et demande seulement si une autre paire présente
+  porte ce N°. Le N° remis entre dans `vinted_nums_physiques` (« chez toi », Stock) jusqu'à la republication ;
+  le cycle d'un article le reçoit (`remis`). La vente sort des totaux par `PAS_UNE_VENTE` (rien de neuf).
+- **Reste** : une paire remise, republiée PUIS revendue réapparaît « remise — à republier » (la règle
+  `republiee` ne regarde que l'annonce en ligne ; existait avant).
+
+**Preuves** : `scripts/audit-colis-trois.cjs` (30 contrôles, `--prouve` 12/12 mutations) ; bancs NOUVEAUX
+`colis-scan` (faux `BarcodeDetector` + fausse caméra : n° connu ⇒ Déposé, deux colis au même titre ⇒ seul
+le n° scanné, 26 chiffres, Annuler ⇒ rien, déjà déposé, inconnu, titre tapé ⇒ rien, clavier, caméra
+ouverte une fois ; 42 verts ; rouge sur origin/main ; mutations « sans forme 26 » 4, « déjà ignoré » 2,
+« sans délai » 12, « par titre » 4 rouges) et `tout-imprimer` (PDF relu par pdf.js : 6 bordereaux dont
+Vestiaire, ordre des groupes de l'écran, d'un seul tenant, N° « à vérifier » demandé, titre + N° sur
+chaque page ou sa fiche ; 24 verts ; rouge sur origin/main ; mutations « sans ordre » 7, « sans Vestiaire »
+6) ; `lot-bordereaux` VERT (rouge sur main) — son contrôle « la plus ancienne en bas » devient « l'aperçu
+suit l'ordre des colis de l'écran » (choix n° 2) ; `retours-stock` mis à la règle (les retours vivent dans
+Envoyés ; 9307 : carte, rien sans tap, N°80 gardé, présent, aucun numéro neuf) : 28 rouges sur origin/main,
+vert après.
+
 ## 3 novembre (soir) — Les villes des colis à retirer : lues, reconnues, jamais devinées (branche `claude/villes-colis`)
 
 Julien (3 nov., 18 h 59) : « pour les colis ce n'est pas encore parfait, il ne reconnaît pas les
@@ -2955,3 +3030,11 @@ d'avant rouge (aperçu absent). Voisins adaptés (ils cliquent « Imprimer » da
 `ventes-bordereau`, `vestiaire-parite`, `lbc-bordereau`. `scripts/tests/bordereau-placement-interface.cjs`
 retiré (il testait `BordPlacer`, supprimé). **Non mesuré** : un vrai iPhone (gestes Safari), une vraie
 impression.
+**Constaté en passant (non corrigé, autre règle)** : une vente à poster lue AVANT sa transaction reçoit un N°
+auto (`autoAssigned`, règle des ventes à poster), remplacé par celui de son annonce quand la transaction
+arrive ; et le N° d'une vente Vestiaire n'est donné qu'au passage de son écran. Pendant cette fenêtre, un
+lot ouvert porte d'autres N° : le garde-fou `verifierContexte` (empreinte N° comprise) ARRÊTE alors le lot
+(« Un article, son numéro ou son état a changé ») — rien n'est imprimé avec un N° faux. Le banc
+`tout-imprimer` attend la fin de ces lectures avant d'ouvrir le lot. Après la fusion du tampon libre
+(#998), le lot passe par `mergeAndDownloadBordereaux` → `choisirTampon({…, apercu:false})` : chaque
+bordereau sort à la place gardée pour SA forme (`vrm_tampon_positions`) — audit `colis-trois` 2g.
