@@ -65,6 +65,11 @@ import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chev
 import {formaterMontantEbay} from './montantsEbay.js';
 import {cibleEbay} from "./ebayParcours.js";
 import {centimes,coutsVente,beneficePaire,champsCharges} from "./beneficePaire.js";
+import {argentAVenir,aVenirPour,texteDatePrevue} from './argentAVenir.js';
+import {comparerMois,ymEnFace} from './comparerMois.js';
+import {fraisParPlateforme,texteCouverture} from './fraisPlateformes.js';
+import {journalSemaine,repliePourSemaine} from './journalSemaine.js';
+import {semainePassee} from '../api/_lib/bilan-semaine.js';
 import CoutsVente from "./CoutsVente.jsx";
 import { feuillesExport, fichiersExport, zipStocke, nomExport } from "./exportDonnees.js";
 import { suggestionsAchat, tousAchatsLibres, filtresAchats, etiquetteLot, liensParAchat, lotDe, prixIndicatifLot, ecritureLot } from "./suggestionsAchat.js";
@@ -19473,6 +19478,49 @@ function ResumePlateforme({children,title='Chiffres de la plateforme',className=
 // le virement se fait là-bas, en deux clics, sur le compte connecté dans le
 // navigateur. ⚠️ L'adresse de la page (`/wallet/balance`) n'est pas mesurée ici.
 const PORTE_MONNAIE_VINTED = 'https://www.vinted.fr/wallet/balance';
+// ── (4 nov.) L'ARGENT À VENIR, LA CARTE ──────────────────────────────────────
+// Rien n'est calculé ici : `A` = `argentAVenir` (src/argentAVenir.js), publié par
+// la coque. Une ligne par site et par compte ; la date prévue seulement quand le
+// site l'écrit (eBay, Vestiaire) ; « au moins » et le manque NOMMÉ si une lecture
+// manque ; une vente au montant illisible est nommée, jamais 0 €.
+const NOM_SITE_AVENIR = { Vinted: 'Vinted', eBay: 'eBay', Vestiaire: 'Vestiaire', Leboncoin: 'Leboncoin' };
+function ArgentAVenirCarte({ A }) {
+  if (!A || A.enCours) return null;
+  const T = aVenirPour(A);
+  if (T.valeur == null && !T.partiel) return null;
+  if (!(A.n > 0) && !A.partiel) return null;
+  const nc = A.nonComptees || [];
+  return (
+    <section className="vrm-a-venir" data-a-venir={T.valeur == null ? '' : String(Math.round(T.valeur * 100))} data-a-venir-n={String(A.n)} data-a-venir-partiel={T.partiel ? '1' : undefined}
+      style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 20, padding: '14px 16px', marginBottom: 12, boxShadow: C.shadow || 'none' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+        <span style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600, color: C.text }}>À venir</span>
+        <span className="vrm-display" style={{ fontSize: 22, fontWeight: 700, color: C.text, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }} title={T.partiel ? `Au moins — sans ${T.manque.join(', ')}` : undefined}>
+          {T.partiel ? <span style={{ fontSize: 13, fontWeight: 500, color: C.muted }}>au moins </span> : null}{T.valeur == null ? '—' : fmt(T.valeur)}
+        </span>
+      </div>
+      <div role="list" style={{ marginTop: 6 }}>
+        {A.parCompte.map((g) => (
+          <div role="listitem" key={g.plateforme + '|' + g.compte} data-a-venir-ligne={g.plateforme} data-a-venir-compte={g.compte} data-a-venir-eur={String(Math.round(g.eur * 100))} data-a-venir-prevu={g.prevu != null ? new Date(g.prevu).toISOString().slice(0, 10) : ''}
+            style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 44, borderTop: `1px solid ${C.border}` }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 15, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{NOM_SITE_AVENIR[g.plateforme] || g.plateforme}{g.compte && g.plateforme === 'Vinted' ? <span style={{ fontWeight: 400, color: C.muted }}> · {g.compte}</span> : null}</div>
+              <div style={{ fontSize: 13, color: C.muted }}>{g.n} vente{g.n > 1 ? 's' : ''}{g.prevu != null ? ` · ${texteDatePrevue(g.prevu)}` : ''}</div>
+            </div>
+            <span style={{ fontSize: 15, fontWeight: 600, color: C.text, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{fmt(g.eur)}</span>
+          </div>
+        ))}
+      </div>
+      {(A.manque.length > 0 || nc.length > 0) && (
+        <div data-a-venir-manque={A.manque.join(',')} data-a-venir-nc={String(nc.length)} style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, marginTop: 2, fontSize: 13, color: C.muted, lineHeight: 1.45 }}>
+          {A.manque.length > 0 ? <>Sans {A.manque.join(', ')} (pas lu)</> : null}
+          {A.manque.length > 0 && nc.length > 0 ? ' · ' : null}
+          {nc.length > 0 ? <>{nc.length} vente{nc.length > 1 ? 's' : ''} au montant pas lu ({[...new Set(nc.map((x) => x.plateforme))].join(', ')})</> : null}
+        </div>
+      )}
+    </section>
+  );
+}
 function RetirerArgent({ liveStats }) {
   const [ouvert, setOuvert] = useState(false);
   const liste = liveStats && Array.isArray(liveStats.walletParCompte) ? liveStats.walletParCompte.filter((x) => x.dispo != null) : null;
@@ -19515,7 +19563,9 @@ function VintedResume({ liveStats, baseKO, siAJour = true, sauf = null, sansMont
   if (baseKO) return null;
   const ca = liveStats && liveStats.caEncaisse != null ? liveStats.caEncaisse : null;
   const dispo = liveStats && liveStats.walletDispo != null ? liveStats.walletDispo : null;
-  const att = liveStats && liveStats.walletAttente != null ? liveStats.walletAttente : null;
+  // (4 nov.) La part Vinted de l'argent à venir (`liveStats.aVenir`, une règle), plus le solde bloqué seul.
+  const attV = aVenirPour(liveStats && liveStats.aVenir, { plateforme: 'Vinted' });
+  const att = attV.valeur;
   const dAge = liveStats && liveStats.dataAgeJours != null ? liveStats.dataAgeJours : null;
   const box = { flex:'1 1 90px', minWidth:0 };
   const eti = { fontSize:11, color:C.muted, textTransform:'uppercase', letterSpacing:0.7, fontWeight:600 };
@@ -19527,7 +19577,7 @@ function VintedResume({ liveStats, baseKO, siAJour = true, sauf = null, sansMont
       <div className="vrm-summary-strip" style={{display:'flex',gap:14,flexWrap:'wrap',border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 15px',boxShadow:C.shadow||'none'}}>
         <div style={box}><div style={eti}>CA finalisé</div><div className="vrm-display" style={{fontSize:20,fontWeight:700,color:C.text}}>{ca==null?'—':fmt(ca)}</div></div>
         <div style={box}><div style={eti}>Disponible</div><div className="vrm-display" style={{fontSize:20,fontWeight:700,color:C.text}}>{dispo==null?'—':fmt(dispo)}</div></div>
-        <div style={box}><div style={eti}>En attente</div><div className="vrm-display" style={{fontSize:20,fontWeight:700,color:C.muted}}>{att==null?'—':fmt(att)}</div></div>
+        <div style={box}><div style={eti}>À venir</div><div className="vrm-display" style={{fontSize:20,fontWeight:700,color:C.muted}} title={attV.partiel?`au moins — sans ${attV.manque.join(', ')}`:undefined}>{att==null?'—':fmt(att)}</div></div>
       </div>
     </div></ResumePlateforme>}
     {/* (18 oct.) Hors du repli : sur téléphone le résumé est replié, et une capture
@@ -49936,8 +49986,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // date ESTIMÉE dépassée n'en est pas une (revue du 22 oct., `retard`
         // de api/_lib/limite-envoi.js) — la ligne « colis-limite » la dit.
         const late = toShip.filter(t=>t.retard).length;
-        const inRoute = (sales.items||[]).filter(o=>!isHidden(o) && classifyOrderStatus(o.status)==='pending');
-        let inRouteSum=0; for(const o of inRoute){ const v=o.price?.amount!=null?Number(o.price.amount):0; if(v>0) inRouteSum+=v; }
         const loading = accounts.length>0 && sales.items===null && buys.items===null && listings.items===null && convs.items===null;
         // ⚠️⚠️ TROIS ÉTATS, JAMAIS DEUX. « aucun compte » se dit seulement quand
         //    on a VRAIMENT regardé : `accountsReady` (la lecture est revenue) et
@@ -50755,25 +50803,33 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         })() : null;
         // L'argent en attente : UNE lecture, pour sa carte et pour la tendance
         // « En attente » (qui ne le redit que si la carte n'est pas là, §7).
-        const escrowJ=(walletEscrow&&walletEscrow.total>0)?walletEscrow:null;
-        const valAttente=escrowJ?escrowJ.total:inRouteSum;
+        // (4 nov.) L'ARGENT À VENIR : la règle de la coque (`liveStats.aVenir`,
+        // src/argentAVenir.js), toutes plateformes — plus le seul Vinted (solde
+        // bloqué ou somme des statuts « en cours » de la liste). Une case pour la
+        // carte ET pour la tendance « À venir » (qui ne le redit que si la carte
+        // n'est pas là, §7). « À virer » reste le porte-monnaie Vinted (déjà versé).
+        const escrowJ=(walletEscrow&&walletEscrow.accounts>0)?walletEscrow:null;
+        const aVenirJ = aVenirPour(liveStats && liveStats.aVenir);
+        const valAttente = aVenirJ.valeur;
         W.attente = (!baseKO && !premierJour) ? (()=>{
-          const escrow=escrowJ;
           const val=valAttente;
-          if(loading||val<=0) return null;
-          const avecDispo = !!(escrow && escrow.dispo > 0);
+          if(loading||val==null||!(val>0||aVenirJ.partiel)) return null;
+          const avecDispo = !!(escrowJ && escrowJ.dispo > 0);
+          const A = liveStats.aVenir;
+          const sites = [...new Set(A.lignes.map(l=>l.plateforme))];
           return (
-          <div data-argent-attente={Math.round(val*100)} className="vrm-day-wallet vrm-day-card" style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',gridTemplateColumns:avecDispo?'minmax(0,1fr) minmax(0,1fr)':'minmax(0,1fr)'}}>
+          <div data-argent-attente={Math.round(val*100)} data-a-venir-partiel={aVenirJ.partiel?'1':undefined} className="vrm-day-wallet vrm-day-card" style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none',gridTemplateColumns:avecDispo?'minmax(0,1fr) minmax(0,1fr)':'minmax(0,1fr)'}}
+            title={aVenirJ.partiel ? `Au moins — sans ${aVenirJ.manque.join(', ')}` : undefined}>
             <div style={{minWidth:0}}>
-              <div className="vrm-day-k" style={{color:C.muted,display:'flex',alignItems:'center',gap:6}}><Icon name="wallet" size={14}/>En attente</div>
-              <div className="vrm-display vrm-day-wallet-n" style={{color:C.text}}><Montant v={val} prefixe={escrow?'':'≈ '}/></div>
-              <div className="vrm-day-note" style={{color:C.muted}}>{inRoute.length} vente{inRoute.length>1?'s':''} en cours{escrow?'':' · estimation'}</div>
+              <div className="vrm-day-k" style={{color:C.muted,display:'flex',alignItems:'center',gap:6}}><Icon name="wallet" size={14}/>À venir</div>
+              <div className="vrm-display vrm-day-wallet-n" style={{color:C.text}}>{aVenirJ.partiel?<span className="vrm-fu-borne">au moins </span>:null}<Montant v={val}/></div>
+              <div className="vrm-day-note" style={{color:C.muted}}>{aVenirJ.n} vente{aVenirJ.n>1?'s':''}{sites.length>1?` · ${sites.length} sites`:sites.length===1&&sites[0]!=='Vinted'?` · ${sites[0]}`:''}</div>
             </div>
             {avecDispo && (
               <div style={{minWidth:0,borderLeft:`1px solid ${C.border}`,paddingLeft:16}}>
                 <div className="vrm-day-k" style={{color:C.muted}}>À virer</div>
-                <div className="vrm-display vrm-day-wallet-n" style={{color:C.text}}><Montant v={escrow.dispo} dec={2}/></div>
-                <div className="vrm-day-note" style={{color:C.muted}}>déjà disponibles{escrow.accounts>1?` · ${escrow.accounts} porte-monnaie`:''}{escrow.plusVieuxJours>7?` · lu il y a ${escrow.plusVieuxJours} j`:''}</div>
+                <div className="vrm-display vrm-day-wallet-n" style={{color:C.text}}><Montant v={escrowJ.dispo} dec={2}/></div>
+                <div className="vrm-day-note" style={{color:C.muted}}>{escrowJ.accounts>1?`${escrowJ.accounts} porte-monnaie`:'porte-monnaie Vinted'}{escrowJ.plusVieuxJours>7?` · lu il y a ${escrowJ.plusVieuxJours} j`:''}</div>
               </div>
             )}
           </div>
@@ -50877,7 +50933,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             { id: 'dort', l: `En ligne depuis ${SLEEP_DAYS} j +`, n: dort ? String(dort.n) : '—', sous: dort ? <>{e0(dort.valeur)} affichés</> : (listingDatesLu === null || listings.error ? 'pas lu' : datesOk && stockDort ? 'aucune date' : 'je lis…'), titre: dort ? `${dort.n} annonce${dort.n > 1 ? 's' : ''} en ligne depuis ${SLEEP_DAYS} jours et plus, ${fmt(dort.valeur)} affichés${stockDort.datesConnues < stockDort.total ? ` · ${stockDort.datesConnues} sur ${stockDort.total} datées` : ''}` : (listingDatesLu === null || listings.error ? 'dates de mise en ligne pas lues' : datesOk && stockDort ? 'aucune date de mise en ligne connue' : 'je lis tes annonces…'), v: dort ? dort.n : null },
             avecAttente
               ? { id: 'panier', l: 'Panier moyen 30 j', n: R.panier30.moyen == null ? '—' : <Montant v={R.panier30.moyen}/>, sous: null, titre: R.panier30.n ? `sur ${R.panier30.n} vente${R.panier30.n > 1 ? 's' : ''} en 30 jours` : 'aucune vente en 30 jours', v: R.panier30.moyen }
-              : { id: 'attente', l: 'En attente', n: loading ? '—' : <Montant v={valAttente} prefixe={escrowJ ? '' : '≈ '}/>, sous: escrowJ ? null : 'estimation', titre: escrowJ ? 'chez Vinted' : `${inRoute.length} vente${inRoute.length > 1 ? 's' : ''} en cours · estimation`, v: valAttente },
+              : { id: 'attente', l: 'À venir', n: loading || valAttente == null ? '—' : <Montant v={valAttente}/>, sous: aVenirJ.partiel ? 'au moins' : null, titre: aVenirJ.partiel ? `au moins — sans ${aVenirJ.manque.join(', ')}` : `${aVenirJ.n} vente${aVenirJ.n > 1 ? 's' : ''} pas encore versée${aVenirJ.n > 1 ? 's' : ''}`, v: valAttente },
           // (1er nov.) Une tendance SANS BASE (« — aucune date », « pas de moyenne »)
           // n'est pas un chiffre : elle ne prend pas une case. Statistiques la dit,
           // avec sa raison (rythme, stock qui dort) — la carte y mène.
@@ -51490,7 +51546,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 (avec le détail par compte et l'avertissement d'incomplétude) est
                 descendue dans « Analyse » — mais le montant lui-même est ce que
                 Julien vient regarder : il prend sa place dans la rangée. */}
-            {totals.nbAttente>0 && <StatBox compact label="En attente" value={fmtE0(totals.enAttente)} sub={`${totals.nbAttente} en cours`}/>}
+            {/* (4 nov.) « En attente » (la somme des statuts « en cours » de la liste, Vinted
+                seul) n'est plus ici : l'argent à venir a UNE règle et UNE carte, plus bas. */}
             {/* ⚠️ PAS DE « 💰 En attente » ICI : la carte dépliable juste au-dessus
                 affiche déjà ce montant, avec le détail par compte et l'avertissement
                 d'incomplétude. On lisait donc « ≈ 807 € · 25 ventes en cours » puis,
@@ -51586,145 +51643,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               )}/>
           );
         })()}
-        {/* 💶 Argent en route : ventes en cours (pas encore validées par
-            l'acheteur) → l'argent que Vinted va te verser bientôt. Visibilité
-            trésorerie sans ouvrir Vinted. Source = statut des ventes. */}
-        {(()=>{
-          const inRoute=(sales.items||[]).filter(o=>!isHidden(o) && classifyOrderStatus(o.status)==='pending');
-          if(!inRoute.length) return null;
-          let sum=0; for(const o of inRoute){ const v=o.price?.amount!=null?Number(o.price.amount):0; if(v>0) sum+=v; }
-          if(sum<=0) return null;
-          // ⚠️ LE VRAI CHIFFRE VIENT DE VINTED, pas d'une addition maison.
-          // Vinted expose le solde BLOQUÉ (escrow) de chaque porte-monnaie,
-          // capté par l'extension. Additionner les ventes « pas encore
-          // finalisées » donnait un tout autre montant (mesuré : 1204 €
-          // affichés contre 86 € réellement bloqués) — beaucoup de ventes
-          // anciennes gardent ce statut alors que l'argent a déjà été versé.
-          const reel = (walletEscrow && walletEscrow.total > 0) ? walletEscrow : null;
-          return (
-            <div style={{position:'relative',overflow:'hidden',border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'11px 14px 11px 16px',marginBottom:10}}>
-              {/* Surface NEUTRE + une barre de 3 px : la couleur signale, elle
-                  n'inonde plus le bloc. Le montant, lui, garde l'accent — c'est
-                  lui l'information, pas le fond. */}
-              <span aria-hidden="true" style={{position:'absolute',left:0,top:0,bottom:0,width:3,background:C.accent}}/>
-              {/* La carte est CLIQUABLE : Julien veut voir d'où sort le total,
-                  compte par compte — un chiffre agrégé qu'on ne peut pas ouvrir
-                  est invérifiable, donc invendable. */}
-              <button type="button" onClick={()=>setDetailAttente(v=>!v)} aria-expanded={detailAttente} disabled={!reel}
-                style={{width:'100%',border:'none',background:'transparent',padding:0,textAlign:'left',fontFamily:'inherit',cursor:reel?'pointer':'default'}}>
-                <div style={{display:'flex',alignItems:'center',gap:11}}>
-                  <span style={{color:C.accent,display:'flex',flexShrink:0}}><Icon name="wallet" size={20}/></span>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:11,color:C.muted,fontWeight:500,textTransform:'uppercase',letterSpacing:0.4}}>{reel?'Argent en attente':'Argent en attente (estimation)'}{reel?<span style={{textTransform:'none',letterSpacing:0,fontWeight:600,color:C.accent}}> · {detailAttente?'masquer le détail ▲':'voir le détail ▼'}</span>:null}</div>
-                    <div style={{fontSize:22,fontWeight:700,color:C.accent,lineHeight:1.1}}>{reel?'':'≈ '}{(reel?reel.total:sum).toFixed(0)} €</div>
-                  </div>
-                  <div style={{textAlign:'right',flexShrink:0}}>
-                    <div style={{fontSize:20,fontWeight:700,color:C.text}}>{inRoute.length}</div>
-                    <div style={{fontSize:11,color:C.muted}}>vente{inRoute.length>1?'s':''} en cours</div>
-                  </div>
-                </div>
-              </button>
-              {/* LE DÉCOMPTE : une ligne par compte, avec sa fraîcheur. Les comptes
-                  sans porte-monnaie lu figurent AUSSI, à 0, pour qu'on voie
-                  immédiatement pourquoi le total est plus bas que la réalité. */}
-              {reel && detailAttente && (()=>{
-                const lignes = (reel.parCompte||[]).map(l=>({...l, nom: accName((accounts||[]).find(a=>String(a.vinted_user_id)===l.uid) || {vinted_user_id:l.uid})}));
-                const lus = reel.avecSolde || new Set();
-                const absents = (accounts||[]).filter(a=>{ const u=String(a.vinted_user_id||''); return u && !lus.has(u) && !acctOff(u); });
-                return (
-                  <div style={{marginTop:10,borderTop:`1px solid ${C.border}`,paddingTop:8}}>
-                    {lignes.map(l=>(
-                      <div key={l.uid} style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',padding:'5px 0'}}>
-                        <div style={{flex:'1 1 130px',minWidth:0}}>
-                          <div style={{fontSize:12,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{l.nom}</div>
-                          <div style={{fontSize:11,color:C.muted,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                            {l.jours==null?'':l.jours<1?'lu aujourd’hui':`lu il y a ${l.jours} j`}{l.dispo>0?` · ${l.dispo.toFixed(2).replace('.',',')} € disponibles`:''}
-                          </div>
-                        </div>
-                        <span style={{flexShrink:0,fontSize:13,fontWeight:700,color:l.attente?C.accent:C.muted}}>{l.attente!=null?`${l.attente.toFixed(2).replace('.',',')} €`:'—'}</span>
-                      </div>
-                    ))}
-                    {/* ⚠️ RÈGLE DE JULIEN, VÉRIFIÉE : l'argent en attente est la SOMME DES
-                        VENTES EN COURS. Mesuré compte par compte contre le solde Vinted —
-                        `angeled92` tombe à l'euro près (91,00 € = 91,00 €, 4 ventes). Donc
-                        pour un compte dont le porte-monnaie n'a jamais été lu, on n'affiche
-                        plus « ? » : on calcule. C'est une ESTIMATION et c'est écrit, mais
-                        c'est infiniment plus utile qu'un trou.
-                        ⚠️ Là où le solde Vinted EST connu, il fait foi : quand il dépasse la
-                        somme des ventes (359 € contre 283 €), l'écart mesure exactement les
-                        ventes qui ne sont pas encore captées — on ne le maquille pas. */}
-                    {absents.map(a=>{
-                      const u=String(a.vinted_user_id||'');
-                      const mes=inRoute.filter(o=>String(o._acc?.vinted_user_id||'')===u);
-                      let s=0; for(const o of mes){ const v=o.price?.amount!=null?Number(o.price.amount):0; if(v>0) s+=v; }
-                      return (
-                        <div key={a.vinted_user_id} style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',padding:'5px 0',opacity:0.85}}>
-                          <div style={{flex:'1 1 130px',minWidth:0}}>
-                            <div style={{fontSize:12,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{accName(a)}</div>
-                            <div style={{fontSize:11,color:C.warn,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                              {mes.length?`estimé sur ${mes.length} vente${mes.length>1?'s':''} en cours — connecte-toi à ce compte pour le solde exact`:'solde jamais lu — connecte-toi une fois à ce compte sur Vinted'}
-                            </div>
-                          </div>
-                          <span style={{flexShrink:0,fontSize:13,fontWeight:700,color:s?C.warn:C.muted}}>{s?`≈ ${s.toFixed(2).replace('.',',')} €`:'?'}</span>
-                        </div>
-                      );
-                    })}
-                    {(()=>{
-                      let est=0;
-                      for(const a of absents){ const u=String(a.vinted_user_id||'');
-                        for(const o of inRoute) if(String(o._acc?.vinted_user_id||'')===u){ const v=o.price?.amount!=null?Number(o.price.amount):0; if(v>0) est+=v; } }
-                      return (
-                        <div style={{borderTop:`1px solid ${C.border}`,marginTop:6,paddingTop:7}}>
-                          <div style={{display:'flex',alignItems:'center',gap:8}}>
-                            <div style={{flex:1,fontSize:12,fontWeight:700,color:C.text}}>Total lu chez Vinted</div>
-                            <span style={{fontSize:15,fontWeight:700,color:C.accent}}>{reel.total.toFixed(2).replace('.',',')} €</span>
-                          </div>
-                          {est>0 && (
-                            <div style={{display:'flex',alignItems:'center',gap:8,marginTop:4}}>
-                              <div style={{flex:1,fontSize:12,fontWeight:700,color:C.text}}>+ estimé sur les autres comptes</div>
-                              <span style={{fontSize:15,fontWeight:700,color:C.warn}}>≈ {est.toFixed(2).replace('.',',')} €</span>
-                            </div>
-                          )}
-                          {est>0 && (
-                            <div style={{display:'flex',alignItems:'center',gap:8,marginTop:6,borderTop:`1px dashed ${C.border}`,paddingTop:6}}>
-                              <div style={{flex:1,fontSize:13,fontWeight:700,color:C.text}}>Total probable</div>
-                              <span style={{fontSize:15,fontWeight:700,color:C.accent}}>≈ {(reel.total+est).toFixed(2).replace('.',',')} €</span>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                );
-              })()}
-              <div style={{fontSize:12,color:C.muted,marginTop:6,lineHeight:1.4}}>{reel
-                ? <>Retenu par Vinted, pas encore virable · {reel.accounts} porte-monnaie lu{reel.accounts>1?'s':''}{reel.dispo>0?<> · <b>{reel.dispo.toFixed(2).replace('.',',')} €</b> disponibles à virer</>:null}</>
-                : <>Estimation sur tes ventes en cours, en attendant que l'extension lise les porte-monnaie.</>}</div>
-              {/* ⚠️ CE TOTAL EST PARTIEL TANT QUE TOUS LES PORTE-MONNAIE N'ONT PAS
-                  ÉTÉ LUS. Julien : « j'ai 323 € en attente sur un seul compte, ce
-                  n'est pas possible que le total soit 504 € avec sept comptes » —
-                  il a raison, et le total n'était pas faux, il était INCOMPLET.
-                  On NOMME donc les comptes manquants au lieu de laisser croire à
-                  un chiffre complet. Un total partiel qui se présente comme
-                  complet est pire qu'un total absent. */}
-              {(()=>{
-                const lus = (reel && reel.avecSolde) || new Set();
-                const manquants = (accounts||[]).filter(a=>{ const u=String(a.vinted_user_id||''); return u && !lus.has(u) && !acctOff(u); });
-                if (!manquants.length) return null;
-                return (
-                  <div data-attente-incomplet={manquants.length} style={{marginTop:8,padding:'8px 10px',borderLeft:`3px solid ${C.warn}`,background:`${C.warn}10`,borderRadius:12,fontSize:12,color:C.text,lineHeight:1.45}}>
-                    <b>Total incomplet</b> — sans {manquants.length} compte{manquants.length>1?'s':''} sur {(accounts||[]).length} : <span style={{opacity:0.9}}>{manquants.map(a=>accName(a)).join(", ")}</span>.
-                    {/* ⚠️ NE PAS redire « ouvre ton porte-monnaie » : depuis la 5.20 la
-                        moisson active lit `payouts` toute seule pour le compte CONNECTÉ
-                        (vérifié : 6 soldes captés en 2 minutes sans ouvrir un seul
-                        porte-monnaie). Le seul geste utile est de se connecter au compte. */}
-                    <div style={{marginTop:2,opacity:0.85}}>Connecte-toi une fois à {manquants.length>1?'chacun':'ce compte'} sur Vinted : l'extension lit le solde toute seule.</div>
-                  </div>
-                );
-              })()}
-            </div>
-          );
-        })()}
+        {/* (4 nov.) L'ARGENT À VENIR, toutes plateformes, compte par compte : la
+            règle de la coque (`liveStats.aVenir`, src/argentAVenir.js). Elle
+            remplace « l'argent en attente » d'avant (Vinted seul, solde bloqué ou
+            somme des statuts « en cours » de la liste — 220 € de ventes déjà
+            versées comptées, mesuré le 4 nov.). */}
+        {!baseKO && <ArgentAVenirCarte A={liveStats && liveStats.aVenir}/>}
         {/* ── VENTES PAR JOUR ────────────────────────────────────────────────
             Demande de Julien : « un endroit où on puisse voir les ventes par
             jour, pareil un calendrier de tel jour à tel jour ; ici ce n'est pas
@@ -58267,6 +58191,12 @@ const numLigneEbay = (o, li) => numEbayLu(li && li.sku, li && (li.legacyItemId |
 const commandeEbayEngagee = (o) => !!o
   && !(/CANCEL/i.test(String((o.cancelStatus && o.cancelStatus.cancelState) || '')) && !/REJECT/i.test(String((o.cancelStatus && o.cancelStatus.cancelState) || '')))
   && !/FAILED|FULLY_REFUNDED/i.test(String(o.orderPaymentStatus || ''));
+// (4 nov.) L'argent à venir avec les règles PROPRIÉTAIRES de l'app (§11) : le
+// module ne recopie aucune d'elles, il les reçoit ici.
+const REGLES_A_VENIR = { classer: (st) => classifyOrderStatus(st), montantVinted: (o) => montantCommandeLu(o), lbcAnnulee: (v) => lbcAnnulee(v), lbcFinalisee: (v) => lbcFinalisee(v),
+  commandeEbayEngagee: (o) => commandeEbayEngagee(o), montantRecuEbay: (o) => montantRecuEbay(o), etapeVc: (v) => etapeMotVc(v), vcAnnulee: (v) => vcVenteAnnulee(v),
+  montantRecuVc: (v) => montantRecuVc(v), dateVersementVc: (v) => dateVersementVc(v) };
+const aVenirCoque = (x) => argentAVenir({ ...x, etatTx: TXN_ETATS_LU === false ? null : etatTxn, R: REGLES_A_VENIR });
 // `programmees` (5 octobre) : les annonces PROGRAMMÉES sur eBay
 // (`ebay_programmees.items`, et celles que VRM vient de programmer). Une paire
 // prouvée vendue sur Vinted qui y figure ⇒ `aAnnulerEbay` : « programmée sur
@@ -65997,6 +65927,13 @@ function AppCoeur() {
   // (1er nov., audit A2) Les ventes Vestiaire entrent dans « vendu » (montant sûr) ou sont nommées.
   const ventesVcCoque = useVentesVestiaire();
   const excluAutreCoque = useExcluAutre();
+  // (4 nov.) L'ARGENT À VENIR, toutes plateformes (`argentAVenir`, src/argentAVenir.js) :
+  // UNE règle, calculée ici une fois et publiée dans `liveStats.aVenir` pour la carte
+  // des chiffres, Ma journée, Ventes et le widget. Les dates de versement Vinted
+  // (450) et l'état de chaque transaction (TXN_ETATS, rempli par la même lecture)
+  // écartent les ventes déjà versées que la LISTE dit encore « en cours ».
+  const [versementsCoque, setVersementsCoque] = useState(undefined);
+  useEffect(() => { let mort = false; fetchVersementsVinted().then((m) => { if (!mort) setVersementsCoque(m); }).catch(() => { if (!mort) setVersementsCoque(null); }); return () => { mort = true; }; }, [ventesCoque]);
   const liveStatsVus = useMemo(() => {
     if (!liveStats) return liveStats;
     if (ventesCoque === null) return { ...liveStats, ...VENDU_PAS_SU };
@@ -66025,10 +65962,13 @@ function AppCoeur() {
         // rythme de Statistiques : la même population que « vendu », jamais une
         // seconde règle (§11).
         venduLignes: v.lignes,
-        venduManque, venduEnAttente: lbcCoqueLu === undefined || ebayCommandes === undefined || ventesVcCoque === undefined };
+        venduManque, venduEnAttente: lbcCoqueLu === undefined || ebayCommandes === undefined || ventesVcCoque === undefined,
+        aVenir: aVenirCoque({ vinted: ventesCoque, lbc: lbcCoqueLu === undefined ? undefined : lbcCoqueLu === true ? ((lbcVentes && lbcVentes.ventes) || []) : null,
+          ebay: ebayCommandes, vestiaire: ventesVcCoque, versements: versementsCoque, cachee: (o) => ecarte(o && o._acc && o._acc.vinted_user_id), excluAutre: excluAutreCoque,
+          manqueVinted: ventesKO.filter(uid => !ecarte(uid)).map(loginDe) }) };
     } catch (_) { return liveStats; }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [liveStats, ventesCoque, ventesKO, lbcVentes, lbcCoqueLu, ebayCommandes, panelOffCoque, nuagePret, masquesTick, jourCle, vintedAccounts, datesLbcTick, ventesVcCoque, excluAutreCoque]);
+  }, [liveStats, ventesCoque, ventesKO, lbcVentes, lbcCoqueLu, ebayCommandes, panelOffCoque, nuagePret, masquesTick, jourCle, vintedAccounts, datesLbcTick, ventesVcCoque, excluAutreCoque, versementsCoque]);
   // Le widget : écrit quand ce qu'il afficherait CHANGE (pas à chaque rendu),
   // et SEULEMENT un « vendu » complet : sources pas encore revenues, illisibles
   // ou un compte manquant ⇒ on n'écrit pas, l'iPhone garde la dernière photo
@@ -66039,6 +65979,10 @@ function AppCoeur() {
     if (liveStatsVus.venduPasSu || liveStatsVus.venduEnAttente || (liveStatsVus.venduManque || []).length || liveStatsVus.caMois == null) return;
     // (1er nov.) Des ventes du mois dont l'argent ne se lit pas : le widget dit « au moins ».
     const { onlinePasSu, ...base0 } = widgetBase;
+    // (4 nov.) « En attente » du widget = l'argent à venir (la règle de la coque),
+    // seulement complet ; sinon la valeur d'avant reste (jamais un minimum présenté complet).
+    const aV = aVenirPour(liveStatsVus.aVenir);
+    if (aV.valeur != null && !aV.partiel) base0.enAttente = Math.round(aV.valeur);
     const data = { ...base0, caMois: Math.round(liveStatsVus.caMois || 0), ventesMois: liveStatsVus.ventesMois || 0, caMoisNonComptees: liveStatsVus.venduNonCompteesMois || 0, ...(onlinePasSu ? { onlineRaison: onlinePasSu } : { onlineAt: new Date().toISOString().slice(0, 10) }) };
     const cle = JSON.stringify(data);
     if (cle === widgetEcrit.current) return;

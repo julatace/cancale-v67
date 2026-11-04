@@ -25,6 +25,8 @@
 // `hors` = le chiffre n'a pas de sens pour cette sélection (« — », et la
 // feuille ne le propose pas). Exécuté par scripts/audit-carte-chiffres.cjs.
 
+import { aVenirPour } from '../argentAVenir.js';
+
 export const CLE_CARTE_STATS = 'vrm_carte_stats';
 
 export const SITES = ['toutes', 'vinted', 'vestiaire', 'leboncoin', 'ebay'];
@@ -57,7 +59,10 @@ export const CHIFFRES = {
   finalisees: { nom: 'Ventes finalisées', court: 'finalisées', type: 'n', periodes: TOUTES_PERIODES, sites: ['toutes'], compte: false, aller: 'compta' },
   aposter:    { nom: 'À poster', court: 'à poster', type: 'n', periodes: null, sites: SITES, compte: false, aller: 'cat_bord' },
   retirer:    { nom: 'À retirer', court: 'à retirer', type: 'n', periodes: null, sites: ['toutes'], compte: false, aller: 'cat_bord' },
-  attente:    { nom: 'Argent en attente', court: 'en attente', type: 'eur', periodes: null, sites: ['toutes', 'vinted'], compte: false, vinted: true, aller: 'cat_ventes' },
+  // (4 nov.) « Argent à venir » : ce que TES SITES te doivent encore (src/argentAVenir.js,
+  // `liveStats.aVenir`) — toutes plateformes, par compte Vinted. L'id reste `attente`
+  // (les réglages rangés le gardent) ; il ne lit plus le seul porte-monnaie Vinted.
+  attente:    { nom: 'Argent à venir', court: 'à venir', type: 'eur', periodes: null, sites: SITES, compte: true, aller: 'cat_ventes' },
   dispo:      { nom: 'Disponible', court: 'disponible', type: 'eur', periodes: null, sites: ['toutes', 'vinted'], compte: true, vinted: true, aller: 'cat_ventes' },
   enligne:    { nom: 'Annonces en ligne', court: 'en ligne', type: 'n', periodes: null, sites: ['toutes', 'vinted'], compte: true, vinted: true, aller: 'annonces' },
   dorment:    { nom: 'Annonces qui dorment', court: 'qui dorment', type: 'n', periodes: null, sites: ['toutes', 'vinted'], compte: false, vinted: true, aller: 'annonces' },
@@ -337,7 +342,10 @@ export const valeurChiffre = (id, place, sources, sel, regles, maintenant = Date
     const L = S.live;
     if (!L) return vide('pasSu');
     const uid = sel && sel.compte ? String(sel.compte.uid || '') : '';
-    if (id === 'attente') return L.walletAttente == null ? vide('pasSu') : { valeur: L.walletAttente, partiel: false, manque: [], hors: '', p: null, raison: '' };
+    if (id === 'attente') {
+      const A = aVenirPour(L.aVenir || null, { plateforme, login });
+      return A.valeur == null ? vide(A.raison || 'pasSu', { manque: A.manque }) : { valeur: A.valeur, partiel: A.partiel, manque: A.manque, hors: '', p: null, raison: '' };
+    }
     if (id === 'dispo') {
       if (!uid) return L.walletDispo == null ? vide('pasSu') : { valeur: L.walletDispo, partiel: false, manque: [], hors: '', p: null, raison: '' };
       const x = Array.isArray(L.walletParCompte) ? L.walletParCompte.find((w) => String(w.uid) === uid) : null;
