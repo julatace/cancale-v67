@@ -4,6 +4,7 @@
 // pleine. Pas su : « — » et la raison. Pas (encore) arrivée : grisée — jamais
 // inventée. Aucune couleur (§7) sauf le rouge de deux paires sous ce N° (§5).
 import React from 'react';
+import {HistoriqueModifications} from './OutilsParcours.jsx';
 import { createPortal } from 'react-dom';
 import './styles-fiche-paire.css';
 import './styles-annonces-outils.css';
@@ -27,7 +28,7 @@ const Evenement = ({ ev }) => (
   </li>
 );
 
-export default function FichePaire({ p, lecture = false, num, onFermer, onRetour, onBordereau, onEmballer, onPrix, onDupliquer, neuve = null, onCopier, Photo, Icon, Retour }) {
+export default function FichePaire({ owner = '', p, lecture = false, num, onFermer, onRetour, onBordereau, onEmballer, onPrix, onDupliquer, neuve = null, onCopier, Photo, Icon, Retour }) {
   React.useEffect(() => {
     const k = (e) => { if (e.key === 'Escape' && !e.defaultPrevented) { e.preventDefault(); onFermer(); } };
     window.addEventListener('keydown', k, true);
@@ -65,9 +66,11 @@ export default function FichePaire({ p, lecture = false, num, onFermer, onRetour
           {neuve && onCopier ? <button type="button" className="vrm-ao-second" data-fiche-copier="" onClick={() => onCopier(neuve)}>Copier le texte</button> : null}
         </div>
       ) : null}
+      <nav className="vrm-fp-raccourcis" aria-label="Rubriques de cet article">{p.etapes.map(e=><button key={e.cle} type="button" onClick={()=>document.getElementById(`vrm-fiche-etape-${e.cle}`)?.scrollIntoView({block:'start',behavior:window.matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'})}>{e.titre}</button>)}</nav>
+      <HistoriqueModifications owner={owner} numero={p.num}/>
       <ol className="vrm-fp-parcours">
         {p.etapes.map((e) => (
-          <li key={e.cle} className={'vrm-fp-etape is-' + e.etat} data-fiche-etape={e.cle} data-fiche-etat={e.etat}>
+          <li key={e.cle} id={`vrm-fiche-etape-${e.cle}`} className={'vrm-fp-etape is-' + e.etat} data-fiche-etape={e.cle} data-fiche-etat={e.etat}>
             <span className="vrm-fp-pastille" aria-hidden="true">{I(ICONE[e.cle] || 'info', 17)}</span>
             <span className="vrm-fp-txt">
               <span className="vrm-fp-ligne1"><b>{e.titre}</b>{e.date ? <time className="vrm-fp-date" dateTime={e.date}>{quand(e.date)}</time> : null}</span>

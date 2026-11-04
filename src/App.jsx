@@ -1,3 +1,6 @@
+import {lireBordereauVestiaire} from './bordereauVestiaire.js';
+import {lireParcours,garderParcours,noterChangements,viderParcours,motifRecherche,restaurerVue} from './parcoursQuotidien.js';
+import {RecapSelection,CompteurListe,HistoriqueModifications} from './OutilsParcours.jsx';
 import {creerGardeLectures,garderConversationsNonLues} from './lecturesVinted.js';
 import {lienAnnonceLeboncoin,etatAnnonceLeboncoin} from './etatAnnonceLeboncoin.js';
 import BilanSynchronisation from './BilanSynchronisation.jsx';
@@ -903,7 +906,7 @@ const _emitAuth = () => { _authListeners.forEach(fn => { try { fn(AUTH); } catch
 const readSession = () => { try { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch { return null; } };
 const writeSession = (s) => {
   if (AUTH.user?.id !== s?.user?.id) {
-    vuesSession.clear(); _prechargeComptes=null;
+    vuesSession.clear(); try{viderParcours(sessionStorage,!AUTH.user?.id&&s?.user?.id?s.user.id:null);}catch(_){} _prechargeComptes=null;
     _confidentialiteUid=''; _cloudReady=false; _pushPending=false;
     if (_cloudTimer) clearTimeout(_cloudTimer); _cloudTimer=null;
     Object.values(_saveTimers).forEach(clearTimeout); _saveTimers={};
@@ -3072,7 +3075,7 @@ const save = (k,v) => {
     let avantTxt; try { avantTxt = localStorage.getItem(k); } catch (_) { avantTxt = undefined; }
     const r = fusionALaSauvegarde(k, v);
     const txt = JSON.stringify(r.v);
-    try { localStorage.setItem(k,txt); _failedLocalSaves.delete(k); }
+    try { localStorage.setItem(k,txt); _failedLocalSaves.delete(k); try { if(noterChangements(sessionStorage,owner,k,_lireJson(avantTxt),r.v))window.dispatchEvent(new Event('vrm:modification-notee')); } catch (_) {} }
     catch (_) {
       delete _saveTimers[k]; _failedLocalSaves.set(k,{owner,v:r.v});
       _emitSync('error','le stockage de cet appareil a refusé la modification'); return;
@@ -3104,7 +3107,7 @@ window.addEventListener('storage', e => {
   if (e.key !== SESSION_KEY && e.key !== null) return;
   const prochaine=readSession();
   if (AUTH.user?.id !== prochaine?.user?.id) {
-    vuesSession.clear(); _confidentialiteUid=''; _cloudReady=false; _pushPending=false;
+    vuesSession.clear(); try{viderParcours(sessionStorage);}catch(_){} _confidentialiteUid=''; _cloudReady=false; _pushPending=false;
     if (_cloudTimer) clearTimeout(_cloudTimer); _cloudTimer=null;
     Object.values(_saveTimers).forEach(clearTimeout); _saveTimers={};
     AUTH={...AUTH,session:prochaine,user:prochaine?.user||null,ready:true};
@@ -11121,6 +11124,7 @@ const annotateAndDownloadBordereauBrut = async (numero, title, pdfArrayBuffer, p
   const safeTitle = (title||'').replace(/[^\w\-]+/g,'_').slice(0,40);
   const filename = `bordereau${hasNum?'-N'+numero:''}${safeTitle?'-'+safeTitle:''}${thermique&&r0.isole?'-thermique':''}.pdf`;
   // Ouvert dans un onglet (ordinateur) ; sinon la modale propose « Ouvrir ».
+  try { if(opts.avantOuverture)await opts.avantOuverture(); } catch(e) { URL.revokeObjectURL(url); throw e; }
   const ouvert = ouvrirPdfOnglet(url, filename);
   const tp = r0.tampons || [];
   return { url, filename, printed: ouvert, ouvert, thermique, isoles: r0.isole ? 1 : 0, etiquettes: r0.etiquettes,
@@ -15494,8 +15498,8 @@ function ReceptionEmails({ tracking, comptes, colisParTransporteur }) {
 // composant et sa règle vivent dans ChoixPeriode.jsx / periodeCalendrier.js ;
 // ce nom reste pour les écrans qui l'appelaient (Ventes, Achats). La VALEUR ne
 // change pas de forme : `{from, to, label?}` ou `null` (§11).
-function PeriodePicker({ value, onChange, titre = 'Période', vide }) {
-  return <ChoixPeriode value={value} onChange={onChange} Retour={FermeAuRetour} Icon={Icon} titre={titre} vide={vide}/>;
+function PeriodePicker({ value, onChange, titre = 'Période', vide, datation }) {
+  return <ChoixPeriode owner={AUTH.user?.id||''} value={value} onChange={onChange} Retour={FermeAuRetour} Icon={Icon} titre={titre} vide={vide} datation={datation}/>;
 }
 
 function EmptyState({ icon, title, desc, action }) {
@@ -16258,13 +16262,16 @@ function MemoireDefilement({ ecran }) {
   React.useLayoutEffect(()=>{
     const main=document.querySelector('.vrm-main');
     if(!main) return;
-    const cible=positions.current.get(ecran)||0;
+    const owner=AUTH.user?.id||'';let gardee=0;try{gardee=Number(lireParcours(sessionStorage,owner,'position:'+ecran,0))||0;}catch(_){}
+    const cible=positions.current.get(owner+':'+ecran)??Math.max(0,Math.min(1000000,gardee));
     let position=cible, restauration=cible>0, arrete=false;   // rien à tenir à 0
     // On ne s'arrête pas au premier succès : l'écran peut se raccourcir le temps
     // d'un chargement (le navigateur ramène alors la position à 0). On tient la
     // position 2,5 s, sauf si la personne fait défiler elle-même.
     const restaurer=()=>{ if(!arrete&&restauration&&Math.abs(main.scrollTop-cible)>=2) main.scrollTop=cible; };
     const lire=()=>{ if(!restauration) position=main.scrollTop; };
+    const garderPosition=()=>{try{if((AUTH.user?.id||'')===owner)garderParcours(sessionStorage,owner,'position:'+ecran,restauration?cible:main.scrollTop);}catch(_){}};
+    window.addEventListener('pagehide',garderPosition);
     const intervenir=()=>{ restauration=false; position=main.scrollTop; };
     main.addEventListener('scroll',lire,{passive:true});
     main.addEventListener('wheel',intervenir,{passive:true});
@@ -16279,8 +16286,9 @@ function MemoireDefilement({ ecran }) {
     boucle();
     const delai=setTimeout(()=>{restauration=false;position=main.scrollTop;cancelAnimationFrame(image);},2500);
     return ()=>{
-      arrete=true;clearTimeout(delai);cancelAnimationFrame(image);
-      positions.current.set(ecran,position);
+      arrete=true;clearTimeout(delai);cancelAnimationFrame(image);window.removeEventListener('pagehide',garderPosition);
+      positions.current.set(owner+':'+ecran,position);
+      try{if((AUTH.user?.id||'')===owner)garderParcours(sessionStorage,owner,'position:'+ecran,position);}catch(_){}
       main.removeEventListener('scroll',lire);main.removeEventListener('wheel',intervenir);main.removeEventListener('touchstart',intervenir);window.removeEventListener('keydown',intervenir);main.removeEventListener('pointerdown',intervenir);
     };
   },[ecran]);
@@ -19698,13 +19706,16 @@ function VintedResume({ liveStats, baseKO, siAJour = true, sauf = null, sansMont
 // expiré, on retombe sur le cadre — la carte le constate elle-même.
 // Préférences temporaires, isolées par vendeur et effacées à la déconnexion.
 function useVueSession(nom, initial) {
-  const cle=`${readSession()?.user?.id || 'local'}:${nom}`;
+  const owner=readSession()?.user?.id||'';
+  const cle=`${owner || 'local'}:${nom}`;
+  if(!vuesSession.has(cle)){try{const v=restaurerVue(sessionStorage,owner,nom,initial);vuesSession.set(cle,v);}catch(_){}}
   const [etat,setEtat]=useState(()=>({cle,valeur:vuesSession.has(cle)?vuesSession.get(cle):initial}));
   const valeur=etat.cle===cle?etat.valeur:(vuesSession.has(cle)?vuesSession.get(cle):initial);
   const changer=next=>setEtat(prev=>{
     const ancien=prev.cle===cle?prev.valeur:(vuesSession.has(cle)?vuesSession.get(cle):initial);
     const nouveau=typeof next==='function'?next(ancien):next;
     vuesSession.set(cle,nouveau);
+    try{if((readSession()?.user?.id||'')===owner)garderParcours(sessionStorage,owner,'vue:'+nom,nouveau);}catch(_){}
     return {cle,valeur:nouveau};
   });
   return [valeur,changer];
@@ -27817,36 +27828,51 @@ const marquerVc = (cle, id, oui) => {
   if (oui) u[String(id)] = Date.now(); else delete u[String(id)];
   vcPoser(cle, u);
 };
-async function imprimerBordereauVc({ bordId, num, titre, venteId }) {
-  const j = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(bordId)}&select=b64:data->>b64`);
-  const b64 = Array.isArray(j) && j[0] && j[0].b64;
-  if (!b64) { libererOngletPdf(); return { etat: Array.isArray(j) ? 'absent' : 'passu' }; }
+async function imprimerBordereauVc({ bordId, num, titre, venteId, original = false }) {
+  const owner=AUTH.user?.id||'';
+  const verifier=()=>{if(!owner||AUTH.user?.id!==owner||readSession()?.user?.id!==owner)throw Error('Le compte VRM a changé. Rouvre la vente dans le bon compte.');};
   try {
-    const r = await annotateAndDownloadBordereau(num || '', titre || '', b64ToBytes(b64), null);
-    if (venteId) marquerVc('vrm_vc_imprimes', venteId, true);
-    return { etat: 'ok', r };
-  } catch (e) { if (estTamponAnnule(e)) return { etat: 'annule' }; return { etat: 'refus', texte: String((e && e.message) || e) }; }
+    const lu=await lireBordereauVestiaire({id:bordId,owner,ownerActuel:()=>AUTH.user?.id||'',lire:id=>lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}&select=b64:data->>b64`)});
+    verifier();if(lu.etat!=='ok'){libererOngletPdf();return lu;}
+    const bytes=b64ToBytes(lu.b64);
+    if(original){
+      const PL=await import('pdf-lib');await PL.PDFDocument.load(bytes);verifier();
+      const url=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));
+      const r={url,filename:'bordereau-vestiaire-original.pdf',ouvert:ouvrirPdfOnglet(url,'bordereau-vestiaire-original.pdf','Bordereau Vestiaire · original sans tampon')};
+      return{etat:'ok',r};
+    }
+    const r=await annotateAndDownloadBordereau(num||'',titre||'',bytes,null,{avantOuverture:verifier});
+    verifier();if(venteId)marquerVc('vrm_vc_imprimes',venteId,true);
+    return{etat:'ok',r};
+  }catch(e){libererOngletPdf();if(estTamponAnnule(e))return{etat:'annule'};return{etat:'refus',texte:String(e?.message||e)};}
 }
 // Le bouton « Imprimer » (le geste principal de la ligne et de la carte).
 // `data-imprime` : la visionneuse s'ouvre au clic (« préparation… »).
-function BoutonImprimerVc({ v, grand = false, carte = false }) {
+function BoutonImprimerVc({ v, grand = false, carte = false, lectureSeule = false }) {
   const [etat, setEtat] = useState('');
   const [lien, setLien] = useState(null);
+  const [erreur,setErreur]=useState('');const enCours=React.useRef(false);const owner=AUTH.user?.id||'';
+  React.useEffect(()=>()=>{if(lien?.url)URL.revokeObjectURL(lien.url);},[lien]);
   if (!v || !v.bordereau || !v.bordereau.id) return null;
-  const go = async () => {
-    setEtat('lecture'); setLien(null);
-    const r = await imprimerBordereauVc({ bordId: v.bordereau.id, num: v.num, titre: v.titre, venteId: v.id });
-    setEtat(r.etat === 'ok' || r.etat === 'annule' ? '' : r.etat);
-    if (r.etat === 'refus') toast(r.texte);
-    // iPhone (aucune visionneuse) : le PDF tamponné s'ouvre d'un vrai toucher.
-    if (r.etat === 'ok' && r.r && !r.r.ouvert) setLien(r.r);
+  const go = async (original=false) => {
+    if(enCours.current)return;enCours.current=true;setEtat('lecture');setErreur('');setLien(null);
+    try {
+      const r=await imprimerBordereauVc({bordId:v.bordereau.id,num:v.num,titre:v.titre,venteId:v.id,original});
+      if(AUTH.user?.id!==owner)return;
+      setEtat(r.etat==='ok'||r.etat==='annule'?'':r.etat);
+      if(r.etat==='refus')setErreur(r.texte||'Impossible d’ouvrir ce bordereau. Réessaie.');
+      if(r.etat==='ok'&&r.r&&!r.r.ouvert)setLien(r.r);
+    }catch(e){if(AUTH.user?.id===owner){setEtat('refus');setErreur(String(e?.message||e));}libererOngletPdf();}
+    finally{enCours.current=false;if(AUTH.user?.id===owner)setEtat(e=>e==='lecture'?'':e);}
   };
   const libelle = etat === 'lecture' ? 'Lecture du bordereau…' : 'Imprimer';
   return <>
-    {carte
-      ? <button type="button" data-imprime="1" data-vc-imprimer={v.id} disabled={etat === 'lecture'} onClick={go} title="Bordereau tamponné (titre + N°), puis impression"
+    {!lectureSeule&&(carte
+      ? <button type="button" data-imprime="1" data-vc-imprimer={v.id} disabled={etat === 'lecture'} onClick={()=>go(false)} title="Bordereau tamponné (titre + N°), puis impression"
           className="vrm-colis-primaire" style={{flex:'1 1 160px',maxWidth:340,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,border:'none',background:C.accent,color:C.onAccent,borderRadius:12,padding:'0 16px',minHeight:44,cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit'}}><Icon name="printer" size={16}/>{etat === 'lecture' ? libelle : <><span className="vrm-lib-long">Imprimer le bordereau</span><span className="vrm-lib-court">Imprimer</span></>}</button>
-      : <Bouton variante={grand ? 'primaire' : 'secondaire'} icone="printer" data-imprime="1" data-vc-imprimer={v.id} disabled={etat === 'lecture'} onClick={go} title="Bordereau tamponné (titre + N°), puis impression">{etat === 'lecture' ? libelle : grand ? <><span className="vrm-lib-long">Imprimer le bordereau</span><span className="vrm-lib-court">Imprimer</span></> : 'Imprimer le bordereau'}</Bouton>}
+      : <Bouton variante={grand ? 'primaire' : 'secondaire'} icone="printer" data-imprime="1" data-vc-imprimer={v.id} disabled={etat === 'lecture'} onClick={()=>go(false)} title="Bordereau tamponné (titre + N°), puis impression">{etat === 'lecture' ? libelle : grand ? <><span className="vrm-lib-long">Imprimer le bordereau</span><span className="vrm-lib-court">Imprimer</span></> : 'Imprimer le bordereau'}</Bouton>)}
+    {!carte&&<button type="button" data-imprime="1" data-vc-original={v.id} disabled={etat==='lecture'} onClick={()=>go(true)} className="vrm-lien-action" style={{minHeight:44,color:C.accent,background:'transparent',border:0,font:'inherit',fontSize:13,cursor:'pointer'}}>Ouvrir le PDF d’origine</button>}
+    {erreur&&<span role="alert" data-vc-bordereau-erreur="" style={{flexBasis:'100%',fontSize:12,color:C.warn}}>{erreur}</span>}
     {lien ? <a href={lien.url} target="_blank" rel="noreferrer" data-vc-bordereau-lien="" style={{ color: C.accent, fontWeight: 600, fontSize: 13 }}>Ouvrir le bordereau</a> : null}
     {etat === 'absent' ? <span data-vc-bordereau-etat="absent" style={{ flexBasis: '100%', fontSize: 12, color: C.muted }}>Le bordereau n'est plus rangé — rouvre la vente sur Vestiaire.</span>
       : etat === 'passu' ? <span data-vc-bordereau-etat="passu" style={{ flexBasis: '100%', fontSize: 12, color: C.muted }}>La base n'a pas répondu — réessaie.</span> : null}
@@ -27967,6 +27993,7 @@ function LigneVenteVc({ v, fait, enV, flou, i = 0 }) {
       </section>
       <section className="vrm-recap-gestes" aria-label="Actions">
         {v.aExpedier && !fait && v.bordereau ? <div className="vrm-recap-principal vrm-rangee-bord" data-rangee-bord=""><PastilleTransporteur t={trV} C={C} data-recap-transporteur=""/><BoutonImprimerVc v={v} grand/></div> : null}
+        {!(v.aExpedier&&!fait)&&v.bordereau?.id?<BoutonImprimerVc v={v} lectureSeule/>:null}
         <div className="vrm-recap-grille">
           {v.aExpedier ? <Bouton variante="secondaire" icone="check" data-geste="fait" data-vc-fait={v.id} onClick={() => marquerVc('vrm_vc_colis_done', v.id, !fait)}>{fait ? '↺ Pas encore' : 'Colis fait'}</Bouton> : null}
           {v.num ? <Bouton variante="secondaire" icone="doc" data-recap-fiche={v.num} aria-label={`Fiche N°${v.num}`} onClick={() => { fermer(); window.dispatchEvent(new CustomEvent('vrm:fiche-article', { detail: v.num })); }}>Fiche de l’article</Bouton> : null}
@@ -39981,7 +40008,7 @@ function CarteStatsApp({ page, liveStats, sel = null, locaux = null, ici = null,
   const liveCoque = React.useContext(LiveStatsCarte);
   const base = useSourcesCarte(liveStats || liveCoque);
   const sources = locaux ? { ...base, locaux } : base;
-  return <CarteStats page={page} sel={sel || { site: 'toutes', compte: null, periode: null }} sources={sources} regles={REGLES_CARTE} reglage={reglage} poser={poser} objectif={objectif} poserObjectif={poserObjectif} FermeAuRetour={FermeAuRetour} extra={{ ici, attrs }} {...rest}/>;
+  return <CarteStats owner={AUTH.user?.id||''} page={page} sel={sel || { site: 'toutes', compte: null, periode: null }} sources={sources} regles={REGLES_CARTE} reglage={reglage} poser={poser} objectif={objectif} poserObjectif={poserObjectif} FermeAuRetour={FermeAuRetour} extra={{ ici, attrs }} {...rest}/>;
 }
 // Le compte choisi, dit pour la carte : { uid, login, nom } ou null (tous).
 const compteCarte = (uid, accounts) => {
@@ -43978,7 +44005,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   if(!brouillonsReponse.current)brouillonsReponse.current=creerBrouillonsReponses(()=>AUTH.user?.id||'');
   const [replyNotice,setReplyNotice]=useState(''),[reponsesIncertaines,setReponsesIncertaines]=useState({}),[capturesRepondues,setCapturesRepondues]=useState({});
   // Messagerie intégrée (3 octobre) : la liste, et les gestes d'offre du fil.
-  const [convMax, setConvMax] = useState(40);
+  const [convMax, setConvMax] = useVueSession('messages-limite',40);
   const [prixOffre, setPrixOffre] = useState('');
   const [contreOffreOuverte,setContreOffreOuverte]=useState(false);
   const prixOffreRef=useRef(null);
@@ -44871,10 +44898,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }, [sales.items, showHidden, hiddenSales, hiddenAccts, blockedAccts, vFilter, ordSearchDiff, periode, numeros, saleOv, shipDone, compteSel, compteConnecte, selEff]);
   // Combien on en DESSINE. Le reste s'ouvre d'un bouton : rien n'est perdu, et
   // le compte total est écrit dessus.
-  const [ventesMax, setVentesMax] = useState(60);
+  const [ventesMax, setVentesMax] = useVueSession('ventes-limite',60);
   // Une recherche ou un changement de filtre repart du haut : sinon on garderait
   // « 240 affichées » sur une liste qui n'en compte plus que trois.
-  useEffect(() => { setVentesMax(60); }, [vFilter, ordSearchDiff, periode, showHidden]);
+  const filtresLimiteVentes=useRef(null);
+  useEffect(() => { const sig=JSON.stringify([vFilter,ordSearchDiff,periode,showHidden]);if(filtresLimiteVentes.current!==null&&filtresLimiteVentes.current!==sig)setVentesMax(60);filtresLimiteVentes.current=sig; }, [vFilter, ordSearchDiff, periode, showHidden]);
   // Un seul compte dans la liste ⇒ le nommer sur chaque carte ne distingue rien
   // (§7 : « compte julatace3535 » ×5). Il ne reste que s'il y en a plusieurs.
   // ⚠️ `_acc` est un OBJET, pas une chaîne (§ le fix #449) : `String(obj)` donne
@@ -50233,7 +50261,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // Numéro et titre : même dérivation que la carte (identité, jamais le titre — §5).
         items.push({ numero: l.num || '', title: l.titre || '', pdfBuf: buf, invBytes, cle: l.cle, site: l.site, ligne: l });
       }
-      if (!items.length) { libererOngletPdf(); toast(pasLus ? "La base n'a pas répondu — réessaie dans un instant." : (sansLignes.length ? texteSansBordereau(sansLignes) + '.' : "Ces bordereaux n'ont plus leur PDF — retélécharge-les depuis les ventes sur Vinted.")); setBatchBusy(false); return; }
+      verifierContexte();
+      if (!items.length) { if(choisis&&(AUTH.user?.id||null)===proprietaire)setLot(x=>x?{...x,coches:new Set(echecs),echecs}:x); libererOngletPdf(); toast(pasLus ? "La base n'a pas répondu — réessaie dans un instant." : (sansLignes.length ? texteSansBordereau(sansLignes) + '.' : "Ces bordereaux n'ont plus leur PDF — retélécharge-les depuis les ventes sur Vinted.")); setBatchBusy(false); return; }
       setProgressionLot({etape:'fusion',fait:items.length,total:aImprimer.length});
       const r = await mergeAndDownloadBordereaux(items, (w, h) => posForFormat(w, h, false), { autoprint:true,imprimante,avantOuverture:verifierContexte, apercu: placer ? 'force' : true });
       setBordResult({ ...r, batch:true,attendus:aImprimer.length });setProgressionLot({etape:'termine',fait:r.count,total:aImprimer.length});
@@ -50249,7 +50278,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const reussiesVinted = (r.reussis || []).filter(i => items[i].site === 'vinted').map(i => items[i].cle);
       if (reussiesVinted.length) setBordsPrinted(prev => { const u = { ...prev }; const at = new Date().toISOString(); reussiesVinted.forEach(k => { u[k] = at; }); save('vinted_bords_printed', u); return u; });
       (r.reussis || []).filter(i => items[i].site === 'vestiaire').forEach(i => { try { marquerVc('vrm_vc_imprimes', items[i].ligne.v.id, true); } catch (_) {} });
-      if (choisis) setLot(x => echecs.length ? { ...x, coches: new Set(echecs), echecs } : null);
+      if (choisis && (AUTH.user?.id||null)===proprietaire) setLot(x => (AUTH.user?.id||null)!==proprietaire?x:x?(echecs.length ? { ...x, coches: new Set(echecs), echecs } : null):x);
       if (pasLus || sansPdf || illisibles) toast(`${imprimes} sur ${aImprimer.length} imprimé${imprimes>1?'s':''} — ${[pasLus?`${pasLus} que la base n'a pas rendu${pasLus>1?'s':''} (réessaie)`:'', sansPdf?texteSansBordereau(sansLignes):'', illisibles?`${illisibles} PDF illisible${illisibles>1?'s':''} (retélécharge-le${illisibles>1?'s':''} depuis la vente sur Vinted)`:''].filter(Boolean).join(', ')}.`);
     } catch(err){ libererOngletPdf(); if (!estTamponAnnule(err)) toast(/Aucun bordereau exploitable/.test(String(err && err.message || err)) ? "Aucun de ces PDF n'a pu être lu — retélécharge-les depuis les ventes sur Vinted." : 'Erreur : ' + String(err)); }
     setBatchBusy(false);
@@ -50337,7 +50366,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {sales.items && sales.items.length>0 && <div className="vrm-outils-recherche" data-outils-recherche="" style={{display:'flex',flexDirection:'column',gap:8,padding:'4px 4px 10px'}}>
               <div className="vrm-list-search"><Icon name="search" size={17}/><input aria-label="Rechercher dans les ventes Vinted" type="search" value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="Rechercher"
                 style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 13px',fontSize:17,background:C.card,color:C.text,outline:'none',minHeight:44}}/></div>
-              <PeriodePicker value={periode} onChange={setPeriode} titre="Période des ventes"/>
+              <PeriodePicker value={periode} onChange={setPeriode} titre="Période des ventes" datation="Date de vente"/>
             </div>}
             <BordereauxAuto key={AUTH.user?.id} owner={AUTH.user?.id} lire={lireBordereauxAuto} sauver={sauverBordereauxAuto}/>
             <VuesVentes owner={AUTH.user?.id} plateforme="vinted" valeur={{filtre:vFilter,recherche:ordSearch,periode}} onAppliquer={v=>{setVFilter(v.filtre);setOrdSearch(v.recherche);setPeriode(v.periode);setToolsOpen(false);}}/>
@@ -51672,7 +51701,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const tacheSimple = (j, i) => { const x = decouper(j); const plein = x.plein ? `${x.court}\n${x.detail ? x.detail + '\n' : ''}${x.plein}` : x.detail ? `${x.court}\n${x.detail}` : x.court; return (
           <button className={'vrm-day-task' + (j.urgent ? ' is-urgent' : '')} key={(j.id||'j')+i} type="button" title={plein} aria-label={plein.replace(/\n/g, ' — ')} data-job={j.id||undefined} data-n={j.n!=null?j.n:undefined} data-n-relier={j.nRelier!=null?j.nRelier:undefined} data-limite-heure={j.limiteHeure!=null?j.limiteHeure:undefined} data-urssaf-echeance={j.urssaf?j.urssaf.dueIso:undefined} data-urssaf-apayer={j.urssaf?(j.urssaf.apayer==null?'':String(j.urssaf.apayer)):undefined} data-urssaf-partiel={j.urssaf&&j.urssaf.partiel?'1':undefined} onClick={()=>{ if (j.avant) j.avant(); if (onNav) onNav(j.tab); }}>
             {corpsTache(j, x)}
-            <span className="vrm-day-task-action" style={j.urgent ? {color:j.color} : undefined}><span className="vrm-day-task-action-mot">{j.action || 'Voir'} </span><span aria-hidden="true">›</span></span>
+            <span className="vrm-day-task-action" style={j.urgent ? {color:j.color} : undefined}><span className="vrm-day-task-action-mot">{j.action || 'Ouvrir le détail'} </span><span aria-hidden="true">›</span></span>
           </button>
         ); };
         // (22 oct., chantier URSSAF) LE RAPPEL URSSAF PORTE SON GESTE : « Noter ma
@@ -52115,7 +52144,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // (3 nov.) Le nombre revient dans le titre : la vignette montre DE QUOI il s'agit (les photos),
               // plus un chiffre en pastille colorée (Julien : « les couleurs… j'aime pas trop »).
               const libCase = (id, n) => ({ envoyer: `${n} colis à poster`, retirer: `${n} colis à retirer`, messages: `${n} message${n > 1 ? 's' : ''}`, prix: `${n} prix à baisser` })[id];
-              const gesteCaseF = { envoyer: nPretsJournee > 0 ? 'Imprimer' : 'Voir', retirer: 'Voir', messages: 'Répondre', prix: 'Voir' };
+              const gesteCaseF = { envoyer: nPretsJournee > 0 ? 'Imprimer' : 'Ouvrir les colis', retirer: 'Voir les retraits', messages: 'Lire les messages', prix: 'Voir les baisses' };
               const nGestes = cases.length + alertesArgent.length + autres.length + (urssafJob ? 1 : 0);
               const carteCase = (x) => {
                 const so = sousCase(x);
@@ -52126,7 +52155,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     title={titreCase(x)} onClick={()=>{ if (x.id === 'envoyer' && nPretsJournee > 0) _pendingBordPrint = true; if (onNav) onNav(x.tab); }}>
                     <PileVignettes srcs={photosCase[x.id]} n={x.t.n} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name={x.ic} size={20}/>}/>
                     <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{presse && !(so && so.ambre) ? <span className="vrm-fu-point" data-fu-point="" aria-hidden="true"/> : null}{libCase(x.id, x.t.n) || x.l}</span>{so ? <span className={'vrm-day-task-note' + (so.ambre ? ' is-urgent' : '')} data-sous-ligne={so.cle}>{so.texte}</span> : (x.id === 'envoyer' && nPretsJournee > 0) ? <span className="vrm-day-task-note">{nPretsJournee} prêt{nPretsJournee > 1 ? 's' : ''} à imprimer</span> : null}</span>
-                    <span className={'vrm-day-task-action' + (x.id === 'envoyer' && nPretsJournee > 0 ? ' is-principal' : '')} data-fu-principal={x.id === 'envoyer' && nPretsJournee > 0 ? '' : undefined}><span className="vrm-day-task-action-mot">{gesteCaseF[x.id] || 'Voir'}</span></span>
+                    <span className={'vrm-day-task-action' + (x.id === 'envoyer' && nPretsJournee > 0 ? ' is-principal' : '')} data-fu-principal={x.id === 'envoyer' && nPretsJournee > 0 ? '' : undefined}><span className="vrm-day-task-action-mot">{gesteCaseF[x.id] || 'Ouvrir le détail'}</span></span>
                   </button>
                 );
               };
@@ -52307,7 +52336,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             au-dessus de tout : six pastilles + la recherche formaient deux blocs
             pleins avant la première vente. Ici, elle est là où on l'utilise —
             on choisit « Finalisées », puis le mois. */}
-        {sales.items && sales.items.length>0 && <PeriodePicker value={periode} onChange={setPeriode} titre="Période des ventes"/>}
+        {sales.items && sales.items.length>0 && <PeriodePicker value={periode} onChange={setPeriode} titre="Période des ventes" datation="Date de vente"/>}
         </div>
         <NoAcc/>
         {/* ⚠️ LES VENTES LEBONCOIN NE SONT PLUS ICI : elles vivent dans l'espace
@@ -52592,8 +52621,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             une longueur qu'on peut parcourir. Les totaux du haut, eux, portent
             TOUJOURS sur l'ensemble : ils ne dépendent pas de cette tranche. */}
         {ventesAffichees.length > ventesMax && (
-          <Bouton variante="secondaire" plein onClick={()=>setVentesMax(n=>n+120)} style={{marginTop:10}}>
-            Voir plus — {ventesMax} affichées sur {ventesAffichees.length}
+          <Bouton variante="secondaire" plein onClick={()=>React.startTransition(()=>setVentesMax(n=>n+120))} style={{marginTop:10}}>
+            Afficher les {Math.min(120,ventesAffichees.length-ventesMax)} suivantes · {ventesMax}/{ventesAffichees.length}
           </Bouton>
         )}
         {/* (29 oct., « un peu moche ») Les contrôles passent SOUS la liste : avant la
@@ -53062,7 +53091,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             le bas, alors que c'est exactement ce qu'on vient chercher quand on
             part au relais. Ils reviennent tels quels sur En route / Reçus /
             Tous, où ils filtrent vraiment quelque chose. */}
-        {buysBase.length>0 && aFilter!=='attente' && <PeriodePicker value={periode} onChange={setPeriode} titre="Période des achats"/>}
+        {buysBase.length>0 && aFilter!=='attente' && <PeriodePicker value={periode} onChange={setPeriode} titre="Période des achats" datation="Date d’achat"/>}
         {buysBase.length>0 && aFilter!=='attente' && (
           <label className="vrm-msg-search vrm-achats-search" style={{color:C.muted}}><Icon name="search" size={16}/><input type="search" aria-label="Rechercher un achat" value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="Titre, N°, vendeur"
             style={{color:C.text,background:'transparent',border:0,boxShadow:'none'}}/></label>
@@ -55463,7 +55492,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   );
                 })}
               </div>
-              {tri.length>convMax && <button type="button" className="vrm-msg-more" onClick={()=>setConvMax(m=>m+40)} style={{color:C.text}}>Voir plus — {convMax} affichées sur {tri.length}</button>}
+              {tri.length>convMax && <button type="button" className="vrm-msg-more" onClick={()=>React.startTransition(()=>setConvMax(m=>m+40))} style={{color:C.text}}>Afficher les {Math.min(40,tri.length-convMax)} suivantes · {convMax}/{tri.length}</button>}
               {retireesIci.length>0 && (
                 <p className="vrm-msg-retirees" data-conv-retirees={retireesIci.length} style={{color:C.muted}}>
                   {/* (revue) Pendant une recherche, une conversation retirée qui
@@ -55950,7 +55979,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         <div style={{padding:'16px 18px 10px',borderBottom:`1px solid ${C.border}`}}>
                           <div style={{fontSize:17,fontWeight:700}}>{lot.echecs.length ? `${lot.echecs.length} bordereau${lot.echecs.length>1?'x':''} pas imprimé${lot.echecs.length>1?'s':''}` : 'Bordereaux à imprimer'}</div>
                         </div>
-                        <div className="vrm-preparation-etapes" aria-label="Préparation des colis"><span>1 · {nb} sélectionné(s)</span><span>2 · {controle.verifies}/{nb} article(s) contrôlé(s)</span><span>3 · Préparer les PDF</span></div>
+                        <>{lot.echecs.length>0&&<p role="alert" className="vrm-preparation-note">Seuls les bordereaux en échec sont sélectionnés. Les PDF préparés avec succès ne seront pas repris.</p>}</><div className="vrm-preparation-etapes" aria-label="Préparation des colis"><span>1 · {nb} sélectionné(s)</span><span>2 · {controle.verifies}/{nb} article(s) contrôlé(s)</span><span>3 · Préparer les PDF</span></div>
+                        <RecapSelection lignes={L} coches={lot.coches}/>
                         <p className="vrm-preparation-note">Compare le numéro et la photo avec l’article physique. Cocher « Article contrôlé » ne marque pas le colis expédié.</p>
                         {batchBusy&&progressionLot&&<div className="vrm-preparation-progression" role="status">{progressionLot.etape==='lecture'?`Lecture des PDF : ${progressionLot.fait}/${progressionLot.total}`:'Préparation du document groupé…'}<progress {...(progressionLot.etape==='lecture'?{value:progressionLot.fait,max:progressionLot.total}:{})}/></div>}
                         <div style={{display:'flex',gap:12,flexWrap:'wrap',padding:'10px 18px',fontSize:12,color:C.muted}}>
@@ -62643,6 +62673,7 @@ function JournalVrm() {
   }
   return (
     <div data-journal={String(vus.length)}>
+      <HistoriqueModifications owner={AUTH.user?.id||''}/>
       <div className="vrm-sec-filtres vrm-compte-puces" role="radiogroup" aria-label="Type">
         {FILTRES_TYPE.map(([id, lib]) => <button key={id} type="button" role="radio" aria-checked={type === id} data-journal-type={id} className={'vrm-compte-puce' + (type === id ? ' is-actif' : '')} onClick={() => setType(id)}>{lib}</button>)}
       </div>
@@ -65469,7 +65500,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
                 </span>
               </button>
             ))}
-            {lignes.length > n && <Bouton variante="discret" data-toutes-plus="" onClick={() => setN((x) => x + 60)} style={{ marginTop: 10 }}>Voir plus ({lignes.length - n})</Bouton>}
+            <CompteurListe affiches={n} total={lignes.length}/>{lignes.length > n && <Bouton variante="discret" data-toutes-plus="" onClick={() => React.startTransition(()=>setN((x) => x + 60))} style={{ marginTop: 10 }}>Afficher les {Math.min(60,lignes.length-n)} suivantes ({lignes.length - n} restantes)</Bouton>}
           </div>
         )}
     </div>
@@ -68092,10 +68123,10 @@ function AppCoeur() {
                 {liste.map((r,i)=>{ const e=r.e; const o=e.o; const c=e.c||{};
                   const etat = type==='vente' ? etapeVente(o, { poste: posteMain }).label : type==='achat' ? etapeAchat(o, null).label : ({ available:'À retirer', retour:'Reparti', delivered:'Retiré' }[c.status] || (c.lieu ? String(c.lieu).split(',')[0] : (c.carrier || '')));
                   const quand = e.date ? jourCourt(e.date) : '';
-                  const par = r.par==='pseudo' ? r.valeur : r.par==='suivi' ? `Suivi ${r.valeur}` : r.par==='code' ? `Code ${r.valeur}` : r.par==='transaction' ? `N° ${r.valeur}` : '';
+                  const par = r.par==='titre' || r.par==='title' ? motifRecherche(r.par) : r.par==='numero' ? motifRecherche(r.par) : r.par==='pseudo' ? r.valeur : r.par==='suivi' ? `Suivi ${r.valeur}` : r.par==='code' ? `Code ${r.valeur}` : r.par==='transaction' ? `N° ${r.valeur}` : '';
                   const ouvrir = ()=>{ const d=destinationResultat(r); if(!d) return; setGsOpen(false); if(type==='achat') demanderVue('achats'); if(type==='vente') subVoulue.current='vinted'; if(d.cible) poserCible(d.cible, redirigerOnglet(d.tab, null, ONGLETS_DEPLACES).tab); setTab(d.tab); };
                   return (
-                  <button key={type+(e.cle||i)} type="button" className="vrm-recherche-ligne" onClick={ouvrir} data-recherche-resultat={type} data-recherche-par={r.par} data-recherche-cle={e.cle}
+                  <button key={type+(e.cle||i)} type="button" className="vrm-recherche-ligne" onClick={ouvrir} data-recherche-resultat={type} data-recherche-par={r.par} title={motifRecherche(r.par)} data-recherche-cle={e.cle}
                     data-recherche-vente={type==='vente'&&e.tx?e.tx:undefined} data-recherche-achat={type==='achat'&&e.tx?e.tx:undefined}
                     style={{width:'100%',minHeight:44,display:'flex',alignItems:'center',gap:11,padding:'9px 10px',marginBottom:6,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
                     {thumb(o ? orderPhoto(o) : null, type==='colis' ? <Icon name="box" size={18} style={{color:C.muted}}/> : null)}
@@ -68321,7 +68352,7 @@ function AppCoeur() {
             montantRecuEbay, commandeEbayEngagee, lbcAnnulee, lbcFinalisee,
           });
           const fermer = () => setFicheNum(null);
-          return <FichePaire p={p} num={ficheNum} lecture={!numData} onFermer={fermer} onRetour={()=>{ fermer(); setGsQ(String((p && p.num) || ficheNum)); setGsOpen(true); }}
+          return <FichePaire owner={AUTH.user?.id||''} p={p} num={ficheNum} lecture={!numData} onFermer={fermer} onRetour={()=>{ fermer(); setGsQ(String((p && p.num) || ficheNum)); setGsOpen(true); }}
             onBordereau={(tx)=>{ fermer(); setGsOpen(false); poserCible({ type: 'colis', tx: String(tx) }, redirigerOnglet('cat_bord', null, ONGLETS_DEPLACES).tab); setTab('cat_bord'); }}
             onEmballer={()=>{ fermer(); setGsOpen(false); DEMANDE_EMBALLAGE.at = Date.now(); setTab('cat_bord'); try { window.dispatchEvent(new Event('vrm:emballer')); } catch (_) {} }}
             onPrix={(n)=>setPrixNum(String(n))} neuve={neuve}

@@ -1212,3 +1212,17 @@ html body .vrm-app-shell .vrm-main .vrm-day-layout .vrm-cycle-carte > .vrm-cycle
 .vrm-fu-prevision { margin: 0 0 14px; }
 .vrm-fu-prevision .vrm-fu-prevision-montant { font: 700 22px/1.2 var(--vrm-police); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
 .vrm-fu-prevision .vrm-fu-prevision-montant small { font: 500 13px/1 var(--vrm-police); color: var(--fu-gris); margin-right: 2px; }
+
+/* Retraits : une ouverture explicite, des actions séparées et accessibles au clavier. */
+.vrm-rpf-ouvrir { display:flex; align-items:center; gap:10px; flex:1 1 0; min-width:0; min-height:44px; padding:0; border:0; background:transparent; color:inherit; text-align:left; cursor:pointer; font:inherit; }
+.vrm-rpf-ouvrir:focus-visible { outline:2px solid var(--fu-bleu,#0071e3); outline-offset:3px; border-radius:8px; }
+.vrm-rpf-chevron { flex:none; color:var(--fu-gris,#6e6e73); font-size:18px; }
+.vrm-rpf-titre-complet { overflow-wrap:anywhere; font-size:13px; line-height:1.4; }
+/* Le résumé des retraits laisse la priorité à la liste, y compris sur téléphone. */
+.vrm-fu-carte[data-fu-colis-retirer] { padding:16px 18px; border-radius:20px; gap:12px; }
+.vrm-fu-carte[data-fu-colis-retirer] .vrm-fu-grand { font-size:30px; line-height:1.1; }
+.vrm-fu-carte[data-fu-colis-retirer] .vrm-fu-surtitre { font-size:11px; }
+.vrm-fu-carte[data-fu-colis-retirer] .vrm-fu-sous { font-size:13px; margin-top:3px; }
+.vrm-fu-carte[data-fu-colis-retirer] .vrm-fu-case { padding:8px 10px; border-radius:12px; }
+.vrm-fu-carte[data-fu-colis-retirer] .vrm-fu-case b { font-size:18px; }
+.vrm-fu-carte[data-fu-colis-retirer] .vrm-fu-case span { font-size:11px; }

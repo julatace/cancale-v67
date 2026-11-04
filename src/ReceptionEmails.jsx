@@ -71,12 +71,12 @@ function ApercuEmails({d,erreur,lecture,maintenant,quarantaine,preuves,onActuali
  // « Rien à faire » ne se dit que si tout ce qui pourrait demander un geste a été LU.
  const toutLu=d&&Array.isArray(quarantaine)&&(preuves!==undefined);
  return <div className="vrm-emails-apercu" data-emails-apercu="" data-reponse={rep.etat}>
-  <section className="vrm-apercu-reponse" data-apercu-reponse={rep.etat} aria-live="polite">
+  <section className="vrm-apercu-reponse" data-apercu-reponse={rep.etat} role={erreur&&!d?'alert':undefined} aria-live="polite">
    <span className="vrm-apercu-pastille" aria-hidden="true"/>
    <div className="vrm-apercu-reponse-texte"><h3>{rep.titre}</h3>{rep.phrase&&<p data-apercu-dernier="">{rep.phrase}</p>}</div>
-   <button type="button" className="vrm-apercu-actualiser" onClick={onActualiser} disabled={lecture}>{lecture?'Lecture…':'Actualiser'}</button>
+   <button type="button" className="vrm-apercu-actualiser" onClick={onActualiser} disabled={lecture}>{lecture?'Lecture…':erreur?'Réessayer':'Actualiser'}</button>
   </section>
-  {erreur&&<p role="alert" className="vrm-apercu-alerte">Je n’ai pas pu relire la réception{d?' : ce qui suit date de la dernière lecture':''}. <button type="button" onClick={onActualiser} disabled={lecture}>Réessayer</button></p>}
+  {erreur&&d&&<p role="alert" className="vrm-apercu-alerte">Je n’ai pas pu relire la réception{d?' : ce qui suit date de la dernière lecture':''}. <button type="button" onClick={onActualiser} disabled={lecture}>Réessayer</button></p>}
   {d&&(gestes.length>0
    ?<section className="vrm-apercu-bloc" data-apercu-gestes={gestes.length}><h4>À faire</h4><ul className="vrm-apercu-lignes">{gestes.map(g=><li key={g.k} data-apercu-geste={g.k} data-n={g.n}><span>{g.phrase}</span><button type="button" className="vrm-apercu-geste" aria-label={g.vers==='a-traiter'?'Vérifier les emails mis de côté':`${g.bouton} : ${g.phrase}`} onClick={()=>aller(g)}>{g.bouton}</button></li>)}</ul></section>
    :toutLu?<p className="vrm-apercu-rien" data-apercu-gestes="0">Rien à faire de ton côté.</p>:null)}

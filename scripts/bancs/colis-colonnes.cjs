@@ -289,7 +289,7 @@ async function main() {
         await pg.click('[data-cc-carte="r:v:9402"] [data-rp-code]').catch(() => {}); await pg.waitForTimeout(250);
         const pumaTxt = await pg.evaluate(() => (document.querySelector('[data-cc-carte="r:v:9402"]') || {}).innerText || '');
         dit(/Puma Suede taille 42/.test(pumaTxt) && /Code de retrait\s*998877/.test(pumaTxt), `${T} une carte à retirer dit ce que c'est et SON code, nommé (« Code de retrait 998877 »)`, pumaTxt);
-        await pg.click('[data-cc-carte="r:v:9402"] .vrm-rpf-rang').catch(() => {}); await pg.waitForTimeout(200);
+        await pg.click('[data-cc-carte="r:v:9402"] .vrm-rpf-ouvrir').catch(() => {}); await pg.waitForTimeout(200);
         const sansGeste = L.idents.filter((x) => x.cle.startsWith('r:') && !x.retire).map((x) => x.cle);
         dit(!sansGeste.length, `${T} chaque colis à retirer porte « J'ai retiré » sur SA carte`, JSON.stringify(sansGeste));
         // (2 nov., n° 1) « J'ai retiré » se LIT : le texte visible du bouton (rendu, pas le

@@ -94,7 +94,7 @@ export function BarreObjectif({ prog, fmt }) {
   );
 }
 
-export default function CarteStats({ page, sel, sources, regles, reglage, poser, attrsDe = null, onNav = null, nu = false, className = '', FermeAuRetour = null, sous = null, extra = {}, clics = null, objectif = null, poserObjectif = null }) {
+export default function CarteStats({ owner = '', page, sel, sources, regles, reglage, poser, attrsDe = null, onNav = null, nu = false, className = '', FermeAuRetour = null, sous = null, extra = {}, clics = null, objectif = null, poserObjectif = null }) {
   const [ouvert, setOuvert] = React.useState(false);
   const locaux = (sources && sources.locaux) || null;
   const V = valeursCarte(page, reglage, sources, sel, regles);
@@ -137,7 +137,7 @@ export default function CarteStats({ page, sel, sources, regles, reglage, poser,
         }))}>
         {prog ? <BarreObjectif prog={prog} fmt={fmt} /> : null}
       </CarteMois>
-      {ouvert ? <FeuilleCarte page={page} sel={sel} sources={sources} regles={regles} reglage={reglage} poser={poser} locaux={locaux} fermer={() => setOuvert(false)} FermeAuRetour={FermeAuRetour} objectif={objectif} poserObjectif={poserObjectif} /> : null}
+      {ouvert ? <FeuilleCarte owner={owner} page={page} sel={sel} sources={sources} regles={regles} reglage={reglage} poser={poser} locaux={locaux} fermer={() => setOuvert(false)} FermeAuRetour={FermeAuRetour} objectif={objectif} poserObjectif={poserObjectif} /> : null}
     </>
   );
 }
@@ -147,7 +147,7 @@ export default function CarteStats({ page, sel, sources, regles, reglage, poser,
 // chiffre qui y va. La période se choisit pour CE chiffre quand la page n'a pas
 // son propre filtre de période. Chaque choix est rangé tout de suite (la carte,
 // derrière, change sous ses yeux) ; « Par défaut » rend la carte des maquettes.
-function FeuilleCarte({ page, sel, sources, regles, reglage, poser, locaux, fermer, FermeAuRetour, objectif = null, poserObjectif = null }) {
+function FeuilleCarte({ owner = '', page, sel, sources, regles, reglage, poser, locaux, fermer, FermeAuRetour, objectif = null, poserObjectif = null }) {
   const R = reglageDePage(reglage, page, locaux);
   const [place, setPlace] = React.useState(0);
   const places = [R.g, ...R.c];
@@ -196,7 +196,7 @@ function FeuilleCarte({ page, sel, sources, regles, reglage, poser, locaux, ferm
               en contrôle segmenté sur une rangée — plus de rangée qui défile de côté. */}
           {def && !def.local && Array.isArray(def.periodes) && def.periodes.length > 1 && !periodePage ? (PLAGE_IDS.includes(actuelle.id) ? (
             <div className="vrm-carte-periode-cal" data-carte-calendrier={actuelle.id}>
-              <ChoixPeriode value={valeurDePeriode(actuelle.p)} titre="Période du chiffre" vide="Choisir une période"
+              <ChoixPeriode owner={owner} value={valeurDePeriode(actuelle.p)} titre="Période du chiffre" vide="Choisir une période"
                 libelle={nomPeriode(actuelle.p || periodeDefaut(def))} raccourcis={raccourcisCarte} Retour={FermeAuRetour}
                 onChange={(v) => choisir(actuelle.id, periodeDeValeur(v, def.periodes) || periodeDefaut(def))}/>
             </div>

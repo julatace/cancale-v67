@@ -18,9 +18,11 @@ const quand = (v) => { const t = Date.parse(v || ''); return Number.isFinite(t) 
 const formeOk = (j) => j && j.ok === true && Array.isArray(j.emails) && j.compteurs && typeof j.compteurs.sur === 'number';
 
 function TexteEmail({ id, headers }) {
+  const [tentative, setTentative] = useState(0);
   const [t, setT] = useState(undefined); // undefined en cours · null pas su · {texte}
   useEffect(() => {
     let vivant = true;
+    setT(undefined);
     (async () => {
       try {
         const r = await requeteJsonBornee(`/api/email-rattacher?mode=journal&texte=${encodeURIComponent(id)}`, { headers: headers(), cache: 'no-store' });
@@ -29,9 +31,9 @@ function TexteEmail({ id, headers }) {
       } catch (_) { if (vivant) setT(null); }
     })();
     return () => { vivant = false; };
-  }, [id, headers]);
+  }, [id, headers, tentative]);
   if (t === undefined) return <p className="vrm-journal-texte-etat" role="status">Lecture du texte…</p>;
-  if (t === null) return <p className="vrm-journal-texte-etat" role="alert" data-journal-texte="pas-su">Je n’ai pas pu lire le texte de cet email — rien n’est perdu, réessaie dans un moment.</p>;
+  if (t === null) return <p className="vrm-journal-texte-etat" role="alert" data-journal-texte="pas-su">Le texte de cet email n’a pas pu être chargé. <button type="button" onClick={() => setTentative((n) => n + 1)}>Réessayer la lecture</button></p>;
   if (!t.texte) return <p className="vrm-journal-texte-etat" data-journal-texte="absent">Texte non gardé (email classé avant le 31 oct.). L’original reste dans ta messagerie.</p>;
   return <pre className="vrm-journal-texte" data-journal-texte="lu">{t.texte}</pre>;
 }
