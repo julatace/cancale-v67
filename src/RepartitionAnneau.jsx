@@ -2,7 +2,10 @@ import React from 'react';
 // Un anneau représente uniquement les observations connues ; sa couverture
 // reste affichée par le composant parent. Le reste du top est agrégé, pas perdu.
 export default function RepartitionAnneau({elements,total,libelle='ventes'}) {
- const valeurs=elements.filter(e=>Number.isFinite(e.n)&&e.n>0);
+ const valeurs=(elements||[]).filter(e=>Number.isFinite(e.n)&&e.n>0);
+ // (5 nov., chantier F, revue 2.26) Rien à répartir (aucune part, total nul ou pas su) : l'anneau
+ // ne rend RIEN — jamais un cercle gris vide avec « 0 ventes » au centre.
+ if(!valeurs.length||!(Number(total)>0))return null;
  const somme=valeurs.reduce((s,e)=>s+e.n,0);const reste=Math.max(0,total-somme);
  const arcs=reste?[...valeurs,{k:'Autres',n:reste}]:valeurs;
  const couleurs=['var(--vrm-accent,#0071E3)','#6E6E73','#8E8E93','#AEAEB2','#C7C7CC','#636366','#E5E5EA'];
