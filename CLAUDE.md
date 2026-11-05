@@ -501,6 +501,8 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 
+- **5 nov. · Paquets 5.321.0** : archives normalisées 644/755 (la 5.320 exportait des fichiers 600), contrôle depuis sources privées, tous formats. Refus Orion réel non reproduit sur appareil ; `docs/passation/2026-11-05-orion-paquet.md`.
+
 - **5 nov. · Extension 5.320.0** : mot de passe sans ouverture automatique de VRM, rappels/promesses Orion et délais de connexion ; capture après session conservée, limites écran d’accueil/iOS expliquées. Voir `docs/passation/2026-11-05-orion-connexion.md`. Installer le nouveau paquet Orion.
 
 - **4 nov. · Finitions bureau** : ventes en colonnes, fil lisible à 1024/1280, filtres et paramètres, téléphone conservé ; voir `docs/passation/2026-11-04-finitions-bureau.md`. Google Cloud reste à configurer par administrateur.
@@ -510,7 +512,7 @@ sans la fonction.
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
-**Extension servie : 5.320.0** (4 nov.). **À lire en premier : `docs/passation/2026-11-02-liste.md`.** **Production** : https://vrm.center,
+**Extension servie : 5.321.0** (4 nov.). **À lire en premier : `docs/passation/2026-11-02-liste.md`.** **Production** : https://vrm.center,
 vérifier par `curl https://vrm.center/api/sante`.
 
 ### Gestes encore attendus de Julien
