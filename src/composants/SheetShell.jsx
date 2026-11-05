@@ -61,26 +61,36 @@ export function SheetShell({ onClose, children, maxWidth = 460, z = 2000, titre,
   const [idTitre] = React.useState(() => 'vrm-fs-titre-' + (++_idTitre));
   const avecCroix = croix != null ? !!croix : titre != null;
 
+  const refAnimVoile = React.useRef(null);
   const arreterAnim = () => {
     const a = refAnim.current; refAnim.current = null;
     if (a) { try { a.cancel(); } catch (_) {} }
+    const b = refAnimVoile.current; refAnimVoile.current = null;
+    if (b) { try { b.cancel(); } catch (_) {} }
   };
+  // L'opacité du voile suit la feuille : il s'éclaircit à mesure qu'elle descend.
+  const opaciteVoile = (y) => { const el = refFeuille.current; const h = (el && el.offsetHeight) || 1; return Math.max(0, Math.min(1, 1 - Math.max(0, y) / h)); };
   const poser = (y) => {
     const el = refFeuille.current; if (!el) return;
     el.style.transform = y ? `translate3d(0,${y}px,0)` : '';
     const v = refVoile.current;
-    if (v) { const h = el.offsetHeight || 1; v.style.opacity = String(Math.max(0, Math.min(1, 1 - Math.max(0, y) / h))); }
+    if (v) v.style.opacity = String(opaciteVoile(y));
   };
   // Une animation de `depuis` à `vers` (px), interrompable : au toucher suivant,
-  // on lit la position affichée et on annule.
+  // on lit la position affichée et on annule (la fin n'est alors jamais jouée).
   const animer = (depuis, vers, duree, courbe, fin) => {
     const el = refFeuille.current; if (!el) return;
     arreterAnim();
     if (mouvementReduit() || !el.animate) { poser(vers); if (fin) fin(); return; }
     const a = el.animate([{ transform: `translate3d(0,${depuis}px,0)` }, { transform: `translate3d(0,${vers}px,0)` }], { duration: duree, easing: courbe });
     refAnim.current = a;
+    const v = refVoile.current;
+    if (v && v.animate) { try { refAnimVoile.current = v.animate([{ opacity: opaciteVoile(depuis) }, { opacity: opaciteVoile(vers) }], { duration: duree, easing: courbe }); } catch (_) {} }
     poser(vers);
-    a.onfinish = () => { if (refAnim.current === a) refAnim.current = null; if (fin) fin(); };
+    let fait = false;
+    const finir = () => { if (fait || refAnim.current !== a) return; fait = true; refAnim.current = null; refAnimVoile.current = null; if (fin) fin(); };
+    a.onfinish = finir;
+    setTimeout(finir, duree + 120);   // un onglet en arrière-plan ne joue pas les animations : la fin arrive quand même
   };
 
   // L'entrée : la feuille monte du bas (le voile fond à part, en CSS).
@@ -104,7 +114,8 @@ export function SheetShell({ onClose, children, maxWidth = 460, z = 2000, titre,
     const el = refFeuille.current; if (!el) return;
     const y0 = translationAffichee(el);                         // là où elle EST, même en plein mouvement
     arreterAnim(); poser(y0);
-    refGeste.current = { id: e.pointerId, depart: e.clientY - y0, hist: [{ t: performance.now(), y: y0 }], y: y0 };
+    refGeste.current = { id: e.pointerId, depart: e.clientY - y0, hist: [{ t: performance.now(), y: y0 }], y: y0, y0 };
+    el.setAttribute('data-feuille-geste', 'suit');               // l'état du geste, lisible par les bancs
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
   };
   const bouge = (e) => {
@@ -120,10 +131,18 @@ export function SheetShell({ onClose, children, maxWidth = 460, z = 2000, titre,
     refGeste.current = null;
     const el = refFeuille.current; if (!el) return;
     const h = el.offsetHeight || 600;
-    const a = g.hist[0], b = g.hist[g.hist.length - 1];
-    const v = b.t > a.t ? (b.y - a.y) / (b.t - a.t) : 0;          // px/ms, positif = vers le bas
+    // La vitesse au lâcher : sur les 100 dernières ms seulement (un doigt arrêté
+    // avant de lâcher n'a plus d'élan).
+    const t = performance.now();
+    const recents = g.hist.filter((p) => t - p.t <= 100);
+    const a = recents[0], b = recents[recents.length - 1];
+    const v = a && b && b.t > a.t ? (b.y - a.y) / (b.t - a.t) : 0;   // px/ms, positif = vers le bas
     const projete = g.y + (v * 0.998) / (1 - 0.998);             // la projection d'Apple (déc. 0,998)
-    if (g.y > 0 && (projete > h * 0.5 || v > 0.6)) {
+    const aBouge = Math.abs(g.y - g.y0) >= 6;                     // un simple toucher ne décide rien
+    const part = aBouge && g.y > 0 && (projete > h * 0.5 || v > 0.6);
+    el.setAttribute('data-feuille-geste', part ? 'part' : 'revient');
+    if (!aBouge) { if (g.y !== 0) animer(g.y, 0, 300, EASE_FEUILLE); return; }
+    if (part) {
       const reste = Math.max(0, h - g.y);
       const duree = Math.max(140, Math.min(260, v > 0 ? reste / v : 260));
       animer(g.y, h, duree, 'cubic-bezier(.2,.8,.3,1)', () => { const f = refFermer.current; if (f) f(); });
@@ -131,7 +150,7 @@ export function SheetShell({ onClose, children, maxWidth = 460, z = 2000, titre,
       animer(g.y, 0, 300, EASE_FEUILLE);
     }
   };
-  const poignee = { onPointerDown: debut, onPointerMove: bouge, onPointerUp: fin, onPointerCancel: fin };
+  const poignee = { onPointerDown: debut, onPointerMove: bouge, onPointerUp: fin, onPointerCancel: fin, onLostPointerCapture: fin };
 
   const cls = `vrm-fs${lumineuse ? ' vrm-fs-lumineuse' : ''}${className ? ' ' + className : ''}`;
   const contenu = (

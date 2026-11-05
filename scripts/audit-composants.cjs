@@ -40,13 +40,14 @@ const MUTATIONS = {
   mot_poster:       ['src/libelles.js', "aEnvoyer:    Object.freeze({ titre: 'À envoyer', bas: 'à envoyer'", "aEnvoyer:    Object.freeze({ titre: 'À poster', bas: 'à poster'"],
   recu_colis:       ['src/libelles.js', "arrives:     Object.freeze({ titre: 'Arrivés'", "arrives:     Object.freeze({ titre: 'Reçus'"],
   numero_vide:      ['src/composants/Numero.jsx', '  if (n == null) return null;\n', '  if (n == null) n = \'—\';\n'],
-  numero_blanc:     ['src/styles-composants.css', ':root[data-theme="dark"] body .vrm-num { background: #3A3A3C; color: #F5F5F7; }', ':root[data-theme="dark"] body .vrm-num { background: #F5F5F7; color: #1D1D1F; }'],
+  numero_blanc:     ['src/styles-composants.css', ':root[data-theme="dark"] body .vrm-num { background: #48484A; color: #F5F5F7; }', ':root[data-theme="dark"] body .vrm-num { background: #F5F5F7; color: #1D1D1F; }'],
   panne_deux:       ['src/composants/EtatPanne.jsx', '      ) : null}\n    </div>', '      ) : null}\n      <button type="button">Fermer</button>\n    </div>'],
   feuille_fond:     ['src/composants/SheetShell.jsx', '<div ref={refVoile} className="vrm-fs-voile" data-feuille-voile="" onClick={() => { const f = refFermer.current; if (f) f(); }} aria-hidden="true"/>', ''],
   feuille_opacite:  ['src/styles-composants.css', '  will-change: transform;\n  font-family', '  will-change: transform; animation: vrm-fs-voile-entree .2s ease-out both;\n  font-family'],
   croix_texte:      ['src/composants/SheetShell.jsx', '<span className="vrm-fs-croix-rond"><IconeComposant nom="close" taille={15} trait={2.2}/></span>', '×'],
   sans_portail:     ['src/composants/SheetShell.jsx', '  return createPortal(contenu, document.body);', '  return contenu;'],
   sans_retour:      ['src/composants/SheetShell.jsx', '{FermeAuRetour ? <FermeAuRetour fermer={onClose}/> : null}', ''],
+  feuille_fondu_js: ['src/composants/SheetShell.jsx', "[{ transform: 'translate3d(0,100%,0)' }, { transform: 'translate3d(0,0,0)' }]", "[{ transform: 'translate3d(0,100%,0)', opacity: 0 }, { transform: 'translate3d(0,0,0)', opacity: 1 }]"],
   danger_rouge:     ['src/styles-composants.css', 'background: rgba(178,80,0,.1) !important; color: var(--vrm-warn, #B25000) !important;', 'background: rgba(215,0,21,.1) !important; color: #D70015 !important;'],
   croix_petite:     ['src/styles-composants.css', '  width: 44px; height: 44px; min-width: 44px; min-height: 44px; margin: 0; padding: 0;', '  width: 30px; height: 30px; min-width: 30px; min-height: 30px; margin: 0; padding: 0;'],
   recherche_croix:  ['src/composants/ChampRecherche.jsx', '      {valeur ? (\n        <button', '      {false ? (\n        <button'],
@@ -246,7 +247,7 @@ function statiques(bavard) {
   const rouges = (css.match(/#D70015|#FF6961|rgba\(215, ?0, ?21/gi) || []).length;
   const rougesNum = (css.match(/\.vrm-num\[data-num-etat="doublon"\][^{]*\{[^}]*(#D70015|#FF6961)/g) || []).length;
   dit(rouges === rougesNum && rougesNum === 2, 'aucun rouge hors de la pastille N° en doublon (clair + sombre)', `${rouges} rouge(s), ${rougesNum} sur le doublon`);
-  dit(/:root\[data-theme="dark"\] body \.vrm-num \{ background: #3A3A3C; color: #F5F5F7; \}/.test(css), 'la pastille N° n\'est jamais blanche en sombre (#3A3A3C)');
+  dit(/:root\[data-theme="dark"\] body \.vrm-num \{ background: #48484A; color: #F5F5F7; \}/.test(css), 'la pastille N° n\'est jamais blanche en sombre (#48484A)');
   const tailles = [...css.matchAll(/font(?:-size)?:\s*(?:\d{3}\s+)?(\d+)px/g)].map((m) => +m[1]);
   dit(tailles.every((t) => [11, 12, 13, 15, 17, 20, 22, 28, 34, 38, 44].includes(t)), 'tailles de police sur l\'échelle fermée', tailles.join(','));
   const rayons = [...css.matchAll(/border-radius:\s*([\d\s px]+?)(?:\s*!important)?;/g)].flatMap((m) => m[1].trim().split(/\s+/).map((x) => parseFloat(x))).filter((x) => x > 3);
@@ -254,7 +255,10 @@ function statiques(bavard) {
   const sh = lire('src/composants/SheetShell.jsx');
   dit(/createPortal\(contenu, document\.body\)/.test(sh) && /prefers-reduced-motion/.test(sh) && /translationAffichee\(el\)/.test(sh) && /setPointerCapture/.test(sh),
     'SheetShell : portail, mouvement réduit, reprise depuis la position AFFICHÉE, capture du doigt');
-  dit(!/animate\(\[\{\s*opacity/.test(sh) && !/opacity:\s*0/.test(sh), 'SheetShell : aucune animation d\'opacité sur la feuille');
+  // La FEUILLE (`el.animate`) n'anime que `transform` ; seul le voile (`v.animate`) anime son opacité.
+  const animsFeuille = sh.split('\n').filter((l) => /\bel\.animate\(/.test(l));
+  dit(animsFeuille.length >= 2 && animsFeuille.every((l) => !/opacity/.test(l) && /transform/.test(l)), 'SheetShell : la feuille n\'anime que `transform` (aucun fondu d\'opacité)', animsFeuille.join(' | ').slice(0, 300));
+  dit(/\bv\.animate\(\[\{ opacity/.test(sh), 'SheetShell : le voile suit la feuille (son opacité, à part)');
   return ko;
 }
 
@@ -270,7 +274,7 @@ async function sourceAvecMutation(nom) {
       const mu = MUTATIONS[nom];
       if (!(await sourceAvecMutation(nom))) { console.log(`❌ mutation ${nom} : motif absent de ${mu[0]}`); rate++; continue; }
       let ko = 0;
-      if (mu[0].endsWith('.css') || ['croix_texte', 'sans_portail', 'feuille_fond', 'sans_retour'].includes(nom)) {
+      if (mu[0].endsWith('.css') || ['croix_texte', 'sans_portail', 'feuille_fond', 'sans_retour', 'feuille_fondu_js'].includes(nom)) {
         // Les règles lues dans les fichiers : on réécrit le fichier le temps du contrôle.
         const p = path.join(R, mu[0]); const avant = fs.readFileSync(p, 'utf8');
         try { fs.writeFileSync(p, avant.replace(mu[1], mu[2])); ko += statiques(false); ko += await audit(await construire(null), false); }

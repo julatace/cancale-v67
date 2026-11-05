@@ -8,7 +8,7 @@
 // d'un coup d'œil, partout pareil.
 // La forme : rayon 6 (--r-num), chiffres alignés, graisse 700 ;
 //   · clair : fond encre #1D1D1F, texte blanc ;
-//   · sombre : fond gris élevé #3A3A3C, texte #F5F5F7 — jamais blanche ;
+//   · sombre : fond gris élevé #48484A, texte #F5F5F7 — jamais blanche ;
 //   · `etat="doublon"` : ROUGE — le SEUL rouge de l'app (deux articles présents
 //     sous ce N°, §5/§7) ;
 //   · `etat="aVerifier"` : ambre (« à vérifier sur son carton », un geste à faire).
