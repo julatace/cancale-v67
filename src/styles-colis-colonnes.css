@@ -148,3 +148,19 @@ button.vrm-cc-carte:focus-visible { outline: 2px solid var(--vrm-focus, #0071E3)
 @media (min-width: 768px) {
   .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte .vrm-colis-actions > .vrm-transporteur { grid-column: 1 / -1; grid-row: 2; justify-self: start; margin-top: 4px; border-color: transparent !important; padding: 0 2px !important; min-height: 24px !important; }
 }
+
+/* ── (5 nov.) CODE ET QR RELIÉS ─────────────────────────────────────────────
+   « En grand » ouvre le code ET le QR au doigt ; un QR qu'on n'a pas se dit,
+   avec où le trouver (jamais un QR fabriqué) ; les comptes Mondial Relay relus
+   disent leur fraîcheur, une ligne par compte. Neutre : l'ambre seulement pour
+   une lecture de plus de 24 h (un geste à faire). */
+.vrm-rp-gestes .vrm-rp-plein { min-height: 44px; padding: 0 14px; border: 1px solid var(--vrm-line, #E5E5EA); border-radius: 12px; background: var(--vrm-surface, #FFFFFF);
+  color: var(--vrm-ink, #1D1D1F); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.vrm-rp-gestes .vrm-rp-qr-absent { flex: 1 1 220px; font-size: 12px; line-height: 1.4; color: var(--vrm-muted, #6E6E73); overflow-wrap: anywhere; }
+.vrm-rp-qr-absent strong { color: var(--vrm-ink, #1D1D1F); font-weight: 600; }
+.vrm-mr-bloc { display: flex; flex-direction: column; gap: 8px; margin: 0 0 12px; }
+.vrm-mr-comptes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.vrm-mr-comptes li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-size: 13px; line-height: 1.4; padding: 8px 12px; border-radius: 12px; background: var(--vrm-surface, #FFFFFF); }
+.vrm-mr-nom { font-weight: 600; color: var(--vrm-ink, #1D1D1F); overflow-wrap: anywhere; }
+.vrm-mr-frais { font-size: 12px; color: var(--vrm-muted, #6E6E73); }
+.vrm-mr-frais.is-ambre { color: var(--vrm-warn, #B25000); font-weight: 600; }

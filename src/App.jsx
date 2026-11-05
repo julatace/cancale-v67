@@ -219,6 +219,8 @@ import { histoireArticle, offresDeConversation } from "./histoireArticle.js";
 import { CLE_MODELES, lireModeles } from "./modelesDescription.js";
 import { MesModeles, InsererModele } from "./ModelesDescription.jsx";
 import PrixPartout from "./PrixPartout.jsx";
+import { MR_SELECT, lireColisMondialRelay, suivisAvecMondialRelay, accordCodes, ouTrouverQr, ilYa as ilYaLecture, compteDuRetrait, indexAchatsAutresSites } from "./retraitQr.js";
+import ExpliqueMondialRelay, { LecturesMondialRelay } from "./ExpliqueMondialRelay.jsx";
 import { lireFile, noterSaisie, instantane, acquitter, compterEnAttente, nuagePlusRecent, fusionAuChargement, oublierCle, CLE_FILE, HORS_FILE } from "./fileEnvoi.js";
 // La migration qui cloisonne les vendeurs, lue depuis LE fichier (pas recopiée) :
 // deux copies finiraient par diverger, et c'est le genre de texte qu'on colle
@@ -4709,6 +4711,19 @@ const fetchTranspLignesBrut = async () => {
     if (!Array.isArray(rows)) return null;
     return rows.map(ligneTranspDeMeta).filter(Boolean);
   } catch (_) { return null; }
+};
+// (5 nov.) LES COLIS LUS DANS SES COMPTES MONDIAL RELAY (`mr_colis_{compte}`,
+// rangés par l'extension quand il est connecté sur mondialrelay.fr — spécification :
+// docs/passation/2026-11-05-colis-qr.md). Projetés (§4.4), paginés, STRICTS : une
+// page ratée = « pas su » (null), jamais une demi-liste. La forme est vérifiée par
+// src/retraitQr.js (`lireColisMondialRelay`) : une forme inconnue n'entre pas.
+const fetchColisMondialRelayBrut = async () => {
+  try { return lireColisMondialRelay(await lireTout(`id=like.mr_colis_*&select=${MR_SELECT}`, { strict: true })); }
+  catch (_) { return null; }
+};
+const fetchColisMondialRelay = async (opts = {}) => {
+  if (opts.force) _rowCache.delete('mr_colis');
+  return cachedRow('mr_colis', fetchColisMondialRelayBrut);
 };
 const fetchTranspLignes = async (opts = {}) => {
   if (opts.force) _rowCache.delete('transp');
@@ -20446,6 +20461,19 @@ function LigneVente({ photo, titre, meta, montant, actions, etat, etatNoeud = nu
     </div>
     {details}
   </LigneVenteCompacte>;
+}
+// (5 nov.) L'ÉCRAN RESTE ALLUMÉ tant que le code / QR est affiché en grand (Screen Wake Lock) :
+// au comptoir, un écran qui s'éteint fait tout recommencer. Refusé ou absent ⇒ rien (aucune erreur).
+function GardeEcranAllume() {
+  React.useEffect(() => {
+    let verrou = null, vivant = true;
+    const prendre = () => { try { if (navigator.wakeLock && document.visibilityState === 'visible') navigator.wakeLock.request('screen').then((v) => { if (vivant) verrou = v; else v.release().catch(() => {}); }).catch(() => {}); } catch (_) {} };
+    prendre();
+    const vis = () => { if (document.visibilityState === 'visible') prendre(); };
+    document.addEventListener('visibilitychange', vis);
+    return () => { vivant = false; document.removeEventListener('visibilitychange', vis); try { if (verrou) verrou.release().catch(() => {}); } catch (_) {} };
+  }, []);
+  return null;
 }
 // Le QR d'un colis Leboncoin : l'image si elle charge, sinon un lien (api.leboncoin
 // peut exiger la session). On ne PROMET pas l'image — on la montre si elle vient,
@@ -41802,7 +41830,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // le nombre doit être celui qu'on voit). `lbcAnnulee` = la règle unique (§11).
       const inc = arr.filter(o => o && o.isSeller == null && !lbcAnnulee(o));
       const inconnuesListe = inc.slice().sort((a,b)=>String(b.at||'').localeCompare(String(a.at||'')));
-      setLbcVentes({ ventes, inconnues: inc.length, inconnuesListe });
+      // (5 nov.) Les ACHATS aussi : leur n° de suivi relie un colis à retirer à son achat Leboncoin (src/retraitQr.js).
+      setLbcVentes({ ventes, achats: arr.filter(o => o && o.isSeller === false), inconnues: inc.length, inconnuesListe });
       setLbcLu(true);
     } catch (_) { if (!estActif()) return; setLbcLu(null); /* pas su ⇒ rien : jamais un faux « vendu » */ }
 
@@ -42121,10 +42150,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // fois en tête de liste) · un tableau. Une relecture ratée garde la dernière
   // liste lue.
   const [transp, setTransp] = useState(undefined);
-  const lireSuivis = (opts) => Promise.all([fetchEmailTracking(opts), fetchTranspLignes(opts).catch(() => null)])
-    .then(([t, tr]) => {
+  // (5 nov.) Les colis lus dans ses comptes Mondial Relay : `undefined` pas encore
+  // lu · `null` pas su · { comptes, colis } (peut-être vides). Lus AVEC les e-mails,
+  // posés dans le même rendu ; une relecture ratée garde la dernière lecture.
+  const [mrColis, setMrColis] = useState(undefined);
+  const lireSuivis = (opts) => Promise.all([fetchEmailTracking(opts), fetchTranspLignes(opts).catch(() => null), fetchColisMondialRelay(opts).catch(() => null)])
+    .then(([t, tr, mr]) => {
       if (t) { setTracking(t); setTrackingKO(false); } else setTrackingKO(true);
       setTransp(prev => (Array.isArray(tr) ? tr : (Array.isArray(prev) ? prev : null)));
+      setMrColis(prev => (mr ? mr : (prev ? prev : null)));
       return t;
     })
     .catch(() => { setTrackingKO(true); setTransp(prev => (Array.isArray(prev) ? prev : null)); return null; });
@@ -42201,6 +42235,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // du n° de suivi produisait un carré que le comptoir ne scanne pas : c'est
   // « juste une retranscription », et ça fait perdre du temps au relais.
   // Quand il n'y a pas de vrai QR, la bonne réponse est le code, en gros.
+  // (5 nov.) Un colis vu par Vinted (conversation lue par l'extension) présenté comme une ligne de
+  // suivi, pour la même vue en grand : son code, son lieu, son QR si la conversation en donne un vrai.
+  const ligneRetraitVinted = (o) => { const r = relaisDe(o) || {}; return { carrier: carrierKey(r.transporteur || ''), code: r.code || null, qrUrl: r.qr || null, lieu: r.lieu || null, artTitle: (o && o.title) || '', photo: (o && orderPhoto(o)) || null, suivi: suivisAchat(o, indexSuivisAchats)[0] || '', _o: o }; };
   const openQrView = async (t) => {
     // UNE seule règle décide quoi présenter au comptoir, selon le transporteur
     // (retraitMode) — plus de logique QR/code éparpillée ici.
@@ -42209,18 +42246,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // TITRE, faute de mieux : un email de suivi n'a pas d'autre lien avec l'achat.
     // Donc UN SEUL candidat, ou aucune photo — montrer la chaussure d'une autre
     // paire à côté d'un code de retrait est pire que de n'en montrer aucune.
-    const pt = normTitle(t.artTitle || t.article || t.modele || '');
-    const cands = pt ? buysBase.filter(o => normTitle(o.title || '') === pt && orderPhoto(o)) : [];
-    const ph = cands.length === 1 ? cands[0] : {};
+    // ⚠️ (5 nov.) PLUS PAR LE TITRE (§5) : la photo est celle de la commande reliée à CE colis par
+    // identité (`cmdParColis` : n° de suivi, conversation ou code de retrait), sinon aucune.
+    const ph = (t && t._o) || (pickupUnion && pickupUnion.cmdParColis && pickupUnion.cmdParColis.get(colisKey(t))) || {};
     const base = {
       title: t.artTitle || (t.subject || 'Colis'), code: codeRetrait(t.code), code2: codeRetrait(t.code2), suivi: t.suivi || '',
       limite: t.limite || '', consigne: !!t.consigne,
       carrier: t.carrier || '', carrierName: r.carrier, lieu: cleanLieu(t.lieu).display || '',
       photo: t.photo || orderPhoto(ph) || null,
       mode: r.mode, _t: t,
+      // (5 nov.) Où trouver le QR qu'on n'a pas, le compte (Mondial Relay ou adresse), l'accord des codes.
+      qrOu: ouTrouverQr(t.carrier), compte: compteDuRetrait(t, mrColis), accord: accordCodes(trackingRetrait, suiviDeLigne(t)),
+      source: t.mrCompte && t.qrB64 ? 'mondialrelay' : (t._o ? 'conversation' : 'email'),
     };
-    if (r.mode === 'qr' && t.qrB64) { setQrView({ ...base, img: `data:${t.qrType || 'image/png'};base64,${t.qrB64}`, real: true }); return; }
-    if (r.mode === 'qr' && !t.qrB64 && qrImage(t)) { setQrView({ ...base, img: qrImage(t), real: true, hosted: true }); return; }
+    // ⚠️ (5 nov.) UN VRAI QR SE MONTRE TOUJOURS, quel que soit le mode préféré du transporteur :
+    // Mondial Relay (« au code ») a désormais un QR quand il vient de son compte. Code ET QR, ensemble.
+    if (t.qrB64) { setQrView({ ...base, img: `data:${t.qrType || 'image/png'};base64,${t.qrB64}`, real: true, mode: 'qr' }); return; }
+    if (qrImage(t)) { setQrView({ ...base, img: qrImage(t), real: true, hosted: true, mode: 'qr' }); return; }
     setQrView({ ...base, img: null, real: false });
   };
   // Le bandeau « Colis retiré · Annuler » se referme tout seul au bout de 6 s.
@@ -43254,12 +43296,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (revue du 23 oct., n° 3) La règle vit dans api/_lib/suivi-colis.js
   // (`finDeCommandeAchat`) : le rappel du matin la lit aussi (§11).
   const finCommandeAchat = (o) => (o ? finDeCommandeAchat({ statut: o.status, etat: etatTxn(o.transaction_id), auRelais: isAtRelayStatus(String(o.status || '')) }) : null);
+  // (5 nov.) LES LIGNES DE SUIVI DES COLIS À RETIRER = les e-mails + les colis lus dans
+  // ses comptes Mondial Relay (src/retraitQr.js), de la MÊME forme, reliés par le n° de
+  // suivi seulement (§5). Toute la règle d'en dessous s'applique telle quelle (§11) :
+  // un colis par n°, retiré, reparti, à vérifier. `null` reste « e-mails pas lus ».
+  const trackingRetrait = useMemo(() => suivisAvecMondialRelay(tracking, mrColis), [tracking, mrColis]);
   const pickupUnion = useMemo(() => {
     const maintenant = Date.now();
     // (23 oct.) LA fin d'un colis par son n° de suivi (retiré · reparti), toutes
     // lignes confondues (api/_lib/suivi-colis.js, §11 : le widget, le rappel du
     // matin et l'écran d'équipe lisent la même).
-    const fins = finsColis(tracking, suivisEnvoyes, transp);
+    const fins = finsColis(trackingRetrait, suivisEnvoyes, transp);
     // Les n° retirés (e-mail OU transporteur : la même règle, `fins`).
     const retires = new Set(); for (const [k, f] of fins) if (f.retire) retires.add(k);
     // (24 oct.) Ce que dit le TRANSPORTEUR, par n° normalisé (null = pas su).
@@ -43315,18 +43362,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // (api/_lib/suivi-colis.js, `fusionTransporteur`) : un e-mail « en transit »
     // dont le transporteur dit, PLUS TARD, qu'il est disponible devient « à
     // retirer » (le lieu et la limite du transporteur, sans code ni QR) — une
-    // seule ligne par n° (la plus récente : `tracking` est trié du plus récent
+    // seule ligne par n° (la plus récente : `trackingRetrait` est trié du plus récent
     // au plus ancien), jamais une seconde à côté d'un e-mail déjà « disponible ».
     // Un n° sans aucun e-mail (ajouté à la main, ou relevé par Vinted) que le
     // transporteur dit disponible entre par une ligne SYNTHÉTIQUE
     // (`ligneDuTransporteur`), sauf si Vinted montre déjà ce colis (`extra`).
     // Les n° dont un E-MAIL dit déjà « retour » (rendu par la boucle des retours).
-    const nRetourEmail = new Set((tracking || []).filter(t => t && t.status === 'retour' && sensColis(t, suivisEnvoyes) !== 'sortant').map(suiviDeLigne).filter(Boolean));
-    const nDispoEmail = new Set((tracking || []).filter(t => t && t.status === 'available' && sensColis(t, suivisEnvoyes) !== 'sortant').map(suiviDeLigne).filter(Boolean));
-    const nTracking = new Set((tracking || []).map(suiviDeLigne).filter(Boolean));
+    const nRetourEmail = new Set((trackingRetrait || []).filter(t => t && t.status === 'retour' && sensColis(t, suivisEnvoyes) !== 'sortant').map(suiviDeLigne).filter(Boolean));
+    const nDispoEmail = new Set((trackingRetrait || []).filter(t => t && t.status === 'available' && sensColis(t, suivisEnvoyes) !== 'sortant').map(suiviDeLigne).filter(Boolean));
+    const nTracking = new Set((trackingRetrait || []).map(suiviDeLigne).filter(Boolean));
     const nMontes = new Set();
     const lignesColis = [];
-    for (const t0 of (tracking || [])) {
+    for (const t0 of (trackingRetrait || [])) {
       const k = suiviDeLigne(t0); const tr = tpm && k ? tpm.get(k) : null;
       if (!tr) { lignesColis.push(t0); continue; }
       const f = fusionTransporteur(t0, tr, maintenant);
@@ -43421,7 +43468,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     // Le transporteur ÉCRIT que le colis repart (statut « retour », 23 oct.).
     // Gardé 30 jours : c'est le temps de vérifier le remboursement.
-    for (const t of (tracking || [])) {
+    for (const t of (trackingRetrait || [])) {
       if (!t || t.status !== 'retour') continue;
       if (sensColis(t, suivisEnvoyes) === 'sortant') continue;      // c'est un colis qu'IL a posté : il lui revient
       if (collected && collected.has(colisKey(t))) continue;
@@ -43448,7 +43495,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       for (const o of vintedToPickup) for (const su of suivisAchat(o, indexColis)) nMontres.add(normaliserSuivi(su));
       const envoyesN = new Set([...(suivisEnvoyes || [])].map(normaliserSuivi).filter(Boolean));
       const parSuivi = new Map();
-      for (const t of (tracking || [])) { const k = suiviDeLigne(t); if (k && !parSuivi.has(k) && sensColis(t, suivisEnvoyes) !== 'sortant') parSuivi.set(k, t); }
+      for (const t of (trackingRetrait || [])) { const k = suiviDeLigne(t); if (k && !parSuivi.has(k) && sensColis(t, suivisEnvoyes) !== 'sortant') parSuivi.set(k, t); }
       const manuels = new Set((Array.isArray(suivisManuels) ? suivisManuels : []).map(m => normaliserSuivi(m && m.suivi)).filter(Boolean));
       for (const [k, tr] of tpm) {
         if (tr.etat !== 'retour_expediteur' && tr.etat !== 'incident') continue;
@@ -43590,7 +43637,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
              prets: (emailList.length - sansCodeEmail) + (extra.length - sansCode),
              total: emailList.length + extra.length };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tracking, transp, collected, collectedAt, vintedToPickup, buysBase, pickupDone, colisRelais, indexSuivisAchats, suivisVinted, suivisEnvoyes, txSuivisColis, suivisManuels]);
+  }, [trackingRetrait, transp, collected, collectedAt, vintedToPickup, buysBase, pickupDone, colisRelais, indexSuivisAchats, suivisVinted, suivisEnvoyes, txSuivisColis, suivisManuels]);
   // ── (31 oct.) LES COLIS À ALLER CHERCHER, PAR POINT RELAIS ───────────────
   // Julien : « une carte avec les colis à aller chercher par point relais, et
   // des prévisions ». Les colis DÉJÀ là : les listes de `pickupUnion` (§11 : le
@@ -50047,9 +50094,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const ra = a ? relaisDe(a) : null; if (ra && ra.lieu) lu = lieuLePlusComplet(lu, lieuDe(ra.lieu));
       return completer(lu, t && t.carrier, t && t.account); };
     const codeDeLigne = (t) => codeRetrait(t && t.code) || '';
+    // (5 nov.) L'ACHAT LEBONCOIN OU VESTIAIRE D'UN COLIS, PAR SON N° DE SUIVI (src/retraitQr.js, §5) :
+    // jamais le titre, le prix ou le relais ; deux achats au même n° ⇒ personne.
+    const achatsAutres = indexAchatsAutresSites({ lbcVentes: (lbcVentes && lbcVentes.achats) || [], vcAchats: ((vcEtat || vcBrut) && (vcEtat || vcBrut).achats) || null });
     for (const t of (pickupUnion.emailList || [])) {
       const a = achatDuColis(t, buysBase, indexSuivisAchats); const lu = lieuDeLigne(t, a); const code = codeDeLigne(t); const eE = etatColisEmail(t, maintenant); const ej = eE.jours;
-      L.push({ cle: 'r:e:' + (suiviDeLigne(t) || t.id || ''), groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(a ? a.title : (t.artTitle || (nomTr(t.carrier) ? `Colis ${nomTr(t.carrier)}` : 'Colis à retirer')), a), photo: a ? photoAchat(a) : (t.photo || null),
+      const aa = a ? null : (achatsAutres.get(suiviDeLigne(t)) || null);
+      L.push({ cle: 'r:e:' + (suiviDeLigne(t) || t.id || ''), groupe: 'retirer', site: aa ? aa.site : 'vinted', achatAutre: aa, nom: nomAvecTaille(a ? a.title : ((aa && aa.titre) || t.artTitle || (nomTr(t.carrier) ? `Colis ${nomTr(t.carrier)}` : 'Colis à retirer')), a), photo: a ? photoAchat(a) : ((aa && aa.photo) || t.photo || null),
         etat: [lu.lieuNom || nomTr(t.carrier), dernierJour(ej) || (code ? code : (qrImage(t) ? 'QR code' : 'code pas encore lu'))].filter(Boolean).join(' · '), ambre: Number.isFinite(ej) && ej <= 1, ouvrir: true,
         ...lu, transporteur: t.carrier || '', transp: transporteurColis(t.carrier, suiviDeLigne(t)), code, code2: codeRetrait(t.code2) || '', qr: !!qrImage(t) && !code, jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eE), ...(lu.lieuNom ? {} : { sansLieu: sansLieuEmail(t) }), src: { t } });
     }
@@ -55633,8 +55684,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return (<>
               {x.code2 ? <CodeRetraitCopiable label="Identifiant" code={x.code2}/> : null}
               {x.code ? <CodeRetraitCopiable label={x.code2 ? 'Code d’ouverture' : 'Code de retrait'} code={x.code}/> : null}
-              {qi ? <button className="vrm-icon-control vrm-rp-qr" type="button" onClick={() => openQrView(t)} title="QR de retrait — afficher en grand pour scanner" aria-label="Afficher le QR de retrait en grand" data-colis-qr="">
+              {qi ? <button className="vrm-icon-control vrm-rp-qr" type="button" onClick={() => openQrView(t)} title="QR de retrait — afficher en grand pour scanner" aria-label="Afficher le QR de retrait en grand" data-colis-qr="" data-colis-qr-source={t && t.mrCompte && t.qrB64 ? 'mondialrelay' : 'email'}>
                 <img src={qi} alt="QR de retrait" onError={() => noterImgMorte(qrImage(t))}/></button> : null}
+              {/* (5 nov.) LE CODE ET LE QR EN GRAND, au doigt, pour le comptoir ou le casier — un geste pour
+                  tout colis qui a un code ou un QR (e-mail, compte Mondial Relay, conversation Vinted). */}
+              {(x.code || x.code2 || qi || (relV && codeRetrait(relV.code))) ? <button type="button" className="vrm-rp-plein" data-colis-plein-ecran="" onClick={() => (t ? openQrView(t) : openQrView(ligneRetraitVinted(o)))}
+                aria-label="Afficher le code et le QR en grand">En grand</button> : null}
+              {/* (5 nov.) Un QR qu'on n'a pas se DIT, avec où le trouver (src/retraitQr.js) — jamais un QR fabriqué. */}
+              {!qi && (t || (relV && codeRetrait(relV.code))) && !(relV && relV.qr) ? <span className="vrm-rp-qr-absent" data-colis-qr-absent={(t && t.carrier) || (relV && relV.transporteur) || ''}><strong>QR pas reçu</strong> · {ouTrouverQr((t && t.carrier) || (relV && relV.transporteur) || '')}</span> : null}
               {!x.code && !qi ? (!t && relV && relV.lieu && !relV.qr
                 // La conversation a été LUE (le lieu en vient) et ne porte aucun code :
                 // il arrive par l'e-mail du transporteur (même phrase que l'ancien détail).
@@ -55675,6 +55732,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 : vers ? <span className="vrm-rp-sous" data-colis-limite="vers" data-colis-limite-vers={String(vers)}>À retirer vers le {new Date(String(vers).slice(0,10)+'T00:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'})} (estimé : le transporteur ne donne pas la date)</span>
                 : <span className="vrm-rp-sous" data-colis-limite="inconnue">Date limite inconnue</span>)}
               {(su || (plusieursComptesRet && cpt)) ? <span className="vrm-rp-suivi" data-rp-suivi={su} data-colis-compte={cpt}>{[su ? `n° ${su}` : '', plusieursComptesRet && cpt ? `compte ${cpt}` : ''].filter(Boolean).join(' · ')}</span> : null}
+              {/* (5 nov.) LE COMPTE QUAND ON LE SAIT (src/retraitQr.js, `compteDuRetrait`) : le compte Mondial Relay
+                  où il a été lu, sinon l'adresse qui a reçu l'e-mail — et « dans aucun compte Mondial Relay » quand
+                  tous ses comptes relus sont complets et qu'aucun ne le porte. Jamais deviné. */}
+              {t ? (() => { const cr = compteDuRetrait(t, mrColis); if (!cr) return null;
+                return <span className="vrm-rp-sous" data-colis-compte-source={cr.source} data-colis-compte-mr={cr.source === 'mondialrelay' ? cr.libelle : undefined} data-colis-hors-comptes-mr={cr.horsComptes ? '1' : undefined}>
+                  {cr.source === 'mondialrelay' ? `Compte Mondial Relay · ${cr.libelle}${cr.aussiEmail ? ' · aussi par e-mail' : ''}` : [cr.libelle ? `Arrivé par e-mail sur ${cr.libelle}` : 'Arrivé par e-mail', cr.horsComptes ? 'dans aucun de tes comptes Mondial Relay relus' : ''].filter(Boolean).join(' · ')}</span>; })() : null}
+              {t ? (() => { const ac = accordCodes(trackingRetrait, suiviDeLigne(t)); if (!ac) return null;
+                return <span className="vrm-rp-sous" data-colis-code-accord={ac}>{ac === 'confirme' ? 'Code confirmé par ton compte Mondial Relay' : `Code différent de l’e-mail : celui de ton compte Mondial Relay (relu ${ilYaLecture(t.mrCompte && t.mrCompte.luAt, Date.now()) || 'récemment'}) fait foi`}</span>; })() : null}
+              {x.achatAutre ? <span className="vrm-rp-sous" data-colis-achat-site={x.achatAutre.site}>{`Achat ${x.achatAutre.site === 'leboncoin' ? 'Leboncoin' : 'Vestiaire'}${x.achatAutre.titre ? ` · ${x.achatAutre.titre}` : ''} (relié par le n° de suivi)`}</span> : null}
               {/* (23-24 oct.) La dernière nouvelle de Vinted et ce que dit le transporteur, par
                   l'identité de CE colis (n° de suivi, transaction) — rien quand il n'y a rien. */}
               {t ? <>
@@ -55823,6 +55889,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <section className="vrm-colis-retirer" data-cc-colonne="retirer" data-cc-n={colRet ? colRet.n : 0} data-cc-hors={colRet ? colRet.nHors : 0}
                 data-pickup-total={tracking === null ? '—' : pickupUnion.total} data-pickup-a-verifier={pickupUnion.aVerifier.length}>
                 {notes.retirer ? <p className="vrm-colis-note" data-cc-note="retirer">{notes.retirer}</p> : null}
+                {(() => { // (5 nov.) MONDIAL RELAY : ses comptes relus (fraîcheur, un par compte) et, repliée, l'explication
+                  // animée (données inventées) de « ouvre ton compte, VRM récupère tes colis et leurs QR ». Tant que
+                  // l'extension ne range aucune ligne `mr_colis_*`, rien n'est promis : le geste d'aujourd'hui est dit.
+                  const comptesMr = (mrColis && Array.isArray(mrColis.comptes)) ? mrColis.comptes : [];
+                  const mrListe = (pickupUnion.emailList || []).filter(t => t && t.carrier === 'mondialrelay');
+                  if (!comptesMr.length && !mrListe.length) return null;
+                  const sansQr = mrListe.filter(t => !qrImage(t)).length;
+                  return <div className="vrm-mr-bloc" data-mr-bloc="" data-mr-sans-qr={sansQr} data-mr-lu={mrColis === undefined ? 'en-cours' : mrColis === null ? 'pas-su' : 'lu'}>
+                    <LecturesMondialRelay mr={mrColis}/>
+                    <details className="vrm-repli" data-mr-explique="">
+                      <summary>{comptesMr.length ? 'Comment VRM relève tes comptes Mondial Relay' : `Les QR Mondial Relay${sansQr ? ` · ${sansQr} pas reçu${sansQr > 1 ? 's' : ''}` : ''}`}</summary>
+                      <ExpliqueMondialRelay/>
+                      {!comptesMr.length ? <p className="vrm-colis-note" data-mr-pas-encore="" style={{marginTop:10}}>Ton extension ne relève pas encore les comptes Mondial Relay : c’est la prochaine étape. D’ici là, le QR est dans ton compte Mondial Relay (site ou application) et le code de l’e-mail suffit au comptoir.</p> : null}
+                    </details>
+                  </div>; })()}
                 {(() => { // (23 oct.) Un compte inconnu ne fait jamais disparaître un colis : dit UNE fois, avec le geste.
                   const sans = (pickupUnion.emailList || []).filter(t => !compteDuColisEmail(t)); const n = sans.length;
                   if (!n) return null;
@@ -56334,6 +56415,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       gestes={<button type="button" data-gerer-ebay={x.orderId} className="vrm-colis-sec" onClick={()=>{ DEMANDE_EBAY_CIBLE.compte = x.compte; DEMANDE_EBAY_CIBLE.id = x.orderId; DEMANDE_EBAY_CIBLE.at = Date.now(); onNav && onNav('ebay_ventes'); }}
                         style={{...sec,border:`1px solid ${C.border}`,background:'transparent',color:C.text}}>Suivi et message à l'acheteur</button>}/>;
                   }
+                  // (5 nov.) Leboncoin : son QR DE DÉPÔT (« sans imprimer ») sur la carte, comme le bordereau — mesuré,
+                  // `label.qrUrl` (api.leboncoin.fr/api/shippingproxy…) sur 2 des 3 ventes ; l'image si elle vient,
+                  // sinon « Voir le QR ↗ » (`QrColis`) ; absent ⇒ rien de plus (le bordereau suffit).
                   // Leboncoin : le N° par l'identifiant de l'annonce (`vinted_annonce_numeros[itemId]`, la règle
                   // de l'écran Colis Leboncoin) ; le bordereau s'imprime, tamponné, depuis l'écran Colis Leboncoin.
                   const x = e.x, o = e.o || {};
@@ -56343,6 +56427,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   return <CarteColisSite ident={e.key} site="leboncoin" photo={photoArticle(o)} titre={x.titre || o.title || '(sans titre)'} num={num}
                     sous={o.label && o.label.voucherUrl ? 'Leboncoin' : 'Leboncoin · bordereau à générer'} transporteur={e.tr} frise={friseColisFusion({}, {})}
                     attrs={{ 'data-lbc-colis': x.txId }}
+                    detail={o.label && o.label.qrUrl ? <div data-lbc-qr-depot="" style={{display:'flex',alignItems:'center',gap:12,marginTop:8}}><QrColis url={o.label.qrUrl} size={88}/><span style={{fontSize:12,color:C.muted,lineHeight:1.4}}>QR de dépôt Leboncoin : à présenter au point relais, sans imprimer.</span></div> : null}
                     primaire={o.label && o.label.voucherUrl
                       ? <button type="button" data-imprime="1" data-imprime-lbc={x.txId} className="vrm-colis-primaire" onClick={() => onColisLeboncoin && onColisLeboncoin()} title="Bordereau Leboncoin tamponné (titre + N°)" style={primaireBleu}><Icon name="printer" size={16}/><span className="vrm-lib-long">Imprimer le bordereau</span><span className="vrm-lib-court">Imprimer</span></button>
                       : <a data-generer-lbc={x.txId} href={`https://www.leboncoin.fr/compte/part/transaction/${encodeURIComponent(x.txId)}`} target="_blank" rel="noreferrer" className="vrm-colis-primaire" title="Le bordereau se génère sur Leboncoin" style={{...primaireBleu,background:C.card2||C.bg,color:C.text}}><Icon name="printer" size={16}/><span className="vrm-lib-long">Générer sur Leboncoin</span><span className="vrm-lib-court">Générer</span></a>}
@@ -58533,7 +58618,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {qrView && (
         <div onClick={()=>setQrView(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.82)',zIndex:1400,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
           <FermeAuRetour fermer={()=>setQrView(null)}/>
-          <div onClick={e=>e.stopPropagation()} style={{background:'#fff',width:'100%',maxWidth:420,borderRadius:12,padding:'22px 20px 18px',display:'flex',flexDirection:'column',alignItems:'center',gap:14,boxShadow:'0 12px 40px rgba(0,0,0,0.4)'}}>
+          <GardeEcranAllume/>
+          <div onClick={e=>e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Code et QR de retrait" data-qr-plein="" data-qr-plein-code={qrView.code||''} data-qr-plein-img={qrView.img?'1':'0'} data-qr-plein-source={qrView.source||''}
+            style={{background:'#fff',width:'100%',maxWidth:420,maxHeight:'calc(100dvh - 32px)',overflowY:'auto',boxSizing:'border-box',borderRadius:12,padding:'22px 20px 18px',display:'flex',flexDirection:'column',alignItems:'center',gap:14,boxShadow:'0 12px 40px rgba(0,0,0,0.4)'}}>
             {qrView.photo && <PhotoVinted src={qrView.photo} alt="" loading="lazy" style={{width:64,height:64,borderRadius:12,objectFit:'cover',border:'1px solid #E5E5EA'}}/>}
             <div style={{fontSize:15,fontWeight:700,color:'#111',textAlign:'center',lineHeight:1.3}}>{qrView.title}</div>
             {/* Vrai QR uniquement (Chronopost). Si l'image hébergée ne charge
@@ -58564,9 +58651,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{fontSize:28,fontWeight:700,color:'#111',fontFamily:'monospace',letterSpacing:2,lineHeight:1.1}}>{qrView.suivi}</div>
               </div>
             )}
+            {/* (5 nov.) Pas de QR : dit, avec où le trouver (jamais un QR fabriqué). */}
+            {!qrView.img && qrView.mode!=='home' && qrView.qrOu && <div data-qr-plein-absent="" style={{fontSize:12,color:'#444',textAlign:'center',lineHeight:1.45,background:'#F5F5F7',borderRadius:12,padding:'8px 12px'}}><strong>QR pas reçu</strong> · {qrView.qrOu}</div>}
+            {qrView.accord && <div data-qr-plein-accord={qrView.accord} style={{fontSize:12,color:'#444',textAlign:'center'}}>{qrView.accord==='confirme'?'Code confirmé par ton compte Mondial Relay':'Code de ton compte Mondial Relay (plus récent que l’e-mail)'}</div>}
+            {qrView.compte && (qrView.compte.libelle || qrView.compte.horsComptes) && <div data-qr-plein-compte={qrView.compte.source} style={{fontSize:12,color:'#666',textAlign:'center'}}>{qrView.compte.source==='mondialrelay'?`Compte Mondial Relay · ${qrView.compte.libelle}`:[qrView.compte.libelle?`Reçu sur ${qrView.compte.libelle}`:'Reçu par e-mail',qrView.compte.horsComptes?'dans aucun compte Mondial Relay':''].filter(Boolean).join(' · ')}</div>}
             {qrView.lieu && <div style={{fontSize:13,fontWeight:600,color:'#111',textAlign:'center',lineHeight:1.35}}>{qrView.lieu}</div>}
             {qrView.limite && (()=>{ const j=Math.ceil((new Date(qrView.limite+'T23:59:59')-Date.now())/86400000);
-              return <div style={{fontSize:12,fontWeight:700,color:j<=2?'#c53030':'#B25000',textAlign:'center'}}>
+              return <div style={{fontSize:12,fontWeight:700,color:'#B25000',textAlign:'center'}}>
                 {j<0?'délai de retrait dépassé':j===0?'dernier jour pour le retirer':j===1?'⏰ à retirer demain':`🗓 à retirer avant le ${new Date(qrView.limite).toLocaleDateString('fr-FR')} · ${j} j`}
               </div>; })()}
             {qrView.suivi && (qrView.img || qrView.code) && <div style={{fontSize:11,color:'#666'}}>{qrView.carrier?`${carrierName(qrView.carrier)} · `:''}n° {qrView.suivi}</div>}
@@ -58590,7 +58681,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {qrView.carrier==='mondialrelay' ? '📱 Ouvrir Mondial Relay (QR)' : '🔍 Suivre le colis'}
               </a>
             )}
-            <button type="button" onClick={()=>setQrView(null)} style={{border:'none',borderRadius:12,background:'#111',color:'#fff',fontSize:15,fontWeight:600,padding:'11px 22px',cursor:'pointer',fontFamily:'inherit',width:'100%'}}>Fermer</button>
+            {/* (5 nov.) LA LUMINOSITÉ : un site ne peut pas la régler (aucune API web) — on le dit, et l'écran
+                reste allumé tant que la vue est ouverte (Wake Lock, quand le navigateur le permet). */}
+            {qrView.img && <div data-qr-plein-luminosite="" style={{fontSize:11,color:'#666',textAlign:'center',lineHeight:1.45}}>☀︎ Monte la luminosité au maximum avant de présenter le QR : le lecteur du relais lit mal un écran sombre. VRM ne peut pas la régler à ta place ; l’écran reste allumé tant que cette vue est ouverte.</div>}
+            <button type="button" onClick={()=>setQrView(null)} style={{border:'none',borderRadius:12,background:'#111',color:'#fff',fontSize:15,fontWeight:600,padding:'11px 22px',minHeight:44,cursor:'pointer',fontFamily:'inherit',width:'100%'}}>Fermer</button>
           </div>
         </div>
       )}
