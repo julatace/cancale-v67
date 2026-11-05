@@ -75,7 +75,10 @@ export function parcoursPaire(rn, d = {}, o = {}) {
   if (fiches == null) etapes.push({ cle: 'achat', etat: 'passu', titre: 'Achat', detail: 'tes fiches numérotées pas encore lues' });
   else if (entree && entree.buyFrom && (entree.buyFromId || entree.buyFrom.title)) {
     const b = entree.buyFrom;
-    etapes.push({ cle: 'achat', etat: 'fait', titre: 'Achetée sur Vinted', date: b.date || null, montant: achatC,
+    // (5 nov., revue) `buyFromId` porté par l'étape : le lien peut venir de la
+    // VENTE (`vinted_sale_overrides`), pas seulement de la fiche — « Voir l'état »
+    // et l'histoire lisent CET achat-là (jamais « saisi à la main » à tort).
+    etapes.push({ cle: 'achat', etat: 'fait', titre: 'Achetée sur Vinted', date: b.date || null, montant: achatC, buyFromId: entree.buyFromId ? String(entree.buyFromId) : null,
       detail: [b.seller ? `vendeur « ${b.seller} »` : null, b.account || null, entree.buyFromId ? 'achat relié par son n° de transaction' : null].filter(Boolean).join(' · ') });
   } else if (achatC != null) etapes.push({ cle: 'achat', etat: 'fait', titre: 'Achat', montant: achatC, detail: 'prix saisi à la main · achat pas relié' });
   else etapes.push({ cle: 'achat', etat: 'absent', titre: 'Achat', detail: 'prix d’achat pas saisi' });

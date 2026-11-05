@@ -76,10 +76,14 @@ export function remettreCase({ slots, meubles, sorti, cle = cleDefaut } = {}) {
 //     (`vinted_nums_physiques` : annonce en ligne ou colis pas encore parti) :
 //     NON — il est parti, il ne revient pas dans « À ranger » ;
 //   · « pas su » (liste des présents jamais publiée : `physiques` null) : OUI,
-//     comme avant — on ne cache jamais sur une absence de lecture.
-export function resteAuStock(f, { pose, vendus, physiques, cle = cleDefaut } = {}) {
+//     comme avant — on ne cache jamais sur une absence de lecture ;
+//   · REMISE à la main (« Remettre », `garder`) : OUI — il a dit qu'elle est
+//     chez lui ; si sa case était prise, elle attend dans « À ranger » (avant,
+//     elle disparaissait de l'écran : ni case, ni « À ranger », ni journal).
+export function resteAuStock(f, { pose, vendus, physiques, garder, cle = cleDefaut } = {}) {
   const k = cle(f && f.numero); if (!k) return false;
   if (pose) return true;
+  if (garder && garder[k]) return true;
   if (!physiques) return true;
   if (vendus && vendus.has(k) && !physiques.has(k)) return false;
   return true;

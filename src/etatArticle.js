@@ -62,14 +62,17 @@ export function etatArticle(p, x = {}) {
   // ── PRIX D'ACHAT ─────────────────────────────────────────────────────────
   const eA = etape('achat');
   const evA = evs(eA)[0] || null;
-  const relie = !!(evA && /^achat n°/.test(str(evA.preuve)));
+  // Relié = l'achat posé par SON lien (n° de transaction, ou lien d'avant sans
+  // n°) ; « prix saisi » = tapé à la main. La date de l'achat n'est lue que d'un
+  // achat relié (un prix saisi n'a pas de date d'achat).
+  const relie = !!(evA && /^achat (n°|relié)/.test(str(evA.preuve)));
   const cents = p.resume && Number.isFinite(p.resume.achat) ? p.resume.achat : null;
   const prixAchat = !eA || eA.etat === 'passu'
     ? { cents: null, source: null, raison: (eA && eA.detail) || 'tes fiches pas encore lues' }
     : cents == null
       ? { cents: null, source: null, raison: eA.etat === 'absent' ? 'prix d’achat pas saisi, aucun achat relié' : 'prix de l’achat relié pas lu' }
       : { cents, source: relie ? 'relie' : 'saisi', raison: '' };
-  const dAchat = relie || (evA && evA.at) ? t(evA && evA.at) : null;
+  const dAchat = relie ? t(evA && evA.at) : null;
 
   // ── VENTE ────────────────────────────────────────────────────────────────
   const eV = etape('vente');
@@ -96,7 +99,10 @@ export function etatArticle(p, x = {}) {
   const jamaisEnLigne = !!(eL && eL.etat === 'absent');
   const raisonLigne = crees === undefined ? undefined
     : !ids.length && !datesL.length ? (jamaisEnLigne ? 'pas encore mise en ligne' : 'aucune annonce lue pour ce N°')
-    : crees === null ? 'dates de mise en ligne pas lues' : 'date de mise en ligne pas écrite par Vinted';
+    // (revue du 5 nov.) Une annonce vendue ou supprimée peut ne plus être dans
+    // le dressing lu : sa date n'est pas « pas écrite par Vinted », elle n'est
+    // pas LUE — on le dit tel quel.
+    : crees === null ? 'dates de mise en ligne pas lues' : 'date de mise en ligne pas trouvée dans ce qui a été lu (dressing, coffre)';
 
   // ── RÉCEPTION ────────────────────────────────────────────────────────────
   const rec = x.reception;

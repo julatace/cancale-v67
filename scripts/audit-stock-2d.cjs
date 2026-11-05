@@ -53,6 +53,10 @@ const MUTATIONS = {
   'ventes-passu': ['etat', "  const venteSu = !!eV && eV.etat !== 'passu';", "  const venteSu = true;"],
   // Un prix SAISI présenté comme achat relié.
   'source-relie': ['etat', "{ cents, source: relie ? 'relie' : 'saisi', raison: '' }", "{ cents, source: 'relie', raison: '' }"],
+  // (revue du 5 nov.) Une paire REMISE à la main dont la case était prise disparaît de l'écran.
+  'remise-cachee': ['sortie', "  if (garder && garder[k]) return true;\n", ''],
+  // (revue du 5 nov.) Un achat relié sans n° de transaction (lien d'avant) dit « saisi à la main ».
+  'relie-sans-tx': ['etat', "/^achat (n°|relié)/", "/^achat n°/"],
 };
 
 const arg = process.argv.slice(2);
@@ -129,6 +133,7 @@ if (arg.includes('--prouve')) {
     dit(S.resteAuStock({ numero: '3' }, { pose: false, vendus, physiques }), 'vendu pas encore parti : montré');
     dit(S.resteAuStock({ numero: '9' }, { pose: false, vendus, physiques }), 'pas vendu (même absent des présents) : montré — on ne cache pas sur une absence');
     dit(S.resteAuStock({ numero: '4' }, { pose: false, vendus, physiques: null }), '« pas su » (présents jamais publiés) : rien n’est caché');
+    dit(S.resteAuStock({ numero: '4' }, { pose: false, vendus, physiques, garder: { '4': 1 } }), 'REMISE à la main (« Remettre », sa case prise) : elle attend dans « À ranger », jamais disparue');
     dit(S.etatCase({ numero: '3' }, { vendus }) === 'vendue' && S.etatCase({ numero: '1' }, { vendus }) === 'occupee' && S.etatCase(null, { vendus }) === 'vide', 'une case : vide · occupée · vendue');
   });
 
@@ -187,11 +192,33 @@ if (arg.includes('--prouve')) {
     dit(E.etatArticle(hist(), { fiches: null, ids: ['1001'], crees, reception: rec, maintenant: NOW }).republications.n === null, 'fiches pas lues : republications « — »');
   });
 
+  // ── 4 bis. (revue du 5 nov.) L'ACHAT RELIÉ DEPUIS LA VENTE ────────────────
+  // Le lien posé depuis une vente (`vinted_sale_overrides`) est un achat relié :
+  // l'histoire (`histoireArticle`, la VRAIE) et « Voir l'état » le disent — avant,
+  // « saisi à la main » et « achat pas relié à cette paire ».
+  await (async () => { try {
+    const H = await import(pathToFileURL(path.join(RACINE, 'src', 'histoireArticle.js')).href);
+    const rn = { etat: 'ok', cle: '7', num: '7', manques: [], annonces: [{ id: '2001', title: 'Paire inventée', etat: 'plus-en-ligne' }],
+      ventes: { vinted: [{ _tx: '8801', transaction_id: '8801', _item: '2001', date: '2026-10-20T10:00:00Z', status: 'Commande finalisée', price: { amount: '70' } }], lbc: [], ebay: [] }, annoncesEbay: [], bordereaux: [] };
+    const fiches = { '2001': { numero: '7', title: 'Paire inventée' } };
+    const d = { fiches, buyByNum: {}, stats: {}, versements: {}, coffres: {}, offres: [], recus: new Set(), autresEnLigne: [], journalPrix: [], prixVinted: [] };
+    const o = { etapeVente: () => ({ label: 'Finalisée', step: 4 }), venteAnnulee: () => false };
+    const pV = H.histoireArticle(rn, { ...d, saleOv: { '8801': { buyPrice: '30', buyFromId: '77700011', buyFrom: { title: 'x', date: '2026-10-01T09:00:00Z', price: 30 } } } }, o);
+    const eV = E.etatArticle(pV, { fiches, ids: ['2001'], crees: {}, reception: null, maintenant: NOW });
+    dit(eV.prixAchat.source === 'relie' && L(eV, 'achat-vente').jours === 19, 'achat relié DEPUIS LA VENTE : « achat relié », achat (1 oct.) → vente (20 oct.) = 19 j', { prix: eV.prixAchat, av: L(eV, 'achat-vente') });
+    const pT = H.histoireArticle(rn, { ...d, fiches: { '2001': { numero: '7', buyPrice: '30', buyFrom: { title: 'x', date: '2026-10-01T09:00:00Z' } } }, saleOv: {} }, o);
+    const eT = E.etatArticle(pT, { fiches, ids: ['2001'], crees: {}, reception: null, maintenant: NOW });
+    dit(eT.prixAchat.source === 'relie' && /pas relié|pas lue/.test(L(eT, 'reception-en-ligne').raison) === true, 'achat relié sans n° de transaction (lien d’avant) : « achat relié », jamais « saisi à la main »', eT.prixAchat);
+    const pS = H.histoireArticle(rn, { ...d, fiches: { '2001': { numero: '7', buyPrice: '30' } }, saleOv: {} }, o);
+    const eS = E.etatArticle(pS, { fiches, ids: ['2001'], crees: {}, reception: null, maintenant: NOW });
+    dit(eS.prixAchat.source === 'saisi' && L(eS, 'achat-vente').jours === null, 'prix tapé à la main : « saisi », aucune durée depuis l’achat', { prix: eS.prixAchat, av: L(eS, 'achat-vente') });
+  } catch (e) { ko++; n++; console.log('❌ histoireArticle + etatArticle a levé : ' + e.message); } })();
+
   // ── 5. L'ÉCRAN PASSE PAR CES RÈGLES ───────────────────────────────────────
   essaie('App.jsx', () => {
     const app = fs.readFileSync(APP, 'utf8').replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
     const garage = app.slice(app.indexOf('function Garage('), app.indexOf('function BackupModal('));
-    dit(/<StockMeubles\s*\/>/.test(garage) && !/<RoomPlan\b/.test(garage) && !/<StockPhotos\b/.test(garage) && !/data-stock-vue=/.test(garage), 'le Stock n’a qu’une vue : les étagères 2D (ni pièce 3D, ni cases de la pièce, ni photos)');
+    dit(/<StockMeubles\b[^>]*\/>/.test(garage) && !/<RoomPlan\b/.test(garage) && !/<StockPhotos\b/.test(garage) && !/data-stock-vue=/.test(garage), 'le Stock n’a qu’une vue : les étagères 2D (ni pièce 3D, ni cases de la pièce, ni photos)');
     const sortie = app.slice(app.indexOf('const sortirPartisDuStock'), app.indexOf('function SortisDuStock('));
     dit(/libererCasesPartis\(/.test(sortie) && sortie.indexOf('libererCasesPartis(') < sortie.indexOf('loadRoomPlan('), 'la sortie automatique libère les cases des meubles (avant, et sans dépendre, de la pièce 3D)');
     const meubles = app.slice(app.indexOf('function StockMeubles('), app.indexOf('function ChoixPlanches('));
@@ -199,6 +226,13 @@ if (arg.includes('--prouve')) {
     dit(/vrm:stock-slots/.test(meubles) && /vrm:stock-slots/.test(sortie), 'l’écran relit les cases quand la sortie automatique les a libérées');
     dit(/etatArticle\(/.test(app) && /data-fiche-voir-etat/.test(meubles), '« Voir l’état » ouvre la fiche, qui calcule `etatArticle`');
     dit(!/saveRoomPlan\(/.test(meubles), 'l’écran Stock ne réécrit jamais l’ancienne pièce 3D');
+    // (revue du 5 nov.) « Voir au stock » / « Ranger au stock » d'Annonces, Ventes,
+    // Ma journée arrivent dans les étagères ; « rangée » se lit dans « Mes meubles ».
+    dit(/<StockMeubles\b[^>]*\blocate=\{locate\}[^>]*\bplaceNum=\{placeNum\}/.test(garage) && /\[locate\]/.test(meubles) && /\[placeNum\]/.test(meubles), '« Voir au stock » / « Ranger au stock » arrivent dans les étagères (recherche, ou paire prise en main)');
+    dit(/const inGarage = \(n\)=>[^\n]*meublesNums\.has\(/.test(app), '« Rangée » (Annonces, Ventes) se lit aussi dans « Mes meubles »');
+    const lex = app.slice(app.indexOf('async function lireExtraFiche('), app.indexOf('async function lireExtraFiche(') + 3000);
+    dit(/vinted_sale_overrides/.test(lex), 'la réception de l’achat relié depuis la VENTE est lue aussi');
+    dit(/garder:/.test(meubles.slice(meubles.indexOf('resteAuStock('), meubles.indexOf('resteAuStock(') + 200)), 'une paire remise à la main reste montrée (garder)');
   });
 
   console.log(`\n${n - ko}/${n} contrôles verts${ko ? ` — ${ko} rouge(s)` : ''}.`);

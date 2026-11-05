@@ -15577,7 +15577,12 @@ async function lireExtraFiche(rn) {
   const sb = async (q) => { try { const r = await fetch(`${SUPABASE_URL}/rest/v1/${q}`, { headers: sbAuth() }); if (!r.ok) return null; const j = await r.json(); return Array.isArray(j) ? j : null; } catch (_) { return null; } };
   const ids = ((rn && rn.annonces) || []).map((a) => String(a.id)).filter((x) => /^\d{4,15}$/.test(x)).slice(0, 20);
   const fiches = load('vinted_annonce_numeros', {}) || {};
-  const achats = [...new Set(ids.map((id) => fiches[id] && fiches[id].buyFromId).filter((x) => x != null && /^\d{4,20}$/.test(String(x))).map(String))];
+  // (5 nov., revue) L'achat relié DEPUIS LA VENTE (`vinted_sale_overrides`, la
+  // même fusion que `parcoursPaire`) compte aussi : sinon « Voir l'état » disait
+  // « achat pas relié » d'une paire reliée par sa vente.
+  const saleOvX = load('vinted_sale_overrides', {}) || {};
+  const idsVentes = (((rn && rn.ventes) || {}).vinted || []).map((v) => saleOvX[String(v && v._tx)]).map((o) => o && o.buyFromId);
+  const achats = [...new Set(ids.map((id) => fiches[id] && fiches[id].buyFromId).concat(idsVentes).filter((x) => x != null && /^\d{4,20}$/.test(String(x))).map(String))];
   const ou = ids.map((id) => `id.like.coffre_*_${id}`).join(',');
   // (5 nov.) « Voir l'état » : la RÉCEPTION de l'achat relié — la règle
   // `dateReception` (livrée dans SA transaction, sinon « Récupéré » touché).
@@ -33321,7 +33326,7 @@ function ouDansMeubles(num, meublesArg, slotsArg) {
   return { meuble: m, i: s.i, ...p, libelle: `rangée ${p.rangee}, colonne ${p.colonne}` };
 }
 
-function StockMeubles() {
+function StockMeubles({ locate = null, placeNum = null, onPlaced = null } = {}) {
   const [meubles, setMeubles] = React.useState(() => { const m = load('vrm_meubles', []); return Array.isArray(m) ? m : []; });
   const [slots, setSlots] = React.useState(() => { const s = load('vrm_slots', {}); return s && typeof s === 'object' ? s : {}; });
   const [pairsLost, setPairsLost] = useStateCle('vinted_pairs_lost', () => load('vinted_pairs_lost', {}));
@@ -33343,6 +33348,17 @@ function StockMeubles() {
   const setZoom = (z) => { setZoomEtat(z); try { localStorage.setItem('vrm_meubles_zoom', z); } catch (_) {} };
   const caseMax = ZOOMS[zoom] || 64;
   const [place, setPlace] = React.useState(null);           // cleNum en cours de pose
+  // (5 nov., revue) « Voir au stock » (Annonces, Ventes, Ma journée) cherche ce
+  // N° ; « Ranger au stock » le prend en main : il ne reste qu'à toucher la case.
+  // Avant, ces deux gestes arrivaient sur un Stock vide de toute demande (ils
+  // ne parlaient qu'à l'ancienne grille et à la pièce 3D, plus affichées).
+  React.useEffect(() => { if (locate != null && String(locate).trim()) { setQ(String(locate)); setCibles([]); } }, [locate]);
+  React.useEffect(() => {
+    if (placeNum == null || !String(placeNum).trim()) return;
+    const k = cleNum(placeNum); if (k) { setPlace(k); setQ(''); toast(`Touche la case où tu ranges N°${placeNum}.`); }
+    if (onPlaced) onPlaced();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [placeNum]);
   const [modal, setModal] = React.useState(null);           // {type:'meuble'|'placer'|'fiche', …}
   // Rattrapage nuage (§5.49) : on ne remplace que si resté VIDE — jamais par-dessus
   // un meuble créé ou une case posée pendant le chargement.
@@ -33388,7 +33404,7 @@ function StockMeubles() {
   const autresParCle = new Map(autresPresents().map((a) => [cleNum(a.numero), a]));
   const fiches = ajouterAutresPresents(Object.keys(numeros).map((id) => ({ id, ...(numeros[id] || {}) }))
     .filter((f) => String(f.numero == null ? '' : f.numero).trim() && !annonceDeclareePartie(f.id, numeros, pairsLost) && !horsCompte(f)))
-    .filter((f) => resteAuStock(f, { pose: !!slots[cleNum(f.numero)], vendus, physiques, cle: cleNum }))
+    .filter((f) => resteAuStock(f, { pose: !!slots[cleNum(f.numero)], vendus, physiques, garder: load('vrm_stock_garder', {}) || {}, cle: cleNum }))
     // Les plateformes de chaque paire (la règle de `fichesStockToutes`) : une
     // fiche Vinted dont l'annonce est partie mais qui est en vente sur eBay le dit.
     .map((f) => { if (f.horsVinted) return f; const a = autresParCle.get(cleNum(f.numero)); return { ...f, plateformes: a ? [...(a.vinted ? ['vinted'] : []), ...(a.plateformes || [])] : ['vinted'] }; });
@@ -34146,7 +34162,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
     <div style={{padding:16,display:'flex',flexDirection:'column',gap:14}}>
       <ScreenHead icon="home" title="Stock" desc="Tes étagères en 2D : chaque article dans sa case. Cherche un numéro, il te dit le meuble et la case."/>
 
-      <StockMeubles/>
+      <StockMeubles locate={locate} placeNum={placeNum} onPlaced={onPlaced}/>
 
       {/* (30 oct.) L'ancienne grille de zones (cases bloquées, couleurs, colonnes) n'était plus
           joignable depuis le 17 oct. (aucune vue « grid ») : ses ~20 boutons sont retirés. */}
@@ -42815,7 +42831,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }, []);
   // (nextNumero est déclaré plus bas, après saleOv dont il dépend.)
   const garageNums = useMemo(()=>{ const s=new Set(); Object.values(garageGrid||{}).forEach(a=>{ if(Array.isArray(a)) a.forEach(v=>{const t=(v||'').trim().toLowerCase(); if(t)s.add(t);}); }); return s; }, [garageGrid]);
-  const inGarage = (n)=> !!n && garageNums.has(String(n).trim().toLowerCase());
+  // (5 nov., revue Stock 2D) « Rangée » se lit d'abord dans « Mes meubles » (le
+  // SEUL rangement affiché depuis le 5 nov.) — l'ancienne grille ne bouge plus :
+  // sans ça, une paire posée dans une case était dite « pas encore rangée ».
+  const meublesNums = (() => { const sl = load('vrm_slots', {}) || {}; const s = new Set(); for (const k of Object.keys(sl)) if (ouDansMeubles(k, null, sl)) s.add(k); return s; })();
+  const inGarage = (n)=> !!n && (garageNums.has(String(n).trim().toLowerCase()) || meublesNums.has(cleNum(n)));
   const openPicker = async (item) => {
     // ⚠️ LA MODALE S'OUVRE TOUT DE SUITE. Avant, elle attendait le chargement de
     // TOUS les achats de TOUS les comptes — 11 s mesurées, à chaque clic. On

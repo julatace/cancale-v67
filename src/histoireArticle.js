@@ -55,10 +55,14 @@ export function histoireArticle(rn, d = {}, o = {}) {
     const fiche = fiches ? ids.map((id) => fiches[id]).find((f) => f && f.buyFrom && (f.buyFromId || f.buyFrom.title)) : null;
     const ev = [];
     if (e && e.etat === 'fait') {
-      const bid = fiche && fiche.buyFromId ? String(fiche.buyFromId) : null;
+      // (5 nov., revue) L'achat de `parcoursPaire` d'abord : il a pu être relié
+      // depuis la VENTE (`vinted_sale_overrides`) — la fiche n'en sait rien. Un
+      // achat relié sans n° de transaction (lien d'avant) reste un achat relié.
+      const bid = e.buyFromId ? String(e.buyFromId) : (fiche && fiche.buyFromId ? String(fiche.buyFromId) : null);
+      const relieSansTx = !bid && e.titre === 'Achetée sur Vinted';
       const recu = !bid ? null : d.recus == null ? 'reçu pas lu' : d.recus.has(bid) ? 'reçu rangé' : 'pas de reçu';
-      ev.push({ at: iso(fiche && fiche.buyFrom && fiche.buyFrom.date), texte: [e.montant != null ? eur(e.montant / 100) : null, e.detail || null, recu].filter(Boolean).join(' · '),
-        preuve: bid ? `achat n° ${bid}` : 'prix saisi', cle: 'achat' });
+      ev.push({ at: iso(e.date || (fiche && fiche.buyFrom && fiche.buyFrom.date)), texte: [e.montant != null ? eur(e.montant / 100) : null, e.detail || null, recu].filter(Boolean).join(' · '),
+        preuve: bid ? `achat n° ${bid}` : relieSansTx ? 'achat relié' : 'prix saisi', cle: 'achat' });
     }
     pose('achat', e ? e.etat : 'passu', e ? e.titre : 'Achat', ev, e && e.etat !== 'fait' ? e.detail : null);
   }
