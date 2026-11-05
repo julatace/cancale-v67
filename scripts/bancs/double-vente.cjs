@@ -18,8 +18,8 @@ const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_m
 const { monterTiroirs } = require('./_tiroirs.cjs');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
-const DIST = path.join(__dirname, '..', '..', 'dist');
-const PORT = 4341;
+const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');
+const PORT = Number(process.env.BANC_PORT) || 4341;
 
 const auj = new Date();
 const ACCS = [{ id: 1, vinted_user_id: '111', login: 'compte_test', domain: 'www.vinted.fr', updated_at: auj.toISOString() }];

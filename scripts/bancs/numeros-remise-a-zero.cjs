@@ -33,8 +33,8 @@ const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
 const http = require('http'), fs = require('fs'), path = require('path');
 
-const DIST = path.join(__dirname, '..', '..', 'dist');   // jamais un chemin absolu (§6.1)
-const PORT = 4511;
+const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');   // jamais un chemin absolu (§6.1)
+const PORT = Number(process.env.BANC_PORT) || 4511;
 const MIME = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css', '.json':'application/json', '.png':'image/png', '.svg':'image/svg+xml', '.webmanifest':'application/manifest+json' };
 const JETON = 'jeton-de-banc';
 const SESSION = { access_token: JETON, refresh_token: 'r', expires_at: Date.now() + 3600e3, user: { id: '11111111-2222-3333-4444-555555555555', email: 'vendeur@exemple.fr' } };

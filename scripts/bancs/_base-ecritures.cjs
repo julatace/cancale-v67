@@ -170,6 +170,66 @@ function brancher(page, base, { faute = null, nom = '' } = {}) {
   });
 }
 
+// ── LA LIGNE `main` SEULE, À LA VRAIE FORME, POUR LES BANCS À ROUTES PROPRES (5 nov.) ──
+// Les bancs écrits avant le 1er nov. comptaient un corps `[{ id: 'main', data }]`
+// (l'ancien upsert) et répondaient `[]` à toute écriture. Depuis 5d7b34f4 l'app
+// écrit `main` par un PATCH CONDITIONNEL (`id=eq.main&…&data->>rev=is.null|eq.N`,
+// corps `{ data, updated_at }` sans `id`, `return=representation`) : ces bancs
+// lisaient « 0 écriture » (un contrôle « rien de fautif sur 0 » ne peut pas
+// échouer) et l'app se croyait devancée. `routeMain` rend la réponse de la vraie
+// base pour la ligne `main` — lecture projetée, PATCH conditionnel jugé sur
+// `data.rev`, insertion (409 si elle existe), garde-fou 017 (`gardeMain`) — et
+// GARDE ce qu'elle accepte. Chaque tentative est notée dans `etat.ecritures`
+// (`{ meth, data, resultat }` : 1 écrite · 0 devancée · 201 · 409 · code 017 ·
+// 500 panne), écrite ou non : un banc juge ce que l'app ENVOIE.
+// `etat` = { main: data|null, maj: iso, ecritures: [], panne?: (meth) => bool,
+//            refuser?: (meth, data) => code|null, clesServeur?: [clé…] }.
+// Rend `null` si la requête ne touche pas `main` (le banc la sert lui-même).
+function routeMain(req, etat) {
+  const meth = req.method(); const urlBrute = req.url();
+  const u = decodeURIComponent(urlBrute);
+  if (!/\/rest\/v1\/app_data\?/.test(u)) return null;
+  const surMain = /[?&]id=eq\.main(&|$)/.test(u);
+  const prefer = (req.headers()['prefer'] || '');
+  const repr = /return=representation/.test(prefer);
+  const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || '*';
+  const ligne = () => ({ id: 'main', data: etat.main, updated_at: etat.maj || null });
+  if (meth === 'GET' || meth === 'HEAD') {
+    if (!surMain) return null;
+    return { status: 200, body: etat.main == null ? [] : [projette(ligne(), sel)] };
+  }
+  let corps = null; try { corps = JSON.parse(req.postData() || 'null'); } catch (_) {}
+  let data;
+  if (meth === 'PATCH' && surMain) data = corps && corps.data;
+  else if (meth === 'POST') { const l = [].concat(corps || []).find((x) => x && x.id === 'main'); if (!l) return null; data = l.data; }
+  else return null;
+  const note = (resultat) => { etat.ecritures.push({ meth, data, resultat }); };
+  if (etat.panne && etat.panne(meth)) { note(500); return { status: 500, body: { code: '57014', message: 'canceling statement due to statement timeout' } }; }
+  // Un refus imposé par le banc (un garde-fou de la base qu'il émule lui-même,
+  // ex. `vrm_numeros_perimes`) : le même 400 P0001 que la vraie base.
+  const refus = etat.refuser ? etat.refuser(meth, data) : null;
+  if (refus) { note(refus); return { status: 400, body: { code: 'P0001', message: refus, details: 'banc', hint: 'Recharge l\'app.' } }; }
+  // Les clés que seul le serveur écrit (ex. `vrm_numerotation`) sont gardées
+  // telles quelles, comme le fait le déclencheur de la vraie base.
+  const garderServeur = (d) => { if (!etat.clesServeur || !d || !etat.main) return d; const o = { ...d }; for (const k of etat.clesServeur) { if (etat.main[k] !== undefined) o[k] = etat.main[k]; else delete o[k]; } return o; };
+  if (meth === 'PATCH') {
+    const m = /[?&]data->>rev=(is\.null|eq\.(\d+))(&|$)/.exec(u);
+    const rev = etat.main != null && Number.isSafeInteger(etat.main.rev) ? etat.main.rev : null;
+    const passe = etat.main != null && data != null && (!m || (m[1] === 'is.null' ? rev == null : rev === Number(m[2])));
+    if (!passe) { note(0); return { status: 200, body: repr ? [] : '' }; }
+    const g = gardeMain(etat.main, data); if (g) { note(g); return { status: 400, body: { code: 'P0001', message: g } }; }
+    etat.main = garderServeur(data); etat.maj = (corps && corps.updated_at) || new Date().toISOString(); note(1);
+    return { status: 200, body: repr ? [projette(ligne(), sel)] : '' };
+  }
+  const fusion = /resolution=merge-duplicates/.test(prefer);
+  if (etat.main != null && !fusion) { note(409); return { status: 409, body: { code: '23505', message: 'duplicate key value violates unique constraint' } }; }
+  if (etat.main != null) { const g = gardeMain(etat.main, data); if (g) { note(g); return { status: 400, body: { code: 'P0001', message: g } }; } }
+  etat.main = garderServeur(data); etat.maj = new Date().toISOString(); note(201);
+  return { status: 201, body: repr ? [{ id: 'main', data }] : '' };
+}
+// Les tentatives d'écriture de `main` (avec un `data`) — ce qu'un banc juge.
+const ecritesMain = (etat) => etat.ecritures.filter((e) => e.data && typeof e.data === 'object').map((e) => e.data);
+
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 async function lancer() {
   return chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
@@ -196,4 +256,4 @@ async function appareil(nav, base, { vp = { width: 1512, height: 900 }, faute = 
 const ecrituresMain = (base, depuis = 0) => base.ecritures.filter((e) => e.at >= depuis && (/app_data\?id=eq\.main/.test(e.url) || [].concat(e.corps || []).some((x) => x && x.id === 'main')));
 const dataMain = (base) => { const l = base.lignes.get('main'); return l ? l.data : null; };
 const attendre = async (pred, ms = 8000, pas = 100) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { try { if (await pred()) return true; } catch (_) {} await new Promise((r) => setTimeout(r, pas)); } return false; };
-module.exports = { serveur, creerBase, brancher, lancer, appareil, ecrituresMain, dataMain, attendre, reLike, cleNum };
+module.exports = { serveur, creerBase, brancher, lancer, appareil, ecrituresMain, dataMain, attendre, reLike, cleNum, routeMain, ecritesMain, gardeMain };
