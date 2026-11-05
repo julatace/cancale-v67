@@ -98,9 +98,15 @@ async function passe(b, nom, ctxOpts, sombre) {
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: /mode=confidentialite/.test(r.request().url()) ? JSON.stringify({ ok: true, uid: SESSION.user.id }) : '{"pret":true,"devices":1}' }));
   await pg.goto(`http://localhost:${PORT}/?tab=achats&site=vinted`, { waitUntil: 'domcontentloaded' });
+  // (5 nov., revue 2.16) Fournisseurs · Délai · Lots sont rangés derrière « … » (barre des étapes) :
+  // fermés à l'arrivée, ouverts d'un geste.
+  const plus = pg.locator('[data-achats-plus]');
+  await plus.first().waitFor({ timeout: 25000 }).catch(() => {});
+  dit(await pg.locator('[data-aso-outils]').count() === 0, `${nom} · Fournisseurs · Délai · Lots fermés derrière « … »`);
+  await plus.first().click().catch(() => {});
   const outils = pg.locator('[data-aso-outils]');
   await outils.waitFor({ timeout: 25000 }).catch(() => {});
-  dit(await outils.count() === 1, `${nom} · les trois entrées sous la carte d'Achats`);
+  dit(await outils.count() === 1, `${nom} · « … » ouvre les trois entrées sous la carte d'Achats`);
   if (!(await outils.count())) { await pg.screenshot({ path: path.join(SC, `z-aso-${nom}-ko.png`), fullPage: true }); console.log(errs.slice(0, 3).join('\n')); await ctx.close(); return; }
   const cibles = await pg.$$eval('[data-aso-ouvrir]', (els) => els.map((e) => Math.round(e.getBoundingClientRect().height)));
   dit(cibles.length === 3 && cibles.every((h) => h >= 44), `${nom} · entrées à 44 px au doigt`, JSON.stringify(cibles));

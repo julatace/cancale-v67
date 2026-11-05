@@ -1401,3 +1401,11 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 /* Read feedback belongs to the conversation header, without moving its history. */
 .vrm-chat-read { padding:8px 14px; margin:0; flex-shrink:0; overflow-wrap:anywhere; }
 .vrm-chat-sync:disabled { opacity:.5; cursor:wait; }
+
+/* (5 nov., revue 2.15-2.16) Achats : la barre des étapes et « … » (Fournisseurs · Délai · Lots) sur une ligne. */
+.vrm-achats-barre { display:flex; align-items:center; gap:8px; margin:0 0 16px; }
+.vrm-achats-barre > .vrm-seg { flex:1 1 auto; min-width:0; }
+.vrm-achats-plus { flex:0 0 44px; width:44px; height:44px; display:grid; place-items:center; border:0; border-radius:var(--r-pilule, 999px); background:var(--fu-remplir, rgba(118,118,128,.12)); color:inherit; cursor:pointer; transition:transform 160ms cubic-bezier(.23,1,.32,1); }
+.vrm-achats-plus:active { transform:scale(.97); }
+.vrm-achats-plus[aria-expanded="true"] { background:var(--fu-remplir-fort, rgba(118,118,128,.2)); }
+.vrm-achats-outils { margin:0 0 12px; }

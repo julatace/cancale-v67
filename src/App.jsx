@@ -50,6 +50,7 @@ import {apercuFamille as apercuFamilleNotif} from '../api/_lib/notif-apercus.js'
 import './notif-reglages.css';
 import {achatDuColis,suivisAchat,entreeIndexAchat} from './liensColis.js';
 import {achatParConversation, regrouperArrivees} from '../api/_lib/achat-arrive-relais.js';
+import {indexCodesSuivis, finParIdentite, fusionnerParCode} from './retraitPreuves.js';
 import {arriveesRelues} from './arriveesRelues.js';
 import {avecSuiviDuSujet,finsDesLignes,sortiParSuivis,sortiParSuivi,suiviDeLigne,lienSuivi,codePostalLu,nouvelleVinted,transporteurDeForme,suiviValide,TRANSPORTEURS_SAISIE,normaliserCodePostal,idSuiviManuel,relireLigneSuivi,finDeCommandeAchat,fusionTransporteur,ligneDuTransporteur,ligneDeSuiviTransporteur,leverGarde,SELECT_TRANSP_META,ligneTranspDeMeta,sensDeLigne,incidentDeSuivis,incidentDeLigne,repartiAffichable,nomTransporteurSuivi} from '../api/_lib/suivi-colis.js';
 import {ligneTransporteur,texteCodePostalMr,carrierLisible,carrierNonLu,nomTransporteur,LECTURE_SERVEUR_TRANSP,heureParis} from '../api/_lib/transporteurs.js';
@@ -7493,7 +7494,7 @@ function phaseAchat(status) {
   if (/finalis|livr[ée]|termin|re[çc]u|complet|arriv/i.test(s)) return 'completed';
   return 'pending';
 }
-function etapeAchat(o, tk) {
+function etapeAchat(o, tk, { fini = false } = {}) {
   const s = o.status || '';
   // ⚠️ « Retour initié » sur un ACHAT = litige, tu dois RENVOYER la paire.
   //    Testé AVANT « annulé/remboursé » : ce n'est pas une commande morte,
@@ -7502,10 +7503,16 @@ function etapeAchat(o, tk) {
   //    l'expéditeur », qui est autre chose.
   if (ACHAT_A_RENVOYER.test(s)) return { label: 'À renvoyer', step: 1, color: C.warn, retour: true };
   if (/annul|rembours|refus/i.test(s)) return { label: 'Annulé', step: 0, color: C.danger };
-  if (/finalis/i.test(s) || tusDe(o) === 'completed') return { label: 'Reçu', step: 4, color: INV_STATUS.online.color };
+  // (5 nov.) Mots retenus (revue du 5 nov.) : « Arrivé » (« Reçu » est réservé à l'argent),
+  // « En route ». Et « à retirer » SEULEMENT si la règle des colis à retirer le compte
+  // (`pickupUnion`) : un achat que Vinted dit encore « déposé » mais dont le transporteur
+  // dit « livré au destinataire » (même n° de suivi) est ARRIVÉ (`fini`, §11).
+  if (/finalis/i.test(s) || tusDe(o) === 'completed') return { label: 'Arrivé', step: 4, color: C.muted };
+  if (/commande\s+livr/i.test(s)) return { label: 'Arrivé', step: 4, color: C.muted };
+  if (fini && (isAtRelayStatus(s) || (tk && tk.status === 'available'))) return { label: 'Arrivé', step: 4, color: C.muted, parTransporteur: true };
   if (isAtRelayStatus(s) || (tk && tk.status === 'available')) return { label: 'À retirer', step: 3, color: C.warn };
-  if (/\blivr[ée]|remis\b|r[ée]ceptionn/i.test(s) || phaseAchat(s) === 'completed') return { label: 'Reçu', step: 4, color: INV_STATUS.online.color };
-  if (/exp[eé]di|transit|achemin|en route|envoy/i.test(s)) return { label: 'En transit', step: 2, color: C.blue || C.accent };
+  if (/\blivr[ée]|remis\b|r[ée]ceptionn/i.test(s) || phaseAchat(s) === 'completed') return { label: 'Arrivé', step: 4, color: C.muted };
+  if (/exp[eé]di|transit|achemin|en route|envoy/i.test(s)) return { label: 'En route', step: 2, color: C.blue || C.accent };
   if (/pay|valid|pr[ée]par|attente|confirm/i.test(s)) return { label: 'Payé', step: 1, color: C.muted };
   return { label: s ? (s.length > 26 ? s.slice(0, 26) + '…' : s) : 'En cours', step: 1, color: C.muted };
 }
@@ -41397,7 +41404,7 @@ function RelierAchatCorps({ cible, achats, liens, curTx, compteDe, prixDe, recep
     </div>
   );
 }
-function AcctTag({ acc, name }) {
+function AcctTag({ acc, name, pastille = true }) {
   // ⚠️ SEULE LA PASTILLE EST COLORÉE, pas l'étiquette entière. Avec huit
   // comptes, huit étiquettes teintées ajoutaient une famille de couleurs
   // complète sur des écrans qui en portaient déjà trois (§5.90) — alors que la
@@ -41405,7 +41412,7 @@ function AcctTag({ acc, name }) {
   // pour ça ; le texte redevient neutre.
   const col = acctColor(acc?.vinted_user_id);
   return <span style={{display:'inline-flex',alignItems:'center',gap:5,background:C.card2,color:C.muted,fontSize:11,fontWeight:600,padding:'2px 7px',borderRadius:12,whiteSpace:'nowrap',border:`1px solid ${C.border}`}}>
-    <span style={{width:6,height:6,borderRadius:12,background:col,flexShrink:0}}/><span className="vrm-sensible">{name}</span>
+    {pastille && <span style={{width:6,height:6,borderRadius:12,background:col,flexShrink:0}}/>}<span className="vrm-sensible">{name}</span>
   </span>;
 }
 
@@ -43704,6 +43711,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // matin (api/ship-reminders.js), qui ne voit pas les commandes Vinted.
     const finis = new Set();
     const noterFini = (t) => { const k = suiviDeLigne(t); if (k) finis.add('e:' + k); };
+    // (5 nov.) Les commandes dont le colis est FINI d'après une autre identité (son n° de
+    // suivi chez le transporteur) : l'écran Achats ne les dit plus « à retirer » (§11).
+    const txFinis = new Set();
     // Le RETOUR (ou le RETRAIT) écrit par le transporteur peut arriver sur une
     // AUTRE ligne que l'e-mail « disponible » (mesuré au banc : « disponible »
     // rangé chez Mondial Relay, « retourné à l'expéditeur » envoyé par
@@ -43749,6 +43759,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // le passage plus bas ne reprend que les autres (e-mail « en transit »,
     // n° ajouté à la main) quand le transporteur dit qu'ils sont sortis.
     const nJuges = new Set();
+    // (5 nov.) LES AUTRES IDENTITÉS D'UN COLIS (src/retraitPreuves.js) : le n° de suivi
+    // de SA commande, et ceux des lignes au même code de retrait. Mesuré sur sa base :
+    // 9 colis « à retirer » dont le transporteur disait déjà « retiré » sous un autre n°.
+    const codeLigne = (t) => normCode(t && t.code);
+    const suivisDeAchat = (o) => suivisAchat(o, indexSuivisAchats).map(normaliserSuivi).filter(Boolean);
+    const codesSuivis = indexCodesSuivis([...lignesColis, ...(trackingRetrait || [])], { codeDe: codeLigne, suiviDe: suiviDeLigne, achats: buysBase, codeAchat: (o) => normCode((colisRelais[String((o && o.transaction_id) || '')] || {}).code), suivisDeAchat });
+    const preuvesIdentite = (t, commande) => ({ codeDe: codeLigne, suiviDe: suiviDeLigne, commande, suivisDeAchat, codes: codesSuivis, fins, sortiParSuivis });
     for (const t of lignesColis) {
       if (t && t.status === 'available' && sensColis(t, suivisEnvoyes) !== 'sortant') { const k = suiviDeLigne(t); if (k) nJuges.add(k); }
       if (!isColisEnAttente(t, collected, suivisEnvoyes)) continue;
@@ -43764,6 +43781,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           if (tr && tr.etat === 'retour_expediteur' && !nRetourEmail.has(k) && repartiAffichable(Date.parse(tr.etatAt || ''), maintenant)) repartis.push({ kind: 'email', t, o: commandeDuColis(t), statut: 'transporteur' }); }
         if (so) { noterFini(t); continue; } }
       const cmd = commandeDuColis(t);
+      { const fi = finParIdentite(t, preuvesIdentite(t, cmd));
+        if (fi === 'retire') { noterFini(t); if (cmd) txFinis.add(String(cmd.transaction_id)); continue; }
+        if (fi === 'reparti') { noterFini(t); repartis.push({ kind: 'email', t, o: cmd, statut: 'transporteur' }); continue; }
+        if (fi === 'a_verifier') { aVerifier.push({ kind: 'email', t, e: { etat: 'transporteur' }, o: cmd }); continue; } }
       const fin = finCommandeAchat(cmd);
       if (fin === 'retire') { noterFini(t); continue; }   // la commande liée dit livrée / finalisée : il l'a eu
       if (fin === 'reparti') { noterFini(t); repartis.push({ kind: 'email', t, o: cmd, statut: (etatTxn(cmd.transaction_id) || {}).ss || String(cmd.status || '') }); continue; }
@@ -43805,6 +43826,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (cmdParColis.has(colisKey(s)) && !cmdParColis.has(colisKey(garde[i]))) cmdParColis.set(colisKey(garde[i]), cmdParColis.get(colisKey(s)));
       }
       if (garde.length !== emailList.length) emailList.splice(0, emailList.length, ...garde);
+      // (5 nov.) …et PAR SON CODE DE RETRAIT (une identité, §5) : la moitié Vinted
+      // « Utilise le code B18948 » et la consigne au même code sont un colis.
+      const parCode = fusionnerParCode(emailList, { codeDe: codeLigne, suiviDe: suiviDeLigne, score: scoreLigneRetrait, fusion: fusionLignesMemeSuivi });
+      if (parCode !== emailList) {
+        for (const t of parCode) if (!cmdParColis.has(colisKey(t))) { const c = commandeDuColis(t); if (c) cmdParColis.set(colisKey(t), c); }
+        emailList.splice(0, emailList.length, ...parCode);
+      }
     }
     // ⚠️ (3 nov.) LA MÊME COMMANDE, UNE LIGNE — et un doute se dit, il ne se
     // tranche pas (api/_lib/achat-arrive-relais.js, `regrouperArrivees`) : l'e-mail
@@ -43813,9 +43841,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // colis annoncé par Vinted sans commande au même code postal qu'un colis de
     // transporteur sans commande = « à vérifier » (jamais compté deux fois).
     {
-      const r = regrouperArrivees(emailList, { commandeDe: (t) => cmdParColis.get(colisKey(t)) || null, score: scoreLigneRetrait, fusion: fusionLignesMemeSuivi });
+      // (5 nov.) Les témoins : TOUTES les lignes de transporteur arrivées à ce point (finies
+      // comprises) ; une moitié Vinted dont la commande n'a aucun n° connu est un doute aussi.
+      const temoins = lignesColis.filter((w) => w && w.status === 'available' && w.source !== 'vinted-commande' && suiviDeLigne(w) && sensColis(w, suivisEnvoyes) !== 'sortant');
+      const sansIdentite = (t, c) => !suiviDeLigne(t) && !suivisDeAchat(c).length && !((codesSuivis.get(codeLigne(t)) || new Set()).size);
+      const r = regrouperArrivees(emailList, { commandeDe: (t) => cmdParColis.get(colisKey(t)) || commandeDuColis(t) || null, score: scoreLigneRetrait, fusion: fusionLignesMemeSuivi, temoins, sansIdentite });
       r.liste.forEach((t, i) => { if (r.commandes[i]) cmdParColis.set(colisKey(t), r.commandes[i]); });
-      for (const t of r.doutes) aVerifier.push({ kind: 'email', t, e: { etat: 'doute_meme_relais' }, o: null });
+      r.doutes.forEach((t, i) => aVerifier.push({ kind: 'email', t, e: { etat: 'doute_meme_relais' }, o: (r.doutesCommandes && r.doutesCommandes[i]) || null }));
       emailList.splice(0, emailList.length, ...r.liste);
     }
     // Le transporteur ÉCRIT que le colis repart (statut « retour », 23 oct.).
@@ -43890,6 +43922,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const ev = etatColisVinted(o, maintenant, tpm);
       { const so = sortiParSuivis(ks, fins, ev.arriveeSure, { borne: ev.borneMs });
         if (so === 'a_verifier') { aVerifier.push({ kind: 'vinted', o, e: { ...ev, etat: 'transporteur', incident: incidentDeSuivis(ks, fins, ev.arriveeSure, { borne: ev.borneMs }) } }); continue; }
+        if (so === 'retire') txFinis.add(String(o.transaction_id));
         if (so === 'reparti') {
           const tr = tpm ? ks.map(k => tpm.get(k)).find(x => x && x.etat === 'retour_expediteur') : null;
           if (tr && !ks.some(k => nRetourEmail.has(k)) && repartiAffichable(Date.parse(tr.etatAt || ''), maintenant)) repartis.push({ kind: 'vinted', o, statut: 'transporteur' }); }
@@ -43985,7 +44018,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     //    vient de `cleanLieu(t.lieu)` (§11, la même source que les groupes de
     //    l'écran Achats), jamais deviné : un email sans lieu n'ajoute rien.
     const lieux = [...new Set(emailList.map(t => (cleanLieu(t.lieu).nom || '').trim()).filter(Boolean))];
-    return { emailList, extra, aConfirmer, attente, attenteMail, aVerifier, repartis, horsDelai, urgents, sansCode, sansCodeEmail, comptesSansCode, lieux, cmdParColis, finis: [...finis].sort().slice(0, 300),
+    // (5 nov.) LES DOUBLES POSSIBLES À PART. Une moitié Vinted « t'attend » sans identité vers
+    // le transporteur, au même point que ses colis (`doute_meme_relais`), n'est pas un colis de
+    // plus à vérifier : c'est peut-être la même boîte. Mesuré sur sa base : 29 des 31 « à
+    // vérifier » — la carte disait « 31 à vérifier » et la liste (clé vide) n'en montrait qu'un.
+    // Ils restent MONTRÉS (Colis → À retirer, « Peut-être en double »), jamais comptés.
+    const enDouble = aVerifier.filter((x) => x.e && x.e.etat === 'doute_meme_relais');
+    if (enDouble.length) aVerifier.splice(0, aVerifier.length, ...aVerifier.filter((x) => !(x.e && x.e.etat === 'doute_meme_relais')));
+    return { emailList, extra, aConfirmer, attente, attenteMail, aVerifier, enDouble, repartis, horsDelai, urgents, sansCode, sansCodeEmail, comptesSansCode, lieux, cmdParColis, txFinis, finis: [...finis].sort().slice(0, 300),
              prets: (emailList.length - sansCodeEmail) + (extra.length - sansCode),
              total: emailList.length + extra.length };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -47803,11 +47843,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!unique(tracking || [], (x) => normTitle(x.artTitle || ''), n)) return null;
     return unique(buysBase, (o) => normTitle(o.title || ''), n);
   };
-  const trackForBuy = (o) => {
-    const n = normTitle(o && o.title); if (!n) return null;
-    if (!unique(buysBase, (x) => normTitle(x.title || ''), n)) return null;
-    return unique(tracking || [], (t) => normTitle(t.artTitle || ''), n);
-  };
+  // ⚠️ (5 nov.) LE COLIS D'UN ACHAT, PAR IDENTITÉ SEULEMENT (§5). Il était trouvé par
+  // le TITRE (« Commande mise à jour pour <titre> » = titre de l'achat) : mesuré sur sa
+  // base, des achats « Commande livrée ! » s'affichaient « À retirer » parce qu'un e-mail
+  // d'arrivée au même titre restait rangé « disponible ». Maintenant : la ligne que
+  // `pickupUnion` a reliée à CETTE commande (conversation, n° de suivi, code), sinon la
+  // conversation, sinon le n° de suivi de la commande. Une ligne que la règle sait finie
+  // (retirée, repartie) est rendue avec `horsRetrait` : elle ne dit plus « à retirer ».
+  const colisParTx = useMemo(() => {
+    const m = new Map();
+    const vus = new Set((pickupUnion.emailList || []).map(colisKey));
+    for (const [k, c] of (pickupUnion.cmdParColis || new Map())) { const t = (pickupUnion.emailList || []).find((x) => colisKey(x) === k); if (t && c) m.set(String(c.transaction_id), t); }
+    const parConv = new Map(); for (const o of buysBase) if (o && o.conversation_id != null) { const k = String(o.conversation_id).toLowerCase(); parConv.set(k, parConv.has(k) ? null : o); }
+    const parSuivi = new Map(); for (const o of buysBase) for (const su of suivisAchat(o, indexSuivisAchats)) { const k = normaliserSuivi(su); if (k) parSuivi.set(k, parSuivi.has(k) ? null : o); }
+    for (const t of (trackingRetrait || [])) {
+      if (!t) continue;
+      const o = (t.conv && parConv.get(String(t.conv).toLowerCase())) || parSuivi.get(suiviDeLigne(t)) || null;
+      if (!o || m.has(String(o.transaction_id))) continue;
+      m.set(String(o.transaction_id), vus.has(colisKey(t)) ? t : { ...t, horsRetrait: true });
+    }
+    return m;
+  }, [pickupUnion, buysBase, trackingRetrait, indexSuivisAchats]);
+  const trackForBuy = (o) => (o ? colisParTx.get(String(o.transaction_id)) || null : null);
   // Étape de suivi d'un achat (payé → expédié → au relais → reçu) à partir du
   // statut Vinted + de l'email transporteur. step: 1=payé 2=transit 3=relais 4=reçu.
   // ⚠️ « AU RELAIS » AVANT « REÇU » (4 octobre). « La livraison n'a pas encore
@@ -47816,7 +47873,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // lieu, le code et le QR de retrait (ils ne s'affichent qu'à l'étape 3) —
   // 4 achats ce jour-là. `phaseReception` avait déjà la parade ; l'étiquette
   // ne l'avait jamais reprise.
-  const achatStage = (o, tk) => etapeAchat(o, tk);   // la règle : niveau module (§11)
+  const achatStage = (o, tk) => etapeAchat(o, tk && tk.horsRetrait ? { ...tk, status: 'fini' } : tk, { fini: !!(o && pickupUnion.txFinis && pickupUnion.txFinis.has(String(o.transaction_id))) });   // la règle : niveau module (§11)
   // Statut précis d'une VENTE (pour l'afficher clairement) : à expédier → en
   // transit → livrée → vendue (finalisée). Se base sur le texte Vinted + l'enum
   // machine transaction_user_status. N'affecte PAS la compta (classifyOrderStatus).
@@ -47876,6 +47933,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [buysBase, aFilter, ordSearchDiff, periode, tracking, colisRelais, numeros, compteSel, compteConnecte, selEff]);
   const [achatsMax, setAchatsMax] = useState(60);
+  const [achatsOutilsOuverts, setAchatsOutilsOuverts] = useState(false);
   // ── ACHATS · ACTIONS RAPIDES (note interne + menu « … ») ──────────────────
   // Note interne par achat (synchronisée, clé = transaction_id) + menu groupant
   // les actions (attestation d'achat / remboursement, étiquette SKU, masquer).
@@ -50613,7 +50671,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     for (const t of (pickupUnion.emailList || [])) {
       const a = achatDuColis(t, buysBase, indexSuivisAchats); const lu = lieuDeLigne(t, a); const code = codeDeLigne(t); const eE = etatColisEmail(t, maintenant); const ej = eE.jours;
       const aa = a ? null : (achatsAutres.get(suiviDeLigne(t)) || null);
-      L.push({ cle: 'r:e:' + (suiviDeLigne(t) || t.id || ''), groupe: 'retirer', site: aa ? aa.site : 'vinted', achatAutre: aa, nom: nomAvecTaille(a ? a.title : ((aa && aa.titre) || t.artTitle || (nomTr(t.carrier) ? `Colis ${nomTr(t.carrier)}` : 'Colis à retirer')), a), photo: a ? photoAchat(a) : ((aa && aa.photo) || t.photo || null),
+      L.push({ cle: 'r:e:' + (suiviDeLigne(t) || t.id || t.cleLigne || colisKey(t) || ''), groupe: 'retirer', site: aa ? aa.site : 'vinted', achatAutre: aa, nom: nomAvecTaille(a ? a.title : ((aa && aa.titre) || t.artTitle || (nomTr(t.carrier) ? `Colis ${nomTr(t.carrier)}` : 'Colis à retirer')), a), photo: a ? photoAchat(a) : ((aa && aa.photo) || t.photo || null),
         etat: [lu.lieuNom || nomTr(t.carrier), dernierJour(ej) || (code ? code : (qrImage(t) ? 'QR code' : 'code pas encore lu'))].filter(Boolean).join(' · '), ambre: Number.isFinite(ej) && ej <= 1, ouvrir: true,
         ...lu, transporteur: t.carrier || '', transp: transporteurColis(t.carrier, suiviDeLigne(t)), code, code2: codeRetrait(t.code2) || '', qr: !!qrImage(t) && !code, jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eE), ...(lu.lieuNom ? {} : { sansLieu: sansLieuEmail(t) }), src: { t } });
     }
@@ -50624,14 +50682,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         etat: [lu.lieuNom || 'au point relais', dernierJour(ej) || (code || 'code pas encore lu')].filter(Boolean).join(' · '), ambre: Number.isFinite(ej) && ej <= 1, ouvrir: true,
         ...lu, transporteur: (r && r.transporteur) || '', transp: transporteurColis((r && r.transporteur) || (eSV && eSV.transporteur) || '', suV), code, qr: !!(r && r.qr) && !code, jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eV), ...(lu.lieuNom ? {} : { sansLieu: r && r.lieu ? { raison: 'La conversation Vinted ne nomme pas clairement le point.', geste: 'Ouvre la conversation du colis : le point y est écrit.' } : sansLieuVinted(o) }) , src: { o } });
     }
-    for (const x of (pickupUnion.aVerifier || [])) {
+    for (const x of [...(pickupUnion.aVerifier || []), ...(pickupUnion.enDouble || [])]) {
       const o = x.kind === 'email' ? (x.o || achatDuColis(x.t, buysBase, indexSuivisAchats)) : x.o;
       // (2 nov.) Même fait que les cartes « extra » : un n° vu sans transporteur nommé.
       const suX = x.kind === 'email' ? (suiviDeLigne(x.t) || '') : (suivisAchat(x.o, indexSuivisAchats)[0] || ''); const eSX = x.kind === 'email' ? null : entreeSuiviAchat(x.o);
       const trInconnu = !!suX && !((x.kind === 'email' ? (x.t && x.t.carrier) : (relaisDe(x.o) || {}).transporteur) || (eSX && eSX.transporteur) || transporteurDeForme(suX));
       const lu = x.kind === 'email' ? lieuDeLigne(x.t, o) : completer(lieuDe((relaisDe(x.o) || {}).lieu), (relaisDe(x.o) || {}).transporteur, '');
       const code = x.kind === 'email' ? codeDeLigne(x.t) : codeRetrait((relaisDe(x.o) || {}).code);
-      L.push({ cle: x.kind === 'email' ? 'r:e:' + (suiviDeLigne(x.t) || (x.t && x.t.id) || '') : 'r:v:' + (x.o && x.o.transaction_id), groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o ? o.title : (x.t && nomTr(x.t.carrier) ? 'Colis ' + nomTr(x.t.carrier) : 'Colis à retirer'), o), photo: o ? photoAchat(o) : ((x.t && x.t.photo) || null), trInconnu,
+      L.push({ cle: x.kind === 'email' ? 'r:e:' + (suiviDeLigne(x.t) || (x.t && (x.t.id || x.t.cleLigne)) || colisKey(x.t) || '') : 'r:v:' + (x.o && x.o.transaction_id), groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o ? o.title : (x.t && nomTr(x.t.carrier) ? 'Colis ' + nomTr(x.t.carrier) : 'Colis à retirer'), o), photo: o ? photoAchat(o) : ((x.t && x.t.photo) || null), trInconnu,
         etat: [lu.lieuNom || (x.kind === 'email' ? nomTr(x.t && x.t.carrier) : ''), 'à vérifier : délai dépassé ou incident'].filter(Boolean).join(' · '), aVerifier: true, horsCompte: true, ouvrir: true,
         ...lu, transporteur: (x.kind === 'email' ? (x.t && x.t.carrier) : ((relaisDe(x.o) || {}).transporteur)) || '', transp: transporteurColis((x.kind === 'email' ? (x.t && x.t.carrier) : ((relaisDe(x.o) || {}).transporteur || (eSX && eSX.transporteur))) || '', suX), code, jours: null,
         ...(lu.lieuNom ? {} : { sansLieu: x.kind === 'email' ? sansLieuEmail(x.t) : sansLieuVinted(x.o) }),
@@ -53535,14 +53593,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             locaux={{
               depense: { nom: 'Dépensé du mois', court: 'Dépensé', type: 'eur', valeur: depense, quand: (() => { const m = m0.toLocaleDateString('fr-FR', { month: 'long' }); return m.charAt(0).toUpperCase() + m.slice(1); })(), attrs: { 'data-n': lu ? String(mois.length) : '' } },
               enroute: { nom: 'En route', court: 'En route', type: 'n', valeur: lu ? n.route : null, attrs: { 'data-n': lu ? String(n.route) : '' } },
-              recus: { nom: 'Reçus', court: 'Reçus', type: 'n', valeur: lu ? n.recu : null, attrs: { 'data-n': lu ? String(n.recu) : '' } },
+              recus: { nom: 'Arrivés', court: 'Arrivés', type: 'n', valeur: lu ? n.recu : null, attrs: { 'data-n': lu ? String(n.recu) : '' } },
             }}/>;
         })()}
-        {/* (4 nov.) Fournisseurs · Délai · Lots (src/AchatsOutils.jsx) : trois feuilles, rien n'est écrit sans son clic. */}
-        {!modeRetraits && !baseKO && <AchatsOutils fournisseurs={asoFournisseurs} delai={asoDelai} lots={asoLots} achatsDeclarables={asoDeclarables} fichesLibres={asoFichesLibres}
+        {/* (5 nov.) Pourquoi des codes manquent (l'extension les lit dans les conversations, sur le
+            compte connecté dans l'onglet) : dit ICI, sur l'écran où il le constate. Se tait si elle est à jour. */}
+        <ExtEnRetard onNav={onNav}/>
+        {/* (5 nov., revue 2.16) Fournisseurs · Délai · Lots rangés derrière « … » : une seule carte de
+            chiffres en tête, les outils à un geste (src/AchatsOutils.jsx, inchangé). */}
+        {!modeRetraits && !baseKO && achatsOutilsOuverts && <div className="vrm-achats-outils" data-achats-outils="ouverts">
+          <AchatsOutils fournisseurs={asoFournisseurs} delai={asoDelai} lots={asoLots} achatsDeclarables={asoDeclarables} fichesLibres={asoFichesLibres}
           onOuvrir={setAsoOuvert} onRelier={asoRelier} onRepartir={asoRepartir} onAnnulerRepartition={asoAnnuler} onDeclarerLot={asoDeclarerLot}
           onFiche={(n)=>{ try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: String(n) })); } catch (_) {} }}
-          Retour={FermeAuRetour} Photo={(src)=><PhotoVinted src={src} alt="" loading="lazy"/>}/>}
+          Retour={FermeAuRetour} Photo={(src)=><PhotoVinted src={src} alt="" loading="lazy"/>}/>
+        </div>}
         {!retraitsOutils && <NoAcc/>}
         {/* ⚠️ LE BANDEAU DE L'EXTENSION VIT AUSSI ICI, PAS SEULEMENT SUR MA
             JOURNÉE. C'est sur CET écran que Julien compte les codes qui
@@ -53551,13 +53615,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             les codes lus dans les conversations, contenait **0 colis**, et
             aucun des colis Vinted à retirer n'avait de code. Lui dire pourquoi
             sur un autre écran que celui où il le constate, ça ne sert à rien.
-            Le bandeau se cache tout seul dès que l'extension est à jour. */}
-        <ExtEnRetard onNav={onNav}/>
+            Le bandeau se cache tout seul dès que l'extension est à jour.
+            (5 nov.) Il est rendu plus haut, en tête de l'écran. */}
         {/* ⚠️ MÊME ORDRE QUE L'ÉCRAN VENTES. Ici la période arrivait en 19e position,
             après les cartes — alors qu'elle est en 1re sur Ventes. Deux écrans
             jumeaux organisés différemment, c'est ce qui rend la navigation
             hésitante : ce qu'on manipule tous les jours passe en premier. */}
-        {!modeRetraits && <div className="vrm-seg vrm-seg-plein" role="group" aria-label="Étapes de tes achats" style={{marginBottom:16}}>
+        {!modeRetraits && <div className="vrm-achats-barre">
+        <div className="vrm-seg vrm-seg-plein" role="group" aria-label="Étapes de tes achats">
           {/* ⚠️ LES ONGLETS SONT LES ÉTAPES DU COLIS, pas des états de commande.
               C'est ça, un outil de réception : où en est chaque article entre
               « payée » et « dans le carton chez moi ». Le compte est affiché :
@@ -53573,14 +53638,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // partiel (les colis d'e-mail manqueraient) présenté comme complet.
             // (31 oct., soir) Sur « Achats », plus d'étape « À retirer » : c'est
             // l'écran voisin, « Colis à retirer » (pas deux fois la même chose).
-            return [...(modeListeAchats?[]:[['attente','À retirer',tracking===null?'—':pickupUnion.total]]),['route','En route',n.route],['recus','Reçus',n.recu],['all','Tous',null]].map(([id,label,cnt])=>(
+            return [...(modeListeAchats?[]:[['attente','À retirer',tracking===null?'—':pickupUnion.total]]),['route','En route',n.route],['recus','Arrivés',n.recu],['all','Tous',null]].map(([id,label,cnt])=>(
             <button type="button" key={id} className="vrm-seg-btn" data-achats-onglet={id} data-n={cnt==null?undefined:String(cnt)} onClick={()=>setAFilter(id)} aria-pressed={aFilter===id} aria-label={cnt?`${label} ${cnt}`:undefined} style={{whiteSpace:'nowrap'}}>{label}{cnt?<span className="vrm-seg-n" title={String(cnt)}> {cnt>=1000?`${(Math.floor(cnt/100)/10).toLocaleString('fr-FR')} k`:cnt}</span>:null}</button>
           )); })()}
+        </div>
+        {!baseKO && <button type="button" className="vrm-icon-control vrm-achats-plus" data-achats-plus={achatsOutilsOuverts?'ouvert':'ferme'} aria-expanded={achatsOutilsOuverts} aria-label="Plus : fournisseurs, délai, lots" title="Fournisseurs · Délai · Lots" onClick={()=>setAchatsOutilsOuverts(v=>!v)}><Icon name="more" size={20}/></button>}
         </div>}
         {/* (31 oct., soir) Achats ne montre plus les colis à retirer : une ligne mène
             à Colis (colonne « À retirer » et son détail). Le nombre est celui de la
             règle (`pickupUnion.total`), seulement quand les e-mails de suivi sont lus. */}
-        {modeListeAchats && tracking!==null && pickupUnion.total>0 && (
+        {modeListeAchats && !dansPlateforme && tracking!==null && pickupUnion.total>0 && (
           <div style={{margin:'0 0 12px'}}>
             <button type="button" className="vrm-lien-action" data-achats-vers-colis={pickupUnion.total} onClick={()=>onNav&&onNav('cat_achats')}
               style={{minHeight:44,background:'transparent',border:0,padding:0,color:C.text,fontSize:13,fontWeight:600,fontFamily:'inherit',cursor:'pointer'}}>
@@ -53676,7 +53743,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             (`pickupUnion.total`, union email + statut Vinted) et il est déjà
             affiché deux fois plus haut. Deux nombres proches pour deux notions
             différentes sur le même écran, c'est exactement ce qu'on s'interdit. */}
-        {buysBase.length>0 && aFilter!=='attente' && (()=>{
+        {/* (5 nov., revue 2.15) Une seule carte de chiffres : la grille ne s'affiche plus sous la carte
+            sombre (espace Vinted), qui dit déjà Dépensé, En route, À retirer, Arrivés. */}
+        {!dansPlateforme && buysBase.length>0 && aFilter!=='attente' && (()=>{
           const dans = buysBase.filter(o=>matchOrd(o));
           const M = (o)=>montantCommande(o);
           const annule = achatAnnule;
@@ -54728,7 +54797,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div className="vrm-buy-title" style={{color:C.text}} title={o.title}>{o.title}</div>
                 <div className="vrm-buy-meta" style={{color:C.muted}}>
                   <span className="vrm-buy-statut" style={{color:C.text}}><i style={{background:st.color}}/>{st.label}</span>
-                  {!unCompte && <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>}
+                  {/* (5 nov., revue 2.16) Achats : le compte en mots, sans pastille de couleur (hors palette). */}
+                  {!unCompte && <AcctTag acc={o._acc} name={accNameOf(o._acc)} pastille={false}/>}
                   <span style={{whiteSpace:'nowrap'}}>{o.date?dateFr(o.date, {day:'numeric',month:'short'}):''}
                   {/* DEPUIS COMBIEN DE TEMPS : « dois-je m'inquiéter ? ». Au-delà de
                       trois semaines, en rouge — le moment de relancer le vendeur. */}
@@ -64382,7 +64452,10 @@ function ColisEquipe({ vendeur, de, onPropre }) {
   else if (d.sansAcces) corps = <div data-equipe-etat="sans-acces" style={{ ...carte, fontSize: 15, color: C.text, lineHeight: 1.55 }}>Tu n'as plus accès aux colis de cette équipe : l'invitation a été retirée, ou l'abonnement du vendeur n'est plus actif. Plus rien de sa boutique n'est lisible d'ici.</div>;
   else {
     const ventes = d.ventes.filter((o) => aExpedier(o) && !d.postes.has(String(o.transaction_id)));
-    const achats = d.achats.filter((o) => !d.retires.has(String(o.transaction_id)) && (isAtRelayStatus(o.status) || tusDe(o) === 'needs_action'));
+    // (5 nov.) `needs_action` sur un ACHAT veut dire « une action » : « Commande livrée ! »
+    // (confirmer « Tout est OK », le colis est déjà retiré) ou « non réclamée - retournée »
+    // le portent aussi (mesuré : 12 sur 21). Seul le statut « au point relais » compte.
+    const achats = d.achats.filter((o) => !d.retires.has(String(o.transaction_id)) && isAtRelayStatus(o.status));
     const labelsTx = new Map(); (d.labels || []).forEach((l) => { const m = /_label_([A-Za-z0-9]+)$/.exec(l.id || ''); const tx = (m && m[1] !== 'latest' && m[1] === String(l.tx || m[1])) ? m[1] : ''; if (tx && !labelsTx.has(tx)) labelsTx.set(tx, l.id); });
     const bordsTx = new Map(); (d.bords || []).forEach((b) => { if (b && b.filename && b.filename !== 'None' && b.transaction && !bordsTx.has(String(b.transaction))) bordsTx.set(String(b.transaction), b); });
     const compte = (o) => d.comptes[String(o.uid || '')] || '';
