@@ -609,6 +609,11 @@ html body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > button.vrm-led
 .vrm-fu-vente-l2 .vrm-fu-site { font: 500 12px/1.3 var(--vrm-police); color: #6e6e73; }
 :root[data-theme="dark"] .vrm-fu-vente-l2 .vrm-fu-site, :root[data-theme="dark"] .vrm-fu-vente-l3 { color: #98989d; }
 .vrm-fu-vente-l2 .vrm-fu-site::before { width: 6px; height: 6px; background: #8e8e93; }
+/* (5 nov.) Le compte de la vente, écrit sur chaque ligne : même taille et même encre que le site,
+   coupé en fin s'il est long (le titre complet est dans l'infobulle et le détail). */
+.vrm-fu-vente-l2 .vrm-fu-vente-compte { font: 500 12px/1.3 var(--vrm-police); color: #6e6e73; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+:root[data-theme="dark"] .vrm-fu-vente-l2 .vrm-fu-vente-compte { color: #98989d; }
+.vrm-fu-vente-l2 .vrm-fu-vente-compte .vrm-vente-compte { font: inherit; color: inherit; }
 .vrm-fu-vente-l3 { margin-top: 3px; font: 600 12px/1.3 var(--vrm-police); color: #6e6e73; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vrm-fu-vente-l3[data-ton="action"] { color: #B25000; }
 :root[data-theme="dark"] .vrm-fu-vente-l3[data-ton="action"] { color: #ffb340; }
