@@ -30,6 +30,8 @@ const MAIN = {
   // N°12 : rangée 2, colonne 3 (case 6) ; N°128 : rangée 1, colonne 1 ; N°31 pas rangée.
   vrm_slots: { '12': { m: 'mA', i: 6 }, '128': { m: 'mA', i: 0 }, '7': { m: 'mA', i: 11 }, '55': { m: 'mB', i: 3 } },
 };
+// (5 nov., v32) Le Stock = les annonces actuelles : N°12, N°31, N°55 en ligne ; N°7 et N°128 vendues ; N°88 d'un compte supprimé (dressing servi).
+const EN_LIGNE = ['9001', '9003', '9005'].map((id) => ({ id, title: MAIN.vinted_annonce_numeros[id].title, is_closed: false, is_hidden: false, is_draft: false, price: { amount: '50.0' } }));
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
 const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/json', '.woff2': 'font/woff2' };
@@ -54,6 +56,8 @@ async function rendre(b, tel) {
     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j([{ id: 1, vinted_user_id: '111', login: 'compte_garde', domain: 'www.vinted.fr', created_at: new Date().toISOString(), updated_at: new Date().toISOString() }]);
     if (/id=eq\.main/.test(u)) return j([{ id: 'main', data: MAIN }]);
+    // (5 nov., v32) Le Stock montre les ANNONCES ACTUELLES : le dressing du compte les porte.
+    if (/id=eq\.harvest_111_listings/.test(u)) return j([{ id: 'harvest_111_listings', data: { capturedAt: new Date().toISOString(), payload: { items: EN_LIGNE } } }]);
     return j([]);
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));

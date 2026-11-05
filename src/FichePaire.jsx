@@ -8,6 +8,7 @@ import {HistoriqueModifications} from './OutilsParcours.jsx';
 import { createPortal } from 'react-dom';
 import './styles-fiche-paire.css';
 import './styles-annonces-outils.css';
+import { texteDuree } from './etatArticle.js';
 
 const ICONE = { achat: 'bag', numero: 'pencil', stock: 'home', annonces: 'grid', prix: 'tag', offres: 'chat', favoris: 'heart', vente: 'cash', colis: 'box', argent: 'euro', retour: 'restore' };
 const eur = (c) => (c == null ? '—' : `${(c / 100).toFixed(Number.isInteger(c / 100) ? 0 : 2).replace('.', ',')} €`);
@@ -28,7 +29,34 @@ const Evenement = ({ ev }) => (
   </li>
 );
 
-export default function FichePaire({ owner = '', p, lecture = false, num, onFermer, onRetour, onBordereau, onEmballer, onPrix, onDupliquer, onPublierAilleurs, neuve = null, onCopier, Photo, Icon, Retour }) {
+// (5 nov.) « VOIR L'ÉTAT » : tout ce qui se calcule sur cet article (le prix
+// d'achat est porté par la tuile « Achat » ci-dessus, avec sa source)
+// (`etatArticle`, src/etatArticle.js) — deux dates LUES par chiffre, sinon « — »
+// et la raison ; « au moins » / « au plus » quand la première mise en ligne est
+// plus ancienne que celle qu'on connaît. Aucune couleur (§7).
+const LIB_SOURCE = { relie: 'achat relié', saisi: 'saisi à la main' };
+function EtatArticle({ etat }) {
+  const r = etat.republications;
+  return (
+    <section className="vrm-fp-etat" aria-label="L’état de cet article" data-fiche-etat-article="">
+      <h3 className="vrm-fp-etat-titre">L’état</h3>
+      <dl className="vrm-fp-etat-grille">
+        {etat.lignes.map((l) => (
+          <div key={l.cle} className="vrm-fp-etat-l" data-etat-ligne={l.cle} data-etat-val={l.jours == null ? '' : l.jours} data-etat-borne={l.borne || ''}>
+            <dt>{l.titre}</dt>
+            <dd><b>{texteDuree(l)}</b>{l.jours == null && l.raison ? <small>{l.raison}</small> : /^depuis/.test(l.borne || '') ? <small>pas encore vendue</small> : l.borne === 'au-plus' || l.borne === 'au-moins' ? <small>la 1re annonce n’a pas de date lue</small> : null}</dd>
+          </div>
+        ))}
+        <div className="vrm-fp-etat-l" data-etat-ligne="republications" data-etat-val={r.n == null ? '' : r.n}>
+          <dt>Republications</dt>
+          <dd><b>{r.n == null ? '—' : r.n}</b><small>{r.n == null ? r.raison : 'vues par VRM'}</small></dd>
+        </div>
+      </dl>
+    </section>
+  );
+}
+
+export default function FichePaire({ owner = '', p, etat = null, lecture = false, num, onFermer, onRetour, onBordereau, onEmballer, onPrix, onDupliquer, onPublierAilleurs, neuve = null, onCopier, Photo, Icon, Retour }) {
   React.useEffect(() => {
     const k = (e) => { if (e.key === 'Escape' && !e.defaultPrevented) { e.preventDefault(); onFermer(); } };
     window.addEventListener('keydown', k, true);
@@ -52,13 +80,18 @@ export default function FichePaire({ owner = '', p, lecture = false, num, onFerm
       </div>
       {p.double ? <p className="vrm-fp-double" role="alert" data-fiche-double="1">Deux paires présentes portent le N°{p.num} : vérifie le carton avant d’emballer ou d’imprimer.</p> : null}
       <div className="vrm-fp-tuiles">
-        <div className="vrm-fp-tuile" data-fiche-resume-achat={r.achat == null ? '' : r.achat}><span>Achat</span><b>{eur(r.achat)}</b></div>
+        {/* (5 nov.) Le prix d'achat de « Voir l'état » est CE nombre (jamais écrit deux fois, §7) : sa source dessous. */}
+        <div className="vrm-fp-tuile" data-fiche-resume-achat={r.achat == null ? '' : r.achat} {...(etat ? { 'data-etat-ligne': 'prix-achat', 'data-etat-val': etat.prixAchat.cents == null ? '' : etat.prixAchat.cents, 'data-etat-source': etat.prixAchat.source || '' } : {})}>
+          <span>Achat</span><b>{eur(r.achat)}</b>
+          {etat ? <small>{etat.prixAchat.cents == null ? etat.prixAchat.raison : LIB_SOURCE[etat.prixAchat.source]}</small> : null}
+        </div>
         <div className="vrm-fp-tuile" data-fiche-resume-vente={r.vente == null ? '' : r.vente}><span>Vente</span><b>{eur(r.vente)}</b></div>
         <div className="vrm-fp-tuile" data-fiche-resume-benefice={r.benefice == null ? '' : r.benefice} data-fiche-benefice-partiel={r.benefPartiel ? '1' : undefined}>
           <span>Bénéfice</span><b>{signe(r.benefice)}</b>
           {r.benefice == null && r.raisonBenef ? <small>{r.raisonBenef}</small> : r.benefPartiel ? <small>frais pas tous confirmés</small> : null}
         </div>
       </div>
+      {etat ? <EtatArticle etat={etat}/> : null}
       {(onPrix || onDupliquer || onPublierAilleurs) && !p.ancienNumero ? (
         <div className="vrm-fp-outils">
           {onPrix && !neuve ? <button type="button" className="vrm-ao-second" data-fiche-prix="" onClick={() => onPrix(p.num)}>Changer le prix</button> : null}
