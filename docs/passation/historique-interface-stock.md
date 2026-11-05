@@ -3565,3 +3565,10 @@ Fusion, 44 px, une ligne au téléphone), chacune une feuille en portail (`src/A
 délai réception → mise en ligne avec la liste « Reçus, pas encore en ligne » (Relier · Mettre en ligne),
 « Répartir » un lot (« Reste X € » en ambre). Aucun texte explicatif. Banc `achats-sourcing` (120, 390/1512
 clair/sombre). Règles et mesures : `historique-compta-urssaf-abonnement.md` (« 4 nov. — Achats »).
+
+
+<!-- déplacé de CLAUDE.md §9 le 5 nov. (limite de 60 Ko) -->
+- **3 nov.** — Ma journée « À faire » en PHOTOS (vignettes par identité, pile + « +k », plus de pastilles colorées ; `src/design/PileVignettes.jsx`) ; Colis en 3 onglets « À envoyer · Envoyés · À retirer », toutes plateformes ensemble groupées par transporteur ; « À retirer » en SECTIONS (aujourd'hui · prêts · code à venir · lieu à confirmer · à vérifier · en route · argent à vérifier), chaque colis une fois, sélecteur de VILLE (lue dans l'adresse) qui filtre carte, liste et carte sombre ; aucune phrase explicative. Bancs `journee-photos`, `colis-retirer-propre` (rouges sur main) ; R2 du récap corrigé (`deps` de `LigneVenteVinted`). → historique interface-stock. Geste : regarder Colis → À retirer et Ma journée.
+
+<!-- déplacé de CLAUDE.md §9 le 5 nov. (limite de 60 Ko) -->
+- **3 nov.** — Annonces, 4 outils : « Changer le prix » d'un N° sur tous les sites où il est en ligne PAR IDENTITÉ (eBay `revise` confirmé ; Vinted par `republiermodif` si l'extension sait, sinon « À faire sur le site » ; Leboncoin/Vestiaire toujours « À faire sur le site » — requête jamais observée) ; « Dupliquer » ⇒ nouveau N° `prochainLibre`, aucune photo ni identité copiée (`vrm_fiches_neuves`) ; historique complet et prouvé d'un article (`src/histoireArticle.js`) ; « Mes modèles » de description (`vrm_modeles_desc`). `audit-annonces-outils` (43 rouges sur main, 17/17 mutations). → historique interface-stock. Geste : essayer « Changer le prix » sur un N°.
