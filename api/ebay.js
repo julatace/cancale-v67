@@ -33,6 +33,7 @@ import { accesVendeur } from './_lib/abonnement.js';
 import { creerRechercheEbay } from './_lib/ebay-recherche.js';
 import { traiterSuppressionEbay } from './_lib/ebay-suppression.js';
 import { lireItemRelance, jugerRelance, xmlRelance, ID_ANNONCE_EBAY } from './_lib/ebay-relance.js';
+import { televerserPhotoEbay } from './_lib/ebay-photo.js';
 import { sbCle } from './_lib/cle.js';
 import { keysReady, canConsent, ruName, authUrl, appToken, jetonApplication, oublierJetonApplication, hasRefresh, accessToken, storeData, lireReglageVendeur, lireDonnee, lireResumeCommandes, modifierDonnee,
   lireComptes, comptesActifs, rangerConnexion, apprendrePrincipal, apprendreTypes, resoudreCompte, deconnecterCompte, suffixeCompte, normaliserRegistre, cleCompteDe,
@@ -2161,6 +2162,10 @@ async function handleApp(req, res) {
       pubverify: (ctx) => handleVerify(b, ctx),
       finances: (ctx) => handleFinances(ctx),
       publish: (ctx) => handlePublish(b, ctx),
+      // (5 nov.) Une photo prise ou choisie sur le téléphone, confiée à
+      // l'hébergement d'images d'eBay : rend son adresse i.ebayimg.com, que
+      // l'annonce emporte. Rien n'est publié ici (api/_lib/ebay-photo.js).
+      photo: (ctx) => televerserPhotoEbay(b, { jeton: () => jetonDe(ctx), siteId: marcheCourant().siteId, api: EBAY_API }),
       sku: (ctx) => handleSku(b, ctx),
       offreinfo: (ctx) => handleOffreInfo(ctx),
       offre: (ctx) => handleOffre(b, ctx),
@@ -2195,12 +2200,6 @@ async function handleApp(req, res) {
       return;
     }
     const commerciales=new Set(['expedier','messageacheteur','repondre','repondreoffre','modifierannonce','terminerannonce','evaluer','deciderretour','rembourserretour','decannulation','promouvoir','changertaux','arreterpromo']);
-    // (29 oct.) L'AGENT eBAY QUI DEMANDE : une publication lancée par l'agent
-    // n'est JAMAIS sans le oui de Julien — le serveur l'exige (`confirme:true`,
-    // posé par la confirmation de l'écran), puis la garde ordinaire de publish
-    // (SKU, déjà en vente / programmée relue chez eBay, prix, livraison gérée
-    // par eBay). Elle est inscrite au journal des actions (« Publiée par
-    // l'agent ») : un résultat incertain se relit avant tout nouvel essai.
     // (2 nov., audit « plateformes » P12) Publier et changer un prix ENGAGENT
     // (une annonce mise en vente, un prix qui vend) : comme `programmer`,
     // `retirer`, `regleoffre` et `modifierannonce`, le serveur exige la
@@ -2209,11 +2208,12 @@ async function handleApp(req, res) {
       res.status(400).json({ ok: false, reason: 'confirmation', error: action === 'publish' ? 'Publication non confirmée — rien n\'a été publié.' : 'Changement de prix non confirmé — rien n\'a changé sur eBay.' });
       return;
     }
+    // (5 nov.) L'AGENT eBAY EST ARRÊTÉ (Julien : « le bot eBay, arrête-le, c'est
+    // nul »). Plus aucune publication « par l'agent » : un ancien onglet resté
+    // ouvert qui l'enverrait encore est refusé AVANT eBay (rien n'est créé). La
+    // publication ordinaire (eBay → Annonces, sur son clic) passe plus bas.
     if (action === 'publish' && b.agent === true) {
-      if (b.confirme !== true) { res.status(400).json({ ok: false, reason: 'confirmation', error: 'L\'agent ne publie qu\'après ton oui — rien n\'a été publié.' }); return; }
-      const num = b.item && b.item.numero != null ? String(b.item.numero).slice(0, 16) : '';
-      const r = await avecMarche(marche||MARCHE_DEFAUT, () => executerAvecJournal({ action: 'agentpublie', b: { listingId: num ? 'VRM-' + num : '' }, execute: () => ACTIONS.publish(ctx), modifier: fn => modifierDonnee(ligneDe('ebay_agent_journal', ctx), owner, fn) }));
-      res.status(r.status).json(r.body);
+      res.status(410).json({ ok: false, reason: 'agent-arrete', error: 'L\'agent eBay est arrêté — rien n\'a été publié. Publie depuis eBay → Annonces.' });
       return;
     }
     const r = await avecMarche(marche||MARCHE_DEFAUT, () => commerciales.has(action) && b.confirme===true

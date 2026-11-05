@@ -1,3 +1,5 @@
+// ⛔ (5 nov.) PLUS APPELÉ : l'agent eBay est arrêté (Julien : « le bot eBay, arrête-le,
+//    c'est nul »). api/ship-reminders.js ne l'importe plus ; gardé pour son audit.
 // ════════════════════════════════════════════════════════════════════════════
 //  « 🛒 N paires prêtes pour eBay — je les publie ? » / « N paires à regarder » — la notification du matin
 //  (29 octobre, l'agent eBay qui demande).

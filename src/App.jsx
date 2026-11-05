@@ -18,6 +18,7 @@ import {retourReponseVinted,cleReponseVinted,creerBrouillonsReponses,etatActionV
 import {etatOffreVinted,offreVintedEnAttente,cleOffreVinted,appliquerOffresConfirmees,annonceOffreEnVente,offreOuverte} from './offresVinted.js';
 import {contreOffreMini} from './messagesVolets.js';
 import { problemesAnnonce, problemesLot } from './verifAnnonce.js';
+import { PHOTOS_AJOUT_MAX, PHOTOS_EBAY_MAX, estPhotoAjoutee, placesPhotos, deplacerPhoto, avecPhotosAjoutees, photoEnJpegBase64 } from './photosEbayAjout.js';
 // « 105 € » (un montant entier sans « ,00 »), « 44,50 € » sinon — la contre-offre en un tap.
 const eurCourt = (v) => (Number.isInteger(Number(v)) ? `${Number(v)} €` : `${Number(v).toFixed(2).replace('.', ',')} €`);
 import {CONVERSATIONS_RETIREES,cleConversation,conversationRetiree,retirerConversation,remettreConversations,majAuGeste,phraseRetour} from './conversationsRetirees.js';
@@ -148,7 +149,6 @@ import { relanceProposable, numeroSorti } from './ebayRelance.js';
 // journée, Ventes, le rappel du matin, le rappel du soir et le widget (§11).
 import {DELAI_EXPEDITION_J, limiteExpedition, lireDateLimite, echeanceLimite, texteLimiteEnvoi, bordsParTransaction} from '../api/_lib/limite-envoi.js';
 import { photoArticle, photoCommande, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from "./photosArticles.js";
-import { REGLES_AGENT_DEFAUT, AGENT_MAX_PAR_JOUR, ETATS_AGENT_MUET, normaliserReglesAgent, propositionAgent, resumeAgent, ligneJourneeAgent, phraseResumeAgent, comprendrePhrase, appliquerPhrase, texteRegles, phraseEcartees } from './agentEbay.js';
 import {appelerEbay,ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres,EbayAgent,EbayEvaluations,EbayRetours,EbayPromotion,EbayAchats} from "./ebayGestion.jsx";
 import RechercheEbay,{repereAdmis} from "./ebayRecherche.jsx";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
@@ -22276,6 +22276,67 @@ const prixAchatDe = (fiche, buyByNum) => {
 // `ventes` : le verdict « déjà vendue, toutes plateformes » (`numerosDejaVendus`,
 // §11) ; `enLigne` / `vendusVinted` : les annonces Vinted en vente / prouvées
 // vendues (Set ; `undefined` en cours ; `null` pas su).
+// (5 nov.) LES PHOTOS DE L'ANNONCE eBAY — défini au niveau module (identité
+// stable, voir BlocEbay). Les photos de l'annonce dans SON ordre (‹ › déplace,
+// × retire, la 1ʳᵉ est la couverture), puis celles en cours d'envoi chez eBay
+// (aperçu local), et deux gestes : prendre une photo (appareil arrière) ou en
+// choisir plusieurs dans la galerie. Rien n'est publié ici.
+let _seqPhotoEbay = 0;
+function PhotosEbayEditeur({ urls, envois, places, message, onUrls, onAjouter, onReessayer, onRetirerEnvoi }) {
+  const C = EBAY_SKIN;
+  const refAppareil = React.useRef(null), refGalerie = React.useRef(null);
+  const choisis = (e) => { const l = Array.from((e.target && e.target.files) || []); try { e.target.value = ''; } catch (_) {} if (l.length) onAjouter(l); };
+  const tuile = { position: 'relative', width: 96, height: 96, borderRadius: 12, overflow: 'hidden', border: `1px solid ${C.border}`, background: C.bg };
+  const croix = { position: 'absolute', top: 0, right: 0, width: 44, height: 44, border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end' };
+  const rond = { margin: 4, width: 26, height: 26, borderRadius: 13, background: 'rgba(0,0,0,.62)', color: '#fff', fontSize: 16, lineHeight: '26px', textAlign: 'center' };
+  const fleche = (off) => ({ flex: 1, height: 44, border: 'none', background: 'transparent', color: off ? C.border : C.text, fontSize: 20, fontWeight: 700, cursor: off ? 'default' : 'pointer', fontFamily: 'inherit' });
+  const geste = (off) => ({ flex: '1 1 150px', minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, border: `1px solid ${C.border}`, borderRadius: 999, background: C.card2, color: C.text, fontSize: 15, fontWeight: 700, cursor: off ? 'default' : 'pointer', opacity: off ? 0.5 : 1, fontFamily: 'inherit' });
+  const nEchec = envois.filter((x) => x.etat === 'echec').length;
+  return (
+    <div data-ebay-photos-editeur={urls.length} data-ebay-photos-envoi={envois.length - nEchec} data-ebay-photos-echec={nEchec}>
+      {urls.length + envois.length > 0 ? (
+        <div className="vrm-rangee" style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
+          {urls.map((u, i) => (
+            <div key={u + i} data-ebay-photo={i} data-ebay-photo-ajoutee={estPhotoAjoutee(u) ? '1' : '0'} data-ebay-photo-url={u} style={{ flexShrink: 0, width: 96 }}>
+              <div style={tuile}>
+                <PhotoVinted src={u} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <button type="button" data-ebay-photo-retirer={i} onClick={() => onUrls(urls.filter((_, j) => j !== i))} aria-label={`Retirer la photo ${i + 1}`} style={croix}><span style={rond}>×</span></button>
+                {i === 0 && <span style={{ position: 'absolute', bottom: 0, left: 0, right: 0, fontSize: 11, textAlign: 'center', background: 'rgba(0,0,0,.6)', color: '#fff', padding: '2px 0', fontWeight: 600 }}>couverture</span>}
+              </div>
+              {urls.length > 1 && <div style={{ display: 'flex' }}>
+                <button type="button" data-ebay-photo-avant={i} disabled={i === 0} onClick={() => onUrls(deplacerPhoto(urls, i, -1))} aria-label={`Photo ${i + 1} : une place plus tôt`} style={fleche(i === 0)}>‹</button>
+                <button type="button" data-ebay-photo-apres={i} disabled={i === urls.length - 1} onClick={() => onUrls(deplacerPhoto(urls, i, 1))} aria-label={`Photo ${i + 1} : une place plus loin`} style={fleche(i === urls.length - 1)}>›</button>
+              </div>}
+            </div>
+          ))}
+          {envois.map((e) => (
+            <div key={e.id} data-ebay-photo-envoi={e.etat} style={{ flexShrink: 0, width: 96 }}>
+              <div style={tuile}>
+                {e.apercu ? <img src={e.apercu} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.45 }} /> : null}
+                <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, fontSize: 11, textAlign: 'center', background: 'rgba(0,0,0,.6)', color: '#fff', padding: '2px 0', fontWeight: 600 }}>{e.etat === 'envoi' ? 'Envoi à eBay…' : 'Pas envoyée'}</span>
+                {e.etat === 'echec' && <button type="button" data-ebay-photo-envoi-retirer="" onClick={() => onRetirerEnvoi(e)} aria-label="Retirer cette photo" style={croix}><span style={rond}>×</span></button>}
+              </div>
+              {e.etat === 'echec' && <button type="button" data-ebay-photo-reessayer="" onClick={() => onReessayer(e)} style={{ width: '100%', height: 44, border: 'none', background: 'transparent', color: C.accent, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Réessayer</button>}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Aucune photo pour l'instant : choisis l'article au-dessus, ou prends-le en photo.</div>
+      )}
+      {nEchec > 0 && <div role="status" data-ebay-photos-raison="" style={{ fontSize: 12, color: C.warn, marginTop: 8, lineHeight: 1.45 }}>{nEchec === 1 ? 'Une photo n\'est pas partie' : nEchec + ' photos ne sont pas parties'} : {(envois.find((x) => x.etat === 'echec') || {}).raison || 'raison inconnue'}. Réessaie, ou retire-{nEchec === 1 ? 'la' : 'les'}.</div>}
+      {message && <div role="status" data-ebay-photos-trop="" style={{ fontSize: 12, color: C.warn, marginTop: 8, lineHeight: 1.45 }}>{message}</div>}
+      <input ref={refAppareil} type="file" accept="image/*" capture="environment" data-ebay-photo-appareil="" onChange={choisis} style={{ display: 'none', fontSize: 16 }} />
+      <input ref={refGalerie} type="file" accept="image/*" multiple data-ebay-photo-galerie="" onChange={choisis} style={{ display: 'none', fontSize: 16 }} />
+      <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+        <button type="button" data-ebay-prendre-photo="" disabled={!places} onClick={() => refAppareil.current && refAppareil.current.click()} style={geste(!places)}><Icon name="camera" size={18}/> Prendre une photo</button>
+        <button type="button" data-ebay-galerie="" disabled={!places} onClick={() => refGalerie.current && refGalerie.current.click()} style={geste(!places)}><Icon name="image" size={18}/> Depuis la galerie</button>
+      </div>
+      <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, marginTop: 8, lineHeight: 1.45 }}>
+        La 1ʳᵉ sert de couverture ; ‹ › change l'ordre. {places ? `Encore ${places} photo${places > 1 ? 's' : ''} possible${places > 1 ? 's' : ''}.` : `Plus de place : ${PHOTOS_AJOUT_MAX} photos ajoutées au plus, ${PHOTOS_EBAY_MAX} en tout chez eBay.`} Une photo ajoutée est envoyée chez eBay (son hébergement d'images) dès que tu la choisis ; l'annonce ne part qu'à ta confirmation.
+      </div>
+    </div>
+  );
+}
 function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = null, onBrouillon, ventes = null, enLigne, vendusVinted, comptesPub = [], compteDefaut = 'principal', onCompte }) {
   const C = EBAY_SKIN;   // peau eBay : tout ce formulaire est au look de l'appli eBay (§ ci-dessus)
   const [ouvert, setOuvert] = React.useState(false);
@@ -22381,6 +22442,16 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
   // (publiée il y a deux minutes : rien n'est encore capté), on demande à
   // l'extension de lire sa page TOUT DE SUITE (`cmd: 'photos'`, sur ce clic).
   const [photosEtat, setPhotosEtat] = React.useState(null);   // null · 'cherche' · 'fait' · {raison}
+  // (5 nov.) LES PHOTOS AJOUTÉES DEPUIS LE TÉLÉPHONE (appareil ou galerie) :
+  // chacune est envoyée à l'hébergement d'images d'eBay (action `photo`) ; tant
+  // qu'elle n'a pas d'adresse i.ebayimg.com, elle est une vignette « en envoi »
+  // ou « pas envoyée » — jamais une photo de l'annonce, et la publication
+  // attend (gardePublier). Envoyées UNE PAR UNE, dans l'ordre où il les ajoute.
+  const [envois, setEnvois] = React.useState([]);   // [{ id, fichier, apercu, etat: 'envoi' | 'echec', raison }]
+  const [photosMsg, setPhotosMsg] = React.useState('');
+  const fileEnvois = React.useRef(Promise.resolve());
+  const genEnvois = React.useRef(0);                 // change au reset : un envoi d'avant ne rejoint pas la nouvelle annonce
+  React.useEffect(() => () => { genEnvois.current++; }, []);
   // (17 oct.) Choisir une paire lance l'analyse eBay (catégorie + caractéristiques)
   // sans attendre un second clic : c'est ELLE qui remplit marque, pointure et
   // état. Une LECTURE chez eBay (Taxonomy), rien n'est publié.
@@ -22390,11 +22461,24 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
   // l'analyse l'attend avant de remplir « Département ».
   const genreRef = React.useRef(null);
   const choisirPaire = (p) => {
+    // (5 nov., revue) Les photos AJOUTÉES ici (appareil, galerie) ont été prises
+    // pour l'article déjà choisi : passer à un AUTRE article les retire, celles
+    // en cours d'envoi comprises (leur adresse ne rejoindra pas cette annonce).
+    // Une photo de la N°31 sur l'annonce de la N°35, c'est la mauvaise chaussure
+    // vendue (§5 : mieux vaut un blanc qu'un faux). Sans article choisi avant
+    // (il photographie d'abord, choisit ensuite), elles restent.
+    const autrePaire = pairId != null && String(pairId) !== String(p.id);
+    const nAjouteesAvant = autrePaire ? photos.split(/\s+/).filter(estPhotoAjoutee).length + envois.length : 0;
+    if (autrePaire) {
+      genEnvois.current++;
+      setEnvois((l) => { l.forEach((x) => { try { URL.revokeObjectURL(x.apercu); } catch (_) {} }); return []; });
+      setPhotosMsg(nAjouteesAvant ? `${nAjouteesAvant === 1 ? 'La photo ajoutée pour l\'article d\'avant est retirée' : `Les ${nAjouteesAvant} photos ajoutées pour l'article d'avant sont retirées`} : ${nAjouteesAvant === 1 ? 'elle ne part' : 'elles ne partent'} pas avec la N°${p.num}.` : '');
+    }
     pairCourante.current = p.id;
     genreRef.current = p.catalogId != null && p.catalogId !== '' ? cheminVintedApp(p.catalogId).then((ch) => familleArticle({ chemin: ch }).genre).catch(() => '') : Promise.resolve('');
     setPairId(p.id); setPickerOpen(false); setPairQ('');
     setTitre(ebayTitre(p.title || '', p.taille || ''));   // « taille 36 », pas « T36 »
-    setPhotos((p.photos || []).join('\n'));
+    setPhotos((old) => avecPhotosAjoutees(p.photos || [], autrePaire ? [] : old.split(/\s+/).filter(Boolean)).join('\n'));   // (5 nov.) ses photos ajoutées restent — pas d'un article à l'autre
     setDesc(p.desc || descriptionDeFaits(p));              // sa description Vinted ; à défaut, ses FAITS captés (jamais inventés)
     if (p.prix != null && !String(prix).trim()) setPrix(String(p.prix).replace('.', ','));
     { const ce = etatEbayDeVinted(p.etat, null); if (ce) setCond(ce); }   // l'état Vinted de la paire (vérifié contre la liste d'eBay à l'analyse)
@@ -22417,7 +22501,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
           if (lues.length) {
             // Seulement si c'est toujours CETTE paire, et sans écraser des photos retirées à la main.
             if (pairCourante.current !== p.id) return;
-            setPhotos((old) => (old.split(/\s+/).filter(Boolean).length <= (p.photos || []).length ? lues.join('\n') : old));
+            setPhotos((old) => { const l = old.split(/\s+/).filter(Boolean); return l.filter((u) => !estPhotoAjoutee(u)).length <= (p.photos || []).length ? avecPhotosAjoutees(lues, l).join('\n') : old; });
             if (!String(p.desc || '').trim() && descriptionEbayPropre(d.description)) setDesc((old) => old.trim() ? old : descriptionEbayPropre(d.description));
             setPhotosEtat('fait');
           } else setPhotosEtat({ raison: "Vinted n'a rendu aucune photo" });
@@ -22531,6 +22615,10 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
     if (!brouillon || !brouillon.id) return;
     const d = brouillon;
     setBrouillonId(d.id); setNumeroBrouillon(d.numero ? String(d.numero) : '');
+    // (5 nov., revue) Rouvrir un brouillon : une photo encore en envoi pour le
+    // formulaire d'avant ne le rejoint pas, ni une relecture Vinted en cours.
+    genEnvois.current++; setEnvois((l) => { l.forEach((x) => { try { URL.revokeObjectURL(x.apercu); } catch (_) {} }); return []; }); setPhotosMsg('');
+    pairCourante.current = d.pairId || null;
     setPairId(d.pairId || null); setPickerOpen(false);
     setTitre(String(d.titre || '')); setPrix(String(d.prix == null ? '' : d.prix)); setQty(String(d.quantite || '1'));
     setCond(String(d.etat || '3000')); setDesc(String(d.description || '')); setPhotos((d.photos || []).join('\n'));
@@ -22579,6 +22667,10 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
   // en vente sur Vinted. Sans N°, aucune identité : elle part « pas reliée »,
   // comme avant. Le bouton est grisé et la raison dite UNE fois (jamais caché).
   const gardePublier = () => {
+    // (5 nov.) Une photo ajoutée qui n'est pas (encore) chez eBay ne partirait
+    // pas : on attend, ou il la retire — jamais une annonce sans elle en silence.
+    if (envois.some((x) => x.etat === 'envoi')) return { k: 'photos-envoi', t: 'J\'envoie tes photos à eBay… la publication attend la fin de l\'envoi.' };
+    if (envois.length) return { k: 'photos-echec', t: `${envois.length === 1 ? 'Une photo n\'est pas partie' : envois.length + ' photos ne sont pas parties'} chez eBay : réessaie ou retire-${envois.length === 1 ? 'la' : 'les'} — rien n'est publié tant qu'${envois.length === 1 ? 'elle manque' : 'elles manquent'}.` };
     const d = brouillonCourant();
     const n = d.numero ? cleNum(d.numero) : '';
     if (!n) return null;
@@ -22725,7 +22817,38 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
   // eyebrow numéroté + carte. §7 : une seule teinte d'accent, rayons 10/12.
   const urls = photos.split(/\s+/).map(s => s.trim()).filter(s => /^https?:\/\//.test(s));
   const setUrls = (arr) => { setPhotos(arr.join('\n')); setCheck(null); };
-  const reset = () => { setOuvert(false); setRes(null); setCheck(null); setTitre(''); setPrix(''); setCat(null); setAsp({}); setPhotos(''); setDesc(''); setPairId(null); setBrouillonId(null); setNumeroBrouillon(''); setBrouillonMsg(''); setOffreA(''); setOffreR(''); setOffreBasOk(false); };
+  const nVinted = urls.filter((u) => !estPhotoAjoutee(u)).length;   // celles de l'annonce Vinted (pas celles ajoutées ici)
+  const envoyerPhoto = async (e, g) => {
+    if (g !== genEnvois.current) return;
+    let b64 = null, raison = '', url = '';
+    try { b64 = await photoEnJpegBase64(e.fichier); } catch (_) { raison = 'ce navigateur ne sait pas lire cette photo (essaie en JPEG)'; }
+    if (b64) {
+      const { code, j } = await appelEbay({ action: 'photo', image: b64, ...corpsCompteEbay(comptePub) });
+      if (j && j.ok && estPhotoAjoutee(j.url)) url = j.url;
+      else raison = (j && j.error) || (code === 0 ? 'pas de réseau, la photo n\'est pas partie' : 'eBay n\'a pas pris la photo');
+    }
+    if (g !== genEnvois.current) return;
+    if (url) {
+      setPhotos((old) => { const l = old.split(/\s+/).filter(Boolean); return l.includes(url) ? old : [...l, url].join('\n'); });
+      setCheck(null);
+      setEnvois((l) => l.filter((x) => x.id !== e.id));
+      try { URL.revokeObjectURL(e.apercu); } catch (_) {}
+    } else setEnvois((l) => l.map((x) => (x.id === e.id ? { ...x, etat: 'echec', raison } : x)));
+  };
+  const enfilerPhoto = (e) => { const g = genEnvois.current; fileEnvois.current = fileEnvois.current.then(() => envoyerPhoto(e, g)).catch(() => {}); };
+  const ajouterPhotos = (fichiers) => {
+    const libres = placesPhotos(urls, envois.length);
+    const pris = fichiers.slice(0, libres);
+    const reste = fichiers.length - pris.length;
+    setPhotosMsg(reste > 0 ? `${reste === 1 ? 'Une photo n\'a pas été ajoutée' : reste + ' photos n\'ont pas été ajoutées'} : ${PHOTOS_AJOUT_MAX} photos ajoutées au plus par annonce, ${PHOTOS_EBAY_MAX} en tout chez eBay.` : '');
+    const nouveaux = pris.map((f) => ({ id: 'ph' + (++_seqPhotoEbay), fichier: f, apercu: (() => { try { return URL.createObjectURL(f); } catch (_) { return ''; } })(), etat: 'envoi', raison: '' }));
+    if (!nouveaux.length) return;
+    setEnvois((l) => [...l, ...nouveaux]);
+    nouveaux.forEach(enfilerPhoto);
+  };
+  const reessayerPhoto = (e) => { setEnvois((l) => l.map((x) => (x.id === e.id ? { ...x, etat: 'envoi', raison: '' } : x))); enfilerPhoto(e); };
+  const retirerEnvoi = (e) => { setEnvois((l) => l.filter((x) => x.id !== e.id)); try { URL.revokeObjectURL(e.apercu); } catch (_) {} };
+  const reset = () => { genEnvois.current++; pairCourante.current = null; setEnvois((l) => { l.forEach((x) => { try { URL.revokeObjectURL(x.apercu); } catch (_) {} }); return []; }); setPhotosMsg(''); setOuvert(false); setRes(null); setCheck(null); setTitre(''); setPrix(''); setCat(null); setAsp({}); setPhotos(''); setDesc(''); setPairId(null); setBrouillonId(null); setNumeroBrouillon(''); setBrouillonMsg(''); setOffreA(''); setOffreR(''); setOffreBasOk(false); };
   // (17 oct.) Une paire n'est proposée qu'UNE fois, même sous deux N° (même
   // photo exacte, `jumellesParPhoto`) : on garde celle déjà sur eBay, sinon
   // l'annonce la plus récente ; l'autre numéro est dit sur la ligne.
@@ -22826,37 +22949,35 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
                 </div>
               </>)
             ) : (<>
-              {/* Paire choisie : ses photos, en vignettes (retirables). */}
+              {/* Paire choisie : son N° et son titre ; ses photos sont dans le bloc « Photos » (5 nov.). */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                 <span className="vrm-display" style={{ fontSize: 13, fontWeight: 800, color: C.accent }}>N°{pairSel.num}</span>
                 <span style={{ fontSize: 13, color: C.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pairSel.title}</span>
               </div>
-              {urls.length > 0 ? (
-                <div className="vrm-rangee" style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
-                  {urls.map((u, i) => (
-                    <div key={u + i} style={{ position: 'relative', width: 74, height: 74, borderRadius: 12, overflow: 'hidden', border: `1px solid ${C.border}`, flexShrink: 0, background: C.bg }}>
-                      <PhotoVinted src={u} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      <button type="button" onClick={() => setUrls(urls.filter((_, j) => j !== i))} aria-label="Retirer" style={{ position: 'absolute', top: 3, right: 3, width: 20, height: 20, borderRadius: 12, border: 'none', background: 'rgba(0,0,0,.62)', color: '#fff', fontSize: 13, cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
-                      {i === 0 && <span style={{ position: 'absolute', bottom: 0, left: 0, right: 0, fontSize: 11, textAlign: 'center', background: 'rgba(0,0,0,.6)', color: '#fff', padding: '2px 0', fontWeight: 600 }}>couverture</span>}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div style={{ fontSize: 12, color: C.warn, lineHeight: 1.45 }}>{photosEtat === 'cherche' ? 'Je récupère ses photos sur Vinted…' : "Cet article n'a pas encore de photo captée. Rouvre son annonce sur Vinted (avec l'extension à jour) puis reviens."}</div>
+              {nVinted === 0 && (
+                <div style={{ fontSize: 12, color: C.warn, lineHeight: 1.45 }}>{photosEtat === 'cherche' ? 'Je récupère ses photos sur Vinted…' : "Cet article n'a pas encore de photo captée. Rouvre son annonce sur Vinted (avec l'extension à jour) puis reviens — ou ajoute tes photos ci-dessous."}</div>
               )}
               {/* ⚠️ HONNÊTE sur le nombre : si Vinted a plus de photos que ce
                   qu'on a capté (carrousel lazy tant que l'extension à jour n'est
                   pas passée), on le DIT et on envoie rouvrir l'annonce. */}
-              {photosEtat === 'cherche' && urls.length > 0 ? (
+              {photosEtat === 'cherche' && nVinted > 0 ? (
                 <div data-ebay-photos="cherche" style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>Je récupère ses autres photos sur Vinted…</div>
               ) : photosEtat && photosEtat.raison ? (
                 <div data-ebay-photos="echec" style={{ fontSize: 12, color: C.warn, marginTop: 8, lineHeight: 1.45 }}>Photos pas récupérées : {photosEtat.raison}. Ouvre son annonce sur Vinted, puis rechoisis l'article.</div>
-              ) : pairSel.nPhotos != null && urls.length < pairSel.nPhotos ? (
-                <div style={{ fontSize: 12, color: C.warn, marginTop: 8, lineHeight: 1.45, background: `${C.warn}12`, border: `1px solid ${C.warn}`, borderRadius: 12, padding: '8px 10px' }}>Seulement {urls.length} photo{urls.length > 1 ? 's' : ''} captée{urls.length > 1 ? 's' : ''} sur {pairSel.nPhotos}. Rouvre l'annonce sur Vinted (extension à jour) pour les avoir toutes — elles s'ajouteront ici automatiquement.</div>
+              ) : pairSel.nPhotos != null && nVinted < pairSel.nPhotos ? (
+                <div style={{ fontSize: 12, color: C.warn, marginTop: 8, lineHeight: 1.45, background: `${C.warn}12`, border: `1px solid ${C.warn}`, borderRadius: 12, padding: '8px 10px' }}>Seulement {nVinted} photo{nVinted > 1 ? 's' : ''} captée{nVinted > 1 ? 's' : ''} sur {pairSel.nPhotos}. Rouvre l'annonce sur Vinted (extension à jour) pour les avoir toutes — elles s'ajouteront ici automatiquement.</div>
               ) : (
-                <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, marginTop: 8, lineHeight: 1.45 }}>Ces photos viennent de ton annonce Vinted. La 1ʳᵉ sert de couverture ; tu peux en retirer.</div>
+                <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, marginTop: 8, lineHeight: 1.45 }}>Ses photos Vinted sont reprises dans « Photos », juste en dessous.</div>
               )}
             </>)}
+          </BlocEbay>
+
+          {/* 1 bis — LES PHOTOS (5 nov.) : celles de l'annonce Vinted et celles
+              qu'il prend ou choisit ici ; l'ordre est le sien (la 1ʳᵉ est la
+              couverture), chacune se retire. */}
+          <BlocEbay n="1b" titre="Photos" right={<span data-ebay-photos-n={urls.length} style={{ fontSize: 11, color: C.muted }}>{urls.length}/{PHOTOS_EBAY_MAX}</span>}>
+            <PhotosEbayEditeur urls={urls} envois={envois} places={placesPhotos(urls, envois.length)} message={photosMsg}
+              onUrls={setUrls} onAjouter={ajouterPhotos} onReessayer={reessayerPhoto} onRetirerEnvoi={retirerEnvoi} />
           </BlocEbay>
 
           {/* 2 — TITRE & CATÉGORIE */}
@@ -22972,7 +23093,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
             {check && check.ok && Array.isArray(check.avertissements) && check.avertissements.length > 0 && <div data-publier-avertissements={check.avertissements.length} style={{ fontSize: 13, color: C.warn, lineHeight: 1.5 }}>eBay signale : {check.avertissements.map((a) => `« ${a} »`).join(' · ')}</div>}
             {check && check.err && <div style={{ fontSize: 13, color: C.warn, background: `${C.warn}12`, border: `1px solid ${C.warn}`, borderRadius: 12, padding: '10px 12px', lineHeight: 1.5 }}>⚠️ eBay signale : {check.err}<br /><span style={{ color: C.muted }}>Rien n'a été publié — corrige et revérifie.</span></div>}
 
-            {garde && <div data-publier-garde={garde.k} style={{ fontSize: 13, color: garde.k === 'en-cours' ? C.muted : C.warn, lineHeight: 1.5 }}>{garde.t}</div>}
+            {garde && <div data-publier-garde={garde.k} style={{ fontSize: 13, color: (garde.k === 'en-cours' || garde.k === 'photos-envoi') ? C.muted : C.warn, lineHeight: 1.5 }}>{garde.t}</div>}
             <div className="vrm-rangee" style={{ display: 'flex', gap: 10 }}>
               <button type="button" onClick={verifier} disabled={verif || busy} style={{ flex: 1, border: 'none', background: C.card2, color: C.text, borderRadius: 999, padding: '14px 16px', fontSize: 15, fontWeight: 700, cursor: (verif || busy) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (verif || busy) ? 0.6 : 1 }}>{verif ? 'eBay vérifie…' : 'Vérifier sans publier'}</button>
               <button type="button" data-publier-ebay="1" onClick={() => publier()} disabled={busy || verif || !!garde} style={{ flex: 1, border: 'none', background: C.accent, color:C.onAccent, borderRadius: 999, padding: '14px 16px', fontSize: 15, fontWeight: 700, cursor: (busy || verif || garde) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (busy || verif || garde) ? 0.45 : 1 }}>{busy ? 'Publication…' : 'Publier sur eBay'}</button>
@@ -25495,86 +25616,17 @@ function EbayReglesToutes({ items = [], etatDe, prixDe, regleBloquee, achats, no
     </div>
   );
 }
-// ════════════════════════════════════════════════════════════════════════════
-//  L'AGENT eBAY QUI DEMANDE (29 octobre)
-//  Julien : « je veux un agent autonome, c'est-à-dire que je veux juste qu'il
-//  demande s'il doit poster les articles, que tu puisses lui dire ce que tu
-//  veux qu'il publie ».
-//  ⇒ L'agent PRÉPARE (titre, catégorie, critères, photos, description, prix,
-//    frais lus chez eBay par la vérification à blanc) et PROPOSE ; Julien dit
-//    oui (ou non, ou « seulement celles-ci ») ; alors seulement il publie, une
-//    par une, par la route existante (ses gardes). Rien ne part sans son clic.
-//  La règle de la proposition est `propositionAgent` (src/agentEbay.js, §11) ;
-//  ses entrées sont les MÊMES lectures que l'écran Annonces (`carteDejaSurEbay`,
-//  `numerosDejaVendus`, `jumellesParPhoto`, `prixAchatDe`).
-// ════════════════════════════════════════════════════════════════════════════
-const AGENT_CLE_REGLES = 'vrm_agent_ebay_regles', AGENT_CLE_RESUME = 'vrm_agent_ebay_resume', AGENT_CLE_JOUR = 'vrm_agent_ebay_jour', AGENT_CLE_INCERTAINS = 'vrm_agent_ebay_incertains';
-const jourParisAgent = () => partsParis(Date.now()).date;
-function lireJourAgent() {
-  const j = load(AGENT_CLE_JOUR, null), t = jourParisAgent();
-  return (j && j.date === t) ? { date: t, publiees: Math.max(0, Number(j.publiees) || 0), pause: j.pause === true } : { date: t, publiees: 0, pause: false };
-}
-const ecrireJourAgent = (ch) => { const j = { ...lireJourAgent(), ...ch }; save(AGENT_CLE_JOUR, j); return j; };
-// Le résumé que lisent Ma journée et la notification du matin. Écrit seulement
-// s'il CHANGE (nombre, prêtes, pause) ou s'il a plus de 12 h : chaque écriture
-// part dans la ligne `main` du nuage. `pretes` : seulement quand l'écran a
-// PRÉPARÉ les paires chez eBay (jamais « prêtes » sans préparation).
-function publierResumeAgent(prop, pretes) {
-  const jour = lireJourAgent();
-  const r = resumeAgent(prop, Date.now(), jour.pause ? jour.date : null, pretes);
-  if (!r) return null;
-  const avant = load(AGENT_CLE_RESUME, null);
-  if (avant && avant.n === r.n && (avant.pretes ?? null) === (r.pretes ?? null) && (avant.pause || null) === (r.pause || null) && Date.now() - (Number(avant.at) || 0) < 12 * 3600000) return avant;
-  save(AGENT_CLE_RESUME, r);
-  return r;
-}
-// Les publications au résultat INCERTAIN (eBay n'a pas répondu clairement) :
-// N° → { at, uuid }. Synchronisées (un autre appareil ne la repropose pas).
-// ⚠️ (revue du 29 oct.) « eBay a été relu » ne suffit pas : eBay peut mettre du
-// temps à montrer une annonce créée. Une incertaine ne revient qu'après une
-// relecture d'eBay faite au moins 15 min APRÈS elle — et elle repart avec le
-// MÊME identifiant d'envoi (`uuid`) : si le premier envoi avait créé l'annonce,
-// eBay refuse le second (488) au lieu d'en créer une seconde.
-const AGENT_INCERTAIN_DELAI_MS = 15 * 60000;
-const lireIncertainsAgent = () => {
-  const v = load(AGENT_CLE_INCERTAINS, {}), o = {};
-  if (!v || typeof v !== 'object' || Array.isArray(v)) return o;
-  for (const [k, x] of Object.entries(v)) {
-    if (typeof x === 'number' && x > 0) o[k] = { at: x, uuid: null };
-    else if (x && typeof x === 'object' && Number(x.at) > 0) o[k] = { at: Number(x.at), uuid: /^[0-9A-F]{32}$/.test(String(x.uuid || '')) ? String(x.uuid) : null };
-  }
-  return o;
-};
-const incertainsAttendusAgent = (v, luesA) => new Set(Object.entries(v || {}).filter(([, x]) => !(Number(luesA) > Number(x.at) + AGENT_INCERTAIN_DELAI_MS)).map(([k]) => k));
-// Une réponse de publication : 'publiee' · 'deja' · 'incertaine' · 'refus' (+ arret).
-// INCERTAINE seulement quand on ne SAIT pas : pas de réponse, pas de corps,
-// 504, `reason: 'incertain'`, ou un 5xx dont la raison ne dit pas que rien
-// n'est parti. Un refus du serveur qui DIT « rien n'a été envoyé » (journal,
-// pas su, numérotation, jeton…) est un refus : son texte est montré tel quel.
-const RIEN_PARTI_EBAY = /^(journal|pas-su|numerotation-pas-su|numerotation-perimee|jeton|reconnecter|pas-relie|abonnement|confirmation|numero|prix|port|offre)$/;
-function issuePublicationAgent(code, j) {
-  if (j && j.ok) return { etat: 'publiee' };
-  if (code === 409 && j && /^deja-/.test(String(j.reason || ''))) return { etat: 'deja' };
-  if (code === 0 || !j || typeof j !== 'object' || code === 504 || j.reason === 'incertain' || (code >= 500 && !RIEN_PARTI_EBAY.test(String(j.reason || '')))) return { etat: 'incertaine' };
-  return { etat: 'refus', arret: code >= 500 };
-}
-// Les N° qui ont déjà un brouillon eBay (pas encore programmé ni publié) — le
-// même N° qu'un brouillon, ou la paire du brouillon. undefined · null · Set.
-function numerosEnBrouillon(brouillons, paires) {
-  if (brouillons === undefined) return undefined;
-  if (!brouillons || typeof brouillons !== 'object') return null;
-  const parId = new Map((Array.isArray(paires) ? paires : []).map((p) => [String(p.id), p.num]));
-  const out = new Set();
-  for (const d of Object.values(brouillons)) {
-    if (!d || (d.etatBrouillon && d.etatBrouillon !== 'brouillon')) continue;
-    const n = d.numero != null && d.numero !== '' ? d.numero : (d.pairId != null ? parId.get(String(d.pairId)) : null);
-    const k = n != null ? cleNum(n) : '';
-    if (k) out.add(k);
-  }
-  return out;
-}
+// ═══════════════════════════════════════════════════════════════════════════
+//  (5 nov.) L'AGENT eBAY EST ARRÊTÉ — Julien : « le bot eBay, arrête-le, c'est
+//  nul » (docs/passation/demandes-2026-11-05.md, confirmé dans le vocal). Plus
+//  rien ne PROPOSE ni ne PRÉPARE de paires pour eBay : la section « Agent eBay »
+//  d'eBay → À traiter, son calcul en fond (`AgentEbayFond`), sa ligne de Ma
+//  journée et la notification du matin sont retirés. Les données déjà écrites
+//  (`vrm_agent_ebay_*`) restent en base, plus lues. ⚠️ Ne pas le remettre sans
+//  qu'il le demande. Publier sur eBay passe par eBay → Annonces, sur SON clic.
+// ═══════════════════════════════════════════════════════════════════════════
 // La demande d'ouvrir un brouillon dans le formulaire d'eBay → Annonces
-// (« Compléter » de l'agent) : lue au montage de l'écran Annonces.
+// (ancien « Compléter » de l'agent eBay, arrêté le 5 nov.) : lue au montage de l'écran Annonces.
 const DEMANDE_EBAY_BROUILLON = { id: null, at: 0 };
 // (3 nov.) « Articles qui dorment » → « Mettre sur eBay » / « Mettre sur Leboncoin » :
 // l'article demandé (son identifiant Vinted), consommé UNE fois par l'écran qui s'ouvre.
@@ -25583,519 +25635,6 @@ const DEMANDE_LBC_FICHE = { id: null, at: 0 };
 // (5 nov.) Venu de « Publier ailleurs » → Vestiaire : la ligne de CET article
 // (par son identifiant Vinted) est ramenée à l'écran et mise en évidence.
 const DEMANDE_VC_PAIRE = { id: null, at: 0 };
-// `fond` : l'agent en FOND (pas l'écran) — ses lectures acceptent une réponse
-// partagée de quelques secondes (`vrmFond`, src/lecturesPartagees.js).
-function useEtatPublicationEbay(comptes, comptesEbay, fond = false) {
-  const { paires, enLigne: enLigne0, pret, doubles, chezMoi } = useEbayPaires(Array.isArray(comptes) ? comptes : null);
-  const [tick, setTick] = React.useState(0);
-  const [items, setItems] = React.useState(undefined);
-  const [luesA, setLuesA] = React.useState(undefined);
-  const [prog, setProg] = React.useState(undefined);
-  const [brouillons, setBrouillons] = React.useState(undefined);
-  const [commandes, setCommandes] = React.useState(undefined);
-  const [vendus, setVendus] = React.useState(undefined);
-  const [ventesLbc, setVentesLbc] = React.useState(undefined);
-  const [lbcItems, setLbcItems] = React.useState(undefined);
-  const [nuage, setNuage] = React.useState(0);
-  React.useEffect(() => onCloudReady(() => setNuage((n) => n + 1)), []);
-  React.useEffect(() => {
-    if (comptesEbay === undefined) return;
-    let stop = false;
-    (async () => {
-      if (comptesEbay === null) { setItems(null); setCommandes(null); setProg(null); setLuesA(null); setBrouillons(await lireBrouillonsEbay()); return; }
-      const [L, O, P, B] = await Promise.all([
-        lireEbayTous('ebay_listings', SEL_EBAY_ANNONCES, 'items', comptesEbay, fond),
-        lireEbayTous('ebay_orders', SEL_EBAY_COMMANDES, 'orders', comptesEbay, fond),
-        lireEbayParCompte('ebay_programmees', SEL_EBAY_PROGRAMMEES, comptesEbay, fond),
-        lireBrouillonsEbay(),
-      ]);
-      if (stop) return;
-      // Un SEUL compte eBay illisible ⇒ « pas su » : une paire en vente sur lui
-      // pourrait repartir en seconde annonce (§5).
-      setItems(!L || L.illisibles.length ? null : L.items);
-      const caps = L && !L.illisibles.length ? L.lignes.map((x) => (x.ligne ? Number(x.ligne.capturedAt) : 0)) : null;
-      setLuesA(caps && caps.length ? Math.min(...caps.map((n) => (Number.isFinite(n) ? n : 0))) : (caps ? 0 : null));
-      setCommandes(!O || O.illisibles.length ? null : O.items);
-      setProg(!P || P.lignes.some((x) => x.ligne === undefined) ? null
-        : { items: P.lignes.flatMap((x) => marquerEbay(x.ligne && x.ligne.items, x.compte)), enLigne: P.lignes.flatMap((x) => marquerEbay(x.ligne && x.ligne.enLigne, x.compte)) });
-      setBrouillons(B);
-    })();
-    return () => { stop = true; };
-  }, [comptesEbay, tick]);
-  const comptesPreuve = React.useMemo(() => {
-    const masques = new Set((load('vinted_accounts_hidden', []) || []).map(String));
-    return Array.isArray(comptes) ? comptes.map((a) => String((a && a.vinted_user_id) || '')).filter((u) => /^\d+$/.test(u) && !masques.has(u)) : null;
-  }, [comptes, nuage]);
-  React.useEffect(() => {
-    if (!comptesPreuve) return;
-    let stop = false;
-    lirePreuvesVenteVinted({ comptes: comptesPreuve }).then((p) => { if (!stop) setVendus(p ? p.vendus : null); });
-    (async () => {
-      try {
-        // (31 oct.) `select=data` comme la cloche et la réception Leboncoin :
-        // une adresse, une lecture partagée (la ligne ne porte que `ventes` et
-        // sa date).
-        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`, fond ? { headers: sbAuth(), vrmFond: true } : { headers: sbAuth() });
-        const rows = r.ok ? await r.json() : null;
-        if (stop) return;
-        if (!Array.isArray(rows)) { setVentesLbc(null); return; }
-        const v = rows[0] && rows[0].data && rows[0].data.ventes;
-        setVentesLbc(v && typeof v === 'object' && !Array.isArray(v) ? v : {});
-      } catch (_) { if (!stop) setVentesLbc(null); }
-    })();
-    return () => { stop = true; };
-  }, [comptesPreuve && comptesPreuve.join(','), tick]);
-  const fiches = React.useMemo(() => load('vinted_annonce_numeros', {}) || {}, [nuage, tick, pret]);
-  // (1er nov., audit A1) Vendue sur Vestiaire (par identité) = déjà vendue aussi.
-  const ventesVcDv = useVentesVestiaire();
-  const ventes = React.useMemo(() => numerosDejaVendus({
-    numeros: fiches,
-    autres: Object.values(brouillons && typeof brouillons === 'object' ? brouillons : {}).map((d) => d && { numero: d.numero, id: d.pairId }),
-    enLigne: Array.isArray(comptes) && pret ? enLigne0 : undefined,
-    vendusVinted: vendus, commandes, ventesLbc, itemsLbc: lbcItems,
-    liensLbc: load('vrm_lbc_liens', {}) || {}, ventesVc: ventesVcDv,
-  }), [fiches, brouillons, comptes, pret, enLigne0, vendus, commandes, ventesLbc, lbcItems, ventesVcDv]);
-  React.useEffect(() => {
-    if (!(ventes.lbcSansPaire > 0) || lbcItems !== undefined) return;
-    let stop = false;
-    lbcAnnoncesSession().then((it) => { if (!stop) setLbcItems(it && typeof it === 'object' ? it : null); });
-    return () => { stop = true; };
-  }, [ventes.lbcSansPaire, lbcItems]);
-  const dejaSurEbay = React.useMemo(() => {
-    if (items === undefined || prog === undefined || brouillons === undefined) return undefined;
-    if (items === null || prog === null) return null;
-    return carteDejaSurEbay({ pris: prisEbay(items), programmees: prog, listeProgrammees: programmeesConnues(prog, brouillons, false), paires });
-  }, [items, prog, brouillons, paires]);
-  const jumelles = React.useMemo(() => jumellesParPhoto(paires, (k) => !!(dejaSurEbay && dejaSurEbay.has(k))), [paires, dejaSurEbay]);
-  return {
-    paires: Array.isArray(comptes) && pret ? paires : undefined,
-    enLigne: Array.isArray(comptes) && pret ? enLigne0 : undefined,
-    ventes, dejaSurEbay, jumelles, fiches, luesA, brouillons, doubles, chezMoi,
-    relire: () => setTick((t) => t + 1),
-  };
-}
-// La préparation d'UNE annonce : la même chaîne que « Publier en un clic »
-// (pubinfo → critères PROUVÉS → état → vérification à blanc). Gardée 30 min
-// (une paire, un compte, un prix) : rouvrir l'écran ne repaie aucun appel. Les
-// frais de la confirmation ne datent jamais de plus d'une demi-heure : `publierLot`
-// REFAIT, juste avant de demander, toute préparation plus vieille (écran resté ouvert).
-const _prepAgentEbay = new Map();
-const AGENT_PREP_MAX_MS = 30 * 60000;
-async function preparerAnnonceAgent(prop, compte) {
-  const p = prop.paire;
-  const photos = ((Array.isArray(p.photos) && p.photos.length) ? p.photos : [p.cover]).filter(Boolean);
-  const cle = [compte, prop.cle, prop.prix, photos.length].join('|');
-  { const g = _prepAgentEbay.get(cle); if (g && Date.now() - (g.at || 0) < AGENT_PREP_MAX_MS) return g; }
-  const titre = ebayTitre(p.title || '', p.taille || '');
-  const corps = corpsCompteEbay(compte);
-  const r1 = await appelEbay({ action: 'pubinfo', title: titre, ...corps });
-  const cat = catDepuisPubinfoEbay(r1.j);
-  if (!cat || !cat.categoryId) return { etat: 'refusee', erreur: (r1.j && r1.j.error) || (r1.code === 0 ? 'eBay n’a pas répondu — rouvre l’écran pour réessayer.' : 'eBay n’a pas suggéré de catégorie pour ce titre.') };
-  let genre = '';
-  try { if (p.catalogId != null && p.catalogId !== '') genre = familleArticle({ chemin: await cheminVintedApp(p.catalogId) }).genre || ''; } catch (_) { genre = ''; }
-  const marqueV = p.marque || '';
-  const aspects = autoRemplirAttributs(cat.attributs, { titre: p.title || titre, marque: marqueV || extractBrand(p.title || '') || '', taille: p.taille || extractSize(p.title || '') || '',
-    faits: { marque: marqueV, taille: p.tailleVinted || '', genre, couleur: p.couleur || '', type: familleArticle({ titre: p.title || '', taille: p.taille || '', marque: marqueV }).sous } });
-  let cond = etatEbayDeVinted(p.etat, cat.conditions) || '3000';
-  if (cat.conditions && !cat.conditions.some((c) => c.id === cond)) { const occ = cat.conditions.find((c) => c.id === '3000'); cond = (occ || cat.conditions[0]).id; }
-  const manquants = (cat.required || []).filter((n) => !String(aspects[n] || '').trim());
-  // Le brouillon préparé — gardé AUSSI quand il reste un critère à compléter :
-  // c'est lui que « Compléter » ouvre dans le formulaire de publication.
-  const brouillon = { pairId: p.id, numero: p.num, titre, prix: String(prop.prix), quantite: '1', etat: cond, description: p.desc || descriptionDeFaits(p), photos,
-    categorie: { id: cat.categoryId, nom: cat.categoryName, requis: cat.required || [] }, aspects, cover: p.cover || photos[0] || null };
-  if (manquants.length) { const r = { etat: 'a-completer', manquants, categorie: cat.categoryName, titre, brouillon, at: Date.now() }; _prepAgentEbay.set(cle, r); return r; }
-  const b = itemDeBrouillon(brouillon);
-  if (b.err) { const r = { etat: 'a-completer', erreur: b.err, titre, brouillon, at: Date.now() }; _prepAgentEbay.set(cle, r); return r; }
-  const r2 = await appelEbay({ action: 'pubverify', item: b.item, ...corps });
-  if (!(r2.j && r2.j.ok)) return { etat: 'refusee', erreur: (r2.j && r2.j.error) || (r2.code === 0 ? 'eBay n’a pas répondu — rouvre l’écran pour réessayer.' : 'eBay refuserait cette annonce.') };
-  const frais = r2.j.frais && typeof r2.j.frais.total === 'number' ? r2.j.frais.total : (typeof r2.j.fees === 'number' ? r2.j.fees : null);
-  const r = { etat: 'prete', at: Date.now(), item: b.item, brouillon, frais, categorie: cat.categoryName, titre, avertissements: Array.isArray(r2.j.avertissements) ? r2.j.avertissements.filter(Boolean).map(String) : [] };
-  _prepAgentEbay.set(cle, r);
-  return r;
-}
-// Les réglages de l'agent : synchronisés (tous ses appareils), lus au montage
-// et RATTRAPÉS à l'arrivée du nuage (§5.49). `undefined` tant que le nuage
-// n'est pas arrivé : on ne propose rien sur des réglages qu'on n'a pas lus.
-function useReglesAgentEbay() {
-  const [regles, setRegles] = React.useState(() => (isCloudReady() ? normaliserReglesAgent(load(AGENT_CLE_REGLES, null)) : undefined));
-  React.useEffect(() => onCloudReady(() => setRegles(normaliserReglesAgent(load(AGENT_CLE_REGLES, null)))), []);
-  const garder = (r) => { const n = normaliserReglesAgent(r); save(AGENT_CLE_REGLES, n); setRegles(n); return n; };
-  return [regles, garder];
-}
-const eurAgent = (n) => (n == null ? '—' : eurEbay(n));
-function AgentEbay({ comptes, comptesEbay, onAnnonces }) {
-  const E = EBAY_SKIN;
-  const [regles, garderRegles] = useReglesAgentEbay();
-  const etat = useEtatPublicationEbay(comptes, comptesEbay);
-  const [jour, setJour] = React.useState(() => lireJourAgent());
-  const [incertainsV, setIncertainsV] = React.useState(() => lireIncertainsAgent());
-  React.useEffect(() => onCloudReady(() => setIncertainsV(lireIncertainsAgent())), []);
-  const [comptesStatut, setComptesStatut] = React.useState(undefined);   // la route : comptes reliés
-  React.useEffect(() => { let stop = false;
-    appelEbay({ action: 'status' }).then(({ j }) => { if (!stop) setComptesStatut(j && j.ok ? (Array.isArray(j.comptes) ? j.comptes : [{ cle: '', pseudo: '', principal: true, relie: !!j.connected }]) : null); });
-    return () => { stop = true; }; }, [comptesEbay]);
-  const relies = React.useMemo(() => (Array.isArray(comptesStatut) ? comptesStatut : []).filter((c) => c.relie === true).map((c) => ({ ...c, ref: c.principal ? 'principal' : c.cle, pseudo: c.pseudo || ((Array.isArray(comptesEbay) ? comptesEbay : []).find((x) => x.ref === (c.principal ? 'principal' : c.cle)) || {}).pseudo || '' })), [comptesStatut, comptesEbay]);
-  const compte = React.useMemo(() => {
-    if (!relies.length) return null;
-    const voulu = regles && regles.compteEbay;
-    if (voulu && relies.some((c) => c.ref === voulu)) return voulu;
-    const memo = load('vrm_ebay_compte_pub', '');
-    return relies.some((c) => c.ref === memo) ? memo : relies[0].ref;
-  }, [relies, regles]);
-  const nomCompte = nomCompteEbay(relies.find((c) => c.ref === compte) || { principal: true });
-  const deviseCompte = compte ? marcheEbayDeRef(compte).devise : 'EUR';
-  // Une incertaine ne revient qu'après une relecture d'eBay faite au moins
-  // 15 min après elle (lecture la plus ancienne de tous les comptes).
-  const incertains = React.useMemo(() => incertainsAttendusAgent(incertainsV, etat.luesA), [incertainsV, etat.luesA]);
-  // Les paires qu'il vient de publier : « déjà sur eBay » tout de suite, sans
-  // attendre que la relecture de ses annonces les montre (sinon elles seraient
-  // reproposées le temps d'un aller-retour).
-  const [publieesV, setPublieesV] = React.useState({});
-  const dejaSurEbayEff = React.useMemo(() => {
-    const d = etat.dejaSurEbay;
-    if (!(d instanceof Map)) return d;
-    const fraiches = Object.entries(publieesV).filter(([, at]) => !(Number(etat.luesA) > Number(at)));
-    if (!fraiches.length) return d;
-    const m = new Map(d); for (const [k] of fraiches) if (!m.get(k)) m.set(k, { etat: 'publiee' });
-    return m;
-  }, [etat.dejaSurEbay, publieesV, etat.luesA]);
-  const buyByNum = React.useMemo(() => load('vinted_buyprice_by_num', {}) || {}, [etat.fiches]);
-  // Les N° déjà en brouillon eBay (relus), plus ceux que l'agent vient d'y
-  // mettre (« Programmer plutôt », « Compléter ») sans attendre la relecture.
-  const [misEnBrouillon, setMisEnBrouillon] = React.useState(() => new Set());
-  const enBrouillon = React.useMemo(() => {
-    const b = numerosEnBrouillon(etat.brouillons, etat.paires);
-    return b instanceof Set ? new Set([...b, ...misEnBrouillon]) : b;
-  }, [etat.brouillons, etat.paires, misEnBrouillon]);
-  const prop = React.useMemo(() => {
-    if (comptesStatut === undefined) return { etat: 'en-cours' };
-    if (comptesStatut === null) return { etat: 'pas-su', pasSu: ['tes comptes eBay'] };
-    if (!relies.length) return { etat: 'sans-ebay' };
-    if (deviseCompte !== 'EUR') return { etat: 'devise' };
-    return propositionAgent({ regles, paires: etat.paires, enLigne: etat.enLigne, chezMoi: etat.chezMoi, ventes: etat.ventes, dejaSurEbay: dejaSurEbayEff, jumelles: etat.jumelles,
-      achatDe: (p) => prixAchatDe(etat.fiches[p.id], buyByNum), cochee: (p) => mpChoisi(etat.fiches[p.id], 'ebay') === true,
-      incertains, brouillons: enBrouillon, doubles: etat.doubles, publieesAujourdhui: jour.publiees, cle: cleNum });
-  }, [comptesStatut, relies, deviseCompte, regles, etat.paires, etat.enLigne, etat.ventes, dejaSurEbayEff, etat.jumelles, etat.fiches, buyByNum, incertains, enBrouillon, etat.doubles, etat.chezMoi, jour.publiees]);
-  // ── LA PRÉPARATION : une par une, les proposées seulement, sur le compte choisi ──
-  // (revue du 29 oct.) Un JETON par passe : quand les paires ou le prix
-  // changent, la passe en cours s'arrête à la paire suivante et une nouvelle
-  // repart (avant : un booléen « en cours » faisait sortir l'effet, et rien ne
-  // le relançait — toutes les lignes restaient sur « Je prépare… »). Une courte
-  // pause avant de préparer : un réglage qui change ne paie pas un appel à chaque fois.
-  const [preps, setPreps] = React.useState({});      // kp → { etat:'prepare' } | résultat de preparerAnnonceAgent
-  const [choix, setChoix] = React.useState(() => new Set());   // N° décochés
-  const prepJeton = React.useRef(0);
-  const kp = (x) => `${compte}|${x.cle}|${x.prix}`;   // une préparation vaut pour UN compte et UN prix
-  React.useEffect(() => {
-    if (prop.etat !== 'lu' || !compte) return undefined;
-    const aFaire = prop.proposees.filter((x) => !preps[kp(x)]);
-    if (!aFaire.length) return undefined;
-    const jeton = ++prepJeton.current;
-    const t = setTimeout(async () => {
-      for (const x of aFaire) {
-        if (prepJeton.current !== jeton) return;
-        const k = kp(x);
-        setPreps((m) => (m[k] ? m : { ...m, [k]: { etat: 'prepare' } }));
-        let r; try { r = await preparerAnnonceAgent(x, compte); } catch (_) { r = { etat: 'refusee', erreur: 'Préparation impossible (réseau).' }; }
-        setPreps((m) => ({ ...m, [k]: { ...r, essaye: true } }));
-      }
-    }, 400);
-    return () => clearTimeout(t);
-  }, [prop, compte]);   // eslint-disable-line react-hooks/exhaustive-deps
-  const [busy, setBusy] = React.useState(false);
-  const [resultats, setResultats] = React.useState({});   // cle → { etat, texte, url }
-  const [bilan, setBilan] = React.useState(null);         // { texte, publiees: [{ num, prix, url }] }
-  const nProp = prop.etat === 'lu' ? prop.proposees.length : 0;
-  const prepFinie = prop.etat === 'lu' && prop.proposees.every((x) => preps[kp(x)] && preps[kp(x)].etat !== 'prepare');
-  const pretes = prop.etat === 'lu' ? prop.proposees.filter((x) => preps[kp(x)] && preps[kp(x)].etat === 'prete' && !resultats[x.cle]) : [];
-  const nPretes = prepFinie ? pretes.length : null;
-  // Le résumé (Ma journée, notification du matin) : publié quand la préparation
-  // est FINIE — il dit alors combien sont vraiment prêtes à partir.
-  React.useEffect(() => { if (prop.etat === 'lu' && (!nProp || prepFinie)) publierResumeAgent(prop, nProp ? nPretes : 0); }, [prop, prepFinie, nPretes]);   // eslint-disable-line react-hooks/exhaustive-deps
-  // (dernier tour du 29 oct.) Arrêté, sans compte eBay relié, ou sur un compte eBay
-  // qui ne vend pas en euros : le résumé devient NEUTRE (n : 0) — Ma journée et
-  // la notification du matin se taisent au lieu de redemander pendant 48 h.
-  React.useEffect(() => { if (ETATS_AGENT_MUET.includes(prop.etat)) publierResumeAgent(prop); }, [prop.etat]);   // eslint-disable-line react-hooks/exhaustive-deps
-  const choisies = pretes.filter((x) => !choix.has(x.cle));
-  const pause = jour.pause === true;
-  const pasMaintenant = () => { const j = ecrireJourAgent({ pause: true }); setJour(j); if (prop.etat === 'lu') publierResumeAgent(prop, nPretes); };
-  const reprendre = () => { const j = ecrireJourAgent({ pause: false }); setJour(j); if (prop.etat === 'lu') publierResumeAgent(prop, nPretes); };
-  const jamaisCelleCi = (x) => { garderRegles({ ...regles, jamais: [...(regles.jamais || []), x.cle] }); toast(`N°${x.num} ne sera plus jamais proposée pour eBay — tu peux l'enlever dans « Ce que je publie ».`, 'ok'); };
-  const [relitFrais, setRelitFrais] = React.useState(false);
-  const publierLot = async () => {
-    if (!choisies.length || busy) return;
-    // ⚠️ (dernier tour du 29 oct.) Les frais montrés dans la confirmation datent de
-    // MOINS de 30 min, toujours : une préparation plus vieille (écran resté
-    // ouvert) est REFAITE chez eBay ici, avant de demander — avant, seul le cache
-    // du module expirait, et l'écran gardait des frais de plusieurs heures.
-    setBusy(true); setRelitFrais(true);
-    const pm = { ...preps };
-    for (const x of choisies) {
-      const k = kp(x), pr = pm[k];
-      if (pr && pr.etat === 'prete' && Date.now() - (Number(pr.at) || 0) < AGENT_PREP_MAX_MS) continue;
-      let r; try { r = await preparerAnnonceAgent(x, compte); } catch (_) { r = { etat: 'refusee', erreur: 'Préparation impossible (réseau).' }; }
-      pm[k] = { ...r, essaye: true };
-    }
-    setPreps((m) => ({ ...m, ...Object.fromEntries(choisies.map((x) => [kp(x), pm[kp(x)]])) }));
-    setRelitFrais(false); setBusy(false);
-    const lot = choisies.filter((x) => pm[kp(x)] && pm[kp(x)].etat === 'prete');
-    if (!lot.length) { toast('Relues chez eBay, ces articles ne peuvent plus partir tels quels — la raison est sur chaque paire. Rien n\'a été publié.', 'error'); return; }
-    const avecFrais = lot.filter((x) => typeof pm[kp(x)].frais === 'number');
-    const totalLot = avecFrais.reduce((t, x) => t + pm[kp(x)].frais, 0);
-    const lignes = lot.map((x) => `N°${x.num} · ${eurEbay(x.prix)}${typeof pm[kp(x)].frais === 'number' ? ` · frais ${eurEbay(pm[kp(x)].frais)}` : ' · frais non annoncés'}`);
-    const sansFrais = lot.length - avecFrais.length;
-    const changees = choisies.length - lot.length;
-    const ok = await askConfirm({
-      title: `Publier ${lot.length} paire${lot.length > 1 ? 's' : ''} sur eBay ?`,
-      desc: [`Sur ton compte eBay « ${nomCompte} », tout de suite, l'une après l'autre.`, lignes.join('\n'),
-        `Frais d'insertion annoncés par eBay : ${eurEbay(totalLot)}${sansFrais ? ` (eBay n'a pas annoncé ceux de ${sansFrais} paire${sansFrais > 1 ? 's' : ''})` : ''}.`,
-        ...(changees ? [`${changees} paire${changees > 1 ? 's' : ''} relue${changees > 1 ? 's' : ''} chez eBay ne ${changees > 1 ? 'peuvent' : 'peut'} plus partir telle${changees > 1 ? 's' : ''} quelle${changees > 1 ? 's' : ''} : je ne ${changees > 1 ? 'les' : 'la'} publie pas.`] : []),
-        'Livraison gérée par eBay : c\'est l\'acheteur qui paie le port. Juste avant chaque paire, eBay est relu (déjà en vente ou programmée : rien ne part) ; au moindre doute je m\'arrête.'].join('\n\n'),
-      ok: `Oui, publier ${lot.length}`, cancel: 'Annuler' });
-    if (!ok) return;
-    setBusy(true); setBilan(null);
-    const res = {}; let refus = 0, deja = 0, incertaine = null, arret = null;
-    const publieesL = [];
-    const incert = { ...lireIncertainsAgent() };
-    let incertChange = false;
-    for (const x of lot) {
-      const pr = pm[kp(x)];
-      // Le MÊME identifiant d'envoi qu'un essai incertain d'avant : eBay refuse
-      // un second envoi qui aurait déjà créé l'annonce (488).
-      const uuid = (incert[x.cle] && incert[x.cle].uuid) || uuidEnvoiEbay();
-      const { code, j } = await appelEbay({ action: 'publish', item: pr.item, uuid, agent: true, confirme: true, ...corpsCompteEbay(compte) });
-      const iss = issuePublicationAgent(code, j);
-      if (iss.etat === 'publiee') {
-        res[x.cle] = { etat: 'publiee', texte: 'Publiée', url: j.url || '' };
-        publieesL.push({ num: x.num, prix: x.prix, url: j.url || '' });
-        if (incert[x.cle]) { delete incert[x.cle]; incertChange = true; }
-        try { if (j.itemId) noterLienEbay(j.itemId, x.id, pr.item.numero, 'agent'); } catch (_) {}
-      } else if (iss.etat === 'deja') {
-        deja++; res[x.cle] = { etat: 'deja', texte: j.error || 'Déjà sur eBay — rien n\'a été publié.' };
-        if (incert[x.cle]) { delete incert[x.cle]; incertChange = true; }
-      } else if (iss.etat === 'incertaine') {
-        incert[x.cle] = { at: Date.now(), uuid }; incertChange = true; incertaine = x;
-        res[x.cle] = { etat: 'incertaine', texte: (j && j.error) || 'eBay n\'a pas répondu — je ne sais pas si l\'annonce est partie.' };
-        break;   // une coupure : on s'arrête, on relit avant tout nouvel essai
-      } else {
-        refus++; res[x.cle] = { etat: 'refusee', texte: (j && j.error) || 'eBay a refusé la publication.' };
-        if (iss.arret) { arret = x; break; }   // le serveur ne peut pas publier pour l'instant : rien d'autre ne part
-      }
-      setResultats((m) => ({ ...m, [x.cle]: res[x.cle] }));
-    }
-    setResultats((m) => ({ ...m, ...res }));
-    if (incertChange) { save(AGENT_CLE_INCERTAINS, incert); setIncertainsV(incert); }
-    { const maint = Date.now(), pub = Object.keys(res).filter((k) => res[k].etat === 'publiee' || res[k].etat === 'deja');
-      if (pub.length) setPublieesV((m) => ({ ...m, ...Object.fromEntries(pub.map((k) => [k, maint])) })); }
-    const j2 = ecrireJourAgent({ publiees: lireJourAgent().publiees + publieesL.length }); setJour(j2);
-    for (const k of Object.keys(res)) for (const c of [..._prepAgentEbay.keys()]) if (c.split('|')[1] === k) _prepAgentEbay.delete(c);
-    const parts = [`${publieesL.length} publiée${publieesL.length > 1 ? 's' : ''}`];
-    if (deja) parts.push(`${deja} déjà sur eBay (rien publié)`);
-    if (refus) parts.push(`${refus} non publiée${refus > 1 ? 's' : ''}`);
-    if (arret) parts.push(`je me suis arrêté à la N°${arret.num} : ${res[arret.cle].texte}`);
-    if (incertaine) parts.push(`N°${incertaine.num} incertaine — je ne sais pas si elle est partie : je ne la reproposerai qu'après avoir relu tes annonces eBay (au moins 15 min), avec le même envoi (eBay refusera de la créer deux fois), et je me suis arrêté là`);
-    setBilan({ texte: parts.join(' · ') + '.', publiees: publieesL });
-    setBusy(false);
-    // Relire chez eBay ce compte (annonces en ligne + programmées) : la carte
-    // « déjà sur eBay » et les incertaines se jugent sur cette relecture.
-    await appelEbay({ action: 'relire', ...corpsCompteEbay(compte) });
-    etat.relire();
-  };
-  // Mettre des paires en BROUILLON (« Programmer plutôt », « Compléter ») : jamais
-  // deux brouillons pour un N° — un brouillon existant est gardé (et rouvert).
-  const [brouillonsMsg, setBrouillonsMsg] = React.useState('');
-  const versBrouillons = async (liste) => {
-    const ids = {};
-    const w = await modifierBrouillonsEbay((items0) => {
-      let change = false;
-      for (const x of liste) {
-        const exist = Object.entries(items0).find(([, d]) => d && (!d.etatBrouillon || d.etatBrouillon === 'brouillon') && ((d.numero != null && cleNum(d.numero) === x.cle) || (d.pairId != null && String(d.pairId) === String(x.id))));
-        if (exist) { ids[x.cle] = exist[0]; continue; }
-        const pr = preps[kp(x)];
-        if (!pr || !pr.brouillon) continue;
-        const id = idBrouillonEbay();
-        items0[id] = { ...pr.brouillon, id, ...(relies.length >= 2 ? { compte } : {}), etatBrouillon: 'brouillon', creeLe: Date.now(), par: 'agent' };
-        ids[x.cle] = id; change = true;
-      }
-      return change ? items0 : false;
-    });
-    if (w.ok) { setMisEnBrouillon((m) => new Set([...m, ...Object.keys(ids)])); etat.relire(); }
-    return { ok: w.ok, ids };
-  };
-  const programmerALaPlace = async () => {
-    if (!choisies.length || busy) return;
-    setBusy(true);
-    const liste = [...choisies];
-    const w = await versBrouillons(liste);
-    setBusy(false);
-    const n = Object.keys(w.ids).length;
-    setBrouillonsMsg(w.ok ? `${n} brouillon${n > 1 ? 's' : ''} prêt${n > 1 ? 's' : ''} : choisis l'heure dans eBay → Annonces → Brouillons → « Programmer la sélection ». Rien n'est encore programmé.` : 'Je n\'ai pas pu enregistrer les brouillons (la base n\'a pas répondu) — rien n\'a changé, réessaie.');
-  };
-  // « Compléter » : la paire préparée part en brouillon (un seul par N°) et
-  // s'ouvre dans le formulaire de publication d'eBay → Annonces, pré-rempli ;
-  // il choisit le critère qui manque, puis vérifie et publie de là.
-  const completer = async (x) => {
-    if (busy) return;
-    setBusy(true);
-    const w = await versBrouillons([x]);
-    setBusy(false);
-    const id = w.ids[x.cle];
-    if (!w.ok || !id) { toast('Je n\'ai pas pu préparer le brouillon (la base n\'a pas répondu) — rien n\'a changé, réessaie.', 'error'); return; }
-    DEMANDE_EBAY_BROUILLON.id = id; DEMANDE_EBAY_BROUILLON.at = Date.now();
-    if (onAnnonces) onAnnonces();
-  };
-  // ── LES RÉGLAGES : « ce que je publie » ──
-  // (revue du 29 oct.) Les nombres se tapent en TEXTE et ne s'enregistrent qu'à
-  // la sortie du champ (ou Entrée), sur une valeur valide : un champ vidé ne
-  // redevient plus « 5 » pendant la frappe (« 3 » donnait « 53 », borné à 20),
-  // et chaque frappe n'écrit plus la ligne `main` du nuage.
-  const [parJourTxt, setParJourTxt] = React.useState(null);
-  const [prixValTxt, setPrixValTxt] = React.useState(null);
-  const garderParJour = () => { const v = String(parJourTxt == null ? '' : parJourTxt).trim(); setParJourTxt(null); if (/^\d{1,2}$/.test(v) && Number(v) >= 1 && Number(v) <= AGENT_MAX_PAR_JOUR && Number(v) !== regles.parJour) garderRegles({ ...regles, parJour: Number(v) }); };
-  const garderPrixVal = () => { const v = String(prixValTxt == null ? '' : prixValTxt).trim().replace(',', '.'); setPrixValTxt(null); if (/^-?\d{1,3}(?:\.\d{1,2})?$/.test(v) && Number(v) !== regles.prixValeur) garderRegles({ ...regles, prixValeur: Number(v) }); };
-  const surEntree = (e) => { if (e.key === 'Enter') e.currentTarget.blur(); };
-  const [phrase, setPhrase] = React.useState('');
-  const [compris, setCompris] = React.useState(null);
-  const comptesNoms = (Array.isArray(comptes) ? comptes : []).map((a) => ({ uid: String(a.vinted_user_id || ''), login: a.login || a.username || '' })).filter((c) => c.uid && c.login);
-  const marquesVues = React.useMemo(() => [...new Set((etat.paires || []).map((p) => p.marque).filter(Boolean))], [etat.paires]);
-  const s = (o) => ({ border: `1px solid ${E.border}`, background: E.card, color: E.text, borderRadius: 12, minHeight: 44, padding: '0 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', ...o });
-  const carte = { border: `1px solid ${E.border}`, background: E.card, borderRadius: 12, padding: '14px 16px', marginBottom: 14 };
-  // La question suit l'état des PRÉPARATIONS (revue du 29 oct.) : « prêtes »
-  // seulement pour des paires préparées chez eBay qui peuvent partir telles quelles.
-  const titreQ = prop.etat !== 'lu' ? 'Articles à publier sur eBay'
-    : !nProp ? 'Aucun article à proposer pour eBay'
-      : !prepFinie ? `${nProp} article${nProp > 1 ? 's' : ''} proposé${nProp > 1 ? 's' : ''} pour eBay — je prépare les annonces…`
-        : phraseResumeAgent(nProp, nPretes);
-  const phraseEcart = prop.etat === 'lu' ? phraseEcartees(prop.ecartees) : '';
-  return <section data-agent-ebay="" data-agent-etat={prop.etat} data-agent-n={prop.etat === 'lu' ? prop.proposees.length : undefined} data-agent-pretes={nPretes == null ? undefined : nPretes} style={{ marginBottom: 18 }}>
-    <h2 data-agent-titre="" style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 700, color: E.muted, letterSpacing: 0.2 }}>Agent eBay</h2>
-    <div style={carte}>
-      <h3 data-agent-question="" style={{ margin: 0, fontSize: 17, color: E.text }}>{titreQ}</h3>
-      {prop.etat === 'en-cours' && <p style={{ fontSize: 13, color: E.muted, margin: '8px 0 0' }}>Je relis tes articles, tes ventes et tes annonces eBay…</p>}
-      {prop.etat === 'pas-su' && <p data-agent-passu="" style={{ fontSize: 13, color: E.text, margin: '8px 0 0', lineHeight: 1.5 }}>Pas lu : {prop.pasSu.join(', ')}</p>}
-      {prop.etat === 'sans-ebay' && <p style={{ fontSize: 13, color: E.muted, margin: '8px 0 0' }}>Relie d'abord ton compte eBay (Paramètres → Comptes eBay) : je te proposerai ensuite les articles à publier.</p>}
-      {prop.etat === 'devise' && <p data-agent-devise="" style={{ fontSize: 13, color: E.text, margin: '8px 0 0', lineHeight: 1.5 }}>Ton compte eBay « {nomCompte} » vend en {deviseCompte} : je ne convertis pas les prix de Vinted. Choisis un compte eBay en euros dans « Ce que je publie ».</p>}
-      {prop.etat === 'eteint' && <p style={{ fontSize: 13, color: E.muted, margin: '8px 0 0' }}>L'agent est arrêté : il ne propose rien. <button type="button" onClick={() => garderRegles({ ...regles, actif: true })} style={s({ marginLeft: 6 })}>Le relancer</button></p>}
-      {prop.etat === 'lu' && <>
-        <p style={{ fontSize: 13, color: E.muted, margin: '6px 0 0', lineHeight: 1.5 }}>Sur ton compte eBay « {nomCompte} ». Rien ne part sans ton oui. {jour.publiees > 0 ? `Déjà ${jour.publiees} publiée${jour.publiees > 1 ? 's' : ''} aujourd'hui.` : ''}</p>
-        {pause && <p data-agent-pause="" style={{ fontSize: 13, color: E.text, margin: '8px 0 0' }}>Mis de côté jusqu'à demain. <button type="button" onClick={reprendre} style={s({ marginLeft: 6 })}>Reprendre</button></p>}
-        {!pause && prop.proposees.length > 0 && <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
-          {prop.proposees.map((x) => { const pr = preps[kp(x)]; const rs = resultats[x.cle]; const coche = pr && pr.etat === 'prete' && !rs && !choix.has(x.cle);
-            return <div key={x.cle} data-agent-paire={x.num} data-agent-prep={pr ? pr.etat : 'attente'} data-agent-resultat={rs ? rs.etat : undefined} style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', border: `1px solid ${E.border}`, borderRadius: 12, padding: 8, minWidth: 0 }}>
-              <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 44, minHeight: 44, cursor: pr && pr.etat === 'prete' && !rs ? 'pointer' : 'default' }}>
-                <input type="checkbox" aria-label={`Publier la N°${x.num}`} disabled={!(pr && pr.etat === 'prete') || !!rs || busy} checked={!!coche} onChange={() => setChoix((c) => { const n = new Set(c); if (n.has(x.cle)) n.delete(x.cle); else n.add(x.cle); return n; })} style={{ width: 20, height: 20 }}/>
-              </label>
-              {(x.paire.cover || (x.paire.photos || [])[0]) ? <PhotoVinted src={x.paire.cover || x.paire.photos[0]} alt="" loading="lazy" style={{ width: 48, height: 60, objectFit: 'cover', borderRadius: 12, flexShrink: 0, background: E.surface }}/> : <span style={{ width: 48, height: 60, borderRadius: 12, background: E.surface, flexShrink: 0 }}/>}
-              {/* (2 nov., capture de Julien) Au téléphone, les boutons « Compléter » et « Jamais »
-                  écrasaient le texte en une colonne d'une lettre : le texte garde au moins 180 px
-                  et les boutons passent à la ligne (flexWrap sur la rangée). */}
-              <span style={{ flex: '1 1 180px', minWidth: 0, fontSize: 13, lineHeight: 1.4, color: E.text }}>
-                <b style={{ display: 'block' }}>N°{x.num} · {eurEbay(x.prix)}{x.prix !== x.prixVinted ? <span style={{ color: E.muted, fontWeight: 400 }}> (Vinted {eurEbay(x.prixVinted)})</span> : null}</b>
-                <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: E.muted }}>{(pr && pr.titre) || x.paire.title}</span>
-                <span data-agent-frais={pr && pr.etat === 'prete' ? (pr.frais == null ? '' : String(pr.frais)) : undefined} style={{ display: 'block', color: rs && rs.etat !== 'publiee' ? E.warn : E.muted }}>
-                  {rs ? (rs.etat === 'publiee' ? <>Publiée{rs.url ? <> · <a href={rs.url} target="_blank" rel="noopener noreferrer" style={{ color: E.text }}>voir sur eBay ↗</a></> : null}</> : rs.texte)
-                    : !pr || pr.etat === 'prepare' ? 'Je prépare l\'annonce (catégorie, critères, frais)…'
-                      : pr.etat === 'prete' ? `${pr.categorie || 'Catégorie eBay'} · frais ${pr.frais == null ? 'non annoncés par eBay' : eurEbay(pr.frais)}`
-                        : pr.etat === 'a-completer' ? (pr.manquants ? `À compléter : ${pr.manquants.join(', ')}. Vinted ne le donne pas : touche « Compléter ».` : pr.erreur)
-                          : `eBay : ${pr.erreur}`}
-                </span>
-              </span>
-              <span style={{ display: 'flex', gap: 8, marginLeft: 'auto', flexShrink: 0 }}>
-              {!rs && pr && pr.etat === 'a-completer' && pr.brouillon && <button type="button" data-agent-completer={x.num} disabled={busy} onClick={() => completer(x)} style={s({ fontSize: 12, flexShrink: 0 })}>Compléter</button>}
-              {!rs && <button type="button" data-agent-jamais={x.num} disabled={busy} onClick={() => jamaisCelleCi(x)} style={s({ fontSize: 12, fontWeight: 500, color: E.muted, flexShrink: 0 })}>Jamais</button>}
-              </span>
-            </div>; })}
-        </div>}
-        {!pause && pretes.length > 0 && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
-          <button type="button" data-agent-publier="" disabled={busy || !choisies.length} onClick={publierLot} style={s({ background: E.accent, color: E.onAccent, border: 'none', opacity: busy || !choisies.length ? 0.55 : 1 })}>{relitFrais ? 'Je relis les frais chez eBay…' : busy ? 'En cours…' : choisies.length ? `Publier ${choisies.length > 1 ? `ces ${choisies.length}` : 'celle-ci'}` : 'Coche au moins un article'}</button>
-          <button type="button" data-agent-plustard="" disabled={busy} onClick={pasMaintenant} style={s()}>Pas maintenant</button>
-          <button type="button" data-agent-programmer="" disabled={busy || !choisies.length} onClick={programmerALaPlace} style={s({ fontWeight: 500 })}>Programmer plutôt</button>
-        </div>}
-        {!pause && prop.proposees.length > 0 && !pretes.length && !Object.keys(resultats).length && prop.proposees.every((x) => preps[kp(x)] && preps[kp(x)].etat !== 'prepare') && <p style={{ fontSize: 13, color: E.muted, margin: '10px 0 0' }}>Aucune annonce n'est prête à partir telle quelle : regarde la raison sur chaque paire.</p>}
-        {bilan && <div role="status" data-agent-bilan="" style={{ fontSize: 13, color: E.text, margin: '10px 0 0', lineHeight: 1.5 }}>
-          <p style={{ margin: 0 }}>{bilan.texte}</p>
-          {bilan.publiees.length > 0 && <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>{bilan.publiees.map((b) => <li key={b.num} data-agent-publiee={b.num}>N°{b.num} · {eurEbay(b.prix)}{b.url ? <> · <a href={b.url} target="_blank" rel="noopener noreferrer" style={{ color: E.text, display: 'inline-flex', alignItems: 'center', minHeight: 44 }}>voir sur eBay ↗</a></> : ' · lien pas encore rendu par eBay'}</li>)}</ul>}
-        </div>}
-        {brouillonsMsg && <p role="status" data-agent-brouillons="" style={{ fontSize: 13, color: E.text, margin: '10px 0 0', lineHeight: 1.5 }}>{brouillonsMsg} {onAnnonces && <button type="button" onClick={onAnnonces} style={s({ marginLeft: 6 })}>Ouvrir les brouillons</button>}</p>}
-        {phraseEcart && <p data-agent-ecartees="" style={{ fontSize: 12, color: E.muted, margin: '10px 0 0', lineHeight: 1.5 }}>{phraseEcart}</p>}
-      </>}
-    </div>
-    {regles && <details className="vrm-repli" data-agent-reglages="" style={carte}>
-      <summary style={{ fontSize: 15, fontWeight: 600, color: E.text }}>Ce que je publie</summary>
-      <ul data-agent-regles="" style={{ margin: '10px 0', paddingLeft: 18, fontSize: 13, color: E.text, lineHeight: 1.6 }}>{texteRegles(regles, { comptes: comptesNoms }).map((l) => <li key={l}>{l}</li>)}</ul>
-      <label style={{ display: 'grid', gap: 6, fontSize: 13, color: E.muted }}>Dis-moi ce que tu veux, en une phrase
-        <input data-agent-phrase="" value={phrase} onChange={(e) => { setPhrase(e.target.value); setCompris(null); }} placeholder="publie les Nike en 42 à plus de 60 €, +10 %, 3 par jour" style={{ minHeight: 44, borderRadius: 12, border: `1px solid ${E.border}`, background: E.surface, color: E.text, padding: '0 12px', fontSize: 17, fontFamily: 'inherit' }}/>
-      </label>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-        <button type="button" data-agent-comprendre="" disabled={!phrase.trim()} title={!phrase.trim() ? 'Écris d’abord ta phrase au-dessus.' : undefined} onClick={() => setCompris(comprendrePhrase(phrase, { comptes: comptesNoms, marques: marquesVues }))} style={s()}>Voir ce que je comprends</button>
-      </div>
-      {compris && <div data-agent-compris="" style={{ marginTop: 10, fontSize: 13, color: E.text, lineHeight: 1.5 }}>
-        {compris.negation ? <p data-agent-negation="" style={{ margin: 0 }}>Je ne sais pas encore EXCLURE avec une phrase (« {compris.negation} ») : je ne garde rien. Pour écarter un article, touche « Jamais » sur sa ligne ; sinon, dis ce que tu VEUX publier (« publie les Nike à plus de 60 € »).</p>
-          : compris.vide ? <p style={{ margin: 0 }}>Je n'ai rien compris dans cette phrase — essaie une marque, une taille (« en 42 »), un prix (« à plus de 60 € »), « +10 % » ou « 3 par jour ».</p>
-          : <><p style={{ margin: 0 }}>J'ai compris :</p><ul style={{ margin: '4px 0', paddingLeft: 18 }}>{texteRegles(appliquerPhrase(regles, compris, phrase), { comptes: comptesNoms }).map((l) => <li key={l}>{l}</li>)}</ul></>}
-        {compris.pasCompris.length > 0 && <p data-agent-pascompris="" style={{ margin: '4px 0 0', color: E.warn }}>Je n'ai pas compris : {compris.pasCompris.map((w) => `« ${w} »`).join(', ')} — je ne le devine pas.</p>}
-        {!compris.vide && <button type="button" data-agent-garder="" onClick={() => { garderRegles(appliquerPhrase(regles, compris, phrase)); setCompris(null); setPhrase(''); toast('Règle gardée.', 'ok'); }} style={s({ marginTop: 8 })}>Garder cette règle</button>}
-      </div>}
-      <div style={{ display: 'grid', gap: 10, marginTop: 14, fontSize: 13, color: E.muted }}>
-        <label style={{ display: 'flex', gap: 8, alignItems: 'center', minHeight: 44 }}>Au plus
-          <input data-agent-parjour="" type="text" inputMode="numeric" value={parJourTxt == null ? String(regles.parJour) : parJourTxt} onChange={(e) => setParJourTxt(e.target.value)} onBlur={garderParJour} onKeyDown={surEntree} style={{ width: 70, minHeight: 44, borderRadius: 12, border: `1px solid ${E.border}`, background: E.surface, color: E.text, padding: '0 8px', fontSize: 17 }}/> par jour</label>
-        <label style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', minHeight: 44 }}>Prix sur eBay
-          <select data-agent-prixmode="" value={regles.prixMode} onChange={(e) => garderRegles({ ...regles, prixMode: e.target.value })} style={{ minHeight: 44, borderRadius: 12, border: `1px solid ${E.border}`, background: E.surface, color: E.text, padding: '0 8px', fontSize: 15 }}>
-            <option value="meme">le même que Vinted</option><option value="pct">Vinted + %</option><option value="eur">Vinted + €</option></select>
-          {regles.prixMode !== 'meme' && <input data-agent-prixvaleur="" type="text" inputMode="decimal" value={prixValTxt == null ? String(regles.prixValeur).replace('.', ',') : prixValTxt} onChange={(e) => setPrixValTxt(e.target.value)} onBlur={garderPrixVal} onKeyDown={surEntree} style={{ width: 80, minHeight: 44, borderRadius: 12, border: `1px solid ${E.border}`, background: E.surface, color: E.text, padding: '0 8px', fontSize: 17 }}/>}
-          <span>— jamais sous ton prix d'achat</span></label>
-        {relies.length >= 2 && <label style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', minHeight: 44 }}>Compte eBay
-          <select data-agent-compte="" value={compte || ''} onChange={(e) => garderRegles({ ...regles, compteEbay: e.target.value })} style={{ minHeight: 44, borderRadius: 12, border: `1px solid ${E.border}`, background: E.surface, color: E.text, padding: '0 8px', fontSize: 15 }}>
-            {relies.map((c) => <option key={c.ref} value={c.ref}>{nomCompteEbay(c)}</option>)}</select></label>}
-        <label style={{ display: 'flex', gap: 8, alignItems: 'center', minHeight: 44 }}><input type="checkbox" checked={regles.seulementCochees} onChange={(e) => garderRegles({ ...regles, seulementCochees: e.target.checked })} style={{ width: 20, height: 20 }}/>Seulement les articles cochés « eBay »</label>
-        {regles.jamais.length > 0 && <div data-agent-jamais-liste="">Jamais sur eBay : {regles.jamais.map((k) => <button key={k} type="button" onClick={() => garderRegles({ ...regles, jamais: regles.jamais.filter((x) => x !== k) })} style={s({ fontSize: 12, fontWeight: 500, margin: '4px 6px 0 0' })} aria-label={`Reproposer la N°${k}`}>N°{k} ✕</button>)}</div>}
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button type="button" onClick={() => garderRegles({ ...REGLES_AGENT_DEFAUT, jamais: regles.jamais, compteEbay: regles.compteEbay, actif: regles.actif })} style={s({ fontWeight: 500 })}>Effacer les filtres</button>
-          <button type="button" data-agent-actif="" onClick={() => { const n = garderRegles({ ...regles, actif: !regles.actif }); if (n.actif === false) publierResumeAgent({ etat: 'eteint' }); }} style={s({ fontWeight: 500 })}>{regles.actif ? 'Arrêter l\'agent' : 'Relancer l\'agent'}</button>
-        </div>
-      </div>
-    </details>}
-  </section>;
-}
-// L'agent PENDANT que VRM est ouvert, ailleurs qu'à l'écran eBay → À traiter (section Agent) : une
-// fois par ouverture, si le dernier résumé a plus de 20 h, il refait la
-// proposition (aucun appel à eBay — seulement nos lectures) et publie le résumé
-// que lisent Ma journée et la notification du matin. Il ne prépare ni ne
-// publie rien.
-// ⚠️ (31 oct., banc vitesse) LE RÉSUMÉ SE RELIT APRÈS LE NUAGE. La porte
-//    (`agentEbayFondUtile`) regardait le navigateur au montage de la coque :
-//    un résumé frais posé par un AUTRE appareil (synchronisé) n'y était pas
-//    encore, et l'agent relisait tout (une douzaine de lectures, ~1 Mo) pour
-//    refaire le même résumé. On attend le nuage, puis on regarde à nouveau.
-function AgentEbayFond(props) {
-  const [utile, setUtile] = React.useState(() => (isCloudReady() ? agentEbayFondUtile() : undefined));
-  React.useEffect(() => onCloudReady(() => setUtile((u) => (u === undefined ? agentEbayFondUtile() : u))), []);
-  return utile ? <AgentEbayFondCalcul {...props}/> : null;
-}
-function AgentEbayFondCalcul({ comptes, comptesEbay }) {
-  const [regles] = useReglesAgentEbay();
-  const etat = useEtatPublicationEbay(comptes, comptesEbay, true);
-  const fait = React.useRef(false);
-  React.useEffect(() => {
-    if (fait.current || !regles) return;
-    // Arrêté ailleurs (un autre appareil) : un ancien résumé ne doit plus demander.
-    if (regles.actif === false) { fait.current = true; publierResumeAgent({ etat: 'eteint' }); return; }
-    if (!Array.isArray(comptesEbay) || !comptesEbay.length) return;
-    const ref = (regles.compteEbay && comptesEbay.some((c) => c.ref === regles.compteEbay)) ? regles.compteEbay : comptesEbay[0].ref;
-    if (marcheEbayDeRef(ref).devise !== 'EUR') { fait.current = true; publierResumeAgent({ etat: 'devise' }); return; }
-    const incertains = incertainsAttendusAgent(lireIncertainsAgent(), etat.luesA);
-    const prop = propositionAgent({ regles, paires: etat.paires, enLigne: etat.enLigne, chezMoi: etat.chezMoi, ventes: etat.ventes, dejaSurEbay: etat.dejaSurEbay, jumelles: etat.jumelles,
-      achatDe: (p) => prixAchatDe(etat.fiches[p.id], load('vinted_buyprice_by_num', {}) || {}), cochee: (p) => mpChoisi(etat.fiches[p.id], 'ebay') === true,
-      incertains, brouillons: numerosEnBrouillon(etat.brouillons, etat.paires), doubles: etat.doubles, publieesAujourdhui: lireJourAgent().publiees, cle: cleNum });
-    if (prop.etat !== 'lu') return;
-    fait.current = true;
-    // Sans préparation chez eBay : le résumé dit « N paires à regarder »,
-    // jamais « prêtes » (seul l'écran de l'agent prépare).
-    publierResumeAgent(prop);
-  }, [regles, comptesEbay, etat.paires, etat.enLigne, etat.ventes, etat.dejaSurEbay, etat.jumelles, etat.fiches, etat.luesA, etat.brouillons, etat.chezMoi]);
-  return null;
-}
-const agentEbayFondUtile = () => { const r = load(AGENT_CLE_RESUME, null); return !(r && Date.now() - (Number(r.at) || 0) < 20 * 3600000); };
 
 function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   const E = EBAY_SKIN;
@@ -67529,9 +67068,6 @@ function AppCoeur() {
   useEffect(()=>{ const f=(e)=>{ if(e && e.type==='vrm:save' && !(e.detail && (e.detail.k==='vrm_colis_aposter'||e.detail.k==='vrm_colis_retirer'))) return; setColisBadge(lireColisBadge()); setRetraitsBadge(lireRetraitsBadge()); };
     window.addEventListener('vrm:colis',f); window.addEventListener('vrm:save',f); const stop=onCloudReady(()=>{ setColisBadge(lireColisBadge()); setRetraitsBadge(lireRetraitsBadge()); });
     return ()=>{ window.removeEventListener('vrm:colis',f); window.removeEventListener('vrm:save',f); if(typeof stop==='function') stop(); }; },[]);
-  // (29 oct.) L'agent eBay qui demande refait sa proposition une fois par
-  // ouverture si le résumé a plus de 20 h (Ma journée, notification du matin).
-  const [agentFond] = useState(() => agentEbayFondUtile());
   // (17 oct.) LE MODE STREAM FLOUTE PARTOUT (src/streamFlou.js) : on lui donne
   // les jetons à reconnaître — pseudos et adresses de ses comptes, le compte
   // Vinted ouvert dans Chrome, son adresse VRM, son entreprise. Un pseudo qui
@@ -68919,9 +68455,7 @@ function AppCoeur() {
       // Vintex). Ne pas les remettre dans la cloche.
       // Actions GRATUITES pour vendre plus (jamais de « booster » payant ici) :
       const numDbl=Object.entries(numPorteurs).filter(([,v])=>v.length>1);
-      // (29 oct.) L'AGENT eBAY QUI DEMANDE : le résumé PUBLIÉ par l'agent (§11) —
-      // frais (48 h), non nul, et pas mis de côté aujourd'hui.
-      { const l = ligneJourneeAgent(load('vrm_agent_ebay_resume', null), partsParis(Date.now()).date, Date.now(), load('vrm_agent_ebay_regles', null)); if (l) items.push({icon:'🛒', ic:'tag', text:l.text, n:l.n, tab:'ebay_agent', jr:true, job:'agent-ebay'}); }
+      // (5 nov.) L'agent eBay est arrêté (sa décision) : plus de ligne « paires pour eBay » ici.
       if(numDbl.length>0) items.push({icon:'🚨', ic:'alert', text:`${numDbl.length} numéro${numDbl.length>1?'s':''} porté${numDbl.length>1?'s':''} par deux annonces (N°${numDbl.map(([n])=>n).slice(0,3).join(', N°')}) — la mauvaise paire peut partir`, n:numDbl.length, tab:'cat_annonces', dv:'num', annonces:true});
       if(noNumCount>0)   items.push({icon:'🔢', ic:'tag', text:`${noNumCount} annonce${noNumCount>1?'s':''} sans numéro`, n:noNumCount, tab:'cat_annonces', jr:true, annonces:true});
       if(sleepCount>0)   items.push({icon:'😴', ic:'sleep', text:`${sleepCount} annonce${sleepCount>1?'s':''} qui ${sleepCount>1?'dorment':'dort'} → baisser le prix`, n:sleepCount, tab:'cat_annonces'});
@@ -69037,11 +68571,10 @@ function AppCoeur() {
   // Favoris & offres, Republier, Vestiaire : aucune source ne publie ce nombre
   // hors de leur écran — rien plutôt qu'un nombre recalculé ici.
   const sommeNotif=(f)=>{ const l=(notifItems||[]).filter(x=>x&&f(x)); return l.length ? l.reduce((a,x)=>a+(Number(x.n)||0),0) : null; };
-  const nAgentEbay=sommeNotif(x=>x.job==='agent-ebay');
   const nLbcRetirer=sommeNotif(x=>x.lbcRetirer);
   const nAnnonces=sommeNotif(x=>x.annonces);
   const badgesNav={ cat_bord: colisBadge, ventes: colisBadge, annonces: nAnnonces, retraits: retraitsBadge, messages: msgNonLus>0 };
-  const badgesRail={ ...badgesNav, plat_ebay: nAgentEbay, plat_leboncoin: nLbcRetirer };
+  const badgesRail={ ...badgesNav, plat_leboncoin: nLbcRetirer };
   // Vestiaire : ses morceaux, chacun dans SA tâche. Annonces · Vestiaire porte
   // aussi ce qui servait à publier (ta clé Photoroom — sur l'écran Vestiaire,
   // jamais dans les Paramètres, sa décision du 17 oct. — et le dernier passage
@@ -69215,7 +68748,6 @@ function AppCoeur() {
           )}
           {sec==='ventes'&&<EbayVentes baseKO={baseKO} vue={ebayVueEff} comptesEbay={comptesEbay} cible={ebayCible?.section==='ventes'?ebayCible:null} onClearCible={()=>setEbayCible(null)}/>}
           {sec==='messages'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayMessagesVolets key={ref} comptesEbay={comptesEbay} owner={AUTH.user?.id || 'installation'} cible={ebayCible?.compte===ref && ebayCible.section==='messages'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/>}</EbayActionCompte></div>}
-          {sec==='agent'&&!baseKO&&<div style={{padding:'16px 16px 0'}}><AgentEbay comptes={accountsLoaded?vintedAccounts:undefined} comptesEbay={comptesEbay} onAnnonces={()=>allerSec('annonces')}/></div>}
           {sec==='agent'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><><EbayRetours key={'rt-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/><EbayAgent key={ref} headers={enTeteSession} theme={C} compte={ref} onSection={(section,t)=>{setEbayVue(ref);setEbayCible(cibleEbay(ref,{...t,section}));allerSec(section);}}/><EbayEvaluations key={'ev-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/></>}</EbayActionCompte></div>}
           {sec==='promo'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayPromotion key={'pr-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/>}</EbayActionCompte></div>}
           {sec==='achats'&&<EbayAchatsOnglet headers={enTeteSession} panelOff={panelOffCoque} vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}/>}
@@ -69813,7 +69345,6 @@ function AppCoeur() {
         {tab==='annonces'&&rendreTache('annonces')}
         {tab==='messages'&&rendreTache('messages')}
         {tab==='achats'&&rendreTache('achats')}
-        {agentFond&&accountsLoaded&&!baseKO&&Array.isArray(comptesEbay)&&comptesEbay.length>0&&!(tab==='ventes'&&siteDeTache('ventes',platSub)==='ebay'&&sectionDeTache('ventes',platSub)==='agent')&&<AgentEbayFond comptes={vintedAccounts} comptesEbay={comptesEbay}/>}
         {tab==='inventory'&&<Inventory inventory={inventory} setInventory={setInventory} accounts={vintedAccounts} garageGrid={garageGrid} labels={accountLabels} onLocate={(numero)=>{ setGarageLocate(String(numero)); setTab('garage'); }}/>}
         {tab==='catalog'  &&<Catalog   catalog={catalog} setCatalog={setCatalog} onDeleteId={(id)=>{
           const norm=v=>String(v||'').trim();

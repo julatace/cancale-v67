@@ -39,8 +39,8 @@ export const FAMILLES = [
 // `sendPushToAll({ cat })`) → famille.
 // (5 nov., Julien : « personnalisable comme on veut ») SEPT types au lieu de six :
 // la double vente a le sien (elle était dans Ventes) et « Compta » devient
-// « Rappels » (URSSAF, bilan de la semaine, la veille au soir, l'agent eBay, les
-// factures). `test` n'appartient à aucune famille : l'essai sonne toujours.
+// « Rappels » (URSSAF, bilan de la semaine, la veille au soir, les factures ;
+// l'agent eBay, arrêté le 5 nov., n'en est plus). `test` n'appartient à aucune famille : l'essai sonne toujours.
 export const FAMILLE_DE = {
   vente: 'ventes', argent: 'ventes',
   doublevente: 'doublevente',
@@ -48,16 +48,19 @@ export const FAMILLE_DE = {
   colis: 'arrives',
   offre: 'offres', offremini: 'offres',
   message: 'messages', action: 'messages', favoris: 'messages',
-  soir: 'rappels', urssaf: 'rappels', bilan: 'rappels', facture: 'rappels', agentebay: 'rappels',
+  soir: 'rappels', urssaf: 'rappels', bilan: 'rappels', facture: 'rappels',
 };
 // Un type NEUF hérite du réglage de la famille d'où il sort tant qu'il n'est pas
 // posé lui-même : il avait coupé « Ventes », la double vente reste coupée ; il
 // avait coupé « Compta », les rappels restent coupés. Une catégorie qui a changé
-// de famille (la veille au soir était dans « Colis à poster », l'agent eBay dans
-// « Ventes ») garde l'ancien réglage de sa famille d'avant. Une seule règle, ici.
+// de famille (la veille au soir était dans « Colis à poster ») garde l'ancien
+// réglage de sa famille d'avant. Une seule règle, ici.
 export const HERITE = { doublevente: 'ventes', rappels: 'compta' };
-export const HERITE_CAT = { soir: 'poster', agentebay: 'ventes' };
-export const CATEGORIES_RETIREES = new Set(['suivi', 'achat', 'favori']);
+export const HERITE_CAT = { soir: 'poster' };
+// (5 nov.) `agentebay` : l'agent eBay est ARRÊTÉ (Julien : « le bot eBay,
+// arrête-le, c'est nul ») — sa notification ne part plus, quel que soit l'ancien
+// réglage ; elle n'appartient plus à aucune famille.
+export const CATEGORIES_RETIREES = new Set(['suivi', 'achat', 'favori', 'agentebay']);
 export const familleDe = (cat) => FAMILLE_DE[cat] || null;
 const famillesDe = (p) => (p && p.familles && typeof p.familles === 'object' ? p.familles : {});
 

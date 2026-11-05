@@ -1,3 +1,5 @@
+// ⛔ (5 nov.) PLUS BRANCHÉ DANS L'APP : l'agent eBay est arrêté (Julien : « le bot eBay,
+//    arrête-le, c'est nul »). Aucun écran ne l'appelle ; gardé pour ses audits.
 // ════════════════════════════════════════════════════════════════════════════
 //  L'AGENT eBAY QUI DEMANDE — la règle pure (29 octobre)
 //
