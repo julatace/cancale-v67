@@ -19,6 +19,7 @@
 //  (src/communaute/accompagnement.js) : la base ne lit jamais ses données.
 // ════════════════════════════════════════════════════════════════════════════
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { EtatPanne } from '../composants/EtatPanne.jsx';
 import { NIVEAUX, STATUTS, codeLisible, codeTape, CODE_RE, lienInvitation, serieVue, etatVue, noterNiveau, publierPartage } from './accompagnement.js';
 
 const PAS_SU = "Je n'ai pas pu lire tes groupes — rien n'est perdu, c'est la lecture qui a échoué.";
@@ -273,10 +274,11 @@ export default function Accompagnement({ api, headers, prenom = '', codeLien = '
   };
 
   if (etat === 'charge') return <p role="status" className="vrm-cm-note" data-cm-accomp="charge">Lecture de tes groupes…</p>;
+  // (5 nov., chantier G, revue 1.10) La panne des groupes : `EtatPanne`.
+  if (etat === 'pas-su') return <EtatPanne data-cm-accomp={etat} quoi="Tes groupes" raison={msg || PAS_SU} onReessayer={() => lire()}/>;
   if (etat !== 'lu') return <div className="vrm-cm-carton" data-cm-accomp={etat}>
     {etat === 'non-installe' ? <><b>Les groupes d’accompagnement ne sont pas encore activés sur ta base.</b><p>Ils s’ouvriront dès que la mise à jour de la base sera faite. D’ici là, rien n’est créé et rien n’est partagé.</p></>
-      : etat === 'abonnement' ? <><b>Ton abonnement n’est pas actif.</b><p>Les groupes sont réservés aux abonnés.</p></>
-      : <><b>{msg || PAS_SU}</b><button type="button" onClick={() => lire()} data-cm-accomp-reessayer>Réessayer</button></>}
+      : <><b>Ton abonnement n’est pas actif.</b><p>Les groupes sont réservés aux abonnés.</p></>}
   </div>;
 
   const publie = d.publie || {};

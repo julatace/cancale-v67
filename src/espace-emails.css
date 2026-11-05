@@ -36,3 +36,5 @@
 .vrm-email-fermer-guide{margin:0 0 10px;}
 .vrm-emails-espace [data-reglage-adresses] button{min-height:34px;}
 @media(max-width:600px){.vrm-emails-espace [data-reglage-adresses] button{min-height:38px;}}
+/* (5 nov., chantier G) La recherche des e-mails à rattacher : le champ commun (`ChampRecherche`). */
+.vrm-emails-espace .vrm-email-recherche-champ{margin:12px 0;}

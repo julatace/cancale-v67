@@ -15269,14 +15269,16 @@ function LigneConv({ actif, onClick, attrs, style, ariaLabel, photo, nom, sensib
       </span>
       <span className="vrm-msg-body">
         <span className="vrm-msg-l1">
-          <span className="vrm-msg-name">{sensible ? <span className="vrm-sensible" data-stream-type="acheteur">{nom}</span> : nom}</span>
-          {compte && <span className="vrm-msg-acc" style={{color:C.muted}}>· {compte}</span>}
+          <span className="vrm-msg-name" title={sensible ? undefined : (typeof nom === 'string' ? nom : undefined)}>{sensible ? <span className="vrm-sensible" data-stream-type="acheteur">{nom}</span> : nom}</span>
           <time className="vrm-msg-time" dateTime={quand ? new Date(quand).toISOString() : undefined} title={quand ? new Date(quand).toLocaleString('fr-FR',{weekday:'long',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'}) : undefined} style={{color:couleurHeure||C.muted}}>{quand ? heureMessage(quand) : ''}</time>
         </span>
-        {(morceaux.length > 0 || etat) && (
+        {/* (5 nov., chantier G, revue 2.23) Le COMPTE passe sur la ligne de la paire : sur la ligne du
+            pseudo il le coupait (« mathilde_sn… · bou… »). Le pseudo a toute la ligne, l'heure à droite. */}
+        {(morceaux.length > 0 || etat || compte) && (
           <span className="vrm-msg-article vrm-msg-paire" data-conv-paire="">
             {/* (31 oct., maquettes) « modèle · N° » : le N° vient de l'identité, jamais du titre. */}
-            <span className="vrm-msg-paire-t">{morceaux.map((x,j)=><React.Fragment key={j}>{j?' · ':''}{num&&x===`N°${num}`?<b className="vrm-msg-paire-num" style={{color:C.text,fontWeight:600}}>{x}</b>:x}</React.Fragment>)}</span>
+            {morceaux.length > 0 && <span className="vrm-msg-paire-t">{morceaux.map((x,j)=><React.Fragment key={j}>{j?' · ':''}{num&&x===`N°${num}`?<b className="vrm-msg-paire-num" style={{color:C.text,fontWeight:600}}>{x}</b>:x}</React.Fragment>)}</span>}
+            {compte && <span className="vrm-msg-acc" data-conv-compte-nom="" style={{color:C.muted}}>{morceaux.length ? '· ' : ''}{compte}</span>}
             {etat && <span className="vrm-msg-etat" data-etat={etat.k} style={{color:C.muted,borderColor:C.border}}>{etat.t}</span>}
           </span>
         )}
@@ -15391,7 +15393,8 @@ function FicheConvVolet({ etat, fc, raison, site }) {
       <div className="vrm-msg-fiche-ph">{fc.photo?<PhotoVinted src={fc.photo} alt="" loading="lazy"/>:<Icon name="image" size={36}/>}</div>
       {fc.titre&&<div className="vrm-msg-fiche-t" data-fiche-titre="">{fc.titre}{fc.taille?` · ${fc.taille}`:''}</div>}
       <div className="vrm-msg-fiche-s">{(fc.sous||[]).filter(Boolean).join(' · ')}</div>
-      {fc.num&&<b className="vrm-num-pastille vrm-msg-fiche-num">N°{fc.num}</b>}
+      {/* (5 nov., chantier G) La pastille N° commune (`Numero`) : plus la pastille blanche en sombre. */}
+      {fc.num&&<Numero n={fc.num} taille="grand" className="vrm-msg-fiche-num"/>}
       {(fc.blocs||[]).filter(x=>x&&x.val).map(x=><div key={x.cle} className="vrm-msg-fiche-bloc" {...{['data-fiche-'+x.cle]:''}}><small>{x.lib}</small><b>{x.val}</b></div>)}
       {fc.lien&&fc.lien.href&&<a className="vrm-msg-fiche-lien" href={fc.lien.href} target="_blank" rel="noreferrer">{fc.lien.texte}</a>}
     </aside>);
@@ -28744,8 +28747,9 @@ function MessagesVestiaire() {
   const page = d && d.lecture && /^\/[\w/.-]*$/.test(d.lecture.page || '') ? d.lecture.page : '';
   const lien = `https://fr.vestiairecollective.com${page || '/'}`;
   let corps;
-  if (d === undefined) corps = <div data-vc-messages="charge" style={style}>Lecture de tes messages Vestiaire…</div>;
-  else if (d === null) corps = <div data-vc-messages="pas-su" style={style}>Je n'ai pas pu lire tes messages Vestiaire — rien n'est perdu, réessaie dans un moment.</div>;
+  if (d === undefined) corps = <div role="status" data-vc-messages="charge" style={{ ...style, padding: '12px 0' }}>{PAS_SU.enCours}</div>;
+  // (5 nov., chantier G, revue 1.10) La panne par `EtatPanne`, avec SON « Réessayer ».
+  else if (d === null) corps = <div data-vc-messages="pas-su"><EtatPanne quoi="Tes messages Vestiaire" raison="Rien n’est perdu : c’est la lecture qui a échoué." onReessayer={() => { setD(undefined); return relire(); }}/></div>;
   else if (!d.compteur && !d.conversations && !(d.fils && Object.keys(d.fils).length)) corps = <div data-vc-messages="jamais" style={style}>Pas encore relevés. Ouvre Vestiaire dans le navigateur où l'extension VRM est installée{extSait('vcmessages') === 'retard' ? <> — mise à jour en <b>{EXT_CAPACITES.vcmessages}</b> d'abord</> : ''} : elle relève le nombre de messages non lus en passant, et tes conversations quand tu ouvres ta messagerie.</div>;
   else {
     const nl = nonLusVestiaire(d.compteur, d.compteurs);
@@ -28768,10 +28772,10 @@ function MessagesVestiaire() {
     const offresEtat = offresVestiaire(d.offres);
     corps = (
       <div data-vc-messages="lu" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <div data-vc-messages-nonlus={n == null ? 'passu' : String(n)} style={style}>
+        <div data-vc-messages-nonlus={n == null ? 'passu' : String(n)} style={{ ...style, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0 12px' }}>
           {n == null ? <>Nombre de non-lus pas encore relevé.</>
-            : <><b style={{ color: C.text }}>{n === 0 ? 'Aucun message non lu' : `${n} message${n > 1 ? 's' : ''} non lu${n > 1 ? 's' : ''}`}</b>{nl.comptes > 1 ? <span data-vc-messages-comptes={nl.comptes}> · {nl.comptes} comptes</span> : null}</>}
-          {' '}<a data-vc-messages-ouvrir="" href={lien} target="_blank" rel="noreferrer" className="vrm-lien-action" style={{ color: C.accentTexte, fontWeight: 600, display: 'inline-flex', alignItems: 'center', minHeight: 44 }}>{page ? 'Ouvrir la messagerie' : 'Ouvrir Vestiaire'}</a>
+            : <span><b style={{ color: C.text }}>{n === 0 ? 'Aucun message non lu' : `${n} message${n > 1 ? 's' : ''} non lu${n > 1 ? 's' : ''}`}</b>{nl.comptes > 1 ? <span data-vc-messages-comptes={nl.comptes}> · {nl.comptes} comptes</span> : null}</span>}
+          <a data-vc-messages-ouvrir="" href={lien} target="_blank" rel="noreferrer" className="vrm-pied-lien" data-pied-lien="ouvrir-vc">{page ? 'Ouvrir la messagerie ↗' : 'Ouvrir Vestiaire ↗'}</a>
         </div>
         <OffresVestiaire etat={offresEtat} recettes={d.recettesOffres} cap={extSait('vcoffrerepondre')} numDe={(pid) => cleNum((pid && d.liens[pid]) || '')}
           envoyer={async (m) => { const r = await vmrCmd(m, 45000); relire(); return r; }} Photo={PhotoOffreVc}/>
@@ -28784,9 +28788,11 @@ function MessagesVestiaire() {
                   const fv = v.num ? ficheDuNumero(v.num) : null; const t = Date.parse(v.date || '');
                   return (
                     <div key={v.id} data-vc-conv={v.id} data-vc-conv-num={v.num || ''} data-vc-conv-nonlu={v.nonLu === true ? 'oui' : v.nonLu === false ? 'non' : 'passu'} data-vc-conv-lu={v.lu ? 'oui' : 'non'} data-flou={vcFloute(vcOuvert, v.compte) ? '1' : '0'} style={vcFloute(vcOuvert, v.compte) && ouvert !== v.id ? STYLE_FLOU : undefined}>
+                      {/* (5 nov., chantier G) La ligne porte le nom de l'ARTICLE (Vestiaire ne donne jamais celui de
+                          l'acheteur) : « Vestiaire » trois fois de suite ne disait rien. Le N° vient de l'identité (référence VRM). */}
                       <LigneConv actif={ouvert === v.id} onClick={() => setOuvert(v.id)} ariaLabel={`Ouvrir la conversation ${v.num ? 'du N°' + v.num : 'pas reliée à un article VRM'}`}
-                        photo={(fv && fv.photo) || v.photoArticle} nom="Vestiaire" quand={isFinite(t) ? t : null} couleurHeure={v.nonLu === true ? C.accent : C.muted}
-                        titre={(fv && fv.titre) || v.titreArticle || (v.num ? '' : 'Pas reliée à un article VRM')} num={v.num}
+                        photo={(fv && fv.photo) || v.photoArticle} nom={(fv && fv.titre) || v.titreArticle || 'Article Vestiaire'} quand={isFinite(t) ? t : null} couleurHeure={v.nonLu === true ? C.text : C.muted}
+                        titre={v.num || v.titreArticle ? '' : 'Pas reliée à un article VRM'} num={v.num}
                         extrait={v.apercu || (v.lu ? '' : 'Texte pas encore lu')} toi={!!v.apercu && v.deMoi} couleurExtrait={v.nonLu === true ? C.text : C.muted}
                         apres={<>{offresEtat.etat === 'lu' && v.pid && offresEtat.parProduit[v.pid] ? <span className="vrm-of-tag" data-vc-conv-offre={offresEtat.parProduit[v.pid].id}>offre {euros(offresEtat.parProduit[v.pid].offre)}</span> : null}{v.nonLu == null ? <span className="vrm-msg-etat" title="Vestiaire ne dit pas si elle est lue" style={{ color: C.muted, borderColor: C.border }}>lu ?</span> : null}</>}
                         point={v.nonLu === true ? C.accent : null}/>
@@ -51761,7 +51767,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {/* (revue) Une offre dont l'annonce est partie : LE geste est dans le
                   bloc de l'offre (« Retirer de la liste ») — pas deux fois (§7). */}
               {!offrePartieDuFil(openConv)&&<button className="vrm-chat-retirer" type="button" data-conv-retirer={String(openConv.convId)} aria-label="Retirer cette conversation de la liste" title={`Retirer de la liste — ${phraseRetour(1)}. Rien ne change sur Vinted.`} onClick={()=>retirerConvDeLaListe(openConv)} style={{color:C.text,borderColor:C.border}}><Icon name="eyeOff" size={15}/><span>Retirer</span></button>}
-              <button className="vrm-icon-control vrm-chat-sync" type="button" aria-label={openConv.refreshing?"Actualisation en cours":"Actualiser la conversation"} disabled={openConv.loading||openConv.refreshing} aria-busy={!!openConv.refreshing} onClick={actualiserConversation} style={{color:C.muted}}><Icon name="sync" size={17}/></button>
+              {/* (5 nov., revue 3.8) Un fil en panne a SON « Réessayer » : l'icône de relecture se tait. */}
+              {!openConv.error&&<button className="vrm-icon-control vrm-chat-sync" type="button" aria-label={openConv.refreshing?"Actualisation en cours":"Actualiser la conversation"} disabled={openConv.loading||openConv.refreshing} aria-busy={!!openConv.refreshing} onClick={actualiserConversation} style={{color:C.muted}}><Icon name="sync" size={17}/></button>}
             </TeteFil>
             {openConv.refreshing&&<div className="vrm-chat-note vrm-chat-read" role="status" data-fil-actualisation style={{color:C.muted}}>Actualisation de la conversation…</div>}
             {openConv.refreshError&&<div className="vrm-chat-note vrm-chat-read" role="alert" data-fil-actualisation-erreur style={{color:C.text}}><span>{openConv.refreshError} <a href={`https://www.vinted.fr/inbox/${openConv.convId}`} target="_blank" rel="noreferrer">Ouvrir sur Vinted ↗</a></span></div>}
@@ -51782,16 +51789,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {pc.url && <> <a href={pc.url} target="_blank" rel="noreferrer" style={{color:C.muted}}>Annonce ↗</a></>}
                     </div>
                   </div>
-                  {pc.num && <b className="vrm-num-pastille vrm-chat-paire-num">N°{pc.num}</b>}
+                  {pc.num && <Numero n={pc.num} className="vrm-chat-paire-numero"/>}
                 </div>
               ); })()}
             <div ref={chatScroll} className="vrm-chat-history" style={{flex:1,overflow:'auto',padding:16,display:'flex',flexDirection:'column',gap:8}}>
-              {openConv.loading && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Chargement…</div>}
-              {openConv.error && <div style={{fontSize:13,color:C.danger}}>Erreur : {String(openConv.error)}</div>}
+              {openConv.loading && <div role="status" style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Ouverture de la conversation…</div>}
+              {/* (5 nov., chantier G) Plus jamais « Erreur : <code> » : la panne dite, son geste (relire ce fil). */}
+              {openConv.error && <EtatPanne compact quoi="Ce fil" raison="La conversation n’a pas pu être lue. Rien n’est perdu." onReessayer={actualiserConversation} data-fil-panne=""/>}
               {/* Bandeau BORDEREAU : lien d'étiquette détecté dans la conversation. */}
               {!openConv.loading && !openConv.error && (()=>{ const bl=[...new Set(openConv.messages.flatMap(m=>(m.links||[]).filter(l=>l.bordereau).map(l=>l.url)))]; return bl.length>0 ? (
-                <div style={{background:`${C.accent}14`,border:`1px solid ${C.accent}66`,borderRadius:12,padding:'10px 12px',marginBottom:4}}>
-                  <div style={{fontSize:11,fontWeight:600,letterSpacing:0.5,color:C.accentTexte,textTransform:'uppercase',marginBottom:6}}>📄 Bordereau détecté dans la conversation</div>
+                <div data-fil-bordereau={bl.length} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',marginBottom:4}}>
+                  <div style={{display:'flex',alignItems:'center',gap:6,fontSize:13,fontWeight:600,color:C.text,marginBottom:8}}><Icon name="doc" size={15} style={{color:C.muted}}/>Bordereau trouvé dans la conversation</div>
                   {bl.map((u,i)=>(
                     <a key={i} href={u} target="_blank" rel="noreferrer" style={{display:'block',background:C.accent,color:C.onAccent,borderRadius:12,padding:'10px 12px',fontSize:13,fontWeight:600,textDecoration:'none',textAlign:'center',marginBottom:i<bl.length-1?6:0}}>Ouvrir le bordereau {bl.length>1?`(${i+1})`:''}</a>
                   ))}
@@ -52505,8 +52513,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         //    bordereaux partaient de côté sans un mot (l'incident du 16 août,
         //    rendu invisible). Le détail (causes) vit dans Réglages.
         { const pp = misDeCote && misDeCote.installation ? phrasePersonne(misDeCote.installation.personne) : null;
-          if (pp) jobs.push({id:'emails-personne',icon:'mail',color:C.warn,title:pp.titre,sub:pp.geste,tab:'settings',prio:4,
-            avant:()=>{ demanderAdresses(); try { localStorage.setItem('vrm_reglages_vue','reglages'); } catch (_) {} }}); }
+          // (5 nov., revue 2.24) Les adresses vivent dans l'écran E-mails (« Relier ma boîte »).
+          if (pp) jobs.push({id:'emails-personne',icon:'mail',color:C.warn,title:pp.titre,sub:pp.geste,tab:'emails',prio:4,
+            avant:()=>{ ouvrirEmailsRelier('adresses'); }}); }
         // ⚠️ ANTI DOUBLE VENTE (16 oct.) : une paire vendue sur une plateforme et
         //    encore en vente ailleurs, ou un numéro porté par deux annonces, ne
         //    vivait plus que dans la cloche (la refonte du tableau de bord l'avait
@@ -56438,10 +56447,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <FavorisConnectes articlesVendus={articlesVendusFavoris} articleFavori={id=>{const it=annonceParId.get(String(id)),n=(numeros[String(id)]||{}).numero;const px=Number(it?.price&&typeof it.price==='object'?it.price.amount:it?.price);return it||n?{titre:it?.title||'',numero:n||'',photo:typeof it?.photo==='string'?it.photo:it?.photo?.url||null,prix:Number.isFinite(px)&&px>0?px:null}:null;}} ecranActif={zoneMessages==='favoris'} chargementAutomatique={zoneMessages==='favoris'} key={'favoris:'+String(AUTH.user?.id||'')+':'+favorisUid} uid={favorisUid} nomCompte={favorisCompte?accNameOf(favorisCompte):''} owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} base={SUPABASE_URL} headers={()=>sbAuth()} executerFavori={t=>sondageConnu().then(()=>vmrExecUn({uid:favorisUid,method:'POST',endpoint:'/vrm/favoris',body:{jeton:t.jeton}},60000))} PhotoVinted={PhotoVinted}/>
         </div>
         <div className="vrm-message-workspace" hidden={zoneMessages!=='conversations'} style={{display:zoneMessages==='conversations'?undefined:'none'}}><div className="vrm-inbox-column">
-        <label className="vrm-msg-search" style={{color:C.muted}}><Icon name="search" size={16}/><input type="search" aria-label="Rechercher une conversation" maxLength={200} placeholder="Pseudo, article, N° de rangement…" value={messageSearch} onChange={e=>setMessageSearch(e.target.value)} style={{color:C.text}}/></label>
-        {!!messageSearch.trim()&&<p className="vrm-msg-recherche-portee" role="status">Recherche sur tous les comptes actifs.{messageFilter!=='all'&&<> Le filtre de conversation reste appliqué. <button type="button" onClick={()=>{setMessageFilter('all');setConvMax(40);}}>Afficher tous les résultats</button></>}</p>}
+        {/* (5 nov., chantier G) Le champ de recherche commun (`ChampRecherche`) : plus un champ teinté posé dans un champ bordé. */}
+        <ChampRecherche className="vrm-msg-recherche" valeur={messageSearch} onChange={(v)=>setMessageSearch(String(v||'').slice(0,200))} label="Rechercher une conversation" placeholder="Pseudo, article, N°…" micro data-msg-recherche=""/>
+        {!!messageSearch.trim()&&<p className="vrm-msg-recherche-portee" role="status">Sur tous tes comptes.{messageFilter!=='all'&&<> Le filtre reste appliqué. <button type="button" className="vrm-pied-lien" data-pied-lien="tout" onClick={()=>{setMessageFilter('all');setConvMax(40);}}>Afficher tous les résultats</button></>}</p>}
         {convs.loading && !convs.items && <Skeleton variant="row" count={2}/>}
-        {convs.error && <LoadError onRetry={()=>loadConvs(true)}/>}
+        {/* (5 nov., chantier G, revue 1.10) La panne dite par `EtatPanne` : une phrase, la raison, UN geste. */}
+        {convs.error && <EtatPanne quoi="Tes conversations Vinted" raison="Aucune boîte n’a pu être lue. Rien n’est perdu : c’est la lecture qui a échoué." onReessayer={()=>loadConvs(true)} data-msg-panne=""/>}
         {/* ── LA MESSAGERIE INTÉGRÉE (3 octobre) ─────────────────────────────
             Julien : « il doit y avoir la messagerie intégrée des derniers
             comptes, avec la possibilité de répondre et de faire l'offre ».
@@ -56577,16 +56588,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   (déjà dans « Toutes N ») lu par les lecteurs d'écran seulement,
                   et l'actualisation en icône — plus deux rangées de commandes. */}
               <div className="vrm-msg-bar">
-                <div className="vrm-inbox-filters" role="group" aria-label="Filtrer les conversations">
+                {/* (5 nov., chantier G, revue 2.23) Les filtres au dessin des AUTRES filtres de l'app (`.vrm-filtres`). */}
+                <div className="vrm-inbox-filters vrm-filtres" role="group" aria-label="Filtrer les conversations">
                   <button type="button" aria-pressed={messageFilter==='all'} onClick={()=>{setMessageFilter('all');setConvMax(40);}}>Toutes <span>{liste.length}</span></button>
-                  <button type="button" data-a-repondre={aRepondre.length} aria-pressed={messageFilter==='repondre'} onClick={()=>{setMessageFilter('repondre');setConvMax(40);}}>À répondre <span>{aRepondre.length}</span></button>
-                  <button type="button" aria-pressed={messageFilter==='unread'} onClick={()=>{setMessageFilter('unread');setConvMax(40);}}>Non lues <span>{nonLus}</span></button>
+                  <button type="button" data-a-repondre={aRepondre.length} aria-pressed={messageFilter==='repondre'} onClick={()=>{setMessageFilter('repondre');setConvMax(40);}}>À répondre{aRepondre.length>0&&<span>{aRepondre.length}</span>}</button>
+                  <button type="button" aria-pressed={messageFilter==='unread'} onClick={()=>{setMessageFilter('unread');setConvMax(40);}}>Non lues{nonLus>0&&<span>{nonLus}</span>}</button>
                   {(nOffres>0 || messageFilter==='offres') && <button type="button" data-filtre-offres={nOffres} aria-pressed={messageFilter==='offres'} onClick={()=>{setMessageFilter('offres');setConvMax(40);}}>Offres reçues <span>{nOffres}</span></button>}
                 </div>
                 <div className="vrm-sr" data-messagerie-tete={nonLus>0 ? 'nonlus' : nonLusAilleurs>0 ? 'ailleurs' : boitesKO.length ? 'passu' : listeBrute.length ? 'toutlu' : 'vide'} data-nonlus={nonLus}>
                   {liste.length} conversation{liste.length>1?'s':''}
                 </div>
-                <button type="button" className="vrm-msg-refresh" onClick={()=>loadConvs(true)} aria-label="Actualiser les conversations" title="Actualiser"><Icon name="sync" size={17}/></button>
+                {/* (5 nov., revue 3.8) Une boîte en panne a SON « Réessayer » : l'icône de relecture se tait à côté. */}
+                {!boitesKO.length && <button type="button" className="vrm-msg-refresh" onClick={()=>loadConvs(true)} aria-label="Relire les conversations" title="Relire"><Icon name="sync" size={17}/></button>}
               </div>
               {messageFilter==='repondre'&&<p className="vrm-inbox-feedback">{aRepondre.length?`${offresARepondre} offre${offresARepondre>1?'s':''} · ${aRepondre.length-offresARepondre} conversation${aRepondre.length-offresARepondre>1?'s':''} sans offre en attente`:'Aucune conversation confirmée comme étant à répondre.'} · Dernier auteur vérifié uniquement. Les fils non vérifiés restent dans Toutes.</p>}
               {messageFilter==='unread' && tri.length===0 && <p className="vrm-inbox-feedback">Aucune conversation non lue dans cette sélection.</p>}
@@ -56603,14 +56616,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <span>
                     {boitesKO.length===1 ? <>La boîte de <b>{accName(boitesKO[0])}</b> n'a pas pu être lue</>
                       : <>Les boîtes de {boitesKO.map((a,i)=><React.Fragment key={String(a.vinted_user_id)}>{i?(i===boitesKO.length-1?' et ':', '):''}<b>{accName(a)}</b></React.Fragment>)} n'ont pas pu être lues</>}
-                    {' '}— {boitesKO.length===1?'ses':'leurs'} messages ne sont ni listés ni comptés ici. Réessaie avec « ↻ Actualiser » ; si ça dure, ouvre ta messagerie Vinted sur {boitesKO.length===1?'ce compte':'ces comptes'}.
+                    {' '}— {boitesKO.length===1?'ses':'leurs'} messages ne sont ni listés ni comptés ici. Si ça dure, ouvre ta messagerie Vinted sur {boitesKO.length===1?'ce compte':'ces comptes'}.
+                    {' '}<button type="button" className="vrm-pied-lien" data-pied-lien="reessayer" data-boites-ko-reessayer="" onClick={()=>loadConvs(true)}>{VERBES.reessayer}</button>
                   </span>
                 </div>
               )}
               {nAuDessusMini>0 && messageFilter!=='offres' && (
-                <button type="button" data-cible="offres" data-offres-au-mini={nAuDessusMini} onClick={()=>{setMessageFilter('offres');setConvMax(40);}} style={{display:'flex',gap:8,alignItems:'center',width:'100%',textAlign:'left',fontSize:13,color:C.text,lineHeight:1.4,border:`1px solid ${C.accent}`,background:`${C.accent}12`,borderRadius:12,padding:'9px 11px',marginBottom:10,cursor:'pointer'}}>
-                  <span aria-hidden="true" style={{flexShrink:0}}><Icon name="tag" size={15} style={{color:C.accentTexte}}/></span>
-                  <span><b>{nAuDessusMini} offre{nAuDessusMini>1?'s':''} au-dessus de ton prix mini</b> — ouvre-la{nAuDessusMini>1?'s':''} pour accepter en 1 tap. <span style={{color:C.muted}}>{offresAuto ? "L'acceptation automatique est activée." : "Rien n'est accepté tout seul."}</span></span>
+                <button type="button" data-cible="offres" data-offres-au-mini={nAuDessusMini} onClick={()=>{setMessageFilter('offres');setConvMax(40);}} style={{display:'flex',gap:8,alignItems:'center',width:'100%',textAlign:'left',fontSize:13,color:C.text,lineHeight:1.4,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'10px 12px',minHeight:44,marginBottom:10,cursor:'pointer'}}>
+                  {/* (5 nov., chantier G) Neutre : l'accent reste rare (§7) ; la carte se touche, le chevron le dit. */}
+                  <span aria-hidden="true" style={{flexShrink:0,color:C.muted,display:'inline-flex'}}><Icon name="tag" size={15}/></span>
+                  <span style={{flex:1,minWidth:0}}><b>{nAuDessusMini} offre{nAuDessusMini>1?'s':''} au-dessus de ton prix mini</b> — accepte en 1 tap. <span style={{color:C.muted}}>{offresAuto ? "Acceptation automatique activée." : "Rien n'est accepté tout seul."}</span></span>
+                  <span aria-hidden="true" style={{flexShrink:0,color:C.muted,fontSize:17}}>›</span>
                 </button>
               )}
               {boitesPerimees.length>0 && (
@@ -56623,8 +56639,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </span>
                 </div>
               )}
-              {liste.length===0 && messageSearch.trim() && retireesIci.length===0 && <p style={{fontSize:12,color:C.muted}}>Aucun résultat parmi les conversations reçues. Essaie un pseudo, des mots de l’article ou le numéro précédé de N°.</p>}
-              {listeBrute.length===0 && !messageSearch.trim() && !boitesKO.length && <div style={{fontSize:13,color:C.muted,padding:'14px 0'}}>Aucune conversation captée pour l'instant — elles arrivent quand l'extension passe sur la messagerie Vinted de chaque compte.</div>}
+              {liste.length===0 && messageSearch.trim() && retireesIci.length===0 && <p data-msg-sans-resultat="" style={{fontSize:13,color:C.muted,lineHeight:1.45,margin:'4px 0 12px'}}>Aucune conversation ne correspond. Essaie un pseudo, un mot de l’article ou « N°12 ». <button type="button" className="vrm-pied-lien" data-pied-lien="effacer" onClick={()=>setMessageSearch('')}>{VERBES.effacer} la recherche</button></p>}
+              {/* (5 nov., chantier G) L'état vide dit QUOI FAIRE, en une phrase, et nomme les comptes lus. */}
+              {listeBrute.length===0 && !messageSearch.trim() && !boitesKO.length && <div data-msg-vide="" style={{fontSize:13,color:C.muted,lineHeight:1.5,padding:'14px 0'}}><b style={{display:'block',fontSize:15,color:C.text,marginBottom:2}}>Aucune conversation pour l’instant</b>Ouvre ta messagerie sur vinted.fr {NAV.dans} : l’extension relève les conversations de chaque compte en passant.</div>}
               <div className="vrm-msg-list" style={{border:liste.length?`1px solid ${C.border}`:'none',background:C.card}}>
                 {affiches.map((c,i)=>{
                   const paire = paireDeConv(uidC(c), c.id, null);
@@ -56672,14 +56689,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       style={{color:ro?C.muted:C.text,...(filtreMsg&&uidC(c)!==filtreMsg?STYLE_FLOU:null)}}
                       photo={photo} nom={nom} sensible
                       compte={(plusieurs||!!messageSearch.trim()) && c._acc ? accName(c._acc) : ''}
-                      quand={tsConv||null} couleurHeure={c.unread&&!ro?C.accent:C.muted}
+                      quand={tsConv||null} couleurHeure={c.unread&&!ro?C.text:C.muted}
                       titre={(paire&&paire.titre)||c.item_title||c.item?.title||''} num={paire&&paire.num?paire.num:''} etat={paire&&paire.etat?paire.etat:null}
                       extrait={offreDer ? <span className="vrm-msg-etat vrm-msg-offre-der" data-offre-derniere={String(offreDer.montant)} data-offre-sens={offreDer.sens} data-offre-etat={offreDer.etat||undefined} style={{color:C.text,borderColor:C.border}}>{libelleOffre(offreDer)} {prix(offreDer.montant,offreDer.devise)}{offreDer.ancien?<> <s className="vrm-msg-offre-ancien" style={{color:C.muted}}>{prix(offreDer.ancien,offreDer.devise)}</s></>:null}{etatOffreCourt(offreDer.etat,offreDer.etatLibelle)?<> · {etatOffreCourt(offreDer.etat,offreDer.etatLibelle)}</>:null}</span> : texteEx} couleurExtrait={c.unread?C.text:C.muted} toi={ex.kind==='message'&&ex.source==='fil'&&(ex.de==='toi'||auteur==='toi')}
                       attrsExtrait={{'data-conv-extrait':ex.kind,'data-conv-extrait-source':ex.source}}
                       apres={<>
                           {/* (19 oct.) Sur la ligne du message, pas sur celle de la paire : là
                               elle tronquait le N° et le prix (vu au rendu à 1512 px). */}
-                          {messageFilter==='repondre'&&!offre&&<span className="vrm-msg-etat">{/\?/.test(c.description||'')?'Question reçue':'Message reçu'}</span>}{offre && <span className="vrm-msg-etat vrm-msg-offre" data-offre-liste={String(offre.prix)} style={{color:C.accentTexte,borderColor:C.accent}}>Offre {prix(offre.prix)} en attente</span>}
+                          {messageFilter==='repondre'&&!offre&&<span className="vrm-msg-etat">{/\?/.test(c.description||'')?'Question reçue':'Message reçu'}</span>}{offre && <span className="vrm-msg-etat vrm-msg-offre" data-offre-liste={String(offre.prix)} style={{color:C.text,borderColor:C.border,fontWeight:600}}>Offre {prix(offre.prix)} en attente</span>}
                           {/* (5 nov.) Le dernier message est une offre (reçue, envoyée, tranchée) :
                               marquée « Offre » avec son montant, à SA conversation — plus jamais un
                               code ni un montant nu. L'offre EN ATTENTE garde sa pastille d'accent. */}
@@ -56690,7 +56707,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   );
                 })}
               </div>
-              {tri.length>convMax && <button type="button" className="vrm-msg-more" onClick={()=>React.startTransition(()=>setConvMax(m=>m+40))} style={{color:C.text}}>Afficher les {Math.min(40,tri.length-convMax)} suivantes · {convMax}/{tri.length}</button>}
+              {/* (5 nov., chantier G, revue 2.23) UN style de lien en pied (`vrm-pied-lien`) ; le compte « 40/200 » reste lisible à côté. */}
+              {tri.length>convMax && <button type="button" className="vrm-msg-more vrm-pied-lien" data-pied-lien="suite" onClick={()=>React.startTransition(()=>setConvMax(m=>m+40))}>Afficher les {Math.min(40,tri.length-convMax)} suivantes <span className="vrm-pied-lien-n">{convMax} sur {tri.length}</span></button>}
               {retireesIci.length>0 && (
                 <p className="vrm-msg-retirees" data-conv-retirees={retireesIci.length} style={{color:C.muted}}>
                   {/* (revue) Pendant une recherche, une conversation retirée qui
@@ -56698,7 +56716,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <span>{messageSearch.trim()
                     ? <>{retireesIci.length} conversation{retireesIci.length>1?'s':''} correspond{retireesIci.length>1?'ent':''} à ta recherche, mais tu {retireesIci.length>1?'les as retirées':'l’as retirée'} de la liste — {phraseRetour(retireesIci.length)}.</>
                     : <>{retireesIci.length} conversation{retireesIci.length>1?'s':''} retirée{retireesIci.length>1?'s':''} de la liste — {phraseRetour(retireesIci.length)}.</>}</span>
-                  <button type="button" data-conv-remettre="" onClick={()=>{const suivant=remettreConversations(convRetirees,retireesIci.map(c=>cleConversation(uidC(c),c.id)));setConvRetirees(suivant);save(CONVERSATIONS_RETIREES,suivant);}} style={{color:C.text,borderColor:C.border}}>{retireesIci.length>1?'Les remettre':'La remettre'}</button>
+                  <button type="button" className="vrm-pied-lien" data-pied-lien="remettre" data-conv-remettre="" onClick={()=>{const suivant=remettreConversations(convRetirees,retireesIci.map(c=>cleConversation(uidC(c),c.id)));setConvRetirees(suivant);save(CONVERSATIONS_RETIREES,suivant);}}>{retireesIci.length>1?'Les remettre':'La remettre'}</button>
                 </p>
               )}
             </div>
@@ -56707,26 +56725,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         </div><div className="vrm-chat-column">{openConv?rendreConversation():<div className="vrm-chat-empty"><Icon name="chat" size={28}/><span>Choisis une conversation</span></div>}</div>{rendreFicheConv()}</div>
         {zoneMessages==='conversations'&&<details className="vrm-quick-settings"><summary>Réponses rapides</summary>
         {/* Réponses rapides : modèles éditables, proposés dans chaque conversation. */}
-        <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'10px 12px',marginBottom:12}}>
-          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
-            <span style={{fontSize:13,fontWeight:700,color:C.text,flex:1}}>Réponses rapides</span>
-            <button type="button" onClick={()=>setShowQR(v=>!v)} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{showQR?'Terminer':<span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="pencil" size={12}/>Modifier</span>}</button>
+        {/* (5 nov., chantier G) Le titre est celui du repli (plus écrit deux fois) ; « Modifier » au style des liens de pied ;
+            chaque pastille se prend au doigt (44 px) ; « + Ajouter » neutre (l'accent reste rare, §7). */}
+        <div className="vrm-qr-boite" data-reponses-rapides={quickReplies.length} style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'10px 12px',marginBottom:12}}>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
+            <span style={{fontSize:13,color:C.muted,flex:1,lineHeight:1.4}}>Un tap copie le message ; dans une conversation, il remplit la réponse.</span>
+            <button type="button" className="vrm-pied-lien" data-pied-lien="qr-modifier" onClick={()=>setShowQR(v=>!v)}>{showQR?'Terminer':VERBES.modifier}</button>
           </div>
           <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
             {quickReplies.map((t,i)=>(
-              <div key={i} style={{display:'flex',alignItems:'center',gap:4,border:`1px solid ${C.border}`,borderRadius:12,background:C.bg,padding:'4px 4px 4px 10px'}}>
-                <button type="button" onClick={(ev)=>{ try{navigator.clipboard.writeText(t);}catch(_){ } const b=ev.currentTarget; const p=b.textContent; b.textContent='✓ Copié !'; setTimeout(()=>{ try{b.textContent=p;}catch(_){ } },1000); }} title="Copier ce message" style={{border:'none',background:'transparent',color:C.text,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',maxWidth:230,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{t}</button>
+              <div key={i} className="vrm-qr-puce" style={{display:'flex',alignItems:'center',gap:2,border:`1px solid ${C.border}`,borderRadius:999,background:C.bg,padding:'0 4px 0 14px'}}>
+                <button type="button" onClick={(ev)=>{ try{navigator.clipboard.writeText(t);}catch(_){ } const b=ev.currentTarget; const p=b.textContent; b.textContent=VERBES.copie; setTimeout(()=>{ try{b.textContent=p;}catch(_){ } },1000); }} title="Copier ce message" style={{border:'none',background:'transparent',color:C.text,fontSize:13,fontWeight:500,cursor:'pointer',fontFamily:'inherit',maxWidth:240,minHeight:36,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',padding:'0 6px 0 0'}}>{t}</button>
                 {showQR ? (
                   <>
-                    <button className="vrm-icon-control" aria-label="Modifier" type="button" onClick={async ()=>{ const v=await askText({ desc: 'Modifier le message :', value: t }); if(v!=null){ const a=[...quickReplies]; if(v.trim()){a[i]=v.trim();} else {a.splice(i,1);} saveQR(a); } }} title="Modifier" style={{border:'none',background:'transparent',color:C.muted,fontSize:11,cursor:'pointer'}}><Icon name="pencil" size={15}/></button>
-                    <button type="button" onClick={()=>{ const a=[...quickReplies]; a.splice(i,1); saveQR(a); }} title="Supprimer" style={{border:'none',background:'transparent',color:C.danger,fontSize:12,cursor:'pointer'}}>×</button>
+                    <button className="vrm-icon-control" aria-label={`Modifier « ${t} »`} type="button" onClick={async ()=>{ const v=await askText({ desc: 'Modifier le message :', value: t }); if(v!=null){ const a=[...quickReplies]; if(v.trim()){a[i]=v.trim();} else {a.splice(i,1);} saveQR(a); } }} title={VERBES.modifier} style={{border:'none',background:'transparent',color:C.muted,cursor:'pointer'}}><Icon name="pencil" size={15}/></button>
+                    <button type="button" className="vrm-icon-control" aria-label={`Supprimer « ${t} »`} onClick={()=>{ const a=[...quickReplies]; a.splice(i,1); saveQR(a); }} title={VERBES.supprimer} style={{border:'none',background:'transparent',color:C.muted,cursor:'pointer'}}><Icon name="trash" size={15}/></button>
                   </>
-                ) : <span style={{color:C.muted,paddingRight:4,display:'inline-flex'}} aria-hidden="true"><Icon name="doc" size={13}/></span>}
+                ) : null}
               </div>
             ))}
-            {showQR && <button type="button" onClick={async ()=>{ const v=await askText({ desc: 'Nouveau message rapide :', value: '' }); if(v&&v.trim()) saveQR([...quickReplies,v.trim()]); }} style={{border:`1px dashed ${C.accent}`,borderRadius:12,background:'transparent',color:C.accentTexte,fontSize:12,fontWeight:600,padding:'4px 12px',cursor:'pointer',fontFamily:'inherit'}}>＋ Ajouter</button>}
+            {showQR && <button type="button" className="vrm-qr-puce" onClick={async ()=>{ const v=await askText({ desc: 'Nouveau message rapide :', value: '' }); if(v&&v.trim()) saveQR([...quickReplies,v.trim()]); }} style={{border:`1px dashed ${C.border}`,borderRadius:999,background:'transparent',color:C.text,fontSize:13,fontWeight:600,padding:'0 14px',cursor:'pointer',fontFamily:'inherit'}}>+ {VERBES.ajouter}</button>}
           </div>
-          <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginTop:6}}>Ils apparaissent aussi dans chaque conversation : un clic remplit la réponse.</div>
         </div>
         </details>}
       </>)}
@@ -57840,7 +57859,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           );
         })()}
-        {ongletColisVu === 'envoyer' && only === 'bordereaux' ? <div className="vrm-colis-bas" style={{marginTop:14}}><EntreeJournalEmails headers={sbAuth} onOuvrir={(f)=>{demanderJournalEmails(f); onNav && onNav('settings');}}/></div> : null}
+        {ongletColisVu === 'envoyer' && only === 'bordereaux' ? <div className="vrm-colis-bas" style={{marginTop:14}}><EntreeJournalEmails headers={sbAuth} onOuvrir={(f)=>{demanderJournalEmails(f); onNav && onNav('emails');}}/></div> : null}
         {/* ── PARTIS : CE QUE VINTED SUIT APRÈS TON ENVOI (4 octobre) ───────────
             Julien : « en transit, colis à faire, vendu… ». Colis ne montrait que
             ce qu'il reste à POSTER : un colis parti disparaissait de l'écran, et
@@ -61415,7 +61434,7 @@ function MessagesLeboncoin() {
     <div data-messages-lbc-zone={zone}>
       <div className="vrm-messages-sections" role="group" aria-label="Choisir Conversations ou Favoris">
         <button type="button" aria-pressed={zone === 'conversations'} onClick={() => setZone('conversations')}><Icon name="chat" size={17}/>Conversations</button>
-        <button type="button" aria-pressed={zone === 'favoris'} onClick={() => setZone('favoris')} data-lbc-zone-favoris=""><span aria-hidden="true">♡</span>Favoris reçus</button>
+        <button type="button" aria-pressed={zone === 'favoris'} onClick={() => setZone('favoris')} data-lbc-zone-favoris=""><Icon name="heart" size={17}/>Favoris reçus</button>
       </div>
       {zone === 'favoris' ? <FavorisLeboncoin/> : <ConversationsLeboncoin/>}
     </div>
@@ -61460,8 +61479,10 @@ function ConversationsLeboncoin() {
   const typeDe = (id) => (((d && d.comptes[id]) || {}).pro || accDe(id).type === 'pro') ? 'pro' : accDe(id).type === 'particulier' ? 'particulier' : '';
   const age = (iso) => { const t = Date.parse(iso || ''); if (!t) return null; const m = Math.round((Date.now() - t) / 60000); return m < 1 ? "à l'instant" : m < 60 ? `il y a ${m} min` : m < 1440 ? `il y a ${Math.round(m / 60)} h` : `il y a ${Math.round(m / 1440)} j`; };
   const ouvrir = <a href="https://www.leboncoin.fr/messages" target="_blank" rel="noreferrer" data-ouvrir-messages-lbc="" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, marginTop: 10, border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 12, padding: '0 14px', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>Ouvrir mes messages Leboncoin ↗</a>;
-  if (d === undefined) return <div style={{ fontSize: 13, color: C.muted }}>Chargement…</div>;
-  if (d === null) return <div data-messages-lbc="pas-su" style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Je n'ai pas pu lire tes messages Leboncoin — rien n'est perdu, c'est la lecture qui a échoué. Réessaie dans un moment.<br/>{ouvrir}</div>;
+  if (d === undefined) return <div role="status" data-messages-lbc="charge" style={{ fontSize: 13, color: C.muted, padding: '12px 0' }}>{PAS_SU.enCours}</div>;
+  // (5 nov., chantier G, revue 1.10) La panne par `EtatPanne` : la raison, UN « Réessayer » ; le site reste à un lien.
+  if (d === null) return <div data-messages-lbc="pas-su"><EtatPanne quoi="Tes messages Leboncoin" raison="Rien n’est perdu : c’est la lecture qui a échoué." onReessayer={() => { setD(undefined); setTickLbc((t) => t + 1); }}/>
+    <a href="https://www.leboncoin.fr/messages" target="_blank" rel="noreferrer" data-ouvrir-messages-lbc="" className="vrm-pied-lien" data-pied-lien="ouvrir-lbc">Ouvrir sur Leboncoin ↗</a></div>;
   // UNE ligne par compte : l'identifiant de messagerie et la session privée sont
   // le même compte (jamais deux lignes pour un compte).
   const ids = [...new Set([...Object.keys(d.compteurs), ...Object.keys(d.comptes)].map(nu))];
@@ -61535,7 +61556,7 @@ function ConversationsLeboncoin() {
             </div>
           ) : null}
           {/* Sous la liste, le lien reste discret : le geste « Répondre sur Leboncoin » est dans le fil (§7, l'accent est rare). */}
-          <a href="https://www.leboncoin.fr/messages" target="_blank" rel="noreferrer" data-ouvrir-messages-lbc="" className="vrm-lien-action" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, marginTop: 6, color: C.text, fontSize: 13, fontWeight: 600 }}>Ouvrir mes messages Leboncoin ↗</a>
+          <a href="https://www.leboncoin.fr/messages" target="_blank" rel="noreferrer" data-ouvrir-messages-lbc="" className="vrm-pied-lien" data-pied-lien="ouvrir-lbc" style={{ marginTop: 6 }}>Ouvrir sur Leboncoin ↗</a>
         </div>
         <div className="vrm-chat-column">{filChoisi ? (
           <FilLeboncoin key={filChoisi.conv} conv={filChoisi.conv} nom={nomDe(filChoisi.compte)} envoi={d.envoi} onFerme={() => setOuvertConv('')}/>
@@ -61565,6 +61586,7 @@ function ConversationsLeboncoin() {
 // « — » et le geste, jamais 0.
 function FavorisLeboncoin() {
   const [d, setD] = useState(undefined);
+  const [relu, setRelu] = useState(0);   // (5 nov., chantier G) « Réessayer » relit
   const capStats = extSait('lbcstats');
   // (31 oct.) Le compte Leboncoin OUVERT mis en avant, les autres estompés (§11).
   const lbcOuvert = useCompteLbcOuvert();
@@ -61578,9 +61600,9 @@ function FavorisLeboncoin() {
       if (!l || !Array.isArray(jv) || !Array.isArray(ja)) { if (!stop) setD(null); return; }
       if (!stop) setD({ items: l.items || {}, ventes: (jv[0] && jv[0].v) || {}, acc: (ja[0] && ja[0].a) || {} });
     } catch (_) { if (!stop) setD(null); }
-  })(); return () => { stop = true; }; }, []);
-  if (d === undefined) return <div style={{ fontSize: 13, color: C.muted }}>Chargement…</div>;
-  if (d === null) return <div data-favoris-lbc="pas-su" style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Je n'ai pas pu lire tes annonces Leboncoin — rien n'est perdu, c'est la lecture qui a échoué. Réessaie dans un moment.</div>;
+  })(); return () => { stop = true; }; }, [relu]);
+  if (d === undefined) return <div role="status" data-favoris-lbc="charge" style={{ fontSize: 13, color: C.muted, padding: '12px 0' }}>{PAS_SU.enCours}</div>;
+  if (d === null) return <EtatPanne data-favoris-lbc="pas-su" quoi="Tes favoris Leboncoin" raison="Tes annonces n’ont pas pu être lues. Rien n’est perdu : c’est la lecture qui a échoué." onReessayer={() => { setD(undefined); setRelu((n) => n + 1); }}/>;
   const prouves = new Set([...comptesLbcProuves(d.ventes, d.items), ...comptesLbcSession(d.acc)]);
   const vendues = annoncesLbcVendues(d.ventes);
   const ads = Object.values(d.items).filter((ad) => ad && ad.id != null && annonceLbcALui(ad, prouves) && annonceLbcEnVente(ad, vendues));
@@ -61624,7 +61646,7 @@ function FavorisLeboncoin() {
               </div>
               <div style={{ flexShrink: 0, textAlign: 'right' }}>
                 <span style={{ fontSize: 17, fontWeight: 700, color: f ? C.text : C.muted, fontVariantNumeric: 'tabular-nums' }}>{f == null ? '—' : f}</span>
-                <span style={{ fontSize: 11, color: C.muted }}> ♡</span>
+                <span aria-label="favoris" style={{ color: C.muted, display: 'inline-flex', verticalAlign: '-2px', marginLeft: 4 }}><Icon name="heart" size={13}/></span>
               </div>
               {lien ? <a href={lien} target="_blank" rel="noreferrer" aria-label={`Ouvrir l'annonce sur Leboncoin : ${ad.subject || ad.id}`} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 44, minHeight: 44, color: C.muted, textDecoration: 'none', flexShrink: 0 }}>↗</a> : null}
             </div>
@@ -63458,10 +63480,11 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   const streamOn = useStream();
   const [nMuetsPush, setNMuetsPush] = React.useState(null);
   const [rechercheReglage, setRechercheReglage] = React.useState('');
-  const [sous, setSous] = React.useState(()=>DEMANDE_ADRESSES.on?'adresses':null);       // l'id du sous-écran ouvert (téléphone)
+  // (5 nov., chantier G, revue 2.24) Les e-mails ne sont plus un sous-écran d'ici : la demande
+  // « ouvre mes adresses » (`DEMANDE_ADRESSES`) est servie par l'écran E-mails, onglet « Relier ma boîte ».
+  const [sous, setSous] = React.useState(null);       // l'id du sous-écran ouvert (téléphone)
   const racine = React.useRef(null);
   const ouvrirSous = (id) => { setSous(id); try { racine.current && racine.current.scrollIntoView({ block: 'start' }); } catch (_) {} };
-  React.useEffect(()=>{const ouvrir=()=>{DEMANDE_ADRESSES.on=false;setVueBrute('reglages');setSous('adresses');};window.addEventListener('vrm:ouvrir-adresses',ouvrir);return()=>window.removeEventListener('vrm:ouvrir-adresses',ouvrir);},[]);
   // (31 oct., soir) Un lien vers l'ancien « eBay → Compte » (`?tab=plat_ebay&section=compte`)
   // ouvre le panneau « Comptes eBay » — une fois, puis la demande est consommée.
   React.useEffect(()=>{ if(ouvrir==='ebay'&&ebayCompte){ setVueBrute('reglages'); setSous('ebay'); if(onOuvert) onOuvert(); } /* eslint-disable-next-line */ },[ouvrir,!!ebayCompte]);
@@ -63574,7 +63597,9 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'connexions', type:'panneau', ic:'sync', lib:'État des connexions', desc:'Ce qui marche, ce qui attend un geste', titreInterne:true, el:<ConnexionsSetting key={AUTH.user?.id||'sans-session'} comptes={comptes||[]} onComptes={()=>setTab('vintedaccounts')} onPlateforme={versPlateforme}/> },
       // (31 oct., soir) L'ancien « eBay → Compte » : connexion et comptes eBay reliés.
       ebayCompte && { id:'ebay', type:'panneau', ic:'link', lib:'Comptes eBay', desc:'Connexion à eBay, comptes reliés', el:ebayCompte },
-      { id:'adresses', type:'panneau', ic:'mail', lib:'E-mails', desc:'Est-ce qu’ils arrivent, ce que VRM en a fait, tes adresses', titreInterne:true, el:<EmailsSetting onComptes={()=>setTab('vintedaccounts')}/> },
+      // (5 nov., chantier G, revue 2.24) UN seul écran « E-mails » : l'ancien sous-écran est devenu
+      // l'onglet « Relier ma boîte » de l'écran E-mails ; Paramètres y MÈNE (plus de second écran ici).
+      { id:'adresses', type:'nav', ic:'mail', lib:L.emails, desc:'Relier ma boîte, tes adresses, ce que VRM en a fait', onClick:()=>{ ouvrirEmailsRelier('reception'); setTab('emails'); }, data:{ 'data-reglage-emails':'', 'data-sous-ouvrir':'adresses' } },   // l'attribut d'avant reste : « Paramètres → E-mails » se touche au même endroit
       proprioInst && { id:'import', type:'panneau', nu:true, ic:'calendar', lib:'Import des emails Vinted', desc:'Date de début de l’historique', el:<EmailStartSetting key={AUTH.user?.id||'sans-session'} nu/> },
       { id:'securite', type:'panneau', ic:'key', lib:'Sécurité des données', desc:'Qui peut lire et écrire tes données', el:<SecuriteSetting/> },
     ]},
@@ -63635,7 +63660,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (2 nov.) La visite en bulles, rejouée sur son clic (src/VisiteBulles.jsx).
       { id:'visite', type:'action', ic:'info', lib:'Revoir la visite', desc:'Les onglets de VRM, un par un', onClick:()=>{ try { window.dispatchEvent(new Event('vrm:visite')); } catch (_) {} }, data:{ 'data-reglage-visite':'' } },
       {id:'depannage',type:'panneau',nu:true,ic:'info',lib:'Résoudre un problème',desc:'Emails, comptes, impression',el:<div className="vrm-settings-help">
-      <details><summary>Je ne reçois pas mes emails</summary><p>Vérifie l’adresse associée au compte Vinted, sa confirmation, puis le transfert depuis ta messagerie. L’historique reçu permet de distinguer un email absent d’un email à vérifier.</p><Bouton variante="secondaire" onClick={()=>ouvrirSous('adresses')}>Ouvrir la réception des emails</Bouton></details>
+      <details><summary>Je ne reçois pas mes emails</summary><p>Vérifie l’adresse associée au compte Vinted, sa confirmation, puis le transfert depuis ta messagerie. L’historique reçu permet de distinguer un email absent d’un email à vérifier.</p><Bouton variante="secondaire" onClick={()=>{ ouvrirEmailsRelier('reception'); setTab('emails'); }}>{L.relierBoite}</Bouton></details>
       <details><summary>Mon compte Vinted n’apparaît pas</summary><p>Connecte le compte attendu sur Vinted et vérifie que l’extension utilise ton compte VRM. Actualise ensuite les comptes liés et contrôle le pseudo. N’ajoute pas les données d’un autre vendeur.</p><Bouton variante="secondaire" onClick={()=>setTab('vintedaccounts')}>Voir mes comptes liés</Bouton></details>
       <details><summary>Mon bordereau s’imprime mal</summary><p>Choisis le papier correspondant à ton imprimante, ouvre un aperçu puis contrôle l’échelle d’impression. Le numéro doit rester dans un espace blanc. En cas d’échec d’un lot, relance uniquement les fichiers refusés.</p><Bouton variante="secondaire" onClick={()=>ouvrirSous('imprimante')}>Vérifier l’impression</Bouton></details>
     </div>}]},
@@ -66288,7 +66313,11 @@ const DEMANDE_ADRESSES = { on: false, vers: '', filtre: '' };
 function demanderAdresses(){DEMANDE_ADRESSES.on=true;DEMANDE_ADRESSES.vers='';window.dispatchEvent(new Event('vrm:ouvrir-adresses'));}
 // (31 oct.) Le journal « Tes emails, ce que VRM en a fait », ouvert depuis Colis
 // (filtré « à vérifier » quand il y a quelque chose à vérifier).
-function demanderJournalEmails(filtre){DEMANDE_ADRESSES.on=true;DEMANDE_ADRESSES.vers='journal';DEMANDE_ADRESSES.filtre=filtre||'';try{localStorage.setItem('vrm_reglages_vue','reglages');}catch(_){}window.dispatchEvent(new Event('vrm:ouvrir-adresses'));}
+function demanderJournalEmails(filtre){DEMANDE_ADRESSES.on=true;DEMANDE_ADRESSES.vers='journal';DEMANDE_ADRESSES.filtre=filtre||'';window.dispatchEvent(new Event('vrm:ouvrir-adresses'));}
+// (5 nov., chantier G, revue 2.24) UN seul écran « E-mails » : toute porte vers les adresses, le
+// journal ou l'aperçu de la réception ouvre l'écran E-mails sur son onglet « Relier ma boîte »
+// (l'appelant pose ensuite `setTab('emails')`). `vers` : 'reception' (aperçu) · 'adresses' · 'journal' · 'a-traiter'.
+function ouvrirEmailsRelier(vers, filtre){DEMANDE_ADRESSES.on=true;DEMANDE_ADRESSES.vers=vers||'';DEMANDE_ADRESSES.filtre=filtre||'';window.dispatchEvent(new Event('vrm:ouvrir-adresses'));}
 // La forme acceptée pour une adresse de réception (saisie à la main OU
 // suggérée) : une seule règle.
 const ADRESSE_RECEPTION_OK = /^[^@\s]+@[^@\s.]+\.[^@\s]+$/;
@@ -66501,7 +66530,7 @@ function EmailsSetting({onComptes}) {
     await ajouterAdresses(adresses);
   };
   const retirer = async (adr) => {
-    const ok = await askConfirm({ title: `Retirer ${adr} ?`, desc: "Les emails qui arriveront ensuite sur cette adresse ne te seront plus attribués : ils seront mis de côté en attendant que tu les réclames. Rien de déjà reçu n'est supprimé.", ok: 'Retirer', danger: true });
+    const ok = await askConfirm({ title: `Retirer ${adr} ?`, desc: "Les e-mails qui arriveront ensuite sur cette adresse ne te seront plus attribués : ils seront mis de côté en attendant que tu les réclames. Rien de déjà reçu n'est supprimé.", ok: 'Retirer', danger: true });
     if (!ok) return;
     const u = { ...(reg || {}) }; delete u[adr]; await ecrire(u);
   };
@@ -66518,7 +66547,7 @@ function EmailsSetting({onComptes}) {
     setBusy(id);
     try {
       const ok = await rejouerUn(id, false);
-      toast(ok ? 'Email rattaché — il apparaît maintenant dans tes écrans.' : "Ce mail n'a pas pu être rattaché (format non reconnu). Il reste conservé.");
+      toast(ok ? 'E-mail rattaché — il apparaît maintenant dans tes écrans.' : "Ce mail n'a pas pu être rattaché (format non reconnu). Il reste conservé.");
     } catch (_) { toast('Réseau indisponible — réessaie.'); }
     setBusy(''); charger();
   };
@@ -66535,7 +66564,7 @@ function EmailsSetting({onComptes}) {
     const ids = (quarantaine || []).map(q => q.id);
     if (!ids.length) return;
     const go = await askConfirm({
-      title: `Rejouer ${ids.length} email${ids.length > 1 ? 's' : ''} ?`,
+      title: `Rejouer ${ids.length} e-mail${ids.length > 1 ? 's' : ''} ?`,
       desc: "Ils repassent dans le traitement normal : colis à retirer avec leur QR et leur code, bordereaux, ventes, offres.\n\nAucune notification ne sera envoyée, et rien n'est supprimé tant que le traitement n'a pas abouti.",
       ok: 'Tout rejouer',
     });
@@ -66547,7 +66576,7 @@ function EmailsSetting({onComptes}) {
       setLot({ fait: i + 1, total: ids.length, ok });
     }
     setLot(null);
-    toast(`${ok} email${ok > 1 ? 's' : ''} traité${ok > 1 ? 's' : ''} sur ${ids.length}.`);
+    toast(`${ok} e-mail${ok > 1 ? 's' : ''} traité${ok > 1 ? 's' : ''} sur ${ids.length}.`);
     charger();
   };
   const liste = Object.keys(reg || {});
@@ -66564,15 +66593,15 @@ function EmailsSetting({onComptes}) {
   //    phrase suit ce que la règle d'arrivée fait vraiment (la route le dit) ;
   //    sans réponse, elle n'affirme rien sur l'attribution.
   const vide = (misDeCote && misDeCote.cloisonnee === false)
-      ? { t: "Aucune adresse déclarée. Cette installation n'a qu'une boutique : tous les emails reçus y sont rangés.", alerte: false }
+      ? { t: "Aucune adresse déclarée. Cette installation n'a qu'une boutique : tous les e-mails reçus y sont rangés.", alerte: false }
     : inst && inst.repli === true
-      ? { t: "Aucune adresse déclarée. Personne d'autre n'en a déclaré : pour l'instant, les emails reçus te reviennent (tu es le propriétaire de cette installation). Dès qu'un autre compte déclarera la sienne, un email arrivé sur une adresse que tu n'as pas déclarée sera mis de côté — déclare les tiennes dès maintenant.", alerte: false }
+      ? { t: "Aucune adresse déclarée. Personne d'autre n'en a déclaré : pour l'instant, les e-mails reçus te reviennent (tu es le propriétaire de cette installation). Dès qu'un autre compte déclarera la sienne, un e-mail arrivé sur une adresse que tu n'as pas déclarée sera mis de côté — déclare les tiennes dès maintenant.", alerte: false }
     : inst && inst.repli === false
       // Le geste ne se dit qu'une fois (§7) : quand le nombre est écrit juste
       // dessous, c'est lui qui le porte.
-      ? { t: "Aucune adresse déclarée — et un autre compte a déclaré les siennes : un email arrivé sur une adresse que tu n'as pas déclarée ne t'est plus attribué, il est mis de côté." + (pers ? '' : ' Ajoute tes adresses de réception.'), alerte: true }
+      ? { t: "Aucune adresse déclarée — et un autre compte a déclaré les siennes : un e-mail arrivé sur une adresse que tu n'as pas déclarée ne t'est plus attribué, il est mis de côté." + (pers ? '' : ' Ajoute tes adresses de réception.'), alerte: true }
     : misDeCote
-      ? { t: "Aucune adresse déclarée : tant que tu n'en déclares aucune, aucun email ne t'est attribué. Ajoute ton adresse personnelle, celle où Vinted t’écrit avant le transfert vers VRM.", alerte: true }
+      ? { t: "Aucune adresse déclarée : tant que tu n'en déclares aucune, aucun e-mail ne t'est attribué. Ajoute ton adresse personnelle, celle où Vinted t’écrit avant le transfert vers VRM.", alerte: true }
       : { t: "Aucune adresse déclarée. Ajoute ton adresse personnelle, celle où Vinted t’écrit avant le transfert vers VRM.", alerte: false };
   // ── L'état de preuve de chaque adresse, tel que le SERVEUR le décide ──────
   const etatsPreuve = preuves && preuves.cloisonnee ? (preuves.adresses || {}) : null;
@@ -66599,7 +66628,7 @@ function EmailsSetting({onComptes}) {
   const toutesSugg = async () => {
     const ok = await askConfirm({
       title: `Ajouter ${sugg.length} adresses ?`,
-      desc: `${promesse === 'confirmation' ? "Un lien de confirmation part à chacune : une fois confirmée, les emails qui arrivent dessus te sont attribués, et ceux déjà mis de côté te sont proposés." : promesse === 'directe' ? 'Les emails qui arrivent dessus te seront attribués, et ceux déjà mis de côté te seront proposés.' : "Les emails qui arrivent dessus sont gardés entiers — rien n'est perdu."}\n\n${sugg.map((v) => v.adresse).join('\n')}`,
+      desc: `${promesse === 'confirmation' ? "Un lien de confirmation part à chacune : une fois confirmée, les e-mails qui arrivent dessus te sont attribués, et ceux déjà mis de côté te sont proposés." : promesse === 'directe' ? 'Les e-mails qui arrivent dessus te seront attribués, et ceux déjà mis de côté te seront proposés.' : "Les e-mails qui arrivent dessus sont gardés entiers — rien n'est perdu."}\n\n${sugg.map((v) => v.adresse).join('\n')}`,
       ok: 'Les ajouter',
     });
     if (ok) await ajouterAdresses(sugg.map((v) => v.adresse));
@@ -66616,8 +66645,8 @@ function EmailsSetting({onComptes}) {
           sans dire l'USAGE. Trois lignes visibles — à quoi ça sert, un exemple,
           ce qui se passe si une adresse manque — et le pas-à-pas replié. */}
 
-      {reg === undefined ? <div style={{fontSize:12,color:C.muted}}>Chargement…</div>
-      : reg === null ? <span style={{display:'inline-block',fontSize:11,fontWeight:600,color:C.muted,background:C.bg,border:`1px solid ${C.border}`,borderRadius:999,padding:'2px 9px'}}>{REGLAGE_PAS_LU}</span>
+      {reg === undefined ? <div role="status" style={{fontSize:12,color:C.muted}}>{PAS_SU.enCours}</div>
+      : reg === null ? <EtatPanne compact data-adresses="pas-su" quoi="Tes adresses de réception" raison="La liste n’a pas pu être lue. Rien n’est changé : elle n’est pas réécrite tant qu’elle n’est pas lue." onReessayer={charger}/>
       : liste.length === 0 ? (
         <div data-adresses-vide={vide.alerte ? 'alerte' : 'info'} style={{fontSize:12,color:vide.alerte?C.warn:C.muted,background:vide.alerte?`${C.warn}12`:C.bg,border:`1px solid ${vide.alerte?`${C.warn}44`:C.border}`,borderRadius:12,padding:'9px 11px',lineHeight:1.45}}>
           {vide.t}
@@ -66630,14 +66659,12 @@ function EmailsSetting({onComptes}) {
             Chaque adresse se confirme une fois : VRM envoie un lien <b style={{color:C.text}}>à cette adresse</b>, et tu l'ouvres en étant connecté à VRM.{' '}
             {preuves && preuves.installation
               ? "Les tiennes restent reçues en attendant (tu es le propriétaire de cette installation) ; les confirmer les protège le jour où d'autres vendeurs rejoindront VRM."
-              : "Tant qu'une adresse n'est pas confirmée, ses emails sont mis de côté — rien n'est perdu, ils te sont proposés dès la confirmation."}
+              : "Tant qu'une adresse n'est pas confirmée, ses e-mails sont mis de côté — rien n'est perdu, ils te sont proposés dès la confirmation."}
             {phraseBoite ? <span data-preuve-boite={!boite.at ? 'jamais' : boiteAge > 30 * 60000 ? 'arretee' : 'active'}>{' '}{phraseBoite}</span> : null}
           </div>
         )}
         {preuves === null && (
-          <div data-preuves="pas-su" style={{fontSize:12,color:C.muted,lineHeight:1.45,margin:'0 0 8px'}}>
-            Je n'ai pas pu vérifier quelles adresses sont confirmées — rien n'est perdu, rouvre cet écran dans un moment.
-          </div>
+          <EtatPanne compact data-preuves="pas-su" quoi="Les adresses confirmées" raison="Je n’ai pas pu vérifier lesquelles le sont. Rien n’est perdu." onReessayer={async()=>{ setPreuves(undefined); setPreuves(await lirePreuvesAdresses()); }}/>
         )}
         {liste.map(adr => { const ep = etatDe(adr); const lp = ep ? PREUVE_LIGNE[ep.etat] : null;
           // « Renvoyer » seulement quand le serveur l'accepterait (10 min après la demande).
@@ -66646,7 +66673,7 @@ function EmailsSetting({onComptes}) {
           return (
         <div key={adr} data-adresse={normAdresse(adr)} data-adresse-etat={ep ? ep.etat : (preuves === undefined ? 'lecture' : preuves === null ? 'pas-su' : 'sans-preuve')} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 0',borderTop:`1px solid ${C.border}`,flexWrap:'wrap'}}>
           <span style={{flex:'1 1 140px',minWidth:0,fontSize:12,color:C.text,overflowWrap:'anywhere'}}>
-            <span style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginBottom:2}}>{((suiviAdresses?.owner===uid?suiviAdresses.adresses:[])||[]).find(a=>a.adresse===normAdresse(adr))?.comptes?.length ? ((suiviAdresses?.owner===uid?suiviAdresses.adresses:[])||[]).find(a=>a.adresse===normAdresse(adr)).comptes.map(compte=><span key={compte.id} style={{display:'inline-flex',alignItems:'center',gap:5}}><b style={{fontSize:12}}>{compte.nom}</b>{compte.bloque&&<span title="Bannissement confirmé par le profil Vinted ; les données VRM restent accessibles" style={{fontSize:11,color:C.danger,background:`${C.danger}0d`,borderRadius:6,padding:'1px 5px'}}>Bloqué</span>}</span>) : <span style={{fontSize:11,color:C.muted}}>Compte à associer</span>}</span>
+            <span style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginBottom:2}}>{((suiviAdresses?.owner===uid?suiviAdresses.adresses:[])||[]).find(a=>a.adresse===normAdresse(adr))?.comptes?.length ? ((suiviAdresses?.owner===uid?suiviAdresses.adresses:[])||[]).find(a=>a.adresse===normAdresse(adr)).comptes.map(compte=><span key={compte.id} style={{display:'inline-flex',alignItems:'center',gap:5}}><b style={{fontSize:12}}>{compte.nom}</b>{compte.bloque&&<span title="Bannissement confirmé par le profil Vinted ; les données VRM restent accessibles" style={{fontSize:11,color:C.muted,border:`1px solid ${C.border}`,borderRadius:6,padding:'0 5px'}}>Bloqué</span>}</span>) : <span style={{fontSize:11,color:C.muted}}>Compte à associer</span>}</span>
             <span style={{fontSize:12,color:C.muted}}>{adr}</span>
             {lp && (
               <span data-adresse-preuve={ep.etat} data-adresse-retenue={ep.retenue ? 'oui' : 'non'} style={{display:'flex',alignItems:'center',gap:5,marginTop:3,fontSize:12,lineHeight:1.4,color:lp.alerte && !ep.retenue ? C.warn : C.muted}}>
@@ -66656,7 +66683,7 @@ function EmailsSetting({onComptes}) {
             )}
             {ep && estRelaisApple(adr) && !['prouvee', 'transition'].includes(ep.etat) && (
               <span data-relais-apple-aide={ep.etat} style={{display:'block',marginTop:4,fontSize:12,lineHeight:1.45,color:C.muted}}>
-                Pourquoi : Apple n'accepte en principe sur ce relais que les emails de Vinted — le lien de VRM risque de ne pas y arriver, et tant que l'adresse n'est pas confirmée, ses emails sont mis de côté (rien n'est perdu, ils te reviennent dès la confirmation).
+                Pourquoi : Apple n'accepte en principe sur ce relais que les e-mails de Vinted — le lien de VRM risque de ne pas y arriver, et tant que l'adresse n'est pas confirmée, ses e-mails sont mis de côté (rien n'est perdu, ils te reviennent dès la confirmation).
                 {' '}<b style={{color:C.text}}>Le plus sûr</b> : sur Vinted, Paramètres → Compte → E-mail, mets ton adresse habituelle (Gmail, Outlook…), puis ajoute-la ici et confirme-la. Tu peux aussi essayer d'envoyer le lien quand même.
               </span>
             )}
@@ -66673,7 +66700,7 @@ function EmailsSetting({onComptes}) {
       </>)}
       {/* ── CE QUE PERSONNE NE PEUT RÉCUPÉRER (le seul propriétaire le voit) ──
           Le nombre et la cause, jamais le contenu : ce tas peut contenir les
-          emails d'un autre vendeur. Placé AVANT les suggestions : on lit le
+          e-mails d'un autre vendeur. Placé AVANT les suggestions : on lit le
           problème, puis le geste qui le règle juste dessous. */}
       {pers && (
         <div data-personne={inst.personne.n} style={{marginTop:12,borderTop:`1px solid ${C.border}`,paddingTop:10}}>
@@ -66684,11 +66711,11 @@ function EmailsSetting({onComptes}) {
       )}
       {inst && inst.personne === null && (
         <div data-personne="pas-su" style={{marginTop:10,fontSize:12,color:C.muted,lineHeight:1.45}}>
-          Je n'ai pas pu compter les emails mis de côté que personne ne peut récupérer — rouvre cet écran dans un moment.
+          Je n'ai pas pu compter les e-mails mis de côté que personne ne peut récupérer — rouvre cet écran dans un moment.
         </div>
       )}
       {/* ── SES ADRESSES DÉJÀ VUES, ajoutables d'un clic ──────────────────
-          Lues sur SES emails déjà rangés (jamais sur le tas mis de côté) : une
+          Lues sur SES e-mails déjà rangés (jamais sur le tas mis de côté) : une
           identité, pas une ressemblance. Le nombre et la date l'aident à
           reconnaître les siennes. Rien quand la lecture a échoué (on ne
           suggère pas sur du vide) ni quand le registre n'est pas lu (on ne
@@ -66696,7 +66723,7 @@ function EmailsSetting({onComptes}) {
       {reg && sugg.length > 0 && (
         <div data-suggestions={sugg.length} style={{marginTop:10,borderTop:`1px solid ${C.border}`,paddingTop:10}}>
           <div style={{fontSize:13,fontWeight:600,color:C.text}}>Adresses où arrivent déjà tes emails</div>
-          <div style={{fontSize:12,color:C.muted,lineHeight:1.45,margin:'2px 0 4px'}}>Vues sur tes emails rangés. Ajoute celles qui sont à toi.</div>
+          <div style={{fontSize:12,color:C.muted,lineHeight:1.45,margin:'2px 0 4px'}}>Vues sur tes e-mails rangés. Ajoute celles qui sont à toi.</div>
           {sugg.slice(0, 8).map((v) => (
             <div key={v.adresse} data-suggestion={v.adresse} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 0',borderTop:`1px solid ${C.border}`}}>
               <span style={{flex:'1 1 140px',minWidth:0}}>
@@ -66724,30 +66751,30 @@ function EmailsSetting({onComptes}) {
       <div data-adresses-explication="" style={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',margin:'6px 0 12px'}}>
         <div style={{display:'grid',gridTemplateColumns:'auto 1fr',columnGap:9,rowGap:6,fontSize:13,lineHeight:1.45,color:C.text}}>
           <span aria-hidden="true" style={{color:C.accentTexte,marginTop:2}}><Icon name="mail" size={14}/></span>
-          <span>VRM range tes emails Vinted (bordereaux, ventes, colis) dans ta boutique <b>grâce à l'adresse où ils arrivent</b>.</span>
+          <span>VRM range tes e-mails Vinted (bordereaux, ventes, colis) dans ta boutique <b>grâce à l'adresse où ils arrivent</b>.</span>
           <span aria-hidden="true" style={{color:C.muted,marginTop:2}}><Icon name="check" size={14}/></span>
           <span><span style={{color:C.muted}}>Exemple :</span> Vinted t'écrit sur <b style={{whiteSpace:'nowrap'}}>tonnom@exemple.fr</b> → ajoute cette adresse ici.</span>
           <span aria-hidden="true" style={{color:C.muted,marginTop:2}}><Icon name="clock" size={14}/></span>
           <span data-adresses-promesse={promesse}>{promesse === 'confirmation'
-            ? "Une adresse manque, ou n'est pas encore confirmée ? Ses emails sont mis de côté, gardés entiers — ils te sont proposés ici dès que tu l'as ajoutée puis confirmée."
+            ? "Une adresse manque, ou n'est pas encore confirmée ? Ses e-mails sont mis de côté, gardés entiers — ils te sont proposés ici dès que tu l'as ajoutée puis confirmée."
             : promesse === 'directe'
-              ? "Une adresse manque ? Ses emails sont mis de côté, gardés entiers — ils te sont proposés ici dès que tu l'ajoutes."
-              : "Une adresse manque ? Ses emails sont mis de côté, gardés entiers — rien n'est perdu."}</span>
+              ? "Une adresse manque ? Ses e-mails sont mis de côté, gardés entiers — ils te sont proposés ici dès que tu l'ajoutes."
+              : "Une adresse manque ? Ses e-mails sont mis de côté, gardés entiers — rien n'est perdu."}</span>
         </div>
         <div data-adresse-transfert-vrm="" style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:8,marginTop:10,fontSize:12}}><span>Adresse de transfert : <b style={{overflowWrap:'anywhere'}}>{ADRESSE_COLLECTRICE}</b></span><button type="button" onClick={async()=>{try{await navigator.clipboard.writeText(ADRESSE_COLLECTRICE);toast('Adresse de transfert copiée.');}catch(_){toast('Sélectionne l’adresse affichée pour la copier.');}}} className="vrm-b vrm-b-secondaire vrm-b-petit">Copier l’adresse</button></div>
         <details style={{marginTop:8}}>
-          <summary style={{cursor:'pointer',fontSize:13,fontWeight:600,color:C.accentTexte,padding:'13px 0',minHeight:44,boxSizing:'border-box'}}>Comment faire suivre mes emails Vinted vers VRM&nbsp;?</summary>
+          <summary style={{cursor:'pointer',fontSize:13,fontWeight:600,color:C.accentTexte,padding:'13px 0',minHeight:44,boxSizing:'border-box'}}>Comment faire suivre mes e-mails Vinted vers VRM&nbsp;?</summary>
           <ol style={{margin:'8px 0 0',paddingLeft:18,fontSize:12,color:C.text,lineHeight:1.5,display:'grid',gap:5}}>
-            <li>Sur Vinted, dans chaque compte : <b>Paramètres → Notifications</b>, laisse les emails activés (ventes, bordereaux, messages).</li>
+            <li>Sur Vinted, dans chaque compte : <b>Paramètres → Notifications</b>, laisse les e-mails activés (ventes, bordereaux, messages).</li>
             <li>Ajoute ici <b>ton adresse personnelle</b>, celle où Vinted et les transporteurs t’écrivent. La boîte collective VRM n’est pas ton adresse personnelle.</li>
             <li>Dans Gmail : <b>Paramètres → Voir tous les paramètres → Transfert et POP/IMAP → Ajouter une adresse de transfert</b>, puis indique <b>{ADRESSE_COLLECTRICE}</b>. Dans Outlook ou iCloud, utilise une règle de transfert automatique vers cette même adresse.</li>
             <li>Google peut demander une validation à la boîte VRM : tant qu’elle n’est pas faite, le transfert n’est pas actif. Une règle de transfert manuel qui masque ton adresse personnelle peut nécessiter une vérification.</li>
-            <li>Crée une règle pour <b>les emails Vinted et de tes transporteurs</b>, avec leurs pièces jointes. Garde une copie dans ta boîte. Le transfert général de tous tes emails personnels n’est pas nécessaire.</li>
-            <li>Après le prochain email, vérifie sa réception dans VRM. Les reçus d’achat sont dans <b>Vinted → Achats → Reçus d’achat par email</b>. Un reçu reçu par email ne crée pas une commande synchronisée.</li>
+            <li>Crée une règle pour <b>les e-mails Vinted et de tes transporteurs</b>, avec leurs pièces jointes. Garde une copie dans ta boîte. Le transfert général de tous tes e-mails personnels n’est pas nécessaire.</li>
+            <li>Après le prochain e-mail, vérifie sa réception dans VRM. Les reçus d’achat sont dans <b>Vinted → Achats → Reçus d’achat par email</b>. Un reçu reçu par e-mail ne crée pas une commande synchronisée.</li>
             <li>Adresse « Masquer mon adresse » d'Apple : sur l'iPhone, <b>Réglages → ton nom → Connexion et sécurité → Se connecter avec Apple → Vinted → Transférer à</b>.</li>
           </ol>
           <div style={{fontSize:12,color:C.muted,lineHeight:1.45,marginTop:8}}>
-            Pourquoi l'adresse et pas le contenu ? Un expéditeur ou un texte se falsifient ; l'adresse d'arrivée, non. Personne ne peut donc déposer ses emails dans ta boutique, et un email dont l'adresse n'est déclarée par personne n'est jamais donné au hasard.
+            Pourquoi l'adresse et pas le contenu ? Un expéditeur ou un texte se falsifient ; l'adresse d'arrivée, non. Personne ne peut donc déposer ses e-mails dans ta boutique, et un e-mail dont l'adresse n'est déclarée par personne n'est jamais donné au hasard.
           </div>
         </details>
       </div>
@@ -66766,23 +66793,21 @@ function EmailsSetting({onComptes}) {
     </div>
     <div id={espaceId+'-a-traiter'} data-email-panneau="a-traiter" hidden={rubriqueEmail!=='a-traiter'} className="vrm-email-rattachement">
       <h3>E-mails à rattacher</h3><p>Arrivés sur une adresse que VRM ne peut pas encore relier à toi : ils sont gardés entiers. Touche « C’est à moi » sur ceux qui sont à toi.</p>
-      {quarantaine===undefined&&<p role="status">Lecture des emails mis de côté…</p>}
-      {Array.isArray(quarantaine)&&quarantaine.length===0&&<div className="vrm-email-vide">Aucun email à rattacher pour le moment.</div>}
+      {quarantaine===undefined&&<p role="status">Lecture des e-mails mis de côté…</p>}
+      {Array.isArray(quarantaine)&&quarantaine.length===0&&<div className="vrm-email-vide">Aucun e-mail à rattacher pour le moment.</div>}
       {/* Pas su ≠ aucun. Une seule phrase, et seulement si le registre, lui, a
           été lu (sinon la pastille du dessus et le bloc de Réglages le disent). */}
       {quarantaine === null && (
-        <div data-mis-de-cote="pas-su" style={{marginTop:10,fontSize:12,color:C.muted,lineHeight:1.45}}>
-          Je n'ai pas pu vérifier s'il y a des emails mis de côté pour toi — rien n'est perdu, rouvre cet écran dans un moment.
-        </div>
+        <EtatPanne data-mis-de-cote="pas-su" quoi="Les e-mails mis de côté" raison="Je n’ai pas pu vérifier s’il y en a pour toi. Rien n’est perdu." onReessayer={charger}/>
       )}
       {enAttente.length > 0 && (
         <div data-emails-mis-de-cote="" style={{marginTop:12,borderTop:`1px solid ${C.border}`,paddingTop:10}}>
           <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>{enAttente.length} email{enAttente.length>1?'s':''} conservé{enAttente.length>1?'s':''}</div>
-          <label className="vrm-email-recherche">Rechercher dans les emails à rattacher<input type="search" value={rechercheRattachement} onChange={e=>{setRechercheRattachement(e.target.value);setLimiteRattachement(10);}} placeholder="Sujet ou motif"/></label>
+          <ChampRecherche className="vrm-email-recherche-champ" valeur={rechercheRattachement} onChange={v=>{setRechercheRattachement(v);setLimiteRattachement(10);}} label="Rechercher dans les e-mails à rattacher" placeholder="Sujet ou motif" voix="brut"/>
           {motsRattachement&&<p className="vrm-email-resultats">{rattachementsVisibles.length} sur {enAttente.length} · recherche appliquée</p>}
           {/* (30 oct.) Un parcours : où j'en suis, une barre, combien. */}
           {lot ? <Avancement titre={`Email ${Math.min(lot.fait + 1, lot.total)} sur ${lot.total}`} part={lot.total ? lot.fait / lot.total : 0}
-              phrase="Chaque email repasse dans le traitement normal. Rien n'est supprimé avant la fin."
+              phrase="Chaque e-mail repasse dans le traitement normal. Rien n'est supprimé avant la fin."
               compte={compteAvancement({ faites: lot.ok, ratees: lot.fait - lot.ok, restent: lot.total - lot.fait, motFait: 'traité' })}
               data={{ 'data-rejeu-lot': `${lot.fait}/${lot.total}` }}/>
             : <button type="button" onClick={toutRejouer} className="vrm-b vrm-b-primaire vrm-b-plein" style={{marginBottom:10}}>
@@ -66799,7 +66824,7 @@ function EmailsSetting({onComptes}) {
               </button>
             </div>
           ))}
-          {rattachementsVisibles.length===0&&<div className="vrm-email-vide">Aucun email ne correspond à cette recherche.</div>}
+          {rattachementsVisibles.length===0&&<div className="vrm-email-vide">Aucun e-mail ne correspond à cette recherche.</div>}
           {rattachementsVisibles.length>limiteRattachement&&<button type="button" className="vrm-email-suivants" onClick={()=>setLimiteRattachement(n=>n+10)}>Afficher les suivants ({rattachementsVisibles.length-limiteRattachement})</button>}
         </div>
       )}
@@ -69935,7 +69960,8 @@ function AppCoeur() {
             // Sur « Ventes », les trois cases disent déjà ces montants : le résumé
             // du haut se tait (le même nombre deux fois sur un écran, §7).
             // (31 oct., soir) Sur Achats non plus : ce sont des montants de ventes.
-            if (sec === 'ventes' || sec === 'achats') return null;
+            // (5 nov., chantier G) Ni sur Messages (« CA finalisé — » au-dessus des conversations).
+            if (sec === 'ventes' || sec === 'achats' || sec === 'messages') return null;
             return (
             <PlatResume baseKO={baseKO} note={note} cases={[[`CA finalisé${ar.nRecu ? ' · ' + ar.nRecu : ''}`, ar.actives ? e2(ar.recu) : null], [`En attente${ar.nAttente ? ' · ' + ar.nAttente : ''}`, ar.actives ? e2(ar.attente) : null, true]]}/>
           ); })()}
@@ -69978,7 +70004,8 @@ function AppCoeur() {
             const nomVue = plusieurs && ebayVueEff !== '*' ? nomCompteEbay(comptesEbay.find((c) => c.ref === ebayVueEff)) : '';
             const lib = 'Ventes payées' + (plusieurs ? (ebayVueEff === '*' ? ` · ${comptesEbay.length} comptes` : ` · ${nomVue}`) : '');
             const note = illVue.length ? `Je n'ai pas pu lire les ventes ${illVue.length > 1 ? 'des comptes eBay' : 'du compte eBay'} ${illVue.map(nomCompteEbay).join(', ')} — rien n'est perdu, réessaie dans un moment.` : null;
-            if (sec === 'ventes' || sec === 'achats') return null;   // les trois cases de « Ventes » le disent (§7) ; Achats : des montants de ventes
+            // (5 nov., chantier G) Ni sur Messages : des montants de ventes au-dessus des conversations n'aident à répondre à personne.
+            if (sec === 'ventes' || sec === 'achats' || sec === 'messages') return null;   // les trois cases de « Ventes » le disent (§7) ; Achats : des montants de ventes
             return <PlatResume dark baseKO={baseKO} note={note} cases={[[lib, ca != null ? fmt(ca) : null]]}/>;
           })()}
           {/* Le SÉLECTEUR DE COMPTE : seulement à partir de deux comptes reliés
@@ -70387,7 +70414,7 @@ function AppCoeur() {
         {horsLigne ? <JourneeHorsLigne tab={tab} uid={(authState.user && authState.user.id) || (MULTI_USER ? '' : 'local')}/> : (<>
         {baseKO && <BaseInjoignable/>}
         <BandeauLiaison/>
-        <BandeauConfirmationAdresse onVoir={() => { demanderAdresses(); try { localStorage.setItem('vrm_reglages_vue','reglages'); } catch (_) {} setTab('settings'); }}/>
+        <BandeauConfirmationAdresse onVoir={() => { ouvrirEmailsRelier('adresses'); setTab('emails'); }}/>
         <DemandeCodeDiscord/>
         {/* Les photos de Vinted qui ne s'affichent pas ICI : dit UNE fois,
             sur la coque, pour tous les écrans (src/photosVinted.js). */}
@@ -70613,10 +70640,15 @@ function AppCoeur() {
         {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices}/>}
         {tab==='communaute'&&<Suspense fallback={<p style={{padding:20}}>Chargement de la communauté…</p>}><Communaute sombre={C===THEMES.dark} headers={enTeteSession} prenom={String(load('vrm_prenom','')||'').trim()} FermeAuRetour={FermeAuRetour}/></Suspense>}
         {/* (5 nov.) E-mails : les liens « Voir dans VRM » passent par `vrm:aller` (un chemin `?tab=…&cible=…`, src/cibleNotif.js). */}
-        {tab==='emails'&&<Suspense fallback={<p style={{padding:20}}>Chargement des e-mails…</p>}><BoiteEmails headers={sbAuth} delies={load('vrm_recus_delies',{})||{}} FermeAuRetour={FermeAuRetour}
+        {/* (5 nov., chantier G, revue 2.24) UN seul écran « E-mails » : son onglet « Relier ma boîte » porte
+            l'ancien sous-écran de Paramètres (`EmailsSetting` : aperçu, journal, adresses, à rattacher) sous
+            l'accompagnement animé. Une demande venue d'ailleurs (`DEMANDE_ADRESSES`) l'ouvre directement. */}
+        {tab==='emails'&&<Suspense fallback={<p role="status" style={{padding:20}}>{PAS_SU.enCours}</p>}><BoiteEmails headers={sbAuth} delies={load('vrm_recus_delies',{})||{}} FermeAuRetour={FermeAuRetour}
+          vueInitiale={DEMANDE_ADRESSES.on?'relier':'boite'}
+          reglages={<EmailsSetting onComptes={()=>setTab('vintedaccounts')}/>}
           onAller={(u)=>{try{window.dispatchEvent(new CustomEvent('vrm:aller',{detail:u}));}catch(_){}}}
           onNum={(n)=>{try{window.dispatchEvent(new CustomEvent('vrm:fiche-article',{detail:String(n)}));}catch(_){}}}
-          onAdresses={()=>{demanderAdresses();try{localStorage.setItem('vrm_reglages_vue','reglages');}catch(_){}setTab('settings');}}/></Suspense>}
+          onAdresses={()=>{ouvrirEmailsRelier('adresses');}}/></Suspense>}
         {tab==='organisation'&&<Suspense fallback={<p style={{padding:20}}>Chargement de l’organisation…</p>}><Operations sombre={C===THEMES.dark} headers={enTeteSession}/></Suspense>}
         {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)} accounts={vintedAccounts} comptesLus={accountsLoaded&&!baseKO}/>}
         {tab==='comptabilite'&&<Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}

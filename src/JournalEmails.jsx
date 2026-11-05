@@ -12,6 +12,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { lectureEmail, ETATS_JOURNAL, FILTRES_TYPE } from './journalEmail.js';
 import { requeteJsonBornee } from './requeteJsonBornee.js';
+import { EtatPanne } from './composants/EtatPanne.jsx';
 import './journal-emails.css';
 
 const quand = (v) => { const t = Date.parse(v || ''); return Number.isFinite(t) ? new Date(t).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'date non lue'; };
@@ -33,8 +34,8 @@ function TexteEmail({ id, headers }) {
     return () => { vivant = false; };
   }, [id, headers, tentative]);
   if (t === undefined) return <p className="vrm-journal-texte-etat" role="status">Lecture du texte…</p>;
-  if (t === null) return <p className="vrm-journal-texte-etat" role="alert" data-journal-texte="pas-su">Le texte de cet email n’a pas pu être chargé. <button type="button" onClick={() => setTentative((n) => n + 1)}>Réessayer la lecture</button></p>;
-  if (!t.texte) return <p className="vrm-journal-texte-etat" data-journal-texte="absent">Texte non gardé (email classé avant le 31 oct.). L’original reste dans ta messagerie.</p>;
+  if (t === null) return <p className="vrm-journal-texte-etat" role="alert" data-journal-texte="pas-su">Le texte de cet e-mail n’a pas pu être chargé. <button type="button" onClick={() => setTentative((n) => n + 1)}>Réessayer la lecture</button></p>;
+  if (!t.texte) return <p className="vrm-journal-texte-etat" data-journal-texte="absent">Texte non gardé (e-mail classé avant le 31 oct.). L’original reste dans ta messagerie.</p>;
   return <pre className="vrm-journal-texte" data-journal-texte="lu">{t.texte}</pre>;
 }
 
@@ -106,7 +107,8 @@ export default function JournalEmails({ headers, filtreInitial = '', typeInitial
           <h3>Tes e-mails, un par un</h3>
           <p>Le plus récent d’abord. Chaque e-mail dit ce que VRM en a fait ; ce qui demande un geste est en ambre.</p>
         </div>
-        <button type="button" className="vrm-journal-actualiser" onClick={() => charger(0)} disabled={lecture}>{lecture ? 'Lecture…' : 'Actualiser'}</button>
+        {/* (5 nov., chantier G, revue 3.8) Pas d'« Actualiser » à côté du « Réessayer » d'une panne. */}
+        {pages !== null && <button type="button" className="vrm-journal-actualiser" onClick={() => charger(0)} disabled={lecture}>{lecture ? 'Lecture…' : 'Actualiser'}</button>}
       </header>
       <div className="vrm-journal-filtres" role="group" aria-label="Filtrer les emails">
         <div className="vrm-journal-segments">
@@ -131,14 +133,15 @@ export default function JournalEmails({ headers, filtreInitial = '', typeInitial
         </label>}
       </div>
       {pages === undefined && <p className="vrm-journal-vide" role="status">Lecture du journal…</p>}
-      {pages === null && <p className="vrm-journal-vide" role="alert" data-journal="pas-su">Je n’ai pas pu lire le journal de tes emails — rien n’est perdu, ils restent rangés. <button type="button" onClick={() => charger(0)}>Réessayer</button></p>}
+      {/* (5 nov., chantier G, revue 1.10) La panne par `EtatPanne`. */}
+      {pages === null && <EtatPanne role="alert" data-journal="pas-su" quoi="Le journal de tes e-mails" raison="Rien n’est perdu : ils restent rangés." onReessayer={() => charger(0)}/>}
       {pages && <>
         {c && <p className="vrm-journal-couverture" data-journal-sur={c.sur}>Sur tes {c.sur} derniers e-mails{c.adresse ? ` reçus sur ${c.adresse}` : ''}{c.plus ? ' (les plus anciens ne sont pas comptés)' : ''}{c.incompris ? ` · dont ${c.incompris} pas compris` : ''}.</p>}
-        {pages.emails.length === 0 && <p className="vrm-journal-vide" data-journal="vide">{etat || type || adresse ? 'Aucun email pour ce filtre.' : 'Aucun email suivi pour l’instant. Le prochain email reçu apparaîtra ici.'}</p>}
+        {pages.emails.length === 0 && <p className="vrm-journal-vide" data-journal="vide">{etat || type || adresse ? 'Aucun e-mail pour ce filtre.' : 'Aucun e-mail suivi pour l’instant. Le prochain e-mail reçu apparaîtra ici.'}</p>}
         <ul className="vrm-journal-liste">
           {pages.emails.map((e) => <LigneEmail key={e.id} e={e} headers={entetes} delies={delies} onNav={onNav} onNum={onNum} onDelier={onDelier} onRelier={onRelier}/>)}
         </ul>
-        {pages.suiteKO && <p className="vrm-journal-vide" role="alert">La suite n’a pas pu être lue. Réessaie.</p>}
+        {pages.suiteKO && <EtatPanne compact role="alert" data-journal-suite="pas-su" quoi="La suite du journal" raison="Les e-mails ci-dessus restent lus." onReessayer={() => charger((pages.page || 0) + 1)}/>}
         {pages.suite && <button type="button" className="vrm-journal-plus" data-journal-plus="" disabled={lecture} onClick={() => charger((pages.page || 0) + 1)}>{lecture ? 'Lecture…' : 'Voir plus'}</button>}
       </>}
     </section>
@@ -163,7 +166,7 @@ export function EntreeJournalEmails({ headers, onOuvrir }) {
   return (
     <div className="vrm-journal-entree" data-journal-entree="" data-n={n == null ? '' : n}>
       <button type="button" onClick={() => onOuvrir && onOuvrir(n > 0 ? 'a-verifier' : '')}>
-        <span>Tes emails, ce que VRM en a fait</span>
+        <span>Tes e-mails, ce que VRM en a fait</span>
         {n > 0 ? <b className="vrm-journal-n-ambre">{n} à vérifier</b> : <span aria-hidden="true">→</span>}
       </button>
     </div>

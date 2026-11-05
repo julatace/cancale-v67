@@ -32,6 +32,8 @@ import Accompagnement from './Accompagnement.jsx';
 import { codeDuLien } from './accompagnement.js';
 import { cellules, resume, grouperParPixels, COUCOU, quandCourt, distanceKm, RAYON_PRES_KM } from './regles.js';
 import './communaute.css';
+// (5 nov., chantier G, revue 1.10) Les pannes de la carte, du classement et d'un fil : `EtatPanne`.
+import { EtatPanne } from '../composants/EtatPanne.jsx';
 import { chargerMaplibre, poserFond, webglDispo, mouvementReduit } from '../fondCarte.js';
 
 // Le fond : OpenFreeMap (positron / dark), dessiné par MapLibre, chargé
@@ -325,7 +327,7 @@ function Fil({ api, conv, entete, onFerme, onChange, FermeAuRetour }) {
     <FermeAuRetour fermer={onFerme} />
     <div className="vrm-cm-feuille vrm-cm-fil" role="dialog" aria-modal="true" aria-label={'Conversation avec ' + titre} data-cm-fil={conv}>
       <div className="vrm-cm-feuille-tete"><h3>{titre}{autre && autre.ville ? <small> · {autre.ville}</small> : null}</h3><button type="button" className="vrm-cm-x" onClick={onFerme} aria-label="Fermer">×</button></div>
-      {fil === undefined ? <p role="status">Lecture de la conversation…</p> : fil === null ? <p className="vrm-cm-msg">{msg || PAS_SU} <button type="button" onClick={lire}>Réessayer</button></p> : <>
+      {fil === undefined ? <p role="status">Lecture de la conversation…</p> : fil === null ? <EtatPanne compact data-cm-fil-panne="" quoi="Cette conversation" raison={msg || 'Je n’ai pas pu la lire. Rien n’est perdu.'} onReessayer={lire}/> : <>
         <div className="vrm-cm-bulles" ref={bas} data-cm-messages={fil.messages.length}>
           {fil.messages.length === 0 && <p className="vrm-cm-note">Aucun message pour l’instant.</p>}
           {fil.messages.map((m) => <div key={m.id} className={'vrm-cm-bulle' + (m.moi ? ' moi' : '')} data-cm-bulle={m.moi ? 'moi' : 'autre'}>
@@ -461,11 +463,11 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
 
   if (etat === 'charge') return <section className="vrm-communaute" data-dark={sombre ? 'true' : 'false'} data-communaute-etat="charge">{entete}<p role="status" className="vrm-cm-note">Lecture de la carte…</p></section>;
   if (etat !== 'lu') return <section className="vrm-communaute" data-dark={sombre ? 'true' : 'false'} data-communaute-etat={etat}>{entete}
-    <div className="vrm-cm-carton">
+    {etat === 'pas-su' ? <EtatPanne data-cm-panne="" quoi="La carte de la communauté" raison={msgEtat || PAS_SU} onReessayer={() => lire()}/>
+    : <div className="vrm-cm-carton">
       {etat === 'non-installe' ? <><b>La carte de la communauté n’est pas encore activée sur ta base.</b><p>Elle s’ouvrira dès que la mise à jour de la base sera faite. Rien n’est perdu, rien n’est partagé d’ici là.</p></>
-        : etat === 'abonnement' ? <><b>Ton abonnement n’est pas actif.</b><p>La carte de la communauté est réservée aux abonnés : tu n’es pas montré aux autres tant qu’il n’est pas réglé.</p></>
-        : <><b>{PAS_SU}</b><button type="button" onClick={() => lire()} data-cm-reessayer>Réessayer</button></>}
-    </div></section>;
+        : <><b>Ton abonnement n’est pas actif.</b><p>La carte de la communauté est réservée aux abonnés : tu n’es pas montré aux autres tant qu’il n’est pas réglé.</p></>}
+    </div>}</section>;
 
   const onglets = <div className="vrm-cm-onglets" role="group" aria-label="Communauté">
     {[['carte', 'Carte'], ['classement', 'Classement'], ['groupes', 'Groupes']].map(([k, t]) => <button key={k} type="button" className="vrm-cm-onglet" aria-pressed={vue === k} onClick={() => setVue(k)} data-cm-vue={k}>{t}</button>)}
@@ -651,7 +653,7 @@ function Classement({ api, moi, groupe }) {
     if (r.ok && r.classement && Array.isArray(r.classement.lignes)) { setC(r.classement); setEtat('lu'); return; }
     setC(null);
     setEtat(r.erreur === 'non-installe' ? 'non-installe' : r.erreur === 'abonnement' ? 'abonnement' : 'pas-su');
-    setMsg(r.message || CLASSEMENT_PAS_SU);
+    setMsg(r.message && r.message !== PAS_SU ? r.message : CLASSEMENT_PAS_SU);   // (5 nov.) la phrase de la CARTE ne dit pas le classement
   }, [api, groupe]);
   useEffect(() => { lire(periode); }, [periode, lire]);
   const inscrire = async (oui) => {
@@ -668,10 +670,11 @@ function Classement({ api, moi, groupe }) {
   const note = <div className="vrm-cm-note" data-cm-classement-regle>Le chiffre : tes ventes Vinted de la période — jamais un montant.{' '}
     <details className="vrm-pourquoi" data-pourquoi><summary aria-label="Comment c'est compté" title="Comment c'est compté">ⓘ</summary><div>Comptées par VRM à partir de ce que l’extension a capté. Annulées et remboursées non comptées. Leboncoin et eBay n’y entrent pas.</div></details></div>;
 
-  if (etat === 'non-installe' || etat === 'abonnement' || etat === 'pas-su') return <div className="vrm-cm-carton" data-cm-classement={etat}>
+  // (5 nov., chantier G, revue 1.10) La panne du classement : `EtatPanne` (« pas su » n'est pas « personne »).
+  if (etat === 'pas-su') return <div data-cm-classement={etat}>{choix}<EtatPanne quoi="Le classement" raison={`${msg || CLASSEMENT_PAS_SU} Ce n’est pas un classement vide.`} onReessayer={() => lire(periode)}/></div>;
+  if (etat === 'non-installe' || etat === 'abonnement') return <div className="vrm-cm-carton" data-cm-classement={etat}>
     {etat === 'non-installe' ? <><b>Le classement n’est pas encore activé sur ta base.</b><p>Il s’ouvrira dès que la mise à jour de la base sera faite. Rien n’est partagé d’ici là.</p></>
-      : etat === 'abonnement' ? <><b>Ton abonnement n’est pas actif.</b><p>Le classement est réservé aux abonnés.</p></>
-      : <><b>{CLASSEMENT_PAS_SU}</b><p>Ce n’est pas un classement vide : je n’ai simplement pas pu le lire.</p><button type="button" onClick={() => lire(periode)} data-cm-classement-reessayer>Réessayer</button></>}
+      : <><b>Ton abonnement n’est pas actif.</b><p>Le classement est réservé aux abonnés.</p></>}
   </div>;
 
   const inscrit = c && c.inscrit, visible = c ? c.visible : !!moi;
