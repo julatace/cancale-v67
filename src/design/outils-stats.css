@@ -88,3 +88,8 @@
 @media (prefers-reduced-motion: reduce) { .vrm-micro[data-micro-ecoute="1"] svg { animation: none; } }
 .vrm-barre-recherche .vrm-micro { margin: 0 -10px 0 -6px; }
 .vrm-hdr-recherche .vrm-micro { margin: 0 -6px; }
+
+/* (5 nov., chantier F, revue 2.25) « Ce qui rapporte le plus » sans rien à classer :
+   une ligne, comme les autres cartes repliées (stats-vitrine.css). */
+html .vrm-stats-vitrine .vrm-cr.vrm-sv-repliee { padding: 12px 14px; gap: 2px 14px; }
+html .vrm-stats-vitrine .vrm-cr.vrm-sv-repliee .vrm-cr-vide { padding: 0; }
