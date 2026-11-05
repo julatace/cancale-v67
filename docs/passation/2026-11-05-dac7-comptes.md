@@ -127,3 +127,32 @@ Aucune fonction `api/` ajoutée ni modifiée, aucune migration, rien dans `vinte
 - Vestiaire : la vente mesurée n'a pas de compte relevé (`vc_session` jamais écrit) — elle reste
   sur « Compte non identifié » tant que l'extension 5.295+ n'a pas vu `/users/me`.
 - eBay et Vestiaire : aucun lien vers leur rapport tant qu'aucun n'a été vu.
+
+## Relecture adverse (5 nov.)
+
+Deux défauts reproduits, corrigés sur la même branche :
+
+1. **Le rapport Vinted arrivé par le relais iCloud n'aurait jamais été reconnu.** Mesuré en
+   lecture seule (`email_inconnu_*`, formes anonymisées) : 683 e-mails Vinted conservés ont pour
+   expéditeur `"l'équipe Vinted" <no-reply_at_vinted_fr_xxxx_yyyy@icloud.com>`, parfois suivi de
+   `(no-reply@vinted.fr.xxxx.yyyy)`. `plateformeExpediteur` lisait la première adresse
+   (icloud.com) ⇒ `null` ⇒ « pas reçu » à vie, alors que l'e-mail était là. Elle lit maintenant le
+   domaine RÉEL encodé dans l'adresse du relais (icloud.com, privaterelay.appleid.com, duck.com,
+   simplelogin, anonaddy), et un domaine ordinaire seulement s'il FINIT par celui de la plateforme
+   (`vinted.fr.exemple.com` était pris pour Vinted). Reproduit : module d'avant ⇒ `null null` ;
+   audit neuf sur le code d'avant : 3 rouges. Mutations `email-relais`, `email-domaine-fin` rouges.
+2. **Le filtre des e-mails fiscaux lisait `data->>subject`** : la base décompressait chaque ligne
+   `email_*`, bordereaux et PDF compris (§5 : lire `meta->>`). `EXPLAIN ANALYZE` (SELECT seul) :
+   35 527 blocs et 115 ms par `data`, 5 807 blocs et 30 ms par `meta`, mêmes lignes. Passé à
+   `meta->>subject/from/to/receivedAt` (la colonne de la migration 004 porte ces champs).
+
+Et une phrase qui affirmait plus que VRM ne sait : « Rapport pas encore reçu par VRM » ⇒
+« Aucun rapport reconnu dans tes e-mails » (un rapport au sujet inattendu peut être arrivé).
+
+Preuves : `audit-dac7-comptes` 43 verts, `--prouve` 13 mutations toutes rouges ; banc
+`dac7-comptes` (BANC_PORT 7983, 1512 / 390 tactile, clair / sombre) 78 verts, **8 rouges sur le
+commit d'avant** (e-mail fiscal Vinted par relais pas listé, lecture par `data`) ; captures
+regardées ; `seuils-annee`, `coherence`, `fonctions-api`, `comptes-exclus`, `icones`, `urssaf`,
+`email-formes` verts ; `npm run build` passe. La syntaxe `or=(meta->>subject.ilike.*…*)` est
+celle qu'utilise déjà `api/email-inbound.js` ; la base REST n'était pas joignable depuis ce
+conteneur pour l'essayer en direct.

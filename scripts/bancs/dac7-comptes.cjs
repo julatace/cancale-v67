@@ -60,7 +60,8 @@ rows.push({ id:'lbc_listings', data:{ lectures:{ AAA111:{ at:iso(maintenant) } }
 rows.push({ id:'ebay_orders', data:{ orders:[] } });
 // Les e-mails fiscaux INVENTÉS (le sujet, l'expéditeur, l'adresse de réception).
 const EMAILS=[
-  { id:'email_inconnu_f1', data:{ subject:'Complète tes informations fiscales', from:'Vinted <no-reply@vinted.fr>', to:'boite@exemple.fr', receivedAt:iso(cetteAnnee(2,4)), brut:'x'.repeat(2000) } },
+  // f1 : la forme RÉELLE de 683 e-mails Vinted conservés (mesuré le 5 nov.) — le relais iCloud « Masquer mon adresse ».
+  { id:'email_inconnu_f1', data:{ subject:'Complète tes informations fiscales', from:'"l\'équipe Vinted" <no-reply_at_vinted_fr_ab12cd34ef_gh56ij78@icloud.com> (no-reply@vinted.fr.ab12cd34ef.gh56ij78)', to:'boite@exemple.fr', receivedAt:iso(cetteAnnee(2,4)), brut:'x'.repeat(2000) } },
   { id:'email_inconnu_f2', data:{ subject:`Votre rapport DAC7 ${AN} est disponible`, from:'leboncoin <noreply@leboncoin.fr>', to:'boite@exemple.fr', receivedAt:iso(cetteAnnee(9,2)), brut:'x' } },
   { id:'email_inconnu_f3', data:{ subject:'Rapport DAC7 Vinted (transféré)', from:'Un ami <ami@exemple.com>', to:'boite@exemple.fr', receivedAt:iso(cetteAnnee(9,3)), brut:'x' } },
   { id:'email_inconnu_v1', data:{ subject:'Ton article a été vendu', from:'Vinted <no-reply@vinted.fr>', to:'boite@exemple.fr', receivedAt:iso(cetteAnnee(9,4)), brut:'x' } },
@@ -97,6 +98,7 @@ async function page(b, T, opts={}){
   await pg.addInitScript((sb)=>{try{localStorage.setItem('vrm_acces_direct','1');if(sb)localStorage.setItem('vinted_dark','true');}catch(_){}},!!T.sombre);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i,(r)=>(['image','media','font'].includes(r.request().resourceType())?r.abort():r.continue()));
   await pg.route('**/rest/v1/**',route=>{
+    const brute=decodeURIComponent(route.request().url());
     const u=decodeURIComponent(metaVersData(route.request().url()));
     const j=d=>route.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*','content-range':`0-${Math.max(0,d.length-1)}/${d.length}`},body:JSON.stringify(d)});
     if(route.request().method()!=='GET'){
@@ -105,7 +107,7 @@ async function page(b, T, opts={}){
     if(/select=owner/.test(u)) return j([{ owner:'0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b' }]);
     const S=(/[?&]select=([^&]*)/.exec(u)||[])[1]||null;
     if(/\/rest\/v1\/vinted_accounts/.test(u)) return j(accounts);
-    if(/data->>subject\.ilike/.test(u)) lourdes.push(u);
+    if(/data->>subject\.ilike/.test(u)) lourdes.push(brute);
     if(opts.emailsKO && /data->>subject\.ilike/.test(u)) return route.fulfill({status:522,contentType:'text/html',body:'<html>522</html>'});
     const eq=/id=eq\.([^&]*)/.exec(u);
     if(eq&&eq[1]==='main') return j([projette({id:'main',data:opts.main||{}},S)]);
@@ -175,7 +177,7 @@ const MAIN0={ vinted_regime:'micro', vinted_accounts_hidden:['333'] };
         dit(rL&&rL.etat==='recu'&&/Rapport reçu/.test(rL.texte),'Leboncoin · le rapport reçu par e-mail est dit',JSON.stringify(rL));
         dit(rV&&rV.etat==='aucun'&&/taxpayer_center/.test(rV.lien),'Vinted · pas de rapport ⇒ où le trouver (ses informations fiscales sur Vinted)',JSON.stringify(rV));
         dit(rV&&rV.fiscaux==='1'&&/informations fiscales/.test(rV.texte)&&!/transféré/.test(rV.texte),'Vinted · l’e-mail fiscal de Vinted listé ; celui d’une autre adresse, jamais',JSON.stringify(rV&&rV.texte));
-        dit(lourdes.length>0&&lourdes.every(x=>/select=id,s:data->>subject,/.test(x)&&!/select=data(&|$)/.test(x)),'les e-mails fiscaux sont lus filtrés par la base et PROJETÉS (jamais select=data)',lourdes.join(' | '));
+        dit(lourdes.length>0&&lourdes.every(x=>/or=\(meta->>subject\.ilike/.test(x)&&/select=id,s:meta->>subject,/.test(x)&&!/data->/.test(x)),'les e-mails fiscaux sont lus filtrés par la base sur `meta` et PROJETÉS (jamais `data`, qui décompresse les PDF)',lourdes.join(' | '));
         // Exports du compte 111
         const csv=await telecharge(pg,'[data-dac7-csv="Vinted|111"]');
         const C=lireCsv(csv.octets.toString('utf8')); const i0=C.findIndex(r=>r[0]==='Date'), iT=C.findIndex((r,i)=>i>i0&&r[0]==='Total');

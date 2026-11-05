@@ -37082,8 +37082,11 @@ function RegistresCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accoun
 const ETAT_LECTURE = (v, lu) => (v === undefined ? 'encours' : lu ? 'lu' : 'passu');
 const MOTS_FISCAUX = ['dac', 'fiscal', 'impot', 'impôt', 'contribuable', 'taxpayer', 'recapitulatif', 'récapitulatif', 'releve annuel', 'relevé annuel', 'rapport annuel'];
 const lireEmailsFiscaux = async () => {
-  const ou = MOTS_FISCAUX.map((m) => `data->>subject.ilike.*${m}*`).join(',');
-  const q = `id=like.email_*&or=(${encodeURIComponent(ou)})&select=id,s:data->>subject,f:data->>from,to:data->>to,at:data->>receivedAt`;
+  // ⚠️ `meta->>` (migration 004), jamais `data->>` : filtrer sur `data` décompresse
+  //    chaque ligne `email_*`, bordereaux et leurs PDF compris (§5). Mesuré le 5 nov. :
+  //    35 527 blocs lus et 115 ms par `data`, 5 807 et 30 ms par `meta`, mêmes lignes.
+  const ou = MOTS_FISCAUX.map((m) => `meta->>subject.ilike.*${m}*`).join(',');
+  const q = `id=like.email_*&or=(${encodeURIComponent(ou)})&select=id,s:meta->>subject,f:meta->>from,to:meta->>to,at:meta->>receivedAt`;
   const l = await lireTout(q).catch(() => null);
   return Array.isArray(l) ? l : null;
 };

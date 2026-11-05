@@ -204,14 +204,30 @@ export function dac7ParCompte({ decl, annee, compteDe = () => null, comptes = []
 // annuel) ou 'fiscal' (une demande d'informations fiscales, un rappel). Rien
 // d'autre n'est reconnu : mieux vaut un blanc qu'un faux (§5).
 const sansAccent = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+// ⚠️ MESURÉ le 5 nov. (lecture seule, `email_inconnu_*`) : 683 e-mails de Vinted
+//    sur 1 724 arrivent par le relais iCloud « Masquer mon adresse » — l'expéditeur
+//    est alors `"l'équipe Vinted" <no-reply_at_vinted_fr_xxxx_yyyy@icloud.com>`,
+//    parfois suivi de `(no-reply@vinted.fr.xxxx.yyyy)` (api/_lib/lire-email.js,
+//    `demasquerRelais`). La première adresse lue était celle d'iCloud : le rapport
+//    de Vinted reçu par ce chemin n'aurait jamais été reconnu. On lit donc le
+//    domaine RÉEL encodé dans l'adresse du relais (`_at_` + domaine aux points
+//    remplacés par `_`), et un domaine ordinaire seulement s'il FINIT par celui
+//    de la plateforme (jamais `vinted.fr.autre.com`).
+const RELAIS_EMAIL = /^(icloud\.com|privaterelay\.appleid\.com|duck\.com|simplelogin\.[a-z]+|anonaddy\.me)$/;
+const DOMAINES_P = [['Vinted', 'vinted'], ['Leboncoin', 'leboncoin'], ['eBay', 'ebay'], ['Vestiaire', 'vestiairecollective']];
+const TLD_P = '(?:fr|com|co[._]uk|de|it|es|be|nl|at|pl|lt|cz|pt|lu|ie|se|dk|fi|ch)';
 export function plateformeExpediteur(from) {
-  const m = /@([a-z0-9.-]+)/i.exec(String(from || ''));
-  const d = m ? m[1].toLowerCase() : '';
-  if (!d) return null;
-  if (/(^|\.)vinted\.[a-z.]+$/.test(d)) return 'Vinted';
-  if (/(^|\.)leboncoin\.[a-z.]+$/.test(d)) return 'Leboncoin';
-  if (/(^|\.)ebay\.[a-z.]+$/.test(d)) return 'eBay';
-  if (/(^|\.)vestiairecollective\.[a-z.]+$/.test(d)) return 'Vestiaire';
+  const s = String(from || '').toLowerCase();
+  for (const m of s.matchAll(/([a-z0-9._+-]+)@([a-z0-9-]+(?:\.[a-z0-9-]+)+)/g)) {
+    const [, local, dom] = m;
+    let test = null;
+    if (RELAIS_EMAIL.test(dom)) {
+      const r = /_at_([a-z0-9_-]+)$/.exec(local);
+      if (r) test = (n) => new RegExp(`(^|_)${n}_${TLD_P}(_|$)`).test(r[1]);
+    } else test = (n) => new RegExp(`(^|\\.)${n}\\.${TLD_P}$`).test(dom);
+    if (!test) continue;
+    for (const [p, n] of DOMAINES_P) if (test(n)) return p;
+  }
   return null;
 }
 export function classerEmailFiscal({ subject, from } = {}) {

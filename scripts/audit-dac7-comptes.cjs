@@ -45,6 +45,8 @@ const MUTATIONS = {
   'annee': ['if (!l || !ymOk(l.ym, annee)) continue;', 'if (!l) continue;'],
   'vieille-adater': ['if (!peutEtreDe(tsV, annee, maintenant)) continue;', ''],
   'email-sujet': ['const plateforme = plateformeExpediteur(from);', "const plateforme = plateformeExpediteur(from) || (/vinted/i.test(String(subject)) ? 'Vinted' : null);"],
+  'email-relais': ["      if (r) test = (n) => new RegExp(`(^|_)${n}_${TLD_P}(_|$)`).test(r[1]);", ''],
+  'email-domaine-fin': ["} else test = (n) => new RegExp(`(^|\\\\.)${n}\\\\.${TLD_P}$`).test(dom);", "} else test = (n) => new RegExp(`(^|\\\\.)${n}\\\\.${TLD_P}`).test(dom);"],
   'email-rapport': ["if (rapport) return { plateforme, nature: 'rapport' };", "if (rapport || dac7) return { plateforme, nature: 'rapport' };"],
   'email-annee': ["return c && c.nature === 'rapport' && d.getMonth() <= 2 ? d.getFullYear() - 1 : d.getFullYear();", 'return d.getFullYear();'],
   'export-total': ["L.push(['Total', nbTableur(k.etat === 'lu' ? k.centimes / 100 : null), '', '', '', '']);", "L.push(['Total', nbTableur(k.etat === 'lu' ? (k.centimes + k.ctsAd) / 100 : null), '', '', '', '']);"],
@@ -230,6 +232,12 @@ async function texteDuPdf(octets) {
   const E = (s, f, at) => M.classerEmailFiscal({ subject: s, from: f });
   dit(JSON.stringify(E('Ton rapport DAC7 2026 est disponible', 'Vinted <no-reply@vinted.fr>')) === '{"plateforme":"Vinted","nature":"rapport"}', 'C7 · rapport DAC7 de Vinted reconnu');
   dit(E('Rapport DAC7 de Vinted', 'ami@gmail.com') === null, 'C7 · un e-mail qui CITE Vinted d’une autre adresse n’est pas de Vinted');
+  // L'expéditeur RÉEL de 683 e-mails Vinted conservés (mesuré le 5 nov.) : le relais iCloud « Masquer mon adresse ».
+  const RELAIS1 = '"l\'équipe Vinted" <no-reply_at_vinted_fr_ab12cd34ef_gh56ij78@icloud.com> (no-reply@vinted.fr.ab12cd34ef.gh56ij78)';
+  const RELAIS2 = '"l\'équipe Vinted" <no-reply_at_vinted_fr_ab12cd34ef_gh56ij78@icloud.com>';
+  dit(JSON.stringify(E('Ton rapport DAC7 est disponible', RELAIS1)) === '{"plateforme":"Vinted","nature":"rapport"}' && JSON.stringify(E('Ton rapport DAC7 est disponible', RELAIS2)) === '{"plateforme":"Vinted","nature":"rapport"}', 'C7 · un rapport de Vinted arrivé par le relais iCloud (avec ou sans l’adresse réelle) est reconnu');
+  dit(M.plateformeExpediteur('x <a_at_ebay_co_uk_zz@privaterelay.appleid.com>') === 'eBay' && M.plateformeExpediteur('x <no-reply_at_vintedcrm_com_ab@icloud.com>') === null, 'C7 · relais : le domaine RÉEL décide (vintedcrm.com n’est pas Vinted)');
+  dit(M.plateformeExpediteur('Faux <no-reply@vinted.fr.exemple.com>') === null && M.plateformeExpediteur('x <no-reply@team.vinted.com>') === 'Vinted', 'C7 · un domaine ordinaire doit FINIR par celui de la plateforme');
   dit(JSON.stringify(E('Complète tes informations fiscales', 'Vinted <no-reply@vinted.fr>')) === '{"plateforme":"Vinted","nature":"fiscal"}', 'C7 · une demande d’informations fiscales n’est PAS un rapport');
   dit(JSON.stringify(E('Information DAC7 : vérifiez vos données', 'Leboncoin <noreply@leboncoin.fr>')) === '{"plateforme":"Leboncoin","nature":"fiscal"}', 'C7 · « DAC7 » seul dans le sujet ⇒ fiscal, pas rapport');
   dit(E('Ton article a été vendu', 'no-reply@vinted.fr') === null, 'C7 · un e-mail de vente n’est pas fiscal');

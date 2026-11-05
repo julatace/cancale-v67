@@ -79,7 +79,7 @@ function Rapport({ plateforme, emails }) {
         <div className="vrm-d7-rapport-l"><b>Rapport reçu{rapport.at ? ` le ${jour(rapport.at)}` : ''}</b><span className="vrm-d7-sujet">« {rapport.sujet} »{rapport.a ? ` · sur ${rapport.a}` : ''}</span></div>
       ) : (
         <div className="vrm-d7-rapport-l">
-          <b>{emails === null ? 'Rapport : e-mails pas lus' : 'Rapport pas encore reçu par VRM'}</b>
+          <b>{emails === null ? 'Rapport : e-mails pas lus' : 'Aucun rapport reconnu dans tes e-mails'}</b>
           <span className="vrm-d7-sujet">{ou.lien ? <a className="vrm-d7-lien" href={ou.lien} target="_blank" rel="noreferrer" data-dac7-ou={plateforme}>{ou.texte} ↗</a> : <span data-dac7-ou={plateforme}>{ou.texte}</span>}</span>
         </div>
       )}
