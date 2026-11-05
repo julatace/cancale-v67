@@ -41,7 +41,7 @@ const MUTATIONS = {
   fiab_titre: ['src/FiabiliteVentes.jsx', "r.calculables===0?`Bénéfice : aucune des ${pl(r.total,'vente')} n’est calculable`:", ''],
   pied_vendus: ['src/App.jsx', '  <GelPendantFrappe gel={ordSearch!==ordSearchDiff} rendre={()=><>\n', "  <GelPendantFrappe gel={ordSearch!==ordSearchDiff} rendre={()=><>\n  <VendusAilleurs owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} charger={chargerRetraitsMulti} onNav={onNav} PhotoVinted={PhotoVinted}/>\n"],
   filtre_mot: ['src/App.jsx', "['aexpedier',L.aEnvoyer]", "['aexpedier','À expédier']"],
-  compteur: ['src/App.jsx', '            {lignes.length > n && <Bouton variante="discret" data-toutes-plus=""', '            <CompteurListe affiches={n} total={lignes.length}/>{lignes.length > n && <Bouton variante="discret" data-toutes-plus=""'],
+  compteur: ['src/App.jsx', '            {lignes.length > n && <Bouton variante="secondaire" plein data-toutes-plus=""', '            <CompteurListe affiches={n} total={lignes.length}/>{lignes.length > n && <Bouton variante="secondaire" plein data-toutes-plus=""'],
   annul_copie: ['src/App.jsx', 'const R = annulationsParCompte({ ventes: sales.items,', 'const R = ({ ventes: sales.items,'],
 };
 

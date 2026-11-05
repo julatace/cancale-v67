@@ -84,8 +84,10 @@ const JEUX = {
   jeu: { lignes: jeu, comptes: NV.JEU_COMPTES },
   annul: { lignes: () => avecAnnulations(), comptes: NV.JEU_COMPTES },
   exclu: { lignes: exclu, comptes: NV.JEU_COMPTES },
-  // Le compte vendeuse_a a ses jetons mais AUCUNE ligne de ventes lisible : sa lecture rate (« pas su »).
-  ko: { lignes: () => avecAnnulations().filter((r) => !/^harvest_111_orders_/.test(r.id)), comptes: NV.JEU_COMPTES },
+  // Un TROISIÈME compte (vendeuse_c) a ses jetons mais AUCUNE ligne de ventes lisible : sa lecture
+  // rate (« pas su »). Les deux autres sont lus et l'un annule nettement plus — mais le repère « tes
+  // autres comptes » est incomplet : aucune alerte.
+  ko: { lignes: () => avecAnnulations(), comptes: [...NV.JEU_COMPTES, { ...NV.JEU_COMPTES[1], id: 3, vinted_user_id: '333', login: 'vendeuse_c' }] },
   egal: { lignes: () => avecAnnulations({ egal: true }), comptes: NV.JEU_COMPTES },
   gros: { lignes: gros, comptes: NV.JEU_COMPTES },
   vide: { lignes: vide, comptes: [] },
@@ -197,7 +199,7 @@ async function tournee(nav, { W, theme, scenario }) {
   await o.pg.waitForTimeout(2000);
   // La liste est LUE (une vente, ou l'état vide) — jamais mesurée pendant le chargement.
   await o.pg.waitForSelector('[data-ventes-toutes="lu"] [data-toutes-vente], [data-ventes-toutes="lu"] [data-toutes-vide]', { timeout: 25000 }).catch(() => {});
-  if (scenario !== 'vide') await o.pg.waitForSelector('[data-a-venir]', { timeout: 8000 }).catch(() => {});
+  if (scenario !== 'vide') await o.pg.waitForSelector('[data-a-venir]', { timeout: 20000 }).catch(() => {});
   await o.pg.waitForTimeout(800);
 
   // ── Ventes · Tous ──
@@ -267,7 +269,7 @@ async function tournee(nav, { W, theme, scenario }) {
     if (scenario === 'egal') dit(!v.alertes.length, 'A', `${T} des parts proches (2/8 contre 3/9) : aucune alerte`, JSON.stringify(v.alertes));
     if (scenario === 'ko') {
       const koVu = await o.pg.evaluate(() => !!document.querySelector('[data-ventes-ko]'));
-      dit(koVu, 'A', `${T} (contrôle du banc) le compte vendeuse_a n’a pas pu être lu`);
+      dit(koVu, 'A', `${T} (contrôle du banc) le compte vendeuse_c n’a pas pu être lu`);
       dit(!v.alertes.length, 'A', `${T} un compte pas lu : « pas su », aucune alerte`, JSON.stringify(v.alertes));
     }
   }

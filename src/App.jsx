@@ -67434,7 +67434,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
                 </span>
               </button>
             ))}
-            {lignes.length > n && <Bouton variante="discret" data-toutes-plus="" onClick={() => React.startTransition(()=>setN((x) => x + 60))} style={{ marginTop: 10 }}>Afficher {Math.min(60,lignes.length-n) > 1 ? `les ${Math.min(60,lignes.length-n)} suivantes` : 'la suivante'}</Bouton>}
+            {lignes.length > n && <Bouton variante="secondaire" plein data-toutes-plus="" onClick={() => React.startTransition(()=>setN((x) => x + 60))} style={{ marginTop: 12 }}>Afficher {Math.min(60,lignes.length-n) > 1 ? `les ${Math.min(60,lignes.length-n)} suivantes` : 'la suivante'}</Bouton>}
           </div>
         )}
     </div>
