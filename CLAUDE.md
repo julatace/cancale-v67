@@ -584,3 +584,28 @@ SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 
 Chromium du banc : `/opt/pw-browsers/chromium` (lien stable),
 `--use-angle=swiftshader --no-sandbox`.
+
+## 5 novembre — le compte sur chaque vente, et un compte récent compte partout (branche `v31-ventes-compte`)
+Julien : « le compte sur lequel l'article a été vendu doit apparaître » ; « le dernier compte connecté n'avait pas son
+CA dans Statistiques ni dans Comptabilité ».
+- **Le compte sur CHAQUE vente** (`CompteVente`, prop `compte` de `LigneVenteCompacte`/`LigneVente`) : Vinted (login),
+  Leboncoin (`compteVenteLbc` : le compte joint à la vente, sinon celui de SON annonce, nom lu dans `lbc_accounts`),
+  eBay (`compteVenteEbay` : pseudo de la commande, sinon du registre pour SON compte) — ligne repliée (forme bureau
+  ET forme courte du téléphone) et détail, même avec un seul compte (la règle §7 « une fois quand uniforme » est
+  abandonnée ICI, à sa demande). Pas su ⇒ « compte … non relevé », jamais deviné. Vestiaire : pas fait.
+- **Mesuré (lecture seule)** : loladupuis35260 (lié le 22 oct.) a UNE vente, EN COURS (50,40 €, 4 nov.). « CA Vinted par
+  compte » ne listait que les comptes à finalisé > 0 : il n'y apparaissait pas. Chaque compte lié non écarté y a
+  maintenant sa ligne (`liveStats.comptesCa`, la même boucle que le total) : finalisé (0,00 € lu), en cours dessous,
+  « — » si ses ventes n'ont pas pu être lues.
+- **La liste des comptes n'est plus figée au montage** (`AppCoeur`) : relue sur `maj · comptes`, sur un signal d'un
+  compte inconnu, au retour au premier plan et toutes les 2 min écran visible ; une lecture ratée ne change rien,
+  une liste identique ne rend rien (`listeComptesChangee`). Le « Finalisé » et le CA par compte de Statistiques ne
+  retirent plus un compte « refusé » par l'heuristique locale (`vinted_accounts_blocked`) : ventes ⇒
+  `compteEcarte` (son choix seulement), la règle de Comptabilité et de « vendu » (§11).
+- Preuves : banc `scripts/bancs/ventes-compte.cjs` (données inventées, 390 tactile + 1512, port `BANC_PORT`, `SHOTS=`)
+  **42 verts ; 24 rouges sur 85dad5b0** ; mutation (relecture coupée + filtre « > 0 » + compte Vinted retiré) ⇒ 7
+  rouges. Audits tdz, variables, identite, coherence, boutons, icones, bancs, urssaf, seuils-vinted, benefice,
+  revue-argent verts ; `audit-chiffres` (6) et `audit-ebay-route` (1) rouges À L'IDENTIQUE sur 85dad5b0.
+- ⚠️ Non mesuré : sa vraie base dans l'app ; pourquoi exactement son écran n'avait pas le compte (liste figée, blocage
+  local, ou seulement la vente en cours absente du « par compte ») — les trois sont corrigés. Une première version de ce
+  chantier (967b9999, sur une base du 30 oct.) n'a pas été reprise telle quelle : refaite sur le code du 5 nov.

@@ -20323,7 +20323,21 @@ function RecapFrise({ etapes, cle = '' }) {
     {(bord && bord.fait) || dates.length ? <p className="vrm-recap-frise-detail">{[bord && bord.fait ? (bord.t != null ? `Bordereau reçu le ${jour(bord.t)}` : 'Bordereau reçu') : null, ...dates].filter(Boolean).join(' · ')}</p> : null}
   </div>;
 }
-function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, etatNoeud = null, ton = '', montant, children, numerosArticle = [], plateforme = '', initialOuvert = false, gestes = null, montantCentimes, benef, recap = null, frise = null, bas = null, fusion = null, ...props }) {
+// ⚠️ (5 nov., Julien : « le compte sur lequel l'article a été vendu doit
+// apparaître ») LE COMPTE EST ÉCRIT SUR CHAQUE VENTE — Vinted, Leboncoin, eBay,
+// ligne repliée (les deux formes : bureau et téléphone) ET détail. La règle
+// « une fois quand il est le même » (§7) est abandonnée ICI, à sa demande : il
+// vend sur plusieurs comptes et doit savoir, vente par vente, où aller.
+// `compte` : un nom (login Vinted, compte Leboncoin, pseudo eBay) · `null` =
+// pas su (dit tel quel, « compte … non relevé », jamais deviné, jamais un
+// compte voisin) · `undefined` = l'appelant ne le fournit pas (Vestiaire).
+const TEXTE_COMPTE_PAS_SU = { vinted: 'compte Vinted non relevé', leboncoin: 'compte Leboncoin non relevé', ebay: 'compte eBay non relevé' };
+const texteCompteVente = (compte, plateforme) => compte ? String(compte) : (TEXTE_COMPTE_PAS_SU[plateforme] || 'compte non relevé');
+function CompteVente({ compte, plateforme, ou = '' }) {
+  if (compte === undefined) return null;
+  return <span className="vrm-vente-compte vrm-sensible" data-vente-compte={compte ? String(compte) : ''} data-vente-compte-ou={ou || undefined} data-vente-compte-passu={compte ? undefined : ''} title={compte ? `Vendue sur le compte ${compte}` : undefined}>{texteCompteVente(compte, plateforme)}</span>;
+}
+function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', compte = undefined, etat, etatNoeud = null, ton = '', montant, children, numerosArticle = [], plateforme = '', initialOuvert = false, gestes = null, montantCentimes, benef, recap = null, frise = null, bas = null, fusion = null, ...props }) {
   const [ouvert, setOuvert] = React.useState(initialOuvert);
   const panneau = React.useId();
   const declencheur = React.useRef(null);
@@ -20400,10 +20414,10 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, 
       <span className="vrm-ledger-photo-empty">{photoNoeud || <PhotoVente src={photo} size={46} portrait/>}</span>
       {fusion ? <span className="vrm-fu-vente-txt">
         <span className="vrm-fu-vente-l1"><span className="vrm-fu-vente-nom">{fusion.nom || '(sans titre)'}</span><span className="vrm-fu-vente-prix" aria-hidden="true">{fusion.prix || montant}</span></span>
-        <span className="vrm-fu-vente-l2">{fusion.num ? <span className="vrm-fu-num">N°{fusion.num}</span> : null}<span className="vrm-fu-site" data-site={fusion.site || plateforme}>{fusion.siteNom || ''}</span>{fusion.taille ? <span className="vrm-fu-vente-taille" data-fu-taille={fusion.taille}>· {fusion.taille}</span> : null}</span>
+        <span className="vrm-fu-vente-l2">{fusion.num ? <span className="vrm-fu-num">N°{fusion.num}</span> : null}<span className="vrm-fu-site" data-site={fusion.site || plateforme}>{fusion.siteNom || ''}</span>{compte !== undefined ? <span className="vrm-fu-vente-compte">· <CompteVente compte={compte} plateforme={plateforme} ou="ligne-court"/></span> : null}{fusion.taille ? <span className="vrm-fu-vente-taille" data-fu-taille={fusion.taille}>· {fusion.taille}</span> : null}</span>
         <span className="vrm-fu-vente-l3" data-ton={ton || undefined}>{etatNoeud || etat}</span>
       </span> : null}
-      <span className="vrm-ledger-sale-title" title={titre}><span className="vrm-ledger-sale-nom">{titre || '(sans titre)'}</span>{sous ? <span className="vrm-ledger-sale-sous" data-vente-sous="">{sous}</span> : null}</span>
+      <span className="vrm-ledger-sale-title" title={titre}><span className="vrm-ledger-sale-nom">{titre || '(sans titre)'}</span>{(sous || compte !== undefined) ? <span className="vrm-ledger-sale-sous" data-vente-sous=""><CompteVente compte={compte} plateforme={plateforme} ou="ligne"/>{compte !== undefined && sous ? ' · ' : ''}{sous}</span> : null}</span>
       <span className="vrm-ledger-sale-state" title={etat} data-ton={ton || undefined}>{etatNoeud || etat}</span>
       <span className="vrm-ledger-sale-amount" data-prix-vente={montantCentimes ?? undefined}>{montant}</span>
       {benef ? <span className="vrm-ledger-sale-achat" data-achat-ligne={benef.achatCentimes ?? ''} data-achat-etat={benef.achatCentimes == null ? 'manque' : 'lu'}>{benef.achatTxt}</span> : null}
@@ -20426,7 +20440,7 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, 
         {recap ? <div className="vrm-main vrm-ledger-drawer-body vrm-recap-corps">{recap({ titreId: panneau+'-titre', fermerRef: fermer, fermer: close })}</div> : <>
         <header className="vrm-ledger-drawer-head"><div><span>VENTE</span><h2 id={panneau+'-titre'}>{titre || 'Vente'}</h2><p>{etat}{etat&&montant?' · ':''}{montant}</p></div><button ref={fermer} type="button" aria-label="Fermer les détails de la vente" onClick={close}><Icon name="close" size={18}/></button></header>
         <div className="vrm-main vrm-ledger-drawer-body">
-          <div className="vrm-fiche-vente-acces"><span>{plateforme?plateforme[0].toUpperCase()+plateforme.slice(1):'Vente'} · {sous||'Compte et date dans les détails'}</span>
+          <div className="vrm-fiche-vente-acces"><span data-vente-acces="">{plateforme?plateforme[0].toUpperCase()+plateforme.slice(1):'Vente'}{compte !== undefined ? <> · Vendue sur <CompteVente compte={compte} plateforme={plateforme} ou="detail"/></> : null}{sous ? ` · ${sous}` : (compte === undefined ? ' · Compte et date dans les détails' : '')}</span>
           {numerosFiche.length?numerosFiche.map(n=><Bouton variante="discret" key={n} onClick={()=>{close();window.dispatchEvent(new CustomEvent('vrm:fiche-article',{detail:n}));}}>Fiche N°{n} ›</Bouton>):<small title="Pas de numéro VRM confirmé pour cette vente : aucune fiche n’est choisie au hasard.">Sans N° VRM</small>}</div>
           <div className="vrm-ventes-liste"><div className={props.className} data-ligne-ouverte="true"><div className="vrm-ledger-sale-content">{children}</div></div></div></div>
         </>}
@@ -20434,8 +20448,8 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, 
     </div>,document.body)}
   </div>;
 }
-function LigneVente({ photo, titre, meta, montant, actions, etat, etatNoeud = null, details, sous = '', ton = '', data = null, numerosArticle = [], plateforme = '', floute = false, gestes = null, frise = null }) {
-  return <LigneVenteCompacte {...(data || {})} gestes={gestes} frise={frise} numerosArticle={numerosArticle} plateforme={plateforme} photo={photo} titre={titre} sous={sous} ton={ton} etat={etat} etatNoeud={etatNoeud} montant={montant} initialOuvert={!!details?.props.ouvrir} className="vrm-sale-row vrm-shared-sale" style={{padding:'12px 14px',borderBottom:`1px solid ${C.border}`,...(floute?STYLE_FLOU:null)}}>
+function LigneVente({ photo, titre, meta, montant, actions, etat, etatNoeud = null, details, sous = '', compte = undefined, ton = '', data = null, numerosArticle = [], plateforme = '', floute = false, gestes = null, frise = null }) {
+  return <LigneVenteCompacte {...(data || {})} gestes={gestes} frise={frise} numerosArticle={numerosArticle} plateforme={plateforme} photo={photo} titre={titre} sous={sous} compte={compte} ton={ton} etat={etat} etatNoeud={etatNoeud} montant={montant} initialOuvert={!!details?.props.ouvrir} className="vrm-sale-row vrm-shared-sale" style={{padding:'12px 14px',borderBottom:`1px solid ${C.border}`,...(floute?STYLE_FLOU:null)}}>
     <div className="vrm-sale-overview" style={{display:'flex',gap:12,alignItems:'flex-start'}}>
       <div className="vrm-sale-photo"><PhotoArticleAgrandissable src={photo} titre={titre}><PhotoVente src={photo} size={64} portrait/></PhotoArticleAgrandissable></div>
       <div className="vrm-sale-info" style={{flex:1,minWidth:0}}>
@@ -20664,7 +20678,7 @@ const lbcExpediee = o => {
 const lbcEuro = (p) => p == null ? '' : (Number(p) / 100).toFixed(2).replace('.', ',') + ' €';
 // Carte d'une transaction Leboncoin — comme Vinted : photo · titre · statut +
 // transporteur · prix. Partagée par Ventes ET Achats (§11 : une seule forme).
-function CarteLbc({ o, num = '', benef = null, floute = false }) {
+function CarteLbc({ o, num = '', benef = null, floute = false, compte = undefined }) {
   // (29 oct., Julien : « côté vente, fais les mêmes modifications que pour
   // Vinted ; enlève N° ») Le titre d'une vente est celui de l'annonce, sans N° :
   // le N° (identité stricte, §5) reste dans le tiroir (« Fiche article N°… »),
@@ -20687,7 +20701,7 @@ function CarteLbc({ o, num = '', benef = null, floute = false }) {
   // (3 nov., critique #3) La frise de Vinted, sur ce que l'extension a LU de la transaction :
   // « Postée » = expédiée, « Livrée » et « Payée » = finalisée (Leboncoin verse à la finalisation).
   const friseLbc = lbcAnnulee(o) ? null : <Frise etapes={friseVenteLue({ vendue: true, postee: lbcExpediee(o) || lbcFinalisee(o), livree: lbcFinalisee(o), payee: lbcFinalisee(o) }, { geste: ton === 'action' })} cle={'lbc' + o.txId} className="vrm-fu-ligne-frise" label="Où en est la vente"/>;
-  return <LigneVente frise={friseLbc} numerosArticle={num?[num]:[]} plateforme="leboncoin" data={{ 'data-lbc-vente': String(o.txId), 'data-lbc-etat': etatCourt, 'data-flou': floute ? '1' : '0' }} floute={floute} photo={photoArticle(o)} titre={titre} sous={sous} ton={ton} montant={lbcEuro(o.price)} etat={etatCourt}
+  return <LigneVente frise={friseLbc} numerosArticle={num?[num]:[]} plateforme="leboncoin" data={{ 'data-lbc-vente': String(o.txId), 'data-lbc-etat': etatCourt, 'data-flou': floute ? '1' : '0' }} floute={floute} photo={photoArticle(o)} titre={titre} sous={sous} compte={compte} ton={ton} montant={lbcEuro(o.price)} etat={etatCourt}
     meta={<>{o.stepLabel || o.stepStatus || ''}{o.deliveryLabel ? ` · ${o.deliveryLabel}` : ''}{benef != null ? <span data-lbc-benef={benef.toFixed(2)} style={{ color: benef >= 0 ? C.text : C.warn, fontWeight: 600 }}> · marge avant frais {fmt(benef)}</span> : null}</>}/>;
 }
 // L'étape d'un ACHAT Leboncoin, dans les mêmes mots et les mêmes couleurs que
@@ -20791,6 +20805,8 @@ function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0}, sansTotaux = fal
   // lien posé à la main suffit déjà (c'est l'identité la plus forte).
   const [itemsLbc, setItemsLbc] = useState(null);
   useEffect(() => { let m = false; lbcAnnoncesSession().then((it) => { if (!m) setItemsLbc(it || null); }).catch(() => {}); return () => { m = true; }; }, []);
+  // (5 nov.) Les noms de ses comptes Leboncoin, pour écrire le compte sur chaque vente.
+  const comptesLbc = useComptesLbcNoms();
   const infoVente = (o) => {
     const num = numeroLbcIdentite(o, itemsLbc, liens);
     const prix = o.price != null ? Number(o.price) / 100 : null;
@@ -20805,7 +20821,7 @@ function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0}, sansTotaux = fal
     const fiche = num ? ficheUniqueDuNumero(numerosFiches, num) : null;
     const achat = fiche ? prixAchatDe({ numero: num }, buyByNum) : null;
     const benef = (prix != null && achat != null && !lbcAnnulee(o)) ? prix - achat : null;
-    return { num, benef, achat };
+    return { num, benef, achat, compte: compteVenteLbc(o, itemsLbc, comptesLbc) };
   };
   return <div>
     <ScreenHead icon="cash" title="Ventes"/>
@@ -21395,6 +21411,17 @@ function comptesEbayActifs(reg) {
 }
 // Le nom à montrer pour un compte : son pseudo eBay, sinon « compte principal ».
 const nomCompteEbay = (c) => (c && c.pseudo) ? c.pseudo : 'compte principal';
+// (5 nov.) Le compte eBay d'UNE vente, écrit sur chaque ligne : le pseudo rangé
+// avec la commande (`_pseudo`), sinon celui du registre pour SON compte
+// (`_compte`, une identité). Pas de pseudo lu ⇒ `null` (« compte eBay non
+// relevé ») — jamais le pseudo d'un autre compte, jamais « compte principal »
+// présenté comme un nom.
+const compteVenteEbay = (o, comptes) => {
+  if (o && o._pseudo) return String(o._pseudo);
+  const ref = (o && o._compte) || 'principal';
+  const c = Array.isArray(comptes) ? comptes.find((x) => x && x.ref === ref) : null;
+  return (c && c.pseudo) ? String(c.pseudo) : null;
+};
 // (17 oct.) Pro ou particulier, tel qu'eBay le dit (GetUser, rangé par la route).
 // Pas su ⇒ rien (jamais « particulier » par défaut).
 const typeCompteEbayTexte = (c) => (c && c.type === 'pro') ? 'Pro' : (c && c.type === 'particulier') ? 'Particulier' : '';
@@ -23515,7 +23542,7 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
         const pfE = preuvesFriseEbay(o);
         const fuE = pfE ? friseVenteFusion(friseVente(pfE), { geste: etat.peutExpedier }) : null;
         return <div className="vrm-ebay-order" data-ebay-vente={o.orderId} data-ebay-compte={o._compte || 'principal'} key={(o._compte || 'principal')+':'+(o.orderId || i)}><LigneVente gestes={gestesEbay} frise={fuE ? <Frise etapes={fuE} cle={'ebay' + (o._compte || 'principal') + o.orderId} className="vrm-fu-ligne-frise" label="Où en est la vente"/> : null} numerosArticle={(o.lineItems||[]).map(l=>numLigneEbay(o,l)).filter(Boolean)} plateforme="ebay" photo={img} titre={(li.title||'Commande')+(o.lineItems?.length>1?` · ${o.lineItems.length} articles`:'')} etat={statut} ton={etat.peutExpedier ? 'action' : ''}
-          sous={[o.creationDate && !isNaN(Date.parse(o.creationDate)) ? new Date(o.creationDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : '', comptesEbay?.length > 1 ? (o._pseudo || nomCompteEbay(comptesEbay.find(c => c.ref === o._compte) || {})) : ''].filter(Boolean).join(' · ')}
+          compte={compteVenteEbay(o, comptesEbay)} sous={o.creationDate && !isNaN(Date.parse(o.creationDate)) ? new Date(o.creationDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : ''}
           etatNoeud={<><span className="vrm-ebay-sale-status" data-state={etat.peutExpedier?'pending':etat.expedie?'shipped':'neutral'} style={{display:'inline-flex',alignItems:'center',gap:5,padding:0,background:'transparent',boxShadow:'none',borderRadius:0,fontSize:'inherit',color:C.text,fontWeight:600}}><span aria-hidden="true" style={{width:7,height:7,borderRadius:999,flexShrink:0,display:'inline-block',background:etat.peutExpedier?C.warn:etat.expedie?(C.blue||C.accent):C.muted}}/>{statut}</span></>}
           meta={<>{statut}{o.buyer?.username ? ` · ${o.buyer.username}` : ''}{o.lineItems?.length>1?` · ${o.lineItems.length} articles`:''}{comptesEbay?.length>1?` · ${o._pseudo || nomCompteEbay(comptesEbay.find(c=>c.ref===o._compte) || {})}`:''}</>}
           montant={euro(o.pricingSummary?.total?.value, o.pricingSummary?.total?.currency)} details={<EbayCommande owner={AUTH.user?.id || 'installation'} order={o} ouvrir={!!cible && cible.id===String(o.orderId) && cible.compte===(o._compte || 'principal')} costs={couts[JSON.stringify([o._compte || 'principal',String(o.orderId)])] || {}} onCosts={patch=>sauverCouts(o._compte || 'principal',o.orderId,patch)} compte={o._compte || 'principal'} headers={enTeteSession} confirm={askConfirm} theme={C}/>}/></div>;
@@ -29169,7 +29196,21 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         const parCompte = (liveStats && liveStats.caParCompte) || null;
         // Rien à décomposer tant que le CA Vinted n'est pas encore lu.
         if (caVinted == null && caLbc == null) return null;
-        const comptes = parCompte ? Object.entries(parCompte).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]) : [];
+        // ⚠️ (5 nov., Julien : « le dernier compte connecté n'avait pas son CA dans
+        //    Statistiques ») Seuls les comptes à CA finalisé > 0 avaient une ligne :
+        //    un compte neuf dont la seule vente est EN COURS (pas encore finalisée)
+        //    disparaissait de la carte, comme s'il n'existait pas. Désormais CHAQUE
+        //    compte lié non écarté a sa ligne (`comptesCa`, la même boucle que le
+        //    total, §11) : son finalisé (0,00 € s'il n'en a pas — un zéro LU),
+        //    et dessous ce qui est en cours ; ventes pas lues ⇒ « — · pas lues ».
+        const detail = (liveStats && Array.isArray(liveStats.comptesCa)) ? liveStats.comptesCa : null;
+        const comptes = detail
+          ? detail.map((c)=>[c.login || `#${c.uid}`, c.lu ? c.finalise : null, c]).sort((a,b)=>(b[1]??-1)-(a[1]??-1) || ((b[2].enCours||0)-(a[2].enCours||0)))
+          : parCompte ? Object.entries(parCompte).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]) : [];
+        const noteCompte = (c) => !c ? null : !c.lu ? 'ventes pas lues pour ce compte' : [
+          c.nFinalise ? `${c.nFinalise} vente${c.nFinalise>1?'s':''} finalisée${c.nFinalise>1?'s':''}` : 'aucune vente finalisée',
+          c.nEnCours ? `${c.nEnCours} en cours · ${fmt(c.enCours)}` : '',
+        ].filter(Boolean).join(' · ');
         // (16 oct.) Une ligne = le nom, sa note, le montant à droite (d'un
         // bloc, chiffres tabulaires) ; dessous, la part du total en barre
         // pleine sur un rail, une seule teinte (§7). Une plateforme sans vente
@@ -29190,7 +29231,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           </div>
         );
         const totPlat = plateformes.reduce((s2,p)=>s2+(p.ca||0),0);
-        const totCpt = comptes.reduce((s2,[,v])=>s2+v,0);
+        const totCpt = comptes.reduce((s2,[,v])=>s2+(v||0),0);
         return (
           <div className="vrm-stats-comptes" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(320px,100%), 1fr))',gap:12,marginTop:4}}>
             <div data-stats-carte="plateformes" data-stats-plateformes data-notion="finalise" style={{...sCarte,paddingBottom:12}}>
@@ -29205,7 +29246,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             <div data-stats-carte="comptes" style={{...sCarte,paddingBottom:12}}>
               <div style={{...sTitre,marginBottom:8}}>CA Vinted par compte</div>
               {comptes.length
-                ? comptes.map(([lg,v]) => <Ligne key={lg} label={lg} val={v} part={comptes.length>1 && totCpt>0 ? v/totCpt : null}/>)
+                ? comptes.map(([lg,v,c]) => <div key={c ? c.uid : lg} data-stats-compte={c ? c.uid : lg} data-stats-compte-cents={v==null?'':String(Math.round(v*100))} data-stats-compte-encours={c&&c.lu?String(Math.round(c.enCours*100)):undefined}><Ligne label={lg} val={v} note={noteCompte(c)} part={comptes.length>1 && totCpt>0 && v!=null ? v/totCpt : null}/></div>)
                 : <div style={{fontSize:13,color:C.muted,padding:'10px 0',borderTop:`1px solid ${C.border}`}}>Le détail par compte apparaît dès que tes ventes sont chargées.</div>}
               {/* (30 oct.) Plus de « Total Vinted » : c'est « Finalisé sur Vinted · tous comptes »,
                   en tête du même écran (§7, un chiffre une fois). */}
@@ -41361,6 +41402,17 @@ const _CACHE_V = 3;
 // La clé d'un ensemble de comptes Vinted : leurs IDENTITÉS, triées — jamais un
 // nom affiché, jamais un nombre (deux listes de même longueur ne sont pas la
 // même liste).
+// (5 nov.) Une liste de comptes relue remplace la connue seulement si elle dit
+// AUTRE CHOSE : un compte de plus ou de moins, ou un login qui change. Les jetons
+// renouvelés n'y entrent pas (sinon un rendu de toute l'app à chaque relecture).
+const listeComptesChangee = (avant, apres) => {
+  if (!Array.isArray(apres)) return false;
+  const sig = (l) => (Array.isArray(l) ? l : []).map((a) => String((a && a.vinted_user_id) ?? '') + '=' + String((a && a.login) || '')).filter((x) => x[0] !== '=').sort().join('|');
+  return sig(avant) !== sig(apres);
+};
+const RELIRE_COMPTES_PERIODE_MS = 120000;   // écran visible : au plus toutes les 2 min
+const RELIRE_COMPTES_RETOUR_MS = 30000;     // retour au premier plan
+const RELIRE_COMPTES_INCONNU_MS = 5000;     // l'extension parle d'un compte inconnu
 const cleComptesVinted = (accs) => [...new Set((accs || []).map(a => String((a && a.vinted_user_id) ?? '')).filter(Boolean))].sort().join(',');
 // Cache des données Vinted (annonces/ventes/achats/messages). Persisté en
 // sessionStorage : il survit aux rechargements fréquents (auto-mise à jour,
@@ -52542,7 +52594,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <section className="vrm-recap-details" aria-label="Détails">
                   <dl>
                     {acheteur ? <div className="vrm-recap-ligne"><dt>Acheteur</dt><dd>{acheteur}</dd></div> : null}
-                    {o._acc ? <div className="vrm-recap-ligne"><dt>Compte</dt><dd>{accNameOf(o._acc)} · Vinted</dd></div> : null}
+                    <div className="vrm-recap-ligne" data-vente-acces=""><dt>Compte</dt><dd><CompteVente compte={o._acc ? (accNameOf(o._acc) || null) : null} plateforme="vinted" ou="detail"/> · Vinted</dd></div>
                     {(!etapes || !o.date) ? <div className="vrm-recap-ligne"><dt>Vendue</dt><dd>{o.date ? dateFr(o.date, { weekday: 'short', day: 'numeric', month: 'short' }) : '— date pas lue'}</dd></div> : null}
                     {!bordGeste && (trRecap.cle || trRecap.nom) ? <div className="vrm-recap-ligne"><dt>Transporteur</dt><dd><PastilleTransporteur t={trRecap} C={C} seul data-recap-transporteur=""/></dd></div> : null}
                     {bordE && bordE.suivi ? <div className="vrm-recap-ligne"><dt>Suivi</dt><dd className="vrm-recap-mono">{bordE.suivi}</dd></div> : null}
@@ -52608,7 +52660,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       : <BoutonBordereau grand uid={o._acc && o._acc.vinted_user_id} tx={txL} conv={o.conversation_id} login={accNameOf(o._acc)} aGenerer pdf={false} onFait={(u)=>actionsVentesProxy.rechargerLabels(u)}/>}
                   </div>
                   {gesteDepose ? <div className="vrm-fu-apres" data-sans-glisse="">{gesteDepose}</div> : null}
-                </> : null} gestes={gesteCout ? <div className="vrm-gestes-pile">{gesteCout}</div> : null} sous={[o.date?dateFr(o.date, {day:'numeric',month:'short'}):'', (o._acc && !ventesUnCompte) ? accNameOf(o._acc) : ''].filter(Boolean).join(' · ')} etat={venteStage(o).label} ton={st!=='cancelled' && aExpedier(o) && !isShipDone(o) ? 'action' : (st==='cancelled' ? 'annule' : '')} montant={sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:'—'} className="vrm-sale-row" key={o.transaction_id} data-tx={String(o.transaction_id)} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null),...(gp.style||{})}}>
+                </> : null} gestes={gesteCout ? <div className="vrm-gestes-pile">{gesteCout}</div> : null} compte={o._acc ? (accNameOf(o._acc) || null) : null} sous={o.date?dateFr(o.date, {day:'numeric',month:'short'}):''} etat={venteStage(o).label} ton={st!=='cancelled' && aExpedier(o) && !isShipDone(o) ? 'action' : (st==='cancelled' ? 'annule' : '')} montant={sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:'—'} className="vrm-sale-row" key={o.transaction_id} data-tx={String(o.transaction_id)} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null),...(gp.style||{})}}>
               </LigneVenteCompacte>
               )}</GlisserVente>
             );
@@ -58894,6 +58946,43 @@ function annonceLbcEnVente(ad, vendues) {
 //     ligne »). Pas su (pas de preuve, date illisible, aucun compte) ⇒ rien
 //     n'est sauté.
 const idCompteLbcApp = (x) => String(x || '').replace(/^lbc-account:/i, '');
+// (5 nov.) Le compte Leboncoin d'UNE vente, écrit sur sa ligne. Par IDENTITÉ
+// seulement (§5) : le compte que l'extension a joint à la vente (la session de
+// la liste « Mes transactions », `account`/`accountName`), sinon le compte de
+// SON annonce (`itemId`). Le nom vient de la vente, sinon de `lbc_accounts`
+// sous CET identifiant (les deux formes, nue et `lbc-account:`). Rien ⇒ `null`
+// (« compte Leboncoin non relevé »), jamais deviné ; un identifiant connu sans
+// nom lu ⇒ dit comme tel, jamais l'identifiant brut.
+const compteVenteLbc = (o, items, comptes) => {
+  if (!o) return null;
+  if (o.accountName) return String(o.accountName);
+  const idA = o.itemId != null ? String(o.itemId) : '';
+  const ann = !idA || !items || typeof items !== 'object' ? null
+    : Array.isArray(items) ? (items.find((x) => x && String(x.id ?? x.list_id ?? '') === idA) || null) : (items[idA] || null);
+  const id = idCompteLbcApp(o.account || (ann && (ann.account || ann.lbcUser)) || '');
+  if (!id) return null;
+  const acc = comptes && typeof comptes === 'object' ? comptes : {};
+  const c = acc['lbc-account:' + id] || acc[id] || Object.values(acc).find((x) => x && idCompteLbcApp(x.id) === id);
+  if (c && c.name) return String(c.name);
+  if (ann && ann.accountName) return String(ann.accountName);
+  return 'compte Leboncoin (nom pas encore lu)';
+};
+// Les noms de ses comptes Leboncoin (`lbc_accounts`), relus comme le flou
+// (`useCompteLbcOuvert`, même adresse : la lecture est partagée). Trois états :
+// undefined en cours · null pas su · objet lu.
+function useComptesLbcNoms() {
+  const [accs, setAccs] = useState(undefined);
+  useEffect(() => {
+    const suivi = suivreReceptionLeboncoin({ fenetre: window, document, relire: async (estActif) => {
+      const rows = await lireBaseRelue(URL_LBC_COMPTES_FLOU());
+      if (!estActif()) return;
+      setAccs(Array.isArray(rows) ? ((rows[0] && rows[0].a) || {}) : null);
+    } });
+    suivi.actualiser();
+    return () => suivi.arreter();
+  }, []);
+  return accs;
+}
 function lbcListesCompletesDepuis(preuve, comptesEnPlus) {
   if (!preuve) return false;
   const depuis = Date.parse(preuve.depuis || '');
@@ -66338,6 +66427,7 @@ function AppCoeur() {
   // `panel_accounts_off` : les comptes écartés depuis le panneau (§35), lus ici
   // aussi pour que « vendu » écarte exactement les mêmes comptes que Ma journée.
   const [panelOffCoque,setPanelOffCoque]=useState({});
+  const panelOffRef=useRef(panelOffCoque); panelOffRef.current=panelOffCoque;
   useEffect(()=>{ (async()=>{
     try {
       const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_accounts_off&select=data`, { headers: sbAuth() });
@@ -66460,6 +66550,45 @@ function AppCoeur() {
       setAccountsLoaded(true);
     })();
     return ()=>{ stop=true; };
+  },[]);
+  // ⚠️⚠️ (5 nov., Julien : « le dernier compte connecté n'avait pas son CA dans
+  //    Statistiques ni dans Comptabilité ») LA LISTE DES COMPTES ÉTAIT FIGÉE AU
+  //    MONTAGE. Lue une seule fois, à l'ouverture : un compte lié PENDANT que VRM
+  //    est ouvert (l'extension le capte sur l'ordinateur, la PWA de l'iPhone
+  //    reste ouverte des jours) n'existait pour aucun écran — ni « Vendu », ni
+  //    Statistiques, ni Comptabilité (`useVentesCoque`), ni les listes — et le
+  //    signal « ventes rangées » de SON compte était jeté (compte inconnu).
+  //    Elle se relit :
+  //    · tout de suite quand l'extension annonce un compte (`maj · comptes`) ou
+  //      parle d'un compte que la liste ne porte pas (au plus toutes les 5 s) ;
+  //    · au retour au premier plan (30 s au plus), et toutes les 2 min écran
+  //      visible.
+  //    Une lecture ratée (`null`) ne change RIEN (pas su ≠ aucun compte) ; une
+  //    liste identique (mêmes comptes, mêmes logins) ne provoque aucun rendu.
+  const comptesVintedRef=useRef(vintedAccounts); comptesVintedRef.current=vintedAccounts;
+  useEffect(()=>{
+    let stop=false, enVol=false, dernier=Date.now();
+    const relire=async(ecartMin)=>{
+      if(stop||enVol||Date.now()-dernier<ecartMin) return;
+      enVol=true; dernier=Date.now();
+      try{
+        const list=await fetchVintedAccounts();
+        if(stop||!Array.isArray(list)) return;              // pas su ⇒ on garde la liste connue
+        if(!listeComptesChangee(comptesVintedRef.current,list)) return;
+        try{ localStorage.setItem('vinted_accounts',JSON.stringify(list)); }catch(_){}
+        setVintedAccounts(list);
+      }catch(_){} finally{ enVol=false; }
+    };
+    const surExt=(e)=>{ const d=e&&e.detail; if(!d||d.type!=='maj') return;
+      if(d.quoi==='comptes') return relire(0);
+      if(d.uid!=null && String(d.uid) && !(comptesVintedRef.current||[]).some(a=>String(a&&a.vinted_user_id)===String(d.uid))) relire(RELIRE_COMPTES_INCONNU_MS);
+    };
+    const visible=()=>typeof document==='undefined'||document.visibilityState!=='hidden';
+    const surVue=()=>{ if(visible()) relire(RELIRE_COMPTES_RETOUR_MS); };
+    const t=setInterval(()=>{ if(visible()) relire(RELIRE_COMPTES_PERIODE_MS); },RELIRE_COMPTES_PERIODE_MS);
+    window.addEventListener('vrm:ext',surExt);
+    document.addEventListener('visibilitychange',surVue);
+    return ()=>{ stop=true; clearInterval(t); window.removeEventListener('vrm:ext',surExt); document.removeEventListener('visibilitychange',surVue); };
   },[]);
 
   // Au démarrage : charger depuis le cloud Supabase (synchro Mac <-> iPhone)
@@ -66918,9 +67047,26 @@ function AppCoeur() {
         for(const o of sold.items){ const id=String(o.transaction_id!=null?o.transaction_id:o.id); if(vusTx.has(id)) continue; vusTx.add(id); ventesToutes.push({ ...o, _acc: a }); }
       }
       if(!stop){ setVentesCoque(ventesLues?ventesToutes:null); setVentesKO(perAcc.filter(p=>!p.sold.ok).map(p=>String(p.a.vinted_user_id))); }
+      // ⚠️ (5 nov.) Les VENTES d'un compte comptent dès qu'il n'est pas écarté
+      //    par SON choix (`compteEcarte` : masqué dans l'app ou depuis le panneau)
+      //    — la règle de l'écran Ventes, de Comptabilité et de « vendu » (§11,
+      //    décision du 31 août : une vente réalisée est de l'argent gagné).
+      //    `skipAcc` lisait aussi `vinted_accounts_blocked`, une liste LOCALE
+      //    remplie par une heuristique : un compte qui y tombait n'avait plus de
+      //    « Finalisé » ni de CA par compte dans Statistiques, pendant que
+      //    Comptabilité le comptait. Le blocage ne retire plus que ses annonces
+      //    et ses messages (périmés), jamais son argent.
+      //    Et CHAQUE compte lié non écarté a sa ligne dans « CA Vinted par
+      //    compte » (`comptesCa`), même à 0 € finalisé — un compte neuf dont la
+      //    seule vente est en cours n'y disparaît plus ; un compte dont les
+      //    ventes n'ont pas pu être lues y est dit « pas lu », jamais 0.
+      const comptesCa=[];
       for(const { a, sold, list, conv, actif } of perAcc){
-        if(!actif) continue;
-        if(sold.ok){ ok=true; for(const o of sold.items){
+        const ventesComptees=!compteEcarte(a.vinted_user_id, hiddenS, panelOffRef.current);
+        const cc=ventesComptees?{ uid:String(a.vinted_user_id), login:String(a.login||'').trim()||null, lu:!!sold.ok, finalise:0, nFinalise:0, enCours:0, nEnCours:0 }:null;
+        if(cc) comptesCa.push(cc);
+        if(!actif && !ventesComptees) continue;
+        if(ventesComptees && sold.ok){ ok=true; for(const o of sold.items){
           // (20 oct., audit) Une vente masquée d'un ✕ sort de ces chiffres — mais
           // elle RESTE du CA déclaré (décision du 3 octobre). On la compte à part
           // pour que le « finalisé » le DISE (§5 : un total partiel ne se présente
@@ -66935,7 +67081,8 @@ function AppCoeur() {
           if(st==='completed' && amtLu==null) prixPasLu++;
           const d=o.date?new Date(o.date):null; const okD=d&&!isNaN(d);
           const inMonth=okD&&d.getFullYear()*100+d.getMonth()===ym;
-          if(st==='pending'){ enCours++; enAttente+=amt0; }
+          if(st==='pending'){ enCours++; enAttente+=amt0; if(cc){ cc.enCours+=amt0; cc.nEnCours++; } }
+          if(st==='completed' && cc){ cc.finalise+=amt0; cc.nFinalise++; }
           if(st==='completed'){ caEncaisse+=amt0; soldTotal++; if(okD) joursVenteSet.add(cleJourLocal(d.getTime()));
             if(okD){ const kj=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; const cj=caFinaliseParJour[kj]||(caFinaliseParJour[kj]={ca:0,n:0}); cj.ca+=amt0; cj.n++; }
             const lg=String(a.login||a.vinted_user_id||'').trim(); if(lg) caParCompte[lg]=(caParCompte[lg]||0)+amt0; }
@@ -66958,7 +67105,7 @@ function AppCoeur() {
         // par `onCloudReady` des deux côtés : sur un appareil neuf elles
         // arrivaient APRÈS le premier rendu, et les deux écrans annonçaient
         // deux nombres (64 et 63, mesuré).
-        if(list.ok){ ok=true;
+        if(actif && list.ok){ ok=true;
           const uidL=String(a.vinted_user_id); let nL=0;
           for(const it of list.items){
             const id=String(it.id);
@@ -66985,7 +67132,7 @@ function AppCoeur() {
         } else annKO.push(String(a.vinted_user_id));
         // (29 oct.) Les conversations retirées de la liste ne font plus le point
         // « nouveau » de l'onglet Messages (la même règle que la liste, §11).
-        if(conv.ok){ ok=true; const ret=load(CONVERSATIONS_RETIREES,{}); for(const c of conv.items){ if(!c.unread) continue; unreadConvs.push({uid:String(a.vinted_user_id),id:c.id,updated_at:c.updated_at}); if(!conversationRetiree(ret,String(a.vinted_user_id),c) && messageRecent(c.updated_at)) unread++; } }
+        if(actif && conv.ok){ ok=true; const ret=load(CONVERSATIONS_RETIREES,{}); for(const c of conv.items){ if(!c.unread) continue; unreadConvs.push({uid:String(a.vinted_user_id),id:c.id,updated_at:c.updated_at}); if(!conversationRetiree(ret,String(a.vinted_user_id),c) && messageRecent(c.updated_at)) unread++; } }
       }
       // Paires en stock = nb de numéros réellement étiquetés dans le garage (3D).
       // Un numéro peut être posé sur une boîte seule (it.num), dans une case de
@@ -67055,7 +67202,7 @@ function AppCoeur() {
         }
       }catch(_){/* pas su ⇒ null ⇒ rien d'affiché */}
       if(!stop && ok){
-      setLiveStats({caMois,caEncaisse,prixPasLu,caFinaliseParJour,nMasque,caMasque:Math.round(caMasque*100)/100,enCours,online,unread,unreadConvs,stockValue,pairesStock,ventesJour,caJour,ventesMois,soldTotal,joursVente:joursVenteSet.size,caParCompte,caParMois,ventesParMois,dataAgeJours,dataAgeCompte,dataAgeComptes,
+      setLiveStats({caMois,caEncaisse,prixPasLu,caFinaliseParJour,nMasque,caMasque:Math.round(caMasque*100)/100,enCours,online,unread,unreadConvs,stockValue,pairesStock,ventesJour,caJour,ventesMois,soldTotal,joursVente:joursVenteSet.size,caParCompte,comptesCa,caParMois,ventesParMois,dataAgeJours,dataAgeCompte,dataAgeComptes,
         annLues,annEnLigne,annSuppr,annNoms,annActivite,annAConfirmer,annMasquees,
         walletDispo:(walletEsc&&walletEsc.accounts>0)?walletEsc.dispo:null,
         walletAttente:(walletEsc&&walletEsc.accounts>0)?walletEsc.total:null,
@@ -67083,7 +67230,7 @@ function AppCoeur() {
     })();
     return ()=>{stop=true;};
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[accountsLoaded, vintedAccounts, nuagePret, annoncesTick, baseKO]);
+  },[accountsLoaded, vintedAccounts, nuagePret, annoncesTick, baseKO, panelOffCoque]);
 
   // ── « VENDU » : UNE RÈGLE, CELLE DE MA JOURNÉE (§11, 4 octobre) ────────────
   // L'accueil (« Aujourd'hui »), Statistiques (« Vendu ce mois », la courbe) et
@@ -67155,7 +67302,7 @@ function AppCoeur() {
   //    Et un total PARTIEL (un compte, Leboncoin ou eBay illisibles) NOMME ce
   //    qui manque (`venduManque`) — jamais présenté comme complet (§5).
   const VENDU_PAS_SU = { caJour: null, ventesJour: null, caMois: null, ventesMois: null, caParMois: null, ventesParMois: null,
-    caEncaisse: null, caFinaliseParJour: null, enCours: null, soldTotal: null, joursVente: null, caParCompte: null, venduLignes: null, venduPasSu: true };
+    caEncaisse: null, caFinaliseParJour: null, enCours: null, soldTotal: null, joursVente: null, caParCompte: null, comptesCa: null, venduLignes: null, venduPasSu: true };
   // (1er nov., audit A2) Les ventes Vestiaire entrent dans « vendu » (montant sûr) ou sont nommées.
   const ventesVcCoque = useVentesVestiaire();
   const excluAutreCoque = useExcluAutre();
