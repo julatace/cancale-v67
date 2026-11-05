@@ -1,6 +1,8 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // AUDIT : LIVRE DES RECETTES ET REGISTRE DES ACHATS (3 novembre)
-//         node scripts/audit-registres.cjs [--mutation=versement|exclu|adater|zero|complet|annule|article|recu|achat-exclu|saisi]
+//         node scripts/audit-registres.cjs [--mutation=versement|exclu|adater|zero|complet|annule|article|recu|achat-exclu|saisi
+//                                            |gros-parts|gros-deux-fois|gros-oublie|gros-frais|hors-deux-fois|hors-nom|a-verifier-tu|gros-carte]
+//         node scripts/audit-registres.cjs --prouve   (toutes les mutations : chacune doit rougir)
 // ═══════════════════════════════════════════════════════════════════════════
 // Les deux registres obligatoires d'une micro-entreprise d'achat-revente, dans
 // Comptabilité (src/registres.js). Cet audit EXÉCUTE la vraie chaîne sur des
@@ -30,6 +32,18 @@
 //       partagent pas un N° ;
 //   A4. les dépenses ne sont pas des achats de marchandise (la carte ne les
 //       passe pas au registre).
+//   G1. (5 nov.) un ACHAT EN GROS (Achats → Fournisseurs, `vrm_fournisseurs`,
+//       lu par la VRAIE `lireRegistre` de src/fournisseurs.js) est UNE ligne :
+//       date, fournisseur, nombre de paires, total + frais saisis (« dont frais ») ;
+//   G2. jamais la somme des parts posées sur ses paires, et une fiche reliée à
+//       un achat en gros ne prête pas son prix à un achat Vinted (`buyFromId`)
+//       — aucun double compte ;
+//   G3. un achat hors plateforme RATTACHÉ à un fournisseur : UNE ligne, à son
+//       nom, jamais ajoutée à un achat en gros ;
+//   G4. un achat hors plateforme au N° d'une paire d'un achat en gros : gardé,
+//       dit « à vérifier » ;
+//   G5. le tableur et le PDF suivent (colonnes « Paires » et « Dont frais ») ;
+//   G6. la carte Registres passe le registre des fournisseurs.
 // `--mutation=…` réaffaiblit une règle dans une copie : rouge exigé.
 const fs = require('fs'), path = require('path'), vm = require('vm'), os = require('os');
 const R0 = process.env.VRM_RACINE || path.join(__dirname, '..');
@@ -55,7 +69,39 @@ else if (MUT === 'article') muter('mod', "complet: !sansMontant && !articleSeul 
 else if (MUT === 'recu') muter('mod', "const m = montantPropose(o, tx ? ventilationDe(tx) : null);", "const m = montantPropose(o, null);");
 else if (MUT === 'achat-exclu') muter('mod', "if (exclu && exclu(o)) { exclues += 1; continue; }", "");
 else if (MUT === 'saisi') muter('mod', "if (liees.length && saisis.every((c) => c != null))", "if (liees.length && saisis.some((c) => c != null))");
+// ── Les achats en gros (5 nov.) ──
+// La somme des parts posées sur ses paires au lieu de son total.
+else if (MUT === 'gros-parts') muter('mod', "montant: (a.total + frais) / 100, source: 'saisi'", "montant: ((parGros.get(gid) || []).length ? (parGros.get(gid) || []).reduce((t, e) => t + (centimesTexte(e.buyPrice) || 0), 0) : a.total + frais) / 100, source: 'saisi'");
+// Le prix posé par un achat en gros relu comme « saisi » d'un achat Vinted : compté deux fois.
+else if (MUT === 'gros-deux-fois') muter('mod', "const saisis = liees.map((e) => (lienGros(e) ? null : centimesTexte(e.buyPrice)));", "const saisis = liees.map((e) => centimesTexte(e.buyPrice));");
+// Les achats en gros oubliés.
+else if (MUT === 'gros-oublie') muter('mod', "for (const [gid, a] of Object.entries(G && G.achats && typeof G.achats === 'object' ? G.achats : {})) {", "for (const [gid, a] of Object.entries({})) {");
+// Les frais saisis oubliés.
+else if (MUT === 'gros-frais') muter('mod', "montant: (a.total + frais) / 100, source: 'saisi'", "montant: a.total / 100, source: 'saisi'");
+// Un achat hors plateforme rattaché compté une seconde fois, chez son fournisseur.
+else if (MUT === 'hors-deux-fois') muter('mod', "if (dansPeriode(ymLocal(l.ts), periode)) { lignes.push(l); if (doublon) aVerifier += 1; }", "if (dansPeriode(ymLocal(l.ts), periode)) { lignes.push(l); if (rat) lignes.push({ ...l, id: 'fo:' + hid }); if (doublon) aVerifier += 1; }");
+// Le rattachement perdu : la ligne ne dit plus son fournisseur.
+else if (MUT === 'hors-nom') muter('mod', "fournisseur: rat || String(", "fournisseur: String(");
+// Plus de « à vérifier ».
+else if (MUT === 'a-verifier-tu') muter('mod', "const doublon = !!num && numsGros.has(cleNum(num));", "const doublon = false;");
+// La carte ne passe plus les achats en gros.
+else if (MUT === 'gros-carte') muter('app', "gros: lireRegistre(load(CLE_FOURNISSEURS, null)), cleNum,", "cleNum,");
 else if (MUT) { console.log('❌ mutation inconnue : ' + MUT); process.exit(2); }
+if (process.argv.includes('--prouve')) {
+  const { spawnSync } = require('child_process');
+  const TOUTES = ['versement', 'exclu', 'adater', 'zero', 'complet', 'annule', 'article', 'recu', 'achat-exclu', 'saisi', 'gros-parts', 'gros-deux-fois', 'gros-oublie', 'gros-frais', 'hors-deux-fois', 'hors-nom', 'a-verifier-tu', 'gros-carte'];
+  let pris = 0;
+  for (const m of TOUTES) {
+    const r = spawnSync(process.execPath, [__filename, '--mutation=' + m], { encoding: 'utf8', env: process.env });
+    // Rouges hors PDF (pdf.js peut manquer : ce n'est pas la mutation qui le fait rougir).
+    const rouges = (r.stdout.match(/^ {2}❌ (?!le PDF se crée|R6 · le PDF dit|G5 · le PDF)/gm) || []).length;
+    const okM = r.status !== 0 && rouges > 0;
+    if (okM) pris++;
+    console.log(`${okM ? '✅' : '❌'} mutation « ${m} » : ${rouges} rouge(s) hors PDF`);
+  }
+  console.log(`\n${pris}/${TOUTES.length} mutations attrapées.`);
+  process.exit(pris === TOUTES.length ? 0 : 1);
+}
 
 function extraire(src, nom) {
   const m = new RegExp(`^(?:async )?function ${nom}\\(|^const ${nom}\\s*=\\s*`, 'm').exec(src);
@@ -232,6 +278,87 @@ const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
     dit(A2.sansMontant === 0 && A2.complet === false && M.resumeRegistre(A2).some(([k, v]) => k === 'Total' && /^au moins /.test(v)), 'A2 · « article seul » seul : total « au moins » (port et frais absents)');
   }
   dit(M.registreDesAchats({ achats: null, periode: '2026-11' }).manque.includes('achats Vinted'), 'achats pas lus : nommés (« — », jamais 0)');
+
+  // ── G. Les achats EN GROS (Achats → Fournisseurs) ───────────────────────────
+  console.log('── Achats en gros');
+  let FO = null;
+  try { FO = await import('file://' + path.join(R0, 'src', 'fournisseurs.js')); } catch (e) { dit(false, 'src/fournisseurs.js se charge', e.message); }
+  if (FO) {
+    // Le registre tel qu'il est rangé (`vrm_fournisseurs`), relu par LA règle (`lireRegistre`).
+    const regFo = FO.lireRegistre({
+      personnes: { p1: { nom: 'Grossiste inventé', tel: '', email: '', note: '' }, p2: { nom: 'Autre grossiste', tel: '', email: '', note: '' } },
+      achats: {
+        g1: { fournisseur: 'p1', date: '2026-11-12', paires: 10, total: 30000, frais: 2500, repartition: { mode: 'egal', base: 'frais' }, parts: {}, gardes: {} },
+        g2: { fournisseur: 'p1', date: '2026-10-20', paires: 3, total: 9000, frais: 0, repartition: { mode: 'egal', base: '' }, parts: {}, gardes: {} },
+        g3: { fournisseur: 'p2', date: '2026-11-14', paires: 1, total: 4000, frais: 0, repartition: { mode: 'egal', base: '' }, parts: {}, gardes: {} },
+      },
+      hors: { ob3: { fournisseur: 'p1', at: '2026-11-05' } },
+    });
+    // Ses paires reliées PAR SON CLIC (`buyGros`), avec la part posée (32,50 € chacune).
+    const fichesG = {
+      ...fiches,
+      g20: { numero: '20', buyGros: { id: 'g1', at: '1', part: 3250 }, buyPrice: '32,50' },
+      g21: { numero: '21', buyGros: { id: 'g1', at: '2', part: 3250 }, buyPrice: '32,50' },
+      g22: { numero: '22', buyGros: { id: 'g1', at: '3', part: 3250 }, buyPrice: '32,50', buyFromId: '7010' },   // reliée AUSSI à un achat Vinted (incohérent)
+      g40: { numero: '40', buyGros: { id: 'g3', at: '1', part: 4000 }, buyPrice: '40' },
+    };
+    const achatsG = [...achats, achat(7010, 28, 'Transaction finalisée', D(10, 13))];
+    const horsG = [...hors,
+      { id: 'ob3', title: 'Paire rattachée au grossiste', price: '120', date: '2026-11-11', source: 'Fournisseur', numero: '30' },
+      { id: 'ob4', title: 'Saisie à la main avant l’achat en gros', price: '35', date: '2026-11-11', source: 'Fournisseur', numero: '020' },
+    ];
+    const argsG = { achats: achatsG, hors: horsG, fiches: fichesG, periode: '2026-11', ventilationDe: (tx) => ventil[tx] || null, exclu: (o) => o._uid === '333',
+      montantHors: (b) => { const p = parseFloat(String(b.price).replace(',', '.')); return isNaN(p) ? null : p; }, sourceHors: (s) => s, gros: regFo,
+      cleNum: (v) => { let x = String(v == null ? '' : v).trim().toUpperCase().replace(/[\s\-_.]/g, ''); if (/^\d+$/.test(x)) x = String(parseInt(x, 10)); return x; } };
+    const AG = M.registreDesAchats(argsG);
+    const g = (id) => AG.lignes.find((l) => l.id === id);
+    console.log('   novembre', JSON.stringify(AG.lignes.filter((l) => /^(gros|hors|vinted:7010)/.test(l.id) || /^fo:/.test(l.id)).map((l) => [l.date, l.id, l.fournisseur, l.paires, l.montant, l.frais, l.source, l.num])));
+    const g1 = g('gros:g1');
+    dit(!!g1 && g1.montant === 325 && g1.frais === 25 && g1.paires === '10' && g1.fournisseur === 'Grossiste inventé' && g1.date === '12/11/2026', 'G1 · un achat en gros = UNE ligne : date, fournisseur, 10 paires, 300 € + 25 € de frais = 325 €', JSON.stringify(g1));
+    dit(!!g('gros:g3') && g('gros:g3').montant === 40 && g('gros:g3').frais == null, 'G1 · un achat en gros sans frais : son total seul (40 €)', JSON.stringify(g('gros:g3')));
+    dit(!g('gros:g2') && AG.lignes.filter((l) => /^gros:/.test(l.id)).length === 2 && AG.nGros === 2, 'G1 · un achat en gros d’octobre n’est pas en novembre ; deux lignes en gros en novembre', String(AG.nGros));
+    dit(!AG.lignes.some((l) => l.montant === 32.5), 'G2 · aucune ligne faite des parts posées sur ses paires (32,50 €)', JSON.stringify(AG.lignes.filter((l) => l.montant === 32.5)));
+    const v10 = g('vinted:7010');
+    dit(!!v10 && v10.montant === 28 && v10.source === 'article', 'G2 · un achat Vinted relié à une paire d’un achat en gros ne prend PAS la part du lot comme « saisi » (pas de double compte)', JSON.stringify(v10));
+    dit(!!g1 && g1.num === '20 + 21 + 22', 'G1 · le N° des paires reliées par SON clic (buyGros), jamais par titre', g1 && g1.num);
+    const o3 = AG.lignes.filter((l) => /ob3$/.test(l.id));
+    dit(o3.length === 1 && o3[0].fournisseur === 'Grossiste inventé' && o3[0].montant === 120, 'G3 · achat hors plateforme rattaché au grossiste : UNE ligne, à son nom, 120 €', JSON.stringify(o3));
+    dit(!!g1 && g1.montant === 325, 'G3 · il n’est pas ajouté à l’achat en gros (325 € reste 325 €)');
+    const o4 = g('hors:ob4');
+    dit(!!o4 && o4.montant === 35 && /à vérifier/.test(o4.raison) && AG.aVerifier === 1 && M.resumeRegistre(AG).some(([, , k]) => k === 'a-verifier'), 'G4 · un achat hors plateforme au N° d’une paire de l’achat en gros (« 020 » = N°20) : gardé, dit « à vérifier »', JSON.stringify(o4));
+    const sG = AG.lignes.reduce((t, l) => t + (l.montant == null ? 0 : Math.round(l.montant * 100)), 0);
+    dit(Math.round(AG.total * 100) === sG && sG === Math.round(A.total * 100) + 32500 + 4000 + 2800 + 12000 + 3500, 'G2 · total = somme des lignes = le registre d’avant + 325 + 40 + 28 + 120 + 35 (rien deux fois)', `${AG.total}`);
+    const anG = M.registreDesAchats({ ...argsG, periode: '2026' });
+    dit(anG.lignes.some((l) => l.id === 'gros:g2' && l.montant === 90) && anG.nGros === 3, 'G1 · l’année compte ses trois achats en gros', String(anG.nGros));
+    // Un fournisseur retiré emporte ses achats en gros (la règle de `sansFournisseur`).
+    const sansP2 = FO.sansFournisseur(regFo, 'p2').registre;
+    dit(!M.registreDesAchats({ ...argsG, gros: sansP2 }).lignes.some((l) => l.id === 'gros:g3'), 'G1 · un fournisseur retiré : ses achats en gros ne sont plus dans le registre');
+    dit(M.registreDesAchats({ ...argsG, gros: null }).nGros === 0, 'G1 · aucun registre de fournisseurs : aucune ligne en gros (rien d’inventé)');
+    // G5 — le tableur suit.
+    const CG = lireCsv(M.csvRegistre(AG, { maintenant: T(10, 20) }));
+    const iH = CG.findIndex((r) => r[0] === 'Date'), iT = CG.findIndex((r, i) => i > iH && r[0] === 'Total');
+    const iP = CG[iH].indexOf('Paires'), iF = CG[iH].indexOf('Dont frais'), iMm = CG[iH].indexOf('Montant');
+    const rg = CG.slice(iH + 1, iT).find((r) => r.includes('Grossiste inventé') && r[iP] === '10');
+    dit(iP > 0 && iF > 0 && !!rg && rg[iMm] === '325,00' && rg[iF] === '25,00', 'G5 · tableur : colonnes « Paires » et « Dont frais » ; la ligne en gros dit 10 · 325,00 · 25,00', JSON.stringify(rg));
+    const sCsv = CG.slice(iH + 1, iT).reduce((t, r) => t + (r[iMm] ? Math.round(Number(r[iMm].replace(',', '.')) * 100) : 0), 0);
+    dit(sCsv === sG && Math.round(Number(CG[iT][iMm].replace(',', '.')) * 100) === sG, 'G5 · tableur : total = somme des lignes', String(sCsv));
+    const tCsv = CG.map((r) => r.join(' ')).join('\n');
+    dit(/À vérifier/.test(tCsv) && /Achats en gros/.test(tCsv), 'G5 · tableur : le résumé dit les achats en gros et « à vérifier »');
+    let pdfG = '';
+    try {
+      const NM = fs.realpathSync(path.join(R0, 'node_modules'));
+      const PDFLib = require(path.join(NM, 'pdf-lib'));
+      const octG = await M.pdfRegistre(AG, { PDFLib, maintenant: T(10, 20) });
+      const pdfjs = await import('file://' + path.join(NM, 'pdfjs-dist', 'legacy', 'build', 'pdf.mjs'));
+      const doc = await pdfjs.getDocument({ data: new Uint8Array(octG), isEvalSupported: false, useSystemFonts: false, standardFontDataUrl: path.join(NM, 'pdfjs-dist', 'standard_fonts') + '/' }).promise;
+      for (let i = 1; i <= doc.numPages; i++) { const p = await doc.getPage(i); const tc = await p.getTextContent(); pdfG += tc.items.map((x) => x.str).join(' ') + '\n'; }
+    } catch (e) { pdfG = ''; dit(false, 'G5 · le PDF des achats se crée et se relit', e.message); }
+    const pg = pdfG.replace(/[\u00a0\u202f]/g, ' ');
+    dit(!!pdfG && /Grossiste invent/.test(pg) && /Dont frais/.test(pg) && /325,00/.test(pg) && pg.includes(M.eurosTexte(AG.total).replace(/[\u00a0\u202f]/g, ' ').replace('−', '-')), 'G5 · le PDF : le grossiste, « Dont frais », 325,00 et le total');
+    // G6 — la carte passe le registre des fournisseurs, lu par LA règle.
+    const carteG = sansCommentaires(extraire(APP, 'RegistresCarte'));
+    dit(/gros: lireRegistre\(load\(CLE_FOURNISSEURS, null\)\)/.test(carteG), 'G6 · la carte Registres passe les achats en gros (lireRegistre de vrm_fournisseurs)');
+  }
 
   // ── A4. La carte : les dépenses ne vont pas dans le registre des achats ─────
   const carte = sansCommentaires(extraire(APP, 'RegistresCarte'));

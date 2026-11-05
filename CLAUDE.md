@@ -501,6 +501,7 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 
+- **5 nov. · Stock + Vestiaire, registre + gros** : le Stock compte les annonces Vestiaire en ligne (N° par identité, `vrm_vc_liens` compris ; sans N° ou lecture absente/vieille nommée) ; registre des achats : un achat en gros = UNE ligne (total + frais, jamais ses parts). Passations stock-annonces et fournisseurs. Geste : ouvrir « Mes articles » sur Vestiaire.
 - **5 nov. · Intégration lot 2** : mode stream, iPhone et reprise, Stock (annonces actuelles, 2D), Fournisseurs fusionnés ; une liste d'écrans (`ONGLETS_LIENS`, avec E-mails), la fiche dit « achat en gros » (règle `origineDuPrix`). Branche `integration-lot2`.
 - **5 nov. · Mode stream** : bouton « Stream » à la place de l'œil des montants ; UNE règle programmée (montants, marques, « commence par », annonce entière « qui contient », comptes, acheteurs, adresses, IBAN) réécrit le texte partout, programme synchronisé ; revue : pseudos en mots entiers, codes de retrait cachés partout. `docs/passation/2026-11-05-mode-stream.md`. Geste : Réglages → Mode stream, écrire ses marques.
 - **5 nov. · iPhone et reprise** : barre du bas revue (4 tâches + 5ᵉ place qui dit l'écran ouvert, « Plus » en tuiles au-dessus de la barre, retour = fermer, bord laissé au système) ; l'app rouverte revient au même écran, section, filtres, défilement (appareil, par vendeur ; `?tab=` gagne) ; rail coupé sur Edge = bloc « Recharger » borné à 1360 px, couvre tout (revue). `docs/passation/2026-11-05-iphone-reprise.md`. Geste : essayer sur l'iPhone.
