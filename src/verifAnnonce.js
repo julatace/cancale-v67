@@ -38,8 +38,27 @@ const GESTES = {
   lbc: { taille: 'Ajoute la taille sur l’annonce Vinted', photos: 'Ouvre l’annonce sur Vinted : ses photos arrivent ici', prix: 'Corrige le prix dans la fiche', titre: 'Raccourcis le titre dans la fiche', marque: 'Ajoute la marque sur l’annonce Vinted', categorie: 'Précise le titre (le type d’article)' },
   ebay: { taille: 'Remplis la pointure dans les caractéristiques', photos: 'Ajoute des photos', prix: 'Corrige le prix', titre: 'Raccourcis le titre', marque: 'Remplis la marque dans les caractéristiques', categorie: 'Choisis la catégorie' },
   vestiaire: { taille: 'Ajoute la taille sur l’annonce Vinted', photos: 'Ouvre l’annonce sur Vinted : ses photos arrivent ici', prix: 'Corrige le prix sur Vinted', titre: 'Raccourcis le titre sur Vinted', marque: 'Ajoute la marque sur l’annonce Vinted', categorie: 'Choisis la catégorie sur Vestiaire' },
-  vinted: { taille: 'Ajoute la taille sur Vinted', photos: 'Ajoute des photos sur Vinted', prix: 'Change le prix dans Republier', titre: 'Raccourcis le titre dans Republier', marque: 'Ajoute la marque sur Vinted', categorie: 'Choisis la catégorie sur Vinted' },
+  vinted: { taille: 'Ajoute la taille sur Vinted', photos: 'Ajoute des photos sur Vinted', prix: 'Change le prix dans Republier', titre: 'Raccourcis le titre dans Republier', marque: 'Ajoute la marque sur Vinted', categorie: 'Choisis la catégorie sur Vinted', description: 'Écris la description sur Vinted', couleur: 'Choisis la couleur sur Vinted', etat: 'Choisis l’état sur Vinted', titreVide: 'Écris un titre sur Vinted', prixVide: 'Mets un prix sur Vinted' },
 };
+// (5 nov., Julien : « avant de lancer une action, savoir s'il manque quelque
+// chose pour la publication ») Ce que l'extension exige AVANT une mise en ligne
+// (`champsManquantsAvant`, background.js) et que l'app peut juger sur ce qu'elle
+// a lu : titre, prix, photos, description (5 caractères au moins, la borne
+// `DESCRIPTION_MIN` de l'extension), couleur, état. Les champs PROPRES à Vinted
+// ne sont jugés que pour `site === 'vinted'` ; ailleurs, rien ne change.
+export const DESCRIPTION_MIN = 5;
+// Les champs que VRM n'a PAS pu lire (`undefined`) : dits à part, « vérifiés par
+// l'extension au lancement » — jamais présentés comme présents.
+const NOMS_CHAMPS = { titre: 'le titre', prix: 'le prix', photos: 'les photos', taille: 'la taille', marque: 'la marque', categorie: 'la catégorie', description: 'la description', couleur: 'la couleur', etat: 'l’état' };
+const CLES_LUES = { titre: 'titre', prix: 'prix', photos: 'nPhotos', taille: 'taille', marque: 'marque', categorie: 'categorie', description: 'descLen', couleur: 'couleur', etat: 'etat' };
+export function champsNonJuges(a, site) {
+  const x = a || {};
+  if (site !== 'vinted') return [];
+  return Object.keys(CLES_LUES).filter((k) => {
+    if (k === 'taille' && SANS_TAILLE.has(String(x.famille || ''))) return false;
+    return x[CLES_LUES[k]] === undefined || x[CLES_LUES[k]] === null;
+  }).map((k) => NOMS_CHAMPS[k]);
+}
 
 // → [{ code, texte, geste }] dans un ordre fixe (le plus bloquant d'abord).
 export function problemesAnnonce(a, site) {
@@ -65,6 +84,20 @@ export function problemesAnnonce(a, site) {
   }
   if (x.marque !== undefined && vide(x.marque)) pose('marque', 'Marque absente');
   if (x.categorie !== undefined && vide(x.categorie)) pose('categorie', 'Catégorie absente');
+  if (site === 'vinted') {
+    // Ce que Vinted refuse à la mise en ligne (`champsManquantsAvant`), jugé
+    // seulement sur ce qui a été lu (trois états, §5).
+    // (revue du 5 nov.) `null` = pas lu (un prix illisible du dressing arrive en
+    // `null` dans Republier) : jamais « Sans prix » ni « Sans titre » inventés.
+    if (x.titre !== undefined && x.titre !== null && vide(x.titre)) out.unshift({ code: 'titreVide', texte: 'Sans titre', geste: g.titreVide });
+    if (x.prix !== undefined && x.prix !== null && !(num(x.prix) > 0)) out.unshift({ code: 'prixVide', texte: 'Sans prix', geste: g.prixVide });
+    if (x.descLen !== undefined && x.descLen !== null) {
+      const d = num(x.descLen);
+      if (d == null || d < DESCRIPTION_MIN) pose('description', !d ? 'Sans description' : `Description trop courte (${d} caractère${d > 1 ? 's' : ''})`);
+    }
+    if (x.couleur !== undefined && x.couleur !== null && vide(x.couleur)) pose('couleur', 'Couleur absente');
+    if (x.etat !== undefined && x.etat !== null && vide(x.etat)) pose('etat', 'État absent');
+  }
   return out;
 }
 
