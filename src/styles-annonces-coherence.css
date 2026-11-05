@@ -162,6 +162,7 @@
 :root:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-chiffres] .vrm-fiche-cell > span:first-child {
   white-space: normal !important; overflow: visible !important; text-overflow: clip !important; line-height: 1.2;
 }
+:root:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-gestes > .vrm-fiche-geste > svg { flex: none; }
 .vrm-fiche-geste-sous { display: block; font-size: 11px; font-weight: 500; color: var(--vrm-muted); white-space: nowrap; }
 
 /* La feuille « … » d'une carte : des lignes de 44 px, pleine largeur. */
