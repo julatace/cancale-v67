@@ -17,6 +17,9 @@
 //  du NOMBRE de ventes Vinted — compté par la base, jamais un montant.
 //  Migration 020 : des GROUPES à code (un accompagnement) — la carte et le
 //  classement peuvent n'afficher que les membres d'un groupe.
+//  Migration 025 (5 nov., PAS APPLIQUÉE) : l'onglet « Groupes » — les groupes
+//  d'accompagnement « comme Skool » (src/communaute/Accompagnement.jsx) : demande,
+//  validation par le créateur, partage choisi par le membre (rien par défaut).
 //  La carte : MapLibre (vectoriel), chargée à l'ouverture de l'écran (jamais
 //  au démarrage), fond OpenFreeMap sobre (positron / dark), sans clé d'API.
 //  Injoignable ⇒ la même communauté en liste.
@@ -25,6 +28,8 @@ import {avatarProfilPermis,initialesProfil} from './avatarDiscord.js';
 import { DISCORD_ERREURS } from './discordErreurs.js';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import Accompagnement from './Accompagnement.jsx';
+import { codeDuLien } from './accompagnement.js';
 import { cellules, resume, grouperParPixels, COUCOU, quandCourt, distanceKm, RAYON_PRES_KM } from './regles.js';
 import './communaute.css';
 import { chargerMaplibre, poserFond, webglDispo, mouvementReduit } from '../fondCarte.js';
@@ -377,7 +382,10 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
   const [rejoindre, setRejoindre] = useState(false), [cellsOuvertes, setCellsOuvertes] = useState(null);
   const [filOuvert, setFilOuvert] = useState(null), [enListe, setEnListe] = useState(false);
   const [envoye, setEnvoye] = useState(() => new Set()), [toast, setToast] = useState('');
-  const [vue, setVue] = useState('carte');            // carte · classement
+  // (5 nov.) Un lien d'invitation (`?tab=communaute&groupe=CODE`, gardé par l'app
+  // avant de nettoyer l'adresse) ouvre l'onglet Groupes, code déjà tapé.
+  const [codeLien] = useState(() => { try { const c = sessionStorage.getItem('vrm_accomp_lien') || ''; sessionStorage.removeItem('vrm_accomp_lien'); return codeDuLien('?groupe=' + encodeURIComponent(c)); } catch (_) { return ''; } });
+  const [vue, setVue] = useState(codeLien ? 'groupes' : 'carte');   // carte · classement · groupes
   const [groupeId, setGroupeId] = useState(null);     // null = tous les membres
   const vivant = useRef(true);
   const lire = useCallback(async (discret) => {
@@ -449,7 +457,7 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
   // Les feuilles et le toast vivent sur <body> : l'écran est dans une coque
   // zoomée / empilée, où un `position:fixed` resterait sous la barre du bas.
   const portail = (x) => createPortal(<div className="vrm-communaute vrm-cm-portail" data-dark={sombre ? 'true' : 'false'}>{x}</div>, document.body);
-  const entete = <header className="vrm-cm-entete"><div><h2>La carte des revendeurs</h2></div></header>;
+  const entete = <header className="vrm-cm-entete"><div><h2>{vue === 'groupes' ? 'Groupes d’accompagnement' : 'La carte des revendeurs'}</h2></div></header>;
 
   if (etat === 'charge') return <section className="vrm-communaute" data-dark={sombre ? 'true' : 'false'} data-communaute-etat="charge">{entete}<p role="status" className="vrm-cm-note">Lecture de la carte…</p></section>;
   if (etat !== 'lu') return <section className="vrm-communaute" data-dark={sombre ? 'true' : 'false'} data-communaute-etat={etat}>{entete}
@@ -460,10 +468,15 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
     </div></section>;
 
   const onglets = <div className="vrm-cm-onglets" role="group" aria-label="Communauté">
-    {[['carte', 'Carte'], ['classement', 'Classement']].map(([k, t]) => <button key={k} type="button" className="vrm-cm-onglet" aria-pressed={vue === k} onClick={() => setVue(k)} data-cm-vue={k}>{t}</button>)}
+    {[['carte', 'Carte'], ['classement', 'Classement'], ['groupes', 'Groupes']].map(([k, t]) => <button key={k} type="button" className="vrm-cm-onglet" aria-pressed={vue === k} onClick={() => setVue(k)} data-cm-vue={k}>{t}</button>)}
   </div>;
   const blocGroupes = groupes && <Groupes api={api} moi={moi} groupes={groupes} actif={groupe} onChoisir={setGroupeId}
     onFait={async (t, id) => { setToast(t); await lire(true); if (id !== undefined) setGroupeId(id); }} />;
+  if (vue === 'groupes') return <section className="vrm-communaute" data-dark={sombre ? 'true' : 'false'} data-communaute-etat="lu" data-cm-vue-active="groupes">
+    {entete}{onglets}
+    <Accompagnement api={api} headers={headers} prenom={prenom} codeLien={codeLien} portail={portail} FermeAuRetour={FermeAuRetour} onToast={setToast} />
+    {toast && portail(<div className="vrm-cm-toast" role="status" data-cm-toast>{toast}</div>)}
+  </section>;
   if (vue === 'classement') return <section className="vrm-communaute" data-dark={sombre ? 'true' : 'false'} data-communaute-etat="lu" data-cm-vue-active="classement">
     {entete}{onglets}{blocGroupes}
     <Classement key={groupe ? groupe.id : 'tous'} api={api} moi={moi} groupe={groupe} />
@@ -741,8 +754,8 @@ function Groupes({ api, moi, groupes, actif, onChoisir, onFait }) {
     catch (_) { setCopie('copie impossible — sélectionne-le'); }
   };
   return <div className="vrm-cm-carton vrm-cm-groupes" data-cm-groupes={groupes.length}>
-    <div className="vrm-cm-groupes-tete"><b>Groupe d’accompagnement</b>
-      <span className="vrm-cm-note"> Pour vous comparer entre membres d’un accompagnement.</span></div>
+    <div className="vrm-cm-groupes-tete"><b>Groupe de comparaison</b>
+      <span className="vrm-cm-note"> Pour comparer la carte et le classement entre vous. Pour suivre ceux que tu accompagnes : onglet Groupes.</span></div>
     {groupes.length > 0 && <div className="vrm-cm-onglets vrm-cm-choix-groupe" role="group" aria-label="Qui afficher">
       <button type="button" className="vrm-cm-onglet" aria-pressed={!actif} onClick={() => onChoisir(null)} data-cm-groupe-choix="tous">Tous les membres</button>
       {groupes.map((g) => <button key={g.id} type="button" className="vrm-cm-onglet" aria-pressed={!!actif && actif.id === g.id} onClick={() => onChoisir(g.id)} data-cm-groupe-choix={g.id}>{g.nom}</button>)}
