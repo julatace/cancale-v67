@@ -10,7 +10,12 @@
      MAILLONS en chaîne (extension → compte VRM → compte Vinted), la dernière
      capture, et LE geste en bas, sur toute la largeur. */
 
-.vrm-etat-pastille .vrm-etat-point { box-shadow: 0 0 0 3px color-mix(in srgb, var(--etat-ton) 22%, transparent); }
+/* (5 nov., « plus pro ») Tout va bien : un point discret, sans halo, et le nom
+   du compte. Le halo (et l'ambre) seulement quand il y a un geste à faire. */
+.vrm-etat-pastille .vrm-etat-point { box-shadow: none; }
+.vrm-etat-pastille[data-etat-ton="ok"] .vrm-etat-point { width: 6px !important; height: 6px !important; opacity: .7; }
+.vrm-etat-pastille[data-etat-ton="attention"] .vrm-etat-point { box-shadow: 0 0 0 3px color-mix(in srgb, var(--etat-ton) 22%, transparent); }
+.vrm-etat-pastille .vrm-etat-compte { font-weight: 600; }
 .vrm-etat-pastille[data-etat-actions="verif"] .vrm-etat-point { animation: vrm-etat-souffle 1.6s ease-in-out infinite; }
 @keyframes vrm-etat-souffle { 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--etat-ton) 10%, transparent); } }
 .vrm-etat-chevron { display: inline-flex; font-style: normal; color: var(--vrm-muted); transform: rotate(90deg); transition: transform .18s cubic-bezier(.23, 1, .32, 1); margin-left: -1px; }
@@ -58,6 +63,14 @@
 @media (pointer: coarse) {
   .vrm-etat-geste > button, .vrm-etat-geste > a { min-height: 44px; }
 }
+/* (5 nov.) Tes comptes, une ligne chacun : la dernière relecture, ce qui bloque. */
+.vrm-etat-comptes { padding: 8px 0 2px; margin-top: 2px; border-top: 1px solid var(--vrm-line); }
+.vrm-etat-comptes-titre { font-weight: 600; font-size: 12px; color: var(--vrm-muted); margin-bottom: 4px; }
+.vrm-etat-compte-ligne { padding: 3px 0; overflow-wrap: anywhere; }
+.vrm-etat-compte-site { color: var(--vrm-muted); font-size: 12px; }
+.vrm-etat-compte-age { color: var(--vrm-muted); }
+.vrm-etat-panneau.ordi { max-height: calc(100dvh - 96px); overflow-y: auto; overscroll-behavior: contain; }
+
 @media (prefers-reduced-motion: reduce) {
   .vrm-etat-panneau, .vrm-etat-pastille .vrm-etat-point, .vrm-etat-chevron { animation: none !important; transition: none !important; }
 }

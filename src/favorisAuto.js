@@ -164,13 +164,16 @@ export const RAISONS_AUTO = {
 // tout, puis laissé de côté avec sa raison. Et quand un geste de Julien débloquerait
 // la situation, VRM le lui DEMANDE une fois (dans l'app et par notification), en une
 // phrase avec le geste. La demande tombe d'elle-même quand le problème est réglé.
+import { motsNavigateur } from './navigateurExtension.js';
+// (5 nov.) Le navigateur d'ICI, nommé seulement s'il est su (jamais « Chrome » sur Orion).
+const NAV = motsNavigateur();
 export const AUTO_ESSAIS = 2;
 export const DEMANDES_AUTO = {
   destinataire_non_prouve: 'Pour écrire aux nouveaux favoris, VRM doit apprendre à qui écrire : sur vinted.fr, ouvre UN favori depuis la cloche (connecté sur ce compte), attends sa page de message, puis reviens.',
-  onglet_vinted: 'Ouvre vinted.fr dans Chrome, connecté sur ce compte, et laisse l’onglet ouvert : les messages automatiques partent de là.',
-  compte_vinted_absent: 'Connecte-toi à Vinted avec ce compte dans Chrome : les messages automatiques partent de l’onglet de CE compte.',
-  compte_vinted_different: 'Chrome est connecté à un autre compte Vinted : passe sur ce compte dans l’onglet vinted.fr.',
-  extension_indisponible: 'L’extension ne répond pas : recharge-la dans Chrome (⟳), puis recharge VRM.',
+  onglet_vinted: `Ouvre vinted.fr ${NAV.dansNu}, connecté sur ce compte, et laisse l’onglet ouvert : les messages automatiques partent de là.`,
+  compte_vinted_absent: `Connecte-toi à Vinted avec ce compte ${NAV.dansNu} : les messages automatiques partent de l’onglet de CE compte.`,
+  compte_vinted_different: `${NAV.Ce} est connecté à un autre compte Vinted : passe sur ce compte dans l’onglet vinted.fr.`,
+  extension_indisponible: `L’extension ne répond pas : recharge-la ${NAV.dansNu}, puis recharge VRM.`,
   extension_version: 'Installe l’extension 5.309 (Paramètres → Extension), puis recharge-la (⟳) : le mode automatique en a besoin.',
   session_extension: 'Reconnecte l’extension à ton compte VRM (ouvre l’extension → Connecter).',
   garde_absente: 'VRM n’a pas pu vérifier tes paires vendues ailleurs : ouvre l’écran Annonces de VRM une fois.',

@@ -122,6 +122,7 @@ import {annoncesVcEnLigne,stockVestiaire,retraitsVestiaire,VC_VENTE_ETAPES,VC_AN
 import {colisLbcAPoster,lbcColisAPoster,totalColis,colisLbcVendeur} from '../api/_lib/colis-sites.js';
 import {CLE_COMPTES_EXCLUS,excluAutreDe,estExclu,basculerExclu,compteDeVente} from '../api/_lib/comptes-exclus.js';
 import {PLATEFORMES_COMPTES,etatCompteLie,ageLecture,comptesLbcLies,comptesVcLies,comptesEbayLies,refDeLigneEbay,nomCompteLie,LIBELLE_ETAT} from './comptesLies.js';
+import { lignesFraicheur, nomPlateforme } from './fraicheurComptes.js';
 import './comptes-lies.css';
 import './comptes-securite.css';
 import { CLE_MONTANTS_CACHES, lireMontantsCaches, installerMasque } from './montantsCaches.js';
@@ -144,7 +145,13 @@ import {appelerEbay,ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres,Eb
 import RechercheEbay,{repereAdmis} from "./ebayRecherche.jsx";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
 import { captchaActif, routeProtegee, jetonCaptcha, etatCaptcha, abonnerCaptcha, consommerCaptcha, corpsAvecCaptcha, monterWidget, MSG_CAPTCHA_ATTENTE, MSG_CAPTCHA_REFUS, MSG_CAPTCHA_ERREUR } from "./captcha.js";
-import { boutiqueIci, boutiqueOrion, estAndroid, pageExtensionsIci, nomNavigateurIci, mobileIci, LIENS_BOUTIQUES, LIEN_FIREFOX_ANDROID, LIEN_ORION_FICHIER, NOTICE_ORION, phraseNavigateur } from "./navigateurExtension.js";
+import { boutiqueIci, boutiqueOrion, estAndroid, pageExtensionsIci, nomNavigateurIci, mobileIci, LIENS_BOUTIQUES, LIEN_FIREFOX_ANDROID, LIEN_ORION_FICHIER, NOTICE_ORION, phraseNavigateur, motsNavigateur } from "./navigateurExtension.js";
+// (5 nov., Julien sur Orion : « elle affiche Chrome alors que je suis sur Orion »)
+// Les mots du navigateur D'ICI, une fois : « ce Chrome », « Orion », « ce
+// navigateur »… — jamais « Chrome » en dur dans une phrase qui parle de lui.
+// Le navigateur de l'ORDINATEUR (vu du téléphone) n'est pas connu : « le
+// navigateur de ton ordinateur ». Voir `motsNavigateur`.
+const NAV = motsNavigateur();
 import { FicheFacturation, FactureVente, ListeFacturesPro, relireFactures } from "./FacturePro.jsx";
 import { etatFacturation, factureDepuisVente, pdfFacturX, nomFichierFacture, recapEReporting, recapCsv, recapJson, eurDe, frJour } from "./facturationElectronique.js";
 import { lireSuperPdp, appelSuperPdp, enBase64, libelleEnvoi, ENV_LIBELLE } from "./superpdp.js";
@@ -3945,11 +3952,11 @@ function FraicheurAnnonces({ lues, enLigne, noms, supprimees, aConfirmer, numero
   const visite = `à ta prochaine visite sur Vinted, sur n'importe lequel de tes comptes${aRelire.length > 3 ? ' (trois comptes par visite)' : ''}`;
   const geste = !aRelire.length ? null
     : ailleurs ? `Avec l'extension VRM à jour, sur l'ordinateur où elle est installée, ${elles} ${visite} ; plus ancienne, ouvre vinted.fr connecté sur ${ceux}.`
-    : perime ? `L'extension de ce Chrome tourne encore sur son ancien code : rien ne sera relu tant qu'elle n'est pas rechargée — ouvre chrome://extensions et clique ⟳ sur VRM.`
+    : perime ? `L'extension ${NAV.de} tourne encore sur son ancien code : rien ne sera relu tant qu'elle n'est pas rechargée — ${NAV.ouvrirPageExt} et ${NAV.rechargerExt}.`
     : cap === 'ok' && relit ? `${elles.charAt(0).toUpperCase() + elles.slice(1)} ${visite}.`
-    : cap === 'ok' && (connexion === 'non' || connexion === 'autre') ? `L'extension de ce Chrome n'est pas connectée à ton compte VRM${connexion === 'autre' ? ' (elle écrit dans un autre)' : ''} : tant qu'elle ne l'est pas, rien ne sera relu. VRM la reconnecte de lui-même ; sinon, recharge cette page.`
-    : cap === 'ok' ? `Dès que l'extension de ce Chrome aura répondu, ${elles} ${visite}.`
-    : `Mets l'extension à jour (${EXT_ATTENDUE}) : elle les vérifiera ${visite}. D'ici là, ouvre vinted.fr connecté sur ${ceux} dans Chrome : elle relit son dressing.`;
+    : cap === 'ok' && (connexion === 'non' || connexion === 'autre') ? `L'extension ${NAV.de} n'est pas connectée à ton compte VRM${connexion === 'autre' ? ' (elle écrit dans un autre)' : ''} : tant qu'elle ne l'est pas, rien ne sera relu. VRM la reconnecte de lui-même ; sinon, recharge cette page.`
+    : cap === 'ok' ? `Dès que l'extension ${NAV.de} aura répondu, ${elles} ${visite}.`
+    : `Mets l'extension à jour (${EXT_ATTENDUE}) : elle les vérifiera ${visite}. D'ici là, ouvre vinted.fr connecté sur ${ceux} ${NAV.dansNu} : elle relit son dressing.`;
   const num = (it) => { if (!numeros) return ''; const n = numeros[it.id] && numeros[it.id].numero; return n != null && String(n).trim() !== '' ? `N°${n}` : 'sans N°'; };
   return (
     <div {...{ [attr]: '' }} data-vieux={vieux.join(',')} data-supprimees={nSuppr} data-cap={cap} data-cap-suppr={capS}
@@ -3978,8 +3985,8 @@ function FraicheurAnnonces({ lues, enLigne, noms, supprimees, aConfirmer, numero
       </span>}
       {geste && <span data-geste-dit>
         {geste}
-        {promet && ' Une suppression faite sur vinted.fr dans ce Chrome sort d’ici tout de suite — recharge d’abord les onglets Vinted ouverts avant la dernière mise à jour de l’extension.'}
-        {plusieurs && ' Deux extensions VRM répondent dans ce Chrome : tant qu’il en reste deux, une suppression peut ne pas être vue.'}
+        {promet && ` Une suppression faite sur vinted.fr ${NAV.dans} sort d’ici tout de suite — recharge d’abord les onglets Vinted ouverts avant la dernière mise à jour de l’extension.`}
+        {plusieurs && ` Deux extensions VRM répondent ${NAV.dans} : tant qu’il en reste deux, une suppression peut ne pas être vue.`}
       </span>}
       {ouvert && nAC > 0 && (
         <div data-a-confirmer-liste style={{ marginTop: 8, borderTop: `1px solid ${C.border}`, paddingTop: 6 }}>
@@ -7788,7 +7795,7 @@ function textePlusieurs() {
   const geste = v.length >= 2
     ? `supprime l'ancienne et garde la ${v[v.length - 1]}`
     : "n'en garde qu'une (la plus récente)";
-  return `Deux extensions VRM répondent dans ce Chrome${v.length >= 2 ? ` (${v.slice(0, -1).join(', ')} et ${v[v.length - 1]})` : ''} : chaque commande partirait deux fois, alors je n'en envoie aucune. Dans chrome://extensions, ${geste}, puis recharge cette page (si tu viens de la retirer, recharger suffit).`;
+  return `Deux extensions VRM répondent ${NAV.dans}${v.length >= 2 ? ` (${v.slice(0, -1).join(', ')} et ${v[v.length - 1]})` : ''} : chaque commande partirait deux fois, alors je n'en envoie aucune. Dans ${NAV.pageExtTexte}, ${geste}, puis recharge cette page (si tu viens de la retirer, recharger suffit).`;
 }
 function sonderPonts(dureeMs = 1500) {
   if (typeof window === 'undefined' || !__vmrExtReady || __vmrTour) return;
@@ -8009,7 +8016,7 @@ const CODE_DANS_ETAT = '5.171.0';
 function textePerime() {
   const p = codePerime() || {};
   const v = String((__vmrEtat && __vmrEtat.version) || vmrExtVersion() || '');
-  return `L'extension de ce Chrome tourne encore sur son ancien code${p.code ? ` (${p.code})` : ''}, pas sur la ${v || 'version'} que tu as installée — Chrome ne la recharge pas tout seul. Dans ce Chrome : ouvre chrome://extensions et clique ⟳ (la flèche ronde) sur VRM. À faire dans CHAQUE Chrome où elle est installée.`;
+  return `L'extension ${NAV.de} tourne encore sur son ancien code${p.code ? ` (${p.code})` : ''}, pas sur la ${v || 'version'} que tu as installée — ${NAV.connu ? NAV.nom : 'le navigateur'} ne la recharge pas tout seul. ${NAV.Dans} : ${NAV.ouvrirPageExt} et ${NAV.rechargerExt}. À faire dans CHAQUE navigateur (chaque profil) où elle est installée.`;
 }
 const __vmrJobs = {};                       // jobId → dernière étape connue
 const __vmrNotifier = () => __vmrExtSubs.forEach(fn => { try { fn(); } catch (_) {} });
@@ -8231,7 +8238,7 @@ async function relaisAttendre(id, data, suivi) {
     return { etat: r.etat, resultat: r.resultat || {} };
   }
 }
-const RAISON_PAS_PRIS = "Ton ordinateur n'a pas pris la commande en 2 min — je l'ai annulée, rien n'est parti. Vérifie que Chrome y est ouvert, puis réessaie.";
+const RAISON_PAS_PRIS = "Ton ordinateur n'a pas pris la commande en 2 min — je l'ai annulée, rien n'est parti. Vérifie que le navigateur où est l'extension VRM y est ouvert, puis réessaie.";
 const RAISON_INCERTAIN = "Ton ordinateur a pris la commande mais n'a pas encore répondu — je ne sais pas si elle est partie : regarde avant de relancer.";
 // Un bordereau accepté avance sur l'ordinateur : la ligne de la commande le
 // dit, le téléphone la relit jusqu'au bout.
@@ -8315,7 +8322,7 @@ function LigneRelais({ quoi }) {
     <div data-relais-info={rl.vinted ? rl.vinted.uid : ''} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13, color: C.text, background: C.card,
       border: `1px solid ${C.border}`, borderRadius: 12, padding: '9px 12px', marginBottom: 10, lineHeight: 1.45 }}>
       <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 6, background: C.accent, flexShrink: 0, marginTop: 5 }}/>
-      <span style={{ minWidth: 0 }}><b>{quoi} {viaOrdinateur(rl.vinted)}</b>{rl.vinted ? '' : ' — ouvre vinted.fr dans le Chrome de ton ordinateur pour agir.'}</span>
+      <span style={{ minWidth: 0 }}><b>{quoi} {viaOrdinateur(rl.vinted)}</b>{rl.vinted ? '' : ' — ouvre vinted.fr dans le navigateur de ton ordinateur pour agir.'}</span>
     </div>
   );
 }
@@ -9004,7 +9011,7 @@ function PhotosBloquees() {
             ? <>L'extension VRM, qui sait aller les chercher, ne répond pas : <b>recharge cette page</b>.</>
             : codeGeste === 'telephone'
               ? <>Ici, rien ne peut aller les chercher : sur l'<b>ordinateur où l'extension VRM est installée</b>, c'est elle qui les récupère.{intactes}</>
-              : <><b>Ouvre VRM dans le Chrome où l'extension VRM est installée</b> : c'est elle qui va les chercher.{intactes}</>;
+              : <><b>Ouvre VRM dans le navigateur où l'extension VRM est installée</b> : c'est elle qui va les chercher.{intactes}</>;
   // ⚠️ `vrm-sous-ile` (index.html) : sur ordinateur, l'île d'actions flotte en
   //    haut à droite et le GESTE de cette phrase passait dessous (mesuré mot par
   //    mot, revue du 11 octobre). Le côté droit lui laisse sa place — c'est
@@ -9064,13 +9071,13 @@ function raisonExtGlobale(sansSouris, opt) {
     // Trois états, jamais deux : vivant · éteint · pas su.
     const rl = etatRelais();
     if (rl.niveau === 'vivant') {
-      if (cap === 'vcpublier') return { code: 'telephone', relais: 'vestiaire', texte: "Préparer sur Vestiaire Co se fait sur l'ordinateur : le formulaire s'ouvre dans son Chrome, c'est là que tu le relis et que tu publies." };
-      if (cap === 'publication-ebay') return { code: 'telephone', relais: 'ebay', texte: "Préparer sur eBay se fait sur l'ordinateur : le formulaire s'ouvre dans son Chrome, c'est là que tu le relis." };
+      if (cap === 'vcpublier') return { code: 'telephone', relais: 'vestiaire', texte: "Préparer sur Vestiaire Co se fait sur l'ordinateur : le formulaire s'ouvre dans son navigateur, c'est là que tu le relis et que tu publies." };
+      if (cap === 'publication-ebay') return { code: 'telephone', relais: 'ebay', texte: "Préparer sur eBay se fait sur l'ordinateur : le formulaire s'ouvre dans son navigateur, c'est là que tu le relis." };
       if (cap !== 'publication' && rl.pauseMs > 0) return { code: 'pause', relais: 'vivant', texte: `Vinted a demandé de ralentir : l'extension de ton ordinateur n'envoie rien chez Vinted pendant encore ${Math.max(1, Math.ceil(rl.pauseMs / 60000))} min (c'est elle qui protège tes comptes). Rien à faire de ton côté.` };
       return null;
     }
     if (rl.niveau === 'verif') return { code: 'verif', relais: 'verif', texte: "Je regarde si ton ordinateur peut agir pour toi…" };
-    if (rl.niveau === 'perime') return { code: 'telephone', relais: 'perime', texte: `Ton ordinateur n'a pas donné signe de vie depuis ${dureeRelais(rl.age)} — ouvre Chrome sur l'ordinateur où l'extension VRM est installée : c'est elle qui ${role}, et tu pourras le faire d'ici.` };
+    if (rl.niveau === 'perime') return { code: 'telephone', relais: 'perime', texte: `Ton ordinateur n'a pas donné signe de vie depuis ${dureeRelais(rl.age)} — ouvre, sur l'ordinateur, le navigateur où l'extension VRM est installée : c'est elle qui ${role}, et tu pourras le faire d'ici.` };
     if (rl.niveau === 'retard') return { code: 'telephone', relais: 'retard', texte: `L'extension de ton ordinateur (${rl.ver || 'version ?'}) ne sait pas encore agir pour ton téléphone : mets-la à jour (${EXT_ATTENDUE}) sur l'ordinateur.` };
     if (rl.niveau === 'passu') return { code: 'telephone', relais: 'passu', texte: `Je n'ai pas pu savoir si ton ordinateur est allumé (la base n'a pas répondu) — c'est l'extension de ton ordinateur qui ${role}.` };
     // 19 oct. : Firefox pour Android accepte l'extension — dit seulement si sa
@@ -12175,7 +12182,7 @@ function ExtEnRetard({ onNav }) {
            exécutaient une 5.95–5.129 sous un manifeste « 5.164 » — tant qu'on
            n'a pas cliqué ⟳, et SEULEMENT dans le Chrome où on le clique. Il a
            un Chrome (un profil) par compte Vinted : ⟳ dans CHACUN. */
-      detail={"1. Télécharge le zip ci-contre. 2. Dézippe-le : tu obtiens un dossier « VRM-extension » — mets-le à la place de l'ancien, au même endroit et avec le même nom. 3. PUIS, dans CHAQUE Chrome où l'extension est installée (chaque profil) : ouvre chrome://extensions, garde une seule carte VRM, et clique ⟳ (la flèche ronde) dessus — sans ⟳, Chrome garde l'ancien code. 4. Recharge une page Vinted : la capture repart avec la nouvelle version."}
+      detail={"1. Télécharge le zip ci-contre. 2. Dézippe-le : tu obtiens un dossier « VRM-extension » — mets-le à la place de l'ancien, au même endroit et avec le même nom. 3. PUIS, dans CHAQUE navigateur où l'extension est installée (chaque profil) : ouvre sa page des extensions (chrome://extensions sur Chrome), garde une seule carte VRM, et recharge-la (⟳ sur Chrome) — sinon le navigateur garde l'ancien code. 4. Recharge une page Vinted : la capture repart avec la nouvelle version."}
       action={<a href={`/VRM-extension.zip?v=${EXT_ATTENDUE}`} download
         style={{display:'inline-block',border:'none',background:C.warn,color:'#fff',borderRadius:12,padding:'9px 15px',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap',textDecoration:'none'}}>
         Télécharger la {EXT_ATTENDUE}
@@ -13509,7 +13516,7 @@ const TEXTE_REFAIRE = {
   'a-refaire': (b) => `Brouillon pas créé.${b.supprime ? ' L’annonce est retirée de la vente.' : ''}${b.peutExister ? ' Regarde d’abord tes brouillons Vinted : il y est peut-être déjà.' : ''}`,
   'a-publier': () => 'Brouillon rangé sur Vinted, mise en ligne pas passée.',
   'a-verifier': () => 'Peut-être déjà en ligne : regarde ton dressing, sinon « Voir mes brouillons ».',
-  interrompu: (b) => `Interrompu en route (Chrome fermé ou extension arrêtée).${b.supprime ? ' L’annonce est retirée de la vente.' : ' Regarde si elle est encore en ligne.'}`,
+  interrompu: (b) => `Interrompu en route (navigateur fermé ou extension arrêtée).${b.supprime ? ' L’annonce est retirée de la vente.' : ' Regarde si elle est encore en ligne.'}`,
 };
 const BOUTON_REFAIRE = { 'a-refaire': 'Refaire le brouillon', 'a-publier': 'Mettre le brouillon en ligne', interrompu: 'Refaire le brouillon' };
 function BrouillonsARefaire({ br, refaire, onClose, onVoirBrouillons, peutAgir, raisonAgir }) {
@@ -13599,7 +13606,7 @@ function BrouillonsVinted({ br, publier, brouillonOk, onClose, onFile }) {
         {liste && liste.length > 0 && <div data-brouillons-compte-chrome={uidChrome || (uidChrome === null ? 'aucun' : 'passu')} style={{ fontSize: 13, color: C.muted, lineHeight: 1.45 }}>{uidChrome
           ? <>Compte ouvert dans Chrome : <b style={{ color: C.text }}>{nomChrome}</b>. Seuls ses brouillons se mettent en ligne d'ici.</>
           : uidChrome === null ? "Aucun compte Vinted ouvert dans Chrome : ouvre vinted.fr sur le compte du brouillon pour le mettre en ligne."
-          : "Compte Vinted ouvert dans Chrome pas encore connu : ouvre vinted.fr sur le compte du brouillon pour le mettre en ligne."}</div>}
+          : `Compte Vinted ouvert ${NAV.dansNu} pas encore connu : ouvre vinted.fr sur le compte du brouillon pour le mettre en ligne.`}</div>}
         {infos === null && liste && liste.length > 0 && <div data-brouillons-passu style={{ fontSize: 13, color: C.muted }}>VRM n'a pas pu lire tes brouillons enregistrés : « Mettre en ligne » attend, « Ouvrir sur Vinted » marche.</div>}
         {!brouillonOk && liste && liste.length > 0 && <div data-brouillons-maj style={{ fontSize: 13, color: C.muted }}>Mettre en ligne d'ici demande l'extension VRM {EXT_CAPACITES.brouillon} ou plus récente.</div>}
         {brouillonOk && nPrets > 1 && onFile && <Bouton variante="primaire" data-brouillons-file onClick={onFile} style={{ alignSelf: 'flex-start', minHeight: 44 }}>En mettre plusieurs en ligne…</Bouton>}
@@ -14225,16 +14232,16 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
             </select>}
             <div data-republier-compte={compteUid || (compteVinted === null ? 'aucun' : 'passu')} style={{ fontSize: 13, color: compteUid ? C.muted : C.warn, lineHeight: 1.45 }}>
               {compteUid
-                ? <>Compte <b style={{ color: C.text }}>{nomCompte}</b> (ouvert dans Chrome){horsCompte > 0 ? <> · {horsCompte} {action === 'enLigne' ? 'autre' + (horsCompte > 1 ? 's' : '') : 'article' + (horsCompte > 1 ? 's' : '')} sur tes autres comptes <Pourquoi label="Et mes autres comptes ?">Ouvre vinted.fr sur l'un d'eux dans Chrome pour {horsCompte > 1 ? 'les' : 'la'} voir ici : seul le compte ouvert dans Chrome peut être republié.</Pourquoi></> : null}</>
+                ? <>Compte <b style={{ color: C.text }}>{nomCompte}</b> (ouvert {NAV.dansNu}){horsCompte > 0 ? <> · {horsCompte} {action === 'enLigne' ? 'autre' + (horsCompte > 1 ? 's' : '') : 'article' + (horsCompte > 1 ? 's' : '')} sur tes autres comptes <Pourquoi label="Et mes autres comptes ?">Ouvre vinted.fr sur l'un d'eux {NAV.dansNu} pour {horsCompte > 1 ? 'les' : 'la'} voir ici : seul le compte ouvert {NAV.dansNu} peut être republié.</Pourquoi></> : null}</>
                 : compteVinted === null
-                  ? "Aucun compte Vinted ouvert dans Chrome : ouvre vinted.fr sur le bon compte, puis rouvre."
-                  : <>Compte ouvert dans Chrome pas encore connu : ouvre vinted.fr sur le bon compte, puis rouvre. <Pourquoi label="Pourquoi ?">L'extension VRM n'a pas encore été interrogée, ou elle ne répond pas.</Pourquoi></>}
+                  ? `Aucun compte Vinted ouvert ${NAV.dansNu} : ouvre vinted.fr sur le bon compte, puis rouvre.`
+                  : <>Compte ouvert {NAV.dansNu} pas encore connu : ouvre vinted.fr sur le bon compte, puis rouvre. <Pourquoi label="Pourquoi ?">L'extension VRM n'a pas encore été interrogée, ou elle ne répond pas.</Pourquoi></>}
             </div>
             <div style={{ fontSize: 13, color: C.muted }}>{action === 'enLigne' ? `${s2(annonces.length, 'brouillon')} sur Vinted` : `${s2(annonces.length, 'article')} en ligne sur Vinted`} · <b style={{ color: C.text }}>{sel.size} choisi{action === 'enLigne' ? '' : 'e'}{sel.size > 1 ? 's' : ''}</b></div>
             {action === 'modifier' && <div style={{ fontSize: 13, color: C.muted }}>Modifiées sur place : même annonce, favoris et vues gardés.</div>}
             {action === 'versBrouillon' && <div style={{ fontSize: 13, color: C.muted }}>Chaque annonce repasse en brouillon : favoris et vues ne suivent pas. <Pourquoi label="Comment ça marche">Chaque annonce est d'abord enregistrée dans VRM (photos, description, recette), puis retirée de la vente, puis recréée en brouillon sur Vinted. Si Vinted refuse de la retirer, rien d'autre n'est fait.</Pourquoi></div>}
             <div style={{ display: 'flex', flexDirection: 'column', border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden' }}>
-              {liste.length === 0 && <div style={{ padding: 14, fontSize: 13, color: C.muted }}>{annonces.length ? 'Aucune ne correspond.' : !compteUid ? 'Le compte ouvert dans Chrome n’est pas encore connu.' : action === 'enLigne' ? "Aucun brouillon sur ce compte d'après tes dressings lus par VRM." : "Aucun article en ligne sur ce compte n'a été lu pour l'instant."}</div>}
+              {liste.length === 0 && <div style={{ padding: 14, fontSize: 13, color: C.muted }}>{annonces.length ? 'Aucune ne correspond.' : !compteUid ? `Le compte ouvert ${NAV.dansNu} n’est pas encore connu.` : action === 'enLigne' ? "Aucun brouillon sur ce compte d'après tes dressings lus par VRM." : "Aucun article en ligne sur ce compte n'a été lu pour l'instant."}</div>}
               {liste.map((a) => (
                 <label key={a.id} data-republier-paire={a.id} data-republier-bloque={a.bloque ? 'oui' : undefined} data-republier-place={a.place || undefined} data-republier-compte-paire={action === 'enLigne' ? (a.uid || '') : undefined} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 10px', minHeight: 56, borderBottom: `1px solid ${C.border}`, cursor: a.bloque ? 'default' : 'pointer', background: sel.has(a.id) ? 'var(--vrm-b-teinte)' : 'transparent', opacity: a.bloque ? 0.6 : 1 }}>
                   <input type="checkbox" disabled={!!a.bloque} checked={sel.has(a.id) && !a.bloque} onChange={() => toggle(a.id)} style={{ width: 20, height: 20, accentColor: C.accent, flexShrink: 0 }} />
@@ -14300,7 +14307,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
               <div style={{ fontSize: 13, color: pageOk ? C.text : C.muted, lineHeight: 1.45 }}>{brouillonOk
                 ? (viaBrouillon
                   ? (pageOk
-                    ? <>Brouillon d'abord, puis en ligne 1 à 3 min après. Garde un onglet vinted.fr ouvert. <Pourquoi label="Comment ça marche">Comme Vintex : tout passe par l’onglet vinted.fr ouvert dans ce Chrome, connecté sur le bon compte. Chaque annonce est enregistrée dans VRM, rangée en brouillon sur Vinted, PUIS l’ancienne est supprimée, et le brouillon est mis en ligne 1 à 3 min plus tard.{extSait('republierfile') === 'ok' ? ' Pendant cette attente l’article suivant est déjà préparé (l’extension met chaque brouillon en ligne à son heure, même si tu fermes cette fenêtre).' : ''} Aucun essai en rafale : un refus s’arrête et le dit. Au plus 10 paires par jour et par compte. Si Vinted ne répond pas clairement, VRM s’arrête (jamais deux fois en ligne) ; rien n’est perdu, tout est enregistré dans VRM.</Pourquoi></>
+                    ? <>Brouillon d'abord, puis en ligne 1 à 3 min après. Garde un onglet vinted.fr ouvert. <Pourquoi label="Comment ça marche">Comme Vintex : tout passe par l’onglet vinted.fr ouvert {NAV.dans}, connecté sur le bon compte. Chaque annonce est enregistrée dans VRM, rangée en brouillon sur Vinted, PUIS l’ancienne est supprimée, et le brouillon est mis en ligne 1 à 3 min plus tard.{extSait('republierfile') === 'ok' ? ' Pendant cette attente l’article suivant est déjà préparé (l’extension met chaque brouillon en ligne à son heure, même si tu fermes cette fenêtre).' : ''} Aucun essai en rafale : un refus s’arrête et le dit. Au plus 10 paires par jour et par compte. Si Vinted ne répond pas clairement, VRM s’arrête (jamais deux fois en ligne) ; rien n’est perdu, tout est enregistré dans VRM.</Pourquoi></>
                     : <>Mets l’extension VRM à jour en {EXT_CAPACITES.republierpage} : elle passera par l’onglet vinted.fr. <Pourquoi label="Pourquoi ?">L’extension installée ici fait encore l’ancienne republication, depuis son fond, avec des renvois automatiques.</Pourquoi></>)
                   : 'L’annonce est créée directement en ligne.')
                 : `Demande l'extension VRM ${EXT_CAPACITES.republierbrouillon} ou plus récente dans ce navigateur.`}</div>
@@ -14371,7 +14378,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
               {nRec > 0 && <div data-republier-recentes={nRec} style={{ fontSize: 13, color: C.warn }}>{nRec > 1 ? `${nRec} articles déjà recréés` : '1 article déjà recréé'} il y a moins de 2 jours : risque de doublon, retire-{nRec > 1 ? 'les' : 'la'}.</div>}
             </>; })()}
             {majExt && <div data-republier-maj style={{ fontSize: 13, color: C.warn }}>Extension VRM à mettre à jour ({EXT_ATTENDUE}) et à connecter : sinon rien ne partira.</div>}
-            {autresComptes > 0 && <div data-republier-autres-comptes style={{ fontSize: 13, color: C.warn }}>{autresComptes} sur un autre compte : ouvre Vinted sur ce compte dans Chrome, sinon {autresComptes > 1 ? 'elles ne partiront' : 'elle ne partira'} pas.</div>}
+            {autresComptes > 0 && <div data-republier-autres-comptes style={{ fontSize: 13, color: C.warn }}>{autresComptes} sur un autre compte : ouvre Vinted sur ce compte {NAV.dansNu}, sinon {autresComptes > 1 ? 'elles ne partiront' : 'elle ne partira'} pas.</div>}
             {mode === 'idle' && <>
               <div data-republier-esp={espMode} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <span style={maj}>Temps entre deux articles</span>
@@ -16920,7 +16927,7 @@ function AuthScreen() {
               UNE connexion pour les deux : l'app connecte l'extension juste après. */}
           {__lier && (mode==='in' || mode==='up') && (
             <div data-lier-connexion="" style={{fontSize:13,color:C.text,background:`${C.accent}12`,border:`1px solid ${C.accent}55`,borderRadius:12,padding:'8px 10px',marginBottom:14,lineHeight:1.45}}>
-              Connecte-toi ici : l'extension de ce Chrome sera connectée en même temps — rien à taper dans l'extension.
+              Connecte-toi ici : l'extension {NAV.de} sera connectée en même temps — rien à taper dans l'extension.
             </div>
           )}
 
@@ -17292,20 +17299,20 @@ function BandeauLiaison() {
   // suivant la relit), et une pause de Vinted n'appelle aucun geste.
   const glob = bon ? raisonExtGlobale(sansSouris) : null;
   const reste = glob && ['plusieurs', 'perime', 'muette', 'absente', 'retard'].includes(glob.code) ? glob : null;
-  const connectee = l.etat === 'ok' ? <>Extension connectée à <b>{l.email || 'ton compte VRM'}</b> ✓</> : <>L'extension de ce Chrome était déjà connectée à ton compte VRM ✓</>;
+  const connectee = l.etat === 'ok' ? <>Extension connectée à <b>{l.email || 'ton compte VRM'}</b> ✓</> : <>L'extension {NAV.de} était déjà connectée à ton compte VRM ✓</>;
   const resteTexte = !reste ? null
-    : reste.code === 'plusieurs' ? <> — mais une autre extension VRM répond encore dans ce Chrome : tant qu'elles sont deux, rien ne part (en haut : lecture seule). Dans chrome://extensions, supprime l'ancienne, puis recharge cette page.</>
-    : reste.code === 'perime' ? <> — mais ce Chrome exécute encore son ancien code : rien ne part tant qu'elle n'est pas rechargée (en haut : lecture seule). Ouvre chrome://extensions et clique ⟳ sur VRM.</>
+    : reste.code === 'plusieurs' ? <> — mais une autre extension VRM répond encore {NAV.dans} : tant qu'elles sont deux, rien ne part (en haut : lecture seule). Dans {NAV.pageExtTexte}, supprime l'ancienne, puis recharge cette page.</>
+    : reste.code === 'perime' ? <> — mais {NAV.ce} exécute encore son ancien code : rien ne part tant qu'elle n'est pas rechargée (en haut : lecture seule). {NAV.ouvrirPageExt.replace(/^o/, 'O')} et {NAV.rechargerExt}.</>
     : <> — mais elle ne peut pas encore agir (en haut : lecture seule) : {reste.texte}</>;
   // Une liaison qui ne PEUT pas partir le dit, avec le geste — jamais
   // « Je connecte… » sans rien envoyer.
-  const texte = encours && l.bloque === 'perime' ? <>L'extension de ce Chrome tourne encore sur son ancien code : je la connecte dès qu'elle est rechargée. Si rien ne bouge : ouvre chrome://extensions, clique ⟳ sur VRM, puis recharge cette page.</>
-    : encours ? "Je connecte l'extension de ce Chrome à ton compte VRM… Rien à taper."
+  const texte = encours && l.bloque === 'perime' ? <>L'extension {NAV.de} tourne encore sur son ancien code : je la connecte dès qu'elle est rechargée. Si rien ne bouge : {NAV.ouvrirPageExt}, {NAV.rechargerExt}, puis recharge cette page.</>
+    : encours ? `Je connecte l'extension ${NAV.de} à ton compte VRM… Rien à taper.`
     : bon && reste ? <>{connectee}{resteTexte}</>
-    : l.etat === 'ok' ? <>Extension connectée à <b>{l.email || 'ton compte VRM'}</b> ✓ — elle capte maintenant pour toi dans ce Chrome. Rien d'autre à faire.</>
-    : l.etat === 'deja' ? <>L'extension de ce Chrome était déjà connectée à ton compte VRM ✓ — rien à faire.</>
-    : l.etat === 'absente' ? <>L'extension n'a pas répondu dans ce Chrome. Ouvre VRM dans le Chrome où tu as cliqué « Se connecter » ; si c'est celui-ci, ouvre chrome://extensions, clique ⟳ sur VRM, puis recharge cette page.</>
-    : <>Je n'ai pas pu connecter l'extension{l.message ? ` (${l.message})` : ''}. Clique son icône en haut de Chrome, puis « avec mon mot de passe VRM ».</>;
+    : l.etat === 'ok' ? <>Extension connectée à <b>{l.email || 'ton compte VRM'}</b> ✓ — elle capte maintenant pour toi {NAV.dans}. Rien d'autre à faire.</>
+    : l.etat === 'deja' ? <>L'extension {NAV.de} était déjà connectée à ton compte VRM ✓ — rien à faire.</>
+    : l.etat === 'absente' ? <>L'extension n'a pas répondu {NAV.dans}. Ouvre VRM dans le navigateur où tu as cliqué « Se connecter » ; si c'est celui-ci, {NAV.ouvrirPageExt}, {NAV.rechargerExt}, puis recharge cette page.</>
+    : <>Je n'ai pas pu connecter l'extension{l.message ? ` (${l.message})` : ''}. Clique son icône {NAV.hautDe}, puis « avec mon mot de passe VRM ».</>;
   // ⚠️ Revue du 11 octobre (§7, l'île) : sur ordinateur, l'île d'actions flotte
   //    en haut à droite, et ce bandeau — premier bloc de la colonne — passait
   //    DESSOUS : sa croix ne se cliquait pas, et « …chrome://extensions… »
@@ -17763,7 +17770,7 @@ function useExtVivante() {
 function etatExtensionFavoris(uid,mesure=null){
   const e=mesure||__vmrEtat;
   if(__vmrPlusieurs)return {disponible:false,raison:textePlusieurs()};
-  if(mesure&&(!e?.code||e.code!==e.version))return {disponible:false,raison:'Le code de l’extension ne correspond pas à sa version. Recharge-la dans Chrome.'};
+  if(mesure&&(!e?.code||e.code!==e.version))return {disponible:false,raison:'Le code de l’extension ne correspond pas à sa version. Recharge-la '+NAV.dansNu+'.'};
   if(!mesure&&codePerime())return {disponible:false,raison:textePerime()};
   if(!mesure&&!vmrExtPresent())return {disponible:false,raison:'L’extension ne répond pas dans ce navigateur. Recharge l’extension puis cette page VRM.'};
   const version=e?.ok?String(e.version||''):vmrExtVersion();
@@ -17786,7 +17793,7 @@ function etatExtensionFavorisAuto(uid){
   }
   if(cmpVersion(version,EXT_CAPACITES.favorisauto)<0)return {disponible:false,code:'extension_version',raison:'Le mode automatique demande l’extension 5.309. Mets-la à jour puis recharge-la (⟳).'};
   const actif=String(__vmrEtat?.vinted?.uid||'');
-  if(actif!==String(uid))return {disponible:false,code:actif?'compte_vinted_different':'onglet_vinted',raison:actif?'Chrome est connecté à un autre compte Vinted : passe sur ce compte dans l’onglet vinted.fr.':'Ouvre vinted.fr dans ce Chrome, connecté sur ce compte, et laisse l’onglet ouvert.'};
+  if(actif!==String(uid))return {disponible:false,code:actif?'compte_vinted_different':'onglet_vinted',raison:actif?NAV.Ce+' est connecté à un autre compte Vinted : passe sur ce compte dans l’onglet vinted.fr.':'Ouvre vinted.fr '+NAV.dans+', connecté sur ce compte, et laisse l’onglet ouvert.'};
   return {disponible:true,raison:''};
 }
 // Les comptes sont tous passés : le SERVEUR n'agit que sur ceux où le mode a été
@@ -17818,12 +17825,12 @@ function FavorisConnectes(props){
       transport.current={mode:'pont',id};return vmrEtat(8000);
     };
     const frais=await mesurer();
-    if(!frais?.ok)return {disponible:false,raison:'Aucune réponse dans ce profil Chrome. Vérifie que VRM est autorisée sur vrm.center dans les accès de l’extension, puis recharge cette page.'};
+    if(!frais?.ok)return {disponible:false,raison:'Aucune réponse dans ce profil '+(NAV.connu?NAV.nom:'du navigateur')+'. Vérifie que VRM est autorisée sur vrm.center dans les accès de l’extension, puis recharge cette page.'};
     __vmrEtat=frais;__vmrRates=0;__vmrNotifier();
     if(frais.vrm?.connecte!==true||String(frais.vrm?.user_id||'')!==String(AUTH.user?.id||'')){
       await assurerSessionExtension();const relu=await mesurer();if(relu?.ok){__vmrEtat=relu;__vmrNotifier();}
     }
-    const r=etatExtensionFavoris(props.uid,transport.current?.mode==='direct'?directVu.current?.etat:null);maj();return {...r,canal:transport.current?.mode==='direct'?'Chrome direct':'pont de page'};
+    const r=etatExtensionFavoris(props.uid,transport.current?.mode==='direct'?directVu.current?.etat:null);maj();return {...r,canal:transport.current?.mode==='direct'?'canal direct':'pont de page'};
   };
   const executer=async(t,lire=false)=>{
     const e=await verifier();
@@ -17920,9 +17927,9 @@ function BoutonBordereau({ uid, tx, conv, login, aGenerer, pdf, onImprimer, onFa
   const glob = raisonExtGlobale(sansSouris);
   let raison = glob ? glob.texte : null, distingue = null;
   if (!raison && etat) {
-    const ou = etat.relais ? 'dans le Chrome de ton ordinateur' : 'dans ce Chrome';
+    const ou = etat.relais ? 'dans le navigateur de ton ordinateur' : NAV.dans;
     if (!etat.vinted) { raison = `Connecte-toi sur vinted.fr avec ${login || 'ce compte'} ${ou}.`; distingue = raison; }
-    else if (String(etat.vinted.uid) !== String(uid)) { raison = `${etat.relais ? 'Le Chrome de ton ordinateur' : 'Chrome'} est connecté sur ${etat.vinted.login || 'un autre compte'} — bascule sur ${login || 'ce compte'} sur vinted.fr${etat.relais ? ', sur l’ordinateur' : ''}.`; distingue = raison; }
+    else if (String(etat.vinted.uid) !== String(uid)) { raison = `${etat.relais ? 'Le navigateur de ton ordinateur' : NAV.Ce} est connecté sur ${etat.vinted.login || 'un autre compte'} — bascule sur ${login || 'ce compte'} sur vinted.fr${etat.relais ? ', sur l’ordinateur' : ''}.`; distingue = raison; }
   }
   const enCours = jobEnCours(job);
   const ko = job && (job.etape === 'echec' || job.etape === 'genere_sans_pdf' || job.etape === 'relais-inconnu');
@@ -17937,8 +17944,8 @@ function BoutonBordereau({ uid, tx, conv, login, aGenerer, pdf, onImprimer, onFa
     //    CE colis arrive (voir `refusVu`).
     if (!r) { setRefus("L'extension n'a pas répondu à temps — je ne sais pas s'il est parti : si cette ligne n'avance pas d'ici une minute, recharge la page avant de réessayer, ou génère-le sur Vinted (lien ci-dessous)."); __vmrRates = 1; battementExt(); return; }
     if (!r.accepte) {
-      setRefus(r.code === 'vinted-autre' ? `Chrome est connecté sur ${r.actifLogin || 'un autre compte'} — bascule sur ${login || 'ce compte'} sur vinted.fr.`
-        : r.code === 'vinted-absent' ? `Connecte-toi sur vinted.fr avec ${login || 'ce compte'} dans ce Chrome.`
+      setRefus(r.code === 'vinted-autre' ? `${NAV.Ce} est connecté sur ${r.actifLogin || 'un autre compte'} — bascule sur ${login || 'ce compte'} sur vinted.fr.`
+        : r.code === 'vinted-absent' ? `Connecte-toi sur vinted.fr avec ${login || 'ce compte'} ${NAV.dans}.`
         : (r.raison || 'Refusé par l\'extension.'));
       return;
     }
@@ -18056,7 +18063,7 @@ function BoutonToutGenerer({ items }) {
   const lancer = async () => {
     if (glob || busy) return;
     setBilan(null);
-    if (!co) { setBilan({ message: etat && etat.vintedPasSu ? "Je regarde quel compte Vinted est ouvert dans Chrome — réessaie dans un instant." : "Aucun compte Vinted ouvert dans ce Chrome — ouvre vinted.fr sur le compte des colis, puis réessaie." }); return; }
+    if (!co) { setBilan({ message: etat && etat.vintedPasSu ? `Je regarde quel compte Vinted est ouvert ${NAV.dansNu} — réessaie dans un instant.` : `Aucun compte Vinted ouvert ${NAV.dans} — ouvre vinted.fr sur le compte des colis, puis réessaie.` }); return; }
     if (!lot.length) { setBilan({ message: autres ? `Ces colis sont sur un autre compte — bascule sur vinted.fr pour les générer (${autres}).` : "Leurs bordereaux sont déjà en file ou en cours — chaque ligne suit le sien." }); return; }
     setBusy(true);
     const b = { at: Date.now(), lances: [], dejaPrets: 0, muets: [], refus: [], attendent: mine.length - lot.length, arret: '', autres };
@@ -18073,7 +18080,7 @@ function BoutonToutGenerer({ items }) {
         continue;
       }
       if (!r) { b.muets.push(jobId); b.attendent += lot.length - i - 1; b.arret = 'muet'; __vmrRates = 1; battementExt(); break; }
-      b.refus.push({ code: r.code || '', raison: r.code === 'vinted-autre' ? `Chrome est connecté sur ${r.actifLogin || 'un autre compte'} — bascule sur vinted.fr` : (r.raison || 'raison non donnée') });
+      b.refus.push({ code: r.code || '', raison: r.code === 'vinted-autre' ? `${NAV.Ce} est connecté sur ${r.actifLogin || 'un autre compte'} — bascule sur vinted.fr` : (r.raison || 'raison non donnée') });
       if (REFUS_DU_LOT.includes(r.code)) { b.attendent += lot.length - i - 1; b.arret = 'refus'; break; }
     }
     setBusy(false); setProg(null); setBilan(b);
@@ -18441,7 +18448,7 @@ function FicheLbc({ q, compteLbc, onClose, onMarquer }) {
         <div data-fiche-infos="" style={{ marginTop: 14, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '4px 12px' }}>
           {[
             ['Catégorie', categorie || 'Leboncoin la propose (il la devine du titre)'],
-            ['Compte Leboncoin', `celui ouvert dans ce Chrome${compteLbc && compteLbc.name ? ` (connecté en dernier : ${compteLbc.name}${compteLbc.type === 'pro' ? ', pro' : compteLbc.type === 'particulier' ? ', particulier' : ''})` : ''}`],
+            ['Compte Leboncoin', `celui ouvert ${NAV.dans}${compteLbc && compteLbc.name ? ` (connecté en dernier : ${compteLbc.name}${compteLbc.type === 'pro' ? ', pro' : compteLbc.type === 'particulier' ? ', particulier' : ''})` : ''}`],
             ['Options payantes', 'aucune — VRM publie sans booster'],
           ].map(([k, val], i) => (
             <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '9px 0', borderTop: i ? `1px solid ${C.border}` : 'none', fontSize: 13 }}>
@@ -18532,15 +18539,15 @@ function etatActionsExt(sansSouris) {
   if (glob) return { niveau: 'lecture', glob, vinted: null };
   // Le cookie Vinted pas lu à temps (5.161 : `vintedPasSu`) n'est pas « aucun
   // compte ouvert » (revue du 5 octobre).
-  if (e && e.vintedPasSu) return { niveau: 'verif', glob: { code: 'vinted-passu', texte: "Je regarde quel compte Vinted est ouvert dans Chrome…" }, vinted: null };
+  if (e && e.vintedPasSu) return { niveau: 'verif', glob: { code: 'vinted-passu', texte: `Je regarde quel compte Vinted est ouvert ${NAV.dansNu}…` }, vinted: null };
   const relais = etatRelais().niveau === 'vivant';
   const vinted = vintedAgissant() || null;
-  if (relais && !vinted) return { niveau: 'lecture', relais, glob: { code: 'vinted', texte: "Aucun compte Vinted n'est ouvert dans le Chrome de ton ordinateur — les actions SUR VINTED (bordereau, répondre) attendent ; publier sur Leboncoin reste possible." }, vinted: null };
+  if (relais && !vinted) return { niveau: 'lecture', relais, glob: { code: 'vinted', texte: "Aucun compte Vinted n'est ouvert dans le navigateur de ton ordinateur — les actions SUR VINTED (bordereau, répondre) attendent ; publier sur Leboncoin reste possible." }, vinted: null };
   // ⚠️ « Publier sur Leboncoin reste possible » ne se dit que si l'extension
   //    installée sait publier depuis l'app (revue du 9 octobre) : avec une 5.143,
   //    la pastille l'affirmait à côté d'un bouton Publier grisé « mets
   //    l'extension à jour » — deux voix sur la même action (§11).
-  if (!vinted) return { niveau: 'lecture', glob: { code: 'vinted', texte: `Aucun compte Vinted n'est ouvert dans ce Chrome — les actions SUR VINTED (bordereau, répondre) attendent ; ${extSait('publication') === 'ok' ? 'publier sur Leboncoin reste possible.' : `publier sur Leboncoin demande une extension à jour (${EXT_ATTENDUE}).`}` }, vinted: null };
+  if (!vinted) return { niveau: 'lecture', glob: { code: 'vinted', texte: `Aucun compte Vinted n'est ouvert ${NAV.dans} — les actions SUR VINTED (bordereau, répondre) attendent ; ${extSait('publication') === 'ok' ? 'publier sur Leboncoin reste possible.' : `publier sur Leboncoin demande une extension à jour (${EXT_ATTENDUE}).`}` }, vinted: null };
   // ⚠️ 11 octobre : « Actions possibles » s'affichait AU-DESSUS de boutons
   //    « Publier sur Leboncoin » grisés (reproduit avec une 5.143) — deux voix
   //    contraires sur le même écran. Quand publier est bloqué alors que le
@@ -18574,14 +18581,26 @@ async function lireDerniereCaptureExt() {
     return (d.ver || at) ? { v: d.ver ? String(d.ver) : '', at } : 'aucune';
   } catch (_) { return null; }
 }
-function EtatActions({ onNav, ordi, sombre }) {
+function EtatActions({ onNav, ordi, sombre, comptes }) {
   useExtVivante();
   const sansSouris = useSansSouris();
   const [ouvert, setOuvert] = React.useState(false);
   const [derniere, setDerniere] = React.useState(undefined);
+  // (5 nov.) Compte par compte : la dernière relecture et ce qui bloque. Lu à
+  // l'OUVERTURE du panneau seulement (il vit sur chaque écran) — trois états :
+  // undefined on lit · null pas su · objet lu.
+  const [caps, setCaps] = React.useState(undefined);
+  const [etatsComptes, setEtatsComptes] = React.useState(undefined);
+  const [autresSites] = useComptesAutresSites(ouvert);
+  const [exclus] = useComptesExclus();
   // Relue à chaque ouverture du panneau : c'est là qu'on la regarde, fraîche.
   React.useEffect(() => { if (!ouvert) return undefined; let stop = false;
     lireDerniereCaptureExt().then((d) => { if (!stop) setDerniere(d); });
+    setCaps(undefined); setEtatsComptes(undefined);
+    lireDernieresCaptures().then((d) => { if (!stop) setCaps(d); });
+    fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_comptes_etat&select=c:data->comptes`, { headers: sbAuth() })
+      .then((r) => (r.ok ? r.json() : null)).then((rows) => { if (stop) return; setEtatsComptes(Array.isArray(rows) ? ((rows[0] && rows[0].c && typeof rows[0].c === 'object') ? rows[0].c : {}) : null); })
+      .catch(() => { if (!stop) setEtatsComptes(null); });
     return () => { stop = true; }; }, [ouvert]);
   const boite = React.useRef(null);
   const panneauEtat = React.useRef(null);   // sur téléphone, le panneau vit dans document.body
@@ -18604,9 +18623,15 @@ function EtatActions({ onNav, ordi, sombre }) {
   // il n'y en a pas, la lecture seule y est normale.
   // Vinted qui demande de ralentir : rien à faire non plus, ça repart seul.
   const aRattraper = st.niveau === 'lecture' && code !== 'telephone' && code !== 'pause';
-  const point = st.niveau === 'ok' ? C.accent : aRattraper ? C.warn : C.muted;
+  // (5 nov., Julien : « l'étiquette rouge "l'extension capte" remplacée par
+  // quelque chose de plus pro ») Quand tout va bien : un point DISCRET à
+  // l'encre et le NOM du compte qui agit — aucune couleur. L'ambre n'apparaît
+  // que s'il y a un geste à faire ici (§7) ; « pas de geste » reste gris.
+  const point = aRattraper ? C.warn : st.niveau === 'ok' ? C.text : C.muted;
   const rl = etatRelais();
   const libelle = st.niveau === 'ok' ? (st.relais ? 'Actions via ton ordinateur' : st.exception ? 'Actions possibles · sauf publier' : 'Actions possibles') : st.niveau === 'verif' ? 'Vérification…' : code === 'absente' ? 'Extension à installer' : 'Lecture seule';
+  // Ce que la pastille ÉCRIT (le libellé complet reste en aria-label et en titre).
+  const visible = st.niveau === 'ok' && loginVinted ? loginVinted : libelle;
   // (1er nov., vendeur neuf) Avant toute installation, « Lecture seule » était la
   // première chose lue en haut de chaque écran, sans dire de quoi : sans
   // extension dans ce navigateur, la pastille dit le geste (même panneau, même clic).
@@ -18648,8 +18673,8 @@ function EtatActions({ onNav, ordi, sombre }) {
 
   // ── LE geste qui débloque (un seul) ─────────────────────────────────────────
   let geste = null;
-  if (code === 'telephone' && rl.niveau === 'perime') geste = <span data-etat-geste="ordinateur">Ouvre Chrome sur ton ordinateur (l'extension VRM s'y réveille toute seule) : dès qu'elle donne signe de vie, les actions reviennent ici.</span>;
-  else if (code === 'telephone' && rl.niveau === 'retard') geste = <span data-etat-geste="maj-ordinateur">Sur ton ordinateur : installe la {EXT_ATTENDUE} (Paramètres → État des connexions), puis ⟳ dans chrome://extensions.</span>;
+  if (code === 'telephone' && rl.niveau === 'perime') geste = <span data-etat-geste="ordinateur">Ouvre, sur ton ordinateur, le navigateur où est l'extension VRM (elle s'y réveille toute seule) : dès qu'elle donne signe de vie, les actions reviennent ici.</span>;
+  else if (code === 'telephone' && rl.niveau === 'retard') geste = <span data-etat-geste="maj-ordinateur">Sur ton ordinateur : installe la {EXT_ATTENDUE} (Paramètres → État des connexions), puis recharge-la dans la page des extensions de son navigateur (⟳ sur Chrome).</span>;
   // (29 oct.) Une ligne : le geste, sans la liste de ce qu'il débloque (le titre
   // « Lecture seule » et la ligne « Extension » le disent déjà, §7).
   else if (code === 'telephone') geste = <span data-etat-geste="telephone">Pour agir, ouvre VRM sur ton ordinateur.{rl.niveau === 'absent' ? <>{' '}<Pourquoi label="Et d'ici ?">Avec l’extension à jour sur ton ordinateur, tes demandes partiront aussi d’ici : elle les exécute pour toi.</Pourquoi></> : null}</span>;
@@ -18657,10 +18682,10 @@ function EtatActions({ onNav, ordi, sombre }) {
   else if (code === 'muette') geste = <button type="button" data-etat-geste="recharger" className="vrm-b vrm-b-primaire" onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>;
   // Code périmé : le geste se fait DANS CHROME (une page web ne peut pas ouvrir
   // chrome://extensions) — on le dit tel quel, puis on recharge la page.
-  else if (code === 'perime') geste = <span data-etat-geste="recharger-extension">Dans ce Chrome : tape <b>chrome://extensions</b> dans la barre d'adresse, clique ⟳ (la flèche ronde) sur VRM, puis <button type="button" data-etat-geste-recharger="1" className="vrm-b vrm-b-discret" onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button></span>;
+  else if (code === 'perime') geste = <span data-etat-geste="recharger-extension">{NAV.Dans} : {NAV.pageExt ? <>tape <b>{NAV.pageExt}</b> dans la barre d'adresse</> : <>ouvre la page des extensions</>}, {NAV.rechargerExt}, puis <button type="button" data-etat-geste-recharger="1" className="vrm-b vrm-b-discret" onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button></span>;
   // Deux extensions : le geste se fait dans Chrome (une page web ne peut pas
   // ouvrir chrome://extensions) — on le DIT, puis on recharge.
-  else if (code === 'plusieurs') geste = <span data-etat-geste="extensions">Tape <b>chrome://extensions</b> dans la barre d'adresse, supprime l'ancienne VRM, puis <button type="button" data-etat-geste-recharger="1" className="vrm-b vrm-b-discret" onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button></span>;
+  else if (code === 'plusieurs') geste = <span data-etat-geste="extensions">{NAV.pageExt ? <>Tape <b>{NAV.pageExt}</b> dans la barre d'adresse</> : <>Ouvre la page des extensions {NAV.de}</>}, supprime l'ancienne VRM, puis <button type="button" data-etat-geste-recharger="1" className="vrm-b vrm-b-discret" onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button></span>;
   // Non connectée : son icône ouvre SA fenêtre de connexion (une extension
   // connectée, elle, ouvre VRM) — c'est le repli si la reconnexion automatique
   // n'aboutit pas.
@@ -18676,14 +18701,14 @@ function EtatActions({ onNav, ordi, sombre }) {
   //    connecte par l'ancien message) — sa fenêtre n'a que email et mot de passe.
   else if (code === 'vrm') { const voie = voieConnexionExt(); geste = <span data-etat-geste={voie === 'retard' ? 'maj-ou-mdp' : voie === 'serveur' ? 'mdp' : voie === 'page' ? 'page' : 'liaison'}>{__sessExtEnVol ? 'Un instant…'
     : voie === 'retard'
-      ? <>Cette extension ({vmrExtVersion() || 'version ?'}) ne sait pas recevoir la connexion de VRM : mets-la à jour en {EXT_ATTENDUE} (Paramètres → État des connexions) — ou clique l'icône VRM en haut de Chrome et connecte-toi avec ton mot de passe VRM (<b>{monMail || 'ton email VRM'}</b>).</>
+      ? <>Cette extension ({vmrExtVersion() || 'version ?'}) ne sait pas recevoir la connexion de VRM : mets-la à jour en {EXT_ATTENDUE} (Paramètres → État des connexions) — ou clique l'icône VRM {NAV.hautDe} et connecte-toi avec ton mot de passe VRM (<b>{monMail || 'ton email VRM'}</b>).</>
       : voie === 'serveur'
         ? (fenetreAncienne()
-          ? <>Le serveur n'a pas pu préparer sa connexion{__sessExtErreur.message ? ` (${__sessExtErreur.message})` : ''} : clique l'icône VRM en haut de Chrome et connecte-toi avec ton mot de passe VRM (<b>{monMail || 'ton email VRM'}</b>).</>
-          : <>Le serveur n'a pas pu préparer sa connexion{__sessExtErreur.message ? ` (${__sessExtErreur.message})` : ''} : clique l'icône VRM en haut de Chrome, puis « avec mon mot de passe VRM » (<b>{monMail || 'ton email VRM'}</b>).</>)
+          ? <>Le serveur n'a pas pu préparer sa connexion{__sessExtErreur.message ? ` (${__sessExtErreur.message})` : ''} : clique l'icône VRM {NAV.hautDe} et connecte-toi avec ton mot de passe VRM (<b>{monMail || 'ton email VRM'}</b>).</>
+          : <>Le serveur n'a pas pu préparer sa connexion{__sessExtErreur.message ? ` (${__sessExtErreur.message})` : ''} : clique l'icône VRM {NAV.hautDe}, puis « avec mon mot de passe VRM » (<b>{monMail || 'ton email VRM'}</b>).</>)
         : voie === 'page'
-          ? <>Je la connecte à <b>{monMail || 'ton compte VRM'}</b>. Si ça ne vient pas : recharge cette page, ou clique l'icône VRM en haut de Chrome et connecte-toi avec ton mot de passe VRM.</>
-          : <>Je la connecte à <b>{monMail || 'ton compte VRM'}</b>. Si ça ne vient pas : clique l'icône VRM en haut de Chrome, puis « Se connecter avec VRM ».</>}</span>; }
+          ? <>Je la connecte à <b>{monMail || 'ton compte VRM'}</b>. Si ça ne vient pas : recharge cette page, ou clique l'icône VRM {NAV.hautDe} et connecte-toi avec ton mot de passe VRM.</>
+          : <>Je la connecte à <b>{monMail || 'ton compte VRM'}</b>. Si ça ne vient pas : clique l'icône VRM {NAV.hautDe}, puis « Se connecter avec VRM ».</>}</span>; }
   // Autre compte : une extension CONNECTÉE ouvre VRM quand on clique son icône
   // (sa fenêtre n'apparaît plus) — « clique l'icône, Se déconnecter » serait
   // impossible à suivre. Avant la 5.171 elle n'entend pas le canal adressé : le
@@ -18691,7 +18716,7 @@ function EtatActions({ onNav, ordi, sombre }) {
   // passe VRM dans sa fenêtre — ou la mettre à jour.
   else if (code === 'autre-vrm') { const voie = voieConnexionExt(); geste = __sessExtEnVol ? <span>Un instant…</span>
     : voie === 'retard'
-      ? <span data-etat-geste="deconnecter">Cette extension ({vmrExtVersion() || 'version ?'}) ne sait pas recevoir la connexion de VRM. <button type="button" data-etat-geste-deconnecter="1" className="vrm-b vrm-b-discret" onClick={() => { deconnecterExtensionAncienne(); }}>Déconnecter l'extension de ce Chrome</button>, puis clique l'icône VRM en haut de Chrome et connecte-toi avec ton mot de passe VRM (<b>{monMail || 'ton email VRM'}</b>) — ou mets-la à jour en {EXT_ATTENDUE} (Paramètres → État des connexions).</span>
+      ? <span data-etat-geste="deconnecter">Cette extension ({vmrExtVersion() || 'version ?'}) ne sait pas recevoir la connexion de VRM. <button type="button" data-etat-geste-deconnecter="1" className="vrm-b vrm-b-discret" onClick={() => { deconnecterExtensionAncienne(); }}>Déconnecter l'extension {NAV.de}</button>, puis clique l'icône VRM {NAV.hautDe} et connecte-toi avec ton mot de passe VRM (<b>{monMail || 'ton email VRM'}</b>) — ou mets-la à jour en {EXT_ATTENDUE} (Paramètres → État des connexions).</span>
       : voie === 'serveur'
         ? <span data-etat-geste="attendre-serveur">Le serveur n'a pas pu préparer sa connexion{__sessExtErreur.message ? ` (${__sessExtErreur.message})` : ''} : je réessaie dans {minutesAvantReessai()} min, cette page ouverte.</span>
         : <button type="button" data-etat-geste="recharger" className="vrm-b vrm-b-primaire" onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>; }
@@ -18708,13 +18733,32 @@ function EtatActions({ onNav, ordi, sombre }) {
   // lignes, même source (`etatActionsExt`) : seule la mise en forme change.
   const Ligne = ({ nom, l }) => (
     <div className="vrm-etat-maillon" data-etat-maillon={l.s === 'oui' ? 'oui' : l.s === 'non' ? 'non' : 'passu'}
-      style={{ '--etat-ton': l.s === 'oui' ? C.accent : l.s === 'non' ? C.warn : C.muted }}>
+      style={{ '--etat-ton': l.s === 'oui' ? C.text : l.s === 'non' && aRattraper ? C.warn : C.muted }}>
       <span className="vrm-etat-rond" aria-hidden="true">{l.s === 'oui' ? '✓' : l.s === 'non' ? '✕' : l.s}</span>
       <span className="vrm-etat-maillon-texte"><b>{nom}</b>{l.t ? <span className="vrm-etat-maillon-detail"> — {l.t}</span> : null}</span>
     </div>
   );
   const ton = st.niveau === 'ok' ? 'ok' : aRattraper ? 'attention' : 'neutre';
-  const couleurTon = ton === 'ok' ? C.accent : ton === 'attention' ? C.warn : C.muted;
+  const couleurTon = ton === 'attention' ? C.warn : ton === 'ok' ? C.text : C.muted;
+  // (5 nov.) Compte par compte, toutes plateformes : la dernière relecture et
+  // ce qui bloque, une ligne chacun (`lignesFraicheur`, règles de Comptes liés).
+  const ouvertIci = (() => { const v = vintedDeChrome(); return v && v.uid ? String(v.uid) : ''; })();
+  const masques = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+  const lignesComptes = (() => {
+    const l = [];
+    if (Array.isArray(comptes) && caps) for (const a of comptes) {
+      const uid = String((a && a.vinted_user_id) || ''); if (!uid) continue;
+      const ev = etatsComptes && etatsComptes[uid];
+      l.push({ plateforme: 'vinted', id: uid, nom: a.login || '', lu: caps[uid] || null, ouvert: ouvertIci === uid && st.niveau === 'ok', banni: !!(ev && ev.etat === 'banni'), masque: masques.has(uid) });
+    }
+    for (const p of ['leboncoin', 'vestiaire', 'ebay']) {
+      const liste = autresSites && autresSites[p];
+      if (Array.isArray(liste)) for (const c of liste) l.push({ ...c, horsTotaux: estExclu(exclus, p, p === 'ebay' ? c.ref : c.id) });
+    }
+    return lignesFraicheur(l, { dans: NAV.dans });
+  })();
+  const passuComptes = [caps === null ? 'Vinted' : null, ...['leboncoin', 'vestiaire', 'ebay'].map((p) => (autresSites && autresSites[p] === null ? nomPlateforme(p) : null))].filter(Boolean);
+  const encoursComptes = !Array.isArray(comptes) || caps === undefined || etatsComptes === undefined || ['leboncoin', 'vestiaire', 'ebay'].some((p) => !autresSites || autresSites[p] === undefined);
 
   return (
     <div ref={boite} style={{ position: 'relative', flexShrink: 0 }}>
@@ -18724,8 +18768,8 @@ function EtatActions({ onNav, ordi, sombre }) {
         style={{ '--etat-ton': point, display: 'inline-flex', alignItems: 'center', gap: 7, background: 'transparent', border: `1px solid ${bd}`, borderRadius: 999,
           padding: court ? '6px 8px' : '6px 10px 6px 11px', color: ink, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
         <span aria-hidden="true" className="vrm-etat-point" style={{ width: 8, height: 8, borderRadius: 6, background: point, flexShrink: 0 }}/>
-        <span>{court && st.niveau === 'lecture' ? (code === 'absente' ? 'Extension' : 'Lecture') : court && st.niveau === 'ok' ? (st.relais ? 'Via ton ordi' : 'Actions') : libelle}</span>
-        {!court && st.niveau === 'ok' && loginVinted ? <span className="vrm-etat-compte" style={{ color: C.muted, fontWeight: 500, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }}>· {loginVinted}</span> : null}
+        <span className={st.niveau === 'ok' && loginVinted ? 'vrm-etat-compte vrm-sensible' : undefined} style={st.niveau === 'ok' && loginVinted ? { maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis' } : undefined}>{court && st.niveau === 'lecture' ? (code === 'absente' ? 'Extension' : 'Lecture') : court && st.niveau === 'ok' && !loginVinted ? (st.relais ? 'Via ton ordi' : 'Actions') : visible}</span>
+        {!court && st.niveau === 'ok' && loginVinted && (st.relais || st.exception) ? <span className="vrm-etat-precision" style={{ color: C.muted, fontWeight: 500 }}>· {st.relais ? 'via ton ordinateur' : 'sauf publier'}</span> : null}
         {!court ? <i className="vrm-etat-chevron" aria-hidden="true"><Icon name="chevron" size={13}/></i> : null}
       </button>
       {/* (23 oct.) Sur téléphone le panneau part dans document.body : posé dans
@@ -18751,21 +18795,21 @@ function EtatActions({ onNav, ordi, sombre }) {
           {st.niveau === 'ok' && st.relais ? (
             <div data-etat-relais-texte="" className="vrm-etat-texte" style={{ color: C.muted }}>
               Tes demandes partent à ton ordinateur, qui agit au nom de <b style={{ color: C.text }}>{loginVinted}</b>.{' '}
-              <Pourquoi label="Comment ça marche">La demande part dans ta base ; l'extension du Chrome de ton ordinateur la prend (en général dans la demi-minute) et l'exécute avec les mêmes garde-fous. Rien n'est dit « fait » avant qu'elle l'ait écrit.</Pourquoi>
+              <Pourquoi label="Comment ça marche">La demande part dans ta base ; l'extension du navigateur de ton ordinateur la prend (en général dans la demi-minute) et l'exécute avec les mêmes garde-fous. Rien n'est dit « fait » avant qu'elle l'ait écrit.</Pourquoi>
             </div>
           ) : st.niveau === 'ok' ? (
             <div className="vrm-etat-texte" style={{ color: C.muted }}>
               {/* On ne promet que ce que l'extension INSTALLÉE sait faire (revue
                   du 5 octobre) : chaque geste suit sa capacité. */}
               {['Bordereaux', extSait('messagerie') === 'ok' ? 'réponses et offres' : null].filter(Boolean).join(', ')} : au nom de <b style={{ color: C.text }}>{loginVinted}</b>.{' '}
-              <Pourquoi label="Un autre compte ?">C'est le compte Vinted ouvert dans ce Chrome. Pour un autre de tes comptes : connecte-toi avec lui sur vinted.fr dans ce Chrome, ou ouvre VRM dans le Chrome (le profil) où il est connecté.{!st.exception && extSait('publication') === 'ok' ? ' Publier sur Leboncoin passe aussi par l’extension.' : ''}</Pourquoi>
+              <Pourquoi label="Un autre compte ?">C'est le compte Vinted ouvert {NAV.dans}. Pour un autre de tes comptes : connecte-toi avec lui sur vinted.fr {NAV.dans}, ou ouvre VRM dans le navigateur (le profil) où il est connecté.{!st.exception && extSait('publication') === 'ok' ? ' Publier sur Leboncoin passe aussi par l’extension.' : ''}</Pourquoi>
               {st.exception ? <span data-etat-exception-texte="publication"><br/><b style={{ color: C.text }}>Sauf publier sur Leboncoin</b> : {st.exception.texte}</span> : null}
             </div>
           ) : (
             <div className="vrm-etat-texte" style={{ color: C.muted }}>
               Tes ventes, colis à retirer, codes et bordereaux déjà reçus restent là.
               {code === 'pause' || code === 'plusieurs' ? <> {st.glob.texte}</>
-                : <>{' '}<Pourquoi label="Ce qui manque">Générer un bordereau ou répondre demande l'extension allumée, connectée à ton compte VRM, avec un compte Vinted ouvert dans Chrome ; publier sur Leboncoin demande {extSait('publication') === 'retard' ? 'une extension à jour' : "l'extension allumée"}.</Pourquoi></>}
+                : <>{' '}<Pourquoi label="Ce qui manque">Générer un bordereau ou répondre demande l'extension allumée, connectée à ton compte VRM, avec un compte Vinted ouvert {NAV.dansNu} ; publier sur Leboncoin demande {extSait('publication') === 'retard' ? 'une extension à jour' : "l'extension allumée"}.</Pourquoi></>}
             </div>
           )}
           <div className="vrm-etat-chaine" data-etat-chaine>
@@ -18773,7 +18817,20 @@ function EtatActions({ onNav, ordi, sombre }) {
             {/* Sans extension ici (téléphone, autre navigateur), ces deux lignes
                 n'ont rien à dire : vides, elles se liraient comme deux problèmes. */}
             {(ligneVrm.t || ligneVrm.s !== '—') && <Ligne nom="Ton compte VRM" l={ligneVrm}/>}
-            {(ligneVinted.t || ligneVinted.s !== '—') && <Ligne nom="Compte Vinted dans Chrome" l={ligneVinted}/>}
+            {(ligneVinted.t || ligneVinted.s !== '—') && <Ligne nom={`Compte Vinted ${NAV.dansNu}`} l={ligneVinted}/>}
+          </div>
+          <div className="vrm-etat-comptes" data-fraicheur-comptes={encoursComptes ? 'encours' : passuComptes.length ? 'partiel' : 'lu'}>
+            <div className="vrm-etat-comptes-titre">Tes comptes — dernière relecture</div>
+            {!encoursComptes && lignesComptes.map((c) => (
+              <div key={c.plateforme + ':' + c.id} className="vrm-etat-compte-ligne" data-fraicheur-compte={c.plateforme} data-fraicheur-id={c.id} data-fraicheur-etat={c.etat} data-fraicheur-geste={c.geste ? '1' : '0'}>
+                <b className="vrm-sensible">{c.nom}</b> <span className="vrm-etat-compte-site">{nomPlateforme(c.plateforme)}</span>
+                <span className="vrm-etat-compte-age"> — {c.etat === 'ouvert' ? 'ouvert ici' : c.age ? `relu ${c.age}` : 'jamais relu'}</span>
+                {c.bloque ? <span className="vrm-etat-compte-bloque" style={{ color: c.geste ? C.warn : C.muted }}> · {c.bloque.replace(/^jamais relu — /, '').replace(/^ouvert ici(?: : )?/, '')}</span> : null}
+              </div>
+            ))}
+            {encoursComptes && <div className="vrm-etat-compte-ligne" style={{ color: C.muted }}>Je regarde tes comptes…</div>}
+            {!encoursComptes && !lignesComptes.length && !passuComptes.length && <div className="vrm-etat-compte-ligne" style={{ color: C.muted }}>Aucun compte relié pour l’instant.</div>}
+            {!encoursComptes && passuComptes.length > 0 && <div className="vrm-etat-compte-ligne" data-fraicheur-passu={passuComptes.join(',')} style={{ color: C.muted }}>{passuComptes.join(', ')} : pas pu lire (la base n’a pas répondu) — rouvre ce panneau.</div>}
           </div>
           {/* 20 octobre (Orion iPhone, Safari…) : ce que l'extension dit de CE
               navigateur — les API qui lui manquent, remplacées ou non. Une
@@ -18909,7 +18966,7 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
   // qu'elle répond vaut mieux qu'une case à cocher.
   const n = !fait.ext ? 1 : !fait.lien ? 2 : 3;
   const ETAPES = [
-    { t: 'Installer l’extension dans Chrome', c: 'extension' },
+    { t: `Installer l’extension ${NAV.dansNu}`, c: 'extension' },
     { t: 'La connecter à ton compte VRM — le même email qu’ici, en un clic', c: 'lien' },
     { t: 'Passer une fois sur vinted.fr', c: 'vinted' },
   ];
@@ -18923,12 +18980,12 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
   const corps = etape === 'autrecompte' ? (
     <>
       <p style={{margin:'0 0 10px'}}>
-        Dans Chrome, l’extension est connectée sous <b style={{color:C.text}}>{extAuth.email}</b>. Toi, tu es sur <b style={{color:C.text}}>{(AUTH.user&&AUTH.user.email)||'ce compte'}</b>.
+        {NAV.Dans}, l’extension est connectée sous <b style={{color:C.text}}>{extAuth.email}</b>. Toi, tu es sur <b style={{color:C.text}}>{(AUTH.user&&AUTH.user.email)||'ce compte'}</b>.
       </p>
       <p style={{margin:0}}>
         Du coup, tout ce qu’elle lit sur Vinted part dans l’autre boutique, et celle-ci reste vide.{' '}
         {voie === 'retard'
-          ? <>Et celle-ci ({vmrExtVersion() || 'version ?'}) ne sait pas recevoir la connexion de VRM : mets-la à jour (bouton ci-dessous) et je la reconnecterai à <b style={{color:C.text}}>{(AUTH.user&&AUTH.user.email)||'ton compte'}</b> — ou déconnecte-la d’ici, puis clique son icône en haut de Chrome et connecte-toi avec l’email et le mot de passe de ton compte VRM.</>
+          ? <>Et celle-ci ({vmrExtVersion() || 'version ?'}) ne sait pas recevoir la connexion de VRM : mets-la à jour (bouton ci-dessous) et je la reconnecterai à <b style={{color:C.text}}>{(AUTH.user&&AUTH.user.email)||'ton compte'}</b> — ou déconnecte-la d’ici, puis clique son icône {NAV.hautDe} et connecte-toi avec l’email et le mot de passe de ton compte VRM.</>
           : voie === 'serveur'
             ? <>Le serveur n’a pas pu préparer sa connexion : je réessaie dans {minutesAvantReessai()} min, cette page ouverte.</>
             : <>Je la reconnecte à <b style={{color:C.text}}>{(AUTH.user&&AUTH.user.email)||'ton compte'}</b> dès que cette page est devant toi — rien à taper. Si ça persiste, recharge cette page.</>}
@@ -18938,17 +18995,17 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
     <>
       <p style={{margin:'0 0 10px'}}>Je vois bien ton extension dans ce navigateur 👍 — mais elle ne sait pas encore à qui elle a affaire, alors elle n’a nulle part où ranger ce qu’elle lit.</p>
       {voie === 'retard' ? (
-        <p style={{margin:0}}>Celle-ci ({vmrExtVersion() || 'version ?'}) ne sait pas recevoir la connexion de VRM. Mets-la à jour avec le bouton ci-dessous — ou clique son icône en haut de Chrome et connecte-toi avec <b style={{color:C.text}}>l’email et le mot de passe de ton compte VRM</b> (pas ceux de Vinted) : c’est ce qui envoie tes données chez toi, et nulle part ailleurs.</p>
+        <p style={{margin:0}}>Celle-ci ({vmrExtVersion() || 'version ?'}) ne sait pas recevoir la connexion de VRM. Mets-la à jour avec le bouton ci-dessous — ou clique son icône {NAV.hautDe} et connecte-toi avec <b style={{color:C.text}}>l’email et le mot de passe de ton compte VRM</b> (pas ceux de Vinted) : c’est ce qui envoie tes données chez toi, et nulle part ailleurs.</p>
       ) : voie === 'serveur' ? (
         fenetreAncienne()
-          ? <p style={{margin:0}}>Le serveur n’a pas pu préparer sa connexion. Clique son icône en haut de Chrome et connecte-toi avec <b style={{color:C.text}}>l’email et le mot de passe de ton compte VRM</b> (pas ceux de Vinted) : c’est ce qui envoie tes données chez toi, et nulle part ailleurs.</p>
-          : <p style={{margin:0}}>Le serveur n’a pas pu préparer sa connexion. Clique son icône en haut de Chrome, puis <b style={{color:C.text}}>« avec mon mot de passe VRM »</b> : c’est ce qui envoie tes données chez toi, et nulle part ailleurs.</p>
+          ? <p style={{margin:0}}>Le serveur n’a pas pu préparer sa connexion. Clique son icône {NAV.hautDe} et connecte-toi avec <b style={{color:C.text}}>l’email et le mot de passe de ton compte VRM</b> (pas ceux de Vinted) : c’est ce qui envoie tes données chez toi, et nulle part ailleurs.</p>
+          : <p style={{margin:0}}>Le serveur n’a pas pu préparer sa connexion. Clique son icône {NAV.hautDe}, puis <b style={{color:C.text}}>« avec mon mot de passe VRM »</b> : c’est ce qui envoie tes données chez toi, et nulle part ailleurs.</p>
       ) : voie === 'page' ? (
         /* Relecture croisée de la 5.174 : une 5.164/5.170, connectée par l'ancien
            message de la page — sa fenêtre n'a pas « Se connecter avec VRM ». */
-        <p style={{margin:0}}>Je la connecte à ton compte VRM d’ici, <b style={{color:C.text}}>sans rien à taper</b> — c’est ce qui envoie tes données chez toi, et nulle part ailleurs. Si ça ne vient pas : recharge cette page, ou clique son icône en haut de Chrome et connecte-toi avec <b style={{color:C.text}}>l’email et le mot de passe de ton compte VRM</b> (pas ceux de Vinted).</p>
+        <p style={{margin:0}}>Je la connecte à ton compte VRM d’ici, <b style={{color:C.text}}>sans rien à taper</b> — c’est ce qui envoie tes données chez toi, et nulle part ailleurs. Si ça ne vient pas : recharge cette page, ou clique son icône {NAV.hautDe} et connecte-toi avec <b style={{color:C.text}}>l’email et le mot de passe de ton compte VRM</b> (pas ceux de Vinted).</p>
       ) : (
-        <p style={{margin:0}}>Je la connecte à ton compte VRM d’ici, <b style={{color:C.text}}>sans rien à taper</b> — c’est ce qui envoie tes données chez toi, et nulle part ailleurs. Si ça ne vient pas : clique son icône en haut de Chrome, puis <b style={{color:C.text}}>« Se connecter avec VRM »</b>.</p>
+        <p style={{margin:0}}>Je la connecte à ton compte VRM d’ici, <b style={{color:C.text}}>sans rien à taper</b> — c’est ce qui envoie tes données chez toi, et nulle part ailleurs. Si ça ne vient pas : clique son icône {NAV.hautDe}, puis <b style={{color:C.text}}>« Se connecter avec VRM »</b>.</p>
       )}
     </>
   ) : etape === 'connectee' ? (
@@ -18993,7 +19050,7 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
         {mobile === 'firefox-android' || mobile === 'samsung' || mobile === 'android' || mobile === 'duckduckgo'
           ? <>En attendant, cette première étape se passe <b style={{color:C.text}}>sur un ordinateur</b>&nbsp;: ouvre </>
           : <>Cette première étape se passe <b style={{color:C.text}}>sur un ordinateur</b>&nbsp;: c’est là que vit l’extension, et ton appareil n’en accepte pas. Ouvre </>}
-        <b style={{color:C.text}}>vrm.center</b> dans le Chrome de ton ordinateur — tu y retrouveras exactement cet écran, avec la marche à suivre. Une fois que c’est fait, tout revient ici tout seul{mobile === 'ios' ? <span data-premiers-relais="ios">, et depuis ton iPhone tu pourras faire agir l’extension de l’ordinateur allumé (bordereaux, réponses, publication)</span> : null}.
+        <b style={{color:C.text}}>vrm.center</b> dans le navigateur de ton ordinateur — tu y retrouveras exactement cet écran, avec la marche à suivre. Une fois que c’est fait, tout revient ici tout seul{mobile === 'ios' ? <span data-premiers-relais="ios">, et depuis ton iPhone tu pourras faire agir l’extension de l’ordinateur allumé (bordereaux, réponses, publication)</span> : null}.
       </p>}
       {mobile === 'ios-orion' && <p style={{margin:'10px 0 0'}} data-premiers-orion="dans-orion">Le paquet pour <b style={{color:C.text}}>Orion sur iPhone et iPad</b> est disponible ci-dessous. Importe-le depuis le menu Extensions d’Orion, puis autorise VRM sur les sites utilisés. <a href={NOTICE_ORION} target="_blank" rel="noreferrer" style={{color:C.accent}}>Voir les étapes</a>. Le fonctionnement sur ton appareil reste à vérifier.</p>}
       {orion && mobile === 'ios' && <p style={{margin:'10px 0 0'}} data-premiers-orion="telephone">Sur iPhone, le navigateur <b style={{color:C.text}}>Orion</b> (gratuit) peut aussi installer l’extension depuis sa boutique — VRM n’y a pas encore été essayé&nbsp;: si l’écran n’avance pas, passe par l’ordinateur.</p>}
@@ -19031,8 +19088,8 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
       <p style={{margin:'0 0 4px'}}>Commence par la télécharger. Ensuite&nbsp;:</p>
       <ul style={{margin:'6px 0 0',padding:'0 0 0 18px',lineHeight:1.7}}>
         <li>ouvre le fichier pour le décompresser&nbsp;— tu obtiens un dossier <b style={{color:C.text}}>VRM-extension</b>&nbsp;;</li>
-        <li>dans Chrome, va sur <code style={{fontSize:12,background:C.bg,padding:'1px 5px',borderRadius:6}}>chrome://extensions</code>&nbsp;;</li>
-        <li>allume l’interrupteur <b style={{color:C.text}}>Mode développeur</b>, en haut à droite. C’est normal&nbsp;: cette extension est la tienne, elle n’est pas sur le magasin de Chrome&nbsp;;</li>
+        <li>{NAV.dansNu}, {NAV.pageExt ? <>va sur <code style={{fontSize:12,background:C.bg,padding:'1px 5px',borderRadius:6}}>{NAV.pageExt}</code></> : <>ouvre la page des extensions</>}&nbsp;;</li>
+        <li>allume l’interrupteur <b style={{color:C.text}}>Mode développeur</b>, en haut à droite. C’est normal&nbsp;: cette extension est la tienne, elle n’est pas sur le magasin des extensions&nbsp;;</li>
         <li>clique <b style={{color:C.text}}>Charger l’extension non empaquetée</b> et choisis le dossier.</li>
       </ul>
     </>
@@ -19065,7 +19122,7 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
     : majLiaison
       ? <>
           <a href="/VRM-extension.zip" download data-premiers-geste="maj" className="vrm-b vrm-b-primaire">Télécharger la mise à jour ({EXT_ATTENDUE})</a>
-          {etape === 'autrecompte' && <button type="button" className="vrm-b vrm-b-secondaire vrm-b-court" data-premiers-geste="deconnecter" disabled={deconnectee} onClick={deconnecter}>{deconnectee ? 'Déconnectée — connecte-la avec ton mot de passe VRM' : 'Déconnecter l’extension de ce Chrome'}</button>}
+          {etape === 'autrecompte' && <button type="button" className="vrm-b vrm-b-secondaire vrm-b-court" data-premiers-geste="deconnecter" disabled={deconnectee} onClick={deconnecter}>{deconnectee ? 'Déconnectée — connecte-la avec ton mot de passe VRM' : `Déconnecter l’extension ${NAV.de}`}</button>}
         </>
     : etape === 'connectee'
       ? <a href="https://www.vinted.fr" target="_blank" rel="noreferrer" className="vrm-b vrm-b-primaire">Ouvrir vinted.fr</a>
@@ -19139,7 +19196,7 @@ function Onboarding({ setTab }) {
       </div>
       <PremiersPas onNav={setTab}
         titreNeuf="Pour commencer, relie ton compte Vinted"
-        introNeuf={<>VRM ne va rien chercher tout seul&nbsp;: c'est l'extension, dans ton navigateur Chrome, qui range ce que Vinted t'envoie déjà. Elle ne touche jamais à ton mot de passe Vinted.</>}/>
+        introNeuf={<>VRM ne va rien chercher tout seul&nbsp;: c'est l'extension, dans ton navigateur, qui range ce que Vinted t'envoie déjà. Elle ne touche jamais à ton mot de passe Vinted.</>}/>
       <div style={{fontSize:12,color:C.muted,textAlign:'center',marginTop:14,lineHeight:1.4}}>
         Déjà des données ailleurs&nbsp;? Va dans Paramètres → Restaurer une sauvegarde pour les récupérer.
       </div>
@@ -19901,7 +19958,7 @@ function TeteTransporteurs({ transp, colis, relire }) {
     ? <>ouvre VRM sur l'ordinateur où l'extension VRM est installée — c'est elle qui lit Mondial Relay.</>
     : sait === 'absente'
     ? <>installe ou allume l'extension VRM sur cet ordinateur — c'est elle qui lit Mondial Relay.</>
-    : <>mets à jour l'extension VRM (version {EXT_CAPACITES.transp} ou plus récente) : elle lira Mondial Relay depuis ce Chrome.</>;
+    : <>mets à jour l'extension VRM (version {EXT_CAPACITES.transp} ou plus récente) : elle lira Mondial Relay depuis {NAV.ce}.</>;
   return <>
     {transp === null && <div data-transp-passu="" style={{...st,display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
       <span style={{flex:'1 1 220px'}}>Le statut chez les transporteurs n'a pas pu être relu (la base n'a pas répondu) : ce que tu vois vient des e-mails et de Vinted. Rien n'est perdu.</span>
@@ -19916,14 +19973,14 @@ function TeteTransporteurs({ transp, colis, relire }) {
           ? <>autorise VRM à lire le suivi des transporteurs (fenêtre de l'icône VRM, « Autoriser ») : l'extension de ce navigateur les lira alors à la place.</>
           : navTransp === 'passu'
             ? <>l'extension VRM de ce navigateur pourrait les lire à la place, mais elle ne sait pas dire si elle en a la permission — ouvre la fenêtre de l'icône VRM pour vérifier.</>
-            : <>l'extension VRM de ce Chrome les lit à la place, depuis ton ordinateur.</>)
+            : <>l'extension VRM {NAV.de} les lit à la place, depuis ton ordinateur.</>)
         : sansSouris
           ? <>l'extension VRM peut les lire à la place — ouvre VRM sur l'ordinateur où elle est installée.</>
           : sait === 'absente'
           // (30 oct.) Sur un ORDINATEUR sans l'extension, « ouvre VRM sur l'ordinateur » ne
           // voulait rien dire : on y est déjà. Le geste est ici.
           ? <>installe ou allume l'extension VRM sur cet ordinateur : elle les lira à la place.</>
-          : <>mets à jour l'extension VRM (version {EXT_CAPACITES.transp} ou plus récente) pour qu'elle les lise depuis ce Chrome.</>}
+          : <>mets à jour l'extension VRM (version {EXT_CAPACITES.transp} ou plus récente) pour qu'elle les lise depuis {NAV.ce}.</>}
     </div>}
     {phrasesCp.map((p, i) => <div key={i} data-transp-cp={/cherche/.test(p) ? 'cherche' : 'inconnu'} data-transp-cp-n={String(/cherche/.test(p) ? cpMr.cherche : cpMr.inconnu)} style={st}>{p}</div>)}
     {nonLus.length > 0 && <div data-transp-non-lu={nonLus.join(',')} style={st}>
@@ -27412,7 +27469,7 @@ function AnnoncesVestiaire() {
     window.addEventListener('vrm:ext', f); return () => window.removeEventListener('vrm:ext', f);
   }, [relire]);
   const style = { fontSize: 13, color: C.muted, lineHeight: 1.55 };
-  const geste = <>ouvre <b style={{ color: C.text }}>« Mes articles »</b> sur vestiairecollective.com, dans le Chrome où l'extension VRM est installée</>;
+  const geste = <>ouvre <b style={{ color: C.text }}>« Mes articles »</b> sur vestiairecollective.com, dans le navigateur où l'extension VRM est installée</>;
   let corps;
   if (d === undefined) corps = <div data-vc-annonces="charge" style={style}>Lecture de tes annonces Vestiaire…</div>;
   else if (d === null) corps = <div data-vc-annonces="pas-su" style={style}>Je n'ai pas pu lire tes annonces Vestiaire — rien n'est perdu, c'est la lecture qui a échoué. <button type="button" className="vrm-lien-action" data-vc-annonces-relire="" onClick={() => { setD(undefined); relire(); }} style={{ background: 'none', border: 'none', color: C.accent, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', minHeight: 44, padding: 0 }}>Réessayer</button></div>;
@@ -28039,7 +28096,7 @@ function VentesVestiaire({ comptes }) {
     return m;
   }, [paires]);
   const style = { fontSize: 13, color: C.muted, lineHeight: 1.55 };
-  const geste = <>ouvre <b style={{ color: C.text }}>« Mes ventes »</b> et <b style={{ color: C.text }}>« Articles à expédier »</b> sur vestiairecollective.com, dans le Chrome où l'extension VRM est installée</>;
+  const geste = <>ouvre <b style={{ color: C.text }}>« Mes ventes »</b> et <b style={{ color: C.text }}>« Articles à expédier »</b> sur vestiairecollective.com, dans le navigateur où l'extension VRM est installée</>;
   // (1er nov., audit A2) Une vente Vestiaire n'entre dans un total que si son
   // montant est SÛR (`montantRecuVc`) ; sinon elle est NOMMÉE à côté de chaque
   // total « toutes plateformes » (« au moins »). La phrase le dit, des mêmes lignes.
@@ -28396,7 +28453,7 @@ function FilVestiaire({ conv, num, titre, envoi, onFerme }) {
   let corps;
   if (fil === undefined) corps = <div data-vc-fil="charge" style={style}>Lecture de la conversation…</div>;
   else if (fil === null) corps = <div data-vc-fil="pas-su" style={style}>Je n'ai pas pu lire cette conversation — rien n'est perdu, réessaie dans un moment.</div>;
-  else if (!fil.messages) corps = <div data-vc-fil="jamais" style={style}>Le texte de cette conversation n'a pas encore été lu : ouvre-la une fois sur Vestiaire, dans le Chrome où l'extension est installée{cap === 'retard' ? <> (mise à jour en <b>{EXT_CAPACITES.vcfil}</b> d'abord)</> : ''}.</div>;
+  else if (!fil.messages) corps = <div data-vc-fil="jamais" style={style}>Le texte de cette conversation n'a pas encore été lu : ouvre-la une fois sur Vestiaire, dans le navigateur où l'extension est installée{cap === 'retard' ? <> (mise à jour en <b>{EXT_CAPACITES.vcfil}</b> d'abord)</> : ''}.</div>;
   else if (!fil.messages.length) corps = <div data-vc-fil="vide" style={style}>Conversation lue, mais Vestiaire n'y a rendu aucun message lisible.</div>;
   else corps = (
     <div data-vc-fil="lu" data-vc-fil-n={fil.messages.length} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -28418,18 +28475,18 @@ function FilVestiaire({ conv, num, titre, envoi, onFerme }) {
       <ComposeConv valeur={texte} onChange={(t) => setTexte(String(t).slice(0, 2000))} onEnvoyer={envoyer} enCours={enCours} etiquette="Ta réponse sur Vestiaire" libelleEnvoyer="Envoyer sur Vestiaire"
         envoiBloque={!texte.trim() || enCours} attrsEnvoyer={{ 'data-vc-envoyer': '' }}/>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 6 }}>
-        <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: C.muted, lineHeight: 1.45 }}>Part de l'onglet Vestiaire ouvert dans ce Chrome, à ton nom, un message à la fois.</span>
+        <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: C.muted, lineHeight: 1.45 }}>Part de l'onglet Vestiaire ouvert {NAV.dans}, à ton nom, un message à la fois.</span>
         <a href={lien} target="_blank" rel="noreferrer" className="vrm-lien-action" style={{ color: C.muted, fontWeight: 600, display: 'inline-flex', alignItems: 'center', minHeight: 44, fontSize: 13 }}>Ouvrir sur Vestiaire ↗</a>
       </div>
     </div>
   );
   else if (fil && fil.messages) pied = (
     <PiedSansEnvoi attrs={{ 'data-vc-repondre': cap !== 'ok' ? 'ext-' + cap : 'pas-appris', ...(cap === 'ok' ? { 'data-vc-pas-appris': envoi && envoi.raison ? envoi.raison : '' } : {}) }} lien={lien} texteLien="Répondre sur Vestiaire ↗"
-      raison={cap === 'absente' ? <>Pour répondre d'ici, ouvre VRM dans le Chrome où l'extension est installée — sinon réponds sur Vestiaire.</>
+      raison={cap === 'absente' ? <>Pour répondre d'ici, ouvre VRM dans le navigateur où l'extension est installée — sinon réponds sur Vestiaire.</>
         : cap !== 'ok' ? <>Pour répondre d'ici, il faut l'extension <b>{EXT_CAPACITES.vcrepondre}</b> — mets-la à jour depuis <b>Paramètres → État des connexions</b>.</>
         : envoi && envoi.raison === 'messagerie-stream'
           ? <span data-vc-envoi-stream="">Vestiaire envoie tes messages par un service de messagerie à part : VRM ne sait pas encore les envoyer d'ici sans risque. Réponds sur Vestiaire — ta réponse apparaîtra ici.</span>
-          : <>Pour répondre d'ici, l'extension doit d'abord VOIR comment Vestiaire envoie un message : envoie <b>une</b> réponse toi-même sur Vestiaire, dans ce Chrome. VRM te dira ensuite s'il peut répondre d'ici — toujours sur ton clic.{envoi && envoi.raison ? <> (Dernier essai vu : pas encore sûr à refaire — {envoi.raison}.)</> : null}</>}>
+          : <>Pour répondre d'ici, l'extension doit d'abord VOIR comment Vestiaire envoie un message : envoie <b>une</b> réponse toi-même sur Vestiaire, {NAV.dans}. VRM te dira ensuite s'il peut répondre d'ici — toujours sur ton clic.{envoi && envoi.raison ? <> (Dernier essai vu : pas encore sûr à refaire — {envoi.raison}.)</> : null}</>}>
       {resultat}
     </PiedSansEnvoi>
   );
@@ -28489,7 +28546,7 @@ function MessagesVestiaire() {
   let corps;
   if (d === undefined) corps = <div data-vc-messages="charge" style={style}>Lecture de tes messages Vestiaire…</div>;
   else if (d === null) corps = <div data-vc-messages="pas-su" style={style}>Je n'ai pas pu lire tes messages Vestiaire — rien n'est perdu, réessaie dans un moment.</div>;
-  else if (!d.compteur && !d.conversations && !(d.fils && Object.keys(d.fils).length)) corps = <div data-vc-messages="jamais" style={style}>Pas encore relevés. Ouvre Vestiaire dans le Chrome où l'extension VRM est installée{extSait('vcmessages') === 'retard' ? <> — mise à jour en <b>{EXT_CAPACITES.vcmessages}</b> d'abord</> : ''} : elle relève le nombre de messages non lus en passant, et tes conversations quand tu ouvres ta messagerie.</div>;
+  else if (!d.compteur && !d.conversations && !(d.fils && Object.keys(d.fils).length)) corps = <div data-vc-messages="jamais" style={style}>Pas encore relevés. Ouvre Vestiaire dans le navigateur où l'extension VRM est installée{extSait('vcmessages') === 'retard' ? <> — mise à jour en <b>{EXT_CAPACITES.vcmessages}</b> d'abord</> : ''} : elle relève le nombre de messages non lus en passant, et tes conversations quand tu ouvres ta messagerie.</div>;
   else {
     const nl = nonLusVestiaire(d.compteur, d.compteurs);
     const n = nl ? nl.n : null;
@@ -28538,7 +28595,7 @@ function MessagesVestiaire() {
                 })}
               </div>
             </> : (d.conversations ? <div data-vc-conv-vide="" style={style}>Aucune conversation à la dernière lecture.</div>
-              : <div data-vc-conv-jamais="" style={style}>Le détail des conversations arrive quand tu ouvres ta messagerie sur Vestiaire dans ce Chrome.</div>)}
+              : <div data-vc-conv-jamais="" style={style}>Le détail des conversations arrive quand tu ouvres ta messagerie sur Vestiaire {NAV.dans}.</div>)}
           </div>
           <div className="vrm-chat-column">{choisie
             ? <FilVestiaire key={choisie.id} conv={choisie.id} num={choisie.num} titre={(fcChoisie && fcChoisie.titre) || choisie.titreArticle || ''} envoi={d.envoi} onFerme={() => setOuvert('')}/>
@@ -28582,11 +28639,11 @@ function AchatsVestiaire() {
   let corps;
   if (d === undefined) corps = <div data-vc-achats="charge" style={style}>Lecture de tes achats Vestiaire…</div>;
   else if (d === null) corps = <div data-vc-achats="pas-su" style={style}>Je n'ai pas pu lire tes achats Vestiaire — rien n'est perdu, c'est la lecture qui a échoué. <button type="button" className="vrm-lien-action" data-vc-achats-relire="" onClick={() => { setD(undefined); relire(); }} style={{ background: 'none', border: 'none', color: C.accent, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', minHeight: 44, padding: 0 }}>Réessayer</button></div>;
-  else if (!d.achats) corps = <div data-vc-achats="jamais" style={style}>Pas encore lus. Ouvre <b style={{ color: C.text }}>tes achats</b> (« Mes commandes ») sur Vestiaire, dans le Chrome où l'extension VRM est installée{extSait('vcachats') === 'retard' ? <> — mise à jour en <b>{EXT_CAPACITES.vcachats}</b> d'abord</> : ''} : elle les lit en passant. Ton panier n'est jamais lu.</div>;
+  else if (!d.achats) corps = <div data-vc-achats="jamais" style={style}>Pas encore lus. Ouvre <b style={{ color: C.text }}>tes achats</b> (« Mes commandes ») sur Vestiaire, dans le navigateur où l'extension VRM est installée{extSait('vcachats') === 'retard' ? <> — mise à jour en <b>{EXT_CAPACITES.vcachats}</b> d'abord</> : ''} : elle les lit en passant. Ton panier n'est jamais lu.</div>;
   else {
     const liste = Object.entries(d.achats).filter(([, v]) => v && typeof v === 'object').map(([id, v]) => ({ id, ...v }))
       .sort((a, z) => String(z.date || z.premiereVue || '').localeCompare(String(a.date || a.premiereVue || '')));
-    if (!liste.length) corps = <div data-vc-achats="vide" style={style}>Aucun achat Vestiaire à la dernière lecture{d.lecture && d.lecture.at ? ` (${ageCourtVc(d.lecture.at)})` : ''}. Après un achat, ouvre <b style={{ color: C.text }}>« Mes commandes »</b> sur vestiairecollective.com dans ce Chrome : il apparaît ici.</div>;
+    if (!liste.length) corps = <div data-vc-achats="vide" style={style}>Aucun achat Vestiaire à la dernière lecture{d.lecture && d.lecture.at ? ` (${ageCourtVc(d.lecture.at)})` : ''}. Après un achat, ouvre <b style={{ color: C.text }}>« Mes commandes »</b> sur vestiairecollective.com {NAV.dans} : il apparaît ici.</div>;
     else corps = (
       <div data-vc-achats="lu" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div data-vc-achats-resume="" style={style}>
@@ -28639,7 +28696,7 @@ function VestiaireMesure() {
   );
   return (
     <div data-vc-mesure="jamais" style={style}>
-      {cap === 'ok' ? <>Pour que VRM apprenne à le lire : ouvre <b>Vestiaire Co</b> dans ce Chrome, connecté à ton compte vendeur, et passe sur tes ventes, tes articles et tes paiements. L'extension relève la <b>forme</b> des pages — jamais leur contenu.</>
+      {cap === 'ok' ? <>Pour que VRM apprenne à le lire : ouvre <b>Vestiaire Co</b> {NAV.dans}, connecté à ton compte vendeur, et passe sur tes ventes, tes articles et tes paiements. L'extension relève la <b>forme</b> des pages — jamais leur contenu.</>
         : cap === 'retard' ? <>Pour que VRM apprenne à lire Vestiaire, l'extension doit passer en <b>{EXT_CAPACITES.vestiaire}</b> : celle installée ne sait pas encore l'observer. Mets-la à jour depuis <b>Paramètres → État des connexions</b>.</>
         : <>Pas encore de passage sur Vestiaire</>}
     </div>
@@ -34362,10 +34419,31 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
    dans api/_lib/comptes-exclus.js. Lecture : trois états par plateforme
    (`undefined` en cours · `null` pas su · lu) — « pas su » n'est jamais « aucun compte ». */
 const URL_SITE_COMPTE = { vinted: 'https://www.vinted.fr/', vestiaire: 'https://fr.vestiairecollective.com/', leboncoin: 'https://www.leboncoin.fr/compte/part/mes-annonces', ebay: 'https://www.ebay.fr/' };
-function useComptesAutresSites() {
+// LA DERNIÈRE CAPTURE DE CHAQUE COMPTE VINTED (une règle, §11 : Comptes liés et
+// le panneau de l'indicateur la lisent). uid → ms ; `null` = pas su (lecture
+// ratée), jamais un objet vide présenté comme « jamais capté ».
+// ⚠️ 1 127 lignes `harvest_*` en base : au-delà de 1 000, Supabase tronque en
+// silence (§A1) — `lireTout` pagine. Les lignes vidées (comptes supprimés) sont
+// écartées : elles ne disent plus rien sur un compte vivant.
+// ⚠️ Revue de la 5.167 : `harvest_{uid}_enligne` est la lecture PUBLIQUE de son
+//    dressing, faite avec la session d'un AUTRE compte — comptée, elle faisait
+//    dire « À jour » à un compte figé depuis trois jours. `ligneDeSaSession`.
+async function lireDernieresCaptures() {
+  try {
+    const rows = await lireTout('id=like.harvest_*&select=id,updated_at,cap:meta->>capturedAt&meta->>supprime=is.null');
+    if (!rows) return null;
+    const by = {};
+    rows.forEach(r => { const m = ligneDeSaSession(r && r.id); if (!m) return; const t = harvestTs(r) || 0; if (t && (!by[m[1]] || t > by[m[1]])) by[m[1]] = t; });
+    return by;
+  } catch (_) { return null; }
+}
+// `actif` (5 nov.) : le panneau de l'indicateur ne lit ces lignes qu'OUVERT —
+// il vit dans l'en-tête de chaque écran, il ne doit rien lire au démarrage.
+function useComptesAutresSites(actif = true) {
   const [lu, setLu] = React.useState({ leboncoin: undefined, vestiaire: undefined, ebay: undefined });
   const [tour, setTour] = React.useState(0);
   React.useEffect(() => {
+    if (!actif) return undefined;
     let mort = false;
     const B = `${SUPABASE_URL}/rest/v1/app_data?`;
     (async () => {
@@ -34396,7 +34474,7 @@ function useComptesAutresSites() {
       setLu({ leboncoin, vestiaire, ebay });
     })();
     return () => { mort = true; };
-  }, [tour]);
+  }, [tour, actif]);
   React.useEffect(() => {
     const f = (e) => { const d = e && e.detail; if (d && d.type === 'maj' && /lbc|vestiaire|vc/.test(String(d.quoi || ''))) setTour((t) => t + 1); };
     const g = () => setTour((t) => t + 1);
@@ -34615,23 +34693,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
   // avec updated_at du compte (fraîcheur du token) et la liste des bloqués.
   const [lastCap, setLastCap] = useState({}); // uid -> ms de la dernière capture
   const blockedAccts = useMemo(() => new Set((load('vinted_accounts_blocked', []) || []).map(String)), []);
-  useEffect(() => { (async () => {
-    try {
-      // ⚠️ 1 127 lignes `harvest_*` en base : au-delà de 1 000, Supabase tronque
-      // en silence et des comptes n'auraient JAMAIS de fraîcheur (§A1).
-      // On écarte aussi les lignes vidées (comptes supprimés) : elles ne disent
-      // plus rien sur la fraîcheur d'un compte vivant.
-      const rows = await lireTout('id=like.harvest_*&select=id,updated_at,cap:meta->>capturedAt&meta->>supprime=is.null');
-      if (!rows) return; const by = {};
-      // ⚠️ Revue de la 5.167 : `harvest_{uid}_enligne` est la lecture PUBLIQUE de
-      //    son dressing, faite avec la session d'un AUTRE compte (5.167) — ni ses
-      //    ventes, ni sa messagerie, ni son porte-monnaie n'ont été lus. Comptée, elle
-      //    faisait dire « À jour » à un compte figé depuis trois jours, en permanence
-      //    (c'est l'écran qui dit sur quel compte repasser). `ligneDeSaSession`.
-      rows.forEach(r => { const m = ligneDeSaSession(r && r.id); if (!m) return; const t = harvestTs(r) || 0; if (t && (!by[m[1]] || t > by[m[1]])) by[m[1]] = t; });
-      setLastCap(by);
-    } catch (_) {}
-  })(); }, []);
+  useEffect(() => { (async () => { const by = await lireDernieresCaptures(); if (by) setLastCap(by); })(); }, []);
   // ÉTAT ÉVALUÉ PAR L'EXTENSION (5.181, `noterEtatCompte`) : actif / banni, lu
   // dans le champ `is_account_banned` du profil Vinted qu'elle reçoit déjà.
   // Trois états : `undefined` en cours · `null` pas su (lecture ratée) · objet lu.
@@ -42570,7 +42632,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const basculerOffresAuto = async () => {
     if (offresAuto) { setOffresAuto(false); save('vinted_offres_auto', false); return; }
     const ok = await askConfirm({ title: 'Accepter les offres tout seul sur Vinted ?',
-      desc: "Dès qu'une offre atteint le « mini » d'une annonce, VRM l'accepte à ta place, pas tout de suite : entre 3 et 20 minutes après l'avoir vue, tiré au hasard (une à la fois, uniquement le compte ouvert dans ce Chrome, plafond 50/h). L'extension doit rester ouverte dans Chrome pendant ce délai.\n\n⚠️ Important : sur Vinted, un programme qui accepte peut être vu comme un robot — c'est un risque pour le compte, que tu prends en l'allumant. Sur eBay c'est sans risque (réglage natif), pas sur Vinted.\n\nPose un « mini » sur les annonces que tu veux laisser partir à ce prix.",
+      desc: "Dès qu'une offre atteint le « mini » d'une annonce, VRM l'accepte à ta place, pas tout de suite : entre 3 et 20 minutes après l'avoir vue, tiré au hasard (une à la fois, uniquement le compte ouvert dans le navigateur de l'extension, plafond 50/h). L'extension doit rester ouverte pendant ce délai.\n\n⚠️ Important : sur Vinted, un programme qui accepte peut être vu comme un robot — c'est un risque pour le compte, que tu prends en l'allumant. Sur eBay c'est sans risque (réglage natif), pas sur Vinted.\n\nPose un « mini » sur les annonces que tu veux laisser partir à ce prix.",
       ok: 'Oui, accepter tout seul', cancel: 'Annuler' });
     if (!ok) return;
     setOffresAuto(true); save('vinted_offres_auto', true);
@@ -47623,7 +47685,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if(!oc?.acc||!oc.owner||oc.owner!==(AUTH.user?.id||'')||!oc.convId||!text||replyBusy||verrouReponse.current||oc.conversation?.allow_reply===false)return;
     const cle=cleReponseVinted(oc.acc.vinted_user_id,oc.convId);
     if(reponsesIncertaines[cle])return;
-    if (!(etatRelais().niveau === 'vivant') && (!vmrExtPresent() || extSait('messagerie')!=='ok' || __vmrPlusieurs)) { setReplyErr("Extension VRM non détectée sur cet appareil. Ouvre l'app dans le Chrome où l'extension est installée, ou réponds sur Vinted."); return; }
+    if (!(etatRelais().niveau === 'vivant') && (!vmrExtPresent() || extSait('messagerie')!=='ok' || __vmrPlusieurs)) { setReplyErr("Extension VRM non détectée sur cet appareil. Ouvre l'app dans le navigateur où l'extension est installée, ou réponds sur Vinted."); return; }
     verrouReponse.current=true;setReplyBusy(true);setReplyErr(null);setReplyNotice('');
     let retour;
     try{
@@ -50679,7 +50741,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {ro && (
                   <div className="vrm-chat-note" data-conv-lecture-seule={String(openConv.acc.vinted_user_id)} style={{color:C.text}}>
                     <span aria-hidden="true" style={{color:C.muted,flexShrink:0,marginTop:1}}><Icon name="eye" size={14}/></span>
-                    <span><b>Lecture seule</b> — pour répondre, ouvre vinted.fr connecté sur <b>{accName(openConv.acc)}</b> {msgRelais ? 'dans le Chrome de ton ordinateur' : 'dans Chrome'} (il est sur {msgNomActif()||(msgRelais?'aucun compte':'un autre compte')}).</span>
+                    <span><b>Lecture seule</b> — pour répondre, ouvre vinted.fr connecté sur <b>{accName(openConv.acc)}</b> {msgRelais ? 'dans le navigateur de ton ordinateur' : NAV.dansNu} (il est sur {msgNomActif()||(msgRelais?'aucun compte':'un autre compte')}).</span>
                   </div>
                 )}
                 {/* ── L'OFFRE (5.135) : trancher celle de l'acheteur, ou en faire
@@ -50716,7 +50778,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div className="vrm-chat-offre vrm-chat-offre-info" data-offre="indisponible" style={{background:C.bg,border:`1px solid ${C.border}`}}>
                       {off ? <div className="vrm-chat-offre-t" style={{color:C.text}}>Offre de <b data-montant="">{fmtE(off.prix)}</b> <span style={{color:C.muted,fontWeight:500}}>en attente</span></div> : null}
                       <div className="vrm-chat-offre-p" style={{color:C.muted}}>
-                        {__vmrPlusieurs ? textePlusieurs() : etat==='retard' ? `Mets l'extension à jour (${EXT_CAPACITES.messagerie}) pour trancher ou faire une offre d'ici.` : "Les offres se font depuis le Chrome où l'extension est installée."}
+                        {__vmrPlusieurs ? textePlusieurs() : etat==='retard' ? `Mets l'extension à jour (${EXT_CAPACITES.messagerie}) pour trancher ou faire une offre d'ici.` : "Les offres se font depuis le navigateur où l'extension est installée."}
                         {!sansExt && <>{' '}<a href={lienVinted} target="_blank" rel="noreferrer" style={{color:C.accent,fontWeight:600}}>Ouvrir sur Vinted</a></>}
                       </div>
                       {contreMini!=null && <a className="vrm-chat-btn" data-offre-proposer-vinted={String(contreMini)} href={lienVinted} target="_blank" rel="noreferrer" style={{marginTop:8,alignSelf:'flex-start',textDecoration:'none'}}>Proposer {eurCourt(contreMini)} · à faire sur Vinted ↗</a>}
@@ -52205,7 +52267,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                  au rendu le 16 septembre. */
               ? <PremiersPas onNav={onNav}
                   titreNeuf="Bienvenue — il reste une chose à brancher"
-                  introNeuf={<>Aucun compte Vinted n'est encore relié&nbsp;: c'est l'extension, dans Chrome, qui range tes ventes.</>}/>
+                  introNeuf={<>Aucun compte Vinted n'est encore relié&nbsp;: c'est l'extension, dans ton navigateur, qui range tes ventes.</>}/>
               : null
             )}
 
@@ -53206,7 +53268,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {vieux.length <= 2
                 ? <>Achats relus {parAge.map((g, i) => <span key={g.j}>{i ? ' et ' : ''}il y a {g.j} j sur {g.l.map((a, k) => <React.Fragment key={a.vinted_user_id}>{k ? ', ' : ''}<b style={{color:C.text,fontWeight:600}}>{accName(a)}</b></React.Fragment>)}</span>)} — ouvre Vinted sur {vieux.length > 1 ? 'chacun' : 'ce compte'}. </>
                 : <>Achats de {vieux.length} comptes pas relus depuis {vieux[vieux.length - 1].j} j ou plus — ouvre Vinted sur chacun. </>}
-              <Pourquoi label="Quels comptes">{vieux.length > 2 ? <>{parAge.map((g, i) => <span key={g.j}>{i ? ' · ' : ''}il y a {g.j} j : {g.l.map((a) => accName(a)).join(', ')}</span>)}. </> : null}Un colis arrivé depuis sur {vieux.length > 1 ? 'ces comptes' : 'ce compte'} n'est pas encore ici : les achats d'un compte ne sont relus que quand Chrome est connecté dessus, avec l'extension VRM.</Pourquoi>
+              <Pourquoi label="Quels comptes">{vieux.length > 2 ? <>{parAge.map((g, i) => <span key={g.j}>{i ? ' · ' : ''}il y a {g.j} j : {g.l.map((a) => accName(a)).join(', ')}</span>)}. </> : null}Un colis arrivé depuis sur {vieux.length > 1 ? 'ces comptes' : 'ce compte'} n'est pas encore ici : les achats d'un compte ne sont relus que quand le navigateur de l'extension est connecté dessus, avec l'extension VRM.</Pourquoi>
             </div>
           );
         })()}
@@ -54364,7 +54426,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
             {offresInfo && (
               <div id="vrm-offres-auto-detail" className="vrm-offres-auto-detail" data-offres-auto-detail>
-                <p>Pose un <b>« mini »</b> sur une annonce : une offre qui l’atteint est acceptée toute seule, entre 3 et 20 min après, une à la fois, sur le compte ouvert dans Chrome. Sous ton <b>{'« refuse < »'}</b>, elle est refusée ; entre les deux, c’est toi qui négocies.</p>
+                <p>Pose un <b>« mini »</b> sur une annonce : une offre qui l’atteint est acceptée toute seule, entre 3 et 20 min après, une à la fois, sur le compte ouvert dans le navigateur de l'extension. Sous ton <b>{'« refuse < »'}</b>, elle est refusée ; entre les deux, c’est toi qui négocies.</p>
                 {offresAuto && (
                   <div data-offre-refus className="vrm-offres-auto-refus">
                     <label htmlFor="vrm-offre-refus-msg">Message quand VRM refuse <span>(vide = refus sans message)</span></label>
@@ -54376,7 +54438,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             )}
             {offresAuto && ext!=='ok' && (
               <div data-offres-auto-ext={ext} className="vrm-offres-auto-ext" style={{color:C.warn}}>{ext==='absente'
-                ? "Rien ne part d'ici : ouvre VRM dans le Chrome (ordinateur) où l'extension est installée."
+                ? "Rien ne part d'ici : ouvre VRM dans le navigateur (ordinateur) où l'extension est installée."
                 : `Mets l'extension à jour (${EXT_CAPACITES.offresgarde.replace(/\.0$/,'')}) : une plus ancienne pourrait accepter une offre sur une paire déjà vendue ailleurs.`}</div>
             )}
           </div>
@@ -55159,7 +55221,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       ? <>La puce sous chaque annonce décide. L'extension prépare ensuite chacune{ou} — <b>photos attachées au formulaire</b> (rien sur ton ordinateur), texte copié, champs remplis : <b>c'est toi qui publies</b>.</>
                       : <>La puce sous chaque annonce décide. L'extension prépare ensuite chacune{ou} — photos téléchargées dans un dossier, texte copié, formulaire pré-rempli : <b>c'est toi qui publies</b>. La <b>{EXT_CAPACITES[pl.capPhotos]}</b> les attache directement au formulaire.</>)
                   : l.etat==='absente'
-                    ? <>Ton choix est enregistré. C'est l'extension, dans ton Chrome, qui prépare ensuite chaque annonce{nommer ? <> sur {pl.nom}</> : ''} — ouvre l'app sur l'ordinateur où elle est installée.</>
+                    ? <>Ton choix est enregistré. C'est l'extension, dans ton navigateur, qui prépare ensuite chaque annonce{nommer ? <> sur {pl.nom}</> : ''} — ouvre l'app sur l'ordinateur où elle est installée.</>
                     : <>Ton choix est enregistré, <b>mais l'extension installée ne sait pas encore {nommer ? <>préparer {pl.nom}</> : 'les préparer'}</b> : il lui faut la <b>{EXT_CAPACITES[pl.cap]}</b>. Mets-la à jour depuis <b>Paramètres → État des connexions</b> — tes coches ne bougent pas.</>;
           };
           return (<>
@@ -55457,7 +55519,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {debutActif && (
                       <div className="vrm-msg-section" data-msg-groupe-actif={prioMsg} style={{color:C.muted,background:C.bg}}>
                         <span aria-hidden="true" style={{width:7,height:7,borderRadius:999,background:C.accent,flexShrink:0}}/>
-                        <span style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{nomActif} · ouvert dans Chrome</span>
+                        <span style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{nomActif} · ouvert {NAV.dansNu}</span>
                       </div>
                     )}
                     {debutRo && (
@@ -55466,7 +55528,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           <Icon name="eye" size={13}/><span>Autres comptes · lecture seule{nonLusRo>0?` · ${nonLusRo} non lu${nonLusRo>1?'s':''}`:''}</span>
                         </div>
                         <div className="vrm-msg-section-p" style={{color:C.text}}>
-                          Chrome est sur <b>{nomActif}</b> : VRM ne répond qu'au nom de ce compte. Pour répondre aux autres, bascule Chrome sur leur compte.
+                          {NAV.Ce} est sur <b>{nomActif}</b> : VRM ne répond qu'au nom de ce compte. Pour répondre aux autres, bascule {NAV.nom} sur leur compte.
                         </div>
                       </div>
                     )}
@@ -58430,7 +58492,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // compte de Chrome, présence prouvée par une lecture complète et récente, contenu prêt.
             place: b._place||'a-verifier',
             bloque: b._place==='proposable' ? '' : b._place==='autre-compte' ? `brouillon du compte ${(b._acc&&(b._acc.login||b._acc.username))||b._uid||'inconnu'} — ouvre Vinted sur ce compte pour le mettre en ligne`
-              : b._place==='compte-inconnu' ? `brouillon du compte ${(b._acc&&(b._acc.login||b._acc.username))||b._uid||'inconnu'} — ouvre Vinted sur ce compte dans Chrome pour le mettre en ligne`
+              : b._place==='compte-inconnu' ? `brouillon du compte ${(b._acc&&(b._acc.login||b._acc.username))||b._uid||'inconnu'} — ouvre Vinted sur ce compte ${NAV.dansNu} pour le mettre en ligne`
               : b._place==='pas-pret' ? (RAISON_BR[b._etat]||'pas prêt')
               : `à vérifier sur Vinted : pas de lecture complète et récente des brouillons de ${(b._acc&&(b._acc.login||b._acc.username))||'ce compte'} — ouvre ton dressing Vinted sur ce compte` }; });
         const fermer = ()=>{ setRepubAction(null); setRepubReprise(null); };
@@ -59790,7 +59852,7 @@ function RepublierLeboncoin({ liste, exclues, onClose, onFini }) {
   // voir : la cause est l'extension absente de ce navigateur (celle de l'indicateur).
   const bloqueExt = !vmrExtPresent() && sansSouris ? "La republication se fait sur l'ordinateur où l'extension VRM est installée : la suppression d'une annonce ne passe pas par le relais du téléphone."
     : glob ? glob.texte
-    : !vmrExtPresent() ? "L'extension VRM n'est pas détectée dans ce navigateur — installe-la, ou ouvre VRM dans le Chrome où elle est installée."
+    : !vmrExtPresent() ? "L'extension VRM n'est pas détectée dans ce navigateur — installe-la, ou ouvre VRM dans le navigateur où elle est installée."
     : __vmrEtat === undefined ? "Je vérifie l'extension…"
     : !saitSuppr ? `Ton extension (${vmrExtVersion() || 'version ?'}) ne sait pas encore supprimer une annonce Leboncoin : mets-la à jour (${EXT_CAPACITES.lbcsupprime}) depuis Paramètres → État des connexions.` : '';
   const triees = (liste || []).filter((it) => !q || `${it.numero} ${it.lbc.titre} ${it.title}`.toLowerCase().includes(q.toLowerCase())).slice()
@@ -61054,7 +61116,7 @@ function LeboncoinScreen() {
                   ? <>Sur l'ordinateur où l'extension est installée, ouvre ta page profil Leboncoin (celle qui liste toutes tes annonces) : elle relira ta liste en entier.</>
                   : pe === 'retard'
                     ? <>Mets l'extension à jour, puis ouvre ta page profil Leboncoin (celle qui liste toutes tes annonces) : elle relira ta liste en entier.</>
-                    : <>Ouvre ta page profil Leboncoin dans ce Chrome (celle qui liste toutes tes annonces) : l'extension relira ta liste en entier et sortira celles qui n'y sont plus.</>}
+                    : <>Ouvre ta page profil Leboncoin {NAV.dans} (celle qui liste toutes tes annonces) : l'extension relira ta liste en entier et sortira celles qui n'y sont plus.</>}
               </div>
             );
           })()}
@@ -62749,7 +62811,7 @@ function FermerCompte() {
           {fin ? (
             <div data-fermer-resultat={fin.ok ? 'ferme' : 'incomplet'} style={{ ...txt, color: C.text }}>
               {fin.message}
-              {fin.ok && <div style={{ ...txt, marginTop: 6 }}>Pense à retirer l'extension VRM de Chrome. Retour à l'accueil dans un instant…</div>}
+              {fin.ok && <div style={{ ...txt, marginTop: 6 }}>Pense à retirer l'extension VRM de ton navigateur. Retour à l'accueil dans un instant…</div>}
             </div>
           ) : info === undefined ? (
             <div style={txt}>Vérification de ton compte…</div>
@@ -62764,7 +62826,7 @@ function FermerCompte() {
               <div style={txt}>
                 Seront effacés : <b style={{ color: C.text }}>tes données VRM</b> (ventes, annonces captées, numéros, compta, réglages), <b style={{ color: C.text }}>tes comptes Vinted liés</b> et <b style={{ color: C.text }}>ton compte de connexion</b>.
                 {(info.peutGerer && info.actif) ? ' Ton abonnement est résilié en même temps : aucun nouveau prélèvement ne part.' : ''}
-                {' '}C'est <b style={{ color: C.text }}>définitif</b> : fais d'abord une « Sauvegarde complète » (Réglages), puis retire l'extension VRM de Chrome.
+                {' '}C'est <b style={{ color: C.text }}>définitif</b> : fais d'abord une « Sauvegarde complète » (Réglages), puis retire l'extension VRM de ton navigateur.
               </div>
               {reglesEbayN === null && <div data-fermer-regles-ebay="pas-su" style={{ ...txt, marginTop: 8, color: C.warn }}>{texteReglesQuiRestent(null, 'fermer')}</div>}
               {reglesEbayN && (reglesEbayN.oui > 0 || reglesEbayN.peutEtre > 0) && <div data-fermer-regles-ebay={reglesEbayN.oui + reglesEbayN.peutEtre} data-fermer-regles-ebay-peut-etre={reglesEbayN.peutEtre} style={{ ...txt, marginTop: 8, color: C.warn }}>Après la fermeture, sur eBay : {texteReglesQuiRestent(reglesEbayN, 'fermer')}</div>}
@@ -64364,9 +64426,9 @@ function SecuriteSetting() {
           : "AVANT la migration, dans Vercel → Settings → Environment Variables : SUPABASE_SERVICE_KEY (Supabase → Settings → API → service_role) et VRM_OWNER_UID. Sans ça, emails et rappels ne seront plus enregistrés."}/>
       <Ligne t="Extension identifiée" ok={ext === undefined ? null : !!(ext && ext.connecte)}
         etat={ext === undefined ? '…' : !ext ? 'extension absente ici' : ext.connecte ? (ext.email || 'connectée') : 'pas connectée'}
-        d={!ext ? "Normal sur téléphone. Sur l'ordinateur, ouvre l'app dans le Chrome de l'extension."
+        d={!ext ? "Normal sur téléphone. Sur l'ordinateur, ouvre l'app dans le navigateur de l'extension."
           : ext.connecte ? "Elle écrira sous ce compte."
-          : "Icône de l'extension dans Chrome → Compte VRM → ton email et ton mot de passe."}/>
+          : `Icône de l'extension ${NAV.dansNu} → Compte VRM → ton email et ton mot de passe.`}/>
     </div>
   );
 }
@@ -65062,7 +65124,7 @@ function ConnexionsSetting({comptes=[],onComptes,onPlateforme}) {
       {ext.on&&codePerime()&&<p style={{color:C.warn}}>{textePerime()}</p>}
       <details><summary>Installer ou mettre à jour l’extension</summary>
         <div className="vrm-connexions-actions"><a href={`/VRM-extension.zip?v=${EXT_ATTENDUE}`} download>Ordinateur · version {EXT_ATTENDUE}</a><a href={`/VRM-Orion.xpi?v=${EXT_ATTENDUE}`} download>Orion · iPhone et iPad</a><a href={`/VRM-Orion-dossier.zip?v=${EXT_ATTENDUE}`} download data-orion-dossier="">Orion · en dossier</a></div>
-        <p>Le zip se dézippe en un seul dossier « VRM-extension » : mets-le à la place de l'ancien, au même endroit, PUIS dans chaque Chrome où elle est installée, ouvre <code>chrome://extensions</code> et clique ⟳ sur VRM (sans ⟳, Chrome garde l'ancien code). Sur Edge, utilise <code>edge://extensions</code>.</p>
+        <p>Le zip se dézippe en un seul dossier « VRM-extension » : mets-le à la place de l'ancien, au même endroit, PUIS dans chaque navigateur où elle est installée, ouvre <code>chrome://extensions</code> et clique ⟳ sur VRM (sans ⟳, le navigateur garde l'ancien code). Sur Edge, utilise <code>edge://extensions</code>.</p>
         <p>Dans Orion : autorise les extensions Firefox, puis installe le fichier XPI depuis Extensions → + → depuis un fichier. Autorise ensuite VRM sur les sites utilisés.</p>
         <p>Si Orion refuse le fichier : télécharge « Orion · en dossier », ouvre-le dans l'app Fichiers (le toucher donne un dossier « VRM-Orion »), puis dans Orion, Extensions → + → depuis un fichier, et choisis ce dossier (ou le fichier manifest.json qui est dedans).</p>
         <a href="/VRM-Orion-installation.txt" target="_blank" rel="noopener noreferrer">Voir les instructions Orion</a>
@@ -65443,7 +65505,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
     else if (ventesVinted === null) etats.push(['vinted', 'pas-su', 'Vinted : ventes pas lues — rien n’est perdu, réessaie dans un moment.']);
     // (1er nov., vendeur neuf) Aucun compte relié : ce n'est pas « aucune vente »,
     // c'est « rien lu » — le geste, comme les autres sites (« jamais lu »).
-    else if (Array.isArray(comptes) && comptes.length === 0 && !(Array.isArray(ventesVinted) && ventesVinted.length)) etats.push(['vinted', 'jamais', 'Vinted : aucun compte relié — installe l’extension Chrome sur ton ordinateur, puis ouvre vinted.fr une fois connecté.']);
+    else if (Array.isArray(comptes) && comptes.length === 0 && !(Array.isArray(ventesVinted) && ventesVinted.length)) etats.push(['vinted', 'jamais', 'Vinted : aucun compte relié — installe l’extension VRM sur ton ordinateur, puis ouvre vinted.fr une fois connecté.']);
     else if (ventesKO && ventesKO.length) {
       const labels = load('vinted_account_labels', {}) || {};
       const noms = ventesKO.map((u) => labels[u] || ((comptes || []).find((a) => String(a.vinted_user_id) === String(u)) || {}).login || ('#' + u));
@@ -68276,7 +68338,7 @@ function AppCoeur() {
             {(() => { const eD = dark; return (<>
             {/* « Puis-je agir sur Vinted depuis cette page ? » — sur tous les
                 écrans (Julien, 5 octobre). Voir `EtatActions`. */}
-            {MULTI_USER && <EtatActions onNav={setTab} ordi={ordi} sombre={eD}/>}
+            {MULTI_USER && <EtatActions onNav={setTab} ordi={ordi} sombre={eD} comptes={accountsLoaded ? vintedAccounts : undefined}/>}
             <PastilleStream/>
             {/* (4 nov.) L'œil : cache TOUS les montants en € de l'écran (src/montantsCaches.js). */}
             <BoutonMontants/>
