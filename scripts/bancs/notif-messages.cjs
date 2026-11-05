@@ -166,6 +166,7 @@ const deuxAppareils = () => ({ subs: [{ endpoint: 'https://web.push.apple.com/ip
   const pushRoute = await import('file://' + path.join(RACINE, 'api', 'push.js'));
   const libPush = await import('file://' + path.join(RACINE, 'api', '_lib', 'push.js'));
   const {contexteVendeur}=await import('file://' + path.join(RACINE,'api','_lib','owner.js'));
+  let notifTextes = null; try { notifTextes = await import('file://' + path.join(RACINE, 'api', '_lib', 'notif-textes.js')); } catch (_) {}
   const recoit = async (mail) => { const res = faireRes(); await inbound.default({ method: 'POST', query: {}, headers: {'x-vrm-email-key':'cle-banc-notifications'}, body: JSON.parse(JSON.stringify(mail)) }, res); return res; };
   // Les mémoires d'instance (préférences vues, clés envoyées pendant un hoquet)
   // se vident entre deux scénarios : chacun part d'une instance « froide ».
@@ -253,15 +254,21 @@ const deuxAppareils = () => ({ subs: [{ endpoint: 'https://web.push.apple.com/ip
     froid();
     await recoit(emailMessage(3, 'Message 3\n'));
     dit(sonnes() === 0, 'messages COUPÉS à la main, préférences illisibles, instance FROIDE : rien ne sonne', `${sonnes()} notification(s)`);
-    reset({ achat: true });                            // jamais activé : le défaut de « message » est non
+    // (5 nov.) Depuis le 3 nov. (familles, api/_lib/notif-textes.js) la famille
+    // « Messages » est ALLUMÉE par défaut (docs/passation/notifications.md §2) : sans
+    // aucune trace de SA préférence, « pas su » retombe sur CE défaut — lu dans la
+    // vraie règle, jamais écrit en dur ici. (Le cas « coupé à la main » est C2 plus haut.)
+    const defautMsg = !!(notifTextes && notifTextes.decisionNotif({}, 'message'));
+    const attendu = defautMsg ? 1 : 0;
+    reset({ achat: true });                            // jamais touché : le défaut de la famille décide
     await recoit(emailMessage(1));                     // lu une fois (rien de coupé, rien d'activé)
     froid(); pannes.add('push_prefs');
     await recoit(emailMessage(2, 'Message 2\n'));
-    dit(sonnes() === 0, 'messages JAMAIS activés (défaut « non »), préférences illisibles, instance froide : rien ne sonne', `${sonnes()} notification(s)`);
+    dit(sonnes() === 2 * attendu, `messages jamais touchés (défaut de la famille : ${defautMsg ? 'allumée' : 'coupée'}), préférences illisibles, instance froide : le défaut décide`, `${sonnes()} notification(s)`);
     reset({ message: false });
     pannes.add('push_prefs');                          // jamais lues nulle part, et illisibles
     await recoit(emailMessage(1));
-    dit(sonnes() === 0, 'préférences JAMAIS lues et illisibles : on ne sonne pas pour une catégorie coupée par défaut (« pas su » ne vaut pas « oui »)', `${sonnes()} notification(s)`);
+    dit(sonnes() === attendu, `préférences JAMAIS lues et illisibles, aucune trace : le défaut de la famille décide (${defautMsg ? 'allumée' : 'coupée'}) — jamais un « oui » inventé pour une famille coupée par défaut`, `${sonnes()} notification(s)`);
     // Une catégorie sans action (favori : défaut non), préférences illisibles,
     // jamais lues : on ne réveille pas pour ce qui n'appelle aucun geste.
     reset({ favori: true });

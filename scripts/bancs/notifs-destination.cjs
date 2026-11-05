@@ -126,7 +126,7 @@ const lire = (pg) => pg.evaluate(() => {
   return {
     tache: tache ? tache.getAttribute('data-tache') : null, site: tache ? tache.getAttribute('data-tache-site') : null,
     colis: !!q('[data-colis-onglet]'), achats: !!q('.vrm-buy-row'), compta: !!q('[data-compta-urssaf]'),
-    cible: cible ? { type: cible.getAttribute('data-cible-notif'), cle: cible.getAttribute('data-colis-ident') || cible.getAttribute('data-cc-carte') || cible.getAttribute('data-conv') || cible.getAttribute('data-tx') || cible.getAttribute('data-achat-tx') || cible.getAttribute('data-cc-colonne') || (cible.hasAttribute('data-compta-urssaf') ? 'urssaf' : '') || (cible.hasAttribute('data-offres-au-mini') ? 'offres' : ''), ouverte: cible.getAttribute('data-ligne-ouverte') } : null,
+    cible: cible ? { type: cible.getAttribute('data-cible-notif'), cle: cible.getAttribute('data-colis-ident') || cible.getAttribute('data-cc-carte') || cible.getAttribute('data-conv') || cible.getAttribute('data-tx') || cible.getAttribute('data-achat-tx') || cible.getAttribute('data-cc-colonne') || (cible.hasAttribute('data-compta-urssaf') ? 'urssaf' : '') || (cible.hasAttribute('data-offres-au-mini') ? 'offres' : '') || (cible.getAttribute('data-cible') || ''), ouverte: cible.getAttribute('data-ligne-ouverte') } : null,
     fil: !!q('button[aria-label="Fermer la conversation"]'), convCourante: conv ? conv.getAttribute('data-conv') : null,
     offre: !!q('.vrm-chat-panel [data-offre], [data-offre]'),
     tiroir: !!document.querySelector('.vrm-ledger-drawer-host:not([hidden])'),
@@ -147,7 +147,8 @@ const sans = (u) => (MUT === 'sanscible' ? u.replace(/&cible=[^&]*/, '') : u);
     { nom: 'offre (sa conversation, la carte d’offre)', url: D.message({ conv: '301', compte: '111' }), ok: (e) => e.cible && e.cible.cle === '301' && e.fil && e.offre },
     { nom: 'vente (Vendu !)', url: D.vente({ tx: '7001' }), ok: (e) => e.tache === 'ventes' && e.site === 'vinted' && e.cible && e.cible.type === 'vente' && e.cible.cle === '7001' && e.tiroir },
     { nom: 'bordereau reçu (colis à poster)', url: D.colis({ tx: '7001' }), ok: (e) => e.colis && e.cible && e.cible.cle === 'v:7001' },
-    { nom: 'rappel du matin / du soir (colonne « Prêts »)', url: D.colis({}), ok: (e) => e.colis && e.cible && e.cible.cle === 'prets' },
+    // (5 nov.) Depuis le 2 nov. il n'y a plus de colonne « Prêts » : la liste « À envoyer » porte `data-cible="colonne:prets …"`.
+    { nom: 'rappel du matin / du soir (colonne « Prêts »)', url: D.colis({}), ok: (e) => e.colis && e.cible && (e.cible.cle === 'prets' || (' ' + e.cible.cle + ' ').includes(' colonne:prets ')) },
     { nom: 'code de retrait (conversation, par transaction)', url: D.retrait({ tx: '9401' }), ok: (e) => e.colis && e.cible && e.cible.cle === 'r:v:9401' },
     { nom: 'colis arrivé (email transporteur, par n° de suivi)', url: D.retrait({ suivi: '1790000000000002' }), ok: (e) => e.colis && e.cible && e.cible.cle === 'r:e:1790000000000002' },
     { nom: 'achat (suivi Vinted)', url: D.achat({ tx: '9401' }), ok: (e) => e.achats && e.cible && e.cible.cle === '9401' },

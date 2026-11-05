@@ -111,7 +111,10 @@ const dispo = (corpsCode = 'Votre code de retrait est 482913\n') => mr(`Votre co
     base.set(`${OWNER}|push_subs`, { subs: [{ endpoint: 'https://web.push.apple.com/iphone' }] });
     if (prefs) base.set(`${OWNER}|push_prefs`, prefs);
   };
-  const relais = () => pushes.filter((p) => /point de retrait|à retirer/i.test(`${p.title} ${p.body}`));
+  // (5 nov.) Depuis le 3 nov. une arrivée se dit « 📍 <article> t'attend » (UN texte pour
+  // toutes les voies, `texteArrivee`, api/_lib/notif-textes.js) — l'ancien « point de
+  // retrait / à retirer » n'est plus écrit : ce filtre ne voyait plus aucune arrivée.
+  const relais = () => pushes.filter((p) => /t['’]attend|point de retrait|à retirer/i.test(`${p.title} ${p.body}`));
 
   console.log('── A. Disponible avec code et lieu : une notification, le code et le lieu dedans');
   await essaie('A', async () => {
@@ -134,7 +137,9 @@ const dispo = (corpsCode = 'Votre code de retrait est 482913\n') => mr(`Votre co
     await recoit(transit());
     const transits = pushes.length;
     await recoit(dispo());
-    dit(transits === 1, '« en transit » sonne (Suivi est activé)', `${transits}`);
+    // (3 nov.) « Suivi » est une catégorie RETIRÉE (aucun geste) : « en transit » ne
+    // sonne plus, même allumée avant (docs/passation/notifications.md §3).
+    dit(transits === 0, '« en transit » ne sonne plus (catégorie « suivi » retirée le 3 nov., même allumée avant)', `${transits}`);
     dit(relais().length === 1 && /482913/.test((relais()[0] || {}).body || ''), '« disponible » sonne QUAND MÊME, avec le code — il n’est plus avalé par « en transit »', `${relais().length} notification(s) à retirer`);
   });
 
