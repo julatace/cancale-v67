@@ -106,8 +106,10 @@
 @media (hover: hover) and (pointer: fine) {
   :root .vrm-seg > .vrm-seg-btn:not(#vrm-seg):not([aria-current]):not([aria-pressed="true"]):hover { background: color-mix(in srgb, var(--seg-actif) 45%, transparent) !important; }
 }
-/* Au doigt : 44 px, la cible. */
-@media (pointer: coarse), (hover: none) {
+/* Au doigt : 44 px, la cible. Le téléphone se reconnaît AUSSI à sa largeur (≤ 767 px, la règle
+   de toute l'app) : Chromium émulé en mobile ne répond pas toujours `pointer: coarse` — mesuré
+   le 5 nov. par le banc `composants`, le segmenté hors de `.vrm-main` restait à 36 px. */
+@media (max-width: 767px), (pointer: coarse), (hover: none) {
   :root .vrm-seg > .vrm-seg-btn:not(#vrm-seg) { min-height: 44px !important; }
 }
 /* À l'ordinateur, la piste ne prend que la place de ses segments. */

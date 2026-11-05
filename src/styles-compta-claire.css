@@ -91,3 +91,72 @@ html .vrm-app-shell .vrm-main .vrm-compta-carte :is(.vrm-compta-geste button, .v
   text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 3px;
   text-decoration-color: color-mix(in srgb, var(--vrm-ink) 35%, transparent);
 }
+
+/* ── (5 nov., chantier F) ─────────────────────────────────────────────────────
+   Revue 2.26 : sans anneau à dessiner, « 6 derniers mois » prend toute la largeur
+   (plus de demi-carte blanche à côté). */
+html body .vrm-app-shell .vrm-main .vrm-fu-compta-grille:not(:has([data-fu-anneau])) > [data-fu-mois6] { grid-column: 1 / -1; }
+
+/* ── (5 nov., chantier F) « À RECOPIER SUR L'URSSAF » ─────────────────────────
+   La feuille de la déclaration : chaque montant sur sa rangée, « Copier » à
+   droite (44 px au doigt), ce qui manque dessous, puis le site et « J'ai
+   déclaré ». Neutre ; l'ambre seulement le dernier jour (un geste à faire). */
+.vrm-main .vrm-urssaf-geste {
+  background: var(--vrm-surface); border: 1px solid var(--vrm-line); border-radius: 14px;
+  padding: 16px 18px; box-sizing: border-box; min-width: 0; display: flex; flex-direction: column;
+}
+.vrm-main .vrm-urssaf-geste-tete { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 12px; margin-bottom: 6px; }
+.vrm-main .vrm-urssaf-geste-tete h3 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -.01em; color: var(--vrm-ink); }
+.vrm-main .vrm-urssaf-geste-tete span { font-size: 13px; color: var(--vrm-muted); font-variant-numeric: tabular-nums; }
+.vrm-main .vrm-urssaf-geste.is-urgent .vrm-urssaf-geste-tete span { color: var(--vrm-warn); font-weight: 600; }
+.vrm-main .vrm-urssaf-ligne {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto 88px; align-items: center; gap: 4px 12px;
+  min-height: 56px; padding: 8px 0; border-top: 1px solid var(--vrm-line);
+}
+.vrm-main .vrm-urssaf-lib { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.vrm-main .vrm-urssaf-lib b { font-size: 15px; font-weight: 600; color: var(--vrm-ink); }
+.vrm-main .vrm-urssaf-lib small { font-size: 12px; color: var(--vrm-muted); line-height: 1.35; }
+.vrm-main .vrm-urssaf-val { font-size: 17px; font-weight: 700; color: var(--vrm-ink); white-space: nowrap; font-variant-numeric: tabular-nums; text-align: right; }
+.vrm-main .vrm-urssaf-val small { font-size: 12px; font-weight: 600; color: var(--vrm-muted); }
+html body .vrm-app-shell .vrm-main button.vrm-urssaf-copier {
+  min-height: 44px; min-width: 88px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--vrm-line);
+  background: var(--vrm-bg); color: var(--vrm-ink); font: 600 15px/1 var(--vrm-police); cursor: pointer;
+  transition: transform .16s cubic-bezier(.23,1,.32,1), background-color .16s ease;
+}
+html body .vrm-app-shell .vrm-main button.vrm-urssaf-copier:active { transform: scale(.97); }
+@media (hover: hover) and (pointer: fine) { html body .vrm-app-shell .vrm-main button.vrm-urssaf-copier:hover { background: var(--vrm-card2); } }
+.vrm-main .vrm-urssaf-manque { font-size: 13px; color: var(--vrm-muted); line-height: 1.45; padding: 10px 0 2px; border-top: 1px solid var(--vrm-line); }
+.vrm-main .vrm-urssaf-manque .vrm-lien-action { font-size: 13px; }
+.vrm-main .vrm-urssaf-gestes { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; padding-top: 12px; margin-top: 4px; border-top: 1px solid var(--vrm-line); }
+@media (max-width: 599px) {
+  .vrm-main .vrm-urssaf-ligne { grid-template-columns: minmax(0, 1fr) auto; }
+  .vrm-main .vrm-urssaf-ligne > .vrm-urssaf-copier, .vrm-main .vrm-urssaf-ligne > .vrm-urssaf-copier-vide { grid-column: 1 / -1; }
+  .vrm-main .vrm-urssaf-copier-vide { display: none; }
+  html body .vrm-app-shell .vrm-main button.vrm-urssaf-copier { width: 100%; }
+  .vrm-main .vrm-urssaf-gestes > * { flex: 1 1 140px; }
+}
+@media (prefers-reduced-motion: reduce) { html body .vrm-app-shell .vrm-main button.vrm-urssaf-copier { transition: none; } }
+
+/* Bilan du mois et délai de paiement : des rangées de 44 px, un chiffre par rangée. */
+.vrm-main .vrm-bilan-mois, .vrm-main .vrm-delai-paiement { display: flex; flex-direction: column; gap: 0; }
+.vrm-main .vrm-bilan-tete { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; padding-bottom: 8px; }
+.vrm-main .vrm-bilan-ligne, .vrm-main .vrm-delai-ligne {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 2px 12px;
+  min-height: 52px; padding: 6px 0; border-top: 1px solid var(--vrm-line);
+}
+.vrm-main .vrm-bilan-ligne > span:first-child, .vrm-main .vrm-delai-ligne > span:first-child { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.vrm-main .vrm-bilan-ligne b, .vrm-main .vrm-delai-ligne b { font-size: 15px; font-weight: 600; color: var(--vrm-ink); }
+.vrm-main .vrm-bilan-ligne small, .vrm-main .vrm-delai-ligne small { font-size: 12px; color: var(--vrm-muted); line-height: 1.35; }
+.vrm-main .vrm-bilan-val, .vrm-main .vrm-delai-val { font-size: 17px; font-weight: 700; color: var(--vrm-ink); white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }
+.vrm-main .vrm-bilan-val[data-vide], .vrm-main .vrm-delai-val[data-vide] { color: var(--vrm-muted); font-weight: 600; }
+.vrm-main .vrm-bilan-pied { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; padding-top: 12px; border-top: 1px solid var(--vrm-line); }
+/* La ligne de ce qui manque : la phrase, puis son geste sur sa ligne (44 px au doigt). */
+.vrm-main .vrm-urssaf-manque { display: flex; flex-wrap: wrap; align-items: center; gap: 0 10px; }
+.vrm-main .vrm-urssaf-manque > span { flex: 1 1 220px; min-width: 0; }
+/* « 6 derniers mois » sans bénéfice brut connu : une ligne, pas six barres plates. */
+html body .vrm-app-shell .vrm-main .vrm-fu-mois6-vide .vrm-fu-note { margin-top: 6px; }
+html body .vrm-app-shell .vrm-main .vrm-fu-mois6-vide .vrm-lien-action { font-size: 13px; }
+/* La carte « Quel est ton statut ? » : un vrai retrait intérieur (les cartes d'option touchaient
+   presque le bord, une règle générale ramenait le retrait à 3 px). */
+html body .vrm-app-shell .vrm-main .vrm-surface:has(> [data-statut-carte]) { padding: 18px !important; }
+@media (max-width: 599px) { html body .vrm-app-shell .vrm-main .vrm-surface:has(> [data-statut-carte]) { padding: 16px !important; } }

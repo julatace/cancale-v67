@@ -81,7 +81,7 @@
   border: 0 !important; border-radius: 12px !important; background: transparent !important; box-shadow: none !important;
   color: var(--fu-encre) !important; font: 600 13px/1 var(--vrm-police) !important; letter-spacing: -.01em !important;
   white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; cursor: pointer;
-  transition: background-color .2s ease, box-shadow .2s ease;
+  transition: none;   /* (5 nov.) l'aplat du site choisi est posé d'un coup : un fondu de .2 s le laissait transparent pendant le chargement (fusion-app F9, 1512) */
 }
 :root:root body .vrm-app-shell .vrm-filtre-site > button:not(#fu)[aria-pressed="true"],
 :root:root body .vrm-app-shell .vrm-main .vrm-filtre-site > button:not(#fu)[aria-pressed="true"] {
@@ -258,7 +258,7 @@ html body .vrm-rangee-bord > .vrm-puce-transp { overflow: hidden !important; tex
    les nombres gardent leurs propres règles (prix, montants, compteurs, N°). Les règles
    d'origine (styles-mineral.css, favoris.css, dac7.css, styles-mobile-studio.css) sont
    à retirer par leurs écrans ; le banc `jetons-coherence` (J4) mesure le rendu. */
-:root:root body :is(.vrm-ann-card, .vrm-lbc-ecran, .vrm-ebay-annonces, .vrm-ann-card [data-chiffres], [data-ann-resume], .vrm-fa, .vrm-finance-page .vrm-display) { font-variant-numeric: normal; }
+:root:root body :is(.vrm-ann-card, .vrm-lbc-ecran, .vrm-ebay-annonces, .vrm-ann-card [data-chiffres], [data-ann-resume], .vrm-fa, .vrm-finance-page .vrm-display, .vrm-s2d-resume-n > span) { font-variant-numeric: normal; }
 
 /* ── 16. LE ROUGE N'EST QU'AU DOUBLON DE N° (5 nov., chantier A, revue 1.6) ───────
    `--vrm-danger` vaut désormais l'ambre (themeMineral.js) ; le rouge a son jeton,
