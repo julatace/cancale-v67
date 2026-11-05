@@ -219,6 +219,8 @@ import { histoireArticle, offresDeConversation } from "./histoireArticle.js";
 import { CLE_MODELES, lireModeles } from "./modelesDescription.js";
 import { MesModeles, InsererModele } from "./ModelesDescription.jsx";
 import PrixPartout from "./PrixPartout.jsx";
+import SelecteurSites, { LogoSite } from "./SelecteurSites.jsx";
+import { optionsSelecteur, nomCompteVente, annuaireLbc, ongletSansDonnee, nomPlateforme } from "./plateformes.js";
 import { lireFile, noterSaisie, instantane, acquitter, compterEnAttente, nuagePlusRecent, fusionAuChargement, oublierCle, CLE_FILE, HORS_FILE } from "./fileEnvoi.js";
 // La migration qui cloisonne les vendeurs, lue depuis LE fichier (pas recopiée) :
 // deux copies finiraient par diverger, et c'est le genre de texte qu'on colle
@@ -20323,7 +20325,11 @@ function RecapFrise({ etapes, cle = '' }) {
     {(bord && bord.fait) || dates.length ? <p className="vrm-recap-frise-detail">{[bord && bord.fait ? (bord.t != null ? `Bordereau reçu le ${jour(bord.t)}` : 'Bordereau reçu') : null, ...dates].filter(Boolean).join(' · ')}</p> : null}
   </div>;
 }
-function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, etatNoeud = null, ton = '', montant, children, numerosArticle = [], plateforme = '', initialOuvert = false, gestes = null, montantCentimes, benef, recap = null, frise = null, bas = null, fusion = null, ...props }) {
+function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous: sousBrut = '', compte = '', etat, etatNoeud = null, ton = '', montant, children, numerosArticle = [], plateforme = '', initialOuvert = false, gestes = null, montantCentimes, benef, recap = null, frise = null, bas = null, fusion = null, ...props }) {
+  // (5 nov., Julien : « le compte sur lequel l'article a été vendu doit apparaître ») Le
+  // compte de la vente, lu PAR SON IDENTITÉ (`nomCompteVente`, src/plateformes.js), sur
+  // CHAQUE ligne, toutes plateformes : dans la ligne repliée et sur la carte Fusion.
+  const sous = [sousBrut, compte && !String(sousBrut || '').includes(compte) ? compte : ''].filter(Boolean).join(' · ');
   const [ouvert, setOuvert] = React.useState(initialOuvert);
   const panneau = React.useId();
   const declencheur = React.useRef(null);
@@ -20395,12 +20401,12 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, 
   const dejaOuvert = React.useRef(false);
   if (ouvert) dejaOuvert.current = true;
   const numerosFiche=[...new Set(numerosArticle.map(n=>String(n||'').trim()).filter(Boolean))];
-  return <div {...props} data-ligne-ouverte={ouvert} data-plateforme-vente={plateforme||undefined} data-benef-cols={benef?'':undefined} data-fu-forme={fusion?'':undefined}>
+  return <div {...props} data-ligne-ouverte={ouvert} data-plateforme-vente={plateforme||undefined} data-vente-compte={compte||undefined} data-benef-cols={benef?'':undefined} data-fu-forme={fusion?'':undefined}>
     <button ref={declencheur} type="button" className="vrm-ledger-sale-toggle" aria-expanded={ouvert} aria-controls={panneau} aria-haspopup="dialog" aria-label={`Ouvrir les actions : ${titre || 'vente'}`} onClick={()=>setOuvert(v=>!v)}>
       <span className="vrm-ledger-photo-empty">{photoNoeud || <PhotoVente src={photo} size={46} portrait/>}</span>
       {fusion ? <span className="vrm-fu-vente-txt">
         <span className="vrm-fu-vente-l1"><span className="vrm-fu-vente-nom">{fusion.nom || '(sans titre)'}</span><span className="vrm-fu-vente-prix" aria-hidden="true">{fusion.prix || montant}</span></span>
-        <span className="vrm-fu-vente-l2">{fusion.num ? <span className="vrm-fu-num">N°{fusion.num}</span> : null}<span className="vrm-fu-site" data-site={fusion.site || plateforme}>{fusion.siteNom || ''}</span>{fusion.taille ? <span className="vrm-fu-vente-taille" data-fu-taille={fusion.taille}>· {fusion.taille}</span> : null}</span>
+        <span className="vrm-fu-vente-l2">{fusion.num ? <span className="vrm-fu-num">N°{fusion.num}</span> : null}<span className="vrm-fu-site" data-site={fusion.site || plateforme}>{fusion.siteNom || ''}</span>{compte ? <span className="vrm-fu-compte vrm-sensible" data-fu-compte="">· {compte}</span> : null}{fusion.taille ? <span className="vrm-fu-vente-taille" data-fu-taille={fusion.taille}>· {fusion.taille}</span> : null}</span>
         <span className="vrm-fu-vente-l3" data-ton={ton || undefined}>{etatNoeud || etat}</span>
       </span> : null}
       <span className="vrm-ledger-sale-title" title={titre}><span className="vrm-ledger-sale-nom">{titre || '(sans titre)'}</span>{sous ? <span className="vrm-ledger-sale-sous" data-vente-sous="">{sous}</span> : null}</span>
@@ -20434,8 +20440,8 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', etat, 
     </div>,document.body)}
   </div>;
 }
-function LigneVente({ photo, titre, meta, montant, actions, etat, etatNoeud = null, details, sous = '', ton = '', data = null, numerosArticle = [], plateforme = '', floute = false, gestes = null, frise = null }) {
-  return <LigneVenteCompacte {...(data || {})} gestes={gestes} frise={frise} numerosArticle={numerosArticle} plateforme={plateforme} photo={photo} titre={titre} sous={sous} ton={ton} etat={etat} etatNoeud={etatNoeud} montant={montant} initialOuvert={!!details?.props.ouvrir} className="vrm-sale-row vrm-shared-sale" style={{padding:'12px 14px',borderBottom:`1px solid ${C.border}`,...(floute?STYLE_FLOU:null)}}>
+function LigneVente({ photo, titre, meta, montant, actions, etat, etatNoeud = null, details, sous = '', compte = '', ton = '', data = null, numerosArticle = [], plateforme = '', floute = false, gestes = null, frise = null }) {
+  return <LigneVenteCompacte {...(data || {})} compte={compte} gestes={gestes} frise={frise} numerosArticle={numerosArticle} plateforme={plateforme} photo={photo} titre={titre} sous={sous} ton={ton} etat={etat} etatNoeud={etatNoeud} montant={montant} initialOuvert={!!details?.props.ouvrir} className="vrm-sale-row vrm-shared-sale" style={{padding:'12px 14px',borderBottom:`1px solid ${C.border}`,...(floute?STYLE_FLOU:null)}}>
     <div className="vrm-sale-overview" style={{display:'flex',gap:12,alignItems:'flex-start'}}>
       <div className="vrm-sale-photo"><PhotoArticleAgrandissable src={photo} titre={titre}><PhotoVente src={photo} size={64} portrait/></PhotoArticleAgrandissable></div>
       <div className="vrm-sale-info" style={{flex:1,minWidth:0}}>
@@ -20665,6 +20671,9 @@ const lbcEuro = (p) => p == null ? '' : (Number(p) / 100).toFixed(2).replace('.'
 // Carte d'une transaction Leboncoin — comme Vinted : photo · titre · statut +
 // transporteur · prix. Partagée par Ventes ET Achats (§11 : une seule forme).
 function CarteLbc({ o, num = '', benef = null, floute = false }) {
+  const annLbc = useAnnuaireLbc();
+  // Le compte de la vente (sa transaction porte son compte) : rien tant que les noms ne sont pas lus.
+  const compteVente = annLbc === undefined ? '' : nomCompteVente('leboncoin', o, { leboncoin: annLbc || {} });
   // (29 oct., Julien : « côté vente, fais les mêmes modifications que pour
   // Vinted ; enlève N° ») Le titre d'une vente est celui de l'annonce, sans N° :
   // le N° (identité stricte, §5) reste dans le tiroir (« Fiche article N°… »),
@@ -20687,7 +20696,7 @@ function CarteLbc({ o, num = '', benef = null, floute = false }) {
   // (3 nov., critique #3) La frise de Vinted, sur ce que l'extension a LU de la transaction :
   // « Postée » = expédiée, « Livrée » et « Payée » = finalisée (Leboncoin verse à la finalisation).
   const friseLbc = lbcAnnulee(o) ? null : <Frise etapes={friseVenteLue({ vendue: true, postee: lbcExpediee(o) || lbcFinalisee(o), livree: lbcFinalisee(o), payee: lbcFinalisee(o) }, { geste: ton === 'action' })} cle={'lbc' + o.txId} className="vrm-fu-ligne-frise" label="Où en est la vente"/>;
-  return <LigneVente frise={friseLbc} numerosArticle={num?[num]:[]} plateforme="leboncoin" data={{ 'data-lbc-vente': String(o.txId), 'data-lbc-etat': etatCourt, 'data-flou': floute ? '1' : '0' }} floute={floute} photo={photoArticle(o)} titre={titre} sous={sous} ton={ton} montant={lbcEuro(o.price)} etat={etatCourt}
+  return <LigneVente compte={compteVente} frise={friseLbc} numerosArticle={num?[num]:[]} plateforme="leboncoin" data={{ 'data-lbc-vente': String(o.txId), 'data-lbc-etat': etatCourt, 'data-flou': floute ? '1' : '0' }} floute={floute} photo={photoArticle(o)} titre={titre} sous={sous} ton={ton} montant={lbcEuro(o.price)} etat={etatCourt}
     meta={<>{o.stepLabel || o.stepStatus || ''}{o.deliveryLabel ? ` · ${o.deliveryLabel}` : ''}{benef != null ? <span data-lbc-benef={benef.toFixed(2)} style={{ color: benef >= 0 ? C.text : C.warn, fontWeight: 600 }}> · marge avant frais {fmt(benef)}</span> : null}</>}/>;
 }
 // L'étape d'un ACHAT Leboncoin, dans les mêmes mots et les mêmes couleurs que
@@ -23514,7 +23523,7 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
         // (3 nov.) La frise de Vinted : Postée = commande « FULFILLED » lue chez eBay, Payée = argent LIBÉRÉ lu (src/friseSites.js).
         const pfE = preuvesFriseEbay(o);
         const fuE = pfE ? friseVenteFusion(friseVente(pfE), { geste: etat.peutExpedier }) : null;
-        return <div className="vrm-ebay-order" data-ebay-vente={o.orderId} data-ebay-compte={o._compte || 'principal'} key={(o._compte || 'principal')+':'+(o.orderId || i)}><LigneVente gestes={gestesEbay} frise={fuE ? <Frise etapes={fuE} cle={'ebay' + (o._compte || 'principal') + o.orderId} className="vrm-fu-ligne-frise" label="Où en est la vente"/> : null} numerosArticle={(o.lineItems||[]).map(l=>numLigneEbay(o,l)).filter(Boolean)} plateforme="ebay" photo={img} titre={(li.title||'Commande')+(o.lineItems?.length>1?` · ${o.lineItems.length} articles`:'')} etat={statut} ton={etat.peutExpedier ? 'action' : ''}
+        return <div className="vrm-ebay-order" data-ebay-vente={o.orderId} data-ebay-compte={o._compte || 'principal'} key={(o._compte || 'principal')+':'+(o.orderId || i)}><LigneVente compte={nomCompteVente('ebay', o, { ebay: Object.fromEntries((comptesEbay || []).map((c) => [c.ref, c.pseudo || ''])) })} gestes={gestesEbay} frise={fuE ? <Frise etapes={fuE} cle={'ebay' + (o._compte || 'principal') + o.orderId} className="vrm-fu-ligne-frise" label="Où en est la vente"/> : null} numerosArticle={(o.lineItems||[]).map(l=>numLigneEbay(o,l)).filter(Boolean)} plateforme="ebay" photo={img} titre={(li.title||'Commande')+(o.lineItems?.length>1?` · ${o.lineItems.length} articles`:'')} etat={statut} ton={etat.peutExpedier ? 'action' : ''}
           sous={[o.creationDate && !isNaN(Date.parse(o.creationDate)) ? new Date(o.creationDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : '', comptesEbay?.length > 1 ? (o._pseudo || nomCompteEbay(comptesEbay.find(c => c.ref === o._compte) || {})) : ''].filter(Boolean).join(' · ')}
           etatNoeud={<><span className="vrm-ebay-sale-status" data-state={etat.peutExpedier?'pending':etat.expedie?'shipped':'neutral'} style={{display:'inline-flex',alignItems:'center',gap:5,padding:0,background:'transparent',boxShadow:'none',borderRadius:0,fontSize:'inherit',color:C.text,fontWeight:600}}><span aria-hidden="true" style={{width:7,height:7,borderRadius:999,flexShrink:0,display:'inline-block',background:etat.peutExpedier?C.warn:etat.expedie?(C.blue||C.accent):C.muted}}/>{statut}</span></>}
           meta={<>{statut}{o.buyer?.username ? ` · ${o.buyer.username}` : ''}{o.lineItems?.length>1?` · ${o.lineItems.length} articles`:''}{comptesEbay?.length>1?` · ${o._pseudo || nomCompteEbay(comptesEbay.find(c=>c.ref===o._compte) || {})}`:''}</>}
@@ -28002,7 +28011,7 @@ function LigneVenteVc({ v, fait, enV, flou, i = 0 }) {
     </>;
   };
   return (
-    <LigneVenteCompacte className="vrm-sale-row" data-tx={'vc:' + v.id} data-vc-vente={v.id} data-vc-vente-num={v.num || ''} data-vc-vente-etape={v.etape} data-flou={flou ? '1' : '0'}
+    <LigneVenteCompacte compte={nomCompteVente('vestiaire', v, {})} className="vrm-sale-row" data-tx={'vc:' + v.id} data-vc-vente={v.id} data-vc-vente-num={v.num || ''} data-vc-vente-etape={v.etape} data-flou={flou ? '1' : '0'}
       style={{ borderTop: i > 0 ? `1px solid ${C.border}` : 'none', opacity: vcVenteAnnulee(v) ? 0.6 : 1, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10, ...(flou ? STYLE_FLOU : null) }}
       montantCentimes={lb.verse != null ? Math.round(lb.verse * 100) : undefined} numerosArticle={v.num ? [v.num] : []} plateforme="vestiaire"
       photo={v.photo || ''} photoNoeud={photoNoeud} titre={nomLigne} sous={sous} etat={etat} ton={ton}
@@ -52608,7 +52617,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       : <BoutonBordereau grand uid={o._acc && o._acc.vinted_user_id} tx={txL} conv={o.conversation_id} login={accNameOf(o._acc)} aGenerer pdf={false} onFait={(u)=>actionsVentesProxy.rechargerLabels(u)}/>}
                   </div>
                   {gesteDepose ? <div className="vrm-fu-apres" data-sans-glisse="">{gesteDepose}</div> : null}
-                </> : null} gestes={gesteCout ? <div className="vrm-gestes-pile">{gesteCout}</div> : null} sous={[o.date?dateFr(o.date, {day:'numeric',month:'short'}):'', (o._acc && !ventesUnCompte) ? accNameOf(o._acc) : ''].filter(Boolean).join(' · ')} etat={venteStage(o).label} ton={st!=='cancelled' && aExpedier(o) && !isShipDone(o) ? 'action' : (st==='cancelled' ? 'annule' : '')} montant={sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:'—'} className="vrm-sale-row" key={o.transaction_id} data-tx={String(o.transaction_id)} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null),...(gp.style||{})}}>
+                </> : null} gestes={gesteCout ? <div className="vrm-gestes-pile">{gesteCout}</div> : null} sous={[o.date?dateFr(o.date, {day:'numeric',month:'short'}):'', ].filter(Boolean).join(' · ')} compte={o._acc ? accNameOf(o._acc) : ''} etat={venteStage(o).label} ton={st!=='cancelled' && aExpedier(o) && !isShipDone(o) ? 'action' : (st==='cancelled' ? 'annule' : '')} montant={sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:'—'} className="vrm-sale-row" key={o.transaction_id} data-tx={String(o.transaction_id)} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null),...(gp.style||{})}}>
               </LigneVenteCompacte>
               )}</GlisserVente>
             );
@@ -55774,9 +55783,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 leur écran (bordereau, QR), ouvert par la coque (`onColisLeboncoin`). */}
             {(sitesVus.length > 1 || onColisLeboncoin) && (
               <DansBarreHaut>
-                <div className="vrm-rangee vrm-filtres vrm-filtre-site" role="group" aria-label="Filtrer les colis par site" data-filtre-site="colis">
-                  {['toutes', ...SITES_COLIS.filter(x => (x === 'leboncoin' && onColisLeboncoin) || (x !== 'leboncoin' && sitesVus.includes(x)))].map(x => <button key={x} type="button" aria-pressed={siteColis===x} data-site={x} onClick={()=>{ if (x === 'leboncoin' && onColisLeboncoin) { onColisLeboncoin(); return; } setSiteColis(x); }} aria-label={x==='toutes'?'Tous les sites':undefined}>{x==='toutes'?'Tous':nomSite[x]}</button>)}
-                </div>
+                <SelecteurSites id="colis" label="Filtrer les colis par site" valeur={siteColis}
+                  options={optionsSelecteur({ toutes: true, site: siteColis, sites: new Set(SITES_COLIS.filter(x => (x === 'leboncoin' && onColisLeboncoin) || (x !== 'leboncoin' && sitesVus.includes(x)))) })}
+                  onChoix={(x)=>{ if (x === 'leboncoin' && onColisLeboncoin) { onColisLeboncoin(); return; } setSiteColis(x); }}/>
               </DansBarreHaut>
             )}
             <div className="vrm-colis-onglets" data-colis-onglet={onglet} data-colis-total={vue.total}>
@@ -58805,6 +58814,21 @@ function compteLbcConnecte(accounts) {
 //    (la ligne ne dit pas lequel) : c'est le compte vu en dernier, à moins de
 //    12 h — la meilleure preuve que l'extension donne aujourd'hui.
 const URL_LBC_COMPTES_FLOU = () => `${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_accounts&select=a:data->accounts`;
+// (5 nov.) LES NOMS DES COMPTES LEBONCOIN (`lbc_accounts`), pour écrire le compte
+// sur chaque vente (`nomCompteVente`). Lu une fois par session (la même projection
+// que le flou) ; `undefined` en cours · `null` pas su · objet { id: nom }.
+let _annuaireLbc = undefined, _annuaireLbcP = null;
+function useAnnuaireLbc() {
+  const [a, setA] = useState(_annuaireLbc);
+  useEffect(() => {
+    if (_annuaireLbc !== undefined) { setA(_annuaireLbc); return undefined; }
+    let vivant = true;
+    if (!_annuaireLbcP) _annuaireLbcP = lireBaseRelue(URL_LBC_COMPTES_FLOU()).then((rows) => { _annuaireLbc = Array.isArray(rows) ? annuaireLbc((rows[0] && rows[0].a) || {}) : null; return _annuaireLbc; }).catch(() => { _annuaireLbc = null; return null; }).finally(() => { _annuaireLbcP = null; });
+    _annuaireLbcP.then((x) => { if (vivant) setA(x); });
+    return () => { vivant = false; };
+  }, []);
+  return a;
+}
 function useCompteLbcOuvert() {
   useExtVivante();
   const sansSouris = useSansSouris();
@@ -65332,19 +65356,10 @@ function AncreDefilement() {
 // site choisi reste toujours montré, même si son compte n'est plus lu. La forme
 // est celle des pastilles de filtre de l'app (`vrm-filtres`, §7).
 function FiltreSites({ tache, site, sites, onSite }) {
+  // (5 nov.) Le sélecteur À LOGOS (`SelecteurSites`, règles `src/plateformes.js`) :
+  // la même rangée qu'avant (mêmes sites, même ordre, « Tous » sur Ventes), un logo par site.
   const t = TACHES_SITE[tache] || {};
-  const options = [
-    ...(t.toutes ? [{ id: 'toutes', label: 'Tous les sites' }] : []),
-    ...SITES_TACHE.filter((s) => !sites || sites.has(s.id) || s.id === site),
-  ];
-  if (options.length < 2) return null;
-  return (
-    <div className="vrm-rangee vrm-filtres vrm-filtre-site" role="group" aria-label="Filtrer par site" data-filtre-site={tache}>
-      {options.map((o) => (
-        <button key={o.id} type="button" aria-pressed={site === o.id} data-site={o.id} aria-label={o.label} onClick={() => onSite(o.id)}>{o.id === 'toutes' ? 'Tous' : o.label}</button>
-      ))}
-    </div>
-  );
+  return <SelecteurSites id={tache} options={optionsSelecteur({ site, sites, toutes: !!t.toutes })} valeur={site} onChoix={onSite}/>;
 }
 
 // ── VENTES · « TOUTES » : LA LISTE MÉLANGÉE, SANS RIEN FUSIONNER ────────────
@@ -65362,6 +65377,8 @@ function FiltreSites({ tache, site, sites, onSite }) {
 // Une ligne ouvre l'écran de SON site (une vente eBay : sa commande).
 function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVentes, lbcLu, ebayTous, onOuvrir }) {
   const voit = (s) => !sites || sites.has(s);
+  // (5 nov.) Le compte de CHAQUE vente, toutes plateformes (`nomCompteVente`).
+  const annLbc = useAnnuaireLbc();
   const [vc, setVc] = React.useState(undefined);   // undefined en cours · null pas su · objet
   React.useEffect(() => {
     if (!voit('vestiaire')) return undefined;
@@ -65409,7 +65426,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
         if (!id) continue;
         out.push({ cle: 'leboncoin:' + id, site: 'leboncoin', id, titre: v.title || '(sans titre)', t: ts(v.dateVente) ?? ts(v.txId ? dates[v.txId] : null),
           prix: v.price != null ? euro(Number(v.price) / 100) : null, devise: 'EUR',
-          etat: lbcFinalisee(v) ? 'Finalisée' : 'En cours', compte: '', num: numeroLbcIdentite(v, null, liens), photo: photoArticle(v) || null });
+          etat: lbcFinalisee(v) ? 'Finalisée' : 'En cours', compte: annLbc === undefined ? '' : nomCompteVente('leboncoin', v, { leboncoin: annLbc || {} }), num: numeroLbcIdentite(v, null, liens), photo: photoArticle(v) || null });
       }
     }
     if (voit('ebay') && ebayTous && Array.isArray(ebayTous.items)) {
@@ -65419,21 +65436,21 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
         const st = c.pricingSummary && c.pricingSummary.priceSubtotal;
         out.push({ cle: 'ebay:' + c.orderId, site: 'ebay', id: String(c.orderId), compteRef: c._compte, titre: li.title || 'Commande eBay', t: ts(c.creationDate),
           prix: st && st.value != null ? euro(st.value) : null, devise: (st && st.currency) || 'EUR',
-          etat: commandeEbayEngagee(c) ? 'Payée' : 'Annulée ou remboursée', compte: c._pseudo || '', num: numLigneEbay(c, li) || '', photo: photoArticle(li) || photoArticle(c) || null });
+          etat: commandeEbayEngagee(c) ? 'Payée' : 'Annulée ou remboursée', compte: c._pseudo || nomCompteVente('ebay', c, {}), num: numLigneEbay(c, li) || '', photo: photoArticle(li) || photoArticle(c) || null });
       }
     }
     if (voit('vestiaire') && vc && vc.ventes) {
       for (const [id, v] of Object.entries(vc.ventes)) {
         if (!v) continue;
         out.push({ cle: 'vestiaire:' + id, site: 'vestiaire', id, titre: v.titre || v.title || 'Vente Vestiaire', t: ts(v.date) ?? ts(v.premiereVue),
-          prix: null, devise: 'EUR', etat: v.aExpedier ? 'À expédier' : (v.etat || ''), compte: '',
+          prix: null, devise: 'EUR', etat: v.aExpedier ? 'À expédier' : (v.etat || ''), compte: nomCompteVente('vestiaire', v, {}),
           num: numVcVente(v, vc.liens, numerosVcEffectifs()), photo: photoArticle(v) || null });
       }
     }
     // La plus récente d'abord ; une vente sans date lue va à la fin (jamais datée au hasard).
     return out.sort((a, z) => (z.t ?? -Infinity) - (a.t ?? -Infinity));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sites, ventesVinted, panelOff, lbcVentes, lbcLu, ebayTous, vc]);
+  }, [sites, ventesVinted, panelOff, lbcVentes, lbcLu, ebayTous, vc, annLbc]);
   const [n, setN] = React.useState(60);
   const NOM = { vinted: 'Vinted', leboncoin: 'Leboncoin', ebay: 'eBay', vestiaire: 'Vestiaire' };
   // Ce que chaque site a pu lire : dit UNE fois, en tête (jamais un « 0 » inventé).
@@ -65481,7 +65498,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
         : (
           <div className="vrm-toutes-liste" role="list">
             {lignes.slice(0, n).map((l) => (
-              <button key={l.cle} type="button" role="listitem" className="vrm-toutes-ligne" data-toutes-vente={l.site} data-toutes-id={l.id} onClick={() => onOuvrir(l)}
+              <button key={l.cle} type="button" role="listitem" className="vrm-toutes-ligne" data-toutes-vente={l.site} data-toutes-id={l.id} data-toutes-compte={l.compte || ''} onClick={() => onOuvrir(l)}
                 style={{ width: '100%', minHeight: 56, display: 'flex', alignItems: 'center', gap: 12, padding: '10px 2px', background: 'transparent', border: 0, borderBottom: `1px solid ${C.border}`, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: C.text }}>
                 {/* (31 oct., Julien : « pas de photos partout ») La photo de la vente, comme sur l'écran de son site. */}
                 <span className="vrm-toutes-photo" data-toutes-photo={l.photo ? '1' : '0'} style={{ width: 64, height: 80, flexShrink: 0, borderRadius: 12, overflow: 'hidden', background: 'var(--vrm-photo, ' + (C.card2 || C.border) + ')', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -65490,7 +65507,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
                 <span className="vrm-toutes-titre" style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ display: 'block', fontSize: 15, fontWeight: 600, lineHeight: 1.3, overflowWrap: 'anywhere' }}>{l.titre}</span>
                   <span className="vrm-toutes-meta" style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    <span data-toutes-site="">{NOM[l.site]}</span> · {jour(l.t)}{l.etat ? ' · ' + l.etat : ''}{l.compte ? ' · ' + l.compte : ''}
+                    <span data-toutes-site=""><LogoSite site={l.site}/>{NOM[l.site]}</span> · {jour(l.t)}{l.etat ? ' · ' + l.etat : ''}{l.compte ? ' · ' + l.compte : ''}
                   </span>
                 </span>
                 <span className="vrm-toutes-bureau" aria-hidden="true"><span><b>{NOM[l.site]}</b>{l.compte&&<small>{l.compte}</small>}</span><span>{jour(l.t)}</span><span>{l.etat||'État non renseigné'}</span></span>
@@ -68632,9 +68649,9 @@ function AppCoeur() {
             ramènent aux quatre colonnes, filtrées sur leur site. */}
         {tab==='cat_bord'&&platSub==='leboncoin'&&<>
           <DansBarreHaut>
-            <div className="vrm-rangee vrm-filtres vrm-filtre-site" role="group" aria-label="Filtrer les colis par site" data-filtre-site="colis">
-              {['toutes',...SITES_COLIS.filter(x=>!sitesPresents||sitesPresents.has(x)||x==='leboncoin')].map(x=><button key={x} type="button" aria-pressed={x==='leboncoin'} data-site={x} onClick={()=>{ if(x!=='leboncoin') setPlatSub('site:'+x); }} aria-label={x==='toutes'?'Tous les sites':undefined}>{x==='toutes'?'Tous':({vinted:'Vinted',leboncoin:'Leboncoin',ebay:'eBay',vestiaire:'Vestiaire'})[x]}</button>)}
-            </div>
+            <SelecteurSites id="colis" label="Filtrer les colis par site" valeur="leboncoin"
+              options={optionsSelecteur({ toutes: true, site: 'leboncoin', sites: new Set(SITES_COLIS.filter(x=>!sitesPresents||sitesPresents.has(x)||x==='leboncoin')) })}
+              onChoix={(x)=>{ if(x!=='leboncoin') setPlatSub('site:'+x); }}/>
           </DansBarreHaut>
           {baseKO?<div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>:<div data-colis-leboncoin=""><LeboncoinColis lbcVentes={lbcVentes}/></div>}
         </>}
