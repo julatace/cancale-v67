@@ -1,7 +1,7 @@
 /* ══ LE CENTRE DE NOTIFICATIONS (5 nov.) — cloche + feuille ═══════════════════
    Neutre partout (§7) : le seul bleu est ce qui n'est pas encore lu (la
-   pastille de la cloche, le point d'une ligne). Feuille du bas au téléphone, panneau flottant
-   en haut à droite sur ordinateur. Échelle Fusion (11/12/13/15/17/20 ;
+   pastille de la cloche, le point d'une ligne) et les liens d'action. La feuille
+   est `SheetShell` (5 nov., chantier H) : poignée, croix, portail. Échelle Fusion (11/12/13/15/17/20 ;
    400–700 ; rayons 12/14/20/999). Portail dans <body> : hors de .vrm-app-shell,
    donc ses propres règles de bouton. */
 .vrm-cn-cloche { position: relative; }
