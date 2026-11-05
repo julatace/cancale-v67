@@ -174,3 +174,14 @@ rien et montre une page avec UN bouton (`POST ?d=…&page=1`, la page « C'est f
 le « un clic » du logiciel de messagerie (RFC 8058, `POST ?d=` avec
 `List-Unsubscribe=One-Click`) reste. `audit-relances-essai` : 30 verts ; sur l'ancien
 `api/compte.js`, D3a et D3 rouges.
+
+## 9. Intégration (5 nov.) — « lu » ne se perd plus entre deux appareils
+
+La relecture laissait ouvert : « deux appareils qui marquent des notifications lues
+au même moment peuvent en faire repasser une en non lue » (`merge-duplicates`
+aveugle). Corrigé : `ecrireLuNotifs` relit, FUSIONNE (`fusionnerLus`, l'union —
+ce qui est lu ne fait que grandir) et écrit en comparer-et-échanger sur `data.rev`
+(PATCH filtré `data->>rev`, POST simple si la ligne n'existe pas, 409 ⇒ relire),
+trois essais. `scripts/audit-lus-deux-appareils.cjs` exécute les vraies fonctions
+avec deux appareils entrelacés : 4 verts ; sur `origin/main` 3 rouges ; `--muter`
+3 rouges. Banc `centre-notifs` : sert maintenant le PATCH.

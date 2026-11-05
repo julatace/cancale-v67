@@ -88,3 +88,20 @@ export async function lireCommeVendeur(req, chemin) {
     return Array.isArray(j) ? j : null;
   } catch (_) { return null; }
 }
+
+// Crée une ligne AU NOM du vendeur (son jeton : RLS). Rend 1 si elle est
+// créée, 0 si elle existe déjà (409 : un autre appareil l'a créée avant), ou
+// `null` si la base n'a pas répondu ou a refusé.
+export async function insererCommeVendeur(req, table, ligne) {
+  const jeton = jetonDe(req);
+  if (!jeton) return null;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+      method: 'POST',
+      headers: { apikey: ANON, Authorization: `Bearer ${jeton}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify(ligne),
+    });
+    if (r.status === 409) return 0;
+    return r.ok ? 1 : null;
+  } catch (_) { return null; }
+}

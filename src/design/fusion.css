@@ -646,7 +646,7 @@ html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-screen-head .vrm-scre
 html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-screen-head .vrm-tete-row > div:not(.vrm-screen-head-titre) { display: none !important; }
 html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-screen-head h1 { display: block !important; }
 /* Ce que la maquette ne montre pas */
-html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) :is(.vrm-filtre-site, [data-emballer-ouvrir], [data-tout-generer], [data-tg-bilan], [data-imprimante-reglage], .vrm-colis-note, [data-colis-filtre-note], .vrm-colis-groupe) { display: none !important; }
+html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) :is(.vrm-filtre-site:not([data-selecteur-logos]), [data-emballer-ouvrir], [data-tout-generer], [data-tg-bilan], [data-imprimante-reglage], .vrm-colis-note, [data-colis-filtre-note], .vrm-colis-groupe) { display: none !important; }
 html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-outils { display: none !important; }
 /* Le sélecteur « J'envoie · 3 / Je reçois · 2 » */
 html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-onglets .vrm-seg { margin: 0 0 4px !important; padding: 4px !important; border-radius: 14px !important; background: #E5E5EA !important; border: 0 !important; }

@@ -73,6 +73,12 @@ async function ouvrir(nav, vp, { sombre = false, chemin = '/?tab=journee', journ
     const req = r.request();
     const u = decodeURIComponent(req.url());
     const j = (d) => r.fulfill({ status: 200, contentType: 'application/json', headers: { 'content-range': `0-${Math.max(0, d.length - 1)}/${d.length}` }, body: JSON.stringify(d) });
+    if (req.method() === 'PATCH') {
+      // (5 nov.) « lu » s'écrit en comparer-et-échanger : PATCH filtré sur la ligne.
+      const id = (/[?&]id=eq\.([^&]+)/.exec(u) || [])[1];
+      try { const b = JSON.parse(req.postData() || '{}'); ecrits.push({ id, data: b.data }); } catch (_) {}
+      return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([{ id }]) });
+    }
     if (req.method() !== 'GET') {
       try { for (const l of JSON.parse(req.postData() || '[]')) ecrits.push(l); } catch (_) {}
       return r.fulfill({ status: 201, contentType: 'application/json', body: '[]' });

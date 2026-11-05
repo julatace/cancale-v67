@@ -95,6 +95,13 @@ async function lireLigne(id, select = 'data') {
     return { existe: !!j[0], ligne: j[0] || null };
   } catch (_) { return null; }
 }
+// La liste rangée (au plus 150 entrées, petite) : `{}` si rien, `null` pas su.
+export async function lireJournal() {
+  const l = await lireLigne(ID_JOURNAL);
+  if (!l) return null;
+  const d = l.ligne && l.ligne.data;
+  return d && typeof d === 'object' ? d : {};
+}
 // Ce qu'il a lu (écrit par l'app) : `{ luJusqua, lus }`, `{}` si rien, `null` pas su.
 export async function lireLu() {
   const l = await lireLigne(ID_LU);

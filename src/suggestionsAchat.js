@@ -144,10 +144,37 @@ export function suggestionsAchat({ cible, achats, liens, marqueDe, couleursDe, m
 // Les achats pas encore reliés (un lot reste tant qu'il n'est pas complet), sans
 // les remboursés, les plus récents d'abord. q : mot dans le titre, la marque ou
 // le n° de transaction ; compte : nom du compte acheteur (compteDe) ; mois : 'AAAA-MM'.
-export function tousAchatsLibres({ achats, liens, curTx = '', q = '', compte = '', mois = '', compteDe = null, marqueDe = null } = {}) {
-  const sansAccent = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+// (5 nov., Julien : « relier un achat à une annonce ou une vente en sélectionnant
+// par prix, par date de reçu… ») Des FILTRES de la liste — rien n'est relié sans
+// SON tap :
+//   prixMin / prixMax : euros, bornes incluses, sur le prix PAYÉ (`prixAchat(a)`,
+//     la règle de l'app ; à défaut le prix lu de l'achat) — un prix illisible
+//     n'est pas gardé quand une borne est posée ;
+//   recuDu / recuAu : 'AAAA-MM-JJ' (jours inclus, heure locale), sur la DATE DE
+//     RÉCEPTION LUE (`receptionDe(a)` → ms | null : livraison lue ou « Je l'ai
+//     retiré » cliqué). « Pas su » ne vaut pas « oui » : une réception pas lue
+//     n'est PAS gardée quand une date est posée — elle est COMPTÉE à part
+//     (`sansReception`), jamais cachée en silence ;
+//   marque : la marque lue du titre (`marqueDe`), sans casse ; taille : la taille
+//     lue du titre (`tailleDuTitre`) = `tailleNorm(taille)`.
+const jourMs = (j, fin) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(j || ''));
+  if (!m) return null;
+  const d = fin ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 23, 59, 59, 999) : new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return Number.isFinite(d.getTime()) ? d.getTime() : null;
+};
+const euroBorne = (v) => { if (v == null || String(v).trim() === '') return null; const n = Number(String(v).replace(/\s/g, '').replace(',', '.')); return Number.isFinite(n) && n >= 0 ? n : null; };
+export function tousAchatsLibresDetail({ achats, liens, curTx = '', q = '', compte = '', mois = '', compteDe = null, marqueDe = null,
+  prixMin = null, prixMax = null, prixAchat = null, recuDu = '', recuAu = '', receptionDe = null, marque = '', taille = '' } = {}) {
+  const sansAccent = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const mots = sansAccent(q).split(/\s+/).filter(Boolean);
+  const pMin = euroBorne(prixMin), pMax = euroBorne(prixMax);
+  const rDu = jourMs(recuDu, false), rAu = jourMs(recuAu, true);
+  const parDate = (rDu != null || rAu != null) && typeof receptionDe === 'function';
+  const mq = String(marque || '').trim().toLowerCase();
+  const tq = taille ? tailleNorm(taille) : '';
   const out = [];
+  let sansReception = 0;
   for (const a of (Array.isArray(achats) ? achats : [])) {
     if (!a || !txDe(a) || achatAnnule(a) || !achatDisponible(a, liens, curTx)) continue;
     if (compte && typeof compteDe === 'function' && String(compteDe(a) || '') !== compte) continue;
@@ -157,18 +184,34 @@ export function tousAchatsLibres({ achats, liens, curTx = '', q = '', compte = '
       const foin = sansAccent([a.title, typeof marqueDe === 'function' ? marqueDe(String(a.title || '')) : '', txDe(a)].join(' '));
       if (!mots.every((m) => foin.includes(m))) continue;
     }
+    if (mq && !(typeof marqueDe === 'function' && String(marqueDe(String(a.title || '')) || '').trim().toLowerCase() === mq)) continue;
+    if (tq && tailleDuTitre(String(a.title || '')) !== tq) continue;
+    if (pMin != null || pMax != null) {
+      const px = typeof prixAchat === 'function' ? Number(prixAchat(a)) : prixDe(a);
+      if (px == null || !Number.isFinite(px) || px <= 0) continue;
+      if ((pMin != null && px < pMin) || (pMax != null && px > pMax)) continue;
+    }
+    if (parDate) {
+      const r = receptionDe(a);
+      if (r == null || !Number.isFinite(Number(r))) { sansReception++; continue; }
+      if ((rDu != null && r < rDu) || (rAu != null && r > rAu)) continue;
+    }
     out.push({ a, d: Number.isFinite(d) ? d : -Infinity });
   }
-  return out.sort((x, y) => y.d - x.d).map((x) => x.a);
+  return { liste: out.sort((x, y) => y.d - x.d).map((x) => x.a), sansReception };
 }
-// Les mois et comptes présents (filtres rapides), du plus récent au plus ancien.
-export function filtresAchats(achats, compteDe) {
-  const mois = new Set(), comptes = new Set();
+export const tousAchatsLibres = (o = {}) => tousAchatsLibresDetail(o).liste;
+// Les mois, comptes, marques et tailles présents (filtres rapides), du plus récent au plus ancien.
+export function filtresAchats(achats, compteDe, marqueDe = null) {
+  const mois = new Set(), comptes = new Set(), marques = new Set(), tailles = new Set();
   for (const a of (Array.isArray(achats) ? achats : [])) {
     const d = dateMs(a && a.date); if (Number.isFinite(d)) mois.add(new Date(d).toISOString().slice(0, 7));
     const c = typeof compteDe === 'function' ? String(compteDe(a) || '') : ''; if (c) comptes.add(c);
+    const m = typeof marqueDe === 'function' ? String(marqueDe(String((a && a.title) || '')) || '').trim() : ''; if (m) marques.add(m);
+    const t = tailleDuTitre(String((a && a.title) || '')); if (t) tailles.add(t);
   }
-  return { mois: [...mois].sort().reverse(), comptes: [...comptes].sort() };
+  const num = (t) => { const m = /^(\d+)(?:\.5| ([12])\/3)?/.exec(t); return m ? Number(m[1]) + (/\.5/.test(t) ? 0.5 : m[2] ? Number(m[2]) / 3 : 0) : 0; };
+  return { mois: [...mois].sort().reverse(), comptes: [...comptes].sort(), marques: [...marques].sort((x, y) => x.localeCompare(y, 'fr')), tailles: [...tailles].sort((x, y) => num(x) - num(y)) };
 }
 // L'écriture d'un LOT : le prix de CET article, SAISI (jamais deviné, jamais le
 // prix du lot). Montant illisible ⇒ null (rien n'est écrit).

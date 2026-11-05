@@ -24,7 +24,8 @@
 // serait déjà consommé.
 
 import './_lib/sans-bruit.js';
-import { vendeurExige, lireCommeVendeur, modifierCommeVendeur } from './_lib/session.js';
+import { vendeurExige, lireCommeVendeur, modifierCommeVendeur, insererCommeVendeur } from './_lib/session.js';
+import { prendrePlaceServeur } from './_lib/frein-relais-serveur.js';
 
 // ⚠️⚠️ 4 OCTOBRE — CE PROXY ÉTAIT UN RELAIS OUVERT. N'importe qui pouvait lui
 // envoyer un jeton Vinted (volé ou non) et n'importe quelle adresse Vinted,
@@ -169,6 +170,22 @@ export default async function handler(req, res) {
   const acc = lignes[0];
   if (!acc || acc.owner !== u.id || !acc.access_token) {
     res.status(403).json({ erreur: 'compte', message: 'Ce compte Vinted n\'est pas relié à ta boutique.' });
+    return;
+  }
+  // ⚠️ 5 nov. : la réserve du COMPTE, tous appareils confondus (le frein de
+  // l'app est compté par appareil) — `api/_lib/frein-relais-serveur.js`.
+  // Freiné, ou réserve illisible ⇒ rien ne part vers Vinted.
+  const place = await prendrePlaceServeur({
+    lire: (chemin) => lireCommeVendeur(req, chemin),
+    inserer: (ligne) => insererCommeVendeur(req, 'app_data', ligne),
+    modifier: (chemin, corps) => modifierCommeVendeur(req, chemin, corps),
+  }, u.id, uid, Date.now());
+  if (!place.ok) {
+    if (place.raison === 'frein') {
+      res.status(429).json({ erreur: 'frein', resteMs: place.resteMs, message: 'Ce compte a déjà été relu souvent : VRM attend avant de redemander à Vinted.' });
+    } else {
+      res.status(503).json({ erreur: 'frein-illisible', message: 'La base ne répond pas — réessaie dans un instant.' });
+    }
     return;
   }
   const token = acc.access_token, refreshToken = acc.refresh_token, anonId = acc.anon_id, csrfToken = acc.csrf_token;

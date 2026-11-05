@@ -21,7 +21,9 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import './_lib/sans-bruit.js';
-import { sendPushToAll, pushCategorieActive } from './_lib/push.js';
+import { sendPushToAll, pushCategorieActive, prefsDuVendeur } from './_lib/push.js';
+import { resumeReveil, ID_REVEIL } from './_lib/reveil-calme.js';
+import { lireJournal, lireLu } from './_lib/journal-notifs.js';
 import { DESTINATIONS } from './_lib/lien-notif.js';
 import { notificationAgentEbay } from './_lib/agent-ebay-rappel.js';
 import { semainePassee, semaineCourante, calculerBilan, bilanAEnvoyer, texteBilan, versementsDeLignes } from './_lib/bilan-semaine.js';
@@ -828,6 +830,22 @@ async function rappelDuSoir() {
   const envoi = await sendPushToAll({ cat: 'soir', ...txt, tag: 'soir-' + today, url: DESTINATIONS.colis({}) });
   return { soir: 'envoyé', n, retard, aVerifier, demain, auMoins, manque, envoi: envoi && (envoi.coupe || envoi.erreur || envoi.sent) };
 }
+// (5 nov.) `?moment=reveil` : à la fin de ses heures calmes, UNE notification
+// dit ce qui est arrivé pendant (api/_lib/reveil-calme.js). Rien d'autre.
+// Le mémo du jour est écrit AVANT l'envoi (un envoi raté ne part pas deux fois) ;
+// mémo pas écrit ⇒ rien ne part.
+async function traiterVendeurReveil(maintenant = Date.now()) {
+  const prefs = await prefsDuVendeur();
+  if (!prefs || !prefs.calme || prefs.calme.actif !== true) return { reveil: 'calme-eteint' };
+  const memo = await getRow(ID_REVEIL);
+  if (memo === undefined) return { reveil: 'pas-su' };
+  const [journal, lu] = await Promise.all([lireJournal(), lireLu()]);
+  const r = resumeReveil({ prefs, journal, lu, dejaJour: memo && memo.jour, maintenant });
+  if (!r.envoyer) return { reveil: r.raison };
+  if (!(await ecrireDedup(ID_REVEIL, { jour: r.jour, n: r.n, at: new Date(maintenant).toISOString() }))) return { reveil: 'memo-non-ecrit' };
+  const envoi = await sendPushToAll({ title: r.title, body: r.body, url: r.url });
+  return { reveil: 'envoye', n: r.n, sent: envoi && envoi.sent };
+}
 async function traiterVendeurSoir() {
   // Le soir : lire et notifier les changements, puis le rappel du soir.
   const [relu, transp] = await Promise.all([relireEbayDuVendeur(), lireTransporteursDuVendeur()]);
@@ -852,9 +870,11 @@ export default async function handler(req, res) {
 
   // `?moment=soir` : le rappel de la veille au soir (second cron), rien d'autre
   // (ni URSSAF, ni bilan, ni rappel du matin).
-  const soir = String((req.query && req.query.moment) || '') === 'soir';
+  const moment = String((req.query && req.query.moment) || '');
+  const soir = moment === 'soir';
+  const reveil = moment === 'reveil';
   const debutCron = Date.now();
-  const traiter = soir ? traiterVendeurSoir : traiterVendeur;
+  const traiter = reveil ? traiterVendeurReveil : soir ? traiterVendeurSoir : traiterVendeur;
   try {
     const cl = await cloisonnee();
     // Pas su : on ne devine pas (ni passe globale, ni passe par vendeur). 503 =
@@ -893,8 +913,8 @@ export default async function handler(req, res) {
     // elle ne fait rien (et le dit dans la réponse) ; une panne ne fait pas
     // échouer les rappels déjà partis.
     let relances = null;
-    if (!soir) { try { relances = await passageRelances({ jusqua: debutCron + RELANCES_JUSQUA_MS }); } catch (e) { relances = { erreur: String((e && e.message) || e).slice(0, 200) }; } }
-    res.status(echecs ? 500 : 200).json({ ok: !echecs, ...(soir ? { moment: 'soir' } : {}), vendeurs: owners.length, echecs, bilans, ...(relances ? { relances } : {}) });
+    if (!soir && !reveil) { try { relances = await passageRelances({ jusqua: debutCron + RELANCES_JUSQUA_MS }); } catch (e) { relances = { erreur: String((e && e.message) || e).slice(0, 200) }; } }
+    res.status(echecs ? 500 : 200).json({ ok: !echecs, ...(soir ? { moment: 'soir' } : reveil ? { moment: 'reveil' } : {}), vendeurs: owners.length, echecs, bilans, ...(relances ? { relances } : {}) });
   } catch (e) {
     // Une tâche planifiée qui répond 200 sur une panne n'apparaît nulle part :
     // le tableau de bord la compte réussie, et les rappels d'expédition

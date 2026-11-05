@@ -1,0 +1,72 @@
+// ── AU RÉVEIL : CE QUI EST ARRIVÉ PENDANT LES HEURES CALMES (5 nov.) ─────────
+// Pendant ses heures calmes, rien ne sonne : la notification est rangée dans la
+// cloche (`push_journal`, état `calme`) et ne sonnait JAMAIS ensuite — il ne la
+// voyait qu'en ouvrant VRM. À la fin des heures calmes, UNE notification dit ce
+// qui attend : « Pendant tes heures calmes : 2 ventes · 1 offre », et ouvre la
+// cloche. Rien n'est inventé : seules les entrées `calme` des dernières 24 h,
+// encore NON LUES, sont comptées ; zéro ⇒ rien ne part.
+//
+// Le déclencheur : `api/ship-reminders.js?moment=reveil`, appelé toutes les
+// 30 minutes le matin (`.github/workflows/reveil-notifs.yml`). La fenêtre est
+// de 3 heures après la fin des heures calmes (un appel GitHub peut être en
+// retard) ; un seul récapitulatif par jour (`push_reveil`, écrit AVANT l'envoi :
+// un envoi raté ne part pas deux fois).
+import { reglageCalme, minutesParis, FAMILLES } from './notif-textes.js';
+
+export const ID_REVEIL = 'push_reveil';
+export const FENETRE_MIN = 180;
+const HHMM = /^([01]\d|2[0-3]):([0-5]\d)$/;
+const minutesDe = (h) => { const m = HHMM.exec(String(h || '')); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
+
+// La date de Paris (AAAA-MM-JJ) d'un instant.
+export function jourParis(t) {
+  try {
+    const p = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(t));
+    const v = (k) => (p.find((x) => x.type === k) || {}).value;
+    return `${v('year')}-${v('month')}-${v('day')}`;
+  } catch (_) { return null; }
+}
+
+const estLue = (e, lu) => {
+  const j = Number.isSafeInteger(lu && lu.luJusqua) ? lu.luJusqua : 0;
+  return e.seq <= j || (Array.isArray(lu && lu.lus) && lu.lus.includes(e.seq));
+};
+// Le singulier de chaque famille, écrit à la main (« colis » ne perd pas son s).
+const SINGULIER = { ventes: 'vente', offres: 'offre', messages: 'message', poster: 'colis à poster', arrives: 'code de retrait', doublevente: 'double vente', rappels: 'rappel', autres: 'autre' };
+const PLURIEL = { doublevente: 'doubles ventes' };
+const accord = (n, id, titre) => (n > 1 ? `${n} ${PLURIEL[id] || titre.toLowerCase()}` : `1 ${SINGULIER[id] || titre.toLowerCase()}`);
+
+// Rend `{ envoyer: false, raison }` ou `{ envoyer: true, jour, title, body, url, n }`.
+// `lu` : `null` = pas su ⇒ on ne compte rien (« pas su » n'invente pas un nombre).
+export function resumeReveil({ prefs, journal, lu, dejaJour, maintenant }) {
+  const c = reglageCalme(prefs);
+  if (!c.actif) return { envoyer: false, raison: 'calme-eteint' };
+  const f = minutesDe(c.fin), d = minutesDe(c.debut), m = minutesParis(maintenant);
+  if (f == null || d == null || m == null || d === f) return { envoyer: false, raison: 'reglage' };
+  const depuisFin = (m - f + 1440) % 1440;
+  if (depuisFin >= FENETRE_MIN) return { envoyer: false, raison: 'pas-l-heure' };
+  const jour = jourParis(maintenant);
+  if (!jour) return { envoyer: false, raison: 'reglage' };
+  if (dejaJour === jour) return { envoyer: false, raison: 'deja' };
+  if (lu === null || journal === null) return { envoyer: false, raison: 'pas-su' };
+  const entrees = journal && Array.isArray(journal.entrees) ? journal.entrees : [];
+  const parFamille = new Map();
+  for (const e of entrees) {
+    if (!e || e.etat !== 'calme' || !Number.isSafeInteger(e.seq)) continue;
+    const at = Date.parse(e.at);
+    if (!Number.isFinite(at) || at > maintenant || maintenant - at > 86400e3) continue;
+    if (estLue(e, lu || {})) continue;
+    parFamille.set(e.famille, (parFamille.get(e.famille) || 0) + 1);
+  }
+  const n = [...parFamille.values()].reduce((a, b) => a + b, 0);
+  if (!n) return { envoyer: false, raison: 'rien', jour };
+  const morceaux = FAMILLES.filter((x) => parFamille.get(x.id)).map((x) => accord(parFamille.get(x.id), x.id, x.titre));
+  const autres = n - FAMILLES.reduce((a, x) => a + (parFamille.get(x.id) || 0), 0);
+  if (autres > 0) morceaux.push(accord(autres, 'autres', 'Autres'));
+  return {
+    envoyer: true, jour, n,
+    title: `Pendant tes heures calmes : ${n} notification${n > 1 ? 's' : ''}`,
+    body: morceaux.join(' · '),
+    url: '/?tab=journee&cloche=1',
+  };
+}

@@ -12,7 +12,8 @@
 //      Plus — et la colonne de l'ordinateur les tâches puis les groupes ;
 //   B. Ventes et Annonces portent la rangée de filtres de site (Toutes ·
 //      Vinted · Leboncoin · eBay · Vestiaire pour Ventes ; sans « Toutes »
-//      pour Annonces), un site sans compte n'y est pas ;
+//      pour Annonces) ; (5 nov., Julien : « les mêmes onglets que Vinted ») les QUATRE sites,
+//      un site sans compte estompé dont l'onglet dit ce qui manque (banc plateformes-logo) ;
 //   C. le filtre « Vinted » rend les MÊMES contrôles que l'ancien écran Vinted
 //      (sélecteur de compte, filtres d'état des ventes, période, résumé) ;
 //   D. « Toutes » ne fusionne RIEN : chaque vente est une ligne, sous SON site
@@ -200,7 +201,8 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
           await capture(pg, 'plus-telephone');
           dit(!!f && f.groupes.map((g) => g.t).join('|') === 'Vendre|Gérer|Argent|Moi', 'J. « Plus » groupé par tâche, SANS « Plateformes » ni « Expédier » : Vendre · Gérer · Argent · Moi', JSON.stringify(f && f.groupes));
           const exp = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sheet [data-nav-groupe="Gérer"] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')));
-          dit(exp.join('|') === 'garage|achats', 'J. « Gérer » : Stock puis Achats ; plus d’entrée « Colis à retirer » (ils vivent dans Colis)', exp.join('|'));
+          // (5 nov.) « E-mails » rejoint « Gérer » (demande du 5 nov., `docs/passation/2026-11-05-onglet-emails.md`).
+          dit(exp.join('|') === 'garage|achats|emails', 'J. « Gérer » : Stock, Achats, E-mails ; plus d’entrée « Colis à retirer » (ils vivent dans Colis)', exp.join('|'));
           dit(!!f && !f.entrees.some((x) => /^plat_|^ebay_|^leboncoin$/.test(x)), 'J. aucune entrée de site dans « Plus »', JSON.stringify(f && f.entrees));
           dit(!!f && f.groupes.every((g) => g.n > 0), 'I. aucun groupe vide', JSON.stringify(f && f.groupes));
           dit(!!f && !['journee', 'annonces', 'ventes', 'cat_bord'].some((x) => f.entrees.includes(x)), 'I. rien de la barre du bas en double dans « Plus »', JSON.stringify(f && f.entrees));
@@ -213,7 +215,7 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
           dit(col.taches.join('|') === 'journee|annonces|ventes|messages|cat_bord', 'A. la colonne : Ma journée · Annonces · Ventes · Messages · Colis', col.taches.join('|'));
           dit(col.groupes.join('|') === 'Vendre|Gérer|Argent|Plateformes|Moi', 'A/J. puis les groupes par tâche — « Plateformes » gardé dans la colonne (sa maquette)', col.groupes.join('|'));
           const exp = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sidebar [data-nav-groupe="Gérer"] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')));
-          dit(exp.join('|') === 'garage|achats' && !col.toutes.includes('retraits'), 'J. colonne, « Gérer » : Stock puis Achats ; aucune entrée « Colis à retirer »', exp.join('|'));
+          dit(exp.join('|') === 'garage|achats|emails' && !col.toutes.includes('retraits'), 'J. colonne, « Gérer » : Stock, Achats, E-mails ; aucune entrée « Colis à retirer »', exp.join('|'));
           const plat = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sidebar [data-nav-groupe="Plateformes"] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')));
           dit(plat.join('|') === 'plat_ebay|plat_leboncoin|plat_vestiaire', 'J. colonne, « Plateformes » : eBay · Leboncoin · Vestiaire', plat.join('|'));
           const cpt = await pg.evaluate(() => { const o = Object.fromEntries([...document.querySelectorAll('.vrm-sidebar [data-badge-nav]')].map((b) => [b.getAttribute('data-badge-nav'), b.getAttribute('data-badge-n')])); try { o.pubR = String(JSON.parse(localStorage.getItem('vrm_colis_retirer')).total); } catch (_) {} return o; });
@@ -325,7 +327,8 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
         // « À envoyer » / « À retirer » ; sous « À retirer », la liste par point relais
         // (chaque colis une fois) puis les OUTILS de retrait (sans redire les colis).
         const f = await pg.evaluate(() => ({ choix: [...document.querySelectorAll('[data-colis-onglet-choix]')].map((x) => x.getAttribute('data-colis-onglet-choix')).join('|'), porte: !!document.querySelector('[data-colis-retraits-ouvrir]') }));
-        dit(f.choix === 'envoyer|retirer' && !f.porte, 'K. Colis : le sélecteur « À envoyer » / « À retirer » (plus de porte vers un détail qui redisait les colis)', JSON.stringify(f));
+        // (3 nov.) Colis a TROIS onglets « À envoyer · Envoyés · À retirer » (historique interface-stock).
+        dit(f.choix === 'envoyer|envoyes|retirer' && !f.porte, 'K. Colis : le sélecteur « À envoyer » / « Envoyés » / « À retirer » (plus de porte vers un détail qui redisait les colis)', JSON.stringify(f));
         await pg.locator('[data-colis-onglet-choix="retirer"]').first().click(); await pg.waitForTimeout(1500);
         await capture(pg, `retraits-${tel ? 'tel' : 'ordi'}`);
         const r = await pg.evaluate(() => { const z = document.querySelector('[data-colis-retraits="outils"]'); return { z: !!z, ecran: z && z.querySelector('[data-ecran-achats]') ? z.querySelector('[data-ecran-achats]').getAttribute('data-ecran-achats') : '',
