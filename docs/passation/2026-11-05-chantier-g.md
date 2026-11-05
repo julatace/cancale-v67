@@ -141,9 +141,28 @@ Communauté
 67. Groupes en panne → `EtatPanne`.
 68. Un fil en panne → `EtatPanne` compact.
 69. Onglets « Carte · Classement · Groupes » : l'actif était un trou NOIR en sombre → le dessin du segmenté de l'app (piste remplie, actif `#636366` la nuit, blanc le jour), 36 px à la souris.
+70. « Chargement de la communauté… » → « Lecture en cours… ».
+Encore Messages
+71. « · boutique_test » répété sur chaque ligne du groupe du compte ouvert → nommé une fois, dans l'en-tête du groupe (gardé sur les autres comptes et pendant une recherche).
+72. Messages · eBay : « Actualiser » en couleurs écrites en dur (#B8B8BC sur #262628 la nuit, F1 de `fusion-app`) → le bouton commun (`BoutonBase` secondaire petit, jetons), occupé pendant la lecture.
 
 ## Preuves
 (complétées en fin de chantier)
 
 ## Ce qui reste
-(complété en fin de chantier)
+- **Hors zone, vu en passant** : le sélecteur de compte de Messages/Ventes/Annonces écrit encore
+  « 📍 » devant le compte ouvert (`SelecteurCompte`, partagé — chantier E2 ou H) ; la ligne
+  « Données · À vérifier · N non confirmées » (`BilanSynchronisation`) et « Comptes Vinted ·
+  lecture indisponible » (`SynchronisationVinted`) sous Messages ont deux dessins de repli
+  différents ; `SynchronisationVinted` garde un bouton « Actualiser l’état » (dans son repli fermé).
+- **Messages · eBay** (`src/ebayGestion.jsx`, zone eBay) : seul « Actualiser » est passé par le
+  bouton commun (demande du coordinateur, F1 de `fusion-app`) ; ses autres boutons `S.button`
+  restent à passer aux jetons. Le F9 « le site se choisit dans un contrôle segmenté » de
+  `fusion-app` (Ventes, Messages, Achats à 1512) est `SelecteurSites` (coque, chantier H).
+- **Favoris reçus · Vinted** (`FavorisConnectes`, écran Favoris) : pas touché.
+- **Communauté** : bloquer / signaler / se retirer passent encore par `window.confirm` /
+  `window.prompt` (la feuille commune `SheetShell` n'est pas importée par ce module chargé à part).
+- **Vocabulaire** : quelques « emails » restent dans des NOMS ACCESSIBLES lus par des bancs
+  (« Rubriques des emails », « Vérifier les emails mis de côté ») — à changer avec leurs bancs.
+- La ligne `vrm-msg-acc` de styles-mineral.css (ellipsis du compte sur la ligne du pseudo) ne
+  sert plus : le compte est sur la ligne de la paire.
