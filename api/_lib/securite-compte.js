@@ -199,7 +199,7 @@ export async function lireJournal({ userId, lireVendeur, lireService, neutre }) 
   if (Array.isArray(comptes)) for (const c of comptes) if (c && c.vinted_user_id != null) parHache.set(hache(c.vinted_user_id), String(c.vinted_user_id));
   // Favoris
   if (lireService && neutre) {
-    const rows = await lireService(`app_data?owner=eq.${neutre}&id=like.favoris_file_*&data->proprietaires=cs.${encodeURIComponent(JSON.stringify([userId]))}&select=id,groupe:data->groupes->${encodeURIComponent(userId)}&limit=100`);
+    const rows = await lireService(`app_data?owner=eq.${neutre}&id=like.favoris_file_*&data->proprietaires=cs.${encodeURIComponent(JSON.stringify([userId]))}&select=id,groupe:data->groupes->${encodeURIComponent('"' + userId + '"')}&limit=100`);
     if (Array.isArray(rows)) sources.favoris = rows.filter((r) => /^favoris_file_[a-f0-9]{64}$/.test(String(r && r.id || ''))).map((r) => ({ compte: parHache.get(String(r.id).slice(13)) || null, jobs: r.groupe && Array.isArray(r.groupe.jobs) ? r.groupe.jobs.map((j) => ({ etat: j.etat, envoyeLe: j.envoyeLe, traiteLe: j.traiteLe, itemId: j.itemId, offre: j.offre ? true : undefined, pourcentage: j.pourcentage })) : [] }));
     else { sources.favoris = null; pasLu.push('favoris'); }
   } else { sources.favoris = null; pasLu.push('favoris'); }
