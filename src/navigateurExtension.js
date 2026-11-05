@@ -41,6 +41,9 @@ export function navigateurIci(ua) {
   const reel = ua == null;
   const u = String(ua != null ? ua : (typeof navigator !== 'undefined' ? navigator.userAgent : '') || '');
   if (reel && estOrionIci()) return 'orion';
+  // (5 nov.) Brave se présente comme Chrome mais pose `navigator.brave` (son
+  // repère documenté) : on ne lui dit pas « Chrome ».
+  try { if (reel && typeof navigator !== 'undefined' && navigator.brave) return 'brave'; } catch (_) {}
   if (/\bDuckDuckGo\/|\bDdg\//.test(u)) return 'duckduckgo';
   if (/Firefox\/|FxiOS\//.test(u)) return 'firefox';
   // Samsung Internet se présente AUSSI comme Chrome : on le lit avant (19 oct.).
@@ -60,7 +63,7 @@ export const estAndroid = (ua) => /Android/i.test(String(ua != null ? ua : (type
 // Brave et Chrome installent depuis le Chrome Web Store.
 export function boutiqueIci(ua) {
   const nav = navigateurIci(ua);
-  const parNav = { yandex: 'chrome', vivaldi: 'chrome' };
+  const parNav = { yandex: 'chrome', vivaldi: 'chrome', brave: 'chrome' };
   const lien = nav === 'orion' ? boutiqueOrion() : (LIENS_BOUTIQUES[parNav[nav] || nav] || '');
   return { nav, lien };
 }
@@ -95,7 +98,43 @@ export function pageExtensionsIci(ua) {
 
 // Le nom du navigateur, pour une phrase (« dans ce Firefox »).
 export function nomNavigateurIci(ua) {
-  return { firefox: 'Firefox', samsung: 'Samsung Internet', edge: 'Edge', opera: 'Opera', chrome: 'Chrome', safari: 'Safari', orion: 'Orion', duckduckgo: 'DuckDuckGo', yandex: 'Yandex Browser', vivaldi: 'Vivaldi' }[navigateurIci(ua)] || 'ce navigateur';
+  return { firefox: 'Firefox', samsung: 'Samsung Internet', edge: 'Edge', opera: 'Opera', chrome: 'Chrome', brave: 'Brave', safari: 'Safari', orion: 'Orion', duckduckgo: 'DuckDuckGo', yandex: 'Yandex Browser', vivaldi: 'Vivaldi' }[navigateurIci(ua)] || 'ce navigateur';
+}
+
+// ══ LES MOTS DU NAVIGATEUR (5 novembre) ═════════════════════════════════════
+// Julien (sur Orion) : « elle affiche Chrome alors que je suis sur Orion ». Une
+// phrase de l'app ne nomme le navigateur que si elle le SAIT : Orion par
+// `window.KAGI`, Chrome par son agent utilisateur (sans autre marque), etc.
+// Sinon « ce navigateur » / « ton navigateur » — jamais « Chrome » au hasard.
+// Les formes grammaticales sont toutes ici (une règle, §11) : l'app n'écrit
+// plus « Chrome » en dur dans une phrase qui parle du navigateur d'ICI.
+// `pageExt` : l'adresse de la page des extensions, seulement si elle est SÛRE
+// (les navigateurs Chromium, Firefox) ; Orion n'en a pas de documentée ⇒ null.
+const NOM_NAV = { chrome: 'Chrome', brave: 'Brave', edge: 'Edge', opera: 'Opera', vivaldi: 'Vivaldi', yandex: 'Yandex Browser', firefox: 'Firefox', orion: 'Orion', samsung: 'Samsung Internet', duckduckgo: 'DuckDuckGo' };
+// Safari n'est PAS nommé : Orion se présente exactement comme lui, et un Orion
+// dont `window.KAGI` manquerait serait appelé « Safari » — « ce navigateur ».
+const PAGE_EXT = { chrome: 'chrome://extensions', brave: 'chrome://extensions', vivaldi: 'chrome://extensions', yandex: 'chrome://extensions', edge: 'edge://extensions', opera: 'opera://extensions', firefox: 'about:addons' };
+export function motsNavigateur(ua) {
+  const nav = navigateurIci(ua);
+  const nom = NOM_NAV[nav] || '';
+  const voyelle = /^[AEIOU]/i.test(nom);
+  const pageExt = PAGE_EXT[nav] || null;
+  const de = nom ? (voyelle ? `d’${nom}` : `de ce ${nom}`) : 'de ce navigateur';
+  const chromium = ['chrome', 'brave', 'vivaldi', 'yandex', 'edge', 'opera'].includes(nav);
+  return {
+    nav, nom: nom || 'ton navigateur', connu: !!nom,
+    ce: nom ? (voyelle ? nom : `ce ${nom}`) : 'ce navigateur',
+    Ce: nom ? (voyelle ? nom : `Ce ${nom}`) : 'Ce navigateur',
+    dans: nom ? (voyelle ? `dans ${nom}` : `dans ce ${nom}`) : 'dans ce navigateur',
+    Dans: nom ? (voyelle ? `Dans ${nom}` : `Dans ce ${nom}`) : 'Dans ce navigateur',
+    dansNu: `dans ${nom || 'ton navigateur'}`,
+    de,
+    hautDe: nom ? (voyelle ? `en haut d’${nom}` : `en haut de ${nom}`) : 'en haut de ton navigateur',
+    pageExt,
+    pageExtTexte: pageExt || `la page des extensions ${de}`,
+    ouvrirPageExt: pageExt ? `ouvre ${pageExt}` : `ouvre la page des extensions ${de}`,
+    rechargerExt: chromium ? 'clique ⟳ (la flèche ronde) sur VRM' : 'désactive puis réactive VRM',
+  };
 }
 
 // ══ LE TÉLÉPHONE (19 octobre, « l'extension pour iPhone et Samsung ») ═══════

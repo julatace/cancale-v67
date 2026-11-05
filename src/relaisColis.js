@@ -370,7 +370,7 @@ export function pointsARetirer({ colis = [], attendus = [], pointsVinted = [] } 
       sansCarte = `deux adresses pour ce colis (e-mail : ${conflit.email || '—'} ; suivi ${conflit.carrier === 'vinted' ? 'Vinted Go' : 'du transporteur'} : ${conflit.transporteur}) : aucune n’est choisie`;
       sansCarteCode = 'deux-adresses';
     } else if (sansCarte && vgPasLu && x.rue && !x.geocode) {
-      sansCarte += ' — le suivi Vinted Go de ce colis ne l’a pas encore donné : VRM le relit tout seul ; sinon ouvre le suivi Vinted Go du colis une fois dans Chrome';
+      sansCarte += ' — le suivi Vinted Go de ce colis ne l’a pas encore donné : VRM le relit tout seul ; sinon ouvre le suivi Vinted Go du colis une fois dans le navigateur où est l’extension VRM';
       sansCarteCode = 'vintedgo-pas-lu';
     }
     return { ...x, numero, repere: rv ? { lat: rv.lat, lon: rv.lon, source: 'vinted' } : null, sansCarte, sansCarteCode, vintedPlusieurs: !!(lu && lu.plusieurs), epingle: nombreEpingle(x) };
