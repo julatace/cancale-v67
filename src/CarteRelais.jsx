@@ -477,7 +477,7 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte, ec
           </span>
           <span className="vrm-rpf-meta">
             {tCommun ? <span className="vrm-rpf-transp" data-relais-transporteur={tCommun.cle || ''}><PastilleTransporteur t={tCommun} C={C} seul taille={18}/></span> : null}
-            <span className="vrm-rpf-n" data-relais-compte={rows.length}>{plur(rows.length, 'colis', 'colis')}</span>
+            <span className="vrm-rpf-n" data-relais-compte={rows.length}>{plur(rows.length, 'colis', 'colis')}{(() => { const n = rows.filter((c) => !c.horsCompte && !(c.code || c.qr || c.code2)).length; return n && n < rows.length ? <span data-relais-sans-code={n}> · {n} code à venir</span> : null; })()}</span>
           </span>
         </header>
         <div className="vrm-rpf-liste">{rows.map((x) => ligne(x, !tCommun))}</div>
@@ -503,7 +503,8 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte, ec
         {villes.map((v) => <button key={v.cle} type="button" className="vrm-seg-btn" aria-pressed={!!vChoisie && vChoisie.cle === v.cle} data-ville={v.cle} data-ville-n={v.n} onClick={() => onVille && onVille(v.cle)}>{v.nom} <span className="vrm-seg-n">{v.n}</span></button>)}
       </div> : null}
       {section('aujourdhui', 'À retirer aujourd’hui', parSection.aujourdhui, { ambre: true })}
-      {section('prets', 'Prêts à retirer', parSection.prets)}
+      {/* (5 nov.) Un point y est entier : s'il porte un colis au code à venir, la section dit « À retirer ». */}
+      {section('prets', parSection.prets.every(({ x }) => x.code || x.qr || x.code2) ? 'Prêts à retirer' : 'À retirer', parSection.prets)}
       {section('avenir', 'Code à venir', parSection.avenir)}
       {parSection.lieu.length ? (
         <section className="vrm-rpf-section" data-rp-section="lieu" data-rp-section-n={parSection.lieu.length}>

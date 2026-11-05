@@ -53601,7 +53601,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <ExtEnRetard onNav={onNav}/>
         {/* (5 nov., revue 2.16) Fournisseurs · Délai · Lots rangés derrière « … » : une seule carte de
             chiffres en tête, les outils à un geste (src/AchatsOutils.jsx, inchangé). */}
-        {!modeRetraits && !baseKO && achatsOutilsOuverts && <div className="vrm-achats-outils" data-achats-outils="ouverts">
+        {!modeRetraits && !baseKO && achatsOutilsOuverts && <div className="vrm-achats-outils" id="vrm-achats-outils" data-achats-outils="ouverts">
           <AchatsOutils fournisseurs={asoFournisseurs} delai={asoDelai} lots={asoLots} achatsDeclarables={asoDeclarables} fichesLibres={asoFichesLibres}
           onOuvrir={setAsoOuvert} onRelier={asoRelier} onRepartir={asoRepartir} onAnnulerRepartition={asoAnnuler} onDeclarerLot={asoDeclarerLot}
           onFiche={(n)=>{ try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: String(n) })); } catch (_) {} }}
@@ -53642,7 +53642,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <button type="button" key={id} className="vrm-seg-btn" data-achats-onglet={id} data-n={cnt==null?undefined:String(cnt)} onClick={()=>setAFilter(id)} aria-pressed={aFilter===id} aria-label={cnt?`${label} ${cnt}`:undefined} style={{whiteSpace:'nowrap'}}>{label}{cnt?<span className="vrm-seg-n" title={String(cnt)}> {cnt>=1000?`${(Math.floor(cnt/100)/10).toLocaleString('fr-FR')} k`:cnt}</span>:null}</button>
           )); })()}
         </div>
-        {!baseKO && <button type="button" className="vrm-icon-control vrm-achats-plus" data-achats-plus={achatsOutilsOuverts?'ouvert':'ferme'} aria-expanded={achatsOutilsOuverts} aria-label="Plus : fournisseurs, délai, lots" title="Fournisseurs · Délai · Lots" onClick={()=>setAchatsOutilsOuverts(v=>!v)}><Icon name="more" size={20}/></button>}
+        {!baseKO && <button type="button" className="vrm-icon-control vrm-achats-plus" data-achats-plus={achatsOutilsOuverts?'ouvert':'ferme'} aria-expanded={achatsOutilsOuverts} aria-controls="vrm-achats-outils" aria-label="Plus : fournisseurs, délai, lots" title="Fournisseurs · Délai · Lots" onClick={()=>setAchatsOutilsOuverts(v=>!v)}><Icon name="more" size={20}/></button>}
         </div>}
         {/* (31 oct., soir) Achats ne montre plus les colis à retirer : une ligne mène
             à Colis (colonne « À retirer » et son détail). Le nombre est celui de la
@@ -54756,9 +54756,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* (la barre d'outils est remontée sous le titre, comme sur Ventes) */}
         {buys.loading && !buys.items && <Skeleton variant="row" count={5}/>}
         {buys.error && <LoadError onRetry={()=>loadOrders('purchased',setBuys,true)}/>}
-        {!modeRetraits && buys.items && !buys.error && buysBase.length===0 && (
-          <EmptyState icon="bag" title="Aucun achat pour l'instant"
-            desc="Tes achats Vinted arrivent ici tout seuls dès que l'extension a capté ton compte. Rien à faire."/>
+        {!modeRetraits && buys.items && !buys.error && buysBase.length===0 && (buys.items.length>0
+          // (5 nov.) Des achats existent, mais tous sur des comptes écartés : « aucun achat » serait faux.
+          ? <div data-achats-vide="ecartes"><EmptyState icon="bag" title="Tes achats sont sur des comptes écartés"
+              desc="Les comptes écartés n'entrent dans aucun écran ni aucun total. Paramètres → Comptes liés pour les remettre."/></div>
+          : <div data-achats-vide="aucun"><EmptyState icon="bag" title="Aucun achat pour l'instant"
+              desc="Tes achats Vinted arrivent ici tout seuls dès que l'extension a capté ton compte. Rien à faire."/></div>
+        )}
+        {/* (5 nov.) Un filtre ou une recherche qui ne trouve rien le DIT (avant : une liste vide, muette). */}
+        {!modeRetraits && buys.items && !buys.error && buysBase.length>0 && achatsAffiches.length===0 && aFilter!=='attente' && (
+          <div className="vrm-achats-vide" data-achats-vide={ordSearchDiff.trim() ? 'recherche' : aFilter} style={{color:C.muted}}>
+            <span>{ordSearchDiff.trim() ? `Aucun achat pour « ${ordSearchDiff.trim().slice(0,40)} »` : aFilter==='route' ? 'Rien en route en ce moment' : aFilter==='recus' ? 'Aucun achat arrivé sur cette période' : 'Aucun achat sur cette période'}</span>
+            {ordSearchDiff.trim() ? <button type="button" className="vrm-lien-action" data-achats-effacer="" onClick={()=>setOrdSearch('')}>Effacer la recherche</button> : null}
+          </div>
         )}
         {/* ⚠️ SUR ORDINATEUR, LA LISTE SE RANGE EN DEUX COLONNES.
             Une ligne de vente de 980 px pour une photo, un titre et un
@@ -54799,11 +54809,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <span className="vrm-buy-statut" style={{color:C.text}}><i style={{background:st.color}}/>{st.label}</span>
                   {/* (5 nov., revue 2.16) Achats : le compte en mots, sans pastille de couleur (hors palette). */}
                   {!unCompte && <AcctTag acc={o._acc} name={accNameOf(o._acc)} pastille={false}/>}
-                  <span style={{whiteSpace:'nowrap'}}>{o.date?dateFr(o.date, {day:'numeric',month:'short'}):''}
+                  <span style={{whiteSpace:'nowrap'}}>{o.date?dateFr(o.date, new Date(o.date).getFullYear()===new Date().getFullYear() ? {day:'numeric',month:'short'} : {day:'numeric',month:'short',year:'numeric'}):''}
                   {/* DEPUIS COMBIEN DE TEMPS : « dois-je m'inquiéter ? ». Au-delà de
                       trois semaines, en rouge — le moment de relancer le vendeur. */}
                   {!cancelled && !st.retour && st.step>=1 && st.step<4 && (()=>{ const t=tsCommande(o); if(!t) return null; const j=Math.floor((Date.now()-t)/86400000); if(j<2) return null; const tard=j>ACHAT_RETARD_J; return <span style={{fontWeight:tard?700:500,color:tard?C.warn:C.muted,whiteSpace:'normal'}}> · depuis {j} j{tard?' — relance le vendeur':''}</span>; })()}</span>
-                  {tk && tk.lieu && st.step===3 && <span style={{color:C.text}}>· {tk.lieu}</span>}
+                  {tk && tk.lieu && st.step===3 && <span style={{color:C.text}} title={tk.lieu}>· {(cleanLieu(tk.lieu).nom || tk.lieu)}</span>}
                   {numA!=null && <span title="Numéro de l'article (lien avec l'annonce / la vente)" style={{fontWeight:600,color:C.text}}>N°{numA}</span>}
                   {o._fromEmail && <span title="Reconstituée depuis l'email — pas encore confirmée par Vinted" style={{fontSize:11,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:12,padding:'0 6px'}}>email</span>}
                 </div>
@@ -54842,7 +54852,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 )}
               </div>
               {/* Prix à deux décimales et une virgule (jamais « 21.0 € » brut). */}
-              <div className="vrm-buy-price" style={{color:C.text}}>{montantCommande(o).toFixed(2).replace('.',',')}{' '}{cur(o.price?.currency_code)}</div>
+              <div className="vrm-buy-price" style={{color:C.text}}>{montantCommande(o).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})}{' '}{cur(o.price?.currency_code)}</div>
               {/* Actions rapides : suivre · code en accès direct ; le reste dans un
                   menu « … » (attestations, étiquette SKU, note interne, masquer). */}
               {(() => {
@@ -54896,7 +54906,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             faisait 72 880 px sur iPhone — quatre-vingt-six écrans. */}
         {achatsAffiches.length > achatsMax && (
           <Bouton variante="secondaire" plein onClick={()=>setAchatsMax(n=>n+120)} style={{marginTop:10}}>
-            Voir plus — {achatsMax} affichés sur {achatsAffiches.length}
+            {achatsAffiches.length - achatsMax <= 120 ? `Voir les ${achatsAffiches.length - achatsMax} derniers` : 'Voir plus'} — {achatsMax} affichés sur {achatsAffiches.length.toLocaleString('fr-FR')}
           </Bouton>
         )}
         {/* (26 oct.) Les reçus par email sont une archive, pas le geste du jour :

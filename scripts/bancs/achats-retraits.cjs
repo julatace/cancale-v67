@@ -27,6 +27,8 @@ const DIST = process.env.DIST || path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT || 8812);
 const SHOTS = process.env.SHOTS || '';
 const VUES = process.env.AR_VUES ? process.env.AR_VUES.split(',') : null;
+// Jeux (AR_JEU) : base · ecartes (tous les comptes écartés) · vide (aucun achat) · long (titre de 200 caractères).
+const JEU = process.env.AR_JEU || 'base';
 const maintenant = new Date(2026, 10, 5, 21, 30, 0);
 const MS = maintenant.getTime(), J = 864e5;
 const iso = (t) => new Date(t).toISOString();
@@ -70,9 +72,9 @@ const TRACKS = [
   vt('0000cccc-0000-4000-8000-000000000001', 'Escarpins noirs 37', 2, 'ici', { code: 'B12345', lieu: 'Thé du Coin, 13 Rue Basse, 56000 Villec', consigne: true, account: 'compte_b', conv: '' }),
 ];
 const LIGNES = [
-  { id: 'main', data: { vrm_ville: 'Villea' } },
-  { id: 'harvest_111_orders_purchased', data: { capturedAt: cap, nItems: A.length + VIEUX.length, payload: { my_orders: [...A, ...VIEUX] } } },
-  { id: 'harvest_222_orders_purchased', data: { capturedAt: cap, payload: { my_orders: [achat(5201, 'Escarpins noirs 37', FIN, 'completed', 9, 20)] } } },
+  { id: 'main', data: { vrm_ville: 'Villea', ...(JEU === 'ecartes' ? { vinted_accounts_hidden: ['111', '222'] } : {}) } },
+  { id: 'harvest_111_orders_purchased', data: { capturedAt: cap, nItems: A.length + VIEUX.length, payload: { my_orders: JEU === 'vide' ? [] : JEU === 'long' ? [achat(5900, 'Paire de baskets montantes en cuir vieilli couleur sable avec semelle crantée épaisse et lacets cirés '.repeat(2).trim(), DEPOSE, 'needs_action', 1, 7)] : [...A, ...VIEUX] } } },
+  { id: 'harvest_222_orders_purchased', data: { capturedAt: cap, payload: { my_orders: JEU === 'base' || JEU === 'ecartes' ? [achat(5201, 'Escarpins noirs 37', FIN, 'completed', 9, 20)] : [] } } },
   { id: 'harvest_111_orders_sold', data: { capturedAt: cap, payload: { my_orders: [] } } },
   { id: 'harvest_222_orders_sold', data: { capturedAt: cap, payload: { my_orders: [] } } },
   { id: 'harvest_111_suivi_5001', data: { tx: '5001', uid: '111', suivi: '81000001', transporteur: 'MONDIAL', capturedAt: cap, dernier: { t: 'Disponible pour retrait', at: ilYa(2) }, etapes: [{ t: 'Disponible pour retrait', at: ilYa(2) }] } },
@@ -150,7 +152,7 @@ const deborde = (pg) => pg.evaluate(() => { const vis = (e) => { const r = e.get
     for (const [vp, sombre, nom] of [[{ width: 390, height: 844 }, false, '390-clair'], [{ width: 390, height: 844 }, true, '390-sombre'], [{ width: 1512, height: 982 }, false, '1512-clair'], [{ width: 1512, height: 982 }, true, '1512-sombre']]) {
       if (VUES && !VUES.includes(nom)) continue;
       console.log(`\n— Colis → À retirer · ${nom}`);
-      { const { ctx, pg, errs } = await ouvrir(b, vp, sombre, 'tab=cat_bord');
+      if (JEU === 'base') { const { ctx, pg, errs } = await ouvrir(b, vp, sombre, 'tab=cat_bord');
         await essaie('retirer', async () => {
           await pg.locator('[data-colis-onglet-choix="retirer"]').first().waitFor({ timeout: 30000 });
           await pg.waitForFunction(() => { try { return !!JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); } catch (_) { return false; } }, null, { timeout: 25000 }).catch(() => {});
@@ -184,6 +186,19 @@ const deborde = (pg) => pg.evaluate(() => { const vis = (e) => { const r = e.get
       console.log(`— Achats · ${nom}`);
       { const { ctx, pg, errs } = await ouvrir(b, vp, sombre, 'tab=cat_achats&vue=achats');
         await essaie('achats', async () => {
+          if (JEU !== 'base') {
+            await pg.waitForTimeout(6000);
+            const v = await pg.evaluate(() => ({ vide: (document.querySelector('[data-achats-vide]') || { getAttribute: () => null }).getAttribute('data-achats-vide'),
+              titre: (() => { const t = document.querySelector('.vrm-buy-title'); if (!t) return null; const lh = parseFloat(getComputedStyle(t).lineHeight) || 18; return Math.round(t.getBoundingClientRect().height / lh); })() }));
+            if (JEU === 'ecartes') dit(v.vide === 'ecartes', 'tous les comptes écartés : « Tes achats sont sur des comptes écartés » (jamais « aucun achat »)', String(v.vide));
+            if (JEU === 'vide') dit(v.vide === 'aucun', 'aucun achat : l’état vide dit pourquoi et qu’il n’y a rien à faire', String(v.vide));
+            if (JEU === 'long') { await pg.locator('[data-achats-onglet="all"]').first().click().catch(() => {}); await pg.waitForTimeout(800);
+              const t = await pg.evaluate(() => { const e = document.querySelector('.vrm-buy-title'); if (!e) return null; const lh = parseFloat(getComputedStyle(e).lineHeight) || 18; return Math.round(e.getBoundingClientRect().height / lh); });
+              dit(t != null && t <= 2, 'un titre de 200 caractères tient sur deux lignes', String(t)); }
+            const d = await deborde(pg); dit(d.deb <= 1 && !d.hors.length, 'rien ne déborde', `${d.deb}px ${d.hors.join(' | ')}`);
+            if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `achats-${JEU}-${nom}.png`) });
+            return;
+          }
           const tous = pg.locator('[data-achats-onglet="all"]').first();
           await tous.waitFor({ timeout: 30000 }); await pg.waitForTimeout(3000); await tous.click(); await pg.waitForTimeout(1500);
           const m = await pg.evaluate(() => {
@@ -201,7 +216,12 @@ const deborde = (pg) => pg.evaluate(() => { const vis = (e) => { const r = e.get
           dit(m.e5001 === 'Arrivé', 'achat « déposé » que le transporteur dit livré au destinataire ⇒ « Arrivé »', String(m.e5001));
           dit(m.e5002 === 'Arrivé', '« Commande livrée ! » ⇒ « Arrivé » (plus relié à un e-mail par son titre)', String(m.e5002));
           dit(m.e5003 === 'À retirer', 'achat « déposé » sans autre preuve ⇒ « À retirer »', String(m.e5003));
-          dit(/60 affichés sur 2011/.test(m.voirPlus), '« Voir plus » honnête : tous les achats lus (2 011), 60 affichés', m.voirPlus);
+          dit(/60 affichés sur 2\D?011/.test(m.voirPlus), '« Voir plus » honnête : tous les achats lus (2 011), 60 affichés', m.voirPlus);
+          await pg.locator('input[aria-label="Rechercher un achat"]').first().fill('zzzz introuvable'); await pg.waitForTimeout(700);
+          const r = await pg.evaluate(() => ({ v: (document.querySelector('[data-achats-vide]') || { getAttribute: () => null }).getAttribute('data-achats-vide'), t: (document.querySelector('[data-achats-vide]') || {}).textContent || '' }));
+          dit(r.v === 'recherche' && /zzzz introuvable/.test(r.t), 'une recherche sans résultat le dit, avec « Effacer la recherche »', JSON.stringify(r));
+          await pg.locator('[data-achats-effacer]').first().click().catch(() => {}); await pg.waitForTimeout(500);
+          dit(await pg.locator('[data-achat-tx]').count() > 0, '« Effacer la recherche » rend la liste');
           dit(!m.vert, 'aucune couleur hors palette sur les lignes (ni vert « Reçu », ni pastille de compte)');
           await pg.locator('[data-achats-plus]').first().click(); await pg.waitForTimeout(400);
           dit(await pg.locator('[data-achats-outils]').count() === 1, '« … » ouvre Fournisseurs · Délai · Lots');

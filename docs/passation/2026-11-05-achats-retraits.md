@@ -95,3 +95,45 @@ suivi, 28 e-mails gardés, 27 suivis Vinted, 61 statuts transporteur, 22 codes l
 - Les e-mails gardés avant le 3 nov. ont un lien de conversation coupé (2 000 caractères) : sans
   code, ils ne se relient à rien et finissent « à vérifier » ou « en double ».
 - `audit-villes-colis` (1) et `audit-statut-transporteurs` (3) étaient déjà rouges sur la base.
+
+## Les améliorations, une par ligne (avant → après)
+Zone : Achats et Colis → À retirer. États parcourus au banc `achats-retraits` (jeux `base`, `vide`,
+`ecartes`, `long` ; 390 tactile et 1512 ; clair et sombre ; 2 011 achats) et sur sa copie.
+1. « À retirer » sur sa copie : 22 (33 en base le soir) → 10.
+2. E-mail Vinted relié à sa commande dont le n° est « livré au destinataire » : compté → fini.
+3. « Utilise le code X » et la consigne retirée au même code : deux colis → un colis fini.
+4. Deux lignes au même code de retrait : deux lignes → une (la plus complète, l'autre la complète).
+5. Moitiés Vinted dont le colis transporteur est déjà retiré : « à retirer » le lendemain → « peut-être en double ».
+6. Moitié Vinted d'une commande sans n° de suivi, au point d'un Mondial Relay : comptée deux fois → une fois.
+7. Doute : même lieu par le CODE POSTAL seul → même lieu (nom + CP) et même adresse de réception, ±3 j.
+8. Un témoin relié à une autre commande : pouvait faire douter → jamais.
+9. « Peut-être en double » : mêlé à « à vérifier » (31) → section repliée à part, jamais comptée.
+10. Carte « à vérifier » 31 / liste 3 → la carte et la liste disent le même nombre (7).
+11. Lignes sans n° de suivi : clé vide, écrasées l'une par l'autre → clé de la ligne (jamais vide).
+12. Un point avec un colis prêt et un code à venir : deux cartes → une carte, dans la section la plus pressée.
+13. Section d'un point qui porte un code à venir : « Prêts à retirer » → « À retirer ».
+14. En-tête d'un point : « 7 colis » → « 7 colis · 1 code à venir » quand c'est le cas.
+15. Écran équipe : « Commande livrée ! » et « non réclamée » comptés à retirer → seul « au point relais ».
+16. Achats : l'e-mail d'un achat trouvé par le TITRE → par la conversation ou le n° de suivi (§5).
+17. Achats : « Commande livrée ! » affiché « À retirer » → « Arrivé ».
+18. Achats : achat « déposé » que le transporteur dit livré → « Arrivé ».
+19. Achats : « Reçu » (mot réservé à l'argent) → « Arrivé » ; « Reçus » → « Arrivés » (carte et barre).
+20. Achats : « En transit » → « En route ».
+21. Achats : point vert « Reçu » hors palette → neutre.
+22. Achats : pastille de couleur du compte sur chaque ligne → le nom seul.
+23. Achats : carte sombre + grille de quatre chiffres → une seule carte (la grille reste hors espace Vinted).
+24. Achats : Fournisseurs · Délai · Lots toujours ouverts sous la carte → derrière « … » (44 px, au bout de la barre).
+25. Achats : « … » sans lien vers son panneau → `aria-expanded` + `aria-controls`.
+26. Achats : lien « N colis à retirer → Colis » sous la carte qui dit déjà « À retirer » → retiré (le nombre une fois).
+27. Achats : bandeau « pourquoi des codes manquent » après les outils → en tête de l'écran.
+28. Achats : une recherche sans résultat : liste vide muette → « Aucun achat pour « … » » + « Effacer la recherche ».
+29. Achats : « En route » vide → « Rien en route en ce moment » ; « Arrivés » vide → le dit.
+30. Achats : tous les comptes écartés → « Tes achats sont sur des comptes écartés » (plus « Aucun achat pour l'instant »).
+31. Achats : « Voir plus — 60 affichés sur 2415 » → « … sur 2 415 » ; le dernier lot dit « Voir les N derniers ».
+32. Achats : date sans année sur un achat de 2023 → l'année quand ce n'est pas cette année.
+33. Achats : le point d'un colis à retirer en capitales avec toute l'adresse → son nom (l'adresse au survol).
+34. Achats : prix d'un achat ≥ 1 000 € sans séparateur → « 1 234,00 € ».
+35. Achats : titre de 200 caractères sur plusieurs lignes → deux lignes au plus, coupé proprement.
+36. Achats : relier chaque ligne à son colis parcourait 2 fois tous les achats et tous les e-mails par ligne
+    (2 415² comparaisons de titres) → une table par transaction, construite une fois.
+37. `audit-retrait` jugeait une distance de 1 800 caractères → juge que le bandeau est dans l'écran, avant la liste.
