@@ -33,3 +33,20 @@ audit-fonctions-api, audit-fusion-nuage verts.
 - Le frein est côté app : deux appareils ont chacun le leur. Un frein serveur (par compte, en base)
   demanderait une écriture à chaque appel du relais — à décider si le relais doit survivre.
 - Piste : supprimer tout repli vers le relais (un compte jamais capté attendrait l'extension).
+
+## Suite (5 nov., soir) — la réserve du COMPTE, côté serveur
+
+Le frein de l'app est compté par appareil (ordinateur + iPhone + iPad = trois
+réserves). `/api/vinted-proxy` tient désormais la même règle (la même fonction
+`prendrePlaceRelais`, 24 requêtes par 30 min) pour le COMPTE, tous appareils
+confondus : `api/_lib/frein-relais-serveur.js`, une ligne `app_data`
+`vrm_frein_relais_{uid}` du vendeur, écrite avec SA session (RLS), en
+comparer-et-échanger sur `data.rev` (lecture projetée `rev:data->>rev,t:data->t`,
+jamais `select=data`). Freiné ⇒ 429 `{erreur:'frein'}` (l'app le rend comme son
+propre frein) ; réserve illisible ou pas écrite ⇒ 503, rien vers Vinted.
+`session.js` gagne `insererCommeVendeur` (201 → 1, 409 → 0, sinon `null`).
+
+Preuve : `scripts/audit-frein-relais-serveur.cjs` exécute la vraie route —
+7 verts ; sur `origin/main` 5 rouges ; `--muter=sans-frein` 5 rouges,
+`--muter=sans-garde` 1 rouge (cinq appuis simultanés sur la dernière place en
+font partir 3).

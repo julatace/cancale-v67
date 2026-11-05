@@ -6204,6 +6204,8 @@ const vintedApiCall = async (account, endpoint, opts = {}) => {
       body: JSON.stringify({ uid: String(account.vinted_user_id || ''), host, endpoint }),
     });
     const json = await res.json();
+    // Le serveur tient la réserve du COMPTE (tous appareils) : freiné ⇒ un échec dit.
+    if (json && json.erreur === 'frein') return { ok: false, error: 'frein', frein: true };
     // Le proxy a du rafraichir le token expire : on persiste les nouveaux tokens.
     if (json && json.refreshed) await persistRefreshedTokens(account, json.refreshed);
     return json; // { status, ok, data, refreshed? }
