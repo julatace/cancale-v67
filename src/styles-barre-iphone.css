@@ -57,6 +57,9 @@
   /* Un libellé de la barre ne se coupe jamais : 11 px dès qu'il est long
      (« Réglages », « Annonces » sur un iPhone SE). */
   html .vrm-app-shell .vrm-tabbar > .vrm-tab .vrm-nav-label { max-width: 100%; overflow: hidden; text-overflow: clip; }
+  html .vrm-app-shell .vrm-tabbar > .vrm-tab .vrm-nav-label[data-lib-long] { font-size: 11px; letter-spacing: -.01em; }
+  /* « Communauté » sur un iPhone SE : la 5ᵉ place s'élargit un peu plutôt que de couper. */
+  html .vrm-app-shell .vrm-tabbar > .vrm-nav-more:has(.vrm-nav-label[data-lib-long]) { flex-grow: 1.3; }
   /* La barre s'arrête au-dessus de l'indicateur d'accueil (zone sûre) et des
      bords arrondis en paysage. */
   html .vrm-app-shell .vrm-tabbar {

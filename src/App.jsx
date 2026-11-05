@@ -16248,7 +16248,7 @@ function MenuEcrans({ tab, setTab, dark = false, bottom = false, sites = null, b
     <>
       <button ref={declencheur} type="button" onClick={()=>setOpen(o=>!o)} className="vrm-tab vrm-nav-more" aria-label="Plus" aria-haspopup="menu" aria-expanded={open} aria-current={!dansBarre?'page':undefined} data-plus-ecran={courant?cleEntree(courant):''}>
         <span aria-hidden="true" className="vrm-tab-ic" style={{display:'flex',position:'relative'}}>{courant ? <NavigationIcon item={courant} size={22} style={{strokeWidth:2}}/> : <Icon name="more" size={24} style={{strokeWidth:1.6}}/>}{pointPlus ? <span className="vrm-nav-badge vrm-nav-badge-point vrm-nav-badge-barre" data-badge-nav="plus" data-badge-n="point" aria-hidden="true"/> : null}</span>
-        <span className="vrm-nav-label">{courant ? (courant.court || courant.label) : 'Plus'}</span>
+        {(() => { const lib = courant ? (courant.court || courant.label) : 'Plus'; return <span className="vrm-nav-label" data-lib-long={lib.length > 8 ? '1' : undefined}>{lib}</span>; })()}
       </button>
       {/* Le PANNEAU « Plus » (5 nov.) : une grille de tuiles posée AU-DESSUS de
           la barre — la barre reste visible et touchable, rien n'est caché sous
@@ -16303,7 +16303,6 @@ function MenuEcrans({ tab, setTab, dark = false, bottom = false, sites = null, b
 }
 
 // Retrouver sa position après un passage dans un autre écran.
-let _premierEcranDefile=true;
 function MemoireDefilement({ ecran }) {
   const positions=React.useRef(new Map());
   React.useLayoutEffect(()=>{
@@ -16339,7 +16338,7 @@ function MemoireDefilement({ ecran }) {
     boucle();
     // Au premier écran après une ouverture, les données arrivent du nuage : on
     // tient la position plus longtemps (6 s), sauf geste de la personne.
-    const tenir=_premierEcranDefile?6000:2500; _premierEcranDefile=false;
+    const tenir=MemoireDefilement.dejaRendu?2500:6000; MemoireDefilement.dejaRendu=true;
     const delai=setTimeout(()=>{restauration=false;position=main.scrollTop;cancelAnimationFrame(image);},tenir);
     return ()=>{
       arrete=true;clearTimeout(delai);cancelAnimationFrame(image);window.removeEventListener('pagehide',garderPosition);document.removeEventListener('visibilitychange',auMasquage);

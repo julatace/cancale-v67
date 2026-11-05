@@ -240,6 +240,14 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         dit(e6.ecran === 'compta' && e6.plusEcran === 'compta' && e6.courant === 'page', `B6 ${qui} : sur Compta, la 5ᵉ place dit Compta`, JSON.stringify(e6));
         const m6 = await mesureBarre(pg);
         dit(m6.entrees.every((e) => !e.coupe), `B6 ${qui} : son libellé n'est pas coupé`, JSON.stringify(m6.entrees.filter((e) => e.coupe)));
+        // Chaque écran de « Plus » : la 5ᵉ place le dit, libellé entier.
+        const vus = [];
+        for (const id of ['messages', 'garage', 'achats', 'dashboard', 'communaute', 'settings']) {
+          await toucher(pg, PLUS); await toucher(pg, `.vrm-sheet [data-nav-entree="${id}"]`);
+          const x = await pg.evaluate(() => { const b = document.querySelector('.vrm-tabbar button[aria-label="Plus"]'); const l = b.querySelector('.vrm-nav-label'); return { e: b.getAttribute('data-plus-ecran'), coupe: l.scrollWidth > l.clientWidth + 1, lib: l.innerText }; });
+          vus.push({ id, ...x });
+        }
+        dit(vus.every((v) => v.e === v.id && !v.coupe), `B6 ${qui} : Messages, Stock, Achats, Stats, Communauté, Réglages — la 5ᵉ place dit l'écran, libellé entier`, JSON.stringify(vus));
         // B7 · balayages
         await toucher(pg, '.vrm-tabbar [data-nav-entree="ventes"]');
         const avant7 = await ecran(pg);

@@ -11,6 +11,7 @@ const vue=source.slice(source.indexOf('function useVueSession('),source.indexOf(
  import{installerMasque}from'./src/montantsCaches.js';
  import{RecapSelection,HistoriqueModifications}from'./src/OutilsParcours.jsx';import Periode from'./src/ChoixPeriode.jsx';
  import{lireParcours,garderParcours,noterChangements,restaurerVue}from'./src/parcoursQuotidien.js';
+ import{stockageParcours}from'./src/repriseEcran.js';
  const AUTH={get user(){return{id:window.owner}}};${scroll}
  const vuesSession=new Map();window.viderVues=()=>vuesSession.clear();window.owner='A';const readSession=()=>({user:{id:window.owner}});${vue}
  const r=createRoot(document.getElementById('root'));window.changes=[];
