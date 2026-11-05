@@ -1,0 +1,83 @@
+/* ── PUBLIER AILLEURS (5 nov.) — src/PublierAilleurs.jsx ───────────────────
+   La feuille des outils d'annonce (styles-annonces-outils.css), une carte par
+   site : frise des quatre étapes, ce qui manque, ce qui part, le geste. Jetons
+   `--fu-*` (clair et sombre). Couleurs : encre et gris ; l'AMBRE seulement pour
+   un manque bloquant (un geste à faire, §7). */
+.vrm-pa-feuille { max-width: 600px; }
+.vrm-pa-article, .vrm-pa-paires button {
+  display: flex; align-items: center; gap: 12px; width: 100%; box-sizing: border-box; text-align: left;
+  background: var(--fu-carte, #fff); border-radius: 20px; padding: 10px 12px; box-shadow: var(--fu-ombre); color: inherit;
+}
+.vrm-pa-article { margin-bottom: 12px; }
+.vrm-pa-paire-photo { flex: none; width: 48px; height: 60px; border-radius: 12px; overflow: hidden; background: var(--fu-case, #f2f2f7); }
+.vrm-pa-paire-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.vrm-pa-paire-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.vrm-pa-paire-txt > b { font-size: 15px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-pa-paire-txt > span { font-size: 13px; color: var(--fu-gris, #6e6e73); overflow-wrap: anywhere; }
+.vrm-pa-partout { white-space: nowrap; margin-left: 6px; color: var(--fu-encre, #1d1d1f); }
+.vrm-pa-paire-prix { flex: none; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.vrm-pa-cherche {
+  width: 100%; box-sizing: border-box; min-height: 48px; border-radius: 14px; border: 0; padding: 0 14px; margin-bottom: 10px;
+  background: var(--fu-carte, #fff); color: inherit; font: inherit; font-size: 17px; box-shadow: var(--fu-ombre);
+}
+.vrm-pa-paires { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.vrm-pa-paires button { border: 0; min-height: 64px; cursor: pointer; font: inherit; }
+
+.vrm-pa-site { background: var(--fu-carte, #fff); border-radius: 20px; box-shadow: var(--fu-ombre); padding: 12px 14px 14px; margin-bottom: 12px; }
+.vrm-pa-site-tete { display: flex; align-items: center; gap: 10px; min-height: 32px; }
+.vrm-pa-site-nom { flex: 1; min-width: 0; font-size: 17px; font-weight: 700; display: flex; align-items: center; }
+.vrm-pa-etat { flex: none; font-size: 13px; font-weight: 700; color: var(--fu-gris, #6e6e73); }
+.vrm-pa-site[data-pa-etat="vue-en-ligne"] .vrm-pa-etat, .vrm-pa-site[data-pa-etat="publiee"] .vrm-pa-etat { color: var(--fu-encre, #1d1d1f); }
+.vrm-pa-etat[data-ton="geste"] { color: var(--fu-ambre-txt, #b25000); }
+
+.vrm-pa-frise { list-style: none; margin: 10px 0 8px; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+.vrm-pa-frise li { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; color: var(--fu-gris, #6e6e73); }
+.vrm-pa-pastille {
+  width: 26px; height: 26px; border-radius: 999px; display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700; background: var(--fu-case, #f2f2f7); color: var(--fu-gris, #6e6e73); font-variant-numeric: tabular-nums;
+}
+.vrm-pa-etape-nom { font-size: 12px; font-weight: 600; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.vrm-pa-frise li[data-pa-etape-etat="fait"] { color: var(--fu-encre, #1d1d1f); }
+.vrm-pa-frise li[data-pa-etape-etat="fait"] .vrm-pa-pastille { background: var(--fu-encre, #1d1d1f); color: var(--fu-carte, #fff); }
+.vrm-pa-frise li[data-pa-etape-etat="ici"] { color: var(--fu-encre, #1d1d1f); }
+.vrm-pa-frise li[data-pa-etape-etat="ici"] .vrm-pa-pastille { box-shadow: inset 0 0 0 2px var(--fu-encre, #1d1d1f); background: transparent; color: var(--fu-encre, #1d1d1f); }
+.vrm-pa-frise li[data-pa-etape-etat="a-corriger"] { color: var(--fu-ambre-txt, #b25000); }
+.vrm-pa-frise li[data-pa-etape-etat="a-corriger"] .vrm-pa-pastille { background: var(--fu-ambre-fond, #fff4e5); color: var(--fu-ambre-txt, #b25000); }
+
+.vrm-pa-manques { list-style: none; margin: 4px 0 8px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.vrm-pa-manques li { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 12px; background: var(--fu-case, #f2f2f7); }
+.vrm-pa-manques li[data-bloque="1"] { background: var(--fu-ambre-fond, #fff4e5); color: var(--fu-ambre-txt, #b25000); }
+.vrm-pa-manques b { font-size: 14px; font-weight: 700; }
+.vrm-pa-manques small { font-size: 13px; color: var(--fu-gris, #6e6e73); }
+.vrm-pa-manques li[data-bloque="1"] small { color: inherit; }
+.vrm-pa-rien { margin: 4px 0 8px; font-size: 13px; color: var(--fu-gris, #6e6e73); }
+
+.vrm-pa-apercu { border-top: 1px solid var(--fu-filet, rgba(0,0,0,.06)); margin-top: 4px; }
+.vrm-pa-apercu-bouton {
+  display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 44px; border: 0; background: transparent;
+  color: inherit; font: inherit; font-size: 15px; font-weight: 700; padding: 0; cursor: pointer;
+}
+.vrm-pa-dl { margin: 0 0 6px; display: flex; flex-direction: column; gap: 8px; }
+.vrm-pa-dl > div { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 8px; align-items: start; }
+.vrm-pa-dl dt { font-size: 13px; color: var(--fu-gris, #6e6e73); font-weight: 600; }
+.vrm-pa-dl dd { margin: 0; font-size: 14px; overflow-wrap: anywhere; min-width: 0; }
+.vrm-pa-dl dd small { color: var(--fu-gris, #6e6e73); font-size: 12px; }
+.vrm-pa-desc dd { white-space: pre-wrap; max-height: 168px; overflow-y: auto; font-size: 13px; line-height: 1.45; background: var(--fu-case, #f2f2f7); border-radius: 12px; padding: 8px 10px; }
+.vrm-pa-vignettes { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+.vrm-pa-vignette { width: 36px; height: 46px; border-radius: 8px; overflow: hidden; background: var(--fu-case, #f2f2f7); }
+.vrm-pa-vignette img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.vrm-pa-plus { font-size: 13px; font-weight: 700; color: var(--fu-gris, #6e6e73); padding-left: 2px; }
+.vrm-pa-actions { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.vrm-pa-actions .vrm-ao-second { align-self: stretch; }
+.vrm-pa-note { font-size: 12px; color: var(--fu-gris, #6e6e73); }
+@media (max-width: 380px) { .vrm-pa-dl > div { grid-template-columns: 76px minmax(0, 1fr); } }
+
+/* L'entrée « Publier ailleurs » dans Annonces · Leboncoin / eBay / Vestiaire. */
+.vrm-pa-entree { margin: 12px 16px 0; }
+.vrm-pa-entree button {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 52px; box-sizing: border-box; border: 0; border-radius: 16px;
+  background: var(--fu-carte, #fff); box-shadow: var(--fu-ombre); color: var(--fu-encre, #1d1d1f); font: inherit; font-size: 15px; font-weight: 700;
+  padding: 0 14px; cursor: pointer; text-align: left;
+}
+.vrm-pa-entree button > span:nth-child(2) { flex: 1; min-width: 0; }
+.vrm-pa-entree small { display: block; font-size: 12px; font-weight: 500; color: var(--fu-gris, #6e6e73); }

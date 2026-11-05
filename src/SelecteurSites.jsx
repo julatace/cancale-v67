@@ -19,7 +19,7 @@ export default function SelecteurSites({ id, options = [], valeur, onChoix, labe
     <div className="vrm-rangee vrm-filtres vrm-filtre-site vrm-sel-sites" role="group" aria-label={label}
       data-filtre-site={id} data-selecteur-logos="" data-n={options.length}>
       {options.map((o) => (
-        <button key={o.id} type="button" aria-pressed={valeur === o.id} data-site={o.id} aria-label={o.nom} title={o.nom}
+        <button key={o.id} type="button" aria-pressed={valeur === o.id} data-site={o.id} data-sans-compte={o.sansCompte ? '' : undefined} aria-label={o.nom} title={o.sansCompte ? `${o.nom} · aucun compte relié` : o.nom}
           onClick={() => onChoix && onChoix(o.id)}>
           <span className="vrm-ss-in">
             {o.logo

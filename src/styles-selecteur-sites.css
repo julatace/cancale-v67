@@ -30,3 +30,6 @@
 .vrm-logo-site[data-logo-site="ebay"] { width: 1.5em; }
 /* Le compte de la vente sur la carte Fusion (une ligne, coupée proprement). */
 .vrm-fu-compte { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Un site sans compte relié : le même segment, estompé (il reste choisissable :
+   son onglet dit ce qui manque et le geste). */
+.vrm-sel-sites > button[data-sans-compte][aria-pressed="false"] .vrm-ss-in { opacity: .45; }
