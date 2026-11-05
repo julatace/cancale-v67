@@ -12,6 +12,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
+const { routeMain, ecritesMain, attendre } = require('./_base-ecritures.cjs');
 const http = require('http'), fs = require('fs'), path = require('path');
 
 const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');   // jamais un chemin absolu (§6.1)
@@ -38,7 +39,11 @@ const ecouter = () => new Promise((res, rej) => {
   srv.listen(PORT, () => res());
 });
 
-// `etat` : { main, listings, ecrits[], ebay: { brouillons, listings } | null, panneEcriture }
+// `etat` : { main, listings, ecritures[], ebay: { brouillons, listings } | null, panneEcriture }
+// (5 nov.) `main` à la VRAIE forme (`routeMain`, _base-ecritures.cjs) : PATCH
+// conditionnel sur `data->>rev`, écriture acceptée gardée. Avant, ce banc ne
+// comptait qu'un corps `{ id: 'main' }` (l'ancien upsert) et ne jugeait aucune
+// écriture : « le N°74 » n'était vérifié que dans le navigateur.
 async function brancher(pg, etat) {
   await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ access_token: JETON, refresh_token: 'r', expires_in: 3600, user: SESSION.user }) }));
   await pg.route('**/rest/v1/**', (r) => {
@@ -46,16 +51,14 @@ async function brancher(pg, etat) {
     const u = decodeURIComponent(metaVersData(req.url()));
     const json = (d, st = 200) => r.fulfill({ status: st, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'content-range': '0-0/0' }, body: JSON.stringify(d) });
     if (/select=owner/.test(u)) return json([]);
+    if (!etat.ecritures) etat.ecritures = [];
+    if (etat.panneEcriture) etat.panne = () => true;
+    const m = routeMain(req, etat); if (m) return r.fulfill({ status: m.status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: typeof m.body === 'string' ? m.body : JSON.stringify(m.body) });
     if (req.method() !== 'GET') {
-      try { const b = JSON.parse(req.postData() || '[]'); (Array.isArray(b) ? b : [b]).forEach((row) => { if (row && row.id === 'main' && row.data) { etat.ecrits.push(row.data); if (!etat.panneEcriture && etat.garder) etat.main = { ...etat.main, ...row.data }; } }); } catch (_) {}
       if (etat.panneEcriture && /app_data/.test(u)) return json({ code: '57014', message: 'canceling statement due to statement timeout' }, 500);
       return json([]);
     }
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return json([COMPTE]);
-    if (/id=eq\.main/.test(u)) {
-      if (/vrm_numerotation/.test(u)) return json([{ v: null }]);
-      return json([{ id: 'main', data: etat.main }]);
-    }
     if (/orders_/.test(u) && /harvest_/.test(u) && etat.ventes) {
       const rows = [{ id: `harvest_${UID}_orders_sold`, data: { capturedAt: new Date().toISOString(), payload: { my_orders: etat.ventes || [] } } }, { id: `harvest_${UID}_orders_purchased`, data: { capturedAt: new Date().toISOString(), payload: { my_orders: [] } } }];
       return json(rows.filter((x) => /like\./.test(u) || u.includes(x.id)).map((x) => ({ ...x, cap: x.data.capturedAt, n: String(x.data.payload.my_orders.length) })));
@@ -149,6 +152,9 @@ async function pageVinted(nav, chemin, reponses, taille) {
       dit(String((loc['10499999999'] || {}).numero) === '74', 'l\'annonce publiée prend le N°74 affiché à côté du bouton (pas le suivant)', String((loc['10499999999'] || {}).numero));
       const autre = String((loc['10499999998'] || {}).numero || '');
       dit(!!autre && !['73', '74', '75'].includes(autre), 'l\'autre annonce neuve ne prend aucun numéro réservé (ni 74, ni 75 en attente)', `N°${autre}`);
+      await attendre(() => { const n = (etat.main && etat.main.vinted_annonce_numeros) || {}; return !!(n['10499999999'] && n['10499999998']); }, 10000);
+      const nuage = (etat.main && etat.main.vinted_annonce_numeros) || {};
+      dit(ecritesMain(etat).length > 0 && String((nuage['10499999999'] || {}).numero) === '74' && String((nuage['10499999998'] || {}).numero) === autre && String((nuage['4001'] || {}).numero) === '73', 'le nuage porte le N°74 réservé, le numéro de l\'autre neuve, et 73 inchangé', `${ecritesMain(etat).length} écriture(s) · ${JSON.stringify(Object.fromEntries(Object.entries(nuage).map(([k, e]) => [k, e && e.numero])))}`);
       await ctx.close();
     }
     {
@@ -162,6 +168,8 @@ async function pageVinted(nav, chemin, reponses, taille) {
       await pg.waitForTimeout(8000);
       const loc = await fichesLocales(pg) || {};
       dit(!(loc['10499999999'] && loc['10499999999'].numero), 'aucun numéro donné tant que les réservations ne sont pas lues', JSON.stringify(loc['10499999999'] || null));
+      const ec = ecritesMain(etat);
+      dit(ec.length > 0 && !ec.some((d) => d.vinted_annonce_numeros && d.vinted_annonce_numeros['10499999999'] && d.vinted_annonce_numeros['10499999999'].numero), 'et rien de ce qui part au nuage ne lui en donne un', `${ec.length} écriture(s)`);
       await ctx.close();
     }
   } catch (e) { dit(false, 'le banc a tourné jusqu\'au bout', String(e && e.message).slice(0, 160)); }

@@ -5,9 +5,8 @@
 // L'écran Achats RENDU sur un scénario INVENTÉ (aucune donnée réelle) servi par
 // le mini PostgREST (projections `select=` comprises : la transaction d'un achat
 // est lue en scalaires) :
-//   · Fournisseurs : pseudo lu dans SA transaction, sinon « Vinted » ; un lot
-//     compté une fois ; reliés N/M ; bénéfice « au plus » / « — » ; hors plateforme
-//     relié par SON N° ; triable ;
+//   · Fournisseurs (5 nov.) : les personnes QU'IL crée ; aucun vendeur Vinted
+//     (pseudo lu dans une transaction) n'y apparaît — détail : fournisseurs.cjs ;
 //   · Délai : médiane, mois, exclus comptés ; « Reçus, pas encore en ligne » ;
 //     « Relier » un N° (son tap) écrit le lien et le prix ;
 //   · Lots : « Répartir » — somme fausse ⇒ « Reste » et Enregistrer grisé ; rien
@@ -106,25 +105,17 @@ async function passe(b, nom, ctxOpts, sombre) {
   dit(cibles.length === 3 && cibles.every((h) => h >= 44), `${nom} · entrées à 44 px au doigt`, JSON.stringify(cibles));
   await capture(pg, `${nom}-ecran`);
 
-  // ── Fournisseurs
+  // ── Fournisseurs (5 nov.) : les personnes QU'IL crée — aucun vendeur Vinted
+  //    (vendeuse_x, grossiste_y : pseudos lus dans les transactions) n'y entre.
+  //    Le détail (création, achat en gros, N° reliés) : scripts/bancs/fournisseurs.cjs.
   await pg.locator('[data-aso-ouvrir="fournisseurs"]').click();
   await pg.locator('[data-aso-feuille="fournisseurs"][data-aso-etat="lu"]').waitFor({ timeout: 20000 }).catch(() => {});
-  const F = await pg.$$eval('[data-aso-fournisseur]', (els) => Object.fromEntries(els.map((e) => [e.getAttribute('data-aso-fournisseur'), {
-    achats: +e.dataset.asoAchats, depense: +e.dataset.asoDepense, relies: +e.dataset.asoRelies, revendus: +e.dataset.asoRevendus, benefice: e.dataset.asoBenefice, partiel: e.dataset.asoPartiel, txt: e.innerText }])));
-  const x = F['v:vendeuse_x'], g = F['v:grossiste_y'], v = F['v:?'], br = F['h:brocante'];
-  dit(x && x.achats === 2 && x.depense === 7000 && x.relies === 2 && x.revendus === 1 && x.benefice === '4000' && x.partiel === '1' && /au plus/.test(x.txt), `${nom} · vendeuse_x : 2 achats, 70 €, reliés 2/2, 1 revendu, « au plus +40 € »`, JSON.stringify(x));
-  dit(g && g.achats === 1 && g.depense === 9000 && g.relies === 1 && g.revendus === 0 && g.benefice === '', `${nom} · le LOT de 90 € compté une fois (jamais 90 + 12), bénéfice « — »`, JSON.stringify(g));
-  dit(v && v.achats === 2 && v.depense === 6300 && v.relies === 0 && /Vinted/.test(v.txt), `${nom} · pseudo pas lu ⇒ « Vinted » (le remboursé n'est nulle part)`, JSON.stringify(v));
-  dit(br && br.relies === 1 && br.revendus === 1 && br.benefice === '2000', `${nom} · hors plateforme « Brocante » relié par SON N°`, JSON.stringify(br));
-  const couv = await pg.locator('[data-aso-pseudo-lu]').getAttribute('data-aso-pseudo-lu').catch(() => '');
-  const sur = await pg.locator('[data-aso-pseudo-sur]').getAttribute('data-aso-pseudo-sur').catch(() => '');
-  dit(couv === '3' && sur === '5', `${nom} · pseudo lu 3/5`, `${couv}/${sur}`);
+  const fTexte = await pg.locator('[data-aso-feuille="fournisseurs"]').innerText().catch(() => '');
+  dit(await pg.locator('[data-fo-vide]').count() === 1 && !(await pg.locator('[data-fo-fournisseur]').count()), `${nom} · aucun fournisseur créé : la liste est vide et dit le geste`);
+  dit(!/vendeuse_x|grossiste_y|boutique_nord/i.test(fTexte), `${nom} · aucun vendeur Vinted n'apparaît dans Fournisseurs`, fTexte.slice(0, 120));
   const portail = await pg.evaluate(() => { const f = document.querySelector('[data-aso-feuille]'); return !!f && f.parentElement === document.body; });
   dit(portail, `${nom} · la feuille passe par un portail`);
   await capture(pg, `${nom}-fournisseurs`);
-  await pg.locator('[data-aso-tri-choix="benefice"]').click();
-  const ordre = await pg.$$eval('[data-aso-fournisseur]', (els) => els.map((e) => e.getAttribute('data-aso-fournisseur')));
-  dit(ordre[0] === 'v:vendeuse_x' && ordre.slice(-2).every((c) => c === 'v:?' || c === 'v:grossiste_y'), `${nom} · tri par bénéfice, les « — » en dernier`, ordre.join(','));
   const deborde = await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
   dit(!deborde, `${nom} · aucun défilement horizontal`);
   await pg.keyboard.press('Escape'); await pg.waitForTimeout(200);

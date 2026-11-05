@@ -118,22 +118,23 @@ async function main() {
         await champ.fill('adidas'); await pg.waitForTimeout(600);
         const adi = await pg.evaluate(() => document.body.innerText);
         dit(/Adidas Spezial/.test(adi), `${T} l'autre sens : la paire du compte vivant est trouvée`);
-        // MODE STREAM : allumé dans Réglages, les noms de comptes sont floutés.
+        // MODE STREAM : allumé d'un tap (le bouton « Stream » de l'en-tête, 5 nov. —
+        // il remplace la pastille et l'œil), les noms de comptes sont CACHÉS (« ••• »).
         await pg.keyboard.press('Escape').catch(() => {});
         // (31 oct.) Échap ferme le panneau de recherche, qui retire son entrée
         // d'historique (retour) : on la laisse partir avant de naviguer.
         await pg.waitForTimeout(600);
-        await pg.goto(`http://localhost:${PORT}/?tab=settings`, { waitUntil: 'domcontentloaded' });
-        const inter = pg.locator('[data-stream-reglage] button[role="switch"]');
-        await inter.waitFor({ timeout: 12000 }); await inter.scrollIntoViewIfNeeded(); await inter.click();
-        const pastille = await pg.locator('[data-stream-pastille]').count();
         await pg.goto(`http://localhost:${PORT}/?tab=vintedaccounts`, { waitUntil: 'domcontentloaded' });
         await pg.getByText('compte_vivant').first().waitFor({ timeout: 12000 });
-        const flou = await pg.evaluate(() => { const e = document.querySelector('.vrm-sensible'); return e ? getComputedStyle(e).filter : ''; });
-        dit(pastille === 1 && /blur/.test(flou), `${T} mode stream : la pastille apparaît et le nom du compte est flouté (même après rechargement)`, `pastille ${pastille} · ${flou}`);
-        await pg.locator('[data-stream-pastille]').first().click();
-        const net = await pg.evaluate(() => { const e = document.querySelector('.vrm-sensible'); return e ? getComputedStyle(e).filter : ''; });
-        dit(!/blur/.test(net), `${T} un clic sur la pastille arrête le flou`, net);
+        const bouton = pg.locator('[data-bouton-stream]');
+        await bouton.first().waitFor({ timeout: 12000 }); await bouton.first().click();
+        await pg.waitForTimeout(400);
+        const cache = await pg.evaluate(() => ({ pousse: (document.querySelector('[data-bouton-stream]') || { getAttribute: () => null }).getAttribute('aria-pressed'), lisible: /compte_vivant/.test(document.body.innerText) }));
+        dit(cache.pousse === 'true' && !cache.lisible, `${T} mode stream : le bouton le dit et le nom du compte est caché`, JSON.stringify(cache));
+        await pg.locator('[data-bouton-stream]').first().click();
+        await pg.waitForTimeout(400);
+        const net = await pg.evaluate(() => /compte_vivant/.test(document.body.innerText));
+        dit(net, `${T} un tap sur « Stream » rend le nom`, String(net));
         dit(!errs.length, `${T} aucune erreur d’app`, errs[0]);
         await ctx.close();
       });

@@ -31,10 +31,11 @@
 // ════════════════════════════════════════════════════════════════════════════
 const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
+const { routeMain, ecritesMain } = require('./_base-ecritures.cjs');
 const http = require('http'), fs = require('fs'), path = require('path');
 
-const DIST = path.join(__dirname, '..', '..', 'dist');   // jamais un chemin absolu (§6.1)
-const PORT = 4511;
+const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');   // jamais un chemin absolu (§6.1)
+const PORT = Number(process.env.BANC_PORT) || 4511;
 const MIME = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css', '.json':'application/json', '.png':'image/png', '.svg':'image/svg+xml', '.webmanifest':'application/manifest+json' };
 const JETON = 'jeton-de-banc';
 const SESSION = { access_token: JETON, refresh_token: 'r', expires_at: Date.now() + 3600e3, user: { id: '11111111-2222-3333-4444-555555555555', email: 'vendeur@exemple.fr' } };
@@ -88,27 +89,30 @@ async function page(ctx, etat) {
   await pg.route('**/rest/v1/**', (r) => {
     const req = r.request();
     const u = decodeURIComponent(metaVersData(req.url()));
-    const json = (d, s = 200) => r.fulfill({ status: s, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
-    if (/select=owner/.test(u)) return json([]);
-    if (req.method() !== 'GET') {
-      let rows = []; try { const b = JSON.parse(req.postData() || '[]'); rows = Array.isArray(b) ? b : [b]; } catch (_) {}
-      const m = rows.find((x) => x && x.id === 'main' && x.data);
-      if (m) {
-        etat.tentatives.push(Date.now());
+    const json = (d, s = 200) => r.fulfill({ status: s, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: typeof d === 'string' ? d : JSON.stringify(d) });
+    if (/select=owner&limit=1/.test(u)) return json([{ owner: SESSION.user.id }]);   // base cloisonnée (la production)
+    // (5 nov.) `main` à la VRAIE forme (`routeMain`, _base-ecritures.cjs) : PATCH
+    // conditionnel sur `data->>rev`, écriture acceptée gardée, garde-fou 017. Avant,
+    // ce banc ne voyait qu'un corps `{ id: 'main' }` (l'ancien upsert) : depuis le
+    // 1er nov. il ne voyait AUCUNE écriture, donc jamais le refus qu'il simule.
+    // `etat.tentatives` = toutes les écritures de `main` envoyées (acceptées ou
+    // refusées) ; `etat.ecrits` = leur contenu (ce qui « repart au nuage »).
+    if (!(/id=eq\.main/.test(u) && /select=v:data->vrm_numerotation->>version/.test(u))) {
+      etat.ecritures = etat.tentatives;
+      etat.clesServeur = ['vrm_numerotation'];   // le marqueur appartient au serveur
+      etat.refuser = () => {
         // (F) La conversion passe entre le chargement et la première écriture :
         //     la base est désormais convertie, et le garde-fou refuse le pool d'avant.
         if (etat.convertirALaPremiereEcriture) { etat.convertirALaPremiereEcriture = false; etat.main = mainDe(); etat.refuse = 'vrm_pool_retreci'; }
-        if (etat.refuse) return json({ code: 'P0001', message: typeof etat.refuse === 'string' ? etat.refuse : 'vrm_numeros_perimes', details: 'banc', hint: 'Recharge l\'app.' }, 400);
-        // Le marqueur appartient au serveur : il est recopié (comme le garde-fou).
-        etat.main = { ...m.data, vrm_numerotation: etat.main.vrm_numerotation };
-        etat.ecrits.push(m.data);
-      }
-      return json([]);
+        return etat.refuse ? (typeof etat.refuse === 'string' ? etat.refuse : 'vrm_numeros_perimes') : null;
+      };
+      const m = routeMain(req, etat);
+      if (m) { etat.ecrits = ecritesMain(etat); return json(m.body, m.status); }
     }
+    if (req.method() !== 'GET') return json([]);
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return json([COMPTE]);
     // La VERSION, lue en scalaire (la forme exacte de la requête de l'app).
     if (/id=eq\.main/.test(u) && /select=v:data->vrm_numerotation->>version/.test(u)) return json([{ v: etat.versionLue != null ? String(etat.versionLue) : (etat.main.vrm_numerotation ? String(etat.main.vrm_numerotation.version) : null) }]);
-    if (/id=eq\.main/.test(u)) return json([{ id: 'main', data: etat.main }]);
     if (etat.lignes) {
       // Des lignes à part (section E), servies sous la FORME demandée : la
       // projection `select=` est appliquée (§6.3).

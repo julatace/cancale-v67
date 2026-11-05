@@ -1,7 +1,11 @@
 // Commodités locales : aucun jeton, aucun message et aucune identité devinée.
 export const cleParcours=(owner,nom)=>owner?`vrm_parcours:${encodeURIComponent(owner)}:${nom}`:null;
-export function lireParcours(storage,owner,nom,defaut=null,now=Date.now()){
- try{const k=cleParcours(owner,nom),x=k&&JSON.parse(storage.getItem(k)||'null');return x?.owner===owner&&Number.isFinite(x.at)&&now>=x.at&&now-x.at<7*86400000?x.valeur:defaut;}catch{return defaut;}
+// `dureeMax` : 7 jours par défaut. (5 nov.) Une RECHERCHE tapée ne revient que
+// 12 h (`restaurerVue`) : rouverte trois jours plus tard, un mot oublié dans le
+// champ cacherait des annonces sans qu'on comprenne pourquoi.
+export const DUREE_PARCOURS=7*86400000, DUREE_RECHERCHE=12*3600000;
+export function lireParcours(storage,owner,nom,defaut=null,now=Date.now(),dureeMax=DUREE_PARCOURS){
+ try{const k=cleParcours(owner,nom),x=k&&JSON.parse(storage.getItem(k)||'null');return x?.owner===owner&&Number.isFinite(x.at)&&now>=x.at&&now-x.at<dureeMax?x.valeur:defaut;}catch{return defaut;}
 }
 export function garderParcours(storage,owner,nom,valeur,now=Date.now()){
  try{const k=cleParcours(owner,nom);if(!k)return false;storage.setItem(k,JSON.stringify({owner,at:now,valeur}));return true;}catch{return false;}
@@ -29,8 +33,8 @@ export function periodeReutilisable(v){
  if(!v||!v.from||!v.to)return null;const a=new Date(v.from),b=new Date(v.to);return Number.isFinite(a.getTime())&&Number.isFinite(b.getTime())&&a<=b?{from:a.toISOString(),to:b.toISOString()}:null;
 }
 export function viderParcours(storage,garderOwner=null){try{for(let i=storage.length-1;i>=0;i--){const k=storage.key(i);if(k?.startsWith('vrm_parcours:')&&(!garderOwner||!k.startsWith(cleParcours(garderOwner,''))))storage.removeItem(k);}}catch{}}
-export function restaurerVue(storage,owner,nom,initial){
- const v=lireParcours(storage,owner,'vue:'+nom);
+export function restaurerVue(storage,owner,nom,initial,now=Date.now()){
+ const v=lireParcours(storage,owner,'vue:'+nom,null,now,/recherche$/.test(nom)?DUREE_RECHERCHE:DUREE_PARCOURS);
  if(typeof initial==='string')return typeof v==='string'&&v.length<=2000?v:initial;
  if(typeof initial==='number')return Number.isFinite(v)&&v>=initial&&v<=10000?v:initial;
  if(initial===null&&nom.includes('periode')){const p=periodeReutilisable(v);return p?{from:new Date(p.from),to:new Date(p.to),...(typeof v.label==='string'?{label:v.label.slice(0,100)}:{})}:null;}

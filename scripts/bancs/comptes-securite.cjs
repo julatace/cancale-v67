@@ -8,9 +8,10 @@ require('./_porte-banc.cjs');
 //      haut de Ventes · Vinted, 44 px au doigt ; un tap filtre l'écran (la vente
 //      de l'autre compte n'est plus nette) ; le choix survit au rechargement ;
 //      la liste native (bancs plus anciens) dit la même valeur.
-//   B. Cacher les montants : l'œil de la tête, puis CHAQUE écran — aucun nombre
-//      suivi de « € » ne reste lisible ; les N° restent ; mémorisé ; ré-ouvert,
-//      les montants reviennent.
+//   B. Cacher les montants : (5 nov.) le bouton « Stream » de la tête, qui remplace
+//      l'œil (src/modeStream.js, montants cachés par défaut), puis CHAQUE écran —
+//      aucun nombre suivi de « € » ne reste lisible ; les N° restent ; mémorisé ;
+//      éteint, les montants reviennent.
 //   C. Appareils connectés : la liste rendue, « Cet appareil » sans bouton, un
 //      autre appareil fermé par SON identifiant seul.
 //   D. Se déconnecter partout : confirmé ⇒ `logout?scope=global` ; une panne
@@ -82,7 +83,7 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
         await attendre(2500);
         const avant = await MONTANTS(pg);
         dit(avant.n > 0, `B ${tag} : Ventes · Vinted montre des montants avant (le banc n'est pas vide)`, JSON.stringify(avant));
-        await pg.click('[data-bouton-montants]');
+        await pg.click('[data-bouton-stream]');
         await attendre(400);
         let pire = null, totalNums = 0;
         for (const e of ECRANS) {
@@ -95,15 +96,15 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
           if (['journee', 'compta', 'ventes'].includes(e)) await capture(pg, `B-${tag}-${e}`);
         }
         dit(totalNums > 0, `B ${tag} : les N° restent lisibles`, totalNums);
-        const etat = await pg.evaluate(() => ({ racine: document.documentElement.getAttribute('data-montants-caches'), memo: localStorage.getItem('vrm_montants_caches'), bouton: (document.querySelector('[data-bouton-montants]') || {}).getAttribute && document.querySelector('[data-bouton-montants]').getAttribute('aria-pressed') }));
-        dit(etat.racine === '1' && etat.memo === '1' && etat.bouton === 'true', `B ${tag} : mémorisé sur l'appareil, l'œil le dit`, JSON.stringify(etat));
+        const etat = await pg.evaluate(() => ({ racine: document.documentElement.getAttribute('data-stream'), memo: localStorage.getItem('vrm_stream'), bouton: (document.querySelector('[data-bouton-stream]') || {}).getAttribute && document.querySelector('[data-bouton-stream]').getAttribute('aria-pressed') }));
+        dit(etat.racine === '1' && etat.memo === '1' && etat.bouton === 'true', `B ${tag} : mémorisé sur l'appareil, le bouton « Stream » le dit`, JSON.stringify(etat));
         // Rendu à la main : les montants reviennent sans recharger.
         await pg.goto(`http://localhost:${NV.PORT}/?tab=plat_vinted`, { waitUntil: 'domcontentloaded' }); await attendre(2200);
-        await pg.click('[data-bouton-montants]'); await attendre(400);
+        await pg.click('[data-bouton-stream]'); await attendre(400);
         const rendu = await MONTANTS(pg);
-        dit(rendu.n > 0, `B ${tag} : l'œil rouvert rend les montants`, JSON.stringify(rendu));
+        dit(rendu.n > 0, `B ${tag} : « Stream » éteint rend les montants`, JSON.stringify(rendu));
         // Une valeur qui CHANGE pendant que c'est caché reste cachée (React réécrit le nœud).
-        await pg.click('[data-bouton-montants]'); await attendre(300);
+        await pg.click('[data-bouton-stream]'); await attendre(300);
         await pg.evaluate(() => { const d = document.createElement('div'); d.id = 'banc-montant'; d.className = 'vrm-main'; document.body.appendChild(d); d.textContent = '12'; const s = document.createElement('span'); s.textContent = ' €'; d.appendChild(s); });
         await attendre(100);
         await pg.evaluate(() => { const d = document.getElementById('banc-montant'); d.firstChild.nodeValue = '99,50 € de plus'; });

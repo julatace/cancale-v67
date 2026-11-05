@@ -19,3 +19,6 @@ scripts/bancs/*.png
 scripts/bancs/*.pdf
 undefined/
 .taste-skill/
+
+# Captures écrites par certains bancs : jamais dans le dépôt (public)
+scripts/bancs/captures/

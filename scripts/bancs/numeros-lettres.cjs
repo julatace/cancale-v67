@@ -16,9 +16,10 @@
 // ════════════════════════════════════════════════════════════════════════════
 const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
+const { routeMain, ecritesMain, attendre } = require('./_base-ecritures.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
-const DIST = path.join(__dirname, '..', '..', 'dist');   // jamais un chemin absolu (§6.1)
-const PORT = 4504;
+const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');   // jamais un chemin absolu (§6.1)
+const PORT = Number(process.env.BANC_PORT) || 4504;
 const auj = new Date();
 const ann = (id, title) => ({ id, title, price: { amount: '49.0', currency_code: 'EUR' }, is_closed: false, is_draft: false, photo: null, brand_title: 'Nike', size_title: '42', status: 'Très bon état', view_count: 3, favourite_count: 0, created_at_ts: Math.floor(Date.now() / 1000) - 86400 });
 const ITEMS = [ann(9201, 'Nike Air Max 90 blanc taille 42'), ann(9202, 'Salomon XT-6 noir taille 41'), ann(9203, 'Adidas Samba vert taille 40')];
@@ -50,11 +51,14 @@ const projette = (row, sel) => {
 };
 
 async function rendre(b, main) {
+  // (5 nov.) `main` à la VRAIE forme (`routeMain`) sur une base CLOISONNÉE (la
+  // production) : avant, la sonde répondait 400 (base non cloisonnée) — l'app
+  // n'écrit alors jamais `main`, et « B125 reste dans le pool de ce qui repart
+  // au nuage » ne jugeait aucune écriture.
+  const base = { main, maj: new Date(Date.now() - 86400e3).toISOString(), ecritures: [] };
   const rows = [
-    { id: 'main', data: main },
     { id: 'harvest_111_listings', data: { capturedAt: auj.toISOString(), payload: { items: ITEMS } } },
   ];
-  const ecrits = [];
   const ctx = await b.newContext({ viewport: { width: 1512, height: 950 } });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
@@ -63,12 +67,10 @@ async function rendre(b, main) {
   await pg.route('**/rest/v1/**', (route) => {
     const req = route.request();
     const u = decodeURIComponent(metaVersData(req.url()));
-    const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
-    if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
-    if (req.method() !== 'GET') {
-      try { const bd = JSON.parse(req.postData() || '[]'); (Array.isArray(bd) ? bd : [bd]).forEach((row) => { if (row && row.id === 'main' && row.data) ecrits.push(row.data); }); } catch (_) {}
-      return j([]);
-    }
+    const j = (d, st = 200) => route.fulfill({ status: st, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: typeof d === 'string' ? d : JSON.stringify(d) });
+    if (/select=owner&limit=1/.test(u)) return j([{ owner: 'banc' }]);
+    const mm = routeMain(req, base); if (mm) return j(mm.body, mm.status);
+    if (req.method() !== 'GET') return j([]);
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCS);
     const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
     const forme = (r) => (sel && !/^id,data|^data$|^data,/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: auj.toISOString(), cap: r.data.capturedAt });
@@ -80,8 +82,13 @@ async function rendre(b, main) {
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
   await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
-  await pg.waitForTimeout(6000);
-  return { pg, ctx, errs, ecrits };
+  // Attendre la CONDITION, pas un délai (§6.5) : la fiche neuve 9203 numérotée,
+  // puis son écriture au nuage (sur une base cloisonnée, plus de lectures
+  // précèdent la numérotation qu'avec l'ancienne base non cloisonnée).
+  await pg.waitForFunction(() => { try { const n = JSON.parse(localStorage.getItem('vinted_annonce_numeros') || '{}'); return !!(n['9203'] && n['9203'].numero); } catch (_) { return false; } }, null, { timeout: 20000 }).catch(() => {});
+  await attendre(() => ecritesMain(base).some((d) => d.vinted_annonce_numeros && d.vinted_annonce_numeros['9203']), 10000);
+  await pg.waitForTimeout(1000);
+  return { pg, ctx, errs, base };
 }
 const local = (pg, k) => pg.evaluate((k) => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (_) { return null; } }, k);
 
@@ -92,7 +99,9 @@ const local = (pg, k) => pg.evaluate((k) => { try { return JSON.parse(localStora
     console.log('\n── Numérotation en chiffres (aucun réglage) : B125 est déjà pris par 9201');
     {
       const main = { vinted_annonce_numeros: { '9201': { numero: 'B125' }, '9202': { numero: '7' } }, vinted_used_numeros: POOL };
-      const { pg, ctx, errs, ecrits } = await rendre(b, main);
+      const { pg, ctx, errs, base } = await rendre(b, main);
+      const ecrits = ecritesMain(base);
+      dit(ecrits.length > 0, 'des écritures de `main` partent au nuage et sont jugées', `${ecrits.length} : ${base.ecritures.map((e) => e.meth + ' ' + e.resultat).join(', ')}`);
       const nums = (await local(pg, 'vinted_annonce_numeros')) || {};
       dit(String((nums['9203'] || {}).numero) === '8', 'la nouvelle paire reçoit le prochain ENTIER libre (8) — rien ne change en chiffres', JSON.stringify(nums['9203'] || null));
       const pools = [await local(pg, 'vinted_used_numeros'), ...ecrits.map((d) => d.vinted_used_numeros).filter(Array.isArray)];
@@ -117,10 +126,13 @@ const local = (pg, k) => pg.evaluate((k) => { try { return JSON.parse(localStora
     console.log('\n── Série « B » choisie dans Réglages');
     {
       const main = { vinted_annonce_numeros: { '9201': { numero: 'B125' }, '9202': { numero: '7' } }, vinted_used_numeros: POOL, vrm_num_prefixe: 'B' };
-      const { pg, ctx, errs } = await rendre(b, main);
+      const { pg, ctx, errs, base } = await rendre(b, main);
       const nums = (await local(pg, 'vinted_annonce_numeros')) || {};
       dit(String((nums['9203'] || {}).numero) === 'B126', 'la nouvelle paire reçoit B126 (après le plus haut de SA série, jamais un trou ni un chiffre)', JSON.stringify(nums['9203'] || null));
       dit(String((nums['9201'] || {}).numero) === 'B125' && String((nums['9202'] || {}).numero) === '7', 'les numéros déjà donnés ne bougent pas (B125, 7)');
+      const ecrits = ecritesMain(base);
+      const nuage = (base.main && base.main.vinted_annonce_numeros) || {};
+      dit(ecrits.length > 0 && String((nuage['9203'] || {}).numero) === 'B126' && String((nuage['9201'] || {}).numero) === 'B125' && String((nuage['9202'] || {}).numero) === '7', 'le nuage porte B126 pour la nouvelle, B125 et 7 inchangés', `${ecrits.length} écriture(s) · ${JSON.stringify(Object.fromEntries(Object.entries(nuage).map(([k, e]) => [k, e && e.numero])))}`);
       dit(errs.length === 0, 'aucune erreur d\'app', errs.join(' | '));
       await ctx.close();
     }

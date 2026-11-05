@@ -55,3 +55,14 @@
 /* La règle commune des croix « Fermer… » (marge négative, rayon 10 px) : ici la
    croix est un rond de 44 px posé dans la barre, sans marge. */
 .vrm-fp .vrm-fp-fermer:not(#vrm-fp-a):not(#vrm-fp-b) { margin: 0 !important; border-radius: 999px !important; }
+
+/* (5 nov.) « Voir l'état » : tout ce qui se calcule, en une grille sobre. */
+.vrm-fp-etat { margin: 0 0 18px; }
+.vrm-fp-etat-titre { font-size: 15px; font-weight: 700; margin: 0 2px 8px; color: var(--vrm-ink, inherit); }
+.vrm-fp-etat-grille { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0; }
+.vrm-fp-etat-l { background: var(--vrm-surface, #FFFFFF); border-radius: 14px; padding: 10px 12px; min-width: 0; }
+.vrm-fp-etat-l dt { font-size: 12px; color: var(--vrm-muted, #6E6E73); margin: 0 0 4px; }
+.vrm-fp-etat-l dd { margin: 0; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.vrm-fp-etat-l dd b { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.vrm-fp-etat-l dd small { font-size: 12px; color: var(--vrm-muted, #6E6E73); line-height: 1.3; overflow-wrap: anywhere; }
+@media (min-width: 700px) { .vrm-fp-etat-grille { grid-template-columns: repeat(3, minmax(0, 1fr)); } }

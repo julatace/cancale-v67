@@ -113,3 +113,100 @@ Une seule forme : un **titre** qui dit ce que c'est, une ou deux phrases sur ce 
 ## Geste de Julien
 Ouvrir **E-mails** au téléphone, toucher un code de retrait : la feuille doit être opaque, avec
 « Colis à retirer » en gros et « Voir le colis à retirer ».
+
+---
+
+# 5 nov. 2026 (nuit) — v33 « tu peux faire mieux »
+
+Branche LOCALE `v33-emails-finition` (depuis `origin/main` 784f625e), **non poussée** (consigne de la
+session). Julien, après la v32 : « tu peux faire mieux ». Skills `apple-design` et `emil-design-eng`
+appliqués dans les limites de §7 (un accent rare, ambre = geste, police système, 44 px).
+
+## Ce qui gênait encore (captures v32, données inventées)
+- Une ligne = un bloc « nature · lieu · code · date » qui passait sur deux lignes : le **code** au milieu,
+  coupé « 418 / 205 » au mieux ; rien ne distinguait ce qui demande un geste du reste.
+- Les transporteurs : une initiale de 16 px collée au nom ; les sites : un logo minuscule dans le pied.
+- Une newsletter avait le même poids qu'une vente.
+- « Codes de retrait » coupé net au bord de la rangée à 1512 (aucun indice de défilement).
+- « Compte » + un menu « compte-un · vendeuse@… » + un gros « Actualiser » toujours là.
+- États : une phrase grise (« Lecture de ta boîte… », « Aucun e-mail… »), aucun geste.
+- Lecture au téléphone : carte blanche dans une feuille grise (marges 30 px), retour qui part avec le
+  défilement, bouton principal étroit, le code de retrait noyé dans la ligne de détails.
+
+## Ce qui a été fait (src/BoiteEmails.jsx, src/boiteEmails.js, src/boite-emails.css)
+- **La ligne en trois étages**, à côté de la **marque** de l'expéditeur (40 px, muette pour le lecteur
+  d'écran) : logo des quatre sites servis, sinon **monogramme neutre** (`monogramme` : « MR », « C »,
+  « LP ») — gris, police système, jamais un faux logo ni une couleur de marque.
+  1. la **nature** en un mot fort (17 px, 600) et l'**heure alignée à droite** ;
+  2. l'**essentiel** sur UNE ligne, faits courts d'abord (code, N°, montant), le nom de l'article en
+     dernier : une coupure « … » ne mange que la fin du nom, jamais le code (`.vrm-boite-code`, gras,
+     chiffres alignés) ;
+  3. le **geste** (`data-boite-geste` = retrait · bordereau · envoi · action · verifier) puis « qui »
+     (transporteur nommé, compte, pièces jointes) — deux blocs insécables : trop long, « qui » passe
+     dessous, entier (aucun nom coupé, aucun « · » orphelin). Le nom d'un SITE n'est plus répété (son
+     logo le dit, l'étiquette lue à voix haute aussi).
+- **`ligneEmail`** (pur) ne fait que RANGER les détails de `titreSimple` (une seule source, le résumé
+  rangé) — l'audit vérifie que chaque mot de l'essentiel est un détail de `titreSimple`. « reçu de
+  commande » se tait sur la ligne (le titre dit « Achat »), la lecture garde tout.
+- **L'ambre est rare** (`gesteAmbre`) : seulement un délai LU à moins de 48 h (« à envoyer avant le
+  6 nov. (demain) », comme les litiges) ou « à vérifier ». Un geste ordinaire est en gras, couleur du
+  texte. Délai passé ⇒ « délai passé (1 nov.) », gris. Date sans année ⇒ jamais « proche » (pas su).
+- **« Rien à faire » atténué** (`data-boite-rien`) : titre gris 500, marque estompée, ligne plus basse ;
+  jamais caché ni replié (rien n'est retiré de la vue).
+- **Rubriques** : fondu de bord (masque) du côté où il reste des pastilles, posé par la position de
+  défilement (`data-bord-gauche/droite`) ; la pastille choisie se ramène dans la vue.
+- **Compte** : un menu-pastille « Tous les comptes ⌄ » au NOM du compte (l'adresse seulement si deux
+  comptes ont le même nom), montré seulement s'il y a un choix. **« Actualiser »** n'apparaît que quand
+  la liste a plus d'une minute (minuterie ou retour dans l'app) — il ne relit rien tout seul.
+- **États**, chacun avec son geste : lignes fantômes (visibles après 150 ms, figées en mouvement réduit) ;
+  panne « Boîte pas lue — <raison> » (hors ligne / pas de réponse à temps / session / connexion) +
+  « Réessayer » ; vide « Ta boîte VRM est vide » + « Relier ma boîte » ; rubrique vide + « Voir tout » ;
+  **compte sans e-mail** (nom + adresse où rien n'arrive) + « Relier ma boîte » / « Tous les comptes ».
+- **Lecture au téléphone** : plus de carte dans la feuille ; barre du retour **collante translucide**
+  (flou, repli opaque si transparence réduite), « ‹ Boîte de réception » en accent ; **marges 16 px** ;
+  titre 28 px ; **le code de retrait en grand** (« Code de retrait 418 205 », 28 px, lu dans le résumé,
+  retiré de la ligne de détails — un nombre une fois) ; bouton principal pleine largeur 50 px ; le message
+  d'origine dans une carte, les pièces, la ligne discrète. Ordinateur : même ordre, carte, bouton 44 px.
+- **Mouvement** : la ligne répond **à l'appui** (`data-appui` posé au pointeur — `:active` ne vient pas
+  partout), sans se tasser ; les boutons se tassent à 0,97 (120 ms) ; la lecture glisse de 16 px
+  (courbe tiroir, 280 ms) sur une feuille OPAQUE ; tout est coupé en mouvement réduit (le contrôle du banc
+  regarde chaque élément de la feuille).
+
+## Preuves (données inventées partout)
+- `npm run build` vert. `fusion-echelle --verifier` : `boite-emails.css` dans l'échelle (les 6 fichiers
+  rouges sont les mêmes sur `origin/main`).
+- **Banc `boite-emails`** : **278 verts / 0 rouge** (215 en v32). Nouveaux contrôles : marque à gauche
+  (logo / « MR » / « C », aucun fond coloré) ; heure à droite sur la ligne de la nature ; nature ·
+  essentiel · geste attendus pour 8 e-mails ; geste marqué + ambre seulement pour « demain » et « à
+  vérifier » ; newsletter atténuée ; aucun libellé coupé (pastilles, onglets, natures, gestes, noms,
+  blocs du pied, code jamais mangé, fondu de bord) ; fondu à gauche une fois défilé ; menu des comptes au
+  nom ; pas d'« Actualiser » sur une liste fraîche ; appui visible tout de suite sans ouverture si le
+  doigt part ; lecture marges 16 px et bouton pleine largeur ; barre collante sur un e-mail long ; code
+  en grand une fois ; contexte « états » (chargement TENU, panne, Réessayer qui relit une fois, vide →
+  Relier, compte sans e-mail, « Actualiser » après 3 min puis relu une fois) en clair et sombre.
+- **Sur `origin/main`** (arbre `git archive` de 784f625e, banc copié dedans, construit à part) :
+  **200 verts / 56 rouges** — chaque nouveau contrôle est rouge dans les 4 contextes ; le contexte
+  « états » lève dès le chargement (pas de lignes fantômes). Le contrôle « mouvement réduit : la feuille
+  s'ouvre sans aucun mouvement » est vert sur main aussi : c'est une GARDE de l'existant (la v32 coupait
+  déjà l'animation de la lecture), pas une règle nouvelle.
+- **Mutation** (fondu de bord retiré, atténuation retirée, ambre sur tout geste, « Actualiser » toujours
+  là) : **256 / 22**, exactement les contrôles de ces quatre règles.
+- **`audit-boite-emails` : 80/80** (8 neufs : ligne d'un code de retrait, délais proches/passés/sans année,
+  faits courts d'abord, « rien à faire » / « à vérifier » / « en attente », §5 N° par le titre et e-mail
+  ancien, une seule source, monogramme, `joursAvant`). Sur `origin/main` il plante (`ligneEmail` absent).
+- Voisins verts : `audit-journal-emails` 58/58, `audit-email-formes`, `audit-coherence`, `audit-icones`,
+  `audit-fonctions-api`.
+- Captures regardées avant / après (390 tactile, 1512, clair, sombre) : liste, boîte, compte choisi,
+  lecture, bas de lecture, extrait (et son bas défilé), et les six états.
+
+## Ce qui reste
+- Les transporteurs n'ont qu'un monogramme : aucun logo n'est servi pour eux, et VRM n'en dessine pas.
+- « Rien à faire » est atténué, pas replié : un repli par jour (« 3 e-mails sans rien à faire ») est
+  possible si Julien le veut.
+- Le geste d'un e-mail est ce que l'e-mail DEMANDAIT (« bordereau prêt ») : la boîte ne sait pas si c'est
+  déjà fait (c'est Colis qui le sait) ; d'où le gras sans ambre.
+- L'heure de l'appareil décide « aujourd'hui / demain » (comme les jours de la liste).
+
+## Geste de Julien
+Ouvrir **E-mails** au téléphone : regarder si la ligne d'un colis à retirer se lit d'un coup d'œil (code
+en tête), la toucher, et dire si le code en grand dans la lecture lui va.

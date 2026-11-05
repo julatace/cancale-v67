@@ -74,6 +74,11 @@
 
 /* L'entrée « Publier ailleurs » dans Annonces · Leboncoin / eBay / Vestiaire. */
 .vrm-pa-entree { margin: 12px 16px 0; }
+/* (5 nov.) Dans Annonces · Leboncoin / eBay, `styles-mineral.css` pose `width:100%`
+   sur chaque `div` enfant de l'écran : avec la marge de 16 px, l'entrée faisait
+   390 px de large à 406 px du bord sur un iPhone, coupée à droite (banc
+   double-vente, audit-entree-publier-ailleurs). Sa largeur suit la colonne. */
+.vrm-market-space > div.vrm-pa-entree[data-pa-entree] { width: auto; }
 .vrm-pa-entree button {
   display: flex; align-items: center; gap: 10px; width: 100%; min-height: 52px; box-sizing: border-box; border: 0; border-radius: 14px;
   background: var(--fu-carte, #fff); box-shadow: var(--fu-ombre); color: var(--fu-encre, #1d1d1f); font: inherit; font-size: 15px; font-weight: 700;

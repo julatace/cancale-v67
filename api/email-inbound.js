@@ -2464,7 +2464,8 @@ export async function traiterEmail(req, res) {
       return;
     }
 
-    // 4) OFFRE reçue → notif immédiate (les offres expirent en 24h !).
+    // 4) OFFRE reçue → notif immédiate. ⚠️ (5 nov., Julien) Une offre Vinted
+    //    n'expire PAS : aucune notification ne doit le dire.
     const textAll = `${subject}\n${corpsTexte}`;
     // Extrait le contenu utile qui suit une phrase d'annonce (le texte du
     // message reçu, l'éventuel mot accompagnant une offre...). On coupe au

@@ -78,3 +78,37 @@
 .vrm-aso-reste { margin: 0 4px 12px; padding: 10px 14px; border-radius: 14px; background: var(--fu-ambre-fond, #fff4e5); color: var(--fu-ambre-txt, #b25000); font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .vrm-aso-reste.is-juste { background: var(--fu-case, #f2f2f7); color: var(--fu-encre, #1d1d1f); }
 .vrm-aso-annuler { display: block; width: 100%; margin-top: 10px; min-height: 48px; }
+
+/* ── (5 nov.) FOURNISSEURS : les personnes qu'il crée (src/fournisseurs.js) ──
+   Même échelle Fusion ; l'ambre seulement pour un prix saisi à la main qui
+   diffère de la part (un geste à faire : le garder ou le remplacer). */
+.vrm-fo-retour { all: unset; box-sizing: border-box; min-height: 44px; display: inline-flex; align-items: center; margin: 0 0 8px; padding: 0 4px; cursor: pointer; font-size: 15px; font-weight: 600; color: var(--fu-bleu, #0071e3); }
+.vrm-fo-retour:focus-visible, .vrm-fo-ouvrir:focus-visible { outline: 2px solid var(--fu-bleu, #0071e3); outline-offset: 2px; }
+.vrm-fo-vide { margin: 4px 4px 16px; font-size: 17px; line-height: 1.4; color: var(--fu-encre, #1d1d1f); }
+.vrm-aso-choisir.vrm-fo-ouvrir { grid-template-columns: minmax(0, 1fr) auto; }
+.vrm-fo-chevron { font-size: 22px; font-weight: 600; color: var(--fu-gris3, #aeaeb2); padding: 0 4px; }
+.vrm-fo-form { display: flex; flex-direction: column; gap: 12px; margin: 0 0 12px; }
+.vrm-fo-champ { display: flex; flex-direction: column; gap: 6px; }
+.vrm-fo-champ span { font-size: 13px; font-weight: 600; color: var(--fu-gris, #6e6e73); margin: 0 4px; }
+.vrm-fo-champ input, .vrm-fo-champ textarea {
+  width: 100%; min-width: 0; min-height: 44px; box-sizing: border-box; border: 0; border-radius: 12px; padding: 10px 12px;
+  background: var(--fu-case, #f2f2f7); color: var(--fu-encre, #1d1d1f); font: inherit; font-size: 17px; resize: vertical;
+}
+.vrm-fo-champ input:focus-visible, .vrm-fo-champ textarea:focus-visible { outline: 2px solid var(--fu-bleu, #0071e3); outline-offset: 1px; }
+.vrm-fo-contact { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: baseline; }
+.vrm-fo-contact a { color: var(--fu-bleu, #0071e3); text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
+.vrm-fo-note { flex-basis: 100%; white-space: pre-wrap; color: var(--fu-encre, #1d1d1f); }
+.vrm-fo-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 12px; }
+.vrm-fo-stat { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.vrm-fo-stat span { font-size: 13px; font-weight: 600; color: var(--fu-gris, #6e6e73); }
+.vrm-fo-stat b { font-size: 22px; font-weight: 800; letter-spacing: -.02em; color: var(--fu-encre, #1d1d1f); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.vrm-fo-stat small { font-size: 13px; color: var(--fu-gris, #6e6e73); line-height: 1.35; overflow-wrap: anywhere; }
+.vrm-fo-stat[data-fo-stat="benefice"] { grid-column: 1 / -1; }
+@media (min-width: 700px) { .vrm-fo-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); } .vrm-fo-stat[data-fo-stat="benefice"] { grid-column: span 2; } }
+.vrm-fo-droite { display: flex; align-items: center; gap: 6px; }
+.vrm-fo-delier { flex: none; }
+.vrm-fo-ambre { color: var(--fu-ambre-txt, #b25000); font-weight: 600; }
+.vrm-fo-hors { grid-template-columns: minmax(0, 1fr) auto; }
+.vrm-fo-gestes { display: flex; gap: 8px; margin: 12px 0 0; }
+.vrm-fo-gestes .vrm-ao-second { flex: 1; min-height: 48px; }
+.vrm-fo-resume .vrm-aso-couv { margin: 8px 0 0; }
