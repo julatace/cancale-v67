@@ -167,8 +167,13 @@ const PONT = ({ version }) => {
   post({ __vmr: 'ready', version, id: 'ext-banc' });
 };
 
-async function ouvrir(nav, { largeur, sombre, chemin, panne = {}, avant }) {
+// Un navigateur fermé en cours de route (machine partagée) est relancé : le banc rapporte, il ne meurt pas.
+let NAVIGATEUR = null;
+const lancer = () => chromium.launch({ executablePath: process.env.CHROMIUM_PATH || (fs.existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined), args: ['--no-sandbox', '--use-angle=swiftshader', '--no-proxy-server'] });
+async function navigateur() { if (!NAVIGATEUR || !NAVIGATEUR.isConnected()) NAVIGATEUR = await lancer(); return NAVIGATEUR; }
+async function ouvrir(_nav, { largeur, sombre, chemin, panne = {}, avant }) {
   const tel = largeur < 600;
+  const nav = await navigateur();
   const ctx = await nav.newContext({ viewport: { width: largeur, height: tel ? 844 : 950 }, isMobile: tel, hasTouch: tel, colorScheme: sombre ? 'dark' : 'light', locale: 'fr-FR', timezoneId: 'Europe/Paris' });
   const pg = await ctx.newPage(); pg.setDefaultTimeout(10000);
   const erreurs = []; pg.on('pageerror', (e) => erreurs.push(e.message));
@@ -257,7 +262,7 @@ const referenceFiltres = (pg) => pg.evaluate((DESSIN) => {
 (async () => {
   await new Promise((r) => srv.listen(PORT, r));
   fs.mkdirSync(CAPT, { recursive: true });
-  const nav = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || (fs.existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined), args: ['--no-sandbox', '--use-angle=swiftshader', '--no-proxy-server'] });
+  const nav = null; await navigateur();
   try {
     for (const sombre of [false, true]) for (const largeur of [390, 1512]) {
       const tel = largeur < 600, suf = `${largeur}-${sombre ? 'sombre' : 'clair'}`;
@@ -423,7 +428,7 @@ const referenceFiltres = (pg) => pg.evaluate((DESSIN) => {
         await ctx.close();
       });
     }
-  } finally { await nav.close(); srv.close(); }
+  } finally { try { if (NAVIGATEUR) await NAVIGATEUR.close(); } catch (_) {} srv.close(); }
   if (EXPLORE) { console.log('Captures : ' + CAPT); return; }
   console.log(`\n${ok} ✅ · ${ko} ❌`);
   process.exit(ko ? 1 : 0);
