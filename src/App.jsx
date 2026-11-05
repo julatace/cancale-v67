@@ -33861,7 +33861,11 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   const blocVendues = vendSortir.length ? (
     <Card style={{ padding: '12px 13px' }}>
       <div data-stock-vendues-sortir={vendSortir.length}>
-        <div style={{ fontSize: 15, fontWeight: 800, color: C.text, marginBottom: 4 }}>Vendues à sortir · {vendSortir.length}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+          <span style={{ fontSize: 15, fontWeight: 800, color: C.text }}>Vendues à sortir · {vendSortir.length}</span>
+          <span style={{ flex: 1 }} />
+          {vendSortir.length > 1 && <button className="vrm-b vrm-b-discret" type="button" data-vendues-chercher={vendSortir.length} onClick={() => { setQ(''); setCibles(vendSortir.map(cleDeFiche)); try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (_) {} }}>Le chemin pour les sortir</button>}
+        </div>
         {vendSortir.map((f) => ligneRangee(f, <button className="vrm-b vrm-b-primaire" type="button" data-stock-sortir={cleDeFiche(f)} onClick={() => sortir(f)}>✓ Je l'ai sortie</button>))}
       </div>
     </Card>) : null;

@@ -28,6 +28,8 @@ const MAIN = {
     { id: 'mP', name: 'Etagere partielle', cols: 2, rows: 3, gravite: true, planches: ['1:1'] }],
   vrm_slots: { '4': { m: 'mG', i: 0 }, '3': { m: 'mG', i: 2 }, '2': { m: 'mG', i: 4 }, '1': { m: 'mG', i: 6 }, '6': { m: 'mF', i: 0 }, '7': { m: 'mF', i: 1 }, '8': { m: 'mP', i: 0 }, '9': { m: 'mP', i: 4 }, '10': { m: 'mP', i: 1 }, '11': { m: 'mP', i: 5 } },
 };
+// (5 nov., v32) Le Stock = les annonces actuelles : toutes ses paires sont des annonces en ligne (dressing servi).
+const EN_LIGNE = Object.keys(MAIN.vinted_annonce_numeros).map((id) => ({ id, title: MAIN.vinted_annonce_numeros[id].title, is_closed: false, is_hidden: false, is_draft: false, price: { amount: '50.0' } }));
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
 const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/json', '.woff2': 'font/woff2' };
@@ -52,6 +54,8 @@ async function rendre(b, tel) {
     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j([{ id: 1, vinted_user_id: '111', login: 'compte_garde', domain: 'www.vinted.fr', created_at: new Date().toISOString(), updated_at: new Date().toISOString() }]);
     if (/id=eq\.main/.test(u)) return j([{ id: 'main', data: MAIN }]);
+    // (5 nov., v32) Le Stock montre les ANNONCES ACTUELLES : le dressing du compte les porte.
+    if (/id=eq\.harvest_111_listings/.test(u)) return j([{ id: 'harvest_111_listings', data: { capturedAt: new Date().toISOString(), payload: { items: EN_LIGNE } } }]);
     return j([]);
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
@@ -74,6 +78,8 @@ async function rendre(b, tel) {
     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j([{ id: 1, vinted_user_id: '111', login: 'compte_garde', domain: 'www.vinted.fr', created_at: new Date().toISOString(), updated_at: new Date().toISOString() }]);
     if (/id=eq\.main/.test(u)) return j([{ id: 'main', data: MAIN }]);
+    // (5 nov., v32) Le Stock montre les ANNONCES ACTUELLES : le dressing du compte les porte.
+    if (/id=eq\.harvest_111_listings/.test(u)) return j([{ id: 'harvest_111_listings', data: { capturedAt: new Date().toISOString(), payload: { items: EN_LIGNE } } }]);
     return j([]);
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
