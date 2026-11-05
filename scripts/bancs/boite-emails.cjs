@@ -213,32 +213,37 @@ const journal = (appels) => appels.filter((a) => a.chemin === '/api/email-rattac
         }
         // Lire un email
         const nLire = journal(appels).filter((a) => a.q.lire).length;
-        const rectL1 = await l1.boundingBox();
-        await l1.click();
-        if (tactile) {
+        if (!tactile) await l1.click();
+        else {
           // ── CLARTÉ 5 (défaut grave du 5 nov.) : la feuille est OPAQUE dès sa
-          // première image. À chaque image pendant ≈ 500 ms : l’opacité de la
-          // feuille et de chacun de ses parents vaut 1, son fond n'a aucune
-          // transparence, et au milieu de la ligne touchée c'est la feuille qui
-          // est au-dessus (rien de la liste visible derrière).
-          const f = pg.locator('[data-boite-feuille]');
-          await f.waitFor({ state: 'attached', timeout: 3000 });
-          const ech = await f.evaluate(async (n, [cx, cy]) => {
+          // première image. Le toucher et la mesure partent du MÊME script (aucun
+          // aller-retour du banc entre les deux, qui laisserait passer le fondu) :
+          // à chaque image pendant ≈ 500 ms, l’opacité de la feuille et de chacun
+          // de ses parents vaut 1, son fond n'a aucune transparence, et au milieu
+          // de la ligne touchée c'est la feuille qui est au-dessus (rien de la
+          // liste visible derrière).
+          const ech = await l1.evaluate(async (ligne) => {
             const alpha = (c) => { const m = /rgba?\(([^)]+)\)/.exec(c || ''); if (!m) return c === 'transparent' ? 0 : 1; const p = m[1].split(/[ ,/]+/).filter(Boolean); return p.length > 3 ? Number(p[3]) : 1; };
+            const rl = ligne.getBoundingClientRect(); const cx = rl.left + rl.width / 2, cy = rl.top + rl.height / 2;
+            const image = () => new Promise((r) => requestAnimationFrame(r));
+            ligne.click();
+            let n = null;
+            for (let i = 0; i < 60 && !(n = document.querySelector('[data-boite-feuille]')); i++) await image();
+            if (!n) return { out: [], couvre: false };
             const out = [];
-            // 30 images (≈ 500 ms) — compté en images : l'horloge du banc est figée.
+            // 30 images (≈ 500 ms) — comptées en images : l'horloge du banc est figée.
             for (let i = 0; i < 30; i++) {
               let op = 1; for (let x = n; x && x.nodeType === 1; x = x.parentElement) op *= Number(getComputedStyle(x).opacity);
               const haut = document.elementFromPoint(cx, cy);
               out.push({ op, a: alpha(getComputedStyle(n).backgroundColor), fond: getComputedStyle(n).backgroundColor, dessus: !!(haut && n.contains(haut)) });
-              await new Promise((r) => requestAnimationFrame(r));
+              await image();
             }
             const r = n.getBoundingClientRect();
             return { out, couvre: r.left <= 0 && r.top <= 0 && r.right >= innerWidth && r.bottom >= innerHeight };
-          }, [rectL1.x + rectL1.width / 2, rectL1.y + rectL1.height / 2]);
+          });
           const mauvais = ech.out.filter((x) => x.op < 0.999 || x.a < 0.999 || !x.dessus);
           dit(ech.out.length >= 5 && mauvais.length === 0 && ech.couvre, `${nom} : la feuille de lecture est OPAQUE dès la première image (opacité 1, fond plein, couvre l’écran, la liste n’est jamais visible au travers)`, `${ech.out.length} échantillons, ${mauvais.length} transparents ; 1er : ${JSON.stringify(ech.out[0])}`);
-          const fond = ech.out[ech.out.length - 1].fond;
+          const fond = (ech.out[ech.out.length - 1] || {}).fond;
           dit(fond === (sombre ? 'rgb(0, 0, 0)' : 'rgb(242, 242, 247)'), `${nom} : le fond de la feuille est celui du thème (${sombre ? 'noir' : 'gris clair'}), comme les autres feuilles`, fond);
         }
         const lec = pg.locator(`[data-boite-lecture="${id(1)}"]`);
