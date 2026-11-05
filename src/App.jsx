@@ -167,6 +167,7 @@ import { installerFiltreSupprimes, sansComptesSupprimes, lireSupprimes, CLE_SUPP
 import { lectureComplete, construirePhoto, ecrirePhoto, lirePhoto, listeDuSoir, joursAvantJour, heurePhoto, adresseQrLocale, CACHE_QR } from "./journeeHorsLigne.js";
 import { jetonsStream, demarrerStream } from "./streamFlou.js";
 import { DISCORD_ERREURS } from "./communaute/discordErreurs.js";
+import { ecouterPartage } from "./communaute/accompagnement.js";
 import { noterTicketDiscord, ecouterDiscord, suivreCodeDiscord, etatCodeDiscord, reprendreDiscord, oublierTicketDiscord } from "./communaute/discordAttente.js";
 import { DESCRIPTION_ORGANISATION } from "./operations/description.js";
 // (31 oct.) Colis → « À retirer » : la carte des points relais (règle pure + carte).
@@ -2082,6 +2083,10 @@ const SYNC_KEYS = [
   // par l'écran Ventes (`totals`, son propriétaire, §11), CONSOMMÉ par
   // Comptabilité (« Ton bénéfice »). Tableaux compacts, deux années au plus.
   'vrm_benefice_jours',
+  // (5 novembre) Les ACHATS cumulés JOUR PAR JOUR : PUBLIÉS par l'écran Achats (la
+  // règle de « Dépensé », son propriétaire, §11), CONSOMMÉS par le partage des
+  // groupes d'accompagnement (src/communaute/accompagnement.js). [n, centimes].
+  'vrm_achats_jours',
   // (20 octobre) Afficher la carte « Ton bénéfice » dans Ma journée : un CHOIX
   // (31 oct. : absent = montré dès qu'il y a un bénéfice publié ; `false` =
   // masqué depuis Ma journée), rattrapé par `onCloudReady` seulement s'il est
@@ -43143,6 +43148,34 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const buysBase = useMemo(() => (buys.items || []).filter(o => !acctOffOf(o)),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [buys.items, hiddenAccts, blockedAccts]);
+  // (5 nov.) LES ACHATS, PUBLIÉS JOUR PAR JOUR (`vrm_achats_jours`, synchronisé) et
+  // achat par achat (`vrm_achats_releve`, cet appareil) — la règle de « Dépensé »
+  // (hors annulés, `achatAnnule`, `montantCommande`, date de l'achat), son
+  // propriétaire est cet écran (§11). CONSOMMÉS par le partage des groupes
+  // d'accompagnement (src/communaute/accompagnement.js), qui ne relit aucun achat.
+  // Un compte non lu ⇒ on ne publie RIEN : la dernière publication, complète, reste (§5).
+  useEffect(() => {
+    if (!Array.isArray(buys.items) || buys.error) return;
+    if ((Array.isArray(buys.failedUids) ? buys.failedUids : []).some(u => !acctOff(u))) return;
+    try {
+      const an0 = new Date().getFullYear() - 1, jours = {}, l = [];
+      for (const o of buysBase) {
+        if (achatAnnule(o)) continue;
+        const t = o && o.date ? Date.parse(o.date) : NaN;
+        if (isNaN(t) || new Date(t).getFullYear() < an0) continue;
+        const k = jourClef(new Date(t)), j = jours[k] || (jours[k] = [0, 0]);
+        j[0] += 1; j[1] += Math.round(montantCommande(o) * 100);
+        l.push([t, String((o._acc && (o._acc.login || o._acc.vinted_user_id)) || ''), String(o.title || ''), montantCommandeLu(o)]);
+      }
+      const charge = {}; for (const k of Object.keys(jours).sort()) charge[k] = jours[k];
+      const avant = load('vrm_achats_jours', null);
+      if (!(avant && JSON.stringify(avant.jours) === JSON.stringify(charge))) save('vrm_achats_jours', { v: 1, jours: charge, at: Date.now() });
+      l.sort((a, b) => b[0] - a[0]); const l300 = l.slice(0, 300);
+      const r0 = load('vrm_achats_releve', null);
+      if (!(r0 && JSON.stringify(r0.l) === JSON.stringify(l300))) save('vrm_achats_releve', { v: 1, l: l300, at: Date.now() });
+    } catch (_) {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [buys.items, buys.error, buys.failedUids, buysBase]);
   // (29 oct.) Combien de reçus reçus par email se relient à un achat AFFICHÉ, par
   // son n° de transaction (la même règle que la ligne, §11). `null` tant que les
   // reçus ou les achats ne sont pas lus — jamais un « 0 » inventé.
@@ -65533,6 +65566,9 @@ function AppCoeur() {
   // Discord lancé sur le téléphone : le retour arrive dans un autre navigateur ;
   // l'app reprend la preuve rangée par le serveur (src/communaute/discordAttente.js).
   React.useEffect(()=>ecouterDiscord(enTeteSession),[]);
+  // (5 nov.) Groupes d'accompagnement : si le vendeur partage ses chiffres dans un
+  // groupe, ses agrégats repartent quand ils changent (src/communaute/accompagnement.js).
+  React.useEffect(()=>ecouterPartage(enTeteSession),[]);
   // ── LE JOURNAL DES PLANTAGES PART DANS SA BASE (src/plantages.js) ──────────
   // AppCoeur ne monte qu'avec une session : c'est ici seulement qu'on peut
   // écrire AU NOM du vendeur (RLS). Une écriture non confirmée reste en file et
@@ -65831,6 +65867,9 @@ function AppCoeur() {
       // (1er nov.) `cat_achats` mène aux colis à retirer (dans Colis) ; avec `vue=achats`, c'est l'écran Achats.
       const tt=(t==='cat_achats'&&vue==='achats')?'achats':t;
       const cible=lireCible(p); if(cible) poserCible(cible, redirigerOnglet(tt, subVoulue.current, ONGLETS_DEPLACES).tab);
+      // (5 nov.) Un lien d'invitation à un groupe d'accompagnement : le code est
+      // gardé pour l'écran Communauté (chargé ensuite), l'adresse est nettoyée.
+      if(tt==='communaute'&&p.get('groupe')){ try{ sessionStorage.setItem('vrm_accomp_lien', String(p.get('groupe')).slice(0,20)); }catch(_){} }
       setTab(tt); window.history.replaceState(window.history.state,'',window.location.pathname); } }catch(_){}};
     goto(window.location.search);
     const onMsg=(e)=>{ if(e.data&&e.data.type==='open-url'&&e.data.url){ try{ goto(new URL(e.data.url,window.location.origin).search); }catch(_){}} };
