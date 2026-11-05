@@ -17,6 +17,7 @@
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { monterTiroirs } = require('./_tiroirs.cjs');
 const { metaVersData } = require('./_meta.cjs');
+const { routeMain, ecritesMain, attendre } = require('./_base-ecritures.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 4341;
@@ -135,6 +136,12 @@ async function allerTache(pg, tache, site) {
       const pg = await ctx.newPage();
       const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
       let bloquerPush = false;   // (26 oct.) course §5.49 : simule un push non abouti (le nuage ne garde pas l'écriture)
+      // (5 nov.) `main` à la VRAIE forme (`routeMain`) : PATCH conditionnel sur
+      // `data->>rev`, écriture acceptée GARDÉE dans `rows[0]`. Avant, ce banc ne
+      // gardait qu'un corps `{ id: 'main' }` (l'ancien upsert) : depuis le 1er nov.
+      // aucune écriture n'était gardée, et le rechargement relisait l'ancien `main`.
+      // Un push « non abouti » est une panne (503) : le nuage ne garde rien.
+      const base = { get main() { return rows[0].data; }, set main(v) { rows[0].data = v; }, maj: auj.toISOString(), ecritures: [], panne: () => bloquerPush };
       await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
       await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
       await pg.route('**/rest/v1/**', (route) => {
@@ -143,12 +150,9 @@ async function allerTache(pg, tache, site) {
         // Une écriture de `main` est GARDÉE, comme dans la vraie base : sans ça,
         // l'écran suivant relisait l'ancien `main` et le banc mesurait une
         // fiction (§6.3 — le lien posé « disparaissait » au rechargement).
-        if (route.request().method() !== 'GET') {
-          try {
-            if (!bloquerPush) { const corps = JSON.parse(route.request().postData() || 'null'); for (const l of [].concat(corps || [])) if (l && l.id === 'main' && l.data) rows[0].data = l.data; }
-          } catch (_) {}
-          return j([]);
-        }
+        const mm = routeMain(route.request(), base);
+        if (mm) return route.fulfill({ status: mm.status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: typeof mm.body === 'string' ? mm.body : JSON.stringify(mm.body) });
+        if (route.request().method() !== 'GET') return j([]);
         // (26 oct.) La base de PRODUCTION est cloisonnée (migration 004) : la sonde
         // de schéma doit répondre 200 avec une ligne `owner`, comme `_porte-banc`
         // le suppose depuis le 21 oct. Avant, ce banc répondait 400 → l'app se
@@ -275,6 +279,8 @@ async function allerTache(pg, tache, site) {
       } catch (e) { dit(false, 'la suggestion se clique', String(e.message).slice(0, 100)); }
       const liens = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_lbc_liens') || 'null'); } catch (_) { return null; } });
       dit(liens && liens.lbc2 === '15', 'son clic écrit le lien : vrm_lbc_liens.lbc2 = "15"', JSON.stringify(liens));
+      await attendre(() => !!(rows[0].data.vrm_lbc_liens && rows[0].data.vrm_lbc_liens.lbc2 === '15'), 10000);
+      dit(ecritesMain(base).length > 0 && rows[0].data.vrm_lbc_liens && rows[0].data.vrm_lbc_liens.lbc2 === '15' && rows[0].data.vrm_lbc_liens.lbc1 === '12', 'et le lien part au nuage (lbc2 = 15, lbc1 = 12 gardé)', `${ecritesMain(base).length} écriture(s) · ${JSON.stringify(rows[0].data.vrm_lbc_liens || null)}`);
       const v2 = await lire();
       const n2 = v2.doublons.map((d) => d.num).sort();
       dit(n2.join() === '12,15', 'l’alerte apparaît pour la N°15 — pas pour sa jumelle N°14', JSON.stringify(n2));
@@ -285,15 +291,24 @@ async function allerTache(pg, tache, site) {
       // de bord a été refondu en « Statistiques » et n'affiche plus les actions :
       // l'alerte vit sur l'écran qu'il ouvre le matin — et c'est là qu'on la juge.
       await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
-      await pg.waitForFunction(() => /vendus? sur Leboncoin, encore en vente sur Vinted/.test(document.body.innerText), null, { timeout: 15000 }).catch(() => {});
+      // (5 nov.) Depuis le 3 nov. (forme « Fusion », sa demande) la ligne d'« À faire »
+      // affiche un titre COURT (« 2 annonces à retirer de Vinted · vendus sur
+      // Leboncoin ») ; la phrase entière, celle de la règle, est le nom du bouton
+      // (`aria-label`) et son nombre est `data-n`. On juge le NOMBRE et la phrase de
+      // la règle, pas le libellé affiché (§6.4) — l'ancien contrôle lisait
+      // `innerText` et rougissait sur un texte raccourci exprès.
+      const taches = () => pg.evaluate(() => [...document.querySelectorAll('.vrm-day-task')].map((e) => ({ plein: e.getAttribute('aria-label') || '', n: e.getAttribute('data-n') })));
+      await pg.waitForFunction(() => [...document.querySelectorAll('.vrm-day-task')].some((e) => /vendus? sur Leboncoin, encore en vente sur Vinted/.test(e.getAttribute('aria-label') || '')), null, { timeout: 15000 }).catch(() => {});
       const txt = await pg.evaluate(() => document.body.innerText);
-      const m = /(\d+) articles? vendus? sur Leboncoin, encore en vente sur Vinted/.exec(txt);
-      dit(m && m[1] === '2', 'Ma journée annonce les mêmes 2 articles', m ? m[0] : 'absent');
+      const tj = await taches();
+      const tLbc = tj.find((t) => /vendus? sur Leboncoin, encore en vente sur Vinted/.test(t.plein));
+      dit(tLbc && tLbc.n === '2' && (/(\d+) articles? vendus? sur Leboncoin, encore en vente sur Vinted/.exec(tLbc.plein) || [])[1] === '2', 'Ma journée annonce les mêmes 2 articles', tLbc ? `${tLbc.n} · ${tLbc.plein.slice(0, 80)}` : 'absent');
       dit(!/vendues? sur Vinted\)/.test(txt), 'et ne dit « vendue sur Vinted » d’aucune paire non prouvée vendue');
       // (26 oct.) CLOCHE eBay→Leboncoin : la N°60, publiée sur LBC (posted) et
       // vendue sur eBay, encore en ligne ici ⇒ une ligne « à retirer de Leboncoin
       // (vendue sur eBay) » — le pendant de la ligne Vinted, visible dès l'accueil.
-      dit(/1 à retirer de Leboncoin \(vendue sur eBay\)/.test(txt), 'Ma journée : « 1 à retirer de Leboncoin (vendue sur eBay) » (croisement eBay→LBC, cloche)', (txt.match(/\d+ à retirer de Leboncoin \([^)]*\)/g) || []).join(' | ') || 'absent');
+      const tEbay = tj.filter((t) => /à retirer de Leboncoin \(vendues? sur eBay\)/.test(t.plein));
+      dit(tEbay.length === 1 && tEbay[0].n === '1' && (/(\d+) à retirer de Leboncoin \(vendues? sur eBay\)/.exec(tEbay[0].plein) || [])[1] === '1', 'Ma journée : « 1 à retirer de Leboncoin (vendue sur eBay) » (croisement eBay→LBC, cloche)', tEbay.map((t) => `${t.n} · ${t.plein.slice(0, 70)}`).join(' | ') || 'absent');
       // (16 oct.) « Je me suis trompé, j'ai mal relié une paire » : le lien se
       // défait, et ça tient au rechargement (le nuage ne le rend pas).
       try {
@@ -305,6 +320,8 @@ async function allerTache(pg, tache, site) {
       } catch (e) { dit(false, '« Pas le bon article » se clique sur la ligne de la N°15', String(e.message).slice(0, 100)); }
       const liens2 = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_lbc_liens') || 'null'); } catch (_) { return null; } });
       dit(liens2 && liens2.lbc2 === '' && liens2.lbc1 === '12', 'le lien de lbc2 est défait (les autres restent)', JSON.stringify(liens2));
+      await attendre(() => !!(rows[0].data.vrm_lbc_liens && rows[0].data.vrm_lbc_liens.lbc2 === ''), 10000);
+      dit(rows[0].data.vrm_lbc_liens && rows[0].data.vrm_lbc_liens.lbc2 === '' && rows[0].data.vrm_lbc_liens.lbc1 === '12', 'et le nuage le défait aussi', JSON.stringify(rows[0].data.vrm_lbc_liens || null));
       await pg.goto(`http://localhost:${PORT}/?tab=leboncoin`, { waitUntil: 'domcontentloaded' });
       await pg.waitForSelector('[data-lbc-doublons], [data-lbc-ventes-a-relier]', { timeout: 15000 }).catch(() => {});
       await pg.waitForTimeout(1500);
