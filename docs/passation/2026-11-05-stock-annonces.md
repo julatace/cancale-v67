@@ -68,6 +68,8 @@ Branche locale `v32-stock-annonces` (depuis `v31-stock-2d`, 79b6268d). Rien n'es
 - **Pas vérifiées** : une ligne discrète nomme les paires rangées dont la lecture manque.
 - **À ranger** : les annonces actuelles SANS case (et une paire « Remise » à la main dont
   la case était prise, comme avant) ; plus jamais une vieille fiche.
+- Une paire sous deux N° (même photo exacte, `aussi`) rangée sous l'un de ses N° compte
+  rangée ; sa case n'est pas « plus en ligne ».
 - **Tes annonces actuelles** (sous les étagères) : chaque paire une fois, ses plateformes,
   ses comptes, « à confirmer » / « masquée par Vinted », sa case ou « pas encore rangée »
   avec « Voir › » / « Ranger › » ; 60 par 60.
@@ -86,16 +88,33 @@ Branche locale `v32-stock-annonces` (depuis `v31-stock-2d`, 79b6268d). Rien n'es
   il y a 3 jours, 1 Leboncoin ; une paire sur deux sites ; une masquée ; une rangée puis
   vendue ; une rangée plus en ligne ; une vieille fiche ; trois scénarios : tout lu, un
   compte pas lu, rien lu ; 390 tactile et 1512 souris, clair et sombre) : **100 verts** ;
-  sur `v31-stock-2d` (arbre extrait, banc copié dedans, build fait là) : voir le chiffre
-  rouge plus bas. Captures regardées (en-tête, étagère, liste, « au moins », « — »).
+  sur `v31-stock-2d` (`git archive` extrait, banc copié dedans, build fait là) :
+  **60 rouges / 100**, chaque exigence A à H rouge dans les 4 configurations (pas d'en-tête,
+  « À ranger » = 2, 3, 5, 9 avec la vieille fiche N°3, N°8 neutre au lieu de « plus en
+  ligne », pas de filtre, pas de « — »). Captures regardées (en-tête, étagère, liste,
+  « au moins », « — », clair et sombre, 390 et 1512).
 - Voisins : `audit-enligne` 101/101, `audit-coherence`, `audit-identite`, `audit-icones`,
-  `audit-fonctions-api` verts ; `audit-stock-2d` 49/49 ; bancs `stock-2d`,
-  `stock-2d-revue`, `stock-plateformes` : voir plus bas.
+  `audit-fonctions-api` verts ; `audit-stock-2d` 49/49 ; `fusion-echelle --verifier` :
+  les 4 mêmes fichiers hors échelle que sur la base, aucun des miens.
+- Bancs voisins (ceux que `v31-stock-2d` a ajoutés ou touchés, et ceux du Stock) :
+  `stock-2d` 104/104, `stock-2d-revue` 80/80, `stock-plateformes` 24/24, `stock-planches`
+  10/10, `stock-retrouver` 38/38. **Données adaptées, par décision** (le Stock ne montre
+  plus une fiche sans annonce) : `stock-2d`, `stock-planches`, `stock-retrouver` servent
+  maintenant le dressing de leurs paires « à ranger » (avant : une fiche numérotée
+  suffisait) ; `stock-plateformes` exige que la N°46 (fiche, aucune annonce) ne soit
+  PLUS « à ranger » ; sa mutation `BANC_MUTATION` (vider `autres` publié) ne touche plus
+  le Stock, qui lit eBay et Leboncoin lui-même. Le bouton « où sont-elles ? » des vendues
+  (`data-vendues-chercher`) vit dans « Vendues à sortir » (« Le chemin pour les sortir »).
 
 ## Ce qui reste
 - Vestiaire n'est pas dans le Stock (il ne l'était pas avant non plus) : ses annonces
   (`vcfiche`) n'ont pas encore de N° par identité côté Stock.
 - Le Stock relit au montage seulement (pas sur le signal « maj annonces » de l'extension).
+  Un compte sans dressing capté passe, comme sur l'écran Annonces, par le relais du serveur
+  (`fetchVintedListings`, freiné depuis le 5 nov.) ; sans réponse, il est « pas lu ».
+- Les bancs rouges par décision de `v31-stock-2d` (pièce 3D : `garage3d`, `stock-piece`,
+  `stock-finitions`, `stock-assistant`, `rangement`, `stock-partis` UI, `compta-stock-ui`,
+  `stock-gestes` A) n'ont pas été relancés ici : rien de ce chantier ne les concerne.
 - « Elle est encore là » vaut jusqu'à ce qu'il la retire : si la paire revient en ligne
   puis repart, elle n'est plus signalée (à reprendre si ça le gêne).
 - Une annonce eBay/Leboncoin sans N° n'est pas montrée (comptée seulement) ; une annonce
