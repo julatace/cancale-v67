@@ -319,7 +319,7 @@ const ouvrirMdp = async (pg) => { const a = await pg.$('#mdpLien'); if (a) { awa
     dit(cl.envoyes.includes('lierAvecVRM') && !cl.ferme, 'dans la carte : le clic demande au service worker d’ouvrir VRM (la carte, elle, reste dans le site)', JSON.stringify(cl.envoyes));
     const cm = await rendre(nav, { ok: true, connecte: false }, { carte: true, geste: async (pg) => { await ouvrirMdp(pg); await pg.fill('#mail', 'a@b.fr'); await pg.fill('#pw', 'x'); await pg.click('#inBtn'); } });
     const login = cm.messages.find((m) => m.action === 'authLogin');
-    dit(!!login && login.ouvrir === true, 'au mot de passe, dans la carte : c’est le service worker qui ouvrira VRM après la connexion', JSON.stringify(login));
+    dit(!!login && login.ouvrir === false && !cm.ouvert, 'au mot de passe : la connexion reste dans l’extension, sans ouvrir VRM', JSON.stringify(login));
     const cc = await rendre(nav, { ok: true, connecte: true, email: 'sophie@exemple.fr', cloisonne: true }, { carte: true });
     dit(!cc.ouvert && !cc.ferme, 'connectée, la carte ne s’ouvre pas toute seule sur VRM (elle est dans le site)', cc.ouvert);
     dit(/sophie@exemple\.fr/.test(cc.txt), 'elle nomme le compte VRM', cc.txt.slice(0, 120));
