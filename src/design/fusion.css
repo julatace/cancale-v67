@@ -1313,3 +1313,4 @@ html body .vrm-fs.vrm-carte-feuille { background: var(--fu-fond, #f2f2f7); color
    de la feuille (z 20000) — la règle d'avant visait l'ancien voile `.vrm-carte-voile`. */
 body:has(.vrm-fs.vrm-carte-feuille) .vrm-cal-voile { z-index: 20001 !important; }
 body:has(.vrm-fs.vrm-carte-feuille) .vrm-cal-feuille { z-index: 20002 !important; }
+html body .vrm-va-feuille.vrm-bilan-sync > button { margin: 0 0 12px; }

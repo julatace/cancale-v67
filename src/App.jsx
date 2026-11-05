@@ -53291,7 +53291,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div className="vrm-w-tuile-case" data-case={x.id}>
             <button type="button" className="vrm-day-card vrm-w-tuile" data-widget-tuile={x.id} data-n={x.pasSu ? '' : String(n)} title={titreCase(x)} onClick={()=>onNav&&onNav(x.tab)}
               style={{border:`1px solid ${C.border}`,background:C.card,boxShadow:C.shadow||'none'}}>
-              <span style={{color:x.t && x.t.alerte ? C.warn : vif ? C.accent : C.muted}}><Icon name={x.ic} size={20}/></span>
+              <span style={{color:x.t && x.t.alerte ? C.warn : vif ? C.text : C.muted}}><Icon name={x.ic} size={20}/></span>
               <span className="vrm-display vrm-w-tuile-n" style={{color:vif ? C.text : C.muted}}>{x.pasSu ? '—' : n}</span>
               <span className="vrm-w-tuile-l" style={{color:C.muted}}>{x.l}</span>
               {(() => { const so = sousCase(x); return so ? <span className={'vrm-day-bar-sous' + (so.ambre ? ' is-ambre' : '')} data-sous-ligne={so.cle}>{so.texte}</span> : null; })()}
