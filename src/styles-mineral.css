@@ -1290,7 +1290,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 .vrm-chart-compare { display:flex; flex-wrap:wrap; justify-content:space-between; gap:4px 12px; font-size:13px; color:var(--vrm-muted); padding-top:6px; }
 .vrm-chart-compare strong { font-weight:500; font-variant-numeric:tabular-nums; max-width:100%; overflow-wrap:anywhere; }
 .vrm-filter-recap { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:12px; color:var(--vrm-muted); }
-.vrm-filter-recap button,.vrm-chat-shortcuts button { background:transparent; border:0; color:var(--vrm-accent); font:600 12px/1.4 Inter,system-ui,sans-serif; cursor:pointer; padding:8px 0; }
+.vrm-filter-recap button,.vrm-chat-shortcuts button { background:transparent; border:0; color:var(--vrm-accent-texte); font:600 12px/1.4 Inter,system-ui,sans-serif; cursor:pointer; padding:8px 0; }
 .vrm-chat-shortcuts { flex-shrink:0; padding:0 16px; border-bottom:1px solid var(--vrm-line); }
 .vrm-msg-article { display:block; color:var(--vrm-muted); font-size:12px; line-height:1.4; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin:2px 0; }
 .vrm-shared-sale .vrm-sale-price { min-width:0; }
