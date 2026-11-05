@@ -90,6 +90,10 @@ déplace sur une offre tranchée ou un évènement) ; 1 642 entrées de boîte n
   `audit-bancs`, `audit-photos-vinted`, `audit-icones`, `audit-boutons`. `audit-chiffres` : 6 rouges,
   les MÊMES sur HEAD. `fusion-echelle --verifier` : 4 fichiers hors échelle, aucun de ce chantier.
 
+- Banc voisin `messagerie.cjs`, machine chargée : 190 à 194 OK et 1 à 5 KO qui CHANGENT d'un passage
+  à l'autre (liste encore vide après l'attente fixe de 3,5 s) ; le build de HEAD sort les mêmes (4 KO,
+  « conversations listées — [] »). Instable sous charge, pas ce chantier — à relancer seul.
+
 ## Non mesuré
 
 - `messages->-1->entity->price->>amount` (et les autres chemins du résumé) contre SA PostgREST :
