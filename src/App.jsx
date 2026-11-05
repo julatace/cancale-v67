@@ -118,6 +118,16 @@ const Communaute = lazy(() => import("./communaute/Communaute.jsx"));
 // (5 nov.) L'écran « E-mails » : boîte de réception + « Relier ma boîte » (src/BoiteEmails.jsx).
 const BoiteEmails = lazy(() => import("./BoiteEmails.jsx"));
 import { createPortal, flushSync } from "react-dom";
+// (5 nov., chantier B) Les composants partagés et l'écriture unique des euros (docs/passation/2026-11-05-chantier-b.md).
+import { montant, fmt as fmtMontant, fmtE as fmtEMontant, fmtE0 as fmtE0Montant, prixTxt as prixTxtMontant } from "./format.js";
+import { SheetShell as SheetShellBase } from "./composants/SheetShell.jsx";
+import { BoutonBase, SegmenteBase } from "./composants/Bouton.jsx";
+// Importés ICI une fois pour les chantiers C à H (aucun n'a à retoucher cette ligne).
+import { ChampRecherche } from "./composants/ChampRecherche.jsx";
+import { PhotoVide } from "./composants/PhotoVide.jsx";
+import { Numero } from "./composants/Numero.jsx";
+import { EtatPanne } from "./composants/EtatPanne.jsx";
+import { L, Lbas, VERBES, PAS_SU } from "./libelles.js";
 import Bienvenue from "./Bienvenue.jsx";
 import VisiteBulles from "./VisiteBulles.jsx";
 import { CLE_VISITE } from "./visiteBulles.js";
@@ -2335,17 +2345,14 @@ function FermeAuRetour({ fermer }) {
 const Z_CONFIRMATION = 20000;
 const Z_MESSAGES = 30000;
 
-// Habillage commun aux deux feuilles : voile flouté + panneau qui monte du bas.
-function SheetShell({ onClose, children, maxWidth = 460, z = 2000 }) {
-  return (
-    <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.46)',backdropFilter:'blur(3px)',WebkitBackdropFilter:'blur(3px)',zIndex:z,display:'flex',alignItems:'flex-end',justifyContent:'center',animation:'cancaleFadeIn .18s ease both'}}>
-      <FermeAuRetour fermer={onClose}/>
-      <div onClick={e => e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth,borderRadius:'22px 22px 0 0',padding:'14px 18px calc(18px + env(safe-area-inset-bottom))',boxShadow:C.shadowLg||'none',maxHeight:'86vh',overflowY:'auto',animation:'cancaleSheet .26s cubic-bezier(.32,.72,0,1) both'}}>
-        <div style={{width:36,height:4,borderRadius:12,background:C.border,margin:'0 auto 14px'}}/>
-        {children}
-      </div>
-    </div>
-  );
+// LA FEUILLE UNIQUE (5 nov., chantier B) : voile, poignée au doigt, titre et
+// croix en icône (44 px) si `titre`, portail, fond OPAQUE dès la première image
+// (l'ancienne fondait avec son voile), mouvement interrompable, mouvement réduit
+// respecté, variante `lumineuse` pour « En grand ». Le dessin et le geste vivent
+// dans src/composants/SheetShell.jsx ; ce relais lui donne le vrai `FermeAuRetour`.
+// Props : onClose · titre? · sousTitre? · croix? · lumineuse? · maxWidth=460 · z=2000 · data-*.
+function SheetShell(props) {
+  return <SheetShellBase {...props} FermeAuRetour={FermeAuRetour}/>;
 }
 
 // ── RANGER UNE VRAIE PAIRE (feuille du garage 3D) ──────────────────────────
@@ -11480,7 +11487,9 @@ const generateEtiquetteSku = async (num, o = {}) => {
 // elles auraient planté à la première ligne si on les avait rebranchées. Pire :
 // `syncFromSheets` écrasait `vinted_catalog` et `vinted_sales` avec la réponse
 // d'un endpoint fantôme. Trouvées par `scripts/audit-variables.cjs`.
-const fmt  = n => isNaN(+n)?'—':Number(n).toFixed(2).replace('.',',')+' €';
+// (5 nov., chantier B) Alias de `montant()` (src/format.js) : centimes seulement
+// s'ils existent ; un montant absent s'écrit « — » (avant : `fmt(null)` = « 0,00 € »).
+const fmt  = fmtMontant;
 // Revue du 16 octobre : « 65 € » sur une ligne, « 65,00 € » ou « +12,00€ »
 // juste à côté. UNE forme pour les écrans Ventes et Annonces — l'entier quand
 // le montant est rond, sinon deux décimales, toujours une espace avant €.
@@ -13995,7 +14004,7 @@ function ChoixAnnoncesVinted({ filtre = 'tout', annonces, sel, setSel, charge, b
   const cocherTout = (g) => setSel((v) => { const deja = new Set(v.map((x) => x.uid + ':' + x.id)); return [...v, ...g.items.filter((a) => !a.raisonPas && !deja.has(cle(a))).map((a) => ({ id: a.id, uid: a.uid, etat: a.etat }))]; });
   const toutCocheG = (g) => g.items.filter((a) => !a.raisonPas).every((a) => coches.has(cle(a)));
   const decocherG = (g) => setSel((v) => v.filter((x) => x.uid !== g.uid));
-  const prixTxt = (p) => (p == null ? 'sans prix' : `${p.toLocaleString('fr-FR', { minimumFractionDigits: p % 1 ? 2 : 0, maximumFractionDigits: 2 })} €`);
+  const prixTxt = prixTxtMontant;   // (5 nov.) alias de `montant()`, src/format.js
   const nCoches = (sel || []).length;
   return (
     <section className="vrm-sel" data-selection-vue={filtre} data-selection-n={liste.length}>
@@ -19889,14 +19898,12 @@ function KpiVentes({ tuiles, note, plateforme, compte = null }) {
 // que poser la classe et l'icône (18 px, ICON_PATHS). `href` ⇒ un <a>. Tout le
 // reste (data-*, title, disabled, aria-*) passe tel quel : un bouton grisé garde
 // sa raison dans `title`, il n'est jamais caché.
-function Bouton({ variante = 'secondaire', icone, plein = false, className = '', children, type = 'button', href, ...rest }) {
-  const cls = `vrm-b vrm-b-${variante}${plein ? ' vrm-b-plein' : ''}${!children && icone ? ' vrm-b-icone' : ''}${className ? ' ' + className : ''}`;
-  const contenu = <>{icone && ICON_PATHS[icone] ? <Icon name={icone} size={18}/> : null}{children}</>;
-  if (href) return <a href={href} className={cls} {...rest}>{contenu}</a>;
-  // Type écrit en clair (audit-commandes) : « submit » seulement quand on le
-  // demande, sinon « button » — jamais un envoi de formulaire par défaut.
-  if (type === 'submit') return <button type="submit" className={cls} {...rest}>{contenu}</button>;
-  return <button type="button" className={cls} {...rest}>{contenu}</button>;
+// (5 nov., chantier B) Le composant vit dans src/composants/Bouton.jsx (`BoutonBase`) :
+// + variante « danger » (AMBRE, §7), + `taille="petit"` (32 px souris / 44 px doigt),
+// + `occupe` (grisé, aria-busy). Ce relais lui branche les icônes de l'app (ICON_PATHS).
+const iconeApp = (nom, taille) => (ICON_PATHS[nom] ? <Icon name={nom} size={taille}/> : null);
+function Bouton(props) {
+  return <BoutonBase {...props} rendreIcone={iconeApp}/>;
 }
 // (29 oct.) UN PARCOURS EN PLUSIEURS ÉTAPES se lit toujours pareil — Julien :
 // « pour les republications la barre de progression est incompréhensible ».
@@ -19924,19 +19931,10 @@ function Avancement({ titre, phrase, part = 0, partRate = 0, compte, erreur, lab
     </div>
   );
 }
-function Segmente({ label, options, value, onChange, plein = false, disabled = false, className = '', style }) {
-  return (
-    <div role="group" aria-label={label} className={`vrm-seg${plein ? ' vrm-seg-plein' : ''}${className ? ' ' + className : ''}`} style={style}>
-      {options.map(o => (
-        <button key={o.v} type="button" className="vrm-seg-btn" aria-pressed={value === o.v}
-          disabled={disabled || !!o.disabled} onClick={() => onChange(o.v)} {...(o.data || {})}>
-          {o.icone ? <Icon name={o.icone} size={15}/> : null}
-          {o.l}
-          {o.n ? <span className="vrm-seg-n"> {o.n}</span> : null}
-        </button>
-      ))}
-    </div>
-  );
+// (5 nov., chantier B) Le composant vit dans src/composants/Bouton.jsx (`SegmenteBase`) :
+// options [{ v, l, icone?, n?, titre?, disabled?, data? }] — `titre` nomme un segment en icône seule.
+function Segmente(props) {
+  return <SegmenteBase {...props} rendreIcone={iconeApp}/>;
 }
 
 function PlatSubNav({ sub, setSub, sections, dark }) {
@@ -50902,12 +50900,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     try { await processBordereau(ctx.numero, ctx.title, await f.arrayBuffer()); } catch(err){ toast('Erreur : '+String(err)); }
   };
 
-  const fmtE = (n)=> (n==null?'—':Number(n).toFixed(2).replace('.',',')+' €');
+  const fmtE = fmtEMontant;   // (5 nov.) alias de `montant()`, src/format.js
   // Montant ARRONDI à l'euro pour les cartes-titres (CA, coût, bénéfice…) : sur
   // une case étroite « 15037,88 € » débordait et se coupait (« 15037,… »). Les
   // centimes n'apportent rien sur un total de plusieurs milliers ; on affiche
   // « 15 038 € » (espace fine des milliers), lisible et jamais tronqué.
-  const fmtE0 = (n)=> (n==null?'—':Math.round(Number(n)).toLocaleString('fr-FR')+' €');
+  const fmtE0 = fmtE0Montant;   // (5 nov.) alias de `montant()`, src/format.js
   const cur = (c)=> (c==='EUR'||!c)?'€':c;
   // Prix Vinted formaté proprement : l'API renvoie « 88.0 » / « 95.0 » (chaîne),
   // qui s'affichait tel quel (« 88.0 € »). On formate en français sans zéro

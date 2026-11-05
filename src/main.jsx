@@ -115,6 +115,9 @@ import './design/dac7.css';
 // (3 nov.) Les jetons Fusion pour TOUTE l'app (échelle fermée, segmentés, cartes) — le tout dernier mot.
 import './design/jetons.css';
 import './styles-bureau.css';
+// (5 nov., chantier B) Les composants partagés (SheetShell, ChampRecherche, PhotoVide, Numero,
+// EtatPanne, bouton « danger » ambre) — après tout le reste : ils portent leur propre forme.
+import './styles-composants.css';
 import { suivreRangeesDefilantes } from './rangeesDefilantes.js';
 if (typeof document !== 'undefined') { if (document.body) suivreRangeesDefilantes(); else document.addEventListener('DOMContentLoaded', suivreRangeesDefilantes); }
 
