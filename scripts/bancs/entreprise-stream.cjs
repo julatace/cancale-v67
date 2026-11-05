@@ -123,7 +123,12 @@ const lireSecrets = (pg, secrets) => pg.evaluate((secrets) => {
     if (!hit || !visible(c)) continue;
     vus.push(hit); if (!flou(c)) clairs.push('[champ] ' + c.value.slice(0, 60));
   }
-  return { vus, clairs };
+  // (5 nov.) Le mode stream RÉÉCRIT le texte (« ••• », src/modeStream.js) : un secret
+  // caché n'est plus dans la page. Ce que la règle a caché se compte à part.
+  let masques = 0;
+  const w2 = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  while ((t = w2.nextNode())) { if (/•••/.test(t.nodeValue || '') && t.parentElement && visible(t.parentElement)) masques++; }
+  return { vus, clairs, masques };
 }, secrets);
 
 (async () => {
@@ -173,7 +178,7 @@ const lireSecrets = (pg, secrets) => pg.evaluate((secrets) => {
         if (tab === 'journee') { const b = pg.locator('[data-etat-actions]'); if (await b.count()) { try { await b.first().click({ timeout: 3000 }); await pg.waitForTimeout(600); } catch (_) {} } }
         if (tab === 'settings') { const b = pg.locator('button', { hasText: /Mon compte/ }); if (await b.count()) { try { await b.first().click({ timeout: 3000 }); await pg.waitForTimeout(800); } catch (_) {} } }
         const r = await lireSecrets(pg, SECRETS);
-        vusTotal += r.vus.length;
+        vusTotal += r.vus.length + (r.masques || 0);
         dit(r.clairs.length === 0, `${qui} · ${tab} : aucun pseudo, email ou nom d'entreprise lisible`, r.clairs.slice(0, 4).join(' | '));
         await ctx.close();
       }

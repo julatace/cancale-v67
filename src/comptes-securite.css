@@ -44,5 +44,4 @@ html body .vrm-app-shell .vrm-compte-puces .vrm-compte-puce:focus-visible { outl
 html body .vrm-app-shell .vrm-sec-ligne .vrm-sec-bouton { flex: none; min-height: 44px; padding: 0 14px; border-radius: 12px; border: 0; background: var(--fu-case, rgba(118,118,128,.12)); color: var(--fu-encre, inherit); font: 600 13px/1 var(--vrm-police); cursor: pointer; }
 html body .vrm-app-shell .vrm-sec-ligne .vrm-sec-bouton:disabled { opacity: .5; cursor: default; }
 
-/* ── L'œil de la tête : allumé = montants cachés ─────────────────────────── */
-.vrm-hbtn[data-montants-caches="1"] { color: var(--fu-encre, inherit); }
+/* (5 nov.) L'œil « cacher les montants » est remplacé par le bouton « Stream » (src/design/mode-stream.css). */

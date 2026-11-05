@@ -12,6 +12,7 @@
 // l'appelant (§11) ; le bénéfice est `beneficePaire` (src/beneficePaire.js),
 // le même que l'écran Ventes. Module PUR : l'écran et le banc `fiche-paire.cjs`.
 import { beneficePaire, centimes, champsCharges } from './beneficePaire.js';
+import { origineDuPrix } from './fournisseurs.js';
 
 const str = (v) => String(v == null ? '' : v).trim();
 
@@ -75,8 +76,17 @@ export function parcoursPaire(rn, d = {}, o = {}) {
   if (fiches == null) etapes.push({ cle: 'achat', etat: 'passu', titre: 'Achat', detail: 'tes fiches numérotées pas encore lues' });
   else if (entree && entree.buyFrom && (entree.buyFromId || entree.buyFrom.title)) {
     const b = entree.buyFrom;
-    etapes.push({ cle: 'achat', etat: 'fait', titre: 'Achetée sur Vinted', date: b.date || null, montant: achatC,
+    // (5 nov., revue) `buyFromId` porté par l'étape : le lien peut venir de la
+    // VENTE (`vinted_sale_overrides`), pas seulement de la fiche — « Voir l'état »
+    // et l'histoire lisent CET achat-là (jamais « saisi à la main » à tort).
+    etapes.push({ cle: 'achat', etat: 'fait', titre: 'Achetée sur Vinted', date: b.date || null, montant: achatC, buyFromId: entree.buyFromId ? String(entree.buyFromId) : null,
       detail: [b.seller ? `vendeur « ${b.seller} »` : null, b.account || null, entree.buyFromId ? 'achat relié par son n° de transaction' : null].filter(Boolean).join(' · ') });
+  } else if (achatC != null && entree.buyGros && origineDuPrix(entree, entree.buyGros.id).etat === 'lot') {
+    // (5 nov., intégration) La part d'un ACHAT EN GROS reliée par SON clic
+    // (Achats → Fournisseurs, `buyGros`) : la règle de Fournisseurs
+    // (`origineDuPrix`) dit si le prix est encore celui du lot — jamais « saisi à
+    // la main » à tort. Un prix retapé ensuite redevient « saisi à la main ».
+    etapes.push({ cle: 'achat', etat: 'fait', titre: 'Achat en gros', montant: achatC, gros: true, detail: 'part d’un achat en gros relié par ton clic (Fournisseurs)' });
   } else if (achatC != null) etapes.push({ cle: 'achat', etat: 'fait', titre: 'Achat', montant: achatC, detail: 'prix saisi à la main · achat pas relié' });
   else etapes.push({ cle: 'achat', etat: 'absent', titre: 'Achat', detail: 'prix d’achat pas saisi' });
 

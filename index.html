@@ -382,11 +382,20 @@
     /* Respect du réglage système « réduire les animations ». */
     @media (prefers-reduced-motion: reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important;animation-delay:0ms!important;}button:active:not(:disabled){transform:none!important;}.vrm-card:hover{transform:none!important;}.vrm-stagger > *{animation:none!important;}}
       /* (16 oct.) MODE STREAM : les données sensibles sont floutées, et le
-       survol ne les révèle pas (on filme l'écran). */
-    [data-stream="1"] .vrm-sensible,
+       survol ne les révèle pas (on filme l'écran).
+       (5 nov.) Le TEXTE est réécrit « ••• » par la règle programmée
+       (src/modeStream.js) ; ici, ce qui n'est pas du texte : les champs dont la
+       valeur est à cacher, la LIGNE entière d'une annonce « qui contient… »
+       (photo comprise), les bordereaux et les QR des codes de retrait à l'écran
+       (selon ses cases), le QR de la double vérification (toujours). */
     [data-stream="1"] [data-stream-flou],
     [data-stream="1"] input[type="email"],
     [data-stream="1"] input[type="tel"] { filter: blur(6px) !important; user-select: none; }
+    [data-stream="1"] [data-stream-ligne] { filter: blur(9px) !important; user-select: none; }
+    [data-stream="1"][data-stream-bordereaux="1"] [data-stream-image="bordereau"] { filter: blur(14px) !important; }
+    [data-stream="1"][data-stream-codes="1"] [data-stream-image="code"],
+    [data-stream="1"][data-stream-codes="1"] img[alt^="QR de retrait"],
+    [data-stream="1"] [data-mfa-qr] { filter: blur(14px) !important; }
 </style>
 </head>
 <body><div id="root"></div>
