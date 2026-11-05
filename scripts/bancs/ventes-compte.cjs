@@ -35,6 +35,9 @@ const VA = [vente(9101, 50, 'Paiement validé', il(0)), vente(9102, 80, 'Command
 const COMPTE_L = { id: 4, vinted_user_id: '444', login: 'compte_recent', domain: 'www.vinted.fr', updated_at: maintenant.toISOString() };
 // Le cas mesuré chez Julien le 5 nov. (loladupuis35260) : un compte récent dont la SEULE vente est en cours.
 const VL = [vente(9401, 50.4, 'Bordereau envoyé au vendeur', il(0))];
+// (revue) Un compte dont une vente finalisée a un prix ILLISIBLE : son CA par compte est un minimum.
+const COMPTE_P = { id: 5, vinted_user_id: '555', login: 'compte_prix_illisible', domain: 'www.vinted.fr', updated_at: maintenant.toISOString() };
+const VP = [vente(9501, 30, 'Commande finalisée', il(2)), { ...vente(9502, 0, 'Commande finalisée', il(2)), price: { amount: '', currency_code: 'EUR' } }];
 const VN = [vente(9301, 40, 'Commande finalisée', il(0)), vente(9302, 25, 'Bordereau envoyé au vendeur', il(0))];
 // Ce que le banc ATTEND, calculé ici, jamais lu dans l'app.
 const cents = (L, f) => Math.round(L.filter(f).reduce((s, o) => s + Number(o.price.amount), 0) * 100);
@@ -81,12 +84,12 @@ const ouvrir = async (b, vp, etat, onglet, init = {}) => {
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     const j = (d, st) => route.fulfill({ status: st || 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'content-range': `0-${Math.max(0, (Array.isArray(d) ? d.length : 1) - 1)}/${Array.isArray(d) ? d.length : 1}` }, body: JSON.stringify(d) });
-    if (route.request().method() !== 'GET') return j([], 201);
+    if (route.request().method() !== 'GET') { if (etat.ecrits) etat.ecrits.push(route.request().postData() || ''); return j([], 201); }
     if (/select=owner/.test(u)) return j({ m: 1 }, 400);
     if (/\/rest\/v1\/vinted_accounts/.test(u)) { etat.lecturesComptes++; return j(etat.comptes); }
     const lignes = [
-      ...etat.comptes.map((a) => ({ id: `harvest_${a.vinted_user_id}_orders_sold`, data: { capturedAt: maintenant.toISOString(), payload: { my_orders: a.vinted_user_id === '333' ? VN : a.vinted_user_id === '444' ? VL : VA } } })),
-      ...etat.comptes.map((a) => ({ id: `harvest_${a.vinted_user_id}_listings`, data: { capturedAt: maintenant.toISOString(), payload: { items: [] } } })),
+      ...etat.comptes.map((a) => ({ id: `harvest_${a.vinted_user_id}_orders_sold`, data: { capturedAt: maintenant.toISOString(), payload: { my_orders: a.vinted_user_id === '333' ? VN : a.vinted_user_id === '444' ? VL : a.vinted_user_id === '555' ? VP : VA } } })),
+      ...etat.comptes.map((a) => ({ id: `harvest_${a.vinted_user_id}_listings`, data: { capturedAt: maintenant.toISOString(), payload: { items: [], pagination: { total_entries: 0 } } } })),
       { id: 'lbc_ventes', data: { ventes: LBC } },
       { id: 'lbc_accounts', data: { accounts: LBC_ACC } },
       { id: 'lbc_listings', data: { items: LBC_ITEMS } },
@@ -235,12 +238,17 @@ const attr = (pg, sel, at) => pg.$eval(sel, (e, a) => e.getAttribute(a), at).cat
     });
     console.log('\n── 2c. Un compte « refusé » par l\'heuristique locale garde son CA finalisé');
     await essaie('bloqué', async () => {
-      const etat = { comptes: [COMPTE_A, COMPTE_N], lecturesComptes: 0 };
+      const etat = { comptes: [COMPTE_A, COMPTE_N], lecturesComptes: 0, ecrits: [] };
       const { ctx, pg, errs } = await ouvrir(b, vp, etat, 'dashboard', { ...STATS_OUVERTES, vinted_accounts_blocked: ['333'] });
       await attendre(pg, '[data-finalise-vinted]');
       await pg.waitForTimeout(2000);
       const fin = await attr(pg, '[data-finalise-vinted]', 'data-finalise-vinted');
       dit(fin === String(finalise([...VA, ...VN])), 'Finalisé sur Vinted = la règle de Comptabilité (le blocage ne retire pas l\'argent)', `${fin} · attendu ${finalise([...VA, ...VN])}`);
+      // (revue) Un compte « refusé » n'a PAS ses annonces lues EXPRÈS : ce n'est pas une
+      // lecture ratée. Le widget ne doit ni perdre son « en ligne » ni dire « annonces pas lues ».
+      for (let k = 0; k < 20 && !etat.ecrits.some((x) => /"widget_stats"/.test(x)); k++) await pg.waitForTimeout(250);
+      const w = etat.ecrits.filter((x) => /"widget_stats"/.test(x)).map((x) => { try { return JSON.parse(x)[0].data; } catch (_) { return null; } }).filter(Boolean).pop();
+      dit(!!w && typeof w.online === 'number' && !w.onlineRaison, 'widget : un compte « refusé » ne rend pas « annonces pas lues » (en ligne publié)', JSON.stringify(w && { online: w.online, raison: w.onlineRaison }));
       dit(errs.length === 0, 'aucune erreur de page', errs.join(' | ').slice(0, 160));
       await ctx.close();
     });
@@ -279,6 +287,36 @@ const attr = (pg, sel, at) => pg.$eval(sel, (e, a) => e.getAttribute(a), at).cat
       await pg.waitForTimeout(2000);
       const eur = Math.round(Number(await attr(pg, '[data-ca-cur="vendu"]', 'data-ca-eur')) * 100);
       dit(eur === venduMois([...VA, ...VL]), 'Comptabilité : « Vendu » du mois compte le compte récent', `${eur} · attendu ${venduMois([...VA, ...VL])}`);
+      dit(errs.length === 0, 'aucune erreur de page', errs.join(' | ').slice(0, 160));
+      await ctx.close();
+    });
+    console.log('\n── 2f. Un prix illisible : le CA de CE compte est un minimum, et le dit');
+    await essaie('prix illisible', async () => {
+      const etat = { comptes: [COMPTE_A, COMPTE_P], lecturesComptes: 0 };
+      const { ctx, pg, errs } = await ouvrir(b, vp, etat, 'dashboard', STATS_OUVERTES);
+      await attendre(pg, '[data-stats-compte="555"]');
+      await pg.waitForTimeout(1200);
+      await pg.locator('[data-stats-carte="comptes"]').first().scrollIntoViewIfNeeded().catch(() => {});
+      await capture(pg, 'stats-comptes-' + vp.width);
+      const p = await attr(pg, '[data-stats-compte="555"]', 'data-stats-compte-partiel');
+      const a = await attr(pg, '[data-stats-compte="111"]', 'data-stats-compte-partiel');
+      dit(p === '1' && a == null, '« CA Vinted par compte » : le compte au prix illisible est dit « au moins », pas l\'autre', `555=${p} · 111=${a}`);
+      dit(errs.length === 0, 'aucune erreur de page', errs.join(' | ').slice(0, 160));
+      await ctx.close();
+    });
+    console.log('\n── 3. Paramètres → Comptes eBay : chaque vente de la carte « Argent eBay » nomme son compte');
+    for (const vp3 of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) await essaie('ebay reglage ' + vp3.width, async () => {
+      const etat = { comptes: [COMPTE_A], lecturesComptes: 0 };
+      const { ctx, pg, errs } = await ouvrir(b, vp3, etat, 'settings');
+      await pg.waitForTimeout(1500);
+      await pg.getByText('Comptes eBay', { exact: true }).first().click({ timeout: 10000 });
+      await attendre(pg, '[data-vente-compte-ou="ebay-reglage"]', 15000);
+      await pg.getByText('Solde et paramètres du compte').first().click({ timeout: 8000 }).catch(() => {});
+      await pg.waitForTimeout(500);
+      await pg.locator('[data-vente-compte-ou="ebay-reglage"]').first().scrollIntoViewIfNeeded().catch(() => {});
+      await capture(pg, 'ebay-reglage-' + vp3.width);
+      const L = await pg.$$eval('[data-vente-compte-ou="ebay-reglage"]', (l) => l.map((c) => { const r = c.getBoundingClientRect(); return r.width > 0 ? c.getAttribute('data-vente-compte') : 'invisible'; }));
+      dit(L.length === EBAY_CMD.length && L.every((x) => x === 'pseudo_ebay_seul'), `eBay ${vp3.width} : la vente de la carte nomme son pseudo, même avec un seul compte`, JSON.stringify(L));
       dit(errs.length === 0, 'aucune erreur de page', errs.join(' | ').slice(0, 160));
       await ctx.close();
     });

@@ -562,7 +562,6 @@ Une ligne par chantier. Le récit complet des lignes du 31 oct. au 2 nov. est, m
 - **3 nov.** — Statistiques « Ce qui rapporte le plus » (Modèle · Marque · Taille · Compte · Site : brut total/moyen, marge, temps pour vendre, couverture « prix d'achat connus N/M » ; modèle = statistique sûre, jamais une identité : `src/ceQuiRapporte.js`) ; « Articles qui dorment » unifiés avec Annonces → À relancer (30/60/90 j, une action qui ouvre l'écran existant) ; micro de recherche (Web Speech `fr-FR`, « numéro 124 » → 124, « bé 125 » → B125). Une vente Vinted au prix illisible est écartée (plus comptée 0 €). Audits `ce-qui-rapporte`/`qui-dorment`/`recherche-vocale`, banc `outils-stats`. → historique interface-stock. Geste : ouvrir Statistiques et toucher le micro.
 - **3 nov.** — Annonces, 4 outils : « Changer le prix » d'un N° sur tous les sites où il est en ligne PAR IDENTITÉ (eBay `revise` confirmé ; Vinted par `republiermodif` si l'extension sait, sinon « À faire sur le site » ; Leboncoin/Vestiaire toujours « À faire sur le site » — requête jamais observée) ; « Dupliquer » ⇒ nouveau N° `prochainLibre`, aucune photo ni identité copiée (`vrm_fiches_neuves`) ; historique complet et prouvé d'un article (`src/histoireArticle.js`) ; « Mes modèles » de description (`vrm_modeles_desc`). `audit-annonces-outils` (43 rouges sur main, 17/17 mutations). → historique interface-stock. Geste : essayer « Changer le prix » sur un N°.
 - **3 nov.** — Paramètres → Comptes liés pour les 4 plateformes (une carte par compte : nom lu, état ouvert/à relire/délié, Pro/Particulier, « dans les totaux », Ouvrir/Relire/Relier/Délier) ; écarter un compte Leboncoin/Vestiaire/eBay des totaux (`api/_lib/comptes-exclus.js`, `vrm_comptes_exclus`, une vente sans compte relevé n'est jamais écartée) ; Vestiaire = « Compte non identifié » tant que `vc_session` n'existe pas. `audit-comptes-exclus` (8 mutations), banc `comptes-lies` (9 rouges sur main). Matrice `docs/passation/parite-plateformes.md`. → historique divers. Geste : Paramètres → Comptes liés.
-- **3 nov.** — Ma journée « À faire » en PHOTOS (vignettes par identité, pile + « +k », plus de pastilles colorées ; `src/design/PileVignettes.jsx`) ; Colis en 3 onglets « À envoyer · Envoyés · À retirer », toutes plateformes ensemble groupées par transporteur ; « À retirer » en SECTIONS (aujourd'hui · prêts · code à venir · lieu à confirmer · à vérifier · en route · argent à vérifier), chaque colis une fois, sélecteur de VILLE (lue dans l'adresse) qui filtre carte, liste et carte sombre ; aucune phrase explicative. Bancs `journee-photos`, `colis-retirer-propre` (rouges sur main) ; R2 du récap corrigé (`deps` de `LigneVenteVinted`). → historique interface-stock. Geste : regarder Colis → À retirer et Ma journée.
 - **Avant le 20 oct.** — `docs/passation/etat-detaille-2026-10-31-au-11-02.md` (fin) et `docs/journal-2026.md`.
 
 ---
@@ -585,27 +584,15 @@ SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 Chromium du banc : `/opt/pw-browsers/chromium` (lien stable),
 `--use-angle=swiftshader --no-sandbox`.
 
-## 5 novembre — le compte sur chaque vente, et un compte récent compte partout (branche `v31-ventes-compte`)
-Julien : « le compte sur lequel l'article a été vendu doit apparaître » ; « le dernier compte connecté n'avait pas son
-CA dans Statistiques ni dans Comptabilité ».
-- **Le compte sur CHAQUE vente** (`CompteVente`, prop `compte` de `LigneVenteCompacte`/`LigneVente`) : Vinted (login),
-  Leboncoin (`compteVenteLbc` : le compte joint à la vente, sinon celui de SON annonce, nom lu dans `lbc_accounts`),
-  eBay (`compteVenteEbay` : pseudo de la commande, sinon du registre pour SON compte) — ligne repliée (forme bureau
-  ET forme courte du téléphone) et détail, même avec un seul compte (la règle §7 « une fois quand uniforme » est
-  abandonnée ICI, à sa demande). Pas su ⇒ « compte … non relevé », jamais deviné. Vestiaire : pas fait.
-- **Mesuré (lecture seule)** : loladupuis35260 (lié le 22 oct.) a UNE vente, EN COURS (50,40 €, 4 nov.). « CA Vinted par
-  compte » ne listait que les comptes à finalisé > 0 : il n'y apparaissait pas. Chaque compte lié non écarté y a
-  maintenant sa ligne (`liveStats.comptesCa`, la même boucle que le total) : finalisé (0,00 € lu), en cours dessous,
-  « — » si ses ventes n'ont pas pu être lues.
-- **La liste des comptes n'est plus figée au montage** (`AppCoeur`) : relue sur `maj · comptes`, sur un signal d'un
-  compte inconnu, au retour au premier plan et toutes les 2 min écran visible ; une lecture ratée ne change rien,
-  une liste identique ne rend rien (`listeComptesChangee`). Le « Finalisé » et le CA par compte de Statistiques ne
-  retirent plus un compte « refusé » par l'heuristique locale (`vinted_accounts_blocked`) : ventes ⇒
-  `compteEcarte` (son choix seulement), la règle de Comptabilité et de « vendu » (§11).
-- Preuves : banc `scripts/bancs/ventes-compte.cjs` (données inventées, 390 tactile + 1512, port `BANC_PORT`, `SHOTS=`)
-  **42 verts ; 24 rouges sur 85dad5b0** ; mutation (relecture coupée + filtre « > 0 » + compte Vinted retiré) ⇒ 7
-  rouges. Audits tdz, variables, identite, coherence, boutons, icones, bancs, urssaf, seuils-vinted, benefice,
-  revue-argent verts ; `audit-chiffres` (6) et `audit-ebay-route` (1) rouges À L'IDENTIQUE sur 85dad5b0.
-- ⚠️ Non mesuré : sa vraie base dans l'app ; pourquoi exactement son écran n'avait pas le compte (liste figée, blocage
-  local, ou seulement la vente en cours absente du « par compte ») — les trois sont corrigés. Une première version de ce
-  chantier (967b9999, sur une base du 30 oct.) n'a pas été reprise telle quelle : refaite sur le code du 5 nov.
+## 5 novembre — le compte sur chaque vente ; un compte récent compte partout (branche `v31-ventes-compte-suite`)
+- **Fait** : le compte (login Vinted, compte Leboncoin, pseudo eBay) écrit sur CHAQUE vente, ligne repliée (bureau et
+  téléphone) et détail, même avec un seul compte (§7 « une fois » abandonné ICI) ; pas su ⇒ « compte … non relevé »
+  (`CompteVente`, `compteVenteLbc`, `compteVenteEbay`) ; aussi la carte « Argent eBay » des Paramètres. Liste des comptes
+  relue sans recharger (`maj · comptes`, compte inconnu, retour, 2 min ; ratée ⇒ rien ne change). « CA Vinted par
+  compte » : chaque compte lié non écarté (0,00 € + en cours, « — » pas lu, « au moins » si un prix est illisible). Un
+  compte « refusé » localement garde son argent ; ses annonces non lues EXPRÈS ne font plus dire « annonces pas lues »
+  au widget (défaut trouvé en revue).
+- **Prouvé** : banc `ventes-compte` (données inventées, 390/1512) 49 verts ; 27 rouges sur 85dad5b0, 4 sur 43c483e3 (avant
+  revue) ; audits tdz, variables, identite, coherence, urssaf, benefice, revue-argent verts ; 15 bancs voisins identiques à 85dad5b0.
+- **Non mesuré** : sa vraie base dans l'app (loladupuis35260 : 1 vente EN COURS, lu en base). Vestiaire : pas de nom de
+  compte lu (`vc_session` n'a qu'un id). Ancienne branche `v31-ventes-compte` (967b9999, périmée) à fermer.

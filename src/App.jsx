@@ -23350,7 +23350,6 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
               const enAttente=euros?ords.filter(o=>!paye(o)).reduce((s,o)=>s+val(o),0):null;
               const payees=ords.some(paye)?caEbayPayees(ords):0;   // même règle que le Collectif (§11)
               const aExpedier = ords.filter(o => paye(o) && !livre(o)).length;
-              const melange = new Set(ords.map((o) => o && o._compte)).size > 1;
               if (ords.length === 0) return <div style={{ fontSize: 13, color: C.muted, marginBottom: 10 }}>Aucune vente eBay pour l'instant — dès ta première vente, le montant, le paiement et les colis à expédier s'afficheront ici.</div>;
               const bloc = (v, lib, col) => <div><div className="vrm-display" style={{ fontSize: 20, fontWeight: 700, color: col || C.text }}>{v}</div><div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>{lib}</div></div>;
               return (
@@ -23373,7 +23372,7 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
                         <div key={(o._compte || '') + (o.orderId || i)} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', borderTop: `1px solid ${C.border}`, paddingTop: 6 }}>
                           <div style={{ flex: '1 1 150px', minWidth: 0 }}>
                             <div style={{ fontSize: 13, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{titre}</div>
-                            <div style={{ fontSize: 11, color: C.muted }}>{acheteur ? acheteur + ' · ' : ''}<span style={{ color: etat.c, fontWeight: 600 }}>{etat.t}</span>{melange ? ` · ${nomCompteEbay({ pseudo: o._pseudo })}` : ''}</div>
+                            <div style={{ fontSize: 11, color: C.muted }}>{acheteur ? acheteur + ' · ' : ''}<span style={{ color: etat.c, fontWeight: 600 }}>{etat.t}</span> · <CompteVente compte={compteVenteEbay(o, comptesEbay)} plateforme="ebay" ou="ebay-reglage"/></div>
                           </div>
                           <div style={{ flexShrink: 0, fontSize: 13, fontWeight: 700, color: C.text }}>{val(o).toFixed(2).replace('.',',')} {o.pricingSummary?.total?.currency==='EUR'?'€':o.pricingSummary?.total?.currency || ''}</div>
                         </div>
@@ -29210,6 +29209,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
         const noteCompte = (c) => !c ? null : !c.lu ? 'ventes pas lues pour ce compte' : [
           c.nFinalise ? `${c.nFinalise} vente${c.nFinalise>1?'s':''} finalisée${c.nFinalise>1?'s':''}` : 'aucune vente finalisée',
           c.nEnCours ? `${c.nEnCours} en cours · ${fmt(c.enCours)}` : '',
+          // (revue) Une vente finalisée au prix illisible : le montant est un minimum, et il le dit (§5).
+          c.nPrixPasLu ? `au moins : ${c.nPrixPasLu} vente${c.nPrixPasLu>1?'s':''} au prix pas lu` : '',
         ].filter(Boolean).join(' · ');
         // (16 oct.) Une ligne = le nom, sa note, le montant à droite (d'un
         // bloc, chiffres tabulaires) ; dessous, la part du total en barre
@@ -29246,7 +29247,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             <div data-stats-carte="comptes" style={{...sCarte,paddingBottom:12}}>
               <div style={{...sTitre,marginBottom:8}}>CA Vinted par compte</div>
               {comptes.length
-                ? comptes.map(([lg,v,c]) => <div key={c ? c.uid : lg} data-stats-compte={c ? c.uid : lg} data-stats-compte-cents={v==null?'':String(Math.round(v*100))} data-stats-compte-encours={c&&c.lu?String(Math.round(c.enCours*100)):undefined}><Ligne label={lg} val={v} note={noteCompte(c)} part={comptes.length>1 && totCpt>0 && v!=null ? v/totCpt : null}/></div>)
+                ? comptes.map(([lg,v,c]) => <div key={c ? c.uid : lg} data-stats-compte={c ? c.uid : lg} data-stats-compte-cents={v==null?'':String(Math.round(v*100))} data-stats-compte-encours={c&&c.lu?String(Math.round(c.enCours*100)):undefined} data-stats-compte-partiel={c&&c.nPrixPasLu?'1':undefined}><Ligne label={lg} val={v} note={noteCompte(c)} part={comptes.length>1 && totCpt>0 && v!=null ? v/totCpt : null}/></div>)
                 : <div style={{fontSize:13,color:C.muted,padding:'10px 0',borderTop:`1px solid ${C.border}`}}>Le détail par compte apparaît dès que tes ventes sont chargées.</div>}
               {/* (30 oct.) Plus de « Total Vinted » : c'est « Finalisé sur Vinted · tous comptes »,
                   en tête du même écran (§7, un chiffre une fois). */}
@@ -67063,7 +67064,7 @@ function AppCoeur() {
       const comptesCa=[];
       for(const { a, sold, list, conv, actif } of perAcc){
         const ventesComptees=!compteEcarte(a.vinted_user_id, hiddenS, panelOffRef.current);
-        const cc=ventesComptees?{ uid:String(a.vinted_user_id), login:String(a.login||'').trim()||null, lu:!!sold.ok, finalise:0, nFinalise:0, enCours:0, nEnCours:0 }:null;
+        const cc=ventesComptees?{ uid:String(a.vinted_user_id), login:String(a.login||'').trim()||null, lu:!!sold.ok, finalise:0, nFinalise:0, enCours:0, nEnCours:0, nPrixPasLu:0 }:null;
         if(cc) comptesCa.push(cc);
         if(!actif && !ventesComptees) continue;
         if(ventesComptees && sold.ok){ ok=true; for(const o of sold.items){
@@ -67078,7 +67079,7 @@ function AppCoeur() {
           // Vinted », le CA par compte et par jour : la vente est COMPTÉE à part
           // (`prixPasLu`) et le chiffre dit « au moins » (§5).
           const amtLu=montantCommandeLu(o), amt0=amtLu==null?0:amtLu;
-          if(st==='completed' && amtLu==null) prixPasLu++;
+          if(st==='completed' && amtLu==null){ prixPasLu++; if(cc) cc.nPrixPasLu++; }
           const d=o.date?new Date(o.date):null; const okD=d&&!isNaN(d);
           const inMonth=okD&&d.getFullYear()*100+d.getMonth()===ym;
           if(st==='pending'){ enCours++; enAttente+=amt0; if(cc){ cc.enCours+=amt0; cc.nEnCours++; } }
@@ -67129,7 +67130,10 @@ function AppCoeur() {
           { const mq=masqueesParCompte((list.masquees||[]).filter(it=>it&&!soldIds.has(String(it.id))&&!annonceDeclareePartie(it.id, numeros, perduesMq)).map(it=>({ ...it, _acc:a })));
             if(mq.etat==='lu') annMasquees[uidL]={ n:mq.n, frais:mq.nFrais }; }
           annNoms[uidL]=(load('vinted_account_labels',{})||{})[uidL]||a.login||`#${uidL}`;
-        } else annKO.push(String(a.vinted_user_id));
+        // ⚠️ (5 nov., revue) Un compte « refusé » (`!actif`) n'a PAS ses annonces lues,
+        //    exprès : ce n'est pas une lecture ratée. Le compter ici faisait publier au
+        //    widget « annonces pas lues (1 compte) » et retirait son « en ligne ».
+        } else if(actif) annKO.push(String(a.vinted_user_id));
         // (29 oct.) Les conversations retirées de la liste ne font plus le point
         // « nouveau » de l'onglet Messages (la même règle que la liste, §11).
         if(actif && conv.ok){ ok=true; const ret=load(CONVERSATIONS_RETIREES,{}); for(const c of conv.items){ if(!c.unread) continue; unreadConvs.push({uid:String(a.vinted_user_id),id:c.id,updated_at:c.updated_at}); if(!conversationRetiree(ret,String(a.vinted_user_id),c) && messageRecent(c.updated_at)) unread++; } }
