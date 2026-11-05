@@ -258,7 +258,7 @@ html body .vrm-rangee-bord > .vrm-puce-transp { overflow: hidden !important; tex
    les nombres gardent leurs propres règles (prix, montants, compteurs, N°). Les règles
    d'origine (styles-mineral.css, favoris.css, dac7.css, styles-mobile-studio.css) sont
    à retirer par leurs écrans ; le banc `jetons-coherence` (J4) mesure le rendu. */
-:root:root body :is(.vrm-ann-card, .vrm-lbc-ecran, .vrm-ebay-annonces, .vrm-ann-card [data-chiffres], [data-ann-resume], .vrm-fa, .vrm-finance-page .vrm-display) { font-variant-numeric: normal; }
+:root:root body :is(.vrm-ann-card, .vrm-lbc-ecran, .vrm-ebay-annonces, .vrm-ann-card [data-chiffres], [data-ann-resume], .vrm-fa, .vrm-finance-page .vrm-display, .vrm-s2d-resume-n > span) { font-variant-numeric: normal; }
 
 /* ── 16. LE ROUGE N'EST QU'AU DOUBLON DE N° (5 nov., chantier A, revue 1.6) ───────
    `--vrm-danger` vaut désormais l'ambre (themeMineral.js) ; le rouge a son jeton,
