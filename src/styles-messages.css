@@ -139,3 +139,8 @@ html body [data-messagerie-site="ebay"] .vrm-ebay-q-vue > .vrm-seg-btn { flex: 1
 html body .vrm-ebay-q-nav.vrm-seg { display: flex !important; width: fit-content !important; flex-shrink: 0; }
 html body .vrm-ebay-q-nav.vrm-seg > button.vrm-seg-btn,
 :root:root body .vrm-app-shell .vrm-main .vrm-ebay-q-nav.vrm-seg > button.vrm-seg-btn:not(#fu) { flex: 0 0 auto !important; min-width: 44px !important; min-height: 44px !important; height: auto !important; padding: 0 12px !important; }
+
+/* (5 nov.) Une offre en dernier message se lit DANS l'extrait de la ligne, à
+   gauche, marquée « Offre » avec son montant — le prix d'avant barré, en sourdine. */
+.vrm-msg-extrait .vrm-msg-offre-der { display: inline-block; vertical-align: baseline; }
+.vrm-msg-offre-der .vrm-msg-offre-ancien { font-weight: 500; }

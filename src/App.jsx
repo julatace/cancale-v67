@@ -17,7 +17,8 @@ import {auteurDernierConfirme,suiviNegociationVinted,reponseAttendueVinted,insta
 import {retourReponseVinted,cleReponseVinted,creerBrouillonsReponses,etatActionVinted,cleActionOffreVinted} from './reponseVinted.js';
 import {etatOffreVinted,offreVintedEnAttente,cleOffreVinted,appliquerOffresConfirmees,annonceOffreEnVente,offreOuverte} from './offresVinted.js';
 import {contreOffreMini} from './messagesVolets.js';
-import { problemesAnnonce, problemesLot } from './verifAnnonce.js';
+import {lireEntiteVinted,extraitConversation,libelleOffre,etatOffreCourt,estCodeTechnique} from './messagesLisibles.js';
+import { problemesAnnonce, problemesLot, champsNonJuges } from './verifAnnonce.js';
 // « 105 € » (un montant entier sans « ,00 »), « 44,50 € » sinon — la contre-offre en un tap.
 const eurCourt = (v) => (Number.isInteger(Number(v)) ? `${Number(v)} €` : `${Number(v).toFixed(2).replace('.', ',')} €`);
 import {CONVERSATIONS_RETIREES,cleConversation,conversationRetiree,retirerConversation,remettreConversations,majAuGeste,phraseRetour} from './conversationsRetirees.js';
@@ -67,6 +68,7 @@ import { annulationsParCompte } from './annulationsCompte.js';
 import { notesParCompte } from './notesRecues.js';
 import { toutSurLeNumero, lireNumeroCherche } from "./rechercheNumero.js";
 import { repriseNumerosRecreation, tableRecrees } from "./repriseNumero.js";
+import { etatAnnonceVinted, enVerificationVinted, raisonPasSelectionnable, actionsPossibles, ETATS_ANNONCE, liensRepubMain, fusionLiensRecrees, lusDuDressing, candidatsNouvelle, etatSuiviMain, filtreReglages, nomPhotoReglee, appliquerCouleursPixels } from "./annoncesActions.js";
 import { etatCycle, cartesSupprimees, majVusEnLigne, indexPresentes, montantSaisi as montantCycle, CHOIX as CHOIX_CYCLE, LIBELLE_CHOIX } from "./cycleArticle.js";
 import { chezMoiProposables } from "./propositionsSites.js";
 import { retraitsEbayAutoAilleursPermis, RAISON_RETRAIT_AILLEURS } from "./retraitAilleurs.js";
@@ -208,6 +210,7 @@ import { friseVenteFusion, friseColisFusion, friseVenteLue, ETAPES_VENTE_FUSION 
 import { etapesTournee, arretsTournee, gestesDepuis } from "./tournee.js";
 import "./styles-barre-haut.css";
 import "./styles-recherche.css";
+import "./annonces-selection.css";
 import { colonnesColis, SITES_COLIS } from "./colisColonnes.js";
 import { fusionEntreeVente, parcoursPaire } from "./fichePaire.js";
 import { etatNumeroColis } from "./emballage.js";
@@ -2021,6 +2024,9 @@ const SYNC_KEYS = [
   'vrm_visite_vue',
   // (28 oct., 5.252) Les brouillons qu'il a retirés de la liste (« plus sur Vinted »).
   'vrm_brouillons_ecartes',
+  // (5 nov.) « Republier à la main, accompagné » : { [ancienId]: { uid, num, titre, at, nouvelId?, lieAt? } }.
+  // Le lien nouvelle → ancienne est posé par SON clic (src/annoncesActions.js).
+  'vrm_repub_main',
   // (28 oct.) Les « brouillons à refaire » qu'il a déclarés réglés (faits à la main sur Vinted).
   'vrm_brouillons_refaire_ecartes',
   // (19 oct.) Annonce eBay → paire, par IDENTITÉ (publication, brouillon, « Relier »).
@@ -6054,7 +6060,11 @@ const fetchHarvestConversation = async (uid, convId) => {
 // Rend une Map `${uid}_${conv}` → résumé, ou `null` (pas su).
 let _resumeConvSansAuteur = false;
 const RESUME_CONV_BASE = 'id=like.harvest_%25_conv_%25&select=id,tx:data->payload->conversation->transaction->>id,item:data->payload->conversation->transaction->>item_id,st:data->payload->conversation->transaction->>status,side:data->payload->conversation->transaction->>current_user_side,titre:data->payload->conversation->transaction->>item_title,ph:data->payload->conversation->transaction->item_photo->>url,opp:data->payload->conversation->opposite_user->>id';
-const RESUME_CONV_AUTEUR = ',der:data->payload->conversation->messages->-1->entity->>user_id,derTs:data->payload->conversation->messages->-1->>created_at_ts';
+const RESUME_CONV_AUTEUR = ',der:data->payload->conversation->messages->-1->entity->>user_id,derTs:data->payload->conversation->messages->-1->>created_at_ts'
+  // (5 nov.) Le DERNIER message en mots, pour l'extrait de la liste
+  // (`apercuDernierMessage`) : son type, son corps, son titre, son montant
+  // d'offre et son statut — des scalaires, jamais tout le fil (§4.4).
+  + ',dt:data->payload->conversation->messages->-1->>entity_type,db:data->payload->conversation->messages->-1->entity->>body,dti:data->payload->conversation->messages->-1->entity->>title,dp:data->payload->conversation->messages->-1->entity->price->>amount,dpo:data->payload->conversation->messages->-1->entity->original_price->>amount,dst:data->payload->conversation->messages->-1->entity->>status,dstt:data->payload->conversation->messages->-1->entity->>status_title,dcur:data->payload->conversation->messages->-1->entity->>current';
 const fetchResumesConversations = async (uid=null) => {
   try {
     if(uid!=null&&!/^\d+$/.test(String(uid)))return null;
@@ -7700,33 +7710,8 @@ const fetchVintedConversationDetail = async (account, conversationId, {force=fal
 };
 
 // Aplati les entites d'une conversation en messages affichables et tries.
-// Extrait TOUT le texte lisible d'une entité d'évènement système : titre,
-// sous-titre, corps, actions... ET surtout tout champ qui ressemble à un CODE
-// (retrait en point relais, PIN, suivi, référence). Vinted range parfois le
-// « code de retrait » dans un champ imbriqué : on scanne défensivement pour ne
-// rien cacher (« voir tout dans la conv »).
-const extractEventText = (e, entity_type) => {
-  const parts = [];
-  ['title','subtitle','body','text','header','description'].forEach(k => { if (typeof e[k] === 'string' && e[k].trim()) parts.push(e[k].trim()); });
-  const seen = new Set(parts);
-  const scan = (obj, depth = 0) => {
-    if (!obj || typeof obj !== 'object' || depth > 6) return;
-    for (const k in obj) {
-      const v = obj[k];
-      if ((typeof v === 'string' && v.trim()) || (typeof v==='number' && Number.isFinite(v))) {
-        const texte=String(v).trim();
-        // Champs qui portent typiquement un code / numéro de suivi / retrait.
-        if (/code|pin|pickup|retrait|tracking|suivi|reference|référence|numero|numéro|colis|shipment|drop/i.test(k) && !seen.has(texte)) {
-          const label=/pickup|retrait|pin/i.test(k)?'Code de retrait':/tracking|suivi/i.test(k)?'Suivi':/reference|référence/i.test(k)?'Référence':k;
-          seen.add(texte); parts.push(`${label}: ${texte}`);
-        }
-      } else if (v && typeof v === 'object') scan(v, depth + 1);
-    }
-  };
-  scan(e);
-  return parts.length ? [...new Set(parts)].join(' · ') : entity_type;
-};
-
+// (5 nov.) `extractEventText` est retiré : son balayage « défensif » prenait
+// `price.currency_code` pour un code de retrait. Voir src/messagesLisibles.js.
 // Récupère tous les LIENS d'une entité (le bordereau/étiquette d'expédition est
 // souvent un lien dans la conversation). On scanne en profondeur, on repère les
 // liens de type bordereau/étiquette/suivi pour les mettre en avant.
@@ -7765,23 +7750,19 @@ const normalizeConversationMessages = (conversation) => {
     const nombre=Number(brut);const date=brut==null || brut===''?null:Number.isFinite(nombre)?(nombre<1e12?nombre*1000:nombre):(Date.parse(brut)||null);
     const ts=date!=null && Number.isFinite(new Date(date).getTime())?date:null;
     const links = extractLinks(e);
-    if (m.entity_type === 'message') {
-      return { kind: 'message', mine:e.user_id!=null && oppId!=null && String(e.user_id)!==String(oppId), body: e.body || '', photos:Array.isArray(e.photos)?e.photos:[], ts, links };
+    // (5 nov.) UNE règle (`lireEntiteVinted`, src/messagesLisibles.js) : le texte
+    // réel de chaque entité, sans HTML, sans nom de type, sans « currency_code:
+    // EUR » (le défaut mesuré sur 587 offres). Ce qui n'a rien de lisible a un
+    // corps vide : le fil ne l'affiche pas.
+    const lu = lireEntiteVinted(m.entity_type, e, oppId);
+    if (lu.kind === 'message') {
+      return { kind: 'message', mine:!lu.vinted&&e.user_id!=null && oppId!=null && String(e.user_id)!==String(oppId), vinted:!!lu.vinted, body: lu.texte, photos:Array.isArray(e.photos)?e.photos:[], ts, links };
     }
-    if(m.entity_type==='offer_request_message'){
-      const brutPrix=e.price&&typeof e.price==='object'?e.price.amount:e.price;
-      const montant=typeof brutPrix==='number'?brutPrix:typeof brutPrix==='string'&&/^\d+(?:[,.]\d{1,2})?$/.test(brutPrix.trim())?Number(brutPrix.replace(',','.')):null;
-      if(Number.isFinite(montant)&&montant>0){
-        const deviseBrute=e.price?.currency_code||e.price?.currency;
-        const devise=typeof deviseBrute==='string'&&/^[A-Z]{3}$/.test(deviseBrute)?deviseBrute:null;
-        const sens=e.user_id!=null&&oppId!=null?(String(e.user_id)===String(oppId)?'recue':'envoyee'):'inconnu';
-        const statut=etatOffreVinted(e).libelle;
-        return {kind:'offer',body:'',offre:{montant,devise,sens,statut,oid:e.offer_request_id!=null?String(e.offer_request_id):null},ts,links};
-      }
+    if (lu.kind === 'offer') {
+      const statut=m.entity_type==='offer_request_message'?etatOffreVinted(e).libelle:'';
+      return {kind:'offer',body:'',offre:{montant:lu.offre.montant,devise:lu.offre.devise,ancien:lu.offre.ancien,sens:lu.offre.sens,statut,oid:e.offer_request_id!=null?String(e.offer_request_id):null,type:m.entity_type},ts,links};
     }
-    // Évènements système (offre, statut, expédition, retrait…) : on montre TOUT,
-    // codes de retrait compris.
-    return { kind: 'event', body: extractEventText(e, m.entity_type), ts, links };
+    return { kind: 'event', body: lu.texte, ts, links };
   });
   return messages.every(m=>m.ts!=null)?messages.sort((a,b)=>a.ts-b.ts):messages;
 };
@@ -9276,6 +9257,16 @@ const mapWardrobeItem = (it) => ({
   // jamais juger la description.
   descLen: Number.isFinite(it.descLen) ? it.descLen
          : (typeof it.description === 'string' ? it.description.trim().length : null),
+  // (5 nov., `src/annoncesActions.js`) « En vérification par Vinted » : Vinted
+  // envoie `is_processing` et `item_alert_type` dans le dressing (mesuré le 5 nov.
+  // sur 2 annonces non allégées). L'extension ne les garde pas encore : absents ⇒
+  // `null`, jamais « en vérification » deviné (pas su ≠ oui).
+  verifVinted: enVerificationVinted(it) ? String(it.item_alert_type || 'processing') : null,
+  // Ce que « vérifier avant de publier » peut juger : seulement ce qui a été LU.
+  // (revue du 5 nov.) Un `null` du dressing est « pas su » (mesuré : le dressing
+  // envoie `color1`/`catalog_id` à null sur des annonces qui en ont) — la règle
+  // est `lusDuDressing` (src/annoncesActions.js).
+  ...lusDuDressing(it),
 });
 // Une annonce est reellement EN LIGNE si elle n'est ni fermee (vendue/retiree),
 // ni masquee, ni un brouillon. La penderie Vinted renvoie AUSSI les articles
@@ -13970,7 +13961,244 @@ async function demanderQuestionRepub(q, titre) {
   const id = await askChoix({ title: `Choisis ${q.nom || 'la valeur'} de ${qui}`, desc: `Vinted refuse l’annonce sans ${q.nom || 'ce champ'}, et VRM ne l’a pas trouvé sur l’annonce elle-même.${titre ? `\n« ${titre} »` : ''}\nChoisis : VRM le pose et reprend, une seule fois. Rien n’a été touché.${autres}`, options: q.options.map(([i, t]) => [String(i), String(t)]), cancel: 'Pas maintenant' });
   return id == null ? null : String(id);
 }
-function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChrome, compteVinted, majExt, lettreOk, brouillonOk, onClose, onReessayer = null, action = 'recreer', reprise = null }) {
+// ══ SÉLECTIONNER DES ANNONCES, PUIS « ACTIONS POSSIBLES » (5 nov.) ═══════════
+// Julien : « pouvoir sélectionner les annonces (brouillons et en ligne — sauf
+// celles en vérification par Vinted), puis un petit carré « Actions » qui
+// propose, selon la sélection… ». Règles : `src/annoncesActions.js`. Les moteurs
+// sont ceux qui existent (`RepublierVinted` / `ACTIONS_REPUB`) : la sélection
+// ne fait que choisir, rien ne part d'ici.
+function ChoixAnnoncesVinted({ filtre = 'tout', annonces, sel, setSel, charge, brLecture, onActions, suivis = [], onSuivi }) {
+  const liste = (annonces || []).filter((a) => filtre !== 'brouillon' || a.etat === 'brouillon');
+  const cle = (a) => a.uid + ':' + a.id;
+  const coches = new Set((sel || []).map((x) => x.uid + ':' + x.id));
+  const groupes = []; const parUid = new Map();
+  for (const a of liste) { if (!parUid.has(a.uid)) { const g = { uid: a.uid, compte: a.compte, items: [] }; parUid.set(a.uid, g); groupes.push(g); } parUid.get(a.uid).items.push(a); }
+  const basculer = (a) => {
+    if (a.raisonPas) { toast(a.raisonPas); return; }
+    setSel((v) => (v.some((x) => x.uid === a.uid && x.id === a.id) ? v.filter((x) => !(x.uid === a.uid && x.id === a.id)) : [...v, { id: a.id, uid: a.uid, etat: a.etat }]));
+  };
+  const cocherTout = (g) => setSel((v) => { const deja = new Set(v.map((x) => x.uid + ':' + x.id)); return [...v, ...g.items.filter((a) => !a.raisonPas && !deja.has(cle(a))).map((a) => ({ id: a.id, uid: a.uid, etat: a.etat }))]; });
+  const toutCocheG = (g) => g.items.filter((a) => !a.raisonPas).every((a) => coches.has(cle(a)));
+  const decocherG = (g) => setSel((v) => v.filter((x) => x.uid !== g.uid));
+  const prixTxt = (p) => (p == null ? 'sans prix' : `${p.toLocaleString('fr-FR', { minimumFractionDigits: p % 1 ? 2 : 0, maximumFractionDigits: 2 })} €`);
+  const nCoches = (sel || []).length;
+  return (
+    <section className="vrm-sel" data-selection-vue={filtre} data-selection-n={liste.length}>
+      {suivis.length > 0 && suivis.map((s) => (
+        <div key={s.ancienId} data-suivi-main={s.ancienId} data-suivi-main-etat={s._etat} className="vrm-act-paire">
+          <span><b>{s.num ? `N°${s.num} ` : ''}{s.titre || 'Annonce'}</b> — republiée à la main : {s._etat === 'lie' ? 'nouvelle annonce désignée ; le N° passe dessus dès que l’ancienne n’est plus du tout sur Vinted.' : 'choisis la nouvelle annonce pour lui remettre son N°.'}</span>
+          <div className="vrm-b-rangee" style={{ justifyContent: 'flex-start' }}><Bouton variante="discret" data-suivi-main-reprendre={s.ancienId} onClick={() => onSuivi && onSuivi(s)}>Reprendre</Bouton></div>
+        </div>
+      ))}
+      <div className="vrm-sel-tete">
+        <span>{filtre === 'brouillon' ? 'Tes brouillons Vinted, compte par compte. ' : ''}Coche des annonces, puis <b>Actions</b>.</span>
+        {nCoches > 0 && <Bouton variante="discret" data-selection-vider onClick={() => setSel([])}>Tout décocher ({nCoches})</Bouton>}
+      </div>
+      {charge ? <div className="vrm-sel-vide" data-selection-charge="">Lecture de tes annonces…</div>
+        : !liste.length ? <div className="vrm-sel-vide" data-selection-vide="">{filtre === 'brouillon' ? (brLecture ? 'Lecture de tes brouillons…' : 'Aucun brouillon lu dans tes dressings Vinted.') : 'Aucune annonce à sélectionner.'}</div>
+        : groupes.map((g) => (
+          <div key={g.uid || 'x'} className="vrm-sel-groupe" data-selection-compte={g.uid} data-selection-compte-n={g.items.length}>
+            <div className="vrm-sel-compte"><b>{g.compte}</b><span className="vrm-sel-n">{g.items.length} annonce{g.items.length > 1 ? 's' : ''}</span>
+              {g.items.some((a) => !a.raisonPas) && (toutCocheG(g)
+                ? <Bouton variante="discret" data-selection-compte-decocher={g.uid} onClick={() => decocherG(g)}>Tout décocher</Bouton>
+                : <Bouton variante="discret" data-selection-compte-cocher={g.uid} onClick={() => cocherTout(g)}>Tout cocher</Bouton>)}
+            </div>
+            <ul className="vrm-sel-liste">
+              {g.items.map((a) => { const on = coches.has(cle(a)); const off = !!a.raisonPas; return (
+                <li key={cle(a)}>
+                  <label className="vrm-sel-ligne" data-selection-annonce={a.id} data-selection-etat={a.etat} data-sel-coche={on ? '1' : '0'} aria-disabled={off ? 'true' : undefined} title={off ? a.raisonPas : undefined}>
+                    <input type="checkbox" className="vrm-sel-case" checked={on} disabled={off} onChange={() => basculer(a)} aria-label={`Sélectionner ${a.titre || 'cette annonce'}`}/>
+                    {a.photo ? <PhotoVinted src={a.photo} alt="" className="vrm-sel-photo" loading="lazy"/> : <span className="vrm-sel-photo" aria-hidden="true"/>}
+                    <span className="vrm-sel-centre">
+                      <span className="vrm-sel-nom">{a.numero ? <span className="vrm-sel-num">N°{a.numero}</span> : null}{a.titre || 'Sans titre'}</span>
+                      <span className="vrm-sel-sous"><span className="vrm-sel-etat" data-etat-annonce={a.etat}>{ETATS_ANNONCE[a.etat] || a.etat}</span><span>{prixTxt(a.prix)}</span></span>
+                      {off && <span className="vrm-sel-raison" data-selection-raison="">{a.raisonPas}</span>}
+                    </span>
+                  </label>
+                </li>
+              ); })}
+            </ul>
+          </div>
+        ))}
+      {nCoches > 0 && <div className="vrm-sel-barre"><Bouton variante="primaire" data-actions-possibles={nCoches} onClick={onActions}>Actions · {nCoches}</Bouton></div>}
+    </section>
+  );
+}
+// Le carré « Actions possibles » : les actions de la sélection (grisées avec leur
+// raison), et AVANT de lancer, paire par paire, ce qui manque pour publier
+// (`problemesAnnonce`, src/verifAnnonce.js — la règle de « vérifier avant »),
+// avec le geste. Ce que VRM n'a pas lu est dit à part : l'extension le vérifie
+// au lancement (`champsManquantsAvant`) et demande ce qui manque.
+function ActionsSelectionFeuille({ choisies, actions, onLancer, onClose }) {
+  const verifs = choisies.filter((a) => a.etat !== 'verification').map((a) => {
+    const pbs = problemesAnnonce(a.verif || {}, 'vinted');
+    if (a.etat === 'brouillon' && a.place && a.place !== 'proposable' && a.place !== 'autre-compte' && a.place !== 'compte-inconnu') pbs.unshift({ code: 'brouillon', texte: a.place === 'pas-pret' ? (a.brEtat === 'inconnu' ? 'Pas encore vu par l’extension' : 'Brouillon incomplet') : 'Brouillon à vérifier sur Vinted', geste: a.brEtat === 'inconnu' ? 'Ouvre-le sur Vinted et fais « Enregistrer le brouillon »' : 'Ouvre ton dressing Vinted sur ce compte' });
+    return { a, pbs, nonLus: champsNonJuges(a.verif || {}, 'vinted') };
+  });
+  const nManque = verifs.filter((v) => v.pbs.length).length;
+  const lien = (a) => `https://${a.domain || 'www.vinted.fr'}/items/${a.id}/edit`;
+  return (
+    <SheetShell onClose={onClose} maxWidth={520}>
+      <div className="vrm-act" data-actions-selection={choisies.length}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <h2 className="vrm-act-titre">Actions · {choisies.length} annonce{choisies.length > 1 ? 's' : ''}</h2>
+          <button type="button" onClick={onClose} aria-label="Fermer" style={{ border: 'none', background: 'transparent', color: C.muted, fontSize: 22, minWidth: 44, minHeight: 44, cursor: 'pointer' }}>✕</button>
+        </div>
+        {actions.map((x) => (
+          <button key={x.k} type="button" className="vrm-act-choix" data-action-sel={x.k} data-action-sel-ok={x.ok ? 'oui' : 'non'} aria-disabled={x.ok ? undefined : 'true'} title={x.ok ? undefined : x.raison}
+            onClick={() => { if (!x.ok) { toast(x.raison); return; } onLancer(x.k); }}>
+            <b>{x.titre}</b>
+            <span>{x.ok ? x.desc : x.raison}</span>
+          </button>
+        ))}
+        <div className="vrm-act-verif" data-avant-lancer={nManque}>
+          <div className="vrm-main-etape">Avant de lancer : {nManque ? `${nManque} annonce${nManque > 1 ? 's' : ''} sur ${verifs.length} ${nManque > 1 ? 'ont' : 'a'} un manque` : 'rien ne manque dans ce que VRM a lu'}</div>
+          {verifs.map(({ a, pbs, nonLus }) => (
+            <div key={a.uid + ':' + a.id} className="vrm-act-paire" data-act-paire={a.id} data-act-manque={pbs.length} data-act-codes={pbs.map((p) => p.code).join(',')}>
+              <b>{a.numero ? `N°${a.numero} · ` : ''}{a.titre || 'Sans titre'}</b>
+              {pbs.length ? pbs.map((p) => (
+                <div key={p.code} className="vrm-act-pb" data-act-pb={p.code}><span>{p.texte}{p.geste ? ` — ${p.geste}` : ''}</span><a href={lien(a)} target="_blank" rel="noreferrer">Corriger sur Vinted ↗</a></div>
+              )) : <div className="vrm-act-muet">✓ Rien ne manque dans ce que VRM a lu.</div>}
+              {nonLus.length > 0 && <div className="vrm-act-muet" data-act-non-lus={nonLus.length}>Pas lu par VRM : {nonLus.join(', ')}. L’extension les vérifie au lancement et demande ce qui manque.</div>}
+            </div>
+          ))}
+        </div>
+      </div>
+    </SheetShell>
+  );
+}
+// ══ REPUBLIER À LA MAIN, ACCOMPAGNÉ (5 nov.) ═════════════════════════════════
+// Julien : « l'app donne les photos modifiées (avec les réglages choisis au
+// préalable), le titre, la description, tout ce qu'il faut ; une fois republiée
+// à la main, l'app remet le N° sur la nouvelle annonce ». Rien ne part chez
+// Vinted d'ici. Le N° : SON clic désigne la nouvelle annonce (une identité,
+// jamais un titre) ; la reprise est la règle des republications
+// (`repriseNumerosRecreation`) — elle attend que l'ancienne ne soit plus en ligne.
+function RepublierALaMain({ paire, suivi, candidats, etatSuivi, onDebut, onLier, onDelier, onRelire, onClose }) {
+  const [fiche, setFiche] = useState(undefined);   // undefined lecture · null pas su · objet lu (vide si rien rangé)
+  useEffect(() => {
+    let vivant = true;
+    (async () => {
+      try {
+        if (!/^\d{1,15}$/.test(String(paire.uid || '')) || !/^\d{4,15}$/.test(String(paire.id || ''))) { if (vivant) setFiche({}); return; }
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.coffre_${paire.uid}_${paire.id}&select=title:data->>title,desc:data->>desc,brand:data->>brand,size:data->>size,etat:data->>etat,price:data->>price,photos:data->photos`, { headers: sbAuth() });
+        if (!r.ok) throw new Error('lecture');
+        const j = await r.json(); if (!Array.isArray(j)) throw new Error('forme');
+        if (vivant) setFiche(j[0] || {});
+      } catch (_) { if (vivant) setFiche(null); }
+    })();
+    return () => { vivant = false; };
+  }, [paire.uid, paire.id]);
+  const presets = (() => { const p = load('vrm_photo_presets', []); return Array.isArray(p) ? p.filter((x) => x && x.nom && x.r) : []; })();
+  // Les réglages choisis AU PRÉALABLE : gardés sur l'appareil d'une fois sur l'autre.
+  const [reg, setReg] = useState(() => { const v = load('vrm_main_reglages', null); return { ...REPUB_REG_DEF, ...(v && typeof v === 'object' ? v : {}) }; });
+  useEffect(() => { save('vrm_main_reglages', reg); }, [reg]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const [dl, setDl] = useState(null);   // { fait, rate, total, encours }
+  const [copie, setCopie] = useState('');
+  const f = fiche || {};
+  const photos = (Array.isArray(f.photos) && f.photos.length ? f.photos : (paire.photo ? [paire.photo] : [])).map((p) => (typeof p === 'string' ? p : (p && (p.url || p.full_size_url)) || '')).filter(Boolean).slice(0, 20);
+  const titre = String(f.title || paire.titre || '');
+  const desc = String(f.desc || '');
+  const prixV = f.price != null && f.price !== '' ? Number(f.price) : paire.prix;
+  const fx = filtreReglages(reg);
+  const cssReg = { width: '100%', height: '100%', objectFit: 'cover', filter: fx.filtre, transform: `rotate(${fx.rot}deg) scale(${fx.zoom})` };
+  // « Copié » seulement si la copie a eu lieu (une promesse rejetée ne passe pas par catch sans await).
+  const copier = async (k, t) => { try { await navigator.clipboard.writeText(String(t || '')); setCopie(k); setTimeout(() => setCopie((c) => (c === k ? '' : c)), 1600); } catch (_) { toast('Copie impossible ici : sélectionne le texte et copie-le.'); } };
+  const telecharger = async () => {
+    setDl({ fait: 0, rate: 0, total: photos.length, encours: true });
+    let fait = 0, rate = 0;
+    for (let i = 0; i < photos.length; i++) {
+      let ok = false;
+      try {
+        const data = await chargerPhotoBoite(photos[i]);
+        if (data) {
+          const img = new Image(); img.src = data; await img.decode();
+          const w = img.naturalWidth, h = img.naturalHeight;
+          const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+          const ctx = cv.getContext('2d');
+          const filtreNatif = typeof ctx.filter === 'string';
+          ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
+          if (filtreNatif) ctx.filter = fx.filtre;
+          ctx.translate(w / 2, h / 2); ctx.rotate(fx.rot * Math.PI / 180); ctx.scale(fx.zoom, fx.zoom);
+          ctx.drawImage(img, -w / 2, -h / 2);
+          if (!filtreNatif) { ctx.setTransform(1, 0, 0, 1, 0, 0); const id = ctx.getImageData(0, 0, w, h); appliquerCouleursPixels(id.data, reg); ctx.putImageData(id, 0, 0); }
+          const blob = await new Promise((ok2) => cv.toBlob(ok2, 'image/jpeg', 0.92));
+          if (blob) { const u = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = u; a.download = nomPhotoReglee(paire.numero, i); document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 4000); ok = true; }
+        }
+      } catch (_) { ok = false; }
+      if (ok) fait++; else rate++;
+      setDl({ fait, rate, total: photos.length, encours: i < photos.length - 1 });
+    }
+  };
+  const curseur = (lab, cle, min, max, pas) => (
+    <label key={cle} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, minHeight: 44 }}>
+      <span style={{ width: 92, flexShrink: 0, color: C.muted }}>{lab}</span>
+      <input type="range" min={min} max={max} step={pas} value={reg[cle]} data-main-reglage={cle} onChange={(ev) => setReg((r) => ({ ...r, [cle]: Number(ev.target.value) }))} style={{ flex: 1, accentColor: C.accent }} />
+      <span style={{ width: 46, textAlign: 'right', color: C.text, fontVariantNumeric: 'tabular-nums' }}>{cle === 'rot' ? `${reg.rot}°` : `${Math.round(reg[cle] * 100)} %`}</span>
+    </label>
+  );
+  const champ = (k, lab, val) => (
+    <div className="vrm-main-champ" data-main-champ={k}>
+      <div className="vrm-main-champ-tete"><span>{lab}</span>{val ? <Bouton variante="secondaire" className="vrm-b-petit" data-main-copier={k} onClick={() => copier(k, val)}>{copie === k ? '✓ Copié' : 'Copier'}</Bouton> : null}</div>
+      <div className="vrm-main-valeur">{val || '—'}</div>
+    </div>
+  );
+  const nouvelleUrl = `https://${paire.domain || 'www.vinted.fr'}/items/new`;
+  const nomNouvelle = suivi && suivi.nouvelId ? (((candidats || []).find((c) => String(c.id) === String(suivi.nouvelId)) || {}).titre || suivi.nouveauTitre || '') : '';
+  return (
+    <SheetShell onClose={onClose} maxWidth={560}>
+      <div className="vrm-act" data-repub-main={paire.id} data-repub-main-etat={etatSuivi}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <h2 className="vrm-act-titre">Republier à la main · {paire.numero ? `N°${paire.numero} ` : ''}{paire.titre || 'annonce'}</h2>
+          <button type="button" onClick={onClose} aria-label="Fermer" style={{ border: 'none', background: 'transparent', color: C.muted, fontSize: 22, minWidth: 44, minHeight: 44, cursor: 'pointer' }}>✕</button>
+        </div>
+        <div className="vrm-act-muet">Compte <b style={{ color: C.text }}>{paire.compte}</b>. Rien ne part chez Vinted d’ici : tu publies toi-même, VRM t’accompagne.</div>
+        {fiche === undefined && <div className="vrm-act-muet" data-main-lecture="">Lecture de ce que VRM a enregistré…</div>}
+        {fiche === null && <div className="vrm-act-muet" data-main-passu="">VRM n’a pas pu lire ce qu’il a enregistré de cette annonce : le titre et le prix viennent de ton dressing, la description manque.</div>}
+        <div className="vrm-main-etape">1. Les photos{photos.length ? ` · ${photos.length}` : ''}</div>
+        {photos.length ? <div className="vrm-main-photos" data-main-photos={photos.length}>{photos.map((u, i) => <div key={i}><PhotoVinted src={u} alt="" style={cssReg}/></div>)}</div> : <div className="vrm-act-muet" data-main-sans-photo="">VRM n’a aucune photo de cette annonce : ouvre-la sur Vinted pour qu’il les lise.</div>}
+        {presets.length > 0 && <div className="vrm-b-rangee" style={{ justifyContent: 'flex-start' }}>{presets.map((p) => <Bouton key={p.nom} variante="secondaire" className="vrm-b-petit" data-main-preset={p.nom} onClick={() => setReg({ ...REPUB_REG_DEF, ...p.r })}>{p.nom}</Bouton>)}</div>}
+        <details className="vrm-repli" data-main-reglages="">
+          <summary>Régler les photos (rotation, lumière, contraste…)</summary>
+          {curseur('Rotation', 'rot', -15, 15, 1)}{curseur('Lumière', 'bright', 0.5, 1.6, 0.05)}{curseur('Contraste', 'contrast', 0.5, 1.6, 0.05)}{curseur('Saturation', 'sat', 0, 2, 0.05)}{curseur('Zoom', 'zoom', 1, 1.5, 0.05)}
+          <Bouton variante="discret" data-main-neutre onClick={() => setReg({ ...REPUB_REG_DEF })}>Remettre à zéro</Bouton>
+        </details>
+        {photos.length > 0 && <div className="vrm-b-rangee" style={{ justifyContent: 'flex-start' }}><Bouton variante="secondaire" data-main-telecharger={photos.length} disabled={!!(dl && dl.encours)} onClick={telecharger}>{dl && dl.encours ? `Photo ${Math.min(dl.total, dl.fait + dl.rate + 1)} sur ${dl.total}…` : `Télécharger les ${photos.length} photo${photos.length > 1 ? 's' : ''} réglée${photos.length > 1 ? 's' : ''}`}</Bouton></div>}
+        {dl && !dl.encours && <div className="vrm-act-muet" data-main-dl-fait={dl.fait} data-main-dl-rate={dl.rate}>{dl.fait} photo{dl.fait > 1 ? 's' : ''} téléchargée{dl.fait > 1 ? 's' : ''}{dl.rate ? ` · ${dl.rate} pas lue${dl.rate > 1 ? 's' : ''} (réessaie, ou enregistre-la depuis Vinted)` : ''}.</div>}
+        <div className="vrm-main-etape">2. Le texte, à copier</div>
+        {champ('titre', 'Titre', titre)}
+        {champ('description', 'Description', desc)}
+        {!desc && fiche !== undefined && <div className="vrm-act-muet" data-main-sans-desc="">VRM n’a pas la description : copie-la depuis l’annonce sur Vinted.</div>}
+        {champ('prix', 'Prix', Number.isFinite(prixV) && prixV > 0 ? String(prixV).replace('.', ',') : '')}
+        {champ('marque', 'Marque', String(f.brand || paire.marque || ''))}
+        {champ('taille', 'Taille', String(f.size || paire.taille || ''))}
+        {champ('etat', 'État', String(f.etat || paire.condition || ''))}
+        <div className="vrm-main-etape">3. Publier sur Vinted</div>
+        <div className="vrm-b-rangee" style={{ justifyContent: 'flex-start' }}><Bouton variante="primaire" data-main-ouvrir-vinted href={nouvelleUrl} target="_blank" rel="noopener noreferrer" onClick={() => onDebut()}>Ouvrir Vinted — nouvelle annonce ↗</Bouton></div>
+        <div className="vrm-act-muet">Quand la nouvelle est en ligne, supprime l’ancienne sur Vinted : sinon la même paire est en vente deux fois.</div>
+        <div className="vrm-main-etape">4. Remettre le N°{paire.numero ? ` ${paire.numero}` : ''} sur la nouvelle annonce</div>
+        {!paire.numero ? <div className="vrm-act-muet" data-main-sans-num="">Cette annonce n’a pas de N° : la nouvelle en recevra un, comme toute annonce.</div>
+          : etatSuivi === 'fait' ? <div data-main-n-fait="" style={{ fontSize: 13, color: C.text }}>✓ La nouvelle annonce porte le N°{paire.numero}.</div>
+          : etatSuivi === 'lie' ? <div className="vrm-act-paire" data-main-lie={suivi.nouvelId}>
+              <span>Nouvelle annonce désignée{nomNouvelle ? ` : « ${nomNouvelle} »` : ''}. Le N°{paire.numero} passe dessus dès que l’ancienne n’est plus du tout sur Vinted — ni en ligne, ni masquée, ni en brouillon (supprime-la sur Vinted, puis rouvre Annonces).</span>
+              <div className="vrm-b-rangee" style={{ justifyContent: 'flex-start' }}><Bouton variante="discret" data-main-delier onClick={onDelier}>Ce n’est pas elle</Bouton></div>
+            </div>
+          : <>
+              <div className="vrm-act-muet">Une fois publiée, choisis-la ici : c’est toi qui la désignes, VRM ne devine pas.</div>
+              {(candidats || []).length ? <ul className="vrm-sel-liste" data-main-candidats={candidats.length}>{candidats.slice(0, 12).map((c) => (
+                <li key={c.id}><div className="vrm-sel-ligne" style={{ cursor: 'default' }} data-main-candidat={c.id}>
+                  {c.photo ? <PhotoVinted src={c.photo} alt="" className="vrm-sel-photo"/> : <span className="vrm-sel-photo" aria-hidden="true"/>}
+                  <span className="vrm-sel-centre"><span className="vrm-sel-nom">{c.titre || 'Sans titre'}</span><span className="vrm-sel-sous">{c.prix != null ? `${String(c.prix).replace('.', ',')} €` : 'sans prix'}{c.numero ? ` · N°${c.numero} (auto)` : ''}</span></span>
+                  <Bouton variante="secondaire" className="vrm-b-petit" data-main-lier={c.id} onClick={() => onLier(c)}>C’est celle-ci</Bouton>
+                </div></li>))}</ul>
+                : <div className="vrm-act-muet" data-main-aucun-candidat="">Aucune nouvelle annonce de {paire.compte} lue depuis que tu as commencé.</div>}
+              <div className="vrm-b-rangee" style={{ justifyContent: 'flex-start' }}><Bouton variante="discret" data-main-relire onClick={onRelire}>Relire mes annonces</Bouton></div>
+            </>}
+      </div>
+    </SheetShell>
+  );
+}
+function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChrome, compteVinted, majExt, lettreOk, brouillonOk, onClose, onReessayer = null, action = 'recreer', reprise = null, depart = null }) {
   const A = ACTIONS_REPUB[action] || ACTIONS_REPUB.recreer;
   // (28 oct., sa demande) Seules les paires du compte Vinted OUVERT DANS CHROME
   // (cookie lu par l'extension, `vintedDeChrome`) : c'est le seul au nom duquel
@@ -13987,7 +14215,9 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   const horsCompte = action === 'enLigne' ? 0 : toutes.length - annonces.length;
   const nomCompte = (compteVinted && compteVinted.login) || (compteUid ? `compte ${compteUid}` : '');
   const recree = action === 'recreer' || action === 'versBrouillon';   // une nouvelle annonce / un brouillon : favoris perdus
-  const [etape, setEtape] = useState('choix');
+  // (5 nov.) Ouvert depuis « Actions possibles » : le choix est fait (sa sélection),
+  // on commence à l'étape d'après — « Retour » ramène au choix, rien n'est perdu.
+  const [etape, setEtape] = useState(() => (depart && Array.isArray(reprise) && reprise.length ? depart : 'choix'));
   const [sel, setSel] = useState(() => new Set(Array.isArray(reprise) ? reprise.map(String) : []));
   const [q, setQ] = useState('');
   const [tMode, setTMode] = useState('aucun');
@@ -14942,7 +15172,7 @@ function BoutonTraduire({ texte }) {
 // SES gestes (ceux qui existaient), et décide lui-même ce que la fiche dit —
 // toujours par identité (§5), sinon « Pas reliée ». Un site qui ne permet pas
 // de répondre depuis VRM pose `PiedSansEnvoi` : il le dit, il ne fait pas semblant.
-function LigneConv({ actif, onClick, attrs, style, ariaLabel, photo, nom, sensible = false, compte, quand, couleurHeure, titre, num, etat, extrait, couleurExtrait, toi = false, apres = null, point = null }) {
+function LigneConv({ actif, onClick, attrs, style, ariaLabel, photo, nom, sensible = false, compte, quand, couleurHeure, titre, num, etat, extrait, couleurExtrait, toi = false, apres = null, point = null, attrsExtrait }) {
   const morceaux = [titre || null, num ? `N°${num}` : null].filter(Boolean);
   return (
     <button className={actif ? 'vrm-inbox-row is-current' : 'vrm-inbox-row'} type="button" {...(attrs || {})} aria-label={ariaLabel} onClick={onClick} style={style}>
@@ -14963,7 +15193,7 @@ function LigneConv({ actif, onClick, attrs, style, ariaLabel, photo, nom, sensib
           </span>
         )}
         <span className="vrm-msg-l2">
-          <span className="vrm-msg-extrait" style={{color:couleurExtrait||C.muted}}>{toi?<span className="vrm-msg-toi" style={{color:C.muted}}>Toi : </span>:null}{extrait||''}</span>
+          <span className="vrm-msg-extrait" {...(attrsExtrait || {})} style={{color:couleurExtrait||C.muted}}>{toi?<span className="vrm-msg-toi" style={{color:C.muted}}>Toi : </span>:null}{extrait||''}</span>
           {apres}
           {point && <span className="vrm-msg-dot" aria-label="non lu" style={{background:point}}/>}
         </span>
@@ -42336,6 +42566,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [repubAction, setRepubAction] = useState(null); // null | 'recreer' | 'modifier' | 'versBrouillon' | 'enLigne'
   const [repubReprise, setRepubReprise] = useState(null); // ids des paires pas commencées (compte rendu)
   const [repubCle, setRepubCle] = useState(0);          // (30 oct.) « Réessayer » rouvre Republier à neuf
+  // (5 nov., `src/annoncesActions.js`) SÉLECTIONNER des annonces (en ligne, brouillons,
+  // masquées) puis UN carré « Actions possibles ». `selAnn` garde l'ordre de ses clics :
+  // [{ id, uid, etat }]. `repubDepart` : Republier ouvert depuis la sélection commence
+  // à l'étape d'après « Choisir » (le choix est déjà fait).
+  const [selAnn, setSelAnn] = useState([]);
+  const [actionsSelOpen, setActionsSelOpen] = useState(false);
+  const [repubDepart, setRepubDepart] = useState(false);
+  const [repubMainOuvert, setRepubMainOuvert] = useState(null); // l'annonce republiée à la main (objet de la sélection)
   const [photoEdit, setPhotoEdit] = useState(null); // { refPhoto, refTitle } → éditeur de photo (recadrer/zoomer)
   const [auditOpen, setAuditOpen] = useState(false); // modale « Audit d'inventaire »
   const [inventOpen, setInventOpen] = useState(false); // modale « Inventaire physique » (déménagement)
@@ -44393,7 +44631,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return tout;
   };
   const [listings, setListings] = useState({ loading:false, items:null });
-  const brVinted = useBrouillonsVinted(listings.brouillons, brouillonsOpen || actionsOpen || repubAction === 'enLigne', accounts, listings.brLectures);
+  const brVinted = useBrouillonsVinted(listings.brouillons, brouillonsOpen || actionsOpen || repubAction === 'enLigne' || annSort === 'selection' || annSort === 'brouillons' || actionsSelOpen, accounts, listings.brLectures);
   // (29 oct.) Les annonces présentes (en ligne, à confirmer, masquées) : un
   // brouillon qui y figure a été mis en ligne, à la main ou par VRM.
   const presentesIds = React.useMemo(() => { const st = new Set(); for (const l of [listings.items, listings.aConfirmer, listings.masquees]) if (Array.isArray(l)) for (const it of l) if (it && it.id != null) st.add(String(it.id)); return st; }, [listings.items, listings.aConfirmer, listings.masquees]);
@@ -44767,6 +45005,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (ancienId, itemId) et `coffre_*_*` (recreeDe), écrits par l'extension. Trois
   // états : undefined pas encore lu (on attend) · null pas su (comme avant) · objet.
   const [recreesNum, setRecreesNum] = useState(undefined);
+  // (5 nov.) Les republications À LA MAIN qu'il suit (`vrm_repub_main`, synchronisé) :
+  // le lien nouvelle → ancienne qu'il a désigné s'ajoute à la table de l'extension,
+  // et la MÊME règle (`repriseNumerosRecreation`) remet le N°.
+  const [repubMain, setRepubMain] = useState(() => { const v = load('vrm_repub_main', {}); return v && typeof v === 'object' ? v : {}; });
+  useEffect(() => onCloudReady(() => setRepubMain((v) => (v && Object.keys(v).length) ? v : (() => { const w = load('vrm_repub_main', {}); return w && typeof w === 'object' ? w : {}; })())), []);
+  const poserRepubMain = (ancienId, patch) => setRepubMain((prev) => {
+    const k = String(ancienId); const u = { ...prev };
+    if (patch === null) delete u[k]; else u[k] = { ...(prev[k] || {}), ...patch };
+    save('vrm_repub_main', u); return u;
+  });
+  // (revue du 5 nov.) Un lien posé à la main n'entre pas tant que l'ancienne est
+  // ENCORE chez lui sur Vinted sous une autre forme (masquée, à confirmer,
+  // brouillon : la reprise ne regarde que l'« en ligne ») — sinon deux paires
+  // présentes sous un N° ; et il ne remplace jamais une identité prouvée par
+  // l'extension (`fusionLiensRecrees`).
+  const recreesEff = useMemo(() => {
+    const pres = new Set();
+    for (const l of [listings.masquees, listings.aConfirmer, listings.brouillons]) if (Array.isArray(l)) for (const it of l) if (it && it.id != null) pres.add(String(it.id));
+    return fusionLiensRecrees(recreesNum, liensRepubMain(repubMain, { presentes: pres, dejaRecrees: recreesNum || {} }));
+  }, [recreesNum, repubMain, listings.masquees, listings.aConfirmer, listings.brouillons]);
   // (29 oct.) Relue quand l'ENSEMBLE des annonces change (une republication
   // apporte un identifiant neuf), pas à chaque nouvelle référence de la liste :
   // le cache puis la lecture fraîche rendent les mêmes annonces, et la table
@@ -46058,6 +46316,51 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }, [annBase, annAConfirmer, listings.lues, annSearch, annSort, numeros, compteSel, compteConnecte, selEff, seuilDort]);
   // Un seul compte à l'écran ⇒ le nommer sur chaque carte ne distingue rien (§7).
   const annUnCompte = useMemo(() => new Set(annShown.map(x => String(x._acc && x._acc.vinted_user_id || ''))).size <= 1, [annShown]);
+  // ── SÉLECTIONNER, PUIS « ACTIONS POSSIBLES » (5 nov., `src/annoncesActions.js`) ──
+  // En ligne (la MÊME base que la grille, `annBase`), masquées (`annMasquees`) et
+  // brouillons (la MÊME liste que « Voir mes brouillons », `brVinted`, §11), chacun
+  // avec SON compte : un brouillon d'un compte n'est jamais montré sous un autre.
+  const annSelectionnables = useMemo(() => {
+    const out = []; const vus = new Set();
+    const nomAcc = (acc, uid) => (acc && acc.vinted_user_id ? accNameOf(acc) : '') || (uid ? `compte ${uid}` : 'compte inconnu');
+    const prixNum = (p) => { const v = p && typeof p === 'object' ? p.amount : p; const n = Number(String(v == null ? '' : v).replace(',', '.')); return isFinite(n) && n > 0 ? n : null; };
+    const ajoute = (it, etatForce) => {
+      const uid = String((it._acc && it._acc.vinted_user_id) || it._uid || ''); const id = String(it.id);
+      const cle = uid + ':' + id; if (vus.has(cle)) return; vus.add(cle);
+      const etat = etatAnnonceVinted({ ...it, ...(etatForce === 'masquee' ? { _vrmMasquee: true } : etatForce === 'brouillon' ? { _vrmBrouillon: true } : {}) });
+      const e = numeros[id] || {}; const i = it._info || null;
+      const titre = (i && i.titre) || it.title || '';
+      const prix = prixNum(i && i.prix != null && i.prix !== '' ? i.prix : it.price);
+      const nph = i && i.nph != null && i.nph !== '' ? Number(i.nph) : (Number.isFinite(it.photoCount) ? it.photoCount : undefined);
+      out.push({ id, uid, compte: nomAcc(it._acc, uid), domain: (it._acc && it._acc.domain) || 'www.vinted.fr', etat,
+        raisonPas: raisonPasSelectionnable(etat), titre, prix, photo: it.photo || '', numero: e.numero ? String(e.numero) : '',
+        taille: it.size || '', marque: it.brand || '', condition: it.condition || '', createdTs: it.createdTs || null,
+        place: it._place || '', brEtat: it._etat || '',
+        // Ce que « vérifier avant » peut juger : ce qui a été LU (trois états, §5).
+        verif: { numero: e.numero || '', titre, prix: prix == null ? (etat === 'brouillon' && i ? 0 : undefined) : prix, achat: prixAchatDe(e, buyByNum),
+          ...(nph !== undefined && Number.isFinite(nph) ? { nPhotos: nph } : {}),
+          ...(it.size !== undefined && etat !== 'brouillon' ? { taille: it.size || '', famille: familleArticle({ titre, taille: it.size, marque: it.brand }).famille } : {}),
+          ...(it.brand !== undefined && etat !== 'brouillon' ? { marque: it.brand || '' } : {}),
+          ...(Number.isFinite(it.descLen) ? { descLen: it.descLen } : {}),
+          ...(it.statusLu ? { etat: it.condition || '' } : {}),
+          ...(it.couleur !== undefined ? { couleur: it.couleur } : {}),
+          ...(it.catalogId !== undefined ? { categorie: it.catalogId ? String(it.catalogId) : '' } : {}) } });
+    };
+    for (const it of annBase) ajoute(it);
+    for (const it of annMasquees) ajoute(it, 'masquee');
+    for (const b of (brVinted.liste || [])) ajoute(b, 'brouillon');
+    return out;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [annBase, annMasquees, brVinted.liste, numeros, buyByNum]);
+  // Une sélection qui ne correspond plus à rien de lu (vendue, plus sur Vinted) se nettoie.
+  useEffect(() => {
+    if (!selAnn.length) return;
+    const ok = new Set(annSelectionnables.filter((a) => !a.raisonPas).map((a) => a.uid + ':' + a.id));
+    if (!annSelectionnables.length) return;   // rien lu (rechargement) : on ne vide rien (« rien lu » ≠ « rien »)
+    if (selAnn.some((x) => !ok.has(x.uid + ':' + x.id))) setSelAnn((v) => v.filter((x) => ok.has(x.uid + ':' + x.id)));
+  }, [annSelectionnables]);   // eslint-disable-line react-hooks/exhaustive-deps
+  // Les republications à la main pas encore finies (dites au-dessus de la liste).
+  const suivisMainVisibles = useMemo(() => Object.entries(repubMain || {}).map(([anc, s]) => ({ ancienId: anc, ...s, _etat: etatSuiviMain(s, { numeros, cle: cleNum }) })).filter((s) => s._etat !== 'fait'), [repubMain, numeros]);
   // Comptes bloqués actuellement présents (pour le bandeau d'alerte).
   const blockedList = useMemo(() => accounts.filter(a => blockedAccts.has(String(a.vinted_user_id))), [accounts, blockedAccts]);
 
@@ -47834,16 +48137,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     .filter(o => matchOrd(o))
     .sort(parDateDesc)
     .map(o => { const tk = trackForBuy(o); return { o, tk, st: achatStage(o, tk) }; })
-    // ⚠️ EN ROUTE : LE PLUS ANCIEN EN PREMIER. Ce qu'on veut voir quand on
-    // attend des colis, ce n'est pas le dernier acheté — c'est celui qui
-    // traîne depuis trois semaines. Partout ailleurs le plus récent d'abord.
-    .sort((a, b) => { const pr = x => x.st.step===3?0 : x.st.step===2?1 : x.st.step===1?2 : x.st.step===4?3 : 4;
+    // ⚠️⚠️ (5 nov., Julien : « dans achat en route c'est le plus récent qui
+    // s'affiche en haut peu importe le compte et le filtre ») EN ROUTE : le plus
+    // RÉCENT en haut, et RIEN d'autre ne passe devant — ni l'étape du colis, ni
+    // le compte choisi. (Avant : le plus ancien d'abord, après l'étape, puis le
+    // compte choisi en tête.) Ailleurs, inchangé : l'étape puis le plus récent.
+    .sort((a, b) => {
+      if (aFilter === 'route') return (tsCommande(b.o)||0) - (tsCommande(a.o)||0);
+      const pr = x => x.st.step===3?0 : x.st.step===2?1 : x.st.step===1?2 : x.st.step===4?3 : 4;
       const d = pr(a) - pr(b); if (d !== 0) return d;
-      return aFilter === 'route' ? ((tsCommande(a.o)||0) - (tsCommande(b.o)||0)) : (new Date(b.o.date||0) - new Date(a.o.date||0)); });
+      return new Date(b.o.date||0) - new Date(a.o.date||0); });
     // Compte choisi (ou connecté) EN TÊTE ; les autres restent (floutés, pas
-    // masqués — demande de Julien). Tri STABLE.
+    // masqués — demande de Julien). Tri STABLE. Pas dans « En route » (5 nov.).
     { const c = selEff;
-      if (c) arr = [...arr].sort((a,b)=>{ const ac=uidA(a.o)===c, bc=uidA(b.o)===c; return ac===bc?0:(ac?-1:1); }); }
+      if (c && aFilter !== 'route') arr = [...arr].sort((a,b)=>{ const ac=uidA(a.o)===c, bc=uidA(b.o)===c; return ac===bc?0:(ac?-1:1); }); }
     return arr; },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [buysBase, aFilter, ordSearchDiff, periode, tracking, colisRelais, numeros, compteSel, compteConnecte, selEff]);
@@ -47951,7 +48258,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // Attendre deux secondes coûte moins cher qu'un numéro faux à vie.
     if (sales.items === null || !txnPret) return;
     if (!reservesNum) return;   // numéros réservés sur Vinted pas encore lus (ou pas su)
-    if (recreesNum === undefined) return; // qui remplace qui (republication) pas encore lu
+    if (recreesEff === undefined) return; // qui remplace qui (republication) pas encore lu
     // Numérotation NEUVE, propre à la nouvelle app : elle démarre à 1 et suit
     // l'ordre d'ajout des annonces. On ignore volontairement l'ancien catalogue
     // et le garage (numéros hérités) — seule compte la numérotation de la nouvelle
@@ -47982,9 +48289,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     let changed = false;
     // La paire REPUBLIÉE reprend le numéro de l'annonce qu'elle remplace (et
     // une annonce renumérotée automatiquement par erreur le retrouve).
-    if (recreesNum) {
+    if (recreesEff) {
       const reprises = repriseNumerosRecreation({
-        enLigneIds: items.map((x) => x.id), numeros: nextNum, recrees: recreesNum, reprenable: numeroReprenable, cle: cleNum,
+        enLigneIds: items.map((x) => x.id), numeros: nextNum, recrees: recreesEff, reprenable: numeroReprenable, cle: cleNum,
         numeroVente: (nid) => { const n = nextNum[nid] && nextNum[nid].numero; return !!numVentesParIdentite.parItem[String(nid)] || (n != null && Object.values(saleOv).some((o) => o && cleNum(o.numero) === cleNum(n))); },
       });
       for (const nid of Object.keys(reprises)) { nextNum[nid] = reprises[nid]; changed = true; }
@@ -48038,7 +48345,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // arrivent souvent APRÈS les annonces. Sans elle, une annonce déjà rendue
   // garderait le numéro neuf qu'on vient justement d'éviter.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings.items, cloudReady, numVentesParIdentite, sales.items, txnPret, verNumTick, listingDates, reservesNum, recreesNum]);
+  }, [listings.items, cloudReady, numVentesParIdentite, sales.items, txnPret, verNumTick, listingDates, reservesNum, recreesEff]);
 
   const openConversation = async (conv) => {
     if(!conv?._acc || conv.id==null)return;
@@ -51166,7 +51473,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 // le jour change ; la bulle ne garde que l'heure.
                 // Un évènement sans texte lisible n'est pas affiché : il n'ouvre
                 // pas de jour (sinon « Hier » au-dessus de rien).
-                const visible = (x) => !(x.kind==='event' && /^[a-z]+(_[a-z]+)+$/.test(String(x.body||'').trim()) && !(x.links||[]).length);
+                // (5 nov.) Ni corps vide, ni nom de type (`estCodeTechnique`) : jamais affiché.
+                const visible = (x) => !(x.kind==='event' && (!String(x.body||'').trim() || estCodeTechnique(x.body)) && !(x.links||[]).length);
                 if (!visible(m)) return null;
                 const j = m.ts ? cleJour(m.ts) : null;
                 const jPrec = (()=>{ for (let k=i-1;k>=0;k--) { const x=openConv.messages[k]; if (x.ts && visible(x)) return cleJour(x.ts); } return null; })();
@@ -51181,22 +51489,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     const close=!!(offP&&String(offP.oid)===m.offre.oid);
                     const statutVu=close?'Plus acceptable':m.offre.statut;
                     return <div className="vrm-chat-offer-event" data-offer-status={close?"close":/accept/i.test(m.offre.statut)?"acceptee":/refus/i.test(m.offre.statut)?"refusee":"autre"} data-offer-side={m.offre.sens}>
-                      <div><span>{m.offre.sens==='recue'?'Offre reçue':m.offre.sens==='envoyee'?'Offre envoyée':'Offre'}</span><strong>{m.offre.devise?new Intl.NumberFormat('fr-FR',{style:'currency',currency:m.offre.devise}).format(m.offre.montant):m.offre.montant.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})}</strong></div>
-                      <div><small>{statutVu}</small>{m.ts&&<time dateTime={new Date(m.ts).toISOString()}>{new Date(m.ts).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</time>}</div>
+                      {/* (5 nov.) Ses offres (`offer_message`, 587 mesurées) ont leur carte : « Ton offre
+                          40,00 € » avec le prix d'avant barré — elles s'affichaient « currency_code: EUR ». */}
+                      <div><span data-offre-libelle="">{libelleOffre(m.offre)}</span><strong>{m.offre.devise?new Intl.NumberFormat('fr-FR',{style:'currency',currency:m.offre.devise}).format(m.offre.montant):m.offre.montant.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})}</strong></div>
+                      <div><small>{statutVu||(m.offre.ancien?<>au lieu de <s>{m.offre.ancien.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})} €</s></>:null)}</small>{m.ts&&<time dateTime={new Date(m.ts).toISOString()}>{new Date(m.ts).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</time>}</div>
                     </div>;})()
                   : m.kind==='event'
                   // Un évènement sans aucun texte lisible ne donne que son type
                   // technique (« offer_request_message ») : ce n'est pas un message
                   // pour lui. L'offre, elle, a sa carte sous le fil.
-                  ? (/^[a-z]+(_[a-z]+)+$/.test(String(m.body||'').trim()) && !(m.links||[]).length ? null
+                  ? (!visible(m) ? null
                     : /code|retrait|pickup|pin|suivi|tracking|colis|r[ée]cup[ée]rer|point relais/i.test(m.body)
                       ? <div key={i} className="vrm-chat-event vrm-chat-event-colis" style={{background:C.card,border:`1px solid ${C.border}`}}>
-                          <div className="vrm-chat-event-k" style={{color:C.muted}}>Colis · retrait</div>
+                          <div className="vrm-chat-event-k" style={{color:C.muted}}>Colis</div>
                           <div style={{fontSize:15,fontWeight:500,color:C.text,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{texteSansBalises(m.body)}</div>
                           {(m.links||[]).map((l,j)=><a key={j} className="vrm-chat-link" href={l.url} target="_blank" rel="noreferrer" style={{color:C.accent}}>{l.bordereau?'Ouvrir le bordereau ↗':'Ouvrir le lien ↗'}</a>)}
                         </div>
-                      : <div key={i} className="vrm-chat-event" style={{color:C.muted}}>{texteSansBalises(m.body)}{(m.links||[]).map((l,j)=><a key={j} className="vrm-chat-link" href={l.url} target="_blank" rel="noreferrer" style={{color:C.accent}}>{l.bordereau?'bordereau ↗':'lien ↗'}</a>)}</div>)
-                  : <BulleConv key={i} moi={!!m.mine} texte={m.body||(m.photos?.length?'📷 photo':'')} quand={m.ts||null} traduire={m.body||''}
+                      : <div key={i} className="vrm-chat-event" data-chat-evenement="" style={{color:C.muted,whiteSpace:'pre-line'}}>{texteSansBalises(m.body)}{(m.links||[]).map((l,j)=><a key={j} className="vrm-chat-link" href={l.url} target="_blank" rel="noreferrer" style={{color:C.accent}}>{l.bordereau?'bordereau ↗':'lien ↗'}</a>)}</div>)
+                  : <BulleConv key={i} moi={!!m.mine} texte={(m.vinted?'Équipe Vinted · ':'')+(m.body||(m.photos?.length?'📷 photo':''))} quand={m.ts||null} traduire={m.body||''}
                       apres={<>
                       {(m.links||[]).map((l,j)=><a key={j} className="vrm-chat-link" href={l.url} target="_blank" rel="noreferrer" style={{color:C.accent}}>{l.bordereau?'Ouvrir le bordereau ↗':'Ouvrir le lien ↗'}</a>)}
                       {(m.photos||[]).length>0 && <div className="vrm-chat-photos">{m.photos.map((ph,j)=>{const src=photoArticle({photo:ph});return src?<PhotoVinted key={j} src={src} alt="Photo du message" loading="lazy" style={{width:104,height:128,objectFit:'cover',borderRadius:12}}/>:null;})}</div>}
@@ -54946,15 +55256,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
           </div>}
 
-        {(listings.items?.length>0 || annMasquees.length>0) && <div className="vrm-stock-views vrm-filtres" role="group" aria-label="Vues rapides des annonces">
+        {(listings.items?.length>0 || annMasquees.length>0 || (brVinted.liste||[]).length>0) && <div className="vrm-stock-views vrm-filtres" role="group" aria-label="Vues rapides des annonces">
           <button type="button" aria-pressed={annSort==='oldest'&&!annSearch.trim()} onClick={()=>{setAnnSort('oldest');setAnnSearch('');}}>Tout le stock</button>
           <button type="button" aria-pressed={annSort==='nonum'} onClick={()=>setAnnSort('nonum')}>Sans numéro</button>
           {annStats.sleeping>0 && <button type="button" aria-pressed={annSort==='sleeping'} onClick={()=>setAnnSort('sleeping')}>À relancer</button>}
           {/* (4 nov.) Les annonces masquées par Vinted, compte par compte (toujours chez toi, pas « en ligne »). */}
           {(annMasquees.length>0 || annSort==='masquees') && <button type="button" data-vue-masquees={annMasquees.length} aria-pressed={annSort==='masquees'} onClick={()=>setAnnSort('masquees')}>Masquées<span className="vrm-of-n">{annMasquees.length}</span></button>}
+          {/* (5 nov., Julien : « les annonces en brouillon doivent apparaître dans Annonces,
+              avec leur marque « brouillon » ») Ses brouillons, compte par compte, à cocher. */}
+          {((brVinted.liste||[]).length>0 || annSort==='brouillons') && <button type="button" data-vue-brouillons={(brVinted.liste||[]).length} aria-pressed={annSort==='brouillons'} onClick={()=>setAnnSort('brouillons')}>Brouillons<span className="vrm-of-n">{(brVinted.liste||[]).length}</span></button>}
+          {/* (5 nov.) « Sélectionner » : en ligne, brouillons et masquées ensemble, puis UN carré « Actions possibles ». */}
+          <button type="button" data-vue-selection aria-pressed={annSort==='selection'} onClick={()=>setAnnSort('selection')}>Sélectionner{selAnn.length ? <span className="vrm-of-n">{selAnn.length}</span> : null}</button>
         </div>}
         {(annSearch.trim() || annSort!=='oldest') && <div className="vrm-filter-recap" role="status">
-          <span>{(()=>{ const k = annSort==='masquees' ? annMasquees.length : annShown.length; return `${k} annonce${k>1?'s':''} dans cette sélection`; })()}</span>
+          <span>{(()=>{ const k = annSort==='masquees' ? annMasquees.length : (annSort==='selection'||annSort==='brouillons') ? annSelectionnables.filter(a=>annSort!=='brouillons'||a.etat==='brouillon').length : annShown.length; return `${k} annonce${k>1?'s':''} dans cette sélection`; })()}</span>
           <button type="button" onClick={()=>{setAnnSearch('');setAnnSort('oldest');}}>Réinitialiser les annonces</button>
         </div>}
 
@@ -55128,7 +55443,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             achat) en bas ; le reste dans « ⋯ ». Une seule couleur d'accent,
             rare (§7) : l'ambre ne sert qu'à « dort » et à une marge négative. */}
         <FichesNeuves/>
-        {annSort==='masquees' ? (
+        {(annSort==='selection' || annSort==='brouillons') ? (
+          <ChoixAnnoncesVinted filtre={annSort==='brouillons' ? 'brouillon' : 'tout'} annonces={annSelectionnables} sel={selAnn} setSel={setSelAnn}
+            charge={listings.items==null && listings.loading} brLecture={brVinted.liste==null}
+            onActions={()=>setActionsSelOpen(true)} suivis={suivisMainVisibles} onSuivi={(a)=>setRepubMainOuvert(a)}/>
+        ) : annSort==='masquees' ? (
           <AnnoncesMasquees Photo={PhotoVinted} res={listings.masquees==null ? (listings.loading ? undefined : null) : masqueesParCompte(annMasquees, { numeroDe:(id)=>(numeros[id]||{}).numero||'', nomDe:(a)=>a?accNameOf(a):'' })}/>
         ) : annSort==='sleeping' ? (
           <QuiDorment seuil={seuilDort} onSeuil={setSeuilDort} Segmente={Segmente} fmt={fmt} onAgir={(a)=>setDortAgir(a)}
@@ -56007,7 +56326,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         </div>
                       </div>
                     )}
-                    {(()=>{ const nom=(c.opposite_user&&c.opposite_user.login)||'Conversation'; return (
+                    {(()=>{ const nom=(c.opposite_user&&c.opposite_user.login)||'Conversation';
+                      // (5 nov.) L'EXTRAIT = le dernier message RÉEL (`extraitConversation`,
+                      // src/messagesLisibles.js) quand le fil capté le confirme ; sinon ce que
+                      // la boîte en dit — jamais le titre de la paire présenté comme un message,
+                      // jamais un montant nu : une OFFRE se dit « Offre » avec son montant.
+                      const ex = extraitConversation(c, paire&&paire.r, paire&&paire.titre, normTitle);
+                      const offreDer = !offre && ex.kind==='offer' ? ex.offre : null;
+                      const texteEx = ex.kind==='event' ? `Vinted : ${ex.texte}` : ex.kind==='message' ? (ex.vinted?`Équipe Vinted : ${ex.texte}`:ex.texte) : '';
+                      return (
                     <LigneConv actif={openConv?.convId===c.id && String(openConv.acc?.vinted_user_id)===uidC(c)}
                       attrs={{'data-conv':c.id,'data-conv-acces':prioMsg?(ro?'lecture':'action'):undefined,'data-nonlu':c.unread?'1':undefined,
                         'data-conv-num':paire&&paire.num?paire.num:undefined,'data-conv-prix':paire&&paire.prix!=null?String(paire.prix):undefined,'data-conv-etat':paire&&paire.etat?paire.etat.k:undefined,'data-conv-auteur':auteur||undefined,'data-conv-quand':tsConv?new Date(tsConv).toISOString():undefined,'data-conv-compte':c._acc?String(c._acc.vinted_user_id):undefined,'data-conv-offre':offre?String(offre.prix):undefined}}
@@ -56017,11 +56344,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       compte={(plusieurs||!!messageSearch.trim()) && c._acc ? accName(c._acc) : ''}
                       quand={tsConv||null} couleurHeure={c.unread&&!ro?C.accent:C.muted}
                       titre={(paire&&paire.titre)||c.item_title||c.item?.title||''} num={paire&&paire.num?paire.num:''} etat={paire&&paire.etat?paire.etat:null}
-                      extrait={c.description||''} couleurExtrait={c.unread?C.text:C.muted} toi={auteur==='toi'}
+                      extrait={offreDer ? <span className="vrm-msg-etat vrm-msg-offre-der" data-offre-derniere={String(offreDer.montant)} data-offre-sens={offreDer.sens} data-offre-etat={offreDer.etat||undefined} style={{color:C.text,borderColor:C.border}}>{libelleOffre(offreDer)} {prix(offreDer.montant,offreDer.devise)}{offreDer.ancien?<> <s className="vrm-msg-offre-ancien" style={{color:C.muted}}>{prix(offreDer.ancien,offreDer.devise)}</s></>:null}{etatOffreCourt(offreDer.etat,offreDer.etatLibelle)?<> · {etatOffreCourt(offreDer.etat,offreDer.etatLibelle)}</>:null}</span> : texteEx} couleurExtrait={c.unread?C.text:C.muted} toi={ex.kind==='message'&&ex.source==='fil'&&(ex.de==='toi'||auteur==='toi')}
+                      attrsExtrait={{'data-conv-extrait':ex.kind,'data-conv-extrait-source':ex.source}}
                       apres={<>
                           {/* (19 oct.) Sur la ligne du message, pas sur celle de la paire : là
                               elle tronquait le N° et le prix (vu au rendu à 1512 px). */}
                           {messageFilter==='repondre'&&!offre&&<span className="vrm-msg-etat">{/\?/.test(c.description||'')?'Question reçue':'Message reçu'}</span>}{offre && <span className="vrm-msg-etat vrm-msg-offre" data-offre-liste={String(offre.prix)} style={{color:C.accent,borderColor:C.accent}}>Offre {prix(offre.prix)} en attente</span>}
+                          {/* (5 nov.) Le dernier message est une offre (reçue, envoyée, tranchée) :
+                              marquée « Offre » avec son montant, à SA conversation — plus jamais un
+                              code ni un montant nu. L'offre EN ATTENTE garde sa pastille d'accent. */}
                       </>}
                       point={c.unread ? (ro?C.muted:C.accent) : null}/>
                     ); })()}
@@ -58931,6 +59262,31 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </SheetShell>
         );
       })()}
+      {actionsSelOpen && (()=>{
+        // (5 nov.) Le carré « Actions possibles » de SA sélection (src/annoncesActions.js).
+        const idx = new Map(annSelectionnables.map(a=>[a.uid+':'+a.id, a]));
+        const choisies = selAnn.map(x=>idx.get(x.uid+':'+x.id)).filter(Boolean);
+        const vc = vintedDeChrome();
+        const actions = actionsPossibles({ selection: choisies.map(a=>({ id:a.id, uid:a.uid, etat:a.etat })), chrome: vc === undefined ? undefined : (vc ? String(vc.uid||'') : null),
+          capOk: (cap)=>extSait(cap)==='ok', nomCompte: (u)=>{ const a=(accounts||[]).find(x=>String(x.vinted_user_id)===String(u)); return a ? accNameOf(a) : ''; } });
+        return <ActionsSelectionFeuille choisies={choisies} actions={actions} onClose={()=>setActionsSelOpen(false)}
+          onLancer={(k)=>{ setActionsSelOpen(false);
+            if (k==='main') { const a=choisies[0]; if (a) { setRepubMainOuvert(a); } return; }
+            setRepubReprise(choisies.map(a=>a.id)); setRepubDepart(true); setRepubCle(c=>c+1); setRepubAction(k); }}/>;
+      })()}
+      {repubMainOuvert && (()=>{
+        const p = repubMainOuvert; const s = repubMain[String(p.ancienId||p.id)] || null;
+        const paire = p.ancienId ? { id:String(p.ancienId), uid:String(p.uid||''), numero:String(p.num||''), titre:p.titre||'', compte:(()=>{ const a=(accounts||[]).find(x=>String(x.vinted_user_id)===String(p.uid)); return a?accNameOf(a):`compte ${p.uid}`; })(), domain:p.domain||'www.vinted.fr', prix:p.prix??null, photo:p.photo||'' } : p;
+        const enLigneMap = (listings.items||[]).map(it=>{ const pr=(it.price&&typeof it.price==='object')?it.price.amount:it.price; const n=Number(String(pr==null?'':pr).replace(',','.')); const e=numeros[it.id]||{};
+          return { id:String(it.id), uid:String((it._acc&&it._acc.vinted_user_id)||''), titre:it.title||'', prix:isFinite(n)&&n>0?n:null, photo:it.photo||'', createdTs:it.createdTs||null, numero:e.numero?String(e.numero):'' }; });
+        const cands = candidatsNouvelle({ ancienId:paire.id, uid:paire.uid, enLigne:enLigneMap, numeros, suivis:repubMain, recrees:recreesNum||{}, debut: s && s.at ? Date.parse(s.at) : 0 });
+        const etatS = etatSuiviMain(s, { numeros, cle: cleNum });
+        const debut = ()=>{ if (!s && paire.numero) poserRepubMain(paire.id, { uid:paire.uid, num:paire.numero||'', titre:paire.titre||'', domain:paire.domain, at:new Date().toISOString() }); };
+        return <RepublierALaMain paire={paire} suivi={s} candidats={cands} etatSuivi={etatS} onDebut={debut} onClose={()=>setRepubMainOuvert(null)} onRelire={()=>loadListings(true)}
+          onDelier={()=>poserRepubMain(paire.id, { nouvelId:null, nouveauTitre:null, lieAt:null })}
+          onLier={async (c)=>{ const ok = await askConfirm({ title:'C’est bien la même paire ?', desc:`« ${c.titre||'Sans titre'} » est la nouvelle annonce de « ${paire.titre||'l’ancienne'} ».${paire.numero?`\nLe N°${paire.numero} passera dessus dès que l’ancienne ne sera plus du tout sur Vinted.`:''}`, ok:'Oui, c’est elle' });
+            if (!ok) return; if (!s) debut(); poserRepubMain(paire.id, { uid:paire.uid, num:paire.numero||'', titre:paire.titre||'', nouvelId:String(c.id), nouveauTitre:c.titre||'', lieAt:new Date().toISOString(), ...(s?{}:{ at:new Date().toISOString() }) }); }}/>;
+      })()}
       {brouillonsOpen && (
         <BrouillonsVinted br={brVinted} brouillonOk={extSait('brouillon')==='ok'} onClose={()=>setBrouillonsOpen(false)} onFile={()=>{ setBrouillonsOpen(false); setRepubAction('enLigne'); }}
           publier={async (it) => {
@@ -59023,16 +59379,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               : b._place==='compte-inconnu' ? `brouillon du compte ${(b._acc&&(b._acc.login||b._acc.username))||b._uid||'inconnu'} — ouvre Vinted sur ce compte dans Chrome pour le mettre en ligne`
               : b._place==='pas-pret' ? (RAISON_BR[b._etat]||'pas prêt')
               : `à vérifier sur Vinted : pas de lecture complète et récente des brouillons de ${(b._acc&&(b._acc.login||b._acc.username))||'ce compte'} — ouvre ton dressing Vinted sur ce compte` }; });
-        const fermer = ()=>{ setRepubAction(null); setRepubReprise(null); };
-        const reessayer = (ids)=>{ setRepubReprise(ids.map(String)); setRepubCle(c=>c+1); };
+        const fermer = ()=>{ setRepubAction(null); setRepubReprise(null); setRepubDepart(false); };
+        const reessayer = (ids)=>{ setRepubReprise(ids.map(String)); setRepubDepart(false); setRepubCle(c=>c+1); };
         // (28 oct.) « Refaire le brouillon » sur la ligne ratée : la même commande que
         // la liste « Brouillons à refaire » (§11), l'annonce désignée par son identité.
         const refaireOk = extSait('refaire')==='ok';
         const refaireLigne = refaireOk ? async (a) => { const r = await refaireBrouillon({ uid:a.uid, id:a.id }); return r.etape==='fait' ? { etat:'fait', raison:r.raison||'' } : r.etape==='incertain' ? { etat:'incertain', raison:r.raison||'' } : r.refaire ? { etat:'a-refaire', raison:r.raison||'' } : { etat:'echec', raison:r.raison||'' }; } : null;
-        if (repubAction==='enLigne') return <RepublierVinted key={"enLigne"+repubCle} action="enLigne" onReessayer={reessayer} reprise={repubReprise} annonces={annoncesBr} publier={publierEnLigne} compteChrome={etatX} compteVinted={vc} majExt={extSait('brouillon')!=='ok'} lettreOk={false} brouillonOk={extSait('brouillon')==='ok'} onClose={fermer} />;
-        if (repubAction==='modifier') return <RepublierVinted key={"modifier"+repubCle} action="modifier" onReessayer={reessayer} reprise={repubReprise} annonces={annoncesR} publier={publierModif} compteChrome={etatX} compteVinted={vc} majExt={extSait('republiermodif')!=='ok'} lettreOk={false} brouillonOk={false} onClose={fermer} />;
-        if (repubAction==='versBrouillon') return <RepublierVinted key={"versBrouillon"+repubCle} action="versBrouillon" onReessayer={reessayer} reprise={repubReprise} annonces={annoncesR} publier={publierVersB} refaire={refaireLigne} compteChrome={etatX} compteVinted={vc} majExt={extSait('versbrouillon')!=='ok'} lettreOk={extSait('lettre')==='ok'} brouillonOk={extSait('versbrouillon')==='ok'} onClose={fermer} />;
-        return <RepublierVinted key={"recreer"+repubCle} onReessayer={reessayer} reprise={repubReprise} annonces={annoncesR} publier={publierR} refaire={refaireLigne} compteChrome={etatX} compteVinted={vc} majExt={extSait('recreer')!=='ok'} lettreOk={extSait('lettre')==='ok'} brouillonOk={extSait('republierbrouillon')==='ok'} onClose={fermer} />;
+        if (repubAction==='enLigne') return <RepublierVinted key={"enLigne"+repubCle} action="enLigne" onReessayer={reessayer} reprise={repubReprise} depart={repubDepart?'envoi':null} annonces={annoncesBr} publier={publierEnLigne} compteChrome={etatX} compteVinted={vc} majExt={extSait('brouillon')!=='ok'} lettreOk={false} brouillonOk={extSait('brouillon')==='ok'} onClose={fermer} />;
+        if (repubAction==='modifier') return <RepublierVinted key={"modifier"+repubCle} action="modifier" onReessayer={reessayer} reprise={repubReprise} depart={repubDepart?'modif':null} annonces={annoncesR} publier={publierModif} compteChrome={etatX} compteVinted={vc} majExt={extSait('republiermodif')!=='ok'} lettreOk={false} brouillonOk={false} onClose={fermer} />;
+        if (repubAction==='versBrouillon') return <RepublierVinted key={"versBrouillon"+repubCle} action="versBrouillon" onReessayer={reessayer} reprise={repubReprise} depart={repubDepart?'modif':null} annonces={annoncesR} publier={publierVersB} refaire={refaireLigne} compteChrome={etatX} compteVinted={vc} majExt={extSait('versbrouillon')!=='ok'} lettreOk={extSait('lettre')==='ok'} brouillonOk={extSait('versbrouillon')==='ok'} onClose={fermer} />;
+        return <RepublierVinted key={"recreer"+repubCle} onReessayer={reessayer} reprise={repubReprise} depart={repubDepart?'modif':null} annonces={annoncesR} publier={publierR} refaire={refaireLigne} compteChrome={etatX} compteVinted={vc} majExt={extSait('recreer')!=='ok'} lettreOk={extSait('lettre')==='ok'} brouillonOk={extSait('republierbrouillon')==='ok'} onClose={fermer} />;
       })()}
       {fileOpen && (()=>{
         // Candidats = brouillons PRÊTS (titre + prix > 0 + au moins une photo) dont

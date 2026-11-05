@@ -3565,3 +3565,13 @@ Fusion, 44 px, une ligne au téléphone), chacune une feuille en portail (`src/A
 délai réception → mise en ligne avec la liste « Reçus, pas encore en ligne » (Relier · Mettre en ligne),
 « Répartir » un lot (« Reste X € » en ambre). Aucun texte explicatif. Banc `achats-sourcing` (120, 390/1512
 clair/sombre). Règles et mesures : `historique-compta-urssaf-abonnement.md` (« 4 nov. — Achats »).
+
+### 5 nov. — Achats « En route » : le plus récent en haut
+Julien : « je veux que dans achat en route c'est le plus récent qui s'affiche en haut
+peu importe le compte et le filtre ». Avant : sous « En route », l'étape du colis
+d'abord, puis le plus ANCIEN, puis le compte choisi passé en tête. Maintenant
+(`achatsAffiches`, src/App.jsx) : sous « En route », seul compte la date de commande,
+la plus récente en haut ; ni l'étape ni le compte choisi ne passent devant. Les
+autres onglets sont inchangés. Banc `scripts/bancs/achats-en-route-ordre.cjs`
+(données inventées, deux comptes, 390 tactile et 1512, avec et sans compte choisi) :
+4 verts ; 4 rouges sur le build d'avant (ordre 9301,9303,9302,9304).

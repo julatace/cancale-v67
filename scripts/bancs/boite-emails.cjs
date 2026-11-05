@@ -12,6 +12,18 @@ require('./_porte-banc.cjs');
 //  « Relier ma boîte » : cinq messageries, huit expéditeurs, une scène animée
 //  (figée en mouvement réduit), AUCUNE requête envoyée ; ni débordement, ni
 //  cible < 44 px, ni erreur JavaScript. Captures dans CAPTURE_DIR.
+//  (5 nov., soir — « ça doit être bcp plus clair ») Juge en plus les RÈGLES de
+//  clarté : la feuille de lecture du téléphone est OPAQUE dès sa première image
+//  (opacité 1 à chaque échantillon, fond sans transparence, aucun point de la
+//  liste au-dessus d'elle) ; chaque ligne commence par CE QUE C'EST en mots
+//  simples (tiré du résumé rangé, jamais le sujet brut) puis l'expéditeur avec
+//  son logo, le compte, l'heure ; les e-mails groupés par jour (Aujourd’hui,
+//  Hier, date) ; aucune balise affichée en texte dans le message ; la lecture
+//  met en haut ce que c'est et le bouton de l'action, « De / Reçu sur / date »
+//  sur une ligne discrète à la fin ; les rubriques au doigt avec leur nombre,
+//  qui défilent ; les libellés techniques retirés.
+//  Horloge FIXÉE (5 nov. 2026, 16 h 05 à Paris) : les jours ne dépendent pas de
+//  l'heure où le banc tourne.
 // ════════════════════════════════════════════════════════════════════════════
 const path = require('path'), http = require('http'), fs = require('fs'), os = require('os');
 let chromium;
@@ -21,7 +33,8 @@ const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT || 7967);
 const CAPT = process.env.CAPTURE_DIR || path.join(os.tmpdir(), 'banc-boite-emails');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json' };
-const SESSION = { access_token: 'jeton-de-banc', refresh_token: 'r', expires_at: Date.now() + 3600e3, user: { id: '22222222-2222-2222-2222-222222222222', email: 'vendeuse@exemple.test' } };
+const MAINTENANT = Date.UTC(2026, 10, 5, 15, 5);
+const SESSION = { access_token: 'jeton-de-banc', refresh_token: 'r', expires_at: Math.max(Date.now(), MAINTENANT) + 24 * 3600e3, user: { id: '22222222-2222-2222-2222-222222222222', email: 'vendeuse@exemple.test' } };
 let ko = 0, ok = 0;
 const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '  ✅ ' : '  ❌ ') + m + (d ? ' — ' + d : '')); };
 const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom, 'a levé : ' + String(e && e.message || e).slice(0, 240)); } };
@@ -33,8 +46,8 @@ const E = [
   { id: id(2), at: H(8), etat: 'integre', type: 'bordereau', subject: "Bordereau d'envoi pour Nike Air Max 90", from: "L'équipe Vinted <no-reply@vinted.fr>", resume: { v: 1, t: 'bordereau', tx: '12345678901', n: '42', pdf: 1, a: 'Nike Air Max 90' }, pj: 1 },
   { id: id(3), at: H(30), etat: 'integre', type: 'vente', subject: 'Ton article est vendu !', from: 'Vinted <no-reply@vinted.fr>', resume: { v: 1, t: 'vente', a: 'Adidas Samba', px: '55', n: '17' }, pj: 0 },
   { id: id(4), at: H(55), etat: 'integre', type: 'achat', subject: 'Ton reçu pour la commande « Nike Air Force 1 »', from: 'Vinted <no-reply@vinted.fr>', resume: { v: 1, t: 'achat', tx: '98765432101', a: 'Nike Air Force 1', px: '45,00', id: 'email_achat_banc', pdf: 1 }, pj: 1 },
-  { id: id(5), at: H(80), etat: 'integre', type: 'connu-sans-action', subject: 'Les nouveautés de la semaine', from: 'Vinted <news@team.vinted.fr>', resume: { v: 1, t: 'connu-sans-action', f: 'lettre d’information' }, pj: 0 },
-  { id: id(6), at: H(120), etat: 'a-verifier', type: 'ignoré', subject: 'Une forme jamais vue', from: 'contact@exemple.test', resume: { v: 1, t: 'incompris', av: 'incompris' }, pj: 0 },
+  { id: id(5), at: H(80), etat: 'integre', type: 'connu-sans-action', subject: 'Les nouveautés de la semaine', from: 'Vinted <news@team.vinted.fr>', resume: { v: 1, t: 'connu-sans-action', f: 'newsletter Vinted' }, pj: 0 },
+  { id: id(6), at: H(1100), etat: 'a-verifier', type: 'ignoré', subject: 'Une forme jamais vue', from: 'contact@exemple.test', resume: { v: 1, t: 'incompris', av: 'incompris' }, pj: 0 },
   { id: id(7), at: H(3000), etat: 'integre', type: 'bordereau', subject: "Bordereau d'envoi pour Vans Old Skool", from: 'no-reply@vinted.fr', resume: null, pj: null },
 ];
 for (let i = 8; i <= 26; i++) E.push({ id: id(i), at: H(3000 + i * 40), etat: 'integre', type: i % 2 ? 'offre' : 'suivi', subject: i % 2 ? `Nouvelle offre ${i}` : `Votre colis ${i} est en route`, from: i % 2 ? 'Vinted <no-reply@vinted.fr>' : 'Chronopost <suivi@chronopost.fr>', resume: i % 2 ? { v: 1, t: 'offre', mt: '30' } : { v: 1, t: 'suivi', s: 'CH' + i, st: 'transit' }, pj: 0 });
@@ -46,7 +59,7 @@ const COMPTEURS = { sur: E.length, plus: false, integre: 25, aVerifier: 1, erreu
 // (revue du 5 nov.) La route compte sur l'adresse choisie et le dit (`adresse`).
 const compteursDe = (adr) => { if (!adr) return COMPTEURS; const l = E.filter((e) => e.adresses.includes(adr)); const pr = { ventes: 0, achats: 0, codes: 0, colis: 0, autres: 0 }; l.forEach((e) => { const r = RUB(e); pr[r]++; if (r === 'codes') pr.colis++; }); return { ...COMPTEURS, sur: l.length, parRubrique: pr, adresse: adr }; };
 const TEXTE = {
-  [id(1)]: 'Bonjour,​\n\n\n\nVotre colis est disponible au Relais Tabac du Port.\nCode de retrait : 418205\nSuivre : https://suivi.exemple.test/' + 'x'.repeat(120) + '\n<img src=x onerror="window.__xss=1"><b>gras</b>',
+  [id(1)]: 'Bonjour,​\n\n\n\nVotre colis est disponible au Relais Tabac du Port.\nCode de retrait : 418205\nSuivre : https://suivi.exemple.test/' + 'x'.repeat(120) + '\n<img src=x onerror="window.__xss=1"><b>gras</b> &amp; &lt;img src=y onerror="window.__xss=2"&gt;fin<div style="color:red',
   [id(2)]: 'Ton bordereau est prêt. N° de transaction : 12345678901',
   [id(3)]: 'Ton article Adidas Samba est vendu. ' + 'Suite du message. '.repeat(90).slice(0, 1464) + '…',
 };
@@ -60,8 +73,9 @@ const srv = http.createServer((q, r) => {
 });
 
 async function ouvrir(nav, { viewport, tactile, sombre, reduit }) {
-  const ctx = await nav.newContext({ viewport, hasTouch: tactile, isMobile: tactile, reducedMotion: reduit ? 'reduce' : 'no-preference', colorScheme: sombre ? 'dark' : 'light' });
+  const ctx = await nav.newContext({ viewport, hasTouch: tactile, isMobile: tactile, reducedMotion: reduit ? 'reduce' : 'no-preference', colorScheme: sombre ? 'dark' : 'light', timezoneId: 'Europe/Paris', locale: 'fr-FR' });
   const pg = await ctx.newPage(); pg.setDefaultTimeout(10000);
+  await pg.clock.setFixedTime(MAINTENANT);
   const erreurs = []; pg.on('pageerror', (e) => erreurs.push(e.message));
   await pg.addInitScript(([s, sombre]) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_bienvenue_vue', '1'); localStorage.setItem('vrm_visite_vue', '1'); localStorage.setItem('vinted_dark', sombre ? 'true' : 'false'); } catch (_) {} window.__aller = []; window.addEventListener('vrm:aller', (e) => window.__aller.push(e.detail)); window.__fiche = []; window.addEventListener('vrm:fiche-article', (e) => window.__fiche.push(e.detail)); }, [SESSION, sombre]);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
@@ -110,12 +124,65 @@ const journal = (appels) => appels.filter((a) => a.chemin === '/api/email-rattac
         const lignes = b.locator('[data-boite-email]');
         dit(await lignes.count() === 20, `${nom} : une page de 20 e-mails`, String(await lignes.count()));
         const l1 = b.locator(`[data-boite-email="${id(1)}"]`);
-        dit(await l1.getAttribute('data-rubrique') === 'codes' && /Mondial Relay/.test(await l1.innerText()) && /Codes de retrait/.test(await l1.innerText()), `${nom} : ligne — expéditeur lisible, étiquette « Codes de retrait »`, await l1.innerText());
+        dit(await l1.getAttribute('data-rubrique') === 'codes' && /Mondial Relay/.test(await l1.innerText()), `${nom} : ligne — rubrique « codes », expéditeur lisible`, await l1.innerText());
+        // ── CLARTÉ 1 : chaque ligne commence par CE QUE C'EST (jamais le sujet brut).
+        {
+          const lu = await lignes.evaluateAll((l) => l.map((x) => {
+            const q = x.querySelector('[data-boite-quoi]'), p = x.querySelector('.vrm-boite-ligne-pied');
+            const premier = x.firstElementChild;
+            return { id: x.dataset.boiteEmail, quoi: q ? q.innerText.trim() : '', titre: q ? q.dataset.boiteQuoi : '', premier: premier === q, auDessus: !!(q && p && q.getBoundingClientRect().bottom <= p.getBoundingClientRect().top + 1), gras: q && q.querySelector('b') ? Number(getComputedStyle(q.querySelector('b')).fontWeight) : 0, tq: q ? parseFloat(getComputedStyle(q).fontSize) : 0, tp: p ? parseFloat(getComputedStyle(p).fontSize) : 0, texte: x.innerText };
+          }));
+          const parId = Object.fromEntries(lu.map((x) => [x.id, x]));
+          const sujetDe = Object.fromEntries(E.map((e) => [e.id, e.subject]));
+          const mauvaises = lu.filter((x) => !x.quoi || !x.titre || !x.premier || !x.auDessus || x.gras < 600 || !(x.tq > x.tp) || x.texte.includes(sujetDe[x.id]));
+          dit(lu.length === 20 && mauvaises.length === 0, `${nom} : chaque ligne commence par ce que c'est (en gras, plus grand), l'expéditeur en dessous — le sujet brut n'est sur aucune ligne`, JSON.stringify(mauvaises.slice(0, 2)));
+          const attendu = {
+            [id(1)]: /^Colis à retirer · Relais Tabac du Port · code 418 205 · avant le 9 nov\.$/,
+            [id(2)]: /^Vendu · Nike Air Max 90 · N°42 · bordereau prêt$/,
+            [id(3)]: /^Vendu · Adidas Samba · 55 € · N°17$/,
+            [id(4)]: /^Achat · reçu de commande · Nike Air Force 1 · 45,00 €$/,
+            [id(5)]: /^Newsletter Vinted — rien à faire$/,
+            [id(6)]: /^Pas reconnu par VRM · à lire$/,
+            [id(7)]: /^Vendu · bordereau · détail non gardé$/,
+          };
+          const faux = Object.entries(attendu).filter(([k, re]) => !parId[k] || !re.test(parId[k].quoi.replace(/\s+/g, ' '))).map(([k]) => (parId[k] || {}).quoi);
+          dit(faux.length === 0, `${nom} : en mots simples, depuis ce que VRM a rangé — « Colis à retirer · lieu · code · avant le », « Vendu · article · bordereau prêt », « Newsletter Vinted — rien à faire » ; rien d'inventé pour un e-mail ancien`, JSON.stringify(faux));
+          const logo = await b.locator(`[data-boite-email="${id(2)}"] .vrm-boite-ligne-pied [data-logo-site="vinted"]`).count();
+          const initiale = await b.locator(`[data-boite-email="${id(1)}"] .vrm-boite-ligne-pied .vrm-boite-initiale`).count();
+          const heureLue = /\b15:58\b/.test(parId[id(1)].texte) && /compte-un/.test(parId[id(1)].texte);
+          dit(logo === 1 && initiale === 1 && heureLue, `${nom} : plus petit — l'expéditeur avec le logo du site (initiale neutre pour un transporteur), le compte, l'heure`, `${logo} ${initiale} ${parId[id(1)].texte.replace(/\n/g, ' | ')}`);
+        }
+        // ── CLARTÉ 2 : groupés par jour.
+        {
+          const jours = await b.locator('[data-boite-jour]').evaluateAll((l) => l.map((g) => ({ mot: g.dataset.boiteJour, titre: (g.querySelector('h2') || {}).innerText || '', ids: [...g.querySelectorAll('[data-boite-email]')].map((x) => x.dataset.boiteEmail) })));
+          const mots = jours.map((j) => j.mot);
+          const dans = (k, mot) => (jours.find((j) => j.mot === mot) || { ids: [] }).ids.includes(k);
+          const total = jours.reduce((s, j) => s + j.ids.length, 0);
+          dit(JSON.stringify(mots) === JSON.stringify(['Aujourd’hui', 'Hier', 'Mardi 3 novembre']) && jours.every((j) => j.titre.trim() === j.mot) && dans(id(1), 'Aujourd’hui') && dans(id(5), 'Aujourd’hui') && dans(id(6), 'Hier') && dans(id(7), 'Mardi 3 novembre') && total === 20, `${nom} : groupés par jour — « Aujourd’hui », « Hier », « Mardi 3 novembre », chaque e-mail une fois`, JSON.stringify(jours.map((j) => [j.mot, j.ids.length])));
+        }
+        // ── CLARTÉ 3 : les rubriques au doigt, avec leur nombre, qui défilent.
+        {
+          const r = await b.locator('.vrm-boite-rubriques').evaluate((row) => {
+            const bs = [...row.querySelectorAll('[data-boite-rubrique]')];
+            return { ox: getComputedStyle(row).overflowX, wrap: getComputedStyle(row).flexWrap, tops: [...new Set(bs.map((x) => Math.round(x.getBoundingClientRect().top)))].length, h: Math.min(...bs.map((x) => x.getBoundingClientRect().height)), n: bs.map((x) => [x.dataset.boiteRubrique, (x.querySelector('[data-boite-n]') || {}).textContent || null]), sw: row.scrollWidth, cw: row.clientWidth };
+          });
+          const attendu = { tout: String(E.length), ventes: String(parRubrique.ventes), achats: String(parRubrique.achats), codes: String(parRubrique.codes), colis: String(parRubrique.colis), autres: String(parRubrique.autres) };
+          const nOk = r.n.every(([k, v]) => v === attendu[k]);
+          dit(nOk && r.h >= 44 && r.tops === 1 && r.wrap === 'nowrap' && ['auto', 'scroll'].includes(r.ox), `${nom} : rubriques — une rangée (une seule ligne), 44 px au doigt, le nombre de CHAQUE rubrique, défilement si ça ne rentre pas`, JSON.stringify(r));
+          if (tactile) {
+            const avant = await b.locator('.vrm-boite-rubriques').evaluate((x) => x.scrollLeft);
+            await b.locator('.vrm-boite-rubriques').evaluate((x) => { x.scrollLeft = x.scrollWidth; });
+            const apres = await b.locator('.vrm-boite-rubriques').evaluate((x) => x.scrollLeft);
+            dit(r.sw > r.cw && apres > avant, `${nom} : au téléphone, la rangée déborde et DÉFILE (pas de retour à la ligne)`, `${r.sw}/${r.cw} ${avant}→${apres}`);
+            await b.locator('.vrm-boite-rubriques').evaluate((x) => { x.scrollLeft = 0; });
+          }
+          dit(await b.locator('[data-boite-sur]').count() === 0, `${nom} : tous les e-mails comptés ⇒ aucune phrase de couverture à lire`);
+        }
         dit(await b.locator(`[data-boite-email="${id(2)}"] [data-boite-pj="1"]`).count() === 1, `${nom} : trombone + nombre de pièces jointes`);
         dit(await b.locator(`[data-boite-email="${id(6)}"] [data-boite-averifier]`).count() === 1 && await b.locator(`[data-boite-email="${id(1)}"] [data-boite-averifier]`).count() === 0, `${nom} : « à vérifier » seulement où il faut`);
         const coulAmbre = await b.locator(`[data-boite-email="${id(6)}"] [data-boite-averifier]`).evaluate((n) => getComputedStyle(n).color);
-        const coulTag = await b.locator(`[data-boite-email="${id(6)}"] .vrm-boite-tag`).evaluate((n) => getComputedStyle(n).color);
-        dit(coulAmbre !== coulTag && !/rgb\(2[0-5]\d, [0-6]\d, [0-6]\d\)/.test(coulAmbre), `${nom} : « à vérifier » en ambre (jamais rouge)`, coulAmbre);
+        const coulPied = await b.locator(`[data-boite-email="${id(6)}"] .vrm-boite-ligne-pied`).evaluate((n) => getComputedStyle(n).color);
+        dit(coulAmbre !== coulPied && !/rgb\(2[0-5]\d, [0-6]\d, [0-6]\d\)/.test(coulAmbre), `${nom} : « à vérifier » en ambre (jamais rouge)`, coulAmbre);
         // Rubriques
         await b.locator('[data-boite-rubrique="codes"]').click(); await pg.waitForTimeout(500);
         const dj = journal(appels).at(-1);
@@ -134,32 +201,90 @@ const journal = (appels) => appels.filter((a) => a.chemin === '/api/email-rattac
           const pastille = (await b.locator('[data-boite-rubrique="ventes"]').innerText()).replace(/\D/g, '');
           const couv = b.locator('[data-boite-sur-adresse="second@exemple.test"]');
           await pg.screenshot({ path: path.join(CAPT, `compte-${nom}.png`) });
-          dit(pastille === String(nV) && await couv.count() === 1 && /reçus sur second@exemple\.test/.test(await couv.innerText()), `${nom} : compte choisi — le nombre de la pastille et la phrase portent sur CE compte`, `${pastille}/${nV}`);
+          dit(pastille === String(nV) && await couv.count() === 1 && /compte-deux/.test(await couv.innerText()), `${nom} : compte choisi — le nombre de la pastille et la phrase portent sur CE compte`, `${pastille}/${nV}`);
         }
         await b.locator('[data-boite-adresse]').selectOption(''); await pg.waitForTimeout(500);
-        if (!sombre) { await pg.screenshot({ path: path.join(CAPT, `boite-${nom}.png`) }); }
+        await pg.screenshot({ path: path.join(CAPT, `boite-${nom}.png`) });
+        await b.locator('[data-boite-liste]').screenshot({ path: path.join(CAPT, `liste-${nom}.png`) });
+        // ── CLARTÉ 4 : libellés techniques retirés de la boîte.
+        {
+          const t = await b.innerText();
+          dit(!/adresse de réception\)|Comptés sur tes|arrivée dans VRM/i.test(t), `${nom} : plus de « Compte (adresse de réception) », « Comptés sur tes N derniers e-mails », « (arrivée dans VRM) »`, (t.match(/adresse de réception\)|Comptés sur tes[^\n]*|arrivée dans VRM/i) || [''])[0]);
+        }
         // Lire un email
         const nLire = journal(appels).filter((a) => a.q.lire).length;
-        await l1.click();
+        if (!tactile) await l1.click();
+        else {
+          // ── CLARTÉ 5 (défaut grave du 5 nov.) : la feuille est OPAQUE dès sa
+          // première image. Le toucher et la mesure partent du MÊME script (aucun
+          // aller-retour du banc entre les deux, qui laisserait passer le fondu) :
+          // à chaque image pendant ≈ 500 ms, l’opacité de la feuille et de chacun
+          // de ses parents vaut 1, son fond n'a aucune transparence, et au milieu
+          // de la ligne touchée c'est la feuille qui est au-dessus (rien de la
+          // liste visible derrière).
+          const ech = await l1.evaluate(async (ligne) => {
+            const alpha = (c) => { const m = /rgba?\(([^)]+)\)/.exec(c || ''); if (!m) return c === 'transparent' ? 0 : 1; const p = m[1].split(/[ ,/]+/).filter(Boolean); return p.length > 3 ? Number(p[3]) : 1; };
+            const rl = ligne.getBoundingClientRect(); const cx = rl.left + rl.width / 2, cy = rl.top + rl.height / 2;
+            const image = () => new Promise((r) => requestAnimationFrame(r));
+            ligne.click();
+            let n = null;
+            for (let i = 0; i < 60 && !(n = document.querySelector('[data-boite-feuille]')); i++) await image();
+            if (!n) return { out: [], couvre: false };
+            const out = [];
+            // 30 images (≈ 500 ms) — comptées en images : l'horloge du banc est figée.
+            for (let i = 0; i < 30; i++) {
+              let op = 1; for (let x = n; x && x.nodeType === 1; x = x.parentElement) op *= Number(getComputedStyle(x).opacity);
+              const haut = document.elementFromPoint(cx, cy);
+              out.push({ op, a: alpha(getComputedStyle(n).backgroundColor), fond: getComputedStyle(n).backgroundColor, dessus: !!(haut && n.contains(haut)) });
+              await image();
+            }
+            const r = n.getBoundingClientRect();
+            return { out, couvre: r.left <= 0 && r.top <= 0 && r.right >= innerWidth && r.bottom >= innerHeight };
+          });
+          const mauvais = ech.out.filter((x) => x.op < 0.999 || x.a < 0.999 || !x.dessus);
+          dit(ech.out.length >= 5 && mauvais.length === 0 && ech.couvre, `${nom} : la feuille de lecture est OPAQUE dès la première image (opacité 1, fond plein, couvre l’écran, la liste n’est jamais visible au travers)`, `${ech.out.length} échantillons, ${mauvais.length} transparents ; 1er : ${JSON.stringify(ech.out[0])}`);
+          const fond = (ech.out[ech.out.length - 1] || {}).fond;
+          dit(fond === (sombre ? 'rgb(0, 0, 0)' : 'rgb(242, 242, 247)'), `${nom} : le fond de la feuille est celui du thème (${sombre ? 'noir' : 'gris clair'}), comme les autres feuilles`, fond);
+        }
         const lec = pg.locator(`[data-boite-lecture="${id(1)}"]`);
         await lec.locator('[data-boite-sujet]').waitFor();
         dit(journal(appels).filter((a) => a.q.lire).length === nLire + 1, `${nom} : le corps se lit sur le clic, un e-mail à la fois`);
-        dit((await lec.locator('[data-boite-sujet]').innerText()) === 'Votre colis 12345678 est disponible' && /Mondial Relay/.test(await lec.locator('[data-boite-de]').innerText()) && /noreply@mondialrelay\.fr/.test(await lec.locator('[data-boite-de]').innerText()) && /2026/.test(await lec.locator('[data-boite-date]').innerText()) && /vendeuse@exemple\.test/.test(await lec.locator('[data-boite-recu]').innerText()), `${nom} : sujet, expéditeur, date, adresse de réception`);
+        dit((await lec.locator('[data-boite-sujet]').innerText()) === 'Votre colis 12345678 est disponible' && /Mondial Relay/.test(await lec.locator('[data-boite-de]').innerText()) && /noreply@mondialrelay\.fr/.test(await lec.locator('[data-boite-de]').innerText()) && /2026/.test(await lec.locator('[data-boite-date]').innerText()) && /vendeuse@exemple\.test/.test(await lec.locator('[data-boite-recu]').innerText()), `${nom} : le sujet d’origine reste visible ; expéditeur, date, adresse de réception`);
         const corps = await lec.locator('[data-boite-corps="lu"]').innerText();
-        dit(/\[lien suivi\.exemple\.test\]/.test(corps) && !/\n\n\n/.test(corps) && /<img src=x/.test(corps) && await lec.locator('[data-boite-corps] img, [data-boite-corps] b').count() === 0 && !(await pg.evaluate(() => window.__xss)), `${nom} : corps nettoyé et rendu en TEXTE (aucune balise active)`);
-        dit(await lec.locator('[data-boite-pieces="0"]').count() === 1 && /Aucune pièce jointe/.test(await lec.locator('[data-boite-pieces]').innerText()), `${nom} : « Aucune pièce jointe » quand on a lu qu’il n’y en a pas`);
+        // ── CLARTÉ 6 : aucune balise affichée en texte, aucune exécutée ; le texte reste.
+        dit(/\[lien suivi\.exemple\.test\]/.test(corps) && !/\n\n\n/.test(corps) && !/<\s*\/?\s*[a-z!]/i.test(corps) && !/&(amp|lt|gt|quot);/.test(corps) && /gras & fin/.test(corps) && await lec.locator('[data-boite-corps] img, [data-boite-corps] b').count() === 0 && !(await pg.evaluate(() => window.__xss)), `${nom} : message nettoyé — balises (<img …>, <b>, &lt;img&gt;, balise coupée) retirées, jamais exécutées, le texte gardé`, JSON.stringify(corps.slice(-80)));
+        dit(await lec.locator('[data-boite-pieces="0"]').count() === 1, `${nom} : « aucune pièce jointe » quand on a lu qu’il n’y en a pas`);
         const objet = lec.locator('[data-boite-objet="retrait"]');
-        dit(await objet.count() === 1 && /12345678/.test(await objet.innerText()), `${nom} : « Voir le colis n° 12345678 » (identité : n° de suivi)`);
+        dit(await objet.count() === 1 && /^Voir le colis à retirer/.test((await objet.innerText()).trim()), `${nom} : « Voir le colis à retirer » (identité : n° de suivi)`, await objet.innerText());
+        // ── CLARTÉ 7 : en haut, en gros, ce que c'est et le bouton ; la ligne discrète à la fin.
+        {
+          const o = await lec.evaluate((a) => {
+            const q = (s) => a.querySelector(s);
+            const h = q('[data-boite-haut]'), ti = q('[data-boite-titre]'), bt = q('[data-boite-haut] button[data-boite-objet]'), co = q('[data-boite-corps]'), pi = q('[data-boite-pieces]'), me = q('[data-boite-meta]');
+            const avant = (x, y) => !!(x && y && (x.compareDocumentPosition(y) & Node.DOCUMENT_POSITION_FOLLOWING));
+            return { titre: ti ? ti.innerText.trim() : '', details: (q('.vrm-boite-details') || {}).innerText || '', tTitre: ti ? parseFloat(getComputedStyle(ti).fontSize) : 0, tCorps: co ? parseFloat(getComputedStyle(co).fontSize) : 0, tMeta: me ? parseFloat(getComputedStyle(me).fontSize) : 0, bouton: !!bt, ordre: avant(h, co) && avant(co, pi) && avant(pi, me), premier: h && a.querySelector('h2,h3') === ti };
+          });
+          dit(o.titre === 'Colis à retirer' && /Relais Tabac du Port · code 418 205 · avant le 9 nov\./.test(o.details.replace(/\s+/g, " ")) && o.tTitre >= 20 && o.tTitre > o.tCorps && o.bouton && o.premier && o.ordre && o.tMeta <= 13, `${nom} : lecture — en haut, en gros, ce que c’est et le bouton ; puis le message, les pièces jointes, et « De · Reçu sur · date » en petit à la fin`, JSON.stringify(o));
+          const t = await lec.innerText();
+          dit(!/arrivée dans VRM|adresse de réception\)/i.test(t), `${nom} : lecture sans « (arrivée dans VRM) »`, (t.match(/arrivée dans VRM/) || [''])[0]);
+        }
         if (w > 1000) {
           // L'accent DU THÈME (--vrm-accent, src/themeMineral.js), résolu par le navigateur.
           const [accent, duTheme] = await objet.evaluate((n) => { const t = document.createElement('i'); t.style.color = 'var(--vrm-accent)'; document.body.appendChild(t); const c = getComputedStyle(t).color; t.remove(); return [getComputedStyle(n).backgroundColor, c]; });
           dit(accent === duTheme && /^rgb\(\d+, \d+, 2\d\d\)$/.test(accent), `${nom} : l’accent bleu du thème, rare, sur le seul bouton qui mène à l’objet`, `${accent} / ${duTheme}`);
+          // La page défilée, le haut de la lecture (« Fermer », le titre) n'est pas caché sous la barre du haut.
+          await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); if (m) m.scrollTop = 500; window.scrollTo(0, 500); });
+          await pg.waitForTimeout(200);
+          const vus = await lec.evaluate((a) => ['[data-boite-fermer]', '[data-boite-titre]'].map((s) => { const n = a.querySelector(s); const r = n.getBoundingClientRect(); const h = document.elementFromPoint(r.left + Math.min(20, r.width / 2), r.top + r.height / 2); return !!(h && (h === n || n.contains(h))); }));
+          dit(vus.every(Boolean), `${nom} : page défilée — « Fermer » et le titre de la lecture restent visibles (pas sous la barre du haut)`, JSON.stringify(vus));
+          await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); if (m) m.scrollTop = 0; window.scrollTo(0, 0); });
           await pg.screenshot({ path: path.join(CAPT, `lecture-${nom}.png`) });
         } else {
           dit(await pg.locator('[data-boite-feuille]').count() === 1, `${nom} : au téléphone, l’e-mail s’ouvre en feuille plein écran`);
-          const fond = await pg.locator('[data-boite-feuille]').evaluate((n) => getComputedStyle(n).backgroundColor);
-          dit(sombre ? /rgb\((0|1\d|2\d), (0|1\d|2\d), (0|1\d|2\d|3\d)\)/.test(fond) : !/rgb\((0|1\d|2\d), /.test(fond), `${nom} : la feuille suit le thème`, fond);
           await pg.screenshot({ path: path.join(CAPT, `lecture-${nom}.png`) });
+          await pg.locator('[data-boite-feuille]').evaluate((n) => { n.scrollTop = n.scrollHeight; });
+          await pg.screenshot({ path: path.join(CAPT, `lecture-bas-${nom}.png`) });
+          await pg.locator('[data-boite-feuille]').evaluate((n) => { n.scrollTop = 0; });
         }
         await objet.click(); await pg.waitForTimeout(600);
         const aller = await pg.evaluate(() => window.__aller.slice());
