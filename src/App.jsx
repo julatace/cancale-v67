@@ -124,7 +124,7 @@ import {CLE_COMPTES_EXCLUS,excluAutreDe,estExclu,basculerExclu,compteDeVente} fr
 import {PLATEFORMES_COMPTES,etatCompteLie,ageLecture,comptesLbcLies,comptesVcLies,comptesEbayLies,refDeLigneEbay,nomCompteLie,LIBELLE_ETAT} from './comptesLies.js';
 import './comptes-lies.css';
 import './comptes-securite.css';
-import { CLE_MONTANTS_CACHES, lireMontantsCaches, installerMasque } from './montantsCaches.js';
+import { CLE_MONTANTS_CACHES } from './montantsCaches.js';
 import { deconnecterPartout, texteConfirmationPartout, ligneJournal, filtrerJournal, comptesDuJournal, FILTRES_TYPE } from './securiteCompte.js';
 import { pucesComptes, choixPourSite, memoriserChoix, lireChoixComptes, CLE_CHOIX_COMPTES } from './compteChoix.js';
 import {joursAvant as joursAvantParis} from '../api/_lib/ebay-a-expedier.js';
@@ -164,7 +164,7 @@ import { libellePlage, phrasePlage } from "./periodeCalendrier.js";
 import { installerLecturesPartagees } from "./lecturesPartagees.js";
 import { installerFiltreSupprimes, sansComptesSupprimes, lireSupprimes, CLE_SUPPRIMES } from "./comptesSupprimes.js";
 import { lectureComplete, construirePhoto, ecrirePhoto, lirePhoto, listeDuSoir, joursAvantJour, heurePhoto, adresseQrLocale, CACHE_QR } from "./journeeHorsLigne.js";
-import { jetonsStream, demarrerStream } from "./streamFlou.js";
+import { jetonsStream, demarrerStream, poserReglesStream, normaliserRegles, compilerRegle, masquerTexteStream, textePourStream, regleCourante, regleApercu, ligneACacher, CATEGORIES as STREAM_CATEGORIES, LISTES as STREAM_LISTES, nettoyerMots, CLE_STREAM, CLE_STREAM_REGLES, REGLES_DEFAUT as STREAM_DEFAUT } from "./modeStream.js";
 import { DISCORD_ERREURS } from "./communaute/discordErreurs.js";
 import { noterTicketDiscord, ecouterDiscord, suivreCodeDiscord, etatCodeDiscord, reprendreDiscord, oublierTicketDiscord } from "./communaute/discordAttente.js";
 import { DESCRIPTION_ORGANISATION } from "./operations/description.js";
@@ -1994,7 +1994,10 @@ const SYNC_KEYS = [
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros','vinted_annonces_vendues','vinted_bords_shipped',
   'vinted_goal','vinted_regime','vrm_micro_options','vinted_tva','vinted_bordereau_formats',
   // (3 nov.) La place du tampon choisie à la main, par FORME de bordereau (« Toujours ici »).
-  'vrm_tampon_positions','vinted_bords_printed','vrm_imprimante','vrm_prenom','vrm_num_prefixe',
+  'vrm_tampon_positions','vinted_bords_printed',
+  // (5 nov.) Le PROGRAMME du mode stream (ce qu'il cache quand il filme) : le même sur
+  // tous ses appareils. L'interrupteur, lui (`vrm_stream`), reste propre à l'appareil.
+  'vrm_stream_regles','vrm_imprimante','vrm_prenom','vrm_num_prefixe',
   // (27 oct.) La présentation d'arrivée a été vue (ou passée) : ne revient pas sur un autre appareil.
   'vrm_bienvenue_vue',
   // (2 nov.) La visite en bulles a été vue (ou passée) : elle ne revient ni après
@@ -10795,7 +10798,7 @@ function ApercuPdf({ octets, page = 1, largeur, zone, label }) {
   return (
     <figure data-apercu={etat} style={{margin:0,display:'flex',flexDirection:'column',gap:6,alignItems:'flex-start'}}>
       <figcaption style={{fontSize:12,fontWeight:600,color:C.muted}}>{label}</figcaption>
-      <canvas ref={ref} aria-label={label} style={{display: etat === 'ko' ? 'none' : 'block', borderRadius:12, border:`1px solid ${C.border}`, background:'#fff', maxWidth:'100%'}}/>
+      <canvas ref={ref} aria-label={label} data-stream-image="bordereau" style={{display: etat === 'ko' ? 'none' : 'block', borderRadius:12, border:`1px solid ${C.border}`, background:'#fff', maxWidth:'100%'}}/>
       {etat === 'charge' && <span style={{fontSize:12,color:C.muted}}>Je dessine l’aperçu…</span>}
       {etat === 'ko' && <span style={{fontSize:12,color:C.muted,lineHeight:1.45}}>Je n’ai pas pu dessiner l’aperçu ici. <button type="button" onClick={ouvrir} style={{border:'none',background:'none',padding:0,color:C.text,textDecoration:'underline',cursor:'pointer',font:'inherit'}}>Ouvrir le PDF</button></span>}
     </figure>
@@ -11036,7 +11039,7 @@ function VisionneusePdf() {
         </div>
         {v.prep
           ? <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', color:C.muted, fontSize:15 }}>Préparation du bordereau…</div>
-          : <iframe ref={cadre} data-visionneuse-cadre="" title={v.titre || 'Bordereau'} src={v.url} onLoad={cadreCharge} onMouseEnter={() => { sourisDansPdf.current = true; }} onMouseLeave={() => { sourisDansPdf.current = false; reprendreFocus(); }} style={{ flex:1, width:'100%', border:0, background:'#fff' }}/>}
+          : <iframe ref={cadre} data-visionneuse-cadre="" data-stream-image="bordereau" title={v.titre || 'Bordereau'} src={v.url} onLoad={cadreCharge} onMouseEnter={() => { sourisDansPdf.current = true; }} onMouseLeave={() => { sourisDansPdf.current = false; reprendreFocus(); }} style={{ flex:1, width:'100%', border:0, background:'#fff' }}/>}
       </div>
     </div>, document.body);
 }
@@ -11632,7 +11635,8 @@ function askNotifPermission(){
 function pushNotif(title, body){
   try{
     if(typeof Notification!=='undefined' && Notification.permission==='granted'){
-      new Notification(title, { body, icon:'/vrm-icon-v4-192.png', badge:'/vrm-icon-v4-192.png' });
+      // (5 nov.) En mode stream, la notification affichée suit la même règle que l'écran.
+      new Notification(textePourStream(title), { body: textePourStream(body), icon:'/vrm-icon-v4-192.png', badge:'/vrm-icon-v4-192.png' });
       return true;
     }
   }catch(_){/* ignore */}
@@ -12293,23 +12297,70 @@ const DEMANDE_DEPENSE = { on: false, at: 0 };
 // (21 sept.). Le teal #007782 ailleurs est « Vinted GO » le transporteur, une
 // autre notion — on n'y touche pas.
 const LBC_ORANGE = '#EC5A13';
-// (16 oct.) LE MODE STREAM — masquer les données sensibles quand il filme son
-// écran (pseudos d'acheteurs, noms de comptes, emails, téléphones, codes de
-// retrait). Réglage PROPRE À L'APPAREIL (on streame depuis un appareil, pas
-// partout) : `localStorage.vrm_stream`. Il pose `data-stream` sur la racine ;
-// la règle CSS floute tout élément `.vrm-sensible` (index.html).
-const streamActif = () => { try { return localStorage.getItem('vrm_stream') === '1'; } catch (_) { return false; } };
+// LE MODE STREAM — cacher ce qu'il ne veut pas montrer quand il filme son écran.
+// (16 oct.) un flou sur `.vrm-sensible` ; (17 oct.) un flou sur tout texte qui
+// porte un pseudo de ses comptes ; (5 nov.) UNE RÈGLE PROGRAMMÉE, src/modeStream.js :
+// le texte rendu est réécrit « ••• » selon SON programme (montants, marques, ses
+// comptes, pseudos d'acheteurs, adresses, numéros de compte, mots qui commencent
+// par…, annonces entières qui contiennent…). Il remplace aussi l'œil « cacher les
+// montants » du 4 nov. : une seule porte, le bouton « Stream » de l'en-tête.
+// · l'interrupteur (`vrm_stream`) est PROPRE À L'APPAREIL (on filme depuis un
+//   appareil, pas partout) ;
+// · le programme (`vrm_stream_regles`) est SYNCHRONISÉ (SYNC_KEYS) : le même sur
+//   tous ses appareils. Pas encore lu ⇒ le programme par défaut, TOUT caché.
+// ⚠️ `save` n'écrit l'appareil qu'après un court délai : un geste PAS ENCORE écrit
+//    (`_reglesStreamEnAttente`) gagne sur ce que l'appareil porte encore — sinon une
+//    relecture du nuage arrivée entre-temps remettait l'ancien programme (vu au banc :
+//    « montants » recochés, puis décochés par la relecture).
+let _reglesStreamEnAttente = null;
+const lireReglesStreamIci = () => _reglesStreamEnAttente || normaliserRegles(load(CLE_STREAM_REGLES, {}));
+const streamActif = () => {
+  try {
+    // (5 nov.) L'œil « cacher les montants » (4 nov.) allumé sur cet appareil ⇒ le
+    // mode stream l'est aussi (il cache les montants par défaut) — une fois.
+    if (localStorage.getItem(CLE_MONTANTS_CACHES) === '1') { localStorage.removeItem(CLE_MONTANTS_CACHES); localStorage.setItem(CLE_STREAM, '1'); }
+    return localStorage.getItem(CLE_STREAM) === '1';
+  } catch (_) { return false; }
+};
 const poserStream = (on) => {
-  try { localStorage.setItem('vrm_stream', on ? '1' : '0'); } catch (_) {}
-  try { document.documentElement.setAttribute('data-stream', on ? '1' : '0'); } catch (_) {}
+  try { localStorage.setItem(CLE_STREAM, on ? '1' : '0'); } catch (_) {}
   try { demarrerStream(on); } catch (_) {}
   try { window.dispatchEvent(new CustomEvent('vrm:stream', { detail: !!on })); } catch (_) {}
 };
-try { if (typeof document !== 'undefined') document.documentElement.setAttribute('data-stream', streamActif() ? '1' : '0'); } catch (_) {}
+// ⚠️ Posé AU CHARGEMENT du module, avant le premier rendu : allumé, aucune image
+//    ne montre ce qu'il a caché (pas d'attente d'un effet React).
+try { poserReglesStream(lireReglesStreamIci()); demarrerStream(streamActif()); } catch (_) {}
 const useStream = () => {
   const [on, setOn] = React.useState(streamActif);
   React.useEffect(() => { const f = (e) => setOn(!!(e && e.detail)); window.addEventListener('vrm:stream', f); return () => window.removeEventListener('vrm:stream', f); }, []);
   return on;
+};
+// Le programme, suivi : relu à l'arrivée du nuage et à chaque sauvegarde (un autre
+// appareil, ou l'écran Réglages).
+const useReglesStream = () => {
+  const [r, setR] = React.useState(lireReglesStreamIci);
+  React.useEffect(() => {
+    const f = () => { const n = lireReglesStreamIci(); poserReglesStream(n); setR(n); };
+    const off = onCloudReady(f);
+    const s = (e) => {
+      if (!(e && e.detail && e.detail.k === CLE_STREAM_REGLES)) return;
+      if (!e.detail.distant) _reglesStreamEnAttente = null;   // le geste est écrit sur l'appareil
+      f();
+    };
+    const ici = (e) => { if (e && e.detail) setR(e.detail); };
+    window.addEventListener('vrm:save', s); window.addEventListener('vrm:stream-regles', ici);
+    return () => { if (typeof off === 'function') off(); window.removeEventListener('vrm:save', s); window.removeEventListener('vrm:stream-regles', ici); };
+  }, []);
+  return r;
+};
+const ecrireReglesStream = (r) => {
+  const n = normaliserRegles(r);
+  // `save` écrit l'appareil (puis le nuage) après un court délai : la règle, elle,
+  // change TOUT DE SUITE, et les écrans ouverts la reçoivent par l'événement.
+  _reglesStreamEnAttente = n;
+  save(CLE_STREAM_REGLES, n);
+  poserReglesStream(n);
+  try { window.dispatchEvent(new CustomEvent('vrm:stream-regles', { detail: n })); } catch (_) {}
 };
 // (17 oct.) L'ENTREPRISE DU VENDEUR, pour l'en-tête : la ligne `vrm_pro_facture`
 // (celle du reçu d'achat, §11), relue au montage et suivie quand « Ton
@@ -12331,7 +12382,7 @@ const useEntreprise = () => {
 function NomEntreprise({ entreprise, className }) {
   const nom = entreprise && entreprise.nom;
   if (!nom) return null;
-  return <span className={`${className} vrm-sensible`} data-nom-entreprise={nom} title={nom}>{nom}</span>;
+  return <span className={`${className} vrm-sensible`} data-stream-type="compte" data-nom-entreprise={nom} title={nom}>{nom}</span>;
 }
 // (16 oct.) Les comptes que la RECHERCHE regarde : liés et pas masqués. Un
 // compte supprimé (plus dans `vinted_accounts`) ou masqué n'y apparaît plus.
@@ -14691,6 +14742,7 @@ const ICON_PATHS = {
   alert:   <><path d="M12 4.2 21 19.2H3L12 4.2Z"/><path d="M12 10v4"/><path d="M12 16.6h.01"/></>,
   check:   <><path d="M4.5 12.6 9.5 17.5 19.5 7"/></>,
   euro:    <><path d="M17 6.6A6.6 6.6 0 0 0 8.2 12 6.6 6.6 0 0 0 17 17.4"/><path d="M4.5 10.4h7.8"/><path d="M4.5 13.6h7.8"/></>,
+  stream:  <><circle cx="12" cy="12" r="2"/><path d="M8.6 8.6a4.8 4.8 0 0 0 0 6.8"/><path d="M15.4 8.6a4.8 4.8 0 0 1 0 6.8"/><path d="M5.8 5.8a8.8 8.8 0 0 0 0 12.4"/><path d="M18.2 5.8a8.8 8.8 0 0 1 0 12.4"/></>,
   eye:     <><path d="M2.5 12S6 6.2 12 6.2 21.5 12 21.5 12 18 17.8 12 17.8 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.7"/></>,
   heart:   <><path d="M12 19.6S3.8 14.8 3.8 9.6a4.2 4.2 0 0 1 8.2-1.4 4.2 4.2 0 0 1 8.2 1.4c0 5.2-8.2 10-8.2 10Z"/></>,
   // (3 nov.) Scanner un code-barres : le viseur et ses barres.
@@ -14870,11 +14922,11 @@ function LigneConv({ actif, onClick, attrs, style, ariaLabel, photo, nom, sensib
   return (
     <button className={actif ? 'vrm-inbox-row is-current' : 'vrm-inbox-row'} type="button" {...(attrs || {})} aria-label={ariaLabel} onClick={onClick} style={style}>
       <span className="vrm-msg-av" style={{background:C.card2||C.bg}}>
-        {photo ? <PhotoVinted src={photo} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:12}}/> : <span className={sensible ? 'vrm-msg-ini vrm-sensible' : 'vrm-msg-ini'} style={{color:C.muted}}>{String(nom || '').trim().charAt(0).toUpperCase() || '·'}</span>}
+        {photo ? <PhotoVinted src={photo} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:12}}/> : <span className={sensible ? 'vrm-msg-ini vrm-sensible' : 'vrm-msg-ini'} data-stream-type="acheteur" style={{color:C.muted}}>{String(nom || '').trim().charAt(0).toUpperCase() || '·'}</span>}
       </span>
       <span className="vrm-msg-body">
         <span className="vrm-msg-l1">
-          <span className="vrm-msg-name">{sensible ? <span className="vrm-sensible">{nom}</span> : nom}</span>
+          <span className="vrm-msg-name">{sensible ? <span className="vrm-sensible" data-stream-type="acheteur">{nom}</span> : nom}</span>
           {compte && <span className="vrm-msg-acc" style={{color:C.muted}}>· {compte}</span>}
           <time className="vrm-msg-time" dateTime={quand ? new Date(quand).toISOString() : undefined} title={quand ? new Date(quand).toLocaleString('fr-FR',{weekday:'long',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'}) : undefined} style={{color:couleurHeure||C.muted}}>{quand ? heureMessage(quand) : ''}</time>
         </span>
@@ -14911,7 +14963,7 @@ function TeteFil({ onFermer, photo, nom, sensible = false, titre, compte, title,
       </button>
       {photo?<PhotoVinted src={photo} alt="" style={{width:36,height:36,borderRadius:12,objectFit:'cover',flexShrink:0}}/>:<span className="vrm-chat-head-ph" style={{background:C.card2||C.bg,color:C.muted}}><Icon name="chat" size={17}/></span>}
       <div className="vrm-chat-head-t">
-        <div className="vrm-chat-head-n" style={{color:C.text}}>{sensible ? <span className="vrm-sensible">{nom}</span> : nom}</div>
+        <div className="vrm-chat-head-n" style={{color:C.text}}>{sensible ? <span className="vrm-sensible" data-stream-type="acheteur">{nom}</span> : nom}</div>
         {/* (revue) Le compte a sa propre place, jamais coupé : sur téléphone le
             titre de la paire se coupe, le nom du compte reste lisible. */}
         <div className="vrm-chat-head-s" style={{color:C.muted}}>{titre&&<span className="vrm-chat-head-titre">{titre}</span>}{titre&&compte&&<span aria-hidden="true" className="vrm-chat-head-sep"> · </span>}{compte&&<span className="vrm-chat-head-compte" data-fil-compte="">{compte}</span>}</div>
@@ -15818,38 +15870,6 @@ function CibleNotif({ tab, sub }) {
       <span>{phraseAbsente(absente)}</span>
       <button type="button" onClick={() => setAbsente(null)} aria-label="Fermer ce message">OK</button>
     </p>
-  );
-}
-// ── CACHER LES MONTANTS (4 nov.) ─────────────────────────────────────────────
-// Un œil dans la tête : allumé, chaque montant en € de l'écran devient « ••• »
-// (src/montantsCaches.js — UN point, le texte rendu, pas écran par écran).
-// Mémorisé sur CET appareil seulement (`vrm_montants_caches`, jamais synchronisé :
-// cacher ses chiffres dans un café ne doit pas les cacher sur l'ordinateur).
-const lireMontantsCachesIci = () => { try { return lireMontantsCaches(localStorage.getItem(CLE_MONTANTS_CACHES)); } catch (_) { return false; } };
-let _montantsCaches = lireMontantsCachesIci();
-let _retirerMasque = null;
-const _montantsSubs = new Set();
-const appliquerMontantsCaches = () => {
-  if (typeof document === 'undefined') return;
-  try { if (_montantsCaches) document.documentElement.setAttribute('data-montants-caches', '1'); else document.documentElement.removeAttribute('data-montants-caches'); } catch (_) {}
-  if (_montantsCaches && !_retirerMasque && document.body) _retirerMasque = installerMasque(document.body);
-  if (!_montantsCaches && _retirerMasque) { const r = _retirerMasque; _retirerMasque = null; r(); }
-};
-const basculerMontants = () => {
-  _montantsCaches = !_montantsCaches;
-  try { if (_montantsCaches) localStorage.setItem(CLE_MONTANTS_CACHES, '1'); else localStorage.removeItem(CLE_MONTANTS_CACHES); } catch (_) {}
-  appliquerMontantsCaches();
-  _montantsSubs.forEach((f) => { try { f(_montantsCaches); } catch (_) {} });
-};
-function BoutonMontants() {
-  const [cache, setCache] = React.useState(_montantsCaches);
-  React.useEffect(() => { _montantsSubs.add(setCache); appliquerMontantsCaches(); return () => { _montantsSubs.delete(setCache); }; }, []);
-  return (
-    <button className="vrm-hbtn" type="button" data-bouton-montants="" data-montants-caches={cache ? '1' : '0'} data-montant-visible=""
-      aria-pressed={cache} aria-label={cache ? 'Montrer les montants' : 'Cacher les montants'} title={cache ? 'Montrer les montants' : 'Cacher les montants'}
-      onClick={basculerMontants}>
-      <Icon name={cache ? 'eyeOff' : 'eye'} size={21}/>
-    </button>
   );
 }
 function ScreenHead({ icon, title, desc, right, principal, sous, date = '' }) {
@@ -20252,7 +20272,7 @@ function CodeRetraitCopiable({label,code}) {
     try { await navigator.clipboard.writeText(String(code));setEtat('Copié'); }
     catch { setEtat('Copie indisponible'); }
   }}>
-    <span>{label}</span><strong className="vrm-sensible" style={{fontSize:String(code).length>10?14:String(code).length>8?16:22,letterSpacing:String(code).length>8?0:1}}>{code}</strong>
+    <span>{label}</span><strong className="vrm-sensible" data-stream-type="code" style={{fontSize:String(code).length>10?14:String(code).length>8?16:22,letterSpacing:String(code).length>8?0:1}}>{code}</strong>
     <small aria-live="polite"><Icon name="copy" size={14}/><span>{etat || 'Copier'}</span></small>
   </button>;
 }
@@ -20454,7 +20474,7 @@ function QrColis({ url, size = 88 }) {
   const [ko, setKo] = React.useState(false);
   if (!url || !/^https?:\/\//.test(String(url))) return null;
   if (ko) return <a href={url} target="_blank" rel="noreferrer" style={{ flexShrink: 0, width: size, height: size, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', border: `1px solid ${C.border}`, borderRadius: 12, background: C.bg, color: C.accent, fontSize: 11, fontWeight: 700, textDecoration: 'none', padding: 6 }}>Voir le QR ↗</a>;
-  return <a href={url} target="_blank" rel="noreferrer" style={{ flexShrink: 0, lineHeight: 0 }}><img src={url} alt="QR du colis" width={size} height={size} onError={() => setKo(true)} style={{ width: size, height: size, borderRadius: 12, background: '#fff', border: `1px solid ${C.border}`, objectFit: 'contain' }} /></a>;
+  return <a href={url} target="_blank" rel="noreferrer" style={{ flexShrink: 0, lineHeight: 0 }}><img src={url} alt="QR du colis" data-stream-image="code" width={size} height={size} onError={() => setKo(true)} style={{ width: size, height: size, borderRadius: 12, background: '#fff', border: `1px solid ${C.border}`, objectFit: 'contain' }} /></a>;
 }
 // ── LEBONCOIN · COLIS — à envoyer (bordereau + QR), puis déjà postés ─────────
 // Julien : « onglet colis Leboncoin, avec le QR code, et le bordereau qui
@@ -34416,7 +34436,7 @@ function CarteCompteLie({ plateforme, id, nom, photo, etat, age, type, inclus, o
           {photo ? <PhotoVinted src={photo} alt="" loading="lazy"/> : String(nom || '?').replace(/^n° /, '').slice(0, 1).toUpperCase()}
         </span>
         <div className="vrm-cl-corps">
-          <div className="vrm-cl-nom vrm-sensible">{nom}</div>
+          <div className="vrm-cl-nom vrm-sensible" data-stream-type="compte">{nom}</div>
           <span className={'vrm-cl-etat is-' + etat} {...(etatVinted ? { 'data-etat-compte': etatVinted.etat, 'data-etat-source': etatVinted.source || '', title: etatVinted.hint } : {})}>{libre}</span>
           {age && etat !== 'ouvert' && etat !== 'jamais' && <span className="vrm-cl-age">{age}</span>}
           {type && <span className="vrm-cl-type" data-type-compte={type}>{type === 'pro' ? 'Pro' : 'Particulier'}</span>}
@@ -36850,7 +36870,7 @@ function ProfilFiscalCarte({ onNav }) {
               {siren.etat === 'vide' ? 'Tape ton SIRET (14 chiffres) : il figure sur ton avis de situation INSEE. Le nom de ton entreprise se remplit tout seul.'
                 : siren.etat !== 'ok' ? `Ce numéro ne semble pas valide : ${siren.raison}. Il reste enregistré tel quel — vérifie-le sur ton avis INSEE.`
                 : !registre || registre.etat === 'encours' ? `${siren.type} valide — je cherche ton entreprise au registre…`
-                : registre.etat === 'trouve' ? <>✓ Trouvée au registre des entreprises : <b className="vrm-sensible" style={{ color: C.text }}>{registre.nom}</b>{registre.ferme ? ' — le registre la dit fermée, vérifie ton numéro.' : '.'}{cfg.nom && cfg.nom !== registre.nom ? ' Tu as gardé ton propre nom : VRM ne le remplace pas.' : ''}</>
+                : registre.etat === 'trouve' ? <>✓ Trouvée au registre des entreprises : <b className="vrm-sensible" data-stream-type="compte" style={{ color: C.text }}>{registre.nom}</b>{registre.ferme ? ' — le registre la dit fermée, vérifie ton numéro.' : '.'}{cfg.nom && cfg.nom !== registre.nom ? ' Tu as gardé ton propre nom : VRM ne le remplace pas.' : ''}</>
                 : registre.etat === 'inconnu' ? `${siren.type} valide, mais aucune entreprise à ce numéro au registre public — tape le nom toi-même.`
                 : `${siren.type} valide. Le registre des entreprises ne répond pas pour l'instant — le nom se remplira à ta prochaine visite, ou tape-le.`}
             </div>
@@ -41137,7 +41157,7 @@ function AcctTag({ acc, name }) {
   // pour ça ; le texte redevient neutre.
   const col = acctColor(acc?.vinted_user_id);
   return <span style={{display:'inline-flex',alignItems:'center',gap:5,background:C.card2,color:C.muted,fontSize:11,fontWeight:600,padding:'2px 7px',borderRadius:12,whiteSpace:'nowrap',border:`1px solid ${C.border}`}}>
-    <span style={{width:6,height:6,borderRadius:12,background:col,flexShrink:0}}/><span className="vrm-sensible">{name}</span>
+    <span style={{width:6,height:6,borderRadius:12,background:col,flexShrink:0}}/><span className="vrm-sensible" data-stream-type="compte">{name}</span>
   </span>;
 }
 
@@ -41300,7 +41320,7 @@ function PlaceurTamponFeuille({ q, fin }) {
       <div className="vrm-tampon-zone">
         <div ref={scene} className="vrm-tampon-scene" data-tampon-scene="1" data-ppt={ppt.toFixed(4)}
              onPointerDown={bas} onPointerMove={bouge} onPointerUp={haut} onPointerCancel={haut}>
-          <canvas ref={page} className="vrm-tampon-page" aria-hidden="true"/>
+          <canvas ref={page} className="vrm-tampon-page" data-stream-image="bordereau" aria-hidden="true"/>
           {etat === 'pret' && img && <div data-tampon-boite="1" data-libre={libre ? '1' : '0'} data-variante={boite.v}
               data-x={boite.x.toFixed(2)} data-y={boite.y.toFixed(2)} data-w={boite.w.toFixed(2)} data-h={h.toFixed(2)}
               tabIndex={0} role="slider" aria-label={`Tampon N° ${q.numero || ''}`} aria-valuetext={`${Math.round(boite.x)}, ${Math.round(boite.y)}`} onKeyDown={clavier}
@@ -43978,6 +43998,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const signalPendantLecture = useRef(false);
   const [convs, setConvs] = useState({ loading:false, items:null });
   const dernieresConvs=useRef({items:[]});if(Array.isArray(convs.items)&&!convs.loading)dernieresConvs.current=convs;
+  // (5 nov.) Le mode stream reconnaît les pseudos des acheteurs (ventes, conversations)
+  // et des vendeurs de ses achats, où qu'ils s'écrivent (src/modeStream.js).
+  useEffect(() => {
+    const pseudo = (o) => o && (o.user_login || (o.buyer && o.buyer.login) || (o.opposite_user && o.opposite_user.login));
+    jetonsStream('acheteurs_vinted', [...(sales.items || []), ...(buys.items || []), ...(convs.items || [])].map(pseudo));
+  }, [sales.items, buys.items, convs.items]);
   // Le résumé de chaque conversation captée (paire, état, dernier auteur) — trois
   // états : `undefined` en cours · `null` pas su · Map (19 octobre).
   const [resumesConv, setResumesConv] = useState(undefined);
@@ -61816,6 +61842,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   //    monté ne lirait rien et ce bloc se tairait. Aucune règle de lecture ni
   //    d'écriture ne change : c'est le même composant, rangé ailleurs.
   const etroit = useEtroitReglages();
+  const streamOn = useStream();
   const [nMuetsPush, setNMuetsPush] = React.useState(null);
   const [rechercheReglage, setRechercheReglage] = React.useState('');
   const [sous, setSous] = React.useState(()=>DEMANDE_ADRESSES.on?'adresses':null);       // l'id du sous-écran ouvert (téléphone)
@@ -61977,7 +62004,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     ]},
     { id:'affichage', titre:'Affichage', items:[
       { id:'sombre', type:'switch', ic:'moon', lib:'Mode sombre', on:!!dark, onClick:toggleDark, data:{ 'data-reglage-sombre': dark ? 'on' : 'off' } },
-      { id:'stream', type:'el', el:<StreamSetting key="stream"/> },
+      // (5 nov.) Le mode stream PROGRAMMÉ : son sous-écran (catégories, mots, aperçu).
+      { id:'stream', type:'panneau', nu:true, ic:'stream', lib:'Mode stream', val: streamOn ? 'Allumé' : 'Éteint', data:{ 'data-reglage-stream': streamOn ? 'on' : 'off' }, el:<ReglagesStream/> },
       { id:'zoom', type:'panneau', nu:true, ic:'grid', lib:"Taille de l'affichage", val:valZoom, el:<ZoomSetting nu/> },
       urlWidget && { id:'widget', type:'panneau', nu:true, ic:'chart', lib:'Widget iPhone', desc:'Ton lien privé pour Scriptable', el:widget },
     ]},
@@ -63785,13 +63813,6 @@ function NumerosSetting({ nu = false, onStock }) {
 // explique une fonction qui n'existe plus est du bruit (§7). Les offres se
 // tranchent dans Messages, sur son clic.
 
-function PastilleStream() {
-  const on = useStream();
-  if (!on) return null;
-  return <button type="button" data-stream-pastille="" onClick={() => poserStream(false)} title="Mode stream actif — cliquer pour l'arrêter" aria-label="Arrêter le mode stream"
-    style={{display:'inline-flex',alignItems:'center',gap:6,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,padding:'6px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>
-    <span aria-hidden="true" style={{width:7,height:7,borderRadius:999,background:C.danger}}/>Stream</button>;
-}
 // L'interrupteur des Paramètres — UNE forme pour tous (16 octobre : les
 // « ON / OFF » en boutons pleins faisaient « page bricolée »). Un vrai
 // `role="switch"` : les bancs le cherchent ainsi, et un lecteur d'écran le dit.
@@ -63805,17 +63826,108 @@ function Interrupteur({ on, onClick, label, disabled, ...rest }) {
 function IconeReglage({ name }) {
   return <span className="vrm-set-ic" aria-hidden="true" style={{background:`${C.text}0d`,color:C.text}}><Icon name={name} size={17}/></span>;
 }
-function StreamSetting() {
-  const on = useStream();
+// ── LE PROGRAMME DU MODE STREAM (5 nov.) ────────────────────────────────────
+// Ce qu'il cache quand il filme : des catégories à cocher, trois listes de mots
+// (marques et mots · « les mots qui commencent par… » · « cacher toute l'annonce
+// qui contient… ») et un APERÇU EN DIRECT sur des données d'exemple (jamais ses
+// vrais pseudos dans une démonstration). Le programme est synchronisé ; la règle
+// (src/modeStream.js) change dès le geste.
+const STREAM_AIDE_LISTE = {
+  marques: 'Le mot entier, majuscules ignorées.',
+  prefixes: 'Chaque mot qui commence ainsi.',
+  contient: 'La ligne entière (texte et photo) est cachée.',
+};
+const STREAM_EX_LISTE = { marques: 'Ex. une marque', prefixes: 'Ex. les 3 premières lettres', contient: 'Ex. un modèle' };
+function ListeMotsStream({ id, titre, mots, onChange }) {
+  const [saisie, setSaisie] = React.useState('');
+  const ajouter = () => {
+    const morceaux = saisie.split(/[,;\n]/).map((x) => x.trim()).filter(Boolean);
+    if (!morceaux.length) return;
+    onChange(nettoyerMots([...mots, ...morceaux]));
+    setSaisie('');
+  };
   return (
-    <div className="vrm-set-ligne" data-stream-reglage={on ? 'on' : 'off'}>
-      <IconeReglage name="eyeOff"/>
-      <span className="vrm-set-lib">
-        <b style={{color:C.text}}>Mode stream</b>
-        {/* (1er nov.) Sans cette ligne, « Mode stream » ne disait rien au téléphone (vrm-aide s'y tait). */}
-      </span>
-      <Interrupteur on={on} label="Mode stream" onClick={() => poserStream(!on)}/>
+    <div className="vrm-stream-liste" data-stream-liste={id} data-stream-mots={mots.length}>
+      <b style={{color:C.text}}>{titre}</b>
+      <small style={{color:C.muted}}>{STREAM_AIDE_LISTE[id]}</small>
+      {mots.length > 0 && <div className="vrm-stream-puces">
+        {mots.map((m) => (
+          <span key={m} className="vrm-stream-puce" data-stream-mot={m} style={{background:`${C.text}0d`,color:C.text}}>
+            <span>{m}</span>
+            <button type="button" aria-label={`Retirer ${m}`} onClick={() => onChange(mots.filter((x) => x !== m))} style={{color:C.muted}}>×</button>
+          </span>
+        ))}
+      </div>}
+      <form className="vrm-stream-ajout" onSubmit={(e) => { e.preventDefault(); ajouter(); }}>
+        <input type="text" value={saisie} onChange={(e) => setSaisie(e.target.value)} placeholder={STREAM_EX_LISTE[id]} aria-label={titre}
+          autoCapitalize="none" autoCorrect="off" spellCheck={false} maxLength={200}
+          style={{background:C.bg,color:C.text,border:`1px solid ${C.border}`}}/>
+        <Bouton type="submit" disabled={!saisie.trim()} data-stream-ajouter={id}>Ajouter</Bouton>
+      </form>
     </div>
+  );
+}
+function ReglagesStream() {
+  const on = useStream();
+  const regles = useReglesStream();
+  const [essai, setEssai] = React.useState('');
+  const changer = (patch) => ecrireReglesStream({ ...regles, ...patch });
+  // L'aperçu : données INVENTÉES (« ton_compte », « acheteur_exemple »), la règle du
+  // programme affiché. Une ligne « annonce entière » se cache d'un bloc.
+  const R = regleApercu(regles, { comptes_apercu: ['ton_compte'], acheteurs_apercu: ['acheteur_exemple'] });
+  const marque = regles.marques[0] || 'Marque';
+  const lignes = [
+    `${marque} Air Max 90 · taille 42 · 89,00 €`,
+    'Vendue sur ton_compte à acheteur_exemple',
+    '8 rue de la Paix, 35000 Rennes · 06 12 34 56 78',
+    'IBAN FR76 3000 6000 0112 3456 7890 189',
+    ...(regles.prefixes[0] ? [`${regles.prefixes[0]}ina Runner · 54,00 €`] : []),
+    ...(regles.contient[0] ? [`${regles.contient[0]} édition limitée · 120,00 €`] : []),
+    ...(essai.trim() ? [essai] : []),
+  ];
+  return (
+    <div className="vrm-stream-reglages" data-stream-reglages="">
+      <div className="vrm-set-ligne" data-stream-reglage={on ? 'on' : 'off'}>
+        <IconeReglage name="stream"/>
+        <span className="vrm-set-lib"><b style={{color:C.text}}>Mode stream</b><small style={{color:C.muted}}>Sur cet appareil. Le bouton « Stream » en haut de l’écran fait la même chose.</small></span>
+        <Interrupteur on={on} label="Mode stream" onClick={() => poserStream(!on)}/>
+      </div>
+      <h3 className="vrm-stream-h" style={{color:C.muted}}>Ce qui est caché</h3>
+      <div className="vrm-stream-cats">
+        {STREAM_CATEGORIES.map(([k, lib]) => (
+          <div key={k} className="vrm-set-ligne" data-stream-cat={k} data-stream-cache={regles[k] ? '1' : '0'}>
+            <span className="vrm-set-lib"><b style={{color:C.text}}>{lib}</b></span>
+            <Interrupteur on={!!regles[k]} label={lib} onClick={() => changer({ [k]: !regles[k] })}/>
+          </div>
+        ))}
+      </div>
+      <h3 className="vrm-stream-h" style={{color:C.muted}}>Tes mots</h3>
+      {STREAM_LISTES.map(([k, lib]) => <ListeMotsStream key={k} id={k} titre={lib} mots={regles[k]} onChange={(l) => changer({ [k]: l })}/>)}
+      <h3 className="vrm-stream-h" style={{color:C.muted}}>Aperçu</h3>
+      <div className="vrm-stream-apercu" data-stream-apercu="" style={{background:C.bg,border:`1px solid ${C.border}`}}>
+        {lignes.map((t, i) => {
+          const entiere = ligneACacher(t, R);
+          return <div key={i} className="vrm-stream-apercu-l" data-apercu-entiere={entiere ? '1' : '0'} style={{color:C.text}}>{entiere ? '•••' : masquerTexteStream(t, R)}</div>;
+        })}
+      </div>
+      <textarea className="vrm-stream-essai" value={essai} onChange={(e) => setEssai(e.target.value)} rows={2} placeholder="Essaie un texte : il s’affiche ci-dessus comme à l’écran" aria-label="Essayer un texte"
+        style={{background:C.bg,color:C.text,border:`1px solid ${C.border}`}}/>
+    </div>
+  );
+}
+// L'INTERRUPTEUR RAPIDE de l'en-tête : remplace l'œil « cacher les montants »
+// (4 nov.) et la pastille rouge du 16 oct. (le rouge est réservé au doublon de
+// N°, §7). Un tap allume ou éteint, sur cet appareil.
+function BoutonStream() {
+  const on = useStream();
+  const lib = on ? 'Mode stream allumé — toucher pour l’arrêter' : 'Allumer le mode stream';
+  return (
+    <button className="vrm-hbtn vrm-hbtn-stream" type="button" data-bouton-stream="" data-stream-on={on ? '1' : '0'} data-stream-libre=""
+      aria-pressed={on} aria-label={lib} title={lib} onClick={() => poserStream(!on)}>
+      <Icon name="stream" size={21}/>
+      <span className="vrm-hbtn-stream-lib">Stream</span>
+      {on && <span className="vrm-hbtn-stream-pt" aria-hidden="true"/>}
+    </button>
   );
 }
 function ZoomSetting({ nu = false }) {
@@ -66405,14 +66517,41 @@ function AppCoeur() {
   // (29 oct.) L'agent eBay qui demande refait sa proposition une fois par
   // ouverture si le résumé a plus de 20 h (Ma journée, notification du matin).
   const [agentFond] = useState(() => agentEbayFondUtile());
-  // (17 oct.) LE MODE STREAM FLOUTE PARTOUT (src/streamFlou.js) : on lui donne
+  // (17 oct., 5 nov.) LE MODE STREAM CACHE PARTOUT (src/modeStream.js) : on lui donne
   // les jetons à reconnaître — pseudos et adresses de ses comptes, le compte
   // Vinted ouvert dans Chrome, son adresse VRM, son entreprise. Un pseudo qui
   // s'écrit dans une phrase (« Actions possibles · … ») est flouté comme les
   // autres, sans qu'il faille y penser à chaque écran.
   const streamOn = useStream();
+  // (5 nov.) Le programme synchronisé est suivi ICI, pas seulement dans Réglages :
+  // le nuage qui arrive (un autre appareil l'a changé) change la règle tout de suite.
+  useReglesStream();
   const entreprise = useEntreprise();
   React.useEffect(() => { demarrerStream(streamOn); }, [streamOn]);
+  // (5 nov.) Les pseudos des acheteurs eBay, et les noms de ses comptes Leboncoin
+  // et Vestiaire (lus seulement en mode stream : rien ne tourne hors stream).
+  React.useEffect(() => {
+    jetonsStream('acheteurs_ebay', (Array.isArray(ebayCommandes) ? ebayCommandes : []).map((o) => o && o.buyer && o.buyer.username));
+  }, [ebayCommandes]);
+  React.useEffect(() => {
+    if (!streamOn) return undefined;
+    let mort = false;
+    (async () => {
+      const B = `${SUPABASE_URL}/rest/v1/app_data?`;
+      const [lbc, vc] = await Promise.all([
+        lireBaseRelue(`${B}id=eq.lbc_accounts&select=a:data->accounts`).catch(() => null),
+        lireBaseRelue(`${B}id=eq.vc_session&select=id:data->>id,comptes:data->comptes`).catch(() => null),
+      ]);
+      if (mort) return;
+      const noms = [];
+      const accs = Array.isArray(lbc) && lbc[0] && lbc[0].a && typeof lbc[0].a === 'object' ? lbc[0].a : {};
+      for (const [id, x] of Object.entries(accs)) { noms.push(id); if (x && typeof x === 'object') noms.push(x.name, x.pseudo, x.email); }
+      const ses = Array.isArray(vc) && vc[0] ? vc[0] : null;
+      if (ses) { noms.push(ses.id); const c = ses.comptes; if (c && typeof c === 'object') for (const [id, x] of Object.entries(c)) { noms.push(id); if (x && typeof x === 'object') noms.push(x.name, x.pseudo, x.email); } }
+      jetonsStream('comptes_sites', noms.filter((x) => typeof x === 'string' || typeof x === 'number').map(String));
+    })();
+    return () => { mort = true; };
+  }, [streamOn]);
   React.useEffect(() => {
     const labels = load('vinted_account_labels', {}) || {};
     const mails = load('vinted_account_emails', {}) || {};
@@ -68277,9 +68416,9 @@ function AppCoeur() {
             {/* « Puis-je agir sur Vinted depuis cette page ? » — sur tous les
                 écrans (Julien, 5 octobre). Voir `EtatActions`. */}
             {MULTI_USER && <EtatActions onNav={setTab} ordi={ordi} sombre={eD}/>}
-            <PastilleStream/>
-            {/* (4 nov.) L'œil : cache TOUS les montants en € de l'écran (src/montantsCaches.js). */}
-            <BoutonMontants/>
+            {/* (5 nov.) « Stream » remplace l'œil des montants : la règle programmée
+                (src/modeStream.js) cache montants, marques, comptes, pseudos… */}
+            <BoutonStream/>
             {!ordi && <button className="vrm-hbtn" type="button" data-recherche-zone="" data-recherche-loupe="" onClick={()=>{ if(gsOpen) fermerRecherche(); else ouvrirRecherche(); }} title="Rechercher" aria-label="Rechercher une paire" aria-expanded={gsOpen} aria-controls="vrm-recherche-resultats">
               <Icon name="search" size={21}/>
             </button>}

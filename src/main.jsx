@@ -114,6 +114,8 @@ import './design/argent-offres.css';
 // (3 nov.) Les jetons Fusion pour TOUTE l'app (échelle fermée, segmentés, cartes) — le tout dernier mot.
 import './design/jetons.css';
 import './styles-bureau.css';
+// (5 nov.) Le bouton « Stream » et son sous-écran (src/modeStream.js).
+import './design/mode-stream.css';
 import { suivreRangeesDefilantes } from './rangeesDefilantes.js';
 if (typeof document !== 'undefined') { if (document.body) suivreRangeesDefilantes(); else document.addEventListener('DOMContentLoaded', suivreRangeesDefilantes); }
 
