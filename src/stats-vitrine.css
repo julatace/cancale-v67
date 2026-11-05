@@ -179,7 +179,8 @@ html .vrm-stats-vitrine .vrm-sv-rangee > .vrm-sv-repliee { align-self: start; }
   html .vrm-stats-vitrine .vrm-sv-repliee-raison { flex-basis: 100%; }
 }
 /* Le choix « Vue d'ensemble · Prix qui marche », sous le grand titre. */
-.vrm-stats-sous-nav { margin-top: 10px; }
+.vrm-stats-sous-nav { margin-top: 4px; }
+@media (max-width: 599px) { .vrm-stats-vitrine .vrm-sv-sous-titre { margin-bottom: 2px; } }
 .vrm-stats-sous-nav .vrm-seg { margin: 0; }
 /* (5 nov., chantier F) Au téléphone, la note d'une carte passe SOUS son titre (le titre ne se
    coupe plus en deux lignes pour lui laisser la place). */
