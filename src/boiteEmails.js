@@ -9,7 +9,7 @@
 //    titre (`nt`) ou un reçu délié par lui n'ouvre rien. Une seule règle (§11).
 // ⚠️ « Pas su » ≠ « rien » : pièces jointes non gardées (email classé avant le
 //    5 nov.) ⇒ `null` et la phrase le dit ; `[]` seulement si on a lu « aucune ».
-import { lectureEmail, expediteurLisible } from './journalEmail.js';
+import { lectureEmail, expediteurLisible, codeLisible } from './journalEmail.js';
 
 export { expediteurLisible };
 
@@ -17,17 +17,42 @@ export { expediteurLisible };
 // (`sourceDate`), sinon l'heure où VRM l'a rangé.
 export const dateEmail = (e) => (e && (e.sourceDate || e.at)) || null;
 
-// Le corps texte, nettoyé pour la lecture : les liens de pistage interminables
-// réduits à leur domaine, les caractères invisibles retirés, les lignes vides
-// resserrées. Du TEXTE seulement (React l'échappe) : aucun HTML n'est rendu.
+// Le corps texte, nettoyé pour la lecture : les balises HTML restées dans le
+// texte (`<img …>`, `<b>`, un `<style>` entier…) RETIRÉES — jamais affichées en
+// texte, jamais exécutées —, les entités courantes (`&amp;`, `&nbsp;`…) rendues
+// en caractères, les liens de pistage interminables réduits à leur domaine, les
+// caractères invisibles retirés, les lignes vides resserrées. Le résultat est du
+// TEXTE (React l'échappe) : aucun HTML n'est rendu.
 // (Construits par chaîne, en échappements : un séparateur de ligne Unicode
 // écrit tel quel dans une expression littérale casse la compilation.)
 const INVISIBLES = new RegExp('[\\u200b-\\u200f\\u00ad\\u034f\\ufeff\\u2060-\\u2064]', 'g');
 const SEPARATEURS = new RegExp('[\\u2028\\u2029]', 'g');
 const ESPACES = new RegExp('[ \\t\\u00a0]+', 'g');
+const ENTITES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', eacute: 'é', egrave: 'è', agrave: 'à', ccedil: 'ç', ecirc: 'ê', rsquo: '’', lsquo: '‘', laquo: '«', raquo: '»', euro: '€', hellip: '…', ndash: '–', mdash: '—' };
+const entite = (m, nom) => {
+  if (nom[0] === '#') { const n = nom[1] === 'x' || nom[1] === 'X' ? parseInt(nom.slice(2), 16) : parseInt(nom.slice(1), 10); return Number.isFinite(n) && n > 0 && n < 0x110000 ? String.fromCodePoint(n) : ''; }
+  const k = nom.toLowerCase();
+  return Object.prototype.hasOwnProperty.call(ENTITES, k) ? ENTITES[k] : m;
+};
+// Une balise : `<` suivi d'une lettre, de `/` ou de `!` (commentaire, doctype).
+// Une balise restée ouverte en fin de texte (texte coupé à 1 500 caractères) part aussi.
+const BLOCS_MORTS = /<(style|script|head|title)\b[^>]*>[\s\S]*?(?:<\/\1\s*>|$)/gi;
+const FIN_DE_BLOC = /<(?:br|\/p|\/div|\/li|\/tr|\/h\d)\b[^>]*>/gi;
+const BALISE = /<\/?[a-zA-Z][^<>]*>|<!--[\s\S]*?(?:-->|$)|<![^<>]*>/g;
+const BALISE_COUPEE = /<\/?[a-zA-Z][^<>]*$/;
+const ENTITE = /&(#x?[0-9a-fA-F]{1,6}|[a-zA-Z]{2,8});/g;
+export function retirerBalises(texte) {
+  let t = String(texte == null ? '' : texte);
+  // Deux tours : une entité qui cachait une balise (`&lt;img …&gt;`) devient une
+  // balise au premier, et part au second.
+  for (let i = 0; i < 2; i++) {
+    t = t.replace(BLOCS_MORTS, ' ').replace(FIN_DE_BLOC, '\n').replace(BALISE, ' ').replace(BALISE_COUPEE, ' ').replace(ENTITE, entite);
+  }
+  return t;
+}
 export function nettoyerCorps(texte) {
   if (typeof texte !== 'string') return null;
-  const t = texte
+  const t = retirerBalises(texte)
     .replace(INVISIBLES, '')
     .replace(SEPARATEURS, '\n')
     .replace(/https?:\/\/[^\s<>()"']{60,}/g, (u) => { const d = (/^https?:\/\/([^/?#\s]+)/.exec(u) || [])[1]; return d ? `[lien ${d}]` : '[lien]'; })
@@ -55,10 +80,10 @@ export function objetRelie(e, delies = {}) {
   const r = e.resume && typeof e.resume === 'object' ? e.resume : null;
   if (!r || l.etat === 'reessai') return null;
   const c = l.cible;
-  if (c && c.k === 'suivi' && r.t === 'suivi' && r.sens !== 'sortant') return { k: 'retrait', url: `?tab=cat_bord&cible=retrait&suivi=${enc(c.v)}`, mot: `Voir le colis n° ${c.v}` };
-  if (c && c.k === 'tx' && r.t === 'bordereau') return { k: 'colis', url: `?tab=cat_bord&cible=colis&tx=${enc(c.v)}`, mot: `Voir le colis de la vente n° ${c.v}` };
-  if (c && c.k === 'tx' && r.t === 'achat' && l.etat !== 'delie') return { k: 'achat', url: `?tab=achats&cible=achat&tx=${enc(c.v)}`, mot: `Voir l’achat n° ${c.v}` };
-  if (l.num) return { k: 'num', num: l.num, mot: `Tout sur le N°${l.num}` };
+  if (c && c.k === 'suivi' && r.t === 'suivi' && r.sens !== 'sortant') return { k: 'retrait', url: `?tab=cat_bord&cible=retrait&suivi=${enc(c.v)}`, mot: r.st === 'available' ? 'Voir le colis à retirer' : 'Voir le colis', ident: `colis n° ${c.v}` };
+  if (c && c.k === 'tx' && r.t === 'bordereau') return { k: 'colis', url: `?tab=cat_bord&cible=colis&tx=${enc(c.v)}`, mot: 'Voir le colis à envoyer', ident: `vente n° ${c.v}` };
+  if (c && c.k === 'tx' && r.t === 'achat' && l.etat !== 'delie') return { k: 'achat', url: `?tab=achats&cible=achat&tx=${enc(c.v)}`, mot: 'Voir l’achat', ident: `achat n° ${c.v}` };
+  if (l.num) return { k: 'num', num: l.num, mot: `Voir le N°${l.num}`, ident: `N°${l.num}` };
   return null;
 }
 
@@ -66,4 +91,111 @@ export function objetRelie(e, delies = {}) {
 export function ceQueVrmAFait(e, delies = {}) {
   const l = lectureEmail(e, delies);
   return { quoi: l.quoi, fait: l.fait, etat: l.etat, raison: l.raison, geste: l.geste };
+}
+
+// ── CE QUE C'EST, EN MOTS SIMPLES (5 nov., Julien : « ça doit être bcp plus
+// clair ») ──────────────────────────────────────────────────────────────────
+// La première chose écrite sur chaque ligne de la boîte, et le grand titre de la
+// lecture : CE QUE C'EST et ce qu'il y a à faire — « Colis à retirer · Relais
+// Tabac du Port · code 418 205 · avant le 9 nov. », « Vendu · Nike Air Max 90 ·
+// bordereau prêt », « Newsletter Vinted — rien à faire ».
+// ⚠️ Rien n'est deviné : chaque mot vient du RÉSUMÉ écrit au classement par les
+//    règles d'e-mail existantes (api/_lib/resume-email.js), la même source que
+//    « Ce que VRM en a fait » (lectureEmail). Un champ non lu n'est pas écrit ;
+//    un e-mail classé avant le résumé dit « détail non gardé » (pas su ≠ rien).
+// ⚠️ Un N° n'est écrit que LU dans l'e-mail : un N° retrouvé par le titre (`nt`)
+//    n'apparaît jamais ici (§5).
+const MOIS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+// « 2026-11-09 » ou « 09/11/2026 » ⇒ « 9 nov. » ; une autre forme reste telle que lue.
+export function jourCourt(v) {
+  const s = String(v == null ? '' : v).trim();
+  if (!s) return '';
+  let m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+  let j = 0, mo = 0;
+  if (m) { j = +m[3]; mo = +m[2]; }
+  else if ((m = /^(\d{1,2})[/.](\d{1,2})(?:[/.]\d{2,4})?\b/.exec(s))) { j = +m[1]; mo = +m[2]; }
+  return j >= 1 && j <= 31 && mo >= 1 && mo <= 12 ? `${j} ${MOIS[mo - 1]}` : s;
+}
+const prix = (m) => { const t = String(m == null ? '' : m).trim(); return t ? `${t.replace('.', ',')} €` : ''; };
+const maj = (s) => { const t = String(s || '').trim(); return t ? t[0].toLocaleUpperCase('fr') + t.slice(1) : ''; };
+// Un code ou une date ne se coupe pas en fin de ligne (« 418 / 205 »).
+const insecable = (s) => String(s).replace(/ /g, "\u00a0");
+const sansParenthese = (s) => String(s || '').replace(/\s*\([^)]*\)\s*/g, ' ').trim();
+const ANCIENS = { suivi: 'Colis', bordereau: 'Vendu · bordereau', achat: 'Achat · reçu de commande', vente: 'Vendu', 'vente-vestiaire': 'Vendu sur Vestiaire', finalisation: 'Argent reçu', offre: 'Offre reçue', message: 'Message', favori: 'Mis en favori', action: 'Demande de Vinted', 'connu-sans-action': 'Information', information: 'Information', ignoré: 'Pas reconnu par VRM' };
+
+// Rend { titre, details: [..], rien } : `titre` en gras, `details` après « · »,
+// `rien` ⇒ « — rien à faire ».
+export function titreSimple(e, delies = {}) {
+  const l = lectureEmail(e || {}, delies);
+  const r = e && e.resume && typeof e.resume === 'object' ? e.resume : null;
+  const d = (...x) => x.filter((v) => typeof v === 'string' && v.trim());
+  if (l.etat === 'reessai') return { titre: 'En cours de rangement', details: [], rien: true };
+  if (!r) return { titre: ANCIENS[e && e.type] || 'E-mail', details: ['détail non gardé'], rien: !!e && e.type === 'connu-sans-action' };
+  switch (r.t) {
+    case 'suivi': {
+      if (r.st === 'available') return { titre: 'Colis à retirer', details: d(r.lieu, r.code ? `code ${insecable(codeLisible(r.code))}` : 'code pas encore lu', r.lim ? `avant le ${insecable(jourCourt(r.lim))}` : '') };
+      if (r.st === 'delivered') return r.sens === 'sortant' ? { titre: 'Ton acheteur a retiré son colis', details: [], rien: true } : { titre: 'Colis livré', details: [] };
+      if (r.st === 'transit') return { titre: 'Colis en route', details: [] };
+      if (r.st === 'retour') return { titre: 'Colis renvoyé à l’expéditeur', details: [] };
+      return { titre: 'Nouvelles d’un colis', details: [] };
+    }
+    case 'bordereau': {
+      if (r.av === 'analyse') return { titre: 'Bordereau', details: ['vente pas reconnue'] };
+      const num = r.n && !r.nt ? `N°${r.n}` : '';
+      return { titre: 'Vendu', details: d(r.a, num, r.av === 'sans-pdf' ? 'bordereau à prendre sur Vinted' : 'bordereau prêt') };
+    }
+    case 'finalisation': return { titre: 'Argent reçu', details: d(prix(r.mt), r.a) };
+    case 'achat': return { titre: 'Achat', details: d('reçu de commande', r.a, prix(r.px), l.etat === 'delie' ? 'délié par toi' : '') };
+    case 'vente':
+      if (r.av === 'analyse') return { titre: 'Vendu', details: ['détail pas lu'] };
+      return { titre: 'Vendu', details: d(r.a, prix(r.px), r.n ? `N°${r.n}` : '') };
+    case 'vente-vestiaire':
+      if (r.av === 'analyse') return { titre: 'Vendu sur Vestiaire', details: ['détail pas lu'] };
+      return { titre: 'Vendu sur Vestiaire', details: d(r.a, r.mt ? `tu reçois ${prix(r.mt)}` : '', r.lim ? `à envoyer avant le ${insecable(jourCourt(r.lim))}` : '') };
+    case 'offre': return { titre: 'Offre reçue', details: d(prix(r.mt), r.a ? `sur ${r.a}` : '', r.de ? `de ${r.de}` : '') };
+    case 'message': return { titre: 'Message', details: d(r.de ? `de ${r.de}` : '', r.a) };
+    case 'favori': return { titre: 'Mis en favori', details: d(r.a, r.de ? `par ${r.de}` : '') };
+    case 'action': return { titre: maj(sansParenthese(r.f)) || 'Demande de Vinted', details: ['à faire sur Vinted'] };
+    case 'connu-sans-action': return { titre: maj(sansParenthese(r.f)) || 'Information', details: [], rien: true };
+    case 'incompris': return { titre: 'Pas reconnu par VRM', details: ['à lire'] };
+    default: return { titre: 'Information', details: [] };
+  }
+}
+// Le titre en une chaîne (attributs, lecteurs d'écran).
+export const titreEnClair = (t) => `${t.titre}${t.details.length ? ' · ' + t.details.join(' · ') : ''}${t.rien ? ' — rien à faire' : ''}`;
+
+// ── LES JOURS ────────────────────────────────────────────────────────────────
+// Les e-mails groupés par jour (heure de l'appareil) : « Aujourd’hui », « Hier »,
+// puis « Mardi 3 novembre » (l'année si ce n'est pas celle d'aujourd'hui).
+// L'ordre reçu est gardé ; un e-mail sans date lisible va dans « Date non lue ».
+const cleJour = (d) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+export function motJour(t, maintenant = Date.now()) {
+  if (!Number.isFinite(t)) return 'Date non lue';
+  const d = new Date(t), auj = new Date(maintenant), hier = new Date(maintenant);
+  hier.setDate(hier.getDate() - 1);
+  if (cleJour(d) === cleJour(auj)) return 'Aujourd’hui';
+  if (cleJour(d) === cleJour(hier)) return 'Hier';
+  const o = { weekday: 'long', day: 'numeric', month: 'long' };
+  if (d.getFullYear() !== auj.getFullYear()) o.year = 'numeric';
+  return maj(d.toLocaleDateString('fr-FR', o)).replace(/ 1 /, ' 1er ');
+}
+export function groupesParJour(emails, maintenant = Date.now()) {
+  const groupes = new Map();
+  for (const e of Array.isArray(emails) ? emails : []) {
+    const t = Date.parse(dateEmail(e) || '');
+    const cle = Number.isFinite(t) ? cleJour(new Date(t)) : 'sans-date';
+    if (!groupes.has(cle)) groupes.set(cle, { cle, mot: motJour(t, maintenant), emails: [] });
+    groupes.get(cle).emails.push(e);
+  }
+  const l = [...groupes.values()];
+  const sans = l.findIndex((g) => g.cle === 'sans-date');
+  if (sans >= 0) l.push(l.splice(sans, 1)[0]);
+  return l;
+}
+
+// Le site d'un expéditeur, pour son logo (Vinted, Leboncoin, eBay, Vestiaire) ;
+// les transporteurs n'ont pas de logo servi : une initiale neutre.
+export function siteExpediteur(from) {
+  const n = expediteurLisible(from);
+  return n === 'Vinted' || n === 'Vinted Go' ? 'vinted' : n === 'Leboncoin' ? 'leboncoin' : n === 'eBay' ? 'ebay' : n === 'Vestiaire Collective' ? 'vestiaire' : '';
 }

@@ -205,7 +205,7 @@ const garde = (x, k, v) => {
   });
 
   // ── 4. IDENTITÉ, CORPS, « RELIER MA BOÎTE » ────────────────────────────────
-  const { objetRelie, nettoyerCorps, poidsLisible } = await import(path.join(R, 'src/boiteEmails.js'));
+  const { objetRelie, nettoyerCorps, poidsLisible, titreSimple, titreEnClair, groupesParJour } = await import(path.join(R, 'src/boiteEmails.js'));
   const E = (resume, extra = {}) => ({ id: 'x', from: 'Vinted <no-reply@vinted.fr>', subject: 'Nike Air Max 90', etat: 'integre', type: resume && resume.t, resume, ...extra });
   {
     const b = objetRelie(E({ v: 1, t: 'bordereau', tx: '12345678901', n: '42', pdf: 1 }));
@@ -226,8 +226,28 @@ const garde = (x, k, v) => {
     dit(memes.every((x) => x === null), '50 reçus au même titre sans n° : aucun n’est relié (aucune ressemblance)');
     const corps = nettoyerCorps('Bonjour​  toi\n\n\n\nSuivre : https://track.exemple.test/' + 'a'.repeat(120) + '\nFin');
     dit(corps === 'Bonjour toi\n\nSuivre : [lien track.exemple.test]\nFin', 'corps nettoyé : invisibles retirés, lien de pistage réduit à son domaine, lignes resserrées', JSON.stringify(corps));
-    dit(nettoyerCorps(null) === null && nettoyerCorps('<b>x</b>') === '<b>x</b>', 'corps absent ⇒ null ; aucun HTML interprété (rendu en texte par React)');
+    // (5 nov., soir) Une balise restée dans le texte n'est plus AFFICHÉE en texte :
+    // elle est retirée (le texte reste), une entité qui cachait une balise aussi,
+    // une balise coupée en fin de texte aussi. Rien n'est interprété (React).
+    const sale = nettoyerCorps('Bonjour <b>toi</b><img src=x onerror="alert(1)"> &amp; &lt;img src=y&gt;fin<style>p{color:red}</style>\nSuite<div class="x');
+    dit(nettoyerCorps(null) === null && nettoyerCorps('<b>x</b>') === 'x' && sale === 'Bonjour toi & fin\nSuite' && !/[<>]/.test(sale), 'corps absent ⇒ null ; balises retirées (jamais affichées, jamais interprétées), le texte gardé', JSON.stringify(sale));
+    dit(nettoyerCorps('Prix < 30 € et 2 > 1') === 'Prix < 30 € et 2 > 1', 'un « < » qui n’ouvre pas de balise reste (le texte n’est pas abîmé)', JSON.stringify(nettoyerCorps('Prix < 30 € et 2 > 1')));
     dit(poidsLisible(48000) === '47 Ko' && poidsLisible(null) === '' && poidsLisible(3 * 1024 * 1024) === '3,0 Mo', 'poids lisible ; inconnu ⇒ rien d’écrit');
+    // (5 nov., soir) CE QUE C'EST, en mots simples — tiré du résumé rangé, jamais du sujet.
+    const clair = (resume, extra) => titreEnClair(titreSimple(E(resume, extra))).replace(/\s+/g, ' ');
+    dit(clair({ v: 1, t: 'suivi', s: 'MR1', st: 'available', code: '418205', lieu: 'Relais Tabac du Port', lim: '2026-11-09' }) === 'Colis à retirer · Relais Tabac du Port · code 418 205 · avant le 9 nov.', 'code de retrait : « Colis à retirer · lieu · code · avant le »', clair({ v: 1, t: 'suivi', s: 'MR1', st: 'available', code: '418205', lieu: 'Relais Tabac du Port', lim: '2026-11-09' }));
+    dit(clair({ v: 1, t: 'suivi', s: 'MR1', st: 'available' }) === 'Colis à retirer · code pas encore lu', 'code non lu : « code pas encore lu » (pas su ≠ inventé)');
+    dit(clair({ v: 1, t: 'bordereau', tx: '1', n: '42', pdf: 1, a: 'Nike Air Max 90' }) === 'Vendu · Nike Air Max 90 · N°42 · bordereau prêt', 'bordereau : « Vendu · article · N° · bordereau prêt »');
+    dit(!/42/.test(clair({ v: 1, t: 'bordereau', tx: '1', n: '42', nt: 1, pdf: 1, av: 'num-titre', a: 'Nike Air Max 90' })), '§5 un N° retrouvé par le TITRE n’est jamais écrit en tête de ligne');
+    dit(clair({ v: 1, t: 'connu-sans-action', f: 'newsletter Vinted' }) === 'Newsletter Vinted — rien à faire' && clair({ v: 1, t: 'connu-sans-action', f: 'commande mise à jour (le statut vient de la moisson)' }) === 'Commande mise à jour — rien à faire', 'information : « … — rien à faire », sans parenthèse technique');
+    dit(clair({ v: 1, t: 'achat', tx: '7', a: 'Nike Air Force 1', px: '45,00', id: 'email_achat_x' }) === 'Achat · reçu de commande · Nike Air Force 1 · 45,00 €', 'achat : « Achat · reçu de commande · article · prix »');
+    dit(clair(null, { type: 'bordereau', subject: 'Bordereau d’envoi pour Vans Old Skool' }) === 'Vendu · bordereau · détail non gardé', 'e-mail d’avant le résumé : « détail non gardé », jamais un détail tiré du sujet');
+    dit(clair({ v: 1, t: 'panne', av: 'panne' }, { etat: 'erreur' }) === 'En cours de rangement — rien à faire', 'en attente de réessai : dit, rien à faire');
+    const sujets = ['Votre colis 999 est disponible', 'Ton article est vendu !', 'Bordereau d’envoi pour Nike'];
+    dit(sujets.every((s) => !clair({ v: 1, t: 'vente', a: 'Adidas Samba' }, { subject: s }).includes(s)), 'le sujet brut n’est jamais la tête de ligne');
+    const T = Date.UTC(2026, 10, 5, 15, 0);
+    const g = groupesParJour([{ id: 'a', at: new Date(T - 6e4).toISOString() }, { id: 'b', at: null }, { id: 'c', at: new Date(T - 20 * 36e5).toISOString() }, { id: 'd', sourceDate: new Date(T - 50 * 36e5).toISOString(), at: new Date(T).toISOString() }], T);
+    dit(g.map((x) => x.mot)[0] === 'Aujourd’hui' && g[g.length - 1].mot === 'Date non lue' && g.reduce((s, x) => s + x.emails.length, 0) === 4 && g.some((x) => x.mot === 'Hier'), 'groupés par jour : Aujourd’hui, Hier, …, « Date non lue » en dernier, chaque e-mail une fois', JSON.stringify(g.map((x) => [x.mot, x.emails.map((e) => e.id)])));
   }
   {
     const { MESSAGERIES, EXPEDITEURS, ADRESSE_EXEMPLE, BOITE_VRM_EXEMPLE, regleFiltre } = await import(path.join(R, 'src/relierBoite.js'));
