@@ -1,0 +1,85 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   L'ÉCRAN VENTES (5 nov., chantier E2 — docs/passation/2026-11-05-chantier-e2.md)
+   La liste « Tous » (VentesToutes), la carte « À venir », la liste Vinted et son
+   pied. Jetons seulement (--vrm-*) : clair et sombre suivent le thème.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── « Tous » : l'état sur SA ligne au téléphone (revue 2.13) ─────────────── */
+html body .vrm-app-shell .vrm-main .vrm-toutes-etat {
+  display: block; margin-top: 3px; font-size: 13px; line-height: 1.35; font-weight: 500;
+  color: var(--vrm-muted); white-space: normal; overflow-wrap: anywhere;
+}
+html body .vrm-app-shell .vrm-main :is(.vrm-toutes-etat, .vrm-toutes-bureau > span)[data-ton="action"] { color: var(--vrm-warn); font-weight: 600; }
+html body .vrm-app-shell .vrm-main .vrm-toutes-photo { background: var(--vrm-photo); }
+html body .vrm-app-shell .vrm-main .vrm-toutes-photo > .vrm-photo-vide { width: 100%; height: 100%; border-radius: inherit; }
+/* Le toucher répond tout de suite (pas d'attente du relâcher). */
+html body .vrm-app-shell .vrm-main .vrm-toutes-ligne { -webkit-tap-highlight-color: transparent; transition: background-color .12s ease-out; }
+html body .vrm-app-shell .vrm-main .vrm-toutes-ligne:active { background: var(--vrm-surface) !important; }
+html body .vrm-app-shell .vrm-main .vrm-toutes-ligne:focus-visible { outline: 2px solid var(--vrm-accent); outline-offset: -2px; border-radius: 10px; }
+html body .vrm-app-shell .vrm-main .vrm-toutes-montant [data-toutes-prix] { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* ── « Pas encore lus » : UNE ligne repliée (revue 2.14) ──────────────────── */
+html body .vrm-app-shell .vrm-main .vrm-toutes-repli { margin: 2px 0 6px; }
+html body .vrm-app-shell .vrm-main .vrm-toutes-repli > summary {
+  list-style: none; display: flex; align-items: center; gap: 8px; min-height: 44px; cursor: pointer;
+  font-size: 13px; color: var(--vrm-muted); -webkit-tap-highlight-color: transparent; user-select: none;
+}
+html body .vrm-app-shell .vrm-main .vrm-toutes-repli > summary::-webkit-details-marker { display: none; }
+html body .vrm-app-shell .vrm-main .vrm-toutes-repli-txt { flex: 0 1 auto; min-width: 0; }
+html body .vrm-app-shell .vrm-main .vrm-toutes-repli-chevron { font-size: 17px; line-height: 1; transition: transform .18s ease-out; }
+html body .vrm-app-shell .vrm-main .vrm-toutes-repli[open] .vrm-toutes-repli-chevron { transform: rotate(90deg); }
+html body .vrm-app-shell .vrm-main .vrm-toutes-repli-corps { padding: 0 0 8px; }
+html body .vrm-app-shell .vrm-main .vrm-toutes-repli-corps p { margin: 0 0 4px; font-size: 13px; line-height: 1.45; color: var(--vrm-muted); }
+
+/* ── L'état vide : un titre, une phrase qui dit quoi faire ─────────────────── */
+html body .vrm-app-shell .vrm-main .vrm-toutes-vide { padding: 28px 8px; text-align: center; }
+html body .vrm-app-shell .vrm-main .vrm-toutes-vide p { margin: 0 auto; max-width: 34em; font-size: 13px; line-height: 1.5; color: var(--vrm-muted); }
+html body .vrm-app-shell .vrm-main .vrm-toutes-vide .vrm-toutes-vide-titre { margin-bottom: 4px; font-size: 15px; font-weight: 600; color: var(--vrm-ink); }
+
+@media (min-width: 1024px) {
+  /* Le bureau a ses colonnes : l'état y est dans la sienne, pas sous le titre. */
+  html body .vrm-app-shell .vrm-main .vrm-toutes-etat { display: none; }
+  /* Des filets DROITS entre les lignes : un filet du bas suivait l'arrondi du survol. */
+  html body .vrm-app-shell .vrm-main .vrm-toutes-ligne {
+    border-bottom: 0 !important;
+    background-image: linear-gradient(var(--vrm-line), var(--vrm-line)) !important;
+    background-size: calc(100% - 20px) 1px !important; background-position: center bottom !important; background-repeat: no-repeat !important;
+  }
+  html body .vrm-app-shell .vrm-main .vrm-toutes-ligne:hover { background-color: var(--vrm-surface) !important; }
+  html body .vrm-app-shell .vrm-main .vrm-toutes-montant { display: flex; flex-direction: column; align-items: flex-end; }
+}
+@media (hover: none) {
+  html body .vrm-app-shell .vrm-main .vrm-toutes-ligne:hover { background-color: transparent !important; }
+}
+
+/* ── L'alerte « un compte annule plus que les autres » ────────────────────── */
+html body .vrm-app-shell .vrm-main .vrm-annul-alerte {
+  margin: 0 0 12px; border: 1px solid var(--vrm-line); background: var(--vrm-card); border-radius: 16px; padding: 12px 14px;
+}
+html body .vrm-app-shell .vrm-main .vrm-annul-alerte-tete { display: flex; gap: 10px; align-items: flex-start; }
+html body .vrm-app-shell .vrm-main .vrm-annul-alerte-tete > svg { flex-shrink: 0; margin-top: 1px; color: var(--vrm-muted); }
+html body .vrm-app-shell .vrm-main .vrm-annul-alerte-titre { margin: 0; font-size: 15px; font-weight: 600; line-height: 1.35; color: var(--vrm-ink); }
+html body .vrm-app-shell .vrm-main .vrm-annul-alerte-sous { margin: 2px 0 0; font-size: 13px; line-height: 1.45; color: var(--vrm-muted); }
+html body .vrm-app-shell .vrm-main .vrm-annul-alerte details { margin-top: 6px; }
+html body .vrm-app-shell .vrm-main .vrm-annul-alerte summary {
+  list-style: none; display: flex; align-items: center; gap: 6px; min-height: 44px; cursor: pointer;
+  font-size: 13px; font-weight: 600; color: var(--vrm-accent-texte); -webkit-tap-highlight-color: transparent;
+}
+html body .vrm-app-shell .vrm-main .vrm-annul-alerte summary::-webkit-details-marker { display: none; }
+html body .vrm-app-shell .vrm-main .vrm-annul-alerte details[open] summary > span[aria-hidden] { transform: rotate(90deg); }
+html body .vrm-app-shell .vrm-main .vrm-annul-alerte summary > span[aria-hidden] { transition: transform .18s ease-out; }
+html body .vrm-app-shell .vrm-main .vrm-annul-ligne {
+  display: flex; align-items: center; gap: 10px; min-height: 44px; border-top: 1px solid var(--vrm-line); font-size: 13px; color: var(--vrm-ink);
+}
+html body .vrm-app-shell .vrm-main .vrm-annul-ligne > span:first-child { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+html body .vrm-app-shell .vrm-main .vrm-annul-ligne small { display: block; color: var(--vrm-muted); font-size: 12px; margin-top: 1px; }
+html body .vrm-app-shell .vrm-main .vrm-annul-ligne a {
+  flex-shrink: 0; display: inline-flex; align-items: center; min-height: 44px; padding: 0 4px; color: var(--vrm-accent-texte); font-weight: 600; text-decoration: none;
+}
+
+/* ── La liste Vinted : le prix et l'état lisibles, rien de coupé ─────────── */
+html body .vrm-app-shell .vrm-main .vrm-fu-vente-prix { font-variant-numeric: tabular-nums; white-space: nowrap; }
+html body .vrm-app-shell .vrm-main .vrm-fu-vente-l2 .vrm-num { flex-shrink: 0; }
+
+/* ── Le pied de Ventes ─────────────────────────────────────────────────────── */
+html body .vrm-app-shell .vrm-main .vrm-ventes-controles:empty { display: none; }

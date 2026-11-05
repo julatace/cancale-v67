@@ -81,6 +81,8 @@ import {formaterMontantEbay} from './montantsEbay.js';
 import {cibleEbay} from "./ebayParcours.js";
 import {centimes,coutsVente,beneficePaire,champsCharges} from "./beneficePaire.js";
 import {argentAVenir,aVenirPour,texteDatePrevue} from './argentAVenir.js';
+import { motEtatVente, lignesAVenir, comptesQuiAnnulent, fenetreAnnulations } from './ventesEcran.js';
+import './ventes-e2.css';
 import {comparerMois,ymEnFace} from './comparerMois.js';
 import {fraisParPlateforme,texteCouverture} from './fraisPlateformes.js';
 import {journalSemaine,repliePourSemaine} from './journalSemaine.js';
@@ -20159,29 +20161,39 @@ function ArgentAVenirCarte({ A, plateforme = null }) {
   if (!groupes.length && !T.partiel) return null;
   const nc = (A.nonComptees || []).filter((x) => !plateforme || x.plateforme === plateforme);
   const manque = T.manque.filter((m) => !nc.some((x) => x.plateforme === m) || A.manque.includes(m));
+  // (5 nov., revue 2.12) UN MONTANT, UNE FOIS : un seul groupe (un site, un compte) ⇒ sa
+  // ligne redisait le total. Il devient la phrase sous le titre, sans montant
+  // (`lignesAVenir`, src/ventesEcran.js) ; plusieurs groupes ⇒ une ligne chacun.
+  const { lignes, resume } = lignesAVenir(groupes);
+  const quand = (g) => `${g.n} vente${g.n > 1 ? 's' : ''}${g.prevu != null ? ` · ${texteDatePrevue(g.prevu)}` : ''}`;
+  const attrsGroupe = (g) => ({ 'data-a-venir-ligne': g.plateforme, 'data-a-venir-compte': g.compte, 'data-a-venir-eur': String(Math.round(g.eur * 100)), 'data-a-venir-prevu': g.prevu != null ? new Date(g.prevu).toISOString().slice(0, 10) : '' });
   return (
-    <section className="vrm-a-venir" data-a-venir={T.valeur == null ? '' : String(Math.round(T.valeur * 100))} data-a-venir-n={String(T.n)} data-a-venir-site={plateforme || 'toutes'} data-a-venir-partiel={T.partiel ? '1' : undefined}
-      style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 20, padding: '14px 16px', marginBottom: 12, boxShadow: C.shadow || 'none' }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-        <span style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600, color: C.text }}>À venir</span>
-        <span className="vrm-display" style={{ fontSize: 22, fontWeight: 700, color: C.text, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }} title={T.partiel ? `Au moins — sans ${T.manque.join(', ')}` : undefined}>
-          {T.partiel ? <span style={{ fontSize: 13, fontWeight: 500, color: C.muted }}>au moins </span> : null}{T.valeur == null ? '—' : fmt(T.valeur)}
+    <section className="vrm-a-venir" data-a-venir={T.valeur == null ? '' : String(Math.round(T.valeur * 100))} data-a-venir-n={String(T.n)} data-a-venir-site={plateforme || 'toutes'} data-a-venir-partiel={T.partiel ? '1' : undefined} data-a-venir-groupes={String(groupes.length)}
+      style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 20, padding: '12px 16px', marginBottom: 12, boxShadow: C.shadow || 'none' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 44 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: C.text }}>À venir</div>
+          {/* Le groupe unique : qui doit l'argent, en une phrase (aucun montant redit). */}
+          {resume ? <div data-a-venir-resume="" {...attrsGroupe(resume)} style={{ fontSize: 13, color: C.muted, marginTop: 2, overflowWrap: 'anywhere' }}>{NOM_SITE_AVENIR[resume.plateforme] || resume.plateforme}{resume.compte && resume.plateforme === 'Vinted' ? <span className="vrm-sensible"> · {resume.compte}</span> : null} · {quand(resume)}</div> : null}
+        </div>
+        <span className="vrm-display" data-a-venir-total="" style={{ fontSize: 22, fontWeight: 700, color: C.text, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }} title={T.partiel ? `Au moins — sans ${T.manque.join(', ')}` : undefined}>
+          {T.partiel && T.valeur != null ? <span style={{ fontSize: 13, fontWeight: 500, color: C.muted }}>au moins </span> : null}{T.valeur == null ? '—' : montant(T.valeur)}
         </span>
       </div>
-      <div role="list" style={{ marginTop: 6 }}>
-        {groupes.map((g) => (
-          <div role="listitem" key={g.plateforme + '|' + g.compte} data-a-venir-ligne={g.plateforme} data-a-venir-compte={g.compte} data-a-venir-eur={String(Math.round(g.eur * 100))} data-a-venir-prevu={g.prevu != null ? new Date(g.prevu).toISOString().slice(0, 10) : ''}
+      {lignes.length > 0 && <div role="list" style={{ marginTop: 6 }}>
+        {lignes.map((g) => (
+          <div role="listitem" key={g.plateforme + '|' + g.compte} {...attrsGroupe(g)}
             style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 44, borderTop: `1px solid ${C.border}` }}>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 15, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{NOM_SITE_AVENIR[g.plateforme] || g.plateforme}{g.compte && g.plateforme === 'Vinted' ? <span style={{ fontWeight: 400, color: C.muted }}> · {g.compte}</span> : null}</div>
-              <div style={{ fontSize: 13, color: C.muted }}>{g.n} vente{g.n > 1 ? 's' : ''}{g.prevu != null ? ` · ${texteDatePrevue(g.prevu)}` : ''}</div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{NOM_SITE_AVENIR[g.plateforme] || g.plateforme}{g.compte && g.plateforme === 'Vinted' ? <span className="vrm-sensible" style={{ fontWeight: 400, color: C.muted }}> · {g.compte}</span> : null}</div>
+              <div style={{ fontSize: 13, color: C.muted }}>{quand(g)}</div>
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: C.text, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{fmt(g.eur)}</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: C.text, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{montant(g.eur)}</span>
           </div>
         ))}
-      </div>
+      </div>}
       {(manque.length > 0 || nc.length > 0) && (
-        <div data-a-venir-manque={manque.join(',')} data-a-venir-nc={String(nc.length)} style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, marginTop: 2, fontSize: 13, color: C.muted, lineHeight: 1.45 }}>
+        <div data-a-venir-manque={manque.join(',')} data-a-venir-nc={String(nc.length)} style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, marginTop: 8, fontSize: 13, color: C.muted, lineHeight: 1.45 }}>
           {manque.length > 0 ? <>Sans {manque.join(', ')} (pas lu)</> : null}
           {manque.length > 0 && nc.length > 0 ? ' · ' : null}
           {nc.length > 0 ? <>{nc.length} vente{nc.length > 1 ? 's' : ''} au montant pas lu ({[...new Set(nc.map((x) => x.plateforme))].join(', ')})</> : null}
@@ -20845,17 +20857,19 @@ function PhotoVente({ src, size = 64, portrait = false }) {
   return <span style={box} role="img" aria-label="Photo indisponible" title="Photo indisponible"><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>;
 }
 function FiltresVentes({ value, onChange, search, onSearch, cancelled = false, doneLabel = 'Finalisées', count, plateforme }) {
-  const tabs=[['all','Toutes'],['pending','À expédier'],['done',doneLabel],...(cancelled?[['cancelled','Annulées']]:[])];
+  // (5 nov., chantier E2) Les mots retenus (src/libelles.js), la recherche partagée, et le
+  // filtre choisi dessiné comme celui de Vinted (la règle commune `.vrm-filtres`, plus un aplat bleu à part).
+  const tabs=[['all','Toutes'],['pending',L.aEnvoyer],['done',doneLabel],...(cancelled?[['cancelled','Annulées']]:[])];
   return <div className="vrm-workbar vrm-shared-workbar">
-    <input aria-label="Rechercher une vente" type="search" value={search} onChange={e=>onSearch(e.target.value)} placeholder="Rechercher une vente…" style={{width:'100%',padding:'9px 12px',fontSize:13,border:`1px solid ${C.border}`,borderRadius:12,background:C.card,color:C.text,marginBottom:10}}/>
+    <ChampRecherche valeur={search} onChange={onSearch} label="Rechercher une vente" placeholder="Rechercher une vente" style={{marginBottom:10}} data-ventes-recherche=""/>
     {/* (27 oct., « pareil que Vinted ») « Mes vues » ne prend plus une ligne à
         lui seul : il est au bout de la ligne des filtres, et ne reprend toute
         la largeur que déplié (styles-annonces-ventes.css). */}
     <div className="vrm-ventes-filtres-ligne">
-    <div className="vrm-rangee vrm-sales-filters vrm-filtres" role="group" aria-label="Filtrer les ventes" style={{display:'flex',gap:6,marginBottom:10}}>{tabs.map(([id,label])=><button key={id} type="button" aria-pressed={value===id} onClick={()=>onChange(id)} style={{whiteSpace:'nowrap',flexShrink:0,padding:'7px 12px',borderRadius:12,border:`1px solid ${C.border}`,background:value===id?C.accent:'transparent',color:value===id?C.onAccent:C.muted,fontSize:12,fontWeight:600,cursor:'pointer'}}>{label}</button>)}</div>
+    <div className="vrm-rangee vrm-sales-filters vrm-filtres" role="group" aria-label="Filtrer les ventes" style={{display:'flex',gap:6,marginBottom:10}}>{tabs.map(([id,label])=><button key={id} type="button" aria-pressed={value===id} onClick={()=>onChange(id)} style={{whiteSpace:'nowrap',flexShrink:0,padding:'7px 14px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{label}</button>)}</div>
     {plateforme && <VuesVentes owner={AUTH.user?.id} plateforme={plateforme} valeur={{filtre:value,recherche:search}} onAppliquer={v=>{onChange(v.filtre);onSearch(v.recherche);}}/>}
     </div>
-    {(search || value!=='all') && <div className="vrm-filter-recap"><span role="status">{count==null?'Filtres actifs':`${count} résultat${count===1?'':'s'}`}</span><button type="button" onClick={()=>{onSearch('');onChange('all');}}>Réinitialiser</button></div>}
+    {(search || value!=='all') && <div className="vrm-filter-recap"><span role="status">Filtres actifs</span><Bouton variante="discret" onClick={()=>{onSearch('');onChange('all');}}>Réinitialiser</Bouton></div>}
   </div>;
 }
 
@@ -20998,7 +21012,7 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', compte
       <span className="vrm-ledger-photo-empty">{photoNoeud || <PhotoVente src={photo} size={46} portrait/>}</span>
       {fusion ? <span className="vrm-fu-vente-txt">
         <span className="vrm-fu-vente-l1"><span className="vrm-fu-vente-nom">{fusion.nom || '(sans titre)'}</span><span className="vrm-fu-vente-prix" aria-hidden="true">{fusion.prix || montant}</span></span>
-        <span className="vrm-fu-vente-l2">{fusion.num ? <span className="vrm-fu-num">N°{fusion.num}</span> : null}<span className="vrm-fu-site" data-site={fusion.site || plateforme}>{fusion.siteNom || ''}</span>{compte !== undefined ? <span className="vrm-fu-vente-compte" data-fu-compte="">· <CompteVente compte={compte} plateforme={plateforme} ou="ligne-court"/></span> : null}{fusion.taille ? <span className="vrm-fu-vente-taille" data-fu-taille={fusion.taille}>· {fusion.taille}</span> : null}</span>
+        <span className="vrm-fu-vente-l2">{fusion.num ? <Numero n={fusion.num} taille="petit" data-fu-num=""/> : null}<span className="vrm-fu-site" data-site={fusion.site || plateforme}>{fusion.siteNom || ''}</span>{compte !== undefined ? <span className="vrm-fu-vente-compte" data-fu-compte="">· <CompteVente compte={compte} plateforme={plateforme} ou="ligne-court"/></span> : null}{fusion.taille ? <span className="vrm-fu-vente-taille" data-fu-taille={fusion.taille}>· {fusion.taille}</span> : null}</span>
         <span className="vrm-fu-vente-l3" data-ton={ton || undefined}>{etatNoeud || etat}</span>
       </span> : null}
       <span className="vrm-ledger-sale-title" title={titre}><span className="vrm-ledger-sale-nom">{titre || '(sans titre)'}</span>{(sous || compte !== undefined) ? <span className="vrm-ledger-sale-sous" data-vente-sous=""><CompteVente compte={compte} plateforme={plateforme} ou="ligne"/>{compte !== undefined && sous ? ' · ' : ''}{sous}</span> : null}</span>
@@ -53461,6 +53475,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               }}/>
           );
         })()}
+        {/* (5 nov., chantier E2) L'argent de Vinted, sous la carte du mois — le même ordre que
+            « Tous » : la carte, puis « À venir ». Mêmes composants, mêmes règles qu'avant. */}
+        {dansPlateforme && !baseKO && <div className="vrm-retirer-hote" style={{margin:'12px 0 0'}}><RetirerArgent liveStats={liveStats}/></div>}
+        {dansPlateforme && !baseKO && <div className="vrm-a-venir-hote" style={{margin:'12px 0 0'}}><ArgentAVenirCarte A={liveStats && liveStats.aVenir} plateforme="Vinted"/></div>}
         {/* ⚠️ LES OUTILS DE TRAVAIL AVANT LES COMMENTAIRES. La période et la
             recherche étaient sous six bandeaux d'explication : il fallait
             défiler un écran et demi pour filtrer ses ventes. Ce qu'on manipule
@@ -53471,9 +53489,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <div className="vrm-workbar vrm-sales-workbar" style={{position:'relative'}}>
         {sales.items && sales.items.length>0 && (
           <div className="vrm-sales-search-group" style={{marginBottom:14}}>
-            <div className="vrm-list-search"><Icon name="search" size={17}/><input aria-label="Rechercher dans les ventes Vinted" type="search" value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="Rechercher"
-              style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 13px',fontSize:13,background:C.card,color:C.text,outline:'none'}}/>
-            {ordSearch && <button className="vrm-icon-control" type="button" aria-label="Effacer la recherche de ventes" onClick={()=>setOrdSearch('')}><Icon name="close" size={17}/></button>}</div>
+            <ChampRecherche valeur={ordSearch} onChange={setOrdSearch} label="Rechercher dans les ventes Vinted" placeholder="Rechercher une vente" data-ventes-recherche=""/>
             {(ordSearch || periode || vFilter!=='all') && <div className="vrm-filter-recap">
               <span>Filtres actifs</span><Bouton variante="discret" onClick={()=>{setOrdSearch('');setPeriode(null);setVFilter('all');}}>Réinitialiser les ventes</Bouton>
             </div>}
@@ -53484,7 +53500,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             Les filtres défilent seuls, « Outils » reste à droite, à part. */}
         <div className="vrm-filtres-et-outils" style={{display:'flex',gap:8,alignItems:'center',marginBottom:12,minWidth:0}}>
         <div className="vrm-rangee vrm-filtres" style={{display:'flex',gap:6,alignItems:'center',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2,flex:'1 1 auto',minWidth:0}}>
-          {[['all','Toutes'],['aexpedier','À expédier'],['transit','En transit'],['finalisees','Finalisées'],['annulees','Annulées']].map(([id,label])=>(
+          {[['all','Toutes'],['aexpedier',L.aEnvoyer],['transit',L.enRoute],['finalisees','Finalisées'],['annulees','Annulées']].map(([id,label])=>(
             <button type="button" key={id} onClick={()=>setVFilter(id)} aria-pressed={vFilter===id} style={{flexShrink:0,whiteSpace:'nowrap',padding:'7px 14px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit',transition:'background-color .15s ease, color .15s ease'}}>{label}</button>
           ))}
         </div>
@@ -53558,6 +53574,39 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {nomsVentesKO.length} compte{nomsVentesKO.length>1?'s':''} non chargé{nomsVentesKO.length>1?'s':''} : {nomsVentesKO.join(', ')}. Ouvre {nomsVentesKO.length>1?'ces comptes':'ce compte'} sur vinted.fr, puis « Synchroniser ».
           </div>
         )}
+        {/* (5 nov., chantier E2) UN COMPTE QUI ANNULE NETTEMENT PLUS QUE LES AUTRES, sur 30 jours.
+            Mesuré par `annulationsParCompte` (src/annulationsCompte.js, la règle de Statistiques,
+            jamais recopiée), jugé par `comptesQuiAnnulent` (src/ventesEcran.js). Dit UNE fois, avec
+            les ventes concernées ; aucune alerte quand ce n'est pas su (lecture en cours, ratée ou
+            partielle), ni pour un compte exclu. Sans geste à faire : ni ambre, ni rouge (§7). */}
+        {Array.isArray(sales.items) && !sales.loading && !sales.error && (() => {
+          const f = fenetreAnnulations();
+          const R = annulationsParCompte({ ventes: sales.items, ko: (Array.isArray(sales.failedUids) ? sales.failedUids : []).map(String), de: f.de, a: f.a,
+            estAnnulee: (o) => classifyOrderStatus(o.status) === 'cancelled', ecarte: (u) => acctOff(u), nomCompte: (o) => (o && o._acc ? accNameOf(o._acc) : '') });
+          const alertes = comptesQuiAnnulent(R).filter((x) => !selEff || String(x.uid) === String(selEff));
+          if (!alertes.length) return null;
+          const jourA = (t) => new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+          return alertes.map((x) => (
+            <section key={x.uid} className="vrm-annul-alerte" data-annulations-alerte={x.uid} data-annulations-n={String(x.annulees)} data-annulations-sur={String(x.n)} aria-label={`Annulations du compte ${x.compte}`}>
+              <div className="vrm-annul-alerte-tete">
+                <Icon name="info" size={18}/>
+                <div style={{ minWidth: 0 }}>
+                  <p className="vrm-annul-alerte-titre"><span className="vrm-sensible">{x.compte}</span> annule plus que tes autres comptes</p>
+                  <p className="vrm-annul-alerte-sous">{x.annulees} annulation{x.annulees > 1 ? 's' : ''} sur {x.n} ventes en 30 jours ({pctFr(x.taux)}), contre {pctFr(x.tauxAutres)} sur tes autres comptes.</p>
+                </div>
+              </div>
+              <details>
+                <summary className="vrm-annul-alerte-voir">Voir {x.annulees > 1 ? `les ${x.annulees} ventes annulées` : 'la vente annulée'}<span aria-hidden="true">›</span></summary>
+                {x.liste.map((v) => (
+                  <div key={v.id} className="vrm-annul-ligne" data-annulation-vente={v.id}>
+                    <span>{v.titre || 'Vente sans titre'}<small>{jourA(v.ts)}{v.eur != null ? ` · ${montant(v.eur)}` : ''}{v.statut ? ` · ${v.statut}` : ''}</small></span>
+                    {v.lien ? <a href={v.lien} target="_blank" rel="noreferrer" aria-label={`Ouvrir sur Vinted : ${v.titre || 'la vente'}`}>Vinted ↗</a> : null}
+                  </div>
+                ))}
+              </details>
+            </section>
+          ));
+        })()}
         {sales.loading && !sales.items && <Skeleton variant="row" count={5}/>}
         {sales.error && <LoadError onRetry={()=>loadOrders('sold',setSales,true)}/>}
         {sales.items && !sales.error && sales.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>Aucune vente pour l'instant.<br/><span style={{fontSize:12}}>Tes ventes finalisées apparaîtront ici automatiquement.</span></div>}
@@ -53686,7 +53735,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <header className="vrm-recap-tete">
                   <div className="vrm-sale-photo vrm-recap-photo">{photo ? <PhotoArticleAgrandissable src={photo} titre={o.title}><PhotoVenteSources {...photoSourcesProps} data-photo-vente="detail" style={{width:'100%',height:'100%',objectFit:'cover'}}/></PhotoArticleAgrandissable> : <Icon name="image" size={22} style={{color:C.muted,opacity:.55}}/>}</div>
                   <div className="vrm-recap-ident">
-                    {num ? <span className="vrm-recap-num" data-recap-num={num}>N°{num}</span> : <span className="vrm-recap-sans-num" data-recap-num="" title="Pas de numéro VRM confirmé pour cette vente : aucune fiche n’est choisie au hasard.">Sans N° VRM</span>}
+                    {num ? <Numero n={num} taille="grand" data-recap-num={num}/> : <span className="vrm-recap-sans-num" data-recap-num="" title="Pas de numéro VRM confirmé pour cette vente : aucune fiche n’est choisie au hasard.">Sans N° VRM</span>}
                     <h2 id={titreId} className="vrm-recap-nom">{nom}</h2>
                     {sousTitre ? <p className="vrm-recap-sous">{sousTitre}</p> : null}
                   </div>
@@ -53771,7 +53820,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // pas de carte encadrée séparée — style démo, comme Achats).
               <LigneVenteCompacte montantCentimes={sell!=null?Math.round(sell*100):undefined} numerosArticle={num?[num]:[]} plateforme="vinted" photo={photo} photoNoeud={photo?<PhotoVenteSources {...photoSourcesProps} data-photo-vente="ligne" style={{width:28,height:36,borderRadius:12,objectFit:'cover',flexShrink:0}}/>:null} titre={(()=>{ const t=String((e&&e.size)||o.size||'').trim(); const nom=t&&!tailleDansTitre(o.title,t)?`${o.title} · taille ${t}`:o.title; return num?`N°${num} · ${nom}`:nom; })()}
                 {...gp} benef={benefLigne} recap={recapVente} data-depose-attente={deposeIci?'1':undefined}
-                data-fu-ligne="" fusion={{ prix: sell!=null && !(o.price?.currency_code && o.price.currency_code!=='EUR') ? eurosRecap(sell) : null, nom: String(o.title||'').replace(/[\s,·-]*(?:taille|t\.?)\s*[\d.,/ ]+(?:\s*(?:eu|fr|us|uk))?\s*$/i,'').trim() || o.title, num, site: 'vinted', siteNom: 'Vinted', taille: String((e&&e.size)||o.size||'').trim() || ((String(o.title||'').match(/taille\s*([\d.,/]+)/i)||[])[1]||'') }} frise={fuEtapes ? <Frise etapes={fuEtapes} cle={txL} className="vrm-fu-ligne-frise" label="Où en est la vente"/> : null}
+                data-fu-ligne="" fusion={{ prix: montant(sell, { devise: o.price?.currency_code || 'EUR' }), nom: String(o.title||'').replace(/[\s,·-]*(?:taille|t\.?)\s*[\d.,/ ]+(?:\s*(?:eu|fr|us|uk))?\s*$/i,'').trim() || o.title, num, site: 'vinted', siteNom: 'Vinted', taille: String((e&&e.size)||o.size||'').trim() || ((String(o.title||'').match(/taille\s*([\d.,/]+)/i)||[])[1]||'') }} frise={fuEtapes ? <Frise etapes={fuEtapes} cle={txL} className="vrm-fu-ligne-frise" label="Où en est la vente"/> : null}
                 bas={peutDeposer ? <>
                   {/* (2 nov., 22 h 30) Une vente à expédier porte TOUJOURS la rangée de la maquette : la puce du
                       transporteur et le bouton bordereau (« Imprimer le bordereau » si le PDF est là, sinon
@@ -53783,7 +53832,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       : <BoutonBordereau grand uid={o._acc && o._acc.vinted_user_id} tx={txL} conv={o.conversation_id} login={accNameOf(o._acc)} aGenerer pdf={false} onFait={(u)=>actionsVentesProxy.rechargerLabels(u)}/>}
                   </div>
                   {gesteDepose ? <div className="vrm-fu-apres" data-sans-glisse="">{gesteDepose}</div> : null}
-                </> : null} gestes={gesteCout ? <div className="vrm-gestes-pile">{gesteCout}</div> : null} compte={o._acc ? (accNameOf(o._acc) || null) : null} sous={o.date?dateFr(o.date, {day:'numeric',month:'short'}):''} etat={venteStage(o).label} ton={st!=='cancelled' && aExpedier(o) && !isShipDone(o) ? 'action' : (st==='cancelled' ? 'annule' : '')} montant={sell!=null?`${Number.isInteger(sell)?sell:sell.toFixed(2).replace('.',',')} ${cur(o.price?.currency_code)}`:'—'} className="vrm-sale-row" key={o.transaction_id} data-tx={String(o.transaction_id)} data-cible={attrCible(['vente',String(o.transaction_id)])} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null),...(gp.style||{})}}>
+                </> : null} gestes={gesteCout ? <div className="vrm-gestes-pile">{gesteCout}</div> : null} compte={o._acc ? (accNameOf(o._acc) || null) : null} sous={o.date?dateFr(o.date, {day:'numeric',month:'short'}):''} etat={motEtatVente(venteStage(o).label)} ton={st!=='cancelled' && aExpedier(o) && !isShipDone(o) ? 'action' : (st==='cancelled' ? 'annule' : '')} montant={montant(sell, { devise: o.price?.currency_code || 'EUR' })} className="vrm-sale-row" key={o.transaction_id} data-tx={String(o.transaction_id)} data-cible={attrCible(['vente',String(o.transaction_id)])} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null),...(gp.style||{})}}>
               </LigneVenteCompacte>
               )}</GlisserVente>
             );
@@ -53804,9 +53853,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             première vente il y avait huit blocs empilés. Ils restent tous là, repliés. */}
         <section className="vrm-ventes-controles" data-ventes-controles="" style={{display:'flex',flexDirection:'column',gap:8,margin:'16px 0 12px'}}>
           <h3 data-titre-section="" style={{fontSize:15,fontWeight:600,color:C.text,letterSpacing:-0.15,margin:'0 2px'}}>Vérifications</h3>
+  {/* (5 nov., revue 2.30) La fraîcheur (« Données ») et « Vendus ailleurs » ne se redisent plus
+      ici : la fraîcheur vit dans la coque, « Vendus ailleurs » dans Ma journée. */}
   <GelPendantFrappe gel={ordSearch!==ordSearchDiff} rendre={()=><>
-  <BilanSynchronisation owner={AUTH.user?.id||''} sources={sourcesBilan} onNav={onNav}/>
-  <VendusAilleurs owner={AUTH.user?.id||''} ownerActuel={()=>AUTH.user?.id||''} charger={chargerRetraitsMulti} onNav={onNav} PhotoVinted={PhotoVinted}/>
         <ComparaisonComptesVinted rows={comparerComptes({comptes:accounts.filter(a=>!acctOff(a.vinted_user_id)).map(a=>({uid:String(a.vinted_user_id),nom:accName(a)})),ventes:sales.items||[],stock:(listings.items||[]).filter(it=>!acctOffOf(it)&&!blockedAccts.has(String(it._acc?.vinted_user_id))&&!soldManual.has(String(it.id))&&!annoncesVendues.has(String(it.id))),dansPeriode:o=>dansPeriode(o,periode),finalisee:o=>classifyOrderStatus(o.status)==='completed',masquee:isHidden,meta:effEntry,aFaire:o=>aExpedier(o)&&!isShipDone(o)})} periode={libellePeriode(periode)} disponible={Array.isArray(sales.items)&&!sales.loading&&!sales.error&&!(sales.failedUids||[]).some(u=>!acctOff(u))} stockDisponible={Array.isArray(listings.items)&&!listings.loading&&!listings.error&&!listings.incomplet} charger={()=>{loadOrders('sold',setSales,true);loadListings(true);}}/>
         <FiabiliteVentes partiel={nomsVentesKO.length>0} perimetre="Vinted · ventes finalisées, hors ventes masquées" lignes={ventesAffichees.map(o=>{const e=effEntry(o),b=beneficePaire(o.price?.amount,e);return {incluse:!isHidden(o)&&venteFinalisee(o),supporte:o.price?.currency_code==='EUR',achatConnu:b.achat!=null,prixConnu:b.vente!=null,valide:b.valid,fraisConfirmes:b.complet};})}/>
   </>}/>
@@ -53990,30 +54039,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           );
         })()}
         {/* Analyse de perf : temps de vente, écoulement, meilleure marque, top compte */}
-        {totals.nb>0 && (perf.joursMoy!=null || perf.ecoul!=null || perf.bestBrand || perf.bestAccount) && (
+        {totals.nb>0 && (perf.joursMoy!=null || perf.ecoul!=null || perf.bestBrand) && (
           <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:8}}>
             {perf.joursMoy!=null && <StatBox label="Temps de vente" value={`${perf.joursMoy.toFixed(0)} j`} sub={`moyenne sur ${perf.joursNb}`}/>}
             {perf.ecoul!=null && <StatBox label="Écoulement" value={`${perf.ecoul.toFixed(0)} %`} sub={`${perf.vendues} vendu / ${perf.online} en ligne`}/>}
             {perf.bestBrand && <StatBox label="Top marque" value={perf.bestBrand.brand} sub={`+${perf.bestBrand.moy.toFixed(0)} €/paire`}/>}
-            {perf.bestAccount && <StatBox label="Compte qui vend le mieux" value={perf.bestAccount.nom} sub={`${perf.bestAccount.n} vente${perf.bestAccount.n>1?'s':''} · ${fmtE(perf.bestAccount.ca)}`}/>}
+            {/* (5 nov.) « Compte qui vend le mieux » : une seule place, Statistiques → « Quel compte vend le mieux ». */}
           </div>
         )}
-        {/* VENTES PAR COMPTE (G24) : le classement complet, pour un revendeur à
-            plusieurs comptes. Agrégation de ventes finalisées connues (comptes
-            exclus écartés) — jamais une estimation (§5). */}
-        {totals.nb>0 && perf.comptesVendeurs && perf.comptesVendeurs.length>=2 && (
-          <div data-ventes-par-compte="" style={{border:`1px solid ${C.border}`,borderRadius:12,background:C.card,padding:'10px 12px',marginBottom:8}}>
-            <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:6}}>Ventes finalisées par compte</div>
-            {perf.comptesVendeurs.map((c,i)=>(
-              <div key={i} data-compte-vend={c.nom} style={{display:'flex',alignItems:'center',gap:8,fontSize:13,color:C.text,padding:'3px 0'}}>
-                <span style={{color:C.muted,width:16,flexShrink:0}}>{i+1}.</span>
-                <span style={{flex:1,minWidth:0,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{c.nom}</span>
-                <span style={{fontWeight:700,flexShrink:0}}>{c.n} vente{c.n>1?'s':''}</span>
-                <span style={{color:C.muted,flexShrink:0}}>· {fmtE(c.ca)}</span>
-              </div>
-            ))}
-          </div>
-        )}
+        {/* (5 nov.) Le classement « Ventes finalisées par compte » vit dans Statistiques (« Quel compte
+            vend le mieux ») : une seule place (banc ventes-par-compte). */}
         {/* Repère d'achat par modèle (proposition 10) : deux moyennes, jamais de la compta. */}
         {totals.nb>0 && (
           <details data-repere-modeles onToggle={(e)=>{ if (e.currentTarget.open) { setRepereOuvert(true); if (buys.items===null && !buys.loading && accounts.length) loadOrders('purchased', setBuys); } }}
@@ -67281,7 +67316,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
       for (const [id, v] of Object.entries(vc.ventes)) {
         if (!v) continue;
         out.push({ cle: 'vestiaire:' + id, site: 'vestiaire', id, titre: v.titre || v.title || 'Vente Vestiaire', t: ts(v.date) ?? ts(v.premiereVue),
-          prix: null, devise: 'EUR', etat: v.aExpedier ? 'À expédier' : (v.etat || ''), compte: nomCompteVente('vestiaire', v, {}),
+          prix: null, devise: 'EUR', etat: v.aExpedier ? L.aEnvoyer : (v.etat || ''), compte: nomCompteVente('vestiaire', v, {}),
           num: numVcVente(v, vc.liens, numerosVcEffectifs()), photo: photoArticle(v) || null });
       }
     }
@@ -67322,40 +67357,70 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
     else if (!vc.ventes) etats.push(['vestiaire', 'jamais', 'Vestiaire : jamais lu — ouvre tes ventes sur Vestiaire avec l’extension.']);
   }
   const jour = (t) => t == null ? 'date pas lue' : new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
-  const prix = (l) => l.prix == null ? '' : (l.devise && l.devise !== 'EUR' ? `${String(l.prix).replace('.', ',')} ${l.devise}` : prixCourt(l.prix));
+  // Une devise étrangère est DITE (« 12,50 GBP »), jamais convertie ; l'euro par `montant()`.
+  const prix = (l) => l.prix == null ? '' : montant(l.prix, { devise: l.devise || 'EUR' });
   const enCours = etats.some((e) => e[1] === 'lecture');
+  // (5 nov., revue 2.14) Ce qui n'appelle aucun geste aujourd'hui ne s'écrit plus en
+  // phrases permanentes : « jamais lu » (un site pas encore ouvert avec l'extension)
+  // se replie en UNE ligne, le geste dedans ; « lu il y a… » ne se redit plus (la
+  // fraîcheur vit dans la coque, revue 2.30). Une lecture en cours, ratée ou partielle
+  // reste écrite, en clair : elle change ce que la liste veut dire.
+  const visibles = etats.filter((e) => e[1] === 'lecture' || e[1] === 'pas-su' || e[1] === 'partiel');
+  const jamais = etats.filter((e) => e[1] === 'jamais');
+  const NOMS_SITES = { vinted: 'Vinted', leboncoin: 'Leboncoin', ebay: 'eBay', vestiaire: 'Vestiaire' };
+  const listeNoms = (l) => l.length < 2 ? l.join('') : l.slice(0, -1).join(', ') + ' et ' + l[l.length - 1];
+  const sansCompteVinted = jamais.some((e) => e[0] === 'vinted');
+  // L'état d'une vente : le mot retenu (« À envoyer », « En route »), et l'ambre
+  // seulement quand il y a un geste à faire (un colis à envoyer, §7).
+  const geste = (l) => l.etat === L.aEnvoyer || motEtatVente(l.etat) === L.aEnvoyer;
   return (
     <div className="vrm-ventes-toutes" data-ventes-toutes={enCours ? 'lecture' : 'lu'} data-n={String(lignes.length)} style={{ padding: '4px 16px 16px' }}>
-      {etats.length > 0 && (
-        <div className="vrm-toutes-etats" style={{ display: 'flex', flexDirection: 'column', gap: 2, margin: '4px 0 10px', fontSize: 12, color: C.muted, lineHeight: 1.45 }}>
-          {etats.map(([s, k, txt]) => <div key={s} data-toutes-etat-site={s} data-etat={k} style={{ color: (k === 'pas-su' || k === 'partiel') ? C.warn : C.muted }}>{txt}</div>)}
+      {visibles.length > 0 && (
+        <div className="vrm-toutes-etats" style={{ display: 'flex', flexDirection: 'column', gap: 2, margin: '4px 0 10px', fontSize: 13, color: C.muted, lineHeight: 1.45 }}>
+          {visibles.map(([s, k, txt]) => <div key={s} data-toutes-etat-site={s} data-etat={k} style={{ color: (k === 'pas-su' || k === 'partiel') ? C.warn : C.muted }}>{txt}</div>)}
         </div>
       )}
+      {jamais.length > 0 && (
+        <details className="vrm-toutes-repli" data-toutes-repli={jamais.map((e) => e[0]).join(',')}>
+          <summary className="vrm-toutes-repli-tete"><span className="vrm-toutes-repli-txt">{listeNoms(jamais.map((e) => NOMS_SITES[e[0]] || e[0]))} : pas encore {jamais.length > 1 ? 'lus' : 'lu'}</span><span className="vrm-toutes-repli-chevron" aria-hidden="true">›</span></summary>
+          <div className="vrm-toutes-repli-corps">
+            {jamais.map(([s, k, txt]) => <p key={s} data-toutes-etat-site={s} data-etat={k}>{txt.replace(' : jamais lu — ', ' : ')}</p>)}
+          </div>
+        </details>
+      )}
       {lignes.length === 0
-        ? <div data-toutes-vide="" style={{ fontSize: 13, color: C.muted, padding: '18px 2px' }}>{enCours ? 'Lecture de tes ventes…' : etats.some((e) => e[1] === 'pas-su' || e[1] === 'partiel') ? 'Aucune vente lue — certaines lectures ont échoué (ci-dessus).' : 'Aucune vente lue pour l’instant.'}</div>
+        ? <div data-toutes-vide="" className="vrm-toutes-vide">
+            {enCours ? <p>{PAS_SU.enCours}</p>
+              : visibles.some((e) => e[1] === 'pas-su' || e[1] === 'partiel') ? <p>Aucune vente lue : une lecture a échoué (ci-dessus). Rien n’est perdu.</p>
+              : sansCompteVinted ? <><p className="vrm-toutes-vide-titre">Tes ventes arriveront ici</p><p>Installe l’extension VRM sur ton ordinateur, puis ouvre vinted.fr une fois connecté : elle range tes ventes toute seule.</p></>
+              : <><p className="vrm-toutes-vide-titre">Aucune vente pour l’instant</p><p>Dès qu’un article part, il apparaît ici, sur tous tes sites.</p></>}
+          </div>
         : (
           <div className="vrm-toutes-liste" role="list">
             {lignes.slice(0, n).map((l) => (
               <button key={l.cle} type="button" role="listitem" className="vrm-toutes-ligne" data-toutes-vente={l.site} data-toutes-id={l.id} data-toutes-compte={l.compte || ''} onClick={() => onOuvrir(l)}
+                aria-label={`${l.titre} — ${NOM[l.site]}${l.compte ? ', ' + l.compte : ''}, ${jour(l.t)}${l.etat ? ', ' + motEtatVente(l.etat) : ''}${l.prix != null ? ', ' + prix(l) : ''}`}
                 style={{ width: '100%', minHeight: 56, display: 'flex', alignItems: 'center', gap: 12, padding: '10px 2px', background: 'transparent', border: 0, borderBottom: `1px solid ${C.border}`, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: C.text }}>
                 {/* (31 oct., Julien : « pas de photos partout ») La photo de la vente, comme sur l'écran de son site. */}
-                <span className="vrm-toutes-photo" data-toutes-photo={l.photo ? '1' : '0'} style={{ width: 64, height: 80, flexShrink: 0, borderRadius: 12, overflow: 'hidden', background: 'var(--vrm-photo, ' + (C.card2 || C.border) + ')', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {l.photo ? <PhotoVinted src={l.photo} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : <Icon name="image" size={22} style={{ color: C.muted, opacity: .55 }}/>}
+                <span className="vrm-toutes-photo" data-toutes-photo={l.photo ? '1' : '0'} aria-hidden="true" style={{ width: 64, height: 80, flexShrink: 0, borderRadius: 12, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {l.photo ? <PhotoVinted src={l.photo} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : <PhotoVide remplir titre=""/>}
                 </span>
-                <span className="vrm-toutes-titre" style={{ flex: 1, minWidth: 0 }}>
+                <span className="vrm-toutes-titre" aria-hidden="true" style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ display: 'block', fontSize: 15, fontWeight: 600, lineHeight: 1.3, overflowWrap: 'anywhere' }}>{l.titre}</span>
                   <span className="vrm-toutes-meta" style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    <span data-toutes-site=""><LogoSite site={l.site}/>{NOM[l.site]}</span>{l.compte ? <> · <span className="vrm-sensible">{l.compte}</span></> : null} · {jour(l.t)}{l.etat ? ' · ' + l.etat : ''}
+                    <span data-toutes-site=""><LogoSite site={l.site}/>{NOM[l.site]}</span>{l.compte ? <> · <span className="vrm-sensible">{l.compte}</span></> : null} · {jour(l.t)}
                   </span>
+                  {/* (5 nov., revue 2.13) L'état sur SA ligne au téléphone : jamais coupé par l'ellipse de la ligne du dessus. */}
+                  {l.etat ? <span className="vrm-toutes-etat" data-toutes-etat={motEtatVente(l.etat)} data-ton={geste(l) ? 'action' : undefined}>{motEtatVente(l.etat)}</span> : null}
                 </span>
-                <span className="vrm-toutes-bureau" aria-hidden="true"><span><b>{NOM[l.site]}</b>{l.compte&&<small>{l.compte}</small>}</span><span>{jour(l.t)}</span><span>{l.etat||'État non renseigné'}</span></span>
-                <span className="vrm-toutes-montant" style={{ flexShrink: 0, textAlign: 'right' }}>
+                <span className="vrm-toutes-bureau" aria-hidden="true"><span><b>{NOM[l.site]}</b>{l.compte&&<small className="vrm-sensible">{l.compte}</small>}</span><span>{jour(l.t)}</span><span data-ton={geste(l) ? 'action' : undefined}>{l.etat ? motEtatVente(l.etat) : PAS_SU.vide}</span></span>
+                <span className="vrm-toutes-montant" aria-hidden="true" style={{ flexShrink: 0, textAlign: 'right' }}>
                   {l.prix != null && <span data-toutes-prix="" style={{ display: 'block', fontSize: 15, fontWeight: 700 }}>{prix(l)}</span>}
-                  {l.num ? <span data-toutes-num={l.num} style={{ display: 'block', fontSize: 12, color: C.muted, fontFamily: 'var(--vrm-mono, ui-monospace, monospace)', marginTop: 2 }}>N°{l.num}</span> : null}
+                  {l.num ? <span data-toutes-num={l.num} style={{ display: 'block', marginTop: 4 }}><Numero n={l.num} taille="petit"/></span> : null}
                 </span>
               </button>
             ))}
-            <CompteurListe affiches={n} total={lignes.length}/>{lignes.length > n && <Bouton variante="discret" data-toutes-plus="" onClick={() => React.startTransition(()=>setN((x) => x + 60))} style={{ marginTop: 10 }}>Afficher les {Math.min(60,lignes.length-n)} suivantes ({lignes.length - n} restantes)</Bouton>}
+            {lignes.length > n && <Bouton variante="discret" data-toutes-plus="" onClick={() => React.startTransition(()=>setN((x) => x + 60))} style={{ marginTop: 10 }}>Afficher {Math.min(60,lignes.length-n) > 1 ? `les ${Math.min(60,lignes.length-n)} suivantes` : 'la suivante'}</Bouton>}
           </div>
         )}
     </div>
@@ -69917,8 +69982,8 @@ function AppCoeur() {
               forcément »). Un seul compte ⇒ la rangée ne s'affiche pas. */}
           {/* (4 nov.) Le sélecteur monte EN HAUT de l'écran (un tap, au-dessus de la carte). */}
           {/* Sous la navigation, pas entre le résumé et elle (revue du 17 oct.). */}
-          {sec==='ventes' && !baseKO && <div className="vrm-retirer-hote" style={{padding:'10px 16px 0'}}><RetirerArgent liveStats={liveStatsVus}/></div>}
-          {sec==='ventes' && !baseKO && <div className="vrm-a-venir-hote" style={{padding:'10px 16px 0'}}><ArgentAVenirCarte A={liveStatsVus && liveStatsVus.aVenir} plateforme="Vinted"/></div>}
+          {/* (5 nov., chantier E2) « Retirer mon argent » et « À venir » passent SOUS la carte du mois,
+              dans l'écran Ventes (Comptabilite) : le même ordre que « Tous » (la carte, puis l'argent). */}
           <Comptabilite key={'pv_'+sec} accounts={vintedAccounts} only={sec==='apercu'?'ventes':sec} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum} compteSel={compteSel} compteConnecte={compteConnecte} dansPlateforme vueAchats={achats?'achats':undefined}/>
         </section>); };
   const rendreLeboncoin=(sec)=>{ return (<section className="vrm-market-space" aria-label="Leboncoin">
