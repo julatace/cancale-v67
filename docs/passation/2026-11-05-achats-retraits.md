@@ -137,3 +137,15 @@ Zone : Achats et Colis → À retirer. États parcourus au banc `achats-retraits
 36. Achats : relier chaque ligne à son colis parcourait 2 fois tous les achats et tous les e-mails par ligne
     (2 415² comparaisons de titres) → une table par transaction, construite une fois.
 37. `audit-retrait` jugeait une distance de 1 800 caractères → juge que le bandeau est dans l'écran, avant la liste.
+
+## Suite (après fusion) — banc `navigation-tache`
+- « K. Achats : ses chiffres » attendait la grille `.vrm-achats-kpis` : la refonte voulue (revue 2.15)
+  l'a retirée. Le banc juge maintenant la règle : UNE carte (`.vrm-fu-ecran`) et 0 grille.
+- « N colis à retirer → Colis » : ce n'était PAS la règle. L'achat 8002 du banc (« déposé au point
+  relais », sans n° de suivi ni autre ligne) est bien compté : il n'a aucun témoin, il n'est ni
+  « peut-être en double » ni « à vérifier » (colonne « À retirer » de Colis, carte « À retirer » d'Achats).
+  C'est la refonte qui avait masqué le lien dans l'espace Vinted. 38. Le chemin revient, sans redire le
+  nombre que la carte sombre porte déjà : « Voir les colis à retirer → Colis » (`data-achats-vers-colis`
+  garde le nombre). Hors espace Vinted, le lien garde son nombre (aucune carte ne le dit).
+- `navigation-tache` 163/0, `achats-retraits` 80/0 (+1 contrôle : le chemin vers Colis),
+  `audit-retrait-preuves` 26/0, `--prouve` 8/8.
