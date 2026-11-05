@@ -15726,3 +15726,18 @@ refait là-bas), vert après, rouge sous mutation.
 - ⚠️ **Non mesuré** : aucun appel réel aux transporteurs (formes de `mesures.json`) ;
   rien lu en production pour ce tour ; la vraie forme de `nav.indispo` sur un Firefox
   réel.
+### « Un autre appareil vient de donner des numéros » ne bloque plus l'écran (5 novembre)
+Capture de Julien (Edge, 14 h 12) : le bloc « Recharger » plein écran. Mesuré (journaux Postgres, lecture
+seule) : `vrm_fiche_perdue` à 12:13:14 UTC — son téléphone avait numéroté N°132-141 le matin, son Edge
+(ouvert avant) a voulu écrire `main` sans ces fiches ; la base a refusé (rien n'était perdu).
+- `cloudPush` : sur `vrm_fiche_perdue` ou `vrm_pool_retreci`, `resynchroNumeros()` relit `main`, fusionne
+  les numéros par `fusionNumerosAuChargement` (la règle du chargement : union du pool, fiches du nuage +
+  celles de l'appareil, le nuage gagne quand les deux ont un N°), prévient l'écran (`vrm:numeros-relus` →
+  `setNumeros`, `setUsedNumeros`) et renvoie. Le bloc ne reste que si la relecture échoue, si la VERSION
+  de numérotation a changé (remise à zéro), si une saisie de N° est encore en route, ou après 3 refus en
+  5 min. `vrm_numeros_perimes`, `vrm_garage_perime` : bloc comme avant.
+- Banc `numeros-remise-a-zero.cjs` section H (le garde-fou de la base émulé ; `SECTION=H` la lance seule,
+  `BANC_PORT`) : **3 rouges sur le code d'avant**, vert après ; C et F (refus d'un écran d'avant la remise
+  à zéro ⇒ bloc) restent verts. G meurt sur un délai, à l'identique avant et après (déjà là).
+- Non mesuré : la vraie PostgREST (forme du refus servie par le banc). Vu sur la capture, pas corrigé ici :
+  les libellés du rail coupés (« Ven », « Gér », « Arg », « Plat ») et le logo « VI » sur Edge.

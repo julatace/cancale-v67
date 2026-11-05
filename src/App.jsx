@@ -2498,6 +2498,19 @@ const cloudPush = () => {
           if (!_prefixeRetente) { _prefixeRetente = true; setTimeout(() => cloudPush(), 50); }
           return;
         }
+        // (5 novembre) Un AUTRE appareil a numéroté depuis le chargement de
+        // celui-ci (Julien : son téléphone a donné les N°132 à 141 le matin, son
+        // Edge ouvert depuis la veille a voulu enregistrer sans eux ⇒ bloc
+        // « Recharger » en plein écran). Ce n'est pas une erreur : on RELIT les
+        // numéros du nuage, on les fusionne (la règle du chargement, §5 : rien ne
+        // se perd, rien n'est réattribué) et on renvoie — sans rien lui demander.
+        // Le bloc ne reste que si la relecture échoue, si la version a changé
+        // (remise à zéro) ou si le refus revient trois fois en 5 min.
+        if (code === 'vrm_fiche_perdue' || code === 'vrm_pool_retreci') {
+          _cloudTimer = null;
+          let relu = false; try { relu = await resynchroNumeros(); } catch (_) { relu = false; }
+          if (relu) { _emitSync('saving'); cloudPush(); return; }
+        }
         if (code) { _pushBloque = true; _emitSync('refus', 'cet écran est plus ancien que tes données (numérotation) — recharge la page'); signalerNumerosPerimes(code); _cloudTimer = null; return; }
         _emitSync('error', res.status === 401 || res.status === 403 ? `la base a refusé l'envoi (${res.status}) — ta session a peut-être expiré` : res.status >= 500 ? `la base ne répond pas (${res.status})` : `la base a répondu ${res.status}`);
         planifierReprise();
@@ -9015,6 +9028,35 @@ const fusionNumerosAuChargement = (k, nuage, local) => {
   return { val: nuage, ajoute: 0 };
 };
 const CLES_FUSION_NUMEROS = ['vinted_used_numeros', 'vinted_annonce_numeros'];
+// La relecture SANS RECHARGER (5 novembre) : appelée quand la base refuse un
+// envoi parce qu'un autre appareil a numéroté. Rend true si les numéros du
+// nuage sont maintenant fusionnés dans cet appareil (et dans l'écran), false
+// sinon (base muette, version changée, refus répété) — le bloc prend alors le
+// relais, comme avant.
+let _resynchros = [];
+const resynchroNumeros = async () => {
+  const maintenant = Date.now();
+  _resynchros = _resynchros.filter((t) => maintenant - t < 5 * 60 * 1000);
+  if (_resynchros.length >= 3) return false;
+  _resynchros.push(maintenant);
+  // Une saisie de numéro encore en route vers le navigateur : on la laisse
+  // arriver (sinon elle réécrirait l'ancienne liste par-dessus la fusion).
+  for (let i = 0; i < 15 && CLES_FUSION_NUMEROS.some((k) => _saveTimers[k]); i++) await new Promise((r) => setTimeout(r, 200));
+  if (CLES_FUSION_NUMEROS.some((k) => _saveTimers[k])) return false;
+  const cloud = await cloudLoad();
+  if (!cloud || typeof cloud !== 'object') return false;
+  const verNuage = cloud.vrm_numerotation && isFinite(Number(cloud.vrm_numerotation.version)) ? Number(cloud.vrm_numerotation.version) : null;
+  if (verNuage !== versionNumerotation()) return false;
+  for (const k of CLES_FUSION_NUMEROS) {
+    if (cloud[k] === undefined || cloud[k] === null) continue;
+    let loc = null; try { const brut = localStorage.getItem(k); loc = brut ? JSON.parse(brut) : null; } catch (_) { loc = null; }
+    const f = fusionNumerosAuChargement(k, cloud[k], loc);
+    try { localStorage.setItem(k, JSON.stringify(f.val)); } catch (_) { return false; }
+  }
+  noterInstantaneCharge(cloud);
+  try { window.dispatchEvent(new Event('vrm:numeros-relus')); } catch (_) {}
+  return true;
+};
 // (26 oct.) Les liens annonce→article Leboncoin (`vrm_lbc_liens`) fusionnent
 // LOCAL PAR-DESSUS NUAGE à la restauration — c'est ce que `delierAnnonceLbc`
 // suppose déjà (une suppression est une valeur VIDE, jamais une clé retirée,
@@ -36725,6 +36767,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // VIDE — donc les numéros existants disparaissaient. Le commentaire de cet
   // effet-là annonçait justement cette protection ; elle n'existait pas.
   // Reproduit au banc : une vente portant le N°777 ressortait à N°319.
+  // (5 novembre) Les numéros relus après le refus de la base (un autre
+  // appareil a numéroté) : l'écran reprend la liste fusionnée, sans recharger.
+  useEffect(() => {
+    const f = () => { setNumeros(load('vinted_annonce_numeros', {})); setUsedNumeros(load('vinted_used_numeros', [])); };
+    window.addEventListener('vrm:numeros-relus', f);
+    return () => window.removeEventListener('vrm:numeros-relus', f);
+  }, []);
   useEffect(() => onCloudReady(() => {
     setNumeros(load('vinted_annonce_numeros', {}));
     setUsedNumeros(load('vinted_used_numeros', []));

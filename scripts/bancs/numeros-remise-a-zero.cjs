@@ -34,7 +34,7 @@ const { metaVersData } = require('./_meta.cjs');
 const http = require('http'), fs = require('fs'), path = require('path');
 
 const DIST = path.join(__dirname, '..', '..', 'dist');   // jamais un chemin absolu (§6.1)
-const PORT = 4511;
+const PORT = Number(process.env.BANC_PORT) || 4511;
 const MIME = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css', '.json':'application/json', '.png':'image/png', '.svg':'image/svg+xml', '.webmanifest':'application/manifest+json' };
 const JETON = 'jeton-de-banc';
 const SESSION = { access_token: JETON, refresh_token: 'r', expires_at: Date.now() + 3600e3, user: { id: '11111111-2222-3333-4444-555555555555', email: 'vendeur@exemple.fr' } };
@@ -99,6 +99,16 @@ async function page(ctx, etat) {
         //     la base est désormais convertie, et le garde-fou refuse le pool d'avant.
         if (etat.convertirALaPremiereEcriture) { etat.convertirALaPremiereEcriture = false; etat.main = mainDe(); etat.refuse = 'vrm_pool_retreci'; }
         if (etat.refuse) return json({ code: 'P0001', message: typeof etat.refuse === 'string' ? etat.refuse : 'vrm_numeros_perimes', details: 'banc', hint: 'Recharge l\'app.' }, 400);
+        // (H) Le garde-fou de la base, pour de vrai : une fiche numérotée du nuage
+        //     absente de l'envoi ⇒ `vrm_fiche_perdue` ; un numéro du pool absent ⇒
+        //     `vrm_pool_retreci` (migration 017).
+        if (etat.garde) {
+          const avant = etat.main.vinted_annonce_numeros || {}, apres = m.data.vinted_annonce_numeros || {};
+          const perdue = Object.keys(avant).some((k) => avant[k] && String(avant[k].numero || '').trim() && !(k in apres));
+          if (perdue) { etat.refus.push('vrm_fiche_perdue'); return json({ code: 'P0001', message: 'vrm_fiche_perdue', details: 'banc', hint: 'Recharge l\'app.' }, 400); }
+          const pool = new Set((m.data.vinted_used_numeros || []).map(String));
+          if ((etat.main.vinted_used_numeros || []).some((x) => !pool.has(String(x)))) { etat.refus.push('vrm_pool_retreci'); return json({ code: 'P0001', message: 'vrm_pool_retreci', details: 'banc', hint: 'Recharge l\'app.' }, 400); }
+        }
         // Le marqueur appartient au serveur : il est recopié (comme le garde-fou).
         etat.main = { ...m.data, vrm_numerotation: etat.main.vrm_numerotation };
         etat.ecrits.push(m.data);
@@ -108,7 +118,12 @@ async function page(ctx, etat) {
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return json([COMPTE]);
     // La VERSION, lue en scalaire (la forme exacte de la requête de l'app).
     if (/id=eq\.main/.test(u) && /select=v:data->vrm_numerotation->>version/.test(u)) return json([{ v: etat.versionLue != null ? String(etat.versionLue) : (etat.main.vrm_numerotation ? String(etat.main.vrm_numerotation.version) : null) }]);
-    if (/id=eq\.main/.test(u)) return json([{ id: 'main', data: etat.main }]);
+    if (/id=eq\.main/.test(u)) {
+      const servi = JSON.parse(JSON.stringify(etat.main));
+      // (H) Un autre appareil numérote JUSTE après le chargement de cet écran.
+      if (etat.autreAppareil) { const f = etat.autreAppareil; etat.autreAppareil = null; f(etat.main); }
+      return json([{ id: 'main', data: servi }]);
+    }
     if (etat.lignes) {
       // Des lignes à part (section E), servies sous la FORME demandée : la
       // projection `select=` est appliquée (§6.3).
@@ -153,6 +168,30 @@ const bloc = (pg) => pg.evaluate(() => { const b = document.querySelector('[data
     return ctx;
   };
   try {
+    console.log('\n── H. Un AUTRE appareil a numéroté pendant que cet écran était ouvert : VRM relit et fusionne, sans bloquer');
+    {
+      // Le téléphone a donné le N°50 à l'annonce 9001 juste après le chargement de
+      // cet écran (Julien, 5 novembre : N°132 à 141 donnés par le téléphone, Edge
+      // ouvert depuis la veille). Le garde-fou de la base est actif.
+      const etat = { main: mainDe(), ecrits: [], tentatives: [], refus: [], garde: true,
+        autreAppareil: (m) => { m.vinted_annonce_numeros = { ...m.vinted_annonce_numeros, 9001: { numero: '50', title: 'Numérotée par le téléphone', auto: true, numberedAt: new Date().toISOString() } }; m.vinted_used_numeros = [...m.vinted_used_numeros, '50']; } };
+      const ctx = await contexte(); const pg = await page(ctx, etat);
+      await pg.goto(`http://localhost:${PORT}/?tab=plat_vinted`, { waitUntil: 'domcontentloaded' });
+      await pg.waitForTimeout(12000);
+      dit(etat.refus.length >= 1, 'la base a bien refusé le premier envoi (la fiche du téléphone y manquait)', etat.refus.join(', ') || 'aucun refus');
+      dit(!(await bloc(pg)), 'AUCUN bloc « Recharger » : VRM a relu les numéros tout seul', String(await bloc(pg)));
+      const nuage = etat.main.vinted_annonce_numeros || {};
+      dit(nuage['9001'] && nuage['9001'].numero === '50', 'le N°50 du téléphone est toujours dans le nuage', JSON.stringify(nuage['9001'] || null));
+      const n = (await numerosLocaux(pg)) || {};
+      dit(['2001', '2002', '2005'].every((id) => nuage[id] && String(nuage[id].numero).trim()), 'les numéros donnés par CET écran sont partis au nuage avec lui', ['2001', '2002', '2005'].map((id) => (nuage[id] || {}).numero).join(' / '));
+      dit(n['9001'] && n['9001'].numero === '50', 'et l\'écran connaît maintenant la paire du téléphone (N°50)', JSON.stringify(n['9001'] || null));
+      const nums = Object.values(nuage).map((e) => e && String(e.numero || '')).filter(Boolean);
+      dit(new Set(nums).size === nums.length, 'aucun numéro donné deux fois', nums.join(','));
+      dit(((etat.main.vinted_used_numeros || []).map(String)).includes('50'), 'le pool du nuage garde le 50');
+      dit(!pg.__erreurs.length, 'aucune erreur d\'app', pg.__erreurs.join(' | '));
+      await ctx.close();
+    }
+    if (process.env.SECTION === 'H') throw new Error('SEUL_H');
     console.log('\n── A. Les annonces republiées après la coupure reçoivent 1, 2, 3 — jamais un ancien numéro');
     {
       const etat = { main: mainDe(), ecrits: [], tentatives: [] };
@@ -308,7 +347,7 @@ const bloc = (pg) => pg.evaluate(() => { const b = document.querySelector('[data
       dit(!pg.__erreurs.length, 'aucune erreur d\'app', pg.__erreurs.join(' | '));
       await ctx.close();
     }
-  } catch (e) { dit(false, 'le banc a tourné jusqu\'au bout', String(e && e.message).slice(0, 200)); }
+  } catch (e) { if (String(e && e.message) !== 'SEUL_H') dit(false, 'le banc a tourné jusqu\'au bout', String(e && e.message).slice(0, 200)); }
   finally { await nav.close(); srv.close(); }
   console.log(ko ? `\n❌ remise à zéro des numéros : ${ko} rouge(s)` : '\n✅ remise à zéro des numéros : tout est vert');
   process.exit(ko ? 1 : 0);
