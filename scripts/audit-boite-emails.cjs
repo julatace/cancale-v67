@@ -300,7 +300,8 @@ const garde = (x, k, v) => {
   // ── 5. L'APP ──────────────────────────────────────────────────────────────
   {
     const APP = fs.readFileSync(path.join(R, 'src/App.jsx'), 'utf8');
-    const tabs = (/const TABS_OK=\[([^\]]*)\]/.exec(APP) || [])[1] || '';
+    // (5 nov.) La liste blanche de `goto` est `ONGLETS_LIENS` (une seule liste, aussi pour la reprise ; `TABS_OK` la reprend).
+    const tabs = (/const (?:TABS_OK|ONGLETS_LIENS)=\[([^\]]*)\]/.exec(APP) || [])[1] || '';
     dit(/'emails'/.test(tabs), '`?tab=emails` accepté (liste blanche de `goto`)');
     dit(/\{id:'emails',\s*icon:'mail',\s*label:'E-mails'\}/.test(APP), 'l’écran est dans la navigation (icône « mail », nom nu)');
     dit((APP.match(/tab==='emails'&&<Suspense/g) || []).length === 1 && /lazy\(\(\) => import\("\.\/BoiteEmails\.jsx"\)\)/.test(APP), 'l’écran est MONTÉ (une fois, chargé à la demande)');
