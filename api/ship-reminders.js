@@ -49,6 +49,8 @@ import { rappelsRetraitDuJour, texteRappelRetrait, SELECT_SUIVI_META, txDuColis,
 import { passageTransporteurs, MAX_CRON, BUDGET_CRON_MS } from './_lib/transporteurs-lecture.js';
 import { accesVendeur } from './_lib/abonnement.js';
 import { passageRelances } from './_lib/relances-essai.js';
+// (5 nov.) « Compte Vinted pas relu » : la règle (api/_lib/comptes-a-relire.js).
+import { comptesARelire, dernieresCaptures, texteComptesARelire, decisionRelecture, CAT_RELECTURE, ID_MEMO_RELECTURE, SELECT_CAPTURES } from './_lib/comptes-a-relire.js';
 // Après 240 s de cron, aucun e-mail de l'essai ne COMMENCE (la fonction s'arrête à 300 s).
 const RELANCES_JUSQUA_MS = 240000;
 
@@ -466,6 +468,46 @@ async function rappelsOffresMini(maintenant = Date.now()) {
   return { offremini: 'envoyé', n, envoi: envoi && (envoi.coupe || envoi.erreur || envoi.sent) };
 }
 
+// ── COMPTE VINTED PAS RELU DEPUIS PLUS DE 24 H (5 nov.) ─────────────────────
+// Au passage du MATIN seulement, pour CE vendeur : les comptes Vinted gardés
+// dans les totaux dont la dernière lecture a plus de 24 h, nommés, avec le geste
+// (api/_lib/comptes-a-relire.js, les règles de l'app). UNE notification par
+// jour au plus : mémo `relecture_rappel_dedup` lu en trois états (illisible ⇒
+// rien), écrit AVANT l'envoi et confirmé. Famille « Rappels » coupée ⇒ rien ;
+// heures calmes ⇒ rangée dans le centre, pas sonnée (`sendPushToAll`). Une
+// lecture ratée (comptes, réglages, lignes captées) ⇒ rien : « pas su » ne
+// nomme personne. Seulement des scalaires (§4.4), paginés (§4.5).
+async function rappelComptesARelire(maintenant = Date.now()) {
+  if (!(await pushCategorieActive(CAT_RELECTURE))) return 'désactivé par le vendeur';
+  const [comptesL, m, panneau, etats, noirs, lignes] = await Promise.all([
+    fetchPaginated(scoped('vinted_accounts?select=vinted_user_id,login')),
+    getRowProjete('main', ['vinted_accounts_hidden']),
+    getRow('panel_accounts_off'),
+    getRowProjete('panel_comptes_etat', ['comptes']),
+    getRowProjete('vrm_blocked_accounts', ['uids']),
+    fetchPaginated(scoped(`app_data?id=like.harvest_%25&meta->>supprime=is.null&select=${SELECT_CAPTURES}`)),
+  ]);
+  if (!Array.isArray(comptesL) || m === undefined || panneau === undefined || etats === undefined || noirs === undefined || !Array.isArray(lignes)) return 'lecture ratée — rien envoyé';
+  const liste = comptesARelire({
+    comptes: comptesL,
+    captures: dernieresCaptures(lignes),
+    masques: ensemble(m && m.vinted_accounts_hidden),
+    panneau: objet(panneau),
+    etats: objet(etats && etats.comptes),
+    supprimes: ensemble(noirs && noirs.uids),
+    maintenant,
+  });
+  const today = parisDate(0);
+  const memo = liste && liste.length ? await getRow(ID_MEMO_RELECTURE) : null;
+  const d = decisionRelecture({ liste, memo, jour: today });
+  if (!d.envoyer) return { relecture: d.raison, n: Array.isArray(liste) ? liste.length : null };
+  if (!(await ecrireDedup(ID_MEMO_RELECTURE, { jour: today, n: liste.length, at: new Date(maintenant).toISOString() }))) return 'mémo non écrit — rien envoyé';
+  const t = texteComptesARelire(liste);
+  const envoi = await sendPushToAll({ cat: CAT_RELECTURE, ...t, tag: 'relecture-' + today, url: DESTINATIONS.comptes() });
+  // Aucun pseudo dans la réponse d'un cron : un nombre.
+  return { relecture: 'envoyé', n: liste.length, envoi: envoi && (envoi.coupe || envoi.erreur || envoi.sent) };
+}
+
 // (5 nov.) L'AGENT eBAY EST ARRÊTÉ (Julien : « le bot eBay, arrête-le, c'est nul »).
 // Sa notification du matin (« 🛒 N paires prêtes pour eBay ») ne part plus : le
 // cron ne lit plus `vrm_agent_ebay_resume` ni `agent_ebay_dedup` (données gardées
@@ -589,6 +631,11 @@ async function traiterVendeurApresRelecture() {
     let offremini = null;
     try { offremini = await rappelsOffresMini(); } catch (e) { offremini = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
 
+    // COMPTE VINTED PAS RELU (5 nov.) — posé comme les autres : un échec ici
+    // n'empêche rien, et le calcul des colis continue.
+    let relecture = null;
+    try { relecture = await rappelComptesARelire(); } catch (e) { relecture = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
+
 
     // ── LES COLIS DU MATIN : LA RÈGLE DU SOIR, DU WIDGET ET DE L'APP (22 oct.) ──
     // ⚠️⚠️ CE RAPPEL ANNONÇAIT « RIEN À ENVOYER » À TORT. Mesuré le 22 octobre
@@ -625,7 +672,7 @@ async function traiterVendeurApresRelecture() {
     // (1er nov., audit A4) Les ventes Vestiaire : leur date limite, la règle de Colis.
     const vcR = t ? t.vestiaire : resumeColisSites({ vc: d.vc }).vestiaire;
     const vcDus = vcR ? vcR.overdue + vcR.today + vcR.tomorrow : 0;
-    if (vintedSkip && !vcDus && (!eb || (!(eb.overdue + eb.today + eb.tomorrow) && !eb.nePasPoster))) return { urssaf, bilan, retrait, offremini, skipped: vintedSkip + ' — aucune notification envoyée' };
+    if (vintedSkip && !vcDus && (!eb || (!(eb.overdue + eb.today + eb.tomorrow) && !eb.nePasPoster))) return { urssaf, bilan, retrait, offremini, relecture, skipped: vintedSkip + ' — aucune notification envoyée' };
 
     const c = vintedSkip ? null : compterEcheances({ txs: [...t.vinted], ventes: ventesParTx(d), bords: bordsDuVendeur(d), maintenant: Date.now() });
     // ⚠️ (revue du 22 oct.) `overdue` = une limite LUE (email du bordereau, ou
@@ -643,14 +690,14 @@ async function traiterVendeurApresRelecture() {
 
     // Anti-doublon : une seule notification par jour pour un même total.
     const dedup = (await getRow('ship_reminder_dedup')) || {};
-    if (dedup.date === today && dedup.total === total && (dedup.nePasPoster || 0) === nePasPoster) return { urssaf, bilan, retrait, offremini, skipped: 'déjà notifié', total };
+    if (dedup.date === today && dedup.total === total && (dedup.nePasPoster || 0) === nePasPoster) return { urssaf, bilan, retrait, offremini, relecture, skipped: 'déjà notifié', total };
 
     if ((total > 0 || nePasPoster > 0) && await pushCategorieActive('expedier')) {
       const txt = texteMatin({ overdue, aVerifier, dueToday, dueTomorrow, ebayDus, vestiaireDus: vcDus, nePasPoster, vinted: c });
       await sendPushToAll({ cat: 'expedier', ...txt, tag: 'ship-reminder', url: DESTINATIONS.colis({}) });
     }
     await ecrireDedup('ship_reminder_dedup', { date: today, total, nePasPoster });
-    return { urssaf, bilan, retrait, offremini, overdue, aVerifier, dueToday, dueTomorrow, total,
+    return { urssaf, bilan, retrait, offremini, relecture, overdue, aVerifier, dueToday, dueTomorrow, total,
       ...(c ? { heures: { aujourdhui: c.premier.aujourdhui ? c.premier.aujourdhui.heure : null, demain: c.premier.demain ? c.premier.demain.heure : null }, estimees: c.estimees, sansLimite: c.sansLimite } : {}),
       ebay: eb ? { aPoster: eb.total, dus: ebayDus, nePasPoster } : null, vestiaire: vcR ? { aPoster: vcR.total, dus: vcDus } : null, ...(vintedSkip ? { vintedSkip } : {}) };
 }
