@@ -192,7 +192,7 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         const fe = await pg.evaluate(() => {
           const d = document.querySelector('[data-carte-feuille]');
           const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
-          return { portail: !!d && d.parentElement === document.body, petits: [...d.querySelectorAll('button')].filter(vis).filter((x) => x.getBoundingClientRect().height < 43.5).map((x) => x.innerText.trim().slice(0, 20)),
+          return { portail: !!d && (d.closest('[data-feuille-cadre]') || d).parentElement === document.body, petits: [...d.querySelectorAll('button')].filter(vis).filter((x) => x.getBoundingClientRect().height < 43.5).map((x) => x.innerText.trim().slice(0, 20)),
             choix: [...d.querySelectorAll('[data-carte-choix]')].map((x) => x.getAttribute('data-carte-choix')) };
         });
         dit(fe.portail, 'la feuille passe par un portail (document.body)');
@@ -203,9 +203,9 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         await pg.locator('[data-carte-choix="ventes"]').click();
         await pg.locator('[data-carte-place="1"]').click();
         await pg.locator('[data-carte-choix="panier"]').click();
-        await pg.locator('[data-carte-fermer]').click();
+        await pg.locator('[data-carte-feuille] [data-feuille-croix]').click();
         await pg.waitForTimeout(500);
-        dit(await pg.locator('[data-carte-feuille]').count() === 0, '« OK » ferme la feuille');
+        dit(await pg.locator('[data-carte-feuille]').count() === 0, 'la croix ferme la feuille');
         const r1 = await carte(pg, 'ventes');
         dit(r1 && r1.grand.id === 'ventes' && r1.grand.v === '3' && r1.cases[0].id === 'panier', 'la carte change sous ses yeux : 3 ventes en grand, le panier moyen en case 1', JSON.stringify(r1 && { g: r1.grand, c: r1.cases[0] }));
         const range = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_carte_stats')); } catch (_) { return null; } });
@@ -239,7 +239,7 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         await pg.locator('[data-jour="2026-11-01"]').first().click();
         await pg.locator('[data-periode-appliquer]').first().click();
         await pg.waitForTimeout(400);
-        await pg.locator('[data-carte-fermer]').click();
+        await pg.locator('[data-carte-feuille] [data-feuille-croix]').click();
         await pg.waitForTimeout(500);
         const r3 = await carte(pg, 'ventes');
         dit(r3 && r3.grand && r3.grand.id === 'ventes' && r3.grand.p === 'plage' && r3.grand.v === '3', 'plage du 30 oct. au 1er nov. : 3 ventes (la règle sur ces dates, à la main)', JSON.stringify(r3 && r3.grand));
@@ -253,7 +253,7 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         await pg.locator('[data-carte-calendrier] [data-periode-ouvrir]').click();
         await pg.locator('[data-periode-raccourci="mois"]').first().click();
         await pg.waitForTimeout(300);
-        await pg.locator('[data-carte-fermer]').click();
+        await pg.locator('[data-carte-feuille] [data-feuille-croix]').click();
         await pg.waitForTimeout(500);
         const r4 = await carte(pg, 'ventes');
         dit(r4 && r4.grand.p === 'mois' && r4.grand.v === '3' && r4.perimetre === 'Novembre · Vinted', '« Ce mois » : la période nommée revient (3 ventes en novembre, « Novembre · Vinted »)', JSON.stringify(r4 && { p: r4.grand.p, v: r4.grand.v, per: r4.perimetre }));
