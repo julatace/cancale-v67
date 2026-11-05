@@ -25,6 +25,7 @@ let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 catch (_) { ({ chromium } = require('playwright')); }
 const { metaVersData } = require('./_meta.cjs');
+const { routeMain, ecritesMain, attendre } = require('./_base-ecritures.cjs');
 const fs = require('fs'), http = require('http');
 const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 7963;
@@ -75,8 +76,11 @@ const projette = (row, sel) => {
 };
 
 async function ouvrir(b, { main, url, largeur, sombre }) {
-  const rows = [{ id: 'main', data: main }, { id: 'harvest_111_listings', data: { capturedAt: auj.toISOString(), payload: { items: ITEMS } } }];
-  const ecrits = [];
+  // (5 nov.) `main` à la VRAIE forme (`routeMain`) sur une base CLOISONNÉE (la
+  // production) : sur l'ancienne base non cloisonnée l'app n'écrivait jamais
+  // `main`, et ni le réglage ni le N° changé n'étaient jugés dans le nuage.
+  const base = { main, maj: new Date(Date.now() - 86400e3).toISOString(), ecritures: [] };
+  const rows = [{ id: 'harvest_111_listings', data: { capturedAt: auj.toISOString(), payload: { items: ITEMS } } }];
   const mobile = largeur < 700;
   const ctx = await b.newContext({ viewport: { width: largeur, height: mobile ? 844 : 950 }, isMobile: mobile, hasTouch: mobile, permissions: ['clipboard-read', 'clipboard-write'] });
   const pg = await ctx.newPage();
@@ -86,12 +90,10 @@ async function ouvrir(b, { main, url, largeur, sombre }) {
   await pg.route('**/rest/v1/**', (route) => {
     const req = route.request();
     const u = decodeURIComponent(metaVersData(req.url()));
-    const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
-    if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
-    if (req.method() !== 'GET') {
-      try { const bd = JSON.parse(req.postData() || '[]'); (Array.isArray(bd) ? bd : [bd]).forEach((row) => { if (row && row.id === 'main' && row.data) ecrits.push(row.data); }); } catch (_) {}
-      return j([]);
-    }
+    const j = (d, st = 200) => route.fulfill({ status: st, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: typeof d === 'string' ? d : JSON.stringify(d) });
+    if (/select=owner&limit=1/.test(u)) return j([{ owner: 'banc' }]);
+    const mm = routeMain(req, base); if (mm) return j(mm.body, mm.status);
+    if (req.method() !== 'GET') return j([]);
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCS);
     const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
     const forme = (r) => (sel && !/^id,data|^data$|^data,/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: auj.toISOString(), cap: r.data.capturedAt });
@@ -104,7 +106,7 @@ async function ouvrir(b, { main, url, largeur, sombre }) {
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
   await pg.goto(`http://localhost:${PORT}${url}`, { waitUntil: 'domcontentloaded' });
   await pg.waitForTimeout(5500);
-  return { pg, ctx, errs, ecrits };
+  return { pg, ctx, errs, base };
 }
 const local = (pg, k) => pg.evaluate((k) => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (_) { return null; } }, k);
 // Les cartes se recomposent (photos, île) : on laisse la page se poser, sans délai
@@ -128,7 +130,7 @@ const capture = async (pg, nom) => { try { await pg.screenshot({ path: path.join
 async function reglages(b, largeur, sombre) {
   const mobile = largeur < 700, tag = `${largeur}${sombre ? ' sombre' : ' clair'}`;
   console.log(`\n── A. Réglages → Numéros (${tag})`);
-  const { pg, ctx, errs, ecrits } = await ouvrir(b, { main: MAIN(), url: '/?tab=settings', largeur, sombre });
+  const { pg, ctx, errs, base } = await ouvrir(b, { main: MAIN(), url: '/?tab=settings', largeur, sombre });
   try {
     await pg.waitForSelector('[data-sous-ouvrir="numeros"]', { timeout: 20000 });
     await toucher(pg, '[data-sous-ouvrir="numeros"]', mobile);
@@ -164,8 +166,11 @@ async function reglages(b, largeur, sombre) {
     await pg.waitForTimeout(2500);   // `save` range 500 ms après le geste, le nuage ensuite
     const reg = await local(pg, 'vrm_num_vinted');
     dit(reg && reg.place === 'desc_debut' && reg.forme === 'diese', `${tag} : réglage rangé sur l'appareil`, JSON.stringify(reg));
-    // (La synchronisation : `vrm_num_vinted` est dans SYNC_KEYS — audit-etiquette-numero.cjs ;
-    // ce banc sert une base non cloisonnée, où l'app n'écrit jamais au nuage.)
+    // (5 nov.) Le réglage part au nuage (`vrm_num_vinted` est dans SYNC_KEYS), jugé
+    // sur ce que la base a GARDÉ.
+    await attendre(() => { const v = base.main && base.main.vrm_num_vinted; return !!(v && v.place === 'desc_debut'); }, 10000);
+    const regN = base.main && base.main.vrm_num_vinted;
+    dit(ecritesMain(base).length > 0 && regN && regN.place === 'desc_debut' && regN.forme === 'diese', `${tag} : le réglage part au nuage`, `${ecritesMain(base).length} écriture(s) · ${JSON.stringify(regN || null)}`);
     // 44 px au doigt : chaque place et chaque forme.
     const petits = await pg.evaluate(() => [...document.querySelectorAll('[data-num-vinted-place],[data-num-vinted-forme-choix],[data-num-vinted-reponse]')].filter((e) => e.getBoundingClientRect().height < 43.5).map((e) => e.textContent.slice(0, 20)));
     dit(petits.length === 0, `${tag} : chaque choix fait au moins 44 px`, petits.join(' | '));
@@ -180,7 +185,7 @@ async function reglages(b, largeur, sombre) {
 async function annonces(b, largeur, sombre) {
   const mobile = largeur < 700, tag = `${largeur}${sombre ? ' sombre' : ' clair'}`;
   console.log(`\n── B. Annonces : N° à la mise en ligne et après (${tag})`);
-  const { pg, ctx, errs } = await ouvrir(b, { main: MAIN({ vrm_num_vinted: { place: 'titre_fin', forme: 'numero' } }), url: '/?tab=cat_annonces', largeur, sombre });
+  const { pg, ctx, errs, base } = await ouvrir(b, { main: MAIN({ vrm_num_vinted: { place: 'titre_fin', forme: 'numero' } }), url: '/?tab=cat_annonces', largeur, sombre });
   try {
     const bloc = await pg.waitForSelector('[data-num-neufs]', { timeout: 8000 }).then(() => true).catch(() => false);
     dit(bloc, `${tag} : la mise en ligne numérotée par VRM est listée`);
@@ -230,6 +235,11 @@ async function annonces(b, largeur, sombre) {
     await pg.waitForTimeout(800);
     f = ((await local(pg, 'vinted_annonce_numeros')) || {})['9201'] || {};
     dit(await pg.locator('[data-a-ecrire="9201"]').count() === 0 && f.reattribue && !!f.reattribue.ecrit && String(f.numero) === '40', `${tag} : « C'est écrit » range N°7 → N°40, le N° reste 40`, JSON.stringify(f.reattribue || null));
+    // (5 nov.) Ce qui part au nuage : 40 et 41 posés à la main, 5 gardé, 7 et 3
+    // toujours brûlés — jugé sur ce que la base a GARDÉ, pas seulement l'appareil.
+    const nuageOk = () => { const n = (base.main && base.main.vinted_annonce_numeros) || {}; const p = ((base.main && base.main.vinted_used_numeros) || []).map(String); return String((n['9201'] || {}).numero) === '40' && !!(n['9201'] || {}).manuelAt && String((n['9203'] || {}).numero) === '41' && String((n['9202'] || {}).numero) === '5' && ['3', '7', '40', '41'].every((x) => p.includes(x)); };
+    await attendre(nuageOk, 10000);
+    { const n = (base.main && base.main.vinted_annonce_numeros) || {}; dit(ecritesMain(base).length > 0 && nuageOk(), `${tag} : le nuage garde 40 et 41 posés à la main, 5 inchangé, 3 et 7 brûlés`, `${ecritesMain(base).length} écriture(s) · ${JSON.stringify(Object.fromEntries(Object.entries(n).map(([k, e]) => [k, e && e.numero])))} · pool ${JSON.stringify((base.main || {}).vinted_used_numeros)}`); }
     dit(await pasDeCote(pg), `${tag} : aucune page qui défile de côté`);
     dit(errs.length === 0, `${tag} : aucune erreur d'app`, errs.join(' | ').slice(0, 200));
   } catch (e) { dit(false, `${tag} : le scénario B a tourné jusqu'au bout`, String(e && e.message).replace(/\x1b\[[0-9;]*m/g, '').slice(0, 900)); await capture(pg, `B-${largeur}-erreur`); }
