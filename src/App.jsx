@@ -12,6 +12,7 @@ import {AnnoncesACompleter,ComparaisonComptesVinted,HistoriqueArticle} from './O
 import {comparerComptes,diagnosticConnexion} from './outilsArticlesVinted.js';
 import {correspondRechercheMessage} from './rechercheMessagesVinted.js';
 import SynchronisationVinted from './SynchronisationVinted.jsx';
+import { prendrePlaceRelais } from './freinRelaisVinted.js';
 import {auteurDernierConfirme,suiviNegociationVinted,reponseAttendueVinted,instantVinted} from './suiviMessagerieVinted.js';
 import {retourReponseVinted,cleReponseVinted,creerBrouillonsReponses,etatActionVinted,cleActionOffreVinted} from './reponseVinted.js';
 import {etatOffreVinted,offreVintedEnAttente,cleOffreVinted,appliquerOffresConfirmees,annonceOffreEnVente,offreOuverte} from './offresVinted.js';
@@ -6165,6 +6166,12 @@ const persistRefreshedTokens = async (account, refreshed) => {
 // Appelle un endpoint de l'API Vinted pour le compte donne, via le proxy
 // (evite le blocage CORS puisque le navigateur ne parle qu'a notre propre domaine).
 const vintedApiCall = async (account, endpoint, opts = {}) => {
+  // ⚠️ 5 nov. : le relais part de l'adresse du SERVEUR — freiné par compte
+  // (`src/freinRelaisVinted.js`). Freiné ⇒ rien ne part, l'appelant garde ce
+  // qu'il montrait (un échec, jamais une liste vide).
+  let place;
+  try { place = prendrePlaceRelais(account && account.vinted_user_id, Date.now(), window.localStorage); } catch (_) { place = { ok: false }; }
+  if (!place.ok) return { ok: false, error: 'frein', frein: true };
   busyStart();
   try {
     const siteDomain = account.domain || 'www.vinted.fr';
@@ -7495,15 +7502,17 @@ const fetchVintedOrders = async (account, type, page = 1, statusFilter = 'comple
   };
   // 1) Données moissonnées par l'extension (aucun appel Vinted). On sépare
   //    achats/ventes par le type d'URL capté ; repli sur l'ancienne clé générique.
-  //    opts.force = on saute la moisson (bouton "Synchroniser") pour le dernier état.
-  if (page === 1 && !opts.force) {
+  //    ⚠️ 5 nov. : `opts.force` (un bouton « relire ») relit cette copie SANS le
+  //    cache de l'écran — il ne va plus chercher Vinted par le serveur pour tous
+  //    les comptes (`src/freinRelaisVinted.js`). Le neuf vient de l'extension.
+  if (page === 1) {
     // ⚠️ PAS de repli sur la ligne générique `harvest_{uid}_orders` : elle est
     // écrite quand Vinted charge /my_orders SANS préciser ?type=, donc elle
     // contient un MÉLANGE ventes + achats. S'en servir affichait des achats
     // dans les ventes (et l'inverse). On n'accepte que les lignes explicitement
     // « sold » ou « purchased ». Mesuré : la ligne générique est vide de toute
     // façon, ce repli ne rapportait rien et ne pouvait que tromper.
-    const h = await fetchHarvestOrders(account.vinted_user_id, type);
+    const h = await fetchHarvestOrders(account.vinted_user_id, type, { force: !!opts.force });
     // Lecture de NOTRE base en échec : c'est un échec, pas un compte jamais
     // moissonné — on ne part surtout pas interroger Vinted pour autant.
     if (h === undefined) return { ok: false, error: 'lecture', items: [], pagination: null, source: 'harvest-ko' };
@@ -7591,6 +7600,13 @@ const fetchVintedConversations = async (account, page = 1, opts = {}) => {
     const h=await fetchHarvest(account.vinted_user_id,'inbox');
     if(Array.isArray(h?.conversations))return {ok:true,items:h.conversations,source:'harvest',stale:true};
     return {ok:false,error:r?.error || 'lecture-indisponible',items:[]};
+  }
+  // ⚠️ 5 nov. : relecture demandée SANS extension capable (téléphone, autre
+  // navigateur) : la copie captée, jamais le relais serveur pour tous les comptes.
+  if (opts.force) {
+    const h=await fetchHarvest(account.vinted_user_id,'inbox');
+    if(Array.isArray(h?.conversations))return {ok:true,items:h.conversations,source:'harvest',stale:true};
+    if(h===undefined)return {ok:false,error:'lecture',items:[]};
   }
   // Mode "moisson seulement" : aucun appel Vinted.
   if (opts.harvestOnly) return { ok: true, items: [], pagination: null, raw: null, source: 'harvest' };
@@ -9259,10 +9275,10 @@ const fetchLotItems = async (account, transactionId) => {
 const fetchVintedListings = async (account, page = 1, opts = {}) => {
   // 1) Données moissonnées par l'extension (aucun appel Vinted). Tu dois avoir
   //    ouvert ta boutique/ton dressing sur vinted.fr pour qu'elles existent.
-  //    opts.force = on saute la moisson pour aller chercher le dernier état
-  //    directement sur Vinted (bouton "Synchroniser").
-  if (page === 1 && !opts.force) {
-    const h = await fetchHarvest(account.vinted_user_id, 'listings');
+  //    ⚠️ 5 nov. : `opts.force` relit cette copie sans le cache de l'écran,
+  //    jamais Vinted par le serveur (`src/freinRelaisVinted.js`).
+  if (page === 1) {
+    const h = await fetchHarvest(account.vinted_user_id, 'listings', opts.force ? { force: true } : undefined);
     // ⚠️ Une moisson VIDE n'est pas une réponse. Zéro annonce moissonnée voulait
     // dire « rien capté », pas « plus rien en ligne » — et l'app le prenait pour
     // argent comptant : d'où les bandeaux « compte muet » et « annonces
