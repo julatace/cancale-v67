@@ -22131,8 +22131,8 @@ function PhotosEbayEditeur({ urls, envois, places, message, onUrls, onAjouter, o
       )}
       {nEchec > 0 && <div role="status" data-ebay-photos-raison="" style={{ fontSize: 12, color: C.warn, marginTop: 8, lineHeight: 1.45 }}>{nEchec === 1 ? 'Une photo n\'est pas partie' : nEchec + ' photos ne sont pas parties'} : {(envois.find((x) => x.etat === 'echec') || {}).raison || 'raison inconnue'}. Réessaie, ou retire-{nEchec === 1 ? 'la' : 'les'}.</div>}
       {message && <div role="status" data-ebay-photos-trop="" style={{ fontSize: 12, color: C.warn, marginTop: 8, lineHeight: 1.45 }}>{message}</div>}
-      <input ref={refAppareil} type="file" accept="image/*" capture="environment" data-ebay-photo-appareil="" onChange={choisis} style={{ display: 'none' }} />
-      <input ref={refGalerie} type="file" accept="image/*" multiple data-ebay-photo-galerie="" onChange={choisis} style={{ display: 'none' }} />
+      <input ref={refAppareil} type="file" accept="image/*" capture="environment" data-ebay-photo-appareil="" onChange={choisis} style={{ display: 'none', fontSize: 16 }} />
+      <input ref={refGalerie} type="file" accept="image/*" multiple data-ebay-photo-galerie="" onChange={choisis} style={{ display: 'none', fontSize: 16 }} />
       <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
         <button type="button" data-ebay-prendre-photo="" disabled={!places} onClick={() => refAppareil.current && refAppareil.current.click()} style={geste(!places)}><Icon name="camera" size={18}/> Prendre une photo</button>
         <button type="button" data-ebay-galerie="" disabled={!places} onClick={() => refGalerie.current && refGalerie.current.click()} style={geste(!places)}><Icon name="image" size={18}/> Depuis la galerie</button>
