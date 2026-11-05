@@ -2640,8 +2640,32 @@ const RA = {};
       '[INA] synchro + relecture : aucune remise en vente envoyée à eBay (ni Relist*, ni AddItem)', tous.map((x) => x.appel).filter(Boolean).join(','));
     const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' ')).replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
     const fichiers = [path.join(RACINE, 'api', 'ebay.js'), ...fs.readdirSync(path.join(RACINE, 'api', '_lib')).filter((f) => /\.js$/.test(f)).map((f) => path.join(RACINE, 'api', '_lib', f))];
-    const fautifs = fichiers.filter((f) => /['"`](?:Relist\w*|AddItem)['"`]/.test(sansCommentaires(fs.readFileSync(f, 'utf8'))));
-    dit(fautifs.length === 0, '[INA] aucun appel Relist*/AddItem dans api/ (lu sans les commentaires)', fautifs.map((f) => path.basename(f)).join(','));
+    // (5 nov.) Depuis le 3-4 nov. (1a81a91c, chantier choisi par Julien) VRM SAIT
+    // remettre une inactive en vente — sur SON clic confirmé, rien d'autre
+    // (`relanceverif` / `relancer`, `handleRelance`, règle api/_lib/ebay-relance.js).
+    // La règle jugée reste « jamais de remise en vente qu'il n'a pas demandée » :
+    // un appel Relist*/AddItem n'existe QUE dans `handleRelance`, qui refuse
+    // tout `relancer` sans `confirme:true`, et le vrai Relist n'y part qu'APRÈS
+    // la branche « vérifier seulement ». Un champ de réponse (`RelistedItemID`)
+    // n'est pas un appel.
+    const APPEL = /['"`](?:(?:Verify)?Relist(?!ed)\w*|AddItem)['"`]/g;
+    const fautifs = [];
+    for (const f of fichiers) {
+      const t = sansCommentaires(fs.readFileSync(f, 'utf8'));
+      const d = path.basename(f) === 'ebay.js' ? t.indexOf('async function handleRelance(') : -1;
+      const fin = d < 0 ? -1 : (() => { const r = /\n(?:async )?function /g; r.lastIndex = d + 10; const m = r.exec(t); return m ? m.index : t.length; })();
+      let m; APPEL.lastIndex = 0;
+      while ((m = APPEL.exec(t))) if (!(d >= 0 && m.index > d && m.index < fin)) fautifs.push(`${path.basename(f)}:${t.slice(0, m.index).split('\n').length} ${m[0]}`);
+    }
+    dit(fautifs.length === 0, '[INA] aucun appel Relist*/AddItem dans api/ hors de la remise en vente sur son clic (lu sans les commentaires)', fautifs.join(','));
+    const ebayTxt = sansCommentaires(fs.readFileSync(path.join(RACINE, 'api', 'ebay.js'), 'utf8'));
+    const iR = ebayTxt.indexOf('async function handleRelance(');
+    const corpsR = iR < 0 ? '' : ebayTxt.slice(iR, ebayTxt.indexOf('\nasync function ', iR + 10));
+    const gardeConf = corpsR.indexOf("if (!seulementVerifier && b.confirme !== true) return");
+    const brancheVerif = corpsR.indexOf('if (seulementVerifier) {'), vraiRelist = corpsR.indexOf("'RelistFixedPriceItem'");
+    const appelants = [...ebayTxt.matchAll(/(\w+): \(ctx\) => handleRelance\(b, ctx, (true|false)\)/g)].map((x) => x[1] + '=' + x[2]);
+    dit(gardeConf > 0 && gardeConf < corpsR.indexOf('tradingCall') && brancheVerif > 0 && vraiRelist > brancheVerif && appelants.join(',') === 'relanceverif=true,relancer=false',
+      '[INA] la remise en vente : seulement `relancer`, `confirme:true` exigé avant tout appel à eBay, Relist après la vérification à blanc', appelants.join(','));
   });
 
   // ── 14 bis. (revue du 23 octobre) LA FENÊTRE, LA COURSE, LA COHÉRENCE ──────
