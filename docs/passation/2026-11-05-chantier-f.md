@@ -127,9 +127,31 @@ Compta
   `recuAvecADater(...)` — il jugeait l'orthographe, la règle (la SOURCE est
   `recuPublieEntre`) reste exigée.
 - Bancs de la zone, base → après : voir `## 6`.
+- `fusion-app` sur Compta, Factures, Statistiques (390 clair/sombre, 1512) : **68/0** après fusion de `claude/project-review-nsk5su` (F6 « En attente » des Factures : l'onglet choisi passe à `C.accentTexte` ; F4 : sous-onglets serrés pour garder les tuiles au-dessus de 300 px).
 - Captures (hors dépôt, regardées) : avant
   `scratchpad/f35/shots-avant/`, après `scratchpad/f35/shots-apres/` (`stats-*`,
   `compta-A-*`, `compta-B-*`, `bilan-*`, `delai-*`, 390/1512, clair/sombre).
+
+## 6. Bancs de la zone, base → après (même machine, données inventées)
+
+| banc | base | après | note |
+|---|---|---|---|
+| compta-stats-coherence (neuf) | 134 rouges / 22 | **0 / 186** | |
+| fusion-app (zone F) | 1 F6 (Factures) | **0 / 68** | |
+| annulations-notes | 0 / 30 | 0 / 30 | |
+| seuils-prevision | 0 / 32 | 0 / 32 | |
+| registres | 0 / 84 | 0 / 84 (première passe) | |
+| carte-stats | 0 / 114 | 0 / 114 (première passe) | |
+| dac7-comptes, benefice-unique, benefice-brut-net | verts | verts | |
+| compta-abonnements | vert | vert (seul) | rouge une fois en parallèle : capture en délai |
+| stats-vitrine | 6 | 6 | les mêmes |
+| stats-premium | 8 | 8 | les mêmes |
+| outils-stats | 2 | 2 | les mêmes |
+| stats-detail | 14 | 14 (seul) | Ma journée, hors zone |
+| offres-objectif | 4 | 4 | Messages, hors zone |
+| compta-claire | 4 | 4 | |
+| compta-simple | 4 | 6 | rouges de chargement qui changent d'une passe à l'autre ; sondé : « 37,20 € » écrit 1 fois, « 7,44 € » 3 fois comme sur la base |
+| stats-compta | 11 | 16 | les 5 de plus = « Ce qui se vend » à 1512 sous charge (attente de 15 s dépassée) ; lancé seul à 1512 : vert |
 
 ## 5. Ce qui reste
 - La visionneuse du ticket de dépense reste une visionneuse photo (`vrm-photo-viewer`),
