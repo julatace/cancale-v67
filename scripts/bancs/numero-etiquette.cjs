@@ -36,13 +36,16 @@ const ann = (id, title, heures) => ({ id, title, price: { amount: '49.0', curren
 // 9201 : publiée il y a 1 h, numérotée par VRM il y a 1 h (N°7) → « mise en ligne ».
 // 9202 : N°5 posé à la main. 9203 : N°3, publiée il y a 30 jours. 9204 : publiée il
 // y a 30 jours, numérotée aujourd'hui (premier passage) → pas une mise en ligne.
-const ITEMS = [ann(9201, 'Nike Air Max 90 blanc taille 42', 1), ann(9202, 'Salomon XT-6 noir taille 41', 40), ann(9203, 'Adidas Samba vert taille 40', 720), ann(9204, 'Asics Gel 1130 argent taille 43', 720)];
+// 9203 porte « N°3 » en fin de titre (posé par lui) ; 9205 : REPUBLIÉE il y a 1 h,
+// elle garde le N°2 de son carton (`recreeDe`) → pas une mise en ligne à renuméroter.
+const ITEMS = [ann(9201, 'Nike Air Max 90 blanc taille 42', 1), ann(9202, 'Salomon XT-6 noir taille 41', 40), ann(9203, 'Adidas Samba vert taille 40 N°3', 720), ann(9204, 'Asics Gel 1130 argent taille 43', 720), ann(9205, 'New Balance 550 blanc taille 44', 1)];
 const MAIN = (extra = {}) => ({
   vinted_annonce_numeros: {
     '9201': { numero: '7', auto: true, numberedAt: ilYa(1) },
     '9202': { numero: '5', auto: false, manuelAt: ilYa(30), numberedAt: ilYa(40) },
     '9203': { numero: '3', auto: true, numberedAt: ilYa(720) },   // avant la panne du 11-18 oct. : pas « à vérifier »
     '9204': { numero: '6', auto: true, numberedAt: ilYa(2) },
+    '9205': { numero: '2', auto: true, numberedAt: ilYa(1), recreeDe: '9100', recreeAt: ilYa(1) },
   },
   vinted_used_numeros: [1, 2, 3, 4, 5, 6, 7], ...extra,
 });
@@ -183,7 +186,7 @@ async function annonces(b, largeur, sombre) {
     dit(bloc, `${tag} : la mise en ligne numérotée par VRM est listée`);
     if (bloc) {
       const ids = await pg.evaluate(() => [...document.querySelectorAll('[data-num-neuf]')].map((e) => e.getAttribute('data-num-neuf')));
-      dit(ids.length === 1 && ids[0] === '9201', `${tag} : seulement 9201 (pas la paire à la main, ni l'ancienne, ni la vieille annonce numérotée aujourd'hui)`, ids.join(','));
+      dit(ids.length === 1 && ids[0] === '9201', `${tag} : seulement 9201 (pas la paire à la main, ni l'ancienne, ni la vieille annonce numérotée aujourd'hui, ni la republiée qui garde son N°)`, ids.join(','));
       await capture(pg, `B-${largeur}-${sombre ? 'sombre' : 'clair'}-neuf`);
     } else await capture(pg, `B-${largeur}-${sombre ? 'sombre' : 'clair'}-absent`);
     // À la mise en ligne : 7 → 40 (sans le bloc — code d'avant —, par la carte :
@@ -199,7 +202,10 @@ async function annonces(b, largeur, sombre) {
     const ligne = pg.locator('[data-a-ecrire="9201"]');
     dit(await ligne.count() === 1 && await ligne.getAttribute('data-a-ecrire-de') === '7' && await ligne.getAttribute('data-a-ecrire-vers') === '40' && await ligne.getAttribute('data-a-ecrire-main') === '1', `${tag} : « N°7 → N°40 » dans « à écrire sur tes cartons », changé par toi`);
     dit(await pg.locator('[data-num-neuf="9201"]').count() === 0, `${tag} : la ligne « mise en ligne » s'efface (le N° est maintenant le sien)`);
-    dit(await pg.locator('[data-a-ecrire="9201"] [data-a-ecrire-copier="N°40"]').count() === 1 && /N°7/.test(await ligne.innerText()), `${tag} : avec « fin du titre » choisie, la ligne dit l'étiquette à remplacer et la copie`);
+    dit(await pg.locator('[data-a-ecrire="9201"] [data-a-ecrire-copier="N°40"]').count() === 1, `${tag} : avec « fin du titre » choisie, la ligne propose de copier « N°40 »`);
+    // Rien d'affirmé qu'on n'a pas lu : le titre lu de 9201 ne porte pas « N°7 »
+    // (VRM n'écrit pas dans les annonces en ligne) ⇒ « ajoute », jamais « remplace « N°7 » ».
+    dit(await pg.getAttribute('[data-a-ecrire="9201"] [data-a-ecrire-vinted]', 'data-a-ecrire-vinted').catch(() => null) === 'ajouter', `${tag} : titre lu sans « N°7 » ⇒ la ligne dit d'ajouter « N°40 », pas de remplacer un « N°7 » absent`);
     await ligne.scrollIntoViewIfNeeded().catch(() => {});
     await capture(pg, `B-${largeur}-${sombre ? 'sombre' : 'clair'}-a-ecrire`);
     // APRÈS la mise en ligne, sur la carte : un N° porté par une autre paire présente.
@@ -218,6 +224,7 @@ async function annonces(b, largeur, sombre) {
     f = ((await local(pg, 'vinted_annonce_numeros')) || {})['9203'] || {};
     dit(String(f.numero) === '41' && f.reattribue && String(f.reattribue.de) === '3' && f.reattribue.main === true, `${tag} : N°3 → N°41 sur une annonce en ligne depuis 30 jours, noté à barrer`, JSON.stringify(f));
     dit(await pg.locator('[data-a-ecrire="9203"]').count() === 1, `${tag} : la ligne « N°3 → N°41 » est dans la liste`);
+    dit(await pg.getAttribute('[data-a-ecrire="9203"] [data-a-ecrire-vinted]', 'data-a-ecrire-vinted').catch(() => null) === 'remplacer', `${tag} : titre lu finissant par « N°3 » ⇒ « remplace « N°3 » par « N°41 » »`);
     // « C'est écrit » range la ligne.
     await toucher(pg, '[data-a-ecrire="9201"] button:has-text("C\'est écrit")', mobile);
     await pg.waitForTimeout(800);

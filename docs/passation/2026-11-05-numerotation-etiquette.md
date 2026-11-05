@@ -64,8 +64,11 @@ simplement 1, 2, 3, 4 » ; « attribuer/modifier le N° à la publication et apr
   « Changé par toi » ou « Doublon réglé par VRM ». Changé deux fois avant d'avoir écrit ⇒ le carton
   porte le PREMIER (12 → 40 → 41 dit « 12 → 41 ») ; revenu au premier ⇒ plus rien à barrer.
   `corrigerCarton` (« le carton dit N°58 ») passe `{ carton: true }` : rien à barrer.
-- Avec un endroit choisi, chaque ligne dit « sur Vinted, remplace « N°7 » par « N°40 » à la fin du
-  titre » et offre « Copier « N°40 » ».
+- Avec un endroit choisi, chaque ligne dit le geste sur Vinted sans rien affirmer qu'on n'a pas lu
+  (`etiquetteSurVinted(num, ancien, titre)`, attribut `data-a-ecrire-vinted`) et offre « Copier « N°40 » » :
+  dans le TITRE (lu du dressing) — `remplacer` (« remplace « N°7 » par « N°40 » ») s'il y porte
+  l'ancienne étiquette, `autre` s'il la porte sous une autre forme, `ajouter` (« ajoute « N°40 » »)
+  s'il n'en porte pas ; dans la DESCRIPTION (pas lue ici) — `si` (« si l'annonce porte « N°7 »… »).
 - Le contrôle d'impression (« As-tu écrit le N° sur le carton ? ») dit « Tu as changé ce numéro »
   au lieu de « doublon réglé » quand c'est son geste.
 - Garde-fous §5 inchangés et rejoués au banc : un ancien N° reste brûlé (le pool ne rend rien),
@@ -124,3 +127,41 @@ simplement 1, 2, 3, 4 » ; « attribuer/modifier le N° à la publication et apr
   questions, regarder l'aperçu, choisir.
 - Annonces : après une mise en ligne, toucher le N° de la ligne « numérotée par VRM » pour mettre
   celui de son carton ; barrer l'ancien et toucher « C'est écrit ».
+
+## Revue en adversaire (5 nov., même branche)
+Défauts reproduits au banc (12 rouges sur le build de l'auteur), corrigés :
+1. **Une instruction fausse sur Vinted.** La ligne « à écrire » disait toujours « sur Vinted, remplace
+   « N°7 » par « N°40 » à la fin du titre », alors que VRM n'écrit l'étiquette dans AUCUNE annonce en
+   ligne : le titre lu (`Nike Air Max 90 blanc taille 42`) ne portait pas « N°7 ». Elle dit maintenant
+   le geste d'après le titre LU (`remplacer` / `autre` / `ajouter`) et reste conditionnelle pour la
+   description (`si`). Banc : 9201 (sans étiquette) ⇒ `ajouter`, 9203 (« … N°3 ») ⇒ `remplacer`.
+2. **« Barre l'ancien numéro sur le carton »** affirmé pour SON geste, alors que le bloc de mise en
+   ligne l'invite à mettre « celui de ton carton » (le carton porte alors déjà le nouveau). Quand
+   toutes les lignes sont « Changé par toi », l'en-tête dit « Si le carton porte encore l'ancien
+   numéro, barre-le et écris le nouveau » ; un doublon réglé par VRM garde la phrase impérative.
+3. **Une paire REPUBLIÉE (`recreeDe`) listée comme « mise en ligne numérotée par VRM »** quand
+   l'ancienne fiche datait de moins de 48 h : elle garde le N° de son carton, rien à lui proposer.
+   Exclue (banc : 9205 republiée il y a 1 h, N°2, n'apparaît plus).
+4. **Le mode d'emploi** affirmait « L'ancienne étiquette est remplacée, jamais empilée » comme un
+   fait sur ses annonces : vrai seulement pour les textes que VRM prépare. Reformulé, et la liste
+   nommée comme à l'écran (« numéros à écrire sur tes cartons », pas « N° à barrer »).
+Preuves : `npm run build` vert ; banc `numero-etiquette` **132 verts** (12 rouges sur le build de
+l'auteur) ; `audit-etiquette-numero` 20 verts (5 rouges sur l'arbre d'avant) ; verts :
+`audit-fusion-nuage`, `audit-garde-numeros-rapide`, `audit-conflits-numeros`, `audit-reprise-numero`,
+`audit-coherence`, `audit-icones`, `audit-ebay-colis`, bancs `deux-appareils`, `numeros-lettres`,
+`numero-vinted`, `numeros-panne`, `numeros-reconnexion`, `lien-vc-frise`. `numeros-doublons` : 5 rouges
+(« part au nuage » ×4, « l'annonce en ligne prend un numéro neuf ») — les mêmes, et davantage (12), sur
+le build de `c52bb8ee` : sans lien avec ce chantier.
+
+### Ce qui reste (à demander à Julien / à décider)
+- **Le réglage n'agit aujourd'hui que dans « Rédiger une annonce (IA) »**, fonction payante qui se
+  tait sans clé (`no-key`) : sans elle, le choix de place/forme ne change encore aucun texte. Le vrai
+  effet viendra de l'extension (section ci-dessus). « À publier » (fiches dupliquées, `texteAColler`)
+  n'est PAS étiqueté exprès : ce texte peut partir sur Leboncoin/Vestiaire/eBay, et le réglage ne
+  vaut que pour Vinted — à trancher avec lui (un bouton « Copier pour Vinted » ?).
+- **« Des rythmes variés, pas simplement 1, 2, 3, 4 »** : lu ici comme des FORMES d'étiquette. Il
+  parlait peut-être de la SUITE des numéros (séries par compte, par carton, par date…). Seule la
+  série à lettre (`vrm_num_prefixe`) existe ; une autre suite toucherait `prochainLibre` (§5, jamais
+  sans sa décision). À lui demander.
+- « C'est bon » du bloc de mise en ligne est rangé par appareil (`vrm_num_neufs_vus`) : la ligne
+  revient sur l'iPhone si elle a été rangée sur l'ordinateur (48 h au plus).

@@ -218,7 +218,7 @@ import { champsSource, dupliquerFiche, fichesAPublier, texteAColler } from "./du
 import { histoireArticle, offresDeConversation } from "./histoireArticle.js";
 import { CLE_MODELES, lireModeles } from "./modelesDescription.js";
 import { MesModeles, InsererModele } from "./ModelesDescription.jsx";
-import { CLE_REGLAGE_ETIQUETTE, PLACES as PLACES_ETIQUETTE, FORMES as FORMES_ETIQUETTE, QUESTIONS as QUESTIONS_ETIQUETTE, ANNONCE_EXEMPLE, lireReglageEtiquette, etiquetteDe, poserEtiquette, proposition as propositionEtiquette } from "./etiquetteNumero.js";
+import { CLE_REGLAGE_ETIQUETTE, PLACES as PLACES_ETIQUETTE, FORMES as FORMES_ETIQUETTE, QUESTIONS as QUESTIONS_ETIQUETTE, ANNONCE_EXEMPLE, lireReglageEtiquette, etiquetteDe, poserEtiquette, retirerEtiquette, proposition as propositionEtiquette } from "./etiquetteNumero.js";
 import PrixPartout from "./PrixPartout.jsx";
 import { lireFile, noterSaisie, instantane, acquitter, compterEnAttente, nuagePlusRecent, fusionAuChargement, oublierCle, CLE_FILE, HORS_FILE } from "./fileEnvoi.js";
 // La migration qui cloisonne les vendeurs, lue depuis LE fichier (pas recopiée) :
@@ -9397,12 +9397,24 @@ const prefixeNumeros = () => { const p = String(load('vrm_num_prefixe', '') || '
 const clavierNum = () => (prefixeNumeros() ? 'text' : 'numeric');
 // (5 nov.) L'étiquette du N° dans le texte d'une annonce Vinted, si un endroit
 // est choisi (Réglages → Numéros, src/etiquetteNumero.js) ; null = « nulle part ».
-const etiquetteSurVinted = (num) => {
+// `ancien` + `titre` (lu du dressing) : le geste à dire, sans rien affirmer
+// qu'on n'a pas lu — VRM n'écrit pas encore dans les annonces en ligne, donc
+// l'ancienne étiquette n'y est que s'il l'a mise lui-même. Dans le titre (lu) :
+// 'remplacer' (elle y est, sous cette forme) · 'autre' (une autre forme) ·
+// 'ajouter' (aucune). Dans la description (pas lue ici) : 'si'.
+// (Jamais une identité, §5 : seulement la phrase.)
+const etiquetteSurVinted = (num, ancien = null, titre = null) => {
   const r = lireReglageEtiquette(load(CLE_REGLAGE_ETIQUETTE, null));
   if (r.place === 'aucune') return null;
   const etiquette = etiquetteDe(num, r.forme); if (!etiquette) return null;
   const p = PLACES_ETIQUETTE.find((x) => x.v === r.place);
-  return { etiquette, forme: r.forme, place: r.place, ou: p ? p.ou : '' };
+  const ancienne = ancien != null ? etiquetteDe(ancien, r.forme) : '';
+  let geste = 'si';
+  if (ancienne && r.place.startsWith('titre') && typeof titre === 'string' && titre.trim()) {
+    geste = retirerEtiquette({ titre }, ancien, [r.forme], [r.place]).retire > 0 ? 'remplacer'
+      : retirerEtiquette({ titre }, ancien, null, [r.place]).retire > 0 ? 'autre' : 'ajouter';
+  }
+  return { etiquette, ancienne, geste, forme: r.forme, place: r.place, ou: p ? p.ou : '' };
 };
 // Le prochain numéro LIBRE : le premier jamais donné. Sans préfixe, l'entier
 // comme avant (prisInt) ; avec préfixe, dans SA série (prisCles). On n'en
@@ -45420,11 +45432,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const blocAEcrire = () => aEcrireCarton.length > 0 && (
     <div data-numeros-a-ecrire={aEcrireCarton.length} style={{ background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn || '#B25000'}`, borderRadius: 12, padding: '10px 12px', marginBottom: 12 }}>
       <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{aEcrireCarton.length > 1 ? `${aEcrireCarton.length} nouveaux numéros à écrire sur tes cartons` : 'Un nouveau numéro à écrire sur un carton'}</div>
-      <div style={{ fontSize: 12, color: C.text2, margin: '3px 0 6px', lineHeight: 1.45 }}>Barre l'ancien numéro sur le carton et écris le nouveau. L'ancien ne sera jamais redonné.</div>
-      {aEcrireCarton.map((it) => { const f = numeros[it.id] || {}; const etq = etiquetteSurVinted(f.numero); return (
+      <div style={{ fontSize: 12, color: C.text2, margin: '3px 0 6px', lineHeight: 1.45 }}>{aEcrireCarton.every((it) => ((numeros[it.id] || {}).reattribue || {}).main) ? 'Si le carton porte encore l’ancien numéro, barre-le et écris le nouveau.' : 'Barre l’ancien numéro sur le carton et écris le nouveau.'} L'ancien ne sera jamais redonné.</div>
+      {aEcrireCarton.map((it) => { const f = numeros[it.id] || {}; const etq = etiquetteSurVinted(f.numero, f.reattribue.de, it.title); return (
         <div key={it.id} data-a-ecrire={String(it.id)} data-a-ecrire-de={f.reattribue.de} data-a-ecrire-vers={f.numero} data-a-ecrire-main={f.reattribue.main ? '1' : '0'} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '6px 0', borderTop: `1px solid ${C.border}` }}>
           <span style={{ fontSize: 13, color: C.text, flex: '1 1 200px', minWidth: 0 }}><s style={{ color: C.text2 }}>N°{f.reattribue.de}</s> → <b>N°{f.numero}</b> · {String(it.title || '').slice(0, 48)}
-            <span style={{ display: 'block', fontSize: 12, color: C.text2, marginTop: 2 }}>{f.reattribue.main ? 'Changé par toi' : 'Doublon réglé par VRM'}{etq ? <> · sur Vinted, remplace « {etiquetteDe(f.reattribue.de, etq.forme)} » par « {etq.etiquette} » {etq.ou}</> : null}</span></span>
+            <span style={{ display: 'block', fontSize: 12, color: C.text2, marginTop: 2 }}>{f.reattribue.main ? 'Changé par toi' : 'Doublon réglé par VRM'}{etq ? <> · <span data-a-ecrire-vinted={etq.geste}>{etq.geste === 'remplacer' ? <>sur Vinted, remplace « {etq.ancienne} » par « {etq.etiquette} » {etq.ou}</> : etq.geste === 'ajouter' ? <>sur Vinted, ajoute « {etq.etiquette} » {etq.ou}</> : etq.geste === 'autre' ? <>sur Vinted, remplace l’ancien N° {etq.ou} par « {etq.etiquette} »</> : <>sur Vinted, si l’annonce porte « {etq.ancienne} » {etq.ou}, remplace-le par « {etq.etiquette} »</>}</span></> : null}</span></span>
           {etq ? <button type="button" data-a-ecrire-copier={etq.etiquette} onClick={() => { try { navigator.clipboard.writeText(etq.etiquette); toast(`« ${etq.etiquette} » copié`); } catch (_) {} }} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 12, padding: '0 12px', minHeight: 44, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Copier « {etq.etiquette} »</button> : null}
           <button type="button" onClick={() => marquerReattribueEcrit(it)} style={{ border: `1px solid ${C.border}`, background: C.card, color: C.text, borderRadius: 12, padding: '0 12px', minHeight: 44, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>C'est écrit</button>
           {it._vrmMasquee ? <button type="button" data-masquee-partie={String(it.id)} onClick={() => masqueePlusLa(it)} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 12, padding: '0 12px', minHeight: 44, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Elle n'est plus là</button> : null}
@@ -45444,7 +45456,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const lim = Date.now() - 48 * 3600e3;
     return annoncesPresentes.filter((it) => {
       const f = numeros[it.id];
-      if (!f || !String(f.numero || '').trim() || f.auto === false || f.manuelAt || f.reattribue || f.repriseAt) return false;
+      // Une paire REPUBLIÉE (`recreeDe`) garde le N° de son carton : rien à proposer.
+      if (!f || !String(f.numero || '').trim() || f.auto === false || f.manuelAt || f.reattribue || f.repriseAt || f.recreeDe) return false;
       if (neufsVus[it.id] && neufsVus[it.id] === cleNum(f.numero)) return false;
       const t = Date.parse(f.numberedAt || ''); if (!isFinite(t) || t < lim) return false;
       // Une annonce publiée il y a longtemps, numérotée aujourd'hui (premier
@@ -63961,7 +63974,7 @@ function NumeroSurVinted() {
       <GuideReglage titre="Bien placer ton N°" etapes={[
         ['Pense au moment où tu le cherches', 'Une vente tombe : tu lis la liste (le titre) ou tu ouvres l’annonce (la description). Mets le N° là où ton œil va en premier.'],
         ['Choisis une forme que tu reconnais', 'N°12, #12, Réf 12, (12)… La même partout : tu la repères d’un coup d’œil, et elle ne change jamais le numéro écrit sur ton carton.'],
-        ['Si tu changes un N°', 'L’ancienne étiquette est remplacée, jamais empilée. L’ancien numéro passe dans « N° à barrer » jusqu’à ce que tu l’aies barré sur le carton.'],
+        ['Si tu changes un N°', 'Dans les textes que VRM te prépare, l’ancienne étiquette est remplacée, jamais empilée. Sur une annonce déjà en ligne, c’est à toi de la changer : VRM te dit quoi remplacer. L’ancien numéro passe dans « numéros à écrire sur tes cartons » jusqu’à « C’est écrit ».'],
       ]}/>
     </section>
   );
