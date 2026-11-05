@@ -37,7 +37,7 @@ jobs:
           node scripts/bancs/session-reveil.cjs
       - name: Vérifier la connexion autonome Orion
         run: |
-          node scripts/tests/orion-auth-bornes.cjs
+          node scripts/tests/orion-auth-autonome.cjs
           node scripts/tests/orion-connexion.cjs
           node scripts/tests/orion-paquet.cjs
       - name: Vérifier le périmètre des numéros Vinted
