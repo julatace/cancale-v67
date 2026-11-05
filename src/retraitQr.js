@@ -108,16 +108,35 @@ export function lignesSuiviMondialRelay(mr) {
 // rien ; sinon la liste fusionnée, triée du plus récent au plus ancien (l'ordre
 // que `pickupUnion` attend). Une ligne d'e-mail du MÊME n° qu'un colis lu dans
 // un compte reçoit le nom de ce compte (`mrCompte`) — l'identité est le n°.
+// ⚠️ (revue adverse du 5 nov.) CE QUE SEUL L'E-MAIL DU MÊME N° SAIT passe aussi sur la
+// ligne du compte : `pickupUnion` ne garde qu'une ligne par n° (la plus complète —
+// celle du compte, qui a le QR) et elle effaçait le compte Vinted de l'e-mail
+// (`account`), l'adresse qui l'a reçu (`recuSur`), le titre et la date d'arrivée LUE
+// (« Arrivé le 4 nov. » devenait « au plus tard le 5 », la date de la lecture).
+// L'identité est le n° de suivi, rien d'autre (§5).
 export function suivisAvecMondialRelay(tracking, mr) {
   const mrL = lignesSuiviMondialRelay(mr);
   if (!mrL.length) return tracking;
   const parN = new Map(mrL.map((l) => [l.suivi, l.mrCompte]));
+  const emailsParN = new Map();
   const emails = (Array.isArray(tracking) ? tracking : []).map((t) => {
     const k = t ? norm(t.suivi) : '';
+    if (k && parN.has(k)) { if (!emailsParN.has(k)) emailsParN.set(k, []); emailsParN.get(k).push(t); }
     return k && parN.has(k) && !t.mrCompte ? { ...t, mrCompte: parN.get(k) } : t;
   });
   const quand = (t) => Date.parse((t && (t.receivedAt || t.emailAt)) || '') || 0;
-  return [...emails, ...mrL].sort((a, b) => quand(b) - quand(a));
+  const mrE = mrL.map((l) => {
+    const es = (emailsParN.get(l.suivi) || []).slice().sort((a, b) => quand(b) - quand(a));
+    if (!es.length) return l;
+    const premier = (f) => { for (const e of es) { const v = f(e); if (v) return v; } return null; };
+    const recu = [];
+    for (const e of es) for (const a of (Array.isArray(e.recuSur) ? e.recuSur : (e.recuSur ? [e.recuSur] : []))) if (a && !recu.includes(a)) recu.push(a);
+    const photo = premier((e) => e.photo);
+    return { ...l, aussiEmail: true, account: premier((e) => e.account) || '', artTitle: premier((e) => e.artTitle) || '',
+      ...(recu.length ? { recuSur: recu } : {}), ...(photo ? { photo } : {}),
+      arriveLe: l.arriveLe || premier((e) => (e.status === 'available' ? dateIso(e.arriveLe) : '')) || null };
+  });
+  return [...emails, ...mrE].sort((a, b) => quand(b) - quand(a));
 }
 
 // Le code d'un e-mail et celui du compte Mondial Relay pour le même n° :
@@ -133,6 +152,14 @@ export function accordCodes(tracking, suivi) {
   }
   if (!codesMail.size || !codesMr.size) return '';
   return [...codesMr].every((c) => codesMail.has(c)) ? 'confirme' : 'different';
+}
+// (revue adverse du 5 nov.) Le code lu dans le compte Mondial Relay pour ce n° ('' sinon) :
+// quand les codes diffèrent, l'écran dit QUI fait foi en comparant au code MONTRÉ — la
+// fusion garde le plus récent, et un e-mail reçu après la lecture du compte peut l'être.
+export function codeDuCompteMr(tracking, suivi) {
+  const k = norm(suivi); if (!k || !Array.isArray(tracking)) return '';
+  for (const t of tracking) if (t && t.source === 'mondialrelay-compte' && norm(t.suivi) === k) { const c = codeRetraitMr(t.code); if (c) return c; }
+  return '';
 }
 
 // ── OÙ TROUVER LE QR QU'ON N'A PAS (« QR pas reçu ») ─────────────────────────
@@ -165,12 +192,19 @@ export function ilYa(iso, maintenant) {
 //   comptes Mondial Relay relus sont COMPLETS et qu'aucun ne le porte — « dans
 //   aucun compte Mondial Relay » (le cas que Julien a nommé) ;
 // · rien de su ⇒ null (jamais deviné).
+// ⚠️ (revue adverse du 5 nov.) « Dans aucun de tes comptes » exige aussi que CHAQUE compte
+// ait été relu APRÈS l'e-mail : un colis arrivé ce matin n'est pas « absent » d'un compte
+// relu hier (pas su ≠ non). Et seule une ligne d'E-MAIL dit « arrivé par e-mail » : un
+// colis vu par Vinted (`_o`) ou lu chez le transporteur (`synthetique`) n'en a pas.
 export function compteDuRetrait(t, mr) {
   if (!t) return null;
   const recu = Array.isArray(t.recuSur) ? t.recuSur.filter(Boolean) : (typeof t.recuSur === 'string' && t.recuSur ? [t.recuSur] : []);
-  if (t.mrCompte && t.mrCompte.libelle) return { source: 'mondialrelay', libelle: t.mrCompte.libelle, aussiEmail: t.source !== 'mondialrelay-compte', adresse: recu[0] || '' };
+  if (t.mrCompte && t.mrCompte.libelle) return { source: 'mondialrelay', libelle: t.mrCompte.libelle, aussiEmail: t.source !== 'mondialrelay-compte' || !!t.aussiEmail, adresse: recu[0] || '' };
+  if (t._o || t.synthetique || t.source === 'mondialrelay-compte') return null;
   const mrLus = mr && Array.isArray(mr.comptes) ? mr.comptes : [];
-  const horsComptes = String(t.carrier || '') === 'mondialrelay' && mrLus.length > 0 && mrLus.every((c) => c.complet);
+  const recuMs = Date.parse(t.receivedAt || t.emailAt || '');
+  const horsComptes = String(t.carrier || '') === 'mondialrelay' && mrLus.length > 0 && Number.isFinite(recuMs)
+    && mrLus.every((c) => c.complet && (Date.parse(c.luAt || '') || 0) >= recuMs);
   if (recu.length) return { source: 'email', libelle: recu[0], horsComptes };
   return horsComptes ? { source: 'email', libelle: '', horsComptes } : null;
 }

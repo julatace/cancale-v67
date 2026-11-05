@@ -219,7 +219,7 @@ import { histoireArticle, offresDeConversation } from "./histoireArticle.js";
 import { CLE_MODELES, lireModeles } from "./modelesDescription.js";
 import { MesModeles, InsererModele } from "./ModelesDescription.jsx";
 import PrixPartout from "./PrixPartout.jsx";
-import { MR_SELECT, lireColisMondialRelay, suivisAvecMondialRelay, accordCodes, ouTrouverQr, ilYa as ilYaLecture, compteDuRetrait, indexAchatsAutresSites } from "./retraitQr.js";
+import { MR_SELECT, lireColisMondialRelay, suivisAvecMondialRelay, accordCodes, codeDuCompteMr, ouTrouverQr, ilYa as ilYaLecture, compteDuRetrait, indexAchatsAutresSites } from "./retraitQr.js";
 import ExpliqueMondialRelay, { LecturesMondialRelay } from "./ExpliqueMondialRelay.jsx";
 import { lireFile, noterSaisie, instantane, acquitter, compterEnAttente, nuagePlusRecent, fusionAuChargement, oublierCle, CLE_FILE, HORS_FILE } from "./fileEnvoi.js";
 // La migration qui cloisonne les vendeurs, lue depuis LE fichier (pas recopiée) :
@@ -42162,6 +42162,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       return t;
     })
     .catch(() => { setTrackingKO(true); setTransp(prev => (Array.isArray(prev) ? prev : null)); return null; });
+  // (5 nov.) LES LIGNES DE SUIVI DES COLIS À RETIRER = les e-mails + les colis lus dans
+  // ses comptes Mondial Relay (src/retraitQr.js), de la MÊME forme, reliées par le n° de
+  // suivi seulement (§5). `pickupUnion` et tout ce qui juge un colis à retirer (fenêtre
+  // des transactions, étapes des suivis ajoutés à la main, points relais de la carte) les
+  // lisent (§11). `null` reste « e-mails pas lus ». Déclarée ICI, avant ses lecteurs (§4.6).
+  const trackingRetrait = useMemo(() => suivisAvecMondialRelay(tracking, mrColis), [tracking, mrColis]);
   const lireTransp = () => fetchTranspLignes({ force: true }).catch(() => null)
     .then(tr => setTransp(prev => (Array.isArray(tr) ? tr : (Array.isArray(prev) ? prev : null))));
   const [achEmails, setAchEmails] = useState(undefined); // reçus d'achat archivés (emails)
@@ -42256,7 +42262,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       photo: t.photo || orderPhoto(ph) || null,
       mode: r.mode, _t: t,
       // (5 nov.) Où trouver le QR qu'on n'a pas, le compte (Mondial Relay ou adresse), l'accord des codes.
-      qrOu: ouTrouverQr(t.carrier), compte: compteDuRetrait(t, mrColis), accord: accordCodes(trackingRetrait, suiviDeLigne(t)),
+      qrOu: ouTrouverQr(t.carrier), compte: compteDuRetrait(t, mrColis), accord: accordCodes(trackingRetrait, suiviDeLigne(t)), codeMr: codeDuCompteMr(trackingRetrait, suiviDeLigne(t)),
       source: t.mrCompte && t.qrB64 ? 'mondialrelay' : (t._o ? 'conversation' : 'email'),
     };
     // ⚠️ (5 nov.) UN VRAI QR SE MONTRE TOUJOURS, quel que soit le mode préféré du transporteur :
@@ -42387,7 +42393,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // géocodé (adresse exacte) et ENREGISTRÉ en permanence. La carte se construit
   // ainsi toute seule à partir de tes vrais points, même après retrait du colis.
   useEffect(() => { (async () => {
-    const avail = (tracking || []).filter(isPickupActive);
+    // (revue adverse du 5 nov.) + les points relais des colis lus dans ses comptes Mondial Relay.
+    const avail = (trackingRetrait || []).filter(isPickupActive);
     // Regroupe par NOM propre du point (plusieurs colis au même relais → 1 point)
     const parPoint = {};
     avail.forEach(t => { const c = cleanLieu(t.lieu); if (c.nom) parPoint[c.nom] = c; });
@@ -42406,7 +42413,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       await new Promise(r2 => setTimeout(r2, 400));
     }
   })(); // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tracking]);
+  }, [trackingRetrait]);
   // Ajoute/complète un point (issu d'un email) dans les points enregistrés.
   const ensureSavedPoint = (nom, adresse, lat, lon) => {
     setSavedPoints(prev => {
@@ -43218,7 +43225,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const txSuivisColis = useMemo(() => {
     const s = new Set(vintedToPickup.map(o => String(o.transaction_id)));
     let plusAncien = Infinity;
-    for (const t of (tracking || [])) {
+    // (revue adverse du 5 nov.) + les colis lus dans ses comptes Mondial Relay (`trackingRetrait`) :
+    // un colis du compte seul doit, lui aussi, ouvrir la fenêtre où se trouve sa commande.
+    for (const t of (trackingRetrait || [])) {
       if (!isColisEnAttente(t, collected, suivisEnvoyes)) continue;
       if (etatColisEmail(t).etat !== 'a_retirer') continue;
       const a = arriveeColisEmail(t);
@@ -43229,7 +43238,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const depuis = plusAncien - 21 * 86400000;
     for (const o of buysBase) { const d = Date.parse((o && o.date) || ''); if (Number.isFinite(d) && d >= depuis) s.add(String(o.transaction_id)); }
     return s;
-  }, [buysBase, vintedToPickup, tracking, collected, suivisEnvoyes]);
+  }, [buysBase, vintedToPickup, trackingRetrait, collected, suivisEnvoyes]);
   // « Colis à retirer » = UN SEUL compteur, l'UNION des deux signaux, dédoublonnée
   // par titre : (1) email transporteur (porte le CODE de retrait) + (2) statut
   // Vinted « déposé en point relais ». ⚠️ Avant on prenait « email OU Vinted »
@@ -43300,7 +43309,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ses comptes Mondial Relay (src/retraitQr.js), de la MÊME forme, reliés par le n° de
   // suivi seulement (§5). Toute la règle d'en dessous s'applique telle quelle (§11) :
   // un colis par n°, retiré, reparti, à vérifier. `null` reste « e-mails pas lus ».
-  const trackingRetrait = useMemo(() => suivisAvecMondialRelay(tracking, mrColis), [tracking, mrColis]);
   const pickupUnion = useMemo(() => {
     const maintenant = Date.now();
     // (23 oct.) LA fin d'un colis par son n° de suivi (retiré · reparti), toutes
@@ -43674,7 +43682,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }, [pickupUnion, buysBase, indexSuivisAchats]);
   // Les fins par n° de suivi (la règle de `pickupUnion`), pour dire où en est un
   // n° ajouté à la main (`etapeDuSuiviManuel`).
-  const finsSuivis = useMemo(() => finsColis(tracking, suivisEnvoyes, transp), [tracking, suivisEnvoyes, transp]);
+  // (revue adverse du 5 nov.) Les mêmes lignes que `pickupUnion` (§11) : un retrait lu dans un compte
+  // Mondial Relay fait avancer, lui aussi, l'étape d'un suivi ajouté à la main.
+  const finsSuivis = useMemo(() => finsColis(trackingRetrait, suivisEnvoyes, transp), [trackingRetrait, suivisEnvoyes, transp]);
   const transpMap = useMemo(() => transpParSuivi(transp), [transp]);
   // (2 nov.) LE TRANSPORTEUR D'UN COLIS, LU (src/transporteursVisuels.js, une règle) :
   // la ligne lue chez le transporteur pour ce n°, ce qu'écrit la plateforme ou
@@ -53932,7 +53942,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {aFilter==='attente' && <EtatSuiviVinted achats={[...pickupUnion.extra, ...(pickupUnion.aConfirmer||[]), ...pickupUnion.aVerifier.filter(x=>x.kind==='vinted').map(x=>x.o)]}
           suivisVinted={suivisVinted} etatDe={etatSuiviDe} accName={accName} relire={relireSuivisVinted}/>}
         {aFilter==='attente' && <SuivisManuels liste={suivisManuels} tracking={tracking} transp={transpMap} achats={buysBase} accName={accName} relire={relireSuivisManuelsPartout}
-          etapeDe={(n)=>etapeDuSuiviManuel(n,{union:pickupUnion,fins:finsSuivis,tracking,collected,index:indexSuivisAchats,raison:raisonAVerifier})}/>}
+          etapeDe={(n)=>etapeDuSuiviManuel(n,{union:pickupUnion,fins:finsSuivis,tracking:trackingRetrait,collected,index:indexSuivisAchats,raison:raisonAVerifier})}/>}
         {/* (29 oct.) « EN COURS DE VÉRIFICATION » : des achats que Vinted dit
             « déposés en point relais », qu'AUCUNE identité ne relie encore à un
             colis montré au-dessus (ni code de retrait, ni n° de suivi), alors
@@ -55739,7 +55749,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 return <span className="vrm-rp-sous" data-colis-compte-source={cr.source} data-colis-compte-mr={cr.source === 'mondialrelay' ? cr.libelle : undefined} data-colis-hors-comptes-mr={cr.horsComptes ? '1' : undefined}>
                   {cr.source === 'mondialrelay' ? `Compte Mondial Relay · ${cr.libelle}${cr.aussiEmail ? ' · aussi par e-mail' : ''}` : [cr.libelle ? `Arrivé par e-mail sur ${cr.libelle}` : 'Arrivé par e-mail', cr.horsComptes ? 'dans aucun de tes comptes Mondial Relay relus' : ''].filter(Boolean).join(' · ')}</span>; })() : null}
               {t ? (() => { const ac = accordCodes(trackingRetrait, suiviDeLigne(t)); if (!ac) return null;
-                return <span className="vrm-rp-sous" data-colis-code-accord={ac}>{ac === 'confirme' ? 'Code confirmé par ton compte Mondial Relay' : `Code différent de l’e-mail : celui de ton compte Mondial Relay (relu ${ilYaLecture(t.mrCompte && t.mrCompte.luAt, Date.now()) || 'récemment'}) fait foi`}</span>; })() : null}
+                // ⚠️ (revue adverse du 5 nov.) QUI fait foi se lit sur le code MONTRÉ : un e-mail reçu après la
+                // lecture du compte porte le code le plus récent (`fusionLignesMemeSuivi`), et c'est lui qui s'affiche.
+                const foi = ac === 'confirme' ? '' : (codeRetrait(t.code) && codeRetrait(t.code) === codeDuCompteMr(trackingRetrait, suiviDeLigne(t)) ? 'compte' : 'email');
+                const relu = ilYaLecture(t.mrCompte && t.mrCompte.luAt, Date.now()) || 'récemment';
+                return <span className="vrm-rp-sous" data-colis-code-accord={ac} data-colis-code-foi={foi || undefined}>{ac === 'confirme' ? 'Code confirmé par ton compte Mondial Relay' : foi === 'compte' ? `Code différent de l’e-mail : celui de ton compte Mondial Relay (relu ${relu}) fait foi` : `Code différent de ton compte Mondial Relay (relu ${relu}) : l’e-mail, reçu après, fait foi`}</span>; })() : null}
               {x.achatAutre ? <span className="vrm-rp-sous" data-colis-achat-site={x.achatAutre.site}>{`Achat ${x.achatAutre.site === 'leboncoin' ? 'Leboncoin' : 'Vestiaire'}${x.achatAutre.titre ? ` · ${x.achatAutre.titre}` : ''} (relié par le n° de suivi)`}</span> : null}
               {/* (23-24 oct.) La dernière nouvelle de Vinted et ce que dit le transporteur, par
                   l'identité de CE colis (n° de suivi, transaction) — rien quand il n'y a rien. */}
@@ -58653,8 +58667,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             )}
             {/* (5 nov.) Pas de QR : dit, avec où le trouver (jamais un QR fabriqué). */}
             {!qrView.img && qrView.mode!=='home' && qrView.qrOu && <div data-qr-plein-absent="" style={{fontSize:12,color:'#444',textAlign:'center',lineHeight:1.45,background:'#F5F5F7',borderRadius:12,padding:'8px 12px'}}><strong>QR pas reçu</strong> · {qrView.qrOu}</div>}
-            {qrView.accord && <div data-qr-plein-accord={qrView.accord} style={{fontSize:12,color:'#444',textAlign:'center'}}>{qrView.accord==='confirme'?'Code confirmé par ton compte Mondial Relay':'Code de ton compte Mondial Relay (plus récent que l’e-mail)'}</div>}
-            {qrView.compte && (qrView.compte.libelle || qrView.compte.horsComptes) && <div data-qr-plein-compte={qrView.compte.source} style={{fontSize:12,color:'#666',textAlign:'center'}}>{qrView.compte.source==='mondialrelay'?`Compte Mondial Relay · ${qrView.compte.libelle}`:[qrView.compte.libelle?`Reçu sur ${qrView.compte.libelle}`:'Reçu par e-mail',qrView.compte.horsComptes?'dans aucun compte Mondial Relay':''].filter(Boolean).join(' · ')}</div>}
+            {qrView.accord && <div data-qr-plein-accord={qrView.accord} style={{fontSize:12,color:'#444',textAlign:'center'}}>{qrView.accord==='confirme'?'Code confirmé par ton compte Mondial Relay':(qrView.code && qrView.code===qrView.codeMr)?'Code de ton compte Mondial Relay (plus récent que l’e-mail)':'Code de l’e-mail (reçu après la lecture de ton compte Mondial Relay)'}</div>}
+            {qrView.compte && (qrView.compte.libelle || qrView.compte.horsComptes) && <div data-qr-plein-compte={qrView.compte.source} style={{fontSize:12,color:'#666',textAlign:'center'}}>{qrView.compte.source==='mondialrelay'?`Compte Mondial Relay · ${qrView.compte.libelle}`:[qrView.compte.libelle?`Reçu sur ${qrView.compte.libelle}`:'Reçu par e-mail',qrView.compte.horsComptes?'dans aucun de tes comptes Mondial Relay relus':''].filter(Boolean).join(' · ')}</div>}
             {qrView.lieu && <div style={{fontSize:13,fontWeight:600,color:'#111',textAlign:'center',lineHeight:1.35}}>{qrView.lieu}</div>}
             {qrView.limite && (()=>{ const j=Math.ceil((new Date(qrView.limite+'T23:59:59')-Date.now())/86400000);
               return <div style={{fontSize:12,fontWeight:700,color:'#B25000',textAlign:'center'}}>

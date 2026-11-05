@@ -8,6 +8,11 @@
 //  · 81000005 : e-mail Mondial Relay d'un ACHAT LEBONCOIN (relié par le n° d'expédition de son lien de suivi) ;
 //  · Chronopost avec code sans QR ⇒ « QR pas reçu » (Chronopost) ; Vinted Go code + QR hébergé.
 //  · une vente Leboncoin à envoyer avec son QR de dépôt.
+//  (revue adverse du 5 nov.) · 81000001 : l'e-mail porte le compte Vinted et la date d'arrivée ⇒ la ligne
+//    fusionnée les GARDE (avant : la ligne du compte Mondial Relay gagnait et les effaçait) ;
+//  · 81000006 : e-mail reçu APRÈS la dernière lecture des comptes ⇒ jamais « dans aucun de tes comptes » ;
+//  · 81000007 : e-mail plus récent que la lecture, code DIFFÉRENT ⇒ le code montré est celui de l'e-mail, et
+//    la phrase le dit (avant : « celui de ton compte Mondial Relay fait foi » sous le code de l'e-mail).
 // Exige (data-* et nombres, §6.4) : 7 colis, chacun une fois (= vrm_colis_retirer) ; le QR du compte sur
 // 81000001 et 81000003, l'accord « confirmé », le compte nommé ; « QR pas reçu » + où le trouver sur
 // 81000002 et le Chronopost ; « dans aucun de tes comptes » ; deux comptes Mondial Relay avec leur
@@ -36,7 +41,9 @@ const QR = { type: 'image/svg+xml', b64: Buffer.from('<svg xmlns="http://www.w3.
 const track = (carrier, suivi, lieu, code, extra = {}) => ({ id: `email_track_${carrier}_${suivi}`, data: Object.assign({ type: 'suivi', carrier, suivi, status: 'available', statusLabel: 'Arrivé au point de retrait', subject: `Votre colis ${suivi} est disponible`, receivedAt: ilYa(0.3), emailAt: ilYa(0.3), arriveLe: ilYa(0.3), code, lieu, limite: jourDans(5), consigne: false, account: '' }, extra) });
 const LIEU = 'MAISON DU QUAI, 40 RUE DU QUAI, 35260 CANCALE';
 const TRACKS = [
-  track('mondialrelay', '81000001', LIEU, '100001', { recuSur: ['boite-a@exemple.fr'] }),
+  track('mondialrelay', '81000001', LIEU, '100001', { recuSur: ['boite-a@exemple.fr'], account: 'compte_a', arriveLe: ilYa(1.2), receivedAt: ilYa(0.3), emailAt: ilYa(0.3) }),
+  track('mondialrelay', '81000006', LIEU, '100006', { recuSur: ['boite-b@exemple.fr'], receivedAt: iso(MS - 60e3), emailAt: iso(MS - 60e3), arriveLe: iso(MS - 60e3) }),
+  track('mondialrelay', '81000007', LIEU, '200007', { recuSur: ['boite-a@exemple.fr'], receivedAt: iso(MS - 60e3), emailAt: iso(MS - 60e3), arriveLe: iso(MS - 60e3) }),
   track('mondialrelay', '81000002', LIEU, '100002', { recuSur: ['boite-b@exemple.fr'] }),
   track('mondialrelay', '81000005', LIEU, '100005', { recuSur: ['boite-a@exemple.fr'] }),
   track('chronopost', 'XW100000001JB', 'RELAIS PICKUP DU PORT, 2 QUAI GAMBETTA, 35260 CANCALE', '700001'),
@@ -46,6 +53,7 @@ const MR = [
   { id: 'mr_colis_a1', data: { v: 1, compte: { libelle: 'compte-mr-1' }, luAt: iso(MS - 3 * 60e3), complet: true, colis: [
     { suivi: '81000001', etat: 'disponible', code: '100001', qr: QR, lieu: LIEU, limite: jourDans(5), sens: 'entrant' },
     { suivi: '81000003', etat: 'disponible', code: '100003', qr: QR, lieu: LIEU, limite: jourDans(6), sens: 'entrant' },
+    { suivi: '81000007', etat: 'disponible', code: '100007', qr: QR, lieu: LIEU, limite: jourDans(6), sens: 'entrant' },
     { suivi: '81000099', etat: 'disponible', code: '100099', qr: QR, lieu: LIEU, sens: 'sortant' },
   ] } },
   { id: 'mr_colis_b2', data: { v: 1, compte: { libelle: 'compte-mr-2' }, luAt: iso(MS - 2 * 3600e3), complet: true, colis: [
@@ -56,7 +64,7 @@ const LBC = { id: 'lbc_ventes', data: { ventes: {
   9001: { txId: 9001, isSeller: true, title: 'Exemple vendu sur Leboncoin', stepStatus: 'paid', stepLabel: 'Vente confirmée', at: ilYa(1), label: { voucherUrl: 'https://exemple.invalid/bordereau.pdf', qrUrl: 'https://api.leboncoin.fr/api/shippingproxy/exemple/qr' } },
   9002: { txId: 9002, isSeller: false, title: 'Exemple acheté sur Leboncoin', stepStatus: 'validation', at: ilYa(3), label: { trackingUrl: 'https://www.mondialrelay.com/public/permanent/tracking.aspx?ens=MRLBCOIN&exp=81000005&language=FR&CodePostal=35260' } },
 } } };
-const TOTAL = 7;
+const TOTAL = 9;
 const lignes = (sombre) => [
   { id: 'main', data: { vinted_dark: sombre, vrm_ville: '' } },
   { id: 'harvest_111_orders_purchased', data: { capturedAt: cap, payload: { my_orders: [] } } },
@@ -126,7 +134,9 @@ const carte = (pg, suivi) => pg.evaluate((k) => {
   const a = (sel, at) => { const e = c.querySelector(sel); return e ? (at ? e.getAttribute(at) : e.textContent.trim()) : null; };
   return { site: c.getAttribute('data-site'), qrSource: a('[data-colis-qr]', 'data-colis-qr-source'), qrAbsent: a('[data-colis-qr-absent]', 'data-colis-qr-absent'), qrAbsentTxt: a('[data-colis-qr-absent]'),
     accord: a('[data-colis-code-accord]', 'data-colis-code-accord'), compteMr: a('[data-colis-compte-mr]', 'data-colis-compte-mr'), horsComptes: a('[data-colis-hors-comptes-mr]', 'data-colis-hors-comptes-mr'),
-    achatSite: a('[data-colis-achat-site]', 'data-colis-achat-site'), plein: !!c.querySelector('[data-colis-plein-ecran]'), code: a('[data-code-retrait]', 'data-code-retrait') };
+    achatSite: a('[data-colis-achat-site]', 'data-colis-achat-site'), plein: !!c.querySelector('[data-colis-plein-ecran]'), code: a('[data-code-retrait]', 'data-code-retrait'),
+    compteSource: a('[data-colis-compte-source]', 'data-colis-compte-source'), accordTxt: a('[data-colis-code-accord]'), accordFoi: a('[data-colis-code-accord]', 'data-colis-code-foi'),
+    compteVinted: a('[data-rp-suivi]', 'data-colis-compte'), arriveSur: a('[data-arrive-sur]', 'data-arrive-sur'), arriveLe: a('[data-arrive-le]', 'data-arrive-le') };
 }, suivi);
 
 (async () => {
@@ -165,6 +175,10 @@ const carte = (pg, suivi) => pg.evaluate((k) => {
         await pg.waitForTimeout(300);
         const c1 = await carte(pg, '81000001'), c2 = await carte(pg, '81000002'), c3 = await carte(pg, '81000003'), c4 = await carte(pg, '81000004'), c5 = await carte(pg, '81000005'), ch = await carte(pg, 'XW100000001JB');
         dit(c1 && c1.qrSource === 'mondialrelay' && c1.accord === 'confirme' && c1.compteMr === 'compte-mr-1' && c1.code === '100001', '81000001 : code de l’e-mail ET QR du compte, « confirmé », compte nommé', JSON.stringify(c1));
+        dit(c1 && c1.compteVinted === 'compte_a' && c1 && c1.arriveSur === 'oui' && c1.arriveLe === jourDans(-1.2).slice(0, 10), '81000001 : la ligne fusionnée garde le compte Vinted et la date d’arrivée de l’e-mail', JSON.stringify({ compte: c1 && c1.compteVinted, sur: c1 && c1.arriveSur, le: c1 && c1.arriveLe }));
+        const c6 = await carte(pg, '81000006'), c7 = await carte(pg, '81000007');
+        dit(c6 && c6.horsComptes == null && c6.compteSource === 'email', '81000006 : e-mail reçu après la dernière lecture des comptes ⇒ jamais « dans aucun de tes comptes »', JSON.stringify(c6));
+        dit(c7 && c7.code === '200007' && c7.accordFoi === 'email' && !/compte Mondial Relay[^:]*fait foi/.test(c7.accordTxt || '') , '81000007 : code de l’e-mail plus récent montré, et la phrase dit que c’est lui qui fait foi', JSON.stringify(c7));
         dit(c2 && c2.qrAbsent === 'mondialrelay' && /QR pas reçu/.test(c2.qrAbsentTxt || '') && /compte Mondial Relay/.test(c2.qrAbsentTxt || '') && c2.horsComptes === '1' && c2.plein, '81000002 : « QR pas reçu » + où le trouver, « dans aucun de tes comptes », le code en grand', JSON.stringify(c2));
         dit(c3 && c3.qrSource === 'mondialrelay' && c3.compteMr === 'compte-mr-1' && c3.code === '100003', '81000003 (compte seul) : son code et son QR', JSON.stringify(c3));
         dit(c4 && c4.compteMr === 'compte-mr-2', '81000004 : le second compte Mondial Relay nommé', JSON.stringify(c4));

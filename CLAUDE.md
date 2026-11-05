@@ -501,7 +501,7 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 
-- **5 nov. · Colis code + QR** : code et QR reliés par n° de suivi, « En grand » (écran allumé), « QR pas reçu » + où, comptes Mondial Relay (`mr_colis_*`) prêts côté app, QR de dépôt Leboncoin ; extension à faire. `docs/passation/2026-11-05-colis-qr.md`. Geste : « En grand » sur un colis.
+- **5 nov. · Colis code + QR** : code et QR reliés par n° de suivi, « En grand » (écran allumé), « QR pas reçu » + où, comptes Mondial Relay (`mr_colis_*`) prêts côté app, QR de dépôt Leboncoin ; extension à faire ; revue adverse : 4 défauts corrigés (§6). `docs/passation/2026-11-05-colis-qr.md`. Geste : « En grand » sur un colis.
 
 - **5 nov. · Numéros** : fiche numérotée du nuage jamais retirée par la fusion (plus de bloc « Recharger »). `docs/passation/2026-11-05-numeros-autre-appareil.md` ; demandes du jour : `demandes-2026-11-05.md`.
 

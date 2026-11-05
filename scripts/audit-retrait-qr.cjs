@@ -72,11 +72,24 @@ async function verifier(srcModule, srcApp, bavard) {
   dit(M.ilYa(L2, now) === 'il y a 3 min' && M.ilYa('', now) === '' && M.ilYa('2026-11-03T11:03:00Z', now) === 'il y a 48 h' || M.ilYa('2026-11-03T11:03:00Z', now) === 'il y a 2 j', 'C6 « relu il y a 3 min » ; date illisible ⇒ rien', M.ilYa(L2, now));
   const cMr = M.compteDuRetrait(fus.find((t) => t.id === 'cible'), mr);
   dit(cMr && cMr.source === 'mondialrelay' && cMr.libelle === 'compte-b@exemple.fr' && cMr.aussiEmail, 'C7 colis d’e-mail aussi lu dans un compte ⇒ ce compte, « aussi par e-mail »', JSON.stringify(cMr));
-  const cHors = M.compteDuRetrait({ carrier: 'mondialrelay', recuSur: ['boite@exemple.fr'] }, mr);
+  const AVANT = '2026-11-05T09:00:00.000Z', APRES = '2026-11-05T10:30:00.000Z';
+  const cHors = M.compteDuRetrait({ carrier: 'mondialrelay', recuSur: ['boite@exemple.fr'], receivedAt: AVANT }, mr);
   dit(cHors && cHors.source === 'email' && cHors.libelle === 'boite@exemple.fr' && cHors.horsComptes === true, 'C8 arrivé par e-mail, dans aucun compte relu complet ⇒ dit', JSON.stringify(cHors));
   const mrPartiel = { comptes: [{ ...mr.comptes[0], complet: false }], colis: [] };
-  dit(M.compteDuRetrait({ carrier: 'mondialrelay', recuSur: ['boite@exemple.fr'] }, mrPartiel).horsComptes === false, 'C9 une lecture partielle ne permet pas de dire « dans aucun compte » (pas su ≠ non)');
+  dit(M.compteDuRetrait({ carrier: 'mondialrelay', recuSur: ['boite@exemple.fr'], receivedAt: AVANT }, mrPartiel).horsComptes === false, 'C9 une lecture partielle ne permet pas de dire « dans aucun compte » (pas su ≠ non)');
   dit(M.compteDuRetrait({ carrier: 'chronopost' }, mr) === null, 'C10 rien de su ⇒ null (jamais deviné)');
+  // (revue adverse du 5 nov.)
+  const cApres = M.compteDuRetrait({ carrier: 'mondialrelay', recuSur: ['boite@exemple.fr'], receivedAt: APRES }, mr);
+  dit(cApres && cApres.horsComptes === false, 'C11 e-mail reçu APRÈS la lecture d’un compte ⇒ jamais « dans aucun compte » (pas su ≠ non)', JSON.stringify(cApres));
+  dit(M.compteDuRetrait({ carrier: 'mondialrelay', receivedAt: AVANT }, mr) && M.compteDuRetrait({ carrier: 'mondialrelay', _o: {}, receivedAt: AVANT }, mr) === null
+    && M.compteDuRetrait({ carrier: 'mondialrelay', synthetique: true, receivedAt: AVANT }, mr) === null, 'C12 un colis vu par Vinted ou lu chez le transporteur n’est jamais « arrivé par e-mail »');
+  const fus3 = M.suivisAvecMondialRelay([{ carrier: 'mondialrelay', status: 'available', suivi: '10000001', code: '123456', account: 'compte_v', recuSur: ['boite@exemple.fr'], artTitle: 'Paire X', arriveLe: '2026-11-03T08:00:00.000Z', receivedAt: AVANT }], mr);
+  const lmr = fus3.find((t) => t.source === 'mondialrelay-compte' && t.suivi === '10000001');
+  dit(lmr && lmr.account === 'compte_v' && lmr.recuSur && lmr.recuSur[0] === 'boite@exemple.fr' && lmr.artTitle === 'Paire X' && lmr.arriveLe === '2026-11-03T08:00:00.000Z' && lmr.aussiEmail,
+    'C13 la ligne du compte reprend ce que seul l’e-mail du MÊME n° sait (compte Vinted, adresse, titre, arrivée lue)', JSON.stringify(lmr && { a: lmr.account, r: lmr.recuSur, ar: lmr.arriveLe }));
+  const autre = fus3.find((t) => t.source === 'mondialrelay-compte' && t.suivi !== '10000001');
+  dit(autre && !autre.account && !autre.artTitle && !autre.aussiEmail, 'C14 un autre n° ne reçoit rien de cet e-mail (§5)');
+  dit(M.codeDuCompteMr(fus2, '10000001') === '123456' && M.codeDuCompteMr(fus2, '20000003') === '', 'C15 le code du compte pour CE n° (pour dire qui fait foi sous le code montré)');
 
   // ── D. achats des autres sites ──
   const idx = M.indexAchatsAutresSites({
@@ -112,6 +125,10 @@ async function verifier(srcModule, srcApp, bavard) {
   dit(/data-colis-qr-absent=/.test(app) && /ouTrouverQr\(/.test(app), 'E7 « QR pas reçu » dit sur la carte, avec où le trouver');
   dit(/<GardeEcranAllume\/>/.test(app) && /data-qr-plein-luminosite/.test(app), 'E8 l’écran reste allumé et la luminosité est expliquée');
   dit(/data-lbc-qr-depot/.test(app), 'E9 le QR de dépôt Leboncoin sur la carte du colis à envoyer');
+  dit(/=== codeDuCompteMr\(trackingRetrait, suiviDeLigne\(t\)\) \? 'compte' : 'email'/.test(app) && /qrView\.code===qrView\.codeMr/.test(app), 'E10 « qui fait foi » se juge sur le code MONTRÉ (carte et vue en grand)');
+  const iTx = app.indexOf('const txSuivisColis = useMemo('), iFs = app.indexOf('const finsSuivis = useMemo(');
+  dit(iTx > 0 && /trackingRetrait/.test(app.slice(iTx, iTx + 900)) && /finsColis\(trackingRetrait,/.test(app.slice(iFs, iFs + 200)) && app.indexOf('const trackingRetrait = useMemo(') < iTx,
+    'E11 fenêtre des transactions et étapes des suivis à la main lisent les mêmes lignes que pickupUnion (déclarées avant, §4.6)');
   fs.rmSync(tmp, { recursive: true, force: true });
   return { ok, ko };
 }
@@ -121,7 +138,11 @@ const MUTATIONS = [
   ['module', 'A3 : accepter le sens sortant', (s) => s.replace("|| (x.sens && x.sens !== 'entrant')", '')],
   ['module', 'A4 : tout QR accepté', (s) => s.replace('if (!TYPES_QR.has(type) || !b64', 'if (!b64')],
   ['module', 'B1 : garder la plus ancienne lecture', (s) => s.replace('>= (Date.parse(c.luAt) || 0)) continue;', '<= (Date.parse(c.luAt) || 0)) continue;')],
-  ['module', 'C9 : lecture partielle = complète', (s) => s.replace('mrLus.every((c) => c.complet)', 'true')],
+  ['module', 'C9 : lecture partielle = complète', (s) => s.replace('mrLus.every((c) => c.complet &&', 'mrLus.every((c) => true &&')],
+  ['module', 'C11 : lecture d’avant l’e-mail suffit', (s) => s.replace("mrLus.every((c) => c.complet && (Date.parse(c.luAt || '') || 0) >= recuMs)", 'mrLus.every((c) => c.complet)')],
+  ['module', 'C12 : conversation « par e-mail »', (s) => s.replace("if (t._o || t.synthetique || t.source === 'mondialrelay-compte') return null;", '')],
+  ['module', 'C13 : la ligne du compte efface l’e-mail', (s) => s.replace('if (!es.length) return l;', 'return l;')],
+  ['app', 'E10 : « fait foi » sans regarder le code montré', (s) => s.replace("codeRetrait(t.code) === codeDuCompteMr(trackingRetrait, suiviDeLigne(t)) ? 'compte' : 'email'", "true ? 'compte' : 'email'")],
   ['module', 'D3 : doublon gardé', (s) => s.replace('for (const k of doubles) m.delete(k);', '')],
   ['module', 'A1 : rien lu ⇒ liste vide', (s) => s.replace('if (!Array.isArray(rows)) return null;', 'if (!Array.isArray(rows)) return { comptes: [], colis: [], ignores: 0 };')],
   ['app', 'E4 : photo par le titre', (s) => s.replace('const ph = (t && t._o) ||', 'const ph = buysBase.find(o => normTitle(o.title) === normTitle(t.artTitle)) || (t && t._o) ||')],
