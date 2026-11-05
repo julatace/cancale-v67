@@ -1,6 +1,6 @@
 VRM POUR ORION — IPHONE ET IPAD
 
-Version du moteur VRM : 5.319.0
+Version du moteur VRM : 5.320.0
 Paquet d’import WebExtension adapté à Orion, distinct du ZIP Chrome.
 Ni fiche de boutique ni application Safari signée par Apple.
 
@@ -32,9 +32,22 @@ INSTALLATION
    Le mode Compatibilité d’Orion peut désactiver les extensions : le vérifier
    sur ces sites si VRM ne s’affiche pas.
 
-5. Ouvrir https://vrm.center dans Orion et se connecter à son compte VRM.
-   Ouvrir ensuite Vinted ou Leboncoin dans CE MÊME Orion et se connecter.
+5. Dans la fenêtre VRM de l’extension : « avec mon mot de passe VRM ».
+   Saisir l’email et le mot de passe du compte VRM (jamais ceux de Vinted).
+   Après connexion, l’adresse du compte doit être affichée. Un onglet VRM
+   n’est pas nécessaire pour transmettre les données. Le mot de passe
+   n’est pas conservé par l’extension.
+   Si une vérification anti-robot est demandée, utiliser « Se connecter
+   avec VRM » : elle doit être effectuée sur le site, sans la contourner.
+   Ouvrir Vinted ou Leboncoin dans CE MÊME Orion et s’y connecter.
    Garder Orion au premier plan pendant la capture.
+
+ÉCRAN D’ACCUEIL IPHONE / IPAD
+
+Une web app Vinted ajoutée à l’écran d’accueil peut fonctionner en dehors
+d’Orion et ne pas disposer de ses extensions. Pour la capture, ouvrir
+Vinted dans Orion et vérifier VRM dans le menu Extensions. Installer
+VRM dans Orion ne l’installe pas dans Safari ni dans l’application Vinted.
 
 VÉRIFICATION
 

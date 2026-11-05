@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.319.0';
+const CODE_VERSION = '5.320.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -404,12 +404,16 @@ async function authLogin(email, password) {
   const mail = String(email || '').trim().toLowerCase();
   if (!mail || !password) return { ok: false, error: 'Email et mot de passe requis.' };
   try {
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+    const res = await avecDelai(fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: mail, password }),
-    });
-    const j = await res.json().catch(() => ({}));
+      ...(ctrl ? { signal: ctrl.signal } : {}),
+    }), 12000, null);
+    if (!res) { if (ctrl) ctrl.abort(); return { ok: false, error: 'Le serveur ne répond pas. Vérifie ta connexion puis réessaie.' }; }
+    const j = await avecDelai(res.json().catch(() => ({})), 6000, null);
+    if (!j) return { ok: false, error: 'La réponse de connexion n’a pas pu être lue. Réessaie.' };
     if (!res.ok || !j.access_token) {
       // On traduit : « invalid_grant » n'aide personne à se connecter.
       const brut = String(j.error_description || j.msg || j.error || '');

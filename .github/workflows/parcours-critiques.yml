@@ -35,6 +35,11 @@ jobs:
         run: |
           node --test scripts/tests/session-renouvellement.test.mjs
           node scripts/bancs/session-reveil.cjs
+      - name: Vérifier la connexion autonome Orion
+        run: |
+          node scripts/tests/orion-auth-bornes.cjs
+          node scripts/tests/orion-connexion.cjs
+          node scripts/tests/orion-paquet.cjs
       - name: Vérifier le périmètre des numéros Vinted
         run: node scripts/tests/numeros-vinted-perimetre-interface.cjs
       - name: Vérifier l’espace emails
