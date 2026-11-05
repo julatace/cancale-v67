@@ -57513,7 +57513,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <span style={{fontSize:17,fontWeight:700,color:C.warn,letterSpacing:-0.3}}>{total}</span>
                 <span style={{fontSize:13,fontWeight:600,color:C.text}}>à envoyer en priorité{overdue?' · du retard':''}</span>
               </div>
-              <div style={{fontSize:11,color:C.text,marginTop:2}}>{parts.join(' · ')} — {ouSontLesPresses(u)}</div>
+              <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.4}}>{parts.join(' · ')} — {ouSontLesPresses(u)}</div>
             </div>
           );
         })()}
@@ -57633,7 +57633,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <span className="vrm-colis-vide-titre">Aucun colis à envoyer</span>
               <span className="vrm-colis-vide-sous">Une vente à envoyer apparaît ici dès que l’extension la lit.</span>
               {nEnvoyesVu ? <Bouton variante="discret" data-colis-voir-envoyes="" onClick={() => onOngletColis && onOngletColis('envoyes')}>Voir les envoyés</Bouton> : null}
-            </div></>
+            </div>
+            {/* La tournée ouverte quand le dernier colis vient d'être déposé : elle le dit, puis se ferme sur SON geste. */}
+            {tourneeDepot ? <SheetShell onClose={() => setTourneeDepot(false)} titre="Tournée de dépôt" maxWidth={560} data-tournee-sheet="">
+              <div className="vrm-colis-vide-envoi" data-tournee-fini=""><span className="vrm-colis-vide-titre">Tout est déposé</span><span className="vrm-colis-vide-sous">Plus aucun colis à déposer pour l’instant.</span></div>
+            </SheetShell> : null}</>
           );
           // (2 nov.) `nowrap` : à 1512 px « Marquer imprimé » passait sur deux lignes dans son bouton.
           const sec = { flexShrink:0, borderRadius:12, padding:'0 14px', minHeight:44, boxSizing:'border-box', cursor:'pointer', fontSize:13, fontWeight:600, fontFamily:'inherit', whiteSpace:'nowrap' };
@@ -57689,6 +57693,84 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   trois colis visibles au lieu de six, sur l'écran où il travaille
                   quand il prépare ses cartons. `minmax(min(430px,100%), 1fr)` —
                   le `min()` évite qu'une piste de 430 px déborde un téléphone. */}
+              {/* (5 nov., chantier D) La tournée de dépôt AU-DESSUS de la liste (la liste s'ouvre par son intertitre) :
+                  les mêmes colis, rangés par la même règle que la liste (`rangerColisEnvoi`). */}
+              {(() => {
+                const trNomDe = trNomColis;
+                const exT = rangerColisEnvoi([...ex, ...autresColis], trNomDe);
+                // ── (5 nov., chantier D) LA TOURNÉE DE DÉPÔT ─────────────────────────────────────────
+                // Les colis À ENVOYER de cette liste (les mêmes, dans le même ordre), regroupés par
+                // transporteur — le réseau où on les dépose. Le point de dépôt précis d'un colis n'est relié
+                // à lui par aucune identité : jamais deviné, c'est dit une fois. Chaque colis UNE fois, par
+                // SA clé (n° de transaction, id Vestiaire, transaction Leboncoin — jamais le titre) ;
+                // « Déposé » est le geste existant (`deposeScan` : « Colis fait », annulable 5 s) et le
+                // scanner existant s'ouvre d'ici. eBay : l'étiquette vient d'eBay, le dépôt s'y suit.
+                const faitsVc = vcCarte('vrm_vc_colis_done') || {};
+                const faitsLbc = load('vrm_lbc_colis_done', {}) || {};
+                const tourneeItems = exT.map((x) => {
+                  const att = attenteColis(x);
+                  if (x.__autre === 'vc') return faitsVc[x.v.id] ? null : { cle: 'vc:' + x.v.id, site: 'vestiaire', v: x.v, num: x.v.num || '', titre: x.v.titre || 'Article Vestiaire', photo: x.v.photo || null, att, pret: !!(x.v.bordereau || x.v.etiquette), x };
+                  if (x.__autre === 'eb') return { cle: x.key, site: 'ebay', num: x.x.ordre ? (numLigneEbay(x.x.ordre, (x.x.ordre.lineItems || [])[0]) || '') : '', titre: x.x.titre || `Commande ${x.x.orderId}`, photo: x.x.ordre ? photoCommande(x.x.ordre) : null, lien: lienCommandeEbay(x.x.orderId, x.x.compte), att, pret: true, x };
+                  if (x.__autre === 'lbc') { if (faitsLbc[x.x.txId]) return null; const f = x.x.itemId ? (load('vinted_annonce_numeros', {}) || {})[x.x.itemId] : null;
+                    return { cle: 'lbc:' + x.x.txId, site: 'leboncoin', txId: x.x.txId, num: (f && f.numero != null) ? String(f.numero).trim() : '', titre: x.x.titre || (x.o && x.o.title) || '(sans titre)', photo: photoArticle(x.o || {}), att, pret: !!(x.o && x.o.label && x.o.label.voucherUrl), x }; }
+                  const o = x.o, b = x.b; if (o ? isShipDone(o) : isBordShippedManual(b)) return null;
+                  return { cle: 'v:' + (x.txn || x.key), site: 'vinted', o, b, num: (b ? numForBord(b) : '') || (o ? (effEntry(o)?.numero || '') : ''), titre: (o && o.title) || (b && (b.modele || b.article)) || 'Colis', photo: o ? orderPhoto(o) : bordPhoto(b), att, pret: !!x.pret, x };
+                }).filter(Boolean);
+                const groupesT = groupesTournee(tourneeItems, { trNom: (t) => trNomDe(t.x), cle: (t) => t.cle });
+                const enAttenteT = deposeScan.attente ? String(deposeScan.attente.cle) : '';
+                const tourneeEl = (tourneeItems.length || tourneeDepot) ? (
+                  <div key="__tournee" className="vrm-tournee-tete" >
+                    {tourneeItems.length ? <Bouton variante="secondaire" icone="pin" data-tournee-ouvrir={tourneeItems.length} onClick={() => setTourneeDepot(true)}>Tournée de dépôt</Bouton> : null}
+                    {tourneeDepot ? (
+                      <SheetShell onClose={() => setTourneeDepot(false)} titre="Tournée de dépôt" maxWidth={560} data-tournee-sheet=""
+                        sousTitre={(() => { const m0 = new Date(); m0.setHours(0, 0, 0, 0); const d = gestesDepuis(shipDone, m0.getTime()); return `${tourneeItems.length} colis à déposer${d ? ` · ${d} déjà déposé${d > 1 ? "s" : ""} aujourd’hui` : ""}`; })()}>
+                        <div className="vrm-tournee">
+                          <div className="vrm-tournee-haut">
+                            <p className="vrm-tournee-note">Dépose chaque groupe dans un point de son transporteur. Le point précis n’est pas lu par VRM.</p>
+                            <Bouton variante="secondaire" icone="scan" data-tournee-scanner="" onClick={() => setScanOuvert(true)}>Scanner</Bouton>
+                          </div>
+                          {!groupesT.length ? <div className="vrm-colis-vide-envoi" data-tournee-fini=""><span className="vrm-colis-vide-titre">Tout est déposé</span><span className="vrm-colis-vide-sous">Plus aucun colis à déposer pour l’instant.</span></div> : null}
+                          {groupesT.map((g) => {
+                            const trG = g.colis[0].x.__autre ? g.colis[0].x.tr : transporteurVente(g.colis[0].x.b);
+                            return (
+                              <section key={g.nom} className="vrm-tournee-groupe" data-tournee-groupe={g.nom} data-n={g.colis.length}>
+                                <div className="vrm-fu-groupe-transp">
+                                  <span className="vrm-fu-groupe-tuile" aria-hidden="true">{trG && trG.cle ? <LogoTransporteur cle={trG.cle} taille={22} repli={<Icon name="truck" size={15}/>}/> : <Icon name="box" size={16}/>}</span>
+                                  <h3>{g.nom}</h3>
+                                  <span>{g.colis.length} colis</span>
+                                </div>
+                                <ul className="vrm-tournee-liste">
+                                  {g.colis.map((t) => {
+                                    const enAttente = enAttenteT === t.cle;
+                                    const peutDeposer = t.site !== 'ebay' && t.pret;
+                                    return (
+                                      <li key={t.cle} className={'vrm-tournee-colis' + (enAttente ? ' is-attente' : '')} data-tournee-colis={t.cle} data-etat={enAttente ? 'attente' : 'a-deposer'}>
+                                        <span className="vrm-tournee-photo">{t.photo && !imgMortes.has(t.photo) ? <PhotoVinted src={t.photo} alt="" loading="lazy" onError={() => noterImgMorte(t.photo)}/> : <PhotoVide taille={44} remplir/>}</span>
+                                        <span className="vrm-tournee-quoi">
+                                          <span className="vrm-tournee-titre">{t.num ? <><Numero n={t.num} taille="petit"/>{' '}</> : null}{t.titre}</span>
+                                          <span className="vrm-tournee-sous">{enAttente ? 'Déposé · annulable quelques secondes' : t.site === 'ebay' ? 'Étiquette eBay : le dépôt se suit dans eBay' : !t.pret ? 'Bordereau pas encore là' : texteAttenteVente(t.att) || '—'}</span>
+                                        </span>
+                                        {enAttente
+                                          ? <Bouton variante="discret" data-tournee-annuler={t.cle} onClick={deposeScan.annuler}>Annuler</Bouton>
+                                          : t.site === 'ebay'
+                                            ? <Bouton variante="discret" href={t.lien} target="_blank" rel="noreferrer" data-tournee-ebay={t.cle}>eBay</Bouton>
+                                            : !peutDeposer ? null
+                                            : <Bouton variante="secondaire" data-tournee-depose={t.cle} title="Marquer ce colis déposé"
+                                                onClick={() => deposeScan.demander(t.cle, t.site === 'vinted' ? { site: 'vinted', cle: t.cle, o: t.o, b: t.b, num: t.num, titre: t.titre } : t.site === 'vestiaire' ? { site: 'vestiaire', cle: t.cle, v: t.v, num: t.num, titre: t.titre } : { site: 'leboncoin', cle: t.cle, txId: t.txId, num: t.num, titre: t.titre }, t.num ? `N°${t.num}` : t.titre)}>Déposé</Bouton>}
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              </section>
+                            );
+                          })}
+                        </div>
+                      </SheetShell>
+                    ) : null}
+                  </div>
+                ) : null;
+                return tourneeEl;
+              })()}
               <div className="vrm-colis-grille" data-cible="colonne:prets colonne:attente" data-colis-lignes="1" style={{display:'flex',flexDirection:'column',gap:6}}>
               {(()=>{
                 // (2 nov., 22 h, maquette FusionColis) LES COLIS RANGÉS PAR TRANSPORTEUR : un en-tête
@@ -57736,77 +57818,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     gestes={<button type="button" data-geste="fait" data-lbc-fait={x.txId} className="vrm-colis-sec vrm-colis-ter" onClick={() => { const u = { ...fait }; if (u[x.txId]) delete u[x.txId]; else u[x.txId] = Date.now(); save('vrm_lbc_colis_done', u); majLbcFait(); }}
                       style={{...sec,border:`1px solid ${C.border}`,background:'transparent',color:C.muted}}>Déposé</button>}/>;
                 };
-                // ── (5 nov., chantier D) LA TOURNÉE DE DÉPÔT ─────────────────────────────────────────
-                // Les colis À ENVOYER de cette liste (les mêmes, dans le même ordre), regroupés par
-                // transporteur — le réseau où on les dépose. Le point de dépôt précis d'un colis n'est relié
-                // à lui par aucune identité : jamais deviné, c'est dit une fois. Chaque colis UNE fois, par
-                // SA clé (n° de transaction, id Vestiaire, transaction Leboncoin — jamais le titre) ;
-                // « Déposé » est le geste existant (`deposeScan` : « Colis fait », annulable 5 s) et le
-                // scanner existant s'ouvre d'ici. eBay : l'étiquette vient d'eBay, le dépôt s'y suit.
-                const faitsVc = vcCarte('vrm_vc_colis_done') || {};
-                const faitsLbc = load('vrm_lbc_colis_done', {}) || {};
-                const tourneeItems = exT.map((x) => {
-                  const att = attenteColis(x);
-                  if (x.__autre === 'vc') return faitsVc[x.v.id] ? null : { cle: 'vc:' + x.v.id, site: 'vestiaire', v: x.v, num: x.v.num || '', titre: x.v.titre || 'Article Vestiaire', photo: x.v.photo || null, att, pret: !!(x.v.bordereau || x.v.etiquette), x };
-                  if (x.__autre === 'eb') return { cle: x.key, site: 'ebay', num: x.x.ordre ? (numLigneEbay(x.x.ordre, (x.x.ordre.lineItems || [])[0]) || '') : '', titre: x.x.titre || `Commande ${x.x.orderId}`, photo: x.x.ordre ? photoCommande(x.x.ordre) : null, lien: lienCommandeEbay(x.x.orderId, x.x.compte), att, pret: true, x };
-                  if (x.__autre === 'lbc') { if (faitsLbc[x.x.txId]) return null; const f = x.x.itemId ? (load('vinted_annonce_numeros', {}) || {})[x.x.itemId] : null;
-                    return { cle: 'lbc:' + x.x.txId, site: 'leboncoin', txId: x.x.txId, num: (f && f.numero != null) ? String(f.numero).trim() : '', titre: x.x.titre || (x.o && x.o.title) || '(sans titre)', photo: photoArticle(x.o || {}), att, pret: !!(x.o && x.o.label && x.o.label.voucherUrl), x }; }
-                  const o = x.o, b = x.b; if (o ? isShipDone(o) : isBordShippedManual(b)) return null;
-                  return { cle: 'v:' + (x.txn || x.key), site: 'vinted', o, b, num: (b ? numForBord(b) : '') || (o ? (effEntry(o)?.numero || '') : ''), titre: (o && o.title) || (b && (b.modele || b.article)) || 'Colis', photo: o ? orderPhoto(o) : bordPhoto(b), att, pret: !!x.pret, x };
-                }).filter(Boolean);
-                const groupesT = groupesTournee(tourneeItems, { trNom: (t) => trNomDe(t.x), cle: (t) => t.cle });
-                const enAttenteT = deposeScan.attente ? String(deposeScan.attente.cle) : '';
-                const tourneeEl = tourneeItems.length ? (
-                  <div key="__tournee" className="vrm-tournee-tete" style={{gridColumn:'1 / -1'}}>
-                    <Bouton variante="secondaire" icone="pin" data-tournee-ouvrir={tourneeItems.length} onClick={() => setTourneeDepot(true)}>Tournée de dépôt</Bouton>
-                    {tourneeDepot ? (
-                      <SheetShell onClose={() => setTourneeDepot(false)} titre="Tournée de dépôt" maxWidth={560} data-tournee-sheet=""
-                        sousTitre={(() => { const m0 = new Date(); m0.setHours(0, 0, 0, 0); const d = gestesDepuis(shipDone, m0.getTime()); return `${tourneeItems.length} colis à déposer${d ? ` · ${d} déjà déposé${d > 1 ? "s" : ""} aujourd’hui` : ""}`; })()}>
-                        <div className="vrm-tournee">
-                          <div className="vrm-tournee-haut">
-                            <p className="vrm-tournee-note">Dépose chaque groupe dans un point de son transporteur. Le point précis n’est pas lu par VRM.</p>
-                            <Bouton variante="secondaire" icone="scan" data-tournee-scanner="" onClick={() => setScanOuvert(true)}>Scanner</Bouton>
-                          </div>
-                          {groupesT.map((g) => {
-                            const trG = g.colis[0].x.__autre ? g.colis[0].x.tr : transporteurVente(g.colis[0].x.b);
-                            return (
-                              <section key={g.nom} className="vrm-tournee-groupe" data-tournee-groupe={g.nom} data-n={g.colis.length}>
-                                <div className="vrm-fu-groupe-transp">
-                                  <span className="vrm-fu-groupe-tuile" aria-hidden="true">{trG && trG.cle ? <LogoTransporteur cle={trG.cle} taille={22} repli={<Icon name="truck" size={15}/>}/> : <Icon name="box" size={16}/>}</span>
-                                  <h3>{g.nom}</h3>
-                                  <span>{g.colis.length} colis</span>
-                                </div>
-                                <ul className="vrm-tournee-liste">
-                                  {g.colis.map((t) => {
-                                    const enAttente = enAttenteT === t.cle;
-                                    const peutDeposer = t.site !== 'ebay' && t.pret;
-                                    return (
-                                      <li key={t.cle} className={'vrm-tournee-colis' + (enAttente ? ' is-attente' : '')} data-tournee-colis={t.cle} data-etat={enAttente ? 'attente' : 'a-deposer'}>
-                                        <span className="vrm-tournee-photo">{t.photo && !imgMortes.has(t.photo) ? <PhotoVinted src={t.photo} alt="" loading="lazy" onError={() => noterImgMorte(t.photo)}/> : <PhotoVide taille={44} remplir/>}</span>
-                                        <span className="vrm-tournee-quoi">
-                                          <span className="vrm-tournee-titre">{t.num ? <><Numero n={t.num} taille="petit"/>{' '}</> : null}{t.titre}</span>
-                                          <span className="vrm-tournee-sous">{enAttente ? 'Déposé · annulable quelques secondes' : t.site === 'ebay' ? 'Étiquette eBay : le dépôt se suit dans eBay' : !t.pret ? 'Bordereau pas encore là' : texteAttenteVente(t.att) || '—'}</span>
-                                        </span>
-                                        {enAttente
-                                          ? <Bouton variante="discret" data-tournee-annuler={t.cle} onClick={deposeScan.annuler}>Annuler</Bouton>
-                                          : t.site === 'ebay'
-                                            ? <Bouton variante="discret" href={t.lien} target="_blank" rel="noreferrer" data-tournee-ebay={t.cle}>eBay</Bouton>
-                                            : !peutDeposer ? null
-                                            : <Bouton variante="secondaire" data-tournee-depose={t.cle} title="Marquer ce colis déposé"
-                                                onClick={() => deposeScan.demander(t.cle, t.site === 'vinted' ? { site: 'vinted', cle: t.cle, o: t.o, b: t.b, num: t.num, titre: t.titre } : t.site === 'vestiaire' ? { site: 'vestiaire', cle: t.cle, v: t.v, num: t.num, titre: t.titre } : { site: 'leboncoin', cle: t.cle, txId: t.txId, num: t.num, titre: t.titre }, t.num ? `N°${t.num}` : t.titre)}>Déposé</Bouton>}
-                                      </li>
-                                    );
-                                  })}
-                                </ul>
-                              </section>
-                            );
-                          })}
-                        </div>
-                      </SheetShell>
-                    ) : null}
-                  </div>
-                ) : null;
-                return [tourneeEl, ...exT.map((e,ix)=>{
+                return exT.map((e,ix)=>{
                 const ouvreT = ix === 0 || trNomDe(exT[ix-1]) !== trNomDe(e);
                 const trG = e.__autre ? e.tr : transporteurVente(e.b);
                 if (e.__autre) return (
@@ -58042,7 +58054,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </div>
                   </React.Fragment>
                 );
-              })]; })()}
+              }); })()}
               </div>
               {/* (2 nov., colis clair) Sous la liste : ce n'est pas un geste du moment. */}
               {/* (17 oct.) Julien : « un bouton dans l'onglet Colis qui met en couleur
@@ -58052,10 +58064,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const nums = [...new Set(ex.filter(x => !estPoste(x)).map(x => (x.b ? numForBord(x.b) : '') || (x.o ? (effEntry(x.o)?.numero || '') : '')).map(n => String(n || '').trim()).filter(Boolean))];
                 if (!nums.length) return null;
                 return (
-                  <button type="button" data-colis-stock={nums.length} onClick={() => { DEMANDE_STOCK_CHERCHE.nums = nums; DEMANDE_STOCK_CHERCHE.at = Date.now(); onNav && onNav('garage'); }}
-                    style={{alignSelf:'flex-start',display:'inline-flex',alignItems:'center',gap:8,border:`1px solid ${C.border}`,borderRadius:12,background:C.card,color:C.text,padding:'0 14px',minHeight:44,fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-                    <Icon name="home" size={16}/>{/* (1er nov.) sans le nombre : c'est celui des colonnes (§7) */}{nums.length>1?'Où sont ces articles':'Où est cet article'} dans le stock
-                  </button>
+                  /* (5 nov., chantier D) La forme commune (`Bouton` discret) : un lien d'action sous la liste, pas une carte. */
+                  <Bouton variante="discret" icone="home" data-colis-stock={nums.length} style={{alignSelf:'flex-start',marginTop:6}} onClick={() => { DEMANDE_STOCK_CHERCHE.nums = nums; DEMANDE_STOCK_CHERCHE.at = Date.now(); onNav && onNav('garage'); }}>
+                    {/* (1er nov.) sans le nombre : c'est celui des colonnes (§7) */}{nums.length>1?'Où sont ces articles':'Où est cet article'} dans le stock
+                  </Bouton>
                 );
               })()}
             </div>
@@ -58178,7 +58190,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           </div>
                         </div>
                         <Frise etapes={frise} cle={x.cle} className="vrm-colis-frise" label="Où en est le colis"/>
-                        {annuler ? <div className="vrm-colis-actions" style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:10}}>{annuler}</div> : null}
+                        {/* (5 nov., chantier D) « Suivre » sur un colis parti dont le n° est lu (le bordereau) : le geste qu'on y vient chercher. */}
+                        {(() => { const su = (x.b && x.b.suivi) || (x.v && x.v.suivi) || ''; const suivre = su ? <BoutonSuivreColis transporteur={(x.tr && x.tr.cle) || ''} suivi={su} enLigne court attrs={{'data-colis-envoye-suivre': x.cle}}/> : null;
+                          return (annuler || suivre) ? <div className="vrm-colis-actions" style={{display:'flex',gap:8,justifyContent:'flex-end',flexWrap:'wrap',marginTop:10}}>{suivre}{annuler}</div> : null; })()}
                       </div>
                     </React.Fragment>
                   );

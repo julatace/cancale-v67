@@ -232,6 +232,8 @@ const carte = (pg, suivi) => pg.evaluate((k) => {
         // « En grand » sans QR (81000001) : le code en gros, « QR dans l’app », « Ajouter le QR » ; le lien suit le colis.
         await pg.locator('[data-cc-carte="r:e:81000001"] [data-colis-plein-ecran]').first().click();
         await pg.waitForSelector('[data-qr-plein]', { timeout: 5000 }).catch(() => {});
+        // (5 nov., chantier D) « En grand » est une SheetShell qui glisse en entrant : on attend qu'elle soit posée (Chromium sans écran laisse parfois l'animation « running »).
+        await pg.evaluate(() => { try { document.getAnimations().forEach((a) => { try { a.finish(); } catch (_) {} }); } catch (_) {} }); await pg.waitForTimeout(500);
         const v0 = await pg.evaluate(() => { const v = document.querySelector('[data-qr-plein]'); return v ? { code: v.getAttribute('data-qr-plein-code'), img: v.getAttribute('data-qr-plein-img'), absent: v.querySelector('[data-qr-plein-absent]') ? v.querySelector('[data-qr-plein-absent]').textContent : null, ajouter: !!v.querySelector('[data-qr-plein-ajouter]'), txt: v.textContent } : null; });
         dit(v0 && v0.code === '100001' && v0.img === '0' && /^QR dans l’app Mondial Relay/.test(v0.absent || '') && v0.ajouter && !/Ouvrir Mondial Relay \(QR\)/.test(v0.txt) && /Suivre le colis/.test(v0.txt), '« En grand » sans QR : le code, « QR dans l’app Mondial Relay », « Ajouter le QR » ; plus de « Ouvrir Mondial Relay (QR) »', JSON.stringify(v0 && { ...v0, txt: undefined }));
         if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `qr-plein-sans-${tag}.png`) });

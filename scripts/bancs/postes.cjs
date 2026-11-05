@@ -114,7 +114,7 @@ let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' �
       'au départ déjà : le compte du haut = les cartes, et les postés annoncés sont tous dans « Partis », sous leur intertitre',
       JSON.stringify(a));
   for(let i=0;i<2;i++){
-    await pg.evaluate(()=>{const b=[...document.querySelectorAll('[data-bord-card] button')].find(x=>/Colis fait/.test(x.textContent)); if(b)b.click();});
+    await pg.evaluate(()=>{/* (5 nov., chantier D) le geste « Colis fait » s'appelle « Déposé » : on le prend par son data-geste */ const b=[...document.querySelectorAll('[data-bord-card] button[data-geste="fait"]')].find(x=>!/Pas encore/.test(x.textContent)); if(b)b.click();});
     await pg.waitForTimeout(700);
   }
   const c=await stable(false);

@@ -119,7 +119,7 @@ async function scenario(b, nom, vue, LIGNES, sombre) {
   await srvPret;
   await pg.goto(`http://localhost:${PORT}/?tab=cat_bord`, { waitUntil: 'domcontentloaded' });
   await pg.waitForSelector('button[data-lot-ouvrir="1"]', { timeout: 20000 }).catch(() => {});
-  const stable = await pg.waitForFunction(() => { const t = document.body.innerText; return ['N°21', 'N°22', 'N°23'].every((n) => t.includes(n)) && /N°\d+ · Delta/.test(t) && /N°\d+ · Echo/.test(t) && /Foxtrot/.test(t) && /eBay Golf/.test(t); }, null, { timeout: 45000 }).then(() => true).catch(() => false);
+  const stable = await pg.waitForFunction(() => { const t = document.body.innerText; return ['N°21', 'N°22', 'N°23'].every((n) => t.includes(n)) && /N°\d+\s+(· )?Delta/.test(t) && /N°\d+\s+(· )?Echo/.test(t) && /Foxtrot/.test(t) && /eBay Golf/.test(t); }, null, { timeout: 45000 }).then(() => true).catch(() => false);
   dit(stable, `${nom} : les colis des 4 sites sont à l'écran (N° lus)`);
   await pg.waitForTimeout(600);
   await shot(pg, `selection-${nom}-colis`);

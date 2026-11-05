@@ -248,3 +248,6 @@ html:not([data-colis-outils]) body .vrm-app-shell .vrm-main .vrm-colis-recap.vrm
 html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-carte[data-bord-card] .vrm-colis-actions > :is([data-geste="relier"], [data-geste="poser-num"]) {
   min-height: 44px !important; border: 6px solid transparent !important; background-clip: padding-box !important; box-sizing: border-box !important;
 }
+/* La pastille N° (`Numero`, inline-flex) se LIT « N°\n31 » (innerText, copier-coller) : dans Colis elle est
+   un bloc en ligne, son texte se lit « N°31 ». Le dessin ne change pas. (Signalé au chantier B.) */
+html body .vrm-main .vrm-colis-titre .vrm-num, html body .vrm-tournee .vrm-num, html body [data-colis-bordereau-frais] .vrm-num { display: inline-block; }

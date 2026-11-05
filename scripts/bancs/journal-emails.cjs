@@ -165,8 +165,8 @@ async function versJournal(pg) {
         // (5 nov., chantier D, revue 2.21) Colis n'a plus l'entrée « Tes emails, ce que VRM en a fait » (un lien
         // technique, pas un geste d'envoi) : on juge que le lien mène à Colis (sa barre du haut), et que l'entrée
         // n'y est plus. Le journal reste joignable par E-mails (le reste de ce banc).
-        await pg.locator('[data-colis-barre]').first().waitFor();
-        dit(await pg.locator('[data-colis-barre]').first().isVisible(), `${w} : « Ouvrir Colis » mène à Colis`);
+        await pg.locator('[data-colis-barre], [data-colis-sans-compte]').first().waitFor();
+        dit(await pg.locator('[data-colis-barre], [data-colis-sans-compte]').first().isVisible(), `${w} : « Ouvrir Colis » mène à Colis`);
         dit(!(await pg.$('[data-journal-entree]')), `${w} : Colis n'a plus l'entrée « Tes emails » (revue 2.21)`);
         await pg.goBack().catch(() => {});
         await pg.locator('[data-journal-emails] .vrm-journal-ligne').first().waitFor({ timeout: 8000 }).catch(() => {});
