@@ -118,7 +118,7 @@ const MUTATIONS = {
   // Les paires qui reviennent ne sortent jamais de la liste (B… jamais porté par une annonce en ligne).
   'retours-jamais-republiees': { app: (s) => remplace(s, "      if (num && !numeroReprenable(num) && republiee(o)) continue;", "", 'retours-jamais-republiees') },
   // L'app ne dit plus au serveur quelle version de numérotation elle a lue (publier / programmer sur eBay).
-  'ebay-sans-version': { app: (s) => remplace(s, "const avecVersion = corps && (corps.action === 'publish' || corps.action === 'programmer');", "const avecVersion = false;", 'ebay-sans-version') },
+  'ebay-sans-version': { app: (s) => remplace(s, "const avecVersion = corps && (corps.action === 'publish' || corps.action === 'programmer' || corps.action === 'relancer');", "const avecVersion = false;", 'ebay-sans-version') },
   // Restaurer une sauvegarde d'avant la remise à zéro : pas de contrôle de version.
   'restaure-sans-version': { app: (s) => remplace(s, "if(vF!==vIci){ toast(SAUVEGARDE_AVANT_REMISE); return; }", "", 'restaure-sans-version') },
   // L'écran ne relit plus la version avant de numéroter.
@@ -421,7 +421,8 @@ const MK = { version: 2, coupure: T, appliqueLe: '2026-10-10T08:00:00.000Z', arc
     dit(/estArchive: \(n\) => !numeroReprenable\(n\)/.test(A) && /desc: r\.archive \? `(?:Il|Elle) portait l['’]ancien N°\$\{r\.num\} : un ancien numéro ne se redonne pas/.test(A) && /: `(?:Il|Elle) garde son N°\$\{r\.num\} : retape-le/.test(A), '« retape son numéro » seulement pour un numéro qui se redonne (remise en stock)');
     dit(/if \(num && !numeroReprenable\(num\) && republiee\(o\)\) continue;/.test(A), 'une paire revenue à l\'ancien N° sort de la liste quand elle est republiée (identité ou photo), pas par le numéro');
     { const ae = corps('async function appelEbay(corps) {', '\n}\n');
-      dit(/const avecVersion = corps && \(corps\.action === 'publish' \|\| corps\.action === 'programmer'\);/.test(ae) && /avecVersion \? \{ \.\.\.corps, numerotation: versionNumerotation\(\) \}/.test(ae),
+      // (5 nov.) 1a81a91c a ajouté `relancer` (remise en vente confirmée, elle aussi refusée sous un N° d'avant la coupure) : publier et programmer doivent TOUJOURS y être.
+      dit(/const avecVersion = corps && \(corps\.action === 'publish' \|\| corps\.action === 'programmer'(?: \|\| corps\.action === '\w+')*\);/.test(ae) && /avecVersion \? \{ \.\.\.corps, numerotation: versionNumerotation\(\) \}/.test(ae),
         'publier / programmer sur eBay disent au serveur la version de numérotation lue par CET écran (il refuse un écran d\'avant la remise à zéro)'); }
     dit(/if\(vF!==vIci\)\{ toast\(SAUVEGARDE_AVANT_REMISE\); return; \}/.test(A) && /refus=codeRefusNumeros\(t\)\|\|\(r\.status>=400&&r\.status<500\?'refus':null\)/.test(A), 'restaurer une sauvegarde d\'avant la remise à zéro : refusé AVANT d\'écrire, et la vraie cause dite (jamais « la base n\'a pas répondu »)');
   });

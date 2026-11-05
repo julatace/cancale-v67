@@ -1227,3 +1227,9 @@ html body .vrm-app-shell .vrm-main .vrm-day-layout .vrm-cycle-carte > .vrm-cycle
 .vrm-fu-carte[data-fu-colis-retirer] .vrm-fu-case { padding:8px 10px; border-radius:12px; }
 .vrm-fu-carte[data-fu-colis-retirer] .vrm-fu-case b { font-size:18px; }
 .vrm-fu-carte[data-fu-colis-retirer] .vrm-fu-case span { font-size:11px; }
+
+/* (5 nov.) « Peut-être en double » : la même forme que « À vérifier » (replié, jamais compté). */
+.vrm-rpf-double > summary { cursor: pointer; }
+.vrm-rpf-double > summary::-webkit-details-marker { display: none; }
+.vrm-rpf-double[open] .vrm-rpf-chevron { transform: rotate(90deg); }
+.vrm-rpf-double { padding-bottom: 4px; }

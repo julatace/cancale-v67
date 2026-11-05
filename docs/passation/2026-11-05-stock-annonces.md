@@ -128,3 +128,82 @@ Branche locale `v32-stock-annonces` (depuis `v31-stock-2d`, 79b6268d). Rien n'es
   `audit-chrome-en-dur` rouge après la fusion, vert après).
 - La fiche complète garde « Voir l'état » ET « Publier ailleurs » (lot 1) dans la même
   rangée d'outils (conflit `FichePaire.jsx`).
+
+## Vestiaire dans le Stock (5 nov., branche locale `v34-stock-vc-registre`)
+« Ce qui reste » n°1 ci-dessus : Vestiaire n'était pas dans le Stock.
+
+### Ce qui est fait
+- **Lecture** (`lireVcStock`, App.jsx, appelée par `lireAnnoncesStock`) : `vc_listings`
+  et `vc_ventes` PROJETÉS (`items`, `liens`, `capturedAt`, `complet` ; `ventes`) — les
+  mêmes champs que l'écran Annonces → Vestiaire, jamais `select=data`. Lecture ratée
+  ⇒ `null` ; aucune ligne rangée ⇒ « jamais lu ».
+- **Jugement** (`annoncesVcStock`, src/stockAnnonces.js, PUR) : LA règle de Vestiaire
+  (`etatAnnonceVcBrut`, api/_lib/vestiaire-regle.js) — « en ligne » compte ; « à
+  confirmer » (plus vue dans une liste relue, ou lecture de plus de 24 h) compte et
+  est NOMMÉE ; vendue (une vente lue, pas annulée, `vcVenteAnnulee`) ou retirée ne
+  compte pas ; « en attente de validation », mot inconnu, état non dit : ni en ligne
+  ni partie ⇒ pas comptée, nommée (« N annonces Vestiaire à l'état non dit »),
+  « au moins », et une paire rangée de ce N° n'est jamais dite « plus en ligne ».
+- **Identité** (§5) : le N° de l'annonce = `numVcAnnonce` (l'annonce publiée par VRM,
+  la référence VRM-{n°} de l'article, le N° donné par VRM, et celui de l'annonce
+  Vinted qu'IL a reliée — `main.vrm_vc_liens` via `numerosVcEffectifs()`). Le Stock
+  le recalcule au rendu (`useVcLocal`) : un N° donné ou relié pendant que l'écran est
+  ouvert arrive tout de suite. La réunion avec les autres sites passe par la même
+  union que Vinted/eBay/Leboncoin (identifiant `vc:{productId}`, N°, photo exacte).
+  JAMAIS le titre.
+- **Sans N°** : pas comptée, NOMMÉE par son titre dans l'en-tête (« 1 annonce Vestiaire
+  sans N° pas comptée : « … » »), total « au moins ». (VRM numérote toute annonce
+  Vestiaire lue — `numeroterVestiaire` — : c'est un état de passage.)
+- **Lecture qui manque** : ratée, jamais faite, ou liste lue en partie (`complet`
+  faux) ⇒ nommée dans « pas lu : Vestiaire (…) » avec le geste (« ouvre « Mes
+  articles » sur vestiairecollective.com »), « au moins », et AUCUNE paire rangée
+  n'est dite « plus en ligne » (`jugeable` faux : Vestiaire pourrait la porter).
+  Plus de 24 h ⇒ ses annonces « à confirmer », « Vestiaire, lu il y a 3 j — ouvre
+  « Mes articles » sur Vestiaire ».
+- Un N° prouvé vendu (`vrm_stock_vendus`) encore en ligne sur Vestiaire n'est pas une
+  annonce actuelle (même exclusion qu'eBay/Leboncoin).
+- Filtre « Vestiaire », libellé « Vestiaire » sur les tuiles « À ranger » et dans la
+  liste (`NOM_PLAT_FILTRE`, `NOM_PLAT_STOCK`). Compte : comme eBay/Leboncoin, aucun
+  compte Vestiaire n'est rattaché (le filtre de compte reste celui de Vinted).
+
+### Décision prise ici (à confirmer avec Julien)
+- « Jamais lu » (aucune ligne `vc_listings`) est NOMMÉ et met « au moins », comme une
+  lecture absente ailleurs (§5 « pas su »). Conséquence : un vendeur qui n'utilise pas
+  Vestiaire voit « pas lu : Vestiaire (jamais lu…) » et aucune paire « plus en
+  ligne ». Chez Julien la ligne existe. Si c'est gênant pour d'autres comptes : un
+  réglage « je n'utilise pas Vestiaire », ou les comptes écartés (`vrm_comptes_exclus`).
+
+### Preuves
+- `node scripts/audit-stock-annonces.cjs` : **53/53** (29 d'avant + 24 Vestiaire, la
+  VRAIE règle de Vestiaire exécutée) ; `--prouve` : **23/23 mutations** attrapées (les
+  12 d'avant + 11 : Vestiaire oublié, sans N° rapproché par le TITRE, lien
+  `vrm_vc_liens` ignoré, sans N° qui ne met plus « au moins », lecture de 3 j lue « en
+  ligne », jamais lu = rien, ratée = rien, liste partielle tue, vente Vestiaire
+  ignorée, N° vendu qui revient par Vestiaire, « en attente » compté en ligne). Sur
+  l'arbre de `claude/project-review-nsk5su` (`git archive`, audit copié dedans) :
+  **6 rouges** (pas de `annoncesVcStock`, pas de lecture Vestiaire).
+- Banc `scripts/bancs/stock-annonces.cjs` (données inventées : vc901 reliée par son
+  clic à la Vinted N°9 au titre différent, vc941 = N°41 Vestiaire seul, vc943 vendue ;
+  scénarios complet, partiel, rien + vc-sans-num, vc-vieille, vc-absent ; 390 tactile
+  et 1512 souris, clair et sombre) : **160 verts**. Captures regardées : en-tête « au
+  moins 7 » avec l'annonce sans N° nommée par son titre, « Vestiaire, lu il y a 3 j »,
+  « pas lu : Vestiaire (jamais lu : …) » et N°8 « pas vérifiée », N°9 « Vinted ·
+  Vestiaire », N°41 « Vestiaire · pas encore rangée », tuile « Vestiaire » dans « À
+  ranger », filtre « Vestiaire » = N°41 et N°9. Sur le build de
+  `claude/project-review-nsk5su` (`git archive`, build fait là, banc copié dedans) :
+  **48 rouges / 160** (chaque exigence V1 à V4 rouge dans les 4 configurations).
+- Voisins verts : `audit-enligne` 101, `coherence`, `identite`, `icones`,
+  `fonctions-api`, `lien-vc` 44, `vestiaire-partout` 43, `chrome-en-dur` ; bancs
+  `stock-2d` 104, `stock-2d-revue` 80, `stock-plateformes` 24, `stock-planches` 32,
+  `stock-retrouver` 38 (ils ne servent pas de `vc_listings` : Vestiaire y est « jamais
+  lu », rien de ce qu'ils exigent ne change).
+- `npm run build` vert.
+
+### Ce qui reste
+- Le Stock ne relit toujours qu'au montage (pas sur le signal « maj vestiaire » de
+  l'extension) ; les N° Vestiaire, eux, suivent en direct.
+- Un compte Vestiaire n'est pas dans le filtre de compte (Vestiaire écrit `compte` sur
+  l'annonce, mais l'écran « Comptes liés » le dit « non identifié » tant que
+  `vc_session` manque).
+- Geste de Julien : ouvrir « Mes articles » sur Vestiaire (jusqu'en bas), puis Stock :
+  ses annonces Vestiaire y sont, reliées à leur paire Vinted quand il les a reliées.

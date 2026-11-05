@@ -9,7 +9,7 @@
 //  Chaque écran principal, à 390 px tactile et 1512 px, clair et sombre. Il MESURE,
 //  par styles calculés (jamais un libellé) :
 //   J1 ACCENT    — une seule couleur d'accent sur les APLATS (fond bleu) de tous les
-//                  écrans : #0071E3 en clair, #0A84FF en sombre ; texte blanc dessus ;
+//                  écrans : #0071E3 dans les deux thèmes (décision du 5 nov. : blanc lisible à 4,7:1) ; texte blanc dessus ;
 //   J2 SEGMENTÉ  — aucun `.vrm-seg-btn` avec un retrait latéral sous 10 px ;
 //   J3 COUPÉ     — aucun libellé de segment (ni du sélecteur de site) coupé : texte
 //                  plus large que sa case, ellipse, ou poussé hors de la piste ;
@@ -41,7 +41,7 @@ const LARGEURS = liste('LARGEURS', '390,1512').map(Number);
 const THEMES = liste('THEMES', 'clair,sombre');
 const FILTRE = process.env.ECRANS ? new RegExp(process.env.ECRANS) : null;
 const SHOTS = process.env.SHOTS || '';
-const ATTENDU = { clair: 'rgb(0, 113, 227)', sombre: 'rgb(10, 132, 255)' };
+const ATTENDU = { clair: 'rgb(0, 113, 227)', sombre: 'rgb(0, 113, 227)' };
 
 let ko = 0;
 const compte = {};
