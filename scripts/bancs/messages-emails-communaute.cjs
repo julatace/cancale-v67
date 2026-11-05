@@ -42,6 +42,15 @@ const PORT = Number(process.env.BANC_PORT || 9251);
 const CAPT = process.env.BANC_CAPTURE || path.join(os.tmpdir(), 'banc-chantier-g');
 const EXPLORE = process.env.BANC_EXPLORE === '1';
 const SEUL = process.env.BANC_SEUL || '';   // « messages », « emails », « communaute »…
+// `BANC_MUTATION=1` : les règles d'AVANT remises dans la page (filtres en contour, colonne de 300 px,
+// lien de pied en bleu, temps restant sans ambre) — G1, G2, G3 et G8 doivent rougir.
+const MUTATION = process.env.BANC_MUTATION === '1';
+const MUTANT_CSS = [
+  ':root:root body .vrm-app-shell .vrm-main .vrm-inbox-filters > button:not(#fu):not(#mu) { border: 1px solid #c7c7cc !important; background: transparent !important; min-height: 36px !important; height: 36px !important; }',
+  ':root body .vrm-message-workspace:not(#_):not(#mu) { grid-template-columns: 300px minmax(0,1fr) 250px !important; }',
+  'html body .vrm-pied-lien[data-pied-lien="suite"]:not(#mu) { color: var(--vrm-accent) !important; }',
+  'html body .vrm-of .vrm-of-reste.is-bientot:not(#mu) { color: var(--vrm-muted) !important; }',
+].join('\n');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json' };
 
 let ko = 0, ok = 0;
@@ -165,6 +174,7 @@ async function ouvrir(nav, { largeur, sombre, chemin, panne = {}, avant }) {
   const erreurs = []; pg.on('pageerror', (e) => erreurs.push(e.message));
   await pg.addInitScript(({ n, sombre }) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_bienvenue_vue', '1'); localStorage.setItem('vrm_visite_vue', '1'); localStorage.setItem('vinted_dark', sombre ? 'true' : 'false'); localStorage.setItem('vinted_annonce_numeros', JSON.stringify(n)); } catch (_) {} }, { n: NUMEROS, sombre });
   await pg.addInitScript(PONT, { version: '5.322.0' });
+  if (MUTATION) await pg.addInitScript((css) => { document.addEventListener('DOMContentLoaded', () => { const s = document.createElement('style'); s.textContent = css; document.head.appendChild(s); }); }, MUTANT_CSS);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (/supabase\.co\//.test(r.request().url()) ? r.fallback() : ['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.fulfill({ status: 404, body: '' })));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
