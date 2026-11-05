@@ -43,9 +43,12 @@ const RUB = (e) => (e.type === 'suivi' && e.resume && e.resume.code ? 'codes' : 
 const dans = (e, r) => !r || (r === 'colis' ? ['colis', 'codes'].includes(RUB(e)) : RUB(e) === r);
 const parRubrique = { ventes: 0, achats: 0, codes: 0, colis: 0, autres: 0 }; E.forEach((e) => { const r = RUB(e); parRubrique[r]++; if (r === 'codes') parRubrique.colis++; });
 const COMPTEURS = { sur: E.length, plus: false, integre: 25, aVerifier: 1, erreur: 0, incompris: 1, parRubrique };
+// (revue du 5 nov.) La route compte sur l'adresse choisie et le dit (`adresse`).
+const compteursDe = (adr) => { if (!adr) return COMPTEURS; const l = E.filter((e) => e.adresses.includes(adr)); const pr = { ventes: 0, achats: 0, codes: 0, colis: 0, autres: 0 }; l.forEach((e) => { const r = RUB(e); pr[r]++; if (r === 'codes') pr.colis++; }); return { ...COMPTEURS, sur: l.length, parRubrique: pr, adresse: adr }; };
 const TEXTE = {
   [id(1)]: 'Bonjour,​\n\n\n\nVotre colis est disponible au Relais Tabac du Port.\nCode de retrait : 418205\nSuivre : https://suivi.exemple.test/' + 'x'.repeat(120) + '\n<img src=x onerror="window.__xss=1"><b>gras</b>',
   [id(2)]: 'Ton bordereau est prêt. N° de transaction : 12345678901',
+  [id(3)]: 'Ton article Adidas Samba est vendu. ' + 'Suite du message. '.repeat(90).slice(0, 1464) + '…',
 };
 const PIECES = { [id(1)]: [], [id(2)]: [{ n: 'Bordereau-Vinted-12345678901.pdf', t: 'application/pdf', o: 48211 }], [id(4)]: [{ n: 'Recu-achat.pdf', t: 'application/pdf', o: 30200 }] };
 
@@ -74,11 +77,11 @@ async function ouvrir(nav, { viewport, tactile, sombre, reduit }) {
     appels.push({ chemin: u.pathname, q: Object.fromEntries(u.searchParams.entries()), methode: r.request().method() });
     if (u.pathname === '/api/email-rattacher' && u.searchParams.get('mode') === 'journal') {
       const q = Object.fromEntries(u.searchParams.entries());
-      if (q.lire) { const e = E.find((x) => x.id === q.lire); return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, id: q.lire, email: e ? { ...e, receivedAt: e.at, pieces: e.pj === null ? null : (PIECES[e.id] || []), texte: TEXTE[e.id] || null } : null }) }); }
+      if (q.lire) { const e = E.find((x) => x.id === q.lire); return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, id: q.lire, email: e ? { ...e, receivedAt: e.at, pieces: e.pj === null ? null : (PIECES[e.id] || []), texte: TEXTE[e.id] || null, texteCoupe: TEXTE[e.id] ? TEXTE[e.id].length > 1500 && TEXTE[e.id].endsWith('…') : null } : null }) }); }
       let l = E.filter((e) => dans(e, q.boite || ''));
       if (q.adresse) l = l.filter((e) => e.adresses.includes(q.adresse));
       const p = Number(q.page || 0);
-      return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, page: p, parPage: 20, suite: l.length > (p + 1) * 20, emails: l.slice(p * 20, p * 20 + 20), compteurs: COMPTEURS, adresses: [{ adresse: 'vendeuse@exemple.test', nom: 'compte-un' }, { adresse: 'second@exemple.test', nom: 'compte-deux' }] }) });
+      return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, page: p, parPage: 20, suite: l.length > (p + 1) * 20, emails: l.slice(p * 20, p * 20 + 20), compteurs: compteursDe(q.adresse), adresses: [{ adresse: 'vendeuse@exemple.test', nom: 'compte-un' }, { adresse: 'second@exemple.test', nom: 'compte-deux' }] }) });
     }
     if (u.searchParams.get('mode') === 'reception') return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, emails: [], adresses: [], collecteur: {}, limite: 100, plus: false }) });
     return r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
@@ -126,6 +129,13 @@ const journal = (appels) => appels.filter((a) => a.chemin === '/api/email-rattac
         await b.locator('[data-boite-rubrique="tout"]').click(); await pg.waitForTimeout(400);
         await b.locator('[data-boite-adresse]').selectOption('second@exemple.test'); await pg.waitForTimeout(500);
         dit(journal(appels).at(-1).q.adresse === 'second@exemple.test' && (await lignes.count()) > 0 && /compte-deux/.test(await lignes.first().innerText()), `${nom} : filtre par compte (adresse de réception)`);
+        {
+          const nV = E.filter((e) => e.adresses.includes('second@exemple.test') && RUB(e) === 'ventes').length;
+          const pastille = (await b.locator('[data-boite-rubrique="ventes"]').innerText()).replace(/\D/g, '');
+          const couv = b.locator('[data-boite-sur-adresse="second@exemple.test"]');
+          await pg.screenshot({ path: path.join(CAPT, `compte-${nom}.png`) });
+          dit(pastille === String(nV) && await couv.count() === 1 && /reçus sur second@exemple\.test/.test(await couv.innerText()), `${nom} : compte choisi — le nombre de la pastille et la phrase portent sur CE compte`, `${pastille}/${nV}`);
+        }
         await b.locator('[data-boite-adresse]').selectOption(''); await pg.waitForTimeout(500);
         if (!sombre) { await pg.screenshot({ path: path.join(CAPT, `boite-${nom}.png`) }); }
         // Lire un email
@@ -173,6 +183,13 @@ const journal = (appels) => appels.filter((a) => a.chemin === '/api/email-rattac
         const l2 = pg.locator(`[data-boite-lecture="${id(2)}"]`);
         await l2.locator('[data-boite-sujet]').waitFor();
         dit(await l2.locator('[data-boite-piece="Bordereau-Vinted-12345678901.pdf"]').count() === 1 && /47 Ko/.test(await l2.locator('[data-boite-pieces]').innerText()) && await l2.locator('[data-boite-objet="colis"]').count() === 1, `${nom} : bordereau — pièce listée (nom, poids), lien vers le colis de SA vente`);
+        if (tactile) await pg.locator('[data-boite-feuille] [data-boite-fermer]').click(); else await l2.locator('[data-boite-fermer]').click();
+        await pg.waitForTimeout(300);
+        await b.locator(`[data-boite-email="${id(3)}"]`).scrollIntoViewIfNeeded(); await b.locator(`[data-boite-email="${id(3)}"]`).click();
+        const l3 = pg.locator(`[data-boite-lecture="${id(3)}"]`);
+        await l3.locator('[data-boite-sujet]').waitFor();
+        dit(await l3.locator('[data-boite-corps="extrait"]').count() === 1 && await l3.locator('[data-boite-extrait]').count() === 1 && /Extrait/.test(await l3.locator('[data-boite-extrait]').innerText()), `${nom} : texte coupé à la réception — dit « Extrait », jamais présenté comme le message entier`);
+        await pg.screenshot({ path: path.join(CAPT, `extrait-${nom}.png`) });
         if (tactile) { dit(await pg.locator('[data-boite-feuille]').count() === 1, `${nom} : feuille ouverte`); await pg.locator('[data-boite-feuille] [data-boite-fermer]').click(); await pg.waitForTimeout(300); dit(await pg.locator('[data-boite-feuille]').count() === 0, `${nom} : « ‹ Boîte de réception » ferme la feuille`); }
         const debord = await pg.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1);
         dit(!debord, `${nom} : aucun débordement horizontal (boîte)`);

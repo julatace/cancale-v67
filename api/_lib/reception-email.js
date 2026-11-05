@@ -1,5 +1,6 @@
 import {normAdresse,estAdresseCollectrice,sansEtiquette} from './proprietaire-email.js';
 import {filtreBoite,rubriqueConnue,rubriqueEmail,RUBRIQUES_BOITE,PIECES_MAX} from './boite-email.js';
+import {TEXTE_MAX} from './resume-email.js';
 // Une règle (§11) : à quel compte Vinted une adresse de réception appartient.
 // Lue par la réception ET par le journal — l'adresse décide, jamais le texte.
 function reglesComptes({registre,main,comptes,etats}){
@@ -43,10 +44,16 @@ export async function lireJournalEmail({owner,url,headers,fetcher=fetch,page=0,e
  if(boite&&!rubriqueConnue(boite))throw Error('rubrique');
  if(boite)filtres.push(filtreBoite(boite));
  const adr=normAdresse(adresse);
- if(adr&&adr.includes('@')&&adr.length<=254)filtres.push(`data->adresses=cs.${encodeURIComponent(JSON.stringify([adr]))}`);
+ const parAdresse=adr&&adr.includes('@')&&adr.length<=254?`data->adresses=cs.${encodeURIComponent(JSON.stringify([adr]))}`:'';
+ if(parAdresse)filtres.push(parAdresse);
  const f=filtres.length?'&'+filtres.join('&'):'';
- const etats=lire(`owner=eq.${o}&id=like.email_reception_*&select=etat:data->>etat,type:data->>type,code:data->resume->>code&order=data->>at.desc,id.asc&limit=${JOURNAL_COMPTES+1}`);
- if(compteSeul){const l=await etats;return {ok:true,compteurs:compter(l)};}
+ // (revue du 5 nov.) Les compteurs suivent le COMPTE choisi (adresse de
+ // réception) : sinon « Ventes 7 » s'affichait à côté d'une liste filtrée sur une
+ // adresse qui n'en a que 3. Ils ne suivent NI l'état NI la rubrique (ce sont
+ // eux qui les comptent). `compteurs.adresse` dit sur quelle adresse ils portent.
+ const etats=lire(`owner=eq.${o}&id=like.email_reception_*${parAdresse?'&'+parAdresse:''}&select=etat:data->>etat,type:data->>type,code:data->resume->>code&order=data->>at.desc,id.asc&limit=${JOURNAL_COMPTES+1}`);
+ const portee=c=>parAdresse?{...c,adresse:adr}:c;
+ if(compteSeul){const l=await etats;return {ok:true,compteurs:portee(compter(l))};}
  const [lignes,l,[registre,main,comptes,etatsC]]=await Promise.all([
   lire(`owner=eq.${o}&id=like.email_reception_*${f}&select=${PROJECTION}&order=data->>at.desc,id.asc&limit=${JOURNAL_PAGE+1}&offset=${p*JOURNAL_PAGE}`),
   etats,lectureComptes(lire,owner),
@@ -60,7 +67,7 @@ export async function lireJournalEmail({owner,url,headers,fetcher=fetch,page=0,e
   return {id:String(x.id),at:date(x.at),sourceDate:date(x.sourceDate),etat:['integre','a-verifier','erreur'].includes(x.etat)?x.etat:'a-verifier',type:String(x.type||'information').slice(0,40),subject:String(x.subject||'').slice(0,200),from:String(x.from||'').slice(0,160),adresses,compte:lies.length===1?{id:lies[0].id,nom:lies[0].nom}:null,compteAmbigu:lies.length>1,resume:r&&JSON.stringify(r).length<=600?r:null,pj:Array.isArray(x.pieces)?Math.min(x.pieces.length,PIECES_MAX):null};
  });
  const adresses=[...new Set([...declarees,...Object.values(correspondances).map(normAdresse).filter(a=>a.includes('@')&&!estAdresseCollectrice(a))])].map(a=>{const c=associes(a);return {adresse:a,nom:c.length===1?c[0].nom:''};});
- return {ok:true,page:p,parPage:JOURNAL_PAGE,suite:lignes.length>JOURNAL_PAGE,emails,compteurs:compter(l),adresses};
+ return {ok:true,page:p,parPage:JOURNAL_PAGE,suite:lignes.length>JOURNAL_PAGE,emails,compteurs:portee(compter(l)),adresses};
 }
 function compter(l){
  const lignes=l.slice(0,JOURNAL_COMPTES);
@@ -106,7 +113,10 @@ export async function lireEmailBoite({owner,url,headers,fetcher=fetch,id}){
  const r=x.resume&&typeof x.resume==='object'&&!Array.isArray(x.resume)?x.resume:null;
  const pieces=Array.isArray(x.pieces)?x.pieces.slice(0,PIECES_MAX).map(p=>({n:String(p&&p.n||'sans nom').slice(0,120),t:String(p&&p.t||'').slice(0,60),o:Number.isFinite(p&&p.o)?p.o:null})):null;
  const texte=textes[0]&&typeof textes[0].texte==='string'?textes[0].texte.slice(0,2000):null;
- return {ok:true,id:m[0],email:{id:m[0],at:date(x.at),sourceDate:date(x.sourceDate),receivedAt:date(x.receivedAt),etat:['integre','a-verifier','erreur'].includes(x.etat)?x.etat:'a-verifier',type:String(x.type||'information').slice(0,40),subject:String(x.subject||'').slice(0,300),from:String(x.from||'').slice(0,200),adresses,compte:lies.length===1?{id:lies[0].id,nom:lies[0].nom}:null,compteAmbigu:lies.length>1,resume:r&&JSON.stringify(r).length<=600?r:null,pieces,texte}};
+ // (revue du 5 nov.) La réception ne garde que TEXTE_MAX caractères (+ « … ») :
+ // un texte coupé est un EXTRAIT, et l'écran le dit (jamais présenté comme entier).
+ const texteCoupe=texte==null?null:texte.length>TEXTE_MAX&&texte.endsWith('…');
+ return {ok:true,id:m[0],email:{id:m[0],at:date(x.at),sourceDate:date(x.sourceDate),receivedAt:date(x.receivedAt),etat:['integre','a-verifier','erreur'].includes(x.etat)?x.etat:'a-verifier',type:String(x.type||'information').slice(0,40),subject:String(x.subject||'').slice(0,300),from:String(x.from||'').slice(0,200),adresses,compte:lies.length===1?{id:lies[0].id,nom:lies[0].nom}:null,compteAmbigu:lies.length>1,resume:r&&JSON.stringify(r).length<=600?r:null,pieces,texte,texteCoupe}};
 }
 
 // Lecture exclusivement sous le propriétaire authentifié. Aucun corps d’email,

@@ -108,3 +108,29 @@ Chronopost, Vinted Go… ».
 ## Geste de Julien
 Ouvrir **E-mails** (Plus → Gérer → E-mails au téléphone), regarder la boîte, ouvrir un code de retrait ;
 puis **Relier ma boîte** → choisir sa messagerie → poser la règle (copier/coller) sur chacune de ses boîtes.
+
+## Revue adverse (même jour)
+
+Mesuré d'abord (lecture seule, SELECT) : 894 lignes `email_reception_*` ; 9 adresses de réception,
+toutes déclarées (aucune avec « + », majuscule ou espace : le filtre `cs.` par compte les trouve
+toutes) ; `resume.code` jamais vide (`court()` rend `undefined`) ; 424 `email_texte_*`, dont **20 coupés**
+à 1 500 caractères + « … » (`TEXTE_MAX`, `api/_lib/resume-email.js`).
+
+Défauts trouvés, reproduits, corrigés :
+1. **Les nombres des pastilles ignoraient le compte choisi** : « Ventes 7 » à côté d'une liste filtrée
+   sur une adresse qui n'en a que 3. La route compte maintenant sur l'adresse choisie (pas sur l'état
+   ni la rubrique, qu'elle compte) et le dit (`compteurs.adresse`) ; la phrase devient « Comptés sur tes
+   N derniers e-mails reçus sur … ». Le journal de Réglages (même route) en profite et le dit aussi.
+2. **Un texte coupé à la réception était présenté comme le message entier** : `lire=` rend `texteCoupe`
+   et l'écran écrit « Extrait : VRM garde le début du message (1 500 caractères). La suite est dans ta
+   messagerie. »
+3. **Outlook, étape 4 : « dis-le dans Réglages → E-mails → Aperçu »** — rien ne permet de « le dire »
+   là-bas. Remplacé par un constat vérifiable : si rien n'apparaît dans la boîte VRM après le prochain
+   email de Vinted, c'est qu'Outlook l'a bloqué.
+
+Preuves : `audit-boite-emails` 61/61 (4 contrôles neufs, rouges sur 3e56e390) ; banc `boite-emails`
+173/0 (8 rouges sur 3e56e390, arbre `git archive` reconstruit, banc copié dedans) ; captures
+`compte-*` et `extrait-*` regardées. Voisins verts : `audit-journal-emails` 58/58, `audit-fonctions-api`,
+`audit-icones`, `audit-coherence`, `audit-comptes-securite`, `audit-bancs`, bancs `journal-emails` 60/0,
+`emails-action` 14. Banc `reception-emails` : 3 rouges (deux boutons « Réessayer », sélecteur strict)
+— **les mêmes 3 sur 3e56e390**, donc antérieurs à cette branche, non touchés ici.

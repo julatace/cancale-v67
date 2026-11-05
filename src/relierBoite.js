@@ -63,7 +63,7 @@ export const MESSAGERIES = [
       { scene: 'reglages', titre: 'Ouvre les paramètres', geste: 'Sur outlook.com : la roue → « Courrier » → « Règles ».' },
       { scene: 'adresse', titre: 'Ajoute une règle', geste: '« Ajouter une nouvelle règle » → condition « De » → l’expéditeur.' },
       { scene: 'filtre', titre: 'Fais-la suivre à VRM', geste: 'Action « Transférer à » → colle l’adresse de VRM → « Enregistrer ». Ajoute les autres expéditeurs à la même condition.' },
-      { scene: 'code', titre: 'Si Outlook bloque', geste: 'Certains comptes Outlook refusent le transfert automatique : si les emails n’arrivent pas, dis-le dans Réglages → E-mails → Aperçu.' },
+      { scene: 'code', titre: 'Si Outlook bloque', geste: 'Certains comptes Outlook refusent le transfert automatique. Si, après le prochain email de Vinted, rien n’apparaît dans la boîte de réception de VRM, c’est qu’Outlook l’a bloqué.' },
       { scene: 'flux', titre: 'C’est en place', geste: 'Le prochain email d’un de ces expéditeurs part aussi vers VRM.' },
     ] },
   { id: 'fai', nom: 'Orange, SFR, Free', famille: 'Fournisseur d’accès', regle: 'regles',

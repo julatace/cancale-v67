@@ -84,7 +84,8 @@ function Lecture({ id, entetes, delies, onFermer, onAller, onNum, plein, FermeAu
         </section>
         <section className="vrm-boite-corps-bloc">
           <h3>Message</h3>
-          {corps ? <pre className="vrm-boite-corps" data-boite-corps="lu">{corps}</pre>
+          {corps && e.texteCoupe && <p className="vrm-boite-doux" data-boite-extrait="">Extrait : VRM garde le début du message (1 500 caractères). La suite est dans ta messagerie.</p>}
+          {corps ? <pre className="vrm-boite-corps" data-boite-corps={e.texteCoupe ? 'extrait' : 'lu'}>{corps}</pre>
             : <p className="vrm-boite-doux" data-boite-corps="absent">Texte non gardé (e-mail rangé avant le 31 oct., ou sans texte). L’original reste dans ta messagerie.</p>}
         </section>
         <section className="vrm-boite-pieces" data-boite-pieces={e.pieces == null ? 'pas-su' : e.pieces.length}>
@@ -153,7 +154,7 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour }) {
             </label>}
             <button type="button" className="vrm-boite-actualiser" onClick={() => charger(0)} disabled={lecture}>{lecture ? 'Lecture…' : 'Actualiser'}</button>
           </div>
-          {parR && <p className="vrm-boite-couverture" data-boite-sur={c.sur}>Comptés sur tes {c.sur} derniers e-mails{c.plus ? ', les plus anciens à part' : ''}.</p>}
+          {parR && <p className="vrm-boite-couverture" data-boite-sur={c.sur} data-boite-sur-adresse={c.adresse || ''}>Comptés sur tes {c.sur} derniers e-mails{c.adresse ? ` reçus sur ${c.adresse}` : ''}{c.plus ? ', les plus anciens ne sont pas comptés' : ''}.</p>}
         </div>
         {pages === undefined && <p className="vrm-boite-etat" role="status">Lecture de ta boîte…</p>}
         {pages === null && <p className="vrm-boite-etat" role="alert" data-boite="pas-su">Je n’ai pas pu lire tes e-mails — rien n’est perdu, ils restent rangés. <button type="button" onClick={() => charger(0)}>Réessayer</button></p>}

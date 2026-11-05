@@ -168,12 +168,32 @@ const garde = (x, k, v) => {
     const l0 = (await appeler({})).corps.emails.find((x) => x.id.startsWith('email_reception_00'));
     dit(l0 && l0.pj === 1 && !('pieces' in l0), 'la liste dit le NOMBRE de pièces, pas leur détail');
   });
+  // (revue du 5 nov.) Les compteurs suivent le COMPTE choisi : sinon « Ventes 4 »
+  // s'affiche à côté d'une liste filtrée sur une adresse qui n'en a qu'une.
+  await essaie('route : compteurs par compte', async () => {
+    const ajout = [0, 1, 2].map((i) => ({ owner: J, id: `email_reception_9${i}${'e'.repeat(61)}`, data: { at: new Date(Date.UTC(2026, 10, 1) - i * 60000).toISOString(), etat: 'integre', type: 'vente', subject: `Autre ${i}`, from: 'Vinted <no-reply@vinted.fr>', adresses: ['autre@vrm.center'], resume: { v: 1, t: 'vente' } } }));
+    lignes.push(...ajout);
+    try {
+      const r = (await appeler({ adresse: 'autre@vrm.center' })).corps;
+      const pr = r && r.compteurs && r.compteurs.parRubrique;
+      dit(r && r.emails.length === 3 && r.compteurs.sur === 3 && pr && pr.ventes === 3 && pr.colis === 0 && pr.codes === 0, 'compte choisi : les compteurs par rubrique portent sur SES e-mails, pas sur tous', JSON.stringify(r && r.compteurs));
+      dit(r && r.compteurs.adresse === 'autre@vrm.center', 'compte choisi : les compteurs disent sur quelle adresse ils portent', JSON.stringify(r && r.compteurs));
+      const tous = (await appeler({})).corps;
+      dit(tous.compteurs.parRubrique.ventes === 7 && !tous.compteurs.adresse, 'sans compte choisi : tous les e-mails comptés', JSON.stringify(tous.compteurs.parRubrique));
+    } finally { lignes.splice(lignes.length - ajout.length, ajout.length); }
+  });
   await essaie('route : lire', async () => {
     lectures.length = 0;
     const r = await appeler({ lire: 'email_reception_00' + 'c'.repeat(62) });
     const e = r.corps && r.corps.email;
     dit(r.code === 200 && e && e.subject === 'Sujet 0' && e.texte === 'Bonjour <img src=x onerror=alert(1)>' && e.pieces.length === 1 && e.pieces[0].n === 'Bordereau.pdf' && e.pieces[0].o === 48000, 'lire : sujet, texte gardé, pièces listées', JSON.stringify(e).slice(0, 300));
     dit(lectures.every((q) => /owner=eq\.1111/.test(q) || /vinted_accounts/.test(q)) && lectures.every((q) => !/select=data(&|$)/.test(q) || /vrm_email_owners|panel_comptes_etat/.test(q)), 'lire : sous SON owner, ligne de suivi en scalaires projetés', lectures.join(' | ').slice(0, 400));
+    dit(e && e.texteCoupe === false, 'texte entier : pas dit « extrait »', JSON.stringify(e && e.texteCoupe));
+    lignes.push({ owner: J, id: 'email_texte_02' + 'c'.repeat(62), data: { texte: 'y'.repeat(1500) + '…' } });
+    try {
+      const c = (await appeler({ lire: 'email_reception_02' + 'c'.repeat(62) })).corps.email;
+      dit(c && c.texte.length === 1501 && c.texteCoupe === true, 'texte coupé à la réception (1 500 caractères + « … ») : la route dit que c’est un EXTRAIT, jamais présenté comme le message entier', JSON.stringify(c && { l: c.texte && c.texte.length, coupe: c.texteCoupe }));
+    } finally { lignes.pop(); }
     const sans = (await appeler({ lire: 'email_reception_01' + 'c'.repeat(62) })).corps.email;
     dit(sans && sans.pieces === null && sans.texte === null, 'email rangé avant le 5 nov. : pièces `null` (pas su), jamais « aucune »');
     const autre = (await appeler({ lire: 'email_reception_05' + 'c'.repeat(62) })).corps;
