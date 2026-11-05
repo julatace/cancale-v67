@@ -28,7 +28,7 @@ const Evenement = ({ ev }) => (
   </li>
 );
 
-export default function FichePaire({ owner = '', p, lecture = false, num, onFermer, onRetour, onBordereau, onEmballer, onPrix, onDupliquer, neuve = null, onCopier, Photo, Icon, Retour }) {
+export default function FichePaire({ owner = '', p, lecture = false, num, onFermer, onRetour, onBordereau, onEmballer, onPrix, onDupliquer, onPublierAilleurs, neuve = null, onCopier, Photo, Icon, Retour }) {
   React.useEffect(() => {
     const k = (e) => { if (e.key === 'Escape' && !e.defaultPrevented) { e.preventDefault(); onFermer(); } };
     window.addEventListener('keydown', k, true);
@@ -59,9 +59,10 @@ export default function FichePaire({ owner = '', p, lecture = false, num, onFerm
           {r.benefice == null && r.raisonBenef ? <small>{r.raisonBenef}</small> : r.benefPartiel ? <small>frais pas tous confirmés</small> : null}
         </div>
       </div>
-      {(onPrix || onDupliquer) && !p.ancienNumero ? (
+      {(onPrix || onDupliquer || onPublierAilleurs) && !p.ancienNumero ? (
         <div className="vrm-fp-outils">
           {onPrix && !neuve ? <button type="button" className="vrm-ao-second" data-fiche-prix="" onClick={() => onPrix(p.num)}>Changer le prix</button> : null}
+          {onPublierAilleurs && !neuve && p.etat !== 'rien' ? <button type="button" className="vrm-ao-second" data-fiche-publier-ailleurs="" onClick={() => onPublierAilleurs(p.num)}>Publier ailleurs</button> : null}
           {onDupliquer && p.etat !== 'rien' ? <button type="button" className="vrm-ao-second" data-fiche-dupliquer="" onClick={() => onDupliquer(p.num)}>Dupliquer</button> : null}
           {neuve && onCopier ? <button type="button" className="vrm-ao-second" data-fiche-copier="" onClick={() => onCopier(neuve)}>Copier le texte</button> : null}
         </div>
