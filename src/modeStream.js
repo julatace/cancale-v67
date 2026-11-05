@@ -295,7 +295,7 @@ export function installerStream(racine, lire) {
   const flous = new Set();
   let arrete = false;
   const obs = new MutationObserver(() => passer());
-  const brancher = () => obs.observe(racine, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['title', 'value', 'class'] });
+  const brancher = () => obs.observe(racine, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['title', 'value'] });
   const passer = () => {
     if (arrete) return;
     obs.disconnect();
