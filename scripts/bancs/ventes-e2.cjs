@@ -84,7 +84,8 @@ const JEUX = {
   jeu: { lignes: jeu, comptes: NV.JEU_COMPTES },
   annul: { lignes: () => avecAnnulations(), comptes: NV.JEU_COMPTES },
   exclu: { lignes: exclu, comptes: NV.JEU_COMPTES },
-  ko: { lignes: () => avecAnnulations(), comptes: NV.JEU_COMPTES, ko: 'harvest_111_orders' },
+  // Le compte vendeuse_a a ses jetons mais AUCUNE ligne de ventes lisible : sa lecture rate (« pas su »).
+  ko: { lignes: () => avecAnnulations().filter((r) => !/^harvest_111_orders_/.test(r.id)), comptes: NV.JEU_COMPTES },
   egal: { lignes: () => avecAnnulations({ egal: true }), comptes: NV.JEU_COMPTES },
   gros: { lignes: gros, comptes: NV.JEU_COMPTES },
   vide: { lignes: vide, comptes: [] },
@@ -171,7 +172,9 @@ const MESURE = (pg, { tel, sombre }) => pg.evaluate(({ tel, sombre }) => {
 const allerSite = async (pg, site) => {
   if (site === 'toutes') { const t = pg.locator('[data-selecteur-logos] button[data-site="toutes"]').first(); if (await t.count()) await t.click().catch(() => {}); }
   else await pg.locator(`[data-selecteur-logos] button[data-site="${site}"]`).first().click();
-  await pg.waitForTimeout(2600);
+  await pg.waitForTimeout(1200);
+  if (site === 'vinted') await pg.waitForSelector('.vrm-ventes-liste [data-tx], [data-ventes-vide], [data-ventes-ko]', { timeout: 20000 }).catch(() => {});
+  await pg.waitForTimeout(1400);
 };
 const capture = async (pg, nom) => {
   if (!SHOTS) return;
@@ -190,14 +193,12 @@ async function tournee(nav, { W, theme, scenario }) {
   const J = JEUX[scenario];
   const base = { lignes: J.lignes(), comptes: J.comptes, ecritures: 0 };
   const o = await NV.ouvrir(nav, { W, sombre, base, tab: 'ventes' });
-  if (J.ko) {
-    // Une lecture RATÉE (la base répond 500 pour ce compte) : « pas su », jamais « rien ».
-    await o.pg.route((u) => decodeURIComponent(String(u)).includes(J.ko), (r) => r.fulfill({ status: 500, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"message":"panne"}' }));
-    await o.pg.evaluate(() => { try { for (const k of Object.keys(localStorage)) if (/orders|cache/i.test(k)) localStorage.removeItem(k); sessionStorage.clear(); } catch (_) {} });
-    await o.pg.reload({ waitUntil: 'domcontentloaded' });
-  }
   await o.pg.waitForSelector('.vrm-main', { timeout: 20000 }).catch(() => {});
-  await o.pg.waitForTimeout(3600);
+  await o.pg.waitForTimeout(2000);
+  // La liste est LUE (une vente, ou l'état vide) — jamais mesurée pendant le chargement.
+  await o.pg.waitForSelector('[data-ventes-toutes="lu"] [data-toutes-vente], [data-ventes-toutes="lu"] [data-toutes-vide]', { timeout: 25000 }).catch(() => {});
+  if (scenario !== 'vide') await o.pg.waitForSelector('[data-a-venir]', { timeout: 8000 }).catch(() => {});
+  await o.pg.waitForTimeout(800);
 
   // ── Ventes · Tous ──
   const t = await MESURE(o.pg, { tel, sombre });

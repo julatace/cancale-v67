@@ -20223,8 +20223,8 @@ function RetirerArgent({ liveStats }) {
           {liste.map((x) => (
             <div key={x.uid} data-retirer-compte={x.uid} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderTop: `1px solid ${C.border}` }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{x.login || `compte ${x.uid}`}</div>
-                <div style={{ fontSize: 12, color: C.muted }}>{fmt(x.dispo || 0)} disponible{x.jours != null && x.jours > 0 ? ` · lu il y a ${x.jours} j` : ''}</div>
+                <div className="vrm-sensible" style={{ fontSize: 13, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{x.login || `compte ${x.uid}`}</div>
+                <div style={{ fontSize: 12, color: C.muted }}>{montant(x.dispo)} disponible{x.jours != null && x.jours > 0 ? ` · lu il y a ${x.jours} j` : ''}</div>
               </div>
               {x.dispo > 0 && <Bouton variante="secondaire" href={PORTE_MONNAIE_VINTED} target="_blank" rel="noreferrer" style={{ flexShrink: 0 }}>Retirer sur Vinted ↗</Bouton>}
             </div>
@@ -20934,8 +20934,11 @@ function CompteVente({ compte, plateforme, ou = '' }) {
   if (!compteFourni(compte)) return null;
   return <span className="vrm-vente-compte vrm-sensible" data-vente-compte={compte ? String(compte) : ''} data-vente-compte-ou={ou || undefined} data-vente-compte-passu={compte ? undefined : ''} title={compte ? `Vendue sur le compte ${compte}` : undefined}>{texteCompteVente(compte, plateforme)}</span>;
 }
-function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', compte: compteBrut = undefined, etat, etatNoeud = null, ton = '', montant, children, numerosArticle = [], plateforme = '', initialOuvert = false, gestes = null, montantCentimes, benef, recap = null, frise = null, bas = null, fusion = null, ...props }) {
+function LigneVenteCompacte({ photo, photoNoeud = null, titre: titreNom, numTitre = '', sous = '', compte: compteBrut = undefined, etat, etatNoeud = null, ton = '', montant, children, numerosArticle = [], plateforme = '', initialOuvert = false, gestes = null, montantCentimes, benef, recap = null, frise = null, bas = null, fusion = null, ...props }) {
   const compte = compteFourni(compteBrut) ? compteBrut : undefined;
+  // (5 nov., chantier E2) Le N° du titre en pastille `Numero` (la même qu'au téléphone) ; le texte
+  // complet « N°x · nom » reste le nom lu et l'infobulle.
+  const titre = numTitre ? `N°${numTitre} · ${titreNom || ''}` : titreNom;
   const [ouvert, setOuvert] = React.useState(initialOuvert);
   const panneau = React.useId();
   const declencheur = React.useRef(null);
@@ -21015,7 +21018,7 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre, sous = '', compte
         <span className="vrm-fu-vente-l2">{fusion.num ? <Numero n={fusion.num} taille="petit" data-fu-num=""/> : null}<span className="vrm-fu-site" data-site={fusion.site || plateforme}>{fusion.siteNom || ''}</span>{compte !== undefined ? <span className="vrm-fu-vente-compte" data-fu-compte="">· <CompteVente compte={compte} plateforme={plateforme} ou="ligne-court"/></span> : null}{fusion.taille ? <span className="vrm-fu-vente-taille" data-fu-taille={fusion.taille}>· {fusion.taille}</span> : null}</span>
         <span className="vrm-fu-vente-l3" data-ton={ton || undefined}>{etatNoeud || etat}</span>
       </span> : null}
-      <span className="vrm-ledger-sale-title" title={titre}><span className="vrm-ledger-sale-nom">{titre || '(sans titre)'}</span>{(sous || compte !== undefined) ? <span className="vrm-ledger-sale-sous" data-vente-sous=""><CompteVente compte={compte} plateforme={plateforme} ou="ligne"/>{compte !== undefined && sous ? ' · ' : ''}{sous}</span> : null}</span>
+      <span className="vrm-ledger-sale-title" title={titre}><span className="vrm-ledger-sale-nom">{numTitre ? <><Numero n={numTitre} taille="petit" data-titre-num=""/>{' '}{titreNom || '(sans titre)'}</> : (titre || '(sans titre)')}</span>{(sous || compte !== undefined) ? <span className="vrm-ledger-sale-sous" data-vente-sous=""><CompteVente compte={compte} plateforme={plateforme} ou="ligne"/>{compte !== undefined && sous ? ' · ' : ''}{sous}</span> : null}</span>
       <span className="vrm-ledger-sale-state" title={etat} data-ton={ton || undefined}>{etatNoeud || etat}</span>
       <span className="vrm-ledger-sale-amount" data-prix-vente={montantCentimes ?? undefined}>{montant}</span>
       {benef ? <span className="vrm-ledger-sale-achat" data-achat-ligne={benef.achatCentimes ?? ''} data-achat-etat={benef.achatCentimes == null ? 'manque' : 'lu'}>{benef.achatTxt}</span> : null}
@@ -53549,7 +53552,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const tot = boostsDetected.reduce((s,b)=>s+(b.amount||0),0);
           return (
             <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'10px 13px',marginBottom:10}}>
-              <div style={{fontSize:13,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>{tot.toFixed(2).replace('.',',')} € de boosts sur Vinted <span style={{color:C.muted,fontWeight:500}}>· {boostsDetected.length} mise{boostsDetected.length>1?'s':''} en avant</span>
+              <div style={{fontSize:13,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>{montant(tot)} de boosts sur Vinted <span style={{color:C.muted,fontWeight:500}}>· {boostsDetected.length} mise{boostsDetected.length>1?'s':''} en avant</span>
                 <Pourquoi label="D'où vient ce montant ?">Capté dans ta facturation Vinted par l'extension. Reporte chaque montant dans le champ « Boost » de son annonce pour un bénéfice net exact — l'app ne l'inscrit pas toute seule, pour ne pas écraser tes saisies.</Pourquoi></div>
             </div>
           );
@@ -53599,7 +53602,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <summary className="vrm-annul-alerte-voir">Voir {x.annulees > 1 ? `les ${x.annulees} ventes annulées` : 'la vente annulée'}<span aria-hidden="true">›</span></summary>
                 {x.liste.map((v) => (
                   <div key={v.id} className="vrm-annul-ligne" data-annulation-vente={v.id}>
-                    <span>{v.titre || 'Vente sans titre'}<small>{jourA(v.ts)}{v.eur != null ? ` · ${montant(v.eur)}` : ''}{v.statut ? ` · ${v.statut}` : ''}</small></span>
+                    <span>{v.titre || 'Vente sans titre'}<small>{jourA(v.ts)}{v.eur != null ? ` · ${montant(v.eur)}` : ''}{v.statut && !/^commande annul[ée]e$/i.test(v.statut.trim()) ? ` · ${v.statut}` : ''}</small></span>
                     {v.lien ? <a href={v.lien} target="_blank" rel="noreferrer" aria-label={`Ouvrir sur Vinted : ${v.titre || 'la vente'}`}>Vinted ↗</a> : null}
                   </div>
                 ))}
@@ -53608,8 +53611,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           ));
         })()}
         {sales.loading && !sales.items && <Skeleton variant="row" count={5}/>}
-        {sales.error && <LoadError onRetry={()=>loadOrders('sold',setSales,true)}/>}
-        {sales.items && !sales.error && sales.items.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'28px 16px',lineHeight:1.5}}>Aucune vente pour l'instant.<br/><span style={{fontSize:12}}>Tes ventes finalisées apparaîtront ici automatiquement.</span></div>}
+        {sales.error && <EtatPanne quoi="Tes ventes Vinted" raison="La lecture n’a pas répondu. Rien n’est perdu." onReessayer={()=>loadOrders('sold',setSales,true)}/>}
+        {/* (5 nov., chantier E2) L'état vide dit ce qui va se passer : TOUTES les ventes arrivent ici
+            (pas seulement les finalisées, comme le disait l'ancienne phrase). */}
+        {sales.items && !sales.error && sales.items.length===0 && <div className="vrm-toutes-vide" data-ventes-vide=""><p className="vrm-toutes-vide-titre">Aucune vente pour l’instant</p><p>Dès qu’un article part sur Vinted, il apparaît ici avec son état et son bordereau.</p></div>}
         {/* ⚠️ SUR ORDINATEUR, LA LISTE SE RANGE EN DEUX COLONNES.
             Une ligne de vente de 980 px pour une photo, un titre et un
             prix, c'est le meme defaut que les cartes d'action de Ma
@@ -53818,7 +53823,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <GlisserVente actif={peutDeposer && !deposeIci} onDepose={()=>demanderDepose(txL, o, libDepose)}>{gp => (
               // Ligne de vente dans la liste groupée (filet fin entre les lignes,
               // pas de carte encadrée séparée — style démo, comme Achats).
-              <LigneVenteCompacte montantCentimes={sell!=null?Math.round(sell*100):undefined} numerosArticle={num?[num]:[]} plateforme="vinted" photo={photo} photoNoeud={photo?<PhotoVenteSources {...photoSourcesProps} data-photo-vente="ligne" style={{width:28,height:36,borderRadius:12,objectFit:'cover',flexShrink:0}}/>:null} titre={(()=>{ const t=String((e&&e.size)||o.size||'').trim(); const nom=t&&!tailleDansTitre(o.title,t)?`${o.title} · taille ${t}`:o.title; return num?`N°${num} · ${nom}`:nom; })()}
+              <LigneVenteCompacte montantCentimes={sell!=null?Math.round(sell*100):undefined} numerosArticle={num?[num]:[]} plateforme="vinted" photo={photo} photoNoeud={photo?<PhotoVenteSources {...photoSourcesProps} data-photo-vente="ligne" style={{width:28,height:36,borderRadius:12,objectFit:'cover',flexShrink:0}}/>:null} titre={(()=>{ const t=String((e&&e.size)||o.size||'').trim(); const nom=t&&!tailleDansTitre(o.title,t)?`${o.title} · taille ${t}`:o.title; return nom; })()} numTitre={num||''}
                 {...gp} benef={benefLigne} recap={recapVente} data-depose-attente={deposeIci?'1':undefined}
                 data-fu-ligne="" fusion={{ prix: montant(sell, { devise: o.price?.currency_code || 'EUR' }), nom: String(o.title||'').replace(/[\s,·-]*(?:taille|t\.?)\s*[\d.,/ ]+(?:\s*(?:eu|fr|us|uk))?\s*$/i,'').trim() || o.title, num, site: 'vinted', siteNom: 'Vinted', taille: String((e&&e.size)||o.size||'').trim() || ((String(o.title||'').match(/taille\s*([\d.,/]+)/i)||[])[1]||'') }} frise={fuEtapes ? <Frise etapes={fuEtapes} cle={txL} className="vrm-fu-ligne-frise" label="Où en est la vente"/> : null}
                 bas={peutDeposer ? <>
@@ -53846,7 +53851,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             TOUJOURS sur l'ensemble : ils ne dépendent pas de cette tranche. */}
         {ventesAffichees.length > ventesMax && (
           <Bouton variante="secondaire" plein onClick={()=>React.startTransition(()=>setVentesMax(n=>n+120))} style={{marginTop:10}}>
-            Afficher les {Math.min(120,ventesAffichees.length-ventesMax)} suivantes · {ventesMax}/{ventesAffichees.length}
+            Afficher {Math.min(120,ventesAffichees.length-ventesMax) > 1 ? `les ${Math.min(120,ventesAffichees.length-ventesMax)} suivantes` : 'la suivante'}{ventesAffichees.length-ventesMax > 120 ? ` · encore ${ventesAffichees.length-ventesMax-120} après` : ''}
           </Bouton>
         )}
         {/* (29 oct., « un peu moche ») Les contrôles passent SOUS la liste : avant la
@@ -67356,7 +67361,14 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
     else if (vc === null) etats.push(['vestiaire', 'pas-su', 'Vestiaire : ventes pas lues — rien n’est perdu, réessaie dans un moment.']);
     else if (!vc.ventes) etats.push(['vestiaire', 'jamais', 'Vestiaire : jamais lu — ouvre tes ventes sur Vestiaire avec l’extension.']);
   }
-  const jour = (t) => t == null ? 'date pas lue' : new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+  // « aujourd'hui », « hier », sinon le jour (l'année seulement si ce n'est pas celle-ci).
+  const jour = (t) => {
+    if (t == null) return 'date pas lue';
+    const d = new Date(t), h = new Date(); const j0 = new Date(h.getFullYear(), h.getMonth(), h.getDate()).getTime();
+    if (t >= j0 && t < j0 + 86400000) return 'aujourd’hui';
+    if (t >= j0 - 86400000 && t < j0) return 'hier';
+    return d.toLocaleDateString('fr-FR', d.getFullYear() === h.getFullYear() ? { day: 'numeric', month: 'short' } : { day: 'numeric', month: 'short', year: 'numeric' });
+  };
   // Une devise étrangère est DITE (« 12,50 GBP »), jamais convertie ; l'euro par `montant()`.
   const prix = (l) => l.prix == null ? '' : montant(l.prix, { devise: l.devise || 'EUR' });
   const enCours = etats.some((e) => e[1] === 'lecture');
@@ -67413,7 +67425,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
                   {/* (5 nov., revue 2.13) L'état sur SA ligne au téléphone : jamais coupé par l'ellipse de la ligne du dessus. */}
                   {l.etat ? <span className="vrm-toutes-etat" data-toutes-etat={motEtatVente(l.etat)} data-ton={geste(l) ? 'action' : undefined}>{motEtatVente(l.etat)}</span> : null}
                 </span>
-                <span className="vrm-toutes-bureau" aria-hidden="true"><span><b>{NOM[l.site]}</b>{l.compte&&<small className="vrm-sensible">{l.compte}</small>}</span><span>{jour(l.t)}</span><span data-ton={geste(l) ? 'action' : undefined}>{l.etat ? motEtatVente(l.etat) : PAS_SU.vide}</span></span>
+                <span className="vrm-toutes-bureau" aria-hidden="true"><span><b className="vrm-toutes-bureau-site"><LogoSite site={l.site}/>{NOM[l.site]}</b>{l.compte&&<small className="vrm-sensible">{l.compte}</small>}</span><span>{jour(l.t)}</span><span data-ton={geste(l) ? 'action' : undefined}>{l.etat ? motEtatVente(l.etat) : PAS_SU.vide}</span></span>
                 <span className="vrm-toutes-montant" aria-hidden="true" style={{ flexShrink: 0, textAlign: 'right' }}>
                   {l.prix != null && <span data-toutes-prix="" style={{ display: 'block', fontSize: 15, fontWeight: 700 }}>{prix(l)}</span>}
                   {l.num ? <span data-toutes-num={l.num} style={{ display: 'block', marginTop: 4 }}><Numero n={l.num} taille="petit"/></span> : null}
@@ -70013,7 +70025,7 @@ function AppCoeur() {
                 { cle: 'encours', lib: 'En cours', val: v(ar.nAttente), sub: (vide && !lu) ? null : fmt(ar.attente) },
                 { cle: 'finalisees', lib: 'Finalisées', val: v(ar.nRecu) },
                 { cle: 'ca', lib: 'CA finalisé', val: (vide && !lu) ? null : fmt(ar.recu), brut: (vide && !lu) ? null : ar.recu },
-              ]} note={vide ? "Tes ventes Leboncoin arrivent quand l'extension passe sur leboncoin.fr (« Mes transactions »). Seules les ventes où tu es bien le vendeur sont comptées." : (lbcVentes.maj ? <span data-lbc-lu="">Lu sur Leboncoin {ilYaCourt(lbcVentes.maj)} <Pourquoi label="Rafraîchir">Ouvre « Mes transactions » sur leboncoin.fr, avec l'extension à jour : tes ventes sont relues.</Pourquoi></span> : null)}/>; })()}
+              ]} note={vide ? "Pas encore lues : ouvre « Mes transactions » sur leboncoin.fr avec l’extension. Seules les ventes où tu es le vendeur comptent." : (lbcVentes.maj ? <span data-lbc-lu="">Lu sur Leboncoin {ilYaCourt(lbcVentes.maj)} <Pourquoi label="Rafraîchir">Ouvre « Mes transactions » sur leboncoin.fr, avec l'extension à jour : tes ventes sont relues.</Pourquoi></span> : null)}/>; })()}
             {((lbcVentes.ventes||[]).length>0||lbcVentes.inconnues>0) && <VentesLeboncoin lbcVentes={lbcVentes} sansTotaux/>}
           </>}</div>}
           {sec==='achats'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<AchatsLeboncoin lbcVentes={lbcVentes}/>}</div>}

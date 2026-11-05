@@ -83,3 +83,15 @@ html body .vrm-app-shell .vrm-main .vrm-fu-vente-l2 .vrm-num { flex-shrink: 0; }
 
 /* ── Le pied de Ventes ─────────────────────────────────────────────────────── */
 html body .vrm-app-shell .vrm-main .vrm-ventes-controles:empty { display: none; }
+
+/* ── « Vendus ailleurs » (le composant seul) : 44 px au doigt ─────────────── */
+html body .vrm-app-shell .vrm-main [data-vendus-ailleurs] :is(button, a[href]) { min-height: 44px; display: inline-flex; align-items: center; box-sizing: border-box; }
+html body .vrm-app-shell .vrm-main [data-vendus-ailleurs] > summary { min-height: 44px; }
+html body .vrm-app-shell .vrm-main [data-vendus-ailleurs] .vrm-vendu-photo > .vrm-photo-vide { width: 100%; height: 100%; }
+
+/* ── La barre des filtres de Ventes · Vinted : à plat, sans carte autour ─────
+   (la recherche et la période y sont masquées — la recherche est dans la barre du
+   haut —, il ne restait qu'une rangée de filtres dans une carte trop haute). */
+html body .vrm-app-shell .vrm-main .vrm-workbar.vrm-sales-workbar { background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; margin: 14px 0 10px !important; }
+html body .vrm-app-shell .vrm-main .vrm-sales-workbar > .vrm-filtres-et-outils { margin-bottom: 0 !important; }
+html body .vrm-app-shell .vrm-main .vrm-toutes-bureau-site { display: inline-flex; align-items: center; gap: 6px; }

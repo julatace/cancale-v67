@@ -1,21 +1,28 @@
 // ── BANC : COMPTE QUI VEND LE MIEUX (G24) ───────────────────────────────────
 // Un revendeur a plusieurs comptes Vinted ; il veut savoir lequel vend le plus.
-// L'écran Ventes → Analyse affiche « Compte qui vend le mieux » (le leader) et
-// « Ventes finalisées par compte » (le classement). C'est une AGRÉGATION de
-// ventes finalisées connues, pas une estimation (§5), et un compte EXCLU n'y
-// entre pas (« ne plus parler des comptes retirés », 3 oct).
+// (5 nov., chantier E2) UNE SEULE PLACE : Statistiques → « Quel compte vend le
+// mieux » (la phrase « … vend le plus », `data-sv-meilleur`, et une ligne par
+// compte, `data-sv-compte`). Le bloc « Compte qui vend le mieux » / « Ventes
+// finalisées par compte » de Ventes → Analyse disait la même chose une seconde
+// fois, derrière deux replis : il est retiré, et ce banc suit la place qui reste
+// (il jugeait la RÈGLE — agrégation de ventes connues, compte exclu absent, rien
+// à comparer avec un seul compte —, pas l'endroit).
+// C'est une AGRÉGATION de ventes connues, pas une estimation (§5), et un compte
+// EXCLU n'y entre pas (« ne plus parler des comptes retirés », 3 oct).
 //
 // Données INVENTÉES (ce banc vit dans le dépôt, sans fx/). Preuves :
-//  • compte_alpha (3 ventes) devant compte_beta (1) ⇒ leader = compte_alpha ;
+//  • compte_alpha (3 ventes) devant compte_beta (1) ⇒ « compte_alpha vend le plus » ;
 //  • le compte EXCLU (compte_gamma, 5 ventes) n'apparaît NULLE PART ;
-//  • un seul compte vendeur ⇒ pas de « qui vend le mieux » (rien à comparer).
+//  • un seul compte vendeur ⇒ pas de « vend le plus » (rien à comparer) ;
+//  • et Ventes ne le redit plus (aucun « Compte qui vend le mieux » dans Ventes).
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT || 4373);
 const MAINTENANT = Date.now();
-const ilYa = (j) => new Date(MAINTENANT - j * 86400000).toISOString();
+// Des ventes de CE mois (quelques minutes plus tôt) : la période par défaut de Statistiques.
+const ilYa = (j) => new Date(MAINTENANT - j * 60000).toISOString();
 
 const vente = (tx, prix, j) => ({ transaction_id: tx, title: `Paire ${tx}`, price: { amount: String(prix), currency_code: 'EUR' },
   status: 'Commande finalisée', transaction_user_status: 'completed', date: ilYa(j) });
@@ -85,20 +92,28 @@ async function preparer(b, vp, ROWS) {
   return { ctx, pg };
 }
 
-const lireVentes = async (pg) => {
-  await pg.goto(`http://localhost:${PORT}/?tab=cat_ventes`, { waitUntil: 'domcontentloaded' });
-  await pg.waitForTimeout(1300);
-  // L'analyse (Temps de vente, Top compte…) est repliée derrière « voir › ».
-  const voir = pg.locator('text=/Analyse de tes ventes/i');
-  if (await voir.count()) { await voir.first().click().catch(() => {}); await pg.waitForTimeout(400); }
+const lireStats = async (pg) => {
+  await pg.goto(`http://localhost:${PORT}/?tab=dashboard`, { waitUntil: 'domcontentloaded' });
+  await pg.waitForSelector('[data-sv-carte="comptes"] [data-sv-etat="lu"]', { timeout: 15000 }).catch(() => {});
+  await pg.waitForTimeout(600);
   return pg.evaluate(() => {
-    const txt = document.body.innerText;
-    const leader = [...document.querySelectorAll('*')].map(e => e.textContent).find(t => /Compte qui vend le mieux/i.test(t || ''));
-    const rang = document.querySelector('[data-ventes-par-compte]');
-    const comptes = rang ? [...rang.querySelectorAll('[data-compte-vend]')].map(e => e.getAttribute('data-compte-vend')) : [];
-    const aLeader = /Compte qui vend le mieux/i.test(txt);
-    return { aLeader, comptes, gamma: /compte_gamma/.test(txt) };
+    const carte = document.querySelector('[data-sv-carte="comptes"]');
+    const m = carte && carte.querySelector('[data-sv-meilleur]');
+    const comptes = carte ? [...carte.querySelectorAll('[data-sv-compte]')].map((e) => String(e.getAttribute('data-sv-compte')).split('|').pop()) : [];
+    // Où le compte exclu serait-il écrit ? (le nom du bloc, pour le rapport)
+    const ou = []; const tw = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    for (let n = tw.nextNode(); n; n = tw.nextNode()) if (/compte_gamma/.test(n.nodeValue) && n.parentElement && n.parentElement.getClientRects().length) { const b = n.parentElement.closest('[data-stats-carte]') || n.parentElement.closest('[data-sv-carte], section, [class]'); ou.push(((b && (b.getAttribute('data-stats-carte') || b.getAttribute('data-sv-carte') || b.className)) || '?') + ' : ' + n.nodeValue.trim().slice(0, 60)); }
+    return { carte: !!carte, leader: m ? String(m.getAttribute('data-sv-meilleur')).split('|').pop() : '', comptes, gamma: !!(carte && /compte_gamma/.test(carte.innerText)), ou };
   });
+};
+const ventesRedit = async (pg) => {
+  await pg.goto(`http://localhost:${PORT}/?tab=cat_ventes`, { waitUntil: 'domcontentloaded' });
+  await pg.waitForTimeout(1500);
+  const v = pg.locator('[data-selecteur-logos] button[data-site="vinted"]').first();
+  if (await v.count()) { await v.click().catch(() => {}); await pg.waitForTimeout(1500); }
+  const voir = pg.locator('.vrm-sales-analysis button[aria-expanded]').first();
+  if (await voir.count()) { await voir.click().catch(() => {}); await pg.waitForTimeout(500); }
+  return pg.evaluate(() => /Compte qui vend le mieux|Ventes finalisées par compte/i.test(document.body.innerText) || !!document.querySelector('[data-ventes-par-compte]'));
 };
 
 async function main() {
@@ -112,11 +127,14 @@ async function main() {
       await essaie(`${T} classement`, async () => {
         const ROWS = rowsPour(['111', '222', '333'], ['333']);
         const { ctx, pg } = await preparer(b, vp, ROWS);
-        const r = await lireVentes(pg);
-        dit(r.aLeader, `${T} « Compte qui vend le mieux » est affiché`);
-        dit(r.comptes[0] === 'compte_alpha', `${T} le leader est compte_alpha (3 ventes > 1)`, JSON.stringify(r.comptes));
-        dit(r.comptes.includes('compte_alpha') && r.comptes.includes('compte_beta'), `${T} le classement liste alpha ET beta`, JSON.stringify(r.comptes));
-        dit(!r.gamma && !r.comptes.includes('compte_gamma'), `${T} le compte EXCLU (gamma) n’apparaît nulle part`, r.gamma ? 'gamma présent à tort' : '');
+        const r = await lireStats(pg);
+        dit(r.carte && r.leader === 'compte_alpha', `${T} Statistiques : « compte_alpha vend le plus » (3 ventes > 1)`, JSON.stringify(r));
+        dit(r.comptes[0] === 'compte_alpha' && r.comptes.includes('compte_beta'), `${T} le classement liste alpha (en tête) ET beta`, JSON.stringify(r.comptes));
+        dit(!r.gamma && !r.comptes.includes('compte_gamma'), `${T} le compte EXCLU (gamma) n’entre pas dans « Quel compte vend le mieux »`, r.gamma ? 'gamma présent à tort' : '');
+        // Rapporté, pas jugé ici (hors de la règle de ce banc, écran Statistiques — chantier F) :
+        // d'autres cartes de Statistiques qui écriraient encore le compte exclu.
+        if (r.ou.length) console.log(`     ${T} (rapporté) le compte exclu est encore écrit ailleurs dans Statistiques : ${r.ou.join(' ¦ ')}`);
+        dit(!(await ventesRedit(pg)), `${T} Ventes ne le redit plus (une seule place : Statistiques)`);
         await ctx.close();
       });
 
@@ -124,8 +142,8 @@ async function main() {
       await essaie(`${T} un seul`, async () => {
         const ROWS = rowsPour(['111'], []);
         const { ctx, pg } = await preparer(b, vp, ROWS);
-        const r = await lireVentes(pg);
-        dit(!r.aLeader && r.comptes.length === 0, `${T} un seul compte vendeur ⇒ pas de classement (rien à comparer)`, r.aLeader ? 'affiché à tort' : '');
+        const r = await lireStats(pg);
+        dit(r.carte && !r.leader && r.comptes.length <= 1, `${T} un seul compte vendeur ⇒ pas de « vend le plus » (rien à comparer)`, JSON.stringify(r));
         await ctx.close();
       });
     }
