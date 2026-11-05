@@ -248,6 +248,35 @@ const garde = (x, k, v) => {
     const T = Date.UTC(2026, 10, 5, 15, 0);
     const g = groupesParJour([{ id: 'a', at: new Date(T - 6e4).toISOString() }, { id: 'b', at: null }, { id: 'c', at: new Date(T - 20 * 36e5).toISOString() }, { id: 'd', sourceDate: new Date(T - 50 * 36e5).toISOString(), at: new Date(T).toISOString() }], T);
     dit(g.map((x) => x.mot)[0] === 'Aujourd’hui' && g[g.length - 1].mot === 'Date non lue' && g.reduce((s, x) => s + x.emails.length, 0) === 4 && g.some((x) => x.mot === 'Hier'), 'groupés par jour : Aujourd’hui, Hier, …, « Date non lue » en dernier, chaque e-mail une fois', JSON.stringify(g.map((x) => [x.mot, x.emails.map((e) => e.id)])));
+    // (v33, « tu peux faire mieux ») UNE LIGNE = nature · essentiel · geste, rangée
+    // depuis `titreSimple` (une seule source) ; le geste est marqué, l'ambre rare.
+    const { ligneEmail, gesteAmbre, monogramme, joursAvant } = await import(path.join(R, 'src/boiteEmails.js'));
+    const L = (resume, extra) => ligneEmail(E(resume, extra), {}, T);
+    const nbsp = (x) => String(x).replace(/ /g, ' ');
+    const ret = L({ v: 1, t: 'suivi', s: 'MR1', st: 'available', code: '418205', lieu: 'Relais Tabac du Port', lim: '2026-11-09' });
+    dit(ret.titre === 'Colis à retirer' && nbsp(ret.essentiel.join(' · ')) === 'code 418 205 · Relais Tabac du Port' && ret.geste && ret.geste.k === 'retrait' && nbsp(ret.geste.mot) === 'avant le 9 nov.' && !gesteAmbre(ret.geste), 'ligne d’un code de retrait : le CODE en tête de l’essentiel, le délai à part (geste), sans ambre à 4 jours', JSON.stringify(ret));
+    const dem = L({ v: 1, t: 'vente-vestiaire', a: 'Jordan 1 Mid', mt: '82,40', lim: '2026-11-06' });
+    const auj = L({ v: 1, t: 'suivi', s: 'X', st: 'available', lim: '05/11/2026' });
+    const passe = L({ v: 1, t: 'suivi', s: 'X', st: 'available', lim: '01/11/2026' });
+    const sansAn = L({ v: 1, t: 'suivi', s: 'X', st: 'available', lim: '06/11' });
+    dit(dem.geste.k === 'envoi' && dem.geste.proche && gesteAmbre(dem.geste) && /\(demain\)$/.test(dem.geste.mot) && auj.geste.proche && /aujourd’hui/.test(auj.geste.mot) && passe.geste.passe && !gesteAmbre(passe.geste) && /délai passé/.test(passe.geste.mot) && !sansAn.geste.proche, 'délai LU : ambre à moins de 48 h (aujourd’hui, demain) ; passé ⇒ « délai passé » sans ambre ; date sans année ⇒ jamais « proche » (pas su)', JSON.stringify([dem.geste, auj.geste, passe.geste, sansAn.geste]));
+    const bo = L({ v: 1, t: 'bordereau', tx: '1', n: '42', pdf: 1, a: 'Nike Air Max 90' });
+    const ve = L({ v: 1, t: 'vente', a: 'Adidas Samba', px: '55', n: '17' });
+    const ac = L({ v: 1, t: 'achat', tx: '7', a: 'Nike Air Force 1', px: '45,00', id: 'email_achat_x' });
+    dit(bo.essentiel.join(' · ') === 'N°42 · Nike Air Max 90' && bo.geste.k === 'bordereau' && bo.geste.mot === 'bordereau prêt' && ve.essentiel.join(' · ') === 'N°17 · 55 € · Adidas Samba' && !ve.geste && ac.essentiel.join(' · ') === '45,00 € · Nike Air Force 1' && !ac.geste, 'faits courts d’abord (N°, montant), le nom de l’article en dernier ; « bordereau prêt » est le geste ; « reçu de commande » se tait sur la ligne', JSON.stringify([bo, ve, ac]));
+    const nl = L({ v: 1, t: 'connu-sans-action', f: 'newsletter Vinted' });
+    const inc = L({ v: 1, t: 'incompris' }, { etat: 'a-verifier' });
+    const att = L({ v: 1, t: 'bordereau', tx: '1', n: '4', pdf: 1 }, { etat: 'erreur' });
+    dit(nl.rien && !nl.geste && inc.geste.k === 'verifier' && inc.geste.mot === 'à vérifier' && gesteAmbre(inc.geste) && inc.essentiel.length === 0 && att.geste.mot === 'en attente', '« rien à faire » marqué ; « à vérifier » prime (ambre) ; « en attente » pour une erreur de rangement', JSON.stringify([nl, inc, att]));
+    const ntl = L({ v: 1, t: 'bordereau', tx: '1', n: '42', nt: 1, pdf: 1, av: 'num-titre', a: 'Nike Air Max 90' });
+    const anc = L(null, { type: 'bordereau', subject: 'Bordereau d’envoi pour Vans Old Skool' });
+    dit(!/42/.test(JSON.stringify(ntl)) && anc.essentiel.join() === 'détail non gardé' && !anc.geste && !/Vans/.test(JSON.stringify(anc)), '§5 la ligne n’écrit jamais un N° retrouvé par le titre ; un e-mail ancien ne reçoit ni détail ni geste tirés du sujet');
+    // Une seule source : chaque mot de la ligne est un détail de `titreSimple` (ou son délai réécrit).
+    const toutes = [ret, dem, bo, ve, ac, nl, inc, ntl, anc];
+    const sources = [{ v: 1, t: 'suivi', s: 'MR1', st: 'available', code: '418205', lieu: 'Relais Tabac du Port', lim: '2026-11-09' }, { v: 1, t: 'vente-vestiaire', a: 'Jordan 1 Mid', mt: '82,40', lim: '2026-11-06' }, { v: 1, t: 'bordereau', tx: '1', n: '42', pdf: 1, a: 'Nike Air Max 90' }, { v: 1, t: 'vente', a: 'Adidas Samba', px: '55', n: '17' }, { v: 1, t: 'achat', tx: '7', a: 'Nike Air Force 1', px: '45,00', id: 'email_achat_x' }];
+    dit(sources.every((r, i) => toutes[i].essentiel.every((x) => titreSimple(E(r)).details.includes(x))), 'chaque mot de l’essentiel est un détail de titreSimple (rien d’ajouté)');
+    dit(monogramme('Mondial Relay') === 'MR' && monogramme('Chronopost') === 'C' && monogramme('La Poste') === 'LP' && monogramme('exemple.test') === 'E' && monogramme('Expéditeur non lu') === '?' && monogramme('') === '?', 'monogramme neutre : « MR », « C », « LP », un domaine ⇒ sa première lettre, inconnu ⇒ « ? »');
+    dit(joursAvant('2026-11-06', T) === 1 && joursAvant('05/11/2026', T) === 0 && joursAvant('06/11', T) === null && joursAvant('n’importe', T) === null, 'joursAvant : date LUE avec son année, sinon null (pas su)');
   }
   {
     const { MESSAGERIES, EXPEDITEURS, ADRESSE_EXEMPLE, BOITE_VRM_EXEMPLE, regleFiltre } = await import(path.join(R, 'src/relierBoite.js'));

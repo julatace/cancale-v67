@@ -1,114 +1,194 @@
 /* ── E-mails : boîte de réception + « Relier ma boîte » (5 nov.) ───────────────
    Vitrine + Apple : surfaces neutres, UNE couleur d'accent rare (le bouton qui
-   mène à l'objet relié, le point d'étape courant), l'ambre seulement pour « à
-   vérifier », jamais de rouge. Cibles 44 px. Boutons : jamais inline-flex. */
-.vrm-boite{
+   mène à l'objet relié, le geste d'un état vide, le retour de la feuille, le
+   point d'étape courant), l'ambre seulement pour un geste à faire PROCHE ou « à
+   vérifier », jamais de rouge. Cibles 44 px. Boutons : jamais inline-flex.
+   (v33, « tu peux faire mieux ») Ligne en trois étages à côté de la marque de
+   l'expéditeur ; e-mails « rien à faire » atténués ; rubriques sous un fondu de
+   bord ; feuille de lecture à barre collante translucide, marges de 16 px. */
+.vrm-boite,.vrm-boite-feuille{
   --bx-encre:var(--vrm-ink,#1D1D1F); --bx-doux:var(--vrm-muted,#6E6E73); --bx-carte:var(--vrm-surface,#FFFFFF);
   --bx-sol:var(--vrm-bg,#F2F2F7); --bx-filet:var(--vrm-line,#E5E5EA); --bx-fin:var(--vrm-hair,#F2F2F7);
+  --bx-gris:var(--vrm-card2,#F2F2F7);
   --bx-accent:var(--vrm-accent,#0071E3); --bx-sur-accent:var(--vrm-on-accent,#FFFFFF);
   --bx-ambre:var(--vrm-warn,#B25000); --bx-ambre-doux:var(--vrm-warn-soft,#FFF4E5);
-  padding:0 16px 24px; color:var(--bx-encre); font-size:15px; line-height:1.45; min-width:0; box-sizing:border-box;
+  --bx-sortie:cubic-bezier(.23,1,.32,1); --bx-tiroir:cubic-bezier(.32,.72,0,1);
 }
-.vrm-boite *{box-sizing:border-box}
-.vrm-boite button,.vrm-boite select{font:inherit;color:inherit;min-height:44px;border-radius:12px;border:1px solid var(--bx-filet);background:var(--bx-carte);padding:0 14px;cursor:pointer}
+.vrm-boite{padding:0 16px 24px;color:var(--bx-encre);font-size:15px;line-height:1.45;min-width:0;box-sizing:border-box}
+.vrm-boite *,.vrm-boite-feuille *{box-sizing:border-box}
+.vrm-boite button,.vrm-boite select,.vrm-boite-feuille button{font:inherit;color:inherit;min-height:44px;border-radius:12px;border:1px solid var(--bx-filet);background:var(--bx-carte);padding:0 14px;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;transition:transform .12s var(--bx-sortie),background-color .2s ease}
+/* Le doigt est entendu tout de suite : un bouton se tasse à l'appui. */
+.vrm-boite button:active:not(:disabled):not(.vrm-boite-ligne),.vrm-boite-feuille button:active:not(:disabled){transform:scale(.97)}
 .vrm-boite button:disabled{opacity:.6;cursor:wait}
-.vrm-boite :focus-visible{outline:2px solid var(--vrm-focus,var(--bx-accent));outline-offset:2px}
+.vrm-boite :focus-visible,.vrm-boite-feuille :focus-visible{outline:2px solid var(--vrm-focus,var(--bx-accent));outline-offset:2px}
+.vrm-boite-sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
 .vrm-boite-vues{display:flex;gap:4px;padding:4px;border-radius:14px;background:var(--bx-fin);margin:4px 0 14px;max-width:440px}
-.vrm-boite-vues button{flex:1 1 0;border:0;background:transparent;font-weight:600;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vrm-boite-vues button{flex:1 1 0;border:0;background:transparent;font-weight:600;min-width:0;white-space:nowrap}
 .vrm-boite-vues button[aria-selected=true]{background:var(--bx-carte);box-shadow:0 1px 2px rgba(0,0,0,.10)}
 
 /* La boîte */
 .vrm-boite-corps-ecran{display:block;min-width:0}
-.vrm-boite-corps-ecran[data-boite-large="1"]{display:grid;grid-template-columns:minmax(340px,440px) minmax(0,1fr);gap:16px;align-items:start}
+.vrm-boite-corps-ecran[data-boite-large="1"]{display:grid;grid-template-columns:minmax(360px,460px) minmax(0,1fr);gap:16px;align-items:start}
 .vrm-boite-liste-col{min-width:0;border-radius:14px;background:var(--bx-carte);overflow:hidden}
-.vrm-boite-filtres{padding:12px 14px 6px}
+.vrm-boite-filtres{padding:12px 16px 4px}
 /* Les rubriques : une rangée au doigt (44 px), chaque pastille avec son nombre ;
-   ce qui ne rentre pas défile, sans barre visible. */
-.vrm-boite-rubriques{display:flex;flex-wrap:nowrap;gap:6px;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;margin:0 -14px;padding:0 14px 4px;scroll-padding:0 14px}
+   ce qui ne rentre pas défile, sans barre visible, sous un FONDU au bord qui dit
+   qu'il y en a d'autres (rien n'est coupé net sans indice). */
+.vrm-boite-rubriques{display:flex;flex-wrap:nowrap;gap:6px;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;margin:0 -16px;padding:0 16px 4px;scroll-padding:0 32px}
 .vrm-boite-rubriques::-webkit-scrollbar{display:none}
-.vrm-boite .vrm-boite-rubriques button{flex:0 0 auto;display:flex;align-items:center;gap:6px;white-space:nowrap;font-weight:500;border-radius:999px;padding:0 14px;background:var(--bx-fin);border-color:transparent}
+.vrm-boite-rubriques[data-bord-droite="1"]{-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 44px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 44px),transparent)}
+.vrm-boite-rubriques[data-bord-gauche="1"]{-webkit-mask-image:linear-gradient(to right,transparent,#000 44px);mask-image:linear-gradient(to right,transparent,#000 44px)}
+.vrm-boite-rubriques[data-bord-gauche="1"][data-bord-droite="1"]{-webkit-mask-image:linear-gradient(to right,transparent,#000 44px,#000 calc(100% - 44px),transparent);mask-image:linear-gradient(to right,transparent,#000 44px,#000 calc(100% - 44px),transparent)}
+.vrm-boite .vrm-boite-rubriques button{flex:0 0 auto;display:flex;align-items:center;gap:6px;white-space:nowrap;font-weight:500;border-radius:999px;padding:0 14px;background:var(--bx-gris);border-color:transparent}
 .vrm-boite .vrm-boite-rubriques button[aria-pressed=true]{background:var(--bx-encre);color:var(--bx-carte);border-color:var(--bx-encre)}
 .vrm-boite-n{font-variant-numeric:tabular-nums;font-size:13px;font-weight:600;opacity:.7}
-.vrm-boite-ligne-outils{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-top:8px}
-.vrm-boite-compte{display:grid;gap:3px;flex:1 1 200px;min-width:0}
-.vrm-boite-compte span{font-size:12px;color:var(--bx-doux)}
-.vrm-boite-compte select{width:100%;max-width:100%}
-.vrm-boite-actualiser{flex:0 0 auto}
+/* Le compte (un menu simple, le nom seul) et « Actualiser » (seulement quand utile). */
+.vrm-boite-ligne-outils{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
+.vrm-boite-compte{position:relative;display:block;flex:0 1 auto;min-width:0;max-width:100%}
+.vrm-boite .vrm-boite-compte select{-webkit-appearance:none;appearance:none;width:auto;max-width:100%;border-radius:999px;border-color:transparent;background:var(--bx-gris);padding:0 36px 0 14px;font-weight:500;text-overflow:ellipsis}
+.vrm-boite-compte-chevron{position:absolute;right:14px;top:50%;margin-top:-6px;pointer-events:none;color:var(--bx-doux)}
+.vrm-boite .vrm-boite-actualiser{margin-left:auto;display:flex;align-items:center;gap:6px;border:0;background:transparent;padding:0 8px;color:var(--bx-doux);font-weight:500}
+.vrm-boite-actualiser svg{display:block}
+.vrm-boite-tourne{display:block;animation:vrm-boite-tourne .8s linear infinite}
+@keyframes vrm-boite-tourne{to{transform:rotate(360deg)}}
 .vrm-boite-couverture{margin:8px 0 0;font-size:13px;color:var(--bx-doux)}
-.vrm-boite-etat{margin:14px;color:var(--bx-doux)}
+.vrm-boite-etat{margin:14px 16px;color:var(--bx-doux)}
 .vrm-boite-etat button{margin-left:6px}
-.vrm-boite-liste{margin:4px 0 0}
+.vrm-boite-liste{margin:0}
 .vrm-boite-jour ul{list-style:none;margin:0;padding:0}
-.vrm-boite-jour-titre{margin:0;padding:14px 14px 4px;font-size:13px;font-weight:600;color:var(--bx-doux);letter-spacing:0}
-.vrm-boite-jour li+li .vrm-boite-ligne{border-top:1px solid var(--bx-fin)}
-.vrm-boite .vrm-boite-ligne{display:grid;gap:4px;width:100%;text-align:left;border:0;border-radius:0;background:transparent;padding:10px 14px;min-height:64px}
-.vrm-boite .vrm-boite-ligne[aria-current=true]{background:var(--bx-fin)}
-/* 1. Ce que c'est (en premier, lisible) */
-.vrm-boite-quoi{display:block;min-width:0;font-size:15px;line-height:1.35;color:var(--bx-encre);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
-.vrm-boite-quoi b{font-weight:600}
-.vrm-boite-rien{color:var(--bx-doux)}
-/* 2. Plus petit : expéditeur (logo), compte, heure */
-.vrm-boite-ligne-pied{display:flex;align-items:center;gap:4px 8px;font-size:13px;color:var(--bx-doux);min-width:0}
-.vrm-boite-exp{display:flex;align-items:center;gap:0;min-width:0;flex:0 1 auto}
-.vrm-boite-exp .vrm-logo-site{flex:0 0 auto}
+.vrm-boite-jour-titre{margin:0;padding:16px 16px 4px;font-size:13px;font-weight:600;color:var(--bx-doux);letter-spacing:0}
+/* Filet INSET (il commence au texte, pas sous la marque), comme sur iPhone. */
+.vrm-boite-jour li{position:relative}
+.vrm-boite-jour li+li::before{content:"";position:absolute;left:68px;right:0;top:0;border-top:1px solid var(--bx-filet);pointer-events:none}
+
+/* Une ligne : la marque à gauche, puis trois étages. */
+.vrm-boite .vrm-boite-ligne{display:grid;grid-template-columns:40px minmax(0,1fr);column-gap:12px;align-items:start;width:100%;text-align:left;border:0;border-radius:0;background:transparent;padding:12px 16px;min-height:68px;transition:background-color .25s ease}
+/* L'appui : fond plein tout de suite (`data-appui` posé au doigt) ; la ligne ne se tasse pas (le tassement des boutons de l'app ne vaut pas pour une ligne entière). */
+.vrm-boite .vrm-boite-ligne:not(:disabled):active,.vrm-boite .vrm-boite-ligne[data-appui="1"]{background:var(--bx-gris);transition-duration:0s;transform:none}
+@media (hover:hover) and (pointer:fine){.vrm-boite .vrm-boite-ligne:hover{background:var(--bx-fin)}}
+.vrm-boite .vrm-boite-ligne[aria-current=true]{background:var(--bx-gris)}
+.vrm-boite-marque{display:grid;place-items:center;width:40px;height:40px;border-radius:999px;background:var(--bx-gris);color:var(--bx-encre);overflow:hidden}
+.vrm-boite-marque .vrm-logo-site{display:block;width:20px;height:20px;margin:0;vertical-align:0}
+.vrm-boite-marque .vrm-logo-site[data-logo-site="ebay"]{width:30px;height:30px;margin:0}
+.vrm-boite-mono{font-size:13px;font-weight:600;letter-spacing:.02em;line-height:1}
+.vrm-boite-ligne-txt{display:grid;gap:2px;min-width:0}
+/* 1. La nature, en un mot fort ; l'heure alignée à droite. */
+.vrm-boite-ligne-haut{display:flex;align-items:baseline;gap:8px;min-width:0}
+.vrm-boite-quoi{flex:1 1 auto;min-width:0;font-size:17px;font-weight:600;line-height:1.3;color:var(--bx-encre);overflow-wrap:anywhere}
+.vrm-boite-ligne-haut time{flex:0 0 auto;margin-left:auto;font-size:13px;color:var(--bx-doux);font-variant-numeric:tabular-nums}
+/* 2. L'essentiel, sur une ligne : les faits courts d'abord, le nom long en dernier. */
+.vrm-boite-essentiel{display:block;min-width:0;font-size:15px;line-height:1.35;color:var(--bx-encre);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vrm-boite-code{font-weight:600;font-variant-numeric:tabular-nums}
+/* 3. Le geste, puis l'expéditeur, le compte, les pièces jointes. */
+.vrm-boite-ligne-pied{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 12px;margin-top:1px;font-size:13px;line-height:1.45;color:var(--bx-doux);min-width:0}
+.vrm-boite-ligne-pied>*{white-space:nowrap;flex:0 0 auto;max-width:100%}
+/* « Qui » : un bloc insécable, ses parties séparées par « · ». */
+.vrm-boite-qui{display:flex;align-items:baseline;gap:0 8px;min-width:0}
+.vrm-boite-qui>*{flex:0 0 auto;white-space:nowrap}
+.vrm-boite-qui>*+*::before{content:"·";margin-right:8px;color:var(--bx-doux);font-weight:400}
+.vrm-boite-geste{font-weight:600;color:var(--bx-encre)}
+.vrm-boite-geste[data-ambre="1"]{color:var(--bx-ambre)}
+.vrm-boite-geste[data-passe="1"]{font-weight:500;color:var(--bx-doux)}
+.vrm-boite-exp{display:flex;align-items:baseline;min-width:0}
+.vrm-boite-qui>.vrm-boite-exp{flex:0 1 auto}
 .vrm-boite-exp-nom{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.vrm-boite-initiale{flex:0 0 auto;display:grid;place-items:center;width:16px;height:16px;margin-right:5px;border-radius:999px;background:var(--bx-fin);color:var(--bx-encre);font-size:11px;font-weight:600;line-height:1}
-.vrm-boite-compte-nom{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:0 1 auto}
-.vrm-boite-compte-nom::before{content:"·";margin-right:8px}
-.vrm-boite-ligne-pied time{margin-left:auto;flex:0 0 auto;font-variant-numeric:tabular-nums}
-.vrm-boite-pj{display:flex;align-items:center;gap:2px;flex:0 0 auto}
+.vrm-boite-pj{display:flex;align-items:center;gap:2px;align-self:center}
 .vrm-boite-pj-ic{flex:0 0 auto}
-.vrm-boite-averifier{flex:0 0 auto;font-weight:600;color:var(--bx-ambre);white-space:nowrap}
-.vrm-boite-plus{display:block;margin:10px 14px 14px;width:calc(100% - 28px)}
+/* « Rien à faire » (newsletters, informations) : atténué, jamais caché. */
+.vrm-boite .vrm-boite-ligne[data-boite-rien="1"]{min-height:60px;padding-top:10px;padding-bottom:10px}
+.vrm-boite-ligne[data-boite-rien="1"] .vrm-boite-quoi{font-weight:500;color:var(--bx-doux)}
+.vrm-boite-ligne[data-boite-rien="1"] .vrm-boite-marque{color:var(--bx-doux);background:var(--bx-fin)}
+.vrm-boite-ligne[data-boite-rien="1"] .vrm-boite-essentiel{color:var(--bx-doux)}
+.vrm-boite-plus{display:block;margin:10px 16px 16px;width:calc(100% - 32px)}
+
+/* En attendant : des lignes fantômes, visibles après 150 ms (pas de clignotement). */
+.vrm-boite-squelette{padding:8px 0 12px;animation:vrm-boite-apparait .2s .15s ease-out both}
+@keyframes vrm-boite-apparait{from{opacity:0}}
+.vrm-boite-sq-ligne{display:grid;grid-template-columns:40px minmax(0,1fr);column-gap:12px;align-items:center;padding:12px 16px;min-height:68px}
+.vrm-boite-sq-ligne>span{display:grid;gap:8px}
+.vrm-boite-sq-ligne i{display:block;height:12px;border-radius:6px;background:var(--bx-gris);animation:vrm-boite-pouls 1.2s ease-in-out infinite alternate}
+.vrm-boite-sq-ligne i.vrm-boite-sq-rond{width:40px;height:40px;border-radius:999px}
+@keyframes vrm-boite-pouls{to{opacity:.55}}
+
+/* Les états : un titre, une phrase, LE geste. */
+.vrm-boite-etat-bloc{display:grid;justify-items:center;text-align:center;gap:6px;padding:36px 24px 32px}
+.vrm-boite-etat-ic{color:var(--bx-doux);margin-bottom:4px}
+.vrm-boite-etat-ic svg{display:block}
+.vrm-boite-etat-bloc p{margin:0}
+.vrm-boite-etat-titre{font-size:17px;font-weight:600;color:var(--bx-encre)}
+.vrm-boite-etat-texte,.vrm-boite-etat-bloc>p:not(.vrm-boite-etat-titre){max-width:34ch;color:var(--bx-doux)}
+.vrm-boite-etat-gestes{display:grid;gap:8px;margin-top:12px;width:min(280px,100%)}
+.vrm-boite .vrm-boite-principal,.vrm-boite-feuille .vrm-boite-principal{background:var(--bx-accent);color:var(--bx-sur-accent);border-color:var(--bx-accent);font-weight:600}
+.vrm-boite .vrm-boite-second{background:var(--bx-gris);border-color:transparent;font-weight:500}
 
 /* Lire un email */
 .vrm-boite-lecture-col{min-width:0;position:sticky;top:12px}
 /* Sur ordinateur, la barre du haut (recherche, 74 px) colle en haut de la page : la lecture se colle SOUS elle (son « Fermer » était caché derrière), et défile seule si l’e-mail est long. */
 .vrm-main:has(> .vrm-barre-haut) .vrm-boite-lecture-col{top:86px;max-height:calc(100vh - 98px);overflow:auto;border-radius:14px}
-.vrm-boite-vide-lecture{margin:0;padding:40px 20px;border-radius:14px;background:var(--bx-carte);color:var(--bx-doux);text-align:center}
-.vrm-boite-lecture{border-radius:14px;background:var(--bx-carte);padding:6px 18px 18px;min-width:0;overflow-wrap:anywhere;animation:vrm-boite-entre .22s cubic-bezier(.2,.8,.2,1)}
+.vrm-boite-vide-lecture{display:grid;justify-items:center;gap:10px;margin:0;padding:64px 20px;border-radius:14px;background:var(--bx-carte);color:var(--bx-doux);text-align:center}
+.vrm-boite-vide-lecture p{margin:0}
+.vrm-boite-lecture{border-radius:14px;background:var(--bx-carte);padding:6px 24px 24px;min-width:0;overflow-wrap:anywhere;animation:vrm-boite-entre .22s var(--bx-sortie)}
 @keyframes vrm-boite-entre{from{transform:translateY(6px)}to{transform:none}}
-.vrm-boite-lecture-barre{display:flex;justify-content:flex-end;padding-top:6px}
+.vrm-boite-lecture-barre{display:flex;justify-content:flex-end;align-items:center;padding-top:6px}
 .vrm-boite .vrm-boite-retour{border:0;background:transparent;padding:0 4px;color:var(--bx-doux);font-weight:500}
+.vrm-boite-lecture-attente{display:grid;gap:10px;padding:16px 0}
+.vrm-boite-lecture-attente i{display:block;height:14px;border-radius:6px;background:var(--bx-gris);animation:vrm-boite-pouls 1.2s ease-in-out infinite alternate}
+.vrm-boite-lecture-attente i:first-of-type{height:28px;width:60%}
+.vrm-boite-lecture-attente i:last-of-type{width:80%}
 /* En haut, en gros : ce que c'est et le bouton de l'action. */
-.vrm-boite-haut{margin:4px 0 18px;display:grid;gap:6px;justify-items:start}
+.vrm-boite-haut{margin:4px 0 20px;display:grid;gap:8px;justify-items:start}
 .vrm-boite-titre{margin:0;font-size:22px;font-weight:700;letter-spacing:-.01em;line-height:1.2}
 .vrm-boite-titre:focus{outline:none}
 .vrm-boite-details{margin:0;font-size:17px;line-height:1.35}
-.vrm-boite-averif{width:100%;padding:10px 12px;border-radius:12px;background:var(--bx-ambre-doux);color:var(--bx-encre)}
+/* Le code de retrait, en grand : ce qu'on montre au relais (chiffres alignés, insécables). */
+.vrm-boite-code-grand{display:grid;gap:2px;margin:4px 0 0;padding:12px 16px;border-radius:14px;background:var(--bx-gris);min-width:min(240px,100%)}
+.vrm-boite-code-grand span{font-size:13px;font-weight:600;color:var(--bx-doux)}
+.vrm-boite-code-grand b{font-size:28px;font-weight:700;letter-spacing:.04em;line-height:1.15;font-variant-numeric:tabular-nums;white-space:nowrap}
+.vrm-boite-feuille .vrm-boite-code-grand{background:var(--bx-carte);width:100%}
+.vrm-boite-averif{width:100%;padding:12px 14px;border-radius:12px;background:var(--bx-ambre-doux);color:var(--bx-encre)}
 .vrm-boite-averif p{margin:0}
 .vrm-boite-averif p+p{margin-top:4px}
 .vrm-boite-averif b{color:var(--bx-ambre)}
-.vrm-boite .vrm-boite-objet{display:block;margin-top:6px;background:var(--bx-accent);color:var(--bx-sur-accent);border-color:var(--bx-accent);font-weight:600;font-size:17px;padding:0 18px}
-.vrm-boite-fait{margin:2px 0 0;font-size:13px;color:var(--bx-doux)}
-.vrm-boite-sous{margin:0 0 6px;font-size:13px;font-weight:600;color:var(--bx-doux)}
+.vrm-boite .vrm-boite-objet{display:block;margin-top:4px;font-size:17px;padding:0 20px}
+.vrm-boite-fait{margin:0;font-size:13px;color:var(--bx-doux)}
+.vrm-boite-sous{margin:0 0 8px;font-size:13px;font-weight:600;color:var(--bx-doux)}
 .vrm-boite-sujet{margin:0 0 8px;font-size:15px;font-weight:600;line-height:1.35}
 .vrm-boite-doux{margin:6px 0 0;font-size:13px;color:var(--bx-doux)}
-.vrm-boite-corps-bloc{margin:0 0 16px;padding-top:14px;border-top:1px solid var(--bx-fin)}
+.vrm-boite-corps-bloc{margin:0 0 20px;padding-top:16px;border-top:1px solid var(--bx-filet)}
 .vrm-boite-corps{margin:0;padding:12px 14px;border-radius:12px;background:var(--bx-sol);font-family:var(--vrm-police,system-ui,sans-serif);font-size:15px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;max-height:60vh;overflow:auto}
-.vrm-boite-pieces{margin:0 0 16px}
+.vrm-boite-pieces{margin:0 0 20px}
 .vrm-boite-pieces ul{list-style:none;margin:0;padding:0;display:grid;gap:6px}
 .vrm-boite-pieces li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 8px;align-items:center;padding:10px 12px;border-radius:12px;border:1px solid var(--bx-filet)}
 .vrm-boite-pieces li small{grid-column:2;color:var(--bx-doux);font-size:13px}
-.vrm-boite-pieces .vrm-boite-doux:first-of-type{margin-top:0}
+.vrm-boite-pieces>.vrm-boite-doux:first-child{margin-top:0}
 .vrm-boite-piece-nom{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* « De », « Reçu sur », la date : une ligne discrète, à la fin. */
-.vrm-boite-meta{margin:0;padding-top:12px;border-top:1px solid var(--bx-fin);font-size:12px;line-height:1.5;color:var(--bx-doux)}
+.vrm-boite-meta{margin:0;padding-top:12px;border-top:1px solid var(--bx-filet);font-size:12px;line-height:1.5;color:var(--bx-doux)}
 .vrm-boite-meta b{font-weight:600;color:var(--bx-doux)}
 
 /* La feuille plein écran (téléphone), en portail. ⚠️ OPAQUE dès la première
    image : aucun fondu d'opacité sur la feuille (la liste se voyait à travers,
-   5 nov.). Seul son contenu glisse (transformation), sur un fond plein. */
-.vrm-boite-feuille{position:fixed;inset:0;z-index:20000;overflow:auto;overscroll-behavior:contain;isolation:isolate;opacity:1;background:#F2F2F7;background:var(--vrm-bg,#F2F2F7);padding:calc(8px + env(safe-area-inset-top)) 12px calc(20px + env(safe-area-inset-bottom))}
+   5 nov.). Seul son contenu glisse (transformation), sur un fond plein. La barre
+   du retour colle en haut, translucide sur le fond de la feuille ; marges 16 px. */
+.vrm-boite-feuille{position:fixed;inset:0;z-index:20000;overflow:auto;overscroll-behavior:contain;isolation:isolate;opacity:1;background:#F2F2F7;background:var(--vrm-bg,#F2F2F7);padding:0 0 calc(20px + env(safe-area-inset-bottom));color:var(--bx-encre);font-size:15px;line-height:1.45}
 :root[data-theme="dark"] .vrm-boite-feuille{background:#000000;background:var(--vrm-bg,#000000)}
-.vrm-boite-feuille .vrm-boite-lecture{animation:vrm-boite-monte .26s cubic-bezier(.2,.8,.2,1);padding-bottom:28px}
-@keyframes vrm-boite-monte{from{transform:translateY(24px)}to{transform:none}}
-.vrm-boite-feuille .vrm-boite-lecture-barre{justify-content:flex-start}
-.vrm-boite-feuille{--bx-encre:var(--vrm-ink,#1D1D1F);--bx-doux:var(--vrm-muted,#6E6E73);--bx-carte:var(--vrm-surface,#FFFFFF);--bx-sol:var(--vrm-bg,#F2F2F7);--bx-filet:var(--vrm-line,#E5E5EA);--bx-fin:var(--vrm-hair,#F2F2F7);--bx-accent:var(--vrm-accent,#0071E3);--bx-sur-accent:var(--vrm-on-accent,#FFFFFF);--bx-ambre:var(--vrm-warn,#B25000);--bx-ambre-doux:var(--vrm-warn-soft,#FFF4E5);color:var(--bx-encre);font-size:15px;line-height:1.45}
-.vrm-boite-feuille button{font:inherit;color:inherit;min-height:44px;border-radius:12px;border:1px solid var(--bx-filet);background:var(--bx-carte);padding:0 14px;cursor:pointer}
-.vrm-boite-feuille .vrm-boite-retour{border:0;background:transparent;padding:0 4px;color:var(--bx-accent);font-weight:500}
-.vrm-boite-feuille .vrm-boite-objet{display:block;margin-top:6px;background:var(--bx-accent);color:var(--bx-sur-accent);border-color:var(--bx-accent);font-weight:600;font-size:17px;padding:0 18px}
-.vrm-boite-feuille :focus-visible{outline:2px solid var(--vrm-focus,var(--bx-accent));outline-offset:2px}
+.vrm-boite-feuille .vrm-boite-lecture{background:transparent;border-radius:0;padding:0 16px 28px;animation:vrm-boite-monte .28s var(--bx-tiroir)}
+@keyframes vrm-boite-monte{from{transform:translateY(16px)}to{transform:none}}
+.vrm-boite-feuille .vrm-boite-lecture-barre{position:sticky;top:0;z-index:2;justify-content:flex-start;margin:0 -16px 4px;padding:env(safe-area-inset-top) 4px 0;background:var(--bx-sol);background:color-mix(in srgb,var(--bx-sol) 80%,transparent);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px)}
+.vrm-boite-feuille .vrm-boite-retour{display:flex;align-items:center;border:0;background:transparent;padding:0 8px;color:var(--bx-accent);font-size:17px;font-weight:400}
+.vrm-boite-chevron{font-size:28px;line-height:1;margin:-4px 4px 0 0;font-weight:400}
+.vrm-boite-feuille .vrm-boite-haut{margin:8px 0 24px}
+.vrm-boite-feuille .vrm-boite-titre{font-size:28px;line-height:1.15}
+.vrm-boite-feuille .vrm-boite-objet{display:block;width:100%;min-height:50px;margin-top:8px;border-radius:14px;font-size:17px;padding:0 18px}
+.vrm-boite-feuille .vrm-boite-corps-bloc{border-top:0;padding-top:0}
+.vrm-boite-feuille .vrm-boite-sous{padding:0 4px}
+.vrm-boite-feuille .vrm-boite-message{padding:14px 16px;border-radius:14px;background:var(--bx-carte)}
+.vrm-boite-feuille .vrm-boite-corps{padding:0;background:transparent;border-radius:0;max-height:none;overflow:visible}
+.vrm-boite-feuille .vrm-boite-pieces li{border-color:transparent;background:var(--bx-carte)}
+.vrm-boite-feuille .vrm-boite-pieces>.vrm-boite-doux{padding:0 4px}
+.vrm-boite-feuille .vrm-boite-meta{border-top:0;padding:0 4px}
+.vrm-boite-feuille .vrm-boite-etat-bloc{padding-top:48px}
+@media(prefers-reduced-transparency:reduce){.vrm-boite-feuille .vrm-boite-lecture-barre{background:var(--bx-sol);-webkit-backdrop-filter:none;backdrop-filter:none}}
 
 /* ── Relier ma boîte ─────────────────────────────────────────────────────── */
 .vrm-relier{display:grid;gap:14px;min-width:0}
@@ -196,7 +276,9 @@
 .vrm-relier-vrm small{font-size:12px;animation:vrm-relier-chiffre .3s 2.5s both}
 @keyframes vrm-relier-recoit{50%{transform:scale(1.08)}100%{transform:none}}
 @media(prefers-reduced-motion:reduce){
-  .vrm-relier *,.vrm-relier *::before,.vrm-relier *::after,.vrm-boite-lecture,.vrm-boite-feuille{animation:none!important;transition:none!important}
+  .vrm-relier *,.vrm-relier *::before,.vrm-relier *::after,.vrm-boite-lecture,.vrm-boite-feuille,.vrm-boite-feuille .vrm-boite-lecture,.vrm-boite-squelette,.vrm-boite-squelette *,.vrm-boite-lecture-attente i,.vrm-boite-tourne{animation:none!important;transition:none!important}
+  .vrm-boite button,.vrm-boite-feuille button{transition:none}
+  .vrm-boite button:active:not(:disabled),.vrm-boite-feuille button:active:not(:disabled){transform:none}
   .vrm-relier-vol{display:none}
 }
 @media(max-width:440px){
