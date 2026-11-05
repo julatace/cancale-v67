@@ -129,10 +129,24 @@ function compatDansPopup(dossier) {
   fs.writeFileSync(ph, n);
 }
 
+// Les droits du poste de construction ne doivent pas voyager dans le ZIP.
+// Un fichier 0600 extrait par un fournisseur de fichiers peut devenir illisible
+// depuis un autre contexte iOS. Le contenu reste privé côté stockage source.
+function preparerArchive(dossier) {
+  fs.chmodSync(dossier, 0o755);
+  for (const entree of fs.readdirSync(dossier, { withFileTypes: true })) {
+    const fichier = path.join(dossier, entree.name);
+    if (entree.isDirectory()) preparerArchive(fichier);
+    else if (entree.isFile()) fs.chmodSync(fichier, 0o644);
+    else throw new Error('Ressource non régulière dans le paquet : ' + entree.name);
+  }
+}
+
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'vrm-zip-'));
 try {
   const dossier = path.join(tmp, 'VRM-extension');
   fs.cpSync(src, dossier, { recursive: true });
+  preparerArchive(dossier);
   const sortie = path.join(racine, 'public', 'VRM-extension.zip');
   fs.rmSync(sortie, { force: true });
   execFileSync('zip', ['-qrX', sortie, 'VRM-extension'], { cwd: tmp });
@@ -152,6 +166,7 @@ try {
     const m = JSON.parse(fs.readFileSync(path.join(fx, 'manifest.json'), 'utf8'));
     fs.writeFileSync(path.join(fx, 'manifest.json'), JSON.stringify(manifesteFirefox(m), null, 2) + '\n');
     compatDansPopup(fx);
+    preparerArchive(fx);
     fs.rmSync(firefox, { force: true });
     execFileSync('zip', ['-qrX', firefox, ...fs.readdirSync(fx)], { cwd: fx });
     console.log('✓', firefox, '(Firefox ordinateur et Android : addons.mozilla.org)');
@@ -164,6 +179,7 @@ try {
     const m = JSON.parse(fs.readFileSync(path.join(sa, 'manifest.json'), 'utf8'));
     fs.writeFileSync(path.join(sa, 'manifest.json'), JSON.stringify(manifesteSafari(m), null, 2) + '\n');
     compatDansPopup(sa);
+    preparerArchive(sa);
     fs.rmSync(safari, { force: true });
     // Un zip qui se dézippe en UN dossier (`VRM-safari/`) : c'est ce dossier
     // qu'on donne au convertisseur d'Apple.
@@ -176,6 +192,7 @@ try {
     const m=JSON.parse(fs.readFileSync(path.join(o,'manifest.json'),'utf8'));
     fs.writeFileSync(path.join(o,'manifest.json'),JSON.stringify(manifesteOrion(m),null,2)+'\n');
     const ph=path.join(o,'popup.html');fs.writeFileSync(ph,fs.readFileSync(ph,'utf8').replace(/<script\b/i,'<script src="compat-orion.js"></script>\n<script'));
+    preparerArchive(o);
     fs.rmSync(orion,{force:true});execFileSync('zip',['-qrX',orion,...fs.readdirSync(o)],{cwd:o});
     if(orion===orionPublic){
       fs.copyFileSync(orion,path.join(racine,'public','VRM-Orion.zip'));
@@ -183,7 +200,7 @@ try {
       // `VRM-Orion/` (manifest.json à sa racine) : dans Fichiers, toucher le zip
       // donne le dossier, qu'Orion installe comme une extension « depuis des
       // fichiers locaux ».
-      const od=path.join(tmp,'VRM-Orion');fs.cpSync(o,od,{recursive:true});
+      const od=path.join(tmp,'VRM-Orion');fs.cpSync(o,od,{recursive:true});preparerArchive(od);
       const dz=path.join(racine,'public','VRM-Orion-dossier.zip');
       fs.rmSync(dz,{force:true});execFileSync('zip',['-qrX',dz,'VRM-Orion'],{cwd:tmp});
       console.log('✓',path.relative(racine,dz),'(Orion iPhone/iPad : un dossier VRM-Orion)');
