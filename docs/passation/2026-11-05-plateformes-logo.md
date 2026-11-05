@@ -23,7 +23,7 @@ date de reçu… » ; « le bot eBay, arrête-le »).
 - **Les quatre sites, toujours** (« les mêmes onglets que Vinted ») : un site sans compte relevé
   reste dans le sélecteur, estompé (`data-sans-compte`). Choisi, son onglet dit **ce qui manque et
   le geste** (`OngletManque`, textes `ONGLET_SANS_DONNEE`) : Leboncoin/Vestiaire → « Ouvrir le site »,
-  eBay → bouton « Comptes liés ». Vaut pour Annonces, Ventes, Achats, Messages et Colis.
+  eBay → « Relier eBay » (le geste et l’attribut `data-vers-comptes-ebay` de l’écran eBay, qui mène à Paramètres → Comptes eBay ; banc `vendeur-neuf` le vérifie). Vaut pour Annonces, Ventes, Achats, Messages et Colis.
   ⚠️ `sitesPresents` (la coque) n'est PAS changé : le menu, la barre et « Tous les sites » gardent
   leur règle ; seul le sélecteur montre les quatre.
 - Colis : la rangée de sites était **cachée au téléphone** par `design/fusion.css` (« ce que la
@@ -88,8 +88,22 @@ date de reçu… » ; « le bot eBay, arrête-le »).
   `audit-comptes-exclus`, `audit-colis-trois`, `audit-recherche-unique`. `fusion-echelle --verifier` :
   les mêmes 4 fichiers hors échelle que sur `main` (aucun ajouté).
 - Banc `scripts/bancs/plateformes-logo.cjs` (données inventées, `BANC_PORT=7967`, 390 tactile et
-  1512, clair et sombre) : RÉSULTAT_BANC
-- Captures regardées : RÉSULTAT_CAPTURES
+  1512, clair et sombre) : **182 verts, 0 rouge** ; le même banc sur le code d'avant (`85dad5b0`,
+  construit à part, `git archive`) : **72 rouges** (pas de logos, pas de compte sur les ventes,
+  sélecteur de Colis invisible au téléphone, pas de parcours, pas d'onglet « ce qui manque »).
+- Bancs voisins : `navigation-tache` — 2 rouges « K. Colis : porte vers un détail », **les mêmes
+  sur le code d'avant** (qui en avait 4 : « colis leboncoin » ne se cliquait pas, réparé par le
+  sélecteur commun) ; `vendeur-neuf` — les 2 rouges « base injoignable », **les mêmes sur le code
+  d'avant** ; le rouge eBay qu'avait ajouté la première version (« Relier eBay ») est réparé :
+  l'onglet sans compte eBay reprend le geste de l'écran eBay.
+- Captures regardées (390 clair/sombre, 1512 clair/sombre) : Ventes · Tous (logos, compte en tête
+  de la ligne), Ventes · Vinted (« 4 nov. · compte_a »), Colis (sélecteur visible), « Publier
+  ailleurs » N°12 (frise, ce qui part, VRM-12), N°13 (Vestiaire « Vue en ligne », frise cochée),
+  N°14 (« Aucune photo » en ambre, bouton grisé), Annonces · Vestiaire (ligne N°12 cerclée),
+  Achats · eBay sans compte. Le logo eBay (un mot dans un carré) a été agrandi après la première
+  capture, et le compte remonté avant la date dans « Tous les sites » (coupé à 390 px sinon).
+- `navigation-tache.cjs` : seul son commentaire d'en-tête change (« un site sans compte n'y est
+  pas » ⇒ les quatre sites, sa décision du 5 nov.) ; aucun de ses contrôles ne l'exigeait.
 
 ## Ce qui reste / à faire côté extension (pas touchée : une autre session y travaille)
 - **Vestiaire : le nom du compte.** L'extension relève l'identifiant (`compte` des ventes,

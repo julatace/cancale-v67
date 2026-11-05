@@ -58,11 +58,11 @@ export const ONGLET_SANS_DONNEE = Object.freeze({
     colis: { manque: 'Aucun bordereau Leboncoin lu.', geste: 'Ouvre la vente sur leboncoin.fr : l’extension relève le bordereau et le QR.' },
   }),
   ebay: Object.freeze({
-    annonces: { manque: 'Aucun compte eBay relié.', geste: 'Paramètres → Comptes liés → eBay : connecte ton compte.' },
-    ventes: { manque: 'Aucun compte eBay relié.', geste: 'Paramètres → Comptes liés → eBay : connecte ton compte.' },
-    achats: { manque: 'Aucun compte eBay relié.', geste: 'Paramètres → Comptes liés → eBay : connecte ton compte.' },
-    messages: { manque: 'Aucun compte eBay relié.', geste: 'Paramètres → Comptes liés → eBay : connecte ton compte.' },
-    colis: { manque: 'Aucune commande eBay à expédier lue.', geste: 'Paramètres → Comptes liés → eBay : connecte ton compte.' },
+    annonces: { manque: 'Aucun compte eBay relié.', geste: 'Relie ton compte eBay : Paramètres → Comptes eBay.' },
+    ventes: { manque: 'Aucun compte eBay relié.', geste: 'Relie ton compte eBay : Paramètres → Comptes eBay.' },
+    achats: { manque: 'Aucun compte eBay relié.', geste: 'Relie ton compte eBay : Paramètres → Comptes eBay.' },
+    messages: { manque: 'Aucun compte eBay relié.', geste: 'Relie ton compte eBay : Paramètres → Comptes eBay.' },
+    colis: { manque: 'Aucune commande eBay à expédier lue.', geste: 'Relie ton compte eBay : Paramètres → Comptes eBay.' },
   }),
   vestiaire: Object.freeze({
     annonces: { manque: 'Tes annonces Vestiaire ne sont pas encore lues.', geste: 'Ouvre « Mes articles » sur vestiairecollective.com, avec l’extension à jour.' },

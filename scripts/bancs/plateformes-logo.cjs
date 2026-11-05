@@ -15,7 +15,7 @@
 //   B. le compte sur CHAQUE vente : « Tous les sites » (Vinted, Leboncoin, eBay,
 //      Vestiaire) et la liste de chaque site ;
 //   C. un site sans compte relié reste choisissable : l'onglet dit ce qui
-//      manque et le geste (« Comptes liés » pour eBay) ;
+//      manque et le geste (« Relier eBay » pour eBay, le geste de l’écran eBay) ;
 //   D. « Publier ailleurs » depuis Annonces · Leboncoin : choisir l'article par
 //      son N° (jamais le titre), trois sites, quatre étapes, ce qui part (la
 //      référence VRM-{n°}), l'état par identité (N°13 vu sur Vestiaire = « vue
@@ -328,12 +328,12 @@ const aller = async (pg, q) => { await pg.goto(`http://localhost:${PORT}/?${q}`,
         dit(s && s.boutons.length === 4 && s.boutons.find((x) => x.site === 'ebay').sansCompte, `${nomVp} · C · eBay sans compte : toujours dans le sélecteur, estompé`, JSON.stringify(s && s.boutons.map((x) => [x.site, x.sansCompte])));
         await z.pg.click('[data-filtre-site="achats"] [data-site="ebay"]');
         await z.pg.waitForSelector('[data-onglet-manque="ebay"][data-onglet="achats"]', { timeout: 10000 });
-        const m = await z.pg.evaluate(() => { const e = document.querySelector('[data-onglet-manque="ebay"]'); return { geste: (e.querySelector('[data-onglet-geste]') || {}).innerText || '', bouton: !!e.querySelector('[data-onglet-geste-bouton="comptes"]') }; });
-        dit(/Comptes liés/.test(m.geste) && m.bouton, `${nomVp} · C · Achats · eBay : « Aucun compte eBay relié » + le geste et son bouton`, JSON.stringify(m));
+        const m = await z.pg.evaluate(() => { const e = document.querySelector('[data-onglet-manque="ebay"]'); const b = e.querySelector('[data-onglet-geste-bouton="comptes"][data-vers-comptes-ebay]'); return { geste: (e.querySelector('[data-onglet-geste]') || {}).innerText || '', bouton: !!b && /Relier eBay/.test(b.innerText) }; });
+        dit(/Paramètres → Comptes eBay/.test(m.geste) && m.bouton, `${nomVp} · C · Achats · eBay : « Aucun compte eBay relié » + le geste et son bouton`, JSON.stringify(m));
         await capture(z.pg, `manque-ebay-${nomVp}`);
         await z.pg.click('[data-onglet-geste-bouton="comptes"]');
-        await z.pg.waitForSelector('[data-comptes-groupe="ebay"]', { timeout: 15000 }).catch(() => {});
-        dit(!!(await z.pg.$('[data-comptes-groupe="ebay"]')), `${nomVp} · C · le bouton mène à Comptes liés`);
+        await z.pg.waitForSelector('[data-ebay-compte-section]', { timeout: 15000 }).catch(() => {});
+        dit(!!(await z.pg.$('[data-ebay-compte-section]')), `${nomVp} · C · « Relier eBay » mène à Paramètres → Comptes eBay`);
         await aller(z.pg, 'tab=cat_bord');
         await z.pg.waitForSelector('[data-filtre-site="colis"]', { timeout: 25000 });
         await z.pg.click('[data-filtre-site="colis"] [data-site="leboncoin"]');

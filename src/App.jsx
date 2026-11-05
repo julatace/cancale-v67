@@ -65502,7 +65502,7 @@ function OngletManque({ site, onglet, onNav }) {
       <div data-onglet-geste="" style={{ marginTop: 6, fontSize: 13, lineHeight: 1.5, color: C.muted }}>{m.geste}</div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
         {site === 'ebay'
-          ? <Bouton variante="secondaire" data-onglet-geste-bouton="comptes" onClick={() => onNav && onNav('vintedaccounts')}>Comptes liés</Bouton>
+          ? <Bouton variante="primaire" data-onglet-geste-bouton="comptes" data-vers-comptes-ebay="" onClick={allerComptesEbay}>Relier eBay</Bouton>
           : lien ? <Bouton variante="secondaire" data-onglet-geste-bouton="site" href={lien} target="_blank" rel="noopener noreferrer">Ouvrir {nomPlateforme(site)} ↗</Bouton> : null}
       </div>
     </div>
