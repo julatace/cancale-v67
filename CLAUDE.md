@@ -501,6 +501,8 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 
+- **5 nov. · Stock 2D** : une seule vue (étagères 2D, 3D gardée en base, ancienne place dite), case d'un vendu allumée puis libérée au départ du colis, « Voir l'état ». `docs/passation/2026-11-05-stock-2d.md`. Geste : ranger les paires de l'ancienne pièce.
+
 - **5 nov. · Numéros** : fiche numérotée du nuage jamais retirée par la fusion (plus de bloc « Recharger »). `docs/passation/2026-11-05-numeros-autre-appareil.md` ; demandes du jour : `demandes-2026-11-05.md`.
 
 - **5 nov. · Orion 5.322.0** : base 5.319 confirmée installable par Julien, moteur/adaptateur repris ; seul le popup change hors versions, pour rester sur Vinted après connexion. Voir `docs/passation/2026-11-05-orion-base-validee.md`.

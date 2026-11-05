@@ -142,7 +142,11 @@ const attendre = async (fn, ms = 20000) => { const t0 = Date.now(); while (Date.
       const e60 = bande.find((x) => x.n === '60'), l61 = bande.find((x) => x.n === '61');
       dit(!!e60 && /eBay/.test(e60.t) && !/vinted/.test(e60.p), 'N°60 (seulement sur eBay) est à ranger, « eBay » écrit' + T, JSON.stringify(e60 || null));
       dit(!!l61 && /Leboncoin/.test(l61.t), 'N°61 (seulement sur Leboncoin) est à ranger, « Leboncoin » écrit' + T, JSON.stringify(l61 || null));
-      dit(!ns.includes('62') && !ns.includes('63') && !ns.includes('46'), 'ni 62, ni 63, ni la N°46 déjà rangée' + T, ns.join(','));
+      dit(!ns.includes('62') && !ns.includes('63'), 'ni 62, ni 63' + T, ns.join(','));
+      // (5 nov.) Le Stock n'a plus que les étagères 2D (« Mes meubles ») : la N°46,
+      // rangée SEULEMENT dans l'ancienne pièce 3D (plus affichée), est à ranger
+      // dans les étagères — sa place d'avant est dite sur sa fiche (banc stock-2d, VIII).
+      dit(ns.includes('46'), 'la N°46 (rangée seulement dans l’ancienne pièce 3D) est à ranger dans les étagères' + T, ns.join(','));
       dit(ns.includes('47'), 'la N°47 (Vinted seule) reste' + T, ns.join(','));
       dit(!ns.includes('70'), 'la N°70 (compte supprimé, shop_cancale) n’est pas à ranger' + T, ns.join(','));
       dit(!errs.length, 'aucune erreur de page' + T, errs.join(' | '));

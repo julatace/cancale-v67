@@ -31,6 +31,10 @@ const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 7947;
 const CHROMIUM = process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium';
+// La vue mémorisée sur l'appareil : la pièce 3D par défaut (I l'exige ignorée).
+// BANC_VUE=meubles sert à la preuve « rouge avant » : sur le code d'avant, on
+// ouvre « Mes meubles » pour que chaque exigence (II…VIII) rougisse pour ELLE.
+const VUE = process.env.BANC_VUE || 'plan';
 
 const AUJ = Date.now();
 const MAIN = {
@@ -89,7 +93,7 @@ async function rendre(b, { tel, sombre = false, reduit = false, main = MAIN }) {
     return j([]);
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
-  await pg.addInitScript(({ m, sombre }) => { try { localStorage.setItem('vrm_acces_direct', '1'); for (const k in m) localStorage.setItem(k, JSON.stringify(m[k])); localStorage.setItem('vinted_dark', JSON.stringify(!!sombre)); localStorage.setItem('vinted_garage_view', JSON.stringify('plan')); } catch (_) {} }, { m: main, sombre });
+  await pg.addInitScript(({ m, sombre, vue }) => { try { localStorage.setItem('vrm_acces_direct', '1'); for (const k in m) localStorage.setItem(k, JSON.stringify(m[k])); localStorage.setItem('vinted_dark', JSON.stringify(!!sombre)); localStorage.setItem('vinted_garage_view', JSON.stringify(vue)); } catch (_) {} }, { m: main, sombre, vue: VUE });
   await pg.goto(`http://localhost:${PORT}/?tab=garage`, { waitUntil: 'domcontentloaded' });
   await pg.waitForSelector('[data-stock-recherche] input, [data-stock-explication], [data-stock-vues]', { timeout: 25000 }).catch(() => {});
   await pg.waitForTimeout(1500);

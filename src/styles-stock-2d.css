@@ -187,3 +187,7 @@
   .vrm-s2d-case.is-vendue { animation: none; box-shadow: 0 0 0 3px var(--s2d-accent), 0 0 0 7px color-mix(in srgb, var(--s2d-accent) 26%, transparent); }
   .vrm-sx *, .vrm-sx { animation: none !important; transition: none !important; }
 }
+
+/* « À ranger » : la plateforme d'une paire vue hors Vinted, l'autre N° d'une même paire. */
+.vrm-s2d-plat { position: absolute; left: 4px; top: 4px; max-width: calc(100% - 8px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: rgba(0, 0, 0, .62); color: #FFFFFF; font-size: 11px; font-weight: 700; line-height: 1.35; padding: 0 6px; border-radius: 6px; }
+.vrm-s2d-aussi { position: absolute; right: 4px; bottom: 22px; background: rgba(0, 0, 0, .62); color: #FFFFFF; font-size: 11px; font-weight: 700; line-height: 1.35; padding: 0 5px; border-radius: 6px; }
