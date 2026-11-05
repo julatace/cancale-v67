@@ -155,3 +155,33 @@
   .vrm-stats-vitrine .vrm-of-ligne > span:not(.vrm-of-nom) { text-align: left; }
   .vrm-stats-vitrine .vrm-of-entete > .vrm-of-nom { display: none; }
 }
+
+/* ── (5 nov., chantier F, revue 2.25) UNE CARTE VIDE SE REPLIE EN UNE LIGNE ──
+   Lecture en cours, pas su, rien sur la période : le titre et la raison sur une
+   rangée de 44 px au moins, sans grand titre ni grand blanc. Elle ne s'étire
+   jamais à la hauteur de sa voisine de rangée. */
+html .vrm-stats-vitrine .vrm-sv-carte.vrm-sv-repliee {
+  flex-direction: row; flex-wrap: wrap; align-items: baseline; align-self: start;
+  justify-content: space-between; gap: 2px 14px;
+  min-height: 44px; padding: 12px 14px; box-sizing: border-box;
+}
+html .vrm-stats-vitrine .vrm-sv-repliee-titre {
+  margin: 0; font-size: 15px; font-weight: 600; line-height: 1.3; letter-spacing: -.01em;
+  color: var(--vrm-ink); flex: 0 1 auto; min-width: 0;
+}
+html .vrm-stats-vitrine .vrm-sv-repliee-raison {
+  font-size: 13px; line-height: 1.4; color: var(--vrm-muted); text-align: right;
+  flex: 1 1 200px; min-width: 0;
+}
+@media (max-width: 599px) {
+  html .vrm-stats-vitrine .vrm-sv-repliee-raison { text-align: left; flex-basis: 100%; }
+}
+/* Le choix « Vue d'ensemble · Prix qui marche », sous le grand titre. */
+.vrm-stats-sous-nav { margin-top: 10px; }
+.vrm-stats-sous-nav .vrm-seg { margin: 0; }
+/* (5 nov., chantier F) Au téléphone, la note d'une carte passe SOUS son titre (le titre ne se
+   coupe plus en deux lignes pour lui laisser la place). */
+@media (max-width: 599px) {
+  .vrm-stats-vitrine .vrm-sv-carte-tete { flex-wrap: wrap; row-gap: 2px; }
+  .vrm-stats-vitrine .vrm-sv-carte-tete .vrm-sv-note { white-space: normal; flex-basis: 100%; }
+}
