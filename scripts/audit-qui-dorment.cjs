@@ -76,7 +76,11 @@ async function audit(src, bavard) {
   dit(/annSort==='sleeping'\) \{\s*arr = articlesQuiDorment\(arr\.map\(it=>\(\{id:String\(it\.id\),it,age:listedAgeDays\(it\)\}\)\), seuilDort\)\.liste\.map\(x=>x\.it\);/.test(code),
     'la vue « qui dorment » d’Annonces passe par `articlesQuiDorment` au seuil choisi, sur la base de la grille');
   dit(/const annBase = useMemo\(\(\) => \(listings\.items \|\| \[\]\)\.filter\(garderAnnonce\)/.test(code), 'la base est `listings.items` (la règle « en ligne ») filtrée comme la grille');
-  dit(/\{annSort==='sleeping' \? \(\s*<QuiDorment /.test(code), 'la liste remplace la grille dans cette vue');
+  // (5 nov.) Depuis le 4 nov. (0b293942, « Masquées ») la vue est une branche d'une
+  // chaîne de ternaires (`) : annSort==='sleeping' ? (`), la grille dans le DERNIER
+  // « sinon ». Même règle : dans cette vue, la liste, et la grille seulement ailleurs.
+  dit(/\{annSort==='sleeping' \? \(\s*<QuiDorment /.test(code)
+    || /\) : annSort==='sleeping' \? \(\s*<QuiDorment [^\n]*\n(?:(?!\) : )[^\n]*\n)*?\s*\) : \(<>\s*<div className="vrm-ledger-heading[^\n]*\n\s*<div className="vrm-ann-grid/.test(code), 'la liste remplace la grille dans cette vue');
   const menu = (/\{dortAgir && \(\(\)=>\{[\s\S]*?<\/SheetShell>/.exec(code) || [''])[0];
   dit(/versRepub\('modifier'\)/.test(menu) && /versRepub\('recreer'\)/.test(menu) && /setRepubReprise\(\[String\(it\.id\)\]\); setRepubAction\(act\);/.test(menu),
     'Baisser le prix / Republier ouvrent l’atelier Republier existant (« modifier » / « recréer ») avec CET article pré-choisi');

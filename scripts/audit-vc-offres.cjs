@@ -56,6 +56,7 @@ if (process.argv.includes('--prouve')) {
     ['fondPause', 'src', "    const pause = await pauseVc();\n    if (pause) return { accepte: false, code: 'vc-pause', raison: `Vestiaire a demandé de ralentir (${pause.statut || 'refus'}) — rien n'est parti, réessaie après ${new Date(pause.jusqua).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` };\n    let tout;", '    let tout;'],
     ['fondConfirme', 'src', "if (rep.confirme !== true) return { accepte: true, etape: 'incertain'", "if (false) return { accepte: true, etape: 'incertain'"],
     ['fondCompte', 'src', "if (p && p.compte && o.compte && p.compte !== o.compte) continue;", ''],
+    ['fondExpiree', 'src', "if (o.expire && Date.parse(o.expire) < Date.now()) return { accepte: false, code: 'expiree',", "if (false) return { accepte: false, code: 'expiree',"],
     ['fondPlusAToi', 'src', "if (o.aToi !== true) return { accepte: false, code: 'plus-a-toi',", "if (false) return { accepte: false, code: 'plus-a-toi',"],
     ['fondBornes', 'src', "if (geste === 'contre' && ((o.offre != null && prixCents <= o.offre) || (o.initial != null && prixCents >= o.initial))) return", 'if (false) return'],
     ['fondSansCompte', 'src', "if (!compteOffre) return { accepte: false, code: 'session',", "if (false) return { accepte: false, code: 'session',"],
@@ -93,11 +94,18 @@ const MOI = '11112222', ACH = '33334444', ART1 = '66668888', ART2 = '99990000', 
 const PERSO = ['jeanne33334444', 'Jeanne', 'avatar-jeanne', ACH, 'secret-entete'];
 const fuite = (o) => { const s = JSON.stringify(o == null ? null : o); return PERSO.filter((x) => s.includes(x)); };
 const eur = (c) => ({ cents: c, currency: 'EUR', formatted: `${c / 100} €` });
+// (5 nov.) L'échéance de l'offre ouverte est posée SEPT JOURS après l'heure du
+// banc, plus une date écrite en dur : le 5 nov. à 19 h 23 UTC, « 2026-11-05T19:23:33Z »
+// est passée et le fond refusait, à juste titre, une offre EXPIRÉE — toute la
+// suite O5 virait au rouge avec l'horloge. La règle « expirée ⇒ rien ne part »
+// est jugée À PART (O5, plus bas), avec une échéance passée.
+const EXPIRE = new Date(Date.now() + 7 * 864e5).toISOString().replace(/\.\d{3}Z$/, 'Z');
+const EXPIREE = new Date(Date.now() - 3600e3).toISOString().replace(/\.\d{3}Z$/, 'Z');
 const user = (id, nom) => ({ id, type: 'user', username: nom + id, firstname: nom, picture: { path: '/profil/avatar-jeanne.gif' }, hasWallet: false });
 const ev = (action, par, c, at) => ({ id: String(Math.floor(Math.random() * 1e9)), type: 'negotiationEvent', price: eur(c), action, createdBy: par, userMessage: 'x', creationDate: at, sellerPvnPrice: eur(Math.round(c * 0.8)) });
 const nego = (id, art, events, o) => Object.assign({ id, type: 'negotiation', buyer: user(ACH, 'Jeanne'), seller: user(MOI, 'Julien'), price: events[0].price, events,
   product: { id: art, name: 'Baskets Dunk Low', brand: { name: 'Nike' }, pictures: [{ alt: 'Baskets', path: `${art}-1_2.jpg` }], path: `/men-shoes/trainers/nike/baskets-nike-${art}.shtml`, price: eur(26200) },
-  isClosed: false, isOpened: true, isAccepted: false, initialPrice: eur(24900), minOffer: eur(17500), maxOffer: eur(24900), expirationDate: '2026-11-05T19:23:33Z', sellerRemainingOffers: 2, buyerRemainingOffers: 3 }, o || {});
+  isClosed: false, isOpened: true, isAccepted: false, initialPrice: eur(24900), minOffer: eur(17500), maxOffer: eur(24900), expirationDate: EXPIRE, sellerRemainingOffers: 2, buyerRemainingOffers: 3 }, o || {});
 const NA = nego(N1, ART1, [ev('offer', 'buyer', 20000, '2026-11-04T08:00:00Z')]);                                   // à toi
 const NB = nego(N2, ART2, [ev('offer', 'seller', 23700, '2026-11-03T19:23:33Z')]);                                  // ton offre à un favori
 const NC = nego(N3, ART1, [ev('accept', 'seller', 22000, '2026-10-31T12:00:01Z'), ev('offer', 'buyer', 22000, '2026-10-31T11:59:39Z')], { isClosed: true, isOpened: false, isAccepted: true, expirationDate: null });
@@ -158,7 +166,7 @@ async function o1a3() {
   const o = de(l, 'vcoffres')[0];
   const a = o && o.offres.find((x) => x.id === N1), b = o && o.offres.find((x) => x.id === N2), c = o && o.offres.find((x) => x.id === N3);
   dit(!!o && o.liste === true && o.offres.length === 3, 'O1 · la liste des négociations (rôle vendeur) ⇒ trois fiches', JSON.stringify(o && o.offres.map((x) => x.id)));
-  dit(!!a && a.aToi === true && a.offre === 20000 && a.initial === 24900 && a.min === 17500 && a.net === 16000 && a.produit === ART1 && a.expire === '2026-11-05T19:23:33Z', 'O1 · l’offre de l’acheteur, ouverte, dernier geste à lui ⇒ « à toi de répondre », prix en centimes, ce que tu touches, expiration', JSON.stringify(a));
+  dit(!!a && a.aToi === true && a.offre === 20000 && a.initial === 24900 && a.min === 17500 && a.net === 16000 && a.produit === ART1 && a.expire === EXPIRE, 'O1 · l’offre de l’acheteur, ouverte, dernier geste à lui ⇒ « à toi de répondre », prix en centimes, ce que tu touches, expiration', JSON.stringify(a));
   dit(!!a && a.titre === 'Nike Baskets Dunk Low' && a.photo === `https://images.vestiairecollective.com/produit/${ART1}-1_2.jpg` && /baskets-nike-66668888\.shtml$/.test(a.lien), 'O1 · l’article : titre, photo, lien Vestiaire', JSON.stringify(a && [a.titre, a.photo, a.lien]));
   dit(!!b && b.aToi === false && b.dernier.par === 'vendeur' && !!c && c.aToi === false && c.acceptee === true && c.fermee === true, 'O1 · ta propre offre (en attente de l’acheteur) et une offre acceptée ne sont pas « à toi »', JSON.stringify([b && b.aToi, c && [c.aToi, c.acceptee]]));
   dit(!!c && c.evenements.map((e) => e.action + '/' + e.par).join() === 'offer/acheteur,accept/vendeur', 'O1 · les gestes, du plus ancien au plus récent', JSON.stringify(c && c.evenements));
@@ -251,6 +259,14 @@ async function o4o5() {
   const rb = await S.cmd({ cmd: 'vcOffre', nego: N1, geste: 'contre', prixCents: 19000 });
   const rb2 = await S.cmd({ cmd: 'vcOffre', nego: N1, geste: 'contre', prixCents: 24900 });
   dit(rb && rb.code === 'invalide' && rb2 && rb2.code === 'invalide' && S.ordres.length === 0, 'O5 · contre-offre sous son offre ou au prix affiché : refusée, rien ne part', JSON.stringify([rb, rb2]));
+  // Une offre dont l'échéance est PASSÉE : rien ne part, quel que soit le geste.
+  { const off = S.fond.lignes.vc_offres && S.fond.lignes.vc_offres.offres && S.fond.lignes.vc_offres.offres['n' + N1];
+    const avant = off ? off.expire : undefined; if (off) off.expire = EXPIREE;
+    const nE = S.ch.appels.length;
+    const re = await S.cmd({ cmd: 'vcOffre', nego: N1, geste: 'contre', prixCents: 22500 });
+    const re2 = await S.cmd({ cmd: 'vcOffre', nego: N1, geste: 'accepter' });
+    if (off) off.expire = avant;
+    dit(!!off && re && re.accepte === false && re.code === 'expiree' && re2 && re2.code === 'expiree' && S.ordres.length === 0 && S.ch.appels.length === nE, 'O5 · une offre EXPIRÉE (échéance passée) : refusée, rien ne part', JSON.stringify([re, re2])); }
   // La contre-offre part : UNE requête, la même que la page.
   const accRep = nego(N1, ART1, [ev('offer', 'seller', 22500, '2026-11-04T10:00:00Z'), NA.events[0]]);
   S.ch.routes[`POST ${API}/products/${ART1}/negotiations/${N1}/events${Q}`] = { status: 201, body: { data: accRep } };
