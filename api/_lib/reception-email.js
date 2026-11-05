@@ -1,4 +1,5 @@
 import {normAdresse,estAdresseCollectrice,sansEtiquette} from './proprietaire-email.js';
+import {filtreBoite,rubriqueConnue,rubriqueEmail,RUBRIQUES_BOITE,PIECES_MAX} from './boite-email.js';
 // Une règle (§11) : à quel compte Vinted une adresse de réception appartient.
 // Lue par la réception ET par le journal — l'adresse décide, jamais le texte.
 function reglesComptes({registre,main,comptes,etats}){
@@ -30,18 +31,21 @@ const lectureComptes=(lire,owner)=>Promise.all([
 // scalaires par ligne) et le disent (`sur`).
 export const JOURNAL_PAGE=20, JOURNAL_COMPTES=200;
 export const JOURNAL_TYPES={colis:['suivi'],bordereau:['bordereau'],vente:['vente','finalisation','vente-vestiaire'],achat:['achat'],messages:['offre','message','favori','action'],incompris:['ignoré'],autre:['connu-sans-action','information']};
-const PROJECTION='id,at:data->>at,etat:data->>etat,type:data->>type,subject:data->>subject,from:data->>from,sourceDate:data->>sourceDate,adresses:data->adresses,resume:data->resume';
-export async function lireJournalEmail({owner,url,headers,fetcher=fetch,page=0,etat='',type='',adresse='',compteSeul=false}){
+const PROJECTION='id,at:data->>at,etat:data->>etat,type:data->>type,subject:data->>subject,from:data->>from,sourceDate:data->>sourceDate,adresses:data->adresses,resume:data->resume,pieces:data->pieces';
+export async function lireJournalEmail({owner,url,headers,fetcher=fetch,page=0,etat='',type='',adresse='',boite='',compteSeul=false}){
  if(!owner || owner==='00000000-0000-0000-0000-000000000000')throw Error('connexion-requise');
  const lire=lecteur({url,headers,fetcher}),o=encodeURIComponent(owner);
  const p=Math.max(0,Math.min(50,Number.parseInt(page,10)||0));
  const filtres=[];
  if(etat==='a-verifier'||etat==='erreur'||etat==='integre')filtres.push(`data->>etat=eq.${etat}`);
  if(JOURNAL_TYPES[type])filtres.push(`data->>type=in.(${JOURNAL_TYPES[type].map(t=>encodeURIComponent(t)).join(',')})`);
+ // (5 nov.) La boîte de réception : une rubrique (api/_lib/boite-email.js, une règle).
+ if(boite&&!rubriqueConnue(boite))throw Error('rubrique');
+ if(boite)filtres.push(filtreBoite(boite));
  const adr=normAdresse(adresse);
  if(adr&&adr.includes('@')&&adr.length<=254)filtres.push(`data->adresses=cs.${encodeURIComponent(JSON.stringify([adr]))}`);
  const f=filtres.length?'&'+filtres.join('&'):'';
- const etats=lire(`owner=eq.${o}&id=like.email_reception_*&select=etat:data->>etat,type:data->>type&order=data->>at.desc,id.asc&limit=${JOURNAL_COMPTES+1}`);
+ const etats=lire(`owner=eq.${o}&id=like.email_reception_*&select=etat:data->>etat,type:data->>type,code:data->resume->>code&order=data->>at.desc,id.asc&limit=${JOURNAL_COMPTES+1}`);
  if(compteSeul){const l=await etats;return {ok:true,compteurs:compter(l)};}
  const [lignes,l,[registre,main,comptes,etatsC]]=await Promise.all([
   lire(`owner=eq.${o}&id=like.email_reception_*${f}&select=${PROJECTION}&order=data->>at.desc,id.asc&limit=${JOURNAL_PAGE+1}&offset=${p*JOURNAL_PAGE}`),
@@ -53,7 +57,7 @@ export async function lireJournalEmail({owner,url,headers,fetcher=fetch,page=0,e
   const adresses=[...new Set((Array.isArray(x.adresses)?x.adresses:[]).map(adresseSuivie))].slice(0,5);
   const lies=[...new Map(adresses.flatMap(associes).map(c=>[c.id,c])).values()];
   const r=x.resume&&typeof x.resume==='object'&&!Array.isArray(x.resume)?x.resume:null;
-  return {id:String(x.id),at:date(x.at),sourceDate:date(x.sourceDate),etat:['integre','a-verifier','erreur'].includes(x.etat)?x.etat:'a-verifier',type:String(x.type||'information').slice(0,40),subject:String(x.subject||'').slice(0,200),from:String(x.from||'').slice(0,160),adresses,compte:lies.length===1?{id:lies[0].id,nom:lies[0].nom}:null,compteAmbigu:lies.length>1,resume:r&&JSON.stringify(r).length<=600?r:null};
+  return {id:String(x.id),at:date(x.at),sourceDate:date(x.sourceDate),etat:['integre','a-verifier','erreur'].includes(x.etat)?x.etat:'a-verifier',type:String(x.type||'information').slice(0,40),subject:String(x.subject||'').slice(0,200),from:String(x.from||'').slice(0,160),adresses,compte:lies.length===1?{id:lies[0].id,nom:lies[0].nom}:null,compteAmbigu:lies.length>1,resume:r&&JSON.stringify(r).length<=600?r:null,pj:Array.isArray(x.pieces)?Math.min(x.pieces.length,PIECES_MAX):null};
  });
  const adresses=[...new Set([...declarees,...Object.values(correspondances).map(normAdresse).filter(a=>a.includes('@')&&!estAdresseCollectrice(a))])].map(a=>{const c=associes(a);return {adresse:a,nom:c.length===1?c[0].nom:''};});
  return {ok:true,page:p,parPage:JOURNAL_PAGE,suite:lignes.length>JOURNAL_PAGE,emails,compteurs:compter(l),adresses};
@@ -61,7 +65,10 @@ export async function lireJournalEmail({owner,url,headers,fetcher=fetch,page=0,e
 function compter(l){
  const lignes=l.slice(0,JOURNAL_COMPTES);
  const n=k=>lignes.filter(k).length;
- return {sur:lignes.length,plus:l.length>JOURNAL_COMPTES,integre:n(x=>x.etat==='integre'),aVerifier:n(x=>x.etat!=='integre'&&x.etat!=='erreur'),erreur:n(x=>x.etat==='erreur'),incompris:n(x=>x.type==='ignoré')};
+ // (5 nov.) Par rubrique de la boîte : la même règle que l'étiquette (`rubriqueEmail`).
+ const parRubrique={};for(const {id} of RUBRIQUES_BOITE)if(id)parRubrique[id]=0;
+ for(const x of lignes){const r=rubriqueEmail({type:x.type,resume:x.code?{code:String(x.code)}:null});parRubrique[r]++;if(r==='codes')parRubrique.colis++;}
+ return {sur:lignes.length,plus:l.length>JOURNAL_COMPTES,integre:n(x=>x.etat==='integre'),aVerifier:n(x=>x.etat!=='integre'&&x.etat!=='erreur'),erreur:n(x=>x.etat==='erreur'),incompris:n(x=>x.type==='ignoré'),parRubrique};
 }
 // Le texte gardé d'UN email (sur son clic). L'id est celui de SA ligne de
 // suivi ; la lecture est filtrée par son propriétaire. Absent ⇒ null (classé
@@ -74,6 +81,32 @@ export async function lireTexteEmail({owner,url,headers,fetcher=fetch,id}){
  const r=await lire(`owner=eq.${encodeURIComponent(owner)}&id=eq.email_texte_${m[1]}&select=texte:data->>texte&limit=1`);
  const t=r[0]&&typeof r[0].texte==='string'?r[0].texte.slice(0,2000):null;
  return {ok:true,id:m[0],texte:t};
+}
+
+// (5 nov.) LIRE UN EMAIL dans la boîte de réception : sa ligne de suivi en
+// scalaires projetés (jamais `select=data`, §4.4) + son texte gardé + la liste
+// de ses pièces jointes. Filtré par SON owner. Les pièces : `null` = liste non
+// gardée (email classé avant le 5 nov.), `[]` = aucune pièce lue.
+export async function lireEmailBoite({owner,url,headers,fetcher=fetch,id}){
+ if(!owner || owner==='00000000-0000-0000-0000-000000000000')throw Error('connexion-requise');
+ const m=/^email_reception_([0-9a-f]{16,64})$/.exec(String(id||''));
+ if(!m)throw Error('identifiant');
+ const lire=lecteur({url,headers,fetcher}),o=encodeURIComponent(owner);
+ const [lignes,textes,[registre,main,comptes,etatsC]]=await Promise.all([
+  lire(`owner=eq.${o}&id=eq.${m[0]}&select=${PROJECTION},receivedAt:data->>receivedAt&limit=1`),
+  lire(`owner=eq.${o}&id=eq.email_texte_${m[1]}&select=texte:data->>texte&limit=1`),
+  lectureComptes(lire,owner),
+ ]);
+ const x=lignes[0];
+ if(!x)return {ok:true,id:m[0],email:null};
+ const {associes,adresseSuivie}=reglesComptes({registre,main,comptes,etats:etatsC});
+ const date=v=>Number.isFinite(Date.parse(v))?new Date(v).toISOString():null;
+ const adresses=[...new Set((Array.isArray(x.adresses)?x.adresses:[]).map(adresseSuivie))].slice(0,5);
+ const lies=[...new Map(adresses.flatMap(associes).map(c=>[c.id,c])).values()];
+ const r=x.resume&&typeof x.resume==='object'&&!Array.isArray(x.resume)?x.resume:null;
+ const pieces=Array.isArray(x.pieces)?x.pieces.slice(0,PIECES_MAX).map(p=>({n:String(p&&p.n||'sans nom').slice(0,120),t:String(p&&p.t||'').slice(0,60),o:Number.isFinite(p&&p.o)?p.o:null})):null;
+ const texte=textes[0]&&typeof textes[0].texte==='string'?textes[0].texte.slice(0,2000):null;
+ return {ok:true,id:m[0],email:{id:m[0],at:date(x.at),sourceDate:date(x.sourceDate),receivedAt:date(x.receivedAt),etat:['integre','a-verifier','erreur'].includes(x.etat)?x.etat:'a-verifier',type:String(x.type||'information').slice(0,40),subject:String(x.subject||'').slice(0,300),from:String(x.from||'').slice(0,200),adresses,compte:lies.length===1?{id:lies[0].id,nom:lies[0].nom}:null,compteAmbigu:lies.length>1,resume:r&&JSON.stringify(r).length<=600?r:null,pieces,texte}};
 }
 
 // Lecture exclusivement sous le propriétaire authentifié. Aucun corps d’email,

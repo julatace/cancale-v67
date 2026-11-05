@@ -105,6 +105,8 @@ import {appelerFavorisDirect} from './favorisTransport.js';
 import React, { useState, useMemo, useEffect, useRef, lazy, Suspense } from "react";
 const Operations = lazy(() => import("./operations/Operations.jsx"));
 const Communaute = lazy(() => import("./communaute/Communaute.jsx"));
+// (5 nov.) L'écran « E-mails » : boîte de réception + « Relier ma boîte » (src/BoiteEmails.jsx).
+const BoiteEmails = lazy(() => import("./BoiteEmails.jsx"));
 import { createPortal, flushSync } from "react-dom";
 import Bienvenue from "./Bienvenue.jsx";
 import VisiteBulles from "./VisiteBulles.jsx";
@@ -15103,6 +15105,8 @@ const GROUPES_PLUS=[
   { titre:'Gérer', items:[
     {id:'garage',     icon:'home', label:'Stock'},
     {id:'achats',     icon:'bag',  label:'Achats'},
+    // (5 nov., Julien : « un onglet dédié aux e-mails… une vraie boîte de réception »)
+    {id:'emails',     icon:'mail', label:'E-mails'},
   ]},
   { titre:'Argent', items:[
     {id:'dashboard', icon:'chart', label:'Statistiques'},
@@ -65805,7 +65809,7 @@ function AppCoeur() {
     // banc, qui navigue par `?tab=`, croyait rendre Leboncoin alors qu'il
     // mesurait l'accueil (un faux vert dans ma propre couverture d'hier).
     // `journee` manquait aussi : invisible parce que c'est l'état de départ.
-    const TABS_OK=['ventes','annonces','messages','achats','retraits','journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','organisation','communaute','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','ebay_messages','vinted_annonces'];
+    const TABS_OK=['ventes','annonces','messages','achats','retraits','journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','organisation','communaute','emails','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','ebay_messages','vinted_annonces'];
     // (31 oct.) Une notification mène à l'élément PRÉCIS : `cible` (+ son
     // identité) et `vue` (src/cibleNotif.js, api/_lib/lien-notif.js). Une
     // `section` vaut aussi pour Comptabilité et Statistiques.
@@ -68592,7 +68596,7 @@ function AppCoeur() {
             ne répondait pas. `baseKO` distingue « aucun compte » de « je n'ai
             pas pu lire », et l'écran le DIT au lieu de repartir de zéro. */}
         {/* (3 nov., critique #2/#9) Un grand titre sur CHAQUE écran : la barre du haut ne le dit plus. */}
-        {tab==='communaute'&&<header className="vrm-market-heading vrm-tache-tete" data-titre-ecran-grand=""><h1>{titreCourant}</h1></header>}
+        {(tab==='communaute'||tab==='emails')&&<header className="vrm-market-heading vrm-tache-tete" data-titre-ecran-grand=""><h1>{titreCourant}</h1></header>}
         {tab==='dashboard'&&!premierJour&&<div className="vrm-rubriques" style={{padding:'12px 16px 0'}}><PlatSubNav sub={platSub==='prix'?'prix':'stats'} setSub={setPlatSub} sections={[['stats','Vue d’ensemble'],['prix','Prix qui marche']]}/></div>}
         {tab==='dashboard'&&platSub==='prix'&&<PrixMarche data={pqmData} baseKO={baseKO}/>}
         {tab==='dashboard'&&premierJour&&<Onboarding setTab={setTab}/>}
@@ -68621,6 +68625,11 @@ function AppCoeur() {
         {tab==='compta'&&platSub==='factures'&&<Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings} entreprises={entreprises} setEntreprises={setEntreprises} activeEnt={activeEnt} setActiveEnt={setActiveEnt}/>}
         {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices}/>}
         {tab==='communaute'&&<Suspense fallback={<p style={{padding:20}}>Chargement de la communauté…</p>}><Communaute sombre={C===THEMES.dark} headers={enTeteSession} prenom={String(load('vrm_prenom','')||'').trim()} FermeAuRetour={FermeAuRetour}/></Suspense>}
+        {/* (5 nov.) E-mails : les liens « Voir dans VRM » passent par `vrm:aller` (un chemin `?tab=…&cible=…`, src/cibleNotif.js). */}
+        {tab==='emails'&&<Suspense fallback={<p style={{padding:20}}>Chargement des e-mails…</p>}><BoiteEmails headers={sbAuth} delies={load('vrm_recus_delies',{})||{}} FermeAuRetour={FermeAuRetour}
+          onAller={(u)=>{try{window.dispatchEvent(new CustomEvent('vrm:aller',{detail:u}));}catch(_){}}}
+          onNum={(n)=>{try{window.dispatchEvent(new CustomEvent('vrm:fiche-article',{detail:String(n)}));}catch(_){}}}
+          onAdresses={()=>{demanderAdresses();try{localStorage.setItem('vrm_reglages_vue','reglages');}catch(_){}setTab('settings');}}/></Suspense>}
         {tab==='organisation'&&<Suspense fallback={<p style={{padding:20}}>Chargement de l’organisation…</p>}><Operations sombre={C===THEMES.dark} headers={enTeteSession}/></Suspense>}
         {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)}/>}
         {tab==='comptabilite'&&<Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
