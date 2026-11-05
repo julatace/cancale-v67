@@ -40,16 +40,17 @@ html body .vrm-app-shell .vrm-main .vrm-toutes-vide .vrm-toutes-vide-titre { mar
   /* Le bureau a ses colonnes : l'état y est dans la sienne, pas sous le titre. */
   html body .vrm-app-shell .vrm-main .vrm-toutes-etat { display: none; }
   /* Des filets DROITS entre les lignes : un filet du bas suivait l'arrondi du survol. */
-  html body .vrm-app-shell .vrm-main .vrm-toutes-ligne {
+  :root body .vrm-app-shell .vrm-main .vrm-toutes-ligne {
     border-bottom: 0 !important;
     background-image: linear-gradient(var(--vrm-line), var(--vrm-line)) !important;
     background-size: calc(100% - 20px) 1px !important; background-position: center bottom !important; background-repeat: no-repeat !important;
   }
-  html body .vrm-app-shell .vrm-main .vrm-toutes-ligne:hover { background-color: var(--vrm-surface) !important; }
+  /* Le survol éclaire la ligne (la carte), il ne l'assombrit pas : le gris secondaire garde 4,5:1. */
+  :root body .vrm-app-shell .vrm-main .vrm-toutes-ligne:hover { background-color: var(--vrm-card) !important; background-image: none !important; }
   html body .vrm-app-shell .vrm-main .vrm-toutes-montant { display: flex; flex-direction: column; align-items: flex-end; }
 }
 @media (hover: none) {
-  html body .vrm-app-shell .vrm-main .vrm-toutes-ligne:hover { background-color: transparent !important; }
+  :root body .vrm-app-shell .vrm-main .vrm-toutes-ligne:hover { background-color: transparent !important; }
 }
 
 /* ── L'alerte « un compte annule plus que les autres » ────────────────────── */
@@ -99,5 +100,5 @@ html body .vrm-app-shell .vrm-main .vrm-toutes-bureau-site { display: inline-fle
 /* ── Le prix d'une vente Leboncoin, eBay, Vestiaire à l'ordinateur : sur l'échelle ─
    (styles-bureau.css le posait à 16 px, hors de l'échelle fermée 15 · 17 — fusion-app F8). */
 @media (min-width: 1024px) {
-  :root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row:not([data-fu-ligne]) > .vrm-ledger-sale-toggle > .vrm-ledger-sale-amount { font-size: 17px !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row > .vrm-ledger-sale-toggle > .vrm-ledger-sale-amount { font-size: 17px !important; }
 }
