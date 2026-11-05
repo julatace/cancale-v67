@@ -3,7 +3,11 @@
 .vrm-statut-option { display:flex; flex-direction:column; gap:4px; text-align:left; padding:14px 16px; min-height:44px;
   border:1px solid var(--vrm-line,#E5E5EA); border-radius:12px; background:var(--vrm-surface,#fff); color:var(--vrm-ink,#1C1C1E);
   font-family:inherit; cursor:pointer; transition:border-color .18s ease, transform .18s cubic-bezier(.2,.8,.2,1), box-shadow .18s ease; }
-.vrm-statut-option:hover { border-color:var(--vrm-accent,#0071E3); box-shadow:0 1px 2px rgba(0,0,0,.04),0 8px 24px rgba(0,0,0,.08); }
+/* (5 nov., chantier F, revue 2.27) Le survol seulement là où il existe vraiment (souris) :
+   au doigt, iOS le « colle » après un toucher et une carte non choisie restait cerclée de bleu. */
+@media (hover: hover) and (pointer: fine) {
+  .vrm-statut-option:hover { border-color:var(--vrm-ink,#1C1C1E); box-shadow:0 1px 2px rgba(0,0,0,.04),0 8px 24px rgba(0,0,0,.08); }
+}
 .vrm-statut-option:active { transform:scale(.985); }
 .vrm-statut-option[aria-pressed="true"] { border-color:var(--vrm-accent,#0071E3); box-shadow:inset 0 0 0 1px var(--vrm-accent,#0071E3); }
 .vrm-statut-t { font-size:15px; font-weight:700; }

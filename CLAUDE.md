@@ -508,6 +508,7 @@ sans la fonction.
 
 - **5 nov. · Chantier H, coque (v35)** : en-tête = pastille de couleur (plus « ⓘ »), nuage seulement en panne ; « Dernière capture » = source de la liste ; Paramètres (icônes distinctes, Organisation en lien, plus de carte dans la carte, Statut) ; icônes de nav distinctes, un badge par colis ; cloche sur SheetShell + « Où ranger à l'arrivée » (`src/ouRanger.js`). `docs/passation/2026-11-05-chantier-h.md`.
 
+- **5 nov. · Chantier F, Compta et Statistiques (v35)** : cartes vides repliées en une ligne, sous-onglets sous le titre, statut choisi à UN endroit, « — » + raison (Comparer, À déclarer) ; « À recopier sur l'URSSAF » (Copier), Bilan du mois (PDF), Délai de paiement par site. `docs/passation/2026-11-05-chantier-f.md`. Geste : déclarer depuis « À recopier ».
 - **5 nov. · Petits plus (v34)** : accueil = vrais navigateurs (`navigateursServis`, Orion « en essai ») ; guide iPhone dans Notifications ; notif « compte Vinted pas relu » (Rappels, 1/jour) ; contrôle de prod (titre, santé, version extension). `docs/passation/2026-11-05-petits-plus.md`.
 
 - **5 nov. · Stock + Vestiaire, registre + gros** : le Stock compte les annonces Vestiaire en ligne (N° par identité, `vrm_vc_liens` compris ; sans N° ou lecture absente/vieille nommée) ; registre des achats : un achat en gros = UNE ligne (total + frais, jamais ses parts). Passations stock-annonces et fournisseurs. Geste : ouvrir « Mes articles » sur Vestiaire.
@@ -535,19 +536,9 @@ sans la fonction.
 - **5 nov. · Notifications et essai** : sept types, heures calmes, regroupement, cloche « centre des notifications » (lu/non lu, ouvre l'objet) ; e-mails j1/j3/j6 de l'essai par le cron du matin, désinscription en un clic ; revue : cloche = liste après purge, chemins des e-mails, heure limite du cron. `docs/passation/2026-11-05-notifications-relances.md`. Geste : poser les variables `RELANCES_*` sur Vercel.
 - **5 nov. · DAC7 par compte** : Compta → Le détail → « DAC7 » (N/30, /2 000 €, rapport ou où le trouver, PDF/tableur). `docs/passation/2026-11-05-dac7-comptes.md`.
 - **5 nov. · Communauté → Groupes** : groupes d'accompagnement (code/lien, validation par le créateur, partage choisi par le membre — rien par défaut, chiffres, détail — révocable et effacé ; relecture : total partiel dit, renvoi après effacement, verrou révocation/publication) ; migration **025 NON appliquée** (l'onglet le dit). `docs/passation/2026-11-05-communaute-groupes.md`. Geste : appliquer la 025.
-- **5 nov. · Réveil** : fin des heures calmes ⇒ une notification « ce qui est arrivé pendant » (`?moment=reveil`, GitHub toutes les 30 min). `docs/passation/2026-11-05-reveil-heures-calmes.md`. Geste : secret `CRON_SECRET` dans GitHub.
-- **5 nov. · Audits rouges** : 15 → 3 (politique : ZXing, Tesseract, logos transporteurs déclarés ; `pdfjs-dist` en devDependency) ; restent 2 extension + `retrait` (Achats). `historique-divers.md` « Audits rouges du 5 nov. ». Julien : relire `public/legal/confidentialite.html`, décider `vc_brut_*`.
 
-- **5 nov. · Achats et à retirer** : 33 → 10 sur sa copie (fin par le n° de la commande et le code ; doubles possibles à part ; un point = une carte) ; Achats : une carte, outils dans « … », « Arrivé ». `docs/passation/2026-11-05-achats-retraits.md`. Geste : dire à quel compte appartient l'adresse qui reçoit 16 e-mails Vinted.
 
-- **5 nov. · Chantier B (composants partagés)** : `montant()` (src/format.js, « — » si pas su, alias fmt/fmtE/fmtE0/prixTxt), `src/libelles.js`, SheetShell unique (portail, opaque dès la 1re image, poignée), ChampRecherche, PhotoVide, Numero, EtatPanne, Bouton « danger » ambre ; écrans pas adaptés (C à H). API : `docs/passation/2026-11-05-chantier-b.md`.
 
-- **5 nov. · Relais Vinted** : un « relire » relit la copie captée, plus le serveur ; relais freiné (24/30 min/compte, sur l'appareil ET au serveur, tous appareils). `docs/passation/2026-11-05-frein-relais-vinted.md`.
-- **5 nov. · Numéros** : fiche numérotée du nuage jamais retirée par la fusion (plus de bloc « Recharger »). `docs/passation/2026-11-05-numeros-autre-appareil.md` ; demandes du jour : `demandes-2026-11-05.md`.
-- **5 nov. · Orion 5.322.0** : base 5.319 confirmée installable par Julien, moteur/adaptateur repris ; seul le popup change hors versions, pour rester sur Vinted après connexion. Voir `docs/passation/2026-11-05-orion-base-validee.md`.
-- **5 nov. · Référence Orion 5.319.0** : archives originales de 61304faf remises séparément, SHA-256 vérifiés ; refus persistant en 5.321, cause non établie et ancienne version installée inconnue. Diff complet : `docs/passation/2026-11-05-orion-comparaison-reference.md`.
-- **5 nov. · Paquets 5.321.0** : archives normalisées 644/755 (la 5.320 exportait des fichiers 600), contrôle depuis sources privées, tous formats. Refus Orion réel non reproduit sur appareil ; `docs/passation/2026-11-05-orion-paquet.md`.
-- **5 nov. · Extension 5.320.0** : mot de passe sans ouverture automatique de VRM, rappels/promesses Orion et délais de connexion ; capture après session conservée, limites écran d’accueil/iOS expliquées. Voir `docs/passation/2026-11-05-orion-connexion.md`. Installer le nouveau paquet Orion.
 
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
