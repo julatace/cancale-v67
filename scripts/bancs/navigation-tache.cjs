@@ -12,7 +12,8 @@
 //      Plus — et la colonne de l'ordinateur les tâches puis les groupes ;
 //   B. Ventes et Annonces portent la rangée de filtres de site (Toutes ·
 //      Vinted · Leboncoin · eBay · Vestiaire pour Ventes ; sans « Toutes »
-//      pour Annonces), un site sans compte n'y est pas ;
+//      pour Annonces) ; (5 nov., Julien : « les mêmes onglets que Vinted ») les QUATRE sites,
+//      un site sans compte estompé dont l'onglet dit ce qui manque (banc plateformes-logo) ;
 //   C. le filtre « Vinted » rend les MÊMES contrôles que l'ancien écran Vinted
 //      (sélecteur de compte, filtres d'état des ventes, période, résumé) ;
 //   D. « Toutes » ne fusionne RIEN : chaque vente est une ligne, sous SON site
