@@ -59,7 +59,11 @@ const MAIN = {
 };
 // L'ANCIENNE pièce 3D : N°2 était dans une pile. Lue seulement.
 const ROOM = { rooms: [{ id: 'r1', name: 'Garage', room: { w: 6, h: 5, wallH: 3 }, items: [{ id: 'p1', type: 'pile', name: 'Pile du fond', x: 1, y: 1, w: 0.4, h: 0.3, rows: 5, nums: ['2'] }] }] };
-const LISTINGS = [{ id: 'harvest_111_listings', data: { capturedAt: new Date(AUJ - 3600000).toISOString(), nItems: 1, payload: { items: [{ id: 1001, title: 'Nike Air Max 90 noire 42', created_at_ts: Math.floor(Date.parse('2026-10-05T12:00:00Z') / 1000), is_closed: false, is_hidden: false, is_draft: false, price: { amount: '70.0' } }] } } }];
+// (5 nov., v32) Le Stock montre les ANNONCES ACTUELLES : N°2 et N°5 (« à ranger »)
+// sont donc des annonces en ligne de ce dressing — avant, une fiche numérotée suffisait.
+const enLigne = (id, title) => ({ id, title, is_closed: false, is_hidden: false, is_draft: false, price: { amount: '60.0' } });
+const LISTINGS = [{ id: 'harvest_111_listings', data: { capturedAt: new Date(AUJ - 3600000).toISOString(), nItems: 3, payload: { items: [{ id: 1001, title: 'Nike Air Max 90 noire 42', created_at_ts: Math.floor(Date.parse('2026-10-05T12:00:00Z') / 1000), is_closed: false, is_hidden: false, is_draft: false, price: { amount: '70.0' } },
+  enLigne(1002, 'Adidas Samba blanche 40'), enLigne(1005, 'New Balance 550 crème 41')] } } }];
 
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d != null && d !== '' ? ' — ' + d : '')); };
@@ -88,6 +92,8 @@ async function rendre(b, { tel, sombre = false, reduit = false, main = MAIN }) {
     if (/id=eq\.main/.test(u)) return j([{ id: 'main', data: main }]);
     if (/id=eq\.vrm_room/.test(u)) return j([{ id: 'vrm_room', data: ROOM }]);
     if (/id=like\.harvest_\*_listings/.test(u)) return j(LISTINGS);
+    // (5 nov., v32) Le Stock lit chaque dressing par sa ligne (`fetchVintedListings`).
+    if (/id=eq\.harvest_111_listings/.test(u)) return j(LISTINGS);
     // La transaction de l'ACHAT relié : livrée le 3 oct. à 10 h (statut 400).
     if (/id=like\.harvest_\*_txn_55501234/.test(u)) return j([{ id: 'harvest_222_txn_55501234', side: 'buyer', livSt: '400', livAt: '2026-10-03T10:00:00Z' }]);
     return j([]);

@@ -11,6 +11,8 @@
 //     parti, l'annonce eBay VRM-63 encore en ligne), une annonce eBay sans SKU.
 // À 1512 px et 390 px tactile. Le Stock est ouvert après Ventes (l'écran qui
 // publie la liste des paires présentes).
+// (5 nov., v32) Le Stock lit lui-même eBay et Leboncoin (`lireEbayEnLigne`,
+// `lireLbcEnVente`) : `BANC_MUTATION` (vider `autres` publié) ne le touche plus.
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
@@ -143,10 +145,11 @@ const attendre = async (fn, ms = 20000) => { const t0 = Date.now(); while (Date.
       dit(!!e60 && /eBay/.test(e60.t) && !/vinted/.test(e60.p), 'N°60 (seulement sur eBay) est à ranger, « eBay » écrit' + T, JSON.stringify(e60 || null));
       dit(!!l61 && /Leboncoin/.test(l61.t), 'N°61 (seulement sur Leboncoin) est à ranger, « Leboncoin » écrit' + T, JSON.stringify(l61 || null));
       dit(!ns.includes('62') && !ns.includes('63'), 'ni 62, ni 63' + T, ns.join(','));
-      // (5 nov.) Le Stock n'a plus que les étagères 2D (« Mes meubles ») : la N°46,
-      // rangée SEULEMENT dans l'ancienne pièce 3D (plus affichée), est à ranger
-      // dans les étagères — sa place d'avant est dite sur sa fiche (banc stock-2d, VIII).
-      dit(ns.includes('46'), 'la N°46 (rangée seulement dans l’ancienne pièce 3D) est à ranger dans les étagères' + T, ns.join(','));
+      // (5 nov., v32) Le Stock = les ANNONCES ACTUELLES (Julien : « pour le stock
+      // onglet je veux que ça soit les annonces actuelles ») : la N°46 a une fiche
+      // numérotée mais AUCUNE annonce en ligne — elle n'est plus proposée « à ranger »
+      // (avant v32 : toute fiche numérotée l'était). Banc dédié : stock-annonces.
+      dit(!ns.includes('46'), 'la N°46 (fiche numérotée, aucune annonce en ligne) n’est pas « à ranger »' + T, ns.join(','));
       dit(ns.includes('47'), 'la N°47 (Vinted seule) reste' + T, ns.join(','));
       dit(!ns.includes('70'), 'la N°70 (compte supprimé, shop_cancale) n’est pas à ranger' + T, ns.join(','));
       dit(!errs.length, 'aucune erreur de page' + T, errs.join(' | '));

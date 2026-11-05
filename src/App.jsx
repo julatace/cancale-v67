@@ -33449,7 +33449,8 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     vinted: lecture.vinted.map((c) => (c.ok ? { ...c, masquees: masqueesPresentes(c.masquees, numeros, pairsLost) } : c)),
     numeros, ebay: lecture.ebay, lbc: lecture.lbc, vendus, cle: cleNum, clePhoto: photoKey,
   }) : null;
-  const actuellesCles = aa ? new Set(aa.articles.map((a) => a.cle).filter(Boolean)) : null;
+  // Une paire sous deux N° (même photo exacte, `aussi`) : chacun de ses N° est actuel.
+  const actuellesCles = aa ? new Set(aa.articles.flatMap((a) => [a.cle, ...(a.aussi || []).map(cleNum)]).filter(Boolean)) : null;
   // Les fiches numérotées par N° : pour montrer une paire rangée qui n'est plus
   // une annonce actuelle, et savoir de quels comptes elle vient.
   const fichesParCle = {};
@@ -33475,7 +33476,10 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   for (const a of (aa ? aa.articles : [])) {
     if (!a.cle || vus.has(a.cle)) continue; vus.add(a.cle);
     const v = (fichesParCle[a.cle] || [])[0];
-    fiches.push({ id: a.ids[0], numero: a.numero, title: a.titre, photo: a.photo || (v && v.photo) || null, plateformes: a.plateformes, comptes: a.comptes, aussi: a.aussi, etatAnnonce: a.etat, actuelle: true });
+    const fa = { id: a.ids[0], numero: a.numero, title: a.titre, photo: a.photo || (v && v.photo) || null, plateformes: a.plateformes, comptes: a.comptes, aussi: a.aussi, etatAnnonce: a.etat, actuelle: true };
+    fiches.push(fa);
+    // Son autre N° (même photo) : la même paire, montrée sous CE numéro s'il est dans une case.
+    for (const n of (a.aussi || [])) { const kn = cleNum(n); if (kn && !vus.has(kn)) { vus.add(kn); if (slots[kn]) fiches.push({ ...fa, id: fa.id + ':' + kn, numero: n, aussi: [a.numero], doublure: true }); } }
   }
   for (const k of Object.keys(etatsRangees)) {
     if (vus.has(k)) continue;
@@ -33504,10 +33508,12 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     if (Object.keys(r.bouges).length) { setTombes(r.bouges); setTimeout(() => setTombes({}), 700); }
   };
   const cleDeFiche = (f) => cleNum(f.numero);
-  const posee = (f) => !!slots[cleDeFiche(f)];
+  // Rangée si l'un de ses N° (le sien, ou l'autre N° de la même paire) a une case.
+  const posee = (f) => !!slots[cleDeFiche(f)] || (f.aussi || []).some((n) => !!slots[cleNum(n)]);
   const occupant = (mid, i) => { const k = Object.keys(slots).find((c) => slots[c] && slots[c].m === mid && slots[c].i === i && ficheParCle[c]); return k ? ficheParCle[k] : null; };
   // « À ranger » : les annonces actuelles SANS case (et les paires remises à la main).
-  const aRanger = unParArticle(fiches.filter((f) => (f.actuelle || f.remise) && correspondFiltre(f)).sort((a, b) => triNum(a.numero, b.numero)), { cle: cleNum, clePhoto: photoKey, estRangee: posee });
+  const aRanger = unParArticle(fiches.filter((f) => (f.actuelle || f.remise) && !f.doublure && correspondFiltre(f)).sort((a, b) => triNum(a.numero, b.numero)), { cle: cleNum, clePhoto: photoKey, estRangee: posee })
+    .map((f) => ({ ...f, aussi: [...new Set([...((ficheParCle[cleNum(f.numero)] || {}).aussi || []), ...(f.aussi || [])])] }));
   const filtre = q.trim().toLowerCase();
   // Plusieurs mots : tous doivent y être (« nike 42 noir »). Un N° seul se juge
   // par IDENTITÉ (« 12 » ne montre pas la N°128) ; un mot cherche aussi le titre.
@@ -33804,7 +33810,8 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   const nAffiche = articlesVus.length;
   const nAConf = articlesVus.filter((a) => a.etat === 'aconfirmer').length;
   const nMasq = articlesVus.filter((a) => a.etat === 'masquee').length;
-  const nRangees = articlesVus.filter((a) => a.cle && slots[a.cle]).length;
+  const articleRange = (a) => !!a.cle && (!!slots[a.cle] || (a.aussi || []).some((n) => !!slots[cleNum(n)]));
+  const nRangees = articlesVus.filter(articleRange).length;
   const nSansNum = articlesVus.filter((a) => !a.cle).length;
   const platsPresents = aa ? [...new Set(aa.articles.flatMap((a) => a.plateformes))] : [];
   const comptesPresents = aa ? [...new Set(aa.articles.flatMap((a) => a.comptes))] : [];
@@ -33878,8 +33885,10 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     <Card style={{ padding: '12px 13px' }}>
       <div data-stock-liste={articlesVus.length}>
         <div style={{ fontSize: 15, fontWeight: 800, color: C.text, marginBottom: 4 }}>Tes annonces actuelles</div>
-        {articlesVus.slice().sort((a, b) => (!!(a.cle && slots[a.cle]) - !!(b.cle && slots[b.cle])) || triNum(a.numero, b.numero)).slice(0, maxListe).map((a) => {
-          const f = a.cle ? ficheParCle[a.cle] : null; const ou = f ? ouEst(f) : null;
+        {articlesVus.slice().sort((a, b) => (articleRange(a) - articleRange(b)) || triNum(a.numero, b.numero)).slice(0, maxListe).map((a) => {
+          const f = a.cle ? ficheParCle[a.cle] : null;
+          const fOu = f ? ((ouEst(f) ? f : null) || (a.aussi || []).map((n) => ficheParCle[cleNum(n)]).filter(Boolean).find((x) => ouEst(x)) || null) : null;
+          const ou = fOu ? ouEst(fOu) : null;
           return (
             <div key={a.ids[0]} className="vrm-s2d-liste-ligne" data-stock-annonce={a.cle || 'sans:' + a.ids[0]} data-stock-annonce-etat={a.etat} data-stock-annonce-plats={a.plateformes.join(',')} data-stock-annonce-place={ou ? `${ou.meuble.name}|${ou.rangee}|${ou.colonne}` : (a.cle ? 'non-range' : 'sans-numero')}>
               <span className="vrm-s2d-vig"><Vignette f={{ numero: a.numero || '—', title: a.titre, photo: a.photo }} sold={false} mini /></span>
@@ -33888,7 +33897,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
                 <span className="vrm-s2d-txt-s">{a.plateformes.map((x) => NOM_PLAT_FILTRE[x] || x).join(' · ')}{a.comptes.length ? ' · ' + a.comptes.map((u) => comptesNoms.get(u) || u).join(', ') : ''}{a.etat === 'aconfirmer' ? ' · à confirmer' : (a.etat === 'masquee' ? ' · masquée par Vinted' : '')}{(a.aussi || []).length ? ' · aussi N°' + a.aussi.join(', N°') : ''}
                   <br />{ou ? <b>{ou.meuble.name} · rangée {ou.rangee}, colonne {ou.colonne}</b> : (a.cle ? 'pas encore rangée' : 'sans N° : pas rangeable')}</span>
               </span>
-              {a.cle && f && <button className="vrm-b vrm-b-discret" type="button" data-stock-annonce-geste={ou ? 'voir' : 'ranger'} onClick={() => { if (ou) montrer(f); else { setPlace(a.cle); toast(`Touche la case où tu ranges N°${a.numero}.`); } }} style={{ flexShrink: 0 }}>{ou ? 'Voir ›' : 'Ranger ›'}</button>}
+              {a.cle && f && <button className="vrm-b vrm-b-discret" type="button" data-stock-annonce-geste={ou ? 'voir' : 'ranger'} onClick={() => { if (ou) montrer(fOu); else { setPlace(a.cle); toast(`Touche la case où tu ranges N°${a.numero}.`); } }} style={{ flexShrink: 0 }}>{ou ? 'Voir ›' : 'Ranger ›'}</button>}
             </div>); })}
         {articlesVus.length > maxListe && <button className="vrm-b vrm-b-discret" type="button" onClick={() => setMaxListe((x) => x + 60)} style={{ width: '100%' }}>Voir plus — {maxListe} sur {articlesVus.length}</button>}
       </div>
