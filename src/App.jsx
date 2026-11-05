@@ -52217,6 +52217,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (5 nov., chantier E1) « N°42 vendue, toujours rangée » se dit UNE fois : « Voir »
   // range le N° ici (commodité de l'appareil, jamais une donnée : la case, elle, ne
   // bouge pas). Une case libérée sort de la liste d'elle-même.
+  // La carte se lit dans des clés publiées APRÈS le rendu (`vrm_stock_vendus` est écrite 500 ms plus
+  // tard par `save`, `vrm_slots` par le Stock ou la sortie automatique) : Ma journée se relit quand
+  // l'une d'elles change (sinon la carte attendait un autre rendu — mesuré au banc, 1 fois sur 3).
+  const [, setTicStock] = useState(0);
+  React.useEffect(() => {
+    if (only !== 'journee') return undefined;
+    const CLES = ['vrm_stock_vendus', 'vrm_slots', 'vrm_meubles'];
+    const f = (e) => { const k = e && e.detail && e.detail.k; if (!k || CLES.includes(k)) setTicStock((t) => t + 1); };
+    window.addEventListener('vrm:save', f); window.addEventListener('vrm:stock-slots', f);
+    return () => { window.removeEventListener('vrm:save', f); window.removeEventListener('vrm:stock-slots', f); };
+  }, [only]);
   const [sortiesVues, setSortiesVues] = useState(() => { try { const v = JSON.parse(localStorage.getItem('vrm_journee_sorties_vues') || '{}'); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch (_) { return {}; } });
   // Rangé TOUT DE SUITE (pas dans la mise à jour d'état : « Voir » change d'écran dans le même
   // geste, l'écran se démonte, et une mise à jour jamais jouée n'aurait rien rangé).
