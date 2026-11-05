@@ -147,7 +147,7 @@ dit((APP.match(/VRM-extension\.zip/g) || []).length >= 2,
   const juge = (F, ou) => {
     dit(/Dézippe|dézippe/.test(F) && /remplace|à la place/i.test(F), `${ou} : la consigne dit de REMPLACER le dossier`,
       '⟳ seul recharge le dossier du disque — donc la même version');
-    dit(/⟳/.test(F) && /chaque Chrome|CHAQUE Chrome/.test(F), `${ou} : PUIS ⟳ dans chaque Chrome où elle est installée`,
+    dit(/⟳/.test(F) && /chaque (?:Chrome|navigateur)|CHAQUE (?:Chrome|navigateur)/.test(F), `${ou} : PUIS ⟳ dans chaque navigateur où elle est installée`,
       'sans ⟳, Chrome garde l\'ancien code — et seulement dans le Chrome où on le clique');
     const iRemp = F.search(/remplace|à la place/i), iRech = F.indexOf('⟳');
     dit(iRemp >= 0 && iRech > iRemp, `${ou} : dans cet ordre (remplacer, PUIS ⟳)`, `remplacer@${iRemp} · ⟳@${iRech}`);

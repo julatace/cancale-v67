@@ -16,6 +16,9 @@
 //   · l'annonce se reconnaît par l'identifiant du lien (/items/<id>), jamais par
 //     le texte de la notification ni par ressemblance (§5).
 import {ageFavori} from './favorisVinted.js';
+import { motsNavigateur } from './navigateurExtension.js';
+// (5 nov.) Le navigateur d'ICI, nommé seulement s'il est su (jamais « Chrome » sur Orion).
+const NAV = motsNavigateur();
 
 // Les mots qui ne doivent jamais apparaître à l'écran (sa demande : « file »,
 // « jeton », « 429 »… interdits).
@@ -55,11 +58,11 @@ const MODE={
   capture:{texte:'Rien ne part : VRM n’a pas encore vu les favoris de ce compte.',geste:'Ouvre la cloche de Vinted avec ce compte.'},
   destinataire_non_prouve:{texte:'Rien ne part : VRM ne sait pas encore à qui écrire.',geste:'Touche « Ouvrir » sur un favori plus bas : VRM apprend à qui écrire.'},
   reglages:{texte:'Rien ne part : aucun message enregistré.',geste:'Écris ton message ci-dessous, puis Enregistrer.'},
-  extension:{texte:'Un message est prêt, mais l’extension ne peut pas l’envoyer.',geste:'Ouvre vinted.fr dans Chrome sur ce compte, avec l’extension à jour.'},
-  onglet_vinted:{texte:'Un message attend : aucun onglet vinted.fr n’est ouvert sur ce compte.',geste:'Ouvre vinted.fr dans Chrome, connecté sur ce compte, et laisse l’onglet ouvert.'},
-  compte_vinted_absent:{texte:'Un message attend : Chrome n’est pas connecté à Vinted.',geste:'Connecte-toi à Vinted avec ce compte dans Chrome.'},
-  compte_vinted_different:{texte:'Un message attend : Chrome est connecté à un autre compte Vinted.',geste:'Passe sur ce compte dans l’onglet vinted.fr.'},
-  extension_indisponible:{texte:'Un message attend : l’extension ne répond pas.',geste:'Recharge l’extension dans Chrome (⟳), puis recharge VRM.'},
+  extension:{texte:'Un message est prêt, mais l’extension ne peut pas l’envoyer.',geste:`Ouvre vinted.fr ${NAV.dansNu} sur ce compte, avec l’extension à jour.`},
+  onglet_vinted:{texte:'Un message attend : aucun onglet vinted.fr n’est ouvert sur ce compte.',geste:`Ouvre vinted.fr ${NAV.dansNu}, connecté sur ce compte, et laisse l’onglet ouvert.`},
+  compte_vinted_absent:{texte:`Un message attend : ${NAV.ce} n’est pas connecté à Vinted.`,geste:`Connecte-toi à Vinted avec ce compte ${NAV.dansNu}.`},
+  compte_vinted_different:{texte:`Un message attend : ${NAV.ce} est connecté à un autre compte Vinted.`,geste:'Passe sur ce compte dans l’onglet vinted.fr.'},
+  extension_indisponible:{texte:'Un message attend : l’extension ne répond pas.',geste:`Recharge l’extension ${NAV.dansNu}, puis recharge VRM.`},
   extension_version:{texte:'Le mode automatique demande une extension plus récente.',geste:'Installe la dernière extension (Paramètres → Extension), puis recharge-la (⟳).'},
   session_extension:{texte:'Un message attend : l’extension n’est pas reliée à ton compte VRM.',geste:'Ouvre l’extension, puis Connecter.'},
 };
@@ -112,10 +115,10 @@ export const RAISONS_ECRAN={
   vinted_refus:{texte:'Vinted a refusé l’envoi'},
   historique:{texte:'VRM n’a pas pu relire la conversation avant d’écrire'},
   ecran_quitte:{texte:'l’écran a été quitté avant l’envoi',geste:'Renvoie-les en gardant cet écran ouvert.'},
-  onglet_vinted:{texte:'aucun onglet vinted.fr ouvert sur ce compte',geste:'Ouvre vinted.fr dans Chrome, connecté sur ce compte, puis renvoie-les.'},
-  compte_vinted_absent:{texte:'Chrome n’était pas connecté à Vinted',geste:'Connecte-toi à Vinted avec ce compte dans Chrome, puis renvoie-les.'},
-  compte_vinted_different:{texte:'Chrome était sur un autre compte Vinted',geste:'Passe sur ce compte dans l’onglet vinted.fr, puis renvoie-les.'},
-  extension:{texte:'l’extension n’a pas répondu',geste:'Recharge l’extension dans Chrome (⟳), puis renvoie-les.'},
+  onglet_vinted:{texte:'aucun onglet vinted.fr ouvert sur ce compte',geste:`Ouvre vinted.fr ${NAV.dansNu}, connecté sur ce compte, puis renvoie-les.`},
+  compte_vinted_absent:{texte:`${NAV.Ce} n’était pas connecté à Vinted`,geste:`Connecte-toi à Vinted avec ce compte ${NAV.dansNu}, puis renvoie-les.`},
+  compte_vinted_different:{texte:`${NAV.Ce} était sur un autre compte Vinted`,geste:'Passe sur ce compte dans l’onglet vinted.fr, puis renvoie-les.'},
+  extension:{texte:'l’extension n’a pas répondu',geste:`Recharge l’extension ${NAV.dansNu}, puis renvoie-les.`},
   session_extension:{texte:'l’extension n’était pas reliée à ton compte VRM',geste:'Ouvre l’extension, puis Connecter.'},
   arrete:{texte:'envoi arrêté avant de partir'},
   annule:{texte:'retiré de l’envoi avant de partir'},

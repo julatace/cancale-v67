@@ -60,7 +60,21 @@ html .vrm-app-shell .vrm-recherche-champ:focus, html .vrm-app-shell .vrm-recherc
 /* ── LA CIBLE D'UNE NOTIFICATION (31 oct.) ───────────────────────────────────
    L'élément visé se signale un instant (un filet d'accent, l'accent RARE du §7),
    puis redevient neutre. */
-.vrm-cible-notif { box-shadow: 0 0 0 2px var(--vrm-accent, #0071E3) !important; border-radius: 12px; transition: box-shadow .3s ease; }
+/* (5 nov.) UNE mise en évidence pour toutes les notifications : un contour d'accent
+   DESSINÉ À L'INTÉRIEUR (`inset`, jamais rogné par une liste qui coupe ce qui
+   dépasse) et un voile d'accent très léger, ~4 s (l'attribut `data-cible-eclaire`
+   est retiré par `CibleNotif`), puis neutre.
+   ⚠️ Mesuré le 5 nov. : les lignes de conversation et de vente posent
+   `box-shadow: none !important` et `background: transparent !important` sous des
+   sélecteurs plus forts (`html body :is([data-messagerie]…) .vrm-inbox-row`,
+   `.vrm-main .vrm-sale-row`) — la mise en évidence d'avant y était INVISIBLE.
+   Les deux `:not(#_)` donnent à cette règle le poids de deux identifiants. */
+html body [data-cible-eclaire][data-cible-eclaire]:not(#_):not(#_) {
+  border-radius: 12px !important;
+  box-shadow: inset 0 0 0 2px var(--vrm-accent, #0071E3), 0 0 0 3px color-mix(in srgb, var(--vrm-accent, #0071E3) 16%, transparent) !important;
+  background-image: linear-gradient(color-mix(in srgb, var(--vrm-accent, #0071E3) 8%, transparent), color-mix(in srgb, var(--vrm-accent, #0071E3) 8%, transparent)) !important;
+  scroll-margin: 96px 0 96px;
+}
 .vrm-cible-absente {
   display: flex; align-items: center; gap: 10px; margin: 8px 16px; padding: 4px 4px 4px 12px; min-height: 44px; box-sizing: border-box;
   border: 1px solid var(--vrm-line, #E5E5EA); border-radius: 12px; background: var(--vrm-surface, #FFFFFF);

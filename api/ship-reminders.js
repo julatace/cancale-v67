@@ -25,7 +25,8 @@ import { sendPushToAll, pushCategorieActive, prefsDuVendeur } from './_lib/push.
 import { resumeReveil, ID_REVEIL } from './_lib/reveil-calme.js';
 import { lireJournal, lireLu } from './_lib/journal-notifs.js';
 import { DESTINATIONS } from './_lib/lien-notif.js';
-import { notificationAgentEbay } from './_lib/agent-ebay-rappel.js';
+// (revue du 5 nov.) Les textes des rappels soir et « offres au mini » : un propriétaire, celui de l'aperçu.
+import { texteSoir, texteOffresMini } from './_lib/notif-apercus.js';
 import { semainePassee, semaineCourante, calculerBilan, bilanAEnvoyer, texteBilan, versementsDeLignes } from './_lib/bilan-semaine.js';
 import { notificationUrssaf, rappelAvantEcheance, MAIN_URSSAF } from './_lib/rappel-urssaf.js';
 // « À expédier » : la règle du widget (elle-même jugée identique à celle de
@@ -458,32 +459,17 @@ async function rappelsOffresMini(maintenant = Date.now()) {
   const n = nouveaux.length;
   // Une seule offre ⇒ sa conversation, ouverte, avec la carte d'offre ; plusieurs ⇒ le filtre « Offres ».
   const uneSeule = n === 1 ? (convDe.get(nouveaux[0]) || null) : null;
-  const envoi = await sendPushToAll({ cat: 'offremini',
-    title: n > 1 ? `${n} offres au-dessus de ton prix mini` : 'Une offre au-dessus de ton prix mini',
-    body: n > 1 ? `${n} offres à accepter en 1 tap dans VRM.` : 'À accepter en 1 tap dans VRM.',
-    tag: 'offremini', url: n === 1 && uneSeule ? DESTINATIONS.message(uneSeule) : DESTINATIONS.offres() });
+  // (revue du 5 nov.) Une seule offre ⇒ cible=offre : SA conversation ouverte ET la carte de l'offre en évidence.
+  const envoi = await sendPushToAll({
+    ...texteOffresMini(n),
+    tag: 'offremini', url: n === 1 && uneSeule ? DESTINATIONS.offre(uneSeule) : DESTINATIONS.offres() });
   return { offremini: 'envoyé', n, envoi: envoi && (envoi.coupe || envoi.erreur || envoi.sent) };
 }
 
-// ── L'AGENT eBAY QUI DEMANDE (29 oct.) ──────────────────────────────────────
-// « 🛒 N paires prêtes pour eBay — publier ? », une fois par jour. Le nombre est
-// celui que l'APP a publié (`vrm_agent_ebay_resume`, sa règle, §11) — le
-// serveur ne recalcule rien et ne publie rien. Le mémo est écrit AVANT l'envoi
-// et CONFIRMÉ (comme le bilan) : jamais deux demandes le même jour.
-async function rappelAgentEbay(maintenant = Date.now()) {
-  if (!(await pushCategorieActive('agentebay'))) return 'désactivé par le vendeur';
-  // (dernier tour du 29 oct.) Les réglages de l'agent sont lus AVEC le résumé :
-  // « Arrêter l'agent » le fait taire ici aussi, même si un ancien résumé traîne.
-  const main = await getRowProjete('main', ['vrm_agent_ebay_resume', 'vrm_agent_ebay_regles']);
-  const today = parisDate(0);
-  const memo = await getRow('agent_ebay_dedup');
-  const n = notificationAgentEbay({ resume: main === undefined ? undefined : ((main && main.vrm_agent_ebay_resume) || null),
-    regles: main === undefined ? undefined : ((main && main.vrm_agent_ebay_regles) || null), memo, today, maintenant });
-  if (!n.envoyer) return n.raison;
-  if (!(await ecrireDedup('agent_ebay_dedup', { date: today, n: n.n, at: new Date(maintenant).toISOString() }))) return 'mémo non écrit — rien envoyé';
-  const envoi = await sendPushToAll({ cat: 'agentebay', title: n.titre, body: n.corps, tag: 'agent-ebay-' + today, url: n.url });
-  return { agentebay: 'envoyé', n: n.n, envoi: envoi && (envoi.coupe || envoi.erreur || envoi.sent) };
-}
+// (5 nov.) L'AGENT eBAY EST ARRÊTÉ (Julien : « le bot eBay, arrête-le, c'est nul »).
+// Sa notification du matin (« 🛒 N paires prêtes pour eBay ») ne part plus : le
+// cron ne lit plus `vrm_agent_ebay_resume` ni `agent_ebay_dedup` (données gardées
+// en base, plus lues). Ne pas la remettre sans qu'il le demande.
 
 // Le traitement d'UN vendeur (celui du `contexteVendeur` courant, ou l'unique
 // vendeur d'une base non cloisonnée). Rend un bilan, n'écrit jamais dans `res`.
@@ -603,10 +589,6 @@ async function traiterVendeurApresRelecture() {
     let offremini = null;
     try { offremini = await rappelsOffresMini(); } catch (e) { offremini = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
 
-    // L'AGENT eBAY QUI DEMANDE (29 oct.) — posé comme les autres : un échec ici
-    // n'empêche rien. Rien n'est publié : la notification ouvre eBay → À traiter (section « Agent eBay »).
-    let agentebay = null;
-    try { agentebay = await rappelAgentEbay(); } catch (e) { agentebay = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
 
     // ── LES COLIS DU MATIN : LA RÈGLE DU SOIR, DU WIDGET ET DE L'APP (22 oct.) ──
     // ⚠️⚠️ CE RAPPEL ANNONÇAIT « RIEN À ENVOYER » À TORT. Mesuré le 22 octobre
@@ -643,7 +625,7 @@ async function traiterVendeurApresRelecture() {
     // (1er nov., audit A4) Les ventes Vestiaire : leur date limite, la règle de Colis.
     const vcR = t ? t.vestiaire : resumeColisSites({ vc: d.vc }).vestiaire;
     const vcDus = vcR ? vcR.overdue + vcR.today + vcR.tomorrow : 0;
-    if (vintedSkip && !vcDus && (!eb || (!(eb.overdue + eb.today + eb.tomorrow) && !eb.nePasPoster))) return { urssaf, bilan, retrait, offremini, agentebay, skipped: vintedSkip + ' — aucune notification envoyée' };
+    if (vintedSkip && !vcDus && (!eb || (!(eb.overdue + eb.today + eb.tomorrow) && !eb.nePasPoster))) return { urssaf, bilan, retrait, offremini, skipped: vintedSkip + ' — aucune notification envoyée' };
 
     const c = vintedSkip ? null : compterEcheances({ txs: [...t.vinted], ventes: ventesParTx(d), bords: bordsDuVendeur(d), maintenant: Date.now() });
     // ⚠️ (revue du 22 oct.) `overdue` = une limite LUE (email du bordereau, ou
@@ -661,14 +643,14 @@ async function traiterVendeurApresRelecture() {
 
     // Anti-doublon : une seule notification par jour pour un même total.
     const dedup = (await getRow('ship_reminder_dedup')) || {};
-    if (dedup.date === today && dedup.total === total && (dedup.nePasPoster || 0) === nePasPoster) return { urssaf, bilan, retrait, offremini, agentebay, skipped: 'déjà notifié', total };
+    if (dedup.date === today && dedup.total === total && (dedup.nePasPoster || 0) === nePasPoster) return { urssaf, bilan, retrait, offremini, skipped: 'déjà notifié', total };
 
     if ((total > 0 || nePasPoster > 0) && await pushCategorieActive('expedier')) {
       const txt = texteMatin({ overdue, aVerifier, dueToday, dueTomorrow, ebayDus, vestiaireDus: vcDus, nePasPoster, vinted: c });
       await sendPushToAll({ cat: 'expedier', ...txt, tag: 'ship-reminder', url: DESTINATIONS.colis({}) });
     }
     await ecrireDedup('ship_reminder_dedup', { date: today, total, nePasPoster });
-    return { urssaf, bilan, retrait, offremini, agentebay, overdue, aVerifier, dueToday, dueTomorrow, total,
+    return { urssaf, bilan, retrait, offremini, overdue, aVerifier, dueToday, dueTomorrow, total,
       ...(c ? { heures: { aujourdhui: c.premier.aujourdhui ? c.premier.aujourdhui.heure : null, demain: c.premier.demain ? c.premier.demain.heure : null }, estimees: c.estimees, sansLimite: c.sansLimite } : {}),
       ebay: eb ? { aPoster: eb.total, dus: ebayDus, nePasPoster } : null, vestiaire: vcR ? { aPoster: vcR.total, dus: vcDus } : null, ...(vintedSkip ? { vintedSkip } : {}) };
 }
@@ -780,21 +762,9 @@ function bordsDuVendeur(d) {
 // su), si la préférence « soir » est coupée, ou s'il est déjà parti ce jour-là
 // (mémo `soir_reminder_dedup` écrit AVANT l'envoi et confirmé). eBay illisible
 // ⇒ « au moins N », eBay nommé (jamais un total partiel présenté complet).
-// Le texte : une fonction pure (le banc la juge par la sortie de la route).
-// `aVerifier` : les dates ESTIMÉES (pas d'email de bordereau) qui seront
-// passées demain — jamais « déjà en retard » (revue du 22 octobre).
-export function texteSoir({ n, auMoins, retard, aVerifier = 0, demain, heureDemain = null, manque = null }) {
-  const N = `${auMoins ? 'au moins ' : ''}${n} colis à poster`;
-  const H = heureDemain ? heureCourte(heureDemain) : '';
-  const parts = [];
-  if (retard) parts.push(`${retard} déjà en retard`);
-  if (aVerifier) parts.push(`${aVerifier} à vérifier sur Vinted (date estimée passée)`);
-  if (demain) parts.push(`${demain} avec la date limite demain${H ? (demain === 1 ? ` à ${H}` : `, la première à ${H}`) : ''}`);
-  return {
-    title: retard ? `⏰ Demain : ${N}` : `📮 Demain : ${N}`,
-    body: `${parts.length ? `Dont ${parts.join(', ')}. ` : ''}${auMoins ? `Les ventes ${(Array.isArray(manque) && manque.length ? manque : ['eBay']).join(' et ')} n'ont pas pu être relues : il peut y en avoir plus. ` : ''}Prépare-les ce soir.`,
-  };
-}
+// Le texte du rappel du soir : `texteSoir`, fabriqué dans api/_lib/notif-apercus.js
+// (l'aperçu de Paramètres → Notifications l'appelle aussi) — réexporté ici.
+export { texteSoir };
 async function rappelDuSoir() {
   const today = parisDate(0);
   const deja = await getRow('soir_reminder_dedup');

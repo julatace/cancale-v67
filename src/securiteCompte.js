@@ -27,7 +27,7 @@ export async function deconnecterPartout({ fetch: f, url, apikey, jeton }) {
 // rouvert et connecté dans ce Chrome ; une plus ancienne demande son mot de passe.
 export function texteConfirmationPartout({ extension }) {
   const base = 'VRM se fermera sur ce téléphone, cet ordinateur et tous les autres. Tu devras te reconnecter partout.';
-  if (extension === 'liaison') return base + ' L’extension VRM sera déconnectée aussi : elle se reconnecte toute seule quand tu rouvres VRM dans son Chrome.';
+  if (extension === 'liaison') return base + ' L’extension VRM sera déconnectée aussi : elle se reconnecte toute seule quand tu rouvres VRM dans son navigateur.';
   if (extension === 'ancienne') return base + ' L’extension VRM sera déconnectée aussi : reconnecte-la avec ton mot de passe VRM.';
   return base + ' L’extension VRM, si tu l’utilises, sera déconnectée aussi.';
 }

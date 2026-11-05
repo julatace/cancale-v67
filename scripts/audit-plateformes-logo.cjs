@@ -40,8 +40,14 @@ const MUTS = {
   'prix-ignore': ['src/suggestionsAchat.js', "if ((pMin != null && px < pMin) || (pMax != null && px > pMax)) continue;", ''],
   'taille-ignoree': ['src/suggestionsAchat.js', "if (tq && tailleDuTitre(String(a.title || '')) !== tq) continue;", ''],
   'rangee-a-la-main': ['src/App.jsx', "return <SelecteurSites id={tache}", "return <div className=\"vrm-rangee vrm-filtres vrm-filtre-site\" data-filtre-site={tache}/>; <SelecteurSites id={tache}"],
-  'compte-lbc-oublie': ['src/App.jsx', '<LigneVente compte={compteVente} frise={friseLbc}', '<LigneVente frise={friseLbc}'],
-  'compte-vc-oublie': ['src/App.jsx', "<LigneVenteCompacte compte={nomCompteVente('vestiaire', v, {})} className=\"vrm-sale-row\"", '<LigneVenteCompacte className="vrm-sale-row"'],
+  'compte-lbc-oublie': ['src/App.jsx', 'titre={titre} sous={sous} compte={compte} ton={ton} montant={lbcEuro(o.price)}', 'titre={titre} sous={sous} ton={ton} montant={lbcEuro(o.price)}'],
+  'compte-vc-oublie': ['src/App.jsx', "<LigneVenteCompacte compte={nomCompteVente('vestiaire', v, {}) || undefined} className=\"vrm-sale-row\"", '<LigneVenteCompacte className="vrm-sale-row"'],
+  // (intégration lot 1) UNE règle : `compteVenteLbc`/`compteVenteEbay` passent par l'identité de src/plateformes.js,
+  // « non fourni » ('' de l'ancienne convention) n'écrit rien, le compte n'est jamais recopié dans `sous`.
+  'vide-dit-non-releve': ['src/App.jsx', "const compteFourni = (compte) => compte !== undefined && compte !== '';", "const compteFourni = (compte) => compte !== undefined;"],
+  'compte-voisin-lbc': ['src/App.jsx', "if (ann && ann.accountName && idAnn === id) return", "if (ann && ann.accountName) return"],
+  'ebay-sans-identite': ['src/App.jsx', "  const ref = identiteCompteVente('ebay', o);\n  if (!ref) return null;", "  const ref = (o && o._compte) || (Array.isArray(comptes) && comptes[0] && comptes[0].ref);\n  if (!ref) return null;"],
+  'compte-dans-sous': ['src/App.jsx', "compte={compteVenteEbay(o, comptesEbay)} sous={o.creationDate", "compte={compteVenteEbay(o, comptesEbay)} sous={(o._pseudo ? o._pseudo + ' · ' : '') + o.creationDate"],
   'ebay-publie-prepare': ['src/publierAilleurs.js', "const marquee = site === 'ebay' ? !!(publiesEbay && typeof publiesEbay.has === 'function' && publiesEbay.has(id))", "const marquee = site === 'ebay' ? false"],
   'hors-vinted-ignore': ['src/publierAilleurs.js', "if (site === 'leboncoin' && horsVinted === true) out.push(", "if (false) out.push("],
   'hors-vinted-pas-passe': ['src/App.jsx', ", horsVinted: paire.chezMoi === true }", " }"],
@@ -163,12 +169,18 @@ const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   const rangees = (APP.match(/className="vrm-rangee vrm-filtres vrm-filtre-site"/g) || []).length;
   dit(rangees === 0, 'D1 plus aucune rangée de sites écrite à la main : toutes passent par SelecteurSites', String(rangees));
   dit((APP.match(/<SelecteurSites id=/g) || []).length >= 3 && /return <SelecteurSites id=\{tache\}/.test(APP), 'D2 Annonces, Ventes, Achats, Messages (FiltreSites) et les deux rangées de Colis : le même sélecteur');
-  dit(/data-vente-compte=\{compte\|\|undefined\}/.test(APP) && /data-fu-compte=""/.test(APP), 'D3 la ligne de vente porte le compte (repliée et carte Fusion)');
-  dit(/<LigneVente compte=\{compteVente\} frise=\{friseLbc\}/.test(APP), 'D4 Leboncoin : le compte de la transaction');
-  dit(/<LigneVente compte=\{nomCompteVente\('ebay', o,/.test(APP), 'D5 eBay : le compte de la ligne de commandes');
-  dit(/<LigneVenteCompacte compte=\{nomCompteVente\('vestiaire', v, \{\}\)\}/.test(APP), 'D6 Vestiaire : le compte relevé');
-  dit(/compte=\{o\._acc \? accNameOf\(o\._acc\) : ''\}/.test(APP), 'D7 Vinted : le compte, même avec un seul compte');
-  dit(/compte: annLbc === undefined \? '' : nomCompteVente\('leboncoin', v,/.test(APP) && /compte: nomCompteVente\('vestiaire', v, \{\}\)/.test(APP), 'D8 « Tous les sites » : le compte de chaque vente');
+  dit(/data-vente-compte=\{compte\|\|undefined\}/.test(APP) && /data-fu-compte="">· <CompteVente compte=\{compte\}/.test(APP) && /<CompteVente compte=\{compte\} plateforme=\{plateforme\} ou="ligne"\/>/.test(APP) && /Vendue sur <CompteVente compte=\{compte\}/.test(APP), 'D3 la ligne de vente porte le compte (repliée, carte Fusion, détail), écrit par UN composant (`CompteVente`)');
+  dit(/sous=\{sous\} compte=\{compte\} ton=\{ton\} montant=\{lbcEuro/.test(APP) && /compte: compteVenteLbc\(o, itemsLbc, annLbc\)/.test(APP), 'D4 Leboncoin : le compte de la transaction (ou de SON annonce), par identité');
+  dit(/compte=\{compteVenteEbay\(o, comptesEbay\)\}/.test(APP) && /const ref = identiteCompteVente\('ebay', o\);/.test(APP), 'D5 eBay : le compte de la ligne de commandes (identité de src/plateformes.js)');
+  dit(/<LigneVenteCompacte compte=\{nomCompteVente\('vestiaire', v, \{\}\) \|\| undefined\}/.test(APP), 'D6 Vestiaire : le compte relevé, sinon rien (jamais « non relevé » inventé)');
+  dit(/compte=\{o\._acc \? \(accNameOf\(o\._acc\) \|\| null\) : null\}/.test(APP), 'D7 Vinted : le compte, même avec un seul compte (pas su ⇒ dit)');
+  dit(/compte: compteVenteLbc\(v, null, annLbc\) \|\| ''/.test(APP) && /compte: compteVenteEbay\(c, null\) \|\| ''/.test(APP) && /compte: nomCompteVente\('vestiaire', v, \{\}\)/.test(APP), 'D8 « Tous les sites » : le compte de chaque vente, par les MÊMES règles que les lignes');
+  // (intégration lot 1) Une seule implémentation : plus de recopie du compte dans `sous`, plus de second hook de noms.
+  const ligneC = (() => { const a = APP.indexOf('function LigneVenteCompacte('); return a < 0 ? '' : APP.slice(a, a + 900); })();
+  dit(!/sousBrut/.test(APP) && !/useComptesLbcNoms/.test(APP) && (APP.match(/function useAnnuaireLbc\(/g) || []).length === 1 && /const compte = compteFourni\(compteBrut\) \? compteBrut : undefined;/.test(ligneC), 'D16 une règle : le compte n’est jamais recopié dans `sous`, un seul lecteur des noms Leboncoin');
+  dit(/const compteFourni = \(compte\) => compte !== undefined && compte !== '';/.test(APP), 'D17 « non fourni » (undefined, ou l’ancien \'\') n’écrit rien — jamais « compte non relevé »');
+  dit(/if \(ann && ann\.accountName && idAnn === id\) return/.test(APP), 'D18 Leboncoin : le nom d’une annonce seulement si elle porte LE MÊME compte (jamais un voisin)');
+  dit(!/compte=\{compteVenteEbay\(o, comptesEbay\)\} sous=\{\(o\._pseudo/.test(APP) && !/meta=\{<>\{statut\}[^\n]*_pseudo/.test(APP), 'D19 eBay : le pseudo écrit une fois (ni dans `sous`, ni dans le détail)');
   dit(/<OngletManque site=\{site\} onglet=\{t\}/.test(APP) && /<OngletManque site=\{siteColis\} onglet="colis"/.test(APP), 'D9 un site sans compte : l’onglet dit ce qui manque et le geste (tâches et Colis)');
   dit(/<EntreePublierAilleurs site="leboncoin"\/>/.test(APP) && /<EntreePublierAilleurs site="ebay"\/>/.test(APP) && /<EntreePublierAilleurs site="vestiaire"\/>/.test(APP), 'D10 « Publier ailleurs » joignable depuis Annonces · Leboncoin, eBay, Vestiaire');
   dit(/receptionDe=\{receptionAchatMs\}/.test(APP) && /const receptionAchatMs = React\.useCallback/.test(APP), 'D11 « Relier un achat » reçoit la date de réception lue (règle `dateReception`)');

@@ -21,6 +21,7 @@
 // champs (`CHAMPS_ARTICLE`) : tant qu'elle ne les garde pas, aucune annonce n'est
 // dite « en vérification » (pas su ≠ oui) — et l'extension revérifie tout au
 // lancement de toute façon.
+import { motsNavigateur } from './navigateurExtension.js';
 export const ETATS_ANNONCE = {
   'en-ligne': 'En ligne',
   brouillon: 'Brouillon',
@@ -104,9 +105,11 @@ export function actionsPossibles({ selection, chrome, capOk, nomCompte } = {}) {
     }
     if (!raison && A.robot) {
       if (A.cap && capOk && !capOk(A.cap)) raison = 'Demande une extension VRM plus récente dans ce navigateur.';
-      else if (chrome === undefined) raison = 'VRM ne sait pas encore quel compte Vinted est ouvert dans Chrome.';
-      else if (chrome === null || chrome === '') raison = `Aucun compte Vinted ouvert dans Chrome : ouvre vinted.fr sur ${nom(comptes[0])}.`;
-      else if (String(chrome) !== comptes[0]) raison = `Chrome est sur ${nom(String(chrome))} : ouvre vinted.fr sur ${nom(comptes[0])} pour agir sur ses annonces.`;
+      // (5 nov.) Le navigateur est NOMMÉ tel qu'il est (Orion, Chrome…), relu à chaque phrase (`motsNavigateur`).
+      const N = motsNavigateur();
+      if (chrome === undefined) raison = `VRM ne sait pas encore quel compte Vinted est ouvert ${N.dans}.`;
+      else if (chrome === null || chrome === '') raison = `Aucun compte Vinted ouvert ${N.dans} : ouvre vinted.fr sur ${nom(comptes[0])}.`;
+      else if (String(chrome) !== comptes[0]) raison = `${N.Ce} est sur ${nom(String(chrome))} : ouvre vinted.fr sur ${nom(comptes[0])} pour agir sur ses annonces.`;
     }
     return { k: A.k, titre: A.titre, desc: A.desc, ok: !raison, raison, ids, robot: !!A.robot };
   });

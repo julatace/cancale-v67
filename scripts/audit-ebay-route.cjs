@@ -2203,32 +2203,33 @@ const RA = {};
       dit(x.code === 400 && x.corps.reason === 'confirmation' && zero(x), `[P12] ${nom} ⇒ 400 « confirmation », zéro appel eBay`, `HTTP ${x.code} · ${x.corps && x.corps.reason}`);
     }
   });
+  // (5 nov.) L'AGENT EST ARRÊTÉ (Julien : « le bot eBay, arrête-le, c'est nul ») :
+  // une publication « par l'agent » (un ancien onglet) ne crée plus RIEN, même
+  // confirmée — 410 `agent-arrete`, zéro appel eBay, aucune ligne au journal.
   await essaie('[R-agent]', async () => {
-    for (const [nom, extra] of [['sans confirmation', {}], ['confirme « true » en texte', { confirme: 'true' }]]) {
+    for (const [nom, extra] of [['sans confirmation', {}], ['confirme « true » en texte', { confirme: 'true' }], ['confirmée', { confirme: true }]]) {
       avecR();
       const x = await app(JWT_J, { action: 'publish', agent: true, ...extra, item: { ...itemC, numero: '63' } });
-      dit(x.code === 400 && x.corps.reason === 'confirmation' && zero(x), `[R-agent] ${nom} ⇒ 400 « confirmation », zéro appel eBay`, `HTTP ${x.code} · ${x.corps && x.corps.reason}`);
+      dit((x.code === 410 && x.corps.reason === 'agent-arrete' || x.code === 400 && x.corps.reason === 'confirmation') && zero(x), `[R-agent] « par l'agent » ${nom} ⇒ refusée (410 agent arrêté, ou 400 confirmation), zéro appel eBay`, `HTTP ${x.code} · ${x.corps && x.corps.reason}`);
+      if (extra.confirme === true) dit(x.code === 410 && x.corps.reason === 'agent-arrete', '[R-agent] confirmée ⇒ 410 « agent-arrete » (rien n\'est publié)', `HTTP ${x.code}`);
     }
-    avecR();
-    const ok = await app(JWT_J, { action: 'publish', confirme: true, agent: true, confirme: true, item: { ...itemC, numero: '63' } });
-    dit(ok.code === 200 && auCompte(ok.journal).some((y) => y.appel === 'AddFixedPriceItem'), '[R-agent] confirmé ⇒ la publication part (mêmes gardes que « Publier »)', `HTTP ${ok.code} · ${appels(ok.journal)}`);
     const jr = lignes.find((l) => /^ebay_agent_journal/.test(l.id));
     const ent = jr && JSON.stringify(jr.data || {});
-    dit(!!ent && /agentpublie/.test(ent) && /VRM-63/.test(ent), '[R-agent] elle est inscrite au journal des actions (« Publiée par l\'agent », VRM-63)', ent ? ent.slice(0, 200) : 'aucune ligne');
+    dit(!(ent && /agentpublie/.test(ent)), '[R-agent] rien n\'est inscrit « Publiée par l\'agent » au journal', ent ? ent.slice(0, 200) : 'aucune ligne');
     // (29 oct., revue) L'identifiant d'envoi : un second essai après un
     // résultat incertain ne peut plus créer une seconde annonce.
     const U = 'ABCDEF0123456789ABCDEF0123456789';
     avecR(); uuidsVus.clear();
-    const u1 = await app(JWT_J, { action: 'publish', confirme: true, agent: true, confirme: true, uuid: U, item: { ...itemC, numero: '64' } });
+    const u1 = await app(JWT_J, { action: 'publish', confirme: true, uuid: U, item: { ...itemC, numero: '64' } });
     const add1 = auCompte(u1.journal).find((y) => y.appel === 'AddFixedPriceItem');
     dit(u1.code === 200 && add1 && new RegExp('<UUID>' + U + '</UUID>').test(add1.corps || ''), '[R-agent] l\'identifiant d\'envoi part dans <UUID> de l\'ajout', `HTTP ${u1.code}`);
     const ver1 = auCompte(u1.journal).filter((y) => y.appel === 'VerifyAddFixedPriceItem');
     dit(!ver1.some((y) => /<UUID>/.test(y.corps || '')), '[R-agent] jamais d\'UUID dans une vérification à blanc');
     avecR(); uuidsVus.clear(); mode.add = '488';
-    const u2 = await app(JWT_J, { action: 'publish', confirme: true, agent: true, confirme: true, uuid: U, item: { ...itemC, numero: '65' } });
+    const u2 = await app(JWT_J, { action: 'publish', confirme: true, uuid: U, item: { ...itemC, numero: '65' } });
     dit(u2.code === 200 && u2.corps.ok === true && u2.corps.deja === true && auCompte(u2.journal).some((y) => y.appel === 'GetItem'), '[R-agent] 488 (cet envoi a DÉJÀ créé l\'annonce) CONFIRMÉ par GetItem ⇒ publiée, pas une seconde annonce', `HTTP ${u2.code} · ${appels(u2.journal)}`);
     avecR(); uuidsVus.clear(); mode.add = '488'; mode.getitem = 'autre';
-    const u3 = await app(JWT_J, { action: 'publish', confirme: true, agent: true, confirme: true, uuid: U, item: { ...itemC, numero: '66' } });
+    const u3 = await app(JWT_J, { action: 'publish', confirme: true, uuid: U, item: { ...itemC, numero: '66' } });
     dit(u3.code === 504 && u3.corps.reason === 'incertain' && u3.corps.ok === false, '[R-agent] 488 dont l\'annonce porte un AUTRE SKU ⇒ « incertain », jamais ok', `HTTP ${u3.code}`);
     avecR(); uuidsVus.clear();
     const u4 = await app(JWT_J, { action: 'publish', confirme: true, item: { ...itemC, numero: '67', uuid: U } });

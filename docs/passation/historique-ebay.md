@@ -1928,3 +1928,66 @@ ordre, email, echappe, envoyer) ; banc `offres-objectif` C (390/1512, clair/somb
 seulement après SA confirmation, `repondre` + `confirme:true` sur CETTE question).
 `messages-sites` : le banc juge la liste « Tout » (un clic ajouté), `e1` porte son `type`.
 Geste de Julien : ouvrir Messages → eBay.
+
+## 5 nov. — L'agent eBay est arrêté ; la mise en ligne prend des photos du téléphone
+
+Demande (pages du 5 nov. et vocal, `docs/passation/demandes-2026-11-05.md`) : « le bot eBay,
+arrête-le, c'est nul » ; « améliorer l'interface et la mise en ligne ; prendre en photo
+l'article ou l'importer depuis la galerie ». Branche `v31-agent-ebay-arret`.
+
+**Arrêt de l'agent (29 oct. → 5 nov.).** Retirés de l'app : le composant `AgentEbay` (section
+« Agent eBay » d'eBay → À traiter), `AgentEbayFond` (le calcul en fond qui refaisait la
+proposition et publiait `vrm_agent_ebay_resume`), `useEtatPublicationEbay`, la préparation
+(`preparerAnnonceAgent`, cache `_prepAgentEbay`), la ligne `ligneJourneeAgent` de Ma journée et
+le badge `plat_ebay` qui en venait. Gardés : `DEMANDE_EBAY_*`, `DEMANDE_LBC_FICHE` (Articles qui
+dorment), la liste « Tâches à traiter » (`EbayAgent` d'`ebayGestion.jsx`, action serveur
+`agent` : commandes, messages, offres — elle ne propose aucune paire). Serveur :
+`rappelAgentEbay` sorti de `api/ship-reminders.js` (ne lit plus `vrm_agent_ebay_resume` ni
+`agent_ebay_dedup`) ; `agentebay` retiré de `PUSH_DEFAUT` et de `FAMILLE_DE`, ajouté à
+`CATEGORIES_RETIREES` (plus jamais envoyée, quel que soit l'ancien réglage) ; `publish` avec
+`agent:true` répond 410 `agent-arrete` AVANT eBay (un ancien onglet resté ouvert ne crée rien).
+`src/agentEbay.js` et `api/_lib/agent-ebay-rappel.js` restent (modules purs, plus appelés,
+gardés pour `audit-agent-ebay` et `audit-cycle-article`). Données en base gardées. Le banc
+`ebay-agent.cjs` (l'écran de l'agent) est retiré ; `agent-ebay-push.cjs` prouve le silence.
+
+**Photos du téléphone.** La publication ne prend que des adresses (`<PictureURL>`). Le stockage
+Supabase du détourage est un compartiment PRIVÉ (clé de service) : eBay n'y lirait rien sans
+adresse signée qui expire, et ouvrir un compartiment public toucherait la base de production.
+Choix : l'hébergement d'images d'eBay (Trading `UploadSiteHostedPictures`, multipart : requête
+XML puis octets), par une action `photo` de la route eBay existante (aucune fonction api/ de
+plus). `api/_lib/ebay-photo.js` : octets d'image exigés (`estUneImage` du détourage), base64
+≤ 3 000 000, adresse rendue exigée en `https://i.ebayimg.com/` (`URL_PHOTO_EBAY`, propriétaire
+`src/photosEbayAjout.js`), sinon `ok:false`. L'app (`PhotosEbayEditeur`, bloc « Photos » de
+Vendre sur eBay) : « Prendre une photo » (`accept=image/*`, `capture=environment`), « Depuis la
+galerie » (`multiple`) ; réduction à 1600 px JPEG (`photoEnJpegBase64`) ; envois UN PAR UN dans
+l'ordre d'ajout ; vignette « Envoi à eBay… » puis l'adresse rejoint la liste ; « Pas envoyée »
+avec la raison et « Réessayer » ; ‹ › déplace, × retire, la 1re est la couverture ; 12 ajoutées
+au plus, 24 en tout (`placesPhotos`) ; choisir une autre paire garde les photos ajoutées
+(`avecPhotosAjoutees`). Une photo en envoi ou ratée bloque la publication (`gardePublier`,
+`photos-envoi` / `photos-echec`).
+
+**Preuves.** `ebay-photos-agent-arret` (Playwright 390 tactile / 1512 sombre, données
+inventées) 32/32, 12 rouges sur 33200ec6 (mutations d'écran : garde « photos-echec » retirée, ‹ inversé ⇒ rouges) ; `ebay-photo-route` (vraie route, faux eBay) 15/15,
+`--prouve` 8/8 ; `agent-ebay-push` 16/16, 15 rouges avant. **Non mesuré** : l'appel réel
+`UploadSiteHostedPictures` (forme de la documentation Trading) ; combien de temps eBay garde une
+photo hébergée qui attend dans un brouillon (documentation : supprimée si jamais utilisée).
+Geste de Julien : Vendre sur eBay → « Prendre une photo » sur l'iPhone, puis publier.
+
+### 5 nov. — Revue de `v31-agent-ebay-arret` : une photo ajoutée ne change pas d'article
+
+Défaut trouvé à la relecture : `choisirPaire` gardait les photos AJOUTÉES (adresses
+i.ebayimg.com) quand il passait d'un article à un autre (« Changer », ou « Publier » en un
+clic sur une autre ligne). Reproduit au banc (1512 px) : photo prise pour la N°31, puis la
+N°35 choisie ⇒ l'annonce de la N°35 partait avec la photo de la N°31 ; et une photo encore en
+envoi au moment du changement rejoignait la N°35 à son retour. C'est la mauvaise chaussure
+montrée à l'acheteur (§5, mieux vaut un blanc qu'un faux).
+Correctif (`EbayPublier`) : passer à un AUTRE article retire les photos ajoutées, annule les
+envois en cours (`genEnvois`) et le dit sous les photos (« La photo ajoutée pour l'article
+d'avant est retirée : elle ne part pas avec la N°35. ») ; sans article choisi avant (il
+photographie d'abord), elles restent. Rouvrir un brouillon annule aussi les envois en cours
+et une relecture Vinted en cours (`pairCourante`).
+Preuve : banc `ebay-photos-agent-arret`, scénario G (5 contrôles, requête `photo` TENUE pour
+le cas « en envoi ») : 3 rouges sur l'avant-revue, vert après ; mutation « sans annulation des
+envois » ⇒ rouge. Build ; `ebay-form`, `ebay-annonces`, `ebay-relecture`, `ebay-visuel`,
+`ebay-photo-route`, `agent-ebay-push` verts ; `ebay-un-clic` rouge à l'identique sur la base
+33200ec6 (navigation `tab=plat_ebay`, sans rapport).

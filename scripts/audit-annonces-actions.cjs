@@ -55,7 +55,8 @@ const MUTATIONS = {
 
 async function charger(src) {
   const f = path.join(os.tmpdir(), `annoncesActions-${process.pid}-${Math.random().toString(36).slice(2)}.mjs`);
-  fs.writeFileSync(f, src);
+  // Le module importe ses voisins en relatif : copié ailleurs, on les pointe vers src/.
+  fs.writeFileSync(f, src.replace(/from '\.\/([^']+)'/g, (_, m) => `from '${require('url').pathToFileURL(path.join(__dirname, '..', 'src', m)).href}'`));
   try { return await import(f); } finally { try { fs.unlinkSync(f); } catch (_) {} }
 }
 

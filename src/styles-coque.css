@@ -255,6 +255,9 @@
     box-shadow: 0 0 0 2px var(--vrm-bg);
   }
   .vrm-app-header.is-defile [data-etat-actions] > span[aria-hidden] { box-shadow: 0 0 0 2px var(--vrm-surface); }
+  /* (5 nov.) Le point de coin ne se montre que s'il y a un geste à faire : tout
+     va bien ⇒ le « i » seul, sans couleur. */
+  .vrm-app-header [data-etat-actions]:not([data-etat-ton="attention"]) > span[aria-hidden] { display: none; }
   .vrm-app-header [data-etat-actions]::after {
     content: 'i'; display: grid; place-items: center; width: 19px; height: 19px;
     border: 1.6px solid currentColor; border-radius: 50%;
