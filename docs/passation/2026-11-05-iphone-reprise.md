@@ -127,3 +127,8 @@ ailleurs. Le code Discord (`DemandeCodeDiscord`, `role="dialog"`, même place) a
 - Extension : rien à faire pour ce chantier (aucune capacité nouvelle).
 - À décider avec lui : la 5ᵉ place qui prend le nom de l'écran (« Compta ») plutôt que « Plus » —
   si elle le trouble, une ligne suffit à la remettre (`courant`).
+
+## Intégration lot 2 (5 nov., branche `integration-lot2`)
+- Une seule liste blanche des écrans : `TABS_OK` = `ONGLETS_LIENS` (celle de la reprise),
+  qui reçoit l'écran « E-mails » du lot 1 ; la tuile « E-mails » est dans « Plus ».
+- `main.jsx` : `mode-stream.css` puis `styles-barre-iphone.css` (en tout dernier).

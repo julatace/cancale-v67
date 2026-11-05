@@ -144,3 +144,12 @@ Styles `vrm-fo-*` dans `src/styles-achats-outils.css` (échelle Fusion).
   lu (sinon la fiche dit « ventes Vinted seulement »).
 - Geste de Julien : Achats → Fournisseurs → « Ajouter un fournisseur », créer un
   achat en gros depuis sa fiche, relier quelques N°.
+
+## Intégration lot 2 (5 nov., branche `integration-lot2`)
+- Croisement avec Stock (« Voir l'état », fiche complète d'une paire) : la fiche disait
+  « prix saisi à la main · achat pas relié » pour une paire reliée par SON clic à un achat
+  en gros. Une règle : `origineDuPrix` (src/fournisseurs.js) est lue par `parcoursPaire`
+  (étape « Achat en gros »), `histoireArticle` (preuve « achat en gros ») et
+  `etatArticle` (source `gros`, « achat en gros » sous la tuile Achat). Un prix retapé
+  ensuite reste « saisi à la main ». `audit-fournisseurs` P1/P2 (P1 rouge sur la fusion
+  d'avant la correction, 853aff8d).

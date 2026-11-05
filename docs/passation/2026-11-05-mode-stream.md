@@ -144,3 +144,11 @@ Preuves de la revue :
 - Ce qui reste : un pseudo qui EST un mot courant (« max ») cache ce mot dans les titres ;
   notifications push du serveur, marque sur une photo, PDF ouvert dans un autre onglet
   (inchangé, voir plus haut).
+
+## Intégration lot 2 (5 nov., branche `integration-lot2`)
+- `pushNotif` garde la cible au toucher (lot 1, `vers` → `vrm:aller`) ET le texte passé
+  par `textePourStream`. L'en-tête : `EtatActions` (avec `comptes`, lot 1), « Stream »
+  à la place de l'œil et de la pastille, puis la cloche du centre des notifications.
+  `SYNC_KEYS` garde `vrm_stream_regles` et `vrm_num_vinted`. L'agent eBay reste arrêté
+  (`agentFond` pas remis).
+- `entreprise-stream` : les 3 mêmes rouges sur `claude/project-review-nsk5su` (relancé).

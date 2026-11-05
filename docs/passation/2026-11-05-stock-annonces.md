@@ -121,3 +121,10 @@ Branche locale `v32-stock-annonces` (depuis `v31-stock-2d`, 79b6268d). Rien n'es
   Vinted sans N° est comptée et dite « sans N° : pas rangeable ».
 - Geste de Julien : ouvrir Stock, regarder le nombre en tête (il doit ressembler à ses
   annonces en ligne), sortir du carton ce qui est dans « Plus en ligne », ranger le reste.
+
+## Intégration lot 2 (5 nov., branche `integration-lot2`)
+- La phrase « Je n'ai pas pu lire tes annonces… Ouvre Vinted dans Chrome » nommait le
+  navigateur en dur : elle passe par `NAV.dans` (`motsNavigateur`, règle du lot 1 ;
+  `audit-chrome-en-dur` rouge après la fusion, vert après).
+- La fiche complète garde « Voir l'état » ET « Publier ailleurs » (lot 1) dans la même
+  rangée d'outils (conflit `FichePaire.jsx`).
