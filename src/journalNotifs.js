@@ -70,6 +70,14 @@ export function marquerLues(lu, seqs) {
   while (s.has(j + 1)) { s.delete(j + 1); j += 1; }
   return { luJusqua: j, lus: [...s].sort((a, b) => b - a).slice(0, 300) };
 }
+// (5 nov., intégration) Deux appareils qui marquent lu en même temps : ce qui
+// est lu ne fait que GRANDIR. La fusion de deux états lus est leur union —
+// jamais une entrée lue d'un côté ne redevient non lue.
+export function fusionnerLus(a, b) {
+  const x = a && typeof a === 'object' ? a : {}, y = b && typeof b === 'object' ? b : {};
+  return marquerLues({ luJusqua: Math.max(ent(x.luJusqua), ent(y.luJusqua)), lus: [] },
+    [...(Array.isArray(x.lus) ? x.lus : []), ...(Array.isArray(y.lus) ? y.lus : [])]);
+}
 export const toutLu = (n, lu) => ({ luJusqua: Math.max(ent(n), ent(lu && lu.luJusqua)), lus: [] });
 
 // Rangées par jour : « Aujourd'hui », « Hier », puis la date (heure de l'appareil).

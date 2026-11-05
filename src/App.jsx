@@ -102,7 +102,7 @@ import { dac7ParCompte, indexComptesVentes, emailsFiscaux, blocagesFiscauxVinted
 import { porteMonnaieParCompte } from "./porteMonnaie.js";
 import AnnoncesMasquees from "./AnnoncesMasquees.jsx";
 import { BoutonCentreNotifs, FeuilleCentreNotifs } from "./CentreNotifs.jsx";
-import { nombreNonLues, marquerLues } from "./journalNotifs.js";
+import { nombreNonLues, marquerLues, fusionnerLus } from "./journalNotifs.js";
 import { masqueesParCompte } from "./annoncesMasquees.js";
 import { rythmeVendu, ecartPct, quandTuVends, margesPar, delaisPar, tranchePrix, TRANCHES_PRIX, stockQuiDort, SEUILS_DORT, rotationStock, tauxVenteMois, tauxAnnulation, PERIODES, bornesPeriode, dansBornes, venduPeriode, barresPeriode, ventesPar, plusRapides } from "./statsVentes.js";
 import "./stats-vitrine.css";
@@ -62048,17 +62048,44 @@ const chargerCentreNotifs = async () => {
   const [j, lu] = await Promise.all([lireLigneNotifs('push_journal'), lireLuNotifs()]);
   return { journal: j ? ((j.ligne && j.ligne.data) || {}) : null, lu };
 };
+// (5 nov., intégration) Écrire « lu » sans écraser un autre appareil : relire,
+// FUSIONNER (union, `fusionnerLus`), écrire en comparer-et-échanger sur
+// `data.rev` ; trois essais, sinon `false` (rien n'est perdu : l'union sera
+// refaite au prochain geste). Avant : un `merge-duplicates` aveugle — deux
+// appareils au même moment, et une notification lue redevenait non lue.
 const ecrireLuNotifs = async (next) => {
   if (!AUTH.user) return false;
+  const filtreMoi = CLOISONNE ? `&owner=eq.${encodeURIComponent(AUTH.user.id)}` : '';
+  let fait = false;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
-      method: 'POST',
-      headers: { ...sbAuth(), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify([withOwner({ id: 'push_journal_lu', data: next })]),
-    });
-    try { window.dispatchEvent(new Event('vrm:notifs-lues')); } catch (_) {}
-    return !!r.ok;
-  } catch (_) { return false; }
+    for (let essai = 0; essai < 3 && !fait; essai++) {
+      const l = await lireLigneNotifs('push_journal_lu');
+      if (!l) break;
+      const cur = l.ligne && l.ligne.data && typeof l.ligne.data === 'object' ? l.ligne.data : null;
+      const rev = cur && Number.isSafeInteger(cur.rev) ? cur.rev : null;
+      const data = { ...fusionnerLus(cur || {}, next), rev: (rev || 0) + 1 };
+      if (!l.ligne) {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data`, {
+          method: 'POST',
+          headers: { ...sbAuth(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+          body: JSON.stringify([withOwner({ id: 'push_journal_lu', data })]),
+        });
+        if (r.ok) fait = true; else if (r.status !== 409) break;
+      } else {
+        const garde = rev === null ? 'data->>rev=is.null' : `data->>rev=eq.${rev}`;
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.push_journal_lu${filtreMoi}&${garde}&select=id`, {
+          method: 'PATCH',
+          headers: { ...sbAuth(), 'Content-Type': 'application/json', Prefer: 'return=representation' },
+          body: JSON.stringify({ data, updated_at: new Date().toISOString() }),
+        });
+        if (!r.ok) break;
+        const j = await r.json().catch(() => null);
+        if (Array.isArray(j) && j.length === 1) fait = true;
+      }
+    }
+  } catch (_) { fait = false; }
+  try { window.dispatchEvent(new Event('vrm:notifs-lues')); } catch (_) {}
+  return fait;
 };
 // Une notification touchée sur le téléphone (`?notif=<n°>`, ajouté par
 // public/sw.js) : SON entrée est marquée lue — relue d'abord ; pas su ⇒ rien.
