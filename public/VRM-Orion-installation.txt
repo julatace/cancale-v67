@@ -74,3 +74,18 @@ https://help.kagi.com/orion/browser-extensions/ios-ipados-extensions.html
 
 Source de cette documentation :
 https://github.com/kagisearch/kagi-docs/blob/main/docs/orion/browser-extensions/ios-ipados-extensions.md
+
+ARCHIVE PRÉCÉDENTE INCHANGÉE — 5.319.0
+
+Cette archive précède les corrections 5.320/5.321. Elle est remise à
+disposition sans reconstruction, avec les octets de l’ancien téléchargement :
+https://vrm.center/VRM-Orion-reference-5.319.0.xpi
+Copie ZIP identique :
+https://vrm.center/VRM-Orion-reference-5.319.0.zip
+Format en dossier :
+https://vrm.center/VRM-Orion-reference-5.319.0-dossier.zip
+
+Elle sert de référence pour vérifier l’installation dans Orion. Elle peut
+encore ouvrir VRM après connexion, comme auparavant. Ne pas installer
+plusieurs copies VRM en parallèle. Le résultat sur un iPhone réel reste
+à vérifier ; la version anciennement installée par le vendeur est inconnue.
