@@ -32,6 +32,13 @@ import { K, COURBE_SORTIE, OMBRE_CARTE, REFLET, HAUTEURS_SCENES, LARGEUR_COMPACT
 import { ACCES_OFFERT, EXTENSION_SUR_LE_STORE, DETOURAGE_POUR_TOUS, VESTIAIRE_BRANCHE, PRIX_MOIS } from './accueil-reglages.js';
 import { useMoinsDeMouvement, useSansSouris, useTaille } from './accueil-mouvement.js';
 import CarteJour from './accueil-carte.jsx';
+// (5 nov.) Les navigateurs où l'extension SERVIE s'installe : une source, la même
+// que l'app (src/navigateurExtension.js) — jamais « Chrome obligatoire ».
+import { navigateursServis, listeNavigateurs } from './navigateurExtension.js';
+const SERVIS = navigateursServis();
+const NAVS_ORDI = listeNavigateurs(SERVIS.ordinateur);
+const NAVS_ESSAI = listeNavigateurs(SERVIS.essai, 'et');
+const NAVS_PAS_ENCORE = listeNavigateurs(SERVIS.pasEncore, 'et');
 
 // ── Les écrans dessinés du bas : un morceau à part ──────────────────────────
 let promesseScenes = null;
@@ -96,7 +103,7 @@ const QUESTIONS = [
   { i: 'euro', q: 'J’ai combien chez Vinted ?', r: 'L’argent en attente et l’argent disponible, compte par compte — jamais mélangés.', c: 'En attente et disponible, compte par compte — jamais mélangés.' },
   { i: 'envoi', q: 'Je la mets aussi sur Leboncoin et eBay ?', r: 'Sans tout retaper : l’extension remplit l’annonce Leboncoin, l’annonce eBay se crée dans VRM.', c: 'L’extension remplit l’annonce Leboncoin ; eBay se crée dans VRM.' },
   { i: 'tel', q: 'Et sur mon téléphone ?', r: 'Sur ton écran d’accueil : une notification à chaque vente si tu l’actives, un widget sur iPhone.', horsTel: true },
-  { i: 'pile', q: 'J’ai plusieurs comptes Vinted.', r: 'C’est fait pour — et un seul marche aussi : chacun se met à jour quand tu l’ouvres dans Chrome.', c: 'Chacun se met à jour quand tu l’ouvres dans ton Chrome.' },
+  { i: 'pile', q: 'J’ai plusieurs comptes Vinted.', r: 'C’est fait pour — et un seul marche aussi : chacun se met à jour quand tu l’ouvres sur ton ordinateur.', c: 'Chacun se met à jour quand tu l’ouvres sur ton ordinateur.' },
   // N'apparaît que le jour où le détourage est ouvert à tous (src/accueil-reglages.js).
   ...(DETOURAGE_POUR_TOUS ? [{ i: 'photo', q: 'Mes photos sur fond blanc ?', r: 'Tes photos sont détourées avant d’être attachées à ton annonce Leboncoin.' }] : []),
 ];
@@ -573,10 +580,13 @@ export default function Accueil({ onEntrer }) {
                   <span className="nw">Sans engagement<span className="sep">·</span></span>{' '}
                   <span className="nw">Aucun mot de passe Vinted demandé</span>
                 </div>
-                <div data-prerequis="" data-variante={sansSouris ? 'tactile' : 'souris'}>
+                {/* (5 nov.) Pas « Chrome obligatoire » : la liste des navigateurs SERVIS
+                    (src/navigateurExtension.js). L'ordinateur reste nécessaire tant
+                    qu'aucun chemin sur téléphone n'est prouvé (`lectureTelephone`). */}
+                <div data-prerequis="" data-variante={sansSouris ? 'tactile' : 'souris'} data-navigateurs={SERVIS.ordinateur.join(',')} data-lecture-telephone={SERVIS.lectureTelephone ? 'oui' : 'non'}>
                   {sansSouris
-                    ? 'Crée ton compte ici, puis installe l’extension une fois dans Chrome sur ordinateur.'
-                    : 'S’installe une fois dans Chrome, sur ton ordinateur — qui reste nécessaire pour lire Vinted. Ton téléphone suit tout.'}
+                    ? `Crée ton compte ici, puis installe l’extension une fois sur ton ordinateur : ${NAVS_ORDI}.`
+                    : `S’installe une fois sur ton ordinateur, dans ${NAVS_ORDI} — il reste nécessaire pour lire Vinted. Ton téléphone suit tout.`}
                 </div>
               </div>
             </div>
@@ -661,20 +671,22 @@ export default function Accueil({ onEntrer }) {
               <h2 className="acc-h2b" data-prerequis-ordinateur="">Une installation, sur ton ordinateur. Ensuite, tu suis tout depuis ton téléphone.</h2>
               <ol className="acc-etapes">
                 <li><span className="n">1</span><div><h3>Crée ton compte</h3><p>Un email et un mot de passe.{ACCES_OFFERT && <span data-sans-carte=""> Aucune carte bancaire.</span>}</p></div></li>
-                <li><span className="n">2</span><div><h3>Ajoute l’extension à Chrome</h3><p>{EXTENSION_SUR_LE_STORE
-                  ? 'Une seule fois, sur ton ordinateur, depuis le Chrome Web Store. Puis connecte-la avec le même email.'
-                  : 'Une seule fois, sur ton ordinateur. Elle n’est pas encore sur le Chrome Web Store : VRM te guide pas à pas, puis tu la connectes avec le même email.'}</p></div></li>
+                <li><span className="n">2</span><div><h3>Ajoute l’extension à ton navigateur</h3><p data-navigateurs={SERVIS.ordinateur.join(',')}>{EXTENSION_SUR_LE_STORE
+                  ? `Une seule fois, sur ton ordinateur, dans ${NAVS_ORDI}, depuis le Chrome Web Store. Puis connecte-la avec le même email.`
+                  : `Une seule fois, sur ton ordinateur, dans ${NAVS_ORDI}. Elle n’est pas encore sur le Chrome Web Store : VRM te guide pas à pas, puis tu la connectes avec le même email.`}</p></div></li>
                 <li><span className="n">3</span><div><h3>Passe sur Vinted</h3><p>Avec chacun de tes comptes. Ventes, annonces, bordereaux et messages arrivent dans VRM.</p></div></li>
               </ol>
               {/* (1er nov., vendeur neuf) CE QUI EST VRAI : VRM lit Vinted par l'extension,
-                  dans le Chrome de l'ordinateur. Le téléphone consulte et commande, mais
+                  dans le navigateur de l'ordinateur. Le téléphone consulte et commande, mais
                   une action (bordereau, réponse, republication) passe par l'ordinateur
-                  allumé, Chrome ouvert — « ton téléphone suffit » promettait l'inverse. */}
-              <p className="acc-note" data-ordinateur-necessaire="">Ton ordinateur avec Chrome reste nécessaire : c’est lui qui lit Vinted. Depuis le téléphone, tu consultes tout ; les actions passent par l’ordinateur allumé, Chrome ouvert.</p>
+                  allumé, navigateur ouvert — « ton téléphone suffit » promettait l'inverse.
+                  (5 nov.) Orion a un paquet servi, en essai : dit tel quel, jamais promis. */}
+              <p className="acc-note" data-ordinateur-necessaire="">Ton ordinateur reste nécessaire : c’est lui qui lit Vinted. Depuis le téléphone, tu consultes tout ; les actions passent par l’ordinateur allumé, navigateur ouvert.</p>
+              {SERVIS.essai.length > 0 && <p className="acc-note" data-navigateurs-essai={SERVIS.essai.join(',')} data-navigateurs-pas-encore={SERVIS.pasEncore.join(',')}>{NAVS_ESSAI} (Mac et iPhone) a son propre paquet, en essai : il s’installe, mais la lecture de Vinted n’y est pas encore confirmée. {NAVS_PAS_ENCORE} : pas encore.</p>}
             </div>
             <div className="acc-conf" data-confiance="">
               <h2 className="acc-h2b">Tes comptes restent les tiens.</h2>
-              <p>VRM agit sur le compte ouvert dans Chrome : une action à la fois, jamais plus de 50 par heure.</p>
+              <p>VRM agit sur le compte ouvert dans ton navigateur : une action à la fois, jamais plus de 50 par heure.</p>
               <p>Tu gardes la main sur tes ventes et tes messages. Les automatismes — <span data-automatisme="">répondre aux questions des acheteurs</span>, <span data-automatisme="">retirer d’eBay une annonce vendue ailleurs</span> — restent éteints tant que tu ne les allumes pas.</p>
               <p>Pas de relances en série aux favoris, de republication en boucle, d’acceptation automatique des offres Vinted ou de suppression d’annonce.</p>
             </div>
