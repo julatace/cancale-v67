@@ -3565,3 +3565,6 @@ Fusion, 44 px, une ligne au téléphone), chacune une feuille en portail (`src/A
 délai réception → mise en ligne avec la liste « Reçus, pas encore en ligne » (Relier · Mettre en ligne),
 « Répartir » un lot (« Reste X € » en ambre). Aucun texte explicatif. Banc `achats-sourcing` (120, 390/1512
 clair/sombre). Règles et mesures : `historique-compta-urssaf-abonnement.md` (« 4 nov. — Achats »).
+
+<!-- déplacé de CLAUDE.md §9 le 5 nov. (limite de 60 Ko) -->
+- **3 nov.** — Ma journée « À faire » en PHOTOS (vignettes par identité, pile + « +k », plus de pastilles colorées ; `src/design/PileVignettes.jsx`) ; Colis en 3 onglets « À envoyer · Envoyés · À retirer », toutes plateformes ensemble groupées par transporteur ; « À retirer » en SECTIONS (aujourd'hui · prêts · code à venir · lieu à confirmer · à vérifier · en route · argent à vérifier), chaque colis une fois, sélecteur de VILLE (lue dans l'adresse) qui filtre carte, liste et carte sombre ; aucune phrase explicative. Bancs `journee-photos`, `colis-retirer-propre` (rouges sur main) ; R2 du récap corrigé (`deps` de `LigneVenteVinted`). → historique interface-stock. Geste : regarder Colis → À retirer et Ma journée.

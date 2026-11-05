@@ -709,3 +709,6 @@ Paramètres → Comptes liés ; couper l'interrupteur d'un compte qu'il ne veut 
 
 <!-- déplacé de CLAUDE.md §9 le 5 nov. (limite de 60 Ko) -->
 - **4 nov., reprise Codex** — intégration des branches argent/mois, offres/objectif/questions eBay, achats/fournisseurs/lots, comptes/sécurité ; corrections des retenues eBay inconnues, lecture inachevée et corps HTTP des appareils. État précis, limites Vinted/Discord, corbeille non livrée : `docs/passation/2026-11-04-reprise-codex.md`. Migration 024 non appliquée.
+
+<!-- déplacé de CLAUDE.md §9 le 5 nov. (limite de 60 Ko) -->
+- **3 nov.** — Paramètres → Comptes liés pour les 4 plateformes (une carte par compte : nom lu, état ouvert/à relire/délié, Pro/Particulier, « dans les totaux », Ouvrir/Relire/Relier/Délier) ; écarter un compte Leboncoin/Vestiaire/eBay des totaux (`api/_lib/comptes-exclus.js`, `vrm_comptes_exclus`, une vente sans compte relevé n'est jamais écartée) ; Vestiaire = « Compte non identifié » tant que `vc_session` n'existe pas. `audit-comptes-exclus` (8 mutations), banc `comptes-lies` (9 rouges sur main). Matrice `docs/passation/parite-plateformes.md`. → historique divers. Geste : Paramètres → Comptes liés.

@@ -1,30 +1,19 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// BANC : « 🛒 N PAIRES PRÊTES POUR eBAY — PUBLIER ? » — la notification du matin
+// BANC : L'AGENT eBAY EST ARRÊTÉ — PLUS AUCUNE NOTIFICATION DU MATIN (5 nov.)
 //        node scripts/bancs/agent-ebay-push.cjs
 // ═══════════════════════════════════════════════════════════════════════════
-// Julien (29 oct.) : « je veux juste qu'il demande s'il doit poster les
-// articles ». L'agent PROPOSE (dans l'app) et publie un résumé dans un réglage
-// synchronisé (`main.vrm_agent_ebay_resume` = { v, n, at, pause? }). Le cron du
-// matin le LIT et pose la question sur le téléphone — il ne publie RIEN.
+// Julien (5 nov.) : « le bot eBay, arrête-le, c'est nul ». Jusqu'au 4 nov., le
+// cron du matin lisait le résumé publié par l'agent (`main.vrm_agent_ebay_resume`)
+// et demandait « 🛒 N paires prêtes pour eBay — publier ? ». Ce banc (qui
+// prouvait cette question) prouve maintenant son SILENCE.
 //
 // §4.10 : on EXÉCUTE la vraie route `api/ship-reminders.js` contre une fausse
-// base et un faux Web Push. Données inventées. On exige :
-//   A. résumé frais (n = 3, sans préparation) ⇒ UNE notification « 🛒 3 paires
-//      à regarder pour eBay » (jamais « prêtes » sans préparation, revue du
-//      29 oct.) qui ouvre ?tab=ebay_agent, et le mémo du jour est écrit AVANT
-//      l'envoi ; A2. résumé préparé ⇒ « 3 proposées · 1 prête », « 2 prêtes » ;
-//   B. résumé de plus de 48 h ⇒ rien ;
-//   C. « Pas maintenant » aujourd'hui (pause) ⇒ rien ;
-//   D. n = 0 ⇒ rien ;
-//   E. préférence « agentebay » coupée ⇒ rien ;
-//   F. abonnement coupé ⇒ rien ;
-//   G. déjà demandé aujourd'hui (mémo) ⇒ rien ;
-//   H. main illisible (522) ⇒ rien ;
-//   I. mémo illisible (522) ⇒ rien ;
-//   J. mémo non écrit (la base refuse l'écriture) ⇒ rien ;
-//   K. le rappel du SOIR ne pose pas la question.
-//   L. (dernier tour du 29 oct.) agent ARRÊTÉ (`vrm_agent_ebay_regles.actif`
-//      false) ⇒ rien, même avec un résumé frais ; actif ⇒ la question part.
+// base et un faux Web Push. Données inventées. Avec les cas où l'ancienne route
+// SONNAIT (résumé frais, préparé, agent actif, préférence allumée), on exige :
+//   A. aucune notification « … pour eBay », aucun mémo `agent_ebay_dedup`
+//      écrit, le résumé de l'agent n'est même plus lu ; la route répond 200 ;
+//   B. la catégorie « agentebay » est RETIRÉE (api/_lib/notif-textes.js) : plus
+//      dans aucune famille, refusée même allumée, et absente des défauts.
 // §6.1 : RACINE se déduit de __dirname.
 const path = require('path');
 const RACINE = path.join(__dirname, '..', '..');
@@ -91,87 +80,29 @@ const agent = () => pushes.filter((p) => /pour eBay/.test(`${p.title} ${p.body}`
     return res;
   };
 
-  console.log('── A. résumé frais (3 paires) : UNE notification, le mémo écrit AVANT');
-  reset();
-  await lancer();
-  { const p = agent()[0] || {};
-    console.log(`     téléphone : « ${p.title} » / « ${p.body} »`);
-    dit(agent().length === 1, 'UNE notification', String(agent().length));
-    dit(p.title === '🛒 3 articles à regarder pour eBay', 'sans préparation chez eBay : « 🛒 3 articles à regarder pour eBay » — jamais « prêtes »', p.title);
-    dit(/Rien n.est publi/.test(p.body || ''), 'elle dit que rien n\'est publié sans son oui', p.body);
-    dit(p.url === '/?tab=ebay_agent', 'le clic ouvre eBay → À traiter, où vit l\'agent (?tab=ebay_agent)', p.url);
-    const iM = journal.indexOf('memo'), iP = journal.findIndex((x) => /^push:agent-ebay/.test(x));
-    dit(iM >= 0 && iP > iM, 'le mémo du jour est écrit AVANT l\'envoi', journal.join(' > '));
-    dit(CFG.ecrits[0] && CFG.ecrits[0].date === auj() && CFG.ecrits[0].n === 3, 'le mémo porte le jour de Paris et le nombre', JSON.stringify(CFG.ecrits[0])); }
+  const lus = [];
+  const fetch0 = global.fetch;
+  global.fetch = async (url, opts) => { const u = decodeURIComponent(String(url)); if (/vrm_agent_ebay_resume|agent_ebay_dedup/.test(u)) lus.push(u.slice(0, 120)); return fetch0(url, opts); };
+  for (const [nom, cfg] of [
+    ['résumé frais, 3 à regarder', {}],
+    ['résumé préparé, 2 prêtes', { resume: { v: 1, n: 2, pretes: 2, at: Date.now() - 3600000 } }],
+    ['agent actif, 3 prêtes', { resume: { v: 1, n: 3, pretes: 3, at: Date.now() - 3600000 }, regles: { v: 1, actif: true } }],
+  ]) {
+    console.log(`── A. ${nom} : rien ne sonne`);
+    reset(cfg); lus.length = 0;
+    const res = await lancer();
+    dit(agent().length === 0, 'aucune notification « … pour eBay »', agent().map((p) => p.title).join(' | ') || 'aucune');
+    dit(!CFG.ecrits.length && !journal.includes('memo'), 'aucun mémo agent_ebay_dedup écrit', JSON.stringify(CFG.ecrits));
+    dit(lus.length === 0, 'le résumé de l\'agent n\'est même plus lu', lus.join(' · '));
+    dit(res.code === 200 && res.corps && !/"agentebay"/.test(JSON.stringify(res.corps)), 'la route répond 200, sans rubrique « agentebay »', `HTTP ${res.code} ${(/"agentebay":[^,}]*/.exec(JSON.stringify(res.corps || {})) || ['sans rubrique'])[0]}`);
+  }
 
-  console.log('\n── A2. résumé PRÉPARÉ par l\'écran (3 proposées, 1 prête)');
-  reset({ resume: { v: 1, n: 3, pretes: 1, at: Date.now() - 3600000 } });
-  await lancer();
-  { const p = agent()[0] || {};
-    dit(p.title === '🛒 3 articles proposés pour eBay · 1 prêt à publier', 'la notification suit les préparations : « 3 proposées · 1 prête »', p.title); }
-  reset({ resume: { v: 1, n: 2, pretes: 2, at: Date.now() - 3600000 } });
-  await lancer();
-  { const p = agent()[0] || {};
-    dit(p.title === '🛒 2 articles prêts pour eBay — je les publie ?', 'toutes préparées et prêtes : « 🛒 2 articles prêts pour eBay — je les publie ? »', p.title); }
-
-  console.log('\n── B. résumé de plus de 48 h : rien');
-  reset({ resume: { v: 1, n: 3, at: Date.now() - 49 * 3600000 } });
-  await lancer();
-  dit(agent().length === 0, 'un résumé périmé ne fait rien sonner (des paires ont pu se vendre)', String(agent().length));
-
-  console.log('\n── C. « Pas maintenant » aujourd’hui : rien');
-  reset({ resume: { v: 1, n: 3, at: Date.now() - 3600000, pause: auj() } });
-  await lancer();
-  dit(agent().length === 0, 'son « pas maintenant » du jour est respecté', String(agent().length));
-
-  console.log('\n── D. aucune paire prête : rien');
-  reset({ resume: { v: 1, n: 0, at: Date.now() - 3600000 } });
-  await lancer();
-  dit(agent().length === 0, 'n = 0 ⇒ aucune notification', String(agent().length));
-
-  console.log('\n── E. préférence « agentebay » coupée : rien');
-  reset({ pref: { agentebay: false } });
-  await lancer();
-  dit(agent().length === 0, '« Agent eBay » coupé ⇒ rien', String(agent().length));
-
-  console.log('\n── F. abonnement coupé : rien');
-  reset({ acces: false });
-  await lancer();
-  dit(agent().length === 0, 'qui ne paie plus ne reçoit plus rien', String(agent().length));
-
-  console.log('\n── G. déjà demandé aujourd’hui : rien');
-  reset({ dedup: { date: auj(), n: 3 } });
-  await lancer();
-  dit(agent().length === 0, 'une seule question par jour', String(agent().length));
-
-  console.log('\n── H. main illisible (522) : rien');
-  reset({ mainKO: true });
-  await lancer();
-  dit(agent().length === 0, 'résumé illisible ⇒ « pas su », rien envoyé', String(agent().length));
-
-  console.log('\n── I. mémo illisible (522) : rien');
-  reset({ memoKO: true });
-  await lancer();
-  dit(agent().length === 0, 'mémo illisible ⇒ rien envoyé (sinon deux fois le même jour)', String(agent().length));
-
-  console.log('\n── J. mémo non écrit (la base refuse) : rien');
-  reset({ ecritureKO: true });
-  await lancer();
-  dit(agent().length === 0, 'mémo non écrit ⇒ rien envoyé', String(agent().length));
-
-  console.log('\n── K. le rappel du soir ne pose pas la question');
-  reset();
-  await lancer({ moment: 'soir' });
-  dit(agent().length === 0, 'seul le cron du matin demande', String(agent().length));
-
-  console.log('\n── L. agent ARRÊTÉ par Julien, ancien résumé « 3 prêtes » encore frais : rien (dernier tour du 29 oct.)');
-  reset({ resume: { v: 1, n: 3, pretes: 3, at: Date.now() - 3600000 }, regles: { v: 1, actif: false } });
-  await lancer();
-  dit(agent().length === 0, '« Arrêter l’agent » fait taire la notification du matin, même avec un résumé frais', String(agent().length));
-  dit(!CFG.ecrits.length, 'et aucun mémo n’est écrit', JSON.stringify(CFG.ecrits));
-  reset({ resume: { v: 1, n: 3, pretes: 3, at: Date.now() - 3600000 }, regles: { v: 1, actif: true } });
-  await lancer();
-  dit(agent().length === 1, 'l’autre sens : agent actif ⇒ la question part', String(agent().length));
+  console.log('\n── B. la catégorie « agentebay » est retirée');
+  let T = {}; try { T = await import('file://' + path.join(RACINE, 'api', '_lib', 'notif-textes.js')); } catch (e) { dit(false, 'notif-textes se charge', String(e && e.message)); }
+  dit(T.FAMILLE_DE && !Object.prototype.hasOwnProperty.call(T.FAMILLE_DE, 'agentebay'), 'elle n\'appartient plus à aucune famille');
+  dit(T.decisionNotif && T.decisionNotif({ agentebay: true, familles: { ventes: true } }, 'agentebay') === false, 'refusée même allumée (ancien réglage) et famille Ventes allumée');
+  dit(libPush.PUSH_DEFAUT && !Object.prototype.hasOwnProperty.call(libPush.PUSH_DEFAUT, 'agentebay'), 'absente des défauts du serveur');
+  dit(T.decisionNotif && T.decisionNotif({}, 'vente') === true, 'l\'autre sens : une vente sonne toujours');
 
   console.log(`\n${okc} contrôle(s) OK, ${ko} en échec`);
   process.exit(ko ? 1 : 0);

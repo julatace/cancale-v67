@@ -561,8 +561,6 @@ Une ligne par chantier. Le récit complet des lignes du 31 oct. au 2 nov. est, m
 - **3 nov.** — Double vente app fermée : à l'e-mail d'une vente Vinted ou Vestiaire, si le même N° (identité) est encore en ligne ailleurs ⇒ une notif « ⚠️ N°x vendu sur … · encore en ligne sur … » (`api/_lib/enligne-regle.js` copie refabriquée par `scripts/recopie-enligne-serveur.cjs`) ; aucun e-mail de vente Leboncoin/eBay n'a jamais été reçu (lecteurs à apprendre). Suggestions d'achat à relier (marque + taille obligatoires, couleur, modèle connu différent écarté, jamais la photo ; « Voir tous les achats » avec recherche ; lots « 2/3 reliés », prix saisi) (`src/suggestionsAchat.js`). « Exporter mes données » (7 CSV zippés, `src/exportDonnees.js`). Audits `double-vente-ailleurs`, `suggestions-achat`, `export-donnees`. → historiques sécurité et compta. Geste : toucher « Relier un achat » sur une vente.
 - **3 nov.** — Statistiques « Ce qui rapporte le plus » (Modèle · Marque · Taille · Compte · Site : brut total/moyen, marge, temps pour vendre, couverture « prix d'achat connus N/M » ; modèle = statistique sûre, jamais une identité : `src/ceQuiRapporte.js`) ; « Articles qui dorment » unifiés avec Annonces → À relancer (30/60/90 j, une action qui ouvre l'écran existant) ; micro de recherche (Web Speech `fr-FR`, « numéro 124 » → 124, « bé 125 » → B125). Une vente Vinted au prix illisible est écartée (plus comptée 0 €). Audits `ce-qui-rapporte`/`qui-dorment`/`recherche-vocale`, banc `outils-stats`. → historique interface-stock. Geste : ouvrir Statistiques et toucher le micro.
 - **3 nov.** — Annonces, 4 outils : « Changer le prix » d'un N° sur tous les sites où il est en ligne PAR IDENTITÉ (eBay `revise` confirmé ; Vinted par `republiermodif` si l'extension sait, sinon « À faire sur le site » ; Leboncoin/Vestiaire toujours « À faire sur le site » — requête jamais observée) ; « Dupliquer » ⇒ nouveau N° `prochainLibre`, aucune photo ni identité copiée (`vrm_fiches_neuves`) ; historique complet et prouvé d'un article (`src/histoireArticle.js`) ; « Mes modèles » de description (`vrm_modeles_desc`). `audit-annonces-outils` (43 rouges sur main, 17/17 mutations). → historique interface-stock. Geste : essayer « Changer le prix » sur un N°.
-- **3 nov.** — Paramètres → Comptes liés pour les 4 plateformes (une carte par compte : nom lu, état ouvert/à relire/délié, Pro/Particulier, « dans les totaux », Ouvrir/Relire/Relier/Délier) ; écarter un compte Leboncoin/Vestiaire/eBay des totaux (`api/_lib/comptes-exclus.js`, `vrm_comptes_exclus`, une vente sans compte relevé n'est jamais écartée) ; Vestiaire = « Compte non identifié » tant que `vc_session` n'existe pas. `audit-comptes-exclus` (8 mutations), banc `comptes-lies` (9 rouges sur main). Matrice `docs/passation/parite-plateformes.md`. → historique divers. Geste : Paramètres → Comptes liés.
-- **3 nov.** — Ma journée « À faire » en PHOTOS (vignettes par identité, pile + « +k », plus de pastilles colorées ; `src/design/PileVignettes.jsx`) ; Colis en 3 onglets « À envoyer · Envoyés · À retirer », toutes plateformes ensemble groupées par transporteur ; « À retirer » en SECTIONS (aujourd'hui · prêts · code à venir · lieu à confirmer · à vérifier · en route · argent à vérifier), chaque colis une fois, sélecteur de VILLE (lue dans l'adresse) qui filtre carte, liste et carte sombre ; aucune phrase explicative. Bancs `journee-photos`, `colis-retirer-propre` (rouges sur main) ; R2 du récap corrigé (`deps` de `LigneVenteVinted`). → historique interface-stock. Geste : regarder Colis → À retirer et Ma journée.
 - **Avant le 20 oct.** — `docs/passation/etat-detaille-2026-10-31-au-11-02.md` (fin) et `docs/journal-2026.md`.
 
 ---
@@ -584,3 +582,20 @@ SECURITE.md · .env.example      ce qui doit rester hors du dépôt
 
 Chromium du banc : `/opt/pw-browsers/chromium` (lien stable),
 `--use-angle=swiftshader --no-sandbox`.
+
+---
+
+## 11. 5 nov. · L'agent eBay arrêté, des photos du téléphone sur eBay
+
+- **Fait** (branche `v31-agent-ebay-arret`) : l'agent eBay ne propose ni ne prépare plus rien
+  (section « Agent eBay » d'À traiter, calcul en fond, ligne et badge de Ma journée, notification
+  du matin retirés ; catégorie `agentebay` dans `CATEGORIES_RETIREES` ; `publish` + `agent:true` ⇒
+  410). Données `vrm_agent_ebay_*` gardées, plus lues. ⚠️ Ne pas le remettre sans qu'il le demande.
+  Vendre sur eBay : bloc « Photos » (appareil `capture=environment`, galerie `multiple`, aperçu,
+  ‹ ›, ×) ; chaque photo réduite à 1600 px puis confiée à l'hébergement d'images d'eBay (action
+  `photo`, `UploadSiteHostedPictures`, `api/_lib/ebay-photo.js`), son adresse i.ebayimg.com part
+  avec l'annonce ; 12 ajoutées, 24 en tout ; envoi en cours ou raté ⇒ publication bloquée et dite.
+- **Prouvé** : bancs `ebay-photos-agent-arret` (32, 13 rouges sur le code d'avant),
+  `ebay-photo-route` (15, 8/8 mutations), `agent-ebay-push` réécrit (16, 15 rouges avant) ; build.
+- **Non mesuré** : `UploadSiteHostedPictures` sur un vrai compte eBay (forme de la documentation) ;
+  durée de vie d'une photo hébergée gardée dans un brouillon. Récit : `historique-ebay.md`.
