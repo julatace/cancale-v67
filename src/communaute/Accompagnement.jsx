@@ -69,11 +69,11 @@ export function VueMembre({ vue, pour = 'createur', nomCreateur = '' }) {
         {(!vue.chiffres.ventes || !vue.chiffres.achats) && <p className="vrm-cm-note" data-cm-accomp-moitie>{!vue.chiffres.ventes ? 'Ventes' : 'Achats'} pas encore publiés depuis {pour === 'membre' ? 'ton' : 'son'} VRM : « — », jamais 0.</p>}
         <p className="vrm-cm-note">Ventes finalisées, toutes plateformes, datées au jour de la vente ; achats Vinted hors annulés. Publié le {dateHeure(vue.chiffres_le) || '—'}.</p>
         {e === 'detail' && (vue.detail ? <div data-cm-accomp-detail={vue.detail.ventes.length}>
-          <h4>Ventes · les {vue.detail.ventes.length} plus récentes</h4>
+          <h4>Ventes · {vue.detail.ventes.length > 1 ? `les ${vue.detail.ventes.length} plus récentes` : 'la plus récente'}</h4>
           {vue.detail.ventes.length === 0 ? <p className="vrm-cm-note">Aucune vente publiée.</p> :
             <ul className="vrm-cm-liste vrm-cm-detail">{vue.detail.ventes.slice(0, 50).map((l, i) => <li key={i} data-cm-accomp-vente>
               <div><b>{l[3] || 'Article'}</b><small>{date(l[0])} · {l[1]}{l[2] ? ' · ' + l[2] : ''}</small></div><span>{eurC(l[4])}</span></li>)}</ul>}
-          <h4>Achats · les {vue.detail.achats.length} plus récents</h4>
+          <h4>Achats · {vue.detail.achats.length > 1 ? `les ${vue.detail.achats.length} plus récents` : 'le plus récent'}</h4>
           {vue.detail.achats.length === 0 ? <p className="vrm-cm-note">Aucun achat publié.</p> :
             <ul className="vrm-cm-liste vrm-cm-detail">{vue.detail.achats.slice(0, 50).map((l, i) => <li key={i} data-cm-accomp-achat>
               <div><b>{l[2] || 'Achat'}</b><small>{date(l[0])}{l[1] ? ' · ' + l[1] : ''}</small></div><span>{eurC(l[3])}</span></li>)}</ul>}
@@ -279,11 +279,12 @@ export default function Accompagnement({ api, headers, prenom = '', codeLien = '
   </div>;
 
   const publie = d.publie || {};
-  return <div data-cm-accomp="lu" data-cm-accomp-niveau={d.niveau}>
+  return <div data-cm-accomp="lu" data-cm-accomp-partage-max={d.niveau}>
     <div className="vrm-cm-carton vrm-cm-accomp-intro">
       <div><p className="vrm-cm-note">Crée un groupe pour ceux que tu accompagnes, ou rejoins celui de ton coach. Chaque entrée est validée par le créateur ; chacun choisit ce qu’il partage — rien, par défaut.</p></div>
       <div className="vrm-cm-ligne-boutons">
-        <button type="button" className="vrm-cm-primaire" onClick={() => setFeuille({ type: 'creer' })} data-cm-accomp-creer>Créer un groupe</button>
+        {/* L'accent est rare (§7) : plein seulement tant qu'il n'a aucun groupe. */}
+        <button type="button" className={d.crees.length || d.rejoints.length ? '' : 'vrm-cm-primaire'} onClick={() => setFeuille({ type: 'creer' })} data-cm-accomp-creer>Créer un groupe</button>
         <button type="button" onClick={() => setFeuille({ type: 'rejoindre', code: '' })} data-cm-accomp-rejoindre>Rejoindre avec un code</button>
       </div>
     </div>
