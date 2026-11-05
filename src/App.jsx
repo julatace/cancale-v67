@@ -47834,16 +47834,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     .filter(o => matchOrd(o))
     .sort(parDateDesc)
     .map(o => { const tk = trackForBuy(o); return { o, tk, st: achatStage(o, tk) }; })
-    // ⚠️ EN ROUTE : LE PLUS ANCIEN EN PREMIER. Ce qu'on veut voir quand on
-    // attend des colis, ce n'est pas le dernier acheté — c'est celui qui
-    // traîne depuis trois semaines. Partout ailleurs le plus récent d'abord.
-    .sort((a, b) => { const pr = x => x.st.step===3?0 : x.st.step===2?1 : x.st.step===1?2 : x.st.step===4?3 : 4;
+    // ⚠️⚠️ (5 nov., Julien : « dans achat en route c'est le plus récent qui
+    // s'affiche en haut peu importe le compte et le filtre ») EN ROUTE : le plus
+    // RÉCENT en haut, et RIEN d'autre ne passe devant — ni l'étape du colis, ni
+    // le compte choisi. (Avant : le plus ancien d'abord, après l'étape, puis le
+    // compte choisi en tête.) Ailleurs, inchangé : l'étape puis le plus récent.
+    .sort((a, b) => {
+      if (aFilter === 'route') return (tsCommande(b.o)||0) - (tsCommande(a.o)||0);
+      const pr = x => x.st.step===3?0 : x.st.step===2?1 : x.st.step===1?2 : x.st.step===4?3 : 4;
       const d = pr(a) - pr(b); if (d !== 0) return d;
-      return aFilter === 'route' ? ((tsCommande(a.o)||0) - (tsCommande(b.o)||0)) : (new Date(b.o.date||0) - new Date(a.o.date||0)); });
+      return new Date(b.o.date||0) - new Date(a.o.date||0); });
     // Compte choisi (ou connecté) EN TÊTE ; les autres restent (floutés, pas
-    // masqués — demande de Julien). Tri STABLE.
+    // masqués — demande de Julien). Tri STABLE. Pas dans « En route » (5 nov.).
     { const c = selEff;
-      if (c) arr = [...arr].sort((a,b)=>{ const ac=uidA(a.o)===c, bc=uidA(b.o)===c; return ac===bc?0:(ac?-1:1); }); }
+      if (c && aFilter !== 'route') arr = [...arr].sort((a,b)=>{ const ac=uidA(a.o)===c, bc=uidA(b.o)===c; return ac===bc?0:(ac?-1:1); }); }
     return arr; },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [buysBase, aFilter, ordSearchDiff, periode, tracking, colisRelais, numeros, compteSel, compteConnecte, selEff]);
