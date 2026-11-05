@@ -56427,7 +56427,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   return <CarteColisSite ident={e.key} site="leboncoin" photo={photoArticle(o)} titre={x.titre || o.title || '(sans titre)'} num={num}
                     sous={o.label && o.label.voucherUrl ? 'Leboncoin' : 'Leboncoin · bordereau à générer'} transporteur={e.tr} frise={friseColisFusion({}, {})}
                     attrs={{ 'data-lbc-colis': x.txId }}
-                    detail={o.label && o.label.qrUrl ? <div data-lbc-qr-depot="" style={{display:'flex',alignItems:'center',gap:12,marginTop:8}}><QrColis url={o.label.qrUrl} size={88}/><span style={{fontSize:12,color:C.muted,lineHeight:1.4}}>QR de dépôt Leboncoin : à présenter au point relais, sans imprimer.</span></div> : null}
+                    detail={o.label && o.label.qrUrl ? <div data-lbc-qr-depot="" style={{display:'flex',flexWrap:'wrap',alignItems:'center',gap:8,marginTop:8}}><QrColis url={o.label.qrUrl} size={72}/><span style={{flex:'1 1 120px',minWidth:120,fontSize:12,color:C.muted,lineHeight:1.4}}>QR de dépôt Leboncoin : à présenter au point relais, sans imprimer.</span></div> : null}
                     primaire={o.label && o.label.voucherUrl
                       ? <button type="button" data-imprime="1" data-imprime-lbc={x.txId} className="vrm-colis-primaire" onClick={() => onColisLeboncoin && onColisLeboncoin()} title="Bordereau Leboncoin tamponné (titre + N°)" style={primaireBleu}><Icon name="printer" size={16}/><span className="vrm-lib-long">Imprimer le bordereau</span><span className="vrm-lib-court">Imprimer</span></button>
                       : <a data-generer-lbc={x.txId} href={`https://www.leboncoin.fr/compte/part/transaction/${encodeURIComponent(x.txId)}`} target="_blank" rel="noreferrer" className="vrm-colis-primaire" title="Le bordereau se génère sur Leboncoin" style={{...primaireBleu,background:C.card2||C.bg,color:C.text}}><Icon name="printer" size={16}/><span className="vrm-lib-long">Générer sur Leboncoin</span><span className="vrm-lib-court">Générer</span></a>}
@@ -58678,7 +58678,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {qrView.suivi && (
               <a href={trackUrl(qrView.carrier, qrView.suivi)} target="_blank" rel="noreferrer"
                 style={{textDecoration:'none',border:'1px solid #ddd',borderRadius:12,background:'#fff',color:'#111',fontSize:13,fontWeight:600,padding:'9px 16px'}}>
-                {qrView.carrier==='mondialrelay' ? '📱 Ouvrir Mondial Relay (QR)' : '🔍 Suivre le colis'}
+                {qrView.carrier==='mondialrelay' && !qrView.img ? '📱 Ouvrir Mondial Relay (QR)' : '🔍 Suivre le colis'}
               </a>
             )}
             {/* (5 nov.) LA LUMINOSITÉ : un site ne peut pas la régler (aucune API web) — on le dit, et l'écran

@@ -18,14 +18,14 @@ const CSS = `
 .mrx{--mrx-ink:var(--vrm-ink,#1D1D1F);--mrx-muted:var(--vrm-muted,#6E6E73);--mrx-line:var(--vrm-line,#E5E5EA);--mrx-surface:var(--vrm-surface,#FFFFFF);--mrx-bg:var(--vrm-bg,#F5F5F7);--mrx-accent:var(--vrm-accent,#0071E3);
   display:flex;flex-direction:column;gap:12px;color:var(--mrx-ink)}
 .mrx-scene{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 40px minmax(0,1fr);align-items:center;gap:8px;padding:14px;border-radius:14px;background:var(--mrx-bg);overflow:hidden;min-height:176px}
-.mrx-fen{background:var(--mrx-surface);border:1px solid var(--mrx-line);border-radius:12px;padding:8px;min-width:0;display:flex;flex-direction:column;gap:6px}
+.mrx-fen{overflow:hidden;background:var(--mrx-surface);border:1px solid var(--mrx-line);border-radius:12px;padding:8px;min-width:0;display:flex;flex-direction:column;gap:6px}
 .mrx-barre{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--mrx-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mrx-barre i{width:6px;height:6px;border-radius:999px;background:var(--mrx-line);flex:none}
 .mrx-colis{display:flex;align-items:center;gap:6px;font-size:11px;padding:6px;border-radius:12px;background:var(--mrx-bg);min-width:0}
 .mrx-colis b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .mrx-colis svg{flex:none}
 .mrx-fleche{display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--mrx-accent)}
-.mrx-point{width:8px;height:8px;border-radius:999px;background:var(--mrx-accent);opacity:0}
+.mrx-point{width:8px;height:8px;border-radius:999px;background:var(--mrx-accent);opacity:.25}
 .mrx-vrm .mrx-colis{background:var(--mrx-surface);border:1px solid var(--mrx-line);justify-content:space-between}
 .mrx-code{font-family:var(--vrm-police-mono,ui-monospace,monospace);font-size:12px;font-weight:600;letter-spacing:.04em;font-variant-numeric:tabular-nums}
 .mrx-qr{width:28px;height:28px;border-radius:6px;background:#fff;padding:2px;box-sizing:border-box;flex:none}
@@ -43,9 +43,9 @@ const CSS = `
   .mrx-anime .mrx-point:nth-child(2){animation-delay:.25s}
   .mrx-anime .mrx-point:nth-child(3){animation-delay:.5s}
 }
-@keyframes mrxPart{0%,18%{opacity:1;transform:none}34%{opacity:.35;transform:translateX(10px)}82%{opacity:.35;transform:translateX(10px)}100%{opacity:1;transform:none}}
-@keyframes mrxArrive{0%,30%{opacity:0;transform:translateX(-10px)}46%,88%{opacity:1;transform:none}100%{opacity:0;transform:translateX(-10px)}}
-@keyframes mrxFlux{0%,16%{opacity:0;transform:translateY(-6px)}26%{opacity:1}40%{opacity:0;transform:translateY(6px)}100%{opacity:0}}
+@keyframes mrxPart{0%,10%{opacity:.4;transform:translateX(6px)}22%,40%{opacity:1;transform:none}56%,100%{opacity:.4;transform:translateX(6px)}}
+@keyframes mrxArrive{0%,10%{opacity:1;transform:none}20%,44%{opacity:0;transform:translateX(-10px)}60%,100%{opacity:1;transform:none}}
+@keyframes mrxFlux{0%,38%{opacity:.25;transform:translateY(-6px)}46%{opacity:1}56%{opacity:.25;transform:translateY(6px)}100%{opacity:.25}}
 @media (prefers-reduced-motion:reduce){.mrx-point{opacity:.5}}
 `;
 
@@ -71,12 +71,12 @@ export default function ExpliqueMondialRelay({ anime = true }) {
       <style>{CSS}</style>
       <div className="mrx-scene" role="img" aria-label="Exemple inventé : ton compte Mondial Relay ouvert dans le navigateur, ses colis arrivent dans VRM avec leur code et leur QR">
         <div className="mrx-fen mrx-src">
-          <div className="mrx-barre"><i/><i/><i/>mondialrelay.fr · Mes colis</div>
+          <div className="mrx-barre"><i/><i/><i/>mondialrelay.fr</div>
           {EXEMPLE.map((c) => <div key={c.n} className="mrx-colis"><Boite/><b>n° {c.n}</b></div>)}
         </div>
         <div className="mrx-fleche" aria-hidden="true"><span className="mrx-point"/><span className="mrx-point"/><span className="mrx-point"/></div>
         <div className="mrx-fen mrx-vrm">
-          <div className="mrx-barre"><i/><i/><i/>VRM · À retirer</div>
+          <div className="mrx-barre"><i/><i/><i/>VRM</div>
           {EXEMPLE.map((c) => <div key={c.n} className="mrx-colis"><span className="mrx-code">{c.code}</span><QrDecoratif graine={c.g}/></div>)}
         </div>
       </div>
