@@ -199,3 +199,77 @@ export function siteExpediteur(from) {
   const n = expediteurLisible(from);
   return n === 'Vinted' || n === 'Vinted Go' ? 'vinted' : n === 'Leboncoin' ? 'leboncoin' : n === 'eBay' ? 'ebay' : n === 'Vestiaire Collective' ? 'vestiaire' : '';
 }
+
+// ── LA MARQUE DE L'EXPÉDITEUR (5 nov., v33 « tu peux faire mieux ») ──────────
+// Les quatre sites servis gardent leur logo (dessiné dans la couleur du texte) ;
+// un transporteur ou un inconnu reçoit un MONOGRAMME NEUTRE tiré de son nom
+// lisible (« Mondial Relay » ⇒ « MR », « Chronopost » ⇒ « C ») — gris, police
+// système, jamais une couleur ni un dessin de marque (aucun faux logo).
+export function monogramme(nom) {
+  let s = String(nom == null ? '' : nom).trim();
+  if (!s || s === 'Expéditeur non lu') return '?';
+  if (!/\s/.test(s) && s.includes('.')) s = s.split('.')[0]; // « exemple.test » ⇒ « exemple »
+  const mots = s.split(/[\s\-_'’]+/).filter((m) => /[\p{L}\p{N}]/u.test(m));
+  const lettre = (m) => (m.match(/[\p{L}\p{N}]/u) || [''])[0].toLocaleUpperCase('fr');
+  return mots.slice(0, 2).map(lettre).join('') || '?';
+}
+
+// ── LE DÉLAI LU (date limite écrite dans l'e-mail) ───────────────────────────
+// Jours entre aujourd'hui (jour de l'appareil) et la date LUE ; `null` si la
+// date n'a pas d'année ou ne se lit pas (pas su ⇒ jamais « proche »).
+export function joursAvant(lim, maintenant = Date.now()) {
+  const s = String(lim == null ? '' : lim).trim();
+  let m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s), a, mo, j;
+  if (m) { a = +m[1]; mo = +m[2]; j = +m[3]; }
+  else if ((m = /^(\d{1,2})[/.](\d{1,2})[/.](\d{4})\b/.exec(s))) { j = +m[1]; mo = +m[2]; a = +m[3]; }
+  else return null;
+  if (!(mo >= 1 && mo <= 12 && j >= 1 && j <= 31)) return null;
+  const auj = new Date(maintenant);
+  const d0 = Date.UTC(auj.getFullYear(), auj.getMonth(), auj.getDate());
+  return Math.round((Date.UTC(a, mo - 1, j) - d0) / 864e5);
+}
+
+// ── UNE LIGNE DE LA BOÎTE : nature · l'essentiel · le geste ──────────────────
+// Rend { titre, essentiel: [..], geste: {k, mot, proche, passe} | null, rien }.
+// ⚠️ UNE SEULE SOURCE : chaque mot vient de `titreSimple` (le résumé rangé) —
+//    `ligneEmail` ne fait que RANGER ses détails : les faits courts d'abord (code,
+//    N°, montant), le nom long de l'article en dernier (une coupure « … » ne mange
+//    que la fin du nom, jamais le code) ; ce qui demande un GESTE sort dans
+//    `geste` (colis à retirer avant une date, bordereau, envoi, à faire sur
+//    Vinted, à vérifier). « reçu de commande » se tait sur la ligne (le titre dit
+//    « Achat ») ; la lecture garde tout.
+// ⚠️ « Proche » (ambre) = délai LU à moins de 48 h (aujourd'hui ou demain), comme
+//    les litiges. Une date sans année ne se juge pas ; une date passée n'est plus
+//    un geste à faire (« délai passé », sans ambre).
+const ECHEANCE = /^(?:à envoyer )?avant le /;
+const GESTES_MOTS = { 'bordereau prêt': 'bordereau', 'bordereau à prendre sur Vinted': 'bordereau', 'à faire sur Vinted': 'action', 'à lire': 'verifier' };
+const rang = (x) => (/^(?:code |N°)/.test(x) ? 0 : /€$/.test(x) ? 1 : 2);
+export function ligneEmail(e, delies = {}, maintenant = Date.now()) {
+  const t = titreSimple(e, delies);
+  const r = e && e.resume && typeof e.resume === 'object' ? e.resume : null;
+  let geste = null;
+  const garde = [];
+  for (const x of t.details) {
+    if (ECHEANCE.test(x) && r && r.lim) {
+      const n = joursAvant(r.lim, maintenant);
+      const k = r.t === 'vente-vestiaire' ? 'envoi' : 'retrait';
+      const date = insecable(jourCourt(r.lim));
+      const quand = n === 0 ? ' (aujourd’hui)' : n === 1 ? ' (demain)' : '';
+      geste = n != null && n < 0
+        ? { k, mot: `délai passé (${date})`, proche: false, passe: true }
+        : { k, mot: `${k === 'envoi' ? 'à envoyer ' : ''}avant le ${date}${quand}`, proche: n === 0 || n === 1, passe: false };
+      continue;
+    }
+    if (GESTES_MOTS[x]) { geste = geste || { k: GESTES_MOTS[x], mot: x, proche: false, passe: false }; continue; }
+    if (x === 'reçu de commande') continue;
+    garde.push(x);
+  }
+  // Un colis à retirer sans date lue reste un geste (l'e-mail le demande).
+  if (!geste && r && r.t === 'suivi' && r.st === 'available' && r.sens !== 'sortant') geste = { k: 'retrait', mot: 'à retirer', proche: false, passe: false };
+  // Un e-mail que VRM n'a pas su ranger : « à vérifier » prime (ambre).
+  if (e && e.etat && e.etat !== 'integre' && e.etat !== 'reessai') geste = { k: 'verifier', mot: e.etat === 'erreur' ? 'en attente' : 'à vérifier', proche: false, passe: false };
+  const essentiel = garde.map((x, i) => [rang(x), i, x]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map((x) => x[2]);
+  return { titre: t.titre, essentiel, geste, rien: !!t.rien && !geste };
+}
+// Un geste qui mérite l'ambre : délai proche (< 48 h), ou à vérifier.
+export const gesteAmbre = (g) => !!(g && !g.passe && (g.proche || g.k === 'verifier'));
