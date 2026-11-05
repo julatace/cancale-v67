@@ -463,7 +463,7 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
 
   if (etat === 'charge') return <section className="vrm-communaute" data-dark={sombre ? 'true' : 'false'} data-communaute-etat="charge">{entete}<p role="status" className="vrm-cm-note">Lecture de la carte…</p></section>;
   if (etat !== 'lu') return <section className="vrm-communaute" data-dark={sombre ? 'true' : 'false'} data-communaute-etat={etat}>{entete}
-    {etat === 'pas-su' ? <EtatPanne data-cm-panne="" quoi="La carte de la communauté" raison={msgEtat || PAS_SU} onReessayer={() => lire()}/>
+    {etat === 'pas-su' ? <EtatPanne data-cm-panne="" quoi="La carte de la communauté" raison={PAS_SU} onReessayer={() => lire()}/>
     : <div className="vrm-cm-carton">
       {etat === 'non-installe' ? <><b>La carte de la communauté n’est pas encore activée sur ta base.</b><p>Elle s’ouvrira dès que la mise à jour de la base sera faite. Rien n’est perdu, rien n’est partagé d’ici là.</p></>
         : <><b>Ton abonnement n’est pas actif.</b><p>La carte de la communauté est réservée aux abonnés : tu n’es pas montré aux autres tant qu’il n’est pas réglé.</p></>}
@@ -653,7 +653,7 @@ function Classement({ api, moi, groupe }) {
     if (r.ok && r.classement && Array.isArray(r.classement.lignes)) { setC(r.classement); setEtat('lu'); return; }
     setC(null);
     setEtat(r.erreur === 'non-installe' ? 'non-installe' : r.erreur === 'abonnement' ? 'abonnement' : 'pas-su');
-    setMsg(r.message && r.message !== PAS_SU ? r.message : CLASSEMENT_PAS_SU);   // (5 nov.) la phrase de la CARTE ne dit pas le classement
+    setMsg(r.message || CLASSEMENT_PAS_SU);
   }, [api, groupe]);
   useEffect(() => { lire(periode); }, [periode, lire]);
   const inscrire = async (oui) => {
@@ -671,7 +671,7 @@ function Classement({ api, moi, groupe }) {
     <details className="vrm-pourquoi" data-pourquoi><summary aria-label="Comment c'est compté" title="Comment c'est compté">ⓘ</summary><div>Comptées par VRM à partir de ce que l’extension a capté. Annulées et remboursées non comptées. Leboncoin et eBay n’y entrent pas.</div></details></div>;
 
   // (5 nov., chantier G, revue 1.10) La panne du classement : `EtatPanne` (« pas su » n'est pas « personne »).
-  if (etat === 'pas-su') return <div data-cm-classement={etat}>{choix}<EtatPanne quoi="Le classement" raison={`${msg || CLASSEMENT_PAS_SU} Ce n’est pas un classement vide.`} onReessayer={() => lire(periode)}/></div>;
+  if (etat === 'pas-su') return <div data-cm-classement={etat}>{choix}<EtatPanne quoi="Le classement" raison={`${CLASSEMENT_PAS_SU} Ce n’est pas un classement vide.`} onReessayer={() => lire(periode)}/></div>;
   if (etat === 'non-installe' || etat === 'abonnement') return <div className="vrm-cm-carton" data-cm-classement={etat}>
     {etat === 'non-installe' ? <><b>Le classement n’est pas encore activé sur ta base.</b><p>Il s’ouvrira dès que la mise à jour de la base sera faite. Rien n’est partagé d’ici là.</p></>
       : <><b>Ton abonnement n’est pas actif.</b><p>Le classement est réservé aux abonnés.</p></>}

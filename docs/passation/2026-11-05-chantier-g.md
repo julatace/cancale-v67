@@ -137,13 +137,13 @@ E-mails
 64. « Chargement des e-mails… » → « Lecture en cours… ».
 Communauté
 65. Carte en panne : texte gras + bouton gris dans une carte → `EtatPanne`, hors carton.
-66. Classement en panne : disait « Je n’ai pas pu lire la CARTE » → la phrase du classement ; la période reste choisissable.
+66. Classement en panne : `EtatPanne` avec la phrase du classement et « Ce n’est pas un classement vide » ; la période reste choisissable au-dessus (elle disparaissait).
 67. Groupes en panne → `EtatPanne`.
 68. Un fil en panne → `EtatPanne` compact.
 69. Onglets « Carte · Classement · Groupes » : l'actif était un trou NOIR en sombre → le dessin du segmenté de l'app (piste remplie, actif `#636366` la nuit, blanc le jour), 36 px à la souris.
 70. « Chargement de la communauté… » → « Lecture en cours… ».
 Encore Messages
-71. « · boutique_test » répété sur chaque ligne du groupe du compte ouvert → nommé une fois, dans l'en-tête du groupe (gardé sur les autres comptes et pendant une recherche).
+71. (essayé puis RETIRÉ) taire « · boutique_test » sur les lignes du compte ouvert : la règle du banc `messagerie` est « le compte est nommé sur chaque ligne (la liste mélange les comptes) » — gardée. Le compte reste sur la ligne de la paire (n° 9).
 72. Messages · eBay : « Actualiser » en couleurs écrites en dur (#B8B8BC sur #262628 la nuit, F1 de `fusion-app`) → le bouton commun (`BoutonBase` secondaire petit, jetons), occupé pendant la lecture.
 
 ## Preuves
