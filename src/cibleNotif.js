@@ -24,10 +24,21 @@
 // Ce module ne porte que la RÈGLE, sans React ni DOM : quels sélecteurs
 // essayer, dans quel ordre, et la phrase quand rien ne répond. L'app (`CibleNotif`)
 // et les bancs la lisent.
+//
+// (5 nov., Julien : « cliquer une notification amène directement sur ce qui est
+// arrivé, mis en évidence, pour TOUTES les notifications de VRM ») UN SEUL
+// CROCHET DANS L'ÉCRAN : l'attribut `data-cible`, une liste de jetons
+// « type:identité » séparés par des espaces, posé par `attrCible(...)` sur
+// chaque élément qu'une notification peut viser (une ligne de vente, la carte
+// d'un colis, une conversation…). `selecteursCible` cherche D'ABORD ce jeton
+// (`[data-cible~="vente:7001"]`) ; les anciens attributs restent un repli.
+//
+//   cible=offre    conv=<id> compte=<uid>               Messages · la conversation ouverte, l'offre en évidence
+//   cible=vcvente  vc=<productId Vestiaire>              Ventes · Vestiaire · la vente
 
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
 const COLONNES = ['prets', 'attente', 'retirer', 'partis'];
-const TYPES = ['conv', 'offres', 'vente', 'colis', 'retrait', 'colonne', 'achat', 'urssaf', 'doublon'];
+const TYPES = ['conv', 'offre', 'offres', 'vente', 'vcvente', 'colis', 'retrait', 'colonne', 'achat', 'urssaf', 'doublon'];
 const propre = (v) => { const s = String(v == null ? '' : v).trim(); return ID.test(s) ? s : ''; };
 // Échappe une valeur d'attribut CSS (les identités sont déjà filtrées par `ID`).
 const q = (s) => String(s).replace(/["\\]/g, '\\$&');
@@ -44,24 +55,75 @@ export function lireCible(params) {
   const g = (k) => { try { return params && typeof params.get === 'function' ? params.get(k) : (params ? params[k] : null); } catch (_) { return null; } };
   const type = String(g('cible') || '');
   if (!TYPES.includes(type)) return null;
-  const c = { type, tx: propre(g('tx')), suivi: propre(g('suivi')), conv: propre(g('conv')), compte: propre(g('compte')), num: propre(g('num')), colonne: COLONNES.includes(g('colonne')) ? g('colonne') : '', plat: ['ebay', 'leboncoin'].includes(g('plat')) ? g('plat') : '' };
-  if (type === 'conv' && !c.conv) return null;
+  const c = { type, tx: propre(g('tx')), suivi: propre(g('suivi')), conv: propre(g('conv')), compte: propre(g('compte')), num: propre(g('num')), vc: propre(g('vc')), colonne: COLONNES.includes(g('colonne')) ? g('colonne') : '', plat: ['ebay', 'leboncoin'].includes(g('plat')) ? g('plat') : '' };
+  if ((type === 'conv' || type === 'offre') && !c.conv) return null;
+  if (type === 'vcvente' && !c.vc) return null;
   if ((type === 'vente' || type === 'colis' || type === 'achat') && !c.tx) return null;
   if (type === 'retrait' && !c.tx && !c.suivi) return null;
   if (type === 'colonne' && !c.colonne) return null;
   return c;
 }
 
+// ── LE CROCHET `data-cible` ────────────────────────────────────────────────
+// `attrCible(['vente', tx], ['colis', tx])` ⇒ « vente:7001 colis:7001 » — la
+// valeur de l'attribut `data-cible` d'un élément. Une identité absente ou mal
+// formée n'écrit PAS de jeton (jamais « vente: » vide qui répondrait à tout) ;
+// rien du tout ⇒ `undefined` (React n'écrit pas l'attribut).
+// Un N° passe par `cleNumCible` (« 007 » = « 7 »).
+export function attrCible(...paires) {
+  const out = [];
+  for (const p of paires) {
+    if (!Array.isArray(p) || !p.length) continue;
+    const [type, ...ids] = p;
+    if (!TYPES.includes(type)) continue;
+    if (!ids.length) { out.push(type); continue; }
+    const morceaux = ids.map((v, i) => (type === 'doublon' && i === ids.length - 1 && ids.length === 2 ? propre(cleNumCible(v)) : propre(v)));
+    if (morceaux.some((m) => !m)) continue;
+    out.push([type, ...morceaux].join(':'));
+  }
+  const u = [...new Set(out)];
+  return u.length ? u.join(' ') : undefined;
+}
+// Les jetons qu'une cible cherche, du plus précis au moins précis.
+export function jetonsCible(c) {
+  if (!c) return [];
+  switch (c.type) {
+    case 'conv': case 'offre': return [c.compte ? `conv:${c.compte}:${c.conv}` : null, `conv:${c.conv}`].filter(Boolean);
+    case 'offres': return ['offres'];
+    case 'vente': return [`vente:${c.tx}`];
+    case 'vcvente': return [`vcvente:${c.vc}`];
+    case 'colis': return [`colis:${c.tx}`];
+    case 'retrait': return [c.tx ? `retrait:tx:${c.tx}` : null, c.suivi ? `retrait:suivi:${c.suivi}` : null].filter(Boolean);
+    case 'colonne': return [`colonne:${c.colonne}`];
+    case 'achat': return [`achat:${c.tx}`];
+    case 'urssaf': return ['urssaf'];
+    case 'doublon': { const n = c.num ? cleNumCible(c.num) : ''; return n ? [`doublon:${c.plat || 'ebay'}:${n}`] : [`doublon:${c.plat || 'ebay'}`]; }
+    default: return [];
+  }
+}
+const parJeton = (c) => jetonsCible(c).map((j) => `[data-cible~="${q(j)}"]`);
+
 // Les sélecteurs à essayer, du plus précis au moins précis — chacun une
 // IDENTITÉ. `ouvrir` : le sélecteur (dans l'élément trouvé, ou l'élément lui-
 // même) à toucher pour l'ouvrir ; `deplier` : ce qu'il faut déplier d'abord si
 // l'élément est replié derrière « Voir les N autres ».
+// `puis` : une fois l'élément ouvert, ce qu'il faut AUSSI mettre en évidence
+// (l'offre dans la conversation ouverte).
 export function selecteursCible(c) {
-  if (!c) return { essais: [], ouvrir: null, deplier: [] };
+  if (!c) return { essais: [], ouvrir: null, deplier: [], puis: null };
+  const r = selecteursAnciens(c);
+  return { puis: null, ...r, essais: [...new Set([...parJeton(c), ...r.essais])] };
+}
+function selecteursAnciens(c) {
   switch (c.type) {
     case 'conv': return {
       essais: [c.compte ? `.vrm-inbox-row[data-conv="${q(c.conv)}"][data-conv-compte="${q(c.compte)}"]` : null, `.vrm-inbox-row[data-conv="${q(c.conv)}"]`].filter(Boolean),
       ouvrir: '', deplier: [] };
+    // (5 nov.) Une offre : SA conversation ouverte, puis la carte de l'offre (dans le fil).
+    case 'offre': return {
+      essais: [c.compte ? `.vrm-inbox-row[data-conv="${q(c.conv)}"][data-conv-compte="${q(c.compte)}"]` : null, `.vrm-inbox-row[data-conv="${q(c.conv)}"]`].filter(Boolean),
+      ouvrir: '', deplier: [], puis: '[data-cible~="offre"]' };
+    case 'vcvente': return { essais: [`.vrm-sale-row[data-vc-vente="${q(c.vc)}"]`], ouvrir: '.vrm-ledger-sale-toggle', deplier: [] };
     case 'offres': return { essais: ['[data-offres-au-mini]'], ouvrir: '', deplier: [] };
     case 'vente': return { essais: [`.vrm-sale-row[data-tx="${q(c.tx)}"]`], ouvrir: '.vrm-ledger-sale-toggle', deplier: [] };
     case 'colis': return {
@@ -70,10 +132,16 @@ export function selecteursCible(c) {
       ouvrir: null, deplier: ['[data-cc-colonne="prets"] [data-cc-plus]', '[data-cc-colonne="attente"] [data-cc-plus]'] };
     case 'retrait': return {
       essais: [c.tx ? `[data-cc-carte="r:v:${q(c.tx)}"]` : null, c.tx ? `[data-cc-carte="r:c:${q(c.tx)}"]` : null, c.suivi ? `[data-cc-carte="r:e:${q(c.suivi)}"]` : null].filter(Boolean),
-      ouvrir: null, deplier: ['[data-cc-colonne="retirer"] [data-cc-plus]'] };
+      // (5 nov., Julien : « la notification doit ouvrir directement le colis, mis en
+      // évidence, AVEC SON CODE ») La ligne s'ouvre (le code est dans son détail).
+      // Une ville choisie qui cache le point ⇒ « Toutes » ; « À vérifier » replié
+      // s'ouvre tout seul (tout `<details>` qui contient la cible, `CibleNotif`).
+      ouvrir: '.vrm-rpf-ouvrir', deplier: ['[data-retirer-villes] [data-ville=""][aria-pressed="false"]'] };
     // (2 nov.) Plus de colonnes : le groupe de la liste (« Prêts à imprimer », « En
     // attente du bordereau »), « À retirer », ou « Partis » (replié).
-    case 'colonne': return { essais: [`[data-cc-colonne="${q(c.colonne)}"]`, ...({ prets: ['[data-groupe="pret"]'], attente: ['[data-groupe="attente"]'] }[c.colonne] || [])], ouvrir: null, deplier: [] };
+    // (5 nov.) « Prêts » / « En attente » : la liste « À envoyer » (`data-cible`
+    // posé sur elle) — l'ancien intertitre `data-groupe` n'existe plus depuis le 2 nov.
+    case 'colonne': return { essais: [`[data-cc-colonne="${q(c.colonne)}"]`], ouvrir: null, deplier: [] };
     case 'achat': return { essais: [`.vrm-buy-row[data-achat-tx="${q(c.tx)}"]`], ouvrir: null, deplier: [] };
     case 'urssaf': return { essais: ['[data-compta-urssaf]', '#compta-urssaf'], ouvrir: null, deplier: [] };
     // ⚠️ (1er nov., audit A5) Avec un N°, SEULE la ligne de ce N° répond —
@@ -100,8 +168,10 @@ export function selecteursCible(c) {
 export function phraseAbsente(c) {
   switch (c && c.type) {
     case 'conv': return "Cette conversation n'est plus dans la liste : elle a peut-être été retirée, ou l'extension ne l'a pas encore relue.";
+    case 'offre': return "Cette offre n'est plus dans tes conversations : elle a peut-être été acceptée, refusée ou retirée, ou l'extension ne l'a pas encore relue.";
     case 'offres': return "Plus aucune offre au-dessus de ton prix mini : elle a déjà été acceptée, refusée ou retirée.";
     case 'vente': return "Cette vente n'est pas dans la liste affichée : regarde les filtres (période, état) ou repasse sur Vinted.";
+    case 'vcvente': return "Cette vente Vestiaire n'est pas encore dans la liste : l'extension la rangera à ta prochaine visite sur Vestiaire.";
     case 'colis': return "Ce colis n'est plus à poster : il est peut-être déjà parti.";
     case 'retrait': return "Ce colis n'est plus dans « À retirer » : il est peut-être déjà retiré.";
     case 'colonne': return 'Rien dans cette colonne pour l\u2019instant.';
@@ -116,4 +186,4 @@ export function phraseAbsente(c) {
 
 // Les paramètres d'adresse qui portent une cible : retirés de la barre
 // d'adresse une fois lus (un rechargement ne rejoue pas la cible).
-export const PARAMS_CIBLE = ['cible', 'tx', 'suivi', 'conv', 'compte', 'num', 'colonne', 'plat', 'vue'];
+export const PARAMS_CIBLE = ['cible', 'tx', 'suivi', 'conv', 'compte', 'num', 'vc', 'colonne', 'plat', 'vue'];
