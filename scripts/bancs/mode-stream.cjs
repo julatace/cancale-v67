@@ -134,7 +134,7 @@ const LIRE = (pg, interdits) => pg.evaluate((I) => {
         dit(!/\d[\d   ,.]*\s?€/.test(p.apercu) && /•••/.test(p.apercu) && p.entieres >= 1, `D ${tag} : l'aperçu cache montants et mots, et la ligne « contient » entière`, p.apercu.replace(/\n/g, ' | '));
         await capture(pg, `D-${tag}-reglages`);
         const avant = b.ecritures;
-        await pg.click('[data-stream-cat="montants"] button[role="switch"]');
+        await pg.click('[data-stream-cat="montants"] button[role="switch"]', { timeout: 5000 }).catch(() => {});
         await attendre(400);
         const ap = await pg.evaluate(() => ({ apercu: (document.querySelector('[data-stream-apercu]') || {}).innerText || '', cache: (document.querySelector('[data-stream-cat="montants"]') || { getAttribute: () => null }).getAttribute('data-stream-cache') }));
         dit(ap.cache === '0' && /89,00\s?€/.test(ap.apercu), `D ${tag} : aperçu EN DIRECT — montants montrés ⇒ « 89,00 € » apparaît`, JSON.stringify(ap));
@@ -143,14 +143,19 @@ const LIRE = (pg, interdits) => pg.evaluate((I) => {
         for (let i = 0; i < 20 && !envoye; i++) { await attendre(500); const m = b.lignes.find((l) => l.id === 'main'); const r = m && m.data && m.data.vrm_stream_regles; if (b.ecritures > avant && r && r.montants === false) envoye = r; }
         dit(!!envoye && envoye.marques && envoye.marques.length === 2, `D ${tag} : le programme est synchronisé (main.vrm_stream_regles, montants:false)`, JSON.stringify(envoye));
         // Un mot ajouté à la main.
-        await pg.fill('[data-stream-liste="marques"] input', 'Puma');
-        await pg.click('[data-stream-ajouter="marques"]');
+        await pg.fill('[data-stream-liste="marques"] input', 'Puma', { timeout: 5000 }).catch(() => {});
+        await pg.click('[data-stream-ajouter="marques"]', { timeout: 5000 }).catch(() => {});
         await attendre(300);
         const n = await pg.evaluate(() => (document.querySelector('[data-stream-liste="marques"]') || { getAttribute: () => null }).getAttribute('data-stream-mots'));
         dit(n === '3', `D ${tag} : un mot s'ajoute à la liste`, n);
         await capture(pg, `D-${tag}-montants-montres`);
         // Rétablir (le reste du banc juge le programme d'origine).
-        await pg.click('[data-stream-cat="montants"] button[role="switch"]'); await attendre(300);
+        await pg.click('[data-stream-cat="montants"] button[role="switch"]', { timeout: 5000 }).catch(() => {});
+        // ⚠️ `save` écrit après 500 ms : on attend que la base du banc REÇOIVE le
+        //    programme rétabli avant de naviguer (sinon le banc jette son propre geste).
+        let retabli = false;
+        for (let i = 0; i < 30 && !retabli; i++) { await attendre(300); const m = b.lignes.find((l) => l.id === 'main'); const r = m && m.data && m.data.vrm_stream_regles; retabli = !!(r && r.montants === true); }
+        dit(retabli, `D ${tag} : la case recochée est synchronisée aussi`, '');
       }
       // ── E. Éteint d'un tap : le texte revient ──────────────────────────────
       if (PARTIES.includes('E')) {
