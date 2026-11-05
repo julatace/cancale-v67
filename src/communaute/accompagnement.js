@@ -98,7 +98,12 @@ export function chiffresPartage({ ventes = null, achats = null, maintenant = Dat
     }
   };
   ajouter(jv, 0); ajouter(ja, 2);
-  return { v: 1, ventes: !!jv, achats: !!ja, semaines, mois, at: Math.round(maintenant) };
+  // (5 nov., relecture) Les ventes Vestiaire au montant PAS SÛR ne sont pas dans
+  // ces jours (ni dans le nombre, ni dans le vendu) : l'écran Ventes les publie en
+  // NOMBRE (`horsVestiaire`). Elles partent avec, pour que la vue le DISE — un
+  // total partiel ne se présente jamais comme complet (§5).
+  const hv = jv && Number.isInteger(ventes.horsVestiaire) && ventes.horsVestiaire > 0 ? Math.min(ventes.horsVestiaire, 1000000) : 0;
+  return { v: 1, ventes: !!jv, achats: !!ja, semaines, mois, ...(hv ? { horsVc: hv } : {}), at: Math.round(maintenant) };
 }
 
 // ── CE QUE L'APP PUBLIE : LE DÉTAIL ──────────────────────────────────────────
@@ -156,12 +161,18 @@ export function charge(niveau, lire = lireLocal, maintenant = Date.now()) {
   return { chiffres, detail };
 }
 // Rend : 'rien' (rien à publier) · 'inchange' · 'publie' · 'refuse' · 'pas-su'.
-export async function publierPartage(headers, { force = false, lire = lireLocal, envoyer = fetch } = {}) {
+// `publie` = ce que la BASE dit avoir rangé ({ chiffres_le, detail_le }, rendu par
+// `accomp-lire`) : la signature locale n'est qu'un cache. Si la base n'a PLUS ce
+// que cet appareil croit avoir envoyé (effacé quand un créateur a retiré le
+// membre ou fermé son groupe, puis partage élargi ailleurs), on renvoie — sinon
+// le créateur lirait « pas encore publié » indéfiniment (5 nov., relecture).
+export async function publierPartage(headers, { force = false, lire = lireLocal, envoyer = fetch, publie } = {}) {
   const niveau = Number(lire(CLE_NIVEAU)) || 0;
   const c = charge(niveau, lire);
   if (!c) return 'rien';
   const sig = JSON.stringify([niveau, c.chiffres && { ...c.chiffres, at: 0 }, c.detail && { ...c.detail, at: 0 }]);
-  if (!force && lire(CLE_SIGNATURE) === sig) return 'inchange';
+  const manque = publie !== undefined && ((c.chiffres && !(publie && publie.chiffres_le)) || (c.detail && !(publie && publie.detail_le)));
+  if (!force && !manque && lire(CLE_SIGNATURE) === sig) return 'inchange';
   try {
     const r = await envoyer('/api/compte?mode=communaute', { method: 'POST', headers: { ...headers(), 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'accomp-publier', chiffres: c.chiffres, detail: c.detail }) });

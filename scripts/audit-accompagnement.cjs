@@ -34,6 +34,10 @@ const MUTATIONS = {
   'semaine-fausse': { f: MOD, m: (s) => remplace(s, '  d.setUTCDate(d.getUTCDate() + 4 - j);', '', 's') },
   'partage-par-defaut-chiffres': { f: ROUTE, m: (s) => remplace(s, "const p = c.partage == null ? 'rien' : String(c.partage);", "const p = c.partage == null ? 'chiffres' : String(c.partage);", 'pd') },
   'non-installe-vide': { f: ROUTE, m: (s) => remplace(s, "    if (r.etat === 'absent') return nonInstalle();\n    if (r.etat !== 'ok') return pasSu();\n    const d = objet(r.data);", "    if (r.etat === 'absent') return dire(200, { ok: true, accomp: { crees: [], rejoints: [], niveau: 0, publie: null } });\n    if (r.etat !== 'ok') return pasSu();\n    const d = objet(r.data);", 'ni') },
+  // (5 nov., relecture) La signature locale crue sur parole : ce que la base a effacé ne repart jamais.
+  'signature-crue': { f: MOD, m: (s) => remplace(s, "  if (!force && !manque && lire(CLE_SIGNATURE) === sig) return 'inchange';", "  if (!force && lire(CLE_SIGNATURE) === sig) return 'inchange';", 'sc') },
+  // (5 nov., relecture) Les ventes Vestiaire hors des totaux tues.
+  'hors-vc-tu': { f: MOD, m: (s) => remplace(s, "...(hv ? { horsVc: hv } : {}), ", '', 'hv') },
   'effacer-oublie': { f: path.join(RACINE, 'api/_lib/communaute.js'), m: (s) => remplace(s, '  const a = await effacerAccompagnement(owner, SERVICE);', '  const a = 0;', 'eo') },
 };
 
@@ -120,6 +124,9 @@ const appeler = async (route, corps) => {
     const serie = A.serieVue(sv, 'mois', 2, MAINTENANT);
     dit(serie[1].ventes === 3 && serie[1].achats === null && serie[1].depense === null, 'la vue dit « — » pour une moitié inconnue, jamais 0', JSON.stringify(serie[1]));
     dit(A.chiffresPartage({ ventes: null, achats: null }) === null, 'rien de publié ⇒ rien (null), pas des zéros');
+    const hv = A.chiffresPartage({ ventes: { ...VENTES, horsVestiaire: 2 }, achats: ACHATS, maintenant: MAINTENANT });
+    dit(hv.horsVc === 2, 'les ventes Vestiaire au montant pas sûr (hors des jours) partent en NOMBRE : la vue dira que le total est partiel', JSON.stringify(hv).slice(0, 120));
+    dit(!('horsVc' in c) && !('horsVc' in A.chiffresPartage({ ventes: { ...VENTES, horsVestiaire: null }, maintenant: MAINTENANT })), 'aucune vente Vestiaire hors des totaux (ou pas su) ⇒ rien d’ajouté');
   });
 
   await essaie('détail', () => {
@@ -146,6 +153,13 @@ const appeler = async (route, corps) => {
     global.localStorage = { setItem: (k, v) => { if (k === 'vrm_accomp_signature') avecSig.sig = JSON.parse(v); }, getItem: () => null, removeItem: () => {} };
     await A.publierPartage(H, { lire, envoyer }); const n = envoyes.length;
     dit(await A.publierPartage(H, { lire, envoyer }) === 'inchange' && envoyes.length === n, 'rien de changé ⇒ rien ne repart');
+    // (5 nov., relecture) La base a EFFACÉ ce que cet appareil avait envoyé (le
+    // créateur l'a retiré, puis il partage ailleurs) : la signature locale ne suffit pas.
+    avecSig.vrm_accomp_niveau = 2; avecSig.sig = undefined;
+    await A.publierPartage(H, { lire, envoyer, publie: { chiffres_le: 'x', detail_le: 'y' } }); const n2 = envoyes.length;
+    dit(await A.publierPartage(H, { lire, envoyer, publie: { chiffres_le: 'x', detail_le: 'y' } }) === 'inchange' && envoyes.length === n2, 'la base a tout ⇒ rien ne repart');
+    dit(await A.publierPartage(H, { lire, envoyer, publie: { chiffres_le: 'x', detail_le: null } }) === 'publie' && envoyes.length === n2 + 1 && envoyes[n2].detail, 'la base n’a plus le détail (effacé) ⇒ il REPART, même signature', envoyes.length - n2);
+    dit(await A.publierPartage(H, { lire, envoyer, publie: null }) === 'publie' && envoyes.length === n2 + 2, 'la base n’a plus rien ⇒ tout repart');
   });
 
   await essaie('vue', () => {

@@ -108,3 +108,47 @@ pas encore activés sur ta base. ») ; panne ⇒ 503 `pas-su`. Un partage absent
 - Le détail ne part que d'un appareil qui a lu Ventes (relevé `vrm_stats_ventes` local).
 - Pas de discussion de groupe ni de fil d'annonces « à la Skool » : seulement l'accès
   validé et le partage de chiffres demandés.
+
+## Relecture adverse (5 nov., même branche)
+Trois défauts trouvés, chacun REPRODUIT avant d'être corrigé (contrôle rouge sur
+l'archive de `e62a27a9`, vert après) :
+1. **Un total partiel présenté comme complet (§5).** Les ventes Vestiaire au montant
+   pas sûr ne sont pas dans `vrm_benefice_jours` (ni dans le nombre, ni dans le CA ;
+   l'écran Ventes les publie en NOMBRE, `horsVestiaire`) ; la vue disait « ventes
+   finalisées, toutes plateformes » sans le dire. Corrigé : les chiffres partagés portent
+   `horsVc` (facultatif, entier ≥ 0, accepté par `vrm_accomp_chiffres_ok`) et la vue dit
+   « Sans N ventes Vestiaire : leur montant versé n'est pas encore connu… » — la même
+   phrase pour le créateur et le membre (`data-cm-accomp-hors-vc`).
+2. **« Pas encore publié » pour toujours.** La signature locale (`vrm_accomp_signature`)
+   était crue sur parole : si la base avait EFFACÉ le détail (le créateur A retire le
+   membre) puis que le membre autorise le détail au groupe B, l'app répondait
+   « inchangé » et ne renvoyait rien — B lisait « Détail autorisé, pas encore publié »
+   indéfiniment. Corrigé : `publierPartage(…, { publie })` reçoit ce que la base dit
+   avoir rangé (`accomp-lire` → `publie`) et renvoie ce qui y manque (pas de boucle :
+   après l'envoi, la base l'a).
+3. **Une publication qui croise une révocation rangeait le détail APRÈS l'effacement.**
+   Reproduit sur le Postgres jetable : le membre passe à « rien » (transaction tenue
+   1,5 s), son app publie pendant ce temps ⇒ chiffres et détail rangés alors qu'il ne
+   partage plus rien (invisibles, mais « effacé de la base » était faux). Corrigé :
+   `vrm_accomp_elaguer` prend un verrou par membre (`vrm_accomp_p`) AVANT de lire ses
+   niveaux ; la publication attend la révocation, relit, et répond « rien à partager ».
+   Les boucles de `fermer` et `effacer` prennent ces verrous dans l'ordre (pas de blocage
+   mutuel) ; la clé n'est jamais celle que `demander` prend avant le verrou d'un groupe.
+
+Preuves : `audit-accompagnement-sql` **103 verts**, `--prouve` **18/18** (+ `elaguer-sans-verrou`,
+`hors-vc-refuse`) ; sur la 025 d'avant **4 rouges**. `audit-accompagnement` **40 verts**,
+`--prouve` **9/9** (+ `signature-crue`, `hors-vc-tu`) ; sur le code d'avant **3 rouges**.
+Banc `communaute-groupes` **46 verts** (1512/390, clair/sombre) ; sur le build de `e62a27a9`
+**1 rouge** (le total partiel tu). Captures regardées. `audit-communaute-sql` 206,
+`audit-fermer-compte` 36, `audit-fonctions-api`, `audit-coherence`, `audit-discord-oauth` verts.
+
+Vérifié sans défaut : aucune table lisible en direct (RLS forcé, aucun droit, clé de
+service comprise) ; identité toujours tirée du jeton ; jamais le compte ni l'email d'un
+membre rendu ; un créateur ne voit que SES groupes, et d'un membre seulement le niveau que
+CE membre a choisi pour CE groupe ; la route relaie avec le jeton de l'appelant ; le
+changement de vendeur sur un même navigateur efface `vrm_accomp_*` (`wipeLocalData`).
+
+Reste (non corrigé, dit) : une personne retirée ou refusée peut redemander tout de suite
+(le créateur doit retrancher) ; `vrm_accomp_ce_que_voit` sur un groupe FERMÉ rend encore la
+vue « membre » (l'écran ne propose pas ce bouton sur un groupe fermé) ; le niveau partagé
+n'est connu d'un appareil qu'après une ouverture de Communauté → Groupes sur cet appareil.

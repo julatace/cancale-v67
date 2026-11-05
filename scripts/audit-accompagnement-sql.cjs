@@ -27,7 +27,7 @@
 //  ⚠️ S'il ne trouve pas Postgres, il le DIT et sort en 1.
 // ════════════════════════════════════════════════════════════════════════════
 const fs = require('fs'), path = require('path'), os = require('os');
-const { spawnSync, execFileSync } = require('child_process');
+const { spawnSync, execFileSync, spawn } = require('child_process');
 const RACINE = path.join(__dirname, '..');
 const M = (f) => path.join(RACINE, 'supabase/migrations', f);
 const MIG = M('025-communaute-accompagnement.sql');
@@ -77,6 +77,12 @@ const MUTATIONS = {
   'retire-visible': { sql: (s) => remplace(s, "                                           where m.groupe = g.id and m.statut in ('attente', 'accepte')), '[]'::jsonb))", "                                           where m.groupe = g.id), '[]'::jsonb))", 'rv') },
   // Partage par défaut = chiffres.
   'defaut-chiffres': { sql: (s) => remplace(s, "        pa text := coalesce(p_partage, 'rien');", "        pa text := coalesce(p_partage, 'chiffres');", 'dc') },
+  // (5 nov., relecture) Sans verrou par membre, une publication qui croise une
+  // révocation range le détail APRÈS l'effacement.
+  'elaguer-sans-verrou': { sql: (s) => remplace(s, "  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('vrm_accomp_p'), pg_catalog.hashtext(p_owner::text));\n", '', 'esv2') },
+  // (5 nov., relecture) Le nombre de ventes Vestiaire hors des totaux refusé : la
+  // vue ne pourrait plus dire que le total est partiel.
+  'hors-vc-refuse': { sql: (s) => remplace(s, "k not in ('v', 'ventes', 'achats', 'semaines', 'mois', 'horsVc', 'at')", "k not in ('v', 'ventes', 'achats', 'semaines', 'mois', 'at')", 'hvr') },
   // La table des partages lisible par un navigateur.
   'partages-lisibles': { apres: 'grant select on public.vrm_accomp_partages to authenticated; alter table public.vrm_accomp_partages no force row level security; alter table public.vrm_accomp_partages disable row level security;' },
   // Anon lit les groupes.
@@ -314,6 +320,39 @@ const membreDe = (l, nom) => (l.crees[0] && l.crees[0].membres || []).find((m) =
     vB = membreDe(lire(U.A), 'Élève Bea');
     dit(vB && !('chiffres' in vB), 'révoquer tout : plus aucun chiffre');
     dit(Q("select count(*) from public.vrm_accomp_partages where chiffres is not null") === '0', 'et les chiffres sont EFFACÉS de la base');
+  });
+
+  // (5 nov., relecture) Une publication qui CROISE une révocation : le membre passe
+  // à « rien » (transaction tenue ouverte 1,5 s) pendant que son app publie. La
+  // publication doit attendre, relire le niveau et ne RIEN ranger.
+  await essaie('révoquer pendant une publication', async () => {
+    partage(U.B, mB, 'detail'); publier(U.B, CHIFFRES, DETAIL);
+    dit(Q(`select count(*) from public.vrm_accomp_partages where owner = '${U.B}' and detail is not null`) === '1', '(préparation) le détail est rangé');
+    const t2 = new Promise((res) => {
+      const p = spawn(PSQL, argsPsql('postgres', DB));
+      let err = ''; p.stderr.on('data', (d) => { err += d; });
+      p.on('close', (c) => res({ ok: c === 0, err }));
+      p.stdin.end(comme(U.B) + `begin;\nselect public.vrm_accomp_partage(${lit(mB)}, 'rien');\nselect pg_catalog.pg_sleep(1.5);\ncommit;\n`);
+    });
+    await new Promise((r) => setTimeout(r, 500));
+    const r1 = publier(U.B, CHIFFRES, DETAIL);
+    const r2 = await t2;
+    dit(r2.ok, '(la révocation tenue ouverte a abouti)', r2.err);
+    const reste = Q(`select count(*) from public.vrm_accomp_partages where owner = '${U.B}' and (detail is not null or chiffres is not null)`);
+    dit(reste === '0', 'une publication qui croise « rien » ne range RIEN après l’effacement (elle attend et relit le niveau)', 'rangé quand même : ' + JSON.stringify(r1));
+    dit(r1 && r1.ok === false && r1.raison === 'rien-a-partager', 'et elle le dit (« rien à partager »)', JSON.stringify(r1));
+  });
+
+  await essaie('ventes Vestiaire hors des totaux', () => {
+    partage(U.B, mB, 'chiffres');
+    const r = publier(U.B, { ...CHIFFRES, horsVc: 2 }, null);
+    dit(r.ok === true, 'le nombre de ventes Vestiaire hors des totaux (`horsVc`) est accepté', JSON.stringify(r));
+    const vB = membreDe(lire(U.A), 'Élève Bea');
+    dit(vB && vB.chiffres && vB.chiffres.horsVc === 2, 'et rendu au créateur (la vue dit que le total est partiel)', JSON.stringify(vB && vB.chiffres).slice(0, 160));
+    dit(publier(U.B, { ...CHIFFRES, horsVc: 'deux' }, null).raison === 'forme', 'un `horsVc` qui n’est pas un entier est refusé (forme), sans erreur');
+    dit(publier(U.B, { ...CHIFFRES, horsVc: -1 }, null).raison === 'forme', 'un `horsVc` négatif est refusé (forme)');
+    dit(publier(U.B, { ...CHIFFRES, semaines: { '2026-W45': ['un', 1, 1, 1] } }, null).raison === 'forme', 'un texte dans les quatre nombres est refusé (forme), sans erreur');
+    partage(U.B, mB, 'rien');
   });
 
   await essaie('retirer, quitter, code, fermer', () => {

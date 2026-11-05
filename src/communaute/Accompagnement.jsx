@@ -67,6 +67,7 @@ export function VueMembre({ vue, pour = 'createur', nomCreateur = '' }) {
           </tr>)}</tbody>
         </table>
         {(!vue.chiffres.ventes || !vue.chiffres.achats) && <p className="vrm-cm-note" data-cm-accomp-moitie>{!vue.chiffres.ventes ? 'Ventes' : 'Achats'} pas encore publiés depuis {pour === 'membre' ? 'ton' : 'son'} VRM : « — », jamais 0.</p>}
+        {vue.chiffres.ventes && vue.chiffres.horsVc > 0 && <p className="vrm-cm-note" data-cm-accomp-hors-vc={vue.chiffres.horsVc}>Sans {vue.chiffres.horsVc} vente{vue.chiffres.horsVc > 1 ? 's' : ''} Vestiaire : {vue.chiffres.horsVc > 1 ? 'leur montant versé n’est pas encore connu, elles ne sont comptées' : 'son montant versé n’est pas encore connu, elle n’est comptée'} ni dans les ventes ni dans le vendu.</p>}
         <p className="vrm-cm-note">Ventes finalisées, toutes plateformes, datées au jour de la vente ; achats Vinted hors annulés. Publié le {dateHeure(vue.chiffres_le) || '—'}.</p>
         {e === 'detail' && (vue.detail ? <div data-cm-accomp-detail={vue.detail.ventes.length}>
           <h4>Ventes · {vue.detail.ventes.length > 1 ? `les ${vue.detail.ventes.length} plus récentes` : 'la plus récente'}</h4>
@@ -256,7 +257,7 @@ export default function Accompagnement({ api, headers, prenom = '', codeLien = '
       setD(r.accomp); setEtat('lu');
       // Ce que l'app publie suit le niveau RENDU PAR LA BASE (jamais deviné ici).
       noterNiveau(r.accomp.niveau);
-      if (r.accomp.niveau >= 1) publierPartage(headers).then((x) => { if (x === 'publie' && vivant.current) lire(true); });
+      if (r.accomp.niveau >= 1) publierPartage(headers, { publie: r.accomp.publie || null }).then((x) => { if (x === 'publie' && vivant.current) lire(true); });
       return;
     }
     if (discret && d) { setMsg(r.message || PAS_SU); return; }

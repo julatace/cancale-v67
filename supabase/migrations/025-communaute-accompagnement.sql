@@ -172,10 +172,17 @@ $$;
 -- Ce que la base GARDE d'un membre = ce que son niveau le plus haut permet,
 -- sur ses adhésions vivantes (en attente ou acceptées, groupe ouvert). Le reste
 -- est EFFACÉ (mis à vide), pas seulement caché : révoquer, c'est retirer.
+-- (5 nov., relecture) Un VERROU par membre, pris AVANT de lire ses niveaux et
+-- gardé jusqu'à la fin de la transaction : une publication qui croise une
+-- révocation (« rien » pendant que l'app envoie le détail) attend qu'elle soit
+-- faite et relit le niveau — sans lui, le détail se rangeait APRÈS l'effacement.
+-- Clé à part (`vrm_accomp_p`) : jamais celle que `demander` prend avant le
+-- verrou d'un groupe, donc aucun croisement d'ordre (pas de blocage mutuel).
 create or replace function public.vrm_accomp_elaguer(p_owner uuid)
 returns int language plpgsql volatile set search_path = '' as $$
 declare n int;
 begin
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('vrm_accomp_p'), pg_catalog.hashtext(p_owner::text));
   select coalesce(pg_catalog.max(public.vrm_accomp_niveau(m.partage)), 0) into n
     from public.vrm_accomp_membres m join public.vrm_accomp_groupes g on g.id = m.groupe
    where m.owner = p_owner and m.statut in ('attente', 'accepte') and g.ferme_le is null;
@@ -207,8 +214,10 @@ $$;
 
 -- La forme des CHIFFRES publiés par l'app :
 --   { v: 1, ventes: bool, achats: bool, semaines: { "2026-W45": [nVentes, caCentimes, nAchats, depenseCentimes] },
---     mois: { "2026-11": [ … ] }, at: nombre }
+--     mois: { "2026-11": [ … ] }, horsVc?: entier, at: nombre }
 -- `ventes`/`achats` = la moitié est-elle CONNUE (« pas su » ≠ 0) ? Entiers ≥ 0.
+-- `horsVc` (facultatif) = le NOMBRE de ventes Vestiaire au montant pas sûr, hors
+-- de ces totaux : la vue le dit (un total partiel ne se dit jamais complet, §5).
 create or replace function public.vrm_accomp_quatre_ok(v jsonb)
 returns boolean language sql immutable set search_path = '' as $$
   select pg_catalog.jsonb_typeof(v) = 'array' and pg_catalog.jsonb_array_length(v) = 4
@@ -224,7 +233,10 @@ returns boolean language sql immutable set search_path = '' as $$
      and pg_catalog.jsonb_typeof(p -> 'ventes') = 'boolean' and pg_catalog.jsonb_typeof(p -> 'achats') = 'boolean'
      and pg_catalog.jsonb_typeof(p -> 'semaines') = 'object' and pg_catalog.jsonb_typeof(p -> 'mois') = 'object'
      and (p -> 'at' is null or pg_catalog.jsonb_typeof(p -> 'at') = 'number')
-     and not exists (select 1 from pg_catalog.jsonb_object_keys(p) k where k not in ('v', 'ventes', 'achats', 'semaines', 'mois', 'at'))
+     and (p -> 'horsVc' is null or case when pg_catalog.jsonb_typeof(p -> 'horsVc') = 'number'
+          then (p ->> 'horsVc')::numeric between 0 and 1000000 and (p ->> 'horsVc')::numeric = pg_catalog.trunc((p ->> 'horsVc')::numeric)
+          else false end)
+     and not exists (select 1 from pg_catalog.jsonb_object_keys(p) k where k not in ('v', 'ventes', 'achats', 'semaines', 'mois', 'horsVc', 'at'))
      and (select pg_catalog.count(*) from pg_catalog.jsonb_object_keys(p -> 'semaines')) <= 110
      and (select pg_catalog.count(*) from pg_catalog.jsonb_object_keys(p -> 'mois')) <= 36
      and not exists (select 1 from pg_catalog.jsonb_each(p -> 'semaines') e(k, v) where e.k !~ '^[0-9]{4}-W[0-9]{2}$' or not public.vrm_accomp_quatre_ok(e.v))
@@ -453,7 +465,7 @@ begin
   if moi is null then return jsonb_build_object('ok', false, 'raison', 'session'); end if;
   update public.vrm_accomp_groupes g set ferme_le = pg_catalog.now() where g.id = p_groupe and g.cree_par = moi and g.ferme_le is null;
   if not found then return jsonb_build_object('ok', false, 'raison', 'pas-createur'); end if;
-  for o in select m.owner from public.vrm_accomp_membres m where m.groupe = p_groupe loop
+  for o in select distinct m.owner from public.vrm_accomp_membres m where m.groupe = p_groupe order by 1 loop
     perform public.vrm_accomp_elaguer(o);
   end loop;
   return jsonb_build_object('ok', true);
@@ -501,7 +513,7 @@ begin
   -- nulle part est effacé ; puis le groupe est détaché de son compte.
   update public.vrm_accomp_groupes g set ferme_le = pg_catalog.now() where g.cree_par = p_owner and g.ferme_le is null;
   for o in select distinct m.owner from public.vrm_accomp_membres m join public.vrm_accomp_groupes g on g.id = m.groupe
-            where g.cree_par = p_owner loop
+            where g.cree_par = p_owner order by 1 loop
     perform public.vrm_accomp_elaguer(o);
   end loop;
   update public.vrm_accomp_groupes g set cree_par = pg_catalog.gen_random_uuid()

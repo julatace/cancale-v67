@@ -50,7 +50,7 @@ const session = (id) => ({ access_token: jetonDe(id), refresh_token: 'r-' + id, 
 
 // Les agrégats que l'app de Bruno a publiés (inventés) : 3 ventes en novembre, 2 achats.
 const ici = new Date(); const jour = (dec) => { const d = new Date(ici); d.setDate(d.getDate() - dec); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
-const VENTES_B = { v: 2, plateformes: ['Vinted'], jours: { [jour(0)]: [2, 9000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [jour(1)]: [1, 4550, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] }, at: Date.now() };
+const VENTES_B = { v: 2, plateformes: ['Vinted'], jours: { [jour(0)]: [2, 9000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [jour(1)]: [1, 4550, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] }, horsVestiaire: 2, at: Date.now() };
 const ACHATS_B = { v: 1, jours: { [jour(0)]: [2, 5000] }, at: Date.now() };
 const RELEVE_B = { v: 1, l: [['Vinted', 'compte_banc_b', 't-1', Date.now() - 3600e3, 45.5, 20, 1, 'Paire inventée du banc 42', '7', '']], at: Date.now() };
 const ACH_REL_B = { v: 1, l: [[Date.now() - 7200e3, 'compte_banc_b', 'Achat inventé du banc', 25]], at: Date.now() };
@@ -350,6 +350,8 @@ const secretsDans = (s, autre) => [autre, USERS[autre].email, USERS[autre].login
       const n = await pgA.$$eval('[data-cm-accomp-ligne]', (e) => e.reduce((s, x) => s + Number(x.getAttribute('data-n') || 0), 0));
       dit(n === 3, 'le créateur lit 3 ventes sur les mois montrés', n);
       dit(!(await pgA.$('[data-cm-accomp-detail]')) && !/Paire inventée du banc/.test(await texte(pgA)), 'aucun détail (pas autorisé)');
+      // (5 nov., relecture) 2 ventes Vestiaire au montant pas sûr ne sont PAS dans ces totaux : la vue le dit (§5).
+      dit(await attr(pgA, '[data-cm-accomp-hors-vc]', 'data-cm-accomp-hors-vc') === '2', 'le total est dit PARTIEL : « sans 2 ventes Vestiaire » (montant pas encore su)', await attr(pgA, '[data-cm-accomp-hors-vc]', 'data-cm-accomp-hors-vc'));
       vueA = await pgA.evaluate(() => document.querySelector('[data-cm-accomp-vue]').innerText);
       await capture(pgA, '5-chiffres-1512-sombre');
       await pgA.click('.vrm-cm-feuille .vrm-cm-x');
