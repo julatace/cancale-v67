@@ -335,7 +335,7 @@ function chargerAuth(rester) {
     const e = r || {};
     if (!e.connecte) { document.body.classList.remove('decide'); rendreAuth(e); return; }
     lirePermisTransp((t) => {
-      if (!CARTE && !rester && !PERMIS_MANQUE(t)) { ouvrirVRM(); return; }
+      if (!CARTE && !rester && !globalThis.__vrmOrionCompat && !PERMIS_MANQUE(t)) { ouvrirVRM(); return; }
       document.body.classList.remove('decide');
       rendreAuth(Object.assign({}, e, { transp: t }));
     });

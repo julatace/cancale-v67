@@ -9,6 +9,7 @@ Le popup envoyait `ouvrir: CARTE` puis ouvrait lui-même VRM hors carte. Après 
 - Le mot de passe envoie `ouvrir:false` et affiche le compte effectivement connecté sur succès du moteur ; champ du mot de passe retiré. La capture après connexion (`visiteApresSession`) reste déclenchée, avec les gardes habituelles. Aucun achat, message, offre ou changement d’annonce de test.
 - Le moteur borne la réponse d’authentification à 12 secondes et son corps à 6 secondes ; aucun jeton n’est rangé si ces réponses manquent. Le popup borne son attente à 25 secondes et redevient utilisable après échec ; un clic ou des Entrée répétées ne lancent qu’une demande à la fois.
 - L’adaptateur Orion transforme une API native à promesse en rappel lorsque le code partagé attend un rappel. Les rejets passent par `runtime.lastError` uniquement pendant le rappel ; aucun listener ou API absente n’est fabriqué.
+- Rouvrir la fenêtre d’une extension déjà connectée dans Orion conserve également Vinted ouvert (Chrome garde son comportement habituel).
 - « Se connecter avec VRM » reste explicite pour OAuth et captcha : aucun contournement de vérification. Le bouton « Ouvrir VRM » reste disponible après connexion.
 - Notice et fenêtre Orion expliquent les limites iOS : un raccourci web autonome peut fonctionner hors Orion, sans ses extensions. L’extension n’est pas installée dans Safari ni dans l’application Vinted. Il faut Vinted ouvert dans Orion ; pas de promesse de capture iOS en veille ou navigateur fermé.
 
