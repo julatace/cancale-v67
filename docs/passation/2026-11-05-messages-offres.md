@@ -129,3 +129,12 @@ et sombre. `messages-offres-historique.test.mjs` : 12/12 (2 nouveaux, rouges sur
 Reste (inchangé) : sans fil capté (1 642 entrées), la description de la boîte reste l'extrait —
 la boîte ne porte aucun titre d'article (clés mesurées : `description, id, item_photos,
 opposite_user, unread, updated_at`), on ne peut donc pas savoir si elle redit le titre.
+
+Bancs voisins sur le build corrigé (passés un par un) : `messagerie` vert (les KO instables
+d'avant ne reviennent pas seul), `messages-priorite`, `messages-volets`, `traduire-messages`,
+`offres-mini-push` 11/11, `retrait-conv-push` 15/15 verts. `messages-sites` : 1 rouge
+(« vestiaire · 390 px : la liste prend toute la largeur »), le MÊME sur b7c40e08 et sur
+cdd871a4 (main d'avant la branche) — Vestiaire, hors de ce chantier. `conversation-relecture-
+interface.cjs` tourne avec `VRM_CHROMIUM_PATH=/opt/pw-browsers/chromium` (pas `CHROMIUM_PATH`) :
+21 contrôles verts. Audits `tdz`, `variables`, `coherence`, `offres-email`, `bancs`, `icones`,
+`boutons` verts.
