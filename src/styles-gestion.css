@@ -352,7 +352,7 @@
 .vrm-repartition-anneau svg{display:block;width:100%;height:auto;}
 .vrm-day-performance{min-width:0;}
 .vrm-day-performance h3{font-size:15px;margin:0;}
-.vrm-day-performance .vrm-day-head button{border:0;background:transparent;color:var(--vrm-accent);font:inherit;font-size:12px;min-height:44px;cursor:pointer;}
+.vrm-day-performance .vrm-day-head button{border:0;background:transparent;color:var(--vrm-accent-texte);font:inherit;font-size:12px;min-height:44px;cursor:pointer;}
 .vrm-performance-chiffres{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:12px 0 16px;}
 .vrm-performance-chiffres div{min-width:0;}
 .vrm-performance-chiffres span{display:block;font-size:11px;color:var(--vrm-muted);line-height:1.5;}

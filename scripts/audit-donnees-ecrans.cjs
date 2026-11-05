@@ -45,10 +45,10 @@ if (process.argv.includes('--mutations')) {
     ['Vestiaire « pas encore de vente captée » en dur', 'src/App.jsx', "{ nom:'Vestiaire Collective', ca:vc.ca, note:vc.note },", "{ nom:'Vestiaire Collective', ca:null, note:'pas encore de vente captée' },"],
     ['prix Leboncoin inconnu compté 0 €', 'src/App.jsx', "const caLbc = (lbcOk.length && !lbcSansPrix) ? lbcOk.reduce((s,o)=> s + lbcPrix(o), 0) : null;", "const caLbc = lbcOk.length ? lbcOk.reduce((s,o)=> s + (lbcPrix(o)||0), 0) : null;"],
     ['Statistiques : « vendu » sans les non comptées', 'src/App.jsx', 'const partielVendu = manque.length > 0 || ncPeriode.length > 0;', 'const partielVendu = manque.length > 0;'],
-    ['« Lie un compte » avant la liste des comptes', 'src/App.jsx', '{accounts.length===0 && accountsReady===true && !baseKO', '{accounts.length===0 && !baseKO'],
+    // (5 nov.) « Lie un compte » avant la liste des comptes : plus de mutation, la phrase a été retirée le 3 nov. (voir D4 : absente = conforme).
     ['valeur des annonces NaN', 'src/App.jsx', 'if (Number.isFinite(p0)) { val += p0; valConnus++; }', 'val += p0; valConnus++;'],
     ['charge datée en UTC', 'src/App.jsx', '  const auj = dateLocaleISO();\n  const [dDate, setDDate]', '  const auj = new Date().toISOString().slice(0, 10);\n  const [dDate, setDDate]'],
-    ['« Finalisé sur Vinted » : prix illisible = 0 € muet', 'src/App.jsx', "if(st==='completed' && amtLu==null) prixPasLu++;", ''],
+    ['« Finalisé sur Vinted » : prix illisible = 0 € muet', 'src/App.jsx', "if(st==='completed' && amtLu==null){ prixPasLu++; if(cc) cc.nPrixPasLu++; }", ''],
     ['semaine en zéros sans ventes lues', 'src/App.jsx', 'if (actifsS>0 && nomsVentesKO.length>=actifsS) return (', 'if (false) return ('],
   ];
   let tues = 0;
@@ -231,7 +231,7 @@ const charger = (noms, ctx) => {
     const corps = m ? m[0] : '';
     dit(/Number\.isFinite\(p0\)\) \{ val \+= p0; valConnus\+\+; \}/.test(corps), 'valeur des annonces : seuls les prix lisibles (« NaN € » impossible), et la couverture est comptée');
     dit(/annStats\.valConnus<annStats\.n\?'au moins '/.test(APPc), '… et l’écran dit « au moins » / « prix lu sur N »');
-    dit(/const amtLu=montantCommandeLu\(o\), amt0=amtLu==null\?0:amtLu;/.test(APPc) && /if\(st==='completed' && amtLu==null\) prixPasLu\+\+;/.test(APPc), '« Finalisé sur Vinted » : prix illisible compté à part');
+    dit(/const amtLu=montantCommandeLu\(o\), amt0=amtLu==null\?0:amtLu;/.test(APPc) && /if\(st==='completed' && amtLu==null\)(?: prixPasLu\+\+;|\{ prixPasLu\+\+;(?: if\(cc\) cc\.nPrixPasLu\+\+;)? \})/.test(APPc), '« Finalisé sur Vinted » : prix illisible compté à part'); // (5 nov.) a7f1fac4 (5 nov.) le compte aussi par compte : `{ prixPasLu++; if(cc) cc.nPrixPasLu++; }`
     dit(/data-finalise-prix-pas-lu=/.test(APPc) && /setLiveStats\(\{caMois,caEncaisse,prixPasLu,/.test(APPc), '… publié et dit (« au moins »)');
   }
 

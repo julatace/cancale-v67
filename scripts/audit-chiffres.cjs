@@ -36,7 +36,12 @@ const regleBenef = (() => { const i = app.indexOf('const ajouterVenteBenefice');
 
 // 2) …et c'est bien CE chiffre qui est affiché
 // (un audit suit la RÈGLE, pas son orthographe : d'autres attributs peuvent précéder `label`)
-/StatBox\b[^>]*?label="Bénéfice[^"]*" value=\{fmtE0\(totals\.benefConnu\)\}/.test(app)
+// (5 nov.) Depuis le 3 nov. (2ef727df) la carte ne s'appelle plus « Bénéfice »
+// (c'est le nom de la règle de Compta) : son libellé est une constante de
+// src/beneficeNoms.js (« Bénéfice brut », « Après frais de vente »). La règle
+// jugée reste : c'est `totals.benefConnu` (le sous-ensemble connu) qui s'affiche.
+(/StatBox\b[^>]*?label=(?:"Bénéfice[^"]*"|\{NOM_BENEFICE_BRUT\}|\{NOM_APRES_FRAIS\}) value=\{(?:totals\.benefConnu==null\?'—':)?fmtE0\(totals\.benefConnu\)\}/.test(app)
+  && /import \{[^}]*\bNOM_BENEFICE_BRUT\b[^}]*\bNOM_APRES_FRAIS\b[^}]*\} from "\.\/beneficeNoms\.js"/.test(app))
   ? ok('Ventes : la carte affiche `benefConnu`, pas `ca - cout`')
   : nok('Ventes : la carte affiche `totals.benefConnu`');
 
@@ -139,12 +144,22 @@ nBenef === 2 ? ok('Rapports mensuel ET annuel : bénéfice sur le coût connu')
   // (16 oct.) La carte de Ma journée est en deux colonnes « En attente » /
   // « À virer » : le bloc est plus long, la fenêtre suit (la RÈGLE reste : deux
   // montants, deux mots, et l'âge d'un vieux solde).
-  const i = app.indexOf('escrow && escrow.dispo > 0');
-  const F = i < 0 ? '' : app.slice(i, i + 1600);
-  F ? ok('l\'accueil dit l\'argent déjà disponible à virer')
+  // (5 nov.) Depuis le 4 nov. (e0385ee3, « Argent à venir : une règle ») la
+  // carte lit `escrowJ` (le porte-monnaie) à côté de l'argent À VENIR
+  // (src/argentAVenir.js) ; « En attente » est devenu « À venir ». La règle
+  // reste : le disponible est dans la MÊME carte que l'argent à venir, sous un
+  // AUTRE mot, et c'est bien `dispo` (le chiffre de Vinted) qui s'y écrit.
+  let i = app.indexOf('escrow && escrow.dispo > 0');
+  if (i < 0) i = app.indexOf('escrowJ && escrowJ.dispo > 0');
+  const F = i < 0 ? '' : app.slice(i, i + 2400); // la carte s'est allongée (en-tête « À venir » + sites)
+  const avant = i < 0 ? '' : app.slice(Math.max(0, i - 1600), i + 1600);
+  const motAttente = (/<Icon name="wallet"[^>]*\/>\s*(À venir|En attente)\s*</.exec(F) || [])[1];
+  (F && (/déjà disponibles à virer/.test(F) || /<Montant v=\{escrowJ?\.dispo\b/.test(F)))
+    ? ok('l\'accueil dit l\'argent déjà disponible à virer')
     : nok('l\'argent virable doit apparaître à côté de l\'argent en attente');
   // ⚠️ « en attente » et « disponible » ne se confondent JAMAIS (§5.14).
-  (/déjà disponibles à virer/.test(F) || (/À virer/.test(F) && /En attente/.test(app.slice(Math.max(0, i - 1600), i + 1600)) && /déjà disponibles/.test(F)))
+  (/déjà disponibles à virer/.test(F) || (/À virer/.test(F) && /En attente/.test(avant) && /déjà disponibles/.test(F))
+    || (/>À virer</.test(F) && !!motAttente && motAttente !== 'À virer'))
     ? ok('et ne le confond pas avec l\'argent en attente')
     : nok('les deux montants doivent porter des mots différents');
   /plusVieuxJours>7/.test(F)
@@ -212,12 +227,19 @@ nBenef === 2 ? ok('Rapports mensuel ET annuel : bénéfice sur le coût connu')
   /ventesAffichees\.slice\(0, ventesMax\)/.test(app)
     ? ok('et l\'écran n\'en dessine qu\'une tranche')
     : nok('287 cartes d\'un coup font 46 209 px sur iPhone');
-  /Voir plus — \{ventesMax\} affichées sur \{ventesAffichees\.length\}/.test(app)
+  // (5 nov.) Depuis le 4 nov. (f1001d7a, « Conserver les parcours vendeurs ») le
+  // bouton dit « Afficher les N suivantes · {affichées}/{total} » et la tranche
+  // survit à un aller-retour (useVueSession) : elle ne se remet à 60 que si un
+  // filtre CHANGE. La règle jugée est la même : le TOTAL est écrit, et changer
+  // de filtre ou chercher repart du haut.
+  (/Voir plus — \{ventesMax\} affichées sur \{ventesAffichees\.length\}/.test(app)
+    || /Afficher les \{Math\.min\(120,ventesAffichees\.length-ventesMax\)\} suivantes · \{ventesMax\}\/\{ventesAffichees\.length\}/.test(app))
     ? ok('le bouton « Voir plus » porte le total — rien n\'est caché')
     : nok('le bouton doit dire combien de ventes existent en tout');
   // ⚠️ Une recherche doit repartir du haut, sinon « 240 affichées » resterait
   // écrit sur une liste qui n'en compte plus que trois.
-  /setVentesMax\(60\); \}, \[vFilter, ordSearchDiff, periode, showHidden\]/.test(app)
+  (/setVentesMax\(60\); \}, \[vFilter, ordSearchDiff, periode, showHidden\]/.test(app)
+    || /const sig=JSON\.stringify\(\[vFilter,ordSearchDiff,periode,showHidden\]\);if\(filtresLimiteVentes\.current!==null&&filtresLimiteVentes\.current!==sig\)setVentesMax\(60\);filtresLimiteVentes\.current=sig; \}, \[vFilter, ordSearchDiff, periode, showHidden\]/.test(app))
     ? ok('changer de filtre ou chercher repart du haut')
     : nok('la tranche doit se remettre à 60 quand la liste change');
 }

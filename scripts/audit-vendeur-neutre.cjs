@@ -67,7 +67,11 @@ const ADMIN = /Restart project|VAPID_PRIVATE_KEY|EBAY_RUNAME|docs\/ebay-api\.md|
 const traces = [], consignes = [];
 const contientProprio = (n) => {
   let trouve = false;
-  const voir = (x) => { if (trouve || !x || typeof x.type !== 'string') return; if (x.type === 'Identifier' && x.name === 'proprio') { trouve = true; return; } for (const k in x) { if (k === 'loc') continue; const v = x[k]; if (Array.isArray(v)) v.forEach(voir); else if (v && typeof v === 'object' && v.type) voir(v); } };
+  // (5 nov.) + `x.proprietaire` : la réponse du SERVEUR qui dit « tu es le
+  // propriétaire » (ex. `/api/compte?mode=relances`, carte des e-mails de l'essai,
+  // 5a5c6648) — la même condition « propriétaire », lue au lieu d'être recalculée.
+  const voir = (x) => { if (trouve || !x || typeof x.type !== 'string') return; if (x.type === 'Identifier' && x.name === 'proprio') { trouve = true; return; }
+    if ((x.type === 'MemberExpression' || x.type === 'OptionalMemberExpression') && !x.computed && x.property && x.property.type === 'Identifier' && x.property.name === 'proprietaire') { trouve = true; return; } for (const k in x) { if (k === 'loc') continue; const v = x[k]; if (Array.isArray(v)) v.forEach(voir); else if (v && typeof v === 'object' && v.type) voir(v); } };
   voir(n); return trouve;
 };
 for (const f of fichiers) {

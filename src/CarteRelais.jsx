@@ -406,8 +406,10 @@ export function useCommunesCp(vue, actif) {
 //   4. « Lieu à confirmer » ; 5. « À vérifier » (replié) ; 6. « En route » (replié, à la fin).
 // La carte (plan) est au-dessus du sélecteur de ville ; les sections suivent la ville choisie.
 // Aucune règle neuve : les mêmes lignes (`pointsARetirer`), rangées.
-export const SECTIONS_RETRAIT = ['aujourdhui', 'prets', 'avenir', 'lieu', 'verifier', 'route'];
+export const SECTIONS_RETRAIT = ['aujourdhui', 'prets', 'avenir', 'lieu', 'verifier', 'double', 'route'];
 export function sectionDuColis(x, point) {
+  // (5 nov.) Une moitié Vinted peut-être déjà comptée par son transporteur : à part, jamais comptée.
+  if (x.horsCompte && x.raisonCode === 'doute_meme_relais') return 'double';
   if (x.horsCompte) return 'verifier';
   if (Number.isFinite(x.jours) && x.jours <= 0) return 'aujourdhui';
   if (!point || point.inconnu) return 'lieu';
@@ -437,11 +439,21 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte, ec
   const trConnu = (x) => !!(x.transp && !x.trInconnu && cleStatTransporteur(x.transp) !== 'pas-lu');
   const ligne = (x, parLigne = true) => <LigneRetraitF key={x.cle || x.id} x={x} Photo={Photo} gestes={gestes} detail={detail} echeance={x.horsCompte ? null : echeance} statut={x.horsCompte ? statut : null} retirer={retirer} C={C} avecTransp={parLigne && trConnu(x)} titreDe={titreDe}/>;
   // Le rangement : chaque colis dans SA section, avec son point.
-  const parSection = { aujourdhui: [], prets: [], avenir: [], lieu: [], verifier: [] };
+  const parSection = { aujourdhui: [], prets: [], avenir: [], lieu: [], verifier: [], double: [] };
   // (3 nov., 19 h) Une ville choisie : un point SANS ville (nom seul, homonyme) va sous « Lieu à
   // confirmer », avec son nom — jamais compté dans la ville, jamais caché.
   const aConfirmer = (x, p) => !!vChoisie && !p.inconnu && sansVille.has(p.cle) && !x.horsCompte && !(Number.isFinite(x.jours) && x.jours <= 0);
-  for (const p of points) for (const x of p.arrives) parSection[aConfirmer(x, p) ? 'lieu' : sectionDuColis(x, p)].push({ x, p });
+  // (5 nov., Julien : « ça me met 2 points de retrait alors que c'est le même ») UN POINT,
+  // UNE CARTE : un point qui a un colis prêt ET un colis au code à venir était dessiné deux
+  // fois (« Prêts à retirer » puis « Code à venir »). Le point va dans la section de son colis
+  // le plus pressé, avec tous ses colis ; chaque ligne garde sa puce (« Code à venir »,
+  // « dernier jour »). « Lieu à confirmer » et « À vérifier » ne bougent pas.
+  const RANG_SECTION = { aujourdhui: 0, prets: 1, avenir: 2 };
+  for (const p of points) {
+    const secs = p.arrives.map((x) => (aConfirmer(x, p) ? 'lieu' : sectionDuColis(x, p)));
+    const principale = secs.filter((s) => s in RANG_SECTION).sort((a, b) => RANG_SECTION[a] - RANG_SECTION[b])[0] || null;
+    p.arrives.forEach((x, i) => parSection[secs[i] in RANG_SECTION ? principale : secs[i]].push({ x, p }));
+  }
   const attendus = connus.flatMap((p) => p.attendus.map((c) => ({ c, p })));
   const routeSans = vChoisie ? [] : (enRoute || []);
   const nRoute = attendus.length + routeSans.length;
@@ -465,7 +477,7 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte, ec
           </span>
           <span className="vrm-rpf-meta">
             {tCommun ? <span className="vrm-rpf-transp" data-relais-transporteur={tCommun.cle || ''}><PastilleTransporteur t={tCommun} C={C} seul taille={18}/></span> : null}
-            <span className="vrm-rpf-n" data-relais-compte={rows.length}>{plur(rows.length, 'colis', 'colis')}</span>
+            <span className="vrm-rpf-n" data-relais-compte={rows.length}>{plur(rows.length, 'colis', 'colis')}{(() => { const n = rows.filter((c) => !c.horsCompte && !(c.code || c.qr || c.code2)).length; return n && n < rows.length ? <span data-relais-sans-code={n}> · {n} code à venir</span> : null; })()}</span>
           </span>
         </header>
         <div className="vrm-rpf-liste">{rows.map((x) => ligne(x, !tCommun))}</div>
@@ -491,7 +503,8 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte, ec
         {villes.map((v) => <button key={v.cle} type="button" className="vrm-seg-btn" aria-pressed={!!vChoisie && vChoisie.cle === v.cle} data-ville={v.cle} data-ville-n={v.n} onClick={() => onVille && onVille(v.cle)}>{v.nom} <span className="vrm-seg-n">{v.n}</span></button>)}
       </div> : null}
       {section('aujourdhui', 'À retirer aujourd’hui', parSection.aujourdhui, { ambre: true })}
-      {section('prets', 'Prêts à retirer', parSection.prets)}
+      {/* (5 nov.) Un point y est entier : s'il porte un colis au code à venir, la section dit « À retirer ». */}
+      {section('prets', parSection.prets.every(({ x }) => x.code || x.qr || x.code2) ? 'Prêts à retirer' : 'À retirer', parSection.prets)}
       {section('avenir', 'Code à venir', parSection.avenir)}
       {parSection.lieu.length ? (
         <section className="vrm-rpf-section" data-rp-section="lieu" data-rp-section-n={parSection.lieu.length}>
@@ -507,6 +520,11 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte, ec
         <details className="vrm-rpf-section is-repli vrm-rpf-verifier" data-rp-section="verifier" data-rp-section-n={parSection.verifier.length} data-retirer-a-verifier={parSection.verifier.length}>
           <summary className="vrm-rpf-section-titre is-repli"><span>À vérifier<span className="vrm-rpf-section-n">{parSection.verifier.length}</span></span><span className="vrm-rpf-chevron" aria-hidden="true">›</span></summary>
           <div className="vrm-rpf-section-corps"><section className="vrm-rpf-point"><div className="vrm-rpf-liste">{parSection.verifier.map(({ x }) => ligne(x))}</div></section></div>
+        </details>) : null}
+      {parSection.double.length ? (
+        <details className="vrm-rpf-section is-repli vrm-rpf-double" data-rp-section="double" data-rp-section-n={parSection.double.length} data-retirer-en-double={parSection.double.length}>
+          <summary className="vrm-rpf-section-titre is-repli"><span>Peut-être en double<span className="vrm-rpf-section-n">{parSection.double.length}</span></span><span className="vrm-rpf-chevron" aria-hidden="true">›</span></summary>
+          <div className="vrm-rpf-section-corps"><section className="vrm-rpf-point"><div className="vrm-rpf-liste">{parSection.double.map(({ x }) => ligne(x))}</div></section></div>
         </details>) : null}
       {nRoute ? (
         <details className="vrm-rpf-section is-repli vrm-rpf-route" data-rp-section="route" data-rp-section-n={nRoute} data-retirer-en-route-sans={routeSans.length}>

@@ -132,7 +132,58 @@ export function cpDuLieu(lieu) {
 //    ligne de transporteur elle aussi sans commande : peut-être le même carton,
 //    rien ne le dit ⇒ `doutes` (montrée « à vérifier », jamais comptée deux fois).
 //    Seule à son code postal, elle reste à retirer. Le titre n'entre jamais ici.
-export function regrouperArrivees(liste, { commandeDe, score = () => 0, fusion = (m, s) => ({ ...s, ...m }) } = {}) {
+// ── (5 nov.) LE DOUTE, ÉLARGI — mesuré sur sa base : 16 e-mails Vinted « ton achat
+// t'attend » d'une adresse sans compte relié, et 17 e-mails Mondial Relay « disponible »
+// au même point, même adresse de réception, les mêmes jours. Le transporteur dit 13 de
+// ces 17 RETIRÉS : ils sortaient de la comparaison (seuls les colis encore à retirer
+// comptaient), et les 16 moitiés Vinted redevenaient « à retirer » — 33 au lieu de ~10.
+// Trois changements, toujours sans relier rien par le titre :
+//  · `temoins` : les lignes de TRANSPORTEUR (n° de suivi) déjà vues à ce point, FINIES
+//    COMPRISES, arrivées à ±3 jours ; un colis retiré reste un témoin de son arrivée ;
+//  · le point est le même LIEU (nom propre + code postal quand les deux le donnent :
+//    « Consigne Vinted Go, Nom, 13 Rue… » = « Nom, 13 Rue…, 56000 Ville »),
+//    et la même adresse de réception quand les deux la connaissent ;
+//  · `sansIdentite(t, commande)` : une ligne Vinted RELIÉE à sa commande, mais dont la
+//    commande n'a aucun n° de suivi connu, n'a pas d'identité vers le transporteur : elle
+//    peut être la moitié Vinted d'une ligne de transporteur sans commande.
+// Une ligne de transporteur reliée à une AUTRE commande n'est jamais son témoin.
+const NOM_LIEU_PREFIXE = /^(?:\s*(?:consigne\s+vinted\s+go|point\s+relais|relais\s+pickup|locker)\s*[,:-]?\s*)+/i;
+export function cleLieuDoute(lieu) {
+  const s = String(lieu || '').replace(/[’']/g, '').trim();
+  if (!s) return null;
+  const sansPrefixe = s.replace(NOM_LIEU_PREFIXE, '');
+  const nom = (sansPrefixe.split(',')[0] || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+  if (!nom) return null;
+  return { nom, cp: cpDuLieu(s) };
+}
+const memeLieu = (a, b) => !!a && !!b && a.nom === b.nom && (!a.cp || !b.cp || a.cp === b.cp);
+const destinataire = (t) => {
+  const a = String((t && t.account) || '').trim().toLowerCase();
+  const r = Array.isArray(t && t.recuSur) && t.recuSur[0] ? String(t.recuSur[0]).trim().toLowerCase() : '';
+  return { a, r };
+};
+const memeDestinataire = (x, y) => {
+  const a = destinataire(x), b = destinataire(y);
+  if (a.a && b.a) return a.a === b.a;
+  if (a.r && b.r) return a.r === b.r;
+  return true;
+};
+const arriveeMs = (t) => { for (const k of ['arriveLe', 'emailAt', 'receivedAt']) { const v = Date.parse((t && t[k]) || ''); if (Number.isFinite(v)) return v; } return NaN; };
+export const FENETRE_DOUTE_J = 3;
+export function aUnTemoin(t, cmd, temoins, { commandeDe = () => null, fenetreJ = FENETRE_DOUTE_J } = {}) {
+  const lt = cleLieuDoute(t && t.lieu); if (!lt) return false;
+  const at = arriveeMs(t);
+  const txT = cmd && cmd.transaction_id != null ? String(cmd.transaction_id) : '';
+  return (temoins || []).some((w) => {
+    if (!w || w === t || w.source === 'vinted-commande') return false;
+    if (!memeLieu(lt, cleLieuDoute(w.lieu)) || !memeDestinataire(t, w)) return false;
+    const cw = commandeDe(w); const txW = cw && cw.transaction_id != null ? String(cw.transaction_id) : '';
+    if (txT && txW && txT !== txW) return false;
+    const aw = arriveeMs(w);
+    return !Number.isFinite(at) || !Number.isFinite(aw) || Math.abs(aw - at) <= fenetreJ * 86400000;
+  });
+}
+export function regrouperArrivees(liste, { commandeDe, score = () => 0, fusion = (m, s) => ({ ...s, ...m }), temoins = null, sansIdentite = null } = {}) {
   const parTx = new Map(); const garde = []; const cmds = [];
   for (const t of liste || []) {
     const c = commandeDe(t); const k = c && c.transaction_id != null ? String(c.transaction_id) : '';
@@ -144,13 +195,17 @@ export function regrouperArrivees(liste, { commandeDe, score = () => 0, fusion =
   }
   const cpOrphelins = new Map();
   garde.forEach((t, i) => { if (!cmds[i] && t.source !== 'vinted-commande') { const cp = cpDuLieu(t.lieu); if (cp) cpOrphelins.set(cp, (cpOrphelins.get(cp) || 0) + 1); } });
-  const reste = [], doutes = [], commandes = [];
+  const reste = [], doutes = [], commandes = [], doutesCommandes = [];
   garde.forEach((t, i) => {
-    const cp = !cmds[i] && t.source === 'vinted-commande' ? cpDuLieu(t.lieu) : '';
-    if (cp && cpOrphelins.get(cp) > 0) { doutes.push(t); return; }
+    if (t.source === 'vinted-commande' && (!cmds[i] || (sansIdentite && sansIdentite(t, cmds[i])))) {
+      const doute = Array.isArray(temoins)
+        ? aUnTemoin(t, cmds[i], temoins, { commandeDe })
+        : (!cmds[i] && (() => { const cp = cpDuLieu(t.lieu); return !!cp && cpOrphelins.get(cp) > 0; })());
+      if (doute) { doutes.push(t); doutesCommandes.push(cmds[i] || null); return; }
+    }
     reste.push(t); commandes.push(cmds[i]);
   });
-  return { liste: reste, doutes, commandes };
+  return { liste: reste, doutes, commandes, doutesCommandes };
 }
 
 // ── LA LIGNE RANGÉE (une forme pour le serveur ET la relecture de l'app) ──────

@@ -13,7 +13,14 @@
 //   · le PDF et le tableur téléchargés disent le MÊME nombre de lignes et le
 //     MÊME total que l'écran ; jamais « encaissé » ;
 //   · aucun texte d'explication sur la carte, aucun débordement, aucune erreur.
-// Sur le code d'avant : aucune carte « Registres » (rouge).
+//   · (5 nov.) les ACHATS EN GROS (Achats → Fournisseurs, `vrm_fournisseurs`) :
+//     UNE ligne chacun (date, fournisseur, paires, total + frais saisis), jamais
+//     les parts posées sur ses paires ; une paire reliée au lot ET à un achat
+//     Vinted ne prête pas sa part à l'achat Vinted (« article seul » reste) ;
+//     un achat hors plateforme rattaché au fournisseur : UNE ligne, à son nom ;
+//     le tableur (« Paires », « Dont frais ») et le PDF suivent.
+// Sur le code d'avant : aucune carte « Registres » (rouge) ; sur la base du
+// 5 nov. : aucune ligne en gros (rouge).
 const path=require('path'), fs=require('fs'), http=require('http');
 let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
@@ -66,6 +73,26 @@ rows.push({ id:'ebay_orders', data:{ orders:[] } });
 const OV_PARTIEL={ '91002':{ buyPrice:'20', fees:'2' }, '91003':{ buyPrice:'15' } };
 const OV_COMPLET={ ...OV_PARTIEL, '91004':{ buyPrice:'30' } };
 const jourIso=(d)=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+// (5 nov.) Les achats EN GROS, inventés : un grossiste, deux achats (ce mois :
+// 300 € + 25 € de frais, 10 paires ; le mois d'avant : 50 €, 2 paires), deux
+// paires reliées par SON clic (part posée 32,50 €), dont une reliée AUSSI à
+// l'achat Vinted 71002 (25,50 €), et un achat hors plateforme rattaché (120 €).
+const GROS_DATE=ceMois(1), GROS0_DATE=ilYa(1,15);
+const FOURNISSEURS={
+  personnes:{ p1:{ nom:'Grossiste inventé', tel:'', email:'', note:'' } },
+  achats:{
+    g1:{ fournisseur:'p1', date:`${GROS_DATE.getFullYear()}-${String(GROS_DATE.getMonth()+1).padStart(2,'0')}-${String(GROS_DATE.getDate()).padStart(2,'0')}`, paires:10, total:30000, frais:2500, repartition:{ mode:'egal', base:'frais' }, parts:{}, gardes:{}, creeLe:'' },
+    g0:{ fournisseur:'p1', date:`${GROS0_DATE.getFullYear()}-${String(GROS0_DATE.getMonth()+1).padStart(2,'0')}-${String(GROS0_DATE.getDate()).padStart(2,'0')}`, paires:2, total:5000, frais:0, repartition:{ mode:'egal', base:'' }, parts:{}, gardes:{}, creeLe:'' },
+  },
+  hors:{ hb1:{ fournisseur:'p1', at:'' } },
+};
+const FICHES_GROS={
+  f20:{ numero:'20', title:'Paire en gros inventée', buyGros:{ id:'g1', at:'1', part:3250 }, buyPrice:'32,50' },
+  f21:{ numero:'21', title:'Paire en gros inventée bis', buyGros:{ id:'g1', at:'2', part:3250 }, buyPrice:'32,50', buyFromId:'71002' },
+};
+const HORS=[{ id:'hb1', title:'Paire rattachée inventée', price:'120', date:`${GROS_DATE.getFullYear()}-${String(GROS_DATE.getMonth()+1).padStart(2,'0')}-${String(GROS_DATE.getDate()).padStart(2,'0')}`, source:'Fournisseur', numero:'30' }];
+// [montant, date] des lignes en gros et hors plateforme attendues.
+const AUTRES_ACHATS=[[325,GROS_DATE,'gros'],[50,GROS0_DATE,'gros'],[120,GROS_DATE,'hors']];
 const COMPTA={ depenses:[{ id:'d1', date:jourIso(ceMois(1)), libelle:'Cartons inventés', cat:'Emballage', montant:12.5 }], packs:[], abonnements:[], fixes:[{ id:'f1', label:'Local inventé', montant:20 }] };
 
 function projette(row,select){
@@ -154,14 +181,16 @@ const telecharge=async(pg,sel)=>{ const [dl]=await Promise.all([pg.waitForEvent(
 
 const csvTot=(t)=>{ const C=lireCsv(t); const i0=C.findIndex(r=>r[0]==='Date'); const iT=C.findIndex((r,i)=>i>i0&&r[0]==='Total'); const iM=i0>=0?C[i0].indexOf('Montant'):-1;
   if(i0<0||iT<0||iM<0) return null; const rows=C.slice(i0+1,iT); return { n:rows.length, total:String(Math.round(Number(C[iT][iM].replace(',','.'))*100)), somme:String(rows.reduce((s,r)=>s+(r[iM]?Math.round(Number(r[iM].replace(',','.'))*100):0),0)), titre:C[0][0] }; };
-const lit=async(pg,type)=>pg.evaluate((t)=>{ const e=document.querySelector(`[data-registre="${t}"]`); return e?{ etat:e.getAttribute('data-registre-etat'), n:e.getAttribute('data-registre-n'), total:e.getAttribute('data-registre-total'), partiel:e.getAttribute('data-registre-partiel'), hors:e.getAttribute('data-registre-hors'), texte:e.innerText }:null; },type);
+const lit=async(pg,type)=>pg.evaluate((t)=>{ const e=document.querySelector(`[data-registre="${t}"]`); return e?{ etat:e.getAttribute('data-registre-etat'), n:e.getAttribute('data-registre-n'), total:e.getAttribute('data-registre-total'), partiel:e.getAttribute('data-registre-partiel'), hors:e.getAttribute('data-registre-hors'), gros:e.getAttribute('data-registre-gros'), texte:e.innerText }:null; },type);
 const attendLu=async(pg)=>pg.waitForFunction(()=>['recettes','achats'].every(t=>{ const e=document.querySelector(`[data-registre="${t}"]`); return e&&e.getAttribute('data-registre-etat')!=='encours'; }),null,{timeout:20000}).catch(()=>{});
 const MODES=[ { nom:'1512 sombre', vp:{width:1512,height:950}, sombre:true }, { nom:'1512 clair', vp:{width:1512,height:950}, sombre:false },
   { nom:'390 clair', vp:{width:390,height:844}, isMobile:true, hasTouch:true, sombre:false }, { nom:'390 sombre', vp:{width:390,height:844}, isMobile:true, hasTouch:true, sombre:true } ];
 // ATTENDU, calculé ici depuis les ventes servies : les ventes finalisées VERSÉES dans la période.
 const yNow=String(maintenant.getFullYear()), ymNow=ym(maintenant);
 const recettesDe=(p)=>VENTES.filter(v=>v[5]&&/finalis/i.test(v[3])&&(p.length===4?String(v[5].getFullYear())===p:ym(v[5])===p));
-const achatsDe=(p)=>ACHATS.filter(a=>!/rembours|annul|refus/i.test(a[3])&&(p.length===4?String(a[4].getFullYear())===p:ym(a[4])===p));
+const dansP=(d,p)=>(p.length===4?String(d.getFullYear())===p:ym(d)===p);
+const achatsDe=(p)=>[...ACHATS.filter(a=>!/rembours|annul|refus/i.test(a[3])&&dansP(a[4],p)).map(a=>[a[2],a[4]]), ...AUTRES_ACHATS.filter(a=>dansP(a[1],p))];
+const grosDe=(p)=>AUTRES_ACHATS.filter(a=>a[2]==='gros'&&dansP(a[1],p)).length;
 const somme=(l,i)=>String(l.reduce((s,x)=>s+Math.round(x[i]*100),0));
 
 (async()=>{
@@ -171,7 +200,7 @@ const somme=(l,i)=>String(l.reduce((s,x)=>s+Math.round(x[i]*100),0));
     for(const T of MODES){
       console.log(`\n══ ${T.nom}${T.hasTouch?' (tactile)':''}`);
       try{
-        const { ctx, pg, errs }=await page(b,{...T},{ main:{ ...MAIN0, vinted_dark:!!T.sombre, vinted_sale_overrides:OV_COMPLET } });
+        const { ctx, pg, errs }=await page(b,{...T},{ main:{ ...MAIN0, vinted_dark:!!T.sombre, vinted_sale_overrides:OV_COMPLET, vrm_fournisseurs:FOURNISSEURS, vinted_annonce_numeros:FICHES_GROS, vinted_offvinted_buys:HORS } });
         await publierBenefice(pg);
         await aller(pg,'compta','[data-benef-etat]',2000);
         await ouvrirAvanceCompta(pg).catch(()=>{});
@@ -186,7 +215,8 @@ const somme=(l,i)=>String(l.reduce((s,x)=>s+Math.round(x[i]*100),0));
           console.log(`   ${p} recettes`,JSON.stringify(R),'\n   achats',JSON.stringify(A));
           dit(R&&R.etat==='lu'&&R.n===String(eR.length)&&R.total===somme(eR,2),`${p} · recettes = les ventes VERSÉES dans la période`,`${R&&R.n}/${eR.length} · ${R&&R.total}/${somme(eR,2)}`);
           dit(R&&Number(R.hors)>=1,`${p} · la vente sans date de versement est à part, jamais dedans`,R&&R.hors);
-          dit(A&&A.etat==='lu'&&A.n===String(eA.length)&&A.total===somme(eA,2),`${p} · achats = hors remboursés, au prix lu`,`${A&&A.n}/${eA.length} · ${A&&A.total}/${somme(eA,2)}`);
+          dit(A&&A.etat==='lu'&&A.n===String(eA.length)&&A.total===somme(eA,0),`${p} · achats = hors remboursés, au prix lu, + les achats en gros par leur total + le hors plateforme rattaché (rien deux fois)`,`${A&&A.n}/${eA.length} · ${A&&A.total}/${somme(eA,0)}`);
+          dit(A&&A.gros===String(grosDe(p))&&(grosDe(p)?new RegExp(`dont ${grosDe(p)} achats? en gros`).test(A.texte):true),`${p} · achats en gros : ${grosDe(p)} ligne(s), dites sur la carte`,`${A&&A.gros} · ${A&&A.texte.replace(/\n/g,' | ')}`);
           dit(A&&A.partiel==='1'&&/au moins/.test(A.texte),`${p} · achats « article seul » : « au moins »`,A&&A.texte.replace(/\n/g,' | '));
           if(p===ymNow){
             for(const type of ['recettes','achats']){
@@ -200,6 +230,20 @@ const somme=(l,i)=>String(l.reduce((s,x)=>s+Math.round(x[i]*100),0));
               const tot=valeurDe(L,/^Total$/);
               dit(cents(String(tot||'').replace(/^au moins /,''))===E.total,`${type} : le PDF dit le même total`,String(tot));
               dit(!/encaiss/i.test(t+csv.octets.toString('utf8')),`${type} : jamais « encaissé »`);
+              if(type==='achats'){
+                const C=lireCsv(csv.octets.toString('utf8')); const iH=C.findIndex(r=>r[0]==='Date'); const iT=C.findIndex((r,i)=>i>iH&&r[0]==='Total');
+                const H=C[iH]||[]; const iP=H.indexOf('Paires'), iF=H.indexOf('Dont frais'), iMo=H.indexOf('Montant'), iFo=H.indexOf('Fournisseur'), iS=H.indexOf('Montant lu');
+                const corps=C.slice(iH+1,iT);
+                const lg=corps.find(r=>r[iFo]==='Grossiste inventé'&&r[iP]==='10');
+                dit(iP>0&&iF>0&&!!lg&&lg[iMo]==='325,00'&&lg[iF]==='25,00',`achats : tableur — l’achat en gros sur UNE ligne : Grossiste inventé · 10 paires · 325,00 dont 25,00 de frais`,JSON.stringify(lg));
+                dit(!corps.some(r=>r[iMo]==='32,50'),`achats : tableur — aucune ligne faite des parts posées sur ses paires (32,50)`);
+                const l71002=corps.find(r=>/71002/.test(r.join(' ')));
+                dit(!!l71002&&l71002[iMo]==='25,50'&&l71002[iS]==='Article seul',`achats : tableur — l’achat Vinted 71002 (paire reliée AUSSI au lot) garde son prix lu, jamais la part du lot`,JSON.stringify(l71002));
+                const rat=corps.filter(r=>/Paire rattachée inventée/.test(r.join(' ')));
+                dit(rat.length===1&&rat[0][iFo]==='Grossiste inventé'&&rat[0][iMo]==='120,00',`achats : tableur — l’achat hors plateforme rattaché : UNE ligne, au nom du grossiste`,JSON.stringify(rat));
+                dit(/Grossiste invent/.test(t)&&/Dont frais/.test(t)&&/325,00/.test(t.replace(/[\u00a0\u202f]/g,' ')),`achats : le PDF dit le grossiste, « Dont frais » et 325,00`);
+                if(process.env.BANC_CAPTURE){ fs.writeFileSync(path.join(process.env.BANC_CAPTURE,`registre-achats-${T.nom.replace(' ','-')}.pdf`),pdf.octets); fs.writeFileSync(path.join(process.env.BANC_CAPTURE,`registre-achats-${T.nom.replace(' ','-')}.csv`),csv.octets); }
+              }
             }
           }
         }
