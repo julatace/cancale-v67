@@ -164,3 +164,62 @@ button.vrm-cc-carte:focus-visible { outline: 2px solid var(--vrm-focus, #0071E3)
 .vrm-mr-nom { font-weight: 600; color: var(--vrm-ink, #1D1D1F); overflow-wrap: anywhere; }
 .vrm-mr-frais { font-size: 12px; color: var(--vrm-muted, #6E6E73); }
 .vrm-mr-frais.is-ambre { color: var(--vrm-warn, #B25000); font-weight: 600; }
+
+/* ══ (5 nov., chantier D) COLIS, CÔTÉ ENVOI ═══════════════════════════════════════════════
+   La barre du haut : les mêmes trois boutons sur les trois onglets, une forme (revue 2.21). */
+.vrm-colis-barre { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; min-width: 0; }
+html body .vrm-colis-barre > .vrm-b { margin: 0; flex: none; }
+html body .vrm-colis-barre > .vrm-b:disabled { opacity: .45; }
+
+/* « En grand » (revue 2.22) : SheetShell lumineuse — les jetons --vrm-* y sont clairs, même la nuit. */
+.vrm-fs.vrm-eg .vrm-fs-titre { text-align: left; }
+.vrm-eg-corps { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 4px 0 6px; }
+.vrm-eg-photo { width: 64px; height: 64px; border-radius: 12px; object-fit: cover; box-shadow: inset 0 0 0 1px var(--vrm-line, #E5E5EA); }
+.vrm-eg-qr { width: min(300px, 86%); aspect-ratio: 1; object-fit: contain; image-rendering: pixelated; background: #FFFFFF; }
+.vrm-eg-code { display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; }
+.vrm-eg-code-l { font: 600 12px/1.3 var(--vrm-police, inherit); color: var(--vrm-muted, #6E6E73); letter-spacing: .02em; }
+.vrm-eg-code-v { font: 700 44px/1.1 var(--vrm-police-mono, ui-monospace, monospace); letter-spacing: .08em; color: var(--vrm-ink, #1D1D1F);
+  font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.vrm-eg-code.avec-qr .vrm-eg-code-v { font-size: 34px; }
+.vrm-eg-code.is-second .vrm-eg-code-v, .vrm-eg-code.is-suivi .vrm-eg-code-v { font-size: 26px; letter-spacing: .05em; }
+.vrm-eg-mode { margin: 0; font-size: 15px; line-height: 1.4; color: var(--vrm-ink, #1D1D1F); text-align: center; max-width: 34ch; }
+.vrm-eg-absent { display: flex; flex-direction: column; gap: 2px; align-self: stretch; text-align: center; font-size: 13px; line-height: 1.45;
+  color: var(--vrm-muted, #6E6E73); background: var(--vrm-card2, #F2F2F7); border-radius: 12px; padding: 10px 14px; }
+.vrm-eg-absent strong { color: var(--vrm-ink, #1D1D1F); font-weight: 600; font-size: 14px; }
+.vrm-eg-note { margin: 0; font-size: 12px; line-height: 1.45; color: var(--vrm-muted, #6E6E73); text-align: center; max-width: 38ch; }
+.vrm-eg-note.is-ambre { color: var(--vrm-warn, #B25000); font-weight: 600; }
+.vrm-eg-capture { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; font-size: 13px; color: var(--vrm-muted, #6E6E73); }
+.vrm-eg-faits { list-style: none; margin: 0; padding: 0; align-self: stretch; display: flex; flex-direction: column; gap: 0;
+  border-top: 1px solid var(--vrm-line, #E5E5EA); }
+.vrm-eg-faits:empty { display: none; }
+.vrm-eg-faits li { font-size: 14px; line-height: 1.4; color: var(--vrm-ink, #1D1D1F); padding: 10px 2px; border-bottom: 1px solid var(--vrm-line, #E5E5EA); overflow-wrap: anywhere; }
+.vrm-eg-faits li.is-ambre { color: var(--vrm-warn, #B25000); font-weight: 600; }
+html body .vrm-eg-corps > .vrm-b { align-self: stretch; }
+
+/* La tournée de dépôt (5 nov.) : un bouton au-dessus des colis, puis une feuille par transporteur. */
+.vrm-tournee-tete { display: flex; align-items: center; justify-content: flex-start; gap: 8px; margin: 0 0 6px; }
+.vrm-tournee { display: flex; flex-direction: column; gap: 18px; padding-bottom: 6px; }
+.vrm-tournee-haut { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.vrm-tournee-note { flex: 1 1 220px; margin: 0; font-size: 13px; line-height: 1.45; color: var(--vrm-muted, #6E6E73); }
+.vrm-tournee-groupe { display: flex; flex-direction: column; gap: 6px; }
+.vrm-tournee-groupe > .vrm-fu-groupe-transp { margin: 0 !important; }
+.vrm-tournee-liste { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border-radius: 14px; background: var(--vrm-surface, #FFFFFF);
+  box-shadow: inset 0 0 0 1px var(--vrm-line, #E5E5EA); overflow: hidden; }
+.vrm-tournee-colis { display: flex; align-items: center; gap: 12px; padding: 8px 10px 8px 12px; min-height: 60px; box-sizing: border-box; transition: background-color .2s ease; }
+.vrm-tournee-colis + .vrm-tournee-colis { box-shadow: inset 0 1px 0 var(--vrm-line, #E5E5EA); }
+.vrm-tournee-colis.is-attente { background: var(--vrm-card2, #F2F2F7); }
+.vrm-tournee-photo { flex: none; width: 44px; height: 44px; border-radius: 10px; overflow: hidden; display: block; position: relative; }
+.vrm-tournee-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.vrm-tournee-quoi { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.vrm-tournee-titre { font-size: 15px; font-weight: 600; line-height: 1.3; color: var(--vrm-ink, #1D1D1F); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-tournee-sous { font-size: 12px; line-height: 1.35; color: var(--vrm-muted, #6E6E73); }
+html body .vrm-tournee-colis > .vrm-b { flex: none; margin: 0; }
+@media (prefers-reduced-motion: reduce) { .vrm-tournee-colis { transition: none; } }
+/* Les boutons de « En grand » et de la tournée gardent leurs 44 px (une règle générale des feuilles les tassait à 30). */
+html body .vrm-fs.vrm-eg .vrm-b, html body .vrm-tournee .vrm-b { min-height: 44px !important; }
+/* L'état vide de « À envoyer » : un titre, une phrase, et l'onglet voisin quand il a du contenu. */
+.vrm-colis-vide-envoi { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; padding: 28px 16px; }
+.vrm-colis-vide-titre { font-size: 17px; font-weight: 600; color: var(--vrm-ink, #1D1D1F); }
+.vrm-colis-vide-sous { font-size: 13px; line-height: 1.45; color: var(--vrm-muted, #6E6E73); max-width: 34ch; }
+/* Le N° dans le titre d'un colis : la pastille garde sa ligne de base. */
+.vrm-colis-titre .vrm-num { vertical-align: 1px; margin-right: 2px; }

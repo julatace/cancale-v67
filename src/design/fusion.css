@@ -128,9 +128,9 @@ button.vrm-fu-case:focus-visible { outline: 2px solid var(--fu-bleu); outline-of
 .vrm-fu-seg > i { display: block; height: 5px; border-radius: 3px; background: var(--fu-piste); transition: background-color .25s ease; }
 .vrm-fu-seg > span { font: 600 11px/1.2 var(--vrm-police); color: var(--fu-gris3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vrm-fu-seg[data-fait="1"] > i { background: var(--fu-bleu); }
-.vrm-fu-seg[data-fait="1"] > span { color: var(--fu-encre); }
-.vrm-fu-seg[data-cours] > i { background: var(--fu-encre); }
-.vrm-fu-seg[data-cours] > span { color: var(--fu-encre); }
+/* (5 nov., revue 2.20) L'encre n'est qu'au MOT de la dernière étape faite ; l'étape en
+   cours reste neutre (piste, mot gris) sauf un geste à faire (ambre). */
+.vrm-fu-seg[data-derniere] > span { color: var(--fu-encre); }
 .vrm-fu-seg[data-cours][data-ton="urgent"] > i { background: var(--fu-ambre); }
 .vrm-fu-seg[data-cours][data-ton="urgent"] > span { color: var(--fu-ambre-txt); }
 @media (prefers-reduced-motion: reduce) { .vrm-fu-seg > i { transition: none; } }
@@ -520,7 +520,7 @@ html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-fu-compta
    Tout TEXTE gris passe à 4,5:1 au moins : le gris le plus clair (#aeaeb2,
    #8e8e93) ne sert plus qu'aux pistes et aux formes, jamais aux mots. */
 .vrm-fu-seg > span { color: var(--fu-gris) !important; font-size: 11px !important; font-weight: 500 !important; }
-.vrm-fu-seg[data-fait="1"] > span, .vrm-fu-seg[data-cours] > span { color: var(--fu-encre) !important; font-weight: 600 !important; }
+.vrm-fu-seg[data-derniere] > span { color: var(--fu-encre) !important; font-weight: 600 !important; }
 .vrm-fu-seg[data-cours][data-ton="urgent"] > span { color: var(--fu-ambre-txt) !important; }
 .vrm-fu-barre > span, .vrm-fu-panneau-tete span, .vrm-fu-titre-section span { color: var(--fu-gris) !important; }
 .vrm-fu-jour[data-futur] > b { color: rgba(255,255,255,.7) !important; }
