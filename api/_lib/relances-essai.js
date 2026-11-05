@@ -42,6 +42,7 @@
 import crypto from 'node:crypto';
 import { sbCle } from './cle.js';
 import { envoyerSmtp, emailSur, hoteValide } from './smtp.js';
+import { gabaritEmail } from './gabarit-email.js';
 
 export const SITE = 'https://vrm.center';
 export const ID_ENVOIS = 'relances_essai';
@@ -119,57 +120,53 @@ export function etapeDuJour({ fin, maintenant = Date.now(), envois = {} }) {
 }
 
 // ── LES TEXTES (sobres, sans donnée réelle) ─────────────────────────────────
+// (5 nov., soir, Julien : « ça doit être bcp plus clair ».) Chaque e-mail suit
+// la forme de api/_lib/gabarit-email.js : un titre qui dit ce que c'est, une ou
+// deux phrases sur ce qu'il faut faire, UN bouton (« Ouvrir VRM »), le pied en
+// petit (pourquoi ce message, comment ne plus le recevoir).
 const dateLongue = (t) => new Date(t).toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris', day: 'numeric', month: 'long' });
-const echapper = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 // Ce qui n'est pas relié, dans l'ordre où ça compte. `true` relié · `false` pas
 // relié · `null` pas su (jamais écrit comme « pas relié »).
 export const RELIER = [
-  { id: 'vinted', texte: 'Ton compte Vinted : installe l’extension VRM, puis ouvre Vinted connecté à ton compte. Elle lit tes annonces et tes ventes.' },
-  { id: 'emails', texte: 'Tes e-mails Vinted : VRM y lit tes ventes, tes bordereaux et tes codes de retrait. Paramètres → Réglages → E-mails te montre comment les transférer.' },
-  { id: 'notifications', texte: 'Les notifications : aucun appareil ne les reçoit encore. Paramètres → Réglages → Notifications, puis « Activer sur cet appareil ».' },
+  { id: 'vinted', texte: 'Ton compte Vinted : installe l’extension VRM, puis ouvre Vinted connecté à ton compte.' },
+  { id: 'emails', texte: 'Tes e-mails Vinted : transfère-les à VRM pour qu’il lise tes ventes, bordereaux et codes de retrait. Le pas-à-pas est dans E-mails → Relier ma boîte.' },
+  { id: 'notifications', texte: 'Les notifications : active-les sur ton téléphone, dans Paramètres → Réglages → Notifications → « Activer sur cet appareil ».' },
 ];
 export function texteRelance(etape, { fin, annule = false, relie = {}, lien = '' } = {}) {
   const finTxt = Number.isFinite(Date.parse(fin || '')) ? dateLongue(Date.parse(fin)) : '';
-  const pied = lien
-    ? `Tu reçois cet e-mail parce que ton essai gratuit de VRM est en cours. Pour ne plus recevoir ces rappels : ${lien}`
-    : 'Tu reçois cet e-mail parce que ton essai gratuit de VRM est en cours.';
-  let sujet = '', paras = [];
+  const pied = { texte: 'Tu reçois ce message parce que ton essai gratuit de VRM est en cours.', ...(lien ? { lien, motLien: 'ne plus recevoir ces rappels' } : {}) };
+  const bouton = { mot: 'Ouvrir VRM', url: SITE };
+  let sujet = '', titre = '', paras = [], liste = [], suite = [];
   if (etape === 'j1') {
     sujet = 'Bienvenue sur VRM — ton premier geste';
+    titre = 'Bienvenue sur VRM';
     paras = [
-      'Bonjour,',
-      `Ton essai gratuit de VRM a commencé${finTxt ? ` : il dure jusqu’au ${finTxt}` : ''}. Sans engagement.`,
-      'Le premier geste qui rend VRM utile : installe l’extension VRM, puis ouvre Vinted dans le même navigateur. VRM lit tes annonces et tes ventes, et donne à chaque article un numéro de rangement.',
-      `Ouvrir VRM : ${SITE}`,
+      `Ton essai gratuit a commencé${finTxt ? `. Il dure jusqu’au ${finTxt}` : ''}, sans engagement.`,
+      'Ton premier geste : installe l’extension VRM, puis ouvre Vinted dans le même navigateur. VRM lit alors tes annonces et tes ventes, et donne un numéro de rangement à chaque article.',
     ];
   } else if (etape === 'j3') {
     const manquent = RELIER.filter((x) => relie[x.id] === false);
     const pasSu = RELIER.some((x) => relie[x.id] !== true && relie[x.id] !== false);
     sujet = manquent.length ? 'VRM — ce qui n’est pas encore relié' : 'VRM — tout est relié';
-    paras = ['Bonjour,'];
+    titre = manquent.length ? (manquent.length === 1 ? 'Une chose n’est pas encore reliée' : `${manquent.length} choses ne sont pas encore reliées`) : pasSu ? 'Où en est ton compte VRM' : 'Tout est relié';
     if (manquent.length) {
-      paras.push('Voici ce qui n’est pas encore relié à ton compte VRM :', ...manquent.map((x) => `· ${x.texte}`));
+      paras.push('Relie-les pour que VRM suive tes ventes et tes colis tout seul :');
+      liste = manquent.map((x) => x.texte);
     } else if (!pasSu) {
-      paras.push('Ton compte Vinted, tes e-mails et tes notifications sont reliés : VRM suit tes ventes et tes colis tout seul.');
+      paras.push('Ton compte Vinted, tes e-mails et tes notifications sont reliés : VRM suit tes ventes et tes colis tout seul. Rien à faire.');
     }
-    if (pasSu) paras.push('Paramètres → Réglages → Comptes liés te dit ce qui est relié et ce qui attend un geste.');
-    if (finTxt) paras.push(`Ton essai continue jusqu’au ${finTxt}.`);
-    paras.push(`Ouvrir VRM : ${SITE}`);
+    if (pasSu) suite.push('Pour voir ce qui est relié et ce qui attend un geste : Paramètres → Réglages → Comptes liés.');
+    if (finTxt) suite.push(`Ton essai continue jusqu’au ${finTxt}.`);
   } else if (etape === 'j6') {
     sujet = 'Ton essai VRM se termine demain';
+    titre = 'Ton essai se termine demain';
     paras = annule
-      ? ['Bonjour,', `Ton essai gratuit se termine demain${finTxt ? `, le ${finTxt}` : ''}. Tu as arrêté l’abonnement : ton accès à VRM se fermera à ce moment-là. Tes données restent gardées.`,
-        'Pour continuer : VRM → Paramètres → Abonnement → « Reprendre mon abonnement ».', `Ouvrir VRM : ${SITE}`]
-      : ['Bonjour,', `Ton essai gratuit se termine demain${finTxt ? `, le ${finTxt}` : ''}. Ensuite ton abonnement démarre au prix affiché à ton inscription — rien à faire pour continuer.`,
-        'Si tu ne veux pas continuer, résilie avant demain : VRM → Paramètres → Abonnement → « Résilier ».', `Ouvrir VRM : ${SITE}`];
+      ? [`Tu as arrêté l’abonnement : ton accès à VRM se ferme demain${finTxt ? ` (${finTxt})` : ''}. Tes données restent gardées.`,
+        'Pour continuer : Paramètres → Abonnement → « Reprendre mon abonnement ».']
+      : [`Demain${finTxt ? ` (${finTxt})` : ''}, ton abonnement démarre au prix affiché à ton inscription. Rien à faire pour continuer.`,
+        'Pour arrêter avant : Paramètres → Abonnement → « Résilier ».'];
   } else return null;
-  const texte = [...paras, '', '—', pied].join('\n\n');
-  const html = `<!doctype html><html lang="fr"><body style="margin:0;padding:24px;background:#ffffff;color:#1d1d1f;font:15px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif">`
-    + `<div style="max-width:520px;margin:0 auto">`
-    + paras.map((p) => `<p style="margin:0 0 14px">${echapper(p).replace(/https:\/\/vrm\.center\S*/g, (u) => `<a href="${u}" style="color:#0071e3">${u}</a>`)}</p>`).join('')
-    + `<hr style="border:0;border-top:1px solid #e5e5ea;margin:24px 0 12px">`
-    + `<p style="margin:0;color:#6e6e73;font-size:12px">${echapper(pied).replace(/https:\/\/vrm\.center\S*/g, (u) => `<a href="${u}" style="color:#6e6e73">ne plus recevoir ces rappels</a>`)}</p>`
-    + `</div></body></html>`;
+  const { texte, html } = gabaritEmail({ titre, paras, liste, suite, bouton, pied });
   return { sujet, texte, html };
 }
 

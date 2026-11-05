@@ -501,6 +501,8 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 
+- **5 nov. · E-mails plus clairs** : feuille de lecture opaque (plus de fondu d'opacité), chaque ligne dit d'abord ce que c'est (tiré du résumé rangé, jamais du sujet), jours, e-mails envoyés en un titre + un bouton. `docs/passation/2026-11-05-emails-clairs.md`. Geste : ouvrir un code de retrait dans E-mails.
+
 - **5 nov. · Annonces → Sélectionner** : en ligne, masquées, brouillons par compte, « en vérification » non cochable ; UN carré « Actions » (moteurs de Republier, raisons dites, manques paire par paire) ; « Republier à la main » (photos réglées, texte à copier, SON clic relie, N° repris quand l'ancienne n'est plus du tout sur Vinted). Revue : `null` = pas lu, masquée ≠ partie. `docs/passation/2026-11-05-annonces-actions.md`.
 - **5 nov. · Messages lisibles** : plus de « currency_code: EUR » (ses 587 offres) ni de HTML de Vinted ; l'extrait de chaque ligne est le dernier message réel (plus le titre de l'annonce), les offres marquées « Offre » avec leur montant à leur conversation (`src/messagesLisibles.js`) ; offres e-mail laissées hors de Messages (décision du 24 oct.). Voir `docs/passation/2026-11-05-messages-offres.md`.
 - **5 nov. · Colis code + QR** : code et QR reliés par n° de suivi, « En grand » (écran allumé), QR de dépôt Leboncoin. ⚠️ Le QR Mondial Relay n'existe QUE dans l'app (« c'est que dans l'app ») : aucune promesse par navigateur/extension (`mr_colis_*` = codes seulement) ; « QR dans l'app Mondial Relay » + « Ajouter le QR » (capture lue dans la page, SON clic = l'identité, jamais un QR fabriqué ; `vrm_colis_qr_poses`). `docs/passation/2026-11-05-colis-qr.md` §7. Geste : ajouter une capture sur un colis.

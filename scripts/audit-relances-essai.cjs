@@ -269,6 +269,16 @@ const decoder = (brut) => {
     dit(recus.length === 1, 'G3 le lendemain (ou au passage suivant) elle part');
     const tout = ['j1', 'j3', 'j6'].map((e) => RE.texteRelance(e, { fin: new Date(maintenant + 3 * JOUR).toISOString(), relie: { vinted: false, emails: false, notifications: false }, lien: RE.lienDesinscription(A, 'cle-de-service-de-banc') }));
     dit(tout.every((t) => t && !/@/.test(t.texte) && !/€/.test(t.texte) && !/\d+ ventes?/.test(t.texte)), 'G4 les gabarits ne portent ni adresse, ni montant, ni chiffre de ventes');
+    // (5 nov., soir — « ça doit être bcp plus clair ») La forme : un titre qui dit
+    // ce que c'est, UN bouton d'action, le lien « ne plus recevoir » seulement
+    // dans le pied ; le texte brut commence par le même titre.
+    const forme = tout.map((t) => {
+      const corps = t.html.split('<hr')[0], piedH = t.html.split('<hr')[1] || '';
+      const h1 = (t.html.match(/<h1\b[^>]*>([^<]*)<\/h1>/g) || []);
+      const titre = ((/<h1\b[^>]*>([^<]*)<\/h1>/.exec(t.html) || [])[1] || '').trim();
+      return { h1: h1.length, titre, liensCorps: (corps.match(/<a\s/g) || []).length, desinscritPied: /mode=relances/.test(piedH) && !/mode=relances/.test(corps), texteTitre: t.texte.split('\n')[0].trim() === titre.replace(/&#39;/g, "'").replace(/&amp;/g, '&') };
+    });
+    dit(forme.every((f) => f.h1 === 1 && f.titre && f.liensCorps === 1 && f.desinscritPied && f.texteTitre), 'G6 chaque e-mail : UN titre, UN bouton d’action, « ne plus recevoir » en pied seulement ; le texte brut commence par le titre', JSON.stringify(forme));
     const brut = recus[0] ? recus[0].brut : '';
     dit(/^From: =\?UTF-8|^From: VRM <bonjour@vrm\.exemple\.test>$/m.test(brut) && /^Auto-Submitted: auto-generated$/m.test(brut), 'G5 expéditeur = la boîte de VRM réglée (jamais celle du vendeur), message marqué automatique');
   });
