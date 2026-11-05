@@ -191,6 +191,9 @@ const deuxAppareils = () => ({ subs: [{ endpoint: 'https://web.push.apple.com/ip
     console.log(`     ce que lit le téléphone : « ${p.title} » / « ${p.body} »`);
     dit(String(p.title || '').includes(ARTICLE), 'le TITRE nomme la paire lue dans le sujet de l’email', JSON.stringify(p.title));
     dit(/nouveau message sur compte_banc/i.test(String(p.body || '')), 'le texte dit « nouveau message sur {compte} »', JSON.stringify(p.body));
+    // (31 oct.) Le lien « Répondre » de l'email porte la conversation (`/inbox/1001`) :
+    // la notification ouvre Messages · Vinted SUR elle (api/_lib/lien-notif.js).
+    dit(/^\/\?tab=messages&site=vinted&cible=conv&conv=1001(&compte=\w+)?$/.test(String(p.url || '')), 'le clic ouvre SA conversation (l’identité lue dans le lien /inbox/ de l’email)', JSON.stringify(p.url));
     // L'AUTRE SENS : la paire SUIT le sujet (pas un titre figé).
     pushes.length = 0;
     await recoit(emailMessage(2, '', 'nike shox TL rose taille 35,5'));

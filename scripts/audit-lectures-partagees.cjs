@@ -17,7 +17,9 @@
 //   8. une autre adresse que notre base, une lecture annulable : jamais
 //      partagées ;
 //   9. un POST vers nos routes `/api/` vaut une écriture ;
-//  10. une lecture PENDUE ne se partage plus au-delà de `VOL_MAX_MS` (22 oct.).
+//  10. une lecture PENDUE ne se partage plus au-delà de `VOL_MAX_MS` (22 oct.) ;
+//  11. une écriture de lignes NOMMÉES ne vide que ce qui peut les porter (31 oct.) ;
+//  12. un passage de FOND déclaré accepte une réponse de moins de 15 s (31 oct.).
 //  `--prouve` réaffaiblit la règle (cinq mutations) et exige du ROUGE.
 //  Lancer : node scripts/audit-lectures-partagees.cjs [--prouve]
 // ════════════════════════════════════════════════════════════════════════════
@@ -154,6 +156,78 @@ async function verifier(mod) {
     const j = r ? await r.json() : null;
     dit(F.appels.length === 2 && !!j && j[0].id === 'frais', '10. une lecture pendue depuis plus longtemps ne capte plus la suivante : elle repart sur le réseau et répond', `appels ${F.appels.length}, rendu ${JSON.stringify(j)}`);
   });
+  // 11. (31 oct., banc vitesse) Une écriture de LIGNES NOMMÉES ne vide que les
+  //     lectures qui peuvent les porter. Mesuré : la publication de
+  //     `widget_stats` au démarrage faisait relire `lbc_ventes`, `ebay_orders`…
+  //     Mais toute lecture qui PEUT porter la ligne écrite (même id, motif
+  //     `like` qui la couvre, liste `in.`, aucun filtre d'id) est relue — y
+  //     compris une lecture partie avant l'écriture et revenue après ; et une
+  //     écriture qu'on ne sait pas nommer (`main`, filtre `like`, autre table,
+  //     corps illisible) vide tout, comme avant.
+  await essaie('11. écriture nommée', async () => {
+    const F = faux(); const lp = mod.creerLecturesPartagees(F.f, BASE, { maintenant });
+    const R = (q) => BASE + '/rest/v1/app_data?' + q;
+    const lect = ['id=eq.lbc_ventes&select=data', 'id=eq.widget_stats&select=data', 'id=like.widget_*&select=id', 'id=in.(a,widget_stats)&select=id', 'select=id&limit=1', 'id=like.harvest_%25_txn_%25&select=id'];
+    const lire = () => Promise.all(lect.map((q) => lp.fetch(R(q), H('A'))));
+    const n = (q) => F.appels.filter((x) => x.url === R(q)).length;
+    await lire();
+    await lp.fetch(R('on_conflict=id'), { method: 'POST', body: JSON.stringify([{ id: 'widget_stats', data: {} }]), headers: { Authorization: 'Bearer A' } });
+    await lire();
+    dit(n(lect[0]) === 1 && n(lect[5]) === 1, '11. une écriture de `widget_stats` ne fait pas relire `lbc_ventes` ni les transactions', `${n(lect[0])}/${n(lect[5])}`);
+    dit([1, 2, 3, 4].every((i) => n(lect[i]) === 2), '11. … mais relire tout ce qui peut la porter (même id, `like`, `in.`, sans filtre)', [1, 2, 3, 4].map((i) => n(lect[i])).join('/'));
+    // partie AVANT l'écriture, revenue APRÈS : pas resservie
+    let libere; F.servir(() => new Promise((r) => { libere = () => r(new Response('[1]', { status: 200 })); }));
+    t += mod.FENETRE_MS + 100;
+    const enVol = lp.fetch(R(lect[1]), H('A'));
+    F.servir(() => new Response('[]', { status: 201 }));
+    await lp.fetch(R('id=eq.widget_stats'), { method: 'PATCH', body: '{}', headers: { Authorization: 'Bearer A' } });
+    libere(); await enVol;
+    F.servir(() => new Response('[2]', { status: 200 }));
+    const apres = await (await lp.fetch(R(lect[1]), H('A'))).json();
+    dit(apres[0] === 2, '11. une lecture de la ligne partie avant son écriture n’est pas resservie après', JSON.stringify(apres));
+    // ce qu'on ne sait pas nommer vide tout
+    for (const [q, init] of [['on_conflict=id', { method: 'POST', body: JSON.stringify({ id: 'main', data: {} }) }], ['id=like.widget_*', { method: 'DELETE' }], ['on_conflict=id', { method: 'POST', body: '[]' }]]) {
+      const avant = n(lect[0]);
+      await lp.fetch(R(lect[0]), H('A'));
+      const lu = n(lect[0]);
+      await lp.fetch(R(q), { ...init, headers: { Authorization: 'Bearer A' } });
+      await lp.fetch(R(lect[0]), H('A'));
+      dit(n(lect[0]) === lu + 1, `11. une écriture qu’on ne sait pas nommer vide tout (${init.method} ${q} ${init.body || ''})`, `${avant}→${lu}→${n(lect[0])}`);
+    }
+    const V = BASE + '/rest/v1/vinted_accounts?select=*';
+    await lp.fetch(V, H('A'));
+    await lp.fetch(BASE + '/rest/v1/vinted_accounts?id=eq.3', { method: 'DELETE', headers: { Authorization: 'Bearer A' } });
+    await lp.fetch(V, H('A'));
+    dit(F.appels.filter((x) => x.url === V).length === 2, '11. une écriture d’une autre table vide tout', F.appels.filter((x) => x.url === V).length);
+  });
+  // 12. (31 oct.) Un passage de FOND déclaré (`vrmFond`) accepte une réponse
+  //     réussie de moins de `FENETRE_FOND_MS` ; une lecture ordinaire, non.
+  //     Jamais d'avant une écriture de la ligne, ni d'avant un signal.
+  await essaie('12. fond', async () => {
+    const F = faux(); const lp = mod.creerLecturesPartagees(F.f, BASE, { maintenant });
+    const FOND = mod.FENETRE_FOND_MS || 0;
+    const fond = (a) => ({ ...H(a), vrmFond: true });
+    await lp.fetch(U, H('A'));
+    t += mod.FENETRE_MS + 500;
+    await lp.fetch(U, fond('A'));
+    dit(F.appels.length === 1 && FOND > mod.FENETRE_MS, '12. un passage de fond, 2,5 s après : la même réponse (une lecture évitée)', F.appels.length);
+    await lp.fetch(U, H('A'));
+    dit(F.appels.length === 2, '12. … une lecture ordinaire au même moment relit', F.appels.length);
+    t += 500; await lp.fetch(U, fond('B'));
+    dit(F.appels.length === 3, '12. une autre session ne reçoit jamais la réponse d’une autre, même en fond', F.appels.length);
+    t += FOND + 10; await lp.fetch(U, fond('A'));
+    dit(F.appels.length === 4, '12. passé la fenêtre de fond : on relit', F.appels.length);
+    await lp.fetch(BASE + '/rest/v1/app_data?on_conflict=id', { method: 'POST', body: JSON.stringify({ id: 'main', data: {} }), headers: { Authorization: 'Bearer A' } });
+    t += 100; await lp.fetch(U, fond('A'));
+    dit(F.appels.length === 6, '12. une écriture de la ligne : le fond relit aussi', F.appels.length);
+    lp.invalider(); t += 100; await lp.fetch(U, fond('A'));
+    dit(F.appels.length === 7, '12. un signal de l’extension : le fond relit aussi', F.appels.length);
+    F.servir(() => new Response('<html>522</html>', { status: 522 }));
+    t += 100; lp.invalider(); await lp.fetch(U, H('A'));
+    F.servir(() => new Response('[]', { status: 200 }));
+    t += 100; const r = await lp.fetch(U, fond('A'));
+    dit(r.ok && F.appels.length === 9, '12. un échec n’est jamais resservi au fond', `${F.appels.length} · ${r.status}`);
+  });
   return { ko, echecs };
 }
 
@@ -168,7 +242,12 @@ async function verifier(mod) {
       'sans-session': [/const cle = url \+ '\\n' \+ ENTETES_CLE\.map\(\(n\) => lireEntete\(h, n\)\)\.join\('\\n'\);/, "const cle = url;"],
       'route-ignoree': [/const versRoute = [^;]+;/, 'const versRoute = false;'],
       'vol-sans-fin': [/date - v\.debut >= volMax|maintenant\(\) - e\.debut < volMax/g, m => m.startsWith('date') ? 'false' : 'true'],
-      'ecriture-ignoree': [/      invalider\(\);\n      const p = fetchOrig\(input, init\);\n      Promise\.resolve\(p\)\.then\(invalider, invalider\);\n      return p;/, '      return fetchOrig(input, init);'],
+      'ligne-jamais-touchee': [/return ids\.includes\(v\.slice\(3\)\);/, 'return false;'],
+      'tout-precis': [/if \(!ids\.length \|\| ids\.some\(\(x\) => !x \|\| PAS_PRECIS\.has\(x\)\)\) return null;/, ''],
+      'like-ignore': [/return ids\.some\(\(x\) => re\.test\(x\)\);/, 'return false;'],
+      'fond-partout': [/const accepte = init && init\.vrmFond === true \? fenetreFond : fenetre;/, 'const accepte = fenetreFond;'],
+      'fond-sans-fenetre': [/maintenant\(\) - e\.fin < accepte/, 'true'],
+      'ecriture-ignoree': [/      vider\(\);\n      const p = fetchOrig\(input, init\);\n      Promise\.resolve\(p\)\.then\(vider, vider\);\n      return p;/, '      return fetchOrig(input, init);'],
     };
     for (const [nom, [re, rep]] of Object.entries(MUT)) {
       if (!re.test(texte)) { console.log(`  ❌ mutation ${nom} : motif introuvable`); ko++; continue; }

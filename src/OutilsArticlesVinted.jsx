@@ -31,11 +31,11 @@ export function AnnoncesACompleter({
   const nInconnu = lignes.filter((x) => x.b.inconnu.length).length;
   // (30 oct.) Rien à compléter, rien d'illisible, lecture complète : le bloc se tait
   // (« 0 avec champs manquants » était une ligne de plus avant la recherche).
-  if (!n && !nInconnu && !charge) return null;
+  if (!n && !nInconnu && !charge && !incomplet) return null;
   return (
     <details className="vrm-outils" data-annonces-completer>
       <summary>
-        Annonces à compléter <span>{n ? `${n} avec champs manquants` : charge ? "lecture…" : `${nInconnu} à relire sur Vinted`}</span>
+        Annonces à compléter <span>{n ? `${n} avec champs manquants` : charge ? "lecture…" : `${nInconnu} à vérifier sur Vinted`}</span>
       </summary>
       <p>Un brouillon VRM : l’annonce en ligne ne change pas.</p>
       {incomplet && <p role="status">Lecture des annonces incomplète : ce bilan porte uniquement sur les données récupérées.</p>}
@@ -111,7 +111,7 @@ export function ComparaisonComptesVinted({
   return (
     <details className="vrm-outils" data-comparer-comptes>
       <summary>
-        Comparer mes comptes Vinted <span>{rows.length} comptes</span>
+        Comparer mes comptes Vinted <span>{rows.length} compte{rows.length > 1 ? 's' : ''}</span>
       </summary>
       <p>
         <b>{periode}</b> · ventes finalisées, à leur date de vente (masquées exclues).

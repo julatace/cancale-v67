@@ -14,7 +14,7 @@
 //     paire choisie, avec SON prix, `confirme: true` ; une paire refusée par
 //     l'extension dit « pas faite » avec SA raison, jamais « republiée ».
 // §6.1 : sur un build d'origin/main, `[data-republier-ouvrir]` n'existe pas ⇒ rouge.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -32,7 +32,9 @@ const ITEMS = [
 const MAIN = { vinted_annonce_numeros: { '9102': { numero: '42' }, '9103': { numero: '43' }, '9106': { numero: '45', buyPrice: '47', recreeAt: new Date(auj - 5 * 3600e3).toISOString() }, '9107': { numero: '46' } } };
 const rows = [
   { id: 'main', data: MAIN },
-  { id: 'harvest_111_listings', data: { capturedAt: auj.toISOString(), payload: { items: ITEMS } } },
+  // (2 nov.) La vraie forme : la moisson active porte la pagination de Vinted. Sans total,
+  // la lecture n'est pas COMPLÈTE et un brouillon ne peut pas être proposé (brouillonsProposables).
+  { id: 'harvest_111_listings', data: { capturedAt: auj.toISOString(), payload: { items: ITEMS, pagination: { total_entries: ITEMS.length } } } },
   // (28 oct.) Un AUTRE compte (222) : ses paires ne sont pas proposées tant que Chrome est sur 111.
   { id: 'harvest_222_listings', data: { capturedAt: auj.toISOString(), payload: { items: [ann(9301, { title: 'Puma Suede autre compte taille 42', created_at_ts: Math.floor(auj / 1000) - 90 * 86400 })] } } },
   { id: 'vinted_brouillon_9201', data: { id: '9201', uid: '111', titre: 'Nike Air Max 1 dark teal', prix: 65, nPhotos: 4, etat: 'brouillon' } },
@@ -68,6 +70,10 @@ const PONT = (o) => {
   });
   post({ __vmr: 'ready', version: o.version });
 };
+// (3 nov.) « Vérifier avant de publier » : une feuille peut s'ouvrir (photos, taille…) ;
+// ce banc juge la suite, il répond « Publier quand même » et note ce qu'elle disait.
+const passerVerif = async (pg) => { try { const f = await pg.waitForSelector('[data-verif-sheet]', { timeout: 900 }); if (f) { const codes = await pg.evaluate(() => [...document.querySelectorAll('[data-verif-probleme]')].map((e) => e.getAttribute('data-verif-probleme')).join(',')); console.log('    · feuille de vérification : ' + codes); await pg.click('[data-verif-publier]'); await pg.waitForTimeout(200); } } catch (_) {} };
+
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
 const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/json', '.woff2': 'font/woff2' };
@@ -124,6 +130,10 @@ const projette = (row, sel) => {
         await bouton.waitFor({ state: 'visible', timeout: 12000 }).catch(() => {});
         dit(await bouton.count() > 0 && await bouton.isVisible(), 'Annonces : un bouton « Actions » dans la barre');
         dit(await pg.locator('[data-republier-ouvrir],[data-brouillons-ouvrir]').count() === 0, 'un seul bouton : plus de « Republier » ni « Brouillons » à part');
+        // (1er nov.) La phrase de l'astuce N° : le mot en gras n'est pas un élément
+        // d'un conteneur flex à part (l'écart du flex posait « numéro , jamais »).
+        { const d = await pg.evaluate(() => { const a = document.querySelector('[data-astuce-numeros]'); if (!a) return 'absente'; const b = [...a.querySelectorAll('b')].find((x) => x.textContent === 'numéro'); return b ? getComputedStyle(b.parentElement).display : 'sans mot'; });
+          if (d !== 'absente') dit(d !== 'flex' && d !== 'sans mot', 'l’astuce « numéro, jamais redonné » se lit d’une traite (pas d’espace avant la virgule)', d); }
         const lb = await bouton.boundingBox().catch(() => null);
         dit(lb && lb.width >= 80 && lb.height >= 40, '« Actions » n’est pas écrasé dans une case de 44 px (barre du téléphone)', lb ? `${Math.round(lb.width)}×${Math.round(lb.height)}` : 'absent');
         await bouton.click();
@@ -245,7 +255,7 @@ const projette = (row, sel) => {
         await pg.locator('[data-republier-esp-choix="fixe"]').click();
         await pg.locator('[data-republier] input[inputmode="numeric"]').fill('0');
         await pg.locator('[data-republier-confirme]').check();
-        await pg.locator('[data-republier-lancer]').click();
+        await pg.locator('[data-republier-lancer]').click(); await passerVerif(pg);
         { const b = pg.locator('[data-republier-progression="9103"][data-republier-etape="brouillon"]');
           let vu = false; for (let i = 0; i < 30 && !vu; i++) { vu = await b.count() > 0; if (!vu) await pg.waitForTimeout(50); }
           const txt = vu ? await b.innerText() : '';
@@ -350,7 +360,7 @@ const projette = (row, sel) => {
       });
       await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
       const action = async (k) => { await pg.locator('[data-actions-ouvrir]').first().click(); await pg.locator(`[data-action="${k}"]`).click(); await pg.locator(`[data-republier-action="${k}"]`).waitFor({ state: 'visible', timeout: 4000 }); };
-      const lancer = async () => { await pg.locator('[data-republier-esp-choix="fixe"]').click().catch(() => {}); await pg.locator('[data-republier] input[inputmode="numeric"]').fill('0').catch(() => {}); await pg.locator('[data-republier-confirme]').check(); await pg.locator('[data-republier-lancer]').click(); for (let i = 0; i < 40; i++) { const m = await pg.locator('[data-republier]').getAttribute('data-republier-mode'); if (m === 'fini' || m === 'pause') break; await pg.waitForTimeout(200); } };
+      const lancer = async () => { await pg.locator('[data-republier-esp-choix="fixe"]').click().catch(() => {}); await pg.locator('[data-republier] input[inputmode="numeric"]').fill('0').catch(() => {}); await pg.locator('[data-republier-confirme]').check(); await pg.locator('[data-republier-lancer]').click(); await passerVerif(pg); for (let i = 0; i < 40; i++) { const m = await pg.locator('[data-republier]').getAttribute('data-republier-mode'); if (m === 'fini' || m === 'pause') break; await pg.waitForTimeout(200); } };
       const fermer = async () => { await pg.locator('[data-republier-fermer]').click().catch(() => {}); await pg.waitForTimeout(250); await pg.evaluate(() => { window.__repub = []; }); };
       try {
         await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
@@ -445,7 +455,7 @@ const projette = (row, sel) => {
         const att1 = Number(await pg.locator('[data-republier-ligne="9103"] [data-republier-attente]').getAttribute('data-republier-attente').catch(() => 'NaN'));
         dit(att0 === '0' && att1 >= 60 && att1 <= 120 && /\+[12] min/.test(await pg.locator('[data-republier-ligne="9103"]').innerText()), 'AVANT de lancer, chaque ligne montre son temps tiré (1re : tout de suite, 2e : +1 min …)', `${att0} / ${att1}`);
         await pg.locator('[data-republier-confirme]').check();
-        await pg.locator('[data-republier-lancer]').click();
+        await pg.locator('[data-republier-lancer]').click(); await passerVerif(pg);
         for (let i = 0; i < 20 && (await pg.evaluate(() => (window.__repub || []).length)) < 1; i++) await pg.clock.runFor(100);
         await pg.clock.runFor(1000);
         const prochaineVue = Number(await pg.locator('[data-republier-prochaine]').getAttribute('data-republier-prochaine').catch(() => 'NaN'));
@@ -561,7 +571,7 @@ const projette = (row, sel) => {
         await pg.locator('[data-republier-suivant]').click();
         await pg.locator('[data-republier-suivant]').click();
         await pg.locator('[data-republier-confirme]').check();
-        await pg.locator('[data-republier-lancer]').click();
+        await pg.locator('[data-republier-lancer]').click(); await passerVerif(pg);
         const l = pg.locator('[data-republier-ligne="9102"]');
         for (let i = 0; i < 40 && (await l.getAttribute('data-republier-statut')) !== 'a-refaire'; i++) await pg.waitForTimeout(100);
         dit(await l.getAttribute('data-republier-statut') === 'a-refaire' && /refusé le brouillon/.test(await l.innerText()), 'Republier, brouillon raté : la ligne dit « à refaire » avec SA raison', await l.innerText());
@@ -626,7 +636,7 @@ const projette = (row, sel) => {
         await pg.locator('[data-republier-esp-choix="fixe"]').click().catch(() => {});
         await pg.locator('[data-republier] input[inputmode="numeric"]').fill('0').catch(() => {});
         await pg.locator('[data-republier-confirme]').check();
-        await pg.locator('[data-republier-lancer]').click();
+        await pg.locator('[data-republier-lancer]').click(); await passerVerif(pg);
         const l = pg.locator('[data-republier-ligne="9102"]');
         for (let i = 0; i < 60 && !['incertain', 'echec'].includes(await l.getAttribute('data-republier-statut')); i++) await pg.waitForTimeout(100);
         await pg.waitForTimeout(1200);

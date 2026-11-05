@@ -37,3 +37,59 @@ Ces compétences sont des conseils de goût. Quand l'un d'eux contredit
   bibliothèque d'interface sans raison mesurée (la taille du bundle compte,
   §« vitesse ») ;
 - « réduire les animations » est toujours respecté (`prefers-reduced-motion`).
+
+## Compétence « taste » — Leonxlnx/taste-skill
+
+Ajoutée le 31 octobre 2026 à la demande de Julien (« pour le changement de style…
+afin que tu t'éloignes de ce que tu fais que je n'aime pas trop »). Copiée depuis
+`github.com/Leonxlnx/taste-skill` (commit `12af471`, 25 octobre 2026), licence MIT
+(`taste-skill/LICENSE`). Contenu relu : règles de direction artistique, bibliothèque
+JSON, scripts Node locaux (`draw.mjs`, `inspect.mjs` : Chromium du banc ;
+`assets.mjs` ne cherche que des images libres — Openverse, Wikimedia, NASA, musées —
+sans clé). Ses fichiers de travail vont dans `.taste-skill/` (hors du dépôt).
+
+| compétence | quand elle sert dans VRM |
+|---|---|
+| `design-taste-frontend` (`taste-skill/`) | tout changement de style. VRM est une app : suivre **`references/app-screens.md`** (`draw.mjs --app`, `inspect.mjs --app`), pas la partie « page ». Le site public (accueil, CGV) suit la partie « page ». Les décisions de Julien du §7 de CLAUDE.md priment (palette violette refusée, rouge réservé aux deux paires sous un N°). |
+
+## Compétence « frontend-design » — anthropics/skills
+
+Ajoutée le 31 octobre 2026 à la demande de Julien (« n'hésite pas à télécharger de
+nouveaux skills de mise en page et de graphisme »). Copiée depuis
+`github.com/anthropics/skills`, dossier `skills/frontend-design` (commit `ca45fc4`,
+28 octobre 2026), licence Apache 2.0 (`frontend-design/LICENSE.txt`). Contenu relu :
+un seul fichier d'instructions (`SKILL.md`, ~9 Ko) — direction visuelle, typographie,
+écriture de l'interface, liste des « tics » des pages générées ; aucun script, aucune
+commande d'installation, aucun appel externe, aucune clé.
+
+| compétence | quand elle sert dans VRM |
+|---|---|
+| `frontend-design` | en complément de `taste-skill` pour un changement de style : partir du métier (sneakers, cartons, colis), poser un plan de tokens (4-6 couleurs, polices, mise en page) et le relire contre les choix « par défaut » avant de coder ; règles d'écriture des boutons et des messages d'erreur. Les décisions de Julien du §7 de CLAUDE.md priment. |
+
+Relus et **non repris** du même dépôt : `theme-factory` (dix thèmes génériques pour
+diapositives, dont un violet), `canvas-design` (affiches PNG/PDF, 5,6 Mo de polices :
+hors sujet pour l'app).
+
+## Ajoutées le 2 novembre 2026 (demande de Julien : « installe des skills pour faire de beaux designs »)
+
+| compétence | source | quand elle sert dans VRM |
+|---|---|---|
+| `impeccable` | `github.com/pbakaus/impeccable` (commit `9c3808b`), Apache 2.0 (`impeccable/LICENSE`, `NOTICE.md`) | direction de design complète pour les écrans d'app (mode **Operate**) : hiérarchie, mise en page, typo, couleur, finition (`reference/craft-floor.md` avant toute retouche visuelle), `audit`, `critique`, `polish`, `quieter`, `bolder` |
+| `design-critique` | `github.com/anthropics/knowledge-work-plugins` `design/` (commit `2574e29`), Apache 2.0 | critiquer une capture d'écran avant de la montrer à Julien |
+| `design-system` | même source | tenir les jetons (couleurs, rayons, ombres, espacements) d'un seul endroit |
+| `ux-copy` | même source | les phrases des boutons, états vides, erreurs |
+| `accessibility-review` | même source | contraste, cibles au doigt, lecteur d'écran |
+
+⚠️ `impeccable/scripts/impeccable` télécharge un binaire au premier lancement :
+ne PAS le lancer (réseau limité, et inutile) — lire `SKILL.md` et les fichiers
+`reference/` directement (son mode « Launcher unavailable »).
+
+**Règle de travail** : tout chantier visuel lit `impeccable` (+ `craft-floor.md`),
+`emil-design-eng` et `apple-design`, et passe ses captures par `design-critique`
+avant de les montrer. Les règles de `CLAUDE.md` (§7, refus) passent toujours avant.
+
+### `ui-ux-pro-max` (ajoutée le 2 nov., 21 h 55)
+Source : `github.com/nextlevelbuilder/ui-ux-pro-max-skill` (commit `713eef5`, ~144 000 étoiles), licence MIT (`ui-ux-pro-max/LICENSE`).
+Base de règles UI/UX cherchable en local (styles, palettes, typographies, 119 règles UX) :
+`python3 .claude/skills/ui-ux-pro-max/scripts/search.py "<requête>" --domain style|ux|typography|color`.
+Aucun appel réseau dans la recherche. À consulter avec `impeccable` pour tout écran.

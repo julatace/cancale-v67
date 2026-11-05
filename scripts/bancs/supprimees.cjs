@@ -31,7 +31,7 @@
 //  13. « sort d'ici tout de suite » : une extension à jour ET seule, avec le geste.
 // Ce qui est jugé : la présence des cartes (`data-carte-annonce`), des attributs
 // `data-*` et des nombres rendus — pas une formulation.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -163,7 +163,11 @@ const lireAnnonces = (pg) => pg.evaluate(() => {
     // La coche « à jour » se reconnaît à ce qu'elle DIT (elle n'avait pas
     // d'attribut avant : un contrôle posé sur un attribut neuf serait vert par
     // accident sur le code d'avant).
-    aJour: (document.body.innerText.match(/✓ (Données|Ventes) Vinted à jour/g) || []).length,
+    // 27 oct. (« téléphone épuré », demande de Julien) : sur téléphone la coche
+    // porte `vrm-aide` et se tait. On la compte dans le DOM (cachée comprise) :
+    // « aucune coche au-dessus du dressing » reste plus strict, et « elle reste
+    // sur Ventes » juge qu'elle est rendue, pas qu'elle est montrée au doigt.
+    aJour: (document.body.textContent.match(/✓ (Données|Ventes) Vinted à jour/g) || []).length,
     texte: el ? el.innerText : '',
     couleurs: el ? [...el.querySelectorAll('*')].concat([el]).map((x) => getComputedStyle(x).color) : [],
     sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth,
@@ -282,10 +286,15 @@ const lireDash = (pg) => pg.evaluate(() => {
       console.log(`── 8. ${t} — Vinted → Annonces : pas de « ✓ à jour » des ventes au-dessus d’un dressing d’hier`);
       await essaie('8 ' + t, async () => {
         const lignes = [...BASE(), ventes('111', 3), ventes('222', 3)];
-        const r = await rendre(b, { lignes, tel, mobile: false, onglet: 'plat_vinted', section: 'annonces' });
+        // (31 oct., navigation par tâche) « Vinted → Annonces » est « Annonces · Vinted »,
+        // « Vinted → Ventes » est « Ventes · Vinted » : l'onglet de la navigation, puis
+        // le filtre de site, comme une personne.
+        const r = await rendre(b, { lignes, tel, mobile: false, onglet: 'annonces&site=vinted' });
         const a = await lireAnnonces(r.pg);
         dit(a.nFraicheur === 1 && a.aJour === 0, `${t} : la date du dressing est dite, et AUCUNE coche « à jour » ne la contredit sur le même écran (§11, §5)`, JSON.stringify({ fraicheur: a.nFraicheur, aJour: a.aJour }));
-        await r.pg.click('[data-section="ventes"]'); await r.pg.waitForTimeout(2500);
+        await r.pg.locator('.vrm-mobile-nav [data-nav-entree="ventes"]:visible, .vrm-sidebar [data-nav-entree="ventes"]:visible').first().click();
+        await r.pg.click('[data-filtre-site="ventes"] button[data-site="vinted"]'); await r.pg.waitForTimeout(2500);
+        dit(await r.pg.evaluate(() => { const t = document.querySelector('[data-tache]'); return !!t && t.getAttribute('data-tache') === 'ventes' && t.getAttribute('data-tache-site') === 'vinted'; }), `${t} : Ventes · Vinted est ouvert`);
         const v = await lireAnnonces(r.pg);
         dit(v.aJour === 1, `${t} : l’autre sens — sur la section Ventes, la coche des ventes captées à l’instant reste`, JSON.stringify({ aJour: v.aJour }));
         dit(r.errs.length === 0, `${t} : aucune erreur d’app`, r.errs.join(' | ').slice(0, 160));

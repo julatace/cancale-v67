@@ -11,7 +11,7 @@
 //     parti, l'annonce eBay VRM-63 encore en ligne), une annonce eBay sans SKU.
 // À 1512 px et 390 px tactile. Le Stock est ouvert après Ventes (l'écran qui
 // publie la liste des paires présentes).
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');

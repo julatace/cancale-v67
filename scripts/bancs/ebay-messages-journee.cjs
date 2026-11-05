@@ -17,7 +17,7 @@
 //      ligne le dit UNE fois, aucun « 0 » eBay, aucune action eBay ;
 //   D. aucun résumé rangé : rien d'eBay (ni attribut, ni ligne, ni action).
 // On juge les attributs et les nombres rendus, jamais une formulation.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -118,7 +118,11 @@ const lireJour = (pg) => pg.evaluate(() => {
 async function ouvrirJour(pg) {
   await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
   await pg.waitForSelector('[data-tuile="messages"]', { timeout: 15000 });
-  await pg.waitForTimeout(3500);
+  // (31 oct.) Attendre que la case ait FINI de lire (Vinted lu : `data-n` posé),
+  //  pas seulement un délai : sur une machine chargée, 3,5 s ne suffisaient pas
+  //  et la case encore « en cours » passait pour un rouge (§6.5).
+  await pg.waitForFunction(() => { const t = document.querySelector('[data-tuile="messages"]'); return t && t.getAttribute('data-n') !== ''; }, null, { timeout: 20000 }).catch(() => {});
+  await pg.waitForTimeout(1500);
 }
 
 (async () => {

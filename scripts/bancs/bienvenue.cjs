@@ -132,7 +132,9 @@ async function page(nav, { telephone, comptes = [], reduit = false, tab = 'journ
       // Le mouvement entre écrans.
       const anim = async (p) => {
         await p.evaluate(() => { const m = document.querySelector('.vrm-main'); window.__anim = []; m && m.addEventListener('animationstart', (e) => { if (e.target === m) window.__anim.push(e.animationName); }); });
-        const lien = p.locator('nav').getByRole('button', { name: 'Vinted', exact: true }).first();
+        // (1er nov.) La navigation par tâche n'a plus de bouton « Vinted » : on change
+        // d'écran par « Ventes », présent dans la barre du bas comme dans la colonne.
+        const lien = p.locator('nav').getByRole('button', { name: 'Ventes', exact: true }).first();
         await lien.click(); await p.waitForTimeout(500);
         return p.evaluate(() => window.__anim);
       };

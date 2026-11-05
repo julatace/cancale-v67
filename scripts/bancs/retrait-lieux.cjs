@@ -10,7 +10,7 @@
 // Vinted), Speed Queen dans un AUTRE, aucun astérisque ni slogan affiché, et
 // pour le colis Mondial Relay sans code : ni « Voir mon code de retrait », ni
 // silence — la phrase qui dit où arrive le code.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -107,9 +107,9 @@ async function main() {
       await essaie(T, async () => {
         const { ctx, pg, errs } = await preparer(b, vp);
         await pg.goto(`http://localhost:${PORT}/?tab=cat_achats`, { waitUntil: 'domcontentloaded' });
-        await pg.locator('.vrm-pickup-point').first().waitFor({ timeout: 15000 });
+        await pg.locator('[data-cc-colonne="retirer"] [data-relais-point]').first().waitFor({ timeout: 15000 }); // (2 nov.) Colis → « À retirer », par point
         await pg.waitForTimeout(1500);
-        const blocs = await pg.evaluate(() => [...document.querySelectorAll('.vrm-pickup-point')].map((e) => e.innerText));
+        const blocs = await pg.evaluate(() => [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-relais-point]')].map((e) => e.innerText));
         const kusmi = blocs.filter((t) => /kusmi tea/i.test(t));
         dit(kusmi.length === 1, `${T} la consigne Kusmi Tea est UN seul bloc (email et conversation)`, `${kusmi.length} bloc(s)`);
         dit(kusmi.length === 1 && /A22222/.test(kusmi[0]) && /B11111/.test(kusmi[0]), `${T} … qui porte les DEUX colis (le code de l'email et celui de la conversation)`);
@@ -119,7 +119,7 @@ async function main() {
         dit(!/\*/.test(tout), `${T} aucun astérisque de la version texte ne s'affiche`);
         dit(!/juste ici/i.test(tout), `${T} aucun slogan (« juste ici ») affiché comme lieu`);
         dit(/494400/.test(tout), `${T} … et le colis Mondial Relay au lieu inconnu garde son code`);
-        const pc = await pg.evaluate(() => { const c = [...document.querySelectorAll('.vrm-pickup-card')].find((e) => /salomon xt-6 grise/i.test(e.innerText)); return c ? { t: c.innerText, n: !!c.querySelector('[data-colis-sans-code-conv]') } : null; });
+        const pc = await pg.evaluate(() => { const c = [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-cc-carte]')].find((e) => /salomon xt-6 grise/i.test(e.innerText)); return c ? { t: c.innerText, n: !!c.querySelector('[data-colis-sans-code-conv]') } : null; });
         dit(pc && pc.n, `${T} colis lu dans la conversation SANS code : la phrase dit où arrive le code`, pc ? '' : 'carte introuvable');
         dit(pc && !/Voir mon code de retrait/i.test(pc.t), `${T} … et aucun bouton ne promet « Voir mon code de retrait »`, pc ? pc.t.slice(0, 120) : '');
         if (process.env.SHOTS) await pg.screenshot({ path: path.join(process.env.SHOTS, `retrait-lieux-${vp.width}.png`), fullPage: true });

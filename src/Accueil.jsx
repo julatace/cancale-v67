@@ -25,6 +25,8 @@
 //    (src/AccueilFilm.jsx) seulement avec `?film`.
 import React from 'react';
 import './styles-accueil-studio.css';
+// (31 oct.) Vitrine, chargée APRÈS la couche « studio » : elle a le dernier mot.
+import './styles-accueil-vitrine.css';
 import { contactEmail, CONTACT_A_VENIR } from './contact.js';
 import { K, COURBE_SORTIE, OMBRE_CARTE, REFLET, HAUTEURS_SCENES, LARGEUR_COMPACTE } from './accueil-jetons.js';
 import { ACCES_OFFERT, EXTENSION_SUR_LE_STORE, DETOURAGE_POUR_TOUS, VESTIAIRE_BRANCHE, PRIX_MOIS } from './accueil-reglages.js';
@@ -106,69 +108,69 @@ const LEGAL = [
 const ANCRES = [['colis', 'Colis'], ['ailleurs', 'Vendu ailleurs'], ['urssaf', 'URSSAF'], ['prix', 'Prix'], ['faq', 'Questions']];
 
 const CSS = `
-.acc{position:relative;background:${K.bg};color:${K.text};min-height:100vh;font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;overflow-x:clip;-webkit-font-smoothing:antialiased;font-variant-numeric:normal;font-feature-settings:normal}
+.acc{position:relative;background:${K.bg};color:${K.text};min-height:100vh;font-family:-apple-system,BlinkMacSystemFont,'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;overflow-x:clip;-webkit-font-smoothing:antialiased;font-variant-numeric:normal;font-feature-settings:normal}
 @supports not (overflow-x:clip){.acc{overflow-x:hidden}}
 .acc *{box-sizing:border-box}
 .acc a{color:inherit}
-.acc :focus-visible{outline:2px solid ${K.accent};outline-offset:2px;border-radius:8px}
+.acc :focus-visible{outline:2px solid ${K.accent};outline-offset:2px;border-radius:12px}
 .acc button,.acc a{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
-:where(.acc) h1,:where(.acc) h2,:where(.acc) h3{font-family:'Space Grotesk','Inter',system-ui,sans-serif;margin:0;color:${K.text}}
+:where(.acc) h1,:where(.acc) h2,:where(.acc) h3{font-family:-apple-system,BlinkMacSystemFont,'Inter',system-ui,sans-serif;margin:0;color:${K.text}}
 :where(.acc) p{margin:0}
 .acc-in{max-width:1180px;margin:0 auto;padding:0 20px}
 .acc-sentinelle{position:absolute;top:8px;left:0;width:1px;height:1px;pointer-events:none}
 
 /* La barre : transparente en haut, matière dès qu'on défile. */
-.acc-nav{position:sticky;top:0;z-index:30;padding-top:env(safe-area-inset-top);background:rgba(242,245,243,0);border-bottom:1px solid transparent;transition:background-color 200ms ease,border-color 200ms ease}
-.acc-nav.defile{background:rgba(242,245,243,.82);-webkit-backdrop-filter:saturate(1.4) blur(14px);backdrop-filter:saturate(1.4) blur(14px);border-bottom-color:${K.line}}
+.acc-nav{position:sticky;top:0;z-index:30;padding-top:env(safe-area-inset-top);background:rgba(255,255,255,0);border-bottom:1px solid transparent;transition:background-color 200ms ease,border-color 200ms ease}
+.acc-nav.defile{background:${K.bg};border-bottom-color:${K.line}}
 @media (prefers-reduced-transparency:reduce){.acc-nav.defile{background:${K.bg};-webkit-backdrop-filter:none;backdrop-filter:none}}
 .acc-nav .acc-in{display:flex;align-items:center;gap:12px;height:64px}
-.acc img.vrm-brand-asset{background:#21343e;padding:2px;object-fit:contain;box-sizing:border-box}
+.acc img.vrm-brand-asset{background:${K.ink};padding:2px;object-fit:contain;box-sizing:border-box}
 .acc .cj-lib img.vrm-brand-asset{padding:0;border-radius:3px}
 .acc-marque{display:flex;align-items:center;gap:10px;flex-shrink:0;text-decoration:none}
-.acc-marque img{width:36px;height:36px;border-radius:9px;display:block;object-fit:contain;background:#21343e;padding:2px;box-sizing:border-box}
-.acc-marque b{font-family:'Space Grotesk','Inter',sans-serif;font-size:19px;font-weight:700;letter-spacing:.04em}
+.acc-marque img{width:36px;height:36px;border-radius:12px;display:block;object-fit:contain;background:${K.ink};padding:2px;box-sizing:border-box}
+.acc-marque b{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;font-size:20px;font-weight:700;letter-spacing:.04em}
 .acc-ancres{display:flex;gap:2px;margin-left:22px}
-.acc-ancres a{color:${K.muted};font-size:14px;font-weight:500;padding:8px 10px;border-radius:8px;text-decoration:none;transition:color 160ms ease}
+.acc-ancres a{color:${K.muted};font-size:15px;font-weight:500;padding:8px 10px;border-radius:12px;text-decoration:none;transition:color 160ms ease}
 @media (hover:hover) and (pointer:fine){.acc-ancres a:hover{color:${K.text}}}
 .acc-nav-droite{margin-left:auto;display:flex;align-items:center;gap:6px}
 
 /* Les boutons : une forme, trois poids. */
-.acc .acc-btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:10px;height:48px;min-height:0;padding:0 20px;border-radius:10px;border:none;cursor:pointer;font-family:'Inter',system-ui,sans-serif;font-size:15px;font-weight:600;letter-spacing:-.005em;white-space:nowrap;text-decoration:none;filter:none;transition:transform 120ms ${COURBE_SORTIE},box-shadow 160ms ${COURBE_SORTIE},opacity 180ms ${COURBE_SORTIE}}
-.acc .acc-p{background:${K.cta};color:#FFFFFF;box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 1px 2px rgba(18,27,44,.12),0 8px 22px rgba(43,69,72,.30)}
+.acc .acc-btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:10px;height:48px;min-height:0;padding:0 20px;border-radius:12px;border:none;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,'Inter',system-ui,sans-serif;font-size:15px;font-weight:600;letter-spacing:-.005em;white-space:nowrap;text-decoration:none;filter:none;transition:transform 120ms ${COURBE_SORTIE},box-shadow 160ms ${COURBE_SORTIE},opacity 180ms ${COURBE_SORTIE}}
+.acc .acc-p{background:${K.cta};color:#FFFFFF;box-shadow:none}
 .acc .acc-btn:active:not(:disabled){transform:scale(.97);filter:none}
 .acc .acc-btn:hover{filter:none}
-.acc-chev{display:inline-block;font-size:19px;line-height:1;margin-right:-4px;transition:transform 160ms ${COURBE_SORTIE}}
+.acc-chev{display:inline-block;font-size:20px;line-height:1;margin-right:-4px;transition:transform 160ms ${COURBE_SORTIE}}
 @media (hover:hover) and (pointer:fine){
-  .acc .acc-p:hover{box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 1px 2px rgba(18,27,44,.12),0 10px 26px rgba(43,69,72,.38)}
+  .acc .acc-p:hover{box-shadow:none;background:#0071E3}
   .acc .acc-btn:hover .acc-chev{transform:translateX(2px)}
 }
-.acc .acc-lien{display:inline-flex;align-items:center;min-height:44px;padding:0 6px;border:none;background:none;cursor:pointer;font-family:'Inter',system-ui,sans-serif;font-size:14px;font-weight:500;color:${K.muted};text-decoration:none;filter:none}
+.acc .acc-lien{display:inline-flex;align-items:center;min-height:44px;padding:0 6px;border:none;background:none;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,'Inter',system-ui,sans-serif;font-size:15px;font-weight:500;color:${K.muted};text-decoration:none;filter:none}
 .acc .acc-lien b{font-weight:600;color:${K.text};margin-left:4px}
 @media (hover:hover) and (pointer:fine){.acc .acc-lien:hover b,.acc .acc-lien:hover{text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px}}
 .acc .acc-lien:active:not(:disabled){transform:none}
-.acc-nav .acc-btn{height:38px;padding:0 14px;font-size:14px;gap:8px}
+.acc-nav .acc-btn{height:38px;padding:0 14px;font-size:15px;gap:8px}
 .acc-nav .acc-btn .acc-chev{font-size:17px}
 .acc-nav .acc-cta-nav{opacity:0;transform:translateY(4px);pointer-events:none;transition:opacity 150ms ${COURBE_SORTIE},transform 150ms ${COURBE_SORTIE}}
 .acc-nav .acc-cta-nav.la{opacity:1;transform:none;pointer-events:auto;transition-duration:180ms}
 
 /* Le haut de page. */
 .acc-hero{position:relative;padding:56px 0 64px}
-.acc-hero:before{content:"";position:absolute;right:max(0px,calc(50% - 640px));top:-40px;width:820px;height:740px;background:radial-gradient(closest-side,rgba(61,123,255,.17),transparent);pointer-events:none}
+.acc-hero:before{content:none}
 .acc-hero .acc-in{position:relative;display:grid;grid-template-columns:minmax(0,580px) minmax(0,500px);gap:60px;align-items:start}
-.acc-def{display:inline-flex;align-items:center;font-size:14px;font-weight:600;color:${K.text};background:${K.card2};border:1px solid ${K.line2};border-radius:8px;padding:6px 12px;line-height:1.3;text-wrap:balance}
+.acc-def{display:inline-flex;align-items:center;font-size:15px;font-weight:600;color:${K.text};background:${K.card2};border:1px solid ${K.line2};border-radius:12px;padding:6px 12px;line-height:1.3;text-wrap:balance}
 .acc-h1{font-size:56px;line-height:1.04;letter-spacing:-.03em;font-weight:700;margin:22px 0 0}
 .acc-h1 span{display:block}
 .acc-h1 .attenue{color:${K.muted}}
-.acc-sous{font-size:19px;line-height:1.5;color:${K.text};margin-top:16px;max-width:560px}
+.acc-sous{font-size:20px;line-height:1.5;color:${K.text};margin-top:16px;max-width:560px}
 .acc-sous em{font-style:normal;color:${K.muted}}
 .acc-actions{display:flex;align-items:center;gap:20px;margin-top:28px;flex-wrap:wrap}
-.acc-hero .acc-actions .acc-btn{font-size:16px}
-.acc-lignes{margin-top:22px;display:flex;flex-direction:column;gap:6px;font-size:14px;line-height:1.5;color:${K.faint}}
+.acc-hero .acc-actions .acc-btn{font-size:17px}
+.acc-lignes{margin-top:22px;display:flex;flex-direction:column;gap:6px;font-size:15px;line-height:1.5;color:${K.faint}}
 .acc-lignes b{color:${K.text};font-weight:600}
 .acc-lignes .sep{padding-left:6px;color:${K.faint}}
 .acc-lignes .nw{white-space:nowrap}
 .acc-carte-jour{position:relative}
-.acc-carte-jour:before{content:"";position:absolute;inset:-110px -80px;background:radial-gradient(closest-side,rgba(61,123,255,.22),transparent);pointer-events:none;z-index:0;filter:blur(2px)}
+.acc-carte-jour:before{content:none}
 .acc-carte-jour > *{position:relative;z-index:1}
 /* PROFONDEUR 3D DE LA CARTE DÉMO (vitrine marketing — JAMAIS sur les écrans de
    données de l'app). Trois couches, transform/opacity seuls :
@@ -182,7 +184,7 @@ const CSS = `
      (≤1099 px) : pas de rotation (évite tout débord), le flottement suffit.
    Le film ne rend que CarteJourEcran : ces wrappers ne le touchent pas.
    Mouvement réduit : tout est coupé, carte à plat et immobile. */
-.acc-flotte{perspective:1100px;border-radius:14px;box-shadow:0 1px 3px rgba(18,27,44,.08),0 26px 60px rgba(18,27,44,.16),0 20px 60px rgba(43,69,72,.16)}
+.acc-flotte{perspective:1100px;border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,.08),0 26px 60px rgba(0,0,0,.16),0 20px 60px rgba(0,0,0,.16)}
 /* La carte se POSE en 3D au chargement (un rotateX qui s'aplatit) : le relief
    se voit sur téléphone comme sur ordinateur, UNE fois, puis la carte se fige
    À PLAT — texte net, chaque ligne cliquable (une démo qu'on lit et qu'on clique
@@ -194,7 +196,7 @@ const CSS = `
 @keyframes accCarte3D{from{transform:rotateX(14deg) translateY(10px)}to{transform:rotateX(0) translateY(0)}}
 @media (prefers-reduced-motion:reduce){.acc-tilt{animation:none!important;transition:none!important;transform:none!important}}
 .acc-carte-jour > .acc-revoir-l{position:absolute;left:0;right:0;top:100%;height:34px;display:flex;justify-content:flex-end;align-items:center;max-width:500px}
-.acc .acc-revoir{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:0 4px;border:none;background:none;cursor:pointer;font-family:'Inter',system-ui,sans-serif;font-size:13px;font-weight:500;color:${K.muted};animation:accApparait 200ms ${COURBE_SORTIE} both}
+.acc .acc-revoir{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:0 4px;border:none;background:none;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,'Inter',system-ui,sans-serif;font-size:13px;font-weight:500;color:${K.muted};animation:accApparait 200ms ${COURBE_SORTIE} both}
 @media (hover:hover) and (pointer:fine){.acc .acc-revoir:hover{color:${K.text}}}
 @keyframes accApparait{from{opacity:0}to{opacity:1}}
 
@@ -220,7 +222,7 @@ const CSS = `
    apparaît : l'œil va à l'action. Invisible avant et après (hors écran), coupé
    en mouvement réduit (le pseudo reste hors champ, aucune animation posée). */
 .acc-actions .acc-p{overflow:hidden}
-.acc-actions .acc-p:after{content:"";position:absolute;top:0;bottom:0;left:0;width:55%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.38),transparent);transform:translateX(-185%) skewX(-12deg);pointer-events:none}
+.acc-actions .acc-p:after{content:none}
 @keyframes accLustre{from{transform:translateX(-185%) skewX(-12deg)}to{transform:translateX(230%) skewX(-12deg)}}
 @media (prefers-reduced-motion:no-preference){
   .acc-actions .acc-p:after{animation:accLustre 1050ms ${COURBE_SORTIE} 820ms 1 both}
@@ -237,13 +239,13 @@ const CSS = `
 .acc-sec{position:relative;padding:64px 0;scroll-margin-top:80px}
 .acc-quand{font-size:13px;font-weight:500;color:${K.muted};margin-bottom:12px}
 .acc-quand b{color:${K.text};font-weight:600}
-.acc-h2{font-size:40px;line-height:1.1;letter-spacing:-.02em;font-weight:700}
-.acc-rep{font-size:19px;line-height:1.5;color:${K.text};margin-top:14px}
-.acc-roles{margin-top:18px;display:flex;flex-direction:column;gap:8px;font-size:14px;line-height:1.5;color:${K.muted}}
+.acc-h2{font-size:38px;line-height:1.1;letter-spacing:-.02em;font-weight:700}
+.acc-rep{font-size:20px;line-height:1.5;color:${K.text};margin-top:14px}
+.acc-roles{margin-top:18px;display:flex;flex-direction:column;gap:8px;font-size:15px;line-height:1.5;color:${K.muted}}
 .acc-roles b{font-weight:600;margin-right:8px}
 .acc-roles .vrm{color:${K.text}}
 .acc-roles .toi{color:${K.muted}}
-.acc-prec{margin:16px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px;font-size:14px;line-height:1.5;color:${K.muted}}
+.acc-prec{margin:16px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px;font-size:15px;line-height:1.5;color:${K.muted}}
 .acc-prec li{position:relative;padding-left:14px}
 .acc-prec li:before{content:"";position:absolute;left:0;top:.62em;width:4px;height:4px;border-radius:2px;background:${K.faint}}
 .acc-emplacement{position:relative;width:100%}
@@ -259,9 +261,9 @@ const CSS = `
 .acc-fil{display:none}
 @media (min-width:1440px){
   .acc-fil{display:block;position:absolute;left:calc(50% - 620px);top:0;bottom:0;width:1px;background:${K.line2};pointer-events:none}
-  .acc-fil i{position:absolute;inset:0;background:rgba(238,241,246,.4);transform-origin:top}
+  .acc-fil i{position:absolute;inset:0;background:rgba(255,255,255,.4);transform-origin:top}
   .acc-fil span{position:absolute;right:12px;top:64px;white-space:nowrap;font-size:13px;font-weight:600;color:${K.text};line-height:18px}
-  .acc-fil span:after{content:"";position:absolute;right:-16px;top:6px;width:7px;height:7px;border-radius:50%;background:${K.bg};border:1px solid rgba(238,241,246,.5)}
+  .acc-fil span:after{content:"";position:absolute;right:-16px;top:6px;width:7px;height:7px;border-radius:50%;background:${K.bg};border:1px solid rgba(255,255,255,.5)}
 }
 @supports (animation-timeline:view()){
   .acc-fil i{animation:accRemplit linear both;animation-timeline:view();animation-range:entry 20% cover 55%}
@@ -273,8 +275,8 @@ const CSS = `
 .acc-qs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:16px}
 .acc-q{background:${K.card};border:1px solid ${K.line};border-radius:12px;padding:18px;box-shadow:${REFLET}}
 .acc-q .acc-icone{color:${K.muted};flex-shrink:0;margin-top:1px}
-.acc-q h3{display:flex;align-items:flex-start;gap:10px;font-family:'Inter',system-ui,sans-serif;font-size:15px;font-weight:600;line-height:1.35;letter-spacing:-.005em}
-.acc-q p{font-size:14px;line-height:1.45;color:${K.muted};margin-top:6px}
+.acc-q h3{display:flex;align-items:flex-start;gap:10px;font-family:-apple-system,BlinkMacSystemFont,'Inter',system-ui,sans-serif;font-size:15px;font-weight:600;line-height:1.35;letter-spacing:-.005em}
+.acc-q p{font-size:15px;line-height:1.45;color:${K.muted};margin-top:6px}
 /* Les cartes répondent sous le curseur (sur SOURIS seulement — sur mobile un
    survol reste collé après un tap, et la carte-question y est de toute façon
    sans cadre). §7 : on réutilise les ombres existantes, aucune couleur neuve. */
@@ -292,10 +294,11 @@ const CSS = `
 .acc-bande{background:${K.surface};border-top:1px solid ${K.line};border-bottom:1px solid ${K.line}}
 .acc-deux{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:72px;align-items:start}
 .acc-h2b{font-size:28px;line-height:1.15;letter-spacing:-.02em;font-weight:700}
+.acc-note{margin:18px 0 0;font-size:13px;line-height:1.55;color:${K.muted}}
 .acc-etapes{list-style:none;margin:24px 0 0;padding:0;display:flex;flex-direction:column;gap:18px}
 .acc-etapes li{display:flex;gap:14px;align-items:flex-start}
-.acc-etapes .n{width:28px;height:28px;border-radius:8px;background:${K.card2};border:1px solid ${K.line2};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:${K.text};flex-shrink:0}
-.acc-etapes h3{font-family:'Inter',system-ui,sans-serif;font-size:16px;font-weight:600;line-height:1.35;letter-spacing:0;margin-top:3px}
+.acc-etapes .n{width:28px;height:28px;border-radius:12px;background:${K.card2};border:1px solid ${K.line2};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:${K.text};flex-shrink:0}
+.acc-etapes h3{font-family:-apple-system,BlinkMacSystemFont,'Inter',system-ui,sans-serif;font-size:17px;font-weight:600;line-height:1.35;letter-spacing:0;margin-top:3px}
 .acc-etapes p{font-size:15px;line-height:1.55;color:${K.muted};margin-top:3px}
 .acc-conf p{font-size:15px;line-height:1.6;color:${K.muted};margin-top:14px}
 .acc-conf p:first-of-type{margin-top:24px;color:${K.text}}
@@ -304,17 +307,17 @@ const CSS = `
 /* Le prix et les questions. */
 .acc-g-prix{display:grid;grid-template-columns:minmax(0,480px) minmax(0,1fr);gap:64px;align-items:start}
 .acc-prix{background:${K.card};border:1px solid ${K.line2};border-radius:12px;padding:28px;box-shadow:${REFLET},${OMBRE_CARTE}}
-.acc-offert{display:inline-flex;font-size:13px;font-weight:600;color:${K.text};background:${K.card2};border:1px solid ${K.line2};border-radius:8px;padding:4px 10px;margin-top:16px}
+.acc-offert{display:inline-flex;font-size:13px;font-weight:600;color:${K.text};background:${K.card2};border:1px solid ${K.line2};border-radius:12px;padding:4px 10px;margin-top:16px}
 .acc-gros{display:flex;align-items:baseline;gap:10px;margin-top:12px}
-.acc-gros b{font-family:'Space Grotesk','Inter',sans-serif;font-size:52px;font-weight:700;letter-spacing:-.02em;line-height:1;font-variant-numeric:tabular-nums}
-.acc-gros span{font-size:16px;color:${K.muted}}
+.acc-gros b{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;font-size:52px;font-weight:700;letter-spacing:-.02em;line-height:1;font-variant-numeric:tabular-nums}
+.acc-gros span{font-size:17px;color:${K.muted}}
 .acc-prix ul{list-style:none;margin:16px 0 0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:15px;line-height:1.5;color:${K.text}}
-.acc-prix .petit{font-size:14px;line-height:1.5;color:${K.muted};margin-top:14px}
+.acc-prix .petit{font-size:15px;line-height:1.5;color:${K.muted};margin-top:14px}
 .acc-prix .petit a{color:${K.text};text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px}
 .acc-prix .acc-btn{width:100%;margin-top:20px}
 .acc-faq h2{font-size:28px;line-height:1.15;letter-spacing:-.02em;font-weight:700;margin-bottom:8px}
 .acc-faq details{border-bottom:1px solid ${K.line}}
-.acc-faq summary{list-style:none;cursor:pointer;min-height:52px;padding:14px 0;font-size:16px;font-weight:600;line-height:1.4;display:flex;justify-content:space-between;gap:16px;align-items:center}
+.acc-faq summary{list-style:none;cursor:pointer;min-height:52px;padding:14px 0;font-size:17px;font-weight:600;line-height:1.4;display:flex;justify-content:space-between;gap:16px;align-items:center}
 .acc-faq summary::-webkit-details-marker{display:none}
 .acc-faq summary:after{content:"+";font-size:22px;line-height:1;color:${K.muted};font-weight:400;flex-shrink:0;transition:transform 200ms ${COURBE_SORTIE}}
 .acc-faq details[open] summary:after{transform:rotate(45deg)}
@@ -324,14 +327,14 @@ const CSS = `
 
 /* La fin. */
 .acc-fin{position:relative;text-align:center;padding:64px 0}
-.acc-fin:before{content:"";position:absolute;left:50%;top:0;width:900px;height:420px;transform:translateX(-50%);background:radial-gradient(closest-side,rgba(61,123,255,.08),transparent);pointer-events:none}
+.acc-fin:before{content:none}
 .acc-fin .acc-in{position:relative;display:flex;flex-direction:column;align-items:center}
 .acc-fin-feuille{display:flex;flex-direction:column;align-items:center}
 .acc-fin-texte{display:flex;flex-direction:column;align-items:center}
 .acc-fin .acc-emplacement{width:220px}
-.acc-fin .note{font-size:14px;color:${K.muted};margin-top:12px}
+.acc-fin .note{font-size:15px;color:${K.muted};margin-top:12px}
 .acc-fin .acc-h2{margin-top:22px}
-.acc-fin .texte{font-size:16px;line-height:1.55;color:${K.muted};margin-top:12px;max-width:520px}
+.acc-fin .texte{font-size:17px;line-height:1.55;color:${K.muted};margin-top:12px;max-width:520px}
 .acc-fin .acc-actions{justify-content:center}
 @media (min-width:1100px){
   .acc-fin .acc-in{flex-direction:row;justify-content:center;align-items:center;gap:64px}
@@ -368,11 +371,11 @@ const CSS = `
   .acc-nav .acc-in{height:56px;gap:8px}
   .acc-marque img{width:32px;height:32px}
   .acc-marque b{font-size:17px}
-  .acc-nav .acc-btn{height:38px;padding:0 12px;font-size:13.5px}
-  .acc-nav .acc-lien{font-size:14px;padding:0 4px}
+  .acc-nav .acc-btn{height:38px;padding:0 12px;font-size:13px}
+  .acc-nav .acc-lien{font-size:15px;padding:0 4px}
   .acc-hero{padding:16px 0 0}
   .acc-def{font-size:13px;padding:5px 10px}
-  .acc-h1{font-size:32px;margin-top:10px}
+  .acc-h1{font-size:34px;margin-top:10px}
   .acc-sous{font-size:17px;line-height:1.45;margin-top:12px}
   .acc-actions{flex-direction:column;align-items:stretch;gap:2px;margin-top:16px}
   .acc-hero .acc-actions .acc-btn{height:52px;width:100%}
@@ -394,17 +397,17 @@ const CSS = `
   .acc-q p{line-height:1.45;margin-top:2px;padding-left:30px}
   .acc-q:last-child{border-bottom:none}
   .acc-hors-tel,.acc-q .acc-long:not(:only-child){display:none}
-  .acc-h2b{font-size:24px}
+  .acc-h2b{font-size:22px}
   .acc-etapes{margin-top:16px;gap:12px}
   .acc-etapes h3{font-size:15px}
-  .acc-etapes p{font-size:14px;line-height:1.5;margin-top:2px}
-  .acc-conf p{font-size:14px;line-height:1.5;margin-top:10px}
+  .acc-etapes p{font-size:15px;line-height:1.5;margin-top:2px}
+  .acc-conf p{font-size:15px;line-height:1.5;margin-top:10px}
   .acc-conf p:first-of-type{margin-top:16px}
   .acc-deux,.acc-g-prix{gap:32px}
   .acc-prix{padding:22px 20px}
   .acc-gros b{font-size:44px}
   .acc-prix .acc-btn{height:52px}
-  .acc-faq h2{font-size:24px}
+  .acc-faq h2{font-size:22px}
   .acc-faq summary{font-size:15px}
   .acc-fin{padding:36px 0 40px}
   .acc-fin .acc-emplacement{width:180px}
@@ -573,7 +576,7 @@ export default function Accueil({ onEntrer }) {
                 <div data-prerequis="" data-variante={sansSouris ? 'tactile' : 'souris'}>
                   {sansSouris
                     ? 'Crée ton compte ici, puis installe l’extension une fois dans Chrome sur ordinateur.'
-                    : 'S’installe une fois dans Chrome, sur ton ordinateur. Ensuite, ton téléphone suffit.'}
+                    : 'S’installe une fois dans Chrome, sur ton ordinateur — qui reste nécessaire pour lire Vinted. Ton téléphone suit tout.'}
                 </div>
               </div>
             </div>
@@ -655,7 +658,7 @@ export default function Accueil({ onEntrer }) {
         <section className="acc-sec acc-bande" id="comment" data-section="comment">
           <div className="acc-in acc-deux">
             <div>
-              <h2 className="acc-h2b">Une installation, sur ton ordinateur. Ensuite, ton téléphone suffit.</h2>
+              <h2 className="acc-h2b" data-prerequis-ordinateur="">Une installation, sur ton ordinateur. Ensuite, tu suis tout depuis ton téléphone.</h2>
               <ol className="acc-etapes">
                 <li><span className="n">1</span><div><h3>Crée ton compte</h3><p>Un email et un mot de passe.{ACCES_OFFERT && <span data-sans-carte=""> Aucune carte bancaire.</span>}</p></div></li>
                 <li><span className="n">2</span><div><h3>Ajoute l’extension à Chrome</h3><p>{EXTENSION_SUR_LE_STORE
@@ -663,6 +666,11 @@ export default function Accueil({ onEntrer }) {
                   : 'Une seule fois, sur ton ordinateur. Elle n’est pas encore sur le Chrome Web Store : VRM te guide pas à pas, puis tu la connectes avec le même email.'}</p></div></li>
                 <li><span className="n">3</span><div><h3>Passe sur Vinted</h3><p>Avec chacun de tes comptes. Ventes, annonces, bordereaux et messages arrivent dans VRM.</p></div></li>
               </ol>
+              {/* (1er nov., vendeur neuf) CE QUI EST VRAI : VRM lit Vinted par l'extension,
+                  dans le Chrome de l'ordinateur. Le téléphone consulte et commande, mais
+                  une action (bordereau, réponse, republication) passe par l'ordinateur
+                  allumé, Chrome ouvert — « ton téléphone suffit » promettait l'inverse. */}
+              <p className="acc-note" data-ordinateur-necessaire="">Ton ordinateur avec Chrome reste nécessaire : c’est lui qui lit Vinted. Depuis le téléphone, tu consultes tout ; les actions passent par l’ordinateur allumé, Chrome ouvert.</p>
             </div>
             <div className="acc-conf" data-confiance="">
               <h2 className="acc-h2b">Tes comptes restent les tiens.</h2>

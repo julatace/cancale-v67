@@ -24,7 +24,7 @@
 const path = require('path');
 let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
-catch (_) { ({ chromium } = require('/home/user/cancale-v67/node_modules/playwright')); }
+catch (_) { ({ chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 const { metaVersData } = require('./_meta.cjs');
 const { ouvrirAvanceCompta } = require('./_compta.cjs');
 const fs = require('fs'), http = require('http');
@@ -113,7 +113,9 @@ const ouvrir = async (b, vp, tab, opts = {}) => {
   const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
-  await pg.addInitScript((d) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_regime', JSON.stringify('micro')); localStorage.setItem('vinted_urssaf_taux', '13.5'); localStorage.setItem('vinted_urssaf_mois', JSON.stringify(d.publie)); localStorage.setItem('vinted_accounts_hidden', JSON.stringify(['333'])); } catch (_) {} }, { publie });
+  // (2 nov.) Le détail des Statistiques vit dans deux volets repliés (RepliStats) : le banc les
+  // ouvre comme Julien le ferait (état gardé sur l'appareil), puis juge les mêmes chiffres.
+  await pg.addInitScript((d) => { try { localStorage.setItem('vrm_acces_direct','1'); localStorage.setItem('vrm_stats_replis', JSON.stringify({ argent: true, vente: true })); localStorage.setItem('vinted_regime', JSON.stringify('micro')); localStorage.setItem('vinted_urssaf_taux', '13.5'); localStorage.setItem('vinted_urssaf_mois', JSON.stringify(d.publie)); localStorage.setItem('vinted_accounts_hidden', JSON.stringify(['333'])); } catch (_) {} }, { publie });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   const L = lignes(!!opts.pack);
   await pg.route('**/rest/v1/**', (route) => {
@@ -224,9 +226,11 @@ const ouvrir = async (b, vp, tab, opts = {}) => {
         dit(t.deb <= 1, 'aucun débordement horizontal', `${t.deb} px`);
         const e2 = (s) => s == null ? null : Number(String(s).replace(/[\s\u00a0\u202f€]/g, '').replace(',', '.'));
         const ap = e2((/À PAYER \([\d,.]+ ?%\)\s*\n\s*([\d\s.,\u00a0\u202f]+€)/i.exec(t.urssaf) || [])[1]);
-        const nt = e2((/NET APRÈS PAIEMENT\s*\n\s*([\d\s.,\u00a0\u202f]+€)/i.exec(t.urssaf) || [])[1]);
-        const cc = e2((/CA des ventes finalisées[^\n]*?\(([\d\s.,\u00a0\u202f]+€)\)/i.exec(t.urssaf) || [])[1]);
-        dit(ap === aPayer && nt === net && cc === caMoisDecl, 'la déclaration URSSAF est dans Compta : CA × 13,5 % = à payer, CA − à payer = net', `${cc} → ${ap} · ${nt}`);
+        // (2 nov., Comptabilité claire) « Net après paiement » est RETIRÉ de la carte (il redisait le
+        // bénéfice autrement) ; le CA cité est dans la phrase sous le chiffre : « … de l'argent reçu en
+        // octobre, toutes plateformes (60,00 €, 1 vente) ». Sur un code d'avant : « CA des ventes finalisées … ».
+        const cc = e2((/(?:CA des ventes finalisées|argent reçu en)[^\n]*?\(([\d\s.,\u00a0\u202f]+€)/i.exec(t.urssaf) || [])[1]);
+        dit(ap === aPayer && cc === caMoisDecl, 'la déclaration URSSAF est dans Compta : CA × 13,5 % = à payer (le CA cité sous le chiffre)', `${cc} → ${ap}`);
         dit(/Prochaine déclaration/.test(t.urssaf), 'la prochaine échéance est dans Compta');
         const nLignes = await pg.evaluate(() => { const h = [...document.querySelectorAll('span')].find((s) => /Récap comptable mensuel/.test(s.textContent)); const card = h && h.closest('.vrm-card, [class*="card"]') || (h && h.parentElement && h.parentElement.parentElement); return card ? card.querySelectorAll('tbody tr').length : -1; });
         dit(nLignes === publie.mois.length, 'le récap comptable mensuel est dans Compta : une ligne par mois publié', String(nLignes));
@@ -234,28 +238,30 @@ const ouvrir = async (b, vp, tab, opts = {}) => {
         await pg.click('[data-dep-ouvrir]');
         await pg.waitForSelector('[data-dep-form]', { timeout: 3000 });
         const forme = await pg.evaluate(() => ({ cats: [...document.querySelectorAll('[data-dep-cat]')].map((e) => e.getAttribute('data-dep-cat')), labels: [...document.querySelectorAll('[data-dep-form] label')].map((l) => l.innerText.split('\n')[0].trim()), abo: [...document.querySelectorAll('[data-dep-cat]')].some((e) => /Abonnement/.test(e.textContent)) }));
-        dit(forme.cats.length >= 5 && !forme.abo && ['Ce que tu as payé', 'Montant', 'Payé le'].every((l) => forme.labels.includes(l)),
+        // (3 nov.) Les catégories de Julien comprennent « Abonnements » (sa liste : Emballage,
+        // Achats de stock, Envois, Abonnements, Autre) : le refus de la pastille est levé.
+        dit(forme.cats.length >= 5 && ['Ce que tu as payé', 'Montant', 'Payé le'].every((l) => forme.labels.includes(l)),
           'dépense : on choisit « c’est pour quoi » en pastilles, chaque champ a son libellé', `${forme.cats.join(',')} · ${forme.labels.join(' / ')}`);
-        await pg.click('[data-dep-cat="Transport"]');
+        await pg.click('[data-dep-cat="Envois"]');
         const ph = await pg.getAttribute('[data-dep-libelle]', 'placeholder');
-        dit(/essence/.test(ph || ''), 'l’exemple suit la catégorie choisie', ph);
+        dit(/relais/.test(ph || ''), 'l’exemple suit la catégorie choisie', ph);
         await pg.fill('[data-dep-montant]', '12,50');
         await pg.click('[data-dep-ajouter]');
         const err = await pg.evaluate(() => (document.querySelector('[data-dep-erreur]') || {}).innerText || '');
         dit(/ce que tu as payé/i.test(err), 'un ajout sans libellé DIT pourquoi (jamais en silence)', err);
         await pg.fill('[data-dep-libelle]', 'Essence relais');
         await pg.click('[data-dep-ajouter]'); await pg.waitForTimeout(300);
-        const ajoute = await pg.evaluate(() => /Essence relais[\s\S]{0,80}Transport/.test(document.querySelector('[data-compta-section="depenses"]').innerText));
+        const ajoute = await pg.evaluate(() => /Essence relais[\s\S]{0,80}Envois/.test(document.querySelector('[data-compta-section="depenses"]').innerText));
         dit(ajoute, 'la dépense est ajoutée, avec sa catégorie');
         // Abonnement : les plus courants
         await pg.click('[data-abo-ouvrir]');
         await pg.waitForSelector('[data-abo-courant="VRM"]', { timeout: 3000 });
         await pg.click('[data-abo-courant="VRM"]');
         const abo = await pg.evaluate(() => ({ nom: document.querySelector('[data-abo-libelle]').value, prix: document.querySelector('[data-abo-montant]').value, labels: [...document.querySelectorAll('[data-abo-form] label')].map((l) => l.innerText.split('\n')[0].trim()) }));
-        dit(abo.nom === 'VRM' && abo.prix === '14,99' && abo.labels.some((l) => /^Jusqu'au/.test(l)), 'abonnement : « VRM » en un clic remplit le nom et le prix des CGV ; « jusqu’au » est expliqué', JSON.stringify(abo));
+        dit(abo.nom === 'VRM' && abo.prix === '16,99' && abo.labels.some((l) => /^Jusqu'au/.test(l)), 'abonnement : « VRM » en un clic remplit le nom et le prix des CGV ; « jusqu’au » est expliqué', JSON.stringify(abo));
         await pg.click('[data-abo-courant="Canva"]');
         const prixCanva = await pg.inputValue('[data-abo-montant]');
-        dit(prixCanva === '14,99' || prixCanva === '', 'aucun prix inventé pour un autre abonnement (le champ garde ce qui était tapé)', prixCanva);
+        dit(prixCanva === '16,99' || prixCanva === '', 'aucun prix inventé pour un autre abonnement (le champ garde ce qui était tapé)', prixCanva);
         // Pack Leboncoin absent : rien d'affirmé
         dit(!(await pg.$('[data-pack-lbc]')) && /facultatif/.test(await pg.evaluate(() => document.querySelector('[data-compta-section="packs"]').innerText)), 'pack Leboncoin : facultatif, rien d’affirmé sans relevé de l’extension');
         await ctx.close();

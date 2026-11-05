@@ -49,7 +49,7 @@
 //  visibles d'un écran (pour écrire un déclencheur).
 // ════════════════════════════════════════════════════════════════════════════
 require('./_porte-banc.cjs');
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const { dressingsDuJour } = require('./_instantane.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
@@ -399,8 +399,12 @@ const attendre = async (pg, fn, arg, ms = 8000) => { const t0 = Date.now(); whil
       if (sc.tactile && !tactile) continue; // sur ordinateur la conversation s'ouvre dans l'écran, pas en feuille
       let r = null, avant = null, ouvert = null;
       try {
-        await aller(pg, sc.tab);
-        if (sc.section) await section(pg, sc.section);
+        // (2 nov.) Plus d'espace Vinted à part (navigation par tâche, 31 oct.) : ses
+        // sections sont des tâches filtrées sur Vinted, ouvertes par le lien profond
+        // `?tab=plat_vinted&section=…` ; Achats est `cat_achats&vue=achats` (1er nov.).
+        const LIEN_VINTED = { Achats: 'cat_achats&vue=achats', Annonces: 'plat_vinted&section=annonces', Ventes: 'plat_vinted&section=ventes', Messages: 'plat_vinted&section=messages' };
+        if (sc.tab === 'plat_vinted' && LIEN_VINTED[sc.section]) await aller(pg, LIEN_VINTED[sc.section]);
+        else { await aller(pg, sc.tab); if (sc.section) await section(pg, sc.section); }
         avant = await histo(pg);
         await sc.etapes(pg);
         ouvert = await histo(pg);

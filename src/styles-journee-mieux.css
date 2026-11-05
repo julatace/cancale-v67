@@ -1,0 +1,230 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   MA JOURNÉE, CALME — 1er novembre 2026
+   Julien, après la refonte des chiffres : « pour Ma journée tu peux faire mieux
+   encore », « tu ne trouves pas que ça fait bordel ? », « c'est pas pro ».
+   Style Vitrine inchangé (blanc, encre, cobalt rare, ambre = geste, Bricolage
+   Grotesque + Geist Mono ; ni dégradé ni nouvelle palette). Ce qui change, c'est
+   l'ordre et la forme :
+     · une colonne de lecture à largeur tenue sur ordinateur (1120 px au plus,
+       centrée), au lieu de cartes étirées sur toute la fenêtre ;
+     · une hiérarchie : le bonjour (titre de page) → l'urgent → la Tournée →
+       À faire → les chiffres ; chaque section a UN titre discret (15 px, encre) ;
+     · des boîtes blanches à filets d'1 px au lieu d'aplats gris empilés ;
+       les listes (« À faire », l'urgent, la Tournée) sont des lignes de même
+       hauteur séparées par des filets ;
+     · trois tailles de texte : le titre de page (32 px, 28 au téléphone), le
+       texte (15 px) et le détail (13 px) — les montants en Geist Mono à part ;
+     · rythme 4/8 : 8 entre un titre de section et sa boîte, 32 entre deux
+       sections (24 au téléphone) ; rayon 12 partout ; cibles 44 px.
+   Chargée en tout dernier (main.jsx). Rien ici ne touche une donnée ni une règle.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ── 0. LA COLONNE ─────────────────────────────────────────────────────────── */
+@media (min-width: 1024px) {
+  html body .vrm-app-shell .vrm-day-layout { max-width: 1120px !important; margin-inline: auto !important; width: 100%; box-sizing: border-box; }
+}
+
+/* ── 1. L'EN-TÊTE : bonjour, puis la date et le nombre de choses à faire ───── */
+html body .vrm-app-shell .vrm-day-layout .vrm-day-greeting {
+  display: flex !important; flex-wrap: wrap !important; align-items: baseline !important; column-gap: 0 !important; row-gap: 4px !important;
+  margin: 8px 0 32px !important; padding: 0 96px 0 0 !important; background: none !important; border: 0 !important; grid-template-columns: none !important;
+}
+html body .vrm-app-shell .vrm-day-layout .vrm-day-greeting::before { content: none !important; display: none !important; }
+html body .vrm-app-shell .vrm-day-layout .vrm-day-greeting .vrm-day-hello {
+  flex: 1 0 100% !important; display: block !important; font-size: 34px !important; font-weight: 800 !important; line-height: 1.15 !important;
+  letter-spacing: -.02em !important; color: var(--vrm-ink) !important; white-space: normal !important; overflow: visible !important; margin: 0 !important;
+}
+html body .vrm-app-shell .vrm-day-layout .vrm-day-greeting :is(.vrm-day-date, .vrm-day-todo) {
+  display: inline !important; flex: 0 0 auto !important; font-size: 15px !important; font-weight: 500 !important; line-height: 1.4 !important;
+  color: var(--vrm-muted) !important; margin: 0 !important; grid-column: auto !important; white-space: nowrap;
+}
+/* (2 nov.) Le point sépare la date et le nombre de choses à faire quand ils sont
+   sur la même ligne ; la phrase de l'écran passe entre les deux depuis le 2 nov. :
+   la ligne commençait par « · ». Le point seulement quand ils se suivent. */
+html body .vrm-app-shell .vrm-day-layout .vrm-day-greeting .vrm-day-date + .vrm-day-todo::before { content: '·'; margin: 0 8px; color: var(--vrm-muted); }
+html body .vrm-app-shell .vrm-day-layout .vrm-day-greeting .vrm-day-todo b { color: var(--vrm-ink) !important; font-weight: 600 !important; }
+html body .vrm-app-shell .vrm-day-layout .vrm-day-greeting .vrm-w-modifier { top: 0 !important; right: 0 !important; transform: none !important; font-size: 15px !important; }
+@media (max-width: 767px) {
+  html body .vrm-app-shell .vrm-day-layout .vrm-day-greeting { display: flex !important; margin: 4px 0 24px !important; padding-right: 0 !important; }
+  html body .vrm-app-shell .vrm-day-layout .vrm-day-greeting .vrm-day-hello { font-size: 28px !important; }
+  html body .vrm-app-shell .vrm-day-layout .vrm-day-greeting :is(.vrm-day-date, .vrm-day-todo) { font-size: 15px !important; }
+}
+
+/* ── 2. LES TITRES DE SECTION ──────────────────────────────────────────────── */
+html body .vrm-app-shell .vrm-day-layout :is(.vrm-day-section, .vrm-day-recent .vrm-w-etiquette .vrm-label, .vrm-day-titre-section) {
+  display: block; font-size: 15px !important; font-weight: 600 !important; line-height: 1.3 !important; letter-spacing: 0 !important;
+  text-transform: none !important; color: var(--vrm-ink) !important; margin: 0 0 8px !important; padding: 0 !important; min-height: 0;
+}
+html body .vrm-app-shell .vrm-day-layout .vrm-day-recent .vrm-w-etiquette { margin: 0 0 8px !important; padding: 0 !important; align-items: center !important; }
+html body .vrm-app-shell .vrm-day-layout .vrm-day-recent .vrm-w-etiquette .vrm-label { margin: 0 !important; }
+
+/* ── 3. L'ESPACE ENTRE LES SECTIONS ────────────────────────────────────────── */
+html body .vrm-app-shell .vrm-day-layout .vrm-widgets { row-gap: 32px !important; column-gap: 16px !important; margin-bottom: 32px !important; }
+html body .vrm-app-shell .vrm-day-layout .vrm-tr { margin: 0 0 32px !important; }
+html body .vrm-app-shell .vrm-day-layout .vrm-day-urgent { margin: 0 0 32px; }
+@media (max-width: 767px) {
+  html body .vrm-app-shell .vrm-day-layout .vrm-widgets { row-gap: 24px !important; column-gap: 12px !important; margin-bottom: 24px !important; }
+  html body .vrm-app-shell .vrm-day-layout .vrm-tr, html body .vrm-app-shell .vrm-day-layout .vrm-day-urgent { margin-bottom: 24px !important; }
+}
+/* Une rangée que ses widgets ne remplissent pas se partage la place (GrilleJournee, `--etire6/2`). */
+@media (min-width: 1280px) {
+  html body .vrm-app-shell .vrm-widgets .vrm-widget[data-etire6] { grid-column: span var(--etire6) !important; }
+}
+@media (min-width: 1024px) and (max-width: 1279px) {
+  html body .vrm-app-shell .vrm-widgets .vrm-widget[data-etire2] { grid-column: span var(--etire2) !important; }
+}
+/* La case portée par la Tournée ne se montre pas (le même nombre jamais deux fois). */
+html body .vrm-app-shell .vrm-day-layout :is([data-tuile], .vrm-day-case)[hidden] { display: none !important; }
+
+/* ── 4. LES LISTES : « À faire », l'urgent ─────────────────────────────────── */
+html body .vrm-app-shell .vrm-day-layout .vrm-day-task-list {
+  display: block !important; margin: 0 !important; padding: 0 !important; gap: 0 !important;
+  border: 1px solid var(--vrm-line) !important; border-radius: 12px !important; background: var(--vrm-bg) !important; overflow: hidden;
+}
+html body .vrm-app-shell .vrm-day-layout .vrm-day-task-list > .vrm-day-task,
+html body .vrm-app-shell .vrm-day-layout .vrm-day-task-list > .vrm-day-task.is-groupe > .vrm-day-task-ouvrir {
+  display: grid !important; grid-template-columns: 24px minmax(0, 1fr) auto; align-items: center; column-gap: 16px;
+  width: 100%; min-width: 0; min-height: 64px; margin: 0 !important; padding: 12px 20px !important; box-sizing: border-box;
+  border: 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important;
+  color: inherit; font: inherit; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+html body .vrm-app-shell .vrm-day-layout .vrm-day-task-list > .vrm-day-task + .vrm-day-task { border-top: 1px solid var(--vrm-line) !important; }
+html body .vrm-app-shell .vrm-day-layout .vrm-day-task-list > .vrm-day-task.is-groupe { grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; padding: 0 20px 0 0 !important; cursor: default; }
+html body .vrm-app-shell .vrm-day-layout .vrm-day-task-list > .vrm-day-task.is-groupe > .vrm-day-task-ouvrir { grid-template-columns: 24px minmax(0, 1fr); }
+@media (hover: hover) and (pointer: fine) {
+  html body .vrm-app-shell .vrm-day-layout .vrm-day-task-list > button.vrm-day-task:hover,
+  html body .vrm-app-shell .vrm-day-layout .vrm-day-task-list > .vrm-day-task.is-groupe > .vrm-day-task-ouvrir:hover { background: var(--vrm-surface) !important; }
+}
+html body .vrm-app-shell .vrm-day-layout .vrm-day-task-list :is(.vrm-day-task, .vrm-day-task-ouvrir):focus-visible { outline: 2px solid var(--vrm-focus, var(--vrm-accent)); outline-offset: -2px; }
+html body .vrm-app-shell .vrm-day-layout .vrm-day-task-ic { display: grid; place-items: center; width: 24px; height: 24px; }
+html body .vrm-app-shell .vrm-day-layout .vrm-day-task-photos { display: flex; width: 24px; overflow: visible; }
+html body .vrm-app-shell .vrm-day-layout .vrm-day-task-photos img { width: 28px; height: 28px; border-radius: 6px; object-fit: cover; border: 2px solid var(--vrm-bg); background: var(--vrm-surface); flex-shrink: 0; margin-top: -2px; }
+html body .vrm-app-shell .vrm-day-layout .vrm-day-task-textes { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+html body .vrm-app-shell .vrm-day-layout .vrm-une-ligne { display: block; white-space: nowrap; overflow: hidden; text-overflow: clip; min-width: 0; max-width: 100%; }
+html body .vrm-app-shell .vrm-day-layout .vrm-une-ligne[data-lignes="2"] { white-space: normal; overflow-wrap: normal; max-height: 2.8em; }
+html body .vrm-app-shell .vrm-day-layout .vrm-day-task-title.vrm-une-ligne[data-lignes="2"] { max-height: 2.7em; }
+html body .vrm-app-shell .vrm-day-layout .vrm-day-task-title { font-size: 15px !important; font-weight: 600 !important; line-height: 1.35 !important; color: var(--vrm-ink) !important; margin: 0 !important; }
+html body .vrm-app-shell .vrm-day-layout .vrm-day-task-note { font-size: 13px !important; font-weight: 400 !important; line-height: 1.4 !important; color: var(--vrm-muted) !important; margin: 0 !important; }
+html body .vrm-app-shell .vrm-day-layout .vrm-day-task-note.is-urgent { color: var(--vrm-warn) !important; font-weight: 500 !important; }
+html body .vrm-app-shell .vrm-day-layout .vrm-day-task-action { font-size: 15px; font-weight: 500; color: var(--vrm-muted); white-space: nowrap; flex-shrink: 0; }
+html body .vrm-app-shell .vrm-day-layout .vrm-day-task-geste { flex-shrink: 0; }
+@media (max-width: 767px) {
+  html body .vrm-app-shell .vrm-day-layout .vrm-day-task-list > .vrm-day-task,
+  html body .vrm-app-shell .vrm-day-layout .vrm-day-task-list > .vrm-day-task.is-groupe > .vrm-day-task-ouvrir { column-gap: 12px; padding: 12px 16px !important; }
+  html body .vrm-app-shell .vrm-day-layout .vrm-day-task-list > .vrm-day-task.is-groupe { grid-template-columns: minmax(0, 1fr); padding: 0 0 12px !important; }
+  html body .vrm-app-shell .vrm-day-layout .vrm-day-task-list > .vrm-day-task.is-groupe > .vrm-day-task-geste { margin: 0 16px 0 52px; justify-self: start; }
+  /* (1er nov., « très répétitif ») Le détail tient sur UNE ligne au doigt aussi : toutes les lignes ont la même hauteur. */
+  html body .vrm-app-shell .vrm-day-layout .vrm-day-task-list > .vrm-day-task:not(.is-groupe) { min-height: 64px; }
+  /* Au doigt, la ligne entière est le bouton : le mot « Voir » laisse sa place au titre. */
+  html body .vrm-app-shell .vrm-day-layout .vrm-day-task-action-mot { display: none; }
+  html body .vrm-app-shell .vrm-day-layout .vrm-day-task-action { font-size: 20px; }
+}
+
+/* ── 5. LES QUATRE CASES (1er nov., « très répétitif ») ────────────────────────
+   Chaque case : le nombre, son libellé ENTIER (jamais « À envoy… »), au plus une
+   sous-ligne (« dont 3 aujourd'hui », « + 4 à vérifier ») et, pour « À envoyer »,
+   le geste « Emballer ». Quatre colonnes sur ordinateur, une grille 2 × 2 au
+   téléphone (le libellé a la place de tenir, « Prix à baisser » passe à la ligne
+   plutôt que d'être coupé). */
+html body .vrm-app-shell .vrm-day-layout .vrm-day-bar {
+  display: grid !important; grid-template-columns: repeat(4, minmax(0, 1fr)) !important; grid-auto-flow: row !important; grid-auto-columns: auto !important;
+  gap: 0 !important; padding: 0 !important; margin: 0 !important; min-height: 0 !important;
+  border: 1px solid var(--vrm-line) !important; border-radius: 12px !important; background: var(--vrm-bg) !important; box-shadow: none !important; overflow: hidden;
+}
+html body .vrm-app-shell .vrm-day-layout .vrm-day-bar > .vrm-day-case { display: flex; flex-direction: column; min-width: 0; margin: 0; }
+html body .vrm-app-shell .vrm-day-layout .vrm-day-bar > .vrm-day-case[hidden] { display: none !important; }
+html body .vrm-app-shell .vrm-day-layout .vrm-day-bar > .vrm-day-case:not([hidden]) ~ .vrm-day-case:not([hidden]) { border-left: 1px solid var(--vrm-line); }
+html body .vrm-app-shell .vrm-day-layout .vrm-day-bar > .vrm-day-case > button[data-tuile] {
+  display: flex !important; flex-direction: row !important; align-items: flex-start !important; justify-content: flex-start !important; gap: 12px !important;
+  flex: 1 1 auto; width: 100%; min-width: 0; min-height: 56px !important; padding: 12px 20px !important; margin: 0 !important; border: 0 !important; border-radius: 0 !important;
+  background: transparent !important; box-shadow: none !important; text-align: left; cursor: pointer; font: inherit; color: inherit; transform: none !important; -webkit-tap-highlight-color: transparent;
+}
+@media (hover: hover) and (pointer: fine) { html body .vrm-app-shell .vrm-day-layout .vrm-day-bar > .vrm-day-case > button[data-tuile]:hover { background: var(--vrm-surface) !important; } }
+html body .vrm-app-shell .vrm-day-layout .vrm-day-bar > .vrm-day-case > button[data-tuile]:focus-visible { outline: 2px solid var(--vrm-focus, var(--vrm-accent)); outline-offset: -2px; }
+html body .vrm-app-shell .vrm-day-layout .vrm-day-bar .vrm-day-bar-ic { display: grid; place-items: center; width: 20px; height: 20px; margin: 0 !important; flex: 0 0 auto; }
+html body .vrm-app-shell .vrm-day-layout .vrm-day-bar .vrm-day-bar-n {
+  font-family: var(--vrm-police-mono) !important; font-weight: 500 !important; font-size: 20px !important; line-height: 1 !important; letter-spacing: -.02em !important;
+  font-variant-numeric: tabular-nums; margin: 0 !important; flex: 0 0 auto; position: static !important;
+}
+html body .vrm-app-shell .vrm-day-layout .vrm-day-bar .vrm-day-bar-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
+html body .vrm-app-shell .vrm-day-layout :is(.vrm-day-bar, .vrm-w-tuile) .vrm-day-bar-l {
+  display: block; flex: 0 1 auto !important; flex-basis: auto !important; max-width: 100%; font-size: 15px !important; font-weight: 500 !important; line-height: 1.3 !important;
+  color: var(--vrm-muted) !important; margin: 0 !important; text-align: left !important;
+  white-space: normal !important; overflow: visible !important; text-overflow: clip !important; overflow-wrap: normal; hyphens: none;
+}
+html body .vrm-app-shell .vrm-day-layout :is(.vrm-day-bar, .vrm-w-tuile) .vrm-day-bar-sous {
+  display: block; font-size: 13px; font-weight: 500; line-height: 1.35; color: var(--vrm-muted); white-space: normal; overflow: visible; text-overflow: clip;
+}
+html body .vrm-app-shell .vrm-day-layout :is(.vrm-day-bar, .vrm-w-tuile) .vrm-day-bar-sous.is-ambre { color: var(--vrm-warn); }
+html body .vrm-app-shell .vrm-day-layout .vrm-day-case-geste { align-self: flex-start; margin: 0 20px 12px 52px !important; min-height: 44px !important; }
+html body .vrm-app-shell .vrm-day-layout .vrm-w-tuile-case { display: flex; flex-direction: column; gap: 8px; height: 100%; min-width: 0; }
+html body .vrm-app-shell .vrm-day-layout .vrm-w-tuile-case > .vrm-w-tuile { flex: 1 1 auto; }
+html body .vrm-app-shell .vrm-day-layout .vrm-w-tuile-case > .vrm-day-case-geste { margin: 0 !important; }
+html body .vrm-app-shell .vrm-day-layout .vrm-w-tuile .vrm-w-tuile-l { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; }
+@media (max-width: 767px) {
+  html body .vrm-app-shell .vrm-day-layout .vrm-day-bar { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  /* Les filets : une colonne de droite sépare de la gauche, la seconde rangée de la première. */
+  html body .vrm-app-shell .vrm-day-layout .vrm-day-bar > .vrm-day-case:not([hidden]) ~ .vrm-day-case:not([hidden]) { border-left: 0; }
+  html body .vrm-app-shell .vrm-day-layout .vrm-day-bar > .vrm-day-case:nth-child(even) { border-left: 1px solid var(--vrm-line) !important; }
+  html body .vrm-app-shell .vrm-day-layout .vrm-day-bar > .vrm-day-case:nth-child(n+3) { border-top: 1px solid var(--vrm-line); }
+  html body .vrm-app-shell .vrm-day-layout .vrm-day-bar > .vrm-day-case > button[data-tuile] { flex-direction: column !important; gap: 4px !important; padding: 12px 16px !important; min-height: 64px !important; }
+  html body .vrm-app-shell .vrm-day-layout .vrm-day-bar .vrm-day-bar-ic { display: none; }
+  html body .vrm-app-shell .vrm-day-layout .vrm-day-bar .vrm-day-bar-n { font-size: 22px !important; }
+  html body .vrm-app-shell .vrm-day-layout .vrm-day-bar .vrm-day-bar-l { font-size: 15px !important; }
+  html body .vrm-app-shell .vrm-day-layout .vrm-day-case-geste { margin: 0 16px 12px 16px !important; }
+}
+
+/* ── 6. LES CARTES : blanches, un filet, même rayon ─────────────────────────── */
+html body .vrm-app-shell .vrm-main .vrm-day-layout :is(.vrm-day-card, .vrm-jc, .vrm-day-wallet, .vrm-day-stock, .vrm-day-performance) {
+  background: var(--vrm-bg) !important; background-color: var(--vrm-bg) !important; background-image: none !important; border: 1px solid var(--vrm-line) !important;
+  border-radius: 12px !important; box-shadow: none !important;
+}
+html body .vrm-app-shell .vrm-day-layout .vrm-day-recent .vrm-carrousel > button {
+  background: var(--vrm-bg) !important; border: 1px solid var(--vrm-line) !important; border-radius: 12px !important; box-shadow: none !important;
+}
+html body .vrm-app-shell .vrm-day-layout .vrm-day-recent .vrm-carrousel > button > div:first-child { background: var(--vrm-surface) !important; }
+@media (hover: hover) and (pointer: fine) {
+  html body .vrm-app-shell .vrm-widgets:not([data-edition]) .vrm-widget:hover > .vrm-widget-in > * { transform: none !important; box-shadow: none !important; }
+}
+/* L'argent en attente, le stock : le même en-tête que les autres cartes. */
+html body .vrm-app-shell .vrm-day-layout .vrm-day-wallet { padding: 20px 24px !important; align-content: start !important; }
+html body .vrm-app-shell .vrm-day-layout .vrm-day-wallet .vrm-day-k { font-size: 15px !important; font-weight: 600 !important; color: var(--vrm-ink) !important; letter-spacing: 0 !important; text-transform: none !important; }
+html body .vrm-app-shell .vrm-day-layout .vrm-day-wallet .vrm-day-k svg { display: none; }
+html body .vrm-app-shell .vrm-day-layout .vrm-day-wallet .vrm-day-wallet-n { margin-top: 16px !important; }
+html body .vrm-app-shell .vrm-day-layout .vrm-day-wallet .vrm-day-note { font-size: 13px !important; color: var(--vrm-muted) !important; margin-top: 4px !important; }
+html body .vrm-app-shell .vrm-day-layout .vrm-day-stock { padding: 20px 24px !important; }
+@media (max-width: 767px) {
+  html body .vrm-app-shell .vrm-day-layout :is(.vrm-day-wallet, .vrm-day-stock) { padding: 16px !important; }
+}
+html body .vrm-app-shell .vrm-day-layout .vrm-jc > .vrm-day-head .vrm-day-k { font-size: 15px !important; }
+
+/* L'argent en attente, à côté de cartes plus hautes : le montant en haut, sa phrase
+   au pied (comme « Vendu » finit par le CA) — pas un montant perdu en haut d'un vide. */
+@media (min-width: 1024px) {
+  html body .vrm-app-shell .vrm-widget .vrm-day-wallet { align-items: stretch !important; align-content: stretch !important; grid-template-rows: minmax(0, 1fr) !important; }
+  html body .vrm-app-shell .vrm-widget .vrm-day-wallet > div { display: flex; flex-direction: column; min-height: 100%; }
+  html body .vrm-app-shell .vrm-widget .vrm-day-wallet .vrm-day-wallet-n { font-size: 28px !important; }
+  html body .vrm-app-shell .vrm-widget .vrm-day-wallet .vrm-day-note { margin-top: auto !important; padding-top: 16px; }
+}
+/* « Vendus ailleurs », au pied : le même filet que le reste, sur le blanc. */
+html body .vrm-app-shell .vrm-day-layout .vrm-bilan-sync[data-vendus-ailleurs] {
+  background: var(--vrm-bg) !important; border: 1px solid var(--vrm-line) !important; border-radius: 12px !important; box-shadow: none !important; margin-top: 0 !important;
+}
+html body .vrm-app-shell .vrm-day-layout .vrm-bilan-sync[data-vendus-ailleurs] > summary { min-height: 56px; display: flex; align-items: center; gap: 12px; padding: 8px 20px !important; font-size: 15px !important; font-weight: 600 !important; }
+html body .vrm-app-shell .vrm-day-layout .vrm-bilan-sync[data-vendus-ailleurs] > summary > span { margin-left: auto; font-size: 15px !important; font-weight: 500 !important; color: var(--vrm-muted) !important; }
+html body .vrm-app-shell .vrm-day-layout .vrm-day-greeting { width: 100% !important; max-width: none !important; box-sizing: border-box; position: relative; }
+
+/* ── 8. LA COLONNE DE GAUCHE : aucune entrée n'a l'air désactivée ───────────
+   (1er nov., capture de Julien) Quand la colonne défile (fenêtre basse), le
+   fondu de `data-rail-suite` (styles-atelier) pâlissait la dernière entrée
+   visible (« eBay ») : elle avait l'air grisée, désactivée. Plus de fondu : un
+   filet d'1 px dit qu'il y a une suite, l'entrée garde son encre. */
+html body .vrm-app-shell .vrm-rail-scroll[data-rail-suite] { -webkit-mask-image: none !important; mask-image: none !important; }
+html body .vrm-app-shell .vrm-rail-scroll:is([data-rail-suite="bas"], [data-rail-suite="les-deux"]) { border-bottom: 1px solid var(--vrm-line); }
+html body .vrm-app-shell .vrm-rail-scroll:is([data-rail-suite="haut"], [data-rail-suite="les-deux"]) { border-top: 1px solid var(--vrm-line); }
+
+/* ── 7. TENDANCES : autant de colonnes que de cases (2 à 4), dans l'ordre ───── */
+@container (min-width: 560px) {
+  html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-rangee.vrm-jc-tendances { grid-template-columns: repeat(var(--n, 4), minmax(0, 1fr)) !important; grid-auto-flow: row !important; grid-auto-columns: auto !important; }
+  html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-rangee > .vrm-jc-cell:nth-child(odd):last-child { grid-column: auto !important; }
+}

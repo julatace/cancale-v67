@@ -34,8 +34,9 @@
 //   4. que le PDF se génère, même avec un emoji dans un titre (les polices
 //      standard de pdf-lib ne savent pas l'écrire : tout l'export échouait), et
 //      qu'il contienne bien les deux registres.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
+const { monterTiroirs } = require('./_tiroirs.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT || process.env.PORT) || 4333;
@@ -150,6 +151,9 @@ async function ouvrirVente(pg, tx) {
       await pg.waitForTimeout(3500);
       // L'onglet « Toutes » : les ventes finalisées comme celles en cours.
       try { await pg.getByText('Toutes', { exact: true }).first().click({ timeout: 3000 }); await pg.waitForTimeout(800); } catch (_) {}
+      // (31 oct.) Le tiroir d'une vente n'est monté qu'à sa première ouverture :
+      // on ouvre chaque vente, comme une personne, avant de lire ses boutons (`_tiroirs.cjs`).
+      await monterTiroirs(pg);
       const bb = await pg.evaluate(() => [...document.querySelectorAll('[data-bouton-bord]')].map((x) => x.getAttribute('data-bouton-bord') + ':' + x.getAttribute('data-tx')));
       dit(bb.includes('pdf:9001'), 'la vente 9001 a son bouton « Bordereau » (relié par sa transaction)', JSON.stringify(bb));
       dit(!bb.includes('pdf:9002'), 'la vente 9002 n’a PAS d’impression : un bordereau au même titre, sans transaction, ne relie rien (§5)', JSON.stringify(bb));
@@ -163,6 +167,9 @@ async function ouvrirVente(pg, tx) {
       // (20 oct.) Vente « une ligne » (#596-#598) : le bouton vit dans la vente ouverte.
       await ouvrirVente(pg, '9001'); 
       try { await pg.locator('[data-bouton-bord="pdf"][data-tx="9001"]:visible').first().click({ timeout: 5000 }); } catch (e) { dit(false, 'le bouton se clique', String(e.message).slice(0, 90)); }
+      // (3 nov.) Une forme de bordereau jamais vue ouvre d'abord l'aperçu du tampon
+      // (`PlaceurTampon`) : on garde le choix de VRM et on imprime.
+      if (await pg.waitForSelector('[data-placeur-tampon="pret"],[data-placeur-tampon="ko"]', { timeout: 8000 }).then(() => true, () => false)) await pg.locator('[data-tampon-imprimer]').click().catch(() => {});
       await pg.waitForTimeout(2500);
       // 26 oct. : « sur ordi les bordereaux sont bègues et ne s'ouvrent pas ». L'onglet
       // vide réservé au clic cachait la confirmation et se refermait tout seul.
@@ -222,6 +229,9 @@ async function ouvrirVente(pg, tx) {
       await pg.goto(`http://localhost:${PORT}/?tab=cat_ventes`, { waitUntil: 'domcontentloaded' });
       await pg.waitForTimeout(3500);
       try { await pg.getByText('Toutes', { exact: true }).first().click({ timeout: 3000 }); await pg.waitForTimeout(800); } catch (_) {}
+      // (31 oct.) Le tiroir d'une vente n'est monté qu'à sa première ouverture :
+      // on ouvre chaque vente, comme une personne, avant de lire ses boutons (`_tiroirs.cjs`).
+      await monterTiroirs(pg);
       // (20 oct.) Vente « une ligne » (#596-#598) : le bouton vit dans la vente ouverte.
       await ouvrirVente(pg, '9001'); 
       try { await pg.locator('[data-bouton-bord="pdf"][data-tx="9001"]:visible').first().click({ timeout: 5000 }); } catch (e) { dit(false, mode + ' : le bouton se clique', String(e.message).slice(0, 90)); }

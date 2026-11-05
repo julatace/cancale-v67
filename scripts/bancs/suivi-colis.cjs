@@ -25,7 +25,7 @@
 //     rangé une ligne par n°, jamais « à retirer » ;
 //   · et, côté serveur (la vraie route du cron du matin) : « 📍 Dernier jour pour
 //     retirer » part une fois, et pas pour un colis retiré sous une autre clé.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const RACINE = path.join(__dirname, '..', '..');
@@ -181,20 +181,20 @@ function PONT(o) {
 
 const ouvrir = async (pg, errs) => {
   await pg.goto(`http://localhost:${PORT}/?tab=cat_achats`, { waitUntil: 'domcontentloaded' });
-  await pg.locator('.vrm-pickup-card').first().waitFor({ timeout: 20000 }).catch(async (e) => { console.log('ÉCRAN : ' + (await pg.locator('body').innerText()).slice(0, 1200)); console.log('ERREURS : ' + errs.join(' | ')); throw e; });
+  await pg.locator('[data-cc-colonne="retirer"] [data-cc-carte]').first().waitFor({ timeout: 20000 }) /* (2 nov.) Colis → « À retirer » */.catch(async (e) => { console.log('ÉCRAN : ' + (await pg.locator('body').innerText()).slice(0, 1200)); console.log('ERREURS : ' + errs.join(' | ')); throw e; });
   await pg.waitForTimeout(1800);
 };
 const lire = (pg) => pg.evaluate(() => {
-  const cartes = [...document.querySelectorAll('.vrm-pickup-card')].map((c) => {
-    const s = c.querySelector('[data-colis-suivi]');
+  const cartes = [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-cc-carte]:not([data-en-verification-tx])')].map((c) => {
+    const s0 = c.querySelector('[data-rp-suivi]'); const s = s0 ? { getAttribute: () => s0.getAttribute('data-rp-suivi') || null } : null;
     const conv = [...c.querySelectorAll('a[href*="/inbox/"]')].map((a) => a.getAttribute('href'));
     return {
       t: c.innerText, suivi: s ? s.getAttribute('data-colis-suivi') : null, conv,
       nv: [...c.querySelectorAll('[data-nouvelle-vinted]')].map((x) => x.getAttribute('data-nouvelle-vinted')),
-      suivre: [...c.querySelectorAll('a[data-suivre-colis]')].map((a) => { const r = a.getBoundingClientRect(); return { href: a.getAttribute('href'), site: a.getAttribute('data-suivre-site'), n: a.getAttribute('data-suivre-colis'), cp: a.getAttribute('data-suivre-cp'), h: r.height, t: a.innerText }; }),
+      suivre: [...c.querySelectorAll('a[data-suivre-colis]')].map((a) => { const r = a.getBoundingClientRect(); return { href: a.getAttribute('href'), site: a.getAttribute('data-suivre-site'), n: a.getAttribute('data-suivre-colis'), cp: a.getAttribute('data-suivre-cp'), h: r.height, t: a.innerText + ' ' + (a.getAttribute('title') || '') }; /* (2 nov.) forme courte « Suivre ↗ » : le libellé long est son titre */ }),
     };
   });
-  const onglet = document.querySelector('[data-achats-onglet="attente"]');
+  const onglet0 = document.querySelector('[data-colis-onglet-choix="retirer"]'); const onglet = onglet0 ? { getAttribute: () => onglet0.getAttribute('data-colis-onglet-n') } : null;
   const etat = document.querySelector('[data-suivi-vinted-etat]');
   return {
     cartes, total: onglet ? onglet.getAttribute('data-n') : null,
@@ -418,7 +418,7 @@ async function revue24(b) {
       await ouvrir(pg, errs);
       const g = await pg.evaluate(() => {
         const W = window.innerWidth;
-        return [...document.querySelectorAll('[data-a-verifier] .vrm-oublie-gestes')].map((x) => [...x.children].map((c) => { const r = c.getBoundingClientRect(); return { t: (c.innerText || c.getAttribute('aria-label') || c.tagName).slice(0, 30), l: Math.round(r.left), r: Math.round(r.right), ok: r.left >= -0.5 && r.right <= W + 0.5 }; }));
+        return [...document.querySelectorAll('[data-a-verifier] .vrm-oublie-gestes, [data-retirer-a-verifier] .vrm-rp-gestes')].map((x) => [...x.children].map((c) => { const r = c.getBoundingClientRect(); return { t: ((c.querySelector && c.querySelector('strong')) ? c.querySelector('strong').innerText : (c.innerText || c.getAttribute('aria-label') || c.tagName)).slice(0, 30), l: Math.round(r.left), r: Math.round(r.right), ok: r.left >= -0.5 && r.right <= W + 0.5 }; }));
       });
       const tous = g.flat();
       dit(g.length >= 2 && tous.length >= 4, `F ${nom} : les rangées « à vérifier » (e-mail et Vinted) sont rendues`, `${g.length} rangée(s)`);
@@ -537,7 +537,7 @@ async function cronDuMatin() {
     const cron = (await import('file://' + path.join(RACINE, 'api', 'ship-reminders.js'))).default;
     const lancer = async () => { const r = { code: 0 }; r.status = (n) => { r.code = n; return r; }; r.json = (o) => { r.corps = o; return r; }; r.setHeader = () => {}; r.end = () => r; r.send = () => r; await cron({ method: 'GET', headers: { authorization: 'Bearer cle-banc-cron' }, query: {} }, r); return r; };
     await lancer();
-    const d1 = pushes.filter((p) => /^📍 Dernier jour pour retirer/.test(p.title || ''));
+    const d1 = pushes.filter((p) => /^📍 Dernier jour · /.test(p.title || ''));
     dit(d1.length === 1 && /30000081/.test(d1[0].body || ''), 'cron du matin : « 📍 Dernier jour pour retirer » part pour le colis dont la limite LUE est aujourd\'hui', JSON.stringify(d1.map((p) => p.body)));
     dit(!pushes.some((p) => /30000082/.test(`${p.title} ${p.body}`)), 'cron du matin : rien pour le colis retiré sous une autre clé (n° du sujet)');
     const n = pushes.length; await lancer();

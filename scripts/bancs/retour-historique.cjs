@@ -9,7 +9,7 @@ require('./_porte-banc.cjs');
 //   · « avancer » rejoue l'écran suivant ;
 //   · une SECTION d'une plateforme (Ventes → Annonces) est une entrée aussi ;
 //   · un changement d'onglet ne crée qu'UNE entrée (pas une par section posée).
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' };
@@ -34,6 +34,8 @@ srv.listen(PORT);
       await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => {
         const u = r.request().url();
         if (/supabase\.co/.test(u) && /select=owner/.test(u)) return r.fulfill({ status: 400, contentType: 'application/json', body: '{"m":1}' });
+        // (31 oct.) Un compte Vinted lié : Ventes porte alors deux filtres (Toutes · Vinted).
+        if (/supabase\.co/.test(u) && /\/rest\/v1\/vinted_accounts/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([{ id: 1, vinted_user_id: '901', login: 'compte_banc', domain: 'www.vinted.fr' }]) });
         if (/supabase\.co/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
         if (/\/api\//.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
         return r.abort();
@@ -61,22 +63,27 @@ srv.listen(PORT);
       dit((await actif()) === a0 && pg.url().startsWith(base), `[${tag}] un second « retour » revient au premier écran, sans quitter VRM`, `${await actif()} · ${pg.url()}`);
       await pg.goForward({ waitUntil: 'commit' }).catch(() => {}); await pg.waitForTimeout(400);
       dit((await actif()) === l1, `[${tag}] « avancer » rejoue l'écran suivant`, `${await actif()}`);
-      // Une section d'une plateforme : la première qui a une sous-navigation.
-      const vinted = labels.find(l => /Vinted/i.test(l));
-      if (vinted) {
-        await clic(vinted);
-        const sections = await pg.$$eval('[data-section]', (l) => l.map(e => ({ id: e.getAttribute('data-section'), on: e.getAttribute('aria-current') === 'page' })));
-        const cur = sections.find(s => s.on), cible = sections.find(s => !s.on);
+      // Un FILTRE de site (31 oct., navigation par tâche) : choisir un site dans
+      // Ventes est une entrée d'historique ; « retour » rend le filtre d'avant.
+      const ventes = labels.find(l => /^Ventes$/i.test(l));
+      if (ventes) {
+        await clic(ventes);
+        const filtres = await pg.$$eval('[data-filtre-site] button[data-site]', (l) => l.map(e => ({ id: e.getAttribute('data-site'), on: e.getAttribute('aria-pressed') === 'true' })));
+        const cur = filtres.find(s => s.on), cible = filtres.find(s => !s.on);
         if (cur && cible) {
-          await pg.click(`[data-section="${cible.id}"]`); await pg.waitForTimeout(400);
+          await pg.click(`[data-filtre-site] button[data-site="${cible.id}"]`); await pg.waitForTimeout(400);
           await pg.goBack({ waitUntil: 'commit' }).catch(() => {}); await pg.waitForTimeout(400);
-          const apres = await pg.$eval('[data-section][aria-current="page"]', e => e.getAttribute('data-section')).catch(() => null);
-          dit(apres === cur.id && (await actif()) === vinted, `[${tag}] « retour » revient à la section d'avant (${cible.id} → ${cur.id})`, `${apres}`);
-        } else dit(false, `[${tag}] sections de Vinted trouvées`, JSON.stringify(sections));
-      } else dit(false, `[${tag}] onglet Vinted trouvé`, labels.join(', '));
+          const apres = await pg.$eval('[data-filtre-site] button[aria-pressed="true"]', e => e.getAttribute('data-site')).catch(() => null);
+          dit(apres === cur.id && (await actif()) === ventes, `[${tag}] « retour » revient au filtre d'avant (${cible.id} → ${cur.id})`, `${apres}`);
+        } else dit(false, `[${tag}] filtres de site de Ventes trouvés`, JSON.stringify(filtres));
+      } else dit(false, `[${tag}] onglet Ventes trouvé`, labels.join(', '));
       // Une FEUILLE ouverte : « retour » la ferme d'abord, sans changer d'écran.
-      const RECH = 'button[aria-label="Rechercher une paire"]';
-      const ouverte = () => pg.$('button[aria-label="Fermer la recherche"]').then(e => !!e);
+      // (31 oct.) La recherche est EN PLACE : la loupe ouvre le champ dans
+      // l'en-tête (téléphone), le champ de la barre se tape directement
+      // (ordinateur). « Ouverte » = le panneau des résultats est déplié.
+      const RECH = tactile ? 'button[aria-label="Rechercher une paire"]' : '[data-recherche-champ]';
+      const ouverte = () => pg.$('[data-recherche-panneau]').then(e => !!e);
+      const fermerX = async () => { if (tactile) await pg.click('button[aria-label="Fermer la recherche"]'); else await pg.keyboard.press('Escape'); };
       if (await pg.$(RECH)) {
         await clic(l1);
         const avant = await actif();
@@ -86,7 +93,7 @@ srv.listen(PORT);
         dit(!(await ouverte()) && (await actif()) === avant && pg.url().startsWith(base), `[${tag}] « retour » ferme la feuille ouverte, sans changer d'écran`, `${await ouverte()} · ${await actif()} · ${pg.url()}`);
         // Fermée par ×, son entrée part : le retour suivant change bien d'écran.
         await pg.click(RECH); await pg.waitForTimeout(400);
-        await pg.click('button[aria-label="Fermer la recherche"]'); await pg.waitForTimeout(500);
+        await fermerX(); await pg.waitForTimeout(500);
         await pg.goBack({ waitUntil: 'commit' }).catch(() => {}); await pg.waitForTimeout(500);
         dit((await actif()) !== avant && pg.url().startsWith(base), `[${tag}] fermée par ×, le « retour » suivant revient à l'écran d'avant (pas un retour à vide)`, `${await actif()}`);
       } else dit(false, `[${tag}] bouton de recherche trouvé`);

@@ -3,7 +3,7 @@
 // jamais relevé (le geste) · lecture ratée (la phrase de panne). Et JAMAIS un
 // chiffre d'affaires Vestiaire : rien n'est capté tant que la forme d'une vente
 // n'a pas été vue.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -66,17 +66,20 @@ srv.listen(PORT);
       if (etat === 'jamais') dit(v && v.etat === 'jamais' && /Vestiaire/.test(v.t), 'jamais relevé : le geste qui fait avancer', v && v.t.slice(0, 120));
       if (etat === 'panne') dit(v && v.etat === 'pas-su' && !/pages,/.test(v.t), 'lecture ratée : ni chiffre, ni « jamais »', v && v.t.slice(0, 120));
       // 5.238 : les messages Vestiaire — trois états, jamais « 0 » sur un « pas su ».
+      // (31 oct., soir) Ils vivent dans Messages · Vestiaire (`?tab=plat_vestiaire` mène à Annonces · Vestiaire).
+      await pg.goto(`http://localhost:${PORT}/?tab=messages&site=vestiaire`, { waitUntil: 'domcontentloaded' });
       await pg.waitForSelector('[data-vc-messages]:not([data-vc-messages="charge"])', { timeout: 10000 }).catch(() => {});
       const m = await pg.evaluate(() => { const e = document.querySelector('[data-vc-messages]'); if (!e) return null; const a = e.querySelector('[data-vc-messages-ouvrir]'); const c = [...e.querySelectorAll('[data-vc-conv]')].map((x) => ({ id: x.getAttribute('data-vc-conv'), num: x.getAttribute('data-vc-conv-num'), nl: x.getAttribute('data-vc-conv-nonlu') })); return { etat: e.getAttribute('data-vc-messages'), n: (e.querySelector('[data-vc-messages-nonlus]') || {}).getAttribute ? e.querySelector('[data-vc-messages-nonlus]').getAttribute('data-vc-messages-nonlus') : null, href: a ? a.href : '', h: a ? a.getBoundingClientRect().height : 0, c, t: e.innerText }; });
       if (etat === 'lu') {
-        dit(m && m.etat === 'lu' && m.n === '3' && /3 messages non lus/.test(m.t) && /il y a 30 min/.test(m.t), 'messages : le nombre de non-lus de Vestiaire et l’âge du relevé', m && m.t.slice(0, 140));
+        dit(m && m.etat === 'lu' && m.n === '3' && /3 messages non lus/.test(m.t), 'messages : le nombre de non-lus de Vestiaire (l’âge du relevé n’est plus écrit — retiré à la demande de Julien, 3 nov.)', m && m.t.slice(0, 140));
         dit(m && m.href === 'https://fr.vestiairecollective.com/messages/', 'le lien ouvre la page de messagerie VUE par l’extension (rien de deviné)', m && m.href);
-        dit(m && m.c.length === 2 && m.c[0].id === 'C1' && m.c[0].num === '401' && m.c[0].nl === 'oui' && m.c[1].num === '' && /Pas reliée à une paire/.test(m.t), 'conversations : reliées par la référence VRM, non lue en tête, sans référence ⇒ pas de paire devinée', JSON.stringify(m && m.c));
+        dit(m && m.c.length === 2 && m.c[0].id === 'C1' && m.c[0].num === '401' && m.c[0].nl === 'oui' && m.c[1].num === '' && /Pas reliée à un article/.test(m.t), 'conversations : reliées par la référence VRM, non lue en tête, sans référence ⇒ pas de paire devinée', JSON.stringify(m && m.c));
         dit(m && m.h >= 44, 'le lien se touche au doigt (44 px)', m && String(m.h));
       }
       if (etat === 'jamais') dit(m && m.etat === 'jamais' && !/\b0 message/.test(m.t), 'messages jamais relevés : le geste, aucun « 0 »', m && m.t.slice(0, 120));
       if (etat === 'panne') dit(m && m.etat === 'pas-su' && !/non lu/.test(m.t), 'messages illisibles : « pas su », aucun nombre', m && m.t.slice(0, 120));
-      // 5.239 : les achats Vestiaire — trois états.
+      // 5.239 : les achats Vestiaire — trois états. (31 oct., soir) Dans Achats · Vestiaire.
+      await pg.goto(`http://localhost:${PORT}/?tab=achats&site=vestiaire`, { waitUntil: 'domcontentloaded' });
       await pg.waitForSelector('[data-vc-achats]:not([data-vc-achats="charge"])', { timeout: 10000 }).catch(() => {});
       const ac = await pg.evaluate(() => { const e = document.querySelector('[data-vc-achats]'); if (!e) return null; const s = e.querySelector('[data-suivre-colis]'); return { etat: e.getAttribute('data-vc-achats'), t: e.innerText, suivre: s ? s.href : '', h: s ? s.getBoundingClientRect().height : 0 }; });
       if (etat === 'lu') {

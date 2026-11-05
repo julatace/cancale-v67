@@ -16,7 +16,7 @@
 //      valide, un SIRET aussi ;
 //   5. aucun débordement horizontal, aucune erreur d'app.
 // On juge des `data-*` et des NOMBRES, jamais un libellé (§6.5).
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const { ouvrirAvanceCompta } = require('./_compta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
@@ -181,6 +181,30 @@ const attendre = async (pg, f, ms = 8000) => { const t0 = Date.now(); for (;;) {
       await pg.waitForTimeout(300);
       const r2 = await lire(pg);
       dit(r2.nAbo === 1 && /avant/.test(r2.aboErr), 'une fin avant le début n’est pas ajoutée, et c’est dit', `${r2.nAbo} · ${r2.aboErr}`);
+
+      // ── (1er nov.) Le « × » d'une ligne DEMANDE avant de supprimer (il supprimait
+      //    d'un toucher, sans rien dire) : « Annuler » ne touche à rien, « Supprimer »
+      //    retire la ligne de l'écran ET de `vrm_compta`, et le dit.
+      try {
+        const feuille = () => pg.evaluate(() => { const b = [...document.querySelectorAll('button')].filter((x) => x.offsetParent && x.textContent.trim() === 'Supprimer'); return b.length ? (b[b.length - 1].closest('div[style*="fixed"]') || document.body).innerText : ''; });
+        await pg.click('[data-abo] [data-compta-supprimer]');
+        await pg.waitForTimeout(500);
+        const q1 = await feuille();
+        dit(/Logiciel test/.test(q1), 'supprimer un abonnement DEMANDE d’abord, en le nommant', q1.slice(0, 90).replace(/\s+/g, ' '));
+        if (q1) await pg.getByRole('button', { name: 'Annuler', exact: true }).last().click();
+        await pg.waitForTimeout(500);
+        const rA = await lire(pg);
+        const stA = await pg.evaluate(() => { try { return (JSON.parse(localStorage.getItem('vrm_compta') || 'null') || {}).abonnements || []; } catch (_) { return null; } });
+        dit(rA.nAbo === 1 && stA && stA.length === 1, '« Annuler » ne supprime rien (écran et `vrm_compta`)', `${rA.nAbo} · ${stA && stA.length}`);
+        await pg.click('[data-abo] [data-compta-supprimer]');
+        await pg.waitForTimeout(500);
+        await pg.getByRole('button', { name: 'Supprimer', exact: true }).last().click();
+        await pg.waitForTimeout(900);
+        const rS = await lire(pg);
+        const stS = await pg.evaluate(() => { try { return (JSON.parse(localStorage.getItem('vrm_compta') || 'null') || {}).abonnements || []; } catch (_) { return null; } });
+        const dit1 = await pg.evaluate(() => /Supprimé de tes charges/.test(document.body.innerText));
+        dit(rS.nAbo === 0 && stS && stS.length === 0 && dit1, '« Supprimer » retire la ligne de l’écran et de `vrm_compta`, et le dit', `${rS.nAbo} · ${stS && stS.length} · retour=${dit1}`);
+      } catch (e) { dit(false, 'la suppression d’un abonnement se joue', String(e.message).slice(0, 140)); }
 
       // ── Le SIREN.
       dit(r2.profil === 'lu', 'le profil fiscal est lu (la ligne `vrm_pro_facture` a répondu)', r2.profil);

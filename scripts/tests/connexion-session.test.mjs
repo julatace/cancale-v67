@@ -140,7 +140,7 @@ test("confirmation : adresse confirmée seule et connexion effective restent dis
 
 const codeRetour =
   source.slice(
-    source.indexOf("const consumeAuthRedirect ="),
+    source.indexOf("const compteOAuthNeuf="),
     source.indexOf("// Le jeton ne dit pas l'email en clair"),
   ) + ";globalThis.retour=consumeAuthRedirect;";
 function retourAvec({ search = "", hash = "", json = {}, me = null } = {}) {
@@ -349,7 +349,7 @@ test("confirmation manuelle : un lien de récupération est orienté sans consom
 const codeNettoyage =
   source.slice(
     source.indexOf("const cleanAuthUrl ="),
-    source.indexOf("const consumeAuthRedirect ="),
+    source.indexOf("const compteOAuthNeuf="),
   ) + ";globalThis.nettoyer=cleanAuthUrl;";
 test("retour de connexion : paramètres sensibles encodés et dupliqués effacés sans perdre les filtres", () => {
   let u = new URL(

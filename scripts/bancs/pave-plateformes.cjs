@@ -30,7 +30,7 @@
 const path = require('path');
 let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
-catch (_) { ({ chromium } = require('/home/user/cancale-v67/node_modules/playwright')); }
+catch (_) { ({ chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -200,7 +200,9 @@ const verrNumEteint = (pg, chiffres) => pg.evaluate((cs) => {
   const sans = { '0': 'Insert', '1': 'End', '2': 'ArrowDown', '3': 'PageDown', '4': 'ArrowLeft', '5': 'Clear', '6': 'ArrowRight', '7': 'Home', '8': 'ArrowUp', '9': 'PageUp' };
   for (const c of cs) { const t = document.activeElement || document.body; t.dispatchEvent(new KeyboardEvent('keydown', { key: sans[c], code: 'Numpad' + c, bubbles: true, cancelable: true })); }
 }, chiffres);
-const allerA = async (pg, tab) => { await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('[data-section="ventes"]', { timeout: 15000 }); await pg.waitForTimeout(1500); await pg.evaluate(() => document.activeElement && document.activeElement.blur && document.activeElement.blur()); };
+// (31 oct., navigation par tâche) `plat_leboncoin` / `plat_ebay` ouvrent « Ventes ·
+// Leboncoin » / « Ventes · eBay » : l'écran est prêt quand la tâche filtrée est rendue.
+const allerA = async (pg, tab) => { await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' }); await pg.waitForSelector(`[data-tache="ventes"][data-tache-site="${tab.replace('plat_', '')}"]`, { timeout: 15000 }); await pg.waitForTimeout(1500); await pg.evaluate(() => document.activeElement && document.activeElement.blur && document.activeElement.blur()); };
 const etat = (pg) => pg.evaluate(() => ({ sec: (document.querySelector('[data-section][aria-current="page"],[data-section][aria-pressed="true"],[data-section][aria-selected="true"]') || {}).getAttribute ? document.querySelector('[data-section][aria-current="page"],[data-section][aria-pressed="true"],[data-section][aria-selected="true"]').getAttribute('data-section') : '', trouve: [...document.querySelectorAll('[data-num-trouve]')].map((e) => e.getAttribute('data-lbc-vente') || e.getAttribute('data-lbc-catalog-id') || e.getAttribute('data-apub') || e.getAttribute('data-ebay-vente') || e.getAttribute('data-ebay-annonce') || e.tagName), msg: (document.querySelector('[data-num-plat] [role=status]') || {}).textContent || '', ton: (document.querySelector('[data-num-plat-msg]') || {}).getAttribute ? (document.querySelector('[data-num-plat-msg]') || { getAttribute: () => '' }).getAttribute('data-num-plat-msg') : '', valeur: (document.querySelector('[data-num-plat-saisie]') || {}).value, focus: !!(document.activeElement && document.activeElement.matches('[data-num-plat-saisie]')) }));
 const attendTrouve = async (pg) => { for (let i = 0; i < 30; i++) { const e = await etat(pg); if (!/Je cherche/.test(e.msg) && e.ton) return e; await pg.waitForTimeout(200); } return etat(pg); };
 
@@ -214,21 +216,24 @@ const attendTrouve = async (pg) => { for (let i = 0; i < 30; i++) { const e = aw
       await allerA(pg, 'plat_leboncoin');
       await essaie('Leboncoin', async () => {
         dit(!(await pg.$('[data-num-plat]')) && !(await pg.$('[data-num-plat-saisie]')), 'plus de saisie « N° + Entrée » sur Leboncoin');
-        const avant = await pg.evaluate(() => ({ url: location.search, sec: (document.querySelector('[data-section][aria-current="page"],[data-section][aria-pressed="true"]') || { getAttribute: () => '' }).getAttribute('data-section') }));
+        const avant = await pg.evaluate(() => ({ url: location.search, sec: (document.querySelector('[data-section][aria-current="page"],[data-section][aria-pressed="true"]') || { getAttribute: () => '' }).getAttribute('data-section'), tache: (document.querySelector('[data-tache]') || { getAttribute: () => '' }).getAttribute('data-tache') + '·' + (document.querySelector('[data-tache]') || { getAttribute: () => '' }).getAttribute('data-tache-site') }));
         await tape(pg, '51'); await pg.keyboard.press('Enter'); await pg.waitForTimeout(500);
-        const apres = await pg.evaluate(() => ({ url: location.search, sec: (document.querySelector('[data-section][aria-current="page"],[data-section][aria-pressed="true"]') || { getAttribute: () => '' }).getAttribute('data-section'), focus: document.activeElement ? document.activeElement.tagName : '' }));
-        dit(apres.url === avant.url && apres.sec === avant.sec && !/INPUT|TEXTAREA/.test(apres.focus), 'un N° tapé hors d’un champ ne fait rien (ni focus, ni onglet)', JSON.stringify({ avant, apres }));
+        const apres = await pg.evaluate(() => ({ url: location.search, sec: (document.querySelector('[data-section][aria-current="page"],[data-section][aria-pressed="true"]') || { getAttribute: () => '' }).getAttribute('data-section'), tache: (document.querySelector('[data-tache]') || { getAttribute: () => '' }).getAttribute('data-tache') + '·' + (document.querySelector('[data-tache]') || { getAttribute: () => '' }).getAttribute('data-tache-site'), focus: document.activeElement ? document.activeElement.tagName : '' }));
+        dit(apres.url === avant.url && apres.sec === avant.sec && apres.tache === avant.tache && !/INPUT|TEXTAREA/.test(apres.focus), 'un N° tapé hors d’un champ ne fait rien (ni focus, ni onglet)', JSON.stringify({ avant, apres }));
       });
       console.log('\n── eBay, 1512 px');
       await allerA(pg, 'plat_ebay');
       await essaie('eBay', async () => {
         dit(!(await pg.$('[data-num-plat]')) && !(await pg.$('[data-num-plat-saisie]')), 'plus de saisie « N° + Entrée » sur eBay');
-        const avant = await pg.evaluate(() => ({ url: location.search, sec: (document.querySelector('[data-section][aria-current="page"],[data-section][aria-pressed="true"]') || { getAttribute: () => '' }).getAttribute('data-section') }));
+        const avant = await pg.evaluate(() => ({ url: location.search, sec: (document.querySelector('[data-section][aria-current="page"],[data-section][aria-pressed="true"]') || { getAttribute: () => '' }).getAttribute('data-section'), tache: (document.querySelector('[data-tache]') || { getAttribute: () => '' }).getAttribute('data-tache') + '·' + (document.querySelector('[data-tache]') || { getAttribute: () => '' }).getAttribute('data-tache-site') }));
         await tape(pg, '51'); await pg.keyboard.press('Enter'); await pg.waitForTimeout(500);
-        const apres = await pg.evaluate(() => ({ url: location.search, sec: (document.querySelector('[data-section][aria-current="page"],[data-section][aria-pressed="true"]') || { getAttribute: () => '' }).getAttribute('data-section'), focus: document.activeElement ? document.activeElement.tagName : '' }));
-        dit(apres.url === avant.url && apres.sec === avant.sec && !/INPUT|TEXTAREA/.test(apres.focus), 'un N° tapé hors d’un champ ne fait rien (ni focus, ni onglet)', JSON.stringify({ avant, apres }));
+        const apres = await pg.evaluate(() => ({ url: location.search, sec: (document.querySelector('[data-section][aria-current="page"],[data-section][aria-pressed="true"]') || { getAttribute: () => '' }).getAttribute('data-section'), tache: (document.querySelector('[data-tache]') || { getAttribute: () => '' }).getAttribute('data-tache') + '·' + (document.querySelector('[data-tache]') || { getAttribute: () => '' }).getAttribute('data-tache-site'), focus: document.activeElement ? document.activeElement.tagName : '' }));
+        dit(apres.url === avant.url && apres.sec === avant.sec && apres.tache === avant.tache && !/INPUT|TEXTAREA/.test(apres.focus), 'un N° tapé hors d’un champ ne fait rien (ni focus, ni onglet)', JSON.stringify({ avant, apres }));
       });
-      dit(!ECRITURES.filter((x) => !/^POST (widget_stats|vinted_urssaf_mois|vrm_colis_\w+|vrm_benefice_jours|plantage_\w+|main|relais_ext|diag_photos|vrm_hl_\w+|vrm_paires_dorment)(,|$)/.test(x)).length, 'aucune écriture en base venue du clavier', ECRITURES.join(' | ').slice(0, 300));
+      // (31 oct.) `lbc_a_retirer` : le résumé « à retirer de Leboncoin » que l'app
+      //  PUBLIE pour le logo VRM sur leboncoin.fr (`publierLbcARetirer`, 29 oct.) —
+      //  une publication de fond comme `widget_stats`, rien venu du clavier.
+      dit(!ECRITURES.filter((x) => !/^POST (widget_stats|vinted_urssaf_mois|vrm_colis_\w+|vrm_benefice_jours|plantage_\w+|main|relais_ext|diag_photos|vrm_hl_\w+|vrm_paires_dorment|lbc_a_retirer)(,|$)/.test(x)).length, 'aucune écriture en base venue du clavier', ECRITURES.join(' | ').slice(0, 300));
       dit(!errs.length, 'aucune erreur de page', errs.join(' | ').slice(0, 200));
       await ctx.close();
     }

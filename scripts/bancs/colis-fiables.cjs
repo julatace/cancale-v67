@@ -19,7 +19,7 @@
 // Rendu à 390 px tactile clair, 390 px tactile sombre, 1512 px, horloge pilotée
 // (23 oct. puis 27 oct. : la date limite du Mondial Relay passe).
 // `BANC_DIST` : un autre build (preuve §6.1 et mutations).
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');
@@ -181,21 +181,23 @@ async function preparer(b, vp, quand, sombre, opts = {}) {
 
 const lire = (pg) => pg.evaluate(() => {
   const at = (s, a) => { const e = document.querySelector(s); return e ? e.getAttribute(a) : null; };
-  const cartes = [...document.querySelectorAll('.vrm-pickup-card')].map((c) => {
-    const s = c.querySelector('[data-colis-suivi]'), l = c.querySelector('[data-colis-limite]');
+  // (2 nov., colis clair) Colis → « À retirer » : une carte par colis, sous son point ;
+  // les « à vérifier » dans leur groupe en bas (`data-hors-compte`).
+  const cartes = [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-cc-carte]:not([data-hors-compte])')].map((c) => {
+    const s = c.querySelector('[data-rp-suivi]'), l = c.querySelector('[data-colis-limite]');
     const r = c.getBoundingClientRect();
-    return { t: c.innerText, suivi: s ? s.getAttribute('data-colis-suivi') : null, compte: s ? s.getAttribute('data-colis-compte') : null, limite: l ? l.getAttribute('data-colis-limite') : null, limiteTxt: l ? l.innerText : '', large: r.right <= window.innerWidth + 1 };
+    return { t: c.innerText, suivi: s ? s.getAttribute('data-rp-suivi') : null, compte: s ? s.getAttribute('data-colis-compte') : null, limite: l ? l.getAttribute('data-colis-limite') : null, limiteTxt: l ? l.innerText : '', large: r.right <= window.innerWidth + 1 };
   });
-  const aVerif = [...document.querySelectorAll('[data-a-verifier-raison]')].map((x) => ({ raison: x.getAttribute('data-a-verifier-raison'), suivi: (x.querySelector('[data-colis-suivi]') || x).getAttribute('data-colis-suivi') || '', t: x.innerText }));
+  const aVerif = [...document.querySelectorAll('[data-a-verifier-raison]')].map((x) => ({ raison: x.getAttribute('data-a-verifier-raison'), suivi: ((x.querySelector('[data-rp-suivi]') || { getAttribute: () => '' }).getAttribute('data-rp-suivi')) || '', t: x.innerText + ' ' + ((document.querySelector('[data-retirer-a-verifier] .vrm-rp-resume') || {}).innerText || '') }));
   const repartis = [...document.querySelectorAll('[data-reparti-suivi],[data-reparti-tx]')].map((x) => ({ suivi: x.getAttribute('data-reparti-suivi') || '', tx: x.getAttribute('data-reparti-tx') || '', t: x.innerText }));
   return {
     total: at('[data-pickup-total]', 'data-pickup-total'), aVerifier: at('[data-pickup-a-verifier]', 'data-pickup-a-verifier'),
-    sansCompte: at('[data-pickup-sans-compte]', 'data-pickup-sans-compte'), nSansCompte: document.querySelectorAll('[data-pickup-sans-compte]').length,
-    blocAVerifier: at('[data-a-verifier]', 'data-a-verifier'), fraicheur: at('[data-fraicheur-achats]', 'data-fraicheur-achats'), nFraicheur: document.querySelectorAll('[data-fraicheur-achats]').length,
+    sansCompte: at('[data-pickup-sans-compte]', 'data-pickup-sans-compte'), nSansCompte: document.querySelectorAll('[data-pickup-sans-compte]').length, sansCompteGeste: document.querySelectorAll('[data-pickup-sans-compte] [data-pickup-sans-compte-geste]').length,
+    blocAVerifier: at('[data-retirer-a-verifier]', 'data-retirer-a-verifier'), fraicheur: at('[data-fraicheur-achats]', 'data-fraicheur-achats'), nFraicheur: document.querySelectorAll('[data-fraicheur-achats]').length,
     cartes, aVerif, repartis, texte: document.body.innerText, deborde: document.documentElement.scrollWidth > window.innerWidth + 1,
     // L'ordre des points relais : la liste des n° de suivi de chaque bloc, dans l'ordre affiché.
-    blocs: [...document.querySelectorAll('.vrm-pickup-point')].map((b) => [...b.querySelectorAll('[data-colis-suivi]')].map((x) => x.getAttribute('data-colis-suivi'))),
-    blocsTexte: [...document.querySelectorAll('.vrm-pickup-point')].map((b) => b.innerText),
+    blocs: [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-relais-point]:not([data-retirer-a-verifier])')].map((b) => [...b.querySelectorAll('[data-rp-suivi]')].map((x) => x.getAttribute('data-rp-suivi'))),
+    blocsTexte: [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-relais-point]:not([data-retirer-a-verifier])')].map((b) => b.innerText),
     publie: (() => { try { return JSON.parse(localStorage.getItem('vinted_vrm_colis_retirer') || localStorage.getItem('vrm_colis_retirer') || 'null'); } catch (_) { return null; } })(),
   };
 });
@@ -214,7 +216,7 @@ async function main() {
       await essaie(T, async () => {
         const { ctx, pg, errs } = await preparer(b, P.vp, NOW, P.sombre);
         await pg.goto(`http://localhost:${PORT}/?tab=cat_achats`, { waitUntil: 'domcontentloaded' });
-        await pg.locator('.vrm-pickup-point, [data-pickup-total]').first().waitFor({ timeout: 20000 }).catch(async (e) => { console.log('ÉCRAN : ' + (await pg.locator('body').innerText()).slice(0, 1500)); throw e; });
+        await pg.locator('[data-cc-colonne="retirer"] [data-relais-point], [data-pickup-total]').first().waitFor({ timeout: 20000 }).catch(async (e) => { console.log('ÉCRAN : ' + (await pg.locator('body').innerText()).slice(0, 1500)); throw e; });
         await pg.waitForTimeout(2500);
         const L = await lire(pg);
         const carte = (s) => L.cartes.find((c) => c.suivi === s);
@@ -231,8 +233,8 @@ async function main() {
         dit(L.publie && L.publie.total === 4 && L.publie.aVerifier === 3 && Array.isArray(L.publie.colis) && L.publie.colis.length === 4, `${T} la publication lue par le widget dit 4 à retirer, 3 à vérifier, et la liste des 4 colis comptés`, L.publie ? JSON.stringify({ total: L.publie.total, aVerifier: L.publie.aVerifier, n: (L.publie.colis || []).length }) : 'absente');
         const c1 = carte('30000001');
         dit(!!c1, `${T} le Mondial Relay arrivé sur une adresse reliée à aucun compte APPARAÎT (jamais écarté)`, c1 ? '' : 'absent');
-        dit(c1 && c1.compte === '' && L.sansCompte === '2' && L.nSansCompte === 1 && (L.texte.match(/compte non reconnu/g) || []).length === 1, `${T} … « compte non reconnu » dit UNE fois pour les deux colis sans compte`, `sansCompte=${L.sansCompte} ×${L.nSansCompte}`);
-        dit(/Relie-la dans Réglages/.test(L.texte), `${T} … avec le geste, puisqu'une adresse de réception connue n'est reliée à aucun compte`);
+        dit(c1 && c1.compte === '' && L.sansCompte === '2' && L.nSansCompte === 1, `${T} … l'adresse reliée à aucun compte dite UNE fois pour les deux colis (2 nov. : la ligne dit le geste, pas « compte non reconnu »)`, `sansCompte=${L.sansCompte} ×${L.nSansCompte}`);
+        dit(L.sansCompteGeste === 1 && /Paramètres → Comptes liés/.test(L.texte), `${T} … avec le geste (un lien vers Paramètres → Comptes liés), puisqu'une adresse de réception connue n'est reliée à aucun compte`, `liens=${L.sansCompteGeste}`);
         dit(c1 && c1.limite === '2026-10-26' && /jusqu'au 26\/10/.test(c1.limiteTxt), `${T} sa date limite (26/10) est sur la carte`, c1 && `${c1.limite} « ${c1.limiteTxt} »`);
         dit(c1 && /30000001/.test(c1.t) && /123456/.test(c1.t), `${T} son n° de suivi et son code sont sur la carte`);
         const c2 = carte('09440000000002');
@@ -287,7 +289,7 @@ async function main() {
     await essaie('27 oct.', async () => {
       const { ctx, pg, errs } = await preparer(b, { width: 390, height: 844 }, APRES, false);
       await pg.goto(`http://localhost:${PORT}/?tab=cat_achats`, { waitUntil: 'domcontentloaded' });
-      await pg.locator('.vrm-pickup-point, [data-pickup-total]').first().waitFor({ timeout: 20000 });
+      await pg.locator('[data-cc-colonne="retirer"] [data-relais-point], [data-pickup-total]').first().waitFor({ timeout: 20000 });
       await pg.waitForTimeout(2500);
       const L = await lire(pg);
       const r1 = L.aVerif.find((x) => x.suivi === '30000001');
@@ -309,13 +311,13 @@ async function main() {
         const journal = [];
         const { ctx, pg, errs } = await preparer(b, P.vp, NOW, false, { rows: ROWS_R, accounts: ACCOUNTS_R, journal });
         await pg.goto(`http://localhost:${PORT}/?tab=cat_achats`, { waitUntil: 'domcontentloaded' });
-        await pg.locator('.vrm-pickup-point, [data-pickup-total]').first().waitFor({ timeout: 20000 });
+        await pg.locator('[data-cc-colonne="retirer"] [data-relais-point], [data-pickup-total]').first().waitFor({ timeout: 20000 });
         await pg.waitForTimeout(2500);
         const L = await lire(pg);
         const c10 = L.cartes.find((c) => c.suivi === '30000010');
         // défaut 5
         dit(!!c10 && /30000010/.test(c10.t), `${T} [défaut 5] un « disponible » sans code, lieu ni QR lus (seulement son n° de suivi) EST montré`, c10 ? '' : 'absent');
-        const D5 = await pg.evaluate(() => { const c = [...document.querySelectorAll('.vrm-pickup-card')].find((x) => x.querySelector('[data-colis-suivi="30000010"]')); return c ? { pasLu: !!c.querySelector('[data-colis-code-pas-lu]'), suivre: !!c.querySelector('[data-colis-suivre]'), haut: (c.querySelector('[data-colis-suivre]') || { getBoundingClientRect: () => ({ height: 0 }) }).getBoundingClientRect().height } : null; });
+        const D5 = await pg.evaluate(() => { const c = [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-cc-carte]')].find((x) => x.querySelector('[data-rp-suivi="30000010"]')); return c ? { pasLu: !!c.querySelector('[data-colis-sans-code]'), suivre: !!c.querySelector('[data-colis-suivre]'), haut: (c.querySelector('[data-colis-suivre]') || { getBoundingClientRect: () => ({ height: 0 }) }).getBoundingClientRect().height } : null; });
         dit(D5 && D5.pasLu && D5.suivre && D5.haut >= 44, `${T} … « code pas lu — ouvre l'e-mail du transporteur », avec « Suivi ↗ » (44 px)`, JSON.stringify(D5));
         dit(L.total === '6', `${T} … et il compte : « à retirer » 6 (1, 2, 8, 10, Asics, Samba)`, `total=${L.total}`);
         // défaut 10
@@ -345,12 +347,15 @@ async function main() {
       const etat = { suivis: 'ko' };
       const { ctx, pg, errs } = await preparer(b, { width: 390, height: 844 }, NOW, false, { etat });
       await pg.goto(`http://localhost:${PORT}/?tab=cat_achats`, { waitUntil: 'domcontentloaded' });
-      await pg.locator('.vrm-pickup-point, [data-pickup-total], [data-suivis-ko]').first().waitFor({ timeout: 20000 }).catch(() => {});
+      await pg.locator('[data-cc-colonne="retirer"] [data-relais-point], [data-pickup-total], [data-suivis-ko]').first().waitFor({ timeout: 20000 }).catch(() => {});
       await pg.waitForTimeout(3000);
-      const K = await pg.evaluate(() => { const p = document.querySelector('[data-achats-onglet="attente"]'); const seg = [...document.querySelectorAll('.vrm-seg-btn')].find((x) => /À retirer/.test(x.innerText));
-        return { n: p ? p.getAttribute('data-n') : null, seg: seg ? seg.innerText : '', ko: document.querySelector('[data-suivis-ko]') ? document.querySelector('[data-suivis-ko]').getAttribute('data-suivis-ko') : null, texte: document.body.innerText,
+      // (31 oct., soir) « Colis à retirer » n'a plus d'onglet « À retirer N » : le nombre est
+      // porté par le titre de la liste (`data-pickup-total`), et sa phrase.
+      // (2 nov., colis clair) La phrase « au moins » : le nombre de « À retirer » porte un « + » (titre « Au moins N »).
+      const K = await pg.evaluate(() => { const p = document.querySelector('[data-pickup-total]'); const sel = document.querySelector('[data-colis-onglet-choix="retirer"]'); const seg = sel ? { innerText: /\+/.test(sel.innerText) ? 'Au moins ' + (sel.getAttribute('data-colis-onglet-n') || '0') : '' } : null;
+        return { n: p ? p.getAttribute('data-pickup-total') : null, seg: seg ? seg.innerText : '', ko: document.querySelector('[data-suivis-ko]') ? document.querySelector('[data-suivis-ko]').getAttribute('data-suivis-ko') : null, texte: document.body.innerText,
                  btn: (() => { const r = document.querySelector('[data-suivis-reessayer]'); return r ? r.getBoundingClientRect().height : 0; })() }; });
-      dit(K.n === '—' && !/À retirer\s*\d/.test(K.seg), '[défaut 6] e-mails de suivi illisibles : « À retirer » dit « — », jamais un total partiel', `data-n=${K.n} · « ${K.seg.replace(/\n/g, ' ')} »`);
+      dit(K.n === '—' && (K.seg === '' || /^Au moins \d/.test(K.seg.trim())), '[défaut 6] e-mails de suivi illisibles : le nombre dit « — » (attribut), et la phrase « au moins » — jamais un total partiel présenté comme complet', `data-n=${K.n} · « ${K.seg.replace(/\n/g, ' ')} »`);
       dit(K.ko === 'jamais' && /n'ont pas pu être lus/.test(K.texte) && K.btn >= 44, '[défaut 6] … la panne est DITE, avec « Réessayer » (44 px)', `ko=${K.ko} · bouton ${K.btn}px`);
       dit(!/aucun email de suivi reçu/i.test(K.texte), '[défaut 6] … jamais « aucun email de suivi reçu »');
       // « Réessayer » sur la MÊME page (pas un rechargement, qui relirait de toute façon).
@@ -373,7 +378,7 @@ async function main() {
     await essaie('revue suivis lents', async () => {
       const { ctx, pg, errs } = await preparer(b, { width: 390, height: 844 }, NOW, false, { suivis: 6000 });
       await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
-      await pg.locator('[data-tuile="retirer"]').first().waitFor({ timeout: 20000 }).catch(() => {});
+      await pg.locator('[data-tuile="retirer"]').first().waitFor({ timeout: 20000, state: 'attached' }).catch(() => {});
       await pg.waitForTimeout(1500);
       const A = await pg.evaluate(() => { const t = document.querySelector('[data-tuile="retirer"]'); const v = document.querySelector('[data-job="retrait-a-verifier"]'); return { n: t ? t.getAttribute('data-n') : null, job: v ? v.getAttribute('data-n') : null }; });
       dit(A.n === '' && A.job == null, '[défaut 12] e-mails de suivi en cours de lecture : « À retirer » dit « — » et aucune ligne « à vérifier » partielle', JSON.stringify(A));

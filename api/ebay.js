@@ -31,8 +31,11 @@ import {creerApresVenteEbay,annulerCommandeRangee} from './_lib/ebay-apres-vente
 import { vendeurExige, baseCloisonnee } from './_lib/session.js';
 import { accesVendeur } from './_lib/abonnement.js';
 import { creerRechercheEbay } from './_lib/ebay-recherche.js';
+import { traiterSuppressionEbay } from './_lib/ebay-suppression.js';
+import { lireItemRelance, jugerRelance, xmlRelance, ID_ANNONCE_EBAY } from './_lib/ebay-relance.js';
+import { sbCle } from './_lib/cle.js';
 import { keysReady, canConsent, ruName, authUrl, appToken, jetonApplication, oublierJetonApplication, hasRefresh, accessToken, storeData, lireReglageVendeur, lireDonnee, lireResumeCommandes, modifierDonnee,
-  lireComptes, comptesActifs, rangerConnexion, apprendrePrincipal, apprendreTypes, resoudreCompte, deconnecterCompte, suffixeCompte,
+  lireComptes, comptesActifs, rangerConnexion, apprendrePrincipal, apprendreTypes, resoudreCompte, deconnecterCompte, suffixeCompte, normaliserRegistre, cleCompteDe,
   montantOk, valideRegleOffre, seuilTropBas } from './_lib/ebay.js';
 
 // ── LE CONTEXTE D'UNE ACTION : QUI (le vendeur de la session) ET SUR QUEL
@@ -102,6 +105,8 @@ function messageEbaySur(m) {
 }
 
 // Une valeur XML lisible (eBay échappe les apostrophes, les guillemets…).
+// (2 nov., P13) Le texte d'une section CDATA ne peut pas contenir « ]]> » : on le coupe.
+export const cdataSur = (s) => String(s == null ? '' : s).split(']]>').join(']]]]><![CDATA[>');
 const dexml = (s) => String(s == null ? '' : s).replace(/<!\[CDATA\[|\]\]>/g, '')
   .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&#39;/g, "'").replace(/&amp;/g, '&');
 
@@ -708,7 +713,9 @@ function itemXml(it) {
     // L'identité de la paire (`VRM-{n°}`). ⚠️ Posée par `avecSku` à partir du
     // NUMÉRO, jamais recopiée d'un `sku` envoyé par le navigateur.
     (it.sku ? `<SKU>${esc(it.sku)}</SKU>` : '') +
-    `<Description><![CDATA[${String(it.description || it.title || '')}]]></Description>` +
+    // (2 nov., audit P13) Un « ]]> » dans la description fermait le CDATA et cassait le XML :
+    // découpé en deux sections (]]]]><![CDATA[>), le texte publié reste identique.
+    `<Description><![CDATA[${cdataSur(String(it.description || it.title || ''))}]]></Description>` +
     `<PrimaryCategory><CategoryID>${esc(it.categoryId)}</CategoryID></PrimaryCategory>` +
     `<StartPrice>${Number(String(it.price).replace(',', '.')).toFixed(2)}</StartPrice>` +
     `<Quantity>${parseInt(it.quantity || 1, 10)}</Quantity>` +
@@ -1476,8 +1483,15 @@ async function handleRetirer(b, ctx) {
   const auto = b.auto === true;
   const skuAttendu = String(b.sku || '').trim();
   let marqueur = null;
+  let venduMs = NaN;
   if (auto) {
     if (!SKU_PAIRE.test(skuAttendu)) return { status: 400, body: { ok: false, reason: 'sku', error: 'Retrait automatique : la paire n\'est pas identifiée par son SKU (VRM-n°) — rien n\'a été envoyé à eBay.' } };
+    // (31 octobre) La date de la vente Vinted, que l'app a PROUVÉE (sa liste de
+    // ventes relue) : la route revérifie elle-même, sur ce qu'eBay dit de
+    // l'annonce, qu'elle a été mise en ligne AVANT cette vente (l'app ne juge
+    // que sur sa copie rangée de la liste eBay). Sans date ⇒ rien ne part.
+    venduMs = Date.parse(String(b.venduLe || ''));
+    if (!Number.isFinite(venduMs)) return { status: 400, body: { ok: false, reason: 'date-vente', error: 'Retrait automatique : la date de la vente Vinted manque — rien n\'a été envoyé à eBay.' } };
     const v = await lireReglageVendeur('vrm_ebay_retrait_auto', ctx.owner);
     if (v === undefined) return { status: 503, body: { ok: false, reason: 'reglage-pas-su', error: 'Je n\'ai pas pu relire ton réglage de retrait automatique — rien n\'a été envoyé à eBay.' } };
     if (v !== 'true') return { status: 403, body: { ok: false, reason: 'auto-eteint', error: 'Le retrait automatique est éteint — rien n\'a été envoyé à eBay.' } };
@@ -1498,6 +1512,12 @@ async function handleRetirer(b, ctx) {
     const skuEbay = lireBalise(String(g.xml || '').replace(/<Variations>[\s\S]*?<\/Variations>/g, ''), 'SKU');
     const lu = numeroExterne(numDeSku(skuEbay), itemId, 'ebayAnnonces', null, marqueur);
     if (!lu || lu !== numDeSku(skuAttendu)) return { status: 409, body: { ok: false, reason: 'sku-change', error: `L'annonce eBay ne porte plus ${skuAttendu} — rien n'a été retiré.` } };
+    // L'annonce eBay doit avoir été mise en ligne AVANT la vente Vinted : une
+    // annonce publiée APRÈS ne peut pas être la paire vendue (une paire revenue
+    // et republiée). Date de mise en ligne illisible ⇒ « pas su » ⇒ rien.
+    const debutMs = Date.parse(lireBalise(String(g.xml || '').replace(/<Variations>[\s\S]*?<\/Variations>/g, ''), 'StartTime') || '');
+    if (!Number.isFinite(debutMs)) return { status: 503, body: { ok: false, reason: 'debut-pas-su', error: 'eBay n\'a pas dit quand l\'annonce a été mise en ligne — rien n\'a été retiré.' } };
+    if (!(debutMs < venduMs)) return { status: 409, body: { ok: false, reason: 'ebay-apres-vente', error: 'L\'annonce eBay a été mise en ligne APRÈS la vente Vinted : ce n\'est pas la paire vendue — rien n\'a été retiré.' } };
   }
   const r = await tradingCall(at.token, 'EndFixedPriceItem', `<ItemID>${itemId}</ItemID><EndingReason>NotAvailable</EndingReason>`);
   if (sansAck(r)) return { status: 504, body: { ok: false, reason: 'incertain', error: 'eBay n\'a pas répondu — je ne sais pas si l\'annonce a été retirée. Regarde sur eBay avant de recommencer.' } };
@@ -1516,12 +1536,17 @@ async function handleRetirer(b, ctx) {
   if (auto) {
     // Le journal ne se réécrit QUE sur une lecture réussie (« rien lu » ne vaut
     // pas « rien », sinon un hoquet effacerait l'historique de ses retraits).
-    const j = await lireDonnee(ligneDe('ebay_retraits_auto', ctx), ctx.owner);
-    journal = false;
-    if (j !== undefined) {
-      const l = (j && Array.isArray(j.items)) ? j.items : [];
-      journal = await storeData(ligneDe('ebay_retraits_auto', ctx), { items: [{ itemId, sku: skuAttendu, titre: String(b.titre || '').slice(0, 140), at: Date.now() }, ...l].slice(0, 50) }, ctx.owner);
-    }
+    // (31 octobre) Comparer-et-échanger (`modifierDonnee`) : deux retraits
+    // automatiques simultanés relisaient la même liste et le second effaçait la
+    // ligne du premier. Lecture ratée ⇒ `null` ⇒ rien n'est écrit.
+    // (3 nov.) Le site de la vente (Vinted, Leboncoin, Vestiaire) — dit tel quel, jamais deviné.
+    const ou = ['Vinted', 'Leboncoin', 'Vestiaire'].includes(String(b.ou || '')) ? String(b.ou) : 'Vinted';
+    const entree = { itemId, sku: skuAttendu, titre: String(b.titre || '').slice(0, 140), at: Date.now(), ou };
+    const w = await modifierDonnee(ligneDe('ebay_retraits_auto', ctx), ctx.owner, (d) => {
+      const l = (d && Array.isArray(d.items)) ? d.items : [];
+      return { ...(d || {}), items: [entree, ...l].slice(0, 50) };
+    });
+    journal = w === true;
   }
   return { status: 200, body: { ok: true, fin, listes, regles: regles === true, ...(auto ? { auto: true, journal } : {}) } };
 }
@@ -1778,23 +1803,47 @@ async function handleRelire(ctx) {
 }
 
 // ── CONFORMITÉ : notification de suppression de compte ──────────────────────
-const verifToken = () => process.env.EBAY_VERIF_TOKEN || '';
+// Le défi GET (doc eBay « Marketplace User Account Deletion ») : SHA-256 de
+// challengeCode + jeton de vérification + adresse EXACTE déclarée chez eBay
+// (`EBAY_DELETION_URL`), en hexadécimal, rendu en JSON `{challengeResponse}`.
+// Le POST (signé) est traité par `api/_lib/ebay-suppression.js` : signature
+// vérifiée (sinon 412), puis anonymisation chez tous les vendeurs ; une
+// panne ⇒ 503, eBay renvoie la notification.
+const verifToken = () => process.env.EBAY_VERIF_TOKEN || process.env.EBAY_VERIFICATION_TOKEN || '';
+// eBay : 32 à 80 caractères, lettres, chiffres, « _ » et « - ».
+const verifTokenConforme = () => /^[A-Za-z0-9_-]{32,80}$/.test(verifToken());
 function deletionUrl(req) {
   if (process.env.EBAY_DELETION_URL) return process.env.EBAY_DELETION_URL;
-  const host = (req.headers && (req.headers['x-forwarded-host'] || req.headers.host)) || 'vrm.center';
+  const host = String((req.headers && (req.headers['x-forwarded-host'] || req.headers.host)) || 'vrm.center').split(',')[0].trim();
   return `https://${host}/api/ebay-deletion`;   // l'URL publique stable, pas le chemin interne
 }
 async function handleDeletion(req, res) {
   if (req.method === 'GET') {
-    const code = (req.query && (req.query.challenge_code || req.query.challengeCode)) || '';
-    if (!code) { res.status(200).json({ ok: true, ready: !!verifToken() }); return; }
+    let code = req.query && (req.query.challenge_code != null ? req.query.challenge_code : req.query.challengeCode);
+    if (Array.isArray(code)) code = code[0];
+    code = code == null ? '' : String(code);
+    if (!code) { res.status(200).json({ ok: true, ready: !!verifToken(), tokenConforme: verifTokenConforme() }); return; }
     if (!verifToken()) { res.status(503).json({ ok: false, reason: 'no-verif-token', error: 'EBAY_VERIF_TOKEN non configuré sur Vercel.' }); return; }
     const hash = crypto.createHash('sha256');
-    hash.update(String(code)); hash.update(verifToken()); hash.update(deletionUrl(req));  // ordre imposé par eBay
+    hash.update(code); hash.update(verifToken()); hash.update(deletionUrl(req));  // ordre imposé par eBay
+    if (typeof res.setHeader === 'function') res.setHeader('Content-Type', 'application/json');
     res.status(200).json({ challengeResponse: hash.digest('hex') });
     return;
   }
-  if (req.method === 'POST') { res.status(200).json({ ok: true }); return; }
+  if (req.method === 'POST') {
+    let r;
+    try {
+      r = await traiterSuppressionEbay(req, {
+        supabaseUrl: process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co',
+        cleService: process.env.SUPABASE_SERVICE_KEY || '',
+        sbCle, jetonApplication, oublierJetonApplication, modifierDonnee, deconnecterCompte, normaliserRegistre, suffixeCompte, cleCompteDe,
+      });
+    } catch (_) {
+      r = { status: 503, body: { ok: false, reason: 'panne', error: 'Notification non traitée — eBay la renverra.' } };
+    }
+    res.status(r.status).json(r.body);
+    return;
+  }
   res.status(405).json({ ok: false, error: 'GET/POST' });
 }
 
@@ -1885,6 +1934,56 @@ async function handleCallback(req, res) {
 }
 
 // L'édition complète garde les contrôles de stock/identité et relit les règles natives.
+// ── REMETTRE EN VENTE UNE INACTIVE (3 novembre — chantier choisi par Julien) ──
+// La règle est dans `api/_lib/ebay-relance.js`. Deux actions :
+//   · `relanceverif` : l'annonce RELUE chez eBay (GetItem), jugée, la paire
+//     cherchée sur TOUS ses comptes eBay (`dejaChezEbay`), puis la vérification
+//     à blanc d'eBay (`VerifyRelistFixedPriceItem`) pour ses FRAIS — rien n'est
+//     créé ;
+//   · `relancer` : la même chose, `confirme:true` EXIGÉ (posé par l'app après
+//     SON clic), la version de numérotation de l'écran (013), puis
+//     `RelistFixedPriceItem` avec l'identifiant SEUL : même prix, même
+//     livraison, même SKU. Relue après coup (`verifie`).
+// Un résultat sans réponse lisible d'eBay est « incertain » (504) : l'annonce a
+// pu repartir — la prochaine relecture le dira, rien n'est renvoyé à l'aveugle.
+async function handleRelance(b, ctx, seulementVerifier) {
+  if (!seulementVerifier && b.confirme !== true) return { status: 400, body: { ok: false, reason: 'confirmation', error: 'Remise en vente non confirmée — rien n\'a été envoyé à eBay.' } };
+  const itemId = String(b.itemId || '');
+  if (!ID_ANNONCE_EBAY.test(itemId)) return { status: 400, body: { ok: false, reason: 'invalide', error: 'Annonce inconnue — rien n\'a été envoyé à eBay.' } };
+  const voulu = cleNum(b.numero);
+  if (!voulu || !NUM_OK.test(voulu)) return { status: 400, body: { ok: false, reason: 'numero', error: 'Numéro de paire illisible — rien n\'a été envoyé à eBay.' } };
+  if (prixLu(b.prixVu) == null) return { status: 400, body: { ok: false, reason: 'prix', error: PRIX_ILLISIBLE } };
+  const num = await numerotationVendeur(ctx.owner);
+  if (!num.ok) return { status: 503, body: { ok: false, reason: 'numerotation-pas-su', error: 'Je n\'ai pas pu relire ta numérotation — rien n\'a été envoyé à eBay.' } };
+  if (!seulementVerifier) { const ref = numerotationRefus(b, num); if (ref) return ref; }
+  const at = await jetonDe(ctx);
+  if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error } };
+  const g = await tradingCall(at.token, 'GetItem', `<ItemID>${itemId}</ItemID><DetailLevel>ReturnAll</DetailLevel>`);
+  if (sansAck(g)) return { status: 503, body: { ok: false, reason: 'pas-su', error: 'eBay n\'a pas rendu cette annonce — rien n\'a été remis en vente.' } };
+  if (!g.ok) return { status: 502, body: { ok: false, reason: 'pas-su', error: g.err || 'eBay n\'a pas rendu cette annonce — rien n\'a été remis en vente.' } };
+  const j = jugerRelance(lireItemRelance(g.xml), { itemId, numero: voulu, prixVu: b.prixVu }, { mk: num.mk, devise: marcheCourant().devise });
+  if (!j.ok) return { status: j.status, body: j.body };
+  const deja = await dejaChezEbay(ctx, at.token, j.sku, 'remis en vente', num.mk);
+  if (deja) return deja;
+  const corps = xmlRelance(itemId);
+  if (seulementVerifier) {
+    const v = await tradingCall(at.token, 'VerifyRelistFixedPriceItem', corps);
+    if (sansAck(v) || !v.ok) return { status: 200, body: { ok: true, num: j.num, sku: j.sku, prix: j.prix, frais: null, verifie: false, error: v && v.err ? v.err : undefined } };
+    return { status: 200, body: { ok: true, num: j.num, sku: j.sku, prix: j.prix, frais: fraisParNom(v.xml), verifie: true } };
+  }
+  const r = await tradingCall(at.token, 'RelistFixedPriceItem', corps);
+  if (sansAck(r)) return { status: 504, body: { ok: false, reason: 'incertain', error: 'eBay n\'a pas répondu clairement — je ne sais pas si elle est repartie. Rafraîchis depuis eBay avant de recommencer.' } };
+  if (!r.ok) return { status: r.status >= 400 ? r.status : 422, body: { ok: false, reason: 'refus', error: r.err || 'eBay a refusé la remise en vente.' } };
+  const neuf = lireBalise(r.xml, 'ItemID');
+  // La RELECTURE : ce qu'eBay tient vraiment (SKU et prix) sur la nouvelle annonce.
+  let verifie = null;
+  if (ID_ANNONCE_EBAY.test(neuf)) {
+    const g2 = await tradingCall(at.token, 'GetItem', `<ItemID>${neuf}</ItemID><DetailLevel>ReturnAll</DetailLevel>`);
+    const l2 = g2 && g2.ok ? lireItemRelance(g2.xml) : null;
+    if (l2 && l2.itemId === neuf) verifie = l2.sku === j.sku && Math.round(Number(l2.prix) * 100) === Math.round(j.prix * 100) && l2.gratuite !== true;
+  }
+  return { status: 200, body: { ok: true, itemId: neuf || null, ancien: itemId, url: neuf ? lienAnnonce(marcheCourant(), neuf) : null, sku: j.sku, num: j.num, prix: j.prix, frais: fraisParNom(r.xml), verifie, compte: ctx.compte.pseudo || '' } };
+}
 async function handleModifierAnnonceGestion(b,ctx){
  if(b.price==null)return gestionEbay.modifierAnnonce(b,ctx);
  if(!ID_EBAY.test(String(b.itemId || '')) || !/^\d+(?:[.,]\d{1,2})?$/.test(String(b.price)) || !(Number(String(b.price).replace(',','.'))>0))return {status:400,body:{ok:false,error:'Annonce ou prix invalide.'}};
@@ -2074,6 +2173,9 @@ async function handleApp(req, res) {
       // (9 octobre) La règle d'offre : c'est eBay qui accepte, au seuil fixé.
       regleoffre: (ctx) => handleRegleOffre(b, ctx),
       regleoffrelire: (ctx) => handleRegleOffreLire(b, ctx),
+      // (3 nov.) Remettre en vente une inactive : vérifier (frais), puis relancer sur SON clic.
+      relanceverif: (ctx) => handleRelance(b, ctx, true),
+      relancer: (ctx) => handleRelance(b, ctx, false),
     };
     if (!Object.prototype.hasOwnProperty.call(ACTIONS, action)) { res.status(400).json({ ok: false, error: 'action inconnue' }); return; }
     const rc = await resoudreCompte(b.compte, owner);
@@ -2085,7 +2187,7 @@ async function handleApp(req, res) {
     // illisible) ou pas géré par VRM est REFUSÉ : jamais publié en France à la
     // place.
     const marche=marcheDuCompte(rc.compte);
-    const creeAnnonce=new Set(['publish','pubverify','pubinfo','programmer']);
+    const creeAnnonce=new Set(['publish','pubverify','pubinfo','programmer','relanceverif','relancer']);
     if(creeAnnonce.has(action)&&(!marche||rc.compte.siteInconnu)){
       res.status(!marche?409:503).json({ok:false,reason:!marche?'marche-non-gere':'marche-pas-su',error:!marche
         ?'Ce compte eBay est inscrit sur un site eBay que VRM ne gère pas encore (VRM gère eBay.fr, eBay.co.uk, eBay.com, eBay.de, eBay.it, eBay.es) — rien n\'a été envoyé.'
@@ -2099,6 +2201,14 @@ async function handleApp(req, res) {
     // (SKU, déjà en vente / programmée relue chez eBay, prix, livraison gérée
     // par eBay). Elle est inscrite au journal des actions (« Publiée par
     // l'agent ») : un résultat incertain se relit avant tout nouvel essai.
+    // (2 nov., audit « plateformes » P12) Publier et changer un prix ENGAGENT
+    // (une annonce mise en vente, un prix qui vend) : comme `programmer`,
+    // `retirer`, `regleoffre` et `modifierannonce`, le serveur exige la
+    // confirmation que l'app ne pose qu'après le clic de Julien (`confirme:true`).
+    if ((action === 'publish' || (action === 'revise' && b.price != null)) && b.confirme !== true) {
+      res.status(400).json({ ok: false, reason: 'confirmation', error: action === 'publish' ? 'Publication non confirmée — rien n\'a été publié.' : 'Changement de prix non confirmé — rien n\'a changé sur eBay.' });
+      return;
+    }
     if (action === 'publish' && b.agent === true) {
       if (b.confirme !== true) { res.status(400).json({ ok: false, reason: 'confirmation', error: 'L\'agent ne publie qu\'après ton oui — rien n\'a été publié.' }); return; }
       const num = b.item && b.item.numero != null ? String(b.item.numero).slice(0, 16) : '';

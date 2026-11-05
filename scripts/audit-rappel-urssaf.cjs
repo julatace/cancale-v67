@@ -330,7 +330,7 @@ if (process.argv.includes('--recopie')) {
       const u = urssafDe();
       dit(u.length === 1, 'le 1er octobre, septembre pas noté : UNE notification URSSAF part', `${u.length}`);
       dit(!!(u[0] && /4330,90 €/.test(u[0].body) && /584,67 €/.test(u[0].body)), 'elle porte le montant publié (4 330,90 € · 584,67 €)', u[0] && u[0].body);
-      dit(!!(u[0] && u[0].url === '/?tab=journee'), 'elle ouvre Ma journée, où vit « C\'est déclaré »', u[0] && u[0].url);
+      dit(!!(u[0] && u[0].url === '/?tab=compta&cible=urssaf'), 'elle ouvre Comptabilité → « Ta déclaration URSSAF », où vit « C\'est déclaré » (31 oct.)', u[0] && u[0].url);
       dit(ecrits.includes('urssaf_reminder_dedup'), 'le mémo du mois est écrit (une fois par mois)');
       const corps = JSON.stringify(res.corps || {});
       dit(!/€|4330|584/.test(corps), 'la réponse du cron ne porte AUCUN montant', corps.slice(0, 160));

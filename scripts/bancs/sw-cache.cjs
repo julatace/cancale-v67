@@ -17,7 +17,7 @@ const RACINE = path.join(__dirname, '..', '..');
 const SW = fs.readFileSync(path.join(RACINE, 'public', 'sw.js'), 'utf8');
 let chromium;
 try { ({ chromium } = require(path.join(RACINE, 'node_modules', 'playwright'))); }
-catch (_) { ({ chromium } = require('/home/user/cancale-v67/node_modules/playwright')); }
+catch (_) { ({ chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 
 let ko = 0;
 const ok = (m) => console.log('OK  ' + m);

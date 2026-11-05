@@ -35,10 +35,17 @@ jobs:
         run: |
           node --test scripts/tests/session-renouvellement.test.mjs
           node scripts/bancs/session-reveil.cjs
+      - name: Vérifier la connexion autonome Orion
+        run: |
+          node scripts/tests/orion-auth-autonome.cjs
+          node scripts/tests/orion-connexion.cjs
+          node scripts/tests/orion-paquet.cjs
       - name: Vérifier le périmètre des numéros Vinted
         run: node scripts/tests/numeros-vinted-perimetre-interface.cjs
       - name: Vérifier l’espace emails
-        run: node scripts/tests/espace-emails-interface.cjs
+        run: |
+          node scripts/tests/espace-emails-interface.cjs
+          node scripts/tests/journal-email-reessai.cjs
       - name: Vérifier le guide de transfert
         run: node scripts/tests/transfert-guide-interface.cjs
       - name: Vérifier la réception multi-comptes
@@ -78,7 +85,7 @@ jobs:
       - name: Vérifier le placement et la lecture des QR après tampon
         run: |
           node scripts/tests/bordereau-zone-protegee.cjs
-          node scripts/tests/bordereau-rendu-blanc.cjs
+          BANC_PDFJS_DIR="$VRM_PDFJS_DIR" node scripts/bancs/tampon-bordereau.cjs
           node scripts/tests/bordereau-qr-lecture.cjs
       - name: Vérifier les politiques SQL sur une base jetable
         run: |

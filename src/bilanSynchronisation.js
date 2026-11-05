@@ -1,3 +1,4 @@
+import { cleNum } from "../api/_lib/numerotation.js";
 // Compare only confirmed rows of the same account/source. A first read is a baseline,
 // an absent row is never inferred to be deleted from a paginated/partial capture.
 const serialiser = (valeur) =>
@@ -75,6 +76,18 @@ export function resumerLecture(avant, source) {
   }
   return { next, resultats };
 }
+// ⚠️ (1er nov., audit des parcours A6) Les N° se comparent par leur CLÉ, la
+// même que l'app (`cleNum` d'App.jsx et d'`api/_lib/numerotation.js`) :
+// « 007 » = « 7 », « B 125 » = « b125 » = « B125 ». Un lot « 12+15 » désigne
+// les DEUX cartons (comme `numerosDeVente`). Avant, la comparaison se faisait
+// en minuscules sur le texte brut : une fiche saisie « 007 » vendue sur
+// Leboncoin (réf « VRM-7 ») ne sortait jamais dans « Vendus ailleurs ».
+// `cleNum` est celle du serveur (`api/_lib/numerotation.js`) ; `audit-flux-divers.cjs`
+// la compare à celle de l'app.
+export const cleNumSync = (v) => cleNum(v);
+export const numerosSync = (v) => [
+  ...new Set(String(v == null ? "" : v).split("+").map(cleNumSync).filter(Boolean)),
+];
 export function articlesVendusAilleurs({
   numeros = {},
   ventes = [],
@@ -82,15 +95,14 @@ export function articlesVendusAilleurs({
 }) {
   const parNum = new Map();
   for (const [id, e] of Object.entries(numeros))
-    if (e?.numero != null && String(e.numero).trim()) {
-      const n = String(e.numero).trim().toLowerCase();
-      if (!parNum.has(n)) parNum.set(n, []);
-      parNum.get(n).push(String(id));
-    }
-  const groupe = (n) => {
-    n = String(n || "")
-      .trim()
-      .toLowerCase();
+    if (e?.numero != null && String(e.numero).trim())
+      for (const n of numerosSync(e.numero)) {
+        if (!parNum.has(n)) parNum.set(n, []);
+        if (!parNum.get(n).includes(String(id))) parNum.get(n).push(String(id));
+      }
+  // Une clé seule : connue d'une fiche, et d'UNE paire (ou d'une chaîne de
+  // recréation explicite). Sinon null (ambiguë ou inconnue).
+  const groupeUn = (n) => {
     if (!n) return null;
     const ids = parNum.get(n) || [];
     if (!ids.length) return null;
@@ -109,6 +121,15 @@ export function articlesVendusAilleurs({
     }
     return roots.size === 1 ? n : null;
   };
+  // Les clés d'un N° (un lot en porte plusieurs). Une seule clé ambiguë rend
+  // TOUT le N° ambigu (null) : mieux vaut un blanc qu'un faux.
+  const groupe = (v) => {
+    const ks = numerosSync(v);
+    if (!ks.length) return null;
+    const g = ks.map(groupeUn);
+    return g.every(Boolean) ? g : null;
+  };
+  const croise = (a, b) => !!a && !!b && a.some((k) => b.includes(k));
   const retour = [],
     vus = new Set();
   let ambigus = 0;
@@ -123,7 +144,7 @@ export function articlesVendusAilleurs({
       (v) =>
         v.engagee === true &&
         v.plateforme !== a.plateforme &&
-        groupe(v.numero) === n,
+        croise(groupe(v.numero), n),
     );
     if (!ventesLiees.length) continue;
     const cle = [a.plateforme, a.compte, a.id].join(":");
@@ -135,12 +156,12 @@ export function articlesVendusAilleurs({
           x.active === true &&
           x.plateforme === v.plateforme &&
           String(x.id) !== String(v.id) &&
-          groupe(x.numero) === n,
+          croise(groupe(x.numero), groupe(v.numero)),
       ),
     );
     retour.push({
       ...a,
-      numero: n,
+      numero: n.join("+"),
       ventes: ventesLiees,
       aConfirmer: remiseEnVente,
       observeAt: Date.now(),

@@ -25,7 +25,7 @@ require('./_porte-banc.cjs');
 const path = require('path'), http = require('http'), fs = require('fs');
 let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
-catch (_) { ({ chromium } = require('/home/user/cancale-v67/node_modules/playwright')); }
+catch (_) { ({ chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 5233;
 const SHOTS = process.env.SHOTS || '';
@@ -161,14 +161,46 @@ async function interrupteurs(pg, T) {
           dit(m.disposition === (mobile ? 'telephone' : 'ordinateur'), `${T} : disposition ${mobile ? 'téléphone (sous-écrans)' : 'ordinateur (tout déplié)'}`, String(m.disposition));
           if (mobile) {
             dit(m.petites.length === 0, `${T} : aucune cible tactile de moins de 44 px`, m.petites.slice(0, 6).join(' · '));
-            dit(m.sous.length >= 3 && m.panneauxVisibles === 0, `${T} : les panneaux longs sont derrière un chevron (rien de déplié sur la liste)`, `${m.sous.length} sous-écrans · ${m.panneauxVisibles} panneau(x) visible(s)`);
-          } else {
-            dit(m.sous.length === 0, `${T} : sur ordinateur, rien n’est caché derrière un chevron`, m.sous.join(','));
           }
+          // Depuis le 28 oct. (77633d9, « Clarifier les paramètres ») les panneaux longs
+          // s'ouvrent dans un écran dédié AUSSI sur ordinateur : la liste reste courte.
+          dit(m.sous.length >= 3 && m.panneauxVisibles === 0, `${T} : les panneaux longs sont derrière un chevron (rien de déplié sur la liste)`, `${m.sous.length} sous-écrans · ${m.panneauxVisibles} panneau(x) visible(s)`);
           const n = await interrupteurs(pg, T);
           if (vue === 'reglages') dit(n >= 3, `${T} : les interrupteurs de la page sont là (sombre, stream, alertes)`, `${n} vu(s)`);
-          // Chaque sous-écran du téléphone : rendu, sans débordement ni petite cible, puis retour.
-          if (mobile) {
+          // (1er nov.) Revue « logique et simple » : chaque ligne dit ce qu'elle porte.
+          if (vue === 'reglages') {
+            const r = await pg.evaluate(() => {
+              const m = document.querySelector('[data-reglage-masques]');
+              const g = document.querySelector('[data-reglage-regime]');
+              return {
+                masques: m ? m.innerText : null,
+                regime: g ? g.getAttribute('data-reglage-regime') : null,
+                regimeVal: g ? ((g.querySelector('.vrm-set-val') || {}).innerText || '').trim() : null,
+                // (1er nov.) « Import des emails » n'agit que pour la boîte du PROPRIÉTAIRE de
+                // l'installation : chez un vendeur (ABO.proprietaire false) il n'est pas
+                // proposé ; s'il l'est, il vit à côté de la réception des emails.
+                importAvecEmails: !!document.querySelector('[data-groupe-reglages="comptes"] [data-sous-ouvrir="adresses"]') && (!document.querySelector('[data-sous-ouvrir="import"]') || !!document.querySelector('[data-groupe-reglages="comptes"] [data-sous-ouvrir="import"]')),
+                importVendeur: !!document.querySelector('[data-sous-ouvrir="import"]'),
+              };
+            });
+            // Une vente ne se masque plus (29 oct.) : la ligne ne parle que des achats.
+            dit(r.masques != null && /achat/i.test(r.masques) && !/vente/i.test(r.masques), `${T} : la ligne des masqués ne promet plus de « ventes » masquées`, String(r.masques).replace(/\s+/g, ' '));
+            // Le régime n'est jamais deviné : pas choisi ⇒ la ligne le DIT à droite.
+            dit(r.regime === 'aucun' && !!r.regimeVal, `${T} : le régime fiscal pas choisi se voit sur sa ligne`, `${r.regime} · « ${r.regimeVal} »`);
+            dit(r.importAvecEmails, `${T} : l’import des emails est rangé avec la réception des emails`);
+            dit(!r.importVendeur, `${T} : l’import des emails (boîte du propriétaire seulement) n’est pas proposé à un vendeur`);
+          } else {
+            const p = await pg.evaluate(() => {
+              const c = document.querySelector('[data-photo-profil]');
+              const ent = document.querySelector('[data-profil-compte] .vrm-set-avatar');
+              const lettre = (e) => (e ? e.innerText : '').trim().slice(0, 1);
+              return c ? { double: !!c.closest('.vrm-set-liste'), lettre: lettre(c.querySelector('span')), tete: lettre(ent) } : null;
+            });
+            dit(!!p && !p.double, `${T} : la photo de profil n’est pas enfermée dans une seconde carte`, JSON.stringify(p));
+            dit(!!p && !!p.tete && p.lettre === p.tete, `${T} : la photo de profil a la même lettre de repli que l’en-tête`, JSON.stringify(p));
+          }
+          // Chaque sous-écran : rendu, sans débordement (ni petite cible au doigt), puis retour.
+          {
             for (const id of m.sous) {
               await pg.locator(`[data-sous-ouvrir="${id}"]`).first().click();
               await pg.waitForTimeout(700);
@@ -181,7 +213,7 @@ async function interrupteurs(pg, T) {
                 await pg.setViewportSize(vp); await pg.waitForTimeout(200);
               }
               dit(!s.tombe && s.deb <= 1 && s.panneauxVisibles === 1 && !!titre, `${T} › « ${titre} » : un seul panneau, sans débordement`, `déb ${s.deb} · ${s.panneauxVisibles} panneau(x)`);
-              dit(s.petites.length === 0, `${T} › « ${titre} » : aucune cible de moins de 44 px`, s.petites.slice(0, 6).join(' · '));
+              if (mobile) dit(s.petites.length === 0, `${T} › « ${titre} » : aucune cible de moins de 44 px`, s.petites.slice(0, 6).join(' · '));
               // §7 : le titre du sous-écran ne se redit pas juste dessous (« Sécurité des
               // données » ×2, revue du 17 oct.). On compte les TITRES RENDUS égaux au titre :
               // éléments visibles (un titre caché par CSS ne compte pas), le plus profond qui
@@ -193,6 +225,13 @@ async function interrupteurs(pg, T) {
                 return [...document.querySelectorAll('.vrm-set *')].filter((e) => egal(e) && vis(e) && ![...e.children].some(egal) && !e.closest('button, a, summary')).length;
               }, titre);
               dit(nTitre === 1, `${T} › « ${titre} » : le titre n’est écrit qu’une fois`, `${nTitre} fois`);
+              // (1er nov.) Le serveur n'a pas dit combien d'appareils sont abonnés : la ligne
+              // ne doit pas laisser croire que CET appareil l'est (au-dessus de « Activer »).
+              if (id === 'push') {
+                const t = await pg.evaluate(() => (document.querySelector('[data-sous-ecran="push"]') || {}).innerText || '');
+                const ligneSrv = (t.match(/Serveur prêt à envoyer[^\n]*/) || [''])[0];
+                dit(!!ligneSrv && (!/·/.test(ligneSrv) || /·\s*\d+ appareils? abonnés? en tout/.test(ligneSrv)), `${T} › « ${titre} » : aucun « appareil abonné » sans un nombre LU`, ligneSrv);
+              }
               await interrupteurs(pg, `${T} › ${titre}`);
               await pg.locator('[data-sous-retour]').click();
               await pg.waitForTimeout(500);

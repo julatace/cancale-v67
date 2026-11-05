@@ -20,8 +20,11 @@
 //     pagination trop tôt. `lireTout` filtre lui-même après avoir tout lu
 //     (`sansComptesSupprimes`).
 //  ⚠️ « Pas su » ne cache rien : liste illisible ou vide ⇒ rien n'est retiré.
-//  ⚠️ Les écritures (POST, PATCH, DELETE) passent telles quelles : la purge et
-//     la suppression d'un compte doivent voir ses lignes.
+//  ⚠️ Les écritures (POST, PATCH, DELETE) passent telles quelles. Et la LECTURE
+//     qui précède la purge ou la suppression d'un compte doit voir ses lignes :
+//     elle passe `{ vrmVoirSupprimes: true }` dans `init` (une propriété que
+//     fetch ignore, jamais un en-tête envoyé à la base). Sans elle, la purge ne
+//     trouvait plus rien à vider (banc compte-supprime, 29 oct.).
 // ═════════════════════════════════════════════════════════════════════════
 
 export const CLE_SUPPRIMES = 'vrm_comptes_supprimes';
@@ -64,6 +67,7 @@ export function creerFiltreSupprimes(fetchOrig, base, lire = lireSupprimes) {
   return function (input, init) {
     const url = typeof input === 'string' ? input : (typeof URL !== 'undefined' && input instanceof URL ? input.href : null);
     const methode = String((init && init.method) || 'GET').toUpperCase();
+    if (init && init.vrmVoirSupprimes) return fetchOrig(input, init);
     if (url == null || methode !== 'GET' || url.indexOf(prefixe) !== 0 || url.indexOf('harvest') < 0) return fetchOrig(input, init);
     if (enteteRange(init && init.headers)) return fetchOrig(input, init);
     const s = lire();

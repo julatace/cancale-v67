@@ -204,7 +204,7 @@ function faire({ numero = '401', vendus = [], preuveKO = false, posted = [], pos
 
   // ── B. vc-depot.js dans un vrai Chromium ────────────────────────────────
   await essaie('page', async () => {
-    let chromium; try { ({ chromium } = require('playwright')); } catch (_) { ({ chromium } = require('/home/user/cancale-v67/node_modules/playwright')); }
+    let chromium; try { ({ chromium } = require('playwright')); } catch (_) { ({ chromium } = require(require('path').join(__dirname, '..', 'node_modules', 'playwright'))); }
     const nav = await chromium.launch(fs.existsSync('/opt/pw-browsers/chromium') ? { executablePath: '/opt/pw-browsers/chromium' } : {});
     const code = fs.readFileSync(path.join(EXT, 'vc-depot.js'), 'utf8');
     const AD = { id: '1001', numero: '401', title: 'Salomon XT-6 blanc T40', description: 'Paire propre.\nRéf. VRM-401', price: '99.00', photos: ['u1', 'u2'], etat: 'Très bon état', marque: 'Salomon', taille: '40' };
@@ -453,7 +453,10 @@ function faire({ numero = '401', vendus = [], preuveKO = false, posted = [], pos
     dit(c0 && c0.productId === '900001' && c0.ref === '401' && c0.nonLu === true && /2026-10-27/.test(c0.date) && c1 && c1.nonLu === false, 'une conversation : son id, son article, sa référence VRM-401, « non lue », sa date', JSON.stringify(lm[0] && lm[0].conversations));
     dit(lm[0] && lm[0].page === '/messages/', 'la page où la liste a été vue part avec (VRM n\'invente pas l\'adresse)', lm[0] && lm[0].page);
     const toutE = JSON.stringify(me);
-    dit(!/Jeanne|Secret|Cach|Bonjour|jeton-secret/.test(toutE), 'aucun texte de message, aucun nom ne sort — ni dans la conversation, ni dans sa forme', toutE.slice(0, 300));
+    // (31 oct., 5.295) Julien veut LIRE ses messages dans VRM : l'aperçu du dernier
+    // message part (son texte seul) ; le nom de la personne, jamais.
+    dit(c0 && c0.apercu === 'Bonjour, mon adresse est 12 rue Cachée' && c0.apercuDeMoi === null, '5.295 : l’aperçu du dernier message part (son texte), « de toi » pas su sans clé qui le dise', JSON.stringify(c0 && { a: c0.apercu, m: c0.apercuDeMoi }));
+    dit(!/Jeanne|Secret|jeton-secret|firstName|interlocutor/.test(toutE), 'aucun nom ne sort — ni dans la conversation, ni dans sa forme (et rien du support)', toutE.slice(0, 300));
     await cE.close();
 
     // ── F. vc-inject.js : tes ACHATS (5.239) ───────────────────────────────

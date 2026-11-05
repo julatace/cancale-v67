@@ -21,11 +21,11 @@
 //     son lien n'est pas écrit deux fois.
 // On juge les ÉTATS (`data-*`) et les NOMBRES (requêtes reçues par le pont,
 // occurrences d'une phrase) — jamais une formulation seule (§6.5).
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
-const PORT = 5710;
+const PORT = Number(process.env.BANC_PORT || process.env.PORT || 5710);
 const EXT_ATTENDUE = (/const EXT_ATTENDUE = '([^']+)'/.exec(fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'App.jsx'), 'utf8')) || [])[1] || '?';
 
 const auj = new Date();
@@ -124,6 +124,10 @@ async function rendre(b, { tab = 'cat_bord', tel = false, pont = { absente: true
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
   await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' });
+  // (31 oct.) Sur Colis, attendre que « Tout générer » soit RENDU avant de juger
+  //  (une machine chargée dépassait le délai fixe : tout lisait `null`, §6.5).
+  //  Le délai reste ensuite, pour laisser l'état de l'extension se poser.
+  if (tab === 'cat_bord') await pg.waitForSelector('[data-tout-generer]', { timeout: 25000 }).catch(() => {});
   await pg.waitForTimeout(attente);
   const lire = () => pg.evaluate(() => {
     const tg = document.querySelector('[data-tout-generer]');
@@ -137,6 +141,13 @@ async function rendre(b, { tab = 'cat_bord', tel = false, pont = { absente: true
       etat: et ? { niveau: et.getAttribute('data-etat-actions'), code: et.getAttribute('data-etat-code'), titre: et.getAttribute('title') || '' } : null,
       cmds: window.__cmds || [],
       corps: document.body.innerText,
+      // 27 oct. (« téléphone épuré », demande de Julien) : sur téléphone, la
+      // phrase d'EXPLICATION du bandeau porte `vrm-aide` et se tait ; le
+      // bandeau, lui (« N bordereaux à générer », `data-raison-bord`), reste
+      // visible. On compte donc aussi le texte du DOM (caché compris) : une
+      // copie de plus, visible ou non, reste rouge.
+      corpsTout: document.body.textContent,
+      bandeauVu: (() => { const x = document.querySelector('[data-raison-bord]'); if (!x) return null; const r = x.getBoundingClientRect(); return { code: x.getAttribute('data-raison-bord'), vu: r.width > 0 && r.height > 0, txt: x.innerText.trim() }; })(),
       sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth,
     };
   });
@@ -158,9 +169,14 @@ const compte = (t, s) => String(t || '').split(s).length - 1;
     console.log('── COLIS · la raison commune d\'un bouton grisé est écrite UNE fois (§7)');
     for (const tel of [false, true]) {
       const r = await rendre(b, { tel }); const v = await r.lire();
-      const phrase = tel ? "Depuis ton ordinateur : c'est là que tourne l'extension qui génère les bordereaux." : "Extension VRM pas détectée dans ce navigateur — c'est elle qui génère les bordereaux.";
+      // (3 nov.) Raisons raccourcies (critique #4, à la demande de Julien) : le geste, sans l'explication.
+      const phrase = tel ? "Depuis ton ordinateur" : "Extension VRM pas détectée dans ce navigateur";
       dit(v.tg && v.tg.etat === 'grise', `${tel ? 'téléphone' : 'ordinateur sans extension'} : « Tout générer » reste visible, grisé`, JSON.stringify(v.tg));
-      dit(compte(v.corps, phrase) === 1, `${tel ? 'téléphone' : 'ordinateur sans extension'} : la raison est écrite une seule fois sur l'écran`, `${compte(v.corps, phrase)} fois`);
+      if (tel) {
+        dit(compte(v.corpsTout, phrase) === 1, "téléphone : la raison est dans la page une seule fois (repliée, « téléphone épuré » du 27 oct.)", `${compte(v.corpsTout, phrase)} fois`);
+        dit(compte(v.corps, phrase) === 0, 'téléphone : l’explication se tait (vrm-aide)', `${compte(v.corps, phrase)} fois visible`);
+        dit(!!(v.bandeauVu && v.bandeauVu.code === 'telephone' && v.bandeauVu.vu && /bordereaux? à générer/.test(v.bandeauVu.txt)), 'téléphone : le bandeau « N bordereaux à générer » reste visible (grisé, jamais muet)', JSON.stringify(v.bandeauVu));
+      } else dit(compte(v.corps, phrase) === 1, "ordinateur sans extension : la raison est écrite une seule fois sur l'écran", `${compte(v.corps, phrase)} fois`);
       dit(v.sw <= v.cw + 1, 'aucun débordement horizontal', `${v.sw} > ${v.cw}`);
       dit(r.errs.length === 0, 'aucune erreur d\'app', r.errs.join(' | ').slice(0, 140));
       await r.ctx.close();

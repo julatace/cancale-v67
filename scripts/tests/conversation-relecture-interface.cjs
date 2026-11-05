@@ -7,21 +7,24 @@ const { build } = require("esbuild"),
 (async () => {
   const root = path.resolve(__dirname, "../.."),
     s = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
-  const a = s.indexOf('            <div className="vrm-chat-head"'),
+  const a = s.indexOf('            <TeteFil onFermer={()=>setOpenConv(null)}'),
     b = s.indexOf(
-      "            {!openConv.loading&&!openConv.error&&(()=>{const suivi=",
+      "            {!openConv.loading&&!openConv.error&&(()=>{const suivi",
       a,
     );
   const c = s.indexOf("  const actualiserConversation=async()=>{"),
     d = s.indexOf("  // Envoi d'une réponse", c);
   assert(a > 0 && b > a && c > 0 && d > c);
+  const teteDebut = s.indexOf('function TeteFil('), teteFin = s.indexOf('function BulleConv(', teteDebut);
+  assert(teteDebut > 0 && teteFin > teteDebut);
   const bundle = await build({
     stdin: {
       resolveDir: root,
       loader: "jsx",
       contents: `import React from'react';import{createRoot}from'react-dom/client';import{fusionnerConversation}from'./src/conversations.js';import'./src/styles-mineral.css';
  const AUTH={user:{id:'a'}},C={text:'#233c40',muted:'#607074',accent:'#245b61',card:'#fff',border:'#dce3e2'};
- const Icon=()=> <span aria-hidden="true">↻</span>,PhotoVinted=()=>null,accName=()=> 'Mon compte Vinted';
+ const Icon=()=> <span aria-hidden="true">↻</span>,PhotoVinted=()=>null,accName=()=> 'Mon compte Vinted',offrePartieDuFil=()=>true;
+ ${s.slice(teteDebut,teteFin)}
  const fil={id:'91',messages:[{id:'1',entity_type:'message',entity:{body:'Message conservé'}}]};
  function App(){const[openConv,setOpenConv]=React.useState({owner:'a',request:1,convId:'91',acc:{vinted_user_id:'7'},conversation:fil,messages:fil.messages,header:{login:'Un acheteur avec un pseudo très long',title:'Ordinateur portable et accessoires'}});const lectureConversationRequest=React.useRef(0),filAvecOffres=c=>c,normalizeConversationMessages=c=>c.messages;
  const fetchVintedConversationDetail=async()=>await new Promise(r=>window.fin=r);

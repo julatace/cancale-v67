@@ -14,7 +14,9 @@ const CODE = APP.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' ')).r
 // La messagerie doit rester centrée sur les conversations et leurs offres.
 dit(!/data-offres-messages/.test(CODE), 'plus de bloc historique des offres email dans Messages');
 dit(!/lireTout\(`id=like\.email_offer_\*/.test(CODE), 'plus de lecture dédiée à ce bloc supprimé');
-dit(/data-conv=/.test(CODE) && /data-offre-liste=/.test(CODE), 'les conversations et leurs offres restent rendues');
+// (1er nov.) La ligne de conversation (`RangeeConversation`) reçoit ses data-* par un
+// objet `attrs={{'data-conv': c.id, …}}` étalé sur le bouton : les deux écritures comptent.
+dit((/data-conv=/.test(CODE) || /'data-conv'\s*:/.test(CODE)) && /\{\.\.\.\(attrs \|\| \{\}\)\}/.test(CODE) && /data-offre-liste=/.test(CODE), 'les conversations et leurs offres restent rendues');
 dit(/'vinted_offers_done',/.test(CODE), 'les choix déjà synchronisés ne sont pas effacés');
 
 // ── 4. Une offre, une fois — par identité ────────────────────────────────────

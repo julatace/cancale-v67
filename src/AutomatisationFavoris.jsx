@@ -1,5 +1,5 @@
 import React from 'react';
-import {ETAPES_FAVORIS,RAISONS_FAVORIS,progressionFavoris,dureeFavoris} from './favorisProgression.js';
+import {ETAPES_FAVORIS,RAISONS_FAVORIS,progressionFavoris,dureeFavoris,traduireResultatFavori} from './favorisProgression.js';
 import {requeteJsonBornee} from './requeteJsonBornee.js';
 export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,selection,reglagesPrets,reglages,preparerReglages,executer,disponible=false,raisonExtension='',verifierExtension,onEtat,onPreparation,masquerSansSelection=false,onErreur,revisionVerification=0,ecranActif=true}){
   const [vue,setVue]=React.useState(null),[erreur,setErreur]=React.useState(''),[controleErreur,setControleErreur]=React.useState(null),[occupe,setOccupe]=React.useState(false),[phase,setPhase]=React.useState(''),[horloge,setHorloge]=React.useState(Date.now());
@@ -39,24 +39,14 @@ export default function AutomatisationFavoris({uid,owner,ownerActuel,headers,sel
       if(j.travail){
         const t=j.travail;travail.current=t;
         if(!ecran.current||document.visibilityState==='hidden'){const arret=await api('terminer',{jeton:t.jeton,resultat:'refuse',raison:'ecran_inactif'},h);if(courant())adopter(arret);return;}
-        let resultat='incertain',raison='reponse_inconnue';
+        let resultat='incertain',raison='reponse_inconnue',ecrits;
         try{
           const r=await executer(t);
-          if(r?.ok&&['envoye','ignore'].includes(r.data?.resultat))resultat=r.data.resultat;
-          else if(r?.data?.resultat==='refuse')resultat='refuse';
-          if(['vinted-pause','vinted-absent','vinted-autre','plafond','plafond-bordereaux','perime','plusieurs','non-autorise','origine','preparation-refusee'].includes(r?.code))resultat='refuse';
-          if(RAISONS_FAVORIS[r?.data?.raison])raison=r.data.raison;
-          else if(r?.code==='vinted-autre')raison='compte_vinted_different';
-          else if(r?.code==='vinted-absent')raison='compte_vinted_absent';
-          else if(['plafond','plafond-bordereaux'].includes(r?.code))raison='quota_extension';
-          else if(r?.code==='vinted-pause')raison='pause_vinted';
-          else if(['perime','plusieurs','non-autorise'].includes(r?.code))raison='extension_indisponible';
-          else if(resultat==='refuse')raison='vinted_refus';
-          if(resultat==='envoye')raison='';
-          else if(courant()&&r?.error)setErreur(String(r.error).slice(0,240));
+          ({resultat,raison,ecrits}=traduireResultatFavori(r));
+          if(resultat!=='envoye'&&courant()&&r?.error)setErreur(String(r.error).slice(0,240));
         }catch{}
         if(courant())setPhase('Enregistrement du résultat');
-        const fini=await api('terminer',{jeton:t.jeton,resultat,raison},h);if(courant())adopter(fini);
+        const fini=await api('terminer',{jeton:t.jeton,resultat,raison,...(Number.isInteger(ecrits)?{ecrits}:{})},h);if(courant())adopter(fini);
       }
     }catch(e){if(courant()){setErreur(e.message+' Aucun renvoi automatique.');pauseLocale.current=true;}}
     finally{busy.current=false;travail.current=null;if(courant())setPhase('');}

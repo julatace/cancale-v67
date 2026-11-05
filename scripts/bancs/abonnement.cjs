@@ -30,7 +30,7 @@ require('./_porte-banc.cjs');
 const path = require('path'), http = require('http'), fs = require('fs');
 let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
-catch (_) { ({ chromium } = require('/home/user/cancale-v67/node_modules/playwright')); }
+catch (_) { ({ chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 4538;
 const { cspBanc, bilanCsp } = require('./_vercel.cjs');   // CSP de vercel.json servie et observée (22 oct. : Stripe, Mon compte)
@@ -38,7 +38,7 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css
 
 const SESSION = { access_token: 'jeton-de-banc', refresh_token: 'r', expires_at: Date.now() + 3600e3,
   user: { id: '11111111-2222-3333-4444-555555555555', email: 'vendeuse@exemple.test' } };
-const PRIX = { montant: 14.99, devise: 'eur', intervalle: 'month' };
+const PRIX = { montant: 16.99, devise: 'eur', intervalle: 'month' };
 // ⚠️ 23 oct. — la forme du VRAI serveur : `mentionsCompletes` est TOUJOURS
 //    présent (true · false · null). L'omettre servait un état que le serveur ne
 //    rend jamais (§6.3), et l'app doit lire « absent » comme « pas su ».
@@ -184,14 +184,14 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
         const { ctx, pg, erreurs } = await ouvrir(nav, { abo: ETATS[nom] });
         const e = await etatCarte(pg), b = await boutons(pg), t = await texteCarte(pg);
         dit(e === rendu && erreurs.length === 0, `serveur « ${nom} » → carte « ${rendu} »`, `rendu ${e} ${erreurs.join(' | ')}`);
-        if (nom === 'sans') dit(b.some((x) => /abonner/i.test(x)) && /14,99/.test(t), '  sans abonnement : le prix et le bouton pour s’abonner', b.join(' · '));
+        if (nom === 'sans') dit(b.some((x) => /abonner/i.test(x)) && /16,99/.test(t), '  sans abonnement : le prix et le bouton pour s’abonner', b.join(' · '));
         // Le prix de Stripe n'est pas celui des CGV : aucun bouton qui mènerait
         // à un refus du serveur, et aucun montant affiché (ni 9,99, ni 12,99 à
         // payer) — « le paiement n'est pas encore ouvert ».
         if (nom === 'prixDifferent') dit(b.length === 0 && !/9,99/.test(t) && /pas encore ouvert/i.test(t), '  prix Stripe ≠ CGV : le paiement est dit fermé, aucun bouton pour payer', b.join(' · ') + ' / ' + t.replace(/\n/g, ' ').slice(0, 120));
         if (nom === 'proprietairePrixDifferent') {
           const w = await pg.evaluate(() => { const e = document.querySelector('[data-prix-stripe="different"]'); return e ? e.innerText : ''; });
-          dit(b.length === 0 && /9,99/.test(w) && /14,99/.test(w) && /vrm_mensuel/.test(w), '  propriétaire : le prix réglé chez Stripe et celui des CGV, et le geste (clé « vrm_mensuel »)', w.replace(/\n/g, ' ').slice(0, 200));
+          dit(b.length === 0 && /9,99/.test(w) && /16,99/.test(w) && /vrm_mensuel/.test(w), '  propriétaire : le prix réglé chez Stripe et celui des CGV, et le geste (clé « vrm_mensuel »)', w.replace(/\n/g, ' ').slice(0, 200));
         }
         if (nom === 'proprietaire') dit(!(await pg.evaluate(() => !!document.querySelector('[data-prix-stripe]'))), '  propriétaire, prix conforme : aucune alerte de prix');
         // ── 22 octobre : mentions de l'éditeur vides ─────────────────────────
@@ -202,7 +202,7 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
         }
         if (nom === 'vendeurMentionsPasSu') {
           const r = await pg.evaluate(() => { const e = document.querySelector('[data-abonnement]'); return { raison: e && e.getAttribute('data-raison'), sab: !!document.querySelector('[data-sabonner]'), cgv: !!document.querySelector('[data-case-cgv]') }; });
-          dit(r.raison === 'mentions' && !r.sab && !r.cgv && b.length === 0 && /pas encore ouvert/i.test(t) && !/14,99/.test(t) && !/editeur|apostrophe/i.test(t),
+          dit(r.raison === 'mentions' && !r.sab && !r.cgv && b.length === 0 && /pas encore ouvert/i.test(t) && !/16,99/.test(t) && !/editeur|apostrophe/i.test(t),
             '  vendeur, mentions ILLISIBLES (le serveur refuse 503) : paiement dit fermé, ni case ni « S’abonner », aucun prix ni détail', JSON.stringify(r) + ' / ' + b.join(' · ') + ' / ' + t.replace(/\n/g, ' ').slice(0, 120));
         }
         if (nom === 'proprietaireMentionsVides') {
@@ -224,13 +224,13 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
           const sab = await pg.evaluate(() => !!document.querySelector('[data-sabonner]'));
           dit(f === '2' && !sab && b.length === 0, '  ancien abonné, prix Stripe ≠ CGV : ses factures restent (sa compta), aucun bouton pour payer', `factures=${f} · s’abonner=${sab} · ${b.join(' · ')}`);
         }
-        if (nom === 'actifPrixDifferent') dit(/abonné/i.test(t) && !/14,99/.test(t) && !/9,99/.test(t), '  abonné actif, prix de son abonnement pas su : « Abonné » sans montant — jamais le prix des CGV', t.replace(/\n/g, ' ').slice(0, 140));
-        if (nom === 'actifAncienPrix') dit(/Abonné · 9,99 € \/ mois/.test(t) && !/14,99/.test(t), '  abonné à 9,99 € quand l’offre est à 14,99 € : la carte dit le prix de SON abonnement', t.replace(/\n/g, ' ').slice(0, 140));
+        if (nom === 'actifPrixDifferent') dit(/abonné/i.test(t) && !/16,99/.test(t) && !/9,99/.test(t), '  abonné actif, prix de son abonnement pas su : « Abonné » sans montant — jamais le prix des CGV', t.replace(/\n/g, ' ').slice(0, 140));
+        if (nom === 'actifAncienPrix') dit(/Abonné · 9,99 € \/ mois/.test(t) && !/16,99/.test(t), '  abonné à 9,99 € quand l’offre est à 16,99 € : la carte dit le prix de SON abonnement', t.replace(/\n/g, ' ').slice(0, 140));
         if (nom === 'proprietaireUsd' || nom === 'proprietairePaliers') {
           const w = await pg.evaluate(() => { const e = document.querySelector('[data-prix-stripe="different"]'); const x = document.querySelector('[data-prix-stripe-texte]'); return { t: e ? e.innerText : '', x: x ? x.innerText : null }; });
           const attendu = ETATS[nom].prixStripe.texte;
-          const nCgv = (w.t.match(/14,99 € \/ mois/g) || []).length;
-          dit(w.x === attendu && nCgv <= 1 && !/0,00/.test(w.t), `  propriétaire, prix Stripe « ${attendu} » : l’alerte écrit le texte du serveur — jamais deux prix identiques ni 0,00 €`, `texte=${w.x} · « 14,99 € / mois » ×${nCgv} · ${w.t.replace(/\n/g, ' ').slice(0, 160)}`);
+          const nCgv = (w.t.match(/16,99 € \/ mois/g) || []).length;
+          dit(w.x === attendu && nCgv <= 1 && !/0,00/.test(w.t), `  propriétaire, prix Stripe « ${attendu} » : l’alerte écrit le texte du serveur — jamais deux prix identiques ni 0,00 €`, `texte=${w.x} · « 16,99 € / mois » ×${nCgv} · ${w.t.replace(/\n/g, ' ').slice(0, 160)}`);
         }
         if (nom === 'actif') dit(b.some((x) => /^résilier$/i.test(x)) && b.some((x) => /carte/i.test(x)) && !b.some((x) => /abonner/i.test(x)) && /prochain prélèvement le 4 novembre 2026/i.test(t), '  abonné : la date du prochain prélèvement, « changer de carte » et « résilier », jamais un second « s’abonner »', b.join(' · ') + ' / ' + t.replace(/\n/g, ' ').slice(0, 120));
         if (nom === 'actif') dit(/Visa •••• 4242/.test(t) && /12\/27/.test(t), '  abonné : la carte est dite (marque, 4 derniers chiffres, expiration)', t.replace(/\n/g, ' ').slice(0, 160));
@@ -292,15 +292,17 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
       const { ctx, pg } = await ouvrir(nav, { abo: ETATS.actif, compte: false });
       const onglets = await pg.evaluate(() => [...document.querySelectorAll('[data-onglets-reglages] [data-vue]')].map((b) => b.innerText.trim()));
       const aboAvant = await etatCarte(pg);
-      const reglagesAvant = await pg.evaluate(() => /Comptes Vinted/i.test(document.body.innerText));
+      // (1er nov.) Le groupe des comptes s'appelle « Comptes et emails » : on juge sa présence
+      // par son attribut (§6.4), plus par son titre.
+      const reglagesAvant = await pg.evaluate(() => !!document.querySelector('[data-groupe-reglages="comptes"]'));
       dit(onglets.length === 3 && /réglages/i.test(onglets[0]) && /compte/i.test(onglets[1]) && /abonnement/i.test(onglets[2]), 'les Paramètres ont trois onglets, dont « Abonnement »', onglets.join(' · '));
       dit(!aboAvant && reglagesAvant, '  par défaut « Réglages » : les réglages de l’app, pas l’abonnement', `abonnement=${aboAvant} réglages=${reglagesAvant}`);
       await pg.locator('[data-onglets-reglages] [data-vue="compte"]').click(); await pg.waitForTimeout(1200);
       const apres = await pg.evaluate(() => ({ abo: (document.querySelector('[data-abonnement]') || {}).getAttribute ? document.querySelector('[data-abonnement]').getAttribute('data-abonnement') : null,
-        email: /vendeuse@exemple\.test/.test(document.body.innerText), reglages: /Comptes Vinted/i.test(document.body.innerText), mdp: /mot de passe/i.test(document.body.innerText) }));
+        email: /vendeuse@exemple\.test/.test(document.body.innerText), reglages: !!document.querySelector('[data-groupe-reglages="comptes"]'), mdp: /mot de passe/i.test(document.body.innerText) }));
       dit(!apres.abo && apres.email && apres.mdp && !apres.reglages, '  « Mon compte » regroupe : identité, connexion — ni l’abonnement (son onglet), ni les réglages de l’app', JSON.stringify(apres));
       await pg.locator('[data-onglets-reglages] [data-vue="abonnement"]').click(); await pg.waitForTimeout(1200);
-      const abo = await pg.evaluate(() => ({ abo: (document.querySelector('[data-abonnement]') || {}).getAttribute ? document.querySelector('[data-abonnement]').getAttribute('data-abonnement') : null, reglages: /Comptes Vinted/i.test(document.body.innerText), mdp: /Changer mon mot de passe/i.test(document.body.innerText) }));
+      const abo = await pg.evaluate(() => ({ abo: (document.querySelector('[data-abonnement]') || {}).getAttribute ? document.querySelector('[data-abonnement]').getAttribute('data-abonnement') : null, reglages: !!document.querySelector('[data-groupe-reglages="comptes"]'), mdp: /Changer mon mot de passe/i.test(document.body.innerText) }));
       dit(abo.abo === 'actif' && !abo.reglages && !abo.mdp, '  « Abonnement » porte la carte de l’abonnement, et elle seule', JSON.stringify(abo));
       await ctx.close();
     });
@@ -371,7 +373,7 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
       const appVisible = await pg.evaluate(() => /Bonjour|Bonsoir|Bon après-midi/.test(document.body.innerText));
       dit(porte && !appVisible, 'obligatoire + pas abonné → l’écran d’abonnement, pas l’app');
       const t = await pg.evaluate(() => (document.querySelector('[data-abonnement-requis]') || {}).innerText || '');
-      dit(/14,99/.test(t) && /déconnecter/i.test(t), '  il dit le prix et laisse se déconnecter', t.replace(/\n/g, ' ').slice(0, 120));
+      dit(/16,99/.test(t) && /déconnecter/i.test(t), '  il dit le prix et laisse se déconnecter', t.replace(/\n/g, ' ').slice(0, 120));
       await ctx.close();
     });
     // 22 octobre : la porte vend aussi l'abonnement — les DEUX cases (CGV et
@@ -411,7 +413,7 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
           });
           dit(!!r && !r.sab && !r.cgv && !r.boutons.some((x) => /abonner|payer/i.test(x)) && erreurs.length === 0,
             `porte, ${nom} (${largeur} px) : ni case des CGV ni « S’abonner » — le serveur refuserait`, r ? r.boutons.join(' · ') : 'pas de porte');
-          dit(!!r && !/9,99/.test(r.t) && !/14,99/.test(r.t) && /pas encore ouvert/i.test(r.t) && /rien n'a été prélevé/i.test(r.t) && /intactes/.test(r.t) && /déconnecter/i.test(r.t) && !r.debord,
+          dit(!!r && !/9,99/.test(r.t) && !/16,99/.test(r.t) && /pas encore ouvert/i.test(r.t) && /rien n'a été prélevé/i.test(r.t) && /intactes/.test(r.t) && /déconnecter/i.test(r.t) && !r.debord,
             '  elle dit que le paiement n’est pas ouvert et que rien n’a été prélevé, sans aucun prix, et laisse se déconnecter', r ? r.t.replace(/\n/g, ' ').slice(0, 180) : '');
           dit(!appels.some((a) => a.mode === 'checkout'), '  et aucune demande de paiement ne part', JSON.stringify(appels));
           await ctx.close();
@@ -453,7 +455,7 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
     // Le serveur décide et dit ce qu'il a fait (audit-fermer-compte.cjs) ; ici
     // on vérifie que l'écran dit CE QUE LE SERVEUR DIT, rien de plus.
     console.log('\n── « Fermer mon compte » et le contact (onglet Mon compte)');
-    const ouvrirFermer = async (pg) => { const b = pg.locator('[data-fermer-compte] button[aria-expanded]'); if (await b.count()) { await b.first().click(); await pg.waitForTimeout(900); } };
+    const ouvrirFermer = async (pg) => { const sous = pg.locator('[data-sous-ouvrir="fermer"]'); if (await sous.count() && await sous.first().isVisible()) { await sous.first().click(); await pg.waitForTimeout(600); } const b = pg.locator('[data-fermer-compte] button[aria-expanded]'); if (await b.count()) { await b.first().click(); await pg.waitForTimeout(900); } };
     const etatFermer = (pg) => pg.evaluate(() => { const e = document.querySelector('[data-fermer-compte] [data-fermer-etat]'); return e ? e.getAttribute('data-fermer-etat') : null; });
     await essaie('contact', async () => {
       const { ctx, pg } = await ouvrir(nav, { abo: ETATS.actif, onglet: 'compte' });

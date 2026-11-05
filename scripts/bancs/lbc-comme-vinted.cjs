@@ -159,8 +159,8 @@ const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scroll
     b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
       console.log(`── ${vp.width} px · Leboncoin → Ventes`);
-      const o1 = await ouvrir(b, vp, { suppr: 'fait' }, '?tab=plat_leboncoin');
-      await o1.pg.click('[data-section="ventes"]').catch(() => {});
+      // (31 oct., navigation par tâche) Ventes et Messages de Leboncoin = les tâches filtrées sur Leboncoin.
+      const o1 = await ouvrir(b, vp, { suppr: 'fait' }, '?tab=ventes&site=leboncoin');
       await o1.pg.waitForSelector('[data-lbc-vente]', { timeout: 10000 }).catch(() => {});
       const v1 = await o1.pg.evaluate(() => { const e = document.querySelector('[data-lbc-vente="T1"]'); const t = e && e.querySelector('.vrm-ledger-sale-nom'); return { titre: t ? t.textContent : null }; });
       dit(v1.titre && /Asics gel kayano 14/.test(v1.titre) && !/N°/.test(v1.titre), 'le titre d’une vente Leboncoin n’a pas de « N° »', JSON.stringify(v1));
@@ -172,8 +172,7 @@ const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scroll
       await o1.ctx.close();
 
       console.log(`── ${vp.width} px · Leboncoin → Messages`);
-      const o2 = await ouvrir(b, vp, { suppr: 'fait' }, '?tab=plat_leboncoin');
-      await o2.pg.click('[data-section="messages"]').catch(() => {});
+      const o2 = await ouvrir(b, vp, { suppr: 'fait' }, '?tab=messages&site=leboncoin');
       await o2.pg.waitForSelector('[data-messages-lbc-zone] [data-messages-lbc]', { timeout: 10000 }).catch(() => {});
       const z0 = await o2.pg.evaluate(() => ({ zone: (document.querySelector('[data-messages-lbc-zone]') || { getAttribute: () => null }).getAttribute('data-messages-lbc-zone'), boutons: [...document.querySelectorAll('.vrm-messages-sections button')].map((x) => x.textContent.trim()), conv: (document.querySelector('[data-messages-lbc]') || { getAttribute: () => null }).getAttribute('data-messages-lbc') }));
       dit(z0.zone === 'conversations' && z0.boutons.length === 2 && /Conversations/.test(z0.boutons[0]) && /Favoris reçus/.test(z0.boutons[1]), 'deux zones, comme Vinted : Conversations · Favoris reçus', JSON.stringify(z0));

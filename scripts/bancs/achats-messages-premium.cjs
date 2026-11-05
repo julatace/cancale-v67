@@ -16,7 +16,7 @@
 const path = require('path');
 let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
-catch (_) { ({ chromium } = require('/home/user/cancale-v67/node_modules/playwright')); }
+catch (_) { ({ chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -222,7 +222,7 @@ const capturer = async (pg, nom, vp) => {
       for (const [onglet, nomOnglet] of [['attente', 'a-retirer'], ['all', 'tous']]) {
         console.log(`\n── Achats · ${nomOnglet} · ${T}`);
         await essaie(`achats ${nomOnglet} ${T}`, async () => {
-          const { ctx, pg, errs } = await ouvrir(b, vp, 'cat_achats');
+          const { ctx, pg, errs } = await ouvrir(b, vp, onglet === 'all' ? 'achats' : 'cat_achats');   // (31 oct., soir) « Tous » vit sur Achats, « À retirer » sur Colis à retirer (`cat_achats` y mène)
           await pg.waitForFunction(() => document.querySelector('.vrm-pickup-code') || /pas pu s'afficher/.test(document.body.innerText), null, { timeout: 15000 }).catch(() => {});
           if (onglet === 'all') {
             await pg.evaluate(() => { const b = [...document.querySelectorAll('button[aria-pressed]')].find((x) => /^Tous/.test(x.innerText.trim())); if (b) b.click(); });
@@ -238,14 +238,18 @@ const capturer = async (pg, nom, vp) => {
           if (onglet === 'attente') dit(m.nCodes >= 3, `${T} les codes de retrait sont là (3 colis)`, String(m.nCodes));
           else dit(m.nAchats >= 6, `${T} la liste des achats est là`, String(m.nAchats));
           if (onglet === 'attente') {
-            const lignes = await pg.evaluate(() => [...document.querySelectorAll('.vrm-pickup-card')].map(e => {
-              const info=e.querySelector(':scope > div:first-of-type'), code=e.querySelector('.vrm-pickup-code'), bouton=e.querySelector('.vrm-pickup-collect');
+            // (2 nov., colis clair) La carte d'un colis à retirer : ce que c'est en haut, puis
+            // SES gestes (code nommé et copiable, « J'ai retiré ») — dans la carte, sans se
+            // chevaucher, le chiffre jamais sous « Copier », la confirmation compacte.
+            const lignes = await pg.evaluate(() => [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-cc-carte]')].map(e => {
+              const info=e.querySelector('.vrm-cc-haut'), code=e.querySelector('.vrm-pickup-code'), bouton=e.querySelector('.vrm-pickup-collect');
               if (!info || !code || !bouton) return null;
-              const a=info.getBoundingClientRect(), b=code.getBoundingClientRect(), c=bouton.getBoundingClientRect();
+              const k=e.getBoundingClientRect(), a=info.getBoundingClientRect(), b=code.getBoundingClientRect(), c=bouton.getBoundingClientRect();
               const chiffre=code.querySelector('strong').getBoundingClientRect(), copie=code.querySelector('small').getBoundingClientRect();
-              return {aligne:b.left>=a.right-1&&chiffre.right<=copie.left+1&&chiffre.left>=b.left&&copie.right<=b.right+1, compact:c.height<=48, code:code.querySelector('strong')?.innerText};
+              const croise=(x,y)=>!(x.right<=y.left||y.right<=x.left||x.bottom<=y.top||y.bottom<=x.top);
+              return {aligne:b.top>=a.bottom-1&&!croise(b,c)&&!croise(chiffre,copie)&&b.right<=k.right+1&&c.right<=k.right+1, compact:c.height<=48, code:code.querySelector('strong')?.innerText};
             }).filter(Boolean));
-            dit(lignes.length>0 && lignes.every(x=>x.aligne&&x.compact), `${T} codes à droite des articles et confirmation compacte`, JSON.stringify(lignes));
+            dit(lignes.length>0 && lignes.every(x=>x.aligne&&x.compact), `${T} le code sous l'article, dans la carte, et la confirmation compacte`, JSON.stringify(lignes));
           }
           await ctx.close();
         });
@@ -281,6 +285,9 @@ const capturer = async (pg, nom, vp) => {
           await pg.getByRole('button',{name:'← Retour',exact:true}).click();await pg.getByRole('button',{name:'← Retour',exact:true}).click();
           await pg.getByRole('button',{name:'Vérifier le premier sélectionné',exact:true}).click();
           await pg.getByRole('alert').filter({hasText:'Vérification interrompue'}).waitFor();
+          // (29 oct., 3c42f7a) « Copier le contrôle » vit dans le repli « Assistance
+          // technique · favoris » (fermé au départ) : on l'ouvre, comme lui.
+          if(await pg.locator('.vrm-favoris-diagnostic').first().evaluate(e=>!e.open))await pg.getByText('Assistance technique · favoris',{exact:true}).first().click();
           await pg.getByRole('button',{name:'Copier le contrôle',exact:true}).click();
           const avantMaj=await pg.evaluate(()=>JSON.parse(window.controleOuverture));
           dit(avantMaj.extension==='5.216.0'&&avantMaj.etape==='connexion'&&avantMaj.code==='extension_a_actualiser',`${T} refus avant ouverture : version mesurée et cause conservées`);
@@ -329,19 +336,25 @@ const capturer = async (pg, nom, vp) => {
         await ctx.close();
       });
       if(!tel) await essaie('sélection souris sans navigation',async()=>{
+        // (31 oct., navigation par tâche) `plat_vinted` ouvre « Ventes · Vinted » : c'est
+        // l'onglet Ventes de la colonne qui est allumé, et le filtre de site dit Vinted.
         const {ctx,pg}=await ouvrir(b,vp,'plat_vinted');
-        const actif=pg.locator('.vrm-rail-button[aria-label="Vinted"]');await actif.waitFor();
-        await pg.waitForFunction(()=>document.querySelector('.vrm-rail-button[aria-label="Vinted"]')?.getAttribute('aria-current')==='page');
+        const actif=pg.locator('.vrm-rail-button[aria-label="Ventes"]');await actif.waitFor();
+        await pg.waitForFunction(()=>document.querySelector('.vrm-rail-button[aria-label="Ventes"]')?.getAttribute('aria-current')==='page' && document.querySelector('[data-tache]')?.getAttribute('data-tache-site')==='vinted');
+        const surVinted=()=>pg.evaluate(()=>document.querySelector('[data-tache]')?.getAttribute('data-tache-site')==='vinted');
         const box=await pg.evaluate(()=>{const e=document.createElement('div');e.id='banc-selection';e.style.cssText='position:absolute;z-index:900;left:400px;top:230px;width:650px;height:60px;padding-left:120px;background:white;color:black;user-select:text';e.textContent='Texte de démonstration à sélectionner sans changer de plateforme';document.querySelector('.vrm-app-shell').append(e);const r=e.getBoundingClientRect();return{x:r.x,y:r.y};});
         await pg.mouse.move(box.x+5,box.y+15);await pg.mouse.down();await pg.mouse.move(box.x+550,box.y+15,{steps:15});await pg.mouse.up();
-        dit(await actif.getAttribute('aria-current')==='page','glisser depuis une marge ne quitte pas Vinted');
+        dit(await actif.getAttribute('aria-current')==='page' && await surVinted(),'glisser depuis une marge ne quitte pas Vinted');
         dit(await pg.evaluate(()=>document.body.style.userSelect!=='none'),'le geste ne désactive pas la sélection du navigateur');
         await pg.evaluate(()=>{const e=document.getElementById('banc-selection'),r=document.createRange();r.selectNodeContents(e);window.getSelection().removeAllRanges();window.getSelection().addRange(r);});
         await pg.mouse.move(box.x+10,box.y+45);await pg.mouse.down();await pg.mouse.move(box.x+500,box.y+45,{steps:12});await pg.mouse.up();
-        dit(await actif.getAttribute('aria-current')==='page','relâcher un deuxième glissement reste sur le même compte');
+        dit(await actif.getAttribute('aria-current')==='page' && await surVinted(),'relâcher un deuxième glissement reste sur le même compte');
         await pg.evaluate(()=>document.getElementById('banc-selection').remove());
-        await pg.locator('.vrm-rail-button[aria-label="Leboncoin"]').click();
-        dit(await pg.locator('.vrm-rail-button[aria-label="Leboncoin"]').getAttribute('aria-current')==='page','le clic explicite sur Leboncoin fonctionne toujours');
+        // Le clic explicite change toujours d'écran : le filtre « Tous les sites », puis l'onglet Annonces.
+        await pg.locator('[data-filtre-site] button[data-site="toutes"]').click();
+        dit(await pg.waitForFunction(()=>document.querySelector('[data-tache]')?.getAttribute('data-tache-site')==='toutes',null,{timeout:5000}).then(()=>true,()=>false),'le clic explicite sur un autre filtre de site fonctionne toujours');
+        await pg.locator('.vrm-rail-button[aria-label="Annonces"]').click();
+        dit(await pg.waitForFunction(()=>document.querySelector('.vrm-rail-button[aria-label="Annonces"]')?.getAttribute('aria-current')==='page',null,{timeout:5000}).then(()=>true,()=>false),'le clic explicite sur un onglet de la colonne fonctionne toujours');
         await ctx.close();
       });
     }

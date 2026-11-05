@@ -151,48 +151,42 @@ const factures = () => [...base.entries()].filter(([k]) => k.includes('|email_in
 
 (async () => {
   try {
+    // (2 nov.) La facture Pro est refaite (api/_lib/facture-pro.js) : l'email de
+    // vente ne NUMÉROTE plus rien — un numéro se donne à l'émission, sur le clic
+    // du vendeur. A, A2 et B gardent leur esprit (rien de perdu en silence, aucun
+    // numéro brûlé, une facture émise ne repasse jamais « à envoyer »).
     if (SC === 'A') {
-      base.set(`${A}|vrm_pro_facture`, { actif: true, autoSend: true, prefixe: 'FA' });
+      // La ligne de la facture ILLISIBLE : pas de « reçu », l'email reviendra.
       base.set(`${A}|vrm_invoice_counter`, 41);
-      pannes.add('vrm_invoice_counter');
+      pannes.add('email_invoice_tx23999999001');
       const inbound = await importer('api/email-inbound.js');
       const res = faireRes();
-      await inbound.default({ method: 'POST', query: {}, headers: {'x-vrm-email-key':'cle-banc-routes'}, body: JSON.parse(JSON.stringify(VENTE)) }, res);
-      const cpt = base.get(`${A}|vrm_invoice_counter`);
-      dit(cpt === 41, 'compteur illisible : le compteur de factures n’est PAS réécrit', `compteur = ${JSON.stringify(cpt)} (était 41)`);
-      const f = factures();
-      dit(!f.some((x) => /-0001$/.test(String(x.number))), 'aucune facture n’est émise sous un numéro déjà donné (0001)', f.map((x) => x.number).join(', ') || 'aucune');
-      dit(res.code === 503, 'la route ne dit pas « reçu » : l’email reviendra quand le compteur sera lisible', `HTTP ${res.code}`);
+      await inbound.default({ method: 'POST', query: {}, headers: {'x-vrm-email-key':'cle-banc-routes'}, body: JSON.parse(JSON.stringify(VENTE_PRO('23999999001'))) }, res);
+      dit(base.get(`${A}|vrm_invoice_counter`) === 41, 'l\u2019email de vente ne touche jamais le compteur de factures', `compteur = ${JSON.stringify(base.get(`${A}|vrm_invoice_counter`))}`);
+      dit(res.code === 503, 'ligne de facture illisible : la route ne dit pas « reçu » (l\u2019email reviendra, le formulaire de retour n\u2019est pas perdu)', `HTTP ${res.code}`);
     }
     if (SC === 'A2') {
-      // Le RÉGLAGE de facturation illisible n'est pas « facturation coupée ».
-      base.set(`${A}|vrm_pro_facture`, { actif: true, autoSend: true, prefixe: 'FA' });
+      // Le réglage de facturation n'entre plus en jeu à l'arrivée : le formulaire
+      // de retour est gardé pour la facture que le vendeur émettra, sans numéro.
       base.set(`${A}|vrm_invoice_counter`, 41);
       pannes.add('vrm_pro_facture');
       const inbound = await importer('api/email-inbound.js');
       const res = faireRes();
-      await inbound.default({ method: 'POST', query: {}, headers: {'x-vrm-email-key':'cle-banc-routes'}, body: JSON.parse(JSON.stringify(VENTE)) }, res);
-      dit(res.code === 503, 'réglage de facturation illisible : pas de « reçu », la facture n’est pas perdue en silence', `HTTP ${res.code}`);
-      // l'autre sens : réglage lisible et coupé ⇒ 200, aucune facture.
-      pannes.clear(); base.set(`${A}|vrm_pro_facture`, { actif: false });
-      const res2 = faireRes();
-      await inbound.default({ method: 'POST', query: {}, headers: {'x-vrm-email-key':'cle-banc-routes'}, body: JSON.parse(JSON.stringify(VENTE)) }, res2);
-      dit(res2.code === 200 && factures().length === 0, 'réglage lu « coupé » : 200 et aucune facture (l’autre sens)', `HTTP ${res2.code} · ${factures().length} facture(s)`);
+      await inbound.default({ method: 'POST', query: {}, headers: {'x-vrm-email-key':'cle-banc-routes'}, body: JSON.parse(JSON.stringify(VENTE_PRO('23999999001'))) }, res);
+      const f = factures();
+      dit(res.code === 200 && f.length === 1 && f[0].number === '' && f[0].status === 'draft', 'vente Pro : un brouillon SANS numéro (le numéro se donne à l\u2019émission)', `HTTP ${res.code} · ${f.map((x) => `${x.number || '(sans)'}/${x.status}`).join(', ')}`);
+      dit(base.get(`${A}|vrm_invoice_counter`) === 41, 'aucun numéro brûlé à l\u2019arrivée de l\u2019email', `compteur = ${base.get(`${A}|vrm_invoice_counter`)}`);
     }
     if (SC === 'B') {
-      base.set(`${A}|vrm_pro_facture`, { actif: true, autoSend: true, prefixe: 'FA' });
-      base.set(`${A}|vrm_invoice_counter`, 41);
+      base.set(`${A}|vrm_invoice_counter`, 42);
+      // Une facture ÉMISE (instantané) et envoyée, sous la transaction.
+      base.set(`${A}|email_invoice_tx23999999001`, { type: 'facture_pro', number: 'FA-2026-0042', status: 'sent', contenu: { numero: 'FA-2026-0042' }, envoi: { etat: 'envoyee' }, transaction: '23999999001', retourB64: '' });
       const inbound = await importer('api/email-inbound.js');
-      const recoit = async () => { const res = faireRes(); await inbound.default({ method: 'POST', query: {}, headers: {'x-vrm-email-key':'cle-banc-routes'}, body: JSON.parse(JSON.stringify(VENTE)) }, res); return res; };
-      await recoit();
-      const f1 = factures();
-      dit(f1.length === 1 && /-0042$/.test(f1[0].number), 'premier passage : une facture, numéro 0042', f1.map((x) => x.number).join(', '));
-      // Le script Gmail l'envoie : statut « sent ».
-      for (const [k, d] of base) if (k.includes('|email_invoice_')) base.set(k, { ...d, status: 'sent', sentAt: '2026-10-17T08:00:00Z' });
-      const res2 = await recoit();
+      const res2 = faireRes();
+      await inbound.default({ method: 'POST', query: {}, headers: {'x-vrm-email-key':'cle-banc-routes'}, body: JSON.parse(JSON.stringify(VENTE_PRO('23999999001'))) }, res2);
       const f2 = factures();
-      dit(f2.length === 1 && /-0042$/.test(f2[0].number), 'email renvoyé : la facture garde SON numéro', f2.map((x) => x.number).join(', '));
-      dit(f2[0] && f2[0].status === 'sent', 'email renvoyé : une facture déjà envoyée ne repasse pas « à envoyer »', f2[0] && f2[0].status);
+      dit(f2.length === 1 && f2[0].number === 'FA-2026-0042', 'email renvoyé : la facture garde SON numéro', f2.map((x) => x.number).join(', '));
+      dit(f2[0] && f2[0].status === 'sent' && f2[0].contenu && f2[0].envoi && f2[0].envoi.etat === 'envoyee', 'email renvoyé : une facture émise et envoyée n\u2019est pas réécrite', f2[0] && f2[0].status);
       dit(base.get(`${A}|vrm_invoice_counter`) === 42, 'email renvoyé : aucun numéro brûlé', `compteur = ${base.get(`${A}|vrm_invoice_counter`)}`);
       dit(res2.code === 200, 'le renvoi est acquitté normalement', `HTTP ${res2.code}`);
     }
@@ -205,7 +199,7 @@ const factures = () => [...base.entries()].filter(([k]) => k.includes('|email_in
       dit(rp.code === 200 && factures().length === 0, 'compte PARTICULIER (ni mention Pro, ni coordonnées) : aucune facture, même facturation allumée', `HTTP ${rp.code} · ${factures().length} facture(s)`);
       const p1 = await recoit(VENTE_PRO('23999999001'));
       const f = factures();
-      dit(p1.code === 200 && f.length === 1, 'compte PRO : une facture est préparée', `HTTP ${p1.code} · ${f.length} facture(s)`);
+      dit(p1.code === 200 && f.length === 1 && f[0].number === '', 'compte PRO : un brouillon est préparé (acheteur + formulaire), sans numéro', `HTTP ${p1.code} · ${f.length} facture(s)`);
       const x = f[0] || {};
       dit(x.transaction === '23999999001', 'son identité est le n° de transaction (pièce jointe « Formulaire-retour-commande-… »)', `transaction=${x.transaction}`);
       dit([...base.keys()].some((k) => k === `${A}|email_invoice_tx23999999001`), 'la ligne de facture est rangée sous la transaction', [...base.keys()].filter((k) => k.includes('email_invoice_')).join(', '));

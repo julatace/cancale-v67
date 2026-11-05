@@ -20,7 +20,7 @@
 //      bouton Envoyer : « pas su » ;
 //   F. aucun débordement horizontal, aucune erreur d'app.
 // On juge des `data-*`, des requêtes et du DOM, jamais un libellé (§6.5).
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const { ouvrirAvanceCompta } = require('./_compta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');

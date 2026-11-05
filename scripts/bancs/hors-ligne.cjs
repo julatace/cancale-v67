@@ -25,7 +25,7 @@ const { servir } = require('./_minipgrest.cjs');
 const { cspBanc, bilanCsp } = require('./_vercel.cjs');   // CSP de vercel.json servie et observée (22 oct. : service worker, QR)
 let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
-catch (_) { ({ chromium } = require('/home/user/cancale-v67/node_modules/playwright')); }
+catch (_) { ({ chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 
 const DIST = path.join(__dirname, '..', '..', 'dist');   // jamais un chemin absolu (§6.1)
 const PORT = Number(process.env.BANC_PORT) || 4961;

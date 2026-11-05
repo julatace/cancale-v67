@@ -43,7 +43,10 @@ function conv({ item, tx, oid, price, user = 500 }) {
 }
 
 // Construit un fond : une liste d'offres, chacune avec son mini / refus sur l'annonce.
-function monter({ offres, actif = true, msgRefus = '', store = {}, lectureKO, connecte = UID, src } = {}) {
+// (2 nov., 5.308) La garde publiée par l'app (src/offresGarde.js) : par défaut une
+// garde COMPLÈTE et fraîche qui ne nomme aucune annonce (sinon rien n'est accepté).
+const GARDE_OK = () => ({ v: 1, at: Date.now(), items: [], complet: true, manques: [], ambigus: 0 });
+function monter({ offres, actif = true, msgRefus = '', store = {}, lectureKO, connecte = UID, src, garde = GARDE_OK() } = {}) {
   const nums = {};
   const lignes = {};
   for (const o of offres) {
@@ -51,6 +54,7 @@ function monter({ offres, actif = true, msgRefus = '', store = {}, lectureKO, co
     lignes[`harvest_${UID}_conv_${o.oid}`] = conv(o);
   }
   lignes.main = { capturedAt: nowISO(), vinted_offres_auto: actif, vinted_annonce_numeros: nums, vinted_offre_refus_msg: msgRefus };
+  if (garde !== undefined) lignes.main.vinted_offres_garde = garde;
   return faireFond({
     src, lignes, connecte, store, lectureKO,
     // Le faux Vinted accepte tout ce qu'on lui demande (200) — on mesure ce qui PART.
@@ -149,6 +153,21 @@ const OFFRE = { item: 444, tx: 9001, oid: 7001, price: 45, min: 40 };   // 45 �
   // K — refus AVEC le message du vendeur : le refus ET son message partent.
   { const { f } = await run({ offres: [{ item: 444, tx: 9001, oid: 7001, price: 20, refuse: 30 }], msgRefus: 'Merci, trop bas pour moi 🙂' });
     dit(refus(f.j) === 1 && messages(f.j) === 1, "refus + message du vendeur : le refus ET SON message (POST …/replies) partent", `refus=${refus(f.j)} msg=${messages(f.j)}`); }
+
+  // L — (2 nov., audit « plateformes » P2) LA GARDE : vendue ailleurs ⇒ jamais acceptée.
+  { const { f } = await run({ offres: [OFFRE], garde: { ...GARDE_OK(), items: [String(OFFRE.item)] } });
+    dit(accepts(f.j) === 0, "paire VENDUE AILLEURS (garde la nomme) : l'offre ≥ mini n'est PAS acceptée", `accepts=${accepts(f.j)}`);
+    dit(!(f.store.vrmOffresFaites || {})[String(OFFRE.oid)], "l'offre n'est pas marquée « traitée » (rien n'a été répondu)"); }
+  { const { f } = await run({ offres: [OFFRE], garde: { ...GARDE_OK(), complet: false, manques: ['Leboncoin non relu'] } });
+    dit(accepts(f.j) === 0, "garde INCOMPLÈTE (une plateforme pas relue) : rien n'est accepté — pas su ≠ oui", `accepts=${accepts(f.j)}`); }
+  { const { f } = await run({ offres: [OFFRE], garde: { ...GARDE_OK(), at: Date.now() - 49 * 3600 * 1000 } });
+    dit(accepts(f.j) === 0, "garde PÉRIMÉE (plus de 48 h, VRM pas rouvert) : rien n'est accepté", `accepts=${accepts(f.j)}`); }
+  { const { f } = await run({ offres: [OFFRE], garde: null });
+    dit(accepts(f.j) === 0, "garde ABSENTE : rien n'est accepté", `accepts=${accepts(f.j)}`); }
+  { const { f } = await run({ offres: [{ item: 444, tx: 9001, oid: 7001, price: 20, refuse: 30 }], garde: null });
+    dit(refus(f.j) === 1, "garde absente : le REFUS sous le seuil part quand même (il ne vend rien)", `refus=${refus(f.j)}`); }
+  { const { f } = await run({ offres: [OFFRE], garde: { ...GARDE_OK(), items: ['999999'] } });
+    dit(accepts(f.j) === 1, "garde complète qui nomme une AUTRE annonce : l'offre est acceptée", `accepts=${accepts(f.j)}`); }
 
   console.log(ko
     ? `\n❌ audit-moteur-offres : ${ko} contrôle(s) rouge(s), ${ok} vert(s)`

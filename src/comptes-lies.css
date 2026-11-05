@@ -1,0 +1,47 @@
+/* ══ COMPTES LIÉS — toutes les plateformes (3 nov.), au style « Fusion » ══════
+   Une carte blanche par compte (rayon 20, ombre douce), groupées par plateforme
+   sous un grand titre ; neutre partout ; ambre seulement pour « À relire » (un
+   geste à faire) ; le bleu seulement pour l'interrupteur allumé (§7). */
+.vrm-cl-ecran { max-width: 760px; margin: 0 auto; padding: 8px 16px 40px; box-sizing: border-box; }
+.vrm-cl-groupe { display: flex; flex-direction: column; gap: 10px; margin-bottom: 8px; }
+.vrm-cl-groupe .vrm-fu-titre-section { margin: 20px 2px 2px; }
+.vrm-cl-carte {
+  background: var(--fu-carte); color: var(--fu-encre); border-radius: var(--fu-r-carte); box-shadow: var(--fu-ombre);
+  padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; box-sizing: border-box;
+}
+.vrm-cl-tete { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.vrm-cl-avatar {
+  flex: none; width: 44px; height: 44px; border-radius: 50%; overflow: hidden; display: grid; place-items: center;
+  background: var(--fu-case); color: var(--fu-gris); font: 700 17px/1 var(--vrm-police);
+}
+.vrm-cl-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.vrm-cl-corps { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.vrm-cl-nom { flex: 1 1 100%; min-width: 0; font: 600 17px/1.25 var(--vrm-police); letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-cl-etat, .vrm-cl-type {
+  display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px;
+  font: 600 12px/1.4 var(--vrm-police); background: var(--fu-case); color: var(--fu-gris); white-space: nowrap;
+}
+.vrm-cl-etat.is-ouvert { background: var(--fu-encre); color: var(--fu-carte); }
+.vrm-cl-etat.is-a-relire, .vrm-cl-etat.is-jamais { background: var(--fu-ambre-fond); color: var(--fu-ambre-txt); }
+.vrm-cl-etat.is-banni { background: var(--fu-ambre-fond); color: var(--fu-ambre-txt); }
+.vrm-cl-age { font: 500 12px/1.4 var(--vrm-police); color: var(--fu-gris2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* L'interrupteur « dans les totaux » : 51×31 (iOS), cible 44 px. */
+.vrm-cl-inclus { flex: none; position: relative; width: 51px; min-height: 44px; display: grid; place-items: center; cursor: pointer; }
+.vrm-cl-inclus input { position: absolute; inset: 0; z-index: 1; opacity: 0; margin: 0; cursor: pointer; width: 100%; height: 100%; }
+.vrm-cl-inclus span { width: 51px; height: 31px; border-radius: 999px; background: var(--fu-piste); position: relative; transition: background-color 160ms ease-out; }
+.vrm-cl-inclus span::after { content: ''; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,.18); transition: transform 160ms ease-out; }
+.vrm-cl-inclus input:checked + span { background: var(--fu-bleu); }
+.vrm-cl-inclus input:checked + span::after { transform: translateX(20px); }
+.vrm-cl-inclus input:focus-visible + span { outline: 2px solid var(--fu-bleu); outline-offset: 2px; }
+.vrm-cl-actions { display: flex; gap: 8px; flex-wrap: wrap; padding-left: 56px; }
+html body .vrm-app-shell .vrm-cl-carte .vrm-cl-bouton { min-height: 44px; border-radius: 12px; }
+html body .vrm-app-shell .vrm-cl-carte a.vrm-cl-bouton { display: flex; align-items: center; justify-content: center; padding: 0 16px; text-decoration: none; background: var(--fu-case); color: var(--fu-encre); font: 600 15px/1 var(--vrm-police); }
+.vrm-cl-vide { font: 500 15px/1.4 var(--vrm-police); color: var(--fu-gris); padding: 4px 2px; display: flex; align-items: center; gap: 10px; }
+.vrm-cl-gerer { padding-left: 56px; }
+.vrm-cl-gerer > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font: 600 13px/1 var(--vrm-police); color: var(--fu-gris); list-style: none; }
+.vrm-cl-gerer > summary::-webkit-details-marker { display: none; }
+.vrm-cl-alerte { background: var(--fu-ambre-fond); color: var(--fu-ambre-txt); border-radius: 16px; padding: 12px 14px; font: 600 14px/1.4 var(--vrm-police); display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 8px 0; }
+@media (max-width: 420px) {
+  .vrm-cl-actions, .vrm-cl-gerer { padding-left: 0; }
+  .vrm-cl-actions > * { flex: 1 1 0; }
+}

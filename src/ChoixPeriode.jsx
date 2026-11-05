@@ -15,8 +15,10 @@
 // est encore) ; « Ce mois » et « Cette année » vont jusqu'au bout du mois / de
 // l'année, comme avant.
 import React from 'react';
+import {lireParcours,garderParcours,periodeReutilisable} from './parcoursQuotidien.js';
 import { createPortal } from 'react-dom';
 import './choix-periode.css';
+import './styles-parcours.css';
 import {
   grilleMois, nomMois, decalerMois, cleJour, libellePlage, nbJours, raccourcisPeriode, raccourciDe,
   toucherJour, etatJour, valeurDeSelection, moisDefilants, JOURS_INITIALES, MOIS_LONG,
@@ -78,7 +80,9 @@ function Mois({ annee, mois, sel, survol, setSurvol, toucher, max, auj, entete =
   );
 }
 
-export default function ChoixPeriode({ value: brut, onChange, Retour, Icon, titre = 'Période', data = {}, vide = 'Toute la période' }) {
+// (3 nov.) `raccourcis` : une autre liste de raccourcis (la carte sombre : Aujourd'hui · Cette semaine ·
+// Ce mois · Mois dernier · Ce trimestre · Cette année) ; `libelle` : ce que dit le bouton.
+export default function ChoixPeriode({ owner = '', datation = '', value: brut, onChange, Retour, Icon, titre = 'Période', data = {}, vide = 'Toute la période', raccourcis: listeRaccourcis = null, libelle = null }) {
   const value = normaliser(brut);
   const etroit = useEtroit();
   // Au doigt : 18 mois d'abord ; « Voir les mois d'avant » en ajoute 12 (ses
@@ -93,8 +97,10 @@ export default function ChoixPeriode({ value: brut, onChange, Retour, Icon, titr
   const boite = React.useRef(null);
   const pop = React.useRef(null);
   const defile = React.useRef(null);
-  const raccourcis = raccourcisPeriode(auj);
-  const actif = raccourciDe(value, auj);
+  const raccourcis = listeRaccourcis ? listeRaccourcis(auj) : raccourcisPeriode(auj);
+  const actif = listeRaccourcis
+    ? ((value && value.from && raccourcis.find((r) => cleJour(r.valeur.from) === cleJour(value.from) && cleJour(r.valeur.to) === cleJour(value.to || value.from))) || {}).cle || ''
+    : raccourciDe(value, auj);
 
   const ouvrir = (ev) => {
     const s = value && value.from ? { from: value.from, to: value.to || value.from } : { from: null, to: null };
@@ -111,7 +117,8 @@ export default function ChoixPeriode({ value: brut, onChange, Retour, Icon, titr
     setOuvert(true);
   };
   const fermer = () => { setOuvert(false); setSurvol(null); };
-  const appliquer = (v) => { onChange(v); fermer(); };
+  const appliquer = (v) => { onChange(v);try{const p=periodeReutilisable(v);if(p)garderParcours(sessionStorage,owner,'periode-recente',p);}catch(_){} fermer(); };
+  let recente=null;try{recente=periodeReutilisable(lireParcours(sessionStorage,owner,'periode-recente'));}catch(_){}
 
   // Ordinateur : un clic dehors ou Échap referme (rien n'est appliqué).
   React.useEffect(() => {
@@ -167,9 +174,11 @@ export default function ChoixPeriode({ value: brut, onChange, Retour, Icon, titr
   );
   const pied = (
     <div className="vrm-cal-pied">
+      {datation&&<p className="vrm-parcours-compteur" data-periode-datation>{datation} · la comptabilité conserve sa propre règle de date.</p>}
       <div className="vrm-cal-plage" data-periode-plage={sel.from && !sel.to ? 'debut' : choix ? 'choisie' : 'vide'}
         data-periode-du={sel.from ? cleJour(sel.from) : ''} data-periode-au={sel.from ? cleJour(sel.to || sel.from) : ''} aria-live="polite">{plage}</div>
       <div className="vrm-cal-boutons">
+        {recente&&<button type="button" className="vrm-periode-recente" onClick={()=>appliquer({from:new Date(recente.from),to:new Date(recente.to)})}>Reprendre la dernière période choisie</button>}
         <button type="button" className="vrm-cal-effacer" data-periode-effacer onClick={() => appliquer(null)}>Effacer</button>
         <button type="button" className="vrm-cal-appliquer" data-periode-appliquer disabled={!choix} onClick={() => choix && appliquer(choix)}>Appliquer</button>
       </div>
@@ -182,7 +191,7 @@ export default function ChoixPeriode({ value: brut, onChange, Retour, Icon, titr
       <div className="vrm-rangee" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
         <button type="button" className="vrm-cal-declencheur" data-periode-ouvrir onClick={(ev) => (ouvert ? fermer() : ouvrir(ev))}
           aria-expanded={ouvert} aria-haspopup="dialog" data-periode-valeur={value && value.from ? `${cleJour(value.from)}..${cleJour(value.to || value.from)}` : ''}>
-          {Icon ? <Icon name="calendar" size={15}/> : null}<span data-periode-libelle>{libelleValeur(value, vide)}</span>
+          {Icon ? <Icon name="calendar" size={15}/> : null}<span data-periode-libelle>{libelle || libelleValeur(value, vide)}</span>
         </button>
         {value && (value.from || value.to) ? <button type="button" className="vrm-icon-control vrm-cal-croix" aria-label="Effacer la période" onClick={() => { onChange(null); fermer(); }}>{Icon ? <Icon name="close" size={14}/> : '×'}</button> : null}
       </div>

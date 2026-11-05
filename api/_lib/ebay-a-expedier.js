@@ -162,13 +162,18 @@ export async function lireCommandesEbayServeur({ lireLigne, lireToutes, comptesA
     lireToutes('app_data?id=like.ebay_orders%25&select=id,orders:data->orders'),
   ]);
   if (reg === undefined || !Array.isArray(rows)) return null;
-  const ids = new Set(comptesActifs(normaliserRegistre(reg)).map((c) => 'ebay_orders' + c.suffixe));
+  const actifs = comptesActifs(normaliserRegistre(reg));
+  const ids = new Set(actifs.map((c) => 'ebay_orders' + c.suffixe));
+  // (3 nov.) Chaque commande porte son compte (`_compte`, la même référence que
+  // l'app : 'principal' ou la clé) — un compte écarté des totaux par SON choix
+  // (api/_lib/comptes-exclus.js) se reconnaît au bilan comme à l'écran.
+  const refDe = new Map(actifs.map((c) => ['ebay_orders' + c.suffixe, c.principal ? 'principal' : String(c.cle || '')]));
   const out = [], vus = new Set(), lus = new Set();
   for (const r of rows) {
     if (!r || !ids.has(r.id)) continue;
     if (!Array.isArray(r.orders)) return null;
     lus.add(r.id);
-    for (const o of r.orders) { const k = o && o.orderId; if (k && vus.has(k)) continue; if (k) vus.add(k); out.push(o); }
+    for (const o of r.orders) { const k = o && o.orderId; if (k && vus.has(k)) continue; if (k) vus.add(k); out.push(o && typeof o === 'object' && refDe.get(r.id) ? { ...o, _compte: refDe.get(r.id) } : o); }
   }
   if ([...ids].some((id) => !lus.has(id) && (id !== 'ebay_orders' || (Array.isArray(reg && reg.comptes) && reg.comptes.some((c) => c.principal && !c.deconnecteLe))))) return null;
   return out;

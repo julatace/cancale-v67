@@ -22,7 +22,7 @@
 //   T. (revue) la tablette au doigt : jours, flèches, boutons à 44 px ;
 //   D. la pastille : ton, chevron, panneau avec un en-tête et la chaîne des trois
 //      maillons, le geste en bas, dans l'écran.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');
@@ -152,6 +152,35 @@ async function sectionAnnonces(b, vp, sombre) {
     await pg.waitForTimeout(800);
     await capture(pg, `annonces-${vp.width}${sombre ? '-sombre' : ''}`);
     if (CAP) { const c = pg.locator('[data-carte-annonce="9201"]'); if (await c.count()) { await c.scrollIntoViewIfNeeded(); await c.screenshot({ path: path.join(CAP, `fiche-${vp.width}${sombre ? '-sombre' : ''}.png`) }).catch(() => {}); } }
+    // (1er nov., Julien : « trop de cases empilées sous la photo » — maquette Vitrine) AU TÉLÉPHONE la fiche
+    //  FERMÉE ne montre que photo + N°, nom, prix, une ligne discrète (état · vues · favoris · âge) et, s'il
+    //  MANQUE, le prix d'achat (ambre). Tout le reste est sous « Plus d'actions » : les MÊMES éléments, jugés
+    //  ci-dessous une fois dépliés. L'ordinateur ne change pas (aucun bouton, tout à la vue).
+    const ferme = await pg.evaluate(() => {
+      const vu = (el) => !!(el && el.offsetParent !== null && el.getBoundingClientRect().height > 0);
+      const c = (id) => document.querySelector(`[data-carte-annonce="${id}"]`);
+      const bt = c('9201') && c('9201').querySelector('[data-fiche-plus-bouton]');
+      return {
+        bouton: vu(bt), boutonH: bt ? bt.getBoundingClientRect().height : 0, expanded: bt ? bt.getAttribute('aria-expanded') : null,
+        chiffres: vu(c('9201') && c('9201').querySelector('[data-chiffres]')), plus: vu(c('9201') && c('9201').querySelector('[data-fiche-plus]')),
+        jauge: vu(c('9201') && c('9201').querySelector('[data-fiche-etat]')),
+        achatConnuVu: vu(c('9201') && c('9201').querySelector('[data-fiche-achat]')),
+        achatManquantVu: vu(c('9202') && c('9202').querySelector('[data-fiche-achat="inconnu"]')),
+        etatCourt: (c('9201') && c('9201').querySelector('[data-etat-court]') || {}).offsetParent ? c('9201').querySelector('[data-etat-court]').textContent : null,
+        ambre: (() => { const a = c('9202') && c('9202').querySelector('[data-fiche-achat="inconnu"]'); return a ? getComputedStyle(a).borderTopColor : ''; })(),
+        neutre: (() => { const a = c('9202') && c('9202').querySelector('[data-fiche-titre], [data-titre]'); return a ? getComputedStyle(a).color : ''; })(),
+      };
+    });
+    if (tel) {
+      dit(ferme.bouton && ferme.expanded === 'false' && ferme.boutonH >= 43.5, `A ${nom} · fiche fermée : « Plus d'actions » touchable (44 px au doigt)`, JSON.stringify(ferme));
+      dit(!ferme.chiffres && !ferme.plus && !ferme.jauge && !ferme.achatConnuVu, `A ${nom} · fiche fermée : ni cases (mini, refuse, boost, marge), ni gestes, ni jauge, ni prix d'achat CONNU`, JSON.stringify(ferme));
+      dit(ferme.achatManquantVu && ferme.ambre && ferme.ambre !== ferme.neutre, `A ${nom} · fiche fermée : le prix d'achat MANQUANT reste à la vue, en ambre`, JSON.stringify(ferme));
+      dit(/Neuf avec étiquette/.test(ferme.etatCourt || ''), `A ${nom} · fiche fermée : l'état dans la ligne discrète`, ferme.etatCourt);
+      for (const id of ['9201', '9202', '9206']) await pg.click(`[data-carte-annonce="${id}"] [data-fiche-plus-bouton]`, { timeout: 5000 });
+      await pg.waitForFunction(() => document.querySelector('[data-carte-annonce="9201"] [data-fiche-plus-bouton]').getAttribute('aria-expanded') === 'true', null, { timeout: 5000 }).catch(() => {});
+    } else {
+      dit(!ferme.bouton && ferme.chiffres && ferme.plus && ferme.jauge, `A ${nom} · ordinateur : la fiche entière, sans « Plus d'actions »`, JSON.stringify(ferme));
+    }
     const r = await pg.evaluate(() => {
       const carte = (id) => document.querySelector(`[data-carte-annonce="${id}"]`);
       const box = (el) => { if (!el) return null; const q = el.getBoundingClientRect(); return { x: q.left, y: q.top, w: q.width, h: q.height }; };
@@ -188,7 +217,9 @@ async function sectionAnnonces(b, vp, sombre) {
     });
     dit(!errs.length, `A ${nom} · aucune erreur`, errs[0]);
     dit(r.nbCartes === 6, `A ${nom} · les six annonces inventées sont rendues`, r.nbCartes);
-    const plancher = tel ? 300 : 330;
+    // (1er nov.) Vitrine (31 oct.) range DEUX fiches par rangée au téléphone (maquette) : la photo y fait la
+    //  largeur de la fiche (~175 px à 390), plus 300. La règle reste « toute la largeur de la fiche ».
+    const plancher = tel ? 160 : 330;
     dit(r.photo && r.photo.w >= plancher && r.photo.h >= plancher && r.photo.w >= r.carte.w - 2, `A ${nom} · la photo est en grand (≥ ${plancher} px, toute la largeur de la fiche)`, r.photo && `${Math.round(r.photo.w)}×${Math.round(r.photo.h)} · fiche ${Math.round(r.carte.w)}`);
     dit(JSON.stringify(r.niveaux) === JSON.stringify(ATTENDU), `A ${nom} · l'état en jauge suit la donnée (neuf avec étiquette 5 · sans étiquette 4 · très bon 3 · satisfaisant 1 · inconnu · aucun)`, JSON.stringify(r.niveaux));
     const coupes = Object.entries(r.mots).filter(([, m]) => !m || m.coupe).map(([id, m]) => `${id}:${m ? m.t : 'absent'}`);
@@ -243,6 +274,9 @@ async function sectionAnnonces(b, vp, sombre) {
       } catch (e) { dit(false, `A ${nom} · boost sur une annonce sans N°`, String(e.message).slice(0, 120)); }
     }
     // ── B. Offres automatiques : une ligne courte, le détail derrière ⓘ.
+    // (3 nov., critique #7, à la demande de Julien) La carte vit dans le menu « Outils » d'Annonces :
+    // le banc l'ouvre d'abord (le premier article remonte dans le premier tiers de l'écran).
+    if (!(await pg.$('[data-offres-auto-carte]'))) { await pg.click('.vrm-ann-outils > button').catch(() => {}); await pg.waitForTimeout(400); }
     const o = await pg.evaluate(() => {
       const c = document.querySelector('[data-offres-auto-carte]'); if (!c) return null;
       const ligne = c.querySelector('.vrm-offres-auto-ligne');

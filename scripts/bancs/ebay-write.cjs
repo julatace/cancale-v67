@@ -63,7 +63,7 @@ const item = { title: 'Nike Air Max 1 Aquatone Bleu T44', categoryId: '15709', p
 
   // 1. Publier OK
   tradingMode = 'ok';
-  { const res = faireRes(); await handler({ method: 'POST', query: {}, body: { action: 'publish', item } }, res);
+  { const res = faireRes(); await handler({ method: 'POST', query: {}, body: { action: 'publish', confirme: true, item } }, res);
     dit(res.code === 200 && res.corps && res.corps.ok === true && res.corps.itemId === '110555000111', 'publish → AddFixedPriceItem, renvoie l\'itemId', `HTTP ${res.code} id=${res.corps && res.corps.itemId}`);
     dit(/AddFixedPriceItem/.test(lastCall), 'l\'appel est bien AddFixedPriceItem');
     dit(/<Name>Pointure EU<\/Name>/.test(lastBody) && /<Name>Marque<\/Name>/.test(lastBody), 'les attributs obligatoires sont envoyés dans ItemSpecifics');
@@ -71,23 +71,23 @@ const item = { title: 'Nike Air Max 1 Aquatone Bleu T44', categoryId: '15709', p
 
   // 2. Refus eBay → remonte (jamais faux succès)
   tradingMode = 'fail';
-  { const res = faireRes(); await handler({ method: 'POST', query: {}, body: { action: 'publish', item } }, res);
+  { const res = faireRes(); await handler({ method: 'POST', query: {}, body: { action: 'publish', confirme: true, item } }, res);
     dit(res.code >= 400 && res.corps && res.corps.ok === false && /Pointure EU|obligatoire/i.test(res.corps.error || ''), 'un refus eBay REMONTE avec son message', `HTTP ${res.code} : ${res.corps && res.corps.error}`); }
 
   // 3. Champs manquants → 400 (pas d'appel vide)
   tradingMode = 'ok';
-  { const res = faireRes(); await handler({ method: 'POST', query: {}, body: { action: 'publish', item: { title: 'x' } } }, res);
+  { const res = faireRes(); await handler({ method: 'POST', query: {}, body: { action: 'publish', confirme: true, item: { title: 'x' } } }, res);
     dit(res.code === 400 && res.corps && res.corps.ok === false, 'publish sans catégorie/prix → 400'); }
 
   // 4. Modifier prix/stock OK
-  { const n0 = appels.length; const res = faireRes(); await handler({ method: 'POST', query: {}, body: { action: 'revise', itemId: '110555000111', price: '72', prixVu: 68, quantity: '1' } }, res);
+  { const n0 = appels.length; const res = faireRes(); await handler({ method: 'POST', query: {}, body: { action: 'revise', confirme: true, itemId: '110555000111', price: '72', prixVu: 68, quantity: '1' } }, res);
     dit(res.code === 200 && res.corps && res.corps.ok === true, 'revise → ReviseInventoryStatus OK');
     const rev = appels.slice(n0).filter((a) => a.nom === 'ReviseInventoryStatus');
     dit(rev.length === 1 && /<StartPrice>72\.00<\/StartPrice>/.test(rev[0].corps), 'le nouveau prix est envoyé (72.00), en UNE révision', appels.slice(n0).map((a) => a.nom).join(',')); }
 
   // 5. Refus de modification → remonte
   tradingMode = 'fail';
-  { const res = faireRes(); await handler({ method: 'POST', query: {}, body: { action: 'revise', itemId: '1', price: '9', prixVu: 68 } }, res);
+  { const res = faireRes(); await handler({ method: 'POST', query: {}, body: { action: 'revise', confirme: true, itemId: '1', price: '9', prixVu: 68 } }, res);
     dit(res.code >= 400 && res.corps && res.corps.ok === false, 'un refus de modification REMONTE'); }
 
   // 6. Vérifier À BLANC (VerifyAddFixedPriceItem) : rien n'est créé, les frais remontent
@@ -117,7 +117,7 @@ const item = { title: 'Nike Air Max 1 Aquatone Bleu T44', categoryId: '15709', p
   // 9. PLUSIEURS <Errors> : un avertissement PUIS le vrai refus — c'est le
   //    refus qui est rendu, et l'avertissement n'est pas pris pour la raison.
   tradingMode = 'deuxErreurs';
-  { const res = faireRes(); await handler({ method: 'POST', query: {}, body: { action: 'publish', item } }, res);
+  { const res = faireRes(); await handler({ method: 'POST', query: {}, body: { action: 'publish', confirme: true, item } }, res);
     dit(res.code >= 400 && res.corps && /photo est trop petite/.test(res.corps.error || '') && !/titre est long/.test(res.corps.error || ''),
       'deux <Errors> (Warning puis Error) : le message rendu est celui de l\'ERREUR', `HTTP ${res.code} : ${res.corps && res.corps.error}`); }
 

@@ -41,7 +41,8 @@
 // Lancer : npm run build, puis
 //   NODE_OPTIONS="--require /tmp/claude-0/redir-pw.cjs" BANC_PORT=9131 node scripts/bancs/ebay-inactives.cjs
 // `BANC_SEUL=A,C,…` ne lance que ces scénarios (lettres ci-dessous).
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
+const SORTIE_INA = require('path').join(require('os').tmpdir(), 'banc-ebay-inactives'); try { require('fs').mkdirSync(SORTIE_INA, { recursive: true }); } catch (_) {}
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -206,14 +207,23 @@ async function ouvrir(b, vp, opts = {}) {
     if (body.action === 'status') return j({ ok: true, connected: opts.connected !== false });
     if (body.action === 'offreinfo') return j({ ok: true, eligibles: [], complet: true });
     if (body.action === 'finances') return j({ ok: false, reason: 'scope', error: 'x' });
+    if (body.action === 'relanceverif') return j({ ok: true, num: String(body.numero), sku: 'VRM-' + body.numero, prix: Number(body.prixVu), frais: { total: 0, devise: 'EUR' }, verifie: true });
+    if (body.action === 'relancer') return body.confirme === true ? j({ ok: true, itemId: '120000000900', ancien: body.itemId, verifie: true }) : j({ ok: false, reason: 'confirmation' }, 400);
     return j({ ok: true });
   });
   return { ctx, pg, errs, envois };
 }
+// (31 oct.) Attendre que l'espace eBay soit MONTÉ (sa rangée de sections) plutôt
+//  qu'un délai fixe : sur une machine chargée, 1,5 s + 8 s ne suffisaient pas et
+//  chaque scénario tombait en « a levé » sans rien juger (§6.5).
+async function espaceEbayMonte(pg) {
+  // (31 oct., navigation par tâche) eBay → Annonces est Annonces filtré sur eBay.
+  await pg.waitForSelector('[data-tache-site="ebay"]', { timeout: 30000 }).catch(() => {});
+  await pg.waitForTimeout(500);
+}
 async function versAnnonces(pg) {
-  await pg.goto(`http://localhost:${PORT}/?tab=plat_ebay`, { waitUntil: 'domcontentloaded' });
-  await pg.waitForTimeout(1500);
-  await pg.getByRole('button', { name: 'Annonces', exact: true }).first().click({ timeout: 8000 });
+  await pg.goto(`http://localhost:${PORT}/?tab=annonces&site=ebay`, { waitUntil: 'domcontentloaded' });
+  await espaceEbayMonte(pg);
   await pg.waitForSelector('[data-ebay-inactives]:not([data-ebay-inactives="charge"])', { timeout: 15000 }).catch(() => {});
   await pg.waitForTimeout(800);
 }
@@ -227,8 +237,8 @@ const lire = (pg) => pg.evaluate(() => {
     vinted: e.getAttribute('data-inactive-vinted'),
     retraitAuto: e.getAttribute('data-inactive-retrait-auto'),
     prix: (e.querySelector('[data-inactive-prix]') || {}).innerText || '',
-    relancer: (e.querySelector('a[data-inactive-relancer]') || {}).href || '',
-    relancerCible: (e.querySelector('a[data-inactive-relancer]') || { getAttribute: () => '' }).getAttribute('target') || '',
+    relancer: (e.querySelector('[data-inactive-relancer]') || { getAttribute: () => '' }).getAttribute('data-inactive-relancer') || '',
+    relancerBouton: !!e.querySelector('button[data-inactive-relancer]'),
     voir: (e.querySelector('a[data-inactive-voir]') || {}).href || '',
     texte: e.innerText,
   }));
@@ -296,9 +306,8 @@ const ligne = (s, id) => s.lignes.find((l) => l.id === id) || {};
         const voir = async (inactives) => {
           remettre(inactives ? { inactives } : {});
           const { ctx, pg } = await ouvrir(b, vp, { connected: false });
-          await pg.goto(`http://localhost:${PORT}/?tab=plat_ebay`, { waitUntil: 'domcontentloaded' });
-          await pg.waitForTimeout(1500);
-          await pg.getByRole('button', { name: 'Annonces', exact: true }).first().click({ timeout: 8000 });
+          await pg.goto(`http://localhost:${PORT}/?tab=annonces&site=ebay`, { waitUntil: 'domcontentloaded' });
+          await espaceEbayMonte(pg);
           await pg.waitForSelector('[data-ebay-annonce]', { timeout: 15000 }).catch(() => {});
           await pg.waitForTimeout(2500);
           const s = await lire(pg); const annonce = !!(await pg.$('[data-ebay-annonce]'));
@@ -324,7 +333,7 @@ const ligne = (s, id) => s.lignes.find((l) => l.id === id) || {};
         remettre({ inactives: lue([I.en_vente, I.relancee, I.sans_sku, I.vendue, I.en_vinted]) });
         const { ctx, pg, errs, envois } = await ouvrir(b, vp);
         await versAnnonces(pg);
-        await pg.waitForSelector('[data-ebay-inactive="120000000021"] a[data-inactive-relancer]', { timeout: 15000 }).catch(() => {});
+        await pg.waitForSelector('[data-ebay-inactive="120000000021"] [data-inactive-relancer]', { timeout: 15000 }).catch(() => {});
         await pg.waitForTimeout(600);
         const s = await lire(pg);
         const L = Object.fromEntries(s.lignes.map((l) => [l.id, l]));
@@ -336,8 +345,8 @@ const ligne = (s, id) => s.lignes.find((l) => l.id === id) || {};
           `${T} le N° SEULEMENT par le SKU : VRM-21/22/24 ⇒ N°21/22/24 ; le titre identique à la N°23 sans SKU ⇒ AUCUN N° (§5)`, JSON.stringify(s.lignes.map((l) => [l.id, l.num])));
         dit(L['120000000021'] && L['120000000021'].fin === parisJour(I.en_vinted.fin) && L['120000000025'].fin === parisJour(I.en_vente.fin), `${T} « terminée le … » (jour de Paris)`, JSON.stringify(s.lignes.map((l) => l.fin)));
         const r21 = L['120000000021'] || {};
-        dit(r21.relancer === 'https://www.ebay.fr/itm/120000000021' && r21.relancerCible === '_blank' && !r21.vendue && !r21.deja,
-          `${T} une paire libre ⇒ « Remettre en vente sur eBay ↗ » vers SA page eBay (nouvel onglet) — VRM ne remet rien en vente lui-même`, JSON.stringify(r21));
+        dit(r21.relancer === 'https://www.ebay.fr/itm/120000000021' && r21.relancerBouton === true && !r21.vendue && !r21.deja,
+          `${T} une paire libre ⇒ le bouton « Remettre en vente » (3 nov. : depuis VRM, sur son clic confirmé)`, JSON.stringify(r21));
         const r22 = L['120000000022'] || {};
         // (revue du 23 octobre) Le contrôle ne portait que sur la N°21 : « encore
         // en ligne sur Vinted » posé sur TOUTE paire numérotée passait vert. La
@@ -349,13 +358,33 @@ const ligne = (s, id) => s.lignes.find((l) => l.id === id) || {};
         dit(r24.deja === 'relancee' && !r24.relancer && !!r24.voir && r25.deja === 'en-vente' && !r25.relancer && !!r25.voir,
           `${T} déjà remise en vente (RelistedItemID) ou déjà de nouveau en vente sur eBay (même N°, AUTRE annonce) ⇒ pas de second « Remettre en vente »`, JSON.stringify([r24.deja, r25.deja]));
         const r23 = L['120000000023'] || {};
-        dit(!!r23.relancer && !r23.vendue && !r23.vinted, `${T} sans N° (pas reliée) : VRM ne juge rien, le lien reste`, JSON.stringify(r23));
+        dit(!r23.relancer && !!r23.voir && !r23.vendue && !r23.vinted, `${T} sans N° (pas reliée) : aucune identité ⇒ pas de « Remettre en vente », « Voir sur eBay » seul`, JSON.stringify(r23));
         dit(s.etat === 'lu' && s.lignes.length === 5 && relistes(envois).length === 0 && s.verif === null && s.phrasesVerif === 0, `${T} la liste lue, rien ne part vers /api/ebay qui remettrait en vente ; ventes vérifiées ⇒ aucune réserve`, JSON.stringify(relistes(envois)));
         const d = await deborde(pg);
         dit(s.lignes.length === 5 && d.sw <= d.cw + 1, `${T} les 5 lignes rendues, aucun débordement horizontal`, `${d.sw} / ${d.cw}`);
         if (vp.width < 600) { const c = await cibles(pg); const petites = c.filter((x) => x.h < 44); dit(c.length >= 5 && !petites.length, `${T} au doigt : chaque lien et bouton de la section fait au moins 44 px`, JSON.stringify(petites)); }
         else { const box = await pg.$eval('[data-ebay-inactives]', (e) => { const r = e.getBoundingClientRect(); return { top: r.top + window.scrollY, h: r.height }; }); dit(box.h > 100, `${T} la section est rendue (hauteur ${Math.round(box.h)} px)`); }
         dit(s.etat === 'lu' && !errs.length && !s.mort, `${T} la liste lue, aucune erreur de page`, errs.join(' | ').slice(0, 160));
+        // (3 nov.) LE GESTE : vérifier (frais), CONFIRMER, puis remettre en vente — rien sans son oui.
+        const n0 = envois.length;
+        const bouton = pg.locator('[data-ebay-inactive="120000000021"] button[data-inactive-relancer]');
+        await bouton.click();
+        const oui = pg.getByRole('button', { name: 'Remettre en vente', exact: true }).last();
+        await pg.waitForFunction(() => /Remettre en vente N°21/.test(document.body.innerText), null, { timeout: 8000 });
+        await pg.screenshot({ path: path.join(SORTIE_INA, `inactives-confirmer-${vp.width}.png`) }).catch(() => {});
+        const avantOui = envois.slice(n0).map((x) => x.action);
+        dit(avantOui.includes('relanceverif') && !avantOui.includes('relancer'), `${T} « Remettre en vente » : d'abord la vérification à blanc (frais), la confirmation s'ouvre, RIEN n'est remis en vente`, avantOui.join(','));
+        await pg.getByRole('button', { name: 'Annuler', exact: true }).last().click();
+        await pg.waitForTimeout(400);
+        dit(!envois.slice(n0).some((x) => x.action === 'relancer'), `${T} « Annuler » : rien ne part`, envois.slice(n0).map((x) => x.action).join(','));
+        await bouton.click();
+        await pg.waitForFunction(() => /Remettre en vente N°21/.test(document.body.innerText), null, { timeout: 8000 });
+        await oui.click();
+        await pg.waitForSelector('[data-inactive-resultat="ok"]', { timeout: 8000 }).catch(() => {});
+        const rel = envois.slice(n0).filter((x) => x.action === 'relancer');
+        dit(rel.length === 1 && rel[0].confirme === true && rel[0].itemId === '120000000021' && rel[0].numero === '21' && Number(rel[0].prixVu) === 95,
+          `${T} sur SON oui : UNE remise en vente, \`confirme:true\`, la N°21 au prix vu`, JSON.stringify(rel));
+        await pg.screenshot({ path: path.join(SORTIE_INA, `inactives-remise-${vp.width}.png`) }).catch(() => {});
         await ctx.close();
       });
       // ── R. RETIRÉE PAR VRM (28 oct.) ───────────────────────────────────────
@@ -365,23 +394,24 @@ const ligne = (s, id) => s.lignes.find((l) => l.id === id) || {};
       // l'identifiant de l'annonce, ce que VRM a fait : aucun « Remettre en vente ».
       if (lance('R')) await essaie(T + ' R retirée par VRM', async () => {
         const R = ina('120000000030', 'Nike Aquatone noir T44', 'VRM-559', '85.0', jour(5));
-        remettre({ inactives: lue([R, I.sans_sku]), retraits: [{ itemId: '120000000030', sku: 'VRM-559', at: Date.now() - 5 * JOUR, n: '559' }] });
+        remettre({ inactives: lue([R, I.en_vinted]), retraits: [{ itemId: '120000000030', sku: 'VRM-559', at: Date.now() - 5 * JOUR, n: '559' }] });
         const { ctx, pg, errs, envois } = await ouvrir(b, vp);
         await versAnnonces(pg);
         await pg.waitForSelector('[data-ebay-inactive="120000000030"]', { timeout: 15000 }).catch(() => {});
         await pg.waitForTimeout(800);
         const s = await lire(pg);
         const L = Object.fromEntries(s.lignes.map((l) => [l.id, l]));
-        const r = L['120000000030'] || {}, a = L['120000000023'] || {};
+        const r = L['120000000030'] || {}, a = L['120000000021'] || {};   // (3 nov.) une paire RELIÉE : sans N°, plus aucune remise en vente
         dit(r.retraitAuto === '1' && !r.relancer && !!r.voir && /retirée par VRM/.test(r.texte) && /ne la remets pas en vente/.test(r.texte),
           `${T} retirée d'eBay PAR VRM (journal du retrait automatique) ⇒ « retirée par VRM … ne la remets pas en vente », aucun « Remettre en vente »`, JSON.stringify({ ra: r.retraitAuto, relancer: r.relancer, t: (r.texte || '').replace(/\n/g, ' · ').slice(0, 160) }));
-        dit(!a.retraitAuto && !!a.relancer, `${T} l'autre sens : une inactive absente du journal garde son lien`, JSON.stringify({ ra: a.retraitAuto, relancer: a.relancer }));
+        dit(!a.retraitAuto && !!a.relancer, `${T} l'autre sens : une inactive reliée absente du journal garde « Remettre en vente »`, JSON.stringify({ ra: a.retraitAuto, relancer: a.relancer }));
         // (28 oct.) Ventes : compte relié, ventes LUES, aucune ⇒ ne plus lui
         // demander de « relier ton compte » (geste déjà fait).
-        await pg.getByRole('button', { name: 'Ventes', exact: true }).first().click({ timeout: 8000 });
+        await pg.locator('.vrm-mobile-nav [data-nav-entree="ventes"], .vrm-sidebar [data-nav-entree="ventes"]').first().click({ timeout: 8000 });
+        await pg.locator('[data-filtre-site] button[data-site="ebay"]').first().click({ timeout: 8000 });
         await pg.waitForTimeout(1200);
         const tv = await pg.evaluate(() => document.body.innerText);
-        dit(/Aucune vente eBay pour l'instant/.test(tv) && !/Relie ton compte/i.test(tv),
+        dit(/Aucune vente eBay/.test(tv) && !/Relie ton compte/i.test(tv),
           `${T} Ventes : compte relié, aucune vente ⇒ « Aucune vente eBay pour l'instant », jamais « Relie ton compte »`, (tv.match(/[^\n]*vente eBay[^\n]*/) || [''])[0].slice(0, 160));
         dit(relistes(envois).length === 0 && !errs.length && !s.mort, `${T} rien ne part, aucune erreur de page`, errs.join(' | ').slice(0, 160));
         await ctx.close();
@@ -475,8 +505,8 @@ const ligne = (s, id) => s.lignes.find((l) => l.id === id) || {};
         await pg.waitForTimeout(800);
         const s = await lire(pg);
         const r21 = ligne(s, '120000000021'), r23 = ligne(s, '120000000023');
-        dit(s.etat === 'lu' && !r21.relancer && !!r21.voir && s.verif === '1' && !!r23.relancer,
-          `${T} ventes illisibles ⇒ la N°21 n'a PAS « Remettre en vente » (vendue ailleurs ? pas su) ; la ligne sans N° garde son lien`, JSON.stringify({ verif: s.verif, r21: [r21.relancer, r21.voir], r23: r23.relancer }));
+        dit(s.etat === 'lu' && !r21.relancer && !!r21.voir && s.verif === '1' && !r23.relancer && !!r23.voir,
+          `${T} ventes illisibles ⇒ la N°21 n'a PAS « Remettre en vente » (vendue ailleurs ? pas su) ; la ligne sans N° n'a que « Voir sur eBay »`, JSON.stringify({ verif: s.verif, r21: [r21.relancer, r21.voir], r23: r23.relancer }));
         // (revue du 23 octobre, §7) La panne est DÉJÀ dite au-dessus (« Je n'ai
         // pas pu lire tes ventes… ») : la section n'y ajoute pas une phrase de plus.
         dit(s.ecranPasSu && s.phrasesVerif === 0,
@@ -512,7 +542,7 @@ const ligne = (s, id) => s.lignes.find((l) => l.id === id) || {};
             `${T} ventes en cours de lecture ⇒ AUCUNE paire reliée n'a « Remettre en vente » (la N°22 est peut-être vendue) — « Voir sur eBay » seulement`, JSON.stringify({ n21: [p21.relancer, p21.voir], n22: [p22.relancer, p22.voir] }));
         } finally { lacher(); }
         await pg.waitForSelector('[data-ebay-inactive="120000000022"][data-inactive-vendue]', { timeout: 15000 }).catch(() => {});
-        await pg.waitForSelector('[data-ebay-inactive="120000000021"] a[data-inactive-relancer]', { timeout: 15000 }).catch(() => {});
+        await pg.waitForSelector('[data-ebay-inactive="120000000021"] [data-inactive-relancer]', { timeout: 15000 }).catch(() => {});
         const s2 = await lire(pg);
         const q21 = ligne(s2, '120000000021'), q22 = ligne(s2, '120000000022');
         dit(q22.vendue === 'Vinted' && !q22.relancer && !!q22.voir && !!q21.relancer,
@@ -582,7 +612,7 @@ const ligne = (s, id) => s.lignes.find((l) => l.id === id) || {};
         ]) });
         const { ctx, pg } = await ouvrir(b, vp);
         await versAnnonces(pg);
-        await pg.waitForSelector('[data-ebay-inactive="120000000027"] a[data-inactive-relancer]', { timeout: 15000 }).catch(() => {});
+        await pg.waitForSelector('[data-ebay-inactive="120000000027"] [data-inactive-relancer]', { timeout: 15000 }).catch(() => {});
         await pg.waitForTimeout(400);
         const s = await lire(pg);
         const x27 = ligne(s, '120000000027');

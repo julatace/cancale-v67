@@ -1,6 +1,6 @@
 import './_lib/sans-bruit.js';
 import crypto from 'node:crypto';
-import {lireReceptionEmail} from './_lib/reception-email.js';
+import {lireReceptionEmail,lireJournalEmail,lireTexteEmail} from './_lib/reception-email.js';
 // ── /api/email-rattacher ──────────────────────────────────────────────────────
 // Rejoue un email mis en QUARANTAINE (adresse de réception inconnue, ou
 // plusieurs vendeurs destinataires) au profit du vendeur qui le réclame.
@@ -382,7 +382,14 @@ async function preuveDemander(req, res) {
     if (!await ecrireNeutre(id, { owner: u.id, adresse: a, etat: 'prouvee', via: 'compte', prouveeLe: iso })) { indispo(res); return; }
     res.status(200).json({ ok: true, etat: 'prouvee', via: 'compte' }); return;
   }
-  if (relaisApple(a)) { res.status(422).json({ ok: false, etat: 'impossible', raison: 'relais-apple', message: "Un relais Apple n'accepte que les emails de Vinted : aucun lien ne peut y arriver." }); return; }
+  // (1er nov., VRM vendu à d'autres) UN RELAIS APPLE « MASQUER MON ADRESSE »
+  // n'accepte en principe que les expéditeurs enregistrés par l'application
+  // (Vinted) — non mesuré d'ici. Sans demande explicite, on le DIT (422, la
+  // raison et le geste : mettre une adresse habituelle sur Vinted). Sur SA
+  // demande (`essai: true`), le lien part quand même — mêmes freins, même
+  // preuve, rien d'attribué tant qu'il n'est pas cliqué depuis SA session :
+  // si Apple le laisse passer, l'adresse est prouvée ; sinon rien ne change.
+  if (relaisApple(a) && corps.essai !== true) { res.status(422).json({ ok: false, etat: 'impossible', raison: 'relais-apple', message: "Une adresse « Masquer mon adresse » d'Apple n'accepte en principe que les emails de Vinted : le lien de VRM risque de ne jamais y arriver. Le plus sûr : sur Vinted (Paramètres → Compte → E-mail), mets ton adresse habituelle, puis déclare-la ici." }); return; }
   if (!cleLiens(process.env.SUPABASE_SERVICE_KEY || '')) { res.status(503).json({ ok: false, error: 'cle-service', message: "Le serveur ne sait pas encore fabriquer de lien (clé de service absente) — rien n'est envoyé." }); return; }
   // Freins : un renvoi toutes les 10 minutes, 5 par adresse et par jour,
   // 10 adresses différentes par vendeur et par jour (VRM n'arrose personne).
@@ -466,6 +473,21 @@ export default async function handler(req, res) {
     if (await sondeCloisonnee() !== true) {indispo(res);return;}
     try {res.status(200).json(await lireReceptionEmail({owner,url:SUPABASE_URL,headers:HEADERS}));}
     catch (_) {indispo(res);}return;
+  }
+  // (31 oct.) LE JOURNAL « Tes emails, ce que VRM en a fait » : une page de 20
+  // en scalaires projetés, les compteurs seuls (`compte=1`, pour Colis), ou le
+  // texte d'UN email (`texte=<id de sa ligne>`). Même garde que la réception :
+  // session prouvée, base cloisonnée, filtre par SON owner ; pas su ⇒ 503.
+  if (req.method === 'GET' && mode === 'journal') {
+    const owner = await vendeurDuJeton(jetonDe(req));
+    if (!owner) {res.status(401).json({ok:false,error:'connexion requise'});return;}
+    if (await sondeCloisonnee() !== true) {indispo(res);return;}
+    const q = req.query || {};
+    try {
+      if (q.texte) {res.status(200).json(await lireTexteEmail({owner,url:SUPABASE_URL,headers:HEADERS,id:String(q.texte)}));return;}
+      res.status(200).json(await lireJournalEmail({owner,url:SUPABASE_URL,headers:HEADERS,page:q.page,etat:String(q.etat||''),type:String(q.type||''),adresse:String(q.adresse||''),compteSeul:String(q.compte||'')==='1'}));
+    } catch (e) { if (e && e.message === 'identifiant') res.status(400).json({ok:false,error:'identifiant'}); else indispo(res); }
+    return;
   }
   if (req.method === 'GET' && mode === 'liste') return lister(req, res);
   if (req.method !== 'POST') { res.status(405).json({ error: 'POST only' }); return; }

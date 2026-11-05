@@ -3,7 +3,7 @@ require('./_porte-banc.cjs');
 const path = require('path'), http = require('http'), fs = require('fs');
 let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
-catch (_) { ({ chromium } = require('/home/user/cancale-v67/node_modules/playwright')); }
+catch (_) { ({ chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = 4817;
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' };
@@ -99,17 +99,19 @@ SUIVI.emails.forEach((e,i)=>{e.adresses=[i?'deux@example.test':'un@example.test'
   await essaie('réception '+viewport.width,async()=>{
    const {ctx,pg,erreurs,panne,retablir,etat}=await ouvrir(nav,{liste:EMAILS,viewport,registre:{'vendeuse@exemple.test':{owner:SESSION.user.id},'un@example.test':{owner:SESSION.user.id},'deux@example.test':{owner:SESSION.user.id}}});
    const panel=pg.locator('[data-reception-emails]');await panel.waitFor();
+   // (2 nov.) La liste détaillée vit sous l'Aperçu, repliée (« Chercher un e-mail précis ») : on l'ouvre comme lui.
+   await panel.locator('[data-emails-apercu]').waitFor();await panel.locator('[data-reception-liste] > summary').click();
    dit(await panel.locator('.vrm-reception-liste > li').count()===3,'les trois états sont rendus '+viewport.width);
-   dit((await panel.innerText()).includes('Service de réception actif'),'passage récent confirmé');
+   dit(await panel.locator('[data-apercu-reponse="oui"]').count()===1,'passage récent confirmé : l’Aperçu répond « oui »');
    const lignes=panel.locator('.vrm-reception-liste > li');dit(await lignes.first().locator('.vrm-reception-compte-nom').innerText()==='vendeur-un','nom du compte affiché à côté du mail');dit(await lignes.first().locator('.vrm-reception-bloque').count()===0,'aucun badge de blocage sur un compte actif');dit(await lignes.nth(1).locator('.vrm-reception-bloque').innerText()==='Bloqué','badge uniquement pour le compte banni');
    await panel.getByLabel('Compte / adresse').selectOption('un@example.test');dit(await lignes.count()===1,'filtrage indépendant du premier compte');await panel.getByLabel('Compte / adresse').selectOption('toutes');
 
-   await panel.getByRole('button',{name:'1 À vérifier',exact:true}).click();dit(await panel.locator('.vrm-reception-liste > li').count()===1,'le filtre ne garde que les vérifications');
-   await panel.getByRole('button',{name:'Tous les états'}).click();
+   // (2 nov.) Les compteurs par état ont quitté la liste : l'Aperçu dit UNE fois « 1 à vérifier » (et son geste ouvre le journal filtré).
+   dit(await panel.locator('[data-apercu-geste="verifier"]').getAttribute('data-n')==='1'&&await panel.locator('[data-apercu-famille="attente"]').getAttribute('data-n')==='1','l’Aperçu compte une vérification et un e-mail en attente');
    await panel.getByRole('searchbox').fill('Reçu');dit(await panel.locator('.vrm-reception-liste > li').count()===1,'recherche par objet');
-   await panel.getByRole('searchbox').fill('');await panel.locator('.vrm-reception-liste > li').first().locator('summary').click();dit((await panel.innerText()).includes('Suppression automatique non autorisée'),'conservation expliquée');await panel.locator('.vrm-reception-liste > li').first().locator('summary').click();
+   await panel.getByRole('searchbox').fill('');await panel.locator('.vrm-reception-liste > li').first().locator('summary').click();dit((await panel.innerText()).includes('rien n’est supprimé'),'conservation expliquée');await panel.locator('.vrm-reception-liste > li').first().locator('summary').click();
    await panel.getByRole('button',{name:'Vérifier les emails mis de côté'}).click();dit(await pg.locator('[data-emails-mis-de-cote]').isVisible(),'rattachement existant accessible');
-   await pg.getByRole('navigation',{name:'Rubriques des emails'}).getByRole('button',{name:/Réception/}).click();
+   await pg.getByRole('navigation',{name:'Rubriques des emails'}).getByRole('button',{name:/Réception/}).click();if(!(await panel.locator('[data-reception-liste]').getAttribute('open')!==null))await panel.locator('[data-reception-liste] > summary').click();
    panne();await panel.getByRole('button',{name:'Actualiser',exact:true}).click();await panel.getByRole('alert').waitFor();dit((await panel.innerText()).includes('dernière lecture'),'une panne conserve les données et indique leur ancienneté');
    retablir();await panel.getByRole('button',{name:'Réessayer',exact:true}).click();await pg.waitForTimeout(150);dit(await panel.getByRole('alert').count()===0,'reprise après une panne');
    await pg.getByRole('navigation',{name:'Rubriques des emails'}).getByRole('button',{name:/Comptes et transfert/}).click();

@@ -31,7 +31,7 @@
 //   5. aucun débordement, aucune erreur, aucun écran tombé.
 // On juge les ATTRIBUTS (`data-poste-sans-depart`, `data-tx`, `data-job`,
 // `data-n`) et les nombres rendus, jamais une formulation.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -122,12 +122,20 @@ async function sain(pg, ecran) {
   const m = /n'a pas pu s'afficher|n’a pas pu s’afficher|Cannot access|is not defined/.exec(r.t);
   dit(!m, `${ecran} : l'écran n'est pas tombé sur le garde-fou`, m && m[0]);
 }
-const lireAlerte = (pg) => pg.evaluate(() => {
-  const el = document.querySelector('[data-poste-sans-depart]');
-  if (!el) return null;
-  return { n: Number(el.getAttribute('data-poste-sans-depart')), txs: [...el.querySelectorAll('[data-tx]')].map((x) => ({ tx: x.getAttribute('data-tx'), limite: x.getAttribute('data-limite') })),
-    txt: el.innerText };
-});
+// (2 nov., colis clair) L'alerte est UNE ligne en tête de « À envoyer » (son nombre) ;
+// les colis eux-mêmes sont dans « Partis » (replié), sous l'intertitre qui dit le
+// geste une fois (`data-postes-pas-partis`) — chaque colis une fois sur l'écran.
+// (3 nov., nouvelle mise en page) L'alerte reste UNE ligne en tête de « À envoyer » (son nombre, le geste dit
+// une fois) ; les colis cochés sont dans l'onglet « Envoyés », chacun marqué `data-postes-pas-partis`.
+const lireAlerte = async (pg) => {
+  await pg.click('[data-colis-onglet-choix="envoyer"]').catch(() => {}); await pg.waitForTimeout(300);
+  const tete = await pg.evaluate(() => { const el = document.querySelector('[data-poste-sans-depart]'); return el ? { n: Number(el.getAttribute('data-poste-sans-depart')), txt: el.textContent } : null; });
+  if (!tete) return null;
+  await pg.click('[data-colis-onglet-choix="envoyes"]').catch(() => {}); await pg.waitForTimeout(500);
+  const txs = await pg.evaluate(() => [...document.querySelectorAll('[data-colis-partis] [data-postes-pas-partis][data-tx]')].map((x) => ({ tx: x.getAttribute('data-tx'), limite: x.getAttribute('data-limite') })));
+  await pg.click('[data-colis-onglet-choix="envoyer"]').catch(() => {}); await pg.waitForTimeout(300);
+  return { ...tete, txs };
+};
 const aEnvoyer = (pg) => pg.evaluate(() => { const m = /(\d+)\s*colis à envoyer/.exec(document.body.innerText); return m ? Number(m[1]) : 0; });
 
 (async () => {
@@ -147,7 +155,7 @@ const aEnvoyer = (pg) => pg.evaluate(() => { const m = /(\d+)\s*colis à envoyer
         dit(!!a && (a.txs.find((x) => x.tx === '9204') || {}).limite === 'depassee', 'Colis : 9204 (vendue il y a 9 j) porte « date limite dépassée »', a && JSON.stringify(a.txs));
         dit(!!a && ['9203', '9205', '9206', '9207'].every((t) => !txs.includes(t)), 'Colis : ni 9203 (trop tôt), ni 9205 (partie), ni 9206 (pas recaptée depuis la coche), ni 9207 (pas cochée)', JSON.stringify(txs));
         nColis = a ? a.n : 0;
-        const gestes = a ? (a.txt.match(/Vérifie que le colis a bien été déposé/g) || []).length : 0;
+        const gestes = a ? (a.txt.match(/vérifie le dépôt/gi) || []).length : 0;
         dit(gestes === 1, 'le geste est dit UNE fois pour tout le groupe (§7)', `${gestes} fois`);
         await pg.screenshot({ path: path.join(os.tmpdir(), 'poste-sans-depart-colis-' + vp.width + '.png'), fullPage: true }).catch(() => {});
         await sain(pg, 'Colis');
@@ -163,7 +171,9 @@ const aEnvoyer = (pg) => pg.evaluate(() => { const m = /(\d+)\s*colis à envoyer
         await pg.goto(`http://localhost:${PORT}/?tab=cat_bord`, { waitUntil: 'domcontentloaded' });
         await pg.waitForTimeout(4500);
         const avant = await aEnvoyer(pg);
+        await pg.click('[data-colis-onglet-choix="envoyes"]').catch(() => {}); await pg.waitForTimeout(500);
         await pg.click('[data-annuler-poste="9201"]', { timeout: 5000 });
+        await pg.click('[data-colis-onglet-choix="envoyer"]').catch(() => {});
         await pg.waitForTimeout(900);
         const a = await lireAlerte(pg);
         const apres = await aEnvoyer(pg);

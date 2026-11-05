@@ -34,7 +34,7 @@ import { CarteJourEcran } from './accueil-carte.jsx';
 import { EcranColis, EcranAilleurs, EcranMois } from './accueil-scenes.jsx';
 
 const V = DEMO.vente, R = DEMO.reste;
-const POLICE_TITRE = "'Space Grotesk','Inter',system-ui,sans-serif";
+const POLICE_TITRE = "-apple-system,BlinkMacSystemFont,'Inter',system-ui,sans-serif";
 
 // ── Les plans ──────────────────────────────────────────────────────────────
 const PLANS_LONG = [
@@ -124,10 +124,10 @@ export default function Film() {
   const W = portrait ? 1080 : 1920, H = portrait ? 1920 : 1080;
   const echelle = Math.min(vue.w / W, vue.h / H);
   return (
-    <div data-film-plan={plan} style={{ position: 'fixed', inset: 0, overflow: 'hidden', background: K.bg, fontFamily: "'Inter',system-ui,sans-serif" }}>
+    <div data-film-plan={plan} style={{ position: 'fixed', inset: 0, overflow: 'hidden', background: K.bg, fontFamily: "-apple-system,BlinkMacSystemFont,'Inter',system-ui,sans-serif" }}>
       <style>{'[data-film-plan] *{box-sizing:border-box}'}</style>
       <div style={{ position: 'absolute', left: (vue.w - W * echelle) / 2, top: (vue.h - H * echelle) / 2, width: W, height: H, transform: `scale(${echelle})`, transformOrigin: '0 0', overflow: 'hidden',
-        background: `radial-gradient(${portrait ? '1100px 1300px at 50% 46%' : '1300px 800px at 50% 50%'}, rgba(61,123,255,0.14), transparent 70%), ${K.bg}` }}>
+        background: K.bg }}>
         <Plateau t={t} W={W} H={H} portrait={portrait} court={court} />
       </div>
     </div>
@@ -310,7 +310,7 @@ function Plateau({ t, W, H, portrait, court }) {
       if (ap <= 0) continue;
       const x = baseC[0] + (i % 3) * 112 + (i >= 3 ? 50 : 0), y = baseC[1] + (i >= 3 ? -88 : 0);
       const v = vers(x + 48, y + 40, i);
-      libres.push(<div key={`c${i}`} style={{ position: 'absolute', left: x, top: y, width: 96, height: 80, borderRadius: 8, background: K.card2, border: `1px solid ${K.line2}`,
+      libres.push(<div key={`c${i}`} style={{ position: 'absolute', left: x, top: y, width: 96, height: 80, borderRadius: 12, background: K.card2, border: `1px solid ${K.line2}`,
         opacity: ap * v.o, transform: `translate(${v.dx.toFixed(1)}px, ${(v.dy + mix(-30, 0, ap)).toFixed(1)}px) rotate(${ROTATIONS[i]}deg) scale(${v.s.toFixed(3)})` }}>
         <div style={{ position: 'absolute', left: 0, right: 0, top: 22, height: 9, background: 'rgba(255,255,255,.06)' }} />
         <div style={{ position: 'absolute', left: '50%', top: 0, width: 16, height: 31, marginLeft: -8, background: 'rgba(255,255,255,.07)' }} />
@@ -322,10 +322,10 @@ function Plateau({ t, W, H, portrait, court }) {
       if (ap > 0) {
         const x = portrait ? 680 : 1400, y = portrait ? 1340 : 690;
         const v = vers(x + 140, y + 110, 6);
-        libres.push(<div key="feuille" style={{ position: 'absolute', left: x, top: y, width: 280, height: 220, borderRadius: 8, background: K.paper, color: K.ink, padding: 24,
+        libres.push(<div key="feuille" style={{ position: 'absolute', left: x, top: y, width: 280, height: 220, borderRadius: 12, background: K.paper, color: K.ink, padding: 24,
           opacity: 0.9 * ap * v.o, transform: `translate(${v.dx.toFixed(1)}px, ${(v.dy + mix(20, 0, ap)).toFixed(1)}px) rotate(4deg) scale(${v.s.toFixed(3)})` }}>
-          {[78, 56, 70, 44].map((w, i) => <div key={i} style={{ height: 10, width: `${w}%`, background: '#D9DEE6', borderRadius: 3, marginTop: i ? 14 : 0 }} />)}
-          <div style={{ marginTop: 26, fontSize: 24, fontWeight: 600 }}>à déclarer : ? €</div>
+          {[78, 56, 70, 44].map((w, i) => <div key={i} style={{ height: 10, width: `${w}%`, background: '#E5E5EA', borderRadius: 3, marginTop: i ? 14 : 0 }} />)}
+          <div style={{ marginTop: 26, fontSize: 22, fontWeight: 600 }}>à déclarer : ? €</div>
         </div>);
       }
     }
@@ -407,7 +407,7 @@ function Plateau({ t, W, H, portrait, court }) {
     const hFin = cibles.ident ? cibles.ident.h * cam.s : 37;
     const sc = mix(mix(0.5, 1, nait), hFin / 72, sortie(pose));
     libres.push(<div key="n128" style={{ position: 'absolute', left: x, top: y, height: 72, padding: '0 26px', display: 'flex', alignItems: 'center', borderRadius: 14,
-      background: 'rgba(61,123,255,.16)', border: `2px solid ${K.accent}`, color: K.text, fontSize: 38, fontWeight: 600, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
+      background: 'rgba(0,113,227,.16)', border: `2px solid ${K.accent}`, color: K.text, fontSize: 38, fontWeight: 600, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
       opacity: Math.min(1, nait * 1.6), transform: `translate(-50%, -50%) scale(${sc.toFixed(4)})` }}>N°{V.n}</div>);
   }
 
@@ -432,11 +432,11 @@ function Plateau({ t, W, H, portrait, court }) {
     const gx = (W - 2 * cw - g) / 2, gy = portrait ? 560 : 320;
     cartes.forEach(([a, b, c, point], i) => {
       const p = sortie(seg(t, 28.2 + 0.15 * i, 28.2 + 0.15 * i + 0.5));
-      libres.push(<div key={`r${i}`} style={{ position: 'absolute', left: gx + (i % 2) * (cw + g), top: gy + Math.floor(i / 2) * (ch + g), width: cw, height: ch, borderRadius: 18,
+      libres.push(<div key={`r${i}`} style={{ position: 'absolute', left: gx + (i % 2) * (cw + g), top: gy + Math.floor(i / 2) * (ch + g), width: cw, height: ch, borderRadius: 20,
         background: K.card, border: `1px solid ${K.line2}`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,.06), 0 2px 4px rgba(0,0,0,.5), 0 40px 90px rgba(0,0,0,.45)', padding: portrait ? '30px 32px' : '30px 34px',
         opacity: p * (1 - out), transform: `translateY(${(mix(16, 0, p) - 0).toFixed(1)}px) scale(${mix(1, 0.96, out).toFixed(4)})` }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 22, fontWeight: 500, color: K.muted, whiteSpace: 'nowrap' }}>{point && <i style={{ width: 11, height: 11, borderRadius: 3, background: point }} />}{a}</div>
-        <div style={{ fontFamily: POLICE_TITRE, fontSize: portrait ? 40 : 42, fontWeight: 700, color: K.text, marginTop: 16, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{b}</div>
+        <div style={{ fontFamily: POLICE_TITRE, fontSize: portrait ? 38 : 44, fontWeight: 700, color: K.text, marginTop: 16, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{b}</div>
         <div style={{ fontSize: 22, color: K.muted, marginTop: 10, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c}</div>
       </div>);
     });
@@ -513,7 +513,7 @@ function PrixVole({ t, cibles, versEcran, W, H, portrait, k, mois, compact }) {
         color: K.text, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', opacity: 1 - fondA, filter: fondA > 0 && fondA < 1 ? `blur(${(2 * fondA).toFixed(2)}px)` : undefined }}>{euros(V.prix)}</span>
       {devient > 0 && (
         <span style={{ position: 'absolute', left: pL, top: pY - 13 * k, height: 26 * k, padding: `0 ${10 * k}px`, display: 'inline-flex', alignItems: 'center', borderRadius: 8 * k,
-          background: 'rgba(61,123,255,.12)', border: `1px solid ${K.accent}`, fontSize: 12 * k, fontWeight: 600, color: K.text, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums',
+          background: 'rgba(0,113,227,.12)', border: `1px solid ${K.accent}`, fontSize: 12 * k, fontWeight: 600, color: K.text, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums',
           clipPath: `inset(0 ${(100 * (1 - ouvre)).toFixed(2)}% 0 0 round ${8 * k}px)`, opacity: Math.min(1, devient * 2) }}>{texte}</span>
       )}
     </>

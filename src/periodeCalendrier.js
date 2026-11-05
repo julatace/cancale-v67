@@ -164,3 +164,37 @@ export function moisDefilants(maintenant = new Date(), nb = 18) {
   for (let i = nb - 1; i >= 0; i--) out.push(decalerMois(n.getFullYear(), n.getMonth(), -i));
   return out;
 }
+
+// ── LA CARTE SOMBRE (3 nov., Julien : « fais un calendrier ») ──────────────────
+// Les raccourcis de la feuille « Modifier » de la carte : Aujourd'hui · Cette semaine ·
+// Ce mois · Mois dernier · Ce trimestre · Cette année. `cle` = la période nommée de la
+// carte (`jour`, `semaine`, `mois`, `trimestre`, `annee`) quand il y en a une — la carte
+// la calcule alors par SES règles (`debutPeriode`) ; « Mois dernier » est une plage.
+export function raccourcisCarte(maintenant = new Date()) {
+  const n = maintenant instanceof Date ? maintenant : new Date(maintenant);
+  const auj = jourSeul(n);
+  const lundi = new Date(auj.getFullYear(), auj.getMonth(), auj.getDate() - ((auj.getDay() + 6) % 7));
+  const t0 = Math.floor(auj.getMonth() / 3) * 3;
+  const md = new Date(auj.getFullYear(), auj.getMonth() - 1, 1);
+  return [
+    { cle: 'jour', nom: 'Aujourd’hui', valeur: { from: auj, to: auj, label: 'aujourd’hui' } },
+    { cle: 'semaine', nom: 'Cette semaine', valeur: { from: lundi, to: new Date(lundi.getFullYear(), lundi.getMonth(), lundi.getDate() + 6), label: 'cette semaine' } },
+    { cle: 'mois', nom: 'Ce mois', valeur: { from: new Date(auj.getFullYear(), auj.getMonth(), 1), to: new Date(auj.getFullYear(), auj.getMonth() + 1, 0), label: nomMois(auj.getFullYear(), auj.getMonth()) } },
+    { cle: 'dernier', nom: 'Mois dernier', valeur: { from: md, to: new Date(md.getFullYear(), md.getMonth() + 1, 0), label: nomMois(md.getFullYear(), md.getMonth()) } },
+    { cle: 'trimestre', nom: 'Ce trimestre', valeur: { from: new Date(auj.getFullYear(), t0, 1), to: new Date(auj.getFullYear(), t0 + 3, 0), label: `T${t0 / 3 + 1} ${auj.getFullYear()}` } },
+    { cle: 'annee', nom: 'Cette année', valeur: { from: new Date(auj.getFullYear(), 0, 1), to: new Date(auj.getFullYear(), 11, 31), label: `année ${auj.getFullYear()}` } },
+  ];
+}
+// L'étiquette COURTE d'une plage en tête de carte : « 3–17 nov. », « 28 oct.–3 nov. »,
+// « octobre 2026 » (un mois entier), « 5 nov. » (un jour).
+export function etiquettePlage(from, to) {
+  const f = from instanceof Date && !isNaN(from) ? jourSeul(from) : null;
+  const t = to instanceof Date && !isNaN(to) ? jourSeul(to) : f;
+  if (!f) return '';
+  const finMois = new Date(f.getFullYear(), f.getMonth() + 1, 0);
+  if (f.getDate() === 1 && memeJour(t, finMois)) return nomMois(f.getFullYear(), f.getMonth());
+  if (memeJour(f, t)) return `${f.getDate()} ${MOIS_COURT[f.getMonth()]}`;
+  const an = f.getFullYear() !== t.getFullYear();
+  if (!an && f.getMonth() === t.getMonth()) return `${f.getDate()}–${t.getDate()} ${MOIS_COURT[t.getMonth()]}`;
+  return `${f.getDate()} ${MOIS_COURT[f.getMonth()]}${an ? ' ' + f.getFullYear() : ''}–${t.getDate()} ${MOIS_COURT[t.getMonth()]}${an ? ' ' + t.getFullYear() : ''}`;
+}

@@ -40,7 +40,7 @@
 //      que VRM savait ;
 //   et partout : aucun débordement, aucune erreur de page, aucun écran mort.
 //        node scripts/bancs/ebay-regle-offre.cjs [--blocs 1,5,9] [--taille 1512]
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -278,7 +278,28 @@ async function ouvrir(b, vp, c) {
   return { ctx, pg, errs };
 }
 const feuille = (pg) => pg.locator('div[style*="z-index: 2000"]');
-const sousOnglet = async (pg, nom) => { await pg.getByRole('button', { name: nom, exact: true }).first().click({ timeout: 8000 }); await pg.waitForTimeout(900); };
+// (31 oct., soir) Plus d'espace eBay à part : « Annonces » / « Ventes » sont les
+// tâches filtrées sur eBay (onglet de la navigation, puis la pastille eBay si le
+// filtre retenu est un autre site) ; « Compte » est le panneau « Comptes eBay »
+// des Paramètres. Toujours SANS recharger la page (le [9] change d'écran pendant
+// un envoi).
+const sousOnglet = async (pg, nom) => {
+  if (nom === 'Compte') {
+    // L'ancien lien « eBay → Compte » : il ouvre le panneau des Paramètres (le seul
+    // geste de ce banc qui recharge, il ne juge rien « pendant » un envoi).
+    await pg.goto(`http://localhost:${PORT}/?tab=plat_ebay&section=compte`, { waitUntil: 'domcontentloaded' });
+    await pg.waitForSelector('[data-sous-ecran="ebay"]:not([hidden]) [data-ebay-compte-section]', { timeout: 15000 });
+    await pg.waitForTimeout(900); return;
+  }
+  const t = nom === 'Annonces' ? 'annonces' : 'ventes';
+  await pg.evaluate((x) => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: x })), t);
+  await pg.waitForTimeout(500);
+  const f = pg.locator('[data-filtre-site] button[data-site="ebay"]');
+  if (await f.count() && (await f.first().getAttribute('aria-pressed')) !== 'true') await f.first().click({ timeout: 8000 });
+  if (t === 'ventes') { const c = pg.locator('[data-tache-sous] [data-section="ventes"]'); if (await c.count() && (await c.first().getAttribute('aria-current')) !== 'page') await c.first().click(); }
+  if (t === 'annonces') { const c = pg.locator('[data-tache-sous] [data-section="annonces"]'); if (await c.count() && (await c.first().getAttribute('aria-current')) !== 'page') await c.first().click(); }
+  await pg.waitForTimeout(900);
+};
 async function allerAnnonces(pg) {
   await pg.goto(`http://localhost:${PORT}/?tab=plat_ebay`, { waitUntil: 'domcontentloaded' });
   await pg.waitForSelector('#vrm-sel-compte-ebay', { timeout: 15000 });

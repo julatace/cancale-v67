@@ -4,7 +4,7 @@
 // vidées (préfixe exact, jamais celles d'un autre compte), la recherche ne le
 // montre plus (l'autre sens : un compte vivant reste trouvé), et la carte d'un
 // compte ne dit que « Actif » (sans « Tester la connexion »).
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -99,7 +99,11 @@ async function main() {
         const { ctx, pg, errs } = await preparer(b, vp);
         await pg.goto(`http://localhost:${PORT}/?tab=vintedaccounts`, { waitUntil: 'domcontentloaded' });
         await pg.getByText('compte_vivant').first().waitFor({ timeout: 12000 });
-        await pg.waitForTimeout(1500);
+        // La purge part à l'arrivée du nuage (onCloudReady) : on attend qu'elle ait
+        // ÉCRIT (jusqu'à 12 s), jamais un délai fixe — il était trop court depuis
+        // que le démarrage lit davantage (vu le 29 oct. : écriture à ~2 s).
+        for (let t = 0; t < 40 && !ECRITS.some((e) => e && /^harvest_199082413_/.test(e.id)); t++) await pg.waitForTimeout(300);
+        await pg.waitForTimeout(300);
         const vides = ECRITS.filter((e) => e && /^harvest_199082413_/.test(e.id) && e.data && e.data.supprime === true).map((e) => e.id).sort();
         dit(vides.join(',') === 'harvest_199082413_listings,harvest_199082413_orders_sold', `${T} les lignes du compte supprimé sont VIDÉES (préfixe exact)`, vides.join(','));
         dit(!ECRITS.some((e) => e && /^harvest_111_/.test(e.id) && e.data && e.data.supprime), `${T} et jamais celles du compte vivant`);
@@ -107,7 +111,7 @@ async function main() {
         dit(ec.etat === 'actif' && !ec.test, `${T} la carte du compte dit « Actif », sans « Tester la connexion »`, JSON.stringify(ec));
         // La recherche.
         await pg.locator('[aria-label="Rechercher une paire"]').first().click();
-        const champ = pg.locator('input[placeholder^="N°, nom du modèle"]');
+        const champ = pg.locator('[data-recherche-champ]');
         await champ.fill('nike'); await pg.waitForTimeout(900);
         const nike = await pg.evaluate(() => document.body.innerText);
         dit(!/Nike Sacai/.test(nike), `${T} la recherche ne montre plus les paires du compte supprimé`, (nike.match(/[^\n]*Nike[^\n]*/g) || []).join(' | '));
@@ -116,6 +120,9 @@ async function main() {
         dit(/Adidas Spezial/.test(adi), `${T} l'autre sens : la paire du compte vivant est trouvée`);
         // MODE STREAM : allumé dans Réglages, les noms de comptes sont floutés.
         await pg.keyboard.press('Escape').catch(() => {});
+        // (31 oct.) Échap ferme le panneau de recherche, qui retire son entrée
+        // d'historique (retour) : on la laisse partir avant de naviguer.
+        await pg.waitForTimeout(600);
         await pg.goto(`http://localhost:${PORT}/?tab=settings`, { waitUntil: 'domcontentloaded' });
         const inter = pg.locator('[data-stream-reglage] button[role="switch"]');
         await inter.waitFor({ timeout: 12000 }); await inter.scrollIntoViewIfNeeded(); await inter.click();

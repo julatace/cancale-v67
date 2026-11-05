@@ -182,14 +182,14 @@ export default function StudioPhoto({ C, paires, base, onClose }) {
           {sel && <button type="button" className={B.d} onClick={() => { couper(); setSel(null); setMode('choix'); setMsg(''); }}>Changer de paire</button>}
           <button type="button" aria-label="Fermer le studio photo" onClick={fermer} style={{ border: 'none', background: 'transparent', color: C.muted, fontSize: 20, minWidth: 44, minHeight: 44, cursor: 'pointer' }}>✕</button>
         </div>
-        <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5, marginBottom: 12 }}>
+        <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5, marginBottom: 12 }}>
           Le même cadre pour toutes tes paires. Enregistre la photo, puis ajoute-la toi-même sur Vinted.
         </div>
 
         {!sel && (
           <div data-studio-choix>
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="N° ou titre de la paire" aria-label="Chercher une paire"
-              style={{ width: '100%', boxSizing: 'border-box', border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', fontSize: 15, background: C.card, color: C.text, marginBottom: 8, fontFamily: 'inherit' }} />
+              style={{ width: '100%', boxSizing: 'border-box', border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 15, background: C.card, color: C.text, marginBottom: 8, fontFamily: 'inherit' }} />
             {!(paires || []).length ? (
               <div style={{ fontSize: 13, color: C.muted }}>Aucune paire numérotée chez toi pour l’instant : le studio range les photos sous le numéro du carton.</div>
             ) : liste.map((p) => (
@@ -209,7 +209,7 @@ export default function StudioPhoto({ C, paires, base, onClose }) {
             </div>
           ) : null}
           {mode === 'fichier' && (
-            <div data-studio-repli={camRaison || 'fichier'} style={{ fontSize: 12.5, color: C.text, lineHeight: 1.5, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', marginBottom: 10 }}>
+            <div data-studio-repli={camRaison || 'fichier'} style={{ fontSize: 13, color: C.text, lineHeight: 1.5, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', marginBottom: 10 }}>
               {camRaison === 'refusee'
                 ? 'Caméra refusée : prends la photo avec l’appareil photo du téléphone, elle sera recadrée au format du cadre. Pour revoir le cadre, autorise la caméra dans le navigateur.'
                 : 'Pas de caméra ici : prends ou choisis une photo, elle sera recadrée au format du cadre.'}
@@ -224,16 +224,16 @@ export default function StudioPhoto({ C, paires, base, onClose }) {
                 : <button type="button" data-studio-ouvrir className={B.p} onClick={ouvrirCamera}>Ouvrir la caméra</button>}
             {mode === 'camera' && <button type="button" className={B.d} onClick={() => { couper(); setMode('choix'); }}>Fermer la caméra</button>}
           </div>
-          {msg && <div data-studio-msg style={{ fontSize: 12.5, color: C.text, lineHeight: 1.5, marginBottom: 10 }}>{msg}</div>}
+          {msg && <div data-studio-msg style={{ fontSize: 13, color: C.text, lineHeight: 1.5, marginBottom: 10 }}>{msg}</div>}
 
           <div style={{ fontSize: 13, fontWeight: 700, color: C.text, margin: '6px 0' }}>Photos de la paire N°{sel.num}</div>
-          {photos === undefined ? <div style={{ fontSize: 12.5, color: C.muted }}>Lecture…</div>
-            : photos === null ? <div data-studio-passu style={{ fontSize: 12.5, color: C.muted }}>La base n’a pas répondu : je ne sais pas encore quelles photos sont rangées. Rien ne sera écrasé.</div>
-            : !photos.length ? <div style={{ fontSize: 12.5, color: C.muted }}>Aucune photo rangée pour cette paire.</div>
+          {photos === undefined ? <div style={{ fontSize: 13, color: C.muted }}>Lecture…</div>
+            : photos === null ? <div data-studio-passu style={{ fontSize: 13, color: C.muted }}>La base n’a pas répondu : je ne sais pas encore quelles photos sont rangées. Rien ne sera écrasé.</div>
+            : !photos.length ? <div style={{ fontSize: 13, color: C.muted }}>Aucune photo rangée pour cette paire.</div>
             : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10 }}>
                 {photos.map((ph, i) => (
-                  <div key={ph.id} data-studio-photo={ph.id} style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: 6, background: C.card }}>
+                  <div key={ph.id} data-studio-photo={ph.id} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: 6, background: C.card }}>
                     <div style={{ display: 'flex', gap: 4 }}>
                       <img src={ph.img} alt={`Photo ${i + 1} de la paire N°${sel.num}`} style={{ width: ph.detoure ? '50%' : '100%', aspectRatio: `${RATIO_CADRE}`, objectFit: 'cover', borderRadius: 6 }} />
                       {ph.detoure && <img src={ph.detoure} data-studio-detoure alt="Détourée" style={{ width: '50%', aspectRatio: `${RATIO_CADRE}`, objectFit: 'contain', borderRadius: 6, background: damier }} />}
@@ -248,7 +248,7 @@ export default function StudioPhoto({ C, paires, base, onClose }) {
                 ))}
               </div>
             )}
-          <div style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5, marginTop: 10 }}>
+          <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginTop: 10 }}>
             « Détourer ici » reste dans ce navigateur, sans envoi ni clé : vérifie les bords avant de t’en servir.
             {avecPhotoroom && <span data-studio-photoroom-note="" style={{ display: 'block', marginTop: 4 }}>« Détourer avec Photoroom » envoie la photo à Photoroom avec <b>ta</b> clé (se termine par {(cleP && cleP.fin) || '····'}) : c’est ton compte Photoroom qui paie, à la photo, sur fond blanc.</span>}
             {sansPhotoroom && <span data-studio-photoroom-indispo={cleP.verif} style={{ display: 'block', marginTop: 4 }}>{sansPhotoroom}</span>}

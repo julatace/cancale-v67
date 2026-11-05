@@ -30,11 +30,32 @@ export function suivreReceptionLeboncoin({fenetre,document,relire,onErreur=()=>{
 // en vol finit sans personne pour l'attendre. Une lecture identique en vol, ou
 // finie il y a moins de 2 s, est aussi fraîche qu'une neuve ; un signal de
 // l'extension (`vrm:ext`) ou une écriture vident ce partage.
-export async function lireReceptionLeboncoin(url,headers,{transport=fetch,delai=12000}={}) {
+// ⚠️ (1er nov.) « Il ne doit plus y avoir d'erreur pendant la lecture des données
+// Leboncoin » : un écran Leboncoin enchaîne une dizaine de lectures, et UNE seule
+// lecture ratée suffisait à afficher « je n'ai pas pu lire… ». Or l'échec courant
+// est PASSAGER — un jeton qui vient d'expirer (401 : `rafraichir` le renouvelle
+// avant de relire, `headers` peut être une fonction pour reprendre le jeton neuf),
+// une base qui hoquette (5xx, 408, 429), le réseau, un corps tronqué. Une SEULE
+// relecture, `pauseRelecture` plus tard, dans le même délai total ; un refus net
+// (400, 403, 404) ne se relit pas. Au bout : toujours `null` (« pas su »), jamais `[]`.
+export async function lireReceptionLeboncoin(url,headers,{transport=fetch,delai=12000,rafraichir=null,pauseRelecture=800}={}) {
   let timer;
   const expire=new Promise(r=>{timer=setTimeout(()=>r(undefined),delai);});
+  const entetes=()=>typeof headers==='function'?headers():headers;
   try{
-    const lecture=(async()=>{const r=await transport(url,{headers});return r.ok?await r.json():null;})();
+    const lecture=(async()=>{
+      for(let essai=0;essai<2;essai++){
+        let r=null;
+        try{r=await transport(url,{headers:entetes()});}catch(_){r=null;}
+        if(r&&r.ok){try{return await r.json();}catch(_){/* corps illisible : relu une fois */}}
+        const st=r?Number(r.status)||0:0;
+        const passager=!r||r.ok||st===0||st===401||st===408||st===429||st>=500;
+        if(!passager||essai>0)return null;
+        if(st===401&&typeof rafraichir==='function'){try{await rafraichir();}catch(_){}}
+        await new Promise(res=>setTimeout(res,pauseRelecture));
+      }
+      return null;
+    })();
     const rep=await Promise.race([lecture,expire]);
     return rep===undefined?null:rep;
   }

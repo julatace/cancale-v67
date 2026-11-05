@@ -15,7 +15,9 @@ const ventes = [
 const rows = [{id:'harvest_111_orders_sold',data:{capturedAt:maintenant,payload:{my_orders:ventes}}}];
 const pixel='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aD1sAAAAASUVORK5CYII=';
 ventes[0].photo={url:'https://images1.vinted.net/test.png'};
-rows.push({id:'email_invoice_test',data:{type:'facture_pro',status:'draft',account:compte.login,number:'FA1',designation:ventes[0].title,prix:95,buyerEmail:'acheteur@example.test'}},
+// (2 nov.) La preuve Pro d'une vente : l'e-mail Vinted Pro de SA transaction (src/FacturePro.jsx).
+const preuvesPro=[{id:'email_sale_pro1',data:{type:'vente',pro:true,transaction:'9001',nomComplet:'Acheteuse Banc',adresse:'1 rue X, Rennes, 35000, FR, France',email:'acheteur@example.test',account:compte.login}},{id:'email_sale_pro2',data:{type:'vente',pro:true,transaction:'9002',nomComplet:'Acheteur Banc',adresse:'2 rue Y, Rennes, 35000, FR, France',email:'acheteur2@example.test',account:compte.login}}];
+rows.push(...preuvesPro,
 {id:'lbc_ventes',data:{ventes:{one:{txId:1,isSeller:true,title:'Paire Leboncoin',price:9500,photo:'data:image/png;base64,'+pixel,stepStatus:'done',stepLabel:'Terminé'}}}},
 {id:'ebay_orders',data:{orders:[{orderId:'1',orderPaymentStatus:'PAID',orderFulfillmentStatus:'NOT_STARTED',lineItems:[{title:'Paire eBay',legacyItemId:'12'}],pricingSummary:{total:{value:'95',currency:'EUR'}}}]}},
 {id:'ebay_listings',data:{items:[{itemId:'12',imageUrl:'data:image/png;base64,'+pixel}]}});
@@ -76,20 +78,27 @@ const ouvrirVente=async(p)=>{const t=p.locator('.vrm-sale-row .vrm-ledger-sale-t
     //    chaque vente est REPLIÉE : la ligne compacte est le bouton `.vrm-ledger-sale-toggle` (vignette,
     //    titre, statut, montant) et le détail s'ouvre au toucher. On juge la ligne repliée, puis on OUVRE
     //    la vente (le geste de la personne) pour juger sa photo, à gauche des informations.
-    const plie=await p.locator('.vrm-sale-row .vrm-ledger-sale-toggle').first().evaluate(e=>{const r=e.getBoundingClientRect();return {h:r.height,visible:r.width>0&&r.height>0};}).catch(()=>null);
-    if(plie){check(plie.visible && plie.h<=64,'ligne repliée compacte '+tab+' ('+Math.round(plie.h)+' px)');
+    // (31 oct.) Julien : « tu peux grossir, les icônes devant sont beaucoup trop petites, on voit même pas ce
+    //    que c'est, il n'y a même pas le nom de la paire en entier ». La ligne repliée porte une photo de 64 × 80
+    //    au moins et le nom EN ENTIER (jamais coupé) ; elle reste une ligne (≤ 120 px, une seule photo de haut).
+    const plie=await p.locator('.vrm-sale-row .vrm-ledger-sale-toggle').first().evaluate(e=>{const r=e.getBoundingClientRect(),ph=e.querySelector('.vrm-ledger-photo-empty'),pr=ph?ph.getBoundingClientRect():null,nom=e.querySelector('.vrm-ledger-sale-nom');const cs=nom?getComputedStyle(nom):null;return {h:r.height,visible:r.width>0&&r.height>0,pw:pr?pr.width:0,ph:pr?pr.height:0,coupe:!nom||nom.scrollWidth>nom.clientWidth+1||(cs.textOverflow==='ellipsis'&&cs.whiteSpace==='nowrap')};}).catch(()=>null);
+    if(plie){check(plie.visible && plie.h<=120 && plie.pw>=64 && plie.ph>=80 && !plie.coupe,'ligne repliée '+tab+' : photo '+Math.round(plie.pw)+'×'+Math.round(plie.ph)+', nom entier '+(!plie.coupe)+', '+Math.round(plie.h)+' px');
       await p.locator('.vrm-sale-row .vrm-ledger-sale-toggle').first().click();await p.locator('.vrm-sale-row[data-ligne-ouverte=true]').first().waitFor({timeout:5000});}
     // (21 oct.) La vente ouverte se détaille dans un TIROIR (portail, `aria-controls` du bouton de la ligne) : on y mesure.
     const idT=await p.locator('.vrm-sale-row .vrm-ledger-sale-toggle').first().getAttribute('aria-controls').catch(()=>null);
-    const cibleVente=idT&&await p.locator(`[id="${idT}"] .vrm-sale-row`).count()?p.locator(`[id="${idT}"] .vrm-sale-row`).first():p.locator('.vrm-sale-row').first();
-    const pos=await cibleVente.evaluate(e=>{const a=e.querySelector('.vrm-sale-photo').getBoundingClientRect(),b=e.querySelector('.vrm-sale-info').getBoundingClientRect(),r=e.getBoundingClientRect(),ov=e.querySelector('.vrm-sale-overview');return {w:a.width,h:a.height,left:a.left,right:b.left,row:r.height,ligne:ov?ov.getBoundingClientRect().height:null};});
+    // (1er nov.) Le tiroir d'une vente VINTED est le récapitulatif (maquette A) : la photo est dans son
+    //    en-tête (`.vrm-recap-tete`), à gauche du N° et du nom (`.vrm-recap-ident`), CARRÉE et de taille
+    //    constante (84 × 84 au téléphone) ; l'en-tête reste sous 200 px. Leboncoin et eBay gardent leur tiroir.
+    const recap=idT&&await p.locator(`[id="${idT}"] .vrm-recap-tete`).count();
+    const cibleVente=recap?p.locator(`[id="${idT}"] .vrm-recap-tete`).first():idT&&await p.locator(`[id="${idT}"] .vrm-sale-row`).count()?p.locator(`[id="${idT}"] .vrm-sale-row`).first():p.locator('.vrm-sale-row').first();
+    const pos=await cibleVente.evaluate(e=>{const a=e.querySelector('.vrm-sale-photo').getBoundingClientRect(),b=e.querySelector('.vrm-sale-info, .vrm-recap-ident').getBoundingClientRect(),r=e.getBoundingClientRect(),ov=e.matches('.vrm-recap-tete')?e:e.querySelector('.vrm-sale-overview');return {w:a.width,h:a.height,left:a.left,right:b.left,row:r.height,ligne:ov?ov.getBoundingClientRect().height:null};});
     // ⚠️ L'écran Ventes de Vinted a sa propre liste depuis le 16 octobre (b8d11f2, « Ventes premium », `.vrm-ventes-liste` : vignette CARRÉE 56 × 56 sur téléphone) ; Leboncoin et eBay gardent la ligne partagée 64 × 84. Chaque liste est jugée sur SA taille exacte, photo à gauche des informations.
     //    Et depuis #545 (« plateformes premium », 16 octobre) Leboncoin et eBay ont, AU TÉLÉPHONE, leur ligne d'app native
     //    (`styles-mineral.css` : vignette portrait 52 × 68). Ce banc est à 390 px : c'est cette taille-là qu'il exige.
     //    (20 octobre) Et depuis fc4c73e (« ventes mobiles sur une seule ligne », styles-mobile-studio.css), les DEUX listes
     //    ont au téléphone la même vignette portrait 36 × 48, ouverte comme repliée. Une taille exacte, jugée vente ouverte.
     //    (26 octobre) Julien : « on voit à peine les photos » — la vignette passe à 60 × 80 (décision de sa demande).
-    const attendu={w:60,h:80,nom:'photo portrait à gauche '};
+    const attendu=recap?{w:84,h:84,nom:'photo carrée du récapitulatif à gauche '}:{w:60,h:80,nom:'photo portrait à gauche '};
     check(pos.w===attendu.w && pos.h===attendu.h && pos.right>pos.left,attendu.nom+tab+' ('+pos.w+'×'+pos.h+')');
     // ⚠️ Ventes Vinted (b8d11f2, 16 octobre) : la LIGNE (`.vrm-sale-overview` : vignette, titre, statut, montant,
     //    bouton du bordereau sous le titre) reste sous 200 px ; les gestes du coût d'achat et « Modifier › »
@@ -107,50 +116,66 @@ const ouvrirVente=async(p)=>{const t=p.locator('.vrm-sale-row .vrm-ledger-sale-t
       //    NOT_STARTED · IN_PROGRESS · FULFILLED) ; « NOT_FULFILLED » n'en est pas un et vaut « Expédition à
       //    confirmer ». La commande du banc porte donc NOT_STARTED (la forme réelle, comme revendeurs.cjs), et le
       //    second filtre d'eBay s'appelle « Expédiées » (doneLabel).
-      await p.getByRole('button',{name:'À expédier',exact:true}).click();await p.getByText('Paire eBay',{exact:true}).first().waitFor({timeout:5000}).catch(()=>{});check(await p.getByText('Paire eBay',{exact:true}).first().isVisible(),'NOT_STARTED reste à expédier');
+      // (1er nov.) La vente est OUVERTE (tiroir = feuille du bas au téléphone) : le filtre reste touchable au-dessus
+      //    d'elle, et ce toucher hors du tiroir le referme (comportement d'une feuille) — avant, la feuille couvrait
+      //    « À expédier » et interceptait le clic. Jugé sur l'état observé (tiroir caché), pas sur un délai.
+      check(await p.locator('.vrm-ledger-drawer-host:not([hidden])').count()===1,'vente ouverte avant le filtre');
+      await p.getByRole('button',{name:'À expédier',exact:true}).click({timeout:10000});
+      check(await p.waitForFunction(()=>!document.querySelector('.vrm-ledger-drawer-host:not([hidden])'),null,{timeout:5000}).then(()=>true,()=>false),'un toucher hors du tiroir le referme et atteint sa cible');
+      await p.getByText('Paire eBay',{exact:true}).first().waitFor({timeout:5000}).catch(()=>{});check(await p.getByText('Paire eBay',{exact:true}).first().isVisible(),'NOT_STARTED reste à expédier');
       await p.getByRole('button',{name:'Expédiées',exact:true}).click();await p.locator('.vrm-sale-row').first().waitFor({state:'detached',timeout:5000}).catch(()=>{});check((await p.locator('.vrm-sale-row').count())===0,'NOT_STARTED non expédiée');
     }
     if(process.env.BANC_CAPTURES){fs.mkdirSync(process.env.BANC_CAPTURES,{recursive:true});await p.screenshot({path:path.join(process.env.BANC_CAPTURES,'compact-'+tab+'.png')});}
   }
   await p.goto(base+'/?tab=cat_ventes');await p.locator('.vrm-sale-row').first().waitFor();await ouvrirVente(p);
-  await p.locator('.vrm-sale-invoice').first().waitFor();
-  check((await p.locator('.vrm-sale-invoice').count())>0,'facture proposée au compte avec reçu Pro');
-  await p.getByRole('button',{name:"Envoyer une facture à l'acheteur"}).first().click();
-  check(await p.getByLabel('Facture de cette vente').isVisible(),'choix explicite facture, aucun envoi à ouverture');
-  await p.getByRole('button',{name:'Toute la période',exact:true}).click();await p.getByRole('button',{name:'Deux dates',exact:true}).click();
-  await p.getByLabel('Début de la période').fill('2026-10-20');await p.getByLabel('Fin de la période').fill('2026-10-10');await p.getByRole('button',{name:'Appliquer',exact:true}).click();
-  check(await p.getByRole('alert').isVisible(),'intervalle inversé refusé');
-  await p.getByLabel('Début de la période').fill('2020-01-01');await p.getByLabel('Fin de la période').fill('2020-01-31');await p.getByRole('button',{name:'Appliquer',exact:true}).click();
-  check((await p.locator('.vrm-sale-row').count())===0,'dates filtrent réellement les ventes');
+  let appelsFacture=0;await p.route('**/api/compte?mode=facture-pro',r=>{if(r.request().method()==='POST')appelsFacture++;return r.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,boite:{etat:'aucune'},fournisseurs:{}})});});
+  await p.locator('[data-fp-vente="a-faire"]').first().waitFor();
+  check((await p.locator('[data-fp-vente]').count())>0,'facture proposée sur une vente prouvée Pro (e-mail Vinted Pro de SA transaction)');
+  await p.locator('[data-fp-vente="a-faire"]').first().click();
+  await p.locator('[data-fp-feuille-vente]').first().waitFor();
+  check(appelsFacture===0,'ouvrir la facture n’émet ni n’envoie rien');
+  await p.keyboard.press('Escape');
+  // (31 oct.) La période se choisit au calendrier (ChoixPeriode, 29-30 oct.) : plus de « Deux dates » ni de champs.
+  //    Même règle jugée : un intervalle touché à l'envers n'est jamais appliqué à l'envers, et les dates filtrent vraiment.
+  const jours = async () => p.evaluate(() => [...document.querySelectorAll('[data-periode-panneau] [data-jour]')].filter((b) => !b.disabled).map((b) => b.getAttribute('data-jour')));
+  await p.goto(base+'/?tab=cat_ventes');await p.locator('.vrm-sale-row').first().waitFor(); // tiroir de la vente refermé
+  await p.locator('[data-periode-ouvrir]').first().click();await p.locator('[data-periode-panneau]').waitFor({timeout:5000});
+  let js = await jours(); const fin = js[Math.min(19, js.length-1)], debut = js[Math.min(9, js.length-1)];
+  await p.locator(`[data-periode-panneau] [data-jour="${fin}"]`).first().click();await p.locator(`[data-periode-panneau] [data-jour="${debut}"]`).first().click();
+  await p.locator('[data-periode-appliquer]').click();
+  const val = await p.locator('[data-periode-ouvrir]').first().getAttribute('data-periode-valeur');
+  check(!!val && val.split('..')[0] <= val.split('..')[1], 'intervalle touché à l\'envers : jamais appliqué à l\'envers ('+val+')');
+  await p.locator('[data-periode-ouvrir]').first().click();await p.locator('[data-periode-panneau]').waitFor({timeout:5000});
+  // Au téléphone, le panneau déroule les mois (ni « Mois précédent » ni « Un an plus tôt ») : on prend les deux
+  // PREMIERS jours qu'il montre, des mois avant toute vente de la base du banc.
+  js = await jours(); await p.locator(`[data-periode-panneau] [data-jour="${js[0]}"]`).first().click();await p.locator(`[data-periode-panneau] [data-jour="${js[1]}"]`).first().click();
+  await p.locator('[data-periode-appliquer]').click();await p.locator('.vrm-sale-row').first().waitFor({state:'detached',timeout:5000}).catch(()=>{});
+  check((await p.locator('.vrm-sale-row').count())===0,'dates filtrent réellement les ventes ('+js[0]+')');
   // ⚠️ Sur téléphone, la croix « Effacer la période » est masquée depuis le 14 octobre (156c95c, la période tient
   //    dans une case de 140 px) : le geste visible est « Réinitialiser les ventes » (période, recherche et filtre).
   //    On clique ce que la personne VOIT ; la croix cachée n'est pas un geste.
   await p.getByRole('button',{name:'Réinitialiser les ventes',exact:true}).click();await p.locator('.vrm-sale-row').first().waitFor({timeout:5000}).catch(()=>{});check((await p.locator('.vrm-sale-row').count())>0,'effacement restaure les ventes');
-  rows.splice(rows.findIndex(x=>x.id==='email_invoice_test'),1);
+  for(const x of preuvesPro)rows.splice(rows.indexOf(x),1);
   await p.goto(base+'/?tab=cat_ventes');await p.locator('.vrm-sale-row').first().waitFor();await ouvrirVente(p);
-  check((await p.locator('.vrm-sale-invoice').count())===0,'pas de bouton sur compte sans preuve Pro');
+  await p.waitForTimeout(800);check((await p.locator('[data-fp-vente]').count())===0,'pas de bouton sur compte sans preuve Pro');
   await p.addInitScript(()=>{localStorage.setItem('vrm_session',JSON.stringify({access_token:'test.test.test',refresh_token:'fake',expires_at:Date.now()+3600000,user:{id:'11111111-1111-1111-1111-111111111111',email:'test@example.test'}}));});
   await p.route('**/auth/v1/user',r=>r.fulfill({contentType:'application/json',body:JSON.stringify({id:'11111111-1111-1111-1111-111111111111',email:'test@example.test'})}));
   await p.goto(base+'/?tab=cat_ventes');await p.locator('.vrm-sale-row').first().waitFor();await ouvrirVente(p);
   await p.waitForFunction(()=>{const i=document.querySelector('.vrm-sale-row img');return i && i.complete && i.naturalWidth>0;},{},{timeout:30000});
   check(await p.locator('.vrm-sale-row img').first().evaluate(e=>e.complete && e.naturalWidth>0),'photo Vinted récupérée sans extension sur téléphone');
   if(process.env.BANC_CAPTURES)await p.screenshot({path:path.join(process.env.BANC_CAPTURES,'compact-photo-telephone.png')});
-  rows.push({id:'email_invoice_test',data:{type:'facture_pro',status:'draft',account:compte.login,number:'FA1',designation:ventes[0].title,prix:95,buyerEmail:'acheteur@example.test'}});
-  let patch=0;await p.route('**/rest/v1/app_data?**',async r=>{if(r.request().method()==='PATCH' && r.request().url().includes('email_invoice_test')){patch++;return r.fulfill({status:403,contentType:'application/json',body:'{}'});}return r.fallback();});
-  await p.goto(base+'/?tab=cat_ventes');await p.locator('.vrm-sale-row').first().waitFor();await ouvrirVente(p);await p.locator('.vrm-sale-invoice').first().waitFor();
-  await p.getByRole('button',{name:"Envoyer une facture à l'acheteur"}).first().click();await p.getByLabel('Facture de cette vente').selectOption('email_invoice_test');
-  check(patch===0,'choisir un brouillon ne déclenche pas envoi');
-  await p.getByRole('button',{name:'Confirmer le destinataire'}).click();await p.getByRole('button',{name:'Annuler',exact:true}).click();check(patch===0,'annuler confirmation ne déclenche pas envoi');
-  await p.getByRole('button',{name:'Confirmer le destinataire'}).click();await p.getByRole('button',{name:'Confirmer',exact:true}).click();
-  await p.getByText('La facture n’a pas été mise en file. Relis son état dans Factures.',{exact:true}).waitFor();check(patch===1,'refus serveur annoncé sans faux succès');
   await p.route('**/api/ebay',async r=>{const action=r.request().method()==='POST'?r.request().postDataJSON().action:null;return r.fulfill({status:action==='sync'?503:200,contentType:'application/json',body:JSON.stringify(action==='status'?{ok:true,connected:true,comptes:[{cle:'',ref:'principal',principal:true,pseudo:'Compte de banc',relie:true}]}:action==='finances'?{reason:'scope'}:action==='sync'?{ok:false}:{ready:true,canConsent:true})});});
-  await p.goto(base+'/?tab=plat_ebay');await p.getByRole('button',{name:'Compte',exact:true}).click();await p.getByText('Compte eBay relié',{exact:true}).waitFor();
+  // (31 oct.) Navigation par tâche : `?tab=plat_ebay` seul mène à Ventes · eBay ; l'espace « Compte » se demande par sa section.
+  await p.goto(base+'/?tab=plat_ebay&section=compte');await p.getByRole('button',{name:'Compte',exact:true}).click({timeout:5000}).catch(()=>{});await p.getByText('Compte eBay relié',{exact:true}).waitFor();
   check(!(await p.getByRole('button',{name:'Autoriser les paiements'}).isVisible()),'paiements repliés, connexion claire');
   await p.getByText('Solde et paramètres du compte',{exact:true}).click();await p.getByRole('button',{name:'Autoriser les paiements'}).waitFor();check(await p.getByText('Compte eBay relié',{exact:true}).isVisible(),'scope paiements distinct de connexion');
   // ⚠️ Depuis le 14 octobre (84c83d3) la synchro eBay va compte par compte : la route « status » rend la liste
   //    des comptes reliés (la forme réelle, comme revendeurs.cjs — sans elle, aucun compte n'est à relire et rien
   //    ne part), et l'échec se dit par « Certaines lectures ont échoué… reprendre uniquement le compte concerné ».
   await p.getByRole('button',{name:'Actualiser',exact:true}).click();await p.getByText('Certaines lectures ont échoué. Tu peux reprendre uniquement le compte concerné.',{exact:true}).waitFor({timeout:10000});check(true,'échec actualisation expliqué');
+  // (1er nov.) « Compte eBay » vit dans Paramètres depuis la navigation par tâche (31 oct.) et n'a plus de repli
+  //    « Chiffres » : la rotation se juge sur Ventes, où le repli existe (fermé au téléphone, ouvert sur ordinateur).
+  await p.goto(base+'/?tab=cat_ventes');await p.locator('.vrm-platform-summary').first().waitFor();check(!(await p.locator('.vrm-platform-summary').first().evaluate(e=>e.open)),'chiffres repliés au téléphone avant rotation');
   await p.setViewportSize({width:1512,height:950});await p.waitForFunction(()=>document.querySelector('.vrm-platform-summary')?.open);check(true,'chiffres visibles sur ordinateur après rotation');
   check(!errors.length,'aucune erreur JavaScript');console.log(n+' contrôles compacts réussis.');
  }finally{if(b)await b.close();await new Promise(ok=>server.close(ok));}

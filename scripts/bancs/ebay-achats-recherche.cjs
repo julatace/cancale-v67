@@ -19,7 +19,7 @@
 //   · les achats gagnés sont repliés et ne sont lus qu'à l'ouverture ;
 //   · aucun débordement, aucune erreur de page.
 //        BANC_PORT=9501 node scripts/bancs/ebay-achats-recherche.cjs
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');

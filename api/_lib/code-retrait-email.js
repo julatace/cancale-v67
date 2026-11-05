@@ -23,3 +23,39 @@ export function codeRetraitTournure(texte) {
   const m = TOURNURE.exec(String(texte == null ? '' : texte));
   return m ? m[1] : '';
 }
+
+// ── LE CODE LU APRÈS UN LIBELLÉ, ET CE QUI N'EST JAMAIS UN CODE (1er nov.) ────
+// Audit des codes de retrait (scripts/audit-codes-retrait.cjs). Un code faux se
+// lit en gros devant le comptoir : Julien se déplace pour rien. Des formes
+// trompaient la route (et une ligne déjà rangée garde ce qu'elle a reçu) :
+//   · le libellé SEUL sur sa ligne (« Présentez votre code de retrait », le code
+//     n'étant que dans l'image du QR) et l'adresse dessous : « 56000 Vannes »
+//     devenait le code. Un nombre pris sur la ligne SUIVANTE doit y être SEUL
+//     (une case de tableau : « Code de retrait : » puis « 123456 ») ;
+//   · le nombre est le n° de suivi (« Votre code de retrait : » puis le n° du
+//     colis) : un code de retrait n'est jamais le n° de suivi du même colis ;
+//   · le nombre est le code postal du lieu lu dans le même e-mail.
+// « Mieux vaut un blanc qu'un faux » (§5) : sans code, l'app dit « code pas lu —
+// ouvre l'e-mail du transporteur », jamais un nombre inventé.
+// `m` : un résultat de RegExp dont le DERNIER groupe capturé est le nombre.
+export function nombreSurSaLigne(texte, m) {
+  if (!m) return false;
+  const s = String(texte == null ? '' : texte);
+  const nombre = m[m.length - 1] == null ? '' : String(m[m.length - 1]);
+  const fin = m.index + m[0].length;
+  const debut = fin - nombre.length;
+  if (!/\n/.test(s.slice(m.index, debut))) return true;      // libellé et nombre sur la même ligne
+  const finLigne = s.indexOf('\n', fin);
+  return /^[\s*_.]*$/.test(s.slice(fin, finLigne < 0 ? s.length : finLigne));
+}
+const normCode = (v) => String(v == null ? '' : v).toUpperCase().replace(/[\s -]+/g, '');
+// Rend la raison ('suivi' · 'code-postal') quand ce « code » n'en est pas un, sinon ''.
+export function codeImpossible(code, ligne = {}) {
+  const c = normCode(code);
+  if (!c) return '';
+  const su = normCode(ligne && ligne.suivi);
+  if (su && su === c) return 'suivi';
+  const lieu = String((ligne && ligne.lieu) || '');
+  if (/^\d{5}$/.test(c) && new RegExp(`(?:^|\\D)${c}\\s+[A-Za-zÀ-ÿ]`).test(lieu)) return 'code-postal';
+  return '';
+}

@@ -1,14 +1,16 @@
 /* ══ Le téléphone, d'après les maquettes du 27 octobre ══════════════════════
    Julien : « applique ça VRM juste pour le téléphone ». Les couleurs sont
-   celles de l'écran de connexion (pétrole #243D43 → #14242B, sauge #B0C5BC /
-   #B7D6C8) ; RIEN ne change au-dessus de 767 px. Aucun JSX, aucun data-*,
+   celles de l'écran de connexion (pétrole #3A3A3C → #1D1D1F, sauge #C7C7CC /
+   #D1D1D6) ; RIEN ne change au-dessus de 767 px. Aucun JSX, aucun data-*,
    aucune règle métier : la tête de Ma journée (bonjour, date, « N choses à
-   faire ») réapparaît dans un bandeau pétrole qui prolonge la barre du haut. */
+   faire ») réapparaît dans un bandeau pétrole qui prolonge la barre du haut.
+   (31 oct., Vitrine) Le pétrole, la sauge et le halo sont retirés : la barre
+   et le bonjour sont sur le blanc, aux jetons (src/styles-vitrine.css §3). */
 @media (max-width: 767px) {
   /* La barre du haut prend le dégradé de la connexion : la barre et le bandeau
      ne font plus qu'un bloc. */
   .vrm-app-shell .vrm-app-header {
-    background-image: linear-gradient(160deg, #243D43 0%, #1F363D 100%) !important;
+    background-image: none !important;
     border-bottom: 0 !important;
   }
 
@@ -19,26 +21,26 @@
     margin: -24px -24px 14px !important; /* annule les marges de la zone (14+10 px, 16+8 px) */
     padding: 14px 20px 22px !important;
     border-radius: 0 0 26px 26px;
-    background: linear-gradient(180deg, #1F363D 0%, #192C34 62%, #14242B 100%);
-    color: #F0F5F2;
+    background: none;
+    color: var(--vrm-ink);
   }
   .vrm-app-shell .vrm-day-layout .vrm-day-greeting::before {
     content: ""; position: absolute; z-index: -1; pointer-events: none;
     width: 240px; height: 240px; right: -70px; top: -110px; border-radius: 50%;
-    background: #4E8A80; opacity: .42; filter: blur(42px);
+    display: none;
   }
   .vrm-app-shell .vrm-day-layout .vrm-day-greeting .vrm-day-date {
     display: block !important; margin: 0 0 2px; font-size: 13px !important;
-    font-weight: 600; color: #B0C5BC !important; white-space: normal;
+    font-weight: 600; color: var(--vrm-muted) !important; white-space: normal;
   }
   .vrm-app-shell .vrm-day-layout .vrm-day-greeting .vrm-day-hello {
-    font-size: 30px !important; line-height: 1.06; white-space: normal;
-    color: #F0F5F2 !important;
+    font-size: 28px !important; line-height: 1.06; white-space: normal;
+    color: var(--vrm-ink) !important;
   }
   .vrm-app-shell .vrm-day-layout .vrm-day-greeting .vrm-day-todo {
-    display: block; margin: 6px 0 0 !important; font-size: 15px !important; color: #D6E3DD !important;
+    display: block; margin: 6px 0 0 !important; font-size: 15px !important; color: var(--vrm-muted) !important;
   }
-  .vrm-app-shell .vrm-day-layout .vrm-day-greeting .vrm-day-todo b { color: #F0F5F2 !important; }
+  .vrm-app-shell .vrm-day-layout .vrm-day-greeting .vrm-day-todo b { color: var(--vrm-ink) !important; }
   /* « Modifier » vit en bas de l'écran sur téléphone (un seul des deux). */
   .vrm-app-shell .vrm-day-layout .vrm-w-tete .vrm-w-modifier { display: none !important; }
   .vrm-app-shell .vrm-day-layout .vrm-w-tete { padding-right: 20px !important; }
@@ -46,7 +48,7 @@
   /* Les choses à faire : des cartes qu'on lit, pas une liste tassée. */
   .vrm-app-shell .vrm-day-layout .vrm-day-task-list { gap: 8px !important; }
   .vrm-app-shell .vrm-day-layout .vrm-day-task { padding: 12px 14px !important; gap: 12px !important; border-radius: 14px !important; }
-  .vrm-app-shell .vrm-day-layout .vrm-day-task-title { font-size: 14px !important; }
+  .vrm-app-shell .vrm-day-layout .vrm-day-task-title { font-size: 15px !important; }
   .vrm-app-shell .vrm-day-layout .vrm-day-task-note { font-size: 12px !important; }
   .vrm-app-shell .vrm-day-layout .vrm-day-task .vrm-day-task-action { font-size: 12px !important; }
 
@@ -99,10 +101,19 @@
   }
 
   /* Des cartes plus calmes : un trait plutôt qu'une ombre, un rayon unique. */
-  .vrm-app-shell .vrm-main .vrm-surface { box-shadow: none !important; border-radius: 18px !important; }
+  .vrm-app-shell .vrm-main .vrm-surface { box-shadow: none !important; border-radius: 20px !important; }
 }
 @media (max-width: 767px) {
   .vrm-app-shell .vrm-day-k, .vrm-app-shell .vrm-day-layout .vrm-label {
     text-transform: none !important; letter-spacing: 0 !important; font-size: 13px !important; font-weight: 600 !important;
+  }
+}
+
+/* (2 nov.) Au téléphone, l'imprimante est cachée (ci-dessus) : un récapitulatif
+   de Colis sans autre geste restait une boîte VIDE en haut de l'écran. */
+@media (max-width: 767px) {
+  .vrm-app-shell .vrm-colis-recap[data-colis-recap-sans-geste="1"] {
+    padding: 0 !important; margin: 0 !important; border: 0 !important;
+    background: transparent !important; box-shadow: none !important; min-height: 0 !important;
   }
 }

@@ -4,7 +4,7 @@
 //     messagerie de Leboncoin ; un compte lié jamais relevé dit « — », pas « 0 » ;
 //   · jamais relevé : aucune ligne à zéro, la consigne (ouvrir leboncoin.fr) ;
 //   · lecture ratée (522) : ni zéro ni « jamais », la phrase de panne.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -37,20 +37,29 @@ srv.listen(PORT);
         const u = decodeURIComponent(metaVersData(route.request().url()));
         const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
         if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
+        // (31 oct.) La rangée de filtres ne montre que les sites où il a un compte
+        // (sonde `select=id`) : ce banc joue un vendeur Leboncoin, une ligne de
+        // l'extension existe.
+        if (/id=in\.\(lbc_listings/.test(u) && /select=id(&|$)/.test(u)) return j([{ id: 'lbc_accounts' }]);
+        // (1er nov.) La VRAIE forme : l'app projette (`compteurs:data->compteurs,…`,
+        // `a:data->accounts`, §4.4) — on rend ce que PostgREST rendrait (§6.3).
+        const proj = (d) => { const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || 'data'; if (sel === 'data') return { data: d }; const o = {}; for (const part of sel.split(',')) { const m = /^(?:([^:]+):)?data->>?(\w+)$/.exec(part); if (m) o[m[1] || m[2]] = d[m[2]] === undefined ? null : d[m[2]]; } return o; };
         if (/id=eq\.lbc_messages/.test(u)) {
           if (etat === 'panne') return route.fulfill({ status: 522, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<html>522</html>' });
-          if (etat === 'session') return j([{ data: { compteurs: { abc: { unread: 2, at: auj.toISOString() } }, comptes: {} } }]);
-          return j(etat === 'lu' ? [{ data: MSG }] : []);
+          if (etat === 'session') return j([proj({ compteurs: { abc: { unread: 2, at: auj.toISOString() } }, comptes: {} })]);
+          return j(etat === 'lu' ? [proj(MSG)] : []);
         }
         // (28 oct.) Le compteur porte l'id NU, la session privée le range sous
         // `lbc-account:{id}` avec son NOM : une seule identité (5.212).
-        if (etat === 'session' && /id=eq\.lbc_accounts/.test(u)) return j([{ data: { accounts: { abc: { id: 'abc', sessionAt: auj.toISOString() }, 'lbc-account:abc': { id: 'lbc-account:abc', name: 'Moncompte', type: 'particulier', sessionAt: auj.toISOString() } } } }]);
+        if (etat === 'session' && /id=eq\.lbc_accounts/.test(u)) return j([proj({ accounts: { abc: { id: 'abc', sessionAt: auj.toISOString() }, 'lbc-account:abc': { id: 'lbc-account:abc', name: 'Moncompte', type: 'particulier', sessionAt: auj.toISOString() } } })]);
         return j([]);
       });
       await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
-      await pg.goto(`http://localhost:${PORT}/?tab=plat_leboncoin`, { waitUntil: 'domcontentloaded' });
+      // (31 oct., navigation par tâche) Messages est une TÂCHE de la barre du bas :
+      // les messages Leboncoin sont « Messages · Leboncoin », par son filtre de site.
+      await pg.goto(`http://localhost:${PORT}/?tab=messages`, { waitUntil: 'domcontentloaded' });
       await pg.waitForTimeout(2000);
-      try { await pg.click('[data-section="messages"]', { timeout: 5000 }); } catch (e) { dit(false, 'la section « Messages » existe dans Leboncoin', String(e.message).slice(0, 80)); await ctx.close(); continue; }
+      try { await pg.click('[data-filtre-site="messages"] [data-site="leboncoin"]', { timeout: 5000 }); } catch (e) { dit(false, 'Messages · Leboncoin est joignable par le filtre de site', String(e.message).slice(0, 80)); await ctx.close(); continue; }
       await pg.waitForSelector('[data-messages-lbc]', { timeout: 8000 }).catch(() => {});
       const v = await pg.evaluate(() => { const e = document.querySelector('[data-messages-lbc]'); return e ? { etat: e.getAttribute('data-messages-lbc'), t: e.innerText, comptes: [...e.querySelectorAll('[data-compte-lbc]')].map((x) => ({ id: x.getAttribute('data-compte-lbc'), t: x.innerText })), lien: (e.querySelector('[data-ouvrir-messages-lbc]') || {}).href || '' } : null; });
       if (etat === 'lu') {

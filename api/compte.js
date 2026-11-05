@@ -24,6 +24,9 @@ import {verifierConfidentialite} from './_lib/confidentialite.js';
 //                                 chiffrée dans le coffre : statut (4 derniers
 //                                 caractères, date) · poser · verifier · retirer
 //                                 — voir api/_lib/photoroom-cle.js
+//   /api/compte?mode=facture-pro  (GET/POST, session) LA FACTURE PRO : sa boîte
+//                                 d'envoi (chiffrée), émettre, envoyer, avoir —
+//                                 voir api/_lib/facture-pro.js
 //   /api/compte?mode=equipe       (GET/POST, session) LE MODE ÉQUIPE (migration
 //                                 016) : lister · inviter · accepter · révoquer ·
 //                                 quitter — voir api/_lib/equipe.js
@@ -45,13 +48,14 @@ import {verifierConfidentialite} from './_lib/confidentialite.js';
 //    vérifiée, dans une table que le vendeur peut lire mais pas écrire
 //    (supabase/migrations/005-abonnements.sql). Sinon on s'abonnerait soi-même
 //    depuis la console du navigateur.
-import { utilisateurDe, jetonDe, vendeurExige, baseCloisonnee } from './_lib/session.js';
+import { utilisateurDe, jetonDe, vendeurExige, baseCloisonnee, lireCommeVendeur } from './_lib/session.js';
 import { stripeApi, stripePret, stripeModeTest, signatureValide, finPeriode } from './_lib/stripe.js';
 import { lireMentions, mentionsManquantes } from './_lib/mentions-legales.js';
 import { sbCle } from './_lib/cle.js';
 import { lirePhoto } from './_lib/photos.js';
 import { routeSuperPdp } from './_lib/superpdp.js';
 import { routePhotoroom } from './_lib/photoroom-cle.js';
+import { routeFacturePro } from './_lib/facture-pro.js';
 import { routeEntreprise } from './_lib/entreprise.js';
 import { accesVendeur } from './_lib/abonnement.js';
 import { routeEquipe, effacerEquipe } from './_lib/equipe.js';
@@ -60,6 +64,8 @@ import { debutDiscord, retourDiscord, attenteDiscord } from './_lib/discord.js';
 import { routeOperations } from './_lib/operations.js';
 import {routeFavoris} from './_lib/favoris.js';
 import {effacerFavorisDe} from './_lib/favoris-confidentialite.js';
+import { traiterAppareils, lireJournal } from './_lib/securite-compte.js';
+import { PROPRIETAIRE_NEUTRE } from './_lib/proprietaire-email.js';
 
 export const config = { api: { bodyParser: false } };
 
@@ -168,7 +174,7 @@ async function prixDeLAbonnement(ligne) {
 //    plus (`lirePrix` rend null ⇒ refus existant).
 //    audit-lancement.cjs exige que cette valeur soit celle écrite dans les CGV
 //    (et dans le repli de l'app) : une seule valeur (§11).
-export const PRIX_CGV = { centimes: 1499, devise: 'eur', intervalle: 'month' };
+export const PRIX_CGV = { centimes: 1699, devise: 'eur', intervalle: 'month' };
 export const prixConforme = (p) => !!(p
   && p.centimes === PRIX_CGV.centimes
   && String(p.devise || '').toLowerCase() === PRIX_CGV.devise
@@ -475,9 +481,10 @@ async function abonnement(req, res) {
 // public/legal/cgv.html (audit-lancement vérifie qu'elles concordent).
 // 11 octobre : prix passé à 12,99 € (version précédente : 2026-10-04, 9,99 €).
 // 22 octobre : case « accès immédiat » et formulaire de rétractation (art. 5).
-// 27 octobre : prix 14,99 €, et essai gratuit de 7 jours (une seule fois par
+// 27 octobre : prix 16,99 €, et essai gratuit de 7 jours (une seule fois par
 //   adresse e-mail ET par compte Vinted).
-const CGV_VERSION = '2026-10-27';
+// 31 octobre : prix 16,99 € (sa décision), essai de 7 jours inchangé.
+const CGV_VERSION = '2026-10-31';
 async function checkout(req, res) {
   const u = await utilisateurDe(req);
   if (!u) return repondre(res, 401, { erreur: 'session' });
@@ -769,6 +776,31 @@ async function fermerSession(jeton) {
 }
 
 const REESSAIE = "Je n'ai pas pu préparer la connexion de l'extension. Réessaie dans un instant.";
+
+// ── APPAREILS CONNECTÉS / JOURNAL (4 nov., api/_lib/securite-compte.js) ─────
+// L'identifiant vient du JETON vérifié par Supabase (`vendeurExige`), jamais
+// de la requête : un vendeur ne voit, ni ne ferme, que SES sessions.
+async function appareils(req, res) {
+  const u = await vendeurExige(req, res);
+  if (!u) return;
+  let corps = {};
+  if (req.method === 'POST') {
+    corps = await lireCorpsJson(req);
+    if (!corps || typeof corps !== 'object' || Array.isArray(corps)) return repondre(res, 400, { erreur: 'corps-invalide' });
+  }
+  const r = await traiterAppareils({ base: SUPABASE_URL, cle: process.env.SUPABASE_SERVICE_KEY || '', user: u, jeton: jetonDe(req), methode: req.method, corps });
+  return repondre(res, r.status, r.body);
+}
+async function journalVrm(req, res) {
+  const u = await vendeurExige(req, res);
+  if (!u) return;
+  const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
+  const lireService = SERVICE ? async (chemin) => {
+    try { const r = await fetch(`${SUPABASE_URL}/rest/v1/${chemin}`, { headers: sbCle(SERVICE), signal: AbortSignal.timeout(12000) }); if (!r.ok) return null; const j = await r.json(); return Array.isArray(j) ? j : null; } catch (_) { return null; }
+  } : null;
+  const j = await lireJournal({ userId: u.id, lireVendeur: (c) => lireCommeVendeur(req, c), lireService, neutre: PROPRIETAIRE_NEUTRE });
+  return repondre(res, 200, { ok: true, ...j });
+}
 
 async function sessionExtension(req, res) {
   const SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
@@ -1097,6 +1129,14 @@ async function photoroom(req, res) {
   return routePhotoroom(req, res, { vendeur, corps, acces: await accesVendeur(vendeur.id), cloisonnee: await baseCloisonnee() });
 }
 
+// ── La facture Pro : émettre, numéroter, envoyer depuis SA boîte (api/_lib/facture-pro.js)
+async function facturePro(req, res) {
+  const vendeur = await vendeurExige(req, res);
+  if (!vendeur) return;
+  const corps = req.method === 'POST' ? await lireCorpsJson(req) : null;
+  return routeFacturePro(req, res, { vendeur, corps, acces: await accesVendeur(vendeur.id), cloisonnee: await baseCloisonnee() });
+}
+
 // ── SIRET → nom de l'entreprise (api/_lib/entreprise.js) : la session d'abord ─
 async function entreprise(req, res) {
   const vendeur = await vendeurExige(req, res);
@@ -1184,6 +1224,7 @@ export default async function handler(req, res) {
   if (mode === 'reprendre') return m === 'POST' ? resilier(req, res, true) : repondre(res, 405, { erreur: 'POST seulement' });
   if (mode === 'session-extension') return m === 'POST' ? sessionExtension(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
   if (mode === 'superpdp') return (m === 'GET' || m === 'POST') ? superpdp(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
+  if (mode === 'facture-pro') return (m === 'GET' || m === 'POST') ? facturePro(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'photoroom') return (m === 'GET' || m === 'POST') ? photoroom(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'equipe') return (m === 'GET' || m === 'POST') ? equipe(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'communaute') return (m === 'GET' || m === 'POST') ? communaute(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
@@ -1193,5 +1234,8 @@ export default async function handler(req, res) {
   if (mode === 'entreprise') return m === 'GET' ? entreprise(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   if (mode === 'discord-deja') return m === 'GET' ? discordDeja(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   if (mode === 'fermer') return m === 'POST' ? fermerCompte(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
+  // (4 nov.) Paramètres → Mon compte : « Appareils connectés » et « Ce que VRM a fait ».
+  if (mode === 'appareils') return (m === 'GET' || m === 'POST') ? appareils(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
+  if (mode === 'journal') return m === 'GET' ? journalVrm(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   return repondre(res, 404, { erreur: 'mode inconnu' });
 }

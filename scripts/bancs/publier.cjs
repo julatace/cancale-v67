@@ -22,7 +22,7 @@
 //     devant, ou relance) — jamais un clic muet ;
 //   · un clic refusé DIT pourquoi (grisé, refus de l'extension) ;
 //   · le bouton annonce les photos captées sur le total de l'annonce.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -41,6 +41,10 @@ const rows = [
   { id: 'vinted_lbc_posted', data: { ids: [] } },
 ];
 const ACCS = [{ id: 1, vinted_user_id: '111', login: 'compte_test', domain: 'www.vinted.fr', updated_at: auj }];
+// (3 nov.) « Vérifier avant de publier » : une feuille peut s'ouvrir (photos, taille…) ;
+// ce banc juge la suite, il répond « Publier quand même » et note ce qu'elle disait.
+const passerVerif = async (pg) => { try { const f = await pg.waitForSelector('[data-verif-sheet]', { timeout: 900 }); if (f) { const codes = await pg.evaluate(() => [...document.querySelectorAll('[data-verif-probleme]')].map((e) => e.getAttribute('data-verif-probleme')).join(',')); console.log('    · feuille de vérification : ' + codes); await pg.click('[data-verif-publier]'); await pg.waitForTimeout(200); } } catch (_) {} };
+
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
 const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/json', '.woff2': 'font/woff2' };
@@ -144,7 +148,7 @@ const PONT = ({ mode, version, suite = 'fait' }) => {
       // cliquer son bouton ; `ficheTxt()` = ce qu'elle dit.
       const publier = async () => {
         if (!(await pg.$('[data-fiche-lbc]'))) { await pg.click('[data-bouton-publier] button'); await pg.waitForSelector('[data-fiche-lbc]', { timeout: 5000 }); }
-        await pg.click('[data-fiche-publier]');
+        await pg.click('[data-fiche-publier]'); await passerVerif(pg);
       };
       const ficheTxt = () => pg.evaluate(() => { const f = document.querySelector('[data-fiche-lbc]'); return f ? { etat: f.getAttribute('data-fiche-etat'), txt: f.innerText } : null; });
       const v = await lire();
@@ -191,7 +195,7 @@ const PONT = ({ mode, version, suite = 'fait' }) => {
         await pg.waitForTimeout(800);
         const a = (await ficheTxt()) || {};
         dit(a.etat === 'encours' && /Remettre le dépôt devant/.test(a.txt), 'le dépôt est ouvert : la fiche dit « Remettre le dépôt devant »', JSON.stringify(a.etat));
-        await pg.click('[data-fiche-publier]');
+        await pg.click('[data-fiche-publier]'); await passerVerif(pg);
         await pg.waitForTimeout(600);
         const cmds = await pg.evaluate(() => window.__cmds);
         dit(cmds.length === 2, '« en cours » : un clic RENVOIE la commande (l’extension remet l’onglet devant, ou relance) — jamais un clic muet', JSON.stringify(cmds));

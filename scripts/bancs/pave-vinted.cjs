@@ -18,7 +18,7 @@
 const path = require('path');
 let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
-catch (_) { ({ chromium } = require('/home/user/cancale-v67/node_modules/playwright')); }
+catch (_) { ({ chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -179,7 +179,8 @@ const attendTrouve = async (pg) => { for (let i = 0; i < 30; i++) { const e = aw
         dit(apres.url === avant.url && apres.sec === avant.sec && !/INPUT|TEXTAREA/.test(apres.focus), 'un N° tapé hors d’un champ ne fait rien (ni focus, ni onglet)', JSON.stringify({ avant, apres }));
       });
       console.log('\n── Achats, 1512 px');
-      await allerA(pg, 'cat_achats', '[data-achats-onglet]');
+      // (2 nov.) Depuis le 1er nov., `cat_achats` mène à Colis → À retirer ; l'écran Achats est `vue=achats`.
+      await allerA(pg, 'cat_achats&vue=achats', '[data-achats-onglet]');
       await essaie('Achats', async () => {
         dit(!(await pg.$('[data-num-plat]')) && !(await pg.$('[data-num-plat-saisie]')), 'plus de saisie « N° + Entrée » sur Achats');
         const avant = await pg.evaluate(() => ({ url: location.search, sec: (document.querySelector('[data-section][aria-current="page"],[data-section][aria-pressed="true"]') || { getAttribute: () => '' }).getAttribute('data-section') }));
@@ -200,7 +201,10 @@ const attendTrouve = async (pg) => { for (let i = 0; i < 30; i++) { const e = aw
         dit(v === '7', 'un chiffre tapé dans la recherche y reste (c’est elle qui cherche un N°)', v);
         await pg.fill('input[aria-label="Rechercher une annonce"]', '');
       });
-      dit(!ECRITURES.filter((x) => !/^POST (widget_stats|vinted_urssaf_mois|vrm_colis_\w+|vrm_benefice_jours|plantage_\w+|main|relais_ext|diag_photos|vrm_hl_\w+|vrm_paires_dorment)(,|$)/.test(x)).length, 'aucune écriture en base venue du clavier', ECRITURES.join(' | ').slice(0, 300));
+      // Les lignes PUBLIÉES par un écran (§11 : widget_stats, vrm_colis_*, et
+      // depuis le 29 oct. `lbc_a_retirer`, le résumé pour le logo VRM sur
+      // leboncoin.fr) partent au chargement, pas du clavier.
+      dit(!ECRITURES.filter((x) => !/^POST (widget_stats|vinted_urssaf_mois|vrm_colis_\w+|vrm_benefice_jours|plantage_\w+|main|relais_ext|diag_photos|vrm_hl_\w+|vrm_paires_dorment|lbc_a_retirer)(,|$)/.test(x)).length, 'aucune écriture en base venue du clavier', ECRITURES.join(' | ').slice(0, 300));
       dit(!errs.length, 'aucune erreur de page', errs.join(' | ').slice(0, 200));
       await ctx.close();
     }

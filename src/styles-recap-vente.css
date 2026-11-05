@@ -1,0 +1,149 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   LE RÉCAPITULATIF D'UNE VENTE — 1er novembre 2026 (maquette A, « fiche en
+   lignes nettes », Julien : « applique tout, je veux que ce soit clair »).
+   Le tiroir de Ventes (Vinted) : feuille du bas au téléphone, panneau de droite
+   sur ordinateur — la MÊME coque (`.vrm-ledger-drawer`, styles-gestion.css),
+   seul son contenu change. Style Vitrine inchangé : surfaces neutres, encre,
+   Geist Mono pour les chiffres, la couleur RARE (§7) — le cobalt marque où en
+   est la vente, l'ambre le geste qui manque.
+   Chargée APRÈS Vitrine (main.jsx) ; ne vise que `.vrm-recap`.
+   ════════════════════════════════════════════════════════════════════════════ */
+html body .vrm-ledger-drawer.vrm-recap {
+  --recap-ink: var(--vrm-ink, #1D1D1F);
+  --recap-muted: var(--vrm-muted, #636366);
+  --recap-line: var(--vrm-line, #E5E5EA);
+  --recap-soft: var(--vrm-card2, #F2F2F7);
+  --recap-accent: var(--vrm-accent, #0071E3);
+  --recap-warn: var(--vrm-warn, #B25000);
+  --recap-mono: var(--vrm-police-mono, 'Geist Mono', ui-monospace, monospace);
+  background: var(--vrm-surface, #FFFFFF);
+  color: var(--recap-ink);
+}
+html body .vrm-ledger-drawer.vrm-recap .vrm-main.vrm-recap-corps {
+  padding: 0 !important; display: block; overscroll-behavior: contain;
+  font-size: 15px; line-height: 1.4; color: var(--recap-ink);
+}
+.vrm-recap-corps > header, .vrm-recap-corps > section { padding: 18px 20px; border-bottom: 1px solid var(--recap-line); }
+.vrm-recap-corps > section:last-child { border-bottom: 0; padding-bottom: 24px; }
+
+/* ── 1. La paire ─────────────────────────────────────────────────────────── */
+.vrm-recap-tete { display: grid; grid-template-columns: 96px minmax(0, 1fr) 44px; gap: 14px; align-items: start; }
+html body .vrm-recap .vrm-recap-tete .vrm-sale-photo.vrm-recap-photo {
+  width: 96px !important; height: 96px !important; border-radius: 14px; overflow: hidden;
+  background: var(--vrm-photo, var(--recap-soft)); display: flex; align-items: center; justify-content: center;
+}
+.vrm-recap-photo > *, .vrm-recap-photo img { width: 100% !important; height: 100% !important; object-fit: cover; display: block; }
+.vrm-recap-ident { min-width: 0; }
+.vrm-recap-num, .vrm-recap-sans-num {
+  display: inline-block; font-family: var(--recap-mono); font-size: 15px; line-height: 1; padding: 6px 8px;
+  border-radius: 12px; background: var(--recap-soft); color: var(--recap-ink); font-variant-numeric: tabular-nums;
+}
+.vrm-recap-sans-num { font-family: inherit; font-size: 13px; color: var(--recap-muted); }
+html body .vrm-recap h2.vrm-recap-nom {
+  font-size: 20px !important; line-height: 1.2 !important; font-weight: 800; letter-spacing: -.02em;
+  margin: 8px 0 0 !important; color: var(--recap-ink); overflow-wrap: anywhere;
+}
+.vrm-recap-sous { margin: 6px 0 0; font-size: 15px; color: var(--recap-muted); }
+html body .vrm-recap .vrm-recap-fermer {
+  width: 44px; height: 44px; border-radius: 12px; border: 0; background: var(--recap-soft); color: var(--recap-ink);
+  display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0;
+}
+
+/* ── 2. Où en est la vente : une phrase, puis la frise ───────────────────── */
+.vrm-recap-phrase { margin: 0; font-size: 15px; line-height: 1.45; }
+.vrm-recap-phrase strong { font-weight: 700; }
+.vrm-recap-issue { margin: 8px 0 0; font-size: 13px; color: var(--recap-muted); line-height: 1.45; }
+.vrm-recap-frise { list-style: none; margin: 18px 0 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.vrm-recap-frise > li { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; min-width: 0; gap: 4px; }
+/* le trait qui relie un point au suivant : plein si l'étape suivante est faite */
+.vrm-recap-frise > li + li::before {
+  content: ''; position: absolute; top: 8px; right: 50%; width: 100%; height: 2px; background: var(--recap-ink);
+}
+.vrm-recap-frise > li[data-fait="0"]::before { background: none; border-top: 2px dashed var(--recap-line); height: 0; }
+.vrm-recap-point {
+  position: relative; z-index: 1; width: 18px; height: 18px; border-radius: 50%; box-sizing: border-box;
+  background: var(--recap-ink); border: 2px solid var(--recap-ink);
+}
+.vrm-recap-frise > li[data-fait="0"] .vrm-recap-point { background: var(--vrm-surface, #FFF); border-color: var(--recap-muted); }
+.vrm-recap-frise > li[data-ici="1"] .vrm-recap-point { background: var(--vrm-surface, #FFF); border: 4px solid var(--recap-accent); }
+.vrm-recap-etape { margin-top: 6px; font-size: 13px; font-weight: 600; line-height: 1.2; overflow-wrap: anywhere; hyphens: auto; }
+.vrm-recap-frise > li[data-fait="0"] .vrm-recap-etape { color: var(--recap-muted); font-weight: 500; }
+.vrm-recap-quand { font-size: 13px; color: var(--recap-muted); font-variant-numeric: tabular-nums; }
+
+/* ── 3. L'argent, en lignes nettes ───────────────────────────────────────── */
+html body .vrm-recap h3.vrm-recap-titre { margin: 0 0 6px !important; font-size: 13px !important; font-weight: 500 !important; color: var(--recap-muted); letter-spacing: 0 !important; font-family: inherit !important; }
+.vrm-recap-corps dl { margin: 0; }
+.vrm-recap-ligne { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 36px; }
+.vrm-recap-ligne > dt { margin: 0; color: var(--recap-muted); font-size: 15px; flex: 0 1 auto; min-width: 0; }
+.vrm-recap-ligne > dd { margin: 0; text-align: right; min-width: 0; overflow-wrap: anywhere; display: flex; flex-direction: column; align-items: flex-end; }
+.vrm-recap-argent .vrm-recap-ligne > dd { font-family: var(--recap-mono); font-variant-numeric: tabular-nums; font-size: 15px; white-space: nowrap; }
+.vrm-recap-argent .vrm-recap-ligne > dd small { font-family: var(--vrm-police, inherit); font-size: 12px; color: var(--recap-muted); white-space: normal; }
+.vrm-recap-argent .vrm-recap-benef { border-top: 1.5px solid var(--recap-ink); margin-top: 8px; padding-top: 12px; min-height: 48px; }
+.vrm-recap-argent .vrm-recap-benef > dt { color: var(--recap-ink); font-weight: 700; font-size: 17px; }
+.vrm-recap-argent .vrm-recap-benef > dd { font-size: 22px; color: var(--recap-ink); }
+.vrm-recap-argent .vrm-recap-benef .vrm-recap-borne { font-family: var(--vrm-police, inherit); font-size: 13px; color: var(--recap-muted); margin-right: 4px; }
+.vrm-recap-argent .vrm-recap-valeur { display: inline-flex; align-items: baseline; gap: 0; flex-wrap: wrap; justify-content: flex-end; }
+.vrm-recap-argent .vrm-recap-montant { white-space: nowrap; }
+.vrm-recap-argent .vrm-recap-ligne > dd { font-weight: 500; word-spacing: -.3em; }
+.vrm-recap-argent .vrm-recap-ligne > dd small, .vrm-recap-argent .vrm-recap-borne, .vrm-recap-argent .vrm-recap-verse > dd { word-spacing: normal; }
+.vrm-recap-argent .vrm-recap-verse > dd { font-family: var(--vrm-police, inherit); color: var(--recap-muted); }
+/* Le prix d'achat qui manque : le geste ambre à la place du montant */
+.vrm-recap-argent .vrm-cout-recap .vrm-cout-rangee { justify-content: flex-end; gap: 6px !important; }
+.vrm-recap-argent .vrm-cout-recap form { flex: none !important; width: min(240px, 100%); }
+.vrm-recap-argent dd:has(.vrm-cout-recap) { white-space: normal; font-family: var(--vrm-police, inherit); }
+html body .vrm-app-shell .vrm-main .vrm-cout-recap .vrm-b.vrm-geste-ambre,
+html body .vrm-app-shell .vrm-main .vrm-cout-recap .vrm-b.vrm-geste-ambre:not(:disabled):hover,
+html body .vrm-app-shell .vrm-main .vrm-cout-recap .vrm-b.vrm-geste-ambre:not(:disabled):active {
+  background: var(--vrm-warn-soft, #F2F2F7) !important; color: var(--recap-warn) !important; border-color: transparent !important; font-weight: 600;
+}
+/* « Prix d'achat » à gauche, le geste ambre à droite, « ou relier » dessous */
+html body .vrm-ledger-drawer.vrm-recap .vrm-ledger-drawer-body .vrm-recap-argent .vrm-cout-recap .vrm-cout-rangee {
+  display: flex !important; flex-direction: column !important; align-items: flex-end !important; flex-wrap: nowrap !important; width: auto; gap: 2px !important;
+}
+.vrm-recap-argent .vrm-recap-ligne:has(.vrm-cout-recap) { align-items: flex-start; padding: 4px 0; }
+.vrm-recap-argent .vrm-recap-ligne:has(.vrm-cout-recap) > dt { padding-top: 11px; white-space: nowrap; flex-shrink: 0; }
+html body .vrm-ledger-drawer.vrm-recap .vrm-ledger-drawer-body .vrm-cout-recap .vrm-cout-rangee > .vrm-b-discret { background: transparent !important; min-height: 44px !important; }
+
+/* ── 4. Les détails ──────────────────────────────────────────────────────── */
+.vrm-recap-details .vrm-recap-ligne { min-height: 32px; }
+.vrm-recap-details .vrm-recap-ligne > dt { font-size: 15px; flex-shrink: 0; }
+.vrm-recap-details .vrm-recap-ligne > dd { font-size: 15px; flex-direction: row; align-items: center; gap: 8px; justify-content: flex-end; }
+.vrm-recap-mono { font-family: var(--recap-mono); font-variant-numeric: tabular-nums; }
+.vrm-recap-achat-photo { width: 28px; height: 28px; border-radius: 6px; overflow: hidden; background: var(--recap-soft); flex-shrink: 0; display: inline-flex; }
+.vrm-recap-achat-photo:empty { display: none; }
+.vrm-recap-achat-photo img { width: 100%; height: 100%; object-fit: cover; }
+
+/* ── 5. Les gestes ───────────────────────────────────────────────────────── */
+.vrm-recap-gestes { display: flex; flex-direction: column; gap: 10px; }
+.vrm-recap-principal > span, .vrm-recap-principal > button { width: 100%; }
+html body .vrm-recap .vrm-recap-principal button { width: 100% !important; justify-content: center !important; min-height: 48px !important; font-size: 15px !important; }
+.vrm-recap-grille { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.vrm-recap-grille:empty { display: none; }
+html body .vrm-recap .vrm-recap-grille > .vrm-b, html body .vrm-recap .vrm-recap-grille > a { width: 100%; min-width: 0; justify-content: center; min-height: 48px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html body .vrm-recap .vrm-recap-gestes .vrm-sale-invoice > button { width: 100% !important; min-height: 44px !important; }
+html body .vrm-recap .vrm-recap-modifier { width: 100%; }
+html body .vrm-recap .vrm-recap-modifier > summary {
+  min-height: 48px; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 0 14px !important; border-radius: 12px; background: var(--recap-soft); border: 0; font-size: 15px !important; font-weight: 600; cursor: pointer;
+}
+html body .vrm-recap .vrm-recap-modifier[open] { display: flex; flex-direction: column; gap: 12px; }
+
+/* ── Téléphone : la feuille du bas ───────────────────────────────────────── */
+@media (max-width: 767px) {
+  .vrm-recap-corps > header, .vrm-recap-corps > section { padding: 16px 16px; }
+  .vrm-recap-tete { grid-template-columns: 84px minmax(0, 1fr) 44px; gap: 12px; }
+  html body .vrm-recap .vrm-recap-tete .vrm-sale-photo.vrm-recap-photo { width: 84px !important; height: 84px !important; }
+  html body .vrm-recap h2.vrm-recap-nom { font-size: 17px !important; }
+  .vrm-recap-etape { font-size: 12px; }
+  .vrm-recap-quand { font-size: 12px; }
+  .vrm-recap-ligne > dt { font-size: 15px; }
+}
+/* Sur ordinateur, le panneau de droite : un peu plus large et aéré */
+@media (min-width: 1024px) {
+  html body .vrm-ledger-drawer.vrm-recap { width: min(520px, 100%); }
+  .vrm-recap-corps > header, .vrm-recap-corps > section { padding: 20px 24px; }
+}
+
+/* (2 nov.) Le transporteur LU, juste au-dessus du bouton bordereau (src/PastilleTransporteur.jsx). */
+.vrm-recap-principal { display: flex; flex-direction: column; gap: 8px; }
+.vrm-recap-principal > .vrm-transporteur { align-self: flex-start; width: auto; }

@@ -212,7 +212,9 @@ dit(/import\s*\{[^}]*\brecuDeLAchat\b[^}]*\bindexRecusParTransaction\b[^}]*\}\s*
 const rf = (app.match(/const receiptFor = \(o\) => ([^\n]*)/) || [])[1] || '';
 dit(/^recuDeLAchat\(o, indexRecusAchat\);/.test(rf), 'receiptFor = la règle partagée, et RIEN d’autre (aucun repli)', rf.slice(0, 160));
 dit(!/normTitle|\.title|article/.test(rf), 'receiptFor ne lit aucun titre', rf.slice(0, 160));
-dit(/const indexRecusAchat = useMemo\(\(\) => indexRecusParTransaction\(recusAchat/.test(app), 'l’index se calcule sur la liste des reçus (une fois par lecture)');
+// (1er nov.) L'index se calcule sur la liste des reçus, privée SEULEMENT de ceux
+// que Julien a déliés lui-même (`recusDelies`, son clic) — aucun autre filtre.
+dit(/const indexRecusAchat = useMemo\(\(\) => indexRecusParTransaction\((?:recusAchat|Array\.isArray\(recusAchat\) \? recusAchat\.filter\(\(r\) => !\(r && r\.id && recusDelies\[r\.id\]\)\) : recusAchat)\s*[,)][^\n]*\]\);/.test(app) && /\[recusAchat(?:, recusDelies)?\]\);\n/.test((app.match(/const indexRecusAchat = useMemo[^\n]*\n/) || [''])[0]), 'l’index se calcule sur la liste des reçus (une fois par lecture)');
 // La constante peut s'écrire en plusieurs morceaux (« '…' + '…' ») : on recolle.
 const selBloc = (app.match(/const SELECT_RECUS_ACHAT = ((?:'[^']*'\s*\+?\s*)+);/) || [])[1];
 const sel = selBloc ? [...selBloc.matchAll(/'([^']*)'/g)].map((m) => m[1]).join('') : null;

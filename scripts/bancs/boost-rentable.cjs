@@ -1,25 +1,27 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// BANC : « LE BOOST EST-IL RENTABLE ? » (Statistiques, 21 octobre)
+// BANC : « BOOST RENTABLE ? » (Statistiques — refait le 3 nov., une seule carte)
 //        npm run build && BANC_PORT=4493 node scripts/bancs/boost-rentable.cjs
 // ═══════════════════════════════════════════════════════════════════════════
-// Données INVENTÉES (ce banc vit dans le dépôt, qui est public), à 1512 px et
-// à 390 px tactile :
-//   A. 6 paires boostées (preuve `promoted` ou « Boost payé » saisi) et 6 non
-//      boostées, toutes à 50 € : la carte compare — délai 3 j contre 10 j,
-//      vues, favoris, marge boost déduit (27 € contre 30 €) — et écrit la
-//      couverture (6 boostées dont 6 avec montant · 6 non boostées) ;
-//   B. 3 boostées seulement : « pas assez de ventes pour juger », aucun chiffre
-//      comparé (que des « — ») ;
-//   C. transactions illisibles (522) : « pas pu lire », aucun chiffre ;
-//   D. deux paires AU MÊME TITRE, une boostée vendue sans transaction reliée :
-//      elle n'est pas comptée boostée (jamais par le titre).
-// Jugé sur les attributs `data-boost-*`, jamais sur un libellé (§6.5).
+// Données INVENTÉES (ce banc vit dans le dépôt, qui est public), période
+// « Année », à 1512 px clair, 1512 px SOMBRE et 390 px tactile SOMBRE :
+//   A. 6 Nike Dunk boostées (« Boost payé » 3 € saisi, `promoted` une sur deux)
+//      dont 4 vendues en 3 j à 60 €, et 6 Dunk NON boostées dont 2 vendues en
+//      10 j à 60 € ; une Samba boostée seule (aucune Samba non boostée : hors
+//      comparaison). Calcul à la main : vendus 4/6 contre 2/6, délai 3 j contre
+//      10 j, prix médian boost déduit 57 € contre 60 €, coût 18 €, montant saisi
+//      6/6 ; couverture « 6 boostés · 6 autres » ;
+//   B. 2 boostées seulement : « Pas assez de données », aucun chiffre comparé ;
+//   C. transactions illisibles (522) : « — », aucun chiffre ;
+//   D. deux ventes boostées SANS transaction reliée (même titre) : jamais
+//      reliées par le titre ⇒ 2/6 vendues ;
+//   E. une SEULE carte « Boost rentable ? » sur l'écran (l'ancienne est retirée).
+// Jugé sur les attributs `data-sv-*`, jamais sur un libellé (§6.5).
 const path = require('path');
 let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
-catch (_) { ({ chromium } = require('/home/user/cancale-v67/node_modules/playwright')); }
+catch (_) { ({ chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 const { metaVersData } = require('./_meta.cjs');
-const fs = require('fs'), http = require('http');
+const fs = require('fs'), http = require('http'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 4493;
 
@@ -28,23 +30,26 @@ const maintenant = Date.now();
 const iso = (t) => new Date(t).toISOString();
 const accounts = [{ id: 1, vinted_user_id: '111', login: 'atelier_sneak', domain: 'www.vinted.fr', updated_at: iso(maintenant), created_at: iso(maintenant - 90 * J), owner: null }];
 
-// nb boostées, nnb non boostées ; `sansTx` : nombre de boostées dont la
-// transaction ne relie pas l'annonce.
-function jeu({ nb = 6, nnb = 6, sansTx = 0 } = {}) {
+// nb boostées (vb vendues), nnb non boostées (vnb vendues) ; `sansTx` : nombre de
+// ventes boostées dont la transaction ne relie pas l'annonce.
+function jeu({ nb = 6, vb = 4, nnb = 6, vnb = 2, sansTx = 0, samba = true } = {}) {
   const ventes = [], txns = [], items = [], fiches = {};
   let i = 0;
-  const pose = (cote, k) => {
+  const pose = (cote, k, vendu, titre = 'Nike Dunk Low blanc taille 42', marque = 'Nike') => {
     i += 1;
     const item = 700000 + i, tx = 900000 + i;
-    const enLigne = maintenant - 40 * J + i * J;
+    const enLigne = maintenant - 60 * J + i * J;
     const delai = cote === 'b' ? 3 : 10;
-    ventes.push({ transaction_id: tx, id: tx, title: 'Baskets inventées taille 42', price: { amount: '50', currency_code: 'EUR' }, status: 'Commande finalisée', date: iso(enLigne + delai * J) });
-    if (!(cote === 'b' && k < sansTx)) txns.push({ id: `harvest_111_txn_${tx}`, data: { capturedAt: iso(maintenant), payload: { transaction: { id: tx, item_id: item, status: 450, status_title: 'Commande finalisée', status_updated_at: iso(enLigne + (delai + 2) * J) } } } });
-    items.push({ id: item, title: 'Baskets inventées taille 42', price: { amount: '50', currency_code: 'EUR' }, is_closed: true, item_closing_action: 'sold', promoted: cote === 'b' ? (k % 2 === 0) : false, view_count: cote === 'b' ? 200 : 80, favourite_count: cote === 'b' ? 12 : 4, created_at_ts: Math.floor(enLigne / 1000) });
+    if (vendu) {
+      ventes.push({ transaction_id: tx, id: tx, title: titre, price: { amount: '60', currency_code: 'EUR' }, status: 'Commande finalisée', date: iso(enLigne + delai * J) });
+      if (!(cote === 'b' && k < sansTx)) txns.push({ id: `harvest_111_txn_${tx}`, data: { capturedAt: iso(maintenant), payload: { transaction: { id: tx, item_id: item, status: 450, status_title: 'Commande finalisée', status_updated_at: iso(enLigne + (delai + 2) * J) } } } });
+    }
+    items.push({ id: item, title: titre, brand_title: marque, size_title: '42', price: { amount: '60', currency_code: 'EUR' }, is_closed: !!vendu, ...(vendu ? { item_closing_action: 'sold' } : {}), promoted: cote === 'b' ? (k % 2 === 0) : false, view_count: 50, favourite_count: 3, created_at_ts: Math.floor(enLigne / 1000) });
     fiches[String(item)] = { numero: String(i), buyPrice: '20', ...(cote === 'b' ? { fees: '3' } : {}) };
   };
-  for (let k = 0; k < nb; k++) pose('b', k);
-  for (let k = 0; k < nnb; k++) pose('nb', k);
+  for (let k = 0; k < nb; k++) pose('b', k, k < vb);
+  for (let k = 0; k < nnb; k++) pose('nb', k, k < vnb);
+  if (samba) pose('b', 99, true, 'Adidas Samba noir taille 41', 'Adidas');
   const rows = [
     { id: 'harvest_111_orders_sold', data: { capturedAt: iso(maintenant), payload: { my_orders: ventes } } },
     { id: 'harvest_111_listings', data: { capturedAt: iso(maintenant - 60000), payload: { items } } },
@@ -78,13 +83,13 @@ srv.listen(PORT);
 
 let ko = 0, ok = 0; const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '  ✅ ' : '  ❌ ') + m + (d ? ' — ' + d : '')); };
 const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom, String(e.message || e).slice(0, 160)); } };
-const TAILLES = [{ nom: '1512', vp: { width: 1512, height: 950 } }, { nom: '390', vp: { width: 390, height: 844 }, isMobile: true, hasTouch: true }];
+const TAILLES = [{ nom: '1512', vp: { width: 1512, height: 950 } }, { nom: '1512-sombre', vp: { width: 1512, height: 950 }, sombre: true }, { nom: '390-sombre', vp: { width: 390, height: 844 }, isMobile: true, hasTouch: true, sombre: true }];
 
 async function ouvrir(b, T, { rows, main }, opts = {}) {
   const ctx = await b.newContext({ viewport: T.vp, isMobile: !!T.isMobile, hasTouch: !!T.hasTouch });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
-  await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
+  await pg.addInitScript((sombre) => { try { localStorage.setItem('vrm_acces_direct', '1'); if (sombre) localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, !!T.sombre);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
@@ -102,23 +107,25 @@ async function ouvrir(b, T, { rows, main }, opts = {}) {
   });
   await pg.route('**/api/**', (r2) => r2.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
   await pg.goto(`http://localhost:${PORT}/?tab=dashboard`, { waitUntil: 'domcontentloaded' });
-  await pg.waitForFunction(() => { const e = document.querySelector('[data-stats-carte="boost"]'); return (e && e.getAttribute('data-boost-etat') !== 'encours') || /pas pu s'afficher/.test(document.body.innerText); }, null, { timeout: 25000 }).catch(() => {});
-  await pg.waitForTimeout(600);
+  await pg.waitForSelector('[data-sv-choix="annee"]', { timeout: 25000 }).catch(() => {});
+  await pg.click('[data-sv-choix="annee"]').catch(() => {});
+  await pg.waitForFunction(() => { const e = document.querySelector('[data-sv-carte="boost"]'); return (e && e.getAttribute('data-sv-etat') !== 'encours') || /pas pu s'afficher/.test(document.body.innerText); }, null, { timeout: 25000 }).catch(() => {});
+  await pg.waitForTimeout(700);
   return { ctx, pg, errs };
 }
 const lire = (pg) => pg.evaluate(() => {
-  const e = document.querySelector('[data-stats-carte="boost"]');
-  if (!e) return null;
-  const o = {}; for (const a of e.getAttributeNames()) if (a.startsWith('data-boost-')) o[a.slice(11)] = e.getAttribute(a);
-  o.vals = {}; for (const v of e.querySelectorAll('[data-boost-val]')) o.vals[v.getAttribute('data-boost-val')] = { t: v.textContent.trim(), c: getComputedStyle(v).color };
-  o.verdict = !!e.querySelector('[data-boost-verdict="pas-assez"]');
-  // (30 oct.) Le détail « N pas reliées » passe derrière ⓘ : il se lit sur l'attribut de la couverture.
-  { const cv = e.querySelector('[data-boost-couverture]'); o.sansAnnonce = cv ? cv.getAttribute('data-boost-sans-annonce') : null; }
-  o.texte = e.innerText;
-  o.deborde = e.scrollWidth > e.clientWidth + 1;
-  return o;
+  const toutes = document.querySelectorAll('[data-sv-carte="boost"], [data-stats-carte="boost"]').length;
+  const e = document.querySelector('[data-sv-carte="boost"]');
+  if (!e) return { toutes };
+  const A = (k) => { const x = e.querySelector(`[data-sv-boost="${k}"]`); return x ? x.getAttribute('data-v') : null; };
+  const cout = e.querySelector('[data-sv-boost="cout"]');
+  const vals = [...e.querySelectorAll('.vrm-sv-boost-val')].map((v) => ({ t: v.textContent.trim(), c: getComputedStyle(v).color }));
+  return { toutes, etat: e.getAttribute('data-sv-etat'), b: e.getAttribute('data-sv-boostees'), nb: e.getAttribute('data-sv-autres'),
+    vendues: A('vendues'), delai: A('delai'), prix: A('prix'), cout: cout ? cout.getAttribute('data-v') : null, couv: cout ? cout.getAttribute('data-couv') : null,
+    pasAssez: (e.querySelector('[data-sv-boost-pas-assez]') || { getAttribute: () => null }).getAttribute('data-sv-boost-pas-assez'),
+    vals, texte: e.innerText, deborde: e.scrollWidth > e.clientWidth + 1 };
 });
-const sansCouleurJugement = (vals) => Object.values(vals).every((v) => { const m = /rgb\((\d+), ?(\d+), ?(\d+)/.exec(v.c) || []; const [r, g, b] = [+m[1], +m[2], +m[3]]; return !(g > r + 40 && g > b + 20) && !(r > g + 60 && r > b + 60); });
+const sansCouleurJugement = (vals) => vals.every((v) => { const m = /rgb\((\d+), ?(\d+), ?(\d+)/.exec(v.c) || []; const [r, g, b] = [+m[1], +m[2], +m[3]]; return !(g > r + 40 && g > b + 20) && !(r > g + 60 && r > b + 60); });
 
 (async () => {
   let b;
@@ -127,32 +134,31 @@ const sansCouleurJugement = (vals) => Object.values(vals).every((v) => { const m
     for (const T of TAILLES) {
       console.log(`\n══ ${T.nom} px${T.hasTouch ? ' (tactile)' : ''}`);
       await essaie('A' + T.nom, async () => {
-        console.log('── A. 6 boostées / 6 non boostées');
+        console.log('── A. 6 Dunk boostées / 6 Dunk non boostées (+ une Samba boostée seule)');
         const { ctx, pg, errs } = await ouvrir(b, T, jeu());
         const R = await lire(pg);
-        dit(!!R && R.etat === 'lu', 'la carte « Le boost est-il rentable ? » est sur Statistiques', JSON.stringify(R && R.etat));
-        if (R) {
-          dit(R.b === '6' && R.montant === '6' && R.nb === '6' && R.comp === '6/6', 'couverture : 6 boostées dont 6 avec montant · 6 non boostées · 6/6 comparées', JSON.stringify([R.b, R.montant, R.nb, R.comp]));
-          dit(R.assez === 'oui' && !R.verdict, 'assez pour juger');
-          dit(R.vals['delai-b'] && /^3\s*j$/.test(R.vals['delai-b'].t) && /^10\s*j$/.test(R.vals['delai-nb'].t), 'délai médian 3 j contre 10 j', JSON.stringify([R.vals['delai-b'], R.vals['delai-nb']]));
-          dit(R.vals['vues-b'] && R.vals['vues-b'].t === '200' && R.vals['favoris-nb'].t === '4', 'vues et favoris', JSON.stringify([R.vals['vues-b'], R.vals['favoris-nb']]));
-          dit(R.vals['marge-b'] && /27/.test(R.vals['marge-b'].t) && /30/.test(R.vals['marge-nb'].t), 'marge boost déduit : 27 € contre 30 €', JSON.stringify([R.vals['marge-b'], R.vals['marge-nb']]));
-          dit(sansCouleurJugement(R.vals), 'aucune couleur verte ni rouge sur les chiffres');
-          dit(/rien ici n.entre dans un total/.test(R.texte), 'la carte dit qu’elle n’entre dans aucun total');
-          dit(!R.deborde, 'aucun débordement dans la carte');
-        }
+        dit(R.toutes === 1, 'E · UNE seule carte « Boost rentable ? » sur Statistiques', String(R.toutes));
+        dit(R.etat === 'lu', 'la carte compare', R.etat);
+        dit(R.b === '6' && R.nb === '6', 'couverture : 6 boostés · 6 autres du même modèle (la Samba seule n’entre pas)', JSON.stringify([R.b, R.nb]));
+        dit(R.vendues === '4/6|2/6', 'vendus 4/6 contre 2/6', R.vendues);
+        dit(R.delai === '3|10', 'délai médian 3 j contre 10 j', R.delai);
+        dit(R.prix === '5700|6000', 'prix médian boost déduit 57 € contre 60 €', R.prix);
+        dit(R.cout === '1800' && R.couv === '6/6', 'coût des boosts 18 €, montant saisi 6/6', JSON.stringify([R.cout, R.couv]));
+        dit(sansCouleurJugement(R.vals), 'aucune couleur verte ni rouge sur les chiffres');
+        dit(!R.deborde, 'aucun débordement dans la carte');
         const deb = await pg.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
         dit(deb <= 1, 'aucun débordement horizontal', `${deb}px`);
-        if (process.env.BANC_CAPTURE) await pg.locator('[data-stats-carte="boost"]').screenshot({ path: path.join(process.env.BANC_CAPTURE, `boost-${T.nom}.png`) });
+        await pg.locator('[data-sv-carte="boost"]').scrollIntoViewIfNeeded().catch(() => {});
+        await pg.locator('[data-sv-carte="boost"]').screenshot({ path: path.join(process.env.BANC_CAPTURE || os.tmpdir(), `boost-${T.nom}.png`) }).catch(() => {});
         dit(errs.length === 0, 'aucune erreur d’app', errs.join(' | ').slice(0, 160));
         await ctx.close();
       });
       await essaie('B' + T.nom, async () => {
-        console.log('── B. 3 boostées seulement');
-        const { ctx, pg, errs } = await ouvrir(b, T, jeu({ nb: 3 }));
+        console.log('── B. 2 boostées seulement');
+        const { ctx, pg, errs } = await ouvrir(b, T, jeu({ nb: 2, vb: 1, samba: false }));
         const R = await lire(pg);
-        dit(!!R && R.etat === 'lu' && R.assez === 'non' && R.verdict, '« pas assez de ventes pour juger »', JSON.stringify(R && [R.etat, R.assez, R.verdict]));
-        dit(!!R && Object.values(R.vals).every((v) => v.t === '—'), 'aucun chiffre comparé (tableau replié ou que des « — »)', JSON.stringify(R && R.vals));
+        dit(R.etat === 'pas-assez' && R.pasAssez === '2', '« Pas assez de données » (2 boostés sur 3)', JSON.stringify([R.etat, R.pasAssez]));
+        dit(R.vendues == null && R.delai == null && R.prix == null && !/\d+\s*j\b/.test(R.texte), 'aucun chiffre comparé', R.texte);
         dit(errs.length === 0, 'aucune erreur d’app', errs.join(' | ').slice(0, 160));
         await ctx.close();
       });
@@ -160,14 +166,14 @@ const sansCouleurJugement = (vals) => Object.values(vals).every((v) => { const m
         console.log('── C. transactions illisibles');
         const { ctx, pg } = await ouvrir(b, T, jeu(), { txnKO: true });
         const R = await lire(pg);
-        dit(!!R && R.etat === 'passu' && !/\d+\s*j\b/.test(R.texte), '« pas pu lire », aucun chiffre', JSON.stringify(R && R.etat));
+        dit(R.etat === 'passu' && R.vendues == null && !/\d+\s*j\b/.test(R.texte), '« — », aucun chiffre', JSON.stringify(R.etat));
         await ctx.close();
       });
       await essaie('D' + T.nom, async () => {
         console.log('── D. même titre, transaction non reliée');
-        const { ctx, pg } = await ouvrir(b, T, jeu({ nb: 6, sansTx: 2 }));
+        const { ctx, pg } = await ouvrir(b, T, jeu({ sansTx: 2 }));
         const R = await lire(pg);
-        dit(!!R && R.b === '4' && R.sansAnnonce === '2', 'les 2 boostées sans transaction reliée ne comptent pas (jamais par le titre)', JSON.stringify(R && [R.b, R.texte.slice(0, 200)]));
+        dit(R.vendues === '2/6|2/6', 'les 2 ventes boostées sans transaction reliée ne rendent rien « vendu » (jamais par le titre)', R.vendues);
         await ctx.close();
       });
     }

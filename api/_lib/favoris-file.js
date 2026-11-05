@@ -2,6 +2,7 @@
 // recipients from native captures before passing targets here. No network IO
 // inside a CAS decision: a retry must never repeat a Vinted request.
 export class RefusFavoris extends Error { constructor(message,status=409){super(message);this.status=status;} }
+import {AUTO_FREINS,AUTO_PAUSE_MS,AUTO_ESSAIS,AUTO_AVANT_ECRITURE,DEMANDES_AUTO,RAISONS_DEMANDE,dansPlageAuto,ecartAutoMs} from '../../src/favorisAuto.js';
 const entier=v=>typeof v==='string'&&/^[1-9]\d{0,19}$/.test(v);
 const clone=v=>structuredClone(v);
 // Tirage du temps avant le message suivant, entre le minimum et le maximum
@@ -24,9 +25,18 @@ export function initialiserFile(d){
   if(d.version!==1||!d.groupes||!Array.isArray(d.tentatives))throw new RefusFavoris('Le format de la file nécessite une vérification.');
   return clone(d);
 }
+// Ce que l'écran du mode auto montre (2 nov.) : réglages, pause, compteurs, journal.
+// Les compteurs sont ceux du COMPTE Vinted (tous les propriétaires de la file).
+function vueAuto(d,g){
+  const pause=Number(d?.pauseAutoJusqua)||0;
+  if(!g?.auto&&!pause)return null;
+  const env=Array.isArray(d?.autoEnvois)?d.autoEnvois:[];
+  return {reglages:g?.auto?.reglages||null,demande:g?.auto?.demande||null,allumeLe:g?.auto?.allumeLe||null,pauseJusqua:pause||null,pauseRaison:d?.pauseAutoRaison||null,envois:env.slice(-60),journal:(g?.auto?.journal||[]).slice(0,60),etat:g?.auto?.etat||null,prochain:g?.auto?.prochain||null};
+}
 export function vueFile(d,owner){
   const g=d?.groupes?.[owner];
-  return g?{active:g.active,raison:g.raison||'',lot:g.lot||null,intervalleMinutes:g.intervalleMinutes,intervalleMaxMinutes:g.intervalleMax||null,prochain:d.enCours?null:Math.max(g.prochain||0,d.prochainGlobal||0),jobs:g.jobs.map(({id,notificationId,etat,raison,lot,traiteLe,envoyeLe})=>({id,notificationId,etat,lot,traiteLe,envoyeLe,...(raison?{raison}:{})}))}:{active:false,raison:'',prochain:null,jobs:[]};
+  const auto=vueAuto(d,g);
+  return g?{...(auto?{auto}:{}),active:g.active,raison:g.raison||'',lot:g.lot||null,intervalleMinutes:g.intervalleMinutes,intervalleMaxMinutes:g.intervalleMax||null,prochain:d.enCours?null:Math.max(g.prochain||0,d.prochainGlobal||0),jobs:g.jobs.map(({id,notificationId,etat,raison,lot,traiteLe,envoyeLe,auto,ecrits})=>({id,notificationId,etat,lot,traiteLe,envoyeLe,...(auto?{auto:true}:{}),...(raison?{raison}:{}),...(Number.isInteger(ecrits)?{ecrits}:{})}))}:{...(auto?{auto}:{}),active:false,raison:'',prochain:null,jobs:[]};
 }
 // L'offre jointe (29 oct.) : {mode:'pct'|'euros'|'prix', valeur, arrondi}, ou rien.
 const offreValide=o=>o==null||(o&&typeof o==='object'&&['pct','euros','prix'].includes(o.mode)&&typeof o.valeur==='number'&&o.valeur>0&&o.valeur<=99999&&(o.mode!=='pct'||Number.isInteger(o.valeur)&&o.valeur<=99)&&typeof o.arrondi==='boolean');
@@ -74,13 +84,24 @@ export function reserverFile(d,{owner,maintenant,jeton,suivi=''}){
   if(maintenant<prochain)return {valeur:{vue:{...vueFile(d,owner),prochain}}};
   const j=g.jobs.find(x=>x.etat==='attente');
   if(!j){g.active=false;return {data:d,valeur:{vue:vueFile(d,owner)}};}
-  const delai=delaiFavori(j.intervalleMinutes,j.intervalleMax,jeton);
+  // (2 nov., mode auto) Un message AUTOMATIQUE ne part que si le mode est encore
+  // allumé, sans pause, dans ses horaires : sinon il est annulé (rien n'est parti,
+  // le favori pourra être repris plus tard par le mode auto).
+  if(j.auto&&(g.auto?.reglages?.actif!==true||(d.pauseAutoJusqua||0)>maintenant||!dansPlageAuto(g.auto.reglages,maintenant))){
+    j.etat='annule';j.raison='auto_suspendu';j.traiteLe=maintenant;
+    if(!g.jobs.some(x=>x.etat==='attente'))g.active=false;
+    return {data:d,valeur:{vue:vueFile(d,owner)}};
+  }
+  const delai=j.auto?ecartAutoMs(jeton):delaiFavori(j.intervalleMinutes,j.intervalleMax,jeton);
+  // Le quota du mode auto se compte à la RÉSERVATION (comme `tentatives`) : une
+  // réponse perdue ne libère jamais une place.
+  if(j.auto)d.autoEnvois=[...(Array.isArray(d.autoEnvois)?d.autoEnvois:[]).filter(x=>x>maintenant-86400000),maintenant];
   j.etat='reserve';d.enCours={owner,id:j.id,jeton,suivi,at:maintenant,delai,prochainAvant:g.prochain||0,globalAvant:d.prochainGlobal||0};d.tentatives=[...t,maintenant];
   g.prochain=maintenant+delai;
   d.prochainGlobal=g.prochain;
   return {data:d,valeur:{vue:vueFile(d,owner),travail:{...j,jeton,suivi}}};
 }
-export function terminerFile(d,{owner,jeton,resultat,maintenant,raison}){
+export function terminerFile(d,{owner,jeton,resultat,maintenant,raison,ecrits=null}){
   d=initialiserFile(d);const e=d.enCours,g=d.groupes[owner];
   if(!e||e.owner!==owner||e.jeton!==jeton)return {valeur:vueFile(d,owner)};
   const j=g.jobs.find(x=>x.id===e.id);
@@ -92,30 +113,56 @@ export function terminerFile(d,{owner,jeton,resultat,maintenant,raison}){
   if(resultat==='ignore'){
     d.tentatives=d.tentatives.filter(t=>t!==e.at);g.prochain=e.prochainAvant||0;d.prochainGlobal=e.globalAvant||0;
   }else{d.tentatives=d.tentatives.map(t=>t===e.at?fin:t);g.prochain=Math.max(g.prochain||0,fin+(Number.isSafeInteger(e.delai)?e.delai:j.intervalleMinutes*60000));d.prochainGlobal=g.prochain;}
-  const raisons=['article_vendu','ecran_inactif','compte_vinted_absent','quota_extension','pause_vinted','conversation_deja_contactee','historique_non_verifie','identite_non_confirmee','autorisation_expiree','compte_vinted_different','extension_indisponible','session_extension','vinted_refus','creation_non_confirmee','reponse_inconnue','onglet_vinted'];
+  const raisons=['article_vendu','ecran_inactif','compte_vinted_absent','quota_extension','pause_vinted','conversation_deja_contactee','historique_non_verifie','identite_non_confirmee','autorisation_expiree','compte_vinted_different','extension_indisponible','session_extension','vinted_refus','creation_non_confirmee','reponse_inconnue','onglet_vinted','offre_refusee','offre_prix_inconnu','offre_incertaine','conversation_existante','vinted_frein','vinted_robot'];
   if(raisons.includes(raison))j.raison=raison;
   j.etat=resultat;d.enCours=null;
+  // Combien d'écritures sont parties chez Vinted (5.309) : 0 ⇒ rien n'est parti,
+  // le mode auto pourra reprendre ce favori. Inconnu ⇒ jamais repris.
+  if(Number.isInteger(ecrits)&&ecrits>=0&&ecrits<=3)j.ecrits=ecrits;
   j.traiteLe=fin;if(resultat==='envoye')j.envoyeLe=fin;
-  if(!['envoye','ignore'].includes(resultat)){g.active=false;g.raison=raison==='article_vendu'?'Article vendu : aucun message envoyé pour cette tentative. Les messages restants ne sont pas envoyés.':raison==='ecran_inactif'?'Écran des favoris quitté avant le départ. Les messages restants ne sont pas envoyés.':resultat==='incertain'?'Réponse incertaine : vérifie la conversation sur Vinted. Aucun renvoi automatique.':'Vinted ou l’extension a interrompu la file. Les messages restants ne sont pas envoyés.';}
+  // (2 nov.) Un frein de Vinted (429/403, captcha, « activité automatisée ») :
+  // le mode AUTO de ce compte Vinted se met en pause 24 h, pour tous les
+  // propriétaires de la file (l'heure de reprise est dite dans l'app).
+  if(AUTO_FREINS.includes(raison)){d.pauseAutoJusqua=Math.max(d.pauseAutoJusqua||0,fin+AUTO_PAUSE_MS);d.pauseAutoRaison=raison;}
+  let nouvelleDemande=null;
+  if(j.auto&&g.auto){
+    const nom=String(j.nom||'').slice(0,80);
+    // (2 nov., 13 h) Jamais de boucle : un refus avant toute écriture est retenté au
+    // plus AUTO_ESSAIS fois en tout ; ensuite le favori est laissé de côté, dit.
+    const reprise=resultat==='refuse'&&j.ecrits===0&&AUTO_AVANT_ECRITURE.includes(j.raison)&&(Number(j.essais)||1)<AUTO_ESSAIS;
+    const epuise=resultat==='refuse'&&j.ecrits===0&&AUTO_AVANT_ECRITURE.includes(j.raison)&&!reprise;
+    g.auto.journal=[{at:fin,notificationId:j.notificationId,itemId:j.itemId,...(nom?{nom}:{}),etat:resultat,raison:resultat==='envoye'?'envoye':epuise?'essais_epuises':(raison||resultat),...(reprise?{reprise:true}:{})},...(g.auto.journal||[])].slice(0,200);
+    // Un refus qu'un geste de Julien réglerait : VRM le lui DEMANDE (une fois).
+    const code=RAISONS_DEMANDE.includes(raison)?raison:null;
+    if(code&&DEMANDES_AUTO[code]&&g.auto.demande?.code!==code){g.auto.demande={code,at:fin};nouvelleDemande=code;}
+    if(resultat==='envoye'&&g.auto.demande&&RAISONS_DEMANDE.includes(g.auto.demande.code))delete g.auto.demande;
+  }
+  if(j.auto&&['envoye','ignore'].includes(resultat)){if(!g.jobs.some(x=>x.etat==='attente'))g.active=false;}
+  else if(!['envoye','ignore'].includes(resultat)){g.active=false;g.raison=raison==='article_vendu'?'Article vendu : aucun message envoyé pour cette tentative. Les messages restants ne sont pas envoyés.':raison==='ecran_inactif'?'Écran des favoris quitté avant le départ. Les messages restants ne sont pas envoyés.':resultat==='incertain'?'Réponse incertaine : vérifie la conversation sur Vinted. Aucun renvoi automatique.':'Vinted ou l’extension a interrompu la file. Les messages restants ne sont pas envoyés.';}
   else {if(!g.jobs.some(x=>x.etat==='attente'))g.active=false;if(!g.active)g.raison='Sélection traitée ou file arrêtée.';}
   // (28 oct.) La file vient de se TERMINER (finie ou interrompue) : son bilan,
   // une seule fois (la transition active → inactive), pour la notification.
-  const valeur=vueFile(d,owner);
-  if(etaitActive&&!g.active){const lot=g.jobs.filter(x=>x.lot===g.lot);const n=k=>lot.filter(x=>x.etat===k).length;valeur.fin={lot:g.lot||null,total:lot.length,envoyes:n('envoye'),incertains:n('incertain'),interrompus:n('refuse'),interrompue:!['envoye','ignore'].includes(resultat)};}
+  const valeur=vueFile(d,owner);if(nouvelleDemande)valeur.nouvelleDemande=nouvelleDemande;
+  if(etaitActive&&!g.active&&!j.auto){const lot=g.jobs.filter(x=>x.lot===g.lot);const n=k=>lot.filter(x=>x.etat===k).length;valeur.fin={lot:g.lot||null,total:lot.length,envoyes:n('envoye'),incertains:n('incertain'),interrompus:n('refuse'),interrompue:!['envoye','ignore'].includes(resultat)};}
   return {data:d,valeur};
 }
 // (29 oct., revue) Une offre (même un simple %) ne part que d'une extension ≥ 5.280 : avant, elle
 // était ignorée et, depuis la 5.281, plus aucune phrase de réduction n'est ajoutée au texte —
 // l'acheteur ne recevait rien de la réduction, sans un mot.
 export const exige5280=j=>!!j?.offre||Number.isInteger(j?.pourcentage)&&j.pourcentage>0;
-export function consommerFile(d,{owner,jeton,maintenant,version5281=true,version5280=true}){
+export function consommerFile(d,{owner,jeton,maintenant,version5281=true,version5280=true,version5309=true}){
   d=initialiserFile(d);const e=d.enCours,g=d.groupes[owner];
   if(!e||e.owner!==owner||e.jeton!==jeton||e.autorise||!g?.active||maintenant<e.at||maintenant-e.at>60000)throw new RefusFavoris('L’autorisation d’envoi n’est plus disponible. Aucun renvoi automatique.');
   const j=g.jobs.find(x=>x.id===e.id);if(j?.etat!=='reserve')throw new RefusFavoris('La tentative n’est plus disponible.');
   if(!version5280&&exige5280(j))throw new RefusFavoris('Mets à jour l’extension (5.281) : celle-ci n’envoie pas la vraie offre Vinted aux favoris. Rien n’a été envoyé.');
   if(!version5281&&exige5281(j))throw new RefusFavoris('Mets à jour l’extension (5.281) : celle-ci ne sait pas faire les variables du message ni cette offre. Rien n’a été envoyé.');
+  // (2 nov.) Un message automatique exige l'extension 5.309 : elle n'écrit RIEN dans
+  // une conversation qui porte déjà un message (« conversation existante ») et dit
+  // les freins de Vinted (captcha, activité automatisée) pour la pause de 24 h.
+  if(j.auto&&!version5309)throw new RefusFavoris('Mets à jour l’extension (5.309) pour le mode automatique des favoris. Rien n’a été envoyé.');
+  if(j.auto&&(g.auto?.reglages?.actif!==true||(d.pauseAutoJusqua||0)>maintenant))throw new RefusFavoris('Mode automatique éteint ou en pause : rien n’a été envoyé.');
   e.autorise=true;
-  return {data:d,valeur:{suivi:e.suivi,travail:{itemId:j.itemId,recipientId:j.recipientId,initiator:j.initiator,message:j.message,...(Number.isInteger(j.pourcentage)?{pourcentage:j.pourcentage}:{}),...(j.offre?{offre:j.offre}:{})}}};
+  return {data:d,valeur:{suivi:e.suivi,travail:{...(j.auto?{auto:true}:{}),itemId:j.itemId,recipientId:j.recipientId,initiator:j.initiator,message:j.message,...(Number.isInteger(j.pourcentage)?{pourcentage:j.pourcentage}:{}),...(j.offre?{offre:j.offre}:{})}}};
 }
 export function verifierReservation(d,{owner,jeton,maintenant}){
   d=initialiserFile(d);const e=d.enCours;

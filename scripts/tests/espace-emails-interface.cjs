@@ -16,6 +16,7 @@ const { build } = require("esbuild"),
       loader: "jsx",
       contents: `import React,{useState,useEffect,useRef}from'react';import{createRoot}from'react-dom/client';import EspaceEmails from'./src/EspaceEmails.jsx';import SuiviReceptionEmails from'./src/ReceptionEmails.jsx';import{normAdresse,ADRESSE_COLLECTRICE}from'./api/_lib/proprietaire-email.js';
 const C={text:'#223d41',muted:'#647676',bg:'#f2f5f0',card:'#fff',border:'#dce4de',accent:'#315e62',warn:'#946d27',danger:'#a33c36',onAccent:'#fff'};
+const useStateCle=(k,f)=>useState(f),load=()=>({}),save=()=>{},onCloudReady=()=>()=>{},JournalEmails=()=>null,Avancement=()=>null,compteAvancement=()=>'',phrasePersonne=()=>null,askText=async()=>'',SUPABASE_URL='',SB_CONFLICT='',withOwner=x=>x,enTeteSession=()=>({}),demanderPreuveAdresse=async()=>({etat:null}),estAdresseCollectrice=()=>false;
 const AUTH={user:{id:'a'}},DEMANDE_ADRESSES={on:false},Icon=()=> <span aria-hidden="true">·</span>,REGLAGE_PAS_LU='Lecture indisponible';
 const PREUVE_LIGNE={prouvee:{t:'Confirmée'},attente:{t:'À confirmer',geste:'Confirmer'}};
 window.q={emails:Array.from({length:13},(_,i)=>({id:'q'+i,sujet:'Colis à retirer '+i,raison:i===12?'Motif exceptionnel':'Adresse à confirmer'})),cloisonnee:true};
@@ -52,7 +53,9 @@ const root=createRoot(document.getElementById('root'));window.afficher=()=>root.
       await p
         .locator(".vrm-reception-liste")
         .getByText("Bordereau de ta vente", { exact: true })
-        .waitFor();
+        // (2 nov.) La liste vit repliée sous l'Aperçu : présente, pas affichée.
+        .waitFor({ state: "attached" });
+      await p.locator('[data-apercu-reponse="oui"]').waitFor();
       p.setDefaultTimeout(8000);
       const nav = p.getByRole("navigation", { name: "Rubriques des emails" });
       check(

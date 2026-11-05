@@ -102,6 +102,12 @@ const MUTER_MODULE = {
   // chaque retour redemande TOUS les refus, même ceux déjà redemandés dans la vague (charge)
   'retour-sans-borne': (s) => s.replace("    if (parRetour && e.etat === 'ko' && e.rouvertAt && t - e.rouvertAt < reculRefus(e.refusN)) continue;\n", ''),
   // le refus ne tombe qu'au retour du réseau (le remontage ne redemande jamais)
+  // le statut du pont est ignoré (le lien mort redemandé comme les autres)
+  'statut-ignore': (s) => s.replace("return { dataUrl: null, issue: 'refus', genre: genreRefus(r.statut) };", "return { dataUrl: null, issue: 'refus' };"),
+  // les passagers ne passent plus devant au témoin
+  'temoin-sans-genre': (s) => s.replace("((a.genre === 'passager' ? 0 : 1) - (b2.genre === 'passager' ? 0 : 1)) || ", ''),
+  // le retour du réseau relève quand même un lien mort
+  'mort-online': (s) => s.replace("  if (mortRecent(e)) return;   // le CDN", "  if (false) return;   // le CDN"),
   'refus-colle': (s) => s.replace("if (raison === 'online' || raison === 'reseau' || maintenant() - e.refusAt >= reculRefus(e.refusN)) e.refus = false;", "if (raison === 'online') e.refus = false;"),
   // le témoin redemande TOUTES les photos refusées à chaque passage (charge)
   'temoin-tout': (s) => s.replace("for (const x of l2) { if (n >= MAX_EN_VOL) break; if (rouvrir(x)) n++; }", 'for (const x of entrees.values()) if (x.refs > 0 && rouvrir(x)) n++;'),
@@ -133,14 +139,21 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
     // La liste FERMÉE des <img> qui ne peuvent PAS montrer une photo Vinted.
     // Clé : « fonction englobante :: source » ; une source inconnue est rouge.
     const PERMIS = {
+      'PhotoOffreVc :: url': 'URL filtrée par urlPhotoVc : HTTPS images.vestiairecollective.com seulement, aucun identifiant dans l’URL ; ce n’est pas une photo Vinted',
+      'ComptaPro :: ticketVu.src': 'ticket photographié puis compressé en data:image/jpeg dans choisirTicket, ou lu comme octets du ticket ; aucune URL d’annonce',
+      'ComptaPro :: dPhoto': 'aperçu du fichier choisi, compressé en data:image/jpeg par le navigateur ; aucune URL distante',
+      'PlaceurTamponFeuille :: img.url': 'page PDF rendue dans un canvas local puis toDataURL : aperçu du bordereau, aucune URL Vinted',
+      'LogoTransporteur :: url': 'logosDuTransporteur : dictionnaire fermé des logos officiels des transporteurs, sans CDN Vinted, no-referrer et repli en cas d’erreur',
       'StudioPhoto :: ph.img': 'photo prise par le vendeur dans le studio, data:image/jpeg fabriquée par le canvas (jamais une adresse Vinted)',
       'StudioPhoto :: ph.detoure': 'la même photo détourée dans le navigateur, data:image/webp|png (jamais une adresse Vinted)',
       'BrandIcon :: source': 'logos locaux : dictionnaire fermé /brands/{vinted,leboncoin,ebay}.svg',
       'PhotoVente :: secours': 'octets raster du secours serveur, convertis en data:image (type et taille vérifiés)',
       'PhotoVinted :: *': 'la règle elle-même (no-referrer, secours, pictogramme)',
+      'PhotoVc :: url': 'photo d’une annonce VESTIAIRE (1er nov., 5.296) : `url` n’est posée que pour https://*.vestiairecollective.com, sans identifiants — jamais une adresse Vinted ; repli « — » si elle ne charge pas',
       'Photo :: url': 'AnnoncesLeboncoin (catalogue, 22 oct., main) : `ad.images[0]` d’une annonce LEBONCOIN lue par l’extension (CDN de Leboncoin) — jamais une adresse Vinted ; https seulement, repli « — » si elle ne charge pas',
       'OsmMap :: tileUrl(t.x, t.y)': 'tuiles de carte OpenStreetMap',
       'AbonnementRequis :: "/vrm-logo-96.png"': 'logo de l’app (fichier du site, logo officiel)',
+      'DemarrageVRM :: "/vrm-icon-v4-192.png"': 'icône officielle locale au démarrage, aucune URL distante',
       'PorteConfidentialite :: "/vrm-icon-v4-192.png"': 'icône de l’app v4 (fichier du site)',
       'AbonnementRequis :: "/vrm-logo-v4-192.png"': 'logo de l’app v4 (fichier du site, logo officiel)',
       'Accueil :: "/vrm-logo-v4-192.png"': 'logo de l’app v4 (fichier du site, logo officiel)',
@@ -169,7 +182,8 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
       'DoubleVerification :: cours.qr': 'QR de la double vérification : data:image/svg+xml rendu par GoTrue (qrEnSrc refuse toute autre forme)',
       'AbonnementRequis :: "/logo-vrm-96.png"': 'logo de l’app',
       'TeteEquipe :: "/logo-vrm-96.png"': 'logo de l’app (écran des colis de l’équipe, mode équipe)',
-      'ProFactureSetting :: cfg.logo': 'logo de facture choisi sur l’appareil (data:)',
+      'FicheFacturation :: cfg.logo': 'logo de la facture Pro, choisi sur l’appareil et réduit (data:image png/jpeg, src/FacturePro.jsx)',
+      'ApercuFacture :: c.logo': 'logo de la facture Pro dans l’aperçu (data:image png/jpeg de l’instantané, filtré par contenuFacture)',
       'AppCoeur :: logoSrc': 'logo de l’app ou logo choisi (data:)',
       'Fenetre :: "/logo-vrm-96.png"': 'logo de l’app (page d’accueil)',
       'Film :: "/logo-vrm-192.png"': 'logo de l’app (film de la page d’accueil)',
@@ -623,6 +637,64 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
     dit(revenues === 15 && parMort.every((n) => n <= 2),
       'des liens morts mêlés à des refus passagers : les 15 passagers reviennent, et chaque lien mort n’est redemandé qu’UNE fois dans la vague (pas une fois par retour)',
       `${revenues}/15 revenues · demandes par lien mort ${JSON.stringify(parMort)}`);
+  });
+
+  await essaie('refus : la raison du pont (5.292)', async () => {
+    // 31 oct. — l'extension relaie le STATUT du CDN. Six liens MORTS (404) en tête
+    // de page, trois refus PASSAGERS (503 la première fois, puis les octets).
+    const w = monde({ sonde: () => 'erreur' });
+    const parUrl = {};
+    const morts = Array.from({ length: 6 }, (_, i) => U(200 + i));
+    const passagers = Array.from({ length: 3 }, (_, i) => U(210 + i));
+    w.m.configurer({ secours: () => 'oui', ext: () => 'presente', chargerImage: async () => false,
+      demander: async (u) => { parUrl[u] = (parUrl[u] || 0) + 1;
+        if (morts.includes(u)) return { dataUrl: null, issue: 'refus', statut: 404 };
+        return parUrl[u] === 1 ? { dataUrl: null, issue: 'refus', statut: 503 } : { dataUrl: PNG, issue: 'ok' }; } });
+    monterEchouer(w.m, [...morts, ...passagers]);
+    await w.avancer(10);
+    // Le premier passage du témoin (20 s) : ses trois places vont aux PASSAGERS.
+    await w.avancer(w.m.TEMOIN_PREMIER_MS + 500);
+    const revenues = passagers.filter((u) => w.m.etat(u) === 'ok').length;
+    dit(revenues === 3, 'page mêlée (6 liens morts en tête, 3 refus passagers) : au premier passage du témoin, les 3 passagers reviennent (les liens morts ne prennent pas ses places)',
+      `${revenues}/3 revenues · demandes ${JSON.stringify(Object.values(parUrl))}`);
+    // 29 min, le retour du réseau : un lien mort n'est jamais redemandé.
+    await w.avancer(29 * 60e3 - w.m.TEMOIN_PREMIER_MS - 1000);
+    w.emettre('online'); await w.avancer(10);
+    morts.forEach((u) => { if (w.m.etat(u) === 'natif') w.m.echecNatif(u); });
+    await w.avancer(10);
+    const parMort = morts.map((u) => parUrl[u] || 0);
+    dit(parMort.every((n) => n === 1), 'un lien MORT (404) n’est plus redemandé avant 30 min — ni par le témoin, ni par le retour du réseau', `demandes par lien mort ${JSON.stringify(parMort)}`);
+    dit(morts.every((u) => !w.m.estDefinitive(u)), '… jamais définitif pour autant (rien ne le retire d’une liste)');
+    // Passé 30 min : il retrouve sa chance (un lien a pu être recapturé entre-temps).
+    await w.avancer(2 * 60e3 + w.m.TEMOIN_MAX_MS);
+    const apres = morts.map((u) => parUrl[u] || 0);
+    dit(apres.some((n) => n >= 2), '… et passé 30 min, il est de nouveau redemandé', JSON.stringify(apres));
+    // L'autre sens : un refus SANS statut (extension d'avant, route serveur) garde la règle d'avant.
+    const w2 = monde({ sonde: () => 'erreur' });
+    const n2 = {};
+    w2.m.configurer({ secours: () => 'oui', ext: () => 'presente', chargerImage: async () => false,
+      demander: async (u) => { n2[u] = (n2[u] || 0) + 1; return { dataUrl: null, issue: 'refus' }; } });
+    monterEchouer(w2.m, [U(220), U(221)]);
+    await w2.avancer(10);
+    await w2.avancer(3 * w2.m.TEMOIN_PREMIER_MS + 2000);
+    dit(Object.values(n2).every((n) => n >= 2), 'l’autre sens : un refus SANS statut (extension d’avant) est encore redemandé par le témoin, comme avant', JSON.stringify(Object.values(n2)));
+    // Les passagers passent AVANT les refus sans raison (extension d'avant mêlée, route serveur).
+    const w3 = monde({ sonde: () => 'erreur' });
+    const n3 = {};
+    const sansRaison = Array.from({ length: 4 }, (_, i) => U(230 + i));
+    const pass3 = Array.from({ length: 3 }, (_, i) => U(240 + i));
+    w3.m.configurer({ secours: () => 'oui', ext: () => 'presente', chargerImage: async () => false,
+      demander: async (u) => { n3[u] = (n3[u] || 0) + 1;
+        if (sansRaison.includes(u)) return { dataUrl: null, issue: 'refus' };
+        return n3[u] === 1 ? { dataUrl: null, issue: 'refus', statut: 429 } : { dataUrl: PNG, issue: 'ok' }; } });
+    monterEchouer(w3.m, [...sansRaison, ...pass3]);
+    await w3.avancer(10);
+    await w3.avancer(w3.m.TEMOIN_PREMIER_MS + 500);
+    const rev3 = pass3.filter((u) => w3.m.etat(u) === 'ok').length;
+    dit(rev3 === 3, 'les refus PASSAGERS (429) passent avant les refus sans raison au témoin : ils reviennent au premier passage', `${rev3}/3 revenues`);
+    const g = w.m.genreRefus;
+    dit(typeof g === 'function' && g(404) === 'mort' && g(410) === 'mort' && g(429) === 'passager' && g(503) === 'passager' && g(0) === 'passager' && g(undefined) === '' && g(403) === '',
+      'genreRefus : 404/410 mort · 429/5xx/0 passager · sans statut ni 403 : pas su');
   });
 
   await essaie('bilan : le retour', async () => {

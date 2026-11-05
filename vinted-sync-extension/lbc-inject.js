@@ -24,7 +24,7 @@
   } catch (_) {}
   if (window.__vrmLbcInjected) return; window.__vrmLbcInjected = true;
   const TAG = 'CANCALE_LBC';
-  const CAPTEUR_VERSION='5.291.0';
+  const CAPTEUR_VERSION='5.322.0';
   // Le monde MAIN peut précéder le relais isolé, même à document_start.
   // Rejouer uniquement en mémoire, borné, sans requête ni persistance locale.
   let relaisPret=false,sequence=0,octetsAttente=0;
@@ -492,7 +492,7 @@
   // lui-même sur ses appels à son API (jamais vus d'ici : on les recopie, on ne
   // les devine pas). Gardés en mémoire, dans la page — jamais envoyés ailleurs,
   // jamais rangés. Seuls leurs NOMBRE part dans le diagnostic.
-  let entetesApi = null, entetesPintad = null;
+  let entetesApi = null, entetesPintad = null, entetesMsg = null;
   const SANS_ENTETE = /^(content-type|content-length|cookie|host|x-vrm)$/i;
   const noterEntetes = (url, h) => {
     try {
@@ -501,6 +501,8 @@
       for (const k of Object.keys(o)) if (SANS_ENTETE.test(k) || typeof o[k] !== 'string') delete o[k];
       if (!Object.keys(o).length) return;
       if (/\/api\/pintad\//i.test(url)) entetesPintad = o; else entetesApi = o;
+      // 5.318 : ceux de la MESSAGERIE à part (une réponse repart avec eux, jamais devinés).
+      if (/\/messaging\//i.test(url)) entetesMsg = o;
     } catch (_) {}
   };
 
@@ -587,6 +589,9 @@
       if (/\/messaging\//i.test(url)) {
         const m = /\/messaging\/proxy\/api\/hal\/([0-9a-f-]{8,64})\/counter\/?(?:\?|$)/i.exec(url);
         if (m) { try { const o = JSON.parse(text); const n = Number(o && o.unread); if (Number.isFinite(n) && n >= 0) { post({ kind: 'lbcmsgcompteur', userId: m[1], unread: Math.round(n) }); noterCompteurDoc(m[1]); } } catch (_) {} }
+        // 5.318 (3 nov., Julien : répondre depuis VRM) : UN FIL — le texte, la date,
+        // « de toi » ; jamais un nom, jamais en `lbcraw`.
+        else noteFilLbc(url, text);
         return;
       }
       // ── UNE OFFRE / NÉGOCIATION : SA STRUCTURE SEULE, JAMAIS SES VALEURS (27 oct.) ──
@@ -624,6 +629,171 @@
     } catch (_) {}
   };
 
+
+  // ── 5.318 (3 nov.) LIRE UN FIL, APPRENDRE L'ENVOI, RÉPONDRE SUR SON CLIC ─────
+  // Julien a choisi « répondre aux messages Leboncoin depuis VRM ». La forme de
+  // Vestiaire (vc-inject.js, 5.295) :
+  //   · UN FIL (`…/conversations/{id}` ou `…/conversations/{id}/messages`) : le
+  //     TEXTE de chaque message (une clé text/body/content/message), sa date, et
+  //     s'il est DE TOI (une clé booléenne qui le dit, ou l'auteur = le compte
+  //     privé de CE document) ; ⚠️ JAMAIS le nom, le pseudo, la photo de l'autre ;
+  //   · RÉPONDRE : rien ne part à l'aveugle. L'adresse et la forme du corps
+  //     s'APPRENNENT quand TU envoies un message toi-même sur la page (une
+  //     écriture 2xx de la messagerie) : méthode, hôte, chemin avec la
+  //     conversation remise en `{conv}` et ton compte en `{moi}`, la clé du
+  //     texte, les mots fixes, les NOMS des en-têtes — jamais ton texte, jamais
+  //     une valeur d'en-tête. Ce qui demanderait de deviner est « pas rejouable ».
+  //     L'ordre ne vient que du fond (SA commande dans l'app), et ne part qu'au
+  //     nom du compte privé de CETTE page.
+  // ⚠️ NON MESURÉ : la forme réelle des réponses de messagerie de Leboncoin.
+  const convsVuesLbc = new Set();
+  const ID_CONV_LBC = /^(?=[\w-]*\d)[\w-]{3,64}$/;
+  const moiLbc = () => (comptePriveDoc && !basculeDoc ? String(comptePriveDoc).replace(/^lbc-account:/, '') : '');
+  const CLE_TEXTE_LBC = /^(text|body|content|message|messageText|message_text|msg)$/i;
+  const CLE_MOI_LBC = /^(isMine|is_mine|mine|fromMe|from_me|isOwn|is_own|own|sentByMe|sent_by_me|isSender|is_sender|outgoing|isOutgoing|is_outgoing|is_me|isMe)$/i;
+  const CLE_AUTEUR_ID_LBC = /^(senderId|sender_id|authorId|author_id|fromId|from_id|userId|user_id|ownerId|owner_id)$/i;
+  const CLE_AUTEUR_LBC = /^(sender|author|from|user|owner|createdBy|created_by)$/i;
+  const CLE_DATE_LBC = /^(createdAt|created_at|sentAt|sent_at|date|timestamp|time|creationDate|creation_date)$/i;
+  const SANS_PERSONNE_LBC = /name|pseudo|avatar|picture|photo|image|email|phone|address|partner/i;
+  const coupeLbc = (x, n) => { const t = String(x == null ? '' : x).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]+/g, ' ').replace(/[ \t]+/g, ' ').trim(); return t.length > n ? t.slice(0, n) : t; };
+  function texteMsgLbc(e, prof) {
+    if (!e || typeof e !== 'object' || Array.isArray(e) || (prof || 0) > 1) return '';
+    for (const k of Object.keys(e).slice(0, 60)) {
+      if (!CLE_TEXTE_LBC.test(k)) continue;
+      const v = e[k];
+      if (typeof v === 'string' && v.trim()) return coupeLbc(v, 2000);
+      if (v && typeof v === 'object') { const t = texteMsgLbc(v, (prof || 0) + 1); if (t) return t; }
+    }
+    return '';
+  }
+  function deMoiMsgLbc(e, moi) {
+    for (const k of Object.keys(e || {}).slice(0, 60)) {
+      if (CLE_MOI_LBC.test(k) && typeof e[k] === 'boolean') return e[k];
+      if (/^direction$/i.test(k) && typeof e[k] === 'string') { if (/^(out|outgoing|sent)$/i.test(e[k])) return true; if (/^(in|incoming|received)$/i.test(e[k])) return false; }
+    }
+    if (!moi) return null;
+    let auteur = null;
+    for (const k of Object.keys(e || {}).slice(0, 60)) {
+      const v = e[k];
+      if (CLE_AUTEUR_ID_LBC.test(k) && (typeof v === 'string' || typeof v === 'number')) { auteur = String(v); break; }
+      if (CLE_AUTEUR_LBC.test(k) && v && typeof v === 'object' && (typeof v.id === 'string' || typeof v.id === 'number' || typeof v.user_id === 'string')) { auteur = String(v.id != null ? v.id : v.user_id); break; }
+    }
+    return auteur == null ? null : auteur.replace(/^lbc-account:/, '') === moi;
+  }
+  function dateMsgLbc(e) {
+    for (const k of Object.keys(e || {}).slice(0, 60)) {
+      if (!CLE_DATE_LBC.test(k)) continue;
+      const v = e[k];
+      if (typeof v === 'string' && /\d{4}-\d{2}-\d{2}/.test(v) && isFinite(Date.parse(v))) return new Date(Date.parse(v)).toISOString();
+      if (typeof v === 'number' && v > 1.5e9) { const ms = v < 1e12 ? v * 1000 : v; if (ms < Date.now() + 86400000) return new Date(ms).toISOString(); }
+    }
+    return '';
+  }
+  function tableauMessagesLbc(obj) {
+    const cands = [];
+    const visite = (x, prof) => {
+      if (!x || typeof x !== 'object' || prof > 4) return;
+      if (Array.isArray(x)) { const n = x.filter((e) => texteMsgLbc(e)).length; if (n) cands.push([n, x]); for (const e of x.slice(0, 5)) visite(e, prof + 1); return; }
+      for (const k of Object.keys(x).slice(0, 60)) if (!SANS_PERSONNE_LBC.test(k)) visite(x[k], prof + 1);
+    };
+    visite(obj, 0);
+    return (cands.sort((a, b) => b[0] - a[0])[0] || [0, null])[1];
+  }
+  const cheminPage = () => String(location.pathname || '').replace(/[^\w/.-]/g, '').slice(0, 160);
+  function noteFilLbc(url, texte) {
+    try {
+      let u; try { u = new URL(url, location.origin); } catch (_) { return; }
+      if (!DE_LEBONCOIN(url) || /counter|credentials|notification|report|block|signal/i.test(u.pathname)) return;
+      const m = /\/(?:conversations?|threads?)\/([\w-]{3,64})(?:\/(?:messages|items))?\/?$/i.exec(u.pathname);
+      if (!m || !ID_CONV_LBC.test(m[1])) return;
+      const conv = m[1];
+      // Le compte : celui du chemin (`/hal/{id}/`) s'il y est ET qu'il est celui de la page ; sinon celui de la page.
+      const duChemin = (/\/hal\/([0-9a-z_-]{8,64})\//i.exec(u.pathname) || [])[1] || '';
+      const moi = moiLbc();
+      // Sans compte privé lu dans CE document, le texte ne quitte pas la page (on ne saurait pas de qui il est).
+      if (!moi || (duChemin && duChemin !== moi)) return;
+      let obj; try { obj = JSON.parse(texte); } catch (_) { return; }
+      if (!obj || typeof obj !== 'object') return;
+      const arr = tableauMessagesLbc(obj) || [];
+      const messages = arr.slice(0, 200).map((e) => {
+        const id = e && (typeof e.id === 'string' || typeof e.id === 'number') && /^[\w-]{1,64}$/.test(String(e.id)) ? String(e.id) : '';
+        return { id, t: texteMsgLbc(e), deMoi: deMoiMsgLbc(e, moi), at: dateMsgLbc(e) };
+      }).filter((x) => x.t);
+      convsVuesLbc.add(conv);
+      const forme = arr.length ? cheminsDeCles(arr[0]).map((c) => sansUuid(c)).filter((c) => !SANS_PERSONNE_LBC.test(c.split(':')[0])).slice(0, 80) : [];
+      post({ kind: 'lbcfil', conv, messages, lus: arr.length, forme, moi, page: cheminPage() });
+    } catch (_) {}
+  }
+  // ── APPRENDRE COMMENT LA PAGE ENVOIE UN MESSAGE ──
+  const PAS_ENVOI_LBC = /counter|credentials|read|seen|typing|archive|delete|mark|block|report|signal|notification/i;
+  const ENTETES_INTERDITS_LBC = /^(cookie|content-length|host|connection|origin|referer|user-agent|accept-encoding|content-type)$/i;
+  const nomsEntetesLbc = (h) => {
+    const out = {};
+    try {
+      if (!h) return out;
+      if (typeof h.forEach === 'function' && !Array.isArray(h)) h.forEach((v, k) => { out[String(k).toLowerCase()] = String(v); });
+      else if (Array.isArray(h)) for (const [k, v] of h) out[String(k).toLowerCase()] = String(v);
+      else if (typeof h === 'object') for (const k of Object.keys(h)) out[String(k).toLowerCase()] = String(h[k]);
+    } catch (_) {}
+    return out;
+  };
+  const cleSureLbc = (k) => (/^[A-Za-z_][\w-]{0,40}$/.test(String(k)) ? String(k) : '{k}');
+  function recetteEnvoiLbc(url, methode, corps, entetes) {
+    let u; try { u = new URL(url, location.origin); } catch (_) { return null; }
+    if (!DE_LEBONCOIN(url) || !/^(POST|PUT)$/i.test(String(methode || ''))) return null;
+    if (!/\/messaging\//i.test(u.pathname) || PAS_ENVOI_LBC.test(u.pathname)) return null;
+    const base = { methode: String(methode).toUpperCase(), hote: u.hostname, chemin: sansUuid(u.pathname).replace(/\/\d{3,}/g, '/{id}').slice(0, 160) };
+    const non = (raison) => ({ ...base, rejouable: false, raison });
+    const moi = moiLbc();
+    if (!moi) return non('compte-pas-su');
+    if (typeof corps !== 'string') return non('corps-illisible');
+    let obj; try { obj = JSON.parse(corps); } catch (_) { return non('corps-pas-json'); }
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return non('corps-pas-objet');
+    const feuilles = []; let tableau = false;
+    const marche = (v, ch) => {
+      if (ch.length > 4 || Array.isArray(v)) { tableau = true; return; }
+      if (v && typeof v === 'object') { for (const k of Object.keys(v).slice(0, 30)) marche(v[k], ch.concat(k)); return; }
+      feuilles.push([ch, v]);
+    };
+    marche(obj, []);
+    if (tableau) return non('corps-tableau');
+    const textes = feuilles.filter(([ch, v]) => CLE_TEXTE_LBC.test(ch[ch.length - 1]) && typeof v === 'string');
+    if (textes.length !== 1) return non('texte-introuvable');
+    // Le chemin : ton compte ⇒ `{moi}`, une conversation VUE dans l'onglet ⇒ `{conv}` ;
+    // tout autre identifiant ⇒ pas rejouable (il faudrait le deviner).
+    const segs = u.pathname.split('/');
+    let conv = '';
+    const modeleSegs = [];
+    for (const sg of segs) {
+      if (sg && sg === moi) { modeleSegs.push('{moi}'); continue; }
+      if (sg && convsVuesLbc.has(sg)) { if (conv && conv !== sg) return non('chemin-ambigu'); conv = sg; modeleSegs.push('{conv}'); continue; }
+      if (ID_CONV_LBC.test(sg) && /\d/.test(sg) && sg.length >= 3 && !/^v\d+$/i.test(sg)) return non('chemin-ambigu');
+      modeleSegs.push(sg);
+    }
+    const fixes = [];
+    for (const [ch, v] of feuilles) {
+      if (ch === textes[0][0]) continue;
+      const cs = ch.map((k) => cleSureLbc(k));
+      if ((typeof v === 'string' || typeof v === 'number') && String(v).replace(/^lbc-account:/, '') === moi && String(v) === moi) { fixes.push([cs, '{moi}', typeof v]); continue; }
+      if (!conv && (typeof v === 'string' || typeof v === 'number') && convsVuesLbc.has(String(v))) conv = String(v);
+      if (conv && (typeof v === 'string' || typeof v === 'number') && String(v) === conv) { fixes.push([cs, '{conv}', typeof v]); continue; }
+      if (typeof v === 'boolean' || v === null) { fixes.push([cs, v, typeof v]); continue; }
+      if (typeof v === 'string' && /^[A-Za-z_.:-]{1,40}$/.test(v)) { fixes.push([cs, v, 'string']); continue; }
+      return non('valeur-inconnue');
+    }
+    if (fixes.some(([ch]) => ch.includes('{k}')) || textes[0][0].some((k) => cleSureLbc(k) === '{k}')) return non('cle-illisible');
+    if (!conv) return non('conversation-non-vue');
+    if (u.search && /\d{3,}|@/.test(u.search)) return non('adresse-a-parametres');
+    const noms = Object.keys(nomsEntetesLbc(entetes)).filter((k) => !ENTETES_INTERDITS_LBC.test(k)).slice(0, 20);
+    return { ...base, rejouable: true, raison: '', modele: modeleSegs.join('/'), recherche: u.search || '', cleTexte: textes[0][0].map(String), fixes, entetes: noms };
+  }
+  function noteEnvoiMsgLbc(url, methode, statut, corps, entetes) {
+    try {
+      if (!(statut >= 200 && statut < 300)) return;
+      const r = recetteEnvoiLbc(url, methode, corps, entetes);
+      if (r) post({ kind: 'lbcenvoiappris', recette: r });
+    } catch (_) {}
+  }
   // Certaines pages contiennent déjà les données : aucun fetch n'aura lieu.
   // La source est le document privé exact, jamais un objet public du DOM.
   const cheminInitial=location.pathname;
@@ -673,6 +843,7 @@
             if (/vinted|supabase/i.test(url)) return; // ne touche pas aux autres domaines
             noteSeen(url, meth, res.status, ct);
             if (corpsRetrait) noterRetraitPage(url, meth, corpsRetrait, res.status);
+            if (MODIFIE.test(meth) && /\/messaging\//i.test(url)) noteEnvoiMsgLbc(url, meth, res.status, init && typeof init.body === 'string' ? init.body : null, init && init.headers);
             res.clone().text().then((t) => handle(url, t, ct, res.status, corpsReq)).catch(() => {});
           } catch (_) {}
         }).catch(() => {});
@@ -688,6 +859,7 @@
     if (origSetH) OX.prototype.setRequestHeader = function (k, v) { try { (this.__lbcH = this.__lbcH || {})[String(k)] = String(v); } catch (_) {} return origSetH.apply(this, arguments); };
     OX.prototype.send = function (corps) {
       try { if (MODIFIE.test(this.__lbcMeth || '')) noteEnvoi(this.__lbcUrl || '', corps, this.__lbcMeth); } catch (_) {}
+      try { this.__lbcCorpsMsg = (typeof corps === 'string' && /\/messaging\//i.test(this.__lbcUrl || '')) ? corps : null; } catch (_) {}
       try { this.__lbcCorps = (typeof corps === 'string' && LISTE_VENDEUR(this.__lbcUrl || '')) ? corps : null; this.__lbcRetrait = (typeof corps === 'string' && RETRAIT_PAGE.test(this.__lbcUrl || '')) ? corps : null; noterEntetes(this.__lbcUrl || '', this.__lbcH); } catch (_) {}
       try {
         this.addEventListener('load', function () {
@@ -697,6 +869,7 @@
             const ct = this.getResponseHeader && this.getResponseHeader('content-type');
             noteSeen(url, this.__lbcMeth, this.status, ct);
             if (this.__lbcRetrait) noterRetraitPage(url, this.__lbcMeth, this.__lbcRetrait, this.status);
+            if (MODIFIE.test(this.__lbcMeth || '') && /\/messaging\//i.test(url)) noteEnvoiMsgLbc(url, this.__lbcMeth, this.status, this.__lbcCorpsMsg, this.__lbcH);
             const t = this.responseType === 'json' ? JSON.stringify(this.response) : (this.responseType === '' || this.responseType === 'text') ? this.responseText : null;
             if (t) handle(url, t, ct, this.status, this.__lbcCorps || null);
           } catch (_) {}
@@ -743,5 +916,52 @@
       try { cles = cheminsDeCles(JSON.parse(corps)).slice(0, 60); } catch (_) {}
       post({ kind: 'lbcpauseresultat', jeton, id, quoi: d.kind, statut, corps: corps.slice(0, 300), cles, erreur, entetes: Object.keys(h).length });
     } finally { pauseEnCours = false; }
+  }); } catch (_) {}
+  // ── 5.318 : RÉPONDRE, SUR SON CLIC (l'ordre vient du fond par lbc-relay.js) ──
+  let envoiMsgEnCours = false;
+  const poserLbc = (o, ch, v) => { let x = o; for (let i = 0; i < ch.length - 1; i++) { if (!x[ch[i]] || typeof x[ch[i]] !== 'object') x[ch[i]] = {}; x = x[ch[i]]; } x[ch[ch.length - 1]] = v; };
+  try { window.addEventListener('message', async (event) => {
+    const d = event && event.data;
+    if (event.source !== window || !d || d.__tag !== 'CANCALE_LBC_ORDRE' || d.kind !== 'repondre') return;
+    const jeton = String(d.jeton || ''), conv = String(d.conv || ''), texte = typeof d.texte === 'string' ? d.texte : '';
+    if (!/^[a-z0-9-]{8,64}$/i.test(jeton)) return;
+    const fin = (o) => post(Object.assign({ kind: 'lbcenvoiresultat', jeton }, o));
+    if (window.top !== window || !/(^|\.)leboncoin\.fr$/i.test(location.hostname)) return fin({ statut: 0, erreur: 'pas-leboncoin' });
+    const r = d.recette;
+    if (!/^[\w-]{3,64}$/.test(conv) || !texte.trim() || texte.length > 2000) return fin({ statut: 0, erreur: 'invalide' });
+    if (!r || r.rejouable !== true || !/^(POST|PUT)$/.test(String(r.methode)) || !/(^|\.)leboncoin\.fr$/i.test(String(r.hote || ''))
+      || typeof r.modele !== 'string' || !/^\/[\w\-/{}.]*$/.test(r.modele) || (r.modele.split('{conv}').length - 1) > 1 || (r.modele.split('{moi}').length - 1) > 1
+      || !Array.isArray(r.cleTexte) || !r.cleTexte.length || !Array.isArray(r.fixes)) return fin({ statut: 0, erreur: 'recette' });
+    if (envoiMsgEnCours) return fin({ statut: 0, erreur: 'en-cours' });
+    // Au nom du compte privé de CETTE page seulement (le fond dit lequel il attend).
+    const moi = moiLbc();
+    if (!moi || String(d.compte || '') !== moi) return fin({ statut: 0, erreur: moi ? 'autre-compte' : 'compte-pas-su' });
+    const h = {};
+    for (const n of (Array.isArray(r.entetes) ? r.entetes : [])) {
+      const k = String(n).toLowerCase();
+      if (ENTETES_INTERDITS_LBC.test(k)) continue;
+      const src = entetesMsg ? nomsEntetesLbc(entetesMsg) : null;
+      if (!src || src[k] == null) return fin({ statut: 0, erreur: 'entetes' });
+      h[k] = src[k];
+    }
+    h['content-type'] = 'application/json'; h.accept = h.accept || 'application/json';
+    const corps = {};
+    try {
+      for (const [ch, v, t] of r.fixes) poserLbc(corps, ch.map(String), v === '{conv}' ? (t === 'number' ? Number(conv) : conv) : v === '{moi}' ? moi : v);
+      poserLbc(corps, r.cleTexte.map(String), texte);
+    } catch (_) { return fin({ statut: 0, erreur: 'recette' }); }
+    const adresse = 'https://' + r.hote + r.modele.replace('{conv}', encodeURIComponent(conv)).replace('{moi}', encodeURIComponent(moi)) + (/^\?[\w=&.%-]*$/.test(String(r.recherche || '')) ? r.recherche : '');
+    envoiMsgEnCours = true;
+    try {
+      let statut = 0, rep = '', erreur = '';
+      try {
+        const res = await origFetch.call(window, adresse, { method: r.methode, credentials: 'include', headers: h, body: JSON.stringify(corps) });
+        statut = Number(res.status) || 0;
+        try { rep = String(await res.text()).slice(0, 4000); } catch (_) {}
+      } catch (e) { erreur = String((e && e.message) || e).slice(0, 80) || 'reseau'; }
+      let cles = [], idMsg = '';
+      try { const j = JSON.parse(rep); cles = cheminsDeCles(j).map((c) => sansUuid(c)).slice(0, 60); const dd = j && (j.data && typeof j.data === 'object' ? j.data : j); const idb = dd && (dd.id != null ? dd.id : dd.message_id); if ((typeof idb === 'string' || typeof idb === 'number') && /^[\w-]{1,64}$/.test(String(idb))) idMsg = String(idb); } catch (_) {}
+      fin({ statut, cles, idMsg, erreur });
+    } finally { envoiMsgEnCours = false; }
   }); } catch (_) {}
 })();

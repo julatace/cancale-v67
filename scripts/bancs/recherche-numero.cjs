@@ -18,7 +18,7 @@
 //   F. une ligne mène à son écran (la recherche se ferme) ;
 //   G. cibles ≥ 44 px, aucun débordement, aucune erreur, écran pas tombé.
 // On juge les ATTRIBUTS (`data-tout-*`), jamais une formulation.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -138,11 +138,15 @@ async function rendre(b, vp, { ventesKO = false } = {}) {
   return { ctx, pg, errs };
 }
 async function chercher(pg, q) {
-  if (!(await pg.$('.vrm-global-search'))) {
+  // (31 oct.) La recherche se tape EN PLACE : le champ de la barre (ordinateur)
+  // ou celui que la loupe ouvre dans l'en-tête (téléphone).
+  const champ = await pg.$('[data-recherche-champ]');
+  if (!champ || !(await champ.isVisible())) {
     await pg.locator('button[aria-label="Rechercher une paire"]').first().click();
-    await pg.waitForSelector('.vrm-global-search', { timeout: 8000 });
+    await pg.waitForSelector('[data-recherche-champ]', { timeout: 8000 });
   }
-  await pg.fill('.vrm-global-search input[type="search"]', q);
+  await pg.fill('[data-recherche-champ]', q);
+  await pg.waitForSelector('.vrm-global-search', { timeout: 8000 });
   // Le bloc se recalcule quand les sources arrivent : on attend qu'il ne soit
   // plus « en lecture » (sans délai fixe sur le résultat lui-même).
   for (let i = 0; i < 40; i++) {

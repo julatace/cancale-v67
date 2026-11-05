@@ -14,7 +14,8 @@
 //     enfin listée ; celle d'un inconnu (étiquetée de son propre compte) non ;
 //   · le tableau de bord dit la même chose (même règle, §11) ;
 //   · aucun débordement, aucune erreur.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
+const { monterTiroirs } = require('./_tiroirs.cjs');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -115,6 +116,14 @@ const projette = (row, sel) => {
   return out;
 };
 
+// (31 oct.) Ouvrir une tâche (Ventes, Annonces…) par la navigation — la barre du
+// bas au téléphone, la colonne sur ordinateur — puis choisir le site au filtre.
+async function allerTache(pg, tache, site) {
+  await pg.locator(`.vrm-mobile-nav [data-nav-entree="${tache}"]:visible, .vrm-sidebar [data-nav-entree="${tache}"]:visible`).first().click({ timeout: 5000 }).catch(() => {});
+  await pg.waitForTimeout(500);
+  await pg.locator(`[data-filtre-site="${tache}"] button[data-site="${site}"]`).first().click({ timeout: 5000 }).catch(() => {});
+  await pg.waitForTimeout(500);
+}
 (async () => {
   let b;
   try {
@@ -154,6 +163,10 @@ const projette = (row, sel) => {
         if (eq) return j(rows.filter((r) => r.id === eq[1]).map(forme));
         const lk = /id=like\.([^&]*)/.exec(u);
         if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(rows.filter((r) => re.test(r.id)).map(forme)); }
+        // (31 oct.) La vraie forme d'une liste d'identifiants (`id=in.(a,b)`) : la
+        // navigation par tâche sonde ainsi les sites où il a un compte.
+        const dans = /id=in\.\(([^)]*)\)/.exec(u);
+        if (dans) { const ids = dans[1].split(','); return j(rows.filter((r) => ids.includes(r.id)).map(forme)); }
         return j([]);
       });
       await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
@@ -175,7 +188,19 @@ const projette = (row, sel) => {
         // ou champ visible dont le bord droit sort de l'écran.
         deborde: [...document.querySelectorAll('button,input')].filter((e) => {
           const r = e.getBoundingClientRect();
-          return r.width > 0 && r.height > 0 && r.right > document.documentElement.clientWidth + 1;
+          if (!(r.width > 0 && r.height > 0 && r.right > document.documentElement.clientWidth + 1)) return false;
+          // (1er nov.) Une RANGÉE DÉFILANTE (§7 : filtres de site, onglets) n'est
+          // pas un rognage : son contenu se fait glisser au doigt. Seul un
+          // conteneur qui défile VRAIMENT (overflow-x auto/scroll ET plus large
+          // que lui-même) l'excuse ; un `overflow: hidden` reste rouge.
+          for (let p = e.parentElement; p && p !== document.body; p = p.parentElement) {
+            const ox = getComputedStyle(p).overflowX;
+            if ((ox === 'auto' || ox === 'scroll') && p.scrollWidth > p.clientWidth + 1) {
+              const rp = p.getBoundingClientRect();
+              if (rp.right <= document.documentElement.clientWidth + 1) return false;
+            }
+          }
+          return true;
         }).map((e) => (e.getAttribute('aria-label') || e.textContent.trim().slice(0, 14) || e.tagName)),
         // L'agent qui conseille (parité eBay) : la liste rangée des priorités.
         conseils: [...document.querySelectorAll('[data-lbc-conseil]')].map((e) => e.getAttribute('data-lbc-conseil')),
@@ -212,11 +237,16 @@ const projette = (row, sel) => {
       // ── BÉNÉFICE PAR VENTE (parité Vinted/eBay) : N° + bénéfice sur la carte,
       //    par identité seulement. t1 est reliée (lien → N°12, achat 30 €) → 55 € ;
       //    t2 n'est reliée à rien → ni N° ni bénéfice inventé (§5).
-      await pg.click('[data-section="ventes"]').catch(() => {});
+      // (31 oct., navigation par tâche) Les ventes Leboncoin sont « Ventes · Leboncoin » :
+      // l'onglet Ventes de la navigation, puis son filtre de site, comme une personne.
+      await allerTache(pg, 'ventes', 'leboncoin');
       await pg.waitForSelector('.vrm-sale-row', { timeout: 8000 }).catch(() => {});
       await pg.waitForTimeout(400);
       // Le N° est sur la carte compacte (titre) ; le bénéfice vit dans le tiroir
       // de détail (portail), comme pour une vente Vinted — même composant partagé.
+      // (31 oct.) Ce tiroir n'est monté qu'à la première ouverture : on ouvre
+      // chaque vente, comme une personne, avant de lire (`_tiroirs.cjs`).
+      await monterTiroirs(pg, '[data-lbc-vente]');
       const ven = await pg.evaluate(() => ({
         titres: [...document.querySelectorAll('.vrm-ledger-sale-title')].map((e) => e.textContent.trim()),
         benefs: [...document.querySelectorAll('[data-lbc-benef]')].map((e) => e.getAttribute('data-lbc-benef')),
@@ -228,12 +258,15 @@ const projette = (row, sel) => {
         const row = [...document.querySelectorAll('.vrm-sale-row, [data-lbc-vente]')].find((e) => /Nike Air Max/.test(e.textContent));
         const t = row && row.querySelector('.vrm-ledger-sale-toggle'); if (t) t.click();
         await new Promise((r) => setTimeout(r, 500));
-        return [...document.querySelectorAll('.vrm-fiche-vente-acces button')].map((x) => x.textContent.trim());
+        const lu = [...document.querySelectorAll('.vrm-fiche-vente-acces button')].map((x) => x.textContent.trim());
+        if (t) t.click();   // (31 oct.) on referme le tiroir, comme une personne, avant de changer de section
+        await new Promise((r) => setTimeout(r, 400));
+        return lu;
       });
       dit(tiroir.some((x) => /N°12/.test(x)), '… le N° de la paire reste dans le tiroir de la vente', JSON.stringify(tiroir));
       dit(ven.benefs.length === 1 && ven.benefs[0] === '55.00', 'son bénéfice (85 € − 30 € d’achat saisi) = 55,00 €, et la vente NON reliée n’en a aucun', JSON.stringify(ven.benefs));
       dit(ven.titres.some((t) => /Adidas Samba/.test(t) && !/N°/.test(t)), 'vente NON reliée : aucun N° inventé', JSON.stringify(ven.titres));
-      await pg.click('[data-section="annonces"]').catch(() => {});
+      await allerTache(pg, 'annonces', 'leboncoin');
       await pg.waitForSelector('[data-lbc-doublons], [data-lbc-ventes-a-relier]', { timeout: 8000 }).catch(() => {});
       await pg.waitForTimeout(300);
       try {

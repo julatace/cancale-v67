@@ -147,6 +147,16 @@ const zero = (j) => gestes(j).length === 0;   // 5.266 : lire la liste des coule
     const r1 = await appel(); const n1 = f.j.vinted.length; const r2 = await appel();
     dit(r1.etape === 'incertain' && /PEUT-ÊTRE/.test(r1.raison || ''), "mise en ligne sans réponse claire (5xx) : « peut-être en ligne », dit", `etape=${r1.etape} ${r1.raison || ''}`);
     dit(r2.accepte === false && r2.code === 'recreer-incertaine' && f.j.vinted.length === n1, "une seconde tentative juste après est REFUSÉE sans rien envoyer (pas de seconde copie)", `code=${r2.code} requêtes=${f.j.vinted.length - n1}`); }
+  // J3 — (1er nov., audit X9) SUPPRESSION sans réponse claire : l'ancienne est peut-être
+  //      encore en ligne. Une relance juste après ne refait PAS de brouillon (ni une
+  //      seconde suppression) : refusée sans aucune requête — republier ET en ligne → brouillon.
+  for (const versBrouillon of [false, true]) {
+    const f = monter({ src: process.env.BG_SRC || undefined, suppression: 502 });
+    const appel = () => f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: 54, titre: 'Nike Air Max 1', confirme: true, versBrouillon });
+    const r1 = await appel(); const n1 = f.j.vinted.length; const r2 = await appel();
+    const nb = f.j.vinted.filter((v) => v.methode === 'POST' && /item_upload\/drafts\/?$/.test(v.chemin)).length;
+    dit((r1.etape === 'incertain' || r1.etape === 'double') && r2.accepte === false && r2.code === 'recreer-incertaine' && f.j.vinted.length === n1 && nb === 1,
+      `${versBrouillon ? 'en ligne → brouillon' : 'republier'}, suppression sans réponse claire puis relance : refusée, aucun second brouillon`, `r1=${r1.etape} r2=${r2.code || r2.etape} brouillons=${nb} requêtes=${f.j.vinted.length - n1}`); }
   // J2 — une création REFUSÉE (4xx) ne bloque pas la tentative suivante.
   { const f = monter({ src: process.env.BG_SRC || undefined, brouillon: 422 });
     await f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: 54, titre: 'Nike', confirme: true });
@@ -194,6 +204,16 @@ const zero = (j) => gestes(j).length === 0;   // 5.266 : lire la liste des coule
     const { f, r } = await run({ extra: { vrm_vinted_modele: { '9101': { corps: sansCouleur, at: nowISO(), uid: '111' } } }, lecture: { status: 200, body: { item: { id: 9101, catalog_id: 1234, color_ids: [7], item_attributes: [{ code: 'size', ids: [56] }], package_size_id: 1 } } } });
     let it = {}; try { it = JSON.parse(creations(f.j)[0].corps).draft; } catch (_) {}
     dit(r.etape === 'fait' && JSON.stringify(it.color_ids) === '[7]', "modèle sans couleur : elle est lue chez Vinted, l'annonce part avec", JSON.stringify({ e: r.etape, code: r.code, c: it.color_ids })); }
+  // C3b — (2 nov., 5.311, Julien : « elle avait oublié la couleur et la taille… tout est
+  //       déjà rempli, l'extension a simplement à lire ») Une recette ANCIENNE (sans la
+  //       taille, autre catégorie) et l'annonce telle que Vinted la montre aujourd'hui :
+  //       c'est Vinted qui fait foi, champ par champ, et une seule lecture part.
+  { const vieille = JSON.stringify({ item: { ...JSON.parse(MODELE).item, catalog_id: 77, item_attributes: [], color_ids: [] } });
+    const { f, r } = await run({ viaBrouillon: true, extra: { vrm_vinted_modele: { '9101': { corps: vieille, at: nowISO(), uid: '111' } } }, lecture: { status: 200, body: { item: { id: 9101, catalog_id: 1234, color_ids: [7], item_attributes: [{ code: 'size', ids: [56] }, { code: 'status', ids: [2] }], package_size_id: 1 } } } });
+    let it = {}; try { it = JSON.parse(creations(f.j)[0].corps).draft; } catch (_) {}
+    const lectures = f.j.vinted.filter((x) => x.methode === 'GET' && /\/item_upload\/items\/9101$/.test(x.chemin)).length;
+    dit(r.etape === 'fait' && it.catalog_id === 1234 && JSON.stringify(it.color_ids) === '[7]' && (it.item_attributes || []).some((a) => a.code === 'size' && a.ids[0] === 56) && it.package_size_id === 1, "recette ancienne sans taille ni couleur : la catégorie, la taille, l'état, la couleur et le colis LUS sur Vinted partent", JSON.stringify({ e: r.etape, code: r.code, cat: it.catalog_id, c: it.color_ids, a: it.item_attributes, raison: r.raison }));
+    dit(lectures === 1, "une seule lecture de l'annonce (sa page « Modifier »), jamais deux", String(lectures)); }
   // C4 — la barre de progression : chaque étape est annoncée à l'app, dans l'ordre.
   { const { f, r } = await run({ viaBrouillon: true });
     const et = f.j.evts.filter((e) => e && e.quoi === 'repub' && e.id === '9101' && e.etape).map((e) => e.etape);
@@ -532,12 +552,14 @@ const zero = (j) => gestes(j).length === 0;   // 5.266 : lire la liste des coule
     dit((f.lignes['coffre_111_9101'] || {}).versBrouillon && f.lignes['coffre_111_9101'].versBrouillon.etat === 'a-publier', "… et le coffre dit « brouillon à mettre en ligne » (Refaire le met en ligne, sans en créer un second)", JSON.stringify((f.lignes['coffre_111_9101'] || {}).versBrouillon || {}).slice(0, 120)); }
   // S — (28 oct., « on ne suit pas vraiment l'avancée ») Chaque pause est annoncée
   //     à l'app avec sa durée ; Refaire annonce ses étapes.
+  // La pause du frein (5.311) écoulée : 30 min plus tard.
+  const finFrein = (f) => { const m = f.store.vrmFreinRepub; if (m) for (const k of Object.keys(m)) m[k].jusqua = Date.now() - 1000; };
   const planterARefaire = (f) => { const c = f.lignes['coffre_111_9101']; if (c && c.versBrouillon) { c.versBrouillon.etat = 'a-refaire'; c.versBrouillon.supprime = true; c.versBrouillon.publier = true; c.versBrouillon.majAt = new Date(Date.now() - 3600e3).toISOString(); } };
   { let st = 422; const f = monter({ src: process.env.BG_SRC || undefined, brouillon: () => st });
     await f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: 54, titre: 'Nike', viaBrouillon: true, confirme: true });
     const pauses = f.j.evts.filter((e) => e && e.quoi === 'repub' && e.pause);
     dit(pauses.length >= 2 && pauses.every((e) => e.id === '9101' && e.ms > 0 && e.jusqua > 0), "chaque pause est annoncée à l'app (quoi, durée) : elle peut afficher le compte à rebours", JSON.stringify(pauses.map((e) => [e.pause, e.ms])));
-    planterARefaire(f); st = 200; const n0 = f.j.evts.length;
+    planterARefaire(f); st = 200; finFrein(f); const n0 = f.j.evts.length;
     if (typeof f.ctx.refaireBrouillon === 'function') await f.ctx.refaireBrouillon({ cmd: 'refaireBrouillon', uid: '111', id: '9101', confirme: true });
     const et = [...new Set(f.j.evts.slice(n0).filter((e) => e && e.quoi === 'repub' && e.etape).map((e) => e.etape))].join(',');
     dit(et === 'photos,brouillon,attente,en-ligne', "Refaire annonce ses étapes (photos, brouillon, pause, mise en ligne)", et); }
@@ -545,12 +567,19 @@ const zero = (j) => gestes(j).length === 0;   // 5.266 : lire la liste des coule
   //     enregistré dans VRM, sans JAMAIS retoucher l'annonce d'origine ; mise en
   //     ligne seulement si la suppression de l'ancienne est CERTAINE.
   const sansDelai = (p, ms = 60000) => Promise.race([p, new Promise((_, ko) => setTimeout(() => ko(new Error('bloqué (file Vinted ?)')), ms))]);
-  const refaire = (f, o = {}) => typeof f.ctx.refaireBrouillon === 'function' ? sansDelai(f.ctx.refaireBrouillon({ cmd: 'refaireBrouillon', uid: '111', id: '9101', confirme: o.confirme !== false })).catch((e) => ({ erreur: e.message })) : Promise.resolve({ absent: true });
+  // (5.311) Sauf `garderFrein`, Refaire est joué APRÈS la pause du frein (un clic plus tard).
+  const refaire = (f, o = {}) => { if (!o.garderFrein) finFrein(f); return refaire0(f, o); };
+  const refaire0 = (f, o = {}) => typeof f.ctx.refaireBrouillon === 'function' ? sansDelai(f.ctx.refaireBrouillon({ cmd: 'refaireBrouillon', uid: '111', id: '9101', confirme: o.confirme !== false })).catch((e) => ({ erreur: e.message })) : Promise.resolve({ absent: true });
   const vb = (f) => (f.lignes['coffre_111_9101'] || {}).versBrouillon || {};
   { let st = 422; const f = monter({ src: process.env.BG_SRC || undefined, brouillon: () => st });
     const r1 = await f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: 54, titre: 'Nike Air Max 1', viaBrouillon: true, confirme: true });
     dit(r1.etape === 'echec' && suppressions(f.j).length === 0 && vb(f).supprime !== true, "republier, brouillon refusé : l'ancienne n'est PAS supprimée (jamais « à refaire » sur une annonce encore en ligne)", JSON.stringify({ e: r1.etape, v: vb(f).etat, s: vb(f).supprime }));
-    planterARefaire(f); st = 200; const n0 = f.j.vinted.length;
+    planterARefaire(f); st = 200;
+    // (2 nov., 5.311) Juste après un refus de Vinted, le compte est FREINÉ : Refaire
+    // ne part pas (jamais un refus en série), et le dit ; après la pause, il part.
+    const nF = f.j.vinted.length; const rf = await refaire(f, { garderFrein: true });
+    dit(rf.code === 'frein-refus' && f.j.vinted.length === nF && /reprends à partir de/.test(rf.raison || ''), "Refaire juste après un refus de Vinted : freiné, aucune requête, l'heure de reprise est dite", JSON.stringify({ code: rf.code, n: f.j.vinted.length - nF, raison: rf.raison }));
+    finFrein(f); const n0 = f.j.vinted.length;
     const r = await refaire(f); const seq = seqDe({ vinted: f.j.vinted.slice(n0) });
     dit(seq === 'PPBM' && r.etape === 'fait' && vb(f).etat === 'fait', "Refaire : photos ×2 depuis VRM, PUIS brouillon, PUIS mise en ligne — l'ancienne n'est pas retouchée", `seq=${seq} etape=${r.etape} ${r.raison || r.erreur || ''}`);
     let b = {}; try { b = JSON.parse(brouillonsP({ vinted: f.j.vinted.slice(n0) })[0].corps); } catch (_) {}
@@ -731,6 +760,41 @@ const zero = (j) => gestes(j).length === 0;   // 5.266 : lire la liste des coule
     const { f, r } = await run({ brouillon: 503 });
     let v = 0; try { v = await f.ctx.lireVerrouRecreer('9101'); } catch (_) {}
     dit(r.etape === 'incertain' && v > 0, "brouillon sans réponse claire : 30 min sans nouvelle tentative de cette annonce", JSON.stringify({ e: r.etape, verrou: !!v })); }
+
+  // R — (2 nov., revue indépendante) quatre trous du frein et de la lecture vivante.
+  { // R1. Le frein posé PENDANT l'attente dans la file (une autre paire refusée) : rien ne part, les places sont rendues.
+    const f = monter({ src: process.env.BG_SRC || undefined });
+    let lacher; const tient = new Promise((ok) => { lacher = ok; });
+    const bloque = f.ctx.avecVinted(async () => { await tient; });
+    const p = f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: 54, titre: 'Nike', confirme: true });
+    for (let i = 0; i < 50; i++) await new Promise((ok) => setTimeout(ok, 5));
+    await f.ctx.chrome.storage.local.set({ vrmFreinRepub: { '111': { jusqua: Date.now() + 1800000, restreint: false, status: 400, at: Date.now() } } });
+    lacher(); await bloque;
+    let r = {}; try { r = await p; } catch (e) { r = { erreur: e.message }; }
+    const ecrits = f.j.vinted.filter((v) => v.methode !== 'GET' && !LECTURE.test(v.chemin)).length;
+    const n = ((f.store.vrmActions || {})['111'] || []).length;
+    dit(r.code === 'frein-refus' && ecrits === 0 && n === 0, "frein posé pendant l'attente dans la file : aucune photo, aucun brouillon, aucune suppression, places rendues", JSON.stringify({ code: r.code, etape: r.etape, ecrits, actions: n })); }
+  { // R2. « limite de 20 photos » est un refus ordinaire (30 min) ; seul le signal de Vinted vaut 24 h.
+    const f = monter({ src: process.env.BG_SRC || undefined });
+    const a = await f.ctx.poserFreinRepub('111', { status: 400, json: { message: 'Tu as atteint la limite de 20 photos', code: 99 } });
+    await f.ctx.chrome.storage.local.set({ vrmFreinRepub: {} });
+    const b = await f.ctx.poserFreinRepub('111', { status: 403, json: { code: 'listing_restricted', message: 'x' } });
+    dit(a && a.restreint === false && b && b.restreint === true, "« limite de 20 photos » : 30 min ; « listing_restricted » : 24 h (jamais « Vinted limite ton compte » sur un refus ordinaire)", JSON.stringify({ a: a && a.restreint, b: b && b.restreint })); }
+  { // R3. Lecture vivante refusée (Vinted 503) avec une recette complète : la vérification « existe encore ? » part quand même — rien n'est créé à l'aveugle.
+    const { f, r } = await run({ lecture: { status: 503, body: {} } });
+    const lu = f.j.vinted.filter((v) => v.methode === 'GET' && /item_upload\/items\/9101$/.test(v.chemin)).length;
+    dit(creations(f.j).length === 0 && suppressions(f.j).length === 0 && lu >= 2, "lecture de l'annonce refusée (503) : relue avant tout geste, aucun brouillon, aucune suppression", JSON.stringify({ c: creations(f.j).length, s: suppressions(f.j).length, lu, code: r.code, etape: r.etape })); }
+  { // R4. Le plafond partagé ne compte QUE ce compte (« _ » de LIKE : le compte 1111 n'est pas le 111).
+    const t = Date.now();
+    const f = monter({ src: process.env.BG_SRC || undefined, extra: { 'actions_compte_1111_aaaaaaaaaaaaaaaa': { uid: '1111', nav: 'aaaaaaaaaaaaaaaa', ts: [t - 1000, t - 2000, t - 3000] }, 'actions_compte_111_bbbbbbbbbbbbbbbb': { uid: '111', nav: 'bbbbbbbbbbbbbbbb', ts: [t - 1000] } } });
+    let a = null; try { a = typeof f.ctx.actionsAutresNavigateurs === 'function' ? await f.ctx.actionsAutresNavigateurs('111') : null; } catch (e) { a = { erreur: e.message }; }
+    dit(a && a.n === 1, "plafond partagé : seules les actions du compte 111 comptent (pas celles du compte 1111)", JSON.stringify(a)); }
+  { // R5. Modifier en place sous frein : aucune action de l'heure consommée.
+    const f = monter({ src: process.env.BG_SRC || undefined });
+    await f.ctx.chrome.storage.local.set({ vrmFreinRepub: { '111': { jusqua: Date.now() + 1800000, restreint: false, status: 400, at: Date.now() } } });
+    let r = {}; try { r = await f.ctx.republierVinted({ cmd: 'republierVinted', uid: '111', id: '9101', baissePct: 5, confirme: true }); } catch (e) { r = { erreur: e.message }; }
+    const n = ((f.store.vrmActions || {})['111'] || []).length;
+    dit(r.code === 'frein-refus' && n === 0 && zero(f.j), "modifier le prix sous frein : refusé, aucune requête, aucune action de l'heure consommée", JSON.stringify({ code: r.code, actions: n })); }
 
   // L — côté app : une annonce et SA recréation au même N° (la suppression de
   //     l'ancienne a échoué) ne déclenchent AUCUNE renumérotation automatique

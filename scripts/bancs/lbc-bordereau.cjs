@@ -24,11 +24,30 @@
 //   2. un onglet s'ouvre sur un PDF qui PORTE le titre (tampon), jamais un
 //      téléchargement ;
 //   3. extension trop ancienne : le lien d'avant (PDF tel quel), aucun appel.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = 4338;
+// 28 oct. (77633d91, choix de Julien) : le tampon ne se pose plus qu'après avoir
+// VÉRIFIÉ l'espace blanc, rendu par pdf.js (cdn.jsdelivr.net, chargé au clic).
+// Le banc sert la MÊME version en local (déterminisme), sinon « Placement du
+// numéro non vérifié : pdf.js » et rien n'est ouvert. BANC_PDFJS_DIR, sinon
+// pdfjs-dist téléchargé une fois depuis npm dans le dossier temporaire.
+const os = require('os'), { execFileSync } = require('child_process');
+const PDFJS_V = '3.11.174';
+function dossierPdfjs() {
+  if (process.env.BANC_PDFJS_DIR && fs.existsSync(path.join(process.env.BANC_PDFJS_DIR, 'pdf.min.js'))) return process.env.BANC_PDFJS_DIR;
+  const base = path.join(os.tmpdir(), 'vrm-banc-pdfjs-' + PDFJS_V);
+  const build = path.join(base, 'package', 'build');
+  if (fs.existsSync(path.join(build, 'pdf.min.js'))) return build;
+  fs.mkdirSync(base, { recursive: true });
+  const tgz = path.join(base, 'pdfjs.tgz');
+  execFileSync('curl', ['-sSL', '-m', '180', '-o', tgz, `https://registry.npmjs.org/pdfjs-dist/-/pdfjs-dist-${PDFJS_V}.tgz`]);
+  execFileSync('tar', ['-xzf', tgz, '-C', base]);
+  return build;
+}
+const PDFJS = dossierPdfjs();
 
 const auj = Date.now();
 const iso = (h) => new Date(auj - h * 3600e3).toISOString();
@@ -84,6 +103,12 @@ async function rendre(b, version) {
   await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
   await pg.addInitScript(PONT, { version, pdf: PDF_B64 });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
+  // Posée APRÈS le fourre-tout : Playwright essaie la dernière route d'abord.
+  await pg.route('**://cdn.jsdelivr.net/npm/pdfjs-dist@*/**', (r) => {
+    const f = path.join(PDFJS, path.basename(new URL(r.request().url()).pathname));
+    if (!fs.existsSync(f)) return r.fulfill({ status: 404, body: '' });
+    return r.fulfill({ status: 200, contentType: 'text/javascript', headers: { 'access-control-allow-origin': '*' }, body: fs.readFileSync(f) });
+  });
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
@@ -96,9 +121,16 @@ async function rendre(b, version) {
     return j([]);
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
-  await pg.goto(`http://localhost:${PORT}/?tab=plat_leboncoin`, { waitUntil: 'domcontentloaded' });
-  await pg.waitForTimeout(3000);
-  await pg.getByRole('button', { name: 'Colis', exact: true }).first().click();
+  // (31 oct., soir) Les colis Leboncoin sont dans Colis, pastille
+  //  « Leboncoin » : l'ancien lien `plat_leboncoin&section=colis` y mène.
+  await pg.goto(`http://localhost:${PORT}/?tab=plat_leboncoin&section=colis`, { waitUntil: 'domcontentloaded' });
+  // (31 oct.) Attendre l'espace MONTÉ (sa rangée de sections), puis la liste
+  //  des colis, plutôt qu'un délai fixe : sur une machine chargée, 3 s ne
+  //  suffisaient pas et le bouton « Imprimer » passait pour absent (§6.5).
+  // (31 oct., soir, après fusion) Colis · Leboncoin = la pastille « Leboncoin » de la
+  //  rangée de sites de Colis ; le lien y mène directement.
+  await pg.waitForSelector('[data-colis-leboncoin]', { timeout: 30000 }).catch(() => {});
+  await pg.waitForSelector('[data-imprime-lbc]', { timeout: 15000 }).catch(() => {});
   await pg.waitForTimeout(800);
   return { ctx, pg, errs, appels };
 }
@@ -114,6 +146,8 @@ async function rendre(b, version) {
       r.ctx.on('page', (p) => onglets.push(p));
       r.pg.on('download', (d) => telecharges.push(d.suggestedFilename()));
       try { await r.pg.click('[data-imprime-lbc="A1"]', { timeout: 5000 }); } catch (e) { dit(false, 'le bouton « Imprimer » du colis existe', String(e.message).slice(0, 80)); }
+      // (3 nov.) Forme jamais vue : l'aperçu du tampon s'ouvre d'abord ; on garde le choix de VRM.
+      if (await r.pg.waitForSelector('[data-placeur-tampon="pret"],[data-placeur-tampon="ko"]', { timeout: 8000 }).then(() => true, () => false)) await r.pg.click('[data-tampon-imprimer]').catch(() => {});
       await r.pg.waitForTimeout(2500);
       dit(r.appels.length === 1 && r.appels[0] === VOUCHER, 'le pont est appelé avec l’adresse EXACTE du bordereau de CE colis', JSON.stringify(r.appels));
       // 26 oct. : le PDF s'ouvre DANS VRM (visionneuse), plus dans un onglet réservé.

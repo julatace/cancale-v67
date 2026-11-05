@@ -20,7 +20,7 @@
 // Données INVENTÉES (il vit dans le dépôt, public). Ce qui est jugé : des
 // attributs `data-*`, `disabled`, le style calculé — jamais une formulation,
 // sauf le nom du compte et la présence du geste dans la phrase commune.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -143,8 +143,9 @@ const lireListe = (pg) => pg.evaluate(() => {
     groupeActif: (document.querySelector('[data-msg-groupe-actif]') || { getAttribute: () => null }).getAttribute('data-msg-groupe-actif'),
   };
 });
+// (31 oct.) « Envoyer » est une icône nommée par son aria-label : le nom accessible compte.
 const lireFil = (pg) => pg.evaluate(() => {
-  const btn = (name) => { const b = [...document.querySelectorAll('.vrm-chat-panel button')].find((x) => (x.innerText || x.textContent).trim() === name || x.textContent.trim() === name); return b ? b.disabled : 'absent'; };
+  const btn = (name) => { const b = [...document.querySelectorAll('.vrm-chat-panel button')].find((x) => (x.innerText || x.textContent).trim() === name || x.textContent.trim() === name || (x.getAttribute('aria-label') || '').trim() === name); return b ? b.disabled : 'absent'; };
   const ta = document.querySelector('textarea[aria-label="Réponse à la conversation"]');
   const prix = document.querySelector('input[aria-label="Prix de l\'offre"]');
   const off = document.querySelector('[data-offre]');

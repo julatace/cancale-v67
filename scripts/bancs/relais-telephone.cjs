@@ -27,7 +27,7 @@
 //   8. l'autre sens, sur ordinateur (1512 px, sans extension) : le relais n'est
 //      pas utilisé, même pas lu.
 // On juge les ÉTATS (`data-*`) et ce qui est ÉCRIT dans la base.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -279,6 +279,16 @@ const cliquer = (pg, tx) => pg.evaluate((tx) => { const b = document.querySelect
       dit(rej && rej.data.args.method === 'PUT' && rej.data.args.endpoint === '/api/v2/transactions/9001/offer_requests/77/reject' && rej.data.args.uid === '111', 'refuser écrit EXACTEMENT ce geste, au nom de compte_a', JSON.stringify(rej && rej.data.args));
       const txt = await r.pg.evaluate(() => document.body.innerText);
       dit(/Offre refusée/.test(txt), 'et dit le résultat écrit par l’extension');
+      dit(r.errs.length === 0, 'aucune erreur d’app (refus)', r.errs.join(' | ').slice(0, 160));
+      await r.ctx.close();
+    }
+    {
+      // Depuis le 28 oct. (3c40747e), une offre déjà tranchée ne se retranche pas
+      // dans le même fil : l'acceptation se joue sur une ouverture neuve.
+      const plan = (row) => [{ ms: 700, etat: 'pris' }, { ms: 1400, etat: 'fait', resultat: { ok: true, status: 200 } }];
+      const r = await rendre(b, { relais: VIVANT, plan, tab: 'cat_msg' });
+      await r.pg.click('[data-conv="301"]', { timeout: 5000 }).catch(() => {});
+      await r.pg.waitForTimeout(1500);
       const avantAcc = r.journal.posts.length;
       await r.pg.getByRole('button', { name: 'Accepter', exact: true }).first().click({ timeout: 3000 }).catch(() => {});
       await r.pg.waitForTimeout(500);

@@ -16,7 +16,7 @@
 // Le banc rejoue le signal de l'extension (`vrm:ext`, la même forme que
 // bridge.js) et juge sur le DOM : nœuds conservés, squelettes comptés,
 // requêtes comptées, attribut d'alerte présent.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -137,15 +137,23 @@ const texte = (pg) => pg.evaluate(() => document.body.innerText);
       {
         const etat = { ventes: [...BASE], cap: ilYa(2) };
         const { ctx, pg, errs } = await ouvrir(b, vp, etat);
-        await pg.goto(`http://localhost:${PORT}/?tab=plat_vinted`, { waitUntil: 'domcontentloaded' });
+        // (31 oct., navigation par tâche) Les achats Vinted restent une section de
+        // l'espace Vinted ; Ventes est un onglet de la navigation, filtré sur Vinted.
+        await pg.goto(`http://localhost:${PORT}/?tab=plat_vinted&section=achats`, { waitUntil: 'domcontentloaded' });
         await pg.waitForTimeout(3000);
-        try { await pg.click('[data-section="achats"]', { timeout: 4000 }); } catch (_) {}
+        // (2 nov.) Plus aucun espace de site n'est monté (31 oct., soir, b5418826) :
+        // `plat_vinted&section=achats` mène à la TÂCHE Achats filtrée sur Vinted.
+        dit(await pg.evaluate(() => { const t = document.querySelector('[data-tache]'); return !!t && t.getAttribute('data-tache') === 'achats' && t.getAttribute('data-tache-site') === 'vinted'; }), 'il est bien sur Achats · Vinted (pas sur Ventes)');
         await pg.waitForTimeout(1500);
         etat.ventes = [NOUVELLE, ...BASE]; etat.cap = ilYa(0);
         await signal(pg, 'ventes');
         await pg.waitForTimeout(600);
         let bascule = false;
-        try { await pg.click('[data-section="ventes"]', { timeout: 4000 }); bascule = true; } catch (_) {}
+        try {
+          await pg.locator('.vrm-mobile-nav [data-nav-entree="ventes"]:visible, .vrm-sidebar [data-nav-entree="ventes"]:visible').first().click({ timeout: 4000 });
+          await pg.click('[data-filtre-site="ventes"] button[data-site="vinted"]', { timeout: 4000 });
+          bascule = await pg.evaluate(() => { const t = document.querySelector('[data-tache]'); return !!t && t.getAttribute('data-tache') === 'ventes' && t.getAttribute('data-tache-site') === 'vinted'; });
+        } catch (_) {}
         dit(bascule, 'on revient sur Ventes par son onglet');
         await pg.waitForTimeout(3000);
         try { await pg.getByText('Toutes', { exact: true }).first().click({ timeout: 3000 }); await pg.waitForTimeout(600); } catch (_) {}
@@ -176,10 +184,15 @@ const texte = (pg) => pg.evaluate(() => document.body.innerText);
         dit(recap !== null && !/en attente de bordereau/.test(recap), 'le récapitulatif n’annonce pas « en attente de bordereau » sur une lecture ratée', JSON.stringify(recap).slice(0, 160));
         // Les colis PARTIS ont leur groupe, replié, en lecture seule — et ils ne
         // gonflent pas le compte des colis à envoyer.
+        // (3 nov., nouvelle mise en page) « Partis » est l'onglet « Envoyés » : à part (pas dans « À envoyer »),
+        // en lecture seule (aucun bouton pour un colis suivi par Vinted).
+        const horsEnvoyer = await pg.evaluate(() => !document.querySelector('[data-colis-partis]'));
+        await pg.click('[data-colis-onglet-choix="envoyes"]').catch(() => {}); await pg.waitForTimeout(600);
         const p = await pg.evaluate(() => { const d = document.querySelector('[data-colis-partis]');
-          return d ? { n: Number(d.getAttribute('data-colis-partis')), ouvert: d.open, etats: [...d.querySelectorAll('[data-parti]')].map((x) => x.getAttribute('data-parti')), boutons: d.querySelectorAll('button').length } : null; });
-        dit(p && p.n === 1 && p.etats.join() === 'En transit', 'Colis montre le colis PARTI (en transit), à part', JSON.stringify(p));
-        dit(p && p.ouvert === false && p.boutons === 0, 'ce groupe est replié et ne porte aucun bouton (rien à faire)', JSON.stringify(p));
+          return d ? { n: Number(d.getAttribute('data-colis-partis')), etats: [...d.querySelectorAll('[data-parti]')].map((x) => x.getAttribute('data-parti')), boutons: d.querySelectorAll('button').length } : null; });
+        dit(p && p.n === 1 && p.etats.join() === 'En transit', 'Colis montre le colis PARTI (en transit), à part (onglet « Envoyés »)', JSON.stringify(p));
+        dit(horsEnvoyer && p && p.boutons === 0, 'il n’est pas dans « À envoyer » et ne porte aucun bouton (rien à faire)', JSON.stringify(p));
+        await pg.click('[data-colis-onglet-choix="envoyer"]').catch(() => {}); await pg.waitForTimeout(400);
         const aPoster = await pg.evaluate(() => { const e = document.querySelector('[data-colis-recap]'); return e ? Number(e.getAttribute('data-colis-recap')) : null; });
         dit(aPoster === 1, 'le compte des colis à envoyer ne compte que la vente à poster (pas les partis, pas la finalisée)', String(aPoster));
         const sw = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));

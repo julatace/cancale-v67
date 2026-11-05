@@ -1,6 +1,4 @@
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import vm from 'node:vm';
 import {photoArticle,photoCommande} from '../../src/photosArticles.js';
 import {lirePhoto,urlPhotoAdmise} from '../../api/_lib/photos.js';
 import compte from '../../api/compte.js';
@@ -27,14 +25,6 @@ try{
  globalThis.fetch=async(u,opts)=>u.includes('/auth/v1/user')?new Response(JSON.stringify({id:'11111111-1111-1111-1111-111111111111'}),{headers:{'content-type':'application/json'}}):new Response(new Uint8Array([1,2]),{headers:{'content-type':'image/jpeg'}});
  out=res();await compte({method:'POST',query:{mode:'photo'},headers:{authorization:'Bearer a.b.c'},body:{url}},out);check(out.code===200 && Buffer.isBuffer(out.body),'route photo authentifiée');check(out.headers.Vary==='Authorization','cache privé par session');
 }finally{globalThis.fetch=originalFetch;}
-// Exécuter le vrai setter sans UI : refus, changement concurrent, mise en file.
-const source=fs.readFileSync(new URL('../../src/App.jsx',import.meta.url),'utf8');
-const setter=source.slice(source.indexOf('const setProInvoiceStatus = async'),source.indexOf('function FactureSousVente'));
-const inv={_id:'email_invoice_test',type:'facture_pro',status:'draft',number:'FA1',buyerEmail:'acheteur@example.test',account:'pro',prix:95,html:'document conservé'};
-async function scenario(status,changed,fresh=inv){let patch=0,body;const ctx={AUTH:{user:{id:'vendeur'}},SUPABASE_URL:'https://example.test',encodeURIComponent,sbAuth:()=>({}),fetch:async(u,o={})=>{if(o.method==='PATCH'){patch++;body=JSON.parse(o.body);check(u.includes('data->>status=eq.draft'),'écriture conditionnelle');return {ok:status===200,json:async()=>changed};}return {ok:true,json:async()=>[{id:inv._id,data:fresh}]};}};vm.createContext(ctx);vm.runInContext(setter+';globalThis.envoyer=setProInvoiceStatus',ctx);const ok=await ctx.envoyer(inv,'queued');return {ok,patch,body};}
-let v=await scenario(403,[]);check(!v.ok,'403 jamais annoncé réussi');
-v=await scenario(200,[]);check(!v.ok,'conflit jamais annoncé réussi');
-v=await scenario(200,[{id:inv._id}],{...inv,buyerEmail:'autre@example.test'});check(!v.ok && !v.patch,'destinataire modifié : pas envoi');
-v=await scenario(200,[{id:inv._id}],{...inv,status:'sent'});check(!v.ok && !v.patch,'pas de renvoi facture envoyée');
-v=await scenario(200,[{id:inv._id}]);check(v.ok && v.body.data.status==='queued' && v.body.data.html===inv.html,'brouillon mis en file, document conservé');
+// (2 nov.) L'ancien envoi « mise en file » des factures Pro (setProInvoiceStatus) est retiré :
+// la facture Pro s'émet et part par api/_lib/facture-pro.js — prouvé par scripts/audit-facture-pro.cjs.
 console.log(n+' contrôles photos et factures réussis.');

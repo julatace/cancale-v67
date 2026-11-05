@@ -2,6 +2,7 @@ import { cleVapid, abonnementAJour } from './vapid.js';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import Accueil from './Accueil.jsx';
+import { DemarrageVRM } from './Chargement.jsx';
 import { ecouterPlantages, ecouterViolationsCsp, noterPlantage } from './plantages.js';
 // Le journal des plantages écoute dès le démarrage : une erreur AVANT que l'app
 // soit montée est justement celle qu'aucun écran ne montre (src/plantages.js).
@@ -79,6 +80,8 @@ import './styles-statut.css';
 import './styles-annonces-pro.css';
 import './styles-mouvement.css';
 import './styles-bienvenue.css';
+// (2 nov.) La visite en bulles (src/VisiteBulles.jsx) — hors de la coque, ses propres teintes.
+import './styles-visite.css';
 import './styles-disposition.css';
 import './styles-telephone.css';
 import './styles-epure.css';
@@ -87,6 +90,30 @@ import './styles-etat-actions.css';
 // (29 oct.) Les trois boutons (primaire · secondaire · discret) — EN DERNIER :
 // la normalisation des boutons écrits en ligne doit passer après toutes les autres.
 import './styles-boutons.css';
+// (31 oct.) La direction « Vitrine » (son choix) : chargée EN DERNIER, elle a le dernier
+// mot sur la forme (fond, navigation, surfaces, étiquettes). Rien de métier.
+import './styles-vitrine.css';
+// (31 oct.) Messages en volets (maquettes choisies) — après Vitrine, l'écran Messages seul.
+import './styles-messages.css';
+// (1er nov.) Les chiffres de Ma journée (Vendu, Cette semaine en barres, Tendances), épurés — après Vitrine.
+import './styles-journee-chiffres.css';
+// (1er nov.) Le récapitulatif d'une vente (tiroir de Ventes, maquette A) — après Vitrine.
+import './styles-recap-vente.css';
+// (1er nov.) La finition « premium » (sans nouvelle palette ni dégradé) — en tout dernier.
+import './styles-finition.css';
+// (1er nov.) Ma journée calme : colonne tenue, listes à filets, une hiérarchie — après la finition.
+import './styles-journee-mieux.css';
+// (2 nov.) Comptabilité en trois questions (gagné · déclarer · détail) — après la finition.
+import './styles-compta-claire.css';
+// (2 nov.) Le style « Fusion » (son choix sur les maquettes) : cartes blanches, carte sombre du mois,
+// frises de suivi — en tout dernier, il a le dernier mot sur la forme des écrans qui le portent.
+import './design/fusion.css';
+import './design/favoris.css';
+import './design/outils-stats.css';
+import './design/argent-offres.css';
+// (3 nov.) Les jetons Fusion pour TOUTE l'app (échelle fermée, segmentés, cartes) — le tout dernier mot.
+import './design/jetons.css';
+import './styles-bureau.css';
 import { suivreRangeesDefilantes } from './rangeesDefilantes.js';
 if (typeof document !== 'undefined') { if (document.body) suivreRangeesDefilantes(); else document.addEventListener('DOMContentLoaded', suivreRangeesDefilantes); }
 
@@ -101,21 +128,21 @@ class DernierFilet extends React.Component {
   render() {
     if (!this.state.err) return this.props.children;
     const msg = String((this.state.err && this.state.err.message) || this.state.err);
-    const btn = { border: '1px solid #d7dde3', background: 'transparent', borderRadius: 10, padding: '10px 15px',
-      fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' };
+    const btn = { border: '1px solid #E5E5EA', background: 'transparent', borderRadius: 12, padding: '10px 15px',
+      fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' };
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 22,
-        fontFamily: 'Inter, system-ui, sans-serif', background: '#f6f7f9', color: '#14181d' }}>
-        <div style={{ maxWidth: 420, width: '100%', background: '#fff', border: '1px solid #e6e9ee', borderRadius: 18, padding: '20px 18px' }}>
+        fontFamily: 'Inter, system-ui, sans-serif', background: '#F2F2F7', color: '#1C1C1E' }}>
+        <div style={{ maxWidth: 420, width: '100%', background: '#fff', border: '1px solid #E5E5EA', borderRadius: 20, padding: '20px 18px' }}>
           <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>L'application n'a pas pu démarrer</div>
-          <div style={{ fontSize: 13, color: '#5b6675', lineHeight: 1.5, marginBottom: 12 }}>
+          <div style={{ fontSize: 13, color: '#636366', lineHeight: 1.5, marginBottom: 12 }}>
             Tes données sont intactes (elles sont dans le nuage, pas dans cette page). Recharge — si l'erreur revient,
             « Repartir propre » efface seulement les réglages de CE navigateur, puis retélécharge tout depuis ton compte.
           </div>
-          <div style={{ fontSize: 11.5, fontFamily: 'ui-monospace, monospace', background: '#f6f7f9', border: '1px solid #e6e9ee',
-            borderRadius: 10, padding: '9px 11px', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{msg}</div>
+          <div style={{ fontSize: 12, fontFamily: 'ui-monospace, monospace', background: '#F2F2F7', border: '1px solid #E5E5EA',
+            borderRadius: 12, padding: '9px 11px', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{msg}</div>
           <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
-            <button type="button" style={{ ...btn, border: 'none', background: '#14181d', color: '#fff' }} onClick={() => location.reload()}>Recharger</button>
+            <button type="button" style={{ ...btn, border: 'none', background: '#1C1C1E', color: '#fff' }} onClick={() => location.reload()}>Recharger</button>
             <button type="button" style={btn} onClick={() => { try { navigator.clipboard.writeText(msg); } catch (_) {} }}>📋 Copier l'erreur</button>
             <button type="button" style={btn} onClick={() => {
               // On ne touche QU'AUX clés de l'app, et on garde la session : le
@@ -152,7 +179,7 @@ const filmDemande = /[?&]film(=|&|$)/.test(window.location.search || '');
 // même le premier rendu, pour ne pas ajouter un aller-retour à son ouverture.
 if (!filmDemande && versApp()) { try { import('./App.jsx'); } catch (_) {} }
 
-const FondApp = () => <div style={{ minHeight: '100vh', background: '#07090D' }} />;
+const FondApp = DemarrageVRM;
 function Racine() {
   const [vue, setVue] = React.useState(() => (versApp() ? 'app' : 'accueil'));
   React.useEffect(() => {

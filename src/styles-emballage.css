@@ -1,0 +1,103 @@
+/* ── MODE EMBALLAGE (1er nov.) — un écran plein, téléphone d'abord ───────────
+   Vitrine : blanc, encre, aplats « surface », rayons 14 px ; cibles 44 px.
+   Couleur rare (§7) : le N° est à l'encre ; rouge SEULEMENT pour deux paires
+   sous ce N°, ambre pour un N° à vérifier ; l'action principale en encre pleine
+   (la maquette validée). Un portail sur <body> : les jetons --vrm-* y sont
+   (posés sur le document, src/themeMineral.js). */
+.vrm-emb {
+  position: fixed; inset: 0; z-index: 9000; overflow-y: auto; overscroll-behavior: contain;
+  background: var(--vrm-bg, #FFFFFF); color: var(--vrm-ink, #1D1D1F);
+  font-family: var(--vrm-police, system-ui, sans-serif);
+}
+.vrm-emb-cadre {
+  box-sizing: border-box; width: 100%; max-width: 600px; min-height: 100%; margin: 0 auto;
+  display: flex; flex-direction: column;
+  padding: max(12px, env(safe-area-inset-top)) 16px 0;
+}
+.vrm-emb-tete { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 56px; }
+.vrm-emb-rond, .vrm-emb-rond-vide { flex: none; width: 48px; height: 48px; border-radius: 999px; }
+.vrm-emb-rond {
+  border: 0; background: var(--vrm-surface, #FFFFFF); color: var(--vrm-ink, #1D1D1F); cursor: pointer;
+  display: flex; align-items: center; justify-content: center; padding: 0;
+}
+.vrm-emb-rond:focus-visible, .vrm-emb-b:focus-visible, .vrm-emb-case:focus-visible, .vrm-emb-recap-ligne:focus-visible, .vrm-emb-lien:focus-visible { outline: 2px solid var(--vrm-focus, #0071E3); outline-offset: 2px; }
+.vrm-emb-titre { flex: 1; text-align: center; font-size: 17px; color: var(--vrm-muted, #6E6E73); font-variant-numeric: tabular-nums; }
+.vrm-emb-corps { flex: 1; padding: 8px 0 20px; }
+.vrm-emb-sur { margin: 4px 0 0; text-align: center; font-size: 15px; color: var(--vrm-muted, #6E6E73); }
+.vrm-emb-num {
+  font-family: var(--vrm-police-mono, ui-monospace, monospace) !important; font-weight: 500 !important;
+  font-size: clamp(88px, 30vw, 168px); line-height: .95; letter-spacing: -.04em; word-spacing: -.2em;
+  text-align: center; margin: 4px 0 6px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere;
+}
+.vrm-emb-num.is-double { color: var(--vrm-danger, #B42318); }
+.vrm-emb-num.is-a-verifier { color: var(--vrm-warn, #B25000); }
+.vrm-emb-num.is-sans { color: var(--vrm-muted, #6E6E73); }
+.vrm-emb-alerte { margin: 0 0 12px; text-align: center; font-size: 15px; font-weight: 600; line-height: 1.35; }
+.vrm-emb-alerte.is-double { color: var(--vrm-danger, #B42318); }
+.vrm-emb-alerte.is-a-verifier { color: var(--vrm-warn, #B25000); }
+.vrm-emb-alerte.is-sans { color: var(--vrm-muted, #6E6E73); font-weight: 500; }
+.vrm-emb-produit { display: flex; align-items: center; gap: 16px; margin: 10px 0 14px; min-width: 0; }
+.vrm-emb-photo { flex: none; width: 96px; height: 96px; border-radius: 14px; overflow: hidden; background: var(--vrm-card2, #F2F2F7); display: block; }
+.vrm-emb-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.vrm-emb-photo-vide { display: block; width: 100%; height: 100%; }
+.vrm-emb-produit-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.vrm-emb-nom { font-size: 20px; font-weight: 800; letter-spacing: -.02em; line-height: 1.15; overflow-wrap: anywhere; }
+.vrm-emb-sous { font-size: 15px; color: var(--vrm-muted, #6E6E73); line-height: 1.35; }
+.vrm-emb-ou { display: flex; flex-direction: column; gap: 3px; background: var(--vrm-surface, #FFFFFF); border-radius: 14px; padding: 14px 16px; }
+.vrm-emb-ou-lib { font-size: 13px; color: var(--vrm-muted, #6E6E73); }
+.vrm-emb-ou-txt { font-size: 20px; font-weight: 800; letter-spacing: -.02em; line-height: 1.2; overflow-wrap: anywhere; }
+.vrm-emb-ou[data-emb-emplacement="pas-range"] .vrm-emb-ou-txt,
+.vrm-emb-ou[data-emb-emplacement="pas-lu"] .vrm-emb-ou-txt { font-size: 17px; font-weight: 600; color: var(--vrm-muted, #6E6E73); }
+.vrm-emb-ou-detail { font-size: 13px; color: var(--vrm-muted, #6E6E73); }
+.vrm-emb-transport { margin: 10px 2px 0; font-size: 15px; color: var(--vrm-muted, #6E6E73); line-height: 1.35; }
+.vrm-emb-cases { margin-top: 14px; display: flex; flex-direction: column; }
+.vrm-emb-case {
+  display: flex; align-items: center; gap: 14px; width: 100%; min-height: 60px; padding: 8px 2px; margin: 0;
+  border: 0; border-bottom: 1px solid var(--vrm-line, #E5E5EA); background: transparent; color: inherit;
+  font: inherit; text-align: left; cursor: pointer;
+}
+.vrm-emb-case:last-child { border-bottom: 0; }
+.vrm-emb-boite {
+  flex: none; width: 30px; height: 30px; border-radius: 12px; box-sizing: border-box;
+  border: 2px solid var(--vrm-line, #D1D1D6); display: flex; align-items: center; justify-content: center; color: var(--vrm-bg, #FFFFFF);
+}
+.vrm-emb-boite.is-coche { background: var(--vrm-ink, #1D1D1F); border-color: var(--vrm-ink, #1D1D1F); }
+.vrm-emb-case-lib { font-size: 17px; font-weight: 600; line-height: 1.3; }
+.vrm-emb-lien { margin-top: 10px; min-height: 44px; border: 0; background: transparent; padding: 0 2px; color: var(--vrm-ink, #1D1D1F); font: inherit; font-size: 15px; font-weight: 600; text-decoration: underline; cursor: pointer; }
+.vrm-emb-pied {
+  position: sticky; bottom: 0; display: flex; gap: 10px; background: var(--vrm-bg, #FFFFFF);
+  padding: 12px 0 max(16px, env(safe-area-inset-bottom));
+}
+.vrm-emb-b {
+  flex: 1 1 0; min-height: 56px; border-radius: 14px; padding: 0 16px; cursor: pointer; font: inherit; font-size: 17px; font-weight: 700;
+  border: 1px solid var(--vrm-line, #D1D1D6); background: var(--vrm-bg, #FFFFFF); color: var(--vrm-ink, #1D1D1F);
+}
+.vrm-emb-b-plein { flex: 2 1 0; background: var(--vrm-ink, #1D1D1F); border-color: var(--vrm-ink, #1D1D1F); color: var(--vrm-bg, #FFFFFF); }
+.vrm-emb-b:disabled { opacity: .45; cursor: default; }
+.vrm-emb-fin { padding-top: 8px; }
+.vrm-emb-grand-texte { font-size: 22px; font-weight: 800; letter-spacing: -.02em; line-height: 1.25; margin: 12px 0 8px; }
+.vrm-emb-aide { font-size: 15px; color: var(--vrm-muted, #6E6E73); line-height: 1.45; margin: 10px 2px 0; }
+.vrm-emb-recap { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.vrm-emb-recap-ligne {
+  width: 100%; min-height: 56px; display: flex; align-items: center; gap: 12px; padding: 10px 14px; box-sizing: border-box;
+  border: 0; border-radius: 14px; background: var(--vrm-surface, #FFFFFF); color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.vrm-emb-recap-num { flex: none; font-family: var(--vrm-police-mono, ui-monospace, monospace) !important; font-weight: 500; font-size: 17px; min-width: 64px; }
+.vrm-emb-recap-num.is-double { color: var(--vrm-danger, #B42318); }
+.vrm-emb-recap-num.is-a-verifier { color: var(--vrm-warn, #B25000); }
+.vrm-emb-recap-nom { flex: 1; min-width: 0; font-weight: 600; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-emb-recap-etat { flex: none; font-size: 13px; color: var(--vrm-muted, #6E6E73); }
+.vrm-emb-recap-ligne[data-emb-complet="1"] .vrm-emb-recap-etat { color: var(--vrm-ink, #1D1D1F); font-weight: 600; }
+
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
+  .vrm-emb-cadre { padding-top: 24px; }
+  .vrm-emb-num { font-size: 168px; }
+  .vrm-emb-photo { width: 120px; height: 120px; }
+  .vrm-emb-pied { padding-bottom: 24px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .vrm-emb-boite { transition: background-color .12s ease, border-color .12s ease; }
+}
+/* La règle commune des croix « Fermer… » (styles-boutons.css : marge négative,
+   rayon 10 px) ne s'applique pas à ces deux ronds de 48 px : ils sont la barre. */
+.vrm-emb .vrm-emb-rond:not(#vrm-emb-a):not(#vrm-emb-b) { margin: 0 !important; border-radius: 999px !important; min-width: 48px !important; min-height: 48px !important; }

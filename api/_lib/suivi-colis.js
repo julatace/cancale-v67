@@ -28,7 +28,7 @@
 import { normaliserSuivi, etatColisDepuisTexte } from './etat-colis-email.js';
 import { arriveeColisEmail } from './arrivee-colis.js';
 import { etatRetrait, lieuDepuisExtrait, limiteRetraitDepuisTexte, LIEU_AU_FUTUR, joursAvantLimite, jourParis } from './retrait-colis.js';
-import { codeRetraitTournure } from './code-retrait-email.js';
+import { codeRetraitTournure, codeImpossible } from './code-retrait-email.js';
 // (24 oct.) LE STATUT LU CHEZ LE TRANSPORTEUR (api/_lib/transporteurs.js) : une
 // ligne `transp_{transporteur}_{n°}` par n°, écrite par le SERVEUR seul. Elle se
 // joint aux e-mails PAR LE N° — jamais réécrite dans une ligne `email_track_*`.
@@ -61,6 +61,11 @@ export function relireLigneSuivi(d) {
   if (!d || typeof d !== 'object') return d;
   if (!codeLu(d.code) && d.extraitCode) { const c = codeRetraitTournure(d.extraitCode); if (c) d = { ...d, code: c }; }
   if (!d.lieu && d.extraitLieu) { const l = lieuDepuisExtrait(d.extraitLieu); if (l) d = { ...d, lieu: l, lieuLuDansExtrait: true }; }
+  // (1er nov., audit des codes de retrait) Une ligne rangée avant la règle peut
+  // porter le n° de suivi ou le code postal du lieu comme « code » : il n'est
+  // plus montré (« code pas lu », jamais un faux devant le comptoir).
+  if (codeLu(d.code) && codeImpossible(d.code, d)) d = { ...d, code: null, codeEcarte: codeImpossible(d.code, d) };
+  if (codeLu(d.code2) && codeImpossible(d.code2, d)) d = { ...d, code2: null };
   if (!d.limite && (d.extraitCode || d.extraitLieu)) { const lim = limiteRetraitDepuisTexte(`${d.extraitCode || ''}\n${d.extraitLieu || ''}`.replace(/\s*\|\s*/g, '\n'), d.receivedAt); if (lim) d = { ...d, limite: lim, limiteLueDansExtrait: true }; }
   const preuve = !!(codeLu(d.code) || aUnQr(d));
   if (d.status === 'available' && d.lieu && LIEU_AU_FUTUR.test(d.lieu) && !preuve) return { ...d, status: 'transit', statusLabel: 'En transit', lieu: null };
@@ -268,7 +273,9 @@ export const repartiAffichable = (ms, maintenant = Date.now()) => !Number.isFini
 // Pure ; ne touche jamais la ligne rangée (une COPIE).
 export const DISPO_LEVE_GARDE_MS = 6 * 3600000;
 const dernierEmailMs = (l) => msDe(l.emailAt != null ? l.emailAt : l.ea) ?? msDe(l.receivedAt != null ? l.receivedAt : l.r);
-export const lieuTransp = (t) => (t ? [t.lieuNom, [t.lieuCp, t.lieuVille].filter(Boolean).join(' ')].filter(Boolean).join(', ') : '');
+// (1er nov.) + la RUE quand le transporteur la donne (Vinted Go : « 24 Rue Hoche,
+// Vannes ») ; Chronopost et Mondial Relay n'en donnent pas : inchangés.
+export const lieuTransp = (t) => (t ? [t.lieuNom, t.lieuRue, [t.lieuCp, t.lieuVille].filter(Boolean).join(' ')].filter(Boolean).join(', ') : '');
 export function fusionTransporteur(l, t, maintenant = Date.now()) {
   if (!l || !t || !t.etat) return l;
   const st = l.status != null ? l.status : l.s;
@@ -566,8 +573,8 @@ export function texteRappelRetrait(x) {
   const heure = x.limiteAt ? heureParis(x.limiteAt) : '';
   if (x.etat === 'dernier') {
     return {
-      title: `📍 Dernier jour pour retirer ${lieu || 'n°' + x.suivi}`,
-      body: `${nom} — n°${x.suivi}${lieu ? `, chez ${lieu}` : ''} : à retirer aujourd'hui${heure ? ` avant ${heure}` : (jjmm(x.limite) ? ` (jusqu'au ${jjmm(x.limite)})` : '')}.`,
+      title: `📍 Dernier jour · ${lieu || `${nom} n°${x.suivi}`}`,
+      body: `À retirer aujourd'hui${heure ? ` avant ${heure}` : ''} · ${nom} n°${x.suivi}`,
     };
   }
   // ⚠️ (29 oct.) « Sans doute reparti » ne s'écrit plus : un délai dépassé ne

@@ -35,6 +35,16 @@
 //     l'ordinateur), mais on y entre par Réglages → Stock et rangement, et
 //     `?tab=organisation` marche toujours.
 //
+// ⚠️ (2 nov.) REMIS À LA NOUVELLE RÈGLE — « Comptabilité claire » (banc
+// compta-claire.cjs) : l'écran répond à trois questions (combien j'ai gagné ·
+// combien je dois déclarer · le détail) ; « Vendu et reçu », les dépenses, le
+// suivi URSSAF, la micro-entreprise et « Documents et réglages » (l'ancien
+// « Avancé ») sont des REPLIS de « Le détail ». Le sommaire à pastilles est
+// retiré. Ce banc garde ce qu'il jugeait (chiffres inchangés, une phrase une
+// fois, micro-entreprise ouverte sur une question, « Année » sans tableau vide,
+// deux périodes nommées, renvoi vers une carte qui existe, saisie qui survit au
+// nuage, trimestre écrit une fois) et ouvre les replis comme Julien.
+//
 // Lancer : npm run build && node scripts/bancs/compta-simple.cjs
 //          (BANC_PORT pour changer de port ; CHROMIUM_PATH pour le navigateur)
 
@@ -128,6 +138,7 @@ const attr = (pg, sel, a) => pg.evaluate(([sel, a]) => { const e = document.quer
 // La position d'un élément dans la page qui défile (px depuis le haut du contenu).
 const topDe = (pg, sel) => pg.evaluate((sel) => { const e = document.querySelector(sel); if (!e) return null; const sc = document.querySelector('.vrm-main'); const t = e.getBoundingClientRect().top + (sc && sc.scrollHeight > sc.clientHeight ? sc.scrollTop : (document.scrollingElement || document.documentElement).scrollTop); return Math.round(t); }, sel);
 const texte = (pg, sel) => pg.evaluate((sel) => { const e = document.querySelector(sel); return e ? e.innerText : null; }, sel);
+const ouvrirRepli = async (pg, id) => { if (await pg.evaluate((id) => { const d = document.getElementById(id); return !!(d && !d.open); }, id)) { await pg.click(`#${id} > summary`); await pg.waitForFunction((id) => document.getElementById(id).open, id, { timeout: 5000 }); await pg.waitForTimeout(150); } };
 const dansAvance = (pg, sel) => pg.evaluate((sel) => { const d = document.querySelector('[data-compta-avance]'); const e = document.querySelector(sel); return !!(d && e && d.contains(e)); }, sel);
 
 async function scenarioA(b, vp, sombre) {
@@ -141,10 +152,10 @@ async function scenarioA(b, vp, sombre) {
     // mesurait la machine (« se calcule dans l'écran Ventes »), pas l'app.
     await pg.waitForFunction(() => !!localStorage.getItem('vrm_benefice_jours'), null, { timeout: 90000 });
     await ouvrir(pg, 'compta');
-    await pg.locator('[data-ca-cur="vendu"]').first().waitFor({ timeout: 40000 });
-    await pg.locator('[data-benef-etat="lu"]').first().waitFor({ timeout: 40000 });
-    await pg.locator('[data-urssaf-declaree]').first().waitFor({ timeout: 40000 });
-    await pg.locator('[data-micro-repli]').first().waitFor({ timeout: 40000 });
+    await pg.locator('[data-ca-cur="vendu"]').first().waitFor({ state: 'attached', timeout: 40000 });
+    await pg.locator('[data-benef-etat="lu"]').first().waitFor({ state: 'attached', timeout: 40000 });
+    await pg.locator('[data-urssaf-declaree]').first().waitFor({ state: 'attached', timeout: 40000 });
+    await pg.locator('[data-micro-repli]').first().waitFor({ state: 'attached', timeout: 40000 });
     await pg.waitForTimeout(800);
   });
   // SHOTS=dossier : capture de tout l'écran (à regarder : §6.2).
@@ -160,10 +171,13 @@ async function scenarioA(b, vp, sombre) {
   await essaie(`A ${nom}`, async () => {
     check(!(await mort(pg)), `A ${nom} — aucun écran tombé sur le garde-fou`);
     // ── l'ordre de lecture
-    check(await avant(pg, '[data-ca-periode]', '[data-benef-etat]'), `A ${nom} — « Vendu et reçu » avant le bénéfice`);
+    // (2 nov.) Le bénéfice (question 1), l'URSSAF (question 2), puis « Le détail » qui porte le reste.
     check(await avant(pg, '[data-benef-etat]', '[data-compta-urssaf]'), `A ${nom} — le bénéfice avant l'URSSAF`);
-    check(await avant(pg, '[data-compta-urssaf]', '[data-compta-depenses]'), `A ${nom} — l'URSSAF avant les dépenses`);
-    check(await avant(pg, '[data-compta-depenses]', '[data-compta-avance]'), `A ${nom} — les dépenses avant « Avancé »`);
+    check(await avant(pg, '[data-compta-urssaf]', '[data-compta-question="detail"]'), `A ${nom} — l'URSSAF avant « Le détail »`);
+    for (const [sel, lib] of [['[data-ca-periode]', 'Vendu et reçu'], ['[data-compta-depenses]', 'les dépenses'], ['[data-compta-avance]', '« Documents et réglages »']]) {
+      check(await pg.evaluate((sel) => { const q = document.querySelector('[data-compta-q="detail"]'), e = document.querySelector(sel); return !!(q && e && q.contains(e)); }, sel), `A ${nom} — ${lib} vit dans « Le détail »`);
+    }
+    check(await avant(pg, '[data-compta-depenses]', '[data-compta-avance]'), `A ${nom} — les dépenses avant « Documents et réglages »`);
     // ── « Avancé » replié, et ce qui y vit
     check((await attr(pg, '[data-compta-avance]', 'data-compta-avance')) === 'ferme', `A ${nom} — « Avancé » est replié par défaut`);
     for (const [sel, lib] of [['[data-compta-resultat]', 'le résultat de l\'année'], ['[data-recap-regle]', 'le récap mensuel'], ['[data-compta-section="packs"]', 'les packs'], ['[data-profil-fiscal]', 'l\'entreprise'], ['#compta-factures', 'les factures'], ['[data-fe-etat]', 'la facturation électronique']]) {
@@ -171,8 +185,12 @@ async function scenarioA(b, vp, sombre) {
       check(!(await visible(pg, sel)), `A ${nom} — ${lib} n'est pas affiché tant qu'« Avancé » est replié`);
     }
     // ── l'essentiel, visible
-    for (const [sel, lib] of [['[data-ca-cur="vendu"]', 'Vendu'], ['[data-ca-cur="recu"]', 'Reçu'], ['[data-benef-net]', 'le bénéfice'], ['[data-echeance-suivante]', 'la prochaine déclaration'], ['[data-dep-ouvrir]', 'Ajouter une dépense'], ['[data-compta-kpi="mois"]', 'les dépenses du mois']]) {
-      check(await visible(pg, sel), `A ${nom} — ${lib} est visible sans rien ouvrir`);
+    for (const [sel, lib] of [['[data-compta-chiffre="gagne"]', 'le bénéfice'], ['[data-echeance-suivante]', 'la prochaine déclaration'], ['[data-compta-chiffre="urssaf-mois"]', 'l\'URSSAF du mois'], ['[data-benef-ajouter-depense]', 'Ajouter une dépense']]) {
+      // (2 nov., 22 h) Compta = la maquette FusionCompta : la carte sombre, l'anneau, six mois et l'encart
+      // de déclaration. L'échéance, l'URSSAF du mois et « Ajouter une dépense » ne sont plus affichés en
+      // tête — retiré à la demande de Julien, 2 nov. 22 h ; ils restent dans l'écran (rien n'est supprimé).
+      if (sel === '[data-compta-chiffre="gagne"]') check(await visible(pg, sel), `A ${nom} — ${lib} est visible sans rien ouvrir`);
+      else check((await pg.locator(sel).count()) > 0, `A ${nom} — ${lib} reste dans l'écran (plus affiché en tête, maquette FusionCompta)`);
     }
     // ── les chiffres n'ont pas bougé (mêmes valeurs que sur le code d'avant)
     check((await attr(pg, '[data-ca-cur="vendu"]', 'data-ca-eur')) === '60', `A ${nom} — Vendu du mois 60 € (inchangé)`);
@@ -192,11 +210,12 @@ async function scenarioA(b, vp, sombre) {
     const carteMois = await pg.evaluate(() => { const e = document.querySelector('[data-stats-carte="mois"]'); return e ? e.innerText : null; });
     check(carteMois != null && !/Bénéfice/.test(carteMois), `A ${nom} — la carte URSSAF du mois ne redit pas « Bénéfice » (la carte Bénéfice est juste au-dessus)`);
     // ── (revue du 29 oct.) les dépenses près du haut, même micro-entreprise ouverte
-    const dep = await topDe(pg, '#compta-charges'), suivi = await topDe(pg, '[data-suivi-urssaf]'), micro = await topDe(pg, '[data-micro-repli]');
+    const dep = await topDe(pg, '#compta-charges'), suivi = await topDe(pg, '#compta-suivi'), micro = await topDe(pg, '[data-micro-repli]');
     const seuilDep = tel ? 2400 : 1900;
     check(dep != null && dep < seuilDep, `A ${nom} — « Tes dépenses » à moins de ${seuilDep} px du haut : ${dep} px`);
     check(dep != null && micro != null && dep < micro && (suivi == null || dep < suivi), `A ${nom} — les dépenses avant le suivi URSSAF et « Ta micro-entreprise » (dépenses ${dep}, suivi ${suivi}, micro ${micro})`);
-    // ── une phrase une fois : l'URSSAF du mois en cours
+    // ── une phrase une fois : l'URSSAF du mois en cours (le suivi ouvert, comme pour le lire)
+    await ouvrirRepli(pg, 'compta-suivi');
     // (la carte Bénéfice retire aussi ces cotisations de son net : c'est un autre calcul, hors du compte)
     const tout = await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); if (!m) return ''; const c = m.cloneNode(true); for (const b of c.querySelectorAll('[data-benef-etat]')) b.remove(); document.body.appendChild(c); const t = c.innerText; c.remove(); return t; });
     const nApayer = (tout.match(/7,44/g) || []).length;
@@ -211,7 +230,10 @@ async function scenarioA(b, vp, sombre) {
     // (le titre replié de la micro-entreprise GARDE l'échéance : `suivi-urssaf.cjs` R l'exige — une décision de l'autre session.)
     // ── accord : « connu pour 1 vente »
     const benef = (await texte(pg, '[data-benef-etat]')) || '';
-    check(!/pour les 1 vente/.test(benef) && /connu pour 1 vente/.test(benef), `A ${nom} — « prix d'achat connu pour 1 vente » (jamais « pour les 1 vente »)`);
+    // (2 nov., 22 h) La phrase de couverture n'est plus sous le chiffre (maquette FusionCompta : « sur X vendus ») —
+    // retiré à la demande de Julien, 2 nov. 22 h. L'accord reste jugé là où il s'écrit (le détail du calcul).
+    const det = (await texte(pg, '[data-benef-ligne="brut"]')) || benef;
+    check(!/pour les 1 vente/.test(det) && !/pour les 1 vente/.test(benef) && /connu pour 1 vente/.test(det), `A ${nom} — « prix d'achat connu pour 1 vente » (jamais « pour les 1 vente »)`);
     // (revue) l'explication du bénéfice se replie ; la couverture reste sur la ligne « brut »
     const calc = await pg.evaluate(() => { const d = document.querySelector('[data-benef-etat] [data-benef-calcul]'); return d ? { open: d.open, txt: /au jour de la vente/.test(d.textContent) } : null; });
     check(!!calc && calc.open === false && calc.txt, `A ${nom} — « Comment c'est calculé » du bénéfice est replié (rien n'est supprimé) : ${JSON.stringify(calc)}`);
@@ -231,10 +253,11 @@ async function scenarioA(b, vp, sombre) {
     check(!!opts && opts.liberatoire === 'non', `A ${nom} — sa réponse est enregistrée (vrm_micro_options.liberatoire = non)`);
     // ── cibles au doigt
     if (tel) {
-      const hauteurs = await pg.evaluate(() => [...document.querySelectorAll('[data-compta-aller], [data-compta-avance] > summary, [data-micro-repli] > summary')].map((e) => Math.round(e.getBoundingClientRect().height)));
-      check(hauteurs.length >= 7 && hauteurs.every((h) => h >= 43), `A ${nom} — sommaire et replis ≥ 44 px au doigt : ${hauteurs.join(', ')}`);
+      const hauteurs = await pg.evaluate(() => [...document.querySelectorAll('[data-compta-repli] > summary, [data-compta-avance] > summary, [data-micro-repli] > summary')].map((e) => Math.round(e.getBoundingClientRect().height)));
+      check(hauteurs.length >= 5 && hauteurs.every((h) => h >= 43), `A ${nom} — replis ≥ 44 px au doigt : ${hauteurs.join(', ')}`);
     }
-    // ── deux cartes, deux périodes : « Année » sur Vendu et reçu
+    // ── deux cartes, deux périodes : « Année » sur Vendu et reçu (son repli ouvert)
+    await ouvrirRepli(pg, 'compta-ca');
     await pg.locator('[data-ca-choix="annee"]').first().click();
     await pg.waitForFunction(() => { const e = document.querySelector('[data-ca-periode]'); return e && e.getAttribute('data-ca-periode') === 'annee'; }, null, { timeout: 5000 }).catch(() => {});
     await pg.waitForTimeout(300);
@@ -245,10 +268,10 @@ async function scenarioA(b, vp, sombre) {
     check(/ne vaut que pour cette carte/.test((await texte(pg, '[data-ca-periode]')) || ''), `A ${nom} — la carte Vendu et reçu dit que sa période ne vaut que pour elle`);
     await pg.locator('[data-ca-choix="mois"]').first().click();
     await pg.waitForTimeout(300);
-    // ── le sommaire mène à « Avancé » et l'ouvre
-    await pg.locator('[data-compta-aller="compta-avance"]').first().click();
+    // ── un toucher sur « Documents et réglages » l'ouvre
+    await pg.locator('[data-compta-avance] > summary').first().click();
     await pg.waitForTimeout(700);
-    check((await attr(pg, '[data-compta-avance]', 'data-compta-avance')) === 'ouvert', `A ${nom} — « Avancé » du sommaire ouvre le repli`);
+    check((await attr(pg, '[data-compta-avance]', 'data-compta-avance')) === 'ouvert', `A ${nom} — « Documents et réglages » s'ouvre d'un toucher`);
     check(await visible(pg, '[data-compta-resultat]'), `A ${nom} — le résultat de l'année apparaît une fois « Avancé » ouvert`);
     check(await visible(pg, '[data-fe-etat]'), `A ${nom} — la facturation électronique est là, en bas`);
     // ── le geste de la facturation électronique nomme une carte qui existe
@@ -272,12 +295,13 @@ async function scenarioB(b, vp, sombre) {
   const { ctx, pg } = await page(b, vp, sombre, true, errs);
   await essaie(`B ${nom}`, async () => {
     await ouvrir(pg, 'compta');
-    await pg.locator('[data-micro-repli]').first().waitFor({ timeout: 40000 });
+    await pg.locator('[data-micro-repli]').first().waitFor({ state: 'attached', timeout: 40000 });
     await pg.waitForTimeout(1500);
     check((await attr(pg, '[data-micro-repli]', 'data-micro-attention')) !== '1', `B ${nom} — versement libératoire déjà dit : rien à trancher`);
     check((await attr(pg, '[data-micro-repli]', 'data-micro-repli')) === 'ferme', `B ${nom} — « Ta micro-entreprise » reste repliée`);
     check(!(await visible(pg, '[data-micro-profil]')), `B ${nom} — son profil URSSAF n'occupe pas l'écran`);
-    check(await visible(pg, '[data-echeance-suivante]'), `B ${nom} — la prochaine déclaration reste visible au-dessus`);
+    // (2 nov., 22 h) L'échéance n'est plus affichée en tête (maquette FusionCompta) : l'encart de déclaration la porte.
+    check((await pg.locator('[data-echeance-suivante]').count()) > 0 || (await visible(pg, '.vrm-fu-declaration')), `B ${nom} — la prochaine déclaration reste dans l'écran`);
     check(!errs.length, `B ${nom} — aucune erreur JavaScript${errs.length ? ' : ' + errs[0].slice(0, 160) : ''}`);
   });
   await ctx.close();
@@ -291,19 +315,24 @@ async function scenarioC(b, vp, sombre) {
     await ouvrir(pg, 'journee');
     await pg.waitForTimeout(2500);
     if (tel) {
-      await pg.locator('.vrm-tabbar').getByRole('button', { name: 'Gestion', exact: true }).click();
-      await pg.getByRole('menuitem', { name: 'Comptabilité', exact: true }).waitFor({ timeout: 8000 });
-      check(await pg.getByRole('menuitem', { name: 'Comptabilité', exact: true }).isVisible(), `C ${nom} — le menu Gestion s'ouvre (Comptabilité y est)`);
-      check((await pg.getByRole('menuitem', { name: 'Organisation', exact: true }).count()) === 0, `C ${nom} — « Organisation » n'est plus dans le menu Gestion`);
+      // (1er nov.) La barre du bas n'a plus « Gestion » : la navigation par tâche range
+      // Comptabilité sous « Plus ». La règle jugée reste la même (le menu la porte,
+      // Organisation n'y est pas).
+      await pg.locator('.vrm-tabbar').getByRole('button', { name: 'Plus', exact: true }).click();
+      await pg.getByRole('menuitem', { name: /^Compta/ }).first().waitFor({ timeout: 8000 });
+      check(await pg.getByRole('menuitem', { name: /^Compta/ }).first().isVisible(), `C ${nom} — le menu Plus s'ouvre (Comptabilité y est)`);
+      check((await pg.getByRole('menuitem', { name: /^Organisation/ }).count()) === 0, `C ${nom} — « Organisation » n'est pas dans le menu Plus`);
       await pg.keyboard.press('Escape');
     } else {
-      check((await pg.locator('.vrm-sidebar').getByRole('button', { name: 'Comptabilité', exact: true }).count()) === 1, `C ${nom} — le rail porte Comptabilité`);
+      check((await pg.locator('.vrm-sidebar').getByRole('button', { name: 'Compta', exact: true }).count()) === 1, `C ${nom} — le rail porte Comptabilité`);
       check((await pg.locator('.vrm-sidebar').getByRole('button', { name: 'Organisation', exact: true }).count()) === 0, `C ${nom} — « Organisation » n'est plus dans le rail`);
     }
     await ouvrir(pg, 'settings');
     await pg.locator('[data-reglage-organisation]').first().waitFor({ timeout: 10000 });
     const descOrga = (await pg.locator('[data-reglage-organisation]').first().innerText()).replace(/\s+/g, ' ');
-    check(/à plusieurs|mises de côté|à racheter/.test(descOrga) && !/Missions, réservations, lots et consommables/.test(descOrga), `C ${nom} — l'entrée de Réglages dit à quoi sert Organisation : « ${descOrga.trim().slice(0, 140)} »`);
+    // (3 nov.) Une ligne de Réglages = son NOM seul : la phrase « à quoi ça sert » n'y est plus (retiré à la demande de Julien,
+    // 3 nov., critique #1.4) ; elle reste sous le titre de l'écran Organisation (contrôlé plus bas).
+    check(/^\s*Organisation\s*$/.test(descOrga) && !/Missions, réservations, lots et consommables/.test(descOrga), `C ${nom} — l'entrée de Réglages dit son nom, sans phrase : « ${descOrga.trim().slice(0, 140)} »`);
     await pg.locator('[data-reglage-organisation]').first().click();
     // L'écran (au téléphone son titre est celui de l'en-tête de l'app : on vise la section).
     const ecran = pg.locator('section.vrm-operations[aria-label="Organisation"]');
@@ -311,8 +340,10 @@ async function scenarioC(b, vp, sombre) {
     check(await ecran.isVisible() && await pg.getByRole('button', { name: 'Réservations', exact: true }).isVisible(), `C ${nom} — Réglages → Stock et rangement → Organisation l'ouvre`);
     // (revue) L'en-tête dit d'où l'on vient et à quoi ça sert — la MÊME phrase que Réglages.
     const tete = await pg.evaluate(() => ({ sur: (document.querySelector('.vrm-operations .ops-surtitre') || {}).textContent || '', acc: ((document.querySelector('.vrm-operations .ops-entete p') || {}).textContent || '').trim() }));
-    check(!/gestion/i.test(tete.sur) && /réglages/i.test(tete.sur), `C ${nom} — le surtitre de l'écran dit « Réglages », plus « Gestion » : « ${tete.sur} »`);
-    check(!!tete.acc && descOrga.includes(tete.acc), `C ${nom} — sous le titre, la phrase de Réglages : « ${tete.acc} »`);
+    // (2 nov.) « Paramètres » partout (1er nov., banc tous-boutons, CLAUDE.md §9) :
+    // l'écran d'où l'on vient s'appelle désormais « Paramètres ».
+    check(!/gestion/i.test(tete.sur) && /paramètres/i.test(tete.sur), `C ${nom} — le surtitre de l'écran dit « Paramètres », plus « Gestion » : « ${tete.sur} »`);
+    check(!!tete.acc && /à plusieurs|mises de côté|à racheter/.test(tete.acc), `C ${nom} — sous le titre de l'écran, à quoi sert Organisation : « ${tete.acc} »`);
     if (!tel) check((await pg.locator('.vrm-sidebar [aria-label="Paramètres"][aria-current="page"]').count()) === 1, `C ${nom} — la roue des Réglages est mise en avant dans le rail`);
     await ouvrir(pg, 'organisation');
     await ecran.waitFor({ timeout: 10000 });
@@ -332,7 +363,7 @@ async function scenarioD(b, vp, sombre) {
   const { ctx, pg } = await page(b, vp, sombre, true, errs, { ligne });
   await essaie(`D ${nom}`, async () => {
     await ouvrir(pg, 'compta');
-    await pg.locator('[data-urssaf-couverture]').first().waitFor({ timeout: 40000 });
+    await pg.locator('[data-urssaf-couverture]').first().waitFor({ state: 'attached', timeout: 40000 });
     const r = await pg.evaluate(() => {
       const c = document.querySelector('[data-urssaf-couverture]');
       const t = c ? c.innerText : '';
@@ -357,8 +388,9 @@ async function scenarioE(b, vp, sombre) {
   const { ctx, pg } = await page(b, vp, sombre, true, errs, { retenu });
   await essaie(`E ${nom}`, async () => {
     await ouvrir(pg, 'compta');
-    await pg.locator('[data-dep-ouvrir]').first().waitFor({ timeout: 40000 });
+    await pg.locator('#compta-charges > summary').first().waitFor({ state: 'attached', timeout: 40000 });
     check((await pg.locator('[data-stats-carte="mois"]').count()) === 0, `E ${nom} — le nuage est bien retenu (statut pas encore lu)`);
+    await ouvrirRepli(pg, 'compta-charges');
     await pg.locator('[data-dep-ouvrir]').first().click();
     await pg.locator('[data-dep-libelle]').first().click();
     await pg.keyboard.type('car');
@@ -386,6 +418,8 @@ async function scenarioF(b, vp, sombre) {
   const { ctx, pg } = await page(b, vp, sombre, true, errs, { extra });
   await essaie(`F ${nom}`, async () => {
     await ouvrir(pg, 'compta');
+    await pg.locator('#compta-suivi > summary').first().waitFor({ timeout: 40000 });
+    await ouvrirRepli(pg, 'compta-suivi');
     await pg.locator('[data-suivi-urssaf="lu"]').first().waitFor({ timeout: 40000 });
     await pg.locator('[data-suivi-periode="T3 2026"]').first().waitFor({ timeout: 40000 });
     await pg.waitForTimeout(600);

@@ -197,6 +197,11 @@ const MR_TEXTE = ['Bonjour,', 'Votre colis 12345678 est disponible.', '', 'POINT
     dit(M.retirerPublie(null) === null && M.retirerPublie({ colis: 'x' }) === null, 'publication absente ou illisible ⇒ null (« pas su »), jamais 0');
     dit(M.lieuDepuisExtrait("TABA'TEST | 12 Rue Exemple | 56000 Vannes | Avec 19 000 points de proximité") === "TABA'TEST, 12 Rue Exemple, 56000 Vannes", 'le lieu gardé dans l\'extrait « NOM | rue | CP Ville » est lu');
     dit(M.lieuDepuisExtrait("MONDIAL RELAY | 1 avenue de l'horizon | 59650 VILLENEUVE D'ASCQ") === null, 'le siège du transporteur n\'est jamais un point relais');
+    // (1er nov.) Le point qui SUIT une autre ligne à code postal est lu (avant :
+    // seul le premier triplet comptait, et le colis restait « point pas connu »).
+    dit(M.lieuDepuisExtrait("MONDIAL RELAY | 1 avenue de l'horizon | 59650 VILLENEUVE D'ASCQ | TABA'TEST | 12 Rue Exemple | 56000 Vannes") === "TABA'TEST, 12 Rue Exemple, 56000 Vannes", 'le point relais APRÈS le pied de l\'e-mail est lu (tous les triplets, pas seulement le premier)', M.lieuDepuisExtrait("MONDIAL RELAY | 1 avenue de l'horizon | 59650 VILLENEUVE D'ASCQ | TABA'TEST | 12 Rue Exemple | 56000 Vannes"));
+    dit(M.lieuDepuisExtrait("TABA'TEST | 12 Rue Exemple | 56000 Vannes | TERRA TEST | 11 Rue Hoche | 56000 Vannes") === null, 'deux points DIFFÉRENTS dans le même extrait ⇒ rien (on ne choisit pas)');
+    dit(M.lieuDepuisExtrait("TABA'TEST | 12 Rue Exemple | 56000 Vannes | Taba'test | 12 rue exemple | 56000 VANNES") === "TABA'TEST, 12 Rue Exemple, 56000 Vannes", 'le même point écrit deux fois reste UN point');
   });
 
   await essaie('parseCarrierEmail', async () => {
@@ -205,6 +210,16 @@ const MR_TEXTE = ['Bonjour,', 'Votre colis 12345678 est disponible.', '', 'POINT
     dit(mr.status === 'available' && mr.code === '123456', 'Mondial Relay « disponible » : statut et code lus', `${mr.status} ${mr.code}`);
     dit(mr.limite === '2026-10-26', 'Mondial Relay : la date limite sans année est rangée', mr.limite);
     dit(/TABA'TEST/.test(mr.lieu || '') && /12 Rue Exemple/.test(mr.lieu || '') && /56000 Vannes/.test(mr.lieu || ''), 'Mondial Relay : « POINT RELAIS® » ne fait plus manquer le lieu', mr.lieu);
+    // (1er nov.) Vinted Go : « Adresse » puis QUATRE lignes (type, enseigne, rue,
+    // « CP Ville ») — la 4e coupait la ville ; une ligne vide avant « CP Ville »
+    // aussi. Le lieu garde maintenant son code postal (sinon : pas sur la carte,
+    // et un second point « Kusmi Test » à côté de celui de la conversation).
+    const VG = ['Ton colis est arrivé !', '', 'Adresse', '*Consigne Vinted Go*', '*Kusmi Test*', '*13 Rue Exemple*', '', '56000 Vannes', '', 'Code : A22222', 'Libère de la place avant le 25/10/2026'].join('\n');
+    const vg = parseCarrierEmail({ from: 'no-reply@vinted.fr', subject: "Ton colis t'attend", text: VG, html: '' }, 'vinted', RECU_MR);
+    dit(/Kusmi Test/.test(vg.lieu || '') && /13 Rue Exemple/.test(vg.lieu || '') && /56000 Vannes/.test(vg.lieu || ''), 'Vinted Go : le lieu garde « 56000 Vannes » (4 lignes, ligne vide avant la ville)', vg.lieu);
+    const VG2 = ['Ton colis est arrivé !', '', 'Adresse', 'Consigne Vinted Go', 'Speed Test - Vannes', '24 Rue Exemple', '56000 Vannes', 'France', '', 'Code : B33333'].join('\n');
+    const vg2 = parseCarrierEmail({ from: 'no-reply@vinted.fr', subject: "Ton colis t'attend", text: VG2, html: '' }, 'vinted', RECU_MR);
+    dit(/56000 Vannes$/.test(vg2.lieu || ''), 'le lieu s\'arrête à « CP Ville » (rien de ce qui suit)', vg2.lieu);
     const fut = parseCarrierEmail({ from: 'x', subject: 'Information sur votre colis XW000000001TS', text: '', html: '<p>Votre colis XW000000001TS sera disponible dans les prochains jours dans votre Relais Pickup.</p>' }, 'chronopost', '2026-10-23T09:53:00Z');
     dit(fut.status !== 'available' && !fut.lieu, '« sera disponible dans les prochains jours » n\'est pas un colis arrivé (et le futur n\'est pas un lieu)', `${fut.status} · lieu=${fut.lieu}`);
     const ret = parseCarrierEmail({ from: 'x', subject: "Votre colis 12345679 a été retourné à l'expéditeur", text: "Votre colis 12345679 n'a pas été retiré dans les délais. Il a été retourné à l'expéditeur.", html: '' }, 'mondialrelay', RECU_MR);
@@ -326,7 +341,12 @@ const MR_TEXTE = ['Bonjour,', 'Votre colis 12345678 est disponible.', '', 'POINT
     tr('30000011', { receivedAt: '2026-10-23T06:00:00Z', limite: '2020-01-01' });                                // délai écrit déjà dépassé
     const w = await importer('api/widget.js');
     const res = faireRes();
-    await w.default({ method: 'GET', headers: {}, query: {} }, res);
+    // Horloge FIXÉE au lendemain de la publication (23 oct., 12 h UTC) : sans elle,
+    // l'achat Vinted 7002 (sans date limite) passait la garde de 7 jours le 30 oct.
+    // et le contrôle tombait tout seul avec le calendrier (vu le 31 oct.).
+    const VraieDate = Date, FIXE = Date.parse('2026-10-23T12:00:00Z');
+    global.Date = class extends VraieDate { constructor(...a) { if (a.length) super(...a); else super(FIXE); } static now() { return FIXE; } };
+    try { await w.default({ method: 'GET', headers: {}, query: {} }, res); } finally { global.Date = VraieDate; }
     const c = res.corps || {};
     dit(res.code === 200, 'le widget répond', `HTTP ${res.code}`);
     dit(c.pickup === 3, 'widget : la liste de l\'app relue (1 dans le délai, 1 limite passée ⇒ sortie) + le colis e-mail ET l\'achat Vinted arrivés APRÈS la publication = 3', `pickup=${c.pickup} · nouveaux=${c.pickupNouveaux}`);

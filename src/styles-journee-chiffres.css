@@ -1,0 +1,159 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   LES CHIFFRES DE MA JOURNÉE — 1er novembre 2026
+   Julien : « je n'aime pas le graphique, il n'est pas beau ; pareil pour le CA,
+   le bénéfice : il y a des écritures partout qui gâchent tout ».
+   Trois cartes : « Vendu en … » (UN grand chiffre, puis une rangée de cases de
+   même forme : Bénéfice · Reçu · À mettre de côté · CA), « Cette semaine » (des
+   barres) et « Tendances ». Chaque case : un libellé, le montant en Geist Mono
+   tabulaire (« € » plus petit), au plus une ligne discrète.
+   Chargée APRÈS Vitrine (main.jsx) : les couches d'avant (styles-iphone,
+   styles-mobile-studio, styles-telephone, styles-epure…) posaient sur ces cartes
+   une grille, des dégradés et des notes cachées au téléphone ; ces sélecteurs,
+   plus forts, les remplacent pour les seules cartes `.vrm-jc`. Échelle 4/8.
+   Rien ici ne touche une donnée, une règle ni un texte : seulement la forme.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+html body .vrm-app-shell .vrm-day-layout .vrm-jc {
+  display: flex !important; flex-direction: column !important; align-items: stretch !important;
+  gap: 0 !important; padding: 20px 24px !important; margin: 0;
+  background: var(--vrm-surface) !important; background-image: none !important;
+  border: 0 !important; border-radius: 14px !important; box-shadow: none !important;
+  color: var(--vrm-ink) !important; container-type: inline-size; min-width: 0; box-sizing: border-box;
+}
+@media (max-width: 767px) {
+  html body .vrm-app-shell .vrm-day-layout .vrm-jc { padding: 16px !important; }
+}
+
+/* L'en-tête de carte : le titre en encre, le lien à droite. */
+html body .vrm-app-shell .vrm-day-layout .vrm-jc > .vrm-day-head {
+  display: flex !important; align-items: baseline !important; justify-content: space-between !important;
+  gap: 8px 16px !important; min-height: 24px; margin: 0 !important; flex-wrap: nowrap !important;
+}
+html body .vrm-app-shell .vrm-day-layout .vrm-jc > .vrm-day-head .vrm-day-k {
+  font-size: 15px !important; font-weight: 600 !important; color: var(--vrm-ink) !important; line-height: 1.4 !important;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+}
+html body .vrm-app-shell .vrm-day-layout .vrm-jc > .vrm-day-head .vrm-day-lien { font-size: 13px !important; flex-shrink: 0; }
+
+/* Les montants : chasse fixe, chiffres tabulaires, « € » plus petit, insécables. */
+html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-montant {
+  font-family: var(--vrm-police-mono) !important; font-weight: 500 !important; font-variant-numeric: tabular-nums;
+  letter-spacing: -.02em; white-space: nowrap;
+}
+html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-eur { font-size: .6em; letter-spacing: 0; }
+html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-vide { color: var(--vrm-muted) !important; }
+
+/* LE grand chiffre (un seul sur l'écran). */
+html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-hero {
+  font-family: var(--vrm-police-mono) !important; font-weight: 500 !important;
+  font-size: 38px !important; line-height: 1.05 !important; letter-spacing: -.03em !important;
+  margin: 16px 0 0 !important; padding: 0 !important; color: var(--vrm-ink) !important;
+  overflow-wrap: normal !important; white-space: nowrap; min-width: 0; grid-area: auto !important;
+}
+@media (max-width: 767px) {
+  html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-hero { font-size: 34px !important; margin-top: 12px !important; }
+}
+html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-hero .vrm-jc-eur { font-size: .5em; margin-left: 2px; }
+
+/* La ligne discrète (une seule sous un chiffre). Toujours visible, téléphone
+   compris : c'est elle qui porte « au moins » et la couverture (§5). */
+html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-sous {
+  display: block !important; font-size: 12px !important; line-height: 1.4 !important; font-weight: 500;
+  color: var(--vrm-muted) !important; margin: 4px 0 0 !important; min-width: 0; overflow-wrap: anywhere;
+}
+html body .vrm-app-shell .vrm-day-layout .vrm-jc > .vrm-jc-sous { margin-top: 8px !important; font-size: 13px !important; }
+html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-sous .vrm-jc-montant { letter-spacing: 0; }
+
+/* La rangée : un conteneur partagé par des filets d'1 px, cases de même forme.
+   Étroit : deux colonnes (la dernière case d'un nombre impair prend la ligne) ;
+   large : une colonne par case. */
+html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-rangee {
+  display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-flow: row;
+  gap: 16px 0; margin: 20px 0 0 !important; padding: 16px 0 0 !important;
+  border-top: 1px solid var(--vrm-line) !important;
+}
+html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-cell {
+  display: flex !important; flex-direction: column; align-items: flex-start; justify-content: flex-start;
+  min-width: 0; margin: 0 !important; padding: 0 0 0 16px !important; box-sizing: border-box;
+  border: 0 !important; border-left: 1px solid var(--vrm-line) !important; border-radius: 0 !important;
+  background: none !important; box-shadow: none !important; text-align: left; font: inherit; color: inherit;
+}
+html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-rangee > .vrm-jc-cell:nth-child(odd) { border-left: 0 !important; padding-left: 0 !important; }
+html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-rangee > .vrm-jc-cell:nth-child(odd):last-child { grid-column: 1 / -1; }
+@container (min-width: 560px) {
+  html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-rangee { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+  html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-rangee > .vrm-jc-cell { border-left: 1px solid var(--vrm-line) !important; padding-left: 16px !important; grid-column: auto; }
+  html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-rangee > .vrm-jc-cell:first-child { border-left: 0 !important; padding-left: 0 !important; }
+}
+/* Au-delà de trois cases, une carte pas assez large reste en deux colonnes. */
+@container (max-width: 699px) {
+  html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-rangee.vrm-jc-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-flow: row; grid-auto-columns: auto; }
+  html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-rangee.vrm-jc-4 > .vrm-jc-cell { border-left: 1px solid var(--vrm-line) !important; padding-left: 16px !important; }
+  html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-rangee.vrm-jc-4 > .vrm-jc-cell:nth-child(odd) { border-left: 0 !important; padding-left: 0 !important; }
+}
+
+html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-l {
+  display: block; font-size: 13px !important; font-weight: 500 !important; line-height: 1.4 !important;
+  color: var(--vrm-muted) !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+  text-decoration: none; letter-spacing: 0 !important; text-transform: none !important;
+}
+html body .vrm-app-shell .vrm-day-layout .vrm-jc a.vrm-jc-l-lien { cursor: pointer; min-height: 0; }
+@media (hover: hover) and (pointer: fine) {
+  html body .vrm-app-shell .vrm-day-layout .vrm-jc a.vrm-jc-l-lien:hover { color: var(--vrm-ink) !important; }
+}
+html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-v {
+  display: block; margin-top: 4px; font-size: 22px; line-height: 1.2; color: var(--vrm-ink) !important; white-space: nowrap; max-width: 100%;
+}
+@media (max-width: 767px) {
+  html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-v { font-size: 20px; }
+}
+
+/* Le seul geste : AMBRE (« 2 prix d'achat › » ouvre la saisie). Le reste reste neutre. */
+html body .vrm-app-shell .vrm-day-layout .vrm-jc :is(.vrm-jc-geste, .vrm-jc-geste-neutre) {
+  display: inline; background: none !important; border: 0 !important; padding: 0 !important; margin: 0 !important;
+  min-height: 0 !important; font: inherit !important; font-weight: 600 !important; cursor: pointer; text-align: left;
+  color: var(--vrm-warn) !important;
+}
+html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-geste-neutre { color: var(--vrm-ink) !important; font-weight: 500 !important; }
+html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-choix { margin-top: 8px; font-size: 12px; }
+html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-choix [data-depenses-choix] { gap: 4px 12px !important; font-size: 12px !important; }
+
+/* Cette semaine : le total à droite du titre, puis les barres. */
+html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-total { font-size: 17px; color: var(--vrm-ink); flex-shrink: 0; }
+html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-barres { margin-top: 16px !important; }
+
+/* Tendances : les quatre cases dans la même rangée, sans cadres. */
+html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-tendances { margin-top: 16px !important; }
+html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-tendance { cursor: pointer; min-height: 44px; }
+@media (hover: hover) and (pointer: fine) {
+  html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-tendance:hover .vrm-jc-l { color: var(--vrm-ink) !important; }
+}
+
+/* Le bénéfice seul (la carte « Vendu » retirée) : une case dans sa carte. */
+html body .vrm-app-shell .vrm-day-layout .vrm-jc-carte { padding: 16px 20px !important; border: 0 !important; border-radius: 14px !important; }
+html body .vrm-app-shell .vrm-day-layout .vrm-jc-carte .vrm-jc-cell { display: flex; flex-direction: column; align-items: flex-start; }
+html body .vrm-app-shell .vrm-day-layout .vrm-jc-carte .vrm-jc-l { font-size: 13px; color: var(--vrm-muted); text-decoration: none; }
+html body .vrm-app-shell .vrm-day-layout .vrm-jc-carte .vrm-jc-v { margin-top: 4px; font-size: 22px; }
+html body .vrm-app-shell .vrm-day-layout .vrm-jc-carte .vrm-jc-montant { font-family: var(--vrm-police-mono); font-weight: 500; white-space: nowrap; }
+html body .vrm-app-shell .vrm-day-layout .vrm-jc-carte .vrm-jc-eur { font-size: .6em; }
+html body .vrm-app-shell .vrm-day-layout .vrm-jc-carte .vrm-jc-sous { display: block !important; font-size: 12px; color: var(--vrm-muted); margin-top: 4px; }
+html body .vrm-app-shell .vrm-day-layout .vrm-jc-carte .vrm-jc-geste { background: none; border: 0; padding: 0; font: inherit; font-weight: 600; color: var(--vrm-warn); cursor: pointer; min-height: 0; }
+
+/* Le nombre de ventes du jour n'est pas une action : pas d'accent (styles-mobile-studio le colorait). */
+html body .vrm-app-shell .vrm-day-layout .vrm-jc [data-vendu-jour] { color: inherit !important; font-weight: inherit !important; }
+/* Le choix « dépenses » (une fois, ordinateur seulement) : deux liens à gauche, petits. */
+html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-choix [data-depenses-choix] { justify-content: flex-start !important; }
+html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-choix button {
+  display: inline !important; width: auto !important; min-height: 0 !important; padding: 0 !important; margin: 0 !important;
+  text-align: left !important; font-size: 12px !important; font-weight: 600 !important; line-height: 1.4 !important;
+}
+/* Les barres remplissent la hauteur que la carte leur laisse (côte à côte avec « Vendu »). */
+html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-barres { position: relative; flex: 1 1 auto; }
+html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-barres > svg { position: absolute; left: 0; bottom: 0; }
+html body .vrm-app-shell .vrm-day-layout .vrm-jc .vrm-jc-tendances { margin-top: 12px !important; }
+/* La carte voisine « En attente / À virer » parle la même langue : montants en chasse fixe, sans gras. */
+html body .vrm-app-shell .vrm-day-layout .vrm-day-wallet .vrm-day-wallet-n {
+  font-family: var(--vrm-police-mono) !important; font-weight: 500 !important; letter-spacing: -.02em !important; font-size: 22px !important;
+}
+html body .vrm-app-shell .vrm-day-layout .vrm-day-wallet .vrm-jc-montant { font-family: var(--vrm-police-mono) !important; font-weight: 500 !important; white-space: nowrap; font-variant-numeric: tabular-nums; }
+html body .vrm-app-shell .vrm-day-layout .vrm-day-wallet .vrm-jc-eur { font-size: .6em; }

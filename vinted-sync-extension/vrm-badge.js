@@ -273,8 +273,15 @@
 
     // 5.243 : sur Vestiaire, ce qui est capté, famille par famille.
     if (e.plateforme === 'vestiaire' && e.vcCapte) {
-      const noms = { ventes: 'Ventes', annonces: 'Annonces', messages: 'Messages', achats: 'Achats' };
-      const lignes = Object.keys(noms).filter((k) => e.vcCapte[k]).map((k) => `<div class="val">${noms[k]} : lues ${esc(depuis(e.vcCapte[k].at))}</div>`);
+      // 5.299 : « lues » ne suffit pas — le NOMBRE trouvé, ou « format pas encore lu ».
+      const noms = { annonces: ['Annonces', 'annonce', 'annonces'], ventes: ['Ventes', 'vente', 'ventes'], achats: ['Achats', 'achat', 'achats'], messages: ['Conversations', 'conversation', 'conversations'], nonlus: ['Messages non lus', 'non lu', 'non lus'] };
+      const lignes = Object.keys(noms).filter((k) => e.vcCapte[k]).map((k) => {
+        const c = e.vcCapte[k], [titre, un, plusieurs] = noms[k], n = Number(c.n) || 0;
+        if (c.inconnu) return `<div class="val alerte" data-vc-capte="${k}" data-vc-capte-n="inconnu">${titre} : Vestiaire a répondu dans une forme pas encore lue (${esc(depuis(c.at))}) — rien n'est deviné</div>`;
+        if (k === 'nonlus') return `<div class="val" data-vc-capte="${k}" data-vc-capte-n="${n}">${titre} : ${n} (relevé ${esc(depuis(c.at))})</div>`;
+        return n > 0 ? `<div class="val" data-vc-capte="${k}" data-vc-capte-n="${n}">${titre} : ${n} ${n > 1 ? plusieurs : un} lue${n > 1 ? 's' : ''} ${esc(depuis(c.at))}</div>`
+          : `<div class="val gris" data-vc-capte="${k}" data-vc-capte-n="0">${titre} : aucune dans ce que Vestiaire a rendu (${esc(depuis(c.at))}) — ouvre la page de tes ${plusieurs} sur Vestiaire</div>`;
+      });
       if (lignes.length) flux = lignes.join('') + flux.replace(/<div class="val gris">Rien envoyé[^<]*<\/div>/, '');
     }
     if(e.plateforme==='leboncoin'){
@@ -282,8 +289,9 @@
       for(const famille of ['annonces','transactions']){
         const r=e.transport?.receptions?.[famille];
         if(!r){flux+=`<div class="val gris">${labels[famille]} : nouvelle intégration non confirmée dans cet onglet</div>`;continue;}
-        const bon=r.etat==='enregistre';
-        const texte=r.etat==='liste-vide'?'liste reçue vide, historique conservé':r.etat==='compte-non-confirme'?'compte non confirmé, aucune attribution faite':bon?`${r.nombre} ${r.nombre===1?'enregistrée':'enregistrées'}${famille==='annonces'?` · ${r.photos} avec photo`:''} ${depuis(r.at)}`:r.etat==='aucune-annonce-reconnue'||r.etat==='format-non-reconnu'?'réponse reçue, format non reconnu':r.etat==='partiel'?'réponse trop volumineuse, non intégrée':'enregistrement refusé, données précédentes conservées';
+        // (1er nov., 5.296) Une liste rendue vide par Leboncoin n'est pas une erreur de lecture : pas en rouge.
+        const bon=r.etat==='enregistre'||r.etat==='liste-vide';
+        const texte=r.etat==='liste-vide'?'liste reçue vide, historique conservé':r.etat==='compte-non-confirme'?'compte non confirmé, aucune attribution faite':bon?`${r.nombre} ${r.nombre===1?'enregistrée':'enregistrées'}${famille==='annonces'?` · ${r.photos} avec photo`:''} ${depuis(r.at)}`:r.etat==='aucune-annonce-reconnue'||r.etat==='format-non-reconnu'?'réponse reçue, format non reconnu':r.etat==='partiel'?'réponse trop volumineuse, non intégrée':r.etat==='lecture-refusee'?'VRM n’a pas répondu (relu une fois) : rien n’est perdu, la prochaine page réessaie':'enregistrement refusé, données précédentes conservées';
         flux+=`<div class="val ${bon?'':'alerte'}">${labels[famille]} : ${esc(texte)}</div>`;
       }
     }

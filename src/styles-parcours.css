@@ -1,0 +1,7 @@
+.vrm-parcours-recap{padding:12px 18px;display:grid;gap:6px;border-bottom:1px solid var(--vrm-line,#ddd);font-size:13px}
+.vrm-parcours-recap>div{display:flex;gap:8px;flex-wrap:wrap}.vrm-parcours-recap>div>span{padding:5px 8px;border-radius:8px;background:var(--vrm-surface,#f2f2f7)}
+.vrm-parcours-recap small,.vrm-parcours-compteur,.vrm-parcours-historique p{color:var(--vrm-muted,#6e6e73);font-size:12px;line-height:1.5}
+.vrm-parcours-historique{margin:16px 0;padding:12px;border:1px solid var(--vrm-line,#ddd);border-radius:12px}.vrm-parcours-historique summary{cursor:pointer;min-height:32px;font-weight:600;font-size:13px}.vrm-parcours-historique ol{padding:0;list-style:none}.vrm-parcours-historique li{display:grid;gap:4px;padding:10px 0;border-bottom:1px solid var(--vrm-line,#ddd);overflow-wrap:anywhere}.vrm-parcours-historique time{font-size:11px;color:var(--vrm-muted)}
+.vrm-fp-raccourcis{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.vrm-fp-raccourcis button{border:1px solid var(--vrm-line,#ddd);background:transparent;color:inherit;border-radius:10px;padding:8px 10px;min-height:44px;cursor:pointer;font:inherit;font-size:12px}.vrm-fp-etape{scroll-margin-top:20px}
+.vrm-periode-recente{border:0;background:transparent;color:var(--vrm-accent,#0066cc);font:inherit;font-size:12px;min-height:44px;padding:8px;cursor:pointer}
+.vrm-cal-boutons:has(.vrm-periode-recente){flex-wrap:wrap}.vrm-cal-boutons>.vrm-periode-recente{flex-basis:100%;text-align:left}

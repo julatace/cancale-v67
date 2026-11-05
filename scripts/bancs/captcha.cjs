@@ -272,7 +272,10 @@ async function scenarios(nav, taille) {
     dit(err && /challenges\.cloudflare\.com/.test(t) && /bloqueur|réseau/i.test(t), 'le message dit ce qui bloque et quoi faire', t.slice(0, 110));
     const b = await bouton(pg);
     dit(b && b.off && /indisponible/i.test(b.txt), 'le bouton est grisé et dit pourquoi (jamais muet)', JSON.stringify(b));
-    const r = await pg.evaluate(() => { const e = document.querySelector('[data-captcha-reessayer]'); if (!e) return 0; const x = e.getBoundingClientRect(); return Math.round(x.height); });
+    // La boîte de connexion entre en scène (animation vrmCxMonte, scale 0,994 → 1) :
+    // getBoundingClientRect lu pendant l'entrée rendait 43,7 px une fois sur deux.
+    // On mesure la taille de mise en page (offsetHeight), celle qui reste au doigt.
+    const r = await pg.evaluate(() => { const e = document.querySelector('[data-captcha-reessayer]'); if (!e) return 0; return e.offsetHeight; });
     dit(r >= 44, '« Réessayer » se touche au doigt (44 px)', r + ' px');
     dit(await sansDebord(pg), 'rien ne déborde');
     st.bloque = false;

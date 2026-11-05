@@ -26,6 +26,13 @@
 //  Fonctions PURES : `scripts/bancs/double-vente-push.cjs` exécute la route.
 // ════════════════════════════════════════════════════════════════════════════
 import { cleNum, numeroExterne } from './numerotation.js';
+import { DESTINATIONS, lienNotif } from './lien-notif.js';
+// (1er nov., audit A1) Vestiaire : ses annonces PROUVÉES en ligne, par identité
+// (annonce créée par VRM ou référence VRM-n° — jamais le titre), la règle de
+// l'app (api/_lib/vestiaire-regle.js, un propriétaire, importée).
+import { annoncesVcEnLigne } from './vestiaire-regle.js';
+import { enLigneDesLignes } from './enligne-regle.js';
+export { annoncesVcEnLigne };
 
 const NUM_OK = /^([A-Z]{1,3})?\d{1,6}$/;
 // STRICT : « VRM-125 », « VRM-B125 », et rien d'autre (la même que `numDeSkuEbay`).
@@ -177,33 +184,98 @@ export function annoncesLbcParNumero(items, ventes, liens, mk, accounts = {}) {
   return out;
 }
 
+// ── VINTED (3 nov.) : ses annonces EN LIGNE, par N° ────────────────────────
+// La règle « en ligne » de l'app, recopiée par script (api/_lib/enligne-regle.js,
+// `node scripts/recopie-enligne-serveur.cjs`) : lecture COMPLÈTE la plus récente
+// de moins de 24 h, sans les supprimées vues après, sans les « à confirmer ».
+// Le N° d'une annonce = celui de SA fiche (`vinted_annonce_numeros[id]`, clé =
+// identifiant d'annonce Vinted, §5) — jamais le titre. Un compte retiré pour de
+// bon (`vrm_annonces_retirees`) ne compte pas. Rend Map N° → [{ id, titre }].
+// `lignesL` : [{ id, cap, uid, items }] (`harvest_{uid}_listings`, projetées) ·
+// `lignesP` : les lectures publiques projetées, ou `null` (pas su — la règle
+// rend alors « à confirmer » ce qu'elle ne peut plus dater) · `supp` : Map uid →
+// ids, ou `null`.
+export function annoncesVintedParNumero(lignesL, lignesP, supp, fiches, retirees, maintenant = Date.now()) {
+  const out = new Map();
+  const F = fiches && typeof fiches === 'object' ? fiches : {};
+  const ret = new Set(retirees && typeof retirees === 'object' ? Object.keys(retirees).map(String) : []);
+  const lignes = (Array.isArray(lignesL) ? lignesL : []).map((r) => ({ id: r.id, cap: r.cap, data: { uid: r.uid, capturedAt: r.cap, payload: { items: Array.isArray(r.items) ? r.items : [] } } }));
+  const { parCompte } = enLigneDesLignes(lignes, lignesP, supp, maintenant);
+  for (const [uid, res] of parCompte) {
+    if (ret.has(String(uid))) continue;
+    for (const it of res.enLigne || []) {
+      const f = F[String(it.id)];
+      const k = f && f.numero != null ? cleNum(f.numero) : '';
+      if (!k || !NUM_OK.test(k)) continue;
+      if (!out.has(k)) out.set(k, []);
+      out.get(k).push({ id: String(it.id), titre: String(it.title || f.title || '') });
+    }
+  }
+  return out;
+}
+
+// eBay retiré tout seul : le journal du retrait automatique (`ebay_retraits_auto`,
+// écrit par api/ebay.js après un EndFixedPriceItem accepté). Rend le Set des N°
+// retirés d'eBay depuis `depuisMs` (le SKU de l'entrée, une identité).
+export function numerosRetiresEbay(journal, depuisMs) {
+  const s = new Set();
+  for (const e of (journal && Array.isArray(journal.items) ? journal.items : [])) {
+    if (!e || !(Number(e.at) >= depuisMs)) continue;
+    const k = numDeSku(e.sku);
+    if (k) s.add(k);
+  }
+  return s;
+}
+
 // Ce que la vente rencontre ailleurs. `ebay` / `lbc` : Map (lu) ou `null` (pas
 // su ⇒ cette plateforme ne dit RIEN). Rend [{ numero, plateforme, annonces }].
-export function doubleVenteApprise(numero, ebay, lbc) {
+// `vc` : Map N° → annonces Vestiaire PROUVÉES en ligne (lecture de moins de
+// 24 h), ou `null` (pas su, ou lecture trop vieille ⇒ Vestiaire ne dit RIEN).
+export const PLATEFORMES = ['vinted', 'ebay', 'leboncoin', 'vestiaire'];
+// `venduSur` : le site de la vente — ses propres annonces ne sont jamais « ailleurs ».
+// `vinted` : Map N° → annonces Vinted en ligne, ou `null` (pas su ⇒ rien).
+export function doubleVenteApprise(numero, ebay, lbc, vc = null, vinted = null, venduSur = 'vinted') {
   const hits = [];
+  const src = { vinted, ebay, leboncoin: lbc, vestiaire: vc };
   for (const n of numerosDeVente(numero)) {
-    if (ebay && ebay.has(n)) hits.push({ numero: n, plateforme: 'ebay', annonces: ebay.get(n) });
-    if (lbc && lbc.has(n)) hits.push({ numero: n, plateforme: 'leboncoin', annonces: lbc.get(n) });
+    for (const p of PLATEFORMES) {
+      if (p === venduSur) continue;
+      const m = src[p];
+      if (m && typeof m.has === 'function' && m.has(n)) hits.push({ numero: n, plateforme: p, annonces: m.get(n) });
+    }
   }
   return hits;
 }
 
-const NOM = { ebay: 'eBay', leboncoin: 'Leboncoin' };
-// La notification : la paire, le N°, la plateforme. Clé anti-doublon = la
-// paire et les annonces qu'elle rencontre (identités) : le bordereau et l'email
-// « vendu » d'une MÊME vente donnent la même clé, un email rejoué aussi.
-export function notificationDoubleVente(hits, titre) {
-  if (!hits.length) return null;
-  const nums = [...new Set(hits.map((h) => h.numero))];
-  const plats = [...new Set(hits.map((h) => h.plateforme))];
-  const ou = plats.map((p) => NOM[p]).join(' et ');
+const NOM = { vinted: 'Vinted', ebay: 'eBay', leboncoin: 'Leboncoin', vestiaire: 'Vestiaire' };
+// La notification (famille Ventes) : « ⚠️ N°124 vendu sur Vinted · encore en
+// ligne sur Leboncoin » — le N°, le site de la vente, les sites où il reste en
+// ligne ; « retiré d'eBay » quand le retrait automatique l'a déjà fait (il n'est
+// jamais refait ici). Clé anti-doublon = la VENTE (site + N°) et les annonces
+// rencontrées : le bordereau et l'e-mail « vendu » d'une même vente, ou un
+// e-mail rejoué, donnent la même clé. Ouvre l'annonce à retirer.
+export function notificationDoubleVente(hits, titre, o = {}) {
+  const venduSur = PLATEFORMES.includes(o.venduSur) ? o.venduSur : 'vinted';
+  const retires = o.retiresEbay && typeof o.retiresEbay.has === 'function' ? o.retiresEbay : new Set();
+  const enLigne = hits.filter((h) => !(h.plateforme === 'ebay' && retires.has(h.numero)));
+  const numsVente = (Array.isArray(o.numeros) ? o.numeros : []).concat(hits.map((h) => h.numero));
+  const retEbay = venduSur !== 'ebay' && numsVente.some((k) => retires.has(k));
+  if (!enLigne.length && !retEbay) return null;
+  const nums = [...new Set(numsVente)];
+  const plats = [...new Set(enLigne.map((h) => h.plateforme))];
+  const ou = plats.map((p) => NOM[p]).join(', ').replace(/, ([^,]*)$/, ' et $1');
   const n = nums.map((x) => 'N°' + x).join(', ');
-  const paire = String(titre || '').trim().slice(0, 60);
-  const ids = hits.flatMap((h) => h.annonces.map((a) => h.plateforme + ':' + (a.itemId || a.id))).sort();
+  const article = String(titre || '').trim().slice(0, 80);
+  const ids = enLigne.flatMap((h) => h.annonces.map((a) => h.plateforme + ':' + (a.itemId || a.id))).sort();
+  const p0 = plats[0] || 'ebay', h0 = enLigne.find((h) => h.plateforme === p0) || { numero: nums[0] };
+  const url = p0 === 'ebay' || p0 === 'leboncoin' ? DESTINATIONS.doublon({ plat: p0, num: h0.numero })
+    // Vinted : la carte « à retirer de Vinted » de Ma journée (VRM n'y retire rien, §3) ;
+    // Vestiaire : Annonces · Vestiaire.
+    : p0 === 'vinted' ? DESTINATIONS.journee() : lienNotif('annonces', { site: 'vestiaire' });
   return {
-    title: `⚠️ Vendue sur Vinted — ${n} encore en vente sur ${ou}`,
-    body: `${paire ? paire + ' — ' : ''}${n} ${nums.length > 1 ? 'sont' : 'est'} encore en vente sur ${ou} : retire-la${plats.length > 1 ? ' des deux' : ''} pour ne pas la vendre deux fois.`,
-    tag: `dv-${nums.join('+')}-${ids.join(',')}`.slice(0, 200),
-    url: plats.includes('ebay') ? '/?tab=ebay_annonces' : '/?tab=leboncoin',
+    title: `⚠️ ${n} vendu sur ${NOM[venduSur]}${plats.length ? ` · encore en ligne sur ${ou}` : ''}${retEbay ? " · retiré d'eBay" : ''}`,
+    body: article,
+    tag: `dv-${venduSur}-${nums.join('+')}-${ids.join(',')}`.slice(0, 200),
+    url,
   };
 }

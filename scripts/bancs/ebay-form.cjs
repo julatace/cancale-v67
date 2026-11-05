@@ -4,7 +4,7 @@
 // demande de Julien), on choisit le MODE DE LIVRAISON, et eBay vérifie avant de
 // publier. La logique d'envoi est couverte par ebay-write.cjs / ebay-api.cjs ;
 // ici c'est le RENDU + le flux « comme dans l'app ».
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -83,7 +83,13 @@ const envoisEbay = []; let avertir = false;
     if(body.action==='finances') return j({ ok:false, reason:'scope', error:'x' });
     return j({ ok:true }); });
   await pg.goto(`http://localhost:${PORT}/?tab=plat_ebay`,{waitUntil:'domcontentloaded'});
-  await pg.waitForTimeout(2500);
+  // (31 oct.) Attendre que l'espace eBay soit MONTÉ (sa rangée de sections), pas
+  //  un délai fixe : la porte de session et le chargement prennent parfois plus
+  //  de 2,5 s, et « Ventes », cherché le premier, tombait dans ce trou (§6.5).
+  // (31 oct., navigation par tâche) Ventes, Annonces, Messages d'eBay sont les tâches
+  //  filtrées sur eBay : on attend l'écran monté (sa rangée de filtres).
+  await pg.waitForSelector('[data-tache]', { timeout: 30000 }).catch(() => {});
+  await pg.waitForTimeout(1000);
   // ⚠️ 4 octobre — Julien : « il y a deux fois le bouton pour poster les
   //    paires ». Le publieur était monté dans « Annonces » ET dans « Compte
   //    eBay ». On COMPTE les boutons qui portent `data-poster="ebay"` sur les
@@ -96,7 +102,11 @@ const envoisEbay = []; let avertir = false;
   //  Un onglet introuvable est maintenant un contrôle rouge, pas un silence.
   const introuvables = [];
   for (const nom of ['Ventes', 'Annonces', 'Messages', 'Offres', 'Compte']) {
-    try { await pg.getByRole('button', { name: nom, exact: true }).first().click({ timeout: 5000 }); await pg.waitForTimeout(1500); } catch (_) { introuvables.push(nom); }
+    // (31 oct.) Chaque « sous-onglet » d'hier a son adresse : la tâche filtrée sur eBay
+    //  (Ventes, Annonces, Messages). (31 oct., soir) Offres : le sous-onglet de Ventes · eBay ;
+    //  Compte : le panneau « Comptes eBay » des Paramètres (l'ancien lien y mène).
+    const URLS = { Ventes: '?tab=ventes&site=ebay', Annonces: '?tab=annonces&site=ebay', Messages: '?tab=messages&site=ebay', Offres: '?tab=plat_ebay&section=offres', Compte: '?tab=plat_ebay&section=compte' };
+    try { await pg.goto(`http://localhost:${PORT}/${URLS[nom]}`, { waitUntil: 'domcontentloaded' }); await pg.waitForSelector(nom === 'Offres' ? `[data-tache-sous] nav.vrm-platform-tabs [data-section="offres"][aria-current="page"]` : nom === 'Compte' ? `[data-sous-ecran="ebay"]:not([hidden]) [data-ebay-compte-section]` : `[data-tache-site="ebay"]`, { timeout: 15000 }); await pg.waitForTimeout(1500); } catch (e) { introuvables.push(nom + ' (' + String(e && e.message).split('\n')[0].slice(0, 90) + ')'); }
     parOnglet[nom] = { n: (await pg.$$('[data-poster="ebay"]')).length, vendre: (await pg.$$('text=Vendre un article sur eBay')).length,
       titre: await pg.evaluate(() => /Publier sur eBay · connexion/.test(document.body.innerText)) };
   }
@@ -104,7 +114,7 @@ const envoisEbay = []; let avertir = false;
   dit(!introuvables.length, 'le banc trouve chaque sous-onglet eBay', introuvables.join(', '));
   dit(total === 1 && parOnglet['Annonces'].n === 1, 'UN seul bouton pour mettre un article en vente, dans « Annonces »', JSON.stringify(Object.fromEntries(Object.entries(parOnglet).map(([k, v]) => [k, v.vendre]))));
   dit(parOnglet['Compte'].vendre === 0 && !parOnglet['Compte'].titre, '« Compte eBay » ne porte plus ni le bouton ni le titre « Publier sur eBay »');
-  try { await pg.getByRole('button', { name: 'Annonces', exact: true }).first().click({ timeout: 5000 }); await pg.waitForTimeout(1500); } catch (_) {}
+  try { await pg.goto(`http://localhost:${PORT}/?tab=annonces&site=ebay`, { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('[data-tache-site="ebay"]', { timeout: 15000 }); await pg.waitForTimeout(1500); } catch (_) {}
   const T = async () => (await pg.evaluate(()=>document.body.innerText));
 
   const openBtn = await pg.$('text=Vendre un article sur eBay');
@@ -203,7 +213,14 @@ const envoisEbay = []; let avertir = false;
   // un bloc dit qu'eBay gère, et on ne réclame jamais un prix à Julien.
   const shipTxt = (await T());
   dit(/livraison.{0,30}g[ée]r[ée]e? par eBay|eBay.{0,20}(g[èe]re|propose).{0,20}(livraison|tarif|prix)/i.test(shipTxt), 'un bloc dit que la LIVRAISON est gérée par eBay (il propose le prix)', shipTxt.replace(/\s+/g,' ').slice(0,80));
-  dit(/tu ne paies jamais le port|tu ne fixes rien/i.test(shipTxt), 'et que Julien ne paie jamais le port / ne fixe rien');
+  // Sur téléphone (390 px), la phrase d'explication « tu ne paies jamais le
+  // port » porte `vrm-aide` et se tait depuis l'épuré du 27 oct. (choix de
+  // Julien, styles-telephone.css). Ce qui reste VISIBLE doit dire qu'eBay fixe
+  // le montant et l'encaisse ; et la phrase doit toujours être écrite dans le
+  // bloc (ordinateur), jamais retirée.
+  dit(/eBay.{0,40}fixe le montant.{0,30}encaisse/i.test(shipTxt), 'ce qui reste visible dit qu\'eBay fixe le montant et l\'encaisse (§2.8)');
+  const shipSrc = await pg.evaluate(()=>{ const b=[...document.querySelectorAll('b')].find(x=>/livraison est g[ée]r[ée]e par eBay/i.test(x.textContent)); return b&&b.parentElement ? b.parentElement.textContent : ''; });
+  dit(/tu ne paies jamais le port|tu ne fixes rien/i.test(shipSrc), 'et que Julien ne paie jamais le port / ne fixe rien (écrit dans le bloc)', shipSrc.replace(/\s+/g,' ').slice(0,80));
   // Aucune saisie de prix de port ne doit être demandée (eBay s'en charge).
   const aChampPort = await pg.evaluate(()=>[...document.querySelectorAll('label')].some(x=>/Frais de port/i.test(x.textContent)));
   dit(!aChampPort, 'aucun champ « frais de port » à remplir — eBay gère le tarif');

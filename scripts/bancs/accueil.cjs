@@ -231,7 +231,7 @@ async function controlesRendu(nav, nom, opt, demo, reglages, prixCgv) {
     dit(joue === 0 && r1 - r0 <= 2, `${nom} : rien ne boucle — une fois la carte arrêtée, aucune image n'est calculée`, `${r1 - r0} image(s) demandée(s) en 1,5 s · ${joue} écran(s) en cours`);
     // 15. L'accent est rare dans le premier écran (hors écrans dessinés).
     const accent = await pg.evaluate(() => {
-      const BLEUS = ['rgb(36, 88, 230)', 'rgb(61, 123, 255)'];
+      const BLEUS = ['rgb(36, 88, 230)', 'rgb(61, 123, 255)', 'rgb(36, 66, 184)'];   // (31 oct.) + le cobalt de Vitrine
       const dedans = (e) => e.closest('[data-demo-animee],[data-scene]');
       let n = 0; const qui = [], hors = [];
       document.querySelectorAll('[data-accueil] *').forEach((e) => {

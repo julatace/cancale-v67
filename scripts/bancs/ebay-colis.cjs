@@ -23,7 +23,7 @@
 //      « Tout est à jour » ;
 //   6. aucun débordement, aucune erreur, aucun écran tombé.
 // On juge les ATTRIBUTS et les nombres rendus, jamais une formulation.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -164,7 +164,7 @@ const lireColis = (pg) => pg.evaluate(() => {
       });
       await essaie('Ma journée', async () => {
         await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
-        await pg.waitForSelector('[data-tuile="envoyer"]', { timeout: 15000 });
+        await pg.waitForSelector('[data-tuile="envoyer"]', { timeout: 15000, state: 'attached' });
         await pg.waitForTimeout(3500);
         const t = await pg.evaluate(() => { const e = document.querySelector('[data-tuile="envoyer"]'); const j = document.querySelector('[data-job="ebay-ne-pas-poster"]'); return { n: e && e.getAttribute('data-n'), eb: e && e.getAttribute('data-ebay'), ne: j ? j.getAttribute('data-n') : null }; });
         dit(t.n === String(total) && t.eb === '2', 'Ma journée : « À envoyer » porte le MÊME nombre que Colis, dont 2 eBay', JSON.stringify({ ...t, colis: total }));
@@ -191,7 +191,7 @@ const lireColis = (pg) => pg.evaluate(() => {
         const c = await lireColis(k.pg);
         dit(c.recapEbay === 'passu' && c.bloc === 'passu' && c.cmds.length === 0, 'pas su : Colis le dit (aucune vente eBay inventée, aucun « 0 »)', JSON.stringify({ e: c.recapEbay, b: c.bloc }));
         await k.pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
-        await k.pg.waitForSelector('[data-tuile="envoyer"]', { timeout: 15000 });
+        await k.pg.waitForSelector('[data-tuile="envoyer"]', { timeout: 15000, state: 'attached' });
         await k.pg.waitForTimeout(3500);
         const t = await k.pg.evaluate(() => { const e = document.querySelector('[data-tuile="envoyer"]'); return { n: e && e.getAttribute('data-n'), eb: e && e.getAttribute('data-ebay'), aJour: !!document.querySelector('[data-tout-a-jour]') }; });
         dit(t.eb === 'passu' && !t.aJour, 'pas su : Ma journée le dit, et jamais « Tout est à jour »', JSON.stringify(t));

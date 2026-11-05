@@ -21,7 +21,7 @@
 //     · une fiche sans titre dont l'annonce en porte un affiche ce titre (par
 //       identité d'annonce), jamais « (sans titre) ».
 // Lancer : npm run build && BANC_PORT=… node scripts/bancs/compta-stock-ui.cjs
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const { ouvrirAvanceCompta } = require('./_compta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
@@ -185,7 +185,8 @@ const photo = async (pg, nom) => { if (CAPT) { fs.mkdirSync(CAPT, { recursive: t
         await pg.waitForTimeout(800);
         await photo(pg, `prixachat-${L}`);
         const r = await pg.evaluate(() => {
-          const vinted = document.querySelector('[data-section="annonces"][aria-current="page"]');
+          // (31 oct., navigation par tâche) Vinted → Annonces est « Annonces · Vinted ».
+          const vinted = document.querySelector('[data-tache="annonces"][data-tache-site="vinted"]');
           const d = [...document.querySelectorAll('[data-fillbuy]')][0];
           let boite = d; while (boite && boite.parentElement && !(getComputedStyle(boite).overflow === 'hidden' && boite.getBoundingClientRect().width >= 300)) boite = boite.parentElement;
           const rc = boite ? boite.getBoundingClientRect() : null;

@@ -11,8 +11,8 @@ export default function SynchronisationVinted({comptes,owner,ownerActuel,lire,co
  const vue=etat.cle===cle?etat:{};
  const aVerifier=vue.items?.reduce((n,c)=>n+['messages','favoris'].filter(type=>c[type].libelle!=='Historique récupéré').length,0)||0;
  if(!owner||!comptes.length)return null;
- return <details className="vrm-sync-comptes" onToggle={e=>{ouvert.current=e.currentTarget.open;if(ouvert.current)recharger.current?.();}}><summary>Synchronisation par compte{vue.charge?' · vérification…':vue.items?` · ${vue.items.length} compte${vue.items.length>1?'s':''}${aVerifier?` · ${aVerifier} lecture${aVerifier>1?'s':''} à vérifier`:''}`:vue.erreur?' · lecture indisponible':''}</summary>
-  <p>Dates des captures reçues, pas des derniers messages. Une lecture ne garantit pas que tout l’historique a été récupéré.</p>
+ return <details className="vrm-sync-comptes" onToggle={e=>{ouvert.current=e.currentTarget.open;if(ouvert.current)recharger.current?.();}}><summary>Comptes Vinted{vue.charge?' · vérification…':vue.items?` · ${vue.items.length} compte${vue.items.length>1?'s':''}${aVerifier?` · ${aVerifier} à vérifier`:''}`:vue.erreur?' · lecture indisponible':''}</summary>
+  <p>Dates où l’extension a lu chaque compte, pas celles des derniers messages. Une lecture ne garantit pas que tout l’historique a été récupéré.</p>
   {verifier&&<button type="button" onClick={()=>{verifier();maj();}}>Vérifier la connexion de l’extension</button>}
   {relire&&<button type="button" onClick={relire}>Relire les données des comptes</button>}
   <button type="button" disabled={vue.charge} onClick={charger}>Actualiser l’état</button>

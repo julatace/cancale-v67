@@ -14,7 +14,7 @@
 //   C. trimestriel, 2 novembre (T4 en cours) ⇒ aucune action ;
 //   D. aucun débordement, aucune erreur, aucun écran tombé.
 // On juge les ATTRIBUTS et les nombres rendus, jamais une formulation.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');

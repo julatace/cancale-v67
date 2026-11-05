@@ -38,7 +38,7 @@
 const path=require('path');
 let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
-catch (_) { ({ chromium } = require('/home/user/cancale-v67/node_modules/playwright')); }
+catch (_) { ({ chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 const { metaVersData } = require('./_meta.cjs');
 const { ouvrirAvanceCompta } = require('./_compta.cjs');
 const fs=require('fs'), http=require('http');
@@ -191,7 +191,8 @@ const lireEcheance=(pg)=>pg.evaluate(()=>{
       if(pub&&de&&a) attendu=Math.round(pub.mois.reduce((s,m)=>{ const [y,mo]=m.ym.split('-'); const d=new Date(Number(y),Number(mo)-1,1); return (d>=de&&d<=a)?s+(Number(m.ca)||0):s; },0)*100)/100;
       const rendu=e.attr?eur(e.ca):eur(e.txt);
       dit(attendu!=null&&rendu!=null&&Math.abs(rendu-attendu)<0.005,'le CA de l’échéance = la somme des mois publiés de SA période',`rendu ${rendu} · attendu ${attendu} (${e.de||'?'} → ${e.a||'?'})`);
-      const taux=await pg.evaluate(()=>{ const m=/À payer \(([\d,.]+) ?%\)/i.exec(document.body.innerText||''); return m?Number(m[1].replace(',','.')):null; });
+      // (2 nov., 22 h) La carte URSSAF du mois n'est plus AFFICHÉE (maquette FusionCompta) mais rendue : on lit son texte.
+      const taux=await pg.evaluate(()=>{ const c=document.querySelector('[data-stats-carte="mois"]'); const m=/À payer \(([\d,.]+) ?%\)/i.exec((c&&c.textContent)||document.body.innerText||''); return m?Number(m[1].replace(',','.')):null; });
       const ap=e.attr?eur(e.apayer):eur(e.ptxt);
       dit(rendu!=null&&taux!=null&&ap!=null&&Math.abs(aPayer(rendu,taux)-ap)<0.005,'et « à payer » en découle, au centime',`${rendu} × ${taux} % → ${ap}`);
       const regle=await pg.evaluate(()=>{ const e=document.querySelector('[data-recap-regle]'); const t=document.body.innerText||''; const i=t.indexOf('Récap comptable mensuel'); return { attr:e?e.getAttribute('data-recap-regle'):null, ditVente:i>=0 && /à leur date de vente/.test(t.slice(i,i+4000)), recap:i>=0 }; });
@@ -201,21 +202,29 @@ const lireEcheance=(pg)=>pg.evaluate(()=>{
       // mois dernier en fait partie. Les écrire « sur N vendues ce mois-ci »
       // les présente comme une partie des vendues — faux sur ces ventes (3
       // finalisées dont 1 vendue le mois dernier, 4 vendues ce mois-ci).
-      const carte=await pg.evaluate(()=>{ const c=document.querySelector('[data-stats-carte="mois"]'); const t=c?(c.innerText||''):''; const m=/Ventes finalisées\s*\n\s*(\d+)\s*\n([^\n]*)/i.exec(t); return m?{ n:Number(m[1]), sous:m[2] }:null; });
+      // (2 nov., Comptabilité claire) Le nombre de ventes est dans la phrase sous le chiffre
+      // (`data-urssaf-mois-n`) ; sur un code d'avant, la tuile « Ventes finalisées ».
+      const carte=await pg.evaluate(()=>{ const c=document.querySelector('[data-stats-carte="mois"]'); const t=c?(c.innerText||''):''; const m=/Ventes finalisées\s*\n\s*(\d+)\s*\n([^\n]*)/i.exec(t); if(m) return { n:Number(m[1]), sous:m[2] }; const p=document.querySelector('[data-compta-phrase="urssaf-mois"]'), s=document.querySelector('[data-urssaf-mois-n]'); return p&&s?{ n:Number(s.getAttribute('data-urssaf-mois-n')), sous:p.innerText }:null; });
       dit(!!carte && !/\bsur \d+ vendue/.test(carte.sous),'les finalisées (au versement) ne sont pas écrites « sur N vendues ce mois-ci »',JSON.stringify(carte));
-      await aller(pg,'dashboard','[data-dash-stat="caMois"]',3000);
+      await aller(pg,'dashboard','[data-dash-stat="caMois"]',1000);
+      // La lecture des ventes est asynchrone : on attend le montant (ou on rapporte « pas su » au bout de 25 s).
+      await pg.waitForFunction(()=>{ const e=document.querySelector('[data-dash-stat="caMois"]'); return e&&e.hasAttribute('data-dash-cents'); },null,{timeout:25000}).catch(()=>{});
       const dashMois=await pg.evaluate(()=>{ const e=document.querySelector('[data-dash-stat="caMois"]'); return e?Number(e.getAttribute('data-dash-cents')):null; });
-      await aller(pg,'journee','[data-vendu-mois]',2500);
+      // (2 nov., 22 h) « Vendu en … », « Reçu » et « CA de l'année » ne sont plus sur Ma journée — retiré à la demande de Julien, 2 nov. 22 h (maquette FusionJournee).
+      // Le VENDU du mois est jugé sur la carte du mois de Ventes (même règle, `bilanVentes`).
+      await aller(pg,'cat_ventes','[data-fu-vendu-mois]',2500);
+      const vVentes=await pg.evaluate(()=>(document.querySelector('[data-fu-vendu-mois]')||{getAttribute:()=>null}).getAttribute('data-fu-vendu-mois'));
       const j=await pg.evaluate(()=>({ v:(document.querySelector('[data-vendu-mois]')||{getAttribute:()=>null}).getAttribute('data-vendu-mois'), r:(document.querySelector('[data-recu-mois]')||{getAttribute:()=>null}).getAttribute('data-recu-mois'), an:(document.querySelector('[data-ca-annee]')||{getAttribute:()=>null}).getAttribute('data-ca-annee') }));
       await aller(pg,'compta','[data-ca-cur]',3000);
       const c=await pg.evaluate(()=>{ const o={}; for(const e of document.querySelectorAll('[data-ca-cur]')) o[e.getAttribute('data-ca-cur')]=e.getAttribute('data-ca-eur'); const r=document.querySelector('[data-compta-resultat]'); o.decl=r?r.getAttribute('data-compta-ca'):null; o.periode=(document.querySelector('[data-ca-periode]')||{getAttribute:()=>null}).getAttribute('data-ca-periode'); return o; });
       console.log(`   rendu : Ma journée vendu ${j.v} reçu ${j.r} · Statistiques vendu ${dashMois} · Compta (${c.periode}) vendu ${c.vendu} reçu ${c.recu} · CA déclaré ${c.decl}`);
-      dit(Number(j.v)===venduMois && dashMois===venduMois && c.periode==='mois' && cents(Number(c.vendu))===venduMois,'VENDU du mois : Ma journée = Statistiques = Comptabilité = attendu',`${j.v} · ${dashMois} · ${cents(Number(c.vendu))} · attendu ${venduMois}`);
-      dit(Number(j.r)===recuMois && cents(Number(c.recu))===recuMois,'REÇU du mois : Ma journée = Comptabilité = attendu',`${j.r} · ${cents(Number(c.recu))} · attendu ${recuMois}`);
+      dit(Number(vVentes)===venduMois && dashMois===venduMois && c.periode==='mois' && cents(Number(c.vendu))===venduMois,'VENDU du mois : Ventes (carte du mois) = Statistiques = Comptabilité = attendu',`${vVentes} · ${dashMois} · ${cents(Number(c.vendu))} · attendu ${venduMois}`);
+      dit(cents(Number(c.recu))===recuMois,'REÇU du mois : Comptabilité = attendu (Ma journée ne l’affiche plus)',`${cents(Number(c.recu))} · attendu ${recuMois}`);
       const an=String(maintenant.getFullYear());
       const declAttendu=pub?Math.round(pub.mois.filter(m=>String(m.ym).slice(0,4)===an).reduce((s,m)=>s+(Number(m.ca)||0),0)*100)/100:null;
       dit(declAttendu!=null && Math.abs(Number(c.decl)-declAttendu)<0.005,'CA déclaré de l’année (Comptabilité) = somme des mois publiés',`${c.decl} · attendu ${declAttendu}`);
-      dit(j.an!=null && j.an!=='' && Math.abs(Number(j.an)-Math.round(Number(c.decl)*100))<=1,'(26 oct.) Ma journée « Chiffre d’affaires de l’année » = CA déclaré de Comptabilité',`${j.an} · ${c.decl}`);
+      // (« Ma journée CA de l'année = CA déclaré » : Ma journée ne l'affiche plus — retiré à la demande de Julien, 2 nov. 22 h (maquette FusionJournee))
+      void j;
       dit(errs.length===0,'aucune erreur d’app',errs.join(' | ').slice(0,160));
       await ctx.close();
     });
@@ -271,7 +280,10 @@ const lireEcheance=(pg)=>pg.evaluate(()=>{
       const bouton=pg.getByRole('button',{ name:/Analyse de tes ventes/ }).first();
       await bouton.waitFor({timeout:15000}).catch(()=>{});
       if(await bouton.count()) await bouton.click();
-      const per=pg.locator('.vrm-period button').first();
+      // (2 nov., 22 h) La période n'est plus sur l'écran : elle est dans « Outils » (maquette FusionVentes).
+      const outils=pg.locator('.vrm-outils-ventes button').first();
+      if(await outils.count()){ await outils.click(); await pg.waitForTimeout(300); }
+      const per=pg.locator('[data-outils-recherche] .vrm-period button, .vrm-period button:visible').first();
       if(await per.count()){ await per.click(); await pg.getByRole('button',{ name:/^Ce mois$/ }).first().click(); }
       await pg.waitForTimeout(700);
       return pg.evaluate(()=>{ const e=document.querySelector('[data-ventes-benef-n]'); return e?{ n:e.getAttribute('data-ventes-benef-n'), ncout:e.getAttribute('data-ventes-benef-ncout'), brut:e.getAttribute('data-ventes-benef-brut'), net:e.getAttribute('data-ventes-benef-net'), couverture:e.getAttribute('data-ventes-benef-couverture'), autres:e.getAttribute('data-ventes-benef-autres') }:null; });

@@ -8,13 +8,13 @@
 // une vente déjà envoyée (V3), un achat en route (A1, suivi Chronopost), un
 // achat livré (A2), 2 messages non lus. Exigé aux deux tailles :
 //   1. Colis : « Ventes Vestiaire à envoyer · 2 », V1 = N°401 avec sa limite,
-//      V2 « pas reliée » (jamais un titre), V3 absente ; « Achats en route · 1 »
+//      V2 reçoit le N° neuf de son produit (404, 2 nov. soir — jamais un titre), V3 absente ; « Achats en route · 1 »
 //      avec « Suivre » vers Chronopost (44 px), A2 absent ;
 //   2. Ma journée : « 2 ventes Vestiaire à envoyer » (ambre : demain) et
 //      « 2 messages Vestiaire non lus » ;
 //   3. « pas su » (lecture en 503) : Colis le dit UNE fois, Ma journée ne
 //      dit RIEN de Vestiaire (aucun « 0 ») ; jamais lu : rien du tout.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -100,11 +100,14 @@ async function sain(pg, ecran) {
   const m = /n'a pas pu s'afficher|n’a pas pu s’afficher|Cannot access|is not defined/.exec(r.t);
   dit(!m, `${ecran} : l'écran n'est pas tombé sur le garde-fou`, m && m[0]);
 }
+// (2 nov.) Les achats en route ne sont plus dans « À envoyer » : sous « À retirer »
+// (`[data-colis-vestiaire-route]`, sa propre section). `lire` lit l'onglet ouvert.
 const lire = (pg) => pg.evaluate(() => {
   const bl = document.querySelector('[data-colis-vestiaire]');
-  const s = bl && bl.querySelector('[data-suivre-colis]');
+  const rt = document.querySelector('section[data-colis-vestiaire-route]');
+  const s = rt && rt.querySelector('[data-suivre-colis]');
   return {
-    bloc: bl ? bl.getAttribute('data-colis-vestiaire') : null, route: bl ? bl.getAttribute('data-colis-vestiaire-route') : null,
+    bloc: bl ? bl.getAttribute('data-colis-vestiaire') : null, route: rt ? rt.getAttribute('data-colis-vestiaire-route') : null,
     ventes: [...document.querySelectorAll('[data-vc-colis]')].map((x) => ({ id: x.getAttribute('data-vc-colis'), num: x.getAttribute('data-vc-colis-num'), lim: x.getAttribute('data-vc-colis-limite'), t: x.innerText })),
     achats: [...document.querySelectorAll('[data-vc-route]')].map((x) => x.getAttribute('data-vc-route')),
     suivre: s ? s.href : '', h: s ? s.getBoundingClientRect().height : 0,
@@ -126,16 +129,28 @@ const jobs = (pg) => pg.evaluate(() => ({ env: (document.querySelector('[data-jo
         const { ctx, pg, errs } = await preparer(b, vp, mode);
         await essaie('Colis ' + mode, async () => {
           await pg.goto(`http://localhost:${PORT}/?tab=cat_bord`, { waitUntil: 'domcontentloaded' });
-          await pg.waitForSelector('[data-colis-recap]', { timeout: 15000 });
+          // (2 nov., colis clair) Les colis à envoyer sont sous « À envoyer » (l'onglet urgent s'ouvre par défaut).
+          await pg.waitForSelector('[data-colis-onglet-choix="envoyer"]', { timeout: 15000 }).then(() => pg.click('[data-colis-onglet-choix="envoyer"]')).catch(() => {});
+          // (2 nov.) Sans colis Vinted ni eBay, le récapitulatif n'est plus dessiné (colis clair) :
+          // on attend l'écran Colis lui-même, puis ce que Vestiaire y pose.
+          await pg.waitForSelector('[data-colis-onglet-choix]', { timeout: 15000 });
           await pg.waitForTimeout(3000);
           const c = await lire(pg);
           if (mode === 'lu') {
             dit(c.bloc === '2' && c.ventes.map((v) => v.id).sort().join() === 'V1,V2', 'Colis : les 2 ventes Vestiaire à envoyer, pas celle déjà partie', JSON.stringify(c.ventes.map((v) => v.id)));
             const v1 = c.ventes.find((v) => v.id === 'V1') || {}, v2 = c.ventes.find((v) => v.id === 'V2') || {};
-            dit(v1.num === '401' && v1.lim && /demain/.test(v1.t) && /bordereau disponible/.test(v1.t), 'V1 : N°401 (référence VRM), à envoyer demain, bordereau disponible', v1.t);
-            dit(v2.num === '' && /Pas reliée/.test(v2.t) && /bordereau : pas su/.test(v2.t), 'V2 : pas reliée (aucun titre deviné), bordereau « pas su »', v2.t);
-            dit(c.route === '1' && c.achats.join() === 'A1', 'Colis : l’achat en route, pas celui livré', JSON.stringify(c.achats));
-            dit(/chronopost\.fr/.test(c.suivre) && c.h >= 44, 'Suivre l’achat sur Chronopost (44 px)', c.suivre);
+            dit(v1.num === '401' && v1.lim && /demain/.test(v1.t) && /bordereau disponible/i.test(v1.t), 'V1 : N°401 (référence VRM), à envoyer demain, bordereau disponible', v1.t);
+            // (2 nov., soir) « un numéro par annonce » : V2, sans référence, reçoit le N° de SON
+            // produit (900002), du plus haut + 1 (401 et 403, références lues, sont pris) — jamais un titre deviné.
+            dit(v2.num === '404' && /bordereau : pas su/i.test(v2.t), 'V2 : sans référence ⇒ le N° neuf de son produit (404), bordereau « pas su »', `${v2.num} · ${v2.t}`);
+            dit(c.route === null && !c.achats.length, '« À envoyer » : aucun achat en route (ce qui arrive n’est pas à envoyer)', JSON.stringify(c.achats));
+            await pg.click('[data-colis-onglet-choix="retirer"]'); await pg.waitForTimeout(800);
+            const r = await lire(pg);
+            dit(r.route === '1' && r.achats.join() === 'A1', 'Colis → « À retirer » : l’achat en route, pas celui livré', JSON.stringify(r.achats));
+            dit(/chronopost\.fr/.test(r.suivre) && r.h >= 44, 'Suivre l’achat sur Chronopost (44 px)', r.suivre);
+            await pg.click('[data-colis-onglet-choix="envoyer"]'); await pg.waitForTimeout(500);
+            const vide = await pg.evaluate(() => /Aucun colis à envoyer\./.test(document.body.innerText));
+            dit(!vide, 'jamais « Aucun colis à envoyer » sous deux colis Vestiaire à envoyer (« Aucun colis Vinted à envoyer »)', String(vide));
           } else if (mode === 'panne') {
             dit(c.panne === 1 && !c.ventes.length, 'pas su : Colis le dit UNE fois, aucune vente inventée', JSON.stringify(c));
           } else dit(c.bloc === null && c.panne === 0, 'jamais lu : rien de Vestiaire dans Colis', JSON.stringify(c));
@@ -143,7 +158,7 @@ const jobs = (pg) => pg.evaluate(() => ({ env: (document.querySelector('[data-jo
         });
         await essaie('Ma journée ' + mode, async () => {
           await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
-          await pg.waitForSelector('[data-tuile="envoyer"]', { timeout: 15000 });
+          await pg.waitForSelector('[data-tuile="envoyer"]', { timeout: 15000, state: 'attached' });
           await pg.waitForTimeout(3000);
           const t = await jobs(pg);
           if (mode === 'lu') {

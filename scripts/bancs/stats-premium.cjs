@@ -20,7 +20,7 @@
 const path = require('path');
 let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
-catch (_) { ({ chromium } = require('/home/user/cancale-v67/node_modules/playwright')); }
+catch (_) { ({ chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -121,7 +121,9 @@ const ouvrir = async (b, vp, opts = {}) => {
   const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
-  await pg.addInitScript((d) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_regime', JSON.stringify('micro')); localStorage.setItem('vinted_urssaf_taux', '13.5'); localStorage.setItem('vinted_urssaf_mois', JSON.stringify(d.publie)); localStorage.setItem('vrm_ca_objectif', '2000'); if (d.dark) localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, { publie, dark: !!opts.dark });
+  // (2 nov.) Le détail des Statistiques vit dans deux volets repliés (RepliStats) : le banc les
+  // ouvre comme Julien le ferait (état gardé sur l'appareil), puis juge les mêmes chiffres.
+  await pg.addInitScript((d) => { try { localStorage.setItem('vrm_acces_direct','1'); localStorage.setItem('vrm_stats_replis', JSON.stringify({ argent: true, vente: true })); localStorage.setItem('vinted_regime', JSON.stringify('micro')); localStorage.setItem('vinted_urssaf_taux', '13.5'); localStorage.setItem('vinted_urssaf_mois', JSON.stringify(d.publie)); localStorage.setItem('vrm_ca_objectif', '2000'); if (d.dark) localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, { publie, dark: !!opts.dark });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
@@ -184,7 +186,7 @@ const lire = (pg) => pg.evaluate(() => {
   for (let n = w2.nextNode(); n; n = w2.nextNode()) for (const s of (n.nodeValue.match(RE) || [])) montants.push(s.replace(/[\u00a0\u202f ]/g, ''));
   const a = (sel, at) => { const e = document.querySelector(sel); return e ? e.getAttribute(at) : null; };
   // Les notions (§5) : chaque grosse carte dit CE qu'elle compte, de sa source.
-  const carte = (k) => { const e = document.querySelector(`[data-stats-carte="${k}"]`); return e ? { notion: e.getAttribute('data-notion'), texte: e.innerText } : null; };
+  const carte = (k) => { const e = document.querySelector(`[data-stats-carte="${k}"]`); return e ? { notion: e.getAttribute('data-notion'), texte: e.innerText, tc: e.textContent } : null; };
   // L'échelle typographique : la taille calculée de chaque texte VISIBLE.
   const tailles = {};
   const w3 = document.createTreeWalker(page, NodeFilter.SHOW_TEXT);
@@ -248,11 +250,13 @@ const fr = (eur) => Number(eur).toFixed(2).replace('.', ',') + '€';
         // ── Trois chiffres d'affaires, trois notions, trois libellés (§5) ─────
         // Le héros (finalisé, Vinted seul, depuis le début) peut être plus petit
         // que la courbe (vendu, toutes plateformes, en cours comprises, 12 mois) :
+        // (18 oct., 866a90d) l'explication de la courbe est repliée : on la lit dans
+        // le DOM (textContent), le titre visible doit toujours commencer par « Vendu ».
         // chacun doit DIRE ce qu'il compte, sinon 12 mois > depuis le début se lit
         // comme une erreur de calcul.
         dit(lu.hero && lu.hero.notion === 'finalise-vinted' && /finalis/i.test(lu.hero.texte) && /Vinted/.test(lu.hero.texte.split('\n')[0]),
           'héros : finalisé, Vinted seul — dit dans son libellé', lu.hero ? `${lu.hero.notion} · ${lu.hero.texte.split('\n')[0]}` : 'absent');
-        dit(lu.courbe && lu.courbe.notion === 'vendu' && /^Vendu/.test(lu.courbe.texte) && /en cours/i.test(lu.courbe.texte) && /toutes plateformes/i.test(lu.courbe.texte) && !/Chiffre d.affaires/i.test(lu.courbe.texte.split('\n')[0]),
+        dit(lu.courbe && lu.courbe.notion === 'vendu' && /^Vendu/.test(lu.courbe.texte) && /en cours/i.test(lu.courbe.tc) && /toutes plateformes/i.test(lu.courbe.tc) && !/Chiffre d.affaires/i.test(lu.courbe.texte.split('\n')[0]),
           'courbe : « Vendu », toutes plateformes, en cours comprises — pas « Chiffre d’affaires »', lu.courbe ? `${lu.courbe.notion} · ${lu.courbe.texte.split('\n')[0]}` : 'absente');
         dit(lu.plateformes && lu.plateformes.notion === 'finalise' && /Finalisé par plateforme/.test(lu.plateformes.texte) && (!/Total/.test(lu.plateformes.texte) || /Total finalisé/.test(lu.plateformes.texte)),
           'par plateforme : finalisé, et son total le dit', lu.plateformes ? lu.plateformes.notion : 'absente');
@@ -275,7 +279,8 @@ const fr = (eur) => Number(eur).toFixed(2).replace('.', ',') + '€';
         dit(tcC.includes(fr(caMoisDecl)) && tcC.includes(fr(aPayer)) && tcC.includes(fr(net)), 'carte du mois : CA × 13,5 % = à payer, CA − à payer = net', `${fr(caMoisDecl)} → ${fr(aPayer)} · ${fr(net)}`);
         dit(new RegExp('(?<!\\d)' + nMoisDecl + '(?!\\d)').test(lc.textContent), 'carte du mois : nombre de ventes finalisées de la ligne publiée', String(nMoisDecl));
         dit(lc.couverture && /51 ventes Vinted/.test(lc.textContent) && tcC.includes(fr(982.7)), 'couverture : 51 ventes Vinted sans date de versement (982,70 €) restent dans la page');
-        dit(/2 ventes Leboncoin/.test(lc.textContent) && /Vestiaire Co/.test(lc.textContent), 'couverture : Leboncoin sans date et Vestiaire pas relié restent dans la page');
+        // (29 oct.) « Vestiaire Co : pas encore relié » est retiré de la carte URSSAF (dit à tous, n'apprenait rien).
+        dit(/2 ventes Leboncoin/.test(lc.textContent), 'couverture : les ventes Leboncoin sans date restent dans la page');
         dit(/sans date/.test(lc.texte), 'la couverture se VOIT sans rien déplier (au moins « sans date »)');
         // La lecture de `urssaf.cjs` (mêmes motifs, sur le texte VISIBLE) doit
         // toujours retrouver taux, CA cité, à payer, net et nombre de ventes.

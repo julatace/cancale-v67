@@ -978,6 +978,102 @@ function contratSuivi(a) {
   }
   return { etapes: toutes, dernier: datees.length ? datees[0] : null, transporteur, suivi };
 }
+// (31 oct., 5.295) LE POINT RELAIS OÙ LE COLIS VA ARRIVER, ET SON ARRIVÉE
+// ESTIMÉE. Julien : « l'extension peut essayer de capter le nom des points
+// relais où les colis vont arriver, pour prévoir ». Lus sur la réponse BRUTE du
+// suivi (la page l'a déjà reçue ; le fond la relit pour SES achats), jamais sur
+// un texte libre :
+//  · `relaisDestination` — UN objet sous une clé qui dit le point de RETRAIT
+//    (pickup, relay, relais, pudo, locker, parcel_shop, service_point…), jamais
+//    le point de DÉPÔT du vendeur (drop_off, depot, origin, sender, seller) ni
+//    une PERSONNE (contact, recipient, destinataire…). Son nom (name/title/
+//    label) est exigé ; l'adresse (une rue, un code postal à 5 chiffres, une
+//    ville) n'est gardée que sous CET objet — c'est l'adresse d'un commerce,
+//    pas celle d'une personne. Deux points de retrait différents ⇒ `null`
+//    (pas su : on ne choisit pas). Un texte qui porte un e-mail ou un
+//    téléphone n'est pas une adresse.
+//  · `arriveeEstimeeSuivi` — une date sous une clé qui dit l'ESTIMATION
+//    (estimated, expected, eta, planned, promised, prevue…) d'une livraison ou
+//    d'une arrivée. Deux dates différentes ⇒ `null`. Ce n'est qu'une
+//    estimation de Vinted ou du transporteur : l'app l'écrit « estimée ».
+// ⚠️ La forme réelle de `journey_summary` n'a jamais été vue ici (la base de
+//    Julien la garde dans `panel_formes_suivi`) : rien de ce bloc ne devine —
+//    une réponse sans ces clés rend `null`, et l'app dit « pas encore su ».
+const SUIVI_PARENT_DESTINATION = /(?:pickup|relay|relais|pudo|locker|parcel_?shop|service_?point|point_?(?:de_?)?retrait|collection_?point|delivery_?point)/i;
+const SUIVI_PARENT_DEPOT = /(?:drop_?off|depot|origin|sender|seller|expediteur|shipper|return)/i;
+const SUIVI_ESTIMEE = /(?:^|_)(?:estimated|expected|eta|planned|promised|prevue?|prevision(?:nelle)?)(?:_|$)/i;
+const suiviSnake = (k) => String(k == null ? '' : k).replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
+function suiviTexteLieu(v, max) {
+  if (typeof v !== 'string' && typeof v !== 'number') return '';
+  const s = String(v).replace(/<[^>]*>/g, ' ').replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!s || s.length > (max || 120) || /@|(?:\+\d{2}\s?|\b0)[1-9](?:[\s.-]?\d{2}){4}\b/.test(s)) return '';
+  return s;
+}
+function suiviLieuDe(o) {
+  if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
+  const val = (re) => { for (const k of Object.keys(o)) if (re.test(suiviSnake(k))) { const t = suiviTexteLieu(o[k]); if (t) return t; } return ''; };
+  let nom = '';
+  for (const k of ['name', 'title', 'label', 'shop_name', 'point_name', 'business_name']) { const t = suiviTexteLieu(suiviVal(o, k), 80); if (t && !/^\d+$/.test(t)) { nom = t; break; } }
+  if (!nom) return null;
+  let rue = val(/^(?:address_?line_?1|line_?1|street|street_?address|address1|rue)$/);
+  let cp = val(/^(?:postal_?code|post_?code|zip|zip_?code|code_?postal|postcode)$/).replace(/\s+/g, '');
+  let ville = val(/^(?:city|town|ville|locality|municipality)$/);
+  const adr = suiviVal(o, 'address');
+  if (adr && typeof adr === 'object' && !Array.isArray(adr)) {
+    const d = suiviLieuDe(Object.assign({}, adr, { name: nom }));
+    if (d) { rue = rue || d.rue; cp = cp || d.cp; ville = ville || d.ville; }
+  } else if (typeof adr === 'string') {
+    const t = suiviTexteLieu(adr, 160);
+    const m = /^(.*?)[,\s]+(\d{5})\s+([A-Za-zÀ-ÿ'’ -]{2,40})$/.exec(t);
+    if (m) { rue = rue || m[1].replace(/[,\s]+$/, ''); cp = cp || m[2]; ville = ville || m[3].trim(); }
+    else if (t && !rue) rue = t;
+  }
+  if (!/^\d{5}$/.test(cp)) cp = '';
+  if (rue && !/^\d{1,4}\s*(?:bis|ter)?[\s,]+\S/i.test(rue) && !/\b(?:rue|avenue|av\.?|bd|boulevard|chemin|place|all[ée]e|impasse|route|quai|cours|zone|centre|za|zi)\b/i.test(rue)) rue = '';
+  return { nom: nom.slice(0, 80), rue: rue.slice(0, 100), cp, ville: ville.slice(0, 60) };
+}
+function relaisDestination(racine) {
+  const vus = [];
+  const marche = (v, prof, interdit) => {
+    if (prof > 8 || !v || typeof v !== 'object') return;
+    if (Array.isArray(v)) { for (const x of v.slice(0, 40)) marche(x, prof + 1, interdit); return; }
+    for (const k of Object.keys(v).slice(0, 80)) {
+      const x = v[k];
+      if (!x || typeof x !== 'object') continue;
+      const kl = suiviSnake(k);
+      const bloque = interdit || SUIVI_PARENT_DEPOT.test(kl) || SUIVI_PARENT_PERSONNE.test(kl);
+      if (!bloque && SUIVI_PARENT_DESTINATION.test(kl) && !Array.isArray(x)) { const l = suiviLieuDe(x); if (l) { vus.push(l); continue; } }
+      marche(x, prof + 1, bloque);
+    }
+  };
+  marche(racine, 0, false);
+  const cle = (l) => `${l.nom.toLowerCase().replace(/[^a-z0-9]+/g, '')}|${l.cp}`;
+  const uniques = new Map();
+  for (const l of vus) { const c = cle(l); const p = uniques.get(c); uniques.set(c, p ? { nom: p.nom, rue: p.rue || l.rue, cp: p.cp || l.cp, ville: p.ville || l.ville } : l); }
+  return uniques.size === 1 ? [...uniques.values()][0] : null;
+}
+function arriveeEstimeeSuivi(racine) {
+  const vues = new Set();
+  const marche = (v, prof) => {
+    if (prof > 8 || !v || typeof v !== 'object') return;
+    if (Array.isArray(v)) { for (const x of v.slice(0, 40)) marche(x, prof + 1); return; }
+    for (const k of Object.keys(v).slice(0, 80)) {
+      const x = v[k], kl = suiviSnake(k);
+      if (x && typeof x === 'object') { if (!SUIVI_PARENT_DEPOT.test(kl)) marche(x, prof + 1); continue; }
+      if (!SUIVI_ESTIMEE.test(kl) || /(?:deadline|expir|limit|until|retrait)/.test(kl)) continue;
+      const d = suiviDateIso(x);
+      if (d) vues.add(d.slice(0, 10));
+    }
+  };
+  marche(racine, 0);
+  return vues.size === 1 ? [...vues][0] : null;
+}
+// Le point relais reçu d'une page (ou d'un message forgé) : ses quatre textes
+// bornés, refaits par la même règle — rien d'autre ne passe.
+function nettoyerRelaisSuivi(r) {
+  if (!r || typeof r !== 'object' || Array.isArray(r)) return null;
+  return suiviLieuDe({ name: r.nom, address_line1: r.rue, postal_code: r.cp, city: r.ville });
+}
 // </suivi-regle>
 
   // ── LE SUIVI QUE VINTED MONTRE DE SES ACHATS (23 octobre, 5.214) ──────────
@@ -1067,7 +1163,7 @@ function contratSuivi(a) {
         if (typeof j.message_code === 'string' && typeof j.code === 'number' && j.code !== 0) return;   // un refus de Vinted n'est pas une forme
         if (typeof j.code === 'string' && j.code && Object.keys(j).every((k) => /^(code|message|message_code|errors|error|status|details)$/.test(k))) return;   // 5.246 : refus à code texte (« UNAUTHORIZED »)
         const msg = { kind: 'suivi', quoi, id, forme: formeSuivi(j) };
-        if (quoi !== 'code') { msg.allege = allegerSuivi(j); const tc = txDuCorps(j); if (tc) msg.txCorps = tc; }
+        if (quoi !== 'code') { msg.allege = allegerSuivi(j); const tc = txDuCorps(j); if (tc) msg.txCorps = tc; const rl = relaisDestination(j); if (rl) msg.relais = rl; }
         post(msg);
       }).catch(() => {});
     } catch (_) {}

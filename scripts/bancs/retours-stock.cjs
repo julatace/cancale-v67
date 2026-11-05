@@ -17,12 +17,19 @@
 //   9305  remboursée, déjà notée reçue, annonce i60 → N°60         ⇒ remise en stock
 //         garde le N°60, passe « à republier », écrite dans le nuage
 //   9306  transaction figée à 440, vente finalisée                ⇒ pas un retour
+//   9307  (3 nov.) retour, colis déposé, annonce i80 → N°80, aucun autre porteur
+//         ⇒ carte « Retour reçu ? » ; rien d'écrit sans son tap ; « Remettre en
+//         stock » ⇒ reçu + remis avec N°80, N°80 parmi les paires présentes
+//         (`vinted_nums_physiques`), la carte disparaît, la ligne passe « à republier »
+// (3 nov., choix de Julien n° 3) Les retours vivent dans Colis → « Envoyés » ; un retour REVENU
+// (en route, livré, remboursé) avec SON N° a une carte « Retour reçu ? » (9303, 9307), les autres
+// restent dans le bloc « Retours » (9301, 9304, 9305) — chacun une fois.
 // Il exige, aux deux tailles (390 px tactile, 1512 px) : les lignes et leurs
 // N° (attributs `data-retour*`), « Reçu chez moi » sur SON clic, la remise en
 // stock qui garde le N°, la question quand le N° est porté ailleurs, et un
 // second rendu où les ventes sont illisibles : « pas pu lire », jamais
 // « aucun retour ». Aucun débordement, aucune erreur, aucun écran tombé.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');
@@ -38,6 +45,7 @@ const VENTES = [
   { transaction_id: 9304, title: T, status: 'Retour initié', transaction_user_status: 'needs_action', date: ilYaH(50), price: { amount: '60.0', currency_code: 'EUR' } },
   { transaction_id: 9305, title: 'Delta Retour taille 43', status: 'Remboursement effectué', transaction_user_status: 'failed', date: ilYaH(240), price: { amount: '80.0', currency_code: 'EUR' } },
   { transaction_id: 9306, title: 'Echo Retour taille 39', status: "Commande finalisée - l'acheteur a validé la commande", transaction_user_status: 'completed', date: ilYaH(400), price: { amount: '40.0', currency_code: 'EUR' } },
+  { transaction_id: 9307, title: 'Foxtrot Retour taille 44', status: 'Commande livrée ! ', transaction_user_status: 'needs_action', date: ilYaH(80), price: { amount: '90.0', currency_code: 'EUR' } },
 ];
 const TXN = [
   { tx: 9301, item: 'i40', s: 440, ss: '' },
@@ -45,18 +53,20 @@ const TXN = [
   { tx: 9303, item: 'i50', s: 440, ss: "La livraison n'a pas encore eu lieu - colis déposé en bureau de Poste ou point relais" },
   { tx: 9305, item: 'i60', s: 440, ss: 'Commande livrée ! ' },
   { tx: 9306, item: 'i70', s: 440, ss: '' },
+  { tx: 9307, item: 'i80', s: 440, ss: "La livraison n'a pas encore eu lieu - colis déposé en bureau de Poste ou point relais" },
 ];
 const NUMEROS = {
   i40: { numero: '40', title: T, auto: false }, i41: { numero: '41', title: T, auto: false },
   i50: { numero: '50', title: 'Bravo Retour taille 42' }, a50b: { numero: '50', title: 'Bravo bis en ligne' },
   i60: { numero: '60', title: 'Delta Retour taille 43' }, i70: { numero: '70', title: 'Echo Retour taille 39' },
+  i80: { numero: '80', title: 'Foxtrot Retour taille 44' },
 };
 const ITEMS = [
   { id: 'a50b', title: 'Bravo bis en ligne', price: { amount: '72.0', currency_code: 'EUR' }, is_closed: false, is_hidden: false, is_draft: false, user: { id: 111 }, photo: { url: 'https://images1.vinted.net/t/x/f800/a50b.jpeg' } },
 ];
 const ACCOUNTS = [{ id: 1, vinted_user_id: '111', login: 'compte_a', domain: 'www.vinted.fr', updated_at: ilYaH(0) }];
 const rowsDe = (ventesOk) => [
-  { id: 'main', data: { vinted_annonce_numeros: NUMEROS, vinted_used_numeros: [40, 41, 50, 60, 70], vinted_retours_recus: { 9305: ilYaH(10) } } },
+  { id: 'main', data: { vinted_annonce_numeros: NUMEROS, vinted_used_numeros: [40, 41, 50, 60, 70, 80], vinted_retours_recus: { 9305: ilYaH(10) } } },
   ...(ventesOk ? [{ id: 'harvest_111_orders_sold', data: { capturedAt: ilYaH(0.2), payload: { my_orders: VENTES } } }] : []),
   { id: 'harvest_111_listings', data: { capturedAt: ilYaH(0.2), payload: { items: ITEMS, pagination: { total_entries: ITEMS.length } } } },
   ...TXN.map((t) => ({ id: `harvest_111_txn_${t.tx}`, data: { capturedAt: ilYaH(1), payload: { transaction: { id: t.tx, item_id: t.item, status: t.s, status_updated_at: ilYaH(5), shipment: { status_title: t.ss } } } } })),
@@ -131,6 +141,9 @@ const lire = (pg) => pg.evaluate(() => {
       remise: !!x.querySelector('[data-geste="remise-en-stock"]') })), txt: el.innerText };
 });
 const ligne = (a, cle) => (a && a.lignes.find((l) => l.cle === cle)) || null;
+const cartes = (pg) => pg.evaluate(() => [...document.querySelectorAll('[data-retour-carte]')].map((x) => ({ cle: x.getAttribute('data-retour-carte'), num: x.getAttribute('data-retour-num'), etape: x.getAttribute('data-retour-etape') })));
+const ouvrirEnvoyes = async (pg) => { await pg.waitForSelector('[data-colis-onglet-choix="envoyes"]', { timeout: 15000 }).catch(() => {}); await pg.click('[data-colis-onglet-choix="envoyes"]').catch(() => {}); await pg.waitForTimeout(800); };
+const lu = (pg, k) => pg.evaluate((k) => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (_) { return null; } }, k);
 const cliquerDans = async (pg, cle, geste) => { await pg.locator(`[data-retour="${cle}"] [data-geste="${geste}"]`).click({ timeout: 5000 }); };
 // La feuille de confirmation : à 1512 px, sous le voile flouté, Playwright juge
 // parfois le bouton « hors de la fenêtre » (vu aussi sur ebay-comptes) — le
@@ -151,13 +164,21 @@ const confirmer = async (pg, libelle) => {
       const { ctx, pg, errs, ecrits } = await preparer(b, vp);
       await essaie('lignes', async () => {
         await pg.goto(`http://localhost:${PORT}/?tab=cat_bord`, { waitUntil: 'domcontentloaded' });
+        await ouvrirEnvoyes(pg);
         await pg.waitForSelector('[data-retours-encours]', { timeout: 15000 }).catch(() => {});
         await pg.waitForTimeout(1500);
         const a = await lire(pg);
         const cles = a ? a.lignes.map((l) => l.cle).sort().join(',') : '';
-        dit(!!a && cles === '9301,9303,9304,9305', 'Colis : « Retours en cours » liste EXACTEMENT les retours (ni la finalisée au même titre, ni la transaction figée d’une vente finalisée)', cles || 'aucun bloc');
+        dit(!!a && cles === '9301,9304,9305', 'Colis → Envoyés : « Retours » liste EXACTEMENT les retours sans carte (ni la finalisée au même titre, ni la transaction figée d’une vente finalisée)', cles || 'aucun bloc');
+        const cs = await cartes(pg);
+        dit(cs.map((c) => c.cle).sort().join(',') === '9303,9307', '« Retour reçu ? » : une carte par retour REVENU avec son N° (9303, 9307), jamais pour un retour seulement initié (9301) ni sans N° (9304)', JSON.stringify(cs));
+        dit(cs.find((c) => c.cle === '9307') && cs.find((c) => c.cle === '9307').num === '80', '9307 : la carte porte SON N° (80, par identité)', JSON.stringify(cs));
+        const envoyes = await pg.evaluate(() => [...document.querySelectorAll('[data-colis-envoye]')].map((x) => x.getAttribute('data-colis-envoye')));
+        dit(!envoyes.some((c) => /930[1-57]/.test(c)), 'chaque retour une fois : sa vente n’est pas redite dans la liste des envoyés', JSON.stringify(envoyes));
+        const remisAvant = await lu(pg, 'vinted_retours_remis');
+        dit(!remisAvant || !remisAvant['9307'], 'rien n’est écrit sans son tap', JSON.stringify(remisAvant));
         dit(ligne(a, '9301') && ligne(a, '9301').num === '40' && ligne(a, '9301').etape === 'initie', '9301 : N°40 par identité (pas le 41 au même titre), étape « initié »', JSON.stringify(ligne(a, '9301')));
-        dit(ligne(a, '9303') && ligne(a, '9303').etape === 'en-route' && ligne(a, '9303').num === '50', '9303 : colis déposé ⇒ « en route », N°50', JSON.stringify(ligne(a, '9303')));
+        dit(cs.find((c) => c.cle === '9303') && cs.find((c) => c.cle === '9303').etape === 'en-route' && cs.find((c) => c.cle === '9303').num === '50', '9303 : colis déposé ⇒ « en route », N°50 (carte)', JSON.stringify(cs));
         dit(ligne(a, '9304') && ligne(a, '9304').num === '', '9304 : aucune identité ⇒ « pas reliée », aucun N° deviné par le titre', JSON.stringify(ligne(a, '9304')));
         dit(ligne(a, '9305') && ligne(a, '9305').etape === 'rembourse' && ligne(a, '9305').recu === '1', '9305 : remboursée, déjà notée reçue', JSON.stringify(ligne(a, '9305')));
         dit(ligne(a, '9305') && ligne(a, '9305').remise && !ligne(a, '9301').remise, '« Remise en stock » seulement sur un colis noté reçu');
@@ -181,16 +202,31 @@ const confirmer = async (pg, libelle) => {
         const nuage = ecrits.some((t) => /vinted_retours_remis/.test(t) && /"9305"/.test(t) && /"num":"60"/.test(t));
         dit(nuage, 'la remise en stock part au nuage avec le N°60 (`vinted_retours_remis`)', ecrits.length + ' écriture(s)');
       });
+      await essaie('Retour reçu ? → Remettre en stock (un tap, SON N°)', async () => {
+        await pg.click('[data-remettre-retour="9307"]');
+        await pg.waitForTimeout(900);
+        const cs = await cartes(pg);
+        dit(!cs.some((c) => c.cle === '9307'), 'après le tap, la carte de 9307 disparaît', JSON.stringify(cs));
+        const remis = await lu(pg, 'vinted_retours_remis'), recus = await lu(pg, 'vinted_retours_recus');
+        dit(remis && remis['9307'] && remis['9307'].num === '80', 'le tap écrit la remise avec SON N° (80) — jamais un nouveau', JSON.stringify(remis && remis['9307']));
+        dit(recus && !!recus['9307'], 'le tap note aussi le colis reçu', JSON.stringify(recus && recus['9307']));
+        const a = await lire(pg); const l = ligne(a, '9307');
+        dit(l && l.etape === 'remis' && l.num === '80', '9307 passe « remis en stock — à republier », N°80', JSON.stringify(l));
+        dit(!!(await pg.$('[data-retour="9307"] [data-geste="republier"]')), '9307 est proposé à la republication');
+        await pg.waitForTimeout(1500);
+        const phys = await lu(pg, 'vinted_nums_physiques');
+        dit(phys && Array.isArray(phys.nums) && phys.nums.map(String).includes('80'), 'N°80 redevient « chez toi » (paires présentes, `vinted_nums_physiques`)', JSON.stringify(phys && phys.nums));
+        const used = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vinted_used_numeros') || 'null'); } catch (_) { return null; } });
+        dit(!used || !used.map(String).some((n) => !['40', '41', '50', '60', '70', '80'].includes(n)), 'aucun numéro neuf n’a été pris', JSON.stringify(used));
+      });
       await essaie('N° porté ailleurs : on demande', async () => {
-        await cliquerDans(pg, '9303', 'recu');
-        await pg.waitForTimeout(400);
-        await cliquerDans(pg, '9303', 'remise-en-stock');
+        await pg.click('[data-remettre-retour="9303"]');
         await pg.waitForTimeout(500);
         const q = await pg.evaluate(() => document.body.innerText);
         dit(/N°50 est déjà porté/.test(q), 'le N°50 porté par une autre paire en ligne ⇒ VRM DEMANDE avant toute remise', '');
         await confirmer(pg, 'Annuler');
-        const a = await lire(pg);
-        dit(ligne(a, '9303') && ligne(a, '9303').etape !== 'remis', '« Annuler » ⇒ rien ne change', JSON.stringify(ligne(a, '9303')));
+        const cs = await cartes(pg); const remis = await lu(pg, 'vinted_retours_remis');
+        dit(cs.some((c) => c.cle === '9303') && !(remis && remis['9303']), '« Annuler » ⇒ rien ne change (la carte reste, rien d’écrit)', JSON.stringify({ cs, r: remis && remis['9303'] }));
       });
       dit(errs.length === 0, 'aucune erreur de page', errs.join(' | ').slice(0, 200));
       await ctx.close();
@@ -198,7 +234,8 @@ const confirmer = async (pg, libelle) => {
       const p2 = await preparer(b, vp, { ventesOk: false });
       await essaie('pas su', async () => {
         await p2.pg.goto(`http://localhost:${PORT}/?tab=cat_bord`, { waitUntil: 'domcontentloaded' });
-        await p2.pg.waitForTimeout(5000);
+        await ouvrirEnvoyes(p2.pg);
+        await p2.pg.waitForTimeout(4000);
         const a = await lire(p2.pg);
         const okPasSu = !!a && (a.n === 'passu' || Number(a.manques) > 0) && !a.lignes.length;
         dit(okPasSu, 'ventes illisibles ⇒ le bloc dit qu’il n’a pas pu lire (jamais « aucun retour »)', a ? JSON.stringify({ n: a.n, m: a.manques, t: a.txt.slice(0, 120) }) : 'aucun bloc');

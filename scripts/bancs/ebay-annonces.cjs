@@ -52,7 +52,7 @@
 //     aucune » dans le même paragraphe), ni code périmé, ni sa 5.164 d'aujourd'hui
 //     (périmée ou muette), ni pas connectée / autre compte VRM, ni absente — et
 //     l'autre sens : une 5.170 connectée (commande possible) les garde.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 // Une extension ≥ CODE_DANS_ETAT (5.171) porte dans son état la version du CODE
@@ -297,9 +297,10 @@ async function ouvrir(b, vp, panne, opts = {}) {
   return { ctx, pg, errs, envois };
 }
 async function versAnnoncesEbay(pg) {
-  await pg.goto(`http://localhost:${PORT}/?tab=plat_ebay`, { waitUntil: 'domcontentloaded' });
+  // (2 nov.) Plus d'espace eBay à part (31 oct., soir) : le lien profond mène à
+  // la tâche Annonces filtrée sur eBay.
+  await pg.goto(`http://localhost:${PORT}/?tab=plat_ebay&section=annonces`, { waitUntil: 'domcontentloaded' });
   await pg.waitForTimeout(1500);
-  await pg.getByRole('button', { name: 'Annonces', exact: true }).first().click({ timeout: 8000 });
   await pg.waitForSelector('[data-ebay-annonce]', { timeout: 15000 }).catch(() => {});
   await pg.waitForSelector('[data-ebay-retirer-vinted]', { timeout: 6000 }).catch(() => {});
   await pg.waitForTimeout(1200);
@@ -574,9 +575,8 @@ const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scroll
       rows[0].data.vrm_ebay_retrait_auto = true;
       const p3 = await ouvrir(b, { width: 390, height: 844 }, false, { mainLent: 4500 });
       await essaie('retrait automatique allumé dans le nuage', async () => {
-        await p3.pg.goto(`http://localhost:${PORT}/?tab=plat_ebay`, { waitUntil: 'domcontentloaded' });
+        await p3.pg.goto(`http://localhost:${PORT}/?tab=plat_ebay&section=annonces`, { waitUntil: 'domcontentloaded' });
         await p3.pg.waitForTimeout(1200);
-        await p3.pg.getByRole('button', { name: 'Annonces', exact: true }).first().click({ timeout: 8000 }).catch(() => {});
         await p3.pg.waitForFunction(() => { const e = document.querySelector('[data-ebay-retrait-auto]'); return e && e.getAttribute('data-ebay-retrait-auto') === 'allume'; }, null, { timeout: 15000 }).catch(() => {});
         const etats = await p3.pg.evaluate(() => window.__etatsAuto || []);
         const fin = await p3.pg.getAttribute('[data-ebay-retrait-auto]', 'data-ebay-retrait-auto').catch(() => null);
@@ -592,9 +592,8 @@ const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scroll
       rows[0].data.vrm_ebay_retrait_auto = false;
       const p4 = await ouvrir(b, { width: 390, height: 844 }, false, { mainLent: 3000, local: { vrm_ebay_retrait_auto: 'true' } });
       await essaie('retrait automatique éteint dans le nuage', async () => {
-        await p4.pg.goto(`http://localhost:${PORT}/?tab=plat_ebay`, { waitUntil: 'domcontentloaded' });
+        await p4.pg.goto(`http://localhost:${PORT}/?tab=plat_ebay&section=annonces`, { waitUntil: 'domcontentloaded' });
         await p4.pg.waitForTimeout(1200);
-        await p4.pg.getByRole('button', { name: 'Annonces', exact: true }).first().click({ timeout: 8000 }).catch(() => {});
         await p4.pg.waitForFunction(() => { const e = document.querySelector('[data-ebay-retrait-auto]'); return e && e.getAttribute('data-ebay-retrait-auto') !== 'pas-lu'; }, null, { timeout: 15000 }).catch(() => {});
         await p4.pg.waitForTimeout(1500);
         const fin = await p4.pg.getAttribute('[data-ebay-retrait-auto]', 'data-ebay-retrait-auto').catch(() => null);

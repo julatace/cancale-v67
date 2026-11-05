@@ -108,6 +108,19 @@
     });
   } catch (_) {}
 
+  // 5.294 : l'onglet Vinted redevient visible ⇒ le fond décide s'il relit
+  // (`retourSurVinted` : plus de 3 min depuis la dernière lecture complète, au
+  // plus une fois par 3 min, tous les garde-fous). 1,5 s d'attente : sur Orion,
+  // les cookies que la page renvoie au même moment arrivent d'abord.
+  try {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible' || !/(^|\.)vinted\.[a-z.]+$/i.test(location.hostname)) return;
+      setTimeout(() => {
+        try { if (document.visibilityState === 'visible') chrome.runtime.sendMessage({ from: 'vrm-retour', action: 'vintedVisible' }, () => { void (chrome.runtime && chrome.runtime.lastError); }); } catch (_) {}
+      }, 1500);
+    });
+  } catch (_) {}
+
   const enAttente = new Map();
   window.addEventListener('message', (event) => {
     if (event.source !== window || !event.data || event.data.__tag !== 'CANCALE_VINTED_REP') return;

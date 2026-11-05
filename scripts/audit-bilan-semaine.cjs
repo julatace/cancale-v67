@@ -32,7 +32,12 @@ catch (e) { console.log('❌ analyseur Babel introuvable — ' + e.message); pro
 // `indexDeclarations` et `moisDeclare` : le registre « J'ai déclaré ce mois »
 // (6 octobre), lu par `ventesDeclarables`. Le miroir doit les porter pour que la
 // règle s'exécute ; le BILAN, lui, ne lui passe aucun registre (voir plus bas).
-const NOMS = ['classifyOrderStatus', 'tsCommande', 'montantCommande', 'lbcAnnulee', 'lbcFinalisee', 'venteFinalisee', 'commandeEbayEngagee', 'montantRecuEbay', 'ymDeTs', 'indexDeclarations', 'moisDeclare', 'ventesDeclarables', 'ventesFaites', 'compteEcarte'];
+// (1er nov.) + `montantCommandeLu` (un prix illisible n'est jamais 0 €) et
+// `lbcExpediee` (les colis Leboncoin à poster, api/_lib/colis-sites.js). Les
+// règles Vestiaire que lisent `ventesFaites`/`ventesDeclarables` vivent dans
+// api/_lib/vestiaire-regle.js (un propriétaire, importé par l'app ET par le
+// miroir) : elles sont posées dans le contexte de l'app avant d'exécuter.
+const NOMS = ['classifyOrderStatus', 'tsCommande', 'montantCommande', 'montantCommandeLu', 'lbcAnnulee', 'lbcFinalisee', 'lbcExpediee', 'venteFinalisee', 'commandeEbayEngagee', 'montantRecuEbay', 'ymDeTs', 'indexDeclarations', 'moisDeclare', 'ventesDeclarables', 'ventesFaites', 'compteEcarte'];
 const lire = (f) => { try { return fs.readFileSync(path.join(R, f), 'utf8'); } catch (_) { return null; } };
 // Les déclarations de premier niveau `const X = …` d'un fichier, par nom.
 function declarations(src, plugins) {
@@ -78,6 +83,7 @@ if (process.argv.includes('--recopie')) {
   // Les règles de l'APP, exécutées telles quelles.
   const ctxApp = vm.createContext({});
   for (const n of NOMS) { if (declApp[n]) try { vm.runInContext(declApp[n].texte + `\nthis.${n} = ${n};`, ctxApp); } catch (_) {} }
+  try { const vcR = await import('file://' + path.join(R, 'api', '_lib', 'vestiaire-regle.js')); for (const k of Object.keys(vcR)) ctxApp[k] = vcR[k]; } catch (e) { dit(false, 'api/_lib/vestiaire-regle.js se charge', e.message); }
   let srv = {}, bil = {}, pushLib = {};
   try { srv = await import('file://' + path.join(R, 'api', '_lib', 'ventes-regle.js')); } catch (e) { dit(false, 'api/_lib/ventes-regle.js se charge', e.message); }
   try { bil = await import('file://' + path.join(R, 'api', '_lib', 'bilan-semaine.js')); } catch (e) { dit(false, 'api/_lib/bilan-semaine.js se charge', e.message); }

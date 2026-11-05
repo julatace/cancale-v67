@@ -28,7 +28,7 @@ const ONGLETS = DEMO.comptes.map((c) => ({
 }));
 
 const CSS_CARTE = `
-.cj{position:relative;width:100%;max-width:500px;font-variant-numeric:normal;font-feature-settings:normal;border-radius:12px;background:${K.card};border:1px solid ${K.line2};box-shadow:${REFLET},${OMBRE_CARTE};overflow:hidden;text-align:left;color:${K.text};font-family:'Inter',system-ui,sans-serif}
+.cj{position:relative;width:100%;max-width:500px;font-variant-numeric:normal;font-feature-settings:normal;border-radius:12px;background:${K.card};border:1px solid ${K.line2};box-shadow:${REFLET},${OMBRE_CARTE};overflow:hidden;text-align:left;color:${K.text};font-family:-apple-system,BlinkMacSystemFont,'Inter',system-ui,sans-serif}
 .cj-onglets{position:relative;height:36px;background:${K.surface};padding:0 12px;display:flex;align-items:flex-end;border-bottom:1px solid ${K.line}}
 .cj.compact .cj-onglets{height:34px}
 .cj-onglet{position:relative;height:28px;display:flex;align-items:center;gap:6px;padding:0 12px;border-radius:8px 8px 0 0;font-size:12px;font-weight:500;color:${K.muted};background:${K.card2};border:1px solid ${K.line};border-bottom:none;white-space:nowrap;flex-shrink:0}
@@ -36,16 +36,16 @@ const CSS_CARTE = `
 .cj-onglet.actif{background:${K.card};color:${K.text};border-color:${K.line2};margin-bottom:-1px;height:29px}
 .cj-onglet i{width:6px;height:6px;border-radius:2px;flex-shrink:0}
 .cj-onglet .cj-lib{display:flex;align-items:center;gap:6px}
-.cj-onglet .cj-lib.vrm{position:absolute;left:12px;top:0;bottom:0;font-family:'Space Grotesk','Inter',sans-serif;font-weight:700;letter-spacing:.04em;color:${K.text}}
-.cj-onglet .cj-lib.vrm img{width:14px;height:14px;border-radius:4px;display:block}
+.cj-onglet .cj-lib.vrm{position:absolute;left:12px;top:0;bottom:0;font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;font-weight:700;letter-spacing:.04em;color:${K.text}}
+.cj-onglet .cj-lib.vrm img{width:14px;height:14px;border-radius:6px;display:block}
 .cj-corps{position:relative;padding:12px 0 6px}
 .cj-tete{display:flex;align-items:center;justify-content:space-between;gap:10px;height:40px;padding:0 16px}
 .cj-titre{display:flex;align-items:center;gap:8px;min-width:0}
-.cj-titre b{font-family:'Space Grotesk','Inter',sans-serif;font-size:18px;font-weight:600;letter-spacing:-.01em;color:${K.text}}
-.cj-ex{font-size:12px;font-weight:500;color:${K.faint};border:1px solid ${K.line2};border-radius:8px;padding:1px 7px;line-height:16px}
+.cj-titre b{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;font-size:17px;font-weight:600;letter-spacing:-.01em;color:${K.text}}
+.cj-ex{font-size:12px;font-weight:500;color:${K.faint};border:1px solid ${K.line2};border-radius:12px;padding:1px 7px;line-height:16px}
 .cj-pile{display:flex;align-items:center;gap:8px;flex-shrink:0}
 .cj-pile .p{display:flex}
-.cj-pile .p span{width:18px;height:18px;border-radius:5px;background:${K.card2};border:1px solid ${K.line2};display:flex;align-items:center;justify-content:center}
+.cj-pile .p span{width:18px;height:18px;border-radius:6px;background:${K.card2};border:1px solid ${K.line2};display:flex;align-items:center;justify-content:center}
 .cj-pile .p span + span{margin-left:-6px}
 .cj-pile .p span i{width:7px;height:7px;border-radius:2px}
 .cj-pile em{font-style:normal;font-size:13px;color:${K.muted};white-space:nowrap}
@@ -53,29 +53,29 @@ const CSS_CARTE = `
 .cj-derniere span{position:absolute;left:16px;right:16px;top:0;overflow:hidden;text-overflow:ellipsis}
 .cj-filet{height:1px;background:${K.line};margin:8px 16px}
 .cj-ligne{position:relative;display:flex;align-items:center;gap:12px;width:100%;min-height:56px;padding:8px 16px;border:none;background:transparent;color:${K.text};text-align:left;cursor:pointer;font:inherit;-webkit-tap-highlight-color:transparent;touch-action:manipulation;border-radius:0;transition:background-color 160ms ease}
-.cj-ligne:focus-visible{outline:2px solid ${K.accent};outline-offset:-2px;border-radius:8px}
-@media (hover:hover) and (pointer:fine){.cj-ligne:hover{background:rgba(18,27,44,.035)}.cj-ligne:hover .cj-chev{transform:translateX(2px)}}
-.cj-ligne:active{background:rgba(18,27,44,.06)}
+.cj-ligne:focus-visible{outline:2px solid ${K.accent};outline-offset:-2px;border-radius:12px}
+@media (hover:hover) and (pointer:fine){.cj-ligne:hover{background:rgba(0,0,0,.035)}.cj-ligne:hover .cj-chev{transform:translateX(2px)}}
+.cj-ligne:active{background:rgba(0,0,0,.06)}
 .cj-eclair{position:absolute;inset:0;background:${K.accentSoft};pointer-events:none}
 .cj-txt{position:relative;flex:1;min-width:0}
 .cj-txt b{display:block;font-size:15px;font-weight:600;line-height:1.3}
 .cj-sous{position:relative;display:block;font-size:13px;color:${K.muted};line-height:1.35;height:18px;margin-top:2px}
 .cj-sous span{position:absolute;left:0;right:0;top:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.cj-nb{position:relative;width:38px;height:28px;flex-shrink:0;font-family:'Space Grotesk','Inter',sans-serif;font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;color:${K.text}}
+.cj-nb{position:relative;width:38px;height:28px;flex-shrink:0;font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;color:${K.text}}
 .cj-nb span{position:absolute;right:0;top:0;line-height:28px}
 .cj-nb .cj-point{position:absolute;right:20px;top:50%;margin-top:-3.5px;width:7px;height:7px;border-radius:50%;background:${K.warn};line-height:0}
-.cj-chev{position:relative;color:${K.faint};font-size:18px;line-height:1;transition:transform 160ms ${COURBE_SORTIE};flex-shrink:0}
+.cj-chev{position:relative;color:${K.faint};font-size:17px;line-height:1;transition:transform 160ms ${COURBE_SORTIE};flex-shrink:0}
 .cj-recu{min-height:48px}
 .cj-recu .cj-txt{display:flex;align-items:baseline;gap:10px}
-.cj-recu .cj-txt b{display:inline;font-size:14px;font-weight:500;color:${K.muted}}
-.cj-recu .cj-txt strong{font-family:'Space Grotesk','Inter',sans-serif;font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;color:${K.text}}
+.cj-recu .cj-txt b{display:inline;font-size:15px;font-weight:500;color:${K.muted}}
+.cj-recu .cj-txt strong{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;color:${K.text}}
 .cj-recu .cj-dec{position:relative;font-size:13px;font-weight:500;color:${K.muted};white-space:nowrap}
-.cj-notif{position:absolute;left:12px;right:12px;top:8px;z-index:3;background:${K.card2};border:1px solid ${K.line2};border-radius:10px;box-shadow:0 1px 2px rgba(18,27,44,.08),0 12px 30px rgba(18,27,44,.16);padding:9px 12px 10px}
+.cj-notif{position:absolute;left:12px;right:12px;top:8px;z-index:3;background:${K.card2};border:1px solid ${K.line2};border-radius:12px;box-shadow:0 1px 2px rgba(0,0,0,.08),0 12px 30px rgba(0,0,0,.16);padding:9px 12px 10px}
 .cj-notif .l1{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:${K.text}}
 .cj-notif .l1 i{width:7px;height:7px;border-radius:2px;flex-shrink:0}
 .cj-notif .l1 em{margin-left:auto;font-style:normal;font-size:12px;font-weight:500;color:${K.faint};white-space:nowrap}
 .cj-notif .l2{display:flex;align-items:center;gap:6px;margin-top:5px;font-size:13px;color:${K.muted};white-space:nowrap}
-.cj-puce{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:8px;font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;color:${K.text};background:rgba(61,123,255,.18);border:1px solid rgba(61,123,255,.55);white-space:nowrap}
+.cj-puce{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:12px;font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;color:${K.text};background:rgba(0,113,227,.18);border:1px solid rgba(0,113,227,.55);white-space:nowrap}
 .cj-vol{position:absolute;left:0;top:0;z-index:5;pointer-events:none;border-color:${K.accent}}
 .cj.compact .cj-tete{padding:0 14px}
 .cj.compact .cj-derniere,.cj.compact .cj-ligne{padding-left:14px;padding-right:14px}
@@ -86,7 +86,7 @@ const CSS_CARTE = `
 .cj.compact .cj-sous{letter-spacing:-.005em}
 .cj.etroit .cj-tete{gap:6px;padding:0 12px}
 .cj.etroit .cj-titre{gap:6px}
-.cj.etroit .cj-titre b{font-size:16px}
+.cj.etroit .cj-titre b{font-size:17px}
 .cj.etroit .cj-ex{padding:1px 5px}
 .cj.etroit .cj-pile{gap:6px}
 .cj.etroit .cj-derniere,.cj.etroit .cj-ligne{padding-left:12px;padding-right:12px}

@@ -1,6 +1,7 @@
 import './_lib/sans-bruit.js';
 import {etatColisDepuisTexte,conserverRetrait,annonceArriveeFuture} from './_lib/etat-colis-email.js';
 import { accuseEmail, empreinteEmail } from "./_lib/accuse-email.js";
+import { resumeClassement, texteBorne } from "./_lib/resume-email.js";
 // api/email-inbound.js
 // ────────────────────────────────────────────────────────────────────────────
 // PIPELINE EMAIL UNIVERSEL (remplace l'Apps Script Gmail, marche pour TOUS les
@@ -22,6 +23,9 @@ import { accuseEmail, empreinteEmail } from "./_lib/accuse-email.js";
 
 import crypto from 'crypto';
 import { sendPushToAll, pushCategorieActive } from './_lib/push.js';
+import { texteArrivee } from './_lib/notif-textes.js';
+import { colisPerdu } from './_lib/etat-colis-email.js';
+import { DESTINATIONS, conversationDeLEmail } from './_lib/lien-notif.js';
 import { stampBordereau } from './_lib/stamp.js';
 
 import { contexteVendeur, proprietaireCourant, duVendeur as duVendeurLib } from './_lib/owner.js';
@@ -31,15 +35,20 @@ import { modifierNeutre } from './_lib/neutre-cas.js';
 import { normaliserEntrant, formeRecue, demasquerRelais } from './_lib/lire-email.js';
 import { sbCle } from './_lib/cle.js';
 import { numeroDuTitreApresCoupure, lireMarqueur, archiveDe, estArchive } from './_lib/numerotation.js';
-import { numerosDeVente, annoncesEbayParNumero, annoncesLbcParNumero, doubleVenteApprise, notificationDoubleVente } from './_lib/double-vente.js';
+import { numerosDeVente, annoncesEbayParNumero, annoncesLbcParNumero, annoncesVcEnLigne, annoncesVintedParNumero, numerosRetiresEbay, doubleVenteApprise, notificationDoubleVente } from './_lib/double-vente.js';
+import { numVcVente, numerosVcAvecLiens } from './_lib/vestiaire-regle.js';
 import { normaliserRegistre, comptesActifs } from './_lib/ebay.js';
 import { arriveLeAuRangement } from './_lib/arrivee-colis.js';
-import { limiteRetraitDepuisTexte, lieuDepuisExtrait, LIEU_AU_FUTUR } from './_lib/retrait-colis.js';
-import { codeRetraitTournure } from './_lib/code-retrait-email.js';
+import { limiteRetraitDepuisTexte, lieuDepuisExtrait, lieuSousEnTete, LIEU_AU_FUTUR } from './_lib/retrait-colis.js';
+import { codeRetraitTournure, nombreSurSaLigne, codeImpossible } from './_lib/code-retrait-email.js';
 import { decoderEntitesHtml } from './_lib/entites-html.js';
 import { transactionDuRecu } from './_lib/recu-achat.js';
 import { suiviDuSujet, finsDesLignes, sortiParSuivis, SELECT_TRANSP_META, ligneTranspDeMeta } from './_lib/suivi-colis.js';
 import { modifierCas } from './_lib/suivi-vinted.js';
+import { estEmailVestiaire, lireEmailVenteVc, fusionnerVenteEmailVc } from './_lib/vestiaire-email.js';
+import { lienNotif } from './_lib/lien-notif.js';
+import { lireArriveeAchat, cleArrivee, ligneArrivee, conversationVinted } from './_lib/achat-arrive-relais.js';
+import { estConfirmationTransfert, lireConfirmationTransfert, authentifieGoogle, sansLienConfirmation, idCodeGmail } from './_lib/transfert-gmail.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
@@ -143,14 +152,25 @@ async function repondre(res, code, corps) {
   // Aucun corps ni document dans cet index, et jamais de propriétaire deviné.
   if (contexte.reception && proprietaireCourant()) {
     const incident = code >= 400 || ecritureRatee();
-    const verification = corps.quarantaine || corps.garde || corps.type === "ignoré";
-    await supabaseUpsert([{id: `email_reception_${empreinteEmail(contexte.messageId)}`, data: {
+    // (31 oct.) CE QUE VRM A FAIT de cet email, en quelques dizaines d'octets
+    // (api/_lib/resume-email.js) : le journal « Tes emails, ce que VRM en a
+    // fait » le dit en une phrase. Une raison « à vérifier » (N° retrouvé par le
+    // titre, reçu sans n° de transaction…) range l'email « à vérifier ».
+    const resume = resumeClassement(incident ? 500 : code, corps, contexte.resumeExtra);
+    const verification = corps.quarantaine || corps.garde || corps.type === "ignoré" || !!resume.av;
+    const cle = empreinteEmail(contexte.messageId);
+    const texte = !incident ? texteBorne(contexte.texte) : '';
+    await supabaseUpsert([{id: `email_reception_${cle}`, data: {
       ...contexte.reception, at: new Date().toISOString(),
       etat: incident ? "erreur" : verification ? "a-verifier" : "integre",
       type: String(corps.type || "information"),
       raison: incident ? "Le rangement n’a pas été confirmé. Le collecteur doit réessayer." : verification ? "Le contenu est conservé pour vérification, sans intégration métier complète." : "",
       documentsVerifies: false, suppressionAutorisee: false,
-    }}]);
+      resume,
+    }},
+    // Le texte lisible (borné, sans HTML) vit dans SA ligne : la liste ne le lit
+    // jamais, « Voir le texte » le lit un email à la fois.
+    ...(texte ? [{ id: `email_texte_${cle}`, data: { texte, at: new Date().toISOString() } }] : [])]);
   }
   if (code < 400 && ecritureRatee()) {
     res.status(503).json({
@@ -433,46 +453,31 @@ function buildInvoiceHtml(cfg, sale, number, dateStr) {
 }
 
 async function createProInvoice(sale, acc, cfg, now, attachments) {
-  // L'IDENTITÉ d'une facture est la transaction quand l'email la porte (pièce
-  // jointe « Formulaire-retour-commande-{tx} ») : deux ventes au même pseudo,
-  // prix et titre ne partagent plus une facture. Sans transaction : l'ancienne clé.
-  const key = sale.transaction ? `tx${sale.transaction}` : shortHash(`${sale.pseudo}|${sale.prix}|${(sale.designation || '').slice(0, 40)}`);
-  // ⚠️⚠️ REVUE DU 17 OCTOBRE (`scripts/audit-routes-revue.cjs`, A et B).
-  //  · Le MÊME email revient (un 503 est fait pour ça, le script Gmail renvoie
-  //    tout le fil) : la facture déjà émise recevait un NOUVEAU numéro et
-  //    repassait « à envoyer » — le script l'envoyait une seconde fois à
-  //    l'acheteur. Une facture émise ne change plus jamais de numéro.
-  //  · Compteur ILLISIBLE : `null` valait 0, la route émettait « FA-AAAA-0001 »
-  //    (déjà donné) et RÉÉCRIVAIT le compteur à 1 — toutes les factures
-  //    suivantes reprenaient des numéros déjà émis. Pas su ⇒ aucune facture, et
-  //    la route répond 503 (l'email reviendra).
+  // ⚠️⚠️ (2 novembre — la facture Pro refaite, api/_lib/facture-pro.js) L'email
+  //    de vente ne NUMÉROTE plus rien. Un numéro de facture est une pièce
+  //    comptable : il se donne quand le vendeur ÉMET la facture (son clic sur la
+  //    vente), d'une séquence sans trou. Ici on ne garde que ce que l'email
+  //    apporte et que rien d'autre ne donne : l'acheteur (nom, adresse, e-mail,
+  //    déjà rangés dans `email_sale_*`) et le formulaire de retour de Vinted, que
+  //    l'envoi joindra à la facture. Les 5 brouillons numérotés avant le 2 nov.
+  //    gardent leur numéro (la facture émise le reprend).
+  if (!sale.transaction) return null;               // l'identité d'une facture est la transaction
+  const key = `tx${sale.transaction}`;
   const deja = await supabaseLireRow(`email_invoice_${key}`);
   if (!deja.lu) { marquerEcritureRatee(); return null; }
-  if (deja.data && deja.data.number) return { number: deja.data.number, status: deja.data.status || 'draft', deja: true };
-  const cpt = await supabaseLireRow('vrm_invoice_counter');
-  if (!cpt.lu) { marquerEcritureRatee(); return null; }
-  const lu = cpt.data == null ? 0 : parseInt(cpt.data, 10);
-  if (!Number.isFinite(lu) || lu < 0) { marquerEcritureRatee(); return null; }
-  // Numéro séquentiel : compteur partagé dans Supabase (jamais réutilisé).
-  const counter = lu + 1;
-  if (!(await supabaseUpsert([{ id: 'vrm_invoice_counter', data: counter }]))) return null;
-  const number = `${cfg.prefixe || 'FA'}-${new Date().getFullYear()}-${('0000' + counter).slice(-4)}`;
-  const dateStr = new Date().toLocaleDateString('fr-FR');
-  const html = buildInvoiceHtml(cfg, sale, number, dateStr);
-  const status = cfg.autoSend ? 'queued' : 'draft';
-  // Le 2e document Vinted Pro (formulaire de retour), joint à la facture envoyée
-  // à l'acheteur. On garde ses octets jusqu'à l'envoi (puis `facture-envoyee` les
-  // purge — hygiène d'égress). Absent ⇒ chaîne vide, l'app le signale.
+  if (deja.data && (deja.data.number || deja.data.contenu)) return { number: deja.data.number || '', status: deja.data.status || 'draft', deja: true };
   const retour = formulaireRetourDe(attachments);
-  await supabaseUpsert([{ id: `email_invoice_${key}`, data: {
-    type: 'facture_pro', number, status,
+  const ok = await supabaseUpsert([{ id: `email_invoice_${key}`, data: {
+    ...(deja.data || {}),
+    type: 'facture_pro', number: '', status: 'draft',
     designation: sale.designation || '', prix: sale.prix || '',
     buyerName: sale.nomComplet || '', buyerEmail: sale.email, buyerAddress: sale.adresse || '',
-    numero: sale.numero || '', pseudo: sale.pseudo || '', transaction: sale.transaction || '',
-    account: acc.login || '', html, createdAt: now,
+    numero: sale.numero || '', pseudo: sale.pseudo || '', transaction: sale.transaction,
+    account: acc.login || '', createdAt: (deja.data && deja.data.createdAt) || now,
     retourB64: retour ? retour.b64 : '', retourNom: retour ? retour.nom : '',
   } }]);
-  return { number, status, retour: !!retour };
+  if (!ok) return null;
+  return { number: '', status: 'draft', retour: !!retour, prete: true };
 }
 
 // Journal des emails traités (30 derniers, même les « ignorés ») : permet de
@@ -754,24 +759,59 @@ const objetJson = (v) => {
 };
 export async function lireAnnoncesAilleurs() {
   const cl = await baseCloisonnee();
-  if (cl === null || (cl && !proprietaireCourant())) return { ebay: null, lbc: null };
-  const [mainL, reg, ebayL, lbcL, ventesL, comptesLbc] = await Promise.all([
-    lirePagine('id=eq.main&select=mk:data->vrm_numerotation,liens:data->vrm_lbc_liens,fiches:data->vinted_annonce_numeros,liensEbay:data->vrm_ebay_liens'),
+  if (cl === null || (cl && !proprietaireCourant())) return { ebay: null, lbc: null, vc: null, vinted: null, retraitsEbay: null };
+  const [mainL, reg, ebayL, lbcL, ventesL, comptesLbc, vcL, vcV, vL, vP, vS, retL] = await Promise.all([
+    lirePagine('id=eq.main&select=mk:data->vrm_numerotation,liens:data->vrm_lbc_liens,fiches:data->vinted_annonce_numeros,liensEbay:data->vrm_ebay_liens,retirees:data->vrm_annonces_retirees,vcAuto:data->vrm_vc_numeros,vcLiensMain:data->vrm_vc_liens'),
     lirePagine('id=eq.ebay_comptes&select=comptes:data->comptes'),
     lirePagine('id=like.ebay_listings%25&select=id,items:data->items'),
     lirePagine('id=eq.lbc_listings&select=items:data->items'),
     lirePagine('id=eq.lbc_ventes&select=ventes:data->ventes'),
     lirePagine('id=eq.lbc_accounts&select=accounts:data->accounts'),
+    // (1er nov., audit A1) Vestiaire : ses annonces (état, liens posés par VRM) et ses ventes.
+    lirePagine('id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt'),
+    lirePagine('id=eq.vc_ventes&select=ventes:data->ventes'),
+    // (3 nov.) Vinted : dressings captés (projetés : date, compte, annonces), lectures
+    // publiques et suppressions vues — la règle « en ligne » de l'app
+    // (api/_lib/enligne-regle.js, copie refabriquée). Mesuré le 3 nov. : 17 lignes
+    // `harvest_*_listings` de 28 Ko au plus.
+    lirePagine('id=like.harvest_%25_listings&select=id,cap:data->>capturedAt,uid:data->uid,items:data->payload->items'),
+    lirePagine('id=like.harvest_%25_enligne&select=id,cap:data->>capturedAt,complet:data->complet,ids:data->ids,items:data->items'),
+    lirePagine('id=like.harvest_%25_supprimees&select=id,ids:data->ids'),
+    // Le journal du retrait automatique d'eBay (api/ebay.js) : « retiré d'eBay ».
+    lirePagine('id=eq.ebay_retraits_auto&select=items:data->items'),
   ]);
+  const retraitsEbay = retL ? { items: retL[0] && Array.isArray(retL[0].items) ? retL[0].items : [] } : null;
+  // Vestiaire ne dépend pas du marqueur 013 (ses annonces sont nées après la
+  // coupure) : une lecture ratée ⇒ `null` (il ne dit RIEN).
+  let vc = null;
+  if (vcL && vcV) {
+    const lst = vcL[0] ? { items: objetJson(vcL[0].items), liens: objetJson(vcL[0].liens), capturedAt: vcL[0].capturedAt } : null;
+    const vv = vcV[0] ? objetJson(vcV[0].ventes) : null;
+    // (3 nov.) + les N° que VRM a donnés aux annonces Vestiaire et la liaison
+    // Vinted ↔ Vestiaire posée par son clic (`main`) : la même identité que l'app.
+    const m0 = mainL && mainL[0] ? mainL[0] : null;
+    const autoVc = numerosVcAvecLiens((m0 && objetJson(m0.vcAuto)) || {}, (m0 && objetJson(m0.vcLiensMain)) || {});
+    if (lst && lst.items !== undefined && lst.liens !== undefined && vv !== undefined) vc = annoncesVcEnLigne({ items: lst.items || {}, liens: lst.liens || {}, capturedAt: lst.capturedAt, auto: autoVc }, vv || {}).parNum;
+  }
   // Le marqueur 013 : illisible ⇒ aucune traduction possible ⇒ rien.
-  if (!mainL) return { ebay: null, lbc: null };
+  if (!mainL) return { ebay: null, lbc: null, vc, vinted: null, retraitsEbay };
+  const fiches = mainL[0] ? objetJson(mainL[0].fiches) : null;
+  // Vinted : fiches (N° par identifiant d'annonce) et dressings LUS ; « pas su » ⇒ rien.
+  // Les lectures publiques ratées passent « pas su » à la règle (elle sait le traiter).
+  let vinted = null;
+  if (fiches !== undefined && vL && vS) {
+    const retirees = mainL[0] ? objetJson(mainL[0].retirees) : null;
+    const supp = new Map();
+    for (const r of vS) { const k = /^harvest_(\d+)_supprimees$/.exec(String((r && r.id) || '')); const ids = objetJson(r && r.ids); if (k && ids) supp.set(k[1], ids); }
+    const lignesL = vL.filter((r) => /^harvest_\d+_listings$/.test(String((r && r.id) || ''))).map((r) => ({ ...r, items: typeof r.items === 'string' ? (() => { try { return JSON.parse(r.items); } catch (_) { return null; } })() : r.items }));
+    if (retirees !== undefined && lignesL.every((r) => r.items == null || Array.isArray(r.items))) vinted = annoncesVintedParNumero(lignesL, vP ? vP.filter((r) => /^harvest_\d+_enligne$/.test(String((r && r.id) || ''))) : null, supp, fiches || {}, retirees || {});
+  }
   const mk = mainL[0] ? objetJson(mainL[0].mk) : null;
-  if (mk === undefined) return { ebay: null, lbc: null };
+  if (mk === undefined) return { ebay: null, lbc: null, vc, vinted, retraitsEbay };
   const liens = mainL[0] ? objetJson(mainL[0].liens) : null;
   let ebay = null;
   if (reg && ebayL) {
     const ids = comptesActifs(normaliserRegistre(reg[0] || null)).map((c) => 'ebay_listings' + c.suffixe);
-    const fiches = mainL[0] ? objetJson(mainL[0].fiches) : null;
     const liensEbay = mainL[0] ? objetJson(mainL[0].liensEbay) : null;
     // Fiches illisibles : on ne sait pas si un SKU désigne encore sa paire ⇒ rien.
     if (fiches !== undefined && liensEbay !== undefined) ebay = annoncesEbayParNumero(ebayL, ids, mk, fiches || {}, liensEbay || {});
@@ -783,43 +823,85 @@ export async function lireAnnoncesAilleurs() {
     const accounts=comptesLbc[0]?objetJson(comptesLbc[0].accounts):null;
     if (items !== undefined && ventes !== undefined && accounts !== undefined) lbc = annoncesLbcParNumero(items || {}, ventes || {}, liens || {}, mk, accounts||{});
   }
-  return { ebay, lbc };
+  return { ebay, lbc, vc, vinted, retraitsEbay };
 }
-// Une vente Vinted vient d'être apprise : la paire est-elle PROUVÉE en vente
-// ailleurs ? Rien sans N°, rien sur « pas su », rien en rejeu en lot, rien si
-// la catégorie est coupée (on ne lit même pas) ; une seule fois (pushOnce).
-async function notifierDoubleVente(numero, titre) {
+// Une vente vient d'être apprise sur `venduSur` (vinted · vestiaire ; leboncoin et
+// ebay le jour où leur e-mail de vente est appris — aucun n'est arrivé au
+// 3 nov.) : l'article est-il PROUVÉ en ligne ailleurs ? Rien sans N°, rien sur
+// « pas su », rien en rejeu en lot, rien si la famille Ventes est coupée (on ne
+// lit même pas) ; une seule fois par vente (pushOnce). Le retrait eBay
+// automatique n'est JAMAIS lancé d'ici (il vit dans l'app) : s'il a déjà eu lieu,
+// on le dit (« retiré d'eBay »).
+async function notifierDoubleVente(numero, titre, venduSur = 'vinted') {
   try {
     if ((contexteVendeur.getStore() || {}).silence) return;
-    if (!numerosDeVente(numero).length) return;
+    const nums = numerosDeVente(numero);
+    if (!nums.length) return;
     if (!(await pushCategorieActive('doublevente'))) return;
-    const { ebay, lbc } = await lireAnnoncesAilleurs();
-    const notif = notificationDoubleVente(doubleVenteApprise(numero, ebay, lbc), titre);
+    const { ebay, lbc, vc, vinted, retraitsEbay } = await lireAnnoncesAilleurs();
+    const retires = retraitsEbay ? numerosRetiresEbay(retraitsEbay, Date.now() - 48 * 3600e3) : new Set();
+    const notif = notificationDoubleVente(doubleVenteApprise(numero, ebay, lbc, vc, vinted, venduSur), titre, { venduSur, retiresEbay: retires, numeros: nums });
     if (notif) await pushOnce(notif, 'doublevente');
   } catch (_) {}
 }
+// Le N° d'une vente Vestiaire, par IDENTITÉ seulement (lien posé par VRM sur
+// l'annonce, référence VRM-n°, N° donné par VRM — `numVcVente`, la règle de
+// l'app). Lecture ratée ⇒ '' (rien).
+async function numeroVenteVc(v) {
+  const [lst, m] = await Promise.all([
+    lirePagine('id=eq.vc_listings&select=liens:data->liens'),
+    lirePagine('id=eq.main&select=auto:data->vrm_vc_numeros,liensMain:data->vrm_vc_liens'),
+  ]);
+  if (!lst || !m) return '';
+  const liens = lst[0] ? objetJson(lst[0].liens) : null, auto = m[0] ? objetJson(m[0].auto) : null;
+  if (liens === undefined || auto === undefined) return '';
+  // (3 nov.) La liaison Vinted ↔ Vestiaire posée par son clic (`vrm_vc_liens`).
+  const liensMain = m[0] ? objetJson(m[0].liensMain) : null;
+  return numVcVente(v, liens || {}, numerosVcAvecLiens(auto || {}, liensMain || {}));
+}
 
-// Prix d'achat d'une paire d'après le titre de l'annonce (pour le Copilote
-// d'offres). Renvoie un nombre, ou null si introuvable / titre ambigu (plusieurs
-// paires même titre avec des prix d'achat différents).
-async function findBuyPriceByTitle(title) {
-  if (!title) return null;
+// Prix d'achat d'une paire d'après le TITRE de l'annonce (pour le conseil d'une
+// offre reçue par email). ⚠️ (1er nov., audit des parcours A7) L'email d'offre ne
+// porte AUCUNE identité de la paire (ni annonce, ni transaction) : son titre est
+// une RESSEMBLANCE (§5 — 22 % des ventes ont un titre en double). Le résultat
+// n'est donc qu'une PROPOSITION, jamais un fait :
+//   · l'ambiguïté se juge sur TOUTES les fiches de ce titre, AVANT d'écarter
+//     celles sans prix (une homonyme sans prix d'achat rend le cas ambigu —
+//     avant, elle était ignorée et le prix de l'autre paire était donné) ;
+//   · rend { etat: 'unique', prix } (une seule fiche, prix connu), 'sans-prix'
+//     (une seule fiche, prix pas saisi), 'ambigu' (plusieurs fiches), 'aucune',
+//     ou null (pas su : lecture ratée).
+// Pure : `jugerPrixParTitre` (exécutée par `audit-flux-divers.cjs`).
+export function jugerPrixParTitre(title, map) {
+  const norm = (s) => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  const t = norm(title); if (!t) return { etat: 'aucune' };
+  const memes = Object.values(map || {}).filter((e) => e && norm(e.title) === t);
+  if (!memes.length) return { etat: 'aucune' };
+  if (memes.length > 1) return { etat: 'ambigu', n: memes.length };
+  const brut = memes[0].buyPrice;
+  const b = brut == null || String(brut).trim() === '' ? NaN : parseFloat(String(brut).replace(',', '.'));
+  return Number.isFinite(b) && b > 0 ? { etat: 'unique', prix: b } : { etat: 'sans-prix' };
+}
+async function prixAchatParTitre(title) {
+  if (!title) return { etat: 'aucune' };
   try {
-    const norm = s => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
-    const t = norm(title); if (!t) return null;
     const res = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_annonce_numeros`), {
       headers: { ...sbCle(SUPABASE_KEY) },
     });
     if (!res.ok) return null;
     const rows = await res.json();
-    const map = (rows[0] && rows[0].vinted_annonce_numeros) || {};
-    const matches = Object.values(map).filter(e => e && norm(e.title) === t && e.buyPrice != null && String(e.buyPrice).trim() !== '');
-    if (!matches.length) return null;
-    const distinct = [...new Set(matches.map(e => String(e.buyPrice)))];
-    if (distinct.length > 1) return null; // ambigu → on ne devine pas
-    const b = parseFloat(String(matches[0].buyPrice).replace(',', '.'));
-    return isNaN(b) ? null : b;
+    return jugerPrixParTitre(title, (rows[0] && rows[0].vinted_annonce_numeros) || {});
   } catch (_) { return null; }
+}
+// La phrase du conseil, dans la notification. Sans identité, AUCUN « Accepte :
+// +X € net » : au mieux « une paire à ce titre a coûté X € — vérifie que c'est
+// elle ». Pure, exécutée par `audit-flux-divers.cjs`.
+export function phraseConseilOffre(juge, offre) {
+  const o = Number(offre);
+  if (!juge || !juge.etat) return ' — expire en 24h.';
+  if (juge.etat === 'ambigu') return ` — ${juge.n || 'plusieurs'} paires portent ce titre dans VRM : ouvre la conversation pour savoir laquelle avant de répondre.`;
+  if (juge.etat === 'unique' && Number.isFinite(o)) return ` — une paire à ce titre a coûté ${Math.round(juge.prix)} € dans VRM (reconnue au titre seulement) : vérifie que c'est elle avant de répondre.`;
+  return ' — expire en 24h.';
 }
 
 // ── Emails transporteurs (Mondial Relay / Chronopost) : n° de suivi + étape ──
@@ -894,23 +976,38 @@ export function parseCarrierEmail(mail, carrier, recuLe = new Date().toISOString
   //    Aucun transporteur observé n'utilise de lettres. On n'accepte que des chiffres.
   // (17 oct.) « Votre code de retrait EST 123456 » / « … sera 123456 » aussi :
   // un petit verbe entre le libellé et le nombre faisait manquer le code.
-  let code = (all.match(/(?:code\s+(?:de\s+)?(?:retrait|r[ée]ception|livraison)|pin)[\s*_\-–—]*(?:(?:est|sera)\b)?[\s*_\-–—]*[:：]?[\s*_\-–—]*(\d{4,10})\b/i) || [])[1] || null;
+  // (1er nov., audit des codes de retrait) Trois défauts mesurés en exécutant
+  // cette fonction (scripts/audit-codes-retrait.cjs) :
+  //   · « pin » était cherché DANS les mots (« Offre Lapin 2026 » au-dessus du
+  //     vrai code donnait le code 2026) ⇒ `\bpin\b` ;
+  //   · un libellé seul sur sa ligne prenait le nombre de la ligne d'après,
+  //     même « 56000 Vannes » ⇒ `nombreSurSaLigne` (le nombre doit y être SEUL) ;
+  //   · DEUX codes différents dans le même e-mail : le premier était pris, sans
+  //     savoir s'il est celui de CE n° de suivi ⇒ aucun (« code pas lu », l'app
+  //     renvoie à l'e-mail — mieux vaut un blanc qu'un faux).
+  const codesLus = [...new Set([...all.matchAll(/(?:code\s+(?:de\s+)?(?:retrait|r[ée]ception|livraison)|\bpin\b)[\s*_\-–—]*(?:(?:est|sera)\b)?[\s*_\-–—]*[:：]?[\s*_\-–—]*(\d{4,10})\b/gi)]
+    .filter((m) => nombreSurSaLigne(all, m)).map((m) => m[1]))];
+  const codesMultiples = codesLus.length > 1;
+  let code = codesLus.length === 1 ? codesLus[0] : null;
   // (22 oct.) Chronopost Pickup : « communiquez le code de retrait SUIVANT au
   // commerçant : 123456 » — règle partagée avec l'app (api/_lib/code-retrait-email.js).
-  if (!code) code = codeRetraitTournure(all) || null;
-  if (!code) {
+  if (!code && !codesMultiples) code = codeRetraitTournure(all) || null;
+  if (!code && !codesMultiples) {
     const m = all.match(/\bcode\s*[:\-]\s*(\d{4,10})\b/i);
     // garde-fou : ne pas confondre avec un code postal
-    if (m && !/postal/i.test(all.slice(Math.max(0, m.index - 14), m.index + 4))) code = m[1];
+    if (m && nombreSurSaLigne(all, m) && !/postal/i.test(all.slice(Math.max(0, m.index - 14), m.index + 4))) code = m[1];
   }
   // ⚠️ VINTED GO : code ALPHANUMÉRIQUE « C49341 » (mesuré sur un vrai email,
   //    2 oct. : « saisis le code suivant : C49341 »). On n'acceptait que des
   //    CHIFFRES — pour ne pas capter le mot « suivant » (bug Chronopost). On
   //    autorise donc 1-2 LETTRES SUIVIES de chiffres (« suivant », tout lettres,
   //    ne peut pas matcher) et seulement près d'un déclencheur « code ».
-  if (!code) {
-    const m = all.match(/(?:code\s+(?:de\s+)?(?:retrait|r[ée]ception|livraison|suivant)|saisis?\s+le\s+code(?:\s+suivant)?)[\s*_:：\-–—]*([A-Z]\d{3,10})\b/i);
-    if (m) code = m[1].toUpperCase();
+  // (1er nov.) Le commentaire dit « 1-2 lettres » mais le motif n'en prenait
+  // qu'une, et un code tout en chiffres après « saisis le code suivant » était
+  // manqué : la même forme que l'extension (`CODE_APRES`) et l'app (`codeRetrait`).
+  if (!code && !codesMultiples) {
+    const m = all.match(/(?:code\s+(?:de\s+)?(?:retrait|r[ée]ception|livraison|suivant)|saisis?\s+le\s+code(?:\s+suivant)?)[\s*_:：\-–—]*([A-Z]{1,2}\d{3,10}|\d{4,10})\b/i);
+    if (m && nombreSurSaLigne(all, m)) code = m[1].toUpperCase();
   }
   // ── Consigne Pickup / casier automatique (Chronopost Pickup) : le retrait se
   //    fait avec DEUX codes — un « Identifiant » ET un « Code d'ouverture » — (et
@@ -926,10 +1023,10 @@ export function parseCarrierEmail(mail, carrier, recuLe = new Date().toISOString
     //    que la date limite et le lieu, eux, passaient. Au casier, sans ces deux
     //    nombres la porte ne s'ouvre pas.
     const DECOR = "[\\s*_\\-–—]*";
-    const mOuv = all.match(new RegExp(`code${DECOR}d['e’]?${DECOR}ouverture${DECOR}[:：]?${DECOR}(\\d{3,8})`, 'i'));
-    const mId = all.match(new RegExp(`identifiant${DECOR}[:：]?${DECOR}(\\d{3,8})`, 'i'));
-    if (mOuv) code = mOuv[1];   // le code d'ouverture devient le code principal
-    if (mId) code2 = mId[1];    // l'identifiant l'accompagne (les DEUX servent au casier)
+    const mOuv = all.match(new RegExp(`code${DECOR}d['e’]?${DECOR}ouverture${DECOR}[:：]?${DECOR}(\\d{3,8})(?!\\d)`, 'i'));
+    const mId = all.match(new RegExp(`identifiant${DECOR}[:：]?${DECOR}(\\d{3,8})(?!\\d)`, 'i'));
+    if (mOuv && nombreSurSaLigne(all, mOuv)) code = mOuv[1];   // le code d'ouverture devient le code principal
+    if (mId && nombreSurSaLigne(all, mId)) code2 = mId[1];    // l'identifiant l'accompagne (les DEUX servent au casier)
   }
   // Titre de l'article (permet de retrouver la photo côté achats)
   const artTitle = ((all.match(/(?:article|commande|achat)\s*[:\-]\s*([^\n]{4,70})/i) || [])[1] || '').trim() || null;
@@ -939,42 +1036,13 @@ export function parseCarrierEmail(mail, carrier, recuLe = new Date().toISOString
   // Format réel Mondial Relay : « Point Relais » sur sa ligne, puis le nom
   // (Maison de la Presse) et l'adresse (40 Rue du Port / 35260 Cancale)
   // sur les lignes SUIVANTES.
-  {
-    const lines = txt.split('\n').map(l => l.trim());
-    // ⚠️ 30 septembre : les emails « colis disponible » d'un LOCKER Mondial Relay
-    //    (casier 24/7, `consigne` vrai) n'avaient JAMAIS de lieu — mesuré : 5 sur 5
-    //    des Mondial Relay sans lieu étaient des lockers. Même forme que le point
-    //    relais (en-tête sur sa ligne, puis nom et adresse dessous) : on accepte
-    //    donc aussi « Locker », « Locker 24/7 », « Consigne », « Casier ».
-    // ⚠️ « Adresse » seule sur sa ligne AUSSI (Vinted Go, 2 oct. : « Adresse » puis
-    //    « Consigne Vinted Go / Speed Queen - Vannes / 24 Rue Hoche »). `^adresse$`
-    //    strict : « Adresse de livraison » (email d'envoi) ne matche pas.
-    // ⚠️ (23 oct.) « POINT RELAIS® » : le ® en fin de ligne faisait échouer le
-    //    test (mesuré sur le Mondial Relay du 21 octobre : lieu vide, alors que
-    //    « TABA'VAP / 29 Rue Hoche / 56000 Vannes » suivaient). On retire ®™©
-    //    et le gras AVANT de tester l'en-tête.
-    const enTete = (l) => l.replace(/®|™|©|[*_]+/g, ' ').replace(/\s+/g, ' ').trim();
-    const idx = lines.findIndex(l => /^(?:point\s+(?:relais|de\s+retrait)|(?:votre\s+)?locker(?:\s*24\s*\/?\s*7)?|(?:votre\s+)?consigne(?:\s+automatique)?|(?:votre\s+)?casier|adresse)\b[\s:–-]*$/i.test(enTete(l)));
-    if (idx >= 0) {
-      const parts = [];
-      // 4 lignes : nom, rue, code postal + ville (la consigne Vinted Go en a 3
-      // après son en-tête « Adresse » : « Consigne Vinted Go », l'enseigne, la rue).
-      for (let i = idx + 1; i < lines.length && parts.length < 4; i++) {
-        const l = lines[i];
-        if (!l) { if (parts.length) break; else continue; }
-        // (23 oct.) La date limite (« RETRAIT JUSQU'AU 26/10 ») et le pied de
-        // l'e-mail (« Avec 19 000 points de proximité… », l'adresse du siège
-        // MONDIAL RELAY) ne sont pas le lieu : on s'arrête là.
-        if (/horaires|ouvert|lundi|mardi|retrouve|suivez|super\s*pratique|https?:|désabonn|code|colis|retrait|jusqu|avec\s+\d|mondial\s*relay|chronopost|villeneuve\s+d/i.test(l)) break;
-        // (17 oct.) Le gras de la version texte (« *Kusmi Tea* ») n'est pas le lieu.
-        const propre = l.replace(/[*_]+/g, ' ').replace(/\s+/g, ' ').trim();
-        if (propre) parts.push(propre);
-      }
-      if (parts.length) {
-        lieu = parts.join(', ').replace(/®|™|©/g, '').replace(/\s+(super\s*pratique|retrouvez).*$/i, '').replace(/\s{2,}/g, ' ').trim();
-      }
-    }
-  }
+  // ⚠️ 30 septembre : les lockers Mondial Relay (« Locker », « Locker 24/7 »,
+  //    « Consigne », « Casier ») et « Adresse » seule (Vinted Go) ; (23 oct.)
+  //    « POINT RELAIS® » ; (1er nov.) jusqu'à la ligne « CP Ville » ; (2 nov.)
+  //    une ligne vide entre CHAQUE ligne et une rue sans numéro (locker d'une
+  //    autre ville) : la règle vit dans api/_lib/retrait-colis.js (`lieuSousEnTete`),
+  //    la même que l'app relit sur le texte gardé d'un e-mail déjà rangé (§11).
+  { const l = lieuSousEnTete(txt); if (l) lieu = l; }
   if (!lieu) for (const pat of [
     /point\s+relais\s*[:\-]?\s*([^\n]{5,90})/i,
     /(?:disponible|à retirer|retire[rz]?(?:\s+ton\s+colis)?)\s+(?:chez|au|à|dans)\s+([^\n]{5,90})/i,
@@ -1060,6 +1128,12 @@ export function parseCarrierEmail(mail, carrier, recuLe = new Date().toISOString
     const l2 = lieuDepuisExtrait(extraitLieu);
     if (l2) lieu = l2;
   }
+
+  // (1er nov.) Un « code » qui est le n° de suivi du colis ou le code postal du
+  // lieu lu n'en est pas un (api/_lib/code-retrait-email.js, `codeImpossible`,
+  // la même règle relit les lignes déjà rangées) : aucun code plutôt qu'un faux.
+  if (code && codeImpossible(code, { suivi, lieu })) code = null;
+  if (code2 && codeImpossible(code2, { suivi, lieu })) code2 = null;
 
   // (23 oct.) « Information sur votre colis : il sera disponible dans les
   // prochains jours dans votre Relais Pickup » était rangé « disponible », avec
@@ -1362,6 +1436,35 @@ async function chargerRegistreEmails() {
 // déclaré son adresse d'arrivée (`peutReclamer`).
 // Base non cloisonnée (une seule boutique) : on n'arrive jamais ici (voir
 // l'appel), et la forme d'avant reste.
+// (1er nov.) Le code de validation d'un transfert Gmail, rendu à SON vendeur.
+// L'identité : l'adresse source nommée par Gmail, déclarée ET prouvée par un
+// seul vendeur (le registre gardé, la même règle que tous ses emails). Message
+// illisible ou pas signé par Google ⇒ quarantaine que personne ne réclame ;
+// adresse pas (encore) prouvée ⇒ quarantaine réclamable par celui qui la
+// prouvera. Le lien de validation du message n'est rangé nulle part.
+async function rendreCodeTransfert(req, res, corpsBrut, mail, registre, conflits) {
+  const lu = lireConfirmationTransfert(mail);
+  const mailSur = { ...mail, text: sansLienConfirmation(mail.text), html: sansLienConfirmation(mail.html), attachments: [] };
+  const authBrute = corpsBrut && (corpsBrut.authentification || (corpsBrut.headers && (corpsBrut.headers['authentication-results'] || corpsBrut.headers['Authentication-Results'])));
+  // Un rejeu (`__ownerForce`) vient d'une quarantaine réclamable : elle n'a été
+  // rangée avec son adresse source QUE si le message était authentifié.
+  const auth = req.__ownerForce ? true : authentifieGoogle(authBrute);
+  if (!lu || !auth) {
+    await mettreEnQuarantaine(mailSur, [], !lu ? 'confirmation de transfert Gmail illisible' : 'confirmation de transfert Gmail non signée par Google');
+    await repondre(res, 200, { ok: true, quarantaine: true, transfert: { rendu: false, raison: !lu ? 'illisible' : 'non-authentifie' } });
+    return;
+  }
+  const owner = req.__ownerForce ? String(req.__ownerForce) : resoudreProprietaire([lu.source], registre, '', conflits).owner;
+  if (!owner) {
+    await mettreEnQuarantaine(mailSur, [lu.source], "code de transfert Gmail : l'adresse source n'est confirmée par aucun vendeur");
+    await repondre(res, 200, { ok: true, quarantaine: true, transfert: { rendu: false, raison: 'adresse-non-prouvee' } });
+    return;
+  }
+  { const st = contexteVendeur.getStore(); if (st) st.owner = owner; }
+  const ok = await supabaseUpsert([{ id: idCodeGmail(lu.source), data: { adresse: lu.source, code: lu.code, recuLe: new Date().toISOString(), messageId: String(mail.messageId || '').slice(0, 300) } }]);
+  if (!ok) { await repondre(res, 503, { ok: false, erreur: 'base-injoignable', message: "Je n'ai pas pu ranger le code de validation : renvoie-le." }); return; }
+  await repondre(res, 200, { ok: true, type: 'connu-sans-action', transfert: { rendu: true } });
+}
 async function mettreEnQuarantaine(mail, adresses, raison) {
   try {
     const id = 'email_quarantaine_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -1586,13 +1689,11 @@ const RETRAIT_NOTIF_AGE_MAX_MS = 72 * 3600000;
 export function notifRetraitConversation(e, tx) {
   const code = codeNotif(e && e.code);
   if (!code) return null;
-  const lieu = lieuBref(e.lieu);
-  const nom = nomTransporteur(e.transporteur);
-  const parts = [lieu ? `${nom} — à retirer chez ${lieu}` : `${nom} — arrivé au point de retrait`, `Code : ${code}`];
-  const titre = String(e.titre || '').trim().slice(0, 60);
+  // (3 nov.) Le texte de toutes les arrivées (api/_lib/notif-textes.js).
+  const t = texteArrivee({ article: String(e.titre || '').trim(), transporteur: e.transporteur ? nomTransporteur(e.transporteur) : '', lieu: e.lieu, code });
   return {
-    payload: { title: '📍 Colis à retirer', body: (titre ? `${titre} · ` : '') + parts.join('. ') + '.',
-      tag: e.suivi ? `relais-${e.suivi}-code` : `relais-tx${tx}-code`, url: '/?tab=cat_achats' },
+    payload: { title: t.title, body: t.body,
+      tag: e.suivi ? `relais-${e.suivi}-code` : `relais-tx${tx}-code`, url: DESTINATIONS.retrait({ tx, suivi: e.suivi }) },
     aussi: [cleCodeRetrait(code)],
   };
 }
@@ -1865,6 +1966,11 @@ export async function traiterEmail(req, res) {
     return;
   }
   const registre = (lu && lu.registre) || {};
+  // (1er nov.) LE CODE DE VALIDATION D'UN TRANSFERT GMAIL arrive sur la boîte
+  // collective (son adresse de réception ne désigne personne) : il est rendu au
+  // vendeur qui a PROUVÉ l'adresse source que Gmail nomme — jamais à un autre
+  // (api/_lib/transfert-gmail.js). Traité avant la résolution ordinaire.
+  if (estConfirmationTransfert(mail)) { await rendreCodeTransfert(req, res, corpsBrut, mail, registre, (lu && lu.conflits) || []); return; }
   const adresses = adressesDeLivraison(corpsBrut, mail);
   const proprio = req.__ownerForce
     ? { owner: String(req.__ownerForce), via: 'rattachement' }
@@ -1894,6 +2000,7 @@ export async function traiterEmail(req, res) {
   // ni acheteur, ni article. Mesuré sur les 184 offres archivées : le pseudo de
   // l'acheteur est vide sur TOUTES, et le montant sur une bonne partie.
   const corpsTexte = texteUtile(mail);
+  { const st = contexteVendeur.getStore(); if (st) st.texte = corpsTexte; }
   const rawForDetect = `${mail.from}\n${mail.to}\n${subject}\n${corpsTexte}`;
   const acc = await detectAccount(rawForDetect);
   // Date de RÉCEPTION de l'email : celle d'origine si on rejoue un email conservé
@@ -1901,6 +2008,93 @@ export async function traiterEmail(req, res) {
   const now = (req && req.__recuLe) ? String(req.__recuLe) : new Date().toISOString();
 
   try {
+    // 00) VESTIAIRE COLLECTIVE (2 nov.) — AVANT les colis et les ventes Vinted :
+    // « Votre article vient d'être vendu » contient « vendu » (la branche vente
+    // Vinted le prenait et le gardait tronqué, « analyse impossible ») et parle
+    // d'étiquette d'expédition. La règle : api/_lib/vestiaire-email.js. Le
+    // vendeur a déjà été décidé plus haut par l'ADRESSE DE RÉCEPTION (§5) ;
+    // l'expéditeur ne choisit que la lecture.
+    if (estEmailVestiaire(mail)) {
+      const emailAt = dateDeLEmail(corpsBrut) || now;
+      const lu = lireEmailVenteVc(mail, corpsTexte, emailAt);
+      if (lu && !lu.ok) {
+        await garderInconnu(corpsBrut, mail, 'vente Vestiaire : ' + lu.raison, '');
+        await repondre(res, 200, { ok: false, type: 'vente-vestiaire', garde: true, raison: lu.raison });
+        return;
+      }
+      if (lu && lu.ok) {
+        const v = lu.vente;
+        // 1. L'email tel que lu, dans SA ligne (une par annonce : un rejeu la
+        //    réécrit à l'identique). Le prix de vente et la marque y restent.
+        const okLigne = await supabaseUpsert([{ id: `vc_email_vente_${v.productId}`, data: { ...v, emailAt, recuLe: now, messageId: String(mail.messageId || '').slice(0, 300) } }]);
+        if (!okLigne) { await repondre(res, 503, { ok: false, erreur: 'base-injoignable', message: "Je n'ai pas pu ranger cette vente Vestiaire : renvoie l'email." }); return; }
+        // 2. LA MÊME vente que l'extension (`vc_ventes`, clé = productId),
+        //    par comparer-et-échanger : jamais une écriture sur une lecture ratée.
+        let nouvelle = false;
+        const r = await modifierCas('vc_ventes', (cur) => { const f = fusionnerVenteEmailVc(cur, v, now); nouvelle = f.nouvelle; return f.change ? f.data : undefined; });
+        if (r === null) { marquerEcritureRatee(); await repondre(res, 503, { ok: false, erreur: 'base-injoignable', message: "Je n'ai pas pu ranger cette vente Vestiaire : renvoie l'email." }); return; }
+        { const st = contexteVendeur.getStore(); if (st) st.resumeExtra = { article: v.titre }; }
+        if (nouvelle) {
+          try { await notifierDoubleVente(await numeroVenteVc(v), v.titre, 'vestiaire'); } catch (_) {}
+          try { await pushOnce({ title: 'Vendu sur Vestiaire', body: `${v.titre || 'Ton article'}${v.montant ? ` — tu reçois ${String(v.montant.valeur.toFixed(2)).replace('.', ',')} €` : ''}${v.limite ? ` — à envoyer avant le ${v.limite.slice(8, 10)}/${v.limite.slice(5, 7)}` : ''}.`, tag: `vc-vente-${v.productId}`, url: lienNotif('plat_vestiaire') }, 'vente'); } catch (_) {}
+        }
+        await logEmail({ type: 'vente-vestiaire', subject, from: mail.from, productId: v.productId, nouvelle });
+        await repondre(res, 200, { ok: true, type: 'vente-vestiaire', productId: v.productId, nouvelle, gain: v.montant ? v.montant.valeur.toFixed(2) : '', prixVente: v.prixVente ? v.prixVente.valeur.toFixed(2) : '', limite: v.limite, date: v.date });
+        return;
+      }
+      // Un AUTRE email de Vestiaire (expédition, paiement, annulation…) : sa
+      // forme n'est pas encore apprise. Gardé ENTIER (jamais jeté, jamais
+      // tronqué) pour l'apprendre — sauf un email de transporteur, qui suit
+      // son chemin (un colis caché est un colis perdu). Le filet générique
+      // « autre » (mots de colis sans transporteur nommé) ne vaut pas pour
+      // Vestiaire : il fabriquait un suivi sans n° à partir de « livré à nos experts ».
+      const transpVc = detecterTransporteur(mail);
+      if (!transpVc || transpVc === 'autre') {
+        await garderInconnu(corpsBrut, mail, 'Vestiaire : forme pas encore apprise', '');
+        await logEmail({ type: 'ignoré', subject, from: mail.from, famille: '' });
+        await repondre(res, 200, { ok: true, type: 'ignoré', subject });
+        return;
+      }
+    }
+
+    // 0a) (3 nov.) « COMMANDE MISE À JOUR » : UN DE SES ACHATS L'ATTEND.
+    // Règle : api/_lib/achat-arrive-relais.js. Une ligne de colis à retirer
+    // (`email_track_autre_conv-{conversation}`), comme un e-mail de transporteur :
+    // lieu LU, arrivée = date de l'e-mail, échéance inconnue, code seulement s'il
+    // est écrit. L'identité est la CONVERSATION du lien (la commande la porte) ;
+    // le titre du sujet n'est qu'un libellé (`artTitle`). Les autres tournures de
+    // cette famille (en route, remboursé, à confirmer…) restent « sans action ».
+    {
+      const arr = lireArriveeAchat(mail, corpsTexte);
+      if (arr) {
+        const rowId = cleArrivee(arr, mail.messageId);
+        const avant = await supabaseLireRow(rowId);
+        if (!avant.lu) { marquerEcritureRatee(); await repondre(res, 503, { ok: false, erreur: 'base-injoignable' }); return; }
+        const prev = avant.data || null;
+        const retire = !!(prev && prev.status === 'delivered');
+        const st = contexteVendeur.getStore();
+        const recu = (st && st.reception && Array.isArray(st.reception.adresses) && st.reception.adresses.length) ? st.reception.adresses : adresses;
+        const ok = await supabaseUpsert([{ id: rowId, data: ligneArrivee(arr, { cleLigne: rowId, subject, emailAt: dateDeLEmail(corpsBrut) || now, recuLe: now, prev, account: acc.login || '', recuSur: recu }) }]);
+        if (!ok) { await repondre(res, 503, { ok: false, erreur: 'base-injoignable' }); return; }
+        // (3 nov.) Sonne SEULEMENT la consigne qui porte son CODE (« t'attend ici …
+        // Utilise le code X ») — partagé avec l'e-mail du transporteur par la clé du
+        // code. « T'attend au point relais » / « livré dans le Point Relais » n'ont pas
+        // de code : mesuré le 3 nov., les 8 e-mails Vinted de 09:17-09:20 précédaient
+        // les 8 e-mails Mondial Relay « disponible » (09:48-09:56) des mêmes colis, qui
+        // portent le code et sonnent — aucune identité commune pour dédoublonner
+        // (l'e-mail Vinted n'a ni n° de suivi ni transaction) : on ne sonne pas deux
+        // fois. La ligne de colis, elle, est rangée (visible dans À retirer).
+        if (!retire && arr.code) try { const t = texteArrivee({ article: arr.titre, lieu: arr.lieu, code: arr.code }); await pushOnce({
+          title: t.title, body: t.body,
+          tag: `relais-conv-${arr.conv || rowId}`, url: DESTINATIONS.retrait({}),
+        }, 'colis', [], [cleCodeRetrait(arr.code)]); } catch (_) {}
+        if (st) st.resumeExtra = { code: arr.code, lieu: arr.lieu, article: arr.titre };
+        await logEmail({ type: 'suivi', subject, from: mail.from, carrier: 'autre', statut: 'achat arrivé', conv: arr.conv || '' });
+        await repondre(res, 200, { ok: true, type: 'suivi', carrier: 'autre', status: retire ? 'delivered' : 'available', arrivee: arr.forme, conv: arr.conv || '', ligne: rowId, lieu: arr.lieu, code: arr.code || '' });
+        return;
+      }
+    }
+
     // 0) SUIVI DE COLIS.
     // Trois provenances : les transporteurs eux-mêmes (Mondial Relay /
     // Chronopost), leurs emails relayés par une adresse masquée iCloud
@@ -1927,6 +2121,24 @@ export async function traiterEmail(req, res) {
       const lecturePrecedente=await supabaseLireRow(rowId);
       if(!lecturePrecedente.lu){marquerEcritureRatee();await repondre(res,503,{ok:false,erreur:'base-injoignable'});return;}
       let prevLigne = lecturePrecedente.data || null;
+      // (1er nov., audit des codes de retrait) UN E-MAIL PROUVÉ PLUS ANCIEN NE
+      // REMPLACE PAS LE CODE D'UN PLUS RÉCENT. Le script Gmail lit sa boîte du
+      // plus récent au plus ancien (reprises, rejeux) : le « disponible » du 21
+      // (code 111111, relais A) traité APRÈS celui du 23 (colis redirigé, code
+      // 222222, relais B) réécrivait le code, le lieu et la date limite du 23 —
+      // Julien allait au relais A avec l'ancien code. Le plus récent pour CE n°
+      // gagne ; l'ancien ne fait que combler ce qui manque. Sans date d'e-mail
+      // des deux côtés, rien ne change (on ne sait pas lequel est le plus récent).
+      {
+        const emailAtNouveau = dateDeLEmail(corpsBrut);
+        const plusAncien = !!(emailAtNouveau && prevLigne && Number.isFinite(Date.parse(prevLigne.emailAt || '')) && Date.parse(emailAtNouveau) < Date.parse(prevLigne.emailAt));
+        if (plusAncien && prevLigne.status === 'available' && track.status === 'available') {
+          if (prevLigne.code) { track.code = prevLigne.code; track.code2 = prevLigne.code2 || null; }
+          if (prevLigne.qrB64 || prevLigne.qrUrl) { qr.qrB64 = prevLigne.qrB64 || null; qr.qrType = prevLigne.qrType || null; qr.qrUrl = prevLigne.qrUrl || null; }
+          if (prevLigne.lieu) track.lieu = prevLigne.lieu;
+          if (prevLigne.limite) track.limite = prevLigne.limite;
+        }
+      }
       if (track.status === 'available' || !qr.qrB64 || !qr.qrUrl || !track.code || !track.code2 || !track.lieu || !track.artTitle || !track.limite) {
         const prev = prevLigne;
         prevLigne = prev || null;
@@ -2026,19 +2238,36 @@ export async function traiterEmail(req, res) {
         }
       }
       // Notif push selon l'étape du colis.
+      // (3 nov.) UNE NOTIFICATION = UN FAIT CONSTATÉ PAR CET E-MAIL. Seuls sonnent :
+      //   · l'ARRIVÉE (« 📍 <article> t'attend · <point> · code ») — quand CET e-mail
+      //     la constate (`etatColisDepuisTexte`, phrase au présent/passé, jamais une
+      //     condition ni un futur) ; pas quand l'état « disponible » est seulement
+      //     GARDÉ d'un e-mail précédent (`garde.conserve`), ni pour un colis qu'il a
+      //     vendu (sortant) ;
+      //   · le colis REPARTI chez l'expéditeur (un geste : vérifier le remboursement).
+      // En transit, en route, livré, retiré par lui-même, retiré par son acheteur :
+      // rien (famille « suivi » retirée — api/_lib/notif-textes.js).
       // (23 oct.) Un colis reparti chez l'expéditeur ne sonne JAMAIS « 📍 à retirer ».
-      const icons = { delivered: '✅', available: '📍', transit: '🚚', info: '📦', retour: '↩️' };
-      const titles = { delivered: 'Colis livré', available: 'Colis arrivé au point de retrait', transit: 'Colis en transit', info: 'Suivi colis', retour: 'Colis reparti chez l’expéditeur' };
-      // (revue du 23 oct., n° 7) Le « retiré » d'un colis qu'il a VENDU : la clé
-      // d'avant (`track-N`, pas de son en plus) et, s'il sonne, ce que c'est —
-      // l'acheteur a retiré son colis, avec Ventes.
-      const venteRetiree = track.status === 'delivered' && sensLigne === 'sortant';
-      if (!sortiAilleurs) try { await pushOnce({
-        title: venteRetiree ? '✅ Ta vente : colis retiré par l’acheteur' : `${icons[track.status]} ${titles[track.status]}`,
-        body: bodyNotifColis(track, carrier),
-        tag: cleNotifColis(track, rowId), url: venteRetiree ? '/?tab=cat_ventes' : '/?tab=cat_achats',
-      }, (track.status === 'available' || track.status === 'retour') ? 'colis' : 'suivi', [],
+      const arriveeIci = track.status === 'available' && !garde.conserve && sensLigne !== 'sortant';
+      const notifColis = arriveeIci
+        ? texteArrivee({ article: track.artTitle, transporteur: nomTransporteur(carrier), lieu: track.lieu, code: codeNotif(track.code), code2: codeNotif(track.code2), limite: track.limite })
+        : (track.status === 'retour' ? { title: '↩️ Colis reparti chez l’expéditeur', body: bodyNotifColis(track, carrier) } : null);
+      if (!sortiAilleurs && notifColis) try { await pushOnce({
+        title: notifColis.title, body: notifColis.body,
+        tag: cleNotifColis(track, rowId), url: track.status === 'available' ? DESTINATIONS.retrait({ suivi: track.suivi }) : DESTINATIONS.achat({}),
+      }, 'colis', [],
       track.status === 'available' ? [cleCodeRetrait(track.code)] : []); } catch (_) {}
+      // (3 nov.) « Action requise : le colis semble avoir été perdu — <article> »
+      // (Vinted, mesuré les 11 oct. et 2 nov.) : rangé « livré / retiré », il sonnait
+      // « ✅ Colis livré ». C'est une DEMANDE de Vinted : une notification « à
+      // trancher » (famille Messages), une fois par e-mail (son sujet).
+      if (colisPerdu(subject)) try {
+        const art = (String(subject).split(/\s[—–-]\s/).slice(1).join(' — ') || '').trim();
+        const conv = conversationVinted(mail);
+        await pushOnce({ title: `⚠️ Colis peut-être perdu${art ? ` · ${court(art, 50)}` : ''}`, body: 'Vinted te demande une action : ouvre la conversation.',
+          tag: `perdu-${conv || shortHash(subject)}`, url: DESTINATIONS.message({ conv }) }, 'action');
+      } catch (_) {}
+      { const st = contexteVendeur.getStore(); if (st) st.resumeExtra = { code: track.code, lieu: track.lieu, limite: track.limite, sens: sensLigne }; }
       await logEmail({ type: 'suivi', subject, from: mail.from, carrier, suivi: track.suivi, statut: track.label });
       await repondre(res, 200, { ok: true, type: 'suivi', carrier, suivi: track.suivi, status: track.status });
       return;
@@ -2082,8 +2311,9 @@ export async function traiterEmail(req, res) {
       };
       await supabaseUpsert([row]);
       // Notif push : bordereau prêt = colis à expédier.
-      try { await pushOnce({ title: pdfTamponneB64 ? '📦 Bordereau prêt à imprimer' : '📦 Bordereau reçu', body: `${data.modele || 'Article'}${data.numero ? ` — N°${data.numero}` : ''}${pdfTamponneB64 ? ' : déjà tamponné' : ''} — à expédier${data.dateLimite ? ` avant le ${data.dateLimite}` : ''}.`, tag: `bord-${data.transaction}`, url: '/?tab=cat_bord' }, 'expedier'); } catch (_) {}
+      try { await pushOnce({ title: pdfTamponneB64 ? '📦 Bordereau prêt à imprimer' : '📦 Bordereau reçu', body: `${data.modele || 'Article'}${data.numero ? ` — N°${data.numero}` : ''}${pdfTamponneB64 ? ' : déjà tamponné' : ''} — à expédier${data.dateLimite ? ` avant le ${data.dateLimite}` : ''}.`, tag: `bord-${data.transaction}`, url: DESTINATIONS.colis({ tx: data.transaction }) }, 'expedier'); } catch (_) {}
       await notifierDoubleVente(numeroLu, data.modele || data.article);
+      { const st = contexteVendeur.getStore(); if (st) st.resumeExtra = { parTitre: !!(data.numero && !numeroLu), article: data.modele || data.article }; }
       await logEmail({ type: 'bordereau', subject, from: mail.from, numero: data.numero, transaction: data.transaction, tamponne: !!pdfTamponneB64 });
       await repondre(res, 200, { ok: true, type: 'bordereau', transaction: data.transaction, numero: data.numero, pdf: !!pdf, tamponne: !!pdfTamponneB64 });
       return;
@@ -2114,7 +2344,7 @@ export async function traiterEmail(req, res) {
       try { await pushOnce({
         title: '💰 Argent reçu',
         body: `${montant ? montant + ' € viré sur ton compte Vinted' : 'Transaction finalisée'}${article ? ' — ' + article.slice(0, 50) : ''}${acc.login ? ` (${acc.login})` : ''}.`,
-        tag: `final-${key}`, url: '/?tab=cat_ventes',
+        tag: `final-${key}`, url: DESTINATIONS.vente({}),
         _cat: 'argent',
       }); } catch (_) {}
       await logEmail({ type: 'finalisation', subject, from: mail.from, montant, article, account: acc.login || '' });
@@ -2188,9 +2418,10 @@ export async function traiterEmail(req, res) {
         body: `${article || 'Commande Vinted'}${prix ? ` — ${prix} €` : ''}${acc.login ? ` (${acc.login})` : ''} — justificatif archivé.`,
         // Une notification par ACHAT (son n°), pas par email : la copie
         // transférée d'un reçu déjà reçu ne sonne pas une seconde fois.
-        tag: transaction ? `achat-tx${transaction}` : `achat-${key}`, url: '/?tab=cat_achats',
+        tag: transaction ? `achat-tx${transaction}` : `achat-${key}`, url: DESTINATIONS.achat({ tx: transaction }),
         _cat: 'achat',
       }); } catch (_) {}
+      { const st = contexteVendeur.getStore(); if (st) st.resumeExtra = { ligne: `email_achat_${key}` }; }
       await logEmail({ type: 'achat', subject, from: mail.from, prix, article, pdf: !!pdfA, account: acc.login || '' });
       await repondre(res, 200, { ok: true, type: 'achat', article, prix, transaction, pdf: !!pdfA });
       return;
@@ -2211,30 +2442,19 @@ export async function traiterEmail(req, res) {
         data.numero = jn.numero; if (jn.numeroTitre) data.numeroTitre = jn.numeroTitre; }
       await supabaseUpsert([{ id: `email_sale_${key}`, data: { type: 'vente', ...data, account: acc.login || '', uid: acc.uid || '', receivedAt: now } }]);
       // Notif push : vente en temps réel, même app fermée et ordi éteint.
-      try { await pushOnce({ title: '💸 Vendu !', body: `${data.designation || 'Article'}${data.prix ? ` — ${data.prix} €` : ''}${acc.login ? ` (${acc.login})` : ''}`, tag: `sale-${key}`, url: '/?tab=cat_ventes' }, 'vente'); } catch (_) {}
+      try { await pushOnce({ title: '💸 Vendu !', body: `${data.designation || 'Article'}${data.prix ? ` — ${data.prix} €` : ''}${acc.login ? ` (${acc.login})` : ''}`, tag: `sale-${key}`, url: DESTINATIONS.vente({ tx: data.transaction }) }, 'vente'); } catch (_) {}
       await notifierDoubleVente(data.numero, data.designation);
-      // Facturation Pro : ne se déclenche que si activée dans l'app ET que
-      // l'email est celui d'un compte Vinted PRO (la mention de Vinted) ET qu'il
-      // porte l'adresse email de l'acheteur. Un compte particulier : jamais.
+      // Vente PRO (la mention de Vinted) avec l'e-mail de l'acheteur et sa
+      // transaction : on garde le formulaire de retour pour la facture que le
+      // vendeur émettra d'un clic sur la vente (api/_lib/facture-pro.js). Un
+      // compte particulier : jamais. Aucun numéro n'est donné ici.
       let facture = null;
       try {
-        if (data.pro && data.email) {
-          // Réglage ILLISIBLE ≠ « facturation coupée » : sans ça, la facture
-          // n'était jamais faite et l'email acquitté. Pas su ⇒ 503, il reviendra.
-          const cfgLu = await supabaseLireRow('vrm_pro_facture');
-          if (!cfgLu.lu) marquerEcritureRatee();
-          const cfg = cfgLu.lu ? cfgLu.data : null;
-          if (cfg && cfg.actif) {
-            facture = await createProInvoice(data, acc, cfg, now, mail.attachments);
-            if (facture && !facture.deja) try { await pushOnce({
-              title: facture.status === 'queued' ? '🧾 Facture en cours d\'envoi' : '🧾 Facture préparée',
-              body: `${facture.number} — ${data.designation || 'article'} (${data.prix} €) pour ${data.email}${facture.status === 'queued' ? '' : ' — envoi manuel dans Factures'}`,
-              tag: `inv-${facture.number}`, url: '/?tab=invoices',
-              _cat: 'facture',
-            }); } catch (_) {}
-          }
+        if (data.pro && data.email && data.transaction) {
+          facture = await createProInvoice(data, acc, null, now, mail.attachments);
         }
       } catch (_) {}
+      { const st = contexteVendeur.getStore(); if (st) st.resumeExtra = { article: data.designation }; }
       await logEmail({ type: 'vente', subject, from: mail.from, prix: data.prix, numero: data.numero, facture: facture ? facture.number : null });
       await repondre(res, 200, { ok: true, type: 'vente', pseudo: data.pseudo, prix: data.prix, numero: data.numero, facture });
       return;
@@ -2285,23 +2505,24 @@ export async function traiterEmail(req, res) {
       // ── COPILOTE D'OFFRES : conseil chiffré instantané ─────────────────────
       // On retrouve le prix d'achat de la paire → on dit s'il faut accepter et
       // combien il reste net, ou refuser (offre sous le coût).
-      const buy = await findBuyPriceByTitle(article);
+      // ⚠️ (1er nov.) Le titre n'est pas une identité : jamais « Accepte : +X €
+      // net » écrit comme un fait (voir `jugerPrixParTitre`). `buy` n'est rangé
+      // que si UNE seule fiche porte ce titre, marqué « reconnu au titre » ;
+      // `net` n'est plus calculé (rien ne le lit, et il se présentait comme sûr).
+      const juge = await prixAchatParTitre(article);
       const offerAmt = parseFloat(String(montant).replace(',', '.'));
-      let advice = '', net = null;
-      if (buy != null && !isNaN(offerAmt)) {
-        net = Math.round((offerAmt - buy) * 100) / 100;
-        advice = net > 0 ? ` → ✅ Accepte : +${Math.round(net)} € net (achat ${Math.round(buy)} €)`
-                          : ` → ⚠️ Refuse : sous ton coût (${Math.round(buy)} €)`;
-      }
+      const buy = juge && juge.etat === 'unique' ? juge.prix : null;
+      const net = null;
+      const advice = phraseConseilOffre(juge, offerAmt);
       try { await pushOnce({
         title: `💰 Offre ${montant ? montant + ' €' : ''}${qui ? ' de ' + qui : ''}`,
-        body: `${article ? `« ${article.trim().slice(0, 40)} »` : 'Un acheteur t\'a fait une offre'}${acc.login ? ` (${acc.login})` : ''}${advice || ' — expire en 24h.'}`,
-        tag: `offer-${key}`, url: '/?tab=cat_msg',
+        body: `${article ? `« ${article.trim().slice(0, 40)} »` : 'Un acheteur t\'a fait une offre'}${acc.login ? ` (${acc.login})` : ''}${advice}`,
+        tag: `offer-${key}`, url: DESTINATIONS.message({ conv: conversationDeLEmail(mail), compte: acc.uid }),
         _cat: 'offre',
       }); } catch (_) {}
       // Archive l'offre + le conseil pour le panneau « Copilote d'offres » de l'app.
       try { await supabaseUpsert([{ id: `email_offer_${key}`, data: {
-        type: 'offre', qui, article, montant, buy, net,
+        type: 'offre', qui, article, montant, buy, net, ...(buy != null ? { buySur: 'titre' } : {}),
         // ⚠️ Quand l'extraction échoue, on garde un ÉCHANTILLON du texte (300
         // caractères) au lieu de deviner une nouvelle regex à l'aveugle — c'est
         // la méthode qui a fini par expliquer la fiche article (§5.24 → §5.26).
@@ -2353,7 +2574,7 @@ export async function traiterEmail(req, res) {
       try { await pushOnce({
         title: `💬 ${paire ? court(paire, 70) : (qui || 'Message Vinted')}`,
         body: `${qui && paire ? `${qui} · ` : ''}Nouveau message${acc.login ? ` sur ${acc.login}` : ''}${extrait ? ` : « ${extrait} »` : ' — ouvre Vinted pour répondre.'}`,
-        tag: cleEmail || `msg-${cleEntiere}`, url: '/?tab=cat_msg',
+        tag: cleEmail || `msg-${cleEntiere}`, url: DESTINATIONS.message({ conv: conversationDeLEmail(mail), compte: acc.uid }),
         _cat: 'message',
       }, null, aliasAncien); } catch (_) {}
       await logEmail({ type: 'message', subject, from: mail.from, de: qui, extrait, paire, account: acc.login || '' });
@@ -2371,7 +2592,7 @@ export async function traiterEmail(req, res) {
       try { await pushOnce({
         title: '❤️ Nouveau favori !',
         body: `${qui || 'Quelqu\'un'} craque sur « ${(article || 'ton article').slice(0, 45)} »${prix ? ` (${prix} €)` : ''}${acc.login ? ` (${acc.login})` : ''} — fais-lui une offre !`,
-        tag: `fav-${key}`, url: '/?tab=cat_annonces',
+        tag: `fav-${key}`, url: DESTINATIONS.favori(),
         _cat: 'favori',
       }); } catch (_) {}
       await logEmail({ type: 'favori', subject, from: mail.from, de: qui, article, account: acc.login || '' });
@@ -2405,16 +2626,18 @@ export async function traiterEmail(req, res) {
           notif = {
             title: `⚠️ Annulation demandée${article ? ` — ${court(article, 60)}` : ''}`,
             body: `${qui || "L'acheteur"} veut annuler${raison ? ` (« ${court(raison, 70)} »)` : ''}${acc.login ? ` sur ${acc.login}` : ''} — accepte ou refuse dans la conversation Vinted.`,
-            tag: `annul-${key}`, url: '/?tab=cat_msg',
+            tag: `annul-${key}`, url: DESTINATIONS.message({ conv: conversationDeLEmail(mail), compte: acc.uid }),
           };
         } else {
           const article = subject.replace(/\s*-\s*Confirmation requise\s*$/i, '').trim();
           const limite = ((plat.match(/Tu as jusqu['’]au\s+(.+?)\s+pour signaler/i) || [])[1] || '').trim();
           famille = 'achat livré, à vérifier avant la date limite';
           notif = {
-            title: `📦 Achat livré${article ? ` — ${court(article, 60)}` : ''}`,
-            body: `Vérifie-le${limite ? ` : tu as jusqu'au ${limite} pour signaler un problème` : ' et signale un problème à temps'}${acc.login ? ` (${acc.login})` : ''} — sinon la vente est finalisée.`,
-            tag: `livre-${key}`, url: '/?tab=cat_achats',
+            // (3 nov.) « Achat livré » se lisait « il est chez moi » alors que Vinted
+            // dit « livré » au point relais : le titre dit le GESTE et l'échéance.
+            title: `⏳ À confirmer${limite ? ` avant le ${court(limite, 30)}` : ''}${article ? ` · ${court(article, 50)}` : ''}`,
+            body: `Vinted dit ta commande livrée : signale un problème avant cette date, sinon la vente est finalisée${acc.login ? ` (${acc.login})` : ''}.`,
+            tag: `livre-${key}`, url: DESTINATIONS.achat({}),
           };
         }
         try { await pushOnce(notif, 'action'); } catch (_) {}

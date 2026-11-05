@@ -16,7 +16,7 @@
 //    écrit dans `vinted_sale_overrides[tx].buyPrice` (la même écriture que le
 //    champ de « Modifier ») ;
 //  • cibles ≥ 44 px, aucun débordement horizontal.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -92,8 +92,26 @@ async function preparer(b, vp) {
           }
         } catch (_) {}
       }
+      // (2 nov.) Depuis « Données sûres » (1er nov., `src/fusionNuage.js`), une
+      // ligne `main` qui EXISTE s'écrit par PATCH conditionnel sur `data.rev`
+      // (`return=representation` : la ligne écrite, [] = devancé). Le banc ne
+      // gardait que les POST : il ne voyait plus rien de ce qu'écrit l'app.
+      if (/\/rest\/v1\/app_data/.test(u) && req.method() === 'PATCH') {
+        const id = (/[?&]id=eq\.([^&]*)/.exec(u) || [])[1];
+        let corps = null; try { corps = JSON.parse(req.postData() || 'null'); } catch (_) {}
+        const ex = id && rows.find((r) => r.id === id);
+        if (ex && corps && corps.data !== undefined) {
+          ecrits.push({ id, data: corps.data });
+          ex.data = corps.data;
+          return j([{ id }]);
+        }
+      }
       return j([]);
     }
+    // (2 nov.) La base de production est CLOISONNÉE, et depuis « Données sûres »
+    // (1er nov.) l'app n'écrit la ligne `main` que sur une base cloisonnée : la
+    // sonde de schéma (`select=owner&limit=1`) répond donc comme la production.
+    if (/select=owner&limit=1/.test(u)) return j([]);
     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);
     const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
@@ -123,7 +141,7 @@ async function main() {
       // ── ACHAT HORS PLATEFORME : ajouter, modifier, supprimer ────────────────
       await essaie(`${T} achat hors plateforme`, async () => {
         const { ctx, pg, errs, ecrits, dernierMain } = await preparer(b, vp);
-        await pg.goto(`http://localhost:${PORT}/?tab=cat_achats`, { waitUntil: 'domcontentloaded' });
+        await pg.goto(`http://localhost:${PORT}/?tab=cat_achats&vue=achats`, { waitUntil: 'domcontentloaded' });
         await pg.locator('[data-achat-hors-ajouter]').first().waitFor({ timeout: 12000 });
         dit((await hauteur(pg, '[data-achat-hors-ajouter]')) >= 44, `${T} « + Ajouter » est une cible d’au moins 44 px`);
         await tap(pg, '[data-achat-hors-ajouter]');

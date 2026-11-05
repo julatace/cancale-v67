@@ -19,7 +19,7 @@
 //     deux annonces au même titre, un bordereau, une seule marquée ;
 //   · aucune couleur hors palette (#0F8A6A, #09B1BA, orange Leboncoin) ;
 //   · aucun débordement à 390 px.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -49,7 +49,15 @@ const rows = [
   { id: 'main', data: MAIN },
   { id: 'harvest_111_listings', data: { capturedAt: auj.toISOString(), payload: { items: ITEMS } } },
   { id: 'vinted_item_details', data: DETAILS },
-  { id: 'vinted_lbc_posted', data: { ids: ['9102'] } },
+  // (31 oct.) La N°43 (9103) est aussi marquée publiée, mais son annonce Leboncoin
+  // (référence VRM-43) n'est PLUS VUE dans une liste complète de son compte,
+  // postérieure à la marque : la preuve de sortie (`numerosLbcSortis`). La N°42
+  // (9102) n'a aucune annonce Leboncoin captée : rien ne prouve qu'elle est partie.
+  { id: 'vinted_lbc_posted', data: { ids: ['9102', '9103'], updatedAt: new Date(Date.now() - 3 * 86400000).toISOString() } },
+  { id: 'lbc_listings', data: { items: { '3000000043': { id: '3000000043', ref: '43', customRef: 'VRM-43', subject: 'Adidas Spezial noir T38', status: 'active', account: 'lbcA', seenAt: new Date(Date.now() - 2 * 86400000).toISOString(), plusVueAt: new Date(Date.now() - 86400000).toISOString() } },
+    lectures: { lbcA: { at: new Date(Date.now() - 86400000).toISOString() } } } },
+  { id: 'lbc_accounts', data: { accounts: { lbcA: { id: 'lbcA', name: 'Moi', sessionAt: new Date(Date.now() - 86400000).toISOString() } } } },
+  { id: 'lbc_ventes', data: { ventes: {} } },
   // Un bordereau pour la transaction 777, que Vinted relie à l'annonce 9104.
   { id: 'email_bord_777', data: { transaction: '777', modele: 'Adidas Spezial noir taille 38', receivedAt: auj.toISOString(), filename: 'b.pdf' } },
   { id: 'harvest_111_txn_777', data: { payload: { transaction: { id: 777, item_id: 9104, status_title: 'Commande finalisée' } } } },
@@ -124,6 +132,9 @@ const projette = (row, sel) => {
       await pg.waitForTimeout(4000);
       if(process.env.BANC_CAPTURES){fs.mkdirSync(process.env.BANC_CAPTURES,{recursive:true});await pg.screenshot({path:path.join(process.env.BANC_CAPTURES,'annonces-premier-ecran-'+vp.width+'.png')});const g=pg.locator('.vrm-ann-grid').first();if(await g.count())await g.screenshot({path:path.join(process.env.BANC_CAPTURES,'annonces-fiches-'+vp.width+'.png')});}
       const stock=pg.locator('.vrm-ann-stock-tools');if(await stock.count())await stock.evaluate(e=>e.open=true);
+      // (1er nov., maquette Vitrine) Au téléphone, achat (connu), boost, marge et les gestes sont sous
+      //  « Plus d'actions » : on le déplie comme la personne avant de lire la carte (les MÊMES éléments).
+      if (vp.width < 600) { const bts = pg.locator('[data-carte-annonce] [data-fiche-plus-bouton][aria-expanded="false"]'); dit(await bts.count() > 0, 'au téléphone, chaque fiche replie le reste sous « Plus d’actions »', String(await bts.count())); while (await bts.count()) await bts.first().click(); }
       const c = await pg.evaluate(() => {
         const carte = (id) => { const el = document.querySelector(`[data-carte-annonce="${id}"]`); return el ? { t: el.innerText, html: (() => { const k = el.cloneNode(true); k.querySelectorAll('[data-marque]').forEach((m) => m.remove()); return k.outerHTML; })(), marques: [...el.querySelectorAll('[data-marque]')].map((m) => m.getAttribute('data-marque')).join(','), boost: !!el.querySelector('[data-boostee]'), aussi: !!el.querySelector('[data-aussi-sur]'), prepa: (el.querySelector('[data-prepa]') || {}).textContent || '' } : null; };
         return { a: carte('9101'), b: carte('9102'), c: carte('9103'), d: carte('9104'), sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth,
@@ -156,6 +167,8 @@ const projette = (row, sel) => {
       dit(/achat\s*—/.test(c.b.t) && !/achat\s*0,00/.test(c.b.t), 'achat inconnu ⇒ « — », jamais 0');
       dit(c.a.boost && !c.b.boost, '« Boostée » quand Vinted le dit, et rien quand il ne dit rien');
       dit(c.b.aussi && !c.a.aussi, '« Aussi sur Leboncoin » seulement pour la paire PROUVÉE publiée');
+      dit(!c.c.aussi, '« Aussi sur Leboncoin » tombe quand son annonce Leboncoin est PROUVÉE sortie (plus vue dans une liste complète, après la marque)',
+        c.c.aussi ? 'la N°43 garde la pastille alors que Leboncoin ne la montre plus' : '');
       dit((c.a.t.match(/dort/g) || []).length === 1 && !/😴/.test(c.a.t), 'le sommeil n\'est dit qu\'UNE fois sur la carte', (c.a.t.match(/[^\n]*dort[^\n]*/g) || []).join(' | '));
       dit(/prête/.test(c.a.prepa) && /2\/6/.test(c.b.prepa), 'la préparation suit la DONNÉE (6/6 ⇒ prête, 2/6 ⇒ « 2/6 »)', `« ${c.a.prepa} » / « ${c.b.prepa} »`);
       dit(!/Vendue — bordereau/.test(c.c.t), 'et sa jumelle au même titre n\'est PAS marquée vendue');
@@ -259,14 +272,11 @@ const projette = (row, sel) => {
         await pg.getByLabel('Trier les annonces',{exact:true}).selectOption('price_desc');
         await pg.getByLabel('Rechercher une annonce',{exact:true}).evaluate(e=>e.blur());
         const nav=pg.getByRole('navigation',{name:'Navigation principale'});
-        if(vp.width<1024){await nav.getByRole('button',{name:'Gestion',exact:true}).click();await pg.getByRole('menuitem',{name:'Stock',exact:true}).click();}else await nav.getByRole('button',{name:'Stock',exact:true}).click();
-        if(vp.width<1024){
-          await nav.getByRole('button',{name:'Vinted',exact:true}).click();
-          await pg.locator('.vrm-platform-tabs').getByRole('button',{name:'Annonces',exact:true}).click();
-        } else {
-          await nav.getByRole('button',{name:'Vinted',exact:true}).click();
-          await pg.locator('.vrm-platform-tabs').getByRole('button',{name:'Annonces',exact:true}).click();
-        }
+        // (31 oct., navigation par tâche) Stock est dans « Plus » au téléphone, dans la
+        // colonne à l'ordinateur ; on revient par l'onglet Annonces (filtre Vinted retenu).
+        if(vp.width<1024){await nav.getByRole('button',{name:'Plus',exact:true}).click();await pg.getByRole('menuitem',{name:'Stock',exact:true}).click();}else await nav.getByRole('button',{name:'Stock',exact:true}).click();
+        await nav.getByRole('button',{name:'Annonces',exact:true}).click();
+        await pg.waitForSelector('[data-tache="annonces"][data-tache-site="vinted"]',{timeout:10000}).catch(()=>{});
         dit(await pg.getByLabel('Rechercher une annonce',{exact:true}).inputValue()==='aucun-modele-impossible-123456', 'recherche d’annonces conservée après le stock');
         dit(await pg.getByLabel('Trier les annonces',{exact:true}).inputValue()==='price_desc', 'tri d’annonces conservé après le stock');
 
@@ -280,14 +290,17 @@ const projette = (row, sel) => {
         // photo sur toute la largeur (≈ 360 px au lieu de 174 à deux par rangée).
         {
           const premier=await pg.locator('.vrm-ann-card').nth(0).boundingBox(), suivant=await pg.locator('.vrm-ann-card').nth(1).boundingBox();
-          if (vp.width < 600) dit(Math.abs(premier.x-suivant.x)<2 && suivant.y>=premier.y+premier.height-1, 'au téléphone, une fiche par rangée (la photo prend toute la largeur)', JSON.stringify({premier,suivant}));
+          // (31 oct., style « Vitrine », son choix sur maquette) au téléphone, DEUX
+          // fiches par rangée, côte à côte, la photo de 190 px sur toute la largeur
+          // de la fiche — la règle « la photo en grand » tient, à sa nouvelle mesure.
+          if (vp.width < 600) dit(Math.abs(premier.y-suivant.y)<2 && suivant.x>premier.x+premier.width-1 && premier.width>=150, 'au téléphone, deux fiches par rangée (la photo prend toute la largeur de la fiche)', JSON.stringify({premier,suivant}));
           else dit(Math.abs(premier.y-suivant.y)<2 && suivant.x>premier.x+premier.width-1, 'les annonces sont des fiches côte à côte', JSON.stringify({premier,suivant}));
           const photo=await pg.locator('.vrm-ann-card').nth(0).locator('.vrm-ann-overview > a').boundingBox();
-          const plancher = vp.width < 600 ? 300 : 330;
+          const plancher = vp.width < 600 ? 180 : 330;
           dit(photo && photo.height>=plancher && photo.width>=premier.width-2, `la première photo occupe toute la largeur de la fiche, en grand (≥ ${plancher} px)`, photo && `${Math.round(photo.width)}×${Math.round(photo.height)} (fiche ${Math.round(premier.width)})`);
         }
 
-      } catch(e) { dit(false, 'recherche et retour au stock', e.message.slice(0,120)); }
+      } catch(e) { dit(false, 'recherche et retour au stock', e.message.slice(0,600)); }
       // ── « RIEN LU » ≠ « RIEN » : un échec de lecture des emails de vente ne doit
       //    PAS effacer `vinted_annonces_email_sold` (clé synchronisée). Sinon une
       //    paire déjà vendue redevient « en ligne » → reproposée ailleurs → DOUBLE

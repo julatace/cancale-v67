@@ -20,7 +20,7 @@
 const path = require('path');
 let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
-catch (_) { ({ chromium } = require('/home/user/cancale-v67/node_modules/playwright')); }
+catch (_) { ({ chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -159,10 +159,26 @@ const ouvrir = async (b, vp, versementsLisibles, onglet = 'journee', opts = {}) 
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
   await pg.goto(`http://localhost:${PORT}/?tab=${onglet}`, { waitUntil: 'domcontentloaded' });
-  const repere = onglet === 'journee' ? '[data-vendu-mois]' : '[data-dash-vendu-jour],[data-dash-vendu-pas-su]';
+  const repere = onglet === 'journee' ? '[data-fu-semaine]' : '[data-dash-vendu-jour],[data-dash-vendu-pas-su]';
   await pg.waitForFunction((r) => document.querySelector(r) || /pas pu s'afficher/.test(document.body.innerText), repere, { timeout: 15000 }).catch(() => {});
   await pg.waitForTimeout(1500);
   const lu = await lire(pg);
+  // (2 nov., 22 h) Ma journée ne montre plus « Vendu en … », « Reçu », la semaine en barres ni les
+  // cotisations — retiré à la demande de Julien, 2 nov. 22 h (maquette FusionJournee). Les CHIFFRES restent jugés là où ils s'affichent
+  // maintenant : « Vendu aujourd'hui » (tête de Ma journée), le vendu du mois (carte de Ventes, même
+  // règle), le reçu du mois (Comptabilité · Vendu et reçu, période « mois »), les cotisations du mois
+  // (Comptabilité, la carte URSSAF du mois, rendue).
+  if (onglet === 'journee') {
+    const sur = async (tab, sel) => { await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' }); await pg.waitForFunction((r) => document.querySelector(r), sel, { timeout: 20000 }).catch(() => {}); await pg.waitForTimeout(1200); };
+    lu.venduJour = (await pg.evaluate(() => (document.querySelector('[data-fu-vendu-jour]') || { getAttribute: () => null }).getAttribute('data-fu-vendu-jour')));
+    await sur('cat_ventes', '[data-fu-vendu-mois]');
+    lu.venduMois = await pg.evaluate(() => (document.querySelector('[data-fu-vendu-mois]') || { getAttribute: () => null }).getAttribute('data-fu-vendu-mois'));
+    await sur('compta', '[data-ca-cur="recu"]');
+    const cpt = await pg.evaluate(() => { const r = document.querySelector('[data-ca-cur="recu"]'); const u = document.querySelector('[data-compta-chiffre="urssaf-mois"]'); return { recu: r ? r.getAttribute('data-ca-eur') : null, cotis: u ? u.getAttribute('data-eur') : null }; });
+    const c = (x) => (x == null || x === '' ? '' : String(Math.round(Number(x) * 100)));
+    lu.recuMois = c(cpt.recu); lu.cotisCompta = cpt.cotis == null || cpt.cotis === '' ? null : Math.round(Number(cpt.cotis) * 100);
+    lu.texte = await pg.evaluate(() => document.body.innerText);
+  }
   return { ctx, pg, lu, errs, widget };
 };
 const lire = (pg) => pg.evaluate(() => {
@@ -200,14 +216,10 @@ const lire = (pg) => pg.evaluate(() => {
         // un jour d'avant lundi n'y est pas — son contrôle est sauté, et dit.
         const dansSemaine = (n) => ((maintenant.getDay() + 6) % 7) >= n;
         const siSemaine = (n, ok, quoi, det) => dansSemaine(n) ? dit(ok, quoi, det) : console.log('  (sauté : ' + quoi + ' — jour d’avant lundi)');
-        dit(Object.keys(lu.jours).length === 7, 'le graphique porte les 7 jours de la semaine', `${Object.keys(lu.jours).length}`);
-        dit(rj(0).vendu === String(auj.vendu) && rj(0).recu === String(auj.recu), 'aujourd’hui : vendu et reçu chacun à SA date', `vendu ${rj(0).vendu}/${auj.vendu} · reçu ${rj(0).recu}/${auj.recu}`);
-        siSemaine(1, rj(1).vendu === String(hier.vendu), 'hier : la vente annulée n’est pas « vendue »', `vendu ${rj(1).vendu}/${hier.vendu}`);
-        siSemaine(1, rj(1).recu === String(hier.recu), 'hier : la vente faite il y a 20 jours et versée hier est REÇUE hier', `reçu ${rj(1).recu}/${hier.recu}`);
-        siSemaine(2, rj(2).vendu === String(avant.vendu) && rj(2).recu === '0', 'avant-hier : vendue ce jour-là, pas encore d’argent ce jour-là', `vendu ${rj(2).vendu}/${avant.vendu} · reçu ${rj(2).recu}`);
-        siSemaine(3, rj(3).recu === '0' && rj(3).vendu === String(attendu.jour(3).vendu), 'la vente finalisée SANS date de versement est vendue, jamais placée dans « reçu »', `vendu ${rj(3).vendu} · reçu ${rj(3).recu}`);
-        dit(lu.aDater === '1', 'et c’est dit : 1 vente attend sa date de versement', `${lu.aDater}`);
-        dit(lu.venduJour === rj(0).vendu, '« Vendu aujourd’hui » = la colonne du jour (une seule liste)', `${lu.venduJour} · ${rj(0).vendu}`);
+        // (le graphique de la semaine, ses barres vendu/reçu par jour et « 1 vente à dater » ne sont plus sur
+        //  Ma journée — retiré à la demande de Julien, 2 nov. 22 h (maquette FusionJournee))
+        void rj; void hier; void avant; void siSemaine;
+        dit(lu.venduJour === String(auj.vendu), '« Vendu aujourd’hui » (tête de Ma journée) = ventes faites aujourd’hui', `${lu.venduJour} · ${auj.vendu}`);
         await ctx.close();
       });
     }
@@ -235,24 +247,22 @@ const lire = (pg) => pg.evaluate(() => {
       dit(lu.venduMois === String(attendu.venduMois), 'le VENDU reste juste (il ne dépend pas des versements)', `${lu.venduMois}`);
       dit(lu.recuMois === '', 'aucun montant « reçu » inventé', `rendu « ${lu.recuMois} »`);
       dit(!lu.texte.includes('cotisations à mettre de côté'), 'versements illisibles : aucune cotisation à mettre de côté inventée');
-      const recus = Object.values(lu.jours).map((j) => j.recu);
-      dit(recus.length === 7 && recus.every((r) => r === ''), 'aucune barre « reçu » — jamais des zéros', recus.slice(-3).join(','));
+      // (les barres « reçu » ne sont plus sur Ma journée — retiré à la demande de Julien, 2 nov. 22 h (maquette FusionJournee))
       await ctx.close();
     });
     console.log('\n── Déclarée le mois dernier, versée aujourd’hui');
     await essaie('declaree ailleurs', async () => {
       const { ctx, pg, lu, errs } = await ouvrir(b, { width: 390, height: 844 }, true, 'journee', { declare: DECLARE, regime: 'micro' });
       dit(!lu.tombe && errs.length === 0, 'l’écran s’affiche', errs.join(' | ').slice(0, 160));
-      const rj = lu.jours[cle(il(0))] || {};
-      dit(rj.recu === String(attendu.jour(0).recu + 5500), 'la barre REÇU du jour compte la vente versée aujourd’hui', `${rj.recu} · attendu ${attendu.jour(0).recu + 5500}`);
+      // (la barre REÇU du jour n'est plus sur Ma journée — retiré à la demande de Julien, 2 nov. 22 h (maquette FusionJournee))
       dit(lu.recuMois === String(attendu.recuMois + 5500), '« Reçu en {mois} » = argent VERSÉ ce mois, y compris une vente déclarée le mois d’avant (même chiffre que les barres)', `rendu ${lu.recuMois} · attendu ${attendu.recuMois + 5500}`);
       // (29 oct.) Cotisations à mettre de côté : sur le CA DÉCLARÉ de ce mois (sans la vente déjà déclarée le mois d'avant).
-      const cot = await pg.evaluate(() => { const e = document.querySelector('[data-cotis-mois]'); return e ? Number(e.getAttribute('data-cotis-mois')) : null; });
+      const cot = lu.cotisCompta != null ? lu.cotisCompta : null;
       const okTaux = [12.4, 13.4, 13.5].some((t) => cot === Math.round(attendu.recuMois * t / 100));
       const avecAilleurs = [12.4, 13.4, 13.5].some((t) => cot === Math.round((attendu.recuMois + 5500) * t / 100));
       dit(cot != null && okTaux && !avecAilleurs, 'micro : « cotisations à mettre de côté » sur le CA déclaré du mois, sans la vente déclarée ailleurs', `${cot} · base ${attendu.recuMois}`);
       // Sur téléphone, Ma journée cache ses phrases (27 oct.) : ce chiffre-là reste visible.
-      dit(cot == null || await pg.locator('[data-cotis-mois]').first().isVisible(), 'les cotisations à mettre de côté se voient (aussi sur téléphone)');
+      // (« les cotisations à mettre de côté se voient sur Ma journée » : plus sur Ma journée — retiré à la demande de Julien, 2 nov. 22 h (maquette FusionJournee) ; le chiffre est jugé ci-dessus)
       if (process.env.CAPTURES) await pg.screenshot({ path: path.join(process.env.CAPTURES, 'journee-recu-declaree.png') });
       // La carte URSSAF (dans Comptabilité depuis le 17 octobre) lit ce que Ventes vient de publier.
       await pg.goto(`http://localhost:${PORT}/?tab=compta`, { waitUntil: 'domcontentloaded' });
@@ -301,9 +311,11 @@ const lire = (pg) => pg.evaluate(() => {
     // enfant du montant « partiel » (elle visait un mot « au moins » qui
     // n'existe plus) : il ne restait que « ≥ », sans aucun montant.
     await essaie('un compte illisible, téléphone', async () => {
-      const { ctx, pg, errs } = await ouvrir(b, { width: 390, height: 844 }, true, 'journee', { comptes: ACCOUNTS2, ventesKO: ['222'] });
-      await pg.waitForSelector('[data-vendu-partiel="1"]', { timeout: 15000 }).catch(() => {});
-      const v = await pg.evaluate(() => { const e = document.querySelector('[data-vendu-partiel="1"]'); return e ? { t: e.innerText.trim(), cents: e.getAttribute('data-vendu-mois') } : null; });
+      // (2 nov. 22 h) Le vendu du mois n'est plus sur Ma journée — retiré à la demande de Julien,
+      // 2 nov. 22 h (maquette FusionJournee) : il vit sur la carte du mois de Ventes, même règle.
+      const { ctx, pg, errs } = await ouvrir(b, { width: 390, height: 844 }, true, 'cat_ventes', { comptes: ACCOUNTS2, ventesKO: ['222'] });
+      await pg.waitForSelector('[data-fu-partiel="1"]', { timeout: 15000 }).catch(() => {});
+      const v = await pg.evaluate(() => { const e = document.querySelector('[data-fu-partiel="1"]'); return e ? { t: (e.querySelector('.vrm-fu-grand') || e).innerText.trim(), cents: e.getAttribute('data-fu-vendu-mois') } : null; });
       const eur = v && v.cents ? Math.round(Number(v.cents) / 100).toLocaleString('fr-FR') : '?';
       dit(v && v.t.replace(/\s/g, '').includes(eur.replace(/\s/g, '')), 'téléphone, total partiel : le montant du mois reste affiché (pas un « ≥ » seul)', JSON.stringify(v));
       dit(errs.length === 0, 'aucune erreur', errs.join(' | ').slice(0, 160));

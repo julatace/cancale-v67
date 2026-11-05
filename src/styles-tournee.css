@@ -1,0 +1,100 @@
+/* ══ LA TOURNÉE DE MA JOURNÉE (1er nov., maquette « journee-A-tournee ») ══════
+   Vitrine (§7) : blanc, encre, l'accent RARE — seulement sur le numéro de
+   l'étape en cours ; l'ambre pour une date limite d'aujourd'hui ou demain. Une
+   étape faite est barrée, sa pastille pleine encre avec la coche. Cibles 44 px.
+   (1er nov., « ça fait bordel ») La carte est une boîte à filets d'1 px, comme
+   « À faire » : l'en-tête au-dessus (titre de section, « 0 sur 4 », « Voir la
+   tournée »), puis les étapes — en liste au téléphone, en quatre colonnes sur
+   ordinateur, chacune avec un titre court et au plus deux lignes, RIEN de coupé. */
+.vrm-tr { margin: 0; padding: 0; color: var(--vrm-ink); }
+.vrm-tr-tete { display: flex; align-items: center; gap: 4px 12px; margin: 0 0 8px; min-height: 32px; }
+.vrm-tr-titre { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: 0; line-height: 1.3; color: var(--vrm-ink); }
+.vrm-tr-compte, .vrm-tr-ordre { font-size: 13px; color: var(--vrm-muted); }
+.vrm-tr-ouvrir-lien {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 2px; border: 0; background: none;
+  color: var(--vrm-b-lien, var(--vrm-accent)); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.vrm-tr-etapes, .vrm-tr-arrets { list-style: none; margin: 0; padding: 0; }
+.vrm-tr-etapes { border: 1px solid var(--vrm-line); border-radius: 12px; background: var(--vrm-bg); overflow: hidden; }
+.vrm-tr-etape, .vrm-tr-arret { border-bottom: 1px solid var(--vrm-line); }
+.vrm-tr-etape:last-child { border-bottom: 0; }
+.vrm-tr-bouton, .vrm-tr-arret-bouton {
+  display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; column-gap: 14px;
+  width: 100%; min-height: 64px; padding: 12px 0; margin: 0; border: 0; background: transparent;
+  color: inherit; font: inherit; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.vrm-tr-etapes .vrm-tr-bouton { grid-template-columns: 32px minmax(0, 1fr) auto; column-gap: 12px; padding: 12px 16px; }
+@media (hover: hover) and (pointer: fine) { .vrm-tr-etapes .vrm-tr-bouton:hover { background: var(--vrm-surface); } }
+.vrm-tr-bouton:disabled { cursor: default; }
+.vrm-tr-bouton:focus-visible, .vrm-tr-arret-bouton:focus-visible, .vrm-tr-ouvrir:focus-visible, .vrm-tr-ouvrir-lien:focus-visible, .vrm-tr-fermer:focus-visible { outline: 2px solid var(--vrm-focus, var(--vrm-accent)); outline-offset: -2px; border-radius: 12px; }
+.vrm-tr-pastille {
+  width: 44px; height: 44px; border-radius: 24px; display: grid; place-items: center;
+  font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums;
+  background: var(--vrm-card2); color: var(--vrm-ink);
+}
+.vrm-tr-etapes .vrm-tr-pastille { width: 32px; height: 32px; border-radius: 14px; font-size: 15px; font-family: var(--vrm-police-mono, ui-monospace, monospace); font-weight: 500; }
+.vrm-tr-etapes .vrm-tr-pastille svg { width: 16px; height: 16px; }
+.vrm-tr-pastille.is-courante { background: var(--vrm-accent); color: var(--vrm-on-accent, #fff); }
+.vrm-tr-pastille.is-fait, .vrm-tr-pastille.is-arret { background: var(--vrm-ink); color: var(--vrm-bg); }
+.vrm-tr-texte { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.vrm-tr-t { font-size: 15px; font-weight: 600; line-height: 1.35; color: var(--vrm-ink); overflow-wrap: normal; }
+.vrm-tr-s { font-size: 13px; line-height: 1.4; color: var(--vrm-muted); overflow-wrap: normal; }
+.vrm-tr-arrets .vrm-tr-t { font-size: 17px; font-weight: 700; overflow-wrap: anywhere; }
+.vrm-tr-arrets .vrm-tr-s { font-size: 15px; overflow-wrap: anywhere; }
+.vrm-tr-passu { color: var(--vrm-muted); font-weight: 600; }
+.vrm-tr-etape.is-fait .vrm-tr-t { text-decoration: line-through; text-decoration-thickness: 1.5px; color: var(--vrm-muted); }
+.vrm-tr-etape.is-rien .vrm-tr-t, .vrm-tr-etape.is-passu .vrm-tr-t { color: var(--vrm-muted); }
+.vrm-tr-chevron { font-size: 20px; color: var(--vrm-muted); padding-left: 4px; }
+.vrm-tr-numeros { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.vrm-tr-num { font-family: var(--vrm-police-mono, ui-monospace, monospace); font-size: 13px; padding: 4px 8px; border-radius: 999px; background: var(--vrm-card2); color: var(--vrm-ink); }
+.vrm-tr-num.is-plus { color: var(--vrm-muted); }
+/* Téléphone : les N° sont des pastilles, la même liste en texte se tait. */
+.vrm-tr-texte:has(.vrm-tr-numeros) .vrm-tr-s { display: none; }
+.vrm-tr-sans { font-size: 13px; color: var(--vrm-muted); align-self: center; }
+@media (max-width: 599px) {
+  .vrm-tr-compte { display: none; }
+}
+/* Ordinateur : les quatre étapes côte à côte, séparées par des filets ; un titre
+   d'une ligne et au plus deux lignes courtes en dessous, jamais coupées. */
+@media (min-width: 1024px) {
+  .vrm-tr-etapes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .vrm-tr-etape { border-bottom: 0; border-left: 1px solid var(--vrm-line); min-width: 0; }
+  .vrm-tr-etape:first-child { border-left: 0; }
+  .vrm-tr-etapes .vrm-tr-bouton { grid-template-columns: 32px minmax(0, 1fr); align-items: start; height: 100%; min-height: 88px; padding: 16px 20px 16px 16px; }
+  .vrm-tr-chevron, .vrm-tr-numeros { display: none; }
+  .vrm-tr-texte:has(.vrm-tr-numeros) .vrm-tr-s { display: block; }
+  .vrm-tr-etapes .vrm-tr-t { padding-top: 5px; }
+}
+
+/* ── Le mode plein écran ─────────────────────────────────────────────────── */
+.vrm-tr-plein {
+  position: fixed; inset: 0; display: flex; flex-direction: column; background: var(--vrm-bg, #fff); color: var(--vrm-ink);
+  font-family: var(--vrm-police, inherit); padding-top: env(safe-area-inset-top); overflow-y: auto; overscroll-behavior: contain;
+}
+.vrm-tr-plein-barre { position: sticky; top: 0; z-index: 2; background: var(--vrm-bg, #fff); display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 16px; }
+.vrm-tr-fermer { width: 44px; height: 44px; border-radius: 24px; border: 0; background: var(--vrm-card2); color: var(--vrm-ink); display: grid; place-items: center; cursor: pointer; }
+.vrm-tr-plein-compte { font-size: 15px; font-weight: 600; padding: 10px 16px; border-radius: 24px; background: var(--vrm-surface, #fff); border: 1px solid var(--vrm-line); }
+.vrm-tr-plein-carte { padding: 0 16px; flex: 0 0 auto; }
+.vrm-tr-plein-carte .vrm-relais-fond { height: min(38vh, 320px) !important; }
+.vrm-tr-note { font-size: 13px; color: var(--vrm-muted); line-height: 1.45; margin: 8px 2px 0; }
+.vrm-tr-plein-feuille { flex: 0 0 auto; padding: 14px 16px calc(20px + env(safe-area-inset-bottom)); }
+.vrm-tr-plein-tete { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+.vrm-tr-arret { display: flex; flex-direction: column; }
+.vrm-tr-quand { font-size: 13px; color: var(--vrm-muted); text-align: right; max-width: 120px; }
+.vrm-tr-quand.is-ambre { color: var(--vrm-warn); font-weight: 600; }
+.vrm-tr-plans { align-self: flex-start; margin: -6px 0 10px 58px; min-height: 44px; display: flex; align-items: center; font-size: 15px; font-weight: 600; color: var(--vrm-b-lien, var(--vrm-accent)); text-decoration: none; }
+@media (min-width: 768px) {
+  .vrm-tr-plein { left: auto; width: min(520px, 100vw); border-left: 1px solid var(--vrm-line); box-shadow: -12px 0 40px rgba(0,0,0, .12); }
+}
+
+/* (1er nov.) Une phrase par point pas sur la carte, sous son arrêt ; la carte et la liste défilent ensemble. */
+.vrm-tr-hors { margin: -6px 0 10px 58px; font-size: 13px; color: var(--vrm-muted); line-height: 1.4; }
+.vrm-tr-credit { font-size: 11px; }
+/* (1er nov.) L'arrêt dont l'épingle vient d'être touchée. */
+.vrm-tr-arret.is-choisi { background: var(--vrm-surface-2, rgba(0,0,0, .04)); box-shadow: inset 3px 0 0 var(--vrm-ink, #1D1D1F); border-radius: 12px; scroll-margin: 80px; }
+/* (1er nov.) Pastille d'un retrait = son épingle (le nombre de colis, l'accent de l'épingle) ; d'un dépôt = une icône. */
+.vrm-tr-pastille.is-epingle { background: var(--vrm-accent); color: var(--vrm-on-accent, #fff); }
+.vrm-tr-pastille.is-epingle.is-neutre { background: var(--vrm-bg); color: var(--vrm-ink); box-shadow: inset 0 0 0 1.5px var(--vrm-line); }
+.vrm-tr-pastille.is-depot { background: transparent; color: var(--vrm-ink); box-shadow: inset 0 0 0 1.5px var(--vrm-line); }
+.vrm-tr-seg { white-space: nowrap; }
+.vrm-tr-s.is-ambre { color: var(--vrm-warn); font-weight: 500; }

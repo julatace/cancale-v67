@@ -44,8 +44,8 @@
 //   M. écran resté ouvert 2 h : « Publier » REFAIT la préparation chez eBay
 //      avant la confirmation (les frais montrés datent de moins de 30 min) ;
 //   N. Réglages → Notifications ne promet pas « N paires prêtes » (la
-//      notification dit souvent « N paires à regarder »).
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+//      notification dit souvent « N articles à regarder »).
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -198,7 +198,7 @@ const preparees = (pg) => pg.waitForFunction(() => { const l = [...document.quer
           const prep = (await pg.$$eval('[data-agent-paire]', (els) => els.map((e) => `${e.getAttribute('data-agent-paire')}:${e.getAttribute('data-agent-prep')}:${(e.querySelector('[data-agent-frais]') || {}).getAttribute ? e.querySelector('[data-agent-frais]').getAttribute('data-agent-frais') : ''}`))).sort();
           dit(prep.join(' ') === '31:prete:0.35 35:prete:0.35 36:prete:0.35', 'chaque paire est PRÉPARÉE (catégorie, frais lus chez eBay par la vérification à blanc)', prep.join(' '));
           const q = await pg.$eval('[data-agent-question]', (e) => e.textContent);
-          dit(/3 paires prêtes pour eBay — je les publie \?/.test(q), 'préparées et prêtes : « 3 paires prêtes pour eBay — je les publie ? »', q);
+          dit(/3 articles prêts pour eBay — je les publie \?/.test(q), 'préparées et prêtes : « 3 articles prêts pour eBay — je les publie ? »', q);
           const h2 = await pg.$eval('[data-agent-titre]', (e) => e.textContent).catch(() => '');
           dit(/Agent eBay/.test(h2), 'un titre de section « Agent eBay » au-dessus de la question', h2);
           await pg.waitForTimeout(800);
@@ -238,7 +238,7 @@ const preparees = (pg) => pg.waitForFunction(() => { const l = [...document.quer
           const bz = await pg.$eval('[data-agent-publier]', (e) => e.textContent).catch(() => '');
           await pg.click('[data-agent-paire="36"] input[type=checkbox]');
           const bz2 = await pg.$eval('[data-agent-publier]', (e) => e.textContent).catch(() => '');
-          dit(!/Publier ces 0/.test(bz2) && /Coche au moins une paire/.test(bz2) && /Publier celle-ci/.test(bz), 'rien de coché : « Coche au moins une paire », jamais « Publier ces 0 »', `${bz} / ${bz2}`);
+          dit(!/Publier ces 0/.test(bz2) && /Coche au moins un article/.test(bz2) && /Publier celle-ci/.test(bz), 'rien de coché : « Coche au moins une paire », jamais « Publier ces 0 »', `${bz} / ${bz2}`);
           dit(envois.some((e) => e.action === 'relire'), 'eBay est relu après le lot');
           await pg.waitForTimeout(1500);
           const res = await local(pg, 'vrm_agent_ebay_resume');
@@ -257,7 +257,7 @@ const preparees = (pg) => pg.waitForFunction(() => { const l = [...document.quer
           await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
           await pg.waitForSelector('[data-job="agent-ebay"]', { timeout: 15000 });
           const t = await pg.$eval('[data-job="agent-ebay"]', (e) => e.textContent);
-          dit(/1 paire prête pour eBay — je la publie \?/.test(t), 'Ma journée : « 1 paire prête pour eBay — je la publie ? » (préparée)', t.trim().slice(0, 90));
+          dit(/1 article prêt pour eBay — je le publie \?/.test(t), 'Ma journée : « 1 article prêt pour eBay — je le publie ? » (préparée)', t.trim().slice(0, 90));
         });
         dit(!errs.length, 'aucune erreur de page', errs.slice(0, 2).join(' | '));
         await ctx.close(); }
@@ -357,7 +357,7 @@ const preparees = (pg) => pg.waitForFunction(() => { const l = [...document.quer
           const et = (await pg.$$eval('[data-agent-paire]', (els) => els.map((e) => `${e.getAttribute('data-agent-paire')}:${e.getAttribute('data-agent-prep')}`))).sort().join(' ');
           dit(et === '31:prete 35:a-completer 36:a-completer', 'Asics et Puma : un critère obligatoire à compléter', et);
           const q = await pg.$eval('[data-agent-question]', (e) => e.textContent);
-          dit(!/3 paires prêtes/.test(q) && /3 paires proposées pour eBay · 1 prête à publier/.test(q), 'la question ne dit PAS « 3 prêtes » : « 3 paires proposées · 1 prête à publier »', q);
+          dit(!/3 articles prêts/.test(q) && /3 articles proposés pour eBay · 1 prêt à publier/.test(q), 'la question ne dit PAS « 3 prêtes » : « 3 paires proposées · 1 prête à publier »', q);
           await pg.waitForTimeout(800);
           const r = await local(pg, 'vrm_agent_ebay_resume');
           dit(r && r.n === 3 && r.pretes === 1, 'le résumé (Ma journée, notification) porte pretes: 1', JSON.stringify(r));
@@ -451,7 +451,7 @@ const preparees = (pg) => pg.waitForFunction(() => { const l = [...document.quer
           await agent(pg);
           const p = await proposees(pg);
           const ec = await pg.$eval('[data-agent-ecartees]', (e) => e.textContent).catch(() => '');
-          dit(p.join(',') === '36' && /2 dont le N° est porté par deux paires/.test(ec), 'la N°31 portée par la Nike ET l’Asics : aucune des deux n’est proposée, et c’est dit', `${p.join(',')} · ${ec.slice(0, 160)}`);
+          dit(p.join(',') === '36' && /2 dont le N° est porté par deux articles/.test(ec), 'la N°31 portée par la Nike ET l’Asics : aucune des deux n’est proposée, et c’est dit', `${p.join(',')} · ${ec.slice(0, 160)}`);
         });
         dit(!errs.length, 'aucune erreur de page', errs.slice(0, 2).join(' | '));
         await ctx.close(); }
@@ -521,7 +521,7 @@ const preparees = (pg) => pg.waitForFunction(() => { const l = [...document.quer
           await sum.scrollIntoViewIfNeeded({ timeout: 8000 }); await sum.click(); await pg.waitForTimeout(400);
           const det = (await pg.locator('details', { has: sum }).first().innerText()).replace(/\s+/g, ' ');
           const l = (/🛒 Agent eBay(.{0,200})/.exec(det) || [])[1] || '';
-          dit(!!l && !/prêtes? pour eBay/.test(l) && /Rien n'est publié sans ton oui/.test(l), 'la catégorie ne promet pas « N paires prêtes » (la notification dit souvent « à regarder »)', l.slice(0, 160));
+          dit(!!l && !/prêt(e)?s? pour eBay/.test(l) && /Rien n'est publié sans ton oui/.test(l), 'la catégorie ne promet pas « N paires prêtes » (la notification dit souvent « à regarder »)', l.slice(0, 160));
         });
         dit(!errs.length, 'aucune erreur de page', errs.slice(0, 2).join(' | '));
         await ctx.close(); }

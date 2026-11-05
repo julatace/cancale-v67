@@ -1,0 +1,65 @@
+/* (2 nov.) L'Aperçu des e-mails et les onglets nus. §7 : une seule couleur
+   d'accent (le point « oui »), l'ambre pour un geste à faire, cibles 44 px,
+   texte ≥ 12 px. Chargé après espace-emails.css et reception-emails.css. */
+
+/* Onglets nus : un mot, pas de nombre, pas d'explication. */
+.vrm-emails-espace .vrm-emails-rubriques { margin-bottom: 16px; }
+.vrm-emails-espace .vrm-emails-rubriques > button { min-height: 44px !important; padding: 8px 6px !important; text-align: center; display: flex; align-items: center; justify-content: center; }
+.vrm-emails-espace .vrm-emails-rubriques strong { font-size: 13px; line-height: 1.25; }
+
+/* L'aperçu */
+.vrm-emails-apercu { display: flex; flex-direction: column; gap: 0; }
+.vrm-apercu-reponse { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 18px 20px 16px; }
+.vrm-apercu-pastille { width: 10px; height: 10px; border-radius: 50%; margin-top: 7px; background: var(--muted, #8E8E93); }
+[data-apercu-reponse=oui] .vrm-apercu-pastille { background: var(--vrm-accent, #0071E3); }
+[data-apercu-reponse=verifier] .vrm-apercu-pastille { background: var(--email-ambre, #b25000); }
+.vrm-apercu-reponse h3 { font-size: 17px !important; font-weight: 600 !important; letter-spacing: -.01em; margin: 0 !important; line-height: 1.3; color: var(--text, inherit); }
+[data-apercu-reponse=verifier] h3 { color: var(--email-ambre, #b25000); }
+.vrm-apercu-reponse p { margin: 4px 0 0 !important; font-size: 13px; color: var(--muted, #6e6e73); line-height: 1.45; }
+.vrm-reception .vrm-apercu-actualiser { min-height: 44px; font-size: 13px; padding: 0 12px; border-radius: 12px; }
+.vrm-apercu-alerte { margin: 0 20px 12px !important; font-size: 13px; color: var(--email-ambre, #b25000); }
+.vrm-apercu-alerte button { min-height: 44px; font-size: 13px; margin-left: 6px; }
+
+.vrm-apercu-bloc { border-top: 1px solid var(--border, #e5e5ea); padding: 14px 20px 10px; }
+.vrm-apercu-bloc h4 { font-size: 13px; font-weight: 600; margin: 0 0 4px; color: var(--muted, #6e6e73); letter-spacing: 0; }
+.vrm-apercu-lignes { list-style: none; margin: 0; padding: 0; }
+.vrm-apercu-lignes > li { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; padding: 6px 0; font-size: 15px; line-height: 1.4; }
+.vrm-apercu-lignes > li + li { border-top: 1px solid var(--border, #e5e5ea); }
+.vrm-reception .vrm-apercu-geste { min-height: 44px; min-width: 72px; font-size: 13px; font-weight: 600; border-radius: 12px; flex-shrink: 0;
+  color: var(--email-ambre, #b25000); border-color: color-mix(in srgb, var(--email-ambre, #b25000) 40%, transparent); }
+[data-apercu-gestes] > ul > li > span:first-child { color: var(--text, inherit); }
+.vrm-reception .vrm-apercu-lien { all: unset; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; min-height: 44px; cursor: pointer; font-size: 15px; color: var(--text, inherit); }
+.vrm-reception .vrm-apercu-lien:hover { background: transparent; }
+.vrm-reception .vrm-apercu-lien:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: 2px; border-radius: 6px; }
+.vrm-apercu-lien > span[aria-hidden] { color: var(--muted, #8E8E93); font-size: 17px; }
+.vrm-apercu-note { font-size: 12px !important; color: var(--muted, #6e6e73); margin: 6px 0 4px !important; line-height: 1.45; }
+.vrm-apercu-rien { margin: 0 !important; padding: 12px 20px 14px; border-top: 1px solid var(--border, #e5e5ea); font-size: 15px; }
+.vrm-apercu-adresse { display: flex; flex-direction: column; min-width: 0; }
+.vrm-apercu-adresse b { font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-apercu-adresse small { font-size: 12px; color: var(--muted, #6e6e73); overflow-wrap: anywhere; }
+.vrm-apercu-quand { font-size: 13px; color: var(--muted, #6e6e73); text-align: right; max-width: 55%; }
+
+/* La liste technique, repliée sous l'aperçu. */
+.vrm-reception-repli { border-top: 1px solid var(--border, #e5e5ea); }
+.vrm-reception-repli > summary { min-height: 48px; padding: 0 20px !important; font-size: 13px; color: var(--muted, #6e6e73); }
+.vrm-reception-repli .vrm-reception-filtres { margin-top: 4px; }
+.vrm-reception-repli .vrm-reception-filtres input { min-height: 44px; font-size: 17px; }
+.vrm-reception-repli .vrm-reception-comptes select { min-height: 44px; }
+.vrm-reception-repli .vrm-reception-email-titre strong { font-size: 13px; }
+.vrm-reception-repli .vrm-reception-email-titre small, .vrm-reception-repli .vrm-reception-etat, .vrm-reception-repli .vrm-reception-contenu { font-size: 12px; }
+.vrm-reception-repli .vrm-reception-liste summary { min-height: 52px; }
+
+/* Adresses et « À rattacher » : cibles au doigt. */
+.vrm-emails-espace [data-reglage-adresses] button, .vrm-email-configurer, .vrm-email-suivants { min-height: 44px !important; }
+.vrm-email-rattachement > p { font-size: 13px !important; }
+
+@media (max-width: 440px) {
+  .vrm-apercu-reponse { padding: 14px 14px 12px; gap: 10px; }
+  .vrm-apercu-bloc { padding: 12px 14px 8px; }
+  .vrm-apercu-rien { padding: 12px 14px; }
+  .vrm-apercu-alerte { margin: 0 14px 12px !important; }
+  .vrm-reception-repli > summary { padding: 0 14px !important; }
+  .vrm-apercu-lignes > li[data-apercu-adresse] { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .vrm-apercu-quand { text-align: left; max-width: none; }
+  .vrm-emails-espace .vrm-emails-rubriques strong { font-size: 12px; }
+}

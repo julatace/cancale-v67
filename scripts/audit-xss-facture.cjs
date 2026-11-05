@@ -28,7 +28,7 @@ const iSrc = process.argv.indexOf('--src');
 const RACINE = iSrc > 0 ? path.resolve(process.argv[iSrc + 1]) : path.join(__dirname, '..');
 const iMut = process.argv.indexOf('--mutation');
 const MUTATION = iMut > 0 ? process.argv[iMut + 1] : '';
-const NM = fs.existsSync(path.join(__dirname, '..', 'node_modules')) ? path.join(__dirname, '..', 'node_modules') : '/home/user/cancale-v67/node_modules';
+const NM = fs.existsSync(path.join(__dirname, '..', 'node_modules')) ? path.join(__dirname, '..', 'node_modules') : require('path').join(__dirname, '..', 'node_modules');
 const parser = require(path.join(NM, '@babel', 'parser'));
 
 let ko = 0, ok = 0;
@@ -76,9 +76,13 @@ function extraire(src, noms, jsx) {
   // ── 2 et 3. L'app, dans un vrai navigateur ───────────────────────────────────
   await essaie('app', async () => {
     const src = fs.readFileSync(path.join(RACINE, 'src', 'App.jsx'), 'utf8');
-    const f = extraire(src, ['generatePDF', 'xmlEsc', 'fmtDate', 'ouvrirDocumentImprimable', 'CSP_DOCUMENT'], true);
+    // (1er nov.) `generatePDF` prend son logo par `logoFacture` (VRM vendu à d'autres :
+    // le logo de la boutique, celui de VRM pour le seul propriétaire) — extraite aussi,
+    // avec une session de banc sans propriétaire.
+    const f = extraire(src, ['generatePDF', 'logoFacture', 'xmlEsc', 'fmtDate', 'ouvrirDocumentImprimable', 'CSP_DOCUMENT'], true);
     dit(!!f.generatePDF, "l'app construit sa facture dans generatePDF");
     let code = ['const LOGO_CANCALE = "data:image/png;base64,iVBORw0KGgo=";', f.xmlEsc || '', f.fmtDate || 'function fmtDate(d){return String(d||"")}',
+      'const AUTH = { user: null }; const PROPRIO_ETAT = {}; function proprietaireMemorise() { return false; }', f.logoFacture || '',
       f.CSP_DOCUMENT || '', f.ouvrirDocumentImprimable || '', f.generatePDF || ''].join('\n');
     if (MUTATION === 'sanscsp') code = code.replace(/const CSP_DOCUMENT = `[^`]*`;/, 'const CSP_DOCUMENT = "";');
     const { chromium } = require(path.join(NM, 'playwright'));

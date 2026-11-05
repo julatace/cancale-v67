@@ -302,8 +302,10 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
       const r = await rendre(b, { version: '5.135.0', tel });
       // 4 octobre : les messages vivent DANS l'onglet Vinted (4ᵉ section) ; l'ancien
       // lien `?tab=cat_msg` (cloche, bandeau) doit y mener.
-      const porte = await r.pg.evaluate(() => { const b = document.querySelector('[data-section="messages"]'); return b ? b.getAttribute('aria-current') : 'absente'; });
-      dit(porte === 'page', 'l’ancien lien mène aux Messages DANS l’onglet Vinted (section active)', String(porte));
+      // (31 oct., navigation par tâche) Messages est une tâche ; l'ancien lien y mène,
+      // filtré sur Vinted.
+      const porte = await r.pg.evaluate(() => { const t = document.querySelector('[data-tache="messages"]'); return t ? t.getAttribute('data-tache-site') : 'absente'; });
+      dit(porte === 'vinted', 'l’ancien lien mène aux Messages, filtre Vinted', String(porte));
       const liste = await r.pg.evaluate(() => [...document.querySelectorAll('[data-messagerie] [data-conv]')].map((x) => ({ id: x.getAttribute('data-conv'), txt: x.innerText })));
       dit(liste.length === 3, 'les conversations des DEUX comptes sont listées', JSON.stringify(liste.map((x) => x.id)));
       // ⚠️ (16 octobre) L'ordre est : le compte ouvert dans Chrome d'abord (là
@@ -360,7 +362,8 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
       // l'Accepter est mis en avant (« ✓ Accepter 45,00 € · ≥ ton mini »). Rien n'est
       // accepté tout seul — c'est le clic qui suit (ci-dessous) qui vend.
       const cue = await r.pg.evaluate(() => { const e = document.querySelector('[data-offre-au-dessus-mini]'); return e ? { min: e.getAttribute('data-offre-au-dessus-mini'), txt: e.innerText } : null; });
-      dit(cue && cue.min === '40' && /✓\s*Accepter/.test(cue.txt) && /ton mini/i.test(cue.txt), 'une offre ≥ ton prix mini est mise en avant pour l’accepter en 1 tap', JSON.stringify(cue));
+      // (31 oct., maquettes Messages) « Offre de 45 € — ton mini : 40 € », puis Accepter.
+      dit(cue && cue.min === '40' && /Accepter/.test(cue.txt) && /ton mini\s*:\s*40/i.test(cue.txt), 'une offre ≥ ton prix mini est mise en avant pour l’accepter en 1 tap', JSON.stringify(cue));
       // 7 bis. Le fil commence par la carte de la paire, et se groupe par jour.
       const fil = await r.pg.evaluate(() => { const c = document.querySelector('[data-fil-paire]'); const seps = [...document.querySelectorAll('[data-jour-sep]')].map((x) => x.getAttribute('data-jour-sep'));
         return { carte: c ? { item: c.getAttribute('data-fil-paire'), num: c.getAttribute('data-fil-num'), prix: c.getAttribute('data-fil-prix'), etat: c.getAttribute('data-fil-etat'), txt: c.innerText } : null, seps }; });
@@ -368,12 +371,14 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
       dit(fil.seps.length === 2 && new Set(fil.seps).size === 2, 'les messages sont groupés par jour (deux jours, deux séparateurs)', JSON.stringify(fil.seps));
       await r.pg.screenshot({ path: path.join(require('os').tmpdir(), 'messagerie-fil-' + (tel ? 390 : 1512) + '.png') });
       dit(await r.pg.locator('.vrm-chat-negociation-etat b').innerText()==='Offre reçue','négociation : offre reçue issue du fil natif');
-      const reperes=await r.pg.locator('.vrm-chat-offre-reperes').innerText();
-      dit(reperes.includes('59')&&reperes.includes('40'),'prix affiché et minimum exacts sont réunis près de l’offre');
+      // (31 oct.) Le prix affiché est dans la carte de la paire (téléphone) ou la fiche
+      // (ordinateur) ; le minimum est sur la carte d'offre, à côté du montant.
+      const tete=await r.pg.locator('.vrm-chat-offre-tete').innerText();
+      dit(tete.includes('45')&&/ton mini\s*:\s*40/.test(tete),'le montant de l’offre et ton minimum exact sont réunis sur la carte d’offre',tete);
       const boutons=await r.pg.locator('.vrm-chat-offre-actions button').evaluateAll(xs=>xs.map(x=>({top:x.getBoundingClientRect().top,left:x.getBoundingClientRect().left})));
-      dit(boutons.length===3&&boutons.every(x=>Math.abs(x.top-boutons[0].top)<2)&&boutons[0].left<boutons[1].left&&boutons[1].left<boutons[2].left,'Accepter, Refuser et Contre-proposer sont côte à côte');
-      await r.pg.getByRole('button',{name:'Contre-proposer',exact:true}).click();
-      dit(await r.pg.getByRole('textbox',{name:"Prix de l'offre"}).isVisible(),'Contre-proposer ouvre le prix sans envoyer de requête');
+      dit(boutons.length===3&&boutons.every(x=>Math.abs(x.top-boutons[0].top)<2)&&boutons[0].left<boutons[1].left&&boutons[1].left<boutons[2].left,'Refuser, la contre-offre et Accepter sont côte à côte');
+      await r.pg.locator('[data-offre-geste="contre"]').click();
+      dit(await r.pg.getByRole('textbox',{name:"Prix de l'offre"}).isVisible() && r.execs.filter((x) => x.method !== 'GET').length === 0,'la contre-offre ouvre le prix sans envoyer de requête');
       await r.pg.getByRole('button', { name: /Accepter/ }).first().click();
       await r.pg.waitForTimeout(500);
       // Ouvrir un fil le relit par l'extension (une LECTURE, `GET`) : seul un
@@ -594,16 +599,18 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
       console.log('── le point « nouveau » de Messages suit « Retirer » sans recharger · 390 px');
       const r = await rendre(b, { version: '5.135.0', tel: true, lignes: rowsDe() });
       await r.pg.waitForTimeout(1200);
-      const point = () => r.pg.evaluate(() => document.querySelectorAll('[data-section="messages"] [data-point]').length);
-      await r.pg.click('[data-section="ventes"]'); await r.pg.waitForTimeout(1500);
+      // (31 oct.) Le point vit sur la navigation : « Plus » au téléphone (Messages y est).
+      const point = () => r.pg.evaluate(() => document.querySelectorAll('.vrm-mobile-nav [data-badge-nav="plus"][data-badge-n="point"]').length);
+      await r.pg.click('.vrm-mobile-nav [data-nav-entree="ventes"]'); await r.pg.waitForTimeout(1500);
       const avant = await point();
-      await r.pg.click('[data-section="messages"]'); await r.pg.waitForTimeout(900);
+      await r.pg.click('.vrm-mobile-nav button[aria-label="Plus"]'); await r.pg.waitForTimeout(500);
+      await r.pg.click('.vrm-sheet [data-nav-entree="messages"]'); await r.pg.waitForTimeout(900);
       for (const id of ['301', '402']) {
         if (!(await r.pg.$(`[data-conv="${id}"]`))) continue;
         await r.pg.click(`[data-conv="${id}"]`); await r.pg.waitForTimeout(900);
         if (await r.pg.$('[data-conv-retirer]')) { await r.pg.click('[data-conv-retirer]'); await r.pg.waitForTimeout(500); }
       }
-      await r.pg.click('[data-section="ventes"]'); await r.pg.waitForTimeout(1500);
+      await r.pg.click('.vrm-mobile-nav [data-nav-entree="ventes"]'); await r.pg.waitForTimeout(1500);
       const apres = await point();
       dit(avant === 1 && apres === 0, 'toutes les non lues retirées : le point disparaît tout de suite', JSON.stringify({ avant, apres }));
       dit(r.errs.length === 0, 'aucune erreur d’app', r.errs.join(' | ').slice(0, 160));
@@ -639,6 +646,29 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
       dit(ofs === null, 'les offres email restent absentes, même avec une offre déjà présente dans sa conversation');
       const pastille = await r.pg.evaluate(() => { const x = document.querySelector('[data-messagerie] [data-conv="301"]'); return x ? x.getAttribute('data-conv-offre') : null; });
       dit(pastille === '45', 'la conversation garde sa pastille « Offre 45 € en attente » (c’est là qu’on la tranche)', String(pastille));
+      dit(r.errs.length === 0, 'aucune erreur d’app', r.errs.join(' | ').slice(0, 160));
+      await r.ctx.close();
+    }
+    // (31 oct.) « Non lues » : UNE règle pour Messages et Ma journée (§11,
+    // src/messagesNonLus.js). Mesuré le 20 oct. : Messages « 156 », Ma journée
+    // « 8 ». Une conversation marquée non lue mais sans message depuis 42 jours
+    // n'est comptée nulle part ; Messages la dit à part sous « Non lues ».
+    console.log('── « Non lues » : la même règle que Ma journée');
+    {
+      const lignes = rowsDe();
+      lignes.find((x) => x.id === 'harvest_111_inbox').data.payload.conversations.push(conv(390, 'vieux_390', 'Toujours dispo ?', true, 24 * 42));
+      const r = await rendre(b, { version: '5.135.0', lignes });
+      await r.pg.waitForTimeout(800);
+      const nl = await r.pg.evaluate(() => { const e = document.querySelector('[data-messagerie-tete]'); return e ? e.getAttribute('data-nonlus') : null; });
+      dit(nl === '2', 'Messages compte les non-lues de moins de 7 jours (2), pas le vieux drapeau', String(nl));
+      await r.pg.getByRole('button', { name: /^Non lues/ }).click(); await r.pg.waitForTimeout(300);
+      const anc = await r.pg.evaluate(() => { const e = document.querySelector('[data-nonlus-anciens]'); return e ? e.getAttribute('data-nonlus-anciens') : null; });
+      dit(anc === '1', 'la non-lue ancienne est DITE à part sous « Non lues », jamais cachée en silence', String(anc));
+      dit(await r.pg.locator('[data-messagerie] [data-conv="390"]').count() === 0, 'le filtre « Non lues » ne la liste pas');
+      await r.pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
+      await r.pg.waitForTimeout(3500);
+      const tuile = await r.pg.evaluate(() => { const e = document.querySelector('[data-tuile="messages"]'); return e ? e.getAttribute('data-n') : null; });
+      dit(tuile === nl, 'Ma journée dit le MÊME nombre que Messages', `journee=${tuile} · messages=${nl}`);
       dit(r.errs.length === 0, 'aucune erreur d’app', r.errs.join(' | ').slice(0, 160));
       await r.ctx.close();
     }

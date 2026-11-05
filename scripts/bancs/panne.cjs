@@ -21,7 +21,7 @@
 // sens : en marche normale, l'app ne doit PAS crier à la panne. Un contrôle qui
 // n'aurait que la première moitié serait vert sur une app qui alerte tout le
 // temps.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const { dressingsDuJour } = require('./_instantane.cjs'); // fx/ est une photo datée : la lecture du dressing la plus récente = « il y a 1 min » (règle « en ligne » ≤ 24 h)
 const fs=require('fs'), http=require('http'), path=require('path');
@@ -91,7 +91,7 @@ const AVEU=/Je n'arrive pas à joindre tes données|Je n'ai pas pu lire tes donn
 
 (async()=>{
   const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
-  const rendre=async(panne,t,depuisJours)=>{
+  const rendre=async(panne,t,depuisJours,proprio)=>{
     const ctx=await b.newContext({viewport:{width:1512,height:950}});
     const pg=await ctx.newPage();
     const errs=[]; pg.on('pageerror',e=>errs.push(e.message));
@@ -100,14 +100,20 @@ const AVEU=/Je n'arrive pas à joindre tes données|Je n'ai pas pu lire tes donn
     //    comme une erreur d'écran au lieu de tuer tout le banc — sinon un hoquet
     //    de teardown masque tous les contrôles suivants.
     try {
-      return await rendreInterne(panne, t, depuisJours, ctx, pg, errs);
+      return await rendreInterne(panne, t, depuisJours, ctx, pg, errs, proprio);
     } catch (e) {
       try { await ctx.close(); } catch (_) {}
       return { txt:'', errs:['contexte fermé: '+String(e&&e.message||e).slice(0,80)], marque:null, liens:[] };
     }
   };
-  const rendreInterne=async(panne,t,depuisJours,ctx,pg,errs)=>{
+  const rendreInterne=async(panne,t,depuisJours,ctx,pg,errs,proprio)=>{
     await pg.addInitScript(()=>{try{localStorage.setItem('vrm_acces_direct','1');}catch(_){}});
+    // (2 nov.) Depuis le 1er nov. (« VRM pour d'autres vendeurs », textes neutres),
+    // le mode d'emploi Supabase n'est dit qu'au PROPRIÉTAIRE de l'installation ;
+    // un autre vendeur lit « VRM est momentanément indisponible ». Pendant la
+    // panne, `/api/compte?mode=abonnement` ne répond pas : l'app se fie à ce
+    // qu'elle a retenu (`vrm_proprio_vu_<uid>`). Le banc le pose pour Julien.
+    if(proprio) await pg.addInitScript(()=>{try{const g=Storage.prototype.getItem;Storage.prototype.getItem=function(k){if(typeof k==='string'&&k.indexOf('vrm_proprio_vu_')===0)return '1';return g.call(this,k);};}catch(_){}});
     // Une panne qui DURE : l'app doit cesser de dire d'attendre.
     if(depuisJours) await pg.addInitScript(j=>{try{localStorage.setItem('vrm_base_ko_depuis',new Date(Date.now()-j*86400000).toISOString());}catch(_){}}, depuisJours);
     if(panne){
@@ -151,7 +157,7 @@ const AVEU=/Je n'arrive pas à joindre tes données|Je n'ai pas pu lire tes donn
   //      liste complète (celle d'`audit-bancs.cjs`), il a trouvé HUIT écrans
   //      muets et cinq affirmations de plus. Même leçon que l'île d'actions :
   //      trois écrans y échappaient parce qu'aucun banc ne les rendait.
-  const ECRANS=['journee','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','garage','invoices','settings','vintedaccounts','catalog','sales','leboncoin','stockvinted'];
+  const ECRANS=['journee','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','cat_annonces','cat_ventes','cat_achats','cat_achats&vue=achats','cat_bord','cat_msg','garage','invoices','settings','vintedaccounts','catalog','sales','leboncoin','stockvinted'];
 
   console.log('── BASE INJOIGNABLE (522, réponse HTML — la vraie forme)');
   for(const t of ECRANS){
@@ -185,7 +191,7 @@ const AVEU=/Je n'arrive pas à joindre tes données|Je n'ai pas pu lire tes donn
   //      muette. Le contrôle porte sur la DURÉE servie, pas sur la tournure.
   console.log('\n── ET QUAND ÇA DURE (3 jours)');
   {
-    const {txt,liens}=await rendre(true,'journee',3);
+    const {txt,liens}=await rendre(true,'journee',3,true);
     dit(/3 jours/.test(txt), 'panne longue : elle dit depuis COMBIEN de temps', 'sinon « en ce moment » au 3ᵉ jour');
     dit(!/revient tout seul/i.test(txt), 'panne longue : elle ne promet plus que ça revient tout seul',
       /revient tout seul/i.test(txt)?"elle lui dit d'attendre":'');
@@ -208,6 +214,14 @@ const AVEU=/Je n'arrive pas à joindre tes données|Je n'ai pas pu lire tes donn
     dit(vise.some(h=>/settings\/general/.test(h)), 'panne longue : et un lien direct vers le bouton Restart',
         'le bouton est tout en bas d\'un écran de réglages — il ne le trouvera pas sans lien');
     dit(/Rien n'est perdu/i.test(txt), 'panne longue : elle rassure toujours sur ses données');
+  }
+  // (2 nov.) L'autre sens : un vendeur qui n'est PAS le propriétaire ne reçoit
+  // ni le mode d'emploi de l'hébergeur ni un lien vers un projet qui n'est pas le sien.
+  {
+    const {txt,liens}=await rendre(true,'journee',3,false);
+    dit(/momentanément indisponible/i.test(txt) && !/supabase\.com/i.test(txt), 'panne longue, autre vendeur : « VRM est momentanément indisponible », sans mode d\'emploi Supabase', txt.split('\n').find(l=>/joindre tes données/.test(l))||'');
+    dit(!liens.some(h=>/supabase\.com/.test(h||'')), 'panne longue, autre vendeur : aucun lien vers le projet du propriétaire', liens.filter(h=>/supabase/.test(h||'')).join(' '));
+    dit(/Rien n'est perdu/i.test(txt), 'panne longue, autre vendeur : elle rassure sur ses données');
   }
 
   // ⚠️⚠️ LE RETOUR. Le 12 septembre Julien reprend son abonnement Supabase :

@@ -1,5 +1,5 @@
 // Banc : aucun écran vide, aucun débordement horizontal, aucune erreur.
-const { chromium } = require('/home/user/cancale-v67/node_modules/playwright');
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const { dressingsDuJour } = require('./_instantane.cjs'); // fx/ est une photo datée : la lecture du dressing la plus récente = « il y a 1 min » (règle « en ligne » ≤ 24 h)
 const fs=require('fs'), http=require('http'), path=require('path');
@@ -127,7 +127,7 @@ const PORT_VV=Number(process.env.BANC_PORT)||4322; srv.listen(PORT_VV);
 // `ScreenHead` : il atterrissait PILE SOUS l'ile d'actions, donc invisible.
 // Le controle existait, l'ecran n'y passait jamais. `catalog` et `sales`
 // (l'ancienne appli) etaient dans le meme angle mort.
-const TABS=['journee','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','garage','organisation','communaute','invoices','masques','settings','vintedaccounts','catalog','sales','leboncoin','stockvinted'];
+const TABS=['journee','ventes','annonces','messages','achats','retraits','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','garage','organisation','communaute','invoices','masques','settings','vintedaccounts','catalog','sales','leboncoin','stockvinted'];
 (async()=>{
   let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'✅ ':'❌ ')+m+(d?' — '+d:''));};
   const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
@@ -253,7 +253,9 @@ const TABS=['journee','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire
     // « pas encore de vente captée », JAMAIS « 0 € » (un zéro inventé).
     dit(/Finalisé par plateforme/i.test(dashTxt),'le CA se décompose par plateforme',dashTxt?'':'tableau de bord non lu');
     dit(/CA Vinted par compte/i.test(dashTxt),'le CA Vinted se décompose par compte');
-    dit(/pas encore de vente captée/.test(dashTxt),'une plateforme sans vente dit « pas encore de vente captée », pas « 0 € »');
+    // (2 nov.) Depuis l'audit des données E0c (f8f5be86), Vestiaire suit ses vraies
+    // règles : sans vente finalisée, la ligne dit « pas encore de vente finalisée ».
+    dit(/pas encore de vente (captée|finalisée)/.test(dashTxt),'une plateforme sans vente dit « pas encore de vente … », pas « 0 € »');
     // ── eBay câblé dans le CA (§ caEbayPayees) : une commande PAYÉE captée doit
     // apparaître dans la décomposition, avec sa note « ventes payées ». Sur le
     // code d'avant `caParPlateforme` ignorait les commandes eBay → eBay restait

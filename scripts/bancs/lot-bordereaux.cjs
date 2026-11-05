@@ -14,7 +14,7 @@
 const path = require('path');
 let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
-catch (_) { ({ chromium } = require('/home/user/cancale-v67/node_modules/playwright')); }
+catch (_) { ({ chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -109,7 +109,10 @@ const projette = (row, sel) => {
     // L'APERÇU : le plus récent en haut, l'ancienne décochée avec sa raison.
     const ap = await pg.evaluate(() => [...document.querySelectorAll('[data-lot-ligne]')].map((e) => ({ cle: e.getAttribute('data-lot-ligne'), coche: e.getAttribute('data-coche') === '1', ancienne: !!e.querySelector('[data-lot-ancienne]') })));
     dit(ap.length === 4, 'l’aperçu liste les 4 bordereaux prêts, aucun caché', JSON.stringify(ap.map((x) => x.cle)));
-    dit(ap.length && ap[ap.length - 1].cle === '9004', 'trié par date de vente : la plus ancienne en bas', JSON.stringify(ap.map((x) => x.cle)));
+    // (3 nov., choix de Julien n° 2) L'aperçu suit l'ordre des GROUPES de l'écran (le plus pressé d'abord, par
+    // transporteur) — avant, la date de vente (la plus récente en haut). Jugé contre les cartes rendues.
+    const ecran = await pg.evaluate(() => [...document.querySelectorAll('[data-bord-card][data-tx-colis]')].map((e) => e.getAttribute('data-tx-colis')).filter((x, i, a) => a.indexOf(x) === i));
+    dit(ap.length && JSON.stringify(ap.map((x) => x.cle)) === JSON.stringify(ecran.filter((c) => ap.some((x) => x.cle === c))), 'l’aperçu suit l’ordre des colis de l’écran', JSON.stringify({ apercu: ap.map((x) => x.cle), ecran }));
     const v4 = ap.find((x) => x.cle === '9004');
     dit(v4 && !v4.coche && v4.ancienne, 'la vente d’il y a un mois est DÉCOCHÉE et dit pourquoi (pas d’impression silencieuse d’archives)', JSON.stringify(v4));
     dit(ap.filter((x) => x.coche).length === 3, 'les trois ventes récentes sont cochées', JSON.stringify(ap));
@@ -121,6 +124,11 @@ const projette = (row, sel) => {
       await bouton.click();
       const continuer=pg.getByRole('button',{name:'Préparer quand même les PDF',exact:true});
       await continuer.waitFor();dit(true,'les articles non contrôlés sont signalés avant le PDF');await continuer.click();
+      // (4 nov.) Le type de ces bordereaux n'a pas de place gardée : la feuille du tampon s'ouvre UNE fois, « Imprimer ».
+      const feuille = await pg.waitForSelector('[data-placeur-tampon]:not([data-placeur-tampon="charge"])', { timeout: 20000 }).then(() => true).catch(() => false);
+      const nFeuilles = await pg.evaluate(() => document.querySelectorAll('[data-placeur-tampon]').length);
+      dit(feuille && nFeuilles === 1, 'la feuille du tampon s’ouvre pour ce type de bordereau, une fois', String(nFeuilles));
+      if (feuille) await pg.click('[data-tampon-imprimer]');
       // Le message du lot : celui qui dit « N sur M ».
       const msg = await pg.waitForFunction(() => {
         const t = document.body.innerText; const m = /(\d+) sur (\d+) imprimé[^\n]*/.exec(t); return m ? m[0] : null;
@@ -128,8 +136,8 @@ const projette = (row, sel) => {
       dit(!!msg, 'un lot imprimé en partie le DIT', msg || '(aucun message « N sur M »)');
       const m = /(\d+) sur (\d+)/.exec(msg || '');
       dit(m && m[1] === '1' && m[2] === '3', 'il annonce le nombre RÉELLEMENT imprimé : 1 sur 3 (le PDF abîmé est écarté par la fusion)', msg || '');
-      dit(/1 sans PDF/.test(msg || ''), 'il nomme le bordereau qui n’a plus son PDF', msg || '');
-      const illisible = (msg || '').replace(/1 sur 3 imprimé[s]? — /, '').replace(/1 sans PDF/, '');
+      dit(/1 sans (PDF|bordereau)/.test(msg || '') && /Paire C/.test(msg || ''), 'il nomme le bordereau qui n’a plus son PDF', msg || '');
+      const illisible = (msg || '').replace(/1 sur 3 imprimé[s]? — /, '').replace(/1 sans (PDF|bordereau)[^,]*/, '');
       dit(/\b1\b/.test(illisible), 'et celui que la fusion a écarté — compté, jamais passé sous silence', msg || '');
       await pg.waitForTimeout(600);
       const reprise = await pg.evaluate(() => { const b = document.querySelector('button[data-lot-imprimer]'); return b ? { n: b.getAttribute('data-lot-imprimer'), t: b.innerText } : null; });
