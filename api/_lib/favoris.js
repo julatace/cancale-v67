@@ -46,7 +46,7 @@ async function notifierFinFavoris(owner,fin){
   return contexteVendeur.run({owner},async()=>{
     if(!(await pushCategorieActive('favoris')))return {envoye:false};
     const {title,body}=texteFinFavoris(fin);
-    return sendPushToAll({title,body,url:DESTINATIONS.favorisFile(),tag:'favoris-file-'+String(fin.lot||'')});
+    return sendPushToAll({cat:'favoris',title,body,url:DESTINATIONS.favorisFile(),tag:'favoris-file-'+String(fin.lot||'')});
   });
 }
 // ── LE TOUR DU MODE AUTOMATIQUE (2 nov.) ─────────────────────────────────────
@@ -65,7 +65,7 @@ const lecture=async(req,chemin)=>{const r=await lireCommeVendeur(req,chemin);if(
 async function notifierDemandeAuto(owner,code){
   return contexteVendeur.run({owner},async()=>{
     if(!(await pushCategorieActive('favoris')))return {envoye:false};
-    return sendPushToAll({title:'Messages automatiques aux favoris : un geste à faire',body:DEMANDES_AUTO[code],url:DESTINATIONS.favorisFile(),tag:'favoris-auto-'+code});
+    return sendPushToAll({cat:'favoris',title:'Messages automatiques aux favoris : un geste à faire',body:DEMANDES_AUTO[code],url:DESTINATIONS.favorisFile(),tag:'favoris-auto-'+code});
   });
 }
 export async function tourAuto(req,{owner,uid,cle,maintenant,extension=null}){

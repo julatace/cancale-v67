@@ -43,7 +43,7 @@ import {preparerLiaisonOAuth,lireLiaisonOAuth,resultatLiaisonPermis} from './aut
 import { SqueletteChargement } from "./Chargement.jsx";
 import ConnexionsCompte from './auth/ConnexionsCompte.jsx';
 import {etatColisDepuisTexte,normaliserSuivi} from '../api/_lib/etat-colis-email.js';
-import {FAMILLES as FAMILLES_NOTIF,familleActive as familleNotifActive} from '../api/_lib/notif-textes.js';
+import {FAMILLES as FAMILLES_NOTIF,familleActive as familleNotifActive,reglageCalme,heureValide} from '../api/_lib/notif-textes.js';
 import {achatDuColis,suivisAchat,entreeIndexAchat} from './liensColis.js';
 import {achatParConversation, regrouperArrivees} from '../api/_lib/achat-arrive-relais.js';
 import {arriveesRelues} from './arriveesRelues.js';
@@ -101,6 +101,8 @@ import Dac7Comptes from "./Dac7Comptes.jsx";
 import { dac7ParCompte, indexComptesVentes, emailsFiscaux, blocagesFiscauxVinted, csvDac7, pdfDac7, nomFichierDac7 } from "./dac7Comptes.js";
 import { porteMonnaieParCompte } from "./porteMonnaie.js";
 import AnnoncesMasquees from "./AnnoncesMasquees.jsx";
+import { BoutonCentreNotifs, FeuilleCentreNotifs } from "./CentreNotifs.jsx";
+import { nombreNonLues, marquerLues } from "./journalNotifs.js";
 import { masqueesParCompte } from "./annoncesMasquees.js";
 import { rythmeVendu, ecartPct, quandTuVends, margesPar, delaisPar, tranchePrix, TRANCHES_PRIX, stockQuiDort, SEUILS_DORT, rotationStock, tauxVenteMois, tauxAnnulation, PERIODES, bornesPeriode, dansBornes, venduPeriode, barresPeriode, ventesPar, plusRapides } from "./statsVentes.js";
 import "./stats-vitrine.css";
@@ -126,6 +128,7 @@ import {colisLbcAPoster,lbcColisAPoster,totalColis,colisLbcVendeur} from '../api
 import {CLE_COMPTES_EXCLUS,excluAutreDe,estExclu,basculerExclu,compteDeVente,exclusNormes} from '../api/_lib/comptes-exclus.js';
 import {PLATEFORMES_COMPTES,etatCompteLie,ageLecture,comptesLbcLies,comptesVcLies,comptesEbayLies,refDeLigneEbay,nomCompteLie,LIBELLE_ETAT} from './comptesLies.js';
 import './comptes-lies.css';
+import './centre-notifs.css';
 import './comptes-securite.css';
 import { CLE_MONTANTS_CACHES, lireMontantsCaches, installerMasque } from './montantsCaches.js';
 import { deconnecterPartout, texteConfirmationPartout, ligneJournal, filtrerJournal, comptesDuJournal, FILTRES_TYPE } from './securiteCompte.js';
@@ -61731,7 +61734,138 @@ function LigneVerifCarton({ it, fiche, preuve, onConfirmer, onCorriger, onPlusLa
   );
 }
 
-// (3 nov.) Six familles, un interrupteur chacune (api/_lib/notif-textes.js, la
+// ── LE CENTRE DE NOTIFICATIONS (5 nov.) ─────────────────────────────────────
+// La liste est écrite par le SERVEUR seul (`push_journal`,
+// api/_lib/journal-notifs.js) ; ce qu'il a lu, par l'app seule
+// (`push_journal_lu`). Trois états partout : `null` = pas su (rien n'est écrit
+// par-dessus), `{}` = rien encore, un objet = lu.
+const lireLigneNotifs = async (id, select = 'data') => {
+  if (!AUTH.user) return null;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}&select=${select}`, { headers: sbAuth(), cache: 'no-store' });
+    if (!r.ok) return null;
+    const j = await r.json();
+    if (!Array.isArray(j)) return null;
+    return { ligne: j[0] || null };
+  } catch (_) { return null; }
+};
+const lireLuNotifs = async () => {
+  const l = await lireLigneNotifs('push_journal_lu');
+  if (!l) return null;
+  const d = l.ligne && l.ligne.data;
+  return d && typeof d === 'object' ? d : {};
+};
+const chargerCentreNotifs = async () => {
+  const [j, lu] = await Promise.all([lireLigneNotifs('push_journal'), lireLuNotifs()]);
+  return { journal: j ? ((j.ligne && j.ligne.data) || {}) : null, lu };
+};
+const ecrireLuNotifs = async (next) => {
+  if (!AUTH.user) return false;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
+      method: 'POST',
+      headers: { ...sbAuth(), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify([withOwner({ id: 'push_journal_lu', data: next })]),
+    });
+    try { window.dispatchEvent(new Event('vrm:notifs-lues')); } catch (_) {}
+    return !!r.ok;
+  } catch (_) { return false; }
+};
+// Une notification touchée sur le téléphone (`?notif=<n°>`, ajouté par
+// public/sw.js) : SON entrée est marquée lue — relue d'abord ; pas su ⇒ rien.
+const marquerNotifLue = async (seq) => {
+  const lu = await lireLuNotifs();
+  if (lu === null) return;
+  const next = marquerLues(lu, [seq]);
+  if (next.luJusqua === (Number(lu.luJusqua) || 0) && JSON.stringify(next.lus) === JSON.stringify(Array.isArray(lu.lus) ? [...lu.lus].sort((a, b) => b - a) : [])) return;
+  await ecrireLuNotifs(next);
+};
+// La pastille : deux scalaires (le dernier n° rangé, ce qu'il a lu) — jamais la liste.
+const compterNonLuesNotifs = async () => {
+  const [j, lu] = await Promise.all([lireLigneNotifs('push_journal', 'n:data->n,depuis:data->depuis'), lireLuNotifs()]);
+  if (!j || lu === null) return null;
+  const n = j.ligne ? Number(j.ligne.n) : 0;
+  const depuis = j.ligne ? Number(j.ligne.depuis) : 1;
+  return nombreNonLues(Number.isSafeInteger(n) ? n : 0, lu, Number.isSafeInteger(depuis) ? depuis : 1);
+};
+// La cloche de l'en-tête et sa feuille. Recompte à l'ouverture de l'app, au
+// retour sur l'onglet, toutes les deux minutes tant qu'il est visible, et
+// quand une entrée vient d'être lue.
+function CentreNotifsCoque({ onReglages }) {
+  const [nonLues, setNonLues] = useState(null);
+  const [ouvert, setOuvert] = useState(false);
+  useEffect(() => {
+    let vivant = true;
+    const compter = () => { if (document.visibilityState === 'hidden') return; compterNonLuesNotifs().then((v) => { if (vivant) setNonLues(v); }); };
+    compter();
+    const t = setInterval(compter, 120000);
+    const ouvrir = () => setOuvert(true);
+    window.addEventListener('focus', compter);
+    document.addEventListener('visibilitychange', compter);
+    window.addEventListener('vrm:notifs-lues', compter);
+    window.addEventListener('vrm:centre-notifs', ouvrir);
+    return () => { vivant = false; clearInterval(t); window.removeEventListener('focus', compter); document.removeEventListener('visibilitychange', compter); window.removeEventListener('vrm:notifs-lues', compter); window.removeEventListener('vrm:centre-notifs', ouvrir); };
+  }, []);
+  const fermer = React.useCallback(() => setOuvert(false), []);
+  const aller = React.useCallback((q) => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: q })); } catch (_) {} }, []);
+  return (
+    <>
+      <BoutonCentreNotifs nonLues={nonLues} onOuvrir={() => setOuvert(true)} Icon={Icon}/>
+      {ouvert && <FeuilleCentreNotifs onFermer={fermer} charger={chargerCentreNotifs} ecrireLu={ecrireLuNotifs} onAller={aller} onReglages={onReglages} Fermer={FermeAuRetour} Icon={Icon}/>}
+    </>
+  );
+}
+
+// ── LES E-MAILS DE L'ESSAI GRATUIT (5 nov., api/_lib/relances-essai.js) ─────
+// Au propriétaire : l'envoi est-il configuré (et sinon, ce qui manque sur
+// Vercel). Au vendeur EN ESSAI : les reçoit-il (un interrupteur). À un abonné
+// qui paie : rien (il n'en reçoit jamais).
+function RelancesEssaiSetting() {
+  const [r, setR] = useState(undefined);
+  const [busy, setBusy] = useState(false);
+  const lire = React.useCallback(async () => {
+    try {
+      const x = await fetch('/api/compte?mode=relances', { headers: enTeteSession(), cache: 'no-store' });
+      const j = x.ok ? await x.json() : null;
+      setR(j && j.ok ? j : null);
+    } catch (_) { setR(null); }
+  }, []);
+  useEffect(() => { lire(); }, [lire]);
+  if (r === undefined) return null;
+  if (r === null) return <div data-relances-essai="passu" className="vrm-np-relance" style={{marginTop:12}}>E-mails de l’essai : —</div>;
+  if (!r.proprietaire && !r.essai) return null;
+  const basculer = async () => {
+    if (busy || r.abonne === null) return; setBusy(true);
+    try {
+      const x = await fetch('/api/compte?mode=relances', { method: 'POST', headers: { ...enTeteSession(), 'Content-Type': 'application/json' }, body: JSON.stringify({ abonne: !r.abonne }) });
+      const j = x.ok ? await x.json() : null;
+      if (j && j.ok) setR({ ...r, abonne: j.abonne }); else toast('Choix non enregistré — réessaie dans un instant.');
+    } catch (_) { toast('Choix non enregistré — réessaie quand tu as du réseau.'); }
+    setBusy(false);
+  };
+  const envoyes = r.envois ? Object.values(r.envois).filter((e) => e && e.issue === 'envoye').length : null;
+  return (
+    <div data-relances-essai={r.configure ? 'pret' : 'non-configure'} style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'4px 14px 10px',marginTop:12,color:C.text}}>
+      <div className="vrm-np-titre">E-mails de l’essai gratuit</div>
+      {r.proprietaire ? (
+        <div className="vrm-np-relance" data-relances-proprio="">
+          {r.configure
+            ? <>Prêts : chaque matin, les comptes en essai reçoivent au plus un e-mail (jour 1, jour 3, la veille de la fin). Jamais toi, jamais un abonné qui paie.</>
+            : <><b>Pas configurés : aucun e-mail ne part.</b> À poser sur Vercel (Settings → Environment Variables), avec une boîte d’envoi de VRM : {(r.manque || []).map((m, i) => <React.Fragment key={m}>{i ? ', ' : ''}<code>{m}</code></React.Fragment>)}.</>}
+        </div>
+      ) : null}
+      {r.essai ? (
+        <div className="vrm-np-ligne" data-relances-abonne={r.abonne === null ? 'passu' : r.abonne ? 'on' : 'off'}>
+          <span className="vrm-np-lib">Conseils par e-mail pendant l’essai<small>{!r.configure ? 'L’envoi d’e-mails n’est pas configuré : aucun ne part.' : envoyes ? `${envoyes} reçu${envoyes > 1 ? 's' : ''} sur 3 au plus.` : 'Trois au plus, à l’adresse de ton compte.'}</small></span>
+          {r.abonne === null ? <span className="vrm-np-relance">—</span>
+            : <Interrupteur on={!!r.abonne} onClick={basculer} disabled={busy} label={`Conseils par e-mail : ${r.abonne ? 'activés' : 'désactivés'}`}/>}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+// (3 nov., 5 nov.) Sept types, un interrupteur chacun (api/_lib/notif-textes.js, la
 // règle que le serveur applique avant d'envoyer). Les anciennes catégories
 // fines restent lues comme réglage d'avant tant qu'une famille n'est pas posée.
 const PUSH_FAMILLES = FAMILLES_NOTIF;
@@ -61765,21 +61899,28 @@ function PushPrefsSetting({ comptes, onMuets }) {
   const actif = (c) => familleNotifActive(prefs || {}, c.id);
   const pasLu = prefs === null;              // la base n'a pas répondu
   const enCours = prefs === undefined;
-  const bascule = async (c) => {
-    if (busy || pasLu) return; setBusy(true);
-    const next = { ...(prefs || {}), familles: { ...((prefs && prefs.familles) || {}), [c.id]: !actif(c) } };
+  // (5 nov.) Une seule écriture pour tous les réglages de la ligne (types,
+  // heures calmes, regroupement) : la ligne LUE, modifiée, réécrite entière.
+  const ecrirePrefs = async (next) => {
+    if (busy || pasLu || !prefs) return; setBusy(true);
     setPrefs(next);
     try {
-      await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
         method: 'POST',
         headers: { ...sbAuth(), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
         body: JSON.stringify([withOwner({ id: 'push_prefs', data: next })]),
       });
+      if (!r.ok) toast("Réglage non enregistré — réessaie dans un instant.");
     } catch (_) { toast("Réglage non enregistré — réessaie quand tu as du réseau."); }
     setBusy(false);
   };
+  const bascule = (c) => ecrirePrefs({ ...(prefs || {}), familles: { ...((prefs && prefs.familles) || {}), [c.id]: !actif(c) } });
+  const calme = reglageCalme(prefs || {});
+  const poserCalme = (patch) => ecrirePrefs({ ...(prefs || {}), calme: { ...calme, ...patch } });
+  const regroupe = !!(prefs && prefs.regrouper === true);
   const n = prefs ? PUSH_FAMILLES.filter(actif).length : 0;
   return (
+    <>
     <details style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'10px 14px'}} onToggle={(e) => setOuvert(e.currentTarget.open)}>
       <summary style={{cursor:'pointer',listStyle:'none',display:'flex',alignItems:'center',gap:8}}>
         <div style={{flex:1,minWidth:0}}>
@@ -61813,6 +61954,34 @@ function PushPrefsSetting({ comptes, onMuets }) {
         })}
       </div>
     </details>
+    {/* (5 nov.) Heures calmes et regroupement : lus par le serveur juste avant
+        d'envoyer (api/_lib/notif-textes.js) — pas un filtre d'affichage. */}
+    <div data-np-reglages="" style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'4px 14px 10px',marginTop:12,color:C.text}}>
+      <div className="vrm-np-ligne" data-np-calme={calme.actif?'on':'off'} style={{borderTop:0}}>
+        <span className="vrm-np-lib">Heures calmes<small>Rien ne sonne ; tout reste dans la cloche de VRM.</small></span>
+        <Interrupteur on={calme.actif} onClick={()=>poserCalme({ actif: !calme.actif })} disabled={!prefs||busy} label={`Heures calmes : ${calme.actif?'activées':'désactivées'}`}/>
+      </div>
+      {calme.actif && (
+        <div className="vrm-np-heures" data-np-heures={`${calme.debut}-${calme.fin}`}>
+          <label>De <input type="time" value={calme.debut} disabled={!prefs||busy} aria-label="Début des heures calmes" onChange={(e)=>{ if (heureValide(e.target.value)) poserCalme({ debut: e.target.value }); }}/></label>
+          <label>à <input type="time" value={calme.fin} disabled={!prefs||busy} aria-label="Fin des heures calmes" onChange={(e)=>{ if (heureValide(e.target.value)) poserCalme({ fin: e.target.value }); }}/></label>
+        </div>
+      )}
+      {calme.actif && (
+        <div className="vrm-np-ligne" data-np-calme-dv={calme.sauf.includes('doublevente')?'on':'off'}>
+          <span className="vrm-np-lib">La double vente sonne quand même</span>
+          <Interrupteur on={calme.sauf.includes('doublevente')} onClick={()=>poserCalme({ sauf: calme.sauf.includes('doublevente') ? calme.sauf.filter((x)=>x!=='doublevente') : [...calme.sauf, 'doublevente'] })} disabled={!prefs||busy} label="La double vente sonne pendant les heures calmes"/>
+        </div>
+      )}
+      <div className="vrm-np-ligne" data-np-regrouper={regroupe?'on':'off'}>
+        <span className="vrm-np-lib">Regrouper par type<small>Une notification par type sur le téléphone, avec le nombre d’autres.</small></span>
+        <Interrupteur on={regroupe} onClick={()=>ecrirePrefs({ ...(prefs || {}), regrouper: !regroupe })} disabled={!prefs||busy} label={`Regrouper par type : ${regroupe?'activé':'désactivé'}`}/>
+      </div>
+      <div className="vrm-np-ligne">
+        <Bouton variante="secondaire" data-np-voir-centre="" onClick={()=>{ try { window.dispatchEvent(new Event('vrm:centre-notifs')); } catch (_) {} }}>Voir les notifications envoyées</Bouton>
+      </div>
+    </div>
+    </>
   );
 }
 function GuideReglage({ titre, etapes }) {
@@ -62103,7 +62272,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     { id:'notifications', titre:'Notifications', items:[
       { id:'push', type:'panneau', ic:'bell2', lib:'Notifications du téléphone', titreInterne:true,
         desc: nMuetsPush > 0 ? <span style={{color:C.warn,fontWeight:600}}>{nMuetsPush} compte{nMuetsPush>1?'s':''} sans email : pas de notification</span> : null,
-        el:<><PushSetting/><div style={{height:12}}/><PushPrefsSetting comptes={comptes} onMuets={setNMuetsPush}/></> },
+        el:<><PushSetting/><div style={{height:12}}/><PushPrefsSetting comptes={comptes} onMuets={setNMuetsPush}/><RelancesEssaiSetting/></> },
       // Alertes locales (l'ancien bouton 🔔 du haut) : bandeau + notification
       // quand l'app est OUVERTE (ventes comptabilisées, factures reçues).
       { id:'alertes', type:'switch', ic:'info', lib:"Alertes dans l'app", desc:'Ventes et factures, quand l’app est ouverte.', on:!!notifEnabled, onClick:onToggleNotif, data:{ 'data-reglage-alertes': notifEnabled ? 'on' : 'off' } },
@@ -65962,7 +66131,9 @@ function AppCoeur() {
     // (31 oct.) Une notification mène à l'élément PRÉCIS : `cible` (+ son
     // identité) et `vue` (src/cibleNotif.js, api/_lib/lien-notif.js). Une
     // `section` vaut aussi pour Comptabilité et Statistiques.
-    const goto=(search)=>{ try{ const p=new URLSearchParams(search); const t=p.get('tab'); if(p.get('print')==='bord') _pendingBordPrint=true; if(t&&TABS_OK.includes(t)){ const site=p.get('site'), section=p.get('section'), vue=p.get('vue');
+    const goto=(search)=>{ try{ const p=new URLSearchParams(search); const t=p.get('tab');
+      // (5 nov.) Une notification touchée porte `notif=<n°>` (public/sw.js) : son entrée du centre est marquée lue.
+      { const nn=Number(p.get('notif')); if(Number.isSafeInteger(nn)&&nn>0){ marquerNotifLue(nn); if(!t) window.history.replaceState(window.history.state,'',window.location.pathname); } } if(p.get('print')==='bord') _pendingBordPrint=true; if(t&&TABS_OK.includes(t)){ const site=p.get('site'), section=p.get('section'), vue=p.get('vue');
       if(site&&estTacheSite(t)&&siteDeTache(t,site)===site) subVoulue.current=site; else if(section&&/^[a-z]{2,12}$/.test(section)&&(t.startsWith('plat_')||t==='compta'||t==='dashboard')) subVoulue.current=section;
       if(vue==='achats'){ demanderVue('achats'); } else if(vue==='retraits'){ demanderVue('retraits'); } else if(vue==='favoris') demanderVue('favoris');
       // (1er nov.) `cat_achats` mène aux colis à retirer (dans Colis) ; avec `vue=achats`, c'est l'écran Achats.
@@ -68436,6 +68607,8 @@ function AppCoeur() {
             <PastilleStream/>
             {/* (4 nov.) L'œil : cache TOUS les montants en € de l'écran (src/montantsCaches.js). */}
             <BoutonMontants/>
+            {/* (5 nov.) La cloche : ce que VRM a envoyé (src/CentreNotifs.jsx). */}
+            {AUTH.user && <CentreNotifsCoque onReglages={()=>setTab('settings')}/>}
             {!ordi && <button className="vrm-hbtn" type="button" data-recherche-zone="" data-recherche-loupe="" onClick={()=>{ if(gsOpen) fermerRecherche(); else ouvrirRecherche(); }} title="Rechercher" aria-label="Rechercher une paire" aria-expanded={gsOpen} aria-controls="vrm-recherche-resultats">
               <Icon name="search" size={21}/>
             </button>}

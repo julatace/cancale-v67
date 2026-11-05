@@ -56,6 +56,14 @@ async function purgerAncienneVersion(res) {
 }
 
 // ── Notifications push (ventes en temps réel, même app fermée) ──
+// (5 nov.) Le serveur joint le numéro de l'entrée du centre de notifications
+// (`notif`) : ajouté à l'adresse, l'app marque cette entrée lue à l'ouverture.
+// Seulement un entier, seulement sur un chemin de l'app.
+const avecNotif = (url, n) => {
+  const u = String(url || '/');
+  if (!Number.isSafeInteger(n) || n <= 0 || !u.startsWith('/')) return u;
+  return u + (u.includes('?') ? '&' : '?') + 'notif=' + n;
+};
 self.addEventListener('push', event => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch (_) { data = { body: event.data ? event.data.text() : '' }; }
@@ -67,7 +75,7 @@ self.addEventListener('push', event => {
     tag: data.tag || 'vrm',
     renotify: true,            // même tag : re-sonne au lieu de rester silencieux
     vibrate: [80, 40, 80],     // petite vibration (Android) pour attirer l'œil
-    data: { url: data.url || '/' },
+    data: { url: avecNotif(data.url || '/', data.notif) },
   };
   // Notification RICHE : si le serveur a joint la photo de l'article, on
   // l'affiche en grand (rendu bien plus pro qu'un texte seul).
