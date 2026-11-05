@@ -245,9 +245,13 @@ async function sectionAnnonces(b, vp, sombre) {
         const l = [...m.querySelectorAll('.vrm-fiche-menu > button, .vrm-fiche-menu > a')];
         const b = m.querySelector('[data-fiche-place="lbc"]'); const t = l.find((x) => /Passeport/.test(x.textContent));
         return { noms: l.map((x) => x.textContent.trim()).join(' | '), place: b ? { etat: b.getAttribute('data-fiche-place-etat'), couleur: getComputedStyle(b).color, bord: getComputedStyle(b).borderTopColor, fond: getComputedStyle(b).backgroundColor, voisinCouleur: t ? getComputedStyle(t).color : '', voisinBord: t ? getComputedStyle(t).borderTopColor : '', voisinFond: t ? getComputedStyle(t).backgroundColor : '' } : null }; });
-      const x = pg.locator('[data-fiche-menu] button[aria-label="Fermer"]').first();
-      if (await x.count()) await x.click().catch(() => pg.keyboard.press('Escape')); else await pg.keyboard.press('Escape');
-      await pg.waitForTimeout(300);
+      // La croix de la feuille (SheetShell) ; on attend qu'elle soit PARTIE (sinon son voile prend les clics suivants).
+      for (let i = 0; i < 3 && await pg.locator('[data-fiche-menu]').count(); i++) {
+        const x = pg.locator('[role="dialog"] button[aria-label="Fermer"]').last();
+        if (await x.count()) await x.click({ timeout: 3000 }).catch(() => pg.keyboard.press('Escape')); else await pg.keyboard.press('Escape');
+        await pg.locator('[data-fiche-menu]').first().waitFor({ state: 'detached', timeout: 2000 }).catch(() => {});
+      }
+      await pg.waitForTimeout(200);
       return f;
     };
     const f9201 = await feuilleFiche('9201'), f9202 = await feuilleFiche('9202');

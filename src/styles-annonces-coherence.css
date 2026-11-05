@@ -259,5 +259,7 @@ html body .vrm-ann-avis > button.vrm-ann-avis-neufs > svg { display: none; flex:
   html body .vrm-ann-avis > button.vrm-ann-avis-neufs .vrm-ann-avis-voir { display: none; }
   html body .vrm-ann-avis > button.vrm-ann-avis-neufs > svg { display: block; }
   /* Le premier article dans le premier écran (fusion-app F4) : un peu moins d'air entre la carte du haut et la barre. */
-  :root body .vrm-app-shell .vrm-main .vrm-ann-workbar { margin-top: -10px !important; margin-bottom: 10px !important; }
+  :root body .vrm-app-shell .vrm-main .vrm-ann-workbar { margin-top: -16px !important; margin-bottom: 8px !important; }
+  .vrm-ann-avis, .vrm-ann-achats { min-height: 44px; }
+  html body .vrm-ann-avis > button.vrm-ann-avis-neufs { min-height: 44px !important; }
 }

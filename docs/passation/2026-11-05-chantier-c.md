@@ -41,11 +41,14 @@ composants du chantier B (utilisés sans les modifier). Branche locale `v35-chan
 - Au téléphone, « Plus d'actions » devient **« Détails et gestes »** (il contient « … »).
 
 ### 2.7 — Le prix d'achat
-- **Un bandeau** au-dessus de la grille : « **Prix d'achat 2/6** connus : le bénéfice ne
-  compte que ceux-là · **Compléter** » (`data-ann-achats`), compté sur la même base que la
-  grille (`annBase`), absent quand tout est connu. « Compléter » ouvre la saisie en série
-  existante. L'entrée « Compléter les prix d'achat » du menu Outils (le même nombre une
-  seconde fois) est retirée.
+- **Une ligne d'avis** en tête de la liste (`data-ann-avis`) : « **Prix d'achat 2/6** connus
+  · **Compléter** » (`data-ann-achats`, compté sur la même base que la grille, `annBase` ;
+  absent quand tout est connu ; « Compléter » ouvre la saisie en série existante) et, à
+  côté, « **4 nouveaux N° · Vérifier** » (`data-num-neufs-ouvrir`) qui déplie dessous la
+  liste des N° posés par VRM (avant : un bloc de quatre lignes toujours ouvert). Une ligne,
+  pas deux blocs : au téléphone le premier article reste dans le premier écran (banc
+  `fusion-app` F4 : y = 904 sur l'état intégré, sous 600 après). L'entrée « Compléter les prix
+  d'achat » du menu Outils (le même nombre une seconde fois) est retirée.
 - La case « Prix d'achat » de la carte est **grise** (plus de bord ni de libellé ambre sur
   chaque carte) ; au téléphone, fermée, elle ne s'affiche plus (le bandeau le dit une fois).
 
@@ -137,6 +140,13 @@ composants du chantier B (utilisés sans les modifier). Branche locale `v35-chan
 61. Reprises : « Remettre N°42 » aplat bleu fait main → `Bouton` secondaire ; « ⚠️ » retiré.
 62. Reprises : vignette vide icône 20 px → `PhotoVide`.
 63. « Aide à la vente » bordure + texte bleus faits main → `Bouton` secondaire.
+64. « 4 mises en ligne numérotées par VRM », bloc de 4 lignes toujours ouvert → « 4 nouveaux N° · Vérifier » dans la ligne d'avis, la liste se déplie dessous.
+65. N° de ces lignes « N°2 » en bleu (#0071E3, 3,6:1 la nuit — fusion-app F6) → `Numero` ; vignette vide noire → `PhotoVide` ; « C'est bon » / « Tout est bon » → `Bouton`.
+66. Bandeau prix d'achat + bloc des N° neufs (deux blocs) → une ligne à deux cases.
+67. Au téléphone : « Vérifier » devient un chevron, la phrase du prix d'achat passe dans l'infobulle — la ligne reste une ligne.
+68. Boutons discrets bleus en aplat (#0A84FF sur la carte sombre, 3,6:1) → bleu « lien » (`--vrm-accent-texte`) dans l'écran et ses feuilles.
+69. Rayons 10 px (vignettes de Sélectionner, photos « à la main ») → 12 (échelle fermée : `annonces-selection.css` sort de la liste des fichiers hors échelle).
+70. Au téléphone, l'air entre la carte du haut et la barre d'outils : 33 → 23 px (premier article dans le premier écran).
 
 ## Preuves
 - `npm run build` vert.
