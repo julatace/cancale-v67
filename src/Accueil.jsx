@@ -684,7 +684,7 @@ export default function Accueil({ onEntrer }) {
               <h2 className="acc-h2b">Tes comptes restent les tiens.</h2>
               <p>VRM agit sur le compte ouvert dans ton navigateur : une action à la fois, jamais plus de 50 par heure.</p>
               <p>Tu gardes la main sur tes ventes et tes messages. Les automatismes — <span data-automatisme="">répondre aux questions des acheteurs</span>, <span data-automatisme="">retirer d’eBay une annonce vendue ailleurs</span> — restent éteints tant que tu ne les allumes pas.</p>
-              <p>Pas de relances en série aux favoris, de republication en boucle, d’acceptation automatique des offres Vinted ou de suppression d’annonce.</p>
+              <p>Rien ne part sans toi : les messages aux favoris, la republication et l’acceptation automatique des offres Vinted (éteinte par défaut) ne démarrent que si tu les lances, et aucune annonce n’est supprimée sans ta confirmation.</p>
             </div>
           </div>
         </section>
