@@ -1,29 +1,34 @@
 // ── LE CODE DE RETRAIT ET LE QR D'UN COLIS, RELIÉS PAR IDENTITÉ (5 nov.) ─────
 // Julien (5 nov.) : « relier le code de retrait et le QR code, pour aller
-// beaucoup plus vite aux retraits » ; « quand il se connecte à son compte
-// Mondial Relay, l'extension capte TOUS les colis arrivés avec leurs QR » ;
-// « une personne peut avoir plusieurs comptes Mondial Relay, et des colis
-// arrivés par e-mail peuvent ne pas figurer dans le compte Mondial Relay ».
+// beaucoup plus vite aux retraits » ; « une personne peut avoir plusieurs
+// comptes Mondial Relay, et des colis arrivés par e-mail peuvent ne pas figurer
+// dans le compte Mondial Relay ».
+// ⚠️ PRÉCISION DU 5 NOV. (mot pour mot) : « je ne peux pas avoir les qr code dans
+// le navigateur c'est que dans l'app ». Le QR Mondial Relay n'existe QUE dans
+// l'application mobile Mondial Relay : ni dans l'e-mail, ni sur mondialrelay.fr.
+// La lecture des comptes mondialrelay.fr (lignes `mr_colis_*`, pas encore écrites
+// par l'extension) reste une PISTE pour le CODE, le lieu et la date — JAMAIS pour
+// le QR : un champ `qr` y est ignoré. Le QR entre par SA capture de l'app, posée
+// sur un colis (src/qrCapture.js).
 //
 // Mesuré dans sa base le 5 nov. (lecture seule, comptes seulement) :
 //   · Mondial Relay : 57 e-mails « disponible », 55 avec code, 0 QR — le QR
-//     Mondial Relay n'est JAMAIS dans l'e-mail (il vit dans son compte) ;
+//     Mondial Relay n’est JAMAIS dans l’e-mail (il vit dans l’app Mondial Relay) ;
 //   · Vinted Go : 25 « disponible », 25 code ET QR (`p.vintedgo.com/…/qr_codes`) ;
 //   · Chronopost : 11 « disponible », 7 code, 9 vrais QR (Pickup Pass), 6 les deux ;
 //   · conversations Vinted (`panel_colis_relais`) : 33 colis, 16 codes, 0 QR ;
 //   · les e-mails Mondial Relay arrivent sur 3 adresses différentes (`recuSur`).
 //
 // Ce module ne DÉCIDE rien sur l'état d'un colis (la règle reste
-// `pickupUnion`, api/_lib/suivi-colis.js) : il range ce que l'extension lira
-// dans les comptes Mondial Relay (lignes `mr_colis_{compte}`), en fait des
+// `pickupUnion`, api/_lib/suivi-colis.js) : il range ce qu'une extension lirait
+// dans les comptes Mondial Relay (lignes `mr_colis_{compte}`, codes seulement), en fait des
 // lignes de suivi de la même forme que celles des e-mails — reliées aux autres
 // par le N° DE SUIVI SEULEMENT (§5 : jamais le titre, le lieu ni la date) —, et
-// dit, pour un colis, d'où viennent son code et son QR, et où trouver le QR
-// qu'on n'a pas. Pur : aucun appel, aucune horloge implicite.
+// dit, pour un colis, d'où vient son code, et où trouver le QR qu'on n'a pas.
+// Pur : aucun appel, aucune horloge implicite.
 
 export const MR_PREFIXE = 'mr_colis_';
-// Projection (§4.4 : jamais `select=data`) : le QR est petit (une image de
-// quelques centaines d'octets en SVG/PNG), la ligne ne porte rien d'autre.
+// Projection (§4.4 : jamais `select=data`) : la ligne ne porte que des textes courts.
 export const MR_SELECT = 'id,v:data->>v,compte:data->compte,luAt:data->>luAt,complet:data->>complet,colis:data->colis';
 // La forme rangée par l'extension (docs/passation/2026-11-05-colis-qr.md).
 export const MR_VERSION = 1;
@@ -33,19 +38,9 @@ const texte = (v, max = 200) => (typeof v === 'string' ? v.trim().slice(0, max) 
 const dateIso = (v) => { const s = texte(v, 40); return s && Number.isFinite(Date.parse(s)) ? s : ''; };
 // Le même filtre que l'app (`codeRetrait`, App.jsx) : au plus deux lettres devant 3 à 10 chiffres.
 export const codeRetraitMr = (v) => { const c = String(v == null ? '' : v).trim().toUpperCase(); return /^[A-Z]{0,2}\d{3,10}$/.test(c) ? c : ''; };
-const TYPES_QR = new Set(['image/png', 'image/svg+xml', 'image/gif', 'image/jpeg', 'image/webp']);
 // L'état écrit par l'extension ⇒ le statut d'une ligne de suivi (celui des e-mails).
 const STATUTS = { en_route: 'transit', disponible: 'available', retire: 'delivered', retour: 'retour' };
 const LIBELLES = { transit: 'En route vers le point relais', available: 'Disponible au point relais', delivered: 'Retiré', retour: 'Retourné à l’expéditeur' };
-
-// Un QR rangé : base64 d'une image, d'un type d'image connu, de taille raisonnable.
-function qrValide(q) {
-  if (!q || typeof q !== 'object') return null;
-  const type = texte(q.type, 40).toLowerCase();
-  const b64 = typeof q.b64 === 'string' ? q.b64.replace(/\s+/g, '') : '';
-  if (!TYPES_QR.has(type) || !b64 || b64.length > 60000 || !/^[A-Za-z0-9+/]+=*$/.test(b64)) return null;
-  return { type, b64 };
-}
 
 // ── LECTURE : les lignes `mr_colis_*` ⇒ comptes + colis (forme inconnue = ignorée) ──
 // `rows` : la réponse de la base (null = pas su). Rend null (pas su), ou
@@ -68,8 +63,9 @@ export function lireColisMondialRelay(rows) {
       const suivi = norm(x.suivi);
       const status = STATUTS[texte(x.etat, 20)];
       if (!/\d/.test(suivi) || suivi.length < 6 || !status || (x.sens && x.sens !== 'entrant')) { ignores++; continue; }
-      const qr = qrValide(x.qr);
-      colis.push({ suivi, status, code: codeRetraitMr(x.code), qr, lieu: texte(x.lieu, 200) || null, limite: dateIso(x.limite).slice(0, 10) || null,
+      // ⚠️ (5 nov.) Aucun QR ne vient d'un compte Mondial Relay lu dans le navigateur : il n'y
+      // existe pas (« c'est que dans l'app »). Un champ `qr` éventuel est IGNORÉ.
+      colis.push({ suivi, status, code: codeRetraitMr(x.code), lieu: texte(x.lieu, 200) || null, limite: dateIso(x.limite).slice(0, 10) || null,
         arriveLe: dateIso(x.arriveLe) || null, compteCle: cle, compteLibelle: libelle, luAt });
       compte.n++;
     }
@@ -96,7 +92,7 @@ export function lignesSuiviMondialRelay(mr) {
   return [...parN.values()].map((c) => ({
     id: `${MR_PREFIXE}${c.compteCle}_${c.suivi}`, source: 'mondialrelay-compte', type: 'suivi', carrier: 'mondialrelay',
     suivi: c.suivi, status: c.status, statusLabel: LIBELLES[c.status], subject: `Colis Mondial Relay ${c.suivi}`,
-    code: c.code || null, code2: null, qrB64: c.qr ? c.qr.b64 : null, qrType: c.qr ? c.qr.type : null, qrUrl: null,
+    code: c.code || null, code2: null, qrB64: null, qrType: null, qrUrl: null,
     lieu: c.lieu, limite: c.limite, consigne: false, account: '', artTitle: '',
     receivedAt: c.luAt || c.arriveLe || null, emailAt: c.luAt || null, arriveLe: c.arriveLe || null,
     mrCompte: { cle: c.compteCle, libelle: c.compteLibelle, luAt: c.luAt },
@@ -110,7 +106,7 @@ export function lignesSuiviMondialRelay(mr) {
 // un compte reçoit le nom de ce compte (`mrCompte`) — l'identité est le n°.
 // ⚠️ (revue adverse du 5 nov.) CE QUE SEUL L'E-MAIL DU MÊME N° SAIT passe aussi sur la
 // ligne du compte : `pickupUnion` ne garde qu'une ligne par n° (la plus complète —
-// celle du compte, qui a le QR) et elle effaçait le compte Vinted de l'e-mail
+// celle du compte, qui a le lieu) et elle effaçait le compte Vinted de l'e-mail
 // (`account`), l'adresse qui l'a reçu (`recuSur`), le titre et la date d'arrivée LUE
 // (« Arrivé le 4 nov. » devenait « au plus tard le 5 », la date de la lecture).
 // L'identité est le n° de suivi, rien d'autre (§5).
@@ -162,11 +158,13 @@ export function codeDuCompteMr(tracking, suivi) {
   return '';
 }
 
-// ── OÙ TROUVER LE QR QU'ON N'A PAS (« QR pas reçu ») ─────────────────────────
-// Une phrase par transporteur, jamais une promesse : le QR Mondial Relay vit
-// dans son compte (site ou application), jamais dans l'e-mail (55/55 mesurés).
+// ── OÙ TROUVER LE QR QU'ON N'A PAS ───────────────────────────────────────────
+// Une phrase par transporteur, jamais une promesse. Mondial Relay (5 nov.) : le QR
+// n'existe que dans l'APPLICATION Mondial Relay (ni e-mail — 0/57 mesurés —, ni
+// site) ; le titre court le dit (« QR dans l'app Mondial Relay », src/qrCapture.js),
+// cette phrase ajoute seulement que le code suffit.
 export const QR_OU = {
-  mondialrelay: 'Mondial Relay ne met pas le QR dans ses e-mails : il est dans ton compte Mondial Relay (site ou application). Au comptoir, le code suffit.',
+  mondialrelay: 'Le code suffit au comptoir.',
   chronopost: 'Dans l’e-mail Chronopost « votre colis vous attend » (Pickup Pass).',
   vinted: 'Dans la conversation Vinted de l’achat, ou l’e-mail Vinted Go.',
   relaiscolis: 'Dans l’e-mail ou l’application Relais Colis.',

@@ -1,16 +1,16 @@
-// ── « OUVRE TON COMPTE MONDIAL RELAY, VRM RÉCUPÈRE TES COLIS ET LEURS QR » (5 nov.) ──
-// Julien (vocal du 5 nov.) : « quand il se connecte à son compte Mondial Relay,
-// l'extension capte TOUS les colis arrivés avec leurs QR codes… Une animation
-// l'explique. » Une scène courte en CSS/SVG : le compte Mondial Relay ouvert
-// dans le navigateur (n'importe lequel, Orion compris), ses colis qui glissent
-// vers VRM, où chacun arrive avec son CODE et son QR, reliés par le n° de suivi.
+// ── « LE QR MONDIAL RELAY : UNE CAPTURE DE L'APP » (5 nov.) ──────────────────
+// Julien (5 nov., mot pour mot) : « je ne peux pas avoir les qr code dans le
+// navigateur c'est que dans l'app ». Le QR Mondial Relay n'existe QUE dans
+// l'application mobile Mondial Relay (ni e-mail, ni mondialrelay.fr) : aucune
+// extension ne peut le lire. La scène montre le SEUL chemin : une capture d'écran
+// de l'app, choisie sur le colis dans VRM (« Ajouter le QR »), lue DANS le
+// téléphone (src/lireQrCapture.js), le code et le QR ensuite « En grand ».
 // ⚠️ DONNÉES INVENTÉES (§2.3 et vocal : « des données simulées, jamais les
-// siennes ») : n°, codes, relais et QR sont faux — le QR dessiné est un motif
-// décoratif, pas un code lisible. `prefers-reduced-motion` ⇒ la scène finale, fixe.
+// siennes ») : n°, code et QR sont faux — le QR dessiné est un motif décoratif,
+// pas un code lisible. `prefers-reduced-motion` ⇒ la scène finale, fixe.
 //
-// `LecturesMondialRelay` : la fraîcheur de CHAQUE compte Mondial Relay relu
-// (« relu il y a 3 min »), une ligne par compte, depuis les lignes `mr_colis_*`
-// (src/retraitQr.js). Rien lu ⇒ rien d'affiché ici (l'explication dit le geste).
+// `LecturesMondialRelay` : la fraîcheur de CHAQUE compte Mondial Relay relu (pour
+// les CODES seulement — piste `mr_colis_*`, src/retraitQr.js). Rien lu ⇒ rien ici.
 import React from 'react';
 import { ilYa } from './retraitQr.js';
 
@@ -33,12 +33,12 @@ const CSS = `
 .mrx-etapes li{font-size:12px;line-height:1.4;color:var(--mrx-muted);padding:8px;border-radius:12px;background:var(--mrx-bg)}
 .mrx-etapes li b{display:block;color:var(--mrx-ink);font-weight:600;margin-bottom:2px}
 .mrx-faux{font-size:11px;color:var(--mrx-muted)}
+.mrx-centre{justify-content:center}
+.mrx-flash{font-size:11px;color:var(--mrx-muted)}
 @media (max-width:520px){.mrx-etapes{grid-template-columns:1fr}.mrx-scene{grid-template-columns:minmax(0,1fr) 24px minmax(0,1fr);padding:10px}}
 @media (prefers-reduced-motion:no-preference){
   .mrx-anime .mrx-src .mrx-colis{animation:mrxPart 6s cubic-bezier(.2,.8,.2,1) infinite both}
-  .mrx-anime .mrx-src .mrx-colis:nth-child(3){animation-delay:.35s}
   .mrx-anime .mrx-vrm .mrx-colis{animation:mrxArrive 6s cubic-bezier(.2,.8,.2,1) infinite both}
-  .mrx-anime .mrx-vrm .mrx-colis:nth-child(3){animation-delay:.35s}
   .mrx-anime .mrx-point{animation:mrxFlux 6s linear infinite}
   .mrx-anime .mrx-point:nth-child(2){animation-delay:.25s}
   .mrx-anime .mrx-point:nth-child(3){animation-delay:.5s}
@@ -62,30 +62,32 @@ function QrDecoratif({ graine = 1 }) {
 }
 const Boite = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" aria-hidden="true"><path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/></svg>;
 
-// Les colis de la scène : INVENTÉS.
-const EXEMPLE = [{ n: '00 000 001', code: '482913', g: 1 }, { n: '00 000 002', code: '730256', g: 2 }];
+// Le colis de la scène : INVENTÉ.
+const EXEMPLE = { n: '00 000 001', code: '482913', g: 1 };
 
 export default function ExpliqueMondialRelay({ anime = true }) {
   return (
-    <div className={'mrx' + (anime ? ' mrx-anime' : '')} data-explique-mr="">
+    <div className={'mrx' + (anime ? ' mrx-anime' : '')} data-explique-mr="" data-explique-mr-chemin="capture">
       <style>{CSS}</style>
-      <div className="mrx-scene" role="img" aria-label="Exemple inventé : ton compte Mondial Relay ouvert dans le navigateur, ses colis arrivent dans VRM avec leur code et leur QR">
+      <div className="mrx-scene" role="img" aria-label="Exemple inventé : une capture d’écran de l’app Mondial Relay, choisie sur le colis dans VRM, qui y montre ensuite le code et le QR">
         <div className="mrx-fen mrx-src">
-          <div className="mrx-barre"><i/><i/><i/>mondialrelay.fr</div>
-          {EXEMPLE.map((c) => <div key={c.n} className="mrx-colis"><Boite/><b>n° {c.n}</b></div>)}
+          <div className="mrx-barre"><i/><i/><i/>App Mondial Relay</div>
+          <div className="mrx-colis"><Boite/><b>n° {EXEMPLE.n}</b></div>
+          <div className="mrx-colis mrx-centre"><QrDecoratif graine={EXEMPLE.g}/><span className="mrx-flash">capture</span></div>
         </div>
         <div className="mrx-fleche" aria-hidden="true"><span className="mrx-point"/><span className="mrx-point"/><span className="mrx-point"/></div>
         <div className="mrx-fen mrx-vrm">
-          <div className="mrx-barre"><i/><i/><i/>VRM</div>
-          {EXEMPLE.map((c) => <div key={c.n} className="mrx-colis"><span className="mrx-code">{c.code}</span><QrDecoratif graine={c.g}/></div>)}
+          <div className="mrx-barre"><i/><i/><i/>VRM · n° {EXEMPLE.n}</div>
+          <div className="mrx-colis"><span className="mrx-code">{EXEMPLE.code}</span><QrDecoratif graine={EXEMPLE.g}/></div>
+          <div className="mrx-colis mrx-centre"><b>En grand</b></div>
         </div>
       </div>
       <ol className="mrx-etapes">
-        <li><b>1. Ouvre ton compte</b>sur mondialrelay.fr, connecté — Chrome, Orion ou un autre navigateur avec l’extension VRM.</li>
-        <li><b>2. VRM relève tes colis</b>ceux qui arrivent, leur code et leur QR, compte par compte.</li>
-        <li><b>3. Au relais</b>« En grand » : le code et le QR, reliés par le n° de suivi — jamais par le titre.</li>
+        <li><b>1. Dans l’app Mondial Relay</b>ouvre le colis et fais une capture d’écran de son QR. Le site et les e-mails ne le montrent pas.</li>
+        <li><b>2. Dans VRM, sur ce colis</b>« Ajouter le QR » puis choisis la capture. Le QR est lu dans ton téléphone : rien n’est envoyé.</li>
+        <li><b>3. Au relais</b>« En grand » : le code et le QR. Sans QR, le code suffit au comptoir.</li>
       </ol>
-      <span className="mrx-faux">Exemple inventé : n°, codes et QR de cette animation sont faux.</span>
+      <span className="mrx-faux">Exemple inventé : n°, code et QR de cette animation sont faux.</span>
     </div>
   );
 }
@@ -100,7 +102,7 @@ export function LecturesMondialRelay({ mr, maintenant = Date.now() }) {
         const vieux = Number.isFinite(age) && maintenant - age > 24 * 3600e3;
         return <li key={c.cle} data-mr-compte={c.cle} data-mr-compte-n={c.n} data-mr-relu={c.luAt || ''} data-mr-complet={c.complet ? '1' : '0'}>
           <span className="vrm-mr-nom">Mondial Relay · {c.libelle}</span>
-          <span className={'vrm-mr-frais' + (vieux ? ' is-ambre' : '')}>{c.n} colis · {c.luAt ? `relu ${ilYa(c.luAt, maintenant)}` : 'jamais relu'}{c.complet ? '' : ' · lecture partielle'}{vieux ? ' · ouvre ce compte sur mondialrelay.fr pour le relire' : ''}</span>
+          <span className={'vrm-mr-frais' + (vieux ? ' is-ambre' : '')}>{c.n} colis · {c.luAt ? `codes relus ${ilYa(c.luAt, maintenant)}` : 'jamais relu'}{c.complet ? '' : ' · lecture partielle'}{vieux ? ' · ouvre ce compte sur mondialrelay.fr pour relire ses codes' : ''}</span>
         </li>;
       })}
     </ul>

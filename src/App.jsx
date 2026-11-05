@@ -221,6 +221,7 @@ import { MesModeles, InsererModele } from "./ModelesDescription.jsx";
 import PrixPartout from "./PrixPartout.jsx";
 import { MR_SELECT, lireColisMondialRelay, suivisAvecMondialRelay, accordCodes, codeDuCompteMr, ouTrouverQr, ilYa as ilYaLecture, compteDuRetrait, indexAchatsAutresSites } from "./retraitQr.js";
 import ExpliqueMondialRelay, { LecturesMondialRelay } from "./ExpliqueMondialRelay.jsx";
+import { CLE_QR_POSES, jugerQrCapture, dessinerQrCapture, avecQrPoses, titreQrAbsent, qrParCapture, messageQrCapture, cleSuiviQr } from "./qrCapture.js";
 import { lireFile, noterSaisie, instantane, acquitter, compterEnAttente, nuagePlusRecent, fusionAuChargement, oublierCle, CLE_FILE, HORS_FILE } from "./fileEnvoi.js";
 // La migration qui cloisonne les vendeurs, lue depuis LE fichier (pas recopiée) :
 // deux copies finiraient par diverger, et c'est le genre de texte qu'on colle
@@ -2012,6 +2013,9 @@ const SYNC_KEYS = [
   // (le garde-fou de la base le recopie depuis la ligne d'avant, quoi que le
   // navigateur envoie). Synchronisé pour être LU : série d'archive, version.
   'vrm_numerotation', 'vinted_repond_auto','vinted_offres_auto','vinted_offre_refus_msg','vinted_offres_garde','vrm_photo_presets','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
+  // (5 nov.) Les QR Mondial Relay qu'il a posés sur un colis depuis une capture de l'app
+  // (src/qrCapture.js) : clé = n° de suivi, écrits sur SON clic seulement.
+  'vrm_colis_qr_poses',
   'vinted_txn_link','vinted_sales_hidden','vinted_purchases_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq','vinted_urssaf_taux',
   // « J'ai déclaré ce mois » : quelles ventes il a déclarées, et dans quel mois
   // (`ventesDeclarables`). Écrit sur SON clic uniquement.
@@ -9765,7 +9769,7 @@ const CHAMPS_NUMERO_VENTE = ['numero', 'autoAssigned', 'autoShip', 'manuelAt'];
 // Les clés « gestes » rejouées telles quelles (objets fusionnés, listes unies).
 const CLES_GESTES = ['vinted_ship_done', 'vinted_bords_printed', 'vinted_bords_hidden', 'vinted_bords_shipped', 'vinted_pickup_done',
   'vinted_offers_done', 'vinted_sales_hidden', 'vinted_purchases_hidden', 'vinted_annonces_vendues', 'vinted_retours_recus',
-  'vinted_retours_dismissed', 'vinted_retours_remis', 'vrm_colis_collected', 'vrm_colis_collected_at', 'vinted_achat_notes', 'vrm_urssaf_declare', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_imprimes'];
+  'vinted_retours_dismissed', 'vinted_retours_remis', 'vrm_colis_collected', 'vrm_colis_collected_at', 'vrm_colis_qr_poses', 'vinted_achat_notes', 'vrm_urssaf_declare', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_imprimes'];
 const SAISIES_A_REJOUER = 'vrm_saisies_a_rejouer';
 const memoriserSaisies = () => {
   const avant = _instantaneCharge; if (!avant) return 0;
@@ -42167,7 +42171,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // suivi seulement (§5). `pickupUnion` et tout ce qui juge un colis à retirer (fenêtre
   // des transactions, étapes des suivis ajoutés à la main, points relais de la carte) les
   // lisent (§11). `null` reste « e-mails pas lus ». Déclarée ICI, avant ses lecteurs (§4.6).
-  const trackingRetrait = useMemo(() => suivisAvecMondialRelay(tracking, mrColis), [tracking, mrColis]);
+  // (5 nov.) + LES QR MONDIAL RELAY QU'IL A POSÉS depuis une capture de l'app (le QR n'existe
+  // que dans l'app : « c'est que dans l'app »), par le n° de suivi du colis où il a touché
+  // « Ajouter le QR » (src/qrCapture.js) — jamais un QR fabriqué depuis le code.
+  const [qrPoses, setQrPoses] = useStateCle(CLE_QR_POSES, () => load(CLE_QR_POSES, {}));
+  const trackingRetrait = useMemo(() => avecQrPoses(suivisAvecMondialRelay(tracking, mrColis), qrPoses, { suiviDe: suiviDeLigne, aDejaQr: (t) => !!qrImage(t), codeDe: (t) => codeRetrait(t && t.code) || '' }), [tracking, mrColis, qrPoses]);
   const lireTransp = () => fetchTranspLignes({ force: true }).catch(() => null)
     .then(tr => setTransp(prev => (Array.isArray(tr) ? tr : (Array.isArray(prev) ? prev : null))));
   const [achEmails, setAchEmails] = useState(undefined); // reçus d'achat archivés (emails)
@@ -42263,13 +42271,66 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       mode: r.mode, _t: t,
       // (5 nov.) Où trouver le QR qu'on n'a pas, le compte (Mondial Relay ou adresse), l'accord des codes.
       qrOu: ouTrouverQr(t.carrier), compte: compteDuRetrait(t, mrColis), accord: accordCodes(trackingRetrait, suiviDeLigne(t)), codeMr: codeDuCompteMr(trackingRetrait, suiviDeLigne(t)),
-      source: t.mrCompte && t.qrB64 ? 'mondialrelay' : (t._o ? 'conversation' : 'email'),
+      // (5 nov.) Le QR d'un compte Mondial Relay n'existe pas (« c'est que dans l'app ») : un QR Mondial
+      // Relay vient de SA capture de l'app (`qrSource: 'capture'`, src/qrCapture.js).
+      source: t.qrSource === 'capture' && t.qrB64 ? 'capture' : (t._o ? 'conversation' : 'email'),
     };
     // ⚠️ (5 nov.) UN VRAI QR SE MONTRE TOUJOURS, quel que soit le mode préféré du transporteur :
     // Mondial Relay (« au code ») a désormais un QR quand il vient de son compte. Code ET QR, ensemble.
     if (t.qrB64) { setQrView({ ...base, img: `data:${t.qrType || 'image/png'};base64,${t.qrB64}`, real: true, mode: 'qr' }); return; }
     if (qrImage(t)) { setQrView({ ...base, img: qrImage(t), real: true, hosted: true, mode: 'qr' }); return; }
     setQrView({ ...base, img: null, real: false });
+  };
+  // ── (5 nov.) « AJOUTER LE QR » : SA CAPTURE DE L'APP MONDIAL RELAY, SUR CE COLIS ─────────
+  // Julien : « je ne peux pas avoir les qr code dans le navigateur c'est que dans l'app ». Il choisit
+  // une capture d'écran de l'app sur le colis : le QR est lu DANS la page (src/lireQrCapture.js :
+  // BarcodeDetector, sinon jsQR embarqué ; rien n'est envoyé), JUGÉ (src/qrCapture.js : l'identité
+  // est SON clic ; un contenu qui porte le n° ou le code d'un AUTRE colis, plusieurs QR, aucun QR,
+  // ou le même QR déjà posé ailleurs ⇒ rien n'est posé et c'est dit), puis recopié à l'identique
+  // (aller-retour prouvé). Jamais un QR fabriqué depuis le code. Rangé dans `vrm_colis_qr_poses`.
+  const qrFichierRef = useRef(null);
+  const qrCibleRef = useRef(null);
+  const [qrAjout, setQrAjout] = useState(null);   // { suivi, etat, msg } — la dernière tentative, dite sur le colis
+  // Les identités de TOUS les autres colis connus (lignes de suivi, conversations des achats).
+  const identitesColisConnus = () => {
+    const out = [];
+    for (const x of (Array.isArray(trackingRetrait) ? trackingRetrait : [])) if (x) out.push({ suivi: suiviDeLigne(x), code: codeRetrait(x.code), code2: codeRetrait(x.code2) });
+    for (const o of (buysBase || [])) { const r = relaisDe(o) || {}; const su = suivisAchat(o, indexSuivisAchats); out.push({ suivi: (su && su[0]) || '', code: codeRetrait(r.code) }); }
+    return out;
+  };
+  const choisirCaptureQr = (t) => {
+    const k = suiviDeLigne(t);
+    if (!k) { setQrAjout({ suivi: '', etat: 'sans-suivi', msg: messageQrCapture({ etat: 'sans-suivi' }) }); return; }
+    qrCibleRef.current = t;
+    const i = qrFichierRef.current; if (i) { try { i.value = ''; } catch (_) {} i.click(); }
+  };
+  const ajouterQrCapture = async (fichier) => {
+    const t = qrCibleRef.current; qrCibleRef.current = null;
+    const k = t ? suiviDeLigne(t) : '';
+    if (!t || !k || !fichier) return;
+    setQrAjout({ suivi: k, etat: 'lecture', msg: messageQrCapture({ etat: 'lecture' }) });
+    let contenus = null, libs = null;
+    try {
+      const m = await import('./lireQrCapture.js');
+      contenus = await m.lireQrDansCapture(fichier);
+      if (contenus && contenus.length) libs = await m.bibliothequesRecopie();
+    } catch (_) { contenus = null; }
+    let j = jugerQrCapture({ contenus, colis: { suivi: k, code: codeRetrait(t.code), code2: codeRetrait(t.code2) }, autres: identitesColisConnus(), poses: qrPoses });
+    const dessin = j.etat === 'pose' ? dessinerQrCapture(j.contenu, libs || {}) : null;
+    if (j.etat === 'pose' && !dessin) j = { etat: 'recopie' };
+    if (j.etat === 'pose') {
+      const p = { contenu: j.contenu, type: dessin.type, b64: dessin.b64, code: codeRetrait(t.code) || '', carrier: t.carrier || '', at: new Date().toISOString() };
+      setQrPoses(prev => { const u = { ...(prev || {}), [k]: p }; save(CLE_QR_POSES, u); return u; });
+      setQrView(v => (v && v._t && suiviDeLigne(v._t) === k) ? { ...v, img: `data:${p.type};base64,${p.b64}`, real: true, hosted: false, mode: 'qr', source: 'capture' } : v);
+    }
+    setQrAjout({ suivi: k, etat: j.etat, msg: messageQrCapture(j) });
+  };
+  // « Retirer ce QR » : sur SON clic, le QR posé part (le colis redit « QR dans l'app Mondial Relay »).
+  const retirerQrPose = (t) => {
+    const k = suiviDeLigne(t); if (!k) return;
+    setQrPoses(prev => { if (!prev || !prev[k]) return prev; const u = { ...prev }; delete u[k]; save(CLE_QR_POSES, u); return u; });
+    setQrView(v => (v && v._t && suiviDeLigne(v._t) === k) ? { ...v, img: null, real: false, source: v._t._o ? 'conversation' : 'email', mode: retraitMode({ ...v._t, qrB64: null, qrType: null, qrSource: null }).mode } : v);
+    setQrAjout({ suivi: k, etat: 'retire', msg: 'QR retiré.' });
   };
   // Le bandeau « Colis retiré · Annuler » se referme tout seul au bout de 6 s.
   useEffect(() => { if (!lastCollected) return; const id = setTimeout(() => setLastCollected(null), 6000); return () => clearTimeout(id); }, [lastCollected]);
@@ -47175,6 +47236,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     setShipDone(n => vide(n) ? load('vinted_ship_done', {}) : n);
     setTxnLink(n => vide(n) ? load('vinted_txn_link', {}) : n);
     setCollectedAt(n => vide(n) ? load('vrm_colis_collected_at', {}) : n);
+    setQrPoses(n => vide(n) ? load(CLE_QR_POSES, {}) : n);
     setCollected(c => (c && c.size) ? c : loadCollected());
     // §5.49 — mêmes cartes PARTAGÉES lues au montage (appareil neuf : vides tant
     // que le nuage n'est pas arrivé) qu'`apply()` ne gère PAS. Sans ça, sur un
@@ -55694,14 +55756,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return (<>
               {x.code2 ? <CodeRetraitCopiable label="Identifiant" code={x.code2}/> : null}
               {x.code ? <CodeRetraitCopiable label={x.code2 ? 'Code d’ouverture' : 'Code de retrait'} code={x.code}/> : null}
-              {qi ? <button className="vrm-icon-control vrm-rp-qr" type="button" onClick={() => openQrView(t)} title="QR de retrait — afficher en grand pour scanner" aria-label="Afficher le QR de retrait en grand" data-colis-qr="" data-colis-qr-source={t && t.mrCompte && t.qrB64 ? 'mondialrelay' : 'email'}>
+              {qi ? <button className="vrm-icon-control vrm-rp-qr" type="button" onClick={() => openQrView(t)} title="QR de retrait — afficher en grand pour scanner" aria-label="Afficher le QR de retrait en grand" data-colis-qr="" data-colis-qr-source={t && t.qrSource === 'capture' && t.qrB64 ? 'capture' : 'email'}>
                 <img src={qi} alt="QR de retrait" onError={() => noterImgMorte(qrImage(t))}/></button> : null}
               {/* (5 nov.) LE CODE ET LE QR EN GRAND, au doigt, pour le comptoir ou le casier — un geste pour
-                  tout colis qui a un code ou un QR (e-mail, compte Mondial Relay, conversation Vinted). */}
+                  tout colis qui a un code ou un QR (e-mail, capture de l’app Mondial Relay, conversation Vinted). */}
               {(x.code || x.code2 || qi || (relV && codeRetrait(relV.code))) ? <button type="button" className="vrm-rp-plein" data-colis-plein-ecran="" onClick={() => (t ? openQrView(t) : openQrView(ligneRetraitVinted(o)))}
                 aria-label="Afficher le code et le QR en grand">En grand</button> : null}
-              {/* (5 nov.) Un QR qu'on n'a pas se DIT, avec où le trouver (src/retraitQr.js) — jamais un QR fabriqué. */}
-              {!qi && (t || (relV && codeRetrait(relV.code))) && !(relV && relV.qr) ? <span className="vrm-rp-qr-absent" data-colis-qr-absent={(t && t.carrier) || (relV && relV.transporteur) || ''}><strong>QR pas reçu</strong> · {ouTrouverQr((t && t.carrier) || (relV && relV.transporteur) || '')}</span> : null}
+              {/* (5 nov.) Un QR qu'on n'a pas se DIT, avec où le trouver (src/retraitQr.js) — jamais un QR fabriqué.
+                  Mondial Relay : la vérité, courte — « QR dans l'app Mondial Relay » (ni e-mail ni site ne le
+                  portent) — et « Ajouter le QR » : SA capture de l'app, posée sur CE colis (src/qrCapture.js). */}
+              {!qi && (t || (relV && codeRetrait(relV.code))) && !(relV && relV.qr) ? (() => { const tr = (t && t.carrier) || (relV && relV.transporteur) || ''; const ou = ouTrouverQr(carrierKey(tr) || tr);
+                return <span className="vrm-rp-qr-absent" data-colis-qr-absent={tr}><strong>{titreQrAbsent(carrierKey(tr))}</strong>{ou ? <> · {ou}</> : null}</span>; })() : null}
+              {!qi && t && qrParCapture(carrierKey(t.carrier)) && suiviDeLigne(t) ? <button type="button" className="vrm-rp-plein" data-colis-qr-ajouter="" onClick={() => choisirCaptureQr(t)}
+                aria-label="Ajouter le QR (capture de l’app Mondial Relay)">Ajouter le QR (capture)</button> : null}
+              {t && qrAjout && qrAjout.suivi && qrAjout.suivi === suiviDeLigne(t) ? <span className={'vrm-rp-sous' + (['pose', 'lecture', 'retire'].includes(qrAjout.etat) ? '' : ' is-ambre')} role="status" data-colis-qr-ajout={qrAjout.etat}>{qrAjout.msg}</span> : null}
               {!x.code && !qi ? (!t && relV && relV.lieu && !relV.qr
                 // La conversation a été LUE (le lieu en vient) et ne porte aucun code :
                 // il arrive par l'e-mail du transporteur (même phrase que l'ancien détail).
@@ -55903,9 +55971,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <section className="vrm-colis-retirer" data-cc-colonne="retirer" data-cc-n={colRet ? colRet.n : 0} data-cc-hors={colRet ? colRet.nHors : 0}
                 data-pickup-total={tracking === null ? '—' : pickupUnion.total} data-pickup-a-verifier={pickupUnion.aVerifier.length}>
                 {notes.retirer ? <p className="vrm-colis-note" data-cc-note="retirer">{notes.retirer}</p> : null}
-                {(() => { // (5 nov.) MONDIAL RELAY : ses comptes relus (fraîcheur, un par compte) et, repliée, l'explication
-                  // animée (données inventées) de « ouvre ton compte, VRM récupère tes colis et leurs QR ». Tant que
-                  // l'extension ne range aucune ligne `mr_colis_*`, rien n'est promis : le geste d'aujourd'hui est dit.
+                {(() => { // (5 nov.) MONDIAL RELAY : ses comptes relus pour les CODES (fraîcheur, un par compte) et, repliée,
+                  // l'explication animée (données inventées) du SEUL chemin du QR : une capture de l'app Mondial Relay
+                  // posée sur le colis (« c'est que dans l'app » : ni e-mail, ni site, ni extension).
                   const comptesMr = (mrColis && Array.isArray(mrColis.comptes)) ? mrColis.comptes : [];
                   const mrListe = (pickupUnion.emailList || []).filter(t => t && t.carrier === 'mondialrelay');
                   if (!comptesMr.length && !mrListe.length) return null;
@@ -55913,9 +55981,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   return <div className="vrm-mr-bloc" data-mr-bloc="" data-mr-sans-qr={sansQr} data-mr-lu={mrColis === undefined ? 'en-cours' : mrColis === null ? 'pas-su' : 'lu'}>
                     <LecturesMondialRelay mr={mrColis}/>
                     <details className="vrm-repli" data-mr-explique="">
-                      <summary>{comptesMr.length ? 'Comment VRM relève tes comptes Mondial Relay' : `Les QR Mondial Relay${sansQr ? ` · ${sansQr} pas reçu${sansQr > 1 ? 's' : ''}` : ''}`}</summary>
+                      <summary>{`Ajouter un QR Mondial Relay${sansQr ? ` · ${sansQr} colis sans QR` : ''}`}</summary>
                       <ExpliqueMondialRelay/>
-                      {!comptesMr.length ? <p className="vrm-colis-note" data-mr-pas-encore="" style={{marginTop:10}}>Ton extension ne relève pas encore les comptes Mondial Relay : c’est la prochaine étape. D’ici là, le QR est dans ton compte Mondial Relay (site ou application) et le code de l’e-mail suffit au comptoir.</p> : null}
                     </details>
                   </div>; })()}
                 {(() => { // (23 oct.) Un compte inconnu ne fait jamais disparaître un colis : dit UNE fois, avec le geste.
@@ -58628,6 +58695,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         );
       })()}
 
+      {/* (5 nov.) La capture de l'app Mondial Relay choisie sur un colis (« Ajouter le QR ») : lue dans la page. */}
+      <input ref={qrFichierRef} type="file" accept="image/*" tabIndex={-1} aria-hidden="true" data-colis-qr-fichier=""
+        style={{position:'fixed',left:-9999,top:0,width:1,height:1,opacity:0,pointerEvents:'none'}}
+        onChange={(e) => { const f = e.target.files && e.target.files[0]; ajouterQrCapture(f || null); }}/>
       {/* ── QR de retrait en PLEIN ÉCRAN (pour scanner au point relais) ── */}
       {qrView && (
         <div onClick={()=>setQrView(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.82)',zIndex:1400,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
@@ -58665,8 +58736,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{fontSize:28,fontWeight:700,color:'#111',fontFamily:'monospace',letterSpacing:2,lineHeight:1.1}}>{qrView.suivi}</div>
               </div>
             )}
-            {/* (5 nov.) Pas de QR : dit, avec où le trouver (jamais un QR fabriqué). */}
-            {!qrView.img && qrView.mode!=='home' && qrView.qrOu && <div data-qr-plein-absent="" style={{fontSize:12,color:'#444',textAlign:'center',lineHeight:1.45,background:'#F5F5F7',borderRadius:12,padding:'8px 12px'}}><strong>QR pas reçu</strong> · {qrView.qrOu}</div>}
+            {/* (5 nov.) Pas de QR : dit, avec où le trouver (jamais un QR fabriqué). Mondial Relay : « QR dans
+                l'app Mondial Relay » et « Ajouter le QR » — SA capture de l'app, posée sur CE colis. */}
+            {!qrView.img && qrView.mode!=='home' && qrView.qrOu && <div data-qr-plein-absent={carrierKey(qrView.carrier)||''} style={{fontSize:12,color:'#444',textAlign:'center',lineHeight:1.45,background:'#F5F5F7',borderRadius:12,padding:'8px 12px'}}><strong>{titreQrAbsent(carrierKey(qrView.carrier))}</strong> · {qrView.qrOu}</div>}
+            {!qrView.img && qrView.mode!=='home' && qrView._t && qrParCapture(carrierKey(qrView.carrier)) && suiviDeLigne(qrView._t) && (
+              <button type="button" data-qr-plein-ajouter="" onClick={()=>choisirCaptureQr(qrView._t)} aria-label="Ajouter le QR (capture de l’app Mondial Relay)"
+                style={{border:'1px solid #ddd',borderRadius:12,background:'#fff',color:'#111',fontSize:14,fontWeight:600,padding:'10px 16px',minHeight:44,cursor:'pointer',fontFamily:'inherit'}}>Ajouter le QR (capture de l’app)</button>
+            )}
+            {qrView._t && qrAjout && qrAjout.suivi && qrAjout.suivi === suiviDeLigne(qrView._t) && <div role="status" data-qr-plein-ajout={qrAjout.etat} style={{fontSize:12,color:['pose','lecture','retire'].includes(qrAjout.etat)?'#444':'#B25000',textAlign:'center',lineHeight:1.45}}>{qrAjout.msg}</div>}
+            {qrView.img && qrView.source==='capture' && qrView._t && (
+              <div data-qr-plein-capture="" style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8,flexWrap:'wrap',fontSize:12,color:'#444',textAlign:'center'}}>
+                <span>QR de ta capture de l’app Mondial Relay</span>
+                <button type="button" data-qr-plein-retirer="" onClick={()=>retirerQrPose(qrView._t)} style={{border:'1px solid #ddd',borderRadius:12,background:'#fff',color:'#111',fontSize:13,fontWeight:600,padding:'8px 14px',minHeight:44,cursor:'pointer',fontFamily:'inherit'}}>Retirer ce QR</button>
+              </div>
+            )}
             {qrView.accord && <div data-qr-plein-accord={qrView.accord} style={{fontSize:12,color:'#444',textAlign:'center'}}>{qrView.accord==='confirme'?'Code confirmé par ton compte Mondial Relay':(qrView.code && qrView.code===qrView.codeMr)?'Code de ton compte Mondial Relay (plus récent que l’e-mail)':'Code de l’e-mail (reçu après la lecture de ton compte Mondial Relay)'}</div>}
             {qrView.compte && (qrView.compte.libelle || qrView.compte.horsComptes) && <div data-qr-plein-compte={qrView.compte.source} style={{fontSize:12,color:'#666',textAlign:'center'}}>{qrView.compte.source==='mondialrelay'?`Compte Mondial Relay · ${qrView.compte.libelle}`:[qrView.compte.libelle?`Reçu sur ${qrView.compte.libelle}`:'Reçu par e-mail',qrView.compte.horsComptes?'dans aucun de tes comptes Mondial Relay relus':''].filter(Boolean).join(' · ')}</div>}
             {qrView.lieu && <div style={{fontSize:13,fontWeight:600,color:'#111',textAlign:'center',lineHeight:1.35}}>{qrView.lieu}</div>}
@@ -58683,16 +58766,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   : `Consigne Pickup : saisis l'identifiant puis le code d'ouverture sur l'écran du casier. Pas de comptoir.`;
                 if(qrView.consigne && qrView.code) return `Consigne Pickup : saisis ce code sur l'écran du casier. Pas de comptoir.`;
                 if(qrView.real) return `QR ${cn} — présente-le au comptoir, le scan suffit.`;
+                if(qrView.code && carrierKey(qrView.carrier)==='mondialrelay') return `Donne ce code au comptoir avec ta pièce d'identité : il suffit.`;
                 if(qrView.code) return `${cn} fonctionne au CODE (pas de QR). Donne ce code au comptoir avec ta pièce d'identité.`;
                 return `Ni QR ni code reçus. Donne le numéro ci-dessus et ta pièce d'identité à ${cn}.`; })()}
             </div>
-            {/* Mondial Relay ne met AUCUN QR dans ses emails : il vit dans leur
-                application. Plutôt que de faire semblant, on ouvre leur suivi —
-                c'est de là qu'on récupère le QR quand on en veut un. */}
+            {/* Le suivi du transporteur. ⚠️ (5 nov.) Plus « Ouvrir Mondial Relay (QR) » : le site de Mondial
+                Relay ne montre PAS le QR (« c'est que dans l'app ») — le lien suit le colis, rien de plus. */}
             {qrView.suivi && (
               <a href={trackUrl(qrView.carrier, qrView.suivi)} target="_blank" rel="noreferrer"
                 style={{textDecoration:'none',border:'1px solid #ddd',borderRadius:12,background:'#fff',color:'#111',fontSize:13,fontWeight:600,padding:'9px 16px'}}>
-                {qrView.carrier==='mondialrelay' && !qrView.img ? '📱 Ouvrir Mondial Relay (QR)' : '🔍 Suivre le colis'}
+                🔍 Suivre le colis
               </a>
             )}
             {/* (5 nov.) LA LUMINOSITÉ : un site ne peut pas la régler (aucune API web) — on le dit, et l'écran

@@ -43,14 +43,15 @@ async function verifier(srcModule, srcApp, bavard) {
   dit(mr && mr.comptes.length === 2, 'A2 une version inconnue n’entre pas (2 comptes sur 3)', JSON.stringify(mr && mr.comptes.map((c) => c.cle)));
   dit(mr && mr.colis.length === 4, 'A3 sans n°, colis envoyé (sortant), état inconnu : écartés (4 colis gardés)', String(mr && mr.colis.length));
   const c3 = mr && mr.colis.find((c) => c.suivi === '10000003');
-  dit(c3 && c3.code === '' && c3.qr === null, 'A4 un « code » sans chiffres et un QR qui n’est pas une image : pas pris', JSON.stringify(c3));
+  // (5 nov.) « c'est que dans l'app » : AUCUN QR ne vient d'un compte Mondial Relay lu dans le navigateur.
+  dit(c3 && c3.code === '' && mr.colis.every((c) => !c.qr), 'A4 un « code » sans chiffres n’est pas pris ; aucun QR n’est pris d’un compte (il n’existe que dans l’app)', JSON.stringify(c3));
   dit(mr && mr.comptes[0].cle === 'b2', 'A5 les comptes du plus récemment relu au plus ancien');
 
   // ── B. identité ──
   const lignesMr = M.lignesSuiviMondialRelay(mr);
   const l1 = lignesMr.filter((l) => l.suivi === '10000001');
   dit(l1.length === 1 && l1[0].mrCompte.cle === 'b2', 'B1 le même n° lu sur deux comptes = UN colis, la lecture la plus récente', JSON.stringify(l1.map((l) => l.mrCompte)));
-  dit(l1[0] && l1[0].carrier === 'mondialrelay' && l1[0].status === 'available' && l1[0].qrB64 && l1[0].code === '123456', 'B2 forme d’une ligne d’e-mail (transporteur, statut, code, QR)');
+  dit(l1[0] && l1[0].carrier === 'mondialrelay' && l1[0].status === 'available' && !l1[0].qrB64 && l1[0].code === '123456', 'B2 forme d’une ligne d’e-mail (transporteur, statut, code ; jamais de QR)');
   dit(M.suivisAvecMondialRelay(null, null) === null && M.suivisAvecMondialRelay(null, { comptes: [], colis: [] }) === null, 'B3 e-mails pas lus et rien de Mondial Relay ⇒ toujours « pas lus » (null)');
   const emails = [];
   for (let i = 0; i < 50; i++) emails.push({ id: 'e' + i, carrier: 'mondialrelay', status: 'available', suivi: String(20000000 + i), artTitle: 'Nike Air Max 90 blanc 42', lieu: 'RELAIS A, 1 RUE X, 35000 RENNES', code: String(400000 + i), receivedAt: L });
@@ -66,7 +67,7 @@ async function verifier(srcModule, srcApp, bavard) {
   const fus2 = M.suivisAvecMondialRelay([{ carrier: 'mondialrelay', status: 'available', suivi: '10000001', code: '999999', receivedAt: L }], mr);
   dit(M.accordCodes(fus2, '10000001') === 'different', 'C2 codes différents ⇒ dit « différent »');
   dit(M.accordCodes(fus, '20000003') === '', 'C3 une seule source ⇒ rien');
-  dit(/compte Mondial Relay/.test(M.ouTrouverQr('mondialrelay')) && /code suffit/.test(M.ouTrouverQr('mondialrelay')), 'C4 QR Mondial Relay pas reçu ⇒ « dans ton compte Mondial Relay », le code suffit');
+  dit(!/compte|site/.test(M.ouTrouverQr('mondialrelay')) && /code suffit/.test(M.ouTrouverQr('mondialrelay')), 'C4 QR Mondial Relay absent ⇒ le code suffit ; ni « compte » ni « site » (le QR n’est que dans l’app)');
   dit(/Chronopost/.test(M.ouTrouverQr('chronopost')) && M.ouTrouverQr('zz') === M.QR_OU_DEFAUT, 'C5 un transporteur inconnu ⇒ la phrase générale');
   const now = Date.parse('2026-11-05T11:03:00Z');
   dit(M.ilYa(L2, now) === 'il y a 3 min' && M.ilYa('', now) === '' && M.ilYa('2026-11-03T11:03:00Z', now) === 'il y a 48 h' || M.ilYa('2026-11-03T11:03:00Z', now) === 'il y a 2 j', 'C6 « relu il y a 3 min » ; date illisible ⇒ rien', M.ilYa(L2, now));
@@ -115,14 +116,14 @@ async function verifier(srcModule, srcApp, bavard) {
   dit(/lireTout\(`id=like\.mr_colis_\*&select=\$\{MR_SELECT\}`/.test(app) && !/mr_colis_[^`]*select=data[`&]/.test(app), 'E1 les lignes mr_colis_* lues projetées (jamais select=data), paginées');
   const pu = app.slice(app.indexOf('const pickupUnion = useMemo('), app.indexOf('const groupesRelais = useMemo('));
   dit(/finsColis\(trackingRetrait,/.test(pu) && !/\btracking\b/.test(pu.replace(/trackingRetrait/g, '')), 'E2 pickupUnion ne lit QUE les lignes fusionnées (e-mails + comptes Mondial Relay)');
-  dit(/const trackingRetrait = useMemo\(\(\) => suivisAvecMondialRelay\(tracking, mrColis\)/.test(app), 'E3 la fusion vient de src/retraitQr.js (une règle)');
+  dit(/const trackingRetrait = useMemo\(\(\) => (?:avecQrPoses\()?suivisAvecMondialRelay\(tracking, mrColis\)/.test(app), 'E3 la fusion vient de src/retraitQr.js (une règle ; + les QR posés depuis une capture, src/qrCapture.js)');
   const ov = app.slice(app.indexOf('const openQrView = async'), app.indexOf('const openQrView = async') + 3000);
   dit(!/normTitle/.test(ov), 'E4 la vue en grand ne cherche plus la photo par le titre (§5)');
   dit(/if \(t\.qrB64\) \{ setQrView/.test(ov) && !/r\.mode === 'qr' && t\.qrB64/.test(ov), 'E5 un vrai QR se montre quel que soit le mode du transporteur (Mondial Relay compris)');
   const iVue = app.indexOf('data-qr-plein=""'), fVue = app.indexOf('{lastCollected && (', iVue);
   const vue = iVue > 0 && fVue > iVue ? app.slice(iVue, fVue) : '';
   dit(vue.length > 100 && !/#c53030|#ff3b30|#e53e3e|\bred\b|C\.danger/i.test(vue), 'E6 aucun rouge dans la vue en grand (§7 : rouge = deux paires sous un N°)');
-  dit(/data-colis-qr-absent=/.test(app) && /ouTrouverQr\(/.test(app), 'E7 « QR pas reçu » dit sur la carte, avec où le trouver');
+  dit(/data-colis-qr-absent=/.test(app) && /ouTrouverQr\(/.test(app), 'E7 un QR absent est dit sur la carte, avec où le trouver');
   dit(/<GardeEcranAllume\/>/.test(app) && /data-qr-plein-luminosite/.test(app), 'E8 l’écran reste allumé et la luminosité est expliquée');
   dit(/data-lbc-qr-depot/.test(app), 'E9 le QR de dépôt Leboncoin sur la carte du colis à envoyer');
   dit(/=== codeDuCompteMr\(trackingRetrait, suiviDeLigne\(t\)\) \? 'compte' : 'email'/.test(app) && /qrView\.code===qrView\.codeMr/.test(app), 'E10 « qui fait foi » se juge sur le code MONTRÉ (carte et vue en grand)');
@@ -136,7 +137,7 @@ async function verifier(srcModule, srcApp, bavard) {
 const MUTATIONS = [
   ['module', 'B4 : relier par le titre', (s) => s.replace("const k = t ? norm(t.suivi) : '';", "const k = t ? norm(t.suivi) : ''; if (t && t.artTitle && parN.size) return { ...t, mrCompte: [...parN.values()][0] };")],
   ['module', 'A3 : accepter le sens sortant', (s) => s.replace("|| (x.sens && x.sens !== 'entrant')", '')],
-  ['module', 'A4 : tout QR accepté', (s) => s.replace('if (!TYPES_QR.has(type) || !b64', 'if (!b64')],
+  ['module', 'A4 : le QR d’un compte repris', (s) => s.replace("colis.push({ suivi, status, code: codeRetraitMr(x.code), lieu", "colis.push({ suivi, status, code: codeRetraitMr(x.code), qr: x.qr || null, lieu")],
   ['module', 'B1 : garder la plus ancienne lecture', (s) => s.replace('>= (Date.parse(c.luAt) || 0)) continue;', '<= (Date.parse(c.luAt) || 0)) continue;')],
   ['module', 'C9 : lecture partielle = complète', (s) => s.replace('mrLus.every((c) => c.complet &&', 'mrLus.every((c) => true &&')],
   ['module', 'C11 : lecture d’avant l’e-mail suffit', (s) => s.replace("mrLus.every((c) => c.complet && (Date.parse(c.luAt || '') || 0) >= recuMs)", 'mrLus.every((c) => c.complet)')],
