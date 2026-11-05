@@ -1,4 +1,10 @@
 name: Disponibilité publique VRM
+# Sonde publique de https://vrm.center (scripts/verifier-production.mjs) : page
+# d'accueil et son titre, /api/sante et ses clés, extension servie et sa version,
+# paquet Orion, manifeste, service worker. Aucune session, aucun secret, aucune
+# donnée. Un contrôle en échec fait échouer le job : GitHub l'annonce par e-mail
+# (au compte qui a posé la planification ci-dessous — ne pas la réécrire sans
+# raison), et l'annotation du job dit lequel et pourquoi.
 on:
   schedule:
     - cron: '17 */6 * * *'
@@ -8,10 +14,11 @@ permissions:
 jobs:
   lecture-publique:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: node scripts/verifier-production.mjs
+      - name: Contrôler la production (lecture publique seulement)
+        run: node scripts/verifier-production.mjs
