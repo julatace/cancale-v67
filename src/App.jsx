@@ -17259,7 +17259,11 @@ function BlocNumerosPerimes() {
   // pourquoi la base a refusé : titre neutre (jamais « un autre appareil » au hasard).
   const relue = !refus || refus.code === 'version' || (ver.at || 0) >= refus.at;
   const remise = ver.nuage != null && ver.nuage !== versionNumerotation();
-  return (
+  // (5 nov., revue) Posé dans document.body : rendu DANS <main>, il héritait des
+  // règles de largeur des écrans d'ordinateur (1360 px centrés) et laissait la
+  // colonne de navigation visible et touchable à gauche (« Ven », « Gér », « VI »
+  // sur la capture Edge de Julien). Il couvre TOUT, exprès.
+  return createPortal(
     <div data-numeros-perimes={refus ? refus.code : 'version'} role="alertdialog" aria-modal="true"
       style={{ position: 'fixed', inset: 0, zIndex: 100000, background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ maxWidth: 460, borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, padding: '22px 20px' }}>
@@ -17276,7 +17280,8 @@ function BlocNumerosPerimes() {
           Recharger
         </button>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

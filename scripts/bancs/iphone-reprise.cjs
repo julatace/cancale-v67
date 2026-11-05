@@ -35,9 +35,16 @@
 // O. L'ORDINATEUR (1512 × 950, puis fenêtres d'Edge : 1512 × 830, 1008 × 633
 //    à 150 %, zoom de l'app 125 %) : aucun libellé de la colonne coupé, le
 //    mot « VRM » entier, et rien ne passe PAR-DESSUS la colonne.
+// O2. (revue du 5 nov.) LA CAUSE DES LIBELLÉS COUPÉS : le bloc « Recharger »
+//    (numéros périmés, la capture Edge de Julien) rendu dans <main> héritait de
+//    la largeur bornée des écrans d'ordinateur (1360 px centrés) : à 1512 px il
+//    commençait à 76 px, la colonne restait visible et TOUCHABLE dessous
+//    (« Ven », « Gér », « Arg », « Plat », « VI ») et l'écran lisible à droite.
+//    Servi ici par une version de numérotation relue différente. Il doit
+//    couvrir TOUTE la fenêtre (390 tactile, 1512 × 950 clair, 1512 × 830 sombre).
 //
 // `BANC_PORT` (défaut 7951), `CAPTURES=<dossier>` pour garder les captures,
-// `BANC_PARTIE=B|R|O` pour une seule partie.
+// `BANC_PARTIE=B|R|O|O2` pour une seule partie.
 'use strict';
 require('./_porte-banc.cjs');
 const path = require('path');
@@ -48,6 +55,7 @@ const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 7951;
 const CAPTURES = process.env.CAPTURES || '';
 const PARTIE = process.env.BANC_PARTIE || '';
+let VERSION_NUAGE = null;
 
 const maintenant = new Date(2026, 9, 31, 15, 30, 0);
 const DEBUT = Date.now();
@@ -96,6 +104,8 @@ const appareil = async (b, mode, local = {}) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     if (route.request().method() !== 'GET') return route.fulfill({ status: 201, contentType: 'application/json', body: '[]' });
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'content-range': `0-${Math.max(0, d.length - 1)}/${d.length}` }, body: JSON.stringify(d) });
+    // O2 : une version de numérotation relue différente de celle chargée ⇒ bloc « Recharger ».
+    if (VERSION_NUAGE && /vrm_numerotation->>version/.test(u)) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([{ v: VERSION_NUAGE }]) });
     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', body: '{"m":1}' });
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);
     const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || '';
@@ -361,6 +371,37 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
           await ctx.close();
         });
       }
+    }
+    if (!PARTIE || PARTIE === 'O2') {
+      VERSION_NUAGE = '99';
+      for (const c of [{ mode: 'ordi', w: 1512, h: 950 }, { mode: 'ordi', w: 1512, h: 830, sombre: true }, { mode: 'tel', w: 390, h: 844 }]) {
+        const qui = `${c.w}×${c.h} ${c.sombre ? 'sombre' : 'clair'}`;
+        console.log(`── O2. le bloc « Recharger » couvre tout · ${qui}`);
+        await essaie(`O2 ${qui}`, async () => {
+          const ctx = await appareil(b, c.mode, { vinted_dark: !!c.sombre });
+          const { pg } = await ouvrirPage(ctx, '?tab=compta');
+          if (c.mode === 'ordi') await pg.setViewportSize({ width: c.w, height: c.h });
+          await pg.waitForSelector('[data-numeros-perimes]', { timeout: 15000 }).catch(() => {});
+          await pg.waitForTimeout(600);
+          const r = await pg.evaluate(() => {
+            const bl = document.querySelector('[data-numeros-perimes]'); if (!bl) return null;
+            const q = bl.getBoundingClientRect();
+            const dedans = (x, y) => { const h = document.elementFromPoint(x, y); return !!h && bl.contains(h); };
+            const side = document.querySelector('.vrm-sidebar');
+            const libs = side ? [...side.querySelectorAll('.vrm-rail-lib, .vrm-rail-section-label, .vrm-sidebar-mot')].filter((e) => e.getClientRects().length) : [];
+            const railVisible = libs.filter((e) => { const r = e.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight && !dedans(r.left + 4, r.top + r.height / 2); }).map((e) => e.innerText);
+            const coins = [[2, 2], [innerWidth - 3, 2], [2, innerHeight - 3], [innerWidth - 3, innerHeight - 3], [innerWidth - 20, innerHeight / 2], [20, innerHeight / 2]];
+            return { rect: [q.left, q.top, q.width, q.height].map(Math.round), vw: innerWidth, vh: innerHeight, railVisible, coins: coins.map(([x, y]) => dedans(x, y)) };
+          });
+          await capture(pg, `recharger-${c.w}x${c.h}-${c.sombre ? 'sombre' : 'clair'}`);
+          dit(!!r, `O2 ${qui} : le bloc « Recharger » est là`);
+          dit(!!r && r.rect[0] === 0 && r.rect[1] === 0 && r.rect[2] === r.vw && r.rect[3] === r.vh, `O2 ${qui} : il couvre toute la fenêtre`, JSON.stringify(r && { rect: r.rect, vw: r.vw, vh: r.vh }));
+          dit(!!r && r.coins.every(Boolean), `O2 ${qui} : bords et coins touchent le bloc (rien de lisible ni de touchable à côté)`, JSON.stringify(r && r.coins));
+          dit(!!r && r.railVisible.length === 0, `O2 ${qui} : la colonne n'apparaît pas dessous (aucun « Ven », « Gér », « VI »)`, JSON.stringify(r && r.railVisible));
+          await ctx.close();
+        });
+      }
+      VERSION_NUAGE = null;
     }
   } finally {
     await b.close(); srv.close();

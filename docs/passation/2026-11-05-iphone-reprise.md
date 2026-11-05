@@ -64,13 +64,28 @@ vocal ») : « la barre d'onglets sur iPhone est à revoir — ça ne marche pas
   l'écran.
 
 ### L'ordinateur (le rail sur Edge)
-**Non reproduit** dans Chromium : à 1512 × 950, 1512 × 830 (fenêtre d'Edge), 1008 × 633 (Windows à
-150 %), zoom de l'app 125 %, police de repli Verdana, nom d'entreprise long, sur 11 écrans, clair et
-sombre : la colonne fait 236 px, aucun libellé coupé, « VRM » entier. La capture de Julien (14 h 12)
-montrait le bloc plein écran « Recharger » (corrigé le matin même, `2026-11-05-numeros-autre-
-appareil.md`) : une hypothèse est qu'un calque recouvrait la colonne à partir de ~45 px — **non
-prouvée**. Le banc vérifie désormais, en plus des coupures, que **rien ne passe par-dessus** la
-colonne (le toucher au milieu de chaque libellé tombe sur elle). Rien n'a été changé au rail.
+**Non reproduit** par l'auteur sur les écrans ordinaires (1512 × 950, 1512 × 830, 1008 × 633, zoom 125 %,
+police de repli, nom d'entreprise long ; 36 écrans balayés à 1512 × 830 et 1280 × 720 par la revue) :
+colonne de 236 px, aucun libellé coupé, « VRM » entier.
+
+**Reproduit et corrigé par la revue (même jour)** : la capture de Julien montrait le bloc plein écran
+« Recharger » (numéros périmés). Ce bloc est posé en `position: fixed` DIRECTEMENT dans `<main>`, et les
+règles « écrans de lecture » de l'ordinateur (`src/design/jetons.css` §9 et `src/design/fusion.css`,
+`.vrm-main … > :not(.vrm-barre-haut)…`, 4 nov.) bornent CHAQUE enfant direct de `<main>` à
+`--vrm-largeur-contenu` (1360 px), centré, `width: 100%`. À 1512 px de large, le bloc commençait donc à
+**76 px** et finissait à 1436 px : la colonne restait visible ET touchable sous sa marge gauche — d'où
+« Ven », « Gér », « Arg », « Plat » et le logo coupé — et l'écran (ses numéros) restait lisible à droite,
+alors que le bloc doit TOUT couvrir (§5). Mesuré : bloc `[76, 0, 1360, 950]`, le toucher à 40 px tombe
+sur un bouton de la colonne. Sous 1360 + marges, il couvrait tout : c'est pourquoi rien ne se voyait
+ailleurs. Le code Discord (`DemandeCodeDiscord`, `role="dialog"`, même place) avait le même défaut.
+- Les deux règles excluent désormais toute couche `[role="dialog"]` / `[role="alertdialog"]`.
+- `BlocNumerosPerimes` est en plus posé dans `document.body` (`createPortal`) : il couvre tout, exprès,
+  quelles que soient les règles futures de `<main>`.
+- Banc `iphone-reprise.cjs` partie **O2** (version de numérotation relue différente ⇒ bloc ouvert) :
+  1512 × 950 clair, 1512 × 830 sombre, 390 tactile — le bloc couvre toute la fenêtre, coins et bords
+  le touchent, aucun libellé de la colonne n'apparaît. **6 rouges** sur le build de `12ab8bfb`
+  (bloc à 76 px, toute la colonne visible), **12/12 verts** après ; la règle CSS seule (sans le portail)
+  suffit aussi (12/12) — le portail est une seconde ceinture.
 
 ## 3. Preuves
 - `npm run build` vert.
@@ -99,8 +114,16 @@ colonne (le toucher au milieu de chaque libellé tombe sur elle). Rien n'a été
 - **Sur son iPhone** (geste de Julien) : ouvrir « Plus », faire le geste retour, aller sur
   Statistiques puis fermer l'app (balayer) et la rouvrir — elle doit revenir sur Statistiques, au
   même défilement. Le vrai Safari n'est pas émulable ici (zone sûre réelle, geste du bord).
-- **Edge** : si les libellés coupés reviennent, une capture avec la fenêtre entière (et le zoom
-  d'Edge) ; le banc O vérifie déjà coupures et recouvrement.
+- **Edge** : les libellés coupés venaient du bloc « Recharger » (voir §2) ; s'ils reviennent HORS de
+  ce bloc, une capture avec la fenêtre entière (et le zoom d'Edge).
+- Pourquoi l'Edge avait une fiche en moins (cause locale du bloc) : toujours non prouvé
+  (`2026-11-05-numeros-autre-appareil.md`).
+- À décider : les positions de défilement et les filtres reviennent jusqu'à 7 jours sur CHAQUE écran
+  (pas seulement celui qu'on a quitté) — ouvrir Ventes le lendemain peut y retomber au milieu de la
+  liste, les nouvelles ventes au-dessus. Une ligne (`DUREE_PARCOURS` pour `position:`) suffit à
+  raccourcir si ça le gêne.
+- Accessibilité : la 5ᵉ place garde `aria-label="Plus"` quand elle affiche « Compta » (les bancs la
+  cherchent par ce nom) ; VoiceOver lit « Plus ».
 - Extension : rien à faire pour ce chantier (aucune capacité nouvelle).
 - À décider avec lui : la 5ᵉ place qui prend le nom de l'écran (« Compta ») plutôt que « Plus » —
   si elle le trouble, une ligne suffit à la remettre (`courant`).
