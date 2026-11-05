@@ -96,7 +96,7 @@ migration (deux lignes `app_data` de plus par vendeur), rien touché dans `vinte
 | `scripts/audit-notifs-centre.cjs` (porte `sendPushToAll` + route du soir EXÉCUTÉES, fausse base, téléphones interceptés) | **27/27** ; sur le code d'avant **20 rouges** ; mutations : porte du type, heures calmes, exception double vente, regroupement, état « pas reçue », héritage ⇒ rouges |
 | `scripts/audit-relances-essai.cjs` (cron du matin + `api/compte.js?mode=relances` EXÉCUTÉS, vrai client SMTP contre un faux serveur SMTP local) | **27/27** ; sur le code d'avant : le module n'existe pas (rouge) ; 8 mutations (propriétaire, propriétaire pas su, mode test, désinscription, réservation, adresse non confirmée, signature, configuration) ⇒ rouges |
 | `scripts/audit-notifications.cjs` | 31/31 (F5 : sept types ; F6 : héritage) |
-| banc `scripts/bancs/centre-notifs.cjs` (390 tactile et 1512, clair et sombre ; captures regardées) | **96/96** ; sur le code d'avant : rouge (pas de cloche, pas de réglages) |
+| banc `scripts/bancs/centre-notifs.cjs` (390 tactile et 1512, clair et sombre ; captures regardées) | **96/96** ; sur le code d’avant : rouge (32 rouges sur les 40 premiers contrôles, arrêté là : pas de cloche, six types, ni heures calmes, ni regroupement, ni carte de l’essai) ; `reglages-premium` 174/174 après |
 | audits voisins (double-vente-ailleurs, suivi-colis, suivi-vinted, transp-notif, mondialrelay-serveur, rappel-urssaf, coherence, csp, vapid, abonnement, fonctions-api, sans-bruit, icones) | inchangés / verts |
 
 ⚠️ **Bancs push réparés au passage** : la clé VAPID factice des bancs (`banc-cle-privee-factice`,
