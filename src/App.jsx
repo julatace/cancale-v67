@@ -60055,7 +60055,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const compteTxt = qrView.compte && (qrView.compte.libelle || qrView.compte.horsComptes)
           ? (qrView.compte.source === 'mondialrelay' ? `Compte Mondial Relay · ${qrView.compte.libelle}` : [qrView.compte.libelle ? `Reçu sur ${qrView.compte.libelle}` : 'Reçu par e-mail', qrView.compte.horsComptes ? 'dans aucun de tes comptes Mondial Relay relus' : ''].filter(Boolean).join(' · '))
           : '';
-        const accordTxt = qrView.accord ? (qrView.accord === 'confirme' ? 'Code confirmé par ton compte Mondial Relay' : (qrView.code && qrView.code === qrView.codeMr) ? 'Code de ton compte Mondial Relay (plus récent que l’e-mail)' : 'Code de l’e-mail (reçu après la lecture de ton compte Mondial Relay)') : '';
+        const accordTxt = qrView.accord ? (qrView.accord === 'confirme' ? 'Code confirmé par ton compte Mondial Relay' : (qrView.code && qrView.code===qrView.codeMr) ? 'Code de ton compte Mondial Relay (plus récent que l’e-mail)' : 'Code de l’e-mail (reçu après la lecture de ton compte Mondial Relay)') : '';
         return (
         <SheetShell lumineuse onClose={() => setQrView(null)} titre={qrView.title} sousTitre={qrView.lieu || null} maxWidth={440} z={Z_CONFIRMATION - 3}
           className="vrm-eg" aria-label="Code et QR de retrait" data-qr-plein="" data-qr-plein-code={qrView.code || ''} data-qr-plein-img={qrView.img ? '1' : '0'} data-qr-plein-source={qrView.source || ''}>
