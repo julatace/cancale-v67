@@ -131,7 +131,7 @@ process.env.SUPABASE_SERVICE_KEY = 'banc-cle-service';
 process.env.VRM_OWNER_UID = A;
 process.env.CRON_SECRET = 'cle-banc-cron';
 process.env.EMAIL_INBOUND_SECRET = 'cle-banc-transp';
-process.env.VAPID_PRIVATE_KEY = 'banc-cle-privee-factice';
+process.env.VAPID_PRIVATE_KEY = 'YmFuYy1jbGUtcHJpdmVlLWZhY3RpY2UtMzItb2N0ZXQ';
 delete process.env.AI_API_KEY; delete process.env.ANTHROPIC_API_KEY;
 const webpush = require(path.join(R, 'node_modules', 'web-push'));
 const pushes = [];

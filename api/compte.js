@@ -66,6 +66,7 @@ import {routeFavoris} from './_lib/favoris.js';
 import {effacerFavorisDe} from './_lib/favoris-confidentialite.js';
 import { traiterAppareils, lireJournal } from './_lib/securite-compte.js';
 import { PROPRIETAIRE_NEUTRE } from './_lib/proprietaire-email.js';
+import { configurationRelances, lireJeton as lireJetonRelance, ecrireChoix as ecrireChoixRelance, lireChoix as lireChoixRelance, lireEnvois as lireEnvoisRelance } from './_lib/relances-essai.js';
 
 export const config = { api: { bodyParser: false } };
 
@@ -1176,6 +1177,66 @@ async function discordAttente(req, res) {
   return attenteDiscord(req, res, utilisateur, corps || {});
 }
 
+// ── LES E-MAILS DE L'ESSAI GRATUIT (5 nov., api/_lib/relances-essai.js) ─────
+//   GET  ?d=<jeton>        le lien « ne plus recevoir ces rappels » de l'e-mail :
+//                          désinscrit CE compte en un clic, répond une page courte ;
+//   POST ?d=<jeton>        la même chose en « un clic » du logiciel de messagerie
+//                          (RFC 8058, `List-Unsubscribe-Post`) ;
+//   GET  (session)         ce que Réglages montre : envoi configuré ? (ce qui
+//                          manque, au propriétaire seul), en essai ?, inscrit ?,
+//                          ce qui est parti ;
+//   POST (session) {abonne} son choix depuis Réglages.
+const pageRelance = (res, code, titre, texte) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  const e = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  res.status(code).send(`<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>VRM</title><meta name="robots" content="noindex"></head>`
+    + `<body style="margin:0;padding:40px 16px;background:#fff;color:#1d1d1f;font:17px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif">`
+    + `<main style="max-width:480px;margin:0 auto"><h1 style="font-size:22px;margin:0 0 12px">${e(titre)}</h1><p style="margin:0 0 20px;color:#3a3a3c">${e(texte)}</p>`
+    + `<a href="${APP_URL}" style="color:#0071e3">Ouvrir VRM</a></main></body></html>`);
+};
+async function relances(req, res) {
+  const m = req.method;
+  const d = String((req.query && req.query.d) || '');
+  if (d) {
+    const owner = lireJetonRelance(d);
+    if (!owner) return m === 'GET' ? pageRelance(res, 400, 'Lien non reconnu', "Ce lien de désinscription n'est pas valable. Tu peux aussi couper ces e-mails dans VRM : Réglages → Notifications.") : repondre(res, 400, { ok: false });
+    const ok = await ecrireChoixRelance(owner, false);
+    if (m === 'POST') return repondre(res, ok ? 200 : 503, { ok });
+    return ok
+      ? pageRelance(res, 200, "C'est fait", "Tu ne recevras plus les e-mails de l'essai gratuit VRM. Tu peux les réactiver dans VRM : Réglages → Notifications.")
+      : pageRelance(res, 503, 'Pas encore enregistré', "Le serveur n'a pas pu enregistrer ton choix. Réessaie dans un instant avec le même lien.");
+  }
+  const u = await utilisateurDe(req);
+  if (u === undefined) return repondre(res, 503, { ok: false, raison: 'connexion-injoignable' });
+  if (!u) return repondre(res, 401, { ok: false, raison: 'session' });
+  if (m === 'POST') {
+    const corps = await lireCorpsJson(req);
+    if (!corps || typeof corps.abonne !== 'boolean') return repondre(res, 400, { ok: false, raison: 'corps' });
+    if (!process.env.SUPABASE_SERVICE_KEY) return repondre(res, 503, { ok: false, raison: 'non-configure' });
+    const ok = await ecrireChoixRelance(u.id, corps.abonne);
+    return repondre(res, ok ? 200 : 503, { ok, abonne: ok ? corps.abonne : undefined });
+  }
+  const cfg = configurationRelances();
+  const [acc, ligne] = await Promise.all([accesDe(req), ligneDe(req)]);
+  const service = !!process.env.SUPABASE_SERVICE_KEY;
+  const [choix, envois] = service ? await Promise.all([lireChoixRelance(u.id), lireEnvoisRelance(u.id)]) : [null, null];
+  return repondre(res, 200, {
+    ok: true,
+    configure: cfg.pret,
+    // Les noms des variables manquantes : au propriétaire seul (lui seul les pose).
+    manque: acc && acc.proprietaire ? cfg.manque : undefined,
+    proprietaire: acc ? acc.proprietaire : null,
+    essai: ligne === undefined ? null : !!(ligne && ligne.statut === 'trialing'),
+    finEssai: ligne && ligne.statut === 'trialing' ? ligne.fin_periode : null,
+    // Trois états : true inscrit · false désinscrit · null pas su.
+    abonne: choix ? choix.desinscrit !== true : null,
+    envois: envois && envois.envois && typeof envois.envois === 'object'
+      ? Object.fromEntries(Object.entries(envois.envois).filter(([k]) => ['j1', 'j3', 'j6'].includes(k)).map(([k, v]) => [k, { at: v && v.at, issue: v && v.issue }]))
+      : (envois ? {} : null),
+  });
+}
+
 // ── Santé : seulement des OUI/NON (route publique) ──────────────────────────
 function sante(req, res) {
   res.setHeader('Referrer-Policy', 'no-referrer');
@@ -1187,6 +1248,7 @@ function sante(req, res) {
     detourage: !!process.env.PHOTOROOM_API_KEY,
     stripe: stripePret(),
     stripeWebhook: !!process.env.STRIPE_WEBHOOK_SECRET,
+    relancesEssai: configurationRelances().pret,
   });
 }
 
@@ -1237,5 +1299,7 @@ export default async function handler(req, res) {
   // (4 nov.) Paramètres → Mon compte : « Appareils connectés » et « Ce que VRM a fait ».
   if (mode === 'appareils') return (m === 'GET' || m === 'POST') ? appareils(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'journal') return m === 'GET' ? journalVrm(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
+  // (5 nov.) Les e-mails de l'essai gratuit : état, choix, lien de désinscription.
+  if (mode === 'relances') return (m === 'GET' || m === 'POST') ? relances(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   return repondre(res, 404, { erreur: 'mode inconnu' });
 }

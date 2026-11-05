@@ -115,6 +115,7 @@ async function traiter(req, res) {
 
     if (body.action === 'test') {
       const r = await sendPushToAll({
+        cat: 'test',
         title: '🔔 VRM — test réussi !',
         body: 'Les notifications push fonctionnent sur cet appareil.',
         tag: 'vrm-test',

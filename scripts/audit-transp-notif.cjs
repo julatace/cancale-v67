@@ -112,7 +112,7 @@ const B = '99999999-8888-7777-6666-555555555555';
 const NEUTRE = '00000000-0000-0000-0000-000000000000';
 process.env.SUPABASE_SERVICE_KEY = 'banc-cle-service';
 process.env.VRM_OWNER_UID = A;
-process.env.VAPID_PRIVATE_KEY = 'banc-cle-privee-factice';
+process.env.VAPID_PRIVATE_KEY = 'YmFuYy1jbGUtcHJpdmVlLWZhY3RpY2UtMzItb2N0ZXQ';
 process.env.CRON_SECRET = 'cle-banc-cron';
 process.env.EMAIL_INBOUND_SECRET = 'cle-banc-suivi';
 delete process.env.AI_API_KEY; delete process.env.ANTHROPIC_API_KEY;

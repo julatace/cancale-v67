@@ -62,7 +62,7 @@ export async function envoyerNotifTransp(t, ch, { txs = [], codes = [] } = {}) {
   if (r === null) return { envoye: false, raison: 'pas-su' };
   if (r === false) return { envoye: false, raison: 'deja-annonce' };
   const txt = texteNotifTransp(t, ch);
-  const e = await sendPushToAll({ title: txt.title, body: txt.body, tag: ch.cle, url: (() => { const un = (txs || []).filter(Boolean); const tx = un.length === 1 ? un[0] : ''; return ch.etat === 'disponible' ? DESTINATIONS.retrait({ suivi: t.suivi, tx }) : DESTINATIONS.achat({ tx }); })() });
+  const e = await sendPushToAll({ cat: ch.categorie, title: txt.title, body: txt.body, tag: ch.cle, url: (() => { const un = (txs || []).filter(Boolean); const tx = un.length === 1 ? un[0] : ''; return ch.etat === 'disponible' ? DESTINATIONS.retrait({ suivi: t.suivi, tx }) : DESTINATIONS.achat({ tx }); })() });
   if (e && e.coupe) return { envoye: false, raison: 'abonnement' };
   if (!e || !(Number(e.sent) > 0)) return { envoye: false, raison: e && e.erreur ? 'envoi-impossible' : 'aucun-appareil' };
   return { envoye: true, raison: ch.etat };
