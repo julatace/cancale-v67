@@ -222,6 +222,8 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         dit(!!m && new Set(m.nombres).size === m.nombres.length, `B2 ${qui} : un nombre une seule fois dans la barre (§7)`, JSON.stringify(m && m.nombres));
         // B3 · « Plus » ouvert
         await toucher(pg, PLUS);
+        // Le panneau glisse de 16 px à l'ouverture : on mesure une fois l'animation finie (sinon un faux rouge de 16 px).
+        await pg.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished.catch(() => {})))).catch(() => {});
         const p = await mesurePanneau(pg);
         await capture(pg, `plus-${mode}-${sombre ? 'sombre' : 'clair'}`);
         dit(!!p && p.plusOuvert === 'true', `B3 ${qui} : « Plus » ouvert le dit (aria-expanded)`);
