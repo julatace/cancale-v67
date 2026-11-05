@@ -7,7 +7,13 @@
 //      reçoit un numéro JAMAIS servi, brûlé ; la liste « à écrire sur tes
 //      cartons » le dit ; « C'est écrit » la retire.
 //   B. un numéro saisi À LA MAIN gagne sur un numéro automatique plus ancien.
-//   C. une vente à poster garde le N° ; l'annonce en ligne qui le porte change.
+//   C. une vente à poster garde le N° ; l'annonce en ligne qui le porte change
+//      — (1er nov., X1) seulement si l'identité de la vente est lue
+//      (transaction → item_id) et n'est pas cette annonce. C2 : la vente EST
+//      l'annonce ⇒ rien ne bouge, pas de rouge. C3 : vente sans identité ⇒ rien
+//      n'est deviné, le rouge reste.
+//   (5 nov.) Les écritures de `main` sont servies à leur vraie forme (PATCH
+//   conditionnel sur `data->>rev`, corps sans `id`) — voir `brancher`.
 //   D. « pas su » ne change rien : ventes d'un compte pas lues ⇒ aucun numéro
 //      ne bouge (le bloc rouge reste).
 //   E. l'impression d'un bordereau dont le carton n'a pas encore son nouveau N°
@@ -37,6 +43,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
+const { projette } = require('./_base-volume.cjs');
 const http = require('http'), fs = require('fs'), path = require('path');
 
 const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');   // jamais un chemin absolu (§6.1)
@@ -72,8 +79,34 @@ async function brancher(pg, etat) {
     const json = (d, st = 200) => r.fulfill({ status: st, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'content-range': '0-0/0' }, body: JSON.stringify(d) });
     if (/select=owner/.test(u)) return json([]);
     if (req.method() !== 'GET') {
-      try { const b = JSON.parse(req.postData() || '[]'); (Array.isArray(b) ? b : [b]).forEach((row) => { if (row && row.id === 'main' && row.data) { etat.ecrits.push(row.data); if (!etat.panneEcriture && etat.garder) etat.main = { ...etat.main, ...row.data }; } }); } catch (_) {}
+      // ⚠️ (5 nov.) LA VRAIE FORME DE L'ÉCRITURE DE `main` depuis le 1er nov.
+      // (5d7b34f4, `cloudPush`) : un PATCH CONDITIONNEL
+      // `app_data?id=eq.main&owner=eq.…&data->>rev=eq.N|is.null&select=id`, corps
+      // `{ data, updated_at }` SANS `id` (la ligne est dans l'adresse), et
+      // `Prefer: return=representation` — la base rend les lignes écrites, `[]`
+      // si la ligne a changé depuis (« devancé » : l'app relit et réessaie, puis
+      // abandonne). Avant, ce banc ne comptait qu'un corps `{ id: 'main', data }`
+      // (l'ancien upsert, toujours celui du tout premier jour) et rendait `[]` à
+      // tout : l'app se croyait devancée six fois de suite, et le banc lisait
+      // « 0 écriture » — une fiction (§6.3). Le comparer-et-échanger est jugé ici
+      // sur `data.rev` de la ligne servie, comme la vraie base.
+      let corps = null; try { corps = JSON.parse(req.postData() || 'null'); } catch (_) {}
+      const versMain = req.method() === 'PATCH' && /\/rest\/v1\/app_data\?/.test(u) && /[?&]id=eq\.main(&|$)/.test(u);
+      const lignes = versMain ? (corps && corps.data ? [{ id: 'main', data: corps.data }] : []) : [].concat(corps || []).filter((row) => row && row.id === 'main' && row.data);
+      lignes.forEach((row) => etat.ecrits.push(row.data));
       if (etat.panneEcriture && /app_data/.test(u)) return json({ code: '57014', message: 'canceling statement due to statement timeout' }, 500);
+      if (versMain) {
+        const m = /[?&]data->>rev=(is\.null|eq\.(\d+))(&|$)/.exec(u);
+        const revBase = etat.main && Number.isSafeInteger(etat.main.rev) ? etat.main.rev : null;
+        const passe = !m || (m[1] === 'is.null' ? revBase == null : revBase === Number(m[2]));
+        if (!passe || !lignes.length) return json([]);
+        // PATCH remplace `data` en entier (la base ne fusionne pas) ; une
+        // écriture acceptée est gardée — une base qui dit « écrit » et relit
+        // l'ancienne ligne serait une autre fiction.
+        etat.main = lignes[0].data;
+        return json([{ id: 'main' }]);
+      }
+      lignes.forEach((row) => { if (etat.garder) etat.main = { ...etat.main, ...row.data }; });
       return json([]);
     }
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return json([COMPTE]);
@@ -84,6 +117,16 @@ async function brancher(pg, etat) {
     if (/orders_/.test(u) && /harvest_/.test(u) && etat.ventes) {
       const rows = [{ id: `harvest_${UID}_orders_sold`, data: { capturedAt: new Date().toISOString(), payload: { my_orders: etat.ventes || [] } } }, { id: `harvest_${UID}_orders_purchased`, data: { capturedAt: new Date().toISOString(), payload: { my_orders: [] } } }];
       return json(rows.filter((x) => /like\./.test(u) || u.includes(x.id)).map((x) => ({ ...x, cap: x.data.capturedAt, n: String(x.data.payload.my_orders.length) })));
+    }
+    // (5 nov.) Les transactions, à la forme lue par l'app (`TXN_META_SELECT` :
+    // `meta->>id`, `meta->>item_id`… que `_meta.cjs` ramène dans
+    // `data->payload->transaction`) : c'est là que vit l'IDENTITÉ d'une vente
+    // (transaction → item_id, §5), seule chose qui permet depuis le 1er nov.
+    // (2bdf211c, X1) de changer le N° de l'annonce posée à côté d'une vente.
+    if (/_txn_/.test(u) && /harvest_/.test(u)) {
+      const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || '*';
+      const lignes = (etat.txns || []).map((t) => ({ id: `harvest_${UID}_txn_${t.tx}`, data: { capturedAt: new Date().toISOString(), payload: { transaction: { id: String(t.tx), item_id: String(t.item), status: t.status || 230, status_title: 'Le paiement a été validé', status_updated_at: new Date(Date.now() - 3600e3).toISOString(), shipment: { status_title: 'Bordereau envoyé au vendeur' } } } } }));
+      return json(lignes.map((l) => projette(l, sel)));
     }
     if (/_listings/.test(u) && /harvest_/.test(u)) return json([{ ...etat.listings, cap: etat.listings.data.capturedAt }]);
     if (/_supprimees/.test(u) && /harvest_/.test(u)) return json(etat.supprimees ? [{ id: `harvest_${UID}_supprimees`, ids: etat.supprimees }] : []);
@@ -160,19 +203,55 @@ const SERVIS = ['1', '2', '3', '51', '52'];
       dit(!!n && !SERVIS.includes(n), 'l\'automatique change, vers un numéro jamais servi', `N°${n}`);
       await ctx.close();
     }
+    // C. Une vente à poster et une annonce en ligne sous le même N°. Depuis le
+    // 1er nov. (2bdf211c, audit X1, historique-numeros.md) l'annonce ne change
+    // que si l'IDENTITÉ de la vente est connue (transaction → item_id) et n'est
+    // pas cette annonce ; sinon rien n'est deviné (§5). Trois cas, trois règles.
+    const etatC = (txns) => ({ main: { vinted_annonce_numeros: {
+        '6001': { numero: '51', auto: true, numberedAt: '2026-10-09T10:00:00.000Z', title: 'Annonce de banc' },
+      }, vinted_sale_overrides: { '77001': { numero: '51' } }, vinted_used_numeros: [1, 2, 3, 51, 52], vinted_accounts_hidden: [] },
+      listings: LISTINGS([{ id: 6001, t: 'Annonce de banc' }]), ventes: [vente(77001, 'Annonce de banc')], txns, ecrits: [], ebay: null, panneEcriture: false });
+    const ovLocaux = (pg) => pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vinted_sale_overrides') || '{}'); } catch (_) { return {}; } });
     {
-      console.log('\n── C. Une vente à poster garde son numéro');
-      const etat = { main: { vinted_annonce_numeros: {
-          '6001': { numero: '51', auto: true, numberedAt: '2026-10-09T10:00:00.000Z', title: 'Annonce de banc' },
-        }, vinted_sale_overrides: { '77001': { numero: '51' } }, vinted_used_numeros: [1, 2, 3, 51, 52], vinted_accounts_hidden: [] },
-        listings: LISTINGS([{ id: 6001, t: 'Annonce de banc' }]), ventes: [vente(77001, 'Vendue de banc')], ecrits: [], ebay: null, panneEcriture: false };
+      console.log('\n── C. Une vente à poster (identité connue, une AUTRE annonce) garde son numéro');
+      // La vente 77001 est l'annonce 6999 (déjà sortie du dressing) ; l'annonce
+      // 6001, au même titre, est une AUTRE paire.
+      const etat = etatC([{ tx: 77001, item: 6999 }]);
       const { ctx, pg } = await ouvrir(nav, etat, 1512, 'cat_bord');
       await pg.waitForSelector('[data-numeros-a-ecrire]', { timeout: 20000 }).catch(() => {}); await pg.waitForTimeout(2500);
       const loc = await fichesLocales(pg) || {};
       const n = String((loc['6001'] || {}).numero || '');
       dit(!!n && !SERVIS.includes(n), 'l\'annonce en ligne prend un numéro neuf (la vente garde le N°51)', `N°${n}`);
-      const ov = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vinted_sale_overrides') || '{}'); } catch (_) { return {}; } });
+      const ov = await ovLocaux(pg);
       dit(String((ov['77001'] || {}).numero) === '51', 'la vente à poster garde le N°51', String((ov['77001'] || {}).numero));
+      const ligne = await pg.evaluate(() => { const e = document.querySelector('[data-a-ecrire="6001"]'); return e ? [e.getAttribute('data-a-ecrire-de'), e.getAttribute('data-a-ecrire-vers')] : null; });
+      dit(!!ligne && ligne[0] === '51' && ligne[1] === n, '« à écrire sur tes cartons » dit N°51 → le neuf', JSON.stringify(ligne));
+      await pg.waitForTimeout(1500);
+      const parti = etat.ecrits.some((d) => d.vinted_annonce_numeros && d.vinted_annonce_numeros['6001'] && String(d.vinted_annonce_numeros['6001'].numero) === n);
+      dit(parti, 'le changement part au nuage', `${etat.ecrits.length} écriture(s)`);
+      await ctx.close();
+    }
+    {
+      console.log('\n── C2. La vente EST cette annonce (identité = 6001) : rien ne bouge, pas de rouge');
+      const etat = etatC([{ tx: 77001, item: 6001 }]);
+      const { ctx, pg } = await ouvrir(nav, etat, 1512, 'cat_bord');
+      await pg.waitForSelector('[data-ann-resume], [data-conflit-num]', { timeout: 20000 }).catch(() => {}); await pg.waitForTimeout(7000);
+      const loc = await fichesLocales(pg) || {};
+      dit(String((loc['6001'] || {}).numero) === '51', 'la paire vendue garde son N°51 (même paire, prouvé)', String((loc['6001'] || {}).numero));
+      const etatEcran = await pg.evaluate(() => ({ conflit: document.querySelectorAll('[data-conflit-num="51"]').length, aEcrire: !!document.querySelector('[data-a-ecrire="6001"]') }));
+      dit(etatEcran.conflit === 0 && !etatEcran.aEcrire, 'ni rouge ni « à écrire » pour une seule paire', JSON.stringify(etatEcran));
+      await ctx.close();
+    }
+    {
+      console.log('\n── C3. Vente SANS identité lue : rien n\'est deviné, le rouge reste');
+      const etat = etatC([]);
+      const { ctx, pg } = await ouvrir(nav, etat, 1512, 'cat_bord');
+      await pg.waitForSelector('[data-conflit-num="51"]', { timeout: 20000 }).catch(() => {}); await pg.waitForTimeout(5000);
+      const loc = await fichesLocales(pg) || {};
+      const ov = await ovLocaux(pg);
+      dit(String((loc['6001'] || {}).numero) === '51' && String((ov['77001'] || {}).numero) === '51', 'aucun numéro ne change (on ne sait pas laquelle est vendue)', JSON.stringify({ annonce: (loc['6001'] || {}).numero, vente: (ov['77001'] || {}).numero }));
+      const rouge = await pg.evaluate(() => document.querySelectorAll('[data-conflit-num="51"]').length);
+      dit(rouge > 0, 'le N°51 reste en rouge (deux porteurs, rien de prouvé)', String(rouge));
       await ctx.close();
     }
     {
