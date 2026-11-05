@@ -24,7 +24,11 @@
 //      « Réessayer » la fait partir ;
 //   E. « Publier » envoie les photos DANS L'ORDRE CHOISI, ajoutées comprises ;
 //   F. 390 px : aucun débordement horizontal, cibles du bloc ≥ 44 px ; aucune
-//      erreur de page.
+//      erreur de page ;
+//   G. (revue du 5 nov.) 1512 px : une photo ajoutée pour la N°31 ne part PAS
+//      avec la N°35 quand il change d'article — ni une photo déjà chez eBay, ni
+//      une encore en envoi (requête TENUE, §6.5) — et le changement est dit ;
+//      une photo prise AVANT de choisir l'article reste avec lui.
 const path = require('path');
 const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
@@ -133,6 +137,7 @@ async function ouvrir(b, vp, sombre) {
     if (body.action === 'agent') return j({ ok: true, tasks: [], sources: [{ nom: 'Commandes', ok: true, partiel: true }], journal: [], journalLisible: true });
     if (body.action === 'photo') {
       await new Promise((r) => setTimeout(r, 150));
+      if (SC.tenir) await SC.tenir;
       if (SC.photoKO) return j({ ok: false, reason: 'photo-refusee', error: 'eBay n\'a pas pris la photo : image trop petite (message inventé)' }, 422);
       nPhoto++;
       return j({ ok: true, url: `https://i.ebayimg.com/images/g/banc${nPhoto}/s-l1600.jpg` });
@@ -249,6 +254,59 @@ const photosEditeur = (pg) => pg.$$eval('[data-ebay-photo]', (els) => els.map((e
           const attendu = [fin[0], fin[1], fin[2], fin[3]];
           dit(!!pub && JSON.stringify(pub.item && pub.item.photos) === JSON.stringify(attendu), 'la publication emporte les photos DANS L\'ORDRE CHOISI, ajoutées comprises', pub ? JSON.stringify(pub.item.photos) : 'aucun publish');
           dit(!!pub && pub.confirme === true && pub.agent !== true, 'publiée sur SON clic (confirme:true), jamais « par l\'agent »', pub ? `confirme=${pub.confirme} agent=${pub.agent}` : '');
+        });
+      } else {
+        // ── G ── changer d'article ne déplace pas les photos ajoutées
+        await essaie('G. photos ajoutées et changement d\'article', async () => {
+          const ouvrirForm = async () => {
+            await pg.goto(`http://localhost:${PORT}/?tab=annonces&site=ebay`, { waitUntil: 'domcontentloaded' });
+            await pg.waitForSelector('[data-poster="ebay"]', { timeout: 25000 });
+            await pg.click('[data-poster="ebay"]');
+            await pg.waitForSelector('[data-choix-paire="31"]', { timeout: 15000 });
+          };
+          const changer = async (n) => {
+            await pg.click('text=Changer');
+            await pg.waitForSelector(`[data-choix-paire="${n}"]`, { timeout: 10000 });
+            await pg.click(`[data-choix-paire="${n}"]`);
+          };
+          const vinted = (n) => [`https://img.test/v${idDe(n)}.jpg`, `https://img.test/v${idDe(n)}b.jpg`];
+          await ouvrirForm();
+          await pg.click('[data-choix-paire="31"]');
+          await pg.waitForFunction(() => document.querySelectorAll('[data-ebay-photo]').length === 2, null, { timeout: 10000 });
+          const gal = await pg.$('input[type="file"][data-ebay-photo-galerie]');
+          await gal.setInputFiles([{ name: 'n31.png', mimeType: 'image/png', buffer: PNG }]);
+          await pg.waitForFunction(() => document.querySelectorAll('[data-ebay-photo]').length === 3 && !document.querySelector('[data-ebay-photo-envoi]'), null, { timeout: 15000 });
+          await changer(35);
+          await pg.waitForTimeout(400);
+          const l35 = await photosEditeur(pg);
+          dit(JSON.stringify(l35) === JSON.stringify(vinted(35)), 'une photo ajoutée pour la N°31 ne part pas avec la N°35 (changement d\'article)', l35.join(' '));
+          const dit35 = await pg.$eval('[data-ebay-photos-trop]', (e) => e.textContent).catch(() => '');
+          dit(/retirée/.test(dit35) && /N°35/.test(dit35), 'le retrait est DIT sous les photos', dit35);
+          // Une photo encore en envoi (réponse d'eBay tenue) quand il change d'article.
+          await changer(31);
+          await pg.waitForFunction(() => document.querySelectorAll('[data-ebay-photo]').length === 2, null, { timeout: 10000 });
+          let lacher; SC.tenir = new Promise((r) => { lacher = r; });
+          const nAv = envois.filter((e) => e.action === 'photo').length;
+          await (await pg.$('input[type="file"][data-ebay-photo-galerie]')).setInputFiles([{ name: 'n31b.png', mimeType: 'image/png', buffer: PNG }]);
+          await pg.waitForSelector('[data-ebay-photo-envoi="envoi"]', { timeout: 5000 });
+          for (let i = 0; i < 40 && envois.filter((e) => e.action === 'photo').length === nAv; i++) await pg.waitForTimeout(100);
+          await changer(35);
+          lacher(); SC.tenir = null;
+          await pg.waitForTimeout(1200);
+          const l35b = await photosEditeur(pg);
+          const resteEnvoi = await pg.$$eval('[data-ebay-photo-envoi]', (l) => l.length);
+          dit(JSON.stringify(l35b) === JSON.stringify(vinted(35)) && resteEnvoi === 0, 'une photo de la N°31 encore en envoi ne rejoint pas la N°35 à son retour', l35b.join(' ') + ' · en envoi=' + resteEnvoi);
+          const gardeG = await pg.$eval('[data-publier-garde]', (e) => e.getAttribute('data-publier-garde')).catch(() => null);
+          dit(gardeG !== 'photos-envoi' && gardeG !== 'photos-echec', 'la publication de la N°35 n\'attend pas une photo de la N°31', String(gardeG));
+          // Photographier d'abord, choisir l'article ensuite : la photo reste.
+          await ouvrirForm();
+          await (await pg.$('input[type="file"][data-ebay-photo-galerie]')).setInputFiles([{ name: 'avant.png', mimeType: 'image/png', buffer: PNG }]);
+          await pg.waitForFunction(() => document.querySelectorAll('[data-ebay-photo]').length === 1 && !document.querySelector('[data-ebay-photo-envoi]'), null, { timeout: 15000 });
+          const prise = (await photosEditeur(pg))[0];
+          await pg.click('[data-choix-paire="31"]');
+          await pg.waitForFunction(() => document.querySelectorAll('[data-ebay-photo]').length === 3, null, { timeout: 10000 }).catch(() => {});
+          const l31 = await photosEditeur(pg);
+          dit(l31.length === 3 && l31.includes(prise) && l31[0] === vinted(31)[0], 'une photo prise AVANT de choisir l\'article reste avec lui', l31.join(' '));
         });
       }
       dit(!errs.length, 'aucune erreur de page', errs.slice(0, 2).join(' | '));

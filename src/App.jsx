@@ -22267,11 +22267,24 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
   // l'analyse l'attend avant de remplir « Département ».
   const genreRef = React.useRef(null);
   const choisirPaire = (p) => {
+    // (5 nov., revue) Les photos AJOUTÉES ici (appareil, galerie) ont été prises
+    // pour l'article déjà choisi : passer à un AUTRE article les retire, celles
+    // en cours d'envoi comprises (leur adresse ne rejoindra pas cette annonce).
+    // Une photo de la N°31 sur l'annonce de la N°35, c'est la mauvaise chaussure
+    // vendue (§5 : mieux vaut un blanc qu'un faux). Sans article choisi avant
+    // (il photographie d'abord, choisit ensuite), elles restent.
+    const autrePaire = pairId != null && String(pairId) !== String(p.id);
+    const nAjouteesAvant = autrePaire ? photos.split(/\s+/).filter(estPhotoAjoutee).length + envois.length : 0;
+    if (autrePaire) {
+      genEnvois.current++;
+      setEnvois((l) => { l.forEach((x) => { try { URL.revokeObjectURL(x.apercu); } catch (_) {} }); return []; });
+      setPhotosMsg(nAjouteesAvant ? `${nAjouteesAvant === 1 ? 'La photo ajoutée pour l\'article d\'avant est retirée' : `Les ${nAjouteesAvant} photos ajoutées pour l'article d'avant sont retirées`} : ${nAjouteesAvant === 1 ? 'elle ne part' : 'elles ne partent'} pas avec la N°${p.num}.` : '');
+    }
     pairCourante.current = p.id;
     genreRef.current = p.catalogId != null && p.catalogId !== '' ? cheminVintedApp(p.catalogId).then((ch) => familleArticle({ chemin: ch }).genre).catch(() => '') : Promise.resolve('');
     setPairId(p.id); setPickerOpen(false); setPairQ('');
     setTitre(ebayTitre(p.title || '', p.taille || ''));   // « taille 36 », pas « T36 »
-    setPhotos((old) => avecPhotosAjoutees(p.photos || [], old.split(/\s+/).filter(Boolean)).join('\n'));   // (5 nov.) ses photos ajoutées restent
+    setPhotos((old) => avecPhotosAjoutees(p.photos || [], autrePaire ? [] : old.split(/\s+/).filter(Boolean)).join('\n'));   // (5 nov.) ses photos ajoutées restent — pas d'un article à l'autre
     setDesc(p.desc || descriptionDeFaits(p));              // sa description Vinted ; à défaut, ses FAITS captés (jamais inventés)
     if (p.prix != null && !String(prix).trim()) setPrix(String(p.prix).replace('.', ','));
     { const ce = etatEbayDeVinted(p.etat, null); if (ce) setCond(ce); }   // l'état Vinted de la paire (vérifié contre la liste d'eBay à l'analyse)
@@ -22408,6 +22421,10 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
     if (!brouillon || !brouillon.id) return;
     const d = brouillon;
     setBrouillonId(d.id); setNumeroBrouillon(d.numero ? String(d.numero) : '');
+    // (5 nov., revue) Rouvrir un brouillon : une photo encore en envoi pour le
+    // formulaire d'avant ne le rejoint pas, ni une relecture Vinted en cours.
+    genEnvois.current++; setEnvois((l) => { l.forEach((x) => { try { URL.revokeObjectURL(x.apercu); } catch (_) {} }); return []; }); setPhotosMsg('');
+    pairCourante.current = d.pairId || null;
     setPairId(d.pairId || null); setPickerOpen(false);
     setTitre(String(d.titre || '')); setPrix(String(d.prix == null ? '' : d.prix)); setQty(String(d.quantite || '1'));
     setCond(String(d.etat || '3000')); setDesc(String(d.description || '')); setPhotos((d.photos || []).join('\n'));
@@ -22637,7 +22654,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
   };
   const reessayerPhoto = (e) => { setEnvois((l) => l.map((x) => (x.id === e.id ? { ...x, etat: 'envoi', raison: '' } : x))); enfilerPhoto(e); };
   const retirerEnvoi = (e) => { setEnvois((l) => l.filter((x) => x.id !== e.id)); try { URL.revokeObjectURL(e.apercu); } catch (_) {} };
-  const reset = () => { genEnvois.current++; setEnvois((l) => { l.forEach((x) => { try { URL.revokeObjectURL(x.apercu); } catch (_) {} }); return []; }); setPhotosMsg(''); setOuvert(false); setRes(null); setCheck(null); setTitre(''); setPrix(''); setCat(null); setAsp({}); setPhotos(''); setDesc(''); setPairId(null); setBrouillonId(null); setNumeroBrouillon(''); setBrouillonMsg(''); setOffreA(''); setOffreR(''); setOffreBasOk(false); };
+  const reset = () => { genEnvois.current++; pairCourante.current = null; setEnvois((l) => { l.forEach((x) => { try { URL.revokeObjectURL(x.apercu); } catch (_) {} }); return []; }); setPhotosMsg(''); setOuvert(false); setRes(null); setCheck(null); setTitre(''); setPrix(''); setCat(null); setAsp({}); setPhotos(''); setDesc(''); setPairId(null); setBrouillonId(null); setNumeroBrouillon(''); setBrouillonMsg(''); setOffreA(''); setOffreR(''); setOffreBasOk(false); };
   // (17 oct.) Une paire n'est proposée qu'UNE fois, même sous deux N° (même
   // photo exacte, `jumellesParPhoto`) : on garde celle déjà sur eBay, sinon
   // l'annonce la plus récente ; l'autre numéro est dit sur la ligne.

@@ -1972,3 +1972,22 @@ inventées) 32/32, 12 rouges sur 33200ec6 (mutations d'écran : garde « photos-
 `UploadSiteHostedPictures` (forme de la documentation Trading) ; combien de temps eBay garde une
 photo hébergée qui attend dans un brouillon (documentation : supprimée si jamais utilisée).
 Geste de Julien : Vendre sur eBay → « Prendre une photo » sur l'iPhone, puis publier.
+
+### 5 nov. — Revue de `v31-agent-ebay-arret` : une photo ajoutée ne change pas d'article
+
+Défaut trouvé à la relecture : `choisirPaire` gardait les photos AJOUTÉES (adresses
+i.ebayimg.com) quand il passait d'un article à un autre (« Changer », ou « Publier » en un
+clic sur une autre ligne). Reproduit au banc (1512 px) : photo prise pour la N°31, puis la
+N°35 choisie ⇒ l'annonce de la N°35 partait avec la photo de la N°31 ; et une photo encore en
+envoi au moment du changement rejoignait la N°35 à son retour. C'est la mauvaise chaussure
+montrée à l'acheteur (§5, mieux vaut un blanc qu'un faux).
+Correctif (`EbayPublier`) : passer à un AUTRE article retire les photos ajoutées, annule les
+envois en cours (`genEnvois`) et le dit sous les photos (« La photo ajoutée pour l'article
+d'avant est retirée : elle ne part pas avec la N°35. ») ; sans article choisi avant (il
+photographie d'abord), elles restent. Rouvrir un brouillon annule aussi les envois en cours
+et une relecture Vinted en cours (`pairCourante`).
+Preuve : banc `ebay-photos-agent-arret`, scénario G (5 contrôles, requête `photo` TENUE pour
+le cas « en envoi ») : 3 rouges sur l'avant-revue, vert après ; mutation « sans annulation des
+envois » ⇒ rouge. Build ; `ebay-form`, `ebay-annonces`, `ebay-relecture`, `ebay-visuel`,
+`ebay-photo-route`, `agent-ebay-push` verts ; `ebay-un-clic` rouge à l'identique sur la base
+33200ec6 (navigation `tab=plat_ebay`, sans rapport).

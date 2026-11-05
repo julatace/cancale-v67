@@ -595,7 +595,8 @@ Chromium du banc : `/opt/pw-browsers/chromium` (lien stable),
   ‹ ›, ×) ; chaque photo réduite à 1600 px puis confiée à l'hébergement d'images d'eBay (action
   `photo`, `UploadSiteHostedPictures`, `api/_lib/ebay-photo.js`), son adresse i.ebayimg.com part
   avec l'annonce ; 12 ajoutées, 24 en tout ; envoi en cours ou raté ⇒ publication bloquée et dite.
-- **Prouvé** : bancs `ebay-photos-agent-arret` (32 ; 12 rouges sur le code d'avant, 2 mutations d'écran attrapées),
+  Revue : changer d'article retire les photos ajoutées (envois en cours compris) et le dit.
+- **Prouvé** : bancs `ebay-photos-agent-arret` (37 ; 12 rouges sur le code d'avant, 3 sur l'avant-revue, 3 mutations attrapées),
   `ebay-photo-route` (15, 8/8 mutations), `agent-ebay-push` réécrit (16, 15 rouges avant) ; build.
 - **Non mesuré** : `UploadSiteHostedPictures` sur un vrai compte eBay (forme de la documentation) ;
   durée de vie d'une photo hébergée gardée dans un brouillon. Récit : `historique-ebay.md`.
