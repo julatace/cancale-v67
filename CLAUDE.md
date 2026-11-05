@@ -506,6 +506,7 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 
+- **5 nov. · Chantier G (v35)** : Messages (filtres `.vrm-filtres`, liens de pied, colonne 368-420 px), UN écran E-mails (Paramètres y mène), `EtatPanne` E-mails/Communauté/Messages, offre Vestiaire < 6 h en ambre (jamais Vinted). `docs/passation/2026-11-05-chantier-g.md`.
 - **5 nov. · Chantier F, Compta et Statistiques (v35)** : cartes vides repliées en une ligne, sous-onglets sous le titre, statut choisi à UN endroit, « — » + raison (Comparer, À déclarer) ; « À recopier sur l'URSSAF » (Copier), Bilan du mois (PDF), Délai de paiement par site. `docs/passation/2026-11-05-chantier-f.md`. Geste : déclarer depuis « À recopier ».
 - **5 nov. · Petits plus (v34)** : accueil = vrais navigateurs (`navigateursServis`, Orion « en essai ») ; guide iPhone dans Notifications ; notif « compte Vinted pas relu » (Rappels, 1/jour) ; contrôle de prod (titre, santé, version extension). `docs/passation/2026-11-05-petits-plus.md`.
 

@@ -287,3 +287,17 @@
   .vrm-relier-choix{grid-template-columns:1fr 1fr}
   .vrm-relier-contenu{grid-template-columns:36px minmax(0,1fr)}
 }
+
+/* ── « RELIER MA BOÎTE » (5 nov., chantier G, revue 2.24) ─────────────────
+   L'ancien sous-écran de Paramètres en tête (est-ce que mes e-mails arrivent,
+   journal, adresses, à rattacher), puis l'accompagnement animé sous un titre. */
+.vrm-boite-relier { display: flex; flex-direction: column; gap: 28px; }
+.vrm-boite-reglages { scroll-margin-top: 80px; }
+.vrm-boite-guide { display: flex; flex-direction: column; gap: 10px; }
+.vrm-boite-guide-titre { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -.01em; line-height: 1.25; color: var(--vrm-ink); }
+.vrm-boite-panne { margin: 8px 0; }
+/* Le second niveau (Aperçu · Journal · Adresses · À rattacher) : une rangée de
+   filtres (dessin `.vrm-filtres` de jetons.css), sans cadre ni piste. */
+.vrm-boite .vrm-emails-rubriques.vrm-filtres{display:flex;flex-wrap:wrap;gap:8px;padding:0;border:0;background:none;border-radius:0;margin:0 0 16px}
+.vrm-boite .vrm-emails-rubriques.vrm-filtres>button{flex:0 0 auto;text-align:center}
+.vrm-boite .vrm-emails-rubriques.vrm-filtres strong{font:inherit}

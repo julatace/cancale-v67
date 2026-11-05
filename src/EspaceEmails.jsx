@@ -6,9 +6,12 @@ import "./emails-apercu.css";
 // écrit UNE fois, dans l'Aperçu, avec sa phrase — §7). Le nom accessible garde le
 // mot d'avant (« Réception », « Journal », « Comptes et transfert ») : on retrouve
 // l'onglet sous les deux noms.
+// (5 nov., chantier G, revue 2.24) Ces rubriques vivent dans l'onglet « Relier ma boîte »
+// de l'écran E-mails : un onglet « E-mails » dans l'écran « E-mails » ne disait rien — il
+// s'appelle « Journal » (le nom accessible garde « E-mails »).
 const rubriques = [
   ["reception", "Aperçu", "Aperçu · Réception"],
-  ["journal", "E-mails", "E-mails · Journal"],
+  ["journal", "Journal", "Journal · E-mails"],
   ["adresses", "Adresses", "Adresses · Comptes et transfert"],
   ["a-traiter", "À rattacher", "À rattacher"],
 ];
@@ -35,7 +38,9 @@ export default function EspaceEmails({
         "--email-ambre": theme.warn,
       }}
     >
-      <nav className="vrm-emails-rubriques" aria-label="Rubriques des emails">
+      {/* (5 nov., chantier G) Sous le choix « Boîte de réception · Relier ma boîte », le second niveau
+          prend le dessin des filtres de l'app (`vrm-filtres`) : deux contrôles segmentés empilés se confondaient. */}
+      <nav className="vrm-emails-rubriques vrm-filtres" aria-label="Rubriques des emails">
         {rubriques.map(([id, titre, nom]) => (
           <button
             key={id}

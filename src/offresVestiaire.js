@@ -62,6 +62,20 @@ export function resteAvant(exp, maintenant = Date.now()) {
   return m < 60 ? `${m} min` : m < 48 * 60 ? `${Math.round(m / 60)} h` : `${Math.round(m / 1440)} j`;
 }
 
+// ── UNE OFFRE QUI EXPIRE BIENTÔT (5 nov., chantier G) ───────────────────────
+// Une offre Vestiaire REÇUE, encore à toi de répondre (`aTrancher` : rangée « à
+// toi » par l'extension, ouverte, pas expirée), dont l'échéance LUE (`expire`,
+// jamais devinée) tombe dans moins de 6 heures : Messages la montre en ambre,
+// UNE fois, avec le temps restant. Sans échéance lue : rien (« pas su » ≠ « bientôt »).
+// ⚠️ VESTIAIRE SEULEMENT. Julien (5 nov.) : les offres VINTED n'expirent PAS —
+//    aucune règle de ce genre pour Vinted, nulle part (scripts/audit-offres-expirent.cjs).
+export const EXPIRE_BIENTOT_MS = 6 * 3600e3;
+export function expireBientot(o, maintenant = Date.now()) {
+  if (!o || typeof o.expire !== 'number' || !isFinite(o.expire) || o.expiree === true) return false;
+  const reste = o.expire - maintenant;
+  return reste > 0 && reste < EXPIRE_BIENTOT_MS;
+}
+
 // Le résultat d'une réponse, dit en français (jamais « fait » sur un doute).
 export function etiquetteOffre(r, geste) {
   const fait = { accepter: 'Offre acceptée sur Vestiaire.', refuser: 'Offre refusée sur Vestiaire.', contre: 'Contre-offre envoyée sur Vestiaire.' }[geste] || 'Fait sur Vestiaire.';

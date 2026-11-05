@@ -308,7 +308,7 @@ function m9() {
   const APP = fs.readFileSync(F.app, 'utf8');
   const debut = APP.indexOf('function MessagesVestiaire()'), fin = APP.indexOf('function AchatsVestiaire()');
   const bloc = debut > 0 && fin > debut ? APP.slice(debut, fin) : '';
-  dit(/titreArticle:\s*String\(v\.titre/.test(bloc) && /titre=\{\(fv && fv\.titre\) \|\| v\.titreArticle/.test(bloc), 'M9 · l’écran Messages → Vestiaire affiche le titre de l’article lu quand la conversation n’est reliée à aucune fiche');
+  dit(/titreArticle:\s*String\(v\.titre/.test(bloc) && /(?:titre|nom)=\{\(fv && fv\.titre\) \|\| v\.titreArticle/.test(bloc), 'M9 · l’écran Messages → Vestiaire affiche le titre de l’article lu quand la conversation n’est reliée à aucune fiche');
   dit(/photoArticle:\s*urlPhotoVc\(/.test(bloc) && /photo=\{\(fv && fv\.photo\) \|\| v\.photoArticle\}/.test(bloc), 'M9 · … et sa photo (adresse vestiairecollective.com vérifiée)');
   const fil = APP.slice(APP.indexOf('function FilVestiaire('), debut);
   dit(/envoi && envoi\.raison === 'messagerie-stream'/.test(fil) && /data-vc-envoi-stream/.test(fil), 'M9 · le pied du fil dit pourquoi VRM n’envoie pas (messagerie à part) au lieu d’un code');
