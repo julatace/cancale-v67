@@ -80,7 +80,7 @@
 .vrm-fa-message-tete { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 28px; }
 .vrm-fa-message-tete h4 { margin: 0; font: 700 17px/1.25 var(--vrm-police); letter-spacing: -.01em; color: var(--fu-encre); }
 .vrm-fa .vrm-fa-lien, .vrm-app-shell .vrm-main .vrm-fa .vrm-fa-lien {
-  min-height: 44px; margin: -8px -8px -8px 0; padding: 0 8px; background: none !important; color: var(--fu-bleu) !important; font: 600 15px/1 var(--vrm-police) !important;
+  min-height: 44px; margin: -8px -8px -8px 0; padding: 0 8px; background: none !important; color: var(--vrm-accent-texte) !important; font: 600 15px/1 var(--vrm-police) !important;
 }
 .vrm-fa-bulle {
   margin: 0; align-self: flex-start; max-width: 100%; padding: 10px 14px; border-radius: 18px 18px 18px 6px;
@@ -139,7 +139,7 @@
   font: 600 14px/1 var(--vrm-police) !important; white-space: nowrap; position: relative; transition: transform .12s ease, opacity .12s ease;
 }
 .vrm-fa .vrm-fa-second, .vrm-fa-feuille .vrm-fa-second, .vrm-app-shell .vrm-main .vrm-fa .vrm-fa-second {
-  flex: none; min-height: 36px; padding: 0 14px; border-radius: 18px !important; background: var(--fu-case) !important; color: var(--fu-bleu) !important;
+  flex: none; min-height: 36px; padding: 0 14px; border-radius: 18px !important; background: var(--fu-case) !important; color: var(--vrm-accent-texte) !important;
   font: 600 14px/1 var(--vrm-police) !important; white-space: nowrap; position: relative; transition: transform .12s ease;
 }
 /* 36 px visibles, 44 px au doigt. */
@@ -149,7 +149,7 @@
 @media (hover: hover) { .vrm-fa .vrm-fa-envoyer:hover:not(:disabled) { opacity: .88; } }
 
 .vrm-fa .vrm-fa-plus, .vrm-app-shell .vrm-main .vrm-fa .vrm-fa-plus {
-  align-self: center; min-height: 44px; padding: 0 18px; border-radius: 22px !important; background: var(--fu-carte) !important; color: var(--fu-bleu) !important; font: 600 15px/1 var(--vrm-police) !important; box-shadow: var(--fu-ombre) !important;
+  align-self: center; min-height: 44px; padding: 0 18px; border-radius: 22px !important; background: var(--fu-carte) !important; color: var(--vrm-accent-texte) !important; font: 600 15px/1 var(--vrm-police) !important; box-shadow: var(--fu-ombre) !important;
 }
 .vrm-fa-ligne { margin: 4px 2px; font: 500 15px/1.4 var(--vrm-police); color: var(--fu-gris); }
 .vrm-fa-ligne.is-geste { color: var(--fu-ambre-txt); }

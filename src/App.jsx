@@ -49,6 +49,7 @@ import {etatColisDepuisTexte,normaliserSuivi} from '../api/_lib/etat-colis-email
 import {FAMILLES as FAMILLES_NOTIF,familleActive as familleNotifActive,reglageCalme,heureValide} from '../api/_lib/notif-textes.js';
 import {apercuFamille as apercuFamilleNotif} from '../api/_lib/notif-apercus.js';
 import './notif-reglages.css';
+import GuideIphone, { useGuideIphone } from './GuideIphone.jsx';
 import {achatDuColis,suivisAchat,entreeIndexAchat} from './liensColis.js';
 import {achatParConversation, regrouperArrivees} from '../api/_lib/achat-arrive-relais.js';
 import {indexCodesSuivis, finParIdentite, fusionnerParCode} from './retraitPreuves.js';
@@ -65929,6 +65930,8 @@ function PushSetting() {
   const [state, setState] = useState('checking'); // checking | unsupported | off | on | busy
   const [msg, setMsg] = useState(null);
   const [srv, setSrv] = useState(null);   // ce que le SERVEUR dit de lui-même
+  // (5 nov.) « Installer VRM sur l'iPhone » : iPhone + Safari + pas installée + pas fermé (src/guideIphone.js).
+  const [guideIphone, fermerGuideIphone] = useGuideIphone();
   const b64ToU8 = (s) => { const p='='.repeat((4-s.length%4)%4); const b=(s+p).replace(/-/g,'+').replace(/_/g,'/'); const r=atob(b); return Uint8Array.from([...r].map(c=>c.charCodeAt(0))); };
 
   // ⚠️ LE PIÈGE QUI A COUPÉ SES NOTIFICATIONS (et qui vient de MOI).
@@ -66048,8 +66051,10 @@ function PushSetting() {
       <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>Notifications téléphone</div>
       <div style={{fontSize:12,color:C.muted,marginBottom:10,lineHeight:1.4}}>
         Vente, bordereau, argent reçu : notifié en temps réel, même app fermée.
-        {state==='unsupported' && ' — Non disponible ici : installe d\'abord l\'app sur ton écran d\'accueil (Partager → Sur l\'écran d\'accueil) puis ouvre-la depuis l\'icône.'}
+        {/* (5 nov.) Sur un iPhone dans Safari, le guide illustré le dit (une phrase, une fois — §7). */}
+        {state==='unsupported' && !guideIphone && ' — Non disponible ici : installe d\'abord l\'app sur ton écran d\'accueil (Partager → Sur l\'écran d\'accueil) puis ouvre-la depuis l\'icône.'}
       </div>
+      {guideIphone && <GuideIphone onFermer={fermerGuideIphone}/>}
       {/* ⚠️ « Je ne reçois plus rien » a DEUX causes qui font le même silence :
           aucun appareil abonné, ou le serveur sans sa clé. On les sépare ici,
           au lieu de laisser deviner. */}

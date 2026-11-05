@@ -58,7 +58,7 @@
  .vrm-day-money .vrm-day-k,.vrm-day-money .vrm-day-note{color:var(--vrm-muted)!important;}
  .vrm-day-money .vrm-day-hero-n{grid-column:1;grid-row:2;font-size:34px!important;color:var(--vrm-ink)!important;letter-spacing:-1.2px;}
  .vrm-day-money .vrm-day-meta{grid-column:1;grid-row:3;color:var(--vrm-muted)!important;}
- .vrm-day-money .vrm-day-meta b,.vrm-day-money [data-vendu-jour],.vrm-day-money .vrm-day-lien{color:var(--vrm-accent)!important;}
+ .vrm-day-money .vrm-day-meta b,.vrm-day-money [data-vendu-jour],.vrm-day-money .vrm-day-lien{color:var(--vrm-accent-texte)!important;}
  .vrm-day-money .vrm-day-recu{grid-column:2;grid-row:2 / span 2;border-top:0!important;border-left:1px solid var(--vrm-line)!important;margin:0!important;padding:0 0 0 12px!important;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;max-width:112px;}
  .vrm-day-money .vrm-day-recu-n{color:var(--vrm-ink)!important;font-size:22px!important;}
  .vrm-day-money .vrm-day-note{font-size:11px;}
