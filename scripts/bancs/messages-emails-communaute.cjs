@@ -48,7 +48,7 @@ const MUTATION = process.env.BANC_MUTATION === '1';
 const MUTANT_CSS = [
   ':root:root body .vrm-app-shell .vrm-main .vrm-inbox-filters > button:not(#fu):not(#mu) { border: 1px solid #c7c7cc !important; background: transparent !important; min-height: 36px !important; height: 36px !important; }',
   ':root body .vrm-message-workspace:not(#_):not(#mu) { grid-template-columns: 300px minmax(0,1fr) 250px !important; }',
-  'html body .vrm-pied-lien[data-pied-lien="suite"]:not(#mu) { color: var(--vrm-accent) !important; }',
+  ':root:root body .vrm-app-shell .vrm-main .vrm-pied-lien[data-pied-lien="suite"]:not(#_):not(#mu) { color: var(--vrm-accent) !important; }',
   'html body .vrm-of .vrm-of-reste.is-bientot:not(#mu) { color: var(--vrm-muted) !important; }',
 ].join('\n');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json' };
