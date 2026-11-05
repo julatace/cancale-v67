@@ -49,14 +49,14 @@
 :root:root:root body .vrm-main .vrm-annbar .vrm-annbar-tri > select.vrm-ann-tri {
   position: absolute !important; inset: 0 !important; width: 100% !important; height: 100% !important; min-width: 0 !important; min-height: 0 !important;
   margin: 0 !important; padding: 0 !important; opacity: 0 !important; border: 0 !important; background: transparent !important;
-  cursor: pointer; font-size: 16px !important; -webkit-appearance: none; appearance: none; color: inherit !important; text-indent: 0 !important;
+  cursor: pointer; font-size: 17px !important; -webkit-appearance: none; appearance: none; color: inherit !important; text-indent: 0 !important;
 }
 :root:root:root body .vrm-main .vrm-annbar .vrm-annbar-tri > select.vrm-ann-tri option { color: var(--vrm-ink); background: var(--vrm-surface); }
 :root:root:root body .vrm-main .vrm-annbar .vrm-ann-outils { position: relative; width: auto !important; }
 /* Le menu « Outils » : des lignes de 44 px. */
 :root:root:root body .vrm-main .vrm-annbar .vrm-annbar-outil {
   display: flex !important; align-items: center; gap: 10px; width: 100%; min-height: 44px !important; margin: 0 !important; padding: 0 10px !important;
-  border: 0 !important; border-radius: 10px !important; background: transparent !important; box-shadow: none !important;
+  border: 0 !important; border-radius: 12px !important; background: transparent !important; box-shadow: none !important;
   color: var(--vrm-ink) !important; font: 600 15px/1.2 var(--vrm-police, inherit) !important; text-align: left; cursor: pointer;
 }
 :root:root:root body .vrm-main .vrm-annbar .vrm-annbar-outil-icone { display: flex; flex: none; color: var(--vrm-muted); }
@@ -80,12 +80,27 @@
 
 /* ── 2. LE BANDEAU « PRIX D'ACHAT · N/M → COMPLÉTER » (2.7) ─────────────────
    Neutre (un fait qu'on complète quand on veut), une ligne au-dessus de la grille. */
-.vrm-ann-achats {
-  display: flex; align-items: center; gap: 4px 12px; flex-wrap: wrap; box-sizing: border-box;
-  margin: 0 0 14px; padding: 4px 4px 4px 14px; min-height: 52px;
+/* La ligne d'avis : un cadre, deux cases côte à côte (prix d'achat · nouveaux N°). */
+.vrm-ann-avis {
+  display: flex; align-items: stretch; box-sizing: border-box; margin: 0 0 12px; min-height: 48px;
   border-radius: 14px; background: var(--vrm-surface, #FFFFFF); box-shadow: inset 0 0 0 1px var(--vrm-line, rgba(0,0,0,.08));
 }
-.vrm-ann-achats-texte { flex: 1 1 200px; min-width: 0; display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 8px; line-height: 1.3; }
+.vrm-ann-avis > * + * { border-left: 1px solid var(--vrm-line, rgba(0,0,0,.08)) !important; }
+.vrm-ann-achats {
+  flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 4px 10px; box-sizing: border-box;
+  padding: 2px 4px 2px 14px; min-height: 48px;
+}
+html body .vrm-ann-avis > button.vrm-ann-avis-neufs {
+  flex: 0 0 auto; display: flex !important; align-items: center; gap: 8px; min-height: 48px !important; margin: 0 !important;
+  padding: 0 14px !important; border: 0 !important; border-radius: 0 14px 14px 0 !important; background: transparent !important; box-shadow: none !important;
+  color: var(--vrm-ink) !important; font: 400 15px/1.2 var(--vrm-police, inherit) !important; cursor: pointer; white-space: nowrap;
+}
+html body .vrm-ann-avis > button.vrm-ann-avis-neufs:only-child { flex: 1 1 auto; justify-content: space-between; border-radius: 14px !important; }
+html body .vrm-ann-avis > button.vrm-ann-avis-neufs b { font-weight: 700; font-variant-numeric: tabular-nums; }
+.vrm-ann-avis-voir { font-size: 13px; font-weight: 600; color: var(--vrm-accent-texte, #0066CC); }
+html body .vrm-ann-avis > button.vrm-ann-avis-neufs[aria-expanded="true"] .vrm-ann-avis-voir { color: var(--vrm-muted); }
+html body .vrm-ann-avis > button.vrm-ann-avis-neufs:active { background: var(--vrm-b-teinte) !important; }
+.vrm-ann-achats-texte { flex: 1 1 auto; min-width: 0; display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 8px; line-height: 1.3; }
 .vrm-ann-achats-nom { font-size: 15px; font-weight: 600; color: var(--vrm-ink); }
 .vrm-ann-achats-n { font-size: 15px; font-weight: 700; color: var(--vrm-ink); font-variant-numeric: tabular-nums; }
 .vrm-ann-achats-sous { font-size: 13px; color: var(--vrm-muted); }
@@ -208,6 +223,41 @@ html body .vrm-act .vrm-act-pb a { color: var(--vrm-accent-texte, #0066CC); }
 .vrm-sel-nom > .vrm-num { margin: 0; }
 .vrm-sel-titre { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vrm-sel-prix { font-variant-numeric: tabular-nums; }
-.vrm-sel-ligne > .vrm-photo-vide.vrm-sel-photo { height: 64px; border-radius: 10px; }
+.vrm-sel-ligne > .vrm-photo-vide.vrm-sel-photo { height: 64px; border-radius: 12px; }
 .vrm-sel-ligne { transition: transform .12s cubic-bezier(.23, 1, .32, 1); }
 .vrm-sel-ligne:not([aria-disabled="true"]):active { transform: scale(.985); }
+
+/* ── 6. LE BLEU « LIEN » DE LA ZONE ───────────────────────────────────────────
+   Les boutons discrets lisent `--vrm-b-lien`, qui vaut l'APLAT (#0071E3/#0A84FF :
+   3,6:1 sur la carte sombre, banc fusion-app F6). Dans l'écran Annonces et ses
+   feuilles, le texte bleu est le bleu « lien » (`--vrm-accent-texte`), lisible dans
+   les deux thèmes — par la variable, comme Compta (styles-compta-claire). */
+.vrm-main:has(.vrm-annbar), .vrm-main .vrm-sel, .vrm-act, .vrm-fiche-menu { --vrm-b-lien: var(--vrm-accent-texte, #0066CC); }
+
+
+/* ── 7. « N NOUVEAUX N° POSÉS PAR VRM » : la liste dépliée sous la ligne d'avis ── */
+.vrm-ann-neufs {
+  margin: -4px 0 12px; padding: 10px 14px 8px; border-radius: 14px; box-sizing: border-box;
+  background: var(--vrm-surface, #FFFFFF); box-shadow: inset 0 0 0 1px var(--vrm-line, rgba(0,0,0,.08));
+}
+.vrm-ann-neufs-tete { font-size: 15px; font-weight: 600; color: var(--vrm-ink); }
+.vrm-ann-neufs-phrase { font-size: 12px; color: var(--vrm-muted); line-height: 1.45; margin: 2px 0 6px; }
+.vrm-ann-neufs-ligne { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid var(--vrm-line); }
+.vrm-ann-neufs-photo { width: 36px; height: 36px; border-radius: 12px; object-fit: cover; flex: none; }
+.vrm-ann-neufs-num { flex: none; display: flex; align-items: center; min-height: 44px; }
+.vrm-ann-neufs-num [data-edition] > span { border-bottom: 0 !important; }
+.vrm-ann-neufs-nom { flex: 1; min-width: 0; font-size: 13px; color: var(--vrm-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Au téléphone : la phrase du prix d'achat dans l'infobulle, la ligne reste UNE ligne. */
+@media (max-width: 767px) {
+  .vrm-ann-achats-sous { display: none; }
+  .vrm-ann-achats-nom, .vrm-ann-achats-n { font-size: 13px; }
+  html body .vrm-ann-avis > button.vrm-ann-avis-neufs { padding: 0 12px !important; font-size: 13px !important; }
+}
+html body .vrm-ann-avis > button.vrm-ann-avis-neufs > svg { display: none; flex: none; color: var(--vrm-muted); }
+.vrm-ann-achats-nom, .vrm-ann-achats-n { white-space: nowrap; }
+@media (max-width: 767px) {
+  html body .vrm-ann-avis > button.vrm-ann-avis-neufs .vrm-ann-avis-voir { display: none; }
+  html body .vrm-ann-avis > button.vrm-ann-avis-neufs > svg { display: block; }
+  /* Le premier article dans le premier écran (fusion-app F4) : un peu moins d'air entre la carte du haut et la barre. */
+  :root body .vrm-app-shell .vrm-main .vrm-ann-workbar { margin-top: -10px !important; margin-bottom: 10px !important; }
+}

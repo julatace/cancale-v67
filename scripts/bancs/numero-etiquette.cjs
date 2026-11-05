@@ -187,6 +187,9 @@ async function annonces(b, largeur, sombre) {
   console.log(`\n── B. Annonces : N° à la mise en ligne et après (${tag})`);
   const { pg, ctx, errs, base } = await ouvrir(b, { main: MAIN({ vrm_num_vinted: { place: 'titre_fin', forme: 'numero' } }), url: '/?tab=cat_annonces', largeur, sombre });
   try {
+    // (5 nov., chantier C) La liste se déplie sous la ligne d'avis (« N nouveaux N° · Vérifier ») :
+    //  ouverte, elle porte les mêmes lignes, le même champ. On la déplie comme la personne.
+    await pg.waitForSelector('[data-num-neufs-ouvrir]', { timeout: 8000 }).then(() => pg.click('[data-num-neufs-ouvrir]')).catch(() => {});
     const bloc = await pg.waitForSelector('[data-num-neufs]', { timeout: 8000 }).then(() => true).catch(() => false);
     dit(bloc, `${tag} : la mise en ligne numérotée par VRM est listée`);
     if (bloc) {

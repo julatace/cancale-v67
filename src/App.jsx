@@ -42782,6 +42782,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [fichesOuvertes, setFichesOuvertes] = useState(() => new Set());
   // (5 nov., chantier C) La feuille « … » d'UNE carte d'annonce (clé `uid_id`), ou null.
   const [ficheMenu, setFicheMenu] = useState(null);
+  // (5 nov., chantier C) La liste « N nouveaux N° posés par VRM », dépliée sous la ligne d’avis.
+  const [neufsOuverts, setNeufsOuverts] = useState(false);
   // ── Atelier de republication ──────────────────────────────────────────────
   // Brouillons de nouvelles versions d'annonces : clé = id d'annonce wardrobe,
   // valeur = { title, desc, price, versions:[{title,desc,price,at,scoreBefore,scoreAfter}], updatedAt }.
@@ -46448,20 +46450,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }).sort((a, b) => String((numeros[b.id] || {}).numberedAt).localeCompare(String((numeros[a.id] || {}).numberedAt)));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [annoncesPresentes, numeros, neufsVus]);
+  // (5 nov., chantier C) Une LIGNE repliée (rien n'y est urgent : le N° posé par VRM est juste,
+  // on le change si on veut) — quatre lignes ouvertes poussaient le premier article sous
+  // l'écran du téléphone (y = 904, banc fusion-app F4). Dedans : la pastille `Numero` (plus de
+  // « N°2 » en bleu, 3,6:1 la nuit), `PhotoVide`, les boutons partagés.
   const blocNouveaux = () => numerosNeufs.length > 0 && (
-    <div data-num-neufs={numerosNeufs.length} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', marginBottom: 12 }}>
-      <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{numerosNeufs.length > 1 ? `${numerosNeufs.length} mises en ligne numérotées par VRM` : 'Une mise en ligne numérotée par VRM'}</div>
-      <div style={{ fontSize: 12, color: C.text2, margin: '3px 0 6px', lineHeight: 1.45 }}>Touche le N° pour en mettre un autre (celui de ton carton, par exemple).</div>
+    <div className="vrm-ann-neufs" data-num-neufs={numerosNeufs.length}>
+      <div className="vrm-ann-neufs-tete">{numerosNeufs.length > 1 ? `${numerosNeufs.length} mises en ligne numérotées par VRM` : 'Une mise en ligne numérotée par VRM'}</div>
+      <div className="vrm-ann-neufs-phrase">Touche le N° pour en mettre un autre (celui de ton carton, par exemple).</div>
       {numerosNeufs.slice(0, 6).map((it) => { const f = numeros[it.id] || {}; return (
-        <div key={it.id} data-num-neuf={String(it.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderTop: `1px solid ${C.border}` }}>
-          <div style={{ width: 36, height: 36, borderRadius: 10, background: C.bg, flexShrink: 0, overflow: 'hidden' }}>{it.photo ? <PhotoVinted src={it.photo} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : null}</div>
-          <span style={{ flexShrink: 0, minHeight: 44, display: 'flex', alignItems: 'center', fontSize: 15, fontWeight: 700, color: C.text, fontVariantNumeric: 'tabular-nums' }}>
-            <EnLigne data="numero-neuf" value={f.numero} onCommit={(v, avant) => poserNumero(it, v, avant)} inputMode={clavierNum()} placeholder={String(nextNumero)} largeur={56} titre="Changer ce numéro" rendu={`N°${f.numero}`}/>
+        <div key={it.id} data-num-neuf={String(it.id)} className="vrm-ann-neufs-ligne">
+          {it.photo ? <PhotoVinted src={it.photo} alt="" loading="lazy" decoding="async" className="vrm-ann-neufs-photo"/> : <PhotoVide taille={36} rayon={12}/>}
+          <span className="vrm-ann-neufs-num">
+            <EnLigne data="numero-neuf" value={f.numero} onCommit={(v, avant) => poserNumero(it, v, avant)} inputMode={clavierNum()} placeholder={String(nextNumero)} largeur={56} titre="Changer ce numéro" rendu={<Numero n={f.numero} titre={`Numéro ${f.numero} — le changer`}/>}/>
           </span>
-          <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.title || '—'}</span>
-          <button type="button" data-num-neuf-ok={String(it.id)} onClick={() => vuNeuf([[it.id, f.numero]])} style={{ flexShrink: 0, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 12, padding: '0 12px', minHeight: 44, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>C'est bon</button>
+          <span className="vrm-ann-neufs-nom">{it.title || '—'}</span>
+          <Bouton variante="secondaire" taille="petit" data-num-neuf-ok={String(it.id)} onClick={() => vuNeuf([[it.id, f.numero]])} style={{ flexShrink: 0 }}>C'est bon</Bouton>
         </div>); })}
-      {numerosNeufs.length > 1 && <button type="button" data-num-neufs-tout="" onClick={() => vuNeuf(numerosNeufs.map((it) => [it.id, (numeros[it.id] || {}).numero]))} style={{ marginTop: 6, border: 'none', background: 'transparent', color: C.accentTexte, padding: 0, minHeight: 44, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>{numerosNeufs.length > 6 ? `Tout est bon (${numerosNeufs.length})` : 'Tout est bon'}</button>}
+      {numerosNeufs.length > 1 && <Bouton variante="discret" data-num-neufs-tout="" onClick={() => vuNeuf(numerosNeufs.map((it) => [it.id, (numeros[it.id] || {}).numero]))}>{numerosNeufs.length > 6 ? `Tout est bon (${numerosNeufs.length})` : 'Tout est bon'}</Bouton>}
     </div>);
   const confirmerCarton = async (it) => {
     const f = numeros[it.id] || {};
@@ -55889,7 +55895,36 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {listings.items && !listings.error && listings.items.length===0 && blocMasquees()}
           {blocAEcrire()}
           <BlocBarrerVc/>
-          {blocNouveaux()}
+          {/* (5 nov., chantier C — revue 2.7) UNE ligne d'avis en tête de la liste :
+              « Prix d'achat N/M · Compléter » (plus l'ambre sur chaque carte ; N/M compté sur
+              les annonces en ligne, §5 : la couverture dite, « Compléter » ouvre la saisie en
+              série) et « N nouveaux N° · Vérifier » (la liste se déplie dessous). Une ligne, pas
+              deux blocs : au téléphone le premier article reste dans le premier écran (fusion-app F4). */}
+          {(()=>{
+            const m = annBase.length;
+            const n = m ? annBase.filter(it=>{ const a = prixAchatDe(numeros[it.id]||{}, buyByNum); return a!=null && !isNaN(a); }).length : 0;
+            const vuePrix = !['selection','brouillons','masquees','sleeping'].includes(annSort);
+            const prixManque = vuePrix && m > 0 && n < m;
+            const nN = numerosNeufs.length;
+            if (!prixManque && !nN) return null;
+            return (<>
+              <div className="vrm-ann-avis" data-ann-avis="">
+                {prixManque && (
+                  <div className="vrm-ann-achats" data-ann-achats={`${n}/${m}`} role="status">
+                    <span className="vrm-ann-achats-texte"><span className="vrm-ann-achats-nom">Prix d’achat</span><span className="vrm-ann-achats-n">{n}/{m}</span><span className="vrm-ann-achats-sous">connus</span></span>
+                    <Bouton variante="discret" data-ann-achats-completer="" title="Le bénéfice ne compte que les prix d’achat connus" onClick={()=>setFillBuyOpen(true)}>Compléter</Bouton>
+                  </div>
+                )}
+                {nN > 0 && (
+                  <button type="button" className="vrm-ann-avis-neufs" data-num-neufs-ouvrir={nN} aria-expanded={neufsOuverts} onClick={()=>setNeufsOuverts(v=>!v)}
+                    title="Les N° que VRM vient de poser sur tes dernières mises en ligne : vérifie-les ou change-les">
+                    <span><b>{nN}</b> {nN > 1 ? 'nouveaux N°' : 'nouveau N°'}</span><span className="vrm-ann-avis-voir">{neufsOuverts ? 'Fermer' : 'Vérifier'}</span><Icon name="chevron" size={14} className="vrm-ann-avis-chevron" style={{transform:neufsOuverts?'rotate(-90deg)':'rotate(90deg)',transition:'transform .15s'}}/>
+                  </button>
+                )}
+              </div>
+              {neufsOuverts && blocNouveaux()}
+            </>);
+          })()}
           {aVerifierCarton.length > 0 && (
           <details data-numeros-a-verifier={aVerifierCarton.length} className="vrm-repli" open style={{ background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn || '#B25000'}`, borderRadius: 12, padding: '4px 12px 10px', marginBottom: 12 }}>
             <summary style={{ fontSize: 15, fontWeight: 700, color: C.text }}>
@@ -55934,19 +55969,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               return { id:String(it.id), it, numero:e.numero?String(e.numero):'', titre:it.title||'', photo:photoArticle(it)||'', prix:isFinite(n)&&n>0?n:null, age:listedAgeDays(it),
                 vues:Number.isFinite(it.views)?it.views:null, favoris:Number.isFinite(it.favourites)?it.favourites:null, compte:annUnCompte?'':((it._acc&&(it._acc.login||it._acc.username))||'') }; })}/>
         ) : (<>
-        {/* (5 nov., chantier C — revue 2.7) LE PRIX D'ACHAT : UN bandeau en tête, plus
-            l'ambre sur chaque carte. « N/M » se compte sur les annonces en ligne de la
-            vue (§5 : on somme ce qu'on connaît et on dit la couverture) ; « Compléter »
-            ouvre la saisie en série (le chiffre faux est la porte pour le corriger). */}
-        {(()=>{ const m = annBase.length; if (!m) return null;
-          const n = annBase.filter(it=>{ const a = prixAchatDe(numeros[it.id]||{}, buyByNum); return a!=null && !isNaN(a); }).length;
-          if (n >= m) return null;
-          return (
-            <div className="vrm-ann-achats" data-ann-achats={`${n}/${m}`} role="status">
-              <span className="vrm-ann-achats-texte"><span className="vrm-ann-achats-nom">Prix d’achat</span><span className="vrm-ann-achats-n">{n}/{m}</span><span className="vrm-ann-achats-sous">connus : le bénéfice ne compte que ceux-là</span></span>
-              <Bouton variante="discret" data-ann-achats-completer="" onClick={()=>setFillBuyOpen(true)}>Compléter</Bouton>
-            </div>
-          ); })()}
         <div className="vrm-ledger-heading vrm-ann-ledger-heading" aria-hidden="true"><span>Article · stock</span><span>Prix</span></div>
         <div className="vrm-ann-grid vrm-fiches" style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(min(100%, 300px), 1fr))',gap:16}}>
           {annShown.map(it=>{

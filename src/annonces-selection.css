@@ -16,7 +16,7 @@
 .vrm-sel-ligne[data-sel-coche="1"] { border-color: var(--vrm-accent, #0071E3); box-shadow: 0 0 0 1px var(--vrm-accent, #0071E3) inset; }
 .vrm-sel-ligne[aria-disabled="true"] { cursor: default; opacity: .72; }
 .vrm-sel-case { width: 22px; height: 22px; flex-shrink: 0; accent-color: var(--vrm-accent, #0071E3); margin: 0; }
-.vrm-sel-photo { width: 52px; height: 64px; border-radius: 10px; object-fit: cover; flex-shrink: 0; background: var(--vrm-bg, #F2F2F7); }
+.vrm-sel-photo { width: 52px; height: 64px; border-radius: 12px; object-fit: cover; flex-shrink: 0; background: var(--vrm-bg, #F2F2F7); }
 .vrm-sel-centre { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .vrm-sel-nom { font-size: 15px; font-weight: 600; color: var(--vrm-ink, #38383A); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vrm-sel-num { font-variant-numeric: tabular-nums; margin-right: 6px; }
@@ -43,7 +43,7 @@
 .vrm-act-muet { color: var(--vrm-muted, #636366); }
 /* Republier à la main */
 .vrm-main-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 6px; }
-.vrm-main-photos > div { aspect-ratio: 4 / 5; border-radius: 10px; overflow: hidden; background: var(--vrm-bg, #F2F2F7); }
+.vrm-main-photos > div { aspect-ratio: 4 / 5; border-radius: 12px; overflow: hidden; background: var(--vrm-bg, #F2F2F7); }
 .vrm-main-photos img { width: 100%; height: 100%; object-fit: cover; }
 .vrm-main-champ { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 12px; background: var(--vrm-b-teinte, rgba(0,0,0,.05)); }
 .vrm-main-champ-tete { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--vrm-muted, #636366); text-transform: uppercase; letter-spacing: .04em; }
