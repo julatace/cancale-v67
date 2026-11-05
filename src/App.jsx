@@ -97,6 +97,8 @@ import QuiDorment from "./design/QuiDorment.jsx";
 import OffresVestiaire from "./OffresVestiaire.jsx";
 import { offresVestiaire, euros } from "./offresVestiaire.js";
 import PorteMonnaie from "./PorteMonnaie.jsx";
+import Dac7Comptes from "./Dac7Comptes.jsx";
+import { dac7ParCompte, indexComptesVentes, emailsFiscaux, blocagesFiscauxVinted, csvDac7, pdfDac7, nomFichierDac7 } from "./dac7Comptes.js";
 import { porteMonnaieParCompte } from "./porteMonnaie.js";
 import AnnoncesMasquees from "./AnnoncesMasquees.jsx";
 import { masqueesParCompte } from "./annoncesMasquees.js";
@@ -121,7 +123,7 @@ import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
 import {colisEbay} from '../api/_lib/ebay-a-expedier.js';
 import {annoncesVcEnLigne,stockVestiaire,retraitsVestiaire,VC_VENTE_ETAPES,VC_ANNONCE_ETATS,etapeMotVc,vcVenteAnnulee,vcVentePartie,numVcVente,numVcAnnonce,numerosVcAvecLiens,montantRecuVc,dateVersementVc,dateVenteVc,ventesVcDe,colisVcAPoster,resumeColisVc,etatAnnonceVcBrut} from '../api/_lib/vestiaire-regle.js';
 import {colisLbcAPoster,lbcColisAPoster,totalColis,colisLbcVendeur} from '../api/_lib/colis-sites.js';
-import {CLE_COMPTES_EXCLUS,excluAutreDe,estExclu,basculerExclu,compteDeVente} from '../api/_lib/comptes-exclus.js';
+import {CLE_COMPTES_EXCLUS,excluAutreDe,estExclu,basculerExclu,compteDeVente,exclusNormes} from '../api/_lib/comptes-exclus.js';
 import {PLATEFORMES_COMPTES,etatCompteLie,ageLecture,comptesLbcLies,comptesVcLies,comptesEbayLies,refDeLigneEbay,nomCompteLie,LIBELLE_ETAT} from './comptesLies.js';
 import './comptes-lies.css';
 import './comptes-securite.css';
@@ -37088,6 +37090,101 @@ function RegistresCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accoun
     </div></Card>
   );
 }
+// ── (5 nov.) DAC7 COMPTE PAR COMPTE — Comptabilité → Le détail → « DAC7 » ──
+// Julien : « mettre les rapports DAC7 pour chaque compte, capter tout ce qu'on
+// peut ». La règle : src/dac7Comptes.js (les cartes) et src/seuilsAnnee.js (le
+// seuil, partagé avec « DAC7 par plateforme »). Les ventes : `useDeclarablesCompta`,
+// la MÊME lecture que les registres et le CA déclaré (datées au versement,
+// comptes exclus dehors). Le compte d'une vente : celui qu'elle PORTE
+// (`indexComptesVentes`). Les comptes connus : Vinted (`accounts`) et les
+// autres sites (`useComptesAutresSites`, l'écran Comptes liés). Lectures
+// PROJETÉES : les sujets d'e-mails fiscaux (filtrés par la base, jamais
+// `select=data`) et `taxpayer_restricted` du porte-monnaie Vinted.
+const ETAT_LECTURE = (v, lu) => (v === undefined ? 'encours' : lu ? 'lu' : 'passu');
+const MOTS_FISCAUX = ['dac', 'fiscal', 'impot', 'impôt', 'contribuable', 'taxpayer', 'recapitulatif', 'récapitulatif', 'releve annuel', 'relevé annuel', 'rapport annuel'];
+const lireEmailsFiscaux = async () => {
+  // ⚠️ `meta->>` (migration 004), jamais `data->>` : filtrer sur `data` décompresse
+  //    chaque ligne `email_*`, bordereaux et leurs PDF compris (§5). Mesuré le 5 nov. :
+  //    35 527 blocs lus et 115 ms par `data`, 5 807 et 30 ms par `meta`, mêmes lignes.
+  const ou = MOTS_FISCAUX.map((m) => `meta->>subject.ilike.*${m}*`).join(',');
+  const q = `id=like.email_*&or=(${encodeURIComponent(ou)})&select=id,s:meta->>subject,f:meta->>from,to:meta->>to,at:meta->>receivedAt`;
+  const l = await lireTout(q).catch(() => null);
+  return Array.isArray(l) ? l : null;
+};
+function Dac7ComptesCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts }) {
+  const { calc, versements } = useDeclarablesCompta({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts });
+  const { ventes, ko } = useVentesCoque();
+  const ventesVcER = useVentesVestiaire();
+  const [autres] = useComptesAutresSites();
+  const [exclusAutres] = useComptesExclus();
+  const an = new Date().getFullYear();
+  const annees = React.useMemo(() => [an, an - 1], [an]);
+  const [annee, setAnnee] = React.useState(an);
+  const [emailsLus, setEmailsLus] = React.useState(undefined);
+  const [billing, setBilling] = React.useState(undefined);
+  React.useEffect(() => {
+    let mort = false;
+    lireEmailsFiscaux().then((l) => { if (!mort) setEmailsLus(l); }).catch(() => { if (!mort) setEmailsLus(null); });
+    lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_billing&select=id,tr:data->payload->>taxpayer_restricted,cap:data->>capturedAt`)
+      .then((b) => { if (!mort) setBilling(Array.isArray(b) ? b : null); }).catch(() => { if (!mort) setBilling(null); });
+    return () => { mort = true; };
+  }, []);
+  const [enCours, setEnCours] = React.useState('');
+  const R = React.useMemo(() => {
+    if (calc.etat === 'encours') return { etat: 'encours', annee };
+    if (calc.etat !== 'lu') return { etat: 'passu', annee };
+    const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+    const labels = load('vinted_account_labels', {}) || {};
+    const nomVinted = (uid, login) => labels[uid] || login || uid;
+    const ecarteV = (uid) => compteEcarte(uid, hAcc, panelOff || {});
+    const ex = exclusNormes(exclusAutres);
+    const P = { leboncoin: 'Leboncoin', vestiaire: 'Vestiaire', ebay: 'eBay' };
+    const comptes = [], exclus = [], nomsAutres = {};
+    for (const a of (accounts || [])) {
+      if (!a || a.vinted_user_id == null) continue;
+      const uid = String(a.vinted_user_id);
+      const c = { plateforme: 'Vinted', cle: uid, nom: nomVinted(uid, a.login) };
+      (ecarteV(uid) ? exclus : comptes).push(c);
+    }
+    for (const [k, nomP] of Object.entries(P)) {
+      for (const c of ((autres && autres[k]) || [])) {
+        if (!c || !c.id) continue;
+        nomsAutres[`${nomP}|${c.id}`] = c.nom || '';
+        (ex[k] && ex[k].has(String(c.id)) ? exclus : comptes).push({ plateforme: nomP, cle: String(c.id), nom: nomCompteLie(c) });
+      }
+    }
+    const lbc = lbcCoqueLu === true ? ((lbcVentes && lbcVentes.ventes) || []) : [];
+    const index = indexComptesVentes({ vinted: Array.isArray(ventes) ? ventes : [], lbc, ebay: Array.isArray(ebayCommandes) ? ebayCommandes : [], vestiaire: ventesVcER || [],
+      nomVinted, nomAutre: (p, cle) => nomsAutres[`${p}|${cle}`] || '' });
+    const rel = lireReleveVentes();
+    const numParId = new Map();
+    for (const l of ((rel && rel.l) || [])) if (Array.isArray(l)) numParId.set(l[0] === 'Vinted' ? 'vinted:' + l[2] : String(l[2]), l[8] || '');
+    const etats = {
+      Vinted: versements === undefined ? 'encours' : versements === null ? 'passu' : 'lu',
+      Leboncoin: ETAT_LECTURE(lbcCoqueLu, lbcCoqueLu === true),
+      eBay: ETAT_LECTURE(ebayCommandes, Array.isArray(ebayCommandes)),
+      Vestiaire: ETAT_LECTURE(ventesVcER, Array.isArray(ventesVcER)),
+    };
+    return dac7ParCompte({ decl: calc.decl, annee, compteDe: (id) => index.get(id) || null, comptes, etats,
+      comptesKO: (ko || []).map((uid) => ({ plateforme: 'Vinted', cle: String(uid) })), exclus, numDe: (id) => numParId.get(id) || '' });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calc, annee, versements, ventes, ko, ventesVcER, autres, exclusAutres, accounts, panelOff, lbcVentes, lbcCoqueLu, ebayCommandes]);
+  const emails = React.useMemo(() => (emailsLus === undefined ? undefined : emailsFiscaux(emailsLus, annee)), [emailsLus, annee]);
+  const blocages = React.useMemo(() => (Array.isArray(billing) ? blocagesFiscauxVinted(billing) : null), [billing]);
+  const exporter = async (k, forme) => {
+    const id = `${k.plateforme}|${k.cle}`;
+    if (enCours || k.etat !== 'lu') return;
+    setEnCours(id + forme);
+    try {
+      let ent = null; try { ent = await lireReglage('vrm_pro_facture'); } catch (_) { ent = null; }
+      const entreprise = ent && String(ent.nom || '').trim() ? { nom: String(ent.nom).trim(), siret: String(ent.siret || '').trim() } : null;
+      if (forme === 'csv') telechargerFichier(new Blob([csvDac7(k, annee, { entreprise })], { type: 'text/csv;charset=utf-8' }), nomFichierDac7(k, annee, 'csv'), 'text/csv;charset=utf-8');
+      else telechargerFichier(new Blob([await pdfDac7(k, annee, { entreprise })], { type: 'application/pdf' }), nomFichierDac7(k, annee, 'pdf'), 'application/pdf');
+    } catch (err) { toast('Export DAC7 pas créé : ' + ((err && err.message) || err)); }
+    setEnCours('');
+  };
+  return <Dac7Comptes R={R} annee={annee} annees={annees} onAnnee={setAnnee} emails={emails} blocages={blocages} onExport={exporter} enCours={enCours} />;
+}
 function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts }) {
   // (3 nov.) Les ventes déclarables : la lecture partagée avec les registres (`useDeclarablesCompta`).
   const { calc, versements } = useDeclarablesCompta({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts });
@@ -40728,6 +40825,10 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
           {/* (4 nov.) Le porte-monnaie de chaque compte Vinted, LU par l'extension (jamais déduit des ventes). */}
           <ComptaRepli id="compta-porte-monnaie" titre="Porte-monnaie" resume="Disponible et en attente, compte par compte">
             <PorteMonnaieCompta accounts={accounts} panelOff={panelOff}/>
+          </ComptaRepli>
+          {/* (5 nov.) DAC7 compte par compte : ventes N/30, montant / 2 000 €, le rapport de la plateforme, l'export (src/dac7Comptes.js). */}
+          <ComptaRepli id="compta-dac7" titre="DAC7" resume="Ce que chaque plateforme transmet aux impôts, compte par compte">
+            <Dac7ComptesCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />
           </ComptaRepli>
 
           <ComptaRepli id="compta-charges" titre="Tes dépenses" resume={(depenses.length || abonnements.length || packs.length || fixes.length)

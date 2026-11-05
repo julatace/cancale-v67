@@ -111,6 +111,7 @@ import './design/fusion.css';
 import './design/favoris.css';
 import './design/outils-stats.css';
 import './design/argent-offres.css';
+import './design/dac7.css';
 // (3 nov.) Les jetons Fusion pour TOUTE l'app (échelle fermée, segmentés, cartes) — le tout dernier mot.
 import './design/jetons.css';
 import './styles-bureau.css';

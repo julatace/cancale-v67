@@ -26,7 +26,24 @@ export const MOIS_FR = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', '
 export const MOIS_MIN_PROJECTION = 2;
 
 const cts = (x) => Math.round(Number(x) * 100);
-const atteint = (n, c) => n >= DAC7.ventes || c > DAC7.centimes;
+// (5 nov.) LA règle DAC7 — exportée : la carte par plateforme ci-dessous ET la
+// section « DAC7 » compte par compte (src/dac7Comptes.js) la partagent (§11).
+export const atteintDac7 = (n, c) => n >= DAC7.ventes || c > DAC7.centimes;
+const atteint = atteintDac7;
+// Le verdict d'un ensemble de ventes (une plateforme, ou un compte) :
+//   · `n`, `centimes` : la partie SÛRE ; `nAd`, `ctsAd` : les ventes pas encore
+//     datées qui PEUVENT être de l'année ; `manque` : il manque des ventes
+//     (pas datées, montant illisible) ⇒ jamais « sous ».
+//   · 'atteint' · 'atteintSi' (seulement avec les pas encore datées) · 'sous'
+//     (seulement si RIEN ne manque) · null (« au moins »).
+//   · `reste` : ce qu'il manque sur la partie sûre (30 ventes, ou 2 000,01 €).
+export const verdictDac7 = ({ n = 0, centimes = 0, nAd = 0, ctsAd = 0, manque = false } = {}) => {
+  const verdict = atteint(n, centimes) ? 'atteint'
+      : (nAd > 0 && atteint(n + nAd, centimes + ctsAd)) ? 'atteintSi'
+      : manque ? null : 'sous';
+  const reste = verdict === 'atteint' ? null : { n: Math.max(0, DAC7.ventes - n), centimes: Math.max(0, DAC7.centimes + 1 - centimes) };
+  return { verdict, reste };
+};
 
 // ── « AU RYTHME ACTUEL, TU L'ATTEINDRAIS VERS [MOIS] » ─────────────────────
 // Projection LINÉAIRE sur les mois ÉCOULÉS (finis) de l'année qui portent des
@@ -101,10 +118,7 @@ export const dac7ParPlateforme = ({ ligne, annee } = {}) => {
     let nNc = 0;
     for (const [k, v] of Object.entries(ncPar)) if (k.split('|')[0] === p) nNc += Number(v) || 0;
     const manque = nAd > 0 || nNc > 0;
-    const verdict = atteint(q.n, q.centimes) ? 'atteint'
-      : (nAd > 0 && atteint(q.n + nAd, q.centimes + ctsAd)) ? 'atteintSi'
-      : manque ? null : 'sous';
-    const reste = verdict === 'atteint' ? null : { n: Math.max(0, DAC7.ventes - q.n), centimes: Math.max(0, DAC7.centimes + 1 - q.centimes) };
+    const { verdict, reste } = verdictDac7({ n: q.n, centimes: q.centimes, nAd, ctsAd, manque });
     return { plateforme: p, etat: 'lu', n: q.n, centimes: q.centimes, nAd, ctsAd, nNc, partiel: manque, verdict, reste };
   });
   return { annee, plateformes: liste };

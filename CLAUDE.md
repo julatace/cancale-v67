@@ -501,6 +501,8 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 
+- **5 nov. · DAC7 par compte** : Compta → Le détail → « DAC7 » (N/30, /2 000 €, rapport ou où le trouver, PDF/tableur). `docs/passation/2026-11-05-dac7-comptes.md`.
+
 - **5 nov. · Communauté → Groupes** : groupes d'accompagnement (code/lien, validation par le créateur, partage choisi par le membre — rien par défaut, chiffres, détail — révocable et effacé ; relecture : total partiel dit, renvoi après effacement, verrou révocation/publication) ; migration **025 NON appliquée** (l'onglet le dit). `docs/passation/2026-11-05-communaute-groupes.md`. Geste : appliquer la 025.
 
 - **5 nov. · Relais Vinted** : un « relire » relit la copie captée, plus le serveur ; relais freiné (24/30 min/compte). `docs/passation/2026-11-05-frein-relais-vinted.md`.
