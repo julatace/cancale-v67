@@ -27,7 +27,7 @@ import { texteArrivee } from './_lib/notif-textes.js';
 import { colisPerdu } from './_lib/etat-colis-email.js';
 import { DESTINATIONS, conversationDeLEmail } from './_lib/lien-notif.js';
 // (5 nov.) Les textes des notifications : fabriqués là où l'aperçu de Paramètres → Notifications les lit.
-import { texteVendu, texteArgentRecu, texteVenduVestiaire, texteBordereau, texteOffre, texteMessage } from './_lib/notif-apercus.js';
+import { texteVendu, texteArgentRecu, texteVenduVestiaire, texteBordereau, texteOffre, texteMessage, texteAnnulation } from './_lib/notif-apercus.js';
 import { stampBordereau } from './_lib/stamp.js';
 
 import { contexteVendeur, proprietaireCourant, duVendeur as duVendeurLib } from './_lib/owner.js';
@@ -2622,8 +2622,7 @@ export async function traiterEmail(req, res) {
           const qui = (m && m[1]) || '', article = (m && m[2]) || '', raison = (m && m[3]) || '';
           famille = "demande d'annulation de l'acheteur";
           notif = {
-            title: `⚠️ Annulation demandée${article ? ` — ${court(article, 60)}` : ''}`,
-            body: `${qui || "L'acheteur"} veut annuler${raison ? ` (« ${court(raison, 70)} »)` : ''}${acc.login ? ` sur ${acc.login}` : ''} — accepte ou refuse dans la conversation Vinted.`,
+            ...texteAnnulation({ qui, article, raison, compte: acc.login }),
             tag: `annul-${key}`, url: DESTINATIONS.message({ conv: conversationDeLEmail(mail), compte: acc.uid }),
           };
         } else {

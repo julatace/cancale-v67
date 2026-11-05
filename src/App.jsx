@@ -15833,7 +15833,10 @@ function CibleNotif({ tab, sub }) {
       }, ms)));
       ouvrirEl(el);
       // (5 nov.) Ce qu'il faut AUSSI montrer une fois ouvert (l'offre dans le fil).
-      if (sel.puis) { const t1 = Date.now(); const ensuite = () => { let p = null; try { p = document.querySelector(sel.puis); } catch (_) {} if (vu(p)) { minuteurs.push(setTimeout(() => { defiler(p, 'auto'); eclairer(p); p.setAttribute('data-cible-notif-puis', c.type); }, 350)); return; } if (Date.now() - t1 < 6000) minuteurs.push(setTimeout(ensuite, 200)); }; minuteurs.push(setTimeout(ensuite, 400)); }
+      // (revue du 5 nov.) Seule une offre EN COURS porte le crochet (`data-cible="offre"` posé
+      // sur la carte quand le fil a une offre) : la carte « Faire une offre » d'un fil sans offre
+      // n'est jamais montrée comme « l'offre ». Pas d'offre en 6 s ⇒ une ligne le dit.
+      if (sel.puis) { const t1 = Date.now(); const ensuite = () => { let p = null; try { p = document.querySelector(sel.puis); } catch (_) {} if (vu(p)) { minuteurs.push(setTimeout(() => { defiler(p, 'auto'); eclairer(p); p.setAttribute('data-cible-notif-puis', c.type); }, 350)); return; } if (Date.now() - t1 < 6000) minuteurs.push(setTimeout(ensuite, 200)); else setAbsente({ type: 'offre-fil' }); }; minuteurs.push(setTimeout(ensuite, 400)); }
     };
     // Déplier ce qui cache la cible (« Toutes » les villes, « Voir les N autres ») :
     // un `<details>` s'ouvre, un bouton déjà enfoncé/ouvert n'est jamais retouché.
@@ -15863,12 +15866,16 @@ function CibleNotif({ tab, sub }) {
   const tabVu = React.useRef(tab);
   React.useEffect(() => { if (tabVu.current !== tab) { tabVu.current = tab; setAbsente(null); } }, [tab]);
   if (!absente) return null;
-  return (
-    <p className="vrm-cible-absente" data-cible-absente={absente.type} role="status">
+  const ligne = (
+    <p className="vrm-cible-absente" data-cible-absente={absente.type} role="status"
+      style={absente.type === 'offre-fil' ? { position: 'fixed', left: 16, right: 16, bottom: 'calc(env(safe-area-inset-bottom, 0px) + 88px)', zIndex: Z_MESSAGES + 1, maxWidth: 560, margin: '0 auto', boxShadow: '0 4px 16px rgba(0,0,0,.12)' } : undefined}>
       <span>{phraseAbsente(absente)}</span>
       <button type="button" onClick={() => setAbsente(null)} aria-label="Fermer ce message">OK</button>
     </p>
   );
+  // (revue du 5 nov.) « Pas d'offre en cours » se dit PAR-DESSUS la conversation ouverte
+  // (au téléphone, une feuille plein écran au-dessus de l'écran cachait la ligne).
+  return absente.type === 'offre-fil' ? createPortal(ligne, document.body) : ligne;
 }
 // ── CACHER LES MONTANTS (4 nov.) ─────────────────────────────────────────────
 // Un œil dans la tête : allumé, chaque montant en € de l'écran devient « ••• »
@@ -28052,7 +28059,7 @@ function LigneVenteVc({ v, fait, enV, flou, i = 0 }) {
     </>;
   };
   return (
-    <LigneVenteCompacte className="vrm-sale-row" data-tx={'vc:' + v.id} data-cible={attrCible(['vcvente', v.id])} data-vc-vente={v.id} data-vc-vente-num={v.num || ''} data-vc-vente-etape={v.etape} data-flou={flou ? '1' : '0'}
+    <LigneVenteCompacte className="vrm-sale-row" data-tx={'vc:' + v.id} data-cible={attrCible(['vcvente', v.id], ['vcvente', v.productId])} data-vc-vente={v.id} data-vc-vente-num={v.num || ''} data-vc-vente-etape={v.etape} data-flou={flou ? '1' : '0'}
       style={{ borderTop: i > 0 ? `1px solid ${C.border}` : 'none', opacity: vcVenteAnnulee(v) ? 0.6 : 1, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10, ...(flou ? STYLE_FLOU : null) }}
       montantCentimes={lb.verse != null ? Math.round(lb.verse * 100) : undefined} numerosArticle={v.num ? [v.num] : []} plateforme="vestiaire"
       photo={v.photo || ''} photoNoeud={photoNoeud} titre={nomLigne} sous={sous} etat={etat} ton={ton}
@@ -50763,7 +50770,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const contreMini = off && pc && (pc.devise||'EUR')==='EUR' ? contreOffreMini(off.prix, pc.prix, isFinite(minF)&&minF>0?minF:null) : null;
                   const etat = msgRelais ? 'ok' : extSait('messagerie');
                   if (etat !== 'ok' || (!msgRelais && __vmrPlusieurs)) return (
-                    <div className="vrm-chat-offre vrm-chat-offre-info" data-cible="offre" data-offre="indisponible" style={{background:C.bg,border:`1px solid ${C.border}`}}>
+                    <div className="vrm-chat-offre vrm-chat-offre-info" data-cible={off?'offre':undefined} data-offre="indisponible" style={{background:C.bg,border:`1px solid ${C.border}`}}>
                       {off ? <div className="vrm-chat-offre-t" style={{color:C.text}}>Offre de <b data-montant="">{fmtE(off.prix)}</b> <span style={{color:C.muted,fontWeight:500}}>en attente</span></div> : null}
                       <div className="vrm-chat-offre-p" style={{color:C.muted}}>
                         {__vmrPlusieurs ? textePlusieurs() : etat==='retard' ? `Mets l'extension à jour (${EXT_CAPACITES.messagerie}) pour trancher ou faire une offre d'ici.` : "Les offres se font depuis le Chrome où l'extension est installée."}
@@ -50773,7 +50780,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     </div>
                   );
                   return (
-                    <div className="vrm-chat-offre" data-cible="offre" data-offre={off?'attente':'libre'} data-offre-ro={ro?'1':undefined} style={{background:C.bg,border:`1px solid ${C.border}`,opacity:ro?0.55:1}}>
+                    <div className="vrm-chat-offre" data-cible={off?'offre':undefined} data-offre={off?'attente':'libre'} data-offre-ro={ro?'1':undefined} style={{background:C.bg,border:`1px solid ${C.border}`,opacity:ro?0.55:1}}>
                       {/* (31 oct., maquettes Messages) LA CARTE D'OFFRE : « Offre de X € — ton
                           mini : Y € » (le mini posé à côté du N°, par identité), puis
                           Refuser · contre-offre proposée · Accepter. Les MÊMES gestes

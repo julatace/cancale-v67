@@ -66,10 +66,17 @@ const APP = ['src/App.jsx', 'src/CarteRelais.jsx'].map((f) => sansCommentaires(l
   const crochet = {
     vente: /attrCible\(\['vente',/, vcvente: /attrCible\(\['vcvente',/, colis: /attrCible\(\['colis',/,
     retrait: /attrCible\(\['retrait', '(?:tx|suivi)'/, achat: /attrCible\(\[['"]achat['"],/, conv: /attrCible\(\['conv',/,
-    offre: /data-cible="offre"/, offres: /data-cible="offres"/, urssaf: /data-cible="urssaf"/,
+    offre: /data-cible=\{off\?'offre':undefined\}/, offres: /data-cible="offres"/, urssaf: /data-cible="urssaf"/,
     colonne: /data-cible="colonne:prets colonne:attente"/, doublon: /attrCible\(\['doublon', 'ebay'|\['doublon', 'leboncoin'/,
   };
   for (const [type, re] of Object.entries(crochet)) dit(re.test(APP), `type « ${type} » : un élément de l’app porte son crochet`);
+  // (revue du 5 nov.) Une carte d'offre ne porte le crochet QUE si le fil a une offre (jamais « Faire une offre »).
+  // Seule la carte « annonce partie » (une offre CAPTURÉE) le porte sans condition.
+  const sansCond = (APP.match(/data-cible="offre"[^>]*/g) || []);
+  dit(sansCond.length === 1 && /data-offre="annonce-partie"/.test(sansCond[0]), 'aucune carte d’offre ne porte le crochet sans offre (« Faire une offre » n’est jamais « l’offre »)', sansCond.map((x) => x.slice(0, 60)).join(' | '));
+  // (revue du 5 nov.) Une vente Vestiaire rangée par l'extension a pour clé l'id de la vente, le productId en champ :
+  // la ligne porte les DEUX (la notification n'a que le productId).
+  dit(/attrCible\(\['vcvente', v\.id\], \['vcvente', v\.productId\]\)/.test(APP), 'vente Vestiaire : la ligne porte sa clé ET son productId (identité de l’e-mail)');
   dit(/'data-cible':\s*cibleRetrait\(x\.cle\)/.test(APP) && (APP.match(/'data-cible':\s*cibleRetrait\(x\.cle\)/g) || []).length === 2, 'les DEUX dessins de la ligne « À retirer » portent le crochet (ancienne carte et ligne Fusion)');
 
   console.log('\n── 3. Le jeton : jamais sans identité');
@@ -107,6 +114,15 @@ const APP = ['src/App.jsx', 'src/CarteRelais.jsx'].map((f) => sansCommentaires(l
     const m = A.texteMessage({ paire: 'P', qui: 'q', compte: 'c', extrait: '' });
     dit(m.title === '💬 P' && m.body === 'q · Nouveau message sur c — ouvre Vinted pour répondre.', 'texte « Message » identique à celui d’avant', JSON.stringify(m));
   }
+
+  // (revue du 5 nov.) Aucun aperçu rédigé à la main : chacun sort de la fabrique du vrai texte.
+  const srcAp = sansCommentaires(lireF('api/_lib/notif-apercus.js'));
+  dit(!/exemple:\s*true/.test(srcAp) && !/title:\s*['"`][^'"`]*['"`],\s*body:/.test(srcAp.slice(srcAp.indexOf('APERCUS_NOTIF'))), 'aucun aperçu écrit à la main (chacun sort de la fabrique du vrai texte)');
+  const cron = sansCommentaires(lireF('api/ship-reminders.js'));
+  dit(/\.\.\.texteOffresMini\(n\)/.test(cron) && /DESTINATIONS\.offre\(uneSeule\)/.test(cron), 'rappel « offres au mini » : son texte vient de notif-apercus.js, une seule offre ouvre L’OFFRE');
+  dit(/import \{[^}]*texteSoir[^}]*\} from '\.\/_lib\/notif-apercus\.js'/.test(cron) && !/export function texteSoir/.test(cron), 'rappel du soir : un seul texte, celui de l’aperçu');
+  dit(/\.\.\.texteAnnulation\(/.test(inbound), 'annulation demandée : son texte vient de notif-apercus.js');
+  if (A.texteOffresMini) dit(JSON.stringify(A.texteOffresMini(1)) === JSON.stringify({ title: 'Une offre au-dessus de ton prix mini', body: 'À accepter en 1 tap dans VRM.' }), 'texte « offres au mini » identique à celui d’avant');
 
   console.log(ko ? `\n❌ audit-cibles-notif : ${ko} rouge(s)` : '\n✅ audit-cibles-notif : tout est vert');
   process.exit(ko ? 1 : 0);

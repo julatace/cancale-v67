@@ -605,5 +605,9 @@ Chromium du banc : `/opt/pw-browsers/chromium` (lien stable),
 - **Non mesuré** : un vrai toucher sur iPhone (service worker réel) ; les e-mails sans
   identité (argent reçu, « à confirmer », commande Vinted au relais) ouvrent l'écran nu ;
   double vente Vinted/Vestiaire ⇒ écran sans ligne ; Leboncoin/eBay n'envoient aucun e-mail
-  de vente. Les aperçus des rappels du cron (matin, soir, URSSAF, bilan) sont des exemples
-  écrits, dits tels.
+  de vente ; un toucher qui change la ville choisie (« Toutes ») la garde changée.
+- **Revue du 5 nov.** : vente Vestiaire de l'extension (clé ≠ productId) jamais trouvée ⇒
+  la ligne porte aussi le productId ; « Faire une offre » sans offre n'est plus montrée comme
+  l'offre (une ligne le dit) ; aperçus tirés des vraies fabriques (`texteSoir`,
+  `texteOffresMini`, `texteAnnulation` dans `notif-apercus.js`) ; offre au mini ⇒
+  `cible=offre`. `cible-evidence` 156 verts (6 rouges avant), `audit-cibles-notif` (7).

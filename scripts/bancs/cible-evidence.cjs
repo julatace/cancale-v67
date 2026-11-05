@@ -72,8 +72,14 @@ const ROWS = [
   // Deux villes (Rennes, Vannes) : le sélecteur de ville existe, et peut cacher la cible.
   { id: `email_track_vinted_${SUIVI_RENNES}`, data: { type: 'suivi', carrier: 'vinted', suivi: SUIVI_RENNES, status: 'available', statusLabel: 'Arrivé au point de retrait', subject: "Ton colis t'attend", receivedAt: ilYa(1), code: '3904112', lieu: 'Relais Pressing Mermoz, 14 Avenue Mermoz, 35000 Rennes', limite: dans(4) } },
   { id: `email_track_mondialrelay_${SUIVI_VANNES}`, data: { type: 'suivi', carrier: 'mondialrelay', suivi: SUIVI_VANNES, status: 'available', statusLabel: 'Disponible', subject: `Votre colis ${SUIVI_VANNES} est disponible`, receivedAt: ilYa(1), code: '482913', lieu: 'Phone Cash Banc, 17 Rue Inventée, 56000 Vannes', limite: dans(5) } },
-  // Vestiaire : la vente rangée par l'extension, clé = productId (comme l'e-mail).
-  { id: 'vc_ventes', data: { ventes: { 48213: { productId: '48213', ref: '48213', titre: 'Sac Longchamp Le Pliage', aExpedier: true, limite: iso(M + 3 * 86400000), date: ilYa(1) } } } },
+  // Vestiaire : une vente écrite par l'e-mail (clé = productId), et une rangée par
+  // l'EXTENSION (clé = l'id de la vente Vestiaire, productId en champ — la forme
+  // de `rangerVcVentesMaintenant`). (Revue du 5 nov. : la seconde n'était jamais
+  // trouvée, et l'écran disait « pas encore dans la liste » d'une vente affichée.)
+  { id: 'vc_ventes', data: { ventes: {
+    48213: { productId: '48213', ref: '48213', titre: 'Sac Longchamp Le Pliage', aExpedier: true, limite: iso(M + 3 * 86400000), date: ilYa(1) },
+    'ord-9911': { productId: '55120', ref: 'ord-9911', titre: 'Pochette banc', aExpedier: true, limite: iso(M + 4 * 86400000), date: ilYa(2), sources: ['extension'] },
+  } } },
   { id: 'vc_listings', data: { liens: {} } },
 ];
 
@@ -181,6 +187,10 @@ const aJeton = (e, j) => !!(e && e.jetons != null && (' ' + e.jetons + ' ').incl
     { nom: 'message → la conversation', url: D.message({ conv: '303', compte: '111' }), jeton: 'conv:111:303', fil: true },
     { nom: 'offre → la conversation ET la carte de l’offre', url: offre, jeton: 'conv:111:301', fil: true, puis: 'offre' },
     { nom: 'vente Vestiaire → la vente', url: vcv, jeton: 'vcvente:48213' },
+    { nom: 'vente Vestiaire rangée par l’extension (clé ≠ productId) → la vente', url: D.vcVente ? D.vcVente({ id: '55120' }) : '/?tab=plat_vestiaire', jeton: 'vcvente:55120' },
+    // Une offre déjà tranchée : la conversation s'ouvre, la carte « Faire une offre » n'est
+    // JAMAIS montrée comme « l'offre », et une ligne le dit.
+    { nom: 'offre qui n’est plus en cours → la conversation, rien de faux', url: D.offre ? D.offre({ conv: '303', compte: '111' }) : D.message({ conv: '303', compte: '111' }), jeton: 'conv:111:303', fil: true, sansPuis: 'offre-fil' },
     { nom: 'URSSAF → la déclaration', url: D.urssaf(), jeton: 'urssaf' },
   ];
   let b;
@@ -221,6 +231,14 @@ const aJeton = (e, j) => !!(e && e.jetons != null && (' ' + e.jetons + ' ').incl
           await pg.waitForTimeout(Math.max(0, 3000 - (Date.now() - tVu)));
           x = await lire(pg);
           dit(x.eclaire, `${T} ${c.nom} : encore en évidence à 3 s`);
+          if (c.sansPuis) {
+            const y = await attendre(pg, (z) => !!z.puis || z.absente === c.sansPuis, 9000);
+            dit(!y.puis && y.absente === c.sansPuis, `${T} ${c.nom} : aucune carte montrée comme « l’offre », une ligne le dit`, JSON.stringify({ puis: y.puis, abs: y.absente, txt: y.absenteTxt }));
+            // La ligne se VOIT : au téléphone la conversation est une feuille plein écran.
+            const dessus = await pg.evaluate(() => { const p = document.querySelector('[data-cible-absente]'); if (!p) return null; const r = p.getBoundingClientRect(); const e = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return { dessus: !!(e && p.contains(e)), top: Math.round(r.top), h: window.innerHeight }; });
+            dit(!!dessus && dessus.dessus && dessus.top >= 0 && dessus.top < dessus.h, `${T} ${c.nom} : la ligne se voit, par-dessus la conversation ouverte`, JSON.stringify(dessus));
+            await pg.screenshot({ path: path.join(SHOTS, `cible-${vp.width}-offre-tranchee.png`) });
+          }
           if (c === CAS[0] || c.code) {
             await pg.waitForTimeout(Math.max(0, 6500 - (Date.now() - tVu)));
             x = await lire(pg);

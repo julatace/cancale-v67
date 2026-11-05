@@ -94,7 +94,7 @@ const mini = () => pushes.filter((p) => /prix mini/i.test(`${p.title} ${p.body}`
     console.log(`     téléphone : « ${p.title} » / « ${p.body} »`);
     dit(mini().length === 1, 'UNE notification « au-dessus de ton prix mini »', String(mini().length));
     dit(/1 tap/i.test(p.body || ''), 'elle dit « à accepter en 1 tap »', p.body);
-    dit(p.url === '/?tab=messages&site=vinted&cible=conv&conv=7444&compte=900', 'le clic ouvre SA conversation (Messages · Vinted, la carte d’offre)', p.url); }
+    dit(p.url === '/?tab=messages&site=vinted&cible=offre&conv=7444&compte=900', 'le clic ouvre SA conversation ET met l’offre en évidence (cible=offre, revue du 5 nov.)', p.url); }
 
   console.log('\n── A2. deux offres au-dessus du mini : le filtre « Offres » de Messages');
   reset({ planchers: { 444: { numero: '7', min: '40' }, 445: { numero: '8', min: '40' } }, convs: [conv(444, 5301, 'O1b', 45), conv(445, 5302, 'O1c', 50)] });

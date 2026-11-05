@@ -171,7 +171,10 @@ export function phraseAbsente(c) {
     case 'offre': return "Cette offre n'est plus dans tes conversations : elle a peut-être été acceptée, refusée ou retirée, ou l'extension ne l'a pas encore relue.";
     case 'offres': return "Plus aucune offre au-dessus de ton prix mini : elle a déjà été acceptée, refusée ou retirée.";
     case 'vente': return "Cette vente n'est pas dans la liste affichée : regarde les filtres (période, état) ou repasse sur Vinted.";
-    case 'vcvente': return "Cette vente Vestiaire n'est pas encore dans la liste : l'extension la rangera à ta prochaine visite sur Vestiaire.";
+    // (revue du 5 nov.) La vente est écrite par l'e-mail lui-même : absente, elle est soit hors des 30 montrées, soit pas relue.
+    case 'vcvente': return "Cette vente Vestiaire n'est pas dans la liste affichée : elle est peut-être plus ancienne que les 30 montrées, ou la lecture n'est pas encore à jour.";
+    // (revue du 5 nov.) La conversation est ouverte, mais son fil ne montre aucune offre en cours.
+    case 'offre-fil': return "La conversation est ouverte, mais je n'y vois pas d'offre en cours : elle a peut-être été acceptée, refusée ou a expiré, ou le fil n'est pas encore relu.";
     case 'colis': return "Ce colis n'est plus à poster : il est peut-être déjà parti.";
     case 'retrait': return "Ce colis n'est plus dans « À retirer » : il est peut-être déjà retiré.";
     case 'colonne': return 'Rien dans cette colonne pour l\u2019instant.';

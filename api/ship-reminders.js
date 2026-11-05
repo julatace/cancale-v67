@@ -23,6 +23,8 @@
 import './_lib/sans-bruit.js';
 import { sendPushToAll, pushCategorieActive } from './_lib/push.js';
 import { DESTINATIONS } from './_lib/lien-notif.js';
+// (revue du 5 nov.) Les textes des rappels soir et « offres au mini » : un propriétaire, celui de l'aperçu.
+import { texteSoir, texteOffresMini } from './_lib/notif-apercus.js';
 import { notificationAgentEbay } from './_lib/agent-ebay-rappel.js';
 import { semainePassee, semaineCourante, calculerBilan, bilanAEnvoyer, texteBilan, versementsDeLignes } from './_lib/bilan-semaine.js';
 import { notificationUrssaf, rappelAvantEcheance, MAIN_URSSAF } from './_lib/rappel-urssaf.js';
@@ -453,10 +455,10 @@ async function rappelsOffresMini(maintenant = Date.now()) {
   const n = nouveaux.length;
   // Une seule offre ⇒ sa conversation, ouverte, avec la carte d'offre ; plusieurs ⇒ le filtre « Offres ».
   const uneSeule = n === 1 ? (convDe.get(nouveaux[0]) || null) : null;
+  // (revue du 5 nov.) Une seule offre ⇒ cible=offre : SA conversation ouverte ET la carte de l'offre en évidence.
   const envoi = await sendPushToAll({
-    title: n > 1 ? `${n} offres au-dessus de ton prix mini` : 'Une offre au-dessus de ton prix mini',
-    body: n > 1 ? `${n} offres à accepter en 1 tap dans VRM.` : 'À accepter en 1 tap dans VRM.',
-    tag: 'offremini', url: n === 1 && uneSeule ? DESTINATIONS.message(uneSeule) : DESTINATIONS.offres() });
+    ...texteOffresMini(n),
+    tag: 'offremini', url: n === 1 && uneSeule ? DESTINATIONS.offre(uneSeule) : DESTINATIONS.offres() });
   return { offremini: 'envoyé', n, envoi: envoi && (envoi.coupe || envoi.erreur || envoi.sent) };
 }
 
@@ -775,21 +777,9 @@ function bordsDuVendeur(d) {
 // su), si la préférence « soir » est coupée, ou s'il est déjà parti ce jour-là
 // (mémo `soir_reminder_dedup` écrit AVANT l'envoi et confirmé). eBay illisible
 // ⇒ « au moins N », eBay nommé (jamais un total partiel présenté complet).
-// Le texte : une fonction pure (le banc la juge par la sortie de la route).
-// `aVerifier` : les dates ESTIMÉES (pas d'email de bordereau) qui seront
-// passées demain — jamais « déjà en retard » (revue du 22 octobre).
-export function texteSoir({ n, auMoins, retard, aVerifier = 0, demain, heureDemain = null, manque = null }) {
-  const N = `${auMoins ? 'au moins ' : ''}${n} colis à poster`;
-  const H = heureDemain ? heureCourte(heureDemain) : '';
-  const parts = [];
-  if (retard) parts.push(`${retard} déjà en retard`);
-  if (aVerifier) parts.push(`${aVerifier} à vérifier sur Vinted (date estimée passée)`);
-  if (demain) parts.push(`${demain} avec la date limite demain${H ? (demain === 1 ? ` à ${H}` : `, la première à ${H}`) : ''}`);
-  return {
-    title: retard ? `⏰ Demain : ${N}` : `📮 Demain : ${N}`,
-    body: `${parts.length ? `Dont ${parts.join(', ')}. ` : ''}${auMoins ? `Les ventes ${(Array.isArray(manque) && manque.length ? manque : ['eBay']).join(' et ')} n'ont pas pu être relues : il peut y en avoir plus. ` : ''}Prépare-les ce soir.`,
-  };
-}
+// Le texte du rappel du soir : `texteSoir`, fabriqué dans api/_lib/notif-apercus.js
+// (l'aperçu de Paramètres → Notifications l'appelle aussi) — réexporté ici.
+export { texteSoir };
 async function rappelDuSoir() {
   const today = parisDate(0);
   const deja = await getRow('soir_reminder_dedup');
