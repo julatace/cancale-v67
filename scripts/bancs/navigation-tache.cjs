@@ -347,13 +347,14 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
         await capture(pg, `achats-${tel ? 'tel' : 'ordi'}`);
         const a = await pg.evaluate(() => ({ ecran: (document.querySelector('[data-ecran-achats]') || { getAttribute: () => '' }).getAttribute('data-ecran-achats'),
           onglets: [...document.querySelectorAll('[data-achats-onglet]')].map((x) => x.getAttribute('data-achats-onglet')),
-          kpis: document.querySelectorAll('.vrm-achats-kpis').length,
+          kpis: document.querySelectorAll('.vrm-achats-kpis').length, carte: document.querySelectorAll('.vrm-fu-ecran').length,
           relais: document.querySelectorAll('.vrm-pickup-card, [data-pickup-total], [data-retraits-vide], [data-a-confirmer], [data-colis-retraits]').length,
           versColis: (document.querySelector('[data-achats-vers-colis]') || { getAttribute: () => '' }).getAttribute('data-achats-vers-colis') }));
         const e = await etat(pg);
         dit(e.tache === 'achats' && e.site === 'vinted' && a.ecran === 'achats', 'K. ?tab=achats ouvre Achats · Vinted', JSON.stringify({ e, a }));
         dit(a.onglets.join('|') === 'route|recus|all', 'K. Achats : En route · Reçus · Tous — pas d’« À retirer »', a.onglets.join('|'));
-        dit(a.kpis === 1 && a.relais === 0, 'K. Achats : ses chiffres, et aucun bloc de colis à retirer', JSON.stringify(a));
+        // (5 nov., revue 2.15) UNE carte de chiffres (la carte sombre), plus la grille qui la répétait.
+        dit(a.carte === 1 && a.kpis === 0 && a.relais === 0, 'K. Achats : une seule carte de chiffres, et aucun bloc de colis à retirer', JSON.stringify(a));
         if (a.versColis) {
           await pg.locator('[data-achats-vers-colis]').first().click(); await pg.waitForTimeout(1500);
           const v = await pg.evaluate(() => ({ ouvert: !!document.querySelector('[data-colis-onglet="retirer"]') && !!document.querySelector('[data-cc-colonne="retirer"]'), tache: !!document.querySelector('[data-tache]') }));
