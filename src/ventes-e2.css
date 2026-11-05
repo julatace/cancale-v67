@@ -43,7 +43,7 @@ html body .vrm-app-shell .vrm-main .vrm-toutes-vide .vrm-toutes-vide-titre { mar
   :root body .vrm-app-shell .vrm-main .vrm-toutes-ligne { border-bottom: 0 !important; position: relative; }
   :root body .vrm-app-shell .vrm-main .vrm-toutes-ligne::after { content: ''; position: absolute; left: 10px; right: 10px; bottom: 0; height: 1px; background: var(--vrm-line); pointer-events: none; }
   /* Le survol éclaire la ligne (la carte), il ne l'assombrit pas : le gris secondaire garde 4,5:1. */
-  :root body .vrm-app-shell .vrm-main .vrm-toutes-ligne:hover { background-color: var(--vrm-card) !important; }
+  :root body .vrm-app-shell .vrm-main .vrm-toutes-ligne:hover { background-color: var(--vrm-surface) !important; }
   :root body .vrm-app-shell .vrm-main .vrm-toutes-ligne:hover::after { opacity: 0; }
   html body .vrm-app-shell .vrm-main .vrm-toutes-montant { display: flex; flex-direction: column; align-items: flex-end; }
 }
@@ -53,7 +53,7 @@ html body .vrm-app-shell .vrm-main .vrm-toutes-vide .vrm-toutes-vide-titre { mar
 
 /* ── L'alerte « un compte annule plus que les autres » ────────────────────── */
 html body .vrm-app-shell .vrm-main .vrm-annul-alerte {
-  margin: 0 0 12px; border: 1px solid var(--vrm-line); background: var(--vrm-card); border-radius: 16px; padding: 12px 14px;
+  margin: 0 0 12px; border: 1px solid var(--vrm-line); background: var(--vrm-surface); border-radius: 16px; padding: 12px 14px;
 }
 html body .vrm-app-shell .vrm-main .vrm-annul-alerte-tete { display: flex; gap: 10px; align-items: flex-start; }
 html body .vrm-app-shell .vrm-main .vrm-annul-alerte-tete > svg { flex-shrink: 0; margin-top: 1px; color: var(--vrm-muted); }

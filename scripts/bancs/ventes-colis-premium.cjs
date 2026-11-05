@@ -197,7 +197,7 @@ const communs = (m, vp, errs) => {
         dit(lu.prix.every((x) => x != null) && somme === ATTENDU.sommeToutes, 'la somme des prix rendus est 696,90 €', `${somme / 100} € ${JSON.stringify(lu.prix)}`);
         communs(await mesurer(pg), vp, errs);
         await capture(pg, vp, 'ventes');
-        await pg.locator('button[aria-pressed]', { hasText: /^À expédier$/ }).first().click({ timeout: 4000 });
+        await pg.locator('button[aria-pressed]', { hasText: /^(À envoyer|À expédier)$/ }).first().click({ timeout: 4000 });
         await pg.waitForTimeout(800);
         const nA = await pg.evaluate(() => document.querySelectorAll('.vrm-sale-row[data-tx]').length);
         dit(nA === ATTENDU.aExpedier, `« À expédier » rend ${ATTENDU.aExpedier} ventes`, `${nA}`);
