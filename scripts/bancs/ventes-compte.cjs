@@ -165,7 +165,11 @@ const attr = (pg, sel, at) => pg.$eval(sel, (e, a) => e.getAttribute(a), at).cat
         const { ctx, pg, errs } = await ouvrir(b, vp, etat, 'plat_leboncoin');
         await attendre(pg, '[data-lbc-vente]');
         await pg.waitForTimeout(1500);
-        const par = await pg.$$eval('[data-lbc-vente]', (l) => Object.fromEntries(l.map((e) => { const c = e.querySelector('[data-vente-sous] [data-vente-compte]'); return [e.getAttribute('data-lbc-vente'), c ? (c.hasAttribute('data-vente-compte-passu') ? '?' : c.getAttribute('data-vente-compte')) : null]; })));
+        await capture(pg, 'leboncoin-' + vp.width);
+        const par = await pg.$$eval('[data-lbc-vente]', (l) => Object.fromEntries(l.map((e) => {
+          const tog = e.querySelector('.vrm-ledger-sale-toggle') || e;
+          const c = [...tog.querySelectorAll('[data-vente-compte]')].find((x) => { const r = x.getBoundingClientRect(); const cs = getComputedStyle(x); return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none'; });
+          return [e.getAttribute('data-lbc-vente'), c ? (c.hasAttribute('data-vente-compte-passu') ? '?' : c.getAttribute('data-vente-compte')) : null]; })));
         dit(par.L1 === 'lbc_joint', 'Leboncoin : le compte joint à la vente par l\'extension', JSON.stringify(par));
         dit(par.L2 === 'lbc_registre', 'Leboncoin : un identifiant seul ⇒ le nom rangé sous CET identifiant (lbc_accounts)', String(par.L2));
         dit(par.L3 === 'lbc_annonce', 'Leboncoin : sans compte joint ⇒ le compte de SON annonce (itemId, une identité)', String(par.L3));
