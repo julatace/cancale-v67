@@ -222,8 +222,12 @@ const ouvrir = async (b, vp, sombre) => {
           dit(m.sections.join(',') === 'aujourdhui,prets,avenir,lieu,verifier,route,argent', 'sections dans l’ordre (aujourd’hui > prêts > code à venir > lieu > à vérifier > en route > argent)', m.sections.join(','));
           const sec = (s) => Object.entries(m.dansSection).filter(([, v]) => v === s).map(([k]) => k);
           dit(sec('aujourdhui').length === 1 && /90000003/.test(sec('aujourdhui')[0]), '« À retirer aujourd’hui » : le seul colis au dernier jour', sec('aujourdhui').join());
-          dit(sec('prets').every((k) => !/90000021|cmd01|90000008/.test(k)) && sec('prets').some((k) => /9301/.test(k)) && sec('prets').some((k) => /90000022/.test(k)), '« Prêts à retirer » : les colis avec code ou QR', sec('prets').join());
-          dit(sec('avenir').some((k) => /90000021/.test(k)) && sec('avenir').every((k) => !/9301|90000022/.test(k)), '« Code à venir » : arrivés sans code', sec('avenir').join());
+          // (5 nov., Julien : « 2 points de retrait alors que c'est le même ») UN POINT, UNE CARTE : Phone Cash
+          // (code connu, QR, code pas lu) va TOUT ENTIER dans « Prêts à retirer », la ligne sans code garde sa
+          // puce « Code à venir » ; « Code à venir » ne garde que les points dont AUCUN colis n'a de code.
+          dit(sec('prets').every((k) => !/cmd01|90000008/.test(k)) && sec('prets').some((k) => /9301/.test(k)) && sec('prets').some((k) => /90000022/.test(k)) && sec('prets').some((k) => /90000021/.test(k)), '« Prêts à retirer » : les points qui ont un colis avec code ou QR, tous leurs colis dedans', sec('prets').join());
+          dit(sec('avenir').some((k) => /cmd01|conv|commande/.test(k) || k === 'r:e:email_track_vinted_commande_cmd01') && sec('avenir').every((k) => !/9301|90000022|90000021/.test(k)), '« Code à venir » : les points sans aucun code', sec('avenir').join());
+          dit(!(await pg.evaluate(() => document.querySelectorAll('.vrm-rpf-section:not(.is-repli) [data-relais-point-suite]').length)), 'chaque point UNE fois (aucune carte « suite » dans une autre section)');
           dit(sec('lieu').length === 1 && /90000008/.test(sec('lieu')[0]), '« Lieu à confirmer » : le colis sans lieu', sec('lieu').join());
           dit(m.air.every((a) => a >= 20 && a <= 40), 'de l’air entre les sections (20–40 px)', m.air.join(','));
           dit(m.verif && m.verif.n === '3' && !m.verif.ouvert, '« À vérifier · 3 » replié', JSON.stringify(m.verif));

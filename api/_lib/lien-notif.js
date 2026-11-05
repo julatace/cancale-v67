@@ -62,6 +62,8 @@ export const DESTINATIONS = {
   agentEbay: () => lienNotif('plat_ebay', { section: 'agent' }),
   facture: () => lienNotif('compta', { section: 'factures' }),
   journee: () => lienNotif('journee'),
+  // (5 nov.) Paramètres → Comptes liés : chaque compte, sa dernière relecture.
+  comptes: () => lienNotif('vintedaccounts'),
 };
 
 // L'identité de la conversation dans un email Vinted : le lien « Répondre »
