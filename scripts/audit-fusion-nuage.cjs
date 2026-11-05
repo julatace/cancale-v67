@@ -55,6 +55,15 @@ async function juger(fichier, bavard) {
     dit(r.data && r.data.vinted_offvinted_buys.length === 2, 'une liste d\'objets réécrits dans un autre ordre : pas de doublon', JSON.stringify(r.data)); }
   { const r = F({ vinted_offvinted_buys: [{ a: 1, b: 2 }] }, { vinted_offvinted_buys: [{ b: 2, a: 1 }] }, { vinted_offvinted_buys: [] });
     dit(r.data && r.data.vinted_offvinted_buys.length === 0, 'un achat retiré là-bas ne ressuscite pas parce qu\'il est réécrit ici', JSON.stringify(r.data)); }
+  // 7 bis. (5 nov.) Une fiche numérotée du nuage ne disparaît jamais par la fusion
+  //    (règle de la base `vrm_fiche_perdue`) : l'appareil qui l'a perdue de son côté
+  //    l'envoie quand même.
+  { const r = F({ vinted_annonce_numeros: { a: { numero: '50' }, b: { numero: '51' } } }, { vinted_annonce_numeros: { b: { numero: '51' } } }, { vinted_annonce_numeros: { a: { numero: '50' }, b: { numero: '51' } } });
+    dit(r.data && r.data.vinted_annonce_numeros && r.data.vinted_annonce_numeros.a && r.data.vinted_annonce_numeros.a.numero === '50', 'une fiche numérotée retirée ici reste dans le nuage (la base la refuserait)', JSON.stringify(r.data)); }
+  { const r = F({ vinted_annonce_numeros: { a: { numero: '50' } } }, { vinted_annonce_numeros: { c: { numero: '50', repriseDe: 'a' } } }, { vinted_annonce_numeros: { a: { numero: '50' } } });
+    dit(r.data && r.data.vinted_annonce_numeros && !r.data.vinted_annonce_numeros.a && r.data.vinted_annonce_numeros.c, 'une fiche REPRISE ailleurs (repriseDe) part bien (l\'autre sens)', JSON.stringify(r.data)); }
+  { const r = F({ vinted_annonce_numeros: { a: { title: 'x' } } }, { vinted_annonce_numeros: {} }, { vinted_annonce_numeros: { a: { title: 'x' } } });
+    dit(r.data && r.data.vinted_annonce_numeros && !r.data.vinted_annonce_numeros.a, 'une fiche SANS numéro retirée ici reste retirée (rien de plus que la règle de la base)', JSON.stringify(r.data)); }
   // 7. Les numéros.
   const fiche = (n, extra) => ({ numero: n, ...extra });
   { const r = F({ vinted_used_numeros: ['1', '2'] }, { vinted_used_numeros: ['1'] }, { vinted_used_numeros: ['1', '2', '3'] });
@@ -100,6 +109,7 @@ function texteApp() {
 }
 
 const MUTATIONS = [
+  ['fiche numérotée perdue par la fusion', (s) => s.replace("if (k === 'vinted_annonce_numeros') v = garderFichesNumerotees(v, N[k], cleNum);", '')],
   ['local gagne toujours', (s) => s.replace("if (egal(l, b)) return n;", "if (egal(l, b)) return l;")],
   ['pas de fusion des objets', (s) => s.replace("if (estObjet(l) && estObjet(n) &&", "if (false &&")],
   ['liste : le nuage seul', (s) => s.replace("return fusionListe(b, l, n);", "return l;")],

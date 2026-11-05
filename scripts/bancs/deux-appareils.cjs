@@ -213,6 +213,29 @@ const prixFiche = (d, id) => String(((d && d.vinted_annonce_numeros) || {})[id]?
     const d2 = H.dataMain(base) || {};
     dit(d2.vinted_dark === false && d2.vrm_ville === 'Saint-Malo', 'E : la panne finie, le geste de B part, fusionné', `dark=${d2.vinted_dark} ville=${JSON.stringify(d2.vrm_ville)}`);
   }
+  // ── I (5 nov. : l'appareil a perdu une fiche numérotée de son côté) ───────────
+  // Capture de Julien (Edge, ouvert depuis la veille) : la base refuse son envoi
+  // (`vrm_fiche_perdue`) et le bloc « Recharger » couvre l'écran. Une fiche
+  // numérotée du nuage ne doit jamais sortir par la fusion : l'envoi passe, la
+  // fiche reste, aucun bloc.
+  if (joue('I')) {
+    const C = await H.appareil(nav, base, { nom: 'C' });
+    const pC = await C.ouvrir('C'); errs.push(pC.errs);
+    await pC.pg.goto(srv.url + '/?tab=settings', { waitUntil: 'domcontentloaded' });
+    await pC.pg.waitForTimeout(5000);
+    const perdue = IDS[4];
+    await pC.pg.evaluate((id) => { const f = JSON.parse(localStorage.getItem('vinted_annonce_numeros') || '{}'); delete f[id]; localStorage.setItem('vinted_annonce_numeros', JSON.stringify(f)); }, perdue);
+    const t0 = Date.now();
+    await pC.pg.locator('[data-reglage-sombre]').first().click().catch(() => {});
+    await pC.pg.waitForTimeout(4000);
+    const refusI = base.ecritures.filter((e) => e.at >= t0 && e.page === 'C' && /vrm_/.test(String(e.resultat)));
+    dit(refusI.length === 0, 'I : un appareil qui a perdu une fiche numérotée : la base ne refuse rien', refusI.map((e) => e.resultat).join(', '));
+    const dI = H.dataMain(base) || {};
+    dit(dI.vinted_annonce_numeros && dI.vinted_annonce_numeros[perdue] && H.cleNum(dI.vinted_annonce_numeros[perdue].numero) === '5', 'I : la fiche N°5 reste en base');
+    const blocI = await pC.pg.evaluate(() => !!document.querySelector('[data-numeros-perimes]'));
+    dit(!blocI, 'I : aucun bloc « Recharger » sur cet appareil');
+    await pC.pg.close();
+  }
   // ── F (les numéros, sur toutes les écritures) ───────────────────────────────
   {
     const fin = H.dataMain(base) || {};

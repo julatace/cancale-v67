@@ -705,3 +705,7 @@ notifications, sans rapport), `audit-coherence` verts.
 lira `/users/me` (ou `user_id` Stream, 5.317) ; « ouvert » Leboncoin/Vestiaire = la session
 relevée < 12 h par n'importe lequel de ses navigateurs. Geste de Julien : regarder
 Paramètres → Comptes liés ; couper l'interrupteur d'un compte qu'il ne veut pas compter.
+
+
+<!-- déplacé de CLAUDE.md §9 le 5 nov. (limite de 60 Ko) -->
+- **4 nov., reprise Codex** — intégration des branches argent/mois, offres/objectif/questions eBay, achats/fournisseurs/lots, comptes/sécurité ; corrections des retenues eBay inconnues, lecture inachevée et corps HTTP des appareils. État précis, limites Vinted/Discord, corbeille non livrée : `docs/passation/2026-11-04-reprise-codex.md`. Migration 024 non appliquée.

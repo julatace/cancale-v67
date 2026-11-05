@@ -110,6 +110,24 @@ export const fusionFichesNumeros = (cle, b, l, n, cleNum, pools = {}) => {
   }
   return { val };
 };
+// (5 novembre) UNE FICHE NUMÉROTÉE DU NUAGE NE DISPARAÎT JAMAIS PAR LA FUSION.
+// C'est la règle de la base (`vrm_fiche_perdue`, migrations 013/017) : une
+// fiche qui porte un N° ne sort de `main` que remplacée par une reprise
+// (`repriseDe`). Mesuré le 5 nov. (journaux Postgres, 12:13 UTC) : un appareil
+// ouvert depuis la veille a envoyé une fusion sans une fiche numérotée ; la base
+// a refusé et l'écran s'est couvert du bloc « Recharger ». On applique la règle
+// AVANT d'écrire : la fiche du nuage est remise telle quelle (rien n'est
+// renuméroté, aucun numéro deviné).
+export const garderFichesNumerotees = (val, nuage, cleNum) => {
+  const no = estObjet(nuage) ? nuage : {};
+  const out = estObjet(val) ? { ...val } : {};
+  const repris = new Set(Object.values(out).map((e) => (estObjet(e) && e.repriseDe != null ? String(e.repriseDe) : '')).filter(Boolean));
+  for (const [id, e] of Object.entries(no)) {
+    if (!numDe(e, cleNum) || id in out || repris.has(String(id))) continue;
+    out[id] = e;
+  }
+  return out;
+};
 // Le pool : l'union, dans l'ordre du nuage, puis ce que l'appareil a de plus.
 export const unionPool = (l, n, cleNum) => {
   const nn = Array.isArray(n) ? n : [], ll = Array.isArray(l) ? l : [];
@@ -148,6 +166,7 @@ export const fusionnerLigne = ({ cles, base, local, nuage, cleNum, localGagne = 
         : fusionFichesNumeros(k, B[k], L[k], N[k], cleNum, { base: B[CLE_POOL], local: L[CLE_POOL], nuage: N[CLE_POOL] });
       if (r.conflit) return { conflit: r.conflit };
       v = r.val;
+      if (k === 'vinted_annonce_numeros') v = garderFichesNumerotees(v, N[k], cleNum);
     } else v = inverse ? fusion3(B[k], N[k], L[k]) : fusion3(B[k], L[k], N[k]);
     if (v !== undefined && v !== null) data[k] = v;
     else if (v === null && (L[k] === null || N[k] === null)) data[k] = null;
