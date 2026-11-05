@@ -67,9 +67,7 @@
   .vrm-app-shell .vrm-main button[style*="background: rgb(36, 78, 84)"],
   .vrm-app-shell .vrm-main a[style*="background: rgb(36, 78, 84)"] { border-radius: 24px !important; box-shadow: none !important; }
 
-  /* Les filtres, segments et étiquettes : même pastille, l'actif en encre. */
-  .vrm-app-shell .vrm-main .vrm-seg { background: var(--ep-teinte) !important; border: 0 !important; border-radius: 999px !important; box-shadow: none !important; }
-  .vrm-app-shell .vrm-main .vrm-seg-btn { border-radius: 999px !important; box-shadow: none !important; }
+  /* Les filtres et étiquettes : même pastille, l'actif en encre (le segmenté : styles-coque.css). */
   .vrm-app-shell .vrm-main .vrm-filtres button { border: 0 !important; background: var(--ep-teinte) !important; box-shadow: none !important; border-radius: 999px !important; }
   .vrm-app-shell .vrm-main .vrm-filtres button[aria-pressed="true"] { background: var(--ep-encre) !important; color: var(--ep-fond) !important; }
 

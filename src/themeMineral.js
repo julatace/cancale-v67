@@ -24,27 +24,37 @@
 // geste à faire, rouge seulement pour deux articles sous un N° (§7). L'accent du TEXTE en clair est
 // #0066CC (le bleu des liens d'Apple : 5,3:1 sur le fond gris, #0071E3 n'y tenait que 4,2:1) ;
 // les aplats Fusion gardent #0071E3 (`--fu-bleu`).
+// (5 nov., revue de cohérence 1.1 et 1.6 — chantier A) UN SEUL BLEU D'ACCENT. Deux bleus
+// vivaient côte à côte (`accent` #0066CC/#409CFF, texte NOIR en sombre, contre `--fu-bleu`
+// #0071E3/#0A84FF) : « accent » est désormais l'APLAT d'Apple (#0071E3 clair, #0A84FF
+// sombre, texte blanc `onAccent`) et `--fu-bleu` le lit ; les LIENS prennent `accentTexte`
+// (#0066CC : 5,3:1 sur le gris ; #409CFF : 5,8:1 sur #1C1C1E). Contraste du blanc sur
+// l'aplat : 4,7:1 en clair (AA) ; 3,65:1 en sombre (AA seulement pour un grand texte ou
+// une commande, comme chez Apple — mesuré par le banc `jetons-coherence`).
+// LE ROUGE : `danger` prend la valeur de l'ambre (`warn`) — 88 usages « danger » rougissaient
+// des erreurs, des annulations, des pertes ; le rouge n'est plus qu'au jeton `doublon`, deux
+// paires présentes sous un même N° (§5, §7). `scripts/audit-rouge-doublon.cjs` l'interdit ailleurs.
 export const MINERAL = Object.freeze({
  bg:'#F2F2F7',surface:'#FFFFFF',card:'#FFFFFF',card2:'#F2F2F7',
  border:'#E5E5EA',text:'#1D1D1F',muted:'#6E6E73',faint:'#6E6E73',
- accent:'#0066CC',accentSoft:'#0066CC',onAccent:'#FFFFFF',
- danger:'#D70015',warn:'#B25000',warnSoft:'#FFF4E5',gold:'#B25000',blue:'#6E6E73',purple:'#6E6E73',
+ accent:'#0071E3',accentTexte:'#0066CC',accentSoft:'#0066CC',onAccent:'#FFFFFF',
+ danger:'#B25000',doublon:'#D70015',warn:'#B25000',warnSoft:'#FFF4E5',gold:'#B25000',blue:'#6E6E73',purple:'#6E6E73',
  shadow:'none',
  shadowMd:'0 1px 2px rgba(0,0,0,.04), 0 6px 20px rgba(0,0,0,.05)',
  shadowLg:'0 6px 16px rgba(0,0,0,.08), 0 24px 56px rgba(0,0,0,.14)',
- ring:'rgba(0,102,204,.20)',glass:'#FFFFFF',bar:'#F2F2F7',hair:'rgba(0,0,0,.06)',
+ ring:'rgba(0,113,227,.20)',glass:'#FFFFFF',bar:'#F2F2F7',hair:'rgba(0,0,0,.06)',
  sidebar:'#F2F2F7',chrome:'#F2F2F7',onChrome:'#1D1D1F',chromeMuted:'#6E6E73',chromeLine:'#E5E5EA',
  chromeGradient:'#F2F2F7',photo:'#F2F2F7',
  s1:'#0071E3',s2:'#8DB8F2',selection:'#0071E3'
 });
-// Le sombre d'iOS : noir pur, cartes #1C1C1E, cases #2C2C2E, filets #38383A ; le bleu
-// éclairci (#409CFF : 5,8:1 sur #1C1C1E ; texte NOIR dessus, 7:1 — le blanc sur #0A84FF n'y tenait que 3,6:1),
-// l'ambre clair. Le gris secondaire #98989D tient 4,5:1 sur #2C2C2E.
+// Le sombre d'iOS : noir pur, cartes #1C1C1E, cases #2C2C2E, filets #38383A ; l'aplat
+// #0A84FF au texte BLANC (comme iOS ; 3,65:1, AA grand texte), les liens #409CFF
+// (5,8:1 sur #1C1C1E), l'ambre clair. Le gris secondaire #98989D tient 4,5:1 sur #2C2C2E.
 export const MINERAL_DARK = Object.freeze({
  bg:'#000000',surface:'#1C1C1E',card:'#1C1C1E',card2:'#2C2C2E',
  border:'#38383A',text:'#F5F5F7',muted:'#98989D',faint:'#98989D',
- accent:'#409CFF',accentSoft:'#64B0FF',onAccent:'#000000',
- danger:'#FF6961',warn:'#FFB340',warnSoft:'#2E2412',gold:'#FFB340',blue:'#98989D',purple:'#98989D',
+ accent:'#0A84FF',accentTexte:'#409CFF',accentSoft:'#409CFF',onAccent:'#FFFFFF',
+ danger:'#FFB340',doublon:'#FF6961',warn:'#FFB340',warnSoft:'#2E2412',gold:'#FFB340',blue:'#98989D',purple:'#98989D',
  shadow:'none',shadowMd:'0 0 0 1px rgba(255,255,255,.05)',shadowLg:'0 0 0 1px rgba(255,255,255,.07), 0 16px 48px rgba(0,0,0,.6)',
  ring:'rgba(10,132,255,.28)',glass:'#1C1C1E',bar:'#000000',hair:'rgba(255,255,255,.08)',
  sidebar:'#000000',chrome:'#000000',onChrome:'#F5F5F7',chromeMuted:'#98989D',chromeLine:'#38383A',
@@ -56,6 +66,6 @@ export const MINERAL_DARK = Object.freeze({
 export function variablesTheme(t,sombre=false){return {
  '--vrm-nav-gradient':t.chromeGradient,'--vrm-ink':t.text,'--vrm-brand-filter':sombre?'invert(1)':'none',
  '--vrm-muted':t.muted,'--vrm-faint':t.faint,'--vrm-hair':t.hair,'--vrm-bar':t.bar,
- '--vrm-accent':t.accent,'--vrm-on-accent':t.onAccent,'--vrm-card2':t.card2,'--vrm-line':t.border,'--vrm-surface':t.card,'--vrm-bg':t.bg,
- '--vrm-danger':t.danger,'--vrm-warn':t.warn,'--vrm-warn-soft':t.warnSoft,'--vrm-photo':t.photo,
+ '--vrm-accent':t.accent,'--vrm-accent-texte':t.accentTexte,'--vrm-on-accent':t.onAccent,'--vrm-card2':t.card2,'--vrm-line':t.border,'--vrm-surface':t.card,'--vrm-bg':t.bg,
+ '--vrm-danger':t.danger,'--vrm-doublon':t.doublon,'--vrm-warn':t.warn,'--vrm-warn-soft':t.warnSoft,'--vrm-photo':t.photo,
 };}

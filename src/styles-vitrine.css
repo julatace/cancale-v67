@@ -11,9 +11,9 @@
    l'app, et une seule à retirer pour revenir en arrière. Les couleurs viennent
    des jetons (src/themeMineral.js → variables --vrm-* posées sur la coque).
 
-     · Bricolage Grotesque pour le texte et les titres, Geist Mono pour les N°
-       et les codes (auto-hébergées, src/fonts/, licence OFL : la politique de
-       sécurité n'autorise que les polices du site) ;
+     · la police du SYSTÈME (SF Pro sur iPhone et Mac) depuis le 2 nov. ; les
+       polices Bricolage Grotesque et Geist Mono du 31 oct., plus dessinées
+       nulle part, sont retirées (5 nov., chantier A) ;
      · fond blanc ; les blocs sont des aplats « surface » sans cadre ni ombre ;
        la photo porte la carte d'annonce ;
      · titres d'écran 44 px (800) sur ordinateur, 34–36 px au téléphone ;
@@ -28,22 +28,12 @@
    ════════════════════════════════════════════════════════════════════════════ */
 
 /* ── 0. LES POLICES ──────────────────────────────────────────────────────── */
-@font-face {
-  font-family: 'Bricolage Grotesque'; font-style: normal; font-weight: 500 800; font-stretch: 100%; font-display: swap;
-  src: url('./fonts/bricolage-grotesque-latin.woff2') format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
-  font-family: 'Geist Mono'; font-style: normal; font-weight: 500; font-display: swap;
-  src: url('./fonts/geist-mono-500-latin.woff2') format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
 :root {
   /* (2 nov., Julien : « copie le style simple et minimaliste d'Apple ») La police
      SYSTÈME d'Apple : SF Pro sur iPhone, iPad et Mac, Segoe UI / Roboto ailleurs.
      Les N° gardent leurs chiffres alignés (tabular-nums), sans chasse fixe. */
-  --vrm-police: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Inter', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --vrm-police-mono: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --vrm-police: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --vrm-police-mono: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --vrm-r-sm: 10px; --vrm-r-md: 14px; --vrm-r-lg: 14px;
   --vrm-ombre-flottante: 0 1px 2px rgba(0,0,0,.06), 0 10px 28px rgba(0,0,0,.12);
   --vrm-t-title: 34px; --vrm-t-section: 22px;
@@ -58,7 +48,12 @@ html .vrm-app-shell, body > :not(#root) {
   font-family: var(--vrm-police) !important;
   font-optical-sizing: auto;
 }
-html body { font-feature-settings: "tnum" 1; }
+/* (5 nov., chantier A, revue 1.5) Plus de chiffres « tabulaires » sur TOUTE la page : posés
+   sur du texte, ils élargissaient les tirets (« Nike XT - 6 », « E - mails »). Ils ne vont
+   qu'aux nombres (montants, N°, compteurs) — chaque classe de nombre les porte ; le banc
+   `jetons-coherence` mesure qu'aucun texte n'en hérite. index.html pose encore sur `body`
+   des chiffres tabulaires et deux variantes d'Inter (cv05, ss01) : ils s'arrêtent ici. */
+html body { font-variant-numeric: normal; font-feature-settings: normal; }
 html :is(h1, h2, h3, .vrm-display) { font-family: var(--vrm-police) !important; font-weight: 700; letter-spacing: -.022em; }
 /* Les N° et les codes : la police à chasse fixe, comme une étiquette de carton. */
 html .vrm-app-shell :is(.vrm-colis-num, .vrm-apub-num, .vrm-tout-num-ligne, [data-edition="numero"], .vrm-pickup-code, .vrm-code-retrait),
@@ -140,7 +135,7 @@ html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button:focus-visible { outline: 
   html .vrm-app-shell .vrm-tabbar > .vrm-tab { color: var(--vrm-muted); border-radius: 0; min-height: 52px; background: transparent !important; box-shadow: none !important; }
   html .vrm-app-shell .vrm-tabbar > .vrm-tab .vrm-nav-label { font-size: 12px; font-weight: 500; letter-spacing: 0; }
   html .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"] { color: var(--vrm-ink); }
-  html .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"] .vrm-tab-ic { color: var(--vrm-accent); }
+  html .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"] .vrm-tab-ic { color: var(--vrm-accent-texte, var(--vrm-accent)); }
   html .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"] .vrm-nav-label { font-weight: 700; }
   html .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"]::before { display: none !important; }
   html .vrm-app-shell .vrm-tabbar > .vrm-tab:focus-visible { outline: 2px solid var(--vrm-accent); outline-offset: -4px; }
@@ -353,10 +348,6 @@ html .vrm-app-shell .vrm-chart-months svg text { font-size: 11px; }
 html .vrm-app-shell :is(.vrm-b, .vrm-button, .vrm-btn-primary, .vrm-w-btn) { box-shadow: none !important; background-image: none !important; }
 html .vrm-b, html .vrm-app-shell .vrm-main .vrm-b.vrm-b { border-radius: 14px !important; }
 html .vrm-app-shell .vrm-main .vrm-b.vrm-b-primaire { font-weight: 700 !important; }
-html .vrm-app-shell .vrm-seg { border-radius: 14px; }
-html .vrm-app-shell .vrm-seg-btn { border-radius: 12px; }
-html .vrm-app-shell .vrm-seg-btn:is([aria-current="page"], [aria-pressed="true"]),
-html .vrm-app-shell .vrm-seg > button:is([aria-current="page"], [aria-pressed="true"]) { box-shadow: none !important; }
 html .vrm-app-shell .vrm-main .vrm-sales-workbar > .vrm-rangee > button { box-shadow: none !important; }
 /* Une rangée de filtres (et la rangée des comptes) : des pastilles ; la
    choisie (le compte ouvert) est noire pleine. */
@@ -389,15 +380,15 @@ html .vrm-app-shell .vrm-inbox-row.is-current { box-shadow: inset 3px 0 var(--vr
 html .vrm-app-shell .vrm-finance-metric.is-primary { background: var(--vrm-surface) !important; border-color: transparent !important; }
 html .vrm-app-shell .vrm-finance-metric.is-primary * { color: var(--vrm-ink) !important; }
 .vrm-bienvenue {
-  --b-carte: #FFFFFF; --b-encre: #1D1D1F; --b-doux: #6E6E73; --b-filet: #E5E5EA; --b-sol: #F2F2F7; --b-accent: #0071E3;
+  --b-carte: #FFFFFF; --b-encre: #1D1D1F; --b-doux: #6E6E73; --b-filet: #E5E5EA; --b-sol: #F2F2F7; --b-accent: var(--vrm-accent, #0071E3);
   backdrop-filter: none; -webkit-backdrop-filter: none;
 }
 :root[data-theme="dark"] .vrm-bienvenue {
-  --b-carte: #1C1C1E; --b-encre: #F5F5F7; --b-doux: #98989D; --b-filet: #38383A; --b-sol: #000000; --b-accent: #0A84FF;
+  --b-carte: #1C1C1E; --b-encre: #F5F5F7; --b-doux: #98989D; --b-filet: #38383A; --b-sol: #000000; --b-accent: var(--vrm-accent, #0A84FF);
 }
-/* (1er nov.) En sombre, le texte du bouton principal suit `onAccent` de Vitrine
-   (encre sombre) : le blanc sur #0A84FF ne se lisait qu'à ~3:1. */
-:root[data-theme="dark"] .vrm-bienvenue-principal { color: #000000; }
+/* (5 nov., chantier A) Le texte du bouton principal suit `onAccent` : blanc, en sombre aussi
+   (un seul aplat bleu, texte blanc, comme iOS — themeMineral.js). */
+:root[data-theme="dark"] .vrm-bienvenue-principal { color: var(--vrm-on-accent, #ffffff); }
 /* Le voile sous une feuille : une ombre de la page, sans flou de verre. */
 .vrm-sheet-voile { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
 

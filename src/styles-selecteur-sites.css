@@ -2,7 +2,7 @@
    La forme segmentée iOS de l'app (jetons.css §4) + un logo par site, dessiné
    en masque : il prend la couleur du texte (encre, ou blanc sur le segment
    choisi en sombre) — aucune couleur de marque (§7). */
-:root:root body .vrm-app-shell .vrm-filtre-site[data-selecteur-logos] > button:not(#fu) { padding: 0 6px !important; }
+:root:root body .vrm-app-shell .vrm-filtre-site[data-selecteur-logos] > button:not(#fu) { padding: 0 10px !important; }
 .vrm-sel-sites .vrm-ss-in { display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; height: 100%; }
 .vrm-sel-sites .vrm-ss-logo {
   flex: 0 0 auto; width: 18px; height: 18px; background-color: currentColor;
@@ -14,15 +14,11 @@
 .vrm-sel-sites .vrm-ss-tous { -webkit-mask: none; mask: none; background: none; display: grid; grid-template-columns: 7px 7px; gap: 3px; width: 17px; height: 17px; }
 .vrm-sel-sites .vrm-ss-tous > i { display: block; width: 7px; height: 7px; border-radius: 2px; background: currentColor; }
 .vrm-sel-sites .vrm-ss-nom { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Au téléphone, une rangée de 4 ou 5 segments : le nom seulement sur le choisi. */
+/* (5 nov., chantier A) Le nom n'est rendu que sur le site choisi (SelecteurSites.jsx) : au
+   téléphone, le segment choisi prend la place de son nom ; les autres, celle d'un logo. */
 @media (max-width: 520px) {
-  .vrm-sel-sites[data-n="4"] > button[aria-pressed="false"] .vrm-ss-nom,
-  .vrm-sel-sites[data-n="5"] > button[aria-pressed="false"] .vrm-ss-nom { display: none; }
-  :root:root body .vrm-app-shell .vrm-filtre-site[data-selecteur-logos][data-n="4"] > button:not(#fu)[aria-pressed="true"],
-  :root:root body .vrm-app-shell .vrm-filtre-site[data-selecteur-logos][data-n="5"] > button:not(#fu)[aria-pressed="true"] { flex: 2.2 1 0 !important; }
+  :root:root body .vrm-app-shell .vrm-filtre-site[data-selecteur-logos] > button:not(#fu)[aria-pressed="true"]:has(.vrm-ss-nom) { flex: 2.2 1 0 !important; }
 }
-/* Dans la barre du haut (ordinateur) : la rangée ne prend que sa place. */
-.vrm-barre-haut-droite .vrm-sel-sites .vrm-ss-nom { display: inline; }
 /* Le logo en ligne d'un texte (LogoSite). */
 .vrm-logo-site {
   display: inline-block; width: 1.05em; height: 1.05em; margin-right: .35em; vertical-align: -.15em; background-color: currentColor;

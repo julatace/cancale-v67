@@ -27,7 +27,7 @@
 .vrm-bienvenue-passer:hover { color: var(--b-encre); }
 .vrm-bienvenue-corps { animation: vrm-b-entre .32s cubic-bezier(.2,.7,.2,1) both; }
 .vrm-bienvenue-sur { margin: 0 0 4px; font-size: 13px; font-weight: 600; color: var(--b-accent); letter-spacing: .01em; }
-.vrm-bienvenue h2 { margin: 0 0 10px; font-family: 'Space Grotesk', inherit; font-size: 28px; line-height: 1.15; letter-spacing: -.02em; font-weight: 700; }
+.vrm-bienvenue h2 { margin: 0 0 10px; font-size: 28px; line-height: 1.15; letter-spacing: -.02em; font-weight: 700; }
 .vrm-bienvenue-texte { margin: 0 0 18px; font-size: 15px; line-height: 1.55; color: var(--b-doux); }
 .vrm-bienvenue-univers { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 4px 0 20px; }
 .vrm-bienvenue-univers button {

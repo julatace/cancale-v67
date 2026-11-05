@@ -26,7 +26,7 @@
   /* Texte secondaire : #6E6E73 (4,5:1 sur le fond gris, 5:1 sur blanc) ; lien bleu
      lisible sur le gris (#0066CC, 5,6:1) ; remplissage d'iOS pour les contrôles. */
   --fu-gris2: #6e6e73;
-  --fu-lien: #0066cc;
+  --fu-lien: var(--vrm-accent-texte, #0066cc);
   --fu-remplir: rgba(118,118,128,.12);
   --fu-remplir-fort: rgba(118,118,128,.2);
 }
@@ -34,7 +34,7 @@
   --o-carte: 0 0 0 1px rgba(255,255,255,.05);
   --o-flottant: 0 0 0 1px rgba(255,255,255,.08), 0 24px 56px rgba(0,0,0,.6);
   --fu-gris2: #98989d;
-  --fu-lien: #409cff;
+  --fu-lien: var(--vrm-accent-texte, #409cff);
   --fu-remplir: rgba(118,118,128,.24);
   --fu-remplir-fort: rgba(118,118,128,.32);
 }
@@ -85,29 +85,27 @@
 }
 :root:root body .vrm-app-shell .vrm-filtre-site > button:not(#fu)[aria-pressed="true"],
 :root:root body .vrm-app-shell .vrm-main .vrm-filtre-site > button:not(#fu)[aria-pressed="true"] {
-  background: #ffffff !important; color: #1d1d1f !important; box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 2px 6px rgba(0,0,0,.06) !important;
+  background: var(--seg-actif) !important; color: var(--seg-actif-texte) !important; box-shadow: var(--seg-actif-ombre) !important;
 }
-:root:root[data-theme="dark"] body .vrm-app-shell .vrm-filtre-site > button:not(#fu)[aria-pressed="true"],
-:root:root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-filtre-site > button:not(#fu)[aria-pressed="true"] { background: #636366 !important; color: #ffffff !important; box-shadow: none !important; }
 :root:root body .vrm-app-shell .vrm-filtre-site > button:not(#fu):focus-visible { outline: 2px solid var(--fu-bleu) !important; outline-offset: 1px; }
 @media (prefers-reduced-motion: reduce) { :root body .vrm-app-shell .vrm-filtre-site > button:not(#fu) { transition: none !important; } }
 :root:root body .vrm-app-shell .vrm-tache-filtres { padding: 0 16px !important; }
 
-/* ── 5. LES AUTRES CONTRÔLES SEGMENTÉS : la même forme (#1.2) ─────────────── */
-:root:root body .vrm-app-shell .vrm-main :is(.vrm-seg, .vrm-messages-sections, .vrm-set-seg) {
+/* ── 5. LES AUTRES CONTRÔLES SEGMENTÉS : la même forme (#1.2) ───────────────
+   (5 nov., chantier A) `.vrm-seg` n'est plus ici : sa règle unique vit dans
+   styles-coque.css. Restent les deux rangées qui n'en portent pas la classe. */
+:root:root body .vrm-app-shell .vrm-main :is(.vrm-messages-sections, .vrm-set-seg) {
   display: flex !important; gap: 2px !important; padding: 3px !important; min-height: 50px !important; box-sizing: border-box !important;
-  border: 0 !important; border-radius: var(--r-ctrl) !important; background: var(--fu-remplir) !important; box-shadow: none !important;
+  border: 0 !important; border-radius: var(--r-ctrl) !important; background: var(--seg-piste, var(--fu-remplir)) !important; box-shadow: none !important;
 }
-:root:root body .vrm-app-shell .vrm-main :is(.vrm-seg, .vrm-messages-sections, .vrm-set-seg) > button:not(#fu) {
+:root:root body .vrm-app-shell .vrm-main :is(.vrm-messages-sections, .vrm-set-seg) > button:not(#fu) {
   flex: 1 1 0; min-height: 38px !important; border: 0 !important; border-radius: 12px !important; background: transparent !important; box-shadow: none !important;
   color: var(--fu-encre) !important; font: 600 13px/1.1 var(--vrm-police) !important;
 }
-:root:root body .vrm-app-shell .vrm-main :is(.vrm-seg, .vrm-messages-sections) > button:not(#fu):is([aria-pressed="true"], [aria-current="page"]),
+:root:root body .vrm-app-shell .vrm-main .vrm-messages-sections > button:not(#fu):is([aria-pressed="true"], [aria-current="page"]),
 :root:root body .vrm-app-shell .vrm-main .vrm-set-seg > button:not(#fu)[aria-selected="true"] {
-  background: #ffffff !important; color: #1d1d1f !important; box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 2px 6px rgba(0,0,0,.06) !important;
+  background: var(--seg-actif) !important; color: var(--seg-actif-texte) !important; box-shadow: var(--seg-actif-ombre) !important;
 }
-:root:root[data-theme="dark"] body .vrm-app-shell .vrm-main :is(.vrm-seg, .vrm-messages-sections) > button:not(#fu):is([aria-pressed="true"], [aria-current="page"]),
-:root:root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-set-seg > button:not(#fu)[aria-selected="true"] { background: #636366 !important; color: #ffffff !important; box-shadow: none !important; }
 
 /* ── 6. LES FILTRES D'ÉTAT : pilules 13/600, actif en encre pleine (blanc en sombre) ── */
 :root:root body .vrm-app-shell .vrm-main .vrm-filtres:not(.vrm-filtre-site) > button:not(#fu) {
@@ -115,7 +113,15 @@
   background: var(--fu-remplir) !important; color: var(--fu-encre) !important; font: 600 13px/1 var(--vrm-police) !important; box-shadow: none !important;
 }
 :root:root body .vrm-app-shell .vrm-main .vrm-filtres:not(.vrm-filtre-site) > button:not(#fu)[aria-pressed="true"] { background: #1d1d1f !important; color: #ffffff !important; }
-:root:root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-filtres:not(.vrm-filtre-site) > button:not(#fu)[aria-pressed="true"] { background: #f5f5f7 !important; color: #000000 !important; }
+/* (5 nov., chantier A, revue 2.33) En sombre, le filtre actif n'est plus une pilule BLANCHE (le point
+   le plus lumineux de l'écran) : il prend l'aplat du segment actif (#636366, texte blanc). Toutes
+   les rangées de filtres « actif à l'encre » (var(--vrm-ink), blanc la nuit), d'où qu'elles viennent :
+   Messages (les puces de compte, « Toutes / À répondre / Non lues »), Ventes, Stock, Leboncoin, Favoris, calendrier. */
+:root:root[data-theme="dark"] body .vrm-app-shell :is(.vrm-filtres:not(.vrm-filtre-site), .vrm-inbox-filters, .vrm-sales-filters, .vrm-stock-views, .vrm-sales-workbar > .vrm-rangee, .vrm-lbc-catalog-filtres, .vrm-favoris-auto-jours, .vrm-cal-raccourcis) button:not(#fu)[aria-pressed="true"],
+:root:root[data-theme="dark"] body :is(.vrm-cal-raccourcis, .vrm-favoris-auto-jours) button:not(#fu)[aria-pressed="true"],
+:root:root[data-theme="dark"] body .vrm-app-shell .vrm-compte-puces .vrm-compte-puce.is-actif:not(#fu) {
+  background: var(--seg-actif) !important; border-color: var(--seg-actif) !important; color: var(--seg-actif-texte) !important;
+}
 
 /* ── 7. MENUS ET FEUILLES : une ombre, un rayon ───────────────────────────── */
 :root:root body .vrm-app-shell .vrm-menu-flottant { border: 0 !important; border-radius: 14px !important; box-shadow: var(--o-flottant) !important; background: var(--fu-carte) !important; }
@@ -192,7 +198,6 @@
   :root:root body .vrm-app-shell .vrm-fu-case > span { font-size: 12px !important; }
 }
 :root:root body .vrm-app-shell :is(.vrm-fu-carte-nu) :is(a, button.vrm-lien-action) { color: #ffffff !important; }
-:root:root body .vrm-app-shell .vrm-main .vrm-seg > button:not(#fu) { height: 44px !important; }
 :root:root body .vrm-app-shell :is(.vrm-sync-comptes, .vrm-bilan-sync) a { display: inline-flex !important; align-items: center; min-height: 44px; }
 :root:root body .vrm-app-shell .vrm-main [data-geste="poser-num"] { min-height: 44px !important; }
 /* Compta : la ligne sous le chiffre est posée sur la carte sombre — ses liens en blanc (le bleu y tombait à 2:1). */
@@ -208,9 +213,7 @@
   :root:root body .vrm-app-shell .vrm-main[data-ecran="dashboard"] > .vrm-rubriques { padding-top: 4px !important; }
   :root:root body .vrm-app-shell .vrm-main[data-ecran="dashboard"] .vrm-screen-head { margin-bottom: 8px !important; }
 }
-/* Les segmentés partagent la largeur (le 4ᵉ onglet du Stock était coupé : « Ph… ») ; au téléphone, les mots seuls. */
-:root:root body .vrm-app-shell .vrm-main .vrm-seg > button:not(#fu) { flex: 1 1 0 !important; min-width: 0 !important; padding: 0 4px !important; justify-content: center !important; white-space: nowrap; }
-:root:root body .vrm-app-shell .vrm-main .vrm-seg { overflow: visible !important; -webkit-mask-image: none !important; mask-image: none !important; }
+/* Au téléphone, les vues du Stock : les mots seuls (le segmenté lui-même : styles-coque.css). */
 @media (max-width: 430px) { :root:root body .vrm-app-shell .vrm-main [data-stock-vues] > button:not(#fu) > svg { display: none !important; } }
 
 /* ── 14. LE CALENDRIER DE LA CARTE (3 nov., Julien : « fais un calendrier ») ──
@@ -241,3 +244,21 @@ html body .vrm-rangee-bord > .vrm-puce-transp { overflow: hidden !important; tex
 :root:root body .vrm-fu-case:not(.is-jour) { container-type: inline-size; }
 :root:root body .vrm-fu-case:not(.is-jour) b { font-size: clamp(13px, 19cqi, 22px); overflow: visible; text-overflow: clip; }
 :root:root body .vrm-fu-case:not(.is-jour) > span { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: break-word; }
+
+/* ── 15. LES CHIFFRES ALIGNÉS VONT AUX NOMBRES, JAMAIS AU TEXTE (5 nov., chantier A,
+   revue 1.5) ────────────────────────────────────────────────────────────────────
+   `tabular-nums` posé sur un BLOC entier (une carte d'annonce, un écran) passait à
+   tout ce qu'il contient : titres, états, noms — et, avec la police du système,
+   élargissait les tirets (« Nike XT - 6 », « E - mails »). Ces blocs rendent la main ;
+   les nombres gardent leurs propres règles (prix, montants, compteurs, N°). Les règles
+   d'origine (styles-mineral.css, favoris.css, dac7.css, styles-mobile-studio.css) sont
+   à retirer par leurs écrans ; le banc `jetons-coherence` (J4) mesure le rendu. */
+:root:root body :is(.vrm-ann-card, .vrm-lbc-ecran, .vrm-ebay-annonces, .vrm-ann-card [data-chiffres], [data-ann-resume], .vrm-fa, .vrm-finance-page .vrm-display) { font-variant-numeric: normal; }
+
+/* ── 16. LE ROUGE N'EST QU'AU DOUBLON DE N° (5 nov., chantier A, revue 1.6) ───────
+   `--vrm-danger` vaut désormais l'ambre (themeMineral.js) ; le rouge a son jeton,
+   `--vrm-doublon`. Le Mode emballage et la fiche d'une paire colorent leur doublon de
+   N° avec `var(--vrm-danger)` (styles-emballage.css, styles-fiche-paire.css) : sur
+   CES éléments seulement, « danger » redevient le rouge du doublon. À retirer quand
+   ces feuilles liront `--vrm-doublon` elles-mêmes (audit-rouge-doublon R4). */
+:root .vrm-emb-num.is-double, :root .vrm-emb-alerte.is-double, :root .vrm-emb-recap-num.is-double, :root .vrm-fp-num.is-double, :root .vrm-fp-double { --vrm-danger: var(--vrm-doublon); }
