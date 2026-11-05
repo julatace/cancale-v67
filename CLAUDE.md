@@ -302,8 +302,13 @@ VRM n'achète **jamais** une étiquette, ne pose **jamais** « livraison gratuit
 - « Prêt à imprimer » est porté par la ligne (`pret`) ; Colis se range sur ce qu'il
   PEUT faire (prêts · en attente · partis).
 - « À expédier » : une règle (`aExpedier`, la même dans l'app, l'extension et
-  `api/widget.js`) sur le champ machine `transaction_user_status` ; sur un ACHAT,
-  `needs_action` veut dire « à retirer ».
+  `api/widget.js`) sur le champ machine `transaction_user_status`. ⚠️ Sur un ACHAT,
+  `needs_action` veut dire « une action », PAS « à retirer » (« Commande livrée ! » et « non
+  réclamée » le portent) : seul le statut « au point relais » (`isAtRelayStatus`) compte.
+- **À retirer** = preuve d'arrivée ET aucune fin prouvée par AUCUNE identité du colis (son n°,
+  le n° de SA commande, son code de retrait) ; une moitié Vinted sans identité au point d'un
+  colis du transporteur est « peut-être en double », jamais comptée (`src/retraitPreuves.js`,
+  `regrouperArrivees`). Un point = une carte.
 - Date limite : celle de l'email du bordereau (heure de Paris) ; vente + 7 j n'est
   qu'une **estimation** (un plancher), jamais « en retard ». Règle :
   `api/_lib/limite-envoi.js`.
@@ -520,6 +525,8 @@ sans la fonction.
 - **5 nov. · Communauté → Groupes** : groupes d'accompagnement (code/lien, validation par le créateur, partage choisi par le membre — rien par défaut, chiffres, détail — révocable et effacé ; relecture : total partiel dit, renvoi après effacement, verrou révocation/publication) ; migration **025 NON appliquée** (l'onglet le dit). `docs/passation/2026-11-05-communaute-groupes.md`. Geste : appliquer la 025.
 
 - **5 nov. · Réveil** : fin des heures calmes ⇒ une notification « ce qui est arrivé pendant » (`?moment=reveil`, GitHub toutes les 30 min). `docs/passation/2026-11-05-reveil-heures-calmes.md`. Geste : secret `CRON_SECRET` dans GitHub.
+- **5 nov. · Achats et à retirer** : 33 → 10 sur sa copie (fin par le n° de la commande et le code ; doubles possibles à part ; un point = une carte) ; Achats : une carte, outils dans « … », « Arrivé ». `docs/passation/2026-11-05-achats-retraits.md`. Geste : dire à quel compte appartient l'adresse qui reçoit 16 e-mails Vinted.
+
 - **5 nov. · Relais Vinted** : un « relire » relit la copie captée, plus le serveur ; relais freiné (24/30 min/compte, sur l'appareil ET au serveur, tous appareils). `docs/passation/2026-11-05-frein-relais-vinted.md`.
 
 - **5 nov. · Numéros** : fiche numérotée du nuage jamais retirée par la fusion (plus de bloc « Recharger »). `docs/passation/2026-11-05-numeros-autre-appareil.md` ; demandes du jour : `demandes-2026-11-05.md`.

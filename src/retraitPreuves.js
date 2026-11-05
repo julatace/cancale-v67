@@ -6,7 +6,7 @@
 //   · l'e-mail Vinted « ton achat t'attend » (relié à SA commande par la
 //     conversation) alors que la commande porte le n° de suivi que Mondial Relay
 //     dit « livré au destinataire » — 2 colis ;
-//   · l'e-mail Vinted gardé « Ta commande t'attend ici … Utilise le code B18948 »
+//   · l'e-mail Vinted gardé « Ta commande t'attend ici … Utilise le code B12345 »
 //     alors que la consigne Vinted Go au MÊME code de retrait est « retirée ».
 //  Un code de retrait n'existe que pour UN colis (§5, 4 oct.) ; le n° de suivi de
 //  la commande reliée est une identité (§5). Rien ici ne relie par le titre, le

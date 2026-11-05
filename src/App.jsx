@@ -43827,7 +43827,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       }
       if (garde.length !== emailList.length) emailList.splice(0, emailList.length, ...garde);
       // (5 nov.) …et PAR SON CODE DE RETRAIT (une identité, §5) : la moitié Vinted
-      // « Utilise le code B18948 » et la consigne au même code sont un colis.
+      // « Utilise le code B12345 » et la consigne au même code sont un colis.
       const parCode = fusionnerParCode(emailList, { codeDe: codeLigne, suiviDe: suiviDeLigne, score: scoreLigneRetrait, fusion: fusionLignesMemeSuivi });
       if (parCode !== emailList) {
         for (const t of parCode) if (!cmdParColis.has(colisKey(t))) { const c = commandeDuColis(t); if (c) cmdParColis.set(colisKey(t), c); }

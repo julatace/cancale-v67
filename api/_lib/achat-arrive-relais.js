@@ -141,7 +141,7 @@ export function cpDuLieu(lieu) {
 //  · `temoins` : les lignes de TRANSPORTEUR (n° de suivi) déjà vues à ce point, FINIES
 //    COMPRISES, arrivées à ±3 jours ; un colis retiré reste un témoin de son arrivée ;
 //  · le point est le même LIEU (nom propre + code postal quand les deux le donnent :
-//    « Consigne Vinted Go, Kusmi Tea, 13 Rue… » = « Kusmi Tea, 13 Rue…, 56000 Vannes »),
+//    « Consigne Vinted Go, Nom, 13 Rue… » = « Nom, 13 Rue…, 56000 Ville »),
 //    et la même adresse de réception quand les deux la connaissent ;
 //  · `sansIdentite(t, commande)` : une ligne Vinted RELIÉE à sa commande, mais dont la
 //    commande n'a aucun n° de suivi connu, n'a pas d'identité vers le transporteur : elle

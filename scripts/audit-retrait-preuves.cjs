@@ -94,7 +94,7 @@ async function controles(src, dit) {
   dit(r7.liste.length === 1, 'B8 un témoin relié à une AUTRE commande n\'est jamais son témoin');
   const k1 = A.cleLieuDoute('Consigne Vinted Go, Thé du Coin, 13 Rue Basse'), k2 = A.cleLieuDoute('Thé du Coin, 13 Rue Basse, 56000 Villec');
   dit(k1 && k2 && k1.nom === k2.nom, 'B9 « Consigne Vinted Go, Nom, rue » = « Nom, rue, CP Ville » (même lieu)', JSON.stringify([k1, k2]));
-  const k3 = A.cleLieuDoute("TAB'AVAP"), k4 = A.cleLieuDoute('TABAVAP, TABAVAP, 2 RUE BASSE, 56000 VILLEC');
+  const k3 = A.cleLieuDoute("TAB'OCAP"), k4 = A.cleLieuDoute('TABOCAP, TABOCAP, 2 RUE BASSE, 56000 VILLEC');
   dit(k3 && k4 && k3.nom === k4.nom, 'B10 apostrophe et nom répété : le même nom');
 
   // ── C. Un point écrit trois fois = un point ──────────────────────────────
