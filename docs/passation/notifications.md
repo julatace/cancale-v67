@@ -103,3 +103,7 @@ plus tard (corrigé : attente de l'état) ; (b) **réseau réellement coupé** (
 `setOffline`) : l'app rouverte par le service worker affichait « Hors ligne — aucune copie de
 ta journée » et **aucun code**, alors qu'ils étaient gardés. Corrigé : `BlocCodesHorsLigne`
 rendu aussi par « Ma journée hors ligne » sans photo.
+
+**5 nov.** : sept types (la double vente a le sien, « Compta » devient « Rappels », héritage de
+l'ancien réglage), heures calmes, regroupement, et un centre des notifications envoyées (la cloche).
+Détail : `docs/passation/2026-11-05-notifications-relances.md`.
