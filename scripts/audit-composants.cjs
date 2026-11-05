@@ -244,8 +244,9 @@ function statiques(bavard) {
   dit(/background: var\(--vrm-bg/.test(fs) && /opacity: 1;/.test(fs) && !/animation/.test(fs) && !/transition/.test(fs), '.vrm-fs : fond opaque, aucune animation ni transition (seul le JS anime `transform`)', fs.slice(0, 160));
   dit(/width: 44px; height: 44px; min-width: 44px; min-height: 44px/.test(css), 'la croix de la feuille : cible 44 × 44');
   dit(/--cr-h: 44px/.test(css), 'le champ de recherche : 44 px au doigt');
-  const rouges = (css.match(/#D70015|#FF6961|rgba\(215, ?0, ?21/gi) || []).length;
-  const rougesNum = (css.match(/\.vrm-num\[data-num-etat="doublon"\][^{]*\{[^}]*(#D70015|#FF6961)/g) || []).length;
+  // (5 nov., intégration) La pastille lit le jeton `--vrm-doublon` (une seule source du rouge).
+  const rouges = (css.match(/#D70015|#FF6961|rgba\(215, ?0, ?21|var\(--vrm-doublon\)/gi) || []).length;
+  const rougesNum = (css.match(/\.vrm-num\[data-num-etat="doublon"\][^{]*\{[^}]*(#D70015|#FF6961|var\(--vrm-doublon\))/g) || []).length;
   dit(rouges === rougesNum && rougesNum === 2, 'aucun rouge hors de la pastille N° en doublon (clair + sombre)', `${rouges} rouge(s), ${rougesNum} sur le doublon`);
   dit(/:root\[data-theme="dark"\] body \.vrm-num \{ background: #48484A; color: #F5F5F7; \}/.test(css), 'la pastille N° n\'est jamais blanche en sombre (#48484A)');
   const tailles = [...css.matchAll(/font(?:-size)?:\s*(?:\d{3}\s+)?(\d+)px/g)].map((m) => +m[1]);

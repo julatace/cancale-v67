@@ -26,11 +26,11 @@
 // les aplats Fusion gardent #0071E3 (`--fu-bleu`).
 // (5 nov., revue de cohérence 1.1 et 1.6 — chantier A) UN SEUL BLEU D'ACCENT. Deux bleus
 // vivaient côte à côte (`accent` #0066CC/#409CFF, texte NOIR en sombre, contre `--fu-bleu`
-// #0071E3/#0A84FF) : « accent » est désormais l'APLAT d'Apple (#0071E3 clair, #0A84FF
-// sombre, texte blanc `onAccent`) et `--fu-bleu` le lit ; les LIENS prennent `accentTexte`
-// (#0066CC : 5,3:1 sur le gris ; #409CFF : 5,8:1 sur #1C1C1E). Contraste du blanc sur
-// l'aplat : 4,7:1 en clair (AA) ; 3,65:1 en sombre (AA seulement pour un grand texte ou
-// une commande, comme chez Apple — mesuré par le banc `jetons-coherence`).
+// #0071E3/#0A84FF) : « accent » est désormais l'APLAT, #0071E3 dans LES DEUX thèmes
+// (texte blanc `onAccent` : 4,7:1, AA — #0A84FF en sombre ne donnait que 3,65:1), et
+// `--fu-bleu` le lit ; tout TEXTE bleu prend `accentTexte` (#0066CC : 5,3:1 sur le gris ;
+// #409CFF : 5,8:1 sur #1C1C1E) — les `color:C.accent` d'App.jsx sont passés à
+// `C.accentTexte` à l'intégration (5 nov.).
 // LE ROUGE : `danger` prend la valeur de l'ambre (`warn`) — 88 usages « danger » rougissaient
 // des erreurs, des annulations, des pertes ; le rouge n'est plus qu'au jeton `doublon`, deux
 // paires présentes sous un même N° (§5, §7). `scripts/audit-rouge-doublon.cjs` l'interdit ailleurs.
@@ -53,7 +53,7 @@ export const MINERAL = Object.freeze({
 export const MINERAL_DARK = Object.freeze({
  bg:'#000000',surface:'#1C1C1E',card:'#1C1C1E',card2:'#2C2C2E',
  border:'#38383A',text:'#F5F5F7',muted:'#98989D',faint:'#98989D',
- accent:'#0A84FF',accentTexte:'#409CFF',accentSoft:'#409CFF',onAccent:'#FFFFFF',
+ accent:'#0071E3',accentTexte:'#409CFF',accentSoft:'#409CFF',onAccent:'#FFFFFF',
  danger:'#FFB340',doublon:'#FF6961',warn:'#FFB340',warnSoft:'#2E2412',gold:'#FFB340',blue:'#98989D',purple:'#98989D',
  shadow:'none',shadowMd:'0 0 0 1px rgba(255,255,255,.05)',shadowLg:'0 0 0 1px rgba(255,255,255,.07), 0 16px 48px rgba(0,0,0,.6)',
  ring:'rgba(10,132,255,.28)',glass:'#1C1C1E',bar:'#000000',hair:'rgba(255,255,255,.08)',

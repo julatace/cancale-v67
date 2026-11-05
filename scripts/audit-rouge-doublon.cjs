@@ -37,7 +37,7 @@ const DETTE = {
   'src/styles-gestion.css': { max: 1, pourquoi: "repli de var(--vrm-danger) sur un champ invalide (jamais dessiné : la variable existe) — chantier B" },
 };
 // Ce que le code autour dit quand un doublon de N° est en jeu.
-const MARQUEUR = /conflit|\bdbl\b|numDoublons|numDbl|dv\s*===?\s*'num'|par deux|deux (paires|articles|annonces)|même numéro|tout-double|rn\.double|numeros-en-double|is-double|-double\b/i;
+const MARQUEUR = /conflit|\bdbl\b|numDoublons|numDbl|dv\s*===?\s*'num'|par deux|deux (paires|articles|annonces)|même numéro|tout-double|rn\.double|numeros-en-double|is-double|-double\b|data-num-etat="doublon"/i;
 
 const hex6 = (h) => { h = h.replace('#', ''); if (h.length === 3) h = h.split('').map((c) => c + c).join(''); return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)); };
 const hsl = ([r, g, b]) => { r /= 255; g /= 255; b /= 255; const mx = Math.max(r, g, b), mn = Math.min(r, g, b); let h = 0, s = 0; const l = (mx + mn) / 2; if (mx !== mn) { const d = mx - mn; s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn); if (mx === r) h = (g - b) / d + (g < b ? 6 : 0); else if (mx === g) h = (b - r) / d + 2; else h = (r - g) / d + 4; h *= 60; } return { h, s, l }; };

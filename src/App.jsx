@@ -2458,7 +2458,7 @@ function RangerSheet({ paires, cellNom, onPick, onLibre, onClose, apercu }) {
               ? <PhotoVinted src={p.photo} alt="" style={{width:44,height:44,borderRadius:12,objectFit:'cover',flexShrink:0,background:C.card2}}/>
               : <span style={{width:44,height:44,borderRadius:12,background:C.card2,display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,flexShrink:0}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
             <span style={{flex:'1 1 120px',minWidth:0}}>
-              <span className="vrm-display" style={{display:'block',fontSize:15,fontWeight:700,color:C.accent}}>N°{p.numero}</span>
+              <span className="vrm-display" style={{display:'block',fontSize:15,fontWeight:700,color:C.accentTexte}}>N°{p.numero}</span>
               <span style={{display:'block',fontSize:12,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.title || '—'}</span>
               {p.taille ? <span className="vrm-label" style={{color:C.muted}}>Pointure {p.taille}</span> : null}
             </span>
@@ -13035,7 +13035,7 @@ function AtelierBrouillon({ it, e, k, draft, onSave, onClose }) {
         </div>
         <div style={{ overflowY: 'auto', padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12, color: C.muted }}>
-            <span style={{ flexShrink: 0, fontWeight: 700, color: C.accent, border: `1px solid ${C.accent}`, borderRadius: 12, padding: '2px 8px' }}>N°{(e && e.numero) || '—'}</span>
+            <span style={{ flexShrink: 0, fontWeight: 700, color: C.accentTexte, border: `1px solid ${C.accent}`, borderRadius: 12, padding: '2px 8px' }}>N°{(e && e.numero) || '—'}</span>
             <span>conservé — une republication ne lui donne jamais un nouveau numéro.</span>
           </div>
           {photos.length > 0 && (
@@ -13077,7 +13077,7 @@ function AtelierBrouillon({ it, e, k, draft, onSave, onClose }) {
                 <button type="button" data-reset-photos onClick={reinitPhotos} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.muted, borderRadius: 12, padding: '5px 9px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Réinitialiser</button>
               </div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                {presets.map((p, i) => (<button key={i} type="button" data-preset-apply={p.nom} onClick={() => majActif({ ...p.r })} style={{ border: `1px solid ${C.accent}`, background: `${C.accent}12`, color: C.accent, borderRadius: 999, padding: '4px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>{p.nom}</button>))}
+                {presets.map((p, i) => (<button key={i} type="button" data-preset-apply={p.nom} onClick={() => majActif({ ...p.r })} style={{ border: `1px solid ${C.accent}`, background: `${C.accent}12`, color: C.accentTexte, borderRadius: 999, padding: '4px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>{p.nom}</button>))}
                 <input value={presetNom} onChange={ev => setPresetNom(ev.target.value)} placeholder="Nom du préréglage" data-preset-nom style={{ ...champ, flex: '1 1 120px', maxWidth: 180, padding: '6px 9px', fontSize: 12 }} />
                 <button type="button" data-preset-save onClick={enregistrerPreset} disabled={!presetNom.trim()} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: presetNom.trim() ? C.text : C.muted, borderRadius: 12, padding: '6px 10px', fontSize: 12, fontWeight: 600, cursor: presetNom.trim() ? 'pointer' : 'default', fontFamily: 'inherit' }}>Enregistrer</button>
               </div>
@@ -13220,7 +13220,7 @@ function AtelierLots({ candidats, onSave, onClose }) {
                   <input type="checkbox" data-lot-item={c.key} checked={sel.has(c.key)} onChange={() => toggle(c.key)} style={{ marginTop: 2, accentColor: C.accent, flexShrink: 0 }} />
                   <span style={{ minWidth: 0, flex: 1 }}>
                     <span style={{ display: 'flex', gap: 6, alignItems: 'baseline' }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: C.accent, flexShrink: 0 }}>N°{c.key}</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: C.accentTexte, flexShrink: 0 }}>N°{c.key}</span>
                       <span style={{ fontSize: 12, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.titre || '—'}</span>
                     </span>
                     {sel.has(c.key) && chg && (
@@ -13408,7 +13408,7 @@ function AtelierFile({ candidats, verifier, publier, majExt, onClose }) {
               {dispo.map(c => (
                 <label key={c.key} style={{ display: 'flex', gap: 9, alignItems: 'center', padding: '6px 10px', borderBottom: `1px solid ${C.border}`, cursor: 'pointer' }}>
                   <input type="checkbox" data-file-cand={c.key} checked={sel.has(c.key)} onChange={() => setSel(s => { const u = new Set(s); u.has(c.key) ? u.delete(c.key) : u.add(c.key); return u; })} style={{ accentColor: C.accent, flexShrink: 0 }} />
-                  <span style={{ fontSize: 11, fontWeight: 700, color: C.accent, flexShrink: 0 }}>N°{c.key}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: C.accentTexte, flexShrink: 0 }}>N°{c.key}</span>
                   <span style={{ fontSize: 12, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.titre || '—'}</span>
                 </label>
               ))}
@@ -13431,7 +13431,7 @@ function AtelierFile({ candidats, verifier, publier, majExt, onClose }) {
               {enFile.map((k, idx) => { const st = q.statuts[k] || 'attente'; return (
                 <div key={k} data-file-item={k} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '7px 10px', borderBottom: `1px solid ${C.border}` }}>
                   <span style={{ fontSize: 11, color: C.muted, width: 18, flexShrink: 0 }}>{idx + 1}.</span>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: C.accent, flexShrink: 0 }}>N°{k}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: C.accentTexte, flexShrink: 0 }}>N°{k}</span>
                   <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{titreDe(k)}</span>
                   <span data-file-statut={k} style={{ fontSize: 11, fontWeight: 600, flexShrink: 0, color: st === 'fait' ? C.accent : st === 'saute' || st === 'echec' ? C.warn : C.muted }}>{stLabel[st]}{(st === 'saute' || st === 'echec') && q.raisons[k] ? ` · ${q.raisons[k]}` : ''}</span>
                   {q.mode === 'idle' && st === 'attente' && <span style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
@@ -13476,8 +13476,8 @@ function AtelierFile({ candidats, verifier, publier, majExt, onClose }) {
           {/* ── commandes ─────────────────────────────── */}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             {q.mode === 'idle' && <button type="button" data-file-demarrer onClick={demarrer} disabled={!reste || (reel && !reelOk)} style={btn({ border: `1px solid ${reel ? C.warn : C.accent}`, background: reel ? `${C.warn}12` : `${C.accent}12`, color: reel ? C.warn : C.accent, padding: '10px 16px', fontSize: 13, fontWeight: 700, opacity: (reste && (!reel || reelOk)) ? 1 : 0.5, cursor: (reste && (!reel || reelOk)) ? 'pointer' : 'default' })}>{reel ? `▶ Publier pour de vrai (${reste})` : "▶ Démarrer l'essai"}</button>}
-            {q.mode === 'run' && <button type="button" data-file-pause onClick={pause} style={btn({ border: `1px solid ${C.accent}`, color: C.accent, padding: '10px 16px', fontSize: 13, fontWeight: 700 })}>⏸ Pause</button>}
-            {q.mode === 'pause' && <button type="button" data-file-reprendre onClick={reprendre} style={btn({ border: `1px solid ${C.accent}`, background: `${C.accent}12`, color: C.accent, padding: '10px 16px', fontSize: 13, fontWeight: 700 })}>▶ Reprendre</button>}
+            {q.mode === 'run' && <button type="button" data-file-pause onClick={pause} style={btn({ border: `1px solid ${C.accent}`, color: C.accentTexte, padding: '10px 16px', fontSize: 13, fontWeight: 700 })}>⏸ Pause</button>}
+            {q.mode === 'pause' && <button type="button" data-file-reprendre onClick={reprendre} style={btn({ border: `1px solid ${C.accent}`, background: `${C.accent}12`, color: C.accentTexte, padding: '10px 16px', fontSize: 13, fontWeight: 700 })}>▶ Reprendre</button>}
             {q.mode !== 'idle' && <button type="button" data-file-arreter onClick={arreter} style={btn({ padding: '10px 16px', fontSize: 13, color: C.warn })}>■ Arrêter</button>}
             {q.mode === 'idle' && enFile.length > 0 && <button type="button" data-file-vider onClick={vider} style={btn({ marginLeft: 'auto', color: C.muted })}>Vider la file</button>}
           </div>
@@ -13837,7 +13837,7 @@ function CompteRenduOperation({ onReprendre, onRefaire }) {
   const nom = (p) => `${p.num ? 'N°' + p.num + ' ' : ''}${p.titre || 'annonce'}`;
   const quand = (t) => { const d = new Date(t); return isNaN(d) ? '' : d.toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); };
   const etapeNom = (e) => { for (const l of Object.values(ETAPES_REPUB)) { const x = l.find((k) => k[0] === e); if (x) return x[1]; } return ''; };
-  const lien = { background: 'none', border: 'none', padding: 0, color: C.accent, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', fontSize: 'inherit' };
+  const lien = { background: 'none', border: 'none', padding: 0, color: C.accentTexte, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', fontSize: 'inherit' };
   // (30 oct.) « Tout doit être plus clair » : un titre qui dit ce qui s'est passé,
   // le compte en une ligne, la paire en cours (le point qui demande de regarder),
   // et le détail des noms replié. Deux gestes : reprendre, effacer.
@@ -14972,7 +14972,7 @@ function PhotoEditor({ refPhoto, refTitle, onClose, toast }) {
                   <PhotoVinted src={refPhoto} alt="" style={{width:110,height:'auto',borderRadius:12,border:`1px solid ${C.border}`}}/>
                 </div>
               )}
-              <label style={{display:'inline-flex',alignItems:'center',gap:8,border:`1px solid ${C.accent}`,background:C.accent+'12',color:C.accent,borderRadius:12,fontSize:15,fontWeight:700,padding:'13px 18px',cursor:'pointer'}}>
+              <label style={{display:'inline-flex',alignItems:'center',gap:8,border:`1px solid ${C.accent}`,background:C.accent+'12',color:C.accentTexte,borderRadius:12,fontSize:15,fontWeight:700,padding:'13px 18px',cursor:'pointer'}}>
                 📷 Choisir une photo
                 <input type="file" accept="image/*" onChange={onFile} style={{display:'none'}}/>
               </label>
@@ -15246,7 +15246,7 @@ function BoutonTraduire({ texte }) {
   if (etat === 'fait') return <div data-traduit={langue} style={{marginTop:4,fontSize:13,color:C.muted,fontStyle:'italic',whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{trad}<span style={{display:'block',fontSize:11,fontStyle:'normal',marginTop:2}}>traduit de {NOM_LANGUE[langue] || langue}</span></div>;
   if (etat === 'deja') return <div data-traduit="fr" style={{marginTop:3,fontSize:11,color:C.muted}}>déjà en français</div>;
   if (etat === 'ko') return <div style={{marginTop:3,fontSize:11,color:C.muted}}>traduction indisponible sur cet appareil</div>;
-  return <button type="button" data-traduire onClick={lancer} style={{marginTop:3,fontSize:11,fontWeight:600,color:C.accent,background:'transparent',border:'none',padding:0,cursor:etat==='charge'?'default':'pointer',fontFamily:'inherit'}}>{etat === 'charge' ? 'traduction…' : 'Traduire'}</button>;
+  return <button type="button" data-traduire onClick={lancer} style={{marginTop:3,fontSize:11,fontWeight:600,color:C.accentTexte,background:'transparent',border:'none',padding:0,cursor:etat==='charge'?'default':'pointer',fontFamily:'inherit'}}>{etat === 'charge' ? 'traduction…' : 'Traduire'}</button>;
 }
 // ══════════════════════════════════════════════════════════════════════════════
 // MESSAGES EN VOLETS — LA COMPOSITION PARTAGÉE (1er nov.)
@@ -15301,7 +15301,7 @@ function CadreFil({ etiquette, onFermer, refPanneau, attrs, children }) {
 function TeteFil({ onFermer, photo, nom, sensible = false, titre, compte, title, libelleFermer = 'Fermer la conversation', children }) {
   return (
     <div className="vrm-chat-head" style={{borderBottom:`1px solid ${C.border}`,background:C.card}} title={title}>
-      <button type="button" className="vrm-chat-back" aria-label={libelleFermer} onClick={onFermer} style={{color:C.accent}}>
+      <button type="button" className="vrm-chat-back" aria-label={libelleFermer} onClick={onFermer} style={{color:C.accentTexte}}>
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
       {photo?<PhotoVinted src={photo} alt="" style={{width:36,height:36,borderRadius:12,objectFit:'cover',flexShrink:0}}/>:<span className="vrm-chat-head-ph" style={{background:C.card2||C.bg,color:C.muted}}><Icon name="chat" size={17}/></span>}
@@ -15784,7 +15784,7 @@ function ReceptionEmails({ tracking, comptes, colisParTransporteur }) {
               <CarrierBadge carrier={k} size={18}/>
               <div style={{flex:1,minWidth:0,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
                 {carrierName(k)}
-                {nColis>0 && <b style={{color:C.accent}}> · {nColis} colis à retirer</b>}
+                {nColis>0 && <b style={{color:C.accentTexte}}> · {nColis} colis à retirer</b>}
               </div>
               <div style={{color:v.ts?(Date.now()-v.ts<3*86400000?(C.ok||C.accent):C.warn):(aucunEmailDeSuivi?C.muted:C.danger),fontWeight:600,flexShrink:0,textAlign:'right'}}>
                 {v.ts ? `${v.n} email${v.n>1?'s':''} · ${age(v.ts)}` : aucunEmailDeSuivi ? 'rien encore' : 'aucun email reçu'}
@@ -16910,7 +16910,7 @@ function MonthDetail({mois,type,C,fmt,catMap,catalog,onClose}){
       </div>
       <div style={{display:'flex',gap:16,marginBottom:12,fontSize:12}}>
         <span style={{color:C.text}}>CA : <b>{fmt(totalCA)}</b></span>
-        <span style={{color:C.accent}}>Bénéfice : <b>{fmt(totalProfit)}</b></span>
+        <span style={{color:C.accentTexte}}>Bénéfice : <b>{fmt(totalProfit)}</b></span>
       </div>
       <div style={{maxHeight:260,overflowY:'auto'}}>
         {ventes.map((v,i)=>{
@@ -17134,7 +17134,7 @@ function PorteMfa({ session }) {
               {plusieurs
                 ? <><b style={{color:C.text}}>Un appareil perdu ou changé ?</b> Entre avec le code d'un AUTRE de tes appareils, puis retire celui qui est perdu dans Paramètres → Mon compte → Double vérification.</>
                 : <><b style={{color:C.text}}>Plus accès à ton app (téléphone perdu ou changé) ?</b> La double vérification ne se retire pas depuis cet écran. Écris à VRM depuis l'adresse email de ton compte : {contact
-                  ? <a href={`mailto:${contact}`} style={{color:C.accent,textDecoration:'none'}}>{contact}</a>
+                  ? <a href={`mailto:${contact}`} style={{color:C.accentTexte,textDecoration:'none'}}>{contact}</a>
                   : <span data-contact-absent="">{CONTACT_A_VENIR}</span>}.</>}
             </div>
           </>)}
@@ -17452,7 +17452,7 @@ function AuthScreen() {
           {(mode==='in'||mode==='up') && moyensConnexion.statut==='chargement' && <div role="status" style={{fontSize:12,color:C.muted,lineHeight:1.5,marginBottom:12}}>Chargement des autres moyens de connexion… Tu peux déjà utiliser ton email.</div>}
           {(mode==='in'||mode==='up') && moyensConnexion.statut==='erreur' && <div data-auth-moyens-indisponibles="" style={{fontSize:12,color:C.text,lineHeight:1.5,marginBottom:14,padding:'10px 12px',border:`1px solid ${C.border}`,borderRadius:12}}>
             Les autres moyens de connexion n’ont pas pu être chargés. L’email reste disponible.
-            <button type="button" disabled={busy} onClick={()=>loadAuthSettings()} style={{display:'block',minHeight:44,padding:'8px 0 0',border:0,background:'transparent',color:C.accent,font:'inherit',fontWeight:600,cursor:busy?'default':'pointer'}}>Réessayer les moyens de connexion</button>
+            <button type="button" disabled={busy} onClick={()=>loadAuthSettings()} style={{display:'block',minHeight:44,padding:'8px 0 0',border:0,background:'transparent',color:C.accentTexte,font:'inherit',fontWeight:600,cursor:busy?'default':'pointer'}}>Réessayer les moyens de connexion</button>
           </div>}
 
           {/* Connexion par Google / Discord, EN PREMIER : c'est le chemin le plus
@@ -17570,9 +17570,9 @@ function AuthScreen() {
               </details>
             </div>
           )}
-          {info && <div role="status" aria-live="polite" style={{fontSize:13,color:C.accent,background:`${C.accent}12`,border:`1px solid ${C.accent}44`,borderRadius:12,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{info}</div>}
+          {info && <div role="status" aria-live="polite" style={{fontSize:13,color:C.accentTexte,background:`${C.accent}12`,border:`1px solid ${C.accent}44`,borderRadius:12,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{info}</div>}
 
-          {mode==='reset' && <div data-auth-recuperation-secours style={{fontSize:12,lineHeight:1.5,marginBottom:12,color:C.muted}}>Tu as déjà un lien qui ne s’ouvre pas ? <a href="/recuperation.html" style={{color:C.accent}}>Ouvrir la récupération dans VRM</a>, puis colle le lien reçu.</div>}
+          {mode==='reset' && <div data-auth-recuperation-secours style={{fontSize:12,lineHeight:1.5,marginBottom:12,color:C.muted}}>Tu as déjà un lien qui ne s’ouvre pas ? <a href="/recuperation.html" style={{color:C.accentTexte}}>Ouvrir la récupération dans VRM</a>, puis colle le lien reçu.</div>}
           {/* L'attente ne porte que sur ce qui ENVOIE un email (inscription, lien de
               mot de passe) — jamais sur « Se connecter ». */}
           {(()=>{ const bloque = busy || attendCaptcha || (enAttenteEmail && (mode==='up'||mode==='reset')); return (
@@ -17585,8 +17585,8 @@ function AuthScreen() {
               collecte). */}
           {mode==='up' && (
             <div style={{fontSize:12,color:C.muted,lineHeight:1.5,marginTop:10,textAlign:'center'}}>
-              En créant ton compte, tu acceptes les <a href="/legal/cgu.html" target="_blank" rel="noopener" style={{color:C.accent}}>conditions d’utilisation</a> et
-              tu as pris connaissance de la <a href="/legal/confidentialite.html" target="_blank" rel="noopener" style={{color:C.accent}}>politique de confidentialité</a>.
+              En créant ton compte, tu acceptes les <a href="/legal/cgu.html" target="_blank" rel="noopener" style={{color:C.accentTexte}}>conditions d’utilisation</a> et
+              tu as pris connaissance de la <a href="/legal/confidentialite.html" target="_blank" rel="noopener" style={{color:C.accentTexte}}>politique de confidentialité</a>.
             </div>
           )}
 
@@ -17597,7 +17597,7 @@ function AuthScreen() {
                 sa comptabilité. Le lien réapparaît seul après la migration. */}
             {mode!=='reset' && ((CLOISONNE || mode==='up') ? (
               <button type="button" disabled={busy} onClick={()=>changerMode(mode==='up'?'in':'up')}
-                style={{border:'none',background:'transparent',color:C.accent,fontSize:15,fontWeight:600,cursor:'pointer',padding:0,fontFamily:'inherit'}}>
+                style={{border:'none',background:'transparent',color:C.accentTexte,fontSize:15,fontWeight:600,cursor:'pointer',padding:0,fontFamily:'inherit'}}>
                 {mode==='up' ? 'J\'ai déjà un compte' : 'Créer un compte'}
               </button>
             ) : (
@@ -17774,7 +17774,7 @@ function BandeauConfirmationAdresse({ onVoir }) {
     : c.etat === 'perime' ? <>Ce lien a expiré (il vaut 72 heures) : demande-en un nouveau.{voir}</>
     : c.etat === 'inconnu' ? <>Ce lien ne correspond à aucune demande de ce compte VRM : ouvre-le en étant connecté avec le compte qui a ajouté l'adresse.</>
     : c.etat === 'refus' ? <>{c.message || "Ce lien n'a pas pu servir."}{voir}</>
-    : <>Je n'ai pas pu confirmer ton adresse pour l'instant (le serveur ne répond pas) — rien n'est perdu. <button type="button" onClick={() => confirmerAdresseParLien()} style={{ border: 'none', background: 'transparent', color: C.accent, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, padding: 0 }}>Réessayer</button></>;
+    : <>Je n'ai pas pu confirmer ton adresse pour l'instant (le serveur ne répond pas) — rien n'est perdu. <button type="button" onClick={() => confirmerAdresseParLien()} style={{ border: 'none', background: 'transparent', color: C.accentTexte, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, padding: 0 }}>Réessayer</button></>;
   const fermable = c.etat !== 'attente' && c.etat !== 'encours';
   return (
     <div className="vrm-tete-row">
@@ -17978,10 +17978,10 @@ function BaseInjoignable() {
             {ref && <>
               <br/><br/>
               <a href={`https://supabase.com/dashboard/project/${ref}`} target="_blank" rel="noreferrer"
-                 style={{color:C.accent,fontWeight:600}}>Ouvrir mon projet sur supabase.com</a>
+                 style={{color:C.accentTexte,fontWeight:600}}>Ouvrir mon projet sur supabase.com</a>
               {' · '}
               <a href={`https://supabase.com/dashboard/project/${ref}/settings/general`} target="_blank" rel="noreferrer"
-                 style={{color:C.accent,fontWeight:600}}>aller directement au bouton Restart</a>
+                 style={{color:C.accentTexte,fontWeight:600}}>aller directement au bouton Restart</a>
             </>}
             <br/><br/>
             Tant que ce n'est pas réglé, les emails Vinted qui arrivent ne peuvent pas être rangés.
@@ -18509,13 +18509,13 @@ function BoutonBordereau({ uid, tx, conv, login, aGenerer, pdf, onImprimer, onFa
           téléchargé depuis la vente sera relié à ELLE (une identité, §5). */}
       {ko && job.etape === 'genere_sans_pdf' && (
         <a href={surVinted} target="_blank" rel="noreferrer"
-          style={{ fontSize: 12, color: C.accent, fontWeight: 600, textDecoration: 'none' }}>
+          style={{ fontSize: 12, color: C.accentTexte, fontWeight: 600, textDecoration: 'none' }}>
           Ouvrir la vente sur Vinted et télécharger le PDF ↗
         </a>
       )}
       {repliVinted && !(ko && job.etape === 'genere_sans_pdf') && (
         <a data-bord-vinted={tx} href={surVinted} target="_blank" rel="noreferrer"
-          style={{ fontSize: 12, color: C.accent, fontWeight: 600, textDecoration: 'none' }}>sur Vinted ↗</a>
+          style={{ fontSize: 12, color: C.accentTexte, fontWeight: 600, textDecoration: 'none' }}>sur Vinted ↗</a>
       )}
     </span>
   );
@@ -19580,7 +19580,7 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
           : <>Cette première étape se passe <b style={{color:C.text}}>sur un ordinateur</b>&nbsp;: c’est là que vit l’extension, et ton appareil n’en accepte pas. Ouvre </>}
         <b style={{color:C.text}}>vrm.center</b> dans le navigateur de ton ordinateur — tu y retrouveras exactement cet écran, avec la marche à suivre. Une fois que c’est fait, tout revient ici tout seul{mobile === 'ios' ? <span data-premiers-relais="ios">, et depuis ton iPhone tu pourras faire agir l’extension de l’ordinateur allumé (bordereaux, réponses, publication)</span> : null}.
       </p>}
-      {mobile === 'ios-orion' && <p style={{margin:'10px 0 0'}} data-premiers-orion="dans-orion">Le paquet pour <b style={{color:C.text}}>Orion sur iPhone et iPad</b> est disponible ci-dessous. Importe-le depuis le menu Extensions d’Orion, puis autorise VRM sur les sites utilisés. <a href={NOTICE_ORION} target="_blank" rel="noreferrer" style={{color:C.accent}}>Voir les étapes</a>. Le fonctionnement sur ton appareil reste à vérifier.</p>}
+      {mobile === 'ios-orion' && <p style={{margin:'10px 0 0'}} data-premiers-orion="dans-orion">Le paquet pour <b style={{color:C.text}}>Orion sur iPhone et iPad</b> est disponible ci-dessous. Importe-le depuis le menu Extensions d’Orion, puis autorise VRM sur les sites utilisés. <a href={NOTICE_ORION} target="_blank" rel="noreferrer" style={{color:C.accentTexte}}>Voir les étapes</a>. Le fonctionnement sur ton appareil reste à vérifier.</p>}
       {orion && mobile === 'ios' && <p style={{margin:'10px 0 0'}} data-premiers-orion="telephone">Sur iPhone, le navigateur <b style={{color:C.text}}>Orion</b> (gratuit) peut aussi installer l’extension depuis sa boutique — VRM n’y a pas encore été essayé&nbsp;: si l’écran n’avance pas, passe par l’ordinateur.</p>}
     </>
   ) : boutique.lien ? (
@@ -19926,7 +19926,7 @@ function PrixMarche({ data, baseKO }) {
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '11px 14px', boxShadow: C.shadow || 'none' }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: C.text, textTransform: 'capitalize' }}>
-                  {gr.modele} <span style={{ color: C.accent, fontWeight: 700, textTransform: 'none' }}>T{gr.taille}</span>
+                  {gr.modele} <span style={{ color: C.accentTexte, fontWeight: 700, textTransform: 'none' }}>T{gr.taille}</span>
                 </div>
                 <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
                   {gr.n} vente{gr.n > 1 ? 's' : ''} · de {eur2(gr.min)} à {eur2(gr.max)} €{gr.stock > 0 ? ` · ${gr.stock} en stock` : ''}
@@ -20680,7 +20680,7 @@ function EtatSuiviVinted({ achats, suivisVinted, etatDe, accName, relire }) {
   const aLire = Array.isArray(achats) && achats.length > 0 && suivisVinted != null;
   React.useEffect(() => { if (!aLire) return; let stop = false; lireFormesSuivi().then((f) => { if (!stop) setFormes(f); }); return () => { stop = true; }; }, [aLire, suivisVinted]);
   if (!Array.isArray(achats) || !achats.length || suivisVinted === undefined) return null;
-  const bouton = { border: 'none', background: 'transparent', color: C.accent, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0, minHeight: 44 };
+  const bouton = { border: 'none', background: 'transparent', color: C.accentTexte, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0, minHeight: 44 };
   if (suivisVinted === null) return <div data-suivi-vinted-etat="passu" style={{fontSize:12,color:C.muted,margin:'0 0 10px',lineHeight:1.45}}>Le suivi Vinted de tes achats n'a pas pu être lu — la base n'a pas répondu ; rien n'est perdu. <Bouton variante="discret" onClick={relire}>Réessayer</Bouton></div>;
   const aucune = achats.filter((o) => etatDe(o) === 'aucune');
   const sansDate = achats.filter((o) => etatDe(o) === 'sans-date');
@@ -21064,7 +21064,7 @@ function GardeEcranAllume() {
 function QrColis({ url, size = 88 }) {
   const [ko, setKo] = React.useState(false);
   if (!url || !/^https?:\/\//.test(String(url))) return null;
-  if (ko) return <a href={url} target="_blank" rel="noreferrer" style={{ flexShrink: 0, width: size, height: size, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', border: `1px solid ${C.border}`, borderRadius: 12, background: C.bg, color: C.accent, fontSize: 11, fontWeight: 700, textDecoration: 'none', padding: 6 }}>Voir le QR ↗</a>;
+  if (ko) return <a href={url} target="_blank" rel="noreferrer" style={{ flexShrink: 0, width: size, height: size, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', border: `1px solid ${C.border}`, borderRadius: 12, background: C.bg, color: C.accentTexte, fontSize: 11, fontWeight: 700, textDecoration: 'none', padding: 6 }}>Voir le QR ↗</a>;
   return <a href={url} target="_blank" rel="noreferrer" style={{ flexShrink: 0, lineHeight: 0 }}><img src={url} alt="QR du colis" data-stream-image="code" width={size} height={size} onError={() => setKo(true)} style={{ width: size, height: size, borderRadius: 12, background: '#fff', border: `1px solid ${C.border}`, objectFit: 'contain' }} /></a>;
 }
 // ── LEBONCOIN · COLIS — à envoyer (bordereau + QR), puis déjà postés ─────────
@@ -21215,7 +21215,7 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
                 </div>
                 {badgeNum(n)}
                 {estFait(o) && !lbcExpediee(o) && <button type="button" onClick={() => toggleFait(o)} title="Remettre dans les colis à poster" style={{ flexShrink: 0, border: 'none', background: 'transparent', color: C.muted, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>↺ Pas encore</button>}
-                {lbl.trackingUrl && <a href={lbl.trackingUrl} target="_blank" rel="noreferrer" style={{ flexShrink: 0, color: C.accent, fontWeight: 700, fontSize: 12, textDecoration: 'none' }}>Suivre ↗</a>}
+                {lbl.trackingUrl && <a href={lbl.trackingUrl} target="_blank" rel="noreferrer" style={{ flexShrink: 0, color: C.accentTexte, fontWeight: 700, fontSize: 12, textDecoration: 'none' }}>Suivre ↗</a>}
               </div>
             ); })}
           </Card>
@@ -22748,7 +22748,7 @@ function PhotosEbayEditeur({ urls, envois, places, message, onUrls, onAjouter, o
                 <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, fontSize: 11, textAlign: 'center', background: 'rgba(0,0,0,.6)', color: '#fff', padding: '2px 0', fontWeight: 600 }}>{e.etat === 'envoi' ? 'Envoi à eBay…' : 'Pas envoyée'}</span>
                 {e.etat === 'echec' && <button type="button" data-ebay-photo-envoi-retirer="" onClick={() => onRetirerEnvoi(e)} aria-label="Retirer cette photo" style={croix}><span style={rond}>×</span></button>}
               </div>
-              {e.etat === 'echec' && <button type="button" data-ebay-photo-reessayer="" onClick={() => onReessayer(e)} style={{ width: '100%', height: 44, border: 'none', background: 'transparent', color: C.accent, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Réessayer</button>}
+              {e.etat === 'echec' && <button type="button" data-ebay-photo-reessayer="" onClick={() => onReessayer(e)} style={{ width: '100%', height: 44, border: 'none', background: 'transparent', color: C.accentTexte, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Réessayer</button>}
             </div>
           ))}
         </div>
@@ -23298,7 +23298,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
     <div ref={racine} data-publier-brouillon-id={brouillonId || ''} style={{ marginTop: 10, border: `1px solid ${C.border}`, borderRadius: 14, background: C.bg || C.card, overflow: 'hidden', boxShadow: C.shadow, scrollMarginTop: 12 }}>
       {/* En-tête façon feuille de vente eBay */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', background: C.card, borderBottom: `1px solid ${C.border}` }}>
-        <span style={{ flexShrink: 0, width: 32, height: 32, borderRadius: 12, background: `${C.accent}15`, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="tag" size={17}/></span>
+        <span style={{ flexShrink: 0, width: 32, height: 32, borderRadius: 12, background: `${C.accent}15`, color: C.accentTexte, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="tag" size={17}/></span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 15, fontWeight: 800, color: C.text }}>Vendre sur eBay</div>
           <div style={{ fontSize: 12, color: C.muted }}>{brouillonId ? 'Brouillon enregistré — modifie-le, enregistre-le ou publie-le' : 'Ton annonce, comme sur eBay — vérifiée avant publication'}</div>
@@ -23308,7 +23308,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
 
       {res && res.ok ? (
         <div style={{ padding: 20, textAlign: 'center' }}>
-          <div style={{ width: 52, height: 52, margin: '0 auto 12px', borderRadius: 24, background: `${C.accent}15`, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28 }}>✓</div>
+          <div style={{ width: 52, height: 52, margin: '0 auto 12px', borderRadius: 24, background: `${C.accent}15`, color: C.accentTexte, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28 }}>✓</div>
           <div style={{ fontSize: 17, fontWeight: 800, color: C.text, marginBottom: 4 }}>Annonce publiée sur eBay{res.compte ? <span data-publie-compte={res.compte}> · {res.compte}</span> : null}</div>
           <div style={{ fontSize: 13, color: C.muted, marginBottom: res.sku ? 4 : 14 }}>N° {res.itemId}</div>
           {/* Le lien à la paire se DIT : c'est lui qui fera apparaître « vendue
@@ -23354,7 +23354,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
 
           {/* 1 — LA PAIRE : on CHOISIT une paire (comme sur eBay on choisit son
               objet), ses photos partent toutes seules — plus aucun lien à coller. */}
-          <BlocEbay n="1" titre="L'article à vendre" right={pairSel ? <button type="button" onClick={() => setPickerOpen(true)} style={{ border: 'none', background: 'transparent', color: C.accent, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Changer</button> : null}>
+          <BlocEbay n="1" titre="L'article à vendre" right={pairSel ? <button type="button" onClick={() => setPickerOpen(true)} style={{ border: 'none', background: 'transparent', color: C.accentTexte, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Changer</button> : null}>
             {(!pairSel || pickerOpen) ? (
               paires.length === 0 ? (
                 <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Aucun article numéroté n'est encore chargé sur cet appareil. Ouvre l'écran <b>Annonces</b> une fois (sur l'ordinateur où l'extension tourne) : tes articles — avec leurs photos — apparaîtront ici.</div>
@@ -23368,7 +23368,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
                     <button type="button" data-choix-paire={p.num} onClick={() => choisirPaire(p)} style={{ display: 'flex', flex: 1, minWidth: 0, minHeight: 64, alignItems: 'center', gap: 11, textAlign: 'left', border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '8px 10px', cursor: 'pointer', fontFamily: 'inherit' }}>
                       {p.cover ? <PhotoVinted src={p.cover} alt="" loading="lazy" style={{ width: 46, height: 46, borderRadius: 12, objectFit: 'cover', flexShrink: 0, background: C.bg }} /> : <span style={{ width: 46, height: 46, borderRadius: 12, background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                       <span style={{ flex: 1, minWidth: 0 }}>
-                        <span className="vrm-display" style={{ display: 'block', fontSize: 15, fontWeight: 700, color: C.accent }}>N°{p.num}</span>
+                        <span className="vrm-display" style={{ display: 'block', fontSize: 15, fontWeight: 700, color: C.accentTexte }}>N°{p.num}</span>
                         <span style={{ display: 'block', fontSize: 13, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.title || 'Titre pas encore capté'}</span>
                         <span style={{ fontSize: 11, color: C.muted }}>{p.taille ? `Pointure ${p.taille} · ` : ''}{p.photos.length} photo{p.photos.length > 1 ? 's' : ''}{(() => { const k = cleNum(p.num); const ou = ventes && ventes.vendus && typeof ventes.vendus.get === 'function' ? ventes.vendus.get(k) : null; const deja = dejaSurEbay && typeof dejaSurEbay.get === 'function' ? dejaSurEbay.get(k) : null;
                           const jm = jumelles.get(String(p.id));
@@ -23383,7 +23383,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
             ) : (<>
               {/* Paire choisie : son N° et son titre ; ses photos sont dans le bloc « Photos » (5 nov.). */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                <span className="vrm-display" style={{ fontSize: 13, fontWeight: 800, color: C.accent }}>N°{pairSel.num}</span>
+                <span className="vrm-display" style={{ fontSize: 13, fontWeight: 800, color: C.accentTexte }}>N°{pairSel.num}</span>
                 <span style={{ fontSize: 13, color: C.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pairSel.title}</span>
               </div>
               {nVinted === 0 && (
@@ -23420,12 +23420,12 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
                 branchée — sinon le titre reste celui de la paire, déjà rempli. */}
             {/* Bouton IA retiré le 30 septembre (rédaction IA abandonnée). */}
             {false && aiPret && (
-              <button type="button" onClick={titreIA} disabled={aiBusy} style={{ marginTop: 8, width: '100%', border: `1px solid ${C.accent}`, background: `${C.accent}0d`, color: C.accent, borderRadius: 12, padding: '10px 14px', fontSize: 13, fontWeight: 700, cursor: aiBusy ? 'default' : 'pointer', fontFamily: 'inherit', opacity: aiBusy ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>{aiBusy ? 'L\'IA rédige…' : '✨ Optimiser le titre avec l\'IA'}</button>
+              <button type="button" onClick={titreIA} disabled={aiBusy} style={{ marginTop: 8, width: '100%', border: `1px solid ${C.accent}`, background: `${C.accent}0d`, color: C.accentTexte, borderRadius: 12, padding: '10px 14px', fontSize: 13, fontWeight: 700, cursor: aiBusy ? 'default' : 'pointer', fontFamily: 'inherit', opacity: aiBusy ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>{aiBusy ? 'L\'IA rédige…' : '✨ Optimiser le titre avec l\'IA'}</button>
             )}
             {aiWhy && <div style={{ fontSize: 12, color: C.muted, marginTop: 6, lineHeight: 1.45 }}>✨ {aiWhy}</div>}
             <div style={{ marginTop: 10 }}>
               {!cat ? (
-                <button type="button" onClick={() => analyser()} disabled={analyse || !titre.trim()} style={{ width: '100%', border: `1px solid ${C.accent}`, background: `${C.accent}12`, color: C.accent, borderRadius: 12, padding: '11px 14px', fontSize: 13, fontWeight: 700, cursor: (analyse || !titre.trim()) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (analyse || !titre.trim()) ? 0.5 : 1 }}>{analyse ? 'eBay cherche la catégorie…' : 'Trouver la catégorie eBay'}</button>
+                <button type="button" onClick={() => analyser()} disabled={analyse || !titre.trim()} style={{ width: '100%', border: `1px solid ${C.accent}`, background: `${C.accent}12`, color: C.accentTexte, borderRadius: 12, padding: '11px 14px', fontSize: 13, fontWeight: 700, cursor: (analyse || !titre.trim()) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (analyse || !titre.trim()) ? 0.5 : 1 }}>{analyse ? 'eBay cherche la catégorie…' : 'Trouver la catégorie eBay'}</button>
               ) : (<>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: `${C.accent}0d`, border: `1px solid ${C.border}`, borderRadius: 12, padding: '9px 12px' }}>
                   <Icon name="check" size={15} />
@@ -23458,14 +23458,14 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(148px,1fr))', gap: 10 }}>
                 <div><label style={lab}>État</label><select value={cond} onChange={e => { setCond(e.target.value); setCheck(null); }} style={inp}>{(cat.conditions && cat.conditions.length ? cat.conditions.map(c => [c.id, c.label]) : EBAY_CONDITIONS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
                 {(cat.attributs || []).filter(a => a.requis).map(a => (
-                  <div key={a.nom}><label style={lab}>{a.nom} <span style={{ color: C.accent }}>✳</span></label>{champAttr(a)}</div>
+                  <div key={a.nom}><label style={lab}>{a.nom} <span style={{ color: C.accentTexte }}>✳</span></label>{champAttr(a)}</div>
                 ))}
               </div>
               {(() => {
                 const opt = (cat.attributs || []).filter(a => !a.requis);
                 if (!opt.length) return null;
                 return (<>
-                  <button type="button" onClick={() => setPlusAttr(v => !v)} style={{ marginTop: 12, border: 'none', background: 'transparent', color: C.accent, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>{plusAttr ? '− Moins de caractéristiques' : `+ Plus de caractéristiques (${opt.length})`}</button>
+                  <button type="button" onClick={() => setPlusAttr(v => !v)} style={{ marginTop: 12, border: 'none', background: 'transparent', color: C.accentTexte, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>{plusAttr ? '− Moins de caractéristiques' : `+ Plus de caractéristiques (${opt.length})`}</button>
                   {plusAttr && (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(148px,1fr))', gap: 10, marginTop: 10 }}>
                       {opt.map(a => (<div key={a.nom}><label style={lab}>{a.nom}</label>{champAttr(a)}</div>))}
@@ -23505,7 +23505,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
                   Donc le choix du transporteur se fait DANS eBay (pas dans VRM), et
                   eBay fixe le prix. VRM publie sans toucher à la livraison. */}
               <div style={{ marginTop: 12, display: 'flex', gap: 11, alignItems: 'flex-start', background: `${C.accent}0D`, border: `1px solid ${C.accent}`, borderRadius: 12, padding: '12px 13px' }}>
-                <Icon name="box" size={20} style={{ color: C.accent, flexShrink: 0, marginTop: 1 }} />
+                <Icon name="box" size={20} style={{ color: C.accentTexte, flexShrink: 0, marginTop: 1 }} />
                 <div style={{ minWidth: 0, fontSize: 13, color: C.text, lineHeight: 1.5 }}>
                   <b>La livraison est gérée par eBay.</b> Le <b>transporteur</b> (Mondial Relay, Chronopost, Colissimo…) se choisit <b>dans eBay</b>, et c'est <b>eBay</b> qui fixe le montant, l'encaisse et te fournit le bordereau. <span className="vrm-aide" style={{ color: C.muted }}>VRM publie l'annonce sans toucher à la livraison — tu ne paies jamais le port. (eBay refuse qu'une appli fixe le transporteur ou le prix à sa place : vérifié.)</span>
                 </div>
@@ -24026,7 +24026,7 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
               if (solde && solde.reason === 'scope') return (
                 <div key={cpt.ref} style={{ border: `1px solid ${C.warn}`, background: `${C.warn}10`, borderRadius: 12, padding: '10px 12px', marginBottom: 10, fontSize: 13, color: C.text, lineHeight: 1.5 }}>
                   L'accès aux paiements{nomS} n'est pas autorisé. Tes annonces et ventes restent accessibles.
-                  <div style={{ marginTop: 8 }}><button type="button" onClick={() => connecter(!cpt.principal)} disabled={busy} style={{ border: `1px solid ${C.accent}`, background: `${C.accent}12`, color: C.accent, borderRadius: 12, padding: '8px 12px', fontSize: 13, fontWeight: 700, cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit', opacity: busy ? 0.6 : 1 }}>{busy ? 'Ouverture d\'eBay…' : 'Autoriser les paiements'}</button></div>
+                  <div style={{ marginTop: 8 }}><button type="button" onClick={() => connecter(!cpt.principal)} disabled={busy} style={{ border: `1px solid ${C.accent}`, background: `${C.accent}12`, color: C.accentTexte, borderRadius: 12, padding: '8px 12px', fontSize: 13, fontWeight: 700, cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit', opacity: busy ? 0.6 : 1 }}>{busy ? 'Ouverture d\'eBay…' : 'Autoriser les paiements'}</button></div>
                 </div>
               );
               if (solde && solde.ok && (solde.dispo != null || solde.retenu != null || solde.enAttente != null)) {
@@ -27442,7 +27442,7 @@ function ClePhotoroom({ cadre = true }) {
           <span style={{ display: 'block' }}>1. Connecte-toi sur Photoroom.</span>
           <span style={{ display: 'block' }}>2. « API dashboard » → « API keys ».</span>
           <span style={{ display: 'block' }}>3. Copie la clé et colle-la ici.</span>
-          <a data-photoroom-lien="" href={LIEN_CLE} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, color: C.accent, fontWeight: 600, textDecoration: 'none' }}>Ouvrir Photoroom ↗</a>
+          <a data-photoroom-lien="" href={LIEN_CLE} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, color: C.accentTexte, fontWeight: 600, textDecoration: 'none' }}>Ouvrir Photoroom ↗</a>
         </>, 'trouver')}
       </div>
       </details>
@@ -27582,7 +27582,7 @@ function AnnoncesVestiaire() {
   const geste = <>ouvre <b style={{ color: C.text }}>« Mes articles »</b> sur vestiairecollective.com, dans le navigateur où l'extension VRM est installée</>;
   let corps;
   if (d === undefined) corps = <div data-vc-annonces="charge" style={style}>Lecture de tes annonces Vestiaire…</div>;
-  else if (d === null) corps = <div data-vc-annonces="pas-su" style={style}>Je n'ai pas pu lire tes annonces Vestiaire — rien n'est perdu, c'est la lecture qui a échoué. <button type="button" className="vrm-lien-action" data-vc-annonces-relire="" onClick={() => { setD(undefined); relire(); }} style={{ background: 'none', border: 'none', color: C.accent, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', minHeight: 44, padding: 0 }}>Réessayer</button></div>;
+  else if (d === null) corps = <div data-vc-annonces="pas-su" style={style}>Je n'ai pas pu lire tes annonces Vestiaire — rien n'est perdu, c'est la lecture qui a échoué. <button type="button" className="vrm-lien-action" data-vc-annonces-relire="" onClick={() => { setD(undefined); relire(); }} style={{ background: 'none', border: 'none', color: C.accentTexte, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', minHeight: 44, padding: 0 }}>Réessayer</button></div>;
   // (5.299) Vestiaire a répondu, mais dans une forme que l'extension ne sait pas encore lire : on le DIT (jamais « aucune annonce »).
   else if (d.inconnu && !(d.items && Object.keys(d.items).length)) corps = <div data-vc-annonces="format" style={style}>Vestiaire a bien répondu quand tu as ouvert tes articles, mais dans une forme que VRM ne sait pas encore lire : <b style={{ color: C.text }}>aucune annonce n'est devinée</b>. La forme de la réponse est gardée (sans aucune valeur) pour que la prochaine mise à jour de l'extension la lise.</div>;
   else if (!d.items || !d.capturedAt) corps = <div data-vc-annonces="jamais" style={style}>Tes annonces Vestiaire n'ont pas encore été lues : {geste}{extSait('vcfiche') === 'retard' ? <> — mise à jour en <b>{EXT_CAPACITES.vcfiche}</b> d'abord</> : ''}. Elle les lit en passant, sans rien cliquer.</div>;
@@ -27990,7 +27990,7 @@ function PublierVestiaire({ comptes }) {
                 return (
                   <div data-vc-etiq={k ? (i >= 0 ? 'choisie' : 'introuvable') : 'pas-choisie'} style={{ fontSize: 12, color: C.muted, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                     {i >= 0 ? <><PhotoVinted src={ph[i]} alt="" style={{ width: 22, height: 28, objectFit: 'cover', borderRadius: 4 }}/>Étiquette : photo {i + 1}</> : k ? 'Étiquette : la photo choisie n\'est plus là' : 'Étiquette : pas choisie'}
-                    <button type="button" className="vrm-lien-action" data-vc-etiq-ouvrir={p.id} onClick={() => setChoixEtiq(choixEtiq === p.id ? '' : p.id)} style={{ background: 'none', border: 'none', color: C.accent, fontWeight: 600, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>{i >= 0 ? 'changer' : 'choisir'}</button>
+                    <button type="button" className="vrm-lien-action" data-vc-etiq-ouvrir={p.id} onClick={() => setChoixEtiq(choixEtiq === p.id ? '' : p.id)} style={{ background: 'none', border: 'none', color: C.accentTexte, fontWeight: 600, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>{i >= 0 ? 'changer' : 'choisir'}</button>
                   </div>
                 );
               })()}
@@ -28017,7 +28017,7 @@ function PublierVestiaire({ comptes }) {
           </div>
         );
       })}
-      {liste.length > 12 && !tout && <button type="button" className="vrm-lien-action" onClick={() => setTout(true)} style={{ alignSelf: 'flex-start', background: 'none', border: 'none', color: C.accent, fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>Voir les {liste.length} articles</button>}
+      {liste.length > 12 && !tout && <button type="button" className="vrm-lien-action" onClick={() => setTout(true)} style={{ alignSelf: 'flex-start', background: 'none', border: 'none', color: C.accentTexte, fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>Voir les {liste.length} articles</button>}
     </div>
   );
   return (
@@ -28128,9 +28128,9 @@ function BoutonImprimerVc({ v, grand = false, carte = false, lectureSeule = fals
       ? <button type="button" data-imprime="1" data-vc-imprimer={v.id} disabled={etat === 'lecture'} onClick={()=>go(false)} title="Bordereau tamponné (titre + N°), puis impression"
           className="vrm-colis-primaire" style={{flex:'1 1 160px',maxWidth:340,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,border:'none',background:C.accent,color:C.onAccent,borderRadius:12,padding:'0 16px',minHeight:44,cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit'}}><Icon name="printer" size={16}/>{etat === 'lecture' ? libelle : <><span className="vrm-lib-long">Imprimer le bordereau</span><span className="vrm-lib-court">Imprimer</span></>}</button>
       : <Bouton variante={grand ? 'primaire' : 'secondaire'} icone="printer" data-imprime="1" data-vc-imprimer={v.id} disabled={etat === 'lecture'} onClick={()=>go(false)} title="Bordereau tamponné (titre + N°), puis impression">{etat === 'lecture' ? libelle : grand ? <><span className="vrm-lib-long">Imprimer le bordereau</span><span className="vrm-lib-court">Imprimer</span></> : 'Imprimer le bordereau'}</Bouton>)}
-    {!carte&&<button type="button" data-imprime="1" data-vc-original={v.id} disabled={etat==='lecture'} onClick={()=>go(true)} className="vrm-lien-action" style={{minHeight:44,color:C.accent,background:'transparent',border:0,font:'inherit',fontSize:13,cursor:'pointer'}}>Ouvrir le PDF d’origine</button>}
+    {!carte&&<button type="button" data-imprime="1" data-vc-original={v.id} disabled={etat==='lecture'} onClick={()=>go(true)} className="vrm-lien-action" style={{minHeight:44,color:C.accentTexte,background:'transparent',border:0,font:'inherit',fontSize:13,cursor:'pointer'}}>Ouvrir le PDF d’origine</button>}
     {erreur&&<span role="alert" data-vc-bordereau-erreur="" style={{flexBasis:'100%',fontSize:12,color:C.warn}}>{erreur}</span>}
-    {lien ? <a href={lien.url} target="_blank" rel="noreferrer" data-vc-bordereau-lien="" style={{ color: C.accent, fontWeight: 600, fontSize: 13 }}>Ouvrir le bordereau</a> : null}
+    {lien ? <a href={lien.url} target="_blank" rel="noreferrer" data-vc-bordereau-lien="" style={{ color: C.accentTexte, fontWeight: 600, fontSize: 13 }}>Ouvrir le bordereau</a> : null}
     {etat === 'absent' ? <span data-vc-bordereau-etat="absent" style={{ flexBasis: '100%', fontSize: 12, color: C.muted }}>Le bordereau n'est plus rangé — rouvre la vente sur Vestiaire.</span>
       : etat === 'passu' ? <span data-vc-bordereau-etat="passu" style={{ flexBasis: '100%', fontSize: 12, color: C.muted }}>La base n'a pas répondu — réessaie.</span> : null}
   </>;
@@ -28306,7 +28306,7 @@ function VentesVestiaire({ comptes }) {
     : null}</div>;
   let corps;
   if (d === undefined) corps = <div data-vc-ventes="charge" style={style}>Lecture de tes ventes Vestiaire…</div>;
-  else if (d === null) corps = <div data-vc-ventes="pas-su" style={style}>Je n'ai pas pu lire tes ventes Vestiaire — rien n'est perdu, c'est la lecture qui a échoué. <button type="button" className="vrm-lien-action" data-vc-ventes-relire="" onClick={() => { setD(undefined); relire(); }} style={{ background: 'none', border: 'none', color: C.accent, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', minHeight: 44, padding: 0 }}>Réessayer</button></div>;
+  else if (d === null) corps = <div data-vc-ventes="pas-su" style={style}>Je n'ai pas pu lire tes ventes Vestiaire — rien n'est perdu, c'est la lecture qui a échoué. <button type="button" className="vrm-lien-action" data-vc-ventes-relire="" onClick={() => { setD(undefined); relire(); }} style={{ background: 'none', border: 'none', color: C.accentTexte, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', minHeight: 44, padding: 0 }}>Réessayer</button></div>;
   else if (!d.ventes) corps = <div data-vc-ventes="jamais" style={style}>Pas encore lues : {geste}{extSait('vcventes') === 'retard' ? <> — mise à jour en <b>{EXT_CAPACITES.vcventes}</b> d'abord</> : ''}. Elle les lit en passant.</div>;
   else {
     const liste = Object.entries(d.ventes).filter(([, v]) => v && typeof v === 'object').map(([id, v]) => {
@@ -28771,7 +28771,7 @@ function MessagesVestiaire() {
         <div data-vc-messages-nonlus={n == null ? 'passu' : String(n)} style={style}>
           {n == null ? <>Nombre de non-lus pas encore relevé.</>
             : <><b style={{ color: C.text }}>{n === 0 ? 'Aucun message non lu' : `${n} message${n > 1 ? 's' : ''} non lu${n > 1 ? 's' : ''}`}</b>{nl.comptes > 1 ? <span data-vc-messages-comptes={nl.comptes}> · {nl.comptes} comptes</span> : null}</>}
-          {' '}<a data-vc-messages-ouvrir="" href={lien} target="_blank" rel="noreferrer" className="vrm-lien-action" style={{ color: C.accent, fontWeight: 600, display: 'inline-flex', alignItems: 'center', minHeight: 44 }}>{page ? 'Ouvrir la messagerie' : 'Ouvrir Vestiaire'}</a>
+          {' '}<a data-vc-messages-ouvrir="" href={lien} target="_blank" rel="noreferrer" className="vrm-lien-action" style={{ color: C.accentTexte, fontWeight: 600, display: 'inline-flex', alignItems: 'center', minHeight: 44 }}>{page ? 'Ouvrir la messagerie' : 'Ouvrir Vestiaire'}</a>
         </div>
         <OffresVestiaire etat={offresEtat} recettes={d.recettesOffres} cap={extSait('vcoffrerepondre')} numDe={(pid) => cleNum((pid && d.liens[pid]) || '')}
           envoyer={async (m) => { const r = await vmrCmd(m, 45000); relire(); return r; }} Photo={PhotoOffreVc}/>
@@ -28838,7 +28838,7 @@ function AchatsVestiaire() {
   const style = { fontSize: 13, color: C.muted, lineHeight: 1.55 };
   let corps;
   if (d === undefined) corps = <div data-vc-achats="charge" style={style}>Lecture de tes achats Vestiaire…</div>;
-  else if (d === null) corps = <div data-vc-achats="pas-su" style={style}>Je n'ai pas pu lire tes achats Vestiaire — rien n'est perdu, c'est la lecture qui a échoué. <button type="button" className="vrm-lien-action" data-vc-achats-relire="" onClick={() => { setD(undefined); relire(); }} style={{ background: 'none', border: 'none', color: C.accent, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', minHeight: 44, padding: 0 }}>Réessayer</button></div>;
+  else if (d === null) corps = <div data-vc-achats="pas-su" style={style}>Je n'ai pas pu lire tes achats Vestiaire — rien n'est perdu, c'est la lecture qui a échoué. <button type="button" className="vrm-lien-action" data-vc-achats-relire="" onClick={() => { setD(undefined); relire(); }} style={{ background: 'none', border: 'none', color: C.accentTexte, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', minHeight: 44, padding: 0 }}>Réessayer</button></div>;
   else if (!d.achats) corps = <div data-vc-achats="jamais" style={style}>Pas encore lus. Ouvre <b style={{ color: C.text }}>tes achats</b> (« Mes commandes ») sur Vestiaire, dans le navigateur où l'extension VRM est installée{extSait('vcachats') === 'retard' ? <> — mise à jour en <b>{EXT_CAPACITES.vcachats}</b> d'abord</> : ''} : elle les lit en passant. Ton panier n'est jamais lu.</div>;
   else {
     const liste = Object.entries(d.achats).filter(([, v]) => v && typeof v === 'object').map(([id, v]) => ({ id, ...v }))
@@ -29248,7 +29248,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       title="Ouvrir la saisie en série des prix d'achat"
       style={{alignSelf:'flex-start',border:'none',background:'transparent',padding:0,margin:dans?0:'-4px 0 0',cursor:'pointer',
         fontFamily:'inherit',fontSize:13,fontWeight:500,color:C.muted,textAlign:'left',minHeight:0,lineHeight:1.45}}>
-      {quoi} attendent tes prix d'achat — <span style={{color:C.accent,fontWeight:600,whiteSpace:'nowrap'}}>les saisir →</span>
+      {quoi} attendent tes prix d'achat — <span style={{color:C.accentTexte,fontWeight:600,whiteSpace:'nowrap'}}>les saisir →</span>
     </button>
   );
   // ── Typographie de l'écran (16 oct.) ─────────────────────────────────────
@@ -29678,8 +29678,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
               <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>Semaine dernière ({weeklyRecapData.from} → {weeklyRecapData.to})</div>
               <div style={{display:'flex',gap:16,flexWrap:'wrap',fontSize:13}}>
                 <span><b style={{color:C.text}}>{weeklyRecapData.count}</b> <span style={{color:C.muted}}>vente{weeklyRecapData.count>1?'s':''}</span></span>
-                <span><b style={{color:C.accent}}>{fmt(weeklyRecapData.ca)}</b> <span style={{color:C.muted}}>vendu</span></span>
-                <span><b style={{color:C.accent}}>{fmt(weeklyRecapData.profit)}</b> <span style={{color:C.muted}} data-benef-notion="brut">{NOM_BENEFICE_BRUT.toLowerCase()}</span></span>
+                <span><b style={{color:C.accentTexte}}>{fmt(weeklyRecapData.ca)}</b> <span style={{color:C.muted}}>vendu</span></span>
+                <span><b style={{color:C.accentTexte}}>{fmt(weeklyRecapData.profit)}</b> <span style={{color:C.muted}} data-benef-notion="brut">{NOM_BENEFICE_BRUT.toLowerCase()}</span></span>
               </div>
               {(()=>{ const pc=weeklyRecapData.prevCa||0, c=weeklyRecapData.ca; if(pc<=0&&c<=0) return null; const diff=c-pc; const pct=pc>0?Math.round(diff/pc*100):null; const up=diff>=0; return (
                 <div style={{fontSize:11,color:up?C.accent:C.muted,fontWeight:600,marginTop:6}}>{up?'▲':'▼'} {up?'+':''}{fmt(diff)} vs semaine précédente{pct!=null?` (${up?'+':''}${pct} %)`:''} <span style={{color:C.muted,fontWeight:600}}>— {fmt(pc)} vendus</span></div>
@@ -29700,8 +29700,8 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
               <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>Récap {monthlyRecapData.nom}</div>
               <div style={{display:'flex',gap:16,flexWrap:'wrap',fontSize:13}}>
                 <span><b style={{color:C.text}}>{monthlyRecapData.count}</b> <span style={{color:C.muted}}>vente{monthlyRecapData.count>1?'s':''}</span></span>
-                <span><b style={{color:C.accent}}>{fmt(monthlyRecapData.ca)}</b> <span style={{color:C.muted}}>vendu</span></span>
-                <span><b style={{color:C.accent}}>{fmt(monthlyRecapData.profit)}</b> <span style={{color:C.muted}} data-benef-notion="brut">{NOM_BENEFICE_BRUT.toLowerCase()}</span></span>
+                <span><b style={{color:C.accentTexte}}>{fmt(monthlyRecapData.ca)}</b> <span style={{color:C.muted}}>vendu</span></span>
+                <span><b style={{color:C.accentTexte}}>{fmt(monthlyRecapData.profit)}</b> <span style={{color:C.muted}} data-benef-notion="brut">{NOM_BENEFICE_BRUT.toLowerCase()}</span></span>
               </div>
             </div>
             <button className="vrm-icon-control" aria-label="Fermer le bilan du mois" type="button" onClick={()=>{localStorage.setItem('vinted_last_monthly_recap',monthKey);setShowMonthly(false);}}
@@ -29842,7 +29842,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
             {list.length===0&&<tr><td colSpan={5} style={{padding:20,textAlign:'center',color:C.muted}}>Aucun article</td></tr>}
             {list.map(p=>(
               <tr key={p.id} style={{borderTop:`1px solid ${C.border}`,background:(()=>{if(p.status==='vendu') return '#ff4d6d08';const parts=(p.addedAt||'').split('/');if(parts.length===3){const d=new Date(+parts[2],+parts[1]-1,+parts[0]);const days=Math.floor((new Date()-d)/86400000);if(days>60) return `${C.danger}18`;if(days>30) return `${C.warn}18`;}return 'transparent';})()}}>
-                <td style={{padding:'2px 12px',fontWeight:600,color:C.accent,fontSize:15,minWidth:60}}>
+                <td style={{padding:'2px 12px',fontWeight:600,color:C.accentTexte,fontSize:15,minWidth:60}}>
                   <Cell value={p.id} onChange={v=>update(p.id,'id',v)} mono/>
                 </td>
                 <td style={{padding:'2px 12px',minWidth:80}}>
@@ -29872,7 +29872,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
                     onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}
                   />
                   <button type="button" onClick={fillNextId} title="Numéro suivant (dernier ajouté +1)"
-                    style={{background:`${C.accent}22`,border:`1px solid ${C.accent}66`,borderRadius:6,color:C.accent,padding:'4px 6px',fontSize:15,fontWeight:600,cursor:'pointer',lineHeight:1}}>
+                    style={{background:`${C.accent}22`,border:`1px solid ${C.accent}66`,borderRadius:6,color:C.accentTexte,padding:'4px 6px',fontSize:15,fontWeight:600,cursor:'pointer',lineHeight:1}}>
                     +1
                   </button>
                 </div>
@@ -30053,7 +30053,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
       </div>
 
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:10}}>
-        <h2 style={{margin:0,color:C.accent,fontSize:20,fontWeight:600}}>Ventes ({sales.length})</h2>
+        <h2 style={{margin:0,color:C.accentTexte,fontSize:20,fontWeight:600}}>Ventes ({sales.length})</h2>
         <div style={{display:'flex',gap:12,fontSize:13,flexWrap:'wrap',alignItems:'center'}}>
           <span style={{color:C.muted}}>CA filtré : <b style={{color:C.text}}>{fmt(totalCA)}</b></span>
           <span style={{color:C.muted}}>Bénéf. : <b style={{color:totalProfit>=0?C.accent:C.danger}}>{fmt(totalProfit)}</b></span>
@@ -30124,7 +30124,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
                     }:undefined}
                     data-vid={v.id}
                     style={{borderTop:`1px solid ${C.border}`,background:isSelected?`${C.accent}33`:'transparent',cursor:selectMode?'pointer':'auto',userSelect:selectMode?'none':'auto',position:'relative'}}>
-                    <td style={{padding:'2px 10px',minWidth:100,fontWeight:500,color:C.accent}}>
+                    <td style={{padding:'2px 10px',minWidth:100,fontWeight:500,color:C.accentTexte}}>
                       <Cell value={v.productId||''} onChange={val=>updateSale(v.id,'productId',val)}/>
                     </td>
                     <td style={{padding:'2px 10px',minWidth:90}}>
@@ -30172,7 +30172,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
                     }));
                   }}
                     placeholder="N° ou N°+N° (lot)" onKeyDown={e=>{if(e.key==='Enter')addRow();}}
-                    style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.accent,padding:'4px 6px',fontSize:12,width:90,fontFamily:'monospace',outline:'none',fontWeight:500}}
+                    style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.accentTexte,padding:'4px 6px',fontSize:12,width:90,fontFamily:'monospace',outline:'none',fontWeight:500}}
                     onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}
                   />
                 </td>
@@ -30251,7 +30251,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
               const sumRecu=sel.filter(v=>v.receiveDate&&v.receiveDate.trim()!=='').reduce((s,v)=>s+ +v.sellPrice,0);
               return (<>
                 <span style={{fontSize:13,color:C.muted,marginLeft:'auto'}}>Σ : <b style={{color:C.text}}>{fmt(sumCA)}</b></span>
-                <span style={{fontSize:13,color:C.muted}}>💰 Reçu : <b style={{color:C.accent}}>{fmt(sumRecu)}</b></span>
+                <span style={{fontSize:13,color:C.muted}}>💰 Reçu : <b style={{color:C.accentTexte}}>{fmt(sumRecu)}</b></span>
                 <span style={{fontSize:13,color:C.muted}}>Bénéf. : <b style={{color:sumProfit>=0?C.accent:C.danger}}>{fmt(sumProfit)}</b></span>
               </>);
             })()}
@@ -30559,10 +30559,10 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
               return (
                 <tr key={inv.id} style={{borderBottom:`1px solid ${C.border}`}}>
                   <td style={{padding:'8px',color:C.warn,fontWeight:600,fontFamily:'monospace',fontSize:15}}>#{inv.productId||'?'}</td>
-                  <td style={{padding:'8px',color:C.accent,fontWeight:500,fontFamily:'monospace',fontSize:11}}>{inv.number||'—'}{(entreprises&&entreprises.length>1)&&(()=>{const e=entForInvoice(inv,entreprises,activeEnt,invoiceSettings);return e&&e.companyName?<div style={{marginTop:2,fontFamily:'inherit',fontSize:11,color:C.muted,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:110}}>🏢 {e.companyName}</div>:null;})()}</td>
+                  <td style={{padding:'8px',color:C.accentTexte,fontWeight:500,fontFamily:'monospace',fontSize:11}}>{inv.number||'—'}{(entreprises&&entreprises.length>1)&&(()=>{const e=entForInvoice(inv,entreprises,activeEnt,invoiceSettings);return e&&e.companyName?<div style={{marginTop:2,fontFamily:'inherit',fontSize:11,color:C.muted,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:110}}>🏢 {e.companyName}</div>:null;})()}</td>
                   <td style={{padding:'8px',color:C.text,fontFamily:'monospace',fontSize:11}}>{fmtDate(inv.saleDate)}</td>
                   <td style={{padding:'8px',color:C.text}}>{String(inv.itemName||'—').replace(/\bimages?\s*:\s*/gi,'').replace(/\bimages?\b/gi,'').replace(/\s+/g,' ').trim()||'—'}</td>
-                  <td style={{padding:'8px',textAlign:'right',color:C.accent,fontWeight:500}}>{fmt(+inv.sellPrice||0)}</td>
+                  <td style={{padding:'8px',textAlign:'right',color:C.accentTexte,fontWeight:500}}>{fmt(+inv.sellPrice||0)}</td>
                   <td style={{padding:'8px',color:C.muted,fontSize:11}}>{inv.buyerName||'—'}</td>
                   <td style={{padding:'8px',textAlign:'right',whiteSpace:'nowrap'}}>
                     <Btn small onClick={()=>generatePDF(inv,entForInvoice(inv,entreprises,activeEnt,invoiceSettings))} color={C.blue} style={{marginRight:4}} aria-label="Imprimer la facture" title="Imprimer la facture"><Icon name="printer" size={15}/></Btn>
@@ -30622,10 +30622,10 @@ function InvoiceForm({onClose,onSave,nextNumber,catalog}) {
       <FermeAuRetour fermer={onClose}/>
       <div onClick={e=>e.stopPropagation()} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:20,maxWidth:480,width:'100%',maxHeight:'90vh',overflowY:'auto'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
-          <h3 style={{margin:0,color:C.accent}}>Nouvelle facture</h3>
+          <h3 style={{margin:0,color:C.accentTexte}}>Nouvelle facture</h3>
           <button type="button" onClick={onClose} style={{background:'none',border:'none',color:C.muted,fontSize:22,cursor:'pointer',padding:0}}>×</button>
         </div>
-        <div style={{fontSize:11,color:C.muted,marginBottom:14}}>Numéro auto : <b style={{color:C.accent}}>{nextNumber}</b></div>
+        <div style={{fontSize:11,color:C.muted,marginBottom:14}}>Numéro auto : <b style={{color:C.accentTexte}}>{nextNumber}</b></div>
         
         <div style={{display:'flex',flexDirection:'column',gap:10}}>
           <Field label="N° article (étiquetage) *">
@@ -30694,7 +30694,7 @@ function InvoiceSettings({settings,setSettings,entreprises,setEntreprises,active
       <FermeAuRetour fermer={onClose}/>
       <div onClick={e=>e.stopPropagation()} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:20,maxWidth:480,width:'100%',maxHeight:'90vh',overflowY:'auto'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
-          <h3 style={{margin:0,color:C.accent}}>⚙ Réglages factures</h3>
+          <h3 style={{margin:0,color:C.accentTexte}}>⚙ Réglages factures</h3>
           <button type="button" onClick={onClose} style={{background:'none',border:'none',color:C.muted,fontSize:22,cursor:'pointer',padding:0}}>×</button>
         </div>
         {/* Sélecteur de micro-entreprise */}
@@ -32893,7 +32893,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
             <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: C.text }}>Aménager la pièce</span>
             <span className="vrm-aide" style={{ display: 'block', fontSize: 12, color: C.muted, marginTop: 2 }}>Ajoute un meuble, règle-le, glisse-le à sa place. Les numéros rangés ne bougent pas.</span>
           </span>
-          <span style={{ flexShrink: 0, color: C.accent, fontSize: 13, fontWeight: 600 }}>Terminer</span>
+          <span style={{ flexShrink: 0, color: C.accentTexte, fontSize: 13, fontWeight: 600 }}>Terminer</span>
         </summary>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '0 13px 13px' }}>
         {/* ── PALETTE DE CONSTRUCTION ──────────────────────────────────────────
@@ -33012,7 +33012,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
                         ? <PhotoVinted src={p.photo} alt="" style={{ width: 36, height: 36, borderRadius: 12, objectFit: 'cover', flexShrink: 0, background: C.card2 }}/>
                         : <span style={{ width: 36, height: 36, borderRadius: 12, background: C.card2, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17, flexShrink: 0 }}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                       <span style={{ flex: '1 1 90px', minWidth: 0 }}>
-                        <span className="vrm-display" style={{ display: 'block', fontSize: 15, fontWeight: 700, color: C.accent }}>N°{p.numero}</span>
+                        <span className="vrm-display" style={{ display: 'block', fontSize: 15, fontWeight: 700, color: C.accentTexte }}>N°{p.numero}</span>
                         <span style={{ display: 'block', fontSize: 11, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {p.ambigu ? '⚠️ N° porté par plusieurs articles' : (p.title || '—')}
                         </span>
@@ -33410,7 +33410,7 @@ function AssistantRangement({ plan, planLu, ecrire, ficheParNum }) {
                               animation: vientDetre ? 'vrmrgtpose .38s ease-out' : 'none', boxShadow: vientDetre && !estHit ? `0 0 0 2px ${C.accent}` : 'none' }}>
                             {a.length
                               ? <span className="vrm-display" style={{ fontSize: 15, fontWeight: 700, letterSpacing: '-0.01em', textDecoration: partie ? 'line-through' : 'none', textDecorationColor: C.warn }}>{a[0]}{a.length > 1 ? <span style={{ fontSize: 11, fontWeight: 600, opacity: .7 }}> +{a.length - 1}</span> : null}</span>
-                              : estProchaine ? <span style={{ fontSize: 11, fontWeight: 700, color: C.accent }}>ici</span> : null}
+                              : estProchaine ? <span style={{ fontSize: 11, fontWeight: 700, color: C.accentTexte }}>ici</span> : null}
                           </div>
                         );
                       })}
@@ -33487,7 +33487,7 @@ function StockPhotos() {
   if (!fiches.length) return <Card style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Aucun article numéroté</Card>;
   return (<>
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-      <div data-stock-resume="" style={{ fontSize: 13, color: C.muted }}>{fiches.length} paire{fiches.length > 1 ? 's' : ''} en stock{nVendus > 0 ? <> · <b style={{ color: C.accent }}>{nVendus} vendue{nVendus > 1 ? 's' : ''} à sortir</b></> : (venduSu ? '' : ' · ventes pas encore lues')}</div>
+      <div data-stock-resume="" style={{ fontSize: 13, color: C.muted }}>{fiches.length} paire{fiches.length > 1 ? 's' : ''} en stock{nVendus > 0 ? <> · <b style={{ color: C.accentTexte }}>{nVendus} vendue{nVendus > 1 ? 's' : ''} à sortir</b></> : (venduSu ? '' : ' · ventes pas encore lues')}</div>
       <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="N° ou titre" aria-label="Chercher un article" style={{ marginLeft: 'auto', padding: '7px 11px', borderRadius: 12, border: `1px solid ${C.line}`, background: C.card, color: C.text, fontSize: 13, maxWidth: 180 }} />
     </div>
     {nVendus > 0 && <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>Qui clignote = vendu · <b style={{ color: C.text }}>Sortie du stock</b> <Pourquoi label="Et si la vente est annulée ?">Une vente annulée qui repart en ligne s'éteint toute seule et l’article reste en stock.</Pourquoi></div>}
@@ -34223,10 +34223,10 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
                   <span style={{ flex: 1, minWidth: 0 }}>
                     <span style={{ display: 'block', fontSize: 15, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}><b>N°{f.numero}</b> · {f.title || '—'}</span>
                     <span data-stock-ou={ou ? `${ou.meuble.name}|${ou.rangee}|${ou.colonne}` : 'non-range'} style={{ display: 'block', fontSize: 13, marginTop: 2, color: ou ? C.text : C.muted, fontWeight: ou ? 700 : 500 }}>
-                      {ou ? <>{ou.meuble.name} · rangée {ou.rangee}, colonne {ou.colonne}</> : 'Pas encore rangé dans un meuble'}{sold ? <span style={{ color: C.accent, fontWeight: 700 }}> · vendue</span> : null}
+                      {ou ? <>{ou.meuble.name} · rangée {ou.rangee}, colonne {ou.colonne}</> : 'Pas encore rangé dans un meuble'}{sold ? <span style={{ color: C.accentTexte, fontWeight: 700 }}> · vendue</span> : null}
                     </span>
                   </span>
-                  <span style={{ color: C.accent, fontSize: 13, fontWeight: 700, flexShrink: 0 }}>{ou ? 'Voir ›' : 'Ranger ›'}</span>
+                  <span style={{ color: C.accentTexte, fontSize: 13, fontWeight: 700, flexShrink: 0 }}>{ou ? 'Voir ›' : 'Ranger ›'}</span>
                 </button>
               ); })}
           {resultats.length > 1 && <button className="vrm-b vrm-b-discret" type="button" data-stock-tout-montrer={resultats.length} onClick={() => { setCibles(resultats.map(cleDeFiche)); setQ(''); }} style={{ width: '100%' }}>Les montrer toutes dans les meubles ({resultats.length})</button>}
@@ -34701,7 +34701,7 @@ function BackupModal({catalog,sales,garageGrid,blockedCells,onClose,onImport}) {
         padding:24,maxWidth:480,width:'100%',
       }}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
-          <h3 style={{margin:0,color:C.accent,fontSize:20,fontWeight:600}}>💾 Sauvegarde</h3>
+          <h3 style={{margin:0,color:C.accentTexte,fontSize:20,fontWeight:600}}>💾 Sauvegarde</h3>
           <button className="vrm-icon-control" type="button" aria-label="Fermer la fenêtre" onClick={onClose} style={{background:'transparent',border:'none',color:C.muted,fontSize:20,cursor:'pointer'}}><Icon name="close" size={15}/></button>
         </div>
         
@@ -35586,8 +35586,8 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
                 const autresT=(accounts||[]).filter(o=>String(o.vinted_user_id)!==uid && telNorm(acctPhones[String(o.vinted_user_id)])===n).map(o=>labels[String(o.vinted_user_id)]||o.login||`#${o.vinted_user_id}`);
                 return autresT.length ? <div style={{fontSize:13,color:C.warn}}>Ce numéro sert aussi sur {autresT.join(', ')}.</div> : null; })()}
               {r && (r.rating != null || r.count != null) && <div style={{fontSize:13,color:C.muted}}>{r.rating != null ? `${(r.rating*5).toFixed(2)}/5` : ''}{r.rating != null && r.count != null ? ' · ' : ''}{r.count != null ? `${r.count} avis` : ''}{r.neg > 0 ? ` · ${r.neg} négatif${r.neg>1?'s':''}` : ''}</div>}
-              {retireesAnn[uid] && <span data-annonces-retirees={uid} style={{fontSize:13,color:C.muted}}>Annonces retirées · <button type="button" className="vrm-lien-action" onClick={()=>remettreAnnonces(acc)} style={{border:'none',background:'transparent',color:C.accent,fontWeight:600,cursor:'pointer',padding:0,minHeight:44,fontFamily:'inherit',fontSize:'inherit'}}>Les remettre</button></span>}
-              {retiresMsg[uid] && <span data-messages-retires={uid} style={{fontSize:13,color:C.muted}}>Messages retirés · <button type="button" className="vrm-lien-action" onClick={()=>remettreMessages(acc)} style={{border:'none',background:'transparent',color:C.accent,fontWeight:600,cursor:'pointer',padding:0,minHeight:44,fontFamily:'inherit',fontSize:'inherit'}}>Les remettre</button></span>}
+              {retireesAnn[uid] && <span data-annonces-retirees={uid} style={{fontSize:13,color:C.muted}}>Annonces retirées · <button type="button" className="vrm-lien-action" onClick={()=>remettreAnnonces(acc)} style={{border:'none',background:'transparent',color:C.accentTexte,fontWeight:600,cursor:'pointer',padding:0,minHeight:44,fontFamily:'inherit',fontSize:'inherit'}}>Les remettre</button></span>}
+              {retiresMsg[uid] && <span data-messages-retires={uid} style={{fontSize:13,color:C.muted}}>Messages retirés · <button type="button" className="vrm-lien-action" onClick={()=>remettreMessages(acc)} style={{border:'none',background:'transparent',color:C.accentTexte,fontWeight:600,cursor:'pointer',padding:0,minHeight:44,fontFamily:'inherit',fontSize:'inherit'}}>Les remettre</button></span>}
               <Bouton variante="discret" icone="trash" onClick={()=>ouvrirSuppression(acc)}>Supprimer des données…</Bouton>
             </div>
           </details>
@@ -37287,7 +37287,7 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
     <Card style={{ padding: 0, overflow: 'hidden' }}>
       <div data-ca-periode={periode} data-ca-etat={calc.etat} data-ca-partiel={partiel ? '1' : '0'}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '13px 16px', borderBottom: `1px solid ${C.border}`, flexWrap: 'wrap' }}>
-          {!dansRepli && <span aria-hidden="true" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 12, background: `${C.accent}14`, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="chart" size={16} /></span>}
+          {!dansRepli && <span aria-hidden="true" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 12, background: `${C.accent}14`, color: C.accentTexte, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="chart" size={16} /></span>}
           <div style={{ flex: '1 1 160px', minWidth: 0 }}>
             {/* (29 oct., revue) Deux cartes, deux périodes : la phrase dit que ce
                 choix ne vaut que pour CETTE carte (le bénéfice a le sien).
@@ -37444,7 +37444,7 @@ function ProfilFiscalCarte({ onNav }) {
     <Card style={{ padding: 0, overflow: 'hidden' }}>
       <div data-profil-fiscal={cfg === undefined ? 'encours' : cfg === null ? 'passu' : 'lu'}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '13px 16px', borderBottom: `1px solid ${C.border}` }}>
-          <span aria-hidden="true" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 12, background: `${C.accent}14`, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="doc" size={16} /></span>
+          <span aria-hidden="true" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 12, background: `${C.accent}14`, color: C.accentTexte, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="doc" size={16} /></span>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Ton entreprise</div>
             <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>Ton SIRET suffit : VRM retrouve le nom et l'adresse. Ils figurent sur tes reçus et tes factures ; ton régime sert à calculer tes cotisations.</div>
@@ -37480,7 +37480,7 @@ function ProfilFiscalCarte({ onNav }) {
               ))}
             </nav>
             {regime !== 'micro' ? (
-              <div data-profil-regime-texte="" style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>{regime ? (REGIMES_FISCAUX.find((x) => x[0] === regime) || [])[3] : 'Choisis ton statut : VRM ne te parle d\'URSSAF que si tu es micro-entrepreneur.'}{regime === 'marge' ? <> Le taux de TVA se règle dans <button type="button" onClick={() => onNav && onNav('settings')} style={{ border: 'none', background: 'transparent', color: C.accent, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0, fontSize: 13 }}>Paramètres → Régime fiscal</button>.</> : null}</div>
+              <div data-profil-regime-texte="" style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>{regime ? (REGIMES_FISCAUX.find((x) => x[0] === regime) || [])[3] : 'Choisis ton statut : VRM ne te parle d\'URSSAF que si tu es micro-entrepreneur.'}{regime === 'marge' ? <> Le taux de TVA se règle dans <button type="button" onClick={() => onNav && onNav('settings')} style={{ border: 'none', background: 'transparent', color: C.accentTexte, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0, fontSize: 13 }}>Paramètres → Régime fiscal</button>.</> : null}</div>
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>Taux de cotisations</span>
@@ -37897,7 +37897,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
     else telechargerFichier(recapJson(recap, v), `e-reporting-${ym}.json`, 'application/json');
   };
 
-  const chip = (icon) => <span aria-hidden="true" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 12, background: `${C.accent}14`, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name={icon} size={16} /></span>;
+  const chip = (icon) => <span aria-hidden="true" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 12, background: `${C.accent}14`, color: C.accentTexte, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name={icon} size={16} /></span>;
   const btn2 = (actif) => ({ border: `1px solid ${C.border}`, background: C.card, color: actif ? C.text : C.muted, borderRadius: 12, padding: '8px 13px', fontSize: 13, fontWeight: 600, cursor: actif ? 'pointer' : 'not-allowed', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6, opacity: actif ? 1 : 0.6 });
   const peutFacturer = etat.ok && nuage;
   const raisonGrise = !etat.ok ? etat.raison : !nuage ? "Je relis d'abord les numéros de facture déjà donnés." : '';
@@ -38122,7 +38122,7 @@ function StatutFiscal({ liveStats, onNav, partie = 'declarer' }) {
         <div className="vrm-set-liste" style={{ background: C.card, border: `1px solid ${C.border}`, '--vrm-set-filet': C.border }}>
           <div className="vrm-set-ligne">
             <span className="vrm-set-lib" data-statut-actuel={regime}><b style={{ color: C.text }}>{libelleRegime(regime)}</b><small style={{ color: C.muted }}>VRM adapte ta comptabilité à ce statut.</small></span>
-            <button type="button" className="vrm-lien-action" data-statut-changer="" onClick={() => setChanger(true)} style={{ border: 'none', background: 'transparent', color: C.accent, fontWeight: 600, fontFamily: 'inherit', fontSize: 15, cursor: 'pointer', padding: '0 4px', minHeight: 44 }}>Changer</button>
+            <button type="button" className="vrm-lien-action" data-statut-changer="" onClick={() => setChanger(true)} style={{ border: 'none', background: 'transparent', color: C.accentTexte, fontWeight: 600, fontFamily: 'inherit', fontSize: 15, cursor: 'pointer', padding: '0 4px', minHeight: 44 }}>Changer</button>
           </div>
         </div>
       </div>
@@ -38515,7 +38515,7 @@ function SuiviUrssaf({ onNav, sansTitre = false }) {
       <div data-suivi-urssaf="lu" data-suivi-retard={String(suivi.enRetard)} data-suivi-regul={String(suivi.aRegulariser)}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           {titre}
-          {suivi.lignes.length ? <button type="button" className="vrm-lien-action" data-suivi-export="" onClick={exporter} style={{ background: 'none', border: 'none', color: C.accent, fontSize: 13, fontWeight: 600, padding: 0, minHeight: 44, cursor: 'pointer', fontFamily: 'inherit' }}>Exporter (CSV)</button> : null}
+          {suivi.lignes.length ? <button type="button" className="vrm-lien-action" data-suivi-export="" onClick={exporter} style={{ background: 'none', border: 'none', color: C.accentTexte, fontSize: 13, fontWeight: 600, padding: 0, minHeight: 44, cursor: 'pointer', fontFamily: 'inherit' }}>Exporter (CSV)</button> : null}
         </div>
         <div data-suivi-annee={a.annee} data-suivi-annee-ca={String(a.ca)} data-suivi-annee-paye={a.paye == null ? '' : String(a.paye)} style={{ fontSize: 13, color: C.muted, marginTop: 2, lineHeight: 1.5 }}>
           {a.n === 0 ? <>Aucune déclaration notée en {a.annee}. Après chaque déclaration sur l'URSSAF, touche « Noter ma déclaration » : VRM garde ce que tu as déclaré et payé.</>
@@ -38596,7 +38596,7 @@ function SuiviUrssaf({ onNav, sansTitre = false }) {
                 </div>
               );
             })}
-            {suivi.lignes.length > 4 ? <button type="button" className="vrm-lien-action" data-suivi-tout="" onClick={() => setOuvert((o) => !o)} style={{ background: 'none', border: 'none', color: C.accent, fontSize: 13, fontWeight: 600, padding: 0, minHeight: 44, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>{ouvert ? 'Moins' : `Voir les ${suivi.lignes.length} périodes`}</button> : null}
+            {suivi.lignes.length > 4 ? <button type="button" className="vrm-lien-action" data-suivi-tout="" onClick={() => setOuvert((o) => !o)} style={{ background: 'none', border: 'none', color: C.accentTexte, fontSize: 13, fontWeight: 600, padding: 0, minHeight: 44, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>{ouvert ? 'Moins' : `Voir les ${suivi.lignes.length} périodes`}</button> : null}
           </div>
         )}
       </div>
@@ -38696,7 +38696,7 @@ function CarteUrssafMois({ liveStats, onNav }) {
           // ici, des mêmes lignes que le total — le chiffre est un minimum (§5).
           if (ncInfo && ncInfo.n > 0) morceaux.push(<Puce key="nc" warn><span data-urssaf-non-comptees={ncInfo.n}>{phraseNonCompteesPar(ncInfo.par)} : dans aucun chiffre — ce total est un minimum</span>{ncInfo.par && Object.keys(ncInfo.par).some(k => k.startsWith('Vestiaire|')) ? <>. VRM ne sait pas encore si le chiffre que Vestiaire écrit est le prix ou ce qu'il te verse : vérifie ces ventes sur Vestiaire avant de déclarer</> : null}</Puce>);
           if (adV && adV.n > 0) morceaux.push(<Puce key="av">{adV.n} vente{adV.n>1?'s':''} Vinted finalisée{adV.n>1?'s':''} sans date de versement (<Mt v={adV.ca}/>) : dans aucun mois pour l'instant{extSait('versement')==='retard' && <span style={{color:C.warn}}> — mets l'extension à jour ({EXT_CAPACITES.versement}) : c'est elle qui va chercher ces dates</span>}</Puce>);
-          if (adL && adL.n > 0) morceaux.push(<Puce key="a">{adL.n} vente{adL.n>1?'s':''} Leboncoin sans date (<Mt v={adL.ca}/>) : dans aucun mois tant que {adL.n>1?'leur date n\'est pas captée':'sa date n\'est pas captée'} — tu peux {adL.n>1?'les':'la'} dater dans <button type="button" className="vrm-lien-action" data-renvoi-carte-ca="" onClick={() => ouvrirRepliCompta('compta-ca')} style={{background:'none',border:0,padding:0,color:C.accent,fontWeight:600,cursor:'pointer',fontSize:'inherit',fontFamily:'inherit',minHeight:0}}>« {TITRE_CARTE_CA} »</button> (dans « Le détail »){extSait('lbcdate')==='retard' && <span style={{color:C.warn}}> — mets d'abord l'extension à jour ({EXT_CAPACITES.lbcdate})</span>}</Puce>);
+          if (adL && adL.n > 0) morceaux.push(<Puce key="a">{adL.n} vente{adL.n>1?'s':''} Leboncoin sans date (<Mt v={adL.ca}/>) : dans aucun mois tant que {adL.n>1?'leur date n\'est pas captée':'sa date n\'est pas captée'} — tu peux {adL.n>1?'les':'la'} dater dans <button type="button" className="vrm-lien-action" data-renvoi-carte-ca="" onClick={() => ouvrirRepliCompta('compta-ca')} style={{background:'none',border:0,padding:0,color:C.accentTexte,fontWeight:600,cursor:'pointer',fontSize:'inherit',fontFamily:'inherit',minHeight:0}}>« {TITRE_CARTE_CA} »</button> (dans « Le détail »){extSait('lbcdate')==='retard' && <span style={{color:C.warn}}> — mets d'abord l'extension à jour ({EXT_CAPACITES.lbcdate})</span>}</Puce>);
           // (29 oct.) « Vestiaire Co : pas encore relié » retiré : affiché à tous, même sans compte Vestiaire, il n'apprenait rien.
         }
         return (
@@ -40104,8 +40104,8 @@ function ComptaSection({ titre, note, total, totalSub, children, data }) {
 // Ligne « + Ajouter… » d'une section : déplie le formulaire dans la liste.
 function ComptaAjout({ ouvert, onClick, libelle, data }) {
   return (
-    <button type="button" className="vrm-set-ligne" onClick={onClick} aria-expanded={ouvert} {...data} style={{ color: C.accent }}>
-      <span className="vrm-set-lib"><b style={{ color: C.accent, fontWeight: 600 }}>{ouvert ? 'Fermer' : `+ ${libelle}`}</b></span>
+    <button type="button" className="vrm-set-ligne" onClick={onClick} aria-expanded={ouvert} {...data} style={{ color: C.accentTexte }}>
+      <span className="vrm-set-lib"><b style={{ color: C.accentTexte, fontWeight: 600 }}>{ouvert ? 'Fermer' : `+ ${libelle}`}</b></span>
     </button>
   );
 }
@@ -40343,7 +40343,7 @@ function ChoixDepenses({ onAucune, onAjouter, compact = false }) {
   return (
     <div data-depenses-choix="" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '4px 14px', fontSize: compact ? 13 : 13, color: compact ? 'inherit' : C.muted, lineHeight: 1.45 }}>
       <button type="button" data-depenses-aucune="" onClick={onAucune} className={compact ? 'vrm-lien-action' : undefined} style={{ ...lien, color: compact ? 'inherit' : C.text }}>{compact ? 'Pas de dépenses' : "Je n'ai pas de dépenses à noter"}</button>
-      <button type="button" data-depenses-ajouter="" onClick={onAjouter} className={compact ? 'vrm-lien-action' : undefined} style={{ ...lien, color: C.accent }}>Ajouter une dépense</button>
+      <button type="button" data-depenses-ajouter="" onClick={onAjouter} className={compact ? 'vrm-lien-action' : undefined} style={{ ...lien, color: C.accentTexte }}>Ajouter une dépense</button>
     </div>
   );
 }
@@ -40368,7 +40368,7 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense, sansC
       <span className="vrm-display" style={{ fontSize: fort ? 20 : 15, fontWeight: fort ? 700 : 600, color: val == null ? C.muted : C.text, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{val == null ? '—' : fmt(val)}</span>
     </div>
   );
-  const lienSaisie = <button type="button" onClick={versSaisiePrix} data-benef-porte="" className="vrm-lien-action" style={{ background: 'none', border: 0, padding: 0, color: C.accent, fontWeight: 600, cursor: 'pointer', fontSize: 'inherit', fontFamily: 'inherit' }}>Compléter les prix d'achat</button>;
+  const lienSaisie = <button type="button" onClick={versSaisiePrix} data-benef-porte="" className="vrm-lien-action" style={{ background: 'none', border: 0, padding: 0, color: C.accentTexte, fontWeight: 600, cursor: 'pointer', fontSize: 'inherit', fontFamily: 'inherit' }}>Compléter les prix d'achat</button>;
   // (2 nov., « surtout comptabilité ») LA PREMIÈRE QUESTION : « Combien j'ai
   // gagné ? ». Un chiffre (le net de `beneficePeriode`, inchangé), une phrase
   // venue du MÊME calcul (sa raison, sa couverture), le geste qui le complète ;
@@ -40405,7 +40405,7 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense, sansC
       <div className="vrm-compta-carte" data-fu-carte="">
         {!B ? (
           <p className="vrm-compta-phrase" data-compta-phrase="gagne" style={{ margin: 0 }}>
-            {etat === 'encours' ? 'Je lis ton bénéfice…' : sansCompte ? <span data-benefice-sans-compte="">Ton bénéfice arrivera ici dès qu’un compte Vinted sera relié (le bandeau du haut dit comment).</span> : <>Ton bénéfice se calcule dans l'écran Ventes, à partir de tes prix d'achat : ouvre-le une fois{onNav ? <> (<a href="?tab=cat_ventes" onClick={(ev) => { ev.preventDefault(); onNav('cat_ventes'); }} style={{ color: C.accent, fontWeight: 600, textDecoration: 'none' }}>Ventes</a>)</> : null}, il arrivera ici.</>}
+            {etat === 'encours' ? 'Je lis ton bénéfice…' : sansCompte ? <span data-benefice-sans-compte="">Ton bénéfice arrivera ici dès qu’un compte Vinted sera relié (le bandeau du haut dit comment).</span> : <>Ton bénéfice se calcule dans l'écran Ventes, à partir de tes prix d'achat : ouvre-le une fois{onNav ? <> (<a href="?tab=cat_ventes" onClick={(ev) => { ev.preventDefault(); onNav('cat_ventes'); }} style={{ color: C.accentTexte, fontWeight: 600, textDecoration: 'none' }}>Ventes</a>)</> : null}, il arrivera ici.</>}
           </p>
         ) : (<>
           {/* (2 nov., 22 h, maquette FusionCompta « à l'identique ») « Ce que tu as gagné », le
@@ -40425,7 +40425,7 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense, sansC
           {B.depenses === 'jamais' && nuagePret && onSansDepenses ? (
             <div className="vrm-compta-geste"><ChoixDepenses onAucune={onSansDepenses} onAjouter={onAjouterDepense} /></div>
           ) : onAjouterDepense && nuagePret ? (
-            <div className="vrm-compta-geste"><button type="button" className="vrm-lien-action" data-benef-ajouter-depense="" onClick={onAjouterDepense} style={{ background: 'none', border: 0, padding: 0, color: C.accent, fontWeight: 600, cursor: 'pointer', fontSize: 'inherit', fontFamily: 'inherit' }}>Ajouter une dépense</button></div>
+            <div className="vrm-compta-geste"><button type="button" className="vrm-lien-action" data-benef-ajouter-depense="" onClick={onAjouterDepense} style={{ background: 'none', border: 0, padding: 0, color: C.accentTexte, fontWeight: 600, cursor: 'pointer', fontSize: 'inherit', fontFamily: 'inherit' }}>Ajouter une dépense</button></div>
           ) : null}
           {/* Le calcul, ligne par ligne : replié (il se lit une fois). */}
           <details className="vrm-repli vrm-compta-calcul" data-benef-calcul="">
@@ -40786,7 +40786,7 @@ function FeuilleAjoutWidget({ dispo, onAjout, onDefaut, onClose }) {
           {!benefOn && (
             <button type="button" data-widget-ajout="benefice" data-journee-benef-activer="" onClick={() => { poserBenef(true); onClose(); }} className="vrm-w-ajout"
               style={{ background: C.card, border: `1px solid ${C.border}`, color: C.text }}>
-              <span className="vrm-w-ajout-plus" aria-hidden="true" style={{ color: C.accent }}>+</span>
+              <span className="vrm-w-ajout-plus" aria-hidden="true" style={{ color: C.accentTexte }}>+</span>
               <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
                 <span style={{ display: 'block', fontWeight: 600, fontSize: 15 }}>Ton bénéfice</span>
                 <span style={{ display: 'block', fontSize: 12, color: C.muted, lineHeight: 1.4 }}>Brut et net du mois et d’aujourd’hui, dans « Vendu et reçu » — les chiffres de Comptabilité</span>
@@ -40805,7 +40805,7 @@ function FeuilleAjoutWidget({ dispo, onAjout, onDefaut, onClose }) {
             return (
               <button key={id} type="button" data-widget-ajout={id} onClick={() => onAjout(id)} className="vrm-w-ajout"
                 style={{ background: C.card, border: `1px solid ${C.border}`, color: C.text }}>
-                <span className="vrm-w-ajout-plus" aria-hidden="true" style={{ color: C.accent }}>+</span>
+                <span className="vrm-w-ajout-plus" aria-hidden="true" style={{ color: C.accentTexte }}>+</span>
                 <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
                   <span style={{ display: 'block', fontWeight: 600, fontSize: 15 }}>{d.nom}</span>
                   <span style={{ display: 'block', fontSize: 12, color: C.muted, lineHeight: 1.4 }}>{d.desc}</span>
@@ -41362,7 +41362,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
   // (16 oct.) Un LIEN dans une phrase, pas un bouton : la règle des boutons
   // (hauteur plancher au doigt) étirait la ligne qui le portait — un
   // interligne de ~2 dans le paragraphe du résultat.
-  const lienBtn = (txt, tab, fs = 13) => <a href={`?tab=${tab}`} onClick={(e) => { e.preventDefault(); if (onNav) onNav(tab); }} style={{ color: C.accent, fontWeight: 600, cursor: 'pointer', fontSize: fs, textDecoration: 'none' }}>{txt}</a>;
+  const lienBtn = (txt, tab, fs = 13) => <a href={`?tab=${tab}`} onClick={(e) => { e.preventDefault(); if (onNav) onNav(tab); }} style={{ color: C.accentTexte, fontWeight: 600, cursor: 'pointer', fontSize: fs, textDecoration: 'none' }}>{txt}</a>;
 
   // (30 oct.) « Se calcule dans Ventes » était écrit ~9 fois sur cet écran : la cause
   // se dit UNE fois ici, avec le geste ; les cartes ne gardent que « — ».
@@ -41445,7 +41445,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
                 ))}
                 {chargesAnnee > 0 && (
                   <button type="button" className="vrm-set-ligne" onClick={exporterCharges}>
-                    <span className="vrm-set-lib"><b style={{ color: C.accent, fontWeight: 600 }}>Exporter mes dépenses {annee} (CSV)</b></span>
+                    <span className="vrm-set-lib"><b style={{ color: C.accentTexte, fontWeight: 600 }}>Exporter mes dépenses {annee} (CSV)</b></span>
                     <span className="vrm-set-chev" aria-hidden="true" style={{ color: C.muted }}><Icon name="save" size={16} /></span>
                   </button>
                 )}
@@ -46354,7 +46354,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.title || '—'}</span>
           <button type="button" data-num-neuf-ok={String(it.id)} onClick={() => vuNeuf([[it.id, f.numero]])} style={{ flexShrink: 0, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 12, padding: '0 12px', minHeight: 44, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>C'est bon</button>
         </div>); })}
-      {numerosNeufs.length > 1 && <button type="button" data-num-neufs-tout="" onClick={() => vuNeuf(numerosNeufs.map((it) => [it.id, (numeros[it.id] || {}).numero]))} style={{ marginTop: 6, border: 'none', background: 'transparent', color: C.accent, padding: 0, minHeight: 44, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>{numerosNeufs.length > 6 ? `Tout est bon (${numerosNeufs.length})` : 'Tout est bon'}</button>}
+      {numerosNeufs.length > 1 && <button type="button" data-num-neufs-tout="" onClick={() => vuNeuf(numerosNeufs.map((it) => [it.id, (numeros[it.id] || {}).numero]))} style={{ marginTop: 6, border: 'none', background: 'transparent', color: C.accentTexte, padding: 0, minHeight: 44, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>{numerosNeufs.length > 6 ? `Tout est bon (${numerosNeufs.length})` : 'Tout est bon'}</button>}
     </div>);
   const confirmerCarton = async (it) => {
     const f = numeros[it.id] || {};
@@ -51766,7 +51766,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {openConv.refreshing&&<div className="vrm-chat-note vrm-chat-read" role="status" data-fil-actualisation style={{color:C.muted}}>Actualisation de la conversation…</div>}
             {openConv.refreshError&&<div className="vrm-chat-note vrm-chat-read" role="alert" data-fil-actualisation-erreur style={{color:C.text}}><span>{openConv.refreshError} <a href={`https://www.vinted.fr/inbox/${openConv.convId}`} target="_blank" rel="noreferrer">Ouvrir sur Vinted ↗</a></span></div>}
             {!openConv.loading&&!openConv.error&&(()=>{const suivi0=suiviNegociationVinted(openConv.conversation,openConv.acc?.vinted_user_id,etatOffreVinted);const suivi=suivi0&&suivi0.libelle==='Offre reçue'&&offrePartieDuFil(openConv)?{libelle:'Annonce plus en vente',detail:'Elle n’est plus dans ton dressing : cette offre ne peut plus être acceptée.'}:suivi0;return suivi?<div className="vrm-chat-negociation-etat" role="status" title={suivi.detail}><b>{suivi.libelle}</b>{suivi.libelle==='Prix accepté'&&<small>{suivi.detail}</small>}</div>:null;})()}
-            {!openConv.loading && !openConv.error && openConv.messages.some(m=>m.kind==='event' && /code|retrait|pickup|pin|suivi|tracking|colis|r[ée]cup[ée]rer|point relais/i.test(m.body)) && <div className="vrm-chat-shortcuts" style={{borderBottom:`1px solid ${C.border}`}}><button type="button" style={{color:C.accent}} onClick={()=>chatScroll.current?.querySelector('.vrm-chat-event-colis')?.scrollIntoView({block:'center',behavior:window.matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'})}>Retrait et suivi ↓</button></div>}
+            {!openConv.loading && !openConv.error && openConv.messages.some(m=>m.kind==='event' && /code|retrait|pickup|pin|suivi|tracking|colis|r[ée]cup[ée]rer|point relais/i.test(m.body)) && <div className="vrm-chat-shortcuts" style={{borderBottom:`1px solid ${C.border}`}}><button type="button" style={{color:C.accentTexte}} onClick={()=>chatScroll.current?.querySelector('.vrm-chat-event-colis')?.scrollIntoView({block:'center',behavior:window.matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'})}>Retrait et suivi ↓</button></div>}
             {/* (31 oct.) Hors du défilement : la carte reste en tête du fil (maquette téléphone). */}
               {/* (19 oct.) LA PAIRE DE CE FIL, en tête — par la transaction de la
                   conversation (identité, §5), jamais par le titre. Ce qu'on ne
@@ -51791,7 +51791,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {/* Bandeau BORDEREAU : lien d'étiquette détecté dans la conversation. */}
               {!openConv.loading && !openConv.error && (()=>{ const bl=[...new Set(openConv.messages.flatMap(m=>(m.links||[]).filter(l=>l.bordereau).map(l=>l.url)))]; return bl.length>0 ? (
                 <div style={{background:`${C.accent}14`,border:`1px solid ${C.accent}66`,borderRadius:12,padding:'10px 12px',marginBottom:4}}>
-                  <div style={{fontSize:11,fontWeight:600,letterSpacing:0.5,color:C.accent,textTransform:'uppercase',marginBottom:6}}>📄 Bordereau détecté dans la conversation</div>
+                  <div style={{fontSize:11,fontWeight:600,letterSpacing:0.5,color:C.accentTexte,textTransform:'uppercase',marginBottom:6}}>📄 Bordereau détecté dans la conversation</div>
                   {bl.map((u,i)=>(
                     <a key={i} href={u} target="_blank" rel="noreferrer" style={{display:'block',background:C.accent,color:C.onAccent,borderRadius:12,padding:'10px 12px',fontSize:13,fontWeight:600,textDecoration:'none',textAlign:'center',marginBottom:i<bl.length-1?6:0}}>Ouvrir le bordereau {bl.length>1?`(${i+1})`:''}</a>
                   ))}
@@ -51832,12 +51832,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       ? <div key={i} className="vrm-chat-event vrm-chat-event-colis" style={{background:C.card,border:`1px solid ${C.border}`}}>
                           <div className="vrm-chat-event-k" style={{color:C.muted}}>Colis</div>
                           <div style={{fontSize:15,fontWeight:500,color:C.text,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{texteSansBalises(m.body)}</div>
-                          {(m.links||[]).map((l,j)=><a key={j} className="vrm-chat-link" href={l.url} target="_blank" rel="noreferrer" style={{color:C.accent}}>{l.bordereau?'Ouvrir le bordereau ↗':'Ouvrir le lien ↗'}</a>)}
+                          {(m.links||[]).map((l,j)=><a key={j} className="vrm-chat-link" href={l.url} target="_blank" rel="noreferrer" style={{color:C.accentTexte}}>{l.bordereau?'Ouvrir le bordereau ↗':'Ouvrir le lien ↗'}</a>)}
                         </div>
-                      : <div key={i} className="vrm-chat-event" data-chat-evenement="" style={{color:C.muted,whiteSpace:'pre-line'}}>{texteSansBalises(m.body)}{(m.links||[]).map((l,j)=><a key={j} className="vrm-chat-link" href={l.url} target="_blank" rel="noreferrer" style={{color:C.accent}}>{l.bordereau?'bordereau ↗':'lien ↗'}</a>)}</div>)
+                      : <div key={i} className="vrm-chat-event" data-chat-evenement="" style={{color:C.muted,whiteSpace:'pre-line'}}>{texteSansBalises(m.body)}{(m.links||[]).map((l,j)=><a key={j} className="vrm-chat-link" href={l.url} target="_blank" rel="noreferrer" style={{color:C.accentTexte}}>{l.bordereau?'bordereau ↗':'lien ↗'}</a>)}</div>)
                   : <BulleConv key={i} moi={!!m.mine} texte={(m.vinted?'Équipe Vinted · ':'')+(m.body||(m.photos?.length?'📷 photo':''))} quand={m.ts||null} traduire={m.body||''}
                       apres={<>
-                      {(m.links||[]).map((l,j)=><a key={j} className="vrm-chat-link" href={l.url} target="_blank" rel="noreferrer" style={{color:C.accent}}>{l.bordereau?'Ouvrir le bordereau ↗':'Ouvrir le lien ↗'}</a>)}
+                      {(m.links||[]).map((l,j)=><a key={j} className="vrm-chat-link" href={l.url} target="_blank" rel="noreferrer" style={{color:C.accentTexte}}>{l.bordereau?'Ouvrir le bordereau ↗':'Ouvrir le lien ↗'}</a>)}
                       {(m.photos||[]).length>0 && <div className="vrm-chat-photos">{m.photos.map((ph,j)=>{const src=photoArticle({photo:ph});return src?<PhotoVinted key={j} src={src} alt="Photo du message" loading="lazy" style={{width:104,height:128,objectFit:'cover',borderRadius:12}}/>:null;})}</div>}
                       </>}/>
               )}</React.Fragment>; })}
@@ -51892,7 +51892,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {off ? <div className="vrm-chat-offre-t" style={{color:C.text}}>Offre de <b data-montant="">{fmtE(off.prix)}</b> <span style={{color:C.muted,fontWeight:500}}>en attente</span></div> : null}
                       <div className="vrm-chat-offre-p" style={{color:C.muted}}>
                         {__vmrPlusieurs ? textePlusieurs() : etat==='retard' ? `Mets l'extension à jour (${EXT_CAPACITES.messagerie}) pour trancher ou faire une offre d'ici.` : "Les offres se font depuis le navigateur où l'extension est installée."}
-                        {!sansExt && <>{' '}<a href={lienVinted} target="_blank" rel="noreferrer" style={{color:C.accent,fontWeight:600}}>Ouvrir sur Vinted</a></>}
+                        {!sansExt && <>{' '}<a href={lienVinted} target="_blank" rel="noreferrer" style={{color:C.accentTexte,fontWeight:600}}>Ouvrir sur Vinted</a></>}
                       </div>
                       {contreMini!=null && <a className="vrm-chat-btn" data-offre-proposer-vinted={String(contreMini)} href={lienVinted} target="_blank" rel="noreferrer" style={{marginTop:8,alignSelf:'flex-start',textDecoration:'none'}}>Proposer {eurCourt(contreMini)} · à faire sur Vinted ↗</a>}
                     </div>
@@ -53816,7 +53816,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div style={{marginBottom:12}}>
             <button type="button" onClick={()=>setAnalyseOpen(v=>!v)} aria-expanded={analyseOpen}
               style={{width:'100%',display:'flex',alignItems:'center',gap:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'11px 14px',cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow||'none'}}>
-              <span aria-hidden="true" style={{color:C.accent,display:'flex'}}><Icon name="chart" size={17}/></span>
+              <span aria-hidden="true" style={{color:C.accentTexte,display:'flex'}}><Icon name="chart" size={17}/></span>
               <span style={{flex:1,textAlign:'left',fontSize:13,fontWeight:600,color:C.text}}>Analyse de tes ventes</span>
               <span style={{fontSize:11,color:C.muted,fontWeight:500}}>{analyseOpen?'masquer':'voir'}</span>
               <span style={{fontSize:13,color:C.muted,transform:analyseOpen?'rotate(90deg)':'none',transition:'transform .2s ease'}}>›</span>
@@ -53966,7 +53966,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           return (
             <details style={{marginBottom:10}} open={liste.length<=10}>
               <summary style={{listStyle:'none',cursor:'pointer',display:'flex',alignItems:'center',gap:8,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'11px 13px'}}>
-                <span aria-hidden="true" style={{flexShrink:0,color:C.accent,display:'flex'}}><Icon name="calendar" size={18}/></span>
+                <span aria-hidden="true" style={{flexShrink:0,color:C.accentTexte,display:'flex'}}><Icon name="calendar" size={18}/></span>
                 <span style={{flex:'1 1 150px',minWidth:0}}>
                   <span style={{display:'block',fontSize:13,fontWeight:600,color:C.text}}>Ventes par jour</span>
                   <span style={{display:'block',fontSize:12,color:C.muted,marginTop:2}}>{liste.length} jour{liste.length>1?'s':''} · {totN} vente{totN>1?'s':''} · {fmtE0(totCa)} — sur {libellePeriode(periode).toLowerCase()}</span>
@@ -55080,7 +55080,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div style={{fontSize:11,color:C.muted}}>{o._acc?accName(o._acc):''}</div>
                   </div>
                   {lienConv(o) && <a href={lienConv(o)} target="_blank" rel="noreferrer" style={{flexShrink:0,textDecoration:'none',border:`1px solid ${C.border}`,color:C.muted,borderRadius:12,padding:'5px 9px',fontSize:12,fontWeight:600,minHeight:44,boxSizing:'border-box',display:'inline-flex',alignItems:'center'}}>Conversation ↗</a>}
-                  <button type="button" title="Je l'avais récupéré" onClick={()=>markPickupDone(o)} style={{flexShrink:0,border:`1px solid ${C.accent}`,background:`${C.accent}14`,color:C.accent,borderRadius:12,padding:'5px 10px',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit',minHeight:44}}>✓ Je l'ai eu</button>
+                  <button type="button" title="Je l'avais récupéré" onClick={()=>markPickupDone(o)} style={{flexShrink:0,border:`1px solid ${C.accent}`,background:`${C.accent}14`,color:C.accentTexte,borderRadius:12,padding:'5px 10px',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit',minHeight:44}}>✓ Je l'ai eu</button>
                 </div>
               ))}
             </div>
@@ -55401,7 +55401,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const close = () => setAchatMenu(null);
                 return (
               <div className="vrm-buy-act">
-                {note && <button className="vrm-icon-control vrm-buy-quick" type="button" onClick={()=>setNoteEdit({tid,title:o.title,val:note})} title={`Note : ${note}`} aria-label="Note interne" style={{color:C.accent}}><Icon name="doc" size={15}/></button>}
+                {note && <button className="vrm-icon-control vrm-buy-quick" type="button" onClick={()=>setNoteEdit({tid,title:o.title,val:note})} title={`Note : ${note}`} aria-label="Note interne" style={{color:C.accentTexte}}><Icon name="doc" size={15}/></button>}
                 {peutSuivre && (
                   <a className="vrm-buy-quick" href={trackUrl(tk.carrier||'', suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis (${carrierName(tk.carrier)} n°${suivi})`} aria-label="Suivre le colis" style={{color:C.muted}}><Icon name="truck" size={16}/></a>
                 )}
@@ -55659,7 +55659,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       setNumeros(prev => { const u={...prev}; u[it.id]={...(u[it.id]||{}), numero:libre, manuelAt:new Date().toISOString()}; save('vinted_annonce_numeros',u); return u; });
                       recordUsed(libre);   // le numéro est pris à vie (§5.40)
                       toast(`✓ Cet article est maintenant le N°${libre}.`);
-                    }} style={{flexShrink:0,border:`1px solid ${C.accent}`,background:'transparent',color:C.accent,borderRadius:12,padding:'5px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+                    }} style={{flexShrink:0,border:`1px solid ${C.accent}`,background:'transparent',color:C.accentTexte,borderRadius:12,padding:'5px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
                       → N°{nextNumero}
                     </button>
                     {it._vrmMasquee ? <button type="button" data-masquee-partie={String(it.id)} onClick={()=>masqueePlusLa(it)} style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,padding:'5px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Elle n'est plus là</button> : null}
@@ -55712,7 +55712,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {refuses.length>0 && <> · <b style={{color:C.warn}}>connexion refusée : {refuses.map(nom).join(', ')}</b></>}
               </span>
               <button type="button" onClick={()=>onNav && onNav('vintedaccounts')}
-                style={{border:'none',background:'transparent',padding:0,color:C.accent,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+                style={{border:'none',background:'transparent',padding:0,color:C.accentTexte,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
                 Gérer les comptes →
               </button>
             </div>
@@ -55964,7 +55964,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {num && <GesteLienVcVinted it={it} num={num} style={geste}/>}
                     {num && <button type="button" className="vrm-fiche-geste" data-annonce-histoire={num} onClick={()=>{ try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire',{detail:String(num)})); } catch (_) {} }} style={geste}>Histoire · Dupliquer</button>}
                     <button type="button" className="vrm-fiche-geste" onClick={async ()=>{ if(await askConfirm('Marquer cet article VENDU et le retirer des annonces ?')) markSold(it.id); }} title="Marquer vendue : la retire des annonces tout de suite (sans attendre la synchro Vinted)" style={geste}>Marquer vendue</button>
-                    {sugg!=null && sugg < Number(it.price) && <a className="vrm-fiche-geste" href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour baisser le prix" style={{...geste,border:`1px solid ${C.accent}`,background:`${C.accent}14`,color:C.accent}}>Baisser à {sugg} {cur(it.currency)} ↗</a>}
+                    {sugg!=null && sugg < Number(it.price) && <a className="vrm-fiche-geste" href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour baisser le prix" style={{...geste,border:`1px solid ${C.accent}`,background:`${C.accent}14`,color:C.accentTexte}}>Baisser à {sugg} {cur(it.currency)} ↗</a>}
                   </div>
                   {/* (29 oct., revue) « il lui faut un N° pour aller sur Leboncoin »
                       était écrit sur CHAQUE fiche sans N° (§7) : la pastille « + N° »
@@ -56040,7 +56040,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {annStats.aRecapturer>0 && <span data-prepa-resume={annStats.aRecapturer} data-prepa-commun={annStats.prepaCommun||''} title={`${annStats.pretLbc} article(s) ont TOUTES leurs photos + une description captées — prêts pour Leboncoin. ${annStats.aRecapturer} n'ont pas encore toutes leurs photos : tu n'as rien à rouvrir — passe simplement sur Vinted connecté sur leurs comptes (extension à jour) et l'extension les complète toute seule, quelques annonces par visite. Si l'une reste incomplète après plusieurs passages, rouvre-la pour forcer.`} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:12,padding:'4px 11px'}}>{annStats.aRecapturer} à recapturer pour Leboncoin</span>}
             {/* Une paire qui dort se rattrape : de l'ambre, jamais du rouge (§5.56). */}
             {annStats.sleeping>0 && <button type="button" onClick={()=>setAnnSort('sleeping')} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:12,padding:'4px 11px',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:5}}><Icon name="sleep" size={13}/>{annStats.sleeping} qui dorment{annStats.sleepingVal>0?` · ${annStats.sleepingVal.toFixed(0)} €`:''}</button>}
-            <button type="button" onClick={()=>setShowLister(true)} title="Prix conseillé + titre & description prêts à coller" style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.accent,background:C.card,border:`1px solid ${C.accent}`,borderRadius:12,padding:'4px 12px',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:5}}><Icon name="spark" size={13}/>Aide à la vente</button>
+            <button type="button" onClick={()=>setShowLister(true)} title="Prix conseillé + titre & description prêts à coller" style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.accentTexte,background:C.card,border:`1px solid ${C.accent}`,borderRadius:12,padding:'4px 12px',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:5}}><Icon name="spark" size={13}/>Aide à la vente</button>
           </div>
           {/* ── CONSEILS ET SIGNALEMENTS : repliés ─────────────────────────
               Cinq bandeaux s'empilaient ici avant la liste des annonces (vendues
@@ -56235,7 +56235,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                                     style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,fontSize:11,fontWeight:600,padding:'4px 9px',borderRadius:12,cursor:'pointer',fontFamily:'inherit'}}>
                                     {eb.fait && eb.fait.etat === 'envoi' ? 'Envoi…' : `Baisser sur eBay à ${eb.sugg} €`}
                                   </button>
-                                  {eb.fait && (eb.fait.etat === 'ko' || eb.fait.etat === 'incertain') && <span data-reprice-ebay-issue={eb.fait.etat} style={{color:C.warn}}>{eb.fait.msg}{eb.fait.etat === 'incertain' && eb.url ? <> <a href={eb.url} target="_blank" rel="noreferrer" style={{color:C.accent,fontWeight:600}}>Voir l'annonce eBay ↗</a></> : null}</span>}
+                                  {eb.fait && (eb.fait.etat === 'ko' || eb.fait.etat === 'incertain') && <span data-reprice-ebay-issue={eb.fait.etat} style={{color:C.warn}}>{eb.fait.msg}{eb.fait.etat === 'incertain' && eb.url ? <> <a href={eb.url} target="_blank" rel="noreferrer" style={{color:C.accentTexte,fontWeight:600}}>Voir l'annonce eBay ↗</a></> : null}</span>}
                                 </>
                               : <span>Aussi sur eBay à {eb.prixActuel} € (déjà au plus bas conseillé)</span>)}
                           {surLbcAussi && <span>Aussi sur Leboncoin : baisse-la là-bas dans « Mes annonces ».</span>}
@@ -56609,7 +56609,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               )}
               {nAuDessusMini>0 && messageFilter!=='offres' && (
                 <button type="button" data-cible="offres" data-offres-au-mini={nAuDessusMini} onClick={()=>{setMessageFilter('offres');setConvMax(40);}} style={{display:'flex',gap:8,alignItems:'center',width:'100%',textAlign:'left',fontSize:13,color:C.text,lineHeight:1.4,border:`1px solid ${C.accent}`,background:`${C.accent}12`,borderRadius:12,padding:'9px 11px',marginBottom:10,cursor:'pointer'}}>
-                  <span aria-hidden="true" style={{flexShrink:0}}><Icon name="tag" size={15} style={{color:C.accent}}/></span>
+                  <span aria-hidden="true" style={{flexShrink:0}}><Icon name="tag" size={15} style={{color:C.accentTexte}}/></span>
                   <span><b>{nAuDessusMini} offre{nAuDessusMini>1?'s':''} au-dessus de ton prix mini</b> — ouvre-la{nAuDessusMini>1?'s':''} pour accepter en 1 tap. <span style={{color:C.muted}}>{offresAuto ? "L'acceptation automatique est activée." : "Rien n'est accepté tout seul."}</span></span>
                 </button>
               )}
@@ -56679,7 +56679,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       apres={<>
                           {/* (19 oct.) Sur la ligne du message, pas sur celle de la paire : là
                               elle tronquait le N° et le prix (vu au rendu à 1512 px). */}
-                          {messageFilter==='repondre'&&!offre&&<span className="vrm-msg-etat">{/\?/.test(c.description||'')?'Question reçue':'Message reçu'}</span>}{offre && <span className="vrm-msg-etat vrm-msg-offre" data-offre-liste={String(offre.prix)} style={{color:C.accent,borderColor:C.accent}}>Offre {prix(offre.prix)} en attente</span>}
+                          {messageFilter==='repondre'&&!offre&&<span className="vrm-msg-etat">{/\?/.test(c.description||'')?'Question reçue':'Message reçu'}</span>}{offre && <span className="vrm-msg-etat vrm-msg-offre" data-offre-liste={String(offre.prix)} style={{color:C.accentTexte,borderColor:C.accent}}>Offre {prix(offre.prix)} en attente</span>}
                           {/* (5 nov.) Le dernier message est une offre (reçue, envoyée, tranchée) :
                               marquée « Offre » avec son montant, à SA conversation — plus jamais un
                               code ni un montant nu. L'offre EN ATTENTE garde sa pastille d'accent. */}
@@ -56724,7 +56724,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 ) : <span style={{color:C.muted,paddingRight:4,display:'inline-flex'}} aria-hidden="true"><Icon name="doc" size={13}/></span>}
               </div>
             ))}
-            {showQR && <button type="button" onClick={async ()=>{ const v=await askText({ desc: 'Nouveau message rapide :', value: '' }); if(v&&v.trim()) saveQR([...quickReplies,v.trim()]); }} style={{border:`1px dashed ${C.accent}`,borderRadius:12,background:'transparent',color:C.accent,fontSize:12,fontWeight:600,padding:'4px 12px',cursor:'pointer',fontFamily:'inherit'}}>＋ Ajouter</button>}
+            {showQR && <button type="button" onClick={async ()=>{ const v=await askText({ desc: 'Nouveau message rapide :', value: '' }); if(v&&v.trim()) saveQR([...quickReplies,v.trim()]); }} style={{border:`1px dashed ${C.accent}`,borderRadius:12,background:'transparent',color:C.accentTexte,fontSize:12,fontWeight:600,padding:'4px 12px',cursor:'pointer',fontFamily:'inherit'}}>＋ Ajouter</button>}
           </div>
           <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginTop:6}}>Ils apparaissent aussi dans chaque conversation : un clic remplit la réponse.</div>
         </div>
@@ -58047,7 +58047,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <span style={{display:'block',fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{f.nom}</span>
                       <span style={{display:'block',fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{f.adresse||f.full}</span>
                     </span>
-                    <span style={{fontSize:12,fontWeight:600,color:C.accent,flexShrink:0}}>Ajouter</span>
+                    <span style={{fontSize:12,fontWeight:600,color:C.accentTexte,flexShrink:0}}>Ajouter</span>
                   </button>
                 ))}
               </div>
@@ -58213,7 +58213,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {capturedReceipts.map((rec,i)=>(
                       <div key={i} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 0'}}>
                         <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:500,color:C.text}}>{rec.name}</div><div style={{fontSize:11,color:C.muted}}>capté le {rec.capturedAt?new Date(rec.capturedAt).toLocaleDateString('fr-FR'):'—'}</div></div>
-                        <button type="button" onClick={()=>downloadReceipt(rec)} style={{flexShrink:0,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,borderRadius:12,padding:'5px 11px',cursor:'pointer',fontSize:12,fontWeight:600}}>⬇️ Télécharger</button>
+                        <button type="button" onClick={()=>downloadReceipt(rec)} style={{flexShrink:0,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accentTexte,borderRadius:12,padding:'5px 11px',cursor:'pointer',fontSize:12,fontWeight:600}}>⬇️ Télécharger</button>
                       </div>
                     ))}
                     {/* Une liste partielle ne se présente pas comme complète (§5) :
@@ -58229,7 +58229,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
               <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
                 <button type="button" onClick={exportAnnualCsv} style={{flex:1,minWidth:120,padding:'9px 12px',borderRadius:12,border:`1px solid ${C.border}`,background:C.card,color:C.text,fontSize:13,fontWeight:500,cursor:'pointer'}}>⬇️ CSV (registre détaillé)</button>
-                <button type="button" onClick={exportAnnualPdf} style={{flex:1,minWidth:120,padding:'9px 12px',borderRadius:12,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,fontSize:13,fontWeight:600,cursor:'pointer'}}>📄 PDF</button>
+                <button type="button" onClick={exportAnnualPdf} style={{flex:1,minWidth:120,padding:'9px 12px',borderRadius:12,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accentTexte,fontSize:13,fontWeight:600,cursor:'pointer'}}>📄 PDF</button>
               </div>
               <div className="vrm-aide" style={{fontSize:11,color:C.muted,lineHeight:1.5,marginTop:12}}>Document indicatif. Ne remplace pas un conseil comptable. Les mois sans prix d'achat renseigné affichent un bénéfice incomplet.</div>
             </div>
@@ -58265,7 +58265,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {lister.reco!=null ? (<>
                     <div style={{fontSize:11,color:C.muted,fontWeight:500,textTransform:'uppercase',letterSpacing:0.4}}>Prix conseillé</div>
                     <div style={{display:'flex',alignItems:'baseline',gap:10,flexWrap:'wrap'}}>
-                      <div style={{fontSize:34,fontWeight:700,color:C.accent,lineHeight:1.1}}>{lister.reco} €</div>
+                      <div style={{fontSize:34,fontWeight:700,color:C.accentTexte,lineHeight:1.1}}>{lister.reco} €</div>
                       {lister.lo!=null && lister.hi!=null && lister.hi!==lister.lo && <div style={{fontSize:12,color:C.muted}}>fourchette {lister.lo}–{lister.hi} €</div>}
                     </div>
                     <div style={{fontSize:11,color:C.muted,marginTop:5,lineHeight:1.45}}>
@@ -58623,12 +58623,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       </div>
                       <div style={{flex:'1 1 130px',minWidth:0}}>
                         <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                          <span style={{color:C.accent,fontWeight:700}}>N°{e.numero}</span> {e.title}
+                          <span style={{color:C.accentTexte,fontWeight:700}}>N°{e.numero}</span> {e.title}
                         </div>
                         {e.price!=null&&e.price!==''&&<div style={{fontSize:11,color:C.muted,marginTop:1}}>{eur(e.price).toFixed(2).replace('.',',')} €</div>}
                       </div>
                       <button type="button" onClick={()=>redigerIA({...e,id})} disabled={repubAi.busy&&actif}
-                        style={{flexShrink:0,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accent,borderRadius:12,padding:'8px 12px',fontSize:13,fontWeight:700,cursor:repubAi.busy&&actif?'default':'pointer',fontFamily:'inherit',opacity:repubAi.busy&&actif?0.6:1}}>
+                        style={{flexShrink:0,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accentTexte,borderRadius:12,padding:'8px 12px',fontSize:13,fontWeight:700,cursor:repubAi.busy&&actif?'default':'pointer',fontFamily:'inherit',opacity:repubAi.busy&&actif?0.6:1}}>
                         {repubAi.busy&&actif?'…':'✨ Rédiger'}
                       </button>
                     </div>
@@ -59203,7 +59203,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {p.adresse && <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.adresse}</div>}
                     </div>
                     <span style={{flexShrink:0,fontSize:12,fontWeight:700,color:C.danger,background:`${C.danger}14`,borderRadius:12,padding:'3px 9px'}}>{p.colis.length}</span>
-                    <a href={mapsUrl(p)} target="_blank" rel="noreferrer" title="Itinéraire" style={{flexShrink:0,textDecoration:'none',fontSize:12,fontWeight:600,color:C.accent,border:`1px solid ${C.accent}`,borderRadius:12,padding:'5px 8px'}}>🧭</a>
+                    <a href={mapsUrl(p)} target="_blank" rel="noreferrer" title="Itinéraire" style={{flexShrink:0,textDecoration:'none',fontSize:12,fontWeight:600,color:C.accentTexte,border:`1px solid ${C.accent}`,borderRadius:12,padding:'5px 8px'}}>🧭</a>
                   </div>
                   <div style={{display:'flex',flexDirection:'column'}}>
                     {p.colis.map((t,j)=>{ const buy=buyForTrack(t); return (
@@ -59278,14 +59278,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div style={{fontSize:17,fontWeight:600,color:C.text,letterSpacing:'-0.02em'}}>Renuméroter à la suite</div>
               <div style={{fontSize:13,color:C.muted,marginTop:4,lineHeight:1.45}}>
                 Tes numéros vont de 1 à <b style={{color:C.text}}>{maxBefore||'—'}</b> pour <b style={{color:C.text}}>{nTotal}</b> article{nTotal>1?'s':''} en ligne.
-                {moves.length>0 ? <> Après, ils iront de 1 à <b style={{color:C.accent}}>{maxAfter}</b>, sans trou.</> : <> Ils sont déjà à la suite.</>}
+                {moves.length>0 ? <> Après, ils iront de 1 à <b style={{color:C.accentTexte}}>{maxAfter}</b>, sans trou.</> : <> Ils sont déjà à la suite.</>}
               </div>
             </div>
             {moves.length>0 && (
               <div style={{padding:'0 18px 12px',flexShrink:0}}>
                 <div style={{display:'flex',gap:8}}>
                   <div style={{flex:1,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'11px 13px'}}>
-                    <div style={{fontSize:22,fontWeight:600,color:C.accent,lineHeight:1,letterSpacing:'-0.02em'}}>{moves.length}</div>
+                    <div style={{fontSize:22,fontWeight:600,color:C.accentTexte,lineHeight:1,letterSpacing:'-0.02em'}}>{moves.length}</div>
                     <div style={{fontSize:11,color:C.muted,fontWeight:600,marginTop:3}}>article{moves.length>1?'s':''} à renuméroter</div>
                   </div>
                   <div style={{flex:1,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'11px 13px'}}>
@@ -59310,7 +59310,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div style={{flexShrink:0,display:'flex',alignItems:'center',gap:7,fontSize:13,fontWeight:600}}>
                     <span style={{color:C.muted,textDecoration:'line-through'}}>{m.from}</span>
                     <span style={{color:C.muted,fontSize:11}}>→</span>
-                    <span style={{color:C.accent}}>{m.to}</span>
+                    <span style={{color:C.accentTexte}}>{m.to}</span>
                   </div>
                 </div>
               ))}
@@ -61038,7 +61038,7 @@ function LbcRelier({ ad, numsConnus, onRelie, suggestions, detail, vendue = fals
           <div style={{ fontSize: 13, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ad.subject || ad.title || '—'}</div>
           <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
             {detail || (ad.price != null && isFinite(Number(ad.price)) ? `${Number(ad.price).toFixed(2).replace('.', ',')} €` : '')}{ad.customRef ? ` · réf ${ad.customRef}` : ''}
-            {ad.url ? <> · <a href={ad.url} target="_blank" rel="noreferrer" className="vrm-lien-touche" style={{ color: C.accent, fontWeight: 600 }}>voir</a></> : null}
+            {ad.url ? <> · <a href={ad.url} target="_blank" rel="noreferrer" className="vrm-lien-touche" style={{ color: C.accentTexte, fontWeight: 600 }}>voir</a></> : null}
           </div>
           {msg && <div style={{ fontSize: 12, color: C.warn, marginTop: 3 }}>{msg}</div>}
         </div>
@@ -61064,7 +61064,7 @@ function LbcRelier({ ad, numsConnus, onRelie, suggestions, detail, vendue = fals
               {s.photo ? <PhotoVinted src={s.photo} alt="" loading="lazy" style={{ width: 34, height: 34, borderRadius: 6, objectFit: 'cover', flexShrink: 0 }}/> : null}
               <b style={{ flexShrink: 0 }}>N°{s.numero}</b>
               <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: C.muted }}>{s.titre || ''}</span>
-              <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 600, color: C.accent }}>{vendue ? "C'est lui" : 'Relier'}</span>
+              <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 600, color: C.accentTexte }}>{vendue ? "C'est lui" : 'Relier'}</span>
             </button>
           ))}
         </div>
@@ -61094,7 +61094,7 @@ function QuotaLbc({ limit, plan, onFait }) {
     if (r && r.accepte) { setOuvert(false); onFait && onFait(); } else setMsg((r && r.raison) || "L'extension n'a pas répondu — réessaie.");
   };
   if (!ouvert) return (
-    <button type="button" onClick={() => setOuvert(true)} style={{ marginTop: 6, border: 'none', background: 'transparent', padding: 0, minHeight: 0, color: C.accent, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+    <button type="button" onClick={() => setOuvert(true)} style={{ marginTop: 6, border: 'none', background: 'transparent', padding: 0, minHeight: 0, color: C.accentTexte, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
       {limit ? 'Changer la limite de mon offre' : 'Indiquer la limite de mon offre Leboncoin'}
     </button>
   );
@@ -63306,8 +63306,8 @@ function LigneFamilleNotif({ c, on, disabled, onBascule }) {
 }
 function GuideReglage({ titre, etapes }) {
   return <details className="vrm-settings-guide" style={{background:C.card,borderColor:C.border,color:C.text}}>
-    <summary>{titre}<span style={{color:C.accent}}>Mode d’emploi</span></summary>
-    <ol>{etapes.map(([titreEtape, texte], i) => <li key={titreEtape}><span className="vrm-settings-step" style={{background:C.bg,color:C.accent}}>{i + 1}</span><div><b>{titreEtape}</b><p style={{color:C.muted}}>{texte}</p></div></li>)}</ol>
+    <summary>{titre}<span style={{color:C.accentTexte}}>Mode d’emploi</span></summary>
+    <ol>{etapes.map(([titreEtape, texte], i) => <li key={titreEtape}><span className="vrm-settings-step" style={{background:C.bg,color:C.accentTexte}}>{i + 1}</span><div><b>{titreEtape}</b><p style={{color:C.muted}}>{texte}</p></div></li>)}</ol>
   </details>;
 }
 
@@ -63537,10 +63537,10 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   // ── TES DONNÉES ET LES CONDITIONS
   const donnees = (
     <div style={{fontSize:13,color:C.muted,lineHeight:1.55}}>
-      <b style={{color:C.text}}>Exporter</b> : « Sauvegarde complète » {ongletsCompte ? '(Réglages)' : 'ci-dessous'}{AUTH.user ? <> · <b style={{color:C.text}}>Fermer ton compte</b> : « Fermer mon compte »</> : null}. Tes autres droits : <a href="/legal/confidentialite.html" target="_blank" rel="noopener" style={{color:C.accent}}>politique de confidentialité</a>.
+      <b style={{color:C.text}}>Exporter</b> : « Sauvegarde complète » {ongletsCompte ? '(Réglages)' : 'ci-dessous'}{AUTH.user ? <> · <b style={{color:C.text}}>Fermer ton compte</b> : « Fermer mon compte »</> : null}. Tes autres droits : <a href="/legal/confidentialite.html" target="_blank" rel="noopener" style={{color:C.accentTexte}}>politique de confidentialité</a>.
       <LigneContact/>
       <div style={{display:'flex',flexWrap:'wrap',gap:'4px 16px',marginTop:10}}>
-        {DOCS_LEGAUX.map(([h,t]) => <a key={h} href={h} target="_blank" rel="noopener" style={{color:C.accent,fontWeight:500,textDecoration:'none',minHeight:44,minWidth:44,display:'inline-flex',alignItems:'center'}}>{t}</a>)}
+        {DOCS_LEGAUX.map(([h,t]) => <a key={h} href={h} target="_blank" rel="noopener" style={{color:C.accentTexte,fontWeight:500,textDecoration:'none',minHeight:44,minWidth:44,display:'inline-flex',alignItems:'center'}}>{t}</a>)}
       </div>
     </div>
   );
@@ -63732,7 +63732,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       {ouvert ? (
         // ── SOUS-ÉCRAN (téléphone) ──
         <div className="vrm-set-nav">
-          <button type="button" className="vrm-set-retour" onClick={fermerSous} data-sous-retour="" style={{color:C.accent}}>
+          <button type="button" className="vrm-set-retour" onClick={fermerSous} data-sous-retour="" style={{color:C.accentTexte}}>
             <svg width="12" height="20" viewBox="0 0 12 20" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 2 2 10l8 8"/></svg>
             {titreRetour}
           </button>
@@ -64432,7 +64432,7 @@ function LigneContact() {
   return (
     <div data-contact="" style={{ marginTop: 9, fontSize: 13 }}>
       Contact : {e
-        ? <a href={`mailto:${e}`} style={{ color: C.accent, fontWeight: 500, textDecoration: 'none' }}>{e}</a>
+        ? <a href={`mailto:${e}`} style={{ color: C.accentTexte, fontWeight: 500, textDecoration: 'none' }}>{e}</a>
         : <span data-contact-absent="" style={{ color: C.muted }}>{CONTACT_A_VENIR}</span>}
     </div>
   );
@@ -64662,7 +64662,7 @@ function FacturesAbonnement({ fx }) {
               </span>
               <span style={{ fontSize: 13, fontWeight: 600, color: C.text, fontVariantNumeric: 'tabular-nums' }}>{montantLisible(f.montant, f.devise)}</span>
               {lien
-                ? <a href={lien} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, fontWeight: 600, color: C.accent, textDecoration: 'none', minWidth: 44, minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end' }}>{lienFacture(f.pdf) ? 'PDF' : 'Voir'}</a>
+                ? <a href={lien} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, fontWeight: 600, color: C.accentTexte, textDecoration: 'none', minWidth: 44, minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end' }}>{lienFacture(f.pdf) ? 'PDF' : 'Voir'}</a>
                 : <span style={{ minWidth: 34 }}/>}
             </div>
           );
@@ -65025,7 +65025,7 @@ function ColisEquipe({ vendeur, de, onPropre }) {
   const h3 = { fontSize: 13, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '.04em', margin: '22px 0 10px' };
   let corps;
   if (d === undefined) corps = <div data-equipe-etat="chargement" style={{ fontSize: 15, color: C.muted }}>Lecture des colis…</div>;
-  else if (d === null) corps = <div data-equipe-etat="pas-su"><LignePanne>Je n'ai pas pu lire les colis — la base n'a pas répondu. Rien n'est perdu. <button type="button" onClick={charger} style={{ border: 'none', background: 'transparent', color: C.accent, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>Réessayer</button></LignePanne></div>;
+  else if (d === null) corps = <div data-equipe-etat="pas-su"><LignePanne>Je n'ai pas pu lire les colis — la base n'a pas répondu. Rien n'est perdu. <button type="button" onClick={charger} style={{ border: 'none', background: 'transparent', color: C.accentTexte, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>Réessayer</button></LignePanne></div>;
   else if (d.nonInstalle) corps = <div data-equipe-etat="non-installe" style={{ ...carte, fontSize: 15, color: C.text }}>{EQUIPE_NON_INSTALLE_TXT}</div>;
   else if (d.sansAcces) corps = <div data-equipe-etat="sans-acces" style={{ ...carte, fontSize: 15, color: C.text, lineHeight: 1.55 }}>Tu n'as plus accès aux colis de cette équipe : l'invitation a été retirée, ou l'abonnement du vendeur n'est plus actif. Plus rien de sa boutique n'est lisible d'ici.</div>;
   else {
@@ -65057,7 +65057,7 @@ function ColisEquipe({ vendeur, de, onPropre }) {
     };
     corps = (<>
       {(d.bords === null || d.labels === null || d.relais === null || d.tracks === null) && (
-        <div data-equipe-partiel="" style={{ marginBottom: 12 }}><LignePanne>Une partie des colis n'a pas pu être lue (bordereaux ou codes) — ce qui manque n'est pas « vide ». <button type="button" onClick={charger} style={{ border: 'none', background: 'transparent', color: C.accent, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>Relire</button></LignePanne></div>
+        <div data-equipe-partiel="" style={{ marginBottom: 12 }}><LignePanne>Une partie des colis n'a pas pu être lue (bordereaux ou codes) — ce qui manque n'est pas « vide ». <button type="button" onClick={charger} style={{ border: 'none', background: 'transparent', color: C.accentTexte, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>Relire</button></LignePanne></div>
       )}
       <div style={h3}>À expédier · {ventes.length}</div>
       {!ventes.length && <div data-equipe-vide="ventes" style={{ fontSize: 15, color: C.muted }}>Aucun colis à expédier pour l'instant.</div>}
@@ -65076,7 +65076,7 @@ function ColisEquipe({ vendeur, de, onPropre }) {
               <div style={{ fontSize: 15, fontWeight: 600, color: C.text, overflowWrap: 'anywhere' }}>{numero ? `N°${numero} · ` : ''}{o.title || 'Article'}</div>
               <div style={{ fontSize: 13, color: C.muted, marginTop: 3 }}>{[plusieurs && compte(o) ? `compte ${compte(o)}` : '', b && b.dateLimite ? `à poster avant le ${b.dateLimite}` : ''].filter(Boolean).join(' · ') || o.status || ''}</div>
               {msg[k] && <div data-equipe-msg={k} style={{ fontSize: 13, color: C.warn, marginTop: 4 }}>{msg[k]}</div>}
-              {lien[k] && <a href={lien[k]} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: C.accent, fontWeight: 600 }}>Ouvrir le bordereau</a>}
+              {lien[k] && <a href={lien[k]} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: C.accentTexte, fontWeight: 600 }}>Ouvrir le bordereau</a>}
             </div>
             {row
               ? <button type="button" data-imprime="1" data-equipe-imprimer={k} onClick={() => imprimer(o, row, numero)} style={{ border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 12, padding: '10px 14px', fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', flex: '0 1 auto', maxWidth: 260 }}>🖨 Imprimer le bordereau</button>
@@ -65938,7 +65938,7 @@ function PushSetting() {
                 pas développeur : la marche à suivre doit être exacte, dans l'ordre,
                 avec le nom du réglage à taper. */}
             {proprio && <details className="vrm-repli" style={{marginTop:7}}><summary>Ce qu'il faut faire, une seule fois</summary>
-              <div>1. Ouvrir <a href="https://vercel.com/dashboard" target="_blank" rel="noreferrer" style={{color:C.accent,fontWeight:600}}>Vercel → projet de l'installation → Settings → Environment Variables</a></div>
+              <div>1. Ouvrir <a href="https://vercel.com/dashboard" target="_blank" rel="noreferrer" style={{color:C.accentTexte,fontWeight:600}}>Vercel → projet de l'installation → Settings → Environment Variables</a></div>
               <div>2. Ajouter la variable <code style={{fontSize:11}}>VAPID_PRIVATE_KEY</code> avec la clé privée que je t'ai donnée</div>
               <div>3. Redéployer (Deployments → ⋯ → Redeploy)</div>
               <div style={{marginTop:4,color:C.muted}}>La clé privée ne peut pas vivre dans le code : le dépôt est public, n'importe qui pourrait envoyer des notifications sur ton téléphone.</div>
@@ -66723,7 +66723,7 @@ function EmailsSetting({onComptes}) {
       <details className="vrm-email-aide-adresses"><summary>Comprendre les adresses et le transfert</summary>
       <div data-adresses-explication="" style={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',margin:'6px 0 12px'}}>
         <div style={{display:'grid',gridTemplateColumns:'auto 1fr',columnGap:9,rowGap:6,fontSize:13,lineHeight:1.45,color:C.text}}>
-          <span aria-hidden="true" style={{color:C.accent,marginTop:2}}><Icon name="mail" size={14}/></span>
+          <span aria-hidden="true" style={{color:C.accentTexte,marginTop:2}}><Icon name="mail" size={14}/></span>
           <span>VRM range tes emails Vinted (bordereaux, ventes, colis) dans ta boutique <b>grâce à l'adresse où ils arrivent</b>.</span>
           <span aria-hidden="true" style={{color:C.muted,marginTop:2}}><Icon name="check" size={14}/></span>
           <span><span style={{color:C.muted}}>Exemple :</span> Vinted t'écrit sur <b style={{whiteSpace:'nowrap'}}>tonnom@exemple.fr</b> → ajoute cette adresse ici.</span>
@@ -66736,7 +66736,7 @@ function EmailsSetting({onComptes}) {
         </div>
         <div data-adresse-transfert-vrm="" style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:8,marginTop:10,fontSize:12}}><span>Adresse de transfert : <b style={{overflowWrap:'anywhere'}}>{ADRESSE_COLLECTRICE}</b></span><button type="button" onClick={async()=>{try{await navigator.clipboard.writeText(ADRESSE_COLLECTRICE);toast('Adresse de transfert copiée.');}catch(_){toast('Sélectionne l’adresse affichée pour la copier.');}}} className="vrm-b vrm-b-secondaire vrm-b-petit">Copier l’adresse</button></div>
         <details style={{marginTop:8}}>
-          <summary style={{cursor:'pointer',fontSize:13,fontWeight:600,color:C.accent,padding:'13px 0',minHeight:44,boxSizing:'border-box'}}>Comment faire suivre mes emails Vinted vers VRM&nbsp;?</summary>
+          <summary style={{cursor:'pointer',fontSize:13,fontWeight:600,color:C.accentTexte,padding:'13px 0',minHeight:44,boxSizing:'border-box'}}>Comment faire suivre mes emails Vinted vers VRM&nbsp;?</summary>
           <ol style={{margin:'8px 0 0',paddingLeft:18,fontSize:12,color:C.text,lineHeight:1.5,display:'grid',gap:5}}>
             <li>Sur Vinted, dans chaque compte : <b>Paramètres → Notifications</b>, laisse les emails activés (ventes, bordereaux, messages).</li>
             <li>Ajoute ici <b>ton adresse personnelle</b>, celle où Vinted et les transporteurs t’écrivent. La boîte collective VRM n’est pas ton adresse personnelle.</li>
@@ -67051,7 +67051,7 @@ function RegimeSetting({ nu = false }) {
           </div>
           <div style={{fontSize:11,color:C.muted,marginTop:6,lineHeight:1.5}}>
             Le tien, vérifié sur{' '}
-            <a href="https://www.autoentrepreneur.urssaf.fr" target="_blank" rel="noopener noreferrer" style={{color:C.accent,fontWeight:700,textDecoration:'none'}}>autoentrepreneur.urssaf.fr →</a>
+            <a href="https://www.autoentrepreneur.urssaf.fr" target="_blank" rel="noopener noreferrer" style={{color:C.accentTexte,fontWeight:700,textDecoration:'none'}}>autoentrepreneur.urssaf.fr →</a>
             {' '}: l'app applique celui que tu poses ici.{' '}
             <Pourquoi label="De quoi se compose ce taux">Cotisations sociales, contribution à la formation, et versement libératoire de l'impôt si tu l'as choisi. Il dépend de ta situation et change d'une année à l'autre ; il sert au rapport mensuel et annuel.</Pourquoi>
           </div>
@@ -70072,7 +70072,7 @@ function AppCoeur() {
                   <div style={{fontSize:12,color:C.muted,fontWeight:500,marginTop:2,display:'flex',gap:8,flexWrap:'wrap'}}>
                     <span style={{color:p.online?INV_STATUS.online.color:C.muted}}>{p.online?'🟢 En ligne':'⚪ Retirée'}</span>
                     {p.onLbc && <span style={{color:LBC_ORANGE}}>🟠 Leboncoin</span>}
-                    {p.box!=null && <span style={{color:C.accent}}>Au garage</span>}
+                    {p.box!=null && <span style={{color:C.accentTexte}}>Au garage</span>}
                     {p.buyPrice && <span>achat {prixCourt(String(p.buyPrice).replace(',', '.'))}</span>}
                     {p.price && <span>· {prixCourt(String(p.price).replace(',', '.'))}</span>}
                   </div>
@@ -70214,7 +70214,7 @@ function AppCoeur() {
         {!ordi && gsOpen && champRechercheMobile}
         <div className="vrm-header-actions">
           <div style={{display:'flex',alignItems:'center'}}>
-            {false&&<span style={{color:C.accent,fontWeight:500}}>📦 {Object.values(garageGrid).flatMap(a=>Array.isArray(a)?a:[]).filter(v=>v&&v.trim()!=='').length}</span>}
+            {false&&<span style={{color:C.accentTexte,fontWeight:500}}>📦 {Object.values(garageGrid).flatMap(a=>Array.isArray(a)?a:[]).filter(v=>v&&v.trim()!=='').length}</span>}
             {false&&<span style={{color:C.muted,fontWeight:500}}>💸 {sales.length}</span>}
             <span style={{position:'relative',display:'inline-flex'}}>
             <BoutonSync ouvert={syncOuvert} onBasculer={()=>setSyncOuvert(v=>!v)}/>

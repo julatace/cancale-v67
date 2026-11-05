@@ -189,8 +189,8 @@ html body .vrm-num-petit { padding: 1px 6px; font-size: 12px; }
 html body .vrm-num-grand { padding: 3px 9px; font-size: 17px; }
 :root[data-theme="dark"] body .vrm-num { background: #48484A; color: #F5F5F7; }
 /* Le SEUL rouge de l'app : deux articles présents sous ce N° (§5, §7). */
-html body .vrm-num[data-num-etat="doublon"] { background: #D70015; color: #FFFFFF; }
-:root[data-theme="dark"] body .vrm-num[data-num-etat="doublon"] { background: #FF6961; color: #000000; }
+html body .vrm-num[data-num-etat="doublon"] { background: var(--vrm-doublon); color: #FFFFFF; }
+:root[data-theme="dark"] body .vrm-num[data-num-etat="doublon"] { background: var(--vrm-doublon); color: #000000; }
 /* À vérifier sur son carton : un geste à faire, en ambre. */
 html body .vrm-num[data-num-etat="aVerifier"] { background: #B25000; color: #FFFFFF; }
 :root[data-theme="dark"] body .vrm-num[data-num-etat="aVerifier"] { background: #FFB340; color: #000000; }
