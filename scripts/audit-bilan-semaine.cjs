@@ -14,7 +14,8 @@
 //      la DONNÉE qui déclenche (un compte lu jeudi, Leboncoin illisible…),
 //      jamais une formulation attendue ;
 //   6. « bilan » est une catégorie de notification, activée par défaut, la même
-//      des deux côtés (Réglages → notifications ⇄ api/_lib/push.js).
+//      des deux côtés (Réglages → notifications ⇄ api/_lib/notif-textes.js, la
+//      famille « Rappels » depuis le 3 nov.).
 //
 //   node scripts/audit-bilan-semaine.cjs            → le contrôle
 //   node scripts/audit-bilan-semaine.cjs --recopie  → refabrique le miroir depuis App.jsx
@@ -260,13 +261,37 @@ if (process.argv.includes('--recopie')) {
 
   console.log('\n── 6. « bilan » est une catégorie de notification, la même des deux côtés');
   await essaie('catégories', async () => {
-    try { pushLib = await import('file://' + path.join(R, 'api', '_lib', 'push.js')); } catch (e) { pushLib = {}; }
-    const D = pushLib.PUSH_DEFAUT || {};
-    const cats = [...(app || '').matchAll(/\{\s*id:'(\w+)',\s*def:(true|false)/g)].map((m) => [m[1], m[2] === 'true']);
-    dit(D.bilan === true, 'serveur : « bilan » activé par défaut (PUSH_DEFAUT)');
-    dit(cats.some(([id, def]) => id === 'bilan' && def === true), 'app : « Bilan de la semaine » dans Réglages → notifications, activé par défaut');
-    const ecarts = cats.filter(([id, def]) => D[id] !== def).map(([id]) => id).concat(Object.keys(D).filter((k) => !cats.some(([id]) => id === k)));
-    dit(cats.length > 0 && ecarts.length === 0, 'mêmes catégories et mêmes défauts dans l’app et sur le serveur', ecarts.join(', '));
+    // (5 nov.) Depuis le 3 nov. (d957146e) Réglages → Notifications montre des
+    // FAMILLES (sept depuis le 5 nov., 5a5c6648) : la catégorie « bilan » est
+    // dans la famille « Rappels ». La règle jugée reste la même : le bilan est
+    // dans l'écran, allumé par défaut, et ce que l'écran montre est ce que le
+    // serveur décide. Les familles et leur état viennent du module du serveur
+    // (api/_lib/notif-textes.js), EXÉCUTÉ ici — jamais un libellé.
+    try { pushLib = await import('file://' + path.join(R, 'api', '_lib', 'notif-textes.js')); } catch (e) { pushLib = {}; }
+    const { FAMILLES = [], FAMILLE_DE = {}, decisionNotif, familleActive } = pushLib;
+    const sansCom = (app || '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    const imp = /import\s*\{([^}]*)\}\s*from\s*'\.\.\/api\/_lib\/notif-textes\.js'/.exec(sansCom);
+    const nomLocal = (n) => { const m = imp && new RegExp(`\\b${n}\\b(?:\\s+as\\s+(\\w+))?`).exec(imp[1]); return m ? (m[1] || n) : null; };
+    const famLoc = nomLocal('FAMILLES'), actLoc = nomLocal('familleActive');
+    // L'écran : la liste qu'il rend est CELLE du serveur, et l'état d'un interrupteur
+    // est `familleActive` du serveur.
+    const listeEcran = (/const PUSH_FAMILLES\s*=\s*(\w+)\s*;/.exec(sansCom) || [])[1];
+    const etatEcran = /const actif\s*=\s*\(c\)\s*=>\s*(\w+)\(prefs \|\| \{\}, c\.id\)/.exec(sansCom);
+    const grp = (/const GROUPES_NOTIF\s*=\s*\[([\s\S]*?)\];/.exec(sansCom) || [])[1] || '';
+    const idsEcran = [...grp.matchAll(/'(\w+)'/g)].map((m) => m[1]);
+    const resteAffiche = /if \(reste\.length\) out\.push/.test(sansCom);
+    const famBilan = FAMILLE_DE.bilan;
+    const affichee = (id) => idsEcran.includes(id) || resteAffiche;
+    dit(typeof decisionNotif === 'function' && decisionNotif({}, 'bilan') === true, 'serveur : « bilan » sonne par défaut (aucun réglage posé ⇒ decisionNotif vrai)');
+    dit(!!famLoc && listeEcran === famLoc && !!actLoc && !!etatEcran && etatEcran[1] === actLoc && !!famBilan && FAMILLES.some((f) => f.id === famBilan && f.def === true) && affichee(famBilan) && typeof familleActive === 'function' && familleActive({}, famBilan) === true,
+      'app : « Bilan de la semaine » dans Réglages → notifications, activé par défaut', `famille ${famBilan || '—'} · liste ${listeEcran || '—'} · état ${etatEcran ? etatEcran[1] : '—'}`);
+    // Mêmes catégories, mêmes défauts : chaque catégorie qui sonne est dans une
+    // famille de l'écran, et, sans réglage, ce que l'écran montre pour sa famille
+    // est ce que le serveur décide pour elle.
+    const ecarts = typeof decisionNotif === 'function' && typeof familleActive === 'function'
+      ? Object.keys(FAMILLE_DE).filter((cat) => { const f = FAMILLES.find((x) => x.id === FAMILLE_DE[cat]); return !f || !affichee(f.id) || familleActive({}, f.id) !== decisionNotif({}, cat) || decisionNotif({}, cat) !== f.def; })
+      : ['notif-textes illisible'];
+    dit(FAMILLES.length > 0 && Object.keys(FAMILLE_DE).length > 0 && ecarts.length === 0, 'mêmes catégories et mêmes défauts dans l’app et sur le serveur', ecarts.join(', '));
   });
   await essaie('publication', async () => {
     const sync = (/const SYNC_KEYS = \[([\s\S]*?)\];/.exec(app || '') || [])[1] || '';

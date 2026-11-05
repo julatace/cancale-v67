@@ -153,3 +153,64 @@ Styles `vrm-fo-*` dans `src/styles-achats-outils.css` (échelle Fusion).
   `etatArticle` (source `gros`, « achat en gros » sous la tuile Achat). Un prix retapé
   ensuite reste « saisi à la main ». `audit-fournisseurs` P1/P2 (P1 rouge sur la fusion
   d'avant la correction, 853aff8d).
+
+## Le registre des achats lit les achats en gros (5 nov., branche locale `v34-stock-vc-registre`)
+« Ce qui reste » n°1 ci-dessus.
+
+### Ce qui est fait — `registreDesAchats` (src/registres.js), carte `RegistresCarte`
+- La carte passe `gros: lireRegistre(load('vrm_fournisseurs'))` (LA règle du registre,
+  src/fournisseurs.js) ; elle se relit quand `vrm_fournisseurs`, les fiches ou les
+  achats hors plateforme changent (ici ou venus d'un autre appareil).
+- **Un achat en gros = UNE ligne** : sa date, son fournisseur (la personne qu'IL a
+  créée), « Paires » = son nombre de paires, « Montant » = total + frais, « Dont
+  frais » = les frais. « Frais confirmés » = ceux qu'IL a tapés sur l'achat (champ
+  « Frais, transport… ») : un achat sans frais saisis compte son total seul. Le N° =
+  les paires reliées par SON clic (`buyGros`), « Article » = « En gros · 10 paires ·
+  2 reliées ». Un achat dont le fournisseur a été retiré n'y est plus (il est parti
+  avec lui, `sansFournisseur`).
+- **Aucun double compte** :
+  - jamais la somme des parts posées sur ses paires (le total, une fois) ;
+  - une fiche reliée à un achat en gros (`buyGros`) ne prête jamais son prix à un
+    achat Vinted relié par `buyFromId` (données incohérentes possibles) : l'achat
+    Vinted retombe sur son reçu ou « article seul » ;
+  - un achat hors plateforme RATTACHÉ à un fournisseur reste UNE ligne (son prix
+    saisi), au nom du fournisseur, jamais ajouté à un achat en gros ; le même achat
+    saisi deux fois (même id) n'est lu qu'une fois ;
+  - un achat hors plateforme dont le N° est une paire reliée à un achat en gros est
+    gardé (on ne jette rien) et dit « N° aussi dans un achat en gros : à vérifier »
+    (ligne « À vérifier » du résumé, en ambre sur la carte).
+- Résumé : « Achats en gros (une ligne chacun, par leur total) N » ; la carte dit
+  « · dont N achats en gros ». Tableur et PDF : colonnes « Paires » et « Dont frais »
+  (largeurs du PDF retouchées pour tenir à l'italienne).
+
+### Preuves
+- `node scripts/audit-registres.cjs` : **62 verts + 4 rouges PDF** dans le dépôt —
+  ⚠️ `pdfjs-dist` n'est pas dans `node_modules` (une autre branche s'en occupe) : les
+  4 rouges sont « le PDF se crée et se relit » ×2 et leurs deux contrôles. Avec
+  `pdfjs-dist@4.10.38` posé hors du dépôt (`VRM_RACINE` vers une racine dont
+  `node_modules` l'a) : **64/64 verts**. `--prouve` (nouveau) : **18/18 mutations**
+  attrapées hors PDF (les 10 d'avant + somme des parts, prix du lot relu « saisi »
+  d'un achat Vinted, achats en gros oubliés, frais oubliés, hors rattaché compté deux
+  fois, rattachement sans nom, « à vérifier » tu, carte qui ne passe pas le registre).
+  Sur l'arbre de `claude/project-review-nsk5su` : **16 rouges** (dont le double compte
+  réel : l'achat Vinted reprenait la part 32,50 € du lot comme « saisi »).
+- Banc `scripts/bancs/registres.cjs` (données inventées : un grossiste, 300 € + 25 € de
+  frais pour 10 paires ce mois, 50 € le mois d'avant, deux paires reliées dont une
+  aussi à l'achat Vinted 71002, un achat hors plateforme rattaché de 120 €) — 1512 et
+  390 tactile, clair et sombre, PDF et tableur téléchargés et relus : **112 verts**
+  (lancé depuis la racine qui a `pdfjs-dist`). Captures regardées (carte « 4 · au
+  moins 510,50 € · dont 1 achat en gros », PDF à l'italienne, tableur). Sur le build
+  de `claude/project-review-nsk5su` : **36 rouges / 112** (9 par configuration : pas de
+  ligne en gros, l'achat Vinted 71002 à 32,50 € — la part du lot —, le rattaché au nom
+  « Fournisseur »).
+- `npm run build` vert.
+- Voisins verts : `fournisseurs` 52, `achats-sourcing` 32, `benefice` 48, `urssaf`,
+  `coherence`, `identite`, `icones`, `fonctions-api`.
+
+### Ce qui reste
+- Les achats en gros ne sont pas « réglés » (aucun mode de règlement saisi : colonne
+  « Règlement » vide) ; à ajouter au formulaire s'il le veut pour son comptable.
+- « À vérifier » ne règle rien tout seul : c'est lui qui dit si l'achat hors plateforme
+  et l'achat en gros sont le même argent (le détacher ou le supprimer).
+- Geste de Julien : Compta → Registres → Tableur du mois, vérifier la ligne de son
+  achat en gros.

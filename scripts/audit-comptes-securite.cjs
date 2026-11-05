@@ -169,7 +169,7 @@ async function audit(fichiers, bavard) {
       lireVendeur: async (c) => { lus.push(c); if (/vinted_accounts/.test(c)) return [{ vinted_user_id: '111' }]; return []; },
       lireService: async (c) => { lus.push('SERVICE ' + c); return [{ id: 'favoris_file_' + require('crypto').createHash('sha256').update('111').digest('hex'), groupe: { jobs: [{ etat: 'envoye', envoyeLe: 1793019613888, itemId: '5', message: 'secret', recipientId: '99' }] } }]; } });
     const serv = lus.filter((x) => /^SERVICE/.test(x));
-    dit(serv.length === 1 && serv[0].includes(`proprietaires=cs.${encodeURIComponent(JSON.stringify([A]))}`) && serv[0].includes(`data->groupes->${A}`), '4.17 la file des favoris : seulement celles où il est propriétaire, seulement SA part', serv[0]);
+    dit(serv.length === 1 && serv[0].includes(`proprietaires=cs.${encodeURIComponent(JSON.stringify([A]))}`) && serv[0].includes(`data->groupes->${encodeURIComponent('"' + A + '"')}`), '4.17 la file des favoris : seulement celles où il est propriétaire, seulement SA part', serv[0]);
     dit(lus.filter((x) => /^app_data/.test(x)).every((x) => x.includes(`owner=eq.${A}`)), '4.18 chaque ligne lue en son nom porte AUSSI le filtre sur son identifiant', JSON.stringify(lus));
     dit(!lus.some((x) => /select=[^&]*\bdata(&|,|$)/.test(x)), '4.19 jamais `select=data` (un bordereau porte son PDF)', JSON.stringify(lus));
     dit(j.evenements.length === 1 && j.evenements[0].compte === '111' && !/secret|99/.test(JSON.stringify(j.evenements)), '4.20 le compte retrouvé par l\'empreinte, ni message ni destinataire rendus', JSON.stringify(j.evenements));

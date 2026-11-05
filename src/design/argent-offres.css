@@ -24,7 +24,7 @@
 .vrm-of-btn:focus-visible, .vrm-of-lien:focus-visible, .vrm-of-champ:focus-visible { outline: 2px solid var(--fu-bleu); outline-offset: 2px; }
 .vrm-of-champ { min-height: 44px; width: 120px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid var(--fu-piste); background: var(--fu-carte); color: var(--fu-encre); font: inherit; font-size: 17px; font-weight: 700; font-variant-numeric: var(--fu-chiffres); }
 .vrm-of-erreur { flex: 1 1 100%; font-size: 13px; color: var(--fu-ambre-txt); }
-.vrm-of-lien { display: inline-flex; align-items: center; align-self: flex-start; min-height: 44px; font-size: 15px; font-weight: 600; color: var(--fu-bleu); text-decoration: none; }
+.vrm-of-lien { display: inline-flex; align-items: center; align-self: flex-start; min-height: 44px; font-size: 15px; font-weight: 600; color: var(--vrm-accent-texte); text-decoration: none; }
 .vrm-of-resultat { font-size: 13px; color: var(--fu-gris); line-height: 1.45; }
 .vrm-of-resultat[data-vc-offre-resultat="ok"] { color: var(--fu-encre); font-weight: 600; }
 .vrm-of-resultat[data-vc-offre-resultat="ko"] { color: var(--fu-ambre-txt); }
