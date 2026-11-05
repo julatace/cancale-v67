@@ -27,35 +27,55 @@
 
 export const FAMILLES = [
   { id: 'ventes', titre: 'Ventes', def: true },
-  { id: 'poster', titre: 'Colis à poster', def: true },
-  { id: 'arrives', titre: 'Colis arrivés', def: true },
   { id: 'offres', titre: 'Offres', def: true },
   { id: 'messages', titre: 'Messages', def: true },
-  { id: 'compta', titre: 'Compta', def: true },
+  { id: 'poster', titre: 'Colis à poster', def: true },
+  { id: 'arrives', titre: 'Codes de retrait', def: true },
+  { id: 'doublevente', titre: 'Double vente', def: true },
+  { id: 'rappels', titre: 'Rappels', def: true },
 ];
 
-// Catégorie (le mot que chaque route passe à `pushCategorieActive`) → famille.
+// Catégorie (le mot que chaque route passe à `pushCategorieActive` et à
+// `sendPushToAll({ cat })`) → famille.
+// (5 nov., Julien : « personnalisable comme on veut ») SEPT types au lieu de six :
+// la double vente a le sien (elle était dans Ventes) et « Compta » devient
+// « Rappels » (URSSAF, bilan de la semaine, la veille au soir, l'agent eBay, les
+// factures). `test` n'appartient à aucune famille : l'essai sonne toujours.
 export const FAMILLE_DE = {
-  vente: 'ventes', argent: 'ventes', doublevente: 'ventes', agentebay: 'ventes',
-  expedier: 'poster', soir: 'poster',
+  vente: 'ventes', argent: 'ventes',
+  doublevente: 'doublevente',
+  expedier: 'poster',
   colis: 'arrives',
   offre: 'offres', offremini: 'offres',
   message: 'messages', action: 'messages', favoris: 'messages',
-  urssaf: 'compta', bilan: 'compta', facture: 'compta',
+  soir: 'rappels', urssaf: 'rappels', bilan: 'rappels', facture: 'rappels', agentebay: 'rappels',
 };
+// Un type NEUF hérite du réglage de la famille d'où il sort tant qu'il n'est pas
+// posé lui-même : il avait coupé « Ventes », la double vente reste coupée ; il
+// avait coupé « Compta », les rappels restent coupés. Une catégorie qui a changé
+// de famille (la veille au soir était dans « Colis à poster », l'agent eBay dans
+// « Ventes ») garde l'ancien réglage de sa famille d'avant. Une seule règle, ici.
+export const HERITE = { doublevente: 'ventes', rappels: 'compta' };
+export const HERITE_CAT = { soir: 'poster', agentebay: 'ventes' };
 export const CATEGORIES_RETIREES = new Set(['suivi', 'achat', 'favori']);
 export const familleDe = (cat) => FAMILLE_DE[cat] || null;
+const famillesDe = (p) => (p && p.familles && typeof p.familles === 'object' ? p.familles : {});
 
 // La décision, à partir des préférences LUES. Ordre : catégorie retirée ⇒ non ;
-// la famille réglée ⇒ elle décide ; sinon l'ancien réglage de la catégorie (ce
-// qu'il avait choisi avant les familles) ; sinon le défaut de la famille.
+// la famille réglée ⇒ elle décide ; sinon la famille d'avant (héritage) ; sinon
+// l'ancien réglage de la catégorie (ce qu'il avait choisi avant les familles) ;
+// sinon le défaut de la famille.
 export function decisionNotif(prefs, cat) {
-  if (!cat) return true;
+  if (!cat || cat === 'test') return true;
   if (CATEGORIES_RETIREES.has(cat)) return false;
   const p = prefs && typeof prefs === 'object' ? prefs : {};
+  const fs = famillesDe(p);
   const fam = familleDe(cat);
-  const f = p.familles && typeof p.familles === 'object' ? p.familles[fam] : undefined;
-  if (typeof f === 'boolean') return f;
+  if (typeof fs[fam] === 'boolean') return fs[fam];
+  const hc = HERITE_CAT[cat];
+  if (hc && typeof fs[hc] === 'boolean') return fs[hc];
+  const hf = HERITE[fam];
+  if (hf && typeof fs[hf] === 'boolean') return fs[hf];
   if (typeof p[cat] === 'boolean') return p[cat];
   const d = FAMILLES.find((x) => x.id === fam);
   return d ? d.def : true;
@@ -64,10 +84,61 @@ export function decisionNotif(prefs, cat) {
 // réglée ⇒ elle ; sinon allumée si une de ses catégories l'est.
 export function familleActive(prefs, fam) {
   const p = prefs && typeof prefs === 'object' ? prefs : {};
-  const f = p.familles && typeof p.familles === 'object' ? p.familles[fam] : undefined;
+  const f = famillesDe(p)[fam];
   if (typeof f === 'boolean') return f;
   const cats = Object.keys(FAMILLE_DE).filter((c) => FAMILLE_DE[c] === fam);
-  return cats.some((c) => decisionNotif({ ...p, familles: {} }, c));
+  return cats.some((c) => decisionNotif(p, c));
+}
+
+// ── HEURES CALMES ET REGROUPEMENT (5 nov.) ─────────────────────────────────
+// Réglés dans Paramètres → Notifications, rangés dans la même ligne
+// `push_prefs` : `calme: { actif, debut: 'HH:MM', fin: 'HH:MM', sauf: [familles] }`
+// et `regrouper: true|false`. Lus par le serveur juste avant d'envoyer
+// (api/_lib/push.js) : pendant les heures calmes, RIEN ne sonne — la
+// notification est rangée dans le centre de l'app (« heures calmes »), jamais
+// perdue. Les heures sont celles de PARIS (VRM reste en France, §3), quelle que
+// soit l'horloge du serveur. Par défaut la double vente sonne quand même (le
+// seul cas où attendre le matin coûte une paire).
+export const CALME_DEFAUT = { actif: false, debut: '22:00', fin: '08:00', sauf: ['doublevente'] };
+const HHMM = /^([01]\d|2[0-3]):([0-5]\d)$/;
+export const heureValide = (h) => HHMM.test(String(h || ''));
+const minutesDe = (h) => { const m = HHMM.exec(String(h || '')); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
+export function reglageCalme(prefs) {
+  const c = prefs && prefs.calme && typeof prefs.calme === 'object' ? prefs.calme : {};
+  return {
+    actif: c.actif === true,
+    debut: heureValide(c.debut) ? c.debut : CALME_DEFAUT.debut,
+    fin: heureValide(c.fin) ? c.fin : CALME_DEFAUT.fin,
+    sauf: Array.isArray(c.sauf) ? c.sauf.filter((x) => FAMILLES.some((f) => f.id === x)) : CALME_DEFAUT.sauf.slice(),
+  };
+}
+// L'heure de Paris d'un instant, en minutes depuis minuit (`null` si illisible).
+export function minutesParis(t = Date.now()) {
+  try {
+    const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(t));
+    const h = Number((parts.find((x) => x.type === 'hour') || {}).value), m = Number((parts.find((x) => x.type === 'minute') || {}).value);
+    return Number.isFinite(h) && Number.isFinite(m) ? (h % 24) * 60 + m : null;
+  } catch (_) { return null; }
+}
+// Vrai si `t` tombe dans les heures calmes (une plage qui passe minuit compte,
+// 22:00 → 08:00 ; début = fin ne fait rien). Une famille exemptée ⇒ non.
+export function dansHeuresCalmes(prefs, cat, t = Date.now()) {
+  const c = reglageCalme(prefs);
+  if (!c.actif || !cat || cat === 'test') return false;
+  if (c.sauf.includes(familleDe(cat))) return false;
+  const d = minutesDe(c.debut), f = minutesDe(c.fin), m = minutesParis(t);
+  if (d == null || f == null || m == null || d === f) return false;
+  return d < f ? (m >= d && m < f) : (m >= d || m < f);
+}
+// Regrouper : sur le téléphone, une seule notification PAR TYPE (la nouvelle
+// remplace l'ancienne et dit combien attendent dans le centre).
+export const regrouper = (prefs) => !!(prefs && prefs.regrouper === true);
+// Le texte d'une notification regroupée : `k` notifications de ce type non lues
+// dans le centre (celle-ci comprise). k ≤ 1 ⇒ inchangé.
+export function texteRegroupe({ title, body }, k) {
+  if (!(k > 1)) return { title, body };
+  const autres = k - 1;
+  return { title, body: `${body ? body + ' · ' : ''}+${autres} autre${autres > 1 ? 's' : ''} dans VRM` };
 }
 
 // ── LES TEXTES ─────────────────────────────────────────────────────────────

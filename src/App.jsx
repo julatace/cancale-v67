@@ -43,7 +43,7 @@ import {preparerLiaisonOAuth,lireLiaisonOAuth,resultatLiaisonPermis} from './aut
 import { SqueletteChargement } from "./Chargement.jsx";
 import ConnexionsCompte from './auth/ConnexionsCompte.jsx';
 import {etatColisDepuisTexte,normaliserSuivi} from '../api/_lib/etat-colis-email.js';
-import {FAMILLES as FAMILLES_NOTIF,familleActive as familleNotifActive} from '../api/_lib/notif-textes.js';
+import {FAMILLES as FAMILLES_NOTIF,familleActive as familleNotifActive,reglageCalme,heureValide} from '../api/_lib/notif-textes.js';
 import {achatDuColis,suivisAchat,entreeIndexAchat} from './liensColis.js';
 import {achatParConversation, regrouperArrivees} from '../api/_lib/achat-arrive-relais.js';
 import {arriveesRelues} from './arriveesRelues.js';
@@ -97,8 +97,12 @@ import QuiDorment from "./design/QuiDorment.jsx";
 import OffresVestiaire from "./OffresVestiaire.jsx";
 import { offresVestiaire, euros } from "./offresVestiaire.js";
 import PorteMonnaie from "./PorteMonnaie.jsx";
+import Dac7Comptes from "./Dac7Comptes.jsx";
+import { dac7ParCompte, indexComptesVentes, emailsFiscaux, blocagesFiscauxVinted, csvDac7, pdfDac7, nomFichierDac7 } from "./dac7Comptes.js";
 import { porteMonnaieParCompte } from "./porteMonnaie.js";
 import AnnoncesMasquees from "./AnnoncesMasquees.jsx";
+import { BoutonCentreNotifs, FeuilleCentreNotifs } from "./CentreNotifs.jsx";
+import { nombreNonLues, marquerLues } from "./journalNotifs.js";
 import { masqueesParCompte } from "./annoncesMasquees.js";
 import { rythmeVendu, ecartPct, quandTuVends, margesPar, delaisPar, tranchePrix, TRANCHES_PRIX, stockQuiDort, SEUILS_DORT, rotationStock, tauxVenteMois, tauxAnnulation, PERIODES, bornesPeriode, dansBornes, venduPeriode, barresPeriode, ventesPar, plusRapides } from "./statsVentes.js";
 import "./stats-vitrine.css";
@@ -121,9 +125,10 @@ import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
 import {colisEbay} from '../api/_lib/ebay-a-expedier.js';
 import {annoncesVcEnLigne,stockVestiaire,retraitsVestiaire,VC_VENTE_ETAPES,VC_ANNONCE_ETATS,etapeMotVc,vcVenteAnnulee,vcVentePartie,numVcVente,numVcAnnonce,numerosVcAvecLiens,montantRecuVc,dateVersementVc,dateVenteVc,ventesVcDe,colisVcAPoster,resumeColisVc,etatAnnonceVcBrut} from '../api/_lib/vestiaire-regle.js';
 import {colisLbcAPoster,lbcColisAPoster,totalColis,colisLbcVendeur} from '../api/_lib/colis-sites.js';
-import {CLE_COMPTES_EXCLUS,excluAutreDe,estExclu,basculerExclu,compteDeVente} from '../api/_lib/comptes-exclus.js';
+import {CLE_COMPTES_EXCLUS,excluAutreDe,estExclu,basculerExclu,compteDeVente,exclusNormes} from '../api/_lib/comptes-exclus.js';
 import {PLATEFORMES_COMPTES,etatCompteLie,ageLecture,comptesLbcLies,comptesVcLies,comptesEbayLies,refDeLigneEbay,nomCompteLie,LIBELLE_ETAT} from './comptesLies.js';
 import './comptes-lies.css';
+import './centre-notifs.css';
 import './comptes-securite.css';
 import { CLE_MONTANTS_CACHES, lireMontantsCaches, installerMasque } from './montantsCaches.js';
 import { deconnecterPartout, texteConfirmationPartout, ligneJournal, filtrerJournal, comptesDuJournal, FILTRES_TYPE } from './securiteCompte.js';
@@ -167,6 +172,7 @@ import { installerFiltreSupprimes, sansComptesSupprimes, lireSupprimes, CLE_SUPP
 import { lectureComplete, construirePhoto, ecrirePhoto, lirePhoto, listeDuSoir, joursAvantJour, heurePhoto, adresseQrLocale, CACHE_QR } from "./journeeHorsLigne.js";
 import { jetonsStream, demarrerStream } from "./streamFlou.js";
 import { DISCORD_ERREURS } from "./communaute/discordErreurs.js";
+import { ecouterPartage } from "./communaute/accompagnement.js";
 import { noterTicketDiscord, ecouterDiscord, suivreCodeDiscord, etatCodeDiscord, reprendreDiscord, oublierTicketDiscord } from "./communaute/discordAttente.js";
 import { DESCRIPTION_ORGANISATION } from "./operations/description.js";
 // (31 oct.) Colis → « À retirer » : la carte des points relais (règle pure + carte).
@@ -2082,6 +2088,10 @@ const SYNC_KEYS = [
   // par l'écran Ventes (`totals`, son propriétaire, §11), CONSOMMÉ par
   // Comptabilité (« Ton bénéfice »). Tableaux compacts, deux années au plus.
   'vrm_benefice_jours',
+  // (5 novembre) Les ACHATS cumulés JOUR PAR JOUR : PUBLIÉS par l'écran Achats (la
+  // règle de « Dépensé », son propriétaire, §11), CONSOMMÉS par le partage des
+  // groupes d'accompagnement (src/communaute/accompagnement.js). [n, centimes].
+  'vrm_achats_jours',
   // (20 octobre) Afficher la carte « Ton bénéfice » dans Ma journée : un CHOIX
   // (31 oct. : absent = montré dès qu'il y a un bénéfice publié ; `false` =
   // masqué depuis Ma journée), rattrapé par `onCloudReady` seulement s'il est
@@ -37083,6 +37093,101 @@ function RegistresCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accoun
     </div></Card>
   );
 }
+// ── (5 nov.) DAC7 COMPTE PAR COMPTE — Comptabilité → Le détail → « DAC7 » ──
+// Julien : « mettre les rapports DAC7 pour chaque compte, capter tout ce qu'on
+// peut ». La règle : src/dac7Comptes.js (les cartes) et src/seuilsAnnee.js (le
+// seuil, partagé avec « DAC7 par plateforme »). Les ventes : `useDeclarablesCompta`,
+// la MÊME lecture que les registres et le CA déclaré (datées au versement,
+// comptes exclus dehors). Le compte d'une vente : celui qu'elle PORTE
+// (`indexComptesVentes`). Les comptes connus : Vinted (`accounts`) et les
+// autres sites (`useComptesAutresSites`, l'écran Comptes liés). Lectures
+// PROJETÉES : les sujets d'e-mails fiscaux (filtrés par la base, jamais
+// `select=data`) et `taxpayer_restricted` du porte-monnaie Vinted.
+const ETAT_LECTURE = (v, lu) => (v === undefined ? 'encours' : lu ? 'lu' : 'passu');
+const MOTS_FISCAUX = ['dac', 'fiscal', 'impot', 'impôt', 'contribuable', 'taxpayer', 'recapitulatif', 'récapitulatif', 'releve annuel', 'relevé annuel', 'rapport annuel'];
+const lireEmailsFiscaux = async () => {
+  // ⚠️ `meta->>` (migration 004), jamais `data->>` : filtrer sur `data` décompresse
+  //    chaque ligne `email_*`, bordereaux et leurs PDF compris (§5). Mesuré le 5 nov. :
+  //    35 527 blocs lus et 115 ms par `data`, 5 807 et 30 ms par `meta`, mêmes lignes.
+  const ou = MOTS_FISCAUX.map((m) => `meta->>subject.ilike.*${m}*`).join(',');
+  const q = `id=like.email_*&or=(${encodeURIComponent(ou)})&select=id,s:meta->>subject,f:meta->>from,to:meta->>to,at:meta->>receivedAt`;
+  const l = await lireTout(q).catch(() => null);
+  return Array.isArray(l) ? l : null;
+};
+function Dac7ComptesCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts }) {
+  const { calc, versements } = useDeclarablesCompta({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts });
+  const { ventes, ko } = useVentesCoque();
+  const ventesVcER = useVentesVestiaire();
+  const [autres] = useComptesAutresSites();
+  const [exclusAutres] = useComptesExclus();
+  const an = new Date().getFullYear();
+  const annees = React.useMemo(() => [an, an - 1], [an]);
+  const [annee, setAnnee] = React.useState(an);
+  const [emailsLus, setEmailsLus] = React.useState(undefined);
+  const [billing, setBilling] = React.useState(undefined);
+  React.useEffect(() => {
+    let mort = false;
+    lireEmailsFiscaux().then((l) => { if (!mort) setEmailsLus(l); }).catch(() => { if (!mort) setEmailsLus(null); });
+    lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_billing&select=id,tr:data->payload->>taxpayer_restricted,cap:data->>capturedAt`)
+      .then((b) => { if (!mort) setBilling(Array.isArray(b) ? b : null); }).catch(() => { if (!mort) setBilling(null); });
+    return () => { mort = true; };
+  }, []);
+  const [enCours, setEnCours] = React.useState('');
+  const R = React.useMemo(() => {
+    if (calc.etat === 'encours') return { etat: 'encours', annee };
+    if (calc.etat !== 'lu') return { etat: 'passu', annee };
+    const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+    const labels = load('vinted_account_labels', {}) || {};
+    const nomVinted = (uid, login) => labels[uid] || login || uid;
+    const ecarteV = (uid) => compteEcarte(uid, hAcc, panelOff || {});
+    const ex = exclusNormes(exclusAutres);
+    const P = { leboncoin: 'Leboncoin', vestiaire: 'Vestiaire', ebay: 'eBay' };
+    const comptes = [], exclus = [], nomsAutres = {};
+    for (const a of (accounts || [])) {
+      if (!a || a.vinted_user_id == null) continue;
+      const uid = String(a.vinted_user_id);
+      const c = { plateforme: 'Vinted', cle: uid, nom: nomVinted(uid, a.login) };
+      (ecarteV(uid) ? exclus : comptes).push(c);
+    }
+    for (const [k, nomP] of Object.entries(P)) {
+      for (const c of ((autres && autres[k]) || [])) {
+        if (!c || !c.id) continue;
+        nomsAutres[`${nomP}|${c.id}`] = c.nom || '';
+        (ex[k] && ex[k].has(String(c.id)) ? exclus : comptes).push({ plateforme: nomP, cle: String(c.id), nom: nomCompteLie(c) });
+      }
+    }
+    const lbc = lbcCoqueLu === true ? ((lbcVentes && lbcVentes.ventes) || []) : [];
+    const index = indexComptesVentes({ vinted: Array.isArray(ventes) ? ventes : [], lbc, ebay: Array.isArray(ebayCommandes) ? ebayCommandes : [], vestiaire: ventesVcER || [],
+      nomVinted, nomAutre: (p, cle) => nomsAutres[`${p}|${cle}`] || '' });
+    const rel = lireReleveVentes();
+    const numParId = new Map();
+    for (const l of ((rel && rel.l) || [])) if (Array.isArray(l)) numParId.set(l[0] === 'Vinted' ? 'vinted:' + l[2] : String(l[2]), l[8] || '');
+    const etats = {
+      Vinted: versements === undefined ? 'encours' : versements === null ? 'passu' : 'lu',
+      Leboncoin: ETAT_LECTURE(lbcCoqueLu, lbcCoqueLu === true),
+      eBay: ETAT_LECTURE(ebayCommandes, Array.isArray(ebayCommandes)),
+      Vestiaire: ETAT_LECTURE(ventesVcER, Array.isArray(ventesVcER)),
+    };
+    return dac7ParCompte({ decl: calc.decl, annee, compteDe: (id) => index.get(id) || null, comptes, etats,
+      comptesKO: (ko || []).map((uid) => ({ plateforme: 'Vinted', cle: String(uid) })), exclus, numDe: (id) => numParId.get(id) || '' });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calc, annee, versements, ventes, ko, ventesVcER, autres, exclusAutres, accounts, panelOff, lbcVentes, lbcCoqueLu, ebayCommandes]);
+  const emails = React.useMemo(() => (emailsLus === undefined ? undefined : emailsFiscaux(emailsLus, annee)), [emailsLus, annee]);
+  const blocages = React.useMemo(() => (Array.isArray(billing) ? blocagesFiscauxVinted(billing) : null), [billing]);
+  const exporter = async (k, forme) => {
+    const id = `${k.plateforme}|${k.cle}`;
+    if (enCours || k.etat !== 'lu') return;
+    setEnCours(id + forme);
+    try {
+      let ent = null; try { ent = await lireReglage('vrm_pro_facture'); } catch (_) { ent = null; }
+      const entreprise = ent && String(ent.nom || '').trim() ? { nom: String(ent.nom).trim(), siret: String(ent.siret || '').trim() } : null;
+      if (forme === 'csv') telechargerFichier(new Blob([csvDac7(k, annee, { entreprise })], { type: 'text/csv;charset=utf-8' }), nomFichierDac7(k, annee, 'csv'), 'text/csv;charset=utf-8');
+      else telechargerFichier(new Blob([await pdfDac7(k, annee, { entreprise })], { type: 'application/pdf' }), nomFichierDac7(k, annee, 'pdf'), 'application/pdf');
+    } catch (err) { toast('Export DAC7 pas créé : ' + ((err && err.message) || err)); }
+    setEnCours('');
+  };
+  return <Dac7Comptes R={R} annee={annee} annees={annees} onAnnee={setAnnee} emails={emails} blocages={blocages} onExport={exporter} enCours={enCours} />;
+}
 function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts }) {
   // (3 nov.) Les ventes déclarables : la lecture partagée avec les registres (`useDeclarablesCompta`).
   const { calc, versements } = useDeclarablesCompta({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts });
@@ -40724,6 +40829,10 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
           <ComptaRepli id="compta-porte-monnaie" titre="Porte-monnaie" resume="Disponible et en attente, compte par compte">
             <PorteMonnaieCompta accounts={accounts} panelOff={panelOff}/>
           </ComptaRepli>
+          {/* (5 nov.) DAC7 compte par compte : ventes N/30, montant / 2 000 €, le rapport de la plateforme, l'export (src/dac7Comptes.js). */}
+          <ComptaRepli id="compta-dac7" titre="DAC7" resume="Ce que chaque plateforme transmet aux impôts, compte par compte">
+            <Dac7ComptesCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />
+          </ComptaRepli>
 
           <ComptaRepli id="compta-charges" titre="Tes dépenses" resume={(depenses.length || abonnements.length || packs.length || fixes.length)
               ? [depenses.length ? `${depenses.length} dépense${depenses.length > 1 ? 's' : ''}` : null, abonnements.length ? `${abonnements.length} abonnement${abonnements.length > 1 ? 's' : ''}` : null, packs.length ? `${packs.length} pack${packs.length > 1 ? 's' : ''}` : null].filter(Boolean).join(' · ') + ' — cartons, abonnements, frais : ce que tu paies pour vendre'
@@ -43143,6 +43252,34 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const buysBase = useMemo(() => (buys.items || []).filter(o => !acctOffOf(o)),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [buys.items, hiddenAccts, blockedAccts]);
+  // (5 nov.) LES ACHATS, PUBLIÉS JOUR PAR JOUR (`vrm_achats_jours`, synchronisé) et
+  // achat par achat (`vrm_achats_releve`, cet appareil) — la règle de « Dépensé »
+  // (hors annulés, `achatAnnule`, `montantCommande`, date de l'achat), son
+  // propriétaire est cet écran (§11). CONSOMMÉS par le partage des groupes
+  // d'accompagnement (src/communaute/accompagnement.js), qui ne relit aucun achat.
+  // Un compte non lu ⇒ on ne publie RIEN : la dernière publication, complète, reste (§5).
+  useEffect(() => {
+    if (!Array.isArray(buys.items) || buys.error) return;
+    if ((Array.isArray(buys.failedUids) ? buys.failedUids : []).some(u => !acctOff(u))) return;
+    try {
+      const an0 = new Date().getFullYear() - 1, jours = {}, l = [];
+      for (const o of buysBase) {
+        if (achatAnnule(o)) continue;
+        const t = o && o.date ? Date.parse(o.date) : NaN;
+        if (isNaN(t) || new Date(t).getFullYear() < an0) continue;
+        const k = jourClef(new Date(t)), j = jours[k] || (jours[k] = [0, 0]);
+        j[0] += 1; j[1] += Math.round(montantCommande(o) * 100);
+        l.push([t, String((o._acc && (o._acc.login || o._acc.vinted_user_id)) || ''), String(o.title || ''), montantCommandeLu(o)]);
+      }
+      const charge = {}; for (const k of Object.keys(jours).sort()) charge[k] = jours[k];
+      const avant = load('vrm_achats_jours', null);
+      if (!(avant && JSON.stringify(avant.jours) === JSON.stringify(charge))) save('vrm_achats_jours', { v: 1, jours: charge, at: Date.now() });
+      l.sort((a, b) => b[0] - a[0]); const l300 = l.slice(0, 300);
+      const r0 = load('vrm_achats_releve', null);
+      if (!(r0 && JSON.stringify(r0.l) === JSON.stringify(l300))) save('vrm_achats_releve', { v: 1, l: l300, at: Date.now() });
+    } catch (_) {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [buys.items, buys.error, buys.failedUids, buysBase]);
   // (29 oct.) Combien de reçus reçus par email se relient à un achat AFFICHÉ, par
   // son n° de transaction (la même règle que la ligne, §11). `null` tant que les
   // reçus ou les achats ne sont pas lus — jamais un « 0 » inventé.
@@ -61597,7 +61734,138 @@ function LigneVerifCarton({ it, fiche, preuve, onConfirmer, onCorriger, onPlusLa
   );
 }
 
-// (3 nov.) Six familles, un interrupteur chacune (api/_lib/notif-textes.js, la
+// ── LE CENTRE DE NOTIFICATIONS (5 nov.) ─────────────────────────────────────
+// La liste est écrite par le SERVEUR seul (`push_journal`,
+// api/_lib/journal-notifs.js) ; ce qu'il a lu, par l'app seule
+// (`push_journal_lu`). Trois états partout : `null` = pas su (rien n'est écrit
+// par-dessus), `{}` = rien encore, un objet = lu.
+const lireLigneNotifs = async (id, select = 'data') => {
+  if (!AUTH.user) return null;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}&select=${select}`, { headers: sbAuth(), cache: 'no-store' });
+    if (!r.ok) return null;
+    const j = await r.json();
+    if (!Array.isArray(j)) return null;
+    return { ligne: j[0] || null };
+  } catch (_) { return null; }
+};
+const lireLuNotifs = async () => {
+  const l = await lireLigneNotifs('push_journal_lu');
+  if (!l) return null;
+  const d = l.ligne && l.ligne.data;
+  return d && typeof d === 'object' ? d : {};
+};
+const chargerCentreNotifs = async () => {
+  const [j, lu] = await Promise.all([lireLigneNotifs('push_journal'), lireLuNotifs()]);
+  return { journal: j ? ((j.ligne && j.ligne.data) || {}) : null, lu };
+};
+const ecrireLuNotifs = async (next) => {
+  if (!AUTH.user) return false;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
+      method: 'POST',
+      headers: { ...sbAuth(), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify([withOwner({ id: 'push_journal_lu', data: next })]),
+    });
+    try { window.dispatchEvent(new Event('vrm:notifs-lues')); } catch (_) {}
+    return !!r.ok;
+  } catch (_) { return false; }
+};
+// Une notification touchée sur le téléphone (`?notif=<n°>`, ajouté par
+// public/sw.js) : SON entrée est marquée lue — relue d'abord ; pas su ⇒ rien.
+const marquerNotifLue = async (seq) => {
+  const lu = await lireLuNotifs();
+  if (lu === null) return;
+  const next = marquerLues(lu, [seq]);
+  if (next.luJusqua === (Number(lu.luJusqua) || 0) && JSON.stringify(next.lus) === JSON.stringify(Array.isArray(lu.lus) ? [...lu.lus].sort((a, b) => b - a) : [])) return;
+  await ecrireLuNotifs(next);
+};
+// La pastille : deux scalaires (le dernier n° rangé, ce qu'il a lu) — jamais la liste.
+const compterNonLuesNotifs = async () => {
+  const [j, lu] = await Promise.all([lireLigneNotifs('push_journal', 'n:data->n,depuis:data->depuis'), lireLuNotifs()]);
+  if (!j || lu === null) return null;
+  const n = j.ligne ? Number(j.ligne.n) : 0;
+  const depuis = j.ligne ? Number(j.ligne.depuis) : 1;
+  return nombreNonLues(Number.isSafeInteger(n) ? n : 0, lu, Number.isSafeInteger(depuis) ? depuis : 1);
+};
+// La cloche de l'en-tête et sa feuille. Recompte à l'ouverture de l'app, au
+// retour sur l'onglet, toutes les deux minutes tant qu'il est visible, et
+// quand une entrée vient d'être lue.
+function CentreNotifsCoque({ onReglages }) {
+  const [nonLues, setNonLues] = useState(null);
+  const [ouvert, setOuvert] = useState(false);
+  useEffect(() => {
+    let vivant = true;
+    const compter = () => { if (document.visibilityState === 'hidden') return; compterNonLuesNotifs().then((v) => { if (vivant) setNonLues(v); }); };
+    compter();
+    const t = setInterval(compter, 120000);
+    const ouvrir = () => setOuvert(true);
+    window.addEventListener('focus', compter);
+    document.addEventListener('visibilitychange', compter);
+    window.addEventListener('vrm:notifs-lues', compter);
+    window.addEventListener('vrm:centre-notifs', ouvrir);
+    return () => { vivant = false; clearInterval(t); window.removeEventListener('focus', compter); document.removeEventListener('visibilitychange', compter); window.removeEventListener('vrm:notifs-lues', compter); window.removeEventListener('vrm:centre-notifs', ouvrir); };
+  }, []);
+  const fermer = React.useCallback(() => setOuvert(false), []);
+  const aller = React.useCallback((q) => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: q })); } catch (_) {} }, []);
+  return (
+    <>
+      <BoutonCentreNotifs nonLues={nonLues} onOuvrir={() => setOuvert(true)} Icon={Icon}/>
+      {ouvert && <FeuilleCentreNotifs onFermer={fermer} charger={chargerCentreNotifs} ecrireLu={ecrireLuNotifs} onAller={aller} onReglages={onReglages} Fermer={FermeAuRetour} Icon={Icon}/>}
+    </>
+  );
+}
+
+// ── LES E-MAILS DE L'ESSAI GRATUIT (5 nov., api/_lib/relances-essai.js) ─────
+// Au propriétaire : l'envoi est-il configuré (et sinon, ce qui manque sur
+// Vercel). Au vendeur EN ESSAI : les reçoit-il (un interrupteur). À un abonné
+// qui paie : rien (il n'en reçoit jamais).
+function RelancesEssaiSetting() {
+  const [r, setR] = useState(undefined);
+  const [busy, setBusy] = useState(false);
+  const lire = React.useCallback(async () => {
+    try {
+      const x = await fetch('/api/compte?mode=relances', { headers: enTeteSession(), cache: 'no-store' });
+      const j = x.ok ? await x.json() : null;
+      setR(j && j.ok ? j : null);
+    } catch (_) { setR(null); }
+  }, []);
+  useEffect(() => { lire(); }, [lire]);
+  if (r === undefined) return null;
+  if (r === null) return <div data-relances-essai="passu" className="vrm-np-relance" style={{marginTop:12}}>E-mails de l’essai : —</div>;
+  if (!r.proprietaire && !r.essai) return null;
+  const basculer = async () => {
+    if (busy || r.abonne === null) return; setBusy(true);
+    try {
+      const x = await fetch('/api/compte?mode=relances', { method: 'POST', headers: { ...enTeteSession(), 'Content-Type': 'application/json' }, body: JSON.stringify({ abonne: !r.abonne }) });
+      const j = x.ok ? await x.json() : null;
+      if (j && j.ok) setR({ ...r, abonne: j.abonne }); else toast('Choix non enregistré — réessaie dans un instant.');
+    } catch (_) { toast('Choix non enregistré — réessaie quand tu as du réseau.'); }
+    setBusy(false);
+  };
+  const envoyes = r.envois ? Object.values(r.envois).filter((e) => e && e.issue === 'envoye').length : null;
+  return (
+    <div data-relances-essai={r.configure ? 'pret' : 'non-configure'} style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'4px 14px 10px',marginTop:12,color:C.text}}>
+      <div className="vrm-np-titre">E-mails de l’essai gratuit</div>
+      {r.proprietaire ? (
+        <div className="vrm-np-relance" data-relances-proprio="">
+          {r.configure
+            ? <>Prêts : chaque matin, les comptes en essai reçoivent au plus un e-mail (jour 1, jour 3, la veille de la fin). Jamais toi, jamais un abonné qui paie.</>
+            : <><b>Pas configurés : aucun e-mail ne part.</b> À poser sur Vercel (Settings → Environment Variables), avec une boîte d’envoi de VRM : {(r.manque || []).map((m, i) => <React.Fragment key={m}>{i ? ', ' : ''}<code>{m}</code></React.Fragment>)}.</>}
+        </div>
+      ) : null}
+      {r.essai ? (
+        <div className="vrm-np-ligne" data-relances-abonne={r.abonne === null ? 'passu' : r.abonne ? 'on' : 'off'}>
+          <span className="vrm-np-lib">Conseils par e-mail pendant l’essai<small>{!r.configure ? 'L’envoi d’e-mails n’est pas configuré : aucun ne part.' : envoyes ? `${envoyes} reçu${envoyes > 1 ? 's' : ''} sur 3 au plus.` : 'Trois au plus, à l’adresse de ton compte.'}</small></span>
+          {r.abonne === null ? <span className="vrm-np-relance">—</span>
+            : <Interrupteur on={!!r.abonne} onClick={basculer} disabled={busy} label={`Conseils par e-mail : ${r.abonne ? 'activés' : 'désactivés'}`}/>}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+// (3 nov., 5 nov.) Sept types, un interrupteur chacun (api/_lib/notif-textes.js, la
 // règle que le serveur applique avant d'envoyer). Les anciennes catégories
 // fines restent lues comme réglage d'avant tant qu'une famille n'est pas posée.
 const PUSH_FAMILLES = FAMILLES_NOTIF;
@@ -61631,21 +61899,28 @@ function PushPrefsSetting({ comptes, onMuets }) {
   const actif = (c) => familleNotifActive(prefs || {}, c.id);
   const pasLu = prefs === null;              // la base n'a pas répondu
   const enCours = prefs === undefined;
-  const bascule = async (c) => {
-    if (busy || pasLu) return; setBusy(true);
-    const next = { ...(prefs || {}), familles: { ...((prefs && prefs.familles) || {}), [c.id]: !actif(c) } };
+  // (5 nov.) Une seule écriture pour tous les réglages de la ligne (types,
+  // heures calmes, regroupement) : la ligne LUE, modifiée, réécrite entière.
+  const ecrirePrefs = async (next) => {
+    if (busy || pasLu || !prefs) return; setBusy(true);
     setPrefs(next);
     try {
-      await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, {
         method: 'POST',
         headers: { ...sbAuth(), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
         body: JSON.stringify([withOwner({ id: 'push_prefs', data: next })]),
       });
+      if (!r.ok) toast("Réglage non enregistré — réessaie dans un instant.");
     } catch (_) { toast("Réglage non enregistré — réessaie quand tu as du réseau."); }
     setBusy(false);
   };
+  const bascule = (c) => ecrirePrefs({ ...(prefs || {}), familles: { ...((prefs && prefs.familles) || {}), [c.id]: !actif(c) } });
+  const calme = reglageCalme(prefs || {});
+  const poserCalme = (patch) => ecrirePrefs({ ...(prefs || {}), calme: { ...calme, ...patch } });
+  const regroupe = !!(prefs && prefs.regrouper === true);
   const n = prefs ? PUSH_FAMILLES.filter(actif).length : 0;
   return (
+    <>
     <details style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'10px 14px'}} onToggle={(e) => setOuvert(e.currentTarget.open)}>
       <summary style={{cursor:'pointer',listStyle:'none',display:'flex',alignItems:'center',gap:8}}>
         <div style={{flex:1,minWidth:0}}>
@@ -61679,6 +61954,34 @@ function PushPrefsSetting({ comptes, onMuets }) {
         })}
       </div>
     </details>
+    {/* (5 nov.) Heures calmes et regroupement : lus par le serveur juste avant
+        d'envoyer (api/_lib/notif-textes.js) — pas un filtre d'affichage. */}
+    <div data-np-reglages="" style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'4px 14px 10px',marginTop:12,color:C.text}}>
+      <div className="vrm-np-ligne" data-np-calme={calme.actif?'on':'off'} style={{borderTop:0}}>
+        <span className="vrm-np-lib">Heures calmes<small>Rien ne sonne ; tout reste dans la cloche de VRM.</small></span>
+        <Interrupteur on={calme.actif} onClick={()=>poserCalme({ actif: !calme.actif })} disabled={!prefs||busy} label={`Heures calmes : ${calme.actif?'activées':'désactivées'}`}/>
+      </div>
+      {calme.actif && (
+        <div className="vrm-np-heures" data-np-heures={`${calme.debut}-${calme.fin}`}>
+          <label>De <input type="time" value={calme.debut} disabled={!prefs||busy} aria-label="Début des heures calmes" onChange={(e)=>{ if (heureValide(e.target.value)) poserCalme({ debut: e.target.value }); }}/></label>
+          <label>à <input type="time" value={calme.fin} disabled={!prefs||busy} aria-label="Fin des heures calmes" onChange={(e)=>{ if (heureValide(e.target.value)) poserCalme({ fin: e.target.value }); }}/></label>
+        </div>
+      )}
+      {calme.actif && (
+        <div className="vrm-np-ligne" data-np-calme-dv={calme.sauf.includes('doublevente')?'on':'off'}>
+          <span className="vrm-np-lib">La double vente sonne quand même</span>
+          <Interrupteur on={calme.sauf.includes('doublevente')} onClick={()=>poserCalme({ sauf: calme.sauf.includes('doublevente') ? calme.sauf.filter((x)=>x!=='doublevente') : [...calme.sauf, 'doublevente'] })} disabled={!prefs||busy} label="La double vente sonne pendant les heures calmes"/>
+        </div>
+      )}
+      <div className="vrm-np-ligne" data-np-regrouper={regroupe?'on':'off'}>
+        <span className="vrm-np-lib">Regrouper par type<small>Une notification par type sur le téléphone, avec le nombre d’autres.</small></span>
+        <Interrupteur on={regroupe} onClick={()=>ecrirePrefs({ ...(prefs || {}), regrouper: !regroupe })} disabled={!prefs||busy} label={`Regrouper par type : ${regroupe?'activé':'désactivé'}`}/>
+      </div>
+      <div className="vrm-np-ligne">
+        <Bouton variante="secondaire" data-np-voir-centre="" onClick={()=>{ try { window.dispatchEvent(new Event('vrm:centre-notifs')); } catch (_) {} }}>Voir les notifications envoyées</Bouton>
+      </div>
+    </div>
+    </>
   );
 }
 function GuideReglage({ titre, etapes }) {
@@ -61969,7 +62272,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     { id:'notifications', titre:'Notifications', items:[
       { id:'push', type:'panneau', ic:'bell2', lib:'Notifications du téléphone', titreInterne:true,
         desc: nMuetsPush > 0 ? <span style={{color:C.warn,fontWeight:600}}>{nMuetsPush} compte{nMuetsPush>1?'s':''} sans email : pas de notification</span> : null,
-        el:<><PushSetting/><div style={{height:12}}/><PushPrefsSetting comptes={comptes} onMuets={setNMuetsPush}/></> },
+        el:<><PushSetting/><div style={{height:12}}/><PushPrefsSetting comptes={comptes} onMuets={setNMuetsPush}/><RelancesEssaiSetting/></> },
       // Alertes locales (l'ancien bouton 🔔 du haut) : bandeau + notification
       // quand l'app est OUVERTE (ventes comptabilisées, factures reçues).
       { id:'alertes', type:'switch', ic:'info', lib:"Alertes dans l'app", desc:'Ventes et factures, quand l’app est ouverte.', on:!!notifEnabled, onClick:onToggleNotif, data:{ 'data-reglage-alertes': notifEnabled ? 'on' : 'off' } },
@@ -65533,6 +65836,9 @@ function AppCoeur() {
   // Discord lancé sur le téléphone : le retour arrive dans un autre navigateur ;
   // l'app reprend la preuve rangée par le serveur (src/communaute/discordAttente.js).
   React.useEffect(()=>ecouterDiscord(enTeteSession),[]);
+  // (5 nov.) Groupes d'accompagnement : si le vendeur partage ses chiffres dans un
+  // groupe, ses agrégats repartent quand ils changent (src/communaute/accompagnement.js).
+  React.useEffect(()=>ecouterPartage(enTeteSession),[]);
   // ── LE JOURNAL DES PLANTAGES PART DANS SA BASE (src/plantages.js) ──────────
   // AppCoeur ne monte qu'avec une session : c'est ici seulement qu'on peut
   // écrire AU NOM du vendeur (RLS). Une écriture non confirmée reste en file et
@@ -65825,12 +66131,17 @@ function AppCoeur() {
     // (31 oct.) Une notification mène à l'élément PRÉCIS : `cible` (+ son
     // identité) et `vue` (src/cibleNotif.js, api/_lib/lien-notif.js). Une
     // `section` vaut aussi pour Comptabilité et Statistiques.
-    const goto=(search)=>{ try{ const p=new URLSearchParams(search); const t=p.get('tab'); if(p.get('print')==='bord') _pendingBordPrint=true; if(t&&TABS_OK.includes(t)){ const site=p.get('site'), section=p.get('section'), vue=p.get('vue');
+    const goto=(search)=>{ try{ const p=new URLSearchParams(search); const t=p.get('tab');
+      // (5 nov.) Une notification touchée porte `notif=<n°>` (public/sw.js) : son entrée du centre est marquée lue.
+      { const nn=Number(p.get('notif')); if(Number.isSafeInteger(nn)&&nn>0){ marquerNotifLue(nn); if(!t) window.history.replaceState(window.history.state,'',window.location.pathname); } } if(p.get('print')==='bord') _pendingBordPrint=true; if(t&&TABS_OK.includes(t)){ const site=p.get('site'), section=p.get('section'), vue=p.get('vue');
       if(site&&estTacheSite(t)&&siteDeTache(t,site)===site) subVoulue.current=site; else if(section&&/^[a-z]{2,12}$/.test(section)&&(t.startsWith('plat_')||t==='compta'||t==='dashboard')) subVoulue.current=section;
       if(vue==='achats'){ demanderVue('achats'); } else if(vue==='retraits'){ demanderVue('retraits'); } else if(vue==='favoris') demanderVue('favoris');
       // (1er nov.) `cat_achats` mène aux colis à retirer (dans Colis) ; avec `vue=achats`, c'est l'écran Achats.
       const tt=(t==='cat_achats'&&vue==='achats')?'achats':t;
       const cible=lireCible(p); if(cible) poserCible(cible, redirigerOnglet(tt, subVoulue.current, ONGLETS_DEPLACES).tab);
+      // (5 nov.) Un lien d'invitation à un groupe d'accompagnement : le code est
+      // gardé pour l'écran Communauté (chargé ensuite), l'adresse est nettoyée.
+      if(tt==='communaute'&&p.get('groupe')){ try{ sessionStorage.setItem('vrm_accomp_lien', String(p.get('groupe')).slice(0,20)); }catch(_){} }
       setTab(tt); window.history.replaceState(window.history.state,'',window.location.pathname); } }catch(_){}};
     goto(window.location.search);
     const onMsg=(e)=>{ if(e.data&&e.data.type==='open-url'&&e.data.url){ try{ goto(new URL(e.data.url,window.location.origin).search); }catch(_){}} };
@@ -68296,6 +68607,8 @@ function AppCoeur() {
             <PastilleStream/>
             {/* (4 nov.) L'œil : cache TOUS les montants en € de l'écran (src/montantsCaches.js). */}
             <BoutonMontants/>
+            {/* (5 nov.) La cloche : ce que VRM a envoyé (src/CentreNotifs.jsx). */}
+            {AUTH.user && <CentreNotifsCoque onReglages={()=>setTab('settings')}/>}
             {!ordi && <button className="vrm-hbtn" type="button" data-recherche-zone="" data-recherche-loupe="" onClick={()=>{ if(gsOpen) fermerRecherche(); else ouvrirRecherche(); }} title="Rechercher" aria-label="Rechercher une paire" aria-expanded={gsOpen} aria-controls="vrm-recherche-resultats">
               <Icon name="search" size={21}/>
             </button>}

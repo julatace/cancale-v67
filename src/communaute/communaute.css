@@ -200,3 +200,44 @@ form.vrm-cm-discord-moi { display: block !important; }
 .vrm-communaute .vrm-cm-primaire,
 .vrm-communaute .vrm-cm-pin.moi,
 .vrm-cm-pastille { color: var(--vrm-on-accent, #fff); }
+
+/* ── 025 : les groupes d'accompagnement (onglet Groupes) ───────────────────── */
+.vrm-cm-accomp-intro { display: grid; gap: 12px; }
+.vrm-cm-accomp-intro .vrm-cm-note { margin: 0; font-size: 15px; color: var(--cm-encre); }
+.vrm-cm-section { margin: 18px 0 8px; font-size: 13px; font-weight: 700; color: var(--cm-doux); letter-spacing: .02em; }
+.vrm-cm-groupe { display: grid; gap: 10px; }
+.vrm-cm-groupe h4, .vrm-cm-vue h4 { margin: 6px 0 2px; font-size: 13px; font-weight: 700; color: var(--cm-doux); }
+.vrm-cm-groupe-tete { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.vrm-cm-groupe-tete h3 { margin: 0; overflow-wrap: anywhere; }
+.vrm-cm-groupe-tete small { color: var(--cm-doux); font-size: 13px; }
+.vrm-cm-description { margin: 0 !important; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 15px; }
+.vrm-cm-invitation { display: grid; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--cm-fond); }
+.vrm-cm-invitation b { font-variant-numeric: tabular-nums; letter-spacing: .06em; font-size: 17px; }
+.vrm-cm-etiquette { font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: var(--cm-fond); color: var(--cm-doux); white-space: nowrap; }
+.vrm-cm-etiquette.attente { color: #B25000; background: rgba(255,149,0,.14); }
+.vrm-communaute[data-dark="true"] .vrm-cm-etiquette.attente { color: #FFB340; }
+.vrm-cm-partage { border: 0; padding: 0; margin: 4px 0; display: grid; gap: 6px; min-width: 0; }
+.vrm-cm-partage legend { font-size: 13px; font-weight: 700; margin-bottom: 4px; padding: 0; }
+.vrm-cm-partage-option { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; min-height: 44px; border-radius: 12px; border: 1px solid var(--cm-bord); background: var(--cm-carte); cursor: pointer; }
+.vrm-cm-partage-option.pris { border-color: var(--cm-accent); background: var(--cm-accent-fond); }
+.vrm-cm-partage-option input { margin: 3px 0 0; width: 18px; height: 18px; accent-color: var(--cm-accent); flex: 0 0 auto; }
+.vrm-cm-partage-option b { display: block; font-size: 15px; }
+.vrm-cm-partage-option small { display: block; color: var(--cm-doux); font-size: 13px; line-height: 1.4; }
+.vrm-cm-champ textarea { width: 100%; border-radius: 12px; border: 1px solid var(--cm-bord); background: var(--cm-carte); color: var(--cm-encre); font: inherit; font-size: 17px; padding: 10px 12px; resize: vertical; }
+.vrm-cm-champ span small { font-weight: 500; color: var(--cm-doux); }
+.vrm-cm-apercu { background: var(--cm-fond) !important; }
+.vrm-cm-apercu small { color: var(--cm-doux); }
+.vrm-cm-vue { display: grid; gap: 8px; }
+.vrm-cm-vue-tete { margin: 0 !important; }
+.vrm-cm-vue-tete span { color: var(--cm-doux); font-size: 13px; }
+.vrm-cm-vue .vrm-cm-periodes { margin: 0; }
+.vrm-cm-tableau { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.vrm-cm-tableau th, .vrm-cm-tableau td { padding: 8px 6px; text-align: right; border-top: 1px solid var(--cm-bord); white-space: nowrap; }
+.vrm-cm-tableau thead th { border-top: 0; color: var(--cm-doux); font-weight: 600; font-size: 12px; }
+.vrm-cm-tableau th:first-child { text-align: left; font-weight: 600; }
+.vrm-cm-tableau td:nth-child(2) { position: relative; min-width: 64px; }
+.vrm-cm-barre { position: absolute; left: 6px; top: 50%; height: 6px; width: calc((100% - 34px) * var(--p, 0)); transform: translateY(-50%); border-radius: 3px; background: var(--cm-accent-fond); }
+.vrm-cm-detail li > span { font-variant-numeric: tabular-nums; font-weight: 600; }
+.vrm-cm-detail li > div { min-width: 0; flex: 1 1 60%; }
+.vrm-cm-detail b { overflow-wrap: anywhere; }
+@media (max-width: 420px) { .vrm-cm-tableau th, .vrm-cm-tableau td { padding: 8px 3px; } .vrm-cm-tableau { font-size: 12px; } }

@@ -16,7 +16,7 @@ const RACINE = path.join(__dirname, '..', '..');
 const OWNER = '11111111-2222-3333-4444-555555555555';
 process.env.VRM_OWNER_UID = OWNER;
 process.env.SUPABASE_SERVICE_KEY = 'banc-cle-service';
-process.env.VAPID_PRIVATE_KEY = 'banc-cle-privee-factice';
+process.env.VAPID_PRIVATE_KEY = 'YmFuYy1jbGUtcHJpdmVlLWZhY3RpY2UtMzItb2N0ZXQ';
 process.env.EMAIL_INBOUND_SECRET='cle-banc-notifications'; // obligatoire depuis dc4799f
 
 const webpush = require(path.join(RACINE, 'node_modules', 'web-push'));

@@ -32,7 +32,7 @@ process.env.CRON_SECRET = 'cle-banc-rappels';
 const OWNER = '11111111-2222-3333-4444-555555555555';
 process.env.VRM_OWNER_UID = OWNER;
 process.env.SUPABASE_SERVICE_KEY = 'banc-cle-service';
-process.env.VAPID_PRIVATE_KEY = 'banc-cle-privee-factice';
+process.env.VAPID_PRIVATE_KEY = 'YmFuYy1jbGUtcHJpdmVlLWZhY3RpY2UtMzItb2N0ZXQ';
 
 const webpush = require(path.join(RACINE, 'node_modules', 'web-push'));
 const pushes = [];

@@ -498,7 +498,7 @@ async function revue24(b) {
 // ── D. Le cron du matin, la vraie route : « 📍 Dernier jour » une fois ──────────
 async function cronDuMatin() {
   const A = SESSION.user.id;
-  process.env.SUPABASE_SERVICE_KEY = 'banc-cle-service'; process.env.VRM_OWNER_UID = A; process.env.CRON_SECRET = 'cle-banc-cron'; process.env.VAPID_PRIVATE_KEY = 'banc-cle-privee-factice';
+  process.env.SUPABASE_SERVICE_KEY = 'banc-cle-service'; process.env.VRM_OWNER_UID = A; process.env.CRON_SECRET = 'cle-banc-cron'; process.env.VAPID_PRIVATE_KEY = 'YmFuYy1jbGUtcHJpdmVlLWZhY3RpY2UtMzItb2N0ZXQ';
   const webpush = require(path.join(RACINE, 'node_modules', 'web-push'));
   const pushes = []; webpush.setVapidDetails = () => {}; webpush.sendNotification = async (sub, body) => { pushes.push(JSON.parse(body)); return { statusCode: 201 }; };
   const base = new Map([

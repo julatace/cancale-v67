@@ -18,7 +18,8 @@ import {endpointPushPermis} from './abonnement-push.js';
 import { proprietaireCourant } from './owner.js';
 import { sbCle } from './cle.js';
 import { accesVendeur } from './abonnement.js';
-import { decisionNotif, CATEGORIES_RETIREES } from './notif-textes.js';
+import { decisionNotif, CATEGORIES_RETIREES, dansHeuresCalmes, regrouper, familleDe, texteRegroupe } from './notif-textes.js';
+import { rangerNotif, corrigerEtat, lireLu, nonLuesDeFamille } from './journal-notifs.js';
 
 // La base sait-elle séparer les vendeurs ? Trois réponses, jamais deux :
 // 200 → oui · 400 (colonne inconnue) → non · le reste (522, délai) → PAS SU.
@@ -175,22 +176,29 @@ async function copierPrefs(qui, prefs) {
     if (e === 'ko') return;
   }
 }
-export async function pushCategorieActive(cat) {
-  if (!cat) return true;
-  if (CATEGORIES_RETIREES.has(cat)) return false;          // (3 nov.) plus jamais, sans même lire
+// Les préférences du vendeur, avec le même repli que la décision : lues (une
+// relecture sur un hoquet), sinon les dernières lues par cette instance, sinon
+// la copie gardée avec ses appareils, sinon `null` (pas su : le défaut décide).
+// (5 nov.) Partagée par la décision ET par l'envoi (heures calmes, regroupement).
+export async function prefsDuVendeur() {
   const qui = vendeurDuPush() || '';
   let lues = await lirePrefs();
   if (!lues) lues = await lirePrefs();              // un hoquet : on relit une fois
   if (lues) {
     _prefsVues.set(qui, lues);
     try { await copierPrefs(qui, lues); } catch (_) {}
-    return decider(lues, cat);
+    return lues;
   }
   const vues = _prefsVues.get(qui);
-  if (vues) return decider(vues, cat);
+  if (vues) return vues;
   const lu = await lireSubsVersion();
-  if (lu && lu.prefs) return decider(lu.prefs, cat);
-  return decisionNotif({}, cat);
+  if (lu && lu.prefs) return lu.prefs;
+  return null;
+}
+export async function pushCategorieActive(cat) {
+  if (!cat) return true;
+  if (CATEGORIES_RETIREES.has(cat)) return false;          // (3 nov.) plus jamais, sans même lire
+  return decider((await prefsDuVendeur()) || {}, cat);
 }
 
 export async function loadSubs() {
@@ -332,6 +340,32 @@ export async function sendPushToAll(payload) {
   //    notifications reviennent sans rien réactiver. « Pas su » ne coupe pas.
   const owner = vendeurDuPush();
   if (owner && (await accesVendeur(owner)) === false) return { sent: 0, total: null, coupe: 'abonnement' };
+  // ── (5 nov.) LE TYPE, LES HEURES CALMES, LE REGROUPEMENT, LE CENTRE ──────
+  // Chaque émetteur dit la CATÉGORIE de sa notification (`cat`, jamais envoyé
+  // au téléphone). Ici, et nulle part ailleurs, on applique dans l'ordre :
+  //   1. type éteint ⇒ RIEN, ni envoyé ni rangé (même si l'émetteur a oublié de
+  //      demander `pushCategorieActive` — la porte est ici aussi) ;
+  //   2. rangée dans le centre de l'app (`push_journal`, au nom de CE vendeur) ;
+  //   3. heures calmes ⇒ rien ne sonne (elle reste dans le centre) ;
+  //   4. regroupement ⇒ une notification par type sur le téléphone, qui dit
+  //      combien d'autres attendent.
+  // La notification porte `notif: <n°>` (le service worker l'ajoute à l'adresse
+  // au toucher) : l'app marque lue l'entrée du centre.
+  const { cat: catBrute = null, _cat, ...notif } = payload || {};
+  const cat = catBrute || _cat || null;
+  let prefs = null, rangee = null;
+  if (cat) {
+    prefs = (await prefsDuVendeur()) || {};
+    if (!decisionNotif(prefs, cat)) return { sent: 0, total: null, coupe: 'preference' };
+  }
+  const ranger = async (etat) => {
+    if (!cat || !owner) return null;
+    try { return await rangerNotif({ cat, titre: notif.title, texte: notif.body, url: notif.url, etat }); } catch (_) { return null; }
+  };
+  if (cat && dansHeuresCalmes(prefs, cat)) {
+    rangee = await ranger('calme');
+    return { sent: 0, total: null, calme: true, ...(rangee ? { seq: rangee.seq } : {}) };
+  }
   // ⚠️ Sans clé privée (variable d'environnement absente), on n'envoie RIEN et
   // on le dit clairement — plutôt que de repartir sur la clé qui traînait dans
   // le dépôt public. Un envoi silencieusement impossible est pire qu'un refus
@@ -345,14 +379,29 @@ export async function sendPushToAll(payload) {
   // abonnés », jamais « ce qu'on a réussi à faire ».
   if (!PUSH_PRET) {
     const abonnes = await loadSubs();
+    await ranger('serveur');
     // Même règle un cran plus loin : `total: 0` sur une liste qu'on n'a PAS pu
     // lire serait « aucun appareil abonné ». On rend `null` — « pas su ».
     return { sent: 0, total: abonnes === null ? null : abonnes.length, erreur: 'VAPID_PRIVATE_KEY absente' };
   }
   const subs = await loadSubs();
   if (subs === null) return { sent: 0, total: null, erreur: 'base-injoignable' };
-  if (!subs.length) return { sent: 0, total: 0 };
-  const body = JSON.stringify(payload);
+  if (!subs.length) { await ranger('sans-appareil'); return { sent: 0, total: 0 }; }
+  rangee = await ranger('envoyee');
+  const aEnvoyer = { ...notif };
+  // Le numéro de l'entrée du centre voyage À CÔTÉ de l'adresse (le service
+  // worker l'ajoute au toucher, public/sw.js) : l'adresse reste celle de l'objet.
+  if (rangee) aEnvoyer.notif = rangee.seq;
+  const fam = cat ? familleDe(cat) : null;
+  if (fam && regrouper(prefs)) {
+    // Une notification par type : la nouvelle remplace l'ancienne sur le
+    // téléphone. « +N » seulement si ce qu'il a lu a pu être relu (`lireLu`).
+    aEnvoyer.tag = `vrm-groupe-${fam}`;
+    const lu = rangee ? await lireLu().catch(() => null) : null;
+    const k = rangee && lu ? nonLuesDeFamille(rangee.entrees, fam, lu) : 1;
+    Object.assign(aEnvoyer, texteRegroupe({ title: aEnvoyer.title, body: aEnvoyer.body }, k));
+  }
+  const body = JSON.stringify(aEnvoyer);
   const alive = [];
   let sent = 0, perimes = 0;
   for (const s of subs) {
@@ -381,7 +430,9 @@ export async function sendPushToAll(payload) {
       return reste.length === cur.length ? null : reste;
     });
   }
+  // Aucun appareil ne l'a acceptée : le centre ne dit pas « envoyée ».
+  if (rangee && sent === 0) { try { await corrigerEtat(rangee.seq, 'echec'); } catch (_) {} }
   // `perimes` remonte jusqu'à l'écran : « 0 envoyé sur 2 » ne dit pas POURQUOI,
   // « 2 appareils scellés sur une ancienne clé » dit quoi faire (rouvrir l'app).
-  return { sent, total: subs.length, ...(perimes ? { perimes } : {}) };
+  return { sent, total: subs.length, ...(perimes ? { perimes } : {}), ...(rangee ? { seq: rangee.seq } : {}) };
 }

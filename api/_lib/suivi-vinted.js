@@ -250,8 +250,8 @@ export async function notifierSuiviVinted(tx, uid) {
   });
   if (reserve === null) return { status: 503, raison: 'pas-su' };
   if (reserve === false) return { status: 200, envoye: false, raison: 'deja' };
-  const r = await sendPushToAll(n);
-  if (r && r.coupe) return { status: 200, envoye: false, raison: 'abonnement' };
+  const r = await sendPushToAll({ ...n, cat: relais ? 'colis' : 'suivi' });
+  if (r && r.coupe) return { status: 200, envoye: false, raison: r.coupe === 'preference' ? 'preference' : 'abonnement' };
   // « Envoyée » seulement si un appareil l'a reçue (clé du serveur absente,
   // appareils illisibles ou aucun appareil : on le dit, sans mentir).
   if (!r || !(Number(r.sent) > 0)) return { status: 200, envoye: false, raison: r && r.erreur ? 'envoi-impossible' : 'aucun-appareil' };

@@ -45,6 +45,9 @@ import { rappelsRetraitDuJour, texteRappelRetrait, SELECT_SUIVI_META, txDuColis,
 // (24 oct.) Le statut des colis lu chez leur transporteur (C1, C5).
 import { passageTransporteurs, MAX_CRON, BUDGET_CRON_MS } from './_lib/transporteurs-lecture.js';
 import { accesVendeur } from './_lib/abonnement.js';
+import { passageRelances } from './_lib/relances-essai.js';
+// Après 240 s de cron, aucun e-mail de l'essai ne COMMENCE (la fonction s'arrête à 300 s).
+const RELANCES_JUSQUA_MS = 240000;
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
@@ -286,7 +289,7 @@ async function bilanDeLaSemaine(maintenant = Date.now(), soir = false) {
   // Le mémo AVANT l'envoi, et CONFIRMÉ : un bilan par semaine, jamais deux.
   if (!(await ecrireDedup('bilan_semaine_dedup', { semaine: sem.lundi, at: new Date(maintenant).toISOString() }))) return 'mémo non écrit — rien envoyé';
   const t = texteBilan(b, sem);
-  const envoi = await sendPushToAll({ title: t.titre, body: t.corps, tag: 'bilan-' + sem.lundi, url: '/?tab=journee' });
+  const envoi = await sendPushToAll({ cat: 'bilan', title: t.titre, body: t.corps, tag: 'bilan-' + sem.lundi, url: '/?tab=journee' });
   // Le bilan rendu ne porte AUCUN montant (la réponse d'un cron se lit dans un
   // tableau de bord) : seulement les états, et le nombre de colis.
   return { semaine: sem.lundi, vendu: b.vendu.etat, recu: b.recu.etat, colis: b.colis.n, envoi: envoi && (envoi.coupe || envoi.erreur || envoi.sent) };
@@ -388,7 +391,7 @@ async function rappelsColisRetrait(maintenant = Date.now()) {
   // pas un fait. Il reste dans Colis → « à vérifier ». Seul « dernier jour » sonne.
   for (const x of nouveaux.filter((y) => y.etat === 'dernier')) {
     const t = texteRappelRetrait(x);
-    envoi = await sendPushToAll({ title: t.title, body: t.body, tag: 'retrait-' + x.cle, url: DESTINATIONS.retrait({ suivi: x.suivi, tx: (() => { const t = txsPar.get(x.suivi); return t && t.size === 1 ? [...t][0] : ''; })() }) });
+    envoi = await sendPushToAll({ cat: 'colis', title: t.title, body: t.body, tag: 'retrait-' + x.cle, url: DESTINATIONS.retrait({ suivi: x.suivi, tx: (() => { const t = txsPar.get(x.suivi); return t && t.size === 1 ? [...t][0] : ''; })() }) });
   }
   // Aucun n° de suivi ni lieu dans la réponse d'un cron : des nombres.
   return { retrait: 'envoyé', dernier: nouveaux.filter((x) => x.etat === 'dernier').length, aVerifier: nouveaux.filter((x) => x.etat === 'a_verifier').length,
@@ -453,7 +456,7 @@ async function rappelsOffresMini(maintenant = Date.now()) {
   const n = nouveaux.length;
   // Une seule offre ⇒ sa conversation, ouverte, avec la carte d'offre ; plusieurs ⇒ le filtre « Offres ».
   const uneSeule = n === 1 ? (convDe.get(nouveaux[0]) || null) : null;
-  const envoi = await sendPushToAll({
+  const envoi = await sendPushToAll({ cat: 'offremini',
     title: n > 1 ? `${n} offres au-dessus de ton prix mini` : 'Une offre au-dessus de ton prix mini',
     body: n > 1 ? `${n} offres à accepter en 1 tap dans VRM.` : 'À accepter en 1 tap dans VRM.',
     tag: 'offremini', url: n === 1 && uneSeule ? DESTINATIONS.message(uneSeule) : DESTINATIONS.offres() });
@@ -476,7 +479,7 @@ async function rappelAgentEbay(maintenant = Date.now()) {
     regles: main === undefined ? undefined : ((main && main.vrm_agent_ebay_regles) || null), memo, today, maintenant });
   if (!n.envoyer) return n.raison;
   if (!(await ecrireDedup('agent_ebay_dedup', { date: today, n: n.n, at: new Date(maintenant).toISOString() }))) return 'mémo non écrit — rien envoyé';
-  const envoi = await sendPushToAll({ title: n.titre, body: n.corps, tag: 'agent-ebay-' + today, url: n.url });
+  const envoi = await sendPushToAll({ cat: 'agentebay', title: n.titre, body: n.corps, tag: 'agent-ebay-' + today, url: n.url });
   return { agentebay: 'envoyé', n: n.n, envoi: envoi && (envoi.coupe || envoi.erreur || envoi.sent) };
 }
 
@@ -558,7 +561,7 @@ async function traiterVendeurApresRelecture() {
         if (deja.mois !== mois && await pushCategorieActive('urssaf')) {
           const n = notificationUrssaf({ today, main: await getRowProjete('main', MAIN_URSSAF) });
           if (n.envoyer) {
-            await sendPushToAll({ title: n.titre, body: n.corps, tag: 'urssaf-' + mois, url: n.url });
+            await sendPushToAll({ cat: 'urssaf', title: n.titre, body: n.corps, tag: 'urssaf-' + mois, url: n.url });
             await ecrireDedup('urssaf_reminder_dedup', { mois });
           }
           urssaf = n.envoyer ? 'envoyé · ' + n.raison : n.raison;
@@ -572,7 +575,7 @@ async function traiterVendeurApresRelecture() {
           if (deja && deja.veille === n.cle) urssaf = 'déjà rappelé avant l\'échéance';
           else if (deja === undefined) urssaf = 'mémo illisible — rien';
           else if (await pushCategorieActive('urssaf')) {
-            await sendPushToAll({ title: n.titre, body: n.corps, tag: 'urssaf-veille-' + n.cle, url: n.url });
+            await sendPushToAll({ cat: 'urssaf', title: n.titre, body: n.corps, tag: 'urssaf-veille-' + n.cle, url: n.url });
             await ecrireDedup('urssaf_reminder_dedup', { ...(deja || {}), veille: n.cle });
             urssaf = 'envoyé · ' + n.raison;
           }
@@ -660,7 +663,7 @@ async function traiterVendeurApresRelecture() {
 
     if ((total > 0 || nePasPoster > 0) && await pushCategorieActive('expedier')) {
       const txt = texteMatin({ overdue, aVerifier, dueToday, dueTomorrow, ebayDus, vestiaireDus: vcDus, nePasPoster, vinted: c });
-      await sendPushToAll({ ...txt, tag: 'ship-reminder', url: DESTINATIONS.colis({}) });
+      await sendPushToAll({ cat: 'expedier', ...txt, tag: 'ship-reminder', url: DESTINATIONS.colis({}) });
     }
     await ecrireDedup('ship_reminder_dedup', { date: today, total, nePasPoster });
     return { urssaf, bilan, retrait, offremini, agentebay, overdue, aVerifier, dueToday, dueTomorrow, total,
@@ -822,7 +825,7 @@ async function rappelDuSoir() {
   if (t.vestiaire) { retard += t.vestiaire.overdue + t.vestiaire.today; demain += t.vestiaire.tomorrow; }
   if (!(await ecrireDedup('soir_reminder_dedup', { date: today, n }))) return { soir: 'mémo non écrit — rien envoyé' };
   const txt = texteSoir({ n, auMoins, retard, aVerifier, demain, manque, heureDemain: (t.ebay && t.ebay.tomorrow) || (t.vestiaire && t.vestiaire.tomorrow) ? null : heureDemain });
-  const envoi = await sendPushToAll({ ...txt, tag: 'soir-' + today, url: DESTINATIONS.colis({}) });
+  const envoi = await sendPushToAll({ cat: 'soir', ...txt, tag: 'soir-' + today, url: DESTINATIONS.colis({}) });
   return { soir: 'envoyé', n, retard, aVerifier, demain, auMoins, manque, envoi: envoi && (envoi.coupe || envoi.erreur || envoi.sent) };
 }
 async function traiterVendeurSoir() {
@@ -850,6 +853,7 @@ export default async function handler(req, res) {
   // `?moment=soir` : le rappel de la veille au soir (second cron), rien d'autre
   // (ni URSSAF, ni bilan, ni rappel du matin).
   const soir = String((req.query && req.query.moment) || '') === 'soir';
+  const debutCron = Date.now();
   const traiter = soir ? traiterVendeurSoir : traiterVendeur;
   try {
     const cl = await cloisonnee();
@@ -884,7 +888,13 @@ export default async function handler(req, res) {
       }
     };
     await Promise.all(Array.from({ length: Math.min(VENDEURS_EN_PARALLELE, owners.length) }, ouvrier));
-    res.status(echecs ? 500 : 200).json({ ok: !echecs, ...(soir ? { moment: 'soir' } : {}), vendeurs: owners.length, echecs, bilans });
+    // (5 nov.) Les e-mails de l'essai gratuit (api/_lib/relances-essai.js) : une
+    // passe à part, le MATIN seulement, après les rappels. Sans envoi configuré
+    // elle ne fait rien (et le dit dans la réponse) ; une panne ne fait pas
+    // échouer les rappels déjà partis.
+    let relances = null;
+    if (!soir) { try { relances = await passageRelances({ jusqua: debutCron + RELANCES_JUSQUA_MS }); } catch (e) { relances = { erreur: String((e && e.message) || e).slice(0, 200) }; } }
+    res.status(echecs ? 500 : 200).json({ ok: !echecs, ...(soir ? { moment: 'soir' } : {}), vendeurs: owners.length, echecs, bilans, ...(relances ? { relances } : {}) });
   } catch (e) {
     // Une tâche planifiée qui répond 200 sur une panne n'apparaît nulle part :
     // le tableau de bord la compte réussie, et les rappels d'expédition

@@ -270,7 +270,7 @@ if (process.argv.includes('--recopie')) {
 
   // ── 3. Le VRAI cron, un 1er octobre ─────────────────────────────────────────
   console.log('\n── 3. Le vrai cron (api/ship-reminders.js), le 1er octobre, faux Web Push');
-  process.env.VAPID_PRIVATE_KEY = 'banc-cle-privee-factice';
+  process.env.VAPID_PRIVATE_KEY = 'YmFuYy1jbGUtcHJpdmVlLWZhY3RpY2UtMzItb2N0ZXQ';
   delete process.env.SUPABASE_SERVICE_KEY;
   process.env.CRON_SECRET = 'cle-audit-urssaf';
   const webpush = require(path.join(R, 'node_modules', 'web-push'));

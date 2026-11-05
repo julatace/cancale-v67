@@ -569,7 +569,7 @@ async function pushOnce(payload, categorie, alias = [], aussi = []) {
     if (!(await pushCategorieActive(cat))) return;
     // `_cat` est un marqueur interne : il ne part pas dans la notification.
     const { _cat, ...notif } = payload || {};
-    if (await shouldNotify(notif.tag ? [notif.tag, ...alias] : null, aussi)) { await sendPushToAll(notif); return true; }
+    if (await shouldNotify(notif.tag ? [notif.tag, ...alias] : null, aussi)) { await sendPushToAll({ ...notif, cat }); return true; }
     return false;
   } catch (_) { return false; }
 }

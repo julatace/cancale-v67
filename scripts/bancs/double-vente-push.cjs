@@ -49,7 +49,7 @@ const A = '11111111-2222-3333-4444-555555555555';   // propriétaire de l'instal
 const B = '99999999-8888-7777-6666-555555555555';   // second vendeur
 process.env.VRM_OWNER_UID = A;
 process.env.SUPABASE_SERVICE_KEY = 'banc-cle-service';
-process.env.VAPID_PRIVATE_KEY = 'banc-cle-privee-factice';
+process.env.VAPID_PRIVATE_KEY = 'YmFuYy1jbGUtcHJpdmVlLWZhY3RpY2UtMzItb2N0ZXQ';
 process.env.EMAIL_INBOUND_SECRET='cle-banc-notifications';
 
 const webpush = require(path.join(RACINE, 'node_modules', 'web-push'));
