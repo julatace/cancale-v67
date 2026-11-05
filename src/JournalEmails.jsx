@@ -133,7 +133,7 @@ export default function JournalEmails({ headers, filtreInitial = '', typeInitial
       {pages === undefined && <p className="vrm-journal-vide" role="status">Lecture du journal…</p>}
       {pages === null && <p className="vrm-journal-vide" role="alert" data-journal="pas-su">Je n’ai pas pu lire le journal de tes emails — rien n’est perdu, ils restent rangés. <button type="button" onClick={() => charger(0)}>Réessayer</button></p>}
       {pages && <>
-        {c && <p className="vrm-journal-couverture" data-journal-sur={c.sur}>Sur tes {c.sur} derniers e-mails{c.plus ? ' (les plus anciens ne sont pas comptés)' : ''}{c.incompris ? ` · dont ${c.incompris} pas compris` : ''}.</p>}
+        {c && <p className="vrm-journal-couverture" data-journal-sur={c.sur}>Sur tes {c.sur} derniers e-mails{c.adresse ? ` reçus sur ${c.adresse}` : ''}{c.plus ? ' (les plus anciens ne sont pas comptés)' : ''}{c.incompris ? ` · dont ${c.incompris} pas compris` : ''}.</p>}
         {pages.emails.length === 0 && <p className="vrm-journal-vide" data-journal="vide">{etat || type || adresse ? 'Aucun email pour ce filtre.' : 'Aucun email suivi pour l’instant. Le prochain email reçu apparaîtra ici.'}</p>}
         <ul className="vrm-journal-liste">
           {pages.emails.map((e) => <LigneEmail key={e.id} e={e} headers={entetes} delies={delies} onNav={onNav} onNum={onNum} onDelier={onDelier} onRelier={onRelier}/>)}

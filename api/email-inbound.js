@@ -2,6 +2,7 @@ import './_lib/sans-bruit.js';
 import {etatColisDepuisTexte,conserverRetrait,annonceArriveeFuture} from './_lib/etat-colis-email.js';
 import { accuseEmail, empreinteEmail } from "./_lib/accuse-email.js";
 import { resumeClassement, texteBorne } from "./_lib/resume-email.js";
+import { listePieces } from "./_lib/boite-email.js";
 // api/email-inbound.js
 // ────────────────────────────────────────────────────────────────────────────
 // PIPELINE EMAIL UNIVERSEL (remplace l'Apps Script Gmail, marche pour TOUS les
@@ -1980,7 +1981,10 @@ export async function traiterEmail(req, res) {
   // Aucune écriture métier ni notification avant résolution de son vendeur.
   if (proprio.owner && mail.messageId) {
     const suivi = contexteVendeur.getStore();
-    suivi.reception = { adresses:adresses.filter(a=>resoudreProprietaire([a],registre,'',(lu&&lu.conflits)||[]).owner===proprio.owner).slice(0,20), messageId:mail.messageId, subject:String(mail.subject || '').slice(0,300), from:String(mail.from || '').slice(0,200), receivedAt: new Date().toISOString(), sourceDate: /^\d{4}-/.test(String(corpsBrut?.sourceDate||'')) && Number.isFinite(Date.parse(corpsBrut.sourceDate)) ? new Date(corpsBrut.sourceDate).toISOString() : null };
+    suivi.reception = { adresses:adresses.filter(a=>resoudreProprietaire([a],registre,'',(lu&&lu.conflits)||[]).owner===proprio.owner).slice(0,20), messageId:mail.messageId, subject:String(mail.subject || '').slice(0,300), from:String(mail.from || '').slice(0,200), receivedAt: new Date().toISOString(), sourceDate: /^\d{4}-/.test(String(corpsBrut?.sourceDate||'')) && Number.isFinite(Date.parse(corpsBrut.sourceDate)) ? new Date(corpsBrut.sourceDate).toISOString() : null,
+      // (5 nov., boîte de réception) La LISTE des pièces jointes (nom, type, poids),
+      // jamais leur contenu : api/_lib/boite-email.js.
+      pieces: listePieces(mail.attachments) };
   }
   if (!proprio.owner && await baseCloisonnee()) {
     // ON NE DEVINE PAS, ET ON NE JETTE PAS. L'email est conservé entier avec sa
