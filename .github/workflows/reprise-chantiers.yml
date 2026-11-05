@@ -23,6 +23,7 @@ jobs:
         run: |
           python3 scripts/tests/paquets-portables.py
           python3 scripts/tests/orion-reference.py
+          python3 scripts/tests/orion-base-validee.py
       - name: Vérifier les calculs, le handler et les changements de session
         run: |
           node --test scripts/tests/finance-reprise.test.mjs scripts/tests/appareils-route.test.mjs scripts/tests/deconnexion-proprietaire.test.mjs scripts/tests/parcours-quotidien.test.mjs scripts/tests/bordereau-vestiaire-ouverture.test.mjs

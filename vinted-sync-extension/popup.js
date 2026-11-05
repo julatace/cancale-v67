@@ -140,12 +140,11 @@ function rendreAuth(e) {
     // Connecté dans la carte : on NOMME le compte (c'est ce qui permet de voir
     // qu'on s'est trompé), et le geste suivant est d'ouvrir VRM.
     poserHtml(box, `<div class="who"><span class="dot"></span><span class="nom">${esc(e.email || 'connecté')}</span></div>
-      <div class="muted" style="margin-top:4px">L’extension est connectée à ce compte VRM. Garde la plateforme ouverte pour la capture ; aucun onglet VRM n’est nécessaire.</div>
+      <div class="muted" style="margin-top:4px">L’extension est connectée. Les données peuvent être transmises pendant que la plateforme est ouverte ici, sans onglet VRM.</div>
       <div id="transpBox" hidden></div>
       <button id="vrmBtn">Ouvrir VRM</button>
       <button class="sec" id="outBtn">Se déconnecter</button>`);
     document.getElementById('vrmBtn').addEventListener('click', ouvrirVRM);
-    if (globalThis.__vrmOrionCompat) { const note = document.createElement('p'); note.className = 'muted'; note.textContent = 'Sur iPhone/iPad, utilise Vinted dans Orion. Une web app ajoutée à l’écran d’accueil peut s’ouvrir sans les extensions du navigateur. iOS peut suspendre la capture quand Orion n’est plus au premier plan.'; box.appendChild(note); }
     rendreTranspPermis(e.transp);
     document.getElementById('outBtn').addEventListener('click', () => {
       chrome.runtime.sendMessage({ from: 'cancale-popup', action: 'authLogout' }, () => chargerAuth(true));
@@ -179,6 +178,20 @@ function rendreAuth(e) {
     f.hidden = !f.hidden;
     if (!f.hidden) { const m = document.getElementById('mail'); if (m && !m.value) m.focus(); else { const p = document.getElementById('pw'); if (p) p.focus(); } }
   });
+  // Orion : le chemin principal est email + mot de passe dans l'extension.
+  // Le lien vers VRM reste facultatif pour les autres méthodes et le captcha.
+  if (globalThis.__vrmOrionCompat) {
+    const formulaire = document.getElementById('mdpForm');
+    formulaire.hidden = false;
+    document.getElementById('mdpLien').parentElement.hidden = true;
+    const autre = document.getElementById('lierBtn');
+    autre.textContent = 'Autre méthode de connexion';
+    autre.classList.add('sec');
+    formulaire.after(autre, document.getElementById('lierEtat'));
+    document.getElementById('inBtn').classList.remove('sec');
+    const phrase = box.querySelector('.who + .muted');
+    if (phrase) phrase.textContent = 'Connecte l’extension avec ton email et ton mot de passe VRM. Aucun onglet VRM à ouvrir.';
+  }
   const err = document.getElementById('authErr');
   // ⚠️ CAPTCHA (21 oct.) : Supabase peut exiger une vérification anti-robot
   //    (Turnstile) que cette fenêtre ne sait pas afficher. Le refus se traduit
@@ -197,32 +210,19 @@ function rendreAuth(e) {
   //    plusieurs sessions pour une seule connexion (mesuré : 4 × Entrée ⇒ 2 à 3
   //    sessions, dont les autres restent orphelines).
   let enVol = false;
-  const go = async () => {
+  const go = () => {
     if (enVol) return;
     const email = document.getElementById('mail').value, password = document.getElementById('pw').value;
     const btn = document.getElementById('inBtn');
     enVol = true; btn.textContent = 'Connexion…'; btn.disabled = true; err.hidden = true;
-    const r = await new Promise((resolve) => {
-      let fini = false;
-      const fin = (v) => { if (fini) return; fini = true; clearTimeout(timer); resolve(v); };
-      const timer = setTimeout(() => fin({ ok: false, error: 'L’extension ne répond pas. Rouvre sa fenêtre dans Orion et vérifie qu’elle est autorisée sur ce site.' }), 25000);
-      try {
-        const retour = chrome.runtime.sendMessage({ from: 'cancale-popup', action: 'authLogin', email, password, ouvrir: false }, (v) => {
-          const erreur = chrome.runtime.lastError;
-          fin(erreur ? { ok: false, error: 'La connexion à l’extension a été interrompue. Rouvre sa fenêtre puis réessaie.' } : v);
-        });
-        if (retour && typeof retour.then === 'function') retour.then(fin, () => fin({ ok: false, error: 'L’extension n’a pas répondu. Rouvre sa fenêtre puis réessaie.' }));
-      } catch (_) { fin({ ok: false, error: 'La connexion à l’extension est indisponible. Vérifie ses autorisations puis réessaie.' }); }
+    // Rester sur la plateforme après le mot de passe : la capture repart
+    // depuis la session conservée par le moteur, sans ouvrir un onglet VRM.
+    chrome.runtime.sendMessage({ from: 'cancale-popup', action: 'authLogin', email, password, ouvrir: false }, (r) => {
+      enVol = false; btn.textContent = 'Me connecter'; btn.disabled = false;
+      if (r && r.ok) { rendreAuth({ connecte: true, email: r.email || email.trim() }); }
+      else if (refusCaptcha(r)) montrerRefusCaptcha();
+      else { err.textContent = (r && r.error) || 'Connexion refusée.'; err.hidden = false; }
     });
-    enVol = false;
-    if (r && r.ok) {
-      document.getElementById('pw').value = '';
-      rendreAuth({ connecte: true, email: r.email || email.trim() });
-      return;
-    }
-    btn.textContent = 'Me connecter'; btn.disabled = false;
-    if (refusCaptcha(r)) montrerRefusCaptcha();
-    else { err.textContent = (r && r.error) || 'Connexion refusée.'; err.hidden = false; }
   };
   document.getElementById('inBtn').addEventListener('click', go);
   // Entrée depuis le champ mot de passe : sinon il faut viser le bouton.

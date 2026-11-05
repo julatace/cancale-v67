@@ -501,6 +501,8 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 
+- **5 nov. · Orion 5.322.0** : base 5.319 confirmée installable par Julien, moteur/adaptateur repris ; seul le popup change hors versions, pour rester sur Vinted après connexion. Voir `docs/passation/2026-11-05-orion-base-validee.md`.
+
 - **5 nov. · Référence Orion 5.319.0** : archives originales de 61304faf remises séparément, SHA-256 vérifiés ; refus persistant en 5.321, cause non établie et ancienne version installée inconnue. Diff complet : `docs/passation/2026-11-05-orion-comparaison-reference.md`.
 
 - **5 nov. · Paquets 5.321.0** : archives normalisées 644/755 (la 5.320 exportait des fichiers 600), contrôle depuis sources privées, tous formats. Refus Orion réel non reproduit sur appareil ; `docs/passation/2026-11-05-orion-paquet.md`.
@@ -514,7 +516,7 @@ sans la fonction.
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
-**Extension servie : 5.321.0** (4 nov.). **À lire en premier : `docs/passation/2026-11-02-liste.md`.** **Production** : https://vrm.center,
+**Extension servie : 5.322.0** (4 nov.). **À lire en premier : `docs/passation/2026-11-02-liste.md`.** **Production** : https://vrm.center,
 vérifier par `curl https://vrm.center/api/sante`.
 
 ### Gestes encore attendus de Julien
