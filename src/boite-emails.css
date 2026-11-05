@@ -63,6 +63,8 @@
 
 /* Lire un email */
 .vrm-boite-lecture-col{min-width:0;position:sticky;top:12px}
+/* Sur ordinateur, la barre du haut (recherche, 74 px) colle en haut de la page : la lecture se colle SOUS elle (son « Fermer » était caché derrière), et défile seule si l’e-mail est long. */
+.vrm-main:has(> .vrm-barre-haut) .vrm-boite-lecture-col{top:86px;max-height:calc(100vh - 98px);overflow:auto;border-radius:14px}
 .vrm-boite-vide-lecture{margin:0;padding:40px 20px;border-radius:14px;background:var(--bx-carte);color:var(--bx-doux);text-align:center}
 .vrm-boite-lecture{border-radius:14px;background:var(--bx-carte);padding:6px 18px 18px;min-width:0;overflow-wrap:anywhere;animation:vrm-boite-entre .22s cubic-bezier(.2,.8,.2,1)}
 @keyframes vrm-boite-entre{from{transform:translateY(6px)}to{transform:none}}

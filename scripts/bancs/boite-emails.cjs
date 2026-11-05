@@ -272,6 +272,12 @@ const journal = (appels) => appels.filter((a) => a.chemin === '/api/email-rattac
           // L'accent DU THÈME (--vrm-accent, src/themeMineral.js), résolu par le navigateur.
           const [accent, duTheme] = await objet.evaluate((n) => { const t = document.createElement('i'); t.style.color = 'var(--vrm-accent)'; document.body.appendChild(t); const c = getComputedStyle(t).color; t.remove(); return [getComputedStyle(n).backgroundColor, c]; });
           dit(accent === duTheme && /^rgb\(\d+, \d+, 2\d\d\)$/.test(accent), `${nom} : l’accent bleu du thème, rare, sur le seul bouton qui mène à l’objet`, `${accent} / ${duTheme}`);
+          // La page défilée, le haut de la lecture (« Fermer », le titre) n'est pas caché sous la barre du haut.
+          await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); if (m) m.scrollTop = 500; window.scrollTo(0, 500); });
+          await pg.waitForTimeout(200);
+          const vus = await lec.evaluate((a) => ['[data-boite-fermer]', '[data-boite-titre]'].map((s) => { const n = a.querySelector(s); const r = n.getBoundingClientRect(); const h = document.elementFromPoint(r.left + Math.min(20, r.width / 2), r.top + r.height / 2); return !!(h && (h === n || n.contains(h))); }));
+          dit(vus.every(Boolean), `${nom} : page défilée — « Fermer » et le titre de la lecture restent visibles (pas sous la barre du haut)`, JSON.stringify(vus));
+          await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); if (m) m.scrollTop = 0; window.scrollTo(0, 0); });
           await pg.screenshot({ path: path.join(CAPT, `lecture-${nom}.png`) });
         } else {
           dit(await pg.locator('[data-boite-feuille]').count() === 1, `${nom} : au téléphone, l’e-mail s’ouvre en feuille plein écran`);
