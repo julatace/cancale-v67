@@ -208,6 +208,7 @@ const deborde = (pg) => pg.evaluate(() => { const vis = (e) => { const r = e.get
               plus: !!document.querySelector('[data-achats-plus]'), outils: !!document.querySelector('[data-achats-outils]'),
               e5001: etat('5001'), e5002: etat('5002'), e5003: etat('5003'),
               voirPlus: [...document.querySelectorAll('button')].map((x) => x.textContent).find((t) => /Voir plus/.test(t)) || '',
+              vers: (() => { const e = document.querySelector('[data-achats-vers-colis]'); return e ? { n: e.getAttribute('data-achats-vers-colis'), t: e.textContent } : null; })(),
               vert: [...document.querySelectorAll('.vrm-buy-row *')].some((e) => /rgb\(46, 158, 91\)|rgb\(52, 199, 89\)|rgb\(48, 209, 88\)/.test(getComputedStyle(e).color) || (e.getBoundingClientRect().width === 6 && e.getBoundingClientRect().height === 6 && getComputedStyle(e).backgroundColor !== 'rgba(0, 0, 0, 0)')),
             };
           });
@@ -222,6 +223,7 @@ const deborde = (pg) => pg.evaluate(() => { const vis = (e) => { const r = e.get
           dit(r.v === 'recherche' && /zzzz introuvable/.test(r.t), 'une recherche sans résultat le dit, avec « Effacer la recherche »', JSON.stringify(r));
           await pg.locator('[data-achats-effacer]').first().click().catch(() => {}); await pg.waitForTimeout(500);
           dit(await pg.locator('[data-achat-tx]').count() > 0, '« Effacer la recherche » rend la liste');
+          dit(!!m.vers && m.vers.n === '3' && !/\d/.test(m.vers.t), 'le chemin vers Colis reste, sans redire le nombre de la carte', JSON.stringify(m.vers));
           dit(!m.vert, 'aucune couleur hors palette sur les lignes (ni vert « Reçu », ni pastille de compte)');
           await pg.locator('[data-achats-plus]').first().click(); await pg.waitForTimeout(400);
           dit(await pg.locator('[data-achats-outils]').count() === 1, '« … » ouvre Fournisseurs · Délai · Lots');

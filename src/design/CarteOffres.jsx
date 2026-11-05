@@ -24,6 +24,21 @@ export default function CarteOffres({ S, etat, fmt, nomDe }) {
     </div>
   );
   const couv = T && T.ventes != null ? `${T.lues}/${T.ventes}` : '';
+  // (5 nov., chantier F, revue 2.25) Aucun chiffre ni aucune offre lue sur la période :
+  // la carte se replie en une ligne (le titre, la raison), plus une grille de « — ».
+  const avecOffre = S ? S.comptes.some((c) => (c.recues || 0) > 0) : false;
+  const rienALire = !S || (!avecOffre && T && T.cout == null && T.remiseMoy == null && T.parOffre == null);
+  if (rienALire) {
+    const pasLues = S && S.comptes.some((c) => c.recues == null);
+    const raison = !S ? (etat === 'passu' ? 'Tes conversations ne sont pas encore lues.' : 'Lecture en cours…')
+      : pasLues ? 'Conversations pas encore lues : elles arrivent à ta prochaine visite sur Vinted.' : 'Aucune offre sur la période.';
+    return (
+      <section className="vrm-sv-carte vrm-of vrm-sv-repliee" data-stats-carte="sv-offres" data-sv-repliee="" data-of-etat={S ? 'lu' : (etat || 'encours')} data-of-couv={couv}>
+        <h2 className="vrm-sv-repliee-titre">Les offres</h2>
+        <span className="vrm-sv-repliee-raison" data-of-vide={S ? (pasLues ? 'pas-lues' : 'aucune') : (etat || 'encours')}>{raison}</span>
+      </section>
+    );
+  }
   let corps;
   if (!S) corps = <div className="vrm-sv-vide" data-of-etat={etat || 'encours'}>{etat === 'passu' ? '—' : '…'}</div>;
   else {
