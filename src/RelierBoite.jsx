@@ -40,6 +40,7 @@ function Scene({ messagerie, etape, expediteur, regle }) {
           <div className="vrm-relier-zone">
             {s === 'reglages' && <div className="vrm-relier-menu">
               <span className="vrm-relier-curseur"/>
+              <div className="vrm-relier-squelette"><i/><i/><i/></div>
               <div className="vrm-relier-menu-liste"><span>Affichage</span><span className="is-cible">{messagerie.regle === 'filtre' ? 'Voir tous les paramètres' : 'Réglages · Règles'}</span><span>Thème</span></div>
             </div>}
             {s === 'adresse' && <div className="vrm-relier-form">
@@ -53,11 +54,14 @@ function Scene({ messagerie, etape, expediteur, regle }) {
                 ? <span className="vrm-relier-cases">{'482913'.split('').map((c, i) => <b key={i} style={{ '--i': i }}>{c}</b>)}</span>
                 : <span className="vrm-relier-coche"><Icone quoi="ok"/> Copie gardée</span>}
             </div>}
-            {s === 'filtre' && <div className="vrm-relier-form">
+            {s === 'filtre' && (() => {
+              // Gmail : le champ « De » porte toute la règle ; ailleurs, une règle PAR expéditeur.
+              const champ = (messagerie.regle === 'filtre' ? regle : `De contient : ${expediteur.mot}`).slice(0, 40);
+              return <div className="vrm-relier-form">
               <span className="vrm-relier-libelle">{messagerie.regle === 'filtre' ? 'Filtre · champ « De »' : `Règle · ${expediteur.nom}`}</span>
-              <span className="vrm-relier-champ"><span className="vrm-relier-tape" style={{ '--n': Math.min(regle.length, 40) }}>{regle.slice(0, 40)}</span></span>
+              <span className="vrm-relier-champ"><span className="vrm-relier-tape" style={{ '--n': champ.length }}>{champ}</span></span>
               <span className="vrm-relier-coche is-retard"><Icone quoi="ok"/> Transférer à {BOITE_VRM_EXEMPLE}</span>
-            </div>}
+            </div>; })()}
             {s === 'flux' && <div className="vrm-relier-flux">
               <div className="vrm-relier-boite-liste">
                 <span className="vrm-relier-mail is-neuf"><b>{expediteur.nom}</b><small>{expediteur.sujet}</small></span>
@@ -80,23 +84,26 @@ export default function RelierBoite({ onAdresses }) {
   const [choisis, setChoisis] = useState(() => EXPEDITEURS.map((x) => x.id));
   const [focus, setFocus] = useState('');
   const [i, setI] = useState(0);
+  // Un tour complet = UN expéditeur, du début à la fin (la scène ne change pas
+  // d'expéditeur en cours de route) ; le suivant au tour d'après.
+  const [tour, setTour] = useState(0);
   const [lecture, setLecture] = useState(() => !reduit());
   const [copie, setCopie] = useState('');
   const m = MESSAGERIES.find((x) => x.id === mid) || MESSAGERIES[0];
   const etapes = m.etapes;
   const etape = etapes[Math.min(i, etapes.length - 1)];
-  // L'expéditeur montré dans la scène : celui qu'il a touché, sinon ils défilent.
+  // L'expéditeur montré dans la scène : celui qu'il a touché, sinon un par tour.
   const dansScene = useMemo(() => {
     const liste = EXPEDITEURS.filter((x) => choisis.includes(x.id));
     if (focus) return EXPEDITEURS.find((x) => x.id === focus) || liste[0] || EXPEDITEURS[0];
-    return liste.length ? liste[i % liste.length] : EXPEDITEURS[0];
-  }, [focus, choisis, i]);
+    return liste.length ? liste[tour % liste.length] : EXPEDITEURS[0];
+  }, [focus, choisis, tour]);
   const regle = regleFiltre(m.id, focus ? [focus] : choisis);
   useEffect(() => {
     if (!lecture) return undefined;
-    const t = setTimeout(() => setI((n) => (n + 1) % etapes.length), DUREE_ETAPE);
+    const t = setTimeout(() => { const n = (i + 1) % etapes.length; if (n === 0) setTour((x) => x + 1); setI(n); }, DUREE_ETAPE);
     return () => clearTimeout(t);
-  }, [lecture, i, etapes.length]);
+  }, [lecture, i, etapes.length, mid]);
   const copier = async (texte, quoi) => {
     try { await navigator.clipboard.writeText(texte); setCopie(`${quoi} copiée.`); }
     catch (_) { setCopie('Sélectionne le texte affiché pour le copier.'); }
