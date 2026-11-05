@@ -78,11 +78,16 @@ prix, numéros de compte, noms de ses comptes Vinted, “les mots qui commencent
   programmée, aucun « Sal… », aucune adresse ni code de retrait dans `innerText`, les N°
   restent, l'annonce Asics cachée en ligne entière ; D réglages : catégories, programme relu
   du nuage, aperçu en direct, POST de `main.vrm_stream_regles` ; E éteint d'un tap, tout
-  revient. **Vert après ; rouge sur le code d'avant** (voir le compte rendu de la session).
+  revient. **Après : 170 OK, 0 KO** (4 configurations). **Avant** (`git archive c52bb8ee`,
+  banc copié dedans) : **116 KO**. Pas de bouton ; montants, comptes, pseudos et marques
+  lisibles sur chaque écran ; pas de réglages ; pas de synchronisation.
 - Bancs adaptés au nouveau bouton : `comptes-securite.cjs` (partie B : `data-bouton-stream`),
   `compte-supprime.cjs` (bouton au lieu de la pastille, texte caché au lieu du flou),
   `entreprise-stream.cjs` (le texte caché se compte, il n'est plus « vu »).
-  `revue-ecrans.cjs` (mode stream) n'a pas besoin de changer.
+  `revue-ecrans.cjs` (mode stream) n'a pas besoin de changer. Relancés : `comptes-securite`
+  (B) vert, `compte-supprime` vert, `entreprise-stream` B et C verts. Ses 2 rouges de la
+  partie A (nom à côté du logo au téléphone, phrase « registre muet ») sont AUSSI rouges sur
+  l'arbre d'avant : sans lien avec le mode stream, pas traités ici.
 
 ## Ce qui reste / limites dites
 - **Notifications push du serveur** (`public/sw.js`, envoyées app fermée) : le serveur ne
