@@ -54541,11 +54541,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* (31 oct., soir) Achats ne montre plus les colis à retirer : une ligne mène
             à Colis (colonne « À retirer » et son détail). Le nombre est celui de la
             règle (`pickupUnion.total`), seulement quand les e-mails de suivi sont lus. */}
-        {modeListeAchats && !dansPlateforme && tracking!==null && pickupUnion.total>0 && (
+        {/* (5 nov.) Le chemin vers Colis reste ; dans l'espace Vinted, la carte sombre dit déjà le nombre :
+            le lien ne le répète pas (le même nombre une fois, §7). */}
+        {modeListeAchats && tracking!==null && pickupUnion.total>0 && (
           <div style={{margin:'0 0 12px'}}>
             <button type="button" className="vrm-lien-action" data-achats-vers-colis={pickupUnion.total} onClick={()=>onNav&&onNav('cat_achats')}
               style={{minHeight:44,background:'transparent',border:0,padding:0,color:C.text,fontSize:13,fontWeight:600,fontFamily:'inherit',cursor:'pointer'}}>
-              {pickupUnion.total} colis à retirer → Colis
+              {dansPlateforme ? 'Voir les colis à retirer → Colis' : `${pickupUnion.total} colis à retirer → Colis`}
             </button>
           </div>
         )}
