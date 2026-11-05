@@ -132,13 +132,16 @@ const faireRes = () => { const r = { code: null, corps: null }; r.status = (n) =
     const ech = ['007', '7', 'b125', 'B 125', 'B-125', ' 40 ', '012', 'C3'];
     dit(typeof cleNumCible === 'function' && ech.every((x) => cleNumCible(x) === cleNum(x)), 'A5 la clé du N° de la cible est celle de l’app (`cleNum`)', typeof cleNumCible === 'function' ? ech.map((x) => x + '→' + cleNumCible(x)).join(' ') : 'absente');
     const lbc = selecteursCible(lireCible({ cible: 'doublon', plat: 'leboncoin', num: '40' }));
-    dit(lbc.essais.length === 1 && lbc.essais[0] === '[data-lbc-retirer-num~="40"]', 'A5 Leboncoin avec un N° : SEULE la ligne de ce N° répond (aucun repli sur la première ligne)', JSON.stringify(lbc.essais));
+    // (5 nov.) Le crochet `data-cible` (jeton « doublon:leboncoin:40 ») passe en premier ; la règle
+    // reste : CHAQUE sélecteur nomme le N°40, aucun ne vise un bloc ni « la première ligne ».
+    const nommeN = (l, n) => l.length > 0 && l.every((x) => new RegExp('(~="|="|:)' + n + '"\\]$').test(x) && !/bloc|a-retirer/.test(x));
+    dit(nommeN(lbc.essais, '40') && lbc.essais.includes('[data-lbc-retirer-num~="40"]') && lbc.essais.includes('[data-cible~="doublon:leboncoin:40"]'), 'A5 Leboncoin avec un N° : SEULE la ligne de ce N° répond (aucun repli sur la première ligne)', JSON.stringify(lbc.essais));
     const lbc7 = selecteursCible(lireCible({ cible: 'doublon', plat: 'leboncoin', num: '007' }));
-    dit(lbc7.essais[0] === '[data-lbc-retirer-num~="7"]', 'A5 « 007 » vise la ligne du N°7', JSON.stringify(lbc7.essais));
+    dit(nommeN(lbc7.essais, '7') && lbc7.essais.includes('[data-lbc-retirer-num~="7"]'), 'A5 « 007 » vise la ligne du N°7', JSON.stringify(lbc7.essais));
     const eb = selecteursCible(lireCible({ cible: 'doublon', plat: 'ebay', num: '117' }));
-    dit(eb.essais.every((s) => /="117"\]$/.test(s)), 'A5 eBay avec un N° : seules les lignes de ce N° répondent (vendue sur Vinted ou sur Leboncoin)', JSON.stringify(eb.essais));
+    dit(nommeN(eb.essais, '117'), 'A5 eBay avec un N° : seules les lignes de ce N° répondent (vendue sur Vinted ou sur Leboncoin)', JSON.stringify(eb.essais));
     const nu = selecteursCible(lireCible({ cible: 'doublon', plat: 'leboncoin' }));
-    dit(nu.essais.length === 1 && /data-lbc-retirer-bloc/.test(nu.essais[0]), 'A5 sans N° (aucune identité) : le BLOC où se règle la double vente, pas une ligne', JSON.stringify(nu.essais));
+    dit(nu.essais.length > 0 && nu.essais.every((x) => x === '[data-cible~="doublon:leboncoin"]' || x === '[data-lbc-retirer-bloc]'), 'A5 sans N° (aucune identité) : le BLOC où se règle la double vente, pas une ligne', JSON.stringify(nu.essais));
     // La ligne de l'app porte la clé de CHACUN de ses N°, sur les seules lignes vendues.
     dit(/data-lbc-retirer-num=\{pausable \? \(String\(r\.numero == null \? '' : r\.numero\)\.split\('\+'\)\.map\(cleNum\)\.filter\(Boolean\)\.join\(' '\) \|\| undefined\) : undefined\}/.test(CODE),
       'A5 la ligne Leboncoin porte `data-lbc-retirer-num` = la clé de chacun de ses N° (lot éclaté), sur les lignes VENDUES seulement');

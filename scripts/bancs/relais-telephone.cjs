@@ -228,7 +228,7 @@ const cliquer = (pg, tx) => pg.evaluate((tx) => { const b = document.querySelect
     {
       const r = await rendre(b, { relais: { ageMin: 0.2, vUid: '222', vLogin: 'compte_b' } });
       const b1 = await bouton(r.pg, 7001);
-      dit(b1 && b1.etat === 'grise' && /Le Chrome de ton ordinateur est connecté sur compte_b/.test(b1.txt), 'grisé AVANT le clic, avec la raison', JSON.stringify(b1));
+      dit(b1 && b1.etat === 'grise' && /Le navigateur de ton ordinateur est connecté sur compte_b/.test(b1.txt), 'grisé AVANT le clic, avec la raison', JSON.stringify(b1));
       await cliquer(r.pg, 7001); await r.pg.waitForTimeout(600);
       dit(r.journal.posts.length === 0, 'et un clic n’écrit rien', String(r.journal.posts.length));
       await r.ctx.close();
@@ -242,7 +242,7 @@ const cliquer = (pg, tx) => pg.evaluate((tx) => { const b = document.querySelect
       const raison = await r.pg.evaluate(() => { const e = document.querySelector('[data-raison-bord]'); return e ? { code: e.getAttribute('data-raison-bord'), txt: e.textContent } : null; });
       dit(p && p.relais === 'perime' && p.niveau === 'lecture', 'la pastille dit « Lecture seule » (relais éteint)', JSON.stringify(p));
       dit(b1 && b1.etat === 'grise', 'le bouton est grisé', JSON.stringify(b1));
-      dit(raison && /pas donné signe de vie depuis 10 min/.test(raison.txt) && /ouvre Chrome/.test(raison.txt), 'la raison : « pas donné signe de vie depuis 10 min — ouvre Chrome »', raison && raison.txt.slice(0, 200));
+      dit(raison && /pas donné signe de vie depuis 10 min/.test(raison.txt) && /ouvre, sur l'ordinateur, le navigateur/.test(raison.txt), 'la raison : « pas donné signe de vie depuis 10 min — ouvre le navigateur de l’ordinateur »', raison && raison.txt.slice(0, 200));
       await cliquer(r.pg, 7001); await r.pg.waitForTimeout(500);
       dit(r.journal.posts.length === 0, 'un clic n’écrit rien', String(r.journal.posts.length));
       await r.pg.screenshot({ path: path.join(os.tmpdir(), 'relais-telephone-eteint.png') });

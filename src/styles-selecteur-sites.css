@@ -29,8 +29,7 @@
   -webkit-mask: var(--vrm-ss-logo) center / contain no-repeat; mask: var(--vrm-ss-logo) center / contain no-repeat;
 }
 .vrm-logo-site[data-logo-site="ebay"] { width: 2.1em; height: 2.1em; margin: -.55em .2em -.55em 0; vertical-align: -.7em; }
-/* Le compte de la vente sur la carte Fusion (une ligne, coupée proprement). */
-.vrm-fu-compte { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Le compte de la vente sur la carte Fusion : `.vrm-fu-vente-compte` (src/design/fusion.css). */
 /* Un site sans compte relié : le même segment, estompé (il reste choisissable :
    son onglet dit ce qui manque et le geste). */
 .vrm-sel-sites > button[data-sans-compte][aria-pressed="false"] .vrm-ss-in { opacity: .45; }
