@@ -1,14 +1,11 @@
 #!/usr/bin/env node
 // ════════════════════════════════════════════════════════════════════════════
-//  AUDIT — ACHATS : FOURNISSEURS · DÉLAI · LOTS RÉPARTIS (4 nov., src/achatsSourcing.js)
+//  AUDIT — ACHATS : DÉLAI · LOTS RÉPARTIS (4 nov., src/achatsSourcing.js)
 //        node scripts/audit-achats-sourcing.cjs [--prouve]
 // ════════════════════════════════════════════════════════════════════════════
 // EXÉCUTE les règles (aucune lecture du texte pour juger) :
-//   F. un achat n'est relié à une vente que par `buyFromId` (ou le N° d'un achat
-//      hors plateforme, s'il n'en désigne qu'un) — 50 achats et 50 ventes au
-//      MÊME titre ne se relient pas ; « Dépensé » = la commande (un lot une fois) ;
-//      bénéfice = ventes au bénéfice connu, « — » si aucun, « au plus » gardé ;
-//      pseudo pas lu ⇒ « Vinted », jamais deviné ;
+//   F. (5 nov.) plus aucun « fournisseur » tiré d'un vendeur Vinted : les
+//      fournisseurs sont les personnes qu'IL crée (scripts/audit-fournisseurs.cjs) ;
 //   D. délai réception → mise en ligne : date LUE (livraison 400 ou son clic),
 //      sinon exclu et compté ; médiane par mois ; « Reçus, pas en ligne » ;
 //   L. répartition d'un lot : rien sans `confirme: true`, somme au centime
@@ -19,13 +16,6 @@ const fs = require('fs'), path = require('path'), os = require('os');
 const { execFileSync } = require('child_process');
 const R = path.join(__dirname, '..');
 const MUTS = {
-  'lien-par-titre': ["    if (tx) l = parTx.get(tx) || null;", "    if (tx) l = parTx.get(tx) || null;\n    else if (v.titre) { for (const a of achats) if (String(a.title) === String(v.titre)) { l = parTx.get(txDe(a)) || null; break; } }"],
-  'relies-par-titre': ["    if ((liens.get(tx) || []).length) { l.relies++; reliesTx.add(tx); }", "    if ((liens.get(tx) || []).length || Object.values(fiches || {}).some((e) => e && e.title === a.title)) { l.relies++; reliesTx.add(tx); }"],
-  'double-compte-lot': ["    if (c == null) { l.sansPrix++; sansPrix++; } else l.depense += c;\n    if ((liens", "    if (c == null) { l.sansPrix++; sansPrix++; } else l.depense += c;\n    for (const x of (liens.get(tx) || [])) { const cx = centimesDe(x.buyPrice); if (cx != null) l.depense += cx; }\n    if ((liens"],
-  'benefice-zero-si-pas-su': ["benefice: l.beneficesConnus ? l.benefice : null", 'benefice: l.benefice'],
-  'pas-su-compte-zero': ["    if (b.valeur != null && Number.isFinite(Number(b.valeur))) {", "    if (true) { b.valeur = b.valeur == null ? 0 : b.valeur;"],
-  'pseudo-devine': ["  return { cle: FOURNISSEUR_VINTED_PAS_LU, nom: 'Vinted', type: 'pas-lu' };", "  const g = String((achat && achat.title) || '').split(' ')[0]; return { cle: 'v:' + g.toLowerCase(), nom: g, type: 'vendeur' };"],
-  'rembourse-compte': ["    const tx = txDe(a); if (!tx || achatSansCout(a) || parTx.has(tx)) continue;", "    const tx = txDe(a); if (!tx || parTx.has(tx)) continue;"],
   'reception-devinee': ["  if (t2 != null) return { ms: t2, source: 'clic' };\n  return null;", "  if (t2 != null) return { ms: t2, source: 'clic' };\n  const t3 = msDe(achat && achat.date); return t3 != null ? { ms: t3, source: 'achat' } : null;"],
   'sans-date-silencieux': ["      if (!rec) exclus.sansReception++;", "      if (!rec) {}"],
   'enligne-pas-su-oui': ["    if (arts.some((x) => x && x.enLigne == null)) { pasSu++; continue; }", ''],
@@ -73,50 +63,13 @@ const url = (f) => require('url').pathToFileURL(path.join(SRC, f)).href;
   const J = 86400e3, T0 = Date.parse('2026-10-01T10:00:00Z');
   const ach = (tx, o = {}) => ({ transaction_id: tx, title: 'Adidas Spezial noir taille 42', date: new Date(T0).toISOString(), price: { amount: '30.0', currency_code: 'EUR' }, status: 'Commande finalisée', ...o });
   const cleNum = (n) => String(n == null ? '' : n).toUpperCase().replace(/\s+/g, '').replace(/^0+(?=\d)/, '');
-  const vendeurs = { 1000001: 'pseudo_a', 1000002: 'pseudo_a', 1000003: 'Pseudo_B' };
-  const vendeurDe = (tx) => vendeurs[tx] || '';
 
-  console.log('\n── F. Achats par fournisseur');
-  {
-    const achats = [ach(1000001), ach(1000002, { price: { amount: '20,5', currency_code: 'EUR' } }), ach(1000003, { price: { amount: '100', currency_code: 'EUR' }, title: 'Lot 3 paires' }),
-      ach(1000004), ach(1000005, { status: 'Commande remboursée' }), ach(1000006, { price: { amount: '12', currency_code: 'GBP' } })];
-    const fiches = { a: { numero: '1', buyFromId: '1000001', buyPrice: '30' }, b: { numero: '2', buyFromId: '1000003', buyPrice: '40' }, c: { numero: '3', buyFromId: '1000003', buyPrice: '35' }, d: { numero: '4', buyFromId: '1000003', buyPrice: '25' },
-      e: { numero: '9', buyFromId: '1000005', buyPrice: '10' } };
-    const ventes = [
-      { id: 'v1', entree: fiches.a, benefice: { valeur: 15, partiel: false } },
-      { id: 'v2', entree: fiches.b, benefice: { valeur: 20, partiel: true } },
-      { id: 'v3', entree: fiches.c, benefice: { valeur: null } },
-      { id: 'v4', entree: fiches.e, benefice: { valeur: 99 } },                 // achat remboursé : hors tableau
-      { id: 'v1', entree: fiches.a, benefice: { valeur: 15 } },                 // même vente vue deux fois
-    ];
-    const hors = [{ id: 'h1', price: '50', numero: '007', source: 'Brocante' }, { id: 'h2', price: '8', numero: '8', source: 'brocante' }, { id: 'h3', price: '5', numero: '8', source: 'Ami' }];
-    const fichesH = { ...fiches, g: { numero: '7', buyPrice: '50' }, h: { numero: '8' } };
-    const ventesH = [...ventes, { id: 'v7', entree: fichesH.g, benefice: { valeur: 30 } }, { id: 'v8', entree: fichesH.h, benefice: { valeur: 3 } }];
-    const r = S.fournisseurs({ achats, hors, fiches: fichesH, saleOv: {}, ventes: ventesH, vendeurDe, cleNum, prixHors: (b) => Number(String(b.price).replace(',', '.')) });
-    const L = Object.fromEntries(r.lignes.map((l) => [l.cle, l]));
-    const a = L['v:pseudo_a'], b = L['v:pseudo_b'], v = L['v:?'], br = L['h:brocante'], ami = L['h:ami'];
-    dit(a && a.achats === 2 && a.depense === 5050 && a.nom === 'pseudo_a', 'F1 deux achats du même pseudo regroupés · Dépensé 50,50 €', JSON.stringify(a));
-    dit(b && b.depense === 10000 && b.achats === 1, 'F2 un LOT de 100 € compte 100 € une fois (jamais la somme des parts de ses N°)', JSON.stringify(b));
-    dit(b && b.relies === 1 && b.revendus === 2, 'F3 un lot relié à 3 N° : 1 achat relié, 2 ventes revendues', JSON.stringify(b));
-    dit(b && b.benefice === 2000 && b.beneficesConnus === 1 && b.partiel === true, 'F4 bénéfice = ventes au bénéfice connu seulement, « au plus » gardé', JSON.stringify(b));
-    dit(v && v.achats === 2 && v.nom === 'Vinted' && v.type === 'pas-lu' && v.sansPrix === 1 && v.depense === 3000, 'F5 pseudo pas lu ⇒ « Vinted » ; autre devise ⇒ non comptée, comptée à part', JSON.stringify(v));
-    dit(v && v.benefice === null && v.revendus === 0, 'F6 aucun bénéfice connu ⇒ null (« — »), jamais 0', JSON.stringify(v));
-    dit(!r.lignes.some((l) => l.depense === 1000 || l.benefice === 9900) && r.lignes.reduce((t, l) => t + l.achats, 0) === 8, 'F7 achat remboursé : ni dépense, ni vente, ni ligne');
-    dit(a && a.relies === 1 && a.revendus === 1 && a.benefice === 1500, 'F8 une vente vue deux fois comptée une fois', JSON.stringify(a));
-    dit(r.vendeurLu.n === 3 && r.vendeurLu.sur === 5, 'F9 couverture du pseudo : 3 lus sur 5 achats Vinted', JSON.stringify(r.vendeurLu));
-    dit(br && br.achats === 2 && br.depense === 5800 && br.relies === 1 && br.revendus === 1 && br.benefice === 3000, 'F10 hors plateforme : source sans casse, N° « 007 » = « 7 » relié par SON N°', JSON.stringify(br));
-    dit(ami && ami.revendus === 0 && br.revendus === 1, 'F11 un N° porté par DEUX achats hors plateforme ne relie rien (ambigu)', JSON.stringify({ ami, br }));
-    // 50 achats et 50 ventes au même titre, aucun lien posé.
-    const memes = Array.from({ length: 50 }, (_, i) => ach(2000000 + i, { title: 'Nike Air Max 90 blanc 42' }));
-    const ventesMemes = Array.from({ length: 50 }, (_, i) => ({ id: 'm' + i, titre: 'Nike Air Max 90 blanc 42', entree: { numero: String(100 + i), title: 'Nike Air Max 90 blanc 42' }, benefice: { valeur: 10 } }));
-    const fichesMemes = Object.fromEntries(ventesMemes.map((x, i) => ['m' + i, x.entree]));
-    const r50 = S.fournisseurs({ achats: memes, fiches: fichesMemes, ventes: ventesMemes, vendeurDe: () => '', cleNum });
-    const l50 = r50.lignes[0];
-    dit(l50 && l50.achats === 50 && l50.revendus === 0 && l50.relies === 0 && l50.benefice === null, 'F12 50 achats et 50 ventes au MÊME titre : aucun relié, aucun revendu, bénéfice « — »', JSON.stringify(l50));
-    const tri = S.trierFournisseurs(r.lignes, 'benefice').map((l) => l.cle);
-    dit(tri[0] === 'h:brocante' && tri.indexOf('v:?') > tri.indexOf('v:pseudo_b'), 'F13 tri par bénéfice : un bénéfice pas su va en dernier', tri.join(','));
-    dit(S.trierFournisseurs(r.lignes, 'depense')[0].cle === 'v:pseudo_b', 'F14 tri par dépensé');
-  }
+  console.log('\n── F. Fournisseurs : plus aucune dérivation par vendeur Vinted (5 nov.)');
+  // Julien : « c'est une personne à qui tu achètes en gros pas des vendeurs
+  // particuliers sur vinted ». Les règles des fournisseurs vivent dans
+  // src/fournisseurs.js (scripts/audit-fournisseurs.cjs) ; ici on vérifie que
+  // l'ancienne dérivation n'est plus exportée.
+  dit(!['fournisseurs', 'fournisseurVinted', 'fournisseurHors', 'trierFournisseurs'].some((k) => typeof S[k] === 'function'), 'F1 src/achatsSourcing.js n’exporte plus de fournisseur tiré des vendeurs Vinted');
 
   console.log('\n── D. Délai réception → mise en ligne');
   {
@@ -188,8 +141,6 @@ const url = (f) => require('url').pathToFileURL(path.join(SRC, f)).href;
     const lotDate = { ...lot, date: '2026-10-01T10:00:00Z' };
     const reg = RG.registreDesAchats({ achats: [lotDate], fiches: { ...fichesR, z: { numero: '5', buyPrice: ov.patch.buyPrice, buyFromId: '4000001' } }, periode: '2026-10' });
     dit(reg && reg.lignes.length === 1 && reg.lignes[0].montant === 100 && reg.lignes[0].source === 'saisi', 'L17 registre des achats : le lot réparti = UNE ligne de 100 € (ses N° saisis), jamais 100 € × 5', JSON.stringify(reg && reg.lignes.map((l) => [l.montant, l.source, l.num])));
-    const fr = S.fournisseurs({ achats: [lotDate], fiches: fichesR, vendeurDe: () => 'g' });
-    dit(fr.lignes[0].depense === 10000 && fr.lignes[0].achats === 1, 'L18 Fournisseurs après répartition : Dépensé 100 € une fois');
   }
 
   console.log('\n── P. prixAchatPropose : jamais le prix entier d’un lot');
