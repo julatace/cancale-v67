@@ -1,0 +1,74 @@
+/* ── LA BARRE DU BAS, REVUE (5 nov., Julien : « ça ne marche pas, c'est pas
+   ouf », « revue TOTALEMENT ») ──────────────────────────────────────────────
+   Chargée en DERNIER (main.jsx) : seulement la coque du téléphone (même
+   requête que styles-vitrine.css §3). Récit et mesures :
+   docs/passation/2026-11-05-iphone-reprise.md ; banc
+   scripts/bancs/iphone-reprise.cjs.
+   · « Plus » n'est plus une feuille de 651 px qui recouvre la barre et la zone
+     sûre : c'est un panneau de tuiles posé JUSTE AU-DESSUS de la barre
+     (`--vrm-barre-bas`, mesurée par BottomBar). La barre reste visible et
+     touchable ; tout tient sans défiler, même sur un iPhone SE (375 × 667).
+   · Le voile laisse la barre hors de lui : toucher « Plus » le referme,
+     toucher un autre onglet y va directement.
+   · Une seule couleur d'accent, rare (§7) : l'icône de l'écran ouvert. */
+@media (max-width: 767px), (max-width: 1023px) and (hover: none), (max-width: 1023px) and (pointer: coarse), (max-width: 1023px) and (pointer: none) {
+  html .vrm-app-shell .vrm-sheet-voile.vrm-plus-voile {
+    bottom: var(--vrm-barre-bas, 64px);
+    background: rgba(0, 0, 0, .28);
+    -webkit-backdrop-filter: none; backdrop-filter: none;
+  }
+  html .vrm-app-shell .vrm-sheet.vrm-plus-panneau {
+    top: auto; bottom: 0; left: 0; right: 0;
+    max-height: calc(100% - 8px); overflow-y: auto; overscroll-behavior: contain;
+    padding: 14px 12px 12px;
+    border-radius: 24px 24px 0 0;
+    background: var(--vrm-bg); color: var(--vrm-ink);
+    box-shadow: 0 -10px 30px rgba(0, 0, 0, .16);
+    animation: vrm-plus-monte .22s var(--vrm-ease-ios, cubic-bezier(.32, .72, 0, 1)) backwards;
+  }
+  @keyframes vrm-plus-monte { from { transform: translateY(16px); opacity: 0; } to { transform: none; opacity: 1; } }
+  .vrm-plus-grille { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  /* Les groupes (Vendre · Gérer · Argent · Moi) gardent leur structure et leur
+     nom pour les lecteurs d'écran ; à l'œil, une seule grille. */
+  .vrm-plus-groupe { display: contents; }
+  html .vrm-app-shell .vrm-plus-panneau .vrm-plus-tuile {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+    min-width: 0; min-height: 76px; margin: 0; padding: 10px 6px;
+    border: 0; border-radius: 14px; background: var(--vrm-surface); color: var(--vrm-ink);
+    font-family: inherit; font-size: 13px; font-weight: 500; line-height: 1.2; letter-spacing: -.005em;
+    text-align: center; cursor: pointer; -webkit-tap-highlight-color: transparent;
+    box-shadow: none; transition: background-color .12s ease;
+  }
+  html .vrm-app-shell .vrm-plus-panneau .vrm-plus-tuile:active { background: var(--vrm-card2); transform: none; filter: none; }
+  .vrm-plus-ic { position: relative; display: flex; align-items: center; justify-content: center; height: 24px; color: var(--vrm-muted); }
+  html .vrm-app-shell .vrm-plus-panneau .vrm-plus-tuile .vrm-sheet-lib {
+    display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 0 0 auto;
+  }
+  html .vrm-app-shell .vrm-plus-panneau .vrm-plus-tuile[aria-current="page"] { font-weight: 600; box-shadow: inset 0 0 0 1.5px var(--vrm-ink); }
+  html .vrm-app-shell .vrm-plus-panneau .vrm-plus-tuile[aria-current="page"] .vrm-plus-ic { color: var(--vrm-accent); }
+  html .vrm-app-shell .vrm-plus-panneau .vrm-plus-tuile:focus-visible { outline: 2px solid var(--vrm-accent); outline-offset: 2px; }
+  html .vrm-app-shell .vrm-nav-badge-tuile { position: absolute; top: -6px; left: calc(100% - 4px); }
+  html .vrm-app-shell .vrm-nav-badge-tuile.vrm-nav-badge-point { top: -2px; left: calc(100% - 2px); box-shadow: 0 0 0 2px var(--vrm-surface); }
+
+  /* « Plus » ouvert : il prend l'état actif le temps du panneau. */
+  html .vrm-app-shell .vrm-tabbar > .vrm-nav-more[aria-expanded="true"] { color: var(--vrm-ink); }
+  html .vrm-app-shell .vrm-tabbar > .vrm-nav-more[aria-expanded="true"] .vrm-tab-ic { color: var(--vrm-accent); }
+  html .vrm-app-shell .vrm-tabbar > .vrm-nav-more[aria-expanded="true"] .vrm-nav-label { font-weight: 700; }
+  /* Un libellé de la barre ne se coupe jamais : 11 px dès qu'il est long
+     (« Réglages », « Annonces » sur un iPhone SE). */
+  html .vrm-app-shell .vrm-tabbar > .vrm-tab .vrm-nav-label { max-width: 100%; overflow: hidden; text-overflow: clip; }
+  html .vrm-app-shell .vrm-tabbar > .vrm-tab .vrm-nav-label[data-lib-long] { font-size: 11px; letter-spacing: -.01em; }
+  /* « Communauté » sur un iPhone SE : la 5ᵉ place s'élargit un peu plutôt que de couper. */
+  html .vrm-app-shell .vrm-tabbar > .vrm-nav-more:has(.vrm-nav-label[data-lib-long]) { flex-grow: 1.3; }
+  /* La barre s'arrête au-dessus de l'indicateur d'accueil (zone sûre) et des
+     bords arrondis en paysage. */
+  html .vrm-app-shell .vrm-tabbar {
+    padding-left: max(4px, env(safe-area-inset-left)) !important;
+    padding-right: max(4px, env(safe-area-inset-right)) !important;
+    padding-bottom: max(6px, env(safe-area-inset-bottom)) !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html .vrm-app-shell .vrm-sheet.vrm-plus-panneau { animation: none !important; }
+  html .vrm-app-shell .vrm-plus-panneau .vrm-plus-tuile { transition: none; }
+}
