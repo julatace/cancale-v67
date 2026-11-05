@@ -33808,14 +33808,16 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   const nSansNum = articlesVus.filter((a) => !a.cle).length;
   const platsPresents = aa ? [...new Set(aa.articles.flatMap((a) => a.plateformes))] : [];
   const comptesPresents = aa ? [...new Set(aa.articles.flatMap((a) => a.comptes))] : [];
-  const manqueTxt = aa ? aa.manque.map((x) => (x.plateforme === 'vinted' ? `${x.nom} (Vinted)` : x.nom) + ' : ' + x.raison).join(' · ') : '';
+  // Les lectures qui manquent, NOMMÉES : « compte_beta sur Vinted, Leboncoin ».
+  const manqueTxt = aa ? (() => { const v = aa.manque.filter((x) => x.plateforme === 'vinted').map((x) => x.nom); const e = aa.manque.filter((x) => x.plateforme === 'ebay').map((x) => (x.nom === 'eBay' ? 'eBay' : `${x.nom} sur eBay`)); const l = aa.manque.some((x) => x.plateforme === 'leboncoin') ? ['Leboncoin'] : [];
+    return [...(v.length ? [`${v.join(', ')} sur Vinted`] : []), ...e, ...l].join(', '); })() : '';
   const sansNumAutres = aa ? (aa.sansNumero.ebay + aa.sansNumero.leboncoin) : 0;
   const blocResume = (
     <Card style={{ padding: '13px 14px' }}>
       <div className="vrm-s2d-resume" data-stock-actuelles={lecture === undefined ? 'encours' : (aa && aa.su ? nAffiche : 'passu')} data-stock-au-moins={aa && aa.auMoins ? '1' : '0'} data-stock-a-confirmer={aa && aa.su ? nAConf : undefined} data-stock-masquees={aa && aa.su ? nMasq : undefined} data-stock-rangees={aa && aa.su ? nRangees : undefined}>
         <div className="vrm-s2d-resume-n">
           {lecture === undefined ? '…' : (aa && aa.su ? <>{aa.auMoins ? <span style={{ fontSize: 15, fontWeight: 600 }}>au moins </span> : null}{nAffiche}</> : '—')}
-          <small>annonce{nAffiche > 1 ? 's' : ''} actuelle{nAffiche > 1 ? 's' : ''}{filtreActif ? ' (filtrées)' : ''}</small>
+          <small>{nAffiche === 1 && aa && aa.su ? 'annonce actuelle' : 'annonces actuelles'}{filtreActif ? ' (filtrées)' : ''}</small>
         </div>
         {lecture === undefined && <div className="vrm-s2d-resume-l">Je lis tes annonces Vinted, Leboncoin et eBay…</div>}
         {lecture && !aa.su && <div className="vrm-s2d-resume-l" data-stock-passu="">Je n'ai pas pu lire tes annonces{manqueTxt ? ` (${manqueTxt})` : ''} — rien n'est perdu, c'est la lecture qui a échoué. Ouvre Vinted dans Chrome avec l'extension, puis reviens ici.</div>}

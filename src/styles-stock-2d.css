@@ -214,3 +214,4 @@
 /* « À ranger » : la plateforme d'une paire vue hors Vinted, l'autre N° d'une même paire. */
 .vrm-s2d-plat { position: absolute; left: 4px; top: 4px; max-width: calc(100% - 8px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: rgba(0, 0, 0, .62); color: #FFFFFF; font-size: 11px; font-weight: 700; line-height: 1.35; padding: 0 6px; border-radius: 6px; }
 .vrm-s2d-aussi { position: absolute; right: 4px; bottom: 22px; background: rgba(0, 0, 0, .62); color: #FFFFFF; font-size: 11px; font-weight: 700; line-height: 1.35; padding: 0 5px; border-radius: 6px; }
+@media (min-width: 760px) { .vrm-s2d-gestes .vrm-b { flex: 0 1 220px; } }
