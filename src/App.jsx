@@ -16,6 +16,7 @@ import {auteurDernierConfirme,suiviNegociationVinted,reponseAttendueVinted,insta
 import {retourReponseVinted,cleReponseVinted,creerBrouillonsReponses,etatActionVinted,cleActionOffreVinted} from './reponseVinted.js';
 import {etatOffreVinted,offreVintedEnAttente,cleOffreVinted,appliquerOffresConfirmees,annonceOffreEnVente,offreOuverte} from './offresVinted.js';
 import {contreOffreMini} from './messagesVolets.js';
+import {lireEntiteVinted,extraitConversation,libelleOffre,etatOffreCourt,estCodeTechnique} from './messagesLisibles.js';
 import { problemesAnnonce, problemesLot } from './verifAnnonce.js';
 // « 105 € » (un montant entier sans « ,00 »), « 44,50 € » sinon — la contre-offre en un tap.
 const eurCourt = (v) => (Number.isInteger(Number(v)) ? `${Number(v)} €` : `${Number(v).toFixed(2).replace('.', ',')} €`);
@@ -6015,7 +6016,11 @@ const fetchHarvestConversation = async (uid, convId) => {
 // Rend une Map `${uid}_${conv}` → résumé, ou `null` (pas su).
 let _resumeConvSansAuteur = false;
 const RESUME_CONV_BASE = 'id=like.harvest_%25_conv_%25&select=id,tx:data->payload->conversation->transaction->>id,item:data->payload->conversation->transaction->>item_id,st:data->payload->conversation->transaction->>status,side:data->payload->conversation->transaction->>current_user_side,titre:data->payload->conversation->transaction->>item_title,ph:data->payload->conversation->transaction->item_photo->>url,opp:data->payload->conversation->opposite_user->>id';
-const RESUME_CONV_AUTEUR = ',der:data->payload->conversation->messages->-1->entity->>user_id,derTs:data->payload->conversation->messages->-1->>created_at_ts';
+const RESUME_CONV_AUTEUR = ',der:data->payload->conversation->messages->-1->entity->>user_id,derTs:data->payload->conversation->messages->-1->>created_at_ts'
+  // (5 nov.) Le DERNIER message en mots, pour l'extrait de la liste
+  // (`apercuDernierMessage`) : son type, son corps, son titre, son montant
+  // d'offre et son statut — des scalaires, jamais tout le fil (§4.4).
+  + ',dt:data->payload->conversation->messages->-1->>entity_type,db:data->payload->conversation->messages->-1->entity->>body,dti:data->payload->conversation->messages->-1->entity->>title,dp:data->payload->conversation->messages->-1->entity->price->>amount,dpo:data->payload->conversation->messages->-1->entity->original_price->>amount,dst:data->payload->conversation->messages->-1->entity->>status';
 const fetchResumesConversations = async (uid=null) => {
   try {
     if(uid!=null&&!/^\d+$/.test(String(uid)))return null;
@@ -7644,33 +7649,8 @@ const fetchVintedConversationDetail = async (account, conversationId, {force=fal
 };
 
 // Aplati les entites d'une conversation en messages affichables et tries.
-// Extrait TOUT le texte lisible d'une entité d'évènement système : titre,
-// sous-titre, corps, actions... ET surtout tout champ qui ressemble à un CODE
-// (retrait en point relais, PIN, suivi, référence). Vinted range parfois le
-// « code de retrait » dans un champ imbriqué : on scanne défensivement pour ne
-// rien cacher (« voir tout dans la conv »).
-const extractEventText = (e, entity_type) => {
-  const parts = [];
-  ['title','subtitle','body','text','header','description'].forEach(k => { if (typeof e[k] === 'string' && e[k].trim()) parts.push(e[k].trim()); });
-  const seen = new Set(parts);
-  const scan = (obj, depth = 0) => {
-    if (!obj || typeof obj !== 'object' || depth > 6) return;
-    for (const k in obj) {
-      const v = obj[k];
-      if ((typeof v === 'string' && v.trim()) || (typeof v==='number' && Number.isFinite(v))) {
-        const texte=String(v).trim();
-        // Champs qui portent typiquement un code / numéro de suivi / retrait.
-        if (/code|pin|pickup|retrait|tracking|suivi|reference|référence|numero|numéro|colis|shipment|drop/i.test(k) && !seen.has(texte)) {
-          const label=/pickup|retrait|pin/i.test(k)?'Code de retrait':/tracking|suivi/i.test(k)?'Suivi':/reference|référence/i.test(k)?'Référence':k;
-          seen.add(texte); parts.push(`${label}: ${texte}`);
-        }
-      } else if (v && typeof v === 'object') scan(v, depth + 1);
-    }
-  };
-  scan(e);
-  return parts.length ? [...new Set(parts)].join(' · ') : entity_type;
-};
-
+// (5 nov.) `extractEventText` est retiré : son balayage « défensif » prenait
+// `price.currency_code` pour un code de retrait. Voir src/messagesLisibles.js.
 // Récupère tous les LIENS d'une entité (le bordereau/étiquette d'expédition est
 // souvent un lien dans la conversation). On scanne en profondeur, on repère les
 // liens de type bordereau/étiquette/suivi pour les mettre en avant.
@@ -7709,23 +7689,19 @@ const normalizeConversationMessages = (conversation) => {
     const nombre=Number(brut);const date=brut==null || brut===''?null:Number.isFinite(nombre)?(nombre<1e12?nombre*1000:nombre):(Date.parse(brut)||null);
     const ts=date!=null && Number.isFinite(new Date(date).getTime())?date:null;
     const links = extractLinks(e);
-    if (m.entity_type === 'message') {
-      return { kind: 'message', mine:e.user_id!=null && oppId!=null && String(e.user_id)!==String(oppId), body: e.body || '', photos:Array.isArray(e.photos)?e.photos:[], ts, links };
+    // (5 nov.) UNE règle (`lireEntiteVinted`, src/messagesLisibles.js) : le texte
+    // réel de chaque entité, sans HTML, sans nom de type, sans « currency_code:
+    // EUR » (le défaut mesuré sur 587 offres). Ce qui n'a rien de lisible a un
+    // corps vide : le fil ne l'affiche pas.
+    const lu = lireEntiteVinted(m.entity_type, e, oppId);
+    if (lu.kind === 'message') {
+      return { kind: 'message', mine:!lu.vinted&&e.user_id!=null && oppId!=null && String(e.user_id)!==String(oppId), vinted:!!lu.vinted, body: lu.texte, photos:Array.isArray(e.photos)?e.photos:[], ts, links };
     }
-    if(m.entity_type==='offer_request_message'){
-      const brutPrix=e.price&&typeof e.price==='object'?e.price.amount:e.price;
-      const montant=typeof brutPrix==='number'?brutPrix:typeof brutPrix==='string'&&/^\d+(?:[,.]\d{1,2})?$/.test(brutPrix.trim())?Number(brutPrix.replace(',','.')):null;
-      if(Number.isFinite(montant)&&montant>0){
-        const deviseBrute=e.price?.currency_code||e.price?.currency;
-        const devise=typeof deviseBrute==='string'&&/^[A-Z]{3}$/.test(deviseBrute)?deviseBrute:null;
-        const sens=e.user_id!=null&&oppId!=null?(String(e.user_id)===String(oppId)?'recue':'envoyee'):'inconnu';
-        const statut=etatOffreVinted(e).libelle;
-        return {kind:'offer',body:'',offre:{montant,devise,sens,statut,oid:e.offer_request_id!=null?String(e.offer_request_id):null},ts,links};
-      }
+    if (lu.kind === 'offer') {
+      const statut=m.entity_type==='offer_request_message'?etatOffreVinted(e).libelle:'';
+      return {kind:'offer',body:'',offre:{montant:lu.offre.montant,devise:lu.offre.devise,ancien:lu.offre.ancien,sens:lu.offre.sens,statut,oid:e.offer_request_id!=null?String(e.offer_request_id):null,type:m.entity_type},ts,links};
     }
-    // Évènements système (offre, statut, expédition, retrait…) : on montre TOUT,
-    // codes de retrait compris.
-    return { kind: 'event', body: extractEventText(e, m.entity_type), ts, links };
+    return { kind: 'event', body: lu.texte, ts, links };
   });
   return messages.every(m=>m.ts!=null)?messages.sort((a,b)=>a.ts-b.ts):messages;
 };
@@ -14865,7 +14841,7 @@ function BoutonTraduire({ texte }) {
 // SES gestes (ceux qui existaient), et décide lui-même ce que la fiche dit —
 // toujours par identité (§5), sinon « Pas reliée ». Un site qui ne permet pas
 // de répondre depuis VRM pose `PiedSansEnvoi` : il le dit, il ne fait pas semblant.
-function LigneConv({ actif, onClick, attrs, style, ariaLabel, photo, nom, sensible = false, compte, quand, couleurHeure, titre, num, etat, extrait, couleurExtrait, toi = false, apres = null, point = null }) {
+function LigneConv({ actif, onClick, attrs, style, ariaLabel, photo, nom, sensible = false, compte, quand, couleurHeure, titre, num, etat, extrait, couleurExtrait, toi = false, apres = null, point = null, attrsExtrait }) {
   const morceaux = [titre || null, num ? `N°${num}` : null].filter(Boolean);
   return (
     <button className={actif ? 'vrm-inbox-row is-current' : 'vrm-inbox-row'} type="button" {...(attrs || {})} aria-label={ariaLabel} onClick={onClick} style={style}>
@@ -14886,7 +14862,7 @@ function LigneConv({ actif, onClick, attrs, style, ariaLabel, photo, nom, sensib
           </span>
         )}
         <span className="vrm-msg-l2">
-          <span className="vrm-msg-extrait" style={{color:couleurExtrait||C.muted}}>{toi?<span className="vrm-msg-toi" style={{color:C.muted}}>Toi : </span>:null}{extrait||''}</span>
+          <span className="vrm-msg-extrait" {...(attrsExtrait || {})} style={{color:couleurExtrait||C.muted}}>{toi?<span className="vrm-msg-toi" style={{color:C.muted}}>Toi : </span>:null}{extrait||''}</span>
           {apres}
           {point && <span className="vrm-msg-dot" aria-label="non lu" style={{background:point}}/>}
         </span>
@@ -50630,7 +50606,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 // le jour change ; la bulle ne garde que l'heure.
                 // Un évènement sans texte lisible n'est pas affiché : il n'ouvre
                 // pas de jour (sinon « Hier » au-dessus de rien).
-                const visible = (x) => !(x.kind==='event' && /^[a-z]+(_[a-z]+)+$/.test(String(x.body||'').trim()) && !(x.links||[]).length);
+                // (5 nov.) Ni corps vide, ni nom de type (`estCodeTechnique`) : jamais affiché.
+                const visible = (x) => !(x.kind==='event' && (!String(x.body||'').trim() || estCodeTechnique(x.body)) && !(x.links||[]).length);
                 if (!visible(m)) return null;
                 const j = m.ts ? cleJour(m.ts) : null;
                 const jPrec = (()=>{ for (let k=i-1;k>=0;k--) { const x=openConv.messages[k]; if (x.ts && visible(x)) return cleJour(x.ts); } return null; })();
@@ -50645,22 +50622,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     const close=!!(offP&&String(offP.oid)===m.offre.oid);
                     const statutVu=close?'Plus acceptable':m.offre.statut;
                     return <div className="vrm-chat-offer-event" data-offer-status={close?"close":/accept/i.test(m.offre.statut)?"acceptee":/refus/i.test(m.offre.statut)?"refusee":"autre"} data-offer-side={m.offre.sens}>
-                      <div><span>{m.offre.sens==='recue'?'Offre reçue':m.offre.sens==='envoyee'?'Offre envoyée':'Offre'}</span><strong>{m.offre.devise?new Intl.NumberFormat('fr-FR',{style:'currency',currency:m.offre.devise}).format(m.offre.montant):m.offre.montant.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})}</strong></div>
-                      <div><small>{statutVu}</small>{m.ts&&<time dateTime={new Date(m.ts).toISOString()}>{new Date(m.ts).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</time>}</div>
+                      {/* (5 nov.) Ses offres (`offer_message`, 587 mesurées) ont leur carte : « Ton offre
+                          40,00 € » avec le prix d'avant barré — elles s'affichaient « currency_code: EUR ». */}
+                      <div><span data-offre-libelle="">{libelleOffre(m.offre)}</span><strong>{m.offre.devise?new Intl.NumberFormat('fr-FR',{style:'currency',currency:m.offre.devise}).format(m.offre.montant):m.offre.montant.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})}</strong></div>
+                      <div><small>{statutVu||(m.offre.ancien?<>au lieu de <s>{m.offre.ancien.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})} €</s></>:null)}</small>{m.ts&&<time dateTime={new Date(m.ts).toISOString()}>{new Date(m.ts).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</time>}</div>
                     </div>;})()
                   : m.kind==='event'
                   // Un évènement sans aucun texte lisible ne donne que son type
                   // technique (« offer_request_message ») : ce n'est pas un message
                   // pour lui. L'offre, elle, a sa carte sous le fil.
-                  ? (/^[a-z]+(_[a-z]+)+$/.test(String(m.body||'').trim()) && !(m.links||[]).length ? null
+                  ? (!visible(m) ? null
                     : /code|retrait|pickup|pin|suivi|tracking|colis|r[ée]cup[ée]rer|point relais/i.test(m.body)
                       ? <div key={i} className="vrm-chat-event vrm-chat-event-colis" style={{background:C.card,border:`1px solid ${C.border}`}}>
-                          <div className="vrm-chat-event-k" style={{color:C.muted}}>Colis · retrait</div>
+                          <div className="vrm-chat-event-k" style={{color:C.muted}}>Colis</div>
                           <div style={{fontSize:15,fontWeight:500,color:C.text,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{texteSansBalises(m.body)}</div>
                           {(m.links||[]).map((l,j)=><a key={j} className="vrm-chat-link" href={l.url} target="_blank" rel="noreferrer" style={{color:C.accent}}>{l.bordereau?'Ouvrir le bordereau ↗':'Ouvrir le lien ↗'}</a>)}
                         </div>
-                      : <div key={i} className="vrm-chat-event" style={{color:C.muted}}>{texteSansBalises(m.body)}{(m.links||[]).map((l,j)=><a key={j} className="vrm-chat-link" href={l.url} target="_blank" rel="noreferrer" style={{color:C.accent}}>{l.bordereau?'bordereau ↗':'lien ↗'}</a>)}</div>)
-                  : <BulleConv key={i} moi={!!m.mine} texte={m.body||(m.photos?.length?'📷 photo':'')} quand={m.ts||null} traduire={m.body||''}
+                      : <div key={i} className="vrm-chat-event" data-chat-evenement="" style={{color:C.muted,whiteSpace:'pre-line'}}>{texteSansBalises(m.body)}{(m.links||[]).map((l,j)=><a key={j} className="vrm-chat-link" href={l.url} target="_blank" rel="noreferrer" style={{color:C.accent}}>{l.bordereau?'bordereau ↗':'lien ↗'}</a>)}</div>)
+                  : <BulleConv key={i} moi={!!m.mine} texte={(m.vinted?'Équipe Vinted · ':'')+(m.body||(m.photos?.length?'📷 photo':''))} quand={m.ts||null} traduire={m.body||''}
                       apres={<>
                       {(m.links||[]).map((l,j)=><a key={j} className="vrm-chat-link" href={l.url} target="_blank" rel="noreferrer" style={{color:C.accent}}>{l.bordereau?'Ouvrir le bordereau ↗':'Ouvrir le lien ↗'}</a>)}
                       {(m.photos||[]).length>0 && <div className="vrm-chat-photos">{m.photos.map((ph,j)=>{const src=photoArticle({photo:ph});return src?<PhotoVinted key={j} src={src} alt="Photo du message" loading="lazy" style={{width:104,height:128,objectFit:'cover',borderRadius:12}}/>:null;})}</div>}
@@ -55470,7 +55449,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         </div>
                       </div>
                     )}
-                    {(()=>{ const nom=(c.opposite_user&&c.opposite_user.login)||'Conversation'; return (
+                    {(()=>{ const nom=(c.opposite_user&&c.opposite_user.login)||'Conversation';
+                      // (5 nov.) L'EXTRAIT = le dernier message RÉEL (`extraitConversation`,
+                      // src/messagesLisibles.js) quand le fil capté le confirme ; sinon ce que
+                      // la boîte en dit — jamais le titre de la paire présenté comme un message,
+                      // jamais un montant nu : une OFFRE se dit « Offre » avec son montant.
+                      const ex = extraitConversation(c, paire&&paire.r, paire&&paire.titre, normTitle);
+                      const offreDer = !offre && ex.kind==='offer' ? ex.offre : null;
+                      const texteEx = ex.kind==='event' ? `Vinted : ${ex.texte}` : ex.kind==='message' ? (ex.vinted?`Équipe Vinted : ${ex.texte}`:ex.texte) : '';
+                      return (
                     <LigneConv actif={openConv?.convId===c.id && String(openConv.acc?.vinted_user_id)===uidC(c)}
                       attrs={{'data-conv':c.id,'data-conv-acces':prioMsg?(ro?'lecture':'action'):undefined,'data-nonlu':c.unread?'1':undefined,
                         'data-conv-num':paire&&paire.num?paire.num:undefined,'data-conv-prix':paire&&paire.prix!=null?String(paire.prix):undefined,'data-conv-etat':paire&&paire.etat?paire.etat.k:undefined,'data-conv-auteur':auteur||undefined,'data-conv-quand':tsConv?new Date(tsConv).toISOString():undefined,'data-conv-compte':c._acc?String(c._acc.vinted_user_id):undefined,'data-conv-offre':offre?String(offre.prix):undefined}}
@@ -55480,11 +55467,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       compte={(plusieurs||!!messageSearch.trim()) && c._acc ? accName(c._acc) : ''}
                       quand={tsConv||null} couleurHeure={c.unread&&!ro?C.accent:C.muted}
                       titre={(paire&&paire.titre)||c.item_title||c.item?.title||''} num={paire&&paire.num?paire.num:''} etat={paire&&paire.etat?paire.etat:null}
-                      extrait={c.description||''} couleurExtrait={c.unread?C.text:C.muted} toi={auteur==='toi'}
+                      extrait={offreDer ? <span className="vrm-msg-etat vrm-msg-offre-der" data-offre-derniere={String(offreDer.montant)} data-offre-sens={offreDer.sens} data-offre-etat={offreDer.etat||undefined} style={{color:C.text,borderColor:C.border}}>{libelleOffre(offreDer)} {prix(offreDer.montant,offreDer.devise)}{offreDer.ancien?<> <s className="vrm-msg-offre-ancien" style={{color:C.muted}}>{prix(offreDer.ancien,offreDer.devise)}</s></>:null}{etatOffreCourt(offreDer.etat)?<> · {etatOffreCourt(offreDer.etat)}</>:null}</span> : texteEx} couleurExtrait={c.unread?C.text:C.muted} toi={auteur==='toi'&&ex.kind==='message'&&ex.source==='fil'}
+                      attrsExtrait={{'data-conv-extrait':ex.kind,'data-conv-extrait-source':ex.source}}
                       apres={<>
                           {/* (19 oct.) Sur la ligne du message, pas sur celle de la paire : là
                               elle tronquait le N° et le prix (vu au rendu à 1512 px). */}
                           {messageFilter==='repondre'&&!offre&&<span className="vrm-msg-etat">{/\?/.test(c.description||'')?'Question reçue':'Message reçu'}</span>}{offre && <span className="vrm-msg-etat vrm-msg-offre" data-offre-liste={String(offre.prix)} style={{color:C.accent,borderColor:C.accent}}>Offre {prix(offre.prix)} en attente</span>}
+                          {/* (5 nov.) Le dernier message est une offre (reçue, envoyée, tranchée) :
+                              marquée « Offre » avec son montant, à SA conversation — plus jamais un
+                              code ni un montant nu. L'offre EN ATTENTE garde sa pastille d'accent. */}
                       </>}
                       point={c.unread ? (ro?C.muted:C.accent) : null}/>
                     ); })()}

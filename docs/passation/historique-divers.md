@@ -705,3 +705,8 @@ notifications, sans rapport), `audit-coherence` verts.
 lira `/users/me` (ou `user_id` Stream, 5.317) ; « ouvert » Leboncoin/Vestiaire = la session
 relevée < 12 h par n'importe lequel de ses navigateurs. Geste de Julien : regarder
 Paramètres → Comptes liés ; couper l'interrupteur d'un compte qu'il ne veut pas compter.
+
+
+## Ligne retirée de CLAUDE.md §9 le 5 novembre (place)
+
+- **3 nov.** — Ma journée « À faire » en PHOTOS (vignettes par identité, pile + « +k », plus de pastilles colorées ; `src/design/PileVignettes.jsx`) ; Colis en 3 onglets « À envoyer · Envoyés · À retirer », toutes plateformes ensemble groupées par transporteur ; « À retirer » en SECTIONS (aujourd'hui · prêts · code à venir · lieu à confirmer · à vérifier · en route · argent à vérifier), chaque colis une fois, sélecteur de VILLE (lue dans l'adresse) qui filtre carte, liste et carte sombre ; aucune phrase explicative. Bancs `journee-photos`, `colis-retirer-propre` (rouges sur main) ; R2 du récap corrigé (`deps` de `LigneVenteVinted`). → historique interface-stock. Geste : regarder Colis → À retirer et Ma journée.
