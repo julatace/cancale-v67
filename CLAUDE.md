@@ -501,7 +501,7 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 
-- **5 nov. · Annonces → Sélectionner** : en ligne, masquées, brouillons par compte, « en vérification » non cochable ; UN carré « Actions possibles » (moteurs de Republier, raisons dites, manques paire par paire) ; « Republier à la main » (photos réglées, texte à copier, SON clic relie, N° repris). `docs/passation/2026-11-05-annonces-actions.md`. Extension : garder `is_processing`/`item_alert_type`/`catalog_id`/`color1`.
+- **5 nov. · Annonces → Sélectionner** : en ligne, masquées, brouillons par compte, « en vérification » non cochable ; UN carré « Actions » (moteurs de Republier, raisons dites, manques paire par paire) ; « Republier à la main » (photos réglées, texte à copier, SON clic relie, N° repris quand l'ancienne n'est plus du tout sur Vinted). Revue : `null` = pas lu, masquée ≠ partie. `docs/passation/2026-11-05-annonces-actions.md`.
 
 - **5 nov. · Numéros** : fiche numérotée du nuage jamais retirée par la fusion (plus de bloc « Recharger »). `docs/passation/2026-11-05-numeros-autre-appareil.md` ; demandes du jour : `demandes-2026-11-05.md`.
 

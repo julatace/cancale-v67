@@ -82,16 +82,26 @@ n'est pas elle » défait le lien.
 
 Dressings : 152 annonces en ligne, 12 masquées, 4 brouillons, 383 vendues. Vinted envoie
 `is_processing` et `item_alert_type` sur les 2 annonces non allégées (valeurs `false` /
-`null`) ; **l'extension ne les garde pas** (`CHAMPS_ARTICLE`, background.js ~l. 4312), ni
-`catalog_id` ni `color1`. Donc aujourd'hui : aucune annonce n'est dite « en vérification »
-(pas su ≠ oui), et couleur/catégorie sont « pas lues » (nommées à part, jamais jugées).
+`null`) ; **l'extension ne les garde pas** (`CHAMPS_ARTICLE`, background.js ~l. 4312).
+⚠️ Correction de la revue : `catalog_id` et `color1`/`color1_id` SONT dans
+`CHAMPS_ARTICLE` depuis la 5.245, et pourtant aucun dressing en base ne les porte (0 sur
+~650 annonces, captures du 5 nov.) ; et sur les 2 annonces non allégées, Vinted les envoie
+**à `null`** (`color1: null`, `color1_id: null`, `catalog_id: null`) sur des annonces qui
+ont une couleur et une catégorie. Le coffre a `catalogId` sur 551 fiches sur 777, **toutes
+à `null`**. Donc aujourd'hui : aucune annonce n'est dite « en vérification » (pas su ≠ oui),
+et couleur/catégorie sont « pas lues » (nommées à part, jamais jugées).
 
 ## Ce qu'il faut côté extension (non touchée, consigne)
 
-1. `CHAMPS_ARTICLE` : garder `is_processing`, `item_alert_type` (« en vérification »),
-   `catalog_id`, `color1`/`color1_id` (et `description` en `descLen` si pas déjà) ⇒ le
-   carré juge couleur et catégorie, et l'état « en vérification » apparaît. L'app les lit
-   déjà (`mapWardrobeItem` : `verifVinted`, `catalogId`, `couleur`, `statusLu`).
+1. `CHAMPS_ARTICLE` : garder `is_processing` et `item_alert_type` ⇒ l'état « en
+   vérification » apparaît (l'app lit déjà `verifVinted`). ⚠️ Avant de s'y fier, MESURER
+   les valeurs de `item_alert_type` d'une annonce réellement en vérification : l'app dit
+   aujourd'hui « en vérification » pour toute valeur non vide.
+   Couleur et catégorie : le DRESSING ne les donne pas (`null`, mesuré) — les garder ne
+   suffit pas. Il faut les lire là où Vinted les remplit (la fiche de l'annonce,
+   `/api/v2/item_upload/items/{id}` ou la page de l'annonce) et les ranger au coffre
+   (`coffre_{uid}_{id}.catalogId`, `.couleur`), puis brancher la lecture du coffre dans le
+   carré. L'app traite un `null` comme « pas lu » (`lusDuDressing`), jamais « absent ».
 2. Republier à la main : quand un suivi `vrm_repub_main` est ouvert pour un compte, noter
    l'identifiant de l'annonce créée dans l'onglet `/items/new` (comme la réservation de
    `noterPublication`) et l'écrire en `ancienId` (`vinted_brouillon_{id}.ancienId` ou
@@ -122,7 +132,51 @@ Dressings : 152 annonces en ligne, 12 masquées, 4 brouillons, 383 vendues. Vint
   identite, photos-vinted. `chiffres` et `politique-hotes` sont rouges **à l'identique**
   sur l'arbre d'avant (préexistant).
 
+## Revue adverse (5 nov.) — défauts trouvés et corrigés
+
+Chacun reproduit d'abord (vm sur le commit 670d1fd1 : 6 défauts sur 6 ; banc K rouge),
+puis corrigé, puis tenu par l'audit (section G, une mutation chacun) et le banc (K).
+
+1. **« Sans prix » inventé dans Republier existant** : la règle Vinted étendue jugeait
+   `prix: null` (prix illisible du dressing, `annoncesR`) comme « Sans prix — Mets un prix
+   sur Vinted ». `null` = pas lu, pour le prix, le titre, la couleur, l'état, la
+   description (`verifAnnonce.js`).
+2. **« Couleur absente » / « Catégorie absente » latents** : `mapWardrobeItem` changeait
+   `color1: null` en `''` et `catalog_id: null` en `''` ⇒ absence affichée sur TOUTES les
+   annonces dès que l'extension garderait ces champs (le geste qu'on lui recommandait).
+   Règle pure `lusDuDressing` : seule une valeur lue compte.
+3. **Deux paires présentes sous un N°** : « à la main » est permis sur une masquée ou un
+   brouillon, mais la reprise ne regarde que l'« en ligne » ; l'ancienne masquée encore
+   chez lui passait pour partie et son N° allait aussitôt sur la nouvelle (prouvé au banc :
+   N°45 sur 9110 ET 9121). Le lien posé à la main attend que l'ancienne ne soit plus ni
+   en ligne, ni masquée, ni à confirmer, ni en brouillon (`liensRepubMain(…, { presentes })`).
+4. **Un clic écrasait une identité prouvée** : `{ ...recreesNum, ...liens }` faisait
+   gagner le lien à la main sur la table de l'extension ; c'est l'inverse
+   (`fusionLiensRecrees`), et une annonce déjà remplaçante d'une autre n'est plus proposée
+   (`candidatsNouvelle(…, recrees)`).
+5. **Suivi sans N° ouvert à vie** : sans N° à remettre, rien à suivre (`etatSuiviMain`
+   ⇒ « fait », et « Ouvrir Vinted » ne crée plus de suivi).
+6. Libellé : « dès que l'ancienne n'est plus du tout sur Vinted — ni en ligne, ni masquée,
+   ni en brouillon » (au lieu de « plus en ligne »).
+7. **Deux sens pour une phrase** : la pastille de l'en-tête dit déjà « Actions possibles ·
+   compte » (l'état de l'extension) ; le bouton de la sélection et le titre du carré disent
+   maintenant « Actions · N » (le mot de Julien : « un petit carré Actions »).
+
+Preuves de la revue : `repro` vm sur 670d1fd1 ⇒ 6 défauts / après ⇒ 0 ;
+`audit-annonces-actions` 58 contrôles (section G), `--prouve` 20/20 mutations ;
+banc `annonces-actions` (contrôles K) : 125 OK après, 10 rouges sur le build de 670d1fd1
+(« Catégorie absente, Couleur absente » sur une annonce dont le dressing dit `null` ;
+N°45 sur la masquée 9110 ET la nouvelle 9121). Captures regardées (390 sombre, 1512 clair).
+
+Reste ouvert (non corrigé) :
+- « En vérification » = toute valeur non vide d'`item_alert_type` : valeurs jamais mesurées.
+- La description n'est jamais jugée en pratique (aucun dressing en base n'a `descLen`) ;
+  le coffre a une description sur 126 fiches sur 777 — seulement une preuve de PRÉSENCE.
+- Une nouvelle annonce republiée à la main reçoit d'abord un N° automatique (brûlé quand
+  l'ancien N° passe dessus), comme pour Republier quand l'extension tarde.
+- Les brouillons d'un compte masqué dans VRM restent montrés dans « Sélectionner »
+  (`brVinted.liste`, la liste de « Voir mes brouillons », n'applique pas `garderAnnonce`).
+
 ## Geste de Julien
 
-Annonces → « Sélectionner » : cocher deux annonces du même compte, ouvrir « Actions
-possibles », lire « Avant de lancer » ; essayer « Republier à la main » sur une paire.
+Annonces → « Sélectionner » : cocher deux annonces du même compte, ouvrir « Actions », lire « Avant de lancer » ; essayer « Republier à la main » sur une paire.

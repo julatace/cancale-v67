@@ -56,7 +56,7 @@ export function champsNonJuges(a, site) {
   if (site !== 'vinted') return [];
   return Object.keys(CLES_LUES).filter((k) => {
     if (k === 'taille' && SANS_TAILLE.has(String(x.famille || ''))) return false;
-    return x[CLES_LUES[k]] === undefined;
+    return x[CLES_LUES[k]] === undefined || x[CLES_LUES[k]] === null;
   }).map((k) => NOMS_CHAMPS[k]);
 }
 
@@ -87,14 +87,16 @@ export function problemesAnnonce(a, site) {
   if (site === 'vinted') {
     // Ce que Vinted refuse à la mise en ligne (`champsManquantsAvant`), jugé
     // seulement sur ce qui a été lu (trois états, §5).
-    if (x.titre !== undefined && vide(x.titre)) out.unshift({ code: 'titreVide', texte: 'Sans titre', geste: g.titreVide });
-    if (x.prix !== undefined && !(num(x.prix) > 0)) out.unshift({ code: 'prixVide', texte: 'Sans prix', geste: g.prixVide });
-    if (x.descLen !== undefined) {
+    // (revue du 5 nov.) `null` = pas lu (un prix illisible du dressing arrive en
+    // `null` dans Republier) : jamais « Sans prix » ni « Sans titre » inventés.
+    if (x.titre !== undefined && x.titre !== null && vide(x.titre)) out.unshift({ code: 'titreVide', texte: 'Sans titre', geste: g.titreVide });
+    if (x.prix !== undefined && x.prix !== null && !(num(x.prix) > 0)) out.unshift({ code: 'prixVide', texte: 'Sans prix', geste: g.prixVide });
+    if (x.descLen !== undefined && x.descLen !== null) {
       const d = num(x.descLen);
       if (d == null || d < DESCRIPTION_MIN) pose('description', !d ? 'Sans description' : `Description trop courte (${d} caractère${d > 1 ? 's' : ''})`);
     }
-    if (x.couleur !== undefined && vide(x.couleur)) pose('couleur', 'Couleur absente');
-    if (x.etat !== undefined && vide(x.etat)) pose('etat', 'État absent');
+    if (x.couleur !== undefined && x.couleur !== null && vide(x.couleur)) pose('couleur', 'Couleur absente');
+    if (x.etat !== undefined && x.etat !== null && vide(x.etat)) pose('etat', 'État absent');
   }
   return out;
 }

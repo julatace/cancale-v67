@@ -19,6 +19,11 @@
 //      désigne la nouvelle annonce (même compte seulement, une annonce au même
 //      TITRE d'un autre compte n'est jamais proposée), confirme ; le N° attend
 //      tant que l'ancienne est en ligne, puis passe sur la nouvelle ;
+//   K. (revue du 5 nov.) un dressing qui envoie `color1`/`catalog_id` à `null`
+//      (la forme MESURÉE en base) ne fait jamais dire « Couleur absente » ni
+//      « Catégorie absente » : c'est « pas lu » ; « à la main » sur une MASQUÉE :
+//      tant que l'ancienne masquée est encore là, son N° ne passe PAS sur la
+//      nouvelle (deux paires présentes sous un N°) ; partie, il passe ;
 //   F. aucun débordement, cibles de 44 px, aucune erreur ; captures dans SHOTS.
 // §6.1 : sur le code d'avant, `[data-vue-selection]` n'existe pas ⇒ rouge.
 const path = require('path'), fs = require('fs'), http = require('http'), os = require('os');
@@ -32,12 +37,15 @@ const auj = new Date(); const s = Math.floor(auj / 1000);
 const ann = (id, o) => Object.assign({ id, price: { amount: '49.0', currency_code: 'EUR' }, is_closed: false, is_draft: false, is_hidden: false, photo: null, brand_title: 'Nike', size_title: '42', status: 'Très bon état', view_count: 10, favourite_count: 1, nPhotos: 5, descLen: 60, color1: 'Blanc', catalog_id: 1242, created_at_ts: s - 40 * 86400 }, o);
 const ITEMS_111 = [
   ann(9102, { title: 'Salomon XT-6 blanc taille 40', brand_title: 'Salomon', size_title: '40' }),
-  ann(9103, { title: 'Adidas Spezial noir taille 38', brand_title: 'Adidas', size_title: '38', descLen: 2, color1: '' }),
+  // (revue) La forme MESURÉE d'un dressing non allégé : couleur et catégorie à `null`.
+  ann(9103, { title: 'Adidas Spezial noir taille 38', brand_title: 'Adidas', size_title: '38', descLen: 2, color1: null, color1_id: null, catalog_id: null }),
   ann(9104, { title: 'Asics Gel-Kayano 14 taille 43', brand_title: 'Asics', is_processing: true, item_alert_type: 'under_review' }),
   ann(9110, { title: 'Puma Speedcat rouge taille 39', brand_title: 'Puma', is_hidden: true }),
   ann(9201, { title: 'Nike Air Max 1 dark teal', is_draft: true }),
   // La nouvelle annonce, republiée À LA MAIN (même titre que 9102, autre identifiant).
   ann(9120, { title: 'Salomon XT-6 blanc taille 40', brand_title: 'Salomon', size_title: '40', created_at_ts: s - 60 }),
+  // La nouvelle de la MASQUÉE 9110, republiée à la main.
+  ann(9121, { title: 'Puma Speedcat rouge taille 39', brand_title: 'Puma', created_at_ts: s - 50 }),
 ];
 const ITEMS_222 = [
   // Même TITRE que 9102, mais un autre compte : jamais proposée comme la nouvelle.
@@ -48,7 +56,7 @@ const ACCS = [{ id: 1, vinted_user_id: '111', login: 'compte_test', domain: 'www
 const MAIN = { vinted_annonce_numeros: { 9102: { numero: '42' }, 9103: { numero: '43' }, 9104: { numero: '44' }, 9110: { numero: '45' }, 9301: { numero: '50' } } };
 const lignes = (etat) => {
   // L'ancienne n'est plus en ligne : Vinted la rend fermée (même nombre d'annonces lues : une lecture plus courte ne remplacerait pas la plus riche, §4.2).
-  const i111 = etat.sans9102 ? ITEMS_111.map((x) => (x.id === 9102 ? { ...x, is_closed: true } : x)) : ITEMS_111;
+  const i111 = ITEMS_111.map((x) => ((x.id === 9102 && etat.sans9102) || (x.id === 9110 && etat.sans9110) ? { ...x, is_closed: true } : x));
   return [
     { id: 'main', data: MAIN },
     { id: 'harvest_111_listings', data: { capturedAt: auj.toISOString(), payload: { items: i111, pagination: { total_entries: i111.length } } } },
@@ -147,7 +155,7 @@ const debordement = (pg) => pg.evaluate(() => document.documentElement.scrollWid
         const T = `${vp.width}${sombre ? ' sombre' : ' clair'}`;
         const nomF = (x) => path.join(SHOTS, `annonces-actions-${vp.width}-${sombre ? 'sombre' : 'clair'}-${x}.png`);
         console.log(`── ${T}`);
-        const etat = { sans9102: false };
+        const etat = { sans9102: false, sans9110: false };
         const { ctx, pg, errs } = await contexte(b, vp, sombre, etat);
         try {
           await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
@@ -169,7 +177,7 @@ const debordement = (pg) => pg.evaluate(() => document.documentElement.scrollWid
           // A — deux comptes mélangés
           await cocher(pg, '9102'); await cocher(pg, '9301');
           const nb = await pg.getAttribute('[data-actions-possibles]', 'data-actions-possibles').catch(() => null);
-          dit(nb === '2', `A ${T} un seul bouton « Actions possibles · 2 »`, nb);
+          dit(nb === '2', `A ${T} un seul bouton « Actions · 2 » (la pastille « Actions possibles » de l’en-tête parle de l’extension)`, nb);
           await clic(pg, '[data-actions-possibles]');
           await pg.waitForSelector('[data-actions-selection]', { timeout: 4000 });
           const mix = await pg.$$eval('[data-action-sel]', (l) => l.map((x) => [x.getAttribute('data-action-sel'), x.getAttribute('data-action-sel-ok'), x.textContent]));
@@ -183,7 +191,10 @@ const debordement = (pg) => pg.evaluate(() => document.documentElement.scrollWid
           dit(oks.recreer === 'oui' && oks.modifier === 'oui' && oks.versBrouillon === 'oui', `A ${T} republier, en ligne avec modifications, en ligne → brouillon possibles`, JSON.stringify(oks));
           dit(oks.enLigne === 'non' && oks.main === 'non', `A ${T} « brouillon → en ligne » et « à la main » grisés (raison dite)`, JSON.stringify(oks));
           const v = Object.fromEntries(await pg.$$eval('[data-act-paire]', (l) => l.map((x) => [x.getAttribute('data-act-paire'), x.getAttribute('data-act-codes')])));
-          dit(/description/.test(v['9103'] || '') && /couleur/.test(v['9103'] || '') && v['9102'] === '', `V ${T} avant de lancer : la paire 9103 dit « description, couleur », la 9102 rien`, JSON.stringify(v));
+          dit(/description/.test(v['9103'] || '') && v['9102'] === '', `V ${T} avant de lancer : la paire 9103 dit « description », la 9102 rien`, JSON.stringify(v));
+          // K — `null` du dressing = pas lu : jamais « Couleur absente » / « Catégorie absente ».
+          const nonLu9103 = await pg.$eval('[data-act-paire="9103"] [data-act-non-lus]', (x) => x.textContent).catch(() => '');
+          dit(!/couleur|categorie/.test(v['9103'] || '') && /couleur/.test(nonLu9103) && /catégorie/.test(nonLu9103), `K ${T} couleur et catégorie à null (forme mesurée) ⇒ « pas lu », jamais « absente »`, `${v['9103']} / ${nonLu9103.slice(0, 80)}`);
           dit(await pg.locator('[data-act-paire="9103"] a[href*="/items/9103/edit"]').count() > 0, `V ${T} le geste « Corriger sur Vinted ↗ » pointe sur CETTE annonce`);
           const petits = await pg.$$eval('[data-actions-selection] button, [data-actions-selection] a', (l) => l.filter((x) => { const r = x.getBoundingClientRect(); return r.height > 0 && r.height < 43.5; }).map((x) => x.textContent.slice(0, 24)));
           dit(!petits.length, `F ${T} cibles ≥ 44 px dans le carré`, petits.join(' | '));
@@ -247,6 +258,40 @@ const debordement = (pg) => pg.evaluate(() => document.documentElement.scrollWid
           for (let i = 0; i < 30; i++) { n = await pg.$eval('[data-selection-annonce="9120"] .vrm-sel-num', (x) => x.textContent).catch(() => ''); if (n === 'N°42') break; await pg.waitForTimeout(250); }
           dit(n === 'N°42' && !(await pg.$('[data-suivi-main="9102"]')),`M ${T} l’ancienne partie ⇒ la nouvelle porte le N°42, le suivi est fini`, n);
           await pg.screenshot({ path: nomF('apres') });
+          // K — « à la main » sur une MASQUÉE : le N°45 attend que la masquée soit partie.
+          await cocher(pg, '9110');
+          await clic(pg, '[data-actions-possibles]');
+          await pg.waitForSelector('[data-actions-selection]', { timeout: 4000 });
+          await clic(pg, '[data-action-sel="main"]');
+          await pg.waitForSelector('[data-main-ouvrir-vinted]', { timeout: 5000 }).catch(() => {});
+          { const [pop2] = await Promise.all([pg.context().waitForEvent('page', { timeout: 5000 }).catch(() => null), clic(pg, '[data-main-ouvrir-vinted]')]); if (pop2) await pop2.close().catch(() => {}); }
+          await pg.waitForSelector('[data-main-lier="9121"]', { timeout: 5000 }).catch(() => {});
+          const candsM = await pg.$$eval('[data-main-candidat]', (l) => l.map((x) => x.getAttribute('data-main-candidat')));
+          dit(candsM.includes('9121') && !candsM.includes('9120'), `K ${T} masquée : la nouvelle 9121 proposée, jamais 9120 (déjà la nouvelle d’une autre)`, candsM.join(','));
+          await clic(pg, '[data-main-lier="9121"]');
+          { const oui = pg.locator('button', { hasText: 'Oui, c’est elle' }).last(); await oui.waitFor({ state: 'visible', timeout: 4000 }); await oui.click({ timeout: 4000 }).catch(() => oui.evaluate((x) => x.click())); }
+          await pg.waitForSelector('[data-main-lie="9121"]', { timeout: 4000 }).catch(() => {});
+          dit(await pg.locator('[data-main-lie="9121"]').count() > 0, `K ${T} masquée : SON clic relie 9121 (confirmée)`);
+          // La sauvegarde de l'appareil part après un court délai (`save`) : on l'attend avant de recharger.
+          for (let i = 0; i < 40; i++) { if (await pg.evaluate(() => /"9110":\{[^}]*"nouvelId":"9121"/.test(localStorage.getItem('vrm_repub_main') || ''))) break; await pg.waitForTimeout(250); }
+          await pg.evaluate(() => { try { sessionStorage.removeItem('vrm_acct_cache'); } catch (_) {} });
+          await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
+          await pg.locator('[data-vue-selection]').first().waitFor({ state: 'attached', timeout: 15000 });
+          await vueSelection(pg);
+          // La numérotation a tourné (9120 porte le N°42) : on juge alors 9121.
+          for (let i = 0; i < 30; i++) { if ((await pg.$eval('[data-selection-annonce="9120"] .vrm-sel-num', (x) => x.textContent).catch(() => '')) === 'N°42') break; await pg.waitForTimeout(250); }
+          await pg.waitForTimeout(1200);
+          const n45 = await pg.$$eval('[data-selection-annonce] .vrm-sel-num', (l) => l.filter((x) => x.textContent === 'N°45').map((x) => x.closest('[data-selection-annonce]').getAttribute('data-selection-annonce')));
+          dit(n45.length === 1 && n45[0] === '9110', `K ${T} la masquée 9110 encore là ⇒ le N°45 reste à elle seule (jamais deux paires sous un N°)`, n45.join(','));
+          await pg.screenshot({ path: nomF('masquee') });
+          etat.sans9110 = true;
+          await pg.evaluate(() => { try { sessionStorage.removeItem('vrm_acct_cache'); } catch (_) {} });
+          await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
+          await pg.locator('[data-vue-selection]').first().waitFor({ state: 'attached', timeout: 15000 });
+          await vueSelection(pg);
+          let n2 = '';
+          for (let i = 0; i < 30; i++) { n2 = await pg.$eval('[data-selection-annonce="9121"] .vrm-sel-num', (x) => x.textContent).catch(() => ''); if (n2 === 'N°45') break; await pg.waitForTimeout(250); }
+          dit(n2 === 'N°45', `K ${T} la masquée partie ⇒ la nouvelle porte le N°45`, n2);
           const deb = await debordement(pg);
           dit(deb <= 1, `F ${T} aucun débordement horizontal`, deb);
           dit(!errs.length, `F ${T} aucune erreur de page`, errs.slice(0, 2).join(' | '));

@@ -41,6 +41,21 @@ export function etatAnnonceVinted(it) {
   if (it._vrmMasquee || it.is_hidden) return 'masquee';
   return 'en-ligne';
 }
+// (revue du 5 nov.) Ce que le DRESSING dit de la couleur, de la catégorie et de
+// l'état, pour « vérifier avant ». Mesuré sur la base (5 nov.) : un dressing non
+// allégé envoie `color1: null`, `color1_id: null`, `catalog_id: null` sur des
+// annonces qui ONT une couleur et une catégorie — le dressing ne les remplit pas.
+// Un `null` y est donc « pas su », jamais « absent » : seule une valeur lue compte.
+export function lusDuDressing(it) {
+  const x = it && typeof it === 'object' ? it : {};
+  const v = (k) => (x[k] != null && String(x[k]).trim() !== '' ? String(x[k]) : '');
+  const couleur = v('color1') || v('color1_id');
+  return {
+    statusLu: x.status != null,
+    catalogId: v('catalog_id') || undefined,
+    couleur: couleur || undefined,
+  };
+}
 // Une annonce se coche-t-elle ? Toutes, sauf celles que Vinted vérifie.
 export function raisonPasSelectionnable(etat) {
   return etat === 'verification' ? 'Vinted la vérifie : rien ne peut partir tant que ce n’est pas fini.' : '';
@@ -104,21 +119,40 @@ export function actionsPossibles({ selection, chrome, capOk, nomCompte } = {}) {
 // titre, de prix ou de date (§5). La reprise du N° elle-même est celle des
 // republications (`repriseNumerosRecreation`, src/repriseNumero.js) : la table
 // { nouvelId: ancienId } rendue ici s'AJOUTE à celle que l'extension écrit.
-export function liensRepubMain(suivis) {
+export function liensRepubMain(suivis, { presentes, dejaRecrees } = {}) {
   const t = {};
   if (!suivis || typeof suivis !== 'object') return t;
   const num = (x) => (/^\d{4,15}$/.test(String(x || '')) ? String(x) : '');
+  // (revue du 5 nov.) `presentes` = les annonces encore chez lui sur Vinted HORS
+  // « en ligne » (masquées, à confirmer, brouillons) : la règle de reprise ne
+  // regarde que les annonces EN LIGNE, donc l'ancienne MASQUÉE (ou en brouillon)
+  // passait pour partie et son N° allait sur la nouvelle — deux paires présentes
+  // sous un N°. Tant que l'ancienne est là, sous quelque forme, le lien attend.
+  const pres = presentes instanceof Set ? presentes : new Set((presentes || []).map(String));
+  // `dejaRecrees` = la table prouvée par l'extension ({ nouvelId: ancienId }) :
+  // une annonce qu'elle a déjà reliée n'est jamais re-reliée par un clic.
+  const prouve = dejaRecrees && typeof dejaRecrees === 'object' ? dejaRecrees : {};
   for (const anc of Object.keys(suivis)) {
     const s = suivis[anc]; const a = num(anc), n = num(s && s.nouvelId);
-    if (a && n && a !== n && !t[n]) t[n] = a;
+    if (!(a && n && a !== n) || t[n]) continue;
+    if (pres.has(a) || Object.prototype.hasOwnProperty.call(prouve, n)) continue;
+    t[n] = a;
   }
   return t;
+}
+// La table de reprise : celle de l'extension (une identité PROUVÉE) gagne
+// toujours sur un lien posé à la main pour la même nouvelle annonce.
+export function fusionLiensRecrees(recrees, manuels) {
+  if (recrees === undefined) return undefined;   // la table de l'extension pas encore lue : on attend
+  const m = manuels && typeof manuels === 'object' ? manuels : {};
+  if (!Object.keys(m).length) return recrees;
+  return { ...m, ...(recrees || {}) };
 }
 // Les annonces qu'il PEUT désigner comme la nouvelle : en ligne, sur le MÊME
 // compte, pas l'ancienne, pas déjà désignée pour une autre, sans N° posé à la
 // main. Triées de la plus récente à la plus ancienne (pour qu'il la trouve vite) ;
 // la date n'est jamais une preuve : rien n'est choisi à sa place.
-export function candidatsNouvelle({ ancienId, uid, enLigne, numeros, suivis, debut }) {
+export function candidatsNouvelle({ ancienId, uid, enLigne, numeros, suivis, debut, recrees }) {
   const anc = String(ancienId || ''); const u = String(uid || '');
   const pris = new Set(Object.entries(suivis || {}).filter(([k, s]) => k !== anc && s && s.nouvelId).map(([, s]) => String(s.nouvelId)));
   const t0 = Number(debut) || 0;
@@ -126,6 +160,9 @@ export function candidatsNouvelle({ ancienId, uid, enLigne, numeros, suivis, deb
   return (enLigne || [])
     .filter((it) => it && String(it.uid || '') === u && String(it.id) !== anc && !pris.has(String(it.id)))
     .filter((it) => { const e = (numeros || {})[it.id]; return !(e && String(e.numero || '').trim() && (!e.auto || e.manuelAt)); })
+    // (revue du 5 nov.) Déjà la remplaçante PROUVÉE d'une autre annonce (table de
+    // l'extension, ou N° déjà repris) : ce n'est pas la nouvelle de celle-ci.
+    .filter((it) => { const e = (numeros || {})[it.id]; const r = recrees && typeof recrees === 'object' ? recrees[String(it.id)] : undefined; return !(e && e.recreeDe && String(e.recreeDe) !== anc) && !(r && String(r) !== anc); })
     // Une annonce mise en ligne bien AVANT qu'il commence (plus de 10 min) ne
     // peut pas être la nouvelle : elle sort de la liste (date connue seulement).
     .filter((it) => { const d = date(it); return !(t0 && d != null && d < t0 - 10 * 60000); })
@@ -134,6 +171,9 @@ export function candidatsNouvelle({ ancienId, uid, enLigne, numeros, suivis, deb
 // Où en est un suivi : 'attente' (pas encore désignée) · 'lie' (désignée, l'ancienne
 // encore en ligne : le N° attend) · 'fait' (la nouvelle porte le N°).
 export function etatSuiviMain(s, { numeros, enLigneIds, cle } = {}) {
+  // (revue du 5 nov.) Sans N° à remettre, il n'y a rien à suivre : sinon le
+  // rappel « choisis la nouvelle annonce » restait au-dessus de la liste à vie.
+  if (s && !String(s.num || '').trim()) return 'fait';
   if (!s || !s.nouvelId) return 'attente';
   const k = cle || ((n) => String(n == null ? '' : n).trim().toUpperCase());
   const e = (numeros || {})[String(s.nouvelId)];

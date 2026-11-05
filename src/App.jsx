@@ -66,7 +66,7 @@ import { annulationsParCompte } from './annulationsCompte.js';
 import { notesParCompte } from './notesRecues.js';
 import { toutSurLeNumero, lireNumeroCherche } from "./rechercheNumero.js";
 import { repriseNumerosRecreation, tableRecrees } from "./repriseNumero.js";
-import { etatAnnonceVinted, enVerificationVinted, raisonPasSelectionnable, actionsPossibles, ETATS_ANNONCE, liensRepubMain, candidatsNouvelle, etatSuiviMain, filtreReglages, nomPhotoReglee, appliquerCouleursPixels } from "./annoncesActions.js";
+import { etatAnnonceVinted, enVerificationVinted, raisonPasSelectionnable, actionsPossibles, ETATS_ANNONCE, liensRepubMain, fusionLiensRecrees, lusDuDressing, candidatsNouvelle, etatSuiviMain, filtreReglages, nomPhotoReglee, appliquerCouleursPixels } from "./annoncesActions.js";
 import { etatCycle, cartesSupprimees, majVusEnLigne, indexPresentes, montantSaisi as montantCycle, CHOIX as CHOIX_CYCLE, LIBELLE_CHOIX } from "./cycleArticle.js";
 import { chezMoiProposables } from "./propositionsSites.js";
 import { retraitsEbayAutoAilleursPermis, RAISON_RETRAIT_AILLEURS } from "./retraitAilleurs.js";
@@ -9231,9 +9231,10 @@ const mapWardrobeItem = (it) => ({
   // `null`, jamais « en vérification » deviné (pas su ≠ oui).
   verifVinted: enVerificationVinted(it) ? String(it.item_alert_type || 'processing') : null,
   // Ce que « vérifier avant de publier » peut juger : seulement ce qui a été LU.
-  statusLu: it.status !== undefined,
-  catalogId: it.catalog_id !== undefined ? it.catalog_id : undefined,
-  couleur: (it.color1 !== undefined || it.color1_id !== undefined) ? String(it.color1 || it.color1_id || '') : undefined,
+  // (revue du 5 nov.) Un `null` du dressing est « pas su » (mesuré : le dressing
+  // envoie `color1`/`catalog_id` à null sur des annonces qui en ont) — la règle
+  // est `lusDuDressing` (src/annoncesActions.js).
+  ...lusDuDressing(it),
 });
 // Une annonce est reellement EN LIGNE si elle n'est ni fermee (vendue/retiree),
 // ni masquee, ni un brouillon. La penderie Vinted renvoie AUSSI les articles
@@ -13932,12 +13933,12 @@ function ChoixAnnoncesVinted({ filtre = 'tout', annonces, sel, setSel, charge, b
     <section className="vrm-sel" data-selection-vue={filtre} data-selection-n={liste.length}>
       {suivis.length > 0 && suivis.map((s) => (
         <div key={s.ancienId} data-suivi-main={s.ancienId} data-suivi-main-etat={s._etat} className="vrm-act-paire">
-          <span><b>{s.num ? `N°${s.num} ` : ''}{s.titre || 'Annonce'}</b> — republiée à la main : {s._etat === 'lie' ? 'nouvelle annonce désignée ; le N° passe dessus dès que l’ancienne n’est plus en ligne.' : 'choisis la nouvelle annonce pour lui remettre son N°.'}</span>
+          <span><b>{s.num ? `N°${s.num} ` : ''}{s.titre || 'Annonce'}</b> — republiée à la main : {s._etat === 'lie' ? 'nouvelle annonce désignée ; le N° passe dessus dès que l’ancienne n’est plus du tout sur Vinted.' : 'choisis la nouvelle annonce pour lui remettre son N°.'}</span>
           <div className="vrm-b-rangee" style={{ justifyContent: 'flex-start' }}><Bouton variante="discret" data-suivi-main-reprendre={s.ancienId} onClick={() => onSuivi && onSuivi(s)}>Reprendre</Bouton></div>
         </div>
       ))}
       <div className="vrm-sel-tete">
-        <span>{filtre === 'brouillon' ? 'Tes brouillons Vinted, compte par compte. ' : ''}Coche des annonces, puis <b>Actions possibles</b>.</span>
+        <span>{filtre === 'brouillon' ? 'Tes brouillons Vinted, compte par compte. ' : ''}Coche des annonces, puis <b>Actions</b>.</span>
         {nCoches > 0 && <Bouton variante="discret" data-selection-vider onClick={() => setSel([])}>Tout décocher ({nCoches})</Bouton>}
       </div>
       {charge ? <div className="vrm-sel-vide" data-selection-charge="">Lecture de tes annonces…</div>
@@ -13966,7 +13967,7 @@ function ChoixAnnoncesVinted({ filtre = 'tout', annonces, sel, setSel, charge, b
             </ul>
           </div>
         ))}
-      {nCoches > 0 && <div className="vrm-sel-barre"><Bouton variante="primaire" data-actions-possibles={nCoches} onClick={onActions}>Actions possibles · {nCoches}</Bouton></div>}
+      {nCoches > 0 && <div className="vrm-sel-barre"><Bouton variante="primaire" data-actions-possibles={nCoches} onClick={onActions}>Actions · {nCoches}</Bouton></div>}
     </section>
   );
 }
@@ -13987,7 +13988,7 @@ function ActionsSelectionFeuille({ choisies, actions, onLancer, onClose }) {
     <SheetShell onClose={onClose} maxWidth={520}>
       <div className="vrm-act" data-actions-selection={choisies.length}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <h2 className="vrm-act-titre">Actions possibles · {choisies.length} annonce{choisies.length > 1 ? 's' : ''}</h2>
+          <h2 className="vrm-act-titre">Actions · {choisies.length} annonce{choisies.length > 1 ? 's' : ''}</h2>
           <button type="button" onClick={onClose} aria-label="Fermer" style={{ border: 'none', background: 'transparent', color: C.muted, fontSize: 22, minWidth: 44, minHeight: 44, cursor: 'pointer' }}>✕</button>
         </div>
         {actions.map((x) => (
@@ -14126,7 +14127,7 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, onDebut, onLier,
         {!paire.numero ? <div className="vrm-act-muet" data-main-sans-num="">Cette annonce n’a pas de N° : la nouvelle en recevra un, comme toute annonce.</div>
           : etatSuivi === 'fait' ? <div data-main-n-fait="" style={{ fontSize: 13, color: C.text }}>✓ La nouvelle annonce porte le N°{paire.numero}.</div>
           : etatSuivi === 'lie' ? <div className="vrm-act-paire" data-main-lie={suivi.nouvelId}>
-              <span>Nouvelle annonce désignée{nomNouvelle ? ` : « ${nomNouvelle} »` : ''}. Le N°{paire.numero} passe dessus dès que l’ancienne n’est plus en ligne (supprime-la sur Vinted, puis rouvre Annonces).</span>
+              <span>Nouvelle annonce désignée{nomNouvelle ? ` : « ${nomNouvelle} »` : ''}. Le N°{paire.numero} passe dessus dès que l’ancienne n’est plus du tout sur Vinted — ni en ligne, ni masquée, ni en brouillon (supprime-la sur Vinted, puis rouvre Annonces).</span>
               <div className="vrm-b-rangee" style={{ justifyContent: 'flex-start' }}><Bouton variante="discret" data-main-delier onClick={onDelier}>Ce n’est pas elle</Bouton></div>
             </div>
           : <>
@@ -44596,12 +44597,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (patch === null) delete u[k]; else u[k] = { ...(prev[k] || {}), ...patch };
     save('vrm_repub_main', u); return u;
   });
+  // (revue du 5 nov.) Un lien posé à la main n'entre pas tant que l'ancienne est
+  // ENCORE chez lui sur Vinted sous une autre forme (masquée, à confirmer,
+  // brouillon : la reprise ne regarde que l'« en ligne ») — sinon deux paires
+  // présentes sous un N° ; et il ne remplace jamais une identité prouvée par
+  // l'extension (`fusionLiensRecrees`).
   const recreesEff = useMemo(() => {
-    if (recreesNum === undefined) return undefined;   // la table de l'extension pas encore lue : on attend
-    const m = liensRepubMain(repubMain);
-    if (!Object.keys(m).length) return recreesNum;
-    return { ...(recreesNum || {}), ...m };
-  }, [recreesNum, repubMain]);
+    const pres = new Set();
+    for (const l of [listings.masquees, listings.aConfirmer, listings.brouillons]) if (Array.isArray(l)) for (const it of l) if (it && it.id != null) pres.add(String(it.id));
+    return fusionLiensRecrees(recreesNum, liensRepubMain(repubMain, { presentes: pres, dejaRecrees: recreesNum || {} }));
+  }, [recreesNum, repubMain, listings.masquees, listings.aConfirmer, listings.brouillons]);
   // (29 oct.) Relue quand l'ENSEMBLE des annonces change (une republication
   // apporte un identifiant neuf), pas à chaque nouvelle référence de la liste :
   // le cache puis la lecture fraîche rendent les mêmes annonces, et la table
@@ -58689,12 +58694,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const paire = p.ancienId ? { id:String(p.ancienId), uid:String(p.uid||''), numero:String(p.num||''), titre:p.titre||'', compte:(()=>{ const a=(accounts||[]).find(x=>String(x.vinted_user_id)===String(p.uid)); return a?accNameOf(a):`compte ${p.uid}`; })(), domain:p.domain||'www.vinted.fr', prix:p.prix??null, photo:p.photo||'' } : p;
         const enLigneMap = (listings.items||[]).map(it=>{ const pr=(it.price&&typeof it.price==='object')?it.price.amount:it.price; const n=Number(String(pr==null?'':pr).replace(',','.')); const e=numeros[it.id]||{};
           return { id:String(it.id), uid:String((it._acc&&it._acc.vinted_user_id)||''), titre:it.title||'', prix:isFinite(n)&&n>0?n:null, photo:it.photo||'', createdTs:it.createdTs||null, numero:e.numero?String(e.numero):'' }; });
-        const cands = candidatsNouvelle({ ancienId:paire.id, uid:paire.uid, enLigne:enLigneMap, numeros, suivis:repubMain, debut: s && s.at ? Date.parse(s.at) : 0 });
+        const cands = candidatsNouvelle({ ancienId:paire.id, uid:paire.uid, enLigne:enLigneMap, numeros, suivis:repubMain, recrees:recreesNum||{}, debut: s && s.at ? Date.parse(s.at) : 0 });
         const etatS = etatSuiviMain(s, { numeros, cle: cleNum });
-        const debut = ()=>{ if (!s) poserRepubMain(paire.id, { uid:paire.uid, num:paire.numero||'', titre:paire.titre||'', domain:paire.domain, at:new Date().toISOString() }); };
+        const debut = ()=>{ if (!s && paire.numero) poserRepubMain(paire.id, { uid:paire.uid, num:paire.numero||'', titre:paire.titre||'', domain:paire.domain, at:new Date().toISOString() }); };
         return <RepublierALaMain paire={paire} suivi={s} candidats={cands} etatSuivi={etatS} onDebut={debut} onClose={()=>setRepubMainOuvert(null)} onRelire={()=>loadListings(true)}
           onDelier={()=>poserRepubMain(paire.id, { nouvelId:null, nouveauTitre:null, lieAt:null })}
-          onLier={async (c)=>{ const ok = await askConfirm({ title:'C’est bien la même paire ?', desc:`« ${c.titre||'Sans titre'} » est la nouvelle annonce de « ${paire.titre||'l’ancienne'} ».${paire.numero?`\nLe N°${paire.numero} passera dessus dès que l’ancienne ne sera plus en ligne.`:''}`, ok:'Oui, c’est elle' });
+          onLier={async (c)=>{ const ok = await askConfirm({ title:'C’est bien la même paire ?', desc:`« ${c.titre||'Sans titre'} » est la nouvelle annonce de « ${paire.titre||'l’ancienne'} ».${paire.numero?`\nLe N°${paire.numero} passera dessus dès que l’ancienne ne sera plus du tout sur Vinted.`:''}`, ok:'Oui, c’est elle' });
             if (!ok) return; if (!s) debut(); poserRepubMain(paire.id, { uid:paire.uid, num:paire.numero||'', titre:paire.titre||'', nouvelId:String(c.id), nouveauTitre:c.titre||'', lieAt:new Date().toISOString(), ...(s?{}:{ at:new Date().toISOString() }) }); }}/>;
       })()}
       {brouillonsOpen && (

@@ -40,7 +40,15 @@ const MUTATIONS = {
   candidats_main: { f: 'src', m: (s) => s.replace("return !(e && String(e.numero || '').trim() && (!e.auto || e.manuelAt));", 'return true;') },
   seule_ignore: { f: 'src', m: (s) => s.replace("else if (A.seule && sel.length > 1) raison", "else if (false) raison") },
   desc_non_jugee: { f: 'verif', m: (s) => s.replace("if (d == null || d < DESCRIPTION_MIN) pose('description'", "if (false) pose('description'") },
-  non_lu_juge: { f: 'verif', m: (s) => s.replace("if (x.couleur !== undefined && vide(x.couleur)) pose('couleur', 'Couleur absente');", "if (vide(x.couleur)) pose('couleur', 'Couleur absente');") },
+  non_lu_juge: { f: 'verif', m: (s) => s.replace("if (x.couleur !== undefined && x.couleur !== null && vide(x.couleur)) pose('couleur', 'Couleur absente');", "if (vide(x.couleur)) pose('couleur', 'Couleur absente');") },
+  // (revue du 5 nov.) G : chaque défaut corrigé, réaffaibli, doit repasser au rouge.
+  prix_null_juge: { f: 'verif', m: (s) => s.replace("if (x.prix !== undefined && x.prix !== null && !(num(x.prix) > 0))", "if (x.prix !== undefined && !(num(x.prix) > 0))") },
+  dressing_null_absent: { f: 'src', m: (s) => s.replace("const v = (k) => (x[k] != null && String(x[k]).trim() !== '' ? String(x[k]) : '');", "const v = (k) => (x[k] !== undefined ? String(x[k] == null ? '' : x[k]) : undefined);").replace('catalogId: v(\'catalog_id\') || undefined,', "catalogId: v('catalog_id'),").replace('couleur: couleur || undefined,', 'couleur,') },
+  masquee_passe: { f: 'src', m: (s) => s.replace('if (pres.has(a) || Object.prototype.hasOwnProperty.call(prouve, n)) continue;', 'if (Object.prototype.hasOwnProperty.call(prouve, n)) continue;') },
+  main_ecrase_preuve: { f: 'src', m: (s) => s.replace('return { ...m, ...(recrees || {}) };', 'return { ...(recrees || {}), ...m };') },
+  candidat_deja_recree: { f: 'src', m: (s) => s.replace("return !(e && e.recreeDe && String(e.recreeDe) !== anc) && !(r && String(r) !== anc);", 'return true;') },
+  suivi_sans_num: { f: 'src', m: (s) => s.replace("if (s && !String(s.num || '').trim()) return 'fait';", '') },
+  app_presentes_ignorees: { f: 'app', m: (s) => s.replace('liensRepubMain(repubMain, { presentes: pres, dejaRecrees: recreesNum || {} })', 'liensRepubMain(repubMain)') },
   app_liens_ignores: { f: 'app', m: (s) => s.replace('recrees: recreesEff,', 'recrees: recreesNum,') },
   app_sans_depart: { f: 'app', m: (s) => s.split(" depart={repubDepart?'modif':null}").join('') },
 };
@@ -142,11 +150,31 @@ async function auditer(sources) {
   // ── F ── l'app
   const app = sources.app;
   dit(/actionsPossibles\(\{ selection:/.test(app) && /<ChoixAnnoncesVinted /.test(app) && /<ActionsSelectionFeuille /.test(app), 'F1 la sélection et le carré « Actions possibles » sont rendus');
-  dit(/recrees: recreesEff,/.test(app) && /liensRepubMain\(repubMain\)/.test(app), 'F2 la table de SES liens s’ajoute à celle de l’extension (même règle de reprise)');
+  dit(/recrees: recreesEff,/.test(app) && /fusionLiensRecrees\(recreesNum, liensRepubMain\(repubMain, \{ presentes: pres, dejaRecrees: recreesNum \|\| \{\} \}\)\)/.test(app), 'F2 la table de SES liens s’ajoute à celle de l’extension (même règle de reprise), anciennes encore présentes écartées');
   dit(/depart=\{repubDepart\?'modif':null\}/.test(app) && /depart=\{repubDepart\?'envoi':null\}/.test(app), 'F3 Republier ouvert depuis la sélection commence après « Choisir »');
   dit(/'vrm_repub_main',/.test(app.slice(app.indexOf('const SYNC_KEYS'), app.indexOf('const SYNC_KEYS') + 30000)), 'F4 `vrm_repub_main` est synchronisé');
   dit(/problemesAnnonce\(a\.verif \|\| \{\}, 'vinted'\)/.test(app) && /champsNonJuges\(a\.verif/.test(app), 'F5 le carré dit, paire par paire, ce qui manque (la règle de « vérifier avant »)');
   dit(!/titre[^;\n]{0,40}===[^;\n]{0,40}titre/.test(app.slice(app.indexOf('function RepublierALaMain'), app.indexOf('function RepublierVinted('))), 'F6 « à la main » ne relie jamais par le titre');
+  // ── G ── revue adverse du 5 nov. : ce qui affichait faux ou cassait une règle
+  dit(V.problemesLot([{ numero: '12', titre: 'Nike', prix: null }], 'vinted').every((x) => x.code !== 'prixVide'), 'G1 un prix illisible (`null`, Republier existant) n’est jamais « Sans prix »');
+  dit(V.problemesAnnonce({ titre: null, couleur: null, etat: null, descLen: null }, 'vinted').length === 0, 'G2 `null` = pas lu : aucun manque inventé');
+  { const d = R.lusDuDressing({ color1: null, color1_id: null, catalog_id: null, status: 'Très bon état' });
+    dit(d.couleur === undefined && d.catalogId === undefined && d.statusLu === true, 'G3 dressing à `null` (mesuré) ⇒ couleur et catégorie « pas lues », jamais absentes', JSON.stringify(d));
+    const v = { titre: 'Nike', prix: 40, ...(d.couleur !== undefined ? { couleur: d.couleur } : {}), ...(d.catalogId !== undefined ? { categorie: d.catalogId } : {}) };
+    dit(V.problemesAnnonce(v, 'vinted').length === 0, 'G4 … donc ni « Couleur absente » ni « Catégorie absente » sur une annonce qui en a');
+    const e = R.lusDuDressing({ color1: 'Noir', catalog_id: 1242 }); dit(e.couleur === 'Noir' && e.catalogId === '1242', 'G5 une valeur lue reste lue'); }
+  { const nums = { 10000001: { numero: '42' }, 20000001: { numero: '901', auto: true } };
+    const liens = R.liensRepubMain({ 10000001: { nouvelId: '20000001' } }, { presentes: new Set(['10000001']) });
+    const rep = P.repriseNumerosRecreation({ enLigneIds: ['20000001'], numeros: nums, recrees: liens });
+    dit(!rep['20000001'], 'G6 ancienne MASQUÉE (ou brouillon) encore chez lui ⇒ le N° attend (jamais deux paires présentes sous un N°)');
+    const rep2 = P.repriseNumerosRecreation({ enLigneIds: ['20000001'], numeros: nums, recrees: R.liensRepubMain({ 10000001: { nouvelId: '20000001' } }, { presentes: new Set() }) });
+    dit(rep2['20000001'] && rep2['20000001'].numero === '42', 'G7 ancienne partie de partout ⇒ le N° passe'); }
+  { const f = R.fusionLiensRecrees({ 20000001: '10000005' }, { 20000001: '10000001', 20000002: '10000003' });
+    dit(f['20000001'] === '10000005' && f['20000002'] === '10000003', 'G8 un lien posé à la main ne remplace jamais l’identité prouvée par l’extension');
+    dit(R.fusionLiensRecrees(undefined, { 1: 2 }) === undefined, 'G9 table de l’extension pas lue ⇒ on attend');
+    const c = R.candidatsNouvelle({ ancienId: '10000001', uid: '111', enLigne: [{ id: '20000001', uid: '111' }, { id: '20000002', uid: '111' }], numeros: { 20000002: { numero: '7', auto: true, recreeDe: '10000005' } }, suivis: {}, recrees: { 20000001: '10000009' } }).map((x) => x.id);
+    dit(c.length === 0, 'G10 une annonce déjà remplaçante d’une AUTRE n’est pas proposée', c.join(',')); }
+  dit(R.etatSuiviMain({ num: '' }, {}) === 'fait' && R.etatSuiviMain({ nouvelId: '20000001', num: '' }, { numeros: {} }) === 'fait', 'G11 rien à remettre (pas de N°) ⇒ le suivi ne reste pas ouvert à vie');
   return out;
 }
 
