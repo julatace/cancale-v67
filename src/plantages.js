@@ -24,8 +24,9 @@ const MAX_ATTENTE = 10;
 const UNE_HEURE = 3600e3;
 let notesCetteOuverture = 0;
 
-// Ce qui n'est PAS un défaut de l'app.
-const BRUIT = /ResizeObserver loop|^Script error\.?$|Failed to fetch|NetworkError|Load failed|AbortError|The (user|operation) aborted|chrome-extension:\/\/|moz-extension:\/\/|safari-(web-)?extension:\/\/|Importing a module script failed|error loading dynamically imported module|Failed to update a ServiceWorker/i;
+// Ce qui n'est PAS un défaut de l'app. (5 nov.) `kagi.executeCallback` : le pont d'Orion lui-même
+// (10 des 15 plantages relevés le 5 nov.), pas VRM.
+const BRUIT = /ResizeObserver loop|^Script error\.?$|Failed to fetch|NetworkError|Load failed|AbortError|The (user|operation) aborted|chrome-extension:\/\/|moz-extension:\/\/|safari-(web-)?extension:\/\/|Importing a module script failed|error loading dynamically imported module|Failed to update a ServiceWorker|kagi\.executeCallback/i;
 
 // ⚠️ Revue adverse du 4 octobre : la première version laissait passer un login
 //    cité par le navigateur (« reading 'julatace3535' »), un téléphone espacé,

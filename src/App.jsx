@@ -65977,7 +65977,7 @@ function ReglagesStream() {
   const lignes = [
     `${marque} Air Max 90 · taille 42 · 89,00 €`,
     'Vendue sur ton_compte à acheteur_exemple',
-    '8 rue de la Paix, 35000 Rennes · 06 12 34 56 78',
+    '8 rue de l’Exemple, 00000 Ville-Test · 06 00 00 00 00',
     'IBAN FR76 3000 6000 0112 3456 7890 189',
     ...(regles.prefixes[0] ? [`${regles.prefixes[0]}ina Runner · 54,00 €`] : []),
     ...(regles.contient[0] ? [`${regles.contient[0]} édition limitée · 120,00 €`] : []),
