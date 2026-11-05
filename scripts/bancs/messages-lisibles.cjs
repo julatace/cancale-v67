@@ -53,6 +53,22 @@ const FILS = {
   505: { id: 505, opposite_user: { id: 5505, login: 'ach_505' }, transaction: tx(505, 'Asics Gel-Lyte III gris 40'), messages: [
     { id: 7, created_at_ts: iso(16), entity_type: 'offer_request_message', entity: { id: 7, user_id: 5505, current: true, status: 20, status_title: '- Offre acceptée', title: 'Hey, ach_505 t’a fait une offre', body: '50,00 €', price: { amount: '50.0', currency_code: 'EUR' }, original_price: { amount: '60.0', currency_code: 'EUR' }, transaction_id: 9505, offer_request_id: 905 } },
   ] },
+  // (relecture) 506 : le fil capté est PLUS RÉCENT que la boîte et SA réponse est
+  //       le dernier message — elle doit se lire « Toi : … », jamais comme celle
+  //       de l'acheteur (`auteurDernierConfirme` exige le même instant, il se tait).
+  506: { id: 506, opposite_user: { id: 5506, login: 'ach_506' }, transaction: tx(506, 'New Balance 550 vert 44'), messages: [
+    { id: 8, created_at_ts: iso(16), entity_type: 'message', entity: { id: 8, user_id: 5506, body: 'Vous l’envoyez quand ?' } },
+    { id: 9, created_at_ts: iso(14.5), entity_type: 'message', entity: { id: 9, user_id: 111, body: 'Je la dépose demain matin' } },
+  ] },
+  // (relecture) 507 : une offre reçue ANNULÉE (statut 40, « Annulée », 22 mesurées).
+  507: { id: 507, opposite_user: { id: 5507, login: 'ach_507' }, transaction: tx(507, 'Puma Suede rouge 39'), messages: [
+    { id: 10, created_at_ts: iso(13), entity_type: 'offer_request_message', entity: { id: 10, user_id: 5507, current: true, status: 40, status_title: 'Annulée', title: 'Hey', body: '35,00 €', price: { amount: '35.0', currency_code: 'EUR' }, transaction_id: 9507, offer_request_id: 907 } },
+  ] },
+  // (relecture) 508 : statut 10 mais `current: false` — le fil dit « Offre
+  //       précédente » : la liste ne doit pas la dire « en attente ».
+  508: { id: 508, opposite_user: { id: 5508, login: 'ach_508' }, transaction: tx(508, 'Vans Old Skool noir 42'), messages: [
+    { id: 11, created_at_ts: iso(12), entity_type: 'offer_request_message', entity: { id: 11, user_id: 5508, current: false, status: 10, status_title: 'En attente', title: 'Hey', body: '30,00 €', price: { amount: '30.0', currency_code: 'EUR' }, transaction_id: 9508, offer_request_id: 908 } },
+  ] },
 };
 const rows = [
   { id: 'harvest_111_inbox', data: { capturedAt: iso(0), payload: { conversations: [
@@ -61,8 +77,11 @@ const rows = [
     conv(503, 'ach_503', 'Nike Air Max 90 blanc 43', true, 18),
     conv(504, 'ach_504', '45,00 €', true, 17),
     conv(505, 'ach_505', 'Asics Gel-Lyte III gris 40', false, 16),
+    conv(506, 'ach_506', 'Vous l’envoyez quand ?', false, 15),
+    conv(507, 'ach_507', 'Puma Suede rouge 39', false, 13),
+    conv(508, 'ach_508', 'Vans Old Skool noir 42', false, 12),
   ] } } },
-  ...[501, 502, 503, 505].map((id) => ({ id: `harvest_111_conv_${id}`, data: { capturedAt: iso(0), payload: { conversation: FILS[id] } } })),
+  ...[501, 502, 503, 505, 506, 507, 508].map((id) => ({ id: `harvest_111_conv_${id}`, data: { capturedAt: iso(0), payload: { conversation: FILS[id] } } })),
 ];
 
 const contient = (a, b) => {
@@ -155,7 +174,7 @@ const CODES = /currency_code|[a-z]+_message\b|msg-status|<a\s|<br|<p>|gray_box|c
           const ex = x.querySelector('.vrm-msg-extrait'); const od = x.querySelector('[data-offre-derniere]');
           return [x.getAttribute('data-conv'), { txt: x.innerText, extrait: ex ? ex.innerText : null, kind: ex ? ex.getAttribute('data-conv-extrait') : null, offre: od ? { m: od.getAttribute('data-offre-derniere'), sens: od.getAttribute('data-offre-sens'), etat: od.getAttribute('data-offre-etat'), txt: od.innerText } : null }];
         })));
-        dit(Object.keys(L).length === 5, 'les cinq conversations sont listées', JSON.stringify(Object.keys(L)));
+        dit(Object.keys(L).length === 8, 'les huit conversations sont listées', JSON.stringify(Object.keys(L)));
         const l503 = L['503'] || {}, l501 = L['501'] || {}, l502 = L['502'] || {}, l504 = L['504'] || {}, l505 = L['505'] || {};
         dit(/Vous feriez 30 € \?/.test(l503.extrait || '') && l503.kind === 'message', 'l’extrait est le VRAI dernier message (pas le titre de l’annonce)', JSON.stringify(l503.extrait));
         dit(!/Air Max 90 blanc 43/.test(l503.extrait || '') && /Air Max 90 blanc 43/.test(l503.txt || ''), 'le titre de la paire reste sur SA ligne, jamais dans l’extrait', (l503.txt || '').replace(/\n/g, ' | '));
@@ -164,6 +183,10 @@ const CODES = /currency_code|[a-z]+_message\b|msg-status|<a\s|<br|<p>|gray_box|c
         dit(/^Vinted : Envoie ta commande/.test(l502.extrait || '') && l502.kind === 'event', 'un évènement de Vinted en dernier : dit en mots, « Vinted : … »', JSON.stringify(l502.extrait));
         dit(l504.offre && l504.offre.m === '45' && /^Offre\b/.test(l504.offre.txt) && /45/.test(l504.offre.txt), 'un montant nu de la boîte devient « Offre 45 € »', JSON.stringify(l504.offre));
         dit(l505.offre && l505.offre.sens === 'recue' && l505.offre.etat === 'acceptee' && /Offre reçue/.test(l505.offre.txt) && /acceptée/.test(l505.offre.txt), 'une offre reçue tranchée : « Offre reçue 50 € · acceptée »', JSON.stringify(l505.offre));
+        const l506 = L['506'] || {}, l507 = L['507'] || {}, l508 = L['508'] || {};
+        dit(/^Toi : Je la dépose demain matin/.test(l506.extrait || '') && l506.kind === 'message', 'fil capté plus récent que la boîte : SA réponse se lit « Toi : … », pas comme celle de l’acheteur', JSON.stringify(l506.extrait));
+        dit(l507.offre && l507.offre.etat === 'terminee' && /Offre reçue/.test(l507.offre.txt) && /annulée/.test(l507.offre.txt), 'une offre reçue annulée le dit (« · annulée »), par la règle du fil', JSON.stringify(l507.offre));
+        dit(l508.offre && !l508.offre.etat && !/en attente/.test(l508.txt || ''), 'une offre précédente (statut 10, current false) n’est jamais dite « en attente »', JSON.stringify(l508.offre) + ' ' + JSON.stringify(l508.txt));
         const listeTxt = await r.pg.evaluate(() => (document.querySelector('[data-messagerie]') || {}).innerText || '');
         dit(!CODES.test(listeTxt), 'aucun code dans la liste', (listeTxt.match(CODES) || [''])[0]);
 

@@ -1,5 +1,5 @@
 import {etatOffreVinted} from '../../src/offresVinted.js';
-import {lireEntiteVinted} from '../../src/messagesLisibles.js';
+import {lireEntiteVinted,extraitConversation} from '../../src/messagesLisibles.js';
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
 const s=fs.readFileSync(new URL('../../src/App.jsx',import.meta.url),'utf8');
 const code=s.slice(s.indexOf('const normalizeConversationMessages ='),s.indexOf("// L'offre d'un ACHETEUR"));
@@ -41,4 +41,21 @@ test('un évènement sans texte n’affiche jamais son type technique',()=>{
 test('un message de l’équipe Vinted (portal_message) est un message lisible',()=>{
  const [r]=normaliser({opposite_user:{id:22},messages:[{entity_type:'portal_message',created_at:'2026-10-25T08:00:00Z',entity:{user_id:null,body:'<p>Bonjour,</p><p>Ton litige est clos.</p>'}}]});
  assert.equal(r.kind,'message');assert.equal(r.vinted,true);assert.equal(r.mine,false);assert.match(r.body,/Bonjour,\nTon litige est clos\./);
+});
+// (5 nov., relecture) L'extrait de la LISTE suit la règle du fil.
+const boite={updated_at:'2026-11-05T10:00:00Z',opposite_user:{id:5},_acc:{vinted_user_id:111},description:'Nike'};
+const ts=(iso)=>Date.parse(iso)/1000;
+test('fil capté plus récent que la boîte : SA réponse est dite de lui (de: toi)',()=>{
+ const ex=extraitConversation(boite,{dt:'message',db:'Je la dépose demain',der:'111',opp:'5',derTs:ts('2026-11-05T10:05:00Z')},'Nike');
+ assert.equal(ex.source,'fil');assert.equal(ex.de,'toi');
+ const eux=extraitConversation(boite,{dt:'message',db:'Dispo ?',der:'5',opp:'5',derTs:ts('2026-11-05T10:00:00Z')},'Nike');
+ assert.equal(eux.de,'eux');
+});
+test('l’état d’une offre en dernier se lit par etatOffreVinted (précédente ≠ en attente, annulée dite)',()=>{
+ const r={dt:'offer_request_message',dp:'50.0',der:'5',opp:'5',derTs:ts('2026-11-05T10:00:00Z')};
+ assert.equal(extraitConversation(boite,{...r,dst:'10',dcur:'false',dstt:'En attente'},'Nike').offre.etat,null);
+ assert.equal(extraitConversation(boite,{...r,dst:'10',dcur:'true',dstt:'En attente'},'Nike').offre.etat,'attente');
+ const an=extraitConversation(boite,{...r,dst:'40',dcur:'true',dstt:'Annulée'},'Nike').offre;
+ assert.equal(an.etat,'terminee');assert.equal(an.etatLibelle,'Annulée');
+ assert.equal(extraitConversation(boite,{...r,dst:'20',dcur:'true',dstt:'- Offre acceptée'},'Nike').offre.etat,'acceptee');
 });

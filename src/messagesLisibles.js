@@ -16,6 +16,7 @@
 // jamais remplacé par un nom de type (`status_message`) : `texte` vaut ''.
 
 import { instantVinted } from './suiviMessagerieVinted.js';
+import { etatOffreVinted } from './offresVinted.js';
 
 const ENTITES = { nbsp: ' ', amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", rsquo: '’', lsquo: '‘', laquo: '«', raquo: '»', hellip: '…', eacute: 'é', egrave: 'è', agrave: 'à', ccedil: 'ç' };
 export function texteSansHtml(t) {
@@ -101,25 +102,44 @@ export function lireEntiteVinted(entityType, entity, oppId) {
 // L'APERÇU du dernier message d'une conversation, pour la LISTE, à partir des
 // scalaires du résumé (`fetchResumesConversations`) : dt (type), db (corps),
 // dti (titre), dp (montant), dpo (ancien montant), dst (statut), dstt (libellé
-// du statut), der (auteur), opp (interlocuteur). Rien lu ⇒ null.
-export function apercuDernierMessage(r) {
+// du statut), dcur (offre courante), der (auteur), opp (interlocuteur).
+// `uid` : le compte de la conversation. Rien lu ⇒ null.
+// (5 nov., relecture) L'état d'une offre se lit par LA règle du fil
+// (`etatOffreVinted` : statut, libellé, `current`) — sinon une offre « précédente »
+// (statut 10, current false) se disait « en attente » sur la liste, et une
+// annulée (statut 40, 22 mesurées) n'y disait rien. L'auteur d'un message se lit
+// du résumé lui-même (`de`) : quand le fil capté est PLUS RÉCENT que la boîte,
+// `auteurDernierConfirme` (instant identique exigé) ne répond pas, et SA réponse
+// s'affichait sans « Toi : », comme si l'acheteur l'avait écrite.
+export function apercuDernierMessage(r, uid) {
   if (!r || !r.dt) return null;
   const entite = { body: r.db, title: r.dti, user_id: r.der, price: r.dp != null ? { amount: r.dp } : null, original_price: r.dpo != null ? { amount: r.dpo } : null };
   const lu = lireEntiteVinted(r.dt, entite, r.opp);
   if (lu.kind === 'offer') {
-    const st = r.dst != null && r.dst !== '' ? Number(r.dst) : null;
-    const etat = st === 20 ? 'acceptee' : st === 30 ? 'refusee' : st === 10 ? 'attente' : null;
-    return { kind: 'offer', offre: { ...lu.offre, etat } };
+    let etat = null, etatLibelle = '';
+    if (r.dt === 'offer_request_message') {
+      const st = r.dst != null && r.dst !== '' && /^\d+$/.test(String(r.dst)) ? Number(r.dst) : null;
+      const cur = r.dcur === true || r.dcur === 'true' ? true : r.dcur === false || r.dcur === 'false' ? false : undefined;
+      const e = etatOffreVinted({ status: st, status_title: r.dstt, current: cur });
+      etat = ['acceptee', 'refusee', 'attente', 'terminee'].includes(e.etat) ? e.etat : null;
+      etatLibelle = etat === 'terminee' ? e.libelle : '';
+    }
+    return { kind: 'offer', offre: { ...lu.offre, etat, etatLibelle } };
   }
   const texte = lu.texte.split('\n')[0];
-  return texte ? { kind: lu.kind, texte, vinted: !!lu.vinted } : null;
+  if (!texte) return null;
+  const de = lu.vinted || r.der == null || r.opp == null ? null
+    : String(r.der) === String(r.opp) ? 'eux'
+    : uid != null && String(r.der) === String(uid) ? 'toi' : null;
+  return { kind: lu.kind, texte, vinted: !!lu.vinted, de };
 }
 
 // Le mot d'une offre sur la liste et dans le fil : jamais un code.
 export function libelleOffre(o) {
   return !o ? 'Offre' : o.sens === 'recue' ? 'Offre reçue' : o.sens === 'envoyee' ? 'Ton offre' : 'Offre';
 }
-export function etatOffreCourt(etat) {
+export function etatOffreCourt(etat, libelle) {
+  if (etat === 'terminee') { const l = String(libelle || '').trim().replace(/^[-–\s]+/, ''); return l ? l.charAt(0).toLowerCase() + l.slice(1) : 'terminée'; }
   return etat === 'acceptee' ? 'acceptée' : etat === 'refusee' ? 'refusée' : etat === 'attente' ? 'en attente' : '';
 }
 
@@ -151,7 +171,7 @@ export function dernierMessageConfirme(c, r) {
 // la paire comme un message ni un montant nu comme du texte.
 export function extraitConversation(c, r, titrePaire, norm) {
   if (r && dernierMessageConfirme(c, r)) {
-    const a = apercuDernierMessage(r);
+    const a = apercuDernierMessage(r, c && c._acc ? c._acc.vinted_user_id : null);
     if (a) return { ...a, source: 'fil' };
   }
   const d = descriptionBoite(c && c.description, titrePaire, norm);

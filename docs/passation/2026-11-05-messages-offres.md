@@ -100,3 +100,32 @@ déplace sur une offre tranchée ou un évènement) ; 1 642 entrées de boîte n
   grammaire de `der`/`derTs` déjà en place ; refusé, la lecture repart sans ces champs
   (`_resumeConvSansAuteur`) et la liste retombe sur la boîte.
 - Le rendu sur sa vraie base (données inventées).
+
+## Relecture adverse (5 nov., même branche)
+
+Trois défauts reproduits (banc + test) puis corrigés :
+
+1. **Sa réponse lue comme celle de l'acheteur.** Quand le fil capté est PLUS RÉCENT que la
+   boîte (cas normal juste après une réponse envoyée), `dernierMessageConfirme` accepte le
+   résumé mais `auteurDernierConfirme` (même instant exigé) se tait : la ligne montrait
+   « Je la dépose demain matin » sans « Toi : ». `apercuDernierMessage(r, uid)` rend
+   maintenant `de` ('toi' | 'eux' | null) lu du résumé lui-même (auteur = compte de la
+   conversation, interlocuteur = `opp`) ; jamais deviné.
+2. **Une offre « précédente » dite « en attente ».** La liste lisait seulement `status` (10 ⇒
+   en attente) alors que le fil applique `etatOffreVinted` (statut, libellé, `current`). Le
+   résumé lit en plus `dstt` (`status_title`) et `dcur` (`current`), et l'état de la liste passe
+   par LA règle du fil (§11).
+3. **Une offre annulée muette.** Statut 40 « Annulée » (22 mesurées, lecture seule) : la liste
+   n'en disait rien ; elle dit « Offre reçue 35 € · annulée » (libellé lu de Vinted).
+
+Mesuré pour ça (lecture seule) : `offer_request_message` 30/Refusée 651, 20/acceptée 244,
+40/Annulée 22, 10/En attente 3 ; `offer_message` n'a ni statut ni libellé (587) ; ses clés :
+`currency, current, original_price, original_price_label, price, price_fixed, price_label, user_id`.
+
+Preuves : banc `messages-lisibles.cjs` étendu (506 réponse plus récente que la boîte, 507
+annulée, 508 précédente) : **12 KO sur b7c40e08, 0 KO après**, 1512 px et 390 px tactile, clair
+et sombre. `messages-offres-historique.test.mjs` : 12/12 (2 nouveaux, rouges sur b7c40e08).
+
+Reste (inchangé) : sans fil capté (1 642 entrées), la description de la boîte reste l'extrait —
+la boîte ne porte aucun titre d'article (clés mesurées : `description, id, item_photos,
+opposite_user, unread, updated_at`), on ne peut donc pas savoir si elle redit le titre.

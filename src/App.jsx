@@ -6020,7 +6020,7 @@ const RESUME_CONV_AUTEUR = ',der:data->payload->conversation->messages->-1->enti
   // (5 nov.) Le DERNIER message en mots, pour l'extrait de la liste
   // (`apercuDernierMessage`) : son type, son corps, son titre, son montant
   // d'offre et son statut — des scalaires, jamais tout le fil (§4.4).
-  + ',dt:data->payload->conversation->messages->-1->>entity_type,db:data->payload->conversation->messages->-1->entity->>body,dti:data->payload->conversation->messages->-1->entity->>title,dp:data->payload->conversation->messages->-1->entity->price->>amount,dpo:data->payload->conversation->messages->-1->entity->original_price->>amount,dst:data->payload->conversation->messages->-1->entity->>status';
+  + ',dt:data->payload->conversation->messages->-1->>entity_type,db:data->payload->conversation->messages->-1->entity->>body,dti:data->payload->conversation->messages->-1->entity->>title,dp:data->payload->conversation->messages->-1->entity->price->>amount,dpo:data->payload->conversation->messages->-1->entity->original_price->>amount,dst:data->payload->conversation->messages->-1->entity->>status,dstt:data->payload->conversation->messages->-1->entity->>status_title,dcur:data->payload->conversation->messages->-1->entity->>current';
 const fetchResumesConversations = async (uid=null) => {
   try {
     if(uid!=null&&!/^\d+$/.test(String(uid)))return null;
@@ -55467,7 +55467,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       compte={(plusieurs||!!messageSearch.trim()) && c._acc ? accName(c._acc) : ''}
                       quand={tsConv||null} couleurHeure={c.unread&&!ro?C.accent:C.muted}
                       titre={(paire&&paire.titre)||c.item_title||c.item?.title||''} num={paire&&paire.num?paire.num:''} etat={paire&&paire.etat?paire.etat:null}
-                      extrait={offreDer ? <span className="vrm-msg-etat vrm-msg-offre-der" data-offre-derniere={String(offreDer.montant)} data-offre-sens={offreDer.sens} data-offre-etat={offreDer.etat||undefined} style={{color:C.text,borderColor:C.border}}>{libelleOffre(offreDer)} {prix(offreDer.montant,offreDer.devise)}{offreDer.ancien?<> <s className="vrm-msg-offre-ancien" style={{color:C.muted}}>{prix(offreDer.ancien,offreDer.devise)}</s></>:null}{etatOffreCourt(offreDer.etat)?<> · {etatOffreCourt(offreDer.etat)}</>:null}</span> : texteEx} couleurExtrait={c.unread?C.text:C.muted} toi={auteur==='toi'&&ex.kind==='message'&&ex.source==='fil'}
+                      extrait={offreDer ? <span className="vrm-msg-etat vrm-msg-offre-der" data-offre-derniere={String(offreDer.montant)} data-offre-sens={offreDer.sens} data-offre-etat={offreDer.etat||undefined} style={{color:C.text,borderColor:C.border}}>{libelleOffre(offreDer)} {prix(offreDer.montant,offreDer.devise)}{offreDer.ancien?<> <s className="vrm-msg-offre-ancien" style={{color:C.muted}}>{prix(offreDer.ancien,offreDer.devise)}</s></>:null}{etatOffreCourt(offreDer.etat,offreDer.etatLibelle)?<> · {etatOffreCourt(offreDer.etat,offreDer.etatLibelle)}</>:null}</span> : texteEx} couleurExtrait={c.unread?C.text:C.muted} toi={ex.kind==='message'&&ex.source==='fil'&&(ex.de==='toi'||auteur==='toi')}
                       attrsExtrait={{'data-conv-extrait':ex.kind,'data-conv-extrait-source':ex.source}}
                       apres={<>
                           {/* (19 oct.) Sur la ligne du message, pas sur celle de la paire : là
