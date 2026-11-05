@@ -147,6 +147,7 @@ import {colisLbcAPoster,lbcColisAPoster,totalColis,colisLbcVendeur} from '../api
 import {CLE_COMPTES_EXCLUS,excluAutreDe,estExclu,basculerExclu,compteDeVente,exclusNormes} from '../api/_lib/comptes-exclus.js';
 import {PLATEFORMES_COMPTES,etatCompteLie,ageLecture,comptesLbcLies,comptesVcLies,comptesEbayLies,refDeLigneEbay,nomCompteLie,LIBELLE_ETAT} from './comptesLies.js';
 import { lignesFraicheur } from './fraicheurComptes.js';
+import { premiereCaseLibre as premiereCaseMeubles, achatsArrives, notifsOuRanger } from './ouRanger.js';
 import './comptes-lies.css';
 import './centre-notifs.css';
 import './comptes-securite.css';
@@ -262,7 +263,7 @@ import PrixPartout from "./PrixPartout.jsx";
 import SelecteurSites, { LogoSite } from "./SelecteurSites.jsx";
 import PublierAilleurs from "./PublierAilleurs.jsx";
 import { SITES_PUBLIER, apercuEnvoi, manquesEnvoi, etatsPaire, partoutLeMeme, lienVu, chercherPaires } from "./publierAilleurs.js";
-import { optionsSelecteur, nomCompteVente, identiteCompteVente, annuaireLbc, ongletSansDonnee, nomPlateforme } from "./plateformes.js";
+import { optionsSelecteur, nomCompteVente, identiteCompteVente, annuaireLbc, ongletSansDonnee, nomPlateforme, logoPlateforme } from "./plateformes.js";
 import { MR_SELECT, lireColisMondialRelay, suivisAvecMondialRelay, accordCodes, codeDuCompteMr, ouTrouverQr, ilYa as ilYaLecture, compteDuRetrait, indexAchatsAutresSites } from "./retraitQr.js";
 import ExpliqueMondialRelay, { LecturesMondialRelay } from "./ExpliqueMondialRelay.jsx";
 import { CLE_QR_POSES, jugerQrCapture, dessinerQrCapture, avecQrPoses, titreQrAbsent, qrParCapture, messageQrCapture, cleSuiviQr } from "./qrCapture.js";
@@ -2594,8 +2595,14 @@ const _statutBoutonSubs = new Set();
 const poserStatutBouton = (st) => { if (st === _statutBouton) return; _statutBouton = st; _statutBoutonSubs.forEach(fn => { try { fn(); } catch (_) {} }); };
 const abonnerStatutBouton = (fn) => { _statutBoutonSubs.add(fn); return () => _statutBoutonSubs.delete(fn); };
 const lireStatutBouton = () => _statutBouton;
+// (5 nov., chantier H — revue 2.28) LE NUAGE N'APPARAÎT QU'EN CAS DE PROBLÈME :
+// sauvegarde ratée (`error`) ou refusée (`refus`). Tout va bien, en cours ou en
+// attente ⇒ rien dans l'en-tête (l'état normal ne réclame pas l'œil, §7) ; le
+// détail reste dans Paramètres (« Enregistrement en cours… », Sécurité des données).
+const SYNC_PROBLEME = new Set(['error', 'refus']);
 function BoutonSync({ ouvert, onBasculer }) {
   const syncStatus = React.useSyncExternalStore(abonnerStatutBouton, lireStatutBouton);
+  if (!SYNC_PROBLEME.has(syncStatus) && !ouvert) return null;
   return (
     <button type="button" className="vrm-hbtn vrm-sync-status" data-sync-etat={syncStatus} aria-label="Voir la synchronisation" aria-expanded={ouvert} onClick={onBasculer} title={
               syncStatus==='synced'?'Synchronisé avec le cloud':
@@ -12548,9 +12555,16 @@ function BrandIcon({plateforme,size=24,style}) {
   if(!source)return null;
   return <img className="vrm-brand-icon" src={source} alt="" aria-hidden="true" width={size} height={size} style={{objectFit:'contain',flexShrink:0,...style}}/>;
 }
+// (5 nov., chantier H — revue 2.32) UNE ICÔNE PAR ENTRÉE : une entrée de SITE
+// (Leboncoin, eBay, Vestiaire) porte le logo du site, monochrome, à la couleur du
+// texte (le même que le sélecteur de site, `logoPlateforme`) — plus l'étiquette
+// de « Prix à baisser », la grille d'Annonces ni le sac des Ventes.
 function NavigationIcon({item,size=20,style}) {
   const marque={plat_vinted:'vinted',plat_leboncoin:'leboncoin',plat_ebay:'ebay'}[item.id];
-  return marque?<BrandIcon plateforme={marque} size={size+3} style={style}/>:<Icon name={item.icon} size={size} style={style}/>;
+  if(marque) return <BrandIcon plateforme={marque} size={size+3} style={style}/>;
+  const logo=item.site?logoPlateforme(item.site):'';
+  if(logo) return <span className="vrm-nav-logo" data-nav-logo={item.site} aria-hidden="true" style={{width:size,height:size,'--vrm-ss-logo':`url("${logo}")`,...(style&&style.opacity!=null?{opacity:style.opacity}:{})}}/>;
+  return <Icon name={item.icon} size={size} style={style}/>;
 }
 function StatBox({label,value,color=C.text,sub=null,subColor=null,onClick=null,title=null,compact=false}) {
   // ⚠️ LE CHIFFRE N'EST PLUS DANS UNE BOÎTE. Trois cartes grises côte à côte,
@@ -15138,6 +15152,19 @@ const ICON_PATHS = {
   pencil: <><path d="M4 20.2h4l10-10a2.8 2.8 0 0 0-4-4l-10 10v4Z"/><path d="m14.5 5.5 4 4"/></>,
   // Atelier de republication (« ✨ ») : une étincelle + une petite touche.
   spark:  <><path d="M12 3.2 13.7 9l5.8 1.7L13.7 12.4 12 18.2l-1.7-5.8L4.5 10.7 10.3 9 12 3.2Z"/><path d="M18.5 4v3M20 5.5h-3"/></>,
+  // (5 nov., chantier H — revue 2.31/2.32) Une icône par chose : Achats n'est plus
+  // le sac des Ventes, l'état des connexions n'est plus la flèche de Republier, la
+  // sécurité n'est plus la clé du mot de passe.
+  cart:   <><path d="M3 4h2.2l2.1 10.6a1.5 1.5 0 0 0 1.5 1.2h8.4a1.5 1.5 0 0 0 1.5-1.2L20.2 8H6.3"/><circle cx="9.5" cy="19.6" r="1.3"/><circle cx="16.8" cy="19.6" r="1.3"/></>,
+  pulse:  <><path d="M3 12h4l2.4-6 4.2 12 2.4-6H21"/></>,
+  shield: <><path d="M12 3.2 19 6v5.4c0 4.4-3 7.9-7 9.4-4-1.5-7-5-7-9.4V6l7-2.8Z"/><path d="m9 12 2.1 2.1L15.2 10"/></>,
+  play:   <><circle cx="12" cy="12" r="8.5"/><path d="M10.2 8.8v6.4l5.2-3.2-5.2-3.2Z"/></>,
+  help:   <><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.7"/><path d="M12 17h.01"/></>,
+  users:  <><circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19.5a5.5 5.5 0 0 1 11 0"/><path d="M15.5 5.6a3.2 3.2 0 0 1 0 5.8"/><path d="M17.5 14.3a5.5 5.5 0 0 1 3 5.2"/></>,
+  device: <><rect x="6.5" y="2.8" width="11" height="18.4" rx="2.4"/><path d="M11 17.8h2"/></>,
+  lock:   <><rect x="4.5" y="10.5" width="15" height="10" rx="2.2"/><path d="M8 10.5V7.6a4 4 0 0 1 8 0v2.9"/><path d="M12 14.6v2"/></>,
+  texte:  <><path d="M3.5 18.5 8 6.5l4.5 12"/><path d="M5.2 14.2h5.6"/><path d="M14.5 18.5l3-8 3 8"/><path d="M15.6 15.8h3.8"/></>,
+  archive:<><rect x="3.5" y="4" width="17" height="4.5" rx="1.2"/><path d="M5 8.5v9.5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5"/><path d="M10 12.5h4"/></>,
 };
 // Tuile d'icône façon réglages iOS : un carré arrondi teinté, une icône au
 // trait dedans. C'est ce détail qui sépare un écran de réglages d'une liste de
@@ -15497,7 +15524,7 @@ const GROUPES_PLUS=[
   // et leur détail — codes, QR, dates limites, relais — juste dessous).
   { titre:'Gérer', items:[
     {id:'garage',     icon:'home', label:'Stock'},
-    {id:'achats',     icon:'bag',  label:'Achats'},
+    {id:'achats',     icon:'cart', label:'Achats'},
     // (5 nov., Julien : « un onglet dédié aux e-mails… une vraie boîte de réception »)
     {id:'emails',     icon:'mail', label:'E-mails'},
   ]},
@@ -19368,11 +19395,21 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
               qu'elle tourne) a écrit pour la dernière fois. Elle n'écrit que
               quand tu passes sur Vinted : un long silence n'est pas une panne,
               on le dit sans l'accuser. */}
-          <div data-etat-derniere={derniere === undefined ? 'encours' : derniere === null ? 'passu' : derniere === 'aucune' ? 'aucune' : 'lue'}
+          {/* (5 nov., chantier H — revue 2.29) « Dernière capture » vient de la MÊME
+              source que la liste juste au-dessus : la relecture la plus récente de tes
+              comptes (`lireDernieresCaptures`). Avant, elle lisait la ligne de
+              diagnostic de l'extension : « Aucune capture reçue » sous « relu il y a
+              15 min ». La ligne de diagnostic ne sert plus qu'à la VERSION, et à la
+              date quand aucune relecture n'est lue (téléphone : le seul fait connu). */}
+          {(() => { const capsMax = caps && typeof caps === 'object' ? Math.max(0, ...Object.values(caps).map(Number).filter(Number.isFinite)) : 0;
+            const d = capsMax > 0 ? { at: capsMax, v: derniere && typeof derniere === 'object' ? derniere.v : '' } : derniere;
+            const enCours = derniere === undefined || caps === undefined;
+            return (
+          <div data-etat-derniere={enCours ? 'encours' : d === null ? 'passu' : d === 'aucune' ? 'aucune' : 'lue'} data-etat-derniere-source={capsMax > 0 ? 'comptes' : 'diagnostic'}
             className="vrm-etat-pied" style={{ color: C.muted }}>
-            {derniere === undefined ? 'Dernière capture reçue : je regarde…'
-              : derniere === null ? 'Dernière capture reçue : pas su (la base n’a pas répondu).'
-              : derniere === 'aucune' ? 'Aucune capture reçue pour l’instant.'
+            {enCours ? 'Dernière capture reçue : je regarde…'
+              : d === null ? 'Dernière capture reçue : pas su (la base n’a pas répondu).'
+              : d === 'aucune' ? 'Aucune capture reçue pour l’instant.'
               // ⚠️⚠️ LA MISE À JOUR N'EST DITE ICI QUE LÀ OÙ LE PONT NE PARLE PAS
               //    (revue du 9 octobre). Sur l'ordinateur, la ligne « Extension »
               //    juste au-dessus vient du pont, qui a mesuré CE navigateur : la
@@ -19382,11 +19419,11 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
               //    trois choses écrites en dur que la 5.161 savait déjà faire. On
               //    ne nomme que ce qui manque VRAIMENT à la version vue
               //    (`capacitesManquantes`, tirée d'EXT_CAPACITES, §11).
-              : (() => { const retard = !vmrExtPresent() && extEnRetard(derniere.v); const manque = retard ? capacitesManquantes(derniere.v) : []; return (
-                <>Dernière capture reçue de ton extension : <b style={{ color: C.text }}>{derniere.at ? ilYaCourt(derniere.at) : 'date inconnue'}</b>{derniere.v ? ` (version ${derniere.v})` : ''}. Elle écrit quand tu passes sur Vinted.
+              : (() => { const retard = !vmrExtPresent() && extEnRetard(d.v); const manque = retard ? capacitesManquantes(d.v) : []; return (
+                <>Dernière capture reçue : <b style={{ color: C.text }}>{d.at ? ilYaCourt(d.at) : 'date inconnue'}</b>{d.v ? ` (version ${d.v})` : ''}. L’extension écrit quand tu passes sur Vinted.
                 {retard ? <> <span style={{ color: C.warn, fontWeight: 600 }}>À mettre à jour en {EXT_ATTENDUE}</span> sur l'ordinateur où elle est installée (Paramètres → État des connexions){manque.length ? <> : celle-ci ne sait pas encore {listeFr(manque)}.</> : '.'}</> : null}</>
               ); })()}
-          </div>
+          </div>); })()}
           {geste && <div className="vrm-etat-geste" data-etat-geste-zone>{geste}</div>}
         </div>
       )}
@@ -63051,9 +63088,55 @@ const compterNonLuesNotifs = async () => {
 // La cloche de l'en-tête et sa feuille. Recompte à l'ouverture de l'app, au
 // retour sur l'onglet, toutes les deux minutes tant qu'il est visible, et
 // quand une entrée vient d'être lue.
+// (5 nov., chantier H) « OÙ RANGER À L'ARRIVÉE » : quand un achat passe à
+// « Arrivés » (règle des achats, `phaseAchat` ; ou « ✓ Récupéré » touché), la
+// cloche propose la PREMIÈRE CASE LIBRE du Stock et mène à « Ranger »
+// (src/ouRanger.js). Une notification DANS la cloche seulement : rien n'est
+// envoyé au téléphone. Ce que l'appareil a vu (`vrm_ranger_vus`) et ce qui est
+// proposé (`vrm_ranger_proposes`) restent sur l'appareil (une commodité, jamais
+// une donnée de stock). Pas su (base, meubles ou cases pas lus) ⇒ rien proposé.
+const CLE_RANGER_VUS = 'vrm_ranger_vus', CLE_RANGER_PROPOSES = 'vrm_ranger_proposes';
+const lireRangerLocal = (k) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v && typeof v === 'object' && !Array.isArray(v) ? v : null; } catch (_) { return null; } };
+const ecrireRangerLocal = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} };
+async function calculerOuRanger() {
+  if (!isCloudReady()) return null;
+  const meubles = load('vrm_meubles', null), slots = load('vrm_slots', null);
+  const caseLibre = premiereCaseMeubles({ meubles, slots });
+  const lignes = await lireTout('id=like.harvest_*_orders_purchased&select=id,orders:data->payload->my_orders').catch(() => null);
+  if (!Array.isArray(lignes)) return null;
+  const recup = load('vinted_pickup_done', {}) || {};
+  const achats = lignes.flatMap((r) => (Array.isArray(r && r.orders) ? r.orders : []));
+  const { arrives, vus } = achatsArrives({ achats, vus: lireRangerLocal(CLE_RANGER_VUS), estArrive: (a) => phaseAchat(a && a.status) === 'completed' || !!recup[String(a && a.transaction_id)] });
+  if (vus) ecrireRangerLocal(CLE_RANGER_VUS, vus);
+  const proposes = { ...(lireRangerLocal(CLE_RANGER_PROPOSES) || {}) };
+  const t = Date.now();
+  for (const a of arrives) { const tx = String(a.transaction_id); if (!proposes[tx]) proposes[tx] = { tx, titre: String(a.title || '').slice(0, 80), at: t }; }
+  // On n'en garde que 30, et 14 jours : une proposition oubliée s'éteint seule.
+  const garde = Object.values(proposes).filter((p) => p && t - (Number(p.at) || 0) < 14 * 86400000).sort((a, b) => b.at - a.at).slice(0, 30);
+  const out = Object.fromEntries(garde.map((p) => [p.tx, p]));
+  ecrireRangerLocal(CLE_RANGER_PROPOSES, out);
+  return notifsOuRanger({ proposes: out, caseLibre });
+}
 function CentreNotifsCoque({ onReglages }) {
   const [nonLues, setNonLues] = useState(null);
   const [ouvert, setOuvert] = useState(false);
+  const [aRanger, setARanger] = useState(null);
+  const relireRanger = React.useCallback(() => { calculerOuRanger().then((l) => setARanger(l)).catch(() => setARanger(null)); }, []);
+  useEffect(() => {
+    let t = null;
+    const stop = onCloudReady(() => { t = setTimeout(relireRanger, 4000); });
+    const f = () => relireRanger();
+    window.addEventListener('vrm:stock-slots', f);
+    return () => { if (t) clearTimeout(t); if (typeof stop === 'function') stop(); window.removeEventListener('vrm:stock-slots', f); };
+  }, [relireRanger]);
+  React.useEffect(() => { if (ouvert) relireRanger(); }, [ouvert, relireRanger]);
+  const rangeFait = React.useCallback((r) => {
+    const p = { ...(lireRangerLocal(CLE_RANGER_PROPOSES) || {}) };
+    if (p[r.tx]) p[r.tx] = { ...p[r.tx], fait: Date.now() };
+    ecrireRangerLocal(CLE_RANGER_PROPOSES, p);
+    setARanger((l) => (Array.isArray(l) ? l.filter((x) => x.tx !== r.tx) : l));
+  }, []);
+  const ranger = React.useCallback((r) => { rangeFait(r); try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=garage' })); } catch (_) {} }, [rangeFait]);
   useEffect(() => {
     let vivant = true;
     const compter = () => { if (document.visibilityState === 'hidden') return; compterNonLuesNotifs().then((v) => { if (vivant) setNonLues(v); }); };
@@ -63071,8 +63154,9 @@ function CentreNotifsCoque({ onReglages }) {
   const aller = React.useCallback((q) => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: q })); } catch (_) {} }, []);
   return (
     <>
-      <BoutonCentreNotifs nonLues={nonLues} onOuvrir={() => setOuvert(true)} Icon={Icon}/>
-      {ouvert && <FeuilleCentreNotifs onFermer={fermer} charger={chargerCentreNotifs} ecrireLu={ecrireLuNotifs} onAller={aller} onReglages={onReglages} Fermer={FermeAuRetour} Icon={Icon}/>}
+      <BoutonCentreNotifs nonLues={nonLues} enPlus={Array.isArray(aRanger) ? aRanger.length : 0} onOuvrir={() => setOuvert(true)} Icon={Icon}/>
+      {ouvert && <FeuilleCentreNotifs onFermer={fermer} charger={chargerCentreNotifs} ecrireLu={ecrireLuNotifs} onAller={aller} onReglages={onReglages} Fermer={FermeAuRetour} Icon={Icon}
+        aRanger={aRanger} onRanger={ranger} onRangeFait={rangeFait}/>}
     </>
   );
 }
@@ -63328,7 +63412,8 @@ function StatutSauvegardeReglages() {
   const echec=stockage||(attente&&['error','refus'].includes(_syncInfo.etat));
   if(!attente&&!stockage) return null;
   return <div className="vrm-settings-status" role="status" data-statut-reglages={echec?'echec':'encours'} style={{color:echec?C.warn:C.muted}}>
-    {stockage?'Modification refusée par le stockage de cet appareil.':echec?'Modifications pas encore synchronisées.':'Enregistrement en cours…'}
+    {!echec&&<span className="vrm-settings-status-pt" aria-hidden="true"/>}
+    <span>{stockage?'Refusée par cet appareil':echec?'Pas encore synchronisé':'Enregistrement…'}</span>
     {echec&&<Bouton variante="discret" onClick={()=>{for(const [k,d] of _failedLocalSaves)if(d.owner===AUTH.user?.id&&!_saveTimers[k])save(k,d.v);cloudPush();}}>Réessayer</Bouton>}
   </div>;
 }
@@ -63366,7 +63451,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     const resteEmail = useSecondesRestantes((acct && acct.finAttente) || 0);
     if (!acct) return null;
     const M = acct.mode;
-    const titre = M==='email' ? 'Changer mon email' : M==='pw' ? 'Changer mon mot de passe' : 'Se déconnecter';
+    const titre = M==='email' ? 'Changer mon e-mail' : M==='pw' ? 'Changer mon mot de passe' : 'Se déconnecter';
     const close = () => setAcct(null);
     const valider = async () => {
       setAcct(a => ({ ...a, busy:true, err:'' }));
@@ -63380,7 +63465,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
         close(); toast('✓ Mot de passe changé');
         return;
       }
-      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(acct.val.trim())) { setAcct(a=>({...a,busy:false,err:'Adresse email invalide.'})); return; }
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(acct.val.trim())) { setAcct(a=>({...a,busy:false,err:'Adresse e-mail invalide.'})); return; }
       if (resteEmail > 0) { setAcct(a=>({...a,busy:false})); return; }
       const r = await authSetEmail(acct.val);
       if (!r.ok) { setAcct(a=>({...a,busy:false,err:r.attente?'':r.error,finAttente:r.attente?Date.now()+r.attente*1000:0})); return; }
@@ -63569,34 +63654,35 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     // emails et la sécurité : son titre dit maintenant ce qu'il contient, et
     // « Import des emails Vinted » vient à côté de « Réception des emails »
     // (il était dans Comptabilité, loin de l'autre réglage des emails).
-    { id:'comptes', titre:'Comptes et emails', items:[
-      { id:'liens', type:'nav', ic:'link', lib:'Comptes liés', desc:'Pseudos et adresses de tes comptes', onClick:()=>setTab('vintedaccounts') },
-      { id:'connexions', type:'panneau', ic:'sync', lib:'État des connexions', desc:'Ce qui marche, ce qui attend un geste', titreInterne:true, el:<ConnexionsSetting key={AUTH.user?.id||'sans-session'} comptes={comptes||[]} onComptes={()=>setTab('vintedaccounts')} onPlateforme={versPlateforme}/> },
+    { id:'comptes', titre:`Comptes et ${Lbas.emails}`, items:[
+      { id:'liens', type:'nav', ic:'link', lib:L.comptesLies, desc:'Pseudos et adresses de tes comptes', onClick:()=>setTab('vintedaccounts') },
+      { id:'connexions', type:'panneau', ic:'pulse', lib:'État des connexions', desc:'Ce qui marche, ce qui attend un geste', titreInterne:true, el:<ConnexionsSetting key={AUTH.user?.id||'sans-session'} comptes={comptes||[]} onComptes={()=>setTab('vintedaccounts')} onPlateforme={versPlateforme}/> },
       // (31 oct., soir) L'ancien « eBay → Compte » : connexion et comptes eBay reliés.
-      ebayCompte && { id:'ebay', type:'panneau', ic:'link', lib:'Comptes eBay', desc:'Connexion à eBay, comptes reliés', el:ebayCompte },
-      { id:'adresses', type:'panneau', ic:'mail', lib:'E-mails', desc:'Est-ce qu’ils arrivent, ce que VRM en a fait, tes adresses', titreInterne:true, el:<EmailsSetting onComptes={()=>setTab('vintedaccounts')}/> },
-      proprioInst && { id:'import', type:'panneau', nu:true, ic:'calendar', lib:'Import des emails Vinted', desc:'Date de début de l’historique', el:<EmailStartSetting key={AUTH.user?.id||'sans-session'} nu/> },
-      { id:'securite', type:'panneau', ic:'key', lib:'Sécurité des données', desc:'Qui peut lire et écrire tes données', el:<SecuriteSetting/> },
+      ebayCompte && { id:'ebay', type:'panneau', ic:'shop', lib:'Comptes eBay', desc:'Connexion à eBay, comptes reliés', el:ebayCompte },
+      { id:'adresses', type:'panneau', ic:'mail', lib:L.emails, desc:'Est-ce qu’ils arrivent, ce que VRM en a fait, tes adresses', titreInterne:true, el:<EmailsSetting onComptes={()=>setTab('vintedaccounts')}/> },
+      proprioInst && { id:'import', type:'panneau', nu:true, ic:'calendar', lib:'Import des e-mails Vinted', desc:'Date de début de l’historique', el:<EmailStartSetting key={AUTH.user?.id||'sans-session'} nu/> },
+      { id:'securite', type:'panneau', ic:'shield', lib:'Sécurité des données', desc:'Qui peut lire et écrire tes données', el:<SecuriteSetting/> },
     ]},
     MULTI_USER && { id:'stock', titre:'Stock et rangement', items:[
       { id:'numeros', type:'panneau', nu:true, ic:'tag', lib:'Numéros de rangement', desc:'Format des prochains numéros', val:valNumeros, el:<NumerosSetting nu onStock={()=>setTab('garage')}/> },
-      // (29 oct.) Organisation n'est plus dans le menu : rangée ici, jamais perdue.
-      { id:'organisation', type:'nav', ic:'check', lib:'Organisation', desc:DESCRIPTION_ORGANISATION, onClick:()=>setTab('organisation'), data:{ 'data-reglage-organisation':'' } },
       // ⛔ Réponse automatique aux messages Vinted retirée (16 oct., sa décision).
       // ⛔ Détourage des photos retiré des Paramètres (17 oct., sa décision) :
       //    il n'existe plus que pour Vestiaire Collective, qui l'exige, sans réglage.
-    ]},
+    // (5 nov., chantier H — revue 2.31) « Organisation » n'est plus une ligne de la
+    // liste (inutilisée, 29 oct.) : l'écran reste joignable par SON LIEN, sous le
+    // groupe — jamais perdu (`?tab=organisation` aussi).
+    ], pied: <button type="button" className="vrm-lien-action vrm-set-lien" data-reglage-organisation="" onClick={()=>setTab('organisation')}>Organisation<Icon name="chevron" size={13}/></button>},
     // (3 nov.) Les textes types insérés en un tap dans une description.
     { id:'annonces-reglages', titre:'Annonces', items:[
       { id:'modeles', type:'panneau', nu:true, ic:'pencil', lib:'Mes modèles', val:String(lireModelesRanges().length || ''), data:{ 'data-reglage-modeles':'' }, el:<ModelesSetting/> },
     ]},
     { id:'notifications', titre:'Notifications', items:[
       { id:'push', type:'panneau', ic:'bell2', lib:'Notifications du téléphone', titreInterne:true,
-        desc: nMuetsPush > 0 ? <span style={{color:C.warn,fontWeight:600}}>{nMuetsPush} compte{nMuetsPush>1?'s':''} sans email : pas de notification</span> : null,
+        desc: nMuetsPush > 0 ? <span style={{color:C.warn,fontWeight:600}}>{nMuetsPush} compte{nMuetsPush>1?'s':''} sans e-mail : pas de notification</span> : null,
         el:<><PushSetting/><div style={{height:12}}/><PushPrefsSetting comptes={comptes} onMuets={setNMuetsPush}/><RelancesEssaiSetting/></> },
       // Alertes locales (l'ancien bouton 🔔 du haut) : bandeau + notification
       // quand l'app est OUVERTE (ventes comptabilisées, factures reçues).
-      { id:'alertes', type:'switch', ic:'info', lib:"Alertes dans l'app", desc:'Ventes et factures, quand l’app est ouverte.', on:!!notifEnabled, onClick:onToggleNotif, data:{ 'data-reglage-alertes': notifEnabled ? 'on' : 'off' } },
+      { id:'alertes', type:'switch', ic:'alert', lib:"Alertes dans l'app", desc:'Ventes et factures, quand l’app est ouverte.', on:!!notifEnabled, onClick:onToggleNotif, data:{ 'data-reglage-alertes': notifEnabled ? 'on' : 'off' } },
     ]},
     { id:'impression', titre:'Impression', items:[
       { id:'imprimante', type:'panneau', nu:true, ic:'printer', lib:'Imprimante et bordereaux', desc:'Papier et aperçus', val: imprimanteChoisie() === 'thermique' ? 'Thermique · 10×15' : 'Normale · A4', el:<ImprimanteSetting nu/> },
@@ -63604,7 +63690,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     { id:'compta', titre:'Compta', items:[
       // (1er nov.) À droite, le statut CHOISI (lu dans `vinted_regime`, jamais deviné) :
       // « À choisir » tant qu'il ne l'a pas posé — avant, il fallait ouvrir pour savoir.
-      { id:'regime', type:'panneau', nu:true, ic:'receipt', lib:'Régime fiscal', desc:'Statut et taux des rapports', val:valRegime, data:{ 'data-reglage-regime': regimeFiscal() || 'aucun' }, el:<RegimeSetting nu/> },
+      { id:'regime', type:'panneau', nu:true, ic:'receipt', lib:L.statut, desc:'Taux des rapports', val:valRegime, data:{ 'data-reglage-regime': regimeFiscal() || 'aucun' }, el:<RegimeSetting nu/> },
       // Julien, 1er oct. : « les ventes masquées, je veux que ce soit dans les
       // paramètres, pas sous Factures ». L'écran reste monté, joignable ici.
       // (1er nov.) Depuis le 29 oct. une VENTE ne se masque plus : la ligne disait
@@ -63619,12 +63705,12 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'sombre', type:'switch', ic:'moon', lib:'Mode sombre', on:!!dark, onClick:toggleDark, data:{ 'data-reglage-sombre': dark ? 'on' : 'off' } },
       // (5 nov.) Le mode stream PROGRAMMÉ : son sous-écran (catégories, mots, aperçu).
       { id:'stream', type:'panneau', nu:true, ic:'stream', lib:'Mode stream', val: streamOn ? 'Allumé' : 'Éteint', data:{ 'data-reglage-stream': streamOn ? 'on' : 'off' }, el:<ReglagesStream/> },
-      { id:'zoom', type:'panneau', nu:true, ic:'grid', lib:"Taille de l'affichage", val:valZoom, el:<ZoomSetting nu/> },
+      { id:'zoom', type:'panneau', nu:true, ic:'texte', lib:"Taille de l'affichage", val:valZoom, el:<ZoomSetting nu/> },
       urlWidget && { id:'widget', type:'panneau', nu:true, ic:'chart', lib:'Widget iPhone', desc:'Ton lien privé pour Scriptable', el:widget },
     ]},
     { id:'sauvegarde', titre:'Sauvegarde', items:[
-      { id:'donnees', type:'action', ic:'save', lib:'Exporter mes données', onClick:exporterMesDonnees, data:{ 'data-exporter-donnees':'' } },
-      { id:'export', type:'action', ic:'save', lib:'Sauvegarde complète', desc:'Réglages, numéros et données captées.', onClick:onExport, data:{ 'data-reglage-sauvegarde':'' } },
+      { id:'donnees', type:'action', ic:'doc', lib:'Exporter mes données', onClick:exporterMesDonnees, data:{ 'data-exporter-donnees':'' } },
+      { id:'export', type:'action', ic:'archive', lib:'Sauvegarde complète', desc:'Réglages, numéros et données captées.', onClick:onExport, data:{ 'data-reglage-sauvegarde':'' } },
       { id:'restaurer', type:'action', ic:'restore', lib:'Restaurer une sauvegarde', onClick:onImport },
     ], pied: (
       <span data-derniere-sauvegarde={derniereSauvegarde.old ? 'ancienne' : 'recente'} style={{color: derniereSauvegarde.old ? C.warn : C.muted, fontWeight: derniereSauvegarde.old ? 600 : 400}}>
@@ -63633,9 +63719,9 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     )},
     {id:'aide',titre:'Besoin d’aide ?',items:[
       // (2 nov.) La visite en bulles, rejouée sur son clic (src/VisiteBulles.jsx).
-      { id:'visite', type:'action', ic:'info', lib:'Revoir la visite', desc:'Les onglets de VRM, un par un', onClick:()=>{ try { window.dispatchEvent(new Event('vrm:visite')); } catch (_) {} }, data:{ 'data-reglage-visite':'' } },
-      {id:'depannage',type:'panneau',nu:true,ic:'info',lib:'Résoudre un problème',desc:'Emails, comptes, impression',el:<div className="vrm-settings-help">
-      <details><summary>Je ne reçois pas mes emails</summary><p>Vérifie l’adresse associée au compte Vinted, sa confirmation, puis le transfert depuis ta messagerie. L’historique reçu permet de distinguer un email absent d’un email à vérifier.</p><Bouton variante="secondaire" onClick={()=>ouvrirSous('adresses')}>Ouvrir la réception des emails</Bouton></details>
+      { id:'visite', type:'action', ic:'play', lib:'Revoir la visite', desc:'Les onglets de VRM, un par un', onClick:()=>{ try { window.dispatchEvent(new Event('vrm:visite')); } catch (_) {} }, data:{ 'data-reglage-visite':'' } },
+      {id:'depannage',type:'panneau',nu:true,ic:'help',lib:'Résoudre un problème',desc:'Emails, comptes, impression',el:<div className="vrm-settings-help">
+      <details><summary>Je ne reçois pas mes e-mails</summary><p>Vérifie l’adresse associée au compte Vinted, sa confirmation, puis le transfert depuis ta messagerie. L’historique reçu permet de distinguer un e-mail absent d’un e-mail à vérifier.</p><Bouton variante="secondaire" onClick={()=>ouvrirSous('adresses')}>Ouvrir les e-mails</Bouton></details>
       <details><summary>Mon compte Vinted n’apparaît pas</summary><p>Connecte le compte attendu sur Vinted et vérifie que l’extension utilise ton compte VRM. Actualise ensuite les comptes liés et contrôle le pseudo. N’ajoute pas les données d’un autre vendeur.</p><Bouton variante="secondaire" onClick={()=>setTab('vintedaccounts')}>Voir mes comptes liés</Bouton></details>
       <details><summary>Mon bordereau s’imprime mal</summary><p>Choisis le papier correspondant à ton imprimante, ouvre un aperçu puis contrôle l’échelle d’impression. Le numéro doit rester dans un espace blanc. En cas d’échec d’un lot, relance uniquement les fichiers refusés.</p><Bouton variante="secondaire" onClick={()=>ouvrirSous('imprimante')}>Vérifier l’impression</Bouton></details>
     </div>}]},
@@ -63647,8 +63733,12 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     ], pied:'Pour te dire bonjour sur l’accueil. Vide : « Bonjour ».' },
     // Discord relié au COMPTE (20 oct.), sans être sur la carte de la communauté.
 
+    // (5 nov., chantier H — revue 2.31) Discord était dit DEUX fois : une ligne
+    // « Bientôt » (fournisseur de connexion) ET la carte qui le relie (« Discord
+    // relié » ou « pas pu lire »). Une seule ligne par compte : Google ici,
+    // Discord par `DiscordCompte` (la liaison, qui ouvre aussi « Se connecter avec Discord »).
     AUTH.user && {id:'connexions-rapides',titre:'Comptes associés',items:[
-      {id:'google',type:'el',el:<ConnexionsCompte theme={C} providers={OAUTH_PROVIDERS} enabled={providerEnabled} relier={oauthRelier} lire={lireConnexionsOAuth} retour={AUTH_REDIRECT?.error||(AUTH_REDIRECT?.liaison==='google'?'Ton compte Google est associé à VRM.':AUTH_REDIRECT?.liaison==='discord'?'Ton compte Discord est associé à VRM : « Se connecter avec Discord » ouvrira désormais ce compte-ci.':'')} icone={id=><BrandMark id={id}/>}/>},
+      {id:'google',type:'el',el:<ConnexionsCompte nu theme={C} providers={OAUTH_PROVIDERS.filter(pr=>pr.id!=='discord')} enabled={providerEnabled} relier={oauthRelier} lire={lireConnexionsOAuth} retour={AUTH_REDIRECT?.error||(AUTH_REDIRECT?.liaison==='google'?'Ton compte Google est associé à VRM.':AUTH_REDIRECT?.liaison==='discord'?'Ton compte Discord est associé à VRM : « Se connecter avec Discord » ouvrira désormais ce compte-ci.':'')} icone={id=><BrandMark id={id}/>}/>},
       {id:'discord',type:'el',el:<DiscordCompte key="discord"/>},
     ]},
     // (29 oct., revue) PAS de carte Photoroom ici : le 17 oct. Julien a dit du
@@ -63657,21 +63747,21 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     // (1er nov.) La carte porte déjà son titre (« Ta photo de profil ») : le groupe ne
     // le redit pas et ne l'enferme plus dans une seconde carte. Sa lettre de repli est
     // celle de l'en-tête (l'initiale de l'email), plus un « V » qui ne venait de rien.
-    AUTH.user && {id:'photo-profil',titre:null,brut:true,items:[{id:'photo-profil',type:'el',el:<PhotoProfil key={AUTH.user.id} owner={AUTH.user.id} headers={enTeteSession} theme={C} lettre={String(AUTH.user.email||'?').slice(0,1).toUpperCase()}/>} ]},
+    // (5 nov., chantier H) La photo se change DANS la carte du profil (plus d'avatar dessiné deux fois).
     // (17 oct.) L'abonnement a SON onglet (« Abonnement ») ; ici, un renvoi.
     AUTH.user && { id:'boutique', titre:'Ta boutique', items:[
       // (30 oct.) « Abonnement et factures » retiré : l'onglet « Abonnement » du haut fait la même chose.
-      { id:'equipe', type:'panneau', ic:'link', lib:'Équipe', desc:'Inviter un aide pour les colis', el:<EquipeSetting/> },
+      { id:'equipe', type:'panneau', ic:'users', lib:'Équipe', desc:'Inviter un aide pour les colis', el:<EquipeSetting/> },
     ]},
     { id:'connexion', titre:'Connexion', items:[
-      AUTH.user && { id:'email', type:'nav', ic:'mail', lib:'Changer mon email', onClick:()=>{ setAcct({ mode:'email', val:'', err:'', busy:false }); } },
+      AUTH.user && { id:'email', type:'nav', ic:'mail', lib:'Changer mon e-mail', onClick:()=>{ setAcct({ mode:'email', val:'', err:'', busy:false }); } },
       AUTH.user && { id:'motdepasse', type:'nav', ic:'key', lib:'Changer mon mot de passe', onClick:()=>{ setAcct({ mode:'pw', val:'', err:'', busy:false }); } },
       // Double vérification (TOTP) — facultative, sur SON clic (16 octobre).
       // (4 nov.) Les appareils où VRM est ouvert, et « Se déconnecter partout ».
-      AUTH.user && { id:'appareils', type:'panneau', ic:'key', lib:'Appareils connectés', el:<AppareilsConnectes/> },
+      AUTH.user && { id:'appareils', type:'panneau', ic:'device', lib:'Appareils connectés', el:<AppareilsConnectes/> },
       // (4 nov.) Tout ce que VRM a envoyé en son nom, lu de ce qui est noté en base.
       AUTH.user && { id:'journal-vrm', type:'panneau', ic:'clock', lib:'Ce que VRM a fait', el:<JournalVrm/> },
-      AUTH.user && { id:'double', type:'panneau', nu:true, ic:'key', lib:'Double vérification', val: Array.isArray(AUTH.session && AUTH.session.totp) ? (AUTH.session.totp.length > 1 ? `Activée · ${AUTH.session.totp.length} appareils` : AUTH.session.totp.length ? 'Activée' : 'Désactivée') : '', el:<DoubleVerification/> },
+      AUTH.user && { id:'double', type:'panneau', nu:true, ic:'lock', lib:'Double vérification', val: Array.isArray(AUTH.session && AUTH.session.totp) ? (AUTH.session.totp.length > 1 ? `Activée · ${AUTH.session.totp.length} appareils` : AUTH.session.totp.length ? 'Activée' : 'Désactivée') : '', el:<DoubleVerification/> },
     ]},
     AUTH.user && { id:'sortir', titre:null, items:[
       { id:'deconnexion', type:'action', ic:'door', lib:'Se déconnecter', danger:true, onClick:()=>{ setAcct({ mode:'out', val:'', err:'', busy:false }); } },
@@ -63709,6 +63799,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
           {CLOISONNE ? 'Tes données ne sont visibles que par toi.' : 'Connecté — séparation des comptes pas encore activée.'}
         </span>
       </span>
+      <div className="vrm-set-profil-photo"><PhotoProfil key={AUTH.user.id} nu owner={AUTH.user.id} headers={enTeteSession} theme={C} lettre={String(AUTH.user.email||'?').slice(0,1).toUpperCase()}/></div>
     </div>
   ) : (
     <div className="vrm-set-carte" style={{border:`1px solid ${C.warn}55`,background:`${C.warn}0d`,marginBottom:32}}>
@@ -63728,7 +63819,6 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     <div ref={racine} className="vrm-set" data-reglages-disposition={etroit ? 'telephone' : 'ordinateur'} data-sous-ecran-ouvert={ouvert ? ouvert.id : ''}
       style={{'--vrm-set-filet': C.border, '--vrm-set-appui': `${C.text}0a`}}>
       <AcctSheet/>
-      <StatutSauvegardeReglages/>
       {ouvert ? (
         // ── SOUS-ÉCRAN (téléphone) ──
         <div className="vrm-set-nav">
@@ -63736,16 +63826,22 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
             <svg width="12" height="20" viewBox="0 0 12 20" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 2 2 10l8 8"/></svg>
             {titreRetour}
           </button>
+          <StatutSauvegardeReglages/>
         </div>
       ) : (<>
-        <div className="vrm-set-tete"><h2 className="vrm-set-h1" style={{color:C.text}}>Paramètres</h2></div>
+        {/* (5 nov., chantier H — revue 2.31) « Enregistrement en cours… » vit dans la
+            ligne du titre, à droite : il ne prend plus la place d'un surtitre (le
+            titre ne saute plus de 26 px à chaque réglage touché). */}
+        <div className="vrm-set-tete"><h2 className="vrm-set-h1" style={{color:C.text}}>Paramètres</h2><StatutSauvegardeReglages/></div>
         {PHRASES_ECRAN.settings ? <p className="vrm-phrase-ecran vrm-phrase-reglages" data-phrase-ecran="settings">{PHRASES_ECRAN.settings}</p> : null}
         <ReglagesPasLus/>
         {ongletsCompte && (
-          <div role="tablist" aria-label="Paramètres" data-onglets-reglages="" className="vrm-set-seg" style={{background:`${C.text}0f`}}>
+          // (5 nov., chantier H) Les trois onglets ont LA forme du contrôle segmenté de
+          // l'app (`.vrm-seg`, une règle) : avant, un dessin à part dont l'aplat se
+          // perdait (l'onglet choisi n'était pas le blanc).
+          <div role="tablist" aria-label="Paramètres" data-onglets-reglages="" className="vrm-seg vrm-seg-plein vrm-set-seg">
             {[['reglages','Réglages'],['compte','Mon compte'],...(AUTH.user?[['abonnement','Abonnement']]:[])].map(([k,l]) => (
-              <button key={k} type="button" role="tab" aria-selected={vue===k} data-vue={k} onClick={()=>setVue(k)}
-                style={{background:vue===k?C.card:'transparent',color:vue===k?C.text:C.muted,boxShadow:vue===k?'0 1px 2px rgba(0,0,0,.08), 0 1px 1px rgba(0,0,0,.04)':'none'}}>
+              <button key={k} type="button" role="tab" className="vrm-seg-btn" aria-selected={vue===k} aria-pressed={vue===k} data-vue={k} onClick={()=>setVue(k)}>
                 {l}
               </button>
             ))}
@@ -63758,14 +63854,11 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       {!ouvert && <>
         {profil}
         {voirReglages && <ActionsReglages comptes={comptes||[]} onOuvrir={id=>id==='comptes'?setTab('vintedaccounts'):ouvrirSous(id)}/>}
-        {voirReglages && <label className="vrm-settings-search" style={{background:C.card,borderColor:C.border,color:C.muted}}>
-          <Icon name="search" size={16}/>
-          <input type="search" value={rechercheReglage} onChange={e=>setRechercheReglage(e.target.value)} placeholder={`Rechercher dans ${titreRetour}…`} aria-label="Rechercher dans les paramètres" style={{color:C.text}}/>
-          {rechercheReglage&&<button type="button" aria-label="Effacer la recherche des paramètres" onClick={e=>{setRechercheReglage('');e.currentTarget.parentElement.querySelector('input')?.focus();}} style={{color:C.muted}}>Effacer</button>}
-        </label>}
+        {/* (5 nov., chantier H) LE champ de recherche de l'app (`ChampRecherche`). */}
+        {voirReglages && <ChampRecherche valeur={rechercheReglage} onChange={setRechercheReglage} placeholder={`Rechercher dans ${titreRetour}`} label="Rechercher dans les paramètres" className="vrm-set-recherche" data-recherche-reglages=""/>}
         {(() => {
           const filtres=filtrerReglages(groupes,voirReglages?rechercheReglage:'');
-          return filtres.length ? <>{rechercheReglage.trim()&&<p className="vrm-settings-search-info" role="status" style={{color:C.muted}}>{(n=>`${n} réglage${n>1?'s':''} trouvé${n>1?'s':''}`)(filtres.reduce((n,g)=>n+g.items.length,0))}</p>}{filtres.map(groupe)}</> : <p role="status" style={{color:C.muted,fontSize:13}}>Aucun réglage trouvé. Essaie « email », « numéro » ou « impression ».</p>;
+          return filtres.length ? <>{rechercheReglage.trim()&&<p className="vrm-settings-search-info" role="status" style={{color:C.muted}}>{(n=>`${n} réglage${n>1?'s':''} trouvé${n>1?'s':''}`)(filtres.reduce((n,g)=>n+g.items.length,0))}</p>}{filtres.map(groupe)}</> : <p role="status" style={{color:C.muted,fontSize:13}}>Aucun réglage trouvé. Essaie « e-mail », « numéro » ou « impression ».</p>;
         })()}
       </>}
       {panneaux.map(it=><div key={it.id} hidden={!ouvert || ouvert.id!==it.id} data-sous-ecran={it.id} className={it.titreInterne?'vrm-set-sans-titre':undefined}>
@@ -65211,14 +65304,16 @@ function DiscordCompte() {
     relire();
   };
   const note = msg && <div data-discord-compte-msg="" role="status" style={{ fontSize: 13, color: C.text, marginTop: 8, lineHeight: 1.45,flexBasis:'100%' }}>{msg}</div>;
-  if (lu === undefined) return <div data-discord-compte="chargement" style={{ fontSize: 13, color: C.muted, padding: '4px 0' }}>Lecture de ton Discord…{note}</div>;
+  if (lu === undefined) return <div data-discord-compte="chargement" style={{ fontSize: 13, color: C.muted, padding: '14px 16px', minHeight: 56, boxSizing: 'border-box' }}>Lecture de ton Discord…{note}</div>;
+  // (5 nov., chantier H) La panne se dit comme partout (`EtatPanne`), et la carte
+  // devient une LIGNE de la liste « Comptes associés » (plus de carte dans la carte).
   if (lu === null) return (
-    <div data-discord-compte="pas-su" style={{ fontSize: 13, color: C.text, lineHeight: 1.5, padding: '4px 0' }}>
-      Je n'ai pas pu lire ton Discord — la base n'a pas répondu. <button type="button" onClick={relire} className="vrm-b vrm-b-secondaire" style={{ marginLeft: 6 }}>Réessayer</button>{note}
+    <div data-discord-compte="pas-su" style={{ padding: '4px 4px' }}>
+      <EtatPanne compact quoi="Ton Discord" raison="La base n’a pas répondu." onReessayer={relire}/>{note}
     </div>
   );
   return (
-    <div data-discord-compte={lu.discord ? 'relie' : 'aucun'} style={{ fontSize: 13, color: C.text, padding:'14px',border:`1px solid ${C.border}`,borderRadius:12,background:C.card,display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap' }}>
+    <div data-discord-compte={lu.discord ? 'relie' : 'aucun'} style={{ fontSize: 13, color: C.text, padding:'10px 14px 10px 16px',minHeight:56,boxSizing:'border-box',borderTop:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap' }}>
       <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0}}><span aria-hidden="true" style={{width:32,height:32,display:'grid',placeItems:'center',borderRadius:12,background:'#5865F218'}}><BrandMark id="discord"/></span><span>{lu.discord ? <>Discord relié : <b data-discord-compte-pseudo={lu.discord}>{lu.discord}</b></> : <><b>Profil Discord</b><span style={{display:'block',fontSize:11,color:C.muted,marginTop:2}}>Ton pseudo et ton avatar Discord dans VRM</span></>}</span></div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         {lu.connexion && <button type="button" data-discord-compte-connecter="" disabled={occupe} onClick={connecter} className="vrm-b vrm-b-secondaire">{occupe ? 'Un instant…' : lu.discord ? 'Changer de compte' : 'Connecter Discord'}</button>}
@@ -69816,7 +69911,11 @@ function AppCoeur() {
   const sommeNotif=(f)=>{ const l=(notifItems||[]).filter(x=>x&&f(x)); return l.length ? l.reduce((a,x)=>a+(Number(x.n)||0),0) : null; };
   const nLbcRetirer=sommeNotif(x=>x.lbcRetirer);
   const nAnnonces=sommeNotif(x=>x.annonces);
-  const badgesNav={ cat_bord: colisBadge, ventes: colisBadge, annonces: nAnnonces, retraits: retraitsBadge, messages: msgNonLus>0 };
+  // (5 nov., chantier H — revue 2.32) UN COLIS SE COMPTE UNE FOIS : les colis à
+  // envoyer portent le badge de Colis (l'écran qui les envoie) — Ventes ne le
+  // redit plus (la colonne de l'ordinateur montrait « 1 » sur Ventes ET « 1 » sur
+  // Colis pour le même colis).
+  const badgesNav={ cat_bord: colisBadge, annonces: nAnnonces, retraits: retraitsBadge, messages: msgNonLus>0 };
   const badgesRail={ ...badgesNav, plat_leboncoin: nLbcRetirer };
   // Vestiaire : ses morceaux, chacun dans SA tâche. Annonces · Vestiaire porte
   // aussi ce qui servait à publier (ta clé Photoroom — sur l'écran Vestiaire,
@@ -70213,38 +70312,14 @@ function AppCoeur() {
         {!ordi && <div className="vrm-hdr-titre" data-titre-ecran="">{titreCourant}</div>}
         {!ordi && gsOpen && champRechercheMobile}
         <div className="vrm-header-actions">
-          <div style={{display:'flex',alignItems:'center'}}>
-            {false&&<span style={{color:C.accentTexte,fontWeight:500}}>📦 {Object.values(garageGrid).flatMap(a=>Array.isArray(a)?a:[]).filter(v=>v&&v.trim()!=='').length}</span>}
-            {false&&<span style={{color:C.muted,fontWeight:500}}>💸 {sales.length}</span>}
-            <span style={{position:'relative',display:'inline-flex'}}>
+          {/* (5 nov., chantier H — revue 2.28) Au téléphone, l'en-tête ne porte plus que :
+              la PASTILLE d'état (un point de couleur, plus de « ⓘ »), « Stream », la
+              cloche, la loupe — et le nuage seulement quand une sauvegarde a raté. */}
+          <span className="vrm-hdr-sync" style={{position:'relative',display:'inline-flex'}}>
             <BoutonSync ouvert={syncOuvert} onBasculer={()=>setSyncOuvert(v=>!v)}/>
             {syncOuvert && <PanneauSync onFermer={()=>setSyncOuvert(false)} onReglages={()=>{ setSyncOuvert(false); setTab('settings'); }}/>}
-            </span>
-          </div>
-          {/* Boutons Exporter / Importer (le mode sombre vit dans Paramètres) */}
+          </span>
           <div style={{display:'flex',alignItems:'center'}}>
-            {false&&<button type="button" onClick={toggleDark} title={dark?'Mode clair':'Mode sombre'}
-              style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:12,padding:'6px 11px',color:C.text,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
-              {dark?'☀️':'🌙'}
-            </button>}
-            {false&&<button type="button" onClick={async()=>{
-              if(!notifEnabled){
-                const res=await askNotifPermission();
-                if(res==='granted'){
-                  setNotifEnabled(true); save('vinted_notif_enabled',true);
-                  pushNotif('Notifications activées','Tu seras prévenu des ventes comptabilisées et des factures reçues.');
-                } else if(res==='denied'){
-                  toast("Les notifications sont bloquées par ton navigateur. Pour les activer : réglages du navigateur > Notifications > autorise le site.");
-                } else if(res==='unsupported'){
-                  toast("Ton navigateur ne supporte pas les notifications. Tu verras quand même le bandeau dans l'app.");
-                }
-              } else {
-                setNotifEnabled(false); save('vinted_notif_enabled',false);
-              }
-            }} title={notifEnabled?'Notifications activées (cliquer pour désactiver)':'Activer les notifications'}
-              style={{background:notifEnabled?C.accent:'transparent',border:`1px solid ${notifEnabled?C.accent:C.border}`,borderRadius:12,padding:'6px 11px',color:notifEnabled?C.onAccent:C.text,cursor:'pointer',fontSize:15,fontWeight:500,fontFamily:'inherit'}}>
-              {notifEnabled?'🔔':'🔕'}
-            </button>}
             {(() => { const eD = dark; return (<>
             {/* « Puis-je agir sur Vinted depuis cette page ? » — sur tous les
                 écrans (Julien, 5 octobre). Voir `EtatActions`. */}

@@ -252,23 +252,19 @@
     color: var(--vrm-ink) !important; position: relative; cursor: pointer;
   }
   .vrm-hbtn[aria-pressed="true"], .vrm-hbtn[aria-expanded="true"] { background: var(--vrm-card2) !important; }
-  /* L'état « puis-je agir sur Vinted ? » : un « i » au trait, avec la PASTILLE
-     d'état en coin (comme un badge iOS) — la couleur dit l'état, le texte est
-     dans le panneau qui s'ouvre. */
+  /* (5 nov., chantier H — revue 2.28) L'état « puis-je agir sur Vinted ? » : une
+     PASTILLE DE COULEUR, plus un « ⓘ » (une icône de plus sans libellé). Le point
+     dit l'état par sa couleur — encre : tu peux agir ; gris : rien à faire ici ;
+     ambre (avec son halo) : un geste à faire (§7). Le texte est dans le panneau ;
+     le nom lu reste en aria-label. Cible de 44 px. */
   .vrm-app-header [data-etat-actions] > span:not([aria-hidden]) { display: none; }
-  .vrm-app-header [data-etat-actions] > span[aria-hidden] {
-    position: absolute; top: 11px; right: 10px; width: 8px !important; height: 8px !important;
-    box-shadow: 0 0 0 2px var(--vrm-bg);
+  .vrm-app-header [data-etat-actions] > span.vrm-etat-point[aria-hidden] {
+    position: static; display: block; width: 12px !important; height: 12px !important; border-radius: 999px !important;
+    opacity: 1 !important; box-shadow: 0 0 0 5px color-mix(in srgb, var(--etat-ton) 16%, transparent) !important;
+    transition: background-color .2s ease, box-shadow .2s ease;
   }
-  .vrm-app-header.is-defile [data-etat-actions] > span[aria-hidden] { box-shadow: 0 0 0 2px var(--vrm-surface); }
-  /* (5 nov.) Le point de coin ne se montre que s'il y a un geste à faire : tout
-     va bien ⇒ le « i » seul, sans couleur. */
-  .vrm-app-header [data-etat-actions]:not([data-etat-ton="attention"]) > span[aria-hidden] { display: none; }
-  .vrm-app-header [data-etat-actions]::after {
-    content: 'i'; display: grid; place-items: center; width: 19px; height: 19px;
-    border: 1.6px solid currentColor; border-radius: 50%;
-    font: 600 12px/1 var(--vrm-police, system-ui); font-style: normal;
-  }
+  .vrm-app-header [data-etat-actions][data-etat-ton="attention"] > span.vrm-etat-point[aria-hidden] { box-shadow: 0 0 0 5px color-mix(in srgb, var(--etat-ton) 26%, transparent) !important; }
+  .vrm-app-header [data-etat-actions]:active > span.vrm-etat-point[aria-hidden] { transform: scale(.9); }
   .vrm-app-header [data-stream-pastille] { font-size: 0 !important; gap: 0 !important; }
   .vrm-app-header [data-stream-pastille] > span { width: 10px !important; height: 10px !important; }
 

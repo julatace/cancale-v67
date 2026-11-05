@@ -92,7 +92,7 @@ const projette = (row, sel) => {
       dit(await pg.locator('[data-sous-ouvrir="numeros"]').isVisible() && !(await pg.locator('[data-sous-ouvrir="imprimante"]').count()), `${largeur} : recherche sans accent`);
       await pg.locator('[aria-label="Rechercher dans les paramètres"]').fill('papier thermique');
       dit(await pg.locator('[data-sous-ouvrir="imprimante"]').isVisible() && !(await pg.locator('[data-sous-ouvrir="numeros"]').count()), `${largeur} : recherche par termes courants et plusieurs mots`);
-      await pg.getByRole('button',{name:'Effacer la recherche des paramètres',exact:true}).click();
+      await pg.locator('[data-recherche-reglages] [data-champ-recherche-effacer]').click();   // (5 nov., chantier H) la croix de `ChampRecherche`
       dit(await pg.locator('[aria-label="Rechercher dans les paramètres"]').inputValue()==='',`${largeur} : effacer rétablit la liste`);
       await pg.locator('[aria-label="Rechercher dans les paramètres"]').fill('numero');
       await pg.locator('[data-sous-ouvrir="numeros"]').click();
