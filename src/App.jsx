@@ -36215,7 +36215,7 @@ const bordereauxPasSynchro = (emailBords, ventes) => {
   const txVendues = new Set((ventes || []).map((o) => String(o && o.transaction_id)).filter((x) => x && x !== 'undefined'));
   return (emailBords || []).filter((b) => b && b.transaction && !txVendues.has(String(b.transaction)));
 };
-const OFFRE_FENETRE_J = 14;          // une offre Vinted expire vite
+const OFFRE_FENETRE_J = 14;          // fenêtre de lecture des offres (une offre Vinted n'expire pas, 5 nov.)
 const OFFRE_TOLERANCE_H = 6;         // délai de classement de l'email
 const offresAtraiter = (offers, ventes, dejaFaites, cle) => {
   const vivantes = (ventes || []).filter((o) => o && classifyOrderStatus(o.status) !== 'cancelled');
