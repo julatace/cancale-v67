@@ -47,7 +47,7 @@
 .vrm-pa-manques { list-style: none; margin: 4px 0 8px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .vrm-pa-manques li { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 12px; background: var(--fu-case, #f2f2f7); }
 .vrm-pa-manques li[data-bloque="1"] { background: var(--fu-ambre-fond, #fff4e5); color: var(--fu-ambre-txt, #b25000); }
-.vrm-pa-manques b { font-size: 14px; font-weight: 700; }
+.vrm-pa-manques b { font-size: 15px; font-weight: 700; }
 .vrm-pa-manques small { font-size: 13px; color: var(--fu-gris, #6e6e73); }
 .vrm-pa-manques li[data-bloque="1"] small { color: inherit; }
 .vrm-pa-rien { margin: 4px 0 8px; font-size: 13px; color: var(--fu-gris, #6e6e73); }
@@ -60,11 +60,11 @@
 .vrm-pa-dl { margin: 0 0 6px; display: flex; flex-direction: column; gap: 8px; }
 .vrm-pa-dl > div { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 8px; align-items: start; }
 .vrm-pa-dl dt { font-size: 13px; color: var(--fu-gris, #6e6e73); font-weight: 600; }
-.vrm-pa-dl dd { margin: 0; font-size: 14px; overflow-wrap: anywhere; min-width: 0; }
+.vrm-pa-dl dd { margin: 0; font-size: 15px; overflow-wrap: anywhere; min-width: 0; }
 .vrm-pa-dl dd small { color: var(--fu-gris, #6e6e73); font-size: 12px; }
 .vrm-pa-desc dd { white-space: pre-wrap; max-height: 168px; overflow-y: auto; font-size: 13px; line-height: 1.45; background: var(--fu-case, #f2f2f7); border-radius: 12px; padding: 8px 10px; }
 .vrm-pa-vignettes { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
-.vrm-pa-vignette { width: 36px; height: 46px; border-radius: 8px; overflow: hidden; background: var(--fu-case, #f2f2f7); }
+.vrm-pa-vignette { width: 36px; height: 46px; border-radius: 6px; overflow: hidden; background: var(--fu-case, #f2f2f7); }
 .vrm-pa-vignette img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .vrm-pa-plus { font-size: 13px; font-weight: 700; color: var(--fu-gris, #6e6e73); padding-left: 2px; }
 .vrm-pa-actions { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
@@ -75,7 +75,7 @@
 /* L'entrée « Publier ailleurs » dans Annonces · Leboncoin / eBay / Vestiaire. */
 .vrm-pa-entree { margin: 12px 16px 0; }
 .vrm-pa-entree button {
-  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 52px; box-sizing: border-box; border: 0; border-radius: 16px;
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 52px; box-sizing: border-box; border: 0; border-radius: 14px;
   background: var(--fu-carte, #fff); box-shadow: var(--fu-ombre); color: var(--fu-encre, #1d1d1f); font: inherit; font-size: 15px; font-weight: 700;
   padding: 0 14px; cursor: pointer; text-align: left;
 }

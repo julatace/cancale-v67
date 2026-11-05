@@ -41238,14 +41238,14 @@ function RelierAchatCorps({ cible, achats, liens, curTx, compteDe, prixDe, recep
           {plus && (
             <div data-filtres-achat="" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8, marginTop: 8 }}>
               <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: C.muted, minWidth: 0 }}>Prix payé, de
-                <input inputMode="decimal" value={prixMin} onChange={(e) => setPrixMin(e.target.value)} placeholder="€" data-filtre-prix-min style={{ ...sel, flex: 'none', fontSize: 16 }}/></label>
+                <input inputMode="decimal" value={prixMin} onChange={(e) => setPrixMin(e.target.value)} placeholder="€" data-filtre-prix-min style={{ ...sel, flex: 'none', fontSize: 17 }}/></label>
               <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: C.muted, minWidth: 0 }}>à
-                <input inputMode="decimal" value={prixMax} onChange={(e) => setPrixMax(e.target.value)} placeholder="€" data-filtre-prix-max style={{ ...sel, flex: 'none', fontSize: 16 }}/></label>
+                <input inputMode="decimal" value={prixMax} onChange={(e) => setPrixMax(e.target.value)} placeholder="€" data-filtre-prix-max style={{ ...sel, flex: 'none', fontSize: 17 }}/></label>
               {receptionDe ? <>
                 <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: C.muted, minWidth: 0 }}>Reçu du
-                  <input type="date" value={recuDu} onChange={(e) => setRecuDu(e.target.value)} data-filtre-recu-du style={{ ...sel, flex: 'none', fontSize: 16 }}/></label>
+                  <input type="date" value={recuDu} onChange={(e) => setRecuDu(e.target.value)} data-filtre-recu-du style={{ ...sel, flex: 'none', fontSize: 17 }}/></label>
                 <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: C.muted, minWidth: 0 }}>au
-                  <input type="date" value={recuAu} onChange={(e) => setRecuAu(e.target.value)} data-filtre-recu-au style={{ ...sel, flex: 'none', fontSize: 16 }}/></label>
+                  <input type="date" value={recuAu} onChange={(e) => setRecuAu(e.target.value)} data-filtre-recu-au style={{ ...sel, flex: 'none', fontSize: 17 }}/></label>
               </> : null}
               {filtres.marques.length > 1 && <select aria-label="Marque" data-filtre-marque value={marque} onChange={(e) => setMarque(e.target.value)} style={{ ...sel, flex: 'none' }}><option value="">Toutes les marques</option>{filtres.marques.map((m) => <option key={m} value={m}>{m}</option>)}</select>}
               {filtres.tailles.length > 1 && <select aria-label="Taille" data-filtre-taille value={taille} onChange={(e) => setTaille(e.target.value)} style={{ ...sel, flex: 'none' }}><option value="">Toutes les tailles</option>{filtres.tailles.map((t) => <option key={t} value={t}>{t}</option>)}</select>}
@@ -65497,7 +65497,7 @@ function OngletManque({ site, onglet, onNav }) {
   if (!m) return null;
   const lien = { leboncoin: 'https://www.leboncoin.fr/compte/part/mes-annonces', vestiaire: 'https://fr.vestiairecollective.com/', vinted: 'https://www.vinted.fr/' }[site];
   return (
-    <div className="vrm-onglet-manque" data-onglet-manque={site} data-onglet={onglet} style={{ margin: '12px 16px', padding: 16, border: `1px solid ${C.border}`, borderRadius: 16, background: C.card }}>
+    <div className="vrm-onglet-manque" data-onglet-manque={site} data-onglet={onglet} style={{ margin: '12px 16px', padding: 16, border: `1px solid ${C.border}`, borderRadius: 14, background: C.card }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 600, color: C.text }}><LogoSite site={site}/>{m.manque}</div>
       <div data-onglet-geste="" style={{ marginTop: 6, fontSize: 13, lineHeight: 1.5, color: C.muted }}>{m.geste}</div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
