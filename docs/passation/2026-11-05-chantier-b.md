@@ -141,6 +141,14 @@ ex. `SelecteurSites`, chantier H). Le DESSIN `.vrm-seg-btn` reste au chantier A 
   `calme()` la termine après 1,5 s (on juge la cible posée par le geste).
 - Bancs voisins, identiques à la base : `nouveau-vendeur` 632, `centre-notifs` 98,
   `boite-emails` 215, `annonces-actions` 125, `colis-qr` 100 (0 rouge avant et après).
+  ⚠️ Lancé en même temps que 6 audits en parallèle, `annonces-actions` a eu UN rouge
+  (« le parcours s’arrête », clic « Oui, c’est elle » à 1512 sombre — le lien était fait,
+  le clic a dépassé ses 4 s sous la charge) ; relancé seul : 125/0, deux fois.
+- Les 287 `scripts/audit-*.cjs`, base (archive de `claude/project-review-nsk5su`) contre
+  branche : aucun audit ne passe du vert au rouge (le seul écart, `audit-frein-relais-serveur`,
+  est un test de concurrence lancé en parallèle : 7/0 relancé seul). Les rouges restants
+  le sont aussi sur la base. ⚠️ Le balayage régénère les zips de `public/` : les remettre
+  (`git checkout -- public/*.zip public/*.xpi`).
 - `fusion-echelle --verifier` : les mêmes 6 fichiers hors échelle qu'avant, aucun nouveau.
 
 ## 7. Ce qui reste (chantiers C à H)
