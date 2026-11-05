@@ -62115,7 +62115,8 @@ function CentreNotifsCoque({ onReglages }) {
     const compter = () => { if (document.visibilityState === 'hidden') return; compterNonLuesNotifs().then((v) => { if (vivant) setNonLues(v); }); };
     compter();
     const t = setInterval(compter, 120000);
-    const ouvrir = () => setOuvert(true);
+    const ouvrir = () => { try { sessionStorage.removeItem('vrm_ouvrir_cloche'); } catch (_) {} setOuvert(true); };
+    try { if (sessionStorage.getItem('vrm_ouvrir_cloche') === '1') ouvrir(); } catch (_) {}
     window.addEventListener('focus', compter);
     document.addEventListener('visibilitychange', compter);
     window.addEventListener('vrm:notifs-lues', compter);
@@ -66579,7 +66580,10 @@ function AppCoeur() {
     // `section` vaut aussi pour Comptabilité et Statistiques.
     const goto=(search)=>{ try{ const p=new URLSearchParams(search); const t=p.get('tab');
       // (5 nov.) Une notification touchée porte `notif=<n°>` (public/sw.js) : son entrée du centre est marquée lue.
-      { const nn=Number(p.get('notif')); if(Number.isSafeInteger(nn)&&nn>0){ marquerNotifLue(nn); if(!t) window.history.replaceState(window.history.state,'',window.location.pathname); } } if(p.get('print')==='bord') _pendingBordPrint=true; if(t&&TABS_OK.includes(t)){ const site=p.get('site'), section=p.get('section'), vue=p.get('vue');
+      { const nn=Number(p.get('notif')); if(Number.isSafeInteger(nn)&&nn>0){ marquerNotifLue(nn); if(!t) window.history.replaceState(window.history.state,'',window.location.pathname); } } if(p.get('print')==='bord') _pendingBordPrint=true;
+      // (5 nov.) `cloche=1` (le récapitulatif du réveil) : ouvrir la cloche — tout de suite si elle est montée, sinon à son montage.
+      if(p.get('cloche')==='1'){ try{ sessionStorage.setItem('vrm_ouvrir_cloche','1'); }catch(_){} try{ window.dispatchEvent(new Event('vrm:centre-notifs')); }catch(_){} }
+      if(t&&TABS_OK.includes(t)){ const site=p.get('site'), section=p.get('section'), vue=p.get('vue');
       if(site&&estTacheSite(t)&&siteDeTache(t,site)===site) subVoulue.current=site; else if(section&&/^[a-z]{2,12}$/.test(section)&&(t.startsWith('plat_')||t==='compta'||t==='dashboard')) subVoulue.current=section;
       if(vue==='achats'){ demanderVue('achats'); } else if(vue==='retraits'){ demanderVue('retraits'); } else if(vue==='favoris') demanderVue('favoris');
       // (1er nov.) `cat_achats` mène aux colis à retirer (dans Colis) ; avec `vue=achats`, c'est l'écran Achats.
