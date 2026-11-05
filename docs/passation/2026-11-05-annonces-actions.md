@@ -167,6 +167,9 @@ Preuves de la revue : `repro` vm sur 670d1fd1 ⇒ 6 défauts / après ⇒ 0 ;
 banc `annonces-actions` (contrôles K) : 125 OK après, 10 rouges sur le build de 670d1fd1
 (« Catégorie absente, Couleur absente » sur une annonce dont le dressing dit `null` ;
 N°45 sur la masquée 9110 ET la nouvelle 9121). Captures regardées (390 sombre, 1512 clair).
+Bancs voisins (même build, puis build de 670d1fd1) : `verif-publication` et
+`brouillons-avancee` verts ; `republier` (4 rouges) et `annonces-ventes-brouillon`
+(20 rouges) rouges À L'IDENTIQUE sur 670d1fd1 — préexistants, rien de nouveau.
 
 Reste ouvert (non corrigé) :
 - « En vérification » = toute valeur non vide d'`item_alert_type` : valeurs jamais mesurées.
