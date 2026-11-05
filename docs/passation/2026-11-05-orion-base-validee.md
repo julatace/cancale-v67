@@ -6,6 +6,7 @@ Julien confirme le 5 novembre que l’archive de référence 5.319.0 remise inta
 Le moteur d’authentification et l’adaptateur Orion retrouvent le code de la référence 5.319. L’adaptation supplémentaire des rappels aux API uniquement à promesses et les délais réseau ajoutés en 5.320 sont retirés : ils ne faisaient pas partie de la demande précisée par Julien (l’ouverture de VRM fait quitter Vinted). Ce retour concerne la base commune, sans créer un moteur Orion séparé qui pourrait diverger des prochaines versions. Les gardes de propriétaire, session, captcha, cookies et plafonds du moteur 5.319 restent intactes.
 
 Seul `popup.js` change fonctionnellement par rapport à l’archive confirmée installable :
+- dans Orion, les champs email/mot de passe sont directement visibles et « Me connecter » est principal ; « Autre méthode de connexion » est facultatif pour OAuth/captcha ;
 - le mot de passe envoie `ouvrir:false` au moteur ;
 - son succès affiche le compte connecté au lieu d’ouvrir VRM ;
 - rouvrir le panneau connecté dans Orion laisse également la plateforme ouverte ; Chrome garde son ouverture habituelle à la consultation de l’icône déjà connectée ;

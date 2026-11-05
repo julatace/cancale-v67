@@ -178,6 +178,20 @@ function rendreAuth(e) {
     f.hidden = !f.hidden;
     if (!f.hidden) { const m = document.getElementById('mail'); if (m && !m.value) m.focus(); else { const p = document.getElementById('pw'); if (p) p.focus(); } }
   });
+  // Orion : le chemin principal est email + mot de passe dans l'extension.
+  // Le lien vers VRM reste facultatif pour les autres méthodes et le captcha.
+  if (globalThis.__vrmOrionCompat) {
+    const formulaire = document.getElementById('mdpForm');
+    formulaire.hidden = false;
+    document.getElementById('mdpLien').parentElement.hidden = true;
+    const autre = document.getElementById('lierBtn');
+    autre.textContent = 'Autre méthode de connexion';
+    autre.classList.add('sec');
+    formulaire.after(autre, document.getElementById('lierEtat'));
+    document.getElementById('inBtn').classList.remove('sec');
+    const phrase = box.querySelector('.who + .muted');
+    if (phrase) phrase.textContent = 'Connecte l’extension avec ton email et ton mot de passe VRM. Aucun onglet VRM à ouvrir.';
+  }
   const err = document.getElementById('authErr');
   // ⚠️ CAPTCHA (21 oct.) : Supabase peut exiger une vérification anti-robot
   //    (Turnstile) que cette fenêtre ne sait pas afficher. Le refus se traduit
