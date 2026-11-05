@@ -587,3 +587,6 @@ Chromium du banc : `/opt/pw-browsers/chromium` (lien stable),
 
 ### 5 nov. · Indicateur sobre, navigateur juste, comptes par ligne (`v31-indicateur-pro`, app seule)
 Fait : point discret + nom du compte (ambre seulement si geste) ; `motsNavigateur()` (Orion/Brave, jamais « Chrome » en dur) ; panneau « Tes comptes — dernière relecture » (`src/fraicheurComptes.js`). Prouvé : banc `indicateur-pro` 19 rouges avant / 0 après, mutation 6 rouges. Non mesuré : un vrai Orion. Détail : `docs/passation/2026-11-05-indicateur-pro.md`.
+
+### 5 nov. · Revue adverse de `v31-indicateur-pro`
+Corrigé : « ouvert ici · » vide sur Leboncoin/Vestiaire ; geste « dans ce navigateur » au téléphone (⇒ l'ordinateur) ; comptes Vinted illisibles tus ; 7 « Chrome » oubliés (dont une notification serveur, `DEMANDES_AUTO` neutre) ; `NAV` relu à chaque phrase. Prouvé : banc `indicateur-pro` 7 rouges sur 811890d5 / 0 après, `audit-chrome-en-dur`. Non mesuré : vrai Orion ; textes d'erreur venus de l'extension.

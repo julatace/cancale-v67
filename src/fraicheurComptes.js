@@ -19,7 +19,9 @@ export const nomPlateforme = (p) => NOM_PLATEFORME[p] || p;
 
 // Le geste qui fait relire un compte, par plateforme. `dans` : « dans ce
 // Chrome », « dans Orion », « dans ce navigateur » (motsNavigateur, jamais
-// « Chrome » en dur).
+// « Chrome » en dur) — ou, quand l'extension n'est PAS dans ce navigateur
+// (téléphone, autre navigateur), « sur l'ordinateur où est l'extension VRM » :
+// ouvrir Vinted ici ne relirait rien (revue du 5 nov.).
 function gesteRelire(plateforme, dans) {
   if (plateforme === 'vinted') return `ouvre vinted.fr connecté sur ce compte ${dans}`;
   if (plateforme === 'leboncoin') return `ouvre « Mes annonces » sur leboncoin.fr connecté sur ce compte ${dans}`;
@@ -28,22 +30,37 @@ function gesteRelire(plateforme, dans) {
   return '';
 }
 
-// Une ligne : { plateforme, id, nom, etat, age, bloque, geste }.
+// Une ligne : { plateforme, id, nom, etat, age, quand, bloque, geste }.
 //   · `c` : { plateforme, id, nom?, lu, ouvert?, delie?, banni?, masque?, horsTotaux? }
+//   · `quand` : la relecture, telle qu'écrite (« ouvert ici », « relu il y a 3 h »,
+//     « jamais relu ») ; `bloque` : ce qui bloque et le geste, ou '' — l'écran
+//     les écrit TELS QUELS (aucune retouche de texte côté écran, §11).
+// ⚠️ Revue du 5 nov. : « ouvert ici » ne se dit que de VINTED (le compte de
+//    l'onglet de CE navigateur, lu par l'extension d'ici). Pour Leboncoin et
+//    Vestiaire, « ouvert » = la dernière session relevée par l'extension, sur
+//    n'importe quel ordinateur (`compteLbcOuvert`, 12 h) : ce n'est pas « ici »,
+//    et l'écran affichait « ouvert ici · » suivi de rien. On y dit l'âge de la
+//    dernière relecture, sans geste.
 export function ligneFraicheur(c, { maintenant = Date.now(), dans = 'dans ce navigateur' } = {}) {
   const plateforme = c.plateforme;
-  const etat = etatCompteLie({ banni: !!c.banni, delie: !!c.delie, ouvert: !!c.ouvert, lu: c.lu, maintenant });
+  const ouvertIci = !!c.ouvert && plateforme === 'vinted';
+  // (Leboncoin : `lu` porte déjà la session relevée — `comptesLbcLies` —, un
+  // compte « ouvert » y est donc relu il y a moins de 12 h.)
+  const etat = etatCompteLie({ banni: !!c.banni, delie: !!c.delie, ouvert: ouvertIci, lu: c.lu, maintenant });
   const age = ageLecture(c.lu, maintenant);
   const nom = plateforme === 'vinted' ? (c.nom || `n° ${c.id}`) : nomCompteLie(c);
+  const quand = etat === 'ouvert' ? 'ouvert ici' : age ? `relu ${age}` : 'jamais relu';
   let bloque = '', geste = false;
   if (c.masque) bloque = 'masqué dans VRM — ton choix';
   else if (etat === 'banni') bloque = 'banni par Vinted (lu dans son profil)';
   else if (etat === 'delie') { bloque = 'délié — relie-le dans Réglages → Comptes liés'; geste = true; }
-  else if (etat === 'ouvert') bloque = plateforme === 'vinted' ? 'ouvert ici : relu à chaque passage sur Vinted' : 'ouvert ici';
-  else if (etat === 'jamais') { bloque = `jamais relu — ${gesteRelire(plateforme, dans)}`; geste = true; }
-  else if (etat === 'a-relire') { bloque = plateforme === 'ebay' ? `eBay n’a rien rendu depuis — ${gesteRelire(plateforme, dans)}` : gesteRelire(plateforme, dans); geste = true; }
+  else if (etat === 'ouvert') bloque = 'relu à chaque passage sur Vinted';
+  else if (etat === 'jamais' || etat === 'a-relire') {
+    bloque = etat === 'a-relire' && plateforme === 'ebay' ? `eBay n’a rien rendu depuis — ${gesteRelire(plateforme, dans)}` : gesteRelire(plateforme, dans);
+    geste = true;
+  }
   if (c.horsTotaux && !c.masque) bloque = bloque ? `${bloque} · hors des totaux (ton choix)` : 'hors des totaux (ton choix)';
-  return { plateforme, id: String(c.id), nom, etat, age, bloque, geste };
+  return { plateforme, id: String(c.id), nom, etat, age, quand, bloque, geste };
 }
 
 // Toutes les lignes, dans l'ordre : ce qui demande un geste d'abord, puis le

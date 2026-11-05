@@ -87,8 +87,10 @@ const PONT_MINI = ({ version, extId }) => {
 };
 const UA_SAFARI = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15';
 
-async function ouvrir(b, { tel = false, pont = false, orion = false, safari = false } = {}) {
-  const ctx = await b.newContext({ viewport: tel ? { width: 390, height: 844 } : { width: 1512, height: 950 }, ...(tel ? { isMobile: true, hasTouch: true } : {}), ...(safari ? { userAgent: UA_SAFARI } : {}) });
+const UA_IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1';
+async function ouvrir(b, { tel = false, pont = false, orion = false, safari = false, iphone = false, donnees = null, comptesKO = false } = {}) {
+  const R = donnees || rows;
+  const ctx = await b.newContext({ viewport: tel ? { width: 390, height: 844 } : { width: 1512, height: 950 }, ...(tel ? { isMobile: true, hasTouch: true } : {}), ...(safari ? { userAgent: UA_SAFARI } : iphone ? { userAgent: UA_IPHONE } : {}) });
   const pg = await ctx.newPage();
   const errs = [], lus = [];
   pg.on('pageerror', (e) => errs.push(e.message));
@@ -102,13 +104,13 @@ async function ouvrir(b, { tel = false, pont = false, orion = false, safari = fa
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
     if (route.request().method() !== 'GET') return j([]);
     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
-    if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCS);
+    if (/\/rest\/v1\/vinted_accounts/.test(u)) return comptesKO ? route.fulfill({ status: 503, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{}' }) : j(ACCS);
     const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
     const forme = (r) => (sel && !/^id,data|^data$|^data,/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: iso(maintenant), cap: r.data.capturedAt });
     const eq = /id=eq\.([^&]*)/.exec(u);
-    if (eq) return j(rows.filter((r) => r.id === eq[1]).map(forme));
+    if (eq) return j(R.filter((r) => r.id === eq[1]).map(forme));
     const lk = /id=like\.([^&]*)/.exec(u);
-    if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(rows.filter((r) => re.test(r.id)).map(forme)); }
+    if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(R.filter((r) => re.test(r.id)).map(forme)); }
     return j([]);
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
@@ -217,6 +219,48 @@ const ouvrirPanneau = async (pg) => {
       const p = await lirePastille(pg);
       // Au téléphone sans extension, aucun geste ICI (on agit depuis l'ordinateur) : gris, pas de point.
       dit(p && p.ton === 'neutre' && !p.pointVu, 'B · au doigt sans extension : rien à faire ici, aucune couleur', JSON.stringify(p && { ton: p.ton, pointVu: p.pointVu, point: p.point }));
+      dit(!errs.length, 'aucune erreur', errs[0]);
+      await ctx.close(); }
+
+    // ── REVUE DU 5 NOV. (adversaire) ─────────────────────────────────────────
+    console.log('── E. 1512 px · un compte Leboncoin dont la session vient d’être relevée (« ouvert »)');
+    { const d = rows.map((r) => r.id !== 'lbc_accounts' ? r : { id: 'lbc_accounts', data: { accounts: { '8442': { id: '8442', name: 'vendeur_lbc', type: 'particulier', sessionAt: iso(maintenant - 1 * H) } } } });
+      const { ctx, pg, errs } = await ouvrir(b, { pont: true, donnees: d });
+      const q = await ouvrirPanneau(pg);
+      const l = (q.lignes || []).find((x) => x.p === 'leboncoin' && x.id === '8442');
+      await capture(pg, 'panneau-lbc-ouvert-1512');
+      dit(l && !/[·—]\s*$/.test(l.txt.trim()), 'E · la ligne Leboncoin ne finit pas sur un séparateur vide', l && JSON.stringify(l.txt));
+      dit(l && !/ouvert ici/.test(l.txt), 'E · « ouvert ici » ne se dit pas d’un compte Leboncoin (sa session peut venir d’un autre ordinateur)', l && l.txt);
+      dit(l && /il y a 1 h/.test(l.txt) && l.geste === '0', 'E · elle dit l’âge de la relecture, sans geste', l && JSON.stringify(l));
+      dit(!errs.length, 'aucune erreur', errs[0]);
+      await ctx.close(); }
+
+    console.log('── F. 390 px · iPhone sans extension : le geste se fait sur l’ordinateur');
+    { const { ctx, pg, errs } = await ouvrir(b, { tel: true, iphone: true });
+      const q = await ouvrirPanneau(pg);
+      await capture(pg, 'panneau-iphone-390');
+      const l = (q.lignes || []).find((x) => x.p === 'vinted' && x.id === '222');
+      dit(l && l.geste === '1' && /ordinateur où est l’extension VRM/.test(l.txt), 'F · compte_beta à relire : « sur l’ordinateur où est l’extension VRM »', l && l.txt);
+      dit(l && !/dans (?:ce |ton )?(?:navigateur|Chrome|Safari)|dans Orion/.test(l.txt), 'F · jamais « dans ce navigateur » au téléphone (ouvrir Vinted ici ne relirait rien)', l && l.txt);
+      dit(!/Chrome/.test(q.txt), 'F · sur iPhone, le panneau ne dit jamais « Chrome »', (q.txt.match(/.{0,40}Chrome.{0,30}/) || [''])[0]);
+      dit(!errs.length, 'aucune erreur', errs[0]);
+      await ctx.close(); }
+
+    console.log('── G. 1512 px · la liste des comptes Vinted n’a pas pu être lue');
+    { const { ctx, pg, errs } = await ouvrir(b, { pont: true, comptesKO: true });
+      const q = await ouvrirPanneau(pg);
+      const passu = await pg.evaluate(() => { const x = document.querySelector('[data-fraicheur-passu]'); return x ? x.getAttribute('data-fraicheur-passu') : ''; });
+      dit(/Vinted/.test(passu), 'G · « Vinted : pas pu lire » — jamais une liste Vinted vide présentée comme complète', JSON.stringify({ passu, zone: q.zone, lignes: (q.lignes || []).map((x) => x.p + ':' + x.id) }));
+      dit(!errs.length, 'aucune erreur', errs[0]);
+      await ctx.close(); }
+
+    console.log('── H. 1512 px · Orion dont le repère (window.KAGI) arrive après le chargement');
+    // (Non mesuré sur un vrai Orion : quand il pose `window.KAGI`. Ici, au pire :
+    //  après le premier rendu de l'app, juste avant d'ouvrir le panneau.)
+    { const { ctx, pg, errs } = await ouvrir(b, { pont: true });
+      await pg.evaluate(() => { window.KAGI = {}; });
+      const q = await ouvrirPanneau(pg);
+      dit(!/Chrome/.test(q.txt) && /Orion/.test(q.txt), 'H · le panneau dit « Orion », pas « Chrome »', (q.txt.match(/.{0,40}(?:Chrome|Orion).{0,30}/) || [''])[0]);
       dit(!errs.length, 'aucune erreur', errs[0]);
       await ctx.close(); }
   } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e.message).slice(0, 200)); }

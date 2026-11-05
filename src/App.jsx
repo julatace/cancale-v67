@@ -151,7 +151,9 @@ import { boutiqueIci, boutiqueOrion, estAndroid, pageExtensionsIci, nomNavigateu
 // navigateur »… — jamais « Chrome » en dur dans une phrase qui parle de lui.
 // Le navigateur de l'ORDINATEUR (vu du téléphone) n'est pas connu : « le
 // navigateur de ton ordinateur ». Voir `motsNavigateur`.
-const NAV = motsNavigateur();
+// Relu à CHAQUE phrase (revue du 5 nov.) : un repère posé après le chargement
+// du module (window.KAGI) est vu quand même — jamais figé au démarrage.
+const NAV = new Proxy({}, { get: (_, k) => motsNavigateur()[k] });
 import { FicheFacturation, FactureVente, ListeFacturesPro, relireFactures } from "./FacturePro.jsx";
 import { etatFacturation, factureDepuisVente, pdfFacturX, nomFichierFacture, recapEReporting, recapCsv, recapJson, eurDe, frJour } from "./facturationElectronique.js";
 import { lireSuperPdp, appelSuperPdp, enBase64, libelleEnvoi, ENV_LIBELLE } from "./superpdp.js";
@@ -13604,8 +13606,8 @@ function BrouillonsVinted({ br, publier, brouillonOk, onClose, onFile }) {
 
         {liste && !liste.length && <div data-brouillons-vide style={{ fontSize: 13, color: C.muted }}>Aucun brouillon sur Vinted d'après tes dressings lus par VRM.</div>}
         {liste && liste.length > 0 && <div data-brouillons-compte-chrome={uidChrome || (uidChrome === null ? 'aucun' : 'passu')} style={{ fontSize: 13, color: C.muted, lineHeight: 1.45 }}>{uidChrome
-          ? <>Compte ouvert dans Chrome : <b style={{ color: C.text }}>{nomChrome}</b>. Seuls ses brouillons se mettent en ligne d'ici.</>
-          : uidChrome === null ? "Aucun compte Vinted ouvert dans Chrome : ouvre vinted.fr sur le compte du brouillon pour le mettre en ligne."
+          ? <>Compte ouvert {NAV.dansNu} : <b style={{ color: C.text }}>{nomChrome}</b>. Seuls ses brouillons se mettent en ligne d'ici.</>
+          : uidChrome === null ? `Aucun compte Vinted ouvert ${NAV.dansNu} : ouvre vinted.fr sur le compte du brouillon pour le mettre en ligne.`
           : `Compte Vinted ouvert ${NAV.dansNu} pas encore connu : ouvre vinted.fr sur le compte du brouillon pour le mettre en ligne.`}</div>}
         {infos === null && liste && liste.length > 0 && <div data-brouillons-passu style={{ fontSize: 13, color: C.muted }}>VRM n'a pas pu lire tes brouillons enregistrés : « Mettre en ligne » attend, « Ouvrir sur Vinted » marche.</div>}
         {!brouillonOk && liste && liste.length > 0 && <div data-brouillons-maj style={{ fontSize: 13, color: C.muted }}>Mettre en ligne d'ici demande l'extension VRM {EXT_CAPACITES.brouillon} ou plus récente.</div>}
@@ -18755,10 +18757,15 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
       const liste = autresSites && autresSites[p];
       if (Array.isArray(liste)) for (const c of liste) l.push({ ...c, horsTotaux: estExclu(exclus, p, p === 'ebay' ? c.ref : c.id) });
     }
-    return lignesFraicheur(l, { dans: NAV.dans });
+    // Le geste se fait là où l'extension LIT : ici si elle y répond, sinon sur
+    // l'ordinateur où elle est (au téléphone, « ouvre vinted.fr dans ce
+    // navigateur » ne relirait rien — revue du 5 nov.).
+    return lignesFraicheur(l, { dans: vmrExtPresent() ? NAV.dans : 'sur l’ordinateur où est l’extension VRM' });
   })();
-  const passuComptes = [caps === null ? 'Vinted' : null, ...['leboncoin', 'vestiaire', 'ebay'].map((p) => (autresSites && autresSites[p] === null ? nomPlateforme(p) : null))].filter(Boolean);
-  const encoursComptes = !Array.isArray(comptes) || caps === undefined || etatsComptes === undefined || ['leboncoin', 'vestiaire', 'ebay'].some((p) => !autresSites || autresSites[p] === undefined);
+  // `comptes === null` : la liste des comptes Vinted n'a pas pu être lue — dit,
+  // jamais une liste vide présentée comme « aucun compte » (revue du 5 nov.).
+  const passuComptes = [caps === null || comptes === null ? 'Vinted' : null, ...['leboncoin', 'vestiaire', 'ebay'].map((p) => (autresSites && autresSites[p] === null ? nomPlateforme(p) : null))].filter(Boolean);
+  const encoursComptes = comptes === undefined || caps === undefined || etatsComptes === undefined || ['leboncoin', 'vestiaire', 'ebay'].some((p) => !autresSites || autresSites[p] === undefined);
 
   return (
     <div ref={boite} style={{ position: 'relative', flexShrink: 0 }}>
@@ -18824,8 +18831,8 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
             {!encoursComptes && lignesComptes.map((c) => (
               <div key={c.plateforme + ':' + c.id} className="vrm-etat-compte-ligne" data-fraicheur-compte={c.plateforme} data-fraicheur-id={c.id} data-fraicheur-etat={c.etat} data-fraicheur-geste={c.geste ? '1' : '0'}>
                 <b className="vrm-sensible">{c.nom}</b> <span className="vrm-etat-compte-site">{nomPlateforme(c.plateforme)}</span>
-                <span className="vrm-etat-compte-age"> — {c.etat === 'ouvert' ? 'ouvert ici' : c.age ? `relu ${c.age}` : 'jamais relu'}</span>
-                {c.bloque ? <span className="vrm-etat-compte-bloque" style={{ color: c.geste ? C.warn : C.muted }}> · {c.bloque.replace(/^jamais relu — /, '').replace(/^ouvert ici(?: : )?/, '')}</span> : null}
+                <span className="vrm-etat-compte-age"> — {c.quand}</span>
+                {c.bloque ? <span className="vrm-etat-compte-bloque" style={{ color: c.geste ? C.warn : C.muted }}> · {c.bloque}</span> : null}
               </div>
             ))}
             {encoursComptes && <div className="vrm-etat-compte-ligne" style={{ color: C.muted }}>Je regarde tes comptes…</div>}
@@ -58377,7 +58384,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           ...(nRefaire ? [{ k:'refaire', t:`Brouillons à refaire · ${nRefaire}`, d:'Un passage par brouillon n’est pas allé au bout : le refaire depuis ce qui est enregistré dans VRM.', cap:'refaire' }] : []),
           { k:'recreer', t:'Republier', d:'Supprimer et recréer : favoris et vues repartent de zéro.', cap:'recreer' },
           { k:'modifier', t:'Modifier prix ou titre', d:'Sur place : favoris et vues gardés.', cap:'republiermodif' },
-          { k:'enLigne', t:'Brouillons → en ligne', d: nBr ? `${nPret} prêt${nPret>1?'s':''} à mettre en ligne sur ${nBr} brouillon${nBr>1?'s':''}${brVinted.uidChrome ? ' (compte ouvert dans Chrome)' : ''}.` : 'Aucun brouillon sur Vinted.', cap:'brouillon', vide: !nBr },
+          { k:'enLigne', t:'Brouillons → en ligne', d: nBr ? `${nPret} prêt${nPret>1?'s':''} à mettre en ligne sur ${nBr} brouillon${nBr>1?'s':''}${brVinted.uidChrome ? ` (compte ouvert ${NAV.dansNu})` : ''}.` : 'Aucun brouillon sur Vinted.', cap:'brouillon', vide: !nBr },
           { k:'versBrouillon', t:'En ligne → brouillon', d:'Retirer de la vente, gardé en brouillon (favoris et vues perdus).', cap:'versbrouillon' },
           { k:'voir', t:`Voir mes brouillons${nBr?` · ${nBr}`:''}`, d:'Ouvrir, mettre en ligne ou retirer un brouillon.' },
         ];
@@ -68338,7 +68345,7 @@ function AppCoeur() {
             {(() => { const eD = dark; return (<>
             {/* « Puis-je agir sur Vinted depuis cette page ? » — sur tous les
                 écrans (Julien, 5 octobre). Voir `EtatActions`. */}
-            {MULTI_USER && <EtatActions onNav={setTab} ordi={ordi} sombre={eD} comptes={accountsLoaded ? vintedAccounts : undefined}/>}
+            {MULTI_USER && <EtatActions onNav={setTab} ordi={ordi} sombre={eD} comptes={!accountsLoaded ? undefined : baseKO ? null : vintedAccounts}/>}
             <PastilleStream/>
             {/* (4 nov.) L'œil : cache TOUS les montants en € de l'écran (src/montantsCaches.js). */}
             <BoutonMontants/>

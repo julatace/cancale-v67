@@ -20,3 +20,27 @@ sur Orion », « être mieux informé de la connexion et de la récupération de
 - **Non mesuré** : un vrai Orion (KAGI présent au chargement, documenté par Kagi, pas vu) ; la page des extensions d'Orion (non nommée) ;
   « désactive puis réactive VRM » comme geste de rechargement hors Chromium (supposé, pas essayé).
 
+
+## Revue adverse (5 nov., même branche)
+Défauts reproduits sur 811890d5 (banc `indicateur-pro`, cas E–H : 7 rouges), puis corrigés :
+- **E** — un compte Leboncoin/Vestiaire « ouvert » (session relevée < 12 h, `compteLbcOuvert`, sur
+  N'IMPORTE QUEL ordinateur) s'écrivait « vendeur_lbc Leboncoin — ouvert ici · » (faux « ici », séparateur
+  vide : l'écran retirait « ouvert ici » du texte par expression régulière). `ligneFraicheur` rend désormais
+  `quand` et `bloque` tels qu'écrits ; « ouvert ici » n'est dit que d'un compte Vinted (onglet de CE navigateur).
+- **F** — au téléphone (ou sans extension ici), le geste disait « ouvre vinted.fr … dans ce navigateur » :
+  ouvrir Vinted sur l'iPhone ne relit rien. Il dit « sur l'ordinateur où est l'extension VRM ».
+- **G** — liste des comptes Vinted illisible (`baseKO`) : aucune ligne Vinted, aucun « pas su ». L'en-tête
+  reçoit `null` et le panneau dit « Vinted : pas pu lire ».
+- **H** — `NAV` figé au chargement du module : un `window.KAGI` posé plus tard laissait « Chrome ». `NAV`
+  est relu à chaque phrase (Proxy sur `motsNavigateur()`). Non mesuré sur un vrai Orion (quand il pose KAGI).
+- **« Chrome » oubliés** (audit neuf `audit-chrome-en-dur.cjs`, rouge sur 811890d5) : Brouillons (2), Republier
+  → Brouillons → en ligne (1), `FavorisVinted.jsx` (2), `favorisProgression.js` (1) ; et `DEMANDES_AUTO`
+  (`src/favorisAuto.js`) que le SERVEUR envoie en notification : la branche y écrivait « Ce navigateur est
+  connecté… », lu sur l'iPhone — désormais « le navigateur où est l'extension VRM », sans dépendre du
+  navigateur où le module est chargé.
+Bancs voisins : `brouillons-avancee`, `filtre-compte` verts ; `vinted-ui` (8), `relais-telephone` (3),
+`favoris-ecran` (2, colonne 1360 px) : mêmes rouges sur 811890d5. Les audits qui régénèrent les zips ont été
+suivis d'un `git checkout public/`.
+Reste : `src/Accueil.jsx` (page publique, « Chrome » comme prérequis) ; les phrases d'erreur écrites par
+l'EXTENSION (« …dans ce profil Chrome… ») qu'affiche l'app telles quelles — à la session Orion/extension ;
+les étiquettes de diagnostic (`plantages.js`, `diag_photos`) disent « Safari » sur Orion.
