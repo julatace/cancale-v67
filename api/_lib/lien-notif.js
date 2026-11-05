@@ -17,7 +17,7 @@ import { normaliserSuivi } from './etat-colis-email.js';
 
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
 const propre = (v) => { const s = String(v == null ? '' : v).trim(); return ID.test(s) ? s : ''; };
-const ORDRE = ['tab', 'site', 'section', 'vue', 'cible', 'conv', 'compte', 'tx', 'suivi', 'num', 'plat', 'colonne'];
+const ORDRE = ['tab', 'site', 'section', 'vue', 'cible', 'conv', 'compte', 'tx', 'suivi', 'num', 'vc', 'plat', 'colonne'];
 
 export function lienNotif(tab, o = {}) {
   const p = { tab, ...o };
@@ -29,7 +29,7 @@ export function lienNotif(tab, o = {}) {
   }
   // Une cible dont l'identité manque n'est pas une cible.
   const garde = (cible, ...cles) => (o.cible === cible && !cles.some((c) => propre(p[c]))) ;
-  if (garde('conv', 'conv') || garde('vente', 'tx') || garde('colis', 'tx') || garde('achat', 'tx') || garde('retrait', 'tx', 'suivi')) {
+  if (garde('conv', 'conv') || garde('offre', 'conv') || garde('vcvente', 'vc') || garde('vente', 'tx') || garde('colis', 'tx') || garde('achat', 'tx') || garde('retrait', 'tx', 'suivi')) {
     return '/?' + parts.filter((x) => /^(tab|site|section|vue|compte)=/.test(x)).join('&');
   }
   return '/?' + parts.join('&');
@@ -39,9 +39,13 @@ export function lienNotif(tab, o = {}) {
 export const DESTINATIONS = {
   // Messages · Vinted · la conversation (si l'email en porte l'identité).
   message: ({ conv, compte } = {}) => lienNotif('messages', { site: 'vinted', compte, ...(conv ? { cible: 'conv', conv } : {}) }),
+  // (5 nov.) Une offre reçue : SA conversation ouverte, la carte de l'offre en évidence.
+  offre: ({ conv, compte } = {}) => lienNotif('messages', { site: 'vinted', compte, ...(conv ? { cible: 'offre', conv } : {}) }),
   offres: () => lienNotif('messages', { site: 'vinted', cible: 'offres' }),
   // Ventes · Vinted · la vente ouverte.
   vente: ({ tx } = {}) => lienNotif('ventes', { site: 'vinted', ...(tx ? { cible: 'vente', tx } : {}) }),
+  // (5 nov.) Ventes · Vestiaire · la vente (identité = le productId de l'annonce).
+  vcVente: ({ id } = {}) => lienNotif('ventes', { site: 'vestiaire', ...(id ? { cible: 'vcvente', vc: id } : {}) }),
   // Colis · la carte du colis à poster (ou la colonne « Prêts à imprimer »).
   colis: ({ tx } = {}) => lienNotif('cat_bord', tx ? { cible: 'colis', tx } : { cible: 'colonne', colonne: 'prets' }),
   // Colis · « À retirer » · la carte (par transaction ou n° de suivi).
