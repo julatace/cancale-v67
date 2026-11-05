@@ -136,5 +136,11 @@ Preuves de la revue :
 - Banc `scripts/bancs/mode-stream.cjs`, partie **F** (F1 pseudo court, F2 codes hors ligne
   base injoignable, F3 placeholder et champ décimal) : **16 KO** sur `df41a091`, **194 OK /
   0 KO** après (390 tactile et 1512, clair et sombre, parties A à F).
-- Bancs voisins relancés : `codes-hors-ligne`, `compte-supprime`, `comptes-securite`,
-  `type-compte`.
+- Bancs voisins relancés : `codes-hors-ligne` (8 OK), `compte-supprime` (22 OK),
+  `comptes-securite` (146 OK seul ; lancé en même temps qu'un autre banc, ses parties C/D
+  à 1512 ont expiré — rejoué seul : vert), `type-compte` vert. `entreprise-stream` : 3 rouges
+  (nom à côté du logo au téléphone, « registre muet » ×2), **les mêmes sur `c52bb8ee`**
+  (main) : sans lien avec le mode stream (le compte rendu d'origine en disait 2).
+- Ce qui reste : un pseudo qui EST un mot courant (« max ») cache ce mot dans les titres ;
+  notifications push du serveur, marque sur une photo, PDF ouvert dans un autre onglet
+  (inchangé, voir plus haut).
