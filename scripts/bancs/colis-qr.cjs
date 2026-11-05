@@ -1,9 +1,13 @@
 // Banc : COLIS → « À RETIRER » — LE CODE ET LE QR RELIÉS, LES COMPTES MONDIAL RELAY (5 nov.).
-// Julien (5 nov.) : « relier le code de retrait et le QR code » ; « l'extension capte tous les colis
-// arrivés avec leurs QR quand il se connecte à son compte Mondial Relay » ; « plusieurs comptes Mondial
-// Relay, et des colis arrivés par e-mail qui ne sont dans aucun compte ». Données INVENTÉES (dépôt public) :
-//  · 81000001 : e-mail Mondial Relay (code, pas de QR) ET lu dans le compte « compte-mr-1 » (même code, QR) ;
-//  · 81000002 : e-mail Mondial Relay seul, reçu sur une autre adresse ⇒ « QR pas reçu », « dans aucun compte » ;
+// Julien (5 nov.) : « relier le code de retrait et le QR code » ; « plusieurs comptes Mondial Relay, et des
+// colis arrivés par e-mail qui ne sont dans aucun compte » ; et (mot pour mot) « je ne peux pas avoir les qr
+// code dans le navigateur c'est que dans l'app » : le QR Mondial Relay n'existe QUE dans l'app Mondial Relay.
+// Les lignes `mr_colis_*` de ce banc portent EXPRÈS un champ `qr` : il doit être IGNORÉ (codes seulement).
+// Le QR entre par « Ajouter le QR (capture) » : le banc FABRIQUE ses captures (PNG inventés : un QR dont le
+// contenu est inventé, une capture sans QR) et les donne au vrai sélecteur de fichier. Données INVENTÉES :
+//  · 81000001 : e-mail Mondial Relay (code) ET lu dans le compte « compte-mr-1 » (même code) ⇒ « QR dans l'app
+//    Mondial Relay » ; sa capture (contenu « MRQR;81000001;100001 ») ⇒ QR posé, relu, « Retirer ce QR » ;
+//  · 81000002 : e-mail Mondial Relay seul, reçu sur une autre adresse ⇒ « QR dans l'app », « dans aucun compte » ;
 //  · 81000003 : lu dans « compte-mr-1 » seulement (aucun e-mail) ; 81000004 : lu dans « compte-mr-2 » seulement ;
 //  · 81000005 : e-mail Mondial Relay d'un ACHAT LEBONCOIN (relié par le n° d'expédition de son lien de suivi) ;
 //  · Chronopost avec code sans QR ⇒ « QR pas reçu » (Chronopost) ; Vinted Go code + QR hébergé.
@@ -13,18 +17,46 @@
 //  · 81000006 : e-mail reçu APRÈS la dernière lecture des comptes ⇒ jamais « dans aucun de tes comptes » ;
 //  · 81000007 : e-mail plus récent que la lecture, code DIFFÉRENT ⇒ le code montré est celui de l'e-mail, et
 //    la phrase le dit (avant : « celui de ton compte Mondial Relay fait foi » sous le code de l'e-mail).
-// Exige (data-* et nombres, §6.4) : 7 colis, chacun une fois (= vrm_colis_retirer) ; le QR du compte sur
-// 81000001 et 81000003, l'accord « confirmé », le compte nommé ; « QR pas reçu » + où le trouver sur
-// 81000002 et le Chronopost ; « dans aucun de tes comptes » ; deux comptes Mondial Relay avec leur
-// fraîcheur (« relu il y a 3 min », « il y a 2 h ») ; l'explication animée ; « En grand » : code ET QR,
-// luminosité dite ; sans QR, « QR pas reçu » dans la vue ; le QR de dépôt Leboncoin dans « À envoyer ».
+// Exige (data-* et nombres, §6.4) : 9 colis, chacun une fois (= vrm_colis_retirer) ; AUCUN QR venu d'un compte
+// (81000001, 81000003 : « QR dans l'app Mondial Relay ») ; l'accord « confirmé », le compte nommé ; « QR pas
+// reçu » + où le trouver sur le Chronopost ; « dans aucun de tes comptes » ; deux comptes Mondial Relay avec la
+// fraîcheur de leurs codes ; l'explication animée (capture de l'app) ; aucune promesse d'un QR du navigateur ;
+// « Ajouter le QR » : posé sur SON colis, relu à l'identique (jsQR dans Node sur les pixels affichés), un QR qui
+// porte un AUTRE colis et une capture sans QR ⇒ rien posé et dit ; « En grand » : code ET QR, « Retirer ce QR » ;
+// le QR de dépôt Leboncoin dans « À envoyer ».
 // 390 tactile et 1512, clair et sombre. `SHOTS=dossier` garde les captures.
 const path = require('path');
 let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 catch (_) { ({ chromium } = require('playwright')); }
 const { metaVersData } = require('./_meta.cjs');
-const fs = require('fs'), http = require('http');
+const fs = require('fs'), http = require('http'), zlib = require('zlib');
+let qrcode, jsQR;
+try { qrcode = require(path.join(__dirname, '..', '..', 'node_modules', 'qrcode-generator')); jsQR = require(path.join(__dirname, '..', '..', 'node_modules', 'jsqr')); }
+catch (_) { qrcode = require('qrcode-generator'); jsQR = require('jsqr'); }
+jsQR = jsQR.default || jsQR;
+// ── LES CAPTURES DU BANC (PNG en niveaux de gris, écrits ici) : une « app » inventée avec, ou sans, un QR. ──
+const crc = (b) => { if (zlib.crc32) return zlib.crc32(b) >>> 0; let c = ~0; for (const x of b) { c ^= x; for (let k = 0; k < 8; k++) c = (c >>> 1) ^ (0xEDB88320 & -(c & 1)); } return ~c >>> 0; };
+const morceau = (type, data) => { const t = Buffer.from(type), l = Buffer.alloc(4), c = Buffer.alloc(4); l.writeUInt32BE(data.length); c.writeUInt32BE(crc(Buffer.concat([t, data]))); return Buffer.concat([l, t, data, c]); };
+const ecrirePng = (w, h, gris) => {
+  const brut = Buffer.alloc((w + 1) * h);
+  for (let y = 0; y < h; y++) { brut[y * (w + 1)] = 0; gris.copy(brut, y * (w + 1) + 1, y * w, (y + 1) * w); }
+  const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr[8] = 8; ihdr[9] = 0;
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), morceau('IHDR', ihdr), morceau('IDAT', zlib.deflateSync(brut)), morceau('IEND', Buffer.alloc(0))]);
+};
+const capture = (contenu) => {
+  const w = 590, h = 1280, g = Buffer.alloc(w * h, 255);
+  const rect = (x0, y0, x1, y1, v) => { for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) g[y * w + x] = v; };
+  rect(0, 0, w, 110, 230); rect(40, 150, 420, 180, 200); rect(40, 200, 300, 222, 215);   // barres de l'« app » inventée
+  if (contenu) {
+    const q = qrcode(0, 'M'); q.addData(contenu, 'Byte'); q.make();
+    const n = q.getModuleCount(), cell = 10, x0 = Math.round((w - n * cell) / 2), y0 = 320;
+    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (q.isDark(r, c)) rect(x0 + c * cell, y0 + r * cell, x0 + (c + 1) * cell, y0 + (r + 1) * cell, 0);
+  }
+  rect(40, 1050, 550, 1110, 225);
+  return ecrirePng(w, h, g);
+};
+const CAPTURE_ICI = 'MRQR;81000001;100001', CAPTURE_AUTRE = 'MRQR;81000002;100002';
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT || 7961);
 const SHOTS = process.env.SHOTS || '';
@@ -136,7 +168,8 @@ const carte = (pg, suivi) => pg.evaluate((k) => {
     accord: a('[data-colis-code-accord]', 'data-colis-code-accord'), compteMr: a('[data-colis-compte-mr]', 'data-colis-compte-mr'), horsComptes: a('[data-colis-hors-comptes-mr]', 'data-colis-hors-comptes-mr'),
     achatSite: a('[data-colis-achat-site]', 'data-colis-achat-site'), plein: !!c.querySelector('[data-colis-plein-ecran]'), code: a('[data-code-retrait]', 'data-code-retrait'),
     compteSource: a('[data-colis-compte-source]', 'data-colis-compte-source'), accordTxt: a('[data-colis-code-accord]'), accordFoi: a('[data-colis-code-accord]', 'data-colis-code-foi'),
-    compteVinted: a('[data-rp-suivi]', 'data-colis-compte'), arriveSur: a('[data-arrive-sur]', 'data-arrive-sur'), arriveLe: a('[data-arrive-le]', 'data-arrive-le') };
+    compteVinted: a('[data-rp-suivi]', 'data-colis-compte'), arriveSur: a('[data-arrive-sur]', 'data-arrive-sur'), arriveLe: a('[data-arrive-le]', 'data-arrive-le'),
+    ajouter: !!c.querySelector('[data-colis-qr-ajouter]'), ajout: a('[data-colis-qr-ajout]', 'data-colis-qr-ajout'), ajoutTxt: a('[data-colis-qr-ajout]') };
 }, suivi);
 
 (async () => {
@@ -168,41 +201,82 @@ const carte = (pg, suivi) => pg.evaluate((k) => {
         const pub = base.pub && Number.isFinite(base.pub.total) ? base.pub.total : null;
         dit(base.cles.length === TOTAL && new Set(base.cles).size === TOTAL && pub === TOTAL, `les ${TOTAL} colis, chacun une fois (e-mails + comptes Mondial Relay, = vrm_colis_retirer)`, `${base.cles.join(',')} · pub ${pub}`);
         dit(base.cles.includes('r:e:81000003') && base.cles.includes('r:e:81000004') && !base.cles.includes('r:e:81000099'), 'les colis lus dans les comptes sans e-mail sont là ; un colis ENVOYÉ (sortant) n’entre pas');
-        dit(base.comptes.length === 2 && /relu il y a 3 min/.test((base.comptes.find((c) => c.cle === 'a1') || {}).txt || '') && /relu il y a 2 h/.test((base.comptes.find((c) => c.cle === 'b2') || {}).txt || ''), 'deux comptes Mondial Relay, chacun sa fraîcheur (« relu il y a 3 min », « il y a 2 h »)', JSON.stringify(base.comptes));
-        dit(base.explique && !base.pasEncore, 'l’explication animée est là ; « pas encore » ne se dit pas quand des comptes sont relus');
+        dit(base.comptes.length === 2 && /codes relus il y a 3 min/.test((base.comptes.find((c) => c.cle === 'a1') || {}).txt || '') && /codes relus il y a 2 h/.test((base.comptes.find((c) => c.cle === 'b2') || {}).txt || ''), 'deux comptes Mondial Relay, la fraîcheur de leurs CODES (« relus il y a 3 min », « il y a 2 h »)', JSON.stringify(base.comptes));
+        dit(base.explique && !base.pasEncore, 'l’explication animée est là ; plus de « ne relève pas encore… le QR est dans ton compte »');
         // Ouvre chaque ligne (le détail porte le code, le QR et les gestes).
         for (const k of base.cles) { const o = pg.locator(`[data-cc-carte="${k}"] .vrm-rpf-ouvrir`).first(); if (await o.count()) { const e = await o.getAttribute('aria-expanded'); if (e !== 'true') await o.click(); } }
         await pg.waitForTimeout(300);
         const c1 = await carte(pg, '81000001'), c2 = await carte(pg, '81000002'), c3 = await carte(pg, '81000003'), c4 = await carte(pg, '81000004'), c5 = await carte(pg, '81000005'), ch = await carte(pg, 'XW100000001JB');
-        dit(c1 && c1.qrSource === 'mondialrelay' && c1.accord === 'confirme' && c1.compteMr === 'compte-mr-1' && c1.code === '100001', '81000001 : code de l’e-mail ET QR du compte, « confirmé », compte nommé', JSON.stringify(c1));
+        const MR_APP = /^QR dans l’app Mondial Relay/;
+        dit(c1 && c1.qrSource == null && c1.qrAbsent === 'mondialrelay' && MR_APP.test(c1.qrAbsentTxt || '') && c1.ajouter && c1.accord === 'confirme' && c1.compteMr === 'compte-mr-1' && c1.code === '100001',
+          '81000001 : le « QR » de la ligne du compte est IGNORÉ ⇒ « QR dans l’app Mondial Relay », « Ajouter le QR » ; code « confirmé », compte nommé', JSON.stringify(c1));
         dit(c1 && c1.compteVinted === 'compte_a' && c1 && c1.arriveSur === 'oui' && c1.arriveLe === jourDans(-1.2).slice(0, 10), '81000001 : la ligne fusionnée garde le compte Vinted et la date d’arrivée de l’e-mail', JSON.stringify({ compte: c1 && c1.compteVinted, sur: c1 && c1.arriveSur, le: c1 && c1.arriveLe }));
         const c6 = await carte(pg, '81000006'), c7 = await carte(pg, '81000007');
         dit(c6 && c6.horsComptes == null && c6.compteSource === 'email', '81000006 : e-mail reçu après la dernière lecture des comptes ⇒ jamais « dans aucun de tes comptes »', JSON.stringify(c6));
         dit(c7 && c7.code === '200007' && c7.accordFoi === 'email' && !/compte Mondial Relay[^:]*fait foi/.test(c7.accordTxt || '') , '81000007 : code de l’e-mail plus récent montré, et la phrase dit que c’est lui qui fait foi', JSON.stringify(c7));
-        dit(c2 && c2.qrAbsent === 'mondialrelay' && /QR pas reçu/.test(c2.qrAbsentTxt || '') && /compte Mondial Relay/.test(c2.qrAbsentTxt || '') && c2.horsComptes === '1' && c2.plein, '81000002 : « QR pas reçu » + où le trouver, « dans aucun de tes comptes », le code en grand', JSON.stringify(c2));
-        dit(c3 && c3.qrSource === 'mondialrelay' && c3.compteMr === 'compte-mr-1' && c3.code === '100003', '81000003 (compte seul) : son code et son QR', JSON.stringify(c3));
+        dit(c2 && c2.qrAbsent === 'mondialrelay' && MR_APP.test(c2.qrAbsentTxt || '') && !/compte|site|mondialrelay\.fr/i.test(c2.qrAbsentTxt || '') && c2.horsComptes === '1' && c2.plein && c2.ajouter, '81000002 : « QR dans l’app Mondial Relay » (ni compte ni site), « dans aucun de tes comptes », le code en grand, « Ajouter le QR »', JSON.stringify(c2));
+        dit(c3 && c3.qrSource == null && MR_APP.test(c3.qrAbsentTxt || '') && c3.compteMr === 'compte-mr-1' && c3.code === '100003', '81000003 (compte seul) : son code, et aucun QR (le compte n’en a pas)', JSON.stringify(c3));
         dit(c4 && c4.compteMr === 'compte-mr-2', '81000004 : le second compte Mondial Relay nommé', JSON.stringify(c4));
         dit(c5 && c5.site === 'leboncoin' && c5.achatSite === 'leboncoin', '81000005 : l’achat Leboncoin, relié par le n° de suivi', JSON.stringify(c5));
-        dit(ch && ch.qrAbsent === 'chronopost' && /Chronopost/.test(ch.qrAbsentTxt || ''), 'Chronopost sans QR : « QR pas reçu » + l’e-mail Pickup Pass', JSON.stringify(ch));
+        dit(ch && ch.qrAbsent === 'chronopost' && /^QR pas reçu/.test(ch.qrAbsentTxt || '') && /Chronopost/.test(ch.qrAbsentTxt || '') && !ch.ajouter, 'Chronopost sans QR : « QR pas reçu » + l’e-mail Pickup Pass (pas de capture proposée)', JSON.stringify(ch));
         if (SHOTS) { await pg.locator('[data-cc-carte="r:e:81000001"]').first().scrollIntoViewIfNeeded().catch(() => {}); await pg.screenshot({ path: path.join(SHOTS, `qr-cartes-${tag}.png`) }); }
-        // L'explication, ouverte.
+        // L'explication, ouverte : le seul chemin du QR (une capture de l'app).
         await pg.locator('[data-mr-explique] > summary').first().click().catch(() => {});
         await pg.waitForTimeout(400);
+        const exp = await pg.evaluate(() => { const e = document.querySelector('[data-explique-mr]'); return e ? { chemin: e.getAttribute('data-explique-mr-chemin'), txt: e.textContent } : null; });
+        const page = await pg.evaluate(() => document.body.innerText);
+        dit(exp && exp.chemin === 'capture' && /App Mondial Relay/.test(exp.txt) && /Ajouter le QR/.test(exp.txt) && !/mondialrelay\.fr/.test(exp.txt), 'l’explication : app Mondial Relay ⇒ capture ⇒ « Ajouter le QR »', exp && exp.txt.slice(0, 120));
+        dit(!/colis et leurs QR|Ouvrir Mondial Relay \(QR\)|site ou application|QR[^\n]{0,60}mondialrelay\.fr/i.test(page), 'aucun texte de l’écran ne promet un QR Mondial Relay lu par le navigateur');
         if (SHOTS) { await pg.locator('[data-mr-bloc]').first().scrollIntoViewIfNeeded().catch(() => {}); await pg.screenshot({ path: path.join(SHOTS, `qr-explique-${tag}.png`) }); }
         const debExp = await pg.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-        // « En grand » : code ET QR.
+        // « En grand » sans QR (81000001) : le code en gros, « QR dans l’app », « Ajouter le QR » ; le lien suit le colis.
         await pg.locator('[data-cc-carte="r:e:81000001"] [data-colis-plein-ecran]').first().click();
         await pg.waitForSelector('[data-qr-plein]', { timeout: 5000 }).catch(() => {});
-        const v1 = await pg.evaluate(() => { const v = document.querySelector('[data-qr-plein]'); return v ? { code: v.getAttribute('data-qr-plein-code'), img: v.getAttribute('data-qr-plein-img'), src: v.getAttribute('data-qr-plein-source'), lum: !!v.querySelector('[data-qr-plein-luminosite]'), accord: (v.querySelector('[data-qr-plein-accord]') || { getAttribute: () => null }).getAttribute('data-qr-plein-accord'), imgOk: !!v.querySelector('img[alt="QR de retrait"]') } : null; });
-        dit(v1 && v1.code === '100001' && v1.img === '1' && v1.imgOk && v1.src === 'mondialrelay' && v1.lum && v1.accord === 'confirme', '« En grand » (Mondial Relay) : le code ET le QR, la luminosité dite', JSON.stringify(v1));
+        const v0 = await pg.evaluate(() => { const v = document.querySelector('[data-qr-plein]'); return v ? { code: v.getAttribute('data-qr-plein-code'), img: v.getAttribute('data-qr-plein-img'), absent: v.querySelector('[data-qr-plein-absent]') ? v.querySelector('[data-qr-plein-absent]').textContent : null, ajouter: !!v.querySelector('[data-qr-plein-ajouter]'), txt: v.textContent } : null; });
+        dit(v0 && v0.code === '100001' && v0.img === '0' && /^QR dans l’app Mondial Relay/.test(v0.absent || '') && v0.ajouter && !/Ouvrir Mondial Relay \(QR\)/.test(v0.txt) && /Suivre le colis/.test(v0.txt), '« En grand » sans QR : le code, « QR dans l’app Mondial Relay », « Ajouter le QR » ; plus de « Ouvrir Mondial Relay (QR) »', JSON.stringify(v0 && { ...v0, txt: undefined }));
+        if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `qr-plein-sans-${tag}.png`) });
+        // « Ajouter le QR » DANS la vue : le vrai sélecteur de fichier reçoit la capture du banc.
+        const [ch1] = await Promise.all([pg.waitForEvent('filechooser', { timeout: 5000 }), pg.locator('[data-qr-plein-ajouter]').first().click()]);
+        await ch1.setFiles({ name: 'capture-app-mondial-relay.png', mimeType: 'image/png', buffer: capture(CAPTURE_ICI) });
+        await pg.waitForFunction(() => { const v = document.querySelector('[data-qr-plein]'); return v && v.getAttribute('data-qr-plein-img') === '1'; }, null, { timeout: 15000 }).catch(() => {});
+        await pg.waitForFunction(() => { try { const p = JSON.parse(localStorage.getItem('vrm_colis_qr_poses') || 'null'); return !!(p && p['81000001']); } catch (_) { return false; } }, null, { timeout: 5000 }).catch(() => {});
+        await pg.waitForTimeout(200);
+        const v1 = await pg.evaluate(() => { const v = document.querySelector('[data-qr-plein]'); if (!v) return null; const im = v.querySelector('img[alt="QR de retrait"]');
+          let px = null; if (im && im.complete && im.naturalWidth) { const c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight; const x = c.getContext('2d'); x.drawImage(im, 0, 0); px = { w: c.width, h: c.height, d: Array.from(x.getImageData(0, 0, c.width, c.height).data) }; }
+          let poses = null; try { poses = JSON.parse(localStorage.getItem('vrm_colis_qr_poses') || 'null'); } catch (_) {}
+          return { code: v.getAttribute('data-qr-plein-code'), img: v.getAttribute('data-qr-plein-img'), src: v.getAttribute('data-qr-plein-source'), lum: !!v.querySelector('[data-qr-plein-luminosite]'), retirer: !!v.querySelector('[data-qr-plein-retirer]'),
+            ajout: (v.querySelector('[data-qr-plein-ajout]') || { getAttribute: () => null }).getAttribute('data-qr-plein-ajout'), px, poses }; });
+        const reluPage = v1 && v1.px ? jsQR(Uint8ClampedArray.from(v1.px.d), v1.px.w, v1.px.h) : null;
+        const pose = v1 && v1.poses && v1.poses['81000001'];
+        dit(v1 && v1.code === '100001' && v1.img === '1' && v1.src === 'capture' && v1.lum && v1.retirer && v1.ajout === 'pose', '« Ajouter le QR » : la capture lue DANS la page, le QR posé sur CE colis, montré avec le code, « Retirer ce QR »', JSON.stringify(v1 && { ...v1, px: v1.px ? `${v1.px.w}×${v1.px.h}` : null, poses: v1.poses ? Object.keys(v1.poses) : null }));
+        dit(reluPage && reluPage.data === CAPTURE_ICI && pose && pose.contenu === CAPTURE_ICI && Object.keys(v1.poses).length === 1, 'le QR affiché, relu par jsQR (Node) sur ses PIXELS, rend exactement le contenu de la capture ; rangé sous SON n° seulement', reluPage ? reluPage.data : 'illisible');
         if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `qr-plein-${tag}.png`) });
         await pg.locator('[data-qr-plein] button', { hasText: 'Fermer' }).first().click();
-        await pg.waitForTimeout(200);
-        await pg.locator('[data-cc-carte="r:e:81000002"] [data-colis-plein-ecran]').first().click();
-        await pg.waitForSelector('[data-qr-plein]', { timeout: 5000 }).catch(() => {});
-        const v2 = await pg.evaluate(() => { const v = document.querySelector('[data-qr-plein]'); return v ? { code: v.getAttribute('data-qr-plein-code'), img: v.getAttribute('data-qr-plein-img'), absent: !!v.querySelector('[data-qr-plein-absent]') } : null; });
-        dit(v2 && v2.code === '100002' && v2.img === '0' && v2.absent, '« En grand » sans QR : le code en grand, « QR pas reçu » et où le trouver', JSON.stringify(v2));
-        if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `qr-plein-sans-${tag}.png`) });
+        await pg.waitForTimeout(300);
+        const c1b = await carte(pg, '81000001');
+        dit(c1b && c1b.qrSource === 'capture' && !c1b.qrAbsent && !c1b.ajouter, 'la carte de 81000001 porte maintenant le QR de sa capture', JSON.stringify(c1b && { s: c1b.qrSource, a: c1b.qrAbsent }));
+        // Un QR qui porte un AUTRE colis (81000002), choisi sur 81000006 ⇒ rien posé, dit.
+        const [ch2] = await Promise.all([pg.waitForEvent('filechooser', { timeout: 5000 }), pg.locator('[data-cc-carte="r:e:81000006"] [data-colis-qr-ajouter]').first().click()]);
+        await ch2.setFiles({ name: 'capture-autre.png', mimeType: 'image/png', buffer: capture(CAPTURE_AUTRE) });
+        await pg.waitForFunction(() => { const e = document.querySelector('[data-cc-carte="r:e:81000006"] [data-colis-qr-ajout]'); return e && e.getAttribute('data-colis-qr-ajout') !== 'lecture'; }, null, { timeout: 15000 }).catch(() => {});
+        const c6b = await carte(pg, '81000006');
+        const poses2 = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_colis_qr_poses') || 'null'); } catch (_) { return null; } });
+        dit(c6b && c6b.ajout === 'autre' && /81000002/.test(c6b.ajoutTxt || '') && /rien/.test(c6b.ajoutTxt || '') && c6b.qrSource == null && poses2 && !poses2['81000006'], 'un QR qui porte le n° d’un AUTRE colis ⇒ rien n’est posé, et c’est dit', JSON.stringify(c6b && { e: c6b.ajout, t: c6b.ajoutTxt }));
+        if (SHOTS) { await pg.locator('[data-cc-carte="r:e:81000006"]').first().scrollIntoViewIfNeeded().catch(() => {}); await pg.screenshot({ path: path.join(SHOTS, `qr-refus-${tag}.png`) }); }
+        // Une capture sans QR, sur 81000002 ⇒ rien posé, dit.
+        const [ch3] = await Promise.all([pg.waitForEvent('filechooser', { timeout: 5000 }), pg.locator('[data-cc-carte="r:e:81000002"] [data-colis-qr-ajouter]').first().click()]);
+        await ch3.setFiles({ name: 'capture-vide.png', mimeType: 'image/png', buffer: capture('') });
+        await pg.waitForFunction(() => { const e = document.querySelector('[data-cc-carte="r:e:81000002"] [data-colis-qr-ajout]'); return e && e.getAttribute('data-colis-qr-ajout') !== 'lecture'; }, null, { timeout: 15000 }).catch(() => {});
+        const c2b = await carte(pg, '81000002');
+        dit(c2b && c2b.ajout === 'aucun' && c2b.qrSource == null, 'une capture sans QR lisible ⇒ rien n’est posé, et c’est dit', JSON.stringify(c2b && { e: c2b.ajout, t: c2b.ajoutTxt }));
+        // « Retirer ce QR » (81000001) ⇒ la pose part, la carte redit « QR dans l’app Mondial Relay ».
+        await pg.locator('[data-cc-carte="r:e:81000001"] [data-colis-plein-ecran]').first().click();
+        await pg.waitForSelector('[data-qr-plein-retirer]', { timeout: 5000 }).catch(() => {});
+        await pg.locator('[data-qr-plein-retirer]').first().click().catch(() => {});
+        // `save` range la clé après 500 ms (anti-rebond) : on attend l'écriture, pas un délai fixe.
+        await pg.waitForFunction(() => { try { const p = JSON.parse(localStorage.getItem('vrm_colis_qr_poses') || 'null'); return !!p && !p['81000001']; } catch (_) { return false; } }, null, { timeout: 5000 }).catch(() => {});
+        const v3 = await pg.evaluate(() => { const v = document.querySelector('[data-qr-plein]'); let p = null; try { p = JSON.parse(localStorage.getItem('vrm_colis_qr_poses') || 'null'); } catch (_) {} return v ? { img: v.getAttribute('data-qr-plein-img'), ajouter: !!v.querySelector('[data-qr-plein-ajouter]'), poses: p } : null; });
+        dit(v3 && v3.img === '0' && v3.ajouter && v3.poses && !v3.poses['81000001'], '« Retirer ce QR » : retiré sur son clic, « Ajouter le QR » revient', JSON.stringify(v3));
         await pg.locator('[data-qr-plein] button', { hasText: 'Fermer' }).first().click();
         const deb = await pg.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
         dit(deb <= 1 && debExp <= 1, 'rien ne déborde', `${deb} / ${debExp}`);

@@ -77,7 +77,7 @@ export default function ExpliqueMondialRelay({ anime = true }) {
         </div>
         <div className="mrx-fleche" aria-hidden="true"><span className="mrx-point"/><span className="mrx-point"/><span className="mrx-point"/></div>
         <div className="mrx-fen mrx-vrm">
-          <div className="mrx-barre"><i/><i/><i/>VRM · n° {EXEMPLE.n}</div>
+          <div className="mrx-barre"><i/><i/><i/>VRM</div>
           <div className="mrx-colis"><span className="mrx-code">{EXEMPLE.code}</span><QrDecoratif graine={EXEMPLE.g}/></div>
           <div className="mrx-colis mrx-centre"><b>En grand</b></div>
         </div>

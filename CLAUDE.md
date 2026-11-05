@@ -501,7 +501,7 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 
-- **5 nov. · Colis code + QR** : code et QR reliés par n° de suivi, « En grand » (écran allumé), « QR pas reçu » + où, comptes Mondial Relay (`mr_colis_*`) prêts côté app, QR de dépôt Leboncoin ; extension à faire ; revue adverse : 4 défauts corrigés (§6). `docs/passation/2026-11-05-colis-qr.md`. Geste : « En grand » sur un colis.
+- **5 nov. · Colis code + QR** : code et QR reliés par n° de suivi, « En grand » (écran allumé), QR de dépôt Leboncoin. ⚠️ Le QR Mondial Relay n'existe QUE dans l'app (« c'est que dans l'app ») : aucune promesse par navigateur/extension (`mr_colis_*` = codes seulement) ; « QR dans l'app Mondial Relay » + « Ajouter le QR » (capture lue dans la page, SON clic = l'identité, jamais un QR fabriqué ; `vrm_colis_qr_poses`). `docs/passation/2026-11-05-colis-qr.md` §7. Geste : ajouter une capture sur un colis.
 
 - **5 nov. · Numéros** : fiche numérotée du nuage jamais retirée par la fusion (plus de bloc « Recharger »). `docs/passation/2026-11-05-numeros-autre-appareil.md` ; demandes du jour : `demandes-2026-11-05.md`.
 
