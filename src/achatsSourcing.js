@@ -1,5 +1,6 @@
 // ════════════════════════════════════════════════════════════════════════════
-//  ACHATS : FOURNISSEURS · DÉLAI AVANT MISE EN LIGNE · LOTS RÉPARTIS (4 nov.)
+//  ACHATS : DÉLAI AVANT MISE EN LIGNE · LOTS RÉPARTIS (4 nov.)
+//  (les fournisseurs vivent dans src/fournisseurs.js depuis le 5 nov.)
 // ════════════════════════════════════════════════════════════════════════════
 // Trois outils choisis par Julien pour l'écran Achats. Module PUR (aucune
 // lecture, aucune écriture) : l'app lui passe ses lectures, il rend des chiffres
@@ -15,15 +16,8 @@
 // JAMAIS le titre, la marque, la taille, la photo ressemblante.
 //
 // §5 « les chiffres » — rien n'est présenté comme complet quand il ne l'est pas :
-//   · « Dépensé » = le prix de la COMMANDE (un lot compté une fois, jamais la
-//     somme des parts de ses N°), hors achats remboursés/annulés ; un prix
-//     illisible ou dans une autre devise n'est pas compté et l'est à part ;
-//   · « Bénéfice » = la somme des bénéfices CONNUS des ventes reliées (règle
-//     propriétaire `beneficeLigneVente`, calculée par l'appelant) ; aucun connu
-//     ⇒ null (« — ») ; un bénéfice « au plus » (frais pas confirmés) le reste ;
-//   · « Reliés N/M » : combien de ses achats ont au moins un article relié.
-//   · Le pseudo d'un vendeur Vinted n'est lu que dans SA transaction ; pas lu ⇒
-//     le groupe « Vinted » (jamais deviné). Donnée tierce : rien n'est exporté.
+//   · un lot compté une fois (jamais la somme des parts de ses N°) ; un prix
+//     illisible ou dans une autre devise n'est pas compté et l'est à part.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Un achat qui n'a rien coûté (la règle de src/prixAchatPropose.js, recopiée
@@ -70,105 +64,11 @@ export function articlesParAchat({ fiches, saleOv } = {}) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// 1. ACHATS PAR FOURNISSEUR
+// 1. FOURNISSEURS — retiré d'ici le 5 nov. (Julien : « c'est une personne à qui
+//    tu achètes en gros pas des vendeurs particuliers sur vinted »). La feuille
+//    faisait un fournisseur de chaque vendeur Vinted : faux. Les fournisseurs
+//    sont maintenant des personnes QU'IL crée : src/fournisseurs.js.
 // ════════════════════════════════════════════════════════════════════════════
-export const FOURNISSEUR_VINTED_PAS_LU = 'v:?';
-// Le fournisseur d'un achat Vinted : le pseudo lu dans SA transaction, sinon « Vinted ».
-export function fournisseurVinted(achat, vendeurDe) {
-  const tx = txDe(achat);
-  const login = tx && typeof vendeurDe === 'function' ? String(vendeurDe(tx) || '').trim() : '';
-  if (login) return { cle: 'v:' + login.toLowerCase(), nom: login, type: 'vendeur' };
-  return { cle: FOURNISSEUR_VINTED_PAS_LU, nom: 'Vinted', type: 'pas-lu' };
-}
-// Le fournisseur d'un achat HORS plateforme : la source qu'il a saisie.
-export function fournisseurHors(b, sourceDe) {
-  const s = String((typeof sourceDe === 'function' ? sourceDe(b) : (b && b.source)) || '').trim();
-  const cle = s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ');
-  return s ? { cle: 'h:' + cle, nom: s, type: 'hors' } : { cle: 'h:?', nom: 'Hors plateforme', type: 'hors' };
-}
-
-// Le tableau des fournisseurs.
-//   achats      : achats Vinted captés (my_orders, `price` objet)
-//   hors        : achats hors plateforme saisis ({ id, price, numero, source })
-//   fiches, saleOv : les fiches (N°) et les corrections posées sur les ventes
-//   ventes      : [{ id, entree, benefice: { valeur: € | null, partiel: bool } }]
-//                 `entree` = la fiche fusionnée de LA vente (effEntry) ;
-//                 `benefice` = la règle propriétaire (beneficeLigneVente).
-//   vendeurDe(tx) → pseudo lu | '' ; sourceDe(b) → libellé ; prixHors(b) → € | null
-//   cleNum(n)   → l'identité d'un N°
-// Rend { lignes, vendeurLu: { n, sur }, sansPrix }.
-export function fournisseurs({ achats = [], hors = [], fiches = {}, saleOv = {}, ventes = [], vendeurDe = null, sourceDe = null, prixHors = null, cleNum = null } = {}) {
-  const lignes = new Map();
-  const ligne = (f) => {
-    if (!lignes.has(f.cle)) lignes.set(f.cle, { cle: f.cle, nom: f.nom, type: f.type, achats: 0, depense: 0, sansPrix: 0, relies: 0, revendus: 0, benefice: 0, beneficesConnus: 0, partiel: false });
-    return lignes.get(f.cle);
-  };
-  const liens = articlesParAchat({ fiches, saleOv });
-  const parTx = new Map();          // tx Vinted → ligne
-  const horsParNum = new Map();     // cleNum → ligne | 'ambigu'
-  const horsAvecFiche = [];         // [ligne, cleNum] : un achat hors plateforme dont le N° porte une fiche
-  let vendeurLu = 0, vendeursSur = 0, sansPrix = 0;
-  const reliesTx = new Set();
-  for (const a of (Array.isArray(achats) ? achats : [])) {
-    const tx = txDe(a); if (!tx || achatSansCout(a) || parTx.has(tx)) continue;
-    const f = fournisseurVinted(a, vendeurDe);
-    vendeursSur++; if (f.type === 'vendeur') vendeurLu++;
-    const l = ligne(f); parTx.set(tx, l);
-    l.achats++;
-    const c = prixAchatCentimes(a);
-    if (c == null) { l.sansPrix++; sansPrix++; } else l.depense += c;
-    if ((liens.get(tx) || []).length) { l.relies++; reliesTx.add(tx); }
-  }
-  const cn = typeof cleNum === 'function' ? cleNum : (x) => String(x == null ? '' : x).trim().toUpperCase();
-  const fichesParNum = new Map();
-  for (const e of Object.values(fiches || {})) { const k = e && e.numero != null ? cn(e.numero) : ''; if (k) fichesParNum.set(k, (fichesParNum.get(k) || 0) + 1); }
-  for (const b of (Array.isArray(hors) ? hors : [])) {
-    if (!b) continue;
-    const l = ligne(fournisseurHors(b, sourceDe));
-    l.achats++;
-    const p = typeof prixHors === 'function' ? prixHors(b) : (centimesDe(b.price) == null ? null : centimesDe(b.price) / 100);
-    const c = p == null || !Number.isFinite(Number(p)) ? null : Math.round(Number(p) * 100);
-    if (c == null) { l.sansPrix++; sansPrix++; } else l.depense += c;
-    const k = b.numero != null ? cn(b.numero) : '';
-    if (k) {
-      horsParNum.set(k, horsParNum.has(k) ? 'ambigu' : l);
-      if (fichesParNum.get(k)) horsAvecFiche.push([l, k]);
-    }
-  }
-  // Un N° hors plateforme relie seulement s'il ne désigne qu'UN achat hors plateforme.
-  for (const [l, k] of horsAvecFiche) if (horsParNum.get(k) === l) l.relies++;
-  // Les ventes reliées : `buyFromId` d'abord, sinon le N° d'un achat hors plateforme.
-  const vuesVentes = new Set();
-  for (const v of (Array.isArray(ventes) ? ventes : [])) {
-    if (!v || vuesVentes.has(v.id)) continue; vuesVentes.add(v.id);
-    const e = v.entree || null;
-    let l = null;
-    const tx = txLien(e && e.buyFromId);
-    if (tx) l = parTx.get(tx) || null;
-    else if (e && e.numero != null && String(e.numero).trim()) { const h = horsParNum.get(cn(e.numero)); l = h && h !== 'ambigu' ? h : null; }
-    if (!l) continue;
-    l.revendus++;
-    const b = v.benefice || {};
-    if (b.valeur != null && Number.isFinite(Number(b.valeur))) { l.benefice += Math.round(Number(b.valeur) * 100); l.beneficesConnus++; if (b.partiel) l.partiel = true; }
-  }
-  const out = [...lignes.values()].map((l) => ({ ...l, benefice: l.beneficesConnus ? l.benefice : null }));
-  return { lignes: out, vendeurLu: { n: vendeurLu, sur: vendeursSur }, sansPrix };
-}
-
-export const TRIS_FOURNISSEURS = { depense: 'Dépensé', achats: 'Achats', revendus: 'Revendus', benefice: 'Bénéfice', nom: 'Nom' };
-// Tri : décroissant (nom : alphabétique) ; un bénéfice pas su va en dernier.
-export function trierFournisseurs(lignes, tri = 'depense') {
-  const l = [...(lignes || [])];
-  const nom = (a, b) => String(a.nom).localeCompare(String(b.nom), 'fr', { sensitivity: 'base' });
-  if (tri === 'nom') return l.sort(nom);
-  return l.sort((a, b) => {
-    const x = a[tri], y = b[tri];
-    if (x == null && y == null) return nom(a, b);
-    if (x == null) return 1;
-    if (y == null) return -1;
-    return (y - x) || nom(a, b);
-  });
-}
 
 // ════════════════════════════════════════════════════════════════════════════
 // 2. DÉLAI ACHAT → MISE EN LIGNE

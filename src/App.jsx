@@ -92,7 +92,8 @@ import FeuilleLienVc from "./LienVestiaire.jsx";
 import { preuvesFriseVc, preuvesFriseEbay } from "./friseSites.js";
 import { suggestionsAchat, tousAchatsLibres, tousAchatsLibresDetail, filtresAchats, etiquetteLot, liensParAchat, lotDe, prixIndicatifLot, ecritureLot } from "./suggestionsAchat.js";
 import AchatsOutils from "./AchatsOutils.jsx";
-import { fournisseurs as fournisseursAchats, trierFournisseurs, articlesParAchat, delaisMiseEnLigne, dateReception, estLot as estLotAchat, nombreLot, totalARepartir, ecrituresRepartition, annulationRepartition, ecritureLienAchat, prixAchatCentimes, achatSansCout } from "./achatsSourcing.js";
+import { CLE_FOURNISSEURS, lireRegistre, avecFournisseur, sansFournisseur, avecAchatGros, sansAchatGros, avecRepartition, achatGros, reliesDuLot, partsDuLot, planPrixGros, ecrituresPrixGros, ecritureLienGros, ecritureDelierGros, origineDuPrix, horsRattachables, avecHors, sansHors, avecGardes, bilanFournisseurs, eurosC as eurosFo } from "./fournisseurs.js";
+import { articlesParAchat, delaisMiseEnLigne, dateReception, estLot as estLotAchat, nombreLot, totalARepartir, ecrituresRepartition, annulationRepartition, ecritureLienAchat, prixAchatCentimes, achatSansCout } from "./achatsSourcing.js";
 import { boostRentable, SEUIL_BOOST } from "./boostRentable.js";
 import { CLE_WIDGETS_JOURNEE, WIDGETS_JOURNEE, NOM_TAILLE, DISPO_JOURNEE_DEFAUT, normaliserDispoJournee, deplacerWidget, retirerWidget, widgetFixe, tailleSuivante, tailleDefautWidget, caseVisible, widgetsAjoutables, dispoAEnregistrer } from "./journeeWidgets.js";
 import { modeleSur, releveVentes } from "./ceQuiRapporte.js";
@@ -2072,6 +2073,10 @@ const SYNC_KEYS = [
   // (4 nov.) Les achats qu'il a DÉCLARÉS lots, et ses répartitions d'un lot sur ses N°
   // (l'état d'avant gardé pour « Annuler ») — src/achatsSourcing.js, écrits sur SON clic.
   'vrm_lots_declares','vrm_repartitions_lots',
+  // (5 nov.) Ses FOURNISSEURS : les personnes à qui il achète en gros (jamais un
+  // vendeur Vinted), ses achats en gros et les achats hors plateforme qu'il y a
+  // rattachés — src/fournisseurs.js, écrits sur SON clic seulement.
+  'vrm_fournisseurs',
   // Par annonce eBay, le prix Vinted de la dernière baisse faite depuis VRM
   // (proposition 9) : rien n'est reproposé tant qu'il n'a pas bougé.
   'vrm_ebay_baisses',
@@ -49923,28 +49928,53 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [asoOuvert, accounts.length]);
   const articlesAchats = useMemo(() => articlesParAchat({ fiches: numeros, saleOv }), [numeros, saleOv]);
+  // (5 nov.) FOURNISSEURS — les personnes à qui il achète EN GROS (src/fournisseurs.js).
+  // Julien : « c'est une personne à qui tu achètes en gros pas des vendeurs
+  // particuliers sur vinted ». La feuille du 4 nov. faisait un fournisseur de
+  // chaque vendeur Vinted (`fournisseurVinted`) : retiré. La liste vient du SEUL
+  // registre `vrm_fournisseurs` (ligne `main`), qu'il remplit ; les achats Vinted
+  // ne sont même pas passés à la règle. Le bénéfice d'une vente reste celui de
+  // `beneficeLigneVente` (Vinted) et de `ventesAutresBenefice` (autres sites).
+  const [registreFo, setRegistreFo] = useStateCle(CLE_FOURNISSEURS, () => lireRegistre(load(CLE_FOURNISSEURS, null)));
+  useEffect(() => onCloudReady(() => setRegistreFo((r) => (r && Object.keys(r.personnes || {}).length ? r : lireRegistre(load(CLE_FOURNISSEURS, null))))), []);   // eslint-disable-line react-hooks/exhaustive-deps
+  const prixParNumFo = (n) => (buyByNum ? buyByNum[String(n == null ? '' : n).trim()] : undefined);
   const asoFournisseurs = useMemo(() => {
     if (curSub !== 'achats' || asoOuvert !== 'fournisseurs') return undefined;
-    if (!Array.isArray(buys.items) || !Array.isArray(sales.items) || infosAchatsLues === undefined) return buys.error || sales.error ? null : undefined;
+    const reg = lireRegistre(registreFo);
+    const ventesLues = Array.isArray(sales.items) ? true : (sales.error ? null : undefined);
     const ventes = [];
-    for (const o of sales.items) {
-      if (isHidden(o) || classifyOrderStatus(o.status) !== 'completed' || o.transaction_id == null) continue;
-      const e = effEntry(o); if (!e) continue;
-      const devise = o.price && o.price.currency_code;
-      const lb = devise && devise !== 'EUR' ? { benefice: null, etat: 'prix' } : beneficeLigneVente(o.price && o.price.amount, e);
-      ventes.push({ id: 'vinted:' + o.transaction_id, entree: e, benefice: { valeur: lb.benefice, partiel: lb.etat === 'partiel' } });
+    if (ventesLues === true) {
+      for (const o of sales.items) {
+        // Une vente prouvée (pas annulée, pas revenue) ; un compte écarté n'entre nulle part.
+        if (isHidden(o) || classifyOrderStatus(o.status) === 'cancelled' || o.transaction_id == null) continue;
+        const e = effEntry(o); if (!e) continue;
+        const devise = o.price && o.price.currency_code;
+        const lb = devise && devise !== 'EUR' ? { benefice: null, etat: 'prix' } : beneficeLigneVente(o.price && o.price.amount, e);
+        ventes.push({ id: 'vinted:' + o.transaction_id, entree: e, benefice: { valeur: lb.benefice, partiel: lb.etat === 'partiel' } });
+      }
+      for (const x of (Array.isArray(autresBenefice) ? autresBenefice : [])) {
+        if (!x || !x.num || /\+/.test(x.num)) continue;                 // une commande eBay à plusieurs N° : pas attribuée
+        const f = ficheUniqueDuNumero(numeros, cleNum(x.num)); if (!f) continue;
+        ventes.push({ id: x.id, entree: withBuyByNum(f), benefice: { valeur: x.achat != null ? Math.round((x.eur - x.achat - (x.frais || 0)) * 100) / 100 : null, partiel: false } });
+      }
     }
-    for (const x of (Array.isArray(autresBenefice) ? autresBenefice : [])) {
-      if (!x || !x.num || /\+/.test(x.num)) continue;                 // une commande eBay à plusieurs N° : pas attribuée
-      const f = ficheUniqueDuNumero(numeros, cleNum(x.num)); if (!f) continue;
-      ventes.push({ id: x.id, entree: f, benefice: { valeur: x.achat != null ? Math.round((x.eur - x.achat - (x.frais || 0)) * 100) / 100 : null, partiel: false } });
+    const r = bilanFournisseurs({ registre: reg, fiches: numeros, ventes, hors: offBuys, prixHors: prixAchatHorsNombre, cleNum });
+    const achats = {};
+    for (const id of Object.keys(reg.achats)) {
+      const a = achatGros(reg, id);
+      const relies = reliesDuLot(numeros, id);
+      const parts = partsDuLot(a, relies);
+      const plan = planPrixGros({ achat: a, relies, prixParNum: prixParNumFo });
+      const gardes = new Set(plan.gardes);
+      achats[id] = { ...a, relies: relies.map((x, i) => ({ cle: x.cle, numero: x.numero, titre: x.titre, photo: (x.entree && x.entree.photo) || '', part: parts[i], origine: origineDuPrix(x.entree, id, prixParNumFo), garde: gardes.has(x.cle) })),
+        plan: { aEcrire: plan.aEcrire.length, aDemander: plan.aDemander.length } };
     }
-    const r = fournisseursAchats({ achats: buysBase, hors: offBuys, fiches: numeros, saleOv, ventes, cleNum,
-      vendeurDe: (tx) => (infosAchatsLues && infosAchatsLues[tx] && infosAchatsLues[tx].vendeur) || '',
-      sourceDe: (b) => libelleSourceAchat(b && b.source), prixHors: prixAchatHorsNombre });
-    return { ...r, partielSites: !Array.isArray(autresBenefice), trier: (t) => trierFournisseurs(r.lignes, t) };
+    const enLigneHors = (b) => ({ id: String(b.id), titre: b.title || '', prix: (() => { const p = prixAchatHorsNombre(b); return p == null ? null : Math.round(p * 100); })(), date: b.date || '', numero: b.numero != null ? String(b.numero) : '' });
+    const hors = (Array.isArray(offBuys) ? offBuys : []).filter((b) => b && reg.hors[b.id]).map((b) => ({ ...enLigneHors(b), fournisseur: reg.hors[b.id].fournisseur }));
+    const rattachables = horsRattachables(offBuys, reg, (b) => libelleSourceAchat(b && b.source)).map(enLigneHors);
+    return { ...r, achats, hors, rattachables, ventesLues, partielSites: !Array.isArray(autresBenefice) };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [curSub, asoOuvert, buys.items, buys.error, sales.items, sales.error, infosAchatsLues, numeros, saleOv, buyByNum, offBuys, autresBenefice, hiddenSales, hiddenAccts]);
+  }, [curSub, asoOuvert, registreFo, sales.items, sales.error, numeros, saleOv, buyByNum, offBuys, autresBenefice, hiddenSales, hiddenAccts]);
   // Les articles d'un achat, avec ce que les annonces en disent (en ligne, vendu, mise en ligne).
   const enLigneLu = Array.isArray(listings.items) && !(Array.isArray(listings.ko) && listings.ko.some((u) => !acctOff(u)));
   const articlesLus = (tx) => {
@@ -49974,7 +50004,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const out = [];
     const horsNums = new Set((offBuys || []).map((b) => (b && b.numero != null ? cleNum(b.numero) : '')).filter(Boolean));   // N° d'un achat hors plateforme : déjà relié
     for (const [k, e] of Object.entries(numeros || {})) {
-      if (!e || !String(e.numero || '').trim() || e.buyFromId || horsNums.has(cleNum(e.numero))) continue;
+      if (!e || !String(e.numero || '').trim() || e.buyFromId || (e.buyGros && e.buyGros.id) || horsNums.has(cleNum(e.numero))) continue;   // (5 nov.) ni une paire reliée à un achat en gros
       out.push({ cle: k, numero: String(e.numero).trim(), titre: e.title || '', photo: e.photo || '' });
     }
     return out.sort((a, b) => (Number(b.numero) || 0) - (Number(a.numero) || 0));
@@ -50041,6 +50071,112 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return true;
   };
   const asoDeclarerLot = (tx, oui) => setLotsDeclares((prev) => { const u = { ...prev }; if (oui) u[String(tx)] = true; else delete u[String(tx)]; save('vrm_lots_declares', u); return u; });
+  // (5 nov.) Fournisseurs : chaque écriture sur SON geste (src/fournisseurs.js).
+  // Le registre se relit au moment d'écrire (`prev`) : deux gestes rapides ne
+  // s'écrasent pas. Les paires reçoivent leur lien (`buyGros`) et leur prix sur
+  // la fiche, par `poserPatchAchat` — le même chemin que « Répartir ».
+  const idFo = (p) => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const poserRegistreFo = (fn) => setRegistreFo((prev) => { const u = fn(lireRegistre(prev)); save(CLE_FOURNISSEURS, u); return u; });
+  // Délier toutes les paires d'un achat : le lien part, le prix que CE lot avait posé aussi (un prix saisi à la main reste).
+  const delierToutFo = (aid) => { for (const x of reliesDuLot(numeros, aid)) { const patch = ecritureDelierGros(x.entree, aid, prixParNumFo); if (patch) poserPatchAchat('f:' + x.cle, patch); } };
+  const foActions = {
+    creer: async (c) => {
+      const id = idFo('f'), at = new Date().toISOString();
+      const t = avecFournisseur(registreFo, id, c, at);
+      if (t.erreur) return { erreur: t.erreur };
+      poserRegistreFo((p) => avecFournisseur(p, id, c, at).registre || p);
+      toast(`${String(c.nom).trim()} ajouté`);
+      return { id };
+    },
+    modifier: async (id, c) => {
+      const t = avecFournisseur(registreFo, id, c);
+      if (t.erreur) return { erreur: t.erreur };
+      poserRegistreFo((p) => avecFournisseur(p, id, c).registre || p);
+      return {};
+    },
+    retirer: async (id) => {
+      const reg = lireRegistre(registreFo); const p = reg.personnes[id]; if (!p) return false;
+      const ids = Object.keys(reg.achats).filter((k) => reg.achats[k].fournisseur === id);
+      const ok = await askConfirm({ title: `Retirer ${p.nom} ?`, desc: ids.length ? `${ids.length} achat${ids.length > 1 ? 's' : ''} en gros partent avec lui et ses paires sont déliées. Un prix d’achat saisi à la main reste.` : 'Ses achats déjà saisis restent dans Achats.', ok: 'Retirer', cancel: 'Garder', danger: true });
+      if (!ok) return false;
+      for (const aid of ids) delierToutFo(aid);
+      poserRegistreFo((r) => sansFournisseur(r, id).registre);
+      toast(`${p.nom} retiré`);
+      return true;
+    },
+    creerAchat: async (fid, c) => {
+      const id = idFo('g'), at = new Date().toISOString();
+      const t = avecAchatGros(registreFo, id, { ...c, fournisseur: fid }, at);
+      if (t.erreur) return { erreur: t.erreur };
+      poserRegistreFo((p) => avecAchatGros(p, id, { ...c, fournisseur: fid }, at).registre || p);
+      return { id };
+    },
+    modifierAchat: async (aid, c) => {
+      const a = achatGros(registreFo, aid); if (!a) return { erreur: 'Cet achat n’existe plus' };
+      const n = reliesDuLot(numeros, aid).length;
+      if (Number(String(c.paires).trim()) < n) return { erreur: `${n} paires sont déjà reliées : délie-en d’abord` };
+      const t = avecAchatGros(registreFo, aid, { ...c, fournisseur: a.fournisseur });
+      if (t.erreur) return { erreur: t.erreur };
+      poserRegistreFo((p) => avecAchatGros(p, aid, { ...c, fournisseur: a.fournisseur }).registre || p);
+      return {};
+    },
+    retirerAchat: async (aid) => {
+      const a = achatGros(registreFo, aid); if (!a) return false;
+      const n = reliesDuLot(numeros, aid).length;
+      const ok = await askConfirm({ title: 'Retirer cet achat en gros ?', desc: n ? `${n} paire${n > 1 ? 's' : ''} reliée${n > 1 ? 's' : ''} : le prix posé par cet achat part aussi. Un prix d’achat saisi à la main reste.` : '', ok: 'Retirer', cancel: 'Garder', danger: true });
+      if (!ok) return false;
+      delierToutFo(aid);
+      poserRegistreFo((p) => sansAchatGros(p, aid));
+      return true;
+    },
+    regler: (aid, x) => poserRegistreFo((p) => avecRepartition(p, aid, x)),
+    relier: (aid, fiche) => {
+      const a = achatGros(registreFo, aid); const entree = fiche && numeros[fiche.cle];
+      if (!a || !entree) return;
+      const relies = reliesDuLot(numeros, aid);
+      const lien = ecritureLienGros(entree, a, { at: new Date().toISOString(), nRelies: relies.length });
+      if (!lien) { toast(relies.length >= a.paires ? 'Toutes les paires de cet achat sont reliées' : `N°${fiche.numero} est déjà relié à un achat`); return; }
+      // Le prix de CETTE paire, s'il se pose sans rien remplacer (fiche sans prix) : la règle des prix, sur le lot avec elle.
+      const avec = { ...numeros, [fiche.cle]: { ...entree, ...lien } };
+      const w = ecrituresPrixGros({ achat: a, relies: reliesDuLot(avec, aid), prixParNum: prixParNumFo, confirme: true });
+      const prix = w && w.ecritures.find((x) => x.cle === fiche.cle);
+      poserPatchAchat('f:' + fiche.cle, prix ? prix.patch : lien);
+      toast(`N°${fiche.numero} relié${prix ? ' · ' + eurosFo(prix.patch.buyGros.part) : ''}`);
+    },
+    delier: async (aid, cle) => {
+      const e = numeros[cle]; const patch = ecritureDelierGros(e, aid, prixParNumFo); if (!patch) return false;
+      const ok = await askConfirm({ title: `Délier le N°${e.numero} ?`, desc: patch.buyPrice !== undefined ? 'Le prix posé par cet achat part aussi.' : 'Son prix d’achat saisi à la main reste.', ok: 'Délier', cancel: 'Annuler' });
+      if (!ok) return false;
+      poserPatchAchat('f:' + cle, patch);
+      return true;
+    },
+    poserPrix: async (aid) => {
+      const a = achatGros(registreFo, aid); if (!a) return false;
+      const relies = reliesDuLot(numeros, aid);
+      const plan = planPrixGros({ achat: a, relies, prixParNum: prixParNumFo });
+      if (plan.aEcrire.length) {
+        const ok = await askConfirm({ title: `Poser ${plan.aEcrire.length} prix d’achat ?`, desc: plan.aEcrire.map((x) => `N°${x.numero} · ${eurosFo(x.part)}`).join('\n'), ok: 'Poser', cancel: 'Annuler' });
+        if (!ok) return false;
+      }
+      // Un prix saisi à la main : on DEMANDE, une paire à la fois. Sans « Remplacer », il reste
+      // (et SA réponse est gardée : la question ne revient que s'il change ce prix).
+      const remplacer = [];
+      for (const x of plan.aDemander) {
+        const sien = x.centimes != null ? eurosFo(x.centimes) : `${x.prix} €`;
+        const oui = await askConfirm({ title: `N°${x.numero} a déjà un prix d’achat`, desc: `${sien} saisi à la main. Le remplacer par ${eurosFo(x.part)}, sa part de cet achat ?`, ok: 'Remplacer', cancel: `Garder ${sien}` });
+        if (oui) remplacer.push(x.cle);
+      }
+      const w = ecrituresPrixGros({ achat: a, relies, prixParNum: prixParNumFo, remplacer, confirme: true });
+      if (!w) return false;
+      for (const x of w.ecritures) poserPatchAchat('f:' + x.cle, x.patch);
+      const gardes = w.gardes.filter((x) => x.centimes != null);
+      if (gardes.length) poserRegistreFo((p) => avecGardes(p, aid, Object.fromEntries(gardes.map((x) => [x.cle, x.centimes]))));
+      toast(w.ecritures.length ? `${w.ecritures.length} prix d’achat posé${w.ecritures.length > 1 ? 's' : ''}` : 'Aucun prix changé');
+      return true;
+    },
+    rattacher: (bid, fid) => poserRegistreFo((p) => avecHors(p, bid, fid, new Date().toISOString())),
+    detacher: (bid) => poserRegistreFo((p) => sansHors(p, bid)),
+  };
 
   // ── URGENCE DES COLIS — UNE SEULE DÉFINITION ────────────────────────────
   // Le calcul vivait dans le bloc de rendu du bandeau rouge ; le bandeau du
@@ -54012,8 +54148,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               recus: { nom: 'Reçus', court: 'Reçus', type: 'n', valeur: lu ? n.recu : null, attrs: { 'data-n': lu ? String(n.recu) : '' } },
             }}/>;
         })()}
-        {/* (4 nov.) Fournisseurs · Délai · Lots (src/AchatsOutils.jsx) : trois feuilles, rien n'est écrit sans son clic. */}
-        {!modeRetraits && !baseKO && <AchatsOutils fournisseurs={asoFournisseurs} delai={asoDelai} lots={asoLots} achatsDeclarables={asoDeclarables} fichesLibres={asoFichesLibres}
+        {/* (4 nov.) Fournisseurs · Délai · Lots (src/AchatsOutils.jsx) : trois feuilles, rien n'est écrit sans son clic.
+            (5 nov.) Fournisseurs = les personnes à qui il achète en gros, qu'IL crée (src/fournisseurs.js). */}
+        {!modeRetraits && !baseKO && <AchatsOutils fournisseurs={asoFournisseurs ? { ...asoFournisseurs, actions: foActions } : asoFournisseurs} delai={asoDelai} lots={asoLots} achatsDeclarables={asoDeclarables} fichesLibres={asoFichesLibres}
           onOuvrir={setAsoOuvert} onRelier={asoRelier} onRepartir={asoRepartir} onAnnulerRepartition={asoAnnuler} onDeclarerLot={asoDeclarerLot}
           onFiche={(n)=>{ try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: String(n) })); } catch (_) {} }}
           Retour={FermeAuRetour} Photo={(src)=><PhotoVinted src={src} alt="" loading="lazy"/>}/>}
