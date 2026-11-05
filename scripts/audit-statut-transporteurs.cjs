@@ -135,6 +135,9 @@ process.env.VAPID_PRIVATE_KEY = 'YmFuYy1jbGUtcHJpdmVlLWZhY3RpY2UtMzItb2N0ZXQ';
 delete process.env.AI_API_KEY; delete process.env.ANTHROPIC_API_KEY;
 const webpush = require(path.join(R, 'node_modules', 'web-push'));
 const pushes = [];
+// L'arrivée du colis Chronopost des essais, reconnue par la clé du FAIT (`tag` =
+// `relais-{n°}-…`, api/_lib/transporteurs.js changementANotifier), jamais par un mot du titre.
+const arriveeCp = (p) => /^relais-XW000000001TS-/.test(String((p && p.tag) || ''));
 webpush.setVapidDetails = () => {};
 webpush.sendNotification = async (sub, body) => { pushes.push({ endpoint: sub.endpoint, ...JSON.parse(body) }); return { statusCode: 201 }; };
 
@@ -477,7 +480,10 @@ const MVC_INTROUVABLE = JSON.stringify({ Success: false, ModelState: [], Message
     dit(lc && lc.etat === 'disponible' && lc.voie === 'cp-ws2' && lv && lv.etat === 'en_route' && lv.voie === 'vg-v3', 'Chronopost et Vinted Go lus et rangés', `${lc && lc.etat} · ${lv && lv.etat}`);
     dit((r.besoinNavigateur || []).length === 0, 'rien à demander à l\'extension quand le serveur a pu lire', JSON.stringify(r.besoinNavigateur));
     const titres = pushes.map((p) => p.title || '');
-    dit(titres.filter((x) => /Chronopost/.test(x) && /disponible/.test(x)).length === 1 && !pushes.some((p) => /Mondial Relay|\b12345678\b/.test(JSON.stringify(p))), 'Chronopost « disponible » sonne une fois ; Mondial Relay, déjà annoncé par l\'e-mail (même n°), se TAIT', JSON.stringify(titres));
+    // (5 nov.) Depuis 217cf4dd (3 nov.) une arrivée s'écrit « 📍 Ton colis Chronopost
+    // t'attend » (api/_lib/notif-textes.js, un texte pour toutes les voies) : on
+    // juge l'IDENTITÉ du fait — la clé `relais-{n°}-…` portée en `tag` — plus le mot.
+    dit(pushes.filter(arriveeCp).length === 1 && !pushes.some((p) => /Mondial Relay|\b12345678\b/.test(JSON.stringify(p))), 'Chronopost « disponible » sonne une fois ; Mondial Relay, déjà annoncé par l\'e-mail (même n°), se TAIT', JSON.stringify(titres));
     const n0 = appels.length;
     await passage();
     dit(appels.length === n0, 'relancé tout de suite : aucune requête (le rythme : disponible toutes les 30 min, en route toutes les 2 h)', `${appels.length - n0} requête(s) de plus`);
@@ -503,7 +509,7 @@ const MVC_INTROUVABLE = JSON.stringify({ Success: false, ModelState: [], Message
     const ab = (ms) => cpEv('AB', ms, 'Colis disponible au point de retrait', { infos: { 'Point de livraison': 'TABAC TEST - 1 RUE EXEMPLE - 99999 - TESTVILLE' } });
     transporteur = (u) => u.hostname === 'ws.chronopost.fr' ? { status: 200, ctype: 'text/xml', body: cpXml('XW000000001TS', [ab(NOW - 5 * H)]) } : null;
     const vieillir = () => { const k = `${A}|transp_chronopost_XW000000001TS`; const d = base.get(k); if (d) base.set(k, { ...d, essai: iso(Date.now() - 3 * H) }); };
-    const compte = () => pushes.filter((p) => /disponible/.test(p.title || '')).length;
+    const compte = () => pushes.filter(arriveeCp).length;
     await passage();
     const l1 = ligneT('chronopost', 'XW000000001TS') || {};
     dit(compte() === 0 && l1.etat === 'disponible' && !!l1.notifEnAttente, 'la clé partagée ne s\'écrit pas : rien ne sonne, la notification reste EN ATTENTE dans la ligne', `${compte()} notification(s) · attente ${l1.notifEnAttente || '—'}`);
