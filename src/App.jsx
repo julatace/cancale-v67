@@ -59082,7 +59082,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:15,fontWeight:700,color:C.text,display:'flex',alignItems:'center',gap:8}}><Icon name="doc" size={17}/>Rapport comptable</div>
-                <div style={{fontSize:11,color:C.muted}}>{libelleRegime(report.regime)} · <span style={{opacity:0.8}}>régime modifiable dans Paramètres → Régime fiscal</span></div>
+                <div style={{fontSize:11,color:C.muted}}>{libelleRegime(report.regime)} · <span style={{opacity:0.8}}>statut modifiable dans Paramètres → Statut</span></div>
               </div>
               <button type="button" onClick={()=>setShowReport(false)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
@@ -67488,7 +67488,7 @@ function RegimeSetting({ nu = false }) {
   const setRate = (v) => { const n = Math.max(0, Math.min(100, Number(v)||0)); setTva(n); save('vinted_tva', n); };
   return (
     <div style={nu ? {} : {border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 14px'}}>
-      {!nu && <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>Régime fiscal</div>}
+      {!nu && <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>{L.statut}</div>}
       <div className="vrm-aide" style={{fontSize:13,color:C.muted,marginBottom:12,lineHeight:1.45}}>Adapte le rapport comptable à ta situation.</div>
       <div style={{display:'flex',flexDirection:'column',gap:8}}>
         {/* (1er nov.) La ligne courte (« Je vends mes propres affaires », « SAS, SASU… »)
