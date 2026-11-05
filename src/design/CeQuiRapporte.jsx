@@ -75,6 +75,16 @@ export default function CeQuiRapporte({ lignes, Segmente, fmt, etat }) {
       </ol>
     );
   }
+  // (5 nov., chantier F, revue 2.25) Rien à classer sur la période : la carte se replie en
+  // une ligne (son titre, la raison) — le choix « Modèle · Marque… » ne sert à rien à vide.
+  if (!C || !C.groupes.length) {
+    return (
+      <section className="vrm-cr vrm-sv-carte vrm-sv-repliee" data-stats-carte="sv-rapporte" data-sv-repliee="" data-cr-axe={axe} data-cr-n={C ? C.n : ''} data-cr-ncout={C ? C.nCout : ''} data-cr-ecartees={C ? C.ecartees : ''}>
+        <h2 className="vrm-sv-repliee-titre">Ce qui rapporte le plus</h2>
+        <span className="vrm-sv-repliee-raison vrm-cr-vide" data-cr-etat={C ? 'lu' : (etat || 'passu')} data-cr-n={C ? '0' : undefined}>{C ? 'Aucune vente finalisée sur la période.' : etat === 'encours' ? 'Lecture en cours…' : 'Tes ventes ne sont pas encore lues.'}</span>
+      </section>
+    );
+  }
   return (
     <section className="vrm-cr" data-stats-carte="sv-rapporte" data-cr-axe={axe} data-cr-n={C ? C.n : ''} data-cr-ncout={C ? C.nCout : ''} data-cr-ecartees={C ? C.ecartees : ''}>
       <div className="vrm-cr-tete">

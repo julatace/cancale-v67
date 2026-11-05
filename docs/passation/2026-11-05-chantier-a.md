@@ -29,7 +29,7 @@ Feuille de route : `docs/passation/2026-11-05-revue-coherence.md` (points 1.1, 1
 `.vrm-seg` / `.vrm-seg-btn` n'ont plus qu'une règle, dans `src/styles-coque.css` : piste
 neutre (remplissage d'iOS) rayon 14, segment rayon 12, **14 px de retrait latéral**, 13/600
 sur une ligne, `flex: 1 0 auto` (un segment prend la largeur de ses mots ; la piste défile au
-lieu de couper), **36 px à la souris, 44 px au doigt** (`(pointer: coarse), (hover: none)`),
+lieu de couper), **36 px à la souris, 44 px au doigt** (`(max-width: 767px), (pointer: coarse), (hover: none)` — la largeur ajoutée après fusion : Chromium émulé en mobile répond `pointer: fine`, le segmenté de la page de démonstration du banc `composants`, hors de `.vrm-main`, restait à 36 px),
 segment choisi en aplat (`--seg-actif` : blanc / `#636366`). Retirées : `jetons.css` §5 et §13
 (le `padding: 0 4px` qui écrasait tout à 1512, le `height: 44px` posé même à la souris),
 `fusion.css` (onglets de Colis, villes à retirer), `styles-vitrine.css` §8, `styles-epure.css`
