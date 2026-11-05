@@ -733,3 +733,58 @@ Paramètres → Comptes liés ; couper l'interrupteur d'un compte qu'il ne veut 
 - **4 nov.** — Un seul N° pour un article sur Vinted ET Vestiaire : « Relier à Vinted / à Vestiaire » sur SON clic + confirmation, le N° Vinted reste, l'ancien N° Vestiaire n'est jamais redonné et passe dans « N° à barrer », « Délier » rend l'état d'avant (`main.vrm_vc_liens`, lu aussi par widget/rappels/e-mail) ; frise Vendue → Postée → Livrée → Payée sur Vestiaire et eBay, étapes prouvées seulement (`src/friseSites.js`). `audit-lien-vc` 11/11, `audit-frise-sites` 6/6, banc `lien-vc-frise` 62. → historiques vestiaire, numéros. Geste : relier un article en double, barrer l'ancien N°.
 - **4 nov.** — Compta → Registres : livre des recettes (`ventesDeclarables`, daté au versement, « à dater » listées à part, comptes exclus dehors) et registre des achats (reçu juste au centime, sinon prix saisis des fiches reliées, sinon « article seul » ⇒ « au moins » ; dépenses jamais dedans), PDF + tableur (`src/registres.js`) ; Statistiques : « Bénéfice » de l'année par la règle de Compta, « Marge », « bénéfice brut » nommé. `audit-registres` 10/10 mutations, banc `registres` 84. → historique compta. Geste : télécharger les registres 2026 et les relire.
 - **4 nov.** — **Extension 5.318.0** : Messages · Leboncoin lit les conversations (`lbcfil`) et y répond sur SON clic une fois la recette d'envoi APPRISE d'un envoi fait à la main (`lbcrepondre`, compte de l'onglet, 50/h, pause 429/403 ; sinon « Répondre sur Leboncoin ↗ ») ; eBay → Inactives : « Remettre en vente » vérifiée par eBay puis confirmée, seulement le n° d'annonce envoyé (même prix, même livraison gérée, SKU gardé) (`api/_lib/ebay-relance.js`). `audit-ebay-relance`, `audit-lbc-repondre`, banc `lbc-repondre`. → historiques ebay et leboncoin. Geste : installer la 5.318.0, puis envoyer UNE réponse à la main sur leboncoin.fr.
+
+## 5 novembre — Audits rouges du 5 nov. (branche locale `v34-audits-rouges`, depuis `claude/project-review-nsk5su`)
+
+Quinze audits étaient rouges sur `claude/project-review-nsk5su`. Pour chacun : vrai défaut de l'app
+(corrigé au plus petit) ou audit périmé (mis à la forme d'aujourd'hui, la MÊME règle, prouvé par
+mutation). Rien n'a été touché dans `vinted-sync-extension/` ni dans les zips de `public/`.
+
+| audit | cause | nature | correction | preuve |
+|---|---|---|---|---|
+| `registres` | `pdfjs-dist/legacy/build/pdf.mjs` introuvable : la dépendance n'a JAMAIS été dans `package.json` (elle traînait installée à la main) | dépendance manquante | `pdfjs-dist` 4.10.38 en devDependency exacte (lu aussi par `audit-dac7-comptes` et des bancs) | après `npm ci` : 46/46 ; « au moins » retiré du PDF ⇒ R6 rouge |
+| `entree-publier-ailleurs` | lit `dist/` : pas de build sur la machine | ni l'un ni l'autre | `npm run build` | vert après le build |
+| `bilan-semaine` §6 | l'écran Notifications rend les FAMILLES de `api/_lib/notif-textes.js` depuis d957146e (3 nov.), plus de `{ id:'bilan', def:true }` | audit périmé | la règle exécutée : `decisionNotif({}, 'bilan')`, famille du bilan dans `GROUPES_NOTIF` et allumée par défaut, l'écran rend `FAMILLES`/`familleActive` du serveur, pour chaque catégorie l'état montré = la décision du serveur | 4 mutations rouges (Rappels `def:false`, bilan hors `FAMILLE_DE`, liste locale dans l'écran, Rappels absent de l'écran) |
+| `chemin-json-guillemets` | `api/_lib/securite-compte.js` : `data->groupes->${uid}` NU | vrai défaut (latent) | `->${encodeURIComponent('"' + userId + '"')}` ; `audit-comptes-securite` 4.17 attend la forme | la faute du serveur disparaît du rouge ; reste `background.js:16034` (extension, voir plus bas) |
+| `chiffres` | 2ef727df (libellés `NOM_BENEFICE_BRUT`/`NOM_APRES_FRAIS`), e0385ee3 (`escrowJ`, « À venir »), f1001d7a (bouton « Afficher les N suivantes · x/y », remise à 60 au changement de filtre seulement) | audit périmé | mêmes règles sur la forme actuelle (fenêtre de la carte 2 400 car.) | 5 mutations de l'app, 5 rouges |
+| `donnees-ecrans` D7 | a7f1fac4 compte aussi par compte : `{ prixPasLu++; if(cc) cc.nPrixPasLu++; }` | audit périmé | regex et mutation D7 à la forme ; la mutation « Lie un compte » n'a plus de cible (phrase retirée le 3 nov.) | `--mutations` 12/12 |
+| `ebay-route` [INA] | 1a81a91c : « Remettre en vente » sur son clic confirmé (`handleRelance`) ; `RelistedItemID` (champ lu) compté comme un appel | audit périmé | Relist*/AddItem seulement dans `handleRelance`, `confirme:true` avant tout appel, Relist après la vérification à blanc, seules `relanceverif`/`relancer` y mènent | 3 mutations rouges |
+| `numerotation-lecteurs` | 1a81a91c ajoute `relancer` à `avecVersion` | audit périmé | `publish` et `programmer` toujours exigés, d'autres gestes permis ; mutation suivie | `--mutation=ebay-sans-version` rouge ; retirer `programmer` rouge |
+| `photos-vinted` | deux `<img>` neufs hors de la liste fermée : `PhotosEbayEditeur :: e.apercu` (blob: du fichier choisi, 24d409ad) et l'icône locale de l'aperçu des notifications (0d961728) | liste fermée pas tenue | ajoutés AVEC leur raison | `img-brut` rouge ; une source inconnue dans l'aperçu rouge |
+| `politique-hotes` | le navigateur contacte TOUT SEUL jsDelivr pour ZXing (scanner) et Tesseract (tickets) et 12 domaines de transporteurs (leurs favicons) sans que la politique le dise ; le reste = liens d'un clic | vrai défaut (politique) + liste | ligne jsDelivr : quatre outils ; une ligne « logos des transporteurs » ; date de mise à jour 5 nov. ; liens classés « lien » | `--prouve` 11/11 dont 2 neuves. **Julien : relire `public/legal/confidentialite.html`** |
+| `qui-dorment` | 0b293942 (« Masquées ») : `) : annSort==='sleeping' ? (<QuiDorment` dans une chaîne de ternaires | audit périmé | même règle (liste dans cette vue, grille dans le dernier « sinon ») | mutation rouge ; `--prouve` 4/4 |
+| `statut-transporteurs` | 217cf4dd : toute arrivée s'écrit « 📍 … t'attend » ; l'audit comptait les titres « disponible » | audit périmé | l'arrivée reconnue par la clé du fait (`tag` = `relais-{n°}-…`) | réservation `push_dedup` retirée ⇒ rouge ; « disponible » ne notifie plus ⇒ 5 rouges |
+| `vc-offres` O5 | échéance de la fixture écrite en dur (`2026-11-05T19:23:33Z`) : passée, le fond refuse (« expiree », règle juste) | audit dépendant de l'horloge | échéance = heure du banc + 7 j ; un contrôle NEUF « offre EXPIRÉE ⇒ rien ne part » | mutation `fondExpiree` rouge ; `--prouve` 17/17 |
+| `vendeur-neutre` B | la consigne « À poser sur Vercel… » (carte des e-mails de l'essai, 5a5c6648) est sous `{r.proprietaire ? …}`, réponse du serveur ; l'audit ne reconnaissait que `proprio` | audit périmé | `x.proprietaire` reconnu comme condition « propriétaire » | condition remplacée ⇒ rouge |
+| `vc-recon` | voir plus bas | défaut de l'extension | NON corrigé (hors branche) | reste rouge |
+
+### Ce qui reste rouge (extension, pas touchée ici)
+- `chemin-json-guillemets` : `vinted-sync-extension/background.js:16034`
+  `sbGet(\`app_data?id=eq.vc_offres&select=o:data->offres->${cleOffreVc(nego)}\`)`. La clé est `n<id>`
+  (jamais numérique) : PostgREST la lit comme une clé, sans défaut constaté ; la règle veut
+  `->"${cleOffreVc(nego)}"`. Une version d'extension à monter.
+- `vc-recon` (CONFIDENTIALITÉ) : la capture brute 5.315 (sa demande du 2 nov. « capte tout Vestiaire »)
+  fait sortir de la page la réponse ENTIÈRE. Chemin : `vc-inject.js:1369` `noteBrut` ⇒
+  `post({ kind:'vcbrut', url, texte })` (`window.postMessage(…, '*')`, toute réponse JSON 2xx ≤ 400 Ko et
+  `__NEXT_DATA__`) ⇒ `vc.js:45` ⇒ `chrome.runtime.sendMessage({ action:'vcBrut' })` ⇒
+  `background.js:2700` ⇒ `rangerVcBrut` (15532) ⇒ upsert `app_data` `vc_brut_{empreinte}`.
+  `sansSecretsVc` ne vide que les clés jetons/mot de passe/carte/`iban`/`bic` : nom, e-mail, adresse,
+  téléphone et messages de l'acheteur, n° de commande et UUID de membre sont écrits en base ; un IBAN
+  sous un autre nom de clé aussi. C'est la décision attendue de Julien (« noms d'acheteurs dans
+  `vc_brut_*` », §9 du 4 nov.) : l'audit n'a pas été assoupli.
+
+- `retrait` (rouge aussi au premier passage, hors de la liste des quinze) : « l'écran Achats dit pourquoi
+  les codes manquent » cherche `<ExtEnRetard` dans les 1 800 premiers caractères de l'écran Achats ; il y
+  est toujours (`src/App.jsx` vers 53555) mais à 3 700 caractères du début : fenêtre de l'audit trop
+  courte, pas un défaut de l'app. Zone « écran Achats » d'une autre branche : décrit, pas touché.
+
+### Passage complet
+`npm run build` vert, puis les 288 `scripts/audit-*.cjs` (240 s chacun) : 3 rouges — `chemin-json-guillemets`
+(extension), `vc-recon` (extension, confidentialité), `retrait` (fenêtre de l'audit, écran Achats).
+
+### Constaté en passant
+- `PUSH_DEFAUT` (`api/_lib/push.js`) n'est plus lu par aucune décision (`decisionNotif` décide) et
+  contredit les familles (`message:false`, `facture:false` alors que leurs familles sonnent par défaut) :
+  table morte, trompeuse.
+- La carte « À venir / À virer » de Ma journée n'apparaît que s'il y a de l'argent À VENIR : un vendeur
+  qui n'a que de l'argent À VIRER ne la voit pas (non corrigé, non jugé par un audit).
