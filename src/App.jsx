@@ -254,7 +254,7 @@ import { histoireArticle, offresDeConversation } from "./histoireArticle.js";
 import { etatArticle } from "./etatArticle.js";
 import StockExplication from "./StockExplication.jsx";
 import { libererCasesPartis, remettreCase, resteAuStock, etatCase } from "./stockSortie.js";
-import { annoncesActuelles, classerRangees } from "./stockAnnonces.js";
+import { annoncesActuelles, annoncesVcStock, classerRangees } from "./stockAnnonces.js";
 import { CLE_MODELES, lireModeles } from "./modelesDescription.js";
 import { MesModeles, InsererModele } from "./ModelesDescription.jsx";
 import { CLE_REGLAGE_ETIQUETTE, PLACES as PLACES_ETIQUETTE, FORMES as FORMES_ETIQUETTE, QUESTIONS as QUESTIONS_ETIQUETTE, ANNONCE_EXEMPLE, lireReglageEtiquette, etiquetteDe, poserEtiquette, retirerEtiquette, proposition as propositionEtiquette } from "./etiquetteNumero.js";
@@ -9554,7 +9554,7 @@ const ajouterAutresPresents = (fiches) => {
   for (const a of autresPresents()) { const k = cleNum(a.numero); if (k && !cles.has(k)) { cles.add(k); plus.push({ id: 'plat:' + k, numero: a.numero, title: a.title || '', photo: a.photo || null, plateformes: a.plateformes || [], horsVinted: true }); } }
   return plus.length ? fiches.concat(plus) : fiches;
 };
-const NOM_PLAT_STOCK = { vinted: 'Vinted', ebay: 'eBay', leboncoin: 'Leboncoin' };
+const NOM_PLAT_STOCK = { vinted: 'Vinted', ebay: 'eBay', leboncoin: 'Leboncoin', vestiaire: 'Vestiaire' };
 
 // ── LA REMISE À ZÉRO DU 9 OCTOBRE : LES ANCIENS NUMÉROS SONT EN « B » ─────────
 // Julien : « tous les anciens numéros, tu les fais commencer par B1, B2… ; on
@@ -33581,23 +33581,38 @@ function ouDansMeubles(num, meublesArg, slotsArg) {
 // (la règle <enligne-regle> : en ligne, à confirmer, masquées), eBay
 // (`lireEbayEnLigne`) et Leboncoin (`lireLbcEnVente`). Un compte écarté du Stock
 // (masqué, retiré, supprimé, plus lié — `comptesStockEcartes`) n'est pas lu.
-// Rend `{ vinted: [{ uid, nom, ok, lu, enLigne, aConfirmer, masquees }], ebay, lbc, at }`
+// (5 nov., « ce qui reste ») Vestiaire : `vc_listings` et `vc_ventes`, PROJETÉS
+// (les mêmes champs que l'écran Annonces → Vestiaire, jamais `select=data`) ;
+// le jugement (`annoncesVcStock`) se fait au rendu, avec les N° du moment
+// (`numerosVcEffectifs`, qui suivent un N° donné ou relié pendant que l'écran
+// est ouvert). `vc: null` = la lecture a raté ; `{ lst: {} }` = jamais rangée.
+// Rend `{ vinted: [{ uid, nom, ok, lu, enLigne, aConfirmer, masquees }], ebay, lbc, vc, at }`
 // — une lecture ratée reste « pas su » (`ok: false`, `null`), jamais `[]`.
+async function lireVcStock() {
+  const [rl, rv] = await Promise.all([
+    lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt,complet:data->complet`).catch(() => null),
+    lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_ventes&select=ventes:data->ventes`).catch(() => null),
+  ]);
+  if (!Array.isArray(rl)) return null;
+  const r = rl[0] || {};
+  const ventes = Array.isArray(rv) && rv[0] && rv[0].ventes && typeof rv[0].ventes === 'object' ? rv[0].ventes : null;
+  return { lst: { items: r.items && typeof r.items === 'object' ? r.items : null, liens: r.liens && typeof r.liens === 'object' ? r.liens : {}, capturedAt: r.capturedAt || '', complet: r.complet === true }, ventes };
+}
 async function lireAnnoncesStock(accounts) {
   const horsCompte = comptesStockEcartes();
   const accs = (accounts || []).filter((a) => a && a.vinted_user_id != null && !horsCompte({ accountId: a.vinted_user_id }));
-  const [vinted, ebay, lbc] = await Promise.all([
+  const [vinted, ebay, lbc, vc] = await Promise.all([
     Promise.all(accs.map(async (acc) => {
       const uid = String(acc.vinted_user_id), nom = String(acc.login || acc.username || uid);
       let r; try { r = await fetchVintedListings(acc, 1, {}); } catch (_) { r = null; }
       if (!r || !r.ok) return { uid, nom, ok: false };
       return { uid, nom, ok: true, lu: Number.isFinite(r.lu) ? r.lu : null, enLigne: r.items || [], aConfirmer: r.aConfirmer || [], masquees: r.masquees || [] };
     })),
-    lireEbayEnLigne(), lireLbcEnVente(),
+    lireEbayEnLigne(), lireLbcEnVente(), lireVcStock().catch(() => null),
   ]);
-  return { vinted, ebay, lbc, at: Date.now() };
+  return { vinted, ebay, lbc, vc, at: Date.now() };
 }
-const NOM_PLAT_FILTRE = { vinted: 'Vinted', leboncoin: 'Leboncoin', ebay: 'eBay' };
+const NOM_PLAT_FILTRE = { vinted: 'Vinted', leboncoin: 'Leboncoin', ebay: 'eBay', vestiaire: 'Vestiaire' };
 const depuisQuand = (ms) => { if (!Number.isFinite(ms)) return 'jamais lu'; const h = (Date.now() - ms) / 3600000; return h < 48 ? `lu il y a ${Math.max(1, Math.round(h))} h` : `lu il y a ${Math.round(h / 24)} j`; };
 
 function StockMeubles({ locate = null, placeNum = null, onPlaced = null, accounts = null, comptesLus = false } = {}) {
@@ -33678,6 +33693,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   // ⇒ « Vendues à sortir », sinon ⇒ « Plus en ligne » (`classerRangees`) — et si
   // une lecture qui pourrait la porter manque, on ne dit RIEN d'elle (« pas su »).
   const [lecture, setLecture] = React.useState(undefined);   // undefined = en cours
+  const vcLocStock = useVcLocal();                           // les N° Vestiaire (donnés, reliés) : redessine quand ils changent
   const cleComptesStock = (accounts || []).map((a) => String((a && a.vinted_user_id) || '')).filter(Boolean).sort().join(',');
   React.useEffect(() => {
     if (!comptesLus) return undefined;
@@ -33694,9 +33710,12 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   const [maxListe, setMaxListe] = React.useState(60);        // la liste des annonces actuelles, 60 par 60
   const [, setTic] = React.useState(0);                      // relire après « Elle est encore là »
   const garder = { ...(load('vrm_stock_garde_hors_ligne', {}) || {}), ...(load('vrm_stock_garder', {}) || {}) };
+  // Vestiaire : ses annonces jugées par la règle de Vestiaire, avec les N° du
+  // moment (donnés par VRM, ou celui de Vinted qu'il a relié — `vrm_vc_liens`).
+  const vcStock = lecture ? (lecture.vc ? annoncesVcStock({ lst: lecture.vc.lst, ventes: lecture.vc.ventes, auto: vcLocStock.auto }) : null) : undefined;
   const aa = lecture ? annoncesActuelles({
     vinted: lecture.vinted.map((c) => (c.ok ? { ...c, masquees: masqueesPresentes(c.masquees, numeros, pairsLost) } : c)),
-    numeros, ebay: lecture.ebay, lbc: lecture.lbc, vendus, cle: cleNum, clePhoto: photoKey,
+    numeros, ebay: lecture.ebay, lbc: lecture.lbc, vestiaire: vcStock, vendus, cle: cleNum, clePhoto: photoKey,
   }) : null;
   // Une paire sous deux N° (même photo exacte, `aussi`) : chacun de ses N° est actuel.
   const actuellesCles = aa ? new Set(aa.articles.flatMap((a) => [a.cle, ...(a.aussi || []).map(cleNum)]).filter(Boolean)) : null;
@@ -33710,8 +33729,12 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   // Toutes les lectures qui pourraient porter ce N° ont-elles répondu ? Sinon
   // « pas su » : la paire rangée n'est dite ni présente ni partie.
   const lusOk = new Set(lecture ? lecture.vinted.filter((c) => c.ok).map((c) => c.uid) : []);
+  // Vestiaire : une lecture absente, ratée ou lue en partie, ou une annonce de
+  // ce N° à l'état non dit ⇒ on ne dit rien de la paire rangée.
+  const vcNonJugeesCles = new Set(aa ? (aa.vcNonJugees || []).map((x) => x.cle).filter(Boolean) : []);
   const jugeable = (k) => {
     if (!aa || !aa.su || !lecture.lbc || !lecture.ebay || (lecture.ebay.illisibles || []).length) return false;
+    if (aa.manque.some((m) => m.plateforme === 'vestiaire') || vcNonJugeesCles.has(k)) return false;
     const cs = (fichesParCle[k] || []).map((f) => String(f.accountId || '')).filter(Boolean);
     return cs.length ? cs.every((u) => lusOk.has(u)) : lecture.vinted.every((c) => c.ok);
   };
@@ -34065,9 +34088,17 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   const platsPresents = aa ? [...new Set(aa.articles.flatMap((a) => a.plateformes))] : [];
   const comptesPresents = aa ? [...new Set(aa.articles.flatMap((a) => a.comptes))] : [];
   // Les lectures qui manquent, NOMMÉES : « compte_beta sur Vinted, Leboncoin ».
+  // (5 nov.) Vestiaire : la raison est dite (« jamais lu », « lue en partie »), avec le geste.
+  const MOT_MANQUE_VC = { 'pas lu': 'Vestiaire (lecture ratée)', 'jamais lu': 'Vestiaire (jamais lu : ouvre « Mes articles » sur vestiairecollective.com)', 'lue en partie': 'Vestiaire (liste lue en partie : ouvre « Mes articles » jusqu’en bas)' };
   const manqueTxt = aa ? (() => { const v = aa.manque.filter((x) => x.plateforme === 'vinted').map((x) => x.nom); const e = aa.manque.filter((x) => x.plateforme === 'ebay').map((x) => (x.nom === 'eBay' ? 'eBay' : `${x.nom} sur eBay`)); const l = aa.manque.some((x) => x.plateforme === 'leboncoin') ? ['Leboncoin'] : [];
-    return [...(v.length ? [`${v.join(', ')} sur Vinted`] : []), ...e, ...l].join(', '); })() : '';
+    const vc = aa.manque.filter((x) => x.plateforme === 'vestiaire').map((x) => MOT_MANQUE_VC[x.raison] || 'Vestiaire');
+    return [...(v.length ? [`${v.join(', ')} sur Vinted`] : []), ...e, ...l, ...vc].join(', '); })() : '';
   const sansNumAutres = aa ? (aa.sansNumero.ebay + aa.sansNumero.leboncoin) : 0;
+  const vcSansNum = aa ? (aa.vcSansNumero || []) : [];
+  const vcNonDites = aa ? (aa.vcNonJugees || []) : [];
+  const aConfVoir = aa ? aa.aConfirmerComptes.filter((c) => !filtreCompte || c.uid === filtreCompte) : [];
+  const aConfTxt = aConfVoir.map((c) => (c.plateforme === 'vestiaire' ? (c.vieille ? `Vestiaire, ${depuisQuand(c.lu)}` : 'Vestiaire, plus vues dans ta dernière liste') : `${c.nom}, ${depuisQuand(c.lu)}`)).join(' ; ');
+  const aConfGeste = [aConfVoir.some((c) => c.plateforme !== 'vestiaire') ? 'plus de 24 h : repasse sur Vinted avec ce compte' : '', aConfVoir.some((c) => c.plateforme === 'vestiaire') ? 'ouvre « Mes articles » sur Vestiaire' : ''].filter(Boolean).join(' ; ');
   const blocResume = (
     <Card style={{ padding: '13px 14px' }}>
       <div className="vrm-s2d-resume" data-stock-actuelles={lecture === undefined ? 'encours' : (aa && aa.su ? nAffiche : 'passu')} data-stock-au-moins={aa && aa.auMoins ? '1' : '0'} data-stock-a-confirmer={aa && aa.su ? nAConf : undefined} data-stock-masquees={aa && aa.su ? nMasq : undefined} data-stock-rangees={aa && aa.su ? nRangees : undefined}>
@@ -34075,15 +34106,18 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
           {lecture === undefined ? '…' : (aa && aa.su ? <>{aa.auMoins ? <span style={{ fontSize: 15, fontWeight: 600 }}>au moins </span> : null}{nAffiche}</> : '—')}
           <small>{nAffiche === 1 && aa && aa.su ? 'annonce actuelle' : 'annonces actuelles'}{filtreActif ? ' (filtrées)' : ''}</small>
         </div>
-        {lecture === undefined && <div className="vrm-s2d-resume-l">Je lis tes annonces Vinted, Leboncoin et eBay…</div>}
+        {lecture === undefined && <div className="vrm-s2d-resume-l">Je lis tes annonces Vinted, Leboncoin, eBay et Vestiaire…</div>}
         {lecture && !aa.su && <div className="vrm-s2d-resume-l" data-stock-passu="">Je n'ai pas pu lire tes annonces{manqueTxt ? ` (${manqueTxt})` : ''} — rien n'est perdu, c'est la lecture qui a échoué. Ouvre Vinted {NAV.dans} avec l'extension, puis reviens ici.</div>}
         {aa && aa.su && <div className="vrm-s2d-resume-l">
           {nAffiche > 0 ? <><b>{nRangees}</b> rangée{nRangees > 1 ? 's' : ''} · <b>{nAffiche - nRangees - nSansNum}</b> pas encore rangée{nAffiche - nRangees - nSansNum > 1 ? 's' : ''}</> : 'Aucune annonce en ligne lue'}
-          {nAConf > 0 && <span data-stock-a-confirmer-noms=""> · dont <b>{nAConf}</b> à confirmer ({aa.aConfirmerComptes.filter((c) => !filtreCompte || c.uid === filtreCompte).map((c) => `${c.nom}, ${depuisQuand(c.lu)}`).join(' ; ')} — plus de 24 h : repasse sur Vinted avec ce compte)</span>}
+          {nAConf > 0 && <span data-stock-a-confirmer-noms=""> · dont <b>{nAConf}</b> à confirmer ({aConfTxt} — {aConfGeste})</span>}
+          {aa.vcVieille && !aConfVoir.some((c) => c.plateforme === 'vestiaire') && <span data-stock-vc-vieille=""> · Vestiaire {depuisQuand(aa.vcVieille.lu)} : ouvre « Mes articles » sur Vestiaire</span>}
           {nMasq > 0 && <> · dont <b>{nMasq}</b> masquée{nMasq > 1 ? 's' : ''} par Vinted (toujours chez toi)</>}
           {nSansNum > 0 && <> · <b>{nSansNum}</b> sans N° (donne-leur un N° dans Annonces pour les ranger)</>}
           {aa.manque.length > 0 && <span data-stock-manque=""> · pas lu : {manqueTxt}</span>}
           {sansNumAutres > 0 && <> · {sansNumAutres} annonce{sansNumAutres > 1 ? 's' : ''} {aa.sansNumero.leboncoin && aa.sansNumero.ebay ? 'Leboncoin et eBay' : (aa.sansNumero.leboncoin ? 'Leboncoin' : 'eBay')} sans N° pas comptée{sansNumAutres > 1 ? 's' : ''} (rien ne dit quelle paire c'est)</>}
+          {vcSansNum.length > 0 && <span data-stock-vc-sans-numero={vcSansNum.length}> · {vcSansNum.length} annonce{vcSansNum.length > 1 ? 's' : ''} Vestiaire sans N° pas comptée{vcSansNum.length > 1 ? 's' : ''} : {vcSansNum.slice(0, 4).map((x) => `« ${x.titre || 'sans titre lu'} »`).join(', ')}{vcSansNum.length > 4 ? '…' : ''} (le N° arrive quand VRM a relu tes numéros — jamais deviné par le titre)</span>}
+          {vcNonDites.length > 0 && <span data-stock-vc-non-dites={vcNonDites.length}> · {vcNonDites.length} annonce{vcNonDites.length > 1 ? 's' : ''} Vestiaire à l'état non dit (ni en ligne ni partie) pas comptée{vcNonDites.length > 1 ? 's' : ''}</span>}
         </div>}
         {aa && aa.su && (platsPresents.length > 1 || comptesPresents.length > 1) && (
           <div className="vrm-s2d-filtres" data-stock-filtres="">
@@ -37618,6 +37652,10 @@ function RegistresCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accoun
     return () => { mort = true; };
   }, []);
   const [enCours, setEnCours] = React.useState('');
+  // Un achat en gros, un rattachement, une fiche reliée changés (ici ou sur un
+  // autre appareil) : le registre des achats se relit.
+  const [ticAchats, setTicAchats] = React.useState(0);
+  React.useEffect(() => { const f = (e) => { const k = e && e.detail && e.detail.k; if (k === CLE_FOURNISSEURS || k === 'vinted_annonce_numeros' || k === 'vinted_offvinted_buys') setTicAchats((t) => t + 1); }; window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f); }, []);
   const recettes = React.useMemo(() => {
     if (calc.etat !== 'lu') return calc.etat === 'passu' ? null : undefined;
     const rel = lireReleveVentes();
@@ -37638,11 +37676,14 @@ function RegistresCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accoun
     const delies = load('vrm_recus_delies', {}) || {};
     const index = indexRecusParTransaction(Array.isArray(recus) ? recus.filter((r) => !(r && r.id && delies[r.id])) : recus, (r) => ventilationRecuAchat(r && r.texte).trouve);
     let fiches = null; try { fiches = load('vinted_annonce_numeros', {}) || {}; } catch (_) { fiches = null; }
+    // (5 nov.) Les achats en gros (Achats → Fournisseurs) : UNE ligne chacun, par
+    // leur total + frais, lus par LA règle du registre (`lireRegistre`).
     return registreDesAchats({ achats, hors: load('vinted_offvinted_buys', []) || [], fiches, periode,
       ventilationDe: (tx) => { const r = index.get(String(tx)); return r ? ventilationRecuAchat(r.texte) : null; },
       exclu: (o) => compteEcarte(o && o._uid, hAcc, panelOff || {}), montantHors: prixAchatHorsNombre, sourceHors: libelleSourceAchat,
+      gros: lireRegistre(load(CLE_FOURNISSEURS, null)), cleNum,
       manque: recus === null ? ['reçus d’achat'] : [] });
-  }, [achats, recus, periode, panelOff]);
+  }, [achats, recus, periode, panelOff, ticAchats]);
   const exporter = async (R, forme) => {
     if (!R || enCours) return;
     setEnCours(R.type + forme);
@@ -37658,11 +37699,13 @@ function RegistresCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accoun
     <div className="vrm-registre" data-registre={type} data-registre-etat={R === undefined ? 'encours' : R === null ? 'passu' : 'lu'}
       data-registre-n={R ? R.n : ''} data-registre-total={R ? String(Math.round(R.total * 100)) : ''} data-registre-sans-montant={R ? R.sansMontant : ''}
       data-registre-partiel={R ? (R.complet ? '0' : '1') : ''} data-registre-hors={R ? R.horsPeriode.length : ''}
+      data-registre-gros={R && R.type === 'achats' ? R.nGros : ''} data-registre-a-verifier={R && R.type === 'achats' ? R.aVerifier : ''}
       style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '12px 0', borderTop: `1px solid ${C.border}` }}>
       <span style={{ flex: '1 1 160px', minWidth: 0 }}>
         <span style={{ display: 'block', fontSize: 15, fontWeight: 600, color: C.text }}>{nom}</span>
         <span className="vrm-display" style={{ display: 'block', fontSize: 13, color: C.muted, fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>
-          {R === undefined ? '…' : R === null ? '—' : `${R.n} · ${R.complet ? '' : 'au moins '}${fmt(R.total)}`}
+          {R === undefined ? '…' : R === null ? '—' : `${R.n} · ${R.complet ? '' : 'au moins '}${fmt(R.total)}${R.type === 'achats' && R.nGros ? ` · dont ${R.nGros} achat${R.nGros > 1 ? 's' : ''} en gros` : ''}`}
+          {R && R.type === 'achats' && R.aVerifier ? <span data-registre-a-verifier-txt="" style={{ color: C.warn }}> · {R.aVerifier} à vérifier (N° aussi dans un achat en gros)</span> : null}
         </span>
       </span>
       <span style={{ display: 'flex', gap: 8, flex: '0 0 auto' }}>

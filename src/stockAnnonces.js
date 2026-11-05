@@ -19,6 +19,17 @@
 // ⚠️ « PAS SU » N'EST PAS « AUCUNE » : un compte dont la lecture a raté, eBay ou
 //    Leboncoin pas lus ⇒ `manque` (nommés) et `auMoins` ; rien lu du tout ⇒
 //    `su: false` (l'écran dit « — », jamais « aucune annonce »).
+// ⚠️ VESTIAIRE (5 nov., « ce qui reste ») : ses annonces EN LIGNE telles que l'app
+//    les connaît déjà (`vc_listings`, rangées par l'extension — `rangerVcAnnonces`,
+//    `ficheVcAnnonce`), jugées par LA règle de Vestiaire (`etatAnnonceVcBrut`,
+//    api/_lib/vestiaire-regle.js) et numérotées par SON identité (`numVcAnnonce` :
+//    l'annonce publiée par VRM, la référence VRM-{n°} de l'article, le N° donné
+//    par VRM ou celui de l'annonce Vinted qu'IL a reliée — `main.vrm_vc_liens`).
+//    Jamais le titre. Sans N° ⇒ pas comptée, NOMMÉE, « au moins ». Lecture
+//    absente ⇒ nommée ; plus de 24 h ⇒ « à confirmer », nommée ; liste lue en
+//    partie ou état non dit ⇒ nommé, « au moins ».
+
+import { etatAnnonceVcBrut, numVcAnnonce, vcVenteAnnulee } from '../api/_lib/vestiaire-regle.js';
 
 const arr = (a) => (Array.isArray(a) ? a : []);
 const cleDefaut = (n) => {
@@ -27,6 +38,42 @@ const cleDefaut = (n) => {
 };
 const RANG_ETAT = { enligne: 0, masquee: 1, aconfirmer: 2 };
 
+// Les annonces Vestiaire telles que le Stock les compte (module PUR).
+//   lst    : `vc_listings` projeté { items, liens, capturedAt, complet } ; null = la
+//            lecture a raté (pas su) ; {} = aucune lecture rangée (jamais lu)
+//   ventes : `vc_ventes.ventes` (une vente lue, pas annulée, PROUVE « vendue ») ;
+//            null = pas lues (rien n'en est tiré, comme l'écran Vestiaire)
+//   auto   : les N° donnés par VRM et ceux qu'IL a reliés à Vinted
+//            (`numerosVcEffectifs()` : `vrm_vc_numeros` + `vrm_vc_liens`)
+// Rend null (pas su) · { lue: false } (jamais lu) · { lue: true, lu, vieille,
+//   complet, liste: [{ id, numero, titre, photo, etat }], sansNumero: [{ id, titre }],
+//   nonJugees: [{ id, titre, numero }] }.
+//   etat : 'enligne' (lecture de moins de 24 h) · 'aconfirmer' (lecture plus
+//   vieille, ou annonce plus vue dans une liste relue — rien n'est retiré).
+export function annoncesVcStock({ lst, ventes = null, auto = null, maintenant = Date.now() } = {}) {
+  if (lst == null || typeof lst !== 'object') return null;
+  const items = lst.items && typeof lst.items === 'object' && !Array.isArray(lst.items) ? lst.items : null;
+  const lu = Date.parse(lst.capturedAt || '');
+  if (!items || !Number.isFinite(lu)) return { lue: false };
+  const vieille = !(maintenant - lu <= 24 * 3600e3);
+  const vendus = new Set();
+  for (const v of Object.values(ventes && typeof ventes === 'object' ? ventes : {})) if (v && v.productId && !vcVenteAnnulee(v)) vendus.add(String(v.productId));
+  const liste = [], sansNumero = [], nonJugees = [];
+  for (const [id, it] of Object.entries(items)) {
+    if (!it || typeof it !== 'object') continue;
+    const e = etatAnnonceVcBrut(it, vendus.has(String(id)), lst.capturedAt);
+    if (e === 'vendue' || e === 'retiree') continue;
+    const titre = String(it.titre || '');
+    const numero = numVcAnnonce(id, it, lst.liens, auto);
+    // « en attente de validation », mot inconnu, état non dit : ni en ligne ni parti.
+    if (e !== 'en-ligne' && e !== 'a-confirmer') { nonJugees.push({ id: String(id), titre, numero }); continue; }
+    const etat = e === 'a-confirmer' || vieille ? 'aconfirmer' : 'enligne';
+    if (!numero) { sansNumero.push({ id: String(id), titre, etat }); continue; }
+    liste.push({ id: String(id), numero, titre, photo: typeof it.photo === 'string' && it.photo ? it.photo : null, etat });
+  }
+  return { lue: true, lu, vieille, complet: lst.complet === true, liste, sansNumero, nonJugees };
+}
+
 // Les annonces actuelles, une par PAIRE.
 //   vinted : [{ uid, nom, ok, lu (ms|null), enLigne:[it], aConfirmer:[it], masquees:[it] }]
 //            (`ok: false` = la lecture de ce compte a raté : « pas su »)
@@ -34,17 +81,22 @@ const RANG_ETAT = { enligne: 0, masquee: 1, aconfirmer: 2 };
 //   numeros : { [idAnnonce]: { numero, photo? } } — la fiche de chaque annonce Vinted
 //   ebay   : null (pas su) | { liste: [{ numero, title, photo }], illisibles: [nom] }
 //   lbc    : null (pas su) | [{ numero, title, photo }]
+//   vestiaire : la sortie de `annoncesVcStock` (null pas su · { lue: false } jamais
+//            lu) ; `undefined` = Vestiaire pas demandé (appelant d'avant)
 //   vendus : Set de clés — N° PROUVÉS vendus (`vrm_stock_vendus`) : une annonce eBay
 //            ou Leboncoin restée en ligne n'en refait pas une annonce actuelle
 //            (la même exclusion que `articlesAutresPlateformes`).
-// Rend { articles, n, nAConfirmer, nMasquees, sansNumero, manque, aConfirmerComptes, su, auMoins }.
+// Rend { articles, n, nAConfirmer, nMasquees, sansNumero, manque, aConfirmerComptes,
+//        vcSansNumero, vcNonJugees, vcVieille, su, auMoins }.
 //   article : { cle, numero, ids, titre, photo, plateformes, comptes, etat, aussi }
 //   etat : 'enligne' (au moins une annonce en ligne) · 'masquee' · 'aconfirmer'
-export function annoncesActuelles({ vinted, numeros, ebay, lbc, vendus, cle = cleDefaut, clePhoto = null } = {}) {
+export function annoncesActuelles({ vinted, numeros, ebay, lbc, vestiaire, vendus, cle = cleDefaut, clePhoto = null } = {}) {
   const parts = [];          // { id, cle, numero, titre, photo, plat, compte, etat }
   const manque = [], aConfirmerComptes = [];
   let lus = 0;
-  const sansNumero = { vinted: 0, ebay: 0, leboncoin: 0 };
+  const sansNumero = { vinted: 0, ebay: 0, leboncoin: 0, vestiaire: 0 };
+  const vcSansNumero = [], vcNonJugees = [];
+  let vcVieille = null;
   const fiches = numeros && typeof numeros === 'object' ? numeros : {};
   for (const c of arr(vinted)) {
     if (!c) continue;
@@ -60,7 +112,7 @@ export function annoncesActuelles({ vinted, numeros, ebay, lbc, vendus, cle = cl
     arr(c.enLigne).forEach((it) => pousse(it, 'enligne'));
     arr(c.aConfirmer).forEach((it) => pousse(it, 'aconfirmer'));
     arr(c.masquees).forEach((it) => pousse(it, 'masquee'));
-    if (arr(c.aConfirmer).length) aConfirmerComptes.push({ uid: String(c.uid || ''), nom: String(c.nom || c.uid || ''), n: arr(c.aConfirmer).length, lu: Number.isFinite(c.lu) ? c.lu : null });
+    if (arr(c.aConfirmer).length) aConfirmerComptes.push({ uid: String(c.uid || ''), plateforme: 'vinted', nom: String(c.nom || c.uid || ''), n: arr(c.aConfirmer).length, lu: Number.isFinite(c.lu) ? c.lu : null });
   }
   const autres = (liste, plat) => {
     for (const a of arr(liste)) {
@@ -79,6 +131,27 @@ export function annoncesActuelles({ vinted, numeros, ebay, lbc, vendus, cle = cl
   }
   if (lbc == null) manque.push({ plateforme: 'leboncoin', nom: 'Leboncoin', raison: 'pas lu' });
   else { lus++; autres(lbc, 'leboncoin'); }
+  // Vestiaire : déjà jugé par `annoncesVcStock` (la règle de Vestiaire) ; ici on
+  // le RÉUNIT par identité, comme les autres.
+  if (vestiaire === null) manque.push({ plateforme: 'vestiaire', nom: 'Vestiaire', raison: 'pas lu' });
+  else if (vestiaire && !vestiaire.lue) manque.push({ plateforme: 'vestiaire', nom: 'Vestiaire', raison: 'jamais lu' });
+  else if (vestiaire) {
+    lus++;
+    let nAc = 0;
+    for (const a of arr(vestiaire.liste)) {
+      const numero = a && a.numero != null ? String(a.numero).trim() : '';
+      const k = numero ? cle(numero) : '';
+      if (!k) { sansNumero.vestiaire += 1; vcSansNumero.push({ id: String((a && a.id) || ''), titre: String((a && a.titre) || '') }); continue; }
+      if (vendus && vendus.has(k)) continue;
+      if (a.etat === 'aconfirmer') nAc++;
+      parts.push({ id: 'vc:' + String(a.id), cle: k, numero, titre: String(a.titre || ''), photo: a.photo || null, plat: 'vestiaire', compte: '', etat: a.etat === 'aconfirmer' ? 'aconfirmer' : 'enligne' });
+    }
+    for (const a of arr(vestiaire.sansNumero)) { sansNumero.vestiaire += 1; vcSansNumero.push({ id: String((a && a.id) || ''), titre: String((a && a.titre) || '') }); }
+    for (const a of arr(vestiaire.nonJugees)) vcNonJugees.push({ id: String((a && a.id) || ''), titre: String((a && a.titre) || ''), cle: a && a.numero ? cle(a.numero) : '' });
+    if (!vestiaire.complet) manque.push({ plateforme: 'vestiaire', nom: 'Vestiaire', raison: 'lue en partie' });
+    if (vestiaire.vieille) vcVieille = { lu: Number.isFinite(vestiaire.lu) ? vestiaire.lu : null };
+    if (nAc) aConfirmerComptes.push({ uid: '', plateforme: 'vestiaire', nom: 'Vestiaire', n: nAc, lu: Number.isFinite(vestiaire.lu) ? vestiaire.lu : null, vieille: !!vestiaire.vieille });
+  }
 
   // Réunir par IDENTITÉ : même annonce, même N°, même photo exacte (union-find).
   const parent = parts.map((_, i) => i);
@@ -113,8 +186,8 @@ export function annoncesActuelles({ vinted, numeros, ebay, lbc, vendus, cle = cl
   const nAConfirmer = articles.filter((a) => a.etat === 'aconfirmer').length;
   const nMasquees = articles.filter((a) => a.etat === 'masquee').length;
   const su = lus > 0;
-  return { articles, n: articles.length, nAConfirmer, nMasquees, sansNumero, manque, aConfirmerComptes, su,
-    auMoins: su && (manque.length > 0 || sansNumero.ebay > 0 || sansNumero.leboncoin > 0) };
+  return { articles, n: articles.length, nAConfirmer, nMasquees, sansNumero, manque, aConfirmerComptes, vcSansNumero, vcNonJugees, vcVieille, su,
+    auMoins: su && (manque.length > 0 || sansNumero.ebay > 0 || sansNumero.leboncoin > 0 || sansNumero.vestiaire > 0 || vcNonJugees.length > 0) };
 }
 
 // Ce qui est dans une CASE et n'est plus une annonce actuelle : à sortir du
