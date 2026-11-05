@@ -1967,7 +1967,7 @@ au plus, 24 en tout (`placesPhotos`) ; choisir une autre paire garde les photos 
 `photos-envoi` / `photos-echec`).
 
 **Preuves.** `ebay-photos-agent-arret` (Playwright 390 tactile / 1512 sombre, données
-inventées) 32/32, 13 rouges sur 33200ec6 ; `ebay-photo-route` (vraie route, faux eBay) 15/15,
+inventées) 32/32, 12 rouges sur 33200ec6 (mutations d'écran : garde « photos-echec » retirée, ‹ inversé ⇒ rouges) ; `ebay-photo-route` (vraie route, faux eBay) 15/15,
 `--prouve` 8/8 ; `agent-ebay-push` 16/16, 15 rouges avant. **Non mesuré** : l'appel réel
 `UploadSiteHostedPictures` (forme de la documentation Trading) ; combien de temps eBay garde une
 photo hébergée qui attend dans un brouillon (documentation : supprimée si jamais utilisée).
