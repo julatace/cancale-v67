@@ -62,7 +62,7 @@ export function histoireArticle(rn, d = {}, o = {}) {
       const relieSansTx = !bid && e.titre === 'Achetée sur Vinted';
       const recu = !bid ? null : d.recus == null ? 'reçu pas lu' : d.recus.has(bid) ? 'reçu rangé' : 'pas de reçu';
       ev.push({ at: iso(e.date || (fiche && fiche.buyFrom && fiche.buyFrom.date)), texte: [e.montant != null ? eur(e.montant / 100) : null, e.detail || null, recu].filter(Boolean).join(' · '),
-        preuve: bid ? `achat n° ${bid}` : relieSansTx ? 'achat relié' : 'prix saisi', cle: 'achat' });
+        preuve: bid ? `achat n° ${bid}` : relieSansTx ? 'achat relié' : e.gros ? 'achat en gros' : 'prix saisi', cle: 'achat' });
     }
     pose('achat', e ? e.etat : 'passu', e ? e.titre : 'Achat', ev, e && e.etat !== 'fait' ? e.detail : null);
   }

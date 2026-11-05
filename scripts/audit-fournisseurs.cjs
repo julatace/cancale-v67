@@ -235,6 +235,27 @@ const somme = (xs) => xs.reduce((t, x) => t + (x || 0), 0);
   const b10 = F.bilanFournisseurs({ registre: reg, fiches: { a: fiche(1, lien('g1', 't1')), b: fiche(2, lien('g1', 't2')), c: fiche(3, lien('g1', 't3')) } });
   dit(b10.parAchat.g1.relies === 3 && F.texteRelies(b10.parAchat.g1) === '3 sur 10 reliées', 'C11 10 paires à 300 €, 3 N° reliés : « 3 sur 10 reliées »');
 
+  // (5 nov., intégration lot 2) La fiche complète d'une paire (« Voir l'état »)
+  // et Fournisseurs disent la MÊME origine du prix (une règle : `origineDuPrix`).
+  console.log('\n── P. La fiche d’une paire dit l’origine du prix comme Fournisseurs');
+  try {
+    const u = (f) => require('url').pathToFileURL(path.join(R, 'src', f)).href;
+    const { parcoursPaire } = await import(u('fichePaire.js'));
+    const { histoireArticle } = await import(u('histoireArticle.js'));
+    const { etatArticle } = await import(u('etatArticle.js'));
+    const voir = (prix) => {
+      const rn = { etat: 'ok', cle: '7', annonces: [{ id: 'a1', title: 'Nike Air Max 90 blanc 42' }], ventes: { vinted: [], lbc: [], ebay: [] }, manques: [] };
+      const d = { fiches: { a1: { numero: '7', title: 'Nike Air Max 90 blanc 42', buyPrice: prix, buyGros: { id: 'g1', at: '2026-10-13T10:00:00Z', part: 3000 } } } };
+      const pp = parcoursPaire(rn, d, {}); const h = histoireArticle(rn, d, {});
+      return { etape: pp && pp.etapes[0], etat: h ? etatArticle(h, { fiches: d.fiches, ids: ['a1'] }) : null };
+    };
+    const lot = voir('30'), main = voir('35');
+    dit(lot.etape && lot.etape.gros === true && !/saisi à la main/.test(lot.etape.detail) && lot.etat && lot.etat.prixAchat.source === 'gros',
+      'P1 prix posé par le lot (part 30 €) : la fiche dit « achat en gros », jamais « saisi à la main »', JSON.stringify([lot.etape, lot.etat && lot.etat.prixAchat]));
+    dit(main.etape && !main.etape.gros && main.etat && main.etat.prixAchat.source === 'saisi',
+      'P2 prix retapé (35 €) sur une paire du lot : « saisi à la main » (la règle de Fournisseurs)', JSON.stringify([main.etape, main.etat && main.etat.prixAchat]));
+  } catch (e) { dit(false, 'P la fiche complète se charge', e.message); }
+
   console.log('\n── A. L’app ne nourrit pas la feuille avec les achats Vinted');
   const sansCom = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
   const APP = sansCom(fs.readFileSync(path.join(R, 'src', 'App.jsx'), 'utf8'));

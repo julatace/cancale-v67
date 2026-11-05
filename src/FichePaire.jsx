@@ -34,7 +34,7 @@ const Evenement = ({ ev }) => (
 // (`etatArticle`, src/etatArticle.js) — deux dates LUES par chiffre, sinon « — »
 // et la raison ; « au moins » / « au plus » quand la première mise en ligne est
 // plus ancienne que celle qu'on connaît. Aucune couleur (§7).
-const LIB_SOURCE = { relie: 'achat relié', saisi: 'saisi à la main' };
+const LIB_SOURCE = { relie: 'achat relié', gros: 'achat en gros', saisi: 'saisi à la main' };
 function EtatArticle({ etat }) {
   const r = etat.republications;
   return (

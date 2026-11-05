@@ -66,12 +66,15 @@ export function etatArticle(p, x = {}) {
   // n°) ; « prix saisi » = tapé à la main. La date de l'achat n'est lue que d'un
   // achat relié (un prix saisi n'a pas de date d'achat).
   const relie = !!(evA && /^achat (n°|relié)/.test(str(evA.preuve)));
+  // (5 nov.) La part d'un achat en gros (Fournisseurs) : ni « saisi », ni un achat
+  // Vinted relié ; sa date vit dans le registre des fournisseurs, pas sur la fiche.
+  const gros = !!(evA && /^achat en gros/.test(str(evA.preuve)));
   const cents = p.resume && Number.isFinite(p.resume.achat) ? p.resume.achat : null;
   const prixAchat = !eA || eA.etat === 'passu'
     ? { cents: null, source: null, raison: (eA && eA.detail) || 'tes fiches pas encore lues' }
     : cents == null
       ? { cents: null, source: null, raison: eA.etat === 'absent' ? 'prix d’achat pas saisi, aucun achat relié' : 'prix de l’achat relié pas lu' }
-      : { cents, source: relie ? 'relie' : 'saisi', raison: '' };
+      : { cents, source: relie ? 'relie' : gros ? 'gros' : 'saisi', raison: '' };
   const dAchat = relie ? t(evA && evA.at) : null;
 
   // ── VENTE ────────────────────────────────────────────────────────────────
@@ -107,14 +110,14 @@ export function etatArticle(p, x = {}) {
   // ── RÉCEPTION ────────────────────────────────────────────────────────────
   const rec = x.reception;
   const dRec = rec && Number.isFinite(rec.ms) ? rec.ms : null;
-  const raisonRec = rec === undefined ? undefined : (!relie ? 'achat pas relié à cette paire' : (x.receptionRaison || 'réception pas lue (ni « livrée » dans la transaction, ni « Récupéré » touché)'));
+  const raisonRec = rec === undefined ? undefined : (!relie ? (gros ? 'réception d’un achat en gros pas suivie' : 'achat pas relié à cette paire') : (x.receptionRaison || 'réception pas lue (ni « livrée » dans la transaction, ni « Récupéré » touché)'));
 
   const lignes = [];
   const pose = (cle, titre, res, raison) => lignes.push(res && res.jours !== undefined ? { cle, titre, ...res, raison: res.raison || '' } : { cle, titre, jours: raison === undefined ? undefined : null, borne: null, raison: raison || '' });
 
   // 1. ACHAT → VENTE
   if (!venteSu) pose('achat-vente', 'Achat → vente', null, (eV && eV.detail) || 'tes ventes pas toutes lues');
-  else if (dAchat == null) pose('achat-vente', 'Achat → vente', null, relie ? 'date de l’achat pas écrite' : 'achat pas relié à cette paire');
+  else if (dAchat == null) pose('achat-vente', 'Achat → vente', null, relie ? 'date de l’achat pas écrite' : gros ? 'date de l’achat en gros dans Achats → Fournisseurs' : 'achat pas relié à cette paire');
   else if (vendue) pose('achat-vente', 'Achat → vente', dVente != null ? duree(dAchat, dVente) : null, 'date de vente pas lue');
   else pose('achat-vente', 'Achat → vente', duree(dAchat, now, 'depuis'), '');
 
