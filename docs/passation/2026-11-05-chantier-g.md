@@ -147,7 +147,51 @@ Encore Messages
 72. Messages · eBay : « Actualiser » en couleurs écrites en dur (#B8B8BC sur #262628 la nuit, F1 de `fusion-app`) → le bouton commun (`BoutonBase` secondaire petit, jetons), occupé pendant la lecture.
 
 ## Preuves
-(complétées en fin de chantier)
+- `npm run build` (vite build) vert, après la fusion de `claude/project-review-nsk5su` (ea4a1ad6).
+- **Banc `scripts/bancs/messages-emails-communaute.cjs`** (données inventées, 390 tactile et 1512,
+  clair et sombre, 9 scénarios : Messages Vinted / Vinted en panne / Leboncoin / Vestiaire,
+  E-mails boîte + Relier / Paramètres → E-mails / E-mails en panne, Communauté en panne /
+  classement en panne) : **après 108 ✅ · 0 ❌** ; **base (`claude/project-review-nsk5su`
+  a8e580d2, arbre `git archive` construit à part, banc copié dedans) 64 ✅ · 44 ❌** — G1 ×4,
+  G2 ×4, G3 ×4, G4 ×4, G5 ×8, G6 ×12, G6/G7 ×4, G8 ×4. **`BANC_MUTATION=1`** (filtres en
+  contour 36 px, colonne de 300 px, lien de pied en bleu, temps restant sans ambre, remis dans
+  la page) : G1 ×4, G2 ×4, G3 ×4, G8 ×4 (et G9 ×4) rougissent — 40 ✅ · 20 ❌.
+  Le banc relance son navigateur s'il est fermé en route (machine partagée : un navigateur
+  tué ne rend plus tout le banc rouge) ; la visibilité se juge par `checkVisibility()` (un
+  bouton dans un `<details>` fermé a un `offsetParent`).
+- **Audit `scripts/audit-offres-expirent.cjs`** (règle exécutée sur la vraie forme de
+  `vc_offres`) : 8 verts ; `--mutation` : 9/9 mutations rouges (seuil 24 h, « pas su » vaut
+  « bientôt », offre passée, 6 h pile, carte qui ne lit plus la règle, pastille de liste
+  ambre, Vinted qui importe la règle, une offre Vinted « expirée », ambre hors `--vrm-warn`) ;
+  sur la base : 5 rouges (la règle n'existe pas).
+- Audits verts après : `audit-rouge-doublon` (et `--mutation`), `audit-composants`,
+  `audit-coherence`, `audit-identite`, `audit-icones`, `audit-fonctions-api`,
+  `audit-boite-emails` 80, `audit-accompagnement` 40, `audit-vc-messages`, `audit-offres-email`,
+  `audit-lbc-messages`, `audit-lbc-repondre` 31, `audit-argent-offres-masquees`,
+  `audit-ebay-messages-nonlus`, `audit-communaute-sql` 206, `audit-favoris-ecran` 42.
+  `audit-vc-offres` : 15 rouges, les mêmes sur la base (dates de fixtures périmées).
+  `audit-politique-hotes` : 1 rouge, le même sur la base.
+- Tests de composants : `scripts/tests/espace-emails-interface.cjs` 57/57,
+  `reception-synthese-interface.cjs`, `journal-email-reessai.cjs` verts.
+- **Bancs ou tests ADAPTÉS** (ils jugeaient l'ancien rendu, pas la règle) :
+  · `tests/espace-emails-interface.cjs` : le harnais qui recopie `EmailsSetting` importe aussi
+    `EtatPanne`, `ChampRecherche`, `PAS_SU` (comme App.jsx) ; « emails » → « e-mails » dans
+    deux phrases attendues ;
+  · `audit-vc-messages.cjs` M9 : le titre de l'article peut être passé en `nom=` (la règle —
+    le titre lu est affiché — est la même) ;
+  · `bancs/boite-emails.cjs` : la panne se reconnaît à « pas su pour l’instant » et au bouton
+    `data-etat-panne-reessayer` d'`EtatPanne` (le « — » et `data-boite-etat-geste` d'avant) ;
+  · `bancs/messages-lisibles.cjs` : « 40,00 » → `40(,00)? €` (montant() n'écrit plus les
+    centimes nuls).
+- `fusion-app` après : 639 ✅ · 16 ❌, **aucun dans la zone** (le F1 « Actualiser » de
+  Messages · eBay a disparu) ; restent Annonces (F4, F6 N°), Ventes (F8, F9 sélecteur de site),
+  Compta Factures et Comptes liés (F6 bleu), Colis (F5) — d'autres chantiers.
+  `jetons-coherence` après : 3 rouges, tous Stock (« au moins » en tabular-nums, autre chantier).
+  `composants` après : 3 rouges « Segmente 36 px au doigt » — aucune feuille partagée touchée ici
+  (`git diff` vide sur styles-coque, styles-composants, composants/, design/).
+- Captures (hors dépôt, regardées) : avant
+  `scratchpad/g/avant/*.png`, après `scratchpad/g/apres/*.png`, mutation
+  `scratchpad/g/mutation/*.png` (dossier de session `/tmp/claude-0/…/scratchpad/g/`).
 
 ## Ce qui reste
 - **Hors zone, vu en passant** : le sélecteur de compte de Messages/Ventes/Annonces écrit encore

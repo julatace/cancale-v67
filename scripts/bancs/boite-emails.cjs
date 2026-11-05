@@ -461,7 +461,9 @@ const journal = (appels) => appels.filter((a) => a.chemin === '/api/email-rattac
           await pg.waitForTimeout(3000);
           if (w > 1000 || k === 3) await rel.locator('.vrm-relier-scene-bloc').screenshot({ path: path.join(CAPT, `relier-scene-${nom}-${k + 1}.png`) });
         }
-        dit(appels.slice(avant).filter((a) => a.chemin !== '/api/compte').length === 0, `${nom} : « Relier ma boîte » n’envoie RIEN`, JSON.stringify(appels.slice(avant)));
+        // (5 nov., chantier G, revue 2.24) L'onglet porte désormais aussi l'état de SA réception (l'ancien sous-écran de
+        // Paramètres) : il LIT ses propres données (GET `/api/email-rattacher`) — il n'ENVOIE toujours rien (aucune écriture).
+        dit(appels.slice(avant).filter((a) => a.chemin !== '/api/compte' && !(a.methode === 'GET' && a.chemin === '/api/email-rattacher')).length === 0, `${nom} : « Relier ma boîte » n’envoie RIEN (il ne fait que lire)`, JSON.stringify(appels.slice(avant)));
         const debord2 = await pg.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1);
         dit(!debord2, `${nom} : aucun débordement horizontal (Relier)`);
         const petits2 = await pg.locator('[data-relier-boite] button:visible').evaluateAll((l) => l.filter((x) => x.getBoundingClientRect().height < 43.5 || x.getBoundingClientRect().width < 43.5).map((x) => x.textContent.trim().slice(0, 30) || x.getAttribute('aria-label')));
