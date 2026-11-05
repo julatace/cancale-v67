@@ -16086,9 +16086,9 @@ function ToutSurLeNumero({ q, numData, comptes, onNav, onStock, onChercher, onFi
       {onFiche && rn.etat === 'trouve' && ligne('parcours', { 'data-tout-parcours': k }, `Toute l'histoire du N°${k}`, 'Achat, stock, annonces, vente, colis, argent', () => onFiche(k))}
       {rn.ancienNumero && <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Un ancien numéro (d'avant la remise à zéro) : il ne désigne que l'histoire.</div>}
       {rn.double && (
-        <div data-tout-double="1" role="alert" style={{ marginTop: 8, padding: '8px 10px', borderRadius: 12, border: `1px solid ${C.danger}`, color: C.danger, fontSize: 13, fontWeight: 600 }}>
+        <div data-tout-double="1" role="alert" style={{ marginTop: 8, padding: '8px 10px', borderRadius: 12, border: `1px solid ${C.doublon}`, color: C.doublon, fontSize: 13, fontWeight: 600 }}>
           Deux paires présentes portent le N°{k}. Vérifie les cartons avant d'imprimer un bordereau.
-          <button type="button" onClick={() => onNav('cat_annonces')} style={{ ...lien, display: 'block', marginTop: 4, color: C.danger }}>Voir dans Annonces</button>
+          <button type="button" onClick={() => onNav('cat_annonces')} style={{ ...lien, display: 'block', marginTop: 4, color: C.doublon }}>Voir dans Annonces</button>
         </div>
       )}
       {rn.reattribues.map((r) => (
@@ -52382,7 +52382,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // (`conflitsNum`, §11), une ligne, le geste là-bas.
         if(conflitsNum.length){
           const nb=conflitsNum.length;
-          jobs.push({id:'numeros-en-double',n:nb,icon:'alert',color:C.danger,urgent:true,
+          jobs.push({id:'numeros-en-double',n:nb,icon:'alert',color:C.doublon,urgent:true,
             title:`${nb} numéro${nb>1?'s':''} porté${nb>1?'s':''} par deux paires`,
             sub:`N°${conflitsNum.slice(0,4).map(c=>c.numero).join(', N°')}${nb>4?'…':''} — corrige avant d'expédier`,
             tab:'cat_bord',prio:0.05});
@@ -52520,7 +52520,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         //    passent ici, après les tuiles (§4.11 : rien ne disparaît en silence).
         if (Array.isArray(alertes)) for (const a of alertes) {
           if (!a || !(a.dv || a.jr)) continue;
-          if (a.dv) jobs.push({id:'double-vente', n:a.n, icon:a.ic||'alert', color:a.dv==='num'?C.danger:C.warn, urgent:true, title:a.text, tab:a.tab, prio:-1, avant:a.avant, lbcSuppr:Array.isArray(a.lbcSuppr)&&a.lbcSuppr.length?a.lbcSuppr:null, photos:a.photos});
+          if (a.dv) jobs.push({id:'double-vente', n:a.n, icon:a.ic||'alert', color:a.dv==='num'?C.doublon:C.warn, urgent:true, title:a.text, tab:a.tab, prio:-1, avant:a.avant, lbcSuppr:Array.isArray(a.lbcSuppr)&&a.lbcSuppr.length?a.lbcSuppr:null, photos:a.photos});
           else jobs.push({id:a.job||('a-faire-'+a.ic), n:a.n, icon:a.ic||'info', color:a.urssaf&&a.urssaf.proche?C.warn:C.text, title:a.text, sub:a.sub, tab:a.tab, prio:3, urssaf:a.urssaf,
             // (1er nov., « très répétitif ») Le rappel URSSAF en court : « Déclarer
             // l'URSSAF d'octobre » + « Avant le 30 nov. · ≈ 331 € à payer (au moins) ».
@@ -55638,8 +55638,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             c'est la seule alerte de l'app qui coûte de l'argent (§19), elle
             n'a pas à être repliable. */}
         {numDoublons.length > 0 && (
-          <div style={{border:`1.5px solid ${C.danger}`,background:`${C.danger}0e`,borderRadius:12,padding:'12px 14px',marginBottom:10}}>
-            <div style={{fontSize:13,fontWeight:700,color:C.danger}}>
+          <div style={{border:`1.5px solid ${C.doublon}`,background:`${C.doublon}0e`,borderRadius:12,padding:'12px 14px',marginBottom:10}}>
+            <div style={{fontSize:13,fontWeight:700,color:C.doublon}}>
               {numDoublons.length} numéro{numDoublons.length>1?'s':''} porté{numDoublons.length>1?'s':''} par deux annonces
             </div>
             <div style={{fontSize:12,color:C.muted,marginTop:3,lineHeight:1.45}}>
@@ -57385,8 +57385,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {blocAEcrire()}
         <BlocBarrerVc/>
         {conflitsNum.length > 0 && (
-          <div style={{border:`2px solid ${C.danger}`,background:`${C.danger}12`,borderRadius:12,padding:'12px 14px',marginBottom:12}}>
-            <div style={{display:'flex',alignItems:'center',gap:7,fontSize:15,fontWeight:700,color:C.danger}}>
+          <div style={{border:`2px solid ${C.doublon}`,background:`${C.doublon}12`,borderRadius:12,padding:'12px 14px',marginBottom:12}}>
+            <div style={{display:'flex',alignItems:'center',gap:7,fontSize:15,fontWeight:700,color:C.doublon}}>
               <Icon name="alert" size={17}/>{conflitsNum.length} numéro{conflitsNum.length>1?'s':''} porté{conflitsNum.length>1?'s':''} par deux articles
             </div>
             <div style={{fontSize:12,color:C.text,marginTop:3,lineHeight:1.45}}>Deux articles portent le même numéro : au moment d'expédier, c'est le mauvais article qui part. Corrige le numéro de l'un des deux avant d'envoyer.</div>
@@ -57705,7 +57705,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           if (!c) return null;
                           const autres = c.porteurs.filter(x => normTitle(x.titre||'') !== normTitle(titre||''));
                           return (
-                            <div style={{fontSize:12,fontWeight:600,marginTop:5,color:C.danger,background:`${C.danger}14`,border:`1px solid ${C.danger}`,borderRadius:12,padding:'6px 9px',lineHeight:1.45}}>
+                            <div style={{fontSize:12,fontWeight:600,marginTop:5,color:C.doublon,background:`${C.doublon}14`,border:`1px solid ${C.doublon}`,borderRadius:12,padding:'6px 9px',lineHeight:1.45}}>
                               <span style={{display:'flex',alignItems:'center',gap:6}}><Icon name="alert" size={14}/>Le N°{num} est porté par un autre article</span>
                               <span style={{display:'block',color:C.text,fontWeight:500,marginTop:3}}>
                                 {autres.map(x=>`${x.type==='annonce'?'en ligne':x.type==='vente'?'à envoyer':'au garage'} « ${String(x.titre||'').slice(0,44)} »`).join(' · ')}
@@ -59380,7 +59380,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <b style={{color:C.text}}>{lignes.length} article{lignes.length>1?'s':''}</b> doivent être chez toi en ce moment : celles en ligne, celles vendues dont le colis n'est pas parti, et celles rangées au garage. Compte tes boîtes contre cette liste — si un numéro manque, l'article n'est pas là où l'app le croit.
               </div>
               {conflits.size>0 && (
-                <div style={{fontSize:12,fontWeight:600,color:C.danger,background:`${C.danger}12`,border:`1px solid ${C.danger}`,borderRadius:12,padding:'9px 11px',marginBottom:12,lineHeight:1.45}}>
+                <div style={{fontSize:12,fontWeight:600,color:C.doublon,background:`${C.doublon}12`,border:`1px solid ${C.doublon}`,borderRadius:12,padding:'9px 11px',marginBottom:12,lineHeight:1.45}}>
                   <span style={{display:'flex',alignItems:'center',gap:6}}><Icon name="alert" size={14}/>{conflits.size} numéro{conflits.size>1?'s':''} porté{conflits.size>1?'s':''} par deux articles</span>
                   <span style={{display:'block',color:C.text,fontWeight:500,marginTop:3}}>À corriger AVANT de déménager : deux articles portent le même numéro, donc rien ne dit lequel expédier. Ils sont marqués en rouge ci-dessous.</span>
                 </div>
@@ -59390,14 +59390,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const dbl = conflits.has(l.num);
                   const ph = l.p.map(photoDe).find(Boolean);
                   return (
-                    <div key={l.num} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 11px',borderTop:i?`1px solid ${C.border}66`:'none',background:dbl?`${C.danger}0e`:'transparent'}}>
-                      <span style={{flexShrink:0,fontSize:15,fontWeight:700,color:'#fff',background:dbl?C.danger:C.accent,borderRadius:12,padding:'3px 8px',minWidth:44,textAlign:'center'}}>N°{l.num}</span>
+                    <div key={l.num} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 11px',borderTop:i?`1px solid ${C.border}66`:'none',background:dbl?`${C.doublon}0e`:'transparent'}}>
+                      <span style={{flexShrink:0,fontSize:15,fontWeight:700,color:'#fff',background:dbl?C.doublon:C.accent,borderRadius:12,padding:'3px 8px',minWidth:44,textAlign:'center'}}>N°{l.num}</span>
                       <span style={{width:38,height:38,borderRadius:12,background:C.border,flexShrink:0,overflow:'hidden'}}>
                         {ph && <PhotoVinted src={ph} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>}
                       </span>
                       <span style={{flex:1,minWidth:0}}>
                         <span style={{display:'block',fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{l.p.map(x=>x.titre).filter(Boolean)[0] || '—'}</span>
-                        <span style={{display:'block',fontSize:11,color:dbl?C.danger:C.muted,marginTop:1}}>{l.p.map(x=>ou(x.type)).join(' + ')}{dbl?' — deux articles !':''}</span>
+                        <span style={{display:'block',fontSize:11,color:dbl?C.doublon:C.muted,marginTop:1}}>{l.p.map(x=>ou(x.type)).join(' + ')}{dbl?' — deux articles !':''}</span>
                       </span>
                     </div>
                   );

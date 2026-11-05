@@ -161,11 +161,8 @@ html body .vrm-inbox-filters > button[aria-pressed="true"]:not(#_) { background:
 html body .vrm-inbox-filters > button[aria-pressed="true"] > span { color: inherit; opacity: .7; }
 @media (pointer: coarse) { html body .vrm-inbox-filters > button:not(#_) { min-height: 44px !important; } }
 
-/* ── 5. LES CHOIX SEGMENTÉS : jamais un mot plus large que son bouton ───────
-   (Statistiques au téléphone : « Semaine » débordait de sa pastille, collé au bord.) */
-html .vrm-app-shell .vrm-seg .vrm-seg-btn { white-space: nowrap; min-width: max-content !important; padding-inline: 14px !important; }
+/* ── 5. LES CHOIX SEGMENTÉS : la règle unique est dans styles-coque.css (5 nov.). */
 html .vrm-app-shell .vrm-sv-periode { width: auto !important; max-width: 100%; }
-html .vrm-app-shell .vrm-sv-periode .vrm-seg-btn { flex: 1 0 auto !important; }
 
 /* ── 6. LES BOUTONS DÉSACTIVÉS SE LISENT ────────────────────────────────────
    Un bouton grisé à 40–55 % d'opacité tombait sous 2:1 (« Générer le bordereau »

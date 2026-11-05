@@ -15,6 +15,7 @@
 .vrm-stats-vitrine .vrm-sv-tuile,
 .vrm-stats-vitrine .vrm-sv-boost-case { background: var(--vrm-surface); border-radius: 12px; padding: 14px 14px 13px; min-width: 0; }
 .vrm-stats-vitrine .vrm-sv-tuile-lib { font-size: 11px; color: var(--vrm-muted); font-weight: 500; }
+.vrm-stats-vitrine .vrm-sv-tuile-lib::first-letter, .vrm-stats-vitrine .vrm-of-tuile > span::first-letter { text-transform: uppercase; }   /* (5 nov.) une majuscule en tête */
 .vrm-stats-vitrine .vrm-sv-tuile-val { font-size: 20px; font-weight: 700; letter-spacing: -.02em; color: var(--vrm-ink); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; line-height: 1.25; }
 .vrm-stats-vitrine .vrm-sv-tuile-val[data-vide] { color: var(--vrm-muted); }
 .vrm-stats-vitrine .vrm-sv-tuile-sous { font-size: 11px; color: var(--vrm-muted); margin-top: 4px; line-height: 1.4; }
@@ -63,7 +64,6 @@
 
 /* Le sélecteur de période, à droite du titre (la piste de `Segmente`). */
 .vrm-sv-periode { min-width: 240px; }
-.vrm-sv-periode .vrm-seg-btn { font-size: 13px; padding: 0 22px; min-height: 40px; flex: 1 1 0; }
 
 /* La grille 12 colonnes de Statistiques (≥ 1200 px, styles-gestion.css) : le bloc
    de la maquette prend la 2ᵉ rangée, le reste descend d'une rangée. */
@@ -86,7 +86,6 @@
   .vrm-stats-vitrine { margin-top: 0; }
   .vrm-stats-vitrine .vrm-sv-tuile-val { white-space: normal; overflow-wrap: anywhere; }
   .vrm-sv-periode { min-width: 0; width: 100%; }
-  .vrm-sv-periode .vrm-seg-btn { min-height: 44px; }
   .vrm-stats-vitrine .vrm-sv-boost { gap: 8px; }
   .vrm-stats-vitrine .vrm-sv-boost-case { padding: 12px 10px; }
   .vrm-stats-vitrine .vrm-sv-boost-case .vrm-sv-tuile-val { font-size: 15px; }
@@ -140,9 +139,10 @@
 .vrm-stats-vitrine .vrm-of-tuile > b { font-size: 20px; font-weight: 700; letter-spacing: -.02em; color: var(--vrm-ink); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.25; }
 .vrm-stats-vitrine .vrm-of-tuile > b[data-vide] { color: var(--vrm-muted); }
 .vrm-stats-vitrine .vrm-of-table { display: flex; flex-direction: column; }
-.vrm-stats-vitrine .vrm-of-ligne { display: grid; grid-template-columns: minmax(0, 1.6fr) repeat(5, minmax(0, 1fr)); gap: 8px; align-items: baseline; padding: 9px 0; border-top: 1px solid var(--vrm-line); font-size: 13px; color: var(--vrm-ink); font-variant-numeric: tabular-nums; }
-.vrm-stats-vitrine .vrm-of-ligne > span:not(.vrm-of-nom) { text-align: right; white-space: nowrap; }
+.vrm-stats-vitrine .vrm-of-ligne { display: grid; grid-template-columns: minmax(0, 1.6fr) repeat(5, minmax(0, 1fr)); gap: 8px; align-items: baseline; padding: 9px 0; border-top: 1px solid var(--vrm-line); font-size: 13px; color: var(--vrm-ink); }
+.vrm-stats-vitrine .vrm-of-ligne > span:not(.vrm-of-nom) { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .vrm-stats-vitrine .vrm-of-entete { border-top: 0; padding-top: 0; font-size: 11px; color: var(--vrm-muted); font-weight: 500; }
+.vrm-stats-vitrine .vrm-of-entete > span:not(.vrm-of-nom) { font-variant-numeric: normal; }
 .vrm-stats-vitrine .vrm-of-entete > span { font-size: 11px !important; font-weight: 500 !important; color: var(--vrm-muted) !important; letter-spacing: 0 !important; }
 .vrm-stats-vitrine .vrm-of-nom { min-width: 0; display: flex; flex-direction: column; }
 .vrm-stats-vitrine .vrm-of-nom > b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
