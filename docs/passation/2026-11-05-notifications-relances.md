@@ -165,3 +165,12 @@ Reste (non corrigé, à décider) :
   temps peuvent perdre un « lu » (l'entrée redevient non lue, rien de plus).
 - Une notification tenue pendant les heures calmes ne sonne jamais ensuite (dédoublonnage déjà
   posé) : elle n'existe que dans la cloche.
+
+## 8. Intégration (5 nov.) — le lien de désinscription ne désinscrit plus à l'ouverture
+
+La relecture laissait ouvert : « un antivirus de messagerie qui ouvre les liens peut
+désinscrire un compte sans clic ». Corrigé à l'intégration : `GET ?d=` n'écrit plus
+rien et montre une page avec UN bouton (`POST ?d=…&page=1`, la page « C'est fait ») ;
+le « un clic » du logiciel de messagerie (RFC 8058, `POST ?d=` avec
+`List-Unsubscribe=One-Click`) reste. `audit-relances-essai` : 30 verts ; sur l'ancien
+`api/compte.js`, D3a et D3 rouges.

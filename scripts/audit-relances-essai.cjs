@@ -242,8 +242,10 @@ const decoder = (brut) => {
     const faux = d.replace(/.$/, (c) => (c === 'A' ? 'B' : 'A'));
     const rf = faireRes(); await compte.default({ method: 'GET', query: { mode: 'relances', d: faux }, headers: {} }, rf);
     dit(rf.code === 400 && !(base.get(k(A, 'relances_essai_choix')) || {}).desinscrit, 'D2 un lien trafiqué ne désinscrit personne');
-    const rd = faireRes(); await compte.default({ method: 'GET', query: { mode: 'relances', d }, headers: {} }, rd);
-    dit(rd.code === 200 && (base.get(k(A, 'relances_essai_choix')) || {}).desinscrit === true && /C'est fait/.test(String(rd.corps)), 'D3 le lien : désinscrit en un clic, une page le dit');
+    const rg = faireRes(); await compte.default({ method: 'GET', query: { mode: 'relances', d }, headers: {} }, rg);
+    dit(rg.code === 200 && !(base.get(k(A, 'relances_essai_choix')) || {}).desinscrit && /<form method="post"/.test(String(rg.corps)), 'D3a ouvrir le lien (un antivirus le fait seul) ne désinscrit PAS : une page avec un bouton');
+    const rd = faireRes(); await compte.default({ method: 'POST', query: { mode: 'relances', d, page: '1' }, headers: {}, body: '' }, rd);
+    dit(rd.code === 200 && (base.get(k(A, 'relances_essai_choix')) || {}).desinscrit === true && /C'est fait/.test(String(rd.corps)), 'D3 le bouton : désinscrit, une page le dit');
     abonnements = [essai(A, 4.5 * JOUR)];
     recus.length = 0;
     await lancerCron();

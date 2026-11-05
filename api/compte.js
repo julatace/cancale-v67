@@ -1179,20 +1179,24 @@ async function discordAttente(req, res) {
 
 // ── LES E-MAILS DE L'ESSAI GRATUIT (5 nov., api/_lib/relances-essai.js) ─────
 //   GET  ?d=<jeton>        le lien « ne plus recevoir ces rappels » de l'e-mail :
-//                          désinscrit CE compte en un clic, répond une page courte ;
-//   POST ?d=<jeton>        la même chose en « un clic » du logiciel de messagerie
-//                          (RFC 8058, `List-Unsubscribe-Post`) ;
+//                          N'ÉCRIT RIEN, montre une page avec UN bouton (un
+//                          antivirus de messagerie ouvre les liens tout seul :
+//                          un GET qui désinscrit désinscrirait sans clic) ;
+//   POST ?d=<jeton>&page=1 ce bouton : désinscrit CE compte, répond la page ;
+//   POST ?d=<jeton>        le « un clic » du logiciel de messagerie
+//                          (RFC 8058, `List-Unsubscribe-Post`), réponse JSON ;
 //   GET  (session)         ce que Réglages montre : envoi configuré ? (ce qui
 //                          manque, au propriétaire seul), en essai ?, inscrit ?,
 //                          ce qui est parti ;
 //   POST (session) {abonne} son choix depuis Réglages.
-const pageRelance = (res, code, titre, texte) => {
+const pageRelance = (res, code, titre, texte, bouton) => {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Referrer-Policy', 'no-referrer');
   const e = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   res.status(code).send(`<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>VRM</title><meta name="robots" content="noindex"></head>`
     + `<body style="margin:0;padding:40px 16px;background:#fff;color:#1d1d1f;font:17px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif">`
     + `<main style="max-width:480px;margin:0 auto"><h1 style="font-size:22px;margin:0 0 12px">${e(titre)}</h1><p style="margin:0 0 20px;color:#3a3a3c">${e(texte)}</p>`
+    + (bouton ? `<form method="post" action="${e(bouton)}" style="margin:0 0 20px"><button type="submit" style="font:inherit;font-weight:600;color:#fff;background:#0071e3;border:0;border-radius:12px;min-height:44px;padding:10px 20px;cursor:pointer">Ne plus recevoir ces e-mails</button></form>` : '')
     + `<a href="${APP_URL}" style="color:#0071e3">Ouvrir VRM</a></main></body></html>`);
 };
 async function relances(req, res) {
@@ -1201,8 +1205,13 @@ async function relances(req, res) {
   if (d) {
     const owner = lireJetonRelance(d);
     if (!owner) return m === 'GET' ? pageRelance(res, 400, 'Lien non reconnu', "Ce lien de désinscription n'est pas valable. Tu peux aussi couper ces e-mails dans VRM : Réglages → Notifications.") : repondre(res, 400, { ok: false });
+    if (m === 'GET') {
+      return pageRelance(res, 200, 'Ne plus recevoir les e-mails de l\'essai ?', "Un seul geste : le bouton ci-dessous. Tu pourras les réactiver dans VRM : Réglages → Notifications.",
+        `/api/compte?mode=relances&d=${encodeURIComponent(d)}&page=1`);
+    }
+    if (m !== 'POST') return repondre(res, 405, { ok: false });
     const ok = await ecrireChoixRelance(owner, false);
-    if (m === 'POST') return repondre(res, ok ? 200 : 503, { ok });
+    if (String((req.query && req.query.page) || '') !== '1') return repondre(res, ok ? 200 : 503, { ok });
     return ok
       ? pageRelance(res, 200, "C'est fait", "Tu ne recevras plus les e-mails de l'essai gratuit VRM. Tu peux les réactiver dans VRM : Réglages → Notifications.")
       : pageRelance(res, 503, 'Pas encore enregistré', "Le serveur n'a pas pu enregistrer ton choix. Réessaie dans un instant avec le même lien.");
