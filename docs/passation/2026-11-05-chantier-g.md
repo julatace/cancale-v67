@@ -147,6 +147,12 @@ Encore Messages
 72. Messages · eBay : « Actualiser » en couleurs écrites en dur (#B8B8BC sur #262628 la nuit, F1 de `fusion-app`) → le bouton commun (`BoutonBase` secondaire petit, jetons), occupé pendant la lecture.
 
 ## Preuves
+- **État final (après la fusion de `claude/project-review-nsk5su` c534f843, finition v33 de
+  l'écran E-mails gardée)** : `vite build` vert ; banc G **108 ✅ · 0 ❌** ; `boite-emails`
+  **278 ✅ · 0 ❌** ; `fusion-app` limité à la zone (`BANC_ECRANS='^(messages|communaute)'`,
+  Messages × 4 sites + Communauté, 4 vues) **124 ✅ · 0 ❌** (le F1 « Actualiser » de Messages ·
+  eBay a disparu) ; `jetons-coherence` **rien à signaler** ; audits de la zone verts,
+  `audit-offres-expirent --mutation` 9/9 ; `tests/espace-emails-interface` 57/57.
 - `npm run build` (vite build) vert, après la fusion de `claude/project-review-nsk5su` (ea4a1ad6).
 - **Banc `scripts/bancs/messages-emails-communaute.cjs`** (données inventées, 390 tactile et 1512,
   clair et sombre, 9 scénarios : Messages Vinted / Vinted en panne / Leboncoin / Vestiaire,
