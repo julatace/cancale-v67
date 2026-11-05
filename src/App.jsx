@@ -218,6 +218,7 @@ import { champsSource, dupliquerFiche, fichesAPublier, texteAColler } from "./du
 import { histoireArticle, offresDeConversation } from "./histoireArticle.js";
 import { CLE_MODELES, lireModeles } from "./modelesDescription.js";
 import { MesModeles, InsererModele } from "./ModelesDescription.jsx";
+import { CLE_REGLAGE_ETIQUETTE, PLACES as PLACES_ETIQUETTE, FORMES as FORMES_ETIQUETTE, QUESTIONS as QUESTIONS_ETIQUETTE, ANNONCE_EXEMPLE, lireReglageEtiquette, etiquetteDe, poserEtiquette, proposition as propositionEtiquette } from "./etiquetteNumero.js";
 import PrixPartout from "./PrixPartout.jsx";
 import { lireFile, noterSaisie, instantane, acquitter, compterEnAttente, nuagePlusRecent, fusionAuChargement, oublierCle, CLE_FILE, HORS_FILE } from "./fileEnvoi.js";
 // La migration qui cloisonne les vendeurs, lue depuis LE fichier (pas recopiée) :
@@ -1995,6 +1996,8 @@ const SYNC_KEYS = [
   'vinted_goal','vinted_regime','vrm_micro_options','vinted_tva','vinted_bordereau_formats',
   // (3 nov.) La place du tampon choisie à la main, par FORME de bordereau (« Toujours ici »).
   'vrm_tampon_positions','vinted_bords_printed','vrm_imprimante','vrm_prenom','vrm_num_prefixe',
+  // (5 nov.) Où et sous quelle forme le N° s'écrit dans le texte d'une annonce Vinted (src/etiquetteNumero.js).
+  'vrm_num_vinted',
   // (27 oct.) La présentation d'arrivée a été vue (ou passée) : ne revient pas sur un autre appareil.
   'vrm_bienvenue_vue',
   // (2 nov.) La visite en bulles a été vue (ou passée) : elle ne revient ni après
@@ -9392,6 +9395,15 @@ const prefixeNumeros = () => { const p = String(load('vrm_num_prefixe', '') || '
 // Le clavier d'un champ N° : chiffres tant qu'il numérote en chiffres, lettres
 // dès qu'il a choisi une série (sinon un téléphone ne laisse pas taper « B »).
 const clavierNum = () => (prefixeNumeros() ? 'text' : 'numeric');
+// (5 nov.) L'étiquette du N° dans le texte d'une annonce Vinted, si un endroit
+// est choisi (Réglages → Numéros, src/etiquetteNumero.js) ; null = « nulle part ».
+const etiquetteSurVinted = (num) => {
+  const r = lireReglageEtiquette(load(CLE_REGLAGE_ETIQUETTE, null));
+  if (r.place === 'aucune') return null;
+  const etiquette = etiquetteDe(num, r.forme); if (!etiquette) return null;
+  const p = PLACES_ETIQUETTE.find((x) => x.v === r.place);
+  return { etiquette, forme: r.forme, place: r.place, ou: p ? p.ou : '' };
+};
 // Le prochain numéro LIBRE : le premier jamais donné. Sans préfixe, l'entier
 // comme avant (prisInt) ; avec préfixe, dans SA série (prisCles). On n'en
 // libère jamais aucun : la séquence monte, elle compte les paires passées.
@@ -11091,7 +11103,7 @@ const confirmerNumerosAVerifier = async (numeros) => {
     if (pasEcrit.length) {
       const ok = await askConfirm({
         title: `As-tu écrit le N°${pasEcrit[0].numero} sur le carton ?`,
-        desc: `${pasEcrit.slice(0, 3).map((f) => `N°${f.reattribue.de} → N°${f.numero} · ${f.title || 'un article'}`).join('\n')}\n\nCet article a reçu un numéro neuf (doublon réglé). Son carton porte peut-être encore l'ancien.`,
+        desc: `${pasEcrit.slice(0, 3).map((f) => `N°${f.reattribue.de} → N°${f.numero} · ${f.title || 'un article'}`).join('\n')}\n\n${pasEcrit.every((f) => f.reattribue.main) ? 'Tu as changé ce numéro' : pasEcrit.some((f) => f.reattribue.main) ? 'Ces numéros ont changé (à la main ou doublon réglé)' : 'Cet article a reçu un numéro neuf (doublon réglé)'}. Son carton porte peut-être encore l'ancien.`,
         ok: 'Oui, c\'est écrit', cancel: 'Annuler',
       });
       if (!ok) return false;
@@ -44683,7 +44695,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     updatePair(item, { buyPrice: v, buyFromId: null, buyFrom: null });
     toast(`Prix d'achat enregistré : ${fmtE(n)}`);
   };
-  const poserNumero = async (item, valeur, avant) => {
+  // (5 nov.) UN N° CHANGÉ À LA MAIN (12 → 40), à la mise en ligne ou après :
+  // l'ancien est peut-être déjà écrit sur le carton. Il passe dans « N° à écrire
+  // sur tes cartons » (barrer N°12, écrire N°40) jusqu'à « C'est écrit » — la
+  // MÊME liste que les doublons réglés (`reattribueAEcrire`, §11) ; `main` dit
+  // que c'est SON geste. L'ancien numéro reste brûlé (le pool ne rend rien).
+  // Rien à barrer : une annonce qui n'avait pas de N°, ou « le carton dit N°58 »
+  // (`corrigerCarton`, le carton porte déjà le bon). Changé deux fois avant
+  // d'avoir écrit : le carton porte toujours le PREMIER (12), pas l'intermédiaire.
+  const changeAMain = (item, avantN, v, at, opts) => {
+    if (opts && opts.carton) return {};
+    const c = numeros[String(item.id)] || {};
+    const enCours = c.reattribue && !c.reattribue.ecrit && cleNum(c.reattribue.vers) === cleNum(avantN) ? c.reattribue : null;
+    const de = enCours ? String(enCours.de) : String(avantN == null ? '' : avantN).trim();
+    if (!cleNum(de) || cleNum(de) === cleNum(v)) return enCours ? { reattribue: null } : {};
+    return { reattribue: { de, vers: String(v), at, main: true } };
+  };
+  const poserNumero = async (item, valeur, avant, opts = {}) => {
     const brut = String(valeur || '').trim();
     // Champ vidé : on ne retire JAMAIS un numéro (§5.40, il est écrit sur une
     // boîte). L'affichage se remet tout seul sur la valeur enregistrée.
@@ -44719,11 +44747,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         ok: 'Oui, le même article', cancel: `Non — N°${nextNumero}`,
       });
       const v = meme ? n : String(nextNumero);
-      updatePair(item, { numero: v, manuelAt }); recordUsed(v); await demanderPrixAchat(item, v); return;
+      updatePair(item, { numero: v, manuelAt, ...changeAMain(item, avant, v, manuelAt, opts) }); recordUsed(v); await demanderPrixAchat(item, v); return;
     }
     // ⚠️ C'EST ICI qu'on écrit le numéro (le champ ne valide qu'à la sortie,
     //    cf. `ChampSaisie` — il n'écrit plus à chaque frappe).
-    if (!autres.length) { updatePair(item, { numero: n, manuelAt }); recordUsed(n); await demanderPrixAchat(item, n); return; }
+    if (!autres.length) { updatePair(item, { numero: n, manuelAt, ...changeAMain(item, avant, n, manuelAt, opts) }); recordUsed(n); await demanderPrixAchat(item, n); return; }
     const presents = (porteursNum[cle] || []).filter(p => String(p.id) !== moi);
     if (presents.length) {
       // Revue de la 5.167 : une annonce « à confirmer » n'est ni « en ligne » ni
@@ -44743,7 +44771,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         desc: `${peutEtre ? 'Un article le porte peut-être encore' : 'Un article le porte encore'} :\n${qui}\n\nDeux articles avec le même numéro, c'est le mauvais article au moment d'expédier.`,
         ok: `Prendre le N°${nextNumero}`, cancel: 'Annuler',
       });
-      updatePair(item, prendre ? { numero: String(nextNumero), manuelAt } : { numero: avant });
+      updatePair(item, prendre ? { numero: String(nextNumero), manuelAt, ...changeAMain(item, avant, String(nextNumero), manuelAt, opts) } : { numero: avant });
       if (prendre) { recordUsed(nextNumero); await demanderPrixAchat(item, String(nextNumero)); }
       return;
     }
@@ -44753,7 +44781,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       desc: `Il était sur « ${anc.title || 'un autre article'} », qui n'est plus en ligne.\n\nEst-ce bien le MÊME article qui te revient (litige, retour, annulation) ?\n\nSi oui, il reprend son prix d'achat et ses infos. Si c'est un autre article, prends le N°${nextNumero} : un numéro ne se réattribue jamais.`,
       ok: 'Oui, le même article revient', cancel: `Non — N°${nextNumero}`,
     });
-    if (!meme) { updatePair(item, { numero: String(nextNumero), manuelAt }); recordUsed(nextNumero); await demanderPrixAchat(item, String(nextNumero)); return; }
+    if (!meme) { updatePair(item, { numero: String(nextNumero), manuelAt, ...changeAMain(item, avant, String(nextNumero), manuelAt, opts) }); recordUsed(nextNumero); await demanderPrixAchat(item, String(nextNumero)); return; }
     setNumeros(prev => {
       const u = { ...prev }; const a = u[autres[0]] || {};
       u[moi] = { ...(u[moi] || {}),
@@ -44761,7 +44789,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         fees: a.fees, size: (u[moi] || {}).size ?? a.size ?? null,
         numero: n, title: item.title, photo: item.photo || null, photoK: photoKey(item.photo) || null,
         price: item.price ?? null, accountId: item._acc?.vinted_user_id,
-        auto: false, repriseAt: new Date().toISOString(), manuelAt, repriseDe: String(autres[0]) };
+        auto: false, repriseAt: new Date().toISOString(), manuelAt, repriseDe: String(autres[0]), ...changeAMain(item, avant, n, manuelAt, opts) };
       delete u[autres[0]];                       // l'ancienne fiche devient celle-ci (`repriseDe` le dit à la base)
       save('vinted_annonce_numeros', u); return u;
     });
@@ -45392,13 +45420,54 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const blocAEcrire = () => aEcrireCarton.length > 0 && (
     <div data-numeros-a-ecrire={aEcrireCarton.length} style={{ background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn || '#B25000'}`, borderRadius: 12, padding: '10px 12px', marginBottom: 12 }}>
       <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{aEcrireCarton.length > 1 ? `${aEcrireCarton.length} nouveaux numéros à écrire sur tes cartons` : 'Un nouveau numéro à écrire sur un carton'}</div>
-      <div style={{ fontSize: 12, color: C.text2, margin: '3px 0 6px', lineHeight: 1.45 }}>Ces numéros étaient portés par deux articles : VRM a donné un numéro neuf à l'un d'eux. Barre l'ancien sur son carton et écris le nouveau.</div>
-      {aEcrireCarton.map((it) => { const f = numeros[it.id] || {}; return (
-        <div key={it.id} data-a-ecrire={String(it.id)} data-a-ecrire-de={f.reattribue.de} data-a-ecrire-vers={f.numero} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '6px 0', borderTop: `1px solid ${C.border}` }}>
-          <span style={{ fontSize: 13, color: C.text, flex: '1 1 200px', minWidth: 0 }}><s style={{ color: C.text2 }}>N°{f.reattribue.de}</s> → <b>N°{f.numero}</b> · {String(it.title || '').slice(0, 48)}</span>
+      <div style={{ fontSize: 12, color: C.text2, margin: '3px 0 6px', lineHeight: 1.45 }}>Barre l'ancien numéro sur le carton et écris le nouveau. L'ancien ne sera jamais redonné.</div>
+      {aEcrireCarton.map((it) => { const f = numeros[it.id] || {}; const etq = etiquetteSurVinted(f.numero); return (
+        <div key={it.id} data-a-ecrire={String(it.id)} data-a-ecrire-de={f.reattribue.de} data-a-ecrire-vers={f.numero} data-a-ecrire-main={f.reattribue.main ? '1' : '0'} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '6px 0', borderTop: `1px solid ${C.border}` }}>
+          <span style={{ fontSize: 13, color: C.text, flex: '1 1 200px', minWidth: 0 }}><s style={{ color: C.text2 }}>N°{f.reattribue.de}</s> → <b>N°{f.numero}</b> · {String(it.title || '').slice(0, 48)}
+            <span style={{ display: 'block', fontSize: 12, color: C.text2, marginTop: 2 }}>{f.reattribue.main ? 'Changé par toi' : 'Doublon réglé par VRM'}{etq ? <> · sur Vinted, remplace « {etiquetteDe(f.reattribue.de, etq.forme)} » par « {etq.etiquette} » {etq.ou}</> : null}</span></span>
+          {etq ? <button type="button" data-a-ecrire-copier={etq.etiquette} onClick={() => { try { navigator.clipboard.writeText(etq.etiquette); toast(`« ${etq.etiquette} » copié`); } catch (_) {} }} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 12, padding: '0 12px', minHeight: 44, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Copier « {etq.etiquette} »</button> : null}
           <button type="button" onClick={() => marquerReattribueEcrit(it)} style={{ border: `1px solid ${C.border}`, background: C.card, color: C.text, borderRadius: 12, padding: '0 12px', minHeight: 44, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>C'est écrit</button>
           {it._vrmMasquee ? <button type="button" data-masquee-partie={String(it.id)} onClick={() => masqueePlusLa(it)} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 12, padding: '0 12px', minHeight: 44, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Elle n'est plus là</button> : null}
         </div>); })}
+    </div>);
+  // ── LE N° À LA MISE EN LIGNE (5 nov.) ────────────────────────────────────
+  // Julien : « pouvoir modifier le N° attribué par VRM, même une fois l'article
+  // publié ». Une annonce publiée depuis moins de 48 h a reçu son N° tout seul
+  // (`auto`, jamais touché à la main) : elle est listée ici, avec le MÊME champ
+  // que la carte (`EnLigne` → `poserNumero` : jamais un ancien B…, un N° porté
+  // par un autre article présent est refusé, un N° déjà servi est demandé, et
+  // l'ancien passe dans « N° à écrire sur tes cartons »). « C'est bon » ne
+  // touche à rien : il range la ligne sur CET appareil (une commodité, §stockage).
+  const [neufsVus, setNeufsVus] = useState(() => { try { const o = JSON.parse(localStorage.getItem('vrm_num_neufs_vus') || '{}'); return o && typeof o === 'object' ? o : {}; } catch (_) { return {}; } });
+  const vuNeuf = (ids) => setNeufsVus((p) => { const u = { ...p }; for (const [id, n] of ids) u[id] = cleNum(n); try { localStorage.setItem('vrm_num_neufs_vus', JSON.stringify(u)); } catch (_) {} return u; });
+  const numerosNeufs = useMemo(() => {
+    const lim = Date.now() - 48 * 3600e3;
+    return annoncesPresentes.filter((it) => {
+      const f = numeros[it.id];
+      if (!f || !String(f.numero || '').trim() || f.auto === false || f.manuelAt || f.reattribue || f.repriseAt) return false;
+      if (neufsVus[it.id] && neufsVus[it.id] === cleNum(f.numero)) return false;
+      const t = Date.parse(f.numberedAt || ''); if (!isFinite(t) || t < lim) return false;
+      // Une annonce publiée il y a longtemps, numérotée aujourd'hui (premier
+      // passage dans VRM) n'est pas « une mise en ligne » : pas ici.
+      const c = it.createdTs != null ? (it.createdTs < 1e12 ? it.createdTs * 1000 : it.createdTs) : null;
+      return !(c != null && c < lim);
+    }).sort((a, b) => String((numeros[b.id] || {}).numberedAt).localeCompare(String((numeros[a.id] || {}).numberedAt)));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [annoncesPresentes, numeros, neufsVus]);
+  const blocNouveaux = () => numerosNeufs.length > 0 && (
+    <div data-num-neufs={numerosNeufs.length} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', marginBottom: 12 }}>
+      <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{numerosNeufs.length > 1 ? `${numerosNeufs.length} mises en ligne numérotées par VRM` : 'Une mise en ligne numérotée par VRM'}</div>
+      <div style={{ fontSize: 12, color: C.text2, margin: '3px 0 6px', lineHeight: 1.45 }}>Touche le N° pour en mettre un autre (celui de ton carton, par exemple).</div>
+      {numerosNeufs.slice(0, 6).map((it) => { const f = numeros[it.id] || {}; return (
+        <div key={it.id} data-num-neuf={String(it.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderTop: `1px solid ${C.border}` }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: C.bg, flexShrink: 0, overflow: 'hidden' }}>{it.photo ? <PhotoVinted src={it.photo} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : null}</div>
+          <span style={{ flexShrink: 0, minHeight: 44, display: 'flex', alignItems: 'center', fontSize: 15, fontWeight: 700, color: C.text, fontVariantNumeric: 'tabular-nums' }}>
+            <EnLigne data="numero-neuf" value={f.numero} onCommit={(v, avant) => poserNumero(it, v, avant)} inputMode={clavierNum()} placeholder={String(nextNumero)} largeur={56} titre="Changer ce numéro" rendu={`N°${f.numero}`}/>
+          </span>
+          <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.title || '—'}</span>
+          <button type="button" data-num-neuf-ok={String(it.id)} onClick={() => vuNeuf([[it.id, f.numero]])} style={{ flexShrink: 0, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 12, padding: '0 12px', minHeight: 44, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>C'est bon</button>
+        </div>); })}
+      {numerosNeufs.length > 1 && <button type="button" data-num-neufs-tout="" onClick={() => vuNeuf(numerosNeufs.map((it) => [it.id, (numeros[it.id] || {}).numero]))} style={{ marginTop: 6, border: 'none', background: 'transparent', color: C.accent, padding: 0, minHeight: 44, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>{numerosNeufs.length > 6 ? `Tout est bon (${numerosNeufs.length})` : 'Tout est bon'}</button>}
     </div>);
   const confirmerCarton = async (it) => {
     const f = numeros[it.id] || {};
@@ -45440,7 +45509,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     // Sinon : le geste habituel du champ N° (il demande quand le numéro a déjà
     // servi ou qu'une autre paire le porte encore), puis « vérifié » s'il a été posé.
-    await poserNumero(it, brut, f.numero);
+    await poserNumero(it, brut, f.numero, { carton: true });
     setTimeout(() => marquerCartonVerifie(moi, cle), 700);
   };
 
@@ -54560,6 +54629,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {listings.items && !listings.error && listings.items.length===0 && blocMasquees()}
           {blocAEcrire()}
           <BlocBarrerVc/>
+          {blocNouveaux()}
           {aVerifierCarton.length > 0 && (
           <details data-numeros-a-verifier={aVerifierCarton.length} className="vrm-repli" open style={{ background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn || '#B25000'}`, borderRadius: 12, padding: '4px 12px 10px', marginBottom: 12 }}>
             <summary style={{ fontSize: 15, fontWeight: 700, color: C.text }}>
@@ -57396,21 +57466,29 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           : <>L'IA n'a pas répondu ({repubAi.reason}). Réessaie dans un instant.</>}
                       </div>
                     )}
-                    {actif&&!repubAi.busy&&repubAi.res&&(
-                      <div style={{marginTop:8,display:'flex',flexDirection:'column',gap:8}}>
+                    {actif&&!repubAi.busy&&repubAi.res&&(()=>{
+                      // (5 nov.) Le N° écrit là où il l'a choisi (Réglages → Numéros →
+                      // « Le N° sur tes annonces Vinted », src/etiquetteNumero.js) : le
+                      // texte copié est celui qui partira. Un refus (titre > 100) laisse
+                      // le texte tel quel et le dit.
+                      const etq=poserEtiquette({titre:repubAi.res.title,description:repubAi.res.desc},e.numero,lireReglageEtiquette(load(CLE_REGLAGE_ETIQUETTE,null)));
+                      const tIA=etq.titre, dIA=etq.description;
+                      return (
+                      <div data-ia-etiquette={etq.pose?etq.place:(etq.refus?'refus':'aucune')} style={{marginTop:8,display:'flex',flexDirection:'column',gap:8}}>
                         <div style={{border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 10px',background:C.card2||C.card}}>
                           <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:2}}>Titre proposé</div>
-                          <div style={{fontSize:13,color:C.text,fontWeight:600}}>{repubAi.res.title}</div>
-                          <button type="button" onClick={()=>copyText(repubAi.res.title,'iat'+k)} style={{marginTop:6,border:`1px solid ${C.border}`,background:'transparent',color:copied==='iat'+k?C.accent:C.text,borderRadius:12,padding:'5px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{copied==='iat'+k?'✓ Copié':'Copier le titre'}</button>
+                          <div style={{fontSize:13,color:C.text,fontWeight:600}}>{tIA}</div>
+                          <button type="button" onClick={()=>copyText(tIA,'iat'+k)} style={{marginTop:6,border:`1px solid ${C.border}`,background:'transparent',color:copied==='iat'+k?C.accent:C.text,borderRadius:12,padding:'5px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{copied==='iat'+k?'✓ Copié':'Copier le titre'}</button>
                         </div>
                         <div style={{border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 10px',background:C.card2||C.card}}>
                           <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500,marginBottom:2}}>Description proposée</div>
-                          <div style={{fontSize:13,color:C.text,whiteSpace:'pre-wrap',lineHeight:1.45}}>{repubAi.res.desc}</div>
-                          <button type="button" onClick={()=>copyText(repubAi.res.desc,'iad'+k)} style={{marginTop:6,border:`1px solid ${C.border}`,background:'transparent',color:copied==='iad'+k?C.accent:C.text,borderRadius:12,padding:'5px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{copied==='iad'+k?'✓ Copié':'Copier la description'}</button>
+                          <div style={{fontSize:13,color:C.text,whiteSpace:'pre-wrap',lineHeight:1.45}}>{dIA}</div>
+                          <button type="button" onClick={()=>copyText(dIA,'iad'+k)} style={{marginTop:6,border:`1px solid ${C.border}`,background:'transparent',color:copied==='iad'+k?C.accent:C.text,borderRadius:12,padding:'5px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{copied==='iad'+k?'✓ Copié':'Copier la description'}</button>
                         </div>
+                        {etq.refus&&<div data-ia-etiquette-refus="" style={{fontSize:12,color:C.text}}>N°{e.numero} pas ajouté : {etq.refus}.</div>}
                         {repubAi.why&&<div style={{fontSize:11,color:C.muted,fontStyle:'italic'}}>{repubAi.why}</div>}
                       </div>
-                    )}
+                    ); })()}
                   </div>
                   ); });
               })()}
@@ -63768,11 +63846,126 @@ function NumerosSetting({ nu = false, onStock }) {
         ['Identifie ton article', 'Reporte le numéro attribué par VRM sur son support physique pour le retrouver sans hésiter.'],
         ['Indique où il est rangé', 'Exemple : l’article N° C125 est dans Étagère A, case 3. Dans Stock 3D, choisis son numéro puis sa place libre. Le numéro identifie l’article ; la case indique où le trouver.']
       ]}/>
+      <NumeroSurVinted/>
       {onStock&&<div className="vrm-settings-next" style={{borderColor:C.border}}><b>Ensuite : indiquer l’emplacement</b><p style={{color:C.muted}}>Choisis la place de l’article dans le stock.</p><Bouton variante="secondaire" onClick={onStock}>Ouvrir mon stock</Bouton></div>}
     </div>
   );
 }
 
+// ── LE N° DANS LE TEXTE DE L'ANNONCE VINTED (5 nov.) ─────────────────────────
+// Julien, 5 novembre : « les numéros sur les annonces Vinted doivent être bien
+// mieux positionnés » ; « plusieurs façons d'étiqueter, des rythmes variés,
+// accompagné par l'app ». La règle (places, formes, pose/retrait, proposition)
+// vit dans src/etiquetteNumero.js ; ici : le choix, l'aperçu EN DIRECT sur une
+// annonce inventée, et deux questions qui proposent un réglage. Rien ne change
+// un numéro : c'est l'écriture du N° dans le texte, pas la numérotation.
+// « Pas su ≠ oui » : l'écran dit où le réglage s'applique AUJOURD'HUI (les
+// textes que VRM prépare à copier) et ce que l'extension ne fait pas encore.
+function surligneEtiquette(texte, etiq, aLaFin) {
+  const t = String(texte || '');
+  const i = etiq ? (aLaFin ? t.lastIndexOf(etiq) : t.indexOf(etiq)) : -1;
+  if (i < 0) return t;
+  return <>{t.slice(0, i)}<mark data-apercu-etiquette={etiq} style={{background:`${C.accent}1F`,color:C.text,fontWeight:700,borderRadius:6,padding:'0 3px'}}>{etiq}</mark>{t.slice(i + etiq.length)}</>;
+}
+function PuceChoix({ actif, onClick, children, data }) {
+  return <button type="button" aria-pressed={!!actif} onClick={onClick} {...(data || {})}
+    style={{minHeight:44,padding:'0 14px',borderRadius:999,border:`1px solid ${actif?C.accent:C.border}`,background:actif?`${C.accent}14`:C.card,color:C.text,fontSize:14,fontWeight:actif?700:500,cursor:'pointer',fontFamily:'inherit',fontVariantNumeric:'tabular-nums'}}>{children}</button>;
+}
+function NumeroSurVinted() {
+  const lire = () => lireReglageEtiquette(load(CLE_REGLAGE_ETIQUETTE, null));
+  const [r, setR] = React.useState(lire);
+  const touche = React.useRef(false);
+  React.useEffect(() => onCloudReady(() => { if (!touche.current) setR(lire()); }), []);
+  const poser = (patch) => { touche.current = true; const n = lireReglageEtiquette({ ...r, ...patch }); setR(n); save(CLE_REGLAGE_ETIQUETTE, n); try { window.dispatchEvent(new Event('vrm-num-vinted')); } catch (_) {} };
+  const [rep, setRep] = React.useState({});
+  const prop = propositionEtiquette(rep);
+  const dejaPris = prop && prop.place === r.place && prop.forme === r.forme;
+  // L'exemple suit SA série (« C12 » s'il numérote en C) : la vraie forme.
+  const pref = prefixeNumeros(); const numEx = pref ? `${pref}12` : '12';
+  const ap = poserEtiquette(ANNONCE_EXEMPLE, numEx, r);
+  const place = PLACES_ETIQUETTE.find((p) => p.v === r.place) || PLACES_ETIQUETTE[0];
+  const enTitre = r.place.startsWith('titre'), aLaFin = r.place.endsWith('_fin');
+  const etiq = ap.pose ? ap.etiquette : '';
+  const lib = {fontSize:13,fontWeight:600,color:C.text,margin:'14px 0 8px'};
+  return (
+    <section data-num-vinted={r.place} data-num-vinted-forme={r.forme} aria-label="Le N° sur tes annonces Vinted" style={{marginTop:16,paddingTop:14,borderTop:`1px solid ${C.border}`}}>
+      <div style={{fontSize:15,fontWeight:700,color:C.text}}>Le N° sur tes annonces Vinted</div>
+      <div style={{fontSize:13,color:C.muted,marginTop:3,lineHeight:1.5}}>Où l'écrire dans le texte de l'annonce, et sous quelle forme. Ton numéro ne change pas.</div>
+
+      {/* L'ACCOMPAGNEMENT : deux questions → une proposition, prise sur SON clic. */}
+      <div data-num-vinted-guide="" style={{marginTop:12,padding:'12px 14px',borderRadius:12,background:C.bg,border:`1px solid ${C.border}`}}>
+        <div style={{fontSize:13,fontWeight:700,color:C.text}}>Je t'aide à choisir</div>
+        {QUESTIONS_ETIQUETTE.map((q) => (q.id === 'vu' && rep.ou === 'vrm') ? null : (
+          <div key={q.id} data-num-vinted-question={q.id}>
+            <div style={{fontSize:13,color:C.text,margin:'10px 0 6px'}}>{q.q}</div>
+            <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+              {q.r.map((o) => <PuceChoix key={o.v} actif={rep[q.id] === o.v} onClick={() => setRep((x) => ({ ...x, [q.id]: o.v }))} data={{'data-num-vinted-reponse': q.id + ':' + o.v}}>{o.l}</PuceChoix>)}
+            </div>
+          </div>))}
+        {prop && (
+          <div data-num-vinted-proposition={prop.place + ':' + prop.forme} style={{marginTop:12,fontSize:13,color:C.text,lineHeight:1.5}}>
+            <b>{(PLACES_ETIQUETTE.find((p) => p.v === prop.place) || {}).l}{prop.place !== 'aucune' ? `, en « ${etiquetteDe(numEx, prop.forme)} »` : ''}.</b> {prop.pourquoi}
+            <div style={{marginTop:8}}>
+              {dejaPris
+                ? <span data-num-vinted-pris="" style={{fontSize:13,color:C.muted}}>C'est ton réglage.</span>
+                : <Bouton variante="secondaire" data-num-vinted-prendre="" onClick={() => poser({ place: prop.place, forme: prop.forme })}>Prendre ce choix</Bouton>}
+            </div>
+          </div>)}
+      </div>
+
+      <div style={lib}>Où l'écrire</div>
+      <div role="radiogroup" aria-label="Où écrire le N°" style={{display:'flex',flexDirection:'column',gap:6}}>
+        {PLACES_ETIQUETTE.map((p) => { const on = r.place === p.v; return (
+          <button key={p.v} type="button" role="radio" aria-checked={on} data-num-vinted-place={p.v} onClick={() => poser({ place: p.v })}
+            style={{display:'flex',alignItems:'flex-start',gap:10,textAlign:'left',minHeight:44,padding:'10px 12px',borderRadius:12,border:`1px solid ${on?C.accent:C.border}`,background:on?`${C.accent}0F`:C.card,color:C.text,cursor:'pointer',fontFamily:'inherit'}}>
+            <span aria-hidden="true" style={{flexShrink:0,width:18,height:18,marginTop:1,borderRadius:999,border:`2px solid ${on?C.accent:C.border}`,boxSizing:'border-box',display:'flex',alignItems:'center',justifyContent:'center'}}>{on && <span style={{width:8,height:8,borderRadius:999,background:C.accent}}/>}</span>
+            <span style={{minWidth:0}}><b style={{display:'block',fontSize:14}}>{p.l}</b><span style={{display:'block',fontSize:12,color:C.muted,lineHeight:1.45,marginTop:2}}>{p.d}</span></span>
+          </button>); })}
+      </div>
+
+      {r.place !== 'aucune' && <>
+        <div style={lib}>Sous quelle forme</div>
+        <div role="group" aria-label="Forme de l'étiquette" style={{display:'flex',flexWrap:'wrap',gap:6}}>
+          {FORMES_ETIQUETTE.map((f) => <PuceChoix key={f.v} actif={r.forme === f.v} onClick={() => poser({ forme: f.v })} data={{'data-num-vinted-forme-choix': f.v}}>{etiquetteDe(numEx, f.v)}</PuceChoix>)}
+        </div>
+      </>}
+
+      {/* L'APERÇU EN DIRECT, sur une annonce INVENTÉE (§2.3 : aucune donnée réelle). */}
+      <div style={lib}>Aperçu <span style={{fontWeight:400,color:C.muted}}>· annonce inventée</span></div>
+      <div data-num-vinted-apercu={ap.pose ? 'pose' : (ap.refus ? 'refus' : 'rien')} style={{border:`1px solid ${C.border}`,borderRadius:12,background:C.card,overflow:'hidden'}}>
+        <div style={{display:'flex',gap:12,padding:12}}>
+          <div aria-hidden="true" style={{width:72,height:90,flexShrink:0,borderRadius:8,background:C.bg,display:'flex',alignItems:'center',justifyContent:'center',color:C.muted}}><Icon name="image" size={22}/></div>
+          <div style={{minWidth:0,flex:1}}>
+            <div style={{fontSize:17,fontWeight:700,color:C.text,fontVariantNumeric:'tabular-nums'}}>{ANNONCE_EXEMPLE.prix}</div>
+            <div data-apercu-titre={ap.titre} style={{fontSize:14,color:C.text,lineHeight:1.4,marginTop:2,overflowWrap:'anywhere'}}>{enTitre ? surligneEtiquette(ap.titre, etiq, aLaFin) : ap.titre}</div>
+            <div style={{fontSize:12,color:C.muted,marginTop:2}}>42 · Très bon état</div>
+          </div>
+        </div>
+        <div style={{borderTop:`1px solid ${C.border}`,padding:'10px 12px'}}>
+          <div style={{fontSize:11,color:C.muted,fontWeight:600,marginBottom:4}}>Description</div>
+          <div data-apercu-desc={ap.description} style={{fontSize:13,color:C.text,whiteSpace:'pre-wrap',lineHeight:1.5}}>{!enTitre ? surligneEtiquette(ap.description, etiq, aLaFin) : ap.description}</div>
+        </div>
+        {/* Une liste étroite (ventes, messages) coupe le titre : on le montre. */}
+        <div style={{borderTop:`1px solid ${C.border}`,padding:'10px 12px'}}>
+          <div style={{fontSize:11,color:C.muted,fontWeight:600,marginBottom:4}}>Dans une liste étroite (ventes, messages)</div>
+          <div data-apercu-liste="" style={{maxWidth:240,fontSize:13,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{enTitre ? surligneEtiquette(ap.titre, etiq, aLaFin) : ap.titre}</div>
+          {enTitre && aLaFin && <div style={{fontSize:12,color:C.muted,marginTop:4,lineHeight:1.45}}>En fin de titre, une liste étroite peut couper le N° : garde tes titres courts, ou mets-le au début.</div>}
+        </div>
+      </div>
+      {ap.refus && <div data-num-vinted-refus="" style={{fontSize:12,color:C.text,marginTop:6}}>{ap.refus}.</div>}
+
+      {r.place !== 'aucune' && (
+        <div data-num-vinted-portee="" style={{fontSize:12,color:C.muted,marginTop:10,lineHeight:1.5}}>
+          Aujourd'hui, VRM écrit « {etiquetteDe(numEx, r.forme)} » {place.ou} dans les textes qu'il te prépare à copier (« Rédiger une annonce »). Tes annonces déjà en ligne ne sont pas réécrites : sur vinted.fr, l'extension continue d'afficher la pastille N° dans ton navigateur.
+        </div>)}
+      <GuideReglage titre="Bien placer ton N°" etapes={[
+        ['Pense au moment où tu le cherches', 'Une vente tombe : tu lis la liste (le titre) ou tu ouvres l’annonce (la description). Mets le N° là où ton œil va en premier.'],
+        ['Choisis une forme que tu reconnais', 'N°12, #12, Réf 12, (12)… La même partout : tu la repères d’un coup d’œil, et elle ne change jamais le numéro écrit sur ton carton.'],
+        ['Si tu changes un N°', 'L’ancienne étiquette est remplacée, jamais empilée. L’ancien numéro passe dans « N° à barrer » jusqu’à ce que tu l’aies barré sur le carton.'],
+      ]}/>
+    </section>
+  );
+}
 
 // ⛔ DÉTOURAGE DES PHOTOS : plus de réglage (17 octobre, sa décision — « le
 // détourage ne doit être présent QUE dans Vestiaire Collective, pas du tout pour
