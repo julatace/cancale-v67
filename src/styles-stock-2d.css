@@ -102,7 +102,7 @@
 /* Les annonces actuelles : chiffres en tête, liste, filtres. */
 .vrm-s2d-resume { display: flex; flex-direction: column; gap: 4px; }
 .vrm-s2d-resume-n { font-size: 28px; font-weight: 800; color: var(--vrm-ink, inherit); font-variant-numeric: tabular-nums; letter-spacing: -.02em; line-height: 1.1; }
-.vrm-s2d-resume-n small { font-size: 15px; font-weight: 600; color: var(--vrm-muted, #6E6E73); letter-spacing: 0; margin-left: 6px; }
+.vrm-s2d-resume-n small { font-size: 15px; font-weight: 600; color: var(--vrm-muted, #6E6E73); letter-spacing: 0; margin-left: 6px; font-variant-numeric: normal; }
 .vrm-s2d-resume-l { font-size: 13px; color: var(--vrm-muted, #6E6E73); line-height: 1.45; }
 .vrm-s2d-resume-l b { color: var(--vrm-ink, inherit); font-weight: 700; }
 .vrm-s2d-liste-ligne { display: flex; align-items: center; gap: 12px; padding: 8px 4px; min-height: 60px; border-top: 1px solid var(--vrm-line, rgba(0, 0, 0, .1)); }
