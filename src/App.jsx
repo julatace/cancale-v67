@@ -2608,8 +2608,8 @@ function BoutonSync({ ouvert, onBasculer }) {
   return (
     <button type="button" className="vrm-hbtn vrm-sync-status" data-sync-etat={syncStatus} aria-label="Voir la synchronisation" aria-expanded={ouvert} onClick={onBasculer} title={
               syncStatus==='synced'?'Synchronisé avec le cloud':
-              syncStatus==='saving'?'Sauvegarde en cours...':
-              syncStatus==='loading'?'Chargement...':
+              syncStatus==='saving'?'Sauvegarde en cours…':
+              syncStatus==='loading'?'Chargement…':
               syncStatus==='refus'?'Refusé par la base : cet écran est périmé, recharge-le':
               syncStatus==='error'?'La base n\u2019a pas répondu — la sauvegarde sera retentée':'En attente'
             }>
@@ -2651,16 +2651,17 @@ function PanneauSync({ onFermer, onReglages }) {
   const sec = i.reprise ? Math.max(0, Math.round((i.reprise - Date.now()) / 1000)) : null;
   return (
     <div data-sync-panneau={i.etat} role="dialog" aria-label="Synchronisation" data-noswipe="1"
-      style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, zIndex: 9500, width: 'min(300px, calc(100vw - 32px))', background: C.card, color: C.text, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: C.shadowLg || '0 16px 48px rgba(0,0,0,.18)', padding: '12px 14px', fontSize: 13, lineHeight: 1.5, textAlign: 'left' }}>
-      <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4 }}>{titre}</div>
+      style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, zIndex: 9500, width: 'min(320px, calc(100vw - 32px))', background: C.card, color: C.text, border: `1px solid ${C.border}`, borderRadius: 14, boxShadow: C.shadowLg || '0 16px 48px rgba(0,0,0,.18)', padding: '14px 16px', fontSize: 13, lineHeight: 1.5, textAlign: 'left' }}>
+      <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4, letterSpacing: '-.01em' }}>{titre}</div>
       {i.okAt && <div style={{ color: C.muted }}>Dernière sauvegarde réussie à {h(i.okAt)}.</div>}
       {!i.okAt && i.etat !== 'synced' && <div style={{ color: C.muted }}>Aucune sauvegarde réussie depuis l’ouverture de l’app.</div>}
       {(i.etat === 'error' || i.etat === 'refus') && <div data-sync-raison style={{ marginTop: 6 }}>Pourquoi : {i.raison || 'la base n’a pas répondu'}.</div>}
       {i.etat === 'error' && <div style={{ color: C.muted, marginTop: 6 }}>Rien n’est perdu : tes changements restent sur cet appareil{sec != null ? ` — nouvel essai dans ${sec} s` : ''}.</div>}
       <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-        {i.etat === 'error' && <button type="button" data-sync-reessayer onClick={() => { reprendreSyncMaintenant(); maj(); }} style={{ border: 'none', background: C.accent, color:C.onAccent, borderRadius: 12, padding: '7px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Réessayer maintenant</button>}
-        {i.etat === 'refus' && <button type="button" onClick={() => location.reload()} style={{ border: 'none', background: C.accent, color:C.onAccent, borderRadius: 12, padding: '7px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Recharger la page</button>}
-        <button type="button" onClick={onReglages} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 12, padding: '7px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Paramètres</button>
+        {/* (5 nov., chantier H) Les boutons de l'app (`Bouton`), plus trois dessins faits main. */}
+        {i.etat === 'error' && <Bouton variante="primaire" taille="petit" data-sync-reessayer="" onClick={() => { reprendreSyncMaintenant(); maj(); }}>Réessayer maintenant</Bouton>}
+        {i.etat === 'refus' && <Bouton variante="primaire" taille="petit" onClick={() => location.reload()}>Recharger la page</Bouton>}
+        <Bouton variante="secondaire" taille="petit" onClick={onReglages}>Paramètres</Bouton>
       </div>
     </div>
   );
@@ -19347,6 +19348,7 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
             borderRadius: 14, padding: '14px 16px', fontSize: 13, lineHeight: 1.45, textAlign: 'left', whiteSpace: 'normal',
             boxShadow: '0 1px 2px rgba(0,0,0,.10),0 16px 40px rgba(0,0,0,.18)' }}>
           <div className="vrm-etat-tete" data-etat-tete>
+            {!ordi ? <button type="button" className="vrm-etat-fermer" data-etat-fermer="" aria-label="Fermer" onClick={() => setOuvert(false)}><Icon name="close" size={15}/></button> : null}
             <span className="vrm-etat-icone" aria-hidden="true"><Icon name={st.niveau === 'ok' ? 'check' : st.niveau === 'verif' ? 'sync' : 'eye'} size={17}/></span>
             <div className="vrm-etat-titre">
               {st.niveau === 'ok' ? (st.relais ? 'Tu peux agir sur Vinted d’ici, via ton ordinateur' : 'Tu peux agir sur Vinted depuis VRM') : st.niveau === 'verif' ? "Je vérifie l'extension…" : 'Lecture seule pour l’instant'}
@@ -19383,7 +19385,7 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
             {(ligneVinted.t || ligneVinted.s !== '—') && <Ligne nom={`Compte Vinted ${NAV.dansNu}`} l={ligneVinted}/>}
           </div>
           <div className="vrm-etat-comptes" data-fraicheur-comptes={encoursComptes ? 'encours' : passuComptes.length ? 'partiel' : 'lu'}>
-            <div className="vrm-etat-comptes-titre">Tes comptes — dernière relecture</div>
+            <div className="vrm-etat-comptes-titre">Tes comptes · dernière relecture</div>
             {!encoursComptes && lignesComptes.map((c) => (
               <div key={c.plateforme + ':' + c.id} className="vrm-etat-compte-ligne" data-fraicheur-compte={c.plateforme} data-fraicheur-id={c.id} data-fraicheur-etat={c.etat} data-fraicheur-geste={c.geste ? '1' : '0'}>
                 <b className="vrm-sensible">{c.nom}</b> <span className="vrm-etat-compte-site">{nomPlateforme(c.plateforme)}</span>
@@ -63598,37 +63600,33 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     // Leboncoin/Vestiaire passe dessus ». Rendue DANS l'écran, la fenêtre était
     // piégée sous la barre du bas (même défaut que l'overlay plus bas) : elle
     // part dans document.body, au-dessus de tout.
-    return createPortal(
-      <div onClick={close} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:10000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
-        <FermeAuRetour fermer={close}/>
-        <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:460,borderRadius:'20px 20px 0 0',padding:'16px 18px calc(22px + env(safe-area-inset-bottom))'}}>
-          <div style={{width:36,height:4,borderRadius:12,background:C.border,margin:'0 auto 14px'}}/>
-          <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:'-0.02em'}}>{titre}</div>
-          <div style={{fontSize:13,color:C.muted,marginTop:4,lineHeight:1.5}}>
+    // (5 nov., chantier H) LA feuille de l'app (`SheetShell` : portail, poignée, la
+    // même croix, retour du navigateur) — plus un calque fait main.
+    return (
+      <SheetShell onClose={close} titre={titre} z={10000} data-feuille-compte={M}>
+          <div style={{fontSize:13,color:C.muted,marginTop:-6,lineHeight:1.5}}>
             {M==='email' ? <>Un lien de validation t’est envoyé. <b style={{color:C.text}}>Ton adresse actuelle marche tant qu’il n’est pas ouvert.</b></>
              : M==='pw'  ? <>8 caractères minimum, lettres et chiffres. Tu restes connecté.</>
              : <>Tes données restent dans ton compte. Seul <b style={{color:C.text}}>ce navigateur</b> est vidé.</>}
           </div>
           {M!=='out' && (
             <input autoFocus type={M==='pw'?'password':'email'} inputMode={M==='email'?'email':undefined}
-              autoComplete={M==='pw'?'new-password':'email'} autoCapitalize="none"
+              autoComplete={M==='pw'?'new-password':'email'} autoCapitalize="none" aria-label={M==='pw'?'Nouveau mot de passe':'Nouvelle adresse e-mail'}
               placeholder={M==='email'?'nouvelle@adresse.com':'Nouveau mot de passe'}
               value={acct.val} onChange={e=>setAcct(a=>({...a,val:e.target.value,err:''}))}
               onKeyDown={e=>{ if(e.key==='Enter') valider(); }}
-              style={{width:'100%',boxSizing:'border-box',marginTop:12,border:`1px solid ${acct.err?C.danger:C.border}`,borderRadius:12,padding:'13px 14px',fontSize:15,background:C.card,color:C.text,outline:'none',fontFamily:'inherit'}}/>
+              style={{width:'100%',boxSizing:'border-box',marginTop:12,border:`1px solid ${acct.err?C.danger:C.border}`,borderRadius:12,padding:'13px 14px',fontSize:17,minHeight:44,background:C.card,color:C.text,outline:'none',fontFamily:'inherit'}}/>
           )}
-          {acct.err && <div style={{fontSize:13,color:C.danger,marginTop:8,lineHeight:1.4}}>{acct.err}</div>}
+          {acct.err && <div role="alert" style={{fontSize:13,color:C.danger,marginTop:8,lineHeight:1.4}}>{acct.err}</div>}
           {M==='email' && resteEmail > 0 && <div role="status" data-auth-attente={resteEmail} style={{fontSize:13,color:C.text,marginTop:8,lineHeight:1.4}}>{TEXTE_DELAI_EMAIL_BOUTON}</div>}
-          <div style={{display:'flex',gap:9,marginTop:14}}>
+          <div style={{display:'flex',gap:9,marginTop:16}}>
             <Bouton variante="discret" onClick={close} style={{flex:1}}>Annuler</Bouton>
-            <Bouton variante="primaire" onClick={valider} disabled={acct.busy || (M!=='out' && !acct.val.trim()) || (M==='email' && resteEmail > 0)}
-              style={{flex:2,opacity:(acct.busy||(M!=='out'&&!acct.val.trim())||(M==='email'&&resteEmail>0))?0.5:1}}>
-              {acct.busy ? '…' : M==='out' ? 'Se déconnecter' : (M==='email' && resteEmail > 0) ? `Réessaie dans ${resteEmail} s` : 'Enregistrer'}
+            <Bouton variante="primaire" onClick={valider} occupe={!!acct.busy} disabled={(M!=='out' && !acct.val.trim()) || (M==='email' && resteEmail > 0)}
+              style={{flex:2,opacity:((M!=='out'&&!acct.val.trim())||(M==='email'&&resteEmail>0))?0.5:1}}>
+              {acct.busy ? (M==='out' ? 'Déconnexion…' : 'Enregistrement…') : M==='out' ? 'Se déconnecter' : (M==='email' && resteEmail > 0) ? `Réessaie dans ${resteEmail} s` : 'Enregistrer'}
             </Bouton>
           </div>
-        </div>
-      </div>,
-      document.body
+      </SheetShell>
     );
   };
 
@@ -63837,7 +63835,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'restaurer', type:'action', ic:'restore', lib:'Restaurer une sauvegarde', onClick:onImport },
     ], pied: (
       <span data-derniere-sauvegarde={derniereSauvegarde.old ? 'ancienne' : 'recente'} style={{color: derniereSauvegarde.old ? C.warn : C.muted, fontWeight: derniereSauvegarde.old ? 600 : 400}}>
-        {derniereSauvegarde.t ? `Dernière sauvegarde : ${derniereSauvegarde.days===0?"aujourd'hui":derniereSauvegarde.days===1?'hier':`il y a ${derniereSauvegarde.days} j`}${derniereSauvegarde.old?' · à refaire':''}` : 'Jamais sauvegardé'}
+        {derniereSauvegarde.t ? `Dernière sauvegarde : ${derniereSauvegarde.days===0?"aujourd'hui":derniereSauvegarde.days===1?'hier':`il y a ${derniereSauvegarde.days} j`}${derniereSauvegarde.old?' · à refaire':''}` : 'Jamais sauvegardé — touche « Sauvegarde complète »'}
       </span>
     )},
     {id:'aide',titre:'Besoin d’aide ?',items:[
@@ -63941,7 +63939,9 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   return (
     <div ref={racine} className="vrm-set" data-reglages-disposition={etroit ? 'telephone' : 'ordinateur'} data-sous-ecran-ouvert={ouvert ? ouvert.id : ''}
       style={{'--vrm-set-filet': C.border, '--vrm-set-appui': `${C.text}0a`}}>
-      <AcctSheet/>
+      {/* (5 nov., chantier H) Appelée, pas montée : `<AcctSheet/>` était un composant
+          RECRÉÉ à chaque rendu — chaque lettre tapée remontait la feuille. */}
+      {AcctSheet()}
       {ouvert ? (
         // ── SOUS-ÉCRAN (téléphone) ──
         <div className="vrm-set-nav">
@@ -63962,7 +63962,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
           // (5 nov., chantier H) Les trois onglets ont LA forme du contrôle segmenté de
           // l'app (`.vrm-seg`, une règle) : avant, un dessin à part dont l'aplat se
           // perdait (l'onglet choisi n'était pas le blanc).
-          <div role="tablist" aria-label="Paramètres" data-onglets-reglages="" className="vrm-seg vrm-seg-plein vrm-set-seg">
+          <div role="tablist" aria-label="Paramètres" data-onglets-reglages="" className="vrm-seg vrm-seg-plein vrm-set-onglets">
             {[['reglages','Réglages'],['compte','Mon compte'],...(AUTH.user?[['abonnement','Abonnement']]:[])].map(([k,l]) => (
               <button key={k} type="button" role="tab" className="vrm-seg-btn" aria-selected={vue===k} aria-pressed={vue===k} data-vue={k} onClick={()=>setVue(k)}>
                 {l}
@@ -63981,7 +63981,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
         {voirReglages && <ChampRecherche valeur={rechercheReglage} onChange={setRechercheReglage} placeholder={`Rechercher dans ${titreRetour}`} label="Rechercher dans les paramètres" className="vrm-set-recherche" data-recherche-reglages=""/>}
         {(() => {
           const filtres=filtrerReglages(groupes,voirReglages?rechercheReglage:'');
-          return filtres.length ? <>{rechercheReglage.trim()&&<p className="vrm-settings-search-info" role="status" style={{color:C.muted}}>{(n=>`${n} réglage${n>1?'s':''} trouvé${n>1?'s':''}`)(filtres.reduce((n,g)=>n+g.items.length,0))}</p>}{filtres.map(groupe)}</> : <p role="status" style={{color:C.muted,fontSize:13}}>Aucun réglage trouvé. Essaie « e-mail », « numéro » ou « impression ».</p>;
+          return filtres.length ? <>{rechercheReglage.trim()&&<p className="vrm-settings-search-info" role="status" style={{color:C.muted}}>{(n=>`${n} réglage${n>1?'s':''} trouvé${n>1?'s':''}`)(filtres.reduce((n,g)=>n+g.items.length,0))}</p>}{filtres.map(groupe)}</> : <div role="status" className="vrm-set-rien" style={{color:C.muted,fontSize:13}}><p style={{margin:'0 0 4px'}}>Aucun réglage pour « {rechercheReglage.trim()} ». Essaie « e-mail », « numéro » ou « impression ».</p><Bouton variante="discret" onClick={()=>setRechercheReglage('')}>Effacer la recherche</Bouton></div>;
         })()}
       </>}
       {panneaux.map(it=><div key={it.id} hidden={!ouvert || ouvert.id!==it.id} data-sous-ecran={it.id} className={it.titreInterne?'vrm-set-sans-titre':undefined}>

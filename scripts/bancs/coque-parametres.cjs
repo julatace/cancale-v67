@@ -214,7 +214,10 @@ async function cloche(nav, { W, theme, scenario }) {
   if (scenario !== 'premiere') await pg.evaluate((v) => { try { localStorage.setItem('vrm_ranger_vus', JSON.stringify(v)); localStorage.removeItem('vrm_ranger_proposes'); } catch (_) {} }, VUS);
   else await pg.evaluate(() => { try { localStorage.removeItem('vrm_ranger_vus'); localStorage.removeItem('vrm_ranger_proposes'); } catch (_) {} });
   await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
-  await attendre(7500);
+  await attendre(4000);
+  // La cloche lit les achats 4 s après le chargement du nuage : on attend la pastille (au plus 15 s).
+  if (scenario === 'arrive') await pg.waitForFunction(() => !!document.querySelector('[data-centre-notifs-cloche] .vrm-cn-pastille'), null, { timeout: 15000 }).catch(() => {});
+  else await attendre(6000);
   const pastille = await pg.evaluate(() => { const p = document.querySelector('[data-centre-notifs-cloche] .vrm-cn-pastille'); return p ? p.innerText.trim() : ''; });
   await pg.locator('[data-centre-notifs-cloche]').first().click().catch(() => {});
   await pg.waitForSelector('[data-centre-notifs]', { timeout: 6000 }).catch(() => {});

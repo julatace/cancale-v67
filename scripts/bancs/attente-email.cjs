@@ -100,7 +100,7 @@ async function changerEmail(nav, taille) {
   let o = pg.locator('[data-onglets-reglages] [data-vue="compte"]');
   await o.first().waitFor({ timeout: 12000 }).catch(() => {});
   if (await o.count()) { await o.first().click().catch(() => {}); await pause(pg, 800); }
-  const ouvert = await clicTexte(pg, 'Changer mon email');
+  const ouvert = await clicTexte(pg, 'Changer mon e-mail');   // (5 nov., chantier H) le mot « e-mail » de libelles.js
   await pause(pg, 500);
   await pg.fill('input[type=email]', 'nouvelle@exemple.fr').catch(() => {});
   const envoye = await clicTexte(pg, 'Enregistrer'); await attendrePhrase(pg);

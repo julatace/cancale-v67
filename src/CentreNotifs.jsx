@@ -13,6 +13,7 @@ import { TYPES_CENTRE, ETAT_CENTRE, entreesDuJournal, estLue, marquerLues, toutL
 import { SheetShell } from './composants/SheetShell.jsx';
 import { EtatPanne } from './composants/EtatPanne.jsx';
 import { BoutonBase as Bouton } from './composants/Bouton.jsx';
+import { NOTIONS } from './libelles.js';
 
 const nomType = (f) => (TYPES_CENTRE.find((t) => t.id === f) || {}).titre || (f === 'test' ? 'Essai' : 'Autre');
 
@@ -89,7 +90,7 @@ export function FeuilleCentreNotifs({ onFermer, charger, ecrireLu, onAller, onRe
                   <div className="vrm-cn-ligne is-non-lue vrm-cn-ranger" data-centre-ranger-tx={r.tx} data-centre-ranger-case={r.case ? r.case.meubleId + ':' + r.case.i : ''}>
                     <span className="vrm-cn-point" aria-hidden="true"/>
                     <span className="vrm-cn-corps">
-                      <span className="vrm-cn-meta"><span>Arrivé</span>{r.at ? <time dateTime={new Date(r.at).toISOString()}>{heureCourte(r.at)}</time> : null}</span>
+                      <span className="vrm-cn-meta"><span>{NOTIONS.arrives.un}</span>{r.at ? <time dateTime={new Date(r.at).toISOString()}>{heureCourte(r.at)}</time> : null}</span>
                       <span className="vrm-cn-ti">{r.titre || 'Un achat'}</span>
                       <span className="vrm-cn-tx">Première case libre : <b>{r.ou}</b></span>
                       <span className="vrm-cn-actions">
