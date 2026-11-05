@@ -20,6 +20,15 @@ require('./_porte-banc.cjs');
 //      suit une case (montants montrés ⇒ « 89,00 € » dans l'aperçu) ; le geste est
 //      ENVOYÉ au nuage (POST de `main` avec `vrm_stream_regles`).
 //   E. Éteint d'un tap : le texte revient sans recharger.
+//   F. (revue adverse du 5 nov.) Ce qui avait échappé :
+//      F1 un pseudo d'acheteur COURT (« ann ») est un mot entier — il ne coupe
+//         jamais un autre mot (« Annonces » ne devient pas « •••onces ») : aucun
+//         « ••• » collé à une lettre dans le texte rendu ;
+//      F2 les codes de retrait gardés HORS LIGNE (base injoignable) sont cachés
+//         comme les autres (ils s'écrivaient en clair) ;
+//      F3 ce qui S'AFFICHE hors du texte : le texte d'attente d'un champ
+//         (« achat 35,00 € (auto) ») suit la règle, un champ de montant (clavier
+//         décimal) est flouté — posés dans la page vivante, jugés sur l'attribut.
 //  `SHOTS=dossier` : une capture par étape (à REGARDER). `PARTIES=A,B,C,D,E`.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
@@ -30,7 +39,7 @@ const SHOTS = process.env.SHOTS || '';
 const liste = (v, d) => String(process.env[v] || d).split(',').map((x) => x.trim()).filter(Boolean);
 const LARGEURS = liste('LARGEURS', '390,1512').map(Number);
 const THEMES = liste('THEMES', 'clair,sombre');
-const PARTIES = liste('PARTIES', 'A,B,C,D,E');
+const PARTIES = liste('PARTIES', 'A,B,C,D,E,F');
 const ECRANS = liste('ECRANS', 'journee,annonces,vinted_annonces,ventes,plat_vinted,plat_leboncoin,cat_bord,messages,garage,achats,dashboard,compta,settings');
 
 let ko = 0;
@@ -44,6 +53,9 @@ const base = () => {
   const lignes = JSON.parse(JSON.stringify(NV.JEU_LIGNES));
   const main = lignes.find((l) => l.id === 'main');
   main.data.vrm_stream_regles = PROGRAMME;
+  // F1 : un acheteur au pseudo court et banal (inventé), dans une conversation.
+  const inbox = lignes.find((l) => l.id === 'harvest_222_inbox');
+  if (inbox) inbox.data.payload.conversations.push({ id: 402, unread: false, updated_at: new Date().toISOString(), description: 'Bonjour', opposite_user: { id: 5402, login: 'ann' } });
   return { lignes, comptes: NV.JEU_COMPTES, ecritures: 0 };
 };
 // Ce qui ne doit JAMAIS être lisible, stream allumé (le jeu inventé du banc).
@@ -164,6 +176,45 @@ const LIRE = (pg, interdits) => pg.evaluate((I) => {
         await pg.click('[data-bouton-stream]').catch(() => {}); await attendre(500);
         const dehors = await LIRE(pg, INTERDITS);
         dit(dedans.montants === 0 && dehors.montants > 0 && (dehors.fuites.marques || []).length > 0 && dehors.lignes === 0, `E ${tag} : éteint d'un tap, montants et marques reviennent sans recharger`, JSON.stringify({ dedans: dedans.montants, dehors: dehors.montants, marques: dehors.fuites.marques, lignes: dehors.lignes }));
+      }
+      // ── F. Revue adverse ──────────────────────────────────────────────────
+      if (PARTIES.includes('F')) {
+        // F1 : la page des conversations publie le pseudo « ann » ; sur la même page,
+        // la barre de navigation et les écrans écrivent « Annonces », « annonce ».
+        await pg.evaluate(() => localStorage.setItem('vrm_stream', '1'));
+        await pg.goto(`http://localhost:${NV.PORT}/?tab=messages`, { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('.vrm-main', { timeout: 15000 }).catch(() => {}); await attendre(2600);
+        const f1 = await pg.evaluate(() => {
+          const t = document.body.innerText || '';
+          const colles = t.match(/[\p{L}\p{N}]•••|•••[\p{L}\p{N}]/gu) || [];
+          return { colles: colles.length, ex: (t.match(/.{0,12}(?:[\p{L}\p{N}]•••|•••[\p{L}\p{N}]).{0,12}/gu) || []).slice(0, 3), ann: /(^|[^\p{L}])ann([^\p{L}]|$)/u.test(t), annonces: /annonce/i.test(t) };
+        });
+        dit(f1.colles === 0 && f1.annonces, `F1 ${tag} : un pseudo court ne coupe aucun mot (aucun « ••• » collé à une lettre ; « Annonces » reste lisible)`, JSON.stringify(f1));
+        dit(!f1.ann, `F1 ${tag} : le pseudo « ann » lui-même est caché`, JSON.stringify(f1));
+        await capture(pg, `F1-${tag}-messages`);
+        // F3 : deux champs posés dans la page (la règle de l'app les voit passer).
+        const f3 = await pg.evaluate(async () => {
+          const d = document.createElement('div');
+          d.innerHTML = '<input data-banc-ph placeholder="achat 35,00 € (auto)"><input data-banc-dec inputmode="decimal" value="45">';
+          document.querySelector('.vrm-main').appendChild(d);
+          await new Promise((r) => setTimeout(r, 300));
+          const ph = d.querySelector('[data-banc-ph]').getAttribute('placeholder');
+          const dec = d.querySelector('[data-banc-dec]'), flou = getComputedStyle(dec).filter;
+          d.remove();
+          return { ph, flou };
+        });
+        dit(!/35/.test(f3.ph) && /•••/.test(f3.ph), `F3 ${tag} : le texte d'attente d'un champ suit la règle`, JSON.stringify(f3));
+        dit(/blur/.test(f3.flou), `F3 ${tag} : un champ de montant (clavier décimal) est flouté`, JSON.stringify(f3));
+        // F2 : codes gardés sur l'appareil, base injoignable.
+        await pg.evaluate(() => localStorage.setItem('vrm_codes_hors_ligne', JSON.stringify({ at: Date.now(), codes: [{ code: 'K48291', titre: 'Colis à retirer', lieu: 'Le Fournil', carrier: 'mondialrelay', suivi: '40817263' }] })));
+        await pg.route('**/rest/v1/**', (r) => r.fulfill({ status: 522, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<html>error</html>' }));
+        await pg.goto(`http://localhost:${NV.PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
+        await pg.waitForSelector('[data-codes-hors-ligne]', { timeout: 20000 }).catch(() => {});
+        await attendre(800);
+        const f2 = await pg.evaluate(() => ({ bloc: !!document.querySelector('[data-codes-hors-ligne]'), code: /K48291/.test(document.body.innerText || ''), stream: document.documentElement.getAttribute('data-stream') }));
+        dit(f2.bloc, `F2 ${tag} : base injoignable ⇒ les codes gardés hors ligne s'affichent (le banc n'est pas vide)`, JSON.stringify(f2));
+        dit(f2.bloc && !f2.code && f2.stream === '1', `F2 ${tag} : stream allumé, le code gardé hors ligne est caché`, JSON.stringify(f2));
+        await capture(pg, `F2-${tag}-hors-ligne`);
+        await pg.unroute('**/rest/v1/**').catch(() => {});
       }
       dit(journal.erreurs.length === 0, `${tag} : aucune erreur de page`, journal.erreurs.join(' // '));
       await ctx.close();

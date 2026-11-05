@@ -104,3 +104,37 @@ prix, numéros de compte, noms de ses comptes Vinted, “les mots qui commencent
   la main) — non fait ici (l'extension est en chantier dans une autre session).
 - **Geste de Julien** : toucher « Stream » en haut, puis Paramètres → Réglages → Mode stream
   pour écrire ses marques et ses mots ; regarder l'aperçu.
+
+## Revue adverse (5 nov., même branche)
+Chaque défaut reproduit AVANT d'être corrigé (règle exécutée, banc rendu, arbre `df41a091`).
+- **Un pseudo court coupait les mots.** Les jetons (pseudos des acheteurs, comptes) étaient
+  cherchés n'importe où dans le texte : un acheteur « ann » donnait « •••onces » dans la
+  barre de navigation et partout où s'écrit « annonces » ; un identifiant de compte
+  Leboncoin/Vestiaire de 3 chiffres aurait caché le N° de rangement (« B125 » → « B•••0 »).
+  ⇒ un jeton est un MOT ENTIER (bornes sans « lookbehind », Safari < 16.4), et un
+  identifiant tout en chiffres de moins de 6 chiffres n'est jamais un jeton.
+  Limite dite : un pseudo qui EST un mot du titre (« max ») cache aussi ce mot.
+- **« 12500 vues sur tes annonces » disparaissait entier** : la ville après le code postal
+  et l'IBAN étaient reconnus sans la casse (`i`) ⇒ ces motifs-là sont en majuscules
+  seulement (`reMotifsC`) ; e-mail, téléphone, « rue » restent sans casse.
+- **Des codes de retrait s'écrivaient en clair** : seul `CodeRetraitCopiable` portait le
+  marqueur. Non marqués : les codes gardés hors ligne (`BlocCodesHorsLigne`,
+  `LigneRetraitHorsLigne`), le code en grand de la vue QR (`qrView.code`, `code2`), les
+  pastilles de code de Colis/Achats (4) et la vue de l'aide (3) ⇒ 11 endroits marqués
+  `vrm-sensible` + `data-stream-type="code"` (suivent la case « Codes de retrait »).
+- **Le texte d'attente d'un champ** (`placeholder="achat 35 € (auto)"`) se lisait ⇒ il suit
+  la règle comme `title`. **Un champ de montant** (clavier décimal : prix d'achat, prix
+  mini, offre) porte un nombre sans « € » ⇒ flouté quand « Prix et montants » est cochée.
+- **Lenteur** : sur 1 500 lignes et 800 pseudos, chaque changement repassait toute la page
+  (50 à 300 ms par frappe, mesuré dans Chromium) ⇒ la règle compilée garde ce qu'elle a
+  déjà passé (`_memo`, vidé au-delà de 20 000 textes).
+
+Preuves de la revue :
+- `node scripts/audit-mode-stream.cjs` : section 6 ajoutée, tout vert ; `--prouve` :
+  **16/16 mutations** au rouge (5 nouvelles : jeton mot entier, identifiant court, casse
+  ville/IBAN, mémoire, code en grand sans marqueur). Sur l'arbre `df41a091` : 9 KO.
+- Banc `scripts/bancs/mode-stream.cjs`, partie **F** (F1 pseudo court, F2 codes hors ligne
+  base injoignable, F3 placeholder et champ décimal) : **16 KO** sur `df41a091`, **194 OK /
+  0 KO** après (390 tactile et 1512, clair et sombre, parties A à F).
+- Bancs voisins relancés : `codes-hors-ligne`, `compte-supprime`, `comptes-securite`,
+  `type-compte`.

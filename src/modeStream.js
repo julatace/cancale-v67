@@ -104,18 +104,35 @@ export function compilerRegle(regles, groupes) {
   for (const [nom, liste] of entrees) {
     const cat = /^acheteurs/.test(nom) ? 'acheteurs' : 'comptes';
     if (!r[cat]) continue;
-    for (const j of Array.isArray(liste) ? liste : []) { const t = String(j == null ? '' : j).trim(); if (t.length >= 3) jetons.add(t); }
+    for (const j of Array.isArray(liste) ? liste : []) {
+      const t = String(j == null ? '' : j).trim();
+      // (revue du 5 nov.) Un identifiant tout en chiffres de moins de 6 chiffres
+      // ressemble à un N° de rangement (qui reste lisible) : jamais un jeton.
+      if (t.length < 3 || (/^\d+$/.test(t) && t.length < 6)) continue;
+      jetons.add(t);
+    }
   }
   // Les plus longs d'abord : « vendeuse_ab » avant « vendeuse_a ».
   const tri = (l) => [...l].sort((a, b) => b.length - a.length);
-  const motifs = [];
-  if (r.adresses) motifs.push(EMAIL, TEL, RUE, CP_VILLE);
-  if (r.numeros) motifs.push(IBAN, CARTE, SIRET);
+  // (revue du 5 nov.) Deux familles de motifs : ceux où la casse ne compte pas (une
+  // adresse e-mail, un téléphone, « rue »/« Rue ») et ceux qui n'existent qu'en
+  // MAJUSCULES (la ville après le code postal, l'IBAN) — en `i`, « 12500 vues sur
+  // tes annonces » passait pour un code postal + une ville et disparaissait entier.
+  const motifsI = [], motifsC = [];
+  if (r.adresses) { motifsI.push(EMAIL, TEL, RUE); motifsC.push(CP_VILLE); }
+  if (r.numeros) motifsC.push(IBAN, CARTE, SIRET);
   const mots = tri([...r.marques, ...r.contient]);
   return {
     montants: r.montants, codes: r.codes, bordereaux: r.bordereaux, acheteurs: r.acheteurs, comptes: r.comptes,
-    reJetons: reSur(tri(jetons).map(echap).join('|'), 'giu'),
-    reMotifs: reSur(motifs.join('|'), 'giu'),
+    // (revue du 5 nov.) Un jeton (pseudo, nom de compte) est un MOT ENTIER : un
+    // acheteur « ann » cachait « annonces » (« •••onces »), un identifiant de compte
+    // « 125 » cachait le N° 125. Bornes écrites sans « lookbehind » (Safari < 16.4).
+    reJetons: reSur(jetons.size ? `(^|[^${L}_])(?:${tri(jetons).map(echap).join('|')})(?![${L}_])` : '', 'giu'),
+    reMotifs: reSur(motifsI.join('|'), 'giu'),
+    reMotifsC: reSur(motifsC.join('|'), 'gu'),
+    // Le texte déjà passé par la règle (une liste de 1 500 lignes repassait toutes
+    // ses phrases à chaque changement : 50 à 300 ms par frappe, mesuré).
+    _memo: new Map(),
     // Un mot ENTIER (« Nike » ne cache pas « Nikeland ») ; une annonce « qui
     // contient » : le début d'un mot suffit (« Jordan » cache « Jordans »).
     reMots: reSur(mots.length ? `(^|[^${L}])((?:${tri(r.marques).map(motif).join('|') || '(?!)'})(?![${L}])|(?:${tri(r.contient).map(motif).join('|') || '(?!)'})[${L}'’_-]*)` : '', 'giu'),
@@ -127,11 +144,15 @@ export function compilerRegle(regles, groupes) {
 
 // Tout ce qui n'est pas un montant, dans un texte seul.
 function masquerAutres(s, R) {
+  const memo = R._memo;
+  if (memo) { const d = memo.get(s); if (d !== undefined) return d; }
   let t = s;
-  if (R.reJetons) t = t.replace(R.reJetons, MASQUE);
+  if (R.reJetons) t = t.replace(R.reJetons, (m, a) => a + MASQUE);
   if (R.reMotifs) t = t.replace(R.reMotifs, MASQUE);
+  if (R.reMotifsC) t = t.replace(R.reMotifsC, MASQUE);
   if (R.rePrefixes) t = t.replace(R.rePrefixes, (m, a) => a + MASQUE);
   if (R.reMots) t = t.replace(R.reMots, (m, a) => a + MASQUE);
+  if (memo) { if (memo.size > 20000) memo.clear(); memo.set(s, t); }
   return t;
 }
 
@@ -290,12 +311,16 @@ export function installerStream(racine, lire) {
   const doc = racine && racine.ownerDocument;
   if (!doc || typeof MutationObserver === 'undefined') return { arreter() {}, repasser() {} };
   const origine = new Map();   // nœud de texte → { o, m }
-  const titres = new Map();    // élément → { o, m } (l'infobulle `title`)
+  // (revue du 5 nov.) Les attributs qui S'AFFICHENT : l'infobulle `title` et le
+  // texte d'attente d'un champ (`placeholder` : « achat 35 € (auto) » se lisait).
+  const ATTRS = ['title', 'placeholder'];
+  const titres = new Map();    // « attribut » → Map(élément → { o, m })
+  for (const a of ATTRS) titres.set(a, new Map());
   const lignes = new Set();
   const flous = new Set();
   let arrete = false;
   const obs = new MutationObserver(() => passer());
-  const brancher = () => obs.observe(racine, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['title', 'value'] });
+  const brancher = () => obs.observe(racine, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['title', 'placeholder', 'value'] });
   const passer = () => {
     if (arrete) return;
     obs.disconnect();
@@ -325,24 +350,29 @@ export function installerStream(racine, lire) {
         else if (origine.has(n)) { if (n.nodeValue !== textes[i]) n.nodeValue = textes[i]; origine.delete(n); }
       }
       for (const n of origine.keys()) if (!n.isConnected) origine.delete(n);
-      // 3. Les infobulles (`title`) : elles s'affichent au survol, à l'écran.
-      const vus = new Set();
-      for (const el of racine.querySelectorAll('[title]')) {
-        if (el.closest('[data-stream-libre]')) continue;
-        const d = titres.get(el), cur = el.getAttribute('title');
-        const o = d && cur === d.m ? d.o : cur;
-        const v = enBloc(el, R) ? toutMasquer(o) : masquerTexteStream(o, R);
-        vus.add(el);
-        if (v !== o) { titres.set(el, { o, m: v }); if (cur !== v) el.setAttribute('title', v); }
-        else if (d) { if (cur !== o) el.setAttribute('title', o); titres.delete(el); }
+      // 3. Les attributs affichés (`title` au survol, `placeholder` dans un champ vide).
+      for (const a of ATTRS) {
+        const carte = titres.get(a), vus = new Set();
+        for (const el of racine.querySelectorAll('[' + a + ']')) {
+          if (el.closest('[data-stream-libre]')) continue;
+          const d = carte.get(el), cur = el.getAttribute(a);
+          const o = d && cur === d.m ? d.o : cur;
+          const v = enBloc(el, R) ? toutMasquer(o) : masquerTexteStream(o, R);
+          vus.add(el);
+          if (v !== o) { carte.set(el, { o, m: v }); if (cur !== v) el.setAttribute(a, v); }
+          else if (d) { if (cur !== o) el.setAttribute(a, o); carte.delete(el); }
+        }
+        for (const el of [...carte.keys()]) if (!vus.has(el) || !el.isConnected) carte.delete(el);
       }
-      for (const el of [...titres.keys()]) if (!vus.has(el) || !el.isConnected) titres.delete(el);
       // 4. Les champs : leur valeur n'est pas un nœud de texte — floutés (CSS).
       const champs = new Set();
       for (const c of racine.querySelectorAll('input, textarea')) {
         if (c.closest('[data-stream-libre]') || c.type === 'password' || c.type === 'checkbox' || c.type === 'radio') continue;
         const v = String(c.value || '');
-        if (v && (masquerTexteStream(v, R) !== v || enBloc(c, R))) champs.add(c);
+        // (revue du 5 nov.) Un champ de MONTANT (clavier décimal : prix d'achat, prix
+        // mini, offre…) porte un nombre sans « € » : la règle du texte ne le voit pas.
+        const montant = R.montants && /\d/.test(v) && (c.inputMode === 'decimal' || c.getAttribute('inputmode') === 'decimal');
+        if (v && (montant || masquerTexteStream(v, R) !== v || enBloc(c, R))) champs.add(c);
       }
       for (const c of flous) if (!champs.has(c)) c.removeAttribute(NOTRE_FLOU);
       for (const c of champs) if (!c.hasAttribute(NOTRE_FLOU)) c.setAttribute(NOTRE_FLOU, '');
@@ -361,10 +391,10 @@ export function installerStream(racine, lire) {
       arrete = true; obs.disconnect();
       doc.removeEventListener('input', surSaisie, true);
       for (const [n, d] of origine) if (n.isConnected && n.nodeValue === d.m) n.nodeValue = d.o;
-      for (const [el, d] of titres) if (el.isConnected && el.getAttribute('title') === d.m) el.setAttribute('title', d.o);
+      for (const [a, carte] of titres) for (const [el, d] of carte) if (el.isConnected && el.getAttribute(a) === d.m) el.setAttribute(a, d.o);
       for (const l of lignes) l.removeAttribute(NOTRE_LIGNE);
       for (const c of flous) c.removeAttribute(NOTRE_FLOU);
-      origine.clear(); titres.clear(); lignes.clear(); flous.clear();
+      origine.clear(); for (const carte of titres.values()) carte.clear(); lignes.clear(); flous.clear();
     },
   };
 }

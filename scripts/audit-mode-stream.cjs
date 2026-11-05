@@ -15,6 +15,13 @@
 //      (SYNC_KEYS), l'interrupteur propre à l'appareil ; la notification système
 //      passe par la règle ; l'ancien flou (streamFlou.js) n'existe plus ; le CSS
 //      floute lignes, bordereaux et QR.
+//   6. (revue adverse du 5 nov.) un jeton (pseudo, compte) est un MOT ENTIER —
+//      un acheteur « ann » ne coupe plus « annonces » ; un identifiant tout en
+//      chiffres court n'est jamais un jeton (le N° reste) ; la ville après le code
+//      postal et l'IBAN ne se reconnaissent qu'en majuscules (« 12500 vues sur tes
+//      annonces » restait caché entier) ; la règle garde ce qu'elle a déjà passé ;
+//      les placeholders et les champs de montant sont pris ; chaque code de
+//      retrait AFFICHÉ porte son marqueur (`data-stream-type="code"`).
 //  `--prouve` : rejoue l'audit sur des copies MUTÉES de la règle (chaque mutation
 //  réaffaiblit une règle) et exige qu'il passe au ROUGE.
 // ════════════════════════════════════════════════════════════════════════════
@@ -95,19 +102,46 @@ async function audit(fichiers, bavard) {
   dit(/\[data-stream="1"\] \[data-stream-ligne\]/.test(html) && /data-stream-image="bordereau"/.test(html) && /data-stream-image="code"/.test(html), '5.7 le CSS floute lignes, bordereaux et QR');
   dit(/\{ id:'stream', type:'panneau'[^\n]*<ReglagesStream\/>/.test(app), '5.8 Réglages → Mode stream ouvre le programme');
   dit(/useReglesStream\(\);/.test(app), '5.9 le programme est suivi au niveau de l\'app (nuage relu ⇒ règle changée)');
+
+  // ── 6. Revue adverse ──────────────────────────────────────────────────────
+  const Rj = S.compilerRegle({}, { acheteurs_vinted: ['ann', 'max_b'], comptes_sites: ['125', '12345678'] });
+  const cas6 = [
+    ['Annonces · 3 annonces · Vendue à ann', 'Annonces · 3 annonces · Vendue à •••'],
+    ['B1250 · max_bis · max_b.', 'B1250 · max_bis · •••.'],
+    ['N°125 · n° 12345678', 'N°125 · n° •••'],
+    ['12500 vues sur tes annonces', '12500 vues sur tes annonces'],
+    ['gs12 ab34 cd56 ef78 ventes', 'gs12 ab34 cd56 ef78 ventes'],
+    ['Retrait au 75011 Paris', 'Retrait au •••'],
+  ];
+  for (const [a, b] of cas6) dit(S.masquerTexteStream(a, Rj) === b, `6.1 « ${a} » ⇒ « ${b} »`, S.masquerTexteStream(a, Rj));
+  const Rm = S.compilerRegle(PROG, JET);
+  const x1 = S.masquerTexteStream('Nike vendue à marc.b', Rm), x2 = S.masquerTexteStream('Nike vendue à marc.b', Rm);
+  dit(x1 === x2 && x1 === '••• vendue à •••' && Rm._memo instanceof Map && Rm._memo.size > 0, '6.2 la règle garde ce qu\'elle a déjà passé (même résultat, sans tout refaire)', x1);
+  const regle = fs.readFileSync(fichiers.regle, 'utf8');
+  dit(/const ATTRS = \[[^\]]*'placeholder'/.test(regle) && /attributeFilter: \[[^\]]*'placeholder'/.test(regle), '6.3 le texte d\'attente d\'un champ (placeholder) suit la règle');
+  dit(/inputMode === 'decimal'/.test(regle), '6.4 un champ de montant (clavier décimal) est flouté quand les montants sont cachés');
+  const reCode = /<(div|span|strong|b)\b((?:[^<>]|=>)*?)>\{(?:x\.code|r\.code|qrView\.code2?|cd|code)\}<\//g;
+  let nCodes = 0, sansMarque = [];
+  for (let m; (m = reCode.exec(app));) { nCodes++; if (!/data-stream-type="code"/.test(m[2])) sansMarque.push(m[0].slice(0, 60)); }
+  dit(nCodes >= 10 && sansMarque.length === 0, `6.5 chaque code de retrait affiché porte son marqueur (${nCodes} endroits)`, JSON.stringify(sansMarque.slice(0, 3)));
   return ko;
 }
 
 const MUTATIONS = [
   ['regle', "for (const [k] of CATEGORIES) out[k] = s[k] !== false;", "for (const [k] of CATEGORIES) out[k] = s[k] === true;", 'pas su = montré'],
-  ['regle', "if (R.reJetons) t = t.replace(R.reJetons, MASQUE);", '', 'pseudos de ses comptes ignorés'],
+  ['regle', "if (R.reJetons) t = t.replace(R.reJetons, (m, a) => a + MASQUE);", '', 'pseudos de ses comptes ignorés'],
+  ['regle', "`(^|[^${L}_])(?:${tri(jetons).map(echap).join('|')})(?![${L}_])`", "`()(?:${tri(jetons).map(echap).join('|')})`", 'jeton : plus le mot entier'],
+  ['regle', "if (t.length < 3 || (/^\\d+$/.test(t) && t.length < 6)) continue;", "if (t.length < 3) continue;", 'identifiant court en chiffres = jeton'],
+  ['regle', "reMotifsC: reSur(motifsC.join('|'), 'gu'),", "reMotifsC: reSur(motifsC.join('|'), 'giu'),", 'ville/IBAN sans la casse'],
+  ['regle', "if (memo) { if (memo.size > 20000) memo.clear(); memo.set(s, t); }", "", 'règle sans mémoire'],
   ['regle', "return masquerAutres(R.montants ? masquerTexte(s) : s, R);", "return masquerAutres(s, R);", 'montants jamais cachés'],
   ['regle', "(?:${tri(r.marques).map(motif).join('|') || '(?!)'})(?![${L}])", "(?:${tri(r.marques).map(motif).join('|') || '(?!)'})[${L}]*", 'marque : plus le mot entier'],
   ['regle', "if (R.rePrefixes) t = t.replace(R.rePrefixes, (m, a) => a + MASQUE);", '', 'préfixes ignorés'],
   ['regle', "return !!(R && R.reLigne && texte && R.reLigne.test(String(texte)));", "return false;", 'lignes entières jamais cachées'],
   ['regle', "const cat = /^acheteurs/.test(nom) ? 'acheteurs' : 'comptes';", "const cat = 'comptes';", 'case pseudos sans effet'],
-  ['regle', "if (r.adresses) motifs.push(EMAIL, TEL, RUE, CP_VILLE);", "if (r.adresses) motifs.push(EMAIL, TEL);", 'adresses postales montrées'],
-  ['regle', "if (r.numeros) motifs.push(IBAN, CARTE, SIRET);", "", 'IBAN montré'],
+  ['regle', "if (r.adresses) { motifsI.push(EMAIL, TEL, RUE); motifsC.push(CP_VILLE); }", "if (r.adresses) { motifsI.push(EMAIL, TEL); }", 'adresses postales montrées'],
+  ['regle', "if (r.numeros) motifsC.push(IBAN, CARTE, SIRET);", "", 'IBAN montré'],
+  ['app', 'className="vrm-sensible" data-stream-type="code" style={{fontSize:qrView.img?34:44', 'style={{fontSize:qrView.img?34:44', 'code en grand (QR) sans marqueur'],
   ['regle', "const m = R.montants ? masquerSuite(t, voisins) : t;", "const m = t.map((x) => R.montants ? masquerTexte(x) : x);", 'montant coupé en deux nœuds'],
   ['regle', "return /\\S/.test(s) ? s.replace(/\\S[\\s\\S]*\\S|\\S/, MASQUE) : s;", "return s;", 'bloc sensible montré'],
 ];
@@ -125,7 +159,7 @@ const MUTATIONS = [
   for (const [cle, de, vers, nom] of MUTATIONS) {
     const src = fs.readFileSync(F[cle], 'utf8');
     if (!src.includes(de)) { console.log(`KO  mutation « ${nom} » : texte introuvable`); rates++; continue; }
-    const f = path.join(tmp, 'modeStream-' + Math.random().toString(36).slice(2) + '.js');
+    const f = path.join(tmp, (cle === 'app' ? 'App-' : 'modeStream-') + Math.random().toString(36).slice(2) + (cle === 'app' ? '.jsx' : '.js'));
     fs.writeFileSync(f, src.replace(de, vers));
     const ko = await audit({ ...F, [cle]: f }, false);
     console.log(`${ko ? 'OK  ' : 'KO  '}mutation « ${nom} » ⇒ ${ko ? ko + ' rouge(s)' : 'RESTE VERT'}`);
