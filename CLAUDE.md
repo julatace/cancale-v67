@@ -501,6 +501,7 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 
+- **5 nov. · Chantier A, jetons (v33)** : un bleu (`accent` aplat #0071E3/#0A84FF texte blanc, `accentTexte` liens) ; `danger` = ambre, rouge = jeton `doublon` seul (`audit-rouge-doublon`) ; `.vrm-seg-btn` = une règle (styles-coque) ; site : logo seul ; tnum aux nombres. `docs/passation/2026-11-05-chantier-a.md`.
 - **5 nov. · Notifications : le toucher mène à l'objet (v31)** : crochet unique `data-cible` (`src/cibleNotif.js`), l'objet défilé, ouvert et éclairé ~4 s ; offre ⇒ sa conversation et sa carte ; vente Vestiaire ⇒ sa ligne ; textes fabriqués une fois (`api/_lib/notif-apercus.js`, aussi l'aperçu des réglages) ; écriture refusée ⇒ interrupteur remis. `docs/passation/2026-11-05-notifs-cible.md`.
 - **5 nov. · Agent eBay arrêté (v31)** : l'agent ne propose ni ne prépare plus rien (`agentebay` dans `CATEGORIES_RETIREES`, `publish`+`agent:true` ⇒ 410 ; ⚠️ ne pas le remettre sans qu'il le demande) ; Vendre sur eBay prend des photos de l'appareil ou de la galerie (`api/_lib/ebay-photo.js`). `docs/passation/2026-11-05-agent-ebay-arret.md`, récit `historique-ebay.md`.
 - **5 nov. · Indicateur sobre (v31)** : point discret + nom du compte (ambre seulement si geste) ; navigateur nommé juste (`motsNavigateur()`, jamais « Chrome » en dur, `audit-chrome-en-dur`) ; « Tes comptes — dernière relecture » un compte par ligne (`src/fraicheurComptes.js`). `docs/passation/2026-11-05-indicateur-pro.md`.

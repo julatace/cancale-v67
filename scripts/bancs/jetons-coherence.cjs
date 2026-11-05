@@ -25,7 +25,9 @@
 //                  commencent par une majuscule.
 //  Réglages : `BANC_PORT` (8700–8749, 8731 par défaut), `LARGEURS=390,1512`,
 //  `THEMES=clair,sombre`, `ECRANS=<regex>`, `SHOTS=<dossier>` (une capture par
-//  écran, à REGARDER), `BANC_DIST` (un autre dist/, pour juger la base).
+//  écran, à REGARDER), `BANC_DIST` (un autre dist/, pour juger la base),
+//  `JC_MUTATION=1` (remet dans la page les anciennes règles — segment à 4 px, page en
+//  `tnum`, filtre blanc la nuit, `--vrm-danger` rouge : le banc DOIT rougir).
 //  Un banc ne meurt pas : il rapporte (le nombre de rouges par mesure, à la fin).
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
@@ -198,6 +200,7 @@ async function tournee(nav, { W, theme, scenario, base, aplatsTheme }) {
     await o.pg.waitForSelector('.vrm-main', { timeout: 20000 }).catch(() => {});
     await o.pg.waitForTimeout(2600);
     if (sous) { const c = o.pg.locator(`[data-colis-onglet-choix="${sous}"]`).first(); if (await c.count()) { await c.click(); await o.pg.waitForTimeout(1300); } }
+    if (process.env.JC_MUTATION === '1') await o.pg.addStyleTag({ content: ':root .vrm-seg > .vrm-seg-btn:not(#a):not(#b):not(#c) { padding: 0 4px !important; } html body.x, html body { font-feature-settings: "tnum" 1 !important; } :root[data-theme="dark"] :is(button[aria-pressed="true"], [role="radio"][aria-checked="true"]):not(#a):not(#b):not(#c) { background: #f5f5f7 !important; } :root .vrm-app-shell.vrm-app-shell { --vrm-danger: #D70015 !important; }' }).then(() => o.pg.waitForTimeout(800));   // les transitions de fond finissent
     const m = await MESURE(o.pg);
     if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); await o.pg.screenshot({ path: path.join(SHOTS, `jc-${scenario}-${W}-${theme}-${ecran.replace(':', '-')}.png`), fullPage: true }); }
     for (const [k, v] of Object.entries(m.aplats)) { (aplatsTheme[k] = aplatsTheme[k] || []).push(...v.map((x) => ({ ...x, ecran: nom, W }))); }
