@@ -1,5 +1,6 @@
 import {lireBordereauVestiaire} from './bordereauVestiaire.js';
 import {lireParcours,garderParcours,noterChangements,viderParcours,motifRecherche,restaurerVue} from './parcoursQuotidien.js';
+import {stockageParcours,lireReprise,garderReprise} from './repriseEcran.js';
 import {RecapSelection,CompteurListe,HistoriqueModifications} from './OutilsParcours.jsx';
 import {creerGardeLectures,garderConversationsNonLues} from './lecturesVinted.js';
 import {lienAnnonceLeboncoin,etatAnnonceLeboncoin} from './etatAnnonceLeboncoin.js';
@@ -298,6 +299,8 @@ const EXT_ATTENDUE = '5.322.0';
 // ⇒ Aucun balayage à la souris : une sélection commencée dans une marge reste
 //    une sélection. Le doigt balaie d'un geste rapide, sans sélection.
 const BALAYAGE_MAX_MS = 600;
+// (5 nov.) Les 24 px des bords appartiennent aux gestes du système (retour d'iOS).
+const BORD_SYSTEME = 24;
 function selectionActive() {
   try { const s = window.getSelection(); return !!(s && !s.isCollapsed && String(s).trim()); } catch (_) { return false; }
 }
@@ -906,7 +909,7 @@ const _emitAuth = () => { _authListeners.forEach(fn => { try { fn(AUTH); } catch
 const readSession = () => { try { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch { return null; } };
 const writeSession = (s) => {
   if (AUTH.user?.id !== s?.user?.id) {
-    vuesSession.clear(); try{viderParcours(sessionStorage,!AUTH.user?.id&&s?.user?.id?s.user.id:null);}catch(_){} _prechargeComptes=null;
+    vuesSession.clear(); try{const garder=!AUTH.user?.id&&s?.user?.id?s.user.id:null; viderParcours(sessionStorage,garder); viderParcours(localStorage,garder);}catch(_){} _prechargeComptes=null;
     _confidentialiteUid=''; _cloudReady=false; _pushPending=false;
     if (_cloudTimer) clearTimeout(_cloudTimer); _cloudTimer=null;
     Object.values(_saveTimers).forEach(clearTimeout); _saveTimers={};
@@ -3107,7 +3110,7 @@ window.addEventListener('storage', e => {
   if (e.key !== SESSION_KEY && e.key !== null) return;
   const prochaine=readSession();
   if (AUTH.user?.id !== prochaine?.user?.id) {
-    vuesSession.clear(); try{viderParcours(sessionStorage);}catch(_){} _confidentialiteUid=''; _cloudReady=false; _pushPending=false;
+    vuesSession.clear(); try{viderParcours(sessionStorage); viderParcours(localStorage);}catch(_){} _confidentialiteUid=''; _cloudReady=false; _pushPending=false;
     if (_cloudTimer) clearTimeout(_cloudTimer); _cloudTimer=null;
     Object.values(_saveTimers).forEach(clearTimeout); _saveTimers={};
     AUTH={...AUTH,session:prochaine,user:prochaine?.user||null,ready:true};
@@ -15105,7 +15108,7 @@ const GROUPES_PLUS=[
     {id:'achats',     icon:'bag',  label:'Achats'},
   ]},
   { titre:'Argent', items:[
-    {id:'dashboard', icon:'chart', label:'Statistiques'},
+    {id:'dashboard', icon:'chart', label:'Statistiques', court:'Stats'},
     {id:'compta',    icon:'euro',  label:'Compta'},
   ]},
   { titre:'Plateformes', ordi:true, items:[
@@ -15115,7 +15118,7 @@ const GROUPES_PLUS=[
   ]},
   { titre:'Moi', items:[
     {id:'communaute', icon:'pin',  label:'Communauté'},
-    {id:'settings',   icon:'gear', label:'Paramètres'},
+    {id:'settings',   icon:'gear', label:'Paramètres', court:'Réglages'},
   ]},
 ];
 // ⚠️ (2 nov., Julien : « il ne doit pas y avoir des écritures partout à côté des
@@ -15152,6 +15155,9 @@ function titreEcran(tab) {
 // rappel du soir…) parlent tous de colis à aller chercher ⇒ Colis, sur la
 // colonne « À retirer » et son détail (`retirer`). Ce qui parle d'un ACHAT
 // (reçu, litige) vise `achats` directement.
+// La liste blanche des écrans qu'un lien `?tab=` (et la reprise, src/repriseEcran.js)
+// peut ouvrir. Un onglet absent d'ici n'ouvre rien : l'app reste sur Ma journée.
+const ONGLETS_LIENS=['ventes','annonces','messages','achats','retraits','journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','organisation','communaute','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','ebay_messages','vinted_annonces'];
 const ONGLETS_DEPLACES = {
   prixmarche: ['dashboard', 'prix'], invoices: ['compta', 'factures'], collectif: ['dashboard', null],
   cat_ventes: ['ventes', 'vinted'], cat_annonces: ['annonces', 'vinted'], vinted_annonces: ['annonces', 'vinted'],
@@ -16182,8 +16188,12 @@ function SideBar({ tab, setTab, entreprise, sites, badges }) {
 // ⚠️ Sur ordinateur elle n'existe pas : la colonne montre déjà tout.
 // Le bouton de l'en-tête (« Tous les écrans », caché sur téléphone depuis la
 // coque iPhone) ouvre la même feuille, depuis le haut.
-function MenuEcrans({ tab, setTab, dark = false, bottom = false, sites = null, badges = null }) {
-  const [open, setOpen] = React.useState(false);
+function MenuEcrans({ tab, setTab, dark = false, bottom = false, sites = null, badges = null, ouvert = null, setOuvert = null }) {
+  // (5 nov.) Dans la barre du bas, l'état « ouvert » appartient à la barre
+  // (`ouvert`/`setOuvert`) : toucher un autre onglet referme le panneau.
+  const [openLocal, setOpenLocal] = React.useState(false);
+  const open = typeof setOuvert === 'function' ? !!ouvert : openLocal;
+  const setOpen = typeof setOuvert === 'function' ? setOuvert : setOpenLocal;
   const declencheur = React.useRef(null);
   const panneau = React.useRef(null);
   React.useEffect(() => { setOpen(false); }, [tab]);
@@ -16208,9 +16218,6 @@ function MenuEcrans({ tab, setTab, dark = false, bottom = false, sites = null, b
   const groupes = groupesVisibles(sites, () => true);
   const dansBarre = BOTTOM_TABS.some(t => t.id === (BAR_GROUPE[tab] || tab));
   const pointPlus = !!(badges && badges.messages === true);
-  // L'en-tête pose sa feuille dans document.body ; celle de la barre du bas
-  // reste où elle est (même étage que la barre).
-  const poserFeuille = bottom ? (x) => x : (x) => createPortal(x, document.body);
   const rangee = (t) => {
     const on = entreeActive(t, tab);
     return (
@@ -16222,27 +16229,65 @@ function MenuEcrans({ tab, setTab, dark = false, bottom = false, sites = null, b
       </button>
     );
   };
+  // (5 nov., barre iPhone revue) LA 5ᵉ PLACE DIT OÙ L'ON EST. Sur un écran
+  // rangé dans « Plus » (Statistiques, Stock, Paramètres…), elle montre CET
+  // écran — son icône, son nom court — au lieu d'un « Plus » allumé qui ne
+  // disait rien. Le toucher ouvre toujours le panneau. Hors de « Plus » (et
+  // pour un écran qui n'y est pas), elle reste « Plus ».
+  const courant = bottom && !dansBarre ? (PLUS_TABS.find(t => entreeActive(t, tab)) || null) : null;
+  const tuile = (t) => {
+    const on = entreeActive(t, tab);
+    return (
+      <button key={cleEntree(t)} type="button" role="menuitem" className="vrm-plus-tuile" data-nav-entree={cleEntree(t)} onClick={()=>{ ouvrirEntree(t, setTab); setOpen(false); }} aria-current={on?'page':undefined}>
+        <span className="vrm-plus-ic" aria-hidden="true"><NavigationIcon item={t} size={22}/><BadgeNav t={t} badges={badges} place="tuile"/></span>
+        <span className="vrm-sheet-lib">{t.label}</span>
+      </button>
+    );
+  };
+  if (bottom) return (
+    <>
+      <button ref={declencheur} type="button" onClick={()=>setOpen(o=>!o)} className="vrm-tab vrm-nav-more" aria-label="Plus" aria-haspopup="menu" aria-expanded={open} aria-current={!dansBarre?'page':undefined} data-plus-ecran={courant?cleEntree(courant):''}>
+        <span aria-hidden="true" className="vrm-tab-ic" style={{display:'flex',position:'relative'}}>{courant ? <NavigationIcon item={courant} size={22} style={{strokeWidth:2}}/> : <Icon name="more" size={24} style={{strokeWidth:1.6}}/>}{pointPlus ? <span className="vrm-nav-badge vrm-nav-badge-point vrm-nav-badge-barre" data-badge-nav="plus" data-badge-n="point" aria-hidden="true"/> : null}</span>
+        <span className="vrm-nav-label">{courant ? (courant.court || courant.label) : 'Plus'}</span>
+      </button>
+      {/* Le PANNEAU « Plus » (5 nov.) : une grille de tuiles posée AU-DESSUS de
+          la barre — la barre reste visible et touchable, rien n'est caché sous
+          la zone sûre ; tout tient sans défiler, même sur un iPhone SE. Il se
+          ferme au geste « retour » (FermeAuRetour : le retour ne quitte plus
+          VRM), en touchant « Plus » ou à côté, par Échap. */}
+      {open && (
+        <div data-noswipe className="vrm-sheet-voile vrm-plus-voile" onClick={()=>setOpen(false)}>
+          <FermeAuRetour fermer={()=>setOpen(false)}/>
+          <div ref={panneau} className="vrm-mobile-menu vrm-sheet vrm-sheet-bas vrm-menu-bottom vrm-plus-panneau" onClick={e=>e.stopPropagation()} role="menu" aria-label="Tous les écrans">
+            <div className="vrm-plus-grille">
+              {groupes.map(g => (
+                <div className="vrm-plus-groupe" key={g.titre} role="group" aria-label={g.titre} data-nav-groupe={g.titre}>{g.items.map(tuile)}</div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
   return (
     <>
-      <button ref={declencheur} type="button" onClick={()=>setOpen(o=>!o)} className={bottom?"vrm-tab vrm-nav-more":"vrm-hbtn"} aria-label={bottom?"Plus":"Tous les écrans"} aria-expanded={open} aria-current={bottom&&!dansBarre?'page':undefined}>
-        <span aria-hidden="true" className={bottom?"vrm-tab-ic":undefined} style={{display:'flex',position:'relative'}}><Icon name={bottom?'more':(open?'close':'menu')} size={bottom?24:22} style={{strokeWidth:1.6}}/>{bottom && pointPlus ? <span className="vrm-nav-badge vrm-nav-badge-point vrm-nav-badge-barre" data-badge-nav="plus" data-badge-n="point" aria-hidden="true"/> : null}</span>{bottom && <span className="vrm-nav-label">Plus</span>}
+      <button ref={declencheur} type="button" onClick={()=>setOpen(o=>!o)} className="vrm-hbtn" aria-label="Tous les écrans" aria-expanded={open}>
+        <span aria-hidden="true" style={{display:'flex',position:'relative'}}><Icon name={open?'close':'menu'} size={22} style={{strokeWidth:1.6}}/></span>
       </button>
       {/* (23 oct.) La feuille d'en-tête part dans document.body : rendue DANS
           l'en-tête (sticky, z-index 50), elle restait SOUS la barre du bas
           (z-index 60) en paysage et sur iPad. Banc `feuilles-coque.cjs`. */}
-      {open && poserFeuille(
+      {open && createPortal(
         <div data-noswipe className="vrm-sheet-voile" onClick={()=>setOpen(false)}>
-          <div ref={panneau} className={bottom?"vrm-mobile-menu vrm-sheet vrm-sheet-bas vrm-menu-bottom":"vrm-mobile-menu vrm-sheet vrm-sheet-haut"} onClick={e=>e.stopPropagation()} role="menu" aria-label="Tous les écrans">
-            {bottom && <div aria-hidden="true" className="vrm-sheet-poignee"/>}
+          <FermeAuRetour fermer={()=>setOpen(false)}/>
+          <div ref={panneau} className="vrm-mobile-menu vrm-sheet vrm-sheet-haut" onClick={e=>e.stopPropagation()} role="menu" aria-label="Tous les écrans">
             <div className="vrm-sheet-tete">
               <span className="vrm-sheet-titre">Ton espace</span>
               <button className="vrm-icon-control vrm-sheet-fermer" type="button" aria-label="Fermer le menu" onClick={()=>setOpen(false)}><Icon name="close" size={18}/></button>
             </div>
-            {!bottom && (
-              <div className="vrm-menu-group vrm-sheet-groupe" data-nav-groupe="Tâches">
-                <div className="vrm-sheet-carte">{NAV_TACHES.map(rangee)}</div>
-              </div>
-            )}
+            <div className="vrm-menu-group vrm-sheet-groupe" data-nav-groupe="Tâches">
+              <div className="vrm-sheet-carte">{NAV_TACHES.map(rangee)}</div>
+            </div>
             {groupes.map(g => (
               <div className="vrm-menu-group vrm-sheet-groupe" key={g.titre} data-nav-groupe={g.titre}>
                 <div className="vrm-sheet-label">{g.titre}</div>
@@ -16250,19 +16295,23 @@ function MenuEcrans({ tab, setTab, dark = false, bottom = false, sites = null, b
               </div>
             ))}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
 }
 
 // Retrouver sa position après un passage dans un autre écran.
+let _premierEcranDefile=true;
 function MemoireDefilement({ ecran }) {
   const positions=React.useRef(new Map());
   React.useLayoutEffect(()=>{
     const main=document.querySelector('.vrm-main');
     if(!main) return;
-    const owner=AUTH.user?.id||'';let gardee=0;try{gardee=Number(lireParcours(sessionStorage,owner,'position:'+ecran,0))||0;}catch(_){}
+    // (5 nov., reprise) La position est rangée sur l'APPAREIL (src/repriseEcran.js) :
+    // l'app installée qu'iOS ferme puis rouvre retrouve aussi son défilement.
+    const owner=AUTH.user?.id||'';const st=stockageParcours();let gardee=0;try{if(st)gardee=Number(lireParcours(st,owner,'position:'+ecran,0))||0;}catch(_){}
     const cible=positions.current.get(owner+':'+ecran)??Math.max(0,Math.min(1000000,gardee));
     let position=cible, restauration=cible>0, arrete=false;   // rien à tenir à 0
     // On ne s'arrête pas au premier succès : l'écran peut se raccourcir le temps
@@ -16270,8 +16319,12 @@ function MemoireDefilement({ ecran }) {
     // position 2,5 s, sauf si la personne fait défiler elle-même.
     const restaurer=()=>{ if(!arrete&&restauration&&Math.abs(main.scrollTop-cible)>=2) main.scrollTop=cible; };
     const lire=()=>{ if(!restauration) position=main.scrollTop; };
-    const garderPosition=()=>{try{if((AUTH.user?.id||'')===owner)garderParcours(sessionStorage,owner,'position:'+ecran,restauration?cible:main.scrollTop);}catch(_){}};
+    const garderPosition=()=>{try{if(st&&(AUTH.user?.id||'')===owner)garderParcours(st,owner,'position:'+ecran,restauration?cible:main.scrollTop);}catch(_){}};
+    // iOS ne promet pas `pagehide` quand on chasse l'app installée : on range
+    // aussi quand elle passe en arrière-plan (le dernier moment sûr).
+    const auMasquage=()=>{ if(document.visibilityState==='hidden') garderPosition(); };
     window.addEventListener('pagehide',garderPosition);
+    document.addEventListener('visibilitychange',auMasquage);
     const intervenir=()=>{ restauration=false; position=main.scrollTop; };
     main.addEventListener('scroll',lire,{passive:true});
     main.addEventListener('wheel',intervenir,{passive:true});
@@ -16284,18 +16337,57 @@ function MemoireDefilement({ ecran }) {
     let image=0;
     const boucle=()=>{ restaurer(); if(!arrete&&restauration) image=requestAnimationFrame(boucle); };
     boucle();
-    const delai=setTimeout(()=>{restauration=false;position=main.scrollTop;cancelAnimationFrame(image);},2500);
+    // Au premier écran après une ouverture, les données arrivent du nuage : on
+    // tient la position plus longtemps (6 s), sauf geste de la personne.
+    const tenir=_premierEcranDefile?6000:2500; _premierEcranDefile=false;
+    const delai=setTimeout(()=>{restauration=false;position=main.scrollTop;cancelAnimationFrame(image);},tenir);
     return ()=>{
-      arrete=true;clearTimeout(delai);cancelAnimationFrame(image);window.removeEventListener('pagehide',garderPosition);
+      arrete=true;clearTimeout(delai);cancelAnimationFrame(image);window.removeEventListener('pagehide',garderPosition);document.removeEventListener('visibilitychange',auMasquage);
       positions.current.set(owner+':'+ecran,position);
-      try{if((AUTH.user?.id||'')===owner)garderParcours(sessionStorage,owner,'position:'+ecran,position);}catch(_){}
+      try{if(st&&(AUTH.user?.id||'')===owner)garderParcours(st,owner,'position:'+ecran,position);}catch(_){}
       main.removeEventListener('scroll',lire);main.removeEventListener('wheel',intervenir);main.removeEventListener('touchstart',intervenir);window.removeEventListener('keydown',intervenir);main.removeEventListener('pointerdown',intervenir);
     };
   },[ecran]);
   return null;
 }
 
+// (5 nov.) Toucher l'onglet où l'on est déjà ramène en haut de l'écran (le
+// geste d'iOS), sans rien changer d'autre. Mouvement réduit ⇒ sans animation.
+function remonterEnHaut() {
+  try {
+    const m = document.querySelector('.vrm-main'); if (!m) return;
+    const doux = !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    m.scrollTo({ top: 0, behavior: doux ? 'smooth' : 'auto' });
+  } catch (_) {}
+}
+// ⚠️⚠️ LA BARRE DU BAS, REVUE (5 nov., Julien : « ça ne marche pas, c'est pas
+// ouf », « revue TOTALEMENT »). Mesuré à 390 px tactile (banc
+// scripts/bancs/iphone-reprise.cjs, récit : docs/passation/2026-11-05-iphone-
+// reprise.md) : le geste « retour » avec « Plus » ouvert QUITTAIT VRM ; la
+// feuille « Plus » couvrait 651 px et la barre (Paramètres hors de l'écran sur
+// un iPhone SE) ; sur Statistiques la barre disait seulement « Plus » ; un
+// balayage parti du bord gauche (le « retour » d'iOS) changeait AUSSI
+// d'onglet ; Ventes et Colis portaient le même nombre côte à côte. Désormais :
+// quatre tâches + une 5ᵉ place qui dit où l'on est ; « Plus » = un panneau de
+// tuiles AU-DESSUS de la barre ; retour = fermer ; toucher l'onglet courant =
+// remonter en haut ; un nombre une seule fois.
 function BottomBar({tab,setTab,sites,badges}) {
+  const [plusOuvert,setPlusOuvert]=React.useState(false);
+  const navRef=React.useRef(null);
+  // La hauteur de la barre (zone sûre comprise), pour poser le panneau « Plus »
+  // juste au-dessus d'elle : `--vrm-barre-bas` sur la racine.
+  React.useLayoutEffect(()=>{
+    const el=navRef.current; if(!el) return undefined;
+    const poser=()=>{ try{ const h=Math.round(el.getBoundingClientRect().height); if(h>0) document.documentElement.style.setProperty('--vrm-barre-bas', h+'px'); }catch(_){} };
+    poser();
+    let ro=null; try{ ro=new ResizeObserver(poser); ro.observe(el); }catch(_){}
+    window.addEventListener('resize',poser);
+    return ()=>{ window.removeEventListener('resize',poser); try{ ro&&ro.disconnect(); }catch(_){} };
+  },[]);
+  // Un nombre ne s'écrit qu'une fois sur l'écran (§7) : Ventes et Colis portent
+  // la MÊME notion (les colis à poster, `vrm_colis_aposter`). Dans la barre, il
+  // reste sur Colis, là où on les poste ; la colonne de l'ordinateur ne change pas.
+  const badgesBarre=badges?{...badges,ventes:undefined}:badges;
   // Se cache quand le clavier est ouvert (saisie dans un champ) : sinon iOS la
   // pousse au milieu de l'écran au-dessus du clavier et la mise en page saute.
   const [kbOpen,setKbOpen]=React.useState(false);
@@ -16323,16 +16415,16 @@ function BottomBar({tab,setTab,sites,badges}) {
        actif prend la teinte d'accent — plus de pastille bleue pleine (§7 : une
        seule couleur, rare). Fond en verre, filet fin. Tout le dessin vit dans
        `.vrm-tabbar` (styles-coque.css) : ici seulement la structure. */}
-    <nav className="vrm-mobile-nav vrm-tabbar" aria-label="Navigation principale" style={{display:kbOpen?'none':'flex','--vrm-nav-bg':C.sidebar||C.chrome}}>
+    <nav ref={navRef} className="vrm-mobile-nav vrm-tabbar" data-plus-ouvert={plusOuvert?'1':'0'} aria-label="Navigation principale" style={{display:kbOpen?'none':'flex','--vrm-nav-bg':C.sidebar||C.chrome}}>
       {/* (31 oct.) PAR TÂCHE : Journée · Annonces · Ventes · Colis · Plus. Icône
           d'accent et libellé d'encre à l'actif (styles-vitrine.css), 52 px. */}
-      {BOTTOM_TABS.map(t=>{ const on=(BAR_GROUPE[tab]||tab)===t.id; const lib=t.court||t.label; return (
-        <button key={t.id} type="button" className="vrm-tab" data-nav-entree={t.id} onClick={()=>setTab(t.id)} aria-label={lib+((badges&&typeof badges[t.id]==='number'&&badges[t.id]>0)?` · ${badges[t.id]} à expédier`:'')} aria-current={on?'page':undefined}>
-          <span aria-hidden="true" className="vrm-tab-ic" style={{position:'relative'}}><NavigationIcon item={t} size={22} style={{strokeWidth:on?2:1.6}}/><BadgeNav t={t} badges={badges} place="barre"/></span>
+      {BOTTOM_TABS.map(t=>{ const on=(BAR_GROUPE[tab]||tab)===t.id; const lib=t.court||t.label; const n=badgesBarre&&typeof badgesBarre[t.id]==='number'&&badgesBarre[t.id]>0?badgesBarre[t.id]:0; return (
+        <button key={t.id} type="button" className="vrm-tab" data-nav-entree={t.id} onClick={()=>{ setPlusOuvert(false); if(on&&t.id===tab) remonterEnHaut(); else setTab(t.id); }} aria-label={lib+(n?` · ${n} à faire`:'')} aria-current={on?'page':undefined}>
+          <span aria-hidden="true" className="vrm-tab-ic" style={{position:'relative'}}><NavigationIcon item={t} size={22} style={{strokeWidth:on?2:1.6}}/><BadgeNav t={t} badges={badgesBarre} place="barre"/></span>
           <span className="vrm-nav-label">{lib}</span>
         </button>
       );})}
-      <MenuEcrans tab={tab} setTab={setTab} bottom sites={sites} badges={badges}/>
+      <MenuEcrans tab={tab} setTab={setTab} bottom sites={sites} badges={badgesBarre} ouvert={plusOuvert} setOuvert={setPlusOuvert}/>
     </nav>
     </>
   );
@@ -19708,14 +19800,16 @@ function VintedResume({ liveStats, baseKO, siAJour = true, sauf = null, sansMont
 function useVueSession(nom, initial) {
   const owner=readSession()?.user?.id||'';
   const cle=`${owner || 'local'}:${nom}`;
-  if(!vuesSession.has(cle)){try{const v=restaurerVue(sessionStorage,owner,nom,initial);vuesSession.set(cle,v);}catch(_){}}
+  // (5 nov., reprise) Rangé sur l'APPAREIL (src/repriseEcran.js) : un `sessionStorage`
+  // repart vide quand iOS rouvre l'app installée. Stockage bloqué ⇒ rien de rangé.
+  if(!vuesSession.has(cle)){try{const st=stockageParcours();const v=st?restaurerVue(st,owner,nom,initial):initial;vuesSession.set(cle,v);}catch(_){}}
   const [etat,setEtat]=useState(()=>({cle,valeur:vuesSession.has(cle)?vuesSession.get(cle):initial}));
   const valeur=etat.cle===cle?etat.valeur:(vuesSession.has(cle)?vuesSession.get(cle):initial);
   const changer=next=>setEtat(prev=>{
     const ancien=prev.cle===cle?prev.valeur:(vuesSession.has(cle)?vuesSession.get(cle):initial);
     const nouveau=typeof next==='function'?next(ancien):next;
     vuesSession.set(cle,nouveau);
-    try{if((readSession()?.user?.id||'')===owner)garderParcours(sessionStorage,owner,'vue:'+nom,nouveau);}catch(_){}
+    try{const st=stockageParcours();if(st&&(readSession()?.user?.id||'')===owner)garderParcours(st,owner,'vue:'+nom,nouveau);}catch(_){}
     return {cle,valeur:nouveau};
   });
   return [valeur,changer];
@@ -65582,7 +65676,13 @@ function AppCoeur() {
   //    vois pas l'utilité d'avoir les deux »). Ma journée est le poste de
   //    pilotage quotidien (les actions du jour) ; Collectif reste une vue
   //    d'ensemble optionnelle dans le menu, plus l'écran forcé à l'ouverture.
-  const [tab,setTabBrut]=useState('journee');
+  // (5 nov., REPRISE) Rouverte (rechargement, app installée qu'iOS a fermée),
+  // l'app revient à l'écran, la section et l'onglet de Colis où il était —
+  // rangés sur CET appareil pour CE vendeur (src/repriseEcran.js). Un lien
+  // `?tab=` reçu gagne : la reprise se tait et `goto` mène au lien. Rien de
+  // lisible ⇒ Ma journée, comme avant.
+  const [reprise0]=useState(()=>{ try{ return lireReprise(stockageParcours(), AUTH.user?.id||readSession()?.user?.id||'', ONGLETS_LIENS, window.location.search); }catch(_){ return null; } });
+  const [tab,setTabBrut]=useState(()=>reprise0?reprise0.tab:'journee');
   // (27 oct., « des effets entre les pages ») Changer d'écran se VOIT : le
   // contenu arrive en fondu, d'un léger glissé (styles-mouvement.css). Rien
   // n'est remonté — on rejoue une classe sur `<main>` — et rien ne bouge si
@@ -65624,12 +65724,16 @@ function AppCoeur() {
   //    d'avoir vente, achat »). Le hub Vinted/Leboncoin porte une sous-navigation
   //    qui rend les écrans détaillés À L'INTÉRIEUR de l'onglet (mêmes composants,
   //    aucune duplication §11) au lieu d'envoyer vers un autre onglet.
-  const [platSub,setPlatSub]=useState('ventes');
+  const [platSub,setPlatSub]=useState(()=>{
+    if(!reprise0) return 'ventes';
+    if(reprise0.sub) return reprise0.sub;
+    return estTacheSite(reprise0.tab)?(filtreRetenu(reprise0.tab)||siteDeTache(reprise0.tab,null)):'ventes';
+  });
   // (2 nov.) Colis : « À envoyer » / « À retirer ». `ongletColis` = le choix
   // (son toucher, ou un lien « à retirer » : `retraits`, une carte de Ma journée,
   // une notification) ; null ⇒ l'écran choisit (l'onglet qui a de l'urgent).
   // `ongletColisMontre` = ce que l'écran montre (pour monter les outils de retrait).
-  const [ongletColis,setOngletColis]=useState(null);
+  const [ongletColis,setOngletColis]=useState(()=>(reprise0&&reprise0.colis)||null);
   const [ongletColisMontre,setOngletColisMontre]=useState(null);
   React.useEffect(()=>{ if(tab==='cat_bord'&&platSub==='retirer') setOngletColis('retirer'); },[tab,platSub]);
   React.useEffect(()=>{
@@ -65714,6 +65818,8 @@ function AppCoeur() {
     window.addEventListener('popstate',onPop);
     return ()=>window.removeEventListener('popstate',onPop);
   },[]);
+  // (5 nov.) La reprise : l'écran, sa section, l'onglet de Colis choisi à la main.
+  React.useEffect(()=>{ try{ garderReprise(stockageParcours(), AUTH.user?.id||'', { tab, sub:platSub, colis:ongletColis }, ONGLETS_LIENS); }catch(_){} },[tab,platSub,ongletColis]);
   // ── FILTRE PAR COMPTE sur les onglets d'une plateforme (Julien, 6 oct.) ──────
   // « Tous les comptes » par défaut. En choisir un ne montre QUE ses annonces /
   // ventes / messages, sur l'onglet où on est — pas ailleurs. `''` = tous.
@@ -65805,7 +65911,7 @@ function AppCoeur() {
     // banc, qui navigue par `?tab=`, croyait rendre Leboncoin alors qu'il
     // mesurait l'accueil (un faux vert dans ma propre couverture d'hier).
     // `journee` manquait aussi : invisible parce que c'est l'état de départ.
-    const TABS_OK=['ventes','annonces','messages','achats','retraits','journee','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','cat_msg','cat_expedition','garage','organisation','communaute','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','ebay_messages','vinted_annonces'];
+    const TABS_OK=ONGLETS_LIENS;
     // (31 oct.) Une notification mène à l'élément PRÉCIS : `cible` (+ son
     // identité) et `vue` (src/cibleNotif.js, api/_lib/lien-notif.js). Une
     // `section` vaut aussi pour Comptabilité et Statistiques.
@@ -68187,7 +68293,13 @@ function AppCoeur() {
       let n=e.target, overlay=false;
       while(n && n!==document.body){ try{ if((n.dataset&&n.dataset.noswipe)||getComputedStyle(n).position==='fixed'){overlay=true;break;} }catch(_){break;} n=n.parentElement; }
       if(overlay||gesteHorsNavigation(e.target)){ swipeStart.current=null; return; }
-      const t=e.touches&&e.touches[0]; if(t) swipeStart.current={x:t.clientX,y:t.clientY,t0:Date.now()};
+      const t=e.touches&&e.touches[0];
+      // (5 nov.) Un geste parti du BORD de l'écran appartient au système : sur
+      // iPhone, le bord gauche est le « retour » de Safari. Il changeait AUSSI
+      // d'onglet (mesuré : Ventes → Annonces), puis le retour en jouait un
+      // second. On le laisse au système.
+      if(t && (t.clientX<BORD_SYSTEME || t.clientX>(window.innerWidth||0)-BORD_SYSTEME)){ swipeStart.current=null; return; }
+      if(t) swipeStart.current={x:t.clientX,y:t.clientY,t0:Date.now()};
       }}
       onTouchEnd={e=>{
       const s=swipeStart.current; if(!s) return; swipeStart.current=null;

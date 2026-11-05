@@ -97,7 +97,8 @@ if (carte) {
   // rendu » en mesurant « Bonjour Julien » — un faux vert dans la couverture
   // que je venais d'élargir. Un lien vers Leboncoin n'y menait pas non plus.
   {
-    const m = /const TABS_OK=\[([^\]]*)\]/.exec(APP);
+    // (5 nov.) La liste vit dans `ONGLETS_LIENS` (partagée avec la reprise, src/repriseEcran.js) ; `TABS_OK` la nomme.
+    const m = /const TABS_OK=\[([^\]]*)\]/.exec(APP) || (/const TABS_OK=ONGLETS_LIENS;/.test(APP) ? /const ONGLETS_LIENS=\[([^\]]*)\]/.exec(APP) : null);
     const acceptes = new Set(m ? [...m[1].matchAll(/'([a-z_]+)'/g)].map(x => x[1]) : []);
     const refuses = joignables.filter(t => !acceptes.has(t));
     dit(refuses.length === 0,
