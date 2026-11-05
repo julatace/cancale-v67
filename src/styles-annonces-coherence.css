@@ -42,8 +42,9 @@
 @media (hover: hover) and (pointer: fine) {
   :root:root:root body .vrm-main .vrm-annbar .vrm-annbar-bouton:hover { background: var(--vrm-b-teinte-f, rgba(118,118,128,.2)) !important; }
 }
-:root:root:root body .vrm-main .vrm-annbar .vrm-annbar-bouton:focus-within,
-:root:root:root body .vrm-main .vrm-annbar .vrm-annbar-bouton:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: 2px; }
+:root:root:root body .vrm-main .vrm-annbar .vrm-annbar-bouton:focus { outline: none !important; }
+:root:root:root body .vrm-main .vrm-annbar .vrm-annbar-bouton:has(select:focus-visible),
+:root:root:root body .vrm-main .vrm-annbar .vrm-annbar-bouton:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3) !important; outline-offset: 2px; }
 /* Trier : la liste native du système (au doigt comme à la souris), posée sur le bouton. */
 :root:root:root body .vrm-main .vrm-annbar .vrm-annbar-tri > select.vrm-ann-tri {
   position: absolute !important; inset: 0 !important; width: 100% !important; height: 100% !important; min-width: 0 !important; min-height: 0 !important;
@@ -150,6 +151,17 @@
 @media (pointer: coarse), (max-width: 767px) {
   :root:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-gestes > .vrm-fiche-geste { min-height: 44px !important; }
 }
+/* Une carte étroite (deux colonnes au téléphone) : « Changer le prix » sur sa ligne,
+   le stock et « … » dessous — rien d'écrasé. */
+@media (max-width: 767px) {
+  :root:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-gestes { flex-wrap: wrap !important; }
+  :root:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-gestes > .vrm-fiche-geste-prix { flex: 1 1 100% !important; }
+  :root:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-gestes > [data-fiche-stock] { flex: 1 1 0 !important; min-width: 0; padding: 0 8px !important; overflow: hidden; text-overflow: ellipsis; }
+}
+/* Les libellés des cases chiffrées : en entier, sur deux lignes s'il le faut (jamais « Accepter … »). */
+:root:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-chiffres] .vrm-fiche-cell > span:first-child {
+  white-space: normal !important; overflow: visible !important; text-overflow: clip !important; line-height: 1.2;
+}
 .vrm-fiche-geste-sous { display: block; font-size: 11px; font-weight: 500; color: var(--vrm-muted); white-space: nowrap; }
 
 /* La feuille « … » d'une carte : des lignes de 44 px, pleine largeur. */
@@ -180,6 +192,8 @@ html body .vrm-act .vrm-act-choix[aria-disabled="true"] { opacity: .5; }
 html body .vrm-act .vrm-act-choix span { font-size: 12px; }
 .vrm-act-main { display: flex; align-items: center; flex-wrap: wrap; gap: 0 10px; font-size: 12px; color: var(--vrm-muted); line-height: 1.4; }
 .vrm-act-main > .vrm-b { flex: none; }
+/* « Republier à la main » grisé : en gris, jamais un bleu éteint illisible la nuit. */
+html body .vrm-act-main > .vrm-b:disabled { color: var(--vrm-muted) !important; opacity: 1 !important; }
 .vrm-act-paire-nom { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .vrm-act-paire-nom > b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vrm-act-ok { display: inline-flex; margin-left: auto; color: var(--vrm-muted); flex: none; }
