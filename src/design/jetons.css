@@ -81,7 +81,7 @@
   border: 0 !important; border-radius: 12px !important; background: transparent !important; box-shadow: none !important;
   color: var(--fu-encre) !important; font: 600 13px/1 var(--vrm-police) !important; letter-spacing: -.01em !important;
   white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; cursor: pointer;
-  transition: background-color .2s ease, box-shadow .2s ease;
+  transition: none;   /* (5 nov.) l'aplat du site choisi est posé d'un coup : un fondu de .2 s le laissait transparent pendant le chargement (fusion-app F9, 1512) */
 }
 :root:root body .vrm-app-shell .vrm-filtre-site > button:not(#fu)[aria-pressed="true"],
 :root:root body .vrm-app-shell .vrm-main .vrm-filtre-site > button:not(#fu)[aria-pressed="true"] {
