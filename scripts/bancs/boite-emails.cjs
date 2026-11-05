@@ -502,8 +502,9 @@ const journal = (appels) => appels.filter((a) => a.chemin === '/api/email-rattac
         const pn = b.locator('[data-boite-etat="panne"]');
         await pn.waitFor({ timeout: 8000 });
         const tp = await pn.innerText();
-        const btP = pn.locator('[data-boite-etat-geste="reessayer"]');
-        dit(await pn.getAttribute('role') === 'alert' && /—/.test(tp) && /VRM n’a pas pu lire ta boîte|n’a pas répondu|connexion/.test(tp) && /Rien n’est perdu/.test(tp) && await btP.count() === 1 && (await btP.boundingBox()).height >= 44 && !/\b0\b/.test(await b.locator('.vrm-boite-rubriques').innerText()), `${nom} : panne — « — » + la raison, rien n’est perdu, « Réessayer » (44 px), aucun nombre inventé dans les pastilles`, tp.replace(/\n/g, ' | '));
+        // (5 nov., chantier G, revue 1.10) La panne est dite par `EtatPanne` : « pas su pour l’instant » (le « — » d’avant), son bouton `data-etat-panne-reessayer`.
+        const btP = pn.locator('[data-boite-etat-geste="reessayer"], [data-etat-panne-reessayer]');
+        dit(await pn.getAttribute('role') === 'alert' && /—|pas su pour l’instant/.test(tp) && /VRM n’a pas pu lire ta boîte|n’a pas répondu|connexion/.test(tp) && /Rien n’est perdu/.test(tp) && await btP.count() === 1 && (await btP.boundingBox()).height >= 44 && !/\b0\b/.test(await b.locator('.vrm-boite-rubriques').innerText()), `${nom} : panne — « — » + la raison, rien n’est perdu, « Réessayer » (44 px), aucun nombre inventé dans les pastilles`, tp.replace(/\n/g, ' | '));
         await pg.screenshot({ path: path.join(CAPT, `etat-panne-${nom}.png`) });
         // Réessayer relit (une requête de plus), et tombe ici sur la boîte vide.
         mode = 'vide'; const avant = journal(appels).length;

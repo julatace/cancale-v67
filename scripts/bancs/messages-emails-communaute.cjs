@@ -257,7 +257,7 @@ const referenceFiltres = (pg) => pg.evaluate((DESSIN) => {
         console.log(`── Messages · Vinted ${suf}`);
         const { ctx, pg, erreurs } = await ouvrir(nav, { largeur, sombre, chemin: '?tab=messages&site=vinted' });
         await pg.waitForSelector('[data-conv="501"]', { timeout: 15000 }).catch(() => {});
-        await pg.waitForTimeout(600);
+        await pg.waitForTimeout(1500);
         await capture(pg, `messages-vinted-${suf}`);
         // G1 — les filtres au dessin des autres filtres.
         const ref = await referenceFiltres(pg);
@@ -277,8 +277,9 @@ const referenceFiltres = (pg) => pg.evaluate((DESSIN) => {
         // G8 (Vinted) — aucune expiration d'offre, nulle part.
         const vintedExpire = await pg.evaluate(() => { const t = (document.querySelector('[data-messagerie]') || {}).innerText || ''; return { attr: document.querySelectorAll('[data-messagerie] [data-offre-expire], [data-messagerie] [data-expire-bientot]').length, mot: /expire|reste \d/i.test(t) }; });
         dit(vintedExpire.attr === 0 && !vintedExpire.mot, `${suf} : G8 Vinted — aucune offre ne « expire » (Julien : les offres Vinted n'expirent pas)`, JSON.stringify(vintedExpire));
-        // G2 — un seul style de lien en pied.
-        const pieds = await pg.evaluate(() => [...document.querySelectorAll('[data-pied-lien]')].filter((x) => x.offsetParent).map((x) => { const s = getComputedStyle(x), r = x.getBoundingClientRect(); return { k: x.getAttribute('data-pied-lien'), c: s.color, t: s.fontSize, g: s.fontWeight, fond: s.backgroundColor, h: Math.round(r.height) }; }));
+        // G2 — un seul style de lien en pied (le repli « Réponses rapides » ouvert : son « Modifier » en fait partie).
+        await pg.evaluate(() => document.querySelectorAll('details.vrm-quick-settings').forEach((d) => { d.open = true; })); await pg.waitForTimeout(200);
+        const pieds = await pg.evaluate(() => [...document.querySelectorAll('[data-pied-lien]')].filter((x) => x.offsetParent && x.checkVisibility()).map((x) => { const s = getComputedStyle(x), r = x.getBoundingClientRect(); return { k: x.getAttribute('data-pied-lien'), c: s.color, t: s.fontSize, g: s.fontWeight, fond: s.backgroundColor, h: Math.round(r.height) }; }));
         const sig = (x) => x.c + '|' + x.t + '|' + x.g + '|' + x.fond;
         dit(pieds.length >= 2 && new Set(pieds.map(sig)).size === 1 && pieds.every((x) => !tel || x.h >= 44), `${suf} : G2 un seul style de lien en pied de Messages (≥ 2 liens, une signature, ≥ 44 px au doigt)`, JSON.stringify(pieds));
         // G9 — aucun texte écrit dans l'aplat d'accent (le bleu reste rare : un point, un bouton plein).
@@ -298,7 +299,7 @@ const referenceFiltres = (pg) => pg.evaluate((DESSIN) => {
         const { ctx, pg, erreurs } = await ouvrir(nav, { largeur, sombre, chemin: '?tab=messages&site=vinted', panne: { vinted: true } });
         await pg.waitForTimeout(1500);
         await capture(pg, `messages-vinted-panne-${suf}`);
-        const g = await pg.evaluate(() => { const z = document.querySelector('[data-tache="messages"]') || document.body; const vis = [...z.querySelectorAll('button')].filter((b) => b.offsetParent); const nom = (b) => (b.getAttribute('aria-label') || '') + ' ' + b.textContent; return { reessayer: vis.filter((b) => /Réessayer/.test(nom(b))).length, actualiser: vis.filter((b) => /Actualiser/i.test(nom(b))).length }; });
+        const g = await pg.evaluate(() => { const z = document.querySelector('[data-tache="messages"]') || document.body; const vis = [...z.querySelectorAll('button')].filter((b) => b.offsetParent && b.checkVisibility()); const nom = (b) => (b.getAttribute('aria-label') || '') + ' ' + b.textContent; return { reessayer: vis.filter((b) => /Réessayer/.test(nom(b))).length, actualiser: vis.filter((b) => /Actualiser/i.test(nom(b))).length, noms: vis.filter((b) => /Actualiser/i.test(nom(b))).map((b) => nom(b).trim().slice(0, 60)) }; });
         dit(g.reessayer >= 1 && g.actualiser === 0, `${suf} : G7 Messages en panne — « Réessayer », jamais « Actualiser » à côté`, JSON.stringify(g));
         dit(erreurs.length === 0, `${suf} : Messages en panne sans erreur JavaScript`, erreurs.join(' | ').slice(0, 200));
         await ctx.close();
@@ -376,13 +377,13 @@ const referenceFiltres = (pg) => pg.evaluate((DESSIN) => {
         const { ctx, pg, erreurs } = await ouvrir(nav, { largeur, sombre, chemin: '?tab=emails', panne: { emails: true, reception: true } });
         await pg.waitForSelector('[data-boite-emails] [data-etat-panne], [data-boite-etat="panne"]', { timeout: 12000 }).catch(() => {}); await pg.waitForTimeout(300);
         await capture(pg, `emails-panne-${suf}`);
-        const p = await pg.evaluate(() => { const z = document.querySelector('[data-boite-emails]'); if (!z) return null; const vis = [...z.querySelectorAll('button')].filter((b) => b.offsetParent); const nom = (b) => (b.getAttribute('aria-label') || '') + ' ' + b.textContent; return { panne: z.querySelectorAll('[data-etat-panne]').length, reessayer: vis.filter((b) => /Réessayer/.test(nom(b))).length, actualiser: vis.filter((b) => /Actualiser/i.test(nom(b))).length }; });
+        const p = await pg.evaluate(() => { const z = document.querySelector('[data-boite-emails]'); if (!z) return null; const vis = [...z.querySelectorAll('button')].filter((b) => b.offsetParent && b.checkVisibility()); const nom = (b) => (b.getAttribute('aria-label') || '') + ' ' + b.textContent; return { panne: z.querySelectorAll('[data-etat-panne]').length, reessayer: vis.filter((b) => /Réessayer/.test(nom(b))).length, actualiser: vis.filter((b) => /Actualiser/i.test(nom(b))).length }; });
         dit(p && p.panne === 1 && p.reessayer === 1, `${suf} : G6 E-mails en panne — EtatPanne, UN « Réessayer »`, JSON.stringify(p));
         dit(p && p.actualiser === 0, `${suf} : G7 E-mails en panne — jamais « Actualiser » à côté de « Réessayer »`, JSON.stringify(p));
         await pg.locator('[data-boite-vue="relier"]').click().catch(() => {});
         await pg.waitForTimeout(1200);
         await capture(pg, `emails-relier-panne-${suf}`);
-        const q = await pg.evaluate(() => { const z = document.querySelector('[data-boite-emails]'); if (!z) return null; const vis = [...z.querySelectorAll('button')].filter((b) => b.offsetParent); const nom = (b) => (b.getAttribute('aria-label') || '') + ' ' + b.textContent; return { panne: z.querySelectorAll('[data-etat-panne]').length, reessayer: vis.filter((b) => /Réessayer/.test(nom(b))).length, actualiser: vis.filter((b) => /Actualiser/i.test(nom(b))).length }; });
+        const q = await pg.evaluate(() => { const z = document.querySelector('[data-boite-emails]'); if (!z) return null; const vis = [...z.querySelectorAll('button')].filter((b) => b.offsetParent && b.checkVisibility()); const nom = (b) => (b.getAttribute('aria-label') || '') + ' ' + b.textContent; return { panne: z.querySelectorAll('[data-etat-panne]').length, reessayer: vis.filter((b) => /Réessayer/.test(nom(b))).length, actualiser: vis.filter((b) => /Actualiser/i.test(nom(b))).length }; });
         dit(q && q.panne >= 1 && q.actualiser === 0, `${suf} : G6/G7 « Relier ma boîte » en panne — EtatPanne, jamais « Actualiser » à côté de « Réessayer »`, JSON.stringify(q));
         dit(erreurs.length === 0, `${suf} : E-mails en panne sans erreur JavaScript`, erreurs.join(' | ').slice(0, 200));
         await ctx.close();
@@ -394,7 +395,7 @@ const referenceFiltres = (pg) => pg.evaluate((DESSIN) => {
         await pg.waitForSelector('[data-communaute-etat]:not([data-communaute-etat="charge"])', { timeout: 12000 }).catch(() => {});
         await pg.waitForTimeout(400);
         await capture(pg, `communaute-panne-${suf}`);
-        const p = await pg.evaluate(() => { const z = document.querySelector('[data-communaute-etat]'); if (!z) return null; const vis = [...z.querySelectorAll('button')].filter((b) => b.offsetParent); return { etat: z.getAttribute('data-communaute-etat'), panne: z.querySelectorAll('[data-etat-panne]').length, reessayer: vis.filter((b) => /Réessayer/.test(b.textContent)).length }; });
+        const p = await pg.evaluate(() => { const z = document.querySelector('[data-communaute-etat]'); if (!z) return null; const vis = [...z.querySelectorAll('button')].filter((b) => b.offsetParent && b.checkVisibility()); return { etat: z.getAttribute('data-communaute-etat'), panne: z.querySelectorAll('[data-etat-panne]').length, reessayer: vis.filter((b) => /Réessayer/.test(b.textContent)).length }; });
         dit(p && p.panne === 1 && p.reessayer === 1, `${suf} : G6 Communauté en panne — EtatPanne, UN « Réessayer »`, JSON.stringify(p));
         dit(erreurs.length === 0, `${suf} : Communauté en panne sans erreur JavaScript`, erreurs.join(' | ').slice(0, 200));
         await ctx.close();

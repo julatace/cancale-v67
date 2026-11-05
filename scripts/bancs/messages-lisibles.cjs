@@ -194,7 +194,7 @@ const CODES = /currency_code|[a-z]+_message\b|msg-status|<a\s|<br|<p>|gray_box|c
         // Le fil de 501 : la carte d'offre.
         await r.pg.click('[data-conv="501"]'); await r.pg.waitForTimeout(1400);
         const f501 = await r.pg.evaluate(() => { const p = document.querySelector('.vrm-chat-panel'); const o = [...document.querySelectorAll('.vrm-chat-offer-event')]; return { txt: p ? p.innerText : '', offres: o.map((x) => x.innerText.replace(/\n/g, ' | ')) }; });
-        dit(f501.offres.length === 1 && /Ton offre/.test(f501.offres[0]) && /40,00/.test(f501.offres[0]) && /au lieu de/.test(f501.offres[0]) && /55,00/.test(f501.offres[0]), 'le fil : « Ton offre 40,00 € au lieu de 55,00 € »', JSON.stringify(f501.offres));
+        dit(f501.offres.length === 1 && /Ton offre/.test(f501.offres[0]) && /40(,00)?\s?€/.test(f501.offres[0]) && /au lieu de/.test(f501.offres[0]) && /55(,00)?\s?€/.test(f501.offres[0]), 'le fil : « Ton offre 40,00 € au lieu de 55,00 € »', JSON.stringify(f501.offres));
         dit(!CODES.test(f501.txt) && !/Colis · retrait/.test(f501.txt), 'le fil n’affiche aucun code (ni « currency_code: EUR », ni « Colis · retrait »)', (f501.txt.match(/currency_code[^\n]*|Colis · retrait/) || [''])[0]);
         if (tel) { await r.pg.locator('.vrm-chat-back').first().click().catch(() => {}); await r.pg.waitForTimeout(500); }
         // Le fil de 502 : l'évènement sans HTML, le vide caché.
