@@ -119,3 +119,43 @@ date de reçu… » ; « le bot eBay, arrête-le »).
 - Pas fait ici (autres lots du 5 nov.) : codes de retrait Leboncoin/eBay/Vestiaire dans Colis
   (§4), photo eBay depuis la galerie (§6), retrait de l'agent eBay (autre lot).
 - Geste de Julien : ouvrir Ventes (le compte sur chaque ligne), puis une fiche N° → « Publier ailleurs ».
+
+## Relecture adverse (5 nov., même branche)
+Chaque défaut a d'abord été REPRODUIT (banc rendu sur le code `a1bde179`), puis corrigé.
+
+1. **« Reçu du / au » écartait TOUT depuis Ventes.** « Relier un achat » s'ouvre depuis Ventes et
+   Annonces ; les transactions d'achat n'y étaient pas lues (`demandesSuivis` ne lit que sur Achats,
+   `infosAchatsLues` y valait `{}`) ⇒ « 4 achats sans date de réception lue » alors que les dates
+   existent (banc : `{"l":"","sans":"4"}`). Correctif : au tap sur « Filtres », les transactions
+   des achats de la feuille sont lues (`harvest_{uid}_txn_{tx}`, projection scalaire
+   `shipment->>status` / `status_updated_at`, `lireTout` paginé, strict ⇒ `null` = pas su) ; pendant
+   la lecture le filtre de date attend (il n'écarte rien) et le dit ; lecture ratée ⇒ dit, seules
+   les dates « Je l'ai retiré » comptent.
+2. **eBay « préparée » pour une annonce déjà en ligne.** Un brouillon eBay mis en ligne/programmé garde
+   sa ligne avec `programme.itemId` : le parcours le disait « Préparée » et proposait « Reprendre sur
+   eBay » (risque de doublon). Désormais `publiesEbay` ⇒ « Publiée ».
+3. **« Publier sur Leboncoin » muet pour un article « toujours chez moi ».** La file Leboncoin (et
+   l'extension) part d'une annonce Vinted EN LIGNE ; un article supprimé de Vinted était proposé, le
+   bouton menait à l'écran Leboncoin sans rien ouvrir. Désormais : manque BLOQUANT « Plus en ligne sur
+   Vinted » + le geste (remettre en ligne, ou publier à la main avec `VRM-{n°}`) ; et l'écran
+   Leboncoin DIT (toast) quand un article demandé n'est pas dans sa file (déjà publié, retiré, vendu…).
+4. **« Ce qui part » n'était pas ce que les moteurs envoient** pour Vestiaire (texte Vinted brut, sans
+   « Réf. VRM-n ») et eBay (titre brut). Désormais Vestiaire = `lbcTitre(…, 80)` + `descriptionLbcDe`
+   (ce que fait `annonceVestiaire` → `buildEbayAd` dans l'extension) ; eBay = `ebayTitre` + description
+   Vinted, à défaut `descriptionDeFaits` (ce que pré-remplit le formulaire « Vendre une paire »).
+5. eBay (Ventes) : le compte s'écrivait deux fois (« compte principal · Compte principal ») avec
+   plusieurs comptes sans pseudo ⇒ il n'est plus dans le sous-titre, seulement dans `compte`.
+6. Vestiaire : l'identifiant du compte n'est plus tronqué à 8 caractères (un numéro tronqué ressemble
+   à un numéro complet).
+
+Preuves : `npm run build` vert ; `audit-plateformes-logo` 56/56, `--prouve` 26/26 (9 nouvelles
+mutations) ; banc `plateformes-logo` 198 verts (12 rouges sur `a1bde179`) ; nouveau banc
+`scripts/bancs/relier-achat-filtres.cjs` (`BANC_PORT=7978`, 390 tactile/1512, clair/sombre) 42 verts
+(8 rouges sur `a1bde179`) — il rend enfin les filtres à l'écran. Bancs voisins : `relier-achat-
+suggestions` 28/28 ; `navigation-tache` 2 rouges et `vendeur-neuf` 2 rouges (les mêmes qu'avant) ;
+`ebay-comptes` 6 rouges — **les mêmes sur `main` (`85dad5b0`)**, sans rapport avec ce lot (résumé
+« 3 comptes », « publier une paire libre », vue d'un compte déconnecté) : à reprendre à part.
+
+Reste : le logo eBay est un mot (« ebay ») suivi du nom « eBay » dans le sélecteur — redondant à
+l'œil ; le nom du compte sur la ligne repliée d'une vente n'est pas flouté en mode stream (seule la
+carte Fusion porte `vrm-sensible`, comme avant ce lot) — à traiter avec le lot « stream ».

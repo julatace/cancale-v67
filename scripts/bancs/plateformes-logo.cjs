@@ -41,7 +41,11 @@ const FICHES = {
   9012: { numero: '12', title: 'Nike Air Max 90 inventée taille 42', photo: PHOTO_V(9012), numberedAt: ilYaH(300), accountId: '111' },
   9013: { numero: '13', title: 'Adidas Samba inventée taille 40', photo: PHOTO_V(9013), numberedAt: ilYaH(200), accountId: '111' },
   9014: { numero: '14', title: 'Puma Suede inventée taille 43', numberedAt: ilYaH(100), accountId: '111' },
+  // (relecture) Supprimé de Vinted, dit « toujours chez moi » : proposable, mais la publication
+  // Leboncoin de VRM part d'une annonce Vinted EN LIGNE ⇒ bloquée et dite, jamais un bouton muet.
+  9015: { numero: '15', title: 'Reebok Club C inventée taille 41', photo: PHOTO_V(9015), numberedAt: ilYaH(400), accountId: '111' },
 };
+const DECISIONS = { 9015: { choix: 'chez-moi', at: ilYaH(50), numero: '15' } };
 const ann = (id, titre, marque, prix, photo) => ({ id, title: titre, price: { amount: String(prix), currency_code: 'EUR' }, brand_title: marque, size_title: '42', status: 'Très bon état', is_closed: false, is_hidden: false, is_draft: false, ...(photo ? { photo: { url: PHOTO_V(id) } } : {}) });
 const LISTINGS = { capturedAt: ilYaH(0.1), payload: { items: [ann(9012, FICHES[9012].title, 'Nike', 80, true), ann(9013, FICHES[9013].title, 'Adidas', 70, true), ann(9014, FICHES[9014].title, 'Puma', 60, false)] } };
 const DETAILS = { 9012: { description: 'Très peu portées, boîte d’origine.', photos: [PHOTO_V(9012, 1), PHOTO_V(9012, 2), PHOTO_V(9012, 3)] }, 9013: { description: 'Comme neuves.', photos: [PHOTO_V(9013, 1), PHOTO_V(9013, 2), PHOTO_V(9013, 3)] } };
@@ -50,7 +54,7 @@ const K1 = 'aaaaaaaaaaaaaaa1';
 const cmdEbay = (orderId, titre) => ({ orderId, orderPaymentStatus: 'PAID', orderFulfillmentStatus: 'NOT_STARTED', creationDate: ilYaH(30), cancelStatus: { cancelState: 'NONE_REQUESTED' }, lineItems: [{ sku: '', title: titre }],
   pricingSummary: { total: { value: '96.50', currency: 'EUR' }, priceSubtotal: { value: '90', currency: 'EUR' } }, paymentSummary: { totalDueSeller: { value: '95', currency: 'EUR' }, payments: [{ paymentStatus: 'PAID' }] }, totalMarketplaceFee: { value: '5', currency: 'EUR' } });
 const lignesDe = ({ ebay = true, lbc = true } = {}) => [
-  { id: 'main', data: { vinted_ship_done: {}, vinted_used_numeros: [12, 13, 14], vinted_annonce_numeros: FICHES } },
+  { id: 'main', data: { vinted_ship_done: {}, vinted_used_numeros: [12, 13, 14, 15], vinted_annonce_numeros: FICHES } },
   { id: 'harvest_111_listings', data: LISTINGS },
   { id: 'harvest_222_listings', data: { capturedAt: ilYaH(0.1), payload: { items: [] } } },
   { id: 'harvest_111_orders_sold', data: { capturedAt: ilYaH(0.2), payload: { my_orders: [{ transaction_id: 5501, id: 5501, title: 'Vans Old Skool inventée', price: { amount: '45', currency_code: 'EUR' }, status: 'Commande finalisée', date: ilYaH(30) }] } } },
@@ -68,6 +72,8 @@ const lignesDe = ({ ebay = true, lbc = true } = {}) => [
   ...(ebay ? [
     { id: 'ebay_comptes', data: { comptes: [{ cle: K1, pseudo: 'paire_perso', principal: true, ajouteLe: 1 }] } },
     { id: 'ebay_listings', data: { items: [], capturedAt: Date.now() } },
+    // (relecture) Le brouillon eBay du N°12, MIS EN LIGNE (programme.itemId) : « publiée », jamais « préparée ».
+    { id: 'ebay_brouillons', data: { majAt: Date.now(), items: { b12: { id: 'b12', pairId: '9012', numero: '12', titre: FICHES[9012].title, etatBrouillon: 'en-ligne', programme: { itemId: '335500000012', debut: null, demande: null, at: Date.now() - H } } } } },
     { id: 'ebay_orders', data: { capturedAt: Date.now(), orders: [cmdEbay('11-0001', 'Converse Chuck 70 inventée')] } },
   ] : []),
 ];
@@ -103,9 +109,9 @@ async function preparer(b, vp, sombre) {
   const ctx = await b.newContext({ viewport: vp, colorScheme: sombre ? 'dark' : 'light', locale: 'fr-FR', ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
-  await pg.addInitScript(([sombre, fiches]) => {
-    try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_dark', JSON.stringify(!!sombre)); localStorage.setItem('vrm_visite_vue', 'true'); if (!sessionStorage.getItem('banc_pose')) { localStorage.setItem('vinted_annonce_numeros', JSON.stringify(fiches)); sessionStorage.setItem('banc_pose', '1'); } } catch (_) {}
-  }, [sombre, FICHES]);
+  await pg.addInitScript(([sombre, fiches, decisions]) => {
+    try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_dark', JSON.stringify(!!sombre)); localStorage.setItem('vrm_visite_vue', 'true'); if (!sessionStorage.getItem('banc_pose')) { localStorage.setItem('vinted_annonce_numeros', JSON.stringify(fiches)); localStorage.setItem('vrm_cycle_decisions', JSON.stringify(decisions)); sessionStorage.setItem('banc_pose', '1'); } } catch (_) {}
+  }, [sombre, FICHES, DECISIONS]);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => {
     const u = r.request().url();
     if (/vinted\.net/.test(u)) return r.fulfill({ status: 200, contentType: 'image/svg+xml', body: svg('#d9c7a8') });
@@ -240,7 +246,7 @@ const aller = async (pg, q) => { await pg.goto(`http://localhost:${PORT}/?${q}`,
         await pg.waitForSelector('[data-publier-ailleurs="choix"]', { timeout: 8000 });
         await pg.waitForSelector('[data-pa-choix]', { timeout: 20000 });
         const n = await pg.evaluate(() => [...document.querySelectorAll('[data-pa-choix]')].map((x) => x.getAttribute('data-pa-choix-num')).sort().join());
-        dit(n === '12,13,14', `${nomVp} · D · les articles proposables (source partagée : en ligne sur Vinted)`, n);
+        dit(n === '12,13,14,15', `${nomVp} · D · les articles proposables (source partagée : en ligne sur Vinted, ou « toujours chez moi »)`, n);
         await pg.fill('[data-pa-cherche]', '12');
         await pg.waitForTimeout(200);
         const n2 = await pg.evaluate(() => [...document.querySelectorAll('[data-pa-choix]')].map((x) => x.getAttribute('data-pa-choix-num')).join());
@@ -266,7 +272,12 @@ const aller = async (pg, q) => { await pg.goto(`http://localhost:${PORT}/?${q}`,
         dit(r.ident === 'VRM-12' && /VRM-12/.test(r.desc), `${nomVp} · D · ce qui part porte le N° : « VRM-12 » dans la description`, `${r.ident} / ${r.desc.slice(0, 60)}`);
         dit(/Nike/.test(r.titre) && r.photos === '3' && r.prix === '80', `${nomVp} · D · ce qui part : le titre (règle Leboncoin), 3 photos, 80 €`, JSON.stringify({ t: r.titre, p: r.photos, x: r.prix }));
         dit(r.etats.leboncoin === 'a-publier' && r.etats.vestiaire === 'a-publier', `${nomVp} · D · N°12 : à publier sur Leboncoin et Vestiaire (listes lues, pas vu)`, JSON.stringify(r.etats));
+        dit(r.etats.ebay === 'publiee', `${nomVp} · D · N°12 : son brouillon eBay MIS EN LIGNE ⇒ « publiée » (jamais « préparée », « Reprendre sur eBay »)`, JSON.stringify(r.etats));
         dit(r.partout === 'vinted', `${nomVp} · D · « N°12 en ligne sur Vinted » (le même N° partout)`, String(r.partout));
+        await pg.click('[data-pa-apercu-bouton="vestiaire"]');
+        await pg.waitForSelector('[data-pa-site="vestiaire"] [data-pa-description]', { timeout: 5000 }).catch(() => {});
+        const dvc = await pg.evaluate(() => (document.querySelector('[data-pa-site="vestiaire"] [data-pa-description]') || {}).innerText || '');
+        dit(/VRM-12/.test(dvc), `${nomVp} · D · Vestiaire, ce qui part = ce que l’extension envoie : la description porte « Réf. VRM-12 »`, dvc.slice(0, 80));
         await capture(pg, `pa-n12-${nomVp}`);
         await sain(pg, `${nomVp} · Publier ailleurs N°12`);
         if (doigt) {
@@ -306,6 +317,23 @@ const aller = async (pg, q) => { await pg.goto(`http://localhost:${PORT}/?${q}`,
         dit(t.site === 'vestiaire', `${nomVp} · D · « Publier sur Vestiaire » ⇒ Annonces · Vestiaire, la ligne du N°12 mise en évidence (son clic publie)`, JSON.stringify(t));
         await capture(pg, `pa-vers-vc-${nomVp}`);
         await sain(pg, `${nomVp} · Annonces · Vestiaire`);
+      });
+      await essaie('D. Publier ailleurs — Leboncoin : la fiche s’ouvre, ou le blocage est dit', async () => {
+        await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:publier-ailleurs', { detail: { num: '15' } })));
+        await pg.waitForSelector('[data-publier-ailleurs="15"] [data-pa-site="leboncoin"]', { timeout: 20000 });
+        const m = await pg.evaluate(() => ({ manque: (document.querySelector('[data-pa-site="leboncoin"] [data-pa-manque="hors-vinted"]') || { getAttribute: () => null }).getAttribute('data-bloque'),
+          desactive: (document.querySelector('[data-pa-publier="leboncoin"]') || {}).disabled, vc: (document.querySelector('[data-pa-publier="vestiaire"]') || {}).disabled }));
+        dit(m.manque === '1' && m.desactive === true, `${nomVp} · D · N°15 (plus en ligne sur Vinted) : Leboncoin BLOQUÉ et dit (« Plus en ligne sur Vinted »), pas un bouton qui n’ouvre rien`, JSON.stringify(m));
+        await capture(pg, `pa-n15-${nomVp}`);
+        await pg.click('[data-pa-fermer]');
+        await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:publier-ailleurs', { detail: { num: '12' } })));
+        await pg.waitForSelector('[data-publier-ailleurs="12"] [data-pa-publier="leboncoin"]:not([disabled])', { timeout: 20000 });
+        await pg.click('[data-pa-publier="leboncoin"]');
+        await pg.waitForSelector('[data-fiche-lbc="9012"]', { timeout: 20000 }).catch(() => {});
+        dit(!!(await pg.$('[data-fiche-lbc="9012"]')), `${nomVp} · D · N°12 « Publier sur Leboncoin » ⇒ la fiche Leboncoin de CET article (moteur existant)`);
+        await capture(pg, `pa-vers-lbc-${nomVp}`);
+        await pg.keyboard.press('Escape').catch(() => {});
+        await pg.waitForTimeout(300);
       });
       await essaie('E. La fiche du N° ouvre le parcours', async () => {
         await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: '12' })));

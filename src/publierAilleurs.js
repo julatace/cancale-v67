@@ -52,8 +52,9 @@ export const refVrm = (num) => (str(num) ? 'VRM-' + str(num) : '');
 // ── 2. Ce qui part ─────────────────────────────────────────────────────────
 // p : la paire telle que la source partagée la donne (`useEbayPaires`) :
 //     { id, num, title, taille, marque, etat, couleur, photos, desc, prix }.
-// r : { titreLbc(marque, titre, taille), descriptionLbc({ ref, texte, marque,
-//       taille, etat, couleur }), descriptionEbay(texte) } — règles de l'app.
+// r : { titreLbc(marque, titre, taille), titreVc(marque, titre, taille),
+//       titreEbay(titre, taille), descriptionLbc({ ref, texte, marque, taille,
+//       etat, couleur }), descriptionEbay(paire) } — règles de l'app.
 export function apercuEnvoi(site, p, r = {}) {
   const x = p || {};
   const num = str(x.num);
@@ -68,12 +69,21 @@ export function apercuEnvoi(site, p, r = {}) {
     const description = typeof r.descriptionLbc === 'function' ? str(r.descriptionLbc({ ref, texte: x.desc, marque: x.marque, taille: x.taille, etat: x.etat, couleur: x.couleur })) : str(x.desc);
     return { ...base, titre, description, identite: ref ? { quoi: 'Référence', valeur: ref, ou: 'dans la description' } : null };
   }
+  // (relecture du 5 nov.) « Ce qui part » = ce que le MOTEUR envoie, pas le texte Vinted brut :
+  //   eBay      → le formulaire « Vendre une paire » : titre `ebayTitre(titre, taille)`,
+  //               description = la description Vinted, à défaut ses FAITS (`descriptionDeFaits`) ;
+  //   Vestiaire → l'extension (`annonceVestiaire` → `buildEbayAd`) : titre `lbcTitre(…, 80)`,
+  //               description `descriptionLbcDe` avec « Réf. VRM-{n°} » (la référence que
+  //               l'extension relit ensuite sur Vestiaire pour reconnaître l'annonce).
   if (site === 'ebay') {
-    const description = typeof r.descriptionEbay === 'function' ? str(r.descriptionEbay(x.desc)) : str(x.desc);
-    return { ...base, titre: str(x.title), description, identite: ref ? { quoi: 'SKU', valeur: ref, ou: 'sur l’annonce eBay' } : null };
+    const titre = typeof r.titreEbay === 'function' ? str(r.titreEbay(x.title, x.taille)) : str(x.title);
+    const description = typeof r.descriptionEbay === 'function' ? str(r.descriptionEbay(x)) : str(x.desc);
+    return { ...base, titre, description, identite: ref ? { quoi: 'SKU', valeur: ref, ou: 'sur l’annonce eBay' } : null };
   }
   if (site === 'vestiaire') {
-    return { ...base, titre: str(x.title), description: str(x.desc), identite: ref ? { quoi: 'Référence', valeur: ref, ou: 'posée par l’extension' } : null };
+    const titre = typeof r.titreVc === 'function' ? str(r.titreVc(x.marque, x.title, x.taille)) : str(x.title);
+    const description = typeof r.descriptionLbc === 'function' ? str(r.descriptionLbc({ ref, texte: x.desc, marque: x.marque, taille: x.taille, etat: x.etat, couleur: x.couleur })) : str(x.desc);
+    return { ...base, titre, description, identite: ref ? { quoi: 'Référence', valeur: ref, ou: 'dans la description' } : null };
   }
   return null;
 }
@@ -84,11 +94,16 @@ export function apercuEnvoi(site, p, r = {}) {
 // Leboncoin par son choix (`mpLbc === false`, jamais remis tout seul), prix pas
 // lu. `achat` : prix d'achat connu (null = pas jugé) ; `famille` : la famille
 // d'article (la taille n'est jugée que pour une famille qui en porte une).
-export function manquesEnvoi(site, ap, { achat = null, famille = '', mpLbc = true } = {}) {
+// `horsVinted` : l'article n'est plus en ligne sur Vinted (« toujours chez moi ») —
+// la publication Leboncoin de VRM part d'une annonce Vinted EN LIGNE (la file
+// « À publier » et l'extension lisent le dressing) : sans elle, « Publier »
+// n'ouvrirait rien (relecture du 5 nov.). Le geste est dit, rien n'est deviné.
+export function manquesEnvoi(site, ap, { achat = null, famille = '', mpLbc = true, horsVinted = false } = {}) {
   if (!ap) return [];
   const out = [];
   if (!ap.num) out.push({ code: 'numero', texte: 'Pas de N°', geste: 'Mets un N° à cet article d’abord (Annonces)', bloque: true });
   if (site === 'leboncoin' && mpLbc === false) out.push({ code: 'retire', texte: 'Retiré de Leboncoin par toi', geste: 'Remets la case « Leboncoin » sur la fiche de l’annonce (Annonces)', bloque: true });
+  if (site === 'leboncoin' && horsVinted === true) out.push({ code: 'hors-vinted', texte: 'Plus en ligne sur Vinted', geste: `VRM publie sur Leboncoin depuis une annonce Vinted en ligne : remets-la en ligne sur Vinted, ou publie-la à la main sur leboncoin.fr avec la référence ${ap.ref || 'VRM-{n°}'}`, bloque: true });
   if (ap.prix == null) out.push({ code: 'prix-absent', texte: 'Prix pas lu', geste: 'Ouvre l’annonce sur Vinted : son prix arrive ici', bloque: false });
   for (const pb of problemesAnnonce({ titre: ap.titre, taille: ap.taille, famille, marque: ap.marque, nPhotos: ap.nPhotos, prix: ap.prix, achat }, SITE_VERIF[site])) {
     out.push({ ...pb, bloque: pb.code === 'photos' && !(ap.nPhotos > 0) });
@@ -147,14 +162,16 @@ export function enLigneSur(site, sitesVus, manquesLecture) {
   if (arr(manquesLecture).includes(NOM_LECTURE[site])) return null;
   return false;
 }
-export function etatsPaire(p, { sitesVus = null, manquesLecture = [], jobs = {}, postes = {}, brouillonsEbay = null, maintenant = Date.now() } = {}) {
+//   publiesEbay : Set des paires dont un brouillon eBay a été MIS EN LIGNE ou programmé
+//   (`programme.itemId`) ⇒ « publiée » (null = pas su).
+export function etatsPaire(p, { sitesVus = null, manquesLecture = [], jobs = {}, postes = {}, brouillonsEbay = null, publiesEbay = null, maintenant = Date.now() } = {}) {
   const id = str(p && p.id);
   const out = {};
   for (const site of SITES_PUBLIER) {
     const pref = JOB[site];
     const job = pref && jobs ? jobs[pref + id] || null : null;
     const set = postes ? postes[site] : undefined;
-    const marquee = site === 'ebay' ? false : (set == null ? null : (typeof set.has === 'function' && set.has(id)));
+    const marquee = site === 'ebay' ? !!(publiesEbay && typeof publiesEbay.has === 'function' && publiesEbay.has(id)) : (set == null ? null : (typeof set.has === 'function' && set.has(id)));
     const brouillon = site === 'ebay' && brouillonsEbay && typeof brouillonsEbay.has === 'function' ? brouillonsEbay.has(id) : false;
     out[site] = etatPublication({ enLigne: enLigneSur(site, sitesVus, manquesLecture), job, marquee, brouillon, maintenant });
   }

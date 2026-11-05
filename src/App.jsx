@@ -23527,7 +23527,7 @@ function EbayVentes({ baseKO,vue='*',comptesEbay,cible,onClearCible }) {
         const pfE = preuvesFriseEbay(o);
         const fuE = pfE ? friseVenteFusion(friseVente(pfE), { geste: etat.peutExpedier }) : null;
         return <div className="vrm-ebay-order" data-ebay-vente={o.orderId} data-ebay-compte={o._compte || 'principal'} key={(o._compte || 'principal')+':'+(o.orderId || i)}><LigneVente compte={nomCompteVente('ebay', o, { ebay: Object.fromEntries((comptesEbay || []).map((c) => [c.ref, c.pseudo || ''])) })} gestes={gestesEbay} frise={fuE ? <Frise etapes={fuE} cle={'ebay' + (o._compte || 'principal') + o.orderId} className="vrm-fu-ligne-frise" label="Où en est la vente"/> : null} numerosArticle={(o.lineItems||[]).map(l=>numLigneEbay(o,l)).filter(Boolean)} plateforme="ebay" photo={img} titre={(li.title||'Commande')+(o.lineItems?.length>1?` · ${o.lineItems.length} articles`:'')} etat={statut} ton={etat.peutExpedier ? 'action' : ''}
-          sous={[o.creationDate && !isNaN(Date.parse(o.creationDate)) ? new Date(o.creationDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : '', comptesEbay?.length > 1 ? (o._pseudo || nomCompteEbay(comptesEbay.find(c => c.ref === o._compte) || {})) : ''].filter(Boolean).join(' · ')}
+          sous={[o.creationDate && !isNaN(Date.parse(o.creationDate)) ? new Date(o.creationDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : ''].filter(Boolean).join(' · ')}
           etatNoeud={<><span className="vrm-ebay-sale-status" data-state={etat.peutExpedier?'pending':etat.expedie?'shipped':'neutral'} style={{display:'inline-flex',alignItems:'center',gap:5,padding:0,background:'transparent',boxShadow:'none',borderRadius:0,fontSize:'inherit',color:C.text,fontWeight:600}}><span aria-hidden="true" style={{width:7,height:7,borderRadius:999,flexShrink:0,display:'inline-block',background:etat.peutExpedier?C.warn:etat.expedie?(C.blue||C.accent):C.muted}}/>{statut}</span></>}
           meta={<>{statut}{o.buyer?.username ? ` · ${o.buyer.username}` : ''}{o.lineItems?.length>1?` · ${o.lineItems.length} articles`:''}{comptesEbay?.length>1?` · ${o._pseudo || nomCompteEbay(comptesEbay.find(c=>c.ref===o._compte) || {})}`:''}</>}
           montant={euro(o.pricingSummary?.total?.value, o.pricingSummary?.total?.currency)} details={<EbayCommande owner={AUTH.user?.id || 'installation'} order={o} ouvrir={!!cible && cible.id===String(o.orderId) && cible.compte===(o._compte || 'principal')} costs={couts[JSON.stringify([o._compte || 'principal',String(o.orderId)])] || {}} onCosts={patch=>sauverCouts(o._compte || 'principal',o.orderId,patch)} compte={o._compte || 'principal'} headers={enTeteSession} confirm={askConfirm} theme={C}/>}/></div>;
@@ -27625,8 +27625,13 @@ function HotePublierAilleurs({ comptes, num, site, sitesVus, manquesLecture, lec
     const ids = async (id) => { try { const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}&select=ids:data->ids`, { headers: sbAuth() }); if (!r.ok) return null; const j = await r.json(); return Array.isArray(j) ? new Set(((j[0] && j[0].ids) || []).map(String)) : null; } catch (_) { return null; } };
     (async () => {
       const [lbc, vc] = await Promise.all([ids('vinted_lbc_posted'), ids('vinted_vc_posted')]);
+      // ⚠️ (relecture du 5 nov.) Un brouillon eBay MIS EN LIGNE (ou programmé) garde sa ligne avec
+      //    `programme.itemId` (`lireBrouillonsEbay`) : il n'est plus « préparé », il est PUBLIÉ —
+      //    le dire « préparée » proposait « Reprendre sur eBay » sur une annonce déjà en ligne.
       let br = null;
-      try { const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.ebay_brouillons&select=items:data->items`, { headers: sbAuth() }); if (r.ok) { const j = await r.json(); const it = Array.isArray(j) && j[0] && j[0].items; br = new Set((Array.isArray(it) ? it : Object.values(it || {})).map((b) => b && b.pairId != null ? String(b.pairId) : '').filter(Boolean)); } } catch (_) { br = null; }
+      try { const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.ebay_brouillons&select=items:data->items`, { headers: sbAuth() }); if (r.ok) { const j = await r.json(); const it = Array.isArray(j) && j[0] && j[0].items; const l = (Array.isArray(it) ? it : Object.values(it || {})).filter((b) => b && b.pairId != null);
+        const publie = (b) => !!((b.programme && b.programme.itemId) || b.itemId);
+        br = { prepares: new Set(l.filter((b) => !publie(b)).map((b) => String(b.pairId))), publies: new Set(l.filter(publie).map((b) => String(b.pairId))) }; } } catch (_) { br = null; }
       if (vivant) { setPostes({ leboncoin: lbc, vestiaire: vc }); setBrouillons(br); }
     })();
     return () => { vivant = false; };
@@ -27640,11 +27645,12 @@ function HotePublierAilleurs({ comptes, num, site, sitesVus, manquesLecture, lec
     const fiche = fiches[String(paire.id)] || {};
     let achat = null; try { achat = prixAchatDe(fiche, load('vinted_buyprice_by_num', {}) || {}); } catch (_) { achat = null; }
     const famille = familleArticle({ titre: paire.title, taille: paire.taille, marque: paire.marque }).famille;
-    const etats = etatsPaire(paire, { sitesVus: lecture ? null : sitesVus, manquesLecture, jobs, brouillonsEbay: brouillons === undefined ? null : brouillons,
+    const etats = etatsPaire(paire, { sitesVus: lecture ? null : sitesVus, manquesLecture, jobs, brouillonsEbay: brouillons ? brouillons.prepares : null, publiesEbay: brouillons ? brouillons.publies : null,
       postes: { leboncoin: postes.leboncoin === undefined ? null : postes.leboncoin, vestiaire: postes.vestiaire === undefined ? null : postes.vestiaire } });
     return SITES_PUBLIER.map((sx) => {
-      const apercu = apercuEnvoi(sx, paire, { titreLbc: (m, t, ta) => lbcTitre(m, t, ta), descriptionLbc: (o) => descriptionLbcDe(o), descriptionEbay: (t) => descriptionEbayPropre(t) });
-      return { site: sx, apercu, manques: manquesEnvoi(sx, apercu, { achat, famille, mpLbc: mpChoisi(fiche, 'lbc') }), etat: etats[sx], lien: lienVu(sx, sitesVus) };
+      const apercu = apercuEnvoi(sx, paire, { titreLbc: (m, t, ta) => lbcTitre(m, t, ta), titreVc: (m, t, ta) => lbcTitre(m, t, ta, 80), titreEbay: (t, ta) => ebayTitre(t || '', ta || ''),
+        descriptionLbc: (o) => descriptionLbcDe(o), descriptionEbay: (pp) => (pp && pp.desc) || descriptionDeFaits(pp || {}) });
+      return { site: sx, apercu, manques: manquesEnvoi(sx, apercu, { achat, famille, mpLbc: mpChoisi(fiche, 'lbc'), horsVinted: paire.chezMoi === true }), etat: etats[sx], lien: lienVu(sx, sitesVus) };
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paire, sitesVus, manquesLecture, lecture, jobs, postes, brouillons]);
@@ -41184,7 +41190,7 @@ function RetoursEnCoursBloc({ res: resBrut, site = 'toutes', nomCompte, plusieur
 // « Voir tous les achats » : ceux pas encore reliés (un LOT reste jusqu'à son
 // nombre d'articles), recherche par mot, filtres compte et mois. Rien n'est
 // relié sans SON tap (`onRelier`). Aucun texte explicatif.
-function RelierAchatCorps({ cible, achats, liens, curTx, compteDe, prixDe, receptionDe = null, onRelier, C }) {
+function RelierAchatCorps({ cible, achats, liens, curTx, compteDe, prixDe, receptionDe = null, receptionEtat = 'lu', onFiltres = null, onRelier, C }) {
   const [tous, setTous] = useState(false);
   const [q, setQ] = useState('');
   const [compte, setCompte] = useState('');
@@ -41200,8 +41206,12 @@ function RelierAchatCorps({ cible, achats, liens, curTx, compteDe, prixDe, recep
   const [taille, setTaille] = useState('');
   const sugg = useMemo(() => (Array.isArray(achats) ? suggestionsAchat({ cible, achats, liens, marqueDe: extractBrand, couleursDe: extractColors, modeleDe: extractModel }) : []), [cible, achats, liens]);
   const voirTous = tous || (Array.isArray(achats) && !sugg.length);
+  // (relecture du 5 nov.) Les dates de réception se lisent à la demande (son tap sur
+  // « Filtres ») : tant qu'elles arrivent, le filtre de date attend — il n'écarte rien
+  // sur une lecture pas faite (« pas su » ≠ « pas reçu »).
+  const dateEnAttente = receptionEtat === 'lecture' && !!(recuDu || recuAu);
   const detail = useMemo(() => (voirTous && Array.isArray(achats) ? tousAchatsLibresDetail({ achats, liens, curTx, q, compte, mois, compteDe, marqueDe: extractBrand,
-    prixMin, prixMax, prixAchat: prixDe, recuDu, recuAu, receptionDe, marque, taille }) : { liste: [], sansReception: 0 }), [voirTous, achats, liens, curTx, q, compte, mois, prixMin, prixMax, recuDu, recuAu, marque, taille, receptionDe]);
+    prixMin, prixMax, prixAchat: prixDe, recuDu: dateEnAttente ? '' : recuDu, recuAu: dateEnAttente ? '' : recuAu, receptionDe, marque, taille }) : { liste: [], sansReception: 0 }), [voirTous, achats, liens, curTx, q, compte, mois, prixMin, prixMax, recuDu, recuAu, marque, taille, receptionDe, dateEnAttente]);
   const liste = detail.liste;
   const filtres = useMemo(() => (voirTous && Array.isArray(achats) ? filtresAchats(tousAchatsLibres({ achats, liens, curTx }), compteDe, extractBrand) : { mois: [], comptes: [], marques: [], tailles: [] }), [voirTous, achats, liens, curTx]);
   const nFiltres = [prixMin, prixMax, recuDu, recuAu, marque, taille].filter((x) => String(x || '').trim()).length;
@@ -41232,7 +41242,7 @@ function RelierAchatCorps({ cible, achats, liens, curTx, compteDe, prixDe, recep
             style={{ width: '100%', boxSizing: 'border-box', minHeight: 44, padding: '0 11px', border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, color: C.text, fontSize: 17, fontFamily: 'inherit' }}/>
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
             {filtres.comptes.length > 1 && <select aria-label="Compte" data-filtre-compte value={compte} onChange={(e) => setCompte(e.target.value)} style={sel}><option value="">Tous les comptes</option>{filtres.comptes.map((c) => <option key={c} value={c}>{c}</option>)}</select>}
-            <Bouton variante="discret" data-filtres-plus={nFiltres} aria-expanded={plus} onClick={() => setPlus((v) => !v)} style={{ minHeight: 44, flex: '0 0 auto' }}>{nFiltres ? `Filtres · ${nFiltres}` : 'Filtres'}</Bouton>
+            <Bouton variante="discret" data-filtres-plus={nFiltres} aria-expanded={plus} onClick={() => { setPlus((v) => !v); if (onFiltres) onFiltres(); }} style={{ minHeight: 44, flex: '0 0 auto' }}>{nFiltres ? `Filtres · ${nFiltres}` : 'Filtres'}</Bouton>
             {filtres.mois.length > 1 && <select aria-label="Mois" data-filtre-mois value={mois} onChange={(e) => setMois(e.target.value)} style={sel}><option value="">Tous les mois</option>{filtres.mois.map((m) => <option key={m} value={m}>{new Date(m + '-15').toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}</option>)}</select>}
           </div>
           {plus && (
@@ -41252,6 +41262,7 @@ function RelierAchatCorps({ cible, achats, liens, curTx, compteDe, prixDe, recep
               {nFiltres ? <Bouton variante="discret" data-filtres-effacer onClick={() => { setPrixMin(''); setPrixMax(''); setRecuDu(''); setRecuAu(''); setMarque(''); setTaille(''); }} style={{ minHeight: 44, gridColumn: '1 / -1', justifySelf: 'start' }}>Effacer les filtres</Bouton> : null}
             </div>
           )}
+          {plus && receptionDe && receptionEtat !== 'lu' ? <div data-receptions-etat={receptionEtat} style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>{receptionEtat === 'lecture' ? 'Je lis les dates de réception de tes achats…' : 'Je n’ai pas pu lire les dates de réception — seules celles cochées « Je l’ai retiré » comptent ; réessaie dans un moment.'}</div> : null}
           {detail.sansReception > 0 && <div data-achats-sans-reception={detail.sansReception} style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>{detail.sansReception} achat{detail.sansReception > 1 ? 's' : ''} sans date de réception lue, pas dans cette liste.</div>}
           {liste.length ? liste.slice(0, 200).map((a) => ligne(a, { 'data-achat-libre': String(a.transaction_id) })) : <div style={{ fontSize: 13, color: C.muted, textAlign: 'center', padding: '20px 0' }}>—</div>}
         </div>
@@ -48897,7 +48908,36 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [repartitionsLots, setRepartitionsLots] = useStateCle('vrm_repartitions_lots', () => load('vrm_repartitions_lots', {}) || {});
   const infosAchatsLues = infosTxAchats !== undefined ? infosTxAchats : (demandesSuivis === '' && Array.isArray(buys.items) ? {} : undefined);
   // (5 nov.) La date de RÉCEPTION lue d'un achat (livraison lue ou « Je l'ai retiré »), pour filtrer « Relier un achat ».
-  const receptionAchatMs = React.useCallback((a) => { const r = dateReception(a, { infosTx: infosAchatsLues, recuClic: pickupDone }); return r ? r.ms : null; }, [infosAchatsLues, pickupDone]);
+  // ⚠️ (5 nov., relecture) « Relier un achat » s'ouvre surtout depuis VENTES et ANNONCES, où les
+  //    transactions d'achat ne sont PAS lues (`demandesSuivis` ne lit que sur Achats, et
+  //    `infosAchatsLues` y vaut `{}`) : le filtre « Reçu du / au » écartait TOUT (« 4 achats sans date
+  //    de réception lue ») alors que les dates existent. Les transactions des achats de la feuille
+  //    sont donc lues ICI, à la demande (son tap sur « Filtres »), projetées en scalaires (§4.4),
+  //    paginées (§4.5) — la même projection que l'écran Achats. Trois états : undefined pas encore
+  //    lu · null pas su · { tx: { livSt, livAt } }. Pendant la lecture, le filtre de date attend.
+  const [infosRelier, setInfosRelier] = useState(undefined);
+  const [besoinInfosRelier, setBesoinInfosRelier] = useState(false);
+  useEffect(() => {
+    if (!besoinInfosRelier || !pickerFor || purchasesPick.loading || !Array.isArray(purchasesPick.items) || infosRelier !== undefined) return undefined;
+    let stop = false;
+    (async () => {
+      const ids = [...new Set(purchasesPick.items.filter((o) => o && o._acc && /^\d+$/.test(String(o.transaction_id || ''))).map((o) => `harvest_${(o._acc && o._acc.vinted_user_id) || o._acc}_txn_${o.transaction_id}`))].sort();
+      const infos = {};
+      for (let i = 0; i < ids.length; i += 100) {
+        const lot = ids.slice(i, i + 100);
+        const rows = await lireTout(`id=in.(${lot.join(',')})&select=id,tx:data->payload->transaction->>id,side:data->payload->transaction->>user_side,livSt:data->payload->transaction->shipment->>status,livAt:data->payload->transaction->shipment->>status_updated_at`, { strict: true });
+        if (stop) return;
+        if (rows === null) { setInfosRelier(null); return; }
+        for (const r of rows) { if (!lot.includes(r.id)) continue; const tx = String(r.tx || r.id.split('_txn_')[1] || ''); if (tx && r.side === 'buyer') infos[tx] = { livSt: r.livSt != null ? String(r.livSt) : '', livAt: r.livAt || '' }; }
+      }
+      if (!stop) setInfosRelier(infos);
+    })();
+    return () => { stop = true; };
+  }, [besoinInfosRelier, pickerFor, purchasesPick, infosRelier]);
+  const infosReception = useMemo(() => ({ ...(infosRelier || {}), ...(infosTxAchats || {}) }), [infosRelier, infosTxAchats]);
+  const receptionAchatMs = React.useCallback((a) => { const r = dateReception(a, { infosTx: infosReception, recuClic: pickupDone }); return r ? r.ms : null; }, [infosReception, pickupDone]);
+  // « lecture » tant que les transactions des achats de la feuille ne sont pas lues.
+  const receptionsRelierEtat = infosRelier === undefined ? 'lecture' : infosRelier === null ? 'pas-su' : 'lu';
   const nArticlesTx = useMemo(() => { const m = {}; for (const [tx, i] of Object.entries(infosAchatsLues || {})) if (i && i.nb != null) m[tx] = i.nb; return m; }, [infosAchatsLues]);
   const estLotApp = (a) => estLotAchat(a, { nArticlesTx, declares: lotsDeclares });
   const estLotPropose = (a) => estLotApp(a) || !!(a && a.lot === true);
@@ -56889,7 +56929,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div data-relier-achat-corps style={{flex:1,overflow:'auto',padding:'4px 14px 14px'}}>
               <RelierAchatCorps C={C} cible={cibleRelier} achats={purchasesPick.loading ? null : purchasesPick.items} liens={liensAchats}
                 curTx={numeros[pickerFor.id]?.buyFromId || ''} compteDe={(a)=>accNameOf(a._acc)||''} prixDe={prixPayeAchat} onRelier={relierAchat}
-                receptionDe={receptionAchatMs}/>
+                receptionDe={receptionAchatMs} receptionEtat={receptionsRelierEtat} onFiltres={()=>setBesoinInfosRelier(true)}/>
             </div>
           </div>
         </div>, document.body)}
@@ -60975,6 +61015,9 @@ function LeboncoinScreen() {
     const q = data.queue.find((x) => String(x.id) === String(d.id));
     d.id = null;
     if (q) setFiche(q);
+    // (relecture du 5 nov.) Un article demandé (« Publier ailleurs », « qui dorment ») qui n'est
+    // PAS dans la file : le dire, jamais un écran qui ne fait rien.
+    else toast('Cet article n’est pas dans ta file « À publier » Leboncoin (déjà publié, retiré de Leboncoin, vendu ou plus en ligne sur Vinted).');
   }, [data]);
   const [repubOuvert, setRepubOuvert] = useState(false);
   const n = data ? Math.max(data.postedCount, data.lbcCount) : 0;

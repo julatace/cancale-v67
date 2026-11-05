@@ -42,6 +42,15 @@ const MUTS = {
   'rangee-a-la-main': ['src/App.jsx', "return <SelecteurSites id={tache}", "return <div className=\"vrm-rangee vrm-filtres vrm-filtre-site\" data-filtre-site={tache}/>; <SelecteurSites id={tache}"],
   'compte-lbc-oublie': ['src/App.jsx', '<LigneVente compte={compteVente} frise={friseLbc}', '<LigneVente frise={friseLbc}'],
   'compte-vc-oublie': ['src/App.jsx', "<LigneVenteCompacte compte={nomCompteVente('vestiaire', v, {})} className=\"vrm-sale-row\"", '<LigneVenteCompacte className="vrm-sale-row"'],
+  'ebay-publie-prepare': ['src/publierAilleurs.js', "const marquee = site === 'ebay' ? !!(publiesEbay && typeof publiesEbay.has === 'function' && publiesEbay.has(id))", "const marquee = site === 'ebay' ? false"],
+  'hors-vinted-ignore': ['src/publierAilleurs.js', "if (site === 'leboncoin' && horsVinted === true) out.push(", "if (false) out.push("],
+  'hors-vinted-pas-passe': ['src/App.jsx', ", horsVinted: paire.chezMoi === true }", " }"],
+  'reception-pas-lue-ici': ['src/App.jsx', "if (!besoinInfosRelier || !pickerFor", "if (true || !besoinInfosRelier || !pickerFor"],
+  'date-filtre-pendant-lecture': ['src/App.jsx', "recuDu: dateEnAttente ? '' : recuDu, recuAu: dateEnAttente ? '' : recuAu", "recuDu, recuAu"],
+  'lbc-demande-muette': ['src/App.jsx', "    else toast('Cet article n’est pas dans ta file « À publier » Leboncoin", "    else void ('Cet article n’est pas dans ta file « À publier » Leboncoin"],
+  'vc-id-tronque': ['src/plateformes.js', "return id === '-' ? '' : `n° ${id}`;", "return id === '-' ? '' : `n° ${id.slice(0, 8)}`;"],
+  'vc-texte-brut': ['src/publierAilleurs.js', "const description = typeof r.descriptionLbc === 'function' ? str(r.descriptionLbc({ ref, texte: x.desc, marque: x.marque, taille: x.taille, etat: x.etat, couleur: x.couleur })) : str(x.desc);\n    return { ...base, titre, description, identite: ref ? { quoi: 'Référence'", "const description = str(x.desc);\n    return { ...base, titre, description, identite: ref ? { quoi: 'Référence'"],
+  'ebay-titre-brut': ['src/publierAilleurs.js', "const titre = typeof r.titreEbay === 'function' ? str(r.titreEbay(x.title, x.taille)) : str(x.title);", "const titre = str(x.title);"],
   'parcours-envoie': ['src/App.jsx', "    if (sx === 'leboncoin') { DEMANDE_LBC_FICHE.id = id;", "    if (sx === 'leboncoin') { vmrCmd({ cmd: 'lbcPublier', id }); DEMANDE_LBC_FICHE.id = id;"],
 };
 if (process.argv.includes('--prouve')) {
@@ -111,6 +120,16 @@ const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   dit(PA.etapeCourante('a-publier', [{ code: 'numero', bloque: true }]) === 'verifier' && PA.etapeCourante('a-publier', [{ code: 'prix', bloque: false }]) === 'publier', 'B13 un manque bloquant arrête à « Vérifier »');
   const e = PA.etatsPaire(paire, { sitesVus: vus, manquesLecture: [], jobs: { 'vc:9001': { etape: 'fait' } }, postes: { leboncoin: new Set(), vestiaire: new Set() }, brouillonsEbay: new Set(['9001']) });
   dit(e.leboncoin === 'vue-en-ligne' && e.vestiaire === 'publiee' && e.ebay === 'preparee', 'B14 l’état de chaque site, chacun par sa source', JSON.stringify(e));
+  const e2 = PA.etatsPaire(paire, { sitesVus: vus, manquesLecture: [], jobs: {}, postes: { leboncoin: new Set(), vestiaire: new Set() }, brouillonsEbay: new Set(), publiesEbay: new Set(['9001']) });
+  dit(e2.ebay === 'publiee', 'B21 un brouillon eBay MIS EN LIGNE (programme.itemId) ⇒ « publiée », jamais « préparée »', JSON.stringify(e2));
+  const apL = PA.apercuEnvoi('leboncoin', { id: '9', num: '15', title: 'T', photos: ['p'], prix: 40 }, {});
+  const mH = PA.manquesEnvoi('leboncoin', apL, { horsVinted: true }), mV = PA.manquesEnvoi('vestiaire', PA.apercuEnvoi('vestiaire', { id: '9', num: '15', title: 'T', photos: ['p'], prix: 40 }, {}), { horsVinted: true });
+  dit(mH.some((m) => m.code === 'hors-vinted' && m.bloque && /VRM-15/.test(m.geste)) && !mV.some((m) => m.code === 'hors-vinted'), 'B22 plus en ligne sur Vinted ⇒ Leboncoin BLOQUÉ et le geste dit (la file Leboncoin part d’une annonce Vinted en ligne) ; Vestiaire non concerné', JSON.stringify(mH));
+  const regles = { titreLbc: (m, t) => 'LBC:' + t, titreVc: (m, t) => 'VC80:' + t, titreEbay: (t, ta) => 'EB:' + t + ' taille ' + ta, descriptionLbc: (o) => '📦 Réf. ' + o.ref + '\n' + o.texte, descriptionEbay: (pp) => pp.desc || 'faits' };
+  const pv = { id: '9', num: '21', title: 'Nike Dunk', taille: '42', desc: 'Texte Vinted', photos: ['p'], prix: 50 };
+  const aV = PA.apercuEnvoi('vestiaire', pv, regles), aE = PA.apercuEnvoi('ebay', { ...pv, desc: '' }, regles);
+  dit(/VRM-21/.test(aV.description) && aV.titre === 'VC80:Nike Dunk' && aE.titre === 'EB:Nike Dunk taille 42' && aE.description === 'faits', 'B24 « Ce qui part » = ce que le MOTEUR envoie : Vestiaire (titre 80, description avec Réf. VRM-n°), eBay (titre du formulaire, faits à défaut de description)', JSON.stringify({ aV: [aV.titre, aV.description], aE: [aE.titre, aE.description] }));
+  dit(/horsVinted: paire\.chezMoi === true/.test(APP), 'B23 l’app passe « toujours chez moi » au parcours');
   dit(PA.partoutLeMeme(vus).join() === 'vinted,leboncoin', 'B15 « le même N° partout » : les sites où il est vu');
   const L = [{ id: '1', num: '42', title: 'Nike 42' }, { id: '2', num: '142', title: 'Nike 42 bis' }, { id: '3', num: '7', title: 'Adidas' }];
   dit(PA.chercherPaires(L, '42').map((p) => p.id).join() === '1', 'B16 un N° tapé désigne la paire exacte, jamais celle dont le titre le contient');
@@ -153,6 +172,15 @@ const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   dit(/<OngletManque site=\{site\} onglet=\{t\}/.test(APP) && /<OngletManque site=\{siteColis\} onglet="colis"/.test(APP), 'D9 un site sans compte : l’onglet dit ce qui manque et le geste (tâches et Colis)');
   dit(/<EntreePublierAilleurs site="leboncoin"\/>/.test(APP) && /<EntreePublierAilleurs site="ebay"\/>/.test(APP) && /<EntreePublierAilleurs site="vestiaire"\/>/.test(APP), 'D10 « Publier ailleurs » joignable depuis Annonces · Leboncoin, eBay, Vestiaire');
   dit(/receptionDe=\{receptionAchatMs\}/.test(APP) && /const receptionAchatMs = React\.useCallback/.test(APP), 'D11 « Relier un achat » reçoit la date de réception lue (règle `dateReception`)');
+
+  // (relecture du 5 nov.) « Relier un achat » s'ouvre depuis Ventes/Annonces : les dates de
+  // réception y sont LUES à la demande (transactions des achats de la feuille), et le filtre de
+  // date attend leur lecture au lieu d'écarter tout.
+  const relierEff = (() => { const a = APP.indexOf('const [infosRelier, setInfosRelier]'); return a < 0 ? '' : APP.slice(a, a + 2600); })();
+  dit(/if \(!besoinInfosRelier \|\| !pickerFor/.test(relierEff) && /_txn_\$\{o\.transaction_id\}/.test(relierEff) && /shipment->>status_updated_at/.test(relierEff) && /rows === null\) \{ setInfosRelier\(null\)/.test(relierEff), 'D12 les dates de réception des achats de la feuille sont lues (projection scalaire, « pas su » = null)');
+  dit(/recuDu: dateEnAttente \? '' : recuDu, recuAu: dateEnAttente \? '' : recuAu/.test(APP) && /receptionEtat=\{receptionsRelierEtat\} onFiltres=/.test(APP), 'D13 pendant la lecture, le filtre de date attend (il n’écarte rien sur une lecture pas faite)');
+  dit(/else toast\('Cet article n’est pas dans ta file « À publier » Leboncoin/.test(APP), 'D14 un article demandé hors de la file Leboncoin : c’est DIT, jamais un écran muet');
+  dit(P.nomCompteVente('vestiaire', { compte: '1234567890' }, {}) === 'n° 1234567890', 'D15 Vestiaire : l’identifiant ENTIER (tronqué, il ressemblerait à un autre numéro)');
 
   console.log(`\n${ko ? '❌' : '✅'} plateformes-logo : ${ok}/${ok + ko}`);
   process.exit(ko ? 1 : 0);

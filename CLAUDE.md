@@ -501,7 +501,7 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 
-- **5 nov. · Plateformes (v31)** : sélecteur À LOGOS unique (Annonces, Ventes, Achats, Messages, Colis ; les 4 sites, un site sans compte dit ce qui manque + le geste), le compte sur CHAQUE vente (identité, `src/plateformes.js`), « Publier ailleurs » guidé (vérifier · ce qui part · publier par le moteur existant · suivi par identité, `src/publierAilleurs.js`), filtres prix/réception/marque/taille pour relier un achat. `docs/passation/2026-11-05-plateformes-logo.md`. Geste : Ventes, puis une fiche N° → « Publier ailleurs ».
+- **5 nov. · Plateformes (v31)** : sélecteur À LOGOS unique (Annonces, Ventes, Achats, Messages, Colis ; les 4 sites, un site sans compte dit ce qui manque + le geste), le compte sur CHAQUE vente (identité, `src/plateformes.js`), « Publier ailleurs » guidé (vérifier · ce qui part · publier par le moteur existant · suivi par identité, `src/publierAilleurs.js`), filtres prix/réception/marque/taille pour relier un achat (relecture : dates de réception lues aussi depuis Ventes, brouillon eBay en ligne = « publiée », Leboncoin bloqué et dit hors Vinted, « ce qui part » = le texte du moteur). `docs/passation/2026-11-05-plateformes-logo.md`. Geste : Ventes, puis une fiche N° → « Publier ailleurs ».
 
 - **5 nov. · Numéros** : fiche numérotée du nuage jamais retirée par la fusion (plus de bloc « Recharger »). `docs/passation/2026-11-05-numeros-autre-appareil.md` ; demandes du jour : `demandes-2026-11-05.md`.
 
