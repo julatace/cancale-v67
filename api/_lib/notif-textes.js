@@ -36,14 +36,16 @@ export const FAMILLES = [
 
 // Catégorie (le mot que chaque route passe à `pushCategorieActive`) → famille.
 export const FAMILLE_DE = {
-  vente: 'ventes', argent: 'ventes', doublevente: 'ventes', agentebay: 'ventes',
+  vente: 'ventes', argent: 'ventes', doublevente: 'ventes',
   expedier: 'poster', soir: 'poster',
   colis: 'arrives',
   offre: 'offres', offremini: 'offres',
   message: 'messages', action: 'messages', favoris: 'messages',
   urssaf: 'compta', bilan: 'compta', facture: 'compta',
 };
-export const CATEGORIES_RETIREES = new Set(['suivi', 'achat', 'favori']);
+// (5 nov.) `agentebay` : l'agent eBay est ARRÊTÉ (Julien : « le bot eBay,
+// arrête-le, c'est nul ») — sa notification ne part plus, quel que soit l'ancien réglage.
+export const CATEGORIES_RETIREES = new Set(['suivi', 'achat', 'favori', 'agentebay']);
 export const familleDe = (cat) => FAMILLE_DE[cat] || null;
 
 // La décision, à partir des préférences LUES. Ordre : catégorie retirée ⇒ non ;
