@@ -17,10 +17,11 @@
 // ════════════════════════════════════════════════════════════════════════════
 const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
+const { routeMain, ecritesMain } = require('./_base-ecritures.cjs');
 const http = require('http'), fs = require('fs'), path = require('path');
 
-const DIST = path.join(__dirname, '..', '..', 'dist');   // jamais un chemin absolu (§6.1)
-const PORT = 4503;
+const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');   // jamais un chemin absolu (§6.1)
+const PORT = Number(process.env.BANC_PORT) || 4503;
 const MIME = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css', '.json':'application/json', '.png':'image/png', '.svg':'image/svg+xml', '.webmanifest':'application/manifest+json' };
 const JETON = 'jeton-de-banc';
 const SESSION = { access_token: JETON, refresh_token: 'r', expires_at: Date.now() + 3600e3, user: { id: '11111111-2222-3333-4444-555555555555', email: 'vendeur@exemple.fr' } };
@@ -51,21 +52,23 @@ const ecouter = () => new Promise((res, rej) => {
   srv.listen(PORT, () => res());
 });
 
-const ecrits = [];   // ce qui repart dans le nuage pour la ligne `main`
+// (5 nov.) La ligne `main` à la VRAIE forme (`routeMain`, _base-ecritures.cjs) :
+// PATCH conditionnel sur `data->>rev`, écriture acceptée GARDÉE et relue par
+// l'ouverture suivante, garde-fou 017. Avant, ce banc ne comptait qu'un corps
+// `{ id: 'main' }` (l'ancien upsert) : depuis le 1er nov. il jugeait « 0 fautive
+// sur 0 » — un contrôle qui ne pouvait plus échouer (§6.1).
+const base = { main: JSON.parse(JSON.stringify(MAIN)), maj: new Date(Date.now() - 86400e3).toISOString(), ecritures: [] };
 async function ouvrir(ctx, tab) {
   const pg = await ctx.newPage();
   await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ access_token: JETON, refresh_token: 'r', expires_in: 3600, user: SESSION.user }) }));
   await pg.route('**/rest/v1/**', (r) => {
     const req = r.request();
     const u = decodeURIComponent(metaVersData(req.url()));
-    const json = (d) => r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
-    if (/select=owner/.test(u)) return json([]);
-    if (req.method() !== 'GET') {
-      try { const b = JSON.parse(req.postData() || '[]'); (Array.isArray(b) ? b : [b]).forEach((row) => { if (row && row.id === 'main' && row.data) ecrits.push(row.data); }); } catch (_) {}
-      return json([]);
-    }
+    const json = (d, st = 200) => r.fulfill({ status: st, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: typeof d === 'string' ? d : JSON.stringify(d) });
+    if (/select=owner&limit=1/.test(u)) return json([{ owner: SESSION.user.id }]);   // base cloisonnée (la production)
+    const m = routeMain(req, base); if (m) return json(m.body, m.status);
+    if (req.method() !== 'GET') return json([]);
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return json([COMPTE]);
-    if (/id=eq\.main/.test(u)) return json([{ id: 'main', data: MAIN }]);
     if (/_listings/.test(u)) return json([{ ...LISTINGS, cap: LISTINGS.data.capturedAt }]);
     return json([]);
   });
@@ -94,6 +97,8 @@ async function ouvrir(ctx, tab) {
     dit(autoLocaux === 5, 'les 5 numéros auto sont toujours là dans le navigateur', `${autoLocaux} sur 5`);
     const memes = Object.keys(NUMEROS).every((k) => loc[k] && String(loc[k].numero) === NUMEROS[k].numero);
     dit(memes, 'aucun numéro n\'a changé (7, 50, 51, 52, 53, 54)', JSON.stringify(Object.fromEntries(Object.entries(loc).map(([k, e]) => [k, e && e.numero]))));
+    const ecrits = ecritesMain(base);
+    dit(ecrits.length > 0, 'des écritures de `main` partent au nuage et sont jugées', `${ecrits.length} écriture(s) : ${base.ecritures.map((e) => e.meth + ' ' + e.resultat).join(', ')}`);
     const mauvais = ecrits.filter((d) => {
       const n = d.vinted_annonce_numeros; const p = d.vinted_used_numeros;
       if (n && Object.keys(NUMEROS).some((k) => !n[k] || String(n[k].numero) !== NUMEROS[k].numero)) return true;
@@ -101,6 +106,8 @@ async function ouvrir(ctx, tab) {
       return false;
     });
     dit(mauvais.length === 0, 'rien de ce qui repart dans le nuage ne perd ni ne change un numéro, ni ne rétrécit le pool', `${mauvais.length} écriture(s) fautive(s) sur ${ecrits.length}`);
+    const nuage = (base.main && base.main.vinted_annonce_numeros) || {};
+    dit(Object.keys(NUMEROS).every((k) => nuage[k] && String(nuage[k].numero) === NUMEROS[k].numero) && POOL.every((x) => (base.main.vinted_used_numeros || []).map(String).includes(String(x))), 'le nuage, à la fin, porte toujours 7, 50…54 et tout le pool', JSON.stringify(Object.fromEntries(Object.entries(nuage).map(([k, e]) => [k, e && e.numero]))));
     dit(a.erreurs.length + b.erreurs.length === 0, 'aucune erreur d\'app', [...a.erreurs, ...b.erreurs].join(' | '));
   } catch (e) { dit(false, 'le banc a tourné jusqu\'au bout', String(e && e.message).slice(0, 160)); }
   finally { await nav.close(); srv.close(); }
