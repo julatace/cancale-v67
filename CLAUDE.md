@@ -501,6 +501,8 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 
+- **5 nov. · E-mails plus clairs** : feuille de lecture opaque (plus de fondu d'opacité), chaque ligne dit d'abord ce que c'est (tiré du résumé rangé, jamais du sujet), jours, e-mails envoyés en un titre + un bouton. `docs/passation/2026-11-05-emails-clairs.md`. Geste : ouvrir un code de retrait dans E-mails.
+
 - **5 nov. · Colis code + QR** : code et QR reliés par n° de suivi, « En grand » (écran allumé), QR de dépôt Leboncoin. ⚠️ Le QR Mondial Relay n'existe QUE dans l'app (« c'est que dans l'app ») : aucune promesse par navigateur/extension (`mr_colis_*` = codes seulement) ; « QR dans l'app Mondial Relay » + « Ajouter le QR » (capture lue dans la page, SON clic = l'identité, jamais un QR fabriqué ; `vrm_colis_qr_poses`). `docs/passation/2026-11-05-colis-qr.md` §7. Geste : ajouter une capture sur un colis.
 - **5 nov. · N° sur l'annonce et N° changé** : réglage « Le N° sur tes annonces Vinted » (place, forme, aperçu, 2 questions ; `src/etiquetteNumero.js`, `vrm_num_vinted`) ; N° changé à la main ⇒ l'ancien dans « à écrire sur tes cartons » ; bloc « mise en ligne numérotée par VRM ». Branche `v31-numerotation`, `docs/passation/2026-11-05-numerotation-etiquette.md` (reste : extension). Geste : Paramètres → Numéros.
 - **5 nov. · E-mails** : écran « E-mails » (boîte de réception : rubriques, compte, lecture, pièces, lien par identité) + « Relier ma boîte » animé, rien envoyé. `docs/passation/2026-11-05-onglet-emails.md`. Geste : poser la règle dans chaque boîte.
