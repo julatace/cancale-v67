@@ -1,0 +1,143 @@
+// ── LE STOCK = TES ANNONCES ACTUELLES (5 nov. 2026, demande de Julien) ─────────
+// Julien, mot pour mot : « pour le stock onglet je veux que ça soit les annonces
+// actuelles ».
+//
+// Module PUR (aucun accès au navigateur ni à la base) : l'écran Stock
+// (`StockMeubles`, App.jsx) et `scripts/audit-stock-annonces.cjs` exécutent les
+// MÊMES fonctions (§11).
+//
+// ⚠️ « EN LIGNE » N'EST PAS JUGÉ ICI. La règle unique de l'app (<enligne-regle>,
+//    `fetchVintedListings` → lecture COMPLÈTE la plus récente ; plus de 24 h ⇒
+//    « à confirmer » ; masquée par Vinted = toujours chez lui) a déjà rangé chaque
+//    annonce Vinted dans `enLigne`, `aConfirmer` ou `masquees` — les trois
+//    ensemble sont les PRÉSENTES (`annoncesPresentes`). eBay (SKU « VRM-{n°} ») et
+//    Leboncoin (`annonceLbcEnVente`, N° par identité) arrivent déjà jugés aussi.
+//    Ce module ne fait que les RÉUNIR par identité et compter.
+// ⚠️ L'IDENTITÉ D'UNE PAIRE (§5) : l'identifiant d'annonce, le N° (`cle`), la
+//    PHOTO exacte (`clePhoto`, le fichier). Jamais le titre. Une paire en ligne sur
+//    Vinted ET Leboncoin (même N°) compte UNE fois.
+// ⚠️ « PAS SU » N'EST PAS « AUCUNE » : un compte dont la lecture a raté, eBay ou
+//    Leboncoin pas lus ⇒ `manque` (nommés) et `auMoins` ; rien lu du tout ⇒
+//    `su: false` (l'écran dit « — », jamais « aucune annonce »).
+
+const arr = (a) => (Array.isArray(a) ? a : []);
+const cleDefaut = (n) => {
+  const s = String(n == null ? '' : n).toUpperCase().replace(/[\s\-_.]/g, '');
+  return /^\d+$/.test(s) ? String(parseInt(s, 10)) : s;
+};
+const RANG_ETAT = { enligne: 0, masquee: 1, aconfirmer: 2 };
+
+// Les annonces actuelles, une par PAIRE.
+//   vinted : [{ uid, nom, ok, lu (ms|null), enLigne:[it], aConfirmer:[it], masquees:[it] }]
+//            (`ok: false` = la lecture de ce compte a raté : « pas su »)
+//            `masquees` : déjà sans celles déclarées parties (`masqueesPresentes`).
+//   numeros : { [idAnnonce]: { numero, photo? } } — la fiche de chaque annonce Vinted
+//   ebay   : null (pas su) | { liste: [{ numero, title, photo }], illisibles: [nom] }
+//   lbc    : null (pas su) | [{ numero, title, photo }]
+//   vendus : Set de clés — N° PROUVÉS vendus (`vrm_stock_vendus`) : une annonce eBay
+//            ou Leboncoin restée en ligne n'en refait pas une annonce actuelle
+//            (la même exclusion que `articlesAutresPlateformes`).
+// Rend { articles, n, nAConfirmer, nMasquees, sansNumero, manque, aConfirmerComptes, su, auMoins }.
+//   article : { cle, numero, ids, titre, photo, plateformes, comptes, etat, aussi }
+//   etat : 'enligne' (au moins une annonce en ligne) · 'masquee' · 'aconfirmer'
+export function annoncesActuelles({ vinted, numeros, ebay, lbc, vendus, cle = cleDefaut, clePhoto = null } = {}) {
+  const parts = [];          // { id, cle, numero, titre, photo, plat, compte, etat }
+  const manque = [], aConfirmerComptes = [];
+  let lus = 0;
+  const sansNumero = { vinted: 0, ebay: 0, leboncoin: 0 };
+  const fiches = numeros && typeof numeros === 'object' ? numeros : {};
+  for (const c of arr(vinted)) {
+    if (!c) continue;
+    if (!c.ok) { manque.push({ plateforme: 'vinted', nom: String(c.nom || c.uid || ''), raison: 'lecture ratée' }); continue; }
+    lus++;
+    const pousse = (it, etat) => {
+      if (!it || it.id == null) return;
+      const id = String(it.id), f = fiches[id] || {};
+      const numero = f.numero != null ? String(f.numero).trim() : '';
+      parts.push({ id: 'v:' + id, cle: numero ? cle(numero) : '', numero, titre: String(it.title || f.title || ''), photo: it.photo || f.photo || null,
+        plat: 'vinted', compte: String(c.uid || ''), etat });
+    };
+    arr(c.enLigne).forEach((it) => pousse(it, 'enligne'));
+    arr(c.aConfirmer).forEach((it) => pousse(it, 'aconfirmer'));
+    arr(c.masquees).forEach((it) => pousse(it, 'masquee'));
+    if (arr(c.aConfirmer).length) aConfirmerComptes.push({ uid: String(c.uid || ''), nom: String(c.nom || c.uid || ''), n: arr(c.aConfirmer).length, lu: Number.isFinite(c.lu) ? c.lu : null });
+  }
+  const autres = (liste, plat) => {
+    for (const a of arr(liste)) {
+      const numero = a && a.numero != null ? String(a.numero).trim() : '';
+      const k = numero ? cle(numero) : '';
+      if (!k) { sansNumero[plat] += 1; continue; }
+      if (vendus && vendus.has(k)) continue;
+      parts.push({ id: plat + ':' + k, cle: k, numero, titre: String((a && a.title) || ''), photo: (a && a.photo) || null, plat, compte: '', etat: 'enligne' });
+    }
+  };
+  if (ebay == null) manque.push({ plateforme: 'ebay', nom: 'eBay', raison: 'pas lu' });
+  else {
+    lus++;
+    autres(ebay.liste, 'ebay');
+    for (const nom of arr(ebay.illisibles)) manque.push({ plateforme: 'ebay', nom: String(nom || 'eBay'), raison: 'lecture ratée' });
+  }
+  if (lbc == null) manque.push({ plateforme: 'leboncoin', nom: 'Leboncoin', raison: 'pas lu' });
+  else { lus++; autres(lbc, 'leboncoin'); }
+
+  // Réunir par IDENTITÉ : même annonce, même N°, même photo exacte (union-find).
+  const parent = parts.map((_, i) => i);
+  const racine = (i) => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
+  const lie = (i, j) => { parent[racine(i)] = racine(j); };
+  const vu = new Map();
+  parts.forEach((p, i) => {
+    const cles = [p.id];
+    if (p.cle) cles.push('n:' + p.cle);
+    const ph = clePhoto && p.photo ? clePhoto(p.photo) : '';
+    if (ph) cles.push('p:' + ph);
+    for (const k of cles) { if (vu.has(k)) lie(i, vu.get(k)); else vu.set(k, i); }
+  });
+  const groupes = new Map();
+  parts.forEach((p, i) => { const r = racine(i); if (!groupes.has(r)) groupes.set(r, []); groupes.get(r).push(p); });
+  const articles = [];
+  for (const g of groupes.values()) {
+    // Le représentant : un N° d'abord (on range un carton par son numéro), Vinted d'abord.
+    const t = g.find((p) => p.cle && p.plat === 'vinted') || g.find((p) => p.cle) || g[0];
+    const etat = g.map((p) => p.etat).sort((a, b) => RANG_ETAT[a] - RANG_ETAT[b])[0];
+    const nums = [...new Set(g.filter((p) => p.cle).map((p) => p.numero))];
+    articles.push({
+      cle: t.cle, numero: t.numero,
+      ids: [...new Set(g.map((p) => p.id))],
+      titre: (g.find((p) => p.titre) || t).titre, photo: (g.find((p) => p.photo) || t).photo,
+      plateformes: [...new Set(g.map((p) => p.plat))],
+      comptes: [...new Set(g.map((p) => p.compte).filter(Boolean))],
+      etat, aussi: nums.filter((n) => cle(n) !== t.cle),
+    });
+    if (!t.cle) sansNumero.vinted += 1;
+  }
+  const nAConfirmer = articles.filter((a) => a.etat === 'aconfirmer').length;
+  const nMasquees = articles.filter((a) => a.etat === 'masquee').length;
+  const su = lus > 0;
+  return { articles, n: articles.length, nAConfirmer, nMasquees, sansNumero, manque, aConfirmerComptes, su,
+    auMoins: su && (manque.length > 0 || sansNumero.ebay > 0 || sansNumero.leboncoin > 0) };
+}
+
+// Ce qui est dans une CASE et n'est plus une annonce actuelle : à sortir du
+// carton — jamais disparu en silence.
+//   slots     { [cle]: { m, i } }
+//   actuelles Set des clés des annonces actuelles
+//   vendus    Set des clés prouvées vendues (`vrm_stock_vendus`)
+//   garder    { [cle]: ts } — « Remettre » (sortie toute seule) ou « Elle est encore là »
+//   jugeable  (cle) => bool — toutes les lectures qui pourraient la porter ont
+//             répondu (sinon « pas su » : elle n'est dite ni présente ni partie)
+// Rend { [cle]: 'actuelle' | 'vendue' | 'gardee' | 'plusenligne' | 'passu' }.
+// Une vendue l'emporte sur tout (sa case s'allume jusqu'à ce qu'il la sorte ou
+// que le colis parte, `libererCasesPartis`).
+export function classerRangees({ slots, actuelles, vendus, garder, jugeable, cle = cleDefaut } = {}) {
+  const out = {};
+  for (const k0 of Object.keys(slots || {})) {
+    if (!slots[k0]) continue;
+    const k = cle(k0); if (!k) continue;
+    if (vendus && vendus.has(k)) out[k] = 'vendue';
+    else if (actuelles && actuelles.has(k)) out[k] = 'actuelle';
+    else if (garder && garder[k]) out[k] = 'gardee';
+    else if (actuelles && jugeable && jugeable(k)) out[k] = 'plusenligne';
+    else out[k] = 'passu';
+  }
+  return out;
+}

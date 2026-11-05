@@ -219,6 +219,7 @@ import { histoireArticle, offresDeConversation } from "./histoireArticle.js";
 import { etatArticle } from "./etatArticle.js";
 import StockExplication from "./StockExplication.jsx";
 import { libererCasesPartis, remettreCase, resteAuStock, etatCase } from "./stockSortie.js";
+import { annoncesActuelles, classerRangees } from "./stockAnnonces.js";
 import { CLE_MODELES, lireModeles } from "./modelesDescription.js";
 import { MesModeles, InsererModele } from "./ModelesDescription.jsx";
 import PrixPartout from "./PrixPartout.jsx";
@@ -2030,7 +2031,7 @@ const SYNC_KEYS = [
   // (proposition 9) : rien n'est reproposé tant qu'il n'a pas bougé.
   'vrm_ebay_baisses',
   'vinted_sale_overrides','vinted_bord_links','vinted_pickup_done','vinted_bords_hidden','vinted_ship_done','vinted_pairs_lost','vinted_retours_recus','vinted_retours_dismissed','vinted_retours_remis',
-  'vrm_stock_sortis','vrm_stock_garder','vinted_offvinted_buys','vinted_buyprice_by_num','vinted_quick_replies','vinted_ca_keep_removed','vinted_achat_notes','vrm_lbc_colis_done',
+  'vrm_stock_sortis','vrm_stock_garder','vrm_stock_garde_hors_ligne','vinted_offvinted_buys','vinted_buyprice_by_num','vinted_quick_replies','vinted_ca_keep_removed','vinted_achat_notes','vrm_lbc_colis_done',
   // Annonce Leboncoin → N° de paire, posé À LA MAIN (« Relier », écran
   // Leboncoin, C4). Une identité qu'il pose lui-même : l'extension la LIT.
   'vrm_lbc_liens',
@@ -33326,7 +33327,31 @@ function ouDansMeubles(num, meublesArg, slotsArg) {
   return { meuble: m, i: s.i, ...p, libelle: `rangée ${p.rangee}, colonne ${p.colonne}` };
 }
 
-function StockMeubles({ locate = null, placeNum = null, onPlaced = null } = {}) {
+// (5 nov.) LES ANNONCES ACTUELLES, lues pour le Stock par les MÊMES lectures que
+// l'écran Annonces (§11) : chaque compte Vinted gardé par `fetchVintedListings`
+// (la règle <enligne-regle> : en ligne, à confirmer, masquées), eBay
+// (`lireEbayEnLigne`) et Leboncoin (`lireLbcEnVente`). Un compte écarté du Stock
+// (masqué, retiré, supprimé, plus lié — `comptesStockEcartes`) n'est pas lu.
+// Rend `{ vinted: [{ uid, nom, ok, lu, enLigne, aConfirmer, masquees }], ebay, lbc, at }`
+// — une lecture ratée reste « pas su » (`ok: false`, `null`), jamais `[]`.
+async function lireAnnoncesStock(accounts) {
+  const horsCompte = comptesStockEcartes();
+  const accs = (accounts || []).filter((a) => a && a.vinted_user_id != null && !horsCompte({ accountId: a.vinted_user_id }));
+  const [vinted, ebay, lbc] = await Promise.all([
+    Promise.all(accs.map(async (acc) => {
+      const uid = String(acc.vinted_user_id), nom = String(acc.login || acc.username || uid);
+      let r; try { r = await fetchVintedListings(acc, 1, {}); } catch (_) { r = null; }
+      if (!r || !r.ok) return { uid, nom, ok: false };
+      return { uid, nom, ok: true, lu: Number.isFinite(r.lu) ? r.lu : null, enLigne: r.items || [], aConfirmer: r.aConfirmer || [], masquees: r.masquees || [] };
+    })),
+    lireEbayEnLigne(), lireLbcEnVente(),
+  ]);
+  return { vinted, ebay, lbc, at: Date.now() };
+}
+const NOM_PLAT_FILTRE = { vinted: 'Vinted', leboncoin: 'Leboncoin', ebay: 'eBay' };
+const depuisQuand = (ms) => { if (!Number.isFinite(ms)) return 'jamais lu'; const h = (Date.now() - ms) / 3600000; return h < 48 ? `lu il y a ${Math.max(1, Math.round(h))} h` : `lu il y a ${Math.round(h / 24)} j`; };
+
+function StockMeubles({ locate = null, placeNum = null, onPlaced = null, accounts = null, comptesLus = false } = {}) {
   const [meubles, setMeubles] = React.useState(() => { const m = load('vrm_meubles', []); return Array.isArray(m) ? m : []; });
   const [slots, setSlots] = React.useState(() => { const s = load('vrm_slots', {}); return s && typeof s === 'object' ? s : {}; });
   const [pairsLost, setPairsLost] = useStateCle('vinted_pairs_lost', () => load('vinted_pairs_lost', {}));
@@ -33394,21 +33419,84 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null } = {}) 
   const venduSig = load('vrm_stock_vendus', null);
   const vendus = new Set((venduSig && Array.isArray(venduSig.nums) ? venduSig.nums : []).map((x) => cleNum(x)).filter(Boolean));
   const estVendu = (f) => vendus.has(cleNum(f.numero));
-  // Paires EN STOCK (même règle que StockPhotos et l'écran Annonces).
-  // (28 oct.) Les paires vues seulement sur eBay ou Leboncoin s'ajoutent
-  // (`ajouterAutresPresents`) ; « À ranger » ne montre chaque article qu'une fois.
-  // (5 nov.) Un article VENDU et PARTI (plus dans `vinted_nums_physiques`) qui
-  // n'a pas de case ne revient pas dans « À ranger » (`resteAuStock`) ; posé, il
-  // reste montré — en surbrillance — jusqu'à ce qu'il l'enlève ou que le colis parte.
-  const physiques = numsPresents();
-  const autresParCle = new Map(autresPresents().map((a) => [cleNum(a.numero), a]));
-  const fiches = ajouterAutresPresents(Object.keys(numeros).map((id) => ({ id, ...(numeros[id] || {}) }))
-    .filter((f) => String(f.numero == null ? '' : f.numero).trim() && !annonceDeclareePartie(f.id, numeros, pairsLost) && !horsCompte(f)))
-    .filter((f) => resteAuStock(f, { pose: !!slots[cleNum(f.numero)], vendus, physiques, garder: load('vrm_stock_garder', {}) || {}, cle: cleNum }))
-    // Les plateformes de chaque paire (la règle de `fichesStockToutes`) : une
-    // fiche Vinted dont l'annonce est partie mais qui est en vente sur eBay le dit.
-    .map((f) => { if (f.horsVinted) return f; const a = autresParCle.get(cleNum(f.numero)); return { ...f, plateformes: a ? [...(a.vinted ? ['vinted'] : []), ...(a.plateformes || [])] : ['vinted'] }; });
+  // ⚠️⚠️ (5 nov.) Julien : « pour le stock onglet je veux que ça soit les annonces
+  // actuelles ». Avant, le Stock proposait TOUTES les fiches numérotées jamais
+  // vues (mesuré chez lui : 521 fiches, dont 401 « B » d'archive, pour 56
+  // annonces présentes sur Vinted). Maintenant : ses ANNONCES ACTUELLES, toutes
+  // plateformes, une fois par paire (`annoncesActuelles`, src/stockAnnonces.js),
+  // lues par la règle unique « en ligne » (`lireAnnoncesStock`). Une paire posée
+  // dans une case qui n'est plus une annonce actuelle ne disparaît pas : vendue
+  // ⇒ « Vendues à sortir », sinon ⇒ « Plus en ligne » (`classerRangees`) — et si
+  // une lecture qui pourrait la porter manque, on ne dit RIEN d'elle (« pas su »).
+  const [lecture, setLecture] = React.useState(undefined);   // undefined = en cours
+  const cleComptesStock = (accounts || []).map((a) => String((a && a.vinted_user_id) || '')).filter(Boolean).sort().join(',');
+  React.useEffect(() => {
+    if (!comptesLus) return undefined;
+    let vivant = true;
+    (async () => { const lu = await lireAnnoncesStock(accounts || []); if (vivant) setLecture(lu); })();
+    return () => { vivant = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [comptesLus, cleComptesStock]);
+  // Les filtres (commodité d'affichage, par appareil) : par défaut TOUT.
+  const [filtrePlat, setFiltrePlatEtat] = React.useState(() => { try { return localStorage.getItem('vrm_stock_filtre_plat') || ''; } catch (_) { return ''; } });
+  const [filtreCompte, setFiltreCompteEtat] = React.useState(() => { try { return localStorage.getItem('vrm_stock_filtre_compte') || ''; } catch (_) { return ''; } });
+  const setFiltrePlat = (v) => { setFiltrePlatEtat(v); try { localStorage.setItem('vrm_stock_filtre_plat', v); } catch (_) {} };
+  const setFiltreCompte = (v) => { setFiltreCompteEtat(v); try { localStorage.setItem('vrm_stock_filtre_compte', v); } catch (_) {} };
+  const [maxListe, setMaxListe] = React.useState(60);        // la liste des annonces actuelles, 60 par 60
+  const [, setTic] = React.useState(0);                      // relire après « Elle est encore là »
+  const garder = { ...(load('vrm_stock_garde_hors_ligne', {}) || {}), ...(load('vrm_stock_garder', {}) || {}) };
+  const aa = lecture ? annoncesActuelles({
+    vinted: lecture.vinted.map((c) => (c.ok ? { ...c, masquees: masqueesPresentes(c.masquees, numeros, pairsLost) } : c)),
+    numeros, ebay: lecture.ebay, lbc: lecture.lbc, vendus, cle: cleNum, clePhoto: photoKey,
+  }) : null;
+  const actuellesCles = aa ? new Set(aa.articles.map((a) => a.cle).filter(Boolean)) : null;
+  // Les fiches numérotées par N° : pour montrer une paire rangée qui n'est plus
+  // une annonce actuelle, et savoir de quels comptes elle vient.
+  const fichesParCle = {};
+  for (const id of Object.keys(numeros)) {
+    const f = numeros[id] || {}; const k = cleNum(f.numero); if (!k) continue;
+    (fichesParCle[k] = fichesParCle[k] || []).push({ id, ...f });
+  }
+  // Toutes les lectures qui pourraient porter ce N° ont-elles répondu ? Sinon
+  // « pas su » : la paire rangée n'est dite ni présente ni partie.
+  const lusOk = new Set(lecture ? lecture.vinted.filter((c) => c.ok).map((c) => c.uid) : []);
+  const jugeable = (k) => {
+    if (!aa || !aa.su || !lecture.lbc || !lecture.ebay || (lecture.ebay.illisibles || []).length) return false;
+    const cs = (fichesParCle[k] || []).map((f) => String(f.accountId || '')).filter(Boolean);
+    return cs.length ? cs.every((u) => lusOk.has(u)) : lecture.vinted.every((c) => c.ok);
+  };
+  const etatsRangees = classerRangees({ slots, actuelles: actuellesCles, vendus, garder, jugeable, cle: cleNum });
+  const correspondFiltre = (f) => (!filtrePlat || (f.plateformes || []).includes(filtrePlat)) && (!filtreCompte || (f.comptes || []).includes(filtreCompte));
+  const filtreActif = !!(filtrePlat || filtreCompte);
+  // Les articles montrés : les annonces actuelles (avec un N°), puis les paires
+  // RANGÉES qui ne le sont plus (vendues, plus en ligne, gardées, pas su).
+  const fiches = [];
+  const vus = new Set();
+  for (const a of (aa ? aa.articles : [])) {
+    if (!a.cle || vus.has(a.cle)) continue; vus.add(a.cle);
+    const v = (fichesParCle[a.cle] || [])[0];
+    fiches.push({ id: a.ids[0], numero: a.numero, title: a.titre, photo: a.photo || (v && v.photo) || null, plateformes: a.plateformes, comptes: a.comptes, aussi: a.aussi, etatAnnonce: a.etat, actuelle: true });
+  }
+  for (const k of Object.keys(etatsRangees)) {
+    if (vus.has(k)) continue;
+    const tout = fichesParCle[k] || [];
+    if (tout.length && tout.every((f) => horsCompte(f))) continue;   // compte écarté : pas montrée (comme avant)
+    const f = tout.find((x) => !horsCompte(x)) || null; const j = (journal || {})[k];
+    vus.add(k);
+    fiches.push({ id: f ? f.id : 'n:' + k, numero: f ? f.numero : (j && j.num) || k, title: (f && f.title) || (j && j.titre) || '', photo: (f && f.photo) || null, plateformes: [], comptes: f && f.accountId ? [String(f.accountId)] : [], aussi: [], actuelle: false, rangee: etatsRangees[k] });
+  }
+  // Une paire REMISE à la main (« Remettre », sa case prise) attend dans « À
+  // ranger », même hors des annonces actuelles : il a dit qu'elle est chez lui.
+  const remises = load('vrm_stock_garder', {}) || {};
+  for (const k of Object.keys(remises)) {
+    if (vus.has(k) || slots[k]) continue;
+    const f = (fichesParCle[k] || []).find((x) => !horsCompte(x) && !annonceDeclareePartie(x.id, numeros, pairsLost)); if (!f) continue;
+    if (!resteAuStock(f, { pose: false, vendus, physiques: null, garder: remises, cle: cleNum })) continue;
+    vus.add(k); fiches.push({ id: f.id, numero: f.numero, title: f.title || '', photo: f.photo || null, plateformes: [], comptes: [], aussi: [], actuelle: false, remise: true });
+  }
   const ficheParCle = {}; fiches.forEach((f) => { const k = cleNum(f.numero); if (k && !ficheParCle[k]) ficheParCle[k] = f; });
+  const rangeeEtat = (f) => etatsRangees[cleNum(f.numero)] || null;
+
   // Toute écriture des cases passe par la gravité des meubles qui l'ont.
   const tasserTout = (u, ms) => { let cur = u, b = {}; (ms || meubles).forEach((m) => { const r = tasserMeuble(cur, m, new Set(Object.keys(ficheParCle))); cur = r.slots; Object.assign(b, r.bouges); }); return { slots: cur, bouges: b }; };
   const ecrireSlots = (u, ms) => {
@@ -33418,7 +33506,8 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null } = {}) 
   const cleDeFiche = (f) => cleNum(f.numero);
   const posee = (f) => !!slots[cleDeFiche(f)];
   const occupant = (mid, i) => { const k = Object.keys(slots).find((c) => slots[c] && slots[c].m === mid && slots[c].i === i && ficheParCle[c]); return k ? ficheParCle[k] : null; };
-  const aRanger = unParArticle(fiches.slice().sort((a, b) => (+cleNum(a.numero) || 0) - (+cleNum(b.numero) || 0)), { cle: cleNum, clePhoto: photoKey, estRangee: posee });
+  // « À ranger » : les annonces actuelles SANS case (et les paires remises à la main).
+  const aRanger = unParArticle(fiches.filter((f) => (f.actuelle || f.remise) && correspondFiltre(f)).sort((a, b) => triNum(a.numero, b.numero)), { cle: cleNum, clePhoto: photoKey, estRangee: posee });
   const filtre = q.trim().toLowerCase();
   // Plusieurs mots : tous doivent y être (« nike 42 noir »). Un N° seul se juge
   // par IDENTITÉ (« 12 » ne montre pas la N°128) ; un mot cherche aussi le titre.
@@ -33465,7 +33554,11 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null } = {}) 
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
   }, []);
-  const nVendus = fiches.filter(estVendu).length;
+  // (5 nov.) Ce qui est dans une case et n'est plus une annonce actuelle.
+  const vendSortir = fiches.filter((f) => rangeeEtat(f) === 'vendue');
+  const plusEnLigne = fiches.filter((f) => rangeeEtat(f) === 'plusenligne');
+  const rangeesPasSu = fiches.filter((f) => rangeeEtat(f) === 'passu');
+  const nVendus = vendSortir.length;
   const nEcartes = Object.keys(numeros).filter((id) => { const f = { id, ...(numeros[id] || {}) }; return String(f.numero == null ? '' : f.numero).trim() && !annonceDeclareePartie(f.id, numeros, pairsLost) && horsCompte(f); }).length;
 
   // ⚠️⚠️ 1er nov. (audit X7) — UNE CASE OCCUPÉE DEMANDE. Avant, toucher par erreur
@@ -33526,13 +33619,15 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null } = {}) 
   // ── Vignette d'un article dans une case ────────────────────────────────
   // (5 nov.) Le N° en bas à gauche, lisible sur toute photo (pastille encre) ;
   // « Vendue » en haut, à l'accent — jamais rouge (§7 : rien d'irréversible).
-  const Vignette = ({ f, sold }) => (
+  // (5 nov.) Rangée mais plus une annonce actuelle : « Plus en ligne », à l'ambre.
+  const Vignette = ({ f, sold, hors = false, mini = false }) => (
     <>
       {f.photo
         ? <PhotoVinted src={f.photo} loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
         : <span className="vrm-s2d-sansphoto" aria-hidden="true">{String(f.title || '').trim().slice(0, 1).toUpperCase() || '·'}</span>}
-      <span className="vrm-s2d-num" data-vendue={sold ? '1' : undefined}>N°{f.numero}</span>
-      {sold && <span className="vrm-s2d-vendue">Vendue</span>}
+      <span className="vrm-s2d-num" data-vendue={sold ? '1' : undefined} data-hors-ligne={!sold && hors ? '1' : undefined}>N°{f.numero}</span>
+      {sold && !mini && <span className="vrm-s2d-vendue">Vendue</span>}
+      {!sold && hors && !mini && <span className="vrm-s2d-horsligne">Plus en ligne</span>}
     </>
   );
 
@@ -33553,7 +33648,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null } = {}) 
     const filled = Array.from({ length: total(m) }).filter((_, i) => occupant(m.id, i)).length;
     const cherche = !!(filtre || cibles.length);
     const nIci = cherche ? Array.from({ length: total(m) }).filter((_, i) => { const o = occupant(m.id, i); if (!o) return false; const k = cleDeFiche(o); return cibles.includes(k) || (filtre && correspond(o)); }).length : 0;
-    const nVenduesIci = Array.from({ length: total(m) }).filter((_, i) => { const o = occupant(m.id, i); return o && estVendu(o); }).length;
+    const nVenduesIci = Array.from({ length: total(m) }).filter((_, i) => { const o = occupant(m.id, i); return o && (estVendu(o) || rangeeEtat(o) === 'plusenligne'); }).length;
     // Pendant une recherche, un meuble où rien ne correspond se replie : celui
     // qui contient l'article remonte sous les yeux.
     const replie = cherche && nIci === 0 && meubles.length > 1;
@@ -33578,19 +33673,20 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null } = {}) 
           {Array.from({ length: total(m) }).map((_, i) => {
             const occ = occupant(m.id, i); const sold = occ && estVendu(occ); const kOcc = occ ? cleDeFiche(occ) : null;
             const vise = kOcc && (flash === kOcc || cibles.includes(kOcc) || (filtre && correspond(occ)));
-            const dim = occ ? (cherche && !vise) : cherche;
+            const dim = occ ? ((cherche && !vise) || (filtreActif && !cherche && !correspondFiltre(occ))) : cherche;
             const pl = placeDansMeubles(i, m);
-            const etat = etatCase(occ, { vendus, cle: cleNum });
+            const hors = !!occ && rangeeEtat(occ) === 'plusenligne';
+            const etat = hors && !sold ? 'plusenligne' : etatCase(occ, { vendus, cle: cleNum });
             const classes = ['vrm-s2d-case', 'is-' + etat, vise ? 'is-vise' : '', dim ? 'is-terne' : '', place ? 'is-cible' : '', survol === m.id + ':' + i ? 'is-survol' : '', glisse && glisse === kOcc ? 'is-glisse' : '',
               flash && flash === kOcc ? 'vrm-case-flash' : '', kOcc && tombes[kOcc] ? 'vrm-case-tombe' : ''].filter(Boolean).join(' ');
             return (
               <React.Fragment key={i}>
               {pl.colonne === 1 && <span data-regle-rang={pl.rangee} className="vrm-s2d-regle">{pl.rangee}</span>}
-              <button type="button" onClick={() => cliquerCase(m.id, i)} aria-label={occ ? `N°${occ.numero}${sold ? ' (vendue, à sortir)' : ''} — rangée ${pl.rangee}, colonne ${pl.colonne}` : `Case vide — rangée ${pl.rangee}, colonne ${pl.colonne}`} title={`Rangée ${pl.rangee}, colonne ${pl.colonne}`}
+              <button type="button" onClick={() => cliquerCase(m.id, i)} aria-label={occ ? `N°${occ.numero}${sold ? ' (vendue, à sortir)' : (hors ? ' (plus en ligne)' : '')} — rangée ${pl.rangee}, colonne ${pl.colonne}` : `Case vide — rangée ${pl.rangee}, colonne ${pl.colonne}`} title={`Rangée ${pl.rangee}, colonne ${pl.colonne}`}
                 data-case-num={kOcc || undefined} data-case-vise={vise ? '' : undefined} data-case-etat={etat} data-case-ici={m.id + ':' + i} data-tombe={kOcc && tombes[kOcc] ? tombes[kOcc] : undefined} className={classes}
                 {...(occ ? dragProps(kOcc) : {})} {...dropProps(m.id, i)}
                 style={kOcc && tombes[kOcc] ? { '--vrm-tombe': `calc(${-tombes[kOcc]} * (100% + ${gap}px))` } : undefined}>
-                {occ ? <Vignette f={occ} sold={sold} /> : <span className="vrm-s2d-plus" aria-hidden="true">+</span>}
+                {occ ? <Vignette f={occ} sold={sold} hors={hors} /> : <span className="vrm-s2d-plus" aria-hidden="true">+</span>}
               </button>
               {pl.colonne === m.cols && pl.rangee < m.rows && (() => {
                 const ks = Array.from({ length: m.cols }, (_, c) => casesPl.has(pl.rangee + ':' + (c + 1)));
@@ -33648,10 +33744,11 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null } = {}) 
     } else if (modal.type === 'fiche') {
       const f = ficheParCle[modal.cle]; if (!f) { fermerModal(); return null; }
       const sold = estVendu(f); const s = slots[modal.cle]; const m = s && meubles.find((x) => x.id === s.m);
+      const hors = !sold && rangeeEtat(f) === 'plusenligne';
       corps = (<>
         <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 10 }}>
-          <span style={{ position: 'relative', width: 72, height: 72, borderRadius: 12, overflow: 'hidden', flex: 'none', background: C.card2 }}><Vignette f={f} sold={sold} /></span>
-          <div><div style={{ fontSize: 17, fontWeight: 800, color: C.text, lineHeight: 1.25 }}>{f.title || '—'}</div><div style={{ color: C.muted, fontSize: 13, marginTop: 2 }}>{sold ? 'Vendu — à sortir du stock' : 'En stock'} · N°{f.numero}</div></div>
+          <span style={{ position: 'relative', width: 72, height: 72, borderRadius: 12, overflow: 'hidden', flex: 'none', background: C.card2 }}><Vignette f={f} sold={sold} hors={hors} /></span>
+          <div><div style={{ fontSize: 17, fontWeight: 800, color: C.text, lineHeight: 1.25 }}>{f.title || '—'}</div><div data-fiche-statut={sold ? 'vendue' : (hors ? 'plusenligne' : (f.actuelle ? 'actuelle' : 'autre'))} style={{ color: C.muted, fontSize: 13, marginTop: 2 }}>{sold ? 'Vendu — à sortir du stock' : (hors ? 'Plus en ligne — plus une annonce actuelle' : (f.actuelle ? `En ligne${(f.plateformes || []).length ? ' sur ' + f.plateformes.map((x) => NOM_PLAT_FILTRE[x] || x).join(' et ') : ''}` : 'En stock'))} · N°{f.numero}</div></div>
         </div>
         <div style={{ textAlign: 'center', background: C.card2, border: `1px solid ${sold ? C.accent : C.line}`, borderRadius: 14, padding: 14, margin: '12px 0' }}>
           <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>{sold ? 'Va le chercher' : 'Rangé dans'}</div>
@@ -33670,6 +33767,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null } = {}) 
           {m && <button className="vrm-b vrm-b-secondaire" type="button" data-fiche-retirer="" onClick={() => { const n = f.numero; retirerCase(modal.cle); fermerModal(); toast(`N°${n} retirée de ${m.name} : elle repasse dans « À ranger ».`); }} style={btnSec}>Retirer de la case</button>}
         </div>
         {sold && <button className="vrm-b vrm-b-primaire" type="button" onClick={() => { sortir(f); fermerModal(); }} style={{ ...btnPri, width: '100%', marginTop: 9 }}>✓ Je l'ai sorti du stock</button>}
+        {hors && <button className="vrm-b vrm-b-secondaire" type="button" data-fiche-encore-la="" onClick={() => { encoreLa(f); fermerModal(); }} style={{ width: '100%', marginTop: 9 }}>Elle est encore là</button>}
       </>);
     }
     return (
@@ -33685,11 +33783,121 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null } = {}) 
   const btnSec = { flex: 1 };
   const btnPri = {};
 
+  // (5 nov.) Rangée, plus en ligne, mais il dit qu'elle est encore là (une
+  // annonce en pause, une paire à republier) : la case n'est plus signalée.
+  const encoreLa = (f) => {
+    const k = cleDeFiche(f); const g = { ...(load('vrm_stock_garde_hors_ligne', {}) || {}) }; g[k] = Date.now();
+    saveTout('vrm_stock_garde_hors_ligne', g); setTic((x) => x + 1);
+    toast(`N°${f.numero} reste dans sa case : elle n'est plus signalée « plus en ligne ».`, 'ok');
+  };
+  const sortirDeLaCase = (f) => {
+    const k = cleDeFiche(f); const ou = ouEst(f); retirerCase(k);
+    toast(`N°${f.numero} retirée${ou ? ' de ' + ou.meuble.name : ''} : la case est libre, le numéro reste pris (jamais redonné).`, 'ok');
+  };
+
+  // ── (5 nov.) LES CHIFFRES EN TÊTE : les annonces actuelles ─────────────────
+  // N annonces actuelles (une par paire), dont « à confirmer » NOMMÉ, dont
+  // masquées par Vinted ; « au moins » si une lecture manque (nommée) ; rien lu
+  // ⇒ « — » et la raison, jamais « aucune annonce ».
+  const comptesNoms = new Map((lecture ? lecture.vinted : []).map((c) => [c.uid, c.nom]));
+  const articlesVus = aa ? aa.articles.filter(correspondFiltre) : [];
+  const nAffiche = articlesVus.length;
+  const nAConf = articlesVus.filter((a) => a.etat === 'aconfirmer').length;
+  const nMasq = articlesVus.filter((a) => a.etat === 'masquee').length;
+  const nRangees = articlesVus.filter((a) => a.cle && slots[a.cle]).length;
+  const nSansNum = articlesVus.filter((a) => !a.cle).length;
+  const platsPresents = aa ? [...new Set(aa.articles.flatMap((a) => a.plateformes))] : [];
+  const comptesPresents = aa ? [...new Set(aa.articles.flatMap((a) => a.comptes))] : [];
+  const manqueTxt = aa ? aa.manque.map((x) => (x.plateforme === 'vinted' ? `${x.nom} (Vinted)` : x.nom) + ' : ' + x.raison).join(' · ') : '';
+  const sansNumAutres = aa ? (aa.sansNumero.ebay + aa.sansNumero.leboncoin) : 0;
+  const blocResume = (
+    <Card style={{ padding: '13px 14px' }}>
+      <div className="vrm-s2d-resume" data-stock-actuelles={lecture === undefined ? 'encours' : (aa && aa.su ? nAffiche : 'passu')} data-stock-au-moins={aa && aa.auMoins ? '1' : '0'} data-stock-a-confirmer={aa && aa.su ? nAConf : undefined} data-stock-masquees={aa && aa.su ? nMasq : undefined} data-stock-rangees={aa && aa.su ? nRangees : undefined}>
+        <div className="vrm-s2d-resume-n">
+          {lecture === undefined ? '…' : (aa && aa.su ? <>{aa.auMoins ? <span style={{ fontSize: 15, fontWeight: 600 }}>au moins </span> : null}{nAffiche}</> : '—')}
+          <small>annonce{nAffiche > 1 ? 's' : ''} actuelle{nAffiche > 1 ? 's' : ''}{filtreActif ? ' (filtrées)' : ''}</small>
+        </div>
+        {lecture === undefined && <div className="vrm-s2d-resume-l">Je lis tes annonces Vinted, Leboncoin et eBay…</div>}
+        {lecture && !aa.su && <div className="vrm-s2d-resume-l" data-stock-passu="">Je n'ai pas pu lire tes annonces{manqueTxt ? ` (${manqueTxt})` : ''} — rien n'est perdu, c'est la lecture qui a échoué. Ouvre Vinted dans Chrome avec l'extension, puis reviens ici.</div>}
+        {aa && aa.su && <div className="vrm-s2d-resume-l">
+          {nAffiche > 0 ? <><b>{nRangees}</b> rangée{nRangees > 1 ? 's' : ''} · <b>{nAffiche - nRangees - nSansNum}</b> pas encore rangée{nAffiche - nRangees - nSansNum > 1 ? 's' : ''}</> : 'Aucune annonce en ligne lue'}
+          {nAConf > 0 && <span data-stock-a-confirmer-noms=""> · dont <b>{nAConf}</b> à confirmer ({aa.aConfirmerComptes.filter((c) => !filtreCompte || c.uid === filtreCompte).map((c) => `${c.nom}, ${depuisQuand(c.lu)}`).join(' ; ')} — plus de 24 h : repasse sur Vinted avec ce compte)</span>}
+          {nMasq > 0 && <> · dont <b>{nMasq}</b> masquée{nMasq > 1 ? 's' : ''} par Vinted (toujours chez toi)</>}
+          {nSansNum > 0 && <> · <b>{nSansNum}</b> sans N° (donne-leur un N° dans Annonces pour les ranger)</>}
+          {aa.manque.length > 0 && <span data-stock-manque=""> · pas lu : {manqueTxt}</span>}
+          {sansNumAutres > 0 && <> · {sansNumAutres} annonce{sansNumAutres > 1 ? 's' : ''} {aa.sansNumero.leboncoin && aa.sansNumero.ebay ? 'Leboncoin et eBay' : (aa.sansNumero.leboncoin ? 'Leboncoin' : 'eBay')} sans N° pas comptée{sansNumAutres > 1 ? 's' : ''} (rien ne dit quelle paire c'est)</>}
+        </div>}
+        {aa && aa.su && (platsPresents.length > 1 || comptesPresents.length > 1) && (
+          <div className="vrm-s2d-filtres" data-stock-filtres="">
+            {platsPresents.length > 1 && <div className="vrm-rangee vrm-filtres" role="group" aria-label="Filtrer par plateforme" data-stock-filtre-plat={filtrePlat || 'toutes'}>
+              {['', ...platsPresents].map((x) => <button key={x || 'toutes'} type="button" aria-pressed={filtrePlat === x} data-plat={x || 'toutes'} onClick={() => setFiltrePlat(x)}>{x ? (NOM_PLAT_FILTRE[x] || x) : 'Toutes'}</button>)}
+            </div>}
+            {comptesPresents.length > 1 && <select aria-label="Filtrer par compte" data-stock-filtre-compte={filtreCompte || 'tous'} value={filtreCompte} onChange={(e) => setFiltreCompte(e.target.value)}>
+              <option value="">Tous les comptes</option>
+              {comptesPresents.map((u) => <option key={u} value={u}>{comptesNoms.get(u) || u}</option>)}
+            </select>}
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+  // ── Vendues à sortir · Plus en ligne : rangées, plus des annonces actuelles ──
+  const ligneRangee = (f, gestes) => { const ou = ouEst(f); const sold = estVendu(f); return (
+    <div key={f.id} className="vrm-s2d-liste-ligne" data-stock-rangee={cleDeFiche(f)} style={{ flexWrap: 'wrap' }}>
+      <span className="vrm-s2d-vig"><Vignette f={f} sold={sold} hors={!sold && rangeeEtat(f) === 'plusenligne'} mini /></span>
+      <span className="vrm-s2d-txt"><span className="vrm-s2d-txt-t"><b>N°{f.numero}</b> · {f.title || '—'}</span>
+        <span className="vrm-s2d-txt-s">{ou ? <><b>{ou.meuble.name}</b> · rangée {ou.rangee}, colonne {ou.colonne}</> : 'case introuvable'}</span></span>
+      <div className="vrm-s2d-gestes">{ou && <button className="vrm-b vrm-b-secondaire" type="button" onClick={() => montrer(f)}>Voir la case</button>}{gestes}</div>
+    </div>); };
+  const blocVendues = vendSortir.length ? (
+    <Card style={{ padding: '12px 13px' }}>
+      <div data-stock-vendues-sortir={vendSortir.length}>
+        <div style={{ fontSize: 15, fontWeight: 800, color: C.text, marginBottom: 4 }}>Vendues à sortir · {vendSortir.length}</div>
+        {vendSortir.map((f) => ligneRangee(f, <button className="vrm-b vrm-b-primaire" type="button" data-stock-sortir={cleDeFiche(f)} onClick={() => sortir(f)}>✓ Je l'ai sortie</button>))}
+      </div>
+    </Card>) : null;
+  const blocPlusEnLigne = plusEnLigne.length ? (
+    <Card style={{ padding: '12px 13px' }}>
+      <div data-stock-plus-en-ligne={plusEnLigne.length}>
+        <div style={{ fontSize: 15, fontWeight: 800, color: C.text }}>Plus en ligne · {plusEnLigne.length}</div>
+        <div style={{ fontSize: 12, color: C.muted, margin: '2px 0 4px', lineHeight: 1.4 }}>Rangées, mais plus en annonce nulle part : retire-les du carton, ou garde-les si elles reviennent en vente.</div>
+        {plusEnLigne.map((f) => ligneRangee(f, <>
+          <button className="vrm-b vrm-b-secondaire" type="button" data-stock-retirer-case={cleDeFiche(f)} onClick={() => sortirDeLaCase(f)}>Je l'ai retirée</button>
+          <button className="vrm-b vrm-b-discret" type="button" data-stock-encore-la={cleDeFiche(f)} onClick={() => encoreLa(f)}>Elle est encore là</button>
+        </>))}
+      </div>
+    </Card>) : null;
+  const blocPasSu = rangeesPasSu.length && aa ? (
+    <div data-stock-rangees-passu={rangeesPasSu.length} style={{ fontSize: 12, color: C.muted, lineHeight: 1.45 }}>
+      {rangeesPasSu.length} paire{rangeesPasSu.length > 1 ? 's' : ''} rangée{rangeesPasSu.length > 1 ? 's' : ''} pas vérifiée{rangeesPasSu.length > 1 ? 's' : ''} ({rangeesPasSu.slice(0, 6).map((f) => 'N°' + f.numero).join(', ')}{rangeesPasSu.length > 6 ? '…' : ''}) : {manqueTxt || 'la lecture de son compte manque'}. Je ne dis ni qu'elles sont en ligne, ni qu'elles sont parties.
+    </div>) : null;
+  // ── La liste de toutes les annonces actuelles, et où chacune est ────────────
+  const blocListe = aa && aa.su && articlesVus.length ? (
+    <Card style={{ padding: '12px 13px' }}>
+      <div data-stock-liste={articlesVus.length}>
+        <div style={{ fontSize: 15, fontWeight: 800, color: C.text, marginBottom: 4 }}>Tes annonces actuelles</div>
+        {articlesVus.slice().sort((a, b) => (!!(a.cle && slots[a.cle]) - !!(b.cle && slots[b.cle])) || triNum(a.numero, b.numero)).slice(0, maxListe).map((a) => {
+          const f = a.cle ? ficheParCle[a.cle] : null; const ou = f ? ouEst(f) : null;
+          return (
+            <div key={a.ids[0]} className="vrm-s2d-liste-ligne" data-stock-annonce={a.cle || 'sans:' + a.ids[0]} data-stock-annonce-etat={a.etat} data-stock-annonce-plats={a.plateformes.join(',')} data-stock-annonce-place={ou ? `${ou.meuble.name}|${ou.rangee}|${ou.colonne}` : (a.cle ? 'non-range' : 'sans-numero')}>
+              <span className="vrm-s2d-vig"><Vignette f={{ numero: a.numero || '—', title: a.titre, photo: a.photo }} sold={false} mini /></span>
+              <span className="vrm-s2d-txt">
+                <span className="vrm-s2d-txt-t">{a.cle ? <b>N°{a.numero} · </b> : null}{a.titre || '—'}</span>
+                <span className="vrm-s2d-txt-s">{a.plateformes.map((x) => NOM_PLAT_FILTRE[x] || x).join(' · ')}{a.comptes.length ? ' · ' + a.comptes.map((u) => comptesNoms.get(u) || u).join(', ') : ''}{a.etat === 'aconfirmer' ? ' · à confirmer' : (a.etat === 'masquee' ? ' · masquée par Vinted' : '')}{(a.aussi || []).length ? ' · aussi N°' + a.aussi.join(', N°') : ''}
+                  <br />{ou ? <b>{ou.meuble.name} · rangée {ou.rangee}, colonne {ou.colonne}</b> : (a.cle ? 'pas encore rangée' : 'sans N° : pas rangeable')}</span>
+              </span>
+              {a.cle && f && <button className="vrm-b vrm-b-discret" type="button" data-stock-annonce-geste={ou ? 'voir' : 'ranger'} onClick={() => { if (ou) montrer(f); else { setPlace(a.cle); toast(`Touche la case où tu ranges N°${a.numero}.`); } }} style={{ flexShrink: 0 }}>{ou ? 'Voir ›' : 'Ranger ›'}</button>}
+            </div>); })}
+        {articlesVus.length > maxListe && <button className="vrm-b vrm-b-discret" type="button" onClick={() => setMaxListe((x) => x + 60)} style={{ width: '100%' }}>Voir plus — {maxListe} sur {articlesVus.length}</button>}
+      </div>
+    </Card>) : null;
+
   // (5 nov.) Qui découvre : l'explication animée (données inventées), puis le
-  // geste. Sans article numéroté, il n'y a rien d'autre à montrer.
-  if (!fiches.length) return (<>
+  // geste. Sans annonce actuelle ni meuble, il n'y a rien d'autre à montrer.
+  if (!fiches.length && !meubles.length) return (<>
+    {blocResume}
     <StockExplication />
-    <Card style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Aucun article numéroté pour l’instant : dès qu’une annonce reçoit son N°, elle arrive ici, prête à ranger.</Card>
+    {aa && aa.su && !aa.n && <Card style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>{aa.auMoins ? 'Aucune annonce lue pour l’instant — une lecture manque (voir plus haut).' : 'Aucune annonce en ligne en ce moment : dès qu’une annonce est en ligne, elle arrive ici, prête à ranger.'}</Card>}
   </>);
 
   // (5 nov.) Ce qui est sorti TOUT SEUL des meubles (colis parti) : dit, avec
@@ -33785,8 +33993,12 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null } = {}) 
   );
 
   return (<>
+    {blocResume}
     {blocCherche}
     {meubles.length === 0 && <StockExplication />}
+    {blocVendues}
+    {blocPlusEnLigne}
+    {blocPasSu}
     {blocSortis}
     {/* à ranger */}
     {aRanger.length > 0 && (
@@ -33821,7 +34033,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null } = {}) 
 
     {nEcartes > 0 && <div data-stock-ecartes={nEcartes} style={{ fontSize: 12, color: C.muted }}>{nEcartes} paire{nEcartes > 1 ? 's' : ''} d'un compte retiré ou masqué {nEcartes > 1 ? 'ne sont' : "n'est"} pas montrée{nEcartes > 1 ? 's' : ''} ici.</div>}
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'space-between' }}>
-      <div style={{ fontSize: 13, color: C.muted, flex: '1 1 200px', minWidth: 0 }}>{fiches.length} paire{fiches.length > 1 ? 's' : ''} en stock{nVendus > 0 ? <> · <button className="vrm-b vrm-b-discret" type="button" data-vendues-chercher={nVendus} onClick={() => { setQ(''); setCibles(fiches.filter(estVendu).map(cleDeFiche)); try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (_) {} }} style={{ textDecoration: 'underline' }}>{nVendus} vendue{nVendus > 1 ? 's' : ''} à sortir — où sont-elles ?</button></> : (venduSig ? '' : ' · ventes pas encore lues')}</div>
+      <div style={{ flex: '1 1 200px', minWidth: 0 }} />
       {/* (30 oct.) Sans meuble, « De loin / De près » ne montrait rien : le choix attend le premier meuble. */}
       {meubles.length > 0 && <div data-meubles-zoom={zoom}><Segmente label="Taille des cases" value={zoom} onChange={setZoom} options={[{ v: 'loin', l: 'De loin', data: { 'data-zoom-choix': 'loin' } }, { v: 'normal', l: 'Normale', data: { 'data-zoom-choix': 'normal' } }, { v: 'pres', l: 'De près', data: { 'data-zoom-choix': 'pres' } }]} /></div>}
     </div>
@@ -33830,6 +34042,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null } = {}) 
     <div data-meubles-liste="" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', columnGap: zoom === 'pres' ? 0 : 28 }}>
       {meubles.map((m) => <div key={m.id} style={{ flex: zoom === 'pres' ? '1 1 100%' : '0 1 auto', minWidth: 0, maxWidth: '100%' }}>{cadreMeuble(m)}</div>)}
     </div>
+    {blocListe}
 
     {/* (30 oct.) Pièce vide : créer un meuble est LE geste de l'écran (primaire) ; ensuite il redevient secondaire. */}
     <button className={`vrm-b ${meubles.length ? 'vrm-b-secondaire' : 'vrm-b-primaire'}`} type="button" data-creer-meuble="" onClick={() => setModal({ type: 'meuble' })} style={{ alignSelf: meubles.length ? 'stretch' : 'flex-start' }}>+ Créer un meuble</button>
@@ -33941,7 +34154,7 @@ function EditeurMeuble({ modal, onSave, onDelete }) {
   </>);
 }
 
-function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,extraCols,setExtraCols,cellColors,setCellColors,locate,onLocateConsumed,placeNum,onPlaced}) {
+function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,extraCols,setExtraCols,cellColors,setCellColors,locate,onLocateConsumed,placeNum,onPlaced,accounts=null,comptesLus=false}) {
   const [searchInput,setSearchInput]=useState('');
   const [garageSearch,setGarageSearch]=useState(''); // recherche validée
   // ⚠️ LA 3D EST LA VUE PAR DÉFAUT (Julien : « je veux vraiment que la 3D soit
@@ -34162,7 +34375,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
     <div style={{padding:16,display:'flex',flexDirection:'column',gap:14}}>
       <ScreenHead icon="home" title="Stock" desc="Tes étagères en 2D : chaque article dans sa case. Cherche un numéro, il te dit le meuble et la case."/>
 
-      <StockMeubles locate={locate} placeNum={placeNum} onPlaced={onPlaced}/>
+      <StockMeubles locate={locate} placeNum={placeNum} onPlaced={onPlaced} accounts={accounts} comptesLus={comptesLus}/>
 
       {/* (30 oct.) L'ancienne grille de zones (cases bloquées, couleurs, colonnes) n'était plus
           joignable depuis le 17 oct. (aucune vue « grid ») : ses ~20 boutons sont retirés. */}
@@ -41741,34 +41954,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // N° par IDENTITÉ (`numeroLbcIdentite` : lien posé à la main, référence VRM —
   // jamais le « nXXX » d'un titre). `null` = pas su (rien n'est ajouté).
   const [lbcStock, setLbcStock] = useState(null);
+  // (5 nov.) Les deux lectures vivent hors de l'écran (`lireLbcEnVente`,
+  // `lireEbayEnLigne`) : le Stock les lit aussi, la MÊME règle (§11).
   useEffect(() => { let stop = false; (async () => {
-    try {
-      const items = await lbcAnnoncesSession();
-      if (!items || stop) return;
-      const vr = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`, { headers: sbAuth() });
-      if (!vr.ok) return;
-      const vrows = await vr.json(); if (!Array.isArray(vrows) || stop) return;
-      const vendues = annoncesLbcVendues((vrows[0] && vrows[0].data && vrows[0].data.ventes) || {});
-      const liens = { ...(load('vrm_lbc_liens', {}) || {}) };
-      const liste = [];
-      for (const ad of Object.values(items || {})) {
-        if (!annonceLbcEnVente(ad, vendues)) continue;
-        if (!(ad.ref || ad.customRef || (liens[String(ad.id)] != null && String(liens[String(ad.id)]).trim()))) continue;   // pas une de ses annonces reliées
-        const n = numeroLbcIdentite({ itemId: ad.id }, items, liens);
-        liste.push({ numero: n || '', title: ad.subject || ad.title || '', photo: (Array.isArray(ad.images) && typeof ad.images[0] === 'string' && ad.images[0]) || null });
-      }
-      setLbcStock(liste);
-    } catch (_) {}
+    const liste = await lireLbcEnVente();
+    if (liste && !stop) setLbcStock(liste);
   })(); return () => { stop = true; }; }, []);
   useEffect(() => { let stop = false; (async () => {
-    try {
-      const lu = await lireEbayTous('ebay_listings', SEL_EBAY_ANNONCES, 'items');
-      if (!lu || stop) return;
-      const set = new Set(); const liste = [];
-      for (const x of lu.items) { const c = numEbayLu(x && x.sku, x && x.itemId, null, x && x.depuis); if (c) set.add(cleNum(c)); liste.push({ numero: c || '', title: (x && x.title) || '', photo: (x && x.photo) || null }); }
-      setEbayNums(set);
-      setEbayStock(liste);
-    } catch (_) {}
+    const lu = await lireEbayEnLigne();
+    if (!lu || stop) return;
+    setEbayNums(lu.nums);
+    setEbayStock(lu.liste);
   })(); return () => { stop = true; }; }, []);
   useEffect(() => { (async () => {
     try {
@@ -59227,6 +59423,43 @@ async function lbcListingsSession() {
   } catch (_) { return null; }
 }
 
+// (5 nov.) Les annonces Leboncoin EN VENTE (la règle `annonceLbcEnVente`, §11)
+// avec leur N° par IDENTITÉ (`numeroLbcIdentite` : lien posé à la main, référence
+// VRM — jamais le « nXXX » d'un titre). Seulement ses annonces reliées à VRM
+// (référence ou lien). Rend `[{ numero, title, photo }]`, ou `null` = pas su.
+// Lue par Annonces (les paires présentes) et par le Stock (annonces actuelles).
+async function lireLbcEnVente() {
+  try {
+    const items = await lbcAnnoncesSession();
+    if (!items) return null;
+    const vr = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`, { headers: sbAuth() });
+    if (!vr.ok) return null;
+    const vrows = await vr.json(); if (!Array.isArray(vrows)) return null;
+    const vendues = annoncesLbcVendues((vrows[0] && vrows[0].data && vrows[0].data.ventes) || {});
+    const liens = { ...(load('vrm_lbc_liens', {}) || {}) };
+    const liste = [];
+    for (const ad of Object.values(items || {})) {
+      if (!annonceLbcEnVente(ad, vendues)) continue;
+      if (!(ad.ref || ad.customRef || (liens[String(ad.id)] != null && String(liens[String(ad.id)]).trim()))) continue;   // pas une de ses annonces reliées
+      const n = numeroLbcIdentite({ itemId: ad.id }, items, liens);
+      liste.push({ numero: n || '', title: ad.subject || ad.title || '', photo: (Array.isArray(ad.images) && typeof ad.images[0] === 'string' && ad.images[0]) || null });
+    }
+    return liste;
+  } catch (_) { return null; }
+}
+// (5 nov.) Les annonces eBay EN LIGNE avec leur N° (SKU « VRM-{n°} », identité).
+// Rend `{ liste: [{ numero, title, photo }], nums: Set, illisibles: [nom] }`, ou
+// `null` = pas su (registre des comptes illisible).
+async function lireEbayEnLigne() {
+  try {
+    const lu = await lireEbayTous('ebay_listings', SEL_EBAY_ANNONCES, 'items');
+    if (!lu) return null;
+    const nums = new Set(); const liste = [];
+    for (const x of lu.items) { const c = numEbayLu(x && x.sku, x && x.itemId, null, x && x.depuis); if (c) nums.add(cleNum(c)); liste.push({ numero: c || '', title: (x && x.title) || '', photo: (x && x.photo) || null }); }
+    return { liste, nums, illisibles: (lu.illisibles || []).map((c) => nomCompteEbay(c)) };
+  } catch (_) { return null; }
+}
+
 // ── VENDUE SUR LEBONCOIN, ENCORE EN VENTE SUR VINTED (anti double vente) ─────
 // Julien, 4 octobre : « quand une paire est vendue sur une plateforme, elle
 // doit disparaître des autres, pour éviter de vendre deux fois la même paire ».
@@ -68766,7 +68999,7 @@ function AppCoeur() {
         {tab==='stockvinted'&&<StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices}/>}
         {tab==='communaute'&&<Suspense fallback={<p style={{padding:20}}>Chargement de la communauté…</p>}><Communaute sombre={C===THEMES.dark} headers={enTeteSession} prenom={String(load('vrm_prenom','')||'').trim()} FermeAuRetour={FermeAuRetour}/></Suspense>}
         {tab==='organisation'&&<Suspense fallback={<p style={{padding:20}}>Chargement de l’organisation…</p>}><Operations sombre={C===THEMES.dark} headers={enTeteSession}/></Suspense>}
-        {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)}/>}
+        {tab==='garage'   &&<Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)} accounts={vintedAccounts} comptesLus={accountsLoaded&&!baseKO}/>}
         {tab==='comptabilite'&&<Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/>}
         {tab==='compta'&&<div className="vrm-rubriques" style={{padding:'12px 16px 0'}}><PlatSubNav sub={platSub==='factures'?'factures':'compta'} setSub={setPlatSub} sections={/* (30 oct.) « Comptabilité » était écrit deux fois en tête (segment + titre) : « Vue d’ensemble », comme Statistiques */ [['compta','Vue d’ensemble'],['factures','Factures']]}/></div>}
         {tab==='compta'&&platSub!=='factures'&&<ComptaPro liveStats={liveStatsVus} onNav={setTab} lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOffCoque} accounts={vintedAccounts} comptesLus={accountsLoaded && !baseKO}/>}
