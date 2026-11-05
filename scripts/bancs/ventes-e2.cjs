@@ -94,7 +94,15 @@ const JEUX = {
 };
 
 // ── Ce que la page MONTRE ───────────────────────────────────────────────────
-const MESURE = (pg, { tel, sombre }) => pg.evaluate(({ tel, sombre }) => {
+// Les entrées animées (fondu d'une liste au premier montage) finissent avant la mesure : sous
+// Chromium sans écran une animation peut rester « running » — on la termine après 3 s.
+const calme = (pg) => pg.evaluate(() => new Promise((ok) => {
+  const anims = () => (document.getAnimations ? document.getAnimations() : []);
+  Promise.race([Promise.all(anims().map((a) => a.finished.catch(() => {}))), new Promise((r) => setTimeout(r, 3000))])
+    .then(() => { for (const a of anims()) { try { if (a.playState === 'running') a.finish(); } catch (_) {} } setTimeout(ok, 120); });
+})).catch(() => {});
+const MESURE = async (pg, o) => { await calme(pg); return MESURE_BRUTE(pg, o); };
+const MESURE_BRUTE = (pg, { tel, sombre }) => pg.evaluate(({ tel, sombre }) => {
   const vis = (e) => { if (!e || !e.getClientRects().length) return false; const r = e.getBoundingClientRect(); if (r.width < 1 || r.height < 1) return false; for (let p = e; p && p !== document.documentElement; p = p.parentElement) { const s = getComputedStyle(p); if (s.visibility === 'hidden' || s.display === 'none' || Number(s.opacity) < 0.05) return false; } return !e.closest('details:not([open]) > :not(summary)'); };
   const rgba = (c) => { const m = /rgba?\(([^)]+)\)/.exec(c || ''); if (!m) return null; const p = m[1].split(/[ ,/]+/).filter(Boolean).map(Number); return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 }; };
   const hsl = ({ r, g, b }) => { r /= 255; g /= 255; b /= 255; const mx = Math.max(r, g, b), mn = Math.min(r, g, b); let h = 0, s = 0; const l = (mx + mn) / 2; if (mx !== mn) { const d = mx - mn; s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn); if (mx === r) h = (g - b) / d + (g < b ? 6 : 0); else if (mx === g) h = (b - r) / d + 2; else h = (r - g) / d + 4; h *= 60; } return { h, s, l }; };
