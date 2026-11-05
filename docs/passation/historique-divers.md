@@ -709,3 +709,6 @@ Paramètres → Comptes liés ; couper l'interrupteur d'un compte qu'il ne veut 
 
 <!-- déplacé de CLAUDE.md §9 le 5 nov. (limite de 60 Ko) -->
 - **4 nov., reprise Codex** — intégration des branches argent/mois, offres/objectif/questions eBay, achats/fournisseurs/lots, comptes/sécurité ; corrections des retenues eBay inconnues, lecture inachevée et corps HTTP des appareils. État précis, limites Vinted/Discord, corbeille non livrée : `docs/passation/2026-11-04-reprise-codex.md`. Migration 024 non appliquée.
+
+<!-- déplacé de CLAUDE.md §9 le 5 nov. (limite de 60 Ko, chantier colis-qr) -->
+- **3 nov.** — Ma journée « À faire » en PHOTOS (vignettes par identité, pile + « +k », plus de pastilles colorées ; `src/design/PileVignettes.jsx`) ; Colis en 3 onglets « À envoyer · Envoyés · À retirer », toutes plateformes ensemble groupées par transporteur ; « À retirer » en SECTIONS (aujourd'hui · prêts · code à venir · lieu à confirmer · à vérifier · en route · argent à vérifier), chaque colis une fois, sélecteur de VILLE (lue dans l'adresse) qui filtre carte, liste et carte sombre ; aucune phrase explicative. Bancs `journee-photos`, `colis-retirer-propre` (rouges sur main) ; R2 du récap corrigé (`deps` de `LigneVenteVinted`). → historique interface-stock. Geste : regarder Colis → À retirer et Ma journée.
