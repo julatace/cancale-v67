@@ -1,0 +1,189 @@
+/* ── LE STOCK EN 2D (5 nov. 2026) ────────────────────────────────────────────
+   Une seule méthode : chaque annonce dans une case d'étagères qu'il dessine
+   comme les vraies (colonnes, rangées, planches). Lisible au doigt (cases de
+   44 px au moins, la rangée défile de côté si le meuble est large) et à la
+   souris (survol, glisser-déposer). UNE couleur d'accent, rare : la case d'un
+   article VENDU (à sortir) et la case visée — jamais le rouge (§7).
+   Jetons : --vrm-* posés par la coque (src/themeMineral.js), clair et sombre. */
+
+.vrm-s2d-meuble {
+  --s2d-bois: color-mix(in srgb, var(--vrm-muted, #8E8E93) 38%, transparent);
+  --s2d-bois-fort: color-mix(in srgb, var(--vrm-muted, #8E8E93) 70%, transparent);
+  --s2d-accent: var(--vrm-accent, #0071E3);
+  margin-bottom: 22px;
+  min-width: 0;
+}
+.vrm-s2d-meuble[data-replie] { margin-bottom: 10px; }
+.vrm-s2d-meuble[data-replie] .vrm-s2d-tete { opacity: .55; }
+.vrm-s2d-tete { display: flex; align-items: center; gap: 10px; margin: 0 2px 6px; min-width: 0; }
+.vrm-s2d-nom { font-size: 17px; font-weight: 800; color: var(--vrm-ink, inherit); letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.vrm-s2d-compte { font-size: 12px; font-weight: 600; color: var(--vrm-muted, #6E6E73); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vrm-s2d-pastille { font-size: 12px; font-weight: 700; color: var(--vrm-on-accent, #FFFFFF); background: var(--s2d-accent); border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
+.vrm-s2d-pastille[data-vide] { color: var(--vrm-muted, #6E6E73); background: transparent; }
+
+/* La rangée défile de côté quand le meuble est plus large que l'écran : la
+   page, elle, ne défile jamais de côté. La marge laisse respirer le halo. */
+.vrm-s2d-defile { overflow-x: auto; overscroll-behavior-x: contain; padding: 8px 8px 6px; margin: 0 -8px; }
+
+.vrm-s2d-etagere {
+  display: grid;
+  position: relative;
+  padding: 10px 12px 0 6px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--vrm-muted, #8E8E93) 9%, var(--vrm-surface, #FFFFFF));
+  /* Les montants et le chapeau du meuble, dessinés. */
+  box-shadow: inset 6px 0 0 var(--s2d-bois), inset -6px 0 0 var(--s2d-bois), inset 0 6px 0 var(--s2d-bois);
+}
+.vrm-s2d-regle { font-size: 11px; font-weight: 700; color: var(--vrm-muted, #6E6E73); display: flex; align-items: center; justify-content: center; font-variant-numeric: tabular-nums; }
+.vrm-s2d-planche { height: 6px; margin: -1px 0; border-radius: 3px; background: var(--s2d-bois-fort); box-shadow: 0 2px 3px rgba(0, 0, 0, .16); }
+.vrm-s2d-planche-vide { height: 0; }
+.vrm-s2d-socle { height: 8px; margin: 2px -12px 0 -6px; border-radius: 0 0 12px 12px; background: var(--s2d-bois-fort); }
+
+/* Une case. Pleine : la photo. Vide : un pointillé et un « + ». */
+.vrm-s2d-case {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  min-width: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+  color: inherit;
+  background: var(--vrm-surface, #FFFFFF);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .10), 0 2px 6px rgba(0, 0, 0, .06);
+  transition: transform .16s cubic-bezier(.2, .8, .2, 1), box-shadow .16s ease, opacity .2s ease, background-color .16s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.vrm-s2d-case.is-vide {
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--vrm-muted, #8E8E93) 7%, transparent);
+  box-shadow: none;
+  outline: 1.5px dashed color-mix(in srgb, var(--vrm-muted, #8E8E93) 55%, transparent);
+  outline-offset: -2px;
+}
+.vrm-s2d-plus { font-size: 22px; font-weight: 400; line-height: 1; color: var(--vrm-muted, #8E8E93); opacity: .45; }
+.vrm-s2d-case.is-vide.is-cible { outline: 2px dashed var(--s2d-accent); background: color-mix(in srgb, var(--s2d-accent) 8%, transparent); }
+.vrm-s2d-case.is-vide.is-cible .vrm-s2d-plus { color: var(--s2d-accent); opacity: .9; }
+.vrm-s2d-case:focus-visible { outline: 3px solid var(--vrm-focus, var(--s2d-accent)); outline-offset: 2px; }
+.vrm-s2d-case:active { transform: scale(.96); }
+@media (hover: hover) and (pointer: fine) {
+  .vrm-s2d-case:not(.is-vide):hover { transform: translateY(-2px); box-shadow: 0 2px 4px rgba(0, 0, 0, .12), 0 8px 18px rgba(0, 0, 0, .14); }
+  .vrm-s2d-case.is-vide:hover { background: color-mix(in srgb, var(--s2d-accent) 10%, transparent); }
+  .vrm-s2d-case.is-vide:hover .vrm-s2d-plus { color: var(--s2d-accent); opacity: .9; }
+  .vrm-s2d-case[draggable="true"] { cursor: grab; }
+}
+.vrm-s2d-case.is-terne { opacity: .28; }
+.vrm-s2d-case.is-vise { box-shadow: 0 0 0 3px var(--s2d-accent); z-index: 1; }
+.vrm-s2d-case.is-survol { box-shadow: 0 0 0 3px var(--s2d-accent); background: color-mix(in srgb, var(--s2d-accent) 18%, transparent); transform: scale(1.04); z-index: 1; }
+.vrm-s2d-case.is-glisse { opacity: .35; }
+
+/* VENDUE : la case s'allume jusqu'à ce qu'il l'enlève (ou que le colis parte). */
+.vrm-s2d-case.is-vendue {
+  z-index: 1;
+  box-shadow: 0 0 0 3px var(--s2d-accent), 0 0 0 7px color-mix(in srgb, var(--s2d-accent) 26%, transparent);
+  animation: vrm-s2d-vendue 2.4s ease-in-out infinite;
+}
+@keyframes vrm-s2d-vendue {
+  0%, 100% { box-shadow: 0 0 0 3px var(--s2d-accent), 0 0 0 6px color-mix(in srgb, var(--s2d-accent) 30%, transparent); }
+  50% { box-shadow: 0 0 0 3px var(--s2d-accent), 0 0 0 12px color-mix(in srgb, var(--s2d-accent) 0%, transparent); }
+}
+.vrm-s2d-num { position: absolute; left: 4px; bottom: 4px; max-width: calc(100% - 8px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: rgba(0, 0, 0, .62); color: #FFFFFF; font-size: 11px; font-weight: 800; line-height: 1.35; padding: 0 6px; border-radius: 6px; font-variant-numeric: tabular-nums; }
+.vrm-s2d-num[data-vendue] { background: var(--vrm-accent, #0071E3); color: var(--vrm-on-accent, #FFFFFF); }
+.vrm-s2d-vendue { position: absolute; right: 4px; top: 4px; background: var(--vrm-accent, #0071E3); color: var(--vrm-on-accent, #FFFFFF); font-size: 11px; font-weight: 800; line-height: 1.35; padding: 0 6px; border-radius: 999px; }
+.vrm-s2d-etagere[data-zoom="loin"] .vrm-s2d-vendue { display: none; }   /* de loin : le halo et le N° à l'accent suffisent */
+.vrm-s2d-sansphoto { position: absolute; inset: 0; display: grid; place-items: center; font-size: 20px; font-weight: 700; color: var(--vrm-muted, #8E8E93); background: color-mix(in srgb, var(--vrm-muted, #8E8E93) 14%, var(--vrm-surface, #FFFFFF)); }
+
+/* Ce qui est sorti tout seul (colis parti), avec « Remettre ». */
+.vrm-s2d-sortis { border: 1px solid var(--vrm-line, rgba(0, 0, 0, .1)); border-radius: 12px; background: var(--vrm-surface, #FFFFFF); padding: 10px 14px; display: flex; flex-direction: column; gap: 6px; }
+.vrm-s2d-sortis-titre { font-size: 13px; font-weight: 600; color: var(--vrm-ink, inherit); }
+.vrm-s2d-sorti { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; border-top: 1px solid var(--vrm-line, rgba(0, 0, 0, .1)); padding-top: 6px; }
+
+/* ── L'EXPLICATION ANIMÉE (StockExplication.jsx) ───────────────────────────── */
+.vrm-sx { --sx-accent: var(--vrm-accent, #0071E3); background: var(--vrm-surface, #FFFFFF); border: 1px solid var(--vrm-line, rgba(0, 0, 0, .1)); border-radius: 14px; padding: 14px 16px 12px; display: flex; flex-direction: column; gap: 10px; }
+.vrm-sx-tete { display: flex; align-items: center; gap: 10px; }
+.vrm-sx-titre { font-size: 15px; font-weight: 700; color: var(--vrm-ink, inherit); flex: 1; }
+.vrm-sx-fermer { width: 44px; height: 44px; margin: -10px -10px -10px 0; border: 0; background: transparent; color: var(--vrm-muted, #6E6E73); font-size: 22px; cursor: pointer; border-radius: 12px; }
+.vrm-sx-scene { width: 100%; max-width: 440px; max-height: 260px; height: auto; align-self: center; display: block; overflow: visible; }
+.vrm-sx-bois { fill: color-mix(in srgb, var(--vrm-muted, #8E8E93) 55%, transparent); }
+.vrm-sx-case { fill: color-mix(in srgb, var(--vrm-muted, #8E8E93) 9%, transparent); stroke: color-mix(in srgb, var(--vrm-muted, #8E8E93) 50%, transparent); stroke-width: 1.2; stroke-dasharray: 3 3; }
+.vrm-sx-case-cible { fill: color-mix(in srgb, var(--vrm-muted, #8E8E93) 9%, transparent); stroke: color-mix(in srgb, var(--vrm-muted, #8E8E93) 50%, transparent); stroke-width: 1.2; stroke-dasharray: 3 3; }
+.vrm-sx-case-pleine { fill: color-mix(in srgb, var(--vrm-muted, #8E8E93) 30%, var(--vrm-surface, #FFFFFF)); }
+.vrm-sx-mini { font-size: 11px; font-weight: 700; fill: var(--vrm-ink, #1D1D1F); font-family: inherit; }
+.vrm-sx-carte-fond { fill: var(--vrm-surface, #FFFFFF); stroke: var(--vrm-line, rgba(0, 0, 0, .12)); stroke-width: 1; filter: drop-shadow(0 4px 10px rgba(0, 0, 0, .14)); }
+.vrm-sx-photo { fill: color-mix(in srgb, var(--vrm-muted, #8E8E93) 16%, var(--vrm-surface, #FFFFFF)); }
+.vrm-sx-basket { fill: var(--vrm-ink, #1D1D1F); opacity: .82; }
+.vrm-sx-chip { fill: rgba(0, 0, 0, .7); }
+.vrm-sx-chip-txt { font-size: 11px; font-weight: 800; fill: #FFFFFF; font-family: inherit; }
+.vrm-sx-legende { font-size: 11px; font-weight: 600; fill: var(--vrm-ink, #1D1D1F); font-family: inherit; }
+.vrm-sx-halo { fill: none; stroke: var(--sx-accent); stroke-width: 3; opacity: 0; }
+.vrm-sx-tag { opacity: 0; }
+.vrm-sx-tag-fond { fill: var(--sx-accent); }
+.vrm-sx-tag-txt { font-size: 11px; font-weight: 800; fill: var(--vrm-on-accent, #FFFFFF); font-family: inherit; }
+.vrm-sx-colis { opacity: 0; }
+.vrm-sx-colis-fond { fill: color-mix(in srgb, var(--vrm-muted, #8E8E93) 40%, var(--vrm-surface, #FFFFFF)); stroke: var(--vrm-muted, #8E8E93); stroke-width: 1; }
+.vrm-sx-colis-trait { stroke: var(--vrm-muted, #8E8E93); stroke-width: 1; fill: none; }
+.vrm-sx-libre { opacity: 0; }
+.vrm-sx-coche { stroke: var(--vrm-muted, #8E8E93); stroke-width: 2.4; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Image fixe (réduire les animations) : l'article dans sa case, vendue. */
+.vrm-sx-halo.is-fixe, .vrm-sx-tag.is-fixe { opacity: 1; }
+.vrm-sx .is-cache { display: none; }
+
+.vrm-sx-etapes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.vrm-sx-etape { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; line-height: 1.4; color: var(--vrm-ink, inherit); }
+.vrm-sx-etape > b { flex: none; width: 20px; height: 20px; border-radius: 999px; display: grid; place-items: center; font-size: 11px; font-weight: 800; background: color-mix(in srgb, var(--vrm-muted, #8E8E93) 18%, transparent); color: var(--vrm-ink, inherit); }
+
+/* Le film (10 s, en boucle) : l'annonce entre dans la case (1), la case
+   s'allume (2), le colis part et la case se vide (3). Chaque mouvement part
+   vite et se pose doucement (sortie en douceur), rien ne rebondit. */
+.vrm-sx[data-anime="1"] .vrm-sx-carte { transform-box: view-box; transform-origin: 0 0; animation: vrm-sx-carte 10s cubic-bezier(.2, .8, .2, 1) infinite; }
+.vrm-sx[data-anime="1"] .vrm-sx-halo { animation: vrm-sx-halo 10s ease-in-out infinite; }
+.vrm-sx[data-anime="1"] .vrm-sx-tag { transform-box: view-box; transform-origin: 0 0; animation: vrm-sx-tag 10s cubic-bezier(.2, .8, .2, 1) infinite; }
+.vrm-sx[data-anime="1"] .vrm-sx-colis { transform-box: view-box; transform-origin: 0 0; animation: vrm-sx-colis 10s cubic-bezier(.4, 0, .2, 1) infinite; }
+.vrm-sx[data-anime="1"] .vrm-sx-libre { animation: vrm-sx-libre 10s ease-out infinite; }
+.vrm-sx[data-anime="1"] .vrm-sx-etape[data-etape="1"] { animation: vrm-sx-e1 10s linear infinite; }
+.vrm-sx[data-anime="1"] .vrm-sx-etape[data-etape="2"] { animation: vrm-sx-e2 10s linear infinite; }
+.vrm-sx[data-anime="1"] .vrm-sx-etape[data-etape="3"] { animation: vrm-sx-e3 10s linear infinite; }
+
+@keyframes vrm-sx-carte {
+  0% { transform: translate(0, 0) scale(1); opacity: 0; }
+  5%, 10% { transform: translate(0, 0) scale(1); opacity: 1; }
+  26%, 64% { transform: translate(199.2px, 32.3px) scale(.3636); opacity: 1; }
+  74%, 100% { transform: translate(52px, 132px) scale(.24); opacity: 0; }
+}
+@keyframes vrm-sx-halo {
+  0%, 36% { opacity: 0; }
+  40% { opacity: 1; }
+  48% { opacity: .5; }
+  56%, 64% { opacity: 1; }
+  70%, 100% { opacity: 0; }
+}
+@keyframes vrm-sx-tag {
+  0%, 37% { opacity: 0; transform: translate(0, 4px); }
+  42%, 66% { opacity: 1; transform: translate(0, 0); }
+  71%, 100% { opacity: 0; transform: translate(0, 0); }
+}
+@keyframes vrm-sx-colis {
+  0%, 62% { opacity: 0; transform: translate(0, 0); }
+  67%, 76% { opacity: 1; transform: translate(0, 0); }
+  90%, 100% { opacity: 0; transform: translate(-80px, 0); }
+}
+@keyframes vrm-sx-libre {
+  0%, 76% { opacity: 0; }
+  81%, 94% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes vrm-sx-e1 { 0%, 34% { opacity: 1; } 37%, 97% { opacity: .38; } 100% { opacity: 1; } }
+@keyframes vrm-sx-e2 { 0%, 34% { opacity: .38; } 37%, 64% { opacity: 1; } 67%, 100% { opacity: .38; } }
+@keyframes vrm-sx-e3 { 0%, 64% { opacity: .38; } 67%, 97% { opacity: 1; } 100% { opacity: .38; } }
+
+/* « Réduire les animations » : rien ne bouge, nulle part dans le Stock. */
+@media (prefers-reduced-motion: reduce) {
+  .vrm-s2d-case { transition: none; }
+  .vrm-s2d-case:active, .vrm-s2d-case.is-survol { transform: none; }
+  .vrm-s2d-case:not(.is-vide):hover { transform: none; }
+  .vrm-s2d-case.is-vendue { animation: none; box-shadow: 0 0 0 3px var(--s2d-accent), 0 0 0 7px color-mix(in srgb, var(--s2d-accent) 26%, transparent); }
+  .vrm-sx *, .vrm-sx { animation: none !important; transition: none !important; }
+}

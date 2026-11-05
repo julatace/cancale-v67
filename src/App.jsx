@@ -216,6 +216,9 @@ import { produitsANumeroter, attribuerNumerosVc, carteNumerosVc } from "./numero
 import { sitesDuNumero, appliquerPrix, noterJournalPrix, envoisPrix } from "./prixPartout.js";
 import { champsSource, dupliquerFiche, fichesAPublier, texteAColler } from "./dupliquerFiche.js";
 import { histoireArticle, offresDeConversation } from "./histoireArticle.js";
+import { etatArticle } from "./etatArticle.js";
+import StockExplication from "./StockExplication.jsx";
+import { libererCasesPartis, remettreCase, resteAuStock, etatCase } from "./stockSortie.js";
 import { CLE_MODELES, lireModeles } from "./modelesDescription.js";
 import { MesModeles, InsererModele } from "./ModelesDescription.jsx";
 import PrixPartout from "./PrixPartout.jsx";
@@ -15576,20 +15579,35 @@ async function lireExtraFiche(rn) {
   const fiches = load('vinted_annonce_numeros', {}) || {};
   const achats = [...new Set(ids.map((id) => fiches[id] && fiches[id].buyFromId).filter((x) => x != null && /^\d{4,20}$/.test(String(x))).map(String))];
   const ou = ids.map((id) => `id.like.coffre_*_${id}`).join(',');
-  const [cof, conv, rec, lbc, vc] = await Promise.all([
+  // (5 nov.) « Voir l'état » : la RÉCEPTION de l'achat relié — la règle
+  // `dateReception` (livrée dans SA transaction, sinon « Récupéré » touché).
+  // Un seul achat relié, sinon on ne choisit pas. Projeté (§4.4), jamais `data`.
+  const txAchat = achats.length === 1 ? achats[0] : null;
+  const [cof, conv, rec, lbc, vc, livA] = await Promise.all([
     ids.length ? sb(`app_data?or=(${ou})&select=id,first:data->>firstSavedAt,saved:data->>savedAt,brand:data->>brand,etat:data->>etat,desc:data->>desc,title:data->>title,size:data->>size,price:data->>price`) : Promise.resolve([]),
     ids.length ? sb(`app_data?id=like.harvest_*_conv_*&data->payload->conversation->transaction->>item_id=in.(${ids.join(',')})&select=id,messages:data->payload->conversation->messages,item:data->payload->conversation->transaction->>item_id`) : Promise.resolve([]),
     achats.length ? sb(`app_data?id=in.(${achats.map((a) => 'email_invoice_tx' + a).join(',')})&select=id`) : Promise.resolve([]),
     lbcListingsSession().catch(() => null),
     lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens`).catch(() => null),
+    txAchat ? sb(`app_data?id=like.harvest_*_txn_${txAchat}&select=id,side:data->payload->transaction->>user_side,livSt:data->payload->transaction->shipment->>status,livAt:data->payload->transaction->shipment->>status_updated_at`) : Promise.resolve([]),
   ]);
+  let reception = null, receptionRaison = '';
+  if (achats.length > 1) receptionRaison = 'plusieurs achats reliés à ce N° : on ne choisit pas';
+  else if (txAchat) {
+    if (livA === null) { reception = null; receptionRaison = 'transaction de l’achat pas lue'; }
+    else {
+      const ligne = (livA || []).find((r) => r && r.side === 'buyer' && new RegExp('_txn_' + txAchat + '$').test(String(r.id || '')));
+      const infos = ligne ? { [txAchat]: { livSt: ligne.livSt != null ? String(ligne.livSt) : '', livAt: ligne.livAt || '' } } : {};
+      reception = dateReception({ transaction_id: txAchat }, { infosTx: infos, recuClic: load('vinted_pickup_done', {}) || {} });
+    }
+  }
   let coffres = null;
   if (cof) { coffres = {}; for (const r of cof) { const m = /^coffre_(\d+)_(\d+)$/.exec(String(r.id || '')); if (m && ids.includes(m[2])) coffres[m[2]] = { firstSavedAt: r.first || null, brand: r.brand, etat: r.etat, desc: r.desc, title: r.title, size: r.size, price: r.price, uid: m[1] }; } }
   let offres = null;
   if (conv) { offres = []; for (const r of conv) { const uid = (/^harvest_(\d+)_conv_/.exec(String(r.id || '')) || [])[1] || null; offres.push(...offresDeConversation({ messages: r.messages, transaction: { item_id: r.item } }, uid)); } }
   const recus = rec ? new Set(rec.map((r) => String(r.id || '').replace(/^email_invoice_tx/, ''))) : null;
   const vcL = Array.isArray(vc) ? (vc[0] || {}) : null;
-  return { coffres, offres, recus, lbcItems: lbc ? lbc.items || {} : null, vcItems: vcL ? (vcL.items || {}) : null, vcLiens: vcL ? (vcL.liens || {}) : {} };
+  return { reception, receptionRaison, coffres, offres, recus, lbcItems: lbc ? lbc.items || {} : null, vcItems: vcL ? (vcL.items || {}) : null, vcLiens: vcL ? (vcL.liens || {}) : {} };
 }
 // Le N° d'une annonce Vestiaire, par identité : le lien posé par VRM, la
 // référence « VRM-{n°} », le N° donné au produit — deux qui se contredisent ⇒ personne.
@@ -31122,6 +31140,23 @@ const sortirPartisDuStock = async (candidats) => {
   if (!cleRun || cleRun === _sortieStock.derniere) return;
   _sortieStock.enCours = true;
   try {
+    // (5 nov.) LE STOCK EN 2D (« Mes meubles », `vrm_slots`) : la même règle,
+    // les mêmes candidats — la case d'un article parti se libère, son N° reste.
+    // Les cases sont dans `main` (synchronisé) : `isCloudReady()` ci-dessus ⇒
+    // la copie de l'appareil est celle du nuage ; elle ne dépend pas du plan 3D.
+    {
+      const r = libererCasesPartis({ slots: load('vrm_slots', {}) || {}, meubles: load('vrm_meubles', []) || [], candidats: liste, garder, cle: cleNum });
+      if (r.sortis.length) {
+        saveTout('vrm_slots', r.slots);
+        const lim = Date.now() - STOCK_SORTIS_JOURS * 86400000;
+        const j = {}; const ancien = load('vrm_stock_sortis', {}) || {};
+        for (const k in ancien) if (ancien[k] && ancien[k].at > lim) j[k] = ancien[k];
+        for (const x of r.sortis) j[x.cle] = x;
+        saveTout('vrm_stock_sortis', j);
+        try { window.dispatchEvent(new CustomEvent('vrm:stock-slots')); } catch (_) {}
+        toast(r.sortis.length === 1 ? `N°${r.sortis[0].num} est partie : sa case dans « ${r.sortis[0].itemName} » est libérée (le numéro reste).` : `${r.sortis.length} articles partis : leurs cases sont libérées (les numéros restent).`);
+      }
+    }
     const brut = await loadRoomPlan();
     if (brut === undefined) return;                       // pas su : rien ne bouge, on réessaiera
     _sortieStock.derniere = cleRun;
@@ -33316,6 +33351,24 @@ function StockMeubles() {
     setSlots((prev) => (prev && Object.keys(prev).length) ? prev : (load('vrm_slots', {}) || {}));
     setPairsLost((prev) => (prev && Object.keys(prev).length) ? prev : (load('vinted_pairs_lost', {}) || {}));
   }), []);
+  // (5 nov.) La sortie automatique (`sortirPartisDuStock`) a libéré une case :
+  // l'écran relit `vrm_slots` (sinon son état, plus ancien, la réécrirait).
+  React.useEffect(() => {
+    const relire = () => { const sl = load('vrm_slots', {}); setSlots(sl && typeof sl === 'object' ? sl : {}); setJournal(load('vrm_stock_sortis', {}) || {}); };
+    window.addEventListener('vrm:stock-slots', relire);
+    return () => window.removeEventListener('vrm:stock-slots', relire);
+  }, []);
+  // L'ANCIENNE PIÈCE 3D (retirée de l'écran le 5 nov.) : LUE seulement, jamais
+  // écrite — une paire « à ranger » qui y avait une place la voit sur sa fiche.
+  // undefined = en cours · null = pas lue ou vide · plan normalisé.
+  const [ancienPlan, setAncienPlan] = React.useState(undefined);
+  React.useEffect(() => { let vivant = true; (async () => { const brut = await loadRoomPlan(); if (!vivant) return; setAncienPlan(brut && (Array.isArray(brut.items) || Array.isArray(brut.rooms)) ? normalizePlan(brut) : null); })(); return () => { vivant = false; }; }, []);
+  const ancienneplace = (num) => { if (!ancienPlan) return null; try { return ouEstNumero(ancienPlan, num); } catch (_) { return null; } };
+  const [journal, setJournal] = useStateCle('vrm_stock_sortis', () => load('vrm_stock_sortis', {}) || {});
+  const [explication, setExplication] = React.useState(false);
+  const [glisse, setGlisse] = React.useState(null);        // cleNum glissé à la souris
+  const [survol, setSurvol] = React.useState(null);        // 'mid:i' sous la souris pendant un glisser
+  const souris = React.useMemo(() => { try { return window.matchMedia('(hover: hover) and (pointer: fine)').matches; } catch (_) { return false; } }, []);
   const ecrireMeubles = (u) => { setMeubles(u); save('vrm_meubles', u); };
   const [tombes, setTombes] = React.useState({});   // cle → rangées descendues (animation)
   const ecrireSlotsBrut = (u) => { setSlots(u); save('vrm_slots', u); };
@@ -33328,8 +33381,13 @@ function StockMeubles() {
   // Paires EN STOCK (même règle que StockPhotos et l'écran Annonces).
   // (28 oct.) Les paires vues seulement sur eBay ou Leboncoin s'ajoutent
   // (`ajouterAutresPresents`) ; « À ranger » ne montre chaque article qu'une fois.
+  // (5 nov.) Un article VENDU et PARTI (plus dans `vinted_nums_physiques`) qui
+  // n'a pas de case ne revient pas dans « À ranger » (`resteAuStock`) ; posé, il
+  // reste montré — en surbrillance — jusqu'à ce qu'il l'enlève ou que le colis parte.
+  const physiques = numsPresents();
   const fiches = ajouterAutresPresents(Object.keys(numeros).map((id) => ({ id, ...(numeros[id] || {}) }))
-    .filter((f) => String(f.numero == null ? '' : f.numero).trim() && !annonceDeclareePartie(f.id, numeros, pairsLost) && !horsCompte(f)));
+    .filter((f) => String(f.numero == null ? '' : f.numero).trim() && !annonceDeclareePartie(f.id, numeros, pairsLost) && !horsCompte(f)))
+    .filter((f) => resteAuStock(f, { pose: !!slots[cleNum(f.numero)], vendus, physiques, cle: cleNum }));
   const ficheParCle = {}; fiches.forEach((f) => { const k = cleNum(f.numero); if (k && !ficheParCle[k]) ficheParCle[k] = f; });
   // Toute écriture des cases passe par la gravité des meubles qui l'ont.
   const tasserTout = (u, ms) => { let cur = u, b = {}; (ms || meubles).forEach((m) => { const r = tasserMeuble(cur, m, new Set(Object.keys(ficheParCle))); cur = r.slots; Object.assign(b, r.bouges); }); return { slots: cur, bouges: b }; };
@@ -33446,63 +33504,85 @@ function StockMeubles() {
   };
 
   // ── Vignette d'un article dans une case ────────────────────────────────
+  // (5 nov.) Le N° en bas à gauche, lisible sur toute photo (pastille encre) ;
+  // « Vendue » en haut, à l'accent — jamais rouge (§7 : rien d'irréversible).
   const Vignette = ({ f, sold }) => (
     <>
       {f.photo
         ? <PhotoVinted src={f.photo} loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-        : <div className="vrm-sans-photo" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted, fontSize: 11 }}>pas de photo</div>}
-      <span style={{ position: 'absolute', left: 4, top: 4, background: sold ? C.accent : 'rgba(0,0,0,0.6)', color: sold ? C.onAccent : '#fff', fontWeight: 800, fontSize: 11, padding: '1px 6px', borderRadius: 6 }}>N°{f.numero}</span>
-      {sold && <span style={{ position: 'absolute', right: 4, bottom: 4, background: C.accent, color: C.onAccent, fontSize: 8.5, fontWeight: 800, padding: '1px 5px', borderRadius: 999, letterSpacing: 0.3 }}>VENDU</span>}
+        : <span className="vrm-s2d-sansphoto" aria-hidden="true">{String(f.title || '').trim().slice(0, 1).toUpperCase() || '·'}</span>}
+      <span className="vrm-s2d-num" data-vendue={sold ? '1' : undefined}>N°{f.numero}</span>
+      {sold && <span className="vrm-s2d-vendue">Vendue</span>}
     </>
   );
 
   const total = (m) => m.cols * m.rows;
+  // Glisser à la SOURIS (le doigt garde « touche un article puis une case ») :
+  // la même pose que le toucher (`poser`, qui DEMANDE si la case est prise).
+  const dragProps = (cle) => (souris ? {
+    draggable: true,
+    onDragStart: (e) => { try { e.dataTransfer.setData('text/plain', 'vrm-num:' + cle); e.dataTransfer.effectAllowed = 'move'; } catch (_) {} setGlisse(cle); setPlace(null); },
+    onDragEnd: () => { setGlisse(null); setSurvol(null); },
+  } : {});
+  const dropProps = (mid, i) => (souris ? {
+    onDragOver: (e) => { if (!glisse) return; e.preventDefault(); try { e.dataTransfer.dropEffect = 'move'; } catch (_) {} const k = mid + ':' + i; if (survol !== k) setSurvol(k); },
+    onDragLeave: () => setSurvol((x) => (x === mid + ':' + i ? null : x)),
+    onDrop: (e) => { e.preventDefault(); let k = glisse; try { const d = e.dataTransfer.getData('text/plain'); if (/^vrm-num:/.test(d)) k = d.slice(8); } catch (_) {} setGlisse(null); setSurvol(null); if (k) poser(k, mid, i); },
+  } : {});
   const cadreMeuble = (m) => {
     const filled = Array.from({ length: total(m) }).filter((_, i) => occupant(m.id, i)).length;
     const cherche = !!(filtre || cibles.length);
     const nIci = cherche ? Array.from({ length: total(m) }).filter((_, i) => { const o = occupant(m.id, i); if (!o) return false; const k = cleDeFiche(o); return cibles.includes(k) || (filtre && correspond(o)); }).length : 0;
+    const nVenduesIci = Array.from({ length: total(m) }).filter((_, i) => { const o = occupant(m.id, i); return o && estVendu(o); }).length;
     // Pendant une recherche, un meuble où rien ne correspond se replie : celui
     // qui contient l'article remonte sous les yeux.
     const replie = cherche && nIci === 0 && meubles.length > 1;
     const casesPl = planchesCases(m.planches, m.cols, m.rows);
-    const regle = { fontSize: 11, fontWeight: 700, color: C.muted, display: 'flex', alignItems: 'center', justifyContent: 'center' };
+    const gap = zoom === 'loin' ? 4 : 6;
     return (
-      <section key={m.id} data-meuble={m.id} data-meuble-ici={cherche ? nIci : undefined} style={{ marginBottom: replie ? 10 : 22 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '0 2px 9px', opacity: replie ? 0.55 : 1 }}>
-          <span style={{ fontSize: 17, fontWeight: 800, color: C.text }}>{m.name}</span>
-          <span style={{ fontSize: 12, color: C.muted, fontWeight: 600 }}>{m.cols}×{m.rows} · {filled}/{total(m)}{m.gravite ? ' · empilé' : ''}</span>
-          {cherche && <span style={{ fontSize: 12, fontWeight: 800, color: nIci ? C.onAccent : C.muted, background: nIci ? C.accent : 'transparent', borderRadius: 999, padding: '1px 8px' }}>{nIci ? `${nIci} ici` : 'rien ici'}</span>}
+      <section key={m.id} data-meuble={m.id} data-meuble-ici={cherche ? nIci : undefined} className="vrm-s2d-meuble" data-replie={replie ? '1' : undefined}>
+        <div className="vrm-s2d-tete">
+          <span className="vrm-s2d-nom">{m.name}</span>
+          <span className="vrm-s2d-compte" data-meuble-plein={filled}>{filled}/{total(m)} · {m.cols}×{m.rows}{m.gravite ? ' · empilé' : ''}</span>
+          {nVenduesIci > 0 && !cherche && <span className="vrm-s2d-pastille" data-meuble-vendues={nVenduesIci}>{nVenduesIci} à sortir</span>}
+          {cherche && <span className="vrm-s2d-pastille" data-vide={nIci ? undefined : '1'}>{nIci ? `${nIci} ici` : 'rien ici'}</span>}
           <span style={{ flex: 1 }} />
-          <button className="vrm-b vrm-b-secondaire vrm-b-petit vrm-b-icone" type="button" onClick={() => setModal({ type: 'meuble', id: m.id, name: m.name, cols: m.cols, rows: m.rows, planches: planchesDe(m), gravite: !!m.gravite })} aria-label="Modifier le meuble" style={{ width: 36, height: 36, display: 'grid', placeItems: 'center' }}><Icon name="pencil" size={15} /></button>
+          <button className="vrm-b vrm-b-secondaire vrm-b-petit vrm-b-icone" type="button" onClick={() => setModal({ type: 'meuble', id: m.id, name: m.name, cols: m.cols, rows: m.rows, planches: planchesDe(m), gravite: !!m.gravite })} aria-label="Modifier le meuble" style={{ width: 44, height: 44, display: 'grid', placeItems: 'center' }}><Icon name="pencil" size={15} /></button>
         </div>
         {!replie && (
-        <div data-meuble-grille="" data-zoom={zoom} style={{ display: 'grid', gridTemplateColumns: `16px repeat(${m.cols},1fr)`, gap: zoom === 'loin' ? 4 : 6, background: C.line, padding: '6px 8px 8px 4px', borderRadius: 12, boxShadow: 'inset 0 2px 7px rgba(0,0,0,0.25)', maxWidth: `min(100%, ${m.cols * (caseMax + (zoom === 'loin' ? 4 : 6)) + 28}px)` }}>
+        <div className="vrm-s2d-defile">
+        <div className="vrm-s2d-etagere" data-meuble-grille="" data-zoom={zoom} data-glisse={glisse ? '1' : undefined} style={{ gridTemplateColumns: `16px repeat(${m.cols},minmax(44px,1fr))`, gap, maxWidth: `max(min(100%, ${m.cols * (caseMax + gap) + 34}px), ${m.cols * (44 + gap) + 34}px)` }}>
           {/* Règle : colonnes numérotées au-dessus, rangées à gauche (comme sur le meuble). */}
           <span />
-          {Array.from({ length: m.cols }).map((_, c) => <span key={'c' + c} data-regle-col={c + 1} style={regle}>{c + 1}</span>)}
+          {Array.from({ length: m.cols }).map((_, c) => <span key={'c' + c} data-regle-col={c + 1} className="vrm-s2d-regle">{c + 1}</span>)}
           {Array.from({ length: total(m) }).map((_, i) => {
             const occ = occupant(m.id, i); const sold = occ && estVendu(occ); const kOcc = occ ? cleDeFiche(occ) : null;
             const vise = kOcc && (flash === kOcc || cibles.includes(kOcc) || (filtre && correspond(occ)));
             const dim = occ ? (cherche && !vise) : cherche;
             const pl = placeDansMeubles(i, m);
+            const etat = etatCase(occ, { vendus, cle: cleNum });
+            const classes = ['vrm-s2d-case', 'is-' + etat, vise ? 'is-vise' : '', dim ? 'is-terne' : '', place ? 'is-cible' : '', survol === m.id + ':' + i ? 'is-survol' : '', glisse && glisse === kOcc ? 'is-glisse' : '',
+              flash && flash === kOcc ? 'vrm-case-flash' : '', kOcc && tombes[kOcc] ? 'vrm-case-tombe' : ''].filter(Boolean).join(' ');
             return (
               <React.Fragment key={i}>
-              {pl.colonne === 1 && <span data-regle-rang={pl.rangee} style={regle}>{pl.rangee}</span>}
-              <button type="button" onClick={() => cliquerCase(m.id, i)} aria-label={occ ? `N°${occ.numero} — rangée ${pl.rangee}, colonne ${pl.colonne}` : `Case vide — rangée ${pl.rangee}, colonne ${pl.colonne}`} title={`Rangée ${pl.rangee}, colonne ${pl.colonne}`}
-                data-case-num={kOcc || undefined} data-case-vise={vise ? '' : undefined} data-tombe={kOcc && tombes[kOcc] ? tombes[kOcc] : undefined} className={[flash && flash === kOcc ? 'vrm-case-flash' : '', kOcc && tombes[kOcc] ? 'vrm-case-tombe' : ''].filter(Boolean).join(' ') || undefined}
-                style={{ ...(kOcc && tombes[kOcc] ? { '--vrm-tombe': `calc(${-tombes[kOcc]} * (100% + 6px))` } : {}), position: 'relative', aspectRatio: '1 / 1', border: vise ? `3px solid ${C.accent}` : (occ && sold ? `2px solid ${C.accent}` : 'none'), padding: 0, borderRadius: 6, overflow: 'hidden', cursor: 'pointer', background: C.card2, opacity: dim ? 0.25 : 1, boxShadow: occ ? 'inset 0 0 0 1px rgba(255,255,255,0.05)' : 'inset 0 2px 6px rgba(0,0,0,0.3)', outline: place ? `2px dashed ${C.accent}` : 'none', outlineOffset: -4 }}>
-                {occ ? <Vignette f={occ} sold={sold} /> : <span style={{ color: C.muted, fontSize: 22, fontWeight: 400, opacity: place ? 0.8 : 0.35 }}>+</span>}
+              {pl.colonne === 1 && <span data-regle-rang={pl.rangee} className="vrm-s2d-regle">{pl.rangee}</span>}
+              <button type="button" onClick={() => cliquerCase(m.id, i)} aria-label={occ ? `N°${occ.numero}${sold ? ' (vendue, à sortir)' : ''} — rangée ${pl.rangee}, colonne ${pl.colonne}` : `Case vide — rangée ${pl.rangee}, colonne ${pl.colonne}`} title={`Rangée ${pl.rangee}, colonne ${pl.colonne}`}
+                data-case-num={kOcc || undefined} data-case-vise={vise ? '' : undefined} data-case-etat={etat} data-case-ici={m.id + ':' + i} data-tombe={kOcc && tombes[kOcc] ? tombes[kOcc] : undefined} className={classes}
+                {...(occ ? dragProps(kOcc) : {})} {...dropProps(m.id, i)}
+                style={kOcc && tombes[kOcc] ? { '--vrm-tombe': `calc(${-tombes[kOcc]} * (100% + ${gap}px))` } : undefined}>
+                {occ ? <Vignette f={occ} sold={sold} /> : <span className="vrm-s2d-plus" aria-hidden="true">+</span>}
               </button>
               {pl.colonne === m.cols && pl.rangee < m.rows && (() => {
                 const ks = Array.from({ length: m.cols }, (_, c) => casesPl.has(pl.rangee + ':' + (c + 1)));
-                const barre = { height: 6, margin: '-1px 0', borderRadius: 3, background: C.muted, boxShadow: '0 2px 3px rgba(0,0,0,0.3)' };
-                if (ks.every(Boolean)) return <span data-planche={pl.rangee} aria-hidden="true" style={{ gridColumn: '2 / -1', ...barre }} />;
+                if (ks.every(Boolean)) return <span data-planche={pl.rangee} aria-hidden="true" className="vrm-s2d-planche" style={{ gridColumn: '2 / -1' }} />;
                 if (!ks.some(Boolean)) return null;
-                return <>{<span aria-hidden="true" />}{ks.map((o, c) => <span key={'p' + c} data-planche-case={o ? pl.rangee + ':' + (c + 1) : undefined} aria-hidden="true" style={o ? barre : { height: 0 }} />)}</>;
+                return <>{<span aria-hidden="true" />}{ks.map((o, c) => <span key={'p' + c} data-planche-case={o ? pl.rangee + ':' + (c + 1) : undefined} aria-hidden="true" className={o ? 'vrm-s2d-planche' : 'vrm-s2d-planche-vide'} />)}</>;
               })()}
               </React.Fragment>
             );
           })}
+          <span aria-hidden="true" className="vrm-s2d-socle" style={{ gridColumn: '1 / -1' }} />
+        </div>
         </div>)}
       </section>
     );
@@ -33557,7 +33637,12 @@ function StockMeubles() {
           <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>{sold ? 'Va le chercher' : 'Rangé dans'}</div>
           <div style={{ fontSize: 22, fontWeight: 800, color: sold ? C.accent : C.text, marginTop: 4 }}>{m ? m.name : 'Pas rangé'}</div>
           {m && (() => { const p = placeDansMeubles(s.i, m); return <div data-fiche-place="" style={{ fontSize: 15, fontWeight: 700, color: C.text, marginTop: 4 }}>Rangée {p.rangee} <span style={{ color: C.muted, fontWeight: 500 }}>(en partant du haut)</span> · colonne {p.colonne} <span style={{ color: C.muted, fontWeight: 500 }}>(depuis la gauche)</span></div>; })()}
+          {!m && (() => { const a = ancienneplace(f.numero); return a ? <div data-fiche-ancienne-place="" style={{ fontSize: 13, color: C.muted, marginTop: 6, lineHeight: 1.4 }}>Ancienne place, dans la pièce 3D (plus affichée) : <b style={{ color: C.text }}>{[a.roomName, a.itemName, a.nom].filter(Boolean).join(' · ')}</b></div> : null; })()}
         </div>
+        {/* (5 nov.) « Voir l'état » : la fiche complète du N°, avec tout ce qui se
+            calcule (prix d'achat, temps achat → vente, réception → mise en ligne,
+            mise en ligne → vente, republications) — `etatArticle`. */}
+        <button className="vrm-b vrm-b-secondaire" type="button" data-fiche-voir-etat={cleDeFiche(f)} onClick={() => { const n = String(f.numero); fermerModal(); try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: n })); } catch (_) {} }} style={{ width: '100%', marginBottom: 9 }}>Voir l’état</button>
         <div style={{ display: 'flex', gap: 9 }}>
           {/* (1er nov.) Une paire PAS rangée : « Déplacer » et « Retirer de la case »
               ne voulaient rien dire. Le geste est de la ranger. */}
@@ -33580,7 +33665,42 @@ function StockMeubles() {
   const btnSec = { flex: 1 };
   const btnPri = {};
 
-  if (!fiches.length) return <Card style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Aucun article numéroté</Card>;
+  // (5 nov.) Qui découvre : l'explication animée (données inventées), puis le
+  // geste. Sans article numéroté, il n'y a rien d'autre à montrer.
+  if (!fiches.length) return (<>
+    <StockExplication />
+    <Card style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Aucun article numéroté pour l’instant : dès qu’une annonce reçoit son N°, elle arrive ici, prête à ranger.</Card>
+  </>);
+
+  // (5 nov.) Ce qui est sorti TOUT SEUL des meubles (colis parti) : dit, avec
+  // « Remettre » (sur son clic : sa case si elle est libre ; une paire remise
+  // n'est plus jamais sortie toute seule — `vrm_stock_garder`).
+  const limJ = Date.now() - 14 * 86400000;
+  const sortisMeubles = Object.values(journal || {}).filter((x) => x && x.source === 'meubles' && x.at > limJ).sort((a, b) => b.at - a.at);
+  const jourCourt = (t) => { try { return new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }); } catch (_) { return ''; } };
+  const remettre = (x) => {
+    const k = cleNum(x.cle || x.num);
+    const g = { ...(load('vrm_stock_garder', {}) || {}) }; g[k] = Date.now(); saveTout('vrm_stock_garder', g);
+    const nj = { ...(journal || {}) }; delete nj[x.cle]; saveTout('vrm_stock_sortis', nj); setJournal(nj);
+    const r = remettreCase({ slots, meubles, sorti: x, cle: cleNum });
+    if (r.remise) { if (r.slots !== slots) ecrireSlots(r.slots); toast(`N°${x.num} remise dans ${x.itemName} · ${x.nom}. Elle ne sera plus sortie toute seule.`, 'ok'); }
+    else { setPlace(k); toast(`N°${x.num} : ${r.raison}. Touche la case où tu la poses.`); }
+  };
+  const blocSortis = sortisMeubles.length ? (
+    <div className="vrm-s2d-sortis" data-stock-sortis-meubles={sortisMeubles.length}>
+      <div className="vrm-s2d-sortis-titre">Cases libérées toutes seules · {sortisMeubles.length}</div>
+      <div className="vrm-aide" style={{ fontSize: 12, color: C.muted, lineHeight: 1.45 }}>Le colis est parti : la case est libre, le numéro reste. Encore chez toi ? Remets-le.</div>
+      {sortisMeubles.map((x) => (
+        <div key={x.cle} className="vrm-s2d-sorti" data-stock-sorti-meuble={x.cle}>
+          <span style={{ flex: '1 1 220px', minWidth: 0, fontSize: 13, color: C.text, lineHeight: 1.4 }}>
+            <b>N°{x.num}</b>{x.titre ? ` · ${x.titre}` : ''}
+            <span style={{ display: 'block', color: C.muted, fontSize: 12 }}>{x.itemName}{x.nom ? ` · ${x.nom}` : ''} · le {jourCourt(x.at)} — {x.plateforme || 'Vinted'} : {x.statut || 'colis parti'}</span>
+          </span>
+          <button className="vrm-b vrm-b-secondaire" type="button" data-stock-remettre-meuble={x.cle} onClick={() => remettre(x)}>Remettre</button>
+        </div>
+      ))}
+    </div>
+  ) : null;
 
   // Ce que la recherche montre : chaque article trouvé, et OÙ il est.
   const MAX_RES = 30;
@@ -33646,18 +33766,20 @@ function StockMeubles() {
 
   return (<>
     {blocCherche}
+    {meubles.length === 0 && <StockExplication />}
+    {blocSortis}
     {/* à ranger */}
     {aRanger.length > 0 && (
       <Card style={{ padding: '12px 13px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 15, fontWeight: 800, color: C.text }}>À ranger</span>
           <span style={{ fontSize: 12, fontWeight: 800, color: C.onAccent, background: C.accent, borderRadius: 999, padding: '1px 8px' }}>{aRanger.length}</span>
-          <span style={{ fontSize: 12, color: C.muted, marginLeft: 'auto' }}>touche un article puis une case</span>
+          <span style={{ fontSize: 12, color: C.muted, marginLeft: 'auto' }}>{souris ? 'glisse un article dans une case (ou clique-le, puis une case)' : 'touche un article puis une case'}</span>
         </div>
         <div style={{ display: 'flex', gap: 9, overflowX: 'auto', paddingBottom: 3 }}>
           {aRanger.map((f) => { const sold = estVendu(f); const sel = place === cleDeFiche(f);
             return (
-              <button type="button" key={f.id} onClick={() => setPlace(sel ? null : cleDeFiche(f))} aria-pressed={sel} aria-label={`Ranger l’article N°${f.numero}${f.title ? ' · ' + f.title : ''}${sold ? ' (vendue)' : ''}`} style={{ position: 'relative', flex: 'none', width: 70, height: 88, borderRadius: 12, overflow: 'hidden', cursor: 'pointer', padding: 0, background: C.card2, border: sel ? `2px solid ${C.accent}` : (sold ? `2px solid ${C.accent}` : `1px solid ${C.border}`), opacity: filtre && !correspond(f) ? 0.3 : 1 }}>
+              <button type="button" key={f.id} data-a-ranger={cleDeFiche(f)} {...dragProps(cleDeFiche(f))} onClick={() => setPlace(sel ? null : cleDeFiche(f))} aria-pressed={sel} aria-label={`Ranger l’article N°${f.numero}${f.title ? ' · ' + f.title : ''}${sold ? ' (vendue)' : ''}`} style={{ position: 'relative', flex: 'none', width: 70, height: 88, borderRadius: 12, overflow: 'hidden', cursor: 'pointer', padding: 0, background: C.card2, border: sel ? `2px solid ${C.accent}` : (sold ? `2px solid ${C.accent}` : `1px solid ${C.border}`), opacity: filtre && !correspond(f) ? 0.3 : 1 }}>
                 <Vignette f={f} sold={sold} />
               </button>
             );
@@ -33687,6 +33809,9 @@ function StockMeubles() {
 
     {/* (30 oct.) Pièce vide : créer un meuble est LE geste de l'écran (primaire) ; ensuite il redevient secondaire. */}
     <button className={`vrm-b ${meubles.length ? 'vrm-b-secondaire' : 'vrm-b-primaire'}`} type="button" data-creer-meuble="" onClick={() => setModal({ type: 'meuble' })} style={{ alignSelf: meubles.length ? 'stretch' : 'flex-start' }}>+ Créer un meuble</button>
+    {meubles.length > 0 && (explication
+      ? <StockExplication onFermer={() => setExplication(false)} />
+      : <button className="vrm-b vrm-b-discret" type="button" data-stock-explication-ouvrir="" onClick={() => setExplication(true)} style={{ alignSelf: 'center' }}>Comment ça marche ?</button>)}
 
     {Modale()}
   </>);
@@ -33803,11 +33928,12 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
   // n'a plus que la pièce (3D + vue du dessus) et l'assistant « Ranger » ; la
   // grille de zones et la photo du local ne s'ouvrent plus (mesuré : vides chez
   // lui). Un choix mémorisé « grille »/« photo » retombe sur la pièce.
-  const [garageView,setGarageView]=useState(()=>{ const dn = DEMANDE_STOCK_CHERCHE.nums;
-    // Une demande (Colis, loupe globale) ouvre la vue où ces paires SONT rangées :
-    // « Mes meubles » d'abord, sinon la pièce 3D si elles y sont (ou s'il n'a
-    // créé aucun meuble : la pièce se lit à son ouverture), sinon les meubles.
-    if (dn && dn.length) { if (dn.some(n => ouDansMeubles(n))) return 'meubles'; try { const pl = load('vrm_room_plan', null); if (pl && dn.some(n => ouEstNumero(normalizePlan(pl), n))) return 'plan'; } catch (_) {} const ms = load('vrm_meubles', []); return (Array.isArray(ms) && ms.length) ? 'meubles' : 'plan'; } const v=load('vinted_garage_view','meubles'); return ['meubles','plan','ranger','photos'].includes(v)?v:'meubles'; }); // meubles | plan | ranger | photos
+  // ⚠️ (5 nov.) Julien : « garder seulement la méthode de rangement annonce →
+  // case sur des étagères que l'on modélise comme on veut, en vue 2D ». Le Stock
+  // n'a plus qu'une vue : « Mes meubles » (`StockMeubles`). La pièce 3D, ses
+  // cases et la grille de photos ne s'ouvrent plus d'ici — RIEN n'est effacé :
+  // `vrm_room` (la pièce et ses piles), `vinted_garage_view` et chaque numéro
+  // restent en base ; une paire notée dans l'ancienne pièce le dit sur sa fiche.
 
   // Localisation demandee depuis l'inventaire : amorce la recherche sur le numero.
   useEffect(()=>{
@@ -34010,24 +34136,9 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
   let colN=0;
   return (
     <div style={{padding:16,display:'flex',flexDirection:'column',gap:14}}>
-      <ScreenHead icon="home" title="Stock" desc="Où sont rangés tes articles. Cherche un numéro, il te dit le meuble et la case."/>
+      <ScreenHead icon="home" title="Stock" desc="Tes étagères en 2D : chaque article dans sa case. Cherche un numéro, il te dit le meuble et la case."/>
 
-      {/* Bascule : grille classique ↔ photo de ton vrai local */}
-      {/* (16 oct.) Le contrôle segmenté PARTAGÉ (`.vrm-seg`, celui des sous-onglets
-          de plateforme) : plus de segment rempli d'accent, plus de boîte bordée. */}
-      <nav role="group" aria-label="Vue du stock" className="vrm-seg" data-segment="" data-stock-vues="" style={{'--seg-ink':C.text,'--seg-muted':C.muted,'--seg-point':C.accent,margin:0}}>
-        {/* (30 oct.) Des mots courts : à 390 px le 4ᵉ onglet était coupé (« En photos » à moitié). */}
-        {[['meubles','box','Meubles'],['plan','home','Ma pièce'],['ranger','grid','Cases'],['photos','image','Photos']].map(([v,ic,l])=>(
-          <button type="button" key={v} onClick={()=>{setGarageView(v);save('vinted_garage_view',v);}} aria-current={garageView===v?'page':undefined} aria-pressed={garageView===v} data-stock-vue={v} className="vrm-seg-btn">
-            <Icon name={ic} size={15}/>{l}
-          </button>
-        ))}
-      </nav>
-
-      {garageView==='meubles' && <StockMeubles/>}
-      {garageView==='plan' && <RoomPlan locate={locate} onLocateConsumed={onLocateConsumed}/>}
-      {garageView==='ranger' && <RoomPlan mode="2d"/>}
-      {garageView==='photos' && <StockPhotos/>}
+      <StockMeubles/>
 
       {/* (30 oct.) L'ancienne grille de zones (cases bloquées, couleurs, colonnes) n'était plus
           joignable depuis le 17 oct. (aucune vue « grid ») : ses ~20 boutons sont retirés. */}
@@ -65989,12 +66100,12 @@ function AppCoeur() {
       loadRoomPlan().catch(()=>undefined),
     ]);
     const plan=planLu===undefined?null:normalizePlan(planLu);
-    let enLigne=null, aConfirmer=null, masquees=null, stats=null;
+    let enLigne=null, aConfirmer=null, masquees=null, stats=null, crees=null;
     if(lstRows){ try{ const lu=await lireLignesEnLigne(lstRows); enLigne=new Set(); aConfirmer=new Set(); masquees=new Set();
       for(const r of lu.lignes){ const p=(r.data&&r.data.payload)||{}; for(const it of (p.items||[])){ if(!it.is_closed&&!it.is_hidden&&!it.is_draft) enLigne.add(String(it.id)); } }
       // (1er nov.) Vues et favoris de chaque annonce lue (la fiche d'une paire) :
       // un nombre seulement s'il est écrit, jamais un 0 deviné.
-      stats={}; for(const r of lstRows){ const p=(r&&r.data&&r.data.payload)||{}; for(const it of (p.items||[])){ if(!it||it.id==null) continue; const fav=Number.isFinite(it.favourite_count)?it.favourite_count:(Number.isFinite(it.favourites_count)?it.favourites_count:null); stats[String(it.id)]={vues:Number.isFinite(it.view_count)?it.view_count:null,favoris:fav}; } }
+      stats={}; crees={}; for(const r of lstRows){ const p=(r&&r.data&&r.data.payload)||{}; for(const it of (p.items||[])){ if(!it||it.id==null) continue; { const c=dateMiseEnLigneMs({ createdTs: Number.isFinite(it.created_at_ts) ? it.created_at_ts : (Number.isFinite(it.createdTs) ? it.createdTs : (it.photo && it.photo.high_resolution && Number.isFinite(it.photo.high_resolution.timestamp) ? it.photo.high_resolution.timestamp : null)), id: it.id }, null); if (c != null) crees[String(it.id)] = c; } const fav=Number.isFinite(it.favourite_count)?it.favourite_count:(Number.isFinite(it.favourites_count)?it.favourites_count:null); stats[String(it.id)]={vues:Number.isFinite(it.view_count)?it.view_count:null,favoris:fav}; } }
       for(const l of lu.aConfirmer.values()) for(const it of (l||[])) aConfirmer.add(String(it.id));
       // 22 oct. : les masquées par Vinted — la même règle que l'écran Annonces (`<masquees-regle>`).
       const supp=await lireSupprimeesTous();
@@ -66002,7 +66113,7 @@ function AppCoeur() {
       const fichesM=load('vinted_annonce_numeros',{})||{}, perduesM=load('vinted_pairs_lost',{})||{};
       for(const r of lstRows){ const k=/^harvest_(\d+)_listings$/.exec(String((r&&r.id)||'')); const res=k?lu.parCompte.get(k[1]):null; if(!res) continue;
         for(const it of masqueesPresentes(masqueesDuCompte(res.fermees, supp===null?null:(supp.get(k[1])||{}), dateLectureDressing(r)), fichesM, perduesM)) masquees.add(String(it.id)); }
-    }catch(_){ enLigne=null; aConfirmer=null; masquees=null; } }
+    }catch(_){ enLigne=null; aConfirmer=null; masquees=null; crees=null; } }
     let ventes=null; if(soldRows){ ventes=[]; const vus=new Set(); for(const r of soldRows){ const p=(r.data&&r.data.payload)||{}; const uid=(/^harvest_(\d+)_orders_sold$/.exec(String((r&&r.id)||''))||[])[1]||null; for(const o of (p.my_orders||[])){ const t=String(o.transaction_id||''); if(t&&!vus.has(t)){ vus.add(t); ventes.push(uid?{...o,_uid:uid}:o); } } } }
     const bordereaux=(bE&&bL)?[...bE,...bL].filter(b=>b&&b.tx).map(b=>({tx:String(b.tx),pdf:!!b.pdf&&String(b.pdf)!=='false'})):null;
     let lbcVentes=null, lbcItems=null;
@@ -66011,7 +66122,7 @@ function AppCoeur() {
     let ebayCommandes=null, ebayAnnonces=null;
     if(Array.isArray(cE)){ const tous=async(base,sel,champ)=>{ const r=await lireEbayTous(base,sel,champ,cE); return (!r||r.illisibles.length)?null:r.items; };
       [ebayCommandes, ebayAnnonces]=await Promise.all([tous('ebay_orders',SEL_EBAY_COMMANDES,'orders'), tous('ebay_listings',SEL_EBAY_ANNONCES,'items')]); }
-    if(vivant) setNumData({enLigne,aConfirmer,masquees,ventes,txnItem,bordereaux,lbcVentes,lbcItems,ebayCommandes,ebayAnnonces,plan,stats,versements:txnItem==null?null:versementsLus});
+    if(vivant) setNumData({enLigne,aConfirmer,masquees,ventes,txnItem,bordereaux,lbcVentes,lbcItems,ebayCommandes,ebayAnnonces,plan,stats,crees,versements:txnItem==null?null:versementsLus});
   })(); return ()=>{ vivant=false; }; /* eslint-disable-next-line */ },[besoinNumData,revisionFiche]);
   const swipeStart=React.useRef(null); // pour le swipe entre onglets du bas
   // Passer à l'onglet voisin au doigt ou avec les flèches du clavier.
@@ -68351,8 +68462,13 @@ function AppCoeur() {
             venteAnnulee: (o) => classifyOrderStatus(o && o.status) === 'cancelled' || (o && o.transaction_id != null && txnAnnuleeAvantEnvoi(o.transaction_id)),
             montantRecuEbay, commandeEbayEngagee, lbcAnnulee, lbcFinalisee,
           });
+          // (5 nov.) « Voir l'état » : ce qui se calcule (`etatArticle`), depuis
+          // l'histoire ci-dessus et deux lectures en plus (dates Vinted, réception).
+          const etat = p ? etatArticle(p, { fiches: numeros, ids: (rn.annonces || []).map((a) => a.id),
+            crees: numData ? (numData.crees === undefined ? null : numData.crees) : undefined,
+            reception: ex ? ex.reception : undefined, receptionRaison: ex ? ex.receptionRaison : '' }) : null;
           const fermer = () => setFicheNum(null);
-          return <FichePaire owner={AUTH.user?.id||''} p={p} num={ficheNum} lecture={!numData} onFermer={fermer} onRetour={()=>{ fermer(); setGsQ(String((p && p.num) || ficheNum)); setGsOpen(true); }}
+          return <FichePaire owner={AUTH.user?.id||''} p={p} etat={etat} num={ficheNum} lecture={!numData} onFermer={fermer} onRetour={()=>{ fermer(); setGsQ(String((p && p.num) || ficheNum)); setGsOpen(true); }}
             onBordereau={(tx)=>{ fermer(); setGsOpen(false); poserCible({ type: 'colis', tx: String(tx) }, redirigerOnglet('cat_bord', null, ONGLETS_DEPLACES).tab); setTab('cat_bord'); }}
             onEmballer={()=>{ fermer(); setGsOpen(false); DEMANDE_EMBALLAGE.at = Date.now(); setTab('cat_bord'); try { window.dispatchEvent(new Event('vrm:emballer')); } catch (_) {} }}
             onPrix={(n)=>setPrixNum(String(n))} neuve={neuve}
