@@ -97,6 +97,8 @@ const appComp = charge('src/App.jsx', ['etapeVente', 'phaseAchat', 'etapeAchat',
   // « Posté », plus « À expédier ») : ici, aucune ne l'est.
   isShipDone: () => false,
   shippedSuivis: new Set(), soldByTxn: {},
+  // (5 nov.) `achatStage` lit les fins prouvées par `pickupUnion` (aucune ici).
+  pickupUnion: { txFinis: new Set() },
 }));
 const ext = charge('vinted-sync-extension/background.js', ['AWAITING_SHIP', 'AT_RELAY', 'PAS_UN_ENVOI', 'COLIS_DEJA_BOUGE', 'besoinBordereauTexte', 'A_EXPEDIER', 'resumeCommandes'], {}, { sourceType: 'script', plugins: [] });
 const wid = charge('api/widget.js', ['awaitingShip', 'PAS_UN_ENVOI', 'besoinBordereauTexte', 'COLIS_DEJA_BOUGE', 'aExpedier'], {});

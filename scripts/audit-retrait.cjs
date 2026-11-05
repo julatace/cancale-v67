@@ -136,7 +136,10 @@ dit(/l'extension va chercher/i.test(APP) || /va chercher les codes toute seule/i
   // 16 oct.) : on suit le début de l'écran, pas son orthographe.
   const m = /curSub==='achats' && \((?:<>|<div[^>]*>)/.exec(APP);
   const i = m ? m.index : -1;
-  const B = i < 0 ? '' : APP.slice(i, i + 1800);
+  // (5 nov.) Juger la RÈGLE, pas une distance en caractères : le bandeau est rendu DANS
+  // l'écran Achats, avant sa liste (l'en-tête de l'écran a grandi : carte, barre, « … »).
+  const fin = i < 0 ? -1 : APP.indexOf('achatsAffiches.slice(0, achatsMax)', i);
+  const B = i < 0 ? '' : APP.slice(i, fin > i ? fin : i + 1800);
   dit(/<ExtEnRetard/.test(B), 'l\'écran Achats dit pourquoi les codes manquent',
     'c\'est l\'extension qui les lit dans les conversations');
 }

@@ -35,6 +35,18 @@ const SERVICE = {
   'ws.chronopost.fr': /Chronopost/,
   'carrier.vintedgo.com': /Vinted Go/,
   'www.mondialrelay.fr': /Mondial Relay/,
+  // (5 nov.) les icônes de site des transporteurs (src/transporteursVisuels.js, PastilleTransporteur)
+  'www.chronopost.fr': /Chronopost/,
+  'www.laposte.fr': /La Poste/,
+  'vintedgo.com': /Vinted Go/,
+  'www.relaiscolis.com': /Relais Colis/,
+  'www.dpd.fr': /DPD/,
+  'www.ups.com': /UPS/,
+  'gls-group.com': /GLS/,
+  'www.colisprive.com': /Colis Privé/,
+  'inpost.fr': /InPost/,
+  'www.dhl.com': /DHL/,
+  'www.fedex.com': /FedEx/,
 };
 const USAGES = {
   achats: { quoi: 'géocodage automatique des points relais (écran Achats)', role: /points? relais/i, donnee: /navigateur/i },
@@ -44,6 +56,10 @@ const USAGES = {
   pdfjs: { quoi: 'aperçu des bordereaux (pdf.js)', role: /pdf\.js|aperçu des bordereaux/i, donnee: /navigateur|adresse IP/i },
   ort: { quoi: 'détourage du Studio photo (onnxruntime)', role: /Studio photo|onnxruntime/i, donnee: /navigateur|adresse IP/i },
   base: { quoi: 'la base de données de VRM', role: /./, donnee: /./ },
+  // (5 nov.) deux outils de plus chargés de jsDelivr par le navigateur, et les logos des transporteurs.
+  zxing: { quoi: 'lecture du code-barres d’un colis à la caméra (ZXing, src/ScannerColis.jsx)', role: /ZXing/, donnee: /navigateur|adresse IP/i },
+  tesseract: { quoi: 'lecture d’un ticket de dépense photographié (Tesseract, src/depensesTicket.js)', role: /Tesseract/, donnee: /navigateur|adresse IP/i },
+  logos: { quoi: 'logo du transporteur (icône de son site, src/transporteursVisuels.js)', role: /logo du transporteur/i, donnee: /navigateur/i },
   // (24 oct.) Le statut public d'un colis, lu par le SERVEUR (Chronopost, Vinted Go).
   transp: { quoi: 'statut public des colis, lu par le serveur', role: /statut public des colis/i, donnee: /n° de suivi[\s\S]*serveur VRM/i },
   // (24 oct., suite) Mondial Relay lu par le SERVEUR (route `_mvc`) : n° ET code postal.
@@ -92,6 +108,37 @@ const COUPLES = {
   // Une origine SENTINELLE en `.invalid` (RFC 6761 : ne se résout jamais) quand
   // le domaine Vinted reçu n'est pas reconnu — rien ne part.
   'src/favorisVinted.js|invalide.invalid': ['vrm', 'origine sentinelle .invalid, jamais contactée'],
+  // (5 nov.) Hôtes écrits depuis le 24 oct. sans être déclarés ici.
+  // Contactés TOUT SEULS par le navigateur ⇒ une ligne de la politique :
+  'src/ScannerColis.jsx|cdn.jsdelivr.net': ['politique', 'zxing'],
+  'src/depensesTicket.js|cdn.jsdelivr.net': ['politique', 'tesseract'],
+  'src/transporteursVisuels.js|www.chronopost.fr': ['politique', 'logos'],
+  'src/transporteursVisuels.js|www.mondialrelay.fr': ['politique', 'logos'],
+  'src/transporteursVisuels.js|www.laposte.fr': ['politique', 'logos'],
+  'src/transporteursVisuels.js|vintedgo.com': ['politique', 'logos'],
+  'src/transporteursVisuels.js|www.relaiscolis.com': ['politique', 'logos'],
+  'src/transporteursVisuels.js|www.dpd.fr': ['politique', 'logos'],
+  'src/transporteursVisuels.js|www.ups.com': ['politique', 'logos'],
+  'src/transporteursVisuels.js|gls-group.com': ['politique', 'logos'],
+  'src/transporteursVisuels.js|www.colisprive.com': ['politique', 'logos'],
+  'src/transporteursVisuels.js|inpost.fr': ['politique', 'logos'],
+  'src/transporteursVisuels.js|www.dhl.com': ['politique', 'logos'],
+  'src/transporteursVisuels.js|www.fedex.com': ['politique', 'logos'],
+  // Liens ouverts d'un clic (rien ne part tout seul) :
+  'src/AchatsOutils.jsx|www.vinted.fr': ['lien', LIEN + ' — « Publier sur Vinted » (valeur par défaut de lienPublier)'],
+  'src/OffresVestiaire.jsx|fr.vestiairecollective.com': ['lien', LIEN + ' — « Répondre sur Vestiaire ↗ »'],
+  'src/annulationsCompte.js|www.vinted.fr': ['lien', LIEN + ' — la conversation ou la transaction annulée'],
+  'src/dac7Comptes.js|www.vinted.fr': ['lien', LIEN + ' — Vinted → Informations fiscales'],
+  'src/dac7Comptes.js|assistance.leboncoin.info': ['lien', LIEN + ' — l’aide Leboncoin sur DAC7'],
+  'src/histoireArticle.js|www.vinted.fr': ['lien', LIEN + ' — l’annonce, dans l’historique d’un article'],
+  'src/histoireArticle.js|www.ebay.fr': ['lien', LIEN + ' — l’annonce eBay, dans l’historique d’un article'],
+  'src/litiges.js|www.ebay.fr': ['lien', LIEN + ' — « Répondre sur eBay » d’un retour'],
+  'src/litiges.js|www.vinted.fr': ['lien', LIEN + ' — la conversation ou la transaction du litige'],
+  'src/prixPartout.js|www.vinted.fr': ['lien', LIEN + ' — « À faire sur le site » de Changer le prix'],
+  'src/prixPartout.js|www.ebay.fr': ['lien', LIEN + ' — l’annonce eBay de Changer le prix'],
+  'src/prixPartout.js|www.leboncoin.fr': ['lien', LIEN + ' — l’annonce Leboncoin de Changer le prix'],
+  'src/prixPartout.js|fr.vestiairecollective.com': ['lien', LIEN + ' — Vestiaire, « À faire sur le site »'],
+  'src/communaute/accompagnement.js|vrm.center': ['vrm', 'VRM lui-même (origine par défaut du lien d’invitation)'],
   // (24 oct.) Le SERVEUR lit le statut public des colis (api/_lib/transporteurs-lecture.js).
   'api/_lib/transporteurs-lecture.js|ws.chronopost.fr': ['politique', 'transp'],
   'api/_lib/transporteurs-lecture.js|carrier.vintedgo.com': ['politique', 'transp'],
@@ -168,6 +215,8 @@ if (PROUVE) {
     ['la ligne « points relais (écran Achats) » retirée', () => [fichiers, sansLigne('points relais où arrivent tes colis')]],
     ['la ligne Achats dit « le serveur » au lieu du navigateur', () => [fichiers, politique.replace('Adresse du point relais, envoyée par ton navigateur (ton adresse IP)', 'Adresse du point relais, envoyée par le serveur VRM')]],
     ['la ligne jsDelivr retirée', () => [fichiers, sansLigne('jsDelivr')]],
+    ['la ligne jsDelivr ne cite plus ZXing ni Tesseract', () => [fichiers, politique.replace(', la lecture du code-barres d’un colis à la caméra quand le téléphone ne sait pas le lire seul (ZXing) et la lecture d’un ticket de dépense photographié (Tesseract)', '')]],
+    ['la ligne des logos des transporteurs retirée', () => [fichiers, sansLigne('Afficher le logo du transporteur')]],
     ['la ligne des photos Discord retirée', () => [fichiers, sansLigne('Photo de profil Discord')]],
     ['la ligne Chronopost / Vinted Go retirée', () => [fichiers, sansLigne('Chronopost \\(groupe La Poste\\)')]],
     ['la ligne Mondial Relay ne dit plus le secours par le navigateur', () => [fichiers, politique.replace('envoyés depuis ton navigateur par l’extension VRM', 'envoyés par le serveur VRM')]],

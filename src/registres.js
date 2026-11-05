@@ -26,6 +26,18 @@
 //       4. sinon rien (autre devise, prix illisible) : « sans montant ».
 //     JAMAIS deviné. Le N° est celui des fiches reliées à cet achat par
 //     identité (`buyFromId` = son n° de transaction), jamais par titre.
+//   · (5 nov., « ce qui reste » des fournisseurs) un ACHAT EN GROS (registre
+//     `vrm_fournisseurs`, src/fournisseurs.js — l'appelant passe `lireRegistre`)
+//     est UNE ligne : sa date, son fournisseur (la personne QU'IL a créée), son
+//     nombre de paires, son montant total + les frais QU'IL a saisis sur
+//     l'achat (« dont frais » à part). JAMAIS la somme des parts posées sur ses
+//     paires : une fiche reliée à un achat en gros (`buyGros`) ne prête jamais
+//     son prix à une autre ligne (un achat Vinted relié par `buyFromId` à une
+//     fiche qui porte aussi `buyGros` ne prend pas ce prix comme « saisi »).
+//     Un achat hors plateforme RATTACHÉ à un fournisseur (`hors`) reste UNE
+//     ligne (son prix saisi), au nom de ce fournisseur — jamais ajouté à un
+//     achat en gros. Un achat hors plateforme dont le N° est une paire reliée à
+//     un achat en gros est gardé (on ne jette rien) et dit « à vérifier ».
 //   · Les DÉPENSES (boîte à dépenses : emballage, envois, abonnements) ne sont
 //     PAS des achats de marchandise : elles n'entrent pas dans le registre des
 //     achats (la catégorie « Achats de stock » a été retirée le 3 nov. pour ne
@@ -101,15 +113,30 @@ export const achatAnnule = (o) => /annul|rembours|refus/i.test(String((o && o.st
 // ventilationDe(tx) : la ventilation du reçu de CET achat (ou null)
 // exclu(o)     : l'achat vient d'un compte écarté des totaux
 // montantHors(b), sourceHors(b) : les règles de l'écran Achats pour un achat saisi
-export function registreDesAchats({ achats = null, hors = [], fiches = null, ventilationDe = () => null, exclu = null, periode, manque = [], montantHors = null, sourceHors = null } = {}) {
+// gros         : `lireRegistre(vrm_fournisseurs)` ({ personnes, achats, hors }) ou null
+// cleNum(n)    : l'identité d'un N° (« 007 » = « 7 »)
+const cleNumDefaut = (n) => { const s = String(n == null ? '' : n).trim().toUpperCase().replace(/[\s\-_.]/g, ''); return /^\d+$/.test(s) ? String(parseInt(s, 10)) : s; };
+const lienGros = (e) => (e && e.buyGros && typeof e.buyGros === 'object' && String(e.buyGros.id || '').trim() ? String(e.buyGros.id).trim() : '');
+export function registreDesAchats({ achats = null, hors = [], fiches = null, ventilationDe = () => null, exclu = null, periode, manque = [], montantHors = null, sourceHors = null, gros = null, cleNum = cleNumDefaut } = {}) {
   if (!PERIODE_OK.test(String(periode || ''))) return null;
-  // Les fiches reliées à un achat PAR SON CLIC : n° de transaction → fiches.
-  const parTx = new Map();
+  // Les fiches reliées à un achat PAR SON CLIC : n° de transaction → fiches ;
+  // id d'achat en gros → fiches (`buyGros`).
+  const parTx = new Map(), parGros = new Map(), numsGros = new Set();
   for (const [, e] of Object.entries(fiches && typeof fiches === 'object' ? fiches : {})) {
-    if (!e || e.buyFromId == null || String(e.buyFromId).trim() === '') continue;
+    if (!e) continue;
+    const g = lienGros(e);
+    if (g) {
+      parGros.set(g, [...(parGros.get(g) || []), e]);
+      const kn = cleNum(e.numero); if (kn) numsGros.add(kn);
+    }
+    if (e.buyFromId == null || String(e.buyFromId).trim() === '') continue;
     const k = String(e.buyFromId).trim();
     parTx.set(k, [...(parTx.get(k) || []), e]);
   }
+  const G = gros && typeof gros === 'object' ? gros : null;
+  const personnes = G && G.personnes && typeof G.personnes === 'object' ? G.personnes : {};
+  const rattaches = G && G.hors && typeof G.hors === 'object' ? G.hors : {};
+  const nomFournisseur = (id) => { const p = personnes[id]; return p && String(p.nom || '').trim() ? String(p.nom).trim() : ''; };
   const lignes = [], sansDate = [], vus = new Set();
   let exclues = 0;
   for (const o of (Array.isArray(achats) ? achats : [])) {
@@ -126,7 +153,9 @@ export function registreDesAchats({ achats = null, hors = [], fiches = null, ven
     const m = montantPropose(o, tx ? ventilationDe(tx) : null);
     if (m && m.source === 'recu') { montant = m.centimes / 100; source = 'recu'; }
     else {
-      const saisis = liees.map((e) => centimesTexte(e.buyPrice));
+      // Un prix posé par un achat en gros (`buyGros`) appartient à CET achat en
+      // gros (compté par son total) : jamais un « saisi » de cet achat Vinted.
+      const saisis = liees.map((e) => (lienGros(e) ? null : centimesTexte(e.buyPrice)));
       if (liees.length && saisis.every((c) => c != null)) { montant = saisis.reduce((s, c) => s + c, 0) / 100; source = 'saisi'; }
       else if (m) { montant = m.centimes / 100; source = 'article'; }
       else raison = String((o.price && o.price.currency_code) || 'EUR').toUpperCase() !== 'EUR' ? 'autre devise' : 'prix pas lu';
@@ -137,22 +166,47 @@ export function registreDesAchats({ achats = null, hors = [], fiches = null, ven
     if (l.ts == null) { sansDate.push(l); continue; }
     if (dansPeriode(ymLocal(l.ts), periode)) lignes.push(l);
   }
+  let aVerifier = 0;
+  const horsVus = new Set();
   for (const b of (Array.isArray(hors) ? hors : [])) {
     if (!b) continue;
+    const hid = String(b.id || '');
+    if (hid && horsVus.has(hid)) continue;   // le même achat saisi : UNE ligne
+    if (hid) horsVus.add(hid);
     const ts = /^\d{4}-\d{2}-\d{2}$/.test(String(b.date || '')) ? Date.parse(b.date + 'T12:00:00') : Date.parse(b.date || '');
     const p = typeof montantHors === 'function' ? montantHors(b) : null;
-    const l = { id: 'hors:' + String(b.id || ''), ts: Number.isFinite(ts) ? ts : null, date: jourFr(ts), plateforme: 'Hors plateforme',
-      fournisseur: String((typeof sourceHors === 'function' ? sourceHors(b.source) : b.source) || ''), montant: p == null ? null : p, source: p == null ? '' : 'saisi',
-      raison: p == null ? 'prix pas saisi' : '', reglement: '', reference: '', num: String(b.numero == null ? '' : b.numero).trim(), compte: '', titre: String(b.title || '') };
+    // Rattaché par SON clic à un fournisseur : la ligne porte son nom (une seule ligne).
+    const rat = hid && rattaches[hid] ? nomFournisseur(rattaches[hid].fournisseur) : '';
+    const num = String(b.numero == null ? '' : b.numero).trim();
+    const doublon = !!num && numsGros.has(cleNum(num));
+    const l = { id: 'hors:' + hid, ts: Number.isFinite(ts) ? ts : null, date: jourFr(ts), plateforme: 'Hors plateforme',
+      fournisseur: rat || String((typeof sourceHors === 'function' ? sourceHors(b.source) : b.source) || ''), montant: p == null ? null : p, source: p == null ? '' : 'saisi',
+      raison: p == null ? 'prix pas saisi' : (doublon ? 'N° aussi dans un achat en gros : à vérifier' : ''), reglement: '', reference: '', num, compte: '', titre: String(b.title || ''),
+      paires: '', frais: null, rattache: !!rat, aVerifier: doublon };
     if (l.ts == null) { sansDate.push(l); continue; }
-    if (dansPeriode(ymLocal(l.ts), periode)) lignes.push(l);
+    if (dansPeriode(ymLocal(l.ts), periode)) { lignes.push(l); if (doublon) aVerifier += 1; }
+  }
+  // ── LES ACHATS EN GROS : une ligne chacun, par SON total (+ ses frais) ──────
+  let nGros = 0;
+  for (const [gid, a] of Object.entries(G && G.achats && typeof G.achats === 'object' ? G.achats : {})) {
+    if (!a || !Number.isSafeInteger(a.total) || a.total < 0 || !Number.isSafeInteger(a.paires) || a.paires < 1) continue;
+    const nom = nomFournisseur(a.fournisseur); if (!nom) continue;   // fournisseur retiré : l'achat est parti avec lui
+    const frais = Number.isSafeInteger(a.frais) && a.frais > 0 ? a.frais : 0;
+    const ts = /^\d{4}-\d{2}-\d{2}$/.test(String(a.date || '')) ? Date.parse(a.date + 'T12:00:00') : NaN;
+    const reliees = (parGros.get(gid) || []).map((e) => String(e.numero == null ? '' : e.numero).trim()).filter(Boolean).sort((x, y) => x.localeCompare(y, 'fr', { numeric: true }));
+    const l = { id: 'gros:' + gid, ts: Number.isFinite(ts) ? ts : null, date: jourFr(ts), plateforme: 'Achat en gros', fournisseur: nom,
+      montant: (a.total + frais) / 100, source: 'saisi', raison: '', reglement: '', reference: '', num: reliees.join(' + '), compte: '',
+      titre: `En gros · ${a.paires} paire${a.paires > 1 ? 's' : ''}${reliees.length ? ` · ${reliees.length} reliée${reliees.length > 1 ? 's' : ''}` : ''}`,
+      paires: String(a.paires), frais: frais ? frais / 100 : null, gros: true };
+    if (l.ts == null) { sansDate.push(l); continue; }
+    if (dansPeriode(ymLocal(l.ts), periode)) { lignes.push(l); nGros += 1; }
   }
   lignes.sort(triChrono);
   const total = lignes.reduce((s, l) => s + (l.montant == null ? 0 : Math.round(l.montant * 100)), 0) / 100;
   const sansMontant = lignes.filter((l) => l.montant == null).length;
   const articleSeul = lignes.filter((l) => l.source === 'article').length;
   const manques = [...(achats == null ? ['achats Vinted'] : []), ...(Array.isArray(manque) ? manque : [])].filter(Boolean).map(String);
-  return { type: 'achats', periode: String(periode), lignes, n: lignes.length, total, sansMontant, articleSeul, horsPeriode: sansDate, exclues, manque: manques, complet: !sansMontant && !articleSeul && !manques.length };
+  return { type: 'achats', periode: String(periode), lignes, n: lignes.length, total, sansMontant, articleSeul, aVerifier, nGros, horsPeriode: sansDate, exclues, manque: manques, complet: !sansMontant && !articleSeul && !manques.length };
 }
 
 // ── LA MISE EN PAGE (une seule pour le PDF et le tableur) ───────────────────
@@ -174,15 +228,18 @@ export function resumeRegistre(R) {
   L.push(['Total', `${partiel ? 'au moins ' : ''}${eurosTexte(R.total)}`, 'total']);
   if (R.sansMontant) L.push(['Lignes sans montant', String(R.sansMontant), 'sans-montant']);
   if (R.type === 'achats' && R.articleSeul) L.push(['Article seul (sans port ni frais)', String(R.articleSeul), 'article-seul']);
+  if (R.type === 'achats' && R.nGros) L.push(['Achats en gros (une ligne chacun, par leur total)', String(R.nGros), 'gros']);
+  if (R.type === 'achats' && R.aVerifier) L.push(['À vérifier (N° aussi dans un achat en gros)', String(R.aVerifier), 'a-verifier']);
   if (R.manque.length) L.push(['Pas lu', R.manque.join(', '), 'manque']);
   return L;
 }
 const COLONNES = {
   recettes: [['date', 'Date'], ['montant', 'Montant', 1], ['plateforme', 'Plateforme'], ['reglement', 'Règlement'], ['reference', 'Référence'], ['num', 'N°'], ['compte', 'Compte']],
-  achats: [['date', 'Date'], ['fournisseur', 'Fournisseur'], ['montant', 'Montant', 1], ['source', 'Montant lu'], ['reglement', 'Règlement'], ['reference', 'Référence'], ['num', 'N°'], ['titre', 'Article']],
+  achats: [['date', 'Date'], ['fournisseur', 'Fournisseur'], ['paires', 'Paires', 1], ['montant', 'Montant', 1], ['frais', 'Dont frais', 1], ['source', 'Montant lu'], ['reglement', 'Règlement'], ['reference', 'Référence'], ['num', 'N°'], ['titre', 'Article']],
 };
 const cellule = (l, k, tableur) => {
   if (k === 'montant') return l.montant == null ? (tableur ? '' : '—') : (tableur ? tableurNb(l.montant) : eurosTexte(l.montant));
+  if (k === 'frais') return l.frais == null ? '' : (tableur ? tableurNb(l.frais) : eurosTexte(l.frais));
   if (k === 'source') return SOURCE[l.source] || '';
   return String(l[k] == null ? '' : l[k]);
 };
@@ -228,7 +285,9 @@ export async function pdfRegistre(R, { PDFLib = null, entreprise = null, mainten
   };
   // Les colonnes : largeurs fixes, le dernier champ prend le reste.
   const cols = COLONNES[R.type];
-  const LARG = { date: 62, montant: 70, plateforme: 80, reglement: 110, reference: 100, num: 60, compte: 90, fournisseur: 100, source: 70, titre: 0 };
+  const LARG = R.type === 'achats'
+    ? { date: 58, fournisseur: 96, paires: 40, montant: 70, frais: 62, source: 66, reglement: 92, reference: 82, num: 66, titre: 0 }
+    : { date: 62, montant: 70, plateforme: 80, reglement: 110, reference: 100, num: 60, compte: 90, fournisseur: 100, source: 70, titre: 0 };
   const xs = []; let x = M;
   for (const [k] of cols) { xs.push(x); x += LARG[k] || 0; }
   const reste = W - M - x; const largeur = (i) => (LARG[cols[i][0]] || Math.max(60, reste + (LARG[cols[i][0]] || 0))) - 8;

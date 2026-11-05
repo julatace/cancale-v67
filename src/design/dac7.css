@@ -17,7 +17,7 @@
 .vrm-d7-rapport-l b { font-weight: 700; font-size: 13px; }
 .vrm-d7-rapport-l.is-fiscal { color: var(--fu-gris); border-top: 1px solid var(--fu-filet); padding-top: 6px; }
 .vrm-d7-sujet { color: var(--fu-gris); overflow-wrap: anywhere; line-height: 1.4; }
-.vrm-d7-lien { display: inline-flex; align-items: center; min-height: 44px; color: var(--fu-bleu); font-weight: 600; text-decoration: none; }
+.vrm-d7-lien { display: inline-flex; align-items: center; min-height: 44px; color: var(--vrm-accent-texte); font-weight: 600; text-decoration: none; }
 .vrm-d7-lien:focus-visible, .vrm-d7-btn:focus-visible, .vrm-d7-annee:focus-visible { outline: 2px solid var(--fu-bleu); outline-offset: 2px; }
 .vrm-d7-liste { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 10px; }
 .vrm-d7-carte { background: var(--fu-carte); border: 1px solid var(--fu-filet); border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
