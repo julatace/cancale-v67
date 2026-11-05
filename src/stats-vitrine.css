@@ -161,8 +161,8 @@
    rangée de 44 px au moins, sans grand titre ni grand blanc. Elle ne s'étire
    jamais à la hauteur de sa voisine de rangée. */
 html .vrm-stats-vitrine .vrm-sv-carte.vrm-sv-repliee {
-  flex-direction: row; flex-wrap: wrap; align-items: baseline; align-self: start;
-  justify-content: space-between; gap: 2px 14px;
+  flex-direction: row; flex-wrap: wrap; align-items: baseline;
+  justify-content: flex-start; gap: 2px 14px;
   min-height: 44px; padding: 12px 14px; box-sizing: border-box;
 }
 html .vrm-stats-vitrine .vrm-sv-repliee-titre {
@@ -170,11 +170,13 @@ html .vrm-stats-vitrine .vrm-sv-repliee-titre {
   color: var(--vrm-ink); flex: 0 1 auto; min-width: 0;
 }
 html .vrm-stats-vitrine .vrm-sv-repliee-raison {
-  font-size: 13px; line-height: 1.4; color: var(--vrm-muted); text-align: right;
+  font-size: 13px; line-height: 1.4; color: var(--vrm-muted); text-align: left;
   flex: 1 1 200px; min-width: 0;
 }
+/* Dans une rangée de cartes, la carte repliée garde sa hauteur d'une ligne (elle ne s'étire pas). */
+html .vrm-stats-vitrine .vrm-sv-rangee > .vrm-sv-repliee { align-self: start; }
 @media (max-width: 599px) {
-  html .vrm-stats-vitrine .vrm-sv-repliee-raison { text-align: left; flex-basis: 100%; }
+  html .vrm-stats-vitrine .vrm-sv-repliee-raison { flex-basis: 100%; }
 }
 /* Le choix « Vue d'ensemble · Prix qui marche », sous le grand titre. */
 .vrm-stats-sous-nav { margin-top: 10px; }
