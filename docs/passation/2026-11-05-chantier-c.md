@@ -169,8 +169,27 @@ composants du chantier B (utilisés sans les modifier). Branche locale `v35-chan
   `audit-identite`, `audit-icones`, `audit-fonctions-api` ; et `audit-annonces-actions` (58),
   `audit-verif-annonce`, `audit-boutons`, `audit-tdz`, `audit-variables`.
 
-## Bancs voisins
-(voir la section « Résultats » ajoutée en fin de chantier)
+## Bancs voisins (base = arbre `git archive` de `claude/project-review-nsk5su` construit à part)
+⚠️ La machine était très chargée (d'autres chantiers lançaient leurs bancs en même temps) :
+plusieurs bancs figent leurs horloges au lancement et rougissent quand un passage dépasse
+10 min ; ces rouges-là sont aussi sur la base.
+
+| banc | base | après | note |
+|---|---|---|---|
+| `annonces-coherence` (neuf) | 48 rouges | **0 rouge** (126-127 verts) | |
+| `fusion-app` (écrans Annonces, 4 vues) | F4 y = 904, F6 « N°2 » bleu 3,6:1 (état intégré) | F4 et F6 verts | F9 (sélecteur de site, segment actif transparent) rougit au hasard sur d'autres écrans : hors zone |
+| `annonces-actions` | 1 rouge (parcours arrêté, délai sous charge) | 1 rouge du même type | adapté : la raison se lit en tête ; « à la main » est un lien sous les tuiles |
+| `annonces-carte` | 7 rouges | les 7 mêmes | |
+| `brouillons-avancee` | vert | **vert** | adapté : « Voir mes brouillons » = vue Brouillons → « Un par un » ; « Mettre en ligne » par Sélectionner → Actions |
+| `numero-etiquette` | 2 rouges | les 2 mêmes | adapté : déplie « N nouveaux N° » avant d'y toucher |
+| `vinted-ui` | 8 rouges (calendrier, « achat à côté de l'état » au téléphone) | voir dernière passe | adapté : prix d'achat manquant = bandeau (plus d'ambre par fiche) ; gestes = deux à la vue + feuille « … » |
+| `republier` | 4 rouges (dont arrêt du parcours sous charge) | voir note | adapté : entrée par Sélectionner → Actions → tuile, puis « Retour » vers l'étape « Choisir » du moteur (pivot décoché) ; le reste jugé tel qu'avant |
+| `lien-vc-frise` | vert (62) | voir dernière passe | adapté : « Relier à Vestiaire » est dans la feuille « … » |
+| `tous-boutons` | non relancé (très long) | non relancé | adapté : l'entrée « Republier » attend la vue Sélectionner ; la feuille jugée à Échap est « … » d'une carte |
+
+Chaque banc adapté jugeait l'ANCIEN rendu voulu (la feuille « Republier et brouillons »,
+l'ambre par fiche, les neuf gestes à la vue) que la revue retire ; aucune règle de §5
+(identité, N°, comptes, confirmation) n'a été affaiblie.
 
 ## Captures (hors dépôt, regardées)
 - Après : `scratchpad/c-apres/ac-{390,1512}-{clair,sombre}-{haut,carte,carte-menu,filtre,selection,actions,actions-raison}.png`.
