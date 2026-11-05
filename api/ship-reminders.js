@@ -46,6 +46,8 @@ import { rappelsRetraitDuJour, texteRappelRetrait, SELECT_SUIVI_META, txDuColis,
 import { passageTransporteurs, MAX_CRON, BUDGET_CRON_MS } from './_lib/transporteurs-lecture.js';
 import { accesVendeur } from './_lib/abonnement.js';
 import { passageRelances } from './_lib/relances-essai.js';
+// Après 240 s de cron, aucun e-mail de l'essai ne COMMENCE (la fonction s'arrête à 300 s).
+const RELANCES_JUSQUA_MS = 240000;
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
@@ -851,6 +853,7 @@ export default async function handler(req, res) {
   // `?moment=soir` : le rappel de la veille au soir (second cron), rien d'autre
   // (ni URSSAF, ni bilan, ni rappel du matin).
   const soir = String((req.query && req.query.moment) || '') === 'soir';
+  const debutCron = Date.now();
   const traiter = soir ? traiterVendeurSoir : traiterVendeur;
   try {
     const cl = await cloisonnee();
@@ -890,7 +893,7 @@ export default async function handler(req, res) {
     // elle ne fait rien (et le dit dans la réponse) ; une panne ne fait pas
     // échouer les rappels déjà partis.
     let relances = null;
-    if (!soir) { try { relances = await passageRelances(); } catch (e) { relances = { erreur: String((e && e.message) || e).slice(0, 200) }; } }
+    if (!soir) { try { relances = await passageRelances({ jusqua: debutCron + RELANCES_JUSQUA_MS }); } catch (e) { relances = { erreur: String((e && e.message) || e).slice(0, 200) }; } }
     res.status(echecs ? 500 : 200).json({ ok: !echecs, ...(soir ? { moment: 'soir' } : {}), vendeurs: owners.length, echecs, bilans, ...(relances ? { relances } : {}) });
   } catch (e) {
     // Une tâche planifiée qui répond 200 sur une panne n'apparaît nulle part :

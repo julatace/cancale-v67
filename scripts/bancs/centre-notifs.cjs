@@ -60,9 +60,9 @@ const srv = http.createServer((q, r) => {
   r.writeHead(200, { 'content-type': MIME[path.extname(p)] || 'application/octet-stream' }); r.end(fs.readFileSync(p));
 });
 
-async function ouvrir(nav, vp, { sombre = false, chemin = '/?tab=journee', journalKO = false } = {}) {
+async function ouvrir(nav, vp, { sombre = false, chemin = '/?tab=journee', journalKO = false, journal = JOURNAL, lu = LU } = {}) {
   const mobile = vp.width < 600;
-  const ctx = await nav.newContext({ viewport: vp, ...(mobile ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}) });
+  const ctx = await nav.newContext({ viewport: vp, locale: 'fr-FR', timezoneId: 'Europe/Paris', ...(mobile ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}) });
   const pg = await ctx.newPage();
   const erreurs = []; pg.on('pageerror', (e) => erreurs.push(e.message));
   const ecrits = [];
@@ -79,11 +79,12 @@ async function ouvrir(nav, vp, { sombre = false, chemin = '/?tab=journee', journ
     }
     if (/select=owner/.test(u)) return j([]);
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);
-    if (u.includes('id=eq.push_journal_lu')) return j([{ data: LU }]);
+    if (u.includes('id=eq.push_journal_lu')) return j([{ data: lu }]);
     if (u.includes('id=eq.push_journal')) {
       if (journalKO) return r.fulfill({ status: 522, contentType: 'text/html', body: '<html>522</html>' });
-      if (/select=n:data->n/.test(u)) return j([{ n: JOURNAL.n }]);
-      return j([{ data: JOURNAL }]);
+      // La projection telle que l'app la demande : seulement les scalaires nommés.
+      if (/select=n:data->n/.test(u)) return j([{ n: journal.n, ...(/depuis:data->depuis/.test(u) ? { depuis: journal.depuis } : {}) }]);
+      return j([{ data: journal }]);
     }
     if (u.includes('id=eq.push_prefs')) return j([{ data: PREFS }]);
     return j([]);
@@ -241,6 +242,19 @@ const mesurer = (pg, mobile, racineSel) => pg.evaluate(([mobile, racineSel]) => 
         await pg.waitForTimeout(800);
         const l = ecrits.find((x) => x.id === 'push_journal_lu');
         dit(!!l && (l.data.lus || []).includes(5) && l.data.luJusqua === 2, `${T} · D1 ouverte depuis le téléphone (?notif=5) : l’entrée 5 est marquée lue, rien d’autre`, JSON.stringify(l && l.data));
+        await ctx.close();
+      });
+      // G — (revue du 5 nov.) une entrée purgée par le serveur (plus de 30 jours,
+      //     au-delà de 150) ne compte plus : la cloche dit ce que la liste montre.
+      await essaie(`${T} · purge`, async () => {
+        const PURGE = { n: 40, depuis: 37, rev: 'r9', entrees: [40, 39, 38, 37].map((seq, i) => ({ seq, at: ilYa(10 + i * 30), famille: 'ventes', cat: 'vente', titre: '💸 Vendu !', texte: `Article de banc ${seq}`, url: `/?tab=ventes&site=vinted&cible=vente&tx=9000${seq}`, etat: 'envoyee' })) };
+        const { ctx, pg } = await ouvrir(nav, vp, { journal: PURGE, lu: {} });
+        await pg.waitForFunction(() => { const c = document.querySelector('[data-centre-notifs-cloche]'); return c && c.getAttribute('data-non-lues') !== ''; }, null, { timeout: 8000 }).catch(() => {});
+        const nl = await pg.locator('[data-centre-notifs-cloche]').first().getAttribute('data-non-lues').catch(() => null);
+        await pg.locator('[data-centre-notifs-cloche]').first().click().catch(() => {});
+        await pg.waitForSelector('[data-centre-notifs][data-centre-etat="lu"]', { timeout: 6000 }).catch(() => {});
+        const liste = await pg.locator('[data-centre-entree][data-non-lue="1"]').count();
+        dit(nl === '4' && liste === 4, `${T} · G1 33 anciennes purgées par le serveur : la cloche dit 4, comme la liste (jamais 40)`, `cloche=${nl} liste=${liste}`);
         await ctx.close();
       });
       await essaie(`${T} · pas su`, async () => {

@@ -121,3 +121,47 @@ migration (deux lignes `app_data` de plus par vendeur), rien touché dans `vinte
 - Le regroupement remplace la notification sur le téléphone ; il ne retarde rien.
 - Les e-mails de l'essai ne citent pas le prix (lu chez Stripe seulement quand il est conforme aux CGV) ;
   à ajouter quand Stripe sera en mode réel.
+
+## 7. Revue adverse (5 nov., même branche)
+
+Défauts reproduits avant correction, puis corrigés :
+
+1. **La cloche comptait des notifications que la liste ne montre plus.** Le serveur purge le
+   journal (30 jours, 150 entrées) mais la pastille se calculait `n − luJusqua` : trois ventes
+   non lues de septembre puis une neuve ⇒ cloche « 4 », feuille « 1 ». Reproduit en VM
+   (`ajouterEntree` + `nombreNonLues`) et au rendu (banc, journal n=40 gardant 37…40 : cloche
+   « 40 », liste 4). Corrigé : le journal porte `depuis` (le plus petit n° gardé, un scalaire de
+   plus), l'app le projette (`select=n:data->n,depuis:data->depuis`) et `nombreNonLues(n, lu,
+   depuis)` ne compte plus une entrée purgée. `audit-notifs-centre` J7 (rouge sur le code d'avant),
+   banc `centre-notifs` G1 (2 rouges sur le code d'avant : « cloche=40 liste=4 »).
+2. **Le chemin donné dans l'e-mail de la veille était faux** : « VRM → Réglages → Abonnement »,
+   alors qu'Abonnement est un onglet de Paramètres à côté de Réglages, et le bouton s'appelle
+   « Résilier » / « Reprendre mon abonnement ». Corrigé (« Paramètres → Abonnement → « Résilier » »),
+   comme les renvois « Paramètres → Réglages → E-mails / Comptes liés / Notifications » ; j1 dit
+   « dans le même navigateur » et « chaque article » (au lieu de « ce navigateur », « chaque
+   paire »). `audit-relances-essai` S6 exigeait l'ancien chemin faux : il exige le bon.
+3. **Les e-mails de l'essai n'avaient pas d'heure limite** : ils partent après les rappels de tous
+   les vendeurs, dans une fonction coupée à 300 s ; un envoi coupé reste « en cours » et n'est
+   jamais refait. `passageRelances({ jusqua })` ne COMMENCE plus d'envoi après 240 s de cron
+   (`RELANCES_JUSQUA_MS`), rien n'est réservé, l'étape attend le lendemain. `audit-relances-essai`
+   B1-B2 (rouges sur le code d'avant).
+4. Banc `centre-notifs` : contexte `fr-FR` / `Europe/Paris`. Les champs d'heure restent affichés
+   « 10:00 PM » dans le Chromium du banc (le champ `type=time` suit la langue du NAVIGATEUR, pas la
+   page) ; sur un iPhone ou un Chrome en français ils s'affichent « 22:00 ». Non corrigé.
+
+Vérifié sans défaut : un type éteint n'est ni envoyé ni rangé (porte dans `sendPushToAll`, tous
+les émetteurs passent `cat`) ; `push_journal` et `push_journal_lu` sont lus/écrits au nom du
+vendeur de la requête (serveur : `owner=eq.` + clé de service ; app : RLS `vrm_lecture_privee`
+owner seul, aucun des deux ids dans la liste blanche de l'équipe 016) ; `?mode=relances` ne rend
+`manque` qu'au propriétaire, n'écrit le choix que pour la session ou le jeton signé ; aucune
+adresse dans la réponse du cron ; l'adresse ouverte au toucher est filtrée (`urlSure`,
+`entreeSure`) et les valeurs de `lienNotif` passent ce filtre.
+
+Reste (non corrigé, à décider) :
+- Le lien « ne plus recevoir ces rappels » désinscrit sur un simple GET (« en un clic », demandé) :
+  un antivirus de messagerie qui ouvre les liens peut désinscrire sans clic (RFC 8058 réserve le
+  un-clic au POST). Conséquence bornée : moins d'e-mails, réactivable dans Réglages.
+- `push_journal_lu` est écrit sans comparer-et-échanger : deux appareils qui marquent lu en même
+  temps peuvent perdre un « lu » (l'entrée redevient non lue, rien de plus).
+- Une notification tenue pendant les heures calmes ne sonne jamais ensuite (dédoublonnage déjà
+  posé) : elle n'existe que dans la cloche.

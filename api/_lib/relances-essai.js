@@ -125,8 +125,8 @@ const echapper = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').r
 // relié · `null` pas su (jamais écrit comme « pas relié »).
 export const RELIER = [
   { id: 'vinted', texte: 'Ton compte Vinted : installe l’extension VRM, puis ouvre Vinted connecté à ton compte. Elle lit tes annonces et tes ventes.' },
-  { id: 'emails', texte: 'Tes e-mails Vinted : VRM y lit tes ventes, tes bordereaux et tes codes de retrait. Réglages → E-mails te montre comment les transférer.' },
-  { id: 'notifications', texte: 'Les notifications : aucun appareil ne les reçoit encore. Réglages → Notifications, puis « Activer sur cet appareil ».' },
+  { id: 'emails', texte: 'Tes e-mails Vinted : VRM y lit tes ventes, tes bordereaux et tes codes de retrait. Paramètres → Réglages → E-mails te montre comment les transférer.' },
+  { id: 'notifications', texte: 'Les notifications : aucun appareil ne les reçoit encore. Paramètres → Réglages → Notifications, puis « Activer sur cet appareil ».' },
 ];
 export function texteRelance(etape, { fin, annule = false, relie = {}, lien = '' } = {}) {
   const finTxt = Number.isFinite(Date.parse(fin || '')) ? dateLongue(Date.parse(fin)) : '';
@@ -139,7 +139,7 @@ export function texteRelance(etape, { fin, annule = false, relie = {}, lien = ''
     paras = [
       'Bonjour,',
       `Ton essai gratuit de VRM a commencé${finTxt ? ` : il dure jusqu’au ${finTxt}` : ''}. Sans engagement.`,
-      'Le premier geste qui rend VRM utile : installe l’extension VRM, puis ouvre Vinted dans ce navigateur. VRM lit tes annonces et tes ventes, et donne à chaque paire un numéro de rangement.',
+      'Le premier geste qui rend VRM utile : installe l’extension VRM, puis ouvre Vinted dans le même navigateur. VRM lit tes annonces et tes ventes, et donne à chaque article un numéro de rangement.',
       `Ouvrir VRM : ${SITE}`,
     ];
   } else if (etape === 'j3') {
@@ -152,16 +152,16 @@ export function texteRelance(etape, { fin, annule = false, relie = {}, lien = ''
     } else if (!pasSu) {
       paras.push('Ton compte Vinted, tes e-mails et tes notifications sont reliés : VRM suit tes ventes et tes colis tout seul.');
     }
-    if (pasSu) paras.push('Réglages → Comptes liés te dit ce qui est relié et ce qui attend un geste.');
+    if (pasSu) paras.push('Paramètres → Réglages → Comptes liés te dit ce qui est relié et ce qui attend un geste.');
     if (finTxt) paras.push(`Ton essai continue jusqu’au ${finTxt}.`);
     paras.push(`Ouvrir VRM : ${SITE}`);
   } else if (etape === 'j6') {
     sujet = 'Ton essai VRM se termine demain';
     paras = annule
       ? ['Bonjour,', `Ton essai gratuit se termine demain${finTxt ? `, le ${finTxt}` : ''}. Tu as arrêté l’abonnement : ton accès à VRM se fermera à ce moment-là. Tes données restent gardées.`,
-        'Pour continuer : VRM → Réglages → Abonnement → Reprendre.', `Ouvrir VRM : ${SITE}`]
+        'Pour continuer : VRM → Paramètres → Abonnement → « Reprendre mon abonnement ».', `Ouvrir VRM : ${SITE}`]
       : ['Bonjour,', `Ton essai gratuit se termine demain${finTxt ? `, le ${finTxt}` : ''}. Ensuite ton abonnement démarre au prix affiché à ton inscription — rien à faire pour continuer.`,
-        'Si tu ne veux pas continuer, arrête l’abonnement avant demain : VRM → Réglages → Abonnement.', `Ouvrir VRM : ${SITE}`];
+        'Si tu ne veux pas continuer, résilie avant demain : VRM → Paramètres → Abonnement → « Résilier ».', `Ouvrir VRM : ${SITE}`];
   } else return null;
   const texte = [...paras, '', '—', pied].join('\n\n');
   const html = `<!doctype html><html lang="fr"><body style="margin:0;padding:24px;background:#ffffff;color:#1d1d1f;font:15px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif">`
@@ -257,7 +257,11 @@ export async function ceQuiEstRelie(owner) {
 
 // ── LE PASSAGE DU MATIN ─────────────────────────────────────────────────────
 // Rend un résumé (jamais une adresse) : { pret, envoyes, ignores: {raison: n} }.
-export async function passageRelances({ maintenant = Date.now(), env = process.env, envoyer = envoyerSmtp } = {}) {
+// `jusqua` : l'heure (ms) après laquelle on ne COMMENCE plus d'envoi — le cron
+// du matin a d'abord fait les rappels de tous les vendeurs, et une fonction
+// Vercel s'arrête à 300 s : un envoi coupé en plein milieu resterait « en
+// cours » (jamais refait). Ce qui n'est pas parti attend le lendemain.
+export async function passageRelances({ maintenant = Date.now(), env = process.env, envoyer = envoyerSmtp, jusqua = Infinity, horloge = Date.now } = {}) {
   const cfg = configurationRelances(env);
   if (!cfg.pret) return { pret: false, manque: cfg.manque, envoyes: 0 };
   const proprio = await proprietaires();
@@ -268,6 +272,7 @@ export async function passageRelances({ maintenant = Date.now(), env = process.e
   let envoyes = 0;
   for (const a of essais) {
     if (envoyes >= MAX_PAR_PASSAGE) { ign('plafond du passage'); continue; }
+    if (horloge() >= jusqua) { ign('temps du passage'); continue; }
     const owner = String((a && a.owner) || '').toLowerCase();
     if (!UUID.test(owner)) { ign('identifiant'); continue; }
     if (a.statut !== 'trialing') { ign('pas en essai'); continue; }

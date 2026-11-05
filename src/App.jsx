@@ -61632,10 +61632,11 @@ const marquerNotifLue = async (seq) => {
 };
 // La pastille : deux scalaires (le dernier n° rangé, ce qu'il a lu) — jamais la liste.
 const compterNonLuesNotifs = async () => {
-  const [j, lu] = await Promise.all([lireLigneNotifs('push_journal', 'n:data->n'), lireLuNotifs()]);
+  const [j, lu] = await Promise.all([lireLigneNotifs('push_journal', 'n:data->n,depuis:data->depuis'), lireLuNotifs()]);
   if (!j || lu === null) return null;
   const n = j.ligne ? Number(j.ligne.n) : 0;
-  return nombreNonLues(Number.isSafeInteger(n) ? n : 0, lu);
+  const depuis = j.ligne ? Number(j.ligne.depuis) : 1;
+  return nombreNonLues(Number.isSafeInteger(n) ? n : 0, lu, Number.isSafeInteger(depuis) ? depuis : 1);
 };
 // La cloche de l'en-tête et sa feuille. Recompte à l'ouverture de l'app, au
 // retour sur l'onglet, toutes les deux minutes tant qu'il est visible, et

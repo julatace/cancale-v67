@@ -223,7 +223,7 @@ const decoder = (brut) => {
     abonnements = [essai(A, 0, { fin_periode: demainMidi })];
     await lancerCron();
     const m6 = decoder(recus[0] ? recus[0].brut : '');
-    dit(/se termine demain/.test(m6.sujet) && /Réglages → Abonnement/.test(m6.texte), 'S6 la veille de la fin : « se termine demain », et comment arrêter', m6.sujet);
+    dit(/se termine demain/.test(m6.sujet) && /Paramètres → Abonnement → « Résilier »/.test(m6.texte), 'S6 la veille de la fin : « se termine demain », et comment arrêter', m6.sujet);
     monde(); configurer(true);
     abonnements = [essai(A, 0, { fin_periode: demainMidi, annule_fin_periode: true })];
     base.set(k(A, 'relances_essai'), { envois: { j1: { issue: 'envoye' }, j3: { issue: 'envoye' } } });
@@ -269,6 +269,17 @@ const decoder = (brut) => {
     dit(tout.every((t) => t && !/@/.test(t.texte) && !/€/.test(t.texte) && !/\d+ ventes?/.test(t.texte)), 'G4 les gabarits ne portent ni adresse, ni montant, ni chiffre de ventes');
     const brut = recus[0] ? recus[0].brut : '';
     dit(/^From: =\?UTF-8|^From: VRM <bonjour@vrm\.exemple\.test>$/m.test(brut) && /^Auto-Submitted: auto-generated$/m.test(brut), 'G5 expéditeur = la boîte de VRM réglée (jamais celle du vendeur), message marqué automatique');
+  });
+
+  await essaie('B — le temps du cron', async () => {
+    // (revue du 5 nov.) Le cron du matin fait d'abord les rappels de tous les
+    // vendeurs ; une fonction Vercel s'arrête à 300 s. Passé l'heure donnée,
+    // aucun envoi ne COMMENCE (un envoi coupé resterait « en cours », jamais refait).
+    monde(); configurer(true);
+    const r = await RE.passageRelances({ jusqua: Date.now() - 1 });
+    dit(recus.length === 0 && r.envoyes === 0 && r.ignores && r.ignores['temps du passage'] >= 1 && !(base.get(k(A, 'relances_essai')) || {}).envois, 'B1 l’heure passée : rien ne commence, rien n’est réservé (l’étape attend le lendemain)', JSON.stringify(r));
+    const src = require('fs').readFileSync(path.join(R, 'api', 'ship-reminders.js'), 'utf8').replace(/\/\/.*$/gm, '');
+    dit(/passageRelances\(\{\s*jusqua:/.test(src), 'B2 la route du matin lui donne son heure limite');
   });
 
   serveur.close();

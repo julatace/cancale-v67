@@ -141,6 +141,25 @@ const hhmm = (m) => { const x = ((m % 1440) + 1440) % 1440; return `${String(Mat
     dit(journal().n === 2 && journal().entrees[0].seq === 2 && journal().entrees[1].seq === 1, 'J4 la plus récente en tête, le numéro ne redescend jamais');
     await comme(K, () => P.sendPushToAll(VENTE));
     dit(journal(K).entrees.length === 1 && journal(J).entrees.length === 2 && pushes.filter((x) => x.tel === TEL_K).length === 1, 'J5 deux vendeurs : chacun SON centre, SON téléphone');
+    // J7 (revue du 5 nov.) : la purge (30 jours, 150 entrées) pose `depuis`, le
+    //    plus petit numéro gardé ; la pastille de l'app (deux scalaires) ne compte
+    //    plus une entrée purgée — elle dit ce que la liste montre.
+    {
+      const JN = await import('file://' + path.join(R, 'api', '_lib', 'journal-notifs.js'));
+      const SN = await import('file://' + path.join(R, 'src', 'journalNotifs.js'));
+      let jj = null;
+      const t0 = Date.parse('2026-09-20T10:00:00Z');
+      for (let i = 0; i < 3; i++) jj = JN.ajouterEntree(jj, { cat: 'vente', titre: 'a', texte: 'b', url: '/?tab=ventes', etat: 'envoyee' }, t0 + i * 1000).journal;
+      jj = JN.ajouterEntree(jj, { cat: 'vente', titre: 'c', texte: 'd', url: '/?tab=ventes', etat: 'envoyee' }, Date.parse('2026-11-05T10:00:00Z')).journal;
+      const liste = SN.entreesDuJournal(jj).filter((e) => !SN.estLue(e, {})).length;
+      const pastille = SN.nombreNonLues(jj.n, {}, jj.depuis);
+      let jk = null;
+      for (let i = 0; i < 160; i++) jk = JN.ajouterEntree(jk, { cat: 'vente', titre: 'a', texte: 'b', url: '/', etat: 'envoyee' }, Date.parse('2026-11-05T10:00:00Z') + i).journal;
+      const appli = require('fs').readFileSync(path.join(R, 'src', 'App.jsx'), 'utf8').replace(/\/\/.*$/gm, '');
+      const lit = /lireLigneNotifs\('push_journal',\s*'[^']*depuis:data->depuis[^']*'\)/.test(appli) && /return nombreNonLues\(.*\bdepuis\b.*\);/.test(appli);
+      dit(jj.depuis === 4 && pastille === liste && liste === 1 && jk.depuis === 11 && SN.nombreNonLues(jk.n, {}, jk.depuis) === 150 && lit,
+        'J7 entrées purgées (30 jours, 150) : `depuis` posé, la pastille dit ce que la liste montre (1, pas 4 ; 150, pas 160) — et l’app le lit', `depuis=${jj.depuis} pastille=${pastille} liste=${liste} k=${jk.depuis} lit=${lit}`);
+    }
     prepare();
     await comme(J, () => P.sendPushToAll({ ...VENTE, url: 'https://exemple.test/piege' }));
     dit((journal().entrees[0] || {}).url === '/', 'J6 une adresse hors de l’app n’entre pas dans le centre', (journal().entrees[0] || {}).url);

@@ -51,11 +51,13 @@ export function estLue(e, lu) {
   const l = lu && typeof lu === 'object' ? lu : {};
   return e.seq <= ent(l.luJusqua) || (Array.isArray(l.lus) && l.lus.includes(e.seq));
 }
-// Le nombre de non-lues, à partir des deux scalaires. `n` inconnu ⇒ `null`.
-export function nombreNonLues(n, lu) {
+// Le nombre de non-lues, à partir des scalaires. `n` inconnu ⇒ `null`.
+// `depuis` (le plus petit numéro encore gardé par le serveur) : une entrée
+// purgée n'est plus dans la liste, elle ne compte plus dans la pastille.
+export function nombreNonLues(n, lu, depuis = 1) {
   if (!Number.isSafeInteger(n) || n < 0) return null;
   const l = lu && typeof lu === 'object' ? lu : {};
-  const j = ent(l.luJusqua);
+  const j = Math.max(ent(l.luJusqua), Number.isSafeInteger(depuis) && depuis > 1 ? Math.min(depuis - 1, n) : 0);
   const une = new Set((Array.isArray(l.lus) ? l.lus : []).filter((s) => Number.isSafeInteger(s) && s > j && s <= n));
   return Math.max(0, n - j - une.size);
 }

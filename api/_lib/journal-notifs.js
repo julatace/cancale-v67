@@ -8,7 +8,7 @@
 // dédoublonnage (`push_dedup`). Chaque notification qui PASSE le réglage du
 // vendeur est maintenant rangée, AU NOM DE CE VENDEUR, dans la ligne
 // `push_journal` — juste avant d'être envoyée (api/_lib/push.js) :
-//   { n: <dernier numéro>, entrees: [{ seq, at, famille, cat, titre, texte, url, etat }], rev }
+//   { n: <dernier numéro>, depuis: <plus petit numéro gardé>, entrees: [{ seq, at, famille, cat, titre, texte, url, etat }], rev }
 //   etat : 'envoyee'        partie vers ses appareils
 //          'calme'          pendant ses heures calmes : rien n'a sonné
 //          'sans-appareil'  aucun appareil abonné
@@ -66,7 +66,12 @@ export function ajouterEntree(journal, e, maintenant = Date.now()) {
     etat: ETATS.includes(e.etat) ? e.etat : 'envoyee',
   };
   const garde = [entree, ...avant].filter((x) => !(Date.parse(x.at) < maintenant - DUREE_MS)).slice(0, MAX_ENTREES);
-  return { journal: { n: seq, entrees: garde }, seq, entree };
+  // `depuis` : le plus petit numéro encore gardé. La pastille de l'app compte
+  // les non-lues entre `depuis` et `n` (deux scalaires) : une entrée purgée
+  // (plus de 30 jours, au-delà de 150) ne compte plus — la cloche ne dit
+  // jamais « 4 » sur une liste qui en montre une.
+  const depuis = garde.reduce((m, x) => Math.min(m, x.seq), seq);
+  return { journal: { n: seq, depuis, entrees: garde }, seq, entree };
 }
 // Combien d'entrées NON LUES de cette famille dans les dernières 24 h (celle qui
 // part comprise) — pour la notification regroupée. `lu` absent ⇒ on ne compte
@@ -148,7 +153,7 @@ export async function corrigerEtat(seq, etat) {
     const i = d.entrees.findIndex((x) => x && x.seq === seq);
     if (i < 0 || d.entrees[i].etat === etat) return undefined;
     const entrees = d.entrees.slice(); entrees[i] = { ...entrees[i], etat };
-    return { journal: { n: d.n, entrees } };
+    return { journal: { n: d.n, ...(Number.isSafeInteger(d.depuis) ? { depuis: d.depuis } : {}), entrees } };
   });
   return !!r;
 }
