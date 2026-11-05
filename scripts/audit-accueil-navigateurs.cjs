@@ -28,17 +28,17 @@ const { spawnSync } = require('child_process');
 const R = path.join(__dirname, '..');
 
 if (process.argv.includes('--prouve')) {
-  const NAV = path.join(R, 'src', 'navigateurExtension.js');
+  const NAV = path.join(R, 'src', 'navigateursServis.js');   // la règle (ré-exportée par navigateurExtension.js)
   const ACC = path.join(R, 'src', 'Accueil.jsx');
   const MUTS = [
     ['Orion promis comme Chrome', NAV, "ordinateur: [...NAVIGATEURS_CHROMIUM, ...(firefox ? ['Firefox'] : [])],", "ordinateur: [...NAVIGATEURS_CHROMIUM, 'Orion', ...(firefox ? ['Firefox'] : [])],"],
     ['Firefox promis sans fiche', NAV, "...(firefox ? ['Firefox'] : [])],", "'Firefox'],"],
     ['téléphone promis', NAV, 'lectureTelephone: false,', 'lectureTelephone: true,'],
-    ['Edge oublié', NAV, "['Chrome', 'Edge', 'Brave', 'Opera', 'Vivaldi']", "['Chrome', 'Brave', 'Opera', 'Vivaldi']"],
+    ['Edge oublié', NAV, "['Chrome', 'Edge', 'Brave', 'Opera', 'Vivaldi'];", "['Chrome', 'Brave', 'Opera', 'Vivaldi'];"],
     ['« dans Chrome » remis (à la souris)', ACC, '`S’installe une fois sur ton ordinateur, dans ${NAVS_ORDI} — il reste', '`S’installe une fois dans Chrome, sur ton ordinateur — il reste'],
     ['« dans Chrome » remis (au doigt)', ACC, 'installe l’extension une fois sur ton ordinateur : ${NAVS_ORDI}.`', 'installe l’extension une fois dans Chrome sur ordinateur.`'],
     ['« ordinateur nécessaire » retiré', ACC, 'Ton ordinateur reste nécessaire : c’est lui qui lit Vinted. ', ''],
-    ['Orion sans « en essai »', ACC, 'a son propre paquet, en essai : il s’installe, mais la lecture de Vinted n’y est pas encore confirmée.', 'marche aussi.'],
+    ['Orion sans « en essai »', ACC, ': en essai, lecture de Vinted pas encore confirmée.', ': il marche aussi.'],
     ['« Chrome ouvert » remis', ACC, 'allumé, navigateur ouvert.</p>', 'allumé, Chrome ouvert.</p>'],
   ];
   let rouges = 0;
@@ -90,7 +90,7 @@ const CHROME_SEUL = [
     dit(f.ordinateur.includes('Firefox') && !f.pasEncore.includes('Firefox'), 'A6 la fiche Firefox publiée ⇒ Firefox nommé', JSON.stringify(f));
     const o = N.navigateursServis(N.LIENS_BOUTIQUES, '');
     dit(o.essai.length === 0, 'A7 sans paquet Orion servi ⇒ Orion pas nommé', JSON.stringify(o));
-    dit(N.listeNavigateurs(['A', 'B', 'C']) === 'A, B ou C' && N.listeNavigateurs(['A']) === 'A' && N.listeNavigateurs(['A', 'B'], 'et') === 'A et B', 'A8 la liste se lit en français (« A, B ou C »)');
+    dit(N.NAVS_ORDINATEUR_TEXTE === 'Chrome, Edge, Brave, Opera ou Vivaldi', 'A8 la liste se lit en français (« Chrome, Edge, Brave, Opera ou Vivaldi »)', N.NAVS_ORDINATEUR_TEXTE);
     // Chaque promesse est adossée à un fichier SERVI (public/ part tel quel en production).
     dit(fs.existsSync(path.join(R, 'public', 'VRM-extension.zip')), 'A9 le paquet Chromium promis est servi (public/VRM-extension.zip)');
     dit(!d.essai.includes('Orion') || fs.existsSync(path.join(R, 'public', N.LIEN_ORION_FICHIER.replace(/^\//, ''))), 'A10 Orion n’est nommé que si son paquet est servi (public' + (N.LIEN_ORION_FICHIER || '') + ')');

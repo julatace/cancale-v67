@@ -33,12 +33,10 @@ import { ACCES_OFFERT, EXTENSION_SUR_LE_STORE, DETOURAGE_POUR_TOUS, VESTIAIRE_BR
 import { useMoinsDeMouvement, useSansSouris, useTaille } from './accueil-mouvement.js';
 import CarteJour from './accueil-carte.jsx';
 // (5 nov.) Les navigateurs où l'extension SERVIE s'installe : une source, la même
-// que l'app (src/navigateurExtension.js) — jamais « Chrome obligatoire ».
-import { navigateursServis, listeNavigateurs } from './navigateurExtension.js';
+// que l'app (src/navigateursServis.js, ré-exporté par navigateurExtension.js) —
+// jamais « Chrome obligatoire ». Module léger : la page se charge avant l'app.
+import { navigateursServis, NAVS_ORDINATEUR_TEXTE as NAVS_ORDI } from './navigateursServis.js';
 const SERVIS = navigateursServis();
-const NAVS_ORDI = listeNavigateurs(SERVIS.ordinateur);
-const NAVS_ESSAI = listeNavigateurs(SERVIS.essai, 'et');
-const NAVS_PAS_ENCORE = listeNavigateurs(SERVIS.pasEncore, 'et');
 
 // ── Les écrans dessinés du bas : un morceau à part ──────────────────────────
 let promesseScenes = null;
@@ -671,9 +669,7 @@ export default function Accueil({ onEntrer }) {
               <h2 className="acc-h2b" data-prerequis-ordinateur="">Une installation, sur ton ordinateur. Ensuite, tu suis tout depuis ton téléphone.</h2>
               <ol className="acc-etapes">
                 <li><span className="n">1</span><div><h3>Crée ton compte</h3><p>Un email et un mot de passe.{ACCES_OFFERT && <span data-sans-carte=""> Aucune carte bancaire.</span>}</p></div></li>
-                <li><span className="n">2</span><div><h3>Ajoute l’extension à ton navigateur</h3><p data-navigateurs={SERVIS.ordinateur.join(',')}>{EXTENSION_SUR_LE_STORE
-                  ? `Une seule fois, sur ton ordinateur, dans ${NAVS_ORDI}, depuis le Chrome Web Store. Puis connecte-la avec le même email.`
-                  : `Une seule fois, sur ton ordinateur, dans ${NAVS_ORDI}. Elle n’est pas encore sur le Chrome Web Store : VRM te guide pas à pas, puis tu la connectes avec le même email.`}</p></div></li>
+                <li><span className="n">2</span><div><h3>Ajoute l’extension à ton navigateur</h3><p>{`Une seule fois, sur ton ordinateur, dans ${NAVS_ORDI}${EXTENSION_SUR_LE_STORE ? ', depuis le Chrome Web Store. Puis connecte-la' : '. Elle n’est pas encore sur le Chrome Web Store : VRM te guide pas à pas, puis tu la connectes'} avec le même email.`}</p></div></li>
                 <li><span className="n">3</span><div><h3>Passe sur Vinted</h3><p>Avec chacun de tes comptes. Ventes, annonces, bordereaux et messages arrivent dans VRM.</p></div></li>
               </ol>
               {/* (1er nov., vendeur neuf) CE QUI EST VRAI : VRM lit Vinted par l'extension,
@@ -682,7 +678,7 @@ export default function Accueil({ onEntrer }) {
                   allumé, navigateur ouvert — « ton téléphone suffit » promettait l'inverse.
                   (5 nov.) Orion a un paquet servi, en essai : dit tel quel, jamais promis. */}
               <p className="acc-note" data-ordinateur-necessaire="">Ton ordinateur reste nécessaire : c’est lui qui lit Vinted. Depuis le téléphone, tu consultes tout ; les actions passent par l’ordinateur allumé, navigateur ouvert.</p>
-              {SERVIS.essai.length > 0 && <p className="acc-note" data-navigateurs-essai={SERVIS.essai.join(',')} data-navigateurs-pas-encore={SERVIS.pasEncore.join(',')}>{NAVS_ESSAI} (Mac et iPhone) a son propre paquet, en essai : il s’installe, mais la lecture de Vinted n’y est pas encore confirmée. {NAVS_PAS_ENCORE} : pas encore.</p>}
+              {SERVIS.essai.length > 0 && <p className="acc-note" data-navigateurs-essai={SERVIS.essai.join(',')}>{SERVIS.essai.join(', ')} (Mac, iPhone) : en essai, lecture de Vinted pas encore confirmée. {SERVIS.pasEncore.join(', ')} : pas encore.</p>}
             </div>
             <div className="acc-conf" data-confiance="">
               <h2 className="acc-h2b">Tes comptes restent les tiens.</h2>
