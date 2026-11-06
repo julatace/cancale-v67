@@ -341,3 +341,4 @@
 /* Le champ vit DANS sa pastille (même dessin que la recherche des achats : plus de second
    cadre à l'intérieur). Spécificité au-dessus des règles génériques des champs. */
 :root body .vrm-app-shell .vrm-main .vrm-boite-cherche input[type=search]:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=hidden]){background:transparent !important;border:0 !important;box-shadow:none !important;padding:0 !important;min-height:44px}
+:root body .vrm-app-shell .vrm-main .vrm-boite-cherche input[type=search]:focus-visible{outline:none !important}
