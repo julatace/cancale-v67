@@ -185,7 +185,7 @@ const ouvrir = async (b, vp, sombre) => {
             verif: (() => { const d = document.querySelector('.vrm-rpf-verifier'); return d ? { n: d.getAttribute('data-retirer-a-verifier'), ouvert: d.open } : null; })(),
             enRoute: (document.querySelector('[data-retirer-en-route-sans]') || { getAttribute: () => null }).getAttribute('data-retirer-en-route-sans'),
             relire: (document.querySelector('[data-comptes-a-relire]') || { getAttribute: () => null }).getAttribute('data-comptes-a-relire'),
-            reparti: [...document.querySelectorAll('.vrm-repartis-courts [data-montant]')].filter(vis).map((x) => x.textContent),
+            reparti: [...document.querySelectorAll('.vrm-repartis-courts .vrm-reparti-court')].filter(vis).map((x) => { const p = x.querySelector('.vrm-rpf-puce.is-ambre'), mt = x.querySelector('[data-montant]'); return (p ? p.textContent : '') + ' · ' + (mt && vis(mt) ? mt.textContent : ''); }),
             texte: main ? main.innerText : '', deb: document.documentElement.scrollWidth - window.innerWidth,
             hors: [...document.querySelectorAll('.vrm-main *')].filter((e) => vis(e) && !e.closest('svg,.vrm-rangee,.vrm-filtres,[data-defile],.maplibregl-map') && getComputedStyle(e).position !== 'fixed' && e.getBoundingClientRect().right > window.innerWidth + 1).map((e) => String(e.className).slice(0, 40)).slice(0, 4),
           };
@@ -248,7 +248,9 @@ const ouvrir = async (b, vp, sombre) => {
           if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `retirer-ville-cancale-${nom}.png`) });
           await pg.locator('[data-retirer-villes] [data-ville=""]').first().click(); await pg.waitForTimeout(400);
           dit(m.relire === '1', '« 1 compte à relire » en puce', m.relire);
-          dit(m.reparti.some((t) => /Remboursement à vérifier · 19,64 €/.test(t)), '« Remboursement à vérifier · 19,64 € »', m.reparti.join(' | '));
+          // (6 nov., v36-visuel-2) La RÈGLE : la ligne dit « Remboursement à vérifier » (puce) ET son montant (`montantCommande`,
+          // écrit par `montant()`), visible — la puce et le montant vivent à part (une puce ne se coupe plus sur 2 lignes).
+          dit(m.reparti.some((t) => /^Remboursement à vérifier · 19,64\u00a0?\s?€$/.test(t.replace(/\u202f/g, ' '))), '« Remboursement à vérifier » et son montant 19,64 €', m.reparti.join(' | '));
           // Ouvrir « À vérifier » : le statut en puce.
           await pg.evaluate(() => { const d = document.querySelector('.vrm-rpf-verifier'); if (d) d.open = true; });
           await pg.waitForTimeout(300);

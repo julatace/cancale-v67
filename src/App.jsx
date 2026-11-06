@@ -388,6 +388,7 @@ import SelecteurSites, { LogoSite } from "./SelecteurSites.jsx";
 import "./styles-publier-ailleurs.css";
 import "./styles-ios.css";       // (6 nov., v36-visuel) rangées « Réglages » d'iOS, « ⓘ » en feuille
 import "./styles-visuel.css";    // (6 nov., v36-visuel) la direction : photos héros, chiffres, rythme 8 px
+import "./styles-visuel-2.css";  // (6 nov., v36-visuel-2) de « propre » à « beau » : échelle, matière, barre floutée, mouvement
 import { GroupeIos, RangeeIos } from "./composants/Ios.jsx";
 import { SITES_PUBLIER, apercuEnvoi, manquesEnvoi, etatsPaire, partoutLeMeme, lienVu, chercherPaires } from "./publierAilleurs.js";
 import { optionsSelecteur, nomCompteVente, identiteCompteVente, annuaireLbc, ongletSansDonnee, nomPlateforme, logoPlateforme } from "./plateformes.js";
@@ -48361,7 +48362,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // barre ambre à gauche ; le titre et son « ⓘ » (le geste détaillé), la liste. Le geste
     // en une ligne reste sous le titre — « barre l'ancien, écris le nouveau ».
     <div data-numeros-a-ecrire={aEcrireCarton.length} className="vrm-carte-alerte" style={{ background: C.card, borderRadius: 14, padding: '12px 16px 4px' }}>
-      <div className="vrm-alerte-tete"><span aria-hidden="true" className="vrm-alerte-icone"><Icon name="pencil" size={15}/></span><span className="vrm-alerte-ligne-texte"><span className="vrm-alerte-ligne-titre">{aEcrireCarton.length > 1 ? `${aEcrireCarton.length} nouveaux numéros à écrire sur tes cartons` : 'Un nouveau numéro à écrire sur un carton'}{' '}<Pourquoi label="Écrire le nouveau numéro" titre="Le nouveau numéro">{aEcrireCarton.every((it) => ((numeros[it.id] || {}).reattribue || {}).main) ? 'Si le carton porte encore l’ancien numéro, barre-le et écris le nouveau.' : 'Barre l’ancien numéro sur le carton et écris le nouveau.'} L'ancien ne sera jamais redonné.</Pourquoi></span>
+      <div className="vrm-alerte-tete"><span aria-hidden="true" className="vrm-alerte-icone"><Icon name="pencil" size={15}/></span><span className="vrm-alerte-ligne-texte"><span className="vrm-alerte-ligne-titre">{/* (6 nov., v36-visuel-2) Le titre tient sur UNE ligne au téléphone (« ⓘ » compris) : le geste est dessous. */}{aEcrireCarton.length > 1 ? `${aEcrireCarton.length} nouveaux N° pour tes cartons` : 'Nouveau N° pour un carton'}{' '}<Pourquoi label="Écrire le nouveau numéro" titre="Le nouveau numéro">{aEcrireCarton.every((it) => ((numeros[it.id] || {}).reattribue || {}).main) ? 'Si le carton porte encore l’ancien numéro, barre-le et écris le nouveau.' : 'Barre l’ancien numéro sur le carton et écris le nouveau.'} L'ancien ne sera jamais redonné.</Pourquoi></span>
       <span className="vrm-alerte-ligne-sous">Barre l’ancien, écris le nouveau.</span></span></div>
       {aEcrireCarton.map((it) => { const f = numeros[it.id] || {}; const etq = etiquetteSurVinted(f.numero, f.reattribue.de, it.title); return (
         <div key={it.id} data-a-ecrire={String(it.id)} data-a-ecrire-de={f.reattribue.de} data-a-ecrire-vers={f.numero} data-a-ecrire-main={f.reattribue.main ? '1' : '0'} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '6px 0', borderTop: `1px solid ${C.border}` }}>
@@ -57727,12 +57728,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const href = o ? lienConv(o) : (t && t.suivi ? trackUrl(t.carrier || '', String(t.suivi)) : '');
                 return (
                   <div key={o ? 'nr' + o.transaction_id : 'nrt' + ((t && t.suivi) || ix)} className="vrm-rpf-ligne vrm-reparti-court" {...(o ? { 'data-reparti-tx': String(o.transaction_id) } : { 'data-reparti-suivi': (t && t.suivi) || '' })}>
-                    <div className="vrm-rpf-rang" style={{cursor:'default'}}>
+                    {/* (6 nov., v36-visuel-2) Une rangée de Wallet : la puce dit l'état en court (une ligne,
+                        jamais coupée), le MONTANT vit à droite comme un prix ; toute la rangée ouvre la
+                        conversation de LA commande (↗) — plus de « Ouvrir » qui serrait la puce sur 2 lignes. */}
+                    {(() => { const corps = (<>
                       <span className={'vrm-rpf-vignette' + (ph && !imgMortes.has(ph) ? '' : ' is-sans')} aria-hidden="true">{ph && !imgMortes.has(ph) ? <PhotoVinted src={ph} alt="" loading="lazy" onError={() => noterImgMorte(ph)}/> : null}</span>
                       <span className="vrm-rpf-quoi"><span className="vrm-rpf-titre">{o ? (o.title || 'Achat') : `${carrierName(t && t.carrier)} · n° ${(t && t.suivi) || ''}`}</span>
-                        <span className="vrm-rpf-puces"><span className="vrm-rpf-puce is-ambre" data-montant="">Remboursement à vérifier{m > 0 ? ` · ${m.toFixed(2).replace('.', ',')} €` : ''}</span></span></span>
-                      {href ? <a className="vrm-rpf-code" href={href} target="_blank" rel="noreferrer" data-reparti-ouvrir="" style={{display:'inline-flex',alignItems:'center',textDecoration:'none'}}>Ouvrir</a> : null}
-                    </div>
+                        <span className="vrm-rpf-puces"><span className="vrm-rpf-puce is-ambre">Remboursement à vérifier</span></span></span>
+                      {m > 0 ? <b className="vrm-rpf-montant" data-montant="">{montant(m)}</b> : null}
+                      {href ? <span className="vrm-rpf-sortie" aria-hidden="true">↗</span> : null}
+                    </>);
+                    return href
+                      ? <a className="vrm-rpf-rang vrm-rpf-rang-lien" href={href} target="_blank" rel="noreferrer" data-reparti-ouvrir="" aria-label={`Ouvrir la conversation : ${o ? (o.title || 'achat') : 'colis'}, remboursement à vérifier${m > 0 ? ' ' + montant(m) : ''}`}>{corps}</a>
+                      : <div className="vrm-rpf-rang" style={{cursor:'default'}}>{corps}</div>; })()}
                   </div>); })}
             </div>
             </section>

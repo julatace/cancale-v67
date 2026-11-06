@@ -1,0 +1,92 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   v36-VISUEL-2 (6 nov.) — DE « PROPRE » À « BEAU »
+   Julien : « c'est catastrophique, on dirait du travail bâclé, je veux quelque
+   chose de parfait et de beau » ; « tu ne peux pas te permettre de me faire un
+   site moyen ». La 1re passe (styles-visuel.css) a retiré le texte ; celle-ci
+   pose la MATIÈRE et le RYTHME des apps d'Apple (Wallet, Fitness, Photos, Mail) :
+     1. une échelle de texte stricte (34/28/22/17/15/13/11 · 700/600/400) ;
+     2. le grand titre qui se replie sous une barre FLOUTÉE (le contenu passe dessous) ;
+     3. des cartes « matériau » (blanches élevées, #1C1C1E la nuit), filets décalés ;
+     4. des pastilles d'UNE ligne, le montant à part, comme un prix ;
+     5. le mouvement : toucher 0,97, chiffre qui roule, feuilles en ressort — et
+        rien de tout ça en mouvement réduit.
+   Aucune couleur nouvelle (§3, §7) : encre, gris, l'ambre d'un geste, le bleu rare.
+   Jetons seulement (--vrm-*). Importée APRÈS styles-visuel.css.
+   Passation : docs/passation/2026-11-06-visuel-2.md
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* L'échelle (iOS : Large Title 34 · Title 1 28 · Title 2 22 · Headline/Body 17 ·
+     Subhead 15 · Footnote 13 · Caption 11). Au-delà de 20 px la police système
+     d'Apple passe d'elle-même en SF Pro Display (font-optical-sizing). */
+  --vrm-t34: 34px; --vrm-t28: 28px; --vrm-t22: 22px; --vrm-t17: 17px; --vrm-t15: 15px; --vrm-t13: 13px; --vrm-t11: 11px;
+  --vrm-ressort: cubic-bezier(.32,.72,0,1);          /* la courbe des tiroirs d'iOS */
+  --vrm-sortie: cubic-bezier(.23,1,.32,1);
+  --vrm-r-carte: 16px;
+}
+
+/* ══ 1. COLIS ══════════════════════════════════════════════════════════════ */
+
+/* L'en-tête d'un point : le NOM a sa ligne (à droite : transporteur · nombre),
+   l'adresse passe DESSOUS, entière jusqu'au bord. Plus jamais « 14 Rue des
+   Glycines, 35000 Re… » coincée à côté du nom. */
+html body .vrm-app-shell .vrm-main .vrm-rpf-point:not(.vrm-rpf-verifier) > .vrm-rpf-tete {
+  display: grid !important; grid-template-columns: minmax(0, 1fr) auto auto; align-items: baseline;
+  column-gap: 8px; row-gap: 2px; padding: 12px 16px 10px !important;
+}
+html body .vrm-app-shell .vrm-main .vrm-rpf-point > .vrm-rpf-tete > :is(.vrm-rpf-ident, .vrm-rpf-meta) { display: contents !important; }
+html body .vrm-app-shell .vrm-main .vrm-rpf-point > .vrm-rpf-tete .vrm-rpf-nom {
+  grid-row: 1; grid-column: 1; min-width: 0; font-size: var(--vrm-t17); font-weight: 600; letter-spacing: -.02em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+html body .vrm-app-shell .vrm-main .vrm-rpf-point > .vrm-rpf-tete .vrm-rpf-transp { grid-row: 1; grid-column: 2; align-self: center; }
+html body .vrm-app-shell .vrm-main .vrm-rpf-point > .vrm-rpf-tete .vrm-rpf-n { grid-row: 1; grid-column: 3; margin: 0 !important; font-size: var(--vrm-t13); font-weight: 400; color: var(--vrm-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+html body .vrm-app-shell .vrm-main .vrm-rpf-point > .vrm-rpf-tete .vrm-rpf-adr {
+  grid-row: 2; grid-column: 1 / -1; min-width: 0; font-size: var(--vrm-t13); font-weight: 400; color: var(--vrm-muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+html body .vrm-app-shell .vrm-main .vrm-rpf-point > .vrm-rpf-tete .vrm-rpf-transp .vrm-transporteur { font-size: var(--vrm-t13); }
+
+/* Une ligne de colis : la photo plus grande (56 px), le NOM DE L'ARTICLE garde la
+   place (deux lignes au plus), les gestes passent dessous, alignés sur le texte.
+   Sur une colonne large (ordinateur), tout reste sur une ligne. */
+html body .vrm-app-shell .vrm-main .vrm-rpf-point { container-type: inline-size; }
+html body .vrm-app-shell .vrm-main .vrm-rpf-vignette { width: 56px; height: 56px; border-radius: 12px; }
+html body .vrm-app-shell .vrm-main .vrm-rpf-titre { font-size: var(--vrm-t15); font-weight: 600; letter-spacing: -.01em; line-height: 1.3; }
+@container (max-width: 480px) {
+  html body .vrm-app-shell .vrm-main .vrm-rpf-ligne:not(.vrm-reparti-court) > .vrm-rpf-rang { flex-wrap: wrap; row-gap: 6px; column-gap: 8px; padding: 12px 0; }
+  html body .vrm-app-shell .vrm-main .vrm-rpf-ligne:not(.vrm-reparti-court) > .vrm-rpf-rang > .vrm-rpf-ouvrir { flex: 1 1 100%; gap: 12px; }
+  html body .vrm-app-shell .vrm-main .vrm-rpf-ligne:not(.vrm-reparti-court) > .vrm-rpf-rang > :is(.vrm-rpf-code, .vrm-rpf-retire) { height: 36px; min-height: 36px; padding: 0 14px !important; font-size: var(--vrm-t15) !important; position: relative; }
+  html body .vrm-app-shell .vrm-main .vrm-rpf-ligne:not(.vrm-reparti-court) > .vrm-rpf-rang > :is(.vrm-rpf-code, .vrm-rpf-retire)::after { content: ''; position: absolute; inset: -4px -2px; } /* 44 px au doigt */
+  html body .vrm-app-shell .vrm-main .vrm-rpf-ligne:not(.vrm-reparti-court) > .vrm-rpf-rang > .vrm-rpf-ouvrir + :is(.vrm-rpf-code, .vrm-rpf-retire) { margin-left: 68px; }
+  html body .vrm-app-shell .vrm-main .vrm-rpf-detail { padding-left: 68px; }
+}
+/* Les filets d'une liste commencent APRÈS la photo (comme Mail et Réglages). */
+html body .vrm-app-shell .vrm-main .vrm-rpf-ligne { position: relative; border-top: 0 !important; }
+html body .vrm-app-shell .vrm-main .vrm-rpf-ligne + .vrm-rpf-ligne::before {
+  content: ''; position: absolute; top: 0; left: 68px; right: 0; height: .5px; background: var(--vrm-line); pointer-events: none;
+}
+:root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-rpf-ligne + .vrm-rpf-ligne::before { background: #38383A; }
+
+/* Une puce : UNE ligne, jamais coupée ; le montant vit à part, comme un prix. */
+html body .vrm-app-shell .vrm-main .vrm-rpf-puce { white-space: nowrap !important; flex: none; height: 22px !important; min-height: 0 !important; padding: 0 8px !important; line-height: 22px !important; overflow: visible; }
+html body .vrm-app-shell .vrm-main .vrm-rpf-montant {
+  flex: none; margin-left: auto; font-size: var(--vrm-t15); font-weight: 600; color: var(--vrm-ink);
+  font-variant-numeric: tabular-nums; white-space: nowrap; letter-spacing: -.01em;
+}
+html body .vrm-app-shell .vrm-main .vrm-rpf-sortie { flex: none; width: 16px; color: var(--vrm-muted); font-size: 15px; text-align: center; }
+html body .vrm-app-shell .vrm-main a.vrm-rpf-rang-lien {
+  display: flex; align-items: center; gap: 12px; color: inherit; text-decoration: none; cursor: pointer;
+  margin: 0 -14px; padding: 12px 14px; -webkit-tap-highlight-color: transparent; transition: background-color 120ms ease-out;
+}
+html body .vrm-app-shell .vrm-main a.vrm-rpf-rang-lien:active { background: var(--vrm-card2); }
+@media (hover: hover) and (pointer: fine) { html body .vrm-app-shell .vrm-main a.vrm-rpf-rang-lien:hover { background: color-mix(in srgb, var(--vrm-card2) 60%, transparent); } }
+html body .vrm-app-shell .vrm-main a.vrm-rpf-rang-lien:focus-visible { outline: 2px solid var(--vrm-accent); outline-offset: -2px; border-radius: 12px; }
+
+/* La carte « Nouveau N° pour un carton » : ses boutons en pilules grises d'iOS. */
+html body .vrm-app-shell .vrm-main [data-numeros-a-ecrire] [data-a-ecrire] button {
+  border: 0 !important; background: var(--vrm-card2) !important; border-radius: 999px !important; padding: 0 16px !important;
+  font-size: var(--vrm-t15) !important; font-weight: 600 !important; color: var(--vrm-ink) !important;
+}
+html body .vrm-app-shell .vrm-main [data-numeros-a-ecrire] [data-a-ecrire] { border-top: .5px solid var(--vrm-line) !important; padding: 10px 0 !important; }
+html body .vrm-app-shell .vrm-main [data-numeros-a-ecrire] .vrm-alerte-ligne-titre { font-size: var(--vrm-t17); white-space: normal; }
