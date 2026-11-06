@@ -89,11 +89,21 @@ annonces » sur Leboncoin pour que VRM relise la liste », ouvre Annonces · Leb
   | `audit-adresse-sans-compte` | 19 verts | 9 rouges | 9/9 |
 - Banc `scripts/bancs/vague2-comptes.cjs` (données inventées, `BANC_PORT` 9520 par défaut,
   390 tactile et 1512, clair et sombre) : W1 Comptes liés, W2 adresse sans compte (+ panne),
-  W3 Ventes. Chiffres : voir « Résultats du banc » ci-dessous.
-- Verts : `email-formes`, `journal-emails`, `boite-emails`, `coque-parametres`,
-  `messages-emails-communaute`, `ventes-e2`, `fonctions-api`, `coherence`, `identite`,
-  `icones` (et les audits voisins des notifications : `notifications`, `cibles-notif`,
-  `notifs-centre`, `compte-pas-relu`, `bilan-semaine`, `flux-divers`…).
+  W3 Ventes. **Après : 102 verts, 0 rouge** (W0 12, W1 24, W2 42, W3 24). **Base (162659a6,
+  arbre extrait à part et construit, banc copié dedans) : 36 verts, 66 rouges** (W1 24,
+  W2 26, W3 16). Captures regardées (hors dépôt) : scratchpad de session `v2c/apres/` et
+  `v2c/avant/` (`v2-comptes-*`, `v2-sans-compte-*`, `v2-ventes-ligne-*`, `v2-ventes-recap-*`).
+  Vu sur capture et corrigé : « 4 e - mails » (chiffres à chasse fixe sur un titre) ⇒ police
+  normale. À 390 px, « Vérification » et « Livrée » se touchent presque (5 segments) : rien
+  n'est coupé (mesuré), le mot court est gardé.
+- Verts : audits `email-formes`, `journal-emails` (58), `boite-emails` (80), `fonctions-api`,
+  `coherence`, `identite`, `icones`, `ventes-e2` ; bancs `journal-emails` (58/0),
+  `boite-emails` (278/0), `coque-parametres` (113/0), `messages-emails-communaute` (108/0),
+  `ventes-e2` (107/0). Voisins des notifications et des e-mails, verts aussi : `notifications`,
+  `cibles-notif`, `notifs-centre`, `compte-pas-relu`, `bilan-semaine`, `flux-divers`,
+  `abonnement`, `lectures`, `routes-revue`, `suivi-colis`, `statuts`, `vestiaire-email`…
+  (le banc `journal-emails` réécrit des captures sous `docs/style-2026-10-31/emails/` :
+  remises à l'identique avant le commit).
 
 ## Ce qui reste
 - L'étape « Au centre de vérification » n'existe que tant que Vinted dit « Envoi au centre de
