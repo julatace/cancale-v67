@@ -205,6 +205,12 @@ const frise = (pg, sel) => pg.evaluate((sel) => { const f = document.querySelect
       });
       await essaie('D. Relier depuis Vinted', async () => {
         await pg.goto(`http://localhost:${PORT}/?tab=annonces&site=vinted`, { waitUntil: 'domcontentloaded' });
+        // (5 nov., chantier C — revue 2.6) « Relier à Vestiaire » vit dans la feuille « … » de la carte
+        //  (deux gestes à la vue). On l'ouvre comme la personne : « Détails et gestes » au téléphone, puis « … ».
+        await pg.waitForSelector('[data-carte-annonce="8013"] [data-fiche-menu-ouvrir]', { state: 'attached', timeout: 20000 }).catch(async (e) => { await capture(pg, `vinted-ko-${nomVp}`); throw e; });
+        await pg.evaluate(() => { const c = document.querySelector('[data-carte-annonce="8013"]'); const d = c && c.querySelector('[data-fiche-plus-bouton][aria-expanded="false"]'); if (d && d.offsetParent) d.click(); });
+        await pg.waitForTimeout(250);
+        { const o = pg.locator('[data-carte-annonce="8013"] [data-fiche-menu-ouvrir]').first(); await o.scrollIntoViewIfNeeded().catch(() => {}); await o.click({ timeout: 5000 }).catch(() => o.evaluate((x) => x.click())); }
         await pg.waitForSelector('[data-annonce-relier-vc="8013"]', { state: 'attached', timeout: 20000 }).catch(async (e) => { await capture(pg, `vinted-ko-${nomVp}`); throw e; });
         const plus = pg.locator('[data-annonce-relier-vc="8013"]');
         if (!(await plus.isVisible())) { await pg.evaluate(() => { const b = document.querySelector('[data-annonce-relier-vc="8013"]'); const c = b && b.closest('[data-fiche-plus]'); const btn = c && c.parentElement && c.parentElement.querySelector('[data-fiche-plus-bouton]'); if (btn) btn.click(); }); await pg.waitForTimeout(300); }
@@ -219,7 +225,11 @@ const frise = (pg, sel) => pg.evaluate((sel) => { const f = document.querySelect
         await attendLs(pg, () => !!JSON.parse(localStorage.getItem('vrm_vc_liens') || '{}')['71000001']);
         const l = await liensLs(pg);
         dit(l['71000001'] && l['71000001'].item === '8013' && l['71000001'].numero === '13', 'D · relié dans l’autre sens : P1 ↔ N°13', JSON.stringify(l['71000001']));
+        // (chantier C) Le geste est dans la feuille « … » de la carte : on la rouvre pour le lire.
+        await pg.waitForTimeout(300);
+        if (!(await pg.$('[data-annonce-delier-vc="8013"]'))) { const o = pg.locator('[data-carte-annonce="8013"] [data-fiche-menu-ouvrir]').first(); await o.click({ timeout: 5000 }).catch(() => o.evaluate((x) => x.click())); await pg.waitForSelector('[data-annonce-delier-vc="8013"]', { timeout: 5000 }).catch(() => {}); }
         dit(!!(await pg.$('[data-annonce-delier-vc="8013"]')), 'D · la fiche Vinted dit « Délier Vestiaire »');
+        await pg.keyboard.press('Escape').catch(() => {});
         await sain(pg, 'Annonces Vinted');
       });
       await essaie('E. Frise Vestiaire', async () => {

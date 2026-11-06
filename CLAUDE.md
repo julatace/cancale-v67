@@ -508,6 +508,11 @@ sans la fonction.
 
 - **5 nov. · Chantier H, coque (v35)** : en-tête = pastille de couleur (plus « ⓘ »), nuage seulement en panne ; « Dernière capture » = source de la liste ; Paramètres (icônes distinctes, Organisation en lien, plus de carte dans la carte, Statut) ; icônes de nav distinctes, un badge par colis ; cloche sur SheetShell + « Où ranger à l'arrivée » (`src/ouRanger.js`). `docs/passation/2026-11-05-chantier-h.md`.
 
+- **5 nov. · Chantier C (Annonces)** : une feuille « Actions » (Republier · Modifier prix ou titre · Mettre en brouillon · Mettre en ligne, raison dite une fois), carte = 2 gestes + « … », bandeau « Prix d'achat N/M », Numero/PhotoVide partout. `docs/passation/2026-11-05-chantier-c.md`. Geste : cocher deux annonces → Actions.
+
+- **5 nov. · Chantier E1 (Ma journée, cartes sombres)** : « N gestes » = toutes les cartes, « Vendus ailleurs » et « N°x vendue, toujours rangée » dans la liste, « Voir » seul verbe, Semaine propre, tête lisible la nuit, « Modifier » hors de la courbe, « — » avec sa raison (Reçu « à dater »). `docs/passation/2026-11-05-chantier-e1.md`.
+
+- **5 nov. · Chantier G (v35)** : Messages (filtres `.vrm-filtres`, liens de pied, colonne 368-420 px), UN écran E-mails (Paramètres y mène), `EtatPanne` E-mails/Communauté/Messages, offre Vestiaire < 6 h en ambre (jamais Vinted). `docs/passation/2026-11-05-chantier-g.md`.
 - **5 nov. · Chantier F, Compta et Statistiques (v35)** : cartes vides repliées en une ligne, sous-onglets sous le titre, statut choisi à UN endroit, « — » + raison (Comparer, À déclarer) ; « À recopier sur l'URSSAF » (Copier), Bilan du mois (PDF), Délai de paiement par site. `docs/passation/2026-11-05-chantier-f.md`. Geste : déclarer depuis « À recopier ».
 - **5 nov. · Petits plus (v34)** : accueil = vrais navigateurs (`navigateursServis`, Orion « en essai ») ; guide iPhone dans Notifications ; notif « compte Vinted pas relu » (Rappels, 1/jour) ; contrôle de prod (titre, santé, version extension). `docs/passation/2026-11-05-petits-plus.md`.
 
@@ -536,7 +541,6 @@ sans la fonction.
 - **5 nov. · Notifications et essai** : sept types, heures calmes, regroupement, cloche « centre des notifications » (lu/non lu, ouvre l'objet) ; e-mails j1/j3/j6 de l'essai par le cron du matin, désinscription en un clic ; revue : cloche = liste après purge, chemins des e-mails, heure limite du cron. `docs/passation/2026-11-05-notifications-relances.md`. Geste : poser les variables `RELANCES_*` sur Vercel.
 - **5 nov. · DAC7 par compte** : Compta → Le détail → « DAC7 » (N/30, /2 000 €, rapport ou où le trouver, PDF/tableur). `docs/passation/2026-11-05-dac7-comptes.md`.
 - **5 nov. · Communauté → Groupes** : groupes d'accompagnement (code/lien, validation par le créateur, partage choisi par le membre — rien par défaut, chiffres, détail — révocable et effacé ; relecture : total partiel dit, renvoi après effacement, verrou révocation/publication) ; migration **025 NON appliquée** (l'onglet le dit). `docs/passation/2026-11-05-communaute-groupes.md`. Geste : appliquer la 025.
-
 
 
 

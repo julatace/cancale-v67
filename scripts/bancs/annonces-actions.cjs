@@ -181,7 +181,10 @@ const debordement = (pg) => pg.evaluate(() => document.documentElement.scrollWid
           await clic(pg, '[data-actions-possibles]');
           await pg.waitForSelector('[data-actions-selection]', { timeout: 4000 });
           const mix = await pg.$$eval('[data-action-sel]', (l) => l.map((x) => [x.getAttribute('data-action-sel'), x.getAttribute('data-action-sel-ok'), x.textContent]));
-          dit(mix.length === 5 && mix.every(([, ok, t]) => ok === 'non' && /2 comptes/.test(t)), `A ${T} deux comptes mélangés ⇒ rien ne se lance, la raison dite`, mix.map((x) => x[0] + ':' + x[1]).join(' '));
+          // (5 nov., chantier C — revue 2.5) La raison commune se dit UNE fois, en tête de la
+          //  feuille (`[data-actions-raison]`), plus sous chaque action : le contrôle lit la tête.
+          const teteMix = await pg.$eval('[data-actions-raison]', (x) => x.textContent).catch(() => '');
+          dit(mix.length === 5 && mix.every(([, ok]) => ok === 'non') && /2 comptes/.test(teteMix), `A ${T} deux comptes mélangés ⇒ rien ne se lance, la raison dite`, mix.map((x) => x[0] + ':' + x[1]).join(' ') + ' / ' + teteMix);
           await fermerFeuille(pg, '[data-actions-selection]');
           // A/V — deux annonces en ligne du compte de Chrome
           await cocher(pg, '9301'); await cocher(pg, '9103');
@@ -226,7 +229,7 @@ const debordement = (pg) => pg.evaluate(() => document.documentElement.scrollWid
           await cocher(pg, '9102');
           await clic(pg, '[data-actions-possibles]');
           await pg.waitForSelector('[data-actions-selection="1"]', { timeout: 4000 });
-          await clic(pg, '[data-action-sel="main"]');
+          await clic(pg, '[data-action-sel="main"] button');   // (chantier C) « à la main » : un lien sous les quatre tuiles
           await pg.waitForSelector('[data-main-champ="titre"]', { timeout: 5000 }).catch(() => {});
           for (let i = 0; i < 20; i++) { if (!(await pg.$('[data-main-lecture]'))) break; await pg.waitForTimeout(200); }
           const champs = await pg.$$eval('[data-main-champ]', (l) => Object.fromEntries(l.map((x) => [x.getAttribute('data-main-champ'), x.textContent])));
@@ -262,7 +265,7 @@ const debordement = (pg) => pg.evaluate(() => document.documentElement.scrollWid
           await cocher(pg, '9110');
           await clic(pg, '[data-actions-possibles]');
           await pg.waitForSelector('[data-actions-selection]', { timeout: 4000 });
-          await clic(pg, '[data-action-sel="main"]');
+          await clic(pg, '[data-action-sel="main"] button');
           await pg.waitForSelector('[data-main-ouvrir-vinted]', { timeout: 5000 }).catch(() => {});
           { const [pop2] = await Promise.all([pg.context().waitForEvent('page', { timeout: 5000 }).catch(() => null), clic(pg, '[data-main-ouvrir-vinted]')]); if (pop2) await pop2.close().catch(() => {}); }
           await pg.waitForSelector('[data-main-lier="9121"]', { timeout: 5000 }).catch(() => {});

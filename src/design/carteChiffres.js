@@ -57,7 +57,9 @@ export const CHIFFRES = {
   declarer:   { nom: 'À déclarer', court: 'à déclarer', type: 'eur', periodes: PERIODES_BENEF, sites: ['toutes'], compte: false, aller: 'compta' },
   urssaf:     { nom: 'URSSAF', court: 'URSSAF', type: 'eur', periodes: PERIODES_BENEF, sites: ['toutes'], compte: false, aller: 'compta', titre: 'L’URSSAF de ces ventes, retirée du bénéfice. Celle à payer se calcule sur l’argent reçu (« Combien je dois déclarer ? »).' },
   finalisees: { nom: 'Ventes finalisées', court: 'finalisées', type: 'n', periodes: TOUTES_PERIODES, sites: ['toutes'], compte: false, aller: 'compta' },
-  aposter:    { nom: 'À poster', court: 'à poster', type: 'n', periodes: null, sites: SITES, compte: false, aller: 'cat_bord' },
+  // (5 nov., chantier E1, revue 1.2) Le mot de l'app : « À envoyer » (src/libelles.js). L'id reste
+  // `aposter` (les réglages rangés le gardent).
+  aposter:    { nom: 'À envoyer', court: 'à envoyer', type: 'n', periodes: null, sites: SITES, compte: false, aller: 'cat_bord' },
   retirer:    { nom: 'À retirer', court: 'à retirer', type: 'n', periodes: null, sites: ['toutes'], compte: false, aller: 'cat_bord' },
   // (4 nov.) « Argent à venir » : ce que TES SITES te doivent encore (src/argentAVenir.js,
   // `liveStats.aVenir`) — toutes plateformes, par compte Vinted. L'id reste `attente`
@@ -353,7 +355,13 @@ export const valeurChiffre = (id, place, sources, sel, regles, maintenant = Date
     const R = recuPublie(S.ligneUrssaf, ym, maintenant);
     if (R.valeur == null) return vide(R.raison, { p });
     if (R.partiel && !(R.valeur > 0)) return vide('partiel', { p, manque: R.manque });
-    return { valeur: R.valeur, partiel: R.partiel, manque: R.manque, hors: '', p, raison: '' };
+    // (5 nov., chantier E1, revue 1.7) Des ventes SANS date de versement (« à dater ») ne
+    // sont dans AUCUN mois (§5). Rien de daté ce mois et des ventes à dater : « 0 € » dirait
+    // « rien reçu » alors qu'on ne SAIT pas ⇒ « — », la raison nommée. Un montant daté reste,
+    // le manque écrit à côté (`aDater`) — jamais caché.
+    const nAd = Number(S.ligneUrssaf && S.ligneUrssaf.aDater && S.ligneUrssaf.aDater.n) || 0;
+    if (nAd > 0 && !(R.valeur > 0)) return vide('a-dater', { p, aDater: nAd });
+    return { valeur: R.valeur, partiel: R.partiel, manque: R.manque, hors: '', p, raison: '', aDater: nAd };
   }
   if (id === 'aposter') {
     const pub = S.colisAPoster;
@@ -410,6 +418,26 @@ export const valeurChiffre = (id, place, sources, sel, regles, maintenant = Date
     return { valeur: pub.n, partiel, manque: [], hors: '', p: null, raison: '' };
   }
   return vide('inconnu');
+};
+
+// ── LA RAISON D'UN « — », EN DEUX OU TROIS MOTS (5 nov., chantier E1) ────────
+// §5 : un chiffre qu'on ne connaît pas s'écrit « — » AVEC la raison. La case la
+// dit sous son libellé (la phrase longue reste dans son titre) ; un montant daté
+// qui laisse des ventes « à dater » le dit aussi (le manque nommé, jamais caché).
+export const RAISON_COURTE = {
+  pasSu: 'pas lu', encours: 'lecture…', publication: 'pas calculé', achats: 'prix d’achat manquants',
+  frais: 'frais pas lus', cotisations: 'statut à choisir', rien: 'rien à compter', aucune: 'aucune vente',
+  statut: 'statut à choisir', absente: 'ouvre Ventes', ancienne: 'à relire', 'ancienne-app': 'à relire', illisible: 'pas lu',
+};
+export const raisonCourte = (x) => {
+  if (!x) return '';
+  if (x.valeur != null) return x.aDater > 0 ? `+ ${x.aDater} à dater` : '';
+  if (x.hors) return x.hors;
+  // Une case PROPRE à la page dit sa raison elle-même (Compta : « À déclarer » sans statut).
+  if (x.def && x.def.local && x.def.raisonCourte) return x.def.raisonCourte;
+  if (x.raison === 'a-dater') return `${x.aDater} à dater`;
+  if (x.raison === 'partiel') return x.manque && x.manque.length ? `sans ${x.manque[0]}` : 'pas tout lu';
+  return RAISON_COURTE[x.raison] || 'pas lu';
 };
 
 // Toute la carte d'une page : le grand chiffre et les cases, avec le périmètre.

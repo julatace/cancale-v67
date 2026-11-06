@@ -66,13 +66,20 @@ export function raisonPasSelectionnable(etat) {
 // `robot` = elle part chez Vinted par l'extension (compte de Chrome exigé) ;
 // `cap` = la capacité d'extension qu'elle demande (`EXT_CAPACITES` de l'app) ;
 // `seule` = une annonce à la fois.
+// (5 nov., chantier C — revue 2.5) QUATRE libellés, les mêmes partout : ceux de
+// l'ancienne feuille « Republier et brouillons » qui parlaient à Julien
+// (« Modifier prix ou titre ») et deux verbes pour les passages d'état — plus de
+// flèches « En ligne → en ligne, avec tes modifications ».
 export const ACTIONS_SELECTION = [
   { k: 'recreer', titre: 'Republier', desc: 'Supprimer et recréer : favoris et vues repartent de zéro.', etats: ['en-ligne'], robot: true, cap: 'recreer' },
-  { k: 'modifier', titre: 'En ligne → en ligne, avec tes modifications', desc: 'Prix ou titre changés sur place : favoris et vues gardés.', etats: ['en-ligne'], robot: true, cap: 'republiermodif' },
-  { k: 'versBrouillon', titre: 'En ligne → brouillon', desc: 'Retirée de la vente, gardée dans tes brouillons Vinted.', etats: ['en-ligne'], robot: true, cap: 'versbrouillon' },
-  { k: 'enLigne', titre: 'Brouillon → en ligne', desc: 'Mis en ligne tel qu’il est enregistré sur Vinted.', etats: ['brouillon'], robot: true, cap: 'brouillon' },
-  { k: 'main', titre: 'Republier à la main, accompagné', desc: 'VRM te donne les photos réglées, le titre, la description et le prix ; puis remet le N° sur la nouvelle annonce.', etats: ['en-ligne', 'masquee', 'brouillon'], robot: false, seule: true },
+  { k: 'modifier', titre: 'Modifier prix ou titre', desc: 'Sur place : favoris et vues gardés.', etats: ['en-ligne'], robot: true, cap: 'republiermodif' },
+  { k: 'versBrouillon', titre: 'Mettre en brouillon', desc: 'Retirée de la vente, gardée dans tes brouillons Vinted.', etats: ['en-ligne'], robot: true, cap: 'versbrouillon' },
+  { k: 'enLigne', titre: 'Mettre en ligne', desc: 'Le brouillon part tel qu’il est enregistré sur Vinted.', etats: ['brouillon'], robot: true, cap: 'brouillon' },
+  // Pas une cinquième tuile : un lien discret sous les quatre (rien ne part chez Vinted d'ici).
+  { k: 'main', titre: 'Republier à la main', desc: 'VRM te donne les photos réglées, le titre, la description et le prix ; puis remet le N° sur la nouvelle annonce.', etats: ['en-ligne', 'masquee', 'brouillon'], robot: false, seule: true, lien: true },
 ];
+// Les quatre tuiles de la feuille, dans l'ordre (« à la main » est un lien à part).
+export const ACTIONS_TUILES = ACTIONS_SELECTION.filter((A) => !A.lien).map((A) => A.k);
 const POUR_ETAT = { 'en-ligne': 'les annonces en ligne', brouillon: 'les brouillons', masquee: 'les annonces masquées', verification: 'les annonces en vérification' };
 const pl = (n, mot, plur) => `${n} ${n > 1 ? (plur || mot + 's') : mot}`;
 const COMPTE_ETAT = (n, e) => (e === 'brouillon' ? pl(n, 'brouillon')
@@ -113,6 +120,26 @@ export function actionsPossibles({ selection, chrome, capOk, nomCompte } = {}) {
     }
     return { k: A.k, titre: A.titre, desc: A.desc, ok: !raison, raison, ids, robot: !!A.robot };
   });
+}
+
+// (5 nov., chantier C — revue 2.5) LA RAISON SE DIT UNE FOIS, EN TÊTE.
+// La feuille répétait la même phrase sous chacune des tuiles (« VRM ne sait pas
+// encore quel compte Vinted est ouvert… » quatre fois). Règle : la raison que
+// partagent au moins deux tuiles grisées (ou celle de la seule tuile, si toutes
+// le sont) se dit une fois en tête ; sous une tuile ne reste que SA raison quand
+// elle diffère (« Seulement pour les brouillons… »). Une tuile possible garde sa
+// description. Rend { tete, parTuile: { k: texte } } — `tete` = '' sans raison commune.
+export function raisonCommune(actions, tuiles = ACTIONS_TUILES) {
+  const t = (Array.isArray(actions) ? actions : []).filter((x) => x && tuiles.includes(x.k));
+  const off = t.filter((x) => !x.ok && x.raison);
+  const compte = new Map();
+  for (const x of off) compte.set(x.raison, (compte.get(x.raison) || 0) + 1);
+  let tete = ''; let max = 0;
+  for (const [r, n] of compte) if (n > max) { max = n; tete = r; }
+  if (max < 2 && !(off.length === 1 && t.length === 1)) tete = '';
+  const parTuile = {};
+  for (const x of t) parTuile[x.k] = x.ok ? (x.desc || '') : (x.raison === tete ? '' : x.raison);
+  return { tete, parTuile };
 }
 
 // ── REPUBLIER À LA MAIN : REMETTRE LE N° SUR LA NOUVELLE (identité) ─────────

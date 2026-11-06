@@ -76,6 +76,26 @@ const passerVerif = async (pg) => { try { const f = await pg.waitForSelector('[d
 
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
+// (5 nov., chantier C — revue 2.5) La feuille « Republier et brouillons » est RETIRÉE : on entre
+// dans le moteur par « Republier… » → « Sélectionner » → une annonce cochée → « Actions » → la
+// tuile. Le moteur s'ouvre après « Choisir » ; « Retour » ramène à son étape « Choisir » (la
+// liste complète du compte), où l'annonce pivot est décochée : la suite du parcours est jugée
+// exactement comme avant (aucune règle du moteur n'a changé).
+async function moteurPar(pg, k) {
+  await pg.locator('[data-actions-ouvrir]').first().click();
+  await pg.waitForSelector('[data-selection-vue]', { timeout: 6000 });
+  const etat = k === 'enLigne' ? 'brouillon' : 'en-ligne';
+  const pivot = await pg.evaluate((e) => { const x = document.querySelector(`[data-selection-compte="111"] [data-selection-annonce][data-selection-etat="${e}"]:not([aria-disabled="true"])`); return x ? x.getAttribute('data-selection-annonce') : null; }, etat);
+  await pg.evaluate(() => { for (const c of document.querySelectorAll('[data-selection-annonce] input:checked')) c.click(); });
+  await pg.locator(`[data-selection-annonce="${pivot}"] input`).check();
+  await pg.locator('[data-actions-possibles]').click();
+  await pg.locator(`[data-action-sel="${k}"]`).click();
+  await pg.locator('[data-republier]').waitFor({ state: 'visible', timeout: 5000 });
+  await pg.locator('[data-republier] button', { hasText: /^Retour$/ }).first().click();
+  await pg.locator(`[data-republier-paire="${pivot}"]`).waitFor({ timeout: 4000 });
+  await pg.locator(`[data-republier-paire="${pivot}"]`).click();
+  return pivot;
+}
 const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/json', '.woff2': 'font/woff2' };
 const srv = http.createServer((q, r) => {
   let f = q.url.split('?')[0]; if (f === '/' || !path.extname(f)) f = '/index.html';
@@ -135,16 +155,27 @@ const projette = (row, sel) => {
         { const d = await pg.evaluate(() => { const a = document.querySelector('[data-astuce-numeros]'); if (!a) return 'absente'; const b = [...a.querySelectorAll('b')].find((x) => x.textContent === 'numéro'); return b ? getComputedStyle(b.parentElement).display : 'sans mot'; });
           if (d !== 'absente') dit(d !== 'flex' && d !== 'sans mot', 'l’astuce « numéro, jamais redonné » se lit d’une traite (pas d’espace avant la virgule)', d); }
         const lb = await bouton.boundingBox().catch(() => null);
-        dit(lb && lb.width >= 80 && lb.height >= 40, '« Actions » n’est pas écrasé dans une case de 44 px (barre du téléphone)', lb ? `${Math.round(lb.width)}×${Math.round(lb.height)}` : 'absent');
+        // (5 nov., chantier C — revue 2.10) Au téléphone, la barre d'Annonces porte ses boutons en
+        //  ICÔNE de 44 × 44 (le nom dans aria-label), à l'ordinateur en mots (36 px à la souris) :
+        //  le contrôle juge « pas écrasé » selon CETTE forme, plus l'ancienne pilule de 80 px.
+        const telR = vp.width < 600;
+        dit(lb && (telR ? lb.width >= 43.5 && lb.height >= 43.5 : lb.width >= 80 && lb.height >= 35.5), '« Republier… » n’est pas écrasé (icône 44 × 44 au téléphone, en mots à l’ordinateur)', lb ? `${Math.round(lb.width)}×${Math.round(lb.height)}` : 'absent');
+        // (5 nov., chantier C — revue 2.5) Plus de menu « Republier et brouillons » : « Republier… »
+        //  mène à « Sélectionner », puis UNE feuille « Actions » à quatre tuiles.
         await bouton.click();
-        await pg.locator('[data-actions-menu]').waitFor({ state: 'visible', timeout: 4000 });
-        const entrees = await pg.$$eval('[data-action]', (els) => els.map((e) => e.getAttribute('data-action')));
-        dit(entrees.join(',') === 'recreer,modifier,enLigne,versBrouillon,voir', 'le menu Actions : republier, modifier sur place, brouillons → en ligne, en ligne → brouillon, voir ses brouillons', entrees.join(','));
-        const hA = await pg.$$eval('[data-action]', (els) => els.map((e) => Math.round(e.getBoundingClientRect().height)));
-        dit(hA.every((h) => h >= 44), 'chaque entrée du menu fait au moins 44 px', hA.join(','));
+        await pg.waitForSelector('[data-selection-vue]', { timeout: 6000 });
+        dit(await pg.locator('[data-actions-menu]').count() === 0, '« Republier… » mène à la vue « Sélectionner » (plus de second menu)');
+        await pg.locator('[data-selection-annonce="9102"] input').check();
+        await pg.locator('[data-actions-possibles]').click();
+        await pg.waitForSelector('[data-actions-selection]', { timeout: 4000 });
+        const entrees = await pg.$$eval('.vrm-act-choix[data-action-sel]', (els) => els.map((e) => e.getAttribute('data-action-sel')));
+        dit(entrees.join(',') === 'recreer,modifier,versBrouillon,enLigne', 'la feuille Actions : Republier, Modifier prix ou titre, Mettre en brouillon, Mettre en ligne', entrees.join(','));
+        const hA = await pg.$$eval('.vrm-act-choix[data-action-sel]', (els) => els.map((e) => Math.round(e.getBoundingClientRect().height)));
+        dit(hA.every((h) => h >= 44), 'chaque tuile fait au moins 44 px', hA.join(','));
         await pg.waitForTimeout(700); await pg.screenshot({ path: path.join(require('os').tmpdir(), `actions-menu-${vp.width}.png`) }).catch(() => {});
-        await pg.locator('[data-actions-menu] [aria-label="Fermer"]').click();
+        await pg.locator('[data-actions-selection]').locator('xpath=ancestor::*[@role="dialog"][1]').locator('button[aria-label="Fermer"]').first().click().catch(() => pg.keyboard.press('Escape'));
         await pg.waitForTimeout(250);
+        await pg.locator('[data-selection-annonce="9102"] input').uncheck();
         await pg.locator('.vrm-ann-toolbar').first().screenshot({ path: path.join(require('os').tmpdir(), `republier-barre-${vp.width}.png`) }).catch(() => {});
         dit(await pg.locator('[data-atelier-ouvrir]').count() === 0, 'plus de « ✨ Préparer » sur les cartes (un seul parcours)');
         const outils = pg.locator('[aria-label="Outils"]').first();
@@ -154,8 +185,10 @@ const projette = (row, sel) => {
         await pg.keyboard.press('Escape').catch(() => {});
         if (await outils.count()) { await pg.mouse.click(5, 5).catch(() => {}); await pg.waitForTimeout(150); }
         // (28 oct.) Ses brouillons : listés, « Mettre en ligne » seulement pour celui dont VRM a le contenu.
-        dit(/2 brouillons/.test(await bouton.innerText()), '« Actions » dit combien de brouillons sont sur Vinted (2)', await bouton.innerText());
-        { await bouton.click(); await pg.locator('[data-action="voir"]').click();
+        // (chantier C) Le nombre de brouillons est porté par le filtre « Brouillons · 2 » (plus par le libellé du bouton).
+        const nBr = await pg.locator('[data-vue-brouillons]').first().getAttribute('data-vue-brouillons').catch(() => '');
+        dit(nBr === '2', '« Brouillons » dit combien de brouillons sont sur Vinted (2)', nBr);
+        { await pg.locator('[data-vue-brouillons]').first().click(); await pg.waitForSelector('[data-selection-vue="brouillon"]', { timeout: 6000 }); await pg.locator('[data-brouillons-detail]').first().click();
           await pg.locator('[data-brouillons-vinted]').waitFor({ state: 'visible', timeout: 4000 });
           await pg.locator('[data-brouillon="9201"][data-brouillon-etat="pret"]').waitFor({ timeout: 4000 }).catch(() => {});
           dit(await pg.locator('[data-brouillon="9201"][data-brouillon-etat="pret"] [data-brouillon-publier]').count() === 1, 'le brouillon dont VRM a le contenu complet propose « Mettre en ligne »');
@@ -194,7 +227,7 @@ const projette = (row, sel) => {
           await pg.waitForTimeout(300);
           await pg.evaluate(() => { window.__repub = []; });
         }
-        await bouton.click(); await pg.locator('[data-action="recreer"]').click();
+        await moteurPar(pg, 'recreer');
         await pg.locator('[data-republier]').waitFor({ state: 'visible', timeout: 4000 });
         const paires = await pg.$$eval('[data-republier-paire]', (els) => els.map((e) => e.getAttribute('data-republier-paire')));
         dit(paires.join(',') === '9103,9102,9106,9107', 'la liste = ses 4 paires en ligne, les plus anciennes d’abord', paires.join(','));
@@ -359,7 +392,7 @@ const projette = (row, sel) => {
         return j([]);
       });
       await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
-      const action = async (k) => { await pg.locator('[data-actions-ouvrir]').first().click(); await pg.locator(`[data-action="${k}"]`).click(); await pg.locator(`[data-republier-action="${k}"]`).waitFor({ state: 'visible', timeout: 4000 }); };
+      const action = async (k) => { await moteurPar(pg, k); await pg.locator(`[data-republier-action="${k}"]`).waitFor({ state: 'visible', timeout: 4000 }); };
       const lancer = async () => { await pg.locator('[data-republier-esp-choix="fixe"]').click().catch(() => {}); await pg.locator('[data-republier] input[inputmode="numeric"]').fill('0').catch(() => {}); await pg.locator('[data-republier-confirme]').check(); await pg.locator('[data-republier-lancer]').click(); await passerVerif(pg); for (let i = 0; i < 40; i++) { const m = await pg.locator('[data-republier]').getAttribute('data-republier-mode'); if (m === 'fini' || m === 'pause') break; await pg.waitForTimeout(200); } };
       const fermer = async () => { await pg.locator('[data-republier-fermer]').click().catch(() => {}); await pg.waitForTimeout(250); await pg.evaluate(() => { window.__repub = []; }); };
       try {
@@ -400,7 +433,7 @@ const projette = (row, sel) => {
         dit(e3.length === 1 && e3[0].cmd === 'recreerVinted' && e3[0].versBrouillon === true && e3[0].id === '9103', '… la commande est la recréation arrêtée au brouillon (versBrouillon)', JSON.stringify(e3));
         await fermer();
         // « Plus sur Vinted » : retiré de la liste, et « Les remettre ».
-        await pg.locator('[data-actions-ouvrir]').first().click(); await pg.locator('[data-action="voir"]').click();
+        await pg.locator('[data-vue-brouillons]').first().click(); await pg.waitForSelector('[data-selection-vue="brouillon"]', { timeout: 6000 }); await pg.locator('[data-brouillons-detail]').first().click();   // (chantier C) « Voir mes brouillons » = « Un par un » de la vue Brouillons
         await pg.locator('[data-brouillon="9202"] [data-brouillon-ecarter]').click();
         dit(await pg.locator('[data-brouillon="9202"]').count() === 0 && await pg.locator('[data-brouillons-ecartes="1"]').count() === 1, '« Plus sur Vinted » : le brouillon sort de la liste, et c’est dit');
         await pg.locator('[data-brouillons-remettre]').click();
@@ -435,7 +468,7 @@ const projette = (row, sel) => {
       try {
         await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
         for (let i = 0; i < 40 && !(await pg.locator('[data-actions-ouvrir]').count()); i++) await pg.clock.runFor(500);
-        await pg.locator('[data-actions-ouvrir]').first().click(); await pg.locator('[data-action="recreer"]').click();
+        await moteurPar(pg, 'recreer');
         await pg.locator('[data-republier-paire="9102"]').click();
         await pg.locator('[data-republier-paire="9103"]').click();
         await pg.locator('[data-republier-suivant]').click();
@@ -534,9 +567,10 @@ const projette = (row, sel) => {
         const ligneR = pg.locator('[data-refaire-ouvrir]').first();
         await ligneR.waitFor({ state: 'visible', timeout: 12000 }).catch(() => {});
         dit(await ligneR.getAttribute('data-refaire-ouvrir').catch(() => '') === '3', 'Annonces : « 3 brouillons à refaire » (à refaire, interrompu, mise en ligne floue ; ni le passage en cours, ni le fait)', await ligneR.getAttribute('data-refaire-ouvrir').catch(() => 'absent'));
-        await pg.locator('[data-actions-ouvrir]').first().click();
-        dit(await pg.locator('[data-action="refaire"]').count() === 1, 'le menu Actions propose « Brouillons à refaire »');
-        await pg.locator('[data-action="refaire"]').click();
+        // (chantier C) Le menu « Republier et brouillons » est retiré : « N brouillons à refaire » de la
+        //  barre d'outils est l'entrée (la même liste).
+        dit(await pg.locator('[data-refaire-ouvrir]').count() === 1, 'la barre d’Annonces propose « Brouillons à refaire »');
+        await ligneR.click();
         await pg.locator('[data-refaire-liste]').waitFor({ state: 'visible', timeout: 4000 });
         const lignes = await pg.$$eval('[data-refaire-ligne]', (els) => els.map((e) => e.getAttribute('data-refaire-ligne') + ':' + e.getAttribute('data-refaire-quoi')).sort());
         dit(lignes.join(',') === '9500:a-refaire,9503:a-verifier,9504:interrompu', 'la liste : à refaire, interrompu, à vérifier', lignes.join(','));
@@ -566,7 +600,7 @@ const projette = (row, sel) => {
         await pg.locator('[data-refaire-liste] [aria-label="Fermer"]').click();
         // La ligne ratée de Republier porte son bouton.
         await pg.evaluate(() => { window.__repub.length = 0; });
-        await pg.locator('[data-actions-ouvrir]').first().click(); await pg.locator('[data-action="recreer"]').click();
+        await moteurPar(pg, 'recreer');
         await pg.locator('[data-republier-paire="9102"]').click();
         await pg.locator('[data-republier-suivant]').click();
         await pg.locator('[data-republier-suivant]').click();
@@ -628,7 +662,7 @@ const projette = (row, sel) => {
       try {
         await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
         await pg.locator('[data-actions-ouvrir]').first().waitFor({ state: 'visible', timeout: 12000 });
-        await pg.locator('[data-actions-ouvrir]').first().click(); await pg.locator('[data-action="recreer"]').click();
+        await moteurPar(pg, 'recreer');
         await pg.locator('[data-republier-paire="9102"]').click();
         await pg.locator('[data-republier-paire="9103"]').click();
         await pg.locator('[data-republier-suivant]').click();

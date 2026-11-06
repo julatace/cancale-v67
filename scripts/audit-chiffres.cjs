@@ -256,7 +256,8 @@ nBenef === 2 ? ok('Rapports mensuel ET annuel : bénéfice sur le coût connu')
   /achatsAffiches\.slice\(0, achatsMax\)/.test(app)
     ? ok('et l\'écran n\'en dessine qu\'une tranche')
     : nok('544 commandes d\'un coup font 72 880 px sur iPhone');
-  /Voir plus — \{achatsMax\} affichés sur \{achatsAffiches\.length\}/.test(app)
+  // (5 nov.) Le bouton dit aussi « Voir les N derniers » ; le total reste écrit (`toLocaleString`).
+  /\{achatsMax\} affichés sur \{achatsAffiches\.length(\.toLocaleString\([^)]*\))?\}/.test(app)
     ? ok('le bouton « Voir plus » porte le total')
     : nok('le bouton doit dire combien d\'achats existent en tout');
   !/\{o\.price\?\.amount\} \{cur\(/.test(app)
