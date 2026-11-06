@@ -80,11 +80,18 @@ const re = (s) => s;
 // « 1 ventes » / « 0 ventes » ; « 2 vente » (un nombre ≥ 2, pas une heure « 12 h », pas une partie d'un nombre « 1 234 »).
 const PLURIEL_FAUX = new RegExp(`(?<![\\d,.\\u00a0\\u202f ])(?:0|1)[\\u00a0\\u202f ](?:${NOMS.map((n) => re(n[1])).join('|')})(?![\\p{L}-])`, 'u');
 const SINGULIER_FAUX = new RegExp(`(?<![\\d,.:/\\u00a0\\u202f-])(?:[2-9]|[1-9]\\d+)[\\u00a0\\u202f ](?:${NOMS.map((n) => re(n[0])).join('|')})(?![\\p{L}-])`, 'u');
+// Le vocabulaire décidé (src/libelles.js) : ses mots ÉCARTÉS ne s'écrivent plus à l'écran.
+const LIB = (() => { const vm = require('vm'); const src = fs.readFileSync(path.join(RACINE, 'src', 'libelles.js'), 'utf8').replace(/^export /gm, ''); const ctx = {}; vm.runInNewContext(src + '\n;this.motsEcartesDans = motsEcartesDans;', ctx); return ctx; })();
 const regleTexte = [
   ['T1', 'accord : « 1 ventes » / « 2 vente »', (t) => { const m = PLURIEL_FAUX.exec(t) || SINGULIER_FAUX.exec(t); return m && m[0]; }],
   ['T2', 'espace manquant ou sécable avant « € »', (t) => { const m = /\d€|\d[ \t\r\n]+€/.exec(t); return m && m[0]; }],
   ['T3', '« n/d », « undefined », « NaN », « null », « [object Object] »', (t) => { const m = /\bn\/d\b|\bundefined\b|\bNaN\b|\bnull\b|\[object Object\]/i.exec(t); return m && m[0]; }],
   ['T4', '« ... » au lieu de « … »', (t) => { const m = /\.\.\./.exec(t); return m && m[0]; }],
+  // « reçus » n'est écarté que pour un COLIS (« Arrivés ») : « Favoris reçus », « reçus d'achat », « bordereaux
+  // reçus » parlent d'autre chose. « Bénéfice brut » est le nom DÉCIDÉ de la tuile de la semaine
+  // (src/beneficeNoms.js, NOM_BENEFICE_BRUT) : une autre notion que le Bénéfice.
+  ['T5', 'mot écarté par src/libelles.js (« à poster », « en transit », « emails »…)', (t) => { const m = LIB.motsEcartesDans(t).filter((w) => !(w === 'reçus' && !/colis/i.test(t)) && w !== 'bénéfice brut'); return m.length ? m.join(', ') : null; }],
+  ['T6', '« email » au lieu de « e-mail » (libelles.js : E-mails)', (t) => { const m = /(^|[^\p{L}-])(e?mails?)(?![\p{L}@.-])/iu.exec(t); return m && !/^mail/i.test(m[2]) ? m[2] : null; }],
 ];
 
 // ── Ce qui se mesure DANS la page ────────────────────────────────────────────
@@ -400,7 +407,6 @@ const court = (a, n = 6) => JSON.stringify(a.slice(0, n)).slice(0, 900);
       ['plus', 'journee', '[data-tabbar-plus], .vrm-tabbar [aria-label="Plus"], .vrm-tabbar button:last-child'],
       ['chiffres', 'journee', '[data-carte-modifier="journee"]'],
       ['aide-ventes', 'ventes', '[data-carte-stats] [data-carte-aide]'],
-      ['recherche', 'journee', 'button[aria-label^="Rechercher"]'],
       ['conversation', 'messages', '[data-conv="502"]'],
     ];
     for (const sombre of [false, true]) for (const [id, tab, q] of OUVRIR) {

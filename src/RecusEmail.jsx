@@ -25,13 +25,13 @@ export default function RecusEmail({recus,autres=0,relies=null,nom='Reçu d’ac
  <p>Tous tes comptes · Ces justificatifs restent accessibles même sans synchronisation Vinted.</p>
  {recus===undefined ? <p role="status">Lecture des reçus…</p> : recus===null ? <div role="status">Les reçus n’ont pas pu être lus.<button type="button" onClick={onActualiser}>Réessayer</button></div> : <>
  <button type="button" onClick={onActualiser}>Actualiser les reçus</button>
- {recus.length>0&&<input type="search" aria-label="Rechercher un reçu par email" value={recherche} onChange={e=>{setRecherche(e.target.value);setMax(10);}} placeholder="Article, compte ou transaction"/>}
+ {recus.length>0&&<input type="search" aria-label="Rechercher un reçu par e-mail" value={recherche} onChange={e=>{setRecherche(e.target.value);setMax(10);}} placeholder="Article, compte ou transaction"/>}
  {!liste.length&&<p>{recus.length?'Aucun reçu pour cette recherche.':'Aucun reçu d’achat arrivé par e-mail pour l’instant.'}</p>}
  {/* (29 oct.) Ce qui se relie à un achat, par le n° de transaction seulement (§5) ; le reste reste ici, jamais rattaché au hasard. */}
  {relies&&recus.length>0&&<p data-recus-relies={relies.achats} data-recus-lignes={relies.lignes} data-recus-sans-tx={relies.sansTx} data-recus-absents={relies.absents} data-recus-passu={relies.passu} data-recus-comptes-ko={(relies.ko||[]).join(',')}>{phraseRelies(relies,nom)}</p>}
  {relies&&<p data-recus-geste="">Un achat sans « {nom} » sur sa ligne : VRM n’a relié aucun reçu à cet achat. Si VRM ne reçoit pas les e-mails Vinted d’un de tes comptes, fais-les suivre vers ton adresse VRM (Paramètres → Réception des e-mails).</p>}
  {autres>0&&<p data-recus-autres={autres}>{autres===1?'1 autre e-mail de commande (mise à jour, confirmation, retour) n’est pas un reçu : il n’est pas listé ici.':`${autres} autres e-mails de commande (mises à jour, confirmations, retours) ne sont pas des reçus : ils ne sont pas listés ici.`}</p>}
- <ul>{liste.slice(0,max).map((r,i)=><li key={r._emailId||i}><button type="button" onClick={()=>onOuvrir(r)}><span><strong>{r.article||r.subject||'Reçu d’achat Vinted'}</strong><small>{[r.account,r.receivedAt&&Number.isFinite(Date.parse(r.receivedAt))?new Date(r.receivedAt).toLocaleDateString('fr-FR'):'',r.transaction?`Transaction ${r.transaction}`:''].filter(Boolean).join(' · ')||'Compte non identifié dans l’email'}</small></span><span aria-hidden="true">Voir ›</span></button></li>)}</ul>
+ <ul>{liste.slice(0,max).map((r,i)=><li key={r._emailId||i}><button type="button" onClick={()=>onOuvrir(r)}><span><strong>{r.article||r.subject||'Reçu d’achat Vinted'}</strong><small>{[r.account,r.receivedAt&&Number.isFinite(Date.parse(r.receivedAt))?new Date(r.receivedAt).toLocaleDateString('fr-FR'):'',r.transaction?`Transaction ${r.transaction}`:''].filter(Boolean).join(' · ')||'Compte non identifié dans l’e-mail'}</small></span><span aria-hidden="true">Voir ›</span></button></li>)}</ul>
  {liste.length>max&&<button type="button" onClick={()=>setMax(n=>n+10)}>Afficher les reçus suivants ({liste.length-max})</button>}
  </>}
  </details>;

@@ -1515,7 +1515,7 @@ const authSignIn  = async (email, password) => {
     if (/not confirmed/i.test(r.error)) return { ok: false, needsConfirm: true, error: "Ton compte existe, mais l'email n'est pas encore confirmé." };
     if (r.status>=500) return {ok:false,error:'Le service de connexion est momentanément indisponible. Réessaie dans un instant.'};
     if (r.status===429) return {ok:false,error:'Trop de tentatives de connexion. Patiente un moment avant de réessayer.'};
-    if (/invalid|credential/i.test(r.error)) return { ok: false, error: 'Email ou mot de passe incorrect.' };
+    if (/invalid|credential/i.test(r.error)) return { ok: false, error: 'E-mail ou mot de passe incorrect.' };
     return { ok: false, error: r.error };
   }
   // Un HTTP 200 ne suffit pas : ne jamais recharger vers une session vide.
@@ -1561,7 +1561,7 @@ const authConfirmFromLink = async (raw, email) => {
     : { type, token_hash: hash || token };
   const r = await authCall('verify', body);
   if (!r.ok) {
-    if (/expired|invalid/i.test(r.error)) return { ok: false, error: 'Lien expiré ou déjà utilisé. Redemande un email, et colle le PLUS RÉCENT.' };
+    if (/expired|invalid/i.test(r.error)) return { ok: false, error: 'Lien expiré ou déjà utilisé. Redemande un e-mail, et colle le PLUS RÉCENT.' };
     return { ok: false, error: r.error };
   }
   const j=r.json;
@@ -1613,13 +1613,13 @@ const delaiDemandeEmail = (err) => {
   const n = Number(m[1]);
   return n > 0 && n <= 3600 ? n : null;
 };
-const texteDelaiEmail = (n) => `Par sécurité, un nouvel email ne peut partir que dans ${n} seconde${n > 1 ? 's' : ''}. Regarde ta boîte (et les indésirables) : le précédent est peut-être déjà arrivé.`;
+const texteDelaiEmail = (n) => `Par sécurité, un nouvel e-mail ne peut partir que dans ${n} seconde${n > 1 ? 's' : ''}. Regarde ta boîte (et les indésirables) : le précédent est peut-être déjà arrivé.`;
 // ⚠️ 23 oct. (revue, §7) — le compte à rebours ne s'écrit qu'UNE fois. Là où un
 //    bouton grisé le porte déjà (« Réessaie dans N s », « Renvoyer dans N s »),
 //    la phrase dit la cause et le geste SANS chiffre : sinon « 57 secondes » et
 //    « 57 s » l'un sous l'autre. Là où aucun bouton ne le porte, la phrase garde
 //    le nombre (`texteDelaiEmail`).
-const TEXTE_DELAI_EMAIL_BOUTON = 'Par sécurité, un nouvel email ne peut partir que dans un instant. Regarde ta boîte (et les indésirables) : le précédent est peut-être déjà arrivé.';
+const TEXTE_DELAI_EMAIL_BOUTON = 'Par sécurité, un nouvel e-mail ne peut partir que dans un instant. Regarde ta boîte (et les indésirables) : le précédent est peut-être déjà arrivé.';
 const mapMailError = (err) => {
   const n = delaiDemandeEmail(err);
   if (n) return texteDelaiEmail(n);
@@ -1649,12 +1649,12 @@ const authSignUp  = async (email, password) => {
     if (attente) return { ok: false, error: texteDelaiEmail(attente), attente };
     if (/already registered/i.test(r.error)) msg = 'Un compte existe déjà avec cet email.';
     else if (/rate limit/i.test(r.error)) msg = MAIL_QUOTA;
-    else if (/invalid/i.test(r.error) && /email/i.test(r.error)) msg = 'Cette adresse email est refusée par le serveur.';
+    else if (/invalid/i.test(r.error) && /email/i.test(r.error)) msg = 'Cette adresse e-mail est refusée par le serveur.';
     else if (/signups? not allowed|disabled/i.test(r.error)) msg = 'Les inscriptions sont fermées pour le moment.';
-    return { ok: false, incertain:r.status===0 || r.status>=500, error: r.status===0 || r.status>=500 ? 'Je ne peux pas confirmer le résultat de la création. Si tu as reçu un email VRM, ton compte peut déjà être créé : confirme-le, puis utilise « Se connecter » ici.' : msg };
+    return { ok: false, incertain:r.status===0 || r.status>=500, error: r.status===0 || r.status>=500 ? 'Je ne peux pas confirmer le résultat de la création. Si tu as reçu un e-mail VRM, ton compte peut déjà être créé : confirme-le, puis utilise « Se connecter » ici.' : msg };
   }
   const j=r.json,uid=j?.user?.id||j?.id;
-  if(typeof uid!=='string'||!uid.trim()||(j?.access_token&&(typeof j.access_token!=='string'||!j.access_token.trim()||typeof j.user?.id!=='string'||!j.user.id.trim())))return {ok:false,incertain:true,error:'La réponse du serveur est incomplète. Si tu as reçu un email, confirme-le puis connecte-toi ici ; sinon réessaie dans un instant.'};
+  if(typeof uid!=='string'||!uid.trim()||(j?.access_token&&(typeof j.access_token!=='string'||!j.access_token.trim()||typeof j.user?.id!=='string'||!j.user.id.trim())))return {ok:false,incertain:true,error:'La réponse du serveur est incomplète. Si tu as reçu un e-mail, confirme-le puis connecte-toi ici ; sinon réessaie dans un instant.'};
   // Si la confirmation par email est activée côté Supabase, il n'y a pas encore
   // de jeton : le compte n'existe vraiment qu'une fois le lien cliqué.
   if (r.json && r.json.access_token) { writeSession(sessionFrom(r.json)); return { ok: true }; }
@@ -1825,7 +1825,7 @@ const consumeAuthRedirect = async () => {
   if (at) {
     const type = hash.get('type');
     const valeurDuree=hash.get('expires_in'),duree=valeurDuree===null?3600:Number(valeurDuree);
-    if(!Number.isFinite(duree)||duree<=0||!Number.isFinite(Date.now()+duree*1000)){cleanAuthUrl();return{error:'Ce lien n’est pas utilisable. Redemande un email depuis la connexion.'};}
+    if(!Number.isFinite(duree)||duree<=0||!Number.isFinite(Date.now()+duree*1000)){cleanAuthUrl();return{error:'Ce lien n’est pas utilisable. Redemande un e-mail depuis la connexion.'};}
     const sess = {
       access_token: at,
       refresh_token: hash.get('refresh_token') || '',
@@ -4605,7 +4605,7 @@ const _reglagesRates = new Map();          // id -> nom lisible
 const _reglagesEcoute = new Set();
 const NOM_REGLAGE = {
   push_prefs: 'les notifications',
-  vrm_email_config: "la date d'import des emails",
+  vrm_email_config: "la date d'import des e-mails",
   vrm_pro_facture: 'la facturation Pro (onglet Factures)',
   vrm_email_owners: 'tes adresses de réception',
 };
@@ -5082,10 +5082,10 @@ const familleEmail = (subject, from) => {
   if (/laiss[ée] une [ée]valuation|^Laisse une [ée]valuation/i.test(s)) return 'évaluation';
   if (/Commande mise [àa] jour/i.test(s)) return 'commande mise à jour (le statut vient de la moisson)';
   if (/a mis en ligne un nouvel article/i.test(s)) return "nouvel article d'un membre suivi";
-  if (/Demande de motivation|Contestation formelle|DEMANDE URGENTE|r[ée]examen humain|MISE EN DEMEURE|intervention humaine|contestation/i.test(s)) return 'ton propre email envoyé à Vinted';
+  if (/Demande de motivation|Contestation formelle|DEMANDE URGENTE|r[ée]examen humain|MISE EN DEMEURE|intervention humaine|contestation/i.test(s)) return 'ton propre e-mail envoyé à Vinted';
   if (/transfert bancaire|virement bancaire/i.test(s)) return 'virement du porte-monnaie vers ta banque';
   if (/@team\.vinted|newsletter/i.test(f) || /rentr[ée]e|d[ée]couvre|inspire|nouveaut[ée]s/i.test(s)) return 'newsletter Vinted';
-  if (/bienvenue|confirme ton adresse|mot de passe/i.test(s)) return 'email de compte Vinted';
+  if (/bienvenue|confirme ton adresse|mot de passe/i.test(s)) return 'e-mail de compte Vinted';
   if (/^Suppression de vos annonces/i.test(s) && /leboncoin/i.test(f + ' ' + s)) return 'annonce Leboncoin supprimée';
   return '';
 };
@@ -5621,7 +5621,7 @@ const modePaiementRecu = (texte, paye) => {
 const phraseSommeRecu = (v) => {
   if (!v || v.somme === 'juste') return '';
   if (v.somme === 'ecart') return `Ces lignes font ${texteCentimesRecu(v.total)}, pas le montant payé (${texteCentimesRecu(v.paye)}) — regarde l'email de Vinted.`;
-  if (v.raison === 'sans-detail') return 'Le détail (article, port, frais) n\'est pas dans cet email — regarde l\'email de Vinted.';
+  if (v.raison === 'sans-detail') return 'Le détail (article, port, frais) n\'est pas dans cet e-mail — regarde l\'email de Vinted.';
   if (v.raison === 'montant-illisible') return 'Le montant payé n\'a pas pu être lu — regarde l\'email de Vinted.';
   return 'Le détail n\'a pas pu être lu en entier : ces lignes ne sont peut-être pas toutes là — regarde l\'email de Vinted.';
 };
@@ -5813,7 +5813,7 @@ function FeuilleRecuAchat({ recu, fermer }) {
         </div>
         {aPdf && (
           <div data-recu-pj={pj ? pj.etat : 'repos'} style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:8,padding:'8px 12px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
-            <button type="button" data-recu-pj-ouvrir="" disabled={!!(pj && pj.etat === 'lecture')} onClick={ouvrirPj} style={{...cible,gap:6,padding:'0 14px',fontSize:15,fontWeight:600}}><Icon name="receipt" size={15}/>{pj && pj.etat === 'lecture' ? 'Lecture du PDF…' : 'PDF joint à l’email'}</button>
+            <button type="button" data-recu-pj-ouvrir="" disabled={!!(pj && pj.etat === 'lecture')} onClick={ouvrirPj} style={{...cible,gap:6,padding:'0 14px',fontSize:15,fontWeight:600}}><Icon name="receipt" size={15}/>{pj && pj.etat === 'lecture' ? 'Lecture du PDF…' : 'PDF joint à l’e-mail'}</button>
             {pj && pj.etat === 'pret' && estIOS() && <a data-recu-pj-lien="" href={pj.url} target="_blank" rel="noopener" style={{...cible,padding:'0 14px',fontSize:15,fontWeight:600,textDecoration:'none'}}>Ouvrir le PDF</a>}
             {pj && pj.etat === 'passu' && <span style={{fontSize:13,color:C.muted}}>La base n'a pas répondu — réessaie dans un instant.</span>}
             {pj && pj.etat === 'absent' && <span style={{fontSize:13,color:C.muted}}>Ce reçu n'a plus son PDF — le texte de l'email est ci-dessous.</span>}
@@ -16556,15 +16556,15 @@ const dateCourteFr = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : 
 // Ce que dit un compte muet, sur sa ligne : la PREUVE (ses ventes sans email),
 // jamais une supposition sur la cause.
 const phraseCompteMuet = (l) => l.jamais
-  ? `aucun email de Vinted n’est jamais arrivé — ${l.nSansEmail} vente${l.nSansEmail > 1 ? 's' : ''} depuis le ${dateCourteFr(l.premiereSansEmail)}, aucune n’a eu son email`
-  : `plus aucun email depuis le ${dateCourteFr(l.depuis)} — ${l.nSansEmail} vente${l.nSansEmail > 1 ? 's' : ''} depuis, sans leur email`;
+  ? `aucun e-mail de Vinted n’est jamais arrivé — ${l.nSansEmail} vente${l.nSansEmail > 1 ? 's' : ''} depuis le ${dateCourteFr(l.premiereSansEmail)}, aucune n’a eu son e-mail`
+  : `plus aucun e-mail depuis le ${dateCourteFr(l.depuis)} — ${l.nSansEmail} vente${l.nSansEmail > 1 ? 's' : ''} depuis, sans leur e-mail`;
 // Un compte qui a vendu SANS email, mais pas assez pour conclure : sa phrase à
 // lui, tirée de la donnée (jamais « n'a pas encore vendu » — revue du 11 oct.).
 const phraseCompteSurveille = (l) => {
   const s = (k) => (k > 1 ? 's' : '');
-  if (l.raisonSurveiller === 'aucunDebut') return 'VRM n’a encore reçu aucun email — rien à conclure';
-  if (l.raisonSurveiller === 'peu') return `${l.nSansEmail} vente${s(l.nSansEmail)} sans email depuis le ${dateCourteFr(l.premiereSansEmail)}${l.nRecentes ? ` (+ ${l.nRecentes} récente${s(l.nRecentes)})` : ''} — pas encore de quoi conclure`;
-  return `${l.nRecentes} vente${s(l.nRecentes)} de moins de 3 jours — ${l.nRecentes > 1 ? 'leur' : 'son'} email peut encore arriver`;
+  if (l.raisonSurveiller === 'aucunDebut') return 'VRM n’a encore reçu aucun e-mail — rien à conclure';
+  if (l.raisonSurveiller === 'peu') return `${l.nSansEmail} vente${s(l.nSansEmail)} sans e-mail depuis le ${dateCourteFr(l.premiereSansEmail)}${l.nRecentes ? ` (+ ${l.nRecentes} récente${s(l.nRecentes)})` : ''} — pas encore de quoi conclure`;
+  return `${l.nRecentes} vente${s(l.nRecentes)} de moins de 3 jours — ${l.nRecentes > 1 ? 'leur' : 'son'} e-mail peut encore arriver`;
 };
 // Le bloc : qui, depuis quand, ce que ça coûte (une fois), et LE geste (une fois).
 // ⚠️ « Masquer mon adresse » n'est PAS la cause prouvée (deux comptes à adresse
@@ -16579,7 +16579,7 @@ function BlocComptesMuets({ muets }) {
   return (
     <div data-comptes-muets={n} style={{border:`1px solid ${C.warn}`,borderLeft:`3px solid ${C.warn}`,background:`${C.warn}10`,borderRadius:12,padding:'9px 11px'}}>
       <div style={{fontSize:13,fontWeight:700,color:C.text}}>
-        {n} compte{n>1?'s':''} Vinted n’envoie{n>1?'nt':''} aucun email à VRM
+        {n} compte{n>1?'s':''} Vinted n’envoie{n>1?'nt':''} aucun e-mail à VRM
       </div>
       <div style={{display:'flex',flexDirection:'column',gap:3,marginTop:5}}>
         {muets.map((l) => (
@@ -16598,13 +16598,13 @@ function BlocComptesMuets({ muets }) {
           l'email du bordereau, la date limite de leurs colis est ESTIMÉE (vente
           + 7 jours, sans l'heure — 90 bordereaux sur 205 disent « avant 10 h »). */}
       <div style={{fontSize:12,color:C.muted,marginTop:6,lineHeight:1.45}} data-effet-muets>
-        {n>1?'Leurs':'Ses'} ventes s’affichent bien (l’extension les capte), mais {n>1?'leurs':'ses'} bordereaux n’arrivent pas par email&nbsp;: <b style={{color:C.text}}>la date limite de {n>1?'leurs':'ses'} colis est estimée (vente + 7 jours, sans l’heure)</b>, et ton téléphone ne sonne ni pour {n>1?'leurs':'ses'} ventes ni pour {n>1?'leurs':'ses'} messages.
+        {n>1?'Leurs':'Ses'} ventes s’affichent bien (l’extension les capte), mais {n>1?'leurs':'ses'} bordereaux n’arrivent pas par e-mail&nbsp;: <b style={{color:C.text}}>la date limite de {n>1?'leurs':'ses'} colis est estimée (vente + 7 jours, sans l’heure)</b>, et ton téléphone ne sonne ni pour {n>1?'leurs':'ses'} ventes ni pour {n>1?'leurs':'ses'} messages.
       </div>
       <div style={{fontSize:12,color:C.text,marginTop:6,lineHeight:1.5}} data-geste-muets>
         <b>Pour {n>1?'chacun':'ce compte'}&nbsp;:</b> 1. sur Vinted, connecté sur {n>1?'ce compte':muets[0].login}&nbsp;: <b>Paramètres → Notifications</b>, active les e-mails (messages, offres, ventes).
         {' '}2. {tousApple
           ? <>{n>1?'Leur':'Son'} adresse est une adresse « Masquer mon adresse » d’Apple&nbsp;: sur l’iPhone, <b>Réglages → ton nom → Connexion et sécurité → Se connecter avec Apple → Vinted → Transférer à</b>, choisis la boîte reliée à VRM.</>
-          : <>Vérifie que sa boîte fait suivre les emails de Vinted vers celle reliée à VRM{apple.length ? <> — pour {apple.map((l) => l.login).join(', ')} (adresse « Masquer mon adresse » d’Apple)&nbsp;: sur l’iPhone, <b>Réglages → ton nom → Connexion et sécurité → Se connecter avec Apple → Vinted → Transférer à</b></> : null}.</>}
+          : <>Vérifie que sa boîte fait suivre les e-mails de Vinted vers celle reliée à VRM{apple.length ? <> — pour {apple.map((l) => l.login).join(', ')} (adresse « Masquer mon adresse » d’Apple)&nbsp;: sur l’iPhone, <b>Réglages → ton nom → Connexion et sécurité → Se connecter avec Apple → Vinted → Transférer à</b></> : null}.</>}
       </div>
     </div>
   );
@@ -16616,7 +16616,7 @@ function MuetsCompact({ muets, detail }) {
     <details data-muets-compact={n} style={{marginBottom:10}} onToggle={(e) => setOuvert(e.currentTarget.open)}>
       <summary style={{cursor:'pointer',listStyle:'none',display:'flex',alignItems:'center',gap:7,fontSize:12,fontWeight:600,color:C.text,padding:'6px 10px',border:`1px solid ${C.warn}`,borderLeft:`3px solid ${C.warn}`,background:`${C.warn}10`,borderRadius:12}}>
         <span aria-hidden="true" style={{color:C.warn,display:'flex'}}><Icon name="alert" size={14}/></span>
-        <span style={{flex:1,minWidth:0}}>{ouvert ? 'Masquer' : <>{n} compte{n>1?'s':''} n’envoie{n>1?'nt':''} aucun email à VRM — voir {n>1?'lesquels':'lequel'} et le geste</>}</span>
+        <span style={{flex:1,minWidth:0}}>{ouvert ? 'Masquer' : <>{n} compte{n>1?'s':''} n’envoie{n>1?'nt':''} aucun e-mail à VRM — voir {n>1?'lesquels':'lequel'} et le geste</>}</span>
         <span aria-hidden="true" style={{color:C.muted}}>{ouvert ? '▴' : '▾'}</span>
       </summary>
       <div style={{marginTop:6}}><BlocComptesMuets muets={muets}/></div>
@@ -16692,7 +16692,7 @@ function ReceptionEmails({ tracking, comptes, colisParTransporteur }) {
                 {nColis>0 && <b style={{color:C.accentTexte}}> · {nColis} colis à retirer</b>}
               </div>
               <div style={{color:v.ts?(Date.now()-v.ts<3*86400000?(C.ok||C.accent):C.warn):(aucunEmailDeSuivi?C.muted:C.danger),fontWeight:600,flexShrink:0,textAlign:'right'}}>
-                {v.ts ? `${v.n} email${v.n>1?'s':''} · ${age(v.ts)}` : aucunEmailDeSuivi ? 'rien encore' : 'aucun email reçu'}
+                {v.ts ? `${v.n} email${v.n>1?'s':''} · ${age(v.ts)}` : aucunEmailDeSuivi ? 'rien encore' : 'aucun e-mail reçu'}
               </div>
             </div>
           );
@@ -16700,9 +16700,9 @@ function ReceptionEmails({ tracking, comptes, colisParTransporteur }) {
       </div>
       {comptes && comptes.length > 0 && (
         <div style={{marginTop:9,paddingTop:8,borderTop:`1px solid ${C.border}`}}>
-          <div style={{fontSize:12,fontWeight:600,color:C.text,marginBottom:5}}>Tes comptes Vinted et leurs emails</div>
+          <div style={{fontSize:12,fontWeight:600,color:C.text,marginBottom:5}}>Tes comptes Vinted et leurs e-mails</div>
           {etatComptes.etat === 'encours' && <div style={{fontSize:11,color:C.muted}}>lecture en cours…</div>}
-          {etatComptes.etat === 'pasSu' && <div style={{fontSize:11,color:C.muted}}>Je n’ai pas pu lire les emails reçus : je ne dis rien des comptes plutôt que d’en accuser un à tort. Rouvre cet écran dans un moment.</div>}
+          {etatComptes.etat === 'pasSu' && <div style={{fontSize:11,color:C.muted}}>Je n’ai pas pu lire les e-mails reçus : je ne dis rien des comptes plutôt que d’en accuser un à tort. Rouvre cet écran dans un moment.</div>}
           {etatComptes.etat === 'lu' && (
             <div style={{display:'flex',flexDirection:'column',gap:4}}>
               {/* ⚠️ §7 (revue du 11 oct.) : un compte déjà nommé dans le bloc
@@ -16714,11 +16714,11 @@ function ReceptionEmails({ tracking, comptes, colisParTransporteur }) {
                 const coul = l.statut === 'muet' ? C.warn
                   : l.statut === 'recoit' ? (!isNaN(ts) && Date.now()-ts<7*86400000 ? (C.ok||C.accent) : C.muted)
                   : C.muted;
-                const txt = l.statut === 'muet' ? (l.jamais ? 'aucun email, jamais' : `plus rien depuis le ${dateCourteFr(l.depuis)}`)
+                const txt = l.statut === 'muet' ? (l.jamais ? 'aucun e-mail, jamais' : `plus rien depuis le ${dateCourteFr(l.depuis)}`)
                   : l.statut === 'recoit' ? `${l.n} email${l.n>1?'s':''}${isNaN(ts)?'':' · '+age(ts)}`
                   : l.statut === 'surveiller' ? phraseCompteSurveille(l)
                   : l.statut === 'exclu' ? 'exclu de l’app — non vérifié'
-                  : l.statut === 'calme' ? 'aucun email pour l’instant'
+                  : l.statut === 'calme' ? 'aucun e-mail pour l’instant'
                   : l.statut === 'encours' ? '…' : '—';
                 return (
                   <div key={l.uid} data-compte-email={l.login} data-statut={l.statut} style={{...ligne,fontSize:12,flexWrap:'wrap'}}>
@@ -16733,7 +16733,7 @@ function ReceptionEmails({ tracking, comptes, colisParTransporteur }) {
               {/* La phrase vient de la MÊME source que le statut (§5) : « calme »
                   = aucune vente depuis le début de la réception. */}
               {etatComptes.lignes.some(l => l.statut === 'calme') && (
-                <div style={{fontSize:11,color:C.muted,marginTop:2}} data-note-calme>« Aucun email pour l’instant » n’est pas une panne : {etatComptes.lignes.filter(l => l.statut === 'calme').length > 1 ? 'ces comptes n’ont rien vendu' : 'ce compte n’a rien vendu'}{etatComptes.debut ? ` depuis le ${dateCourteFr(etatComptes.debut)}, premier email reçu par VRM` : ''} — rien n’avait à arriver.</div>
+                <div style={{fontSize:11,color:C.muted,marginTop:2}} data-note-calme>« Aucun e-mail pour l’instant » n’est pas une panne : {etatComptes.lignes.filter(l => l.statut === 'calme').length > 1 ? 'ces comptes n’ont rien vendu' : 'ce compte n’a rien vendu'}{etatComptes.debut ? ` depuis le ${dateCourteFr(etatComptes.debut)}, premier e-mail reçu par VRM` : ''} — rien n’avait à arriver.</div>
               )}
             </div>
           )}
@@ -16793,7 +16793,7 @@ function ReceptionEmails({ tracking, comptes, colisParTransporteur }) {
             quoi répondre. */}
         <span aria-hidden="true" style={{color:muetsTr?C.warn:aucunEmailDeSuivi?C.muted:(C.ok||C.accent),display:'flex'}}><Icon name={muetsTr?'alert':aucunEmailDeSuivi?'clock':'check'} size={14}/></span>
         Réception des e-mails{muetsTr>0 ? ` · ${muetsTr} transporteur${muetsTr>1?'s':''} silencieux`
-          : aucunEmailDeSuivi ? ' · aucun email de suivi reçu pour l’instant' : ' · tout arrive'}
+          : aucunEmailDeSuivi ? ' · aucun e-mail de suivi reçu pour l’instant' : ' · tout arrive'}
       </summary>
       <div style={{marginTop:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'10px 12px'}}>{detail}</div>
     </details>
@@ -17936,7 +17936,7 @@ function PorteNouveauOAuth({ fournisseur, email, onContinuer }) {
       </>}
       {etape === 'confirmer' && <>
         <h1 id="vrm-nouveau-oauth-titre" style={{ fontSize: 20, margin: '0 0 10px' }}>Supprimer ce compte vide ?</h1>
-        <p style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 18px', color: C.muted }}>Ton vrai compte n’est pas touché. Ensuite : connecte-toi {deja ? <>avec <strong>{deja.email}</strong></> : 'avec ton email'}, puis Paramètres → Mon compte → Comptes associés → « Connecter {nom} ». La prochaine fois, « Se connecter avec {nom} » ouvrira ton vrai compte.</p>
+        <p style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 18px', color: C.muted }}>Ton vrai compte n’est pas touché. Ensuite : connecte-toi {deja ? <>avec <strong>{deja.email}</strong></> : 'avec ton e-mail'}, puis Paramètres → Mon compte → Comptes associés → « Connecter {nom} ». La prochaine fois, « Se connecter avec {nom} » ouvrira ton vrai compte.</p>
         {err && <p role="alert" style={{ fontSize: 13, color: C.warn || C.text, margin: '0 0 12px' }}>{err}</p>}
         <div style={{ display: 'grid', gap: 10 }}>
           <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" data-nouveau-oauth="supprimer" disabled={busy || !email} onClick={supprimer}>{busy ? 'Suppression…' : 'Supprimer ce compte vide'}</button>
@@ -17945,7 +17945,7 @@ function PorteNouveauOAuth({ fournisseur, email, onContinuer }) {
       </>}
       {etape === 'fait' && <>
         <h1 id="vrm-nouveau-oauth-titre" style={{ fontSize: 20, margin: '0 0 10px' }}>C’est fait</h1>
-        <p style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 18px', color: C.muted }}>Le compte vide est supprimé. Connecte-toi avec ton email, puis Paramètres → Mon compte → Comptes associés → « Connecter {nom} ».</p>
+        <p style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 18px', color: C.muted }}>Le compte vide est supprimé. Connecte-toi avec ton e-mail, puis Paramètres → Mon compte → Comptes associés → « Connecter {nom} ».</p>
         <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" onClick={() => authSignOut()}>Aller à la connexion</button>
       </>}
     </div>
@@ -18045,7 +18045,7 @@ function PorteMfa({ session }) {
             <div data-mfa-perdu={plusieurs ? 'autre-appareil' : 'contact'} style={{fontSize:12,color:C.muted,marginTop:14,lineHeight:1.5,borderTop:`1px solid ${C.border}`,paddingTop:12}}>
               {plusieurs
                 ? <><b style={{color:C.text}}>Un appareil perdu ou changé ?</b> Entre avec le code d'un AUTRE de tes appareils, puis retire celui qui est perdu dans Paramètres → Mon compte → Double vérification.</>
-                : <><b style={{color:C.text}}>Plus accès à ton app (téléphone perdu ou changé) ?</b> La double vérification ne se retire pas depuis cet écran. Écris à VRM depuis l'adresse email de ton compte : {contact
+                : <><b style={{color:C.text}}>Plus accès à ton app (téléphone perdu ou changé) ?</b> La double vérification ne se retire pas depuis cet écran. Écris à VRM depuis l'adresse e-mail de ton compte : {contact
                   ? <a href={`mailto:${contact}`} style={{color:C.accentTexte,textDecoration:'none'}}>{contact}</a>
                   : <span data-contact-absent="">{CONTACT_A_VENIR}</span>}.</>}
             </div>
@@ -18170,7 +18170,7 @@ function AuthScreen() {
         setNeedConfirm(false);setConfirmLink('');
         setInfo(r.connected?'Compte confirmé. Connexion en cours…':'Adresse confirmée. Tu peux maintenant te connecter avec ton mot de passe.');
         if(r.connected)setTimeout(()=>location.reload(),800);
-      } else if(action==='renvoyer')setInfo('Nouvel email envoyé — utilise le plus récent.');
+      } else if(action==='renvoyer')setInfo('Nouvel e-mail envoyé — utilise le plus récent.');
       else setInfo('Lien de connexion envoyé. Ouvre le lien du mail pour continuer. S’il ne s’ouvre pas, utilise l’aide « Le lien de confirmation ne s’ouvre pas ? ».');
     } catch (_) {setErr('La demande n’a pas pu être confirmée. Réessaie dans un instant.');}
     finally {demandeEnCours.current=false;setBusy(false);}
@@ -18196,10 +18196,10 @@ function AuthScreen() {
         const rr = await authReset(email);
         if (rr && rr.captcha) { setErr(rr.error); return; }
         if (rr && !rr.ok && attendreEmail({ attente: delaiDemandeEmail(rr.error) })) return;
-        if(!rr?.ok){setErr('L’envoi du lien n’est pas confirmé. Réessaie dans quelques minutes ; si tu as déjà reçu un email, utilise le lien le plus récent.');return;}
+        if(!rr?.ok){setErr('L’envoi du lien n’est pas confirmé. Réessaie dans quelques minutes ; si tu as déjà reçu un e-mail, utilise le lien le plus récent.');return;}
         // Réponse volontairement identique que le compte existe ou non : sinon
         // ce formulaire dirait à n'importe qui quels emails sont inscrits.
-        setInfo("Si un compte existe avec cet email, tu vas recevoir un lien pour choisir un nouveau mot de passe.");
+        setInfo("Si un compte existe avec cet e-mail, tu vas recevoir un lien pour choisir un nouveau mot de passe.");
       } else if (mode === 'up') {
         // On l'écrit AVANT de partir : `save` range dans le navigateur et le
         // nuage suivra à la première synchro. Écrit seulement s'il l'a donné —
@@ -18207,7 +18207,7 @@ function AuthScreen() {
         try { if (prenom.trim()) save('vrm_prenom', prenom.trim()); } catch (_) {}
         const r = await authSignUp(email, pw);
         if (!r.ok) { if(attendreEmail(r)){} else if(r.incertain){setMode('in');setInfo(r.error);}else setErr(r.error); }
-        else if (r.needsConfirm) { setNeedConfirm(true); setMode('in'); setInfo('Ton compte est créé. Confirme ton email, puis connecte-toi ici : inutile de quitter cette page.'); }
+        else if (r.needsConfirm) { setNeedConfirm(true); setMode('in'); setInfo('Ton compte est créé. Confirme ton e-mail, puis connecte-toi ici : inutile de quitter cette page.'); }
         else location.reload();
       } else {
         const r = await authSignIn(email, pw);
@@ -18363,7 +18363,7 @@ function AuthScreen() {
 
           {(mode==='in'||mode==='up') && moyensConnexion.statut==='chargement' && <div role="status" style={{fontSize:12,color:C.muted,lineHeight:1.5,marginBottom:12}}>Chargement des autres moyens de connexion… Tu peux déjà utiliser ton email.</div>}
           {(mode==='in'||mode==='up') && moyensConnexion.statut==='erreur' && <div data-auth-moyens-indisponibles="" style={{fontSize:12,color:C.text,lineHeight:1.5,marginBottom:14,padding:'10px 12px',border:`1px solid ${C.border}`,borderRadius:12}}>
-            Les autres moyens de connexion n’ont pas pu être chargés. L’email reste disponible.
+            Les autres moyens de connexion n’ont pas pu être chargés. L’e-mail reste disponible.
             <button type="button" disabled={busy} onClick={()=>loadAuthSettings()} style={{display:'block',minHeight:44,padding:'8px 0 0',border:0,background:'transparent',color:C.accentTexte,font:'inherit',fontWeight:600,cursor:busy?'default':'pointer'}}>Réessayer les moyens de connexion</button>
           </div>}
 
@@ -18387,7 +18387,7 @@ function AuthScreen() {
               ))}
               <div style={{display:'flex',alignItems:'center',gap:10,margin:'4px 0 12px'}}>
                 <span style={{flex:1,height:1,background:C.border}}/>
-                <span style={{fontSize:11,color:C.muted,fontWeight:500}}>ou par email</span>
+                <span style={{fontSize:11,color:C.muted,fontWeight:500}}>ou par e-mail</span>
                 <span style={{flex:1,height:1,background:C.border}}/>
               </div>
             </>);
@@ -18414,7 +18414,7 @@ function AuthScreen() {
             </label>
           )}
           {mode!=='newpw' && (
-            <label className="vrm-cx-champ"><span>Adresse email</span>
+            <label className="vrm-cx-champ"><span>Adresse e-mail</span>
               <input type="email" inputMode="email" autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="Email" required
                 disabled={busy} value={email} onChange={e=>{setEmail(e.target.value);setNeedConfirm(false);setConfirmLink('');setInfo('');setErr('');setFinAttente(0);}} style={field}/>
             </label>
@@ -18470,7 +18470,7 @@ function AuthScreen() {
                 Si le lien du mail affiche « <i>impossible d'accéder au site</i> »,
                 <b style={{color:C.text}}> copie le lien</b> (appui long → Copier le lien) et colle-le ici — on s'occupe du reste.
               </div>
-              <input aria-label="Lien de confirmation reçu par email" value={confirmLink} onChange={e=>setConfirmLink(e.target.value)} placeholder="Colle le lien du mail ici"
+              <input aria-label="Lien de confirmation reçu par e-mail" value={confirmLink} onChange={e=>setConfirmLink(e.target.value)} placeholder="Colle le lien du mail ici"
                 style={{width:'100%',boxSizing:'border-box',marginTop:8,border:`1px solid ${C.border}`,borderRadius:12,
                   padding:'10px 11px',fontSize:17,background:C.card,color:C.text,outline:'none',fontFamily:'inherit'}}/>
                 <button type="button" disabled={busy||!confirmLink.trim()}
@@ -18681,7 +18681,7 @@ function BandeauConfirmationAdresse({ onVoir }) {
   const bon = c.etat === 'ok' || c.etat === 'deja';
   const voir = onVoir ? <button type="button" data-voir-adresses="" onClick={() => { poserConfAdr(null); onVoir(); }} style={{ marginLeft: 6, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 12, padding: '4px 9px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Voir mes adresses</button> : null;
   const texte = c.etat === 'attente' || c.etat === 'encours' ? 'Je confirme ton adresse de réception…'
-    : c.etat === 'ok' ? <>Adresse <b>{c.adresse || 'de réception'}</b> confirmée ✓ — les emails qui y arrivent sont rangés chez toi, et ceux mis de côté te sont proposés.{voir}</>
+    : c.etat === 'ok' ? <>Adresse <b>{c.adresse || 'de réception'}</b> confirmée ✓ — les e-mails qui y arrivent sont rangés chez toi, et ceux mis de côté te sont proposés.{voir}</>
     : c.etat === 'deja' ? <>Cette adresse{c.adresse ? <> (<b>{c.adresse}</b>)</> : null} était déjà confirmée ✓ — rien à faire.</>
     : c.etat === 'perime' ? <>Ce lien a expiré (il vaut 72 heures) : demande-en un nouveau.{voir}</>
     : c.etat === 'inconnu' ? <>Ce lien ne correspond à aucune demande de ce compte VRM : ouvre-le en étant connecté avec le compte qui a ajouté l'adresse.</>
@@ -18896,7 +18896,7 @@ function BaseInjoignable() {
                  style={{color:C.accentTexte,fontWeight:600}}>aller directement au bouton Restart</a>
             </>}
             <br/><br/>
-            Tant que ce n'est pas réglé, les emails Vinted qui arrivent ne peuvent pas être rangés.
+            Tant que ce n'est pas réglé, les e-mails Vinted qui arrivent ne peuvent pas être rangés.
           </> : <>
             Vérifie ta connexion, puis recharge la page. Si ça dure plus d'une heure, l'app te dira quoi faire.
           </>}
@@ -20137,11 +20137,11 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
   //    connecte par l'ancien message) — sa fenêtre n'a que email et mot de passe.
   else if (code === 'vrm') { const voie = voieConnexionExt(); geste = <span data-etat-geste={voie === 'retard' ? 'maj-ou-mdp' : voie === 'serveur' ? 'mdp' : voie === 'page' ? 'page' : 'liaison'}>{__sessExtEnVol ? 'Un instant…'
     : voie === 'retard'
-      ? <>Cette extension ({vmrExtVersion() || 'version ?'}) ne sait pas recevoir la connexion de VRM : mets-la à jour en {EXT_ATTENDUE} (Paramètres → État des connexions) — ou clique l'icône VRM {NAV.hautDe} et connecte-toi avec ton mot de passe VRM (<b>{monMail || 'ton email VRM'}</b>).</>
+      ? <>Cette extension ({vmrExtVersion() || 'version ?'}) ne sait pas recevoir la connexion de VRM : mets-la à jour en {EXT_ATTENDUE} (Paramètres → État des connexions) — ou clique l'icône VRM {NAV.hautDe} et connecte-toi avec ton mot de passe VRM (<b>{monMail || 'ton e-mail VRM'}</b>).</>
       : voie === 'serveur'
         ? (fenetreAncienne()
-          ? <>Le serveur n'a pas pu préparer sa connexion{__sessExtErreur.message ? ` (${__sessExtErreur.message})` : ''} : clique l'icône VRM {NAV.hautDe} et connecte-toi avec ton mot de passe VRM (<b>{monMail || 'ton email VRM'}</b>).</>
-          : <>Le serveur n'a pas pu préparer sa connexion{__sessExtErreur.message ? ` (${__sessExtErreur.message})` : ''} : clique l'icône VRM {NAV.hautDe}, puis « avec mon mot de passe VRM » (<b>{monMail || 'ton email VRM'}</b>).</>)
+          ? <>Le serveur n'a pas pu préparer sa connexion{__sessExtErreur.message ? ` (${__sessExtErreur.message})` : ''} : clique l'icône VRM {NAV.hautDe} et connecte-toi avec ton mot de passe VRM (<b>{monMail || 'ton e-mail VRM'}</b>).</>
+          : <>Le serveur n'a pas pu préparer sa connexion{__sessExtErreur.message ? ` (${__sessExtErreur.message})` : ''} : clique l'icône VRM {NAV.hautDe}, puis « avec mon mot de passe VRM » (<b>{monMail || 'ton e-mail VRM'}</b>).</>)
         : voie === 'page'
           ? <>Je la connecte à <b>{monMail || 'ton compte VRM'}</b>. Si ça ne vient pas : recharge cette page, ou clique l'icône VRM {NAV.hautDe} et connecte-toi avec ton mot de passe VRM.</>
           : <>Je la connecte à <b>{monMail || 'ton compte VRM'}</b>. Si ça ne vient pas : clique l'icône VRM {NAV.hautDe}, puis « Se connecter avec VRM ».</>}</span>; }
@@ -20152,7 +20152,7 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
   // passe VRM dans sa fenêtre — ou la mettre à jour.
   else if (code === 'autre-vrm') { const voie = voieConnexionExt(); geste = __sessExtEnVol ? <span>Un instant…</span>
     : voie === 'retard'
-      ? <span data-etat-geste="deconnecter">Cette extension ({vmrExtVersion() || 'version ?'}) ne sait pas recevoir la connexion de VRM. <button type="button" data-etat-geste-deconnecter="1" className="vrm-b vrm-b-discret" onClick={() => { deconnecterExtensionAncienne(); }}>Déconnecter l'extension {NAV.de}</button>, puis clique l'icône VRM {NAV.hautDe} et connecte-toi avec ton mot de passe VRM (<b>{monMail || 'ton email VRM'}</b>) — ou mets-la à jour en {EXT_ATTENDUE} (Paramètres → État des connexions).</span>
+      ? <span data-etat-geste="deconnecter">Cette extension ({vmrExtVersion() || 'version ?'}) ne sait pas recevoir la connexion de VRM. <button type="button" data-etat-geste-deconnecter="1" className="vrm-b vrm-b-discret" onClick={() => { deconnecterExtensionAncienne(); }}>Déconnecter l'extension {NAV.de}</button>, puis clique l'icône VRM {NAV.hautDe} et connecte-toi avec ton mot de passe VRM (<b>{monMail || 'ton e-mail VRM'}</b>) — ou mets-la à jour en {EXT_ATTENDUE} (Paramètres → État des connexions).</span>
       : voie === 'serveur'
         ? <span data-etat-geste="attendre-serveur">Le serveur n'a pas pu préparer sa connexion{__sessExtErreur.message ? ` (${__sessExtErreur.message})` : ''} : je réessaie dans {minutesAvantReessai()} min, cette page ouverte.</span>
         : <button type="button" data-etat-geste="recharger" className="vrm-b vrm-b-primaire" onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>; }
@@ -20420,7 +20420,7 @@ function PremiersPas({ onNav, titreNeuf, introNeuf, dansGuide = false }) {
   const n = !fait.ext ? 1 : !fait.lien ? 2 : 3;
   const ETAPES = [
     { t: `Installer l’extension ${NAV.dansNu}`, c: 'extension' },
-    { t: 'La connecter à ton compte VRM — le même email qu’ici, en un clic', c: 'lien' },
+    { t: 'La connecter à ton compte VRM — le même e-mail qu’ici, en un clic', c: 'lien' },
     { t: 'Passer une fois sur vinted.fr', c: 'vinted' },
   ];
 
@@ -20438,7 +20438,7 @@ function PremiersPas({ onNav, titreNeuf, introNeuf, dansGuide = false }) {
       <p style={{margin:0}}>
         Du coup, tout ce qu’elle lit sur Vinted part dans l’autre boutique, et celle-ci reste vide.{' '}
         {voie === 'retard'
-          ? <>Et celle-ci ({vmrExtVersion() || 'version ?'}) ne sait pas recevoir la connexion de VRM : mets-la à jour (bouton ci-dessous) et je la reconnecterai à <b style={{color:C.text}}>{(AUTH.user&&AUTH.user.email)||'ton compte'}</b> — ou déconnecte-la d’ici, puis clique son icône {NAV.hautDe} et connecte-toi avec l’email et le mot de passe de ton compte VRM.</>
+          ? <>Et celle-ci ({vmrExtVersion() || 'version ?'}) ne sait pas recevoir la connexion de VRM : mets-la à jour (bouton ci-dessous) et je la reconnecterai à <b style={{color:C.text}}>{(AUTH.user&&AUTH.user.email)||'ton compte'}</b> — ou déconnecte-la d’ici, puis clique son icône {NAV.hautDe} et connecte-toi avec l’e-mail et le mot de passe de ton compte VRM.</>
           : voie === 'serveur'
             ? <>Le serveur n’a pas pu préparer sa connexion : je réessaie dans {minutesAvantReessai()} min, cette page ouverte.</>
             : <>Je la reconnecte à <b style={{color:C.text}}>{(AUTH.user&&AUTH.user.email)||'ton compte'}</b> dès que cette page est devant toi — rien à taper. Si ça persiste, recharge cette page.</>}
@@ -20448,15 +20448,15 @@ function PremiersPas({ onNav, titreNeuf, introNeuf, dansGuide = false }) {
     <>
       <p style={{margin:'0 0 10px'}}>Je vois bien ton extension dans ce navigateur 👍 — mais elle ne sait pas encore à qui elle a affaire, alors elle n’a nulle part où ranger ce qu’elle lit.</p>
       {voie === 'retard' ? (
-        <p style={{margin:0}}>Celle-ci ({vmrExtVersion() || 'version ?'}) ne sait pas recevoir la connexion de VRM. Mets-la à jour avec le bouton ci-dessous — ou clique son icône {NAV.hautDe} et connecte-toi avec <b style={{color:C.text}}>l’email et le mot de passe de ton compte VRM</b> (pas ceux de Vinted) : c’est ce qui envoie tes données chez toi, et nulle part ailleurs.</p>
+        <p style={{margin:0}}>Celle-ci ({vmrExtVersion() || 'version ?'}) ne sait pas recevoir la connexion de VRM. Mets-la à jour avec le bouton ci-dessous — ou clique son icône {NAV.hautDe} et connecte-toi avec <b style={{color:C.text}}>l’e-mail et le mot de passe de ton compte VRM</b> (pas ceux de Vinted) : c’est ce qui envoie tes données chez toi, et nulle part ailleurs.</p>
       ) : voie === 'serveur' ? (
         fenetreAncienne()
-          ? <p style={{margin:0}}>Le serveur n’a pas pu préparer sa connexion. Clique son icône {NAV.hautDe} et connecte-toi avec <b style={{color:C.text}}>l’email et le mot de passe de ton compte VRM</b> (pas ceux de Vinted) : c’est ce qui envoie tes données chez toi, et nulle part ailleurs.</p>
+          ? <p style={{margin:0}}>Le serveur n’a pas pu préparer sa connexion. Clique son icône {NAV.hautDe} et connecte-toi avec <b style={{color:C.text}}>l’e-mail et le mot de passe de ton compte VRM</b> (pas ceux de Vinted) : c’est ce qui envoie tes données chez toi, et nulle part ailleurs.</p>
           : <p style={{margin:0}}>Le serveur n’a pas pu préparer sa connexion. Clique son icône {NAV.hautDe}, puis <b style={{color:C.text}}>« avec mon mot de passe VRM »</b> : c’est ce qui envoie tes données chez toi, et nulle part ailleurs.</p>
       ) : voie === 'page' ? (
         /* Relecture croisée de la 5.174 : une 5.164/5.170, connectée par l'ancien
            message de la page — sa fenêtre n'a pas « Se connecter avec VRM ». */
-        <p style={{margin:0}}>Je la connecte à ton compte VRM d’ici, <b style={{color:C.text}}>sans rien à taper</b> — c’est ce qui envoie tes données chez toi, et nulle part ailleurs. Si ça ne vient pas : recharge cette page, ou clique son icône {NAV.hautDe} et connecte-toi avec <b style={{color:C.text}}>l’email et le mot de passe de ton compte VRM</b> (pas ceux de Vinted).</p>
+        <p style={{margin:0}}>Je la connecte à ton compte VRM d’ici, <b style={{color:C.text}}>sans rien à taper</b> — c’est ce qui envoie tes données chez toi, et nulle part ailleurs. Si ça ne vient pas : recharge cette page, ou clique son icône {NAV.hautDe} et connecte-toi avec <b style={{color:C.text}}>l’e-mail et le mot de passe de ton compte VRM</b> (pas ceux de Vinted).</p>
       ) : (
         <p style={{margin:0}}>Je la connecte à ton compte VRM d’ici, <b style={{color:C.text}}>sans rien à taper</b> — c’est ce qui envoie tes données chez toi, et nulle part ailleurs. Si ça ne vient pas : clique son icône {NAV.hautDe}, puis <b style={{color:C.text}}>« Se connecter avec VRM »</b>.</p>
       )}
@@ -31622,7 +31622,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
           glissaient SOUS l'île d'actions flottante : « ⚙ Réglages » était
           invisible (vu en capture). Le slot `right` existe pour ça. */}
       <div>
-        <ScreenHead icon="receipt" title="Factures" desc="Les justificatifs de tes ventes, importés depuis tes emails Vinted."
+        <ScreenHead icon="receipt" title="Factures" desc="Les justificatifs de tes ventes, importés depuis tes e-mails Vinted."
           right={<div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
           <Btn small primaire onClick={()=>setShowForm(true)}>+ Nouvelle facture</Btn>
           {/* ⚠️ « Récupérer Vinted » appelait l'Apps Script mort : le bouton ne
@@ -43532,7 +43532,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
             <div className="vrm-set-liste" style={{ background: C.card, border: `1px solid ${C.border}`, '--vrm-set-filet': C.border }}>
               <button type="button" className="vrm-set-ligne" onClick={() => onNav && onNav('invoices')}>
                 <IconeReglage name="receipt" />
-                <span className="vrm-set-lib"><b style={{ color: C.text }}>Factures{nFactures != null && nFactures > 0 ? ` — ${nFactures} reçue${nFactures > 1 ? 's' : ''}` : ''}</b><small style={{ color: C.muted }}>Tes reçus Vinted arrivés par email, et tes factures à émettre pour tes clients.</small></span>
+                <span className="vrm-set-lib"><b style={{ color: C.text }}>Factures{nFactures != null && nFactures > 0 ? ` — ${nFactures} reçue${nFactures > 1 ? 's' : ''}` : ''}</b><small style={{ color: C.muted }}>Tes reçus Vinted arrivés par e-mail, et tes factures à émettre pour tes clients.</small></span>
                 <span className="vrm-set-chev" aria-hidden="true" style={{ color: C.muted, fontSize: 20 }}>›</span>
               </button>
             </div>
@@ -57901,7 +57901,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {rc && (
                   <div className="vrm-buy-facture">
                     <button type="button" className="vrm-lien-action" data-achat-facture={rc._pdf || rc.pdfB64 ? 'pdf' : 'email'} data-achat-facture-tx={String(txRecuAchat(rc))}
-                      onClick={()=>setReceiptView(rc)} title="Ouvrir le reçu d'achat que Vinted t'a envoyé par email"
+                      onClick={()=>setReceiptView(rc)} title="Ouvrir le reçu d'achat que Vinted t'a envoyé par e-mail"
                       style={{display:'inline-flex',alignItems:'center',gap:5,border:'none',background:'transparent',padding:0,font:'inherit',fontSize:12,fontWeight:600,lineHeight:1.25,color:C.text,cursor:'pointer',textAlign:'left',minHeight:0}}>
                       <Icon name="receipt" size={13} style={{color:C.muted,flexShrink:0}}/>{NOM_RECU_ACHAT}
                     </button>
@@ -58786,7 +58786,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           {emailSoldIds.size>0 && (
             <div style={{fontSize:12,color:C.muted,marginBottom:10,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',background:`${INV_STATUS.online.color}0c`,border:`1px solid ${INV_STATUS.online.color}33`,borderRadius:12,padding:'7px 11px'}}>
               <span style={{color:INV_STATUS.online.color,fontWeight:600}}>🤖 {emailSoldIds.size} annonce{emailSoldIds.size>1?'s':''} retirée{emailSoldIds.size>1?'s':''} auto</span>
-              <span style={{flex:1,minWidth:0}}>email de vente ou bordereau reçu — plus besoin d'attendre la synchro.</span>
+              <span style={{flex:1,minWidth:0}}>e-mail de vente ou bordereau reçu — plus besoin d'attendre la synchro.</span>
               <button type="button" onClick={()=>setShowEmailSold(v=>!v)} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',fontSize:12,padding:0,fontFamily:'inherit'}}>{showEmailSold?'masquer':'voir'}</button>
             </div>
           )}
@@ -60455,7 +60455,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                                vide (mesuré : 0 case posée). Dès qu'une paire y est,
                                la mention redevient un écart qui se remarque. */
                             : ((num && garageUtilise) ? <span style={{flexShrink:0,display:'inline-flex',alignItems:'center',gap:3}}>· <Icon name="home" size={12}/>pas rangée</span> : null)}
-                          {inv && <span title="Compte pro : la facture reçue par email sera imprimée avec le bordereau" style={{flexShrink:0,display:'inline-flex',alignItems:'center',gap:3,color:C.text,fontSize:12,fontWeight:600,whiteSpace:'nowrap'}}>· Facture {inv.number||''}</span>}
+                          {inv && <span title="Compte pro : la facture reçue par e-mail sera imprimée avec le bordereau" style={{flexShrink:0,display:'inline-flex',alignItems:'center',gap:3,color:C.text,fontSize:12,fontWeight:600,whiteSpace:'nowrap'}}>· Facture {inv.number||''}</span>}
                           {posted && <span style={{flexShrink:0,color:C.text,fontWeight:600}}>· déposé</span>}
                         </div>
                         {/* Le numéro de l'email vient d'un rapprochement par titre,
@@ -60825,7 +60825,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </>)}
             {!relayPicker.loading && !relayPicker.error && relayPicker.results.length===0 && (
               <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',color:C.muted,fontSize:13,textAlign:'center',padding:'0 24px',lineHeight:1.6}}>
-                Tes points relais confirmés par tes emails apparaissent déjà tout seuls sur la carte.<br/>Ici, ajoute-en un que tu utilises : tape son nom + la ville.
+                Tes points relais confirmés par tes e-mails apparaissent déjà tout seuls sur la carte.<br/>Ici, ajoute-en un que tu utilises : tape son nom + la ville.
               </div>
             )}
           </div>
@@ -66057,7 +66057,7 @@ function PushPrefsSetting({ comptes, onMuets }) {
             {/* §7 (revue du 11 oct.) : déplié, le bloc dessous dit tout — le résumé se tait. */}
             {muets && muets.length > 0 && !ouvert && (
               <div style={{color:C.warn,fontWeight:600,marginTop:3}} data-resume-muets={muets.length}>
-                ⚠ {muets.length} compte{muets.length>1?'s':''} sans email&nbsp;: ni {muets.length>1?'leurs':'ses'} ventes ni {muets.length>1?'leurs':'ses'} messages ne sonneront.
+                ⚠ {muets.length} compte{muets.length>1?'s':''} sans e-mail&nbsp;: ni {muets.length>1?'leurs':'ses'} ventes ni {muets.length>1?'leurs':'ses'} messages ne sonneront.
               </div>
             )}
           </div>
@@ -68027,7 +68027,7 @@ function ColisEquipe({ vendeur, de, onPropre }) {
         );
       })}
       {tracks.length > 0 && (<>
-        <div style={h3}>Codes reçus par email · {tracks.length}</div>
+        <div style={h3}>Codes reçus par e-mail · {tracks.length}</div>
         {tracks.map((t, i) => {
           const code = codeRetrait(t.code); const qr = qrImage(t);
           return (
@@ -68184,18 +68184,18 @@ function EquipeSetting() {
   const vivants = lu.equipe.filter((x) => x.statut !== 'revoquee');
   const inviter = async () => {
     const e = email.trim();
-    if (!e) { setMsg("Tape l'adresse email de la personne qui t'aide."); return; }
+    if (!e) { setMsg("Tape l'adresse e-mail de la personne qui t'aide."); return; }
     await agir('inviter', 'inviter', { email: e }, (r) => { setEmail(''); setMsg(r.deja ? 'Cette personne est déjà invitée.' : ''); });
   };
   return (
     <div data-equipe-reglage="lu" style={{ fontSize: 13, color: C.text }}>
       <div style={{ color: C.muted, lineHeight: 1.5, marginBottom: 10 }}>{CE_QUE_VOIT_UN_MEMBRE}</div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email de la personne" aria-label="Email à inviter" data-equipe-email=""
+        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="e-mail de la personne" aria-label="E-mail à inviter" data-equipe-email=""
           style={{ flex: '1 1 200px', minWidth: 0, border: `1px solid ${C.border}`, borderRadius: 12, padding: '8px 10px', fontSize: 15, background: C.bg, color: C.text, outline: 'none', fontFamily: 'inherit' }}/>
         <button type="button" data-equipe-inviter="" disabled={!!occupe} onClick={inviter} className="vrm-b vrm-b-primaire">{occupe === 'inviter' ? 'Invitation…' : 'Inviter'}</button>
       </div>
-      <div style={{ color: C.muted, fontSize: 12, marginTop: 6, lineHeight: 1.45 }}>Aucun email n'est envoyé : préviens-la. Elle crée son compte VRM avec cette adresse.</div>
+      <div style={{ color: C.muted, fontSize: 12, marginTop: 6, lineHeight: 1.45 }}>Aucun e-mail n'est envoyé : préviens-la. Elle crée son compte VRM avec cette adresse.</div>
       {msg && <div data-equipe-msg="" style={{ color: C.warn, marginTop: 8 }}>{msg}</div>}
       {vivants.length > 0 && <div style={{ marginTop: 12 }}>
         {vivants.map((x) => (
@@ -68748,9 +68748,9 @@ function EmailStartSetting({ nu = false }) {
 
   return (
     <div style={nu ? {} : {border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 14px'}}>
-      {!nu && <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>Import des emails</div>}
+      {!nu && <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>Import des e-mails</div>}
       <div style={{fontSize:13,color:C.muted,marginBottom:12,lineHeight:1.45}}>
-        Les emails Vinted sont pris en compte à partir de cette date (appliqué en 5 min au plus).
+        Les e-mails Vinted sont pris en compte à partir de cette date (appliqué en 5 min au plus).
       </div>
       {/* (1er nov.) Ce qui est VRAI : le script collectif (BOITE_PARTAGEE) ne lit pas
           cette date — il reçoit pour tous les vendeurs ; sa date de départ est la
@@ -69133,7 +69133,7 @@ function SecuriteSetting() {
         );
       })()}
       <Ligne t="Création de compte" ok={s.mailAuto == null ? null : s.mailAuto === true}
-        etat={s.mailAuto == null ? 'pas encore vérifié' : s.mailAuto ? 'immédiate' : 'email de confirmation exigé'}
+        etat={s.mailAuto == null ? 'pas encore vérifié' : s.mailAuto ? 'immédiate' : 'e-mail de confirmation exigé'}
         d={s.mailAuto == null ? PAS_SU : s.mailAuto ? "Un nouveau compte est utilisable tout de suite."
           : "Lien de confirmation exigé. Pas reçu ? Vérifie les indésirables, puis redemande-le depuis la connexion."}/>
       {/* ⚠️ LA MOITIÉ SERVEUR DU CLOISONNEMENT. Les emails, les rappels
@@ -69143,17 +69143,17 @@ function SecuriteSetting() {
           leurs lignes n'appartiendront à personne (email reçu la nuit =
           silencieusement perdu). C'est le vrai blocage à lever AVANT la
           migration, et il ne se voit nulle part ailleurs. */}
-      <Ligne t="Routes serveur (emails, rappels)" ok={srv === null ? null : !!(srv.serviceKey && srv.owner)}
+      <Ligne t="Routes serveur (e-mails, rappels)" ok={srv === null ? null : !!(srv.serviceKey && srv.owner)}
         etat={srv == null ? 'pas encore vérifié' : srv.serviceKey && srv.owner ? 'prêtes' : srv.serviceKey ? 'propriétaire manquant' : 'clé de service manquante'}
         d={srv == null ? PAS_SU : srv.serviceKey && srv.owner
           ? "Elles écriront sous ton compte une fois la base cloisonnée."
           : !proprio ? "Pas encore activé sur VRM : c'est réglé de notre côté, tu n'as rien à faire."
-          : "AVANT la migration, dans Vercel → Settings → Environment Variables : SUPABASE_SERVICE_KEY (Supabase → Settings → API → service_role) et VRM_OWNER_UID. Sans ça, emails et rappels ne seront plus enregistrés."}/>
+          : "AVANT la migration, dans Vercel → Settings → Environment Variables : SUPABASE_SERVICE_KEY (Supabase → Settings → API → service_role) et VRM_OWNER_UID. Sans ça, e-mails et rappels ne seront plus enregistrés."}/>
       <Ligne t="Extension identifiée" ok={ext === undefined ? null : !!(ext && ext.connecte)}
         etat={ext === undefined ? '…' : !ext ? 'extension absente ici' : ext.connecte ? (ext.email || 'connectée') : 'pas connectée'}
         d={!ext ? "Normal sur téléphone. Sur l'ordinateur, ouvre l'app dans le navigateur de l'extension."
           : ext.connecte ? "Elle écrira sous ce compte."
-          : `Icône de l'extension ${NAV.dansNu} → Compte VRM → ton email et ton mot de passe.`}/>
+          : `Icône de l'extension ${NAV.dansNu} → Compte VRM → ton e-mail et ton mot de passe.`}/>
     </div>
   );
 }
@@ -69318,11 +69318,11 @@ const PREUVE_LIGNE = {
   // (22 oct., revue) La boîte VRM n'a pas réussi à l'envoyer (3 essais) : la
   // demande sort de sa file — « Renvoyer » repart d'une demande neuve.
   echec: { t: "la boîte VRM n'a pas pu envoyer le lien — vérifie l'adresse", alerte: true, geste: 'Renvoyer' },
-  aucune: { t: 'pas confirmée — ses emails sont mis de côté', alerte: true, geste: 'Confirmer' },
+  aucune: { t: 'pas confirmée — ses e-mails sont mis de côté', alerte: true, geste: 'Confirmer' },
   // (1er nov.) Plus de quarantaine silencieuse : la ligne dit que ses emails sont
   // mis de côté, l'aide dessous dit pourquoi et le geste sûr, et « Essayer quand
   // même » envoie le lien (si Apple le laisse passer, l'adresse est prouvée).
-  impossible: { t: "relais Apple « Masquer mon adresse » : pas confirmée — ses emails sont mis de côté", alerte: true, geste: 'Essayer quand même' },
+  impossible: { t: "relais Apple « Masquer mon adresse » : pas confirmée — ses e-mails sont mis de côté", alerte: true, geste: 'Essayer quand même' },
 };
 // ── « RELIER LA BOÎTE DE <COMPTE> » (6 nov., onglets C) ──────────────────────
 // La règle des comptes muets (`etatEmailsComptes`, §11) projetée par src/relierCompte.js :
@@ -69802,7 +69802,7 @@ function EmailsSetting({onComptes}) {
           pourrait pas l'écrire). */}
       {reg && sugg.length > 0 && (
         <div data-suggestions={sugg.length} style={{marginTop:10,borderTop:`1px solid ${C.border}`,paddingTop:10}}>
-          <div style={{fontSize:13,fontWeight:600,color:C.text}}>Adresses où arrivent déjà tes emails</div>
+          <div style={{fontSize:13,fontWeight:600,color:C.text}}>Adresses où arrivent déjà tes e-mails</div>
           <div style={{fontSize:12,color:C.muted,lineHeight:1.45,margin:'2px 0 4px'}}>Vues sur tes e-mails rangés. Ajoute celles qui sont à toi.</div>
           {sugg.slice(0, 8).map((v) => (
             <div key={v.adresse} data-suggestion={v.adresse} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 0',borderTop:`1px solid ${C.border}`}}>
@@ -69850,7 +69850,7 @@ function EmailsSetting({onComptes}) {
             <li>Dans Gmail : <b>Paramètres → Voir tous les paramètres → Transfert et POP/IMAP → Ajouter une adresse de transfert</b>, puis indique <b>{ADRESSE_COLLECTRICE}</b>. Dans Outlook ou iCloud, utilise une règle de transfert automatique vers cette même adresse.</li>
             <li>Google peut demander une validation à la boîte VRM : tant qu’elle n’est pas faite, le transfert n’est pas actif. Une règle de transfert manuel qui masque ton adresse personnelle peut nécessiter une vérification.</li>
             <li>Crée une règle pour <b>les e-mails Vinted et de tes transporteurs</b>, avec leurs pièces jointes. Garde une copie dans ta boîte. Le transfert général de tous tes e-mails personnels n’est pas nécessaire.</li>
-            <li>Après le prochain e-mail, vérifie sa réception dans VRM. Les reçus d’achat sont dans <b>Vinted → Achats → Reçus d’achat par email</b>. Un reçu reçu par e-mail ne crée pas une commande synchronisée.</li>
+            <li>Après le prochain e-mail, vérifie sa réception dans VRM. Les reçus d’achat sont dans <b>Vinted → Achats → Reçus d’achat par e-mail</b>. Un reçu reçu par e-mail ne crée pas une commande synchronisée.</li>
             <li>Adresse « Masquer mon adresse » d'Apple : sur l'iPhone, <b>Réglages → ton nom → Connexion et sécurité → Se connecter avec Apple → Vinted → Transférer à</b>.</li>
           </ol>
           <div style={{fontSize:12,color:C.muted,lineHeight:1.45,marginTop:8}}>
@@ -70017,7 +70017,7 @@ function ConnexionsSetting({comptes=[],onComptes,onPlateforme}) {
     <section className="vrm-connexion-source" data-connexion="capture" style={{borderColor:C.border}}><h3>Ce que l’extension a lu</h3><strong>{capture.titre}</strong>{capture.date&&<time dateTime={capture.date}>{dateLisible(capture.date)}</time>}<p style={{color:C.muted}}>Pour la rafraîchir : ouvre le compte sur sa plateforme, extension active.</p></section>
     <SuiviComptes comptes={comptes} lignes={capt?.lignes||null} onComptes={onComptes}/>
     {onPlateforme&&<div className="vrm-connexions-actions"><Bouton variante="secondaire" onClick={()=>onPlateforme('plat_leboncoin')}>Comptes Leboncoin</Bouton><Bouton variante="secondaire" onClick={()=>onPlateforme('plat_ebay')}>Comptes eBay</Bouton></div>}
-    <section className="vrm-connexion-source" data-connexion="emails" style={{borderColor:C.border}}><h3>E-mails reçus</h3><strong>{emails.titre}</strong>{emails.date&&<time dateTime={emails.date}>{dateLisible(emails.date)}</time>}<p style={{color:C.muted}}>La date du dernier arrivé, pas la preuve que chaque transfert marche. Détail : « Réception des emails ».</p></section>
+    <section className="vrm-connexion-source" data-connexion="emails" style={{borderColor:C.border}}><h3>E-mails reçus</h3><strong>{emails.titre}</strong>{emails.date&&<time dateTime={emails.date}>{dateLisible(emails.date)}</time>}<p style={{color:C.muted}}>La date du dernier arrivé, pas la preuve que chaque transfert marche. Détail : « Réception des e-mails ».</p></section>
     {((Array.isArray(drift)&&drift.length>0)||(Array.isArray(plantages)&&plantages.length>0))&&<details className="vrm-connexion-source" style={{borderColor:C.border}}><summary>Incidents et détails pour l’assistance</summary>
       {Array.isArray(drift)&&drift.length>0&&<p>Le format de certaines réponses est à vérifier : {[...new Set(drift.map(x=>nomFamille(x.type)))].join(', ')}.</p>}
       {Array.isArray(plantages)&&plantages.length>0&&<p data-plantages={plantages.length}>{plantages.length} incident(s) observé(s) ces 7 derniers jours. Dernier : {plantages[0].message} · {dateLisible(plantages[0].at)}.</p>}
@@ -73737,14 +73737,14 @@ function AppCoeur() {
               toutLire(`app_data?select=id,meta&or=(id.like.harvest_*_txn_*,id.like.harvest_*_label_*,id.like.email_bord_*)&order=id`),
               (async()=>{ try{ const r=await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=vinted_user_id,login,domain`,{headers:sbAuth()}); if(!r.ok) return null; const j=await r.json(); return Array.isArray(j)?j:null; }catch(_){ return null; } })(),
             ]);
-            const manques=[]; if(!lignes) manques.push('tes données captées (ventes, achats, messages, annonces, emails)'); if(!legeres) manques.push('le résumé des transactions et des bordereaux'); if(!comptes) manques.push('la liste de tes comptes Vinted');
+            const manques=[]; if(!lignes) manques.push('tes données captées (ventes, achats, messages, annonces, e-mails)'); if(!legeres) manques.push('le résumé des transactions et des bordereaux'); if(!comptes) manques.push('la liste de tes comptes Vinted');
             // Réglages lus dans le navigateur AVANT que le nuage soit arrivé : ils
             // peuvent être vides ou périmés — le fichier ne se dit pas complet.
             if(!isCloudReady()) manques.push('tes réglages (pas encore chargés depuis ton compte)');
             const data={ _cancale_backup:3, exportDate:new Date().toISOString(), keys,
               donnees:{ lignes:(lignes||[]).map(l=>({ id:l.id, data:sansSecrets(l.data) })), resumes:legeres||[], comptes:comptes||[] },
               complet: manques.length===0, manques,
-              omis:['PDF des bordereaux (ils se retéléchargent depuis Vinted ou ton email)','détail brut des transactions (on garde article, état et dates)','jetons de connexion Vinted et eBay, clé du widget, clé Photoroom, clés de tes téléphones (jamais dans un fichier)'] };
+              omis:['PDF des bordereaux (ils se retéléchargent depuis Vinted ou ton e-mail)','détail brut des transactions (on garde article, état et dates)','jetons de connexion Vinted et eBay, clé du widget, clé Photoroom, clés de tes téléphones (jamais dans un fichier)'] };
             const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
             const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url;
             a.download=`vrm-sauvegarde-${new Date().toISOString().slice(0,10)}.json`;

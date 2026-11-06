@@ -63,18 +63,18 @@ export function expediteurLisible(from) {
 
 const POURQUOI_PAS_DELIER = {
   bordereau: 'Ce bordereau est relié par le n° de transaction que Vinted a écrit dedans : il appartient à cette vente et à aucune autre. Si le N° de rangement est faux, corrige-le dans Colis.',
-  suivi: 'Ce colis est relié par son n° de suivi, écrit dans l’email par le transporteur : rien n’a été deviné.',
+  suivi: 'Ce colis est relié par son n° de suivi, écrit dans l’e-mail par le transporteur : rien n’a été deviné.',
 };
 
 const ANCIEN = 'Classé avant le 31 oct. — détail non gardé.';
 const ongletDuType = { suivi: 'cat_bord', bordereau: 'cat_bord', achat: 'achats', vente: 'cat_ventes', 'vente-vestiaire': 'cat_ventes', finalisation: 'cat_ventes', offre: 'cat_msg', message: 'cat_msg', favori: 'cat_annonces', action: 'cat_msg' };
-const TYPES_ANCIENS = { suivi: 'Suivi de colis', bordereau: 'Bordereau', achat: 'Reçu d’achat', vente: 'Vente', 'vente-vestiaire': 'Vente Vestiaire', finalisation: 'Versement', offre: 'Offre', message: 'Message', favori: 'Favori', action: 'Demande Vinted', 'connu-sans-action': 'Information', information: 'Information', ignoré: 'Email non reconnu' };
+const TYPES_ANCIENS = { suivi: 'Suivi de colis', bordereau: 'Bordereau', achat: 'Reçu d’achat', vente: 'Vente', 'vente-vestiaire': 'Vente Vestiaire', finalisation: 'Versement', offre: 'Offre', message: 'Message', favori: 'Favori', action: 'Demande Vinted', 'connu-sans-action': 'Information', information: 'Information', ignoré: 'E-mail non reconnu' };
 
 // e : une ligne du journal (route `mode=journal`) ; delies : { [id de la ligne
 // du reçu]: { tx } } — les reçus que LUI a déliés (« Ce n'est pas ça »).
 export function lectureEmail(e, delies = {}) {
   const de = expediteurLisible(e && e.from);
-  const sujet = String((e && e.subject) || '').trim() || 'Email sans objet';
+  const sujet = String((e && e.subject) || '').trim() || 'E-mail sans objet';
   const r = e && e.resume && typeof e.resume === 'object' ? e.resume : null;
   const base = { de, sujet, num: null, lien: null, raison: '', geste: '', delier: null, cible: null };
 
@@ -106,7 +106,7 @@ export function lectureEmail(e, delies = {}) {
         fait: r.s ? `Rangé avec le colis n° ${r.s}` : 'Gardé, relié à aucun colis',
         lien: lien(r.sens === 'sortant' && r.st === 'delivered' ? 'cat_ventes' : r.st === 'delivered' ? 'achats' : 'cat_bord'),
         cible: r.s ? { k: 'suivi', v: r.s } : null };
-      if (r.av === 'sans-suivi') Object.assign(o, { raison: 'Je n’ai pas trouvé le n° de suivi dans cet email : je ne sais pas à quel colis il appartient.', geste: 'Lis le texte ci-dessous ; si c’est un de tes colis, retrouve-le dans Colis par son code.' });
+      if (r.av === 'sans-suivi') Object.assign(o, { raison: 'Je n’ai pas trouvé le n° de suivi dans cet e-mail : je ne sais pas à quel colis il appartient.', geste: 'Lis le texte ci-dessous ; si c’est un de tes colis, retrouve-le dans Colis par son code.' });
       o.delier = { offert: false, pourquoi: POURQUOI_PAS_DELIER.suivi };
       break;
     }
@@ -121,8 +121,8 @@ export function lectureEmail(e, delies = {}) {
       o = { quoi: `Bordereau de la vente ${r.a ? r.a : 'n° ' + (r.tx || '?')}`,
         fait: `Ajouté aux colis à expédier · vente n° ${r.tx}${numSur ? ` · N°${r.n}` : ''}${r.tp ? ' · déjà tamponné' : ''}`,
         lien: lien('cat_bord'), num: numSur ? String(r.n) : null, cible: { k: 'tx', v: r.tx } };
-      if (r.av === 'num-titre') Object.assign(o, { raison: `Le N°${r.n} a été retrouvé par le titre de l’annonce, pas lu dans l’email : il peut désigner une autre paire.`, geste: 'Vérifie ce N° sur ton carton avant d’imprimer le bordereau (Colis).' });
-      if (r.av === 'sans-pdf') Object.assign(o, { raison: 'L’email ne portait pas de PDF : il n’y a rien à imprimer depuis VRM.', geste: 'Télécharge le bordereau depuis la vente sur Vinted.' });
+      if (r.av === 'num-titre') Object.assign(o, { raison: `Le N°${r.n} a été retrouvé par le titre de l’annonce, pas lu dans l’e-mail : il peut désigner une autre paire.`, geste: 'Vérifie ce N° sur ton carton avant d’imprimer le bordereau (Colis).' });
+      if (r.av === 'sans-pdf') Object.assign(o, { raison: 'L’e-mail ne portait pas de PDF : il n’y a rien à imprimer depuis VRM.', geste: 'Télécharge le bordereau depuis la vente sur Vinted.' });
       o.delier = { offert: false, pourquoi: POURQUOI_PAS_DELIER.bordereau };
       break;
     }

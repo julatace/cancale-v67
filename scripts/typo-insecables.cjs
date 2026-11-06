@@ -25,6 +25,9 @@ const RACINE = path.join(__dirname, '..');
 const parser = require(path.join(RACINE, 'node_modules', '@babel', 'parser'));
 const args = process.argv.slice(2);
 const ECRIRE = args.includes('--ecrire');
+// `--email` : « email(s) » ⇒ « e-mail(s) » (src/libelles.js, notion E-mails) dans les PHRASES seulement
+// (un littéral d'un seul mot, « 'email' », est une valeur technique : jamais touché).
+const EMAIL = args.includes('--email');
 const SIGNES = ((args.find((a) => a.startsWith('--signes=')) || '').slice(9) || '€%:;?!').split('');
 const nommes = args.filter((a) => !a.startsWith('--'));
 const fichiers = [];
@@ -61,7 +64,11 @@ function chemins(src, ast) {
         const brut = src.slice(debut, fin);
         // Une chaîne en `'…'` ou un gabarit : un « \n » écrit reste « \n » (on ne touche qu'aux espaces).
         const premier = genre === 'gabarit' && parent && parent.quasis && parent.quasis[0] !== n;
-        for (const signe of SIGNES) {
+        if (EMAIL && /\s/.test(brut.trim())) {
+          const re = /(^|[\s«(’])([Ee])mail(s?)(?![\p{L}\d@._-])/gu; let m;
+          while ((m = re.exec(brut))) { const i = m.index + m[1].length; sorties.push({ pos: debut + i, len: 5 + m[3].length, par: m[2] + '-mail' + m[3], genre, signe: 'email', ligne: src.slice(0, debut + i).split('\n').length, extrait: brut.slice(Math.max(0, i - 24), i + 10) }); }
+        }
+        for (const signe of (EMAIL ? [] : SIGNES)) {
           const esc = signe.replace(/[?]/g, '\\?');
           const re = new RegExp(` (?=${esc}(?:[\\s»"'’)\\].,<]|$))`, 'g');
           let m;
@@ -101,7 +108,7 @@ for (const p of fichiers) {
   parFichier[path.relative(RACINE, p)] = s.length; total += s.length;
   if (!ECRIRE) { for (const x of s.slice().reverse()) console.log(`${path.relative(RACINE, p)}:${x.ligne}  ${x.genre}  « ${x.extrait.replace(/\n/g, '⏎')} »`); continue; }
   let out = src;
-  for (const x of s) out = out.slice(0, x.pos) + (x.genre === 'jsx' ? '&nbsp;' : '\\u00a0') + out.slice(x.pos + 1);
+  for (const x of s) out = out.slice(0, x.pos) + (x.par != null ? x.par : (x.genre === 'jsx' ? '&nbsp;' : '\\u00a0')) + out.slice(x.pos + (x.len || 1));
   fs.writeFileSync(p, out);
 }
 console.log(`\n${total} espace(s) à rendre insécable(s)${ECRIRE ? ' — écrit' : ''} :`, parFichier);

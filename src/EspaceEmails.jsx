@@ -40,7 +40,7 @@ export default function EspaceEmails({
     >
       {/* (5 nov., chantier G) Sous le choix « Boîte de réception · Relier ma boîte », le second niveau
           prend le dessin des filtres de l'app (`vrm-filtres`) : deux contrôles segmentés empilés se confondaient. */}
-      <nav className="vrm-emails-rubriques vrm-filtres" aria-label="Rubriques des emails">
+      <nav className="vrm-emails-rubriques vrm-filtres" aria-label="Rubriques des e-mails">
         {rubriques.map(([id, titre, nom]) => (
           <button
             key={id}

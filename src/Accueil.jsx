@@ -668,7 +668,7 @@ export default function Accueil({ onEntrer }) {
             <div>
               <h2 className="acc-h2b" data-prerequis-ordinateur="">Une installation, sur ton ordinateur. Ensuite, tu suis tout depuis ton téléphone.</h2>
               <ol className="acc-etapes">
-                <li><span className="n">1</span><div><h3>Crée ton compte</h3><p>Un email et un mot de passe.{ACCES_OFFERT && <span data-sans-carte=""> Aucune carte bancaire.</span>}</p></div></li>
+                <li><span className="n">1</span><div><h3>Crée ton compte</h3><p>Un e-mail et un mot de passe.{ACCES_OFFERT && <span data-sans-carte=""> Aucune carte bancaire.</span>}</p></div></li>
                 <li><span className="n">2</span><div><h3>Ajoute l’extension à ton navigateur</h3><p>{`Une seule fois, sur ton ordinateur, dans ${NAVS_ORDI}${EXTENSION_SUR_LE_STORE ? ', depuis le Chrome Web Store. Puis connecte-la' : '. Elle n’est pas encore sur le Chrome Web Store : VRM te guide pas à pas, puis tu la connectes'} avec le même email.`}</p></div></li>
                 <li><span className="n">3</span><div><h3>Passe sur Vinted</h3><p>Avec chacun de tes comptes. Ventes, annonces, bordereaux et messages arrivent dans VRM.</p></div></li>
               </ol>

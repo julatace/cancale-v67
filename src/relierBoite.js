@@ -48,23 +48,23 @@ export const MESSAGERIES = [
       { scene: 'adresse', titre: 'Ajoute l’adresse de VRM', geste: 'Onglet « Transfert et POP/IMAP » → « Ajouter une adresse de transfert » → colle l’adresse de VRM.' },
       { scene: 'code', titre: 'Valide le transfert', geste: 'Gmail envoie un code de validation à la boîte de VRM : VRM te le rend dans Réglages → E-mails → Adresses, une fois ton adresse confirmée. Tape-le à côté de « Valider ».' },
       { scene: 'filtre', titre: 'Crée le filtre', geste: 'Dans la barre de recherche : l’icône des options → champ « De » : colle la règle ci-dessous → « Créer un filtre » → coche « Transférer à » l’adresse de VRM.' },
-      { scene: 'flux', titre: 'C’est en place', geste: 'Le prochain email d’un de ces expéditeurs part aussi vers VRM. Ton courrier personnel, lui, ne part pas.' },
+      { scene: 'flux', titre: 'C’est en place', geste: 'Le prochain e-mail d’un de ces expéditeurs part aussi vers VRM. Ton courrier personnel, lui, ne part pas.' },
     ] },
   { id: 'icloud', nom: 'iCloud Mail', famille: 'Apple', regle: 'regles',
     etapes: [
       { scene: 'reglages', titre: 'Ouvre les réglages', geste: 'Sur icloud.com/mail (ordinateur) : la roue → « Réglages » → « Règles ».' },
       { scene: 'adresse', titre: 'Ajoute une règle', geste: '« Ajouter une règle » → « Si un message est de » → l’expéditeur (un par règle).' },
       { scene: 'filtre', titre: 'Fais-la suivre à VRM', geste: '« Alors » → « Transférer à » → colle l’adresse de VRM. Recommence pour chaque expéditeur de la liste.' },
-      { scene: 'code', titre: 'Garde une copie', geste: 'Laisse les emails aussi dans ta boîte : le transfert envoie une copie, rien n’est déplacé.' },
-      { scene: 'flux', titre: 'C’est en place', geste: 'Le prochain email d’un de ces expéditeurs part aussi vers VRM.' },
+      { scene: 'code', titre: 'Garde une copie', geste: 'Laisse les e-mails aussi dans ta boîte : le transfert envoie une copie, rien n’est déplacé.' },
+      { scene: 'flux', titre: 'C’est en place', geste: 'Le prochain e-mail d’un de ces expéditeurs part aussi vers VRM.' },
     ] },
   { id: 'outlook', nom: 'Outlook / Hotmail', famille: 'Microsoft', regle: 'regles',
     etapes: [
       { scene: 'reglages', titre: 'Ouvre les paramètres', geste: 'Sur outlook.com : la roue → « Courrier » → « Règles ».' },
       { scene: 'adresse', titre: 'Ajoute une règle', geste: '« Ajouter une nouvelle règle » → condition « De » → l’expéditeur.' },
       { scene: 'filtre', titre: 'Fais-la suivre à VRM', geste: 'Action « Transférer à » → colle l’adresse de VRM → « Enregistrer ». Ajoute les autres expéditeurs à la même condition.' },
-      { scene: 'code', titre: 'Si Outlook bloque', geste: 'Certains comptes Outlook refusent le transfert automatique. Si, après le prochain email de Vinted, rien n’apparaît dans la boîte de réception de VRM, c’est qu’Outlook l’a bloqué.' },
-      { scene: 'flux', titre: 'C’est en place', geste: 'Le prochain email d’un de ces expéditeurs part aussi vers VRM.' },
+      { scene: 'code', titre: 'Si Outlook bloque', geste: 'Certains comptes Outlook refusent le transfert automatique. Si, après le prochain e-mail de Vinted, rien n’apparaît dans la boîte de réception de VRM, c’est qu’Outlook l’a bloqué.' },
+      { scene: 'flux', titre: 'C’est en place', geste: 'Le prochain e-mail d’un de ces expéditeurs part aussi vers VRM.' },
     ] },
   { id: 'fai', nom: 'Orange, SFR, Free', famille: 'Fournisseur d’accès', regle: 'regles',
     etapes: [
@@ -103,7 +103,7 @@ export const MESSAGERIES = [
       { scene: 'adresse', titre: 'Trouve « Filtres » ou « Règles »', geste: 'Le nom change d’une messagerie à l’autre ; « transfert » marche aussi dans la recherche des paramètres.' },
       { scene: 'filtre', titre: 'Crée la règle', geste: 'Condition sur l’expéditeur, action « Transférer » vers l’adresse de VRM.' },
       { scene: 'code', titre: 'Valide si on te le demande', geste: 'Si ta messagerie envoie un code à VRM, VRM te le rend dans Réglages → E-mails → Adresses (une fois ton adresse confirmée).' },
-      { scene: 'flux', titre: 'C’est en place', geste: 'Le prochain email d’un de ces expéditeurs part aussi vers VRM.' },
+      { scene: 'flux', titre: 'C’est en place', geste: 'Le prochain e-mail d’un de ces expéditeurs part aussi vers VRM.' },
     ] },
 ];
 
