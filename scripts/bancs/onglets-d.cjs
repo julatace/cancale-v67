@@ -26,10 +26,13 @@ let ok = 0, ko = 0;
 const dit = (bon, quoi, det) => { if (bon) ok++; else ko++; console.log(`${bon ? '✅' : '❌'} ${quoi}${!bon && det ? ' — ' + String(det).slice(0, 300) : ''}`); };
 
 const now = Date.now(), iso = (j) => new Date(now - j * 86400000).toISOString();
+// Un versement « il y a j jours » posé à midi (UTC) de ce jour-là : lancé entre 23 h et minuit UTC, « il y a 6 j »
+// tombait après minuit à Paris — le 31 oct. devenait le 1er nov. et le mois d'octobre se vidait (banc rouge la nuit seulement).
+const midi = (j) => { const d = new Date(now - j * 86400000); d.setUTCHours(12, 0, 0, 0); return d.toISOString(); };
 const AN = new Date().getFullYear();
 // Une vente finalisée SANS transaction lue (pas de date de versement) : « à dater ».
 const finalisee = (tx, eur, dateIso) => ({ transaction_id: tx, title: `Paire inventée ${tx}`, price: { amount: String(eur), currency_code: 'EUR' }, status: 'Commande finalisée', transaction_user_status: 'completed', date: dateIso });
-const txn = (uid, tx, jVerse) => ({ id: `harvest_${uid}_txn_${tx}`, data: { capturedAt: iso(0.01), payload: { transaction: { id: tx, item_id: tx + 500000, status: 450, status_title: 'Commande finalisée', status_updated_at: iso(jVerse) } } } });
+const txn = (uid, tx, jVerse) => ({ id: `harvest_${uid}_txn_${tx}`, data: { capturedAt: iso(0.01), payload: { transaction: { id: tx, item_id: tx + 500000, status: 450, status_title: 'Commande finalisée', status_updated_at: midi(jVerse) } } } });
 const jeu = () => {
   const L = JSON.parse(JSON.stringify(NV.JEU_LIGNES));
   const v2 = L.find((r) => r.id === 'harvest_222_orders_sold');
