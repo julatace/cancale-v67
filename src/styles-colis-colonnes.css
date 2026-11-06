@@ -237,7 +237,6 @@ html body .vrm-lot-pied > .vrm-b { margin: 0; }
 
 /* Les vides de l'en-tête de « À envoyer » ne prennent plus de place (une marge sous un bloc vide
    creusait 30 px entre les onglets et la liste). */
-.vrm-colis-fraicheur:empty { display: none; }
 html:not([data-colis-outils]) body .vrm-app-shell .vrm-main .vrm-colis-recap.vrm-colis-recap-nu { height: 0 !important; margin: 0 !important; overflow: hidden !important; }
 /* Le titre d'un colis tient sur deux lignes au téléphone (une seule coupait « Samba noir… »). */
 @media (max-width: 767px) {

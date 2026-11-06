@@ -126,17 +126,17 @@ const res = (pg) => pg.evaluate(() => ({
         const pl = await r.pg.evaluate(() => ({ a: document.querySelector('[data-meuble="mA"]').getAttribute('data-meuble-ici'), ag: !!document.querySelector('[data-meuble="mA"] [data-meuble-grille]'), b: document.querySelector('[data-meuble="mB"]').getAttribute('data-meuble-ici') }));
         dit(pl.a === '0' && !pl.ag && pl.b === '1', `${t} : « puma » : l'étagère se replie (rien ici), les bacs disent « 1 ici »`, JSON.stringify(pl));
         // Plusieurs résultats : « les montrer toutes » — triées dans l'ordre du chemin.
-        // (6 nov., vague 3) Les cases portent aussi le crochet des notifications (`data-cible="case:…"`) :
-        // on lit la liste « à aller chercher », pas les cases.
+        // (6 nov., finitions) La liste « à aller chercher » porte SON attribut (`data-aller-chercher`) :
+        // `data-cible` est le crochet des notifications (src/cibleNotif.js), un autre sens.
         await inp.fill('nike');
         await r.pg.click('[data-stock-tout-montrer]');
         await r.pg.waitForTimeout(300);
-        const ci = await r.pg.evaluate(() => [...document.querySelectorAll('[data-cible]:not([data-case-ici])')].map((x) => x.getAttribute('data-cible')).join(','));
+        const ci = await r.pg.evaluate(() => [...document.querySelectorAll('[data-stock-cibles] [data-aller-chercher]')].map((x) => x.getAttribute('data-aller-chercher')).join(','));
         dit(ci === '12,7', `${t} : les Nike montrées ensemble, dans l'ordre du meuble (N°12 rangée 2 puis N°7 rangée 3)`, ci);
         // « 2 vendues à sortir — où sont-elles ? »
         await r.pg.click('[data-vendues-chercher]');
         await r.pg.waitForTimeout(300);
-        const ve = await r.pg.evaluate(() => [...document.querySelectorAll('[data-cible]:not([data-case-ici])')].map((x) => x.getAttribute('data-cible')).join(','));
+        const ve = await r.pg.evaluate(() => [...document.querySelectorAll('[data-stock-cibles] [data-aller-chercher]')].map((x) => x.getAttribute('data-aller-chercher')).join(','));
         if (process.env.SHOT) await r.pg.screenshot({ path: process.env.SHOT + '-vendues' + (tel ? '-390' : '-1512') + '.png', fullPage: false });
         dit(ve === '128,7', `${t} : les vendues à sortir listées avec leur place, dans l'ordre du chemin`, ve);
         await inp.fill('nike 42');

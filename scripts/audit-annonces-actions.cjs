@@ -52,6 +52,10 @@ const MUTATIONS = {
   app_presentes_ignorees: { f: 'app', m: (s) => s.replace('liensRepubMain(repubMain, { presentes: pres, dejaRecrees: recreesNum || {} })', 'liensRepubMain(repubMain)') },
   app_liens_ignores: { f: 'app', m: (s) => s.replace('recrees: recreesEff,', 'recrees: recreesNum,') },
   app_sans_depart: { f: 'app', m: (s) => s.split(" depart={repubDepart?'modif':null}").join('') },
+  // (6 nov., finitions) La phrase à deux comptes retombe dans l'à-peu-près : « Prix mini » tu, ou dit possible sans l'être.
+  mini_possible_tu: { f: 'src', m: (s) => s.replace("if (possibles.length) for (const x of res)", "if (false) for (const x of res)") },
+  mini_toujours_dit: { f: 'src', m: (s) => s.replace("res.filter((x) => x.ok && (ACTIONS_SELECTION", "res.filter((x) => (ACTIONS_SELECTION") },
+  phrase_d_avant: { f: 'src', m: (s) => s.replace("). ${PAR_COMPTE} : un compte à la fois.`", ") : une action se lance sur un seul compte à la fois.`") },
 };
 
 async function charger(src) {
@@ -86,7 +90,13 @@ async function auditer(sources) {
     // dans ses fiches. Toutes les AUTRES actions restent bloquées par le mélange des comptes.
     const parCompte = Object.values(a).filter((x) => x.k !== 'mini');
     dit(parCompte.length >= 5 && parCompte.every((x) => !x.ok && /2 comptes/.test(x.raison) && /compte_a/.test(x.raison) && /compte_b/.test(x.raison)), 'B2 deux comptes mélangés ⇒ aucune action qui agit au nom d’un compte, les comptes nommés', a.recreer.raison);
-    dit(a.mini && a.mini.ok && a.mini.robot === false, 'B16 « Prix mini… » sur deux comptes ⇒ possible (rien ne part chez Vinted, aucun robot)', a.mini && a.mini.raison); }
+    dit(a.mini && a.mini.ok && a.mini.robot === false, 'B16 « Prix mini… » sur deux comptes ⇒ possible (rien ne part chez Vinted, aucun robot)', a.mini && a.mini.raison);
+    // (6 nov., finitions) La phrase commune dit JUSTE : ce qui se lance au nom d'un compte, et que « Prix mini » reste possible.
+    const tete = R.raisonCommune(Object.values(a)).tete;
+    dit(/Republier, modifier, brouillon, mise en ligne : un compte à la fois/.test(tete) && /Prix mini : possible/.test(tete) && !/une action se lance sur un seul compte/.test(tete), 'B19 deux comptes : « Republier, modifier, brouillon, mise en ligne : un compte à la fois · Prix mini : possible »', tete); }
+  { const a = L([{ id: '1', uid: '111', etat: 'brouillon' }, { id: '2', uid: '222', etat: 'en-ligne' }]);
+    const tete = R.raisonCommune(Object.values(a)).tete;
+    dit(a.mini && !a.mini.ok && /un compte à la fois/.test(tete) && !/Prix mini : possible/.test(tete), 'B20 deux comptes et un brouillon coché : « Prix mini » n’est PAS dit possible (il ne l’est pas)', tete); }
   { const a = L([{ id: '5', uid: '111', etat: 'brouillon' }]);
     dit(a.mini && !a.mini.ok && /en ligne/.test(a.mini.raison), 'B17 « Prix mini… » sur un brouillon ⇒ grisé (une offre n’arrive que sur une annonce en ligne), raison dite', a.mini && a.mini.raison);
     const sel = R.ACTIONS_SELECTION.filter((A) => A.multiComptes);
@@ -160,7 +170,7 @@ async function auditer(sources) {
   // ── F ── l'app
   const app = sources.app;
   dit(/actionsPossibles\(\{ selection:/.test(app) && /<ChoixAnnoncesVinted /.test(app) && /<ActionsSelectionFeuille /.test(app), 'F1 la sélection et le carré « Actions possibles » sont rendus');
-  dit(/recrees: recreesEff,/.test(app) && /fusionLiensRecrees\(recreesNum, liensRepubMain\(repubMain, \{ presentes: pres, dejaRecrees: recreesNum \|\| \{\} \}\)\)/.test(app), 'F2 la table de SES liens s’ajoute à celle de l’extension (même règle de reprise), anciennes encore présentes écartées');
+  dit(/repriseNumerosRecreation\(\{[\s\S]{0,600}?recrees: recreesEff,/.test(app) && /fusionLiensRecrees\(recreesNum, liensRepubMain\(repubMain, \{ presentes: pres, dejaRecrees: recreesNum \|\| \{\} \}\)\)/.test(app), 'F2 la table de SES liens s’ajoute à celle de l’extension (même règle de reprise), anciennes encore présentes écartées');
   dit(/depart=\{repubDepart\?'modif':null\}/.test(app) && /depart=\{repubDepart\?'envoi':null\}/.test(app), 'F3 Republier ouvert depuis la sélection commence après « Choisir »');
   dit(/'vrm_repub_main',/.test(app.slice(app.indexOf('const SYNC_KEYS'), app.indexOf('const SYNC_KEYS') + 30000)), 'F4 `vrm_repub_main` est synchronisé');
   dit(/problemesAnnonce\(a\.verif \|\| \{\}, 'vinted'\)/.test(app) && /champsNonJuges\(a\.verif/.test(app), 'F5 le carré dit, paire par paire, ce qui manque (la règle de « vérifier avant »)');

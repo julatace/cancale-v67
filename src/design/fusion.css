@@ -38,6 +38,7 @@
   --fu-case-sombre: var(--vrm-case-sombre, rgba(255,255,255,.1));
   --fu-sur-sombre: var(--vrm-sur-sombre, #fff);
   --fu-sur-sombre-2: var(--vrm-sur-sombre-2, rgba(255,255,255,.7));
+  --fu-sur-sombre-3: var(--vrm-sur-sombre-3, rgba(255,255,255,.55));
   --fu-filet: rgba(0,0,0,.06);
   --fu-r-carte: 20px;
   --fu-r-sombre: 24px;
@@ -209,7 +210,6 @@ html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-greeting.vrm-fu-t
 .vrm-fu-jour > span { font: 700 11px/1 var(--vrm-police); color: var(--fu-sur-sombre-2); text-transform: uppercase; letter-spacing: .02em; }
 .vrm-fu-jour > b { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font: 700 15px/1 var(--vrm-police); color: #fff; background: rgba(255,255,255,.08); font-variant-numeric: tabular-nums; position: relative; }
 .vrm-fu-jour[data-vendu]:not([data-vendu="0"]) > b::after { content: ''; position: absolute; bottom: 4px; left: 50%; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: rgba(255,255,255,.75); }
-.vrm-fu-jour[data-futur] > b { background: transparent; color: rgba(255,255,255,.38); }
 .vrm-fu-jour[data-auj] > span { color: #fff; }
 .vrm-fu-jour[data-auj] > b { background: #fff; color: #1d1d1f; }
 .vrm-fu-jour[data-auj][data-vendu]:not([data-vendu="0"]) > b::after { background: #1d1d1f; }
@@ -515,7 +515,7 @@ html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q
 }
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte .vrm-compta-libelle { color: var(--fu-sur-sombre-2) !important; text-transform: uppercase; letter-spacing: .06em; font-size: 12px !important; }
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte .vrm-compta-hero { color: #fff !important; font-size: 44px !important; }
-html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte .vrm-compta-hero[data-eur=""] { color: rgba(255,255,255,.5) !important; }
+html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte .vrm-compta-hero[data-eur=""] { color: var(--fu-sur-sombre-3) !important; }
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte :is(.vrm-compta-phrase, small, .vrm-set-lib small) { color: var(--fu-sur-sombre-2) !important; }
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte :is(b, .vrm-display, summary, .vrm-set-lib b) { color: #fff !important; }
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte [data-benef-manque] { color: #ffc773 !important; }
@@ -535,7 +535,6 @@ html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-fu-compta
 .vrm-fu-seg[data-derniere] > span { color: var(--fu-encre) !important; font-weight: 600 !important; }
 .vrm-fu-seg[data-cours][data-ton="urgent"] > span { color: var(--fu-ambre-txt) !important; }
 .vrm-fu-barre > span, .vrm-fu-panneau-tete span, .vrm-fu-titre-section span { color: var(--fu-gris) !important; }
-.vrm-fu-jour[data-futur] > b { color: var(--fu-sur-sombre-2) !important; }
 :root:not([data-theme="dark"]) { --fu-ambre-txt: #B25000; }
 
 /* ══ 11. MA JOURNÉE = LA MAQUETTE FusionJournee, à l'identique (2 nov., 22 h) ══
@@ -1081,8 +1080,6 @@ html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-carte[data-vc-c
 :root[data-theme="dark"] .vrm-colis-en-route-liste { background: #1c1c1e; }
 .vrm-colis-en-route-liste > .vrm-rpf-ligne:first-child { border-top: 0; }
 .vrm-rpf-liste > .vrm-rpf-ligne:first-child { border-top: .5px solid rgba(0,0,0,.18); }
-/* Le bandeau de fraîcheur du bas de Colis est devenu la puce « N comptes à relire ». */
-html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-fraicheur { display: none !important; }
 .vrm-repartis-courts { background: var(--fu-carte, #fff); border-radius: var(--fu-r-carte, 20px); box-shadow: var(--fu-ombre); padding: 0 14px; margin: 12px 0 0; }
 :root[data-theme="dark"] .vrm-repartis-courts { background: #1c1c1e; }
 .vrm-repartis-courts > .vrm-rpf-ligne:first-child { border-top: 0; }
