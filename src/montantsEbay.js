@@ -8,5 +8,5 @@ export function formaterMontantEbay(value,currency){
  const entier=BigInt(match[2]),decimales=fraction.padEnd(2,'0');
  const signe=match[1] && (entier!==0n || decimales!=='00')?'-':'';
  const code=typeof currency==='string'?currency.trim():'';
- return signe+new Intl.NumberFormat('fr-FR',{maximumFractionDigits:0}).format(entier)+','+decimales+(code?' '+(code==='EUR'?'€':code):'');
+ return signe+new Intl.NumberFormat('fr-FR',{maximumFractionDigits:0}).format(entier)+','+decimales+(code?'\u00a0'+(code==='EUR'?'€':code):'');
 }

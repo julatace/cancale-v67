@@ -45521,7 +45521,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <div style={{flex:'1 1 90px',minWidth:0}}>
           <div style={{fontSize:11,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={a.title}><span style={{color:C.muted,fontWeight:500}}>Achat relié · </span>{a.title||'sans titre'}</div>
           <div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-            Acheté {a.price?.amount!=null?`${Number(a.price.amount).toFixed(2).replace('.',',')} ${cur(a.price?.currency_code)}`:'—'}{a.date?` · ${new Date(a.date).toLocaleDateString('fr-FR')}`:''}
+            Acheté {a.price?.amount!=null?`${Number(a.price.amount).toFixed(2).replace('.',',')}\u00a0${cur(a.price?.currency_code)}`:'—'}{a.date?` · ${new Date(a.date).toLocaleDateString('fr-FR')}`:''}
           </div>
         </div>
         <button type="button" onClick={()=>generateAchatJustificatif(a,{ account:a._accName||accNameOf(a._acc), regime:load('vinted_regime','micro'), numero:numero||'' })}
@@ -53711,7 +53711,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // inutile : « 88 € », « 158,99 € ».
   // « 249,5 € » se lisait inachevé (revue visuelle du 17 oct.) : des centimes
   // s'écrivent sur deux chiffres, un prix rond reste rond.
-  const prix = (p, c)=> (p==null||p==='')?'':`${Number(p).toLocaleString('fr-FR',{minimumFractionDigits:Number.isInteger(Number(p))?0:2,maximumFractionDigits:2})} ${cur(c)}`;
+  const prix = (p, c)=> (p==null||p==='')?'':`${Number(p).toLocaleString('fr-FR',{minimumFractionDigits:Number.isInteger(Number(p))?0:2,maximumFractionDigits:2})}\u00a0${cur(c)}`;
 
   // Le menu « ⋯ Outils » des Ventes : UN contenu, deux ancrages (dans le
   // bouton sur ordinateur, sous la barre ailleurs). Sur téléphone il porte en
@@ -61092,7 +61092,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div style={{fontSize:17,fontWeight:700,color:C.text}}>📦 Paires du lot</div>
               <button className="vrm-icon-control" type="button" onClick={()=>setLotView(null)} aria-label="Fermer" style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,width:34,height:34,cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit'}}><Icon name="close" size={15}/></button>
             </div>
-            <div style={{fontSize:12,color:C.muted,marginBottom:12}}>{lotView.order?.title||''}{lotView.order?.price?.amount!=null?` · ${Number(lotView.order.price.amount).toFixed(0)} ${cur(lotView.order.price?.currency_code)}`:''}{classifyOrderStatus(lotView.order?.status)==='cancelled'?' · ❌ remboursé (hors CA)':''}</div>
+            <div style={{fontSize:12,color:C.muted,marginBottom:12}}>{lotView.order?.title||''}{lotView.order?.price?.amount!=null?` · ${Number(lotView.order.price.amount).toFixed(0)}\u00a0${cur(lotView.order.price?.currency_code)}`:''}{classifyOrderStatus(lotView.order?.status)==='cancelled'?' · ❌ remboursé (hors CA)':''}</div>
             {lotView.loading ? (
               <Skeleton variant="row" count={4}/>
             ) : lotView.items.length===0 ? (

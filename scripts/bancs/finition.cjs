@@ -123,8 +123,10 @@ function mesurer(opts) {
   const dansDefilant = (e) => { for (let x = e.parentElement; x && x !== document.body; x = x.parentElement) { const s = getComputedStyle(x); if (/(auto|scroll)/.test(s.overflowX)) return true; } return false; };
   const fixeHorsEcran = (e) => { for (let x = e; x && x.nodeType === 1; x = x.parentElement) { const s = getComputedStyle(x); if (s.transform && s.transform !== 'none' && (s.position === 'fixed' || s.position === 'absolute')) { const r = x.getBoundingClientRect(); if (r.right <= 0 || r.left >= W || r.bottom <= 0 || r.top >= H) return true; } } return false; };
 
+  // Une feuille ouverte : on ne juge QU'ELLE (la page derrière est sous le voile).
+  const RAC = (opts.feuille && [...document.querySelectorAll('[role=dialog][aria-modal=true], [role=menu].vrm-sheet')].filter(vis).pop()) || document.body;
   // 1. Les textes visibles
-  const tw = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  const tw = document.createTreeWalker(RAC, NodeFilter.SHOW_TEXT);
   const boites = [];
   let somme = 0, nPol = 0;
   for (let n = tw.nextNode(); n; n = tw.nextNode()) {
@@ -138,14 +140,16 @@ function mesurer(opts) {
     // Texte réservé au lecteur d'écran (clip / 1 px) : lu, pas vu.
     const srOnly = (r0.width <= 2 && r0.height <= 2) || /rect\(0(px)?,? 0(px)?,? 0(px)?,? 0(px)?\)/.test(s.clip) || s.clipPath === 'inset(50%)';
     const enVue = rr.some((r) => r.bottom > 0 && r.top < H && r.right > 0 && r.left < W);
-    out.textes.push({ t: t.replace(/\s+/g, (m) => (/[  ]/.test(m) && m.length === 1 ? m : m.replace(/[^  ]/g, ' ').replace(/ +/g, ' '))), sel: sel(e) });
+    // Le texte d'un TIERS (message d'un acheteur, titre d'annonce) n'est pas un texte de l'app.
+    const tiers = !!e.closest('[data-conv-extrait], .vrm-bulle, .vrm-msg-bulle, .vrm-chat-msg, [data-texte-tiers]');
+    if (!tiers) out.textes.push({ t: t.replace(/\s+/g, (m) => (/[  ]/.test(m) && m.length === 1 ? m : m.replace(/[^  ]/g, ' ').replace(/ +/g, ' '))), sel: sel(e) });
     if (srOnly) continue;
     const op = opacite(e);
     if (op < 0.05) continue;
     // Taille de police affichée (zoom compris) : texte courant (11–20 px CSS) seulement.
     const fs = parseFloat(s.fontSize);
     const zoom = (() => { let z = 1; for (let x = e; x && x.nodeType === 1; x = x.parentElement) { const v = parseFloat(getComputedStyle(x).zoom); if (v && v !== 1) z *= v; } return z; })();
-    if (enVue && fs >= 11 && fs <= 20) { somme += fs * zoom; nPol++; }
+    if (enVue && fs >= 11 && fs <= 20 && e.closest('.vrm-main')) { somme += fs * zoom; nPol++; }
     if (enVue) boites.push({ e, rr, t: t.trim().slice(0, 40) });
     // Contraste
     if (!enVue) continue;
@@ -169,6 +173,7 @@ function mesurer(opts) {
     if (/^(SCRIPT|STYLE|NOSCRIPT|TEMPLATE|svg|SVG)$/.test(e.tagName)) continue;
     const d = getComputedStyle(e).display; if (d === 'inline' || d === 'contents' || d === 'none') continue;
     if (!vis(e) || cache(e)) continue;
+    if (e.querySelector('[data-conv-extrait], .vrm-bulle, .vrm-msg-bulle, .vrm-chat-msg, [data-texte-tiers]') || e.closest('[data-conv-extrait], .vrm-bulle, .vrm-msg-bulle, .vrm-chat-msg, [data-texte-tiers]')) continue;
     const it = e.innerText; if (!it || it.length > 400) continue;
     for (const ligne of it.split('\n')) { const l = ligne.trim(); if (l && !vues.has(l)) { vues.add(l); out.textes.push({ t: l, sel: sel(e) + ' (ligne)' }); } }
   }
@@ -198,7 +203,7 @@ function mesurer(opts) {
   };
   const INTER = 'button, a[href], input:not([type=hidden]), select, textarea, [role=button], [role=switch], [role=tab], [role=checkbox], [role=radio], [role=menuitem], [role=link], summary';
   const dejaCible = new Set();
-  for (const e of document.querySelectorAll(INTER)) {
+  for (const e of RAC.querySelectorAll(INTER)) {
     if (!vis(e) || cache(e)) continue;
     const r = e.getBoundingClientRect(); if (r.width < 1 || r.height < 1) continue;
     const enVue = r.bottom > 0 && r.top < H && r.right > 0 && r.left < W; if (!enVue) continue;
@@ -231,7 +236,7 @@ function mesurer(opts) {
     if (Math.min(w, h) + 0.5 < 44) out.cibles.push({ nom: nom.slice(0, 40), w: Math.round(w), h: Math.round(h), sel: sel(cible) });
   }
   // 3. Feuilles
-  for (const d of document.querySelectorAll('[role=dialog],[role=alertdialog]')) {
+  for (const d of document.querySelectorAll('[role=dialog],[role=alertdialog],[role=menu].vrm-sheet')) {
     if (!vis(d) || cache(d)) continue;
     const r = d.getBoundingClientRect(); if (r.width < 20 || r.height < 20) continue;
     out.dialogues.push({ sel: sel(d), nom: nomDe({ getAttribute: (a) => d.getAttribute(a), tagName: 'DIV', closest: () => null }) || (d.getAttribute('aria-labelledby') ? '' : ''), labelled: d.getAttribute('aria-labelledby') || '', label: d.getAttribute('aria-label') || '' });
@@ -257,6 +262,20 @@ function mesurer(opts) {
       if (!/(hidden|clip)/.test(s.overflowX) && !/(hidden|clip)/.test(s.overflow)) continue;
       if (s.textOverflow === 'ellipsis' || parseInt(s.webkitLineClamp || '0', 10) > 0 || s.webkitLineClamp !== 'none' && s.webkitLineClamp) continue;
       if (e.scrollWidth > e.clientWidth + 2 && e.clientWidth > 0) out.coupes.push({ t: (e.innerText || '').trim().slice(0, 50), sel: sel(e), sw: e.scrollWidth, cw: e.clientWidth });
+    }
+    // Un mot coupé en deux par un retour à la ligne (« demai / n ») : illisible.
+    out.motsCoupes = [];
+    for (const { e, rr } of boites) {
+      if (rr.length < 2 || out.motsCoupes.length >= 10) continue;
+      for (const n of e.childNodes) {
+        if (n.nodeType !== 3 || !n.nodeValue || n.nodeValue.length > 160) continue;
+        const v = n.nodeValue, rg = document.createRange(); let haut = null;
+        for (let i = 0; i < v.length; i++) {
+          rg.setStart(n, i); rg.setEnd(n, i + 1); const r = rg.getBoundingClientRect(); if (!r.height) continue;
+          if (haut != null && r.top > haut + 2 && /\p{L}/u.test(v[i]) && i > 0 && /\p{L}/u.test(v[i - 1])) { out.motsCoupes.push({ t: v.slice(Math.max(0, i - 12), i) + '|' + v.slice(i, i + 8), sel: sel(e) }); break; }
+          haut = r.top;
+        }
+      }
     }
     // Deux textes l'un sur l'autre : boîtes de texte d'éléments différents qui se croisent nettement.
     // Un texte dans une barre fixe ou collante (barre du bas, en-tête) : le contenu passe dessous, c'est voulu.
@@ -366,7 +385,7 @@ const court = (a, n = 6) => JSON.stringify(a.slice(0, n)).slice(0, 900);
       const att = 1 + (f - 1) * 0.75;
       dit(base > 0 && mes.taillePolice >= base * att, `${nom} G1 le texte grandit (≥ ${att.toFixed(2)}×)`, `${mes.taillePolice.toFixed(1)} px contre ${base.toFixed(1)} px`);
       dit(mes.largeurDoc <= 1 && !mes.debord.length, `${nom} G2 rien ne sort de l'écran`, `page +${mes.largeurDoc}px ; ` + court(mes.debord, 5));
-      dit(!mes.coupes.length && !mes.chevauche.length, `${nom} G3 aucun texte coupé net ni recouvert`, court(mes.coupes, 3) + ' ' + court(mes.chevauche, 3));
+      dit(!mes.coupes.length && !mes.chevauche.length && !(mes.motsCoupes || []).length, `${nom} G3 aucun texte coupé net, recouvert, ni mot coupé en deux`, court(mes.coupes, 3) + ' ' + court(mes.chevauche, 3) + ' ' + court(mes.motsCoupes || [], 4));
     }
     // Contraste (toutes les vues normales) ; surfaces claires (sombre)
     if (!grand) dit(!mes.contraste.length, `${nom} S1 contraste AA sur ${mes.contrasteJuge} textes (${mes.contrasteNonJuge} sur photo/dégradé non jugés)`, court(mes.contraste, 5));
@@ -379,6 +398,10 @@ const court = (a, n = 6) => JSON.stringify(a.slice(0, n)).slice(0, 900);
     const OUVRIR = [
       ['notifications', 'journee', '[data-cloche], button[aria-label*="otification"]'],
       ['plus', 'journee', '[data-tabbar-plus], .vrm-tabbar [aria-label="Plus"], .vrm-tabbar button:last-child'],
+      ['chiffres', 'journee', '[data-carte-modifier="journee"]'],
+      ['aide-ventes', 'ventes', '[data-carte-stats] [data-carte-aide]'],
+      ['recherche', 'journee', 'button[aria-label^="Rechercher"]'],
+      ['conversation', 'messages', '[data-conv="502"]'],
     ];
     for (const sombre of [false, true]) for (const [id, tab, q] of OUVRIR) {
       const m = monde();
@@ -396,7 +419,7 @@ const court = (a, n = 6) => JSON.stringify(a.slice(0, n)).slice(0, 900);
       if (!el) { dit(false, `${nom} : le bouton qui l'ouvre est trouvé`, q); await ctx.close(); continue; }
       await el.click().catch(() => {});
       await pg.waitForTimeout(1200);
-      const mes = await pg.evaluate(mesurer, { tactile: true, sombre: true, coupes: false });
+      const mes = await pg.evaluate(mesurer, { tactile: true, sombre: true, coupes: false, feuille: true });
       if (CAPT) await pg.screenshot({ path: path.join(CAPT, `finition-feuille-${id}-390-${sombre ? 'sombre' : 'clair'}.png`) });
       rapport[nom] = mes;
       dit(mes.dialogues.length > 0 && mes.dialogues.every((d) => d.nom), `${nom} A3 la feuille est un dialogue nommé`, court(mes.dialogues));

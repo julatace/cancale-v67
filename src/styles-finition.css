@@ -156,7 +156,7 @@ html body .vrm-inbox-filters > button:not(#_) {
   background: var(--vrm-bg) !important; color: var(--vrm-ink) !important; font-size: 13px !important; font-weight: 500 !important;
   display: inline-flex !important; align-items: center; gap: 6px; flex: 0 0 auto !important; box-shadow: none !important;
 }
-html body .vrm-inbox-filters > button > span { color: var(--vrm-muted); font-weight: 500; }
+html body .vrm-inbox-filters > button > span { color: inherit; opacity: .72; font-weight: 500; } /* le gris sur la pilule « remplissage » ne tenait que 3,9:1 (finition 6 nov.) */
 html body .vrm-inbox-filters > button[aria-pressed="true"]:not(#_) { background: var(--vrm-ink) !important; border-color: var(--vrm-ink) !important; color: var(--vrm-bg) !important; }
 html body .vrm-inbox-filters > button[aria-pressed="true"] > span { color: inherit; opacity: .85; }
 @media (pointer: coarse) { html body .vrm-inbox-filters > button:not(#_) { min-height: 44px !important; } }
