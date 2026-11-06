@@ -77,7 +77,11 @@ au même N° avec des photos différentes (ou sans photo connue) : règle du 20 
   second compte lu il y a 30 h ⇒ aucune carte. **4 rouges** sur le build de be6b7179 ;
   mutation « par titre » ⇒ 2 rouges. Captures regardées (390, 1512, feuille).
 - `npm run build`, `audit-identite`, `audit-coherence`, `audit-rouge-doublon`,
-  `audit-conflits-numeros` (et `--prouve`) verts.
+  `audit-conflits-numeros` (et `--prouve`) verts. Les 313 `audit-*.cjs` relancés : deux
+  ajustés pour la nouvelle carte (`audit-journee-coherence` A4 compte aussi
+  `deuxFois`, 7/7 mutations ; `audit-politique-hotes` déclare le lien vinted.fr de la
+  feuille). Restent rouges À L'IDENTIQUE sur l'arbre d'avant : `audit-chemin-json-guillemets`,
+  `audit-vc-recon` ; `audit-renum-b` dépasse 120 s des deux côtés.
 
 ## Ce qui reste
 

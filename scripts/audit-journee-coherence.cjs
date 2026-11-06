@@ -95,7 +95,8 @@ async function passe(mut) {
 
   // A4 / A5 / A6 — Ma journée (source, sans commentaires).
   const z = (app.split('const libCase = (id, n)')[1] || '').split('Les cases à zéro restent lisibles')[0] || app.split('const libCase = (id, n)')[1] || '';
-  dit(/const nGestes = cases\.length \+ alertesArgent\.length \+ autres\.length \+ \(urssafJob \? 1 : 0\) \+ \(carteAilleurs \? 1 : 0\) \+ \(sortiesStock\.length \? 1 : 0\);/.test(z), 'A4 « N gestes » compte toutes les cartes (dont « Vendus ailleurs » et la sortie du Stock)');
+  // (6 nov., vague 3) + la carte « en ligne deux fois » (`deuxFois`, src/enLigneDeuxFois.js).
+  dit(/const nGestes = cases\.length \+ alertesArgent\.length \+ autres\.length \+ \(urssafJob \? 1 : 0\) \+ \(carteAilleurs \? 1 : 0\) \+ \(sortiesStock\.length \? 1 : 0\) \+ \(deuxFois\.length \? 1 : 0\);/.test(z) && /\{deuxFois\.length \? carteDeuxFois\(\) : null\}/.test(z), 'A4 « N gestes » compte toutes les cartes (dont « Vendus ailleurs », la sortie du Stock et « en ligne deux fois »)');
   dit(/\{carteAilleurs \? carteVendusAilleurs\(\) : null\}/.test(z) && /\{sortiesStock\.length \? carteSortieStock\(\) : null\}/.test(z), 'A4 les deux cartes sont rendues DANS la liste');
   const zoneJournee = (app.split("className=\"vrm-day-layout vrm-fu-ecran vrm-fu-journee\"")[1] || '').split("{!only && (")[0];
   dit(zoneJournee.length > 0 && !/<VendusAilleurs /.test(zoneJournee), 'A4 « Vendus ailleurs » n’est plus un repli posé sous la journée');
