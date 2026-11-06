@@ -55,3 +55,6 @@
 .vrm-ar-sugg { padding: 8px 10px; border-radius: 12px; background: var(--vrm-b-teinte, rgba(0,0,0,.04)); }
 .vrm-ar-sans { font-size: 13px; color: var(--vrm-muted); padding: 2px 0; }
 .vrm-ar-gestes { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+
+/* (6 nov.) « Saisie en série » en tête de la file Sans achat relié (la porte du chiffre faux). */
+.vrm-ar-serie { display: flex; justify-content: flex-end; margin: 0 0 10px; }
