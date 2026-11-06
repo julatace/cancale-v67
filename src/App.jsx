@@ -47,7 +47,7 @@ import DiagnosticLeboncoin from './DiagnosticLeboncoin.jsx';
 import {preparerLiaisonOAuth,lireLiaisonOAuth,resultatLiaisonPermis} from './auth/liaisonOAuth.js';
 import { SqueletteChargement } from "./Chargement.jsx";
 import { AttenteEcran, useEssentiel } from './AttenteEcran.jsx';
-import { SqLignes } from './Squelette.jsx';
+import { SqLignes, SqBarre } from './Squelette.jsx';
 import { usePreparation, useEnPreparation } from './preparations.js';
 import { souvenir, retenir } from './memoireEcrans.js';
 import ConnexionsCompte from './auth/ConnexionsCompte.jsx';
@@ -21152,11 +21152,21 @@ const PORTE_MONNAIE_VINTED = 'https://www.vinted.fr/wallet/balance';
 // site l'écrit (eBay, Vestiaire) ; « au moins » et le manque NOMMÉ si une lecture
 // manque ; une vente au montant illisible est nommée, jamais 0 €.
 const NOM_SITE_AVENIR = { Vinted: 'Vinted', eBay: 'eBay', Vestiaire: 'Vestiaire', Leboncoin: 'Leboncoin' };
-function ArgentAVenirCarte({ A, plateforme = null }) {
+function ArgentAVenirCarte({ A, plateforme = null, reserve = false }) {
   // (6 nov., Julien : « le montant en attente mais pas tout d'un coup ») Le total
   // reste en tête ; le détail par compte est REPLIÉ, il s'ouvre au toucher.
   const [detail, setDetail] = useState(false);
-  if (!A || A.enCours) return null;
+  // (6 nov., v36-raccords · banc chargement) `reserve` : pendant la lecture, la carte
+  // garde SA place (la carte repliée : 70 px + 12 px de marge, en squelette) — sans quoi
+  // elle arrivait en poussant la liste des ventes de 82 px (CLS 0,036 en réseau lent).
+  if (!A || A.enCours) return reserve ? (
+    <div data-a-venir-attente="" aria-hidden="true" style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 20, padding: '12px 16px', marginBottom: 12, boxShadow: C.shadow || 'none' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 44 }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 7 }}><SqBarre l={64} h={13}/><SqBarre l={150} h={10}/></div>
+        <SqBarre l={88} h={22} r={8}/>
+      </div>
+    </div>
+  ) : null;
   // Sur une plateforme (Ventes · Vinted) : sa part seulement, par la même règle.
   const T = aVenirPour(A, { plateforme });
   const groupes = A.parCompte.filter((g) => !plateforme || g.plateforme === plateforme);
@@ -44459,6 +44469,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // écrase les numéros du cloud). Dès qu'il l'est, on RECHARGE les numéros depuis
   // le localStorage (que le cloud vient de remplir) → les numéros restent stables.
   const [cloudReady, setCloudReady] = useState(() => isCloudReady());
+  // (6 nov., v36-raccords) La numérotation automatique a-t-elle pu passer une fois (ses
+  // gardes levées) ? Tant que non, une annonce numérotable sans N° n'est pas « sans
+  // numéro » : elle en reçoit un dans l'instant (voir `numAttente`, plus bas).
+  const [numPasse, setNumPasse] = useState(false);
   // La numérotation attend une version RELUE (migration 013) : chaque relecture
   // relance les deux effets qui numérotent.
   const [verNumTick, setVerNumTick] = useState(0);
@@ -50575,6 +50589,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (sales.items === null || !txnPret) return;
     if (!reservesNum) return;   // numéros réservés sur Vinted pas encore lus (ou pas su)
     if (recreesEff === undefined) return; // qui remplace qui (republication) pas encore lu
+    if (!numPasse) setNumPasse(true);     // (6 nov.) dans le même rendu que les N° posés ci-dessous
     // Numérotation NEUVE, propre à la nouvelle app : elle démarre à 1 et suit
     // l'ordre d'ajout des annonces. On ignore volontairement l'ancien catalogue
     // et le garage (numéros hérités) — seule compte la numérotation de la nouvelle
@@ -50675,6 +50690,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // garderait le numéro neuf qu'on vient justement d'éviter.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listings.items, cloudReady, numVentesParIdentite, sales.items, txnPret, verNumTick, listingDates, reservesNum, recreesEff, repubMain]);
+  // (6 nov., v36-raccords · banc chargement) LA LISTE D'ANNONCES ATTEND SA NUMÉROTATION :
+  // des annonces numérotables sans N° et la numérotation pas encore passée ⇒ la liste
+  // (prochain geste, N° à vérifier, grille) garde son squelette, à sa place. Sinon elle
+  // paraissait « sans numéro » (un faux geste), puis les N° arrivaient, « N numéros à
+  // vérifier » s'ouvrait au-dessus de la grille et la poussait (CLS 0,036 à 0,045).
+  // Borné à 8 s : une garde qui ne se lève pas ne laisse jamais un squelette pour toujours.
+  const numAttenteBrut = useMemo(() => !numPasse && Array.isArray(listings.items)
+    && listings.items.some((it) => !String((numeros[it.id] || {}).numero || '').trim() && annonceNumerotable(it, listingDates)),
+  [numPasse, listings.items, numeros, listingDates]);
+  const [numBorne, setNumBorne] = useState(false);
+  useEffect(() => {
+    if (!numAttenteBrut || numBorne) return undefined;
+    const t = setTimeout(() => setNumBorne(true), 8000);
+    return () => clearTimeout(t);
+  }, [numAttenteBrut, numBorne]);
+  const numAttente = numAttenteBrut && !numBorne;
 
   const openConversation = async (conv) => {
     if(!conv?._acc || conv.id==null)return;
@@ -58266,6 +58297,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             action={<Bouton variante="primaire" href="https://www.vinted.fr/member/general/settings" target="_blank" rel="noreferrer">Ouvrir Vinted ↗</Bouton>}/>
         )}
         {listings.items && !listings.error && listings.items.length===0 && blocMasquees()}
+          {numAttente ? <Skeleton variant="card" count={6}/> : (<>
           {blocAEcrire()}
           <BlocBarrerVc/>
           {/* (5 nov., chantier C — revue 2.7) UNE ligne d'avis en tête de la liste :
@@ -58587,6 +58619,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           })}
         </div>
         </>)}
+          </>)}
         {listings.items && listings.items.length>0 && (<details className="vrm-ann-stock-tools"><summary aria-label="Stock et ajustements"><span className="vrm-label-full">Stock et ajustements</span><span className="vrm-label-short" aria-hidden="true">Stock</span></summary>
           {/* FRAÎCHEUR : l'extension ne capte que quand tu navigues sur Vinted.
               Si elle n'a rien capté depuis longtemps, on le DIT (avant, l'app
@@ -73087,7 +73120,7 @@ function AppCoeur() {
           {sous && <div className="vrm-tache-sous" data-tache-sous={t+'.'+site}><PlatSubNav sub={sec} setSub={(x)=>{ setEbayCible(null); setPlatSub(subDeTache(site,x)); }} sections={sous}/></div>}
         </div>
         {site==='toutes' && t==='ventes' && !baseKO && <div style={{padding:'12px 16px 0'}}><CarteStatsApp page="ventes-toutes" aide className="vrm-fu-ecran" ici="cat_ventes" onNav={setTab} sel={{ site: 'toutes', compte: null, periode: null }}/></div>}
-        {site==='toutes' && t==='ventes' && !baseKO && <div className="vrm-a-venir-hote" style={{padding:'12px 16px 0'}}><ArgentAVenirCarte A={liveStatsVus && liveStatsVus.aVenir}/></div>}
+        {site==='toutes' && t==='ventes' && !baseKO && <div className="vrm-a-venir-hote" style={{padding:'12px 16px 0'}}><ArgentAVenirCarte A={liveStatsVus && liveStatsVus.aVenir} reserve/></div>}
         {/* (6 nov., filet 2) La section d'un site tombe seule : le titre et le filtre des sites restent, on change de site. */}
         <GardeEcran nom={t+':'+site} resetKey={platSub}>
         {site==='toutes'
