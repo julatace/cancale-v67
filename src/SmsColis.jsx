@@ -88,7 +88,8 @@ export default function SmsColisSetting({ jeton = '', onJeton, toast = () => {},
     setEssai({ busy: true });
     try {
       const f = envoyer || ((u, o) => fetch(u, o));
-      const r = await f(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texte: SMS_EXEMPLE, expediteur: 'MRELAY', date: new Date().toISOString(), essai: true }) });
+      const r = await f(urlSms(jeton, ''), {   // même origine que l'app (la CSP n'a rien à autoriser)
+       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texte: SMS_EXEMPLE, expediteur: 'MRELAY', date: new Date().toISOString(), essai: true }) });
       let j = null; try { j = await r.json(); } catch (_) {}
       setEssai(texteEssai(r.status, j));
     } catch (_) { setEssai(texteEssai(0, null)); }
