@@ -21,7 +21,7 @@ const { spawn } = require('child_process');
 
 const RACINE = path.join(__dirname, '..');
 // Les parts et les durées : docs/passation/2026-11-06-filets-anti-bug.md (§1).
-const LOT = ['nouveau-vendeur', 'navigation-tache', 'ventes-e2', 'colis-retirer-propre',
+const LOT = ['nouveau-vendeur', 'navigation-tache', 'ventes-e2', 'colis-retirer-propre', 'statut-colis',
   'annonces-actions', 'journee-coherence', 'iphone-reprise', 'argent-mois', 'garde-ecrans', 'morceau-perime'];
 const noms = process.argv.slice(2).length ? process.argv.slice(2) : LOT;
 const BASE = Number(process.env.BANCS_PORT_BASE) || 10000;
