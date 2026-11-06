@@ -71391,9 +71391,11 @@ function AppCoeur() {
                 stream (« Afficher le bouton Stream », éteint par défaut). Allumé, il
                 RESTE tant que le mode stream l'est (le décocher en filmant ne doit pas
                 tout montrer d'un coup, ni laisser le mode sans bouton pour l'éteindre).
-                Sans lui, l'œil des montants revient (et reste tant qu'il est allumé). */}
+                Sans lui, l'œil des montants revient (et reste tant qu'il est allumé) ;
+                pendant un stream, l'œil se tait (le stream cache déjà les montants :
+                une seule porte à la fois dans l'en-tête). */}
             {(reglesStream.bouton || streamOn) ? <BoutonStream/> : null}
-            {(!reglesStream.bouton || montantsCaches) ? <BoutonMontants/> : null}
+            {((!reglesStream.bouton && !streamOn) || montantsCaches) ? <BoutonMontants/> : null}
             {/* (5 nov.) La cloche : ce que VRM a envoyé (src/CentreNotifs.jsx). */}
             {AUTH.user && <CentreNotifsCoque onReglages={()=>setTab('settings')}/>}
             {!ordi && <button className="vrm-hbtn" type="button" data-recherche-zone="" data-recherche-loupe="" onClick={()=>{ if(gsOpen) fermerRecherche(); else ouvrirRecherche(); }} title="Rechercher" aria-label="Rechercher une paire" aria-expanded={gsOpen} aria-controls="vrm-recherche-resultats">

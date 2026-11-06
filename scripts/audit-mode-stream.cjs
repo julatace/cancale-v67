@@ -95,7 +95,7 @@ async function audit(fichiers, bavard) {
   const html = fs.readFileSync(fichiers.html, 'utf8');
   // (6 nov.) Le bouton « Stream » n'apparaît que s'il est choisi dans les réglages ;
   // sans lui, l'œil des montants revient (stream-photos, audit-stream-photos.cjs).
-  dit(/\(reglesStream\.bouton \|\| streamOn\) \? <BoutonStream\/>/.test(app) && /\(!reglesStream\.bouton \|\| montantsCaches\) \? <BoutonMontants\/>/.test(app), '5.1 l\'œil des montants ne revient que sans le bouton « Stream » (6 nov.)');
+  dit(/\(reglesStream\.bouton \|\| streamOn\) \? <BoutonStream\/>/.test(app) && /\(\(!reglesStream\.bouton && !streamOn\) \|\| montantsCaches\) \? <BoutonMontants\/>/.test(app), '5.1 l\'œil des montants ne revient que sans le bouton « Stream » (6 nov.)');
   dit(!/data-stream-pastille|function PastilleStream/.test(app), '5.2 la pastille ROUGE du stream est retirée (rouge = doublon de N° seulement)');
   dit((app.match(/<BoutonStream\/>/g) || []).length === 1 && /data-bouton-stream=""/.test(app), '5.3 le bouton « Stream » est RENDU, une fois, dans l\'en-tête');
   const sync = (/const SYNC_KEYS = \[([\s\S]*?)\];/.exec(app) || ['', ''])[1];

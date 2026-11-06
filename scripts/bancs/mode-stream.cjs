@@ -48,7 +48,8 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
 const capture = async (pg, nom) => { if (!SHOTS) return; fs.mkdirSync(SHOTS, { recursive: true }); await pg.screenshot({ path: path.join(SHOTS, nom + '.png') }).catch(() => {}); };
 
 // SON programme (inventé) : rangé dans la ligne `main`, comme le synchroniserait l'app.
-const PROGRAMME = { v: 1, marques: ['Nike', 'Adidas'], prefixes: ['Sal'], contient: ['Asics'] };
+// (6 nov.) `bouton: true` : le bouton « Stream » n'est dans l'en-tête que s'il est choisi.
+const PROGRAMME = { v: 1, marques: ['Nike', 'Adidas'], prefixes: ['Sal'], contient: ['Asics'], bouton: true };
 const base = () => {
   const lignes = JSON.parse(JSON.stringify(NV.JEU_LIGNES));
   const main = lignes.find((l) => l.id === 'main');

@@ -93,7 +93,9 @@ async function enTete(nav, { W, theme }) {
     dit(s.boutons.length <= 4, 'H1', `${T} au plus 4 commandes dans l'en-tête quand tout va bien (${s.boutons.length})`, s.boutons.join(' | '));
   }
   dit(!s.nuage.length, 'H1', `${T} le nuage n'est pas dans l'en-tête quand rien n'a raté`, JSON.stringify(s.nuage));
-  dit(s.stream === 1 && s.oeil === 0, 'H1', `${T} « Stream » : un seul bouton, aucun œil des montants`, JSON.stringify({ stream: s.stream, oeil: s.oeil }));
+  // (6 nov.) « Stream » n'est dans l'en-tête que s'il est choisi dans les réglages
+  // (éteint par défaut) ; sans lui, l'œil des montants (un seul des deux).
+  dit(s.stream === 0 && s.oeil === 1, 'H1', `${T} par défaut : l'œil des montants, pas de bouton « Stream » (un seul bouton)`, JSON.stringify({ stream: s.stream, oeil: s.oeil }));
   await capture(pg, `ch-entete-${W}-${theme}`);
   // H2 — le panneau de la pastille.
   await pg.locator('.vrm-app-header [data-etat-actions]').first().click().catch(() => {});

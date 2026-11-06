@@ -100,7 +100,7 @@ async function audit(fichiers, bavard) {
   const html = fs.readFileSync(fichiers.html, 'utf8');
   const regle = sansCommentaires(fs.readFileSync(fichiers.regle, 'utf8'));
   dit(/\(reglesStream\.bouton \|\| streamOn\) \? <BoutonStream\/> : null/.test(app), '4.1 le bouton « Stream » n\'est rendu que s\'il est choisi, ou tant que le mode est allumé');
-  dit(/\(!reglesStream\.bouton \|\| montantsCaches\) \? <BoutonMontants\/> : null/.test(app) && /function BoutonMontants\(\)[\s\S]{0,600}data-bouton-montants=""[\s\S]{0,300}poserMontants\(!cache\)/.test(app), '4.2 sans le bouton « Stream », l\'œil des montants revient (rien de perdu)');
+  dit(/\(\(!reglesStream\.bouton && !streamOn\) \|\| montantsCaches\) \? <BoutonMontants\/> : null/.test(app) && /function BoutonMontants\(\)[\s\S]{0,600}data-bouton-montants=""[\s\S]{0,300}poserMontants\(!cache\)/.test(app), '4.2 sans le bouton « Stream », l\'œil des montants revient (rien de perdu)');
   dit(/const reglesStream = useReglesStream\(\);/.test(app), '4.3 l\'en-tête lit le programme SYNCHRONISÉ (pas un drapeau de l\'appareil)');
   dit(/data-stream-option="bouton"[\s\S]{0,900}changer\(\{ bouton: !regles\.bouton \}\)/.test(app), '4.4 Réglages → Mode stream : « Afficher le bouton Stream »');
   dit(/data-stream-option="photos"[\s\S]{0,500}changer\(\{ photos: !regles\.photos \}\)/.test(app) && /data-stream-option="photosToutes"[\s\S]{0,500}changer\(\{ photosToutes: !regles\.photosToutes \}\)/.test(app), '4.5 Réglages : « Flouter aussi les photos » et « Flouter toutes les photos »');
@@ -130,7 +130,7 @@ const MUTATIONS = [
   ['regle', "export function regleEffective() { return _actif ? regleCourante() : _montantsSeuls ? R_MONTANTS : null; }", "export function regleEffective() { return _actif || _montantsSeuls ? regleCourante() : null; }", 'l\'œil applique tout le programme'],
   ['regle', "const ATTRS = ['title', 'placeholder', 'alt', 'aria-label'];", "const ATTRS = ['title', 'placeholder'];", 'alt en clair'],
   ['app', "{(reglesStream.bouton || streamOn) ? <BoutonStream/> : null}", "<BoutonStream/>", 'bouton toujours affiché'],
-  ['app', "{(!reglesStream.bouton || montantsCaches) ? <BoutonMontants/> : null}", "", 'œil perdu'],
+  ['app', "{((!reglesStream.bouton && !streamOn) || montantsCaches) ? <BoutonMontants/> : null}", "", 'œil perdu'],
   ['app', "const floue = photoACacherSelon(t, Rp);", "const floue = /Nike/i.test(t);", 'aperçu : une seconde règle'],
   ['html', "[data-stream=\"1\"] [data-stream-photo],", "[data-stream=\"1\"] [data-stream-photo-x],", 'CSS des photos absent'],
 ];
