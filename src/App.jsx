@@ -57876,7 +57876,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div data-colis-aucun="" className="vrm-colis-vide-envoi">
               <span className="vrm-colis-vide-titre">Aucun colis à envoyer</span>
               <span className="vrm-colis-vide-sous">Une vente à envoyer apparaît ici dès que l’extension la lit.</span>
-              {nEnvoyesVu ? <Bouton variante="discret" data-colis-voir-envoyes="" onClick={() => onOngletColis && onOngletColis('envoyes')}>Voir les envoyés</Bouton> : null}
+              {nEnvoyesVu ? <Bouton variante="secondaire" data-colis-voir-envoyes="" onClick={() => onOngletColis && onOngletColis('envoyes')}>Voir les envoyés</Bouton> : null}
             </div>
             {/* La tournée ouverte quand le dernier colis vient d'être déposé : elle le dit, puis se ferme sur SON geste. */}
             {tourneeDepot ? <SheetShell onClose={() => setTourneeDepot(false)} titre="Tournée de dépôt" maxWidth={560} data-tournee-sheet="">
@@ -58308,8 +58308,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const nums = [...new Set(ex.filter(x => !estPoste(x)).map(x => (x.b ? numForBord(x.b) : '') || (x.o ? (effEntry(x.o)?.numero || '') : '')).map(n => String(n || '').trim()).filter(Boolean))];
                 if (!nums.length) return null;
                 return (
-                  /* (5 nov., chantier D) La forme commune (`Bouton` discret) : un lien d'action sous la liste, pas une carte. */
-                  <Bouton variante="discret" icone="home" data-colis-stock={nums.length} style={{alignSelf:'flex-start',marginTop:6}} onClick={() => { DEMANDE_STOCK_CHERCHE.nums = nums; DEMANDE_STOCK_CHERCHE.at = Date.now(); onNav && onNav('garage'); }}>
+                  /* (5 nov., chantier D) La forme commune (`Bouton` secondaire, texte à l'encre : le « discret » bleu tombe à 4,2:1 sur le gris de la page). */
+                  <Bouton variante="secondaire" icone="home" data-colis-stock={nums.length} style={{alignSelf:'flex-start',marginTop:6}} onClick={() => { DEMANDE_STOCK_CHERCHE.nums = nums; DEMANDE_STOCK_CHERCHE.at = Date.now(); onNav && onNav('garage'); }}>
                     {/* (1er nov.) sans le nombre : c'est celui des colonnes (§7) */}{nums.length>1?'Où sont ces articles':'Où est cet article'} dans le stock
                   </Bouton>
                 );
