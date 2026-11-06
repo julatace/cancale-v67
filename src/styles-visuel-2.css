@@ -23,7 +23,9 @@
   --vrm-ressort: cubic-bezier(.32,.72,0,1);          /* la courbe des tiroirs d'iOS */
   --vrm-sortie: cubic-bezier(.23,1,.32,1);
   --vrm-r-carte: 16px;
+  --vrm-remplissage: rgba(118,118,128,.14);   /* le « fill » d'iOS, sur fond comme sur carte */
 }
+:root[data-theme="dark"] { --vrm-remplissage: rgba(118,118,128,.30); }
 
 /* ══ 1. COLIS ══════════════════════════════════════════════════════════════ */
 
@@ -308,7 +310,7 @@ html body .vrm-app-shell .vrm-main .vrm-lbc-catalog header .vrm-lbc-catalog-note
 html body .vrm-app-shell .vrm-main .vrm-lbc-catalog h2 { font-size: var(--vrm-t22) !important; font-weight: 700; letter-spacing: -.022em; }
 html body .vrm-app-shell .vrm-main .vrm-lbc-catalog-filtres { flex-wrap: nowrap !important; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: auto; }
 html body .vrm-app-shell .vrm-main .vrm-lbc-catalog-filtres::-webkit-scrollbar { display: none; }
-html body .vrm-app-shell .vrm-main .vrm-lbc-catalog-filtres button { border: 0 !important; background: var(--vrm-card2) !important; border-radius: 999px !important; padding: 0 14px !important; white-space: nowrap; font-size: var(--vrm-t15) !important; }
+html body .vrm-app-shell .vrm-main .vrm-lbc-catalog-filtres button { border: 0 !important; background: var(--vrm-remplissage) !important; border-radius: 999px !important; padding: 0 14px !important; white-space: nowrap; font-size: var(--vrm-t15) !important; }
 html body .vrm-app-shell .vrm-main .vrm-lbc-catalog-filtres button[aria-pressed="true"] { background: var(--vrm-ink) !important; color: var(--vrm-bg) !important; }
 
 /* ══ 5 quinquies. MA JOURNÉE : « À FAIRE » EN UNE CARTE À RANGÉES ═══════════
@@ -346,14 +348,15 @@ html body .vrm-app-shell .vrm-main :is(.vrm-ann-geste, .vrm-ann-avis) { border: 
    (« C'est bien le N°x » · le champ · « Corriger »), en pilules d'iOS, alignés sur le texte. */
 html body .vrm-app-shell .vrm-main [data-verif-carton] { position: relative; border-top: 0 !important; padding: 12px 0 !important; }
 html body .vrm-app-shell .vrm-main [data-verif-carton] + [data-verif-carton]::before { content: ''; position: absolute; top: 0; left: 58px; right: 0; height: .5px; background: var(--vrm-line); }
-html body .vrm-app-shell .vrm-main [data-verif-carton] > div:last-child { flex: 1 1 100% !important; flex-wrap: nowrap !important; gap: 8px !important; padding-left: 58px; box-sizing: border-box; }
+html body .vrm-app-shell .vrm-main [data-verif-carton] > div:last-child {
+  flex: 1 1 100% !important; display: grid !important; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px !important; box-sizing: border-box;
+}
 html body .vrm-app-shell .vrm-main [data-verif-carton] > div:last-child > :is(button, input) {
   min-height: 44px !important; border-radius: 999px !important; font-size: var(--vrm-t15) !important; padding: 0 14px !important; white-space: nowrap; box-sizing: border-box;
 }
-html body .vrm-app-shell .vrm-main [data-verif-carton] > div:last-child > button:first-child { flex: none; border: 0 !important; background: var(--vrm-card2) !important; color: var(--vrm-ink) !important; }
-html body .vrm-app-shell .vrm-main [data-verif-carton] > div:last-child > input { flex: 1 1 60px; min-width: 0; width: auto !important; border: 0 !important; background: var(--vrm-card2) !important; font-size: 16px !important; }
-html body .vrm-app-shell .vrm-main [data-verif-carton] > div:last-child > button:nth-of-type(2) { flex: none; }
-@media (max-width: 400px) { html body .vrm-app-shell .vrm-main [data-verif-carton] > div:last-child { padding-left: 0; } }
+/* Le remplissage d'iOS (gris translucide) : visible sur le fond groupé comme sur une carte, le jour et la nuit. */
+html body .vrm-app-shell .vrm-main [data-verif-carton] > div:last-child > button:first-child { border: 0 !important; background: var(--vrm-remplissage) !important; color: var(--vrm-ink) !important; }
+html body .vrm-app-shell .vrm-main [data-verif-carton] > div:last-child > input { min-width: 0; width: 100% !important; border: 0 !important; background: var(--vrm-surface) !important; box-shadow: inset 0 0 0 .5px var(--vrm-line); font-size: 16px !important; }
 
 /* « Données · Voir le détail » : une rangée de carte (icône de synchronisation, libellé, état,
    chevron) — plus un bloc gris flottant ; et la note se range au-dessus de « Mes annonces ». */
