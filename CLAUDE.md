@@ -508,6 +508,7 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 
+- **6 nov. · Visuel (v36)** : une ligne d'explication au plus, le reste en feuille (`Pourquoi`, ⓘ collé au texte) ; Réglages eBay en rangées iOS (`src/composants/Ios.jsx`), `Notice` en rangée, plus de barres latérales, listes en groupes iOS. `docs/passation/2026-11-06-visuel.md`.
 - **6 nov. · Bancs rouges d'avant (v36)** : Facturation Pro ne plante plus (réponse sans boîte = pas su), « Ajouter » du stream dit pourquoi, Statistiques à l'échelle 28/20/15/13/11, transporteurs 2 × 2 au téléphone ; 15 bancs jugent la règle actuelle. `docs/passation/2026-11-06-bancs-preexistants.md`. Geste : aucun.
 
 - **6 nov. · Onglets D (Annonces, Compta, Statistiques, Paramètres)** : sa base recalculée = l'app (25 mois de CA, 49 en ligne, 19 vendues) ; une vente « à dater » vendue ET lue finalisée la même année compte dans le CA de l'ANNÉE, jamais d'un mois (`src/aDaterAnnee.js` ; seuils, revenus, DAC7, « CA de l'année » de Ventes) ; « Déclarer » en 3 étapes avec « ? » ; Annonces « Prochain geste » ; Paramètres par intention, une phrase par réglage. `docs/passation/2026-11-06-onglets-d.md`. Geste : Compta → Déclarer octobre.
@@ -558,8 +559,6 @@ sans la fonction.
 
 
 - **6 nov. · Vague 2 Ventes (v36)** : « Remettre en vente » une vente annulée avant l'envoi (« à la main » depuis le coffre : `recreerVinted` supprime toujours l'ancienne ; N° repris, archive ⇒ neuf) ; « Prix mini… » sur une sélection ; Annonces « Sans achat relié » ; saisie en série sur `suggestionsAchat` ; Ventes : « Prix d'achat N/M » une fois. `docs/passation/2026-11-06-vague2-ventes.md`. Geste : Ventes → Annulées.
-
-- **6 nov. · Vague 2, comptes et e-mails** : Comptes liés, ligne « E-mails » par compte Vinted (reçoit · aucun depuis N j → Relier sa boîte) ; E-mails → Relier ma boîte : « adresse sans compte » (Relier un compte = `vinted_account_emails` sur son clic · compte acheteur) ; vente « avec Vérification de l'article » lue sans prix + étape « Au centre de vérification » (état de la transaction) ; Leboncoin « Suppression » gardé + 1 rappel/jour. `docs/passation/2026-11-06-vague2-comptes.md`. Geste : relier ses adresses sans compte.
 
 
 

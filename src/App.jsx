@@ -65336,7 +65336,7 @@ function LeboncoinScreen() {
             <div style={{ fontSize: 12, color: C.muted, marginBottom: 10, lineHeight: 1.5 }}>
               {p === null
                 ? 'Je n’ai pas pu lire où ça en est. Rien n’est perdu — rouvre cet écran dans un moment.'
-                : <>Le formulaire de Leboncoin n’est pas le même d’une annonce à l’autre : il est <b>construit</b> à partir d’une configuration qu’il envoie. Il me faut ces quatre pièces pour remplir juste — <b>{faits} sur {PIECES.length}</b> {faits > 1 ? 'reçues' : 'reçue'}{coupes ? `, ${coupes} incomplète${coupes > 1 ? 's' : ''}` : ''}.</>}
+                : <><b>{faits} sur {PIECES.length}</b> pièces {faits > 1 ? 'reçues' : 'reçue'}{coupes ? `, ${coupes} incomplète${coupes > 1 ? 's' : ''}` : ''}{' '}<Pourquoi label="Pourquoi ces pièces" titre="Publier sans rien retaper">Le formulaire de Leboncoin n’est pas le même d’une annonce à l’autre : il est <b>construit</b> à partir d’une configuration qu’il envoie. Il me faut ces quatre pièces pour remplir juste.</Pourquoi></>}
             </div>
             {p !== null && (
               <div style={{ display: 'grid', gap: 5, marginBottom: geste ? 10 : 0 }}>
@@ -65379,14 +65379,15 @@ function LeboncoinScreen() {
           du premier jet d'`extSaitLireCodes` (« l'extension la plus en retard
           était la seule à ne rien déclencher »), et l'écran Annonces, lui,
           traitait déjà les trois. *« Pas su » ne vaut pas « oui ».* */}
-      <div style={{ fontSize: 12, color: C.muted, marginBottom: 14, lineHeight: 1.5 }}>La file est construite à partir de tes <b>annonces réellement en ligne sur Vinted</b> (comptes actifs uniquement, paires retirées exclues). {(() => {
+      {/* (6 nov., v36-visuel — « des murs de texte ») Une ligne ; le comment, derrière le « ⓘ ». */}
+      <div style={{ fontSize: 13, color: C.muted, marginBottom: 16, lineHeight: 1.4 }}>La file : tes annonces en ligne sur Vinted.{' '}<Pourquoi label="Comment se fait la file" titre="La file Leboncoin">La file est construite à partir de tes <b>annonces réellement en ligne sur Vinted</b> (comptes actifs uniquement, paires retirées exclues). {(() => {
         // Trois états, jamais deux (§ extSait) — et la phrase suit la version
         // INSTALLÉE : c'est l'extension qui publie, avec SA règle.
         const e = extSait('publication');
         if (e === 'ok') return <>Chaque paire a son bouton <b>« Publier sur Leboncoin »</b> : l'extension ouvre le dépôt, attache les photos, remplit tout et publie <b>sans option payante</b>.</>;
         if (e === 'retard') return <>Le bouton <b>« Publier sur Leboncoin »</b> arrive avec l'extension <b>{EXT_CAPACITES.publication}</b> : mets-la à jour depuis <b>Paramètres → État des connexions</b>. En attendant, celle installée publie encore depuis son panneau sur leboncoin.fr.</>;
         return <>La publication part de l'ordinateur où l'extension est installée : ouvre cet écran là-bas et clique « Publier » sur la paire. Cette liste, elle, se consulte de partout.</>;
-      })()}</div>
+      })()}</Pourquoi></div>
 
       {/* COMPTES LEBONCOIN — plusieurs comptes possibles. On liste ceux que
           l'extension a réellement vus connectés dans le navigateur, avec le
