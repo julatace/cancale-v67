@@ -12828,7 +12828,9 @@ function Notice({ tone='info', icon, title, value, desc, detail, action, style={
 function Card({children,style={}}) {
   // Rayon plus généreux + ombre douce : une carte doit se poser SUR le fond,
   // pas être découpée dedans au cutter.
-  return <div className="vrm-surface" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:20,boxShadow:C.shadow,...style}}>{children}</div>;
+  // (6 nov., v36-visuel-2) Le ton se DIT (`data-ton`) : la feuille de style pose la matière (carte élevée,
+  // sans cadre) et garde à une carte « geste » (cadre ambre posé par l'écran) son anneau ambre.
+  return <div className="vrm-surface" data-ton={style && style.borderColor === C.warn ? 'geste' : undefined} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:20,boxShadow:C.shadow,...style}}>{children}</div>;
 }
 function Badge({children,color}) {
   const tone = color || C.muted;
@@ -28981,7 +28983,8 @@ function EntreePublierAilleurs({ site }) {
     <div className="vrm-pa-entree" data-pa-entree={site}>
       <button type="button" onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:publier-ailleurs', { detail: { site } })); } catch (_) {} }}>
         <LogoSite site="vinted"/>
-        <span>Publier une annonce Vinted sur {nomPlateforme(site)}<small>Vérifier · ce qui part · publier · suivi</small></span>
+        {/* (6 nov., v36-visuel-2) Le titre tient sur UNE ligne au téléphone ; le logo Vinted dit d'où part l'annonce. */}
+        <span>Publier sur {nomPlateforme(site)}<small>Une annonce Vinted · vérifier, publier, suivre</small></span>
         <span aria-hidden="true">›</span>
       </button>
     </div>
@@ -39765,7 +39768,8 @@ function useFreqUrssaf() {
   return f;
 }
 const lireOptionsMicro = () => optionsMicro(load('vrm_micro_options', null));
-const eurMicro = (n) => n == null ? '—' : `${Number(n).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} €`;
+// (6 nov., v36-visuel-2) La règle unique des euros : centimes seulement s'ils existent (« 1 395 € »).
+const eurMicro = (n) => n == null ? '—' : montant(Number(n));
 const eurRond = (n) => `${Math.round(Number(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} €`;
 const pctFr = (n) => `${String(n).replace('.', ',')} %`;
 function LigneProfil({ titre, aide, children, attr }) {

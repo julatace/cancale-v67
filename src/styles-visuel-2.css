@@ -211,6 +211,9 @@ html body .vrm-app-shell .vrm-main .vrm-eb-gestes .vrm-b[data-relier-ouvrir]::be
 /* ══ 4. LE GRAND TITRE ET L'ÉCHELLE ═══════════════════════════════════════ */
 html body .vrm-app-shell .vrm-main .vrm-screen-head .vrm-display { letter-spacing: -.025em; line-height: 1.1; }
 @media (max-width: 767px) { html body .vrm-app-shell .vrm-main .vrm-screen-head .vrm-display { font-size: var(--vrm-t34) !important; font-weight: 700 !important; } }
+/* Dans un espace de plateforme, le titre de l'écran (« Annonces eBay (5) ») est un titre de
+   SECTION (22/700) sous le grand titre « Annonces » — jamais deux grands titres l'un sur l'autre. */
+html body .vrm-app-shell .vrm-main .vrm-market-space .vrm-screen-head h2.vrm-display { font-size: var(--vrm-t22) !important; letter-spacing: -.022em; }
 /* Les titres de section (22/700) et leurs compteurs (17, au gris) : une seule forme. */
 html body .vrm-app-shell .vrm-main :is(.vrm-rpf-section-titre, .vrm-eb-inactives-titre) { font-size: var(--vrm-t22) !important; font-weight: 700 !important; letter-spacing: -.022em !important; line-height: 1.2; }
 html body .vrm-app-shell .vrm-main .vrm-rpf-section-n { font-size: var(--vrm-t17); font-weight: 400; color: var(--vrm-muted); font-variant-numeric: tabular-nums; }
@@ -266,14 +269,17 @@ html body .vrm-app-shell .vrm-main .vrm-pa-entree > button > span:nth-child(2) s
 html body .vrm-app-shell .vrm-main .vrm-lbc-tete { margin-bottom: 4px !important; }
 html body .vrm-app-shell .vrm-main .vrm-lbc-tete > button { border: 0 !important; background: transparent !important; color: var(--vrm-muted) !important; font-size: var(--vrm-t13) !important; min-height: 44px; }
 /* « À faire sur Leboncoin » : le groupe de Réglages d'eBay (icône par geste, filets décalés). */
-html body .vrm-app-shell .vrm-main [data-lbc-conseils] { border: 0 !important; box-shadow: var(--vrm-ombre-carte) !important; border-radius: var(--vrm-r-carte) !important; padding: 14px 16px 6px !important; }
-html body .vrm-app-shell .vrm-main [data-lbc-conseils] > div:first-child { font-size: var(--vrm-t15) !important; font-weight: 600 !important; letter-spacing: -.01em; }
-html body .vrm-app-shell .vrm-main [data-lbc-conseils] [data-lbc-conseil] { gap: 12px !important; min-height: 56px; padding: 8px 0 !important; position: relative; border-top: 0 !important; }
-html body .vrm-app-shell .vrm-main [data-lbc-conseils] [data-lbc-conseil] + [data-lbc-conseil]::before { content: ''; position: absolute; top: 0; left: 42px; right: 0; height: .5px; background: var(--vrm-line); }
-html body .vrm-app-shell .vrm-main [data-lbc-conseils] [data-lbc-conseil] > span:nth-child(2) { font-size: var(--vrm-t15) !important; }
-html body .vrm-app-shell .vrm-main [data-lbc-conseils] [data-lbc-conseil-go] { border: 0 !important; background: var(--vrm-card2) !important; border-radius: 999px !important; min-height: 44px; padding: 0 16px !important; font-size: var(--vrm-t15) !important; }
+html body .vrm-app-shell .vrm-main :is([data-lbc-conseils], .vrm-card:has(> [data-lbc-conseil]), div:has(> [data-lbc-conseil])) { border: 0 !important; box-shadow: var(--vrm-ombre-carte) !important; border-radius: var(--vrm-r-carte) !important; padding: 14px 16px 6px !important; }
+html body .vrm-app-shell .vrm-main div:has(> [data-lbc-conseil]) > div:first-child { font-size: var(--vrm-t15) !important; font-weight: 600 !important; letter-spacing: -.01em; }
+html body .vrm-app-shell .vrm-main [data-lbc-conseil] { gap: 12px !important; min-height: 56px; padding: 8px 0 !important; position: relative; border-top: 0 !important; }
+html body .vrm-app-shell .vrm-main [data-lbc-conseil] + [data-lbc-conseil]::before { content: ''; position: absolute; top: 0; left: 42px; right: 0; height: .5px; background: var(--vrm-line); }
+html body .vrm-app-shell .vrm-main [data-lbc-conseil] > span:nth-child(2) { font-size: var(--vrm-t15) !important; }
+html body .vrm-app-shell .vrm-main [data-lbc-conseil] [data-lbc-conseil-go] { border: 0 !important; background: var(--vrm-card2) !important; border-radius: 999px !important; min-height: 44px; padding: 0 16px !important; font-size: var(--vrm-t15) !important; }
 .vrm-lbc-conseil-icone { flex: 0 0 30px; width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; background: var(--vrm-card2); color: var(--vrm-ink); }
 .vrm-lbc-conseil-icone[data-urgent="1"] { background: var(--vrm-warn-soft); color: var(--vrm-warn); }
+/* La raison de ne pas publier d'ici (« Depuis ton ordinateur ») : une carte, le geste en ambre — plus de barre latérale. */
+html body .vrm-app-shell .vrm-main [data-raison-publier] { border: 0 !important; box-shadow: var(--vrm-ombre-carte); border-radius: 14px !important; }
+html body .vrm-app-shell .vrm-main [data-raison-publier] b { color: var(--vrm-ink); }
 /* « Republier sur Leboncoin » : une carte comme les autres (titre, une ligne + ⓘ, le geste). */
 html body .vrm-app-shell .vrm-main [data-repub-lbc-porte] { border: 0 !important; box-shadow: var(--vrm-ombre-carte); border-radius: var(--vrm-r-carte) !important; }
 html body .vrm-app-shell .vrm-main [data-repub-lbc-porte] [data-repub-lbc-ouvrir] { border: 0 !important; background: var(--vrm-card2) !important; border-radius: 999px !important; font-size: var(--vrm-t15) !important; }
@@ -297,6 +303,54 @@ html body .vrm-app-shell .vrm-main .vrm-lbc-catalog-filtres { flex-wrap: nowrap 
 html body .vrm-app-shell .vrm-main .vrm-lbc-catalog-filtres::-webkit-scrollbar { display: none; }
 html body .vrm-app-shell .vrm-main .vrm-lbc-catalog-filtres button { border: 0 !important; background: var(--vrm-card2) !important; border-radius: 999px !important; padding: 0 14px !important; white-space: nowrap; font-size: var(--vrm-t15) !important; }
 html body .vrm-app-shell .vrm-main .vrm-lbc-catalog-filtres button[aria-pressed="true"] { background: var(--vrm-ink) !important; color: var(--vrm-bg) !important; }
+
+/* ══ 5 quinquies. MA JOURNÉE : « À FAIRE » EN UNE CARTE À RANGÉES ═══════════
+   Cinq cartes empilées (une ombre chacune) deviennent UN groupe, comme Rappels : une
+   carte blanche (#1C1C1E la nuit), des rangées séparées par un filet qui commence
+   après la photo. Chaque rangée garde ses photos en pile, son titre, sa ligne et son
+   geste ; l'ambre reste au geste pressé. */
+@media (max-width: 1023px) {
+  html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task-list {
+    gap: 0 !important; background: var(--fu-carte, var(--vrm-surface)) !important; border-radius: var(--fu-r-carte, 20px) !important;
+    box-shadow: var(--fu-ombre, var(--vrm-ombre-carte)) !important; overflow: hidden !important;
+  }
+  :root[data-theme="dark"] body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task-list { background: #1c1c1e !important; }
+  html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task-list > .vrm-day-task,
+  :root body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task-list [data-alertes-argent] > .vrm-day-task {
+    position: relative; background: transparent !important; box-shadow: none !important; border-radius: 0 !important;
+  }
+  html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task-list .vrm-day-task + .vrm-day-task::before,
+  html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task-list [data-alertes-argent] + .vrm-day-task::before {
+    content: ''; position: absolute; top: 0; left: 74px; right: 0; height: .5px; background: var(--vrm-line); pointer-events: none;
+  }
+  :root[data-theme="dark"] body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task-list .vrm-day-task + .vrm-day-task::before { background: #38383A; }
+}
+
+/* ══ 5 sexies. UNE CARTE « GESTE » (`Card` au cadre ambre) ══════════════════
+   design/jetons.css rend toute carte sans cadre (élevée, ombre douce) — le cadre ambre
+   qu'un écran posait pour un geste pressé (vendue ailleurs, à retirer) disparaissait
+   avec. `Card` dit son ton (`data-ton="geste"`) : un anneau ambre fin le garde. */
+:root:root body .vrm-app-shell .vrm-main .vrm-surface[data-ton="geste"] { box-shadow: 0 0 0 1px color-mix(in srgb, var(--vrm-warn) 45%, transparent), var(--vrm-ombre-carte) !important; }
+
+/* ══ 5 septies. ANNONCES ══════════════════════════════════════════════════ */
+/* « Prochain geste » et « Prix d'achat N/M » : des cartes élevées, sans cadre. */
+html body .vrm-app-shell .vrm-main :is(.vrm-ann-geste, .vrm-ann-avis) { border: 0 !important; box-shadow: var(--vrm-ombre-carte) !important; border-radius: var(--vrm-r-carte) !important; }
+/* « N° à vérifier » : une rangée = la paire, puis ses trois gestes TOUJOURS sur une ligne
+   (« C'est bien le N°x » · le champ · « Corriger »), en pilules d'iOS, alignés sur le texte. */
+html body .vrm-app-shell .vrm-main [data-verif-carton] { position: relative; border-top: 0 !important; padding: 12px 0 !important; }
+html body .vrm-app-shell .vrm-main [data-verif-carton] + [data-verif-carton]::before { content: ''; position: absolute; top: 0; left: 58px; right: 0; height: .5px; background: var(--vrm-line); }
+html body .vrm-app-shell .vrm-main [data-verif-carton] > div:last-child { flex: 1 1 100% !important; flex-wrap: nowrap !important; gap: 8px !important; padding-left: 58px; box-sizing: border-box; }
+html body .vrm-app-shell .vrm-main [data-verif-carton] > div:last-child > :is(button, input) {
+  min-height: 44px !important; border-radius: 999px !important; font-size: var(--vrm-t15) !important; padding: 0 14px !important; white-space: nowrap; box-sizing: border-box;
+}
+html body .vrm-app-shell .vrm-main [data-verif-carton] > div:last-child > button:first-child { flex: none; border: 0 !important; background: var(--vrm-card2) !important; color: var(--vrm-ink) !important; }
+html body .vrm-app-shell .vrm-main [data-verif-carton] > div:last-child > input { flex: 1 1 60px; min-width: 0; width: auto !important; border: 0 !important; background: var(--vrm-card2) !important; font-size: 16px !important; }
+html body .vrm-app-shell .vrm-main [data-verif-carton] > div:last-child > button:nth-of-type(2) { flex: none; }
+@media (max-width: 400px) { html body .vrm-app-shell .vrm-main [data-verif-carton] > div:last-child { padding-left: 0; } }
+
+/* ══ 5 octies. VESTIAIRE · « Mettre en vente » : les deux gestes en pilules d'iOS ══ */
+html body .vrm-app-shell .vrm-main :is([data-vc-preparer], [data-vc-marquer]) { border: 0 !important; border-radius: 999px !important; min-height: 44px; padding: 0 16px !important; font-size: var(--vrm-t15) !important; }
+html body .vrm-app-shell .vrm-main [data-vc-marquer] { background: transparent !important; color: var(--vrm-ink) !important; }
 
 /* ══ 6. LES ÉTATS VIDES ILLUSTRÉS (src/composants/Illustration.jsx) ═══════ */
 .vrm-illustration { display: block; color: var(--vrm-muted); opacity: .9; }
