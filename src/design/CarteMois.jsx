@@ -39,6 +39,10 @@ export default function CarteMois({ surtitre, valeur, sous = null, cases = [], c
   // en « 35 211,9… » : la taille descend d'un pixel à la fois jusqu'à ce qu'il tienne
   // (plancher 22 px), et remonte quand la place revient. Mesuré, pas deviné.
   const grandRef = useRef(null);
+  // (6 nov., v36-raccords · banc chargement) Une case qui a dit une raison (« lecture… »)
+  // garde la place de cette ligne quand sa valeur arrive : la carte ne rétrécit pas sous
+  // le doigt (Colis en réseau lent : −18 px, la rangée des filtres remontait, CLS 0,005).
+  const raisonsVues = useRef(new Set());
   useLayoutEffect(() => {
     const el = grandRef.current;
     if (!el) return undefined;
@@ -78,7 +82,8 @@ export default function CarteMois({ surtitre, valeur, sous = null, cases = [], c
       {cases.length ? (
         <div className="vrm-fu-cases" style={{ '--n': cases.length }}>
           {cases.map((c) => {
-            const corps = <><b className={c.n == null ? 'is-vide' : undefined}>{c.n == null ? '—' : c.n}</b><span>{c.l}</span>{c.raison ? <small className="vrm-fu-case-raison" data-carte-raison="">{c.raison}</small> : null}</>;
+            if (c.raison) raisonsVues.current.add(c.cle);
+            const corps = <><b className={c.n == null ? 'is-vide' : undefined}>{c.n == null ? '—' : c.n}</b><span>{c.l}</span>{c.raison ? <small className="vrm-fu-case-raison" data-carte-raison="">{c.raison}</small> : raisonsVues.current.has(c.cle) ? <small className="vrm-fu-case-raison" aria-hidden="true">{'\u00a0'}</small> : null}</>;
             return c.onClick
               ? <button key={c.cle} type="button" className="vrm-fu-case" data-fu-case={c.cle} title={c.titre} onClick={c.onClick} {...(c.attrs || {})}>{corps}</button>
               : <div key={c.cle} className="vrm-fu-case" data-fu-case={c.cle} title={c.titre} {...(c.attrs || {})}>{corps}</div>;

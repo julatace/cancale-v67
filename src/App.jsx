@@ -60058,6 +60058,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* ⚠️ DEUX PAIRES, UN SEUL NUMÉRO = la mauvaise chaussure part. C'est le
             risque le plus coûteux de l'app : une fois le mauvais carton envoyé,
             rien ne le rattrape. On le met en tête, en rouge, avec les porteurs. */}
+        {/* (6 nov., v36-raccords · banc chargement) « À envoyer » : tant que la numérotation
+            n'est pas passée (`numAttente`), « deux articles sous un N° » n'est pas su — la
+            liste garde son squelette au lieu d'être poussée par l'alerte qui arrive (CLS).
+            Ventes pas encore lues : c'est leur squelette à elles, plus bas, qui tient la place. */}
+        {numAttente && ongletColisVu === 'envoyer' && sales.items ? <Skeleton variant="row" count={4}/> : (<>
         {blocAEcrire()}
         <BlocBarrerVc/>
         {conflitsNum.length > 0 && (
@@ -60655,6 +60660,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               ))}
           </div>
         )}
+        </>)}
         </>)}
         {/* ── (3 nov.) « ENVOYÉS » : L'ONGLET DES COLIS PARTIS, TOUS SITES ─────────────────────
             Julien : « je veux des colis ENVOYÉS, et dans un autre onglet ». Ce qui vivait replié en bas
