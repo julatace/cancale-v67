@@ -260,7 +260,7 @@ const detail = async (pg, sousCle) => {
         { const x = L(String(13).padStart(12, '0')); dit(x.length === 1 && x[0].section === 'double' && x[0].hors, 'C13 moitié Vinted sans identité au point d’un colis Mondial Relay ⇒ « peut-être en double », hors compte', J(x));
           dit(/sans rien qui les relie/.test(m.doubleExpl) && /ne compte(nt)? pas/.test(m.doubleExpl), '« Peut-être en double » est expliqué une fois (le fait, pourquoi, le geste)', m.doubleExpl.slice(0, 160)); }
         // C14
-        dit(!m.lignes.some((l) => /C14/.test(l.titre) || /c14|Phone Test/i.test(l.point)) && !m.lignes.some((l) => l.raison === 'trop_long' && /phonetest/.test(l.point)), 'C14 e-mail Vinted gardé (lien base64) d’un achat FINALISÉ ⇒ fini, ni « à vérifier » ni « en double »', J(m.lignes.filter((l) => /phonetest/.test(l.point))));
+        dit(!m.lignes.some((l) => /C14/.test(l.titre) || /c14|Phone Test/i.test(l.point)) && !m.lignes.some((l) => l.raison === 'trop_long' && /phonetest/.test(l.point)), 'C14 e-mail Vinted gardé (lien base64) d’un achat FINALISÉ ⇒ fini, ni « à vérifier » ni « en double »', J(m.lignes.filter((l) => /C14/.test(l.titre) || /phonetest/.test(l.point))));
         // C15
         { const x = m.lignes.filter((l) => /C15/.test(l.titre) || /terratest/.test(l.point)); dit(x.length === 1 && !x[0].hors && /Achat déposé C15/.test(x[0].titre), 'C15 e-mail Vinted gardé relié à son achat « déposé » ⇒ UNE ligne comptée, au titre de l’achat', J(x)); }
         // C18
