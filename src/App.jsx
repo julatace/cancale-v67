@@ -74,7 +74,11 @@ import { annulationsParCompte } from './annulationsCompte.js';
 import { notesParCompte } from './notesRecues.js';
 import { toutSurLeNumero, lireNumeroCherche } from "./rechercheNumero.js";
 import { repriseNumerosRecreation, tableRecrees } from "./repriseNumero.js";
-import { etatAnnonceVinted, enVerificationVinted, raisonPasSelectionnable, actionsPossibles, raisonCommune, ACTIONS_TUILES, ETATS_ANNONCE, liensRepubMain, fusionLiensRecrees, lusDuDressing, candidatsNouvelle, etatSuiviMain, filtreReglages, nomPhotoReglee, appliquerCouleursPixels } from "./annoncesActions.js";
+import { etatAnnonceVinted, enVerificationVinted, raisonPasSelectionnable, actionsPossibles, raisonCommune, ACTIONS_TUILES, ETATS_ANNONCE, liensRepubMain, fusionLiensRecrees, lusDuDressing, candidatsNouvelle, etatSuiviMain, filtreReglages, nomPhotoReglee, appliquerCouleursPixels, minisSelection, ecritureMini } from "./annoncesActions.js";
+// (6 nov., vague 2) Remettre en vente une vente annulée avant l'envoi ; relier l'achat des annonces numérotées.
+import { annuleesChezToi, paireARemettre, fichesAnciennesAnnulees, ligneJournee as ligneAnnuleesJournee, etatRemise, VERDICT_MOTEUR as VERDICT_REMISE } from "./annuleesChezToi.js";
+import { fileSansAchat, aRelierJournee, meilleureSuggestion, texteSuggestion } from "./achatsARelier.js";
+import "./vague2-ventes.css";
 import { etatCycle, cartesSupprimees, majVusEnLigne, indexPresentes, montantSaisi as montantCycle, CHOIX as CHOIX_CYCLE, LIBELLE_CHOIX } from "./cycleArticle.js";
 import { chezMoiProposables } from "./propositionsSites.js";
 import { retraitsEbayAutoAilleursPermis, RAISON_RETRAIT_AILLEURS } from "./retraitAilleurs.js";
@@ -94,7 +98,7 @@ import { feuillesExport, fichiersExport, zipStocke, nomExport } from "./exportDo
 import { poserLienVc, defaireLienVc, numerosABarrer, marquerBarre, lienDe, produitDeVinted, vcReliable, suggestionsLienVc } from "./lienVestiaire.js";
 import FeuilleLienVc from "./LienVestiaire.jsx";
 import { preuvesFriseVc, preuvesFriseEbay } from "./friseSites.js";
-import { suggestionsAchat, tousAchatsLibres, tousAchatsLibresDetail, filtresAchats, etiquetteLot, liensParAchat, lotDe, prixIndicatifLot, ecritureLot } from "./suggestionsAchat.js";
+import { suggestionsAchat, tousAchatsLibres, tousAchatsLibresDetail, filtresAchats, etiquetteLot, liensParAchat, lotDe, prixIndicatifLot, ecritureLot, suggestionsSaisieSerie } from "./suggestionsAchat.js";
 import AchatsOutils from "./AchatsOutils.jsx";
 import { CLE_FOURNISSEURS, lireRegistre, avecFournisseur, sansFournisseur, avecAchatGros, sansAchatGros, avecRepartition, achatGros, reliesDuLot, partsDuLot, planPrixGros, ecrituresPrixGros, ecritureLienGros, ecritureDelierGros, origineDuPrix, horsRattachables, avecHors, sansHors, avecGardes, bilanFournisseurs, eurosC as eurosFo } from "./fournisseurs.js";
 import { articlesParAchat, delaisMiseEnLigne, dateReception, estLot as estLotAchat, nombreLot, totalARepartir, ecrituresRepartition, annulationRepartition, ecritureLienAchat, prixAchatCentimes, achatSansCout } from "./achatsSourcing.js";
@@ -2070,6 +2074,10 @@ const SYNC_KEYS = [
   // (5 nov.) « Republier à la main, accompagné » : { [ancienId]: { uid, num, titre, at, nouvelId?, lieAt? } }.
   // Le lien nouvelle → ancienne est posé par SON clic (src/annoncesActions.js).
   'vrm_repub_main',
+  // (6 nov., vague 2) « Déjà remise en vente » posé par SON clic sur une vente annulée
+  // avant l'envoi ({ [tx]: at }), et les annonces « Plus tard » de « Sans achat relié »
+  // ({ [itemId]: at }) : le même état sur tous ses appareils. Aucun prix, aucun N°.
+  'vrm_annulees_reglees', 'vrm_achat_plus_tard',
   // (28 oct.) Les « brouillons à refaire » qu'il a déclarés réglés (faits à la main sur Vinted).
   'vrm_brouillons_refaire_ecartes',
   // (19 oct.) Annonce eBay → paire, par IDENTITÉ (publication, brouillon, « Relier »).
@@ -14163,6 +14171,8 @@ function ActionsSelectionFeuille({ choisies, actions, onLancer, onClose }) {
   // « Republier à la main » n'est pas une cinquième tuile : un lien discret dessous.
   const tuiles = ACTIONS_TUILES.map((k) => actions.find((x) => x.k === k)).filter(Boolean);
   const main = actions.find((x) => x.k === 'main');
+  // (6 nov., vague 2 · point 2) « Prix mini… » : un second lien discret (rien ne part chez Vinted).
+  const mini = actions.find((x) => x.k === 'mini');
   const { tete, parTuile } = raisonCommune(actions);
   // Ce que VRM n'a pas lu : la MÊME phrase sur chaque paire ⇒ une fois, sous la liste.
   const cleNL = (l) => l.join(', ');
@@ -14185,6 +14195,12 @@ function ActionsSelectionFeuille({ choisies, actions, onLancer, onClose }) {
           <div className="vrm-act-main" data-action-sel="main" data-action-sel-ok={main.ok ? 'oui' : 'non'}>
             <Bouton variante="discret" disabled={!main.ok} title={main.ok ? main.desc : main.raison} onClick={() => { if (main.ok) onLancer('main'); }}>{main.titre}</Bouton>
             {main.ok || main.raison !== tete ? <span>{main.ok ? 'Sans l’extension : VRM te prépare tout, tu publies toi-même.' : main.raison}</span> : null}
+          </div>
+        ) : null}
+        {mini ? (
+          <div className="vrm-act-main" data-action-sel="mini" data-action-sel-ok={mini.ok ? 'oui' : 'non'}>
+            <Bouton variante="discret" disabled={!mini.ok} title={mini.ok ? mini.desc : mini.raison} onClick={() => { if (mini.ok) onLancer('mini'); }}>{mini.titre}</Bouton>
+            <span>{mini.ok ? '« Accepter dès » sur toutes, depuis leur prix.' : mini.raison}</span>
           </div>
         ) : null}
         <div className="vrm-act-verif" data-avant-lancer={nManque}>
@@ -14313,12 +14329,18 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, onDebut, onLier,
         {champ('etat', 'État', String(f.etat || paire.condition || ''))}
         <div className="vrm-main-etape">3. Publier sur Vinted</div>
         <div className="vrm-b-rangee" style={{ justifyContent: 'flex-start' }}><Bouton variante="primaire" data-main-ouvrir-vinted href={nouvelleUrl} target="_blank" rel="noopener noreferrer" onClick={() => onDebut()}>Ouvrir Vinted — nouvelle annonce ↗</Bouton></div>
-        <div className="vrm-act-muet">Quand la nouvelle est en ligne, supprime l’ancienne sur Vinted : sinon la même paire est en vente deux fois.</div>
-        <div className="vrm-main-etape">4. Remettre le N°{paire.numero ? ` ${paire.numero}` : ''} sur la nouvelle annonce</div>
-        {!paire.numero ? <div className="vrm-act-muet" data-main-sans-num="">Cette annonce n’a pas de N° : la nouvelle en recevra un, comme toute annonce.</div>
+        {/* (6 nov., vague 2 · point 1) Une vente annulée avant l'envoi : l'ancienne annonce est FERMÉE
+            chez Vinted (vendue puis annulée, mesuré) — rien à supprimer, jamais deux fois en vente. */}
+        {paire.annulee
+          ? <div className="vrm-act-muet" data-main-annulee={paire.tx || ''}>L’ancienne annonce est fermée chez Vinted (vente annulée) : rien à supprimer.</div>
+          : <div className="vrm-act-muet">Quand la nouvelle est en ligne, supprime l’ancienne sur Vinted : sinon la même paire est en vente deux fois.</div>}
+        <div className="vrm-main-etape">4. {paire.annulee && !paire.numero ? 'Désigner la nouvelle annonce' : `Remettre le N°${paire.numero ? ` ${paire.numero}` : ''} sur la nouvelle annonce`}</div>
+        {paire.annulee && !paire.numero && etatSuivi !== 'fait' ? <div className="vrm-act-muet" data-main-num-neuf={paire.archive ? 'archive' : 'sans'}>{paire.archive ? `Le N°${paire.numAffiche} est un ancien numéro : il ne se redonne pas. La nouvelle annonce recevra un N° neuf, à écrire sur son carton.` : 'Paire pas reliée : cette vente n’a pas de N°. La nouvelle annonce en recevra un, comme toute annonce.'}</div> : null}
+        {paire.annulee && !paire.numero && etatSuivi === 'fait' ? <div data-main-n-fait="" style={{ fontSize: 13, color: C.text }}>✓ Nouvelle annonce désignée : la vente annulée est remise en vente.</div>
+          : !paire.numero && !paire.annulee ? <div className="vrm-act-muet" data-main-sans-num="">Cette annonce n’a pas de N° : la nouvelle en recevra un, comme toute annonce.</div>
           : etatSuivi === 'fait' ? <div data-main-n-fait="" style={{ fontSize: 13, color: C.text }}>✓ La nouvelle annonce porte le N°{paire.numero}.</div>
           : etatSuivi === 'lie' ? <div className="vrm-act-paire" data-main-lie={suivi.nouvelId}>
-              <span>Nouvelle annonce désignée{nomNouvelle ? ` : « ${nomNouvelle} »` : ''}. Le N°{paire.numero} passe dessus dès que l’ancienne n’est plus du tout sur Vinted — ni en ligne, ni masquée, ni en brouillon (supprime-la sur Vinted, puis rouvre Annonces).</span>
+              <span>Nouvelle annonce désignée{nomNouvelle ? ` : « ${nomNouvelle} »` : ''}. {paire.annulee ? `Le N°${paire.numero} passe dessus à la prochaine lecture de tes annonces.` : `Le N°${paire.numero} passe dessus dès que l’ancienne n’est plus du tout sur Vinted — ni en ligne, ni masquée, ni en brouillon (supprime-la sur Vinted, puis rouvre Annonces).`}</span>
               <div className="vrm-b-rangee" style={{ justifyContent: 'flex-start' }}><Bouton variante="discret" data-main-delier onClick={onDelier}>Ce n’est pas elle</Bouton></div>
             </div>
           : <>
@@ -14334,6 +14356,104 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, onDebut, onLier,
             </>}
       </div>
     </SheetShell>
+  );
+}
+// ══ « PRIX MINI… » SUR UNE SÉLECTION (6 nov., vague 2 · point 2) ══════════════
+// La feuille de la sélection : − X % ou − X €, arrondi à l'euro (src/annoncesActions.js,
+// `minisSelection`), « Refuser sous » en option. L'aperçu dit N° · prix · mini (· refus)
+// et ce qui ne sera pas posé ; une ligne sous un prix d'achat CONNU le dit en ambre (un
+// geste à regarder, §7). « Poser » demande confirmation (la liste), puis `onPoser` écrit
+// par le chemin de la carte (`updatePair` … `min`/`refuse`). Rien ne part chez Vinted.
+function PrixMiniFeuille({ choisies, onPoser, onClose }) {
+  const [mode, setMode] = useState('pct');
+  const [val, setVal] = useState('10');
+  const [refOn, setRefOn] = useState(false);
+  const [refVal, setRefVal] = useState('30');
+  const annonces = (choisies || []).filter((a) => a && a.etat === 'en-ligne').map((a) => ({ id: a.id, numero: a.numero, titre: a.titre, prix: a.prix, achat: a.verif ? a.verif.achat : null }));
+  const horsLigne = (choisies || []).length - annonces.length;
+  const r = minisSelection({ annonces, mini: { mode, valeur: val }, refuse: refOn ? { mode, valeur: refVal } : null });
+  const nSous = r.lignes.filter((l) => l.mini != null && l.sousAchat).length;
+  const unite = mode === 'pct' ? '%' : '€';
+  const champ = (v, set, data, lab) => (
+    <label className="vrm-mini-champ" data-mini-champ={data}>
+      <span>{lab}</span>
+      <span className="vrm-mini-saisie"><span aria-hidden="true">−</span><input value={v} inputMode="decimal" enterKeyHint="done" aria-label={`${lab} (${unite})`} onChange={(e) => set(e.target.value)} /><span aria-hidden="true">{unite}</span></span>
+    </label>
+  );
+  return (
+    <SheetShell onClose={onClose} maxWidth={520} titre={`Prix mini · ${annonces.length} annonce${annonces.length > 1 ? 's' : ''}`}>
+      <div className="vrm-act vrm-mini" data-prix-mini={annonces.length} data-prix-mini-poser={r.aPoser}>
+        <p className="vrm-act-muet">« Accepter dès » de chaque annonce, depuis son prix, arrondi à l’euro. Rien ne part chez Vinted : c’est le seuil que lisent tes offres.</p>
+        <Segmente label="Réduction" value={mode} onChange={setMode} options={[{ v: 'pct', l: 'En %' }, { v: 'eur', l: 'En €' }]}/>
+        {champ(val, setVal, 'mini', 'Accepter dès : prix')}
+        <label className="vrm-mini-option"><input type="checkbox" checked={refOn} onChange={(e) => setRefOn(e.target.checked)} data-mini-refus-on="" /><span>Refuser aussi les offres trop basses</span></label>
+        {refOn ? champ(refVal, setRefVal, 'refuse', 'Refuser sous : prix') : null}
+        {horsLigne > 0 ? <p className="vrm-act-muet" data-mini-hors={horsLigne}>{horsLigne} annonce{horsLigne > 1 ? 's' : ''} pas en ligne : rien n’y est posé.</p> : null}
+        {r.erreur ? <p className="vrm-act-raison" role="alert" data-mini-erreur="">{r.erreur}</p> : (
+          <div className="vrm-mini-liste" data-mini-liste={r.lignes.length}>
+            {nSous ? <p className="vrm-mini-avert" data-mini-sous-achat={nSous}>{nSous} mini{nSous > 1 ? 's' : ''} sous ton prix d’achat</p> : null}
+            {r.lignes.map((l) => (
+              <div key={l.id} className="vrm-mini-ligne" data-mini-ligne={l.id} data-mini-valeur={l.mini == null ? '' : String(l.mini)} data-mini-refus={l.refuse == null ? '' : String(l.refuse)} data-mini-sous={l.sousAchat ? '1' : undefined}>
+                <span className="vrm-mini-nom">{l.numero ? <Numero n={l.numero} taille="petit"/> : <span className="vrm-mini-sans">Sans N°</span>}<span className="vrm-mini-titre">{l.titre || 'Sans titre'}</span></span>
+                <span className="vrm-mini-chiffres">{l.mini == null ? <span className="vrm-mini-raison">{l.raison}</span> : <>{montant(l.prix)} → <b>{montant(l.mini)}</b>{l.refuse != null ? <span className="vrm-mini-refus"> · refus sous {montant(l.refuse)}</span> : null}</>}</span>
+                {l.mini != null && (l.sousAchat || l.raison) ? <span className="vrm-mini-note">{[l.sousAchat ? 'sous ton prix d’achat' : '', l.raison].filter(Boolean).join(' · ')}</span> : null}
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="vrm-b-rangee"><Bouton variante="primaire" data-mini-poser="" disabled={!r.aPoser || !!r.erreur} onClick={() => onPoser(r.lignes.filter((l) => l.mini != null), { avecRefus: refOn })}>{r.aPoser ? `Poser sur ${r.aPoser} annonce${r.aPoser > 1 ? 's' : ''}` : 'Rien à poser'}</Bouton></div>
+      </div>
+    </SheetShell>
+  );
+}
+// ══ « SANS ACHAT RELIÉ » : UNE SUGGESTION PAR ANNONCE (6 nov., vague 2 · point 4) ══
+// La file (src/achatsARelier.js) : chaque annonce numérotée en ligne sans achat relié, avec
+// LA meilleure suggestion de `suggestionsAchat` (marque et taille obligatoires, achat
+// antérieur à la mise en ligne, lots). « Relier » écrit au prix du reçu (`propositionDe`),
+// « Saisir » le prix qu'il tape, « Plus tard » la range en fin de file. SON tap, toujours.
+function AchatsARelier({ file, achats, liens, propositionDe, onRelier, onSaisir, onPlusTard, onChoisir, compteDe }) {
+  const lignes = useMemo(() => (Array.isArray(file) ? file.map((x) => {
+    const sugg = Array.isArray(achats) ? meilleureSuggestion({ item: x.item, achats, liens, marqueDe: extractBrand, couleursDe: extractColors, modeleDe: extractModel }) : null;
+    const p = sugg ? propositionDe(sugg.achat) : null;
+    return { ...x, sugg, texte: texteSuggestion(sugg, p) };
+  }) : null), [file, achats, liens, propositionDe]);
+  if (lignes == null) return <div className="vrm-ar-vide" data-ar-etat="lecture">{PAS_SU.enCours}</div>;
+  if (!lignes.length) return <div className="vrm-ar-vide" data-ar-etat="vide">Chaque annonce numérotée a son achat relié ou son prix d’achat.</div>;
+  const nSugg = lignes.filter((l) => l.sugg).length;
+  const jour = (d) => { const t = Date.parse(d || ''); return Number.isFinite(t) ? new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: new Date(t).getFullYear() === new Date().getFullYear() ? undefined : 'numeric' }) : ''; };
+  return (
+    <section className="vrm-ar" data-ar={lignes.length} data-ar-sugg={achats === undefined ? '' : String(nSugg)} aria-label="Annonces sans achat relié">
+      <p className="vrm-ar-tete">{achats === undefined ? `${lignes.length} annonce${lignes.length > 1 ? 's' : ''} · ${PAS_SU.enCours.toLowerCase()}` : `${lignes.length} annonce${lignes.length > 1 ? 's' : ''} · ${nSugg} avec une suggestion`}<span> · ton tap relie, rien ne se relie tout seul</span></p>
+      <ul className="vrm-ar-liste">
+        {lignes.map((l) => {
+          const it = l.item, t = l.texte, num = l.fiche && l.fiche.numero;
+          const prix = (() => { const v = it.price && typeof it.price === 'object' ? it.price.amount : it.price; const n = Number(String(v == null ? '' : v).replace(',', '.')); return Number.isFinite(n) && n > 0 ? n : null; })();
+          const relierTxt = t && t.proposition ? `${VERBES.relier} · ${montant(t.proposition.centimes / 100)}` : VERBES.relier;
+          return (
+            <li key={l.id} className="vrm-ar-ligne" data-ar-ligne={l.id} data-ar-plus-tard={l.plusTard ? '1' : undefined} data-ar-sugg-tx={l.sugg ? String(l.sugg.achat.transaction_id) : ''}>
+              <div className="vrm-ar-annonce">
+                {it.photo ? <PhotoVinted src={it.photo} alt="" className="vrm-ar-photo" loading="lazy"/> : <PhotoVide taille={48}/>}
+                <span className="vrm-ar-centre"><span className="vrm-ar-nom">{num ? <Numero n={num} taille="petit"/> : null}<span className="vrm-ar-titre">{it.title || 'Sans titre'}</span></span>
+                  <span className="vrm-ar-sous">{[prix != null ? montant(prix) : '', l.plusTard ? 'remise à plus tard' : ''].filter(Boolean).join(' · ')}</span></span>
+              </div>
+              {l.sugg ? (
+                <div className="vrm-ar-sugg" data-ar-rang={l.sugg.rang}>
+                  {orderPhoto(l.sugg.achat) ? <PhotoVinted src={orderPhoto(l.sugg.achat)} alt="" className="vrm-ar-photo-achat" loading="lazy"/> : <PhotoVide taille={36}/>}
+                  <span className="vrm-ar-centre"><span className="vrm-ar-titre">{t.titre || 'Achat sans titre'}</span>
+                    <span className="vrm-ar-sous">{[jour(t.date), compteDe(l.sugg.achat), t.lot ? 'lot : le prix de cet article te sera demandé' : t.proposition ? (t.proposition.source === 'recu' ? 'prix du reçu' : 'article seul') : (t.prixLu != null ? `payé ${montant(t.prixLu)}` : '')].filter(Boolean).join(' · ')}</span></span>
+                </div>
+              ) : <div className="vrm-ar-sans" data-ar-sans-sugg="">{achats === undefined ? PAS_SU.enCours : 'Aucune suggestion sûre (même marque, même taille, achetée avant la mise en ligne)'}</div>}
+              <div className="vrm-ar-gestes">
+                {l.sugg ? <Bouton variante="secondaire" icone="link" data-ar-relier={String(l.sugg.achat.transaction_id)} onClick={() => onRelier(it, l.sugg.achat)}>{relierTxt}</Bouton>
+                  : <Bouton variante="secondaire" icone="link" data-ar-choisir="" disabled={achats === undefined} onClick={() => onChoisir(it)}>Choisir un achat</Bouton>}
+                <Bouton variante="discret" icone="pencil" data-ar-saisir="" onClick={() => onSaisir(it)}>Saisir</Bouton>
+                {!l.plusTard ? <Bouton variante="discret" data-ar-plus-tard-geste="" onClick={() => onPlusTard(l.id)}>Plus tard</Bouton> : null}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChrome, compteVinted, majExt, lettreOk, brouillonOk, onClose, onReessayer = null, action = 'recreer', reprise = null, depart = null }) {
@@ -43149,7 +43269,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [selAnn, setSelAnn] = useState([]);
   const [actionsSelOpen, setActionsSelOpen] = useState(false);
   const [repubDepart, setRepubDepart] = useState(false);
-  const [repubMainOuvert, setRepubMainOuvert] = useState(null); // l'annonce republiée à la main (objet de la sélection)
+  const [repubMainOuvert, setRepubMainOuvert] = useState(null);
+  const [miniSel, setMiniSel] = useState(null);   // (6 nov., vague 2) « Prix mini… » : les annonces cochées // l'annonce republiée à la main (objet de la sélection)
   const [photoEdit, setPhotoEdit] = useState(null); // { refPhoto, refTitle } → éditeur de photo (recadrer/zoomer)
   const [auditOpen, setAuditOpen] = useState(false); // modale « Audit d'inventaire »
   const [inventOpen, setInventOpen] = useState(false); // modale « Inventaire physique » (déménagement)
@@ -45637,6 +45758,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (patch === null) delete u[k]; else u[k] = { ...(prev[k] || {}), ...patch };
     save('vrm_repub_main', u); return u;
   });
+  // (6 nov., vague 2 · point 1) « Déjà remise en vente » (SON clic) : { [tx]: at }.
+  const [annuleesReglees, setAnnuleesReglees] = useStateCle('vrm_annulees_reglees', () => { const v = load('vrm_annulees_reglees', {}); return v && typeof v === 'object' ? v : {}; });
+  const poserAnnuleeReglee = (tx) => setAnnuleesReglees((prev) => { const u = { ...(prev || {}), [String(tx)]: new Date().toISOString() }; save('vrm_annulees_reglees', u); return u; });
+  // (6 nov., vague 2 · point 4) « Plus tard » dans « Sans achat relié » : { [itemId]: at }.
+  const [achatPlusTard, setAchatPlusTard] = useStateCle('vrm_achat_plus_tard', () => { const v = load('vrm_achat_plus_tard', {}); return v && typeof v === 'object' ? v : {}; });
+  const poserAchatPlusTard = (id) => setAchatPlusTard((prev) => { const u = { ...(prev || {}), [String(id)]: new Date().toISOString() }; save('vrm_achat_plus_tard', u); return u; });
   // (revue du 5 nov.) Un lien posé à la main n'entre pas tant que l'ancienne est
   // ENCORE chez lui sur Vinted sous une autre forme (masquée, à confirmer,
   // brouillon : la reprise ne regarde que l'« en ligne ») — sinon deux paires
@@ -48935,7 +49062,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // une annonce renumérotée automatiquement par erreur le retrouve).
     if (recreesEff) {
       const reprises = repriseNumerosRecreation({
-        enLigneIds: items.map((x) => x.id), numeros: nextNum, recrees: recreesEff, reprenable: numeroReprenable, cle: cleNum,
+        // (6 nov., vague 2 · point 1) Une vente annulée avant l'envoi dont le N° est posé
+        // sur la VENTE (aucune fiche sous l'annonce fermée) : la reprise lit l'ancienne
+        // fiche par `numeros[ancienId]` — elle lui est prêtée ici, en lecture seulement
+        // (src/annuleesChezToi.js ; un N° d'archive jamais).
+        enLigneIds: items.map((x) => x.id), numeros: { ...fichesAnciennesAnnulees(repubMain, nextNum, { reprenable: numeroReprenable }), ...nextNum }, recrees: recreesEff, reprenable: numeroReprenable, cle: cleNum,
         numeroVente: (nid) => { const n = nextNum[nid] && nextNum[nid].numero; return !!numVentesParIdentite.parItem[String(nid)] || (n != null && Object.values(saleOv).some((o) => o && cleNum(o.numero) === cleNum(n))); },
       });
       for (const nid of Object.keys(reprises)) { nextNum[nid] = reprises[nid]; changed = true; }
@@ -48989,7 +49120,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // arrivent souvent APRÈS les annonces. Sans elle, une annonce déjà rendue
   // garderait le numéro neuf qu'on vient justement d'éviter.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings.items, cloudReady, numVentesParIdentite, sales.items, txnPret, verNumTick, listingDates, reservesNum, recreesEff]);
+  }, [listings.items, cloudReady, numVentesParIdentite, sales.items, txnPret, verNumTick, listingDates, reservesNum, recreesEff, repubMain]);
 
   const openConversation = async (conv) => {
     if(!conv?._acc || conv.id==null)return;
@@ -50128,8 +50259,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (classifyOrderStatus(o.status) === 'cancelled') continue;
       const k = identiteAnnonce(o); if (!k) continue;
       const p = (o.price && o.price.amount != null) ? Number(o.price.amount) || 0 : 0;
-      const e = (impact[k] = impact[k] || { n: 0, ca: 0 });
+      const e = (impact[k] = impact[k] || { n: 0, ca: 0, d: null });
       e.n += 1; e.ca += p;
+      // (6 nov., vague 2 · point 7) La date de vente la plus ANCIENNE : un achat postérieur n'est pas la paire.
+      const dv = Date.parse(o.date || ''); if (Number.isFinite(dv) && (e.d == null || dv < e.d)) e.d = dv;
     }
     // (16 oct.) « (sans titre) » s'affichait pour des paires dont la FICHE n'a
     // pas gardé de titre alors que leur annonce (en ligne) ou leur vente le
@@ -50137,14 +50270,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // (id d'annonce, §5), jamais par ressemblance. Sinon on le dit.
     const titreAnnonce = {};
     for (const it of (listings.items || [])) if (it && it.id != null && String(it.title || '').trim()) titreAnnonce[String(it.id)] = String(it.title).trim();
+    // (6 nov., vague 2 · point 7) Ce que l'ANNONCE dit d'elle (marque, taille, mise en ligne), par identité.
+    const infoAnnonce = {};
+    for (const it of (listings.items || [])) if (it && it.id != null) { const t = Number(it.createdTs); infoAnnonce[String(it.id)] = { marque: it.brand || '', taille: it.size || '', ts: Number.isFinite(t) && t > 0 ? (t < 1e12 ? t * 1000 : t) : null }; }
     for (const o of (sales.items || [])) { const k = identiteAnnonce(o); if (k && !titreAnnonce[String(k)] && String(o.title || '').trim()) titreAnnonce[String(k)] = String(o.title).trim(); }
     const out = [];
     for (const k in numeros) {
       const e = numeros[k]; if (!e) continue;
       if (String(e.buyPrice || '').trim()) continue;          // déjà renseigné
       const num = String(e.numero || '').trim(); if (!num) continue;
-      const im = impact[k] || { n: 0, ca: 0 };
-      out.push({ key: k, e, numero: num, titre: String(e.title || '').trim() || titreAnnonce[String(k)] || '', enLigne: onlineAnnonceIds.has(String(k)), nVentes: im.n, ca: im.ca });
+      const im = impact[k] || { n: 0, ca: 0, d: null };
+      // La date la plus ANCIENNE connue de l'article (mise en ligne, vente, N° posé) : la borne
+      // de « l'achat est antérieur » (`suggestionsAchat`). Aucune ⇒ pas de borne.
+      const ia = infoAnnonce[String(k)] || {};
+      const dNum = Date.parse(e.numberedAt || '');
+      const ds = [ia.ts, im.d, Number.isFinite(dNum) ? dNum : null].filter((x) => x != null && Number.isFinite(x));
+      out.push({ key: k, e, numero: num, titre: String(e.title || '').trim() || titreAnnonce[String(k)] || '', enLigne: onlineAnnonceIds.has(String(k)), nVentes: im.n, ca: im.ca,
+        marque: ia.marque || '', taille: ia.taille || String(e.size || ''), dateRef: ds.length ? new Date(Math.min(...ds)).toISOString() : null });
     }
     // Les paires VENDUES d'abord, au CA décroissant : c'est là que le coût
     // manquant fausse vraiment les chiffres. Les annonces en ligne ensuite.
@@ -50164,49 +50306,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // compté deux fois. On sert les lignes dans l'ordre de la liste (les ventes
   // au plus gros CA d'abord), et un achat retenu ne ressort plus.
   const fillBuySugg = useMemo(() => {
-    // ⚠️ 300 paires × ~700 achats = 210 000 comparaisons de titres. C'est LOURD
-    // (mesuré : ~2 s de calcul), et ça ne sert QU'À la modale de saisie en
-    // série. Depuis que la liste des achats est partagée avec le sélecteur 🔗,
-    // ce calcul se déclenchait aussi à chaque clic sur 🔗 — pour un résultat
-    // que personne ne regardait. On le borne à la modale qui l'utilise.
+    // Borné à la modale qui l'utilise (300 paires × ~700 achats, mesuré ~2 s avant).
     if (!fillBuyOpen) return {};
     const achats = fillBuyAchats.items;
     if (!achats || !achats.length) return {};
-    const pris = new Set(linkedBuyIds);
-    // ⚠️ CHAQUE ACHAT ÉPLUCHÉ UNE FOIS (voir `prepAchat`) : 544 fois au lieu de
-    // 156 672. Et plus de plafond à 300 — il a 320 paires, les vingt dernières
-    // n'avaient jamais de suggestion.
-    const prets = [];
-    for (const o of achats) {
-      if (pris.has(String(o.transaction_id))) continue;
-      if (classifyOrderStatus(o.status) === 'cancelled') continue;
-      prets.push({ o, id: String(o.transaction_id), p: prepAchat(o) });
-    }
+    // (6 nov., vague 2 · point 7) UNE RÈGLE DE SUGGESTION : celle de « Relier un achat »
+    // (`suggestionsSaisieSerie` → `suggestionsAchat`, src/suggestionsAchat.js) — marque ET
+    // taille obligatoires, modèle et couleur contradictoires écartés, achat ANTÉRIEUR à
+    // l'article, remboursés écartés, déjà reliés écartés sauf un LOT jusqu'à son nombre.
+    // Avant : le barème `scoreAchatPrep`, où le titre seul suffisait et où un achat
+    // postérieur à l'annonce pouvait être proposé. Rien n'est relié tout seul : SON tap.
+    // `sur` (« C'est ça ») = les trois critères (marque, taille, couleur) ; les autres se replient.
+    const s = suggestionsSaisieSerie({ lignes: fillBuyRows.map((r) => ({ key: r.key, titre: r.titre, marque: r.marque, taille: r.taille, dateRef: r.dateRef })),
+      achats, liens: liensParAchat(numeros, saleOv), marqueDe: extractBrand, couleursDe: extractColors, modeleDe: extractModel, max: 3 });
     const out = {};
-    for (const r of fillBuyRows) {
-      const ref = refAchat({ title: r.e.title, price: r.e.price });
-      // ⚠️ TOUTES les pistes au-dessus du plancher, pas seulement la plus sûre.
-      // Avant : on ne gardait que le meilleur >= 12, sinon rien — donc un blanc
-      // sur 209 paires. Maintenant on garde jusqu'à 3 candidats >= SEUIL_CANDIDAT,
-      // classés par score : le 1er « sûr » (>=12) reste en accent (« C'est ça »),
-      // les suivants « à vérifier » — TOUJOURS avec titre/prix/photo, et c'est
-      // LUI qui confirme (§5 : jamais l'app qui relie toute seule sous 12).
-      // Plus de dédup gloutonne entre paires : rien ne se relie automatiquement,
-      // donc un même achat peut être une piste pour deux paires — dès qu'il est
-      // relié à l'une, `linkedBuyIds` l'écarte de l'autre.
-      const scored = [];
-      for (const c of prets) {
-        if (pris.has(c.id)) continue;
-        const sc = scoreAchatPrep(ref, c.p);
-        if (sc >= SEUIL_CANDIDAT) scored.push({ o: c.o, sc });
-      }
-      if (scored.length) {
-        scored.sort((a, b) => b.sc - a.sc);
-        out[r.key] = scored.slice(0, 3).map(x => ({ o: x.o, sur: x.sc >= SEUIL_SUGGERE }));
-      }
-    }
+    for (const k of Object.keys(s)) out[k] = s[k].map((x) => ({ o: x.achat, sur: x.sur }));
     return out;
-  }, [fillBuyOpen, fillBuyAchats.items, fillBuyRows, linkedBuyIds]);
+    // ⚠️ `liensAchats` est déclaré plus bas (piège TDZ, §4.6) : la table des liens est relue ici.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fillBuyOpen, fillBuyAchats.items, fillBuyRows, numeros, saleOv]);
 
   // ── (3 nov.) LE PRIX D'ACHAT PROPOSÉ, PAR IDENTITÉ (src/prixAchatPropose.js) ──
   // Une vente ou une fiche sans prix d'achat, reliée PAR IDENTITÉ à un achat
@@ -50282,10 +50400,38 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, numeros, saleOv, buyByNum, achatsIdentite, indexRecusAchat, linkedBuyIds, nArticlesTx, lotsDeclares]);
   const propositionVente = (tx) => propositionsPrix.m.get('v:' + tx) || null;
+  // ── (6 nov., vague 2 · point 1) LES VENTES ANNULÉES AVANT L'ENVOI, PAIRE CHEZ LUI ──
+  // src/annuleesChezToi.js : annulée PROUVÉE par la transaction (`txnAnnuleeAvantEnvoi`,
+  // « pas su » ⇒ rien), N° par identité (`effEntry`), compte exclu écarté, annonce de
+  // nouveau chez lui sur Vinted ⇒ rien à remettre, remise faite ⇒ plus dite.
+  const annulChez = useMemo(() => {
+    if (!Array.isArray(sales.items)) return [];
+    const pres = new Set();
+    for (const l of [listings.items, listings.masquees, listings.aConfirmer, listings.brouillons]) if (Array.isArray(l)) for (const it of l) if (it && it.id != null) pres.add(String(it.id));
+    return annuleesChezToi({ ventes: sales.items, annuleeAvantEnvoi: (o) => o.transaction_id != null && txnAnnuleeAvantEnvoi(o.transaction_id),
+      identite: identiteAnnonce, numeroDe: (o) => { const e = effEntry(o); return e && e.numero ? String(e.numero) : ''; }, ecarte: acctOffOf,
+      presente: (id) => pres.has(String(id)), reglees: annuleesReglees, suivis: repubMain, recrees: recreesNum || {}, numeros, reprenable: numeroReprenable, cle: cleNum });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, listings.items, listings.masquees, listings.aConfirmer, listings.brouillons, annuleesReglees, repubMain, recreesNum, numeros, saleOv, txnPret]);
+  const annulChezParTx = useMemo(() => new Map(annulChez.map((x) => [x.tx, x])), [annulChez]);
+  // SON clic : « Republier à la main » accompagné, depuis le coffre (le moteur ne sait pas
+  // recréer une annonce fermée sans la supprimer : VERDICT_REMISE).
+  const remettreEnVente = (x) => { const p = paireARemettre(x, { reprenable: numeroReprenable }); if (p) setRepubMainOuvert(p); };
+  // ── (6 nov., vague 2 · point 4) LES ANNONCES NUMÉROTÉES SANS ACHAT RELIÉ ──
+  // src/achatsARelier.js : en ligne (la liste de la grille), numérotées, ni achat relié
+  // ni prix d'achat connu (`prixAchatDe`) ; « Plus tard » en fin de file et hors du nombre
+  // de Ma journée. Compte exclu écarté (comme la grille).
+  const fileAchat = useMemo(() => (Array.isArray(listings.items)
+    ? fileSansAchat({ annonces: listings.items.filter((it) => it && !acctOffOf(it)), numeros, prixAchat: (e) => { const a = prixAchatDe(e, buyByNum); return a != null && !isNaN(a) ? a : null; }, plusTard: achatPlusTard })
+    : null),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [listings.items, numeros, buyByNum, achatPlusTard]);
   // Ventes et la saisie en série lisent les achats captés (relecture de l'extension
   // seulement, `harvestOnly`) ; les reçus ne partent que s'il y a une proposition.
   useEffect(() => { if (curSub === 'ventes' && accounts.length && !buys.items) chargerAchats(); /* eslint-disable-next-line */ }, [curSub, accounts.length]);
   useEffect(() => { if ((curSub === 'ventes' || fillBuyOpen) && propositionsPrix.m.size && achEmails === undefined) fetchEmailAchats().then(setAchEmails); /* eslint-disable-next-line */ }, [curSub, fillBuyOpen, propositionsPrix.m.size]);
+  // (6 nov., vague 2 · point 4) « Sans achat relié » lit les achats captés et leurs reçus (le prix proposé).
+  useEffect(() => { if (curSub === 'annonces' && annSort === 'sansachat') { if (accounts.length && !fillBuyAchats.items) chargerAchats(); if (achEmails === undefined) fetchEmailAchats().then(setAchEmails); } /* eslint-disable-next-line */ }, [curSub, annSort, accounts.length]);
   const nPropVentes = [...propositionsPrix.m.keys()].filter((c) => c.startsWith('v:')).length;
   const propositionFiche = (k) => propositionsPrix.m.get('f:' + k) || null;
   // SON tap : la même écriture que « Relier un achat » (prix + lien + instantané).
@@ -50325,41 +50471,58 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // reçu s'il tombe juste — `prixAchatPropose` —, sinon le prix de l'achat).
   // Un LOT : le prix de CET article est demandé (jamais deviné, jamais pré-rempli ;
   // le prix du lot ÷ nombre d'articles n'est qu'une indication).
-  const relierAchat = async (a) => {
-    const cible = pickerFor; if (!cible || !a) return;
+  // (6 nov., vague 2) L'ÉCRITURE de « Relier » sortie du sélecteur : la même pour le sélecteur,
+  // la file « Sans achat relié » et la saisie en série (§11). Rend l'écriture, ou null (rien relié).
+  const ecritureRelierAchat = async (a) => {
+    if (!a) return null;
     const accNom = accNameOf(a._acc) || '';
-    let w = null;
     if (lotDe(a).lot || estLotApp(a)) {
       const l = lotDe(a), ind = prixIndicatifLot(a), px = prixPayeAchat(a);
       const saisi = await askText({ title: "Prix d'achat de cet article", desc: ind != null ? `${prixCourt(px)} ÷ ${l.n} ≈ ${prixCourt(ind)}` : (px != null ? `Lot · ${prixCourt(px)}` : ''), numeric: true, value: '', ok: 'Relier', cancel: 'Annuler' });
-      if (saisi == null) return;
-      w = ecritureLot(a, saisi, { accNom, photo: orderPhoto(a) || '' });
-      if (!w) { toast("Montant illisible : rien n'a été relié"); return; }
-    } else {
-      const p = propositionPrixAchat({ identite: { achat: a, par: 'choix' }, ventilationDe: ventilationDeTx });
-      if (!p) { choosePick(a); return; }
-      w = ecritureProposition(p, { accNom, photoDe: orderPhoto });
+      if (saisi == null) return null;
+      const w = ecritureLot(a, saisi, { accNom, photo: orderPhoto(a) || '' });
+      if (!w) { toast("Montant illisible : rien n'a été relié"); return null; }
+      return w;
     }
+    const p = propositionPrixAchat({ identite: { achat: a, par: 'choix' }, ventilationDe: ventilationDeTx });
+    if (p) return ecritureProposition(p, { accNom, photoDe: orderPhoto });
+    // Aucun montant proposé (prix illisible, autre devise) : l'écriture de `choosePick`, telle qu'avant.
+    const price = a.price?.amount!=null ? Number(a.price.amount) : null;
+    return { buyPrice: price!=null?String(price):'', buyFromId: a.transaction_id?String(a.transaction_id):null,
+      buyFrom: { title: a.title||'', date: a.date||'', photo: orderPhoto(a)||'', price, devise: a.price?.currency_code||'EUR', seller: a.seller||a.user_login||'', status: a.status||'', account: accNom } };
+  };
+  const relierAchat = async (a) => {
+    const cible = pickerFor; if (!cible || !a) return;
+    const w = await ecritureRelierAchat(a); if (!w) return;
     if (cible._saleTx) setSaleOverride(cible._saleTx, w); else updatePair(cible, w);
     setPickerFor(null);
   };
-
-  // Relier un achat à une paire depuis la liste (pas depuis le sélecteur) :
-  // même écriture que `choosePick`, instantané compris (§5.36) — sinon le reçu
-  // et la photo de l'achat ne seraient plus affichables sans tout recharger.
-  const linkBuyForKey = (key, p) => {
-    const prix = p.price?.amount != null ? Number(p.price.amount) : null;
-    setNumeros(prev => {
-      const u = { ...prev }; const c = u[key] || {};
-      u[key] = { ...c,
-        buyPrice: prix != null ? String(prix) : '',
-        buyFromId: p.transaction_id ? String(p.transaction_id) : null,
-        buyFrom: { title:p.title||'', date:p.date||'', photo:orderPhoto(p)||'', price:prix,
-                   devise:p.price?.currency_code||'EUR', seller:p.seller||p.user_login||'',
-                   status:p.status||'', account:accNameOf(p._acc)||'' } };
-      save('vinted_annonce_numeros', u); return u;
-    });
+  // (6 nov., vague 2 · point 4) « Relier » depuis la file « Sans achat relié » : SON tap, sur CETTE annonce.
+  const relierAchatAnnonce = async (it, a) => {
+    const w = await ecritureRelierAchat(a); if (!w) return;
+    updatePair(it, w);
+    toast(`Achat relié${w.buyPrice ? ` · ${String(w.buyPrice).replace('.', ',')} €` : ''}`);
   };
+  // « Saisir » : le prix qu'il tape (jamais deviné), sans achat relié — l'écriture de la case de la carte.
+  const saisirPrixAnnonce = async (it) => {
+    const e = numeros[it.id] || {};
+    const t = await askText({ title: "Prix d'achat", desc: `${e.numero ? `N°${e.numero} · ` : ''}${it.title || ''}`, numeric: true, value: '', ok: VERBES.enregistrer, cancel: VERBES.annuler });
+    if (t == null) return;
+    const p = prixAchatSaisi(t);
+    if (p === undefined) return;
+    if (p === null) { toast('Un montant en euros (ex : 25 ou 25,50).'); return; }
+    updatePair(it, { buyPrice: p, buyFromId: null, buyFrom: null });
+  };
+  // Le prix PROPOSÉ d'une suggestion (reçu juste, sinon l'article seul ; jamais pour un lot).
+  const propositionSuggestion = (a) => (a ? propositionPrixAchat({ identite: { achat: a, par: 'suggestion' }, ventilationDe: ventilationDeTx, estLot: estLotPropose }) : null);
+  // La saisie en série relie par la MÊME écriture (un lot demande le prix de CET article).
+  const relierAchatCle = async (key, a) => {
+    const w = await ecritureRelierAchat(a); if (!w) return;
+    setNumeros(prev => { const u = { ...prev, [key]: { ...(prev[key] || {}), ...w } }; save('vinted_annonce_numeros', u); return u; });
+  };
+
+  // (6 nov., vague 2) `linkBuyForKey` (le prix de l'achat tel quel, même pour un LOT) est remplacé
+  // par `relierAchatCle` : l'écriture de « Relier un achat » (reçu juste, prix d'un article de lot saisi).
 
   // ── (4 nov.) ACHATS : FOURNISSEURS · DÉLAI · LOTS (src/achatsSourcing.js, src/AchatsOutils.jsx) ──
   // Les lectures existantes passées aux règles pures ; aucune règle ici. Un achat
@@ -51400,7 +51563,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // « pas lu » pour toujours (banc transporteurs-logos R2, intermittent).
       (() => { const t = transporteurVente(bordParTx[tx] || null); return (t.cle || '') + '|' + (t.nom || '') + '|' + (t.source || ''); })(),
       // (3 nov.) le prix d'achat proposé par identité (src/prixAchatPropose.js)
-      (propositionVente(tx) || {}).centimes ?? null, (propositionVente(tx) || {}).detail || ''];
+      (propositionVente(tx) || {}).centimes ?? null, (propositionVente(tx) || {}).detail || '',
+      // (6 nov., vague 2) la remise en vente d'une vente annulée avant l'envoi (src/annuleesChezToi.js)
+      (() => { const r = annulChezParTx.get(tx); return r ? [r.etat, r.num, r.item].join('|') : ''; })()];
     // L'état de l'article (« Très bon état ») : celui de SON annonce, trouvée par
     // identité (`txnItem`, la transaction), jamais par titre — sinon rien.
     const annonce = txnItem[tx] != null ? lst.find((it) => it && String(it.id) === String(txnItem[tx])) : null;
@@ -52201,6 +52366,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const appliquer=()=>{
       if(only==='annonces' && prendreVue('republier')) setAnnSort('selection');   // (5 nov., chantier C) l'entrée « Republier » mène à « Sélectionner », puis Actions
       if(only==='annonces' && prendreVue('dorment')) setAnnSort('sleeping');
+      // (6 nov., vague 2) Ma journée : « N annonces sans achat relié » et « N ventes annulées avant l'envoi ».
+      if(only==='annonces' && prendreVue('sansachat')) setAnnSort('sansachat');
+      if(only==='ventes' && prendreVue('annulees')) setVFilter('annulees');
       if(only==='messages' && prendreVue('favoris')) setZoneMessages('favoris');
       if(only==='achats' && !modeRetraits && prendreVue('achats')) setAFilter('all');
     };
@@ -53143,6 +53311,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           if (cycleRepondus[c.id]) continue;
           jobs.push({ id: 'supprime-vinted', cycle: c, icon: 'tag', color: C.text, court: `N°${c.numero} supprimé de Vinted`, detail: enArticles(String(c.title || '').slice(0, 80)), title: `N°${c.numero} supprimé de Vinted`, sub: c.title, photos: c.photo ? [c.photo] : null, prio: 0.8 });
         }
+        // (6 nov., vague 2 · point 1) Les ventes annulées AVANT l'envoi (paire chez lui), dites
+        // UNE fois : « Voir » ouvre Ventes · Vinted sur « Annulées », où chaque vente porte son
+        // « Remettre en vente ». Seulement quand ses annonces ont été LUES (une annonce de nouveau
+        // en ligne n'est pas à remettre : pas su ⇒ rien). Neutre : aucun argent ne presse.
+        { const lj = Array.isArray(listings.items) ? ligneAnnuleesJournee(annulChez) : null;
+          if (lj) jobs.push({ id: 'remettre-en-vente', n: lj.n, icon: 'restore', color: C.text, court: lj.court, detail: lj.detail, title: lj.court, photos: lj.photos.length ? lj.photos : null, tab: 'cat_ventes', prio: 2.6, avant: () => demanderVue('annulees') }); }
+        // (6 nov., vague 2 · point 4) Les annonces numérotées sans achat relié : le nombre, une fois ;
+        // « Voir » ouvre Annonces sur « Sans achat relié » (une suggestion par annonce, SON tap relie).
+        { const nR = fileAchat ? aRelierJournee(fileAchat) : 0;
+          if (nR > 0) jobs.push({ id: 'achat-a-relier', n: nR, icon: 'link', color: C.text, court: `${nR} annonce${nR > 1 ? 's' : ''} sans achat relié`, detail: 'Une suggestion par annonce : ton tap relie', title: `${nR} annonce${nR > 1 ? 's' : ''} sans achat relié`, tab: 'cat_annonces', prio: 3.4, avant: () => demanderVue('sansachat') }); }
         jobs.sort((a,b)=>a.prio-b.prio);
         // RÉSULTAT DU JOUR : les paires VENDUES aujourd'hui (pas l'argent viré,
         // qui arrive plusieurs jours après). Source = les emails de vente, la
@@ -54233,6 +54411,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             bordereau » sont grisés pour la même raison : on la dit ici, au-dessus
             de la liste, au lieu de la répéter sous chaque vente. */}
         {nPropVentes > 1 && <div className="vrm-prix-proposes" data-prix-proposes={nPropVentes} style={{display:'flex',justifyContent:'flex-end',margin:'0 0 10px'}}><Bouton variante="secondaire" icone="check" data-prix-proposes-valider="" onClick={()=>validerPropositions([...propositionsPrix.m.keys()].filter(c=>c.startsWith('v:')))}>Valider les {nPropVentes} prix proposés</Bouton></div>}
+        {/* (6 nov., vague 2 · E2 « ce qui reste ») LE PRIX D'ACHAT SE DIT UNE FOIS, EN TÊTE — comme Annonces
+            (chantier C, `data-ann-achats`) : « Prix d'achat N/M connus · Compléter ». Compté sur les ventes
+            affichées qui ont un coût (pas les annulées, ni une autre devise), avec la règle de la ligne
+            (`beneficeLigneVente`). La case « Achat » de chaque ligne passe en gris (plus d'ambre répété). */}
+        {Array.isArray(sales.items) && !sales.error && (()=>{
+          let m = 0, n = 0;
+          for (const o of ventesAffichees) {
+            if (!o || o.transaction_id == null || isHidden(o) || classifyOrderStatus(o.status) === 'cancelled') continue;
+            const dv = o.price?.currency_code; if (dv && dv !== 'EUR') continue;
+            m++; if (beneficeLigneVente(o.price?.amount, effEntry(o), { annulee: false }).achat != null) n++;
+          }
+          if (!m || n >= m) return null;
+          return (
+            <div className="vrm-ann-avis vrm-ventes-avis" data-ventes-avis="">
+              <div className="vrm-ann-achats" data-ventes-achats={`${n}/${m}`} role="status">
+                <span className="vrm-ann-achats-texte"><span className="vrm-ann-achats-nom">Prix d’achat</span><span className="vrm-ann-achats-n">{n}/{m}</span><span className="vrm-ann-achats-sous">connus</span></span>
+                <Bouton variante="discret" data-ventes-achats-completer="" title="Le bénéfice ne compte que les prix d’achat connus" onClick={()=>setFillBuyOpen(true)}>{VERBES.completer}</Bouton>
+              </div>
+            </div>
+          );
+        })()}
         <RaisonBordereauxGrises ventes={ventesAffichees.filter(o=>o && o.transaction_id!=null && !isHidden(o) && classifyOrderStatus(o.status)!=='cancelled' && aExpedier(o) && !isShipDone(o) && !labelsCaptes[String(o.transaction_id)] && !bordParTx[String(o.transaction_id)])}/>
         <div className="vrm-ventes-liste" data-fu-liste="" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden',boxShadow:C.shadow||'none'}}>
           <div className="vrm-ledger-heading" aria-hidden="true"><span>Article</span><span className="vrm-ledger-state-heading">État</span><span>Montant</span></div>
@@ -54287,6 +54486,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const libDepose = num ? `N°${num}` : (o.title || '');
             const gesteCout = coutManque ? <CoutAchatVente surLigne propose={propPrix} onUtiliser={propPrix ? ()=>appliquerProposition('v:'+o.transaction_id, propPrix) : null} onSaisir={p=>setSaleOverride(o.transaction_id,{buyPrice:p})}
                   onRelier={()=>{ const idf = identiteAnnonce(o); openPicker(idf ? { id: idf, title: o.title, photo: photo, price: sell, _acc: o._acc, _dateRef: o.date } : { id: '_v'+o.transaction_id, _saleTx: String(o.transaction_id), title: o.title, photo: photo, price: sell, _acc: o._acc, _dateRef: o.date }); }}/> : null;
+            // (6 nov., vague 2 · point 1) Vente annulée AVANT l'envoi, paire chez lui : « Remettre en
+            // vente » (SON clic → « Republier à la main » depuis le coffre, src/annuleesChezToi.js).
+            const annChez = annulChezParTx.get(txL) || null;
+            const gesteRemise = annChez ? <div className="vrm-remise-ligne" data-remise-vente={txL} data-remise-etat={annChez.etat} data-remise-num={annChez.sansNum ? 'sans' : annChez.archive ? 'archive' : 'garde'}>
+                {annChez.item ? <Bouton variante="secondaire" icone="sync" data-remettre-vente={txL} onClick={()=>remettreEnVente(annChez)}>{annChez.etat === 'en-cours' ? 'Reprendre la remise en vente' : 'Remettre en vente'}</Bouton> : null}
+                {annChez.sansNum ? <span className="vrm-remise-note" data-remise-sans-num="">Paire pas reliée</span> : !annChez.item ? <span className="vrm-remise-note">Annonce pas identifiée</span> : null}
+              </div> : null;
             const gesteDepose = peutDeposer ? <Bouton variante="secondaire" icone="check" className="vrm-depose-bouton" data-depose-vente={txL} data-sans-glisse="" disabled={deposeIci} aria-label={`Marquer ${libDepose || 'ce colis'} déposé`} onClick={()=>demanderDepose(txL, o, libDepose)}>Déposé</Bouton> : null;
             // ── (1er nov.) LE RÉCAPITULATIF DE LA VENTE — maquette A, « fiche en lignes nettes »
             // (Julien : « applique tout, je veux que ce soit clair »). De haut en bas : la paire
@@ -54326,6 +54532,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // du stock, sa case est vidée, son N° n'est jamais redonné (§5).
               // `k` marque une ancienne paire (N° B…) qui prendra un numéro neuf.
               const issue = (() => {
+                // (6 nov., vague 2 · point 1) Annulée AVANT l'envoi (prouvé par la transaction) : la paire
+                // n'est jamais partie, elle est chez lui — le geste est « Remettre en vente ».
+                if (annChez) return { k: annChez.archive ? 'remise-archive' : 'remise', t: annChez.sansNum ? 'La paire n’est jamais partie : elle est chez toi. Paire pas reliée (cette vente n’a pas de N°).' : annChez.archive ? `La paire n’est jamais partie : elle est chez toi. Le N°${num} est un ancien numéro : remise en vente, elle en prendra un neuf.` : `La paire n’est jamais partie : elle est chez toi. Remise en vente, elle garde le N°${num}.` };
                 if (!(st === 'cancelled' && num)) return null;
                 const out = saleOutcome(o); const arch = !numeroReprenable(num);
                 if (isPairLost(num)) return { t: `N°${num} déclarée perdue : elle est sortie du stock et sa case au garage est vidée. Son numéro n'est jamais redonné à une autre paire.` };
@@ -54390,7 +54599,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {lienVinted ? <Bouton variante="secondaire" href={lienVinted} target="_blank" rel="noreferrer" data-recap-vinted="">Voir sur Vinted ↗</Bouton> : null}
                     {num && aExpedier(o) && !hidden && inGarage(num) ? <Bouton variante="secondaire" icone="pin" onClick={()=>{fermer();onLocate&&onLocate(num);}} aria-label="Voir au stock">Voir au stock</Bouton> : null}
                     {isLotTitle(o.title) ? <Bouton variante="secondaire" icone="box" onClick={async(ev)=>{ lotOrigineRef.current = ev.currentTarget; setLotView({loading:true,order:o,items:[]}); const items=await fetchLotItems(o._acc,o.transaction_id); setLotView({loading:false,order:o,items}); }} title="Voir les paires du lot" aria-label="Voir les paires du lot">Voir le lot</Bouton> : null}
-                    {st==='cancelled' && num && saleOutcome(o)==='rembourse' && !isPairLost(num) ? <Bouton variante="secondaire" onClick={()=>markPairLost(num,o)} title={`Tu as remboursé l'acheteur. Si l'article ne revient PAS, déclare-le perdu : le N°${num} sera libéré et sa case au garage vidée.`} aria-label="Déclarer l'article perdu">Article perdu ?</Bouton> : null}
+                    {annChez && annChez.item ? <Bouton variante="secondaire" icone="sync" data-recap-remettre={txL} onClick={()=>{ fermer(); remettreEnVente(annChez); }}>{annChez.etat === 'en-cours' ? 'Reprendre la remise en vente' : 'Remettre en vente'}</Bouton> : null}
+                    {annChez ? <Bouton variante="discret" data-recap-remise-faite={txL} title="Tu l’as déjà remise en vente toi-même : VRM ne le redit plus" onClick={()=>{ poserAnnuleeReglee(txL); toast('Noté : VRM ne la propose plus'); }}>Déjà remise en vente</Bouton> : null}
+                    {!annChez && st==='cancelled' && num && saleOutcome(o)==='rembourse' && !isPairLost(num) ? <Bouton variante="secondaire" onClick={()=>markPairLost(num,o)} title={`Tu as remboursé l'acheteur. Si l'article ne revient PAS, déclare-le perdu : le N°${num} sera libéré et sa case au garage vidée.`} aria-label="Déclarer l'article perdu">Article perdu ?</Bouton> : null}
                     {num && isPairLost(num) ? <Bouton variante="discret" onClick={()=>unmarkPairLost(num)} title={`Annuler : l'article N°${num} est finalement revenu.`} aria-label="Annuler article perdu">Il est revenu</Bouton> : null}
                   </div>
                   {(o._fromEmail ? o._txMail : o.transaction_id != null) ? <FactureVente deps={DEPS_FACTURE} vente={{ tx: String(o._fromEmail ? o._txMail : o.transaction_id), uid: o._acc && o._acc.vinted_user_id, compte: o._acc && o._acc.login, titre: o.title || '', centimes: sell != null && !autreDevise ? Math.round(sell * 100) : null, venteLe: o.date || '' }}/> : null}
@@ -54438,7 +54649,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       : <BoutonBordereau grand uid={o._acc && o._acc.vinted_user_id} tx={txL} conv={o.conversation_id} login={accNameOf(o._acc)} aGenerer pdf={false} onFait={(u)=>actionsVentesProxy.rechargerLabels(u)}/>}
                   </div>
                   {gesteDepose ? <div className="vrm-fu-apres" data-sans-glisse="">{gesteDepose}</div> : null}
-                </> : null} gestes={gesteCout ? <div className="vrm-gestes-pile">{gesteCout}</div> : null} compte={o._acc ? (accNameOf(o._acc) || null) : null} sous={o.date?dateFr(o.date, {day:'numeric',month:'short'}):''} etat={motEtatVente(venteStage(o).label)} ton={st!=='cancelled' && aExpedier(o) && !isShipDone(o) ? 'action' : (st==='cancelled' ? 'annule' : '')} montant={montant(sell, { devise: o.price?.currency_code || 'EUR' })} className="vrm-sale-row" key={o.transaction_id} data-tx={String(o.transaction_id)} data-cible={attrCible(['vente',String(o.transaction_id)])} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null),...(gp.style||{})}}>
+                </> : null} gestes={gesteCout || gesteRemise ? <div className="vrm-gestes-pile">{gesteCout}{gesteRemise}</div> : null} compte={o._acc ? (accNameOf(o._acc) || null) : null} sous={o.date?dateFr(o.date, {day:'numeric',month:'short'}):''} etat={motEtatVente(venteStage(o).label)} ton={st!=='cancelled' && aExpedier(o) && !isShipDone(o) ? 'action' : (st==='cancelled' ? 'annule' : '')} montant={montant(sell, { devise: o.price?.currency_code || 'EUR' })} className="vrm-sale-row" key={o.transaction_id} data-tx={String(o.transaction_id)} data-cible={attrCible(['vente',String(o.transaction_id)])} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'&&!annChez?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null),...(gp.style||{})}}>
               </LigneVenteCompacte>
               )}</GlisserVente>
             );
@@ -56262,13 +56473,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           {/* (4 nov.) Les annonces masquées par Vinted, compte par compte (toujours chez toi, pas « en ligne »). */}
           {(annMasquees.length>0 || annSort==='masquees') && <button type="button" data-vue-masquees={annMasquees.length} aria-pressed={annSort==='masquees'} onClick={()=>setAnnSort('masquees')}>Masquées<span className="vrm-of-n">{annMasquees.length}</span></button>}
           <button type="button" aria-pressed={annSort==='nonum'} onClick={()=>setAnnSort('nonum')}>Sans numéro{annStats.sansNum>0 ? <span className="vrm-of-n">{annStats.sansNum}</span> : null}</button>
+          {/* (6 nov., vague 2 · point 4) Les annonces numérotées dont l'achat n'est pas relié (src/achatsARelier.js). */}
+          {((fileAchat && fileAchat.length > 0) || annSort==='sansachat') && <button type="button" data-vue-sans-achat={fileAchat ? fileAchat.length : ''} aria-pressed={annSort==='sansachat'} onClick={()=>setAnnSort('sansachat')}>Sans achat relié{fileAchat && fileAchat.length ? <span className="vrm-of-n">{fileAchat.length}</span> : null}</button>}
           {annStats.sleeping>0 && <button type="button" aria-pressed={annSort==='sleeping'} onClick={()=>setAnnSort('sleeping')}>À relancer</button>}
         </div>}
         {/* (5 nov., chantier C — revue 2.9) « sélection » ne nomme plus que les cases cochées :
             le filtre dit « affichées ». Dans les vues à cocher (Sélectionner, Brouillons), leur
             propre tête dit déjà quoi faire : pas de ligne de filtre en plus. */}
         {(annSearch.trim() || annSort!=='oldest') && annSort!=='selection' && annSort!=='brouillons' && <div className="vrm-filter-recap" role="status" data-ann-filtre="">
-          <span>{(()=>{ const k = annSort==='masquees' ? annMasquees.length : annShown.length; return `${k} annonce${k>1?'s':''} affichée${k>1?'s':''}`; })()}</span>
+          <span>{(()=>{ const k = annSort==='masquees' ? annMasquees.length : annSort==='sansachat' ? (fileAchat ? fileAchat.length : 0) : annShown.length; return `${k} annonce${k>1?'s':''} affichée${k>1?'s':''}`; })()}</span>
           <button type="button" onClick={()=>{setAnnSearch('');setAnnSort('oldest');}}>Tout afficher</button>
         </div>}
 
@@ -56417,7 +56630,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           {(()=>{
             const m = annBase.length;
             const n = m ? annBase.filter(it=>{ const a = prixAchatDe(numeros[it.id]||{}, buyByNum); return a!=null && !isNaN(a); }).length : 0;
-            const vuePrix = !['selection','brouillons','masquees','sleeping'].includes(annSort);
+            const vuePrix = !['selection','brouillons','masquees','sleeping','sansachat'].includes(annSort);   // (6 nov.) « Sans achat relié » dit déjà sa file
             const prixManque = vuePrix && m > 0 && n < m;
             const nN = numerosNeufs.length;
             if (!prixManque && !nN) return null;
@@ -56475,6 +56688,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             charge={listings.items==null && listings.loading} brLecture={brVinted.liste==null}
             onActions={()=>setActionsSelOpen(true)} suivis={suivisMainVisibles} onSuivi={(a)=>setRepubMainOuvert(a)}
             onDetailBrouillons={()=>setBrouillonsOpen(true)}/>
+        ) : annSort==='sansachat' ? (
+          <AchatsARelier file={fileAchat} achats={fillBuyAchats.loading && !fillBuyAchats.items ? undefined : (fillBuyAchats.items || (accounts.length ? undefined : []))} liens={liensAchats}
+            propositionDe={propositionSuggestion} onRelier={relierAchatAnnonce} onSaisir={saisirPrixAnnonce} onPlusTard={poserAchatPlusTard}
+            onChoisir={(it)=>openPicker({ ...it, _dateRef: (()=>{ const t=Number(it.createdTs); return Number.isFinite(t)&&t>0 ? new Date(t<1e12?t*1000:t).toISOString() : null; })() })} compteDe={(a)=>a&&a._acc?accNameOf(a._acc):''}/>
         ) : annSort==='masquees' ? (
           <AnnoncesMasquees Photo={PhotoVinted} res={listings.masquees==null ? (listings.loading ? undefined : null) : masqueesParCompte(annMasquees, { numeroDe:(id)=>(numeros[id]||{}).numero||'', nomDe:(a)=>a?accNameOf(a):'' })}/>
         ) : annSort==='sleeping' ? (
@@ -59372,7 +59589,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                          const pr=p.price?.amount!=null?Number(p.price.amount):null;
                          const d=p.date?new Date(p.date):null;
                          return (
-                           <button key={ci} type="button" onClick={()=>linkBuyForKey(r.key,p)}
+                           <button key={ci} type="button" data-fillbuy-piste={String(p.transaction_id)} data-fillbuy-sur={sur?'1':'0'} onClick={()=>relierAchatCle(r.key,p)}
                              style={{width:'100%',display:'flex',alignItems:'center',gap:8,border:`1px solid ${sur?C.accent+'55':C.border}`,background:sur?`${C.accent}10`:C.card,borderRadius:12,padding:'6px 8px',cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
                              {orderPhoto(p)
                                ? <PhotoVinted src={orderPhoto(p)} alt="" loading="lazy" decoding="async" style={{width:26,height:26,borderRadius:6,objectFit:'cover',flexShrink:0}}/>
@@ -60378,20 +60595,40 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         return <ActionsSelectionFeuille choisies={choisies} actions={actions} onClose={()=>setActionsSelOpen(false)}
           onLancer={(k)=>{ setActionsSelOpen(false);
             if (k==='main') { const a=choisies[0]; if (a) { setRepubMainOuvert(a); } return; }
+            if (k==='mini') { setMiniSel(choisies); return; }
             setRepubReprise(choisies.map(a=>a.id)); setRepubDepart(true); setRepubCle(c=>c+1); setRepubAction(k); }}/>;
       })()}
+      {miniSel && (
+        // (6 nov., vague 2 · point 2) « Prix mini… » : la confirmation liste N° · prix · mini, puis
+        // l'écriture par le chemin de la carte (`updatePair` … `min`/`refuse`), annonce par annonce.
+        <PrixMiniFeuille choisies={miniSel} onClose={()=>setMiniSel(null)} onPoser={async (lignes, { avecRefus })=>{
+          const ok = await askConfirm({ title: `Poser ${lignes.length} prix mini ?`, desc: lignes.map((l)=>`${l.numero ? 'N°'+l.numero : 'Sans N°'} · ${montant(l.prix)} → mini ${montant(l.mini)}${avecRefus && l.refuse != null ? ` · refus sous ${montant(l.refuse)}` : ''}${l.sousAchat ? ' · sous ton prix d’achat' : ''}`).join('\n'), ok: 'Poser', cancel: 'Annuler' });
+          if (!ok) return;
+          const idx = new Map((listings.items||[]).map((it)=>[String(it.id), it]));
+          let n = 0;
+          for (const l of lignes) { const it = idx.get(String(l.id)); const w = ecritureMini(l, { avecRefus }); if (it && w) { updatePair(it, w); n++; } }
+          setMiniSel(null);
+          toast(n === lignes.length ? `${n} prix mini posé${n>1?'s':''}` : `${n} prix mini posé${n>1?'s':''} · ${lignes.length - n} annonce${lignes.length - n > 1 ? 's' : ''} plus en ligne : rien posé`);
+        }}/>
+      )}
       {repubMainOuvert && (()=>{
         const p = repubMainOuvert; const s = repubMain[String(p.ancienId||p.id)] || null;
-        const paire = p.ancienId ? { id:String(p.ancienId), uid:String(p.uid||''), numero:String(p.num||''), titre:p.titre||'', compte:(()=>{ const a=(accounts||[]).find(x=>String(x.vinted_user_id)===String(p.uid)); return a?accNameOf(a):`compte ${p.uid}`; })(), domain:p.domain||'www.vinted.fr', prix:p.prix??null, photo:p.photo||'' } : p;
+        // (6 nov., vague 2 · point 1) Une vente ANNULÉE avant l'envoi (`annulee`) : l'ancienne
+        // annonce est fermée chez Vinted (rien à supprimer) ; `numAffiche` = le N° de la vente,
+        // `numero` = celui qui se reprend (vide pour un N° d'archive : un neuf viendra).
+        const paire = p.ancienId ? { id:String(p.ancienId), uid:String(p.uid||''), numero:String(p.num||''), titre:p.titre||'', compte:(()=>{ const a=(accounts||[]).find(x=>String(x.vinted_user_id)===String(p.uid)); return a?accNameOf(a):`compte ${p.uid}`; })(), domain:p.domain||'www.vinted.fr', prix:p.prix??null, photo:p.photo||'',
+          ...(p.annulee ? { annulee:true, tx:String(p.tx||''), numAffiche:String(p.numAffiche||''), archive:!!p.archive } : {}) } : p;
         const enLigneMap = (listings.items||[]).map(it=>{ const pr=(it.price&&typeof it.price==='object')?it.price.amount:it.price; const n=Number(String(pr==null?'':pr).replace(',','.')); const e=numeros[it.id]||{};
           return { id:String(it.id), uid:String((it._acc&&it._acc.vinted_user_id)||''), titre:it.title||'', prix:isFinite(n)&&n>0?n:null, photo:it.photo||'', createdTs:it.createdTs||null, numero:e.numero?String(e.numero):'' }; });
         const cands = candidatsNouvelle({ ancienId:paire.id, uid:paire.uid, enLigne:enLigneMap, numeros, suivis:repubMain, recrees:recreesNum||{}, debut: s && s.at ? Date.parse(s.at) : 0 });
-        const etatS = etatSuiviMain(s, { numeros, cle: cleNum });
-        const debut = ()=>{ if (!s && paire.numero) poserRepubMain(paire.id, { uid:paire.uid, num:paire.numero||'', titre:paire.titre||'', domain:paire.domain, at:new Date().toISOString() }); };
+        // Une remise en vente se suit même sans N° à reprendre : désigner la nouvelle la clôt.
+        const etatS = paire.annulee ? ({ 'a-remettre':'attente', 'en-cours': s && s.nouvelId ? 'lie' : 'attente', fait:'fait' })[etatRemise(s, { num:paire.numero, reprenable:numeroReprenable, numeros, cle:cleNum })] : etatSuiviMain(s, { numeros, cle: cleNum });
+        const marque = paire.annulee ? { annulee:true, tx:paire.tx } : {};
+        const debut = ()=>{ if (!s && (paire.numero || paire.annulee)) poserRepubMain(paire.id, { uid:paire.uid, num:paire.numero||'', titre:paire.titre||'', domain:paire.domain, at:new Date().toISOString(), ...marque }); };
         return <RepublierALaMain paire={paire} suivi={s} candidats={cands} etatSuivi={etatS} onDebut={debut} onClose={()=>setRepubMainOuvert(null)} onRelire={()=>loadListings(true)}
           onDelier={()=>poserRepubMain(paire.id, { nouvelId:null, nouveauTitre:null, lieAt:null })}
           onLier={async (c)=>{ const ok = await askConfirm({ title:'C’est bien la même paire ?', desc:`« ${c.titre||'Sans titre'} » est la nouvelle annonce de « ${paire.titre||'l’ancienne'} ».${paire.numero?`\nLe N°${paire.numero} passera dessus dès que l’ancienne ne sera plus du tout sur Vinted.`:''}`, ok:'Oui, c’est elle' });
-            if (!ok) return; if (!s) debut(); poserRepubMain(paire.id, { uid:paire.uid, num:paire.numero||'', titre:paire.titre||'', nouvelId:String(c.id), nouveauTitre:c.titre||'', lieAt:new Date().toISOString(), ...(s?{}:{ at:new Date().toISOString() }) }); }}/>;
+            if (!ok) return; if (!s) debut(); poserRepubMain(paire.id, { uid:paire.uid, num:paire.numero||'', titre:paire.titre||'', nouvelId:String(c.id), nouveauTitre:c.titre||'', lieAt:new Date().toISOString(), ...marque, ...(s?{}:{ at:new Date().toISOString() }) }); }}/>;
       })()}
       {brouillonsOpen && (
         <BrouillonsVinted br={brVinted} brouillonOk={extSait('brouillon')==='ok'} onClose={()=>setBrouillonsOpen(false)} onFile={()=>{ setBrouillonsOpen(false); setRepubAction('enLigne'); }}

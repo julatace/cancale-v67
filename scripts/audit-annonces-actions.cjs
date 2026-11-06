@@ -81,7 +81,15 @@ async function auditer(sources) {
   const L = (selection, chrome = '111', capOk = caps) => parK(R.actionsPossibles({ selection, chrome, capOk, nomCompte: nom }));
   { const a = L([]); dit(Object.values(a).every((x) => !x.ok && x.raison), 'B1 rien de coché ⇒ toutes grisées, avec une raison'); }
   { const a = L([{ id: '1', uid: '111', etat: 'en-ligne' }, { id: '2', uid: '222', etat: 'en-ligne' }]);
-    dit(Object.values(a).every((x) => !x.ok && /2 comptes/.test(x.raison) && /compte_a/.test(x.raison) && /compte_b/.test(x.raison)), 'B2 deux comptes mélangés ⇒ aucune action, les comptes nommés', a.recreer.raison); }
+    // (6 nov., vague 2) « Prix mini… » (`multiComptes`) n'agit pas au nom d'un compte : une écriture
+    // dans ses fiches. Toutes les AUTRES actions restent bloquées par le mélange des comptes.
+    const parCompte = Object.values(a).filter((x) => x.k !== 'mini');
+    dit(parCompte.length >= 5 && parCompte.every((x) => !x.ok && /2 comptes/.test(x.raison) && /compte_a/.test(x.raison) && /compte_b/.test(x.raison)), 'B2 deux comptes mélangés ⇒ aucune action qui agit au nom d’un compte, les comptes nommés', a.recreer.raison);
+    dit(a.mini && a.mini.ok && a.mini.robot === false, 'B16 « Prix mini… » sur deux comptes ⇒ possible (rien ne part chez Vinted, aucun robot)', a.mini && a.mini.raison); }
+  { const a = L([{ id: '5', uid: '111', etat: 'brouillon' }]);
+    dit(a.mini && !a.mini.ok && /en ligne/.test(a.mini.raison), 'B17 « Prix mini… » sur un brouillon ⇒ grisé (une offre n’arrive que sur une annonce en ligne), raison dite', a.mini && a.mini.raison);
+    const sel = R.ACTIONS_SELECTION.filter((A) => A.multiComptes);
+    dit(sel.length === 1 && sel[0].k === 'mini' && sel[0].robot === false && sel[0].lien === true && !R.ACTIONS_TUILES.includes('mini'), 'B18 seul « Prix mini… » ignore le compte : non robot, un lien sous les tuiles', JSON.stringify(sel.map((A) => A.k))); }
   { const a = L([{ id: '1', uid: '111', etat: 'en-ligne' }, { id: '3', uid: '111', etat: 'en-ligne' }]);
     dit(a.recreer.ok && a.modifier.ok && a.versBrouillon.ok, 'B3 en ligne, compte de Chrome ⇒ republier, modifier, en ligne → brouillon possibles');
     dit(!a.enLigne.ok && /en ligne/.test(a.enLigne.raison), 'B4 « brouillon → en ligne » grisé sur des annonces en ligne, raison dite', a.enLigne.raison);
@@ -102,7 +110,7 @@ async function auditer(sources) {
     dit(!b.recreer.ok && /Aucun compte/.test(b.recreer.raison), 'B13 aucun compte ouvert dans Chrome ⇒ le geste est dit', b.recreer.raison); }
   { const a = L([{ id: '1', uid: '111', etat: 'en-ligne' }], '111', (c) => c !== 'recreer');
     dit(!a.recreer.ok && /extension/.test(a.recreer.raison) && a.modifier.ok, 'B14 extension trop ancienne pour une action ⇒ elle seule est grisée'); }
-  { const a = L([{ id: '1', uid: '', etat: 'en-ligne' }]); dit(Object.values(a).every((x) => !x.ok), 'B15 compte inconnu ⇒ rien'); }
+  { const a = L([{ id: '1', uid: '', etat: 'en-ligne' }]); dit(Object.values(a).filter((x) => x.k !== 'mini').every((x) => !x.ok), 'B15 compte inconnu ⇒ rien qui agisse au nom d’un compte'); }
   // ── C ──
   dit(JSON.stringify(R.liensRepubMain({ 10000001: { nouvelId: '10000009' }, 10000002: {}, abc: { nouvelId: '1' }, 10000003: { nouvelId: '10000003' } })) === JSON.stringify({ 10000009: '10000001' }), 'C1 seuls les liens qu’il a posés comptent (identifiants valides, jamais elle-même)');
   {
