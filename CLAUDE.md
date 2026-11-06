@@ -506,6 +506,7 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 
+- **6 nov. · Recherche par photo (v36)** : appareil photo dans la loupe et le Stock ; empreinte locale SANS modèle (`src/empreintePhoto.js` : couleur sans le fond + balance des blancs, grille, bords, hachages), index sur l'appareil par URL exacte, octets par `chargerPhotoBoite` ; 5 propositions « très proche / proche / peu sûr », SON clic ouvre « Tout sur le N° », rien relié ; mesure 3D inventée top 5 100 %, top 1 82,5 %. `docs/passation/2026-11-06-recherche-photo.md`. Geste : l'essayer dans le navigateur de l'extension.
 - **6 nov. · Stream (v36)** : bouton « Stream » au choix (Réglages → Mode stream, éteint ; sinon l'œil des montants, qui revient) ; photos d'article floutées par la règle du texte (`photoACacherSelon`), « toutes » au choix. `docs/passation/2026-11-06-stream-photos.md`. Geste : cocher le bouton s'il le veut.
 
 - **6 nov. · Signaler + /etat** : « Signaler un problème » (Paramètres → Besoin d'aide, garde-fou d'écran ; `SignalerProbleme` réutilisable) : aperçu = ce qui part (une règle, `api/_lib/signalement.js`), rangé chez le propriétaire de l'installation, 5/h/compte tenu par la base, push regroupé > 3/h, « Signalements reçus » + Traité (lui seul) ; page publique `vrm.center/etat` (`public/etat.*`, `/api/sante` → `etat`, 30 s). `docs/passation/2026-11-06-signaler-etat.md`. Geste : s'envoyer un essai, ouvrir /etat.

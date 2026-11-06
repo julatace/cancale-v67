@@ -114,7 +114,11 @@ async function rendre(b, { tel, images, refus = new Set() }) {
   const ctx = await b.newContext({ viewport: tel ? { width: 390, height: 844 } : { width: 1512, height: 950 }, ...(tel ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
-  const req = []; pg.on('request', (r) => { try { const u = new URL(r.url()); req.push({ hote: u.host, chemin: u.pathname + (u.search || ''), methode: r.method(), type: r.resourceType() }); } catch (_) {} });
+  if (process.env.BANC_DEBUG) pg.on('console', (m) => console.log('   [console] ' + m.type() + ' ' + m.text().slice(0, 200)));
+  // Chaque requête : l'hôte, le chemin, la méthode ; pour une ÉCRITURE en base, ce
+  // qu'elle écrit (les identifiants de lignes et les clés de `main` touchées).
+  const ecrit = (r) => { if (r.method() === 'GET' || !/\/rest\/v1\//.test(r.url())) return undefined; try { const d = JSON.parse(r.postData() || 'null'); const l = Array.isArray(d) ? d : [d]; return l.filter(Boolean).map((x) => String(x.id || '?') + (x.data && typeof x.data === 'object' ? '{' + Object.keys(x.data).slice(0, 8).join(',') + '}' : '')); } catch (_) { return ['?']; } };
+  const req = []; pg.on('request', (r) => { try { const u = new URL(r.url()); req.push({ hote: u.host, chemin: u.pathname + (u.search || ''), methode: r.method(), type: r.resourceType(), ecrit: ecrit(r) }); } catch (_) {} });
   const photosRoute = { n: 0 };
   // Tout ce qui sort vers un hôte inconnu est COUPÉ (et compté par `req`).
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
@@ -150,13 +154,15 @@ async function rendre(b, { tel, images, refus = new Set() }) {
   await pg.waitForTimeout(1500);
   return { ctx, pg, errs, req, photosRoute };
 }
+// Une capture à REGARDER (§6.2) : un échec est dit, il n'arrête pas le scénario.
+const capture = async (pg, nom) => { if (!SHOTS) return; try { await pg.screenshot({ path: path.join(SHOTS, nom), timeout: 60000, animations: 'disabled' }); } catch (e) { dit(false, 'capture ' + nom, String(e && e.message).split('\n')[0].slice(0, 120)); } };
 const toucher = async (pg, tel, sel) => { if (tel) await pg.tap(sel); else await pg.click(sel); };
 const etatFeuille = (pg) => pg.evaluate(() => {
   const f = document.querySelector('[data-recherche-photo]');
   if (!f) return null;
   const lignes = [...f.querySelectorAll('[data-rp-resultat]')].map((el) => {
     const img = el.querySelector('img'); const r = el.getBoundingClientRect();
-    return { cle: el.getAttribute('data-rp-resultat'), rang: el.getAttribute('data-rp-rang'), niveau: el.getAttribute('data-rp-niveau'), num: el.getAttribute('data-rp-num'), mot: (el.querySelector('[data-rp-mot]') || {}).textContent || '', etat: (el.querySelector('[data-rp-etat-annonce]') || {}).textContent || '', h: Math.round(r.height), w: Math.round(r.width), photo: !!(img && img.complete && img.naturalWidth > 0) };
+    return { score: el.getAttribute('data-rp-score'), cle: el.getAttribute('data-rp-resultat'), rang: el.getAttribute('data-rp-rang'), niveau: el.getAttribute('data-rp-niveau'), num: el.getAttribute('data-rp-num'), mot: (el.querySelector('[data-rp-mot]') || {}).textContent || '', etat: (el.querySelector('[data-rp-etat-annonce]') || {}).textContent || '', h: Math.round(r.height), w: Math.round(r.width), photo: !!(img && img.complete && img.naturalWidth > 0) };
   });
   const bilan = f.querySelector('[data-rp-bilan]');
   return { etat: f.getAttribute('data-rp-etat'), lignes, indexees: bilan && bilan.getAttribute('data-rp-indexees'), illisibles: bilan && bilan.getAttribute('data-rp-illisibles'), texte: (f.innerText || '').replace(/\s+/g, ' ').slice(0, 900), fw: Math.round(f.getBoundingClientRect().width), sw: f.scrollWidth, cw: f.clientWidth };
@@ -164,7 +170,7 @@ const etatFeuille = (pg) => pg.evaluate(() => {
 // « Prendre la photo » : un fichier posé dans le champ de l'appareil photo.
 const photographier = async (pg, b64, nom = 'paire.jpg') => {
   await pg.setInputFiles('[data-rp-fichier="camera"]', { name: nom, mimeType: 'image/jpeg', buffer: Buffer.from(b64, 'base64') });
-  await pg.waitForFunction(() => { const f = document.querySelector('[data-recherche-photo]'); const e = f && f.getAttribute('data-rp-etat'); return e && e !== 'calcul' && e !== 'attente'; }, null, { timeout: 60000 }).catch(() => {});
+  await pg.waitForFunction(() => { const f = document.querySelector('[data-recherche-photo]'); const e = f && f.getAttribute('data-rp-etat'); return e && e !== 'calcul' && e !== 'attente'; }, null, { timeout: Number(process.env.BANC_ATTENTE) || 60000 }).catch(() => {});
 };
 const ouvrirDepuisLoupe = async (pg, tel) => {
   if (tel) { await pg.tap('[data-recherche-loupe]'); await pg.waitForSelector('.vrm-hdr-recherche [data-recherche-photo-ouvrir]', { timeout: 8000 }); await pg.tap('.vrm-hdr-recherche [data-recherche-photo-ouvrir]'); }
@@ -202,9 +208,10 @@ const ouvrirDepuisLoupe = async (pg, tel) => {
         await photographier(pg, q13);
         await pg.waitForTimeout(600);
         f = await etatFeuille(pg);
+        if (process.env.BANC_DEBUG) console.log(JSON.stringify(req.slice(avant).map((r) => r.methode + ' ' + r.hote + r.chemin.slice(0, 120))));
         const L = (f && f.lignes) || [];
         dit(!!f && f.etat === 'resultats' && L.length >= 1 && L.length <= 5, `${T} B. des propositions (5 au plus)`, f && `${f.etat} · ${L.length}`);
-        dit(L[0] && L[0].num === '13', `${T} B. la N°13 photographiée à la main est EN TÊTE`, JSON.stringify(L.map((x) => x.num + ':' + x.niveau)));
+        dit(L[0] && L[0].num === '13', `${T} B. la N°13 photographiée à la main est EN TÊTE`, JSON.stringify(L.map((x) => x.num + ':' + x.niveau + ':' + x.score)));
         dit(L.length && L.every((x) => x.photo), `${T} B. chaque proposition montre sa photo`, JSON.stringify(L.map((x) => x.photo)));
         dit(L.length && L.every((x) => /^(Très proche|Proche|Peu sûr)$/.test(x.mot.trim())), `${T} B. chaque proposition dit un mot de ressemblance (jamais « c'est elle »)`, JSON.stringify(L.map((x) => x.mot)));
         dit(!/c['’]est elle\s*[.!]?$/im.test(L.map((x) => x.mot).join('\n')), `${T} B. aucun « c'est elle »`);
@@ -214,7 +221,7 @@ const ouvrirDepuisLoupe = async (pg, tel) => {
         dit(f && f.indexees === '8' && f.illisibles === '0', `${T} B. 8 photos d'annonces comparées, aucune pas lue`, f && `${f.indexees}/${f.illisibles}`);
         const lSans = L.find((x) => x.cle === '7018');
         if (lSans) dit(lSans.num === '' , `${T} B. l'annonce sans N° est dite « Sans N° »`);
-        if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `recherche-photo-${tel ? 390 : 1512}.png`) });
+        await capture(pg, `recherche-photo-${tel ? 390 : 1512}.png`);
         // E. Aucune requête vers un tiers pendant la recherche.
         const pendant = req.slice(avant);
         const app = (h) => /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(h);
@@ -239,19 +246,25 @@ const ouvrirDepuisLoupe = async (pg, tel) => {
         const L2 = (f && f.lignes) || [];
         dit(photosRoute.n === n1, `${T} F. 2e recherche : aucune photo relue (index gardé sur l'appareil)`, `${photosRoute.n - n1} relue(s)`);
         // C. Même titre, deux paires.
-        dit(L2[0] && L2[0].num === '15', `${T} C. la photo de la N°15 la met en tête (la N°14 a le même titre)`, JSON.stringify(L2.map((x) => x.num + ':' + x.niveau)));
+        dit(L2[0] && L2[0].num === '15', `${T} C. la photo de la N°15 la met en tête (la N°14 a le même titre)`, JSON.stringify(L2.map((x) => x.num + ':' + x.niveau + ':' + x.score)));
         const l14 = L2.find((x) => x.num === '14');
         dit(!l14 || (l14.cle === '7014' && l14.cle !== L2[0].cle), `${T} C. la N°14, si proposée, est une AUTRE ligne avec SON N°`, l14 ? JSON.stringify(l14) : 'pas proposée');
         dit(new Set(L2.map((x) => x.cle)).size === L2.length, `${T} C. chaque annonce une seule fois`);
-        if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `recherche-photo-${tel ? 390 : 1512}-n15.png`) });
+        await capture(pg, `recherche-photo-${tel ? 390 : 1512}-n15.png`);
         // D. Le clic ouvre « Tout sur le N° » de CE numéro.
         await toucher(pg, tel, '[data-rp-resultat][data-rp-rang="1"]');
         await pg.waitForSelector('[data-tout-num]', { timeout: 10000 }).catch(() => {});
         const tout = await pg.evaluate(() => { const el = document.querySelector('[data-tout-num]'); return { num: el && el.getAttribute('data-tout-num'), feuille: !!document.querySelector('[data-recherche-photo]') }; });
         dit(tout.num === '15' && !tout.feuille, `${T} D. le clic ouvre « Tout sur le N°15 » (la feuille se ferme)`, JSON.stringify(tout));
-        if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `recherche-photo-${tel ? 390 : 1512}-tout.png`) });
-        const ecr2 = req.filter((r) => /\/rest\/v1\//.test(r.chemin) && r.methode !== 'GET' && !/select=owner/.test(r.chemin));
-        dit(!ecr2.length, `${T} D. toujours aucune écriture après le clic (rien n'est relié)`, JSON.stringify(ecr2.slice(0, 3)));
+        await capture(pg, `recherche-photo-${tel ? 390 : 1512}-tout.png`);
+        // Après le clic, l'app peut publier ses RÉSUMÉS calculés (ex. `lbc_a_retirer`,
+        // §11) comme sur n'importe quel écran : on exige qu'AUCUNE écriture ne touche
+        // une identité ou un lien (fiches N°, ventes reliées, liens Leboncoin/Vestiaire,
+        // pool des numéros) — rien n'est relié par la recherche.
+        const ecr2 = req.filter((r) => /\/rest\/v1\//.test(r.chemin) && r.methode !== 'GET');
+        const IDENT = /^main\b|numero|override|lien|buy|achat|relie|vinted_annonce|used_num|fiche/i;
+        const liees = ecr2.filter((r) => (r.ecrit || ['?']).some((x) => IDENT.test(x) || x === '?'));
+        dit(!liees.length, `${T} D. après le clic, aucune écriture d'identité ni de lien (rien n'est relié)`, liees.length ? JSON.stringify(liees.slice(0, 3)) : 'écrit ailleurs : ' + (ecr2.flatMap((r) => r.ecrit || []).join(' ') || 'rien'));
         // A (Stock) : le bouton du Stock ouvre la même feuille.
         await pg.goto(`http://localhost:${PORT}/?tab=garage`, { waitUntil: 'domcontentloaded' });
         await pg.waitForSelector('[data-stock-recherche-photo]', { timeout: 20000 }).catch(() => {});

@@ -29,13 +29,15 @@ export default function RecherchePhoto({ C, Feuille, Bouton, PhotoVinted, lireCa
   const [progres, setProgres] = useState(null);         // { faits, total }
   const [res, setRes] = useState(null);                 // { top, illisibles, indexees, candidats, raisons }
   const photoRef = useRef(null), imageRef = useRef(null), vivant = useRef(true), tour = useRef(0);
-  useEffect(() => () => { vivant.current = false; if (apercu) try { URL.revokeObjectURL(apercu); } catch (_) {} }, [apercu]);
+  // Deux effets distincts : la feuille démontée arrête le travail en cours ; un
+  // aperçu remplacé libère l'ancien (sans arrêter la recherche qui commence).
+  useEffect(() => { vivant.current = true; return () => { vivant.current = false; }; }, []);
+  useEffect(() => () => { if (apercu) try { URL.revokeObjectURL(apercu); } catch (_) {} }, [apercu]);
 
   const chercher = async (file) => {
     if (!file) return;
     const n = ++tour.current;
     const encore = () => vivant.current && tour.current === n;
-    if (apercu) try { URL.revokeObjectURL(apercu); } catch (_) {}
     setApercu(URL.createObjectURL(file));
     setEtat('calcul'); setRes(null); setProgres(null);
     const [requete, lus] = await Promise.all([empreinteDeFichier(file), lireCandidats().catch(() => null)]);
@@ -70,7 +72,7 @@ export default function RecherchePhoto({ C, Feuille, Bouton, PhotoVinted, lireCa
     <Feuille onClose={onClose} titre="Chercher par photo" data-recherche-photo="" data-rp-etat={etat}>
       <div style={{ padding: '0 16px 16px' }}>
         <p style={{ ...texte, marginTop: 0 }}>
-          Prends la paire en photo : VRM te montre les annonces dont la photo lui ressemble le plus. C'est toi qui choisis — rien n'est relié, et ta photo ne quitte pas cet appareil.
+          Prends la paire en photo : VRM te montre les annonces dont la photo lui ressemble le plus. C'est toi qui choisis — rien n'est relié, et ta photo ne quitte pas cet appareil. Le mieux : la paire de profil, sur un fond uni.
         </p>
         {choix}
         {apercu && (
