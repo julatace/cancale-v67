@@ -22,7 +22,8 @@ require('./_porte-banc.cjs');
 //   E. aucune requête vers un tiers : seulement l'app, sa base, sa route photo
 //      (`/api/compte?mode=photo`, l'extension étant absente) et le CDN Vinted
 //      pour AFFICHER les vignettes ; aucun script ni modèle chargé d'ailleurs ;
-//   F. l'index est GARDÉ sur l'appareil : la 2e recherche ne relit aucune photo ;
+//   F. l'index est GARDÉ sur l'appareil : la 2e recherche ne relit aucune photo,
+//      et après un RECHARGEMENT de la page non plus (IndexedDB) ;
 //   G. une photo que la route refuse (503) est COMPTÉE « pas lue », jamais classée ;
 //   H. lignes ≥ 44 px, aucun débordement horizontal, aucune erreur de page.
 // Captures : SHOTS=dossier (feuille avec résultats, aux deux tailles).
@@ -32,6 +33,8 @@ const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 10352;
 const SHOTS = process.env.SHOTS || '';
+// BANC_MUTATION=sans-index : l'index de l'appareil est effacé avant le rechargement ⇒ F doit rougir.
+const MUT = process.env.BANC_MUTATION || '';
 const CHROMIUM = process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium';
 const AUJ = Date.now();
 const CDN = (id) => `https://images1.vinted.net/t/banc/f800/${id}.jpeg?s=banc`;
@@ -265,13 +268,20 @@ const ouvrirDepuisLoupe = async (pg, tel) => {
         const IDENT = /^main\b|numero|override|lien|buy|achat|relie|vinted_annonce|used_num|fiche/i;
         const liees = ecr2.filter((r) => (r.ecrit || ['?']).some((x) => IDENT.test(x) || x === '?'));
         dit(!liees.length, `${T} D. après le clic, aucune écriture d'identité ni de lien (rien n'est relié)`, liees.length ? JSON.stringify(liees.slice(0, 3)) : 'écrit ailleurs : ' + (ecr2.flatMap((r) => r.ecrit || []).join(' ') || 'rien'));
-        // A (Stock) : le bouton du Stock ouvre la même feuille.
+        // A (Stock) : le bouton du Stock ouvre la même feuille — après un RECHARGEMENT
+        // (la mémoire de la page est perdue ; seul l'IndexedDB de l'appareil reste).
+        if (MUT === 'sans-index') await pg.evaluate(() => new Promise((ok) => { const r = indexedDB.deleteDatabase('vrm_empreintes_photos'); r.onsuccess = r.onerror = r.onblocked = () => ok(); }));
+        const n2 = photosRoute.n;
         await pg.goto(`http://localhost:${PORT}/?tab=garage`, { waitUntil: 'domcontentloaded' });
         await pg.waitForSelector('[data-stock-recherche-photo]', { timeout: 20000 }).catch(() => {});
         await toucher(pg, tel, '[data-stock-recherche-photo]');
         await pg.waitForSelector('[data-recherche-photo]', { timeout: 15000 }).catch(() => {});
         f = await etatFeuille(pg);
         dit(!!f && f.etat === 'attente', `${T} A. « Par photo » du Stock ouvre la même feuille`, f && f.etat);
+        // F. Après le rechargement, l'index est relu de l'APPAREIL : aucune photo relue.
+        await photographier(pg, q13, 'encore.jpg');
+        f = await etatFeuille(pg);
+        dit(!!f && f.etat === 'resultats' && f.lignes[0] && f.lignes[0].num === '13' && photosRoute.n === n2, `${T} F. après rechargement, l'index vient de l'appareil (IndexedDB) : aucune photo relue, la N°13 toujours en tête`, `${photosRoute.n - n2} relue(s) · ${f && f.lignes.map((x) => x.num).join(',')}`);
         const large = await pg.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
         dit(large <= 1, `${T} H. pas de défilement horizontal de la page`, String(large));
         dit(!errs.length, `${T} H. aucune erreur de page`, errs.join(' | ').slice(0, 300));

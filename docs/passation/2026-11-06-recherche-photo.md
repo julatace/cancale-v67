@@ -154,9 +154,43 @@ noir » par canal en plus : 74,2 % (retiré). Mots : « Très proche » est just
 ### Banc (`BANC_PORT=10352 node scripts/bancs/recherche-photo.cjs`, après `npm run build`)
 390 px tactile et 1512 px souris ; photos dessinées dans la page et servies
 comme le CDN (sans en-tête CORS) ; la prise de photo = un fichier posé dans le
-champ de l'appareil photo. Voir le résultat plus bas (« Résultat du banc »).
+champ de l'appareil photo. **58 contrôles verts** :
+- A : l'appareil photo de la loupe (barre / en-tête) et « Par photo » du Stock
+  ouvrent la feuille ;
+- B : la N°13 photographiée « à la main » (fond sombre, sépia, zoom, main) est
+  **en tête** (0,745 contre 0,633 pour la suivante — dite « Peu sûr » : le mot
+  reste prudent quand la photo est très différente), 5 lignes, photo affichée,
+  N°, compte, état, mot ; la fiche N°99 sans photo comptée « sans photo » ;
+- C : la N°15 (même titre que la N°14) en tête, « Très proche » (0,852) ; la
+  N°14 3e, sa ligne et son N° à elle ;
+- D : **aucune écriture** pendant la recherche ; le clic ouvre « Tout sur le
+  N°15 » ; après le clic, aucune écriture d'identité ni de lien (seul le résumé
+  `lbc_a_retirer`, publié par l'app comme sur tout écran) ;
+- E : **aucune requête tierce**, aucun modèle ni moteur chargé, le CDN Vinted
+  seulement pour AFFICHER les vignettes (balises image), les 8 photos lues par
+  la route de VRM une fois chacune ;
+- F : 2e recherche ⇒ 0 photo relue ; **après rechargement** ⇒ 0 photo relue
+  (IndexedDB) ; G : une photo refusée (503) est comptée « pas lue », jamais
+  classée ; H : lignes 74 px, rien ne déborde, aucune erreur de page.
+- **Rouge sur le build d'avant** (aucun appareil photo, aucune feuille) ;
+  `BANC_MUTATION=sans-index` (index effacé avant le rechargement) ⇒ 2 rouges.
+- Captures regardées (390 et 1512 : feuille avec résultats, même titre, « Tout
+  sur le N°15 »).
 Il a attrapé un défaut : l'effet qui libérait l'aperçu arrêtait aussi la
 recherche (la feuille restait sur « Je compare… »).
+
+### Poids au premier chargement : 0
+Build d'avant (`claude/project-review-nsk5su`) contre build d'après : l'entrée
+`index-*.js` est **identique** (82 732 o) ; le morceau `App-*.js` n'a pas grossi
+(3 998 464 → 3 997 356 o, la différence vient du minifieur) ; tout le reste est
+au même octet. Le seul ajout est `RecherchePhoto-*.js` (16 468 o, 7 032 o
+gzip : la feuille, l'empreinte, l'index), téléchargé **au premier clic** sur
+l'appareil photo. Aucun modèle, aucun moteur.
+
+### Autres audits
+`npm run build`, `audit-identite`, `audit-coherence`, `audit-csp` (aucun modèle
+chargé : rien à ouvrir), `audit-secrets`, `audit-icones`, `audit-boutons`,
+`audit-rouge-doublon` : verts.
 
 ## Limites (à dire à Julien)
 
