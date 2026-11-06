@@ -115,8 +115,10 @@ const MAINT = Date.UTC(2026, 10, 6, 15, 0);
 const iso = (jours) => new Date(MAINT - jours * 864e5).toISOString();
 
 (async () => {
-  const H = await import(path.join(R, 'api/_lib/email-html.js'));
-  const C = await import(path.join(R, 'src/cadreEmail.js'));
+  // Un module absent (arbre d'avant) est un ROUGE par règle, jamais un audit qui s'arrête.
+  const charger = async (f) => { try { return await import(path.join(R, f)); } catch (e) { dit(false, `module ${f}`, String(e && e.message || e).slice(0, 120)); return {}; } };
+  const H = await charger('api/_lib/email-html.js');
+  const C = await charger('src/cadreEmail.js');
 
   // ── H0. Le lecteur de l'audit sait voir une faute (sinon il ne prouve rien) ──
   await essaie('H0', async () => {
@@ -251,7 +253,7 @@ const iso = (jours) => new Date(MAINT - jours * 864e5).toISOString();
   const cle = (i) => (String(i).padStart(4, '0') + 'ab'.repeat(30)).slice(0, 64);
   const lignes = [];
   const recu = (i, jours, type, resume) => lignes.push({ owner: J, id: 'email_reception_' + cle(i), meta: { at: iso(jours) }, data: { at: iso(jours), etat: 'integre', type, subject: 'Sujet inventé ' + i, from: 'Vinted <no-reply@vinted.fr>', adresses: ['recu@vrm.center'], resume } });
-  const htmlPiege = H.assainirHtml(VENTE_HTML).html + '<script>parent.__xss(1)</script><img src="https://a.test/x.png" onerror="x">';
+  const htmlPiege = '<p>Vente inventée</p><img data-vrm-src="https://images.exemple.test/a.png"><img data-vrm-src="https://images.exemple.test/b.png">' + '<script>parent.__xss(1)</script><img src="https://a.test/x.png" onerror="x">';
   recu(1, 1, 'vente', { v: 1, t: 'vente', a: 'Paire inventée' });
   lignes.push({ owner: J, id: 'email_texte_' + cle(1), data: { texte: 'Texte inventé', at: iso(1) } });
   lignes.push({ owner: J, id: 'email_html_' + cle(1), meta: { at: iso(1) }, data: { v: 1, at: iso(1), html: htmlPiege, octets: 3000, images: 2, pixels: 2, sombre: 0 } });
