@@ -17,8 +17,8 @@ require('./_porte-banc.cjs');
 //       (clé `vrm_visite_vue`) — rechargée, avec le stockage de l'appareil VIDÉ
 //       de cette clé, elle ne revient pas ;
 //   V5  Échap ferme (et note vu) ; un toucher dehors ferme (et note vu) ;
-//   V6  un onglet absent (pas de compte : pas de « Messages » visible…) ⇒ sa bulle
-//       est sautée, jamais une bulle dans le vide ;
+//   V6  une cible absente (étape du guide cachée…) ⇒ sa bulle est sautée, jamais
+//       une bulle dans le vide ;
 //   V7  « Revoir la visite » dans Paramètres la rejoue ;
 //   V8  mouvement réduit : aucune animation sur la bulle ;
 //   V9  ONGLETS NUS : aucun texte permanent à côté des onglets (colonne, barre du
@@ -160,7 +160,8 @@ const capture = async (pg, nom) => { if (!CAPTURES) return; fs.mkdirSync(CAPTURE
           await sv.click(); await a.pg.waitForTimeout(450);
           if (fin) break;
         }
-        const attendu = telephone ? 'journee,annonces,ventes,colis,plus' : 'journee,annonces,ventes,messages,colis,parametres';
+        // (6 nov.) Quatre bulles : la navigation entière, l'extension, la boîte e-mail, l'exemple.
+        const attendu = 'navigation,extension,emails,exemple';
         dit(vues.join(',') === attendu, `${T} V1 les bulles, dans l'ordre de la navigation`, vues.join(','));
         dit(await a.pg.locator('.vrm-visite').count() === 0, `${T} V4 « Terminer » ferme la visite`);
         await a.pg.waitForTimeout(2600);
@@ -245,12 +246,12 @@ const capture = async (pg, nom) => { if (!CAPTURES) return; fs.mkdirSync(CAPTURE
           dit((await d.pg.evaluate(() => (history.state || {}).vrmTab || '')) !== 'annonces', `${T} V5 le toucher dehors ne déclenche rien dessous`);
         } else dit(false, `${T} V5 dehors : la visite ne s'est pas ouverte`);
         await d.ctx.close(); }
-      // ── V6 : un onglet absent ⇒ sa bulle est sautée.
+      // ── V6 : une cible absente ⇒ sa bulle est sautée.
       { const b4 = { data: null, ecritures: 0 }; const s = await page(nav, { telephone, base: b4 });
-        await s.pg.addStyleTag({ content: '[data-nav-entree="ventes"]{display:none !important}' });
+        await s.pg.addStyleTag({ content: '[data-guide-demarrage] [data-guide-etape="emails"]{display:none !important}' });
         if (await attendreBulle(s.pg, 9000)) {
           const vues = []; for (let k = 0; k < 10; k++) { const b = await lireBulle(s.pg); if (!b) break; vues.push(b.cle); if (!b.visible) dit(false, `${T} V6 « ${b.cle} » pointe dans le vide`); const sv = s.pg.locator('[data-visite-suivant]'); const fin = /Terminer/.test(await sv.innerText()); await sv.click(); await s.pg.waitForTimeout(400); if (fin) break; }
-          dit(!vues.includes('ventes') && vues.length >= 3, `${T} V6 onglet « Ventes » caché ⇒ sa bulle est sautée`, vues.join(','));
+          dit(!vues.includes('emails') && vues.length >= 3, `${T} V6 étape « e-mails » cachée ⇒ sa bulle est sautée`, vues.join(','));
         } else dit(false, `${T} V6 : la visite ne s'est pas ouverte`);
         await s.ctx.close(); }
       // ── V7 : « Revoir la visite » (Paramètres).

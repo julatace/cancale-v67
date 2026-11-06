@@ -19,14 +19,16 @@
 export const CLE_VISITE = 'vrm_visite_vue';
 
 // `cible` : sélecteur de l'élément réel ; `ou` : 'telephone' | 'ordinateur' | les deux.
+// (6 nov., Julien : « quelque chose de plus beau, simple et visuel ») QUATRE bulles :
+// la navigation entière (une fois, pas onglet par onglet), puis les deux étapes du
+// guide de démarrage qui comptent le plus (l'extension, la boîte e-mail), puis
+// « Découvrir avec des exemples ». Ce que la visite ne trouve pas est sauté.
 export const ETAPES_VISITE = [
-  { cle: 'journee', cible: '[data-nav-entree="journee"]', titre: 'Ma journée', texte: 'Chaque matin, ce qui presse : colis, retraits, messages.' },
-  { cle: 'annonces', cible: '[data-nav-entree="annonces"]', titre: 'Annonces', texte: 'Tes paires en vente, site par site, avec leur numéro.' },
-  { cle: 'ventes', cible: '[data-nav-entree="ventes"]', titre: 'Ventes', texte: 'Ce que tu as vendu, et le bénéfice de chaque paire.' },
-  { cle: 'messages', cible: '[data-nav-entree="messages"]', titre: 'Messages', texte: 'Réponds aux acheteurs et à leurs offres sans changer de site.', ou: 'ordinateur' },
-  { cle: 'colis', cible: '[data-nav-entree="cat_bord"]', titre: 'Colis', texte: 'Imprime tes bordereaux et retrouve tes codes de retrait.' },
-  { cle: 'plus', cible: '.vrm-nav-more', titre: 'Plus', texte: 'Messages, stock, compta et paramètres : tout le reste est ici.', ou: 'telephone' },
-  { cle: 'parametres', cible: '[data-nav-entree="settings"]', titre: 'Paramètres', texte: 'Tes comptes, tes emails, et cette visite à revoir.', ou: 'ordinateur' },
+  { cle: 'navigation', cible: '.vrm-mobile-nav', titre: 'Tout est en bas', texte: 'Ta journée, tes annonces, tes ventes et tes colis, d’un toucher.', ou: 'telephone' },
+  { cle: 'navigation', cible: '.vrm-atelier-rail', titre: 'Tout est à gauche', texte: 'Ta journée, tes annonces, tes ventes et tes colis, d’un clic.', ou: 'ordinateur' },
+  { cle: 'extension', cible: '[data-guide-demarrage] [data-guide-etape="extension"]', titre: 'D’abord, l’extension', texte: 'Elle lit tes ventes et tes colis sur Vinted, pour toi.' },
+  { cle: 'emails', cible: '[data-guide-demarrage] [data-guide-etape="emails"]', titre: 'Puis ta boîte e-mail', texte: 'Bordereaux et codes de retrait arrivent alors tout seuls ici.' },
+  { cle: 'exemple', cible: '[data-exemple-entrer]', titre: 'Envie de voir avant ?', texte: 'VRM rempli de données inventées : rien n’est enregistré.' },
 ];
 
 export const MOTS_MAX = 12;
