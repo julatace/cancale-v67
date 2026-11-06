@@ -7,7 +7,7 @@
 //  conteneurs, les mêmes marges et à peu près les mêmes hauteurs que l'écran fini
 //  (le titre est le VRAI titre, avec les classes du vrai titre). Une pulsation
 //  douce, coupée par « réduire les animations ». Aucune couleur nouvelle : l'encre
-//  à 7 %, le blanc à 14 % sur la carte sombre.
+//  à 8 %, le blanc à 14 % sur la carte sombre.
 //  Rien ici ne lit une donnée : un squelette ne dit jamais « 0 », ni « pas su ».
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';

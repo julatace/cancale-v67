@@ -1,7 +1,7 @@
 /* ════════════════════════════════════════════════════════════════════════════
    L'ATTENTE D'UN ÉCRAN ET SON SQUELETTE (6 nov.) — src/AttenteEcran.jsx,
-   src/Squelette.jsx. Aucune couleur nouvelle : l'encre de la coque à 7 % (6 %
-   pour les fonds de segmenté et de puces), le blanc à 14 % sur la carte sombre,
+   src/Squelette.jsx. Aucune couleur nouvelle : l'encre de la coque à 8 % (6 %
+   pour le fond du segmenté), le blanc à 14 % sur la carte sombre,
    les surfaces et filets de la coque. Une pulsation d'opacité (jamais de
    déplacement), coupée par « réduire les animations ».
    ════════════════════════════════════════════════════════════════════════════ */
@@ -17,9 +17,9 @@
 
 /* ── Les briques ─────────────────────────────────────────────────────────── */
 .vrm-squelette { display: block; padding-bottom: 8px; }
-.vrm-sq-barre { display: block; flex: none; max-width: 100%; background: color-mix(in srgb, var(--vrm-ink, #1d1d1f) 7%, transparent); animation: vrm-sq-pouls 1.6s ease-in-out infinite alternate; }
+.vrm-sq-barre { display: block; flex: none; max-width: 100%; background: color-mix(in srgb, var(--vrm-ink, #1d1d1f) 8%, transparent); animation: vrm-sq-pouls 1.6s ease-in-out infinite alternate; }
 .vrm-sq-carte { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 18px; box-sizing: border-box; border-radius: 18px; background: var(--vrm-surface, #fff); border: 1px solid var(--vrm-hair, rgba(0, 0, 0, .06)); }
-.vrm-sq-carte > .vrm-sq-barre { width: auto; }
+.vrm-sq-carte > .vrm-sq-barre { max-width: min(100%, 320px); }
 .vrm-sq-carte.is-sombre { background: var(--fu-sombre, var(--vrm-carte-sombre, #1d1d1f)); border: 0; padding: 20px 18px 18px; border-radius: 22px; }
 .vrm-sq-carte.is-sombre .vrm-sq-barre { background: rgba(255, 255, 255, .14); }
 .vrm-sq-cases { display: grid; gap: 8px; width: 100%; margin-top: 6px; }
@@ -28,7 +28,7 @@
 .vrm-sq-segmente > span { flex: 1; display: grid; place-items: center; border-radius: 9px; }
 .vrm-sq-segmente > span.is-choisi { background: var(--vrm-surface, #fff); }
 .vrm-sq-puces { display: flex; gap: 8px; overflow: hidden; margin: 2px 0 4px; }
-.vrm-sq-puce { flex: none; height: 34px; border-radius: 999px; background: color-mix(in srgb, var(--vrm-ink, #1d1d1f) 6%, transparent); animation: vrm-sq-pouls 1.6s ease-in-out infinite alternate; }
+.vrm-sq-puce { flex: none; height: 34px; border-radius: 999px; background: color-mix(in srgb, var(--vrm-ink, #1d1d1f) 8%, transparent); animation: vrm-sq-pouls 1.6s ease-in-out infinite alternate; }
 .vrm-sq-lignes { gap: 0; padding: 2px 16px; align-items: stretch; }
 .vrm-sq-ligne { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 11px 0; border-bottom: 1px solid var(--vrm-hair, rgba(0, 0, 0, .06)); }
 .vrm-sq-ligne:last-child { border-bottom: 0; }
