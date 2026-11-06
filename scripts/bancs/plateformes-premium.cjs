@@ -134,7 +134,7 @@ const projette = (row, sel) => {
     if (src === 'id') { out[alias] = row.id; continue; }
     if (src === 'data') { out[alias] = row.data; continue; }
     if (src === 'updated_at') { out[alias] = cap; continue; }
-    let v = row.data; for (const seg of src.replace(/^data(->>|->)/, '').split(/->>|->/)) v = v == null ? null : v[seg];
+    let v = row.data; for (const seg of src.replace(/^data(->>|->)/, '').split(/->>|->/)) v = v == null ? null : v[seg.replace(/^"|"$/g, '')];
     out[alias] = v == null ? null : (/->>/.test(src) && typeof v === 'object' ? JSON.stringify(v) : v);
   }
   return out;

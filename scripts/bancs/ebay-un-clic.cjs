@@ -10,7 +10,7 @@
 //   B. sans catégorie Vinted : « Département » ne se devine pas ⇒ rien n'est
 //      vérifié ni publié, et le critère manquant est NOMMÉ.
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
-const { metaVersData } = require('./_meta.cjs');
+const { metaVersData, fichesDePage } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const MIME = { '.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.png':'image/png','.svg':'image/svg+xml','.webmanifest':'application/manifest+json' };
@@ -35,7 +35,7 @@ async function scenario(b, avecCategorie) {
     if(/select=owner/.test(u)) return route.fulfill({status:400,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:'{"m":1}'});
     if(/\/vinted_accounts/.test(u)) return j([{ vinted_user_id:'u1', login:'moi' }]);
     if(/id=eq\.vinted_catalogue/.test(u)) return j([{ c: CATALOGUE }]);
-    if(/id=eq\.vinted_item_details/.test(u)) return j([{ data: DETAILS }]);
+    if(/id=eq\.vinted_item_details/.test(u)) return j(fichesDePage(u, DETAILS));
     if(/id=eq\.harvest_u1_listings/.test(u)) return j([LISTINGS]);
     return j([]); });
   await pg.route('**/api/**', r2=>r2.fulfill({status:200,contentType:'application/json',body:'{"ok":true}'}));

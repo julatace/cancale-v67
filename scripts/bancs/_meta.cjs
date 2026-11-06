@@ -20,4 +20,21 @@ function metaVersData(u) {
     return `data${fl}${k}${eqTrue || ''}`;
   });
 }
-module.exports = { metaVersData };
+// (6 nov., vague 2 « vitesse ») `vinted_item_details` servie comme PostgREST :
+// `select=data` rend la ligne entière ; `fN:data->"<id>"` (la lecture de l'app,
+// une fiche par clé, `lireFichesPage`) rend UNE ligne avec une colonne par fiche
+// (`null` pour une fiche absente). Un banc qui rendait `[{ data }]` quel que soit
+// le `select=` servait une forme que l'app ne lit plus (§6.3).
+function fichesDePage(u, details) {
+  const sel = (/[?&]select=([^&]*)/.exec(decodeURIComponent(u)) || [])[1] || 'data';
+  if (sel === 'data') return [{ data: details }];
+  const out = {};
+  for (const champ of sel.split(',')) {
+    const m = /^(?:([^:]+):)?data->"([^"]+)"(.*)$/.exec(champ.trim()); if (!m) continue;
+    let v = (details || {})[m[2]];
+    for (const seg of m[3].split(/->>|->/).filter(Boolean)) v = v == null ? undefined : v[seg.replace(/^"|"$/g, '')];
+    out[m[1] || m[2]] = v === undefined ? null : v;
+  }
+  return [out];
+}
+module.exports = { metaVersData, fichesDePage };

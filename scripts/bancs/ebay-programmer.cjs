@@ -185,7 +185,7 @@ const projette = (row, sel) => {
     const src = m[2], alias = m[1] || src.split(/->>|->/).pop();
     if (src === 'id') { out[alias] = row.id; continue; }
     if (src === 'data') { out[alias] = row.data; continue; }
-    let v = row.data; for (const seg of src.replace(/^data(->>|->)/, '').split(/->>|->/)) v = v == null ? null : v[seg];
+    let v = row.data; for (const seg of src.replace(/^data(->>|->)/, '').split(/->>|->/)) v = v == null ? null : v[seg.replace(/^"|"$/g, '')];
     out[alias] = v == null ? null : (/->>/.test(src) && typeof v !== 'string' ? String(v) : v);
   }
   return out;

@@ -5,7 +5,7 @@
 // publier. La logique d'envoi est couverte par ebay-write.cjs / ebay-api.cjs ;
 // ici c'est le RENDU + le flux « comme dans l'app ».
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
-const { metaVersData } = require('./_meta.cjs');
+const { metaVersData, fichesDePage } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const MIME = { '.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.png':'image/png','.svg':'image/svg+xml','.webmanifest':'application/manifest+json' };
@@ -42,7 +42,7 @@ const envoisEbay = []; let avertir = false;
   await pg.route('**/rest/v1/**', route=>{ const u=metaVersData(route.request().url()); const j=d=>route.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify(d)});
     if(/select=owner/.test(u)) return route.fulfill({status:400,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:'{"m":1}'});
     if(/\/vinted_accounts/.test(u)) return j(ACCOUNTS);
-    if(/id=eq\.vinted_item_details/.test(u)) return j([{ data: DETAILS }]);
+    if(/id=eq\.vinted_item_details/.test(u)) return j(fichesDePage(u, DETAILS));
     if(/id=eq\.harvest_u1_listings/.test(u)) return j([LISTINGS]);
     if(/id=like\.coffre_/.test(u)) return j(COFFRE);
     return j([]); });
