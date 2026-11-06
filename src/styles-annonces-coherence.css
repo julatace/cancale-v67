@@ -271,3 +271,13 @@ html body .vrm-ann-avis > button.vrm-ann-avis-neufs > svg { display: none; flex:
   .vrm-ann-avis, .vrm-ann-achats { min-height: 44px; }
   html body .vrm-ann-avis > button.vrm-ann-avis-neufs { min-height: 44px !important; }
 }
+
+/* (6 nov.) Le prochain geste, en tête de la liste : une rangée neutre (l'accent reste rare),
+   « Prochain geste » en encre, la phrase en gris, le bouton à droite (44 px). */
+.vrm-ann-geste {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; box-sizing: border-box; margin: 0 0 12px;
+  min-height: 48px; padding: 8px 6px 8px 14px; border-radius: 14px;
+  background: var(--vrm-surface, #FFFFFF); box-shadow: inset 0 0 0 1px var(--vrm-line, rgba(0,0,0,.08));
+}
+.vrm-ann-geste-texte { flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13px; line-height: 1.4; color: var(--vrm-muted, #6E6E73); }
+.vrm-ann-geste-texte b { font-size: 14px; font-weight: 700; color: var(--vrm-ink, #1D1D1F); }

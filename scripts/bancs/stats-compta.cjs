@@ -115,7 +115,7 @@ const ouvrir = async (b, vp, tab, opts = {}) => {
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   // (2 nov.) Le détail des Statistiques vit dans deux volets repliés (RepliStats) : le banc les
   // ouvre comme Julien le ferait (état gardé sur l'appareil), puis juge les mêmes chiffres.
-  await pg.addInitScript((d) => { try { localStorage.setItem('vrm_acces_direct','1'); localStorage.setItem('vrm_stats_replis', JSON.stringify({ argent: true, vente: true })); localStorage.setItem('vinted_regime', JSON.stringify('micro')); localStorage.setItem('vinted_urssaf_taux', '13.5'); localStorage.setItem('vinted_urssaf_mois', JSON.stringify(d.publie)); localStorage.setItem('vinted_accounts_hidden', JSON.stringify(['333'])); } catch (_) {} }, { publie });
+  await pg.addInitScript((d) => { try { localStorage.setItem('vrm_acces_direct','1'); localStorage.setItem('vrm_stats_replis', JSON.stringify({ argent: true, vente: true })); localStorage.setItem('vinted_regime', JSON.stringify('micro')); localStorage.setItem('vinted_urssaf_taux', '13.5'); localStorage.setItem('vinted_urssaf_freq', JSON.stringify('mensuel')); localStorage.setItem('vinted_urssaf_mois', JSON.stringify(d.publie)); localStorage.setItem('vinted_accounts_hidden', JSON.stringify(['333'])); } catch (_) {} }, { publie });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   const L = lignes(!!opts.pack);
   await pg.route('**/rest/v1/**', (route) => {
@@ -225,13 +225,17 @@ const ouvrir = async (b, vp, tab, opts = {}) => {
         dit(!t.tombe && errs.length === 0, 'Compta s’affiche, sans erreur', errs.join(' | ').slice(0, 160));
         dit(t.deb <= 1, 'aucun débordement horizontal', `${t.deb} px`);
         const e2 = (s) => s == null ? null : Number(String(s).replace(/[\s\u00a0\u202f€]/g, '').replace(',', '.'));
-        const ap = e2((/À PAYER \([\d,.]+ ?%\)\s*\n\s*([\d\s.,\u00a0\u202f]+€)/i.exec(t.urssaf) || [])[1]);
-        // (2 nov., Comptabilité claire) « Net après paiement » est RETIRÉ de la carte (il redisait le
-        // bénéfice autrement) ; le CA cité est dans la phrase sous le chiffre : « … de l'argent reçu en
-        // octobre, toutes plateformes (60,00 €, 1 vente) ». Sur un code d'avant : « CA des ventes finalisées … ».
-        const cc = e2((/(?:CA des ventes finalisées|argent reçu en)[^\n]*?\(([\d\s.,\u00a0\u202f]+€)/i.exec(t.urssaf) || [])[1]);
-        dit(ap === aPayer && cc === caMoisDecl, 'la déclaration URSSAF est dans Compta : CA × 13,5 % = à payer (le CA cité sous le chiffre)', `${cc} → ${ap}`);
-        dit(/Prochaine déclaration/.test(t.urssaf), 'la prochaine échéance est dans Compta');
+        // (6 nov.) La carte « Prochaine déclaration » (`CarteUrssafMois`) est masquée depuis le 3 nov.
+        // (Fusion, fusion.css §15) : la déclaration vit dans « Déclarer {mois} » (`PrevisionUrssafCarte`,
+        // chantier F puis onglets D). On juge la RÈGLE là où elle est : la période ouverte (en mensuel,
+        // le mois d'avant), son CA = celui de la ligne publiée, à payer = CA × taux, et l'échéance.
+        await pg.waitForSelector('[data-prevision-carte]', { timeout: 15000 }).catch(() => {});
+        const pv = await pg.evaluate(() => { const c = document.querySelector('[data-prevision-carte]'); return c ? { etat: c.getAttribute('data-prevision-carte'), ca: c.getAttribute('data-prevision-ca'), ap: c.getAttribute('data-prevision-apayer'), echeance: (c.querySelector('[data-urssaf-echeance]') || {}).innerText || c.innerText } : null; });
+        const ymOuvert = ym(new Date(maintenant.getFullYear(), maintenant.getMonth() - 1, 15));
+        const caOuvert = (publie.mois.find((m) => m.ym === ymOuvert) || {}).ca;
+        const apOuvert = Math.round(Number((c(caOuvert) * TAUX / 100).toFixed(6))) / 100;
+        dit(pv && pv.etat === 'lu' && Number(pv.ca) === caOuvert && Number(pv.ap) === apOuvert, 'la déclaration URSSAF est dans Compta : CA du mois ouvert × 13,5 % = à payer', pv ? `${pv.ca} → ${pv.ap} (attendu ${caOuvert} → ${apOuvert})` : 'carte absente');
+        dit(!!pv && /avant le \d+ \S+/.test(pv.echeance), 'la prochaine échéance est dans Compta', pv && pv.echeance.slice(0, 80));
         const nLignes = await pg.evaluate(() => { const h = [...document.querySelectorAll('span')].find((s) => /Récap comptable mensuel/.test(s.textContent)); const card = h && h.closest('.vrm-card, [class*="card"]') || (h && h.parentElement && h.parentElement.parentElement); return card ? card.querySelectorAll('tbody tr').length : -1; });
         dit(nLignes === publie.mois.length, 'le récap comptable mensuel est dans Compta : une ligne par mois publié', String(nLignes));
         // Formulaire de dépense
@@ -240,7 +244,10 @@ const ouvrir = async (b, vp, tab, opts = {}) => {
         const forme = await pg.evaluate(() => ({ cats: [...document.querySelectorAll('[data-dep-cat]')].map((e) => e.getAttribute('data-dep-cat')), labels: [...document.querySelectorAll('[data-dep-form] label')].map((l) => l.innerText.split('\n')[0].trim()), abo: [...document.querySelectorAll('[data-dep-cat]')].some((e) => /Abonnement/.test(e.textContent)) }));
         // (3 nov.) Les catégories de Julien comprennent « Abonnements » (sa liste : Emballage,
         // Achats de stock, Envois, Abonnements, Autre) : le refus de la pastille est levé.
-        dit(forme.cats.length >= 5 && ['Ce que tu as payé', 'Montant', 'Payé le'].every((l) => forme.labels.includes(l)),
+        // (6 nov.) La liste vient de la règle (src/depensesTicket.js) : « Achats de stock » en est sorti
+        // le 3 nov. (le prix d'achat est déjà compté par article) — on juge les pastilles = la règle.
+        const catsRegle = [...require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'src', 'depensesTicket.js'), 'utf8').matchAll(/\{ k: '([^']+)'/g)].map((m) => m[1]);
+        dit(catsRegle.length >= 2 && forme.cats.join(',') === catsRegle.join(',') && ['Ce que tu as payé', 'Montant', 'Payé le'].every((l) => forme.labels.includes(l)),
           'dépense : on choisit « c’est pour quoi » en pastilles, chaque champ a son libellé', `${forme.cats.join(',')} · ${forme.labels.join(' / ')}`);
         await pg.click('[data-dep-cat="Envois"]');
         const ph = await pg.getAttribute('[data-dep-libelle]', 'placeholder');
