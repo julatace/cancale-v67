@@ -29,7 +29,7 @@
 //  échouer, et la pastille retombe alors sur le nom seul, sans image cassée
 //  (`PastilleTransporteur`). Un transporteur sans adresse sûre n'a pas de logo.
 // ════════════════════════════════════════════════════════════════════════════
-import { transporteurDeForme } from '../api/_lib/suivi-colis.js';
+import { transporteurDeForme, colisInternational } from '../api/_lib/suivi-colis.js';
 import { normaliserSuivi } from '../api/_lib/etat-colis-email.js';
 
 export const PAS_LU = 'Transporteur inconnu';  // (3 nov., critique #15) des mots simples, pas « pas lu »
@@ -103,7 +103,10 @@ const ligneTranspDe = (transp, n) => {
 export function transporteurDuColis({ declare = '', suivi = '', transp = null, suivisEmail = null } = {}) {
   const n = normaliserSuivi(suivi);
   const t = ligneTranspDe(transp, n);
-  const cT = t ? cleTransporteur(t.carrier) : null;
+  // (6 nov.) La ligne du transporteur ne NOMME le transporteur que s'il a RÉPONDU
+  // (un état lu, une lecture datée) : une ligne `transp_chronopost_…` créée par un
+  // essai qui n'a jamais abouti n'est que l'endroit où on a frappé, pas une preuve.
+  const cT = t && (t.lu || t.etat || t.fini) ? cleTransporteur(t.carrier) : null;
   if (cT) return { cle: cT, nom: nomDuTransporteur(cT), source: 'transporteur' };
   let cle = null, source = null;
   const prendre = (c, s) => { if (c && rang(c) > rang(cle)) { cle = c; source = s; } };
@@ -123,6 +126,10 @@ export function transporteurDuColis({ declare = '', suivi = '', transp = null, s
   const cF = n ? transporteurDeForme(n) : null;
   if (cF) return { cle: cF, nom: nomDuTransporteur(cF), source: 'forme' };
   if (cle) return { cle, nom: nomDuTransporteur(cle), source };
+  // (6 nov.) Un n° postal international (S10 « …IE ») : son PAYS, lu dans le n°,
+  // jamais un transporteur deviné (suivi-colis.js, `colisInternational`).
+  const inter = colisInternational(n);
+  if (inter && !String(declare || '').trim()) return { cle: null, nom: inter, source: 'pays' };
   // Un transporteur écrit mais inconnu de VRM : recopié tel quel (borné).
   const brut = String(declare == null ? '' : declare).replace(/\s+/g, ' ').trim();
   if (brut && !/^(autre|generic|transporteur|colis|other)$/i.test(brut) && !/^[a-z0-9_]+$/.test(brut)) return { cle: null, nom: brut.slice(0, 30), source: 'plateforme' };
