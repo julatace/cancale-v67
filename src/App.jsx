@@ -58663,7 +58663,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <b style={{color:C.text,fontWeight:700}}>{annStats.n} en ligne sur Vinted</b>
             {annStats.aussiLbc>0?` · ${annStats.aussiLbc} aussi sur Leboncoin`:''}
             {annStats.boostees>0?` · ${annStats.boostees} boostée${annStats.boostees>1?'s':''}`:''}
-            {annStats.valConnus>0 ? <span data-ann-valeur={Math.round(annStats.val)} data-ann-valeur-sur={annStats.valConnus<annStats.n?annStats.valConnus:undefined}>{` · ${annStats.valConnus<annStats.n?'au moins ':''}${annStats.val.toFixed(0)}\u00a0€ de valeur${annStats.valConnus<annStats.n?` (prix lu sur ${annStats.valConnus})`:''}`}</span> : null}
+            {annStats.valConnus>0 ? <span data-ann-valeur={Math.round(annStats.val)} data-ann-valeur-sur={annStats.valConnus<annStats.n?annStats.valConnus:undefined}>{` · ${annStats.valConnus<annStats.n?'au moins ':''}${montant(annStats.val, { centimes: 'jamais' })} de valeur${annStats.valConnus<annStats.n?` (prix lu sur ${annStats.valConnus})`:''}`}</span> : null}
             {annStats.hasFav?<> · <Icon name="heart" size={12} style={{verticalAlign:'-2px'}}/> {annStats.favs}</>:null}
             {annStats.hasView?<> · <Icon name="eye" size={12} style={{verticalAlign:'-2px'}}/> {annStats.views}</>:null}
             {annStats.pretLbc>0 && (annStats.aRecapturer===0 || annStats.prepaCommun==='prete') ? <span data-prepa-pretes={annStats.pretLbc}>{` · ✓ ${annStats.pretLbc} prêtes pour Leboncoin`}</span> : ''}
@@ -66841,7 +66841,7 @@ async function ouvrirStripe(mode, extra) {
 // des CGV (le serveur ne le relaie alors pas, api/compte.js `prixConforme`).
 // audit-lancement.cjs exige que ce soit la même valeur que les CGV et que le
 // serveur (`PRIX_CGV`) : 12,99 € depuis le 11 octobre (décision de Julien).
-const PRIX_CGV_LISIBLE = '16,99\u00a0€ / mois';
+const PRIX_CGV_LISIBLE = '16,99 € / mois'; // espace ORDINAIRE : le serveur (api/compte.js) écrit le même texte, comparé à l'octet près (audit-abonnement)
 const prixLisible = (p) => p ? `${Number(p.montant).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\u00a0€ / ${p.intervalle === 'year' ? 'an' : 'mois'}` : PRIX_CGV_LISIBLE;
 const dateLisible = (iso) => { try { return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (_) { return ''; } };
 

@@ -69,7 +69,7 @@ const MAINT = Date.UTC(2026, 10, 6, 15, 0);
     dit(sorties.every((s) => !/999|500|777|55555555555/.test(s)), 'M1 un sujet piégé (code, montant, N°, n° de transaction) n’écrit rien sur la ligne ni sur la carte', sorties.find((s) => /999|500|777|5555/.test(s)));
     dit(B.carteHeros(formes[3], {}, MAINT).num === '' && !/N°42/.test(JSON.stringify(B.ligneEmail(formes[3], {}, MAINT))), 'M1 un N° retrouvé par le TITRE (`nt`) n’est écrit ni sur la ligne ni sur la carte (§5)');
     const v = B.carteHeros({ id: id(6), type: 'vente', resume: { v: 1, t: 'vente', a: 'Nike inventée', px: '55.00', n: '17' } }, {}, MAINT);
-    dit(v.genre === 'vente' && v.montant === '55,00 €' && v.article === 'Nike inventée' && v.num === '17', 'M1 la carte d’une vente : montant, article et N° LUS dans le résumé', JSON.stringify(v));
+    dit(v.genre === 'vente' && String(v.montant).replace(/\u00a0/g, ' ') === '55,00 €' && v.article === 'Nike inventée' && v.num === '17', 'M1 la carte d’une vente : montant, article et N° LUS dans le résumé', JSON.stringify(v));
     const r = B.carteHeros({ id: id(7), type: 'suivi', resume: { v: 1, t: 'suivi', s: 'MR1', st: 'available', code: '418205', lieu: 'RELAIS DU PORT, 12 RUE DES EMBRUNS, 35000 EXEMPLEVILLE', lim: '2026-11-07' } }, {}, MAINT);
     dit(r.genre === 'retrait' && r.code === '418 205' && r.lieu.nom === 'Relais du Port' && r.lieu.adresse === '12 Rue des Embruns, 35000 Exempleville' && r.limite.mot === 'demain' && r.limite.proche === true, 'M1 la carte d’un retrait : code, lieu mis en forme (rien ajouté), date limite « demain »', JSON.stringify(r));
   });

@@ -154,7 +154,7 @@ async function verifier(fichier, fichierRappel) {
     const d = A.comprendrePhrase('compte_test qui dorment', { comptes: [{ uid: '11', login: 'compte_test' }] });
     dit((d.regles.comptesVinted || []).join() === '11' && d.regles.joursMin === 30, 'un compte Vinted nommé, « qui dorment » ⇒ 30 jours', JSON.stringify(d.regles));
     const r = A.texteRegles(A.appliquerPhrase({ jamais: ['7'] }, A.comprendrePhrase('Nike +5 €'), 'Nike +5 €'));
-    dit(r.some((l) => /Nike/.test(l)) && r.some((l) => /\+ 5 €.*jamais sous ton prix d’achat/.test(l)) && r.some((l) => /N°7/.test(l)), 'la règle comprise est montrée en clair (et « jamais » est gardé)', r.join(' | '));
+    dit(r.some((l) => /Nike/.test(l)) && r.some((l) => /\+ 5\s€.*jamais sous ton prix d’achat/.test(l)) && r.some((l) => /N°7/.test(l)), 'la règle comprise est montrée en clair (et « jamais » est gardé)', r.join(' | '));
   });
   await essaie('numero-double', async () => {
     const p = A.propositionAgent(base({ paires: [paire(30, { id: 'a30', prix: 50 }), paire(30, { id: 'b30', prix: 90 }), paire(2)] }));
