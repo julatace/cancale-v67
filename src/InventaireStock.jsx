@@ -37,6 +37,7 @@ const lireLocal = (owner) => { try { const v = localStorage.getItem(cleLocale(ow
 const ecrireLocal = (owner, d) => { try { localStorage.setItem(cleLocale(owner), JSON.stringify(d)); } catch (_) {} };
 const NOM_PLAT = { vinted: 'Vinted', leboncoin: 'Leboncoin', ebay: 'eBay', vestiaire: 'Vestiaire' };
 const RAISON_TROP = { archive: 'ancien numéro (archive) : plus une annonce', jamais: 'jamais donné par VRM', plusenligne: 'plus en annonce nulle part' };
+const majuscule = (t) => (t ? t.charAt(0).toUpperCase() + t.slice(1) : t);
 const heure = (t) => { try { return new Date(t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }); } catch (_) { return ''; } };
 const jour = (t) => { try { return new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' }); } catch (_) { return ''; } };
 
@@ -170,7 +171,7 @@ export function InventaireStock({ stock, meubles = [], slots = {}, owner = '', l
         : (!stock || !stock.su ? <p className="vrm-inv-note" data-inv-lecture="passu">Je n’ai pas pu lire tes annonces{lecturesTxt ? ` (${lecturesTxt})` : ''} : sans elles, je ne peux rien dire de ce qui manque. Ouvre Vinted avec l’extension, puis reviens.</p>
           : <p className="vrm-inv-note" data-inv-lecture="ok" data-inv-attendus={index ? index.unites.length : 0}>{plur(index ? index.unites.length : 0, 'paire attendue', 'paires attendues')} en stock{lecturesTxt ? <> · <b>pas lu : {lecturesTxt}</b> — ses paires ne comptent pas</> : null}.</p>)}
       <button type="button" className="vrm-b vrm-b-primaire vrm-inv-large" data-inv-commencer="" disabled={sync === 'lecture' || stock === undefined} onClick={commencer}>Commencer l’inventaire</button>
-      {etatSync}
+      {sync === 'lecture' ? etatSync : (sync === 'ko' ? <p className="vrm-inv-sync" data-inv-sync="ko">Je n’ai pas pu relire ton inventaire : un inventaire commencé sur un autre appareil n’apparaît pas encore ici.</p> : null)}
     </div>
   );
 
@@ -250,7 +251,7 @@ export function InventaireStock({ stock, meubles = [], slots = {}, owner = '', l
         <>{onSortir && peutSortir && peutSortir(v.k) ? <button type="button" className="vrm-b vrm-b-secondaire" data-inv-sortir={v.k} onClick={() => onSortir(v.k)}>Je l’ai sortie</button> : null}{gesteFiche(v.k)}</>), 'Prouvées vendues : sors-les du carton pour l’envoi.')}
       {section('manque', 'Manquent', bilan.manque, (u) => ligneBilan(u.cles[0], u.numero, 'manque', u.titre || 'Sans titre lu', [u.source === 'gardee' ? 'tu l’avais gardée « encore là »' : (u.plateformes || []).map((x) => NOM_PLAT[x] || x).join(' et '), comptes(u), placeDe(u.cles[0]) ? 'notée : ' + placeDe(u.cles[0]) : ''].filter(Boolean).join(' · '),
         <>{onVoirCase && slots && slots[u.cles[0]] ? <button type="button" className="vrm-b vrm-b-discret" data-inv-voir-case={u.cles[0]} onClick={() => onVoirCase(u.cles[0])}>Voir la case</button> : null}{gesteFiche(u.numero)}</>), 'Attendues en stock, pas vues : cherche le carton, ou ouvre la fiche (vendue ailleurs ? perdue ?).')}
-      {section('trop', 'En trop', bilan.trop, (v) => ligneBilan(v.k, v.k, 'trop', RAISON_TROP[v.jugement.raison] || 'VRM ne l’attend pas', v.cases.length ? 'vu dans ' + v.cases.map(nomCase).join(', ') : '', gesteFiche(v.k)), 'Vues sur un carton, mais pas en annonce : remets-les en vente, ou sors-les.')}
+      {section('trop', 'En trop', bilan.trop, (v) => ligneBilan(v.k, v.k, 'trop', majuscule(RAISON_TROP[v.jugement.raison] || 'VRM ne l’attend pas'), v.cases.length ? 'vu dans ' + v.cases.map(nomCase).join(', ') : '', gesteFiche(v.k)), 'Vues sur un carton, mais pas en annonce : remets-les en vente, ou sors-les.')}
       {section('passu', 'Pas su', bilan.passu, (v) => ligneBilan(v.k, v.k, 'passu', motJugement(v.jugement).s, '', gesteFiche(v.k)), null)}
       {section('place', 'Pas dans leur case', bilan.pasASaPlace, (v) => ligneBilan(v.k, v.k, 'place', 'Vue dans ' + v.cases.map(nomCase).join(', '), 'notée dans ' + nomCase(v.notee.m + ':' + v.notee.i), onVoirCase ? <button type="button" className="vrm-b vrm-b-discret" data-inv-voir-case={v.k} onClick={() => onVoirCase(v.k)}>Voir la case</button> : null), null)}
       {bilan.vendusNonVus.length > 0 && <p className="vrm-inv-note" data-inv-vendus-non-vus={bilan.vendusNonVus.length}>{plur(bilan.vendusNonVus.length, 'vente à envoyer', 'ventes à envoyer')} pas vue{bilan.vendusNonVus.length > 1 ? 's' : ''} : N°{bilan.vendusNonVus.slice(0, 8).join(', N°')}{bilan.vendusNonVus.length > 8 ? '…' : ''} — déjà emballée{bilan.vendusNonVus.length > 1 ? 's' : ''} ?</p>}

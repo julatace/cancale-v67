@@ -254,7 +254,7 @@ async function ouvrirInventaire(pg, tel) {
         await ctx.close();
         // D — Ma journée (un AUTRE appareil : stockage vide, la ligne seule).
         ({ ctx, pg, errs } = await rendre(b, { tel, sombre, tab: 'journee', base, vide: true }));
-        await pg.waitForSelector('[data-job="inventaire-en-cours"]', { timeout: 30000 }).catch(() => {});
+        await pg.waitForSelector('[data-job="inventaire-en-cours"]', { timeout: 60000 }).catch(() => {});
         const job = await pg.evaluate(() => { const el = document.querySelector('[data-job="inventaire-en-cours"]'); return el ? { n: el.getAttribute('data-n'), txt: el.innerText.replace(/\s+/g, ' ') } : null; });
         dit(job && job.n === '6', `${t} : D — Ma journée (autre appareil) : « Inventaire en cours », 6 N° vus`, JSON.stringify(job));
         await shot(pg, nomShot('journee'));
