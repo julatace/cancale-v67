@@ -221,7 +221,7 @@ export function contenuFacture(cfg, vente, { numero, emiseLe, type = 'facture', 
     nature: NATURE,
     paiement: type === 'avoir'
       ? 'Montant remboursé à l\'acheteur.'
-      : `Facture acquittée — payée le ${jourParis(venteLe)}${txt(vente.plateforme) ? ` via ${txt(vente.plateforme)}` : ''}.`,
+      : `Facture acquittée — payée le ${jourParis(venteLe)}${txt(vente.plateforme) ? ` via ${txt(vente.plateforme)}` : ''}.${txt(c.mentionPaiement) ? ` ${txt(c.mentionPaiement).slice(0, 200)}` : ''}`,
     reference: txt(vente.reference) ? `${txt(vente.plateforme) || 'Vente'} n° ${txt(vente.reference)}` : '',
     mentions,
     note: String(c.note || '').slice(0, 600).trim(),
@@ -265,4 +265,110 @@ export function adresseVintedLisible(brut) {
   if (rue.length === 2 && /^\d+\s?[a-z]?$/i.test(rue[1])) rue.splice(0, 2, `${rue[1]} ${rue[0]}`);
   const fin = parts.slice(iCp + 1);
   return [rue.join(', '), `${parts[iCp]} ${ville}`, ...fin, pays && !/^france$/i.test(pays) ? pays : ''].filter(Boolean).join('\n');
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  (6 nov.) « MA FACTURE » : L'APERÇU QUI SUIT LA FRAPPE, MÊME INCOMPLET
+// ════════════════════════════════════════════════════════════════════════════
+// Julien : « un endroit où on met toutes ses infos et on peut visuellement voir
+// à quoi elle va ressembler pour tous les futurs acheteurs ».
+// `contenuFacture` refuse une fiche incomplète (il fabrique une PIÈCE
+// comptable). L'aperçu, lui, doit se dessiner dès la première lettre : là où une
+// mention obligatoire manque, il écrit un TROU — `{ trou: champ, t: '… : à
+// compléter' }` — que l'écran montre en ambre. Le reste est le MÊME instantané
+// que le PDF (on part de `contenuFacture` sur une fiche rendue complète par des
+// valeurs témoins, puis chaque valeur témoin est remplacée par son trou : aucune
+// n'est jamais montrée).
+export const A_COMPLETER = 'à compléter';
+const trou = (champ, libelle) => ({ trou: champ, t: `${libelle} : ${A_COMPLETER}` });
+export const estTrou = (x) => !!(x && typeof x === 'object' && x.trou);
+const SIRET_TEMOIN = '73282932000074';
+export function contenuApercu(cfg, vente, { numero, emiseLe }) {
+  const c = { ...(cfg && typeof cfg === 'object' ? cfg : {}) };
+  const manque = manquantsVendeur(c);
+  const champs = new Set(manque.map((m) => m.champ));
+  const temoin = { ...c };
+  if (champs.has('nom')) temoin.nom = 'X';
+  if (champs.has('forme')) temoin.forme = 'EI';
+  if (champs.has('siret')) temoin.siret = SIRET_TEMOIN;
+  if (champs.has('adresse')) temoin.adresse = 'X';
+  if (champs.has('codePostal')) temoin.codePostal = '00000';
+  if (champs.has('ville')) temoin.ville = 'X';
+  if (champs.has('tva_regime')) temoin.tva_regime = 'franchise';
+  if (champs.has('tva_taux')) temoin.tva_taux = 20;
+  if (champs.has('tva')) temoin.tva = 'FR00' + SIRET_TEMOIN.slice(0, 9);
+  if (champs.has('rcs')) temoin.rcs = '§RCS§';
+  if (champs.has('capital')) temoin.capital = '§CAP§';
+  if (champs.has('prefixe')) temoin.prefixe = 'FA';
+  const contenu = contenuFacture(temoin, vente, { numero, emiseLe });
+  const v = contenu.vendeur;
+  if (champs.has('nom')) v.nom = trou('nom', estSociete(c.forme) ? 'Raison sociale' : 'Ton nom et prénom');
+  else if (champs.has('forme')) v.nom = txt(c.nom);
+  const ligneCp = `${txt(c.codePostal)} ${txt(c.ville)}`.trim();
+  v.adresse = [
+    champs.has('adresse') ? trou('adresse', 'Adresse') : txt(c.adresse),
+    champs.has('codePostal') || champs.has('ville') ? trou(champs.has('codePostal') ? 'codePostal' : 'ville', 'Code postal et ville') : ligneCp,
+  ];
+  v.legal = v.legal.map((l) => {
+    if (champs.has('siret') && /^SIRE[NT] /.test(l)) return trou('siret', 'SIRET');
+    if (champs.has('tva') && /^TVA FR/.test(l)) return trou('tva', 'N° de TVA intracommunautaire');
+    if (champs.has('rcs') && l === '§RCS§') return trou('rcs', 'Immatriculation (RCS ou RM)');
+    if (champs.has('capital') && /§CAP§/.test(l)) return String(c.forme || '');
+    return l;
+  });
+  if (champs.has('capital')) v.legal.push(trou('capital', 'Capital social'));
+  if (champs.has('forme')) v.legal.unshift(trou('forme', 'Forme de l’entreprise (EI, SASU…)'));
+  if (champs.has('tva_regime')) contenu.mentions = [trou('tva_regime', 'Mention de TVA (choisis ton régime)')];
+  if (champs.has('tva_taux')) contenu.mentions = [...contenu.mentions, trou('tva_taux', 'Taux de TVA')];
+  if (champs.has('prefixe')) contenu.numeroTrou = trou('prefixe', 'Début des numéros');
+  return { contenu, manque };
+}
+
+// ── LES MENTIONS OBLIGATOIRES, une par une (l'audit et l'écran les comptent) ─
+// Vente de biens par un micro-entrepreneur à un particulier (Code de commerce
+// L441-9 ; CGI art. 242 nonies A de l'annexe II ; art. 293 B ; art. L526-22 du
+// Code de commerce et décret 2022-725 pour « EI ») — sources citées dans
+// docs/passation/2026-11-06-facture-pro.md.
+const plein = (x) => (estTrou(x) ? false : !!txt(x));
+const trouDe = (liste, champ) => liste.some((l) => estTrou(l) && l.trou === champ);
+export const MENTIONS_OBLIGATOIRES = [
+  { cle: 'numero', l: 'Numéro unique de la facture', ok: (c) => !c.numeroTrou && /^[A-Z0-9]{1,6}-\d{4}-\d{4,}$/.test(String(c.numero)) },
+  { cle: 'emise', l: "Date d'émission", ok: (c) => /^\d{2}\/\d{2}\/\d{4}$/.test(c.emiseJour) },
+  { cle: 'vente', l: 'Date de la vente (livraison)', ok: (c) => /^\d{2}\/\d{2}\/\d{4}$/.test(c.venteJour) },
+  { cle: 'vendeur', l: 'Nom du vendeur (avec « EI » pour un entrepreneur individuel)', ok: (c) => plein(c.vendeur.nom) && (c.vendeur.legal.some((l) => typeof l === 'string' && /^(SAS|SASU|SARL|EURL)\b/.test(l)) || /(^|\s)(EI|Entrepreneur individuel)$/i.test(String(c.vendeur.nom))) },
+  { cle: 'forme', l: 'Forme juridique', ok: (c) => !trouDe(c.vendeur.legal, 'forme') },
+  { cle: 'adresse', l: 'Adresse du vendeur', ok: (c) => c.vendeur.adresse.length === 2 && c.vendeur.adresse.every(plein) },
+  { cle: 'siret', l: 'SIREN ou SIRET', ok: (c) => c.vendeur.legal.some((l) => typeof l === 'string' && /^SIRE[NT] \d/.test(l)) },
+  { cle: 'societe', l: 'Immatriculation et capital (société)', ok: (c) => !trouDe(c.vendeur.legal, 'rcs') && !trouDe(c.vendeur.legal, 'capital') },
+  { cle: 'tvaintra', l: 'N° de TVA intracommunautaire (si assujetti)', ok: (c) => !trouDe(c.vendeur.legal, 'tva') && (c.regime === 'franchise' || c.vendeur.legal.some((l) => typeof l === 'string' && /^TVA FR/.test(l))) },
+  { cle: 'acheteur', l: "Nom et adresse de l'acheteur", ok: (c) => plein(c.acheteur.nom) && c.acheteur.adresse.length > 0 },
+  { cle: 'designation', l: 'Désignation, quantité et prix unitaire', ok: (c) => c.lignes.length > 0 && c.lignes.every((x) => txt(x.designation) && x.quantite > 0 && Number.isInteger(x.unite)) },
+  { cle: 'totaux', l: 'Total à payer', ok: (c) => Number.isInteger(c.totaux.ttc) },
+  { cle: 'tva', l: 'TVA (taux et montant) ou la mention qui la remplace', ok: (c) => (c.regime === 'normal' ? Number.isInteger(c.totaux.tva) && c.taux != null && !trouDe(c.mentions, 'tva_taux') : c.mentions.some((m) => m === MENTION_FRANCHISE || m === MENTION_MARGE)) },
+  { cle: 'paiement', l: 'Date du paiement (facture acquittée)', ok: (c) => c.type === 'avoir' || /payée le \d{2}\/\d{2}\/\d{4}/.test(c.paiement) },
+];
+export const mentionsManquantes = (contenu) => MENTIONS_OBLIGATOIRES.filter((m) => { try { return !m.ok(contenu); } catch (_) { return true; } }).map((m) => m.cle);
+
+// ── L'E-MAIL DE LA FACTURE (6 nov., décision de Julien : « ça peut être VRM qui
+// envoie et met en copie le vendeur ») ───────────────────────────────────────
+// Le texte du vendeur (`messageEmail`) et une version HTML qui dit la même chose
+// (tout est échappé : aucune valeur n'écrit du HTML), avec en petit pourquoi VRM
+// l'envoie et à qui répondre. Jamais de lien de désinscription : c'est un e-mail
+// transactionnel (la facture d'un achat), pas une lettre d'information.
+const echapper = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+export function emailFacture(cfg, contenu, { via = 'vrm' } = {}) {
+  const { sujet, corps } = messageEmail(cfg, contenu);
+  const nom = contenu.vendeur.nom;
+  const pied = via === 'vrm'
+    ? `Cette facture vous est envoyée par VRM pour le compte de ${nom}. Pour toute question, répondez simplement à cet e-mail : votre réponse arrive chez ${nom}.`
+    : '';
+  const texte = pied ? `${corps}\n\n—\n${pied}` : corps;
+  const paras = corps.split(/\n{2,}/).map((p) => `<p style="margin:0 0 14px">${echapper(p).replace(/\n/g, '<br>')}</p>`).join('');
+  const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${echapper(sujet)}</title></head>`
+    + `<body style="margin:0;padding:24px 16px;background:#ffffff;color:#1d1d1f;font:16px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif">`
+    + `<div style="max-width:520px;margin:0 auto">${paras}`
+    + `<p style="margin:0 0 14px;color:#6e6e73;font-size:14px">${echapper(`${contenu.type === 'avoir' ? 'Avoir' : 'Facture'} ${contenu.numero} en pièce jointe (PDF).`)}</p>`
+    + (pied ? `<p style="margin:24px 0 0;padding-top:12px;border-top:1px solid #e5e5ea;color:#6e6e73;font-size:12px">${echapper(pied)}</p>` : '')
+    + `</div></body></html>`;
+  return { sujet, texte, html, nomExpediteur: via === 'vrm' ? `${nom} via VRM`.slice(0, 120) : nom };
 }

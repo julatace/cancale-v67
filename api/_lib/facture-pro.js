@@ -9,10 +9,12 @@
 //                               les identifiants CHIFFRÉS dans le coffre
 //   POST {action:'boite-essai'} envoie un e-mail d'essai à SA propre adresse
 //   POST {action:'boite-retirer', confirme:true}
-//   POST {action:'emettre', tx, compte, acheteur:{nom,adresse,email}, designation,
-//         centimes, venteLe, confirme:true}
+//   POST {action:'emettre', tx, compte, designation?, confirme:true}
 //                               numérote et fige la facture de CETTE vente (une
-//                               seule par transaction, jamais deux numéros)
+//                               seule par transaction, jamais deux numéros) ;
+//                               (6 nov.) l'acheteur, le prix et la date viennent
+//                               de la PREUVE relue par le serveur (lirePreuve),
+//                               jamais du navigateur
 //   POST {action:'envoyer', tx, avoir?, renvoyer?, confirme:true}
 //                               l'envoie à l'acheteur depuis SA boîte
 //   POST {action:'avoir', tx, confirme:true}
@@ -35,8 +37,10 @@ import crypto from 'crypto';
 import { sbCle } from './cle.js';
 import { coffrePret, chiffrerCoffre, dechiffrerCoffre } from './coffre.js';
 import { envoyerSmtp, FOURNISSEURS, fournisseurDe, hoteValide, emailSur } from './smtp.js';
-import { manquantsVendeur, manquantsVente, contenuFacture, numeroFacture, anneeParis, jourParis, messageEmail, nomFichier, MESSAGE_DEFAUT } from '../../src/facturePro/regle.js';
+import { manquantsVendeur, manquantsVente, contenuFacture, numeroFacture, anneeParis, jourParis, nomFichier, MESSAGE_DEFAUT, emailFacture, adresseVintedLisible, emailValide } from '../../src/facturePro/regle.js';
+import { preuveAcheteur } from '../../src/facturePro/rattachement.js';
 import { pdfFacture } from '../../src/facturePro/pdf.js';
+import { configurationRelances } from './relances-essai.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const sbKey = () => process.env.SUPABASE_SERVICE_KEY || '';
@@ -46,6 +50,16 @@ export const USAGE = 'smtp-facture-v1';
 const TX_RE = /^\d{4,20}$/;
 const EN_COURS_MS = 3 * 60 * 1000;
 const JOURNAL_MAX = 60;
+// (6 nov.) L'envoi PAR VRM (décision de Julien : « ça peut être VRM qui envoie
+// et met en copie le vendeur ») passe par le serveur d'envoi de VRM — les mêmes
+// variables que les e-mails de l'essai (RELANCES_SMTP_*, RELANCES_EXPEDITEUR,
+// api/_lib/relances-essai.js). Garde-fou anti-abus : un plafond d'envois PAR
+// VENDEUR ET PAR JOUR (heure de Paris), réservé AVANT l'envoi (comparer-et-
+// échanger) ; l'offre gratuite d'un fournisseur comme Brevo s'arrête à 300 / jour
+// pour TOUTE l'installation.
+export const PLAFOND_JOUR = 50;
+export const ID_ENVOIS_JOUR = 'vrm_facture_envois_jour';
+const JOURNAL_ENVOIS_MAX = 20;
 
 const enTetes = (extra = {}) => ({ ...sbCle(sbKey()), ...extra });
 const url = (id, owner) => `${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(id)}&owner=eq.${encodeURIComponent(owner)}`;
@@ -84,6 +98,40 @@ async function modifierSi(id, owner, filtre, data) {
     return out.length ? 'ok' : 'conflit';
   } catch (_) { return 'ko'; }
 }
+// Une liste du vendeur (projection scalaire, jamais `select=data`) : undefined = pas su.
+async function lireListe(requete, owner) {
+  if (!sbKey() || !UUID.test(String(owner || ''))) return undefined;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${encodeURIComponent(owner)}&${requete}`, { headers: enTetes() });
+    if (!r.ok) return undefined;
+    const rows = await r.json();
+    return Array.isArray(rows) ? rows : undefined;
+  } catch (_) { return undefined; }
+}
+// ── (6 nov.) LE BON ACHETEUR, PROUVÉ PAR LE SERVEUR LUI-MÊME ──────────────────
+// La règle de src/facturePro/rattachement.js, exécutée sur les lectures du
+// SERVEUR (jamais sur l'acheteur que le navigateur envoie) :
+//   · les e-mails de vente Vinted Pro qui portent CE n° (scalaires) ;
+//   · les lectures `orders_sold` qui contiennent CE n° (filtre `cs` : seules ces
+//     lignes reviennent ; une lecture par clic d'émission ou d'envoi, jamais
+//     dans une liste) ;
+//   · le brouillon de facture déjà lu.
+// undefined = pas su (une lecture a échoué) ⇒ l'appelant répond 503, rien.
+export async function lirePreuve(owner, tx, brouillon) {
+  if (!/^\d{4,20}$/.test(String(tx))) return preuveAcheteur({ tx });
+  const [mails, ventes] = await Promise.all([
+    lireListe(`id=like.email_sale_*&data->>transaction=eq.${tx}&data->>pro=eq.true&select=id,transaction:data->>transaction,receivedAt:data->>receivedAt,prix:data->>prix,email:data->>email,nom:data->>nomComplet,adresse:data->>adresse,uid:data->>uid,designation:data->>designation`, owner),
+    lireListe(`id=like.harvest_*_orders_sold&data->payload->my_orders=cs.${encodeURIComponent(JSON.stringify([{ transaction_id: Number(tx) }]))}&select=id,commandes:data->payload->my_orders`, owner),
+  ]);
+  if (mails === undefined || ventes === undefined) return undefined;
+  const commandes = [];
+  for (const v of ventes) {
+    const uid = (String((v && v.id) || '').match(/^harvest_(\d+)_orders_sold$/) || [])[1] || '';
+    for (const c of Array.isArray(v && v.commandes) ? v.commandes : []) if (c && String(c.transaction_id) === String(tx)) commandes.push({ ...c, uid });
+  }
+  return preuveAcheteur({ tx, mails, commandes, brouillon, adresseLisible: adresseVintedLisible });
+}
+
 const condRev = (rev) => (rev == null || rev === '' ? 'data->>rev=is.null' : `data->>rev=eq.${encodeURIComponent(String(rev))}`);
 
 // ── LE NUMÉRO ───────────────────────────────────────────────────────────────
@@ -196,7 +244,8 @@ async function boiteRetirer(owner, corps, res) {
 // Ce que l'app apprend d'une facture (jamais les octets du formulaire).
 export const facturePublique = (d, id) => (!d ? null : {
   id, numero: d.number || '', emise: !!d.contenu, emiseLe: d.emiseLe || null, contenu: d.contenu || null,
-  envoi: d.envoi || null, retour: !!(d.retourNom), annuleePar: d.annuleePar || null, transaction: d.transaction || '',
+  envoi: d.envoi || null, envois: Array.isArray(d.envois) ? d.envois : [], retour: !!(d.retourNom), annuleePar: d.annuleePar || null, transaction: d.transaction || '',
+  preuve: !!d.preuve,
 });
 async function emettre(owner, corps, res) {
   const tx = String(corps.tx || '');
@@ -208,11 +257,16 @@ async function emettre(owner, corps, res) {
   // Déjà émise : on rend LA MÊME (jamais un second numéro, jamais un contenu changé).
   if (ligne && ligne.contenu) return repondre(res, 200, { ok: true, deja: true, facture: facturePublique(ligne, id) });
   const mv = manquantsVendeur(cfg || {});
+  // (6 nov.) L'acheteur, le prix et la date viennent de la PREUVE lue par le
+  // serveur — jamais du navigateur. Pas prouvé ⇒ aucune facture, aucun numéro.
+  const preuve = await lirePreuve(owner, tx, ligne);
+  if (preuve === undefined) return repondre(res, 503, { erreur: 'pas-su', message: "La base n'a pas répondu : aucune facture n'a été numérotée. Réessaie." });
+  if (!preuve.prouve) return repondre(res, 409, { erreur: 'pas-prouve', code: preuve.code, raison: preuve.raison, message: `Pas de facture : acheteur pas prouvé — ${preuve.raison}.` });
   const vente = {
-    acheteur: { nom: String((corps.acheteur || {}).nom || '').slice(0, 200), adresse: String((corps.acheteur || {}).adresse || '').slice(0, 600), email: String((corps.acheteur || {}).email || '').trim().slice(0, 200) },
-    designation: String(corps.designation || '').slice(0, 400),
-    centimes: Number(corps.centimes),
-    venteLe: String(corps.venteLe || ''),
+    acheteur: { nom: preuve.acheteur.nom.slice(0, 200), adresse: preuve.acheteur.adresse.slice(0, 600), email: preuve.acheteur.email.slice(0, 200) },
+    designation: (String(corps.designation || '').trim() || preuve.designation).slice(0, 400),
+    centimes: preuve.centimes,
+    venteLe: preuve.venteLe,
     reference: tx, plateforme: 'Vinted',
   };
   const mvt = manquantsVente(vente);
@@ -231,6 +285,7 @@ async function emettre(owner, corps, res) {
     emiseLe: contenu.emiseLe, transaction: tx, account: String(corps.compte || (ligne && ligne.account) || '').slice(0, 80),
     buyerEmail: contenu.acheteur.email, buyerName: contenu.acheteur.nom, designation: contenu.lignes[0].designation, prix: (vente.centimes / 100).toFixed(2),
     html: '', createdAt: (ligne && ligne.createdAt) || contenu.emiseLe, rev: nouveauRev(),
+    preuve: { tx, uid: preuve.uid, ecartS: preuve.ecartS, centimes: preuve.centimes, venteLe: preuve.venteLe, at: contenu.emiseLe },
   };
   const w = ligne ? await modifierSi(id, owner, condRev(ligne.rev), data) : await creer(id, owner, data);
   if (w === 'conflit') {
@@ -270,51 +325,118 @@ async function avoir(owner, corps, res) {
 }
 
 // ── ENVOYER ─────────────────────────────────────────────────────────────────
-async function envoyer(owner, corps, res) {
+// (6 nov.) Deux chemins, choisis dans « Ma facture » (`cfg.envoiPar`) :
+//   · 'vrm' (DÉFAUT, décision de Julien) : de l'adresse d'envoi de VRM, sous le
+//     nom « <vendeur> via VRM », Reply-To = l'e-mail du vendeur, le vendeur en
+//     COPIE (Cc), l'acheteur PROUVÉ en destinataire ;
+//   · 'boite' : depuis SA boîte (mot de passe d'application chiffré), copie
+//     cachée à lui-même (le chemin du 2 nov.).
+// Garde-fous, dans l'ordre : facture émise AVEC sa preuve · preuve relue par le
+// serveur, même acheteur que la facture · pas d'envoi en cours · pas de second
+// envoi sans « Renvoyer » · serveur d'envoi configuré · plafond du jour réservé
+// · « en cours » posé AVANT d'envoyer. Une écriture ratée avant l'envoi ⇒ RIEN
+// ne part (« pas envoyé »), jamais « envoyé ».
+const jourParisIso = (t = Date.now()) => { const j = jourParis(t); return `${j.slice(6, 10)}-${j.slice(3, 5)}-${j.slice(0, 2)}`; };
+export const configurationEnvoiVrm = (env = process.env) => {
+  const c = configurationRelances(env);
+  return { pret: c.pret, manque: c.manque.filter((m) => m !== 'SUPABASE_SERVICE_KEY'), port: c.port };
+};
+// Réserve un envoi dans le plafond du jour : 'ok' · 'plein' · 'pas-su'.
+async function reserverEnvoiJour(owner) {
+  const jour = jourParisIso();
+  for (let i = 0; i < 8; i++) {
+    const brut = await lireLigne(ID_ENVOIS_JOUR, owner, 'data');
+    if (brut === undefined) return { etat: 'pas-su' };
+    const n = brut && brut.jour === jour && Number.isInteger(brut.n) ? brut.n : 0;
+    if (n >= PLAFOND_JOUR) return { etat: 'plein', n };
+    const data = { jour, n: n + 1, rev: nouveauRev() };
+    const w = brut == null ? await creer(ID_ENVOIS_JOUR, owner, data) : await modifierSi(ID_ENVOIS_JOUR, owner, condRev(brut.rev), data);
+    if (w === 'ok') return { etat: 'ok', n: n + 1 };
+    if (w === 'ko') return { etat: 'pas-su' };
+  }
+  return { etat: 'pas-su' };
+}
+async function envoyer(owner, corps, res, env = process.env) {
   const tx = String(corps.tx || '');
   if (!TX_RE.test(tx) || corps.confirme !== true) return repondre(res, 400, { erreur: 'tx' });
-  const id = idFacture(tx, !!corps.avoir);
-  const [cfg, ligne, ids] = await Promise.all([lireLigne('vrm_pro_facture', owner), lireLigne(id, owner), identifiants(owner)]);
-  if (cfg === undefined || ligne === undefined || ids.erreur === 'pas-su') return repondre(res, 503, { erreur: 'pas-su', message: "La base n'a pas répondu : rien n'est parti. Réessaie." });
+  const avoir = !!corps.avoir;
+  const id = idFacture(tx, avoir);
+  const [cfg, ligne, facture] = await Promise.all([lireLigne('vrm_pro_facture', owner), lireLigne(id, owner), avoir ? lireLigne(idFacture(tx), owner) : Promise.resolve(null)]);
+  if (cfg === undefined || ligne === undefined || facture === undefined) return repondre(res, 503, { erreur: 'pas-su', message: "La base n'a pas répondu : rien n'est parti. Réessaie." });
   if (!ligne || !ligne.contenu) return repondre(res, 409, { erreur: 'pas-emise', message: "La facture n'est pas encore émise." });
-  if (ids.erreur) return repondre(res, 409, { erreur: 'boite', message: ids.erreur === 'aucune' ? 'Connecte d’abord ta boîte e-mail (Facturation Pro → Envoi).' : 'Ta boîte d’envoi ne se lit plus côté serveur : reconnecte-la.' });
   const c = ligne.contenu;
+  // La preuve : celle de l'émission, puis RELUE maintenant (une vente peut avoir changé).
+  const preuveEmise = avoir ? (facture && facture.preuve) : ligne.preuve;
+  if (!preuveEmise) return repondre(res, 409, { erreur: 'pas-prouve', code: 'emission', message: "Cette facture a été émise sans preuve de l'acheteur : VRM ne l'envoie pas. Partage le PDF toi-même si tu es sûr du destinataire." });
+  const preuve = await lirePreuve(owner, tx, avoir ? facture : ligne);
+  if (preuve === undefined) return repondre(res, 503, { erreur: 'pas-su', message: "La base n'a pas répondu : rien n'est parti. Réessaie." });
+  if (!preuve.prouve) return repondre(res, 409, { erreur: 'pas-prouve', code: preuve.code, raison: preuve.raison, message: `Rien n'est parti : acheteur pas prouvé — ${preuve.raison}.` });
+  if (String(preuve.acheteur.email).toLowerCase() !== String(c.acheteur.email || '').toLowerCase()) return repondre(res, 409, { erreur: 'pas-prouve', code: 'destinataire', message: "Rien n'est parti : l'adresse de la facture n'est plus celle de l'acheteur prouvé." });
   if (!emailSur(c.acheteur.email)) return repondre(res, 409, { erreur: 'email', message: "La facture ne porte pas d'adresse e-mail d'acheteur valide." });
   const e = ligne.envoi || null;
   const tEnvoi = Date.parse((e && e.at) || '');
   if (e && e.etat === 'en-cours' && Number.isFinite(tEnvoi) && Date.now() - tEnvoi < EN_COURS_MS) return repondre(res, 409, { erreur: 'en-cours', message: "Un envoi de cette facture est déjà en cours. Attends une minute." });
   if (e && (e.etat === 'envoyee' || e.etat === 'incertaine') && corps.renvoyer !== true) return repondre(res, 409, { erreur: 'deja', envoi: e, message: e.etat === 'envoyee' ? 'Cette facture est déjà partie.' : 'Un envoi précédent est incertain.' });
+  // Le chemin d'envoi et ce qu'il exige.
+  const via = cfg && cfg.envoiPar === 'boite' ? 'boite' : 'vrm';
+  const vendeurEmail = String((cfg && cfg.email) || '').trim();
+  let transport;
+  if (via === 'vrm') {
+    const conf = configurationEnvoiVrm(env);
+    if (!conf.pret) return repondre(res, 503, { erreur: 'vrm-smtp', manque: conf.manque, message: "L'envoi par VRM n'est pas encore ouvert sur ce serveur : rien n'est parti." });
+    if (!emailValide(vendeurEmail) || !emailSur(vendeurEmail)) return repondre(res, 409, { erreur: 'email-vendeur', message: "Ajoute ton adresse e-mail dans « Ma facture » : l'acheteur te répond à cette adresse et tu reçois la copie. Rien n'est parti." });
+    transport = { hote: env.RELANCES_SMTP_HOTE, port: conf.port, utilisateur: env.RELANCES_SMTP_UTILISATEUR, motDePasse: env.RELANCES_SMTP_MOT_DE_PASSE, de: String(env.RELANCES_EXPEDITEUR).trim(), cc: [vendeurEmail], replyTo: vendeurEmail, bcc: [] };
+  } else {
+    const ids = await identifiants(owner);
+    if (ids.erreur === 'pas-su') return repondre(res, 503, { erreur: 'pas-su', message: "La base n'a pas répondu : rien n'est parti. Réessaie." });
+    if (ids.erreur) return repondre(res, 409, { erreur: 'boite', message: ids.erreur === 'aucune' ? 'Connecte d’abord ta boîte e-mail (Ma facture → Envoi), ou laisse VRM envoyer.' : 'Ta boîte d’envoi ne se lit plus côté serveur : reconnecte-la.' });
+    transport = { hote: ids.b.hote, port: ids.b.port, utilisateur: ids.d.utilisateur, motDePasse: ids.d.motDePasse, de: ids.b.adresse, cc: [], replyTo: '', bcc: cfg && cfg.copie === false ? [] : [ids.b.adresse] };
+  }
+  // Le plafond du jour (envoi par VRM seulement : c'est son serveur qui compte).
+  if (via === 'vrm') {
+    const p = await reserverEnvoiJour(owner);
+    if (p.etat === 'pas-su') return repondre(res, 503, { erreur: 'pas-su', message: "La base n'a pas répondu : rien n'est parti. Réessaie." });
+    if (p.etat === 'plein') return repondre(res, 429, { erreur: 'plafond', plafond: PLAFOND_JOUR, message: `Plafond atteint : ${PLAFOND_JOUR} factures envoyées par VRM aujourd'hui. Rien n'est parti ; réessaie demain, ou partage le PDF toi-même.` });
+  }
   // Marquer « en cours » AVANT d'envoyer (comparer-et-échanger) : deux clics,
-  // deux appareils, un seul envoi.
-  const marque = { ...ligne, envoi: { etat: 'en-cours', at: new Date().toISOString(), a: c.acheteur.email }, rev: nouveauRev() };
+  // deux appareils, un seul envoi. Écriture ratée ⇒ rien ne part.
+  const marque = { ...ligne, envoi: { etat: 'en-cours', at: new Date().toISOString(), a: c.acheteur.email, via }, rev: nouveauRev() };
   const w = await modifierSi(id, owner, condRev(ligne.rev), marque);
   if (w === 'conflit') return repondre(res, 409, { erreur: 'en-cours', message: "La facture a changé à l'instant (un autre appareil ?). Rouvre-la." });
   if (w !== 'ok') return repondre(res, 503, { erreur: 'base', message: "La base n'a pas répondu : rien n'est parti. Réessaie." });
   let pdf;
   try { pdf = Buffer.from(await pdfFacture(c)); } catch (err) {
-    await modifierSi(id, owner, condRev(marque.rev), { ...marque, envoi: { etat: 'refusee', at: new Date().toISOString(), message: 'Le PDF n’a pas pu être fabriqué.' }, rev: nouveauRev() });
+    await modifierSi(id, owner, condRev(marque.rev), { ...marque, envoi: { etat: 'refusee', at: new Date().toISOString(), message: 'Le PDF n’a pas pu être fabriqué.', via }, rev: nouveauRev() });
     return repondre(res, 500, { erreur: 'pdf', message: "Le PDF de la facture n'a pas pu être fabriqué : rien n'est parti." });
   }
   const pieces = [{ nom: nomFichier(c), octets: pdf }];
   if (c.type !== 'avoir' && ligne.retourB64) pieces.push({ nom: ligne.retourNom || 'Formulaire-retour.pdf', octets: Buffer.from(ligne.retourB64, 'base64') });
-  const { sujet, corps: texte } = messageEmail(cfg || {}, c);
-  const v = await envoyerSmtp({ hote: ids.b.hote, port: ids.b.port, utilisateur: ids.d.utilisateur, motDePasse: ids.d.motDePasse,
-    de: ids.b.adresse, nomDe: c.vendeur.nom, a: c.acheteur.email, bcc: cfg && cfg.copie === false ? [] : [ids.b.adresse],
-    sujet, texte, pieces });
+  const mail = emailFacture(cfg || {}, c, { via });
+  const v = await envoyerSmtp({ hote: transport.hote, port: transport.port, utilisateur: transport.utilisateur, motDePasse: transport.motDePasse,
+    de: transport.de, nomDe: mail.nomExpediteur, a: c.acheteur.email, cc: transport.cc, replyTo: transport.replyTo, bcc: transport.bcc,
+    sujet: mail.sujet, texte: mail.texte, html: mail.html, pieces });
   const at = new Date().toISOString();
-  const envoi = v.issue === 'envoye' ? { etat: 'envoyee', at, a: c.acheteur.email, de: ids.b.adresse, id: v.id, retour: pieces.length > 1 }
-    : v.issue === 'incertain' ? { etat: 'incertaine', at, a: c.acheteur.email, message: v.message }
-    : { etat: 'refusee', at, a: c.acheteur.email, message: `${MSG_ETAPE[v.etape] || "L'envoi a échoué."}${v.message ? ` (${v.message})` : ''}` };
-  const fin = { ...marque, envoi, status: v.issue === 'envoye' ? 'sent' : marque.status, ...(v.issue === 'envoye' ? { sentAt: at, retourB64: '' } : {}), rev: nouveauRev() };
+  const envoi = v.issue === 'envoye' ? { etat: 'envoyee', at, a: c.acheteur.email, de: transport.de, via, cc: transport.cc[0] || '', id: v.id, retour: pieces.length > 1 }
+    : v.issue === 'incertain' ? { etat: 'incertaine', at, a: c.acheteur.email, via, message: v.message }
+    : { etat: 'refusee', at, a: c.acheteur.email, via, message: `${MSG_ETAPE[v.etape] || "L'envoi a échoué."}${v.message ? ` (${v.message})` : ''}` };
+  // Le JOURNAL des envois (date, destinataire, chemin, issue) : seulement allongé.
+  const envois = [...(Array.isArray(ligne.envois) ? ligne.envois : []), { etat: envoi.etat, at, a: envoi.a, via, cc: envoi.cc || '' }].slice(-JOURNAL_ENVOIS_MAX);
+  const fin = { ...marque, envoi, envois, status: v.issue === 'envoye' ? 'sent' : marque.status, ...(v.issue === 'envoye' ? { sentAt: at, retourB64: '' } : {}), rev: nouveauRev() };
   let ecrit = await modifierSi(id, owner, condRev(marque.rev), fin);
   if (ecrit === 'ko') ecrit = await modifierSi(id, owner, condRev(marque.rev), fin);   // un hoquet : une fois encore
-  return repondre(res, 200, { ok: v.issue === 'envoye', issue: v.issue, envoi, noteRatee: ecrit !== 'ok', facture: facturePublique(fin, id) });
+  return repondre(res, 200, { ok: v.issue === 'envoye', issue: v.issue, envoi, envois, noteRatee: ecrit !== 'ok', facture: facturePublique(fin, id) });
 }
 
-async function etat(owner, res) {
-  const b = await lireBoite(owner);
+async function etat(owner, res, env = process.env) {
+  const [b, compteur, jour] = await Promise.all([lireBoite(owner), lireLigne('vrm_invoice_counter', owner, 'data'), lireLigne(ID_ENVOIS_JOUR, owner, 'data')]);
   if (b === undefined) return repondre(res, 503, { erreur: 'pas-su', message: "Je n'ai pas pu lire ta boîte d'envoi (la base n'a pas répondu)." });
-  return repondre(res, 200, { ok: true, coffre: coffrePret(), boite: boitePublique(b), fournisseurs: Object.fromEntries(Object.entries(FOURNISSEURS).map(([k, f]) => [k, { l: f.l, hote: f.hote, port: f.port }])), messageDefaut: MESSAGE_DEFAUT });
+  // Le prochain n° (lu, jamais deviné) : null = pas su.
+  const cpt = compteur === undefined ? null : lireCompteur(compteur);
+  const conf = configurationEnvoiVrm(env);
+  const n = jour === undefined ? null : (jour && jour.jour === jourParisIso() && Number.isInteger(jour.n) ? jour.n : 0);
+  return repondre(res, 200, { ok: true, coffre: coffrePret(), boite: boitePublique(b), fournisseurs: Object.fromEntries(Object.entries(FOURNISSEURS).map(([k, f]) => [k, { l: f.l, hote: f.hote, port: f.port }])), messageDefaut: MESSAGE_DEFAUT,
+    prochain: cpt ? cpt.n + 1 : null,
+    vrm: { pret: conf.pret, manque: conf.manque, plafond: PLAFOND_JOUR, aujourdhui: n } });
 }
 
 export async function routeFacturePro(req, res, { vendeur, corps, acces, cloisonnee }) {
