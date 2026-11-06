@@ -120,7 +120,7 @@ async function contexte(b, vp, sombre) {
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
   return { ctx, pg, errs };
 }
-const clic = async (pg, sel) => { const l = pg.locator(sel).first(); await l.scrollIntoViewIfNeeded().catch(() => {}); await l.click({ timeout: 4000 }).catch(async () => { await pg.$eval(sel, (x) => x.click()); }); };
+const clic = async (pg, sel) => { const l = pg.locator(sel).first(); await l.scrollIntoViewIfNeeded().catch(() => {}); await l.click({ timeout: 4000 }).catch(async () => { await pg.$eval(sel, (x) => x.click()).catch(() => {}); }); };   // sous charge, un clic qui a agi peut « échouer » : la feuille s'est déjà refermée
 const ouvrirSelection = async (pg) => {
   await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
   await pg.locator('[data-vue-selection]').first().waitFor({ state: 'attached', timeout: 15000 });
