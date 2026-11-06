@@ -62416,6 +62416,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         );
       })()}
 
+      {/* ── Bandeau « Annuler » après « J'ai retiré » : remplacé le 6 nov. (v36) par la pilule commune
+          (src/PiluleAnnuler.jsx, montée dans la coque) — `markCollected` est un geste annulable. ── */}
     </div>
   );
 }

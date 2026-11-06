@@ -141,9 +141,11 @@ const corps = (src, nom) => { const i = src.indexOf(`function ${nom}(`); if (i <
     dit(p.nouveaux.length === 0, 'L1 · aucune numérotation ne bouge', `${p.nouveaux.length}`);
     // Dans l'app : la liaison ne s'écrit que dans les gestes (relier confirmé, défaire confirmé, « C'est écrit »).
     const src = sansCommentaires(APPSRC);
-    const ecritures = (src.match(/vcPoser\('vrm_vc_liens'/g) || []).length;
+    // (6 nov., v36) « C'est écrit » est un geste annulable (src/gesteAnnulable.js) : il écrit `vrm_vc_liens` par
+    // `gesteVrm(…, [{ k: 'vrm_vc_liens', … }])` — compté comme une écriture, et seulement dans le bloc « à barrer ».
+    const ecritures = (src.match(/vcPoser\('vrm_vc_liens'|\{ k: 'vrm_vc_liens'/g) || []).length;
     const relier = corps(src, 'relierVc'), defaire = corps(src, 'defaireVc'), barrer = corps(src, 'BlocBarrerVc');
-    const dansGestes = (relier.match(/vcPoser\('vrm_vc_liens'/g) || []).length + (defaire.match(/vcPoser\('vrm_vc_liens'/g) || []).length + (barrer.match(/onClick=\{\(\) => vcPoser\('vrm_vc_liens'/g) || []).length;
+    const dansGestes = (relier.match(/vcPoser\('vrm_vc_liens'/g) || []).length + (defaire.match(/vcPoser\('vrm_vc_liens'/g) || []).length + (barrer.match(/onClick=\{\(\) => vcPoser\('vrm_vc_liens'|onClick=\{\(\) => \{[^\n]*gesteVrm\([^\n]*\{ k: 'vrm_vc_liens'/g) || []).length;
     dit(ecritures === 3 && dansGestes === 3, 'L1 · App.jsx écrit `vrm_vc_liens` seulement dans relier / défaire / « C’est écrit »', `${ecritures} écritures, ${dansGestes} dans les gestes`);
     dit(/const ok = await askConfirm\(/.test(relier) && relier.indexOf('if (!ok) return false;') > 0 && relier.indexOf('if (!ok) return false;') < relier.indexOf("vcPoser('vrm_vc_liens'"), 'L1 · relier DEMANDE (confirmation) avant d’écrire');
     const appels = (src.match(/(?<!function )relierVc\(\{/g) || []).length;
