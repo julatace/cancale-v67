@@ -254,6 +254,8 @@ html body .vrm-app-shell .vrm-main .vrm-achats-filtres .vrm-cal-declencheur[data
 html body .vrm-app-shell .vrm-main .vrm-achats-bloc[data-repartis] { border: 0 !important; border-radius: var(--vrm-r-carte) !important; box-shadow: var(--vrm-ombre-carte); }
 html body .vrm-app-shell .vrm-main .vrm-achats-bloc[data-repartis] .vrm-alerte-ligne-titre { font-size: var(--vrm-t15); }
 html body .vrm-app-shell .vrm-main .vrm-achats-bloc[data-repartis] .vrm-alerte-ligne-sous { font-variant-numeric: tabular-nums; }
+html body .vrm-app-shell .vrm-main .vrm-achats-bloc[data-repartis] .vrm-achats-bloc-ligne { display: flex; flex-wrap: nowrap !important; align-items: center; gap: 12px; }
+html body .vrm-app-shell .vrm-main .vrm-achats-bloc[data-repartis] .vrm-achats-bloc-ligne > .vrm-pickup-lien { margin: 0 !important; flex: none; }
 
 /* « Ajouter un QR Mondial Relay » (Colis) : une rangée de carte, plus une phrase flottante. */
 html body .vrm-app-shell .vrm-main .vrm-mr-bloc > .vrm-repli > summary {
@@ -361,6 +363,8 @@ html body .vrm-app-shell .vrm-main details.vrm-bilan-sync:not([open]) {
 }
 html body .vrm-app-shell .vrm-main details.vrm-bilan-sync > summary { min-height: 48px; padding: 0 16px !important; font-size: var(--vrm-t15) !important; font-weight: 400 !important; color: var(--vrm-ink) !important; }
 html body .vrm-app-shell .vrm-main details.vrm-bilan-sync > summary span { font-size: var(--vrm-t15) !important; color: var(--vrm-muted) !important; }
+/* « ● Active » : le point à l’encre — l’accent n’est pas une puce d’état (§7 : le bleu est rare). */
+html body .vrm-app-shell .vrm-main .vrm-lbc-catalog-info [data-etat=active]::before, :root[data-theme=dark] body .vrm-app-shell .vrm-main .vrm-lbc-catalog-info [data-etat=active]::before { background: var(--vrm-ink) !important; }
 /* Une annonce Leboncoin sans photo : une vignette basse (le dessin), plus un carré vide de 170 px. */
 html body .vrm-app-shell .vrm-main .vrm-lbc-catalog .vrm-lbc-catalog-photo-empty { aspect-ratio: 16 / 9 !important; height: auto !important; max-height: 110px; }
 
