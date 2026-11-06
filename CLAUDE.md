@@ -508,6 +508,8 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 
+- **6 nov. · Ouvrir aux clients** : pas-à-pas `docs/ouvrir-aux-clients.md` (mentions, Supabase SMTP, Vercel Pro, Stripe, verrou `abonnement_obligatoire`) ; « Découvrir avec des exemples » (`src/modeExemple.js` : tout en mémoire, 0 écriture) ; guide de démarrage coché sur preuve (`src/guideDemarrage.js`). `docs/passation/2026-11-06-clients.md`. Geste : suivre le pas-à-pas.
+
 - **6 nov. · SMS Mondial Relay** : casiers annoncés par SMS ⇒ Raccourcis POST `/api/widget?mode=sms` (jeton `vrm_sms_token`, le vendeur = le jeton), rangés comme les e-mails. `docs/passation/2026-11-06-sms-colis.md`. Geste : Réglages → SMS Mondial Relay.
 
 - **6 nov. · Sauvegarde + prix au numérotage** : copie nocturne chiffrée du `public` (gpg, artefact 30 j, dépôt PUBLIC ⇒ jamais en clair), essai de restauration le dimanche (`scripts/sauvegarde/`) ; prix d'achat demandé à chaque N° par UNE écriture (`src/prixAuNumerotage.js`, vide ⇒ rien), carte Ma journée fusionnée. `docs/passation/2026-11-06-sauvegarde-prix.md`. Geste : poser `SUPABASE_DB_URL` (Session pooler) et `SAUVEGARDE_PHRASE` dans les secrets GitHub, puis Run workflow.

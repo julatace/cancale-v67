@@ -146,6 +146,11 @@ import { L, Lbas, VERBES, PAS_SU } from "./libelles.js";
 import Bienvenue from "./Bienvenue.jsx";
 import VisiteBulles from "./VisiteBulles.jsx";
 import { CLE_VISITE } from "./visiteBulles.js";
+// (6 nov.) VRM ouvert à des clients : le mode exemple (données inventées, en mémoire
+// seulement) et le guide de démarrage (quatre étapes cochées sur une preuve lue).
+import { exempleActif, entrerModeExemple, sortirModeExemple } from "./modeExemple.js";
+import { GuideDemarrage, BandeauExemple } from "./GuideDemarrage.jsx";
+import { etatGuide, preuveExtension, preuveListe, preuveNombre, compterNumeros } from "./guideDemarrage.js";
 import { PHRASES_ECRAN } from "./phrasesEcran.js";
 import { VAPID_PUBLIC_KEY } from "./vapid.js";
 import { noterPlantage, viderPlantages, ecouterViolationsCspDans, derniersPlantages } from "./plantages.js";
@@ -2130,6 +2135,8 @@ const SYNC_KEYS = [
   // (2 nov.) La visite en bulles a été vue (ou passée) : elle ne revient ni après
   // un rechargement ni sur un autre appareil (src/visiteBulles.js, CLE_VISITE).
   'vrm_visite_vue',
+  // (6 nov.) « Masquer le guide » de démarrage (src/guideDemarrage.js) : le même choix sur tous ses appareils.
+  'vrm_guide_masque',
   // (28 oct., 5.252) Les brouillons qu'il a retirés de la liste (« plus sur Vinted »).
   'vrm_brouillons_ecartes',
   // (5 nov.) « Republier à la main, accompagné » : { [ancienId]: { uid, num, titre, at, nouvelId?, lieAt? } }.
@@ -19929,7 +19936,7 @@ function TutoIllustration({ n }) {
     </div>
   );
 }
-function PremiersPas({ onNav, titreNeuf, introNeuf }) {
+function PremiersPas({ onNav, titreNeuf, introNeuf, dansGuide = false }) {
   const { extAuth, etape, relire } = useEtapePont();
   const sansSouris = useSansSouris();
   // ⚠️⚠️ Revue du 11 octobre : « je la connecte d'ici, sans rien à taper » était
@@ -20010,7 +20017,7 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
        sa boutique (aucun zip ne s'installe sur un téléphone). Lien PUBLIÉ
        seulement (`LIENS_BOUTIQUES`) : sinon, la phrase d'avant. */
     <>
-      {introNeuf ? <p style={{margin:'0 0 10px'}}>{introNeuf}</p> : (
+      {dansGuide ? null : introNeuf ? <p style={{margin:'0 0 10px'}}>{introNeuf}</p> : (
         <p style={{margin:'0 0 10px'}}>VRM ne va rien chercher tout seul sur Vinted. C’est une petite extension, installée dans ton navigateur, qui lit tes pages Vinted quand tu y passes et range tout ici.</p>
       )}
       <p style={{margin:0}} data-premiers-boutique="firefox-android">Sur ton téléphone, Firefox accepte l’extension&nbsp;: installe-la depuis la boutique de Firefox (bouton ci-dessous), puis reviens ici — l’écran avance tout seul.</p>
@@ -20020,7 +20027,7 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
        suivre, c'est donner du travail impossible — et proposer d'y télécharger
        un zip, c'est pire. On dit OÙ ça se passe, et rien d'autre. */
     <>
-      {introNeuf ? <p style={{margin:'0 0 10px'}}>{introNeuf}</p> : (
+      {dansGuide ? null : introNeuf ? <p style={{margin:'0 0 10px'}}>{introNeuf}</p> : (
         <p style={{margin:'0 0 10px'}}>VRM ne va rien chercher tout seul sur Vinted. C’est une petite extension, installée dans ton navigateur, qui lit tes pages Vinted quand tu y passes et range tout ici.</p>
       )}
       {/* 19 octobre : le BON geste selon le navigateur du téléphone (mesuré,
@@ -20048,7 +20055,7 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
   ) : boutique.lien ? (
     /* 5.188 : la fiche de CE navigateur est publiée — un seul geste, « Ajouter ». */
     <>
-      {introNeuf ? <p style={{margin:'0 0 10px'}}>{introNeuf}</p> : (
+      {dansGuide ? null : introNeuf ? <p style={{margin:'0 0 10px'}}>{introNeuf}</p> : (
         <p style={{margin:'0 0 10px'}}>VRM ne va rien chercher tout seul sur Vinted. C’est une petite extension, installée dans ton navigateur, qui lit tes pages Vinted quand tu y passes et range tout ici. Elle ne touche jamais à ton mot de passe Vinted.</p>
       )}
       <p style={{margin:0}} data-premiers-boutique={boutique.nav}>Installe-la depuis la boutique de {nomNavigateurIci()} (bouton ci-dessous) et clique «&nbsp;Ajouter&nbsp;». Reviens ensuite ici&nbsp;: l’écran avance tout seul.</p>
@@ -20058,7 +20065,7 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
        Firefox : paquet prêt, mais pas encore publié (`LIENS_BOUTIQUES`) ;
        Safari : aucune version. On dit où ça marche aujourd'hui, sans promesse. */
     <>
-      {introNeuf ? <p style={{margin:'0 0 10px'}}>{introNeuf}</p> : (
+      {dansGuide ? null : introNeuf ? <p style={{margin:'0 0 10px'}}>{introNeuf}</p> : (
         <p style={{margin:'0 0 10px'}}>VRM ne va rien chercher tout seul sur Vinted. C’est une petite extension, installée dans ton navigateur, qui lit tes pages Vinted quand tu y passes et range tout ici.</p>
       )}
       <p style={{margin:0}} data-premiers-boutique={boutique.nav + '-pas-encore'}>
@@ -20072,7 +20079,7 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
     </>
   ) : (
     <>
-      {introNeuf ? <p style={{margin:'0 0 10px'}}>{introNeuf}</p> : (
+      {dansGuide ? null : introNeuf ? <p style={{margin:'0 0 10px'}}>{introNeuf}</p> : (
         <p style={{margin:'0 0 10px'}}>VRM ne va rien chercher tout seul sur Vinted. C’est une petite extension, installée dans ton navigateur, qui lit tes pages Vinted quand tu y passes et range tout ici. Elle ne touche jamais à ton mot de passe Vinted.</p>
       )}
       <p style={{margin:'0 0 4px'}}>Commence par la télécharger. Ensuite&nbsp;:</p>
@@ -20124,17 +20131,21 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
        vingt-trois fois dans ce projet. Le banc juge l'état rendu et ses
        conséquences (quel bouton, quelles adresses nommées) ; le texte reste
        libre. */
-    <div className="vrm-card" data-etape={etape} data-voie={fait.ext && !fait.lien ? voie : undefined} style={{padding:'22px 20px',border:`1px solid ${etape==='autrecompte'?C.warn+'66':C.border}`,borderRadius:12,background:C.card}}>
-      {/* Où on en est — trois pastilles, lisibles d'un coup d'œil. */}
-      <div style={{display:'flex',gap:6,marginBottom:14}}>
+    <div className={dansGuide ? 'vrm-premiers-sans-cadre' : 'vrm-card'} data-etape={etape} data-voie={fait.ext && !fait.lien ? voie : undefined} style={{padding:'22px 20px',border:`1px solid ${etape==='autrecompte'?C.warn+'66':C.border}`,borderRadius:12,background:C.card}}>
+      {/* Où on en est — trois pastilles, lisibles d'un coup d'œil. (6 nov.) Dans le
+          guide de démarrage, c'est le guide qui dit où on en est : ni pastilles ni
+          liste ici, une seule carte (`dansGuide`). */}
+      {!dansGuide && <div style={{display:'flex',gap:6,marginBottom:14}}>
         {ETAPES.map((e,k)=>(
           <span key={e.c} style={{flex:1,height:4,borderRadius:999,background:(k+1)<=n?C.accent:C.border,opacity:(k+1)===n?.55:1}}/>
         ))}
-      </div>
+      </div>}
       {/* Mini-tuto illustré de l'étape courante — sur le parcours normal (3 étapes),
           pas sur un état-problème où un autre message doit dominer. */}
       {['absente','demande','pasconnectee','connectee'].includes(etape) && <TutoIllustration n={n}/>}
-      <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:-0.3}}>{titre}</div>
+      {/* (6 nov.) Dans le guide, le titre d'accueil et l'introduction se taisent : l'étape
+          et son « pourquoi » les disent déjà. Un titre d'ÉTAT (autre boutique, pas connectée…) reste. */}
+      {!(dansGuide && titre === (titreNeuf || 'Bienvenue — on branche ta boutique en trois minutes')) && <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:-0.3}}>{titre}</div>}
       <div style={{fontSize:13,color:C.muted,marginTop:7,lineHeight:1.6}}>{corps}</div>
 
       {(bouton || onNav) && (
@@ -20146,13 +20157,13 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
 
       {/* Les autres étapes restent VISIBLES, en sourdine : savoir ce qui reste
           rassure, le détail de chacune arrive à son tour. */}
-      <ol className="vrm-stagger" style={{margin:'12px 0 0',padding:'0 0 0 18px',fontSize:12,color:C.muted,lineHeight:1.9}}>
+      {!dansGuide && <ol className="vrm-stagger" style={{margin:'12px 0 0',padding:'0 0 0 18px',fontSize:12,color:C.muted,lineHeight:1.9}}>
         {ETAPES.map((e,k)=>(
           <li key={e.c} style={{color:(k+1)===n?C.text:C.muted,fontWeight:(k+1)===n?600:400}}>
             {(k+1)<n && <span style={{color:INV_STATUS.online.color,fontWeight:700,marginRight:5}}>✓</span>}{e.t}
           </li>
         ))}
-      </ol>
+      </ol>}
       {/* L'écran avance TOUT SEUL : le pont prévient dès que l'extension
           répond. Le dire, c'est la différence entre « on t'accompagne » et
           « débrouille-toi ». On ne promet aucun délai pour autant. */}
@@ -20166,6 +20177,72 @@ function PremiersPas({ onNav, titreNeuf, introNeuf }) {
       </div>
 
     </div>
+  );
+}
+
+// ── LE GUIDE DE DÉMARRAGE, BRANCHÉ SUR LES PREUVES DE L'APP (6 nov.) ─────────
+// La règle et les textes : src/guideDemarrage.js ; le dessin : src/GuideDemarrage.jsx.
+// Ici, seulement les LECTURES qui prouvent chaque étape (§8, trois états) :
+//   · extension : le pont (`useEtapePont`) ou un compte déjà rangé ;
+//   · Vinted : `comptes` (la liste lue par la coque ; `undefined` en cours, `null` pas su) ;
+//   · boîte e-mail : une ligne `email_reception_*` chez lui (une seule, `select=id`,
+//     jamais `select=data`) ; échec ⇒ `null`, jamais « aucun » ;
+//   · numéros : ses tables synchronisées, lues après l'arrivée du nuage.
+// `plein` (aucun compte relié) : la carte d'accueil, avec « Découvrir avec des
+// exemples ». Sinon : seulement s'il reste une étape à faire, et « Masquer le guide ».
+// En mode exemple : rien (le bandeau dit déjà « Brancher mes comptes »).
+const CLE_GUIDE_MASQUE = 'vrm_guide_masque';
+function useReceptionEmails(actif) {
+  const [l, setL] = React.useState(undefined);
+  React.useEffect(() => {
+    if (!actif) return undefined;
+    let stop = false;
+    (async () => {
+      try {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_reception_*&select=id&limit=1`, { headers: sbAuth(), cache: 'no-store' });
+        const j = r.ok ? await r.json() : null;
+        if (!stop) setL(Array.isArray(j) ? j : null);
+      } catch (_) { if (!stop) setL(null); }
+    })();
+    return () => { stop = true; };
+  }, [actif]);
+  return l;
+}
+function useNumerosGuide() {
+  const lire = () => (isCloudReady() ? compterNumeros(load('vinted_annonce_numeros', {}), load('vrm_vc_numeros', {})) : undefined);
+  const [n, setN] = React.useState(lire);
+  React.useEffect(() => {
+    const off = onCloudReady(() => setN(lire()));
+    const f = (e) => { const k = e && e.detail && e.detail.k; if (k === 'vinted_annonce_numeros' || k === 'vrm_vc_numeros') setN(lire()); };
+    window.addEventListener('vrm:save', f);
+    return () => { if (typeof off === 'function') off(); window.removeEventListener('vrm:save', f); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  return n;
+}
+// Le pont n'est interrogé que pour la carte d'accueil (`plein`) : un compte relié
+// prouve déjà l'extension, Ma journée ne questionne pas l'extension pour rien.
+function GuidePont({ children }) { const { etape } = useEtapePont(); return children(etape); }
+function GuideDemarrageApp(props) {
+  if (exempleActif()) return null;
+  return props.plein ? <GuidePont>{(etape) => <GuideDemarrageCarte {...props} etape={etape}/>}</GuidePont> : <GuideDemarrageCarte {...props} etape={null}/>;
+}
+function GuideDemarrageCarte({ onNav, comptes, plein = false, etape }) {
+  const sansSouris = useSansSouris();
+  const [masque, setMasque] = React.useState(() => !!load(CLE_GUIDE_MASQUE, null));
+  React.useEffect(() => onCloudReady(() => setMasque(!!load(CLE_GUIDE_MASQUE, null))), []);
+  const emails = useReceptionEmails(plein || !masque);
+  const nNum = useNumerosGuide();
+  const guide = etatGuide({ extension: preuveExtension(etape, comptes), vinted: preuveListe(comptes), emails: preuveListe(emails), numeros: preuveNombre(nNum) });
+  if (!plein && (guide.fini || masque || !guide.courante)) return null;
+  const sansCompte = Array.isArray(comptes) && comptes.length === 0;
+  return (
+    // Où s'installe l'extension : dans CE navigateur, ou — appareil sans extension
+    // (téléphone, sauf Orion et Firefox Android avec sa fiche) — sur l'ordinateur.
+    <GuideDemarrage guide={guide} nav={(sansSouris && !(mobileIci() === 'ios-orion' || (boutiqueIci().nav === 'firefox' && estAndroid() && boutiqueIci().lien))) ? 'sur ton ordinateur' : NAV.dansNu}
+      detail={<PremiersPas onNav={onNav} dansGuide/>}
+      gestes={{ emails: { libelle: 'Relier ma boîte', onClick: () => ouvrirEmailsRelier() }, numeros: { libelle: 'Voir mes annonces', onClick: () => onNav && onNav('annonces') } }}
+      onExemple={sansCompte ? () => entrerModeExemple() : null}
+      onMasquer={!plein ? () => { save(CLE_GUIDE_MASQUE, { at: new Date().toISOString() }); setMasque(true); } : null}/>
   );
 }
 
@@ -20184,9 +20261,8 @@ function Onboarding({ setTab }) {
           </div>
         </div>
       </div>
-      <PremiersPas onNav={setTab}
-        titreNeuf="Pour commencer, relie ton compte Vinted"
-        introNeuf={<>VRM ne va rien chercher tout seul&nbsp;: c'est l'extension, dans ton navigateur, qui range ce que Vinted t'envoie déjà. Elle ne touche jamais à ton mot de passe Vinted.</>}/>
+      {/* (6 nov.) Le guide de démarrage : la MÊME carte que Ma journée (§11). */}
+      <GuideDemarrageApp onNav={setTab} comptes={[]} plein/>
       <div style={{fontSize:12,color:C.muted,textAlign:'center',marginTop:14,lineHeight:1.4}}>
         Déjà des données ailleurs&nbsp;? Va dans Paramètres → Restaurer une sauvegarde pour les récupérer.
       </div>
@@ -54643,11 +54719,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               /* §11 : les étapes vivent dans `PremiersPas`, rendu ici ET sur le
                  tableau de bord. Deux copies, c'était deux consignes — mesuré
                  au rendu le 16 septembre. */
-              ? <PremiersPas onNav={onNav}
-                  titreNeuf="Bienvenue — il reste une chose à brancher"
-                  introNeuf={<>Aucun compte Vinted n'est encore relié&nbsp;: c'est l'extension, dans ton navigateur, qui range tes ventes.</>}/>
+              /* (6 nov.) Le guide de démarrage (quatre étapes, cochées sur une preuve) porte
+                 `PremiersPas` comme détail de l'étape courante — une seule carte. */
+              ? <GuideDemarrageApp onNav={onNav} comptes={accounts} plein/>
               : null
             )}
+            {/* (6 nov.) Un compte relié : le guide reste tant qu'une étape est à faire
+                (boîte e-mail, numéros), et se masque d'un geste. */}
+            {!loading && !baseKO && !premierJour && accountsReady && Array.isArray(accounts) ? <GuideDemarrageApp onNav={onNav} comptes={accounts}/> : null}
 
             {/* ⚠️ `accounts.length===0` veut dire « aucun compte » OU « je n'ai
                 rien pu lire » : pendant la panne cette consigne envoyait lier
@@ -72040,6 +72119,8 @@ function AppCoeur() {
           la barre de Ma journée dit déjà colis, messages et prix, sans couvrir l'écran. */}
       {/* Sur ordinateur, le contenu occupe la largeur disponible après le rail.
           L'ordre des blocs et la disposition de chaque page restent conservés. */}
+      {/* (6 nov.) Mode exemple : le bandeau, hors de <main> (il ne défile pas), sur TOUS les écrans. */}
+      {exempleActif() && <BandeauExemple style={ordi ? { marginLeft: NAV_LARGEUR + 36 } : undefined} onBrancher={() => sortirModeExemple()}/>}
       <main className="vrm-main" data-ecran={tab} data-defile="1" style={{
         // ⚠️ COQUE APP-SHELL : c'est `<main>` qui défile, pas le document. La
         // barre du bas est un frère HORS de ce conteneur → elle ne bouge plus

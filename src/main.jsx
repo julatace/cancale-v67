@@ -1,3 +1,7 @@
+// (6 nov.) LE MODE EXEMPLE s'installe EN PREMIER, avant tout module de l'app : s'il
+// est demandé par cet onglet, le stockage et la base deviennent des copies en
+// mémoire (src/modeExemple.js) — rien de l'exemple n'est écrit nulle part.
+import './modeExemple.js';
 import { cleVapid, abonnementAJour } from './vapid.js';
 import React from 'react';
 import ReactDOM from 'react-dom/client';

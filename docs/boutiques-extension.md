@@ -346,3 +346,46 @@ du navigateur (partitionnement possible), la nécessité du `Referer` (interdit 
 demande de permission dans un vrai Firefox (la fenêtre peut se fermer quand la
 demande s'affiche ; la lecture repart à l'accord par `permissions.onAdded`).
 `web-ext lint` n'est pas installé dans ce conteneur : pas relancé pour la 5.290.
+
+## 8. Ouvrir aux clients : les trois boutiques, dans l'ordre (6 nov.)
+
+Complète `docs/ouvrir-aux-clients.md` §7 (le pas-à-pas général) ; les textes à
+coller restent ceux du §3 ci-dessus et de `docs/chrome-web-store/README.md`.
+
+**Avant toute fiche.** Les mentions légales complètes (`public/legal/editeur.js`,
+10 champs) : chaque boutique demande l'adresse de la politique de confidentialité
+(`https://vrm.center/legal/confidentialite.html`) et un relecteur qui y lit
+« à compléter » peut refuser.
+
+**Le fichier.** `node scripts/zip-extension.cjs --store VRM-chromium.zip --firefox VRM-firefox.zip`
+— `VRM-chromium.zip` (manifeste à la racine : Chrome, Edge, Opera, Brave),
+`VRM-firefox.zip` (Firefox ordinateur et Android, Orion). Jamais
+`public/VRM-extension.zip` (il se dézippe en UN dossier, pour l'installation à la
+main — les boutiques veulent le manifeste à la racine). Le paquet Orion
+(`public/VRM-Orion.xpi`) reste l'installation par fichier tant qu'aucune fiche
+Firefox n'est publiée.
+
+| | Chrome Web Store | Firefox (AMO) | Microsoft Edge Add-ons |
+|---|---|---|---|
+| compte | Google, accepter le contrat développeur | Mozilla | Microsoft (Partner Center, programme Edge) |
+| coût | **5 $ une fois** (inscription développeur) | gratuit | gratuit |
+| paquet | `VRM-chromium.zip` | `VRM-firefox.zip` | `VRM-chromium.zip` |
+| à fournir | description, catégorie, icône 128 (dans le paquet), captures 1280×800 (`docs/chrome-web-store/capture-*.png`), vignette 440×280, **objectif unique**, **justification de chaque permission** (`cookies`, `storage`, `alarms`, `scripting`, `tabs`, `downloads` et chaque hôte — tableau du README Chrome), « code distant : non », données collectées + les trois certifications, politique de confidentialité | résumé, description, catégories, licence, politique de confidentialité, **notes pour le relecteur** (§3), plateformes Firefox + Firefox pour Android | les mêmes textes que Chrome |
+| revue | en général quelques jours ; Google prévient que les délais peuvent s'allonger, et l'accès aux cookies et à de nombreux sites rallonge l'examen | de quelques heures à quelques jours | jusqu'à 7 jours ouvrés |
+| visibilité conseillée au début | « Non répertoriée » (par lien) | « Sur ce site » (sinon Orion ne la trouve pas) | publique ou masquée |
+
+**Pourquoi la justification des permissions compte.** Le motif de refus le plus
+courant d'une extension est une permission mal expliquée ; celle de VRM demande
+les cookies (savoir quel compte Vinted est ouvert) et beaucoup d'hôtes (Vinted,
+Leboncoin, eBay, Vestiaire, transporteurs). Coller le tableau tel quel, une ligne
+par permission, sans « au cas où ».
+
+**Après chaque acceptation.** L'adresse de la fiche → `LIENS_BOUTIQUES`
+(`src/navigateursServis.js`) : l'app propose alors « Installer depuis la
+boutique » (`PremiersPas`, guide de démarrage) au lieu du zip. Chaque nouvelle
+version de l'extension repasse par la revue de chaque boutique.
+
+**Non vérifié d'ici (6 nov.)** : les pages officielles de Google, Mozilla et
+Microsoft ne sont pas joignables depuis le conteneur ; montants et délais ci-dessus
+sont ceux affichés publiquement à ce jour (recherche web) — à revérifier à
+l'inscription.
