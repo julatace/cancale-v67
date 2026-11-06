@@ -59,7 +59,7 @@ html body .vrm-app-shell .vrm-cl-carte a.vrm-cl-bouton { display: flex; align-it
 .vrm-sans-compte { display: flex; flex-direction: column; gap: 10px; margin: 0 0 16px; min-width: 0; }
 .vrm-sans-compte-ligne { background: var(--fu-carte); color: var(--fu-encre); border-radius: 16px; box-shadow: var(--fu-ombre); padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; box-sizing: border-box; }
 .vrm-sans-compte-tete { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.vrm-sans-compte-titre { font: 600 15px/1.35 var(--vrm-police); color: var(--fu-ambre-txt); font-variant-numeric: tabular-nums; }
+.vrm-sans-compte-titre { font: 600 15px/1.35 var(--vrm-police); color: var(--fu-ambre-txt); }
 .vrm-sans-compte-adresse { font: 500 14px/1.4 var(--vrm-police); color: var(--fu-encre); overflow-wrap: anywhere; }
 .vrm-sans-compte-aide { font: 500 13px/1.45 var(--vrm-police); color: var(--fu-gris); }
 .vrm-sans-compte-gestes, .vrm-sans-compte-choix { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; min-width: 0; }
