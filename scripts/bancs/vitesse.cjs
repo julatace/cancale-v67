@@ -302,6 +302,14 @@ function bilan(nom, r) {
 // un temps mesuré dessus varie du simple au double (`perfv.cjs` garde ceux de
 // la frappe sur Ventes).
 const DOUBLONS_MAX = 8;
+// (6 nov., vitesse 2) LE PREMIER CHARGEMENT DE MA JOURNÉE : les fichiers de l'app
+// (JavaScript + CSS, compressés) téléchargés pour l'ouvrir. Mesuré le 6 nov. :
+// ~1 395 Ko avant (le morceau `App` seul : 1 194 Ko), ~1 290 Ko après le
+// découpage des écrans qui ne sont pas l'écran d'ouverture. Le plafond ne bloque
+// que le retour du défaut (un écran à la demande réimporté en statique).
+const JS_JOURNEE_MAX = 1340 * 1024;
+// Les morceaux chargés À LA DEMANDE : aucun ne doit partir à l'ouverture de Ma journée.
+const MORCEAUX_A_LA_DEMANDE = /\/assets\/(FavorisVinted|FacturePro|AchatsOutils|ebayGestion|ebayRecherche|FichePaire|ModeEmballage|PublierAilleurs|Dac7Comptes|ScannerColis|OffresVestiaire|PrixPartout|ReceptionEmails|JournalEmails|qrcode|Room3D|StudioPhoto|Communaute|BoiteEmails|Operations|three\.module|maplibre-gl|jsQR)-/;
 // Rendus de Ma journée au démarrage, téléphone ×4 (médiane de trois ouvertures
 // à froid) : 14 à 19 avant le 17 octobre, 11 à 12 après (`BoutonSync`, lectures de la fin
 // lancées avec les ventes). Le plafond ne bloque que le retour du défaut.
@@ -373,6 +381,10 @@ const ECRANS = [
           dit(ref != null && a === c, `${vp.width} px · ${tab} : texte rendu identique à celui de l'autre build (${process.env.VITESSE_REFERENCE})`, ref == null ? 'pas de référence' : a === c ? `${a.length} caractères` : `écart au caractère ${i} : « ${a.slice(Math.max(0, i - 40), i + 60)} » ≠ « ${c.slice(Math.max(0, i - 40), i + 60)} »`);
         }
         if (tab === 'journee') {
+          // ── (6 nov., vitesse 2) LE PREMIER CHARGEMENT : ni un morceau à la demande, ni plus que le plafond.
+          const inutiles = (r.fichiers || []).map((x) => x.f).filter((x) => MORCEAUX_A_LA_DEMANDE.test(x));
+          dit(!inutiles.length, `${vp.width} px · journee : aucun morceau chargé à la demande n'est téléchargé à l'ouverture`, inutiles.join(', ') || 'aucun');
+          dit(m.octJs > 0 && m.octJs <= JS_JOURNEE_MAX, `${vp.width} px · journee : au plus ${Math.round(JS_JOURNEE_MAX / 1024)} Ko de JavaScript et CSS compressés au premier chargement`, `${Math.round(m.octJs / 1024)} Ko`);
           // ── CE QUE LES AJOUTS DU 21-22 OCTOBRE FAISAIENT LIRE ET RENDRE EN TROP (22 oct.) ──
           // Mesuré par bissection (une construction par fusion de `main`) : Ma
           // journée est passée de 54 à 64 lectures et de ~13 à 15-16 rendus. Les
