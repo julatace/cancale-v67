@@ -50,6 +50,9 @@ import {FAMILLES as FAMILLES_NOTIF,familleActive as familleNotifActive,reglageCa
 import {apercuFamille as apercuFamilleNotif} from '../api/_lib/notif-apercus.js';
 import './notif-reglages.css';
 import GuideIphone, { useGuideIphone } from './GuideIphone.jsx';
+// (6 nov.) « Recevoir les SMS Mondial Relay » : jeton, adresse, pas-à-pas Raccourcis (api/_lib/sms-mondialrelay.js).
+import SmsColisSetting from './SmsColis.jsx';
+import { etatJetonSms } from './smsColis.js';
 import {achatDuColis,suivisAchat,entreeIndexAchat} from './liensColis.js';
 import {achatParConversation, regrouperArrivees} from '../api/_lib/achat-arrive-relais.js';
 import {indexCodesSuivis, finParIdentite, fusionnerParCode} from './retraitPreuves.js';
@@ -2198,6 +2201,10 @@ const SYNC_KEYS = [
   // Clé personnelle du widget iPhone (voir api/widget.js) : sans elle, la route
   // renverrait le chiffre d'affaires à qui connaît l'adresse.
   'vrm_widget_token',
+  // (6 nov.) Le jeton des SMS Mondial Relay (api/_lib/sms-mondialrelay.js) : le
+  // serveur range un SMS chez le vendeur DONT LA LIGNE `main` porte ce jeton.
+  // Créé, régénéré ou coupé sur SON clic seulement (src/smsColis.js).
+  'vrm_sms_token',
   // « Les paires qui dorment » : PUBLIÉ par l'écran Annonces (`annStats`, son
   // propriétaire, §11), CONSOMMÉ par le bilan de la semaine du serveur
   // (api/_lib/bilan-semaine.js) — qui ne le recalcule jamais.
@@ -21078,6 +21085,8 @@ const raisonAVerifier = (x) => {
     return i && i.libelle ? `${nom} dit « ${String(i.libelle).slice(0,120)} »` : `${nom} signale un problème`;
   }
   // (3 nov.) Annoncé par Vinted, au même relais qu'un colis du transporteur, sans identité commune.
+  // (6 nov.) Un SMS de Mondial Relay que VRM ne sait pas encore lire (seul son n° est gardé).
+  if (x.e.etat==='sms_inconnu') return "SMS de Mondial Relay pas reconnu : regarde le SMS ou l'app Mondial Relay";
   if (x.e.etat==='doute_meme_relais') return "peut-être le même colis qu'un autre e-mail de ce relais — rien ne les relie";
   if (x.e.etat==='delai_depasse' && x.e.heurePassee && x.e.limiteAt) return `délai de retrait passé aujourd'hui à ${heureParis(x.e.limiteAt)}`;
   if (x.e.etat==='delai_depasse') { const lim = x.kind==='email' && x.t ? x.t.limite : (x.e.limite || null); const jj = lim ? new Date(String(lim).slice(0,10)+'T00:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'}) : ''; return `délai de retrait dépassé${jj?` le ${jj}`:''}`; }
@@ -37091,6 +37100,17 @@ const cleanLieu = (raw) => {
   const r = cleanLieuCorps(s);
   return { ...r, type: r.nom ? type : '' };
 };
+// (6 nov.) LE NOM D'UN CASIER DIT QUE C'EST UN CASIER. « LOCKER 24/7 SUPER U » (SMS ou e-mail
+// de Mondial Relay) s'affichait « Super U » — rien ne disait qu'il n'y a pas de comptoir (on
+// tape le code sur l'écran du casier). Le TYPE lu en tête du lieu (`cleanLieu(...).type`) est
+// remis devant le nom, en français : « Casier 24/7 Super U ». Un point relais garde son nom ;
+// un casier et un comptoir du même nom restent deux points (deux cartes).
+const nomPointRetrait = (cl) => {
+  if (!cl || !cl.nom) return '';
+  const ty = String(cl.type || '');
+  if (/locker|casier/i.test(ty)) return `${/24\s*\/?\s*7/.test(ty) ? 'Casier 24/7' : 'Casier'} ${cl.nom}`;
+  return cl.nom;
+};
 const cleanLieuCorps = (s) => {
   if (!s) return { nom: '', adresse: '', display: '' };
   // Coupe le baratin après l'adresse.
@@ -45100,6 +45120,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const preuvesIdentite = (t, commande) => ({ codeDe: codeLigne, suiviDe: suiviDeLigne, commande, suivisDeAchat, codes: codesSuivis, fins, sortiParSuivis });
     for (const t of lignesColis) {
       if (t && t.status === 'available' && sensColis(t, suivisEnvoyes) !== 'sortant') { const k = suiviDeLigne(t); if (k) nJuges.add(k); }
+      // (6 nov.) UN SMS DE MONDIAL RELAY D'UNE FORME PAS ENCORE APPRISE (api/_lib/sms-mondialrelay.js) :
+      // rangé avec son n° seul. Ni « à retirer » (rien ne prouve l'arrivée), ni caché : « à vérifier »,
+      // sauf si une autre ligne du même n° dit déjà où il en est (disponible, retiré, reparti).
+      if (t && t.source === 'sms' && t.smsAVerifier && t.status === 'info') {
+        const k = suiviDeLigne(t);
+        if (!k || nDispoEmail.has(k) || nJuges.has(k) || (collected && collected.has(colisKey(t))) || sortiParSuivi(t, fins)) continue;
+        nJuges.add(k); aVerifier.push({ kind: 'email', t, e: { etat: 'sms_inconnu' }, o: commandeDuColis(t) }); continue;
+      }
       if (!isColisEnAttente(t, collected, suivisEnvoyes)) continue;
       { const so = sortiParSuivi(t, fins);
         // (24 oct.) Le transporteur signale un incident (« a quitté le point relais
@@ -52221,6 +52249,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         geste: `Ouvre Vinted${qui ? ` sur ${qui}` : ''}` };
     };
     const lieuDe = (raw) => { const cl = cleanLieu(raw); return { lieuNom: cl.nom || '', lieuAdresse: cl.adresse || '' }; };
+    // (6 nov.) « Casier 24/7 » / « Casier » quand le lieu écrit est un LOCKER (SMS ou e-mail Mondial
+    // Relay) : le point le porte devant son nom (src/relaisColis.js, `regrouperRelais`).
+    const typeCasier = (raw) => { const n = nomPointRetrait(cleanLieu(raw)); const m = /^(Casier(?: 24\/7)?) /.exec(n); return m ? m[1] : ''; };
     // (1er nov.) Le lieu d'un e-mail complété par le suivi du transporteur du
     // MÊME n° (Vinted Go : rue + ville du point où le colis attend) — par
     // identité, jamais par le nom ; deux adresses ⇒ rien, dit (`lieuConflit`).
@@ -52249,7 +52280,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const aa = a ? null : (achatsAutres.get(suiviDeLigne(t)) || null);
       L.push({ cle: 'r:e:' + (suiviDeLigne(t) || t.id || t.cleLigne || colisKey(t) || ''), groupe: 'retirer', site: aa ? aa.site : 'vinted', achatAutre: aa, nom: nomAvecTaille(a ? a.title : ((aa && aa.titre) || t.artTitle || (nomTr(t.carrier) ? `Colis ${nomTr(t.carrier)}` : 'Colis à retirer')), a), photo: a ? photoAchat(a) : ((aa && aa.photo) || t.photo || null),
         etat: [lu.lieuNom || nomTr(t.carrier), dernierJour(ej) || (code ? code : (qrImage(t) ? 'QR code' : 'code pas encore lu'))].filter(Boolean).join(' · '), ambre: Number.isFinite(ej) && ej <= 1, ouvrir: true,
-        ...lu, transporteur: t.carrier || '', transp: transporteurColis(t.carrier, suiviDeLigne(t)), code, code2: codeRetrait(t.code2) || '', qr: !!qrImage(t) && !code, jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eE), ...(lu.lieuNom ? {} : { sansLieu: sansLieuEmail(t) }), src: { t } });
+        ...lu, lieuType: typeCasier(t.lieu), transporteur: t.carrier || '', transp: transporteurColis(t.carrier, suiviDeLigne(t)), code, code2: codeRetrait(t.code2) || '', qr: !!qrImage(t) && !code, jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eE), ...(lu.lieuNom ? {} : { sansLieu: sansLieuEmail(t) }), src: { t } });
     }
     for (const o of (pickupUnion.extra || [])) {
       const r = relaisDe(o); const lu = completer(lieuDe(r && r.lieu), r && r.transporteur, ''); const code = r ? codeRetrait(r.code) : ''; const eV = etatColisVinted(o, maintenant, tpmC); const ej = eV.jours;
@@ -52267,7 +52298,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const code = x.kind === 'email' ? codeDeLigne(x.t) : codeRetrait((relaisDe(x.o) || {}).code);
       L.push({ cle: x.kind === 'email' ? 'r:e:' + (suiviDeLigne(x.t) || (x.t && (x.t.id || x.t.cleLigne)) || colisKey(x.t) || '') : 'r:v:' + (x.o && x.o.transaction_id), groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o ? o.title : (x.t && nomTr(x.t.carrier) ? 'Colis ' + nomTr(x.t.carrier) : 'Colis à retirer'), o), photo: o ? photoAchat(o) : ((x.t && x.t.photo) || null), trInconnu,
         etat: [lu.lieuNom || (x.kind === 'email' ? nomTr(x.t && x.t.carrier) : ''), 'à vérifier : délai dépassé ou incident'].filter(Boolean).join(' · '), aVerifier: true, horsCompte: true, ouvrir: true,
-        ...lu, transporteur: (x.kind === 'email' ? (x.t && x.t.carrier) : ((relaisDe(x.o) || {}).transporteur)) || '', transp: transporteurColis((x.kind === 'email' ? (x.t && x.t.carrier) : ((relaisDe(x.o) || {}).transporteur || (eSX && eSX.transporteur))) || '', suX), code, jours: null,
+        ...lu, lieuType: x.kind === 'email' ? typeCasier(x.t && x.t.lieu) : '', transporteur: (x.kind === 'email' ? (x.t && x.t.carrier) : ((relaisDe(x.o) || {}).transporteur)) || '', transp: transporteurColis((x.kind === 'email' ? (x.t && x.t.carrier) : ((relaisDe(x.o) || {}).transporteur || (eSX && eSX.transporteur))) || '', suX), code, jours: null,
         ...(lu.lieuNom ? {} : { sansLieu: x.kind === 'email' ? sansLieuEmail(x.t) : sansLieuVinted(x.o) }),
         // (2 nov.) Présentation seulement : la raison (`raisonAVerifier`, la même que
         // l'ancien bloc « à vérifier ») et la source, pour les gestes de SA carte.
@@ -55863,7 +55894,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const pointsConnus = {};
           ((dropOffs&&dropOffs.carriers)||[]).forEach(c=>c.points.forEach(p=>{ const k=normNom(p.nom); if(k&&!pointsConnus[k]) pointsConnus[k]=p; }));
           const groups = {};
-          avail.forEach(t=>{ const cl=cleanLieu(t.lieu); const lieuInconnu=!cl.nom; const nom = cl.nom || (t.consigne ? `Consigne Pick-up ${carrierName(t.carrier)}` : `${carrierName(t.carrier)} — lieu non indiqué dans l'e-mail`); const pc = lieuInconnu ? null : (pointsConnus[normNom(nom)]||null); (groups[nom]=groups[nom]||{colis:[],carrier:t.carrier,adresse:cl.adresse||(pc&&pc.adresse)||'',horaires:(pc&&pc.ouverture)||'',geoPt:pc||null,lieuInconnu}).colis.push(t); if(!groups[nom].carrier) groups[nom].carrier=t.carrier; });
+          avail.forEach(t=>{ const cl=cleanLieu(t.lieu); const lieuInconnu=!cl.nom; const nom = nomPointRetrait(cl) || (t.consigne ? `Consigne Pick-up ${carrierName(t.carrier)}` : `${carrierName(t.carrier)} — lieu non indiqué dans l'e-mail`); const pc = lieuInconnu ? null : (pointsConnus[normNom(cl.nom)]||null); (groups[nom]=groups[nom]||{colis:[],carrier:t.carrier,adresse:cl.adresse||(pc&&pc.adresse)||'',horaires:(pc&&pc.ouverture)||'',geoPt:pc||null,lieuInconnu}).colis.push(t); if(!groups[nom].carrier) groups[nom].carrier=t.carrier; });
           // (17 oct.) UN ENDROIT = UN BLOC, QUELLE QUE SOIT LA SOURCE. Plainte de Julien :
           // « des colis à Vinted Go et d'autres à Kusmi Tea (aussi Vinted Go) ». Mesuré :
           // l'email nommait le lieu « *Consigne Vinted Go*, * Kusmi Tea *… » (rangé sous
@@ -55874,7 +55905,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // Identité : le nom EXACT normalisé du lieu, jamais une ressemblance.
           const nomsEmail = new Set(Object.keys(groups).filter(n => !groups[n].lieuInconnu).map(normNom));
           const extraFusion = {}; const extraSeul = [];
-          extra.forEach(o => { const rel = relaisDe(o); const k = normNom(cleanLieu(rel && rel.lieu).nom); if (k && nomsEmail.has(k)) (extraFusion[k] = extraFusion[k] || []).push(o); else extraSeul.push(o); });
+          extra.forEach(o => { const rel = relaisDe(o); const k = normNom(nomPointRetrait(cleanLieu(rel && rel.lieu))); if (k && nomsEmail.has(k)) (extraFusion[k] = extraFusion[k] || []).push(o); else extraSeul.push(o); });
           return (
             <div className="vrm-pickup-board">
               <div className="vrm-pickup-head">
@@ -55915,7 +55946,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       réception est connue ET toujours reliée à aucun compte : une
                       ligne rangée avant le 23 oct. ne la porte pas (on ne sait pas
                       laquelle c'était — elle a pu être reliée depuis). */}
-                  {(()=>{ const sans = avail.filter(t => !compteDuColisEmail(t)); const n = sans.length;
+                  {(()=>{ const sans = avail.filter(t => !compteDuColisEmail(t) && t.source !== 'sms'); const n = sans.length;   /* (6 nov.) un SMS n'a pas d'adresse de réception : il le dit sur sa carte */
                     const adresseLibre = sans.some(t => Array.isArray(t.recuSur) && t.recuSur.length);
                     return n ? <div data-pickup-sans-compte={n} style={{fontSize:12,color:C.muted,marginTop:3,lineHeight:1.4}}>{n>1?`${n} colis : compte non reconnu`:'1 colis : compte non reconnu'}{adresseLibre?' — Relie-la dans Paramètres → Comptes liés.':''} <Pourquoi label="Pourquoi">L'e-mail est arrivé sur une adresse qui n'était alors reliée à aucun de tes comptes Vinted (e-mail du compte, dans Paramètres → Comptes liés).</Pourquoi></div> : null; })()}
                   {/* ⚠️ « À chaque fois on doit voir le nombre de paires que l'on
@@ -58272,6 +58303,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {/* (5 nov.) LE COMPTE QUAND ON LE SAIT (src/retraitQr.js, `compteDuRetrait`) : le compte Mondial Relay
                   où il a été lu, sinon l'adresse qui a reçu l'e-mail — et « dans aucun compte Mondial Relay » quand
                   tous ses comptes relus sont complets et qu'aucun ne le porte. Jamais deviné. */}
+              {/* (6 nov.) UN COLIS ANNONCÉ PAR SMS (api/_lib/sms-mondialrelay.js) : dit, et s'il n'est relié à
+                  AUCUN achat connu, dit aussi — jamais caché pour ça. Un autre code dans le SMS que dans
+                  l'e-mail (l'e-mail fait foi) se dit, il ne disparaît pas. */}
+              {t && (t.source === 'sms' || t.aussiSms) ? (() => { const cmdT = pickupUnion.cmdParColis ? pickupUnion.cmdParColis.get(colisKey(t)) : null;
+                const sansAchat = !cmdT && !x.achatAutre && !achatDuColis(t, buysBase, indexSuivisAchats);
+                return <span className="vrm-rp-sous" data-colis-sms={t.source === 'sms' ? 'sms' : 'aussi'} data-colis-sans-achat={sansAchat ? '1' : undefined}>{[t.source === 'sms' ? 'Reçu par SMS Mondial Relay' : 'Aussi annoncé par SMS', sansAchat ? 'achat pas encore relu' : ''].filter(Boolean).join(' · ')}</span>; })() : null}
+              {t && t.codeSms && codeRetrait(t.codeSms) && codeRetrait(t.codeSms) !== codeRetrait(t.code) ? <span className="vrm-rp-sous is-ambre" data-colis-code-sms={codeRetrait(t.codeSms)}>{`Le SMS donne un autre code : ${codeRetrait(t.codeSms)} (l’e-mail fait foi)`}</span> : null}
               {t ? (() => { const cr = compteDuRetrait(t, mrColis); if (!cr) return null;
                 return <span className="vrm-rp-sous" data-colis-compte-source={cr.source} data-colis-compte-mr={cr.source === 'mondialrelay' ? cr.libelle : undefined} data-colis-hors-comptes-mr={cr.horsComptes ? '1' : undefined}>
                   {cr.source === 'mondialrelay' ? `Compte Mondial Relay · ${cr.libelle}${cr.aussiEmail ? ' · aussi par e-mail' : ''}` : [cr.libelle ? `Arrivé par e-mail sur ${cr.libelle}` : 'Arrivé par e-mail', cr.horsComptes ? 'dans aucun de tes comptes Mondial Relay relus' : ''].filter(Boolean).join(' · ')}</span>; })() : null}
@@ -64966,6 +65004,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   const valZoom = (() => { const z = readZoom(); const t = etroit && Number(z) < 1 ? '1' : z; return (ZOOMS.find(([v]) => v === t) || [, 'Normal'])[1]; })();
   const derniereSauvegarde = (() => { const t = Number(load('vinted_last_backup', 0)) || 0; const days = t ? Math.floor((Date.now() - t) / 86400000) : null; return { t, days, old: days === null || days >= 30 }; })();
   const tokWidget = load('vrm_widget_token', '');
+  // (6 nov.) Le jeton des SMS Mondial Relay : relu dans le stockage (le nuage le remplit au chargement).
+  const [jetonSms, setJetonSms] = useState(() => load('vrm_sms_token', ''));
   const urlWidget = tokWidget ? `https://vrm.center/api/widget?k=${tokWidget}` : '';
 
   // ── Les morceaux de rendu (des FONCTIONS appelées, pas des composants : un
@@ -65088,6 +65128,9 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
         el:<><PushSetting/><div style={{height:12}}/><PushPrefsSetting comptes={comptes} onMuets={setNMuetsPush}/><RelancesEssaiSetting/></> },
       // Alertes locales (l'ancien bouton 🔔 du haut) : bandeau + notification
       // quand l'app est OUVERTE (ventes comptabilisées, factures reçues).
+      // (6 nov.) Les colis en casier que Mondial Relay n'annonce que par SMS : jeton + pas-à-pas Raccourcis.
+      { id:'sms-colis', type:'panneau', nu:true, ic:'chat', lib:'SMS Mondial Relay', val: etatJetonSms(jetonSms) === 'actif' ? 'Activé' : etatJetonSms(jetonSms) === 'coupe' ? 'Coupé' : 'À activer', data:{ 'data-reglage-sms':etatJetonSms(jetonSms) },
+        el:<SmsColisSetting jeton={jetonSms} onJeton={(v)=>{ save('vrm_sms_token', v); setJetonSms(v); }} toast={toast}/> },
       { id:'alertes', type:'switch', ic:'alert', lib:"Alertes dans l'app", desc:'Ventes et factures, quand l’app est ouverte.', on:!!notifEnabled, onClick:onToggleNotif, data:{ 'data-reglage-alertes': notifEnabled ? 'on' : 'off' } },
     ]},
     { id:'impression', titre:'Impression', items:[
@@ -72158,7 +72201,7 @@ function AppCoeur() {
             //    applique. La règle est la MÊME que pour le nuage (§11), plus la clé
             //    du widget (elle suffit à lire ses chiffres). Et un filet : tout
             //    champ de jeton, où qu'il soit, est retiré du fichier.
-            const SANS_FICHIER = new Set(['vrm_widget_token']);
+            const SANS_FICHIER = new Set(['vrm_widget_token', 'vrm_sms_token']);
             const SECRET = /^(access_token|refresh_token|csrf_token|id_token|client_secret|password|p256dh)$/i;
             const sansSecrets = (v, prof = 0) => {
               if (prof > 40 || v === null || typeof v !== 'object') return v;
@@ -72243,7 +72286,7 @@ function AppCoeur() {
                 const vF=mkF&&typeof mkF==='object'?Number(mkF.version):NaN;
                 if(vF!==vIci){ toast(SAUVEGARDE_AVANT_REMISE); return; }
               }
-              const entries=entriesBrutes.filter(([k])=>k!=='vinted_accounts' && k!=='vrm_widget_token').map(([k,v])=>{
+              const entries=entriesBrutes.filter(([k])=>k!=='vinted_accounts' && k!=='vrm_widget_token' && k!=='vrm_sms_token').map(([k,v])=>{
                 const cur=lireLocal(k);
                 if(k==='vinted_used_numeros' && Array.isArray(v)){
                   const vu=new Set(); const out=[];

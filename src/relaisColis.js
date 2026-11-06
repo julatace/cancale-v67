@@ -148,7 +148,10 @@ export function regrouperRelais({ arrives = [], attendus = [] } = {}) {
     const cp = /^\d{5}$/.test(String(morceaux.cp || '')) ? String(morceaux.cp) : '';
     const rueLue = String(morceaux.rue || '').trim();
     const rueOk = rueCherchable(rueLue, cp) ? rueLue : '';
-    const nom = nomRelaisPropre(nomLu, morceaux.ville);
+    // (6 nov.) Un CASIER le dit devant son nom (« Casier 24/7 Super U ») : le type lu en tête du lieu
+    // (`lieuType`, posé par l'écran Colis). Un casier et un comptoir du même nom sont deux points.
+    const nom0 = nomRelaisPropre(nomLu, morceaux.ville);
+    const nom = nom0 && /^Casier(?: 24\/7)?$/.test(String(x.lieuType || '')) ? `${x.lieuType} ${nom0}` : nom0;
     // L'identité d'un LIEU : son nom propre + son code postal ; sans nom, sa rue
     // + son code postal (une adresse est un endroit) ; sans rien, « pas connu ».
     const cle = nom ? normNomRelais(nom) + '|' + cp : (rueOk && cp ? 'adr:' + normNomRelais(rueOk) + '|' + cp : CLE_INCONNU);
