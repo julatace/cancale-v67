@@ -1124,11 +1124,8 @@ html:not([data-colis-outils]) body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) [
 @media (min-width: 1024px) {
   .vrm-fu-tete > .vrm-carte-stats { grid-column: 2; grid-row: 1 / span 2; align-self: end; }
 }
-/* La case de Compta : la carte sombre est la boîte autour, la nôtre s'y pose nue.
-   (6 nov., finitions) Le « — » d'un chiffre pas su garde l'encre des vides de TOUTES les cartes
-   sombres (`.vrm-fu-grand.is-vide`, le jeton --fu-sur-sombre-2) : cette règle le forçait au blanc plein. */
-.vrm-compta-carte > .vrm-carte-stats .vrm-fu-grand:not(.is-vide) { color: #fff; }
-.vrm-compta-carte > .vrm-carte-stats .vrm-fu-grand.is-vide { color: var(--fu-sur-sombre-2); }
+/* La case de Compta : la carte sombre est la boîte autour, la nôtre s'y pose nue. */
+.vrm-compta-carte > .vrm-carte-stats .vrm-fu-grand { color: #fff; }
 
 /* La feuille « Modifier » */
 .vrm-carte-voile { z-index: 20000; }
