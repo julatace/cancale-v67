@@ -15833,6 +15833,16 @@ const DICTEE_OK = typeof window !== 'undefined' && typeof (window.SpeechRecognit
 // (3 nov.) Le micro REFUSÉ (permission du navigateur, ou service coupé) : le
 // bouton disparaît aussi — partout, pour la session — sans un mot.
 const DICTEE_REFUS = { non: false };
+// (6 nov.) L'appareil photo de la recherche : ouvre « Chercher par photo »
+// (src/RecherchePhoto.jsx, chargé à ce moment-là seulement).
+function BoutonPhotoRecherche() {
+  return (
+    <button className="vrm-micro" type="button" data-recherche-photo-ouvrir="" onClick={(e) => { e.preventDefault(); ouvrirRecherchePhoto(); }}
+      aria-label="Chercher par photo" title="Chercher par photo : prends la paire, VRM montre les annonces qui lui ressemblent">
+      <Icon name="camera" size={19}/>
+    </button>
+  );
+}
 function MicDictee({ onText, titre = 'Dicter', nu = false }) {
   const [ecoute, setEcoute] = React.useState(false);
   const [refus, setRefus] = React.useState(DICTEE_REFUS.non);
@@ -31971,6 +31981,48 @@ function CountUpEuro({ value, petitEuro = false }) {
 const Room3D = React.lazy(() => import('./Room3D.jsx'));
 // Studio photo (fonction n°33) : chargé au clic, jamais à l'ouverture de l'app.
 const StudioPhoto = React.lazy(() => import('./StudioPhoto.jsx'));
+// (6 nov.) Chercher par photo : la feuille, l'empreinte et l'index se chargent
+// au clic sur l'appareil photo (loupe, Stock) — rien au premier chargement.
+const RecherchePhoto = React.lazy(() => import('./RecherchePhoto.jsx'));
+const ouvrirRecherchePhoto = () => { try { window.dispatchEvent(new Event('vrm:recherche-photo')); } catch (_) {} };
+// Les candidats de la recherche par photo (src/RecherchePhoto.jsx) : la 1re
+// photo de chaque annonce EN LIGNE (la règle `lireLignesEnLigne`, §11) et de
+// chaque fiche N° (`vinted_annonce_numeros`), une entrée par ANNONCE (son id,
+// jamais son titre, §5). Le N° vient de la fiche de CETTE annonce ; « vendue »
+// seulement PROUVÉE (`lirePreuvesVenteVinted`). Ses comptes cherchés seulement
+// (`comptesRecherche`). `null` = rien n'a pu être lu (pas su ≠ aucune annonce).
+async function lireCandidatsPhoto(comptes) {
+  const okUid = comptesRecherche(comptes);
+  const duCompte = (u) => !okUid || u == null || u === '' || okUid.has(String(u));
+  const uidDe = (r) => (/^harvest_([^_]+)_listings$/.exec(String((r && r.id) || '')) || [])[1] || null;
+  const fiches = load('vinted_annonce_numeros', {}) || {};
+  let rows = null;
+  try { const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_listings&select=id,data`, { headers: sbAuth() }); const j = r.ok ? await r.json() : null; rows = Array.isArray(j) ? j : null; } catch (_) { rows = null; }
+  const preuves = await lirePreuvesVenteVinted().catch(() => null);
+  if (rows === null && !Object.keys(fiches).length) return null;
+  const labels = load('vinted_account_labels', {}) || {};
+  const nom = (u) => { if (u == null || u === '') return ''; const a = (comptes || []).find((x) => String(x.vinted_user_id) === String(u)); return labels[String(u)] || (a && a.login) || ''; };
+  const photoDe = (x) => (typeof x === 'string' ? x : (x && typeof x.url === 'string' ? x.url : ''));
+  const par = new Map(), raisons = [];
+  let enLigne = null;
+  if (rows) {
+    try {
+      const lu = await lireLignesEnLigne(rows.filter((r) => duCompte(uidDe(r))));
+      enLigne = new Set();
+      const ajouter = (it, uid, etat) => { const id = String(it.id); if (par.has(id)) return; const f = fiches[id]; par.set(id, { cle: id, url: photoDe(it.photo), titre: it.title || '', compte: nom(uid), numero: f && f.numero ? String(f.numero) : '', etat }); };
+      for (const r of lu.lignes) { const p = (r.data && r.data.payload) || {}; for (const it of (p.items || [])) { if (!it || it.id == null || it.is_closed || it.is_hidden || it.is_draft) continue; enLigne.add(String(it.id)); ajouter(it, uidDe(r), 'en-ligne'); } }
+      for (const [uid, l] of lu.aConfirmer.entries()) for (const it of (l || [])) if (it && it.id != null) ajouter(it, uid, 'a-confirmer');
+    } catch (_) { enLigne = null; }
+  }
+  if (enLigne === null) raisons.push('Tes annonces en ligne n’ont pas pu être lues : seules tes fiches N° sont comparées.');
+  const vendus = preuves && preuves.vendus instanceof Set ? preuves.vendus : null;
+  for (const [id, f] of Object.entries(fiches)) {
+    if (!f || par.has(String(id)) || !duCompte(f.accountId)) continue;
+    const etat = vendus && vendus.has(String(id)) ? 'vendue' : (enLigne ? 'hors-ligne' : 'pas-su');
+    par.set(String(id), { cle: String(id), url: photoDe(f.photo), titre: f.title || '', compte: nom(f.accountId), numero: f.numero ? String(f.numero) : '', etat });
+  }
+  return { candidats: [...par.values()], raisons };
+}
 // Un plan peut contenir PLUSIEURS pièces. On normalise l'ancien format
 // mono-pièce ({ room, items }) vers { rooms:[{id,name,room,items}], active }.
 const ROOM_DEFAULT = { w: 10, h: 8, wallH: 3.4, wallColor: '#E5E5EA' };
@@ -35501,7 +35553,8 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
   let colN=0;
   return (
     <div style={{padding:16,display:'flex',flexDirection:'column',gap:14}}>
-      <ScreenHead icon="home" title="Stock" desc="Tes étagères en 2D : chaque article dans sa case. Cherche un numéro, il te dit le meuble et la case."/>
+      <ScreenHead icon="home" title="Stock" desc="Tes étagères en 2D : chaque article dans sa case. Cherche un numéro, il te dit le meuble et la case."
+        right={<Bouton variante="secondaire" icone="camera" data-stock-recherche-photo="" onClick={ouvrirRecherchePhoto} style={{ minHeight: 44 }}>Par photo</Bouton>}/>
 
       <StockMeubles locate={locate} placeNum={placeNum} onPlaced={onPlaced} accounts={accounts} comptesLus={comptesLus}/>
 
@@ -69918,6 +69971,10 @@ function AppCoeur() {
   useEffect(()=>onCloudReady(()=>{ purgerComptesSupprimes(); }),[]);
   const [gsOpen,setGsOpen]=useState(false);
   const [gsQ,setGsQ]=useState('');
+  // (6 nov.) CHERCHER PAR PHOTO : la feuille (src/RecherchePhoto.jsx), ouverte par
+  // l'appareil photo de la loupe ou du Stock (`vrm:recherche-photo`).
+  const [rpOuvert,setRpOuvert]=useState(false);
+  useEffect(()=>{ const o=()=>{ setGsOpen(false); setRpOuvert(true); }; window.addEventListener('vrm:recherche-photo',o); return ()=>window.removeEventListener('vrm:recherche-photo',o); },[]);
   // (31 oct.) LA RECHERCHE EN PLACE : le champ vit dans la barre (ordinateur) ou
   // dans l'en-tête (téléphone) ; `gsOpen` ne dit plus « un écran par-dessus »
   // mais « le panneau des résultats est déplié sous le champ ».
@@ -72344,6 +72401,7 @@ function AppCoeur() {
         <Icon name="search" size={18}/>
         {champRecherche(false)}
         <MicDictee nu titre="Chercher à la voix" onText={dicterRecherche}/>
+        <BoutonPhotoRecherche/>
         {gsQ ? <button type="button" className="vrm-recherche-effacer" aria-label="Effacer la recherche" onClick={()=>{ setGsQ(''); try{ gsChampRef.current&&gsChampRef.current.focus(); }catch(_){} }}><Icon name="close" size={14}/></button>
           : <kbd className="vrm-barre-kbd">/</kbd>}
       </label>
@@ -72355,6 +72413,7 @@ function AppCoeur() {
       <Icon name="search" size={18} style={{color:C.muted,flexShrink:0}}/>
       {champRecherche(true)}
       <MicDictee nu titre="Chercher à la voix" onText={dicterRecherche}/>
+      <BoutonPhotoRecherche/>
       <button type="button" className="vrm-hdr-recherche-fermer" aria-label="Fermer la recherche" onClick={fermerRecherche} style={{color:C.text}}>Fermer</button>
     </div>
   );
@@ -72507,6 +72566,12 @@ function AppCoeur() {
         {ordi && <BarreHaut champ={champRechercheOrdi} poserSlot={setSlotBarre}/>}
         <BarreHautSlot.Provider value={ordi ? slotBarre : null}>
         <CibleNotif tab={tab} sub={platSub}/>
+        {rpOuvert && <React.Suspense fallback={null}>
+          <RecherchePhoto C={C} Feuille={SheetShell} Bouton={Bouton} PhotoVinted={PhotoVinted}
+            lireCandidats={()=>lireCandidatsPhoto(vintedAccounts)} lireOctets={(u)=>chargerPhotoBoite(u)}
+            ouvrirNumero={(n)=>{ setRpOuvert(false); try{ window.dispatchEvent(new CustomEvent('vrm:fiche-article',{detail:String(n)})); }catch(_){} }}
+            ouvrirAnnonces={()=>{ setRpOuvert(false); setTab('cat_annonces'); }} onClose={()=>setRpOuvert(false)}/>
+        </React.Suspense>}
         {ficheNum && (()=>{
           // (1er nov.) LA FICHE COMPLÈTE D'UNE PAIRE : la même lecture que « Tout
           // sur le N° » (`rechercheParNumero`), racontée en parcours (`parcoursPaire`).
