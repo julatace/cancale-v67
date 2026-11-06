@@ -150,7 +150,7 @@ import {annoncesVcEnLigne,stockVestiaire,retraitsVestiaire,VC_VENTE_ETAPES,VC_AN
 import {colisLbcAPoster,lbcColisAPoster,totalColis,colisLbcVendeur} from '../api/_lib/colis-sites.js';
 import {CLE_COMPTES_EXCLUS,excluAutreDe,estExclu,basculerExclu,compteDeVente,exclusNormes} from '../api/_lib/comptes-exclus.js';
 import {PLATEFORMES_COMPTES,etatCompteLie,ageLecture,comptesLbcLies,comptesVcLies,comptesEbayLies,refDeLigneEbay,nomCompteLie,LIBELLE_ETAT} from './comptesLies.js';
-import { lignesFraicheur } from './fraicheurComptes.js';
+import { lignesFraicheur, quandRelu } from './fraicheurComptes.js';
 import { ventesEmailFraiches, avecVentesEmail, requeteVentesEmail, gesteVenteEmail, STATUT_VENTE_EMAIL } from './venteEmailFraiche.js';
 import { premiereCaseLibre as premiereCaseMeubles, achatsArrives, notifsOuRanger } from './ouRanger.js';
 import './comptes-lies.css';
@@ -4773,13 +4773,14 @@ function useVentesEmailFraiches(ventes, ko, comptes, ecarte, cleEcarte) {
 // `motsNavigateur`, ou l'ordinateur de l'extension quand elle n'est pas ici).
 function NoteVenteEmail({ o }) {
   const lu = Number(o && o._lectureVentes);
-  const quand = Number.isFinite(lu) ? new Date(lu).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' }) : '';
+  // La date dite comme dans l'indicateur des comptes (`quandRelu`, une règle) : « hier 15 h 11 ».
+  const quand = Number.isFinite(lu) ? quandRelu(lu) : '';
   const dans = vmrExtPresent() ? NAV.dans : 'sur l’ordinateur où est l’extension VRM';
   return (
     <div className="vrm-vente-email" data-vente-email={String(o.transaction_id)} data-vente-email-lu={Number.isFinite(lu) ? String(lu) : ''} data-sans-glisse=""
       style={{ fontSize: 13, lineHeight: 1.45, color: C.muted, overflowWrap: 'anywhere' }}>
       <span style={{ color: C.text, fontWeight: 600 }}>{STATUT_VENTE_EMAIL}</span>
-      {quand ? <> · ventes de ce compte relues le {quand}</> : null}
+      {quand ? <> · ventes de ce compte relues {quand}</> : null}
       <br/><span data-vente-email-geste="" style={{ color: C.warn }}>{gesteVenteEmail(dans).replace(/^./, (c) => c.toUpperCase())}.</span>
     </div>
   );
