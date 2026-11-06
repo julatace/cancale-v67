@@ -407,7 +407,8 @@ export const valeurChiffre = (id, place, sources, sel, regles, maintenant = Date
   }
   if (id === 'retirer') {
     const pub = S.colisARetirer;
-    return pub && Number.isFinite(pub.total) ? { valeur: pub.total, partiel: false, manque: [], hors: '', p: null, raison: '' } : vide('pasSu');
+    // (6 nov.) Absente pendant que l'écran ouvert la prépare : « lecture… », jamais « pas lu ».
+    return pub && Number.isFinite(pub.total) ? { valeur: pub.total, partiel: false, manque: [], hors: '', p: null, raison: '' } : vide(S.enPreparation && S.enPreparation.retirer ? 'encours' : 'pasSu');
   }
   if (id === 'attente' || id === 'dispo' || id === 'enligne') {
     const L = S.live;
@@ -442,7 +443,7 @@ export const valeurChiffre = (id, place, sources, sel, regles, maintenant = Date
   }
   if (id === 'dorment') {
     const pub = S.dorment;
-    if (!pub || !Number.isFinite(pub.n)) return vide('pasSu');
+    if (!pub || !Number.isFinite(pub.n)) return vide(S.enPreparation && S.enPreparation.dorment ? 'encours' : 'pasSu');
     // Moins de dates connues que d'annonces : « au moins » (la règle du bilan de la semaine).
     const partiel = Number.isFinite(pub.datesKnown) && Number.isFinite(pub.total) && pub.datesKnown < pub.total;
     if (partiel && !(pub.n > 0)) return vide('partiel');

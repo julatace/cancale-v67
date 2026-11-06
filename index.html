@@ -410,8 +410,50 @@
     [data-stream="1"] [data-stream-article][data-stream-photo] { filter: blur(48px) saturate(.6) !important; }
     [data-stream="m"] [data-stream-flou] { filter: blur(6px) !important; user-select: none; }
 </style>
+  <!-- (6 nov.) L'ÉCRAN DE DÉMARRAGE — avant tout JavaScript. Julien : « je veux qu'il y
+       ait de vrais écrans de chargement ». Il couvre le téléchargement de l'app, la
+       vérification de la session et l'ouverture du premier écran ; l'app le retire
+       (fondu de 200 ms) quand cet écran est prêt — ou au bout de ~2,5 s, src/demarrage.js.
+       Styles EN LIGNE (la CSP les permet, pas les scripts), logo en `data:` (aucune
+       requête), fond = celui de la coque (#F2F2F7 / #000), thème déjà posé par
+       demarrage-theme.js. Aucune couleur nouvelle : l'encre, à faible opacité. -->
+  <style>
+    #vrm-demarrage{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;background:#F2F2F7;color:#1D1D1F;opacity:1;transition:opacity .2s cubic-bezier(.22,1,.36,1);font:13px/1.4 -apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased}
+    html[data-theme="dark"] #vrm-demarrage{background:#000000;color:#F5F5F7}
+    #vrm-demarrage[data-sortie]{opacity:0;pointer-events:none}
+    #vrm-demarrage .vrm-boot-centre{display:flex;flex-direction:column;align-items:center;gap:22px;margin-top:-6vh}
+    #vrm-demarrage .vrm-boot-logo{display:block;width:72px;height:72px;border-radius:17px;animation:vrmBootLogo .45s cubic-bezier(.22,1,.36,1) both}
+    #vrm-demarrage .vrm-boot-rail{position:relative;display:block;width:112px;height:3px;border-radius:99px;overflow:hidden;background:rgba(29,29,31,.10)}
+    #vrm-demarrage .vrm-boot-rail>span{position:absolute;top:0;bottom:0;left:0;width:40%;border-radius:inherit;background:rgba(29,29,31,.42);animation:vrmBootRail 1.25s cubic-bezier(.45,0,.55,1) infinite}
+    html[data-theme="dark"] #vrm-demarrage .vrm-boot-rail{background:rgba(245,245,247,.16)}
+    html[data-theme="dark"] #vrm-demarrage .vrm-boot-rail>span{background:rgba(245,245,247,.6)}
+    #vrm-demarrage .vrm-boot-mot{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+    #vrm-demarrage .vrm-boot-lent{margin:0;min-height:18px;color:#6E6E73;opacity:0;visibility:hidden;animation:vrmBootLent .3s ease 12s forwards}
+    html[data-theme="dark"] #vrm-demarrage .vrm-boot-lent{color:#98989D}
+    #vrm-demarrage .vrm-boot-lent a{color:#0066CC;font-weight:600;text-decoration:none}
+    html[data-theme="dark"] #vrm-demarrage .vrm-boot-lent a{color:#409CFF}
+    @keyframes vrmBootRail{from{transform:translateX(-100%)}to{transform:translateX(250%)}}
+    @keyframes vrmBootLogo{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:none}}
+    @keyframes vrmBootLent{to{opacity:1;visibility:visible}}
+    /* Réduire les animations : pas de rail qui court (le mot « Ouverture… » le remplace),
+       pas de fondu ; la phrase « connexion lente » garde son délai (la règle globale
+       ramène tous les délais à 0, l'identifiant passe devant). */
+    @media (prefers-reduced-motion: reduce){
+      #vrm-demarrage{transition:none!important}
+      #vrm-demarrage .vrm-boot-logo{animation:none!important}
+      #vrm-demarrage .vrm-boot-rail{display:none}
+      #vrm-demarrage .vrm-boot-mot{position:static;width:auto;height:auto;clip:auto;color:#6E6E73}
+      html[data-theme="dark"] #vrm-demarrage .vrm-boot-mot{color:#98989D}
+      #vrm-demarrage .vrm-boot-lent{animation:vrmBootLent .001ms linear 12s forwards!important}
+    }
+  </style>
 </head>
 <body><div id="root"></div>
+<div id="vrm-demarrage" role="status" aria-live="polite" aria-busy="true"><div class="vrm-boot-centre">
+  <img class="vrm-boot-logo" width="72" height="72" alt="VRM" src="data:image/png;base64,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">
+  <span class="vrm-boot-rail" aria-hidden="true"><span></span></span><span class="vrm-boot-mot">Ouverture…</span>
+  <p class="vrm-boot-lent">La connexion est lente. <a href="">Recharger</a></p>
+</div></div>
 <!-- Densité d'affichage (Réglages → Affichage). Appliquée AVANT le chargement
      de l'app : sinon la page s'affiche à 100 % puis saute de taille sous les
      yeux de l'utilisateur à chaque ouverture. -->
