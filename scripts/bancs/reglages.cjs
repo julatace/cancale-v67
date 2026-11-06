@@ -242,7 +242,7 @@ const MENSONGES = [
   // normale, l'entité s'affiche.
   // Ouvre le panneau SANS rien saisir : pour LIRE ce qui s'affiche (l'entité).
   const ouvrirProPanneau = async (pg) => {
-    const bt = pg.locator('button', { hasText: 'Facturation Pro' });
+    const bt = pg.locator('button', { hasText: 'Ma facture' });   // (6 nov.) « Facturation Pro » s'appelle « Ma facture »
     if (await bt.count()) { try { await bt.first().click({ timeout: 2500 }); } catch (_) {} }
     await pg.waitForTimeout(1500);
   };

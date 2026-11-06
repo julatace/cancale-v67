@@ -71,19 +71,24 @@ export const emailSur = (a) => /^[^\s@<>"',;()\[\]\\]+@[a-z0-9.-]+\.[a-z]{2,}$/i
 const base64Lignes = (buf) => (Buffer.isBuffer(buf) ? buf : Buffer.from(buf)).toString('base64').replace(/.{1,76}/g, (x) => x + CRLF);
 const nomFichierSur = (n) => String(n || 'piece.pdf').replace(/[^\w.\-]/g, '_').slice(0, 120);
 
-export function composerMessage({ de, nomDe, a, sujet, texte, html, pieces = [], domaine, entetes = {} }) {
+export function composerMessage({ de, nomDe, a, cc = [], replyTo = '', sujet, texte, html, pieces = [], domaine, entetes = {} }) {
+  const copies = (Array.isArray(cc) ? cc : []).filter(emailSur);
   const frontiere = `vrm-${crypto.randomBytes(12).toString('hex')}`;
   const alt = `vrm-alt-${crypto.randomBytes(12).toString('hex')}`;
   const id = `<${crypto.randomBytes(16).toString('hex')}@${domaine || String(de).split('@')[1] || 'vrm.center'}>`;
   const h = [
     `From: ${nomDe ? `${enteteEncode(nomDe)} ` : ''}<${adresseNue(de)}>`,
     `To: <${adresseNue(a)}>`,
+    // (6 nov.) La facture envoyée par VRM : le vendeur en COPIE visible, et les
+    // réponses de l'acheteur vont chez LUI (Reply-To), jamais chez VRM.
+    ...(copies.length ? [`Cc: ${copies.map((x) => `<${adresseNue(x)}>`).join(', ')}`] : []),
+    ...(emailSur(replyTo) ? [`Reply-To: <${adresseNue(replyTo)}>`] : []),
     `Subject: ${enteteEncode(sujet)}`,
     `Date: ${new Date().toUTCString().replace('GMT', '+0000')}`,
     `Message-ID: ${id}`,
     // (5 nov.) En-têtes en plus (« List-Unsubscribe » des relances de l'essai) :
     // seulement des noms d'en-tête simples et des valeurs ASCII sur une ligne.
-    ...Object.entries(entetes || {}).filter(([k, v]) => !/^(from|to|cc|bcc|subject|date|message-id|mime-version|content-type|content-transfer-encoding)$/i.test(k) && /^[A-Za-z][A-Za-z0-9-]{1,40}$/.test(k) && /^[\x20-\x7e]{1,500}$/.test(String(v))).map(([k, v]) => `${k}: ${v}`),
+    ...Object.entries(entetes || {}).filter(([k, v]) => !/^(from|to|cc|bcc|reply-to|subject|date|message-id|mime-version|content-type|content-transfer-encoding)$/i.test(k) && /^[A-Za-z][A-Za-z0-9-]{1,40}$/.test(k) && /^[\x20-\x7e]{1,500}$/.test(String(v))).map(([k, v]) => `${k}: ${v}`),
     'MIME-Version: 1.0',
     `Content-Type: multipart/mixed; boundary="${frontiere}"`,
   ];
@@ -106,7 +111,7 @@ export const pointsDoubles = (s) => s.replace(/(^|\r\n)\./g, '$1..');
 
 // ── La conversation SMTP ────────────────────────────────────────────────────
 // `connecter` est injectable (bancs : un faux serveur local).
-export async function envoyerSmtp({ seulementConnexion = false, hote, port, utilisateur, motDePasse, de, nomDe, a, bcc = [], sujet, texte, html, pieces, entetes, connecter, tlsOptions = {} }) {
+export async function envoyerSmtp({ seulementConnexion = false, hote, port, utilisateur, motDePasse, de, nomDe, a, cc = [], replyTo = '', bcc = [], sujet, texte, html, pieces, entetes, connecter, tlsOptions = {} }) {
   if (!emailSur(de) || !emailSur(a)) return { issue: 'refuse', etape: 'adresse', message: "Adresse d'expéditeur ou de destinataire invalide." };
   const securise = Number(port) === 465;
   let sock = null; let tampon = ''; let attente = null; let ferme = false; let messageParti = false;
@@ -166,12 +171,12 @@ export async function envoyerSmtp({ seulementConnexion = false, hote, port, util
     if (r.code !== 235) return refus('identifiants', r);
     if (seulementConnexion) { try { sock.write('QUIT' + CRLF); } catch (_) {} return { issue: 'connecte' }; }
     r = await dire(`MAIL FROM:<${adresseNue(de)}>`); if (r.code !== 250) return refus('expediteur', r);
-    for (const dest of [a, ...bcc.filter(emailSur)]) {
+    for (const dest of [a, ...(Array.isArray(cc) ? cc : []).filter(emailSur), ...bcc.filter(emailSur)]) {
       r = await dire(`RCPT TO:<${adresseNue(dest)}>`);
       if (r.code !== 250 && r.code !== 251) { if (dest === a) return refus('destinataire', r); }
     }
     r = await dire('DATA'); if (r.code !== 354) return refus('message', r);
-    const { id, brut } = composerMessage({ de, nomDe, a, sujet, texte, html, pieces, entetes });
+    const { id, brut } = composerMessage({ de, nomDe, a, cc, replyTo, sujet, texte, html, pieces, entetes });
     messageParti = true;
     sock.write(pointsDoubles(brut.replace(/\r?\n/g, CRLF)) + `${CRLF}.${CRLF}`);
     r = await lire();

@@ -179,6 +179,10 @@ const RechercheEbay = aLaDemande(() => import('./ebayRecherche.jsx'));
 const FicheFacturation = aLaDemande(() => import('./FacturePro.jsx').then((m) => ({ default: m.FicheFacturation })));
 const ListeFacturesPro = aLaDemande(() => import('./FacturePro.jsx').then((m) => ({ default: m.ListeFacturesPro })));
 const FactureVente = aLaDemande(() => import('./FacturePro.jsx').then((m) => ({ default: m.FactureVente })));
+// (6 nov.) La même, sur la LIGNE de la vente (à côté de la vente) : rien pendant le
+// chargement (pas de squelette sur chaque ligne de la liste).
+const FactureVenteLigneParesseuse = lazy(() => import('./FacturePro.jsx').then((m) => ({ default: m.FactureVente })));
+const FactureVenteLigne = (props) => <Suspense fallback={null}><FactureVenteLigneParesseuse ligne {...props}/></Suspense>;
 const ScannerColis = aLaDemande(() => import('./ScannerColis.jsx'), true);
 const ModeEmballage = aLaDemande(() => import('./ModeEmballage.jsx'), true);
 const FichePaire = aLaDemande(() => import('./FichePaire.jsx'), true);
@@ -31432,7 +31436,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
             <Icon name="sync" size={13}/>{fetching?'Chargement…':'Relire les factures'}
           </Btn>
           <Btn small outline color={C.muted} onClick={exportExcel} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="save" size={13}/>Exporter Excel</Btn>
-          <Btn small outline color={C.muted} onClick={()=>setShowPro(v=>!v)} aria-expanded={showPro} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="receipt" size={13}/>Facturation Pro</Btn>
+          <Btn small outline color={C.muted} onClick={()=>setShowPro(v=>!v)} aria-expanded={showPro} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="receipt" size={13}/>Ma facture</Btn>
           <Btn small outline color={C.muted} onClick={()=>setShowSettings(true)} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="gear" size={13}/>Réglages des factures</Btn>
         </div>}/>
       </div>
@@ -45294,6 +45298,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Vinted seule — une ligne e-mail n'y numérote ni n'y expédie rien.
   const ventesEmail = useVentesEmailFraiches(sales.items, sales.failedUids, accounts, acctOff, [...hiddenAccts].sort().join(',') + '|' + JSON.stringify(panelAcctOff || {}));
   const ventesListe = useMemo(() => avecVentesEmail(sales.items, ventesEmail), [sales.items, ventesEmail]);
+  // (6 nov.) LA FACTURE PRO : les ventes VINTED lues, par n° de transaction (tous
+  // comptes), pour la preuve de l'acheteur (src/facturePro/rattachement.js : une
+  // seule vente Vinted à ce n°, heure et montant de l'e-mail de vente). Seule la
+  // liste Vinted compte (jamais une ligne reconstituée d'un e-mail).
+  const commandesParTx = useMemo(() => {
+    const m = new Map();
+    for (const o of (sales.items || [])) {
+      if (!o || o._fromEmail || o._venteEmail || o.transaction_id == null) continue;
+      const k = String(o.transaction_id);
+      if (!m.has(k)) m.set(k, []);
+      m.get(k).push({ transaction_id: k, date: o.date || null, price: o.price || null, uid: String((o._acc && o._acc.vinted_user_id) || o._uid || ''), title: o.title || '' });
+    }
+    return m;
+  }, [sales.items]);
   // Colis marqués « récupéré » À LA MAIN (par transaction) : disparaissent de « à
   // retirer » sans attendre que Vinted mette à jour. Synchronisé.
   const [pickupDone, setPickupDone] = useStateCle('vinted_pickup_done', () => load('vinted_pickup_done', {}));
@@ -55883,7 +55901,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {!annChez && st==='cancelled' && num && saleOutcome(o)==='rembourse' && !isPairLost(num) ? <Bouton variante="secondaire" onClick={()=>markPairLost(num,o)} title={`Tu as remboursé l'acheteur. Si l'article ne revient PAS, déclare-le perdu : le N°${num} sera libéré et sa case au garage vidée.`} aria-label="Déclarer l'article perdu">Article perdu ?</Bouton> : null}
                     {num && isPairLost(num) ? <Bouton variante="discret" onClick={()=>unmarkPairLost(num)} title={`Annuler : l'article N°${num} est finalement revenu.`} aria-label="Annuler article perdu">Il est revenu</Bouton> : null}
                   </div>
-                  {(o._fromEmail ? o._txMail : o.transaction_id != null) ? <FactureVente deps={DEPS_FACTURE} vente={{ tx: String(o._fromEmail ? o._txMail : o.transaction_id), uid: o._acc && o._acc.vinted_user_id, compte: o._acc && o._acc.login, titre: o.title || '', centimes: sell != null && !autreDevise ? Math.round(sell * 100) : null, venteLe: o.date || '' }}/> : null}
+                  {(o._fromEmail ? o._txMail : o.transaction_id != null) ? <FactureVente deps={DEPS_FACTURE} vente={{ tx: String(o._fromEmail ? o._txMail : o.transaction_id), uid: o._acc && o._acc.vinted_user_id, compte: o._acc && o._acc.login, titre: o.title || '', centimes: sell != null && !autreDevise ? Math.round(sell * 100) : null, venteLe: o.date || '', commandes: commandesParTx.get(String(o._fromEmail ? o._txMail : o.transaction_id)) || [] }}/> : null}
                   <details className="vrm-sale-details vrm-recap-modifier"><summary title="Numéro, coût d’achat, frais">N° et frais</summary>
                     {!hidden && <CoutsVente entry={e} onSave={patch=>setSaleOverride(o.transaction_id,patch)} theme={C}/>}
                     {!hidden && (
@@ -55916,7 +55934,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // pas de carte encadrée séparée — style démo, comme Achats).
               <LigneVenteCompacte montantCentimes={sell!=null?Math.round(sell*100):undefined} numerosArticle={num?[num]:[]} plateforme="vinted" photo={photo} photoNoeud={photo?<PhotoVenteSources {...photoSourcesProps} data-photo-vente="ligne" style={{width:28,height:36,borderRadius:12,objectFit:'cover',flexShrink:0}}/>:null} titre={(()=>{ const t=String((e&&e.size)||o.size||'').trim(); const nom=t&&!tailleDansTitre(o.title,t)?`${o.title} · taille ${t}`:o.title; return nom; })()} numTitre={num||''}
                 {...gp} benef={benefLigne} recap={recapVente} data-depose-attente={deposeIci?'1':undefined}
-                data-fu-ligne="" fusion={{ prix: montant(sell, { devise: o.price?.currency_code || 'EUR' }), nom: String(o.title||'').replace(/[\s,·-]*(?:taille|t\.?)\s*[\d.,/ ]+(?:\s*(?:eu|fr|us|uk))?\s*$/i,'').trim() || o.title, num, site: 'vinted', siteNom: 'Vinted', taille: String((e&&e.size)||o.size||'').trim() || ((String(o.title||'').match(/taille\s*([\d.,/]+)/i)||[])[1]||'') }} frise={fuEtapes ? <Frise etapes={fuEtapes} cle={txL} className="vrm-fu-ligne-frise" label="Où en est la vente"/> : null}
+                data-fu-ligne="" fusion={{ prix: montant(sell, { devise: o.price?.currency_code || 'EUR' }), nom: String(o.title||'').replace(/[\s,·-]*(?:taille|t\.?)\s*[\d.,/ ]+(?:\s*(?:eu|fr|us|uk))?\s*$/i,'').trim() || o.title, num, site: 'vinted', siteNom: 'Vinted', taille: String((e&&e.size)||o.size||'').trim() || ((String(o.title||'').match(/taille\s*([\d.,/]+)/i)||[])[1]||'') }} frise={<>{fuEtapes ? <Frise etapes={fuEtapes} cle={txL} className="vrm-fu-ligne-frise" label="Où en est la vente"/> : null}{(o._fromEmail ? o._txMail : o.transaction_id != null) ? <FactureVenteLigne deps={DEPS_FACTURE} vente={{ tx: String(o._fromEmail ? o._txMail : o.transaction_id), uid: o._acc && o._acc.vinted_user_id, compte: o._acc && o._acc.login, titre: o.title || '', venteLe: o.date || '', commandes: commandesParTx.get(String(o._fromEmail ? o._txMail : o.transaction_id)) || [] }}/> : null}</>}
                 bas={o._venteEmail ? <NoteVenteEmail o={o}/> : peutDeposer ? <>
                   {/* (2 nov., 22 h 30) Une vente à expédier porte TOUJOURS la rangée de la maquette : la puce du
                       transporteur et le bouton bordereau (« Imprimer le bordereau » si le PDF est là, sinon
@@ -66364,7 +66382,7 @@ const ecrireReglage = async (id, data) => {
     return r.ok;
   } catch (_) { return false; }
 };
-const DEPS_FACTURE = { lireReglage, ecrireReglage, lireTout, enTeteSession, askConfirm, toast: (m) => toast(m), chercherEntreprise, ouvrirPdfOnglet, FermeAuRetour, typeCompteVinted };
+const DEPS_FACTURE = { lireReglage, ecrireReglage, lireTout, enTeteSession, askConfirm, toast: (m) => toast(m), chercherEntreprise, ouvrirPdfOnglet, FermeAuRetour, typeCompteVinted, lireProprietaire: () => lireProprietaire() };
 // Trois états : `undefined` en cours · `null` pas su · l'objet du serveur.
 async function lireAbonnement() {
   try {
