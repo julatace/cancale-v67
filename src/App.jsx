@@ -73517,7 +73517,7 @@ function AppCoeur() {
             };
             // `ebay_tokens*` (les jetons eBay, de chacun de ses comptes) et `push_subs` (les clés de ses téléphones)
             // ne quittent pas la base.
-            const EXCLUS = ['harvest_*_txn_*','harvest_*_label_*','email_bord_*','lbc_catalogue','lbc_recon','backup_*','harvest_*_seen_urls','harvest_*_wreq_*','harvest_*_pickup_points','ebay_tokens*','push_subs','vrm_photoroom_cle','photoroom_cle'];
+            const EXCLUS = ['harvest_*_txn_*','harvest_*_label_*','email_bord_*','email_html_*','lbc_catalogue','lbc_recon','backup_*','harvest_*_seen_urls','harvest_*_wreq_*','harvest_*_pickup_points','ebay_tokens*','push_subs','vrm_photoroom_cle','photoroom_cle'];
             const [lignes, legeres, comptes] = await Promise.all([
               toutLire(`app_data?select=id,data&and=(${EXCLUS.map(x=>`id.not.like.${x}`).join(',')})&order=id`),
               toutLire(`app_data?select=id,meta&or=(id.like.harvest_*_txn_*,id.like.harvest_*_label_*,id.like.email_bord_*)&order=id`),

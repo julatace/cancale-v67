@@ -34,8 +34,11 @@
 // ⚠️ AUCUN HTML n'est rendu : le texte gardé est dessiné en éléments React
 //    (aucun `dangerouslySetInnerHTML`, aucun `iframe`) ; balises, scripts et
 //    `on…=` restés dans le texte sont retirés (`retirerBalises`) ; un lien n'est
-//    gardé qu'en http(s), ouvert ailleurs (`noopener noreferrer`). Le HTML
-//    d'origine n'est pas gardé à la réception (poids de la base — passation).
+//    gardé qu'en http(s), ouvert ailleurs (`noopener noreferrer`).
+// ⚠️ (6 nov., décision de Julien) Le HTML d'origine ASSAINI des e-mails « à geste »
+//    (30 jours, api/_lib/email-html.js) n'est rendu QUE dans le cadre isolé de
+//    src/CadreEmail.jsx (`sandbox` sans `allow-scripts`) — jamais dans cet écran ;
+//    pas demandé en mode stream (« Masqué en mode stream » : noms et adresses).
 // ⚠️ §5 : un geste (« Voir le colis… ») ne part QUE d'une identité lue.
 // ⚠️ Au téléphone, la feuille de lecture est OPAQUE dès sa première image.
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -50,6 +53,8 @@ import RelierBoite from './RelierBoite.jsx';
 import RelierCompte from './RelierCompte.jsx';
 import { phraseARelier } from './relierCompte.js';
 import { EtatPanne } from './composants/EtatPanne.jsx';
+import CadreEmail from './CadreEmail.jsx';
+import { streamAllume } from './modeStream.js';
 import './boite-emails.css';
 
 const PAR_PAGE = 50;
@@ -201,22 +206,47 @@ function Corps({ texte, coupe }) {
   </div>;
 }
 
+// (6 nov.) Le mode stream, suivi ici (l'évènement que pose l'interrupteur de l'app).
+function useStreamIci() {
+  const [on, setOn] = useState(() => { try { return streamAllume(); } catch (_) { return false; } });
+  useEffect(() => { const f = (ev) => setOn(!!(ev && ev.detail)); window.addEventListener('vrm:stream', f); return () => window.removeEventListener('vrm:stream', f); }, []);
+  return on;
+}
+const appSombre = () => { try { return document.documentElement.getAttribute('data-theme') === 'dark'; } catch (_) { return false; } };
+// Le message d'origine : sa MISE EN PAGE (HTML assaini, cadre isolé) quand elle est
+// gardée, sinon le texte remis en forme — et une ligne qui dit pourquoi, s'il y en a une.
+function MessageOrigine({ e, stream }) {
+  const o = e.origine;
+  const texte = typeof e.texte === 'string' && e.texte.trim()
+    ? <Corps texte={e.texte} coupe={!!e.texteCoupe}/>
+    : <p className="vrm-boite-doux" data-boite-corps="absent">Le texte de cet e-mail n’est pas gardé dans VRM (rangé avant le 31 oct.). Il est dans ta messagerie.</p>;
+  if (stream) return <><p className="vrm-boite-doux" data-boite-origine="stream">Mise en page d’origine masquée en mode stream (elle contient noms et adresses).</p>{texte}</>;
+  if (o && o.etat === 'garde' && typeof o.html === 'string') return <div data-boite-origine="html"><CadreEmail html={o.html} images={Number(o.images) || 0} sombreEmail={!!o.sombre} appSombre={appSombre()} titre={`Message d’origine : ${e.subject || 'e-mail sans objet'}`}/></div>;
+  const [cle, note] = o === null ? ['pas-su', 'Mise en page d’origine pas lue cette fois : voici le texte.']
+    : o && o.etat === 'trop' ? ['trop', `Mise en page trop lourde${o.octets ? ` (${poidsLisible(o.octets)})` : ''} : VRM n’en garde que le texte.`]
+    : o && o.raison === 'trop-vieux' ? ['trop-vieux', 'La mise en page d’origine n’est gardée que 30 jours : voici le texte.']
+    : ['texte', ''];
+  return <>{note ? <p className="vrm-boite-doux" data-boite-origine={cle}>{note}</p> : <span hidden data-boite-origine={cle}/>}{texte}</>;
+}
+
 // ── LIRE UN E-MAIL ───────────────────────────────────────────────────────────
 function Lecture({ id, entetes, delies, onFermer, onAller, onNum, plein, FermeAuRetour, lu, onLu, photoDe }) {
   const [m, setM] = useState(undefined); // undefined en cours · null pas su · {email}
   const [essai, setEssai] = useState(0);
   const titre = useRef(null);
+  const stream = useStreamIci();
   useEffect(() => {
     let vivant = true; setM(undefined);
     (async () => {
       try {
-        const r = await requeteJsonBornee(`/api/email-rattacher?mode=journal&lire=${encodeURIComponent(id)}`, { headers: entetes(), cache: 'no-store' });
+        // (6 nov.) `html=1` : la mise en page d'origine, jamais demandée en mode stream.
+        const r = await requeteJsonBornee(`/api/email-rattacher?mode=journal&lire=${encodeURIComponent(id)}${stream ? '' : '&html=1'}`, { headers: entetes(), cache: 'no-store' });
         if (!vivant) return;
         setM(r.ok && r.json && r.json.ok === true && r.json.id === id ? { email: r.json.email || null } : null);
       } catch (_) { if (vivant) setM(null); }
     })();
     return () => { vivant = false; };
-  }, [id, entetes, essai]);
+  }, [id, entetes, essai, stream]);
   useEffect(() => { if (m && m.email && titre.current) { try { titre.current.focus({ preventScroll: true }); } catch (_) {} } }, [m]);
   const e = m && m.email;
   const lecture = e ? ceQueVrmAFait(e, delies) : null;
@@ -263,9 +293,7 @@ function Lecture({ id, entetes, delies, onFermer, onAller, onNum, plein, FermeAu
           <p className="vrm-boite-sous">Message d’origine</p>
           <div className="vrm-boite-message">
             <h3 className="vrm-boite-sujet" data-boite-sujet="">{e.subject || 'E-mail sans objet'}</h3>
-            {typeof e.texte === 'string' && e.texte.trim()
-              ? <Corps texte={e.texte} coupe={!!e.texteCoupe}/>
-              : <p className="vrm-boite-doux" data-boite-corps="absent">Le texte de cet e-mail n’est pas gardé dans VRM (rangé avant le 31 oct.). Il est dans ta messagerie.</p>}
+            <MessageOrigine e={e} stream={stream}/>
           </div>
         </section>
         <section className="vrm-boite-pieces" data-boite-pieces={e.pieces == null ? 'pas-su' : e.pieces.length}>
