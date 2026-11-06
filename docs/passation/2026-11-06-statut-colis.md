@@ -160,7 +160,10 @@ Où elle agit :
 
 ## 6. Bancs voisins
 
-(rempli à la fin de la session)
+Sur le build final : `colis-retirer-propre` 120 verts, `colis-envoi` 114 verts, `colis-sms` 57 verts,
+`statut-colis` 81 verts. `transporteurs` : 1 rouge, « F n° 8 : « Reçus 1,7 k » sur une ligne »
+(l'onglet d'Achats s'appelle « Arrivés » depuis le 5 nov.) — le même rouge sur l'arbre d'avant,
+pas causé ici, à reprendre par le chantier d'Achats.
 
 ## Geste de Julien
 
