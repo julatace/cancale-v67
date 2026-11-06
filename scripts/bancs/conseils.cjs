@@ -154,7 +154,8 @@ const etatDe = (base, cle) => (base.acc && base.acc.etats && base.acc.etats[cle]
         const vue = await attendreBulle(a.pg, 12000);
         dit(vue, `${T} C1 la bulle paraît sur Ma journée`);
         if (vue) {
-          await a.pg.waitForTimeout(700);           // l'entrée finie
+          // L'entrée finie (le ressort, puis le halo) : on mesure la bulle posée, pas en vol.
+          await a.pg.waitForFunction(() => [...document.querySelectorAll('.vrm-conseil-bulle, .vrm-conseil-halo')].every((e) => e.getAnimations().every((x) => x.playState === 'finished')), null, { timeout: 5000 }).catch(() => {});
           const b = await lireBulle(a.pg);
           dit(b.n === 1 && b.cle === CLE, `${T} C1 une seule bulle, « ${CLE} »`, `${b.n} · ${b.cle}`);
           dit(Number.isFinite(etatDe(base, CLE).vu) && base.ecritures.length >= 1, `${T} C1 son « vu » est écrit dans la ligne vrm_accompagnement`, JSON.stringify(base.acc));
