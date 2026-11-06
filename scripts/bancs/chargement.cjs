@@ -149,6 +149,7 @@ async function ouvrir(b, combo, tab, opts = {}) {
     try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_comptes_lies', JSON.stringify({ qui, uids })); localStorage.setItem('vinted_dark', sombre ? 'true' : 'false'); } catch (_) {}
   }, [UID_BANC, UIDS_LIES, combo.theme === 'sombre']);
   await pg.addInitScript(enregistreur);
+  if (process.env.CHARGEMENT_SANS_ANIM) await pg.addInitScript(() => document.addEventListener('DOMContentLoaded', () => { const st = document.createElement('style'); st.textContent = '*{animation:none!important;transition:none!important}'; document.head.appendChild(st); }));
   // Les photos (CDN Vinted) : une vraie image, petite, après un aller-retour — couper les
   // images ferait apparaître, au bout d'un délai, la phrase « photos bloquées » (un décalage
   // que le vendeur ne voit jamais).
@@ -163,6 +164,7 @@ async function ouvrir(b, combo, tab, opts = {}) {
     if (P.cdp) { await cdp.send('Network.enable'); await cdp.send('Network.emulateNetworkConditions', P.cdp); }
   }
   let enVol = 0, derniere = Date.now();
+  const lectures = [];   // [début, fin] de chaque lecture de la base (ms depuis la navigation, horloge du banc)
   // Toute requête de la page (fichiers de l'app compris) : le calme attend aussi la fin des téléchargements.
   const vols = new Set();
   pg.on('request', (q) => vols.add(q)); const fin = (q) => { vols.delete(q); derniere = Date.now(); };
@@ -177,12 +179,14 @@ async function ouvrir(b, combo, tab, opts = {}) {
       const h = await rq.allHeaders();
       const rep = repondre(url, h.range, base);
       const body = JSON.stringify(rep.body);
+      const d0 = Date.now() - t0;
       await new Promise((r) => setTimeout(r, P.rtt + Math.round(body.length / P.debit * 1000)));
+      lectures.push([d0, Date.now() - t0, du.replace(/^.*\/rest\/v1\//, '').slice(0, 150)]);
       return await route.fulfill({ status: rep.status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', ...(rep.headers || {}) }, body });
     } catch (_) { /* page fermée */ } finally { enVol--; derniere = Date.now(); }
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true,"devices":1}' }));
-  const t0 = Date.now();
+  var t0 = Date.now();
   await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'commit', timeout: P.max });
   // Le calme : aucune lecture de la base en vol ni finie depuis 3 s, et aucun
   // changement visible depuis 3 s (ou le plafond du profil).
@@ -211,6 +215,11 @@ async function ouvrir(b, combo, tab, opts = {}) {
     for (const x of R.shifts) console.log(`    [debug] décalage ${x.t} ${x.v} ${x.src.join(' / ')}`);
   }
   res.calme = fini; res.erreurs = errs.slice(0, 3);
+  const premiere = lectures.length ? Math.min(...lectures.map((x) => x[0])) : null, derniereL = lectures.length ? Math.max(...lectures.map((x) => x[1])) : null;
+  const iCoque = R.ech.find((e) => e.coque);
+  res.lectures = { n: lectures.length, premiere, derniere: derniereL, coque: iCoque ? iCoque.t : null };
+  if (process.env.CHARGEMENT_LECTURES) for (const l of lectures.slice().sort((a, b) => a[0] - b[0])) console.log(`    [lecture] ${l[0]}→${l[1]} ${l[2]}`);
+  if (process.env.CHARGEMENT_DEBUG) console.log(`    [debug] coque montée ${res.lectures.coque} ms · ${lectures.length} lectures de la base, de ${premiere} à ${derniereL} ms (horloge du banc)`);
   if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); await pg.screenshot({ path: path.join(SHOTS, `${combo.nom.replace(/:/g, '-')}-${tab}.png`) }).catch(() => {}); }
   // ── Revenir sur un écran déjà vu : Ventes puis Ma journée, par la navigation.
   if (opts.retour) {
