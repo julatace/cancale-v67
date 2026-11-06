@@ -80,8 +80,9 @@ button.vrm-ios-rangee-zone:focus-visible { outline: 2px solid var(--vrm-accent, 
    ligne. Il reste un bloc-en-ligne, cible de 44 px reprise par des marges négatives. */
 .vrm-main .vrm-pourquoi > summary, .vrm-pourquoi > summary {
   display: inline-block !important; vertical-align: baseline; white-space: nowrap; text-align: center;
-  width: auto !important; min-width: 0 !important; min-height: 0 !important; height: auto;
-  padding: 14px 10px !important; margin: -14px -6px -14px -4px !important; line-height: 16px;
+  width: auto !important; min-height: 0 !important; height: auto;
+  padding: 14px 10px !important; margin: -14px -12px -14px -10px !important; line-height: 16px;
+  min-width: 44px !important; box-sizing: border-box; /* 44 × 44 au doigt (banc nouveau-vendeur) ; les marges le reprennent */
   color: var(--vrm-muted, #6E6E73); font-size: 15px; font-weight: 400; cursor: pointer;
 }
 .vrm-main .vrm-pourquoi.vrm-pourquoi-ecrit > summary, .vrm-pourquoi.vrm-pourquoi-ecrit > summary { padding: 14px 4px !important; margin: -14px 0 !important; font-size: 13px; }

@@ -101,6 +101,9 @@
    rangée de carte, à gauche, avec son chevron — comme une rangée de Réglages. */
 @media (max-width: 767px) {
   .vrm-main .vrm-platform-summary { margin: 0 0 var(--vrm-entre-cartes); }
+  :root body .vrm-app-shell .vrm-main .vrm-market-space > .vrm-platform-summary {
+    grid-column: 1 / -1 !important; align-self: stretch; padding: 0 16px !important; background: transparent !important;
+  }
   .vrm-main .vrm-platform-summary > summary {
     display: flex !important; align-items: center; justify-content: space-between; gap: 8px;
     min-height: 48px; padding: 0 16px !important; border-radius: 14px;
@@ -209,7 +212,7 @@ button.vrm-notice-zone:focus-visible { outline: 2px solid var(--vrm-accent, #007
   .vrm-main .vrm-buy-ph { width: 64px !important; height: 64px !important; border-radius: 12px !important; overflow: hidden; }
   .vrm-main .vrm-buy-ph img { width: 100%; height: 100%; object-fit: cover; }
   .vrm-main .vrm-buy-statut { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 999px; background: var(--vrm-card2); font-weight: 600; }
-  .vrm-main .vrm-buy-title { font-size: 15px !important; font-weight: 600 !important; letter-spacing: -.01em; }
+  :root body .vrm-app-shell .vrm-main .vrm-buy-row .vrm-buy-title { font-size: 15px !important; font-weight: 600 !important; letter-spacing: -.01em; }
 }
 
 /* ── Annonces : la grille façon Photos — la photo carrée, coins continus, ombre douce ── */
