@@ -71084,7 +71084,7 @@ function AppCoeur() {
             if(age!=null && age>=30) sleepCount+=1;
             if(!nums[it.id] || !nums[it.id].numero) noNumCount+=1;
             const nn=String((nums[it.id]||{}).numero||'').trim();
-            if(nn) (numPorteurs[nn]=numPorteurs[nn]||[]).push(it.title||'');
+            if(nn) (numPorteurs[nn]=numPorteurs[nn]||[]).push({ id:String(it.id), t:it.title||'' });
           }
         }
       }
@@ -71427,7 +71427,9 @@ function AppCoeur() {
       // et les messages auront leur propre onglet (captation + envoi, comme
       // Vintex). Ne pas les remettre dans la cloche.
       // Actions GRATUITES pour vendre plus (jamais de « booster » payant ici) :
-      const numDbl=Object.entries(numPorteurs).filter(([,v])=>v.length>1);
+      // (6 nov., finitions) Des annonces que la carte ambre « en ligne deux fois » réunit (même paire
+      // PROUVÉE) ne sont pas « deux paires » : la règle du bloc rouge (`GROUPES_DEUX_FOIS`, §11).
+      const numDbl=Object.entries(numPorteurs).filter(([,v])=>v.length>1 && !GROUPES_DEUX_FOIS.some(g=>Array.isArray(g) && v.every(x=>g.some(y=>String(y)===x.id))));
       // (5 nov.) L'agent eBay est arrêté (sa décision) : plus de ligne « paires pour eBay » ici.
       if(numDbl.length>0) items.push({icon:'🚨', ic:'alert', text:`${numDbl.length} numéro${numDbl.length>1?'s':''} porté${numDbl.length>1?'s':''} par deux annonces (N°${numDbl.map(([n])=>n).slice(0,3).join(', N°')}) — la mauvaise paire peut partir`, n:numDbl.length, tab:'cat_annonces', dv:'num', annonces:true});
       if(noNumCount>0)   items.push({icon:'🔢', ic:'tag', text:`${noNumCount} annonce${noNumCount>1?'s':''} sans numéro`, n:noNumCount, tab:'cat_annonces', jr:true, annonces:true, job:'sans-numero'});

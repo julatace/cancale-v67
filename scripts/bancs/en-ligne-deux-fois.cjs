@@ -200,7 +200,9 @@ const ouvrir = async (b, vp, sc) => {
       });
       // (6 nov., finitions) Le rouge et l'ambre ensemble : jamais pour UNE paire prouvée.
       const lireDR = (pg) => pg.evaluate(() => {
-        const j = document.querySelector('[data-job="numeros-en-double"]');
+        // Le rouge de Ma journée : le bloc (`numeros-en-double`) ET l'alerte « N° porté par deux annonces »
+        // (`double-vente` en rouge doublon, issue de la cloche) — les deux disent « deux paires sous un N° ».
+        const j = document.querySelector('[data-job="numeros-en-double"]') || [...document.querySelectorAll('[data-job="double-vente"]')].find((x) => /numéro/i.test(x.textContent || '')) || null;
         return { ambre: !!document.querySelector('[data-en-ligne-deux-fois]'), rouge: !!j, rougeTxt: j ? j.textContent.replace(/\s+/g, ' ').slice(0, 120) : '', rendu: !!document.querySelector('.vrm-fu-afaire, [data-tout-a-jour]') };
       });
       await essaie(`D ${nomVp}`, async () => {

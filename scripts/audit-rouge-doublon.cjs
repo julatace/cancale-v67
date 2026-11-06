@@ -121,6 +121,7 @@ function juger(depot) {
     dit(/uniq\.every\(x => x\.type === 'annonce'\) && Array\.isArray\(memePaires\)/.test(regle) && /ids\.every\(id => g\.some\(/.test(regle), 'R6 `conflitsDeNumeros` dispense des annonces qu’un groupe de la carte ambre réunit TOUTES (jamais une partie)', regle.slice(0, 200));
     dit(/const conflitsNum = useMemo\(\(\) => conflitsDeNumeros\(porteursNum, groupesDeuxFois\)/.test(app) && /const groupesDeuxFois = useMemo\(\(\) => \(enLigneDeux && Array\.isArray\(enLigneDeux\.vinted\)/.test(app), 'R6 le bloc rouge reçoit les groupes de la carte ambre (`enLigneDeux.vinted`)');
     dit(/\{conflitsNum\.length > 0 && \(/.test(app) && /if\(conflitsNum\.length\)\{/.test(app), 'R6 le bloc rouge de Colis et la ligne de Ma journée lisent `conflitsNum` (une seule règle)');
+    dit(/const numDbl=Object\.entries\(numPorteurs\)\.filter\(\(\[,v\]\)=>v\.length>1 && !GROUPES_DEUX_FOIS\.some\(g=>Array\.isArray\(g\) && v\.every\(/.test(app), 'R6 l’alerte « N° porté par deux annonces » (cloche, Ma journée) se tait aussi pour UNE paire en ligne deux fois');
     dit(/conflits: \(p\) => conflitsDeNumeros\(p, GROUPES_DEUX_FOIS\)/.test(app) && /useEffect\(\(\) => \{ GROUPES_DEUX_FOIS = groupesDeuxFois; \}, \[groupesDeuxFois\]\)/.test(app), 'R6 « Tout sur le N° » suit la même règle (les groupes publiés par Ma journée)');
   }
   if (process.env.DETAIL) console.log(JSON.stringify(parDette, null, 1));
@@ -145,6 +146,7 @@ function mutations() {
     ['R5 un rouge en dur dans une feuille de la zone', { 'src/styles-coque.css': coque + '\n.vrm-essai { color: #E5484D; }\n' }],
     ['R6 le rouge ignore la carte ambre', { 'src/App.jsx': app.replace('conflitsDeNumeros(porteursNum, groupesDeuxFois)', 'conflitsDeNumeros(porteursNum)') }],
     ['R6 « Tout sur le N° » ignore la carte ambre', { 'src/App.jsx': app.replace('conflits: (p) => conflitsDeNumeros(p, GROUPES_DEUX_FOIS),', 'conflits: conflitsDeNumeros,') }],
+    ['R6 l’alerte de la cloche ignore la carte ambre', { 'src/App.jsx': app.replace("v.length>1 && !GROUPES_DEUX_FOIS.some(g=>Array.isArray(g) && v.every(x=>g.some(y=>String(y)===x.id)))", 'v.length>1') }],
     ['R6 un groupe partiel suffit', { 'src/App.jsx': app.replace('ids.every(id => g.some(', 'ids.some(id => g.some(') }],
     ['R5 un rouge en dur de plus dans App.jsx', { 'src/App.jsx': app.replace('let C = THEMES.light;', "let C = THEMES.light; const ROUGE_ESSAI = 'rgb(229, 72, 77)';") }],
   ];
