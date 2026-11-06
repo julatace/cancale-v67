@@ -78,7 +78,7 @@ décidées par `photoACacherSelon` sur la règle de l'aperçu, avec le même flo
 
 ## Preuves
 - `npm run build` vert.
-- `node scripts/audit-stream-photos.cjs` (nouveau) : 48 contrôles verts — programme (bouton
+- `node scripts/audit-stream-photos.cjs` (nouveau) : 41 contrôles verts — programme (bouton
   caché, photos allumé, toutes éteint par défaut ; seuls les choix explicites changent),
   règle EXÉCUTÉE (marque cachée ⇒ floue ; autre marque ⇒ nette ; mot entier ; « commence
   par », « contient » ; pseudo seul ⇒ nette ; fiche objet ; adresse de photo ignorée ;
@@ -107,7 +107,27 @@ décidées par `photoACacherSelon` sur la règle de l'aperçu, avec le même flo
   choisit le bouton), `coque-parametres` H1 (par défaut : l'œil, pas « Stream »).
 
 ## Mesures
-(remplies à la fin du chantier — voir plus bas)
+- `stream-photos.cjs` **après** : **162 OK, 0 KO** (390 tactile et 1512, clair et sombre,
+  parties A à E). Une première passe sous charge avait 3 rouges à 390 sombre (écran encore
+  « pas lu » à 2,4 s, capture regardée) : le banc attend désormais qu'une photo du jeu soit
+  à l'écran (15 s au plus) avant de juger — relancé : vert.
+- **Avant** (`git archive be6b7179`, banc copié dedans, construit et lancé depuis cet arbre) :
+  **16 KO** à 390 clair et **16 KO** à 1512 sombre — « Stream » toujours là et pas d'œil, pas
+  d'option ni d'aperçu, aucune photo Adidas floutée (Annonces 3, Ventes 2, Colis 1,
+  Messages 1, visionneuse), « Adidas » lisible dans un `aria-label` et l'`alt` de la
+  visionneuse, « toutes » sans effet, le bouton ne part pas à l'extinction.
+- **Mutation** (couche DOM qui ne demande plus `photoACacherSelon`, arbre reconstruit) :
+  **5 KO** (les quatre écrans et la visionneuse).
+- Bancs voisins relancés après (dist de la branche) : `mode-stream` (A, B, D, E ; 390 et
+  1512 clair) **27 OK** ; `comptes-securite` (B, 390 clair) **16 OK** ; `compte-supprime`
+  **22 OK** ; `coque-parametres` (390 et 1512 clair) **60 OK** (H1 : par défaut l'œil, pas
+  « Stream »). Audits : `audit-coherence`, `audit-identite`, `audit-composants`,
+  `audit-secrets`, `audit-icones` verts.
+- Captures regardées : aperçu des réglages (une vignette floutée, l'autre nette, légende
+  « ••• Air Max 90 »), Annonces 1512 sombre (la carte Adidas floutée entre Asics et New
+  Balance nettes), Colis 1512 clair, Messages 390 (la conversation Adidas floutée, Nike et
+  New Balance nettes), visionneuse (flou doublé : ni lettres ni forme), en-tête par défaut
+  (l'œil, pas « Stream »).
 
 ## Ce qui reste / limites dites
 - Une photo dont l'article n'a AUCUN texte autour (une grille de vignettes nues sous un titre
