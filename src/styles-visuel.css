@@ -170,7 +170,8 @@ button.vrm-notice-zone:focus-visible { outline: 2px solid var(--vrm-accent, #007
 .vrm-alerte-tete .vrm-alerte-ligne-sous { display: block; padding: 0; }
 .vrm-alerte-tete .vrm-alerte-ligne-titre { display: block; }
 /* L'écran Colis finit par la carte « N° à écrire » : la section suivante suit à 24 px, pas 52 (mesuré). */
-.vrm-main > div:has(> .vrm-carte-alerte:last-child) { padding-bottom: 12px !important; }
+.vrm-main > div:has(> .vrm-carte-alerte:last-child),
+.vrm-main > div[style*="14px 40px"]:has(+ section) { padding-bottom: 12px !important; } /* (mesuré : un <input> caché est le dernier enfant) */
 /* « Remboursement à vérifier · 19,64 € » : le montant ne se coupe jamais (il passe à la ligne). */
 .vrm-main .vrm-reparti-court .vrm-rpf-puce { white-space: normal; height: auto; min-height: 22px; padding: 3px 8px; line-height: 1.3; }
 
