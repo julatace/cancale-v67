@@ -273,6 +273,8 @@ import { etatArticle } from "./etatArticle.js";
 import StockExplication from "./StockExplication.jsx";
 import { libererCasesPartis, remettreCase, resteAuStock, etatCase } from "./stockSortie.js";
 import { annoncesActuelles, annoncesVcStock, classerRangees } from "./stockAnnonces.js";
+import { enLigneDeuxFois, texteCarte as texteEnLigneDeuxFois } from "./enLigneDeuxFois.js";
+import { EnLigneDeuxFoisDetail } from "./EnLigneDeuxFois.jsx";
 import { carteArgentJournee } from "./journeeArgent.js";
 import { CLE_MODELES, lireModeles } from "./modelesDescription.js";
 import { MesModeles, InsererModele } from "./ModelesDescription.jsx";
@@ -36255,6 +36257,11 @@ function doublonsAReattribuer(conflits, fiches) {
     // l'ancienne a échoué, les deux sont en ligne quelques minutes. On ne renumérote
     // RIEN (le carton porte ce N°) ; le bloc rouge reste et dit d'en supprimer une.
     if (annonces.length === 2 && annonces.some((x) => { const f = fiches[x.id] || {}; return f.recreeDe && annonces.some((y) => String(y.id) === String(f.recreeDe)); })) continue;
+    // (6 nov., vague 3) Même chose pour deux annonces de même PHOTO EXACTE (`photoK`
+    // de leurs fiches — `jumellesParPhoto`, §5) : la MÊME paire en ligne deux fois,
+    // un carton. On ne renumérote rien ; Ma journée dit d'en supprimer une
+    // (src/enLigneDeuxFois.js).
+    if (annonces.length === 2) { const pk = annonces.map((x) => String((fiches[x.id] || {}).photoK || '')); if (pk[0] && pk[0] === pk[1]) continue; }
     const ventes = p.filter((x) => x.type === 'vente');
     const autres = p.filter((x) => x.type !== 'annonce' && x.type !== 'vente');
     if (autres.length) continue;                       // garage / annulée : pas deviné
@@ -45780,6 +45787,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return out;
   }, [listings.items, listings.aConfirmer, masqueesSurEtagere]);
   const presentesAnnonceIds = useMemo(() => new Set(annoncesPresentes.map(it => String(it.id))), [annoncesPresentes]);
+  // (6 nov., vague 3) LA MÊME PAIRE EN LIGNE DEUX FOIS SUR VINTED (src/enLigneDeuxFois.js) :
+  // deux annonces EN LIGNE (la règle <enligne-regle>, jamais « à confirmer » ni masquées)
+  // de même PHOTO EXACTE ou reliées par `recreeDe` — risque de double vente. Un compte
+  // pas lu, sans heure ou lu il y a plus de 24 h ne conclut rien. Jamais le titre ; le
+  // même N° seul est le bloc rouge (déjà dit). `null` = lecture pas prête (aucune carte).
+  const enLigneDeux = useMemo(() => {
+    if (!Array.isArray(listings.items) || listings.loading || listings.comptes !== cleComptes) return null;
+    const ko = new Set((listings.ko || []).map(String));
+    const vinted = (accounts || []).filter((a) => !acctOff(a.vinted_user_id)).map((a) => {
+      const uid = String(a.vinted_user_id);
+      return { uid, nom: accNameOf(a), ok: !ko.has(uid), lu: listings.lues ? listings.lues[uid] : null,
+        enLigne: listings.items.filter((it) => String(it && it._acc && it._acc.vinted_user_id) === uid) };
+    });
+    return enLigneDeuxFois({ vinted, fiches: numeros, clePhoto: photoKey, cle: cleNum });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listings, numeros, accounts, cleComptes, hiddenAccts, panelAcctOff]);
   // (29 oct.) La lecture des annonces telle que la règle de l'offre la juge
   // (`annonceOffreEnVente`) : la MÊME que l'écran Annonces (§11) — en ligne, à
   // confirmer, masquées, brouillons, l'heure de la lecture qui fait foi par compte
@@ -53072,6 +53095,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [only, baseKO, sales.items, sales.loading, listings.items, listings.loading, txnPret, vendusAilleurs.v.at, vendusAilleurs.v.charge]);
   const [feuilleAilleurs, setFeuilleAilleurs] = useState(false);
+  const [feuilleDeux, setFeuilleDeux] = useState(false);   // (6 nov.) « en ligne deux fois »
   // (5 nov., chantier E1) « N°42 vendue, toujours rangée » se dit UNE fois : « Voir »
   // range le N° ici (commodité de l'appareil, jamais une donnée : la case, elle, ne
   // bouge pas). Une case libérée sort de la liste d'elle-même.
@@ -54283,7 +54307,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     .filter(Boolean).sort((a, b) => triNum(a.num, b.num));
                 } catch (_) { return []; }
               })();
-              const nGestes = cases.length + alertesArgent.length + autres.length + (urssafJob ? 1 : 0) + (carteAilleurs ? 1 : 0) + (sortiesStock.length ? 1 : 0);
+              // (6 nov., vague 3) LA MÊME PAIRE EN LIGNE DEUX FOIS SUR VINTED (`enLigneDeux`, src/enLigneDeuxFois.js) :
+              // une carte AMBRE (c'est un geste), seulement s'il y en a. Le geste : supprimer celle en trop sur
+              // vinted.fr, SON clic — VRM ne supprime rien tout seul (§3).
+              const deuxFois = enLigneDeux && enLigneDeux.vinted.length ? enLigneDeux.vinted : [];
+              const nGestes = cases.length + alertesArgent.length + autres.length + (urssafJob ? 1 : 0) + (carteAilleurs ? 1 : 0) + (sortiesStock.length ? 1 : 0) + (deuxFois.length ? 1 : 0);
+              const carteDeuxFois = () => {
+                const t = texteEnLigneDeuxFois(deuxFois);
+                return (
+                  <button key="en-ligne-deux-fois" type="button" className="vrm-day-task vrm-fu-tache" data-en-ligne-deux-fois={deuxFois.map((g) => g.annonces.map((a) => a.id).join('+')).join(' ')} data-n={String(deuxFois.length)}
+                    title={t.complet} aria-label={t.complet} onClick={() => setFeuilleDeux(true)}>
+                    <PileVignettes srcs={deuxFois.flatMap((g) => g.annonces.map((a) => a.photo))} n={deuxFois.length} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name="alert" size={20}/>}/>
+                    <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{t.titre}</span><span className="vrm-day-task-note is-urgent" data-sous-ligne="deux-fois">{t.detail}</span></span>
+                    <span className="vrm-day-task-action"><span className="vrm-day-task-action-mot">{VERBES.voir}</span></span>
+                  </button>
+                );
+              };
               const carteVendusAilleurs = () => {
                 const plats = [...new Set(lignesA.map((a) => a.plateforme).filter(Boolean))];
                 const court = carteAilleurs.erreur && !carteAilleurs.n ? 'Vendus ailleurs : pas vérifié' : `${carteAilleurs.n} annonce${carteAilleurs.n > 1 ? 's' : ''} vendue${carteAilleurs.n > 1 ? 's' : ''} ailleurs`;
@@ -54338,6 +54377,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div className="vrm-day-task-list" data-barre-jour="">
                     {alertesArgent.length ? <div style={{display:'contents'}} data-alertes-argent="">{alertesArgent.map(tache)}</div> : null}
                     {carteAilleurs ? carteVendusAilleurs() : null}
+                    {deuxFois.length ? carteDeuxFois() : null}
                     {cases.map(carteCase)}
                     {sortiesStock.length ? carteSortieStock() : null}
                     {autres.map(tache)}
@@ -54348,6 +54388,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div className="vrm-bilan-sync vrm-va-feuille">
                         <VendusAilleursDetail v={vA} lire={vendusAilleurs.lire} onNav={(t) => { setFeuilleAilleurs(false); if (onNav) onNav(t); }} PhotoVinted={PhotoVinted}/>
                       </div>
+                    </SheetShell>
+                  ) : null}
+                  {feuilleDeux && deuxFois.length ? (
+                    <SheetShell titre="En ligne deux fois" sousTitre="Sur Vinted" onClose={() => setFeuilleDeux(false)} maxWidth={560} data-feuille-deux-fois="">
+                      <EnLigneDeuxFoisDetail groupes={deuxFois} manque={enLigneDeux.manque} PhotoVinted={PhotoVinted}/>
                     </SheetShell>
                   ) : null}
                   {/* Les cases à zéro restent lisibles par les autres écrans et les bancs (mêmes compteurs), sans place à l'écran. */}

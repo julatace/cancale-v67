@@ -98,6 +98,7 @@ const COUPLES = {
   'src/App.jsx|www.mondialrelay.fr': ['lien', LIEN],
   'src/App.jsx|www.vinted.fr': ['lien', LIEN],
   'src/OutilsArticlesVinted.jsx|www.vinted.fr': ['lien', LIEN],
+  'src/EnLigneDeuxFois.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir sur Vinted » l’annonce en trop (Ma journée, « en ligne deux fois »)'],
   'src/SynchronisationVinted.jsx|www.vinted.fr': ['lien', LIEN],
   'src/ebayGestion.jsx|www.ebay.fr': ['lien', LIEN],
   'src/ConfigurerTransfert.jsx|mail.google.com': ['lien', LIEN],
