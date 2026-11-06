@@ -259,7 +259,7 @@ const LIGNE_J = { owner: J, data: { adresses: { 'recu@vrm.center': { owner: J } 
     const ss = L({ v: 1, t: 'suivi', st: 'available', av: 'sans-suivi' });
     dit(ss.etat === 'verifier' && /n° de suivi/.test(ss.raison) && !ss.cible, 'colis sans n° : « à vérifier », relié à rien');
     const a = L({ v: 1, t: 'achat', tx: '98765432101', a: 'Nike Air Force 1', px: '45,00', id: 'email_achat_abc' });
-    dit(a.etat === 'range' && a.quoi === 'Reçu d’achat · Nike Air Force 1 (45,00 €)' && a.fait === 'Reçu rangé avec ton achat n° 98765432101' && a.delier.offert && a.lien.tab === 'achats', 'reçu : phrase, lien Achats, « Ce n’est pas ça » proposé', JSON.stringify(a));
+    dit(a.etat === 'range' && String(a.quoi).replace(/\u00a0/g, ' ') === 'Reçu d’achat · Nike Air Force 1 (45,00 €)' && a.fait === 'Reçu rangé avec ton achat n° 98765432101' && a.delier.offert && a.lien.tab === 'achats', 'reçu : phrase, lien Achats, « Ce n’est pas ça » proposé', JSON.stringify(a));
     const ad = lectureEmail({ id: 'x', from: '', subject: 's', etat: 'integre', resume: { v: 1, t: 'achat', tx: '98765432101', id: 'email_achat_abc' } }, { email_achat_abc: { tx: '98765432101' } });
     dit(ad.etat === 'delie' && ad.delier.delie && /Délié par toi/.test(ad.fait), 'reçu délié par lui : dit, et réversible (« Relier à nouveau »)');
     const st = L({ v: 1, t: 'achat', a: 'Nike Air Force 1', av: 'sans-tx' });
@@ -271,7 +271,7 @@ const LIGNE_J = { owner: J, data: { adresses: { 'recu@vrm.center': { owner: J } 
     const ancien = lectureEmail({ id: 'x', etat: 'integre', type: 'bordereau', subject: 'Vieux bordereau', resume: null });
     dit(ancien.fait === 'Classé avant le 31 oct. — détail non gardé.' && ancien.etat === 'range' && ancien.lien.tab === 'cat_bord', 'un email d’avant le résumé : « classé avant le 31 oct. — détail non gardé »');
     const o = L({ v: 1, t: 'offre', mt: '35', de: 'marie_b', a: 'Nike Dunk' });
-    dit(o.quoi === 'Offre de 35 € de marie_b sur Nike Dunk' && o.lien.tab === 'cat_msg', 'offre : phrase et lien Messages', o.quoi);
+    dit(String(o.quoi).replace(/\u00a0/g, ' ') === 'Offre de 35 € de marie_b sur Nike Dunk' && o.lien.tab === 'cat_msg', 'offre : phrase et lien Messages', o.quoi);
     // 50 reçus au même titre : chacun ne dit que SON n° ; aucun sans n° n'est relié.
     const recus = Array.from({ length: 50 }, (_, i) => L({ v: 1, t: 'achat', a: 'Nike Air Force 1', px: '45,00', ...(i % 5 ? { tx: String(10000000000 + i), id: 'email_achat_' + i } : { av: 'sans-tx' }) }));
     const bons = recus.every((x, i) => (i % 5 ? x.fait === `Reçu rangé avec ton achat n° ${10000000000 + i}` && x.cible.v === String(10000000000 + i) : x.cible === null && x.etat === 'verifier'));

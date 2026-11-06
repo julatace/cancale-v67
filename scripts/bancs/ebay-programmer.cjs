@@ -383,7 +383,7 @@ const lignesPlan = (pg) => pg.$$eval('[data-planif-ligne]', (els) => els.map((e)
         const jours = await pg.$$eval('[data-planif-jour-groupe]', (els) => els.map((e) => e.getAttribute('data-planif-jour-groupe')));
         dit(jours.join(',') === '2026-10-23,2026-10-24,2026-10-25', 'l\'aperçu est groupé par jour', jours.join(','));
         const lim = await pg.$eval('[data-planif-limites]', (e) => ({ etat: e.getAttribute('data-planif-limites'), t: e.textContent }));
-        dit(lim.etat === 'lu' && /10 annonces/.test(lim.t) && /500,00 €/.test(lim.t), 'la limite de vente lue chez eBay est dite (10 annonces, 500 € par mois)', lim.t.trim().slice(0, 90));
+        dit(lim.etat === 'lu' && /10 annonces/.test(lim.t) && /500,00\s€/.test(lim.t), 'la limite de vente lue chez eBay est dite (10 annonces, 500 € par mois)', lim.t.trim().slice(0, 90));
       });
       // ── 3. LES FRAIS, LUS CHEZ eBAY POUR CETTE HEURE ──────────────────────
       await essaie('frais', async () => {

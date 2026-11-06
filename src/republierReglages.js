@@ -267,9 +267,9 @@ export function resumeReglages(reg) {
   out.push(photoNeutre(r.photo) ? 'Photos d’origine' : 'Photos retouchées');
   const p = r.prix;
   if (!prixChange(r)) out.push('Prix gardé');
-  else if (p.base === 'pct') out.push(`Prix −${String(p.delta).replace(/^-/, '') || '?'} %${p.arrondi === 'euro' ? ', arrondi' : ''}`);
-  else if (p.base === 'fixe') out.push(`Prix −${String(p.delta).replace(/^-/, '') || '?'} €${p.arrondi === 'euro' ? ', arrondi' : ''}`);
-  else if (p.base === 'commun') out.push(`Prix ${p.commun || '?'} € pour toutes`);
+  else if (p.base === 'pct') out.push(`Prix −${String(p.delta).replace(/^-/, '') || '?'}\u00a0%${p.arrondi === 'euro' ? ', arrondi' : ''}`);
+  else if (p.base === 'fixe') out.push(`Prix −${String(p.delta).replace(/^-/, '') || '?'}\u00a0€${p.arrondi === 'euro' ? ', arrondi' : ''}`);
+  else if (p.base === 'commun') out.push(`Prix ${p.commun || '?'}\u00a0€ pour toutes`);
   else out.push('Prix arrondi');
   if (titreChange(r)) out.push('Titre modifié');
   if (r.lettre) out.push('Lettre en bas');

@@ -195,8 +195,8 @@ async function parcours(pg, nom, errs, ecrits) {
   await pg.locator('[data-fo-fiche]').waitFor({ timeout: 5000 }).catch(() => {});
   await pg.waitForFunction(() => { const f = document.querySelector('[data-fo-fiche]'); return f && f.dataset.foRevendues !== ''; }, null, { timeout: 15000 }).catch(() => {});
   const fi = await pg.evaluate(() => { const f = document.querySelector('[data-fo-fiche]'); const t = (k) => (document.querySelector(`[data-fo-stat="${k}"]`) || {}).innerText || ''; return f && { ...f.dataset, depT: t('depense'), benT: t('benefice'), moyT: t('moyen'), achat: (document.querySelector('[data-fo-achat]') || {}).innerText }; });
-  dit(fi && fi.foDepense === '30000' && fi.foPaires === '10' && fi.foMoyen === '3000' && fi.foAuMoins === '' && /300 €/.test(fi.depT) && !/au moins/.test(fi.depT), `${nom} · Dépensé 300 €, 10 paires, 30 € en moyenne`, JSON.stringify(fi));
-  dit(fi && fi.foRevendues === '1' && fi.foBenefice === '6000' && /au plus \+60 €/.test(fi.benT) && !/au moins/.test(fi.benT), `${nom} · 1 revendue (N°1 à 90 €), « au plus +60 € » (frais pas confirmés)`, fi && fi.benT);
+  dit(fi && fi.foDepense === '30000' && fi.foPaires === '10' && fi.foMoyen === '3000' && fi.foAuMoins === '' && /300\s€/.test(fi.depT) && !/au moins/.test(fi.depT), `${nom} · Dépensé 300 €, 10 paires, 30 € en moyenne`, JSON.stringify(fi));
+  dit(fi && fi.foRevendues === '1' && fi.foBenefice === '6000' && /au plus \+60\s€/.test(fi.benT) && !/au moins/.test(fi.benT), `${nom} · 1 revendue (N°1 à 90 €), « au plus +60 € » (frais pas confirmés)`, fi && fi.benT);
   dit(fi && /sur 1 vendue, prix d’achat connu pour 1/.test(fi.benT), `${nom} · couverture « sur 1 vendue, prix d'achat connu pour 1 »`, fi && fi.benT);
   dit(fi && /3 sur 10 reliées/.test(fi.achat || ''), `${nom} · l'achat en gros dit « 3 sur 10 reliées » dans la fiche`, fi && fi.achat);
   await capture(pg, `${nom}-7-fiche`);

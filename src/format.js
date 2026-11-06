@@ -91,14 +91,17 @@ export function montant(v, opts = {}) {
   }
   const signe = n < 0 ? '-' : (opts.signe && n > 0 ? '+' : '');
   const corps = (opts.milliers === false ? entier : grouper(entier)) + (decimales ? ',' + decimales : '');
-  return `${signe}${corps} ${devise === 'EUR' ? '€' : devise}`;
+  // L'espace avant la devise est INSÉCABLE (U+00A0) : « € » ne passe jamais seul à la ligne.
+  return `${signe}${corps}\u00a0${devise === 'EUR' ? '€' : devise}`;
 }
 
 // ── Les quatre anciennes écritures, devenues des alias ──────────────────────
 // Elles rendent ce qu'elles rendaient pour un nombre lu, SAUF les centimes
 // inutiles (« 12,00 € » ⇒ « 12 € ») ; un montant absent ou illisible rend
 // « — » (avant : « 0,00 € » ou « NaN € »). Liste exacte : audit-composants.
-export const fmt = (n) => montant(n, { milliers: false });            // ex-App.jsx l. 11483
-export const fmtE = (n) => montant(n, { milliers: false });           // ex-Comptabilité, l. 50905
+// (6 nov., finition) `fmt` et `fmtE` groupent les milliers (« 1 551,50 € », jamais « 1551,50 € » :
+// une faute en français, lue sur la table de Compta et les registres à l'écran).
+export const fmt = (n) => montant(n);            // ex-App.jsx l. 11483
+export const fmtE = (n) => montant(n);           // ex-Comptabilité, l. 50905
 export const fmtE0 = (n) => montant(n, { centimes: 'jamais' });       // ex-Comptabilité, l. 50910 (cartes-titres)
 export const prixTxt = (p) => montant(p, { vide: 'sans prix', arrondi: 'decimal' });   // ex-ChoixAnnoncesVinted

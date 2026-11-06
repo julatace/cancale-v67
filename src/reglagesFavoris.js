@@ -25,8 +25,8 @@ export function offreFavori({pourcentage=null,offreMode=null,offreValeur=null,ar
   const brut=String(offreValeur??'').trim().replace(/\s|€/g,'');
   if(!MONTANT.test(brut))throw Error(mode==='euros'?'Saisis le montant à retirer en euros (par exemple 5 ou 4,50).':'Saisis le prix de l’offre en euros (par exemple 45 ou 44,90).');
   const v=Math.round(Number(brut.replace(',','.'))*100)/100;
-  if(mode==='euros'&&!(v>=0.01&&v<=9999))throw Error('Le montant à retirer doit être entre 0,01 € et 9 999 €.');
-  if(mode==='prix'&&!(v>=1&&v<=99999))throw Error('Le prix de l’offre doit être d’au moins 1 €.');
+  if(mode==='euros'&&!(v>=0.01&&v<=9999))throw Error('Le montant à retirer doit être entre 0,01\u00a0€ et 9 999\u00a0€.');
+  if(mode==='prix'&&!(v>=1&&v<=99999))throw Error('Le prix de l’offre doit être d’au moins 1\u00a0€.');
   return {pourcentage:null,offreMode:mode,offreValeur:v,arrondi:arrondi===true};
 }
 export function validerReglagesFavoris({message='',pourcentage=null,offreMode=null,offreValeur=null,arrondi=false,intervalleMinutes,intervalleMaxMinutes=null}) {

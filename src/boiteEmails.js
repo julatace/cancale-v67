@@ -116,7 +116,7 @@ export function jourCourt(v) {
   else if ((m = /^(\d{1,2})[/.](\d{1,2})(?:[/.]\d{2,4})?\b/.exec(s))) { j = +m[1]; mo = +m[2]; }
   return j >= 1 && j <= 31 && mo >= 1 && mo <= 12 ? `${j} ${MOIS[mo - 1]}` : s;
 }
-const prix = (m) => { const t = String(m == null ? '' : m).trim(); return t ? `${t.replace('.', ',')} €` : ''; };
+const prix = (m) => { const t = String(m == null ? '' : m).trim(); return t ? `${t.replace('.', ',')}\u00a0€` : ''; };
 const maj = (s) => { const t = String(s || '').trim(); return t ? t[0].toLocaleUpperCase('fr') + t.slice(1) : ''; };
 // Un code ou une date ne se coupe pas en fin de ligne (« 418 / 205 »).
 const insecable = (s) => String(s).replace(/ /g, "\u00a0");
@@ -337,7 +337,7 @@ export function carteHeros(e, delies = {}, maintenant = Date.now()) {
   const t = titreSimple(e || {}, delies);
   const base = { titre: t.titre, genre: 'info' };
   if (!r || t.titre === 'En cours de rangement') return base;
-  const prixLu = (m) => { const x = String(m == null ? '' : m).trim(); return x ? `${x.replace('.', ',')} €` : ''; };
+  const prixLu = (m) => { const x = String(m == null ? '' : m).trim(); return x ? `${x.replace('.', ',')}\u00a0€` : ''; };
   const num = r.n && !r.nt ? String(r.n) : '';     // §5 : un N° retrouvé par le titre n'est jamais écrit
   const tr = r.tr && r.tr !== 'autre' ? String(r.tr) : '';
   switch (r.t) {

@@ -127,7 +127,7 @@ function Stat({ nom, valeur, sous, data }) {
 const ETAT_PRIX = {
   vide: (p) => (p == null ? 'prix à choisir' : 'prix à poser'),
   lot: (p, o) => (p != null && o.centimes === p ? 'prix posé' : 'prix à mettre à jour'),
-  main: (p, o, garde) => (p != null && o.centimes === p ? 'prix posé' : `${garde ? 'prix gardé' : 'saisi à la main'} : ${o.centimes != null ? eurosC(o.centimes) : o.prix + ' €'}`),
+  main: (p, o, garde) => (p != null && o.centimes === p ? 'prix posé' : `${garde ? 'prix gardé' : 'saisi à la main'} : ${o.centimes != null ? eurosC(o.centimes) : o.prix + '\u00a0€'}`),
 };
 
 function FicheAchatGros({ a, fichesLibres, actions, Photo }) {

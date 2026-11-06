@@ -313,7 +313,7 @@
 .vrm-boite-feuille .vrm-boite-etat-bloc{padding-top:48px}
 @media(prefers-reduced-transparency:reduce){.vrm-boite-feuille .vrm-boite-lecture-barre{background:var(--bx-sol);-webkit-backdrop-filter:none;backdrop-filter:none}}
 /* Le petit mot après un geste (« Tout est marqué lu », « pas enregistré »). */
-.vrm-boite-avis{position:fixed;z-index:20001;left:50%;bottom:calc(92px + env(safe-area-inset-bottom));transform:translateX(-50%);max-width:min(420px,calc(100vw - 32px));padding:12px 18px;border-radius:999px;background:var(--bx-encre);color:var(--bx-carte);font-size:15px;font-weight:500;line-height:1.3;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.18);animation:vrm-boite-avis .28s var(--bx-sortie)}
+.vrm-boite-avis{position:fixed;z-index:20001;left:50%;bottom:calc(92px + env(safe-area-inset-bottom));transform:translateX(-50%);max-width:min(420px,calc(var(--vrm-vw100, 100vw) - 32px));padding:12px 18px;border-radius:999px;background:var(--bx-encre);color:var(--bx-carte);font-size:15px;font-weight:500;line-height:1.3;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.18);animation:vrm-boite-avis .28s var(--bx-sortie)}
 @keyframes vrm-boite-avis{from{transform:translate(-50%,12px);opacity:0}to{transform:translateX(-50%);opacity:1}}
 @media(min-width:900px){.vrm-boite-avis{bottom:28px}}
 

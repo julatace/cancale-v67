@@ -342,7 +342,7 @@ async function controlesRendu(nav, nom, opt, demo, reglages, prixCgv) {
   const srcReglages = lire('src/accueil-reglages.js') || '';
   const reglages = { ACCES_OFFERT: constante(srcReglages, 'ACCES_OFFERT'), DETOURAGE_POUR_TOUS: constante(srcReglages, 'DETOURAGE_POUR_TOUS'), PRIX_MOIS: (constante(srcReglages, 'PRIX_MOIS') || '').replace(/['"]/g, '') };
   const cgv = lire('public/legal/cgv.html') || '';
-  const prixCgv = (/abonnement à (\d+,\d{2}) € par mois/i.exec(cgv) || [])[1] || null;
+  const prixCgv = (/abonnement à (\d+,\d{2})\s€ par mois/i.exec(cgv) || [])[1] || null;
   const DEMO = demo || { jour: { colisApres: '?', aRetirerApres: '?' }, mois: { apres: NaN } };
   if (!demo) dit(false, 'src/accueil-demo.js se charge (la table de démo)', 'introuvable');
 
@@ -567,7 +567,7 @@ async function controlesRendu(nav, nom, opt, demo, reglages, prixCgv) {
         await pg.evaluate(() => document.querySelectorAll('[data-faq] details').forEach((d) => { d.open = true; }));
         const t = await pg.evaluate(() => document.querySelector('[data-accueil]').innerText);
         const gratuitCgv = /VRM est gratuit/i.test(cgv);
-        if (gratuitCgv) dit(/gratuit/i.test(t) && /0 €/.test(t), 'le prix affiché est celui des CGV (« gratuit »)');
+        if (gratuitCgv) dit(/gratuit/i.test(t) && /0\s€/.test(t), 'le prix affiché est celui des CGV (« gratuit »)');
         else {
           const montants = [...t.matchAll(/(\d+,\d{2})\s*€\s*(?:\/\s*mois|par mois)/gi)].map((m) => m[1]);
           // « 0 € » ou « 0,00 € » : un compteur qui partirait de zéro se lirait

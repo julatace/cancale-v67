@@ -204,7 +204,7 @@ async function controles(racine, silencieux) {
   await essai('H3 · 50 au même titre : ni l\'offre, ni les favoris, ni le prix, ni la vente du N°28 n\'entrent dans le N°27', () => {
     const h = hist(rnH(), DH());
     const t = JSON.stringify(h.etapes);
-    return (!/880002|\b51 €|99 favori|60 €/.test(t) && /7 favoris/.test(h.etapes.find((e) => e.cle === 'favoris').titre)) || t.slice(0, 600);
+    return (!/880002|\b51\s€|99 favori|60\s€/.test(t) && /7 favoris/.test(h.etapes.find((e) => e.cle === 'favoris').titre)) || t.slice(0, 600);
   });
   await essai('H4 · le reçu de CET achat est dit (« reçu rangé »), un achat sans reçu « pas de reçu », non lu « reçu pas lu »', () => {
     const a = ev(hist(rnH(), DH()), 'achat')[0].texte, b = ev(hist(rnH(), DH({ recus: new Set() })), 'achat')[0].texte, c = ev(hist(rnH(), DH({ recus: null })), 'achat')[0].texte;
@@ -242,7 +242,7 @@ async function controles(racine, silencieux) {
   await essai('M1 · variables remplacées ({taille}, {marque}, {N°}, {titre}, {prix}) ; sans valeur, la variable RESTE écrite', () => {
     const t = M.remplirModele('Taille {taille} · {marque} · {N°} · {prix} · {inconnue}', { taille: '42', marque: 'Nike', numero: '27', prix: 60 });
     const u = M.remplirModele('Taille {taille} · {marque}', { taille: '' });
-    return (t === 'Taille 42 · Nike · N°27 · 60 € · {inconnue}' && u === 'Taille {taille} · {marque}') || [t, u];
+    return (t.replace(/\u00a0/g, ' ') === 'Taille 42 · Nike · N°27 · 60 € · {inconnue}' && u === 'Taille {taille} · {marque}') || [t, u];
   });
   await essai('M2 · insertion au curseur, séparée par une ligne vide, rien d\'écrasé', () => {
     const a = M.insererDans('Bonjour\nfin', 'MODELE', 7), b = M.insererDans('', 'MODELE'), c = M.insererDans('Texte', 'MODELE');

@@ -166,7 +166,7 @@ async function contexte(b, W, H, tactile, sombre) {
       });
       dit(!!r, `[${W}] Statistiques : l'anneau par plateforme est rendu`);
       if (r) {
-        const m = /([\d ]+,\d\d) €/.exec(r.legende.replace(r.centre, ''));
+        const m = /([\d ]+,\d\d)\s€/.exec(r.legende.replace(r.centre, ''));
         dit(!!m && r.centre.includes(m[1].trim()), `[${W}] Statistiques : l'anneau dit au centre le même total que sa légende`, `centre « ${r.centre} », légende « ${m ? m[1].trim() : '?'} € »`);
         dit(r.coupes.length === 0, `[${W}] Statistiques : le nom de la plateforme n'est pas coupé dans la légende de l'anneau`, r.coupes.join(', '));
       }

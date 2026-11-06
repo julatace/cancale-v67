@@ -218,17 +218,18 @@ const somme = (xs) => xs.reduce((t, x) => t + (x || 0), 0);
   ];
   const lc = F.bilanFournisseurs({ registre: regC, fiches: fichesC, ventes: ventesC, hors: horsC, cleNum }).lignes.find((l) => l.id === 'fA');
   dit(lc.paires === 15 && lc.depense === 30000 + 22000 && lc.sansPrix === 1, 'C1 Dépensé = 300 € + 200 € + 20 € de frais, le prix illisible compté à part', JSON.stringify([lc.paires, lc.depense, lc.sansPrix]));
-  dit(F.texteDepense(lc) === 'au moins 520 €', 'C2 un prix illisible ⇒ « au moins 520 € »', F.texteDepense(lc));
-  dit(lc.prixMoyen === Math.round(52000 / 14) && F.texteMoyen(lc) === '37,14 €', 'C3 prix moyen = sur les paires au prix connu (520 € / 14), jamais 520 € / 15', JSON.stringify([lc.prixMoyen, F.texteMoyen(lc)]));
+  dit(F.texteDepense(lc).replace(/\u00a0/g, ' ') === 'au moins 520 €', 'C2 un prix illisible ⇒ « au moins 520 € »', F.texteDepense(lc));
+  dit(lc.prixMoyen === Math.round(52000 / 14) && F.texteMoyen(lc).replace(/\u00a0/g, ' ') === '37,14 €', 'C3 prix moyen = sur les paires au prix connu (520 € / 14), jamais 520 € / 15', JSON.stringify([lc.prixMoyen, F.texteMoyen(lc)]));
   dit(lc.revendues === 3 && lc.achatConnu === 2 && lc.beneficesConnus === 2 && lc.benefice === 3500, 'C4 3 revendues (une vente vue deux fois comptée une fois, l’achat Vinted dehors), prix d’achat connu pour 2, bénéfice 35 €', JSON.stringify(lc));
   dit(F.texteCouverture(lc) === 'sur 3 vendues, prix d’achat connu pour 2', 'C5 couverture « sur 3 vendues, prix d’achat connu pour 2 »', F.texteCouverture(lc));
-  dit(F.texteBeneficeFournisseur(lc) === 'au plus +35 €' && !/au moins/.test(F.texteBeneficeFournisseur(lc)), 'C6 frais pas confirmés ⇒ « au plus +35 € » ; jamais « au moins » sur un bénéfice', F.texteBeneficeFournisseur(lc));
+  const sp = (t) => String(t).replace(/\u00a0/g, ' '); // (6 nov., finition) l'espace avant « € » est insécable
+  dit(sp(F.texteBeneficeFournisseur(lc)) === 'au plus +35 €' && !/au moins/.test(F.texteBeneficeFournisseur(lc)), 'C6 frais pas confirmés ⇒ « au plus +35 € » ; jamais « au moins » sur un bénéfice', F.texteBeneficeFournisseur(lc));
   const lp = F.bilanFournisseurs({ registre: regC, fiches: fichesC, ventes: ventesC.filter((v) => v.id !== 'v3'), hors: horsC, cleNum }).lignes.find((l) => l.id === 'fA');
-  dit(F.texteBeneficeFournisseur(lp) === '+25 €' && F.texteCouverture(lp) === 'sur 2 vendues, prix d’achat connu pour 1', 'C7 bénéfice partiel ⇒ « +25 € » et sa couverture « sur 2 vendues, prix d’achat connu pour 1 », jamais « au moins »', F.texteBeneficeFournisseur(lp) + ' | ' + F.texteCouverture(lp));
+  dit(sp(F.texteBeneficeFournisseur(lp)) === '+25 €' && F.texteCouverture(lp) === 'sur 2 vendues, prix d’achat connu pour 1', 'C7 bénéfice partiel ⇒ « +25 € » et sa couverture « sur 2 vendues, prix d’achat connu pour 1 », jamais « au moins »', F.texteBeneficeFournisseur(lp) + ' | ' + F.texteCouverture(lp));
   const ln = F.bilanFournisseurs({ registre: regC, fiches: fichesC, ventes: [ventesC[1]], hors: [], cleNum }).lignes.find((l) => l.id === 'fA');
   dit(ln.benefice === null && F.texteBeneficeFournisseur(ln) === '—' && F.texteCouverture(ln) === 'sur 1 vendue, prix d’achat connu pour 0', 'C8 aucun bénéfice connu ⇒ « — » (jamais 0 €), la couverture le dit', JSON.stringify([ln.benefice, F.texteCouverture(ln)]));
   const l0 = F.bilanFournisseurs({ registre: F.avecFournisseur({}, 'fZ', { nom: 'Zoé' }).registre }).lignes[0];
-  dit(l0.prixMoyen === null && F.texteMoyen(l0) === '—' && F.texteDepense(l0) === '0 €' && F.texteCouverture(l0) === '', 'C9 un fournisseur sans achat : prix moyen « — », aucune couverture inventée');
+  dit(l0.prixMoyen === null && F.texteMoyen(l0) === '—' && sp(F.texteDepense(l0)) === '0 €' && F.texteCouverture(l0) === '', 'C9 un fournisseur sans achat : prix moyen « — », aucune couverture inventée');
   const lt = F.bilanFournisseurs({ registre: F.avecHors(F.avecFournisseur({}, 'fZ', { nom: 'Zoé' }).registre, 'h9', 'fZ'), hors: horsC }).lignes[0];
   dit(F.texteDepense(lt) === '—', 'C10 rien de lisible ⇒ « — », jamais « au moins 0 € »', F.texteDepense(lt));
   // 10 paires à 300 €, 3 reliées : le scénario du banc.

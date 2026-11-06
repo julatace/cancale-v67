@@ -53,7 +53,7 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   dit(nPartiel >= 2, 'CA déclaré ET vendu traitent `PARTIALLY_REFUNDED`', nPartiel);
   dit(/ecartees\.push\(\{ id: idp, plateforme: 'eBay', raison: 'remboursement partiel/.test(app), 'CA déclaré : remboursée en partie ⇒ mise à part et nommée (« au moins »)');
   dit(/nonComptees\.push\(\{ plateforme: 'eBay', raison: 'remboursement partiel/.test(app), 'vendu : remboursée en partie ⇒ nommée dans les ventes non comptées');
-  dit(/si tu as reçu un avis/.test(app) && /sous 5 000 €/.test(app), 'CFE : au conditionnel, et rien sous 5 000 € de CA');
+  dit(/si tu as reçu un avis/.test(app) && /sous 5 000(?: |&nbsp;|\\u00a0)€/.test(app), 'CFE : au conditionnel, et rien sous 5 000 € de CA');
   dit(/data-ca-ebay-date=""/.test(app), 'CA déclaré : « eBay : daté au jour de la commande » est dit');
 
   console.log('\nP5 — ACRE (décret n° 2026-69)');

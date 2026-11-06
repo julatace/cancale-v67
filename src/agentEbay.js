@@ -346,9 +346,9 @@ export function comprendrePhrase(texte, opts = {}) {
     const n = Number(m[1]); if (n >= 1) { regles.parJour = Math.min(AGENT_MAX_PAR_JOUR, n); compris.push(`au plus ${regles.parJour} par jour`); } ote(m);
   }
   if ((m = new RegExp(`\\+\\s*${MOT_NB}\\s*%|${MOT_NB}\\s*%\\s*(?:de plus|plus cher)`).exec(t))) {
-    const n = nombre(m[1] || m[2]); if (n != null) { regles.prixMode = 'pct'; regles.prixValeur = n; compris.push(`prix sur eBay : celui de Vinted + ${String(n).replace('.', ',')} %`); } ote(m);
+    const n = nombre(m[1] || m[2]); if (n != null) { regles.prixMode = 'pct'; regles.prixValeur = n; compris.push(`prix sur eBay : celui de Vinted + ${String(n).replace('.', ',')}\u00a0%`); } ote(m);
   } else if ((m = new RegExp(`\\+\\s*${MOT_NB}\\s*(?:€|euros?|eur|e)(?=\\s|,|$)|${MOT_NB}\\s*(?:€|euros?|eur|e)\\s*(?:de plus|plus cher)`).exec(t))) {
-    const n = nombre(m[1] || m[2]); if (n != null) { regles.prixMode = 'eur'; regles.prixValeur = n; compris.push(`prix sur eBay : celui de Vinted + ${String(n).replace('.', ',')} €`); } ote(m);
+    const n = nombre(m[1] || m[2]); if (n != null) { regles.prixMode = 'eur'; regles.prixValeur = n; compris.push(`prix sur eBay : celui de Vinted + ${String(n).replace('.', ',')}\u00a0€`); } ote(m);
   } else if ((m = /\b(?:au )?meme prix\b/.exec(t))) { regles.prixMode = 'meme'; regles.prixValeur = 0; compris.push('prix sur eBay : le même que sur Vinted'); ote(m); }
   if ((m = new RegExp(`(?:\\ben|\\btailles?|\\bpointures?|\\bdu)\\s+(${TAILLE_SEULE}(?:\\s*(?:,|et|ou|-|a|au|\\/)\\s*${TAILLE_SEULE})*)\\b`).exec(t))) {
     const tl = etendreTailles(m[1]);
@@ -362,7 +362,7 @@ export function comprendrePhrase(texte, opts = {}) {
   if ((m = new RegExp(`(?:a plus de|plus de|au[- ]dessus de|a partir de|minimum|min|superieure? a|plus cher que|>=?)\\s*${MOT_NB}${PAS_JOURS}${EUR}`).exec(t))) { const n = nombre(m[1]); if (n != null) regles.prixMin = n; ote(m); }
   if ((m = new RegExp(`(?:a moins de|moins de|en dessous de|au[- ]dessous de|sous|jusqu a|maximum|max|inferieure? a|<=?)\\s*${MOT_NB}${PAS_JOURS}${EUR}`).exec(t))) { const n = nombre(m[1]); if (n != null) regles.prixMax = n; ote(m); }
   if (regles.prixMin != null || regles.prixMax != null) {
-    const f = (n) => String(n).replace('.', ',') + ' €';
+    const f = (n) => String(n).replace('.', ',') + '\u00a0€';
     compris.push(regles.prixMin != null && regles.prixMax != null ? `prix Vinted entre ${f(regles.prixMin)} et ${f(regles.prixMax)}` : regles.prixMin != null ? `prix Vinted à partir de ${f(regles.prixMin)}` : `prix Vinted jusqu’à ${f(regles.prixMax)}`);
   }
   const comptes = Array.isArray(opts.comptes) ? opts.comptes : [];
@@ -416,7 +416,7 @@ export function appliquerPhrase(regles, compris, phrase) {
 // Les règles en clair (ce qu'on lui MONTRE, avant et après l'avoir gardé).
 export function texteRegles(regles, opts = {}) {
   const r = normaliserReglesAgent(regles);
-  const f = (n) => String(Math.round(n * 100) / 100).replace('.', ',') + ' €';
+  const f = (n) => String(Math.round(n * 100) / 100).replace('.', ',') + '\u00a0€';
   const l = [];
   const quoi = [];
   if (r.marques.length) quoi.push(r.marques.join(', '));
@@ -430,8 +430,8 @@ export function texteRegles(regles, opts = {}) {
   if (r.comptesVinted.length) quoi.push(`compte${r.comptesVinted.length > 1 ? 's' : ''} ${r.comptesVinted.map((u) => (noms.find((c) => String(c.uid) === u) || {}).login || u).join(', ')}`);
   l.push(quoi.length ? `Articles : ${quoi.join(' · ')}` : 'Articles : tous tes articles en ligne sur Vinted');
   const v = String(r.prixValeur).replace('.', ',');
-  l.push(r.prixMode === 'pct' ? `Prix sur eBay : celui de Vinted ${r.prixValeur >= 0 ? '+' : '−'} ${v.replace('-', '')} % — jamais sous ton prix d’achat`
-    : r.prixMode === 'eur' ? `Prix sur eBay : celui de Vinted ${r.prixValeur >= 0 ? '+' : '−'} ${v.replace('-', '')} € — jamais sous ton prix d’achat`
+  l.push(r.prixMode === 'pct' ? `Prix sur eBay : celui de Vinted ${r.prixValeur >= 0 ? '+' : '−'} ${v.replace('-', '')}\u00a0% — jamais sous ton prix d’achat`
+    : r.prixMode === 'eur' ? `Prix sur eBay : celui de Vinted ${r.prixValeur >= 0 ? '+' : '−'} ${v.replace('-', '')}\u00a0€ — jamais sous ton prix d’achat`
       : 'Prix sur eBay : le même que sur Vinted — jamais sous ton prix d’achat');
   l.push(`Au plus ${r.parJour} par jour`);
   if (r.jamais.length) l.push(`Jamais sur eBay : N°${r.jamais.slice(0, 12).join(', N°')}${r.jamais.length > 12 ? ` et ${r.jamais.length - 12} autres` : ''}`);

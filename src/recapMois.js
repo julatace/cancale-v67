@@ -29,7 +29,7 @@ const c2 = (x) => (x == null || !isFinite(Number(x)) ? null : Math.round(Number(
 export const eurosTexte = (x) => {
   const c = c2(x); if (c == null) return '—';
   const n = Math.abs(c);
-  return (c < 0 ? '−' : '') + String(Math.floor(n / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ',' + String(n % 100).padStart(2, '0') + ' €';
+  return (c < 0 ? '−' : '') + String(Math.floor(n / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ',' + String(n % 100).padStart(2, '0') + '\u00a0€';
 };
 const tableur = (x) => (x == null || !isFinite(Number(x)) ? '' : (Math.round(Number(x) * 100) / 100).toFixed(2).replace('.', ','));
 const jour = (t) => { const d = new Date(t); return isNaN(d) ? '' : `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`; };
@@ -75,7 +75,7 @@ export function resumeRecap(d) {
   L.push(['Bénéfice', d.benefice == null ? '—' : eurosTexte(d.benefice), 'benefice']);
   if (d.couverture) L.push(["Prix d'achat connus", `${d.couverture.nCout}/${d.couverture.n}`, 'couverture']);
   L.push(['CA déclaré (argent reçu ce mois)', d.caDeclare == null ? '—' : eurosTexte(d.caDeclare), 'ca']);
-  if (d.taux != null) L.push([`URSSAF à payer (${String(d.taux).replace('.', ',')} %)`, d.urssaf == null ? '—' : eurosTexte(d.urssaf), 'urssaf']);
+  if (d.taux != null) L.push([`URSSAF à payer (${String(d.taux).replace('.', ',')}\u00a0%)`, d.urssaf == null ? '—' : eurosTexte(d.urssaf), 'urssaf']);
   return L;
 }
 const RAISONS = { achats: "il manque des prix d'achat", frais: 'des frais ne sont pas connus', rien: 'aucune vente ni dépense', publication: 'ventes pas encore lues', encours: 'ventes pas encore lues', cotisations: 'CA déclaré pas encore lu' };

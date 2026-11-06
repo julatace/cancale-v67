@@ -268,7 +268,7 @@ async function fermerParEchap(pg) {
       await essaie('A2. reçu sans Montant payé', async () => {
         await ouvrirDepuisListe(pg, /Escarpin merci banc/);
         const f = await lireFeuille(pg);
-        dit(f && /Total payé : 24,93 €/.test(f.texte) && !/ne sont peut-être pas toutes là/.test(f.texte) && f.lignes.length === 0,
+        dit(f && /Total payé : 24,93\s€/.test(f.texte) && !/ne sont peut-être pas toutes là/.test(f.texte) && f.lignes.length === 0,
           'A2. un reçu sans « Montant payé » montre le texte de l’email (« Total payé : 24,93 € »), sans en-tête vide ni phrase « lignes incomplètes »', f && JSON.stringify(f.texte.slice(0, 160)));
         await fermerParEchap(pg);
       });

@@ -96,7 +96,7 @@
   white-space: nowrap !important; overflow: visible !important; text-overflow: clip !important; cursor: pointer;
   transition: background-color .18s var(--vrm-ease-out, ease), box-shadow .18s ease;
 }
-:root .vrm-seg > .vrm-seg-btn:not(#vrm-seg):is([aria-current="page"], [aria-pressed="true"]) {
+:root .vrm-seg > .vrm-seg-btn:not(#vrm-seg):is([aria-current="page"], [aria-pressed="true"], [aria-selected="true"]) {
   background: var(--seg-actif) !important; color: var(--seg-actif-texte) !important; box-shadow: var(--seg-actif-ombre) !important;
 }
 .vrm-seg-btn:active:not(:disabled) { transform: none; }
@@ -104,7 +104,7 @@
 .vrm-seg-point { width: 6px; height: 6px; border-radius: 99px; background: var(--seg-point); flex-shrink: 0; }
 .vrm-seg-n { font-variant-numeric: tabular-nums; }
 @media (hover: hover) and (pointer: fine) {
-  :root .vrm-seg > .vrm-seg-btn:not(#vrm-seg):not([aria-current]):not([aria-pressed="true"]):hover { background: color-mix(in srgb, var(--seg-actif) 45%, transparent) !important; }
+  :root .vrm-seg > .vrm-seg-btn:not(#vrm-seg):not([aria-current]):not([aria-pressed="true"]):not([aria-selected="true"]):hover { background: color-mix(in srgb, var(--seg-actif) 45%, transparent) !important; }
 }
 /* Au doigt : 44 px, la cible. Le téléphone se reconnaît AUSSI à sa largeur (≤ 767 px, la règle
    de toute l'app) : Chromium émulé en mobile ne répond pas toujours `pointer: coarse` — mesuré

@@ -263,7 +263,7 @@ const garde = (x, k, v) => {
     const bo = L({ v: 1, t: 'bordereau', tx: '1', n: '42', pdf: 1, a: 'Nike Air Max 90' });
     const ve = L({ v: 1, t: 'vente', a: 'Adidas Samba', px: '55', n: '17' });
     const ac = L({ v: 1, t: 'achat', tx: '7', a: 'Nike Air Force 1', px: '45,00', id: 'email_achat_x' });
-    dit(bo.essentiel.join(' · ') === 'N°42 · Nike Air Max 90' && bo.geste.k === 'bordereau' && bo.geste.mot === 'bordereau prêt' && ve.essentiel.join(' · ') === 'N°17 · 55 € · Adidas Samba' && !ve.geste && ac.essentiel.join(' · ') === '45,00 € · Nike Air Force 1' && !ac.geste, 'faits courts d’abord (N°, montant), le nom de l’article en dernier ; « bordereau prêt » est le geste ; « reçu de commande » se tait sur la ligne', JSON.stringify([bo, ve, ac]));
+    dit(bo.essentiel.join(' · ') === 'N°42 · Nike Air Max 90' && bo.geste.k === 'bordereau' && bo.geste.mot === 'bordereau prêt' && ve.essentiel.join(' · ').replace(/\u00a0/g, ' ') === 'N°17 · 55 € · Adidas Samba' && !ve.geste && ac.essentiel.join(' · ').replace(/\u00a0/g, ' ') === '45,00 € · Nike Air Force 1' && !ac.geste, 'faits courts d’abord (N°, montant), le nom de l’article en dernier ; « bordereau prêt » est le geste ; « reçu de commande » se tait sur la ligne', JSON.stringify([bo, ve, ac]));
     const nl = L({ v: 1, t: 'connu-sans-action', f: 'newsletter Vinted' });
     const inc = L({ v: 1, t: 'incompris' }, { etat: 'a-verifier' });
     const att = L({ v: 1, t: 'bordereau', tx: '1', n: '4', pdf: 1 }, { etat: 'erreur' });

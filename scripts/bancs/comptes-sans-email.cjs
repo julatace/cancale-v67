@@ -229,7 +229,7 @@ const PAS_MUETS = ['jujuf38', 'compte_neuf', 'llloollllaa', 'dormant', 'une_vent
       dit(/arthuror2[^.]*depuis le \d{1,2} [a-zéû]+/i.test(bloc), `${T} Achats : arthuror2 « plus aucun email depuis le … »`, (bloc.match(/arthuror2[^.]{0,120}/) || [''])[0]);
       dit(/date limite[^.]{0,40}estimée/i.test(bloc) && !/pas de rappel du matin/i.test(bloc) && !/codes? de retrait/i.test(bloc.slice(0, bloc.indexOf('Pour') > 0 ? bloc.indexOf('Pour') : 1400)), `${T} Achats : l’effet prouvé (date limite estimée), plus « pas de rappel du matin », pas les codes de retrait`, (bloc.match(/s’affichent bien.{0,240}/) || [''])[0]);
       // Le détail des comptes (déplié s'il est replié).
-      const resumes = pg.locator('summary', { hasText: /détail|Réception des emails/ });
+      const resumes = pg.locator('summary', { hasText: /détail|Réception des e-?mails/ });
       if (await resumes.count()) { await resumes.first().click().catch(() => {}); await pg.waitForTimeout(400); }
       const lignes = await pg.evaluate((DANGER) => {
         // Les lignes du tableau « Tes comptes Vinted et leurs emails » : login → (texte, couleur).
@@ -288,7 +288,7 @@ const PAS_MUETS = ['jujuf38', 'compte_neuf', 'llloollllaa', 'dormant', 'une_vent
     const { ctx, pg, errs } = await preparer(b, { width: 1512, height: 982 }, { journalKO: true });
     await pg.goto(`http://localhost:${PORT}/?tab=cat_achats`, { waitUntil: 'domcontentloaded' });
     await pg.waitForTimeout(5500);
-    const resumes = pg.locator('summary', { hasText: /Réception des emails|détail/ });
+    const resumes = pg.locator('summary', { hasText: /Réception des e-?mails|détail/ });
     if (await resumes.count()) { await resumes.first().click().catch(() => {}); await pg.waitForTimeout(400); }
     const txt = (await pg.evaluate(() => document.body.innerText)).replace(/\s+/g, ' ');
     dit(!/comptes? Vinted n’envoie/.test(txt) && !(await pg.locator('[data-comptes-muets]').count()), 'journal illisible : aucun compte n’est dit muet');

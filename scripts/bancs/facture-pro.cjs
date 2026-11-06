@@ -213,7 +213,7 @@ const mesurer = (pg, sel) => pg.evaluate((sel) => {
           raisons[tx] = { code: await l.locator('[data-fp-vente="pas-prouve"]').getAttribute('data-fp-preuve').catch(() => null), bouton: await l.locator('button').count(), t: (await l.innerText()).replace(/\s+/g, ' ') };
           dit(raisons[tx].code === code && raisons[tx].bouton === 0 && /acheteur pas prouvé/.test(raisons[tx].t), `1. ${tx} : PAS de bouton, la ligne dit pourquoi (${code})`, raisons[tx].t);
         }
-        dit(/3 h après/.test(raisons['7005'].t) && /e-mail 59,00 €, Vinted 55,00 €/.test(raisons['7006'].t), '1. la raison est précise (l’écart d’heure, les deux prix)', raisons['7005'].t + ' | ' + raisons['7006'].t);
+        dit(/3 h après/.test(raisons['7005'].t) && /e-mail 59,00\s€, Vinted 55,00\s€/.test(raisons['7006'].t), '1. la raison est précise (l’écart d’heure, les deux prix)', raisons['7005'].t + ' | ' + raisons['7006'].t);
         dit(await pg.locator('.vrm-sale-row[data-tx="8001"] [data-fp-forme]').count() === 0, '1. compte PARTICULIER : rien sur la ligne');
         const l2 = ligneFacture(pg, '7002');
         dit(/Facture envoyée le/.test(await l2.innerText()) && await l2.locator('[data-fp-vente="envoyee"]').count() === 1, '4. 7002 déjà envoyée : « Facture envoyée le … » sur la ligne', (await l2.innerText()).replace(/\s+/g, ' '));
@@ -237,7 +237,7 @@ const mesurer = (pg, sel) => pg.evaluate((sel) => {
         dit(/Acheteur prouvé : le même n° de transaction \(7001\)/.test(t) && /arrivé 60 s après la vente/.test(t), '2. la feuille dit POURQUOI c’est le bon acheteur (n°, 60 s, montant)', (/Acheteur prouvé[^.]*\./.exec(t) || [''])[0]);
         dit(await f.locator('[data-fp-objet]').innerText() === 'Facture FA-2026-0006 — Boutique Banc EI' && /Boutique Banc EI via VRM/.test(t) && /Bonjour Marie Banc/.test(t), '2. l’objet, l’expéditeur « … via VRM » et le message', await f.locator('[data-fp-objet]').innerText());
         const ap = (await f.locator('[data-fp-apercu]').innerText()).replace(/\s+/g, ' ');
-        dit(/TVA non applicable, art\. 293 B du CGI/.test(ap) && /Boutique Banc EI/.test(ap) && /65,00 €/.test(ap) && /Marie Banc/.test(ap) && /12 rue Inventée/.test(ap), '2. l’aperçu exact : mention, « EI », prix, acheteur et son adresse', ap.slice(0, 120));
+        dit(/TVA non applicable, art\. 293 B du CGI/.test(ap) && /Boutique Banc EI/.test(ap) && /65,00\s€/.test(ap) && /Marie Banc/.test(ap) && /12 rue Inventée/.test(ap), '2. l’aperçu exact : mention, « EI », prix, acheteur et son adresse', ap.slice(0, 120));
         const m = await mesurer(pg, '[data-fp-feuille-vente="7001"]');
         dit(m.deb <= 1 && !m.hors.length, '6. feuille : aucun débordement horizontal', `${m.deb}px ${m.hors.join(' | ')}`);
         if (tel) dit(!m.petites.length, '6. feuille : cibles de 44 px', m.petites.join(' | '));

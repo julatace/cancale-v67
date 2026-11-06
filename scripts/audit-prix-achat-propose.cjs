@@ -90,8 +90,8 @@ const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   RECUS.set(String(ach[0].transaction_id), { trouve: true, paye: 3463, somme: 'juste', lignes: [{ libelle: 'Article', centimes: 3000 }, { libelle: 'Frais de port', centimes: 263 }, { libelle: 'Frais Vinted', centimes: 200 }] });
   const c1 = propositionPrixAchat({ identite: b1, ventilationDe: ventil });
   dit(c1 && c1.centimes === 3463 && c1.source === 'recu', 'reçu juste ⇒ le montant payé', c1 && c1.texte);
-  dit(c1 && c1.detail === 'Article 30,00 € · Frais de port 2,63 € · Frais Vinted 2,00 €', 'détail en une ligne', c1 && c1.detail);
-  dit(c1 && c1.texte === '34,63 €' && c1.valeur === '34,63', 'texte et valeur écrite');
+  dit(c1 && String(c1.detail).replace(/\u00a0/g, ' ') === 'Article 30,00 € · Frais de port 2,63 € · Frais Vinted 2,00 €', 'détail en une ligne', c1 && c1.detail);
+  dit(c1 && String(c1.texte).replace(/\u00a0/g, ' ') === '34,63 €' && c1.valeur === '34,63', 'texte et valeur écrite');
   RECUS.set(String(ach[0].transaction_id), { trouve: true, paye: 3500, somme: 'ecart', lignes: [{ libelle: 'Article', centimes: 3000 }] });
   const c2 = propositionPrixAchat({ identite: b1, ventilationDe: ventil });
   dit(c2 && c2.centimes === 3000 && c2.detail === 'Article seul', 'reçu qui ne tombe pas juste ⇒ article seul', c2 && c2.texte);

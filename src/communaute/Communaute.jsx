@@ -264,7 +264,7 @@ function Rejoindre({ api, moi, prenom, discordCompte = '', onFait, onAnnuler, Fe
     <FermeAuRetour fermer={onAnnuler} />
     <div className="vrm-cm-feuille" role="dialog" aria-modal="true" aria-label="Apparaître sur la carte" data-cm-rejoindre>
       <div className="vrm-cm-feuille-tete"><h3>{moi ? 'Changer ma présence' : 'Apparaître sur la carte'}</h3><button type="button" className="vrm-cm-x" onClick={onAnnuler} aria-label="Fermer">×</button></div>
-      <p className="vrm-cm-note">Visible : <b>ton pseudo et ta ville</b> (à 5 km près). Jamais ton adresse, ton email ni tes comptes Vinted.</p>
+      <p className="vrm-cm-note">Visible : <b>ton pseudo et ta ville</b> (à 5 km près). Jamais ton adresse, ton e-mail ni tes comptes Vinted.</p>
       <label className="vrm-cm-champ"><span>Ton pseudo (unique sur la carte)</span>
         <input value={pseudo} maxLength={30} onChange={(e) => setPseudo(e.target.value)} placeholder="Ton nom de revendeur" data-cm-pseudo /></label>
       {(() => { const dd = (moi && moi.discord) || discordCompte; return dd && pseudo !== dd && <button type="button" className="vrm-cm-lien" onClick={() => setPseudo(dd)} data-cm-pseudo-discord>Prendre « {dd} » (Discord)</button>; })()}

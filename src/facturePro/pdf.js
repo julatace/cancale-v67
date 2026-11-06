@@ -149,7 +149,7 @@ export async function pdfFacture(contenu, { PDFLib } = {}) {
   const T = contenu.totaux;
   if (contenu.regime === 'normal') {
     tot('Total HT', euros(T.ht));
-    tot(`TVA ${String(contenu.taux).replace('.', ',')} %`, euros(T.tva));
+    tot(`TVA ${String(contenu.taux).replace('.', ',')}\u00a0%`, euros(T.tva));
     page.drawLine({ start: { x: xL, y: y + 10 }, end: { x: W - M, y: y + 10 }, thickness: 0.5, color: c(FILET) }); y -= 4;
     tot(estAvoir ? 'Total TTC à rembourser' : 'Total TTC', euros(T.ttc), true);
   } else if (contenu.regime === 'franchise') {

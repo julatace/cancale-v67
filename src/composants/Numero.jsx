@@ -25,7 +25,7 @@ export function Numero({ n, taille = 'normal', etat, prefixe = true, titre, clas
   const nomLu = titre || `Numéro ${txt}${e === 'doublon' ? ', porté par deux articles' : e === 'aVerifier' ? ', à vérifier sur le carton' : ''}`;
   return (
     <span className={`vrm-num vrm-num-${taille === 'petit' || taille === 'grand' ? taille : 'normal'}${className ? ' ' + className : ''}`}
-      data-num={txt} data-num-etat={e || undefined} title={titre} aria-label={nomLu} {...rest}>
+      data-num={txt} data-num-etat={e || undefined} title={titre} role="img" aria-label={nomLu} {...rest}>
       {prefixe ? <span className="vrm-num-prefixe" aria-hidden="true">N°</span> : null}<span aria-hidden="true">{txt}</span>
     </span>
   );

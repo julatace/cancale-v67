@@ -847,7 +847,7 @@ async function finPage(pg, errs, quoi) {
         dit(!bruts.some((x) => /"action":"(?:revise|modifierannonce)"/.test(x)) && /règle d'offre accepte dès 72,00/.test(msg1), `[11] ${T} un prix à ou sous la règle (72 €) : rien n'est envoyé, et c'est dit`, msg1);
         await pg.fill(`[data-ebay-revise-prix="${A.A1}"]`, '85'); await pg.waitForTimeout(200);
         const rap = await pg.$eval(`[data-regle-rappel="${A.A1}"]`, (e) => e.innerText).catch(() => '');
-        dit(/85 %/.test(rap), `[11] ${T} le rappel dit le pourcentage du NOUVEAU prix (72 / 85 = 85 %)`, rap);
+        dit(/85\s%/.test(rap), `[11] ${T} le rappel dit le pourcentage du NOUVEAU prix (72 / 85 = 85 %)`, rap);
         await validerRevision(pg,A.A1); await pg.waitForTimeout(1200);
         const rv = bruts.filter((x) => /"action":"(?:revise|modifierannonce)"/.test(x));
         const msg2 = await pg.$eval(`[data-ebay-revise-msg="${A.A1}"]`, (e) => e.innerText).catch(() => '');

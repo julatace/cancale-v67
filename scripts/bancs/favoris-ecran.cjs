@@ -252,7 +252,7 @@ createRoot(document.getElementById('r')).render(<Banc/>);
     const premier = FAV.length ? (() => { const a = m.articles.find((x) => x.geste === 'envoyer') || m.articles[0]; return a; })() : null;
     dit(m.message && m.message.etat === 'pret' && !/\{|\}/.test(m.message.texte) && /merci pour ton favori/.test(m.message.texte) && m.message.modifier, `${T} « Ton message » : le vrai texte, sans variable brute, modifiable`, JSON.stringify(m.message));
     if (FAV.length && premier) { const ps = (PSEUDOS_ITEM[premier.item] || []).filter(Boolean); dit(ps.some((x) => m.message.texte.includes(x)), `${T} la variable {username} est remplacée par le pseudo d'un VRAI favori`, m.message.texte); }
-    dit(m.message && /−10 %|→/.test(m.message.offre), `${T} l'offre est dite (−10 % ou prix → prix)`, m.message && m.message.offre);
+    dit(m.message && /−10\s%|→/.test(m.message.offre), `${T} l'offre est dite (−10 % ou prix → prix)`, m.message && m.message.offre);
     // 3. Une carte par article
     if (FAV.length) {
       const items = Object.keys(ATT).map(String).sort();
@@ -266,7 +266,7 @@ createRoot(document.getElementById('r')).render(<Banc/>);
       if (JEU === 'base') { const a13 = m.articles.find((x) => x.item === '9008'); dit(a13 && a13.initiales.includes(''), `${T} pseudo illisible ⇒ un rond vide`, JSON.stringify(a13)); }
       dit(m.articles.filter((x) => ARTICLES[x.item]).every((x) => x.numero === ARTICLES[x.item].numero && x.titre.length > 0), `${T} N° et titre par identité de l'annonce`);
       if (JEU === 'base') { const a10 = m.articles.find((x) => x.item === '9010'); dit(!a10, `${T} un favori hors période (40 j) n'est pas dans « 30 j »`); }
-      dit(m.articles.filter((x) => ARTICLES[x.item]?.prix).every((x) => /\d+ €/.test(x.prix)), `${T} le prix connu est affiché`);
+      dit(m.articles.filter((x) => ARTICLES[x.item]?.prix).every((x) => /\d+\s€/.test(x.prix)), `${T} le prix connu est affiché`);
       dit(m.articles.every((x) => x.photo === !(SANS_PHOTO.has(Number(x.item)))), `${T} une photo par article (ou la vignette vide)`);
       dit(m.articles.every((x) => x.h < 140), `${T} cartes compactes (aucune ne dépasse 140 px)`, Math.max(...m.articles.map((x) => x.h)) + ' px');
     }

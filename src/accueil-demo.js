@@ -60,4 +60,4 @@ export const DEMO = {
 export const nomCompte = (id) => (DEMO.comptes.find((c) => c.id === id) || {}).nom || '';
 
 // 1 244,50 € — espace fine insécable entre les milliers, virgule, deux décimales.
-export const euros = (n) => `${Number(n).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+export const euros = (n) => `${Number(n).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\u00a0€`;
