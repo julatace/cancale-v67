@@ -40996,7 +40996,7 @@ function ComparerMoisCarte({ liveStats }) {
         <h2 className="vrm-display" data-titre-section="" style={{ flex: '1 1 auto', margin: 0, fontSize: 20, fontWeight: 700, letterSpacing: '-.02em', color: C.text }}>Comparer</h2>
         <Segmente label="Comparer avec" value={K.mode} onChange={setMode} options={[{ v: 'precedent', l: 'Mois d’avant', data: { 'data-comparer-choix': 'precedent' } }, { v: 'an', l: 'Il y a un an', data: { 'data-comparer-choix': 'an' } }]}/>
       </div>
-      <div role="row" style={{ ...grille, fontSize: 12, color: C.muted, fontWeight: 600, padding: '4px 0' }}>
+      <div role="row" style={{ ...grille, fontSize: 11, color: C.muted, fontWeight: 600, padding: '4px 0' }}>
         <span/>
         <span style={{ textAlign: 'right', ...chiffre }} data-comparer-col="a">{colA}</span>
         <span style={{ textAlign: 'right', ...chiffre }} data-comparer-col="b">{colB}</span>
@@ -41022,7 +41022,7 @@ function ComparerMoisCarte({ liveStats }) {
       ))}
       {pourquoi.length ? (
         <div data-comparer-pourquoi="" style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {pourquoi.map((p) => <div key={p.cle} data-comparer-pourquoi-ligne={p.cle} style={{ fontSize: 12, color: C.muted, lineHeight: 1.45 }}><b style={{ fontWeight: 600, color: C.text }}>{p.nom} —</b> {p.txt}</div>)}
+          {pourquoi.map((p) => <div key={p.cle} data-comparer-pourquoi-ligne={p.cle} style={{ fontSize: 11, color: C.muted, lineHeight: 1.45 }}><b style={{ fontWeight: 600, color: C.text }}>{p.nom} —</b> {p.txt}</div>)}
         </div>
       ) : null}
     </section>
@@ -41048,7 +41048,7 @@ function FraisParSiteCarte({ periode, ebayCommandes }) {
   // celles qui servent). Le geste qui la remplit est dit.
   if (F.sites.every((x) => x.passu)) return (
     <section className="vrm-frais-sites" data-frais-sites={b.type} data-frais-tous-passu="" style={{ padding: '14px 18px', background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, boxShadow: 'none', display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '4px 12px' }}>
-      <h2 className="vrm-display" data-titre-section="" style={{ margin: 0, fontSize: 17, fontWeight: 700, letterSpacing: '-.02em', color: C.text }}>Frais par site</h2>
+      <h2 className="vrm-display" data-titre-section="" style={{ margin: 0, fontSize: 15, fontWeight: 600, letterSpacing: '-.01em', color: C.text }}>Frais par site</h2>
       <span style={{ fontSize: 13, color: C.muted }}>Pas encore calculés : ils se lisent dans le relevé de tes ventes, fait par l’écran Ventes. Ouvre-le une fois.</span>
     </section>
   );
@@ -41058,7 +41058,7 @@ function FraisParSiteCarte({ periode, ebayCommandes }) {
       style={{ padding: 18, background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, boxShadow: 'none' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 6 }}>
         <h2 className="vrm-display" data-titre-section="" style={{ flex: 1, margin: 0, fontSize: 20, fontWeight: 700, letterSpacing: '-.02em', color: C.text }}>Frais par site</h2>
-        <span style={{ fontSize: 12, color: C.muted, fontWeight: 600, width: 64, textAlign: 'right' }}>% vendu</span>
+        <span style={{ fontSize: 11, color: C.muted, fontWeight: 600, width: 64, textAlign: 'right' }}>% vendu</span>
       </div>
       {F.sites.map((x) => {
         const cov = texteCouverture(x);
