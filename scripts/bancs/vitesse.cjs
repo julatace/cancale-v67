@@ -47,8 +47,10 @@ const UIDS_LIES = new Set(base.accounts.map((a) => String(a.vinted_user_id)));
 const POIDS_FICHES = JSON.stringify((base.rows.find((r) => r.id === 'vinted_item_details') || {}).data || {}).length;
 const UID_BANC = process.env.BANC_SESSION_UID || '0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b';
 const MEMOIRE = process.env.VITESSE_MEMOIRE !== '0';
-const horsEcran = (id) => { const m = /^harvest_(\d+)_(.*)$/.exec(String(id || '')); return !!(m && /orders/.test(m[2]) && (!UIDS_LIES.has(m[1]) || !/^orders_(sold|purchased)$/.test(m[2]))); };
-const visePoids = (u) => /vinted_item_details/.test(u) ? 'fiches' : (/harvest_[^&]*_orders_/.test(u) ? 'commandes' : '');
+const horsEcran = (id) => { const m = /^harvest_(\d+)_(.*)$/.exec(String(id || '')); return !!(m && ((/orders/.test(m[2]) && (!UIDS_LIES.has(m[1]) || !/^orders_(sold|purchased)$/.test(m[2]))) || (m[2] === 'listings' && !UIDS_LIES.has(m[1])))); };
+// (6 nov., vitesse 2) Les achats d'un ancien compte : ce que lisaient la cloche « où ranger », le registre et l'export.
+const achatsHors_ = (id) => { const m = /^harvest_(\d+)_orders_purchased$/.exec(String(id || '')); return !!(m && !UIDS_LIES.has(m[1])); };
+const visePoids = (u) => /vinted_item_details/.test(u) ? 'fiches' : (/harvest_[^&]*_orders_/.test(u) ? 'commandes' : (/harvest_[^&]*_listings/.test(u) ? 'dressings' : ''));
 // Une lecture qui rapatrie la ligne ENTIÈRE : `select=` qui nomme `data` seul.
 const selectEntier = (u) => { const m = /[?&]select=([^&]*)/.exec(u); return !!m && m[1].split(',').some((x) => /^(?:[^:]+:)?data$/.test(x.trim())); };
 // La famille de commandes de TOUS les comptes en une lecture (le préchargement).
@@ -57,12 +59,33 @@ const estFamille = (u) => /id=like\.harvest_\*_orders_\*/.test(u) || /or=\(id\.l
 // a besoin du n° de suivi (`vintedToPickup`).
 const ACHATS_AU_RELAIS = base.rows.filter((r) => /_orders_purchased$/.test(r.id)).reduce((n, r) => n + (((r.data || {}).payload || {}).my_orders || []).filter((o) => /point relais/i.test(o.status || '')).length, 0);
 const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/json', '.woff2': 'font/woff2', '.woff': 'font/woff' };
+// (6 nov., vitesse 2) Les fichiers de l'app servis COMPRESSÉS (gzip), comme par
+// Vercel : un réseau « 4G » simulé ne doit pas transporter 3,9 Mo de JavaScript
+// en clair. Chaque fichier servi est noté (chemin, octets compressés) : ce que
+// coûte le PREMIER chargement d'un écran, morceau par morceau.
+const zlib = require('zlib');
+const _gz = new Map();
+let servis = [];
 const srv = http.createServer((q, r) => {
   let f = q.url.split('?')[0]; if (f === '/' || !path.extname(f)) f = '/index.html';
   const p = path.join(DIST, f);
   if (!fs.existsSync(p)) { r.writeHead(404); return r.end(); }
-  r.writeHead(200, { 'content-type': types[path.extname(p)] || 'application/octet-stream' }); fs.createReadStream(p).pipe(r);
+  const ext = path.extname(p);
+  if (/^\.(js|css|html|json|webmanifest|svg)$/.test(ext) && /gzip/.test(q.headers['accept-encoding'] || '')) {
+    if (!_gz.has(p)) _gz.set(p, zlib.gzipSync(fs.readFileSync(p), { level: 9 }));
+    const b = _gz.get(p);
+    servis.push({ f, octets: b.length });
+    r.writeHead(200, { 'content-type': types[ext] || 'application/octet-stream', 'content-encoding': 'gzip', 'content-length': b.length, 'cache-control': 'no-store' }); return r.end(b);
+  }
+  servis.push({ f, octets: fs.statSync(p).size });
+  r.writeHead(200, { 'content-type': types[ext] || 'application/octet-stream' }); fs.createReadStream(p).pipe(r);
 });
+// `VITESSE_RESEAU=4g` : le téléphone sur un réseau 4G simulé (Chrome, CDP) — 150 ms
+// d'aller-retour, 1,6 Mbit/s descendant, 750 kbit/s montant (le profil « 4G lente »
+// de Lighthouse, celui des mesures mobiles). Seuls les fichiers de l'app passent
+// par ce réseau : la base reste servie par le banc (RTT + débit simulés plus bas).
+const RESEAU = process.env.VITESSE_RESEAU === '4g' ? { offline: false, latency: 150, downloadThroughput: 1.6e6 / 8, uploadThroughput: 750e3 / 8 } : null;
+const LARGEURS = process.env.VITESSE_LARGEURS ? process.env.VITESSE_LARGEURS.split(',').map(Number) : [390, 1512];
 srv.on('error', (e) => { console.log('❌ le port ' + PORT + ' est pris (' + e.code + ')'); process.exit(1); });
 srv.listen(PORT);
 
@@ -106,7 +129,8 @@ async function ouvrir(b, vp, tab, attendre, frappe, opts = {}) {
   if (opts.memoire !== false && MEMOIRE) await pg.addInitScript(([qui, uids]) => { try { localStorage.setItem('vrm_comptes_lies', JSON.stringify({ qui, uids })); } catch (_) {} }, [UID_BANC, [...UIDS_LIES]]);
   if (opts.rendus) await pg.addInitScript(crochetRendus, opts.rendus);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
-  if (vp.width < 600 && CPU > 1) { const cdp = await ctx.newCDPSession(pg); await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU }); }
+  if (vp.width < 600 && (CPU > 1 || RESEAU)) { const cdp = await ctx.newCDPSession(pg); if (CPU > 1) await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU }); if (RESEAU) { await cdp.send('Network.enable'); await cdp.send('Network.emulateNetworkConditions', RESEAU); } }
+  servis = [];
   const req = [];
   let fige = false;   // après la mesure d'ouverture : les lectures du signal ne comptent pas dans le bilan
   const noter = (e) => { if (!fige) req.push(e); };
@@ -142,7 +166,8 @@ async function ouvrir(b, vp, tab, attendre, frappe, opts = {}) {
     const delai = RTT + Math.round(body.length / DEBIT * 1000);
     const du = decodeURIComponent(url);
     const hors = Array.isArray(rep.body) ? rep.body.filter((x) => x && horsEcran(x.id)).reduce((a, x) => a + JSON.stringify(x).length, 0) : 0;
-    const e = { m: 'GET', url, range: h.range || '', debut, fin: debut + delai, octets: body.length, pdf, poids: visePoids(du), entier: !!visePoids(du) && selectEntier(du), hors };
+    const achatsHors = Array.isArray(rep.body) ? rep.body.filter((x) => x && achatsHors_(x.id)).reduce((a, x) => a + JSON.stringify(x).length, 0) : 0;
+    const e = { m: 'GET', url, range: h.range || '', debut, fin: debut + delai, octets: body.length, pdf, poids: visePoids(du), entier: !!visePoids(du) && selectEntier(du), hors, achatsHors };
     noter(e);
     await new Promise((r) => setTimeout(r, delai));
     return route.fulfill({ status: rep.status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', ...(rep.headers || {}) }, body });
@@ -210,10 +235,12 @@ async function ouvrir(b, vp, tab, attendre, frappe, opts = {}) {
       return { t, max: Math.max(...t), moy: Math.round(t.reduce((a, x) => a + x, 0) / t.length), apres };
     }, frappe);
   }
+  // Les fichiers de l'app chargés jusqu'au premier écran utile (et après, jusqu'au calme).
+  const fichiers = servis.slice(); servis = [];
   const heros = await pg.evaluate(() => window.__heros || []).catch(() => []);
   if (DETAIL) console.log('    héros :', JSON.stringify(heros));
   await ctx.close();
-  return { req, utile, errs, lu, frappes, heros, rendusSignal };
+  return { req, utile, errs, lu, frappes, heros, rendusSignal, fichiers };
 }
 
 function bilan(nom, r) {
@@ -244,6 +271,9 @@ function bilan(nom, r) {
   const fiches = gets.filter((x) => x.poids === 'fiches'), commandes = gets.filter((x) => x.poids === 'commandes');
   const octFiches = fiches.reduce((a, x) => a + x.octets, 0), octCommandes = commandes.reduce((a, x) => a + x.octets, 0);
   const entieres = gets.filter((x) => x.entier), octHors = gets.reduce((a, x) => a + (x.hors || 0), 0);
+  const dressings = gets.filter((x) => x.poids === 'dressings'), octDressings = dressings.reduce((a, x) => a + x.octets, 0);
+  const octAchatsHors = gets.reduce((a, x) => a + (x.achatsHors || 0), 0);
+  const js = (r.fichiers || []).filter((x) => /\.(js|css)$/.test(x.f)), octJs = js.reduce((a, x) => a + x.octets, 0);
   // Les lignes jamais montrées que rapporte la lecture des COMMANDES de l'écran
   // (le préchargement, puis la lecture par compte) — celle que ce chantier juge.
   const octHorsCommandes = gets.filter(estVentes).reduce((a, x) => a + (x.hors || 0), 0);
@@ -253,8 +283,10 @@ function bilan(nom, r) {
     for (const x of tri) console.log(`      ${String(x.debut).padStart(6)}→${String(x.fin).padStart(6)} ${String(Math.round(x.octets / 1024)).padStart(5)} Ko ${decodeURIComponent(x.url.replace(/^https?:\/\/[^/]+\/rest\/v1\//, '')).slice(0, 170)} ${x.range}`);
     for (const [k, n] of doublons) console.log(`      ×${n} ${decodeURIComponent(k).slice(0, 170)}`);
   }
+  console.log(`     dressings ${Math.round(octDressings / 1024)} Ko en ${dressings.length} lecture(s) · achats d'anciens comptes lus ${Math.round(octAchatsHors / 1024)} Ko · fichiers de l'app ${Math.round(octJs / 1024)} Ko compressés en ${js.length} fichier(s)`);
+  if (DETAIL) for (const x of js) console.log(`      ${String(Math.round(x.octets / 1024)).padStart(6)} Ko ${x.f}`);
   if (profVentes) console.log(`     ventes lues au ${profVentes}ᵉ aller-retour à la suite · héros ${JSON.stringify(r.heros || [])}`);
-  return { utile: r.utile, fin, n: gets.length, octets, pdf, enDouble, profondeur, txn, supprParCompte, profVentes, octFiches, nFiches: fiches.length, octCommandes, nCommandes: commandes.length, entieres: entieres.map((x) => decodeURIComponent(x.url).replace(/^.*\/rest\/v1\//, '').slice(0, 120)), octHors, octHorsCommandes };
+  return { utile: r.utile, fin, n: gets.length, octets, pdf, enDouble, profondeur, txn, supprParCompte, profVentes, octFiches, nFiches: fiches.length, octCommandes, nCommandes: commandes.length, entieres: entieres.map((x) => decodeURIComponent(x.url).replace(/^.*\/rest\/v1\//, '').slice(0, 120)), octHors, octHorsCommandes, octDressings, nDressings: dressings.length, octAchatsHors, octJs, fichiersJs: js.map((x) => x.f.replace(/-[\w-]{8}\.(js|css)$/, '.$1')) };
 }
 
 // ⚠️ PLAFONDS MESURÉS le 16 octobre (base inventée, 7 comptes). Avant les
@@ -290,6 +322,11 @@ const ECRANS = [
   ['cat_achats', () => /achat/i.test(document.body.innerText), 'input[placeholder^="Rechercher (titre, N°"]'],
   ['cat_msg', () => /message|offre/i.test(document.body.innerText)],
   ['dashboard', () => /annonces|vendu/i.test(document.body.innerText)],
+  // (6 nov., vitesse 2) Achats, Stock et Comptabilité : les écrans dont la lecture des achats et
+  // les morceaux chargés à la demande ont changé. Pas de plafond de lectures (imprimé seulement).
+  ['achats', () => /achat/i.test(document.body.innerText)],
+  ['garage', () => /stock|étagère|meuble|rang/i.test(document.body.innerText)],
+  ['compta', () => /compta|bénéfice|déclar|URSSAF/i.test(document.body.innerText)],
 ];
 
 (async () => {
@@ -297,7 +334,7 @@ const ECRANS = [
   const res = {};
   try {
     const seuls = process.env.ECRANS ? process.env.ECRANS.split(',') : null;
-    for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
+    for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }].filter((v) => LARGEURS.includes(v.width))) {
       console.log(`\n── ${vp.width} px (RTT ${RTT} ms, ${DEBIT / 1e6} Mo/s)`);
       for (const [tab, att, frappe] of ECRANS) {
         if (seuls && !seuls.includes(tab)) continue;
@@ -310,13 +347,16 @@ const ECRANS = [
         dit(!r.lu.tombe && !r.errs.length, `${vp.width} px · ${tab} : l'écran s'affiche, sans erreur`, (r.errs.join(' | ') || (r.lu.tombe ? 'écran tombé' : '')).slice(0, 200));
         dit(m.pdf === 0, `${vp.width} px · ${tab} : aucun octet de PDF rapatrié à l'ouverture`, Math.round(m.pdf / 1024) + ' Ko');
         dit(m.enDouble <= DOUBLONS_MAX, `${vp.width} px · ${tab} : au plus ${DOUBLONS_MAX} lectures identiques refaites`, `${m.enDouble}`);
-        dit(m.n <= plafond, `${vp.width} px · ${tab} : au plus ${plafond} lectures de la base`, `${m.n}`);
+        if (plafond != null) dit(m.n <= plafond, `${vp.width} px · ${tab} : au plus ${plafond} lectures de la base`, `${m.n}`);
         // Deux lecteurs LÉGITIMES : le pont transaction → annonce + dates de versement
         // (une projection, partagée) et la preuve de vente (une autre). Avant : 2 à 7.
         dit(m.txn <= 2, `${vp.width} px · ${tab} : la famille des transactions balayée deux fois au plus`, `${m.txn}`);
         dit(m.supprParCompte === 0, `${vp.width} px · ${tab} : les suppressions lues en une lecture, pas une par compte`, `${m.supprParCompte}`);
         // (6 nov.) Ni `vinted_item_details`, ni une ligne de commandes lue ENTIÈRE (§4.4).
-        dit(m.entieres.length === 0, `${vp.width} px · ${tab} : aucune fiche de page ni ligne de commandes lue entière (select=data)`, m.entieres.join(' | ') || 'aucune');
+        dit(m.entieres.length === 0, `${vp.width} px · ${tab} : aucune fiche de page, ligne de commandes ni dressing lu entier (select=data)`, m.entieres.join(' | ') || 'aucune');
+        // (6 nov., vitesse 2) Les achats d'un ancien compte (plus dans vinted_accounts) : ni la cloche
+        // « où ranger », ni le registre, ni l'export ne les lisent plus (appareil de tous les jours).
+        if (MEMOIRE) dit(m.octAchatsHors === 0, `${vp.width} px · ${tab} : aucun achat d'un ancien compte lu`, `${Math.round(m.octAchatsHors / 1024)} Ko`);
         // Les fiches de page : seulement celles des annonces montrées (au plus la moitié de la ligne).
         dit(m.octFiches <= POIDS_FICHES / 2, `${vp.width} px · ${tab} : au plus la moitié de vinted_item_details rapatriée`, `${Math.round(m.octFiches / 1024)} Ko sur ${Math.round(POIDS_FICHES / 1024)} Ko`);
         // Les commandes d'un ancien compte, `orders_bought` et `wreq_*` : jamais montrées, jamais lues

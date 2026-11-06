@@ -141,6 +141,9 @@ function fabriquer({ comptes = 7, volumeReel = false } = {}) {
         price: { amount: '40.0', currency_code: 'EUR' }, status: 'Commande finalisée', date: iso((400 + i) * J), transaction_user_status: 'completed', _pad: pad(300) }));
       rows.push({ id: `harvest_${uid}_orders_sold`, data: { capturedAt: iso(300 * J), nItems: 30, payload: { my_orders: vieux(30, 0) } } });
       rows.push({ id: `harvest_${uid}_orders_purchased`, data: { capturedAt: iso(300 * J), nItems: 40, payload: { my_orders: vieux(40, 1) } } });
+      // (6 nov., vitesse 2) Deux anciens comptes gardent leur DRESSING (sa base : un
+      // compte plus lié, 2 annonces, ~46 Ko — des annonces captées entières).
+      if (v < 2) rows.push({ id: `harvest_${uid}_listings`, data: { uid: Number(uid), type: 'listings', domain: 'www.vinted.fr', capturedAt: iso(300 * J), nItems: 2, payload: { code: 0, items: [0, 1].map((i) => ({ id: 6800000000 + v * 10 + i, title: `Ancienne annonce ${i}`, brand_title: 'Nike', size_title: '42', status: 'Très bon état', price: { amount: '50.0', currency_code: 'EUR' }, is_closed: false, is_hidden: false, is_draft: false, favourite_count: 1, view_count: 3, photo: { url: 'https://images1.vinted.net/t/a/f800/v.jpeg' }, _pad: pad(11000) })), pagination: { total_entries: 2 } } } });
       if (v < 2) rows.push({ id: `harvest_${uid}_orders_bought`, data: { capturedAt: iso(300 * J), nItems: 5, payload: { my_orders: vieux(5, 0) } } });
     }
   }
@@ -184,6 +187,7 @@ function filtreId(expr) {
   if ((m = /^eq\.(.*)$/.exec(expr))) return (id) => id === m[1];
   if ((m = /^like\.(.*)$/.exec(expr))) { const re = reLike(m[1]); return (id) => re.test(id); }
   if ((m = /^not\.like\.(.*)$/.exec(expr))) { const re = reLike(m[1]); return (id) => !re.test(id); }
+  if ((m = /^not\.in\.\((.*)\)$/.exec(expr))) { const s = new Set(m[1].split(',').map((x) => x.replace(/^"|"$/g, ''))); return (id) => !s.has(id); }
   if ((m = /^in\.\((.*)\)$/.exec(expr))) { const s = new Set(m[1].split(',').map((x) => x.replace(/^"|"$/g, ''))); return (id) => s.has(id); }
   return () => true;
 }
