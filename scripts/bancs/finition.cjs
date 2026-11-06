@@ -76,13 +76,13 @@ const NOMS = [['vente', 'ventes'], ['annonce', 'annonces'], ['paire', 'paires'],
   ['action', 'actions'], ['site', 'sites'], ['vendeur', 'vendeurs'], ['acheteur', 'acheteurs'], ['membre', 'membres'], ['retour', 'retours'],
   ['facture', 'factures'], ['fournisseur', 'fournisseurs'], ['rappel', 'rappels'], ['notification', 'notifications'], ['adresse', 'adresses'],
   ['étape', 'étapes'], ['case', 'cases'], ['meuble', 'meubles'], ['annulation', 'annulations'], ['visite', 'visites'], ['vue', 'vues'], ['lecture', 'lectures']];
-const re = (s) => s.replace(/[-]/g, '\\-');
+const re = (s) => s;
 // « 1 ventes » / « 0 ventes » ; « 2 vente » (un nombre ≥ 2, pas une heure « 12 h », pas une partie d'un nombre « 1 234 »).
 const PLURIEL_FAUX = new RegExp(`(?<![\\d,.\\u00a0\\u202f ])(?:0|1)[\\u00a0\\u202f ](?:${NOMS.map((n) => re(n[1])).join('|')})(?![\\p{L}-])`, 'u');
 const SINGULIER_FAUX = new RegExp(`(?<![\\d,.:/\\u00a0\\u202f-])(?:[2-9]|[1-9]\\d+)[\\u00a0\\u202f ](?:${NOMS.map((n) => re(n[0])).join('|')})(?![\\p{L}-])`, 'u');
 const regleTexte = [
   ['T1', 'accord : « 1 ventes » / « 2 vente »', (t) => { const m = PLURIEL_FAUX.exec(t) || SINGULIER_FAUX.exec(t); return m && m[0]; }],
-  ['T2', 'espace manquant ou sécable avant « € »', (t) => { const m = /\d€|\d ( )?€|\d[  ]? €|\d\s€/.exec(t); return m && m[0].includes('€') && !/[  ]€/.test(m[0]) ? m[0] : null; }],
+  ['T2', 'espace manquant ou sécable avant « € »', (t) => { const m = /\d€|\d[ \t\r\n]+€/.exec(t); return m && m[0]; }],
   ['T3', '« n/d », « undefined », « NaN », « null », « [object Object] »', (t) => { const m = /\bn\/d\b|\bundefined\b|\bNaN\b|\bnull\b|\[object Object\]/i.exec(t); return m && m[0]; }],
   ['T4', '« ... » au lieu de « … »', (t) => { const m = /\.\.\./.exec(t); return m && m[0]; }],
 ];
@@ -162,6 +162,16 @@ function mesurer(opts) {
     if (k + 0.005 < seuil) out.contraste.push({ t: t.trim().slice(0, 60), k: Math.round(k * 100) / 100, seuil, fg: s.color, op: Math.round(op * 100) / 100, fond: `rgb(${fond.slice(0, 3).map(Math.round).join(',')})`, sel: sel(e) });
   }
   out.taillePolice = nPol ? somme / nPol : 0;
+  // Les PHRASES (lignes rendues des blocs) : « 4 » + « geste » + « s » sont trois nœuds
+  // mais une phrase lue « 4 gestes » — c'est elle que les règles de texte jugent.
+  const vues = new Set();
+  for (const e of document.querySelectorAll('body *')) {
+    if (/^(SCRIPT|STYLE|NOSCRIPT|TEMPLATE|svg|SVG)$/.test(e.tagName)) continue;
+    const d = getComputedStyle(e).display; if (d === 'inline' || d === 'contents' || d === 'none') continue;
+    if (!vis(e) || cache(e)) continue;
+    const it = e.innerText; if (!it || it.length > 400) continue;
+    for (const ligne of it.split('\n')) { const l = ligne.trim(); if (l && !vues.has(l)) { vues.add(l); out.textes.push({ t: l, sel: sel(e) + ' (ligne)' }); } }
+  }
   // Noms (aria-label, title, placeholder, alt) : relus aussi par le lecteur d'écran.
   for (const e of document.querySelectorAll('[aria-label],[title],[placeholder],img[alt]')) {
     if (!vis(e) || cache(e)) continue;
@@ -314,7 +324,10 @@ const court = (a, n = 6) => JSON.stringify(a.slice(0, n)).slice(0, 900);
         localStorage.setItem('vrm_acces_direct', '1');
       } catch (_) {}
       // Le réglage « texte plus grand » du navigateur : la taille de police racine.
-      if (gr) { const st = document.createElement('style'); st.textContent = `html{font-size:${gr}% !important}`; (document.head || document.documentElement).appendChild(st); document.documentElement.style.setProperty('--banc-grand', gr); }
+      if (gr) {
+        const poser = () => { const st = document.createElement('style'); st.textContent = `html{font-size:${gr}% !important}`; document.documentElement.appendChild(st); };
+        if (document.documentElement) poser(); else { const ob = new MutationObserver(() => { if (document.documentElement) { ob.disconnect(); poser(); } }); ob.observe(document, { childList: true }); }
+      }
     }, [session, sombre, grand ? Number(grand[1]) : 0]);
     const pg = await ctx.newPage();
     const errs = [];
