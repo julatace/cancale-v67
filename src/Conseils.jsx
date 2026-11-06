@@ -188,7 +188,11 @@ export default function Conseils({ ecran = '', contexte = {}, lire, ecrire, onAc
     if (dehors) { setPos((p) => (p && p.cache ? p : { ...(p || {}), cache: true })); return; }
     const b = bulle.current.getBoundingClientRect();
     const p = placerConseil(r, window.innerWidth, window.innerHeight, b.width, b.height, { bas: el.closest('.vrm-mobile-nav') ? 0 : basReserve() });
-    const halo = { x: Math.round(r.left - 6), y: Math.round(r.top - 6), w: Math.round(r.width + 12), h: Math.round(r.height + 12) };
+    // Le halo déborde de 6 px autour de la cible, mais jamais hors de l'écran (« Plus »,
+    // collé au bord de la barre, aurait un anneau coupé) : il rentre alors sur ce bord.
+    const hx0 = Math.max(3, r.left - 6), hy0 = Math.max(3, r.top - 6);
+    const hx1 = Math.min(window.innerWidth - 3, r.right + 6), hy1 = Math.min(window.innerHeight - 3, r.bottom + 6);
+    const halo = { x: Math.round(hx0), y: Math.round(hy0), w: Math.round(hx1 - hx0), h: Math.round(hy1 - hy0) };
     setPos((q) => (q && !q.cache && q.x === p.x && q.y === p.y && q.flecheX === p.flecheX && q.cote === p.cote && q.halo.x === halo.x && q.halo.y === halo.y && q.halo.w === halo.w && q.halo.h === halo.h ? q : { ...p, halo, cache: false }));
   }, [montre, ecran, fermer]);
   useLayoutEffect(() => { if (montre) placer(); }, [montre, placer]);
