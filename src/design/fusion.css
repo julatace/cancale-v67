@@ -1240,6 +1240,12 @@ html body .vrm-app-shell .vrm-main .vrm-day-layout .vrm-cycle-carte > .vrm-cycle
 .vrm-fu-carte[data-fu-colis-retirer] .vrm-fu-case b { font-size:18px; }
 .vrm-fu-carte[data-fu-colis-retirer] .vrm-fu-case span { font-size:11px; }
 
+/* (5 nov.) « Peut-être en double » : la même forme que « À vérifier » (replié, jamais compté). */
+.vrm-rpf-double > summary { cursor: pointer; }
+.vrm-rpf-double > summary::-webkit-details-marker { display: none; }
+.vrm-rpf-double[open] .vrm-rpf-chevron { transform: rotate(90deg); }
+.vrm-rpf-double { padding-bottom: 4px; }
+
 /* ══ E1. MA JOURNÉE ET LES CARTES SOMBRES (5 nov., revue de cohérence 2.1–2.4, 2.11, 1.7, 3.2) ══
    Récit : docs/passation/2026-11-05-chantier-e1.md ; banc scripts/bancs/journee-coherence.cjs. */
 /* « Modifier » dans la rangée du surtitre (CarteMois `a-rangee`) : plus jamais au-dessus de la

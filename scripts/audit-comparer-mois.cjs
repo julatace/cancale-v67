@@ -136,7 +136,8 @@ const proche = (a, b) => (a == null && b == null) || (a != null && b != null && 
   console.log('── Le branchement');
   const A0 = sansCommentaires(APP);
   dit(/<ComparerMoisCarte liveStats=\{liveStats\}\/>/.test(A0), 'Statistiques monte « Comparer » sous le choix de période');
-  dit(/recuDe: \(b\) => recuPublieEntre\(ligneUrssaf, b, maintenant\)/.test(A0) && /beneficeDuMoisPub\(\{ pub, compta, ligneUrssaf, regime \}, ym, jusqua\)/.test(A0) && /R: \{ bilanLignes \}/.test(A0), 'avec les règles propriétaires (reçu publié, bénéfice du mois, bilanLignes)');
+  // (5 nov., chantier F) Le reçu peut passer par `recuAvecADater` (§5 : des ventes « à dater » font d'un 0 un « pas su ») : la SOURCE reste `recuPublieEntre`.
+  dit(/recuDe: \(b\) => (?:recuAvecADater\()?recuPublieEntre\(ligneUrssaf, b, maintenant\)/.test(A0) && /beneficeDuMoisPub\(\{ pub, compta, ligneUrssaf, regime \}, ym, jusqua\)/.test(A0) && /R: \{ bilanLignes \}/.test(A0), 'avec les règles propriétaires (reçu publié, bénéfice du mois, bilanLignes)');
   dit((A0.match(/beneficeDuMoisPub\(\{ pub: pubB, compta: comptaB, ligneUrssaf: v, regime: regimeB \}, ym\)/g) || []).length === 2, 'le récap mensuel lit le bénéfice par la MÊME fonction');
   dit(/recuJours\[k\] = r2\(\(recuJours\[k\] \|\| 0\) \+ l\.eur\)/.test(A0) && /recu, recuJours, nonComptees \}/.test(A0), 'Ventes publie le reçu jour par jour, des mêmes lignes');
   console.log(`\n${ko ? '❌' : '✅'} audit-comparer-mois : ${ok} vert(s), ${ko} rouge(s)${MUT ? ' [mutation ' + MUT + ']' : ''}`);

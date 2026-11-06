@@ -427,12 +427,14 @@ export const valeurChiffre = (id, place, sources, sel, regles, maintenant = Date
 export const RAISON_COURTE = {
   pasSu: 'pas lu', encours: 'lecture…', publication: 'pas calculé', achats: 'prix d’achat manquants',
   frais: 'frais pas lus', cotisations: 'statut à choisir', rien: 'rien à compter', aucune: 'aucune vente',
-  absente: 'ouvre Ventes', ancienne: 'à relire', 'ancienne-app': 'à relire', illisible: 'pas lu',
+  statut: 'statut à choisir', absente: 'ouvre Ventes', ancienne: 'à relire', 'ancienne-app': 'à relire', illisible: 'pas lu',
 };
 export const raisonCourte = (x) => {
   if (!x) return '';
   if (x.valeur != null) return x.aDater > 0 ? `+ ${x.aDater} à dater` : '';
   if (x.hors) return x.hors;
+  // Une case PROPRE à la page dit sa raison elle-même (Compta : « À déclarer » sans statut).
+  if (x.def && x.def.local && x.def.raisonCourte) return x.def.raisonCourte;
   if (x.raison === 'a-dater') return `${x.aDater} à dater`;
   if (x.raison === 'partiel') return x.manque && x.manque.length ? `sans ${x.manque[0]}` : 'pas tout lu';
   return RAISON_COURTE[x.raison] || 'pas lu';

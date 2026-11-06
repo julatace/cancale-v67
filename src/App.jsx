@@ -49,8 +49,10 @@ import {etatColisDepuisTexte,normaliserSuivi} from '../api/_lib/etat-colis-email
 import {FAMILLES as FAMILLES_NOTIF,familleActive as familleNotifActive,reglageCalme,heureValide} from '../api/_lib/notif-textes.js';
 import {apercuFamille as apercuFamilleNotif} from '../api/_lib/notif-apercus.js';
 import './notif-reglages.css';
+import GuideIphone, { useGuideIphone } from './GuideIphone.jsx';
 import {achatDuColis,suivisAchat,entreeIndexAchat} from './liensColis.js';
 import {achatParConversation, regrouperArrivees} from '../api/_lib/achat-arrive-relais.js';
+import {indexCodesSuivis, finParIdentite, fusionnerParCode} from './retraitPreuves.js';
 import {arriveesRelues} from './arriveesRelues.js';
 import {avecSuiviDuSujet,finsDesLignes,sortiParSuivis,sortiParSuivi,suiviDeLigne,lienSuivi,codePostalLu,nouvelleVinted,transporteurDeForme,suiviValide,TRANSPORTEURS_SAISIE,normaliserCodePostal,idSuiviManuel,relireLigneSuivi,finDeCommandeAchat,fusionTransporteur,ligneDuTransporteur,ligneDeSuiviTransporteur,leverGarde,SELECT_TRANSP_META,ligneTranspDeMeta,sensDeLigne,incidentDeSuivis,incidentDeLigne,repartiAffichable,nomTransporteurSuivi} from '../api/_lib/suivi-colis.js';
 import {ligneTransporteur,texteCodePostalMr,carrierLisible,carrierNonLu,nomTransporteur,LECTURE_SERVEUR_TRANSP,heureParis} from '../api/_lib/transporteurs.js';
@@ -225,6 +227,7 @@ import CarteStats from "./design/CarteStats.jsx";
 import CarteOffres from "./design/CarteOffres.jsx";
 import { statsOffres } from "./statsOffres.js";
 import { CLE_CARTE_STATS, raisonCourte, recuPublieEntre, valeurObjectif } from "./design/carteChiffres.js";
+import { CHIFFRES as CHIFFRES_CARTE } from "./design/carteChiffres.js";
 import { CLE_OBJECTIF, lireObjectif, lireSaisieObjectif, objectifAEnregistrer, progressionObjectif } from "./objectifMois.js";
 import { courtFusion, enArticles } from "./design/tacheCourte.js";
 import { PileVignettes } from "./design/PileVignettes.jsx";
@@ -245,6 +248,8 @@ import { fusionnerLigne, fusion3, egal as egalStable, CLE_POOL, CLES_FICHES } fr
 import { NOM_BENEFICE, NOM_BENEFICE_BRUT, NOM_APRES_FRAIS, chiffreBenefice, chiffreBrut, chiffreApresFrais, finDuMois, moisCouvertParPublication } from "./beneficeNoms.js";
 import { achatParIdentite, propositionPrixAchat, propositionsUniques, listeConfirmation, ecritureProposition } from "./prixAchatPropose.js";
 import { donneesRecapMois, csvRecapMois, pdfRecapMois, libelleMois, nomFichierRecap } from "./recapMois.js";
+import { bilanDuMois, meilleurCompte, pdfBilanMois, nomFichierBilan, texteBilan } from "./bilanMois.js";
+import { delaisPaiement, texteDelai } from "./delaiPaiement.js";
 import { livreDesRecettes, registreDesAchats, csvRegistre, pdfRegistre, nomFichierRegistre, achatAnnule } from "./registres.js";
 import { CATEGORIES_DEPENSE, idTicket, montantDuTicket, texteMontantSaisie, texteDuTicket } from "./depensesTicket.js";
 import { produitsANumeroter, attribuerNumerosVc, carteNumerosVc } from "./numerosVestiaire.js";
@@ -254,7 +259,7 @@ import { histoireArticle, offresDeConversation } from "./histoireArticle.js";
 import { etatArticle } from "./etatArticle.js";
 import StockExplication from "./StockExplication.jsx";
 import { libererCasesPartis, remettreCase, resteAuStock, etatCase } from "./stockSortie.js";
-import { annoncesActuelles, classerRangees } from "./stockAnnonces.js";
+import { annoncesActuelles, annoncesVcStock, classerRangees } from "./stockAnnonces.js";
 import { carteArgentJournee } from "./journeeArgent.js";
 import { CLE_MODELES, lireModeles } from "./modelesDescription.js";
 import { MesModeles, InsererModele } from "./ModelesDescription.jsx";
@@ -7516,7 +7521,7 @@ function phaseAchat(status) {
   if (/finalis|livr[ée]|termin|re[çc]u|complet|arriv/i.test(s)) return 'completed';
   return 'pending';
 }
-function etapeAchat(o, tk) {
+function etapeAchat(o, tk, { fini = false } = {}) {
   const s = o.status || '';
   // ⚠️ « Retour initié » sur un ACHAT = litige, tu dois RENVOYER la paire.
   //    Testé AVANT « annulé/remboursé » : ce n'est pas une commande morte,
@@ -7525,10 +7530,16 @@ function etapeAchat(o, tk) {
   //    l'expéditeur », qui est autre chose.
   if (ACHAT_A_RENVOYER.test(s)) return { label: 'À renvoyer', step: 1, color: C.warn, retour: true };
   if (/annul|rembours|refus/i.test(s)) return { label: 'Annulé', step: 0, color: C.danger };
-  if (/finalis/i.test(s) || tusDe(o) === 'completed') return { label: 'Reçu', step: 4, color: INV_STATUS.online.color };
+  // (5 nov.) Mots retenus (revue du 5 nov.) : « Arrivé » (« Reçu » est réservé à l'argent),
+  // « En route ». Et « à retirer » SEULEMENT si la règle des colis à retirer le compte
+  // (`pickupUnion`) : un achat que Vinted dit encore « déposé » mais dont le transporteur
+  // dit « livré au destinataire » (même n° de suivi) est ARRIVÉ (`fini`, §11).
+  if (/finalis/i.test(s) || tusDe(o) === 'completed') return { label: 'Arrivé', step: 4, color: C.muted };
+  if (/commande\s+livr/i.test(s)) return { label: 'Arrivé', step: 4, color: C.muted };
+  if (fini && (isAtRelayStatus(s) || (tk && tk.status === 'available'))) return { label: 'Arrivé', step: 4, color: C.muted, parTransporteur: true };
   if (isAtRelayStatus(s) || (tk && tk.status === 'available')) return { label: 'À retirer', step: 3, color: C.warn };
-  if (/\blivr[ée]|remis\b|r[ée]ceptionn/i.test(s) || phaseAchat(s) === 'completed') return { label: 'Reçu', step: 4, color: INV_STATUS.online.color };
-  if (/exp[eé]di|transit|achemin|en route|envoy/i.test(s)) return { label: 'En transit', step: 2, color: C.blue || C.accent };
+  if (/\blivr[ée]|remis\b|r[ée]ceptionn/i.test(s) || phaseAchat(s) === 'completed') return { label: 'Arrivé', step: 4, color: C.muted };
+  if (/exp[eé]di|transit|achemin|en route|envoy/i.test(s)) return { label: 'En route', step: 2, color: C.blue || C.accent };
   if (/pay|valid|pr[ée]par|attente|confirm/i.test(s)) return { label: 'Payé', step: 1, color: C.muted };
   return { label: s ? (s.length > 26 ? s.slice(0, 26) + '…' : s) : 'En cours', step: 1, color: C.muted };
 }
@@ -9555,7 +9566,7 @@ const ajouterAutresPresents = (fiches) => {
   for (const a of autresPresents()) { const k = cleNum(a.numero); if (k && !cles.has(k)) { cles.add(k); plus.push({ id: 'plat:' + k, numero: a.numero, title: a.title || '', photo: a.photo || null, plateformes: a.plateformes || [], horsVinted: true }); } }
   return plus.length ? fiches.concat(plus) : fiches;
 };
-const NOM_PLAT_STOCK = { vinted: 'Vinted', ebay: 'eBay', leboncoin: 'Leboncoin' };
+const NOM_PLAT_STOCK = { vinted: 'Vinted', ebay: 'eBay', leboncoin: 'Leboncoin', vestiaire: 'Vestiaire' };
 
 // ── LA REMISE À ZÉRO DU 9 OCTOBRE : LES ANCIENS NUMÉROS SONT EN « B » ─────────
 // Julien : « tous les anciens numéros, tu les fais commencer par B1, B2… ; on
@@ -19887,14 +19898,14 @@ function valoriserStock(groups, online) {
   }
   return { total: (online || []).length, reconnu, marche, affiche };
 }
-function PrixMarche({ data, baseKO }) {
+function PrixMarche({ data, baseKO, sousNav = null }) {
   const eur2 = (n) => n.toFixed(n % 1 ? 2 : 0).replace('.', ',');
   const groups = data && data.groups;
   const valo = data && data.valo;
   const eti = { fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 500 };
   return (
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <ScreenHead icon="chart" title="Le prix qui marche"
+      <ScreenHead icon="chart" title="Le prix qui marche" sous={sousNav ? <div className="vrm-stats-sous-nav" data-stats-sous-nav="">{sousNav}</div> : null}
         desc="Ce que tes ventes disent du prix — par modèle et taille, pour tarifer et racheter juste." />
       {baseKO ? (
         <LignePanne>Je n'ai pas pu lire tes ventes — un prix médian faux serait pire que pas de prix. Rien n'est perdu : c'est la lecture qui a échoué.</LignePanne>
@@ -28925,7 +28936,7 @@ function RepliStats({ id, titre, phrase, children }) {
     </details>
   );
 }
-function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,baseKO,premierJour,lbcVentes={ventes:[],inconnues:0},ebayCa=null,ebayCommandes,panelOff=null,ventesVc}) {
+function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,baseKO,premierJour,lbcVentes={ventes:[],inconnues:0},ebayCa=null,ebayCommandes,panelOff=null,ventesVc,sousNav=null}) {
   // Les N° des annonces « à confirmer » (la liste dépliée sous « Annonces en ligne ») :
   // relus avec les chiffres, jamais un « sans N° » inventé (revue de la 5.167).
   const numerosDash=React.useMemo(()=>load('vinted_annonce_numeros',{}),[liveStats]);
@@ -29266,7 +29277,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
 
   return (
     <div className="vrm-finance-page vrm-statistiques-premium" style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
-      <ScreenHead icon="chart" title="Statistiques" right={<Segmente label="Période" className="vrm-sv-periode" value={periodeStats} onChange={setPeriodeStats} options={Object.entries(PERIODES).map(([v,l])=>({v,l,data:{'data-sv-choix':v}}))}/>}/>
+      <ScreenHead icon="chart" title="Statistiques" sous={sousNav ? <div className="vrm-stats-sous-nav" data-stats-sous-nav="">{sousNav}</div> : null} right={<Segmente label="Période" className="vrm-sv-periode" value={periodeStats} onChange={setPeriodeStats} options={Object.entries(PERIODES).map(([v,l])=>({v,l,data:{'data-sv-choix':v}}))}/>}/>
       <StatsVitrine liveStats={liveStats} panelOff={panelOff} periode={periodeStats}/>
       <ComparerMoisCarte liveStats={liveStats}/>
       <FraisParSiteCarte periode={periodeStats} ebayCommandes={ebayCommandes}/>
@@ -30506,7 +30517,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
         ].map(z=>(
           <button key={z.id} type="button" aria-pressed={zone===z.id} onClick={()=>{setZone(z.id);setPage(null);}}
             style={{background:'transparent',border:'none',borderBottom:zone===z.id?`3px solid ${C.accent}`:'3px solid transparent',
-              color:zone===z.id?C.accent:C.muted,padding:'8px 14px',cursor:'pointer',fontSize:13,fontWeight:500,fontFamily:'inherit',whiteSpace:'nowrap'}}>
+              color:zone===z.id?C.accentTexte:C.muted,padding:'8px 14px',cursor:'pointer',fontSize:13,fontWeight:500,fontFamily:'inherit',whiteSpace:'nowrap'}}>
             <span style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name={z.icon} size={13}/>{z.label} ({z.count})</span>
           </button>
         ))}
@@ -33582,23 +33593,38 @@ function ouDansMeubles(num, meublesArg, slotsArg) {
 // (la règle <enligne-regle> : en ligne, à confirmer, masquées), eBay
 // (`lireEbayEnLigne`) et Leboncoin (`lireLbcEnVente`). Un compte écarté du Stock
 // (masqué, retiré, supprimé, plus lié — `comptesStockEcartes`) n'est pas lu.
-// Rend `{ vinted: [{ uid, nom, ok, lu, enLigne, aConfirmer, masquees }], ebay, lbc, at }`
+// (5 nov., « ce qui reste ») Vestiaire : `vc_listings` et `vc_ventes`, PROJETÉS
+// (les mêmes champs que l'écran Annonces → Vestiaire, jamais `select=data`) ;
+// le jugement (`annoncesVcStock`) se fait au rendu, avec les N° du moment
+// (`numerosVcEffectifs`, qui suivent un N° donné ou relié pendant que l'écran
+// est ouvert). `vc: null` = la lecture a raté ; `{ lst: {} }` = jamais rangée.
+// Rend `{ vinted: [{ uid, nom, ok, lu, enLigne, aConfirmer, masquees }], ebay, lbc, vc, at }`
 // — une lecture ratée reste « pas su » (`ok: false`, `null`), jamais `[]`.
+async function lireVcStock() {
+  const [rl, rv] = await Promise.all([
+    lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt,complet:data->complet`).catch(() => null),
+    lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_ventes&select=ventes:data->ventes`).catch(() => null),
+  ]);
+  if (!Array.isArray(rl)) return null;
+  const r = rl[0] || {};
+  const ventes = Array.isArray(rv) && rv[0] && rv[0].ventes && typeof rv[0].ventes === 'object' ? rv[0].ventes : null;
+  return { lst: { items: r.items && typeof r.items === 'object' ? r.items : null, liens: r.liens && typeof r.liens === 'object' ? r.liens : {}, capturedAt: r.capturedAt || '', complet: r.complet === true }, ventes };
+}
 async function lireAnnoncesStock(accounts) {
   const horsCompte = comptesStockEcartes();
   const accs = (accounts || []).filter((a) => a && a.vinted_user_id != null && !horsCompte({ accountId: a.vinted_user_id }));
-  const [vinted, ebay, lbc] = await Promise.all([
+  const [vinted, ebay, lbc, vc] = await Promise.all([
     Promise.all(accs.map(async (acc) => {
       const uid = String(acc.vinted_user_id), nom = String(acc.login || acc.username || uid);
       let r; try { r = await fetchVintedListings(acc, 1, {}); } catch (_) { r = null; }
       if (!r || !r.ok) return { uid, nom, ok: false };
       return { uid, nom, ok: true, lu: Number.isFinite(r.lu) ? r.lu : null, enLigne: r.items || [], aConfirmer: r.aConfirmer || [], masquees: r.masquees || [] };
     })),
-    lireEbayEnLigne(), lireLbcEnVente(),
+    lireEbayEnLigne(), lireLbcEnVente(), lireVcStock().catch(() => null),
   ]);
-  return { vinted, ebay, lbc, at: Date.now() };
+  return { vinted, ebay, lbc, vc, at: Date.now() };
 }
-const NOM_PLAT_FILTRE = { vinted: 'Vinted', leboncoin: 'Leboncoin', ebay: 'eBay' };
+const NOM_PLAT_FILTRE = { vinted: 'Vinted', leboncoin: 'Leboncoin', ebay: 'eBay', vestiaire: 'Vestiaire' };
 const depuisQuand = (ms) => { if (!Number.isFinite(ms)) return 'jamais lu'; const h = (Date.now() - ms) / 3600000; return h < 48 ? `lu il y a ${Math.max(1, Math.round(h))} h` : `lu il y a ${Math.round(h / 24)} j`; };
 
 function StockMeubles({ locate = null, placeNum = null, onPlaced = null, accounts = null, comptesLus = false } = {}) {
@@ -33679,6 +33705,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   // ⇒ « Vendues à sortir », sinon ⇒ « Plus en ligne » (`classerRangees`) — et si
   // une lecture qui pourrait la porter manque, on ne dit RIEN d'elle (« pas su »).
   const [lecture, setLecture] = React.useState(undefined);   // undefined = en cours
+  const vcLocStock = useVcLocal();                           // les N° Vestiaire (donnés, reliés) : redessine quand ils changent
   const cleComptesStock = (accounts || []).map((a) => String((a && a.vinted_user_id) || '')).filter(Boolean).sort().join(',');
   React.useEffect(() => {
     if (!comptesLus) return undefined;
@@ -33695,9 +33722,12 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   const [maxListe, setMaxListe] = React.useState(60);        // la liste des annonces actuelles, 60 par 60
   const [, setTic] = React.useState(0);                      // relire après « Elle est encore là »
   const garder = { ...(load('vrm_stock_garde_hors_ligne', {}) || {}), ...(load('vrm_stock_garder', {}) || {}) };
+  // Vestiaire : ses annonces jugées par la règle de Vestiaire, avec les N° du
+  // moment (donnés par VRM, ou celui de Vinted qu'il a relié — `vrm_vc_liens`).
+  const vcStock = lecture ? (lecture.vc ? annoncesVcStock({ lst: lecture.vc.lst, ventes: lecture.vc.ventes, auto: vcLocStock.auto }) : null) : undefined;
   const aa = lecture ? annoncesActuelles({
     vinted: lecture.vinted.map((c) => (c.ok ? { ...c, masquees: masqueesPresentes(c.masquees, numeros, pairsLost) } : c)),
-    numeros, ebay: lecture.ebay, lbc: lecture.lbc, vendus, cle: cleNum, clePhoto: photoKey,
+    numeros, ebay: lecture.ebay, lbc: lecture.lbc, vestiaire: vcStock, vendus, cle: cleNum, clePhoto: photoKey,
   }) : null;
   // Une paire sous deux N° (même photo exacte, `aussi`) : chacun de ses N° est actuel.
   const actuellesCles = aa ? new Set(aa.articles.flatMap((a) => [a.cle, ...(a.aussi || []).map(cleNum)]).filter(Boolean)) : null;
@@ -33711,8 +33741,12 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   // Toutes les lectures qui pourraient porter ce N° ont-elles répondu ? Sinon
   // « pas su » : la paire rangée n'est dite ni présente ni partie.
   const lusOk = new Set(lecture ? lecture.vinted.filter((c) => c.ok).map((c) => c.uid) : []);
+  // Vestiaire : une lecture absente, ratée ou lue en partie, ou une annonce de
+  // ce N° à l'état non dit ⇒ on ne dit rien de la paire rangée.
+  const vcNonJugeesCles = new Set(aa ? (aa.vcNonJugees || []).map((x) => x.cle).filter(Boolean) : []);
   const jugeable = (k) => {
     if (!aa || !aa.su || !lecture.lbc || !lecture.ebay || (lecture.ebay.illisibles || []).length) return false;
+    if (aa.manque.some((m) => m.plateforme === 'vestiaire') || vcNonJugeesCles.has(k)) return false;
     const cs = (fichesParCle[k] || []).map((f) => String(f.accountId || '')).filter(Boolean);
     return cs.length ? cs.every((u) => lusOk.has(u)) : lecture.vinted.every((c) => c.ok);
   };
@@ -34066,9 +34100,17 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   const platsPresents = aa ? [...new Set(aa.articles.flatMap((a) => a.plateformes))] : [];
   const comptesPresents = aa ? [...new Set(aa.articles.flatMap((a) => a.comptes))] : [];
   // Les lectures qui manquent, NOMMÉES : « compte_beta sur Vinted, Leboncoin ».
+  // (5 nov.) Vestiaire : la raison est dite (« jamais lu », « lue en partie »), avec le geste.
+  const MOT_MANQUE_VC = { 'pas lu': 'Vestiaire (lecture ratée)', 'jamais lu': 'Vestiaire (jamais lu : ouvre « Mes articles » sur vestiairecollective.com)', 'lue en partie': 'Vestiaire (liste lue en partie : ouvre « Mes articles » jusqu’en bas)' };
   const manqueTxt = aa ? (() => { const v = aa.manque.filter((x) => x.plateforme === 'vinted').map((x) => x.nom); const e = aa.manque.filter((x) => x.plateforme === 'ebay').map((x) => (x.nom === 'eBay' ? 'eBay' : `${x.nom} sur eBay`)); const l = aa.manque.some((x) => x.plateforme === 'leboncoin') ? ['Leboncoin'] : [];
-    return [...(v.length ? [`${v.join(', ')} sur Vinted`] : []), ...e, ...l].join(', '); })() : '';
+    const vc = aa.manque.filter((x) => x.plateforme === 'vestiaire').map((x) => MOT_MANQUE_VC[x.raison] || 'Vestiaire');
+    return [...(v.length ? [`${v.join(', ')} sur Vinted`] : []), ...e, ...l, ...vc].join(', '); })() : '';
   const sansNumAutres = aa ? (aa.sansNumero.ebay + aa.sansNumero.leboncoin) : 0;
+  const vcSansNum = aa ? (aa.vcSansNumero || []) : [];
+  const vcNonDites = aa ? (aa.vcNonJugees || []) : [];
+  const aConfVoir = aa ? aa.aConfirmerComptes.filter((c) => !filtreCompte || c.uid === filtreCompte) : [];
+  const aConfTxt = aConfVoir.map((c) => (c.plateforme === 'vestiaire' ? (c.vieille ? `Vestiaire, ${depuisQuand(c.lu)}` : 'Vestiaire, plus vues dans ta dernière liste') : `${c.nom}, ${depuisQuand(c.lu)}`)).join(' ; ');
+  const aConfGeste = [aConfVoir.some((c) => c.plateforme !== 'vestiaire') ? 'plus de 24 h : repasse sur Vinted avec ce compte' : '', aConfVoir.some((c) => c.plateforme === 'vestiaire') ? 'ouvre « Mes articles » sur Vestiaire' : ''].filter(Boolean).join(' ; ');
   const blocResume = (
     <Card style={{ padding: '13px 14px' }}>
       <div className="vrm-s2d-resume" data-stock-actuelles={lecture === undefined ? 'encours' : (aa && aa.su ? nAffiche : 'passu')} data-stock-au-moins={aa && aa.auMoins ? '1' : '0'} data-stock-a-confirmer={aa && aa.su ? nAConf : undefined} data-stock-masquees={aa && aa.su ? nMasq : undefined} data-stock-rangees={aa && aa.su ? nRangees : undefined}>
@@ -34076,15 +34118,18 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
           {lecture === undefined ? '…' : (aa && aa.su ? <>{aa.auMoins ? <span style={{ fontSize: 15, fontWeight: 600 }}>au moins </span> : null}{nAffiche}</> : '—')}
           <small>{nAffiche === 1 && aa && aa.su ? 'annonce actuelle' : 'annonces actuelles'}{filtreActif ? ' (filtrées)' : ''}</small>
         </div>
-        {lecture === undefined && <div className="vrm-s2d-resume-l">Je lis tes annonces Vinted, Leboncoin et eBay…</div>}
+        {lecture === undefined && <div className="vrm-s2d-resume-l">Je lis tes annonces Vinted, Leboncoin, eBay et Vestiaire…</div>}
         {lecture && !aa.su && <div className="vrm-s2d-resume-l" data-stock-passu="">Je n'ai pas pu lire tes annonces{manqueTxt ? ` (${manqueTxt})` : ''} — rien n'est perdu, c'est la lecture qui a échoué. Ouvre Vinted {NAV.dans} avec l'extension, puis reviens ici.</div>}
         {aa && aa.su && <div className="vrm-s2d-resume-l">
           {nAffiche > 0 ? <><b>{nRangees}</b> rangée{nRangees > 1 ? 's' : ''} · <b>{nAffiche - nRangees - nSansNum}</b> pas encore rangée{nAffiche - nRangees - nSansNum > 1 ? 's' : ''}</> : 'Aucune annonce en ligne lue'}
-          {nAConf > 0 && <span data-stock-a-confirmer-noms=""> · dont <b>{nAConf}</b> à confirmer ({aa.aConfirmerComptes.filter((c) => !filtreCompte || c.uid === filtreCompte).map((c) => `${c.nom}, ${depuisQuand(c.lu)}`).join(' ; ')} — plus de 24 h : repasse sur Vinted avec ce compte)</span>}
+          {nAConf > 0 && <span data-stock-a-confirmer-noms=""> · dont <b>{nAConf}</b> à confirmer ({aConfTxt} — {aConfGeste})</span>}
+          {aa.vcVieille && !aConfVoir.some((c) => c.plateforme === 'vestiaire') && <span data-stock-vc-vieille=""> · Vestiaire {depuisQuand(aa.vcVieille.lu)} : ouvre « Mes articles » sur Vestiaire</span>}
           {nMasq > 0 && <> · dont <b>{nMasq}</b> masquée{nMasq > 1 ? 's' : ''} par Vinted (toujours chez toi)</>}
           {nSansNum > 0 && <> · <b>{nSansNum}</b> sans N° (donne-leur un N° dans Annonces pour les ranger)</>}
           {aa.manque.length > 0 && <span data-stock-manque=""> · pas lu : {manqueTxt}</span>}
           {sansNumAutres > 0 && <> · {sansNumAutres} annonce{sansNumAutres > 1 ? 's' : ''} {aa.sansNumero.leboncoin && aa.sansNumero.ebay ? 'Leboncoin et eBay' : (aa.sansNumero.leboncoin ? 'Leboncoin' : 'eBay')} sans N° pas comptée{sansNumAutres > 1 ? 's' : ''} (rien ne dit quelle paire c'est)</>}
+          {vcSansNum.length > 0 && <span data-stock-vc-sans-numero={vcSansNum.length}> · {vcSansNum.length} annonce{vcSansNum.length > 1 ? 's' : ''} Vestiaire sans N° pas comptée{vcSansNum.length > 1 ? 's' : ''} : {vcSansNum.slice(0, 4).map((x) => `« ${x.titre || 'sans titre lu'} »`).join(', ')}{vcSansNum.length > 4 ? '…' : ''} (le N° arrive quand VRM a relu tes numéros — jamais deviné par le titre)</span>}
+          {vcNonDites.length > 0 && <span data-stock-vc-non-dites={vcNonDites.length}> · {vcNonDites.length} annonce{vcNonDites.length > 1 ? 's' : ''} Vestiaire à l'état non dit (ni en ligne ni partie) pas comptée{vcNonDites.length > 1 ? 's' : ''}</span>}
         </div>}
         {aa && aa.su && (platsPresents.length > 1 || comptesPresents.length > 1) && (
           <div className="vrm-s2d-filtres" data-stock-filtres="">
@@ -37406,8 +37451,7 @@ function ProfilFiscalCarte({ onNav }) {
       } catch (_) { setStatut("⚠ pas enregistré — la base n'a pas répondu, réessaie"); }
     }, 600);
   };
-  const [regime, setRegime] = React.useState(() => regimeFiscal());
-  React.useEffect(() => onCloudReady(() => setRegime((v) => v == null ? regimeFiscal() : v)), []);
+  const regime = useRegimeFiscal();
   const virgule = (n) => String(n).replace('.', ',');
   const [taux, setTaux] = React.useState(() => virgule(tauxUrssaf()));
   React.useEffect(() => onCloudReady(() => setTaux((v) => v === virgule(TAUX_URSSAF_DEFAUT) ? virgule(tauxUrssaf()) : v)), []);
@@ -37445,10 +37489,10 @@ function ProfilFiscalCarte({ onNav }) {
     <Card style={{ padding: 0, overflow: 'hidden' }}>
       <div data-profil-fiscal={cfg === undefined ? 'encours' : cfg === null ? 'passu' : 'lu'}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '13px 16px', borderBottom: `1px solid ${C.border}` }}>
-          <span aria-hidden="true" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 12, background: `${C.accent}14`, color: C.accentTexte, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="doc" size={16} /></span>
+          <span aria-hidden="true" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 10, background: C.card2 || C.bg, color: C.muted, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="doc" size={16} /></span>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Ton entreprise</div>
-            <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>Ton SIRET suffit : VRM retrouve le nom et l'adresse. Ils figurent sur tes reçus et tes factures ; ton régime sert à calculer tes cotisations.</div>
+            <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>Ton SIRET suffit : VRM retrouve le nom et l'adresse. Ils figurent sur tes reçus et tes factures.</div>
           </div>
           {statut && <span style={{ fontSize: 11, color: /⚠/.test(statut) ? C.warn : C.muted, whiteSpace: 'nowrap' }} data-profil-statut>{statut}</span>}
         </div>
@@ -37473,25 +37517,20 @@ function ProfilFiscalCarte({ onNav }) {
                 : `${siren.type} valide. Le registre des entreprises ne répond pas pour l'instant — le nom se remplira à ta prochaine visite, ou tape-le.`}
             </div>
           </>)}
+          {/* (5 nov., chantier F, revue 2.27) Le statut ne se choisit plus ICI : un seul endroit,
+              « Statut » (la question 2 tant qu'il n'est pas choisi, puis Documents et réglages →
+              Statut · Changer). Reste le taux de cotisations, pour un micro-entrepreneur. */}
+          {regime === 'micro' ? (
           <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 9 }}>
-            {/* (16 oct.) Contrôle segmenté PARTAGÉ (`.vrm-seg`) : plus de segment rempli d'accent. */}
-            <nav role="group" aria-label="Régime fiscal" className="vrm-seg" data-segment="" style={{ '--seg-ink': C.text, '--seg-muted': C.muted, '--seg-point': C.accent, margin: 0 }}>
-              {REGIMES_FISCAUX.map(([k, court, l]) => (
-                <button key={k} type="button" aria-pressed={regime === k} aria-current={regime === k ? 'page' : undefined} data-regime-choix={k} title={l} onClick={() => { setRegime(k); save('vinted_regime', k); }} className="vrm-seg-btn">{court}</button>
-              ))}
-            </nav>
-            {regime !== 'micro' ? (
-              <div data-profil-regime-texte="" style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>{regime ? (REGIMES_FISCAUX.find((x) => x[0] === regime) || [])[3] : 'Choisis ton statut : VRM ne te parle d\'URSSAF que si tu es micro-entrepreneur.'}{regime === 'marge' ? <> Le taux de TVA se règle dans <button type="button" onClick={() => onNav && onNav('settings')} style={{ border: 'none', background: 'transparent', color: C.accentTexte, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0, fontSize: 13 }}>Paramètres → Régime fiscal</button>.</> : null}</div>
-            ) : (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>Taux de cotisations</span>
-                <input type="text" inputMode="decimal" value={taux} onChange={(e) => setTaux(e.target.value)} data-profil-taux
+                <input type="text" inputMode="decimal" value={taux} onChange={(e) => setTaux(e.target.value)} data-profil-taux aria-label="Taux de cotisations, en %"
                   onBlur={() => { const v = parseFloat(String(taux).replace(',', '.')); const ok = (isFinite(v) && v >= 0 && v <= 50) ? v : TAUX_URSSAF_DEFAUT; setTaux(virgule(ok)); save('vinted_urssaf_taux', ok); }}
-                  style={{ ...inp, width: 72, padding: '6px 9px', fontWeight: 600 }} />
+                  style={{ ...inp, width: 72, padding: '6px 9px', fontWeight: 600, minHeight: 44 }} />
                 <span style={{ fontSize: 13, color: C.muted }}>% du CA déclaré — celui que tu choisis, l'app ne le devine pas.</span>
               </div>
-            )}
           </div>
+          ) : null}
         </div>
       </div>
     </Card>
@@ -37619,6 +37658,10 @@ function RegistresCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accoun
     return () => { mort = true; };
   }, []);
   const [enCours, setEnCours] = React.useState('');
+  // Un achat en gros, un rattachement, une fiche reliée changés (ici ou sur un
+  // autre appareil) : le registre des achats se relit.
+  const [ticAchats, setTicAchats] = React.useState(0);
+  React.useEffect(() => { const f = (e) => { const k = e && e.detail && e.detail.k; if (k === CLE_FOURNISSEURS || k === 'vinted_annonce_numeros' || k === 'vinted_offvinted_buys') setTicAchats((t) => t + 1); }; window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f); }, []);
   const recettes = React.useMemo(() => {
     if (calc.etat !== 'lu') return calc.etat === 'passu' ? null : undefined;
     const rel = lireReleveVentes();
@@ -37639,11 +37682,14 @@ function RegistresCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accoun
     const delies = load('vrm_recus_delies', {}) || {};
     const index = indexRecusParTransaction(Array.isArray(recus) ? recus.filter((r) => !(r && r.id && delies[r.id])) : recus, (r) => ventilationRecuAchat(r && r.texte).trouve);
     let fiches = null; try { fiches = load('vinted_annonce_numeros', {}) || {}; } catch (_) { fiches = null; }
+    // (5 nov.) Les achats en gros (Achats → Fournisseurs) : UNE ligne chacun, par
+    // leur total + frais, lus par LA règle du registre (`lireRegistre`).
     return registreDesAchats({ achats, hors: load('vinted_offvinted_buys', []) || [], fiches, periode,
       ventilationDe: (tx) => { const r = index.get(String(tx)); return r ? ventilationRecuAchat(r.texte) : null; },
       exclu: (o) => compteEcarte(o && o._uid, hAcc, panelOff || {}), montantHors: prixAchatHorsNombre, sourceHors: libelleSourceAchat,
+      gros: lireRegistre(load(CLE_FOURNISSEURS, null)), cleNum,
       manque: recus === null ? ['reçus d’achat'] : [] });
-  }, [achats, recus, periode, panelOff]);
+  }, [achats, recus, periode, panelOff, ticAchats]);
   const exporter = async (R, forme) => {
     if (!R || enCours) return;
     setEnCours(R.type + forme);
@@ -37659,11 +37705,13 @@ function RegistresCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accoun
     <div className="vrm-registre" data-registre={type} data-registre-etat={R === undefined ? 'encours' : R === null ? 'passu' : 'lu'}
       data-registre-n={R ? R.n : ''} data-registre-total={R ? String(Math.round(R.total * 100)) : ''} data-registre-sans-montant={R ? R.sansMontant : ''}
       data-registre-partiel={R ? (R.complet ? '0' : '1') : ''} data-registre-hors={R ? R.horsPeriode.length : ''}
+      data-registre-gros={R && R.type === 'achats' ? R.nGros : ''} data-registre-a-verifier={R && R.type === 'achats' ? R.aVerifier : ''}
       style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '12px 0', borderTop: `1px solid ${C.border}` }}>
       <span style={{ flex: '1 1 160px', minWidth: 0 }}>
         <span style={{ display: 'block', fontSize: 15, fontWeight: 600, color: C.text }}>{nom}</span>
         <span className="vrm-display" style={{ display: 'block', fontSize: 13, color: C.muted, fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>
-          {R === undefined ? '…' : R === null ? '—' : `${R.n} · ${R.complet ? '' : 'au moins '}${fmt(R.total)}`}
+          {R === undefined ? '…' : R === null ? '—' : `${R.n} · ${R.complet ? '' : 'au moins '}${fmt(R.total)}${R.type === 'achats' && R.nGros ? ` · dont ${R.nGros} achat${R.nGros > 1 ? 's' : ''} en gros` : ''}`}
+          {R && R.type === 'achats' && R.aVerifier ? <span data-registre-a-verifier-txt="" style={{ color: C.warn }}> · {R.aVerifier} à vérifier (N° aussi dans un achat en gros)</span> : null}
         </span>
       </span>
       <span style={{ display: 'flex', gap: 8, flex: '0 0 auto' }}>
@@ -38119,7 +38167,7 @@ function StatutFiscal({ liveStats, onNav, partie = 'declarer' }) {
     if (changer) return carteChoix;
     return (
       <div className="vrm-set-groupe vrm-compta-groupe" style={{ margin: 0 }}>
-        <h3 className="vrm-titre-compta" data-titre-section="" style={{ fontSize: 15, fontWeight: 600, color: C.text, letterSpacing: -0.15, margin: '0 16px 8px' }}>Ton statut</h3>
+        <h3 className="vrm-titre-compta" data-titre-section="" style={{ fontSize: 15, fontWeight: 600, color: C.text, letterSpacing: -0.15, margin: '0 16px 8px' }}>{L.statut}</h3>
         <div className="vrm-set-liste" style={{ background: C.card, border: `1px solid ${C.border}`, '--vrm-set-filet': C.border }}>
           <div className="vrm-set-ligne">
             <span className="vrm-set-lib" data-statut-actuel={regime}><b style={{ color: C.text }}>{libelleRegime(regime)}</b><small style={{ color: C.muted }}>VRM adapte ta comptabilité à ce statut.</small></span>
@@ -38142,7 +38190,7 @@ function StatutFiscal({ liveStats, onNav, partie = 'declarer' }) {
   if (!regime) return carteChoix;
   if (regime !== 'micro') {
     const texte = regime === 'particulier'
-      ? <>Tu vends tes propres affaires : rien à déclarer à l'URSSAF, et VRM n'estime aucune cotisation. Bon à savoir : chaque année, Vinted transmet aux impôts les vendeurs qui dépassent <b>30 ventes ou 2 000 €</b> (le détail, compte par compte, est dans Ventes → Outils → Registre annuel). Si tu achètes pour revendre, c'est une activité : choisis « Micro-entrepreneur » ou « Société » (Documents et réglages → Ton statut).</>
+      ? <>Tu vends tes propres affaires : rien à déclarer à l'URSSAF, et VRM n'estime aucune cotisation. Bon à savoir : chaque année, Vinted transmet aux impôts les vendeurs qui dépassent <b>30 ventes ou 2 000 €</b> (le détail, compte par compte, est dans Ventes → Outils → Registre annuel). Si tu achètes pour revendre, c'est une activité : choisis « Micro-entrepreneur » ou « Société » (Documents et réglages → Statut).</>
       : regime === 'marge'
         ? <>Régime de la marge : VRM calcule la TVA sur ta marge dans le rapport comptable (Ventes → Outils). Tes cotisations ne se calculent pas sur ton chiffre d'affaires : VRM ne les estime pas — ton comptable s'en charge.</>
         : <>En société, tes impôts et tes cotisations ne se calculent pas sur ton chiffre d'affaires : VRM ne les estime pas et ne t'envoie aucun rappel URSSAF. Ton chiffre d'affaires et ton bénéfice restent sur cet écran, pour ton comptable.</>;
@@ -38324,7 +38372,7 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '4px 12px', marginTop: 8, fontSize: 13, color: C.muted }}>
               {lignesTaux.map(([l, t, n]) => <React.Fragment key={l}><span>{l} <span style={{ fontSize: 12 }}>· {n}</span></span><span style={{ color: C.text, fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>{pctFr(t)}</span></React.Fragment>)}
             </div>
-          ) : <div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>Posé à la main dans Paramètres → Régime fiscal : VRM ne le change pas quand tu réponds ci-dessus.</div>}
+          ) : <div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>Posé à la main dans « Ton entreprise » : VRM ne le change pas quand tu réponds ci-dessus.</div>}
           <div style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>Taux officiels 2026 de l'achat-revente, à vérifier sur ton espace URSSAF. VRM ne remplace pas un comptable.</div>
         </div>
       </div>
@@ -38958,7 +39006,7 @@ function RecapComptableMensuel() {
           <div data-recap-regle={urssafMois?'versement':'archive'} style={{fontSize:11,color:C.muted,marginTop:12,lineHeight:1.5}}>
             {urssafMois
               ? <>Ventes <b>finalisées</b>, toutes plateformes, comptées dans le mois où l'argent a été versé (Vinted), de la vente (Leboncoin), de la commande payée (eBay) — ou dans le mois où tu les as déclarées. Annulées et remboursements exclus, ventes masquées comprises ; une vente sans date de versement n'est dans aucun mois.</>
-              : <>Ventes de l'ancienne archive, à leur date de réception — annulées et remboursements exclus.</>} Le bénéfice, lui, est celui de Comptabilité (« Combien j'ai gagné ? ») : ventes au jour de la vente, moins prix d'achat, frais, dépenses et URSSAF ; « — » quand un prix d'achat manque. Cotisations estimées à {String(tauxUrssaf()).replace('.',',')} % (taux réglable dans Paramètres → Régime fiscal). La déclaration se fait sur autoentrepreneur.urssaf.fr.
+              : <>Ventes de l'ancienne archive, à leur date de réception — annulées et remboursements exclus.</>} Le bénéfice, lui, est celui de Comptabilité (« Combien j'ai gagné ? ») : ventes au jour de la vente, moins prix d'achat, frais, dépenses et URSSAF ; « — » quand un prix d'achat manque. Cotisations estimées à {String(tauxUrssaf()).replace('.',',')} % (taux réglable dans Documents et réglages → Ton entreprise). La déclaration se fait sur autoentrepreneur.urssaf.fr.
           </div>
         </details></Card>
       )}
@@ -39230,6 +39278,29 @@ const lireProfilsNotes = async () => {
     });
   } catch (_) { return null; }
 };
+// (5 nov., chantier F, revue 2.25) LA CARTE DE STATISTIQUES, ET SA FORME REPLIÉE.
+// Un corps « vide » (`videStatsVitrine` : lecture en cours, pas su, rien sur la
+// période) ne prend plus une carte entière : une ligne, le titre et la raison
+// (`data-sv-repliee`). Le texte reste celui que l'écran disait déjà.
+const videStatsVitrine = (txt, attrs) => <div className="vrm-sv-vide" data-sv-vide-carte="" {...(attrs || {})}>{txt}</div>;
+const estVideStats = (corps) => !!(corps && corps.props && Object.prototype.hasOwnProperty.call(corps.props, 'data-sv-vide-carte'));
+function CarteStatsVitrine({ k, titre, droite, corps, attrs, cls }) {
+  if (estVideStats(corps)) {
+    const raison = corps.props.children;
+    return (
+      <section className={`vrm-sv-carte vrm-sv-repliee${cls ? ' ' + cls : ''}`} data-stats-carte={k} data-sv-repliee="" {...(attrs || {})}>
+        <h2 className="vrm-sv-repliee-titre">{titre}</h2>
+        <span className="vrm-sv-repliee-raison" {...Object.fromEntries(Object.entries(corps.props).filter(([a]) => a.startsWith('data-') && a !== 'data-sv-vide-carte'))}>{raison === '…' ? 'Lecture en cours…' : raison}</span>
+      </section>
+    );
+  }
+  return (
+    <section className={`vrm-sv-carte${cls ? ' ' + cls : ''}`} data-stats-carte={k} {...(attrs || {})}>
+      <div className="vrm-sv-carte-tete"><h2 className="vrm-display vrm-sv-carte-titre">{titre}</h2>{droite ? <span className="vrm-sv-note">{droite}</span> : null}</div>
+      {corps}
+    </section>
+  );
+}
 function AnnulationsEtNotes({ b, panelOff }) {
   const { ventes, ko } = useVentesCoque();
   const [profils, setProfils] = React.useState(undefined);
@@ -39256,20 +39327,18 @@ function AnnulationsEtNotes({ b, panelOff }) {
   const pctTxt = (t) => (t == null ? '—' : `${String(t).replace('.', ',')} %`);
   const note = (x) => (x == null ? '—' : String(x).replace('.', ','));
   const jour = (t) => new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
-  const carte = (k, titre, droite, corps, attrs) => (
-    <section className="vrm-sv-carte" data-stats-carte={k} {...(attrs || {})}>
-      <div className="vrm-sv-carte-tete"><h2 className="vrm-display vrm-sv-carte-titre">{titre}</h2>{droite ? <span className="vrm-sv-note">{droite}</span> : null}</div>
-      {corps}
-    </section>
-  );
-  const vide = (txt, attrs) => <div className="vrm-sv-vide" {...(attrs || {})}>{txt}</div>;
+  const carte = (k, titre, droite, corps, attrs) => <CarteStatsVitrine k={k} titre={titre} droite={droite} corps={corps} attrs={attrs}/>;
+  const vide = videStatsVitrine;
   const maxT = A.etat === 'lu' ? Math.max(1, ...A.comptes.map((g) => g.taux || 0)) : 1;
+  // (5 nov., chantier F, revue 2.25) « Annulations » se dit UNE fois : le total d'en-tête
+  // n'apparaît que s'il additionne PLUSIEURS comptes (avec un seul, il redisait la ligne).
   const annul = carte('sv-annulations', 'Annulations',
-    A.etat === 'lu' && A.n ? <span data-sv-annul-total={`${A.annulees}/${A.n}`}>{A.annulees} sur {A.n}{A.partiel ? '' : ` · ${pctTxt(A.taux)}`}</span> : null,
+    A.etat === 'lu' && A.n && A.comptes.length > 1 ? <span data-sv-annul-total={`${A.annulees}/${A.n}`}>{A.annulees} sur {A.n}{A.partiel ? '' : ` · ${pctTxt(A.taux)}`}</span> : null,
     A.etat === 'encours' ? vide('…', { 'data-sv-annul': 'encours' })
-      : A.etat !== 'lu' ? vide('—', { 'data-sv-annul': 'passu' })
+      : A.etat !== 'lu' ? vide('Tes ventes Vinted n’ont pas pu être lues.', { 'data-sv-annul': 'passu' })
+        : !A.comptes.length ? vide('Aucune vente Vinted sur la période.', { 'data-sv-annul': 'lu' })
         : (<div className="vrm-sv-lignes" data-sv-annul="lu">
-          {!A.comptes.length ? vide('Aucune vente Vinted sur la période.') : A.comptes.map((g) => (
+          {A.comptes.map((g) => (
             <details key={g.cle} className="vrm-sv-annul-compte" data-sv-annul-compte={g.uid} data-n={g.n} data-annulees={g.annulees} data-taux={g.taux == null ? '' : g.taux}>
               <summary className="vrm-sv-annul-ligne">
                 <span className="vrm-sv-nom">{g.compte}</span>
@@ -39291,10 +39360,13 @@ function AnnulationsEtNotes({ b, panelOff }) {
           <div className="vrm-sv-note" data-sv-annul-non-couvertes={A.nonCouvertes.join(',')} style={{ marginTop: 4 }}>{A.nonCouvertes.join(', ')} : pas comptés</div>
         </div>),
     { 'data-sv-carte': 'annulations', 'data-sv-etat': A.etat });
+  // (5 nov., chantier F) Aucun compte lu : une ligne repliée, pas une liste de « pas lu — ».
+  const aucuneNoteLue = N.etat !== 'encours' && N.etat !== 'passu' && Array.isArray(N.comptes) && !N.comptes.some((c) => c.etat === 'lu');
   const notes = carte('sv-notes', 'Notes reçues',
-    N.etat === 'lu' && N.moyenne != null ? <span data-sv-notes-moyenne={N.moyenne} data-sv-notes-total={N.total}>{N.partiel ? 'au moins ' : ''}{pl(N.total, 'avis', 'avis')} · {note(N.moyenne)}/5</span> : null,
+    N.etat === 'lu' && N.moyenne != null && N.comptes.length > 1 ? <span data-sv-notes-moyenne={N.moyenne} data-sv-notes-total={N.total}>{N.partiel ? 'au moins ' : ''}{pl(N.total, 'avis', 'avis')} · {note(N.moyenne)}/5</span> : null,
     N.etat === 'encours' ? vide('…', { 'data-sv-notes': 'encours' })
-      : N.etat === 'passu' ? vide('—', { 'data-sv-notes': 'passu' })
+      : N.etat === 'passu' ? vide('Tes profils Vinted n’ont pas pu être lus.', { 'data-sv-notes': 'passu' })
+        : aucuneNoteLue ? vide('Pas encore lues : elles arrivent à ta prochaine visite sur Vinted.', { 'data-sv-notes': N.etat, 'data-sv-notes-aucune': '' })
         : (<div className="vrm-sv-lignes" data-sv-notes={N.etat}>
           {N.comptes.map((c) => (
             <div key={c.uid} className="vrm-sv-note-ligne" data-sv-notes-compte={c.uid} data-etat={c.etat} data-note={c.note == null ? '' : c.note} data-n={c.n == null ? '' : c.n} data-neg={c.neg == null ? '' : c.neg} data-vieux={c.vieux ? '1' : ''}>
@@ -39466,7 +39538,7 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
   const dort = stock && stock.dort && stock.dort.seuils ? (stock.dort.seuils[30] || { n: 0 }).n : null;
   const tEnLigne = tuile('enligne', 'En ligne',
     <span data-dash-stat="online">{enLigneTxt === '—' ? '—' : <><b style={{ fontWeight: 'inherit' }}>{enLigneTxt}</b> annonce{enLigneTxt === '1' ? '' : 's'}</>}</span>,
-    dort == null ? 'en ligne' : `dont ${dort} en ligne depuis 30 jours ou plus`,
+    dort == null ? 'aujourd’hui' : dort === 0 ? 'aucune depuis 30 jours ou plus' : `dont ${dort} depuis 30 jours ou plus`,
     { 'data-sv-etat': enLigneTxt === '—' ? 'passu' : 'lu', 'data-sv-dort': dort == null ? '' : dort }, 'Aujourd’hui, quelle que soit la période choisie.');
 
   // ── Les barres ──
@@ -39477,13 +39549,10 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
   const noteBarres = b.type === 'semaine' ? 'cette semaine' : b.type === 'annee' ? String(new Date(b.de).getFullYear()) : '8 dernières semaines';
   const H = 190;
 
-  const carte = (k, titre, droite, corps, attrs, cls) => (
-    <section className={`vrm-sv-carte${cls ? ' ' + cls : ''}`} data-stats-carte={k} {...(attrs || {})}>
-      <div className="vrm-sv-carte-tete"><h2 className="vrm-display vrm-sv-carte-titre">{titre}</h2>{droite ? <span className="vrm-sv-note">{droite}</span> : null}</div>
-      {corps}
-    </section>
-  );
-  const vide = (txt, attrs) => <div className="vrm-sv-vide" {...(attrs || {})}>{txt}</div>;
+  // (5 nov., chantier F, revue 2.25) Une carte sans rien à montrer (lecture en cours, pas su,
+  // aucune donnée sur la période) se REPLIE en une ligne : son titre et la raison, rien d'autre.
+  const carte = (k, titre, droite, corps, attrs, cls) => <CarteStatsVitrine k={k} titre={titre} droite={droite} corps={corps} attrs={attrs} cls={cls}/>;
+  const vide = videStatsVitrine;
   const maxRapide = rapides && rapides.length ? Math.max(...rapides.map((g) => g.mediane), 1) : 1;
   const maxTaille = tailles && tailles.groupes.length ? Math.max(...tailles.groupes.map((g) => g.n), 1) : 1;
 
@@ -39510,7 +39579,7 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
           ? vide('Pas encore calculé', { 'data-sv-etat': 'passu' })
           : extras === undefined ? vide('Je lis les dates de mise en ligne…', { 'data-sv-etat': 'encours' })
             : datesPasSu ? vide('Tes annonces n’ont pas pu être lues : aucun délai.', { 'data-sv-etat': 'passu' })
-              : !rapides.length ? vide('Aucune vente Vinted datée sur la période (il faut la date de mise en ligne de son annonce).', { 'data-sv-etat': 'lu' })
+              : !rapides.length ? vide('Aucune vente Vinted à la date de mise en ligne connue sur la période.', { 'data-sv-etat': 'lu' })
                 : (
                   <div className="vrm-sv-lignes" data-sv-etat="lu">
                     {rapides.map((g) => (
@@ -39576,7 +39645,7 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
             </div>
           );
           const corps = etat === 'encours' ? vide('…')
-            : etat === 'passu' ? vide('—', { 'data-sv-boost-passu': '' })
+            : etat === 'passu' ? vide('Tes annonces ou tes ventes ne sont pas encore lues.', { 'data-sv-boost-passu': '' })
               : etat === 'pas-assez' ? vide(`Pas assez de données · ${boost.comparables.b}/${SEUIL_BOOST} boostés`, { 'data-sv-boost-pas-assez': String(boost.comparables.b) })
                 : (<>
                   <div className="vrm-sv-boost-table">
@@ -39618,6 +39687,37 @@ const nomColonneMois = (ym, b, memePoint, maintenant) => {
 };
 const signeEur = (v) => (v > 0 ? '+' : v < 0 ? '−' : '') + fmt(Math.abs(v));
 const signePct = (v) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${String(Math.abs(v)).replace('.', ',')} %`;
+// (5 nov., chantier F, revue 1.7) LE REÇU QUI VEUT DIRE « PAS SU ». Des ventes finalisées
+// SANS date de versement (« à dater ») ne sont dans AUCUN mois : le reçu d'un mois n'est
+// alors qu'un minimum. Un minimum de 0 ne se dit jamais (§5) ⇒ « — » et la raison ; un
+// minimum positif ⇒ « au moins ». Aucun montant n'est calculé ici : la valeur reste celle
+// de `recuPublieEntre` (la ligne publiée par Ventes).
+const recuAvecADater = (r, ligne) => {
+  const nAd = ligne && ligne.aDater && Number(ligne.aDater.n) > 0 ? Number(ligne.aDater.n) : 0;
+  if (!r || r.valeur == null || !nAd) return r;
+  const manque = [...(r.manque || []), `${nAd} vente${nAd > 1 ? 's' : ''} sans date de versement`];
+  if (!(r.valeur > 0)) return { valeur: null, partiel: false, manque, raison: 'aDater', nAd };
+  return { ...r, partiel: true, manque };
+};
+// La raison d'un « — », dite en mots (une phrase sous le tableau, jamais une infobulle seule).
+const RAISONS_COMPARER = {
+  absente: 'pas encore calculé : ouvre l’écran Ventes une fois',
+  illisible: 'pas pu être lu',
+  ancienne: 'calcul trop ancien : rouvre l’écran Ventes',
+  'ancienne-app': 'calcul d’une version d’avant : rouvre l’écran Ventes',
+  publication: 'pas encore calculé : ouvre l’écran Ventes une fois',
+  'mois pas couvert': 'mois pas couvert par tes ventes lues',
+  achats: 'il manque des prix d’achat',
+  frais: 'des frais eBay ne sont pas connus',
+  cotisations: 'CA déclaré pas encore calculé',
+  rien: 'aucune vente finalisée ni dépense',
+  pasSu: 'pas su pour l’instant',
+};
+const raisonComparer = (x) => {
+  if (!x || x.valeur != null) return '';
+  if (x.raison === 'aDater' || x.raison === 'partiel') return (x.manque || []).join(', ') || RAISONS_COMPARER.pasSu;
+  return RAISONS_COMPARER[x.raison] || RAISONS_COMPARER.pasSu;
+};
 function ComparerMoisCarte({ liveStats }) {
   const [mode, setModeB] = React.useState(() => { try { return localStorage.getItem('vrm_comparer_mode') === 'an' ? 'an' : 'precedent'; } catch (_) { return 'precedent'; } });
   const setMode = (v) => { setModeB(v); try { localStorage.setItem('vrm_comparer_mode', v); } catch (_) {} };
@@ -39629,45 +39729,61 @@ function ComparerMoisCarte({ liveStats }) {
   const vendu = liveStats && !liveStats.venduPasSu && Array.isArray(liveStats.venduLignes)
     ? { lignes: liveStats.venduLignes, manque: [...(liveStats.venduManque || []), ...(liveStats.venduEnAttente ? ['lecture en cours'] : [])], nonComptees: liveStats.venduNonComptees || [] } : null;
   const K = comparerMois({ ymA: ymCourant(maintenant), mode, maintenant, vendu,
-    recuDe: (b) => recuPublieEntre(ligneUrssaf, b, maintenant),
+    recuDe: (b) => recuAvecADater(recuPublieEntre(ligneUrssaf, b, maintenant), ligneUrssaf),
     beneficeDe: ({ ym, jusqua }) => { const B = beneficeDuMoisPub({ pub, compta, ligneUrssaf, regime }, ym, jusqua); return B ? chiffreBenefice(B, 'lu') : { valeur: null, raison: pub ? 'mois pas couvert' : 'publication' }; },
     R: { bilanLignes } });
   if (!K) return null;
   const colA = nomColonneMois(K.ymA, K.bornes.A, K.memePoint, maintenant), colB = nomColonneMois(K.ymB, K.bornes.B, K.memePoint, maintenant);
   const val = (x, type) => x.valeur == null ? '—' : type === 'eur' ? fmt(x.valeur) : String(x.valeur);
   const cents = (x, type) => x == null ? '' : type === 'eur' ? String(Math.round(x * 100)) : String(x);
-  // 390 px : le libellé garde sa place (« Bénéfice », « CA vendu ») — trois colonnes de chiffres étroites.
-  const grille = { display: 'grid', gridTemplateColumns: 'minmax(64px,1fr) minmax(0,80px) minmax(0,80px) minmax(0,74px)', columnGap: 6, alignItems: 'center' };
+  // Les mots de l'app (src/libelles.js) : « Vendu », pas « CA vendu ».
+  const nomLigne = (Lg) => (Lg.cle === 'vendu' ? L.vendu : Lg.cle === 'benefice' ? L.benefice : Lg.cle === 'recu' ? L.recu : Lg.nom);
+  // Les « — » de la carte et leur raison, une ligne par chiffre (la même raison des deux côtés se dit une fois).
+  const pourquoi = K.lignes.map((Lg) => {
+    const ra = raisonComparer(Lg.a), rb = raisonComparer(Lg.b);
+    if (!ra && !rb) return null;
+    const txt = ra && rb && ra !== rb ? `${colA} : ${ra} ; ${colB} : ${rb}` : (ra || rb);
+    return { cle: Lg.cle, nom: nomLigne(Lg), txt };
+  }).filter(Boolean);
+  // 390 px : le libellé garde sa place (« Bénéfice », « Vendu ») — trois colonnes de chiffres étroites.
+  const grille = { display: 'grid', gridTemplateColumns: 'minmax(64px,1fr) minmax(0,84px) minmax(0,84px) minmax(0,74px)', columnGap: 6, alignItems: 'center' };
+  const chiffre = { fontVariantNumeric: 'tabular-nums' };
   return (
     <section className="vrm-comparer" data-comparer={K.mode} data-comparer-a={K.ymA} data-comparer-b={K.ymB} data-comparer-meme-point={K.memePoint ? '1' : '0'}
-      style={{ padding: 18, background: C.card, border: `1px solid ${C.border}`, borderRadius: 20, boxShadow: C.shadow || 'none' }}>
+      style={{ padding: 18, background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, boxShadow: 'none' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
-        <span data-titre-section="" style={{ flex: '1 1 auto', fontSize: 15, fontWeight: 600, color: C.text }}>Comparer</span>
+        <h2 className="vrm-display" data-titre-section="" style={{ flex: '1 1 auto', margin: 0, fontSize: 20, fontWeight: 700, letterSpacing: '-.02em', color: C.text }}>Comparer</h2>
         <Segmente label="Comparer avec" value={K.mode} onChange={setMode} options={[{ v: 'precedent', l: 'Mois d’avant', data: { 'data-comparer-choix': 'precedent' } }, { v: 'an', l: 'Il y a un an', data: { 'data-comparer-choix': 'an' } }]}/>
       </div>
       <div role="row" style={{ ...grille, fontSize: 12, color: C.muted, fontWeight: 600, padding: '4px 0' }}>
         <span/>
-        <span style={{ textAlign: 'right' }} data-comparer-col="a">{colA}</span>
-        <span style={{ textAlign: 'right' }} data-comparer-col="b">{colB}</span>
+        <span style={{ textAlign: 'right', ...chiffre }} data-comparer-col="a">{colA}</span>
+        <span style={{ textAlign: 'right', ...chiffre }} data-comparer-col="b">{colB}</span>
         <span style={{ textAlign: 'right' }}>Écart</span>
       </div>
-      {K.lignes.map((L) => (
-        <div role="row" key={L.cle} data-comparer-ligne={L.cle} data-a={cents(L.a.valeur, L.type)} data-b={cents(L.b.valeur, L.type)} data-ecart={cents(L.ecart, L.type)} data-pct={L.pct == null ? '' : String(L.pct)}
-          data-a-partiel={L.a.partiel ? '1' : undefined} data-b-partiel={L.b.partiel ? '1' : undefined}
-          style={{ ...grille, minHeight: 44, borderTop: `1px solid ${C.border}`, fontVariantNumeric: 'tabular-nums' }}>
-          <span style={{ fontSize: 15, color: C.text, fontWeight: 500, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{L.nom}</span>
-          {[L.a, L.b].map((x, i) => (
-            <span key={i} style={{ textAlign: 'right', minWidth: 0 }} title={x.partiel ? `au moins — sans ${x.manque.join(', ')}` : x.valeur == null ? 'pas su' : undefined}>
-              <span style={{ display: 'block', fontSize: 15, fontWeight: i === 0 ? 600 : 400, color: i === 0 ? C.text : C.muted, whiteSpace: 'nowrap' }}>{val(x, L.type)}</span>
+      {K.lignes.map((Lg) => (
+        <div role="row" key={Lg.cle} data-comparer-ligne={Lg.cle} data-a={cents(Lg.a.valeur, Lg.type)} data-b={cents(Lg.b.valeur, Lg.type)} data-ecart={cents(Lg.ecart, Lg.type)} data-pct={Lg.pct == null ? '' : String(Lg.pct)}
+          data-a-partiel={Lg.a.partiel ? '1' : undefined} data-b-partiel={Lg.b.partiel ? '1' : undefined}
+          data-a-raison={Lg.a.valeur == null ? (Lg.a.raison || 'pasSu') : undefined} data-b-raison={Lg.b.valeur == null ? (Lg.b.raison || 'pasSu') : undefined}
+          style={{ ...grille, minHeight: 44, borderTop: `1px solid ${C.border}` }}>
+          <span style={{ fontSize: 15, color: C.text, fontWeight: 500, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nomLigne(Lg)}</span>
+          {[Lg.a, Lg.b].map((x, i) => (
+            <span key={i} style={{ textAlign: 'right', minWidth: 0 }} title={x.partiel ? `au moins — sans ${x.manque.join(', ')}` : x.valeur == null ? raisonComparer(x) : undefined}>
+              <span style={{ display: 'block', fontSize: 15, fontWeight: i === 0 ? 600 : 400, color: x.valeur == null ? C.muted : i === 0 ? C.text : C.muted, whiteSpace: 'nowrap', ...chiffre }}>{val(x, Lg.type)}</span>
               {x.partiel ? <span style={{ display: 'block', fontSize: 11, color: C.muted }}>au moins</span> : null}
             </span>
           ))}
           <span style={{ textAlign: 'right', minWidth: 0, whiteSpace: 'nowrap' }}>
-            <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: C.text }}>{L.ecart == null ? '—' : L.type === 'eur' ? signeEur(L.ecart) : (L.ecart > 0 ? '+' : L.ecart < 0 ? '−' : '') + Math.abs(L.ecart)}</span>
-            {L.pct != null ? <span style={{ display: 'block', fontSize: 11, color: C.muted }}>{signePct(L.pct)}</span> : null}
+            <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: Lg.ecart == null ? C.muted : C.text, ...chiffre }}>{Lg.ecart == null ? '—' : Lg.type === 'eur' ? signeEur(Lg.ecart) : (Lg.ecart > 0 ? '+' : Lg.ecart < 0 ? '−' : '') + Math.abs(Lg.ecart)}</span>
+            {Lg.pct != null ? <span style={{ display: 'block', fontSize: 11, color: C.muted, ...chiffre }}>{signePct(Lg.pct)}</span> : null}
           </span>
         </div>
       ))}
+      {pourquoi.length ? (
+        <div data-comparer-pourquoi="" style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {pourquoi.map((p) => <div key={p.cle} data-comparer-pourquoi-ligne={p.cle} style={{ fontSize: 12, color: C.muted, lineHeight: 1.45 }}><b style={{ fontWeight: 600, color: C.text }}>{p.nom} —</b> {p.txt}</div>)}
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -39690,9 +39806,9 @@ function FraisParSiteCarte({ periode, ebayCommandes }) {
   const grille = { display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,96px) minmax(0,64px)', columnGap: 10, alignItems: 'center' };
   return (
     <section className="vrm-frais-sites" data-frais-sites={b.type} data-frais-total={String(Math.round(F.total * 100))} data-frais-partiel={F.partiel ? '1' : undefined}
-      style={{ padding: 18, background: C.card, border: `1px solid ${C.border}`, borderRadius: 20, boxShadow: C.shadow || 'none' }}>
+      style={{ padding: 18, background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, boxShadow: 'none' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 6 }}>
-        <span data-titre-section="" style={{ flex: 1, fontSize: 15, fontWeight: 600, color: C.text }}>Frais par site</span>
+        <h2 className="vrm-display" data-titre-section="" style={{ flex: 1, margin: 0, fontSize: 20, fontWeight: 700, letterSpacing: '-.02em', color: C.text }}>Frais par site</h2>
         <span style={{ fontSize: 12, color: C.muted, fontWeight: 600, width: 64, textAlign: 'right' }}>% vendu</span>
       </div>
       {F.sites.map((x) => {
@@ -39701,13 +39817,13 @@ function FraisParSiteCarte({ periode, ebayCommandes }) {
           <div key={x.plateforme} role="row" data-frais-site={x.plateforme} data-frais-eur={x.frais == null ? '' : String(Math.round(x.frais * 100))} data-frais-pct={x.pct == null ? '' : String(x.pct)}
             data-frais-lus={x.couverture ? `${x.couverture.lus}/${x.couverture.n}` : ''} data-frais-options={String(Math.round(x.options * 100))}
             title={x.options > 0 ? `dont ${fmt(x.options)} d’options et packs (${x.nOptions})` : undefined}
-            style={{ ...grille, minHeight: 44, borderTop: `1px solid ${C.border}`, fontVariantNumeric: 'tabular-nums' }}>
+            style={{ ...grille, minHeight: 44, borderTop: `1px solid ${C.border}` }}>
             <span style={{ minWidth: 0 }}>
               <span style={{ display: 'block', fontSize: 15, fontWeight: 500, color: C.text }}>{x.plateforme}</span>
               <span style={{ display: 'block', fontSize: 12, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{x.passu ? 'pas lu' : `${x.n} vente${x.n > 1 ? 's' : ''}${cov ? ` · ${cov}` : ''}`}</span>
             </span>
-            <span style={{ textAlign: 'right', fontSize: 15, fontWeight: 600, color: C.text, whiteSpace: 'nowrap' }}>{x.frais == null ? '—' : fmt(x.frais)}</span>
-            <span style={{ textAlign: 'right', fontSize: 13, color: C.muted, whiteSpace: 'nowrap' }}>{x.pct == null ? '—' : `${String(x.pct).replace('.', ',')} %`}</span>
+            <span style={{ textAlign: 'right', fontSize: 15, fontWeight: 600, color: x.frais == null ? C.muted : C.text, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{x.frais == null ? '—' : fmt(x.frais)}</span>
+            <span style={{ textAlign: 'right', fontSize: 13, color: C.muted, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{x.pct == null ? '—' : `${String(x.pct).replace('.', ',')} %`}</span>
           </div>
         );
       })}
@@ -40085,7 +40201,7 @@ function ComptaLigne({ gauche, droite, onDel, extra, attrs }) {
       <span className="vrm-set-lib">{gauche}</span>
       <span className="vrm-display" style={{ fontSize: 15, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{droite}</span>
       {extra}
-      <button type="button" onClick={onDel} title="Supprimer" aria-label="Supprimer" data-compta-supprimer="" style={{ border: 'none', background: 'transparent', color: C.muted, fontSize: 20, cursor: 'pointer', flexShrink: 0, lineHeight: 1, padding: 0, minHeight: 44, minWidth: 44, marginRight: -10 }}>×</button>
+      <button type="button" onClick={onDel} title="Supprimer" aria-label="Supprimer" data-compta-supprimer="" style={{ border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', flexShrink: 0, lineHeight: 1, padding: 0, minHeight: 44, minWidth: 44, marginRight: -10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="close" size={16} /></button>
     </div>
   );
 }
@@ -40235,41 +40351,100 @@ function useBeneficeCalcul(compta, periode) {
 // tête de « Combien je dois déclarer ? ». Une règle : `previsionUrssaf`
 // (src/previsionUrssaf.js) avec les règles d'argent de l'app. Aucune phrase :
 // la période, le montant (« au moins » si partiel), la date, « N à dater ».
-function PrevisionUrssafCarte() {
+// ── (5 nov., chantier F) « URSSAF EN UN GESTE » ────────────────────────────
+// La période finie (la déclaration est ouverte), la carte devient la feuille à
+// recopier : le chiffre d'affaires EXACT de la période (`previsionUrssaf`, la
+// ligne publiée datée au versement — rien de recalculé), « Copier » à côté, les
+// cotisations estimées pour contrôler ce que le site affichera, ce qui MANQUE
+// (« 3 ventes sans date de versement », avec le geste), puis le site et « J'ai
+// déclaré » (le registre `vrm_urssaf_declare`, sur SON clic seulement). Période
+// en cours : une prévision, sans « Copier » (on ne recopie pas un minimum).
+// Jamais « encaissé » (§5).
+const copierPresse = async (texte) => {
+  try { await navigator.clipboard.writeText(String(texte)); return true; } catch (_) {}
+  try {
+    const t = document.createElement('textarea'); t.value = String(texte); t.setAttribute('readonly', ''); t.style.position = 'fixed'; t.style.opacity = '0';
+    document.body.appendChild(t); t.select(); const ok = document.execCommand('copy'); t.remove(); return !!ok;
+  } catch (_) { return false; }
+};
+// Le montant tel qu'il se tape dans un formulaire : chiffres et virgule, sans espace ni « € ».
+const montantARecopier = (v) => (v == null || !Number.isFinite(Number(v)) ? '' : (Math.round(Number(v) * 100) / 100).toFixed(2).replace(/\.00$/, '').replace('.', ','));
+function PrevisionUrssafCarte({ onNav }) {
   const regime = useRegimeFiscal();
   const ligne = useLigneUrssaf();
   const [regLu, regPret] = useLigneSynchro('vrm_urssaf_declare', lireDeclarations);
   const [rythme, setRythme] = React.useState(() => load('vinted_urssaf_freq', null));
+  const [copie, setCopie] = React.useState('');
   React.useEffect(() => onCloudReady(() => setRythme(load('vinted_urssaf_freq', null))), []);
   React.useEffect(() => { const h = (e) => { if (e && e.detail && e.detail.k === 'vinted_urssaf_freq') setRythme(load('vinted_urssaf_freq', null)); }; window.addEventListener('vrm:save', h); return () => window.removeEventListener('vrm:save', h); }, []);
   const P = previsionUrssaf({ regime, rythme, now: new Date(), ligne, declare: regPret ? regLu : null, taux: tauxUrssaf(),
     regle: { nextUrssafDeadline, moisPeriodeUrssaf, montantPeriodeUrssaf, moisDeclare } });
-  if (P.etat === 'encours' || P.etat === 'horsMicro' || P.etat === 'aucune') return null;
-  const vers = () => { try { const e = document.querySelector('[data-statut-carte]'); if (e) e.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_) {} };
+  // (5 nov., chantier F, revue 2.27) Statut pas choisi : rien ici — la question « Quel est ton
+  // statut ? » est posée juste dessous, et c'est le SEUL endroit où il se choisit.
+  if (P.etat === 'encours' || P.etat === 'horsMicro' || P.etat === 'aucune' || P.etat === 'statut') return null;
   const date = P.dueDate ? new Date(P.dueDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' }) : '';
-  return (
-    <section className="vrm-fu-declaration is-calme vrm-fu-prevision" data-prevision-carte={P.etat} data-prevision-label={P.label || ''} data-prevision-ca={P.ca == null ? '' : String(P.ca)} data-prevision-apayer={P.apayer == null ? '' : String(P.apayer)} data-prevision-partiel={P.partiel ? '1' : ''} data-prevision-adater={P.aDater || ''} data-prevision-encours={P.enCours ? '1' : ''} aria-label="Prochaine échéance URSSAF">
-      <div>
-        <b className="vrm-fu-prevision-montant">{P.etat === 'lu' ? <>{P.partiel ? <small>au moins </small> : null}{fmt(P.apayer)}</> : '—'}</b>
-        <span>{P.etat === 'statut' ? 'URSSAF' : P.etat === 'rythme' ? 'URSSAF · rythme' : <>URSSAF · <span style={{ display: 'inline', textTransform: 'capitalize' }}>{P.label}</span> · avant le {date}{P.aDater > 0 ? ` · ${P.aDater} à dater` : ''}</>}</span>
-      </div>
-      {P.etat === 'statut' ? <button type="button" className="vrm-fu-encre-btn" data-prevision-geste="statut" onClick={vers}>Choisir mon statut</button>
-        : P.etat === 'rythme' ? <Segmente label="Rythme de déclaration" value={null} onChange={(f) => save('vinted_urssaf_freq', f)}
+  const periode = P.label ? P.label.charAt(0).toUpperCase() + P.label.slice(1) : '';
+  // La déclaration est OUVERTE quand la période est finie (le rappel de Ma journée dit la même chose).
+  const ouverte = (P.etat === 'lu' || P.etat === 'passu') && !P.enCours;
+  const aNoter = ouverte && regPret ? (P.mois || []).filter((ym) => !moisDeclare(regLu, ym)) : [];
+  const jour = P.daysLeft == null ? '' : P.daysLeft <= 0 ? 'aujourd’hui, dernier jour' : P.daysLeft === 1 ? 'demain' : `dans ${P.daysLeft} jours`;
+  const urgent = ouverte && P.daysLeft != null && P.daysLeft <= 1;
+  const copier = async (k, v) => { const ok = await copierPresse(v); if (ok) { setCopie(k); setTimeout(() => setCopie((c) => (c === k ? '' : c)), 1800); } else toast('Copie impossible ici : sélectionne le montant et copie-le.'); };
+  const vers = (id) => { try { ouvrirRepliCompta(id); } catch (_) {} };
+  const attrs = { 'data-prevision-carte': P.etat, 'data-prevision-label': P.label || '', 'data-prevision-ca': P.ca == null ? '' : String(P.ca), 'data-prevision-apayer': P.apayer == null ? '' : String(P.apayer), 'data-prevision-partiel': P.partiel ? '1' : '', 'data-prevision-adater': P.aDater || '', 'data-prevision-encours': P.enCours ? '1' : '', 'data-urssaf-geste': ouverte ? 'recopier' : 'prevision' };
+  if (P.etat === 'rythme') {
+    return (
+      <section className="vrm-fu-declaration is-calme vrm-fu-prevision" {...attrs} aria-label="Prochaine échéance URSSAF">
+        <div><b className="vrm-fu-prevision-montant">—</b><span>URSSAF · choisis ton rythme de déclaration</span></div>
+        <Segmente label="Rythme de déclaration" value={null} onChange={(f) => save('vinted_urssaf_freq', f)}
           options={[{ v: 'mensuel', l: 'Par mois', data: { 'data-prevision-rythme': 'mensuel' } }, { v: 'trimestriel', l: 'Par trimestre', data: { 'data-prevision-rythme': 'trimestriel' } }]} />
-        : null}
+      </section>
+    );
+  }
+  if (!ouverte) {
+    return (
+      <section className="vrm-fu-declaration is-calme vrm-fu-prevision" {...attrs} aria-label="Prochaine échéance URSSAF">
+        <div>
+          <b className="vrm-fu-prevision-montant">{P.etat === 'lu' ? <>{P.partiel ? <small>au moins </small> : null}{fmt(P.apayer)}</> : '—'}</b>
+          <span>URSSAF · {periode} · à déclarer avant le {date}{P.aDater > 0 ? ` · ${P.aDater} à dater` : ''}</span>
+        </div>
+      </section>
+    );
+  }
+  const caTxt = montantARecopier(P.ca);
+  return (
+    <section className={'vrm-urssaf-geste' + (urgent ? ' is-urgent' : '')} {...attrs} aria-label={`Déclaration URSSAF ${P.label}`}>
+      <div className="vrm-urssaf-geste-tete">
+        <h3>À recopier sur l’URSSAF</h3>
+        <span data-urssaf-echeance={P.daysLeft == null ? '' : String(P.daysLeft)}>{periode} · avant le {date}{jour ? ` · ${jour}` : ''}</span>
+      </div>
+      <div className="vrm-urssaf-ligne" data-urssaf-ligne="ca" data-eur={P.ca == null ? '' : String(P.ca)}>
+        <span className="vrm-urssaf-lib"><b>Chiffre d’affaires</b><small>ventes de marchandises · reçu sur la période</small></span>
+        <span className="vrm-urssaf-val">{P.ca == null ? '—' : <>{P.partiel ? <small>au moins </small> : null}{fmt(P.ca)}</>}</span>
+        {P.ca != null ? <button type="button" className="vrm-urssaf-copier" data-urssaf-copier="ca" data-urssaf-texte={caTxt} aria-label={`Copier ${caTxt}`} onClick={() => copier('ca', caTxt)}>{copie === 'ca' ? VERBES.copie : VERBES.copier}</button> : <span className="vrm-urssaf-copier-vide" aria-hidden="true"/>}
+      </div>
+      <div className="vrm-urssaf-ligne" data-urssaf-ligne="cotis" data-eur={P.apayer == null ? '' : String(P.apayer)}>
+        <span className="vrm-urssaf-lib"><b>Cotisations</b><small>estimation VRM · {String(tauxUrssaf()).replace('.', ',')} % : à comparer avec le site</small></span>
+        <span className="vrm-urssaf-val">{P.apayer == null ? '—' : <>{P.partiel ? <small>au moins </small> : null}{fmt(P.apayer)}</>}</span>
+        <span className="vrm-urssaf-copier-vide" aria-hidden="true"/>
+      </div>
+      {(P.ca == null || P.partiel || P.aDater > 0) ? (
+        <div className="vrm-urssaf-manque" data-urssaf-manque={P.aDater > 0 ? String(P.aDater) : P.ca == null ? 'passu' : 'partiel'}>
+          {P.ca == null ? <>Pas encore calculé : ouvre l’écran Ventes une fois.</>
+            : P.aDater > 0 ? <><span>{P.aDater} vente{P.aDater > 1 ? 's' : ''} sans date de versement : pas dans ce montant.</span><Bouton variante="discret" data-urssaf-dater="" onClick={() => vers('compta-ca')}>{P.aDater > 1 ? 'Les dater' : 'La dater'}</Bouton></>
+            : <>Il manque des ventes pas encore lues : ce montant est un minimum.</>}
+        </div>
+      ) : null}
+      <div className="vrm-urssaf-gestes">
+        <Bouton variante="secondaire" href="https://www.autoentrepreneur.urssaf.fr" target="_blank" rel="noopener noreferrer" data-fu-declarer-urssaf="" data-urssaf-site="">Ouvrir l’URSSAF ↗</Bouton>
+        {aNoter.length ? <Bouton variante="primaire" data-fu-geste="" data-urssaf-cest-declare={aNoter[0]} onClick={() => demanderDeclaration(aNoter[0], onNav)}>J’ai déclaré</Bouton> : null}
+      </div>
     </section>
   );
 }
 function ComptaFusion({ compta, onNav }) {
   const { pub, etat, B } = useBeneficeCalcul(compta, 'mois');
-  const ligneUrssaf = useLigneUrssaf();
-  const regime = useRegimeFiscal();
   if (etat === 'encours' || !pub) return null;
-  // L'encart « Déclaration URSSAF » (maquette) : le rappel de Ma journée (`rappelUrssaf`), « J'ai
-  // déclaré » ouvre le formulaire de toujours (`demanderDeclaration`) ; rien sinon.
-  const micro = regime === undefined || urssafConcerne(regime);
-  const rappel = micro ? rappelUrssaf({ freq: load('vinted_urssaf_freq', 'trimestriel'), declare: lireDeclarations(), ligne: ligneUrssaf }) : null;
-  const dateRappel = rappel ? (() => { const [y, m, d] = String(rappel.dueIso).split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' }); })() : '';
   const moisLong = new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
   const anneau = (() => {
     if (!B || B.netFinal == null || !(B.ca > 0) || B.nCout !== B.n) return null;
@@ -40293,7 +40468,9 @@ function ComptaFusion({ compta, onNav }) {
   const max6 = Math.max(1, ...mois6.map((m) => (m.v != null && m.v > 0 ? m.v : 0)));
   return (
     <div className="vrm-fu-compta vrm-fu-ecran vrm-fu-compta-grille" data-fu-compta="">
-      <section className="vrm-fu-panneau" aria-label="Où passe l'argent vendu" data-fu-anneau={anneau ? String(anneau.pct) : ''}>
+      {/* (5 nov., chantier F, revue 2.26) Pas d'anneau à dessiner ⇒ pas de panneau : plus de carte
+          blanche vide. La raison (prix d'achat à saisir) est déjà dite, avec son geste, sur la carte du dessus. */}
+      {anneau ? <section className="vrm-fu-panneau" aria-label="Où passe l'argent vendu" data-fu-anneau={String(anneau.pct)}>
         {anneau ? (
           <div className="vrm-fu-anneau">
             <svg width="132" height="132" viewBox="0 0 132 132" role="img" aria-label={`Il te reste ${anneau.pct} % de ce que tu as vendu`}>
@@ -40306,8 +40483,15 @@ function ComptaFusion({ compta, onNav }) {
               {anneau.parts.filter(([cle, , v]) => !(cle === 'frais' && !(v > 0))).map(([cle, lib, , p]) => <li key={cle} data-fu-part={cle} data-fu-pct={String(p)}><i className={'is-' + cle}/><span>{lib}</span><b>{p} %</b></li>)}
             </ul>
           </div>
-        ) : <p className="vrm-fu-note" data-fu-anneau-pourquoi="">{!B ? 'Rien à répartir tant que le bénéfice n’est pas calculé.' : B.n === 0 ? '' : B.nCout < B.n ? 'La répartition s’affiche quand tous les prix d’achat du mois sont saisis.' : 'La répartition s’affiche quand les frais et les cotisations du mois sont connus.'}</p>}
-      </section>
+        ) : null}
+      </section> : null}
+      {/* (5 nov., chantier F) Aucun mois au bénéfice brut connu : une ligne (la raison et le geste), plus six barres plates. */}
+      {!mois6.some((m) => m.v != null && m.n > 0) ? (
+        <section className="vrm-fu-panneau vrm-fu-mois6-vide" aria-label="Bénéfice brut sur tes ventes, six derniers mois" data-fu-mois6={mois6.map((m) => (m.v == null ? '' : Math.round(m.v))).join(',')} data-fu-mois6-vide="">
+          <div className="vrm-fu-panneau-tete"><h3>6 derniers mois</h3><span data-benef-notion="brut">{NOM_BENEFICE_BRUT.toLowerCase()}</span></div>
+          <p className="vrm-fu-note">{mois6.some((m) => m.n > 0) ? <>Pas encore de prix d’achat sur tes ventes de ces six mois. <Bouton variante="discret" data-fu-mois6-porte="" onClick={() => { DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); }}>Les saisir</Bouton></> : 'Aucune vente finalisée sur ces six mois.'}</p>
+        </section>
+      ) : (
       <section className="vrm-fu-panneau" aria-label="Bénéfice brut sur tes ventes, six derniers mois" data-fu-mois6={mois6.map((m) => (m.v == null ? '' : Math.round(m.v))).join(',')}>
         <div className="vrm-fu-panneau-tete"><h3>6 derniers mois</h3>{/* (3 nov.) Ces barres sont le BRUT (ventes − prix d'achat) : elles portent son nom (src/beneficeNoms.js), jamais « bénéfice » seul. */}<span data-benef-notion="brut">{NOM_BENEFICE_BRUT.toLowerCase()}</span></div>
         <div className="vrm-fu-barres">
@@ -40320,13 +40504,8 @@ function ComptaFusion({ compta, onNav }) {
           ))}
         </div>
       </section>
-      {rappel && rappel.aNoter && rappel.aNoter.length ? (
-        <section className="vrm-fu-declaration" data-fu-urssaf={rappel.dueIso} aria-label="Déclaration URSSAF">
-          {/* « Déclaration URSSAF » est le lien vers le site de l'URSSAF (un geste, aucun texte en plus). */}
-          <div><a className="vrm-fu-decl-lien" href="https://www.autoentrepreneur.urssaf.fr" target="_blank" rel="noopener noreferrer" data-fu-declarer-urssaf="">Déclaration URSSAF</a><span>avant le {dateRappel}</span></div>
-          <button type="button" className="vrm-fu-encre-btn" data-fu-geste="" data-urssaf-cest-declare={rappel.aNoter[0]} onClick={() => demanderDeclaration(rappel.aNoter[0], onNav)}>J'ai déclaré</button>
-        </section>
-      ) : null}
+      )}
+      {/* (5 nov., chantier F) « Déclaration URSSAF · J'ai déclaré » vit dans la carte « À recopier sur l'URSSAF » (question 2) : un seul endroit. */}
     </div>
   );
 }
@@ -40364,6 +40543,16 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense, sansC
   const [periode, setPeriode] = React.useState(() => { try { const v = localStorage.getItem('vrm_compta_periode_benef'); return PERIODES_BENEF.some(([k]) => k === v) ? v : 'mois'; } catch (_) { return 'mois'; } });
   const choisir = (p) => { setPeriode(p); try { localStorage.setItem('vrm_compta_periode_benef', p); } catch (_) {} };
   const { pub, etat, B } = useBeneficeCalcul(compta, periode);
+  // (5 nov., chantier F, revue 1.7) « À déclarer » sans statut choisi (ou pour un particulier,
+  // qui n'a rien à déclarer) : « — » et la raison, jamais un « 0 € » qui se lirait « rien à
+  // déclarer ». La case reste la même (`declarer`) ; seule sa valeur est dite « pas su ».
+  const regimeCarte = useRegimeFiscal();
+  const declarerSansStatut = regimeCarte === null || regimeCarte === 'particulier';
+  const locauxCarte = declarerSansStatut ? { declarer: { ...CHIFFRES_CARTE.declarer, valeur: null, raison: 'statut',
+    titre: regimeCarte === null ? 'À déclarer : choisis d’abord ton statut' : 'À déclarer : rien à l’URSSAF pour un particulier',
+    // (chantier E1) La raison courte écrite sous le « — » de la case (`raisonCourte`, carteChiffres.js).
+    raisonCourte: regimeCarte === null ? 'statut à choisir' : 'particulier',
+    attrs: { 'data-declarer-sans-statut': regimeCarte === null ? 'pas-choisi' : 'particulier' } } } : null;
   const versSaisiePrix = () => { DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); };
   const e2 = (x) => x == null ? '' : String(Math.round(x * 100) / 100);
   const sansAchat = B ? B.n - B.nCout : 0;
@@ -40418,15 +40607,23 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense, sansC
           {/* (3 nov., carte réglable par page) Le grand chiffre et les trois cases de cette carte se
               choisissent (« Modifier ») ; défaut = la maquette : bénéfice (`chiffreBenefice`, CETTE
               lecture), à déclarer, URSSAF, ventes finalisées — de la période choisie au-dessus. */}
-          <CarteStatsApp page="compta" nu ici="compta" onNav={onNav} sel={{ site: 'toutes', compte: null, periode }} attrs={{ 'data-benef-titre': '', title: `${titreNet} · ${B.libelle}` }}
+          <CarteStatsApp page="compta" nu ici="compta" onNav={onNav} sel={{ site: 'toutes', compte: null, periode }} locaux={locauxCarte} attrs={{ 'data-benef-titre': '', title: `${titreNet} · ${B.libelle}` }}
             attrsDe={(x) => x.place.id === 'benefice' ? { 'data-compta-chiffre': 'gagne', 'data-eur': e2(x.valeur) } : (x.place.id === 'declarer' || x.place.id === 'urssaf') ? { 'data-fu-case': x.place.id, 'data-eur': e2(x.valeur) } : null}/>
           {/* (3 nov., finitions) Aucune vente finalisée : plus de phrase sous la carte (la carte dit « — »/0). */}
-          {B.n === 0 && !(B.nCout < B.n) && !B.raison ? null : <p className="vrm-compta-phrase vrm-fu-compta-sous" data-compta-phrase="gagne" title={typeof phrase === 'string' ? phrase : undefined}>
-            {/* Le vendu n'est pas redit s'il vaut déjà « à déclarer » (§7 : un nombre, une fois). */}
-            {B.n === 0 ? null : (B.caDecl != null && Math.round(B.caDecl * 100) === Math.round(B.ca * 100)) ? B.libelle : <>sur {fmt(B.ca)} vendus</>}
-            {B.nCout < B.n ? <> · <button type="button" onClick={versSaisiePrix} data-benef-porte="" data-benef-manque="" className="vrm-lien-action">{sansAchat} prix d'achat à saisir</button></> : null}
-            {B.raison === 'frais' ? <> · frais eBay pas connus</> : B.raison === 'cotisations' ? <> · CA déclaré pas encore calculé</> : null}
-          </p>}
+          {(() => {
+            // (5 nov., chantier F) La phrase sous la carte : seulement ce qu'elle a À DIRE (plus de
+            // paragraphe vide), chaque morceau séparé par « · » sans jamais en commencer un.
+            const morceaux = [];
+            if (B.n > 0) morceaux.push((B.caDecl != null && Math.round(B.caDecl * 100) === Math.round(B.ca * 100)) ? <span key="v">{B.libelle}</span> : <span key="v">sur {fmt(B.ca)} vendus</span>);
+            if (B.nCout < B.n) morceaux.push(<button key="p" type="button" onClick={versSaisiePrix} data-benef-porte="" data-benef-manque="" className="vrm-lien-action">{sansAchat} prix d'achat à saisir</button>);
+            if (B.raison === 'frais') morceaux.push(<span key="f">frais eBay pas connus</span>);
+            else if (B.raison === 'cotisations') morceaux.push(<span key="c">CA déclaré pas encore calculé</span>);
+            if (regimeCarte === null) morceaux.push(<span key="s" data-declarer-raison="">à déclarer : choisis ton statut, plus bas</span>);
+            if (!morceaux.length) return null;
+            return <p className="vrm-compta-phrase vrm-fu-compta-sous" data-compta-phrase="gagne" title={typeof phrase === 'string' ? phrase : undefined}>
+              {morceaux.map((m, i) => <React.Fragment key={i}>{i ? ' · ' : ''}{m}</React.Fragment>)}
+            </p>;
+          })()}
           {B.depenses === 'jamais' && nuagePret && onSansDepenses ? (
             <div className="vrm-compta-geste"><ChoixDepenses onAucune={onSansDepenses} onAjouter={onAjouterDepense} /></div>
           ) : onAjouterDepense && nuagePret ? (
@@ -40445,7 +40642,7 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense, sansC
               <Ligne lib="− tes dépenses" val={B.depenses === 'jamais' ? null : B.charges}
                 sous={B.depenses === 'jamais' ? 'aucune dépense notée' : B.depenses === 'aucune' ? 'aucune — tu as indiqué ne pas avoir de dépenses à noter' : 'abonnements, dépenses, packs et coûts fixes de la période'}
                 data={{ 'data-benef-ligne': 'charges' }} />
-              {B.sansCotis ? <div className="vrm-set-ligne" data-benef-ligne="cotis" data-benef-sans-cotis=""><span className="vrm-set-lib"><small style={{ color: C.muted, marginTop: 0 }}>Aucune cotisation URSSAF déduite — {regimeFiscal() ? `statut : ${libelleRegime(regimeFiscal())}` : 'ton statut n\'est pas encore choisi (Documents et réglages → Ton statut)'}.</small></span></div> :
+              {B.sansCotis ? <div className="vrm-set-ligne" data-benef-ligne="cotis" data-benef-sans-cotis=""><span className="vrm-set-lib"><small style={{ color: C.muted, marginTop: 0 }}>Aucune cotisation URSSAF déduite — {regimeFiscal() ? `statut : ${libelleRegime(regimeFiscal())}` : 'ton statut n\'est pas encore choisi (« Combien je dois déclarer ? »)'}.</small></span></div> :
               <Ligne lib="− URSSAF" val={B.cotis}
                 sous={B.cotis == null ? 'ton chiffre d\'affaires déclaré se calcule dans l\'écran Ventes' : `${String(tauxUrssaf()).replace('.', ',')} % des mêmes ventes (${fmt(B.ca)})`}
                 data={{ 'data-benef-ligne': 'cotis' }} />}
@@ -41140,6 +41337,96 @@ function PorteMonnaieCompta({ accounts, panelOff }) {
   }, [lu, accounts, panelOff, tick]);
   return <PorteMonnaie pm={pm}/>;
 }
+// ── (5 nov., chantier F) LE BILAN DU MOIS EN UNE PAGE ──────────────────────
+// Vendu · Reçu · Dépensé · Bénéfice (et sa couverture) · Paires vendues ·
+// Meilleur compte, pour ce mois ou le mois d'avant ; « Télécharger en PDF ».
+// Chaque valeur vient de SA règle (src/bilanMois.js le dit) : rien n'est
+// recalculé ici. « — » = pas su ; « au moins » = un minimum, le manque nommé.
+function BilanMoisCarte({ liveStats, compta }) {
+  const [quel, setQuel] = React.useState('courant');
+  const [pub] = useLigneSynchro('vrm_benefice_jours', lireBeneficeJours);
+  const ligneUrssaf = useLigneUrssaf();
+  const regime = useRegimeFiscal();
+  const [envoi, setEnvoi] = React.useState(false);
+  const maintenant = Date.now();
+  const ymA = ymCourant(maintenant);
+  const ym = quel === 'courant' ? ymA : (() => { const [y, m] = ymA.split('-').map(Number); const d = new Date(y, m - 2, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; })();
+  const [y, m] = ym.split('-').map(Number);
+  const de = new Date(y, m - 1, 1).getTime(), finMois = new Date(y, m, 1).getTime();
+  const enCours = quel === 'courant';
+  const a = enCours ? maintenant : finMois;
+  const V = liveStats && !liveStats.venduPasSu && Array.isArray(liveStats.venduLignes) ? liveStats.venduLignes : null;
+  const vendu = (() => {
+    if (!V) return null;
+    const r = bilanLignes(V, de, a - 1);
+    const nc = (liveStats.venduNonComptees || []).filter((x) => x && x.ts != null && x.ts >= de && x.ts < a);
+    const manque = [...new Set([...(liveStats.venduManque || []), ...(liveStats.venduEnAttente ? ['lecture en cours'] : []), ...nc.map((x) => x.plateforme)])];
+    return { n: r.n, eur: r.eur, manque };
+  })();
+  const recu = recuAvecADater(recuPublieEntre(ligneUrssaf, { de, a, ym, complet: !enCours }, maintenant), ligneUrssaf);
+  const charges = compta ? comptaChargesMois(compta, ym).total : null;
+  const Bm = beneficeDuMoisPub({ pub, compta, ligneUrssaf, regime }, ym, null);
+  const CB = Bm ? chiffreBenefice(Bm, 'lu') : { valeur: null, raison: pub ? 'mois pas couvert' : 'publication' };
+  const nomGroupe = (l) => (l.plateforme === 'Vinted' ? (l.compte || 'Vinted') : (l.compte ? `${l.compte} (${l.plateforme})` : l.plateforme));
+  const meilleur = V ? meilleurCompte(V.filter((l) => l.ts >= de && l.ts < a), nomGroupe) : null;
+  const D = bilanDuMois({ ym, vendu, recu, depense: charges, benefice: CB, B: Bm, meilleur, maintenant, enCours });
+  const telecharger = async () => {
+    if (envoi) return;
+    setEnvoi(true);
+    try { telechargerFichier(new Blob([await pdfBilanMois(D, { fmt })], { type: 'application/pdf' }), nomFichierBilan(ym), 'application/pdf'); }
+    catch (_) { toast('Le PDF n’a pas pu être préparé — réessaie dans un moment.'); }
+    setEnvoi(false);
+  };
+  return (
+    <div className="vrm-bilan-mois" data-bilan-mois={ym} data-bilan-en-cours={enCours ? '1' : '0'}>
+      <div className="vrm-bilan-tete">
+        <Segmente label="Mois du bilan" value={quel} onChange={setQuel}
+          options={[{ v: 'courant', l: 'Ce mois-ci', data: { 'data-bilan-choix': 'courant' } }, { v: 'precedent', l: 'Mois dernier', data: { 'data-bilan-choix': 'precedent' } }]} />
+      </div>
+      {D.lignes.map((l) => (
+        <div key={l.cle} className="vrm-bilan-ligne" data-bilan-ligne={l.cle} data-valeur={l.valeur == null ? '' : String(l.valeur)} data-au-moins={l.auMoins ? '1' : undefined}>
+          <span><b>{l.nom}</b>{l.note ? <small>{l.note}</small> : null}</span>
+          <span className="vrm-bilan-val" data-vide={l.valeur == null ? '1' : undefined}>{texteBilan(l, fmt)}</span>
+        </div>
+      ))}
+      <div className="vrm-bilan-ligne" data-bilan-ligne="meilleur" data-valeur={D.meilleur ? D.meilleur.nom : ''}>
+        <span><b>Meilleur compte</b><small>{D.meilleur ? `${D.meilleur.n} vente${D.meilleur.n > 1 ? 's' : ''} · ${fmt(D.meilleur.eur)} vendus` : (vendu && vendu.manque.length ? 'pas désigné : des ventes ne sont pas lues' : vendu && vendu.n ? 'égalité' : 'aucune vente sur le mois')}</small></span>
+        <span className="vrm-bilan-val" data-vide={D.meilleur ? undefined : '1'}>{D.meilleur ? D.meilleur.nom : '—'}</span>
+      </div>
+      <div className="vrm-bilan-pied">
+        <Bouton variante="secondaire" icone="save" occupe={envoi} data-bilan-pdf="" onClick={telecharger}>Télécharger en PDF</Bouton>
+      </div>
+    </div>
+  );
+}
+// ── (5 nov., chantier F) LE DÉLAI DE PAIEMENT PAR SITE ──────────────────────
+// Le délai MÉDIAN entre la vente et le versement, sur les versements LUS
+// seulement (Vinted : transaction finalisée ; Vestiaire : date de versement),
+// avec le nombre de ventes mesurées. Leboncoin et eBay ne donnent pas leur date
+// de versement : « — », dit. La règle : src/delaiPaiement.js.
+function DelaiPaiementCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts }) {
+  const { calc } = useDeclarablesCompta({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts });
+  const ventesVcER = useVentesVestiaire();
+  const R = React.useMemo(() => {
+    if (calc.etat !== 'lu') return calc.etat === 'passu' ? null : undefined;
+    const venteVc = new Map((ventesVcER || []).filter((v) => v && v.id).map((v) => ['vestiaire:' + v.id, dateVenteVc(v) || null]));
+    const dateVenteDe = (l) => (l.plateforme === 'Vinted' ? (Date.parse((l.o && l.o.date) || l.dateVente || '') || null) : l.plateforme === 'Vestiaire' ? venteVc.get(String(l.id)) || null : null);
+    return delaisPaiement({ lignes: calc.decl.lignes, dateVenteDe });
+  }, [calc, ventesVcER]);
+  if (R === undefined) return <p className="vrm-compta-phrase" data-delai-etat="encours" style={{ margin: 0 }}>{PAS_SU.enCours}</p>;
+  if (R === null) return <EtatPanne quoi="Le délai de paiement" raison="Tes ventes n’ont pas pu être lues." compact />;
+  if (!R.sites.length) return <p className="vrm-compta-phrase" data-delai-etat="vide" style={{ margin: 0 }}>Aucune vente reçue pour l’instant : le délai se mesure au premier versement.</p>;
+  return (
+    <div className="vrm-delai-paiement" data-delai-etat="lu">
+      {R.sites.map((x) => (
+        <div key={x.plateforme} className="vrm-delai-ligne" data-delai-site={x.plateforme} data-delai-mediane={x.mediane == null ? '' : String(x.mediane)} data-delai-n={String(x.n)} data-delai-lu={x.lu ? '1' : '0'}>
+          <span><b>{x.plateforme}</b><small>{!x.lu ? 'date de versement pas lue sur ce site' : x.n ? `médiane sur ${x.n} vente${x.n > 1 ? 's' : ''} versée${x.n > 1 ? 's' : ''}${x.n > 1 && x.min != null && x.max > x.min ? ` · entre ${String(x.min).replace('.', ',')} et ${texteDelai(x.max)}` : ''}${x.nSans ? ` · ${x.nSans} sans date` : ''}` : `aucun versement daté${x.nSans ? ` · ${x.nSans} sans date` : ''}`}</small></span>
+          <span className="vrm-delai-val" data-vide={x.mediane == null ? '1' : undefined}>{texteDelai(x.mediane)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts, comptesLus = false }) {
   const [data, setData] = React.useState(() => {
     try { const d = load('vrm_compta', null); return d && typeof d === 'object' ? { ...COMPTA_DEFAUT, ...d } : { ...COMPTA_DEFAUT }; }
@@ -41352,11 +41639,11 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
   React.useEffect(() => { let stop = false; fetchProInvoices({ metadata: true }).then(r => { if (!stop) setNFactures(Array.isArray(r) ? r.filter((x) => x.number).length : null); }).catch(() => {}); return () => { stop = true; }; }, []);
 
   // ── Palette d'écran (§7 : neutre partout, UN accent rare) ──────────────────
-  const inp = { border: `1px solid ${C.border}`, background: C.bg, color: C.text, borderRadius: 12, padding: '9px 11px', fontSize: 15, fontFamily: 'inherit', minWidth: 0, outline: 'none', boxSizing: 'border-box', minHeight: 40 };
-  const btnAdd = { border: 'none', background: C.accent, color: '#fff', borderRadius: 12, padding: '9px 16px', fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0, minHeight: 40 };
+  const inp = { border: `1px solid ${C.border}`, background: C.bg, color: C.text, borderRadius: 12, padding: '9px 11px', fontSize: 15, fontFamily: 'inherit', minWidth: 0, outline: 'none', boxSizing: 'border-box', minHeight: 44 };
+  const btnAdd = { border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 12, padding: '9px 18px', fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0, minHeight: 44 };
   const formBox = { padding: '12px 16px 14px', borderTop: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', gap: 8 };
   const lab = { display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, color: C.muted, flex: '1 1 140px', minWidth: 0 };
-  const pastille = (actif) => ({ border: `1px solid ${actif ? C.text : C.border}`, background: actif ? C.text : 'transparent', color: actif ? C.card : C.text, borderRadius: 999, padding: '6px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', minHeight: 36 });
+  const pastille = (actif) => ({ border: `1px solid ${actif ? C.text : C.border}`, background: actif ? C.text : 'transparent', color: actif ? C.card : C.text, borderRadius: 999, padding: '6px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', minHeight: 44 });
   // Section et Ligne vivent HORS du composant : définies ici, elles changeaient
   // d'identité à chaque rendu et React remontait leurs champs — le curseur
   // sautait à chaque lettre tapée.
@@ -41374,7 +41661,8 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
   const ligneComptaPub = useLigneUrssaf();
   return (
     <div className="vrm-finance-page vrm-fu-ecran" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <ScreenHead icon="euro" title="Compta" date={(()=>{ const t = new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }); return t.charAt(0).toUpperCase() + t.slice(1); })()} desc="Ce que tu as gagné, ce que tu dois déclarer à l'URSSAF, puis le détail." />
+      {/* (5 nov., chantier F, revue 2.27) Plus de surtitre « Novembre 2026 » au-dessus du titre : la carte sombre dit déjà sa période. */}
+      <ScreenHead icon="euro" title={L.compta} desc="Ce que tu as gagné, ce que tu dois déclarer à l'URSSAF, puis le détail." />
       {!ligneComptaPub && <div data-compta-pas-calcule="" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 14px', borderRadius: 12, background: 'var(--vrm-b-teinte)', fontSize: 13, color: C.text }}>
         {/* (2 nov.) Un compte neuf, sans compte Vinted : « ouvre Ventes » ne menait
             nulle part (Ventes n'a rien à publier). La cause vraie et son geste —
@@ -41409,7 +41697,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
         <div className="vrm-compta-q-tete">
           <h2 className="vrm-compta-question" data-compta-question="declarer"><span className="vrm-compta-q-n" aria-hidden="true">2</span>Combien je dois déclarer ?</h2>
         </div>
-        <PrevisionUrssafCarte />
+        <PrevisionUrssafCarte onNav={onNav} />
         <StatutFiscal partie="declarer" liveStats={liveStats} onNav={onNav} />
       </section>
 
@@ -41420,6 +41708,13 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
         <div className="vrm-compta-replis">
           <ComptaRepli id="compta-ca" titre={TITRE_CARTE_CA} resume="Tes ventes par période : le jour de la vente, puis le jour où l'argent t'est versé">
             <CaParPeriodeCarte dansRepli lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />
+          </ComptaRepli>
+          {/* (5 nov., chantier F) Le bilan du mois en une page, et le délai de paiement par site. */}
+          <ComptaRepli id="compta-bilan" titre="Bilan du mois" resume="Vendu, reçu, dépensé, bénéfice, meilleur compte — en PDF">
+            <BilanMoisCarte liveStats={liveStats} compta={data} />
+          </ComptaRepli>
+          <ComptaRepli id="compta-delai" titre="Délai de paiement" resume="Combien de jours entre la vente et le versement, site par site">
+            <DelaiPaiementCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />
           </ComptaRepli>
           {/* (4 nov.) Le porte-monnaie de chaque compte Vinted, LU par l'extension (jamais déduit des ventes). */}
           <ComptaRepli id="compta-porte-monnaie" titre="Porte-monnaie" resume="Disponible et en attente, compte par compte">
@@ -41518,7 +41813,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
                           {!pasEncore && ` · ${ech.length} échéance${ech.length > 1 ? 's' : ''}, ${fmt(cumul)} en tout`}
                         </small></>}
                       droite={fmt(a.montant) + (a.periode === 'an' ? ' /an' : ' /mois')}
-                      extra={!a.fin && !pasEncore ? <button type="button" onClick={() => terminerAbonnement(a.id)} title="Il s'arrête ce mois-ci (le mois en cours reste compté)" style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.muted, borderRadius: 6, fontSize: 13, fontWeight: 600, padding: '4px 8px', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>Arrêter</button> : null}
+                      extra={!a.fin && !pasEncore ? <Bouton variante="secondaire" taille="petit" data-abo-arreter="" onClick={() => terminerAbonnement(a.id)} title="Il s'arrête ce mois-ci (le mois en cours reste compté)" style={{ flexShrink: 0 }}>Arrêter</Bouton> : null}
                       onDel={() => retirer('abonnements', a.id)} />
                 );
               }))}
@@ -41567,7 +41862,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
         <summary>
           <span className="vrm-compta-repli-tete">
             <span className="vrm-compta-repli-titre">Documents et réglages</span>
-            <span className="vrm-compta-repli-resume">Ton statut, ton entreprise, tes factures, le récap mensuel, le résultat de l'année, les packs, la facturation électronique</span>
+            <span className="vrm-compta-repli-resume">Statut, entreprise, factures, récap mensuel, résultat de l'année, packs, facturation électronique</span>
           </span>
         </summary>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingTop: 10 }}>
@@ -41886,7 +42181,7 @@ function RelierAchatCorps({ cible, achats, liens, curTx, compteDe, prixDe, recep
     </div>
   );
 }
-function AcctTag({ acc, name }) {
+function AcctTag({ acc, name, pastille = true }) {
   // ⚠️ SEULE LA PASTILLE EST COLORÉE, pas l'étiquette entière. Avec huit
   // comptes, huit étiquettes teintées ajoutaient une famille de couleurs
   // complète sur des écrans qui en portaient déjà trois (§5.90) — alors que la
@@ -41894,7 +42189,7 @@ function AcctTag({ acc, name }) {
   // pour ça ; le texte redevient neutre.
   const col = acctColor(acc?.vinted_user_id);
   return <span style={{display:'inline-flex',alignItems:'center',gap:5,background:C.card2,color:C.muted,fontSize:11,fontWeight:600,padding:'2px 7px',borderRadius:12,whiteSpace:'nowrap',border:`1px solid ${C.border}`}}>
-    <span style={{width:6,height:6,borderRadius:12,background:col,flexShrink:0}}/><span className="vrm-sensible" data-stream-type="compte">{name}</span>
+    {pastille && <span style={{width:6,height:6,borderRadius:12,background:col,flexShrink:0}}/>}<span className="vrm-sensible" data-stream-type="compte">{name}</span>
   </span>;
 }
 
@@ -44180,6 +44475,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // matin (api/ship-reminders.js), qui ne voit pas les commandes Vinted.
     const finis = new Set();
     const noterFini = (t) => { const k = suiviDeLigne(t); if (k) finis.add('e:' + k); };
+    // (5 nov.) Les commandes dont le colis est FINI d'après une autre identité (son n° de
+    // suivi chez le transporteur) : l'écran Achats ne les dit plus « à retirer » (§11).
+    const txFinis = new Set();
     // Le RETOUR (ou le RETRAIT) écrit par le transporteur peut arriver sur une
     // AUTRE ligne que l'e-mail « disponible » (mesuré au banc : « disponible »
     // rangé chez Mondial Relay, « retourné à l'expéditeur » envoyé par
@@ -44225,6 +44523,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // le passage plus bas ne reprend que les autres (e-mail « en transit »,
     // n° ajouté à la main) quand le transporteur dit qu'ils sont sortis.
     const nJuges = new Set();
+    // (5 nov.) LES AUTRES IDENTITÉS D'UN COLIS (src/retraitPreuves.js) : le n° de suivi
+    // de SA commande, et ceux des lignes au même code de retrait. Mesuré sur sa base :
+    // 9 colis « à retirer » dont le transporteur disait déjà « retiré » sous un autre n°.
+    const codeLigne = (t) => normCode(t && t.code);
+    const suivisDeAchat = (o) => suivisAchat(o, indexSuivisAchats).map(normaliserSuivi).filter(Boolean);
+    const codesSuivis = indexCodesSuivis([...lignesColis, ...(trackingRetrait || [])], { codeDe: codeLigne, suiviDe: suiviDeLigne, achats: buysBase, codeAchat: (o) => normCode((colisRelais[String((o && o.transaction_id) || '')] || {}).code), suivisDeAchat });
+    const preuvesIdentite = (t, commande) => ({ codeDe: codeLigne, suiviDe: suiviDeLigne, commande, suivisDeAchat, codes: codesSuivis, fins, sortiParSuivis });
     for (const t of lignesColis) {
       if (t && t.status === 'available' && sensColis(t, suivisEnvoyes) !== 'sortant') { const k = suiviDeLigne(t); if (k) nJuges.add(k); }
       if (!isColisEnAttente(t, collected, suivisEnvoyes)) continue;
@@ -44240,6 +44545,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           if (tr && tr.etat === 'retour_expediteur' && !nRetourEmail.has(k) && repartiAffichable(Date.parse(tr.etatAt || ''), maintenant)) repartis.push({ kind: 'email', t, o: commandeDuColis(t), statut: 'transporteur' }); }
         if (so) { noterFini(t); continue; } }
       const cmd = commandeDuColis(t);
+      { const fi = finParIdentite(t, preuvesIdentite(t, cmd));
+        if (fi === 'retire') { noterFini(t); if (cmd) txFinis.add(String(cmd.transaction_id)); continue; }
+        if (fi === 'reparti') { noterFini(t); repartis.push({ kind: 'email', t, o: cmd, statut: 'transporteur' }); continue; }
+        if (fi === 'a_verifier') { aVerifier.push({ kind: 'email', t, e: { etat: 'transporteur' }, o: cmd }); continue; } }
       const fin = finCommandeAchat(cmd);
       if (fin === 'retire') { noterFini(t); continue; }   // la commande liée dit livrée / finalisée : il l'a eu
       if (fin === 'reparti') { noterFini(t); repartis.push({ kind: 'email', t, o: cmd, statut: (etatTxn(cmd.transaction_id) || {}).ss || String(cmd.status || '') }); continue; }
@@ -44281,6 +44590,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (cmdParColis.has(colisKey(s)) && !cmdParColis.has(colisKey(garde[i]))) cmdParColis.set(colisKey(garde[i]), cmdParColis.get(colisKey(s)));
       }
       if (garde.length !== emailList.length) emailList.splice(0, emailList.length, ...garde);
+      // (5 nov.) …et PAR SON CODE DE RETRAIT (une identité, §5) : la moitié Vinted
+      // « Utilise le code B12345 » et la consigne au même code sont un colis.
+      const parCode = fusionnerParCode(emailList, { codeDe: codeLigne, suiviDe: suiviDeLigne, score: scoreLigneRetrait, fusion: fusionLignesMemeSuivi });
+      if (parCode !== emailList) {
+        for (const t of parCode) if (!cmdParColis.has(colisKey(t))) { const c = commandeDuColis(t); if (c) cmdParColis.set(colisKey(t), c); }
+        emailList.splice(0, emailList.length, ...parCode);
+      }
     }
     // ⚠️ (3 nov.) LA MÊME COMMANDE, UNE LIGNE — et un doute se dit, il ne se
     // tranche pas (api/_lib/achat-arrive-relais.js, `regrouperArrivees`) : l'e-mail
@@ -44289,9 +44605,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // colis annoncé par Vinted sans commande au même code postal qu'un colis de
     // transporteur sans commande = « à vérifier » (jamais compté deux fois).
     {
-      const r = regrouperArrivees(emailList, { commandeDe: (t) => cmdParColis.get(colisKey(t)) || null, score: scoreLigneRetrait, fusion: fusionLignesMemeSuivi });
+      // (5 nov.) Les témoins : TOUTES les lignes de transporteur arrivées à ce point (finies
+      // comprises) ; une moitié Vinted dont la commande n'a aucun n° connu est un doute aussi.
+      const temoins = lignesColis.filter((w) => w && w.status === 'available' && w.source !== 'vinted-commande' && suiviDeLigne(w) && sensColis(w, suivisEnvoyes) !== 'sortant');
+      const sansIdentite = (t, c) => !suiviDeLigne(t) && !suivisDeAchat(c).length && !((codesSuivis.get(codeLigne(t)) || new Set()).size);
+      const r = regrouperArrivees(emailList, { commandeDe: (t) => cmdParColis.get(colisKey(t)) || commandeDuColis(t) || null, score: scoreLigneRetrait, fusion: fusionLignesMemeSuivi, temoins, sansIdentite });
       r.liste.forEach((t, i) => { if (r.commandes[i]) cmdParColis.set(colisKey(t), r.commandes[i]); });
-      for (const t of r.doutes) aVerifier.push({ kind: 'email', t, e: { etat: 'doute_meme_relais' }, o: null });
+      r.doutes.forEach((t, i) => aVerifier.push({ kind: 'email', t, e: { etat: 'doute_meme_relais' }, o: (r.doutesCommandes && r.doutesCommandes[i]) || null }));
       emailList.splice(0, emailList.length, ...r.liste);
     }
     // Le transporteur ÉCRIT que le colis repart (statut « retour », 23 oct.).
@@ -44366,6 +44686,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const ev = etatColisVinted(o, maintenant, tpm);
       { const so = sortiParSuivis(ks, fins, ev.arriveeSure, { borne: ev.borneMs });
         if (so === 'a_verifier') { aVerifier.push({ kind: 'vinted', o, e: { ...ev, etat: 'transporteur', incident: incidentDeSuivis(ks, fins, ev.arriveeSure, { borne: ev.borneMs }) } }); continue; }
+        if (so === 'retire') txFinis.add(String(o.transaction_id));
         if (so === 'reparti') {
           const tr = tpm ? ks.map(k => tpm.get(k)).find(x => x && x.etat === 'retour_expediteur') : null;
           if (tr && !ks.some(k => nRetourEmail.has(k)) && repartiAffichable(Date.parse(tr.etatAt || ''), maintenant)) repartis.push({ kind: 'vinted', o, statut: 'transporteur' }); }
@@ -44461,7 +44782,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     //    vient de `cleanLieu(t.lieu)` (§11, la même source que les groupes de
     //    l'écran Achats), jamais deviné : un email sans lieu n'ajoute rien.
     const lieux = [...new Set(emailList.map(t => (cleanLieu(t.lieu).nom || '').trim()).filter(Boolean))];
-    return { emailList, extra, aConfirmer, attente, attenteMail, aVerifier, repartis, horsDelai, urgents, sansCode, sansCodeEmail, comptesSansCode, lieux, cmdParColis, finis: [...finis].sort().slice(0, 300),
+    // (5 nov.) LES DOUBLES POSSIBLES À PART. Une moitié Vinted « t'attend » sans identité vers
+    // le transporteur, au même point que ses colis (`doute_meme_relais`), n'est pas un colis de
+    // plus à vérifier : c'est peut-être la même boîte. Mesuré sur sa base : 29 des 31 « à
+    // vérifier » — la carte disait « 31 à vérifier » et la liste (clé vide) n'en montrait qu'un.
+    // Ils restent MONTRÉS (Colis → À retirer, « Peut-être en double »), jamais comptés.
+    const enDouble = aVerifier.filter((x) => x.e && x.e.etat === 'doute_meme_relais');
+    if (enDouble.length) aVerifier.splice(0, aVerifier.length, ...aVerifier.filter((x) => !(x.e && x.e.etat === 'doute_meme_relais')));
+    return { emailList, extra, aConfirmer, attente, attenteMail, aVerifier, enDouble, repartis, horsDelai, urgents, sansCode, sansCodeEmail, comptesSansCode, lieux, cmdParColis, txFinis, finis: [...finis].sort().slice(0, 300),
              prets: (emailList.length - sansCodeEmail) + (extra.length - sansCode),
              total: emailList.length + extra.length };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -48285,11 +48613,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!unique(tracking || [], (x) => normTitle(x.artTitle || ''), n)) return null;
     return unique(buysBase, (o) => normTitle(o.title || ''), n);
   };
-  const trackForBuy = (o) => {
-    const n = normTitle(o && o.title); if (!n) return null;
-    if (!unique(buysBase, (x) => normTitle(x.title || ''), n)) return null;
-    return unique(tracking || [], (t) => normTitle(t.artTitle || ''), n);
-  };
+  // ⚠️ (5 nov.) LE COLIS D'UN ACHAT, PAR IDENTITÉ SEULEMENT (§5). Il était trouvé par
+  // le TITRE (« Commande mise à jour pour <titre> » = titre de l'achat) : mesuré sur sa
+  // base, des achats « Commande livrée ! » s'affichaient « À retirer » parce qu'un e-mail
+  // d'arrivée au même titre restait rangé « disponible ». Maintenant : la ligne que
+  // `pickupUnion` a reliée à CETTE commande (conversation, n° de suivi, code), sinon la
+  // conversation, sinon le n° de suivi de la commande. Une ligne que la règle sait finie
+  // (retirée, repartie) est rendue avec `horsRetrait` : elle ne dit plus « à retirer ».
+  const colisParTx = useMemo(() => {
+    const m = new Map();
+    const vus = new Set((pickupUnion.emailList || []).map(colisKey));
+    for (const [k, c] of (pickupUnion.cmdParColis || new Map())) { const t = (pickupUnion.emailList || []).find((x) => colisKey(x) === k); if (t && c) m.set(String(c.transaction_id), t); }
+    const parConv = new Map(); for (const o of buysBase) if (o && o.conversation_id != null) { const k = String(o.conversation_id).toLowerCase(); parConv.set(k, parConv.has(k) ? null : o); }
+    const parSuivi = new Map(); for (const o of buysBase) for (const su of suivisAchat(o, indexSuivisAchats)) { const k = normaliserSuivi(su); if (k) parSuivi.set(k, parSuivi.has(k) ? null : o); }
+    for (const t of (trackingRetrait || [])) {
+      if (!t) continue;
+      const o = (t.conv && parConv.get(String(t.conv).toLowerCase())) || parSuivi.get(suiviDeLigne(t)) || null;
+      if (!o || m.has(String(o.transaction_id))) continue;
+      m.set(String(o.transaction_id), vus.has(colisKey(t)) ? t : { ...t, horsRetrait: true });
+    }
+    return m;
+  }, [pickupUnion, buysBase, trackingRetrait, indexSuivisAchats]);
+  const trackForBuy = (o) => (o ? colisParTx.get(String(o.transaction_id)) || null : null);
   // Étape de suivi d'un achat (payé → expédié → au relais → reçu) à partir du
   // statut Vinted + de l'email transporteur. step: 1=payé 2=transit 3=relais 4=reçu.
   // ⚠️ « AU RELAIS » AVANT « REÇU » (4 octobre). « La livraison n'a pas encore
@@ -48298,7 +48643,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // lieu, le code et le QR de retrait (ils ne s'affichent qu'à l'étape 3) —
   // 4 achats ce jour-là. `phaseReception` avait déjà la parade ; l'étiquette
   // ne l'avait jamais reprise.
-  const achatStage = (o, tk) => etapeAchat(o, tk);   // la règle : niveau module (§11)
+  const achatStage = (o, tk) => etapeAchat(o, tk && tk.horsRetrait ? { ...tk, status: 'fini' } : tk, { fini: !!(o && pickupUnion.txFinis && pickupUnion.txFinis.has(String(o.transaction_id))) });   // la règle : niveau module (§11)
   // Statut précis d'une VENTE (pour l'afficher clairement) : à expédier → en
   // transit → livrée → vendue (finalisée). Se base sur le texte Vinted + l'enum
   // machine transaction_user_status. N'affecte PAS la compta (classifyOrderStatus).
@@ -48358,6 +48703,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [buysBase, aFilter, ordSearchDiff, periode, tracking, colisRelais, numeros, compteSel, compteConnecte, selEff]);
   const [achatsMax, setAchatsMax] = useState(60);
+  const [achatsOutilsOuverts, setAchatsOutilsOuverts] = useState(false);
   // ── ACHATS · ACTIONS RAPIDES (note interne + menu « … ») ──────────────────
   // Note interne par achat (synchronisée, clé = transaction_id) + menu groupant
   // les actions (attestation d'achat / remboursement, étiquette SKU, masquer).
@@ -51226,7 +51572,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     for (const t of (pickupUnion.emailList || [])) {
       const a = achatDuColis(t, buysBase, indexSuivisAchats); const lu = lieuDeLigne(t, a); const code = codeDeLigne(t); const eE = etatColisEmail(t, maintenant); const ej = eE.jours;
       const aa = a ? null : (achatsAutres.get(suiviDeLigne(t)) || null);
-      L.push({ cle: 'r:e:' + (suiviDeLigne(t) || t.id || ''), groupe: 'retirer', site: aa ? aa.site : 'vinted', achatAutre: aa, nom: nomAvecTaille(a ? a.title : ((aa && aa.titre) || t.artTitle || (nomTr(t.carrier) ? `Colis ${nomTr(t.carrier)}` : 'Colis à retirer')), a), photo: a ? photoAchat(a) : ((aa && aa.photo) || t.photo || null),
+      L.push({ cle: 'r:e:' + (suiviDeLigne(t) || t.id || t.cleLigne || colisKey(t) || ''), groupe: 'retirer', site: aa ? aa.site : 'vinted', achatAutre: aa, nom: nomAvecTaille(a ? a.title : ((aa && aa.titre) || t.artTitle || (nomTr(t.carrier) ? `Colis ${nomTr(t.carrier)}` : 'Colis à retirer')), a), photo: a ? photoAchat(a) : ((aa && aa.photo) || t.photo || null),
         etat: [lu.lieuNom || nomTr(t.carrier), dernierJour(ej) || (code ? code : (qrImage(t) ? 'QR code' : 'code pas encore lu'))].filter(Boolean).join(' · '), ambre: Number.isFinite(ej) && ej <= 1, ouvrir: true,
         ...lu, transporteur: t.carrier || '', transp: transporteurColis(t.carrier, suiviDeLigne(t)), code, code2: codeRetrait(t.code2) || '', qr: !!qrImage(t) && !code, jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eE), ...(lu.lieuNom ? {} : { sansLieu: sansLieuEmail(t) }), src: { t } });
     }
@@ -51237,14 +51583,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         etat: [lu.lieuNom || 'au point relais', dernierJour(ej) || (code || 'code pas encore lu')].filter(Boolean).join(' · '), ambre: Number.isFinite(ej) && ej <= 1, ouvrir: true,
         ...lu, transporteur: (r && r.transporteur) || '', transp: transporteurColis((r && r.transporteur) || (eSV && eSV.transporteur) || '', suV), code, qr: !!(r && r.qr) && !code, jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eV), ...(lu.lieuNom ? {} : { sansLieu: r && r.lieu ? { raison: 'La conversation Vinted ne nomme pas clairement le point.', geste: 'Ouvre la conversation du colis : le point y est écrit.' } : sansLieuVinted(o) }) , src: { o } });
     }
-    for (const x of (pickupUnion.aVerifier || [])) {
+    for (const x of [...(pickupUnion.aVerifier || []), ...(pickupUnion.enDouble || [])]) {
       const o = x.kind === 'email' ? (x.o || achatDuColis(x.t, buysBase, indexSuivisAchats)) : x.o;
       // (2 nov.) Même fait que les cartes « extra » : un n° vu sans transporteur nommé.
       const suX = x.kind === 'email' ? (suiviDeLigne(x.t) || '') : (suivisAchat(x.o, indexSuivisAchats)[0] || ''); const eSX = x.kind === 'email' ? null : entreeSuiviAchat(x.o);
       const trInconnu = !!suX && !((x.kind === 'email' ? (x.t && x.t.carrier) : (relaisDe(x.o) || {}).transporteur) || (eSX && eSX.transporteur) || transporteurDeForme(suX));
       const lu = x.kind === 'email' ? lieuDeLigne(x.t, o) : completer(lieuDe((relaisDe(x.o) || {}).lieu), (relaisDe(x.o) || {}).transporteur, '');
       const code = x.kind === 'email' ? codeDeLigne(x.t) : codeRetrait((relaisDe(x.o) || {}).code);
-      L.push({ cle: x.kind === 'email' ? 'r:e:' + (suiviDeLigne(x.t) || (x.t && x.t.id) || '') : 'r:v:' + (x.o && x.o.transaction_id), groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o ? o.title : (x.t && nomTr(x.t.carrier) ? 'Colis ' + nomTr(x.t.carrier) : 'Colis à retirer'), o), photo: o ? photoAchat(o) : ((x.t && x.t.photo) || null), trInconnu,
+      L.push({ cle: x.kind === 'email' ? 'r:e:' + (suiviDeLigne(x.t) || (x.t && (x.t.id || x.t.cleLigne)) || colisKey(x.t) || '') : 'r:v:' + (x.o && x.o.transaction_id), groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o ? o.title : (x.t && nomTr(x.t.carrier) ? 'Colis ' + nomTr(x.t.carrier) : 'Colis à retirer'), o), photo: o ? photoAchat(o) : ((x.t && x.t.photo) || null), trInconnu,
         etat: [lu.lieuNom || (x.kind === 'email' ? nomTr(x.t && x.t.carrier) : ''), 'à vérifier : délai dépassé ou incident'].filter(Boolean).join(' · '), aVerifier: true, horsCompte: true, ouvrir: true,
         ...lu, transporteur: (x.kind === 'email' ? (x.t && x.t.carrier) : ((relaisDe(x.o) || {}).transporteur)) || '', transp: transporteurColis((x.kind === 'email' ? (x.t && x.t.carrier) : ((relaisDe(x.o) || {}).transporteur || (eSX && eSX.transporteur))) || '', suX), code, jours: null,
         ...(lu.lieuNom ? {} : { sansLieu: x.kind === 'email' ? sansLieuEmail(x.t) : sansLieuVinted(x.o) }),
@@ -54281,15 +54627,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             locaux={{
               depense: { nom: 'Dépensé du mois', court: 'Dépensé', type: 'eur', valeur: depense, quand: (() => { const m = m0.toLocaleDateString('fr-FR', { month: 'long' }); return m.charAt(0).toUpperCase() + m.slice(1); })(), attrs: { 'data-n': lu ? String(mois.length) : '' } },
               enroute: { nom: 'En route', court: 'En route', type: 'n', valeur: lu ? n.route : null, attrs: { 'data-n': lu ? String(n.route) : '' } },
-              recus: { nom: 'Reçus', court: 'Reçus', type: 'n', valeur: lu ? n.recu : null, attrs: { 'data-n': lu ? String(n.recu) : '' } },
+              recus: { nom: 'Arrivés', court: 'Arrivés', type: 'n', valeur: lu ? n.recu : null, attrs: { 'data-n': lu ? String(n.recu) : '' } },
             }}/>;
         })()}
-        {/* (4 nov.) Fournisseurs · Délai · Lots (src/AchatsOutils.jsx) : trois feuilles, rien n'est écrit sans son clic.
-            (5 nov.) Fournisseurs = les personnes à qui il achète en gros, qu'IL crée (src/fournisseurs.js). */}
-        {!modeRetraits && !baseKO && <AchatsOutils fournisseurs={asoFournisseurs ? { ...asoFournisseurs, actions: foActions } : asoFournisseurs} delai={asoDelai} lots={asoLots} achatsDeclarables={asoDeclarables} fichesLibres={asoFichesLibres}
+        {/* (5 nov.) Pourquoi des codes manquent (l'extension les lit dans les conversations, sur le
+            compte connecté dans l'onglet) : dit ICI, sur l'écran où il le constate. Se tait si elle est à jour. */}
+        <ExtEnRetard onNav={onNav}/>
+        {/* (5 nov., revue 2.16) Fournisseurs · Délai · Lots rangés derrière « … » : une seule carte de
+            chiffres en tête, les outils à un geste (src/AchatsOutils.jsx, inchangé). */}
+        {!modeRetraits && !baseKO && achatsOutilsOuverts && <div className="vrm-achats-outils" id="vrm-achats-outils" data-achats-outils="ouverts">
+          <AchatsOutils fournisseurs={asoFournisseurs ? { ...asoFournisseurs, actions: foActions } : asoFournisseurs} delai={asoDelai} lots={asoLots} achatsDeclarables={asoDeclarables} fichesLibres={asoFichesLibres}
           onOuvrir={setAsoOuvert} onRelier={asoRelier} onRepartir={asoRepartir} onAnnulerRepartition={asoAnnuler} onDeclarerLot={asoDeclarerLot}
           onFiche={(n)=>{ try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: String(n) })); } catch (_) {} }}
-          Retour={FermeAuRetour} Photo={(src)=><PhotoVinted src={src} alt="" loading="lazy"/>}/>}
+          Retour={FermeAuRetour} Photo={(src)=><PhotoVinted src={src} alt="" loading="lazy"/>}/>
+        </div>}
         {!retraitsOutils && <NoAcc/>}
         {/* ⚠️ LE BANDEAU DE L'EXTENSION VIT AUSSI ICI, PAS SEULEMENT SUR MA
             JOURNÉE. C'est sur CET écran que Julien compte les codes qui
@@ -54298,13 +54649,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             les codes lus dans les conversations, contenait **0 colis**, et
             aucun des colis Vinted à retirer n'avait de code. Lui dire pourquoi
             sur un autre écran que celui où il le constate, ça ne sert à rien.
-            Le bandeau se cache tout seul dès que l'extension est à jour. */}
-        <ExtEnRetard onNav={onNav}/>
+            Le bandeau se cache tout seul dès que l'extension est à jour.
+            (5 nov.) Il est rendu plus haut, en tête de l'écran. */}
         {/* ⚠️ MÊME ORDRE QUE L'ÉCRAN VENTES. Ici la période arrivait en 19e position,
             après les cartes — alors qu'elle est en 1re sur Ventes. Deux écrans
             jumeaux organisés différemment, c'est ce qui rend la navigation
             hésitante : ce qu'on manipule tous les jours passe en premier. */}
-        {!modeRetraits && <div className="vrm-seg vrm-seg-plein" role="group" aria-label="Étapes de tes achats" style={{marginBottom:16}}>
+        {!modeRetraits && <div className="vrm-achats-barre">
+        <div className="vrm-seg vrm-seg-plein" role="group" aria-label="Étapes de tes achats">
           {/* ⚠️ LES ONGLETS SONT LES ÉTAPES DU COLIS, pas des états de commande.
               C'est ça, un outil de réception : où en est chaque article entre
               « payée » et « dans le carton chez moi ». Le compte est affiché :
@@ -54320,18 +54672,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // partiel (les colis d'e-mail manqueraient) présenté comme complet.
             // (31 oct., soir) Sur « Achats », plus d'étape « À retirer » : c'est
             // l'écran voisin, « Colis à retirer » (pas deux fois la même chose).
-            return [...(modeListeAchats?[]:[['attente','À retirer',tracking===null?'—':pickupUnion.total]]),['route','En route',n.route],['recus','Reçus',n.recu],['all','Tous',null]].map(([id,label,cnt])=>(
+            return [...(modeListeAchats?[]:[['attente','À retirer',tracking===null?'—':pickupUnion.total]]),['route','En route',n.route],['recus','Arrivés',n.recu],['all','Tous',null]].map(([id,label,cnt])=>(
             <button type="button" key={id} className="vrm-seg-btn" data-achats-onglet={id} data-n={cnt==null?undefined:String(cnt)} onClick={()=>setAFilter(id)} aria-pressed={aFilter===id} aria-label={cnt?`${label} ${cnt}`:undefined} style={{whiteSpace:'nowrap'}}>{label}{cnt?<span className="vrm-seg-n" title={String(cnt)}> {cnt>=1000?`${(Math.floor(cnt/100)/10).toLocaleString('fr-FR')} k`:cnt}</span>:null}</button>
           )); })()}
+        </div>
+        {!baseKO && <button type="button" className="vrm-icon-control vrm-achats-plus" data-achats-plus={achatsOutilsOuverts?'ouvert':'ferme'} aria-expanded={achatsOutilsOuverts} aria-controls="vrm-achats-outils" aria-label="Plus : fournisseurs, délai, lots" title="Fournisseurs · Délai · Lots" onClick={()=>setAchatsOutilsOuverts(v=>!v)}><Icon name="more" size={20}/></button>}
         </div>}
         {/* (31 oct., soir) Achats ne montre plus les colis à retirer : une ligne mène
             à Colis (colonne « À retirer » et son détail). Le nombre est celui de la
             règle (`pickupUnion.total`), seulement quand les e-mails de suivi sont lus. */}
+        {/* (5 nov.) Le chemin vers Colis reste ; dans l'espace Vinted, la carte sombre dit déjà le nombre :
+            le lien ne le répète pas (le même nombre une fois, §7). */}
         {modeListeAchats && tracking!==null && pickupUnion.total>0 && (
           <div style={{margin:'0 0 12px'}}>
             <button type="button" className="vrm-lien-action" data-achats-vers-colis={pickupUnion.total} onClick={()=>onNav&&onNav('cat_achats')}
               style={{minHeight:44,background:'transparent',border:0,padding:0,color:C.text,fontSize:13,fontWeight:600,fontFamily:'inherit',cursor:'pointer'}}>
-              {pickupUnion.total} colis à retirer → Colis
+              {dansPlateforme ? 'Voir les colis à retirer → Colis' : `${pickupUnion.total} colis à retirer → Colis`}
             </button>
           </div>
         )}
@@ -54423,7 +54779,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             (`pickupUnion.total`, union email + statut Vinted) et il est déjà
             affiché deux fois plus haut. Deux nombres proches pour deux notions
             différentes sur le même écran, c'est exactement ce qu'on s'interdit. */}
-        {buysBase.length>0 && aFilter!=='attente' && (()=>{
+        {/* (5 nov., revue 2.15) Une seule carte de chiffres : la grille ne s'affiche plus sous la carte
+            sombre (espace Vinted), qui dit déjà Dépensé, En route, À retirer, Arrivés. */}
+        {!dansPlateforme && buysBase.length>0 && aFilter!=='attente' && (()=>{
           const dans = buysBase.filter(o=>matchOrd(o));
           const M = (o)=>montantCommande(o);
           const annule = achatAnnule;
@@ -55434,9 +55792,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* (la barre d'outils est remontée sous le titre, comme sur Ventes) */}
         {buys.loading && !buys.items && <Skeleton variant="row" count={5}/>}
         {buys.error && <LoadError onRetry={()=>loadOrders('purchased',setBuys,true)}/>}
-        {!modeRetraits && buys.items && !buys.error && buysBase.length===0 && (
-          <EmptyState icon="bag" title="Aucun achat pour l'instant"
-            desc="Tes achats Vinted arrivent ici tout seuls dès que l'extension a capté ton compte. Rien à faire."/>
+        {!modeRetraits && buys.items && !buys.error && buysBase.length===0 && (buys.items.length>0
+          // (5 nov.) Des achats existent, mais tous sur des comptes écartés : « aucun achat » serait faux.
+          ? <div data-achats-vide="ecartes"><EmptyState icon="bag" title="Tes achats sont sur des comptes écartés"
+              desc="Les comptes écartés n'entrent dans aucun écran ni aucun total. Paramètres → Comptes liés pour les remettre."/></div>
+          : <div data-achats-vide="aucun"><EmptyState icon="bag" title="Aucun achat pour l'instant"
+              desc="Tes achats Vinted arrivent ici tout seuls dès que l'extension a capté ton compte. Rien à faire."/></div>
+        )}
+        {/* (5 nov.) Un filtre ou une recherche qui ne trouve rien le DIT (avant : une liste vide, muette). */}
+        {!modeRetraits && buys.items && !buys.error && buysBase.length>0 && achatsAffiches.length===0 && aFilter!=='attente' && (
+          <div className="vrm-achats-vide" data-achats-vide={ordSearchDiff.trim() ? 'recherche' : aFilter} style={{color:C.muted}}>
+            <span>{ordSearchDiff.trim() ? `Aucun achat pour « ${ordSearchDiff.trim().slice(0,40)} »` : aFilter==='route' ? 'Rien en route en ce moment' : aFilter==='recus' ? 'Aucun achat arrivé sur cette période' : 'Aucun achat sur cette période'}</span>
+            {ordSearchDiff.trim() ? <button type="button" className="vrm-lien-action" data-achats-effacer="" onClick={()=>setOrdSearch('')}>Effacer la recherche</button> : null}
+          </div>
         )}
         {/* ⚠️ SUR ORDINATEUR, LA LISTE SE RANGE EN DEUX COLONNES.
             Une ligne de vente de 980 px pour une photo, un titre et un
@@ -55475,12 +55843,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div className="vrm-buy-title" style={{color:C.text}} title={o.title}>{o.title}</div>
                 <div className="vrm-buy-meta" style={{color:C.muted}}>
                   <span className="vrm-buy-statut" style={{color:C.text}}><i style={{background:st.color}}/>{st.label}</span>
-                  {!unCompte && <AcctTag acc={o._acc} name={accNameOf(o._acc)}/>}
-                  <span style={{whiteSpace:'nowrap'}}>{o.date?dateFr(o.date, {day:'numeric',month:'short'}):''}
+                  {/* (5 nov., revue 2.16) Achats : le compte en mots, sans pastille de couleur (hors palette). */}
+                  {!unCompte && <AcctTag acc={o._acc} name={accNameOf(o._acc)} pastille={false}/>}
+                  <span style={{whiteSpace:'nowrap'}}>{o.date?dateFr(o.date, new Date(o.date).getFullYear()===new Date().getFullYear() ? {day:'numeric',month:'short'} : {day:'numeric',month:'short',year:'numeric'}):''}
                   {/* DEPUIS COMBIEN DE TEMPS : « dois-je m'inquiéter ? ». Au-delà de
                       trois semaines, en rouge — le moment de relancer le vendeur. */}
                   {!cancelled && !st.retour && st.step>=1 && st.step<4 && (()=>{ const t=tsCommande(o); if(!t) return null; const j=Math.floor((Date.now()-t)/86400000); if(j<2) return null; const tard=j>ACHAT_RETARD_J; return <span style={{fontWeight:tard?700:500,color:tard?C.warn:C.muted,whiteSpace:'normal'}}> · depuis {j} j{tard?' — relance le vendeur':''}</span>; })()}</span>
-                  {tk && tk.lieu && st.step===3 && <span style={{color:C.text}}>· {tk.lieu}</span>}
+                  {tk && tk.lieu && st.step===3 && <span style={{color:C.text}} title={tk.lieu}>· {(cleanLieu(tk.lieu).nom || tk.lieu)}</span>}
                   {numA!=null && <span title="Numéro de l'article (lien avec l'annonce / la vente)" style={{fontWeight:600,color:C.text}}>N°{numA}</span>}
                   {o._fromEmail && <span title="Reconstituée depuis l'email — pas encore confirmée par Vinted" style={{fontSize:11,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:12,padding:'0 6px'}}>email</span>}
                 </div>
@@ -55519,7 +55888,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 )}
               </div>
               {/* Prix à deux décimales et une virgule (jamais « 21.0 € » brut). */}
-              <div className="vrm-buy-price" style={{color:C.text}}>{montantCommande(o).toFixed(2).replace('.',',')}{' '}{cur(o.price?.currency_code)}</div>
+              <div className="vrm-buy-price" style={{color:C.text}}>{montantCommande(o).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})}{' '}{cur(o.price?.currency_code)}</div>
               {/* Actions rapides : suivre · code en accès direct ; le reste dans un
                   menu « … » (attestations, étiquette SKU, note interne, masquer). */}
               {(() => {
@@ -55573,7 +55942,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             faisait 72 880 px sur iPhone — quatre-vingt-six écrans. */}
         {achatsAffiches.length > achatsMax && (
           <Bouton variante="secondaire" plein onClick={()=>setAchatsMax(n=>n+120)} style={{marginTop:10}}>
-            Voir plus — {achatsMax} affichés sur {achatsAffiches.length}
+            {achatsAffiches.length - achatsMax <= 120 ? `Voir les ${achatsAffiches.length - achatsMax} derniers` : 'Voir plus'} — {achatsMax} affichés sur {achatsAffiches.length.toLocaleString('fr-FR')}
           </Bouton>
         )}
         {/* (26 oct.) Les reçus par email sont une archive, pas le geste du jour :
@@ -65168,7 +65537,10 @@ function ColisEquipe({ vendeur, de, onPropre }) {
   else if (d.sansAcces) corps = <div data-equipe-etat="sans-acces" style={{ ...carte, fontSize: 15, color: C.text, lineHeight: 1.55 }}>Tu n'as plus accès aux colis de cette équipe : l'invitation a été retirée, ou l'abonnement du vendeur n'est plus actif. Plus rien de sa boutique n'est lisible d'ici.</div>;
   else {
     const ventes = d.ventes.filter((o) => aExpedier(o) && !d.postes.has(String(o.transaction_id)));
-    const achats = d.achats.filter((o) => !d.retires.has(String(o.transaction_id)) && (isAtRelayStatus(o.status) || tusDe(o) === 'needs_action'));
+    // (5 nov.) `needs_action` sur un ACHAT veut dire « une action » : « Commande livrée ! »
+    // (confirmer « Tout est OK », le colis est déjà retiré) ou « non réclamée - retournée »
+    // le portent aussi (mesuré : 12 sur 21). Seul le statut « au point relais » compte.
+    const achats = d.achats.filter((o) => !d.retires.has(String(o.transaction_id)) && isAtRelayStatus(o.status));
     const labelsTx = new Map(); (d.labels || []).forEach((l) => { const m = /_label_([A-Za-z0-9]+)$/.exec(l.id || ''); const tx = (m && m[1] !== 'latest' && m[1] === String(l.tx || m[1])) ? m[1] : ''; if (tx && !labelsTx.has(tx)) labelsTx.set(tx, l.id); });
     const bordsTx = new Map(); (d.bords || []).forEach((b) => { if (b && b.filename && b.filename !== 'None' && b.transaction && !bordsTx.has(String(b.transaction))) bordsTx.set(String(b.transaction), b); });
     const compte = (o) => d.comptes[String(o.uid || '')] || '';
@@ -65942,6 +66314,8 @@ function PushSetting() {
   const [state, setState] = useState('checking'); // checking | unsupported | off | on | busy
   const [msg, setMsg] = useState(null);
   const [srv, setSrv] = useState(null);   // ce que le SERVEUR dit de lui-même
+  // (5 nov.) « Installer VRM sur l'iPhone » : iPhone + Safari + pas installée + pas fermé (src/guideIphone.js).
+  const [guideIphone, fermerGuideIphone] = useGuideIphone();
   const b64ToU8 = (s) => { const p='='.repeat((4-s.length%4)%4); const b=(s+p).replace(/-/g,'+').replace(/_/g,'/'); const r=atob(b); return Uint8Array.from([...r].map(c=>c.charCodeAt(0))); };
 
   // ⚠️ LE PIÈGE QUI A COUPÉ SES NOTIFICATIONS (et qui vient de MOI).
@@ -66061,8 +66435,10 @@ function PushSetting() {
       <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>Notifications téléphone</div>
       <div style={{fontSize:12,color:C.muted,marginBottom:10,lineHeight:1.4}}>
         Vente, bordereau, argent reçu : notifié en temps réel, même app fermée.
-        {state==='unsupported' && ' — Non disponible ici : installe d\'abord l\'app sur ton écran d\'accueil (Partager → Sur l\'écran d\'accueil) puis ouvre-la depuis l\'icône.'}
+        {/* (5 nov.) Sur un iPhone dans Safari, le guide illustré le dit (une phrase, une fois — §7). */}
+        {state==='unsupported' && !guideIphone && ' — Non disponible ici : installe d\'abord l\'app sur ton écran d\'accueil (Partager → Sur l\'écran d\'accueil) puis ouvre-la depuis l\'icône.'}
       </div>
+      {guideIphone && <GuideIphone onFermer={fermerGuideIphone}/>}
       {/* ⚠️ « Je ne reçois plus rien » a DEUX causes qui font le même silence :
           aucun appareil abonné, ou le serveur sans sa clé. On les sépare ici,
           au lieu de laisser deviner. */}
@@ -70723,10 +71099,10 @@ function AppCoeur() {
             pas pu lire », et l'écran le DIT au lieu de repartir de zéro. */}
         {/* (3 nov., critique #2/#9) Un grand titre sur CHAQUE écran : la barre du haut ne le dit plus. */}
         {(tab==='communaute'||tab==='emails')&&<header className="vrm-market-heading vrm-tache-tete" data-titre-ecran-grand=""><h1>{titreCourant}</h1></header>}
-        {tab==='dashboard'&&!premierJour&&<div className="vrm-rubriques" style={{padding:'12px 16px 0'}}><PlatSubNav sub={platSub==='prix'?'prix':'stats'} setSub={setPlatSub} sections={[['stats','Vue d’ensemble'],['prix','Prix qui marche']]}/></div>}
-        {tab==='dashboard'&&platSub==='prix'&&<PrixMarche data={pqmData} baseKO={baseKO}/>}
+        {/* (5 nov., chantier F, revue 2.25) Le choix « Vue d'ensemble · Prix qui marche » vit SOUS le titre de l'écran (il passait au-dessus). */}
+        {tab==='dashboard'&&platSub==='prix'&&<PrixMarche data={pqmData} baseKO={baseKO} sousNav={!premierJour?<PlatSubNav sub="prix" setSub={setPlatSub} sections={[['stats','Vue d’ensemble'],['prix','Prix qui marche']]}/>:null}/>}
         {tab==='dashboard'&&premierJour&&<Onboarding setTab={setTab}/>}
-        {tab==='dashboard'&&platSub!=='prix'&&<Dashboard premierJour={premierJour} catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStatsVus} lbcVentes={lbcVentes} ebayCa={ebayCa} ebayCommandes={ebayCommandes} ventesVc={ventesVcCoque} onGo={setTab} actions={notifItems} baseKO={baseKO} panelOff={panelOffCoque}/>}
+        {tab==='dashboard'&&platSub!=='prix'&&<Dashboard premierJour={premierJour} catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStatsVus} lbcVentes={lbcVentes} ebayCa={ebayCa} ebayCommandes={ebayCommandes} ventesVc={ventesVcCoque} onGo={setTab} actions={notifItems} baseKO={baseKO} panelOff={panelOffCoque} sousNav={!premierJour?<PlatSubNav sub="stats" setSub={setPlatSub} sections={[['stats','Vue d’ensemble'],['prix','Prix qui marche']]}/>:null}/>}
         {/* ⚠️ UN SEUL ONGLET VINTED QUI CONTIENT TOUT : Aperçu (CA, argent,
             compteurs) + Annonces / Ventes / Achats rendus À L'INTÉRIEUR, via les
             MÊMES composants que les écrans séparés (aucune duplication §11). Les
