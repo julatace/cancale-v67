@@ -21,7 +21,7 @@ const muter = (avant, apres) => { if (!MODULE.includes(avant)) { console.log('â
 if (MUT === 'semaine') muter('const S = R.semainePassee(maintenant);', 'const S = (() => { const fin = maintenant, debut = fin - 7 * 86400000; const x = R.semainePassee(maintenant); return { ...x, debut, fin }; })();');
 else if (MUT === 'colis') muter('if (t != null && t >= debut && t < fin) n++;', 'if (t != null) n++;');
 else if (MUT === 'brut') muter('const CB = R.chiffreBrut(B);', 'const CB = { valeur: B.ca, partiel: false };');
-else if (MUT === 'ebay') muter("const manque = ebaySemaine ? ['eBay'] : [];", 'const manque = [];');
+else if (MUT === 'ebay') muter("...(ebaySemaine ? ['eBay'] : []), ", '');
 else if (MUT === 'repli') muter("export const repliePourSemaine = (memo, lundi) => !!memo && String(memo) === String(lundi);", 'export const repliePourSemaine = (memo) => !!memo;');
 else if (MUT) { console.log('âŒ mutation inconnue : ' + MUT); process.exit(2); }
 const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');

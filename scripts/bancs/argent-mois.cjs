@@ -211,8 +211,17 @@ const capture = async (pg, nom, sel) => { if (!SHOTS) return; fs.mkdirSync(SHOTS
       await pg.click('[data-comparer-choix="precedent"]'); await pg.waitForTimeout(300);
       const F = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-frais-site]')].map((e) => [e.getAttribute('data-frais-site'), { eur: e.getAttribute('data-frais-eur'), pct: e.getAttribute('data-frais-pct'), lus: e.getAttribute('data-frais-lus') }])));
       dit(!!(await pg.$('[data-frais-sites]')) && F.Leboncoin && F.Leboncoin.eur === '499' && F.Leboncoin.pct === '', 'C : « Frais par site » : le pack Leboncoin du mois (4,99 €), pas de % sans vente', JSON.stringify(F));
+      // Les choix de « Comparer » sont un `Segmente` : la règle commune du segmenté
+      // (styles-coque.css, chantier A du 5 nov. : « 36 px à la souris, 44 px au doigt »).
+      // Au doigt (390 tactile) : 44 px, la cible (§7). À la souris (1512) : la hauteur du
+      // segmenté commun, jamais une forme à part — le banc exigeait 44 partout, écrit le
+      // 4 nov. quand le segmenté faisait 44 px à la souris aussi.
       const petits = await cibles(pg, '[data-comparer] button');
-      dit(!petits.length, 'C : les choix font 44 px', JSON.stringify(petits));
+      if (T.hasTouch) dit(!petits.length, 'C : au doigt, les choix font 44 px', JSON.stringify(petits));
+      else {
+        const seg = await pg.evaluate(() => [...document.querySelectorAll('[data-comparer] button')].filter((e) => e.offsetParent).map((e) => ({ t: (e.innerText || '').trim().slice(0, 30), h: Math.round(e.getBoundingClientRect().height), commun: e.matches('.vrm-seg > .vrm-seg-btn') })));
+        dit(seg.length >= 2 && seg.every((x) => x.commun && x.h >= 36), 'C : à la souris, les choix suivent le segmenté commun (≥ 36 px)', JSON.stringify(seg));
+      }
       dit(T.vp.width > 500 || (await deborde(pg)) <= 1, 'C : aucun débordement à 390 px', String(await deborde(pg)));
       await capture(pg, `C-frais-${T.nom}`, '[data-frais-sites]');
       // Le mois d'avant ENTIER : frais saisis (pack Vinted 2,30 €) sur la période « Mois » d'avant n'est pas affichée ici ;

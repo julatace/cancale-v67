@@ -234,8 +234,12 @@ function chargeApp(noms, injecte) {
     dit(S.sortiParSuivis(['30000013'], fins, arr) === null, 'un retour écrit AVANT l\'arrivée ne compte pas (ce n\'est pas ce passage-là)');
     dit(S.sortiParSuivis(['30000014'], fins, arr) === 'retire', 'une ligne « info » NL rangée avant ce jour est relue avec la règle d\'aujourd\'hui ⇒ retiré');
     dit(S.sortiParSuivis(['30000015'], fins, arr) === null, 'le retour d\'un colis QU\'IL A ENVOYÉ ne sort rien de « à retirer »');
-    dit(S.transporteurDeForme('30000060') === 'mondialrelay' && S.transporteurDeForme('XW123456789FR') === 'chronopost' && S.transporteurDeForme('VGS12345678') === 'vinted' && S.transporteurDeForme('09440000000061') === null,
-      'le transporteur se lit à la FORME du n° (8 chiffres · 2 lettres 9 chiffres 2 lettres · VGS…) ; ambigu ⇒ null (on demande)');
+    dit(S.transporteurDeForme('30000060') === 'mondialrelay' && S.transporteurDeForme('XW123456789TS') === 'chronopost' && S.transporteurDeForme('VGS12345678') === 'vinted' && S.transporteurDeForme('09440000000061') === null,
+      'le transporteur se lit à la FORME du n° (8 chiffres · forme propre Chronopost XW…TS · VGS…) ; ambigu ⇒ null (on demande)');
+    // (6 nov.) Un n° postal international (S10) n'est pas Chronopost : « …FR » ⇒ rien (La Poste ou
+    // Chronopost, on ne choisit pas), un autre pays ⇒ « Colis international (<pays>) », jamais un transporteur.
+    dit(S.transporteurDeForme('XW123456789FR') === null && S.transporteurDeForme('CP000000001IE') === null && S.colisInternational('CP000000001IE') === 'Colis international (Irlande)' && S.colisInternational('XW123456789FR') === '' && S.colisInternational('XW123456789TS') === '',
+      'S10 : « …FR » ⇒ aucun transporteur deviné ; « CP…IE » ⇒ « Colis international (Irlande) » (6 nov.)');
     const lc = S.lienSuivi('chronopost', 'XW123456789FR');
     dit(lc && /chronopost\.fr\/tracking-no-cms\/suivi-page\?listeNumerosLT=XW123456789FR$/.test(lc.url) && lc.site, 'Chronopost : « tracking-no-cms » (l\'adresse « tracking-no-cdn » est morte), n° pré-rempli', lc && lc.url);
     const lm = S.lienSuivi('mondialrelay', '30000060', '35260'), lm2 = S.lienSuivi('mondialrelay', '30000060', ''), lm3 = S.lienSuivi('mondialrelay', '30000060', 'Cancale');
