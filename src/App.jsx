@@ -235,6 +235,8 @@ import { beneficeLigneVente, texteBenefice, euros as eurosLigne } from "./benefi
 import { friseVente, phraseVente, eurosRecap, ETATS_HORS_PARCOURS } from "./recapVente.js";
 import { auCentreDeVerification } from "./verificationArticle.js";
 import { ligneEmailsCompte } from "./emailsCompteLie.js";
+import { prochainGesteColis, bordereauxAImprimer } from "./prochainGesteColis.js";
+import "./colis-prochain.css";
 import { adressesSansCompte, comptesSansAdresse, relierAdresse, CLE_ADRESSES_ACHETEUR } from "./adressesSansCompte.js";
 // (2 nov.) Le style « Fusion » : la carte sombre du mois et la frise de suivi (src/design/).
 import CarteMois from "./design/CarteMois.jsx";
@@ -35639,6 +35641,23 @@ function CarteCompteLie({ plateforme, id, nom, photo, etat, age, type, inclus, o
     </div>
   );
 }
+// (6 nov., onglets B) EN TÊTE DE COLIS : les comptes qui n'envoient AUCUN e-mail à VRM (la MÊME règle,
+// `etatEmailsComptes` — celle de Comptes liés, Notifications et Achats, §11). Leurs codes de retrait et
+// leurs bordereaux n'arrivent pas ici : la phrase le dit et mène à Comptes liés, où chaque compte muet a
+// sa ligne « E-mails » et son geste « Relier sa boîte ». Rendu seulement sur Colis (une lecture de plus,
+// scalaire, pas sur les autres écrans). Rien tant que ce n'est pas lu (« pas su » ne dit rien).
+function ComptesMuetsColis({ accounts, onNav }) {
+  const etat = useEtatEmailsComptes(accounts);
+  const muets = etat && etat.etat === 'lu' ? (etat.muets || []) : [];
+  if (!muets.length) return null;
+  const noms = muets.map((l) => l.login).filter(Boolean);
+  return (
+    <div className="vrm-colis-prochain is-second" data-colis-comptes-muets={muets.length}>
+      <span className="vrm-colis-prochain-txt">{muets.length > 1 ? `${muets.length} comptes n’envoient aucun e-mail à VRM` : `Le compte ${noms[0] || 'Vinted'} n’envoie aucun e-mail à VRM`}<span className="vrm-colis-prochain-sous"> — {muets.length > 1 ? 'leurs' : 'ses'} codes de retrait et bordereaux n’arrivent pas ici</span></span>
+      {onNav ? <button type="button" className="vrm-lien-action" data-colis-comptes-muets-ouvrir="" onClick={() => onNav('vintedaccounts')}>Relier {muets.length > 1 ? 'leurs boîtes' : 'sa boîte'}</button> : null}
+    </div>
+  );
+}
 // (6 nov., vague 2, point 5) LA LIGNE « E-MAILS » D'UNE CARTE VINTED : la règle des
 // comptes sans e-mail (`etatEmailsComptes`, celle de Notifications et d'Achats — §11),
 // projetée par `ligneEmailsCompte` (src/emailsCompteLie.js). Le geste n'apparaît que
@@ -58127,7 +58146,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // la même action (`ouvrirLot`), le même compte (`lignesLot`, §11).
           const cartes = cartesColis();
           const vue = colonnesColis(cartes, siteColis);
-          const nPrets = lignesLot().length;
+          // (6 nov.) « À imprimer » = les bordereaux reçus PAS ENCORE imprimés (src/prochainGesteColis.js) :
+          // mesuré sur sa base, la case disait 9 quand 6 avaient été imprimés la veille.
+          const lignesImpr = lignesLot();
+          const nPrets = bordereauxAImprimer(lignesImpr).length, nDejaImpr = lignesImpr.length - nPrets;
           const nLot = lignesLotTous().length;
           // (1er nov., capture de Julien : « Vestiaire » absent de Colis alors
           // qu'il y a un compte) Même règle que les filtres d'Annonces, Ventes,
@@ -58341,6 +58363,33 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     onClick={() => setOutilsColis((v) => !v)}/>
                 </div>
               }/>
+            {/* (6 nov., onglets B) LE PROCHAIN GESTE, EN UNE PHRASE ET UN BOUTON (src/prochainGesteColis.js) :
+                les MÊMES listes que les nombres de l'écran — les points de « À retirer » (`parPoint`, colis
+                comptés seulement), le lot « Tout imprimer » (`lignesLot`, avec SA limite), « À envoyer »
+                (`vrm_colis_aposter`). L'urgent passe devant, quel que soit l'onglet. Rien tant que c'est en cours. */}
+            {!baseKO && (() => {
+              const vinted = voitSite('vinted');
+              const imp = vinted ? bordereauxAImprimer(lignesImpr).map((l) => ({ jours: l.e && Number.isFinite(l.e.dl) ? l.e.dl : null, limite: l.e && l.e.lim ? texteEnvoiColis(texteLimiteEnvoi(l.e.lim) || '') : '' })) : [];
+              const sansBord = vinted && labelsPrets && emailBords !== null ? expeditions().filter((e) => !e.pret && !(e.o && isShipDone(e.o))).length : 0;
+              const pts = ((parPoint && parPoint.points) || []).filter((p) => !p.inconnu).map((p) => ({ cle: p.cle, nom: p.nom || p.adresseCourte || '', colis: (p.arrives || []).filter((c) => !c.horsCompte).map((c) => ({ code: !!(c.code || c.qr || c.code2), jours: Number.isFinite(c.jours) ? c.jours : null })) }));
+              const g = prochainGesteColis({ onglet,
+                envoi: { total: nEnv, partiel: envPartiel, aImprimer: imp, aDeposer: vinted ? nDejaImpr : 0, sansBordereau: sansBord },
+                retrait: { total: nRet, partiel: retPartiel, points: pts } });
+              if (!g) return null;
+              const agir = () => {
+                if (g.onglet && g.onglet !== onglet && onOngletColis) onOngletColis(g.onglet);
+                if (g.action === 'imprimer' && nLot > 0) { ouvrirLot(); return; }
+                if (g.action === 'tournee') { setTourneeDepot(true); return; }
+                if (g.point) setTimeout(() => { const el = [...document.querySelectorAll('[data-relais-point]')].find((e) => e.getAttribute('data-relais-point') === g.point); if (el) { try { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) { el.scrollIntoView(); } } }, 80);
+              };
+              const verbe = g.action === 'imprimer' ? 'Imprimer' : g.action === 'tournee' ? 'Tournée' : g.onglet && g.onglet !== onglet ? 'Voir' : g.point ? 'Voir le point' : null;
+              return (
+                <div className={'vrm-colis-prochain' + (g.ambre ? ' is-ambre' : '')} data-colis-prochain={g.cle} data-colis-prochain-onglet={g.onglet || ''} data-colis-prochain-point={g.point || undefined} role="status">
+                  <span className="vrm-colis-prochain-txt">{g.partiel ? 'Au moins ' : ''}{g.texte}{g.sous ? <span className="vrm-colis-prochain-sous"> · {g.sous}</span> : null}</span>
+                  {verbe ? <Bouton variante={g.action === 'imprimer' ? 'primaire' : 'secondaire'} data-colis-prochain-agir="" onClick={agir} disabled={g.action === 'imprimer' && (batchBusy || nLot === 0)}>{verbe}</Bouton> : null}
+                </div>);
+            })()}
+            {!baseKO ? <ComptesMuetsColis accounts={accounts} onNav={onNav}/> : null}
             {/* (2 nov., style « Fusion ») LA CARTE « AUJOURD'HUI ». Le grand chiffre est le
                 nombre de colis À ENVOYER publié par cet écran (`vrm_colis_aposter`, celui de Ma
                 journée et du sélecteur, « au moins » si un site n'est pas lu) ; « à imprimer » =
@@ -58357,13 +58406,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               if (vc) { const pts = parPoint.points.filter((p) => vc.points.includes(p.cle)); const rows = pts.flatMap((p) => p.arrives); const cpt = rows.filter((c) => !c.horsCompte);
                 const nD = cpt.filter((c) => c.jours != null && c.jours <= 1).length, nC = cpt.filter((c) => c.code || c.qr).length, nV = rows.filter((c) => c.horsCompte).length;
                 return <CarteMois className="vrm-fu-ecran vrm-fu-colis" surtitre={vc.nom} data-fu-colis-retirer={String(cpt.length)} data-fu-ville={vc.cle} valeur={<>{cpt.length} colis</>} sous="à retirer"
-                  cases={[{ cle: 'dernier', n: nD, l: 'dernier jour', attrs: { 'data-n': String(nD) } }, { cle: 'code', n: nC, l: 'avec code', attrs: { 'data-n': String(nC) } }, { cle: 'verifier', n: nV, l: 'à vérifier', attrs: { 'data-n': String(nV) } }]}/>; }
+                  cases={[{ cle: 'dernier', n: nD, l: 'd’ici demain', attrs: { 'data-n': String(nD) } }, { cle: 'code', n: nC, l: 'avec code', attrs: { 'data-n': String(nC) } }, { cle: 'verifier', n: nV, l: 'à vérifier', attrs: { 'data-n': String(nV) } }]}/>; }
               return (
               <CarteMois className="vrm-fu-ecran vrm-fu-colis" surtitre="Aujourd'hui" data-fu-colis-retirer={nRet == null ? '' : String(nRet)}
                 valeur={nRet == null ? null : <>{retPartiel ? <span className="vrm-fu-borne">au moins</span> : null}{nRet} colis</>}
                 sous={nRet == null ? 'Je lis tes colis…' : nRet === 0 ? 'Rien à aller chercher' : 'à retirer'}
                 cases={[
-                  { cle: 'dernier', n: pickupUnion.urgents || 0, l: 'dernier jour', titre: 'À retirer aujourd’hui ou demain', attrs: { 'data-n': String(pickupUnion.urgents || 0) } },
+                  { cle: 'dernier', n: pickupUnion.urgents || 0, l: 'd’ici demain', titre: 'À retirer aujourd’hui ou demain', attrs: { 'data-n': String(pickupUnion.urgents || 0) } },
                   { cle: 'code', n: pickupUnion.prets || 0, l: 'avec code', titre: 'Le code de retrait est connu', attrs: { 'data-n': String(pickupUnion.prets || 0) } },
                   { cle: 'verifier', n: (pickupUnion.aVerifier || []).length + (pickupUnion.aConfirmer || []).length, l: 'à vérifier', titre: 'Hors du compte « à retirer »', attrs: { 'data-n': String((pickupUnion.aVerifier || []).length + (pickupUnion.aConfirmer || []).length) } },
                 ]}/>); })() : null}
@@ -58377,7 +58426,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 sel={{ site: siteColis, compte: null, periode: null }} attrs={{ 'data-fu-colis-envoyer': nEnv == null ? '' : String(nEnv) }}
                 clics={{ aposter: () => onOngletColis && onOngletColis('envoyer') }}
                 locaux={{
-                  imprimer: { nom: 'Bordereaux à imprimer', court: 'à imprimer', type: 'n', valeur: nPrets, titre: 'Bordereaux reçus, prêts à imprimer', onClick: nPrets > 0 ? () => onOngletColis && onOngletColis('envoyer') : undefined, attrs: { 'data-n': String(nPrets) } },
+                  imprimer: { nom: 'Bordereaux à imprimer', court: 'à imprimer', type: 'n', valeur: nPrets, titre: nDejaImpr > 0 ? `Bordereaux reçus pas encore imprimés (${nDejaImpr} déjà imprimé${nDejaImpr > 1 ? 's' : ''}, à déposer)` : 'Bordereaux reçus, pas encore imprimés', onClick: nPrets > 0 ? () => onOngletColis && onOngletColis('envoyer') : undefined, attrs: { 'data-n': String(nPrets) } },
                   deposes: { nom: 'Colis déposés aujourd’hui', court: deposes > 1 ? 'déposés' : 'déposé', type: 'n', valeur: deposes, titre: "Colis marqués « Colis fait » aujourd'hui", attrs: { 'data-n': String(deposes) } },
                   retirer: { nom: 'À retirer', court: 'à retirer', type: 'n', valeur: nRet, partiel: retPartiel && nRet != null, affiche: nRet == null ? undefined : `${nRet}${retPartiel ? '+' : ''}`, titre: retPartiel && nRet != null ? `Au moins ${nRet} : les e-mails de suivi n'ont pas pu être lus` : 'Colis arrivés à aller chercher', onClick: () => onOngletColis && onOngletColis('retirer'), attrs: { 'data-n': nRet == null ? '' : String(nRet) } },
                 }}/>

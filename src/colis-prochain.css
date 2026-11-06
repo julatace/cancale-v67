@@ -1,0 +1,18 @@
+/* (6 nov., onglets B) Le prochain geste de Colis : UNE ligne (pas une carte), une phrase, un bouton.
+   Neutre ; l'ambre seulement quand c'est pressé (dernier jour, envoi pour aujourd'hui ou demain, §7). */
+.vrm-colis-prochain {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin: 4px 0 12px; padding: 10px 14px; min-height: 44px; box-sizing: border-box;
+  border-radius: 12px; background: var(--vrm-surface, #FFFFFF);
+  color: var(--vrm-ink, #1D1D1F); font-size: 15px; line-height: 1.35;
+}
+.vrm-colis-prochain-txt { flex: 1 1 240px; min-width: 0; font-weight: 600; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.vrm-colis-prochain-sous { font-weight: 400; color: var(--vrm-muted, #6E6E73); }
+.vrm-colis-prochain.is-ambre .vrm-colis-prochain-txt { color: var(--vrm-warn, #B25000); }
+.vrm-colis-prochain.is-second { margin-top: -6px; padding-top: 8px; padding-bottom: 8px; font-size: 14px; }
+.vrm-colis-prochain.is-second .vrm-colis-prochain-txt { font-weight: 500; }
+.vrm-colis-prochain > button { flex: 0 0 auto; }
+@media (max-width: 520px) {
+  .vrm-colis-prochain { padding: 10px 12px; }
+  .vrm-colis-prochain > button { flex: 1 1 100%; }
+}
