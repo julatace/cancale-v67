@@ -868,3 +868,8 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 - **5 nov. · Chantier H, coque (v35)** : en-tête = pastille de couleur (plus « ⓘ »), nuage seulement en panne ; « Dernière capture » = source de la liste ; Paramètres (icônes distinctes, Organisation en lien, plus de carte dans la carte, Statut) ; icônes de nav distinctes, un badge par colis ; cloche sur SheetShell + « Où ranger à l'arrivée » (`src/ouRanger.js`). `docs/passation/2026-11-05-chantier-h.md`.
 
 - **6 nov. · Vague 2, comptes et e-mails** : Comptes liés, ligne « E-mails » par compte Vinted (reçoit · aucun depuis N j → Relier sa boîte) ; E-mails → Relier ma boîte : « adresse sans compte » (Relier un compte = `vinted_account_emails` sur son clic · compte acheteur) ; vente « avec Vérification de l'article » lue sans prix + étape « Au centre de vérification » (état de la transaction) ; Leboncoin « Suppression » gardé + 1 rappel/jour. `docs/passation/2026-11-06-vague2-comptes.md`. Geste : relier ses adresses sans compte.
+
+
+## Lignes de « État actuel » du 5 nov. déplacées le 6 nov. (4ᵉ lot, telles quelles)
+
+

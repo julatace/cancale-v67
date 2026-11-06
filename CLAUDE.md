@@ -508,6 +508,8 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 
+- **6 nov. · Accompagnement (v36)** : visite à 4 bulles ; conseils = 1 bulle non modale sur le VRAI bouton (halo, Plus tard, Ne plus montrer), 2/jour, 1/écran, 3 j de repos, sur un chiffre publié par l'écran (`<ChiffreConseil>`, pas su ⇒ rien), « vu » écrit d'abord dans `vrm_accompagnement` (rev) ; `src/accompagnement.js`, `audit-conseils`. `docs/passation/2026-11-06-accompagnement.md`. Geste : aucun.
+
 - **6 nov. · Facture Pro (v36)** : bouton « Envoyer la facture » sur la LIGNE de la vente seulement si l'acheteur est PROUVÉ (même n° de transaction Vinted + e-mail Pro, heure −2/+15 min, montant ; sinon la raison, `src/facturePro/rattachement.js`, relue par le serveur) ; envoi PAR VRM (From « … via VRM », Reply-To et Cc au vendeur, 50/jour) ; « Ma facture » avec aperçu en direct. `docs/passation/2026-11-06-facture-pro.md`. Geste : remplir Ma facture, poser `RELANCES_SMTP_*`.
 
 - **6 nov. · Bancs rouges d'avant (v36)** : Facturation Pro ne plante plus (réponse sans boîte = pas su), « Ajouter » du stream dit pourquoi, Statistiques à l'échelle 28/20/15/13/11, transporteurs 2 × 2 au téléphone ; 15 bancs jugent la règle actuelle. `docs/passation/2026-11-06-bancs-preexistants.md`. Geste : aucun.
