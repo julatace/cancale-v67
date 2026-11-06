@@ -173,7 +173,13 @@ de `rev` pris pour un succès, reprise ignorée, case par case ignorée.
 depuis cet arbre) : rouge (« src/inventaire.js absent »). Avec la seule règle recopiée dans
 l'arbre d'avant : **12 rouges** (tout I7 : l'app ne la branchait nulle part).
 
-### Banc `scripts/bancs/inventaire.cjs` — 112/112 OK (390 tactile et 1512 souris, clair et sombre)
+### Banc `scripts/bancs/inventaire.cjs` — 120/120 OK (390 tactile et 1512 souris, clair et sombre)
+
+Après le retrait du vert : 390 vert au passage complet (60/60), 1512 relancé seul (60/60 ; au
+passage complet, la carte de Ma journée était arrivée après 60 s à 1512 clair — la capture la
+montre). **Arbre au vert (`ea752837`, rebâti, même banc)** : 4 rouges, exactement « ✓ Attendu à
+l’encre » et « aucune teinte hors des jetons » (`rgb(36, 138, 61)` sur le point attendu), en
+clair et en sombre.
 `npm run build`, puis `BANC_PORT=103xx SHOT=<dossier>/inv node scripts/bancs/inventaire.cjs`
 (`BANC_SEUL=390|1512` pour une seule largeur). Données inventées : deux comptes Vinted
 (`compte_banc` lu, `compte_pas_lu` dont la lecture RATE), une annonce eBay (SKU VRM-40),
