@@ -105,6 +105,11 @@ function construire({ n = 950, seed = 7 } = {}) {
     rows.push({ owner: OWNER, id: `email_reception_${cle}`, data });
     if (texte) rows.push({ owner: OWNER, id: `email_texte_${cle}`, data: { texte: texte.length > 1500 ? texte.slice(0, 1500) + '…' : texte, at } });
   }
+  // Les lus (api/_lib/emails-lus.js) : tout est lu jusqu'à hier 14 h, puis un e-mail
+  // récent sur trois a été ouvert — la boîte montre des points bleus, comme chez lui.
+  const jusqua = MAINTENANT - 25 * 3600e3;
+  const recents = rows.filter((x) => x.id.startsWith('email_reception_') && Date.parse(x.data.at) > jusqua);
+  rows.push({ owner: OWNER, id: 'vrm_emails_lus', data: { v: 1, jusqua: iso(jusqua), lus: recents.filter((_, k) => k % 3 === 2).map((x) => [x.id.slice(16, 40), Date.parse(x.data.at)]), nonlus: [], rev: 1 } });
   rows.push({ owner: OWNER, id: 'main', data: { vinted_account_emails: Object.fromEntries(COMPTES.map((c) => [c.u, c.adr])) } });
   rows.push({ owner: OWNER, id: 'vrm_email_owners', data: { adresses: Object.fromEntries(ADRESSES.map((a) => [a, { owner: OWNER }])) } });
   return { owner: OWNER, maintenant: MAINTENANT, rows, comptes: COMPTES.map((c) => ({ owner: OWNER, vinted_user_id: c.u, login: c.l })) };

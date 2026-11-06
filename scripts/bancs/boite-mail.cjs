@@ -110,6 +110,8 @@ async function ouvrir(nav, base, { viewport, tactile, sombre, reduit = false, st
   const tPremiere = Date.now() - t0;
   return { ctx, pg, erreurs, appels, ecritures, tPremiere };
 }
+// Les e-mails chargés : chaque ligne, plus ceux d'une pile repliée (une pile ne cache rien : elle compte).
+const chargees = (pg) => pg.evaluate(() => document.querySelectorAll('[data-boite-email]').length + [...document.querySelectorAll('[data-boite-pile][data-deplie="0"]')].reduce((s, x) => s + Number(x.dataset.boitePile || 0), 0));
 const journal = (appels) => appels.filter((a) => a.chemin === '/api/email-rattacher' && a.q.mode === 'journal' && !a.q.lire);
 
 // Ce qui se voit et ne doit jamais se voir.
@@ -126,7 +128,7 @@ async function inspecter(pg, nom, racine = '[data-boite-emails]') {
     const feuille = document.querySelector('[data-boite-feuille]');
     const hors = [...document.querySelectorAll(feuille ? '[data-boite-feuille] *' : '[data-boite-emails] *')].filter((n) => vis(n) && n.getBoundingClientRect().right > largeur + 1 && !rogne(n)).map((n) => (n.className && String(n.className).slice(0, 40)) || n.tagName).slice(0, 5);
     const petits = [...document.querySelectorAll('[data-boite-emails] button, [data-boite-emails] select, [data-boite-emails] a[href], [data-boite-feuille] button, [data-boite-feuille] a[href]')]
-      .filter((n) => vis(n) && !n.closest('[aria-hidden="true"]')).filter((n) => { const b = n.getBoundingClientRect(); return b.height < 43.5 || b.width < 43.5; }).map((n) => (n.innerText || n.getAttribute('aria-label') || n.className || '').trim().slice(0, 30)).slice(0, 6);
+      .filter((n) => vis(n) && !n.closest('[aria-hidden="true"]') && !n.matches('[data-boite-lien]')).filter((n) => { const b = n.getBoundingClientRect(); return b.height < 43.5 || b.width < 43.5; }).map((n) => (n.innerText || n.getAttribute('aria-label') || n.className || '').trim().slice(0, 30)).slice(0, 6);
     return { mots, deborde, hors, petits };
   }, [racine]);
 }
@@ -159,14 +161,14 @@ async function inspecter(pg, nom, racine = '[data-boite-emails]') {
         // La liste ENTIÈRE : la suite se charge au défilement (ou « Voir plus » sur l'arbre d'avant).
         const tA = Date.now();
         for (let i = 0; i < 80; i++) {
-          const n = await pg.locator('[data-boite-email]').count();
+          const n = await chargees(pg);
           if (n >= recus.length) break;
           const plus = pg.locator('[data-boite-plus]');
           if (await plus.count() && await plus.isEnabled().catch(() => false)) await plus.click({ timeout: 3000 }).catch(() => {});
           await pg.evaluate(() => { const l = document.querySelectorAll('[data-boite-email]'); const d = l[l.length - 1]; if (d) d.scrollIntoView({ block: 'end' }); });
           await pg.waitForTimeout(250);
         }
-        const nTotal = await pg.locator('[data-boite-email]').count();
+        const nTotal = await chargees(pg);
         const tToute = Date.now() - tA;
         // Défilement de haut en bas : les tâches longues (> 50 ms) mesurées par la page.
         const def = await pg.evaluate(async () => {
@@ -232,6 +234,103 @@ async function inspecter(pg, nom, racine = '[data-boite-emails]') {
 
 // ── LES RÈGLES (neuves au 6 nov. : rouges sur l'arbre d'avant) ──────────────
 async function regles(pg, nom, base, { tactile, appels }) {
-  // Rempli plus bas, une fois l'écran construit.
-  void pg; void nom; void base; void tactile; void appels;
+  const parId = new Map(base.rows.filter((x) => x.id.startsWith('email_reception_')).map((x) => [x.id, x.data]));
+  await pg.evaluate(() => { const p = document.querySelector('[data-boite-email]'); if (p) p.scrollIntoView({ block: 'center' }); });
+  // R1. La ligne vient du résumé rangé, jamais du sujet.
+  const lignes = await pg.locator('[data-boite-email]').evaluateAll((l) => l.map((x) => ({ id: x.dataset.boiteEmail, quoi: (x.querySelector('[data-boite-quoi]') || {}).textContent || '', texte: x.innerText, code: x.dataset.boiteACode === '1', lu: x.dataset.lu })));
+  const sujet = lignes.filter((x) => { const d = parId.get(x.id); return d && d.subject && d.subject.length > 12 && x.texte.includes(d.subject); });
+  dit(lignes.length > 100 && !sujet.length, `${nom} : R1 aucune ligne n'écrit le sujet brut (${lignes.length} lignes)`, JSON.stringify(sujet.slice(0, 2)));
+  // R2. Le code sur la ligne SEULEMENT s'il est lu (colis à retirer).
+  const attendu = (d) => !!(d && d.resume && d.resume.t === 'suivi' && d.resume.st === 'available' && d.resume.sens !== 'sortant' && typeof d.resume.code === 'string' && d.resume.code.trim());
+  const fauxCode = lignes.filter((x) => x.code !== attendu(parId.get(x.id)));
+  dit(lignes.some((x) => x.code) && !fauxCode.length, `${nom} : R2 code de retrait sur la ligne ⇔ code LU dans le résumé`, JSON.stringify(fauxCode.slice(0, 2)));
+  const puce = pg.locator('[data-boite-code-copier]').first();
+  if (await puce.count()) {
+    const brut = await puce.getAttribute('data-boite-code-copier');
+    const bb = await puce.boundingBox();
+    await puce.click();
+    await pg.waitForTimeout(200);
+    const copie = await pg.evaluate(() => navigator.clipboard.readText().catch(() => null));
+    const etat = await puce.getAttribute('data-copie');
+    dit(bb && bb.height >= 44 && bb.width >= 44 && copie === brut && etat === '1' && (await pg.locator('[data-boite-lecture]').count()) === 0, `${nom} : R2 un toucher sur le code le COPIE (sans ouvrir l'e-mail), 44 px`, JSON.stringify({ copie, brut, etat, bb }));
+  }
+  // R3. Non lu : point bleu, filtre, ouvrir = lu (écrit), « Tout marquer lu ».
+  const nonLus = lignes.filter((x) => x.lu === '0');
+  const points = await pg.locator('[data-boite-email][data-lu="0"] [data-boite-point="1"]').count();
+  dit(nonLus.length > 0 && points === nonLus.length, `${nom} : R3 chaque non-lu porte son point (${points})`);
+  const avantEcr = base.rows.find((x) => x.id === 'vrm_emails_lus');
+  const revAvant = avantEcr && avantEcr.data && avantEcr.data.rev;
+  const cible = pg.locator('[data-boite-email][data-lu="0"]').first();
+  const idCible = await cible.getAttribute('data-boite-email');
+  await cible.click();
+  await pg.locator(`[data-boite-lecture="${idCible}"] [data-boite-titre]`).waitFor({ timeout: 8000 });
+  await pg.waitForTimeout(400);
+  const ligneLus = base.rows.find((x) => x.id === 'vrm_emails_lus');
+  const L = await import(path.join(RACINE, 'api', '_lib', 'emails-lus.js'));
+  const luEcrit = ligneLus && L.estLu({ id: idCible, at: parId.get(idCible).at }, L.etatLus(ligneLus.data)) === true && ligneLus.data.rev === (revAvant || 0) + 1;
+  // R4. La lecture : la carte et les gestes par identité.
+  const lec = await pg.evaluate((id) => { const a = document.querySelector(`[data-boite-lecture="${id}"]`); if (!a) return null; return { heros: (a.querySelector('[data-boite-heros]') || {}).dataset ? a.querySelector('[data-boite-heros]') && a.querySelector('[data-boite-heros]').dataset.boiteHeros : null, gestes: [...a.querySelectorAll('[data-boite-geste-id]')].map((g) => [g.dataset.boiteGesteId, g.dataset.boiteIdent]), bascule: (a.querySelector('[data-boite-basculer-lu]') || {}).textContent || '', balises: a.querySelectorAll('.vrm-boite-msg script, .vrm-boite-msg iframe, .vrm-boite-msg img, .vrm-boite-msg svg, .vrm-boite-msg style').length, texte: a.innerText }; }, idCible);
+  dit(luEcrit && lec && /Marquer non lu/.test(lec.bascule), `${nom} : R3 ouvrir un non-lu l'écrit LU (relu par la règle) et propose « Marquer non lu »`, JSON.stringify({ rev: ligneLus && ligneLus.data.rev, revAvant, b: lec && lec.bascule }));
+  const d = parId.get(idCible), res = d.resume || {};
+  const ident = (k) => (lec.gestes.find((g) => g[0] === k) || [])[1] || '';
+  const okGestes = lec.gestes.every(([k, idt]) => (k === 'offres' ? !idt : (k === 'retrait' ? idt === `colis n° ${res.s}` : k === 'colis' || k === 'vente' ? idt.endsWith(String(res.tx)) : k === 'achat' ? idt === `achat n° ${res.tx}` : k === 'vcvente' ? idt.endsWith(String(res.p)) : k === 'num' ? !res.nt : false)));
+  dit(okGestes && lec.balises === 0 && !/<\s*(script|iframe|img)\b/i.test(lec.texte), `${nom} : R4 les gestes de l'e-mail ouvert portent SON identité (${lec.gestes.map((g) => g[0]).join(', ') || 'aucun'}) ; le message n'a aucune balise`, JSON.stringify({ g: lec.gestes, ident: ident('retrait'), res: { s: res.s, tx: res.tx } }));
+  await pg.locator('[data-boite-fermer]').first().click();
+  await pg.waitForTimeout(250);
+  // R5. L'e-mail « à vérifier » (texte piégé : <script>, <img onerror>, <iframe>) : rien ne s'exécute.
+  const piege = [...parId.entries()].find(([, x]) => x.type === 'ignoré' && x.resume);
+  if (piege) {
+    const l = pg.locator(`[data-boite-email="${piege[0]}"]`);
+    if (await l.count()) {
+      await l.scrollIntoViewIfNeeded(); await l.click();
+      await pg.locator(`[data-boite-lecture="${piege[0]}"] [data-boite-titre]`).waitFor({ timeout: 8000 });
+      const x = await pg.evaluate((id) => { const a = document.querySelector(`[data-boite-lecture="${id}"]`); return { xss: window.__xss || null, balises: a.querySelectorAll('.vrm-boite-msg script, .vrm-boite-msg iframe, .vrm-boite-msg img').length, liens: [...a.querySelectorAll('.vrm-boite-msg a')].map((y) => [y.getAttribute('href'), y.getAttribute('target'), y.getAttribute('rel')]) }; }, piege[0]);
+      dit(!x.xss && x.balises === 0 && x.liens.every(([h, t, r]) => /^https?:/.test(h) && t === '_blank' && /noopener/.test(r)), `${nom} : R5 le texte piégé n'exécute rien, aucune balise rendue, liens http(s) ouverts ailleurs`, JSON.stringify(x));
+      await pg.locator('[data-boite-fermer]').first().click(); await pg.waitForTimeout(250);
+    }
+  }
+  // R6. Glisser au doigt : lu ⇄ non lu (téléphone).
+  if (tactile) {
+    const g = pg.locator('[data-boite-email][data-lu="0"]').first();
+    if (await g.count()) {
+      const gid = await g.getAttribute('data-boite-email');
+      await g.scrollIntoViewIfNeeded();
+      const bb = await g.boundingBox();
+      await g.evaluate((el, b) => {
+        const y = b.y + b.height / 2, x0 = b.x + 30;
+        const ev = (t, x) => el.dispatchEvent(new PointerEvent(t, { bubbles: true, cancelable: true, pointerId: 7, pointerType: 'touch', isPrimary: true, clientX: x, clientY: y }));
+        ev('pointerdown', x0); for (let i = 1; i <= 10; i++) ev('pointermove', x0 + i * 13); ev('pointerup', x0 + 130);
+      }, bb);
+      await pg.waitForTimeout(500);
+      const apres = await pg.locator(`[data-boite-email="${gid}"]`).getAttribute('data-lu');
+      const ouverte = await pg.locator('[data-boite-feuille]').count();
+      dit(apres === '1' && ouverte === 0, `${nom} : R6 glisser une ligne vers la droite la marque LUE, sans l'ouvrir`, JSON.stringify({ apres, ouverte }));
+    }
+  }
+  // R7. Le filtre « Non lus » (côté route) et « Tout marquer lu ».
+  await pg.evaluate(() => { const p = document.querySelector('[data-boite-rubrique="nonlus"]'); if (p) p.scrollIntoView({ block: 'center' }); });
+  const avantNL = journal(appels).length;
+  await pg.locator('[data-boite-rubrique="nonlus"]').click();
+  await pg.waitForTimeout(900);
+  const nl = await pg.locator('[data-boite-email]').evaluateAll((l) => l.map((x) => x.dataset.lu));
+  const parti = journal(appels).slice(avantNL).some((a) => a.q.nonlus === '1');
+  dit(parti && nl.length > 0 && nl.every((x) => x === '0'), `${nom} : R7 « Non lus » demande la route (nonlus=1) et ne montre que des non-lus (${nl.length})`);
+  await pg.screenshot({ path: path.join(CAPT, `nonlus-${nom}.png`) });
+  const tout = pg.locator('[data-boite-tout-lu]');
+  if (await tout.count()) {
+    await tout.click(); await pg.waitForTimeout(500);
+    const restants = await pg.locator('[data-boite-email][data-lu="0"]').count();
+    dit(restants === 0 && (await pg.locator('[data-boite-avis]').count()) === 1, `${nom} : R7 « Marquer ceux-ci lus » : plus aucun point, un mot le dit`);
+  } else dit(false, `${nom} : R7 « Tout marquer lu » présent quand il reste des non-lus`);
+  await pg.locator('[data-boite-rubrique="tout"]').click(); await pg.waitForTimeout(700);
+  // R8. Une pile se déplie et montre chacun de ses e-mails.
+  const pile = pg.locator('[data-boite-pile]').first();
+  if (await pile.count()) {
+    const n = Number(await pile.getAttribute('data-boite-pile'));
+    await pile.scrollIntoViewIfNeeded();
+    await pile.locator('[data-boite-pile-tete]').click(); await pg.waitForTimeout(250);
+    const vus = await pile.locator('[data-boite-email]').count();
+    await pg.screenshot({ path: path.join(CAPT, `pile-${nom}.png`) });
+    dit(n >= 3 && vus === n, `${nom} : R8 une pile de ${n} e-mails se déplie et les montre tous`, String(vus));
+  } else dit(false, `${nom} : R8 au moins une pile dans une boîte au volume réel`);
 }

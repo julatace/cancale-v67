@@ -244,6 +244,16 @@ export function joursAvant(lim, maintenant = Date.now()) {
 const ECHEANCE = /^(?:à envoyer )?avant le /;
 const GESTES_MOTS = { 'bordereau prêt': 'bordereau', 'bordereau à prendre sur Vinted': 'bordereau', 'à faire sur Vinted': 'action', 'à lire': 'verifier' };
 const rang = (x) => (/^(?:code |N°)/.test(x) ? 0 : /€$/.test(x) ? 1 : 2);
+// (6 nov., v36) Sur la LIGNE, la nature tient en quelques mots (la lecture garde la
+// phrase entière) : les familles longues rangées au classement, raccourcies — une mise
+// en forme du même champ, rien d'ajouté.
+const NATURE_COURTE = {
+  'Virement du porte-monnaie vers ta banque': 'Virement vers ta banque',
+  'Achat livré, à vérifier avant la date limite': 'Achat livré à vérifier',
+  "Nouvel article d'un membre suivi": 'Nouvel article suivi',
+  "Remboursement d'un de tes achats": 'Remboursement',
+  'Ton acheteur a retiré son colis': 'Colis retiré par l’acheteur',
+};
 export function ligneEmail(e, delies = {}, maintenant = Date.now()) {
   const t = titreSimple(e, delies);
   const r = e && e.resume && typeof e.resume === 'object' ? e.resume : null;
@@ -269,7 +279,7 @@ export function ligneEmail(e, delies = {}, maintenant = Date.now()) {
   // Un e-mail que VRM n'a pas su ranger : « à vérifier » prime (ambre).
   if (e && e.etat && e.etat !== 'integre' && e.etat !== 'reessai') geste = { k: 'verifier', mot: e.etat === 'erreur' ? 'en attente' : 'à vérifier', proche: false, passe: false };
   const essentiel = garde.map((x, i) => [rang(x), i, x]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map((x) => x[2]);
-  return { titre: t.titre, essentiel, geste, rien: !!t.rien && !geste };
+  return { titre: NATURE_COURTE[t.titre] || t.titre, essentiel, geste, rien: !!t.rien && !geste };
 }
 // Un geste qui mérite l'ambre : délai proche (< 48 h), ou à vérifier.
 export const gesteAmbre = (g) => !!(g && !g.passe && (g.proche || g.k === 'verifier'));
@@ -332,7 +342,7 @@ export function carteHeros(e, delies = {}, maintenant = Date.now()) {
   const tr = r.tr && r.tr !== 'autre' ? String(r.tr) : '';
   switch (r.t) {
     case 'suivi':
-      if (r.st === 'available' && r.sens !== 'sortant') return { ...base, genre: 'retrait', code: typeof r.code === 'string' && r.code.trim() ? codeLisible(r.code) : '', lieu: lieuLisible(r.lieu), limite: limiteLue(r.lim, maintenant), transporteur: tr };
+      if (r.st === 'available' && r.sens !== 'sortant') return { ...base, genre: 'retrait', code: codeSurLigne(e), lieu: lieuLisible(r.lieu), limite: limiteLue(r.lim, maintenant), transporteur: tr };
       return { ...base, genre: 'colis', transporteur: tr };
     case 'bordereau': return r.av === 'analyse' ? base : { ...base, genre: 'bordereau', article: r.a || '', num };
     case 'vente': return r.av === 'analyse' ? base : { ...base, genre: 'vente', montant: prixLu(r.px), montantMot: r.px ? 'vendu' : '', article: r.a || '', num };
@@ -462,4 +472,13 @@ export function lireCorps(texte) {
     });
   }
   return { blocs, pied: pied.join(' ').replace(/\s+([.,])/g, '$1').replace(/\s{2,}/g, ' ').trim() };
+}
+
+// ── LE CODE DE RETRAIT SUR LA LIGNE ─────────────────────────────────────────
+// Seulement LU (le `code` du résumé rangé), seulement pour un colis À RETIRER
+// (arrivé, pas un colis que TON acheteur retire) ; sinon '' — jamais tiré du sujet
+// ni du texte (« pas su » ≠ « oui »).
+export function codeSurLigne(e) {
+  const r = e && e.resume && typeof e.resume === 'object' ? e.resume : null;
+  return r && r.t === 'suivi' && r.st === 'available' && r.sens !== 'sortant' && typeof r.code === 'string' && r.code.trim() ? codeLisible(r.code) : '';
 }

@@ -41,7 +41,7 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { RUBRIQUES_BOITE, rubriqueEmail } from '../api/_lib/boite-email.js';
-import { expediteurLisible, dateEmail, poidsLisible, ceQueVrmAFait, titreSimple, titreEnClair, groupesParJour, siteExpediteur, ligneEmail, gesteAmbre, monogramme, empiler, carteHeros, gestesEmail, lireCorps, lieuLisible } from './boiteEmails.js';
+import { expediteurLisible, dateEmail, poidsLisible, ceQueVrmAFait, titreSimple, titreEnClair, groupesParJour, siteExpediteur, ligneEmail, gesteAmbre, monogramme, empiler, carteHeros, gestesEmail, lireCorps, lieuLisible, codeSurLigne } from './boiteEmails.js';
 import { requeteJsonBornee } from './requeteJsonBornee.js';
 import { LogoSite } from './SelecteurSites.jsx';
 import { LogoTransporteur } from './PastilleTransporteur.jsx';
@@ -305,7 +305,7 @@ const Ligne = memo(function Ligne({ e, delies, ouvert, lu, photo, onOuvrir, onLu
   const site = siteExpediteur(e.from);
   const res = e.resume && typeof e.resume === 'object' ? e.resume : null;
   // Le code : seulement LU (le résumé), seulement sur un colis à retirer.
-  const code = res && res.t === 'suivi' && res.st === 'available' && res.sens !== 'sortant' && typeof res.code === 'string' && res.code.trim() ? carteHeros(e, delies, maintenant).code : '';
+  const code = codeSurLigne(e);
   // L'essentiel, sans le code (il est à droite, en grand) ; le lieu en court.
   const lieu = res && res.lieu ? lieuLisible(res.lieu) : null;
   const essentiel = l.essentiel.filter((x) => !(code && /^code /.test(x))).map((x) => (lieu && x === res.lieu ? lieu.nom : x));
@@ -531,8 +531,13 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
   const libelleCompte = (a) => (a.nom ? (nomsDoubles[a.nom] > 1 ? `${a.nom} · ${a.adresse}` : a.nom) : a.adresse);
   const choixCompte = Array.isArray(adresses) && (adresses.length > 1 || (adresse && adresses.length > 0));
   const filtre = !!(cherche || aVerif || nonLus);
+  // (6 nov., v36) Les rubriques ne portent leur nombre que s'il est COMPLET (la route
+  // compte les 200 derniers) : une boîte plus grande n'affiche pas de total partiel,
+  // et plus de phrase de couverture sous les pastilles (§5). « Non lus » et « À
+  // vérifier » gardent le leur, suivi de « + » s'il peut y en avoir d'autres.
+  const complet = !!(c && parR && !c.plus);
   const phrase = cherche ? `Recherche « ${cherche} » dans le sujet, l’expéditeur, l’article, le code et le n° de suivi${adresse ? ` de ${nomCompte(adresse)}` : ''}.`
-    : c && parR && !filtre ? (c.plus ? `Les nombres ne comptent que tes ${c.sur} derniers e-mails${c.adresse ? ` de ${nomCompte(c.adresse)}` : ''}.` : c.adresse ? `Les nombres sont ceux de ${nomCompte(c.adresse)}.` : '') : '';
+    : complet && !filtre && c.adresse ? `Les nombres sont ceux de ${nomCompte(c.adresse)}.` : '';
   const rangee = useRef(null);
   useBords(rangee, parR ? 1 : 0);
   const choisir = (id, bouton) => {
@@ -552,7 +557,7 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
   }, [pages && pages.suite, groupes.length]);
   const photoLigne = useCallback((e) => (photoDe ? photoDe(e) : null), [photoDe]);
   const rendreEmail = (e) => <Ligne key={e.id} e={e} delies={delies} ouvert={ouvert === e.id} lu={luDe(e)} photo={photoLigne(e)} onOuvrir={ouvrir} onLu={onLu} maintenant={maintenant}/>;
-  const nPastille = (id) => (filtre ? null : parR && Number.isFinite(parR[id]) ? parR[id] : null);
+  const nPastille = (id) => (filtre || !complet ? null : Number.isFinite(parR[id]) ? parR[id] : null);
   return (
     <div className="vrm-boite-corps-ecran" data-boite-large={large ? '1' : '0'} data-boite-ouvert={ouvert ? '1' : '0'}>
       <div className="vrm-boite-liste-col">
@@ -578,7 +583,7 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
               </button>;
             })}
             {(aVerif || (c && c.aVerifier > 0)) && <button type="button" aria-pressed={aVerif} data-boite-rubrique="a-verifier" className="vrm-boite-averif-pastille" onClick={() => { setAVerif((v) => !v); setOuvert(''); }}>
-              <span>À vérifier</span>{!filtre && c && c.aVerifier > 0 ? <span className="vrm-boite-n" data-boite-n={c.aVerifier}>{c.aVerifier}</span> : null}
+              <span>À vérifier</span>{!filtre && c && c.aVerifier > 0 ? <span className="vrm-boite-n" data-boite-n={c.aVerifier}>{c.aVerifier}{c.plus ? '+' : ''}</span> : null}
             </button>}
           </div>
           {(choixCompte || (vieille && pages !== null) || (lusSus && nNonLus > 0)) && <div className="vrm-boite-ligne-outils">
