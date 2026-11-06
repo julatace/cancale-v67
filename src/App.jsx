@@ -50041,8 +50041,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     //    vente ne connaissait que les emails — mesuré, 30 ventes en 30 jours
     //    avaient un PDF capté par l'extension et AUCUN email : le bouton les
     //    ignorait. La capture de l'extension est la source ; l'email, le filet.
-    if ((curSub!=='bordereaux' && curSub!=='ventes') || !accounts.length) return;
-    if (curSub==='ventes') { await rechargerLabels(); return; }
+    // (6 nov., audit des chiffres) ET SUR MA JOURNÉE : sans les bordereaux captés, sa case disait
+    // « au moins 1 à imprimer » (les e-mails seuls) quand Colis en comptait 4. Lecture scalaire
+    // (`meta->>`, une par compte, en même temps) — les octets du PDF ne partent qu'à l'impression.
+    if ((curSub!=='bordereaux' && curSub!=='ventes' && curSub!=='journee') || !accounts.length) return;
+    if (curSub==='ventes' || curSub==='journee') { await rechargerLabels(); return; }
     let best = null;
     // ⚠️ SCALAIRES SEULEMENT : on demande « y a-t-il un PDF, et de quand ? »,
     //    pas le PDF. Les octets ne partent qu'au clic (§34 — mesuré : 1,6 Mo

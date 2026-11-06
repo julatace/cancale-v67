@@ -290,7 +290,9 @@ const attendus=aEnvoyer.filter(o=>parTx[String(o.transaction_id)]).length;
     //    passé en retard, et le banc a crié au loup sur une app intacte.
     //    C'est §6.5 à mes dépens : on lit le NOMBRE devant « prêt(s) à
     //    imprimer », quelle que soit la phrase autour.
-    const lit = (t) => { const m=/((?:au moins )?)(\d+)\s+(?:bordereaux?\s+)?pr[êe]ts?\s+[àa]\s+imprimer/i.exec(t);
+    //    (6 nov., audit des chiffres) « à imprimer » = pas encore imprimés (la case de
+    //    Colis) : « N à imprimer » sans « prêts » est lu aussi.
+    const lit = (t) => { const m=/((?:au moins )?)(\d+)\s+(?:bordereaux?\s+)?(?:pr[êe]ts?\s+)?[àa]\s+imprimer/i.exec(t);
       return m ? { n:+m[2], approx:!!m[1].trim() } : null; };
     const ctx = await b2.newContext({viewport:{width:1512,height:950}});
     const p2 = await ctx.newPage();
