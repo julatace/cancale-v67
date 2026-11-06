@@ -29,25 +29,26 @@
 
 /* ══ 1. COLIS ══════════════════════════════════════════════════════════════ */
 
-/* L'en-tête d'un point : le NOM a sa ligne (à droite : transporteur · nombre),
-   l'adresse passe DESSOUS, entière jusqu'au bord. Plus jamais « 14 Rue des
-   Glycines, 35000 Re… » coincée à côté du nom. */
+/* L'en-tête d'un point : le NOM a sa ligne (à droite : le nombre de colis), le
+   transporteur et l'adresse passent DESSOUS. Plus jamais « 14 Rue des Glycines,
+   35000 Re… » coincée à côté du nom, ni « Phone C… » serré par « Mondial Relay ». */
 html body .vrm-app-shell .vrm-main .vrm-rpf-point:not(.vrm-rpf-verifier) > .vrm-rpf-tete {
-  display: grid !important; grid-template-columns: minmax(0, 1fr) auto auto; align-items: baseline;
+  display: grid !important; grid-template-columns: auto minmax(0, 1fr) auto; align-items: baseline;
   column-gap: 8px; row-gap: 2px; padding: 12px 16px 10px !important;
 }
 html body .vrm-app-shell .vrm-main .vrm-rpf-point > .vrm-rpf-tete > :is(.vrm-rpf-ident, .vrm-rpf-meta) { display: contents !important; }
 html body .vrm-app-shell .vrm-main .vrm-rpf-point > .vrm-rpf-tete .vrm-rpf-nom {
-  grid-row: 1; grid-column: 1; min-width: 0; font-size: var(--vrm-t17); font-weight: 600; letter-spacing: -.02em;
+  grid-row: 1; grid-column: 1 / 3; min-width: 0; font-size: var(--vrm-t17); font-weight: 600; letter-spacing: -.02em;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-html body .vrm-app-shell .vrm-main .vrm-rpf-point > .vrm-rpf-tete .vrm-rpf-transp { grid-row: 1; grid-column: 2; align-self: center; }
+html body .vrm-app-shell .vrm-main .vrm-rpf-point > .vrm-rpf-tete .vrm-rpf-transp { grid-row: 2; grid-column: 1; align-self: center; margin-right: 6px; }
 html body .vrm-app-shell .vrm-main .vrm-rpf-point > .vrm-rpf-tete .vrm-rpf-n { grid-row: 1; grid-column: 3; margin: 0 !important; font-size: var(--vrm-t13); font-weight: 400; color: var(--vrm-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 html body .vrm-app-shell .vrm-main .vrm-rpf-point > .vrm-rpf-tete .vrm-rpf-adr {
-  grid-row: 2; grid-column: 1 / -1; min-width: 0; font-size: var(--vrm-t13); font-weight: 400; color: var(--vrm-muted);
+  grid-row: 2; grid-column: 2 / -1; min-width: 0; font-size: var(--vrm-t13); font-weight: 400; color: var(--vrm-muted);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 html body .vrm-app-shell .vrm-main .vrm-rpf-point > .vrm-rpf-tete .vrm-rpf-transp .vrm-transporteur { font-size: var(--vrm-t13); }
+html body .vrm-app-shell .vrm-main .vrm-rpf-point > .vrm-rpf-tete:not(:has(.vrm-rpf-transp)) .vrm-rpf-adr { grid-column: 1 / -1; }
 
 /* Une ligne de colis : la photo plus grande (56 px), le NOM DE L'ARTICLE garde la
    place (deux lignes au plus), les gestes passent dessous, alignés sur le texte.
@@ -84,6 +85,10 @@ html body .vrm-app-shell .vrm-main a.vrm-rpf-rang-lien:active { background: var(
 @media (hover: hover) and (pointer: fine) { html body .vrm-app-shell .vrm-main a.vrm-rpf-rang-lien:hover { background: color-mix(in srgb, var(--vrm-card2) 60%, transparent); } }
 html body .vrm-app-shell .vrm-main a.vrm-rpf-rang-lien:focus-visible { outline: 2px solid var(--vrm-accent); outline-offset: -2px; border-radius: 12px; }
 
+/* Le bas de « À retirer » portait 40 px de marge intérieure (le cadre de l’écran Colis) : avec les 28 px d’une
+   section, « Argent à vérifier » tombait à 68 px de « En route » (banc colis-retirer-propre, rouge AVANT ce chantier
+   aussi — mesuré sur la base). 12 + 28 = 40 px : le rythme des autres sections. */
+html body .vrm-app-shell .vrm-main div:has(> section.vrm-colis-retirer) { padding-bottom: 12px !important; }
 /* La carte « Nouveau N° pour un carton » : ses boutons en pilules grises d'iOS. */
 html body .vrm-app-shell .vrm-main [data-numeros-a-ecrire] [data-a-ecrire] button {
   border: 0 !important; background: var(--vrm-card2) !important; border-radius: 999px !important; padding: 0 16px !important;
