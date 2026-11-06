@@ -12711,34 +12711,42 @@ function ExtEnRetard({ onNav }) {
   );
 }
 
+// (6 nov., v36-visuel — Julien sur Colis : « même ça c'est moche » : un « 10 » ambre
+// énorme, un paragraphe, un « Pourquoi ? » gris isolé, une barre ambre à gauche)
+// UNE ALERTE = UNE RANGÉE : l'icône dans sa pastille (la seule couleur), le titre
+// où le nombre est dans la phrase, UNE ligne de description au plus, puis le
+// geste (l'action, ou le chevron qui ouvre le détail en FEUILLE). Plus de barre
+// latérale, plus de nombre en exergue : il EST dans le titre. Mêmes props.
 function Notice({ tone='info', icon, title, value, desc, detail, action, style={} }) {
-  const col = tone==='danger' ? C.danger : tone==='warn' ? C.warn : tone==='ok' ? C.accent : C.blue;
+  const [ouvert, setOuvert] = useState(false);
+  const col = tone==='danger' ? C.danger : tone==='warn' ? C.warn : tone==='ok' ? C.accent : C.muted;
+  const tete = <>{value != null && <span className="vrm-notice-n" data-notice-valeur="">{value}</span>}{value != null ? ' ' : ''}{title}</>;
+  const aDetail = !!(detail || (desc && action));
+  const corps = (
+    <>
+      {icon && <span className="vrm-notice-icone" aria-hidden="true" style={{color:col}}><Icon name={icon} size={17}/></span>}
+      <span className="vrm-notice-texte">
+        <span className="vrm-notice-titre">{tete}</span>
+        {desc && <span className="vrm-notice-desc">{desc}</span>}
+      </span>
+    </>
+  );
   return (
-    /* ⚠️ §5.26 : sans `flexWrap` ni largeur plancher, un bouton d'action large
-       écrase le bloc de texte et le titre s'écrit deux mots par ligne (vu en
-       capture sur « 112 ventes sans prix d'achat »). La rangée passe à la ligne,
-       le texte ne descend jamais sous 190 px. */
-    <div className="vrm-notice" data-tone={tone} style={{position:'relative',display:'flex',gap:11,alignItems:'flex-start',flexWrap:'wrap',
-      background:C.card,border:`1px solid ${C.border}`,borderRadius:12,boxShadow:C.shadow,
-      padding:'13px 15px 13px 17px',marginBottom:10,overflow:'hidden',...style}}>
-      <span aria-hidden="true" style={{position:'absolute',left:0,top:0,bottom:0,width:3,background:col}}/>
-      {/* (31 oct., « Vitrine ») Le voile en dégradé de la couleur est retiré :
-          le trait de 3 px à gauche dit déjà le ton, la surface reste neutre. */}
-      {icon && <span aria-hidden="true" style={{flexShrink:0,color:col,marginTop:1}}><Icon name={icon} size={18}/></span>}
-      <div style={{flex:'1 1 190px',minWidth:0}}>
-        <div style={{display:'flex',alignItems:'baseline',gap:7,flexWrap:'wrap'}}>
-          {value != null && <span className="vrm-display" style={{fontSize:20,fontWeight:700,color:col,whiteSpace:'nowrap'}}>{value}</span>}
-          <span style={{fontSize:13,fontWeight:600,color:C.text,minWidth:0}}>{title}</span>
-        </div>
-        {desc && <div style={{fontSize:12,color:C.muted,marginTop:3,lineHeight:1.45}}>{desc}</div>}
-        {detail && (
-          <details style={{marginTop:5}}>
-            <summary style={{listStyle:'none',cursor:'pointer',fontSize:11,color:C.muted,opacity:.85}}>Pourquoi ?</summary>
-            <div style={{fontSize:11,color:C.muted,marginTop:4,lineHeight:1.45}}>{detail}</div>
-          </details>
-        )}
-      </div>
-      {action && <div style={{flexShrink:0,marginLeft:'auto'}}>{action}</div>}
+    <div className="vrm-notice" data-tone={tone} style={style}>
+      {aDetail && !action
+        ? <button type="button" className="vrm-notice-zone" onClick={()=>setOuvert(true)} aria-haspopup="dialog">{corps}<span className="vrm-ios-chevron" aria-hidden="true"><svg width="8" height="13" viewBox="0 0 8 13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m1.5 1.5 5 5-5 5"/></svg></span></button>
+        : <div className="vrm-notice-zone">{corps}{aDetail && <button type="button" className="vrm-notice-info" aria-label="En savoir plus" onClick={()=>setOuvert(true)}><Icon name="info" size={18}/></button>}</div>}
+      {action && <div className="vrm-notice-action">{action}</div>}
+      {/* Le détail reste dans la page (caché) : un lecteur d'écran et la recherche le trouvent. */}
+      {detail && <div className="vrm-sr">{detail}</div>}
+      {ouvert && (
+        <SheetShell onClose={()=>setOuvert(false)} titre={<>{tete}</>} z={12000} data-notice-feuille="">
+          <div className="vrm-feuille-info">
+            {desc && <p style={{margin:'0 0 12px'}}>{desc}</p>}
+            {detail && <div style={{color:C.muted,fontSize:15,lineHeight:1.5}}>{detail}</div>}
+          </div>
+        </SheetShell>
+      )}
     </div>
   );
 }
@@ -48134,9 +48142,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     updatePair(it, { reattribue: { ...f.reattribue, ecrit: new Date().toISOString() }, cartonVerifie: new Date().toISOString() });
   };
   const blocAEcrire = () => aEcrireCarton.length > 0 && (
-    <div data-numeros-a-ecrire={aEcrireCarton.length} style={{ background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn || '#B25000'}`, borderRadius: 12, padding: '10px 12px', marginBottom: 12 }}>
-      <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{aEcrireCarton.length > 1 ? `${aEcrireCarton.length} nouveaux numéros à écrire sur tes cartons` : 'Un nouveau numéro à écrire sur un carton'}</div>
-      <div style={{ fontSize: 12, color: C.text2, margin: '3px 0 6px', lineHeight: 1.45 }}>{aEcrireCarton.every((it) => ((numeros[it.id] || {}).reattribue || {}).main) ? 'Si le carton porte encore l’ancien numéro, barre-le et écris le nouveau.' : 'Barre l’ancien numéro sur le carton et écris le nouveau.'} L'ancien ne sera jamais redonné.</div>
+    // (6 nov., v36-visuel — Julien : « même ça c'est moche ») Une carte d'alerte : plus de
+    // barre ambre à gauche ; le titre et son « ⓘ » (le geste détaillé), la liste. Le geste
+    // en une ligne reste sous le titre — « barre l'ancien, écris le nouveau ».
+    <div data-numeros-a-ecrire={aEcrireCarton.length} className="vrm-carte-alerte" style={{ background: C.card, borderRadius: 14, padding: '12px 16px 4px' }}>
+      <div className="vrm-alerte-tete"><span aria-hidden="true" className="vrm-alerte-icone"><Icon name="pencil" size={15}/></span><span className="vrm-alerte-ligne-texte"><span className="vrm-alerte-ligne-titre">{aEcrireCarton.length > 1 ? `${aEcrireCarton.length} nouveaux numéros à écrire sur tes cartons` : 'Un nouveau numéro à écrire sur un carton'}{' '}<Pourquoi label="Écrire le nouveau numéro" titre="Le nouveau numéro">{aEcrireCarton.every((it) => ((numeros[it.id] || {}).reattribue || {}).main) ? 'Si le carton porte encore l’ancien numéro, barre-le et écris le nouveau.' : 'Barre l’ancien numéro sur le carton et écris le nouveau.'} L'ancien ne sera jamais redonné.</Pourquoi></span>
+      <span className="vrm-alerte-ligne-sous">Barre l’ancien, écris le nouveau.</span></span></div>
       {aEcrireCarton.map((it) => { const f = numeros[it.id] || {}; const etq = etiquetteSurVinted(f.numero, f.reattribue.de, it.title); return (
         <div key={it.id} data-a-ecrire={String(it.id)} data-a-ecrire-de={f.reattribue.de} data-a-ecrire-vers={f.numero} data-a-ecrire-main={f.reattribue.main ? '1' : '0'} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '6px 0', borderTop: `1px solid ${C.border}` }}>
           <span style={{ fontSize: 13, color: C.text, flex: '1 1 200px', minWidth: 0 }}><s style={{ color: C.text2 }}>N°{f.reattribue.de}</s> → <b>N°{f.numero}</b> · {String(it.title || '').slice(0, 48)}
