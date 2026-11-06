@@ -183,8 +183,28 @@ const ouvrir = async (pg, errs) => {
   await pg.goto(`http://localhost:${PORT}/?tab=cat_achats`, { waitUntil: 'domcontentloaded' });
   await pg.locator('[data-cc-colonne="retirer"] [data-cc-carte]').first().waitFor({ timeout: 20000 }) /* (2 nov.) Colis → « À retirer » */.catch(async (e) => { console.log('ÉCRAN : ' + (await pg.locator('body').innerText()).slice(0, 1200)); console.log('ERREURS : ' + errs.join(' | ')); throw e; });
   await pg.waitForTimeout(1800);
+  await deplier(pg);
 };
-const lire = (pg) => pg.evaluate(() => {
+// (6 nov.) Depuis le 3 nov. (src/CarteRelais.jsx, `LigneRetraitF`), un colis à retirer est une LIGNE
+// repliée par point relais : son suivi, ses liens « Suivre », la nouvelle Vinted et le code vivent dans
+// son détail, ouvert au toucher. Le banc ouvre chaque ligne (et les sections repliées « À vérifier »,
+// « En double », « En route ») comme Julien le ferait, puis lit — la règle jugée ne change pas.
+const deplier = async (pg) => {
+  await pg.evaluate(() => { for (const d of document.querySelectorAll('details[data-rp-section]')) d.open = true; });
+  for (let i = 0; i < 3; i++) {
+    const n = await pg.evaluate(() => { const bs = [...document.querySelectorAll('.vrm-rpf-ouvrir[aria-expanded="false"]')]; bs.forEach((b) => b.click()); return bs.length; });
+    if (!n) break;
+    await pg.waitForTimeout(300);
+  }
+};
+// (6 nov.) « + Ajouter un n° de suivi » et les n° ajoutés vivent sous « … » en haut de Colis
+// (docs/passation/2026-11-06-finitions.md, b. ; `data-colis-outils-bascule`, comme transporteurs.cjs).
+const outils = async (pg) => {
+  if (await pg.locator('[data-suivi-ajouter]').first().isVisible().catch(() => false)) return;
+  await pg.click('[data-colis-outils-bascule]').catch(() => {}); await pg.waitForTimeout(400);
+};
+const lire = async (pg) => { await deplier(pg); return lire0(pg); };   // une ligne apparue (achat relié) s'ouvre aussi
+const lire0 = (pg) => pg.evaluate(() => {
   const cartes = [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-cc-carte]:not([data-en-verification-tx])')].map((c) => {
     const s0 = c.querySelector('[data-rp-suivi]'); const s = s0 ? { getAttribute: () => s0.getAttribute('data-rp-suivi') || null } : null;
     const conv = [...c.querySelectorAll('a[href*="/inbox/"]')].map((a) => a.getAttribute('href'));
@@ -282,7 +302,7 @@ async function navigateur() {
         const { ctx, pg, errs, ROWS, ecrits } = await preparer(b, vp, false);
         await ouvrir(pg, errs);
         const total0 = (await lire(pg)).total;
-        await pg.locator('[data-suivi-ajouter]').click();
+        await outils(pg); await pg.locator('[data-suivi-ajouter]').click();
         await pg.locator('[data-suivi-saisie]').fill('30 000 071');
         dit(await pg.locator('[data-suivi-transporteur="mondialrelay"]').count() === 1, `C ${nom} : 8 chiffres ⇒ Mondial Relay, lu à la forme du n°`);
         await pg.locator('[data-suivi-cp]').fill('35260');
@@ -296,7 +316,7 @@ async function navigateur() {
         dit(/numeroExpedition=30000071&codePostal=35260$/.test(href || ''), `C ${nom} : « Suivre ↗ » avec le code postal qu'il a donné`, href);
         dit((await lire(pg)).total === total0, `C ${nom} : JAMAIS « à retirer » (le compte ne bouge pas)`, `${total0}`);
         // Un n° à la forme ambiguë : on DEMANDE le transporteur.
-        await pg.locator('[data-suivi-ajouter]').click();
+        await outils(pg); await pg.locator('[data-suivi-ajouter]').click();
         await pg.locator('[data-suivi-saisie]').fill('09440000000072');
         dit(await pg.locator('[data-suivi-transporteur="a-choisir"]').count() === 1, `C ${nom} : forme ambiguë ⇒ « Quel transporteur ? »`);
         await pg.locator('[data-suivi-enregistrer]').click();
@@ -306,7 +326,7 @@ async function navigateur() {
         await pg.locator('[data-suivi-manuel="09440000000072"]').waitFor({ timeout: 8000 });
         dit(ROWS.some((x) => x.id === 'colis_suivi_chronopost_09440000000072'), `C ${nom} : son choix est rangé (colis_suivi_chronopost_…)`);
         // Un n° déjà connu par e-mail : la ligne le DIT (jamais une preuve d'arrivée inventée).
-        await pg.locator('[data-suivi-ajouter]').click();
+        await outils(pg); await pg.locator('[data-suivi-ajouter]').click();
         await pg.locator('[data-suivi-saisie]').fill('30000051');
         await pg.locator('[data-suivi-enregistrer]').click();
         await pg.locator('[data-suivi-manuel="30000051"]').waitFor({ timeout: 8000 });
@@ -434,7 +454,7 @@ async function revue24(b) {
       const rows = rowsAV();
       for (const n of ['30000054', '30000090', '30000051']) rows.push({ id: `colis_suivi_mondialrelay_${n}`, data: { suivi: n, transporteur: 'mondialrelay', codePostal: null, at: j(0.1), majAt: j(0.1) } });
       const { ctx, pg, errs, ROWS, dialogues } = await preparer(b, vp, false, { rows });
-      await ouvrir(pg, errs);
+      await ouvrir(pg, errs); await outils(pg);
       const m = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-suivi-manuel]')].map((x) => [x.getAttribute('data-suivi-manuel'), { ou: x.getAttribute('data-suivi-ou'), t: x.innerText }])));
       const r54 = m['30000054'], r90 = m['30000090'], r51 = m['30000051'];
       dit(r54 && !/il est dans « à retirer »/.test(r54.t) && /retiré/.test(r54.t), `G ${nom} : 30000054, « retiré » sous une autre clé puis rappel : dit retiré, jamais « il est dans « à retirer » »`, r54 && r54.t.split('\n').slice(0, 2).join(' | '));
@@ -455,7 +475,7 @@ async function revue24(b) {
     await essaie(`H ${nom}`, async () => {
       const { ctx, pg, errs } = await preparer(b, { width: 390, height: 844 }, sombre);
       await ouvrir(pg, errs);
-      await pg.locator('[data-suivi-ajouter]').click();
+      await outils(pg); await pg.locator('[data-suivi-ajouter]').click();
       await pg.locator('[data-suivi-saisie]').fill('30000071');
       const t1 = await pg.locator('[data-suivi-transporteur]').innerText();
       // Le choix actif mesuré AVANT tout clic (un clic laisse le survol et le
@@ -472,7 +492,7 @@ async function revue24(b) {
       dit(actif.pressed === 'true' && actif0.pressed === 'true', `H ${nom} : le choix actif est dit (aria-pressed)`);
       if (sombre) dit(actif0.L != null && actif0.L < 0.5, `H ${nom} : en sombre, le choix actif n'est pas un aplat blanc (luminance < 0,5)`, `${actif0.v} · L=${actif0.L != null && actif0.L.toFixed(3)}`);
       const larges = await pg.evaluate(() => [...document.querySelectorAll('[data-suivi-choix]')].map((e) => { const r = e.getBoundingClientRect(); return r.right <= window.innerWidth + 0.5 && r.left >= -0.5 && r.height >= 43.5; }));
-      dit(larges.length === 4 && larges.every(Boolean), `H ${nom} : les quatre choix tiennent dans l'écran, 44 px au doigt`);
+      dit(larges.length === 4 && larges.every(Boolean), `H ${nom} : les quatre choix tiennent dans l'écran, 44 px au doigt`, JSON.stringify(await pg.evaluate(() => [...document.querySelectorAll('[data-suivi-choix]')].map((e) => { const r = e.getBoundingClientRect(); return [e.getAttribute('data-suivi-choix'), Math.round(r.left), Math.round(r.right), Math.round(r.height)]; }))));
       dit(!errs.length, `H ${nom} : aucune erreur d'app`, errs[0]);
       await ctx.close();
     });

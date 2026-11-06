@@ -10,10 +10,9 @@
 //     · aucun placeholder coupé ;
 //     · le segmenté « Mois / Trimestre / Année » est le contrôle PARTAGÉ
 //       (`.vrm-seg-btn`), son choix n'est pas rempli d'accent (§7).
-//   Stock
-//     · la barre des vues est `.vrm-seg`, son choix n'est pas rempli d'accent ;
-//     · une seule pièce : « Ma pièce » n'est pas marquée sélectionnée deux fois ;
-//     · une pièce vide DIT quoi faire, et son bouton ouvre « Aménager la pièce ».
+//   Stock (6 nov. : une seule vue, les étagères 2D — décision du 5 nov.)
+//     · plus de barre des vues ;
+//     · un Stock sans meuble DIT quoi faire, et « + Créer un meuble » ouvre la création.
 //   Prix d'achat
 //     · « Compléter les prix d'achat » (Réglages) mène à Vinted → Annonces,
 //       plus à l'ancien écran isolé ;
@@ -23,6 +22,7 @@
 // Lancer : npm run build && BANC_PORT=… node scripts/bancs/compta-stock-ui.cjs
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
+const { getPath } = require('./_minipgrest.cjs');
 const { ouvrirAvanceCompta } = require('./_compta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -77,7 +77,8 @@ async function ouvrir(b, largeur, tab, init = {}) {
     const forme = (r) => {
       if (/^[a-z]+:data->/i.test(sel)) {
         const o = {};
-        for (const champ of sel.split(',')) { const m = /^([a-z_]+):data->(.+)$/i.exec(champ); if (!m) continue; let v = r.data; for (const p of m[2].split(/->>?/)) v = v == null ? v : v[p]; o[m[1]] = (v != null && /->>/.test(m[2])) ? String(v) : v; }
+        // (6 nov.) chemin JSON lu comme PostgREST (getPath : `->>` = texte, absent ⇒ null) ; `alias:data->>x` était lu comme la clé « >x », toujours absente (§6.3).
+        for (const champ of sel.split(',')) { const m = /^([a-z_]+):(data->.+)$/i.exec(champ); if (!m) continue; o[m[1]] = getPath(r, m[2]); }
         return o;
       }
       return { ...r, updated_at: maintenant.toISOString() };
@@ -147,28 +148,28 @@ const photo = async (pg, nom) => { if (CAPT) { fs.mkdirSync(CAPT, { recursive: t
       });
 
       // ── STOCK ────────────────────────────────────────────────────────────
-      console.log(`\n── Stock (pièce vide), ${L} px`);
+      // (6 nov.) Le Stock n'a plus qu'UNE vue, les étagères 2D (« Mes meubles ») : plus de
+      // sélecteur « Meubles · Ma pièce · Cases · Photos », la pièce 3D n'est plus montée — décision
+      // de Julien du 5 nov. (docs/passation/2026-11-05-stock-2d.md §1). Les trois contrôles de la
+      // pièce vide (barre des vues `.vrm-seg`, « Ma pièce » choisie une fois, « Aménager la pièce »)
+      // jugeaient un écran retiré ; la RÈGLE qui reste : un Stock sans meuble DIT quoi faire, et
+      // son geste mène à la création du meuble.
+      console.log(`\n── Stock (sans meuble), ${L} px`);
       await essaie('stock', async () => {
-        const { ctx, pg, errs } = await ouvrir(b, L, 'garage', { vinted_garage_view: '"plan"' });
-        await pg.waitForFunction(() => /Aménager la pièce/.test(document.body.innerText), null, { timeout: 25000 });
+        const { ctx, pg, errs } = await ouvrir(b, L, 'garage');
+        await pg.waitForSelector('[data-creer-meuble]', { timeout: 25000 });
         await pg.waitForTimeout(800);
         await photo(pg, `stock-${L}`);
-        const r = await pg.evaluate((ACCENT) => {
-          const vues = document.querySelector('[data-stock-vues]') || null;
-          const boutons = [...document.querySelectorAll('button')].filter((b) => b.getBoundingClientRect().width > 0);
-          const choisi = boutons.filter((b) => /Ma pièce/.test(b.textContent) && (getComputedStyle(b).backgroundColor === ACCENT || b.getAttribute('aria-current') === 'page' || b.getAttribute('aria-pressed') === 'true'));
-          const fondAccent = boutons.filter((b) => /Ma pièce/.test(b.textContent) && getComputedStyle(b).backgroundColor === ACCENT).length;
-          return { seg: !!(vues && vues.classList.contains('vrm-seg')), choisi: choisi.length, fondAccent, vide: !!document.querySelector('[data-piece-vide]'), texteVide: (document.querySelector('[data-piece-vide]') || {}).innerText || '', deb: document.documentElement.scrollWidth - document.documentElement.clientWidth };
-        }, ACCENT);
-        dit(r.seg, 'la barre des vues est le contrôle partagé `.vrm-seg`');
-        dit(r.fondAccent === 0, 'aucun « Ma pièce » rempli d’accent (§7)', String(r.fondAccent));
-        dit(r.choisi === 1, '« Ma pièce » n’est marquée choisie qu’UNE fois (l’onglet)', String(r.choisi));
-        dit(r.vide && /vide/i.test(r.texteVide) && /meuble/i.test(r.texteVide), 'une pièce vide DIT quoi faire', r.texteVide.replace(/\s+/g, ' ').slice(0, 90));
-        await essaie('le geste de la pièce vide', async () => {
-          await pg.click('[data-piece-vide-geste]');
-          await pg.waitForTimeout(400);
-          const ouvert = await pg.evaluate(() => { const d = document.querySelector('[data-amenager]'); return d ? d.open : null; });
-          dit(ouvert === true, '« Ajouter un meuble » ouvre « Aménager la pièce »', String(ouvert));
+        const r = await pg.evaluate(() => {
+          const ex = document.querySelector('[data-stock-explication]');
+          return { vues: !!document.querySelector('[data-stock-vues]'), expli: ex ? ex.innerText : '', deb: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+        });
+        dit(!r.vues, 'une seule vue : plus de barre « Meubles · Ma pièce · Cases · Photos » (5 nov.)');
+        dit(/meuble/i.test(r.expli) && /case/i.test(r.expli), 'un Stock sans meuble DIT quoi faire (crée ton meuble, chaque article dans sa case)', r.expli.replace(/\s+/g, ' ').slice(0, 90));
+        await essaie('le geste du Stock sans meuble', async () => {
+          await pg.click('[data-creer-meuble]');
+          const ouvert = await pg.waitForSelector('[data-stock-modale] [data-gravite-choix]', { timeout: 8000 }).then(() => true).catch(() => false);
+          dit(ouvert, '« + Créer un meuble » ouvre la création du meuble', String(ouvert));
         });
         dit(r.deb <= 1, 'aucun débordement horizontal', `${r.deb} px`);
         dit(errs.length === 0, 'aucune erreur d’app', errs.join(' | ').slice(0, 160));

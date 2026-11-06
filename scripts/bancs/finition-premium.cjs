@@ -23,6 +23,7 @@ let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 catch (_) { ({ chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 const { metaVersData } = require('./_meta.cjs');
+const { getPath } = require('./_minipgrest.cjs');
 const fs = require('fs'), http = require('http');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 5471;
@@ -122,7 +123,8 @@ const ouvrir = async (b, vp, sombre, tab) => {
     const forme = (r) => {
       if (/^[a-z_]+:data->/i.test(sel)) {
         const o = {};
-        for (const champ of sel.split(',')) { const m = /^([a-z_]+):data->(.+)$/i.exec(champ); if (!m) continue; let v = r.data; for (const p of m[2].split(/->>?/)) v = v == null ? v : v[p]; o[m[1]] = (v != null && /->>/.test(m[2])) ? String(v) : v; }
+        // (6 nov.) chemin JSON lu comme PostgREST (getPath : `->>` = texte, absent ⇒ null) ; `alias:data->>x` était lu comme la clé « >x », toujours absente (§6.3).
+        for (const champ of sel.split(',')) { const m = /^([a-z_]+):(data->.+)$/i.exec(champ); if (!m) continue; o[m[1]] = getPath(r, m[2]); }
         return o;
       }
       return { ...r, updated_at: cap, cap: r.data.capturedAt };
@@ -187,7 +189,11 @@ const ECRANS = [
           const r = rail.getBoundingClientRect();
           return { n: bs.length, railBas: Math.round(r.bottom), railH: Math.round(r.height), defile: !!defilant,
             coupees: bs.filter((e) => { const x = e.getBoundingClientRect(); return x.bottom > innerHeight + .5 || x.bottom > r.bottom + .5; }).map((e) => e.innerText.trim()),
-            petites: bs.filter((e) => e.getBoundingClientRect().height < 33.5).map((e) => e.innerText.trim() + ' ' + Math.round(e.getBoundingClientRect().height)) };
+            // (6 nov.) Le plancher suit la densité de la colonne (3012b3df, 1er nov. après-midi,
+            // styles-finition.css : « 1-2 : les entrées gardent 34 px ; 3-4 : 30 puis 28 px — seulement
+            // quand, sinon, une ligne serait coupée »). Hors densité 3-4, 34 px reste exigé.
+            densite: rail.getAttribute('data-rail-densite') || '0',
+            petites: bs.filter((e) => e.getBoundingClientRect().height < ({ 3: 29.5, 4: 27.5 }[rail.getAttribute('data-rail-densite')] || 33.5)).map((e) => e.innerText.trim() + ' ' + Math.round(e.getBoundingClientRect().height)) };
         });
         await shot(pg, nom(vp, false, 'colonne'));
         dit(!!avant && avant.n >= 10 && avant.railH <= vp.height + 1, 'la colonne est rendue et ne dépasse pas la hauteur de l’écran', JSON.stringify(avant));
@@ -205,7 +211,7 @@ const ECRANS = [
           return out;
         });
         dit(atteintes.length === 0, 'chaque entrée (Paramètres compris) s’atteint EN ENTIER, sans être coupée par le bas', atteintes.join(' · '));
-        dit(avant && avant.petites.length === 0, 'aucune entrée sous 34 px de haut (une rangée de navigation à la souris)', avant && avant.petites.join(' · '));
+        dit(avant && avant.petites.length === 0, 'aucune entrée sous 34 px de haut (30/28 px seulement en densité 3/4, quand sinon une ligne serait coupée)', avant && `densité ${avant.densite}${avant.petites.length ? ' — ' + avant.petites.join(' · ') : ''}`);
         dit(errs.length === 0, 'aucune erreur', errs.join(' | ').slice(0, 160));
         await ctx.close();
       });

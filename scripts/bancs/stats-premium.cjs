@@ -22,6 +22,7 @@ let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 catch (_) { ({ chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 const { metaVersData } = require('./_meta.cjs');
+const { getPath } = require('./_minipgrest.cjs');
 const fs = require('fs'), http = require('http');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 4938;
@@ -123,7 +124,7 @@ const ouvrir = async (b, vp, opts = {}) => {
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   // (2 nov.) Le détail des Statistiques vit dans deux volets repliés (RepliStats) : le banc les
   // ouvre comme Julien le ferait (état gardé sur l'appareil), puis juge les mêmes chiffres.
-  await pg.addInitScript((d) => { try { localStorage.setItem('vrm_acces_direct','1'); localStorage.setItem('vrm_stats_replis', JSON.stringify({ argent: true, vente: true })); localStorage.setItem('vinted_regime', JSON.stringify('micro')); localStorage.setItem('vinted_urssaf_taux', '13.5'); localStorage.setItem('vinted_urssaf_mois', JSON.stringify(d.publie)); localStorage.setItem('vrm_ca_objectif', '2000'); if (d.dark) localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, { publie, dark: !!opts.dark });
+  await pg.addInitScript((d) => { try { localStorage.setItem('vrm_acces_direct','1'); localStorage.setItem('vrm_stats_replis', JSON.stringify({ argent: true, vente: true })); localStorage.setItem('vinted_regime', JSON.stringify('micro')); localStorage.setItem('vinted_urssaf_taux', '13.5'); localStorage.setItem('vinted_urssaf_mois', JSON.stringify(d.publie)); localStorage.setItem('vrm_objectif_mois', JSON.stringify({ v: 1, type: 'ca', valeur: 2000 })); localStorage.setItem('vinted_urssaf_freq', JSON.stringify('mensuel')); if (d.dark) localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, { publie, dark: !!opts.dark });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
@@ -136,7 +137,8 @@ const ouvrir = async (b, vp, opts = {}) => {
       if (/^[a-z]+:data->[a-z]+$/i.test(sel)) { const [al, src] = sel.split(':'); return { [al]: (r.data || {})[src.split('->')[1]] }; }
       if (/^[a-z]+:data->/i.test(sel)) {
         const o = {};
-        for (const champ of sel.split(',')) { const m = /^([a-z]+):data->(.+)$/i.exec(champ); if (!m) continue; let v = r.data; for (const p of m[2].split(/->>?/)) v = v == null ? v : v[p]; o[m[1]] = (v != null && /->>/.test(m[2])) ? String(v) : v; }
+        // (6 nov.) chemin JSON lu comme PostgREST (getPath : `->>` = texte, absent ⇒ null) ; `alias:data->>x` était lu comme la clé « >x », toujours absente (§6.3).
+        for (const champ of sel.split(',')) { const m = /^([a-z_]+):(data->.+)$/i.exec(champ); if (!m) continue; o[m[1]] = getPath(r, m[2]); }
         return o;
       }
       return { ...r, updated_at: maintenant.toISOString(), cap: r.data.capturedAt };
@@ -209,6 +211,10 @@ const lire = (pg) => pg.evaluate(() => {
 });
 
 const fr = (eur) => Number(eur).toFixed(2).replace('.', ',') + '€';
+// (6 nov.) `montant()` (src/format.js, chantier B) n'écrit les centimes que s'il y en a :
+// « 6 586 € » et « 612,40 € ». On juge la VALEUR écrite, pas sa forme (§6.4) — l'une ou
+// l'autre écriture, jamais collée à un autre chiffre.
+const ecrit = (tc, eur) => { const v = [Number(eur).toFixed(2).replace('.', ',')]; if (/,00$/.test(v[0])) v.push(v[0].slice(0, -3)); return v.some((x) => (Array.isArray(tc) ? tc.includes(x + '€') : new RegExp('(?<![\\d,])' + x + '€').test(tc))); };
 
 (async () => {
   let b; const base = {};
@@ -240,10 +246,10 @@ const fr = (eur) => Number(eur).toFixed(2).replace('.', ',') + '€';
         dit(lu.deb <= 1, 'aucun débordement horizontal', `${lu.deb} px`);
         dit(lu.coupes.length === 0, 'aucun montant coupé sur deux lignes', lu.coupes.slice(0, 4).join(' · '));
         const tc = lu.textContent.replace(/[\u00a0\u202f ]/g, '');
-        dit(tc.includes(fr(caFin)), 'CA finalisé Vinted = somme des ventes finalisées des deux comptes', fr(caFin));
-        dit(tc.includes(fr(caA)) && tc.includes(fr(caB)), 'CA par compte = somme des finalisées de chaque compte', `${fr(caA)} · ${fr(caB)}`);
-        dit(tc.includes(fr(tot12)), 'courbe : total des 12 derniers mois (vendu, toutes plateformes captées)', fr(tot12));
-        dit(tc.includes(fr(meilleur[1])), 'courbe : la valeur du meilleur mois est écrite', `${meilleur[0]} ${fr(meilleur[1])}`);
+        dit(ecrit(tc, caFin), 'CA finalisé Vinted = somme des ventes finalisées des deux comptes', fr(caFin));
+        dit(ecrit(tc, caA) && ecrit(tc, caB), 'CA par compte = somme des finalisées de chaque compte', `${fr(caA)} · ${fr(caB)}`);
+        dit(ecrit(tc, tot12), 'courbe : total des 12 derniers mois (vendu, toutes plateformes captées)', fr(tot12));
+        dit(ecrit(lu.montants, meilleur[1]) || ecrit(tc, meilleur[1]), 'courbe : la valeur du meilleur mois est écrite', `${meilleur[0]} ${fr(meilleur[1])}`);
         // (17 oct.) La déclaration URSSAF a quitté Statistiques : elle vit dans
         // Comptabilité (jugée plus bas, sur cet onglet-là).
         dit(!lu.declare && !/À payer \(/.test(lu.texte), 'la déclaration URSSAF n’est plus dans Statistiques');
@@ -262,8 +268,14 @@ const fr = (eur) => Number(eur).toFixed(2).replace('.', ',') + '€';
           'par plateforme : finalisé, et son total le dit', lu.plateformes ? lu.plateformes.notion : 'absente');
         // La jauge lit le VENDU du mois (toutes plateformes, en cours compris) :
         // sa phrase le dit, elle ne parle plus de « Vinted, finalisées ».
-        dit(/% de ton objectif · vendu ce mois, toutes plateformes/.test(lu.textContent) && !/Vinted, ventes finalisées et en cours du mois/.test(lu.textContent),
-          'objectif : la phrase dit « vendu ce mois, toutes plateformes » (la source de la jauge)', (/[^.]{0,30}% de ton objectif[^<]{0,70}/.exec(lu.textContent) || [''])[0]);
+        // (6 nov.) Un seul objectif depuis le 4 nov. (`vrm_objectif_mois`, src/objectifMois.js : plus
+        // `vrm_ca_objectif`) ; le bloc « Objectif du mois » lit la MÊME valeur que la carte sombre. La
+        // règle reste : la jauge lit le VENDU du mois, toutes plateformes, en cours compris.
+        {
+          const ob = await pg.evaluate(() => { const e = document.querySelector('[data-objectif-bloc="ca"] [data-objectif-valeur]'); return e ? { v: e.getAttribute('data-objectif-valeur'), pct: e.getAttribute('data-objectif-pct') } : null; });
+          const attendu = c(parMois[ym(maintenant)] || 0);
+          dit(!!ob && Number(ob.v) === attendu && Number(ob.pct) === Math.min(100, Math.floor(attendu / 2000)), 'objectif : la jauge lit le vendu du mois, toutes plateformes (la source de la carte)', ob ? `${ob.v} (attendu ${attendu}) · ${ob.pct} %` : 'bloc absent');
+        }
         {
           const OK = new Set(['11', '13', '15', '20']);
           const hors = Object.entries(lu.tailles).filter(([k]) => !OK.has(k) && !(Number(k) >= 28));
@@ -276,23 +288,23 @@ const fr = (eur) => Number(eur).toFixed(2).replace('.', ',') + '€';
         await pg.waitForTimeout(800);
         const lc = await lire(pg);
         const tcC = lc.textContent.replace(/[\u00a0\u202f ]/g, '');
-        dit(tcC.includes(fr(caMoisDecl)) && tcC.includes(fr(aPayer)) && tcC.includes(fr(net)), 'carte du mois : CA × 13,5 % = à payer, CA − à payer = net', `${fr(caMoisDecl)} → ${fr(aPayer)} · ${fr(net)}`);
+        dit(ecrit(tcC, caMoisDecl) && ecrit(tcC, aPayer) && ecrit(tcC, net), 'carte du mois : CA × 13,5 % = à payer, CA − à payer = net', `${fr(caMoisDecl)} → ${fr(aPayer)} · ${fr(net)}`);
         dit(new RegExp('(?<!\\d)' + nMoisDecl + '(?!\\d)').test(lc.textContent), 'carte du mois : nombre de ventes finalisées de la ligne publiée', String(nMoisDecl));
-        dit(lc.couverture && /51 ventes Vinted/.test(lc.textContent) && tcC.includes(fr(982.7)), 'couverture : 51 ventes Vinted sans date de versement (982,70 €) restent dans la page');
+        dit(lc.couverture && /51 ventes Vinted/.test(lc.textContent) && ecrit(tcC, 982.7), 'couverture : 51 ventes Vinted sans date de versement (982,70 €) restent dans la page');
         // (29 oct.) « Vestiaire Co : pas encore relié » est retiré de la carte URSSAF (dit à tous, n'apprenait rien).
         dit(/2 ventes Leboncoin/.test(lc.textContent), 'couverture : les ventes Leboncoin sans date restent dans la page');
         dit(/sans date/.test(lc.texte), 'la couverture se VOIT sans rien déplier (au moins « sans date »)');
-        // La lecture de `urssaf.cjs` (mêmes motifs, sur le texte VISIBLE) doit
-        // toujours retrouver taux, CA cité, à payer, net et nombre de ventes.
+        // (6 nov.) La carte « Prochaine déclaration » est masquée depuis le 3 nov. (fusion.css §15) :
+        // la déclaration vit dans « Déclarer {mois} » (`PrevisionUrssafCarte`, chantier F puis onglets
+        // D) — comme stats-compta (ee20bd93), on juge la RÈGLE là où elle est : en mensuel, le mois
+        // d'avant, son CA = la ligne publiée, à payer = CA × taux, et l'échéance dite.
         {
-          const t = lc.texte, e2 = (s) => s == null ? null : Number(String(s).replace(/[\s  €]/g, '').replace(',', '.'));
-          const taux = e2((/À PAYER \(([\d,.]+) ?%\)/i.exec(t) || [])[1]);
-          const ap = e2((/À PAYER \([\d,.]+ ?%\)\s*\n\s*([\d\s.,  ]+€)/i.exec(t) || [])[1]);
-          const nt = e2((/NET APRÈS PAIEMENT\s*\n\s*([\d\s.,  ]+€)/i.exec(t) || [])[1]);
-          const cc = e2((/CA des ventes finalisées[^\n]*?\(([\d\s.,  ]+€)\)/i.exec(t) || [])[1]);
-          const nf = Number((/VENTES FINALISÉES\s*\n\s*(\d+)/i.exec(t) || [])[1]);
-          dit(taux === TAUX && ap === aPayer && nt === net && cc === caMoisDecl && nf === nMoisDecl,
-            'la carte se lit comme urssaf.cjs la lit (libellé puis montant, phrase de calcul visible)', `${taux} · ${cc} · ${ap} · ${nt} · ${nf}`);
+          await pg.waitForSelector('[data-prevision-carte]', { timeout: 15000 }).catch(() => {});
+          const pv = await pg.evaluate(() => { const e = document.querySelector('[data-prevision-carte]'); return e ? { etat: e.getAttribute('data-prevision-carte'), ca: e.getAttribute('data-prevision-ca'), ap: e.getAttribute('data-prevision-apayer'), echeance: (e.querySelector('[data-urssaf-echeance]') || {}).innerText || e.innerText } : null; });
+          const caOuvert = (publie.mois.find((m) => m.ym === ym(new Date(maintenant.getFullYear(), maintenant.getMonth() - 1, 15))) || {}).ca;
+          const apOuvert = Math.round(Number((c(caOuvert) * TAUX / 100).toFixed(6))) / 100;
+          dit(!!pv && pv.etat === 'lu' && Number(pv.ca) === caOuvert && Number(pv.ap) === apOuvert && /avant le \d+ \S+/.test(pv.echeance),
+            'Déclarer {mois} : CA du mois ouvert × 13,5 % = à payer, échéance dite', pv ? `${pv.ca} → ${pv.ap} (attendu ${caOuvert} → ${apOuvert}) · ${pv.echeance.slice(0, 60)}` : 'carte absente');
         }
         dit(lc.declare === 'lu', 'la phrase de calcul porte toujours data-urssaf-declare', String(lc.declare));
         if (!dark) {

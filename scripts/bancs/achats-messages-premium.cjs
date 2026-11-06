@@ -223,6 +223,9 @@ const capturer = async (pg, nom, vp) => {
         console.log(`\n── Achats · ${nomOnglet} · ${T}`);
         await essaie(`achats ${nomOnglet} ${T}`, async () => {
           const { ctx, pg, errs } = await ouvrir(b, vp, onglet === 'all' ? 'achats' : 'cat_achats');   // (31 oct., soir) « Tous » vit sur Achats, « À retirer » sur Colis à retirer (`cat_achats` y mène)
+          // (6 nov.) Colis a trois onglets depuis le 3 nov. (c2f4245f) et s'ouvre sur « À envoyer » :
+          // les codes de retrait sont sous « À retirer » — on le touche, comme Julien.
+          if (onglet === 'attente') await pg.waitForSelector('[data-colis-onglet-choix="retirer"]', { timeout: 15000 }).then(() => pg.click('[data-colis-onglet-choix="retirer"]')).catch(() => {});
           await pg.waitForFunction(() => document.querySelector('.vrm-pickup-code') || /pas pu s'afficher/.test(document.body.innerText), null, { timeout: 15000 }).catch(() => {});
           if (onglet === 'all') {
             await pg.evaluate(() => { const b = [...document.querySelectorAll('button[aria-pressed]')].find((x) => /^Tous/.test(x.innerText.trim())); if (b) b.click(); });
@@ -235,20 +238,36 @@ const capturer = async (pg, nom, vp) => {
           dit(m.deb <= 1, `${T} aucun débordement horizontal`, `${m.deb} px`);
           dit(!m.coupes.length, `${T} aucun montant ni code coupé`, m.coupes.join(' | '));
           if (tel) dit(!m.petits.length, `${T} aucune cible tactile < 44 px`, m.petits.slice(0, 8).join(' | '));
-          if (onglet === 'attente') dit(m.nCodes >= 3, `${T} les codes de retrait sont là (3 colis)`, String(m.nCodes));
+          // (6 nov.) Depuis le 3 nov. (src/CarteRelais.jsx, `LigneRetraitF`, « tu dois mieux SÉPARER »),
+          // un colis à retirer est UNE ligne par point relais : son code est porté par la ligne
+          // (`data-code-retrait`) et s'ouvre au toucher de « Code » (`data-rp-code`) — plus affiché d'emblée.
+          if (onglet === 'attente') {
+            const nC = await pg.evaluate(() => [...document.querySelectorAll('[data-cc-dans="retirer"]')].filter((e) => e.querySelector('[data-code-retrait]') && e.querySelector('[data-rp-code]')).length);
+            dit(nC >= 3, `${T} les codes de retrait sont là (3 colis, chacun avec sa porte « Code »)`, String(nC));
+          }
           else dit(m.nAchats >= 6, `${T} la liste des achats est là`, String(m.nAchats));
           if (onglet === 'attente') {
             // (2 nov., colis clair) La carte d'un colis à retirer : ce que c'est en haut, puis
             // SES gestes (code nommé et copiable, « J'ai retiré ») — dans la carte, sans se
             // chevaucher, le chiffre jamais sous « Copier », la confirmation compacte.
-            const lignes = await pg.evaluate(() => [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-cc-carte]')].map(e => {
-              const info=e.querySelector('.vrm-cc-haut'), code=e.querySelector('.vrm-pickup-code'), bouton=e.querySelector('.vrm-pickup-collect');
-              if (!info || !code || !bouton) return null;
-              const k=e.getBoundingClientRect(), a=info.getBoundingClientRect(), b=code.getBoundingClientRect(), c=bouton.getBoundingClientRect();
-              const chiffre=code.querySelector('strong').getBoundingClientRect(), copie=code.querySelector('small').getBoundingClientRect();
-              const croise=(x,y)=>!(x.right<=y.left||y.right<=x.left||x.bottom<=y.top||y.bottom<=x.top);
-              return {aligne:b.top>=a.bottom-1&&!croise(b,c)&&!croise(chiffre,copie)&&b.right<=k.right+1&&c.right<=k.right+1, compact:c.height<=48, code:code.querySelector('strong')?.innerText};
-            }).filter(Boolean));
+            // La ligne : l'article, puis SES deux gestes (« Code », « J'ai retiré ») dans la ligne, sans se
+            // chevaucher ni chevaucher l'article, la confirmation compacte ; « Code » ouvre le code SOUS
+            // l'article, dans la ligne, le chiffre jamais sous « Copier ».
+            const lignes = [];
+            const n = await pg.evaluate(() => document.querySelectorAll('[data-cc-dans="retirer"]').length);
+            for (let i = 0; i < n; i++) {
+              const l = pg.locator('[data-cc-dans="retirer"]').nth(i);
+              if (!(await l.locator('[data-rp-code]').count())) continue;
+              await l.locator('[data-rp-code]').click(); await pg.waitForTimeout(250);
+              lignes.push(await l.evaluate((e) => {
+                const rang = e.querySelector('.vrm-rpf-rang'), info = e.querySelector('.vrm-rpf-quoi'), cb = e.querySelector('[data-rp-code]'), bouton = e.querySelector('[data-colis-retire]'), code = e.querySelector('.vrm-pickup-code');
+                if (!rang || !info || !bouton || !code) return { aligne: false, compact: false, manque: [!rang && 'rang', !info && 'article', !bouton && 'j’ai retiré', !code && 'code'].filter(Boolean) };
+                const k = e.getBoundingClientRect(), r = rang.getBoundingClientRect(), a = info.getBoundingClientRect(), g = cb.getBoundingClientRect(), c = bouton.getBoundingClientRect(), b = code.getBoundingClientRect();
+                const chiffre = code.querySelector('strong').getBoundingClientRect(), copie = code.querySelector('small').getBoundingClientRect();
+                const croise = (x, y) => !(x.right <= y.left || y.right <= x.left || x.bottom <= y.top || y.bottom <= x.top);
+                return { aligne: b.top >= r.bottom - 1 && !croise(a, g) && !croise(a, c) && !croise(g, c) && !croise(chiffre, copie) && b.right <= k.right + 1 && c.right <= k.right + 1 && g.right <= k.right + 1, compact: c.height <= 48, code: code.querySelector('strong').innerText };
+              }));
+            }
             dit(lignes.length>0 && lignes.every(x=>x.aligne&&x.compact), `${T} le code sous l'article, dans la carte, et la confirmation compacte`, JSON.stringify(lignes));
           }
           await ctx.close();

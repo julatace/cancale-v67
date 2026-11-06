@@ -53,6 +53,7 @@ const { chromium } = PW;
 // (6 nov., filet 6) `NAVIGATEUR=webkit` : le moteur de Safari (_navigateur.cjs).
 const { lancer } = require('./_navigateur.cjs');
 const { metaVersData } = require('./_meta.cjs');
+const { getPath } = require('./_minipgrest.cjs');
 const fs = require('fs'), http = require('http');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 7951;
@@ -118,9 +119,10 @@ const appareil = async (b, mode, local = {}) => {
         for (const champ of sel.split(',')) {
           if (champ === 'id') { o.id = r.id; continue; }
           if (champ === 'data') { o.data = r.data; continue; }
-          const m = /^([a-z_]+):data->(.+)$/i.exec(champ); if (!m) continue;
-          let v = r.data; for (const p of m[2].split(/->>?/)) v = v == null ? v : v[p];
-          o[m[1]] = (v != null && /->>/.test(m[2])) ? String(v) : v;
+          if (champ === 'updated_at') { o.updated_at = cap; continue; }
+          // (6 nov.) chemin JSON lu comme PostgREST (getPath : `->>` = texte, absent ⇒ null) ; `alias:data->>x` était lu comme la clé « >x », toujours absente (§6.3).
+          const m = /^([a-z_]+):(data->.+)$/i.exec(champ); if (!m) continue;
+          o[m[1]] = getPath(r, m[2]);
         }
         return o;
       }

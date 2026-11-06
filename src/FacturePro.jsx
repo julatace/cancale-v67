@@ -131,6 +131,11 @@ async function route(deps, corps) {
     return { code: r.status, j: j || {} };
   } catch (_) { return { code: 0, j: { message: "Pas de réseau : rien n'a été fait." } }; }
 }
+// (6 nov.) L'état de la boîte d'envoi ne vaut que LU : un 200 qui ne porte pas
+// `boite` (page HTML servie à la place de la route, réponse d'une autre version
+// du serveur, corps illisible) est « pas su » (`null`), jamais un objet vide —
+// l'écran Facturation Pro tombait sur le garde-fou (`b.etat` sur undefined).
+const boiteLue = (r) => (r && r.code === 200 && r.j && r.j.boite && typeof r.j.boite === 'object' && typeof r.j.boite.etat === 'string' ? r.j.boite : null);
 
 // Une feuille plein écran au téléphone, centrée sur ordinateur.
 function Feuille({ titre, fermer, children, deps, large = false, data }) {
@@ -329,7 +334,7 @@ export function BoiteEnvoi({ deps, cfg, upd }) {
   const [form, setForm] = React.useState({ adresse: '', motDePasse: '', fournisseur: '', hote: '', port: '465' });
   const [occupe, setOccupe] = React.useState('');
   const [msg, setMsg] = React.useState('');
-  const charger = React.useCallback(async () => { const r = await route(deps); setE(r.code === 200 ? r.j : null); }, [deps]);
+  const charger = React.useCallback(async () => { const r = await route(deps); setE(boiteLue(r) ? r.j : null); }, [deps]);
   React.useEffect(() => { charger(); }, [charger]);
   const domaine = (form.adresse.split('@')[1] || '').toLowerCase();
   const deduit = e && e.fournisseurs ? ({ 'gmail.com': 'gmail', 'googlemail.com': 'gmail', 'icloud.com': 'icloud', 'me.com': 'icloud', 'mac.com': 'icloud', 'orange.fr': 'orange', 'wanadoo.fr': 'orange', 'free.fr': 'free', 'sfr.fr': 'sfr', 'laposte.net': 'laposte', 'yahoo.fr': 'yahoo', 'yahoo.com': 'yahoo' })[domaine] || '' : '';
@@ -338,7 +343,8 @@ export function BoiteEnvoi({ deps, cfg, upd }) {
     setOccupe('poser'); setMsg('');
     const r = await route(deps, { action: 'boite-poser', adresse: form.adresse, motDePasse: form.motDePasse, fournisseur: fourEff || undefined, hote: fourEff ? undefined : form.hote, port: fourEff ? undefined : Number(form.port) });
     setOccupe('');
-    if (r.code === 200) { setForm({ ...form, motDePasse: '' }); setE((x) => ({ ...(x || {}), boite: r.j.boite })); setMsg('Boîte connectée. Envoie-toi un essai pour vérifier.'); }
+    if (boiteLue(r)) { setForm({ ...form, motDePasse: '' }); setE((x) => ({ ...(x || {}), boite: boiteLue(r) })); setMsg('Boîte connectée. Envoie-toi un essai pour vérifier.'); }
+    else if (r.code === 200) { setMsg("La réponse du serveur ne se lit pas : je ne sais pas si ta boîte est connectée. Je relis son état."); charger(); }
     else setMsg(r.j.message || "La connexion a échoué. Rien n'a été rangé.");
   };
   const essai = async () => { setOccupe('essai'); setMsg(''); const r = await route(deps, { action: 'boite-essai' }); setOccupe(''); setMsg(r.j.issue === 'envoye' ? `Essai envoyé à ${r.j.a}. Regarde ta boîte de réception.` : (r.j.message || "L'essai n'est pas parti.")); if (r.j.issue === 'envoye') charger(); };
@@ -454,7 +460,7 @@ function FeuilleFactureVente({ vente, proMail, facture, avoir, deps, fermer }) {
   const tx = String(vente.tx);
   const [fiche, setFiche] = React.useState(false);
   const [boite, setBoite] = React.useState(undefined);
-  React.useEffect(() => { route(deps).then((r) => setBoite(r.code === 200 ? r.j.boite : null)); }, [deps, fiche]);
+  React.useEffect(() => { route(deps).then((r) => setBoite(boiteLue(r))); }, [deps, fiche]);
   // L'acheteur : l'e-mail Vinted Pro de CETTE transaction, sinon à saisir.
   const adresseProMail = proMail && proMail.adresse ? adresseVintedLisible(proMail.adresse) : '';
   const [form, setForm] = React.useState(() => ({

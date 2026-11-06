@@ -18,6 +18,7 @@ let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 catch (_) { ({ chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 const { metaVersData } = require('./_meta.cjs');
+const { getPath } = require('./_minipgrest.cjs');
 const fs = require('fs'), http = require('http');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 4861;
@@ -96,7 +97,8 @@ const ouvrir = async (b, vp, prenom, ventesKO = false) => {
       if (/^[a-z]+:data->[a-z]+$/i.test(sel)) { const [al, src] = sel.split(':'); return { [al]: (r.data || {})[src.split('->')[1]] }; }
       if (/^[a-z]+:data->/i.test(sel)) {
         const o = {};
-        for (const champ of sel.split(',')) { const m = /^([a-z]+):data->(.+)$/i.exec(champ); if (!m) continue; let v = r.data; for (const p of m[2].split(/->>?/)) v = v == null ? v : v[p]; o[m[1]] = (v != null && /->>/.test(m[2])) ? String(v) : v; }
+        // (6 nov.) chemin JSON lu comme PostgREST (getPath : `->>` = texte, absent ⇒ null) ; `alias:data->>x` était lu comme la clé « >x », toujours absente (§6.3).
+        for (const champ of sel.split(',')) { const m = /^([a-z_]+):(data->.+)$/i.exec(champ); if (!m) continue; o[m[1]] = getPath(r, m[2]); }
         return o;
       }
       return { ...r, updated_at: cap, cap: r.data.capturedAt };
@@ -134,6 +136,9 @@ const lire = (pg) => pg.evaluate(() => {
   return {
     bonjour: g ? g.innerText.replace(/\s+/g, ' ').trim() : '',
     hBonjour: g ? Math.round(g.getBoundingClientRect().height) : 0,
+    // Le premier geste du jour (la première carte « À faire ») et le haut de la barre du bas.
+    geste1: (() => { const t = document.querySelector('[data-barre-jour] [data-tuile]'); if (!t) return null; const r = t.getBoundingClientRect(); return { haut: Math.round(r.top), bas: Math.round(r.bottom) }; })(),
+    hautBarre: (() => { const n = document.querySelector('.vrm-mobile-nav'); const r = n && n.getClientRects().length ? n.getBoundingClientRect() : null; return r ? Math.round(r.top) : window.innerHeight; })(),
     courbeVisible: !!(rc && rc.width > 200 && rc.height > 80 && !ferme),
     tuiles, deborde,
     tombe: /pas pu s'afficher|Cannot access|is not defined/.test(document.body.innerText),
@@ -168,7 +173,13 @@ const lire = (pg) => pg.evaluate(() => {
         // (2 nov., 22 h) La tête sombre de la maquette porte le bonjour, le titre, les 7 jours et deux cases :
         // ≤ 300 px au téléphone. Le graphique de la semaine n'est plus sur Ma journée, et une case à
         // zéro ne prend plus de place (une carte « À faire » par geste) — retiré à la demande de Julien, 2 nov. 22 h (maquette FusionJournee).
-        if (vp.width < 600) dit(lu.hBonjour >= 0 && lu.hBonjour <= 300, 'la tête sombre reste compacte sur téléphone (≤ 300 px)', `${lu.hBonjour} px`);
+        // (6 nov.) Les ≤ 300 px du 2 nov. mesuraient la tête de la maquette à DEUX cases. Depuis, sur
+        // décision : « un grand chiffre + trois cases » (3 nov., 2705c0c5, carte réglable par page) et
+        // chaque « — » dit sa raison sous lui (5 nov., chantier E1, docs/passation/2026-11-05-chantier-e1.md
+        // point 1.7) : 376 px à 390 px. La RÈGLE (27 oct.) est que les gestes ne passent pas sous la
+        // ligne de flottaison : la première carte « À faire » est ENTIÈRE au-dessus de la barre du bas,
+        // sans défiler, sur un téléphone de 844 px. Une tête qui grandit encore la repousse dessous (rouge).
+        if (vp.width < 600) dit(lu.hBonjour > 0 && !!lu.geste1 && lu.geste1.bas <= lu.hautBarre, 'la tête sombre laisse le premier geste entier au-dessus de la barre du bas (téléphone, 844 px)', `tête ${lu.hBonjour} px · 1er geste ${lu.geste1 ? lu.geste1.haut + '→' + lu.geste1.bas : 'absent'} · barre à ${lu.hautBarre}`);
         dit(lu.tuiles.length >= 1 && lu.tuiles.every(([, n]) => Number(n) > 0), 'les gestes du jour sont là, un par carte, jamais une carte à zéro', JSON.stringify(lu.tuiles));
         dit(lu.tuiles.some(([id, n]) => id === 'envoyer' && n === '2'), '« À envoyer » compte les 2 ventes à expédier', JSON.stringify(lu.tuiles));
         dit(lu.deborde.length === 0, 'aucun texte ne sort de sa boîte', lu.deborde.join(' | '));

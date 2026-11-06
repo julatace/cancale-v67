@@ -22,6 +22,7 @@ let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 catch (_) { ({ chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 const { metaVersData } = require('./_meta.cjs');
+const { getPath } = require('./_minipgrest.cjs');
 const fs = require('fs'), http = require('http');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 4337;
@@ -107,7 +108,9 @@ const ouvrir = async (b, vp, versementsLisibles, onglet = 'journee', opts = {}) 
   // l'écran Comptabilité montre d'abord « Quel est ton statut ? ». Les tests de
   // cette carte posent donc le régime, comme un vrai micro-entrepreneur.
   if (opts.regime) await pg.addInitScript((r) => { try { localStorage.setItem('vinted_regime', JSON.stringify(r)); } catch (_) {} }, opts.regime);
-  await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
+  // (6 nov.) Le détail des Statistiques vit dans deux volets repliés depuis le 2 nov. (RepliStats,
+  // « Ventes enregistrées · aujourd'hui ») : le banc les ouvre comme Julien le ferait (stats-compta, stats-premium).
+  await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_stats_replis', JSON.stringify({ argent: true, vente: true })); } catch (_) {} });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   const L = lignes(versementsLisibles).map((r) => (opts.declare && r.id === 'harvest_111_orders_sold')
     ? { ...r, data: { ...r.data, payload: { my_orders: [...r.data.payload.my_orders, VENTE_DECL] } } } : r);
@@ -142,7 +145,8 @@ const ouvrir = async (b, vp, versementsLisibles, onglet = 'journee', opts = {}) 
       if (/^[a-z]+:data->[a-z]+$/i.test(sel)) { const [al, src] = sel.split(':'); return { [al]: (r.data || {})[src.split('->')[1]] }; }
       if (/^[a-z]+:data->/i.test(sel)) {
         const o = {};
-        for (const champ of sel.split(',')) { const m = /^([a-z]+):data->(.+)$/i.exec(champ); if (!m) continue; let v = r.data; for (const p of m[2].split(/->>?/)) v = v == null ? v : v[p]; o[m[1]] = (v != null && /->>/.test(m[2])) ? String(v) : v; }
+        // (6 nov.) chemin JSON lu comme PostgREST (getPath : `->>` = texte, absent ⇒ null) ; `alias:data->>x` était lu comme la clé « >x », toujours absente (§6.3).
+        for (const champ of sel.split(',')) { const m = /^([a-z_]+):(data->.+)$/i.exec(champ); if (!m) continue; o[m[1]] = getPath(r, m[2]); }
         return o;
       }
       return { ...r, updated_at: maintenant.toISOString(), cap: r.data.capturedAt };
@@ -171,8 +175,12 @@ const ouvrir = async (b, vp, versementsLisibles, onglet = 'journee', opts = {}) 
   if (onglet === 'journee') {
     const sur = async (tab, sel) => { await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' }); await pg.waitForFunction((r) => document.querySelector(r), sel, { timeout: 20000 }).catch(() => {}); await pg.waitForTimeout(1200); };
     lu.venduJour = (await pg.evaluate(() => (document.querySelector('[data-fu-vendu-jour]') || { getAttribute: () => null }).getAttribute('data-fu-vendu-jour')));
-    await sur('cat_ventes', '[data-fu-vendu-mois]');
-    lu.venduMois = await pg.evaluate(() => (document.querySelector('[data-fu-vendu-mois]') || { getAttribute: () => null }).getAttribute('data-fu-vendu-mois'));
+    // (6 nov.) Ventes s'ouvre sur UN site (Plateformes, 5 nov.) : le vendu de TOUTES les plateformes
+    // est la carte du mois de Ventes · « Toutes » (même règle).
+    // Ses chiffres portent les attributs communs de la carte (`data-carte-*`, src/design/CarteStats.jsx).
+    const SEL_TOUTES = '[data-carte-page="ventes-toutes"][data-carte-chiffre="vendu"][data-carte-p="mois"]';
+    await sur('ventes&site=toutes', SEL_TOUTES);
+    lu.venduMois = await pg.evaluate((sel) => (document.querySelector(sel) || { getAttribute: () => null }).getAttribute('data-carte-valeur'), SEL_TOUTES);
     await sur('compta', '[data-ca-cur="recu"]');
     const cpt = await pg.evaluate(() => { const r = document.querySelector('[data-ca-cur="recu"]'); const u = document.querySelector('[data-compta-chiffre="urssaf-mois"]'); return { recu: r ? r.getAttribute('data-ca-eur') : null, cotis: u ? u.getAttribute('data-eur') : null }; });
     const c = (x) => (x == null || x === '' ? '' : String(Math.round(Number(x) * 100)));
@@ -187,8 +195,10 @@ const lire = (pg) => pg.evaluate(() => {
     for (const e of document.querySelectorAll('[data-courbe-semaine] [data-jour]')) jours[e.getAttribute('data-jour')] = { vendu: e.getAttribute('data-vendu'), recu: e.getAttribute('data-recu') };
     return { venduMois: a('[data-vendu-mois]', 'data-vendu-mois'), recuMois: a('[data-recu-mois]', 'data-recu-mois'), venduJour: a('[data-vendu-jour]', 'data-vendu-jour'),
       dashJour: a('[data-dash-vendu-jour]', 'data-dash-vendu-jour'), dashJourN: a('[data-dash-vendu-jour]', 'data-dash-vendu-jour-n'),
-      dashMois: a('[data-dash-stat="caMois"]', 'data-dash-cents'),
-      dashMoisTxt: (() => { const e = document.querySelector('[data-dash-stat="caMois"]'); return e ? e.innerText.replace(/\s+/g, ' ').trim() : null; })(),
+      // (6 nov.) « Vendu ce mois » de Statistiques est la tuile « Vendu » de la maquette (31 oct.,
+      // stats-vitrine), période « Mois » par défaut : `data-sv-eur` (centimes), absent quand pas su.
+      dashMois: a('[data-sv-tuile="vendu"]', 'data-sv-eur'),
+      dashMoisTxt: (() => { const e = document.querySelector('[data-sv-tuile="vendu"]'); return e ? e.innerText.replace(/\s+/g, ' ').trim() : null; })(),
       pasSu: !!document.querySelector('[data-dash-vendu-pas-su]'),
       manque: a('[data-dash-vendu-manque]', 'data-dash-vendu-manque'),
       texte: document.body.innerText,
