@@ -85,13 +85,15 @@ function verifier(M, dit) {
   // Les deux blancs « écrits à la main » visaient des éléments qui n'existent plus : aucun jour futur
   // (la semaine de Ma journée = les 7 derniers jours) et plus de `.vrm-compta-hero` dans la carte
   // « gagné » (CarteStatsApp depuis le 3 nov.). Le « — » RENDU de cette carte est `.vrm-fu-grand.is-vide`,
-  // à l'encre des vides (le jeton) — mesuré au banc vague3-ecrans (K, Compta).
+  // que `.vrm-compta-carte > .vrm-carte-stats .vrm-fu-grand { color: #fff }` forçait au blanc plein
+  // (mesuré au banc vague3-ecrans K sur l'arbre d'avant : rgb(255, 255, 255)).
   for (const [nom, t] of [['clair', Th.MINERAL], ['sombre', Th.MINERAL_DARK]]) {
     const clair = rgba(t.carteSombreClair), fg = rgba(t.surSombre2), caseFond = sur(rgba(t.caseSombre), clair);
     const rF = ratio(sur(fg, clair), clair), rC = ratio(sur(fg, caseFond), caseFond);
     dit(rF >= 4.5 && rC >= 4.5, 'K', `${nom} : le « — » prend surSombre2, ≥ 4,5:1 au pire point (fond ${rF.toFixed(2)}:1, case ${rC.toFixed(2)}:1 ; un grand texte n'en demande que 3)`);
   }
   const fus = T['src/design/fusion.css'].replace(/\/\*[\s\S]*?\*\//g, '');
+  dit(/\.vrm-compta-carte > \.vrm-carte-stats \.vrm-fu-grand:not\(\.is-vide\) \{ color: #fff; \}/.test(fus) && /\.vrm-compta-carte > \.vrm-carte-stats \.vrm-fu-grand\.is-vide \{ color: var\(--fu-sur-sombre-2\); \}/.test(fus) && !/\.vrm-compta-carte > \.vrm-carte-stats \.vrm-fu-grand \{ color: #fff; \}/.test(fus), 'K', 'le « — » de la carte Compta lit le jeton (--fu-sur-sombre-2), comme toutes les cartes sombres — plus forcé au blanc');
   dit(/\.vrm-fu-grand\.is-vide \{ color: var\(--fu-sur-sombre-2\); \}/.test(fus), 'K', 'la règle commune des vides (`.vrm-fu-grand.is-vide`) lit le jeton');
   const blancs = fus.split('\n').filter((l) => /color:\s*rgba\(255,\s*255,\s*255,\s*\.(38|5)\)/.test(l));
   dit(!blancs.length, 'K', 'fusion.css : plus de texte blanc à 38 % ou 50 % écrit à la main', blancs.join(' ¦ ').slice(0, 200));
@@ -111,6 +113,7 @@ const MUTATIONS = [
   ['N', 'l’app ne pose plus `reattribue`', 'src/App.jsx', (t) => t.replace('reattribue: { de: ae[nid].de, vers: ae[nid].vers, at: new Date().toISOString(), archive: true }', 'archiveAEcrire: ae[nid]')],
   ['C', 'la ligne du bas remise', 'src/App.jsx', (t) => t.replace("        {!colisSansCompte && <NoAcc/>}", "        <div className=\"vrm-colis-fraicheur\"><FraicheurDonnees jours={liveStats && liveStats.dataAgeJours} siAJour={false}/></div>\n        {!colisSansCompte && <NoAcc/>}")],
   ['D', '`data-cible` remis sur les N° du Stock', 'src/App.jsx', (t) => t.replace('key={k} data-aller-chercher={k} onClick', 'key={k} data-cible={k} onClick')],
+  ['K', 'le « — » de Compta reforcé au blanc (la règle d’avant)', 'src/design/fusion.css', (t) => t.replace('.vrm-compta-carte > .vrm-carte-stats .vrm-fu-grand:not(.is-vide) { color: #fff; }\n.vrm-compta-carte > .vrm-carte-stats .vrm-fu-grand.is-vide { color: var(--fu-sur-sombre-2); }', '.vrm-compta-carte > .vrm-carte-stats .vrm-fu-grand { color: #fff; }')],
   ['K', 'un blanc à 50 % remis à la main', 'src/design/fusion.css', (t) => t.replace('.vrm-fu-grand.is-vide { color: var(--fu-sur-sombre-2); }', '.vrm-fu-grand.is-vide { color: rgba(255,255,255,.5); }')],
   ['K', 'le jour futur à 38 % remis', 'src/design/fusion.css', (t) => t + '\n.vrm-fu-jour[data-futur] > b { background: transparent; color: rgba(255,255,255,.38); }\n'],
   ['T', 'la phrase d’avant (Achats → À retirer)', 'api/_lib/transporteurs.js', (t) => t.replace('— ajoute ce n° avec son code postal : « … » en haut de Colis, puis « + Ajouter un n° de suivi ».', '— ajoute ce n° avec son code postal dans « N° de suivi ajoutés » (Achats → À retirer).')],
