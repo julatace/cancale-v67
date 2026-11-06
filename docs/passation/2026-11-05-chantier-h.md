@@ -186,10 +186,9 @@ en cours de route). Rien dans `vinted-sync-extension/`, `public/` remis à l'ide
 ## Ce qui reste
 - Hors zone (2.30) : `FraicheurDonnees` (Colis, écrans de site) et `FraicheurAnnonces`
   (Annonces, Statistiques) redisent la fraîcheur des comptes.
-- Partagé (pas modifié) : `--vrm-b-lien` vaut l'aplat dans `styles-boutons.css` — tous les
-  `Bouton variante="discret"` de l'app écrivent leur texte en #0071E3 (4,2:1 sur le gris clair) ;
-  redéfini ici pour Paramètres et Comptes liés seulement. À passer à `--vrm-accent-texte` par le
-  propriétaire des boutons.
+- `--vrm-b-lien` : redéfini ici (Paramètres, Comptes liés) au bleu « lien » ; depuis fb795e40
+  le jeton partagé l'est aussi (« Bouton discret au bleu lien ») — la redéfinition locale est
+  devenue redondante, inoffensive, à retirer quand on veut.
 - Le panneau de la pastille au téléphone reste un calque (huit bancs lisent sa forme :
   `pont`, `indicateur-pro`, `relais-telephone`…) ; il a gagné sa croix.
 - « Ranger » ouvre le Stock sans viser la case (le Stock n'a pas d'entrée pour ça).
