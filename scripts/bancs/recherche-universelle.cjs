@@ -62,7 +62,7 @@ const ROWS = [
   ...EMAILS,
 ];
 // La boîte de réception (route de l'écran E-mails) : 1 000 e-mails, filtrés comme côté base.
-const BOITE = Array.from({ length: 1000 }, (_, i) => ({ id: 'email_reception_' + (0x1000000000000000 + i).toString(16), at: ilYaH(i), etat: 'integre', type: i === 321 ? 'suivi' : 'vente', subject: i === 321 ? 'Ton colis est arrivé' : `Information ${i}`, from: 'Vinted <no-reply@vinted.fr>', sourceDate: ilYaH(i),
+const BOITE = Array.from({ length: 1000 }, (_, i) => ({ id: 'email_reception_' + 'abcdef' + String(i).padStart(10, '0'), at: ilYaH(i), etat: 'integre', type: i === 321 ? 'suivi' : 'vente', subject: i === 321 ? 'Ton colis est arrivé' : `Information ${i}`, from: 'Vinted <no-reply@vinted.fr>', sourceDate: ilYaH(i),
   resume: i === 321 ? { t: 'suivi', st: 'available', code: '913377', s: 'MR8800321', a: 'Asics Gel-Kayano' } : { t: 'vente', a: `${MARQUES[i % 6]} ${MODELES[i % 6]}`, px: '60' }, adresses: [], pj: 0 }));
 const ID321 = BOITE[321].id;
 
@@ -211,7 +211,7 @@ const ouvrirLoupe = async (pg, tel) => {
           // elle sort alors en paire — toujours UNE ligne, celle de SON annonce.
           ['onitsuka 44,5', '[data-recherche-cle$=":libre7"]', (x) => x.r.filter((r) => r.type === 'annonce' || r.type === 'paire').map((r) => r.cle.replace(/^\w+:/, '')).join() === 'libre7', 'marque + taille (champs de l’annonce) ⇒ L’annonce, une ligne'],
           ['PRO-2026-0007', '[data-recherche-resultat="facture"]', (x) => x.r.filter((r) => r.type === 'facture').length === 1, 'n° de facture ⇒ SA facture'],
-          ['913377', '[data-recherche-resultat="email"]', (x) => x.r.some((r) => r.type === 'email' && r.cle === 'email:' + ID321), 'code dans un e-mail ⇒ L’e-mail (moteur de l’écran E-mails)'],
+          ['913377', '[data-recherche-resultat="email"]', (x) => x.r.some((r) => r.type === 'email' && r.cle === 'email:' + ID321) && !x.tout, 'code dans un e-mail ⇒ L’e-mail (moteur de l’écran E-mails), sans « Tout sur le N°913377 — jamais servi »'],
         ];
         for (const [q, sel, ok, lib] of cas) {
           const m = await mesurer(pg, q, sel);
@@ -291,7 +291,7 @@ const ouvrirLoupe = async (pg, tel) => {
         await pg.locator('[data-recherche-resultat="facture"]').first().click();
         await pg.waitForTimeout(1500);
         const fa = await pg.evaluate(() => ({ url: location.search, h: [...document.querySelectorAll('h1,h2')].map((x) => x.textContent.trim()).join(' | ').slice(0, 120), champ: [...document.querySelectorAll('input')].map((i) => i.value).filter(Boolean) }));
-        dit(/Factures|Comptabilit/i.test(fa.h) && fa.champ.includes('PRO-2026-0007'), `${TT} la facture ouvre Factures, cherchée sur SON n°`, JSON.stringify(fa));
+        dit(/Factures|Comptabilit/i.test(fa.h) && !fa.champ.includes('PRO-2026-0007'), `${TT} la facture Pro ouvre Factures (liste des Pro en tête, aucune recherche « 0 résultat » posée)`, JSON.stringify(fa));
         // Champ vide après un résultat ouvert : la recherche récente est là.
         await ouvrirLoupe(pg, tel);
         await pg.locator('[data-recherche-champ]').first().fill('');

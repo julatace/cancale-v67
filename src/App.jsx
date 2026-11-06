@@ -73025,7 +73025,9 @@ function AppCoeur() {
         // code de retrait, un n° de suivi ou de transaction exact : « Tout sur le N°482913 — jamais
         // servi » ne s'affiche pas par-dessus.
         const identiteExacte = !!(trouve && Object.values(trouve.groupes).some(g => g.some(r => r.exact && r.par !== 'pseudo' && r.par !== 'numero')));
-        const estNumQ = !!kNumQ && !(identiteExacte && /^\d{5,}$/.test(kNumQ));
+        // (6 nov.) Idem quand ce nombre long est trouvé dans un e-mail (un code de retrait lu).
+        const mailsTrouves = !!(gsEmails && Array.isArray(gsEmails.liste) && gsEmails.liste.length && gsEmails.q === requeteEmails(qBrut.trim()));
+        const estNumQ = !!kNumQ && !((identiteExacte || mailsTrouves) && /^\d{5,}$/.test(kNumQ));
         // La fiche du N° exact est déjà dans « Tout sur le N° » : pas deux fois.
         const groupe = (t) => !trouve ? [] : (t === 'paire' && estNumQ ? trouve.groupes.paire.filter(r => !(r.par === 'numero' && r.exact)) : trouve.groupes[t]);
         const totalDe = (t) => !trouve ? 0 : (t === 'paire' && estNumQ ? trouve.totaux.paire - trouve.groupes.paire.filter(r => r.par === 'numero' && r.exact).length : trouve.totaux[t]);

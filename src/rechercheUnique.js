@@ -244,6 +244,8 @@ export function destinationResultat(r) {
   // SA carte dans Annonces (l'id de l'annonce) ; une facture, Factures sur SON n°.
   if (e.type === 'paire') return { fiche: e.numero };
   if (e.type === 'annonce') return { tab: 'cat_annonces', cible: { type: 'annonce', id: e.id } };
-  if (e.type === 'facture') return { tab: 'invoices', facture: e.facture || '' };
+  // Une facture saisie dans l'app : la liste cherchée sur SON n°. Une facture Pro : la liste
+  // « Factures Pro émises », en tête de l'écran (la recherche de l'écran ne la voit pas).
+  if (e.type === 'facture') return { tab: 'invoices', facture: e.x && e.x.pro ? '' : (e.facture || '') };
   return null;
 }

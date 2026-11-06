@@ -175,7 +175,9 @@ function sansCommentaires(t) {
     r = ch('PRO-2026-0007');
     dit(cles(r, 'facture').length === 1 && r.groupes.facture[0].par === 'facture', 'n° de facture Pro ⇒ SA facture', cles(r, 'facture'));
     const df = R.destinationResultat(r.groupes.facture[0]);
-    dit(df && df.tab === 'invoices' && df.facture === 'PRO-2026-0007', 'la facture ouvre Factures sur SON n°', df);
+    dit(df && df.tab === 'invoices' && df.facture === '', 'une facture Pro ouvre Factures (la liste des Pro, en tête), sans chercher dans la liste des factures saisies', df);
+    const dl = R.destinationResultat(ch('2026-0042').groupes.facture[0]);
+    dit(dl && dl.tab === 'invoices' && dl.facture === '2026-0042', 'une facture saisie ouvre Factures cherchée sur SON n°', dl);
     dit(!factures.some((f) => f.titre === 'brouillon'), 'un brouillon de facture sans n° n’est pas une facture');
     r = ch('22999990001');
     dit(r.groupes.facture.some((x) => x.e.facture === '2026-0042'), 'le n° d’article de la facture (sa référence) la trouve aussi', cles(r, 'facture'));
@@ -214,7 +216,7 @@ function sansCommentaires(t) {
   essaie('e-mails : le moteur de l’écran E-mails', () => {
     // 1 000 lignes `email_reception_*` (forme de la base) ; le filtre `or=(…ilike…)` est
     // INTERPRÉTÉ comme PostgREST le ferait (ilike, `*` = n'importe quoi, insensible à la casse).
-    const rows = Array.from({ length: 1000 }, (_, i) => ({ id: 'email_reception_' + (0x1000000000000000 + i).toString(16), data: { subject: i === 321 ? 'Ton colis est arrivé' : `Information ${i}`, from: 'no-reply@vinted.fr', resume: i === 321 ? { t: 'suivi', st: 'available', code: '913377', s: 'MR8800321', a: 'Asics Gel-Kayano' } : { t: 'vente', a: `${MARQUES[i % 6]} ${MODELES[i % 6]}` } } }));
+    const rows = Array.from({ length: 1000 }, (_, i) => ({ id: 'email_reception_' + 'abcdef' + String(i).padStart(10, '0'), data: { subject: i === 321 ? 'Ton colis est arrivé' : `Information ${i}`, from: 'no-reply@vinted.fr', resume: i === 321 ? { t: 'suivi', st: 'available', code: '913377', s: 'MR8800321', a: 'Asics Gel-Kayano' } : { t: 'vente', a: `${MARQUES[i % 6]} ${MODELES[i % 6]}` } } }));
     const lit = (row, col) => { let v = row.data; for (const k of col.replace(/^data->>?/, '').split(/->>|->/)) v = v == null ? null : v[k]; return v == null ? '' : String(v); };
     const filtrer = (q) => {
       const f = REC.filtreRecherche(q); if (!f) return null;
@@ -225,7 +227,7 @@ function sansCommentaires(t) {
     const t0 = performance.now();
     const a = filtrer('913377'), b = filtrer('MR8800321'), c = filtrer('gel-kayano');
     const tMail = performance.now() - t0;
-    dit(a && a.length === 1 && a[0].id.endsWith((0x1000000000000000 + 321).toString(16)), 'code de retrait ⇒ L’e-mail du colis (côté base, sur les 1 000)', a && a.length);
+    dit(a && a.length === 1 && a[0].id.endsWith('abcdef' + String(321).padStart(10, '0')), 'code de retrait ⇒ L’e-mail du colis (côté base, sur les 1 000)', a && a.length);
     dit(b && b.length === 1 && c && c.some((x) => x === a[0]), 'n° de suivi et mots de l’article ⇒ le même e-mail', [b && b.length, c && c.length]);
     dit(E.requeteEmails('52 €') === '52' && E.requeteEmails('a') === '' && E.requeteEmails('Gel-Kayano') === 'Gel-Kayano', 'le mot envoyé : réduit comme côté serveur, rien sous 2 caractères (l’écran n’envoie aucun montant)', [E.requeteEmails('52 €'), E.requeteEmails('a')]);
     const lu = E.emailsDeLaReponse({ ok: true, emails: [{ id: rows[321].id, subject: 'x' }, { id: 'email_inconnu_1' }], suite: false });
