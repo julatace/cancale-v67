@@ -199,7 +199,7 @@ button.vrm-notice-zone:focus-visible { outline: 2px solid var(--vrm-accent, #007
   html body .vrm-app-shell .vrm-main .vrm-toutes-etat {
     display: inline-block; width: max-content; max-width: 100%; margin-top: 5px; padding: 2px 8px; border-radius: 999px;
     font-size: 12px; font-weight: 600; line-height: 1.35; background: var(--vrm-card2); color: var(--vrm-muted);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    white-space: normal; overflow-wrap: anywhere; /* l’état ENTIER, jamais coupé (banc ventes-e2 V2) */
   }
   html body .vrm-app-shell .vrm-main .vrm-toutes-etat[data-ton="action"] { background: var(--vrm-warn-soft); color: var(--vrm-warn); }
   :root body .vrm-app-shell .vrm-main .vrm-toutes-ligne:active { background: var(--vrm-card2) !important; }
