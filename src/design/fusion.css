@@ -1057,7 +1057,9 @@ html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-carte[data-vc-c
 .vrm-rpf-puces { display: flex; gap: 6px; flex-wrap: wrap; min-width: 0; }
 .vrm-rpf-puce { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 12px; background: var(--fu-case, #f2f2f7); color: var(--fu-gris, #6e6e73); font: 600 12px/1 var(--vrm-police, system-ui); white-space: nowrap; }
 :root[data-theme="dark"] .vrm-rpf-puce { background: #2c2c2e; color: #aeaeb2; }
-.vrm-rpf-puce.is-ambre { background: var(--fu-ambre-fond, #fff4e5); color: var(--fu-ambre-txt, #b25000); }
+/* (6 nov., finitions) La règle sombre ci-dessus (plus précise) éteignait l'ambre en mode sombre : « dernier
+   jour », « Remboursement à vérifier », le statut d'un « à vérifier » passaient au gris (banc transporteurs). */
+.vrm-rpf-puce.is-ambre, :root[data-theme="dark"] .vrm-rpf-puce.is-ambre { background: var(--fu-ambre-fond, #fff4e5); color: var(--fu-ambre-txt, #b25000); }
 :root body .vrm-app-shell .vrm-main :is(.vrm-rpf-code, .vrm-rpf-retire) {
   flex: none; min-height: 44px; height: 44px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--fu-case, #f2f2f7); color: var(--fu-encre, #1d1d1f);
   font: 600 15px/1 var(--vrm-police, system-ui); cursor: pointer; white-space: nowrap; transition: transform 140ms cubic-bezier(.23,1,.32,1); }

@@ -33,6 +33,7 @@ const MUTS = {
   'plus-tard-jamais': ['src/achatsARelier.js', "  return { reporte: Number(maintenant) < revient,", "  return { reporte: false,"],
   'plus-tard-illisible-reporte': ['src/achatsARelier.js', "  if (!Number.isFinite(t)) return { reporte: false, le: null, revient: null };", "  if (!Number.isFinite(t)) return { reporte: true, le: null, revient: null };"],
   'app-sans-horloge': ['src/App.jsx', 'plusTard: achatPlusTard, maintenant: Date.now() })', 'plusTard: achatPlusTard, maintenant: 0 })'],
+  'app-pas-relu-au-nuage': ['src/App.jsx', "    setAchatPlusTard((v) => (v && Object.keys(v).length) ? v : lu('vrm_achat_plus_tard'));\n", ''],
   'app-date-tue': ['src/App.jsx', "l.reporteLe ? `reportée le ${jour(l.reporteLe)}", "l.plusTard ? `remise à plus tard"],
   'sans-date': ['src/achatsARelier.js', "dateRef: ms != null ? new Date(ms).toISOString() : null, curTx: ''", "dateRef: null, curTx: ''"],
   'champs-ignores': ['src/achatsARelier.js', "marque: x.brand || x.brand_title || '', taille: x.size || x.size_title || '',", "marque: '', taille: '',"],
@@ -138,6 +139,7 @@ const { extractBrand: marqueDe, extractColors: couleursDe, extractModel: modeleD
   dit(/await ecritureRelierAchat\(a\)/.test(rel) && /updatePair\(it, w\)/.test(rel) && /propositionPrixAchat\(\{ identite: \{ achat: a, par: 'choix' \}, ventilationDe: ventilationDeTx \}\)/.test(ecr) && /ecritureLot\(a, saisi/.test(ecr), 'S3 « Relier » : l’écriture de « Relier un achat » (prix du reçu ; un lot demande le prix de l’article)');
   dit(/onPlusTard=\{poserAchatPlusTard\}/.test(APP) && /const poserAchatPlusTard = \(id\) => setAchatPlusTard/.test(APP) && !/poserAchatPlusTard[^\n]*buyPrice/.test(APP), 'S4 « Plus tard » ne pose aucun prix');
   dit(/const poserAchatPlusTard = \(id\) => setAchatPlusTard\(\(prev\) => \{ const u = \{ \.\.\.\(prev \|\| \{\}\), \[String\(id\)\]: new Date\(\)\.toISOString\(\) \}; save\('vrm_achat_plus_tard', u\)/.test(APP) && /'vrm_achat_plus_tard',/.test(APP), 'S7 « Plus tard » : la DATE de son clic, synchronisée (`vrm_achat_plus_tard`)');
+  dit(/useEffect\(\(\) => onCloudReady\(\(\) => \{\s*const lu = [\s\S]{0,300}?setAchatPlusTard\(\(v\) => \(v && Object\.keys\(v\)\.length\) \? v : lu\('vrm_achat_plus_tard'\)\)/.test(APP), 'S9 un appareil neuf relit « Plus tard » quand le nuage arrive (seulement si resté vide)');
   dit(/plusTard: achatPlusTard, maintenant: Date\.now\(\) \}\)/.test(APP) && /l\.reporteLe \? `reportée le \$\{jour\(l\.reporteLe\)\}/.test(APP) && /data-ar-reportee=/.test(APP), 'S8 la file lit l’heure (elle revient au bout de 7 jours) et la ligne dit « reportée le … »');
   dit(/if \(nR > 0\) jobs\.push\(\{ id: 'achat-a-relier'/.test(APP) && /aRelierJournee\(fileAchat\)/.test(APP), 'S5 Ma journée dit le nombre, une fois');
   dit(!/useEffect\([^;]*relierAchatAnnonce/.test(APP) && !/useEffect\([^\n]*meilleureSuggestion/.test(APP), 'S6 rien ne relie tout seul (aucun effet ne relie)');

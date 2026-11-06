@@ -8,7 +8,12 @@
 //      avec « Ouvrir sur Vinted » (vinted.fr, nouvel onglet), aucune écriture ni
 //      commande ne part (VRM ne supprime rien) ; ni débordement ni erreur JS ;
 //   B. 50 annonces au MÊME TITRE (photos et N° différents) ⇒ aucune carte ;
-//   C. la même photo, mais le second compte lu il y a 30 h ⇒ aucune carte (« pas su »).
+//   C. la même photo, mais le second compte lu il y a 30 h ⇒ aucune carte (« pas su ») ;
+//   D. (6 nov., finitions) la même photo exacte ET le même N°12 sur les deux : la carte
+//      ambre, et PAS le rouge « deux paires sous un N° » (c'est une paire, la carte suffit) ;
+//   E. le même N°12 sur deux photos différentes (peut-être deux paires) : le ROUGE, pas d'ambre ;
+//   F. comme D, le second compte lu il y a 30 h : l'ambre se tait ⇒ le ROUGE reste (jamais muets).
+// `BANC_DIST=<dist>` : rendre un autre build (l'arbre d'avant, une mutation).
 // Lancer :
 //   npm run build && NODE_OPTIONS="--require $PWD/scripts/bancs/_porte-banc.cjs" BANC_PORT=9651 node scripts/bancs/en-ligne-deux-fois.cjs
 // Captures : CAPTURES=<dossier>.
@@ -16,7 +21,7 @@ const path = require('path');
 const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http');
-const DIST = path.join(__dirname, '..', '..', 'dist');
+const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || Number(process.env.PORT) || 9651;
 const CAPT = process.env.CAPTURES || '';
 
@@ -51,6 +56,12 @@ const SCENARIOS = {
   })(),
 };
 SCENARIOS.C = { listings: { [A]: SCENARIOS.A.listings[A], [B]: { ...SCENARIOS.A.listings[B], cap: iso(30) } }, fiches: SCENARIOS.A.fiches };
+// (6 nov., finitions) D : la même paire (photo exacte) sous le MÊME N°12 sur les deux comptes.
+SCENARIOS.D = { listings: SCENARIOS.A.listings, fiches: { ...SCENARIOS.A.fiches, 6000001: { ...SCENARIOS.A.fiches[6000001], numero: '12' } } };
+// E : le N°12 sur une AUTRE photo (Asics, 6000002) : peut-être deux paires.
+SCENARIOS.E = { listings: SCENARIOS.A.listings, fiches: { ...SCENARIOS.A.fiches, 6000002: { ...SCENARIOS.A.fiches[6000002], numero: '12' } } };
+// F : D, le second compte lu il y a 30 h.
+SCENARIOS.F = { listings: SCENARIOS.C.listings, fiches: SCENARIOS.D.fiches };
 
 let ko = 0, ok = 0;
 const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '  ✅ ' : '  ❌ ') + m + (d && !c ? ' — ' + d : '')); };
@@ -184,6 +195,38 @@ const ouvrir = async (b, vp, sc) => {
         if (CAPT) await pg.screenshot({ path: path.join(CAPT, `deux-fois-B-${nomVp}.png`) });
         const r = await pg.evaluate(() => ({ carte: !!document.querySelector('[data-en-ligne-deux-fois]'), rendu: !!document.querySelector('.vrm-fu-afaire, [data-tout-a-jour]') }));
         dit(r.rendu && !r.carte, '50 annonces au même titre (photos et N° différents) : aucune carte', JSON.stringify(r));
+        dit(errs.length === 0, 'aucune erreur JS', errs.slice(0, 2).join(' | '));
+        await ctx.close();
+      });
+      // (6 nov., finitions) Le rouge et l'ambre ensemble : jamais pour UNE paire prouvée.
+      const lireDR = (pg) => pg.evaluate(() => {
+        const j = document.querySelector('[data-job="numeros-en-double"]');
+        return { ambre: !!document.querySelector('[data-en-ligne-deux-fois]'), rouge: !!j, rougeTxt: j ? j.textContent.replace(/\s+/g, ' ').slice(0, 120) : '', rendu: !!document.querySelector('.vrm-fu-afaire, [data-tout-a-jour]') };
+      });
+      await essaie(`D ${nomVp}`, async () => {
+        const { ctx, pg, errs } = await ouvrir(b, vp, SCENARIOS.D);
+        await pg.waitForTimeout(800);
+        if (CAPT) await pg.screenshot({ path: path.join(CAPT, `deux-fois-D-${nomVp}.png`) });
+        const r = await lireDR(pg);
+        dit(r.rendu && r.ambre, 'D même photo exacte ET même N°12 : la carte AMBRE « en ligne deux fois »', JSON.stringify(r));
+        dit(r.rendu && !r.rouge, 'D … et PAS le rouge « deux paires sous un N° » (une paire en ligne deux fois : la carte ambre suffit)', JSON.stringify(r));
+        dit(errs.length === 0, 'aucune erreur JS', errs.slice(0, 2).join(' | '));
+        await ctx.close();
+      });
+      await essaie(`E ${nomVp}`, async () => {
+        const { ctx, pg, errs } = await ouvrir(b, vp, SCENARIOS.E);
+        await pg.waitForTimeout(800);
+        if (CAPT) await pg.screenshot({ path: path.join(CAPT, `deux-fois-E-${nomVp}.png`) });
+        const r = await lireDR(pg);
+        dit(r.rendu && r.rouge && /12/.test(r.rougeTxt), 'E même N°12 sur deux photos différentes (peut-être deux paires) : le ROUGE', JSON.stringify(r));
+        dit(errs.length === 0, 'aucune erreur JS', errs.slice(0, 2).join(' | '));
+        await ctx.close();
+      });
+      await essaie(`F ${nomVp}`, async () => {
+        const { ctx, pg, errs } = await ouvrir(b, vp, SCENARIOS.F);
+        await pg.waitForTimeout(800);
+        const r = await lireDR(pg);
+        dit(r.rendu && !r.ambre && r.rouge, 'F comme D, un compte lu il y a 30 h : l’ambre se tait, le ROUGE reste (jamais les deux muets)', JSON.stringify(r));
         dit(errs.length === 0, 'aucune erreur JS', errs.slice(0, 2).join(' | '));
         await ctx.close();
       });
