@@ -280,7 +280,7 @@ function texteApp() {
   let ko = 0;
   const dit = (c, m) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m); };
   const app = fs.readFileSync(path.join(racine, 'src', 'App.jsx'), 'utf8').replace(/^\s*\/\/.*$/gm, '');
-  const save = (/const save = \(k,v\) => \{[\s\S]*?\n\};/.exec(app) || [''])[0];
+  const save = (/const save = \(k,v(?:,quand)?\) => \{[\s\S]*?\n\};/.exec(app) || [''])[0];   // (6 nov., v36) `quand` : l'issue locale du geste annulable
   dit(/noterSaisie\(localStorage, owner, k,/.test(save), 'App.jsx : `save` note le geste dans la file');
   dit(/localStorage\.setItem\(k,txt\)[\s\S]*noterSaisie/.test(save), 'App.jsx : …après l\'avoir gardé dans le navigateur');
   const push = (/const cloudPush = \(\) => \{[\s\S]*?\n\};/.exec(app) || [''])[0];

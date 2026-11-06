@@ -508,6 +508,8 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 
+- **6 nov. · « Annuler » partout (v36)** : geste interne instantané + pilule 5 s « Annuler » (`src/gesteAnnulable.js`, `PiluleAnnuler`, `gesteVrm`) sur 10 gestes ; refus ⇒ l'écran revient, « Pas enregistré — Réessayer » ; réseau ⇒ « pas encore envoyé » (file d'envoi) ; jamais sur un geste chez un tiers. `docs/passation/2026-11-06-annuler.md`. Geste : Colis → « J'ai retiré » → Annuler.
+
 - **6 nov. · Chargement** : écran de démarrage dans `index.html` (avant le JS, retiré par `src/demarrage.js`) ; chaque écran attend ses données essentielles derrière son squelette (`src/AttenteEcran.jsx`, `ESSENTIELS_ECRAN`, plafond 2,5 s) ; « lecture… », jamais « pas lu », pendant qu'une publication se prépare ; banc `chargement.cjs`. `docs/passation/2026-11-06-chargement.md`.
 
 - **6 nov. · Boîte mail façon Mail (v36)** : lu / non lu (`api/_lib/emails-lus.js`, ligne `vrm_emails_lus`, glisser au doigt, « Tout marquer lu », rien de caché, pas d'« Archiver »), code de retrait copiable sur la ligne (lu seulement), piles des rafales, avatars (logos de l'app), carte « ce qu'il faut savoir » (code façon carte d'embarquement), gestes par identité, message rendu sans HTML, rubrique Offres, 50 par page au défilement. `docs/passation/2026-11-06-boite-mail.md`. Geste : copier un code depuis la ligne ; décider du HTML d'origine.
