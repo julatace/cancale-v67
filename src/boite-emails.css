@@ -301,3 +301,43 @@
 .vrm-boite .vrm-emails-rubriques.vrm-filtres{display:flex;flex-wrap:wrap;gap:8px;padding:0;border:0;background:none;border-radius:0;margin:0 0 16px}
 .vrm-boite .vrm-emails-rubriques.vrm-filtres>button{flex:0 0 auto;text-align:center}
 .vrm-boite .vrm-emails-rubriques.vrm-filtres strong{font:inherit}
+
+/* ── (6 nov., onglets C) Les comptes dont les e-mails n'arrivent pas, la recherche,
+   et « Relier la boîte de <compte> » (un pas-à-pas avec sa vérification). Ambre
+   seulement pour le bandeau (un geste à faire) ; le coché de la vérification est
+   à l'encre (pas de vert, pas de rouge). */
+.vrm-boite-arelier{margin:12px 16px 4px;padding:12px 14px;border-radius:14px;background:var(--bx-ambre-doux);border-left:3px solid var(--bx-ambre)}
+.vrm-boite-relier .vrm-boite-arelier{margin:0 0 14px}
+.vrm-boite-arelier-titre{margin:0 0 8px;font-size:14px;line-height:1.45}
+.vrm-boite-arelier-titre b{color:var(--bx-ambre)}
+.vrm-boite-arelier ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.vrm-boite-arelier li{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;justify-content:space-between}
+.vrm-boite-arelier-qui{flex:1 1 200px;min-width:0;font-size:13px;color:var(--bx-doux);overflow-wrap:anywhere}
+.vrm-boite-arelier-qui b{color:var(--bx-encre)}
+.vrm-boite .vrm-boite-arelier button{flex:0 0 auto;max-width:100%;white-space:normal;text-align:center}
+.vrm-boite-cherche{display:flex;align-items:center;gap:8px;min-height:44px;padding:0 12px;margin:0 0 10px;border-radius:12px;background:var(--bx-gris);color:var(--bx-doux)}
+.vrm-boite-cherche svg{flex:0 0 auto}
+.vrm-boite-cherche input{flex:1 1 auto;min-width:0;min-height:44px;border:0;background:transparent;font:inherit;font-size:16px;color:var(--bx-encre);outline:none}
+.vrm-boite-cherche:focus-within{box-shadow:0 0 0 2px var(--vrm-focus,var(--bx-accent))}
+.vrm-boite .vrm-boite-rubriques .vrm-boite-averif-pastille[aria-pressed=false]{color:var(--bx-ambre)}
+.vrm-rc{display:grid;gap:12px;padding:16px;border-radius:14px;background:var(--bx-carte);margin:0 0 14px;min-width:0}
+.vrm-rc-tete{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;justify-content:space-between}
+.vrm-rc-titre{margin:0;font-size:20px;line-height:1.25;font-weight:700;overflow-wrap:anywhere}
+.vrm-rc-preuve{margin:0;color:var(--bx-doux);font-size:14px}
+.vrm-rc-adresse{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 8px;align-items:center}
+.vrm-rc-adresse span{grid-column:1/-1;font-size:13px;color:var(--bx-doux)}
+.vrm-rc-adresse code,.vrm-rc-adresse em{min-width:0;padding:10px 12px;border-radius:12px;background:var(--bx-sol);font-size:13px;overflow-wrap:anywhere;font-style:normal}
+.vrm-rc-adresse em{grid-column:1/-1;color:var(--bx-doux)}
+.vrm-rc-conseil{margin:0;font-size:14px}
+.vrm-rc-conseil code{overflow-wrap:anywhere}
+.vrm-rc-verif{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:12px 14px;border-radius:12px;border:1px solid var(--bx-filet);font-size:14px}
+.vrm-rc-verif-ic{flex:0 0 auto;width:24px;height:24px;border-radius:50%;border:2px solid var(--bx-filet);display:grid;place-items:center;font-weight:700;font-size:13px}
+.vrm-rc-verif[data-relier-verif=attente] .vrm-rc-verif-ic{border-color:var(--bx-doux);border-top-color:transparent;animation:vrm-rc-tourne 1.4s linear infinite}
+.vrm-rc-verif[data-relier-verif=relie] .vrm-rc-verif-ic{background:var(--bx-encre);border-color:var(--bx-encre);color:var(--bx-carte)}
+.vrm-rc-verif-txt{flex:1 1 220px;min-width:0}
+.vrm-boite .vrm-rc-verif-geste{flex:0 0 auto}
+@keyframes vrm-rc-tourne{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion: reduce){.vrm-rc-verif[data-relier-verif=attente] .vrm-rc-verif-ic{animation:none}}
+/* Le champ vit DANS sa pastille (même dessin que la recherche des achats : plus de second
+   cadre à l'intérieur). Spécificité au-dessus des règles génériques des champs. */
+:root body .vrm-app-shell .vrm-main .vrm-boite-cherche input[type=search]:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=hidden]){background:transparent !important;border:0 !important;box-shadow:none !important;padding:0 !important;min-height:44px}
