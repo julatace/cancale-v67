@@ -42227,7 +42227,8 @@ function CarteStatsApp({ page, liveStats, sel = null, locaux = null, ici = null,
   // là, un bénéfice ou une publication que l'écran ouvert prépare encore — jamais « pas lu » puis la valeur.
   useEssentiel('carte', (base.vendu === undefined || base.etatBenef === 'encours'
     || (base.enPreparation.dorment && !base.dorment) || (base.enPreparation.retirer && !base.colisARetirer)
-    || (base.enPreparation.urssaf && !base.ligneUrssaf)) ? undefined : true);
+    || (base.enPreparation.urssaf && !base.ligneUrssaf)
+    || Object.values(locaux || {}).some((x) => x && x.enCours)) ? undefined : true);
   const sources = locaux ? { ...base, locaux } : base;
   return <CarteStats owner={AUTH.user?.id||''} page={page} sel={sel || { site: 'toutes', compte: null, periode: null }} sources={sources} regles={REGLES_CARTE} reglage={reglage} poser={poser} objectif={objectif} poserObjectif={poserObjectif} FermeAuRetour={FermeAuRetour} extra={{ ici, attrs }} {...rest}/>;
 }
@@ -56331,6 +56332,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             (les nombres des onglets, `phaseReception`), À retirer (`vrm_colis_retirer`). Aucun nombre recalculé. */}
         {dansPlateforme && !modeRetraits && !baseKO && (() => {
           const lu = Array.isArray(buys.items);
+          // (6 nov.) Les achats se lisent encore : « lecture… » (jamais « pas lu » qui deviendrait un nombre),
+          // et la carte attend avec l'écran (src/AttenteEcran.jsx).
+          const enLecture = !lu && !buys.error ? { raisonCourte: 'lecture…', enCours: true } : {};
           const m0 = new Date(); m0.setDate(1);
           const duMois = { from: m0, to: new Date() };
           const annule = achatAnnule;   // (3 nov.) la règle de « Dépensé », partagée avec le registre des achats (src/registres.js)
@@ -56339,9 +56343,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const n = { route: 0, recu: 0 }; if (lu) buysBase.forEach((o) => { const ph = phaseReception(o); if (n[ph] != null) n[ph]++; });
           return <CarteStatsApp page="achats" aide liveStats={liveStats} className="vrm-fu-ecran" ici="achats" onNav={onNav} sel={{ site: 'toutes', compte: null, periode: null }}
             locaux={{
-              depense: { nom: 'Dépensé du mois', court: 'Dépensé', type: 'eur', aide: 'Tes achats du mois, hors annulés et remboursés (le montant payé).', valeur: depense, quand: (() => { const m = m0.toLocaleDateString('fr-FR', { month: 'long' }); return m.charAt(0).toUpperCase() + m.slice(1); })(), attrs: { 'data-n': lu ? String(mois.length) : '' } },
-              enroute: { nom: 'En route', court: 'En route', type: 'n', aide: 'Tes achats payés ou expédiés, pas encore arrivés au point relais.', valeur: lu ? n.route : null, attrs: { 'data-n': lu ? String(n.route) : '' } },
-              recus: { nom: 'Arrivés', court: 'Arrivés', type: 'n', aide: 'Tes achats livrés ou finalisés, depuis toujours.', valeur: lu ? n.recu : null, attrs: { 'data-n': lu ? String(n.recu) : '' } },
+              depense: { nom: 'Dépensé du mois', court: 'Dépensé', type: 'eur', aide: 'Tes achats du mois, hors annulés et remboursés (le montant payé).', valeur: depense, ...enLecture, quand: (() => { const m = m0.toLocaleDateString('fr-FR', { month: 'long' }); return m.charAt(0).toUpperCase() + m.slice(1); })(), attrs: { 'data-n': lu ? String(mois.length) : '' } },
+              enroute: { nom: 'En route', court: 'En route', type: 'n', aide: 'Tes achats payés ou expédiés, pas encore arrivés au point relais.', valeur: lu ? n.route : null, ...enLecture, attrs: { 'data-n': lu ? String(n.route) : '' } },
+              recus: { nom: 'Arrivés', court: 'Arrivés', type: 'n', aide: 'Tes achats livrés ou finalisés, depuis toujours.', valeur: lu ? n.recu : null, ...enLecture, attrs: { 'data-n': lu ? String(n.recu) : '' } },
             }}/>;
         })()}
         {/* (5 nov.) Pourquoi des codes manquent (l'extension les lit dans les conversations, sur le
@@ -59356,7 +59360,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 locaux={{
                   imprimer: { nom: 'Bordereaux à imprimer', court: 'à imprimer', type: 'n', valeur: nPrets, titre: nDejaImpr > 0 ? `Bordereaux reçus pas encore imprimés (${nDejaImpr} déjà imprimé${nDejaImpr > 1 ? 's' : ''}, à déposer)` : 'Bordereaux reçus, pas encore imprimés', onClick: nPrets > 0 ? () => onOngletColis && onOngletColis('envoyer') : undefined, attrs: { 'data-n': String(nPrets) } },
                   deposes: { nom: 'Colis déposés aujourd’hui', court: deposes > 1 ? 'déposés' : 'déposé', type: 'n', valeur: deposes, titre: "Colis marqués « Colis fait » aujourd'hui", attrs: { 'data-n': String(deposes) } },
-                  retirer: { nom: 'À retirer', court: 'à retirer', type: 'n', valeur: nRet, partiel: retPartiel && nRet != null, affiche: nRet == null ? undefined : `${nRet}${retPartiel ? '+' : ''}`, ...(nRet == null && prepCompta.has('vrm_colis_retirer') ? { raisonCourte: 'lecture…' } : {}), titre: retPartiel && nRet != null ? `Au moins ${nRet} : les e-mails de suivi n'ont pas pu être lus` : 'Colis arrivés à aller chercher', onClick: () => onOngletColis && onOngletColis('retirer'), attrs: { 'data-n': nRet == null ? '' : String(nRet) } },
+                  retirer: { nom: 'À retirer', court: 'à retirer', type: 'n', valeur: nRet, partiel: retPartiel && nRet != null, affiche: nRet == null ? undefined : `${nRet}${retPartiel ? '+' : ''}`, ...(nRet == null && prepCompta.has('vrm_colis_retirer') ? { raisonCourte: 'lecture…', enCours: true } : {}), titre: retPartiel && nRet != null ? `Au moins ${nRet} : les e-mails de suivi n'ont pas pu être lus` : 'Colis arrivés à aller chercher', onClick: () => onOngletColis && onOngletColis('retirer'), attrs: { 'data-n': nRet == null ? '' : String(nRet) } },
                 }}/>
               ); })()}
             {/* (31 oct., soir) + « Leboncoin » quand il y a un compte : ses colis ont
