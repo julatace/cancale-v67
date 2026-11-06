@@ -309,6 +309,7 @@ import { auCentreDeVerification } from "./verificationArticle.js";
 import { ligneEmailsCompte } from "./emailsCompteLie.js";
 import { prochainGesteColis, bordereauxAImprimer } from "./prochainGesteColis.js";
 import "./styles-onglets-b.css";
+import { comptesARelier, boitesQuiArrivent, phraseARelier } from "./relierCompte.js";
 import { adressesSansCompte, comptesSansAdresse, relierAdresse, CLE_ADRESSES_ACHETEUR } from "./adressesSansCompte.js";
 // (2 nov.) Le style « Fusion » : la carte sombre du mois et la frise de suivi (src/design/).
 import CarteMois from "./design/CarteMois.jsx";
@@ -16432,14 +16433,25 @@ const libellePeriode = (p) => {
 // ── « QUELS COMPTES N'ENVOIENT AUCUN EMAIL À VRM, ET DEPUIS QUAND » (11 oct.) ──
 // Une règle (`etatEmailsComptes`), un bloc, deux endroits : Réglages →
 // Notifications et Achats → En attente (§11 — deux écrans, une phrase).
-function useEtatEmailsComptes(comptes) {
-  const [reception, setReception] = useState(undefined);   // undefined en cours · null pas su · objet lu
+// (6 nov., onglets C) UNE lecture partagée : la règle est maintenant lue par Comptes liés,
+// E-mails, Colis, Ma journée, Notifications et Achats. Gardée 2 min, une seule en vol ; une
+// lecture ratée (`null`) n'est pas gardée (la suivante réessaie).
+const _receptionComptes = { t: 0, v: undefined, p: null };
+function fetchEmailsParCompteMemo() {
+  if (_receptionComptes.v != null && Date.now() - _receptionComptes.t < 120e3) return Promise.resolve(_receptionComptes.v);
+  if (_receptionComptes.p) return _receptionComptes.p;
+  _receptionComptes.p = fetchEmailsParCompte().then((r) => { _receptionComptes.p = null; if (r != null) { _receptionComptes.v = r; _receptionComptes.t = Date.now(); } return r; }, () => { _receptionComptes.p = null; return null; });
+  return _receptionComptes.p;
+}
+function useEtatEmailsComptes(comptes, actif = true) {
+  const [reception, setReception] = useState(() => (_receptionComptes.v != null && Date.now() - _receptionComptes.t < 120e3 ? _receptionComptes.v : undefined));   // undefined en cours · null pas su · objet lu
   const { ventes, ko } = useVentesCoque();
   useEffect(() => {
     let mort = false;
-    fetchEmailsParCompte().then((r) => { if (!mort) setReception(r); });
+    if (!actif) return () => { mort = true; };
+    fetchEmailsParCompteMemo().then((r) => { if (!mort) setReception(r); });
     return () => { mort = true; };
-  }, []);
+  }, [actif]);
   return useMemo(() => etatEmailsComptes({
     comptes: comptes || [], reception, ventes, ventesKO: ko,
     adresses: load('vinted_account_emails', {}) || {},
@@ -36260,14 +36272,16 @@ function ComptesMuetsColis({ accounts, onNav }) {
 // comptes sans e-mail (`etatEmailsComptes`, celle de Notifications et d'Achats — §11),
 // projetée par `ligneEmailsCompte` (src/emailsCompteLie.js). Le geste n'apparaît que
 // sur un compte MUET prouvé : il ouvre E-mails → Relier ma boîte, sur les adresses.
-function LigneEmailsCompte({ ligne }) {
+// (6 nov., onglets C) Le geste NOMME le compte et ouvre SON pas-à-pas (avec la vérification) :
+// `relierBoiteDe(uid)` — le même chemin depuis Comptes liés, Colis et Ma journée.
+function LigneEmailsCompte({ ligne, uid, login }) {
   if (!ligne) return null;
-  const relier = () => { ouvrirEmailsRelier('adresses'); try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: 'emails' })); } catch (_) {} };
+  const relier = () => relierBoiteDe(uid);
   return (
     <div className="vrm-cl-emails" data-compte-emails={ligne.etat} data-compte-emails-jours={ligne.jours != null ? String(ligne.jours) : undefined}>
       <span className="vrm-cl-emails-lib">{L.emails}</span>
       <span className={'vrm-cl-emails-txt' + (ligne.geste ? ' is-geste' : '')}>{ligne.texte}</span>
-      {ligne.geste && <button type="button" className="vrm-lien-action vrm-cl-emails-geste" data-compte-emails-relier="" onClick={relier}>{L.relierBoite.replace(/\bma\b/, 'sa')}</button>}
+      {ligne.geste && <button type="button" className="vrm-lien-action vrm-cl-emails-geste" data-compte-emails-relier={uid || ''} onClick={relier}>{login ? `Relier la boîte de ${login}` : L.relierBoite.replace(/\bma\b/, 'sa')}</button>}
     </div>
   );
 }
@@ -36778,7 +36792,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
       <CarteCompteLie key={uid} plateforme="vinted" id={uid} nom={nomAff} photo={photosProfil[uid] || ''} etat={etat} age={ageLecture(lastCap[uid], Date.now())}
         type={pro == null ? '' : pro ? 'pro' : 'particulier'} inclus={!hiddenAccts.has(uid)} onInclus={() => toggleAcctCompta(acc.vinted_user_id)}
         etatVinted={{ etat: h.etat === 'bad' ? 'banni' : h.etat === 'exclu' ? 'masque' : 'actif', source: h.source || '', hint: h.hint }}
-        emails={<LigneEmailsCompte ligne={emailsDe(uid)}/>}
+        emails={<LigneEmailsCompte ligne={emailsDe(uid)} uid={uid} login={acc.login || nomAff}/>}
         action={<a className="vrm-b vrm-b-discret vrm-cl-bouton" href={`https://www.vinted.fr/member/${encodeURIComponent(uid)}`} target="_blank" rel="noreferrer" data-compte-action="ouvrir">Ouvrir</a>}
         enfants={(
           <details data-gerer-compte="" className="vrm-cl-gerer">
@@ -53974,6 +53988,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return () => { window.removeEventListener('vrm:save', f); window.removeEventListener('vrm:stock-slots', f); };
   }, [only]);
   const [sortiesVues, setSortiesVues] = useState(() => { try { const v = JSON.parse(localStorage.getItem('vrm_journee_sorties_vues') || '{}'); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch (_) { return {}; } });
+  // (6 nov., onglets C) LES COMPTES DONT LES E-MAILS N'ARRIVENT PAS, sur Ma journée : UNE carte (la
+  // règle des comptes muets, src/relierCompte.js), dite une fois par jour — touchée, elle s'efface
+  // jusqu'au lendemain (préférence de cet appareil ; E-mails et Comptes liés la redisent).
+  const { liste: aRelierListe } = useComptesARelier(accounts, only === 'journee');
+  const jourRelier = new Date().toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' });
+  const [aRelierVus, setARelierVus] = useState(() => { try { const v = JSON.parse(localStorage.getItem('vrm_journee_relier_vus') || '{}'); return v && v.j === new Date().toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' }) && Array.isArray(v.uids) ? v.uids : []; } catch (_) { return []; } });
+  const comptesARelierJour = only === 'journee' && Array.isArray(aRelierListe) ? aRelierListe.filter((c) => !aRelierVus.includes(c.uid)) : [];
+  const noterRelierVus = (uids) => { const n = [...new Set([...aRelierVus, ...uids])]; try { localStorage.setItem('vrm_journee_relier_vus', JSON.stringify({ j: jourRelier, uids: n })); } catch (_) {} setARelierVus(n); };
   // Rangé TOUT DE SUITE (pas dans la mise à jour d'état : « Voir » change d'écran dans le même
   // geste, l'écran se démonte, et une mise à jour jamais jouée n'aurait rien rangé).
   const noterSortiesVues = (cles) => {
@@ -55188,7 +55210,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // une carte AMBRE (c'est un geste), seulement s'il y en a. Le geste : supprimer celle en trop sur
               // vinted.fr, SON clic — VRM ne supprime rien tout seul (§3).
               const deuxFois = enLigneDeux && enLigneDeux.vinted.length ? enLigneDeux.vinted : [];
-              const nGestes = cases.length + alertesArgent.length + autres.length + (urssafJob ? 1 : 0) + (carteAilleurs ? 1 : 0) + (sortiesStock.length ? 1 : 0) + (deuxFois.length ? 1 : 0);
+              const nGestes = cases.length + alertesArgent.length + autres.length + (urssafJob ? 1 : 0) + (carteAilleurs ? 1 : 0) + (sortiesStock.length ? 1 : 0) + (deuxFois.length ? 1 : 0) + (comptesARelierJour.length ? 1 : 0);
+              // (6 nov., onglets C) UNE carte pour les comptes dont les e-mails n'arrivent pas : le geste ouvre
+              // le pas-à-pas du premier (les autres y sont proposés), et la carte s'efface pour la journée.
+              const carteARelier = () => {
+                const un = comptesARelierJour.length === 1 ? comptesARelierJour[0] : null;
+                const court = un ? `E-mails de ${un.login} : rien n’arrive` : `${comptesARelierJour.length} comptes n’envoient aucun e-mail`;
+                const detail = un ? phraseARelier(un) : comptesARelierJour.map((c) => c.login).join(', ');
+                return (
+                  <button key="a-relier" type="button" className="vrm-day-task vrm-fu-tache" data-journee-a-relier={comptesARelierJour.map((c) => c.uid).join(' ')} data-n={String(comptesARelierJour.length)}
+                    title={`${court}\n${detail}`} aria-label={`${court} — ${detail}`}
+                    onClick={() => { noterRelierVus(comptesARelierJour.map((c) => c.uid)); relierBoiteDe(comptesARelierJour[0].uid); }}>
+                    <PileVignettes srcs={[]} n={comptesARelierJour.length} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name="mail" size={20}/>}/>
+                    <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{court}</span><span className="vrm-day-task-note is-urgent" data-sous-ligne="a-relier">{detail}</span></span>
+                    <span className="vrm-day-task-action"><span className="vrm-day-task-action-mot">Relier</span></span>
+                  </button>
+                );
+              };
               const carteDeuxFois = () => {
                 const t = texteEnLigneDeuxFois(deuxFois);
                 return (
@@ -55256,6 +55294,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {carteAilleurs ? carteVendusAilleurs() : null}
                     {deuxFois.length ? carteDeuxFois() : null}
                     {cases.map(carteCase)}
+                    {comptesARelierJour.length ? carteARelier() : null}
                     {sortiesStock.length ? carteSortieStock() : null}
                     {autres.map(tache)}
                     {urssafJob ? tache(urssafJob, 99) : null}
@@ -59546,6 +59585,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* (3 nov.) Les ventes Vestiaire à envoyer sont dans LA liste ci-dessous (« tout va être ensemble ») ;
             leurs « Colis fait » sont dans l'onglet « Envoyés ». Reste ici : Vestiaire illisible, dit. */}
         {only === 'bordereaux' && voitSite('vestiaire') && colisVestiaire(vcEtat) === null ? <div data-colis-vestiaire="passu" style={{ marginBottom: 10 }}><EtatPanne compact quoi="Tes colis Vestiaire" raison="Rien n’est perdu : rouvre Colis dans un moment."/></div> : null}
+        {/* (6 nov., onglets C) Un compte dont les e-mails n'arrivent pas, avec des colis à envoyer : dit ici, avec LE geste. */}
+        {only === 'bordereaux' && <ComptesARelierColis comptes={accounts}/>}
         {/* (31 oct.) Les emails reçus et ce que VRM en a fait — l'ambre quand un
             email attend un geste (bordereau au N° deviné, reçu sans n°…). */}
         {/* (2 nov., colis clair) « Tes emails, ce que VRM en a fait » n'est pas un geste
@@ -68608,7 +68649,7 @@ function phrasePersonne(p) {
 }
 // Le panneau des adresses se fait défiler jusqu'à lui quand on y arrive par le
 // geste de Ma journée (au moment du clic, Réglages n'est pas monté).
-const DEMANDE_ADRESSES = { on: false, vers: '', filtre: '' };
+const DEMANDE_ADRESSES = { on: false, vers: '', filtre: '', compte: '' };
 function demanderAdresses(){DEMANDE_ADRESSES.on=true;DEMANDE_ADRESSES.vers='';window.dispatchEvent(new Event('vrm:ouvrir-adresses'));}
 // (31 oct.) Le journal « Tes emails, ce que VRM en a fait », ouvert depuis Colis
 // (filtré « à vérifier » quand il y a quelque chose à vérifier).
@@ -68617,6 +68658,9 @@ function demanderJournalEmails(filtre){DEMANDE_ADRESSES.on=true;DEMANDE_ADRESSES
 // journal ou l'aperçu de la réception ouvre l'écran E-mails sur son onglet « Relier ma boîte »
 // (l'appelant pose ensuite `setTab('emails')`). `vers` : 'reception' (aperçu) · 'adresses' · 'journal' · 'a-traiter'.
 function ouvrirEmailsRelier(vers, filtre){DEMANDE_ADRESSES.on=true;DEMANDE_ADRESSES.vers=vers||'';DEMANDE_ADRESSES.filtre=filtre||'';window.dispatchEvent(new Event('vrm:ouvrir-adresses'));}
+// (6 nov., onglets C) « Relier la boîte de <compte> » : ouvre E-mails → Relier ma boîte sur le
+// pas-à-pas DE CE COMPTE (src/RelierCompte.jsx). Un seul chemin pour Comptes liés, Colis, Ma journée.
+function relierBoiteDe(uid){DEMANDE_ADRESSES.on=true;DEMANDE_ADRESSES.vers='reception';DEMANDE_ADRESSES.compte=String(uid||'');try{window.dispatchEvent(new CustomEvent('vrm:relier-compte',{detail:String(uid||'')}));window.dispatchEvent(new CustomEvent('vrm:aller',{detail:'emails'}));}catch(_){}}
 // La forme acceptée pour une adresse de réception (saisie à la main OU
 // suggérée) : une seule règle.
 const ADRESSE_RECEPTION_OK = /^[^@\s]+@[^@\s.]+\.[^@\s]+$/;
@@ -68698,6 +68742,72 @@ const PREUVE_LIGNE = {
   // même » envoie le lien (si Apple le laisse passer, l'adresse est prouvée).
   impossible: { t: "relais Apple « Masquer mon adresse » : pas confirmée — ses emails sont mis de côté", alerte: true, geste: 'Essayer quand même' },
 };
+// ── « RELIER LA BOÎTE DE <COMPTE> » (6 nov., onglets C) ──────────────────────
+// La règle des comptes muets (`etatEmailsComptes`, §11) projetée par src/relierCompte.js :
+// les comptes dont les e-mails n'arrivent pas, avec LE geste. La preuve de la
+// vérification : la date du dernier e-mail rangé AU NOM du compte (le même champ que
+// la règle : `meta->>account` des lignes `email_*` et le journal), lue à la demande —
+// deux lectures scalaires (une ligne, `limit=1`) et le journal (`data->entries`).
+// Lecture ratée ⇒ `null` (pas su), jamais « relié ».
+async function lireDernierEmailCompte(login) {
+  const l = String(login || '').trim(); if (!l) return null;
+  // Bornée (15 s) et annulable : une vérification est un GESTE, elle lit la base à neuf
+  // (une lecture avec `signal` n'est jamais servie par le partage des lectures, src/lecturesPartagees.js).
+  const ac = typeof AbortController === 'function' ? new AbortController() : null;
+  const t = ac ? setTimeout(() => { try { ac.abort(); } catch (_) {} }, 15000) : null;
+  const opt = ac ? { headers: sbAuth(), signal: ac.signal } : { headers: sbAuth() };
+  try {
+    const [r1, r2] = await Promise.all([
+      fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_*&meta->>account=eq.${encodeURIComponent(l)}&select=at:meta->>receivedAt&order=meta->>receivedAt.desc.nullslast&limit=1`, opt),
+      fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.email_journal&select=entries:data->entries`, opt),
+    ]);
+    if (!r1.ok || !r2.ok) return null;
+    const a = await r1.json(), b = await r2.json();
+    if (!Array.isArray(a) || !Array.isArray(b)) return null;
+    let d = '';
+    const prend = (v) => { const t = Date.parse(String(v || '')); if (Number.isFinite(t) && (!d || t > Date.parse(d))) d = new Date(t).toISOString(); };
+    for (const x of a) prend(x && x.at);
+    for (const e of ((b[0] && Array.isArray(b[0].entries)) ? b[0].entries : [])) if (e && String(e.account || '').trim() === l) prend(e.at);
+    return d;
+  } catch (_) { return null; } finally { if (t) clearTimeout(t); }
+}
+function useComptesARelier(comptes, actif = true) {
+  const etat = useEtatEmailsComptes(comptes, actif);
+  const adresses = load('vinted_account_emails', {}) || {};
+  const liste = comptesARelier(etat, adresses);
+  return { etat, liste, boites: boitesQuiArrivent(etat, adresses) };
+}
+// L'écran E-mails, avec les comptes à relier (en tête) et la demande venue d'ailleurs.
+function EcranEmails({ comptes, ...props }) {
+  const { liste, boites } = useComptesARelier(comptes);
+  // La demande « Relier la boîte de <compte> » (Comptes liés, Colis, Ma journée) est servie une fois.
+  // ⚠️ Consommée APRÈS le montage (effet), jamais dans l'initialiseur : au premier montage, l'écran
+  //    (chargé à la demande) suspend et React rejoue l'initialiseur — la demande était déjà vidée.
+  const [compteInitial] = useState(() => DEMANDE_ADRESSES.compte || '');
+  useEffect(() => { DEMANDE_ADRESSES.compte = ''; const f = () => { DEMANDE_ADRESSES.compte = ''; }; window.addEventListener('vrm:relier-compte', f); return () => window.removeEventListener('vrm:relier-compte', f); }, []);
+  return <BoiteEmails {...props} aRelier={liste} boites={boites} compteInitial={compteInitial} lireDernier={lireDernierEmailCompte}/>;
+}
+// Colis : une ligne quand un compte dont les e-mails n'arrivent pas a des colis À ENVOYER
+// (`aExpedier`, la règle unique) : leur bordereau et leur date limite ne viennent pas par
+// e-mail. Seulement ces comptes-là ; rien si la lecture n'a pas abouti.
+function ComptesARelierColis({ comptes }) {
+  const { liste } = useComptesARelier(comptes);
+  const { ventes } = useVentesCoque();
+  if (!Array.isArray(liste) || !liste.length || !Array.isArray(ventes)) return null;
+  const parCompte = liste.map((c) => ({ c, n: ventes.filter((o) => o && o._acc && String(o._acc.vinted_user_id) === c.uid && aExpedier(o)).length })).filter((x) => x.n > 0);
+  if (!parCompte.length) return null;
+  return (
+    <div className="vrm-colis-arelier" data-colis-a-relier={parCompte.length} role="note">
+      {parCompte.map(({ c, n }) => (
+        <div key={c.uid} className="vrm-colis-arelier-ligne" data-colis-a-relier-compte={c.uid} data-n={String(n)}>
+          <span className="vrm-colis-arelier-txt"><b>{n} colis de {c.login}</b> : ses e-mails n’arrivent pas (bordereau, date limite, codes de retrait).</span>
+          <button type="button" className="vrm-lien-action" data-colis-relier={c.uid} onClick={() => relierBoiteDe(c.uid)}>Relier la boîte de {c.login}</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── « ADRESSE SANS COMPTE » (6 nov., vague 2, point 5) ──────────────────────
 // En tête de E-mails → Relier ma boîte. La règle est dans src/adressesSansCompte.js :
 // SES e-mails rangés (`email_reception_*`, l'adresse de RÉCEPTION a décidé qu'ils
@@ -73154,7 +73264,7 @@ function AppCoeur() {
         {/* (5 nov., chantier G, revue 2.24) UN seul écran « E-mails » : son onglet « Relier ma boîte » porte
             l'ancien sous-écran de Paramètres (`EmailsSetting` : aperçu, journal, adresses, à rattacher) sous
             l'accompagnement animé. Une demande venue d'ailleurs (`DEMANDE_ADRESSES`) l'ouvre directement. */}
-        {tab==='emails'&&<GardeEcran nom="emails"><Suspense fallback={<p role="status" style={{padding:20}}>{PAS_SU.enCours}</p>}><BoiteEmails headers={sbAuth} delies={load('vrm_recus_delies',{})||{}} FermeAuRetour={FermeAuRetour}
+        {tab==='emails'&&<GardeEcran nom="emails"><Suspense fallback={<p role="status" style={{padding:20}}>{PAS_SU.enCours}</p>}><EcranEmails comptes={vintedAccounts} headers={sbAuth} delies={load('vrm_recus_delies',{})||{}} FermeAuRetour={FermeAuRetour}
           vueInitiale={DEMANDE_ADRESSES.on?'relier':'boite'}
           reglages={<><AdressesSansCompte comptes={vintedAccounts}/><EmailsSetting onComptes={()=>setTab('vintedaccounts')}/></>}
           onAller={(u)=>{try{window.dispatchEvent(new CustomEvent('vrm:aller',{detail:u}));}catch(_){}}}
