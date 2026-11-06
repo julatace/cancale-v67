@@ -14558,7 +14558,7 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, onDebut, onLier,
         {nPh ? <div className="vrm-main-photos" data-main-photos={nPh}>{photos.map((u, i) => <div key={i}><PhotoVinted src={u} alt={`Photo ${i + 1}`} style={cssPh}/></div>)}</div>
           : <div className="vrm-rm-note" data-main-sans-photo="">VRM n’a aucune photo de cette annonce : ouvre-la sur Vinted pour qu’il les lise.</div>}
         {nPh > 0 && <>
-          <p className="vrm-rm-muet">{regNeutre ? 'Les photos telles qu’enregistrées' : 'Les photos avec ta retouche (Réglages)'}, nommées {nomPhotoReglee(paire.numero, 0).replace('-01', '-01, -02…')}.{partageFichiersPossible() ? ' Sur iPhone : « Enregistrer les images » les met dans Photos.' : ''}</p>
+          <p className="vrm-rm-muet">{regNeutre ? 'Les photos telles qu’enregistrées' : 'Les photos avec ta retouche (Réglages)'}, nommées {nomPhotoReglee(paire.numero, 0)}{nPh > 1 ? `, ${nomPhotoReglee(paire.numero, 1)}${nPh > 2 ? '…' : ''}` : ''}.{partageFichiersPossible() ? ' Sur iPhone : « Enregistrer les images » les met dans Photos.' : ''}</p>
           <div className="vrm-b-rangee vrm-rm-gauche"><Bouton variante={pretes && !ph.enregistre ? 'primaire' : 'secondaire'} icone="image" data-main-telecharger={nPh} occupe={!!(ph && ph.encours)} disabled={!!(ph && ph.encours)} onClick={enregistrer}>{libellePhotos}</Bouton></div>
         </>}
         {ph && !ph.encours && <div className="vrm-rm-muet" data-main-dl-fait={ph.fait} data-main-dl-rate={ph.rate} role="status">
@@ -14605,7 +14605,7 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, onDebut, onLier,
       </>)}
 
       {section('relier', <>
-        <p className="vrm-rm-muet" data-main-but="">{paire.annulee && !paire.numero ? 'Désigne la nouvelle annonce : la vente annulée est alors remise en vente.' : paire.numero ? `Désigne la nouvelle annonce : le N°${paire.numero} passe dessus (le même carton).` : 'Désigne la nouvelle annonce, pour la suivre.'}</p>
+        {paire.numero && etatSuivi !== 'fait' ? <p className="vrm-rm-muet" data-main-but="">Le N°{paire.numero} passera sur la nouvelle annonce : le même carton.</p> : null}
         {paire.annulee && !paire.numero && etatSuivi !== 'fait' ? <div className="vrm-rm-muet" data-main-num-neuf={paire.archive ? 'archive' : 'sans'}>{paire.archive ? `Le N°${paire.numAffiche} est un ancien numéro : il ne se redonne pas. La nouvelle annonce recevra un N° neuf, à écrire sur son carton.` : 'Paire pas reliée : cette vente n’a pas de N°. La nouvelle annonce en recevra un, comme toute annonce.'}</div> : null}
         {paire.annulee && !paire.numero && etatSuivi === 'fait' ? <div className="vrm-rm-fait" data-main-n-fait=""><Icon name="check" size={16}/> Nouvelle annonce désignée : la vente annulée est remise en vente.</div>
           : !paire.numero && !paire.annulee ? <div className="vrm-rm-muet" data-main-sans-num="">Cette annonce n’a pas de N° : la nouvelle en recevra un, comme toute annonce.</div>

@@ -135,9 +135,16 @@ const actions = async (pg, n) => { await clic(pg, '[data-actions-possibles]'); a
 const curseur = (pg, sel, v) => pg.locator(sel).first().evaluate((el, val) => { const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(el, String(val)); el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); }, v);
 // La feuille entre en glissant : on attend la fin de l'entrée, puis on mesure qu'elle est bien À L'ÉCRAN
 // (un rectangle non nul ne suffit pas : une feuille restée sous le bord passe tous les contrôles du DOM).
+// Sous charge (machine partagée), l'entrée de 320 ms peut prendre plusieurs secondes : on
+// attend jusqu'à 12 s qu'elle soit posée ; restée sous le bord au-delà, c'est un défaut.
 const feuillePosee = async (pg) => {
-  await pg.evaluate(() => Promise.race([Promise.all(document.getAnimations().map((a) => a.finished.catch(() => {}))), new Promise((r) => setTimeout(r, 2500))])).catch(() => {});
-  return pg.evaluate(() => { const f = document.querySelector('[data-repub-main]'); if (!f) return null; const r = f.getBoundingClientRect(); return { haut: Math.round(r.top), bas: Math.round(r.bottom), vh: innerHeight }; });
+  let m = null;
+  for (let i = 0; i < 48; i++) {
+    m = await pg.evaluate(() => { const f = document.querySelector('[data-repub-main]'); if (!f) return null; const r = f.getBoundingClientRect(); return { haut: Math.round(r.top), bas: Math.round(r.bottom), vh: innerHeight, anims: document.getAnimations().filter((a) => a.playState === 'running').length, tf: getComputedStyle(f).transform }; }).catch(() => null);
+    if (m && m.haut >= 0 && m.haut < m.vh - 200 && !m.anims) break;
+    await pg.waitForTimeout(250);
+  }
+  return m;
 };
 const reglagesStockes = (pg) => pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_republier_reglages') || 'null'); } catch (_) { return null; } });
 const etapeVisible = (pg) => pg.evaluate(() => { const v = [...document.querySelectorAll('[data-main-section]')].filter((x) => !x.hidden && x.getClientRects().length); return v.map((x) => x.getAttribute('data-main-section')).join(','); });
@@ -150,6 +157,8 @@ const petitsDans = (pg, sel) => pg.$$eval(`${sel} button, ${sel} a[href], ${sel}
     for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
       for (const sombre of [false, true]) {
         const T = `${vp.width}${sombre ? ' sombre' : ' clair'}`;
+        // VUES=390-clair,1512-sombre : seulement ces vues (par défaut les quatre).
+        if (process.env.VUES && !process.env.VUES.split(',').includes(T.replace(' ', '-'))) continue;
         const nomF = (x) => path.join(SHOTS, `republier-main-${vp.width}-${sombre ? 'sombre' : 'clair'}-${x}.png`);
         console.log(`── ${T}`);
         const { ctx, pg, errs } = await contexte(b, vp, sombre);
