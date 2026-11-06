@@ -72,7 +72,22 @@ const dit = (c, m, d = '') => { if (c) { ok++; console.log('  ✓ ' + m); } else
   const g8 = prochainGesteColis({ onglet: 'envoyer', envoi: { total: 1, aImprimer: [], aDeposer: 0, sansBordereau: 1 }, retrait: { total: 0 } });
   dit(g8 && g8.cle === 'attente' && g8.texte === '1 vente attend son bordereau', 'une vente sans bordereau : elle attend le sien (rien à imprimer)', JSON.stringify(g8));
 
+  console.log('§6 (audit des chiffres, 6 nov.) « à imprimer » hors de Colis : la même notion');
+  const { compteAImprimer } = M;
+  dit(typeof compteAImprimer === 'function', 'le module exporte compteAImprimer');
+  if (typeof compteAImprimer === 'function') {
+    const a = compteAImprimer({ local: 2, complet: true, pub: { aImprimer: 9, total: 5 }, totalAPoster: 5 });
+    dit(a.n === 2 && a.exact, 'tout lu ⇒ son propre compte, exact (la publication ne le remplace pas)', JSON.stringify(a));
+    const b = compteAImprimer({ local: 1, complet: false, pub: { prets: 10, aImprimer: 4, total: 11 }, totalAPoster: 11 });
+    dit(b.n === 4 && b.exact, 'pas tout lu, publication du MÊME lot ⇒ ses « à imprimer » (4), jamais ses « prêts » (10)', JSON.stringify(b));
+    const c = compteAImprimer({ local: 1, complet: false, pub: { prets: 10, total: 11 }, totalAPoster: 11 });
+    dit(c.n === 1 && !c.exact, 'publication d’avant (sans aImprimer) ⇒ « au moins » ce qu’il sait', JSON.stringify(c));
+    const d = compteAImprimer({ local: 1, complet: false, pub: { aImprimer: 4, total: 9 }, totalAPoster: 11 });
+    dit(d.n === 1 && !d.exact, 'publication d’un autre lot ⇒ « au moins »', JSON.stringify(d));
+  }
+
   console.log('§5 le branchement dans l’écran');
+  dit(/compteAImprimer\(\{ local: bordereauxAImprimer\(lignesLot\(\)\)\.length/.test(fs.readFileSync(APP, 'utf8')), 'Ma journée compte « à imprimer » par la même fonction que la case de Colis (pas encore imprimés)');
   const src = fs.readFileSync(APP, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   dit(/const nPrets = bordereauxAImprimer\(lignesImpr\)\.length/.test(src), 'la case « à imprimer » compte les bordereaux PAS ENCORE imprimés (la même fonction)');
   dit(/data-colis-prochain=\{g\.cle\}/.test(src) && /prochainGesteColis\(\{ onglet,/.test(src), 'la ligne du prochain geste est rendue en tête de Colis');
