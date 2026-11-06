@@ -47,6 +47,7 @@ import DiagnosticLeboncoin from './DiagnosticLeboncoin.jsx';
 import {preparerLiaisonOAuth,lireLiaisonOAuth,resultatLiaisonPermis} from './auth/liaisonOAuth.js';
 import { SqueletteChargement } from "./Chargement.jsx";
 import { AttenteEcran, useEssentiel } from './AttenteEcran.jsx';
+import { SqLignes } from './Squelette.jsx';
 import { usePreparation, useEnPreparation } from './preparations.js';
 import { souvenir, retenir } from './memoireEcrans.js';
 import ConnexionsCompte from './auth/ConnexionsCompte.jsx';
@@ -35223,7 +35224,8 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
           {lecture === undefined ? '…' : (aa && aa.su ? <>{aa.auMoins ? <span style={{ fontSize: 15, fontWeight: 600 }}>au moins </span> : null}{nAffiche}</> : '—')}
           <small>{nAffiche === 1 && aa && aa.su ? 'annonce actuelle' : 'annonces actuelles'}{filtreActif ? ' (filtrées)' : ''}</small>
         </div>
-        {lecture === undefined && <div className="vrm-s2d-resume-l">Je lis tes annonces Vinted, Leboncoin, eBay et Vestiaire…</div>}
+        {/* (6 nov.) La lecture garde la place des lignes qui suivront (trois lignes) : le Stock ne saute plus quand elles arrivent. */}
+        {lecture === undefined && <div className="vrm-s2d-resume-l" data-stock-resume-attente="" style={{ minHeight: 'calc(3 * 1.45em)' }}>Je lis tes annonces Vinted, Leboncoin, eBay et Vestiaire…</div>}
         {lecture && !aa.su && <div className="vrm-s2d-resume-l" data-stock-passu="">Je n'ai pas pu lire tes annonces{manqueTxt ? ` (${manqueTxt})` : ''} — rien n'est perdu, c'est la lecture qui a échoué. Ouvre Vinted {NAV.dans} avec l'extension, puis reviens ici.</div>}
         {aa && aa.su && <div className="vrm-s2d-resume-l">
           {nAffiche > 0 ? <><b>{nRangees}</b> rangée{nRangees > 1 ? 's' : ''} · <b>{nAffiche - nRangees - nSansNum}</b> pas encore rangée{nAffiche - nRangees - nSansNum > 1 ? 's' : ''}</> : 'Aucune annonce en ligne lue'}
@@ -42185,7 +42187,7 @@ const lireColisAPoster = lirePub('vrm_colis_aposter'), lireColisARetirer = lireP
 // `ventesFaites`, le porte-monnaie, les annonces), le reste = les publications.
 // L'état de « vendu » dans le `liveStats` de la coque : 'encours' (pas encore là) · 'pasSu' · 'lu'.
 const venduEtat = (liveStats) => !liveStats ? 'encours' : liveStats.venduPasSu ? 'pasSu' : Array.isArray(liveStats.venduLignes) ? 'lu' : 'encours';
-const CLES_PREPAREES = ['vrm_paires_dorment', 'vrm_colis_retirer', 'vrm_benefice_jours'];
+const CLES_PREPAREES = ['vrm_paires_dorment', 'vrm_colis_retirer', 'vrm_benefice_jours', 'vinted_urssaf_mois'];
 function useSourcesCarte(liveStats) {
   const [compta] = useLigneSynchro('vrm_compta', lireComptaSynchro);
   const [pub, pret] = useLigneSynchro('vrm_benefice_jours', lireBeneficeJours);
@@ -42206,7 +42208,7 @@ function useSourcesCarte(liveStats) {
     beneficeDe: (p) => ({ B: beneficeDe({ pub, compta, ligneUrssaf, regime }, p), etat }),
     joursBenef: pub, etatBenef: etat, ligneUrssaf, colisAPoster, colisARetirer, dorment, live: liveStats || null,
     // (6 nov.) Une publication absente que l'écran ouvert est en train de préparer : « lecture… ».
-    enPreparation: { dorment: prep.has('vrm_paires_dorment'), retirer: prep.has('vrm_colis_retirer') },
+    enPreparation: { dorment: prep.has('vrm_paires_dorment'), retirer: prep.has('vrm_colis_retirer'), urssaf: prep.has('vinted_urssaf_mois') },
   }), [liveStats, pub, etat, compta, ligneUrssaf, regime, colisAPoster, colisARetirer, dorment, prep]);
 }
 // Le liveStats de la coque, donné à toute carte sans le passer de main en main
@@ -42224,7 +42226,8 @@ function CarteStatsApp({ page, liveStats, sel = null, locaux = null, ici = null,
   // (6 nov.) La carte attend ses chiffres avec l'écran (src/AttenteEcran.jsx) : « vendu » pas encore
   // là, un bénéfice ou une publication que l'écran ouvert prépare encore — jamais « pas lu » puis la valeur.
   useEssentiel('carte', (base.vendu === undefined || base.etatBenef === 'encours'
-    || (base.enPreparation.dorment && !base.dorment) || (base.enPreparation.retirer && !base.colisARetirer)) ? undefined : true);
+    || (base.enPreparation.dorment && !base.dorment) || (base.enPreparation.retirer && !base.colisARetirer)
+    || (base.enPreparation.urssaf && !base.ligneUrssaf)) ? undefined : true);
   const sources = locaux ? { ...base, locaux } : base;
   return <CarteStats owner={AUTH.user?.id||''} page={page} sel={sel || { site: 'toutes', compte: null, periode: null }} sources={sources} regles={REGLES_CARTE} reglage={reglage} poser={poser} objectif={objectif} poserObjectif={poserObjectif} FermeAuRetour={FermeAuRetour} extra={{ ici, attrs }} {...rest}/>;
 }
@@ -43844,7 +43847,7 @@ function ListeComptes({ id, valeur, options, onChange, note, skin, attrs }) {
     </div>
   );
 }
-function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', compteConnecte = '', alertes = null, cycle = null, onCycle = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false }) {
+function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', compteConnecte = '', alertes = null, alertesLues = true, cycle = null, onCycle = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false }) {
   // (3 nov.) Les cartes « supprimé de Vinted » déjà répondues sur cet écran
   // (elles partent tout de suite, la coque recalcule ensuite) et la réponse en cours.
   const [cycleRepondus, setCycleRepondus] = useState({});
@@ -49682,6 +49685,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   usePreparation('vrm_paires_dorment', litAnnonces && accounts.length > 0, Array.isArray(listings.items) && !listings.loading);
   usePreparation('vrm_colis_retirer', litAchats && accounts.length > 0, Array.isArray(buys.items));
   usePreparation('vrm_benefice_jours', accounts.length > 0, Array.isArray(sales.items));
+  usePreparation('vinted_urssaf_mois', accounts.length > 0, Array.isArray(sales.items));
   const prepCompta = useEnPreparation(CLES_PREPAREES);
   // Les résumés : seulement sur Messages, relus quand la liste change, au plus une
   // fois par minute (une lecture de ~1 400 lignes, en scalaires).
@@ -55424,6 +55428,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 );
               };
               if (loading) return null;
+              // (6 nov.) Les actions du jour de la coque (la cloche) pas encore rangées : la liste
+              // n'arrive pas geste par geste — sa place, en lignes de chargement, puis la liste d'un bloc.
+              // Et jamais « Rien à faire… : pas lu » pendant qu'elles se lisent.
+              if (!alertesLues) return (
+                <section className="vrm-fu-afaire" aria-label="À faire" aria-busy="true" data-afaire-attente="">
+                  <div className="vrm-fu-titre-section"><h2 className="vrm-day-titre-section">À faire</h2></div>
+                  <SqLignes n={3} montant={false}/>
+                </section>
+              );
               // (5 nov., chantier E1, §5) « Rien à faire » ne se dit que sur ce qui a été LU : une case
               // pas lue (« — ») n'est pas une case à zéro. Sinon la ligne nomme ce qui manque.
               const pasLus = T.filter((x) => x.pasSu).map((x) => x.l);
@@ -70896,6 +70909,9 @@ function AppCoeur() {
   // « Comptes liés », ce qui laissait les onglets vides tant qu'on n'y était pas
   // passé. C'est une lecture Supabase légère (pas un appel Vinted, aucun risque).
   const [accountsLoaded,setAccountsLoaded]=useState(false);
+  // (6 nov.) Un passage qui ne finit jamais (lecture pendue, erreur) ne bloque rien : au plus 20 s après les
+  // comptes, Ma journée montre ce qu'elle sait (comme avant).
+  useEffect(()=>{ if(!accountsLoaded||notifsLus) return undefined; const t=setTimeout(()=>setNotifsLus(true),20000); return ()=>clearTimeout(t); },[accountsLoaded,notifsLus]);
   // ⚠️ TROIS ÉTATS, comme partout ailleurs (panneau de sécurité, `extSait`,
   //    `acctHealth`) : on charge · la base a répondu · la base n'a pas répondu.
   //    Sans le troisième, « je n'ai pas pu lire » s'affiche comme « il n'y a
@@ -73472,7 +73488,7 @@ function AppCoeur() {
             annoncer « 🎉 Tout est à jour ! » pendant la panne, c'est-à-dire
             précisément l'écran qu'il ouvre le matin. Corriger « partout » se
             vérifie au rendu, écran par écran, pas en lisant le code. */}
-        {tab==='journee'&&<GardeEcran nom="journee"><Comptabilite key="journee" panelOff={panelOffCoque} accounts={vintedAccounts} only="journee" alertes={notifItems} cycle={cycleCartes} onCycle={()=>setPreuveTick(t=>t+1)} liveStats={liveStatsVus} onNav={setTab} baseKO={baseKO} accountsReady={accountsLoaded} premierJour={premierJour} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/></GardeEcran>}
+        {tab==='journee'&&<GardeEcran nom="journee"><Comptabilite key="journee" panelOff={panelOffCoque} accounts={vintedAccounts} only="journee" alertes={notifItems} alertesLues={notifsLus||baseKO||(accountsLoaded&&!vintedAccounts.length)} cycle={cycleCartes} onCycle={()=>setPreuveTick(t=>t+1)} liveStats={liveStatsVus} onNav={setTab} baseKO={baseKO} accountsReady={accountsLoaded} premierJour={premierJour} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/></GardeEcran>}
         {/* ⚠️ « Bienvenue 👋 · connecte ton compte Vinted pour commencer » à
             quelqu'un qui a neuf comptes : c'est ce qu'il voyait quand la base
             ne répondait pas. `baseKO` distingue « aucun compte » de « je n'ai

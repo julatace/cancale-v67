@@ -380,7 +380,8 @@ export const valeurChiffre = (id, place, sources, sel, regles, maintenant = Date
   if (id === 'recu') {
     const ym = `${new Date(maintenant).getFullYear()}-${String(new Date(maintenant).getMonth() + 1).padStart(2, '0')}`;
     const R = recuPublie(S.ligneUrssaf, ym, maintenant);
-    if (R.valeur == null) return vide(R.raison, { p });
+    // (6 nov.) Jamais publiée mais l'écran ouvert la prépare : « lecture… », pas « ouvre Ventes ».
+    if (R.valeur == null) return vide(R.raison === 'absente' && S.enPreparation && S.enPreparation.urssaf ? 'encours' : R.raison, { p });
     if (R.partiel && !(R.valeur > 0)) return vide('partiel', { p, manque: R.manque });
     // (5 nov., chantier E1, revue 1.7) Des ventes SANS date de versement (« à dater ») ne
     // sont dans AUCUN mois (§5). Rien de daté ce mois et des ventes à dater : « 0 € » dirait
