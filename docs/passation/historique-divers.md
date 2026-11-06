@@ -821,4 +821,6 @@ Après la fusion des chantiers v35 (C, D, E1, E2, F, G, H), quatre audits étaie
 
 Passage final : `npm run build`, les 4 audits + `frein-relais-serveur`/`frein-relais-vinted`, `coherence`,
 `identite`, `icones`, `fonctions-api` verts ; bancs `annonces-coherence`, `brouillons-avancee`,
-`journee-coherence`, `ventes-e2`, `colis-envoi`, `colis-qr`, `fournisseurs` (ports 9401–9407) : voir le rapport de la session.
+`journee-coherence`, `ventes-e2`, `colis-envoi`, `colis-qr` (ports 9401–9406) verts. `fournisseurs` (écran
+touché par le nom du bouton) était rouge AVANT ce changement, au premier sélecteur : depuis la revue 2.16 d'Achats,
+les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abord, puis 112/112.
