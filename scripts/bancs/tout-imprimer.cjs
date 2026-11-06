@@ -29,10 +29,10 @@ const ACCOUNTS = [{ id: 1, vinted_user_id: '111', login: 'compte_a', domain: 'ww
 // tx, titre, suivi (sa forme dit le transporteur), N°, PDF présent
 const V = [
   { tx: 9201, titre: 'Alpha Nike taille 42', suivi: '41234567', num: '21' },
-  { tx: 9202, titre: 'Bravo Adidas taille 40', suivi: 'XA123456789FR', num: '22' },
+  { tx: 9202, titre: 'Bravo Adidas taille 40', suivi: 'XW123456789TS', num: '22' },
   { tx: 9203, titre: 'Charlie Asics taille 41', suivi: '42234567', num: '23', aVerifier: true },
   { tx: 9204, titre: 'Delta Puma taille 39', suivi: '', num: '24' },
-  { tx: 9205, titre: 'Echo Vans taille 38', suivi: 'XB223456789FR', num: '25' },
+  { tx: 9205, titre: 'Echo Vans taille 38', suivi: 'XW223456789TS', num: '25' },
 ];
 const TR = { 9201: 'mondialrelay', 9202: 'chronopost', 9203: 'mondialrelay', 9204: 'autres', 9205: 'chronopost', V1: 'chronopost' };
 const VC_TITRE = 'Foxtrot Cabas cuir';
