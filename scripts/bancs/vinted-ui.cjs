@@ -251,7 +251,9 @@ async function sectionAnnonces(b, vp, sombre) {
         if (await x.count()) await x.click({ timeout: 3000 }).catch(() => pg.keyboard.press('Escape')); else await pg.keyboard.press('Escape');
         await pg.locator('[data-fiche-menu]').first().waitFor({ state: 'detached', timeout: 2000 }).catch(() => {});
       }
-      await pg.waitForTimeout(200);
+      // Plus aucune feuille ni voile au-dessus de la grille (le clic suivant doit toucher la carte).
+      await pg.waitForFunction(() => !document.querySelector('[role="dialog"]') && !document.querySelector('.vrm-fs-voile'), null, { timeout: 3000 }).catch(() => {});
+      await pg.waitForTimeout(400);
       return f;
     };
     const f9201 = await feuilleFiche('9201'), f9202 = await feuilleFiche('9202');

@@ -177,14 +177,14 @@ plusieurs bancs figent leurs horloges au lancement et rougissent quand un passag
 | banc | base | après | note |
 |---|---|---|---|
 | `annonces-coherence` (neuf) | 48 rouges | **0 rouge** (126-127 verts) | |
-| `fusion-app` (écrans Annonces, 4 vues) | F4 y = 904, F6 « N°2 » bleu 3,6:1 (état intégré) | F4 et F6 verts | F9 (sélecteur de site, segment actif transparent) rougit au hasard sur d'autres écrans : hors zone |
-| `annonces-actions` | 1 rouge (parcours arrêté, délai sous charge) | 1 rouge du même type | adapté : la raison se lit en tête ; « à la main » est un lien sous les tuiles |
+| `fusion-app` (écrans Annonces, 4 vues) | F4 y = 904, F6 « N°2 » bleu 3,6:1 (état intégré) | **130 verts, 0 rouge** (après fusion de l’état intégré) | F9 (sélecteur de site, segment actif transparent) rougit au hasard sur d'autres écrans : hors zone |
+| `annonces-actions` | 1 rouge (parcours arrêté, délai sous charge) | **vert** (dernière passe, machine calme ; un arrêt du même type sous charge) | adapté : la raison se lit en tête ; « à la main » est un lien sous les tuiles |
 | `annonces-carte` | 7 rouges | les 7 mêmes | |
 | `brouillons-avancee` | vert | **vert** | adapté : « Voir mes brouillons » = vue Brouillons → « Un par un » ; « Mettre en ligne » par Sélectionner → Actions |
 | `numero-etiquette` | 2 rouges | les 2 mêmes | adapté : déplie « N nouveaux N° » avant d'y toucher |
-| `vinted-ui` | 8 rouges (calendrier, « achat à côté de l'état » au téléphone) | voir dernière passe | adapté : prix d'achat manquant = bandeau (plus d'ambre par fiche) ; gestes = deux à la vue + feuille « … » |
-| `republier` | 4 rouges (dont arrêt du parcours sous charge) | voir note | adapté : entrée par Sélectionner → Actions → tuile, puis « Retour » vers l'étape « Choisir » du moteur (pivot décoché) ; le reste jugé tel qu'avant |
-| `lien-vc-frise` | vert (62) | voir dernière passe | adapté : « Relier à Vestiaire » est dans la feuille « … » |
+| `vinted-ui` | 8 rouges (calendrier, « achat à côté de l'état » au téléphone) | **les 8 mêmes** | adapté : prix d'achat manquant = bandeau (plus d'ambre par fiche) ; gestes = deux à la vue + feuille « … » |
+| `republier` | 4 rouges (dont arrêt du parcours sous charge) | 5 rouges : « la fenêtre nomme le compte » ×2 (= base), et une course de temps (« pendant la file » vert à 390, rouge à 1512, puis les 2 qui en dépendent) | adapté : entrée par Sélectionner → Actions → tuile, puis « Retour » vers l'étape « Choisir » du moteur (pivot décoché) ; le reste jugé tel qu'avant |
+| `lien-vc-frise` | vert (62) | **vert (62)** | adapté : « Relier à Vestiaire » est dans la feuille « … » |
 | `tous-boutons` | non relancé (très long) | non relancé | adapté : l'entrée « Republier » attend la vue Sélectionner ; la feuille jugée à Échap est « … » d'une carte |
 
 Chaque banc adapté jugeait l'ANCIEN rendu voulu (la feuille « Republier et brouillons »,
@@ -209,3 +209,12 @@ l'ambre par fiche, les neuf gestes à la vue) que la revue retire ; aucune règl
 ## Geste de Julien
 Annonces : cocher deux annonces d'un même compte → « Actions » ; sur une carte, toucher
 « … » ; toucher « Compléter » dans le bandeau « Prix d'achat ».
+
+## Dernière passe (6 nov., après fusion de `claude/project-review-nsk5su` c534f843)
+`npm run build` vert ; `jetons-coherence` vert ; `composants` 274/0 ; `fusion-app` (Annonces,
+4 vues) 130/0 ; `annonces-coherence` 126/0 ; `audit-annonces-coherence` 29/29, `--prouve`
+15/15 ; audits `rouge-doublon`, `composants`, `coherence`, `identite`, `icones`,
+`fonctions-api`, `annonces-actions` (58), `tdz`, `variables` verts ; `fusion-echelle
+--verifier` : 5 fichiers hors échelle (6 sur la base : `annonces-selection.css` en sort).
+Non relancés : `tous-boutons`, `nouveau-vendeur` (très longs ; leurs contrôles d'Annonces
+sont conditionnels ou adaptés ci-dessus).
