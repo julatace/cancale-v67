@@ -123,7 +123,7 @@ function Resultat({ x, nouveau, rp, C }) {
         <span data-ebay-prix={x.prix} data-ebay-port={x.port == null ? 'inconnu' : x.port} style={{ color: C.text, fontWeight: 600 }}>{x.port == null ? <>{eur(x.prix)} <span style={{ fontWeight: 400, color: C.muted }}>+ port non indiqué</span></> : x.port === 0 ? <>{eur(x.prix)} <span style={{ fontWeight: 400, color: C.muted }}>port compris</span></> : <>{eur(x.total)} <span style={{ fontWeight: 400, color: C.muted }}>({eur(x.prix)} + {eur(x.port)} de port)</span></>}</span>
         {x.etat && <span>· {x.etat}</span>}
         {x.enchere && !x.achatImmediat && <span>· enchère</span>}
-        {x.vendeur && <span>· {x.vendeur}{Number.isFinite(x.avis) ? ` (${String(x.avis).replace('.', ',')} %)` : ''}</span>}
+        {x.vendeur && <span>· {x.vendeur}{Number.isFinite(x.avis) ? ` (${String(x.avis).replace('.', ',')}\u00a0%)` : ''}</span>}
       </div>
       {rp && <div data-ebay-repere={rp.modele} style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.4 }}>{phraseRepere(rp)}</div>}
     </div>

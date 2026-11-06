@@ -108,8 +108,9 @@ function categorie(nom, v, avant, apres, M) {
   }
   let a = avant;
   const cats = [];
-  if (/^-0(,00)? €$/.test(a)) { a = a.replace(/^-/, ''); cats.push('« -0 » ⇒ « 0 »'); }
-  if (/,00 €$/.test(a)) { a = a.replace(/,00 €$/, ' €'); cats.push('centimes inutiles'); }
+  if (/ (€|[A-Z]{3})$/.test(a) && /\u00a0(€|[A-Z]{3})$/.test(apres)) { a = a.replace(/ (€|[A-Z]{3})$/, '\u00a0$1'); cats.push('espace insécable avant la devise'); }
+  if (/^-0(,00)?\u00a0€$/.test(a)) { a = a.replace(/^-/, ''); cats.push('« -0 » ⇒ « 0 »'); }
+  if (/,00\u00a0€$/.test(a)) { a = a.replace(/,00\u00a0€$/, '\u00a0€'); cats.push('centimes inutiles'); }
   return a === apres && cats.length ? cats.join(' + ') : null;
 }
 
@@ -132,6 +133,9 @@ async function audit(M, bavard) {
     [[12, { centimes: 'toujours' }], '12,00 €'], [[12.3, { centimes: 'toujours' }], '12,30 €'], [[1234.6, { centimes: 'jamais' }], `1${NB}235 €`],
     [[1234, { milliers: false }], '1234 €'], [[12.999], '13 €'], [[0.001], '0 €'], [[1.005, { arrondi: 'decimal' }], '1,01 €'], [[1.005], '1 €'],
   ];
+  // 6 nov. (v36-finition) : l'espace avant la devise est INSÉCABLE (U+00A0) — « € » ne passe
+  // jamais seul à la ligne. Les attentes s'écrivent à l'espace ordinaire, lue ici insécable.
+  for (const c of CAS) c[1] = c[1].replace(/ (€|[A-Z]{3})$/, '\u00a0$1');
   for (const [args, att] of CAS) {
     let r; try { r = F.montant(...args); } catch (e) { r = 'ERREUR ' + e.message; }
     dit(r === att, `montant(${args.map(decrire).join(', ')}) = « ${att} »`, r);
@@ -139,7 +143,7 @@ async function audit(M, bavard) {
   dit(F.valeurMontant(null) === null && F.valeurMontant('x') === null && F.valeurMontant('12.5') === 12.5 && F.valeurMontant(1250, { enCentimes: true }) === 12.5,
     'valeurMontant : null pour un montant pas su, le nombre sinon (jamais 0 pour « pas su »)');
   // « Au moins 0,00 € » ne se dit jamais : en mode auto, aucun « ,00 € ».
-  const avecZeros = CORPUS.map((v) => F.montant(v)).filter((s) => /,00 /.test(s));
+  const avecZeros = CORPUS.map((v) => F.montant(v)).filter((s) => /,00\s/.test(s));
   dit(avecZeros.length === 0, 'aucun « ,00 € » écrit en mode auto', avecZeros.join(' | '));
 
   // ── 2. Les quatre alias contre les écritures d'avant ─────────────────────
@@ -164,7 +168,7 @@ async function audit(M, bavard) {
     console.log('');
   }
   // Un nombre lu ne change que par ses centimes inutiles (le cœur de la consigne).
-  const nombresTouches = ecarts.filter((e) => /^-?[\d.]+(e[+-]?\d+)?$/.test(e.v) && !/centimes|-0/.test(e.c || ''));
+  const nombresTouches = ecarts.filter((e) => /^-?[\d.]+(e[+-]?\d+)?$/.test(e.v) && !/centimes|-0|insécable/.test(e.c || ''));
   dit(nombresTouches.length === 0, 'aucun nombre lu ne change autrement que par ses centimes inutiles (ou un « -0 »)', nombresTouches.map((e) => e.nom + '(' + e.v + ')').join(', '));
 
   // ── 3. Les mots ────────────────────────────────────────────────────────────

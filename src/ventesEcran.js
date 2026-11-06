@@ -87,4 +87,4 @@ export const comptesQuiAnnulent = (R, s = SEUILS_ANNULATIONS) => {
 // `annulationsParCompte` : [de, a)).
 export const fenetreAnnulations = (maintenant = Date.now(), s = SEUILS_ANNULATIONS) => ({ de: maintenant - s.jours * 86400000, a: maintenant + 1 });
 // « 3 annulations sur 6 ventes (50 %) » — un pourcentage à la virgule française.
-export const pctFr = (t) => (t == null ? '—' : `${String(t).replace('.', ',')} %`);
+export const pctFr = (t) => (t == null ? '—' : `${String(t).replace('.', ',')}\u00a0%`);

@@ -102,7 +102,7 @@ export function preuveAcheteur({ tx, mails = [], commandes = [], brouillon = nul
   if (deviseDe(cmd.price) !== 'EUR') return non('montant', `la vente est en ${deviseDe(cmd.price)}, pas en euros`);
   const cMail = centimesDe(mail.prix); const cVente = centimesDe(cmd.price);
   if (cMail == null || cVente == null) return non('montant', 'le prix de l’e-mail ou de la vente n’est pas lu');
-  if (cMail !== cVente) return non('montant', `le prix diffère (e-mail ${(cMail / 100).toFixed(2).replace('.', ',')} €, Vinted ${(cVente / 100).toFixed(2).replace('.', ',')} €)`);
+  if (cMail !== cVente) return non('montant', `le prix diffère (e-mail ${(cMail / 100).toFixed(2).replace('.', ',')}\u00a0€, Vinted ${(cVente / 100).toFixed(2).replace('.', ',')}\u00a0€)`);
   // Le brouillon de facture, s'il existe.
   if (brouillon && typeof brouillon === 'object') {
     if (txt(brouillon.transaction) && txt(brouillon.transaction) !== t) return non('brouillon', 'le brouillon de facture porte un autre n° de transaction');

@@ -198,5 +198,5 @@ export function proposition(rep = {}) {
 export const ANNONCE_EXEMPLE = Object.freeze({
   titre: 'Nike Air Max 90 blanches taille 42',
   description: 'Portées quelques fois, très bon état.\nSemelle propre, boîte d’origine.\nEnvoi rapide et soigné.',
-  prix: '45,00 €',
+  prix: '45,00\u00a0€',
 });

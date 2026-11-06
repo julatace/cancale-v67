@@ -40,7 +40,7 @@ export function jeuExemple(now = Date.now()) {
     { id: 'harvest_111_orders_sold', data: { capturedAt: iso(0.01), payload: { my_orders: V1 } } },
     { id: 'harvest_222_orders_sold', data: { capturedAt: iso(0.02), payload: { my_orders: V2 } } },
     { id: 'harvest_111_orders_purchased', data: { capturedAt: iso(0.01), payload: { my_orders: B1 } } },
-    { id: 'harvest_111_inbox', data: { capturedAt: iso(0.01), payload: { conversations: [conv(301, 'acheteuse_lyon', 'Vous feriez 50 € ?', true, 3), conv(302, 'marc.b', 'Merci, bien reçu !', false, 30)] } } },
+    { id: 'harvest_111_inbox', data: { capturedAt: iso(0.01), payload: { conversations: [conv(301, 'acheteuse_lyon', 'Vous feriez 50\u00a0€ ?', true, 3), conv(302, 'marc.b', 'Merci, bien reçu !', false, 30)] } } },
     { id: 'harvest_222_inbox', data: { capturedAt: iso(0.02), payload: { conversations: [conv(401, 'sneaker_fan', 'Toujours disponible en 42 ?', true, 6)] } } },
     { id: 'email_bord_62000', data: { transaction: '62000', filename: 'bordereau-62000.pdf', pdfB64: 'JVBERi0x', modele: V1[0].title, account: 'vendeuse_a', receivedAt: iso(0.2), dateLimite: new Date(now + 3 * 86400000).toLocaleDateString('fr-FR') + ' 10 h 00', type: 'vinted' } },
     { id: 'panel_colis_relais', data: { 73000: { code: 'K48291', lieu: 'Le Fournil, 8 Rue de la Paix, 35000 Rennes, France', at: iso(0.5) } } },

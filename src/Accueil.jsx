@@ -51,7 +51,7 @@ const SCENES = {
 const LIBELLES = {
   colis: 'Exemple d’écran Colis : trois colis à poster, deux bordereaux prêts ; le bordereau de la N°128 sort avec son numéro imprimé, et le carton 128 est mis en avant.',
   ailleurs: 'Exemple : la N°128 est vendue sur Vinted ; VRM la relie par son numéro à ses annonces Leboncoin et eBay, les signale à retirer, et l’annonce eBay est retirée après confirmation.',
-  urssaf: 'Exemple : la vente de la N°128, versée en fin de mois, porte le chiffre à déclarer de 1 159,50 € à 1 244,50 €, toutes plateformes ; le mois est ensuite noté comme déclaré.',
+  urssaf: 'Exemple : la vente de la N°128, versée en fin de mois, porte le chiffre à déclarer de 1 159,50\u00a0€ à 1 244,50\u00a0€, toutes plateformes ; le mois est ensuite noté comme déclaré.',
   premier: 'Un bordereau dessiné, tamponné du numéro 1.',
 };
 
@@ -574,7 +574,7 @@ export default function Accueil({ onEntrer }) {
                 {/* Trois morceaux insécables : la ligne ne se coupe qu'APRÈS un
                     « · » (vu au rendu à 390 px : « · Sans / engagement »). */}
                 <div>
-                  <span className="nw">{ACCES_OFFERT && <><span data-acces-offert="">Gratuit pour l’instant</span>, puis </>}<b>{PRIX_MOIS} €</b> par mois<span className="sep">·</span></span>{' '}
+                  <span className="nw">{ACCES_OFFERT && <><span data-acces-offert="">Gratuit pour l’instant</span>, puis </>}<b>{PRIX_MOIS}&nbsp;€</b> par mois<span className="sep">·</span></span>{' '}
                   <span className="nw">Sans engagement<span className="sep">·</span></span>{' '}
                   <span className="nw">Aucun mot de passe Vinted demandé</span>
                 </div>
@@ -694,7 +694,7 @@ export default function Accueil({ onEntrer }) {
             <div className="acc-prix">
               <h2 className="acc-h2b">Tous tes comptes. Un seul espace.</h2>
               {ACCES_OFFERT && <div className="acc-offert" data-acces-offert="">Gratuit pour l’instant</div>}
-              <div className="acc-gros"><b>{PRIX_MOIS} €</b><span>par mois</span></div>
+              <div className="acc-gros"><b>{PRIX_MOIS}&nbsp;€</b><span>par mois</span></div>
               <ul>
                 <li>Sans engagement · résiliable en ligne, depuis l’app</li>
                 <li>Tous tes comptes, toutes les fonctions.</li>

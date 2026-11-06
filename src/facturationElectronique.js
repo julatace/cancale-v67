@@ -224,9 +224,9 @@ export const pdfFacturX = async (f, v) => {
   y -= 12; page.drawLine({ start: { x: M, y }, end: { x: W - M, y }, thickness: 0.6, color: filet });
   y -= 24;
   T('Total', W - M - 160, y, { s: 12, b: true }); T(eur(f.centimes), W - M - 8, y, { s: 12, b: true, droite: true }); y -= 16;
-  T('TVA', W - M - 160, y, { s: 9, c: gris }); T('0,00 €', W - M - 8, y, { s: 9, c: gris, droite: true }); y -= 16;
+  T('TVA', W - M - 160, y, { s: 9, c: gris }); T('0,00\u00a0€', W - M - 8, y, { s: 9, c: gris, droite: true }); y -= 16;
   T('Déjà payé', W - M - 160, y, { s: 9, c: gris }); T(eur(f.centimes), W - M - 8, y, { s: 9, c: gris, droite: true }); y -= 16;
-  T('Reste à payer', W - M - 160, y, { s: 9, b: true }); T('0,00 €', W - M - 8, y, { s: 9, b: true, droite: true }); y -= 26;
+  T('Reste à payer', W - M - 160, y, { s: 9, b: true }); T('0,00\u00a0€', W - M - 8, y, { s: 9, b: true, droite: true }); y -= 26;
   T(v.mention, M, y, { s: 9.5, b: true });
   T('Facture électronique Factur-X (profil BASIC WL) — données lisibles par machine dans le fichier joint factur-x.xml.', M, 44, { s: 7.5, c: gris });
   const xml = xmlFacturX(f, v);
@@ -257,7 +257,7 @@ export const recapEReporting = ({ lignes, aDater, ym, ymDe, manque = [], attente
   if (attente) manques.push('une source encore en lecture (Leboncoin ou eBay)');
   if (!versementsLus) manques.push('les ventes Vinted (dates de versement illisibles)');
   const nADater = (aDater || []).length, cADater = (aDater || []).reduce((s, l) => s + (centimesDe(l.eur) || 0), 0);
-  if (nADater) manques.push(`${nADater} vente${nADater > 1 ? 's' : ''} finalisée${nADater > 1 ? 's' : ''} sans date de versement (${eurDe(cADater).replace('.', ',')} €) — elles peuvent appartenir à ce mois`);
+  if (nADater) manques.push(`${nADater} vente${nADater > 1 ? 's' : ''} finalisée${nADater > 1 ? 's' : ''} sans date de versement (${eurDe(cADater).replace('.', ',')}\u00a0€) — elles peuvent appartenir à ce mois`);
   return { ym, lignes: duMois, n: duMois.length, centimes: total, parPlateforme, parJour, partiel: manques.length > 0, manques, nADater, cADater };
 };
 

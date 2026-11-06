@@ -36,7 +36,7 @@ export const FILTRES_TYPE = [
 const ONGLETS = { cat_bord: 'Ouvrir Colis', achats: 'Ouvrir Achats', retraits: 'Ouvrir Colis à retirer', cat_ventes: 'Ouvrir Ventes', cat_msg: 'Ouvrir Messages', cat_annonces: 'Ouvrir Annonces' };
 const lien = (tab) => (tab ? { tab, label: ONGLETS[tab] } : null);
 const maj = (s) => { const t = String(s || '').trim(); return t ? t[0].toLocaleUpperCase('fr') + t.slice(1) : ''; };
-const euros = (m) => { const t = String(m || '').trim(); return t ? `${t.replace('.', ',')} €` : ''; };
+const euros = (m) => { const t = String(m || '').trim(); return t ? `${t.replace('.', ',')}\u00a0€` : ''; };
 // Un code de retrait se lit par groupes de trois (« 418 205 »).
 export const codeLisible = (c) => { const t = String(c || '').replace(/\s+/g, ''); return /^\d{6,}$/.test(t) ? t.replace(/(\d{3})(?=\d)/g, '$1 ') : String(c || '').trim(); };
 

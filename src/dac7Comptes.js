@@ -298,7 +298,7 @@ const verdictTexte = (k) => {
   if (k.etat !== 'lu') return 'pas su';
   if (k.verdict === 'atteint') {
     const parN = k.n >= DAC7.ventes, parE = k.centimes > DAC7.centimes;
-    return `au-dessus du seuil (${parN && parE ? '30 ventes et plus de 2 000 €' : parN ? '30 ventes' : 'plus de 2 000 €'})`;
+    return `au-dessus du seuil (${parN && parE ? '30 ventes et plus de 2 000\u00a0€' : parN ? '30 ventes' : 'plus de 2 000\u00a0€'})`;
   }
   if (k.verdict === 'atteintSi') return 'au-dessus si les ventes pas encore datées comptent';
   if (k.verdict === 'sous') return 'sous le seuil';

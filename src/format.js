@@ -91,7 +91,8 @@ export function montant(v, opts = {}) {
   }
   const signe = n < 0 ? '-' : (opts.signe && n > 0 ? '+' : '');
   const corps = (opts.milliers === false ? entier : grouper(entier)) + (decimales ? ',' + decimales : '');
-  return `${signe}${corps} ${devise === 'EUR' ? '€' : devise}`;
+  // L'espace avant la devise est INSÉCABLE (U+00A0) : « € » ne passe jamais seul à la ligne.
+  return `${signe}${corps}\u00a0${devise === 'EUR' ? '€' : devise}`;
 }
 
 // ── Les quatre anciennes écritures, devenues des alias ──────────────────────

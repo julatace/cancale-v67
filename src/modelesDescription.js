@@ -35,7 +35,7 @@ export function remplirModele(texte, v = {}) {
     taille: v.taille, marque: v.marque, titre: v.titre,
     'n°': v.numero != null && str(v.numero).trim() ? `N°${str(v.numero).trim()}` : null,
     numero: v.numero, 'numéro': v.numero,
-    prix: v.prix != null && Number.isFinite(Number(v.prix)) && Number(v.prix) > 0 ? `${String(Math.round(Number(v.prix) * 100) / 100).replace('.', ',')} €` : null,
+    prix: v.prix != null && Number.isFinite(Number(v.prix)) && Number(v.prix) > 0 ? `${String(Math.round(Number(v.prix) * 100) / 100).replace('.', ',')}\u00a0€` : null,
   };
   return str(texte).replace(/\{\s*([^{}\s]{1,10})\s*\}/g, (tout, nom) => {
     const k = nom.toLowerCase();

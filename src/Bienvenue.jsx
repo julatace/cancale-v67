@@ -27,7 +27,7 @@ export const DEMO_BIENVENUE = [
   { cle: 'numeros', titre: 'Un numéro par paire', texte: "Chaque paire reçoit un numéro à écrire sur sa boîte. Il est tamponné sur le bordereau et te montre où elle est rangée. Deux paires n'ont jamais le même.",
     lignes: [['N°41', 'étagère 2 · case 3'], ['N°42', 'étagère 2 · case 4'], ['N°43', 'à ranger']] },
   { cle: 'compta', titre: 'Ta compta', texte: "Ce que tu vends, ce que tu reçois, ton bénéfice. Et selon ton statut, ce que tu dois déclarer. Rien n'est imposé : tu choisis quand tu veux.",
-    lignes: [['Vendu ce mois', '1 240 €'], ['Reçu', '980 €'], ['Bénéfice', '+ 410 €']] },
+    lignes: [['Vendu ce mois', '1 240\u00a0€'], ['Reçu', '980\u00a0€'], ['Bénéfice', '+ 410\u00a0€']] },
   { cle: 'extension', titre: "L'extension", texte: "Une extension pour ton navigateur lit tes ventes, tes colis et tes bordereaux sur Vinted, Leboncoin, eBay et Vestiaire. C'est la première chose à installer : on t'accompagne pas à pas.",
     lignes: [['Ventes', 'lues'], ['Bordereaux', 'prêts à imprimer'], ['Colis', 'suivis']] },
 ];

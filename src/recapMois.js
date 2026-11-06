@@ -75,7 +75,7 @@ export function resumeRecap(d) {
   L.push(['Bénéfice', d.benefice == null ? '—' : eurosTexte(d.benefice), 'benefice']);
   if (d.couverture) L.push(["Prix d'achat connus", `${d.couverture.nCout}/${d.couverture.n}`, 'couverture']);
   L.push(['CA déclaré (argent reçu ce mois)', d.caDeclare == null ? '—' : eurosTexte(d.caDeclare), 'ca']);
-  if (d.taux != null) L.push([`URSSAF à payer (${String(d.taux).replace('.', ',')} %)`, d.urssaf == null ? '—' : eurosTexte(d.urssaf), 'urssaf']);
+  if (d.taux != null) L.push([`URSSAF à payer (${String(d.taux).replace('.', ',')}\u00a0%)`, d.urssaf == null ? '—' : eurosTexte(d.urssaf), 'urssaf']);
   return L;
 }
 const RAISONS = { achats: "il manque des prix d'achat", frais: 'des frais ne sont pas connus', rien: 'aucune vente ni dépense', publication: 'ventes pas encore lues', encours: 'ventes pas encore lues', cotisations: 'CA déclaré pas encore lu' };

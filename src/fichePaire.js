@@ -100,7 +100,7 @@ export function parcoursPaire(rn, d = {}, o = {}) {
   for (const a of rn.annonces) {
     const st = d.stats ? d.stats[a.id] : null;
     const prix = a.price != null && a.price !== '' ? (typeof a.price === 'object' ? a.price.amount : a.price) : null;
-    lignesAnn.push({ site: 'Vinted', id: a.id, etat: a.etat, texte: ['Vinted', ETAT_ANN[a.etat] || a.etat, prix != null ? `${String(prix).replace('.', ',')} €` : null,
+    lignesAnn.push({ site: 'Vinted', id: a.id, etat: a.etat, texte: ['Vinted', ETAT_ANN[a.etat] || a.etat, prix != null ? `${String(prix).replace('.', ',')}\u00a0€` : null,
       st && Number.isFinite(st.favoris) ? `${st.favoris} fav.` : null, st && Number.isFinite(st.vues) ? `${st.vues} vues` : null].filter(Boolean).join(' · ') });
   }
   for (const a of (rn.annoncesEbay || [])) lignesAnn.push({ site: 'eBay', id: String(a.itemId), etat: 'en-ligne', texte: 'eBay · en vente' });
@@ -115,9 +115,9 @@ export function parcoursPaire(rn, d = {}, o = {}) {
   for (const v of vVinted) {
     const ev = o.etapeVente ? o.etapeVente(v) : { label: '' };
     const p = v.price && v.price.amount != null ? v.price.amount : null;
-    lignesV.push({ site: 'vinted', tx: v._tx, texte: ['Vinted', p != null ? `${String(p).replace('.', ',')} €` : null, d.nomCompte ? d.nomCompte(v._uid) : null, ev.label || null].filter(Boolean).join(' · '), date: jour(v.date), annulee: annulee(v) });
+    lignesV.push({ site: 'vinted', tx: v._tx, texte: ['Vinted', p != null ? `${String(p).replace('.', ',')}\u00a0€` : null, d.nomCompte ? d.nomCompte(v._uid) : null, ev.label || null].filter(Boolean).join(' · '), date: jour(v.date), annulee: annulee(v) });
   }
-  for (const v of lbc) lignesV.push({ site: 'leboncoin', texte: ['Leboncoin', v.price != null ? `${(Number(v.price) / 100).toFixed(2).replace('.', ',')} €` : null, o.lbcAnnulee && o.lbcAnnulee(v) ? 'annulée' : o.lbcFinalisee && o.lbcFinalisee(v) ? 'finalisée' : 'en cours'].filter(Boolean).join(' · '), date: jour(v.dateVente || v.date) });
+  for (const v of lbc) lignesV.push({ site: 'leboncoin', texte: ['Leboncoin', v.price != null ? `${(Number(v.price) / 100).toFixed(2).replace('.', ',')}\u00a0€` : null, o.lbcAnnulee && o.lbcAnnulee(v) ? 'annulée' : o.lbcFinalisee && o.lbcFinalisee(v) ? 'finalisée' : 'en cours'].filter(Boolean).join(' · '), date: jour(v.dateVente || v.date) });
   for (const c of ebay) lignesV.push({ site: 'ebay', texte: ['eBay', o.commandeEbayEngagee && !o.commandeEbayEngagee(c) ? 'annulée ou remboursée' : 'payée'].join(' · '), date: jour(c.creationDate) });
   // Aucune vente trouvée ET une lecture de ventes a manqué : on ne sait pas si
   // elle est vendue — la vente, le colis et l'argent disent « pas su ».
@@ -154,7 +154,7 @@ export function parcoursPaire(rn, d = {}, o = {}) {
     else if (bil.benefice != null) { benefice = Math.round(bil.benefice * 100); benefPartiel = !bil.complet; }
     else raisonBenef = bil.achat == null ? 'prix d’achat pas saisi' : bil.vente == null ? 'prix de vente illisible' : 'frais illisibles';
     const ver = d.versements == null ? undefined : d.versements[String(venteV._tx)] || null;
-    const frais = bil.cents ? `frais renseignés ${(bil.cents / 100).toFixed(2).replace('.', ',')} €${bil.complet ? '' : ' (pas tous confirmés)'}` : (bil.complet ? 'aucun frais' : 'frais pas renseignés');
+    const frais = bil.cents ? `frais renseignés ${(bil.cents / 100).toFixed(2).replace('.', ',')}\u00a0€${bil.complet ? '' : ' (pas tous confirmés)'}` : (bil.complet ? 'aucun frais' : 'frais pas renseignés');
     if (ver === undefined) etapes.push({ cle: 'argent', etat: 'passu', titre: 'Argent', detail: `dates de versement pas lues · ${frais}` });
     else if (ver) etapes.push({ cle: 'argent', etat: 'fait', titre: 'Argent versé', date: ver, detail: frais });
     else etapes.push({ cle: 'argent', etat: 'absent', titre: 'Argent', detail: `versement pas encore lu · à dater · ${frais}` });

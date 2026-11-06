@@ -22,7 +22,7 @@ import {lireEntiteVinted,extraitConversation,libelleOffre,etatOffreCourt,estCode
 import { problemesAnnonce, problemesLot, champsNonJuges } from './verifAnnonce.js';
 import { PHOTOS_AJOUT_MAX, PHOTOS_EBAY_MAX, estPhotoAjoutee, placesPhotos, deplacerPhoto, avecPhotosAjoutees, photoEnJpegBase64 } from './photosEbayAjout.js';
 // « 105 € » (un montant entier sans « ,00 »), « 44,50 € » sinon — la contre-offre en un tap.
-const eurCourt = (v) => (Number.isInteger(Number(v)) ? `${Number(v)} €` : `${Number(v).toFixed(2).replace('.', ',')} €`);
+const eurCourt = (v) => (Number.isInteger(Number(v)) ? `${Number(v)}\u00a0€` : `${Number(v).toFixed(2).replace('.', ',')}\u00a0€`);
 import {CONVERSATIONS_RETIREES,cleConversation,conversationRetiree,retirerConversation,remettreConversations,majAuGeste,phraseRetour} from './conversationsRetirees.js';
 import {conversationNonLue,conversationNonLueAncienne,messageRecent} from './messagesNonLus.js';
 import {etatSourceMemoire} from './suiviComptes.js';
@@ -399,6 +399,7 @@ import { CLE_QR_POSES, jugerQrCapture, dessinerQrCapture, avecQrPoses, titreQrAb
 import { lireFile, noterSaisie, instantane, acquitter, compterEnAttente, nuagePlusRecent, fusionAuChargement, oublierCle, CLE_FILE, HORS_FILE } from "./fileEnvoi.js";
 import { creerGestes, creerEcrivainLocal, ecrireOps, clesDe, vueDesOps } from "./gesteAnnulable.js";
 import { PiluleAnnuler } from "./PiluleAnnuler.jsx";
+import { echelleTexte, marquerGrandTexte } from "./grandTexte.js";
 // La migration qui cloisonne les vendeurs, lue depuis LE fichier (pas recopiée) :
 // deux copies finiraient par diverger, et c'est le genre de texte qu'on colle
 // dans une base de production sans le relire.
@@ -3136,7 +3137,7 @@ function FichesNeuves() {
       {liste.map((f) => (
         <div key={f.id} className="vrm-ao-neuve" data-fiche-neuve-num={f.numero}>
           <span className="vrm-ao-neuve-num">N°{f.numero}</span>
-          <span className="vrm-ao-neuve-txt"><b>{f.titre || 'Sans titre'}</b><small>{[f.taille, f.prix != null ? `${String(f.prix).replace('.', ',')} €` : null, 'photos à prendre'].filter(Boolean).join(' · ')}</small></span>
+          <span className="vrm-ao-neuve-txt"><b>{f.titre || 'Sans titre'}</b><small>{[f.taille, f.prix != null ? `${String(f.prix).replace('.', ',')}\u00a0€` : null, 'photos à prendre'].filter(Boolean).join(' · ')}</small></span>
           <button type="button" className="vrm-ao-second" data-fiche-neuve-copier={f.numero} onClick={async () => { try { await navigator.clipboard.writeText(texteAColler(f)); toast('Texte copié'); } catch (_) { toast('Copie impossible ici'); } }}>Copier</button>
           <button type="button" className="vrm-ao-second" aria-label={`Retirer la fiche N°${f.numero}`} data-fiche-neuve-retirer={f.numero} onClick={() => retirer(f)}>×</button>
         </div>
@@ -6994,7 +6995,7 @@ const urssafCourt = (r, text, sub) => {
   const quoi = /^T\d/.test(String(r.label || '')) ? `du ${String(r.label).split(' ')[0]}` : (() => { const mois = String(r.label || '').split(' ')[0]; return /^[aeiouyéèh]/i.test(mois) ? `d'${mois}` : `de ${mois}`; })();
   const quand = r.daysLeft <= 0 ? "aujourd'hui" : r.daysLeft === 1 ? 'demain' : `dans ${r.daysLeft} jours`;
   const date = `avant le ${echeance.getDate()} ${echeance.toLocaleDateString('fr-FR', { month: 'short' })}`;
-  const montant = r.apayer == null ? 'montant : pas encore calculé' : `≈ ${Math.round(r.apayer)} € à payer${r.partiel ? ' (au moins)' : ''}`;
+  const montant = r.apayer == null ? 'montant : pas encore calculé' : `≈ ${Math.round(r.apayer)}\u00a0€ à payer${r.partiel ? ' (au moins)' : ''}`;
   const det = `${r.proche ? quand : date} · ${montant}`;
   return { court: `Déclarer l'URSSAF ${quoi}`, detail: det.charAt(0).toUpperCase() + det.slice(1), plein: [text, sub].filter(Boolean).join(' — ') };
 };
@@ -12537,7 +12538,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
   };
   const supprimer = async () => {
     const b = liste.find(x => x.id === editId); if (!b) return;
-    const ok = await askConfirm({ title: `Supprimer « ${b.title || 'cet achat'} » ?`, desc: `Il sort de tes achats hors plateforme et de ce que tu as dépensé${b.price ? ` (${b.price} €)` : ''}. Ça ne se rattrape pas.`, ok: 'Oui, supprimer', cancel: 'Annuler', danger: true });
+    const ok = await askConfirm({ title: `Supprimer « ${b.title || 'cet achat'} » ?`, desc: `Il sort de tes achats hors plateforme et de ce que tu as dépensé${b.price ? ` (${b.price}\u00a0€)` : ''}. Ça ne se rattrape pas.`, ok: 'Oui, supprimer', cancel: 'Annuler', danger: true });
     if (!ok) return;
     onSupprimer(b.id);
     if (b.photo) ecrirePhotoAchatHors(b.id, null);
@@ -12549,7 +12550,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
     <label style={{ display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 }}><span style={lab}>{label}</span>{enfant}</label>
   );
   const sousTitre = liste.length
-    ? `${liste.length} achat${liste.length > 1 ? 's' : ''} · ${total.toFixed(2).replace('.', ',')} € payés`
+    ? `${liste.length} achat${liste.length > 1 ? 's' : ''} · ${total.toFixed(2).replace('.', ',')}\u00a0€ payés`
     : 'Brocante, fournisseur, main propre…';
   const photoForm = form ? (form.photo || (form.photoAvant && photos ? photos[idPhotoAchatHors(editId)] : null)) : null;
   return (
@@ -12634,7 +12635,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
                     {b.numero && <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, color: C.text, background: C.card2 || C.border, borderRadius: 6, padding: '1px 6px' }}>N°{b.numero}</span>}
                   </span>
                 </span>
-                <span data-achat-hors-prix style={{ flexShrink: 0, fontSize: 15, fontWeight: 700, letterSpacing: -0.2 }}>{p != null ? `${p.toFixed(2).replace('.', ',')} €` : '—'}</span>
+                <span data-achat-hors-prix style={{ flexShrink: 0, fontSize: 15, fontWeight: 700, letterSpacing: -0.2 }}>{p != null ? `${p.toFixed(2).replace('.', ',')}\u00a0€` : '—'}</span>
               </button>
             );
           })}
@@ -13229,7 +13230,7 @@ function CarteSeuilsVinted({ annee, echoues, comptes, ecarte, nomDe, datees, aDa
 // (Remplace `MiniBarres`, définie et jamais rendue — §4.11.)
 function BarresVenduRecu({ jours, hauteur = 96 }) {
   const max = Math.max(1, ...jours.map(j => Math.max(j.vendu.eur, j.recu ? j.recu.eur : 0)));
-  const eur = (x) => `${Math.round(x).toLocaleString('fr-FR')} €`;
+  const eur = (x) => `${Math.round(x).toLocaleString('fr-FR')}\u00a0€`;
   const h = (v) => v > 0 ? Math.max(4, Math.round((v / max) * (hauteur - 4))) : 2;
   const totV = jours.reduce((a, j) => a + j.vendu.eur, 0);
   const totR = jours.every(j => j.recu) ? jours.reduce((a, j) => a + j.recu.eur, 0) : null;
@@ -13311,7 +13312,7 @@ function BarresSemaine({ jours }) {
   const vus = jours.filter((j) => !j.futur);
   const max = Math.max(1, ...vus.map((j) => j.vendu.eur));
   const totV = vus.reduce((a, j) => a + j.vendu.eur, 0);
-  const eur = (x) => `${Math.round(x).toLocaleString('fr-FR')} €`;
+  const eur = (x) => `${Math.round(x).toLocaleString('fr-FR')}\u00a0€`;
   const mono = { fontFamily: 'var(--vrm-police-mono)', fontVariantNumeric: 'tabular-nums' };
   return (
     <div ref={ref} className="vrm-jc-barres" style={{ width: '100%', minHeight: Hmin }}>
@@ -13381,7 +13382,7 @@ function CourbeVentes({ jours, hauteur = 70, surSombre = false, libDebut = null,
   return (
     <div>
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none" role="img"
-        aria-label={`Ventes des ${n} derniers jours : ${jours.reduce((a, j) => a + j.eur, 0).toFixed(0)} €`} style={{display:'block',overflow:'visible'}}>
+        aria-label={`Ventes des ${n} derniers jours : ${jours.reduce((a, j) => a + j.eur, 0).toFixed(0)}\u00a0€`} style={{display:'block',overflow:'visible'}}>
         <defs>
           <linearGradient id={`cvg${uid}`} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={trait} stopOpacity={surSombre ? 0.42 : 0.28}/>
@@ -13391,7 +13392,7 @@ function CourbeVentes({ jours, hauteur = 70, surSombre = false, libDebut = null,
         {[0.5, 1].map(f => <line key={f} x1="0" x2={W} y1={(H - pad) * f} y2={(H - pad) * f} stroke={grille} strokeWidth="1" vectorEffect="non-scaling-stroke" strokeDasharray={f < 1 ? '2 4' : undefined}/>)}
         {d && <path d={`${d} L${last[0].toFixed(1)},${H - pad} L${pts[0][0].toFixed(1)},${H - pad} Z`} fill={`url(#cvg${uid})`}/>}
         {d && <path d={d} fill="none" stroke={trait} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/>}
-        {pts.map((p, i) => <rect key={i} x={p[0] - (W / n) / 2} y="0" width={W / n} height={H} fill="transparent"><title>{`${jours[i].long} · ${jours[i].n} vente${jours[i].n > 1 ? 's' : ''} · ${jours[i].eur.toFixed(0)} €`}</title></rect>)}
+        {pts.map((p, i) => <rect key={i} x={p[0] - (W / n) / 2} y="0" width={W / n} height={H} fill="transparent"><title>{`${jours[i].long} · ${jours[i].n} vente${jours[i].n > 1 ? 's' : ''} · ${jours[i].eur.toFixed(0)}\u00a0€`}</title></rect>)}
       </svg>
       <div style={{position:'relative',height:0}}>
         <span aria-hidden="true" style={{position:'absolute',right:`${(pad / W) * 100}%`,top:-(H - last[1]) - 4,width:8,height:8,marginRight:-4,borderRadius:999,background:trait,boxShadow:`0 0 0 4px ${surSombre ? 'rgba(143,178,255,.22)' : C.accent + '33'}`}}/>
@@ -13414,7 +13415,7 @@ function CourbeVentes({ jours, hauteur = 70, surSombre = false, libDebut = null,
 // complet, §5). Sur téléphone, douze valeurs ne tiennent pas côte à côte : on
 // n'écrit que le meilleur mois, le dernier et celui qu'on a touché ; les
 // autres sont dans l'infobulle et au toucher (`onChoisir`).
-function CourbeMois({ mois, presentation = 'barres', valeur = (m) => m.eur, format = (v) => `${Math.round(v).toLocaleString('fr-FR')} €`, hauteur = 176, choisi = null, onChoisir = null, attr = 'data-courbe-mois', legende = true }) {
+function CourbeMois({ mois, presentation = 'barres', valeur = (m) => m.eur, format = (v) => `${Math.round(v).toLocaleString('fr-FR')}\u00a0€`, hauteur = 176, choisi = null, onChoisir = null, attr = 'data-courbe-mois', legende = true }) {
   const ref=React.useRef(null);
   const [W,setW]=React.useState(340);
   const [compact,setCompact]=React.useState(()=>window.matchMedia('(max-width:767px)').matches);
@@ -13749,7 +13750,7 @@ function AtelierLots({ candidats, onSave, onClose }) {
               <option value="pct">Ajouter / retirer un pourcentage (%)</option>
               <option value="commun">Mettre tout le monde au même prix</option>
             </select>
-            {(pBase === 'fixe' || pBase === 'pct') && <input data-lot-prix-delta value={pDelta} onChange={ev => setPDelta(ev.target.value)} inputMode="decimal" placeholder={pBase === 'pct' ? 'ex. -10 (= −10 %)' : 'ex. -5 (= −5 €)'} style={{ ...champ, maxWidth: 220 }} />}
+            {(pBase === 'fixe' || pBase === 'pct') && <input data-lot-prix-delta value={pDelta} onChange={ev => setPDelta(ev.target.value)} inputMode="decimal" placeholder={pBase === 'pct' ? 'ex. -10 (= −10\u00a0%)' : 'ex. -5 (= −5\u00a0€)'} style={{ ...champ, maxWidth: 220 }} />}
             {pBase === 'commun' && <input data-lot-prix-commun value={pCommun} onChange={ev => setPCommun(ev.target.value)} inputMode="decimal" placeholder="Prix commun (€)" style={{ ...champ, maxWidth: 200 }} />}
             {pBase !== 'aucun' && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
               <select data-lot-arrondi value={pArr} onChange={ev => setPArr(ev.target.value)} style={{ ...selStyle, flex: '1 1 120px' }}>
@@ -13959,7 +13960,7 @@ function AtelierFile({ candidats, verifier, publier, majExt, onClose }) {
                 <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: C.text }}>Baisser le prix de <input data-file-pct value={pct} onChange={ev => setPct(ev.target.value)} inputMode="numeric" style={{ ...champ, width: 64 }} /> % <span style={{ color: C.muted }}>(jamais sous le prix d'achat)</span></label>
                 <label style={{ display: 'flex', gap: 9, alignItems: 'flex-start', cursor: 'pointer', fontSize: 13, color: C.text }}>
                   <input type="checkbox" data-file-reel-confirme checked={reelOk} onChange={ev => setReelOk(ev.target.checked)} style={{ marginTop: 2, accentColor: C.warn, flexShrink: 0 }} />
-                  <span>Je confirme : le prix de chaque annonce de la file sera <b>baissé de {pctNum} %</b> sur mon compte Vinted.</span>
+                  <span>Je confirme : le prix de chaque annonce de la file sera <b>baissé de {pctNum}&nbsp;%</b> sur mon compte Vinted.</span>
                 </label>
               </>}
             </div>
@@ -14905,7 +14906,7 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, onDebut, onLier,
               <label key={c.cle} className="vrm-rm-curseur">
                 <span>{c.l}</span>
                 <input type="range" min={c.min} max={c.max} step={c.pas} value={regs.photo[c.cle]} data-main-reglage={c.cle} onChange={(ev) => { const v = Number(ev.target.value); poserRegs((x) => ({ photo: { ...x.photo, [c.cle]: v } })); }}/>
-                <span className="vrm-rm-val">{c.cle === 'rot' ? `${regs.photo.rot}°` : `${Math.round(regs.photo[c.cle] * 100)} %`}</span>
+                <span className="vrm-rm-val">{c.cle === 'rot' ? `${regs.photo.rot}°` : `${Math.round(regs.photo[c.cle] * 100)}\u00a0%`}</span>
               </label>
             ))}
             {!regNeutre && <Bouton variante="discret" data-main-neutre="" onClick={() => poserRegs({ photo: { ...PHOTO_NEUTRE } })}>Photos d’origine</Bouton>}
@@ -14914,7 +14915,7 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, onDebut, onLier,
         <div className="vrm-rm-bloc" data-main-bloc="prix">
           <div className="vrm-rm-bloc-tete"><b>Prix</b><span>jamais sous le prix d’achat</span></div>
           <div className="vrm-filtres vrm-rm-puces" role="group" aria-label="Baisse du prix">
-            {[['aucun', 'Garder'], ...REDUCTIONS_RAPIDES.map((v) => [v, `−${v.slice(1)} %`]), ['autre', 'Autre…']].map(([v, l]) => {
+            {[['aucun', 'Garder'], ...REDUCTIONS_RAPIDES.map((v) => [v, `−${v.slice(1)}\u00a0%`]), ['autre', 'Autre…']].map(([v, l]) => {
               const actif = v === 'aucun' ? p.base === 'aucun' : v === 'autre' ? (p.base !== 'aucun' && !rapide) : (p.base === 'pct' && String(p.delta).trim() === v);
               return <button key={v} type="button" data-main-reduc={v} aria-pressed={actif} onClick={() => choixPrix(v)}>{l}</button>;
             })}
@@ -14922,13 +14923,13 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, onDebut, onLier,
           {p.base !== 'aucun' && !rapide && <div className="vrm-rm-ligne">
             <select value={p.base} aria-label="Type de baisse" data-main-prix-type="" onChange={(ev) => { const v = ev.target.value; poserRegs((c) => ({ prix: { ...c.prix, base: v } })); }}>
               <option value="pct">Baisser d’un pourcentage</option>
-              <option value="fixe">Baisser d’un montant en €</option>
+              <option value="fixe">Baisser d’un montant en&nbsp;€</option>
               <option value="commun">Mettre toutes au même prix</option>
             </select>
-            {(p.base === 'pct' || p.base === 'fixe') && <input value={String(p.delta).replace(/^-/, '')} inputMode="decimal" data-main-delta="" placeholder={p.base === 'pct' ? 'ex. 12 (= −12 %)' : 'ex. 5 (= −5 €)'} aria-label={p.base === 'pct' ? 'Baisse en %' : 'Baisse en €'} onChange={(ev) => { const v = ev.target.value.replace(/[^0-9.,]/g, ''); poserRegs((c) => ({ prix: { ...c.prix, delta: v ? '-' + v : '' } })); }}/>}
+            {(p.base === 'pct' || p.base === 'fixe') && <input value={String(p.delta).replace(/^-/, '')} inputMode="decimal" data-main-delta="" placeholder={p.base === 'pct' ? 'ex. 12 (= −12\u00a0%)' : 'ex. 5 (= −5\u00a0€)'} aria-label={p.base === 'pct' ? 'Baisse en %' : 'Baisse en\u00a0€'} onChange={(ev) => { const v = ev.target.value.replace(/[^0-9.,]/g, ''); poserRegs((c) => ({ prix: { ...c.prix, delta: v ? '-' + v : '' } })); }}/>}
             {p.base === 'commun' && <input value={p.commun} inputMode="decimal" data-main-commun="" placeholder="Prix (€)" aria-label="Prix pour toutes" onChange={(ev) => { const v = ev.target.value; poserRegs((c) => ({ prix: { ...c.prix, commun: v } })); }}/>}
           </div>}
-          {p.base !== 'aucun' && <label className="vrm-rm-case"><input type="checkbox" data-main-arrondi="" checked={p.arrondi === 'euro'} onChange={(ev) => { const on = ev.target.checked; poserRegs((c) => ({ prix: { ...c.prix, arrondi: on ? 'euro' : 'aucun', fin: 'aucune' } })); }}/><span>Arrondir à l’euro (44,10 € → 44 €)</span></label>}
+          {p.base !== 'aucun' && <label className="vrm-rm-case"><input type="checkbox" data-main-arrondi="" checked={p.arrondi === 'euro'} onChange={(ev) => { const on = ev.target.checked; poserRegs((c) => ({ prix: { ...c.prix, arrondi: on ? 'euro' : 'aucun', fin: 'aucune' } })); }}/><span>Arrondir à l’euro (44,10&nbsp;€ → 44&nbsp;€)</span></label>}
           <div className="vrm-rm-resultat" data-main-prix-resultat={ann.prix != null ? Math.round(ann.prix * 100) : ''}>
             {ann.prixAvant == null ? <span className="vrm-rm-muet">Prix pas lu par VRM : reprends celui de l’annonce sur Vinted.</span>
               : ann.prix !== ann.prixAvant ? <>{montant(ann.prixAvant)} → <b>{montant(ann.prix)}</b>{ann.plancher ? <span className="vrm-rm-ambre"> · ramené à ton prix d’achat</span> : null}</>
@@ -15066,7 +15067,7 @@ function PrixMiniFeuille({ choisies, onPoser, onClose }) {
     <SheetShell onClose={onClose} maxWidth={520} titre={`Prix mini · ${annonces.length} annonce${annonces.length > 1 ? 's' : ''}`}>
       <div className="vrm-act vrm-mini" data-prix-mini={annonces.length} data-prix-mini-poser={r.aPoser}>
         <p className="vrm-act-muet">« Accepter dès » de chaque annonce, depuis son prix, arrondi à l’euro. Rien ne part chez Vinted : c’est le seuil que lisent tes offres.</p>
-        <Segmente label="Réduction" value={mode} onChange={setMode} options={[{ v: 'pct', l: 'En %' }, { v: 'eur', l: 'En €' }]}/>
+        <Segmente label="Réduction" value={mode} onChange={setMode} options={[{ v: 'pct', l: 'En %' }, { v: 'eur', l: 'En\u00a0€' }]}/>
         {champ(val, setVal, 'mini', 'Accepter dès : prix')}
         <label className="vrm-mini-option"><input type="checkbox" checked={refOn} onChange={(e) => setRefOn(e.target.checked)} data-mini-refus-on="" /><span>Refuser aussi les offres trop basses</span></label>
         {refOn ? champ(refVal, setRefVal, 'refuse', 'Refuser sous : prix') : null}
@@ -15390,7 +15391,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
     <label key={cle} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, minHeight: 44 }}>
       <span style={{ width: 92, flexShrink: 0, color: C.muted }}>{lab}</span>
       <input type="range" min={min} max={max} step={pas} value={reg[cle]} data-republier-reglage={cle} onChange={(ev) => setReg((r) => ({ ...r, [cle]: Number(ev.target.value) }))} style={{ flex: 1, accentColor: C.accent }} />
-      <span style={{ width: 46, textAlign: 'right', color: C.text, fontVariantNumeric: 'tabular-nums' }}>{cle === 'rot' ? `${reg.rot}°` : `${Math.round(reg[cle] * 100)} %`}</span>
+      <span style={{ width: 46, textAlign: 'right', color: C.text, fontVariantNumeric: 'tabular-nums' }}>{cle === 'rot' ? `${reg.rot}°` : `${Math.round(reg[cle] * 100)}\u00a0%`}</span>
     </label>
   );
   const fermer = () => { if (mode === 'run') return; onClose(); };
@@ -15574,7 +15575,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
                   par bouton : garder le prix, ou baisser de 5, 10, 15, 20 %. Le reste
                   (autre %, en €, même prix pour toutes) est replié dans « Autre ». */}
               <div data-republier-reductions className="vrm-filtres" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {[['aucun', 'Garder le prix'], ...REDUCTIONS_RAPIDES.map((v) => [v, `−${v.slice(1)} %`]), ['autre', 'Autre…']].map(([v, l]) => {
+                {[['aucun', 'Garder le prix'], ...REDUCTIONS_RAPIDES.map((v) => [v, `−${v.slice(1)}\u00a0%`]), ['autre', 'Autre…']].map(([v, l]) => {
                   const actif = v === 'aucun' ? pBase === 'aucun' : v === 'autre' ? (pBase === 'fixe' || pBase === 'commun' || (pBase === 'pct' && !REDUCTIONS_RAPIDES.includes(String(pDelta).trim()))) : (pBase === 'pct' && String(pDelta).trim() === v);
                   return <button key={v} type="button" data-republier-reduc={v} aria-pressed={actif} onClick={() => { if (v === 'aucun') setPBase('aucun'); else if (v === 'autre') { if (pBase === 'aucun' || REDUCTIONS_RAPIDES.includes(String(pDelta).trim())) { setPBase('pct'); setPDelta(''); } } else { setPBase('pct'); setPDelta(v); } }} style={{ minHeight: 44, padding: '0 14px', fontSize: 15, cursor: 'pointer', fontFamily: 'inherit' }}>{l}</button>;
                 })}
@@ -15582,15 +15583,15 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
               {pBase !== 'aucun' && !(pBase === 'pct' && REDUCTIONS_RAPIDES.includes(String(pDelta).trim())) && <div data-republier-autre style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                 <select data-republier-prix value={pBase} onChange={(ev) => setPBase(ev.target.value)} aria-label="Type de baisse" style={{ ...champ, flex: '1 1 200px' }}>
                   <option value="pct">Baisser d'un pourcentage</option>
-                  <option value="fixe">Baisser d'un montant en €</option>
+                  <option value="fixe">Baisser d'un montant en&nbsp;€</option>
                   <option value="commun">Mettre toutes au même prix</option>
                 </select>
-                {(pBase === 'pct' || pBase === 'fixe') && <input data-republier-delta value={String(pDelta).replace(/^-/, '')} onChange={(ev) => { const v = ev.target.value.replace(/[^0-9.,]/g, ''); setPDelta(v ? '-' + v : ''); }} inputMode="decimal" placeholder={pBase === 'pct' ? 'ex. 12 (= −12 %)' : 'ex. 5 (= −5 €)'} style={{ ...champ, maxWidth: 200 }} />}
+                {(pBase === 'pct' || pBase === 'fixe') && <input data-republier-delta value={String(pDelta).replace(/^-/, '')} onChange={(ev) => { const v = ev.target.value.replace(/[^0-9.,]/g, ''); setPDelta(v ? '-' + v : ''); }} inputMode="decimal" placeholder={pBase === 'pct' ? 'ex. 12 (= −12\u00a0%)' : 'ex. 5 (= −5\u00a0€)'} style={{ ...champ, maxWidth: 200 }} />}
                 {pBase === 'commun' && <input data-republier-commun value={pCommun} onChange={(ev) => setPCommun(ev.target.value)} inputMode="decimal" placeholder="Prix (€)" style={{ ...champ, maxWidth: 200 }} />}
               </div>}
               {pBase !== 'aucun' && <label style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 13, color: C.text, minHeight: 44, cursor: 'pointer' }}>
                 <input type="checkbox" data-republier-arrondi checked={pArr === 'euro'} onChange={(ev) => { setPArr(ev.target.checked ? 'euro' : 'aucun'); setPFin('aucune'); }} style={{ width: 20, height: 20, accentColor: C.accent, flexShrink: 0 }} />
-                <span>Arrondir à l'euro (ex. 44,10 € → 44 €)</span>
+                <span>Arrondir à l'euro (ex. 44,10&nbsp;€ → 44&nbsp;€)</span>
               </label>}
               {(() => { const a = choisies[0]; if (!a || a.prix == null) return null; const x = apercu(a);
                 return <div data-republier-exemple style={{ fontSize: 13, color: pBase === 'aucun' ? C.muted : C.text }}>{pBase === 'aucun' ? 'Les prix ne changent pas.' : <>Exemple : {a.numero ? `N°${a.numero}` : 'la première'} passe de {prixCourt(a.prix)} à <b>{prixCourt(x.prix != null ? x.prix : a.prix)}</b>{x.plancher ? ' (ramené au prix d’achat)' : ''} · jamais sous le prix d'achat.</>}</div>; })()}
@@ -20899,11 +20900,11 @@ function PrixMarche({ data, baseKO, sousNav = null }) {
         {valo && valo.reconnu > 0 && (
           <Card style={{ padding: 18 }}>
             <div style={{ ...eti, marginBottom: 4 }}>Valeur de ton stock en ligne · au prix du marché</div>
-            <div className="vrm-display" style={{ fontSize: 28, fontWeight: 700, color: C.text }}>≈ {eur2(valo.marche)} €</div>
+            <div className="vrm-display" style={{ fontSize: 28, fontWeight: 700, color: C.text }}>≈ {eur2(valo.marche)}&nbsp;€</div>
             <div style={{ fontSize: 12, color: C.muted, marginTop: 4, lineHeight: 1.5 }}>
               Sur <b>{valo.reconnu}</b> annonce{valo.reconnu > 1 ? 's' : ''} en ligne dont on connaît le prix du marché{valo.total > valo.reconnu ? <> (sur {valo.total} — les autres n'ont pas encore 2 ventes du même modèle+taille)</> : null}.
               {valo.affiche > 0 && (() => { const ec = Math.round((valo.affiche / valo.marche - 1) * 100);
-                return <> Tu les affiches à ≈ <b>{eur2(valo.affiche)} €</b>{Math.abs(ec) >= 5 ? <> — soit <b style={{ color: C.text }}>{ec > 0 ? '+' : ''}{ec}%</b> {ec > 0 ? 'au-dessus' : 'en dessous'} du marché</> : ' — en ligne avec le marché'}.</>; })()}
+                return <> Tu les affiches à ≈ <b>{eur2(valo.affiche)}&nbsp;€</b>{Math.abs(ec) >= 5 ? <> — soit <b style={{ color: C.text }}>{ec > 0 ? '+' : ''}{ec}%</b> {ec > 0 ? 'au-dessus' : 'en dessous'} du marché</> : ' — en ligne avec le marché'}.</>; })()}
             </div>
           </Card>
         )}
@@ -20925,12 +20926,12 @@ function PrixMarche({ data, baseKO, sousNav = null }) {
                   {gr.modele} <span style={{ color: C.accentTexte, fontWeight: 700, textTransform: 'none' }}>T{gr.taille}</span>
                 </div>
                 <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
-                  {gr.n} vente{gr.n > 1 ? 's' : ''} · de {eur2(gr.min)} à {eur2(gr.max)} €{gr.stock > 0 ? ` · ${gr.stock} en stock` : ''}
+                  {gr.n} vente{gr.n > 1 ? 's' : ''} · de {eur2(gr.min)} à {eur2(gr.max)}&nbsp;€{gr.stock > 0 ? ` · ${gr.stock} en stock` : ''}
                 </div>
               </div>
               <div style={{ flexShrink: 0, textAlign: 'right' }}>
                 <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 500 }}>Prix médian</div>
-                <div className="vrm-display" style={{ fontSize: 22, fontWeight: 700, color: C.text }}>{eur2(gr.med)} €</div>
+                <div className="vrm-display" style={{ fontSize: 22, fontWeight: 700, color: C.text }}>{eur2(gr.med)}&nbsp;€</div>
               </div>
             </div>
           ))}
@@ -22566,7 +22567,7 @@ function LigneDestinationEbay({ d }) {
   } else if (d.international === true) {
     cle = d.douane ? 'douane' : 'ue';
     txt = d.douane
-      ? `International — ${nomPaysEbay(d.pays)} (hors Union européenne) : joins une déclaration en douane (CN22, ou CN23 au-delà de 425 €) avec le contenu et la valeur. Les droits d'importation sont à la charge de l'acheteur.`
+      ? `International — ${nomPaysEbay(d.pays)} (hors Union européenne) : joins une déclaration en douane (CN22, ou CN23 au-delà de 425\u00a0€) avec le contenu et la valeur. Les droits d'importation sont à la charge de l'acheteur.`
       : `International — ${nomPaysEbay(d.pays)} (Union européenne) : pas de douane, l'étiquette d'eBay suffit.`;
   }
   if (!txt) return null;
@@ -23416,7 +23417,7 @@ function valideRegleOffre({ accepte, refuse, prix }) {
   const R = (refuse === undefined || refuse === null) ? refuse : Math.round(refuse * 100);
   if (A === null && R != null) return { ok: false, code: 'refuse-seul', err: 'Le refus va avec un montant d\'acceptation.' };
   if (A !== null && R != null && R >= A) return { ok: false, code: 'refuse', err: 'Le refus doit être sous le montant d\'acceptation.' };
-  if (A !== null && prix != null && Number.isFinite(prix) && A >= Math.round(prix * 100)) return { ok: false, code: 'seuil-prix', err: `Ce montant doit rester sous le prix de l'annonce (${(prix).toFixed(2).replace('.', ',')} €) : eBay refuse une règle égale ou supérieure au prix.` };
+  if (A !== null && prix != null && Number.isFinite(prix) && A >= Math.round(prix * 100)) return { ok: false, code: 'seuil-prix', err: `Ce montant doit rester sous le prix de l'annonce (${(prix).toFixed(2).replace('.', ',')}\u00a0€) : eBay refuse une règle égale ou supérieure au prix.` };
   return { ok: true, accepte: A === null ? null : A / 100, refuse: R === undefined ? undefined : (R === null ? null : R / 100) };
 }
 // Un seuil sous la MOITIÉ du prix : la faute de frappe « 7 » au lieu de « 72 ».
@@ -23600,7 +23601,7 @@ function regleApresPrix(regle, erreurs) {
     if (etL.etat !== 'connue') return { msg: `Prix changé — l'annonce eBay montre : ${etatEnClair(l)}.` + plus, ton: 'warn', lecture };
     const pct = Number(l.prix) > 0 ? Math.round(Number(l.accepte) / Number(l.prix) * 100) : null;
     const bas = seuilTropBas(Number(l.accepte), Number(l.prix));
-    return { msg: `✓ Prix changé — ta règle d'offre reste à ${eurEbay(l.accepte)}${pct != null ? ` (${pct} % du nouveau prix)` : ''}.` + (bas ? ' C\'est moins de la moitié du prix : change-la si besoin.' : '') + plus, ton: (bas || vingt) ? 'warn' : 'ok', lecture };
+    return { msg: `✓ Prix changé — ta règle d'offre reste à ${eurEbay(l.accepte)}${pct != null ? ` (${pct}\u00a0% du nouveau prix)` : ''}.` + (bas ? ' C\'est moins de la moitié du prix : change-la si besoin.' : '') + plus, ton: (bas || vingt) ? 'warn' : 'ok', lecture };
   }
   if (!l && regle.avant) return { msg: 'Prix changé — je n\'ai pas pu relire ta règle d\'offre : « Relire chez eBay ».' + plus, ton: 'warn', lecture };
   return { msg: plus.trim(), ton: plus ? 'warn' : 'ok', lecture };
@@ -24262,7 +24263,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
         offre.refuse != null && `Toute offre sous ${eurEbay(offre.refuse)} sera refusée par eBay.`,
         !b.item.numero && 'Cette annonce n\'est reliée à aucun article : si eBay la vend, VRM ne saura pas quel article retirer de Vinted. Choisis l\'article d\'abord.',
         typeof achatP === 'number' && offre.accepte < achatP && `C'est sous ton prix d'achat (${eurEbay(achatP)}), avant frais eBay.`,
-        offre.sousMoitie && `C'est ${Math.round(offre.accepte / prixP * 100)} % du prix de l'annonce — tu l'as confirmé.`,
+        offre.sousMoitie && `C'est ${Math.round(offre.accepte / prixP * 100)}\u00a0% du prix de l'annonce — tu l'as confirmé.`,
         b.item.numero && plusieursPub && `VRM vérifie avant que l'article N°${b.item.numero} n'est en vente sur AUCUN de tes comptes eBay.`,
       ].filter(Boolean);
       const ok = await askConfirm({ title: `Publier, et laisser eBay accepter les offres dès ${eurEbay(offre.accepte)} ?`, desc: lignes.join('\n\n'), ok: 'Oui, publier', cancel: 'Annuler' });
@@ -24547,15 +24548,15 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
               {/* (9 octobre) LA RÈGLE D'OFFRE, facultative : c'est eBay qui
                   acceptera, au montant fixé ici. Validée contre le prix tapé. */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(148px,1fr))', gap: 10, marginTop: 10 }}>
-                <div><label style={lab}>Accepter les offres dès (€) — facultatif</label><input value={offreA} onChange={e => { setOffreA(e.target.value); setCheck(null); setOffreBasOk(false); }} inputMode="decimal" placeholder="montant en €" data-publier-offre-accepte="1" style={inp} /></div>
-                <div><label style={lab}>Refuser les offres sous (€) — facultatif</label><input value={offreR} onChange={e => { setOffreR(e.target.value); setCheck(null); }} inputMode="decimal" placeholder="montant en €" data-publier-offre-refuse="1" style={inp} /></div>
+                <div><label style={lab}>Accepter les offres dès (€) — facultatif</label><input value={offreA} onChange={e => { setOffreA(e.target.value); setCheck(null); setOffreBasOk(false); }} inputMode="decimal" placeholder="montant en&nbsp;€" data-publier-offre-accepte="1" style={inp} /></div>
+                <div><label style={lab}>Refuser les offres sous (€) — facultatif</label><input value={offreR} onChange={e => { setOffreR(e.target.value); setCheck(null); }} inputMode="decimal" placeholder="montant en&nbsp;€" data-publier-offre-refuse="1" style={inp} /></div>
               </div>
               {offreA.trim() && vOffre && vOffre.ok && <div style={{ fontSize: 12, color: C.muted, marginTop: 6, lineHeight: 1.45 }}>eBay acceptera seul toute offre de ce montant ou plus : l'article sera vendu à ce prix.</div>}
               {vOffre && !vOffre.ok && <div data-publier-offre-erreur="1" style={{ fontSize: 12, color: C.warn, marginTop: 6, lineHeight: 1.45 }}>{vOffre.err}</div>}
               {offreTropBas && (
                 <label data-publier-offre-sous-moitie="1" style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13, color: C.warn, marginTop: 8, lineHeight: 1.4, cursor: 'pointer' }}>
                   <input type="checkbox" checked={offreBasOk} onChange={(e) => { setOffreBasOk(e.target.checked); setCheck(null); }} style={{ marginTop: 2 }} />
-                  <span>Je fixe volontairement {eurEbay(vOffre.accepte)} — {Math.round(vOffre.accepte / prixOffre * 100)} % du prix.</span>
+                  <span>Je fixe volontairement {eurEbay(vOffre.accepte)} — {Math.round(vOffre.accepte / prixOffre * 100)}&nbsp;% du prix.</span>
                 </label>
               )}
               {/* ── LIVRAISON GÉRÉE PAR eBay (Julien, 27 sept. : « c'est MOI qui
@@ -25409,11 +25410,11 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
   };
   const envoyerOffre = async () => {
     dire('');
-    if (!remiseOk) { dire('La remise doit être un nombre entier entre 5 et 50 %.'); return; }
+    if (!remiseOk) { dire('La remise doit être un nombre entier entre 5 et 50\u00a0%.'); return; }
     if (mot.length > 2000) { dire('Message trop long (2 000 caractères au plus).'); return; }
     const prix = prixRemise != null ? eurE(prixRemise) : '';
     const ok = await askConfirm({
-      title: `Envoyer une offre à −${remiseN} % ?`,
+      title: `Envoyer une offre à −${remiseN}\u00a0% ?`,
       desc: `Les personnes qui suivent « ${it.title || it.itemId} » sur eBay${obs ? ` (${obs})` : ''} recevront une offre${prix ? ` à ${prix}` : ''}, valable 48 h. C'est eBay qui les choisit : VRM ne voit pas qui elles sont.\n\nSi l'une d'elles accepte, l'article est vendu à ce prix.`,
       ok: 'Oui, envoyer', cancel: 'Annuler',
     });
@@ -25426,7 +25427,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
       const j = await r.json().catch(() => ({}));
       if (j && j.ok) {
         const n = Number(j.envoyees) || 0;
-        dire(n ? `✓ Offre à −${remiseN} % envoyée à ${n} personne${n > 1 ? 's' : ''}, valable 48 h.` : `✓ Offre à −${remiseN} % envoyée par eBay, valable 48 h.`);
+        dire(n ? `✓ Offre à −${remiseN}\u00a0% envoyée à ${n} personne${n > 1 ? 's' : ''}, valable 48 h.` : `✓ Offre à −${remiseN}\u00a0% envoyée par eBay, valable 48 h.`);
         setOffreOuverte(false); if (onOffre) onOffre(it.itemId);
       } else dire((j && j.error) || 'eBay a refusé l\'offre.');
     } catch (_) { dire('Envoi impossible (réseau) — regarde sur eBay avant de recommencer.'); }
@@ -25555,7 +25556,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
       else if (!et || et.etat === 'pas-su' || et.offresActives == null) lignes.push('Les offres seront activées si elles ne le sont pas déjà.');
       if (!numero) lignes.push('Cette annonce n\'est reliée à aucun article : si eBay la vend, VRM ne saura pas quel article retirer de Vinted. « Relier à un article » d\'abord.');
       if (sousAchat) lignes.push(`C'est sous ton prix d'achat (${eurEbay(achat)}), avant frais eBay.`);
-      if (tropBas) lignes.push(`C'est ${pctSaisi} % du prix de l'annonce — tu l'as confirmé.`);
+      if (tropBas) lignes.push(`C'est ${pctSaisi}\u00a0% du prix de l'annonce — tu l'as confirmé.`);
       if (et && et.offresFaites > 0) lignes.push(texteOffresDejaFaites(1, 1));
       const ok = await askConfirm({ title: `eBay acceptera seul les offres dès ${eurEbay(X)} ?`, desc: lignes.join('\n\n'), ok: 'Oui, poser la règle', cancel: 'Annuler' });
       if (!ok) return;
@@ -25754,15 +25755,15 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
           {!prixVuN && <div style={{ fontSize: 12, color: E.warn, marginBottom: 8 }}>Prix de l'annonce pas lu — rouvre l'écran.</div>}
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
             <label style={{ fontSize: 12, color: E.muted, flex: '1 1 150px', minWidth: 0 }}>Accepter les offres dès (€)<br />
-              <input value={saisieA} onChange={(e) => { setSaisieA(e.target.value); setSousMoitieOk(false); }} inputMode="decimal" placeholder="montant en €" data-regle-saisie-accepte={it.itemId} style={{ ...inpE, width: '100%', maxWidth: 160 }} /></label>
+              <input value={saisieA} onChange={(e) => { setSaisieA(e.target.value); setSousMoitieOk(false); }} inputMode="decimal" placeholder="montant en&nbsp;€" data-regle-saisie-accepte={it.itemId} style={{ ...inpE, width: '100%', maxWidth: 160 }} /></label>
             <label style={{ fontSize: 12, color: E.muted, flex: '1 1 150px', minWidth: 0 }}>Refuser les offres sous (€) — facultatif<br />
-              <input value={saisieR} onChange={(e) => setSaisieR(e.target.value)} inputMode="decimal" placeholder="montant en €" data-regle-saisie-refuse={it.itemId} style={{ ...inpE, width: '100%', maxWidth: 160 }} /></label>
+              <input value={saisieR} onChange={(e) => setSaisieR(e.target.value)} inputMode="decimal" placeholder="montant en&nbsp;€" data-regle-saisie-refuse={it.itemId} style={{ ...inpE, width: '100%', maxWidth: 160 }} /></label>
           </div>
           {errSaisie && <div data-regle-erreur={it.itemId} style={{ fontSize: 12, color: E.warn, marginTop: 6 }}>{errSaisie}</div>}
           {tropBas && (
             <label data-regle-sous-moitie={it.itemId} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12, color: E.warn, marginTop: 8, lineHeight: 1.4, cursor: 'pointer' }}>
               <input type="checkbox" checked={sousMoitieOk} onChange={(e) => setSousMoitieOk(e.target.checked)} style={{ marginTop: 2 }} />
-              <span>Je fixe volontairement {eurEbay(vSaisie.accepte)} — {pctSaisi} % du prix de l'annonce.</span>
+              <span>Je fixe volontairement {eurEbay(vSaisie.accepte)} — {pctSaisi}&nbsp;% du prix de l'annonce.</span>
             </label>
           )}
           {typeof achat === 'number' && (sousAchat
@@ -25807,7 +25808,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
             <label style={{ fontSize: 12, color: E.muted }}>Remise %<br /><input value={remise} onChange={(e) => setRemise(e.target.value)} inputMode="numeric" data-offre-remise={it.itemId} style={{ ...inpE, width: 76 }} /></label>
             <div style={{ fontSize: 13, color: E.muted, paddingBottom: 10 }}>soit <b data-offre-prix={prixRemise != null ? prixRemise.toFixed(2) : ''} style={{ color: E.text, fontSize: 15 }}>{prixRemise != null ? eurE(prixRemise) : '—'}</b>{isFinite(prixBase) && prixBase > 0 ? <> au lieu de {eurE(prixBase)}</> : null}</div>
           </div>
-          {!remiseOk && <div style={{ fontSize: 12, color: E.warn, marginTop: 6 }}>Entre 5 et 50 %, un nombre entier.</div>}
+          {!remiseOk && <div style={{ fontSize: 12, color: E.warn, marginTop: 6 }}>Entre 5 et 50&nbsp;%, un nombre entier.</div>}
           {/* (9 octobre) La règle d'offre ne joue pas sur une offre qu'il ENVOIE. */}
           {et && et.etat === 'connue' && prixRemise != null && prixRemise < et.accepte && (
             <div data-offre-sous-regle={it.itemId} style={{ fontSize: 12, color: E.warn, marginTop: 6, lineHeight: 1.45 }}>C'est sous ta règle d'offre ({eurEbay(et.accepte)}) : si l'une accepte, l'article part à {eurEbay(prixRemise)}.</div>
@@ -25823,7 +25824,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
           {/* (9 octobre) Une règle d'offre connue : le nouveau prix la touche peut-être. */}
           {edit && et && et.etat === 'connue' && prixChange && (
             <div data-regle-rappel={it.itemId} style={{ fontSize: 12, color: E.muted, marginTop: 7, lineHeight: 1.45 }}>
-              Ta règle d'offre : eBay accepte dès {eurEbay(et.accepte)} — {Math.round(et.accepte / prixTape * 100)} % du nouveau prix. Changer le prix peut la faire tomber : VRM la relit après et te le dit.
+              Ta règle d'offre : eBay accepte dès {eurEbay(et.accepte)} — {Math.round(et.accepte / prixTape * 100)}&nbsp;% du nouveau prix. Changer le prix peut la faire tomber : VRM la relit après et te le dit.
             </div>
           )}
           {/* Couleur FIXÉE (9 octobre) : jamais le vert ni le rouge (§7). */}
@@ -26120,7 +26121,7 @@ function EbayPlanificateur({ brouillons = [], annoncesEbay, programmees, ventes,
     const texteOffres = avecOffre.length
       ? `\n${avecOffre.length} avec une règle d'offre — dès la mise en ligne, toute offre égale ou supérieure au montant ${OFFRE_VEND_LA_PAIRE} :` + avecOffre.map(({ l }) => {
         const p = Number(String(l.item.price).replace(',', '.')); const o = l.item.offre;
-        return `\n« ${l.item.title || ''} » ${eurEbay(p)} → dès ${eurEbay(o.accepte)} (${p > 0 ? Math.round(o.accepte / p * 100) : '—'} %)${o.sousMoitie ? ' — moins de la moitié, confirmé dans le brouillon' : ''}`;
+        return `\n« ${l.item.title || ''} » ${eurEbay(p)} → dès ${eurEbay(o.accepte)} (${p > 0 ? Math.round(o.accepte / p * 100) : '—'}\u00a0%)${o.sousMoitie ? ' — moins de la moitié, confirmé dans le brouillon' : ''}`;
       }).join('')
       : '';
     const ok = await askConfirm({
@@ -27061,7 +27062,7 @@ function EbayReglesToutes({ items = [], etatDe, prixDe, regleBloquee, achats, no
         <div style={{ flex: '1 1 160px', minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: E.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.it.title || l.it.itemId}</div>
           <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.45 }}>
-            {l.prix != null ? eurEbay(l.prix) : '—'}{l.seuil != null && l.statut !== 'exclue' && l.statut !== 'a-relire' && l.statut !== 'a-voir-ebay' && l.statut !== 'illisible' ? <> → dès <b style={{ color: E.text }}>{eurEbay(l.seuil)}</b> ({pctReel(l)} %)</> : null}
+            {l.prix != null ? eurEbay(l.prix) : '—'}{l.seuil != null && l.statut !== 'exclue' && l.statut !== 'a-relire' && l.statut !== 'a-voir-ebay' && l.statut !== 'illisible' ? <> → dès <b style={{ color: E.text }}>{eurEbay(l.seuil)}</b> ({pctReel(l)}&nbsp;%)</> : null}
             {/* Une cause, une phrase (§7) : l'issue « offres-inconnues » dit déjà ce que la note dirait. */}
             {l.note && !(r && r.issue === 'offres-inconnues' && l.statut === 'a-voir-ebay') ? ` · ${l.note}` : ''}
             {plusieursComptes ? ` · ${nomRef(l.it._compte || 'principal')}` : ''}
@@ -27096,7 +27097,7 @@ function EbayReglesToutes({ items = [], etatDe, prixDe, regleBloquee, achats, no
         <input value={pct} onChange={(ev) => { setPct(ev.target.value); setChoix(new Map()); }} inputMode="numeric" placeholder="90" data-regles-pct disabled={enCours} style={inp} />
         % du prix
       </label>
-      {pct.trim() !== '' && !pctOk && <div data-regles-pct-erreur style={{ fontSize: 12, color: E.warn, marginTop: 6 }}>Entre 50 et 99 % (en dessous, fixe le montant annonce par annonce).</div>}
+      {pct.trim() !== '' && !pctOk && <div data-regles-pct-erreur style={{ fontSize: 12, color: E.warn, marginTop: 6 }}>Entre 50 et 99&nbsp;% (en dessous, fixe le montant annonce par annonce).</div>}
       {enCours && lot ? (
         <div style={{ marginTop: 10 }}>
           {lot.map((x) => {
@@ -29348,7 +29349,7 @@ function LigneVenteVc({ v, fait, enV, flou, i = 0 }) {
   const sous = [v.date ? dateCourteVc(v.date) : '', v.aExpedier && !fait ? limiteVcTexte(v) : ''].filter(Boolean).join(' · ');
   const trV = transporteurDuColis({ declare: v.transporteur, suivi: v.suivi });
   const benef = lb.etat === 'annulee' ? null : { etat: lb.etat, achatCentimes: lb.achat != null ? Math.round(lb.achat * 100) : null, benefCentimes: lb.benefice != null ? Math.round(lb.benefice * 100) : null,
-    achatTxt: lb.achat != null ? `${eurosLigne(lb.achat)} €` : (v.num ? 'à saisir' : '—'), benefTxt: texteBenefice(lb),
+    achatTxt: lb.achat != null ? `${eurosLigne(lb.achat)}\u00a0€` : (v.num ? 'à saisir' : '—'), benefTxt: texteBenefice(lb),
     aria: lb.etat === 'achat' ? "Bénéfice : prix d'achat manquant" : undefined };
   const coutManque = lb.etat !== 'annulee' && lb.achat == null && !!v.num;
   const gesteCout = coutManque ? <CoutAchatVente surLigne onSaisir={(p) => poserAchatVc(v.num, p)}/> : null;
@@ -29420,7 +29421,7 @@ function LigneVenteVc({ v, fait, enV, flou, i = 0 }) {
       style={{ borderTop: i > 0 ? `1px solid ${C.border}` : 'none', opacity: vcVenteAnnulee(v) ? 0.6 : 1, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10, ...(flou ? STYLE_FLOU : null) }}
       montantCentimes={lb.verse != null ? Math.round(lb.verse * 100) : undefined} numerosArticle={v.num ? [v.num] : []} plateforme="vestiaire"
       photo={v.photo || ''} photoNoeud={photoNoeud} titre={nomLigne} sous={sous} etat={etat} ton={ton}
-      montant={lb.verse != null ? `${eurosLigne(lb.verse)} €` : '—'} benef={benef} recap={recap}
+      montant={lb.verse != null ? `${eurosLigne(lb.verse)}\u00a0€` : '—'} benef={benef} recap={recap}
       frise={fuVc ? <Frise etapes={fuVc} cle={'vc' + v.id} className="vrm-fu-ligne-frise" label="Où en est la vente"/> : null}
       gestes={gesteCout ? <div className="vrm-gestes-pile">{gesteCout}</div> : null}/>
   );
@@ -30468,7 +30469,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
               chose que ses deux voisines : une cause, une phrase (le lien
               dessous). */}
           {[[NOM_BENEFICE, CBa.valeur==null?'—':fmt(CBa.valeur), `en ${anneeA}`, { 'data-benef-notion':'benefice', 'data-benef-periode':'annee', 'data-benef-valeur':CBa.valeur==null?'':String(Math.round(CBa.valeur*100)), 'data-benef-raison':CBa.raison||'' }],
-            ['Marge', margeA==null?'—':`${String(margeA).replace('.',',')} %`, `en ${anneeA}`, { 'data-marge-notion':'benefice', 'data-marge-valeur':margeA==null?'':String(margeA) }]].map(([l,v,sub,attrs],i)=>(
+            ['Marge', margeA==null?'—':`${String(margeA).replace('.',',')}\u00a0%`, `en ${anneeA}`, { 'data-marge-notion':'benefice', 'data-marge-valeur':margeA==null?'':String(margeA) }]].map(([l,v,sub,attrs],i)=>(
             <div key={l} {...attrs} style={{padding:'12px 0 0',paddingLeft:i?16:0,borderLeft:i?`1px solid ${C.border}`:'none',minWidth:0}}>
               <div style={sLib}>{l}</div>
               <div className="vrm-display" style={{...sHero,fontSize:20,letterSpacing:-0.4,marginTop:4,color:v==='—'?C.muted:C.text}}>{v}</div>
@@ -30618,7 +30619,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
             </div>
             {part!=null && <div style={{display:'flex',alignItems:'center',gap:10,marginTop:8}}>
               <div style={{flex:1,height:6,borderRadius:999,background:C.card2||C.border,overflow:'hidden'}}><div style={{width:`${Math.max(2,part*100)}%`,height:'100%',borderRadius:999,background:C.accent}}/></div>
-              <span style={{fontSize:11,color:C.muted,fontVariantNumeric:'tabular-nums',minWidth:34,textAlign:'right',whiteSpace:'nowrap'}}>{Math.round(part*100)} %</span>
+              <span style={{fontSize:11,color:C.muted,fontVariantNumeric:'tabular-nums',minWidth:34,textAlign:'right',whiteSpace:'nowrap'}}>{Math.round(part*100)}&nbsp;%</span>
             </div>}
           </div>
         );
@@ -30726,12 +30727,12 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           <Card>
             <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginBottom:6}}>
               <span style={{fontSize:13,fontWeight:600,color:C.text,flex:1,minWidth:120}}>Évolution — ventes finalisées</span>
-              <Segmente label="Montrer" value={caMode} onChange={setCaMode} options={[{v:'ca',l:'CA €'},{v:'ventes',l:'Ventes'}]}/>
+              <Segmente label="Montrer" value={caMode} onChange={setCaMode} options={[{v:'ca',l:'CA\u00a0€'},{v:'ventes',l:'Ventes'}]}/>
             </div>
             <div style={{fontSize:11,color:C.muted,marginBottom:14}}>
               {moisMoisson.length} mois · touche un point pour le détail
             </div>
-            <CourbeMois mois={moisMoisson.map(h=>({cle:h.key,long:h.nomComplet,n:h.ventes,ca:h.ca,ventes:h.ventes,enCours:h.enCours}))} valeur={(m)=>caMode==='ca'?m.ca:m.ventes} format={(v)=>caMode==='ca'?`${Math.round(v).toLocaleString('fr-FR')} €`:String(Math.round(v))} choisi={selMois} onChoisir={setSelMois} attr="data-courbe-finalise"/>
+            <CourbeMois mois={moisMoisson.map(h=>({cle:h.key,long:h.nomComplet,n:h.ventes,ca:h.ca,ventes:h.ventes,enCours:h.enCours}))} valeur={(m)=>caMode==='ca'?m.ca:m.ventes} format={(v)=>caMode==='ca'?`${Math.round(v).toLocaleString('fr-FR')}\u00a0€`:String(Math.round(v))} choisi={selMois} onChoisir={setSelMois} attr="data-courbe-finalise"/>
             {sel&&(
               <div style={{marginTop:12,paddingTop:12,borderTop:`1px solid ${C.border}`,fontSize:13,color:C.text}}>
                 <b>{sel.nomComplet}</b>{sel.enCours&&<span style={{color:C.muted,fontWeight:500}}> · en cours (se finalise ~2 semaines après la vente)</span>} — <b>{fmt(sel.ca)}</b> · {sel.ventes} vente{sel.ventes>1?'s':''}
@@ -30750,7 +30751,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           <Card>
             <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>Évolution du CA (ventes finalisées, 12 derniers mois)</div>
             <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:14}}>Touche un point pour voir le détail des ventes du mois.</div>
-            <CourbeMois mois={caHistory.map(h=>({cle:h.key,long:h.nomComplet,ca:h.ca,n:h.ventes.length}))} valeur={(m)=>m.ca} format={(v)=>`${Math.round(v).toLocaleString('fr-FR')} €`} choisi={selMonthEnc} onChoisir={setSelMonthEnc} attr="data-courbe-encaisse"/>
+            <CourbeMois mois={caHistory.map(h=>({cle:h.key,long:h.nomComplet,ca:h.ca,n:h.ventes.length}))} valeur={(m)=>m.ca} format={(v)=>`${Math.round(v).toLocaleString('fr-FR')}\u00a0€`} choisi={selMonthEnc} onChoisir={setSelMonthEnc} attr="data-courbe-encaisse"/>
             {sel&&<MonthDetail mois={sel} type="encaisse" C={C} fmt={fmt} catMap={catMap} catalog={catalog} onClose={()=>setSelMonthEnc(null)}/>}
           </Card>
         );
@@ -30797,7 +30798,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           <Card>
             <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>Évolution du CA par date de vente (12 derniers mois)</div>
             <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:14}}>Touche un point pour voir le détail des ventes du mois.</div>
-            <CourbeMois mois={caHistoryVente.map(h=>({cle:h.key,long:h.nomComplet,ca:h.ca,n:h.ventes.length}))} valeur={(m)=>m.ca} format={(v)=>`${Math.round(v).toLocaleString('fr-FR')} €`} choisi={selMonthVente} onChoisir={setSelMonthVente} attr="data-courbe-vente"/>
+            <CourbeMois mois={caHistoryVente.map(h=>({cle:h.key,long:h.nomComplet,ca:h.ca,n:h.ventes.length}))} valeur={(m)=>m.ca} format={(v)=>`${Math.round(v).toLocaleString('fr-FR')}\u00a0€`} choisi={selMonthVente} onChoisir={setSelMonthVente} attr="data-courbe-vente"/>
             {sel&&<MonthDetail mois={sel} type="vente" C={C} fmt={fmt} catMap={catMap} catalog={catalog} onClose={()=>setSelMonthVente(null)}/>}
           </Card>
         );
@@ -30842,7 +30843,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
                 <span><b style={{color:C.accentTexte}}>{fmt(weeklyRecapData.profit)}</b> <span style={{color:C.muted}} data-benef-notion="brut">{NOM_BENEFICE_BRUT.toLowerCase()}</span></span>
               </div>
               {(()=>{ const pc=weeklyRecapData.prevCa||0, c=weeklyRecapData.ca; if(pc<=0&&c<=0) return null; const diff=c-pc; const pct=pc>0?Math.round(diff/pc*100):null; const up=diff>=0; return (
-                <div style={{fontSize:11,color:up?C.accent:C.muted,fontWeight:600,marginTop:6}}>{up?'▲':'▼'} {up?'+':''}{fmt(diff)} vs semaine précédente{pct!=null?` (${up?'+':''}${pct} %)`:''} <span style={{color:C.muted,fontWeight:600}}>— {fmt(pc)} vendus</span></div>
+                <div style={{fontSize:11,color:up?C.accent:C.muted,fontWeight:600,marginTop:6}}>{up?'▲':'▼'} {up?'+':''}{fmt(diff)} vs semaine précédente{pct!=null?` (${up?'+':''}${pct}\u00a0%)`:''} <span style={{color:C.muted,fontWeight:600}}>— {fmt(pc)} vendus</span></div>
               ); })()}
             </div>
             <button className="vrm-icon-control" aria-label="Fermer le bilan de la semaine" type="button" onClick={()=>{localStorage.setItem('vinted_last_weekly_recap',isoWeek);setShowWeekly(false);}}
@@ -31039,7 +31040,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
               </td>
               <td style={{padding:'6px 8px'}}>
                 <input ref={priceInputRef} value={newRow.buyPrice} onChange={e=>setNewRow(n=>({...n,buyPrice:e.target.value}))}
-                  type="number" placeholder="Prix achat €" onKeyDown={e=>{if(e.key==='Enter')addRow();}}
+                  type="number" placeholder="Prix achat&nbsp;€" onKeyDown={e=>{if(e.key==='Enter')addRow();}}
                   style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'4px 8px',fontSize:12,width:100,outline:'none',fontFamily:'inherit'}}
                   onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}
                 />
@@ -31254,7 +31255,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
           <table style={{width:'100%',borderCollapse:'collapse',fontSize:12,
             ...(selectMode?{userSelect:'none',WebkitUserSelect:'none'}:{})}}>
             <thead style={{background:C.surface,position:'sticky',top:0,zIndex:1}}><tr>
-              {['Article','Date vente','Réception €','Achat','Vente','Bénéfice','×','Facture',''].map(h=>(
+              {['Article','Date vente','Réception\u00a0€','Achat','Vente','Bénéfice','×','Facture',''].map(h=>(
                 <th key={h} style={{textAlign:'left',padding:'10px 10px',color:C.muted,fontWeight:600,fontSize:11,textTransform:'uppercase',whiteSpace:'nowrap'}}>{h}</th>
               ))}
             </tr></thead>
@@ -31353,14 +31354,14 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
                 <td style={{padding:'6px 6px'}}>
                   {_foundItems.length>0?<span style={{color:C.muted,fontSize:12,padding:'0 6px'}}>{fmt(previewBuy)}{_foundItems.length>1?<span style={{fontSize:11,color:C.purple,marginLeft:3}}>lot</span>:null}</span>:
                   <input value={newRow.buyPrice} onChange={e=>setNewRow(n=>({...n,buyPrice:e.target.value}))}
-                    type="number" placeholder="Achat €"
+                    type="number" placeholder="Achat&nbsp;€"
                     style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'4px 6px',fontSize:12,width:70,outline:'none',fontFamily:'inherit'}}
                     onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}
                   />}
                 </td>
                 <td style={{padding:'6px 6px'}}>
                   <input value={newRow.sellPrice} onChange={e=>setNewRow(n=>({...n,sellPrice:e.target.value}))}
-                    type="number" placeholder="Vente €"
+                    type="number" placeholder="Vente&nbsp;€"
                     style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'4px 6px',fontSize:12,width:70,outline:'none',fontFamily:'inherit'}}
                     onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}
                   />
@@ -31799,7 +31800,7 @@ function InvoiceForm({onClose,onSave,nextNumber,catalog}) {
             <Input value={data.itemName} onChange={e=>setData(d=>({...d,itemName:e.target.value}))} placeholder="ex: Adidas Spezial bleu marine taille 365"/>
           </Field>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-            <Field label="Prix de vente € *">
+            <Field label="Prix de vente&nbsp;€ *">
               <Input type="number" step="0.01" value={data.sellPrice} onChange={e=>setData(d=>({...d,sellPrice:e.target.value}))} placeholder="38.00"/>
             </Field>
             <Field label="Date vente">
@@ -32013,12 +32014,12 @@ td.right{text-align:right;}
 </div>
 <table>
   <thead><tr><th>Objet</th><th class="right">Quantité</th><th class="right">Prix unitaire (HT)</th><th class="right">Montant (HT)</th></tr></thead>
-  <tbody><tr><td>${xmlEsc(inv.itemName||'')}</td><td class="right">1</td><td class="right">${(+inv.sellPrice).toFixed(2)} €</td><td class="right">${(+inv.sellPrice).toFixed(2)} €</td></tr></tbody>
+  <tbody><tr><td>${xmlEsc(inv.itemName||'')}</td><td class="right">1</td><td class="right">${(+inv.sellPrice).toFixed(2)}\u00a0€</td><td class="right">${(+inv.sellPrice).toFixed(2)}\u00a0€</td></tr></tbody>
 </table>
 <div class="totals">
-  <div class="row"><b>Sous-total :</b> <b>${(+inv.sellPrice).toFixed(2)} €</b></div>
-  <div class="row total"><b>Total :</b> <b>${(+inv.sellPrice).toFixed(2)} €</b></div>
-  <div class="row"><b>Montant payé :</b> <b>${(+inv.sellPrice).toFixed(2)} €</b></div>
+  <div class="row"><b>Sous-total :</b> <b>${(+inv.sellPrice).toFixed(2)}\u00a0€</b></div>
+  <div class="row total"><b>Total :</b> <b>${(+inv.sellPrice).toFixed(2)}\u00a0€</b></div>
+  <div class="row"><b>Montant payé :</b> <b>${(+inv.sellPrice).toFixed(2)}\u00a0€</b></div>
 </div>
 <div style="text-align:right;font-size:11px;color:#555;margin-top:6px;font-style:italic">${xmlEsc(settings.tvaMention||'TVA non applicable, art. 293 B du CGI')}</div>
 <div class="acquittee">Facture acquittée</div>
@@ -38477,7 +38478,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
                     style={{border:'none',background:'transparent',cursor:garage?'pointer':'default',padding:0,fontSize:11,fontWeight:500,color:garage?C.blue||C.accent:C.muted}}>
                     {garage ? 'Au stock' : 'Absent du stock'}
                   </button>
-                  {p.price != null && <span style={{fontSize:11,color:C.muted}}>{p.price} €</span>}
+                  {p.price != null && <span style={{fontSize:11,color:C.muted}}>{p.price}&nbsp;€</span>}
                   {p.vintedItemId && <span style={{fontSize:11,color:C.muted}}>🔗 annonce liée</span>}
                 </div>
               </div>
@@ -38745,7 +38746,7 @@ function DaterVentesLbc({ ventes, dates }) {
     const u = { ...(dates || {}) }; if (d) u[String(tx)] = d; else delete u[String(tx)];
     save('vrm_lbc_dates', u); setMsg(null);
   };
-  const eur = (v) => v.price != null && isFinite(Number(v.price)) ? `${(Number(v.price) / 100).toFixed(2).replace('.', ',')} €` : '—';
+  const eur = (v) => v.price != null && isFinite(Number(v.price)) ? `${(Number(v.price) / 100).toFixed(2).replace('.', ',')}\u00a0€` : '—';
   return (
     <div data-dater-lbc={liste.length} style={{ padding: '10px 16px 14px', borderTop: `1px solid ${C.border}`, fontSize: 13, color: C.text }}>
       <div style={{ fontWeight: 600 }}>Dater tes ventes Leboncoin</div>
@@ -39708,7 +39709,7 @@ function StatutFiscal({ liveStats, onNav, partie = 'declarer' }) {
   if (!regime) return carteChoix;
   if (regime !== 'micro') {
     const texte = regime === 'particulier'
-      ? <>Tu vends tes propres affaires : rien à déclarer à l'URSSAF, et VRM n'estime aucune cotisation. Bon à savoir : chaque année, Vinted transmet aux impôts les vendeurs qui dépassent <b>30 ventes ou 2 000 €</b> (le détail, compte par compte, est dans Ventes → Outils → Registre annuel). Si tu achètes pour revendre, c'est une activité : choisis « Micro-entrepreneur » ou « Société » (Documents et réglages → Statut).</>
+      ? <>Tu vends tes propres affaires : rien à déclarer à l'URSSAF, et VRM n'estime aucune cotisation. Bon à savoir : chaque année, Vinted transmet aux impôts les vendeurs qui dépassent <b>30 ventes ou 2 000&nbsp;€</b> (le détail, compte par compte, est dans Ventes → Outils → Registre annuel). Si tu achètes pour revendre, c'est une activité : choisis « Micro-entrepreneur » ou « Société » (Documents et réglages → Statut).</>
       : regime === 'marge'
         ? <>Régime de la marge : VRM calcule la TVA sur ta marge dans le rapport comptable (Ventes → Outils). Tes cotisations ne se calculent pas sur ton chiffre d'affaires : VRM ne les estime pas — ton comptable s'en charge.</>
         : <>En société, tes impôts et tes cotisations ne se calculent pas sur ton chiffre d'affaires : VRM ne les estime pas et ne t'envoie aucun rappel URSSAF. Ton chiffre d'affaires et ton bénéfice restent sur cet écran, pour ton comptable.</>;
@@ -39770,8 +39771,8 @@ function useFreqUrssaf() {
 const lireOptionsMicro = () => optionsMicro(load('vrm_micro_options', null));
 // (6 nov., v36-visuel-2) La règle unique des euros : centimes seulement s'ils existent (« 1 395 € »).
 const eurMicro = (n) => n == null ? '—' : montant(Number(n));
-const eurRond = (n) => `${Math.round(Number(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} €`;
-const pctFr = (n) => `${String(n).replace('.', ',')} %`;
+const eurRond = (n) => `${Math.round(Number(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}\u00a0€`;
+const pctFr = (n) => `${String(n).replace('.', ',')}\u00a0%`;
 function LigneProfil({ titre, aide, children, attr }) {
   return (
     <div className="vrm-micro-ligne" {...(attr || {})} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '12px 0', borderTop: `1px solid ${C.border}` }}>
@@ -39809,7 +39810,7 @@ function Dac7Plateformes({ ligne, annee }) {
     <div data-dac7="" data-dac7-annee={annee} style={{ marginTop: 16, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 13, marginBottom: 4 }}>
         <span style={{ fontWeight: 600, color: C.text }}>DAC7</span>
-        <span style={{ color: C.muted }}>30 ventes ou plus de 2 000 €</span>
+        <span style={{ color: C.muted }}>30 ventes ou plus de 2 000&nbsp;€</span>
       </div>
       {D.plateformes.map((p) => {
         const pct = p.etat !== 'lu' ? 0 : Math.min(100, Math.max(p.n / 30, p.centimes / 200000) * 100);
@@ -39873,9 +39874,9 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
         </LigneProfil>
         <LigneProfil titre="Versement libératoire de l'impôt" attr={{ 'data-micro-vl': vl || 'passu' }}
           aide={<>
-            {vl == null && optsPret ? <div data-micro-vl-question="" style={{ color: C.warn, fontWeight: 600, marginBottom: 4 }}>À confirmer : as-tu choisi cette option auprès de l'URSSAF ?{vlTaux ? ' Ton taux actuel (13,4 %) laisse penser que oui.' : ''}</div> : null}
-            {vl === 'oui' ? <>Ton impôt sur le revenu ({TAUX_MICRO.liberatoire} %) part avec tes cotisations, {freq === 'mensuel' ? 'chaque mois' : 'chaque trimestre'}.</> : vl === 'non' ? <>Ton impôt sur le revenu se calcule à part, sur ta déclaration de revenus du printemps.</> : <>Ton impôt sur le revenu payé avec tes cotisations ({TAUX_MICRO.liberatoire} %), ou à part sur ta déclaration de revenus.</>}
-            <Pourquoi label="Comment savoir si je l'ai choisi">Sur autoentrepreneur.urssaf.fr, ta déclaration affiche une ligne « versement libératoire » à côté des cotisations si tu l'as choisi. Avec l'option, l'impôt sur ce chiffre d'affaires ({TAUX_MICRO.liberatoire} % pour l'achat-revente) est payé au même rythme que tes cotisations, et tu n'as plus rien à payer dessus au printemps.{s ? <> Elle est possible si ton revenu fiscal de référence d'il y a deux ans était sous {eurRond(s.rfrLiberatoire)} (personne seule), et se demande avant le 30 septembre pour l'année suivante.</> : null}</Pourquoi>
+            {vl == null && optsPret ? <div data-micro-vl-question="" style={{ color: C.warn, fontWeight: 600, marginBottom: 4 }}>À confirmer : as-tu choisi cette option auprès de l'URSSAF ?{vlTaux ? ' Ton taux actuel (13,4\u00a0%) laisse penser que oui.' : ''}</div> : null}
+            {vl === 'oui' ? <>Ton impôt sur le revenu ({TAUX_MICRO.liberatoire}&nbsp;%) part avec tes cotisations, {freq === 'mensuel' ? 'chaque mois' : 'chaque trimestre'}.</> : vl === 'non' ? <>Ton impôt sur le revenu se calcule à part, sur ta déclaration de revenus du printemps.</> : <>Ton impôt sur le revenu payé avec tes cotisations ({TAUX_MICRO.liberatoire}&nbsp;%), ou à part sur ta déclaration de revenus.</>}
+            <Pourquoi label="Comment savoir si je l'ai choisi">Sur autoentrepreneur.urssaf.fr, ta déclaration affiche une ligne « versement libératoire » à côté des cotisations si tu l'as choisi. Avec l'option, l'impôt sur ce chiffre d'affaires ({TAUX_MICRO.liberatoire}&nbsp;% pour l'achat-revente) est payé au même rythme que tes cotisations, et tu n'as plus rien à payer dessus au printemps.{s ? <> Elle est possible si ton revenu fiscal de référence d'il y a deux ans était sous {eurRond(s.rfrLiberatoire)} (personne seule), et se demande avant le 30 septembre pour l'année suivante.</> : null}</Pourquoi>
           </>}>
           <Segmente label="Versement libératoire" value={vl} onChange={(v) => poserOptions({ liberatoire: v })}
             options={[{ v: 'oui', l: 'Oui', data: { 'data-taux-option': 'liberatoire' } }, { v: 'non', l: 'Non', data: { 'data-micro-vl-choix': 'non' } }]} />
@@ -39905,7 +39906,7 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
       <div data-micro-calendrier={freq}>
         <div style={sTitre}>Ton calendrier{' '}<Pourquoi titre="Ton calendrier">
           {freq === 'mensuel' ? 'Le chiffre d\'affaires d\'un mois se déclare et se paie le mois suivant.' : 'Le chiffre d\'affaires d\'un trimestre se déclare et se paie le mois qui suit le trimestre.'}
-          {vl === 'oui' ? ' Ton impôt (1 %) part en même temps.' : vl === 'non' ? ' Ton impôt sur le revenu se paie à part (déclaration de revenus).' : ''}
+          {vl === 'oui' ? ' Ton impôt (1\u00a0%) part en même temps.' : vl === 'non' ? ' Ton impôt sur le revenu se paie à part (déclaration de revenus).' : ''}
         </Pourquoi></div>
         <div style={{ display: 'flex', flexDirection: 'column', marginTop: 8 }}>
           {cal.map((p, i) => {
@@ -40022,12 +40023,12 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
           </div>
           <div style={{ fontSize: 13, color: C.muted, marginTop: 6, lineHeight: 1.5 }}>
             {dr.liberatoire === 'oui' ? <>Ton impôt est déjà payé avec tes cotisations : ce chiffre est déclaré pour information (il compte dans ton revenu fiscal de référence).</>
-              : <>Le chiffre d'affaires brut, sans retirer d'abattement : les impôts appliquent eux-mêmes les 71 % de la vente de marchandises.</>}
+              : <>Le chiffre d'affaires brut, sans retirer d'abattement : les impôts appliquent eux-mêmes les 71&nbsp;% de la vente de marchandises.</>}
             {dr.partiel ? <> C'est un minimum : {dr.raisons.join(' · ')}.</> : null}
             {' '}VRM ne compte que ce qu'il a capté sur tes plateformes reliées : compare avec le total de tes déclarations URSSAF de l'année.
           </div>
         </>)}
-        {cfe ? <div data-micro-cfe="" style={{ fontSize: 13, color: C.text, marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}`, lineHeight: 1.5 }}>CFE : si tu as reçu un avis, il est à payer au plus tard le <b>{cfe.limite}</b>, dans ton espace professionnel sur impots.gouv.fr. Pas d'avis l'année de création de ton entreprise, ni si ton chiffre d'affaires d'il y a deux ans était sous 5 000 €.</div> : null}
+        {cfe ? <div data-micro-cfe="" style={{ fontSize: 13, color: C.text, marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}`, lineHeight: 1.5 }}>CFE : si tu as reçu un avis, il est à payer au plus tard le <b>{cfe.limite}</b>, dans ton espace professionnel sur impots.gouv.fr. Pas d'avis l'année de création de ton entreprise, ni si ton chiffre d'affaires d'il y a deux ans était sous 5 000&nbsp;€.</div> : null}
       </div>
     </Card>
   );
@@ -40045,7 +40046,7 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
     <summary>
       <span style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: '1 1 auto', minWidth: 0 }}>
         <span style={{ fontSize: 15, fontWeight: 600, color: C.text }}>Ta micro-entreprise</span>
-        <span style={{ fontSize: 13, color: besoin ? (C.warn || '#B25000') : C.muted, fontWeight: 500, lineHeight: 1.4 }}>{aConfirmer ? '1 question à confirmer · ' : ''}{seuilAlerte ? 'un seuil approche · ' : ''}taux {String(taux).replace('.', ',')} %{prochaine ? ` · ${prochaine.periode} à déclarer avant le ${prochaine.limite.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : ''} · seuils et impôts</span>
+        <span style={{ fontSize: 13, color: besoin ? (C.warn || '#B25000') : C.muted, fontWeight: 500, lineHeight: 1.4 }}>{aConfirmer ? '1 question à confirmer · ' : ''}{seuilAlerte ? 'un seuil approche · ' : ''}taux {String(taux).replace('.', ',')}&nbsp;%{prochaine ? ` · ${prochaine.periode} à déclarer avant le ${prochaine.limite.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : ''} · seuils et impôts</span>
       </span>
     </summary>
     <div data-micro-entreprise="" className="vrm-micro-grille" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 440px), 1fr))', gap: 12, alignItems: 'stretch', marginTop: 8 }}>{calendrier}{seuils}{profil}{impots}</div>
@@ -40356,7 +40357,7 @@ function CarteUrssafMois({ liveStats, onNav }) {
                       {ymsDue.length > 1 ? `Noter ma déclaration — ${nomYm(aNoter[0])}` : 'Noter ma déclaration'}
                     </button>
                   )}
-                  <span style={{fontSize:11,color:C.muted,lineHeight:1.4,flex:'1 1 160px'}}>Estimation ({String(tauxUrssaf()).replace('.',',')} %) — le chiffre officiel se saisit là‑bas.{finie && aNoter.length > 0 ? <> Une fois déclaré, note-le ici : ses ventes ne seront plus recomptées le mois suivant.</> : null}{finie && ymsDue.length > 1 && aNoter.length > 0 && aNoter.length < ymsDue.length ? <> {ymsDue.length - aNoter.length} mois sur {ymsDue.length} déjà noté{ymsDue.length - aNoter.length > 1 ? 's' : ''}.</> : null}</span>
+                  <span style={{fontSize:11,color:C.muted,lineHeight:1.4,flex:'1 1 160px'}}>Estimation ({String(tauxUrssaf()).replace('.',',')}&nbsp;%) — le chiffre officiel se saisit là‑bas.{finie && aNoter.length > 0 ? <> Une fois déclaré, note-le ici : ses ventes ne seront plus recomptées le mois suivant.</> : null}{finie && ymsDue.length > 1 && aNoter.length > 0 && aNoter.length < ymsDue.length ? <> {ymsDue.length - aNoter.length} mois sur {ymsDue.length} déjà noté{ymsDue.length - aNoter.length > 1 ? 's' : ''}.</> : null}</span>
                 </div>
                 )}
               </div>
@@ -40364,7 +40365,7 @@ function CarteUrssafMois({ liveStats, onNav }) {
           })() : <div style={{fontSize:13,color:C.muted}}>Aucune échéance à venir.</div>}
         </div>
         <div data-compta-mois="" style={{marginTop:16,paddingTop:16,borderTop:`1px solid ${C.border}`}}>
-          <div className="vrm-compta-libelle"><span style={{textTransform:'capitalize'}}>{moisCourant.nom}</span>, en cours · à payer ({String(tauxUrssaf()).replace('.',',')} %)</div>
+          <div className="vrm-compta-libelle"><span style={{textTransform:'capitalize'}}>{moisCourant.nom}</span>, en cours · à payer ({String(tauxUrssaf()).replace('.',',')}&nbsp;%)</div>
           <div className="vrm-compta-hero vrm-compta-hero-2 vrm-display" data-compta-chiffre="urssaf-mois" data-eur={urssafEstime==null?'':String(urssafEstime)} style={{color:urssafEstime==null?C.muted:C.text}}>{urssafEstime==null?'—':fmt(urssafEstime)}</div>
           {/* (2 nov.) La phrase vient de la MÊME ligne publiée que le chiffre :
               le CA reçu du mois (`moisCourantCA`) et son nombre de ventes. « Net
@@ -40373,7 +40374,7 @@ function CarteUrssafMois({ liveStats, onNav }) {
           <p className="vrm-compta-phrase" data-compta-phrase="urssaf-mois">
             {moisCourantCA==null
               ? <>— pas encore calculé</>
-              : <span data-urssaf-declare={decl} data-urssaf-mois-n={moisCourantN}>À mettre de côté : {String(tauxUrssaf()).replace('.',',')} % de l'argent reçu en {moisCourant.nom}, toutes plateformes{ncInfo && ncInfo.n > 0 ? ' (au moins : voir ci-dessous)' : ''} (<b style={{color:C.text,fontWeight:600}}><Mt v={moisCourantCA}/></b>{moisCourantN>0 ? <>, {moisCourantN} vente{moisCourantN>1?'s':''}</> : null})
+              : <span data-urssaf-declare={decl} data-urssaf-mois-n={moisCourantN}>À mettre de côté : {String(tauxUrssaf()).replace('.',',')}&nbsp;% de l'argent reçu en {moisCourant.nom}, toutes plateformes{ncInfo && ncInfo.n > 0 ? ' (au moins : voir ci-dessous)' : ''} (<b style={{color:C.text,fontWeight:600}}><Mt v={moisCourantCA}/></b>{moisCourantN>0 ? <>, {moisCourantN} vente{moisCourantN>1?'s':''}</> : null})
                 {nA > 0 && <span data-urssaf-ailleurs={Math.round(caA*100)} data-urssaf-ailleurs-n={nA}>, hors {nA} vente{nA>1?'s':''} (<Mt v={caA}/>) déjà dans ta déclaration{ou ? <> de {ou}</> : null}</span>}
                 .
                 {decl === 'pasSu' && <span style={{color:C.warn}}> Tes déclarations passées (« J'ai déclaré ce mois ») n'étaient pas encore chargées quand ce chiffre a été calculé : une vente déjà déclarée peut encore y être comptée — ouvre l'écran <b>Ventes</b> pour le mettre à jour.</span>}
@@ -40497,7 +40498,7 @@ function RecapComptableMensuel() {
             <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
               <thead>
                 <tr style={{borderBottom:`1px solid ${C.border}`}}>
-                  {['Mois','Ventes','CA finalisé',NOM_BENEFICE,`Cotis.+impôt ${String(tauxUrssaf()).replace('.',',')} %`,'CA après URSSAF'].map(h=>(
+                  {['Mois','Ventes','CA finalisé',NOM_BENEFICE,`Cotis.+impôt ${String(tauxUrssaf()).replace('.',',')}\u00a0%`,'CA après URSSAF'].map(h=>(
                     <th key={h} style={{textAlign:h==='Mois'?'left':'right',padding:'8px 10px',color:C.muted,fontWeight:600,fontSize:11,textTransform:'uppercase',whiteSpace:'nowrap'}}>{h}</th>
                   ))}
                 </tr>
@@ -40527,7 +40528,7 @@ function RecapComptableMensuel() {
           <div data-recap-regle={urssafMois?'versement':'archive'} style={{fontSize:11,color:C.muted,marginTop:12,lineHeight:1.5}}>
             {urssafMois
               ? <>Ventes <b>finalisées</b>, toutes plateformes, comptées dans le mois où l'argent a été versé (Vinted), de la vente (Leboncoin), de la commande payée (eBay) — ou dans le mois où tu les as déclarées. Annulées et remboursements exclus, ventes masquées comprises ; une vente sans date de versement n'est dans aucun mois.</>
-              : <>Ventes de l'ancienne archive, à leur date de réception — annulées et remboursements exclus.</>} Le bénéfice, lui, est celui de Comptabilité (« Combien j'ai gagné ? ») : ventes au jour de la vente, moins prix d'achat, frais, dépenses et URSSAF ; « — » quand un prix d'achat manque. Cotisations estimées à {String(tauxUrssaf()).replace('.',',')} % (taux réglable dans Documents et réglages → Ton entreprise). La déclaration se fait sur autoentrepreneur.urssaf.fr.
+              : <>Ventes de l'ancienne archive, à leur date de réception — annulées et remboursements exclus.</>} Le bénéfice, lui, est celui de Comptabilité (« Combien j'ai gagné ? ») : ventes au jour de la vente, moins prix d'achat, frais, dépenses et URSSAF ; « — » quand un prix d'achat manque. Cotisations estimées à {String(tauxUrssaf()).replace('.',',')}&nbsp;% (taux réglable dans Documents et réglages → Ton entreprise). La déclaration se fait sur autoentrepreneur.urssaf.fr.
           </div>
         </details></Card>
       )}
@@ -40698,7 +40699,7 @@ const clesVenteStats = (titre, it) => ({
   modele: extractModel(titre || '') || '',
 });
 const eurStat = (v) => v == null ? '—' : fmt(v);
-const pctStat = (v) => v == null ? '—' : `${v > 0 ? '+' : ''}${v} %`;
+const pctStat = (v) => v == null ? '—' : `${v > 0 ? '+' : ''}${v}\u00a0%`;
 const minuitLocalStats = (k = 0) => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate() + k).getTime(); };
 // Barres verticales, une série (une teinte), survol natif (<title>) sur une
 // cible de toute la hauteur (plus large que la barre).
@@ -40841,7 +40842,7 @@ function AnnulationsEtNotes({ b, panelOff }) {
   const A = React.useMemo(() => annulationsParCompte({ ventes, ko, de: b.de, a: b.a, estAnnulee: (o) => classifyOrderStatus(o.status) === 'cancelled', ecarte: ecarteUid }), [ventes, ko, b, ecarteUid]);
   const N = React.useMemo(() => notesParCompte({ profils, comptes }), [profils, comptes]);
   const pl = (n, s1, p) => `${n} ${n > 1 ? (p || s1 + 's') : s1}`;
-  const pctTxt = (t) => (t == null ? '—' : `${String(t).replace('.', ',')} %`);
+  const pctTxt = (t) => (t == null ? '—' : `${String(t).replace('.', ',')}\u00a0%`);
   const note = (x) => (x == null ? '—' : String(x).replace('.', ','));
   const jour = (t) => new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
   const carte = (k, titre, droite, corps, attrs) => <CarteStatsVitrine k={k} titre={titre} droite={droite} corps={corps} attrs={attrs}/>;
@@ -41017,7 +41018,7 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
   const tVendu = V == null
     ? tuile('vendu', 'Vendu', '—', vendu === null ? 'ventes pas pu être lues' : 'je lis tes ventes…', { 'data-sv-etat': vendu === null ? 'passu' : 'encours' })
     : tuile('vendu', 'Vendu', `${partielVendu ? 'au moins ' : ''}${fmt(V.eur)}`,
-      <>{pl(V.n, 'vente')}{V.ecart != null && !partielVendu ? <span title={`Comparé à ${nomPrec}${auMemePoint ? ', au même jour' : ''} : ${fmt(V.prec.eur)}`}>{` · ${V.ecart > 0 ? '+' : ''}${V.ecart} % par rapport à ${nomPrec}`}</span> : null}{manque.length ? ` · sans ${manque.join(', ')}` : ''}{ncPeriode.length ? ` · ${ncPeriode.length} non comptée${ncPeriode.length > 1 ? 's' : ''}` : ''}</>,
+      <>{pl(V.n, 'vente')}{V.ecart != null && !partielVendu ? <span title={`Comparé à ${nomPrec}${auMemePoint ? ', au même jour' : ''} : ${fmt(V.prec.eur)}`}>{` · ${V.ecart > 0 ? '+' : ''}${V.ecart}\u00a0% par rapport à ${nomPrec}`}</span> : null}{manque.length ? ` · sans ${manque.join(', ')}` : ''}{ncPeriode.length ? ` · ${ncPeriode.length} non comptée${ncPeriode.length > 1 ? 's' : ''}` : ''}</>,
       { 'data-sv-etat': 'lu', 'data-sv-n': V.n, 'data-sv-eur': cents(V.eur), 'data-sv-prec': cents(V.prec.eur), 'data-sv-ecart': V.ecart == null ? '' : V.ecart, 'data-sv-partiel': partielVendu ? '1' : '0', 'data-sv-non-comptees': ncPeriode.length || undefined }, ncPeriode.length ? `Pas dans ce montant : ${phraseNonComptees(ncPeriode)}` : undefined);
   const tBenef = (() => {
     if (b.type === 'semaine') {
@@ -41152,7 +41153,7 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
           const etat = boost == null ? (Array.isArray(ventesCoque) || ventesCoque === null || (extras && extras.items == null) ? 'passu' : 'encours') : boost.etat !== 'lu' ? 'passu' : boost.assez ? 'lu' : 'pas-assez';
           const C2 = boost && boost.etat === 'lu' ? boost.comparables : null;
           const droite = C2 ? `${pl(C2.b, 'boosté')} · ${pl(C2.nb, 'autre')}` : null;
-          const pct = (t) => `${Math.round(t * 100)} %`;
+          const pct = (t) => `${Math.round(t * 100)}\u00a0%`;
           const ligneB = (k, lib, vb, vnb, dv) => (
             <div className="vrm-sv-boost-ligne" data-sv-boost={k} data-v={dv} style={{ display: 'contents' }}>
               <span className="vrm-sv-tuile-lib" style={{ alignSelf: 'center' }}>{lib}</span>
@@ -41202,7 +41203,7 @@ const nomColonneMois = (ym, b, memePoint, maintenant) => {
   return `1–${fin} ${MOIS_COURTS[m - 1]}${an}`;
 };
 const signeEur = (v) => (v > 0 ? '+' : v < 0 ? '−' : '') + fmt(Math.abs(v));
-const signePct = (v) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${String(Math.abs(v)).replace('.', ',')} %`;
+const signePct = (v) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${String(Math.abs(v)).replace('.', ',')}\u00a0%`;
 // (5 nov., chantier F, revue 1.7) LE REÇU QUI VEUT DIRE « PAS SU ». Des ventes finalisées
 // SANS date de versement (« à dater ») ne sont dans AUCUN mois : le reçu d'un mois n'est
 // alors qu'un minimum. Un minimum de 0 ne se dit jamais (§5) ⇒ « — » et la raison ; un
@@ -41347,7 +41348,7 @@ function FraisParSiteCarte({ periode, ebayCommandes }) {
               <span style={{ display: 'block', fontSize: 12, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{x.passu ? 'pas lu' : `${x.n} vente${x.n > 1 ? 's' : ''}${cov ? ` · ${cov}` : ''}`}</span>
             </span>
             <span style={{ textAlign: 'right', fontSize: 15, fontWeight: 600, color: x.frais == null ? C.muted : C.text, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{x.frais == null ? '—' : fmt(x.frais)}</span>
-            <span style={{ textAlign: 'right', fontSize: 13, color: C.muted, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{x.pct == null ? '—' : `${String(x.pct).replace('.', ',')} %`}</span>
+            <span style={{ textAlign: 'right', fontSize: 13, color: C.muted, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{x.pct == null ? '—' : `${String(x.pct).replace('.', ',')}\u00a0%`}</span>
           </div>
         );
       })}
@@ -41520,7 +41521,7 @@ function StatsDetaillees({ liveStats, panelOff, onVoirDorment = null }) {
                 <span role="cell" title={g.k} style={{ color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.k}</span>
                 <span role="cell" style={{ textAlign: 'right', color: C.muted }}>{g.nCout < g.n ? `${g.nCout}/${g.n}` : g.n}</span>
                 <span role="cell" style={{ textAlign: 'right', color: g.brut == null ? C.muted : C.text, whiteSpace: 'nowrap' }}>{eurStat(g.brut)}</span>
-                <span role="cell" style={{ textAlign: 'right', color: g.marge == null ? C.muted : C.text, whiteSpace: 'nowrap' }}>{g.marge == null ? '—' : `${String(g.marge).replace('.', ',')} %`}</span>
+                <span role="cell" style={{ textAlign: 'right', color: g.marge == null ? C.muted : C.text, whiteSpace: 'nowrap' }}>{g.marge == null ? '—' : `${String(g.marge).replace('.', ',')}\u00a0%`}</span>
                 <span role="cell" style={{ textAlign: 'right', color: g.parPaire == null ? C.muted : C.text, whiteSpace: 'nowrap' }}>{eurStat(g.parPaire)}</span>
               </div>
             ))}
@@ -41599,8 +41600,8 @@ function StatsDetaillees({ liveStats, panelOff, onVoirDorment = null }) {
         </div>
         <div style={grille}>
           {fig('Rotation', rot == null ? '—' : `${rot} j`, vint30 ? `au rythme de ${pl(vint30, 'vente')} Vinted en 30 jours — un repère, pas une prévision` : 'aucune vente Vinted en 30 jours', { 'data-stat-rotation': rot == null ? '' : rot })}
-          {fig('Taux de vente du mois', tauxV == null ? '—' : `${tauxV} %`, vintMois != null && enLigne != null ? `${vintMois} vendue${vintMois > 1 ? 's' : ''} ce mois sur ${vintMois + enLigne} (vendues + encore en ligne), Vinted` : 'ventes pas lues', { 'data-stat-taux-vente': tauxV == null ? '' : tauxV })}
-          {fig('Annulations', annul && annul.taux != null ? `${String(annul.taux).replace('.', ',')} %` : '—', annul ? `${annul.annulees} sur ${pl(annul.n, 'commande')} Vinted lue${annul.n > 1 ? 's' : ''}` : 'ventes pas lues', { 'data-stat-annulation': annul && annul.taux != null ? annul.taux : '' })}
+          {fig('Taux de vente du mois', tauxV == null ? '—' : `${tauxV}\u00a0%`, vintMois != null && enLigne != null ? `${vintMois} vendue${vintMois > 1 ? 's' : ''} ce mois sur ${vintMois + enLigne} (vendues + encore en ligne), Vinted` : 'ventes pas lues', { 'data-stat-taux-vente': tauxV == null ? '' : tauxV })}
+          {fig('Annulations', annul && annul.taux != null ? `${String(annul.taux).replace('.', ',')}\u00a0%` : '—', annul ? `${annul.annulees} sur ${pl(annul.n, 'commande')} Vinted lue${annul.n > 1 ? 's' : ''}` : 'ventes pas lues', { 'data-stat-annulation': annul && annul.taux != null ? annul.taux : '' })}
         </div>
         <div style={{ ...sNote, marginTop: 10 }}>Âge = date de mise en ligne lue sur l'annonce, connue pour {stock.dort.datesConnues} sur {stock.dort.total}{stock.dort.datesConnues < stock.dort.total ? ' — les autres ne sont dans aucune ligne' : ''}. Valeur = prix affichés ; coût = prix d'achat connus seulement. Calculé le {quand(stock.at)}.</div>
       </>)}
@@ -41648,7 +41649,7 @@ function RepartitionsVentes({ panelOff, apercu = false }) {
       return <div key={cle} className="vrm-analyse-mini" data-analyse={cle}><h4>{titre}</h4>
         {attente?<p>Lecture des pays…</p>:!bloc?<p>Lecture indisponible.</p>:!bloc.n?<p>{cle==='pays'?'Aucun pays reçu.':'Aucune marque identifiée.'}</p>:<>
           <RepartitionAnneau elements={top.map(e=>({...e,k:nom(e.k)}))} total={bloc.n}/>
-          <ul>{top.map(e=><li key={e.k}><span title={nom(e.k)}>{nom(e.k)}</span><b>{Math.round(e.n/bloc.n*100)} %</b></li>)}{lignes.length>5&&<li><span>Autres</span><b>{Math.round((bloc.n-top.reduce((n,e)=>n+e.n,0))/bloc.n*100)} %</b></li>}</ul>
+          <ul>{top.map(e=><li key={e.k}><span title={nom(e.k)}>{nom(e.k)}</span><b>{Math.round(e.n/bloc.n*100)}&nbsp;%</b></li>)}{lignes.length>5&&<li><span>Autres</span><b>{Math.round((bloc.n-top.reduce((n,e)=>n+e.n,0))/bloc.n*100)}&nbsp;%</b></li>}</ul>
           <small>{bloc.n} sur {R.total} ventes renseignées</small>
         </>}
       </div>;
@@ -41966,7 +41967,7 @@ function PrevisionUrssafCarte({ onNav }) {
         {P.ca != null ? <button type="button" className="vrm-urssaf-copier" data-urssaf-copier="ca" data-urssaf-texte={caTxt} aria-label={`Copier ${caTxt}`} onClick={() => copier('ca', caTxt)}>{copie === 'ca' ? VERBES.copie : VERBES.copier}</button> : <span className="vrm-urssaf-copier-vide" aria-hidden="true"/>}
       </div>
       <div className="vrm-urssaf-ligne" data-urssaf-ligne="cotis" data-eur={P.apayer == null ? '' : String(P.apayer)}>
-        <span className="vrm-urssaf-lib"><b>Cotisations <SourceChiffre id="cotis">{P.apayer == null ? <>Elles se calculent sur le chiffre d’affaires, pas encore calculé.</> : <>{fmt(P.ca)} × {tauxTxt} % (ton taux : Ta micro-entreprise → Ton taux) = {fmt(P.apayer)}. Une estimation pour vérifier : le site de l’URSSAF fait foi.</>}</SourceChiffre></b><small>estimation VRM · {tauxTxt} % : à comparer avec le site</small></span>
+        <span className="vrm-urssaf-lib"><b>Cotisations <SourceChiffre id="cotis">{P.apayer == null ? <>Elles se calculent sur le chiffre d’affaires, pas encore calculé.</> : <>{fmt(P.ca)} × {tauxTxt}&nbsp;% (ton taux : Ta micro-entreprise → Ton taux) = {fmt(P.apayer)}. Une estimation pour vérifier : le site de l’URSSAF fait foi.</>}</SourceChiffre></b><small>estimation VRM · {tauxTxt}&nbsp;% : à comparer avec le site</small></span>
         <span className="vrm-urssaf-val">{P.apayer == null ? '—' : <>{P.partiel ? <small>au moins </small> : null}{fmt(P.apayer)}</>}</span>
         <span className="vrm-urssaf-copier-vide" aria-hidden="true"/>
       </div>
@@ -42028,14 +42029,14 @@ function ComptaFusion({ compta, onNav }) {
       {anneau ? <section className="vrm-fu-panneau" aria-label="Où passe l'argent vendu" data-fu-anneau={String(anneau.pct)}>
         {anneau ? (
           <div className="vrm-fu-anneau">
-            <svg width="132" height="132" viewBox="0 0 132 132" role="img" aria-label={`Il te reste ${anneau.pct} % de ce que tu as vendu`}>
+            <svg width="132" height="132" viewBox="0 0 132 132" role="img" aria-label={`Il te reste ${anneau.pct}\u00a0% de ce que tu as vendu`}>
               <circle cx="66" cy="66" r={R} fill="none" stroke="var(--fu-piste)" strokeWidth="16"/>
               {anneau.parts.map(([cle, , v]) => { const part = anneau.total > 0 ? v / anneau.total : 0; const seg = <circle key={cle} className={'vrm-fu-arc is-' + cle} cx="66" cy="66" r={R} fill="none" strokeWidth="16" strokeDasharray={`${Math.max(0, part * L - 2)} ${L}`} strokeDashoffset={-cumul * L} transform="rotate(-90 66 66)"/>; cumul += part; return seg; })}
-              <text x="66" y="68" textAnchor="middle" className="vrm-fu-anneau-centre">{anneau.pct} %</text>
+              <text x="66" y="68" textAnchor="middle" className="vrm-fu-anneau-centre">{anneau.pct}&nbsp;%</text>
               <text x="66" y="87" textAnchor="middle" className="vrm-fu-anneau-sous">te reste</text>
             </svg>
             <ul className="vrm-fu-legende">
-              {anneau.parts.filter(([cle, , v]) => !(cle === 'frais' && !(v > 0))).map(([cle, lib, , p]) => <li key={cle} data-fu-part={cle} data-fu-pct={String(p)}><i className={'is-' + cle}/><span>{lib}</span><b>{p} %</b></li>)}
+              {anneau.parts.filter(([cle, , v]) => !(cle === 'frais' && !(v > 0))).map(([cle, lib, , p]) => <li key={cle} data-fu-part={cle} data-fu-pct={String(p)}><i className={'is-' + cle}/><span>{lib}</span><b>{p}&nbsp;%</b></li>)}
             </ul>
           </div>
         ) : null}
@@ -42199,7 +42200,7 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense, sansC
                 data={{ 'data-benef-ligne': 'charges' }} />
               {B.sansCotis ? <div className="vrm-set-ligne" data-benef-ligne="cotis" data-benef-sans-cotis=""><span className="vrm-set-lib"><small style={{ color: C.muted, marginTop: 0 }}>Aucune cotisation URSSAF déduite — {regimeFiscal() ? `statut : ${libelleRegime(regimeFiscal())}` : 'ton statut n\'est pas encore choisi (« Combien je dois déclarer ? »)'}.</small></span></div> :
               <Ligne lib="− URSSAF" val={B.cotis}
-                sous={B.cotis == null ? 'ton chiffre d\'affaires déclaré se calcule dans l\'écran Ventes' : `${String(tauxUrssaf()).replace('.', ',')} % des mêmes ventes (${fmt(B.ca)})`}
+                sous={B.cotis == null ? 'ton chiffre d\'affaires déclaré se calcule dans l\'écran Ventes' : `${String(tauxUrssaf()).replace('.', ',')}\u00a0% des mêmes ventes (${fmt(B.ca)})`}
                 data={{ 'data-benef-ligne': 'cotis' }} />}
               <div className="vrm-set-ligne" data-benef-ligne="net"><span className="vrm-set-lib"><b style={{ color: C.text }}>= {titreNet.toLowerCase()}</b></span><span className="vrm-set-lib" style={{ flex: '0 0 auto', textAlign: 'right' }}><small style={{ color: C.muted, marginTop: 0 }}>le chiffre au-dessus</small></span></div>
             </div>
@@ -43357,7 +43358,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
                   <input type="text" placeholder={`ex. ${(DEPENSE_CATS.find((c) => c.k === dCat) || DEPENSE_CATS[DEPENSE_CATS.length - 1]).ex}`} data-dep-libelle value={dLib} onChange={e => { setDLib(e.target.value); setDErr(''); }} onKeyDown={e => { if (e.key === 'Enter') ajouterDepense(); }} style={{ ...inp, width: '100%' }} />
                 </label>
                 <label style={{ ...lab, flex: '0 1 110px' }}>Montant
-                  <input type="text" inputMode="decimal" placeholder={dLu === 'lecture' ? '…' : '0,00 €'} data-dep-montant data-dep-montant-lu={dLu} value={dMnt} onChange={e => { setDMnt(e.target.value); setDErr(''); setDLu(''); }} onKeyDown={e => { if (e.key === 'Enter') ajouterDepense(); }} style={{ ...inp, width: '100%' }} />
+                  <input type="text" inputMode="decimal" placeholder={dLu === 'lecture' ? '…' : '0,00\u00a0€'} data-dep-montant data-dep-montant-lu={dLu} value={dMnt} onChange={e => { setDMnt(e.target.value); setDErr(''); setDLu(''); }} onKeyDown={e => { if (e.key === 'Enter') ajouterDepense(); }} style={{ ...inp, width: '100%' }} />
                 </label>
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
@@ -43403,7 +43404,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
                 <input type="text" placeholder="ex. Canva" data-abo-libelle value={aLib} onChange={e => { setALib(e.target.value); setAErr(''); }} onKeyDown={e => { if (e.key === 'Enter') ajouterAbonnement(); }} style={{ ...inp, width: '100%' }} />
               </label>
               <label style={{ ...lab, flex: '0 1 110px' }}>Prix
-                <input type="text" inputMode="decimal" placeholder="0,00 €" data-abo-montant value={aMnt} onChange={e => { setAMnt(e.target.value); setAErr(''); }} onKeyDown={e => { if (e.key === 'Enter') ajouterAbonnement(); }} style={{ ...inp, width: '100%' }} />
+                <input type="text" inputMode="decimal" placeholder="0,00&nbsp;€" data-abo-montant value={aMnt} onChange={e => { setAMnt(e.target.value); setAErr(''); }} onKeyDown={e => { if (e.key === 'Enter') ajouterAbonnement(); }} style={{ ...inp, width: '100%' }} />
               </label>
               <label style={{ ...lab, flex: '1 1 140px' }}>Revient
                 <select value={aPer} onChange={e => setAPer(e.target.value)} data-abo-periode style={{ ...inp, width: '100%' }}><option value="mois">tous les mois</option><option value="an">tous les ans</option></select>
@@ -44687,7 +44688,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // achat → numérotation → rangement garage → mise en ligne → vente → expédition.
   const buildPassport = (it, e, num) => {
     const steps = [];
-    const eur2 = v => (v!=null && String(v).trim()!=='') ? `${eur(v).toFixed(2).replace('.',',')} €` : null;
+    const eur2 = v => (v!=null && String(v).trim()!=='') ? `${eur(v).toFixed(2).replace('.',',')}\u00a0€` : null;
     // 1) Achat
     const buy = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? eur2(e.buyPrice) : null;
     let buyDate = null;
@@ -44702,7 +44703,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (it) { const age = listedAgeDays(it); steps.push({ icon:'🟢', label:'En ligne', detail:[prix(it.price,it.currency)||null, age!=null?`depuis ${age} j`:null, it.views!=null?`👁 ${it.views}`:null, it.favourites!=null?`❤️ ${it.favourites}`:null].filter(Boolean).join(' · '), done:true }); }
     // 5) Vente
     const sold = (sales.items||[]).find(o=>it?.id&&String(txnItem[String(o.transaction_id)]||'')===String(it.id)&&String(o._acc?.vinted_user_id||'')===String(it._acc?.vinted_user_id||''));
-    if (sold) { const st=classifyOrderStatus(sold.status); const sp=sold.price?.amount!=null?Number(sold.price.amount):null; steps.push({ icon: st==='cancelled'?'✖️':'💸', label: st==='cancelled'?'Vente annulée':(st==='completed'?'Vendue':'Vente en cours'), detail:[sp!=null?`${sp.toFixed(0)} €`:null, sold.date?`le ${new Date(sold.date).toLocaleDateString('fr-FR')}`:null].filter(Boolean).join(' '), done:st==='completed' }); }
+    if (sold) { const st=classifyOrderStatus(sold.status); const sp=sold.price?.amount!=null?Number(sold.price.amount):null; steps.push({ icon: st==='cancelled'?'✖️':'💸', label: st==='cancelled'?'Vente annulée':(st==='completed'?'Vendue':'Vente en cours'), detail:[sp!=null?`${sp.toFixed(0)}\u00a0€`:null, sold.date?`le ${new Date(sold.date).toLocaleDateString('fr-FR')}`:null].filter(Boolean).join(' '), done:st==='completed' }); }
     // 6) Bordereau / expédition
     const bord = bordForItem(it ? it.id : null, null);
     if (bord) steps.push({ icon:'📮', label:'Bordereau reçu — à expédier', detail: bord.dateLimite?`avant le ${bord.dateLimite}`:'', done:true });
@@ -47626,7 +47627,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (rep == null) return;                               // « Plus tard » / fermé : rien d'écrit
     if (typeof rep === 'object') { if (rep.relier && sugg) await relierAchatAnnonce(item, sugg.achat); return; }
     const w = ecrirePrixTape(item, rep, numeroPose);
-    if (w.etat === 'ok') toast(`Prix d'achat enregistré : ${w.patch.buyPrice} €`);
+    if (w.etat === 'ok') toast(`Prix d'achat enregistré : ${w.patch.buyPrice}\u00a0€`);
   };
   // (5 nov.) UN N° CHANGÉ À LA MAIN (12 → 40), à la mise en ligne ou après :
   // l'ancien est peut-être déjà écrit sur le carton. Il passe dans « N° à écrire
@@ -52074,7 +52075,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const relierAchatAnnonce = async (it, a) => {
     const w = await ecritureRelierAchat(a); if (!w) return;
     updatePair(it, w);
-    toast(`Achat relié${w.buyPrice ? ` · ${String(w.buyPrice).replace('.', ',')} €` : ''}`);
+    toast(`Achat relié${w.buyPrice ? ` · ${String(w.buyPrice).replace('.', ',')}\u00a0€` : ''}`);
   };
   // « Saisir » : le prix qu'il tape (jamais deviné), sans achat relié — l'écriture de la case de la carte.
   const saisirPrixAnnonce = async (it) => {
@@ -52228,7 +52229,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   const asoRepartir = async ({ lot, saisies, inclus }) => {
     const ok = await askConfirm({ title: `Répartir ${lot.titre ? '« ' + lot.titre + ' »' : 'ce lot'} ?`,
-      desc: lot.articles.map((x, i) => `${x.numero ? 'N°' + x.numero : 'Sans N°'} · ${String(saisies[i] || '').trim()} €`).join('\n'), ok: 'Enregistrer', cancel: 'Annuler' });
+      desc: lot.articles.map((x, i) => `${x.numero ? 'N°' + x.numero : 'Sans N°'} · ${String(saisies[i] || '').trim()}\u00a0€`).join('\n'), ok: 'Enregistrer', cancel: 'Annuler' });
     if (!ok) return false;
     const w = ecrituresRepartition({ achat: lot.achat, articles: lot.articles, saisies, inclus, ventilation: ventilationDeTx(lot.tx), confirme: true,
       at: new Date().toISOString(), accNom: lot.achat._acc ? accNameOf(lot.achat._acc) : '', photo: orderPhoto(lot.achat) || '' });
@@ -52339,7 +52340,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // (et SA réponse est gardée : la question ne revient que s'il change ce prix).
       const remplacer = [];
       for (const x of plan.aDemander) {
-        const sien = x.centimes != null ? eurosFo(x.centimes) : `${x.prix} €`;
+        const sien = x.centimes != null ? eurosFo(x.centimes) : `${x.prix}\u00a0€`;
         const oui = await askConfirm({ title: `N°${x.numero} a déjà un prix d’achat`, desc: `${sien} saisi à la main. Le remplacer par ${eurosFo(x.part)}, sa part de cet achat ?`, ok: 'Remplacer', cancel: `Garder ${sien}` });
         if (oui) remplacer.push(x.cle);
       }
@@ -54143,7 +54144,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {tx && (
                         <details className="vrm-chat-negociation" open={!off||!!prixOffre||contreOffreOuverte}><summary>{off?'Proposer un autre prix':'Proposer un prix'}</summary><div className="vrm-chat-offre-l">
                           <span className="vrm-chat-offre-k" style={{color:C.muted}}>Ton prix</span>
-                          <input ref={prixOffreRef} className="vrm-chat-prix" inputMode="decimal" disabled={ro||offreBusy||offreBloquee} value={prixOffre} onChange={e=>setPrixOffre(e.target.value)} placeholder="Prix €" aria-label="Prix de l'offre"
+                          <input ref={prixOffreRef} className="vrm-chat-prix" inputMode="decimal" disabled={ro||offreBusy||offreBloquee} value={prixOffre} onChange={e=>setPrixOffre(e.target.value)} placeholder="Prix&nbsp;€" aria-label="Prix de l'offre"
                             style={{border:`1px solid ${C.border}`,background:C.card,color:C.text}}/>
                           <button type="button" className="vrm-chat-btn" disabled={offreBusy||ro||offreBloquee||!prixOffre.trim()} onClick={()=>actionOffre('offre')} style={{border:`1px solid ${C.border}`,background:C.card,color:ro?C.muted:C.text,opacity:(offreBusy||ro||offreBloquee||!prixOffre.trim())?0.5:1}}>Envoyer l'offre</button>
                         </div></details>
@@ -55448,7 +55449,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div style={{padding:'10px 11px 11px'}}>
                         <UneLigne texte={o.title||'—'} title={o.title||undefined} style={{display:'block',fontSize:13,fontWeight:600,color:C.text,overflow:'hidden',whiteSpace:'nowrap'}}/>
                         <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:8,marginTop:4}}>
-                          <span className="vrm-display" style={{fontSize:15,fontWeight:700,color:C.text}}>{montantCommande(o).toFixed(0)} €</span>
+                          <span className="vrm-display" style={{fontSize:15,fontWeight:700,color:C.text}}>{montantCommande(o).toFixed(0)}&nbsp;€</span>
                         </div>
                         <div style={{fontSize:12,color:C.muted,marginTop:6,display:'flex',alignItems:'center',gap:6,minWidth:0}}>
                           <span style={{width:7,height:7,borderRadius:999,background:vs.color,flexShrink:0}}/>
@@ -56117,7 +56118,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const propPrix = !hidden && st!=='cancelled' && buy==null ? propositionVente(o.transaction_id) : null;
             const coutManque = !hidden && st!=='cancelled' && buy==null && (!(e && e.buyFromId) || !!propPrix);
             const benefLigne = { etat: lb.etat, achatCentimes: lb.achat!=null ? Math.round(lb.achat*100) : null, benefCentimes: lb.benefice!=null ? Math.round(lb.benefice*100) : null,
-              achatTxt: lb.achat!=null ? `${eurosLigne(lb.achat)} €` : (st==='cancelled' ? '' : coutManque ? 'à saisir' : '—'), benefTxt: texteBenefice(lb.etat==='partiel' ? { ...lb, etat:'ok' } : lb),
+              achatTxt: lb.achat!=null ? `${eurosLigne(lb.achat)}\u00a0€` : (st==='cancelled' ? '' : coutManque ? 'à saisir' : '—'), benefTxt: texteBenefice(lb.etat==='partiel' ? { ...lb, etat:'ok' } : lb),
               aria: lb.etat==='partiel' ? `Bénéfice : au plus ${texteBenefice({ ...lb, etat:'ok' })}, frais pas confirmés` : lb.etat==='achat' ? "Bénéfice : prix d'achat manquant" : undefined };
             // (1er nov.) « DÉPOSÉ » : seulement une vente À EXPÉDIER, pas encore cochée.
             const txL = String(o.transaction_id);
@@ -56389,7 +56390,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     subColor={totals.nbCout<totals.bN?C.warn:undefined}
                     sub={totals.nbCout<totals.bN
                       ? `sur ${totals.nbCout} vente${totals.nbCout>1?'s':''} sur ${totals.bN} — les autres n'ont pas de prix d'achat`
-                      : (totals.margeMoy!=null?`marge ${totals.margeMoy.toFixed(0)} %`:'CA − achat')}/>
+                      : (totals.margeMoy!=null?`marge ${totals.margeMoy.toFixed(0)}\u00a0%`:'CA − achat')}/>
                 : <>
                     <StatBox compact label={NOM_BENEFICE_BRUT} value={fmtE0(totals.benefBrut)} color={totals.benefBrut>=0?C.text:C.danger}
                       subColor={totals.nbCout<totals.bN?C.warn:undefined}
@@ -56397,7 +56398,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         ? `sur ${totals.nbCout} vente${totals.nbCout>1?'s':''} sur ${totals.bN} — avant frais`
                         : 'CA − achat (avant frais)'}/>
                     <StatBox compact label={NOM_APRES_FRAIS} value={totals.benefConnu==null?'—':fmtE0(totals.benefConnu)} color={totals.benefConnu==null?C.muted:(totals.benefConnu>=0?C.text:C.danger)}
-                      sub={totals.benefConnu==null?`frais eBay pas connus pour ${totals.fraisInconnus} vente${totals.fraisInconnus>1?'s':''}`:totals.margeMoy!=null?`après boosts & frais · marge ${totals.margeMoy.toFixed(0)} %`:'après boosts & frais'}/>
+                      sub={totals.benefConnu==null?`frais eBay pas connus pour ${totals.fraisInconnus} vente${totals.fraisInconnus>1?'s':''}`:totals.margeMoy!=null?`après boosts & frais · marge ${totals.margeMoy.toFixed(0)}\u00a0%`:'après boosts & frais'}/>
                   </>}
           </div>
           {/* (19 oct.) La couverture PAR PLATEFORME, une fois sous les chiffres :
@@ -56503,7 +56504,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {totals.nb>0 && (perf.joursMoy!=null || perf.ecoul!=null || perf.bestBrand) && (
           <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:8}}>
             {perf.joursMoy!=null && <StatBox label="Temps de vente" value={`${perf.joursMoy.toFixed(0)} j`} sub={`moyenne sur ${perf.joursNb}`}/>}
-            {perf.ecoul!=null && <StatBox label="Écoulement" value={`${perf.ecoul.toFixed(0)} %`} sub={`${perf.vendues} vendu / ${perf.online} en ligne`}/>}
+            {perf.ecoul!=null && <StatBox label="Écoulement" value={`${perf.ecoul.toFixed(0)}\u00a0%`} sub={`${perf.vendues} vendu / ${perf.online} en ligne`}/>}
             {perf.bestBrand && <StatBox label="Top marque" value={perf.bestBrand.brand} sub={`+${perf.bestBrand.moy.toFixed(0)} €/paire`}/>}
             {/* (5 nov.) « Compte qui vend le mieux » : une seule place, Statistiques → « Quel compte vend le mieux ». */}
           </div>
@@ -56826,7 +56827,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 ['Dépensé', fmtE0(somme(vrais)), `${vrais.length} article${vrais.length>1?'s':''}`, null],
                 ['Prix médian', fmtE0(med), 'par article', null],
                 ['En route', fmtE0(somme(rte)), `${rte.length} article${rte.length>1?'s':''}`, null],
-                ['Annulés', fmtE0(somme(ann)), `${ann.length} sur ${dans.length} · ${tauxAnn} %`, tauxAnn>=20?C.warn:null],
+                ['Annulés', fmtE0(somme(ann)), `${ann.length} sur ${dans.length} · ${tauxAnn}\u00a0%`, tauxAnn>=20?C.warn:null],
               ].map(([k,v,sub,col])=>(
                 <div key={k} className="vrm-achats-kpi" style={{borderColor:C.border}}>
                   <div className="vrm-achats-kpi-k" style={{color:C.muted}}>{k}</div>
@@ -57960,7 +57961,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div role="menu" className="vrm-buy-menu" style={{background:C.card,border:`1px solid ${C.border}`,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.18)'}}>
                     {peutCode && <button type="button" role="menuitem" className="vrm-buy-menu-tel" style={item} onClick={()=>{ close(); openQrView(tk); }}><Icon name="key" size={15} style={{color:C.muted}}/>Code de retrait</button>}
                     {peutSuivre && <a role="menuitem" className="vrm-buy-menu-tel" href={trackUrl(tk.carrier||'', suivi)} target="_blank" rel="noreferrer" style={item} onClick={close}><Icon name="truck" size={15} style={{color:C.muted}}/>Suivre le colis</a>}
-                    {arrive && <button type="button" role="menuitem" data-copier-prix={prixPaye} style={item} onClick={async ()=>{ close(); try { await navigator.clipboard.writeText(prixPaye); toast(`Prix payé copié : ${prixPaye} € — colle-le au numérotage`); } catch(_) { toast('Copie impossible','error'); } }}><Icon name="cash" size={15} style={{color:C.muted}}/>Copier le prix payé (pour le numérotage)</button>}
+                    {arrive && <button type="button" role="menuitem" data-copier-prix={prixPaye} style={item} onClick={async ()=>{ close(); try { await navigator.clipboard.writeText(prixPaye); toast(`Prix payé copié : ${prixPaye}\u00a0€ — colle-le au numérotage`); } catch(_) { toast('Copie impossible','error'); } }}><Icon name="cash" size={15} style={{color:C.muted}}/>Copier le prix payé (pour le numérotage)</button>}
                     <button type="button" role="menuitem" style={item} onClick={()=>{ close(); setNoteEdit({tid,title:o.title,val:note}); }}><Icon name="doc" size={15} style={{color:C.muted}}/>{note?'Modifier la note interne':'Ajouter une note interne'}</button>
                     <button type="button" role="menuitem" style={item} onClick={()=>{ close(); if(rc){ setReceiptView(rc); } else generateAchatJustificatif(o,{ account:accNameOf(o._acc), regime:load('vinted_regime','micro'), numero:numA||'' }); }}><Icon name="receipt" size={15} style={{color:C.muted}}/>{rc?NOM_RECU_ACHAT:'Attestation d\'achat'}</button>
                     {rembourse && <button type="button" role="menuitem" style={item} onClick={()=>{ close(); generateRemboursementAttestation(o,{ account:accNameOf(o._acc) }); }}><Icon name="receipt" size={15} style={{color:C.muted}}/>Attestation de remboursement</button>}
@@ -58552,7 +58553,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div className="vrm-fiche-gestes" data-fiche-gestes="" data-fiche-gestes-n={num ? 2 : 1}>
                     {num
                       ? <button type="button" className="vrm-fiche-geste vrm-fiche-geste-prix" data-annonce-prix-partout={num} onClick={()=>{ try { window.dispatchEvent(new CustomEvent('vrm:prix-partout',{detail:String(num)})); } catch (_) {} }} style={geste}
-                          title={sugg!=null && sugg < Number(it.price) ? `Elle dort : ${sugg} € serait un prix plus juste (−15 %)` : 'Le prix de ce N° sur tous les sites où il est en ligne'}>
+                          title={sugg!=null && sugg < Number(it.price) ? `Elle dort : ${sugg}\u00a0€ serait un prix plus juste (−15\u00a0%)` : 'Le prix de ce N° sur tous les sites où il est en ligne'}>
                           Changer le prix{sugg!=null && sugg < Number(it.price) ? <span className="vrm-fiche-geste-sous" data-prix-conseille={sugg}>{montant(sugg)} conseillé</span> : null}</button>
                       : <a className="vrm-fiche-geste vrm-fiche-geste-prix" href={urlFiche ? `${urlFiche.replace(/\/$/,'')}/edit` : undefined} target="_blank" rel="noreferrer" data-annonce-prix-vinted="" style={geste}
                           title="Sans N°, le prix se change sur Vinted">Changer le prix ↗{sugg!=null && sugg < Number(it.price) ? <span className="vrm-fiche-geste-sous" data-prix-conseille={sugg}>{montant(sugg)} conseillé</span> : null}</a>}
@@ -58662,7 +58663,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <b style={{color:C.text,fontWeight:700}}>{annStats.n} en ligne sur Vinted</b>
             {annStats.aussiLbc>0?` · ${annStats.aussiLbc} aussi sur Leboncoin`:''}
             {annStats.boostees>0?` · ${annStats.boostees} boostée${annStats.boostees>1?'s':''}`:''}
-            {annStats.valConnus>0 ? <span data-ann-valeur={Math.round(annStats.val)} data-ann-valeur-sur={annStats.valConnus<annStats.n?annStats.valConnus:undefined}>{` · ${annStats.valConnus<annStats.n?'au moins ':''}${annStats.val.toFixed(0)} € de valeur${annStats.valConnus<annStats.n?` (prix lu sur ${annStats.valConnus})`:''}`}</span> : null}
+            {annStats.valConnus>0 ? <span data-ann-valeur={Math.round(annStats.val)} data-ann-valeur-sur={annStats.valConnus<annStats.n?annStats.valConnus:undefined}>{` · ${annStats.valConnus<annStats.n?'au moins ':''}${annStats.val.toFixed(0)}\u00a0€ de valeur${annStats.valConnus<annStats.n?` (prix lu sur ${annStats.valConnus})`:''}`}</span> : null}
             {annStats.hasFav?<> · <Icon name="heart" size={12} style={{verticalAlign:'-2px'}}/> {annStats.favs}</>:null}
             {annStats.hasView?<> · <Icon name="eye" size={12} style={{verticalAlign:'-2px'}}/> {annStats.views}</>:null}
             {annStats.pretLbc>0 && (annStats.aRecapturer===0 || annStats.prepaCommun==='prete') ? <span data-prepa-pretes={annStats.pretLbc}>{` · ✓ ${annStats.pretLbc} prêtes pour Leboncoin`}</span> : ''}
@@ -58672,7 +58673,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {/* ⚠️ « Toute l'annonce captée ? » — même base que la grille (§11). */}
             {annStats.aRecapturer>0 && <span data-prepa-resume={annStats.aRecapturer} data-prepa-commun={annStats.prepaCommun||''} title={`${annStats.pretLbc} article(s) ont TOUTES leurs photos + une description captées — prêts pour Leboncoin. ${annStats.aRecapturer} n'ont pas encore toutes leurs photos : tu n'as rien à rouvrir — passe simplement sur Vinted connecté sur leurs comptes (extension à jour) et l'extension les complète toute seule, quelques annonces par visite. Si l'une reste incomplète après plusieurs passages, rouvre-la pour forcer.`} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:12,padding:'4px 11px'}}>{annStats.aRecapturer} à recapturer pour Leboncoin</span>}
             {/* Une paire qui dort se rattrape : de l'ambre, jamais du rouge (§5.56). */}
-            {annStats.sleeping>0 && <button type="button" onClick={()=>setAnnSort('sleeping')} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:12,padding:'4px 11px',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:5}}><Icon name="sleep" size={13}/>{annStats.sleeping} qui dorment{annStats.sleepingVal>0?` · ${annStats.sleepingVal.toFixed(0)} €`:''}</button>}
+            {annStats.sleeping>0 && <button type="button" onClick={()=>setAnnSort('sleeping')} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:12,padding:'4px 11px',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:5}}><Icon name="sleep" size={13}/>{annStats.sleeping} qui dorment{annStats.sleepingVal>0?` · ${annStats.sleepingVal.toFixed(0)}\u00a0€`:''}</button>}
             <Bouton variante="secondaire" taille="petit" icone="spark" onClick={()=>setShowLister(true)} title="Prix conseillé + titre & description prêts à coller" style={{flexShrink:0}}>Aide à la vente</Bouton>
           </div>
           {/* ── CONSEILS ET SIGNALEMENTS : repliés ─────────────────────────
@@ -58798,7 +58799,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           ); })()}
           {annStats.sleeping>0 && annSort!=='sleeping' && (
             <div style={{fontSize:12,color:C.text,background:`${C.warn}10`,border:`1px solid ${C.warn}44`,borderRadius:12,padding:'8px 12px',marginBottom:10,lineHeight:1.4}}>
-              😴 {annStats.sleeping} article{annStats.sleeping>1?'s':''} en ligne depuis plus de {SLEEP_DAYS} jours{annStats.sleepingVal>0?<>, soit <b>{annStats.sleepingVal.toFixed(0)} € qui dorment</b></>:''} — pense à <b>baisser le prix</b> ou <b>republier</b>. <button type="button" onClick={()=>setAnnSort('sleeping')} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',padding:0,fontSize:12}}>Voir →</button>
+              😴 {annStats.sleeping} article{annStats.sleeping>1?'s':''} en ligne depuis plus de {SLEEP_DAYS} jours{annStats.sleepingVal>0?<>, soit <b>{annStats.sleepingVal.toFixed(0)}&nbsp;€ qui dorment</b></>:''} — pense à <b>baisser le prix</b> ou <b>republier</b>. <button type="button" onClick={()=>setAnnSort('sleeping')} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',padding:0,fontSize:12}}>Voir →</button>
               {annStats.datesKnown<annStats.n && <div style={{fontSize:11,color:C.muted,marginTop:3}}>Calculé sur les {annStats.datesKnown} annonce{annStats.datesKnown>1?'s':''} dont la date est connue (sur {annStats.n}).</div>}
             </div>
           )}
@@ -58855,22 +58856,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           {eb && eb.ambigu === 'numero' && <span data-reprice-ebay-ambigu="numero">eBay : ce N° est porté par plusieurs articles dans VRM — l'annonce eBay est peut-être l'autre, je n'y touche pas.</span>}
                           {eb && !eb.ambigu && (eb.fait && eb.fait.etat === 'ok'
                             ? (eb.fait.memo
-                              ? <span data-reprice-ebay="fait" data-reprice-ebay-memo="1">eBay : déjà baissé pour ce prix Vinted — <b style={{color:C.text}}>{eb.prixActuel} €</b> aujourd'hui ✓</span>
+                              ? <span data-reprice-ebay="fait" data-reprice-ebay-memo="1">eBay : déjà baissé pour ce prix Vinted — <b style={{color:C.text}}>{eb.prixActuel}&nbsp;€</b> aujourd'hui ✓</span>
                               : (eb.fait.regleMsg
-                                ? <span data-reprice-ebay="fait" data-reprice-ebay-regle-msg={eb.fait.regleTon === 'ok' && /^✓/.test(eb.fait.regleMsg) ? 'ok' : 'warn'} style={{color: eb.fait.regleTon === 'ok' && /^✓/.test(eb.fait.regleMsg) ? C.text : C.warn}}>eBay : baissé à <b>{eb.fait.prix} €</b> — {eb.fait.regleMsg}</span>
-                                : <span data-reprice-ebay="fait">eBay : baissé à <b style={{color:C.text}}>{eb.fait.prix} €</b> ✓</span>))
+                                ? <span data-reprice-ebay="fait" data-reprice-ebay-regle-msg={eb.fait.regleTon === 'ok' && /^✓/.test(eb.fait.regleMsg) ? 'ok' : 'warn'} style={{color: eb.fait.regleTon === 'ok' && /^✓/.test(eb.fait.regleMsg) ? C.text : C.warn}}>eBay : baissé à <b>{eb.fait.prix}&nbsp;€</b> — {eb.fait.regleMsg}</span>
+                                : <span data-reprice-ebay="fait">eBay : baissé à <b style={{color:C.text}}>{eb.fait.prix}&nbsp;€</b> ✓</span>))
                             : eb.bloqueRegle
-                              ? <span data-reprice-ebay-regle={eb.itemId} style={{color:C.warn}}>Aussi sur eBay à <b style={{color:C.text}}>{eb.prixActuel} €</b> — ta règle d'offre accepte dès {Number(eb.bloqueRegle.accepte).toFixed(2).replace('.', ',')} € : baisse-la ou retire-la d'abord (eBay → Annonces).</span>
+                              ? <span data-reprice-ebay-regle={eb.itemId} style={{color:C.warn}}>Aussi sur eBay à <b style={{color:C.text}}>{eb.prixActuel}&nbsp;€</b> — ta règle d'offre accepte dès {Number(eb.bloqueRegle.accepte).toFixed(2).replace('.', ',')}&nbsp;€ : baisse-la ou retire-la d'abord (eBay → Annonces).</span>
                             : eb.utile
                               ? <>
-                                  <span>Aussi sur eBay à <b style={{color:C.text}}>{eb.prixActuel} €</b></span>
+                                  <span>Aussi sur eBay à <b style={{color:C.text}}>{eb.prixActuel}&nbsp;€</b></span>
                                   <button type="button" data-reprice-ebay={eb.itemId} disabled={eb.fait && eb.fait.etat === 'envoi'} onClick={()=>baisserSurEbay(eb, rp)}
                                     style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,fontSize:11,fontWeight:600,padding:'4px 9px',borderRadius:12,cursor:'pointer',fontFamily:'inherit'}}>
-                                    {eb.fait && eb.fait.etat === 'envoi' ? 'Envoi…' : `Baisser sur eBay à ${eb.sugg} €`}
+                                    {eb.fait && eb.fait.etat === 'envoi' ? 'Envoi…' : `Baisser sur eBay à ${eb.sugg}\u00a0€`}
                                   </button>
                                   {eb.fait && (eb.fait.etat === 'ko' || eb.fait.etat === 'incertain') && <span data-reprice-ebay-issue={eb.fait.etat} style={{color:C.warn}}>{eb.fait.msg}{eb.fait.etat === 'incertain' && eb.url ? <> <a href={eb.url} target="_blank" rel="noreferrer" style={{color:C.accentTexte,fontWeight:600}}>Voir l'annonce eBay ↗</a></> : null}</span>}
                                 </>
-                              : <span>Aussi sur eBay à {eb.prixActuel} € (déjà au plus bas conseillé)</span>)}
+                              : <span>Aussi sur eBay à {eb.prixActuel}&nbsp;€ (déjà au plus bas conseillé)</span>)}
                           {surLbcAussi && <span>Aussi sur Leboncoin : baisse-la là-bas dans « Mes annonces ».</span>}
                         </div>
                       )}
@@ -60760,7 +60761,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <span style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{pickerFor.title}</span>
                 </div>
                 <div style={{fontSize:12,color:C.muted,marginTop:2}}>
-                  {[pickerFor.brand, pickerFor.size && `taille ${pickerFor.size}`, pickerFor.price!=null && `en vente ${eur(pickerFor.price).toFixed(2).replace('.',',')} €`].filter(Boolean).join(' · ')}
+                  {[pickerFor.brand, pickerFor.size && `taille ${pickerFor.size}`, pickerFor.price!=null && `en vente ${eur(pickerFor.price).toFixed(2).replace('.',',')}\u00a0€`].filter(Boolean).join(' · ')}
                 </div>
               </div>
               <button type="button" onClick={()=>setPickerFor(null)} aria-label="Fermer" style={{flexShrink:0,border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer'}}>×</button>
@@ -60911,7 +60912,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <StatBox label="Bénéfice estimé" value={inc ?? fmtE(annual.benefNet)} color={inc ? C.muted : annual.benefNet>=0?INV_STATUS.online.color:C.danger}
                     subColor={annual.nbCout<annual.nb?C.warn:undefined}
                     sub={inc ? undefined : annual.nbCout<annual.nb?`sur ${annual.nbCout} vente${annual.nbCout>1?'s':''} sur ${annual.nb} — prix d'achat manquants`:(annual.frais>0?`frais renseignés ${fmtE(annual.frais)}`:undefined)}/>
-                  <StatBox label="Cotisations est." value={inc ?? fmtE(annual.urssaf)} color={inc ? C.muted : C.warn} sub={inc === '—' ? 'attend tes ventes Vinted' : `${String(annual.taux).replace('.',',')} % du CA · réglable`}/>
+                  <StatBox label="Cotisations est." value={inc ?? fmtE(annual.urssaf)} color={inc ? C.muted : C.warn} sub={inc === '—' ? 'attend tes ventes Vinted' : `${String(annual.taux).replace('.',',')}\u00a0% du CA · réglable`}/>
                 </>)}
                 {annual.charges && annual.charges.total>0 && (<>
                   <StatBox label="Charges d'entreprise" value={fmtE(annual.charges.total)} sub={(annual.charges.fixesTotal>0?`packs + dépenses + abonnements + fixes × ${annual.charges.moisComptes} mois`:'packs + dépenses + abonnements')}/>
@@ -60950,9 +60951,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     );})}
                     <tr style={{borderTop:`2px solid ${C.border}`,color:C.text,textAlign:'right',fontWeight:700}}>
                       <td style={{textAlign:'left',padding:'6px'}}>TOTAL</td>
-                      <td style={{padding:'6px'}}>{annual.enCours ? '…' : (annual.vinted === 'passu' && !annual.nb) ? '—' : `${annual.ca.toFixed(0)} €`}</td>
-                      <td style={{padding:'6px'}}>{annual.cout.toFixed(0)} €</td>
-                      <td style={{padding:'6px',color:annual.benefNet>=0?INV_STATUS.online.color:C.danger}}>{(annual.benefNet>=0?'+':'')+annual.benefNet.toFixed(0)} €</td>
+                      <td style={{padding:'6px'}}>{annual.enCours ? '…' : (annual.vinted === 'passu' && !annual.nb) ? '—' : `${annual.ca.toFixed(0)}\u00a0€`}</td>
+                      <td style={{padding:'6px'}}>{annual.cout.toFixed(0)}&nbsp;€</td>
+                      <td style={{padding:'6px',color:annual.benefNet>=0?INV_STATUS.online.color:C.danger}}>{(annual.benefNet>=0?'+':'')+annual.benefNet.toFixed(0)}&nbsp;€</td>
                       <td style={{padding:'6px'}}>{annual.nb}</td>
                     </tr>
                   </tbody>
@@ -60969,7 +60970,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div style={{fontSize:12,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{b.title||'—'}</div>
                       <div style={{fontSize:11,color:C.muted}}>{b.date?new Date(b.date).toLocaleDateString('fr-FR'):''}{b.seller?` · ${b.seller}`:''}</div>
                     </div>
-                    <div style={{fontSize:13,fontWeight:600,color:C.text,flexShrink:0}}>{b.montant.toFixed(2)} €</div>
+                    <div style={{fontSize:13,fontWeight:600,color:C.text,flexShrink:0}}>{b.montant.toFixed(2)}&nbsp;€</div>
                     <button className="vrm-icon-control" type="button" onClick={()=>generateAchatJustificatif(b.o,{ account:accNameOf(b.o._acc), regime:annual.regime, numero:buyNumByTxn[String(b.o.transaction_id)]||'' })} title="Reçu d'achat PDF" aria-label="Justificatif d'achat" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:12,background:'transparent',color:C.text,cursor:'pointer',fontSize:12,padding:'3px 8px'}}><Icon name="doc" size={16}/></button>
                   </div>
                 ))}
@@ -61024,7 +61025,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <MicDictee onText={(t)=>setListQ(t)} titre="Dicter le modèle"/>
                 <input value={listSize} onChange={e=>setListSize(e.target.value)} placeholder="Pointure" inputMode="decimal"
                   style={{flex:'1 1 80px',border:`1px solid ${C.border}`,borderRadius:12,padding:'9px 12px',fontSize:15,fontFamily:'inherit',background:C.card,color:C.text,outline:'none'}}/>
-                <input value={listBuy} onChange={e=>setListBuy(e.target.value)} placeholder="Prix d'achat €" inputMode="decimal"
+                <input value={listBuy} onChange={e=>setListBuy(e.target.value)} placeholder="Prix d'achat&nbsp;€" inputMode="decimal"
                   style={{flex:'1 1 90px',border:`1px solid ${C.border}`,borderRadius:12,padding:'9px 12px',fontSize:15,fontFamily:'inherit',background:C.card,color:C.text,outline:'none'}}/>
               </div>
               {!lister ? (
@@ -61035,21 +61036,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {lister.reco!=null ? (<>
                     <div style={{fontSize:11,color:C.muted,fontWeight:500,textTransform:'uppercase',letterSpacing:0.4}}>Prix conseillé</div>
                     <div style={{display:'flex',alignItems:'baseline',gap:10,flexWrap:'wrap'}}>
-                      <div style={{fontSize:34,fontWeight:700,color:C.accentTexte,lineHeight:1.1}}>{lister.reco} €</div>
-                      {lister.lo!=null && lister.hi!=null && lister.hi!==lister.lo && <div style={{fontSize:12,color:C.muted}}>fourchette {lister.lo}–{lister.hi} €</div>}
+                      <div style={{fontSize:34,fontWeight:700,color:C.accentTexte,lineHeight:1.1}}>{lister.reco}&nbsp;€</div>
+                      {lister.lo!=null && lister.hi!=null && lister.hi!==lister.lo && <div style={{fontSize:12,color:C.muted}}>fourchette {lister.lo}–{lister.hi}&nbsp;€</div>}
                     </div>
                     <div style={{fontSize:11,color:C.muted,marginTop:5,lineHeight:1.45}}>
                       {lister.soldNb>0
-                        ? <>Basé sur <b>{lister.soldNb}</b> vente{lister.soldNb>1?'s':''} identique{lister.soldNb>1?'s':''} chez toi (médiane {lister.soldMed} €){lister.joursMoy!=null?<> · vendues en <b>{lister.joursMoy.toFixed(0)} j</b> en moyenne</>:''}.</>
+                        ? <>Basé sur <b>{lister.soldNb}</b> vente{lister.soldNb>1?'s':''} identique{lister.soldNb>1?'s':''} chez toi (médiane {lister.soldMed}&nbsp;€){lister.joursMoy!=null?<> · vendues en <b>{lister.joursMoy.toFixed(0)} j</b> en moyenne</>:''}.</>
                         : lister.onlineNb>0
-                          ? <>Aucune vente passée : basé sur <b>{lister.onlineNb}</b> de tes annonces en ligne (médiane {lister.onlineMed} €).</>
+                          ? <>Aucune vente passée : basé sur <b>{lister.onlineNb}</b> de tes annonces en ligne (médiane {lister.onlineMed}&nbsp;€).</>
                           : <>Pas d'historique pour ce modèle — prix calé sur ta marge minimale.</>}
-                      {lister.bumped && <> <span style={{color:C.warn,fontWeight:500}}>Relevé à ton plancher de marge ({lister.floor} €).</span></>}
+                      {lister.bumped && <> <span style={{color:C.warn,fontWeight:500}}>Relevé à ton plancher de marge ({lister.floor}&nbsp;€).</span></>}
                     </div>
                     {lister.margin!=null && (
                       <div style={{marginTop:8,fontSize:13,fontWeight:600,color:lister.margin>0?C.accent:C.danger}}>
-                        {lister.margin>0?`≈ +${Math.round(lister.margin)} € de marge brute`:`⚠️ ${Math.round(lister.margin)} € : sous ton prix d'achat`}
-                        <span style={{color:C.muted,fontWeight:600}}> (achat {Math.round(parseFloat(String(listBuy).replace(',','.')))} €, hors boost)</span>
+                        {lister.margin>0?`≈ +${Math.round(lister.margin)}\u00a0€ de marge brute`:`⚠️ ${Math.round(lister.margin)}\u00a0€ : sous ton prix d'achat`}
+                        <span style={{color:C.muted,fontWeight:600}}> (achat {Math.round(parseFloat(String(listBuy).replace(',','.')))}&nbsp;€, hors boost)</span>
                       </div>
                     )}
                   </>) : (
@@ -61111,7 +61112,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         : <span style={{flexShrink:0,width:34,height:34,borderRadius:12,background:C.border,display:'flex',alignItems:'center',justifyContent:'center',fontSize:15}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
                       <span style={{flexShrink:0,minWidth:30,height:30,borderRadius:12,background:num?C.accent:C.border,color:num?C.onAccent:C.muted,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:700,padding:'0 5px'}}>{num?`#${num}`:'—'}</span>
                       <span style={{flex:'1 1 120px',minWidth:0,fontSize:13,fontWeight:500,color:C.text,overflow:'hidden',textOverflow:'ellipsis'}}>{it.title}{it.size?<span style={{color:C.muted,fontWeight:400}}> · {it.size}</span>:''}</span>
-                      {it.price!=null && <span style={{fontSize:12,fontWeight:600,color:C.muted}}>{Number(it.price).toFixed(0)} €</span>}
+                      {it.price!=null && <span style={{fontSize:12,fontWeight:600,color:C.muted}}>{Number(it.price).toFixed(0)}&nbsp;€</span>}
                     </div>
                   );
                 })}
@@ -61141,7 +61142,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:checker?10:0}}>
                   <input value={srcQuery} onChange={e=>setSrcQuery(e.target.value)} placeholder="Modèle (ex : gel-lyte, spezial…)"
                     style={{flex:'2 1 160px',border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 11px',fontSize:13,fontFamily:'inherit',background:C.bg,color:C.text,outline:'none'}}/>
-                  <input value={srcPrice} onChange={e=>setSrcPrice(e.target.value)} placeholder="Prix demandé €" inputMode="decimal"
+                  <input value={srcPrice} onChange={e=>setSrcPrice(e.target.value)} placeholder="Prix demandé&nbsp;€" inputMode="decimal"
                     style={{flex:'1 1 90px',border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 11px',fontSize:13,fontFamily:'inherit',background:C.bg,color:C.text,outline:'none'}}/>
                 </div>
                 {checker && (checker.nb===0 ? (
@@ -61160,7 +61161,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {checker.estBenef!=null && (
                       <div style={{border:`1.5px solid ${okCol}`,background:`${okCol}14`,borderRadius:12,padding:'9px 12px'}}>
                         <div style={{fontSize:13,fontWeight:700,color:okCol}}>
-                          {ok==='go'?'🟢 Fonce':ok==='mid'?'🟡 Négocie':'🔴 Laisse'} — bénéfice estimé {checker.estBenef>=0?'+':''}{checker.estBenef.toFixed(0)} €
+                          {ok==='go'?'🟢 Fonce':ok==='mid'?'🟡 Négocie':'🔴 Laisse'} — bénéfice estimé {checker.estBenef>=0?'+':''}{checker.estBenef.toFixed(0)}&nbsp;€
                         </div>
                         <div style={{fontSize:11,color:C.muted,marginTop:3}}>Prix de vente moyen {fmtE(checker.avgSell)} − prix demandé {fmtE(checker.price)} (hors boost/frais).</div>
                       </div>
@@ -61187,7 +61188,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                               <div style={{fontSize:11,color:C.muted}}>{r.nb} vendue{r.nb>1?'s':''} · CA {fmtE(r.ca)}{r.joursMoy!=null?` · ${r.joursMoy.toFixed(0)} j en moy.`:''}</div>
                             </div>
                             <div style={{textAlign:'right',flexShrink:0}}>
-                              <div style={{fontSize:15,fontWeight:700,color:r.benefMoy==null?C.muted:(r.benefMoy>=0?INV_STATUS.online.color:C.danger)}}>{r.benefMoy==null?'—':`${r.benefMoy>=0?'+':''}${r.benefMoy.toFixed(0)} €`}</div>
+                              <div style={{fontSize:15,fontWeight:700,color:r.benefMoy==null?C.muted:(r.benefMoy>=0?INV_STATUS.online.color:C.danger)}}>{r.benefMoy==null?'—':`${r.benefMoy>=0?'+':''}${r.benefMoy.toFixed(0)}\u00a0€`}</div>
                               <div style={{fontSize:11,color:C.muted}}>{r.benefMoy==null?'achat inconnu':'bénéf./article'}</div>
                             </div>
                           </div>
@@ -61221,7 +61222,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {/* ARGENT RÉELLEMENT REÇU */}
               <div style={{border:`1px solid #16a34a55`,background:'#16a34a10',borderRadius:12,padding:'13px 15px',marginBottom:11}}>
                 <div style={{fontSize:12,color:'#16a34a',fontWeight:600,textTransform:'uppercase',letterSpacing:0.5}}>✅ Reçu dans le porte-monnaie</div>
-                <div style={{fontSize:34,fontWeight:700,color:C.text,margin:'3px 0',lineHeight:1}}>{Math.round(treasury.recu)} €</div>
+                <div style={{fontSize:34,fontWeight:700,color:C.text,margin:'3px 0',lineHeight:1}}>{Math.round(treasury.recu)}&nbsp;€</div>
                 <div style={{fontSize:12,color:C.muted}}>{treasury.nRecu} vente{treasury.nRecu>1?'s':''} finalisée{treasury.nRecu>1?'s':''} — argent crédité sur ton solde Vinted. <b>Ne compte pas</b> tes virements vers ta banque.</div>
               </div>
               {/* EN ATTENTE = somme des porte-monnaie Vinted (escrow réel si capté,
@@ -61229,7 +61230,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {(()=>{ const useEscrow = walletEscrow && walletEscrow.total>0; const val = useEscrow ? walletEscrow.total : treasury.attente; return (
               <div style={{border:`1px solid ${C.warn}55`,background:`${C.warn}10`,borderRadius:12,padding:'13px 15px',marginBottom:11}}>
                 <div style={{fontSize:12,color:C.warn,fontWeight:600,textTransform:'uppercase',letterSpacing:0.5}}>⏳ En attente (porte-monnaie Vinted)</div>
-                <div style={{fontSize:34,fontWeight:700,color:C.text,margin:'3px 0',lineHeight:1}}>{Math.round(val)} €</div>
+                <div style={{fontSize:34,fontWeight:700,color:C.text,margin:'3px 0',lineHeight:1}}>{Math.round(val)}&nbsp;€</div>
                 <div style={{fontSize:12,color:C.muted}}>{useEscrow ? <>Solde <b>en attente</b> réel, additionné sur {walletEscrow.accounts} porte-monnaie{walletEscrow.plusVieuxJours>1?<> — dont un lu il y a <b>{walletEscrow.plusVieuxJours} j</b>, repasse dessus pour le montant du jour</>:null}.</> : <>Somme de tes {treasury.nAttente} vente{treasury.nAttente>1?'s':''} en cours (bloquées par Vinted). <span style={{opacity:0.85}}>Ouvre ton porte-monnaie Vinted sur chaque compte pour le solde exact.</span></>}</div>
               </div>
               ); })()}
@@ -61252,7 +61253,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {/* DÉPENSÉ */}
               <div style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'13px 15px',marginBottom:11}}>
                 <div style={{fontSize:12,color:C.muted,fontWeight:600,textTransform:'uppercase',letterSpacing:0.5}}>🛒 Argent dépensé (tous comptes)</div>
-                <div style={{fontSize:28,fontWeight:700,color:C.text,margin:'3px 0',lineHeight:1}}>{buys.items===null && offBuys.length===0 ? '…' : `${Math.round(treasury.spent)} €`}</div>
+                <div style={{fontSize:28,fontWeight:700,color:C.text,margin:'3px 0',lineHeight:1}}>{buys.items===null && offBuys.length===0 ? '…' : `${Math.round(treasury.spent)}\u00a0€`}</div>
                 <div style={{fontSize:12,color:C.muted}}>{treasury.nSpent} achat{treasury.nSpent>1?'s':''} (Vinted + hors Vinted){buys.items===null?' · chargement…':''}</div>
               </div>
               <div className="vrm-aide" style={{fontSize:11,color:C.muted,lineHeight:1.5}}>Basé sur le statut Vinted de chaque commande (fiable, se met à jour tout seul).</div>
@@ -61274,7 +61275,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
               <div style={{display:'flex',alignItems:'center',gap:10}}>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:20,fontWeight:600,color:C.text,letterSpacing:'-0.02em'}}>Prix d'achat à compléter {fillBuyRows.length>0 && <Pourquoi label="Pourquoi c'est important">Tant qu'un coût manque, la vente compte comme 100 % de marge : ton bénéfice et ton rapport comptable sont faussés.</Pourquoi>}</div>
+                  <div style={{fontSize:20,fontWeight:600,color:C.text,letterSpacing:'-0.02em'}}>Prix d'achat à compléter {fillBuyRows.length>0 && <Pourquoi label="Pourquoi c'est important">Tant qu'un coût manque, la vente compte comme 100&nbsp;% de marge : ton bénéfice et ton rapport comptable sont faussés.</Pourquoi>}</div>
                 </div>
                 <button className="vrm-icon-control" type="button" onClick={()=>setFillBuyOpen(false)} aria-label="Fermer" style={{flexShrink:0,border:'none',background:'transparent',color:C.muted,cursor:'pointer',padding:4}}><Icon name="close" size={18}/></button>
               </div>
@@ -61314,7 +61315,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div style={{fontSize:11,color:C.muted,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
                       {/* Montants au format français (virgule) : `eur` ne fait que
                           convertir en nombre, il ne met pas en forme. */}
-                      {r.nVentes>0 ? `vendue ${r.nVentes>1?r.nVentes+' fois · ':''}${r.ca.toFixed(2).replace('.',',')} €` : r.enLigne ? `en ligne${r.e.price!=null?` · ${eur(r.e.price).toFixed(2).replace('.',',')} €`:''}` : 'plus en ligne'}
+                      {r.nVentes>0 ? `vendue ${r.nVentes>1?r.nVentes+' fois · ':''}${r.ca.toFixed(2).replace('.',',')}\u00a0€` : r.enLigne ? `en ligne${r.e.price!=null?` · ${eur(r.e.price).toFixed(2).replace('.',',')}\u00a0€`:''}` : 'plus en ligne'}
                     </div>
                   </div>
                   <div style={{flexShrink:0,display:'flex',alignItems:'center',gap:3,border:`1px solid ${C.border}`,borderRadius:12,padding:'2px 6px',background:C.bg,width:96}}>
@@ -61347,7 +61348,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                              <span style={{flex:1,minWidth:0}}>
                                <span style={{display:'block',fontSize:11,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.title||'(sans titre)'}</span>
                                <span style={{display:'block',fontSize:11,color:C.muted}}>
-                                 {pr!=null?`payé ${pr.toFixed(2).replace('.',',')} €`:'prix inconnu'}{d&&!isNaN(d)?` · ${d.toLocaleDateString('fr-FR')}`:''}{p._acc?` · ${accNameOf(p._acc)}`:''}
+                                 {pr!=null?`payé ${pr.toFixed(2).replace('.',',')}\u00a0€`:'prix inconnu'}{d&&!isNaN(d)?` · ${d.toLocaleDateString('fr-FR')}`:''}{p._acc?` · ${accNameOf(p._acc)}`:''}
                                </span>
                              </span>
                              <span style={{flexShrink:0,fontSize:11,fontWeight:700,color:sur?C.accent:C.muted,border:`1px solid ${sur?C.accent:C.border}`,borderRadius:12,padding:'3px 9px'}}>{sur?"C'est ça":'à vérifier'}</span>
@@ -61395,7 +61396,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
                           <span style={{color:C.accentTexte,fontWeight:700}}>N°{e.numero}</span> {e.title}
                         </div>
-                        {e.price!=null&&e.price!==''&&<div style={{fontSize:11,color:C.muted,marginTop:1}}>{eur(e.price).toFixed(2).replace('.',',')} €</div>}
+                        {e.price!=null&&e.price!==''&&<div style={{fontSize:11,color:C.muted,marginTop:1}}>{eur(e.price).toFixed(2).replace('.',',')}&nbsp;€</div>}
                       </div>
                       <button type="button" onClick={()=>redigerIA({...e,id})} disabled={repubAi.busy&&actif}
                         style={{flexShrink:0,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accentTexte,borderRadius:12,padding:'8px 12px',fontSize:13,fontWeight:700,cursor:repubAi.busy&&actif?'default':'pointer',fontFamily:'inherit',opacity:repubAi.busy&&actif?0.6:1}}>
@@ -61517,7 +61518,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <StatBox label="Bénéfice estimé" value={report.enCours?'…':report.nbCout===0?'—':fmtE(report.benefNet)} color={report.nbCout===0||report.benefNet>=0?C.text:C.danger}
                     subColor={report.nbCout<report.nb?C.warn:undefined}
                     sub={report.nbCout===0&&report.nb>0?`aucun prix d'achat saisi pour ${report.nb>1?'ces':'cette'} ${report.nb} vente${report.nb>1?'s':''}`:report.nbCout<report.nb?`sur ${report.nbCout} vente${report.nbCout>1?'s':''} sur ${report.nb} — prix d'achat manquants`:(report.frais>0?`frais renseignés ${fmtE(report.frais)}`:undefined)}/>
-                  <StatBox label="Cotisations est." value={inc ?? fmtE(report.urssaf)} sub={inc === '—' ? 'attend tes ventes Vinted' : `${String(report.taux).replace('.',',')} % du CA · réglable`}/>
+                  <StatBox label="Cotisations est." value={inc ?? fmtE(report.urssaf)} sub={inc === '—' ? 'attend tes ventes Vinted' : `${String(report.taux).replace('.',',')}\u00a0% du CA · réglable`}/>
                 </>)}
               </div>); })()}
               {/* ⚠️ Les ventes masquées à l'écran COMPTENT dans le CA déclaré.
@@ -61716,7 +61717,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div style={{fontSize:12,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{b.title||'—'}</div>
                       <div style={{fontSize:11,color:C.muted}}>{b.date?new Date(b.date).toLocaleDateString('fr-FR'):''}{b.seller?` · ${b.seller}`:''}</div>
                     </div>
-                    <div style={{fontSize:13,fontWeight:600,color:C.text,flexShrink:0}}>{b.montant.toFixed(2)} €</div>
+                    <div style={{fontSize:13,fontWeight:600,color:C.text,flexShrink:0}}>{b.montant.toFixed(2)}&nbsp;€</div>
                     <button className="vrm-icon-control" type="button" onClick={()=>generateAchatJustificatif(b.o,{ account:accNameOf(b.o._acc), regime:report.regime })} title="Reçu d'achat PDF" aria-label="Justificatif d'achat" style={{flexShrink:0,border:`1px solid ${C.border}`,borderRadius:12,background:'transparent',color:C.text,cursor:'pointer',fontSize:12,padding:'3px 8px'}}><Icon name="doc" size={16}/></button>
                   </div>
                 ))}
@@ -61817,7 +61818,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {/* ── Wrapped du vendeur : histoire plein écran façon Spotify Wrapped ── */}
       {showWrapped && (()=>{
         const w = wrapped;
-        const eur0 = n => `${Math.round(n).toLocaleString('fr-FR')} €`;
+        const eur0 = n => `${Math.round(n).toLocaleString('fr-FR')}\u00a0€`;
         // On ne garde QUE les cartes qui ont une donnée réelle (pas d'invention).
         // (31 oct., Vitrine) Plus de dégradés multicolores ni de violet : chaque
         // carte est un APLAT — l'encre de Vitrine, et le cobalt (la seule couleur
@@ -62004,12 +62005,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div style={{display:'flex',gap:10,padding:'12px 16px',flexShrink:0}}>
               <div style={{flex:1,border:`1px solid ${C.danger}44`,background:`${C.danger}0e`,borderRadius:12,padding:'10px 12px'}}>
                 <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500}}>Manque à gagner</div>
-                <div style={{fontSize:22,fontWeight:700,color:C.danger}}>−{Math.round(disputes.totalLost)} €</div>
+                <div style={{fontSize:22,fontWeight:700,color:C.danger}}>−{Math.round(disputes.totalLost)}&nbsp;€</div>
                 <div style={{fontSize:11,color:C.muted}}>{disputes.salesLost.length} vente{disputes.salesLost.length>1?'s':''} perdue{disputes.salesLost.length>1?'s':''}</div>
               </div>
               <div style={{flex:1,border:`1px solid ${INV_STATUS.online.color}44`,background:`${INV_STATUS.online.color}0e`,borderRadius:12,padding:'10px 12px'}}>
                 <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500}}>Récupéré (achats)</div>
-                <div style={{fontSize:22,fontWeight:700,color:INV_STATUS.online.color}}>+{Math.round(disputes.totalBack)} €</div>
+                <div style={{fontSize:22,fontWeight:700,color:INV_STATUS.online.color}}>+{Math.round(disputes.totalBack)}&nbsp;€</div>
                 <div style={{fontSize:11,color:C.muted}}>{disputes.buysBack.length} achat{disputes.buysBack.length>1?'s':''} remboursé{disputes.buysBack.length>1?'s':''}</div>
               </div>
             </div>
@@ -62018,14 +62019,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {disputes.salesLost.map((x,i)=>(
                 <div key={'s'+i} style={{display:'flex',gap:8,alignItems:'center',padding:'7px 0',borderBottom:`1px solid ${C.border}`}}>
                   <div style={{flex:1,minWidth:0}}><div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{x.title}</div><div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{[x.date?new Date(x.date).toLocaleDateString('fr-FR'):'', x.status].filter(Boolean).join(' · ')}</div></div>
-                  <div style={{flexShrink:0,fontSize:13,fontWeight:700,color:C.danger}}>−{Math.round(x.amount)} €</div>
+                  <div style={{flexShrink:0,fontSize:13,fontWeight:700,color:C.danger}}>−{Math.round(x.amount)}&nbsp;€</div>
                 </div>
               ))}
               {disputes.buysBack.length>0 && <div style={{fontSize:12,fontWeight:700,color:INV_STATUS.online.color,margin:'14px 0 6px'}}>↩️ Achats remboursés</div>}
               {disputes.buysBack.map((x,i)=>(
                 <div key={'b'+i} style={{display:'flex',gap:8,alignItems:'center',padding:'7px 0',borderBottom:`1px solid ${C.border}`}}>
                   <div style={{flex:1,minWidth:0}}><div style={{fontSize:13,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{x.title}</div><div style={{fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{[x.date?new Date(x.date).toLocaleDateString('fr-FR'):'', x.status].filter(Boolean).join(' · ')}</div></div>
-                  <div style={{flexShrink:0,fontSize:13,fontWeight:700,color:INV_STATUS.online.color}}>+{Math.round(x.amount)} €</div>
+                  <div style={{flexShrink:0,fontSize:13,fontWeight:700,color:INV_STATUS.online.color}}>+{Math.round(x.amount)}&nbsp;€</div>
                 </div>
               ))}
               {disputes.salesLost.length===0 && disputes.buysBack.length===0 && <div style={{fontSize:13,color:C.muted,textAlign:'center',padding:'24px 0'}}>Aucun litige — nickel ! 👌</div>}
@@ -62260,7 +62261,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <button key={id} type="button" onClick={()=>setLotMode(id)} style={{border:`1px solid ${lotMode===id?C.accent:C.border}`,background:lotMode===id?C.accent:'transparent',color:lotMode===id?'#fff':C.text,borderRadius:12,padding:'6px 11px',fontSize:12,fontWeight:600,cursor:'pointer'}}>{lb}</button>
                 ))}
               </div>
-              <div style={{fontSize:12,color:nSel&&total>0?INV_STATUS.online.color:C.muted,fontWeight:600,marginTop:8}}>{nSel} article{nSel>1?'s':''} sélectionné{nSel>1?'s':''}{nSel&&total>0?` · ${(total/nSel).toFixed(2).replace('.',',')} € en moyenne`:''}</div>
+              <div style={{fontSize:12,color:nSel&&total>0?INV_STATUS.online.color:C.muted,fontWeight:600,marginTop:8}}>{nSel} article{nSel>1?'s':''} sélectionné{nSel>1?'s':''}{nSel&&total>0?` · ${(total/nSel).toFixed(2).replace('.',',')}\u00a0€ en moyenne`:''}</div>
               <input value={lotSearch} onChange={e=>setLotSearch(e.target.value)} placeholder="Chercher une annonce (N°, titre, marque)…" style={{marginTop:8,width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 12px',fontSize:13,background:C.card,color:C.text,outline:'none',fontFamily:'inherit'}}/>
             </div>
             <div style={{flex:1,overflow:'auto',padding:10,display:'flex',flexDirection:'column',gap:6}}>
@@ -62272,13 +62273,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div style={{width:20,height:20,borderRadius:6,flexShrink:0,border:`1.5px solid ${sel?C.accent:C.border}`,background:sel?C.accent:'transparent',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:700}}>{sel?'✓':''}</div>
                   <div style={{width:38,height:38,borderRadius:12,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{it.photo?<PhotoVinted src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}</div>
                   <div style={{flex:1,minWidth:0}}><div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{num?`N°${num} · `:''}{it.title}</div><div style={{fontSize:11,color:C.muted}}>{[it.size,prix(it.price,it.currency)||null].filter(Boolean).join(' · ')}</div></div>
-                  {sel && sh!=null && <div style={{flexShrink:0,fontSize:13,fontWeight:700,color:INV_STATUS.online.color}}>{sh.toFixed(2).replace('.',',')} €</div>}
+                  {sel && sh!=null && <div style={{flexShrink:0,fontSize:13,fontWeight:700,color:INV_STATUS.online.color}}>{sh.toFixed(2).replace('.',',')}&nbsp;€</div>}
                 </button>
                 );
               })}
             </div>
             <div style={{flexShrink:0,padding:'12px 16px',borderTop:`1px solid ${C.border}`,display:'flex',gap:10,alignItems:'center'}}>
-              <div style={{flex:1,fontSize:12,color:C.muted}}>{nSel>0&&total>0?`Total réparti : ${total.toFixed(2).replace('.',',')} €`:'Renseigne le prix du lot et coche les articles.'}</div>
+              <div style={{flex:1,fontSize:12,color:C.muted}}>{nSel>0&&total>0?`Total réparti : ${total.toFixed(2).replace('.',',')}\u00a0€`:'Renseigne le prix du lot et coche les articles.'}</div>
               <button type="button" disabled={!(nSel>0&&total>0)} onClick={applyLot} style={{border:'none',borderRadius:12,padding:'11px 18px',background:(nSel>0&&total>0)?C.accent:C.border,color:'#fff',fontSize:15,fontWeight:600,cursor:(nSel>0&&total>0)?'pointer':'default',fontFamily:'inherit'}}>Appliquer</button>
             </div>
           </div>
@@ -63782,7 +63783,7 @@ function LbcRelier({ ad, numsConnus, onRelie, suggestions, detail, vendue = fals
         <div style={{ flex: '1 1 150px', minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ad.subject || ad.title || '—'}</div>
           <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
-            {detail || (ad.price != null && isFinite(Number(ad.price)) ? `${Number(ad.price).toFixed(2).replace('.', ',')} €` : '')}{ad.customRef ? ` · réf ${ad.customRef}` : ''}
+            {detail || (ad.price != null && isFinite(Number(ad.price)) ? `${Number(ad.price).toFixed(2).replace('.', ',')}\u00a0€` : '')}{ad.customRef ? ` · réf ${ad.customRef}` : ''}
             {ad.url ? <> · <a href={ad.url} target="_blank" rel="noreferrer" className="vrm-lien-touche" style={{ color: C.accentTexte, fontWeight: 600 }}>voir</a></> : null}
           </div>
           {msg && <div style={{ fontSize: 12, color: C.warn, marginTop: 3 }}>{msg}</div>}
@@ -63931,7 +63932,7 @@ function RepublierLeboncoin({ liste, exclues, onClose, onFini }) {
   const invalides = fiches.filter(({ f }) => !f.v.ok);
   const sansFiche = !saitFiche && fiches.some(({ f }) => f.change);
   const dateCourte = (iso) => { const t = Date.parse(iso || ''); return isNaN(t) ? '' : new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }); };
-  const euro = (n) => (n == null ? '—' : `${Number(n).toFixed(2).replace('.', ',').replace(/,00$/, '')} €`);
+  const euro = (n) => (n == null ? '—' : `${Number(n).toFixed(2).replace('.', ',').replace(/,00$/, '')}\u00a0€`);
   const poser = (id, etat, texte) => setSt((p) => ({ ...p, [id]: { etat, texte } }));
   const lancer = async () => {
     if (mode === 'run' || !fiches.length || bloqueExt || invalides.length || sansFiche) return;
@@ -64896,7 +64897,7 @@ function LeboncoinScreen() {
   const [pauseRes, setPauseRes] = useState([]);
   const mettreEnPause = async (r) => {
     if (pauseEnVol || !r || !r.id) return;
-    const prix = r.prix != null ? ` · ${Number(r.prix).toFixed(2).replace('.', ',').replace(/,00$/, '')} €` : '';
+    const prix = r.prix != null ? ` · ${Number(r.prix).toFixed(2).replace('.', ',').replace(/,00$/, '')}\u00a0€` : '';
     const ok = await askConfirm({
       title: `Mettre en pause « ${r.title || 'cette annonce'} » sur Leboncoin ?`,
       desc: `N°${r.numero}${prix} — vendue sur Vinted.\n\nElle ne sera plus visible sur Leboncoin. Ce n'est pas une suppression : tu pourras la remettre en ligne depuis « Mes annonces » sur Leboncoin.\n\nL'extension l'envoie depuis ta session Leboncoin, sur le compte de cette annonce.`,
@@ -64927,7 +64928,7 @@ function LeboncoinScreen() {
   const [supprRes, setSupprRes] = useState([]);
   const supprimerSurLbc = async (r) => {
     if (pauseEnVol || !r || !r.id) return;
-    const prix = r.prix != null && isFinite(Number(r.prix)) && Number(r.prix) > 0 ? ` · ${Number(r.prix).toFixed(2).replace('.', ',').replace(/,00$/, '')} €` : '';
+    const prix = r.prix != null && isFinite(Number(r.prix)) && Number(r.prix) > 0 ? ` · ${Number(r.prix).toFixed(2).replace('.', ',').replace(/,00$/, '')}\u00a0€` : '';
     const ok = await askConfirm({
       title: `Supprimer « ${r.title || 'cette annonce'} » de Leboncoin ?`,
       desc: `${r.numero ? `N°${r.numero}` : 'Annonce Leboncoin'}${prix}${r.pourquoi ? ` — ${r.pourquoi}` : ''}.\n\nC'est sans retour : l'annonce disparaît de Leboncoin, avec ses favoris et ses statistiques. Pour la remettre, il faudra la republier.\n\nL'extension l'envoie depuis ta session Leboncoin, sur le compte de cette annonce.`,
@@ -65385,7 +65386,7 @@ function LeboncoinScreen() {
               <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>C'est Leboncoin qui le dit dans ton espace pro : ces annonces sortent mal. Baisse le prix, améliore le titre/les photos, ou passe une option de visibilité.</div>
               {flagged.slice(0, 20).map((a, i) => (
                 <div key={i} style={{ fontSize: 13, color: C.text, padding: '3px 0' }}>
-                  {a.subject || '—'}{a.price != null && isFinite(Number(a.price)) ? ` · ${Number(a.price).toFixed(2).replace('.', ',')} €` : ''} · <span style={{ color: C.warn, fontWeight: 700 }}>{a.issue === 'LowVisibility' ? 'peu visible' : a.issue}</span>
+                  {a.subject || '—'}{a.price != null && isFinite(Number(a.price)) ? ` · ${Number(a.price).toFixed(2).replace('.', ',')}\u00a0€` : ''} · <span style={{ color: C.warn, fontWeight: 700 }}>{a.issue === 'LowVisibility' ? 'peu visible' : a.issue}</span>
                   {a.url ? <> · <a href={a.url} target="_blank" rel="noreferrer" style={{ color: C.blue || C.accent, fontWeight: 700 }}>voir</a></> : null}
                 </div>
               ))}
@@ -66724,13 +66725,17 @@ const applyZoom = (z) => {
     // et on la redivise, ce qui compose les zooms à chaque appel.
     d.style.zoom = ''; d.style.minWidth = '';
     d.style.setProperty('--vrm-zoom', '1');
-    const f = parseFloat(z);
+    // Le texte en grand de l'APPAREIL (src/grandTexte.js) multiplie la densité choisie.
+    const g = echelleTexte(); marquerGrandTexte(g);
+    let f = parseFloat(z) || 1;
     // Un téléphone garde sa largeur réelle et des commandes lisibles, même
     // lorsqu'un ancien réglage « Minus » est encore enregistré sur l'appareil.
     const telephone = window.matchMedia('(max-width: 767px)').matches;
-    if (f && f !== 1 && !(telephone && f < 1)) {
+    if (telephone && f < 1) f = 1;
+    f = Math.round(f * g * 100) / 100;
+    if (f && f !== 1) {
       const w = d.clientWidth;              // largeur réelle, zoom retiré
-      d.style.zoom = z;
+      d.style.zoom = String(f);
       d.style.setProperty('--vrm-zoom', String(f));
       d.style.minWidth = Math.round(w / f) + 'px';
     }
@@ -66830,8 +66835,8 @@ async function ouvrirStripe(mode, extra) {
 // des CGV (le serveur ne le relaie alors pas, api/compte.js `prixConforme`).
 // audit-lancement.cjs exige que ce soit la même valeur que les CGV et que le
 // serveur (`PRIX_CGV`) : 12,99 € depuis le 11 octobre (décision de Julien).
-const PRIX_CGV_LISIBLE = '16,99 € / mois';
-const prixLisible = (p) => p ? `${Number(p.montant).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € / ${p.intervalle === 'year' ? 'an' : 'mois'}` : PRIX_CGV_LISIBLE;
+const PRIX_CGV_LISIBLE = '16,99\u00a0€ / mois';
+const prixLisible = (p) => p ? `${Number(p.montant).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\u00a0€ / ${p.intervalle === 'year' ? 'an' : 'mois'}` : PRIX_CGV_LISIBLE;
 const dateLisible = (iso) => { try { return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (_) { return ''; } };
 
 // MES FACTURES ET MA CARTE — trois états : `undefined` en cours · `null` pas su
@@ -66858,7 +66863,7 @@ async function choisirResiliation(reprendre) {
 const montantLisible = (n, devise) => {
   if (!Number.isFinite(Number(n))) return '—';
   try { return Number(n).toLocaleString('fr-FR', { style: 'currency', currency: String(devise || 'eur').toUpperCase() }); }
-  catch (_) { return `${Number(n).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`; }
+  catch (_) { return `${Number(n).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\u00a0€`; }
 };
 const STATUT_FACTURE = { paid: 'Payée', open: 'À payer', void: 'Annulée', uncollectible: 'Impayée' };
 // Seuls les liens de Stripe s'ouvrent depuis la liste (le serveur filtre déjà ;
@@ -68529,12 +68534,12 @@ function ReglagesStream() {
   const motPhoto = regles.marques[0] || regles.contient[0] || (regles.prefixes[0] ? regles.prefixes[0] + 'ina' : 'Marque');
   const photosEx = [`${motPhoto} Air Max 90 · taille 42`, 'Autre paire · taille 41'];
   const lignes = [
-    `${marque} Air Max 90 · taille 42 · 89,00 €`,
+    `${marque} Air Max 90 · taille 42 · 89,00\u00a0€`,
     'Vendue sur ton_compte à acheteur_exemple',
     '8 rue de l’Exemple, 00000 Ville-Test · 06 00 00 00 00',
     'IBAN FR76 3000 6000 0112 3456 7890 189',
-    ...(regles.prefixes[0] ? [`${regles.prefixes[0]}ina Runner · 54,00 €`] : []),
-    ...(regles.contient[0] ? [`${regles.contient[0]} édition limitée · 120,00 €`] : []),
+    ...(regles.prefixes[0] ? [`${regles.prefixes[0]}ina Runner · 54,00\u00a0€`] : []),
+    ...(regles.contient[0] ? [`${regles.contient[0]} édition limitée · 120,00\u00a0€`] : []),
     ...(essai.trim() ? [essai] : []),
   ];
   return (
@@ -70139,7 +70144,7 @@ function RegimeSetting({ nu = false }) {
               onChange={e=>setTxUrs(e.target.value)}
               onBlur={()=>{ const v=parseFloat(String(txUrs).replace(',','.')); const ok=(isFinite(v)&&v>=0&&v<=50)?v:TAUX_URSSAF_DEFAUT; const avant=Number(load('vinted_urssaf_taux', TAUX_URSSAF_DEFAUT)); setTxUrs(virgule(ok)); save('vinted_urssaf_taux', ok);
                 // (1er nov.) Le taux s'enregistrait sans rien dire ; un taux illisible retombait au défaut en silence.
-                if (ok !== v) toast(`Taux illisible : ${virgule(ok)} % gardé`, 'error'); else if (ok !== avant) toast(`✓ Taux enregistré : ${virgule(ok)} %`); }}
+                if (ok !== v) toast(`Taux illisible : ${virgule(ok)}\u00a0% gardé`, 'error'); else if (ok !== avant) toast(`✓ Taux enregistré : ${virgule(ok)}\u00a0%`); }}
               style={{width:70,border:`1px solid ${C.border}`,borderRadius:12,padding:'5px 8px',fontSize:13,fontWeight:600,background:C.bg,color:C.text,outline:'none'}}/>
             <span style={{fontSize:12,color:C.muted}}>% du CA</span>
           </div>

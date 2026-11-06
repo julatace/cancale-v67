@@ -15,7 +15,7 @@ import { nomPlateforme } from './plateformes.js';
 import './styles-annonces-outils.css';
 import './styles-publier-ailleurs.css';
 
-const eur = (n) => (n == null ? '—' : `${(Math.round(n * 100) / 100).toFixed(Number.isInteger(n) ? 0 : 2).replace('.', ',')} €`);
+const eur = (n) => (n == null ? '—' : `${(Math.round(n * 100) / 100).toFixed(Number.isInteger(n) ? 0 : 2).replace('.', ',')}\u00a0€`);
 const MAX_TITRE = { leboncoin: TITRE_MAX.lbc, ebay: TITRE_MAX.ebay, vestiaire: null };
 const VERBE = { leboncoin: 'Publier sur Leboncoin', ebay: 'Préparer sur eBay', vestiaire: 'Publier sur Vestiaire' };
 

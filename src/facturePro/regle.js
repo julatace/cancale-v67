@@ -154,7 +154,7 @@ export const numeroFacture = (prefixe, annee, n, type = 'facture') =>
 export const euros = (c) => {
   const neg = c < 0; const a = Math.abs(Math.round(c));
   const e = String(Math.floor(a / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-  return `${neg ? '-' : ''}${e},${String(a % 100).padStart(2, '0')} €`;
+  return `${neg ? '-' : ''}${e},${String(a % 100).padStart(2, '0')}\u00a0€`;
 };
 const pad = (n) => String(n).padStart(2, '0');
 // Une date « jj/mm/aaaa » à l'heure de Paris (une vente à 23 h 30 le 31 ne
@@ -186,7 +186,7 @@ export function contenuFacture(cfg, vente, { numero, emiseLe, type = 'facture', 
   // « EI » accolé au nom pour un entrepreneur individuel (sauf s'il y est déjà).
   const nomAffiche = forme === 'EI' && !/(^|\s)(EI|Entrepreneur individuel)(\s|$)/i.test(nomVendeur) ? `${nomVendeur} EI` : nomVendeur;
   const legal = [];
-  if (forme && forme !== 'EI') legal.push(`${forme}${txt(c.capital) ? ` au capital de ${txt(c.capital).replace(/\s*€?$/, '')} €` : ''}`);
+  if (forme && forme !== 'EI') legal.push(`${forme}${txt(c.capital) ? ` au capital de ${txt(c.capital).replace(/\s*€?$/, '')}\u00a0€` : ''}`);
   legal.push(s.siret ? `SIRET ${s.siret.replace(/(\d{3})(\d{3})(\d{3})(\d{5})/, '$1 $2 $3 $4')}` : `SIREN ${s.siren.replace(/(\d{3})(\d{3})(\d{3})/, '$1 $2 $3')}`);
   if (txt(c.rcs)) legal.push(txt(c.rcs));
   if (tvaIntraValide(c.tva)) legal.push(`TVA ${String(c.tva).replace(/\s/g, '').toUpperCase()}`);

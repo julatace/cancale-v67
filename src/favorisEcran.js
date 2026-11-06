@@ -223,9 +223,9 @@ export function enteteGroupe(g){
 export function resumeOffre(reglages){
   const m=reglages?.offreMode,v=reglages?.offreValeur,p=reglages?.pourcentage;
   const nb=x=>String(x).replace('.',',');
-  if(m==='pct'&&p)return `Avec une offre à −${p} %${reglages.arrondi?', arrondie à l’euro':''}.`;
-  if(m==='euros'&&v)return `Avec une offre à −${nb(v)} €${reglages.arrondi?', arrondie à l’euro':''}.`;
-  if(m==='prix'&&v)return `Avec une offre à ${nb(v)} €.`;
+  if(m==='pct'&&p)return `Avec une offre à −${p}\u00a0%${reglages.arrondi?', arrondie à l’euro':''}.`;
+  if(m==='euros'&&v)return `Avec une offre à −${nb(v)}\u00a0€${reglages.arrondi?', arrondie à l’euro':''}.`;
+  if(m==='prix'&&v)return `Avec une offre à ${nb(v)}\u00a0€.`;
   return 'Sans offre de prix.';
 }
 
@@ -368,7 +368,7 @@ export function apercuMessageFavori({message='',offre=null,exemple=null,personna
     const apres=Number.isFinite(prix)&&prix>0?prixOffre(prix,offre):null;
     const eur=x=>Number(x).toFixed(2).replace('.',',').replace(/,00$/,'')+' €';
     if(apres)offreTxt=`${eur(prix)} → ${eur(apres)}`;
-    else if(offre.mode==='pct')offreTxt=`Offre −${offre.valeur} %`;
+    else if(offre.mode==='pct')offreTxt=`Offre −${offre.valeur}\u00a0%`;
     else if(offre.mode==='euros')offreTxt=`Offre −${eur(offre.valeur)}`;
     else offreTxt=`Offre à ${eur(offre.arrondi?Math.floor(offre.valeur):offre.valeur)}`;
   }
