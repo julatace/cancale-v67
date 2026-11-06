@@ -342,32 +342,40 @@ class Film {
   // UNE COUPE : la base change (le temps a passé dans l'histoire), une seconde app
   // se charge derrière la première, puis le fondu enchaîné. L'horloge avance
   // pendant le chargement sans qu'aucune image ne soit tournée.
-  async coupe(modifier, { tab, fondu = 0.5, attente = 2.5 } = {}) {
+  async coupe(modifier, { tab, fondu = 0.5, attente = 2.5, oublier = false } = {}) {
+    // 1. L'image de l'app est figée (une capture posée par-dessus, dans l'écran) et
+    //    l'ancienne app est ARRÊTÉE : deux apps vivantes sur le même stockage se
+    //    réécrivaient l'une l'autre (la case libérée revenait).
+    const png = await (await this.pg.$('#app')).screenshot({ type: 'png' });
+    await this.pg.evaluate((b64) => {
+      const f = document.getElementById('app'); const im = document.createElement('img');
+      im.id = 'gel'; im.src = 'data:image/png;base64,' + b64;
+      im.style.cssText = `position:absolute;left:${f.offsetLeft}px;top:${f.offsetTop}px;width:${f.offsetWidth}px;height:${f.offsetHeight}px;z-index:2`;
+      f.after(im); f.src = 'about:blank';
+    }, png.toString('base64'));
+    await this.pg.waitForTimeout(200);
     if (modifier) modifier(this.monde);
-    // `tab` peut être une liste : les premiers écrans s'ouvrent dans l'app cachée (ils publient).
+    // Un autre jour : l'appareil n'a gardé que la session (le reste se relit dans la base).
+    if (oublier) await this.pg.evaluate(() => { const garder = ['vrm_session', 'vrm_local_owner', 'vinted_dark', 'vrm_bienvenue_vue', 'vrm_visite_vue']; for (const k of Object.keys(localStorage)) if (!garder.includes(k)) localStorage.removeItem(k); });
+    // 2. La nouvelle app se charge dessous (les premiers écrans d'une liste publient).
     const tabs = Array.isArray(tab) ? tab : [tab || this.tab];
-    for (let n = 0; n < tabs.length; n++) {
-      await this.pg.evaluate(([src, premier]) => {
-        if (premier) { const a = document.getElementById('app'); const b = a.cloneNode(false); b.id = 'app-suite'; b.style.opacity = '0'; b.src = src; a.after(b); }
-        else document.getElementById('app-suite').src = src;
-      }, [`/?tab=${tabs[n]}`, n === 0]);
+    for (const t of tabs) {
+      await this.pg.evaluate((src) => { document.getElementById('app').src = src; }, `/?tab=${t}`);
       await this.pg.waitForTimeout(300);
       const fin = Date.now() + 30000;
       for (;;) {
         await this.pg.clock.runFor(100); await this.pg.waitForTimeout(40);
-        const ok = await this.pg.evaluate(() => { const d = document.getElementById('app-suite').contentDocument; return !!(d && d.readyState === 'complete' && d.querySelector('.vrm-main')); });
+        const ok = await this.pg.evaluate(() => { const d = document.getElementById('app').contentDocument; return !!(d && d.readyState === 'complete' && d.querySelector('.vrm-main')); });
         if (ok || Date.now() > fin) break;
       }
       for (let k = 0; k < attente * 10; k++) { await this.pg.clock.runFor(100); await this.pg.waitForTimeout(60); }
     }
-    const nouvelle = await (await this.pg.$('#app-suite')).contentFrame();
-    const ancienne = this._app;
-    this._app = nouvelle;
-    const n = Math.max(1, Math.round(fondu * IPS));
-    for (let k = 1; k <= n; k++) { await this.pg.evaluate((o) => { document.getElementById('app-suite').style.opacity = String(o); }, EASE.doux(k / n)); await this.image(); }
-    await this.pg.evaluate(() => { document.getElementById('app').remove(); const b = document.getElementById('app-suite'); b.id = 'app'; });
-    void ancienne;
+    this._app = await (await this.pg.$('#app')).contentFrame();
     await this.teinte();
+    // 3. Le fondu enchaîné.
+    const n = Math.max(1, Math.round(fondu * IPS));
+    for (let k = 1; k <= n; k++) { await this.pg.evaluate((o) => { document.getElementById('gel').style.opacity = String(o); }, 1 - EASE.doux(k / n)); await this.image(); }
+    await this.pg.evaluate(() => document.getElementById('gel').remove());
   }
   async attendreReel(ms) { await this.pg.waitForTimeout(ms); }
   // La couleur de la barre d'état et du bas suit l'app (clair ou sombre).

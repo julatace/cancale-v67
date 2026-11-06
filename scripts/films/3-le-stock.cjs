@@ -1,9 +1,9 @@
 // FILM 3 — « Le Stock » (Julien : un motion design pour expliquer le Stock à qui
 // découvre) : chaque paire a sa case → une paire arrive, on la range → vendue,
 // sa case s'allume → le colis part, la case se libère toute seule.
-// Tourné dans la VRAIE app (dist/), données inventées (_monde.cjs). La coupe
-// « le colis est parti » recharge l'app sur la même base où la vente N°24 est
-// passée « en cours d'acheminement » : c'est l'app qui libère la case.
+// Tourné dans la VRAIE app (dist/), données inventées (_monde.cjs). Le colis de
+// N°24 est déjà parti dans la base servie (« en cours d'acheminement ») : c'est
+// l'app qui a libéré sa case et le dit (« Cases libérées toutes seules »).
 //   FILMS_SORTIE=/dossier node scripts/films/3-le-stock.cjs   (FORMATS=portrait,paysage)
 'use strict';
 const { tourner } = require('./_commun.cjs');
@@ -38,23 +38,21 @@ async function scenario(f) {
   await f.jouer(2.4); f.cle('allumee');
   // Le colis part : la case se libère toute seule.
   f.repos_(0.6); await f.jouer(0.5);
-  f.titre('Le colis part :', { sous: 'la case se libère toute seule.', duree: 4.6 });
-  await f.coupe((m) => {
-    // La même base, le colis de N°24 parti ; la ligne `main` écrite par l'app est gardée.
-    const suite = monde({ partis: ['81002'] });
-    const main = m.lignes.find((l) => l.id === 'main');
-    m.lignes = suite.lignes.map((l) => (l.id === 'main' ? main : l));
-  }, { tab: ['annonces', 'garage'], fondu: 0.6 });
+  f.titre('Le colis part :', { sous: 'sa case se libère toute seule.', duree: 6.2 });
   await f.defilerVers('[data-stock-sortis-meubles]', { marge: 90, dur: 1.0 });
-  await f.viser('[data-stock-sortis-meubles]', { zoom: P ? 1.4 : 1.05, dur: 1.0 });
-  await f.jouer(1.8); f.cle('liberee');
+  await f.viser('[data-stock-sortis-meubles]', { zoom: P ? 1.38 : 1.05, dur: 1.0 });
+  await f.jouer(1.6); f.cle('liberee');
+  // La case vide, à sa place sur l'étagère.
+  await f.defilerVers('[data-meuble="m1"]', { marge: 70, dur: 1.0 });
+  await f.viser('[data-case-ici="m1:11"]', { zoom: P ? 1.6 : 1.12, zmax: 1.6, dur: 0.9 });
+  await f.jouer(1.2);
   f.repos_(0.8); await f.jouer(0.4);
   await f.fin('Le Stock : chaque paire à sa place.', 3.0);
 }
 
 if (require.main === module) {
   // Annonces d'abord (hors tournage) : c'est l'écran qui publie les preuves de vente que le Stock lit.
-  tourner('le-stock', scenario, { formats: ['portrait', 'paysage'], monde, tab: ['annonces', 'garage'] })
+  tourner('le-stock', scenario, { formats: ['portrait', 'paysage'], monde: () => monde({ partis: ['81002'] }), tab: ['annonces', 'garage'] })
     .catch((e) => { console.error(e); process.exitCode = 1; });
 }
 module.exports = { scenario };

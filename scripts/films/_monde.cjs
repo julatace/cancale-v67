@@ -156,7 +156,8 @@ function monde({ partis = [] } = {}) {
   } });
   for (const u of U) {
     lignes.push({ id: `harvest_${u}_listings`, data: { capturedAt: ilYaH(0.15), nItems: parCompte[u].length, payload: { items: parCompte[u], pagination: null } } });
-    lignes.push({ id: `harvest_${u}_orders_sold`, data: { capturedAt: ilYaH(0.15), payload: { my_orders: ventes[u] } } });
+    // Une lecture plus récente quand le temps a passé (sinon l'app garde sa copie : même date de capture).
+    lignes.push({ id: `harvest_${u}_orders_sold`, data: { capturedAt: partis.length ? iso(T0) : ilYaH(0.15), payload: { my_orders: ventes[u] } } });
   }
   lignes.push({ id: `harvest_${U[0]}_orders_purchased`, data: { capturedAt: ilYaH(0.15), payload: { my_orders: achats } } });
   lignes.push(...txns);
