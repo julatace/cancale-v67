@@ -147,6 +147,10 @@ const cartes = (pg) => pg.evaluate(() => [...document.querySelectorAll('[data-jo
         const { ctx, pg, errs } = await preparer(b, vp, sombre);
         await essaie('Ma journée', async () => {
           await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
+          // L'écran attend ses données essentielles derrière son squelette (AttenteEcran) : les cartes y sont
+          // montées mais cachées (innerText vide). On juge l'écran MONTRÉ.
+          // (Juste après domcontentloaded, l'attente n'est pas encore montée : on attend qu'elle SOIT là et ouverte.)
+          await pg.waitForFunction(() => !!document.querySelector('[data-attente]:not([data-attente="attente"])') && !document.getElementById('vrm-demarrage'), null, { timeout: 15000 }).catch(() => {});
           for (let i = 0; i < 40; i++) { if ((await cartes(pg)).length >= 3) break; await pg.waitForTimeout(250); }
           await pg.waitForTimeout(600);
           const c = await cartes(pg);
