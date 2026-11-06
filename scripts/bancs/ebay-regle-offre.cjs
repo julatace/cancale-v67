@@ -321,7 +321,8 @@ async function ouvrir(b, vp, c) {
   });
   return { ctx, pg: avecFeuilleReglages(pg), errs };
 }
-const feuille = (pg) => pg.locator('div[style*="z-index: 2000"]');
+// (6 nov.) La confirmation se pose PAR-DESSUS la feuille « Règle d’offre » (même plan, 2000) : c’est la DERNIÈRE ouverte.
+const feuille = (pg) => pg.locator('div[style*="z-index: 2000"]').last();
 // (31 oct., soir) Plus d'espace eBay à part : « Annonces » / « Ventes » sont les
 // tâches filtrées sur eBay (onglet de la navigation, puis la pastille eBay si le
 // filtre retenu est un autre site) ; « Compte » est le panneau « Comptes eBay »

@@ -159,7 +159,7 @@ button.vrm-notice-zone:focus-visible { outline: 2px solid var(--vrm-accent, #007
 .vrm-main .vrm-day-layout .vrm-day-task { border-left-width: 1px !important; }
 
 /* ══ Colis : une grille d'espacement unique ════════════════════════════════ */
-.vrm-main .vrm-rpf-section { margin-top: var(--vrm-entre-sections) !important; }
+.vrm-main .vrm-rpf-section { margin-top: 28px !important; } /* 28 + la marge d’une alerte (12) ≤ 40 : banc colis-retirer-propre, 20–40 px */
 .vrm-main .vrm-rpf-section-titre { margin: 0 4px 12px !important; }
 .vrm-main .vrm-rpf-puces { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
 .vrm-main .vrm-rpf-puce { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
