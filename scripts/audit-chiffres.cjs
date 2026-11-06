@@ -149,12 +149,39 @@ nBenef === 2 ? ok('Rapports mensuel ET annuel : bénéfice sur le coût connu')
   // (src/argentAVenir.js) ; « En attente » est devenu « À venir ». La règle
   // reste : le disponible est dans la MÊME carte que l'argent à venir, sous un
   // AUTRE mot, et c'est bien `dispo` (le chiffre de Vinted) qui s'y écrit.
+  // (6 nov., v36) Chantier E1 : la carte passe par `carteArgentJournee`
+  // (src/journeeArgent.js) — elle s'affiche dès qu'UN des deux montants est connu et
+  // non nul, et la moitié « À virer » écrit `K.virer.valeur`. On juge la MÊME règle sur
+  // cette forme : (a) `escrowJ` est le porte-monnaie LU (`walletEscrow`), passé tel
+  // quel ; (b) la règle EXÉCUTÉE rend le `dispo` de Vinted (281,94 €) à côté de
+  // l'argent à venir, dans la même carte, et « pas lu » reste `null` (jamais 0) ;
+  // (c) la carte écrit `K.virer.valeur` dans sa moitié « virer », à côté de « venir ».
   let i = app.indexOf('escrow && escrow.dispo > 0');
   if (i < 0) i = app.indexOf('escrowJ && escrowJ.dispo > 0');
-  const F = i < 0 ? '' : app.slice(i, i + 2400); // la carte s'est allongée (en-tête « À venir » + sites)
-  const avant = i < 0 ? '' : app.slice(Math.max(0, i - 1600), i + 1600);
+  let F = i < 0 ? '' : app.slice(i, i + 2400); // la carte s'est allongée (en-tête « À venir » + sites)
+  let avant = i < 0 ? '' : app.slice(Math.max(0, i - 1600), i + 1600);
+  let virableOk = false;
+  const iK = app.indexOf('carteArgentJournee({ aVenir: aVenirJ, aVirer: escrowJ');
+  if (i < 0 && iK >= 0) {
+    const fin = app.indexOf('})() : null;', iK);
+    F = fin < 0 ? '' : app.slice(iK, fin); avant = F;
+    const lu = /const escrowJ\s*=\s*\(walletEscrow\s*&&\s*walletEscrow\.accounts\s*>\s*0\)\s*\?\s*walletEscrow\s*:\s*null/.test(app.slice(Math.max(0, iK - 2000), iK));
+    let regle = false;
+    try {
+      const srcK = fs.readFileSync(path.join(__dirname, '..', 'src/journeeArgent.js'), 'utf8').replace(/^export\s+/gm, '');
+      const carte = new Function(srcK + '\nreturn carteArgentJournee;')();
+      const deux = carte({ aVenir: { valeur: 2235.80 }, aVirer: { dispo: 281.94, accounts: 9 } });
+      const seul = carte({ aVenir: { valeur: 0 }, aVirer: { dispo: 281.94, accounts: 9 } });
+      const passu = carte({ aVenir: { valeur: 2235.80 }, aVirer: null });
+      regle = !!deux && deux.montrerVenir && deux.montrerVirer && deux.virer.valeur === 281.94 && deux.venir.valeur === 2235.80
+        && !!seul && seul.montrerVirer && seul.virer.valeur === 281.94
+        && !!passu && passu.virer.valeur === null;
+    } catch (_) { regle = false; }
+    const moities = /data-argent-moitie="venir"/.test(F) && /data-argent-moitie="virer"[\s\S]*<Montant v=\{K\.virer\.valeur\b/.test(F);
+    virableOk = lu && regle && moities;
+  }
   const motAttente = (/<Icon name="wallet"[^>]*\/>\s*(À venir|En attente)\s*</.exec(F) || [])[1];
-  (F && (/déjà disponibles à virer/.test(F) || /<Montant v=\{escrowJ?\.dispo\b/.test(F)))
+  (F && (/déjà disponibles à virer/.test(F) || /<Montant v=\{escrowJ?\.dispo\b/.test(F) || virableOk))
     ? ok('l\'accueil dit l\'argent déjà disponible à virer')
     : nok('l\'argent virable doit apparaître à côté de l\'argent en attente');
   // ⚠️ « en attente » et « disponible » ne se confondent JAMAIS (§5.14).
@@ -232,8 +259,34 @@ nBenef === 2 ? ok('Rapports mensuel ET annuel : bénéfice sur le coût connu')
   // survit à un aller-retour (useVueSession) : elle ne se remet à 60 que si un
   // filtre CHANGE. La règle jugée est la même : le TOTAL est écrit, et changer
   // de filtre ou chercher repart du haut.
+  // (6 nov., v36) Chantier E2 : « Afficher les 120 suivantes · 60/287 » est devenu
+  // « Afficher les 120 suivantes · encore 107 après » (« la suivante » au singulier).
+  // On juge la RÈGLE en RENDANT le texte du bouton (287 ventes, 60 affichées ; puis
+  // 65 et 61) : soit il écrit le total, soit les nombres qu'il écrit couvrent EXACTEMENT
+  // ce qui n'est pas encore dessiné (120 + 107 = 227) — rien n'est caché.
+  const boutonVentes = (() => {
+    const i = app.indexOf('{ventesAffichees.length > ventesMax && (');
+    if (i < 0) return null;
+    const j = app.indexOf('<Bouton', i), k = app.indexOf('</Bouton>', i);
+    if (j < 0 || k < 0) return null;
+    const jsx = app.slice(j, k + '</Bouton>'.length);
+    // Le JSX lu par Babel : le texte reste, chaque {expr} est évaluée.
+    let el; try { el = require('@babel/parser').parseExpression(jsx, { plugins: ['jsx'] }); } catch (_) { return null; }
+    const morceaux = el.children.map((c) => c.type === 'JSXText' ? (() => c.value)
+      : c.type === 'JSXExpressionContainer' ? new Function('ventesAffichees', 'ventesMax', 'return (' + jsx.slice(c.expression.start, c.expression.end) + ');')
+      : (() => { throw new Error('élément'); }));
+    return (va, vm) => morceaux.map((f) => f(va, vm)).join('');
+  })();
+  const rendBien = (total, montre) => {
+    if (!boutonVentes) return false;
+    let t = ''; try { t = boutonVentes(new Array(total), montre); } catch (_) { return false; }
+    const nb = (t.replace(/\s+/g, ' ').match(/\d+/g) || []).map(Number);
+    if (/la suivante/.test(t)) nb.push(1);
+    return nb.includes(total) || nb.reduce((s, x) => s + x, 0) === total - montre;
+  };
   (/Voir plus — \{ventesMax\} affichées sur \{ventesAffichees\.length\}/.test(app)
-    || /Afficher les \{Math\.min\(120,ventesAffichees\.length-ventesMax\)\} suivantes · \{ventesMax\}\/\{ventesAffichees\.length\}/.test(app))
+    || /Afficher les \{Math\.min\(120,ventesAffichees\.length-ventesMax\)\} suivantes · \{ventesMax\}\/\{ventesAffichees\.length\}/.test(app)
+    || (rendBien(287, 60) && rendBien(65, 60) && rendBien(61, 60)))
     ? ok('le bouton « Voir plus » porte le total — rien n\'est caché')
     : nok('le bouton doit dire combien de ventes existent en tout');
   // ⚠️ Une recherche doit repartir du haut, sinon « 240 affichées » resterait

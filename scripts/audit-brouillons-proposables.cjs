@@ -12,7 +12,9 @@
 //   · enregistré il y a peu (vu par l'extension), sans lecture plus récente ⇒ prouvé ;
 //   · contenu pas prêt ⇒ « pas-pret » ;
 // et que l'app BRANCHE cette règle (§11, une règle) : `_place` décide du bouton
-// « Mettre en ligne » de « Voir mes brouillons », du compte « prêts » du menu et
+// « Mettre en ligne » de « Voir mes brouillons », de son compte « prêts » (le menu
+// « Republier et brouillons » est retiré depuis le chantier C), de ce que nomme la
+// feuille « Actions » et
 // du blocage des lignes de l'atelier « Brouillons → en ligne ».
 //   node scripts/audit-brouillons-proposables.cjs              la règle du dépôt
 //   node scripts/audit-brouillons-proposables.cjs --prouve     chaque mutation doit rougir
@@ -32,6 +34,9 @@ const MUTATIONS = {
   'pret-ignore': ["  if (b.etat !== 'pret') return { place: 'pas-pret' };\n", ''],
   'app-bouton': ['{proposable && complet && brouillonOk && (!e', '{complet && brouillonOk && (!e'],
   'app-atelier': ["bloque: b._place==='proposable' ? ''", "bloque: b._etat==='pret' ? ''"],
+  // (6 nov., v36) le compte « prêts » de « Voir mes brouillons » (le menu est retiré).
+  'app-compte-prets': ["const nPrets = liste ? liste.filter((b) => b._place === 'proposable').length", "const nPrets = liste ? liste.filter((b) => b._etat === 'pret').length"],
+  'app-actions-tait': ["if (a.etat === 'brouillon' && a.place && a.place !== 'proposable' && a.place !== 'autre-compte'", "if (a.etat === 'brouillon' && a.place && a.place === 'proposable' && a.place !== 'autre-compte'"],
   'app-hors-compte': ["    ? toutes.map((a) => (String(a.uid || '') === compteUid || a.bloque) ? a : {", "    ? toutes.filter((a) => String(a.uid || '') === compteUid).map((a) => (String(a.uid || '') === compteUid || a.bloque) ? a : {"],
 };
 const arg = process.argv.slice(2);
@@ -122,7 +127,23 @@ if (arg.includes('--prouve')) {
   dit(/\{proposable && complet && brouillonOk && \(!e/.test(sansCom), '« Voir mes brouillons » : « Mettre en ligne » seulement pour un brouillon proposable');
   dit(/bloque: b\._place==='proposable' \? ''/.test(sansCom), 'atelier « Brouillons → en ligne » : seul un brouillon proposable se coche');
   dit(/action === 'enLigne'\s*\n?\s*\? toutes\.map\(/.test(sansCom), 'atelier : les brouillons des autres comptes sont MONTRÉS (grisés), pas cachés');
-  dit(/filter\(b=>b\._place==='proposable'\)/.test(sansCom), 'le menu compte les brouillons PROPOSABLES, pas seulement « prêts »');
+  // (6 nov., v36) Le chantier C a RETIRÉ la feuille « Republier et brouillons » (son
+  // « N prêts à mettre en ligne sur M brouillons ») : « Republier… » mène à
+  // « Sélectionner », puis à la feuille « Actions ». La RÈGLE reste : là où l'app compte
+  // ou annonce des brouillons « à mettre en ligne », c'est `_place === 'proposable'` qui
+  // compte, jamais l'état du contenu (`_etat === 'pret'`). Formes actuelles :
+  //   · « Voir mes brouillons » : le compte `nPrets` (qui ouvre « En mettre plusieurs en
+  //     ligne… ») filtre les PROPOSABLES ;
+  //   · « Actions » d'une sélection : un brouillon du compte ouvert mais pas proposable
+  //     est NOMMÉ parmi ce qui manque (« Brouillon à vérifier sur Vinted », « incomplet »).
+  //   · nulle part un compte de brouillons sur `_etat === 'pret'`.
+  const menuRetire = !/t:'Brouillons → en ligne'/.test(sansCom);
+  const ancienMenu = /filter\(b=>b\._place==='proposable'\)/.test(sansCom);
+  const nPretsOk = /const nPrets = liste \? liste\.filter\(\(?b\)? *=> *b\._place *=== *'proposable'\)\.length/.test(sansCom) && /nPrets > 1 && onFile/.test(sansCom);
+  const actionsNomme = /a\.etat === 'brouillon' && a\.place && a\.place !== 'proposable'[^\n]*pbs\.unshift\(\{ code: 'brouillon'/.test(sansCom);
+  const compteSurEtat = /\.filter\(\(?\w+\)? *=> *\w+\._etat *={2,3} *'pret'\)/.test(sansCom);
+  dit((ancienMenu || (menuRetire && nPretsOk && actionsNomme)) && !compteSurEtat, 'le menu compte les brouillons PROPOSABLES, pas seulement « prêts »',
+    { menuRetire, ancienMenu, nPretsOk, actionsNomme, compteSurEtat });
   dit(/data-brouillon-pseudo/.test(sansCom), 'chaque brouillon écrit son compte');
   dit(!/lu >= at \+ SUPPR_MARGE_MS/.test(sansCom), 'plus de disparition jugée sur une lecture quelconque (publique ou partielle)');
 

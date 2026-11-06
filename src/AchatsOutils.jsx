@@ -311,7 +311,7 @@ function FeuilleFournisseurs({ f, fichesLibres, onFermer, Retour, Photo }) {
                 <ul className="vrm-aso-liste" data-fo-rattachables={f.rattachables.length}>
                   {f.rattachables.map((b) => (
                     <li key={b.id} className="vrm-aso-ligne is-choix">
-                      <button type="button" className="vrm-aso-choisir vrm-fo-ouvrir" data-fo-rattacher={b.id} onClick={() => { f.actions.rattacher(b.id, ligne.id); setVue({ v: 'fiche', id: ligne.id }); }}>
+                      <button type="button" className="vrm-aso-choisir vrm-fo-ouvrir" data-fo-rattacher={b.id} aria-label={`Rattacher l’achat « ${b.titre || 'Sans titre'} » à ce fournisseur`} onClick={() => { f.actions.rattacher(b.id, ligne.id); setVue({ v: 'fiche', id: ligne.id }); }}>
                         <LigneHors b={b}><span className="vrm-fo-chevron" aria-hidden="true">+</span></LigneHors>
                       </button>
                     </li>
