@@ -4,6 +4,7 @@ import {
   conserverRetraitsNonConfirmes,
 } from "./bilanSynchronisation.js";
 import "./bilanSynchronisation.css";
+import { PhotoVide } from "./composants/PhotoVide.jsx";
 // Keep unresolved alerts when navigating to the platform to handle a withdrawal.
 // This memory belongs to one logged-in owner and is never persisted.
 let memoire = { owner: null, vue: {} };
@@ -11,13 +12,12 @@ function retrouver(owner) {
   if (memoire.owner !== owner) memoire = { owner, vue: {} };
   return memoire.vue;
 }
-export default function VendusAilleurs({
-  owner,
-  ownerActuel,
-  charger,
-  onNav,
-  PhotoVinted,
-}) {
+// (5 nov., chantier E1) La lecture est un CROCHET : Ma journée la lance au
+// montage (« Vendus ailleurs » n'y est une carte de « À faire » que s'il y a
+// quelque chose à vérifier) ; le repli d'origine (`VendusAilleurs`) la garde
+// paresseuse. La mémoire est la même (par propriétaire, jamais rangée) : une
+// lecture par session, « Revérifier » relit.
+export function useVerifVendusAilleurs({ owner, ownerActuel, charger }) {
   const [vue, setVue] = React.useState(() => retrouver(owner)),
     gen = React.useRef(0),
     source = React.useRef();
@@ -78,6 +78,17 @@ export default function VendusAilleurs({
     }
   };
   const v = vue.owner === owner ? vue : {};
+  return { v, lire };
+}
+
+export default function VendusAilleurs({
+  owner,
+  ownerActuel,
+  charger,
+  onNav,
+  PhotoVinted,
+}) {
+  const { v, lire } = useVerifVendusAilleurs({ owner, ownerActuel, charger });
   return (
     <details
       className="vrm-bilan-sync"
@@ -97,6 +108,16 @@ export default function VendusAilleurs({
               : "Vérifier"}
         </span>
       </summary>
+      <VendusAilleursDetail v={v} lire={lire} onNav={onNav} PhotoVinted={PhotoVinted} />
+    </details>
+  );
+}
+
+// Le détail : le corps du repli, ou de la feuille de Ma journée — les annonces à
+// retirer, chacune avec son lien et « Gérer le retrait ».
+export function VendusAilleursDetail({ v, lire, onNav, PhotoVinted }) {
+  return (
+    <>
       <p>Reliés par référence VRM, jamais par titre — retire-les sur leur plateforme.</p>
       <button type="button" disabled={v.charge} onClick={lire}>
         {v.charge ? "Lecture…" : "Revérifier les annonces"}
@@ -124,8 +145,10 @@ export default function VendusAilleurs({
       {v.lignes?.map((a) => (
         <article key={[a.plateforme, a.compte, a.id].join(":")}>
           <div className="vrm-vendu-photo">
-            {a.photo && PhotoVinted && (
+            {a.photo && PhotoVinted ? (
               <PhotoVinted src={a.photo} alt="" loading="lazy" />
+            ) : (
+              <PhotoVide remplir />
             )}
           </div>
           <div>
@@ -136,7 +159,8 @@ export default function VendusAilleurs({
               {a.aConfirmer
                 ? "Ancienne alerte à vérifier · vendu sur "
                 : "Vendu sur "}
-              {[...new Set(a.ventes.map((x) => x.plateforme))].join(", ")} ·
+              {[...new Set(a.ventes.map((x) => x.plateforme))].join(", ")}
+              {" · "}
               {a.aConfirmer
                 ? "retrait non confirmé sur "
                 : "encore proposé sur "}
@@ -151,19 +175,21 @@ export default function VendusAilleurs({
               </small>
             )}
           </div>
-          {a.lien && (
-            <a href={a.lien} target="_blank" rel="noreferrer">
-              Ouvrir l’annonce ↗
-            </a>
-          )}
-          <button type="button" onClick={() => onNav?.(a.onglet)}>
-            Gérer le retrait
-          </button>
+          <div className="vrm-va-gestes">
+            <button type="button" onClick={() => onNav?.(a.onglet)}>
+              Gérer le retrait
+            </button>
+            {a.lien && (
+              <a href={a.lien} target="_blank" rel="noreferrer">
+                Ouvrir l’annonce ↗
+              </a>
+            )}
+          </div>
         </article>
       ))}
       {v.lignes?.length === 0 && (
         <p>Aucune correspondance à retirer dans les données récupérées.</p>
       )}
-    </details>
+    </>
   );
 }

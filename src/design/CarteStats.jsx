@@ -9,9 +9,10 @@
 // `valeursCarte` (src/design/carteChiffres.js), qui les tient des règles
 // propriétaires que l'app lui passe. `null` ⇒ « — », jamais 0.
 import React from 'react';
-import { createPortal } from 'react-dom';
 import CarteMois from './CarteMois.jsx';
-import { CHIFFRES, NOM_PERIODE, PAGES_CARTE, PLAGE_IDS, clePeriode, chiffresProposes, courbeVendu, defDe, horsSelection, libelleCase, nomPeriode, periodeDefaut, reglageAEnregistrer, reglageDePage, valeursCarte, valeurChiffre, valeurObjectif } from './carteChiffres.js';
+import { SheetShell } from '../composants/SheetShell.jsx';
+import { montant } from '../format.js';
+import { CHIFFRES, NOM_PERIODE, PAGES_CARTE, PLAGE_IDS, clePeriode, chiffresProposes, courbeVendu, defDe, horsSelection, libelleCase, nomPeriode, periodeDefaut, raisonCourte, reglageAEnregistrer, reglageDePage, valeursCarte, valeurChiffre, valeurObjectif } from './carteChiffres.js';
 import { TYPES_OBJECTIF, lireSaisieObjectif, objectifAEnregistrer, objectifSurPage, progressionObjectif } from '../objectifMois.js';
 import ChoixPeriode from '../ChoixPeriode.jsx';
 import { raccourcisCarte, etiquettePlage, cleJour } from '../periodeCalendrier.js';
@@ -37,7 +38,8 @@ export const periodeDeValeur = (v, permis, maintenant = new Date()) => {
 };
 
 const centimes = (v, type) => (v == null ? '' : type === 'eur' ? String(Math.round(Number(v) * 100)) : String(v));
-const euros = (v) => `${Math.round(Number(v)).toLocaleString('fr-FR')} €`;
+// (5 nov., chantier E1) Les euros ronds par `montant()` (src/format.js) : la même écriture partout.
+const euros = (v) => montant(v, { centimes: 'jamais' });
 
 // `x` = une valeur de `valeursCarte` ; `grand` : le grand chiffre (centimes).
 const affiche = (x, fmt, grand) => {
@@ -60,6 +62,10 @@ const attrsDeValeur = (x, page) => ({
 });
 const titreDe = (x) => {
   if (x.hors) return `${x.def ? x.def.nom : ''} : ${x.hors}`;
+  // (5 nov., chantier E1) Des ventes sans date de versement : la phrase entière.
+  if (x.raison === 'a-dater') return `${x.def ? x.def.nom : ''} : pas su — ${x.aDater} vente${x.aDater > 1 ? 's' : ''} sans date de versement (à dater), dans aucun mois`;
+  if (x.valeur != null && x.aDater > 0) return `${x.def ? x.def.nom : ''} daté au versement — sans ${x.aDater} vente${x.aDater > 1 ? 's' : ''} encore à dater`;
+  if (x.valeur == null && !x.def?.local) return `${x.def ? x.def.nom : ''} : pas su — ${raisonCourte(x)}`;
   if (x.partiel && x.manque && x.manque.length) return `Au moins : ${x.manque.join(', ')} pas lu`;
   if (x.partiel) return `Au moins · ${x.def ? x.def.nom : ''}`;
   if (x.def && x.def.titre) return x.def.titre;
@@ -75,7 +81,7 @@ const majuscule = (s) => (typeof s === 'string' && s ? s.charAt(0).toUpperCase()
 export function BarreObjectif({ prog, fmt }) {
   if (!prog) return null;
   const eur = prog.type === 'ca';
-  const montre = (v) => (eur ? `${Math.round(Number(v)).toLocaleString('fr-FR')} €` : String(v));
+  const montre = (v) => (eur ? euros(v) : String(v));
   const cible = montre(prog.objectif);
   const titre = prog.valeur == null ? 'Objectif du mois : pas su'
     : `${prog.partiel ? 'Au moins ' : ''}${eur ? fmt(prog.valeur) : prog.valeur} sur ${eur ? fmt(prog.objectif) : prog.objectif}${prog.partiel && prog.manque.length ? ` · ${prog.manque.join(', ')} pas lu` : ''}`;
@@ -132,6 +138,9 @@ export default function CarteStats({ owner = '', page, sel, sources, regles, reg
           // (3 nov.) Le libellé court seul (jamais « … · Vinted » rogné) : le site se dit dans le titre de la case.
           l: majuscule(x.def ? (x.def.local ? (x.def.court || x.def.nom) : libelleCase({ ...x.def, vinted: false }, x.p, g.p, sel)) : ''),
           titre: titreDe(x),
+          // (5 nov., chantier E1, §5) Un « — » dit sa raison sous le libellé ; un montant qui
+          // laisse des ventes « à dater » le dit aussi.
+          raison: raisonCourte(x),
           onClick: aller(x),
           attrs: { ...attrsDeValeur(x, page), ...(x.attrs || {}), ...(x.def && x.def.local && x.def.attrs ? x.def.attrs : {}), ...(plus(x) || {}) },
         }))}>
@@ -170,17 +179,15 @@ function FeuilleCarte({ owner = '', page, sel, sources, regles, reglage, poser, 
     const d = defDe(id, locaux);
     const v = valeurChiffre(id, { id, p: (actuelle && actuelle.id === id && actuelle.p) || periodeDefaut(d) }, sources, sel, regles);
     if (v.valeur == null) return '—';
-    return (d.type === 'eur' ? `${Math.round(Number(v.valeur)).toLocaleString('fr-FR')} €` : String(v.valeur)) + (v.partiel ? ' au moins' : '');
+    return (v.partiel ? 'au moins ' : '') + (d.type === 'eur' ? euros(v.valeur) : String(v.valeur));
   };
-  const contenu = (
-    <div data-noswipe="" data-carte-feuille={page} onClick={fermer} className="vrm-w-voile vrm-carte-voile">
-      {FermeAuRetour ? <FermeAuRetour fermer={fermer} /> : null}
-      <div role="dialog" aria-label="Les chiffres de la carte" onClick={(e) => e.stopPropagation()} className="vrm-w-feuille vrm-carte-feuille">
-        <div className="vrm-w-feuille-tete vrm-carte-feuille-tete">
-          <div className="vrm-carte-feuille-titre">{(PAGES_CARTE[page] && PAGES_CARTE[page].nom) || 'La carte'}</div>
-          <button type="button" className="vrm-carte-ok" data-carte-fermer="" onClick={fermer}>OK</button>
-        </div>
-        <div className="vrm-w-feuille-corps">
+  // (5 nov., chantier E1) La feuille unique de l'app (`SheetShell`, chantier B) : portail, fond
+  // opaque dès la première image, poignée au doigt, titre et croix en icône, retour du navigateur.
+  // Chaque choix est rangé tout de suite : la croix suffit (plus de « OK » à côté d'elle).
+  return (
+    <SheetShell titre={(PAGES_CARTE[page] && PAGES_CARTE[page].nom) || 'La carte'} sousTitre="Les chiffres de la carte" onClose={fermer} FermeAuRetour={FermeAuRetour}
+      z={20000} maxWidth={560} className="vrm-carte-feuille" data-noswipe="" data-carte-feuille={page}>
+        <div className="vrm-carte-feuille-corps">
           <div className="vrm-carte-places" role="group" aria-label="Place à régler">
             {places.map((x, i) => {
               const d = x ? defDe(x.id, locaux) : null;
@@ -225,10 +232,8 @@ function FeuilleCarte({ owner = '', page, sel, sources, regles, reglage, poser, 
           {poserObjectif ? <ObjectifFeuille page={page} objectif={objectif} poserObjectif={poserObjectif} /> : null}
           <button type="button" className="vrm-carte-defaut" data-carte-defaut-remettre="" onClick={() => { poser(reglageAEnregistrer(reglage, page, null)); setPlace(0); }}>Par défaut</button>
         </div>
-      </div>
-    </div>
+    </SheetShell>
   );
-  return typeof document !== 'undefined' ? createPortal(contenu, document.body) : contenu;
 }
 
 // ── « Objectif » DANS LA FEUILLE (4 nov.) ───────────────────────────────────
@@ -246,7 +251,7 @@ function ObjectifFeuille({ page, objectif, poserObjectif }) {
     <div className="vrm-carte-objectif" data-carte-objectif={objectif ? objectif.type : ''} data-carte-objectif-ici={objectif ? (ici ? '1' : '0') : undefined}>
       <button type="button" className="vrm-carte-choix" aria-expanded={ouvert} data-carte-objectif-ouvrir="" onClick={() => setOuvert(!ouvert)}>
         <span className="vrm-carte-choix-nom">Objectif</span>
-        <span className="vrm-carte-choix-v">{objectif ? (objectif.type === 'ca' ? `${Math.round(objectif.valeur).toLocaleString('fr-FR')} €` : `${objectif.valeur} ventes`) : '—'}</span>
+        <span className="vrm-carte-choix-v">{objectif ? (objectif.type === 'ca' ? euros(objectif.valeur) : `${objectif.valeur} ventes`) : '—'}</span>
         <span className="vrm-carte-coche" aria-hidden="true">{ouvert ? '−' : '+'}</span>
       </button>
       {ouvert ? (
