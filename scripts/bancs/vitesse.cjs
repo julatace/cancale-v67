@@ -142,6 +142,7 @@ async function ouvrir(b, vp, tab, attendre, frappe, opts = {}) {
     const note = () => { const e = document.querySelector('[data-vendu-mois]'); const v = e ? e.getAttribute('data-vendu-mois') : null; const l = window.__heros[window.__heros.length - 1]; if (!l || l.v !== v) window.__heros.push({ t: Date.now() - t0, v }); };
     document.addEventListener('DOMContentLoaded', () => new MutationObserver(note).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-vendu-mois'] }));
   }, t0);
+  await pg.addInitScript(() => { const voir = () => { if (!window.__vrmCoque && document.querySelector('.vrm-app-header')) window.__vrmCoque = Math.round(performance.now()); }; document.addEventListener('DOMContentLoaded', () => { voir(); new MutationObserver(voir).observe(document.body, { subtree: true, childList: true }); }); });
   await pg.route('**/rest/v1/**', async (route) => {
     const rq = route.request();
     const url = rq.url();
@@ -175,7 +176,9 @@ async function ouvrir(b, vp, tab, attendre, frappe, opts = {}) {
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true,"devices":1}' }));
   await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' });
   let utile = null;
-  try { await pg.waitForFunction(attendre, null, { timeout: 30000, polling: 50 }); utile = Date.now() - t0; } catch (_) {}
+  try { await pg.waitForFunction(attendre, null, { timeout: RESEAU ? 120000 : 30000, polling: 50 }); utile = Date.now() - t0; } catch (_) {}
+  // (6 nov., vitesse 2) La coque dessinée (le morceau `App` téléchargé, compilé, rendu) : mesurée dans la page.
+  const coque = await pg.evaluate(() => window.__vrmCoque || null).catch(() => null);
   // Le calme : plus aucune requête GET pendant 3 s.
   for (let i = 0; i < 120; i++) {
     await pg.waitForTimeout(500);
@@ -240,7 +243,7 @@ async function ouvrir(b, vp, tab, attendre, frappe, opts = {}) {
   const heros = await pg.evaluate(() => window.__heros || []).catch(() => []);
   if (DETAIL) console.log('    héros :', JSON.stringify(heros));
   await ctx.close();
-  return { req, utile, errs, lu, frappes, heros, rendusSignal, fichiers };
+  return { req, utile, errs, lu, frappes, heros, rendusSignal, fichiers, coque };
 }
 
 function bilan(nom, r) {
@@ -339,6 +342,24 @@ const ECRANS = [
   ['compta', () => /compta|bénéfice|déclar|URSSAF/i.test(document.body.innerText)],
 ];
 
+// (6 nov., vitesse 2) `VITESSE_PREMIER=n` : seulement le PREMIER CHARGEMENT de Ma journée, n fois
+// (avec `VITESSE_RESEAU=4g` : le téléphone en 4G) — coque dessinée, premier écran utile, fichiers.
+if (process.env.VITESSE_PREMIER) {
+  (async () => {
+    const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server', '--explicitly-allowed-ports=' + PORT] });
+    const sortie = [];
+    try {
+      for (let i = 0; i < Number(process.env.VITESSE_PREMIER); i++) {
+        const r = await ouvrir(b, { width: 390, height: 844 }, 'journee', ECRANS[0][1], null);
+        const js = (r.fichiers || []).filter((x) => /\.(js|css)$/.test(x.f));
+        sortie.push({ coque: r.coque, utile: r.utile, octJs: js.reduce((a, x) => a + x.octets, 0), fichiers: js.map((x) => x.f) });
+        console.log(`  passage ${i + 1} : coque dessinée ${r.coque ?? '—'} ms · premier écran utile ${r.utile ?? '—'} ms · ${Math.round(sortie[i].octJs / 1024)} Ko de JS+CSS en ${js.length} fichiers`);
+      }
+    } finally { await b.close(); srv.close(); }
+    if (process.env.VITESSE_JSON) fs.writeFileSync(process.env.VITESSE_JSON, JSON.stringify(sortie, null, 1));
+    process.exit(0);
+  })();
+} else
 (async () => {
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server', '--explicitly-allowed-ports=' + PORT] });
   const res = {};
