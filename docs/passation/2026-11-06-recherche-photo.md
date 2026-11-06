@@ -119,12 +119,12 @@ lumière chaude + main ; −40° fond bleu-gris lumière froide ; plongée 45° 
 | empreinte | top 1 | top 5 |
 |---|---|---|
 | hachage seul (dHash/pHash) | 5 % | 15 % |
-| bords seuls | 7,5 % | 15 % |
-| grille seule | 65 % | 92,5 % |
+| bords seuls | 6,7 % | 12,5 % |
+| grille seule | 64,2 % | 90,8 % |
 | couleur du centre seule | 68,3 % | 96,7 % |
 | couleur sans le fond seule | 84,2 % | 100 % |
 | **retenu** | **82,5 %** | **100 %** |
-| meilleur d'une grille de 192 poids | 83,3 % | 100 % |
+| meilleur d'une grille de 144 jeux de poids | 83,3 % | 100 % |
 
 Étapes mesurées : couleur avec fond = médiane du bord 51,7 % → fond en
 k-moyennes 73,3 % → + balance des blancs 80,8 % (top 5 99,2 %) ; un « point
