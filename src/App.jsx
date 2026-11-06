@@ -39,6 +39,7 @@ import FavorisVinted from './FavorisVinted.jsx';
 import PiloteFavorisAuto from './PiloteFavorisAuto.jsx';
 import RepartitionAnneau from './RepartitionAnneau.jsx';
 import AnnoncesLeboncoin from './AnnoncesLeboncoin.jsx';
+import { bilanEnLigneLbc, etatEnLigneLbc, quandLectureLbc, LIEN_MES_ANNONCES_LBC } from './enLigneLbc.js';
 import {suivreReceptionLeboncoin,lireReceptionLeboncoin} from './rafraichissementLeboncoin.js';
 import { STYLE_FLOU, compteLbcOuvert, lbcFloute, compteVcOuvert, vcFloute } from './flouCompte.js';
 import DiagnosticLeboncoin from './DiagnosticLeboncoin.jsx';
@@ -34705,8 +34706,8 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   const vcSansNum = aa ? (aa.vcSansNumero || []) : [];
   const vcNonDites = aa ? (aa.vcNonJugees || []) : [];
   const aConfVoir = aa ? aa.aConfirmerComptes.filter((c) => !filtreCompte || c.uid === filtreCompte) : [];
-  const aConfTxt = aConfVoir.map((c) => (c.plateforme === 'vestiaire' ? (c.vieille ? `Vestiaire, ${depuisQuand(c.lu)}` : 'Vestiaire, plus vues dans ta dernière liste') : `${c.nom}, ${depuisQuand(c.lu)}`)).join(' ; ');
-  const aConfGeste = [aConfVoir.some((c) => c.plateforme !== 'vestiaire') ? 'plus de 24 h : repasse sur Vinted avec ce compte' : '', aConfVoir.some((c) => c.plateforme === 'vestiaire') ? 'ouvre « Mes articles » sur Vestiaire' : ''].filter(Boolean).join(' ; ');
+  const aConfTxt = aConfVoir.map((c) => (c.plateforme === 'vestiaire' ? (c.vieille ? `Vestiaire, ${depuisQuand(c.lu)}` : 'Vestiaire, plus vues dans ta dernière liste') : c.plateforme === 'leboncoin' ? `Leboncoin, ${quandLectureLbc(c.lu)}` : `${c.nom}, ${depuisQuand(c.lu)}`)).join(' ; ');
+  const aConfGeste = [aConfVoir.some((c) => c.plateforme === 'vinted') ? 'plus de 24 h : repasse sur Vinted avec ce compte' : '', aConfVoir.some((c) => c.plateforme === 'vestiaire') ? 'ouvre « Mes articles » sur Vestiaire' : '', aConfVoir.some((c) => c.plateforme === 'leboncoin') ? 'ouvre « Mes annonces » sur leboncoin.fr' : ''].filter(Boolean).join(' ; ');
   const blocResume = (
     <Card style={{ padding: '13px 14px' }}>
       <div className="vrm-s2d-resume" data-stock-actuelles={lecture === undefined ? 'encours' : (aa && aa.su ? nAffiche : 'passu')} data-stock-au-moins={aa && aa.auMoins ? '1' : '0'} data-stock-a-confirmer={aa && aa.su ? nAConf : undefined} data-stock-masquees={aa && aa.su ? nMasq : undefined} data-stock-rangees={aa && aa.su ? nRangees : undefined}>
@@ -61982,11 +61983,15 @@ async function lbcListingsSession() {
 // (5 nov.) Les annonces Leboncoin EN VENTE (la règle `annonceLbcEnVente`, §11)
 // avec leur N° par IDENTITÉ (`numeroLbcIdentite` : lien posé à la main, référence
 // VRM — jamais le « nXXX » d'un titre). Seulement ses annonces reliées à VRM
-// (référence ou lien). Rend `[{ numero, title, photo }]`, ou `null` = pas su.
+// (référence ou lien). Rend `[{ numero, title, photo, etat, lu }]`, ou `null` = pas su.
 // Lue par Annonces (les paires présentes) et par le Stock (annonces actuelles).
+// (6 nov.) `etat` : la règle « en ligne » de Leboncoin (src/enLigneLbc.js) —
+// 'enligne' (lecture complète de « Mes annonces » de moins de 24 h) ou
+// 'aconfirmer' (plus vieille, ou jamais faite) ; `lu` = sa date (ms | null).
 async function lireLbcEnVente() {
   try {
-    const items = await lbcAnnoncesSession();
+    const ls = await lbcListingsSession();
+    const items = ls ? ls.items : null;
     if (!items) return null;
     const vr = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`, { headers: sbAuth() });
     if (!vr.ok) return null;
@@ -61998,7 +62003,8 @@ async function lireLbcEnVente() {
       if (!annonceLbcEnVente(ad, vendues)) continue;
       if (!(ad.ref || ad.customRef || (liens[String(ad.id)] != null && String(liens[String(ad.id)]).trim()))) continue;   // pas une de ses annonces reliées
       const n = numeroLbcIdentite({ itemId: ad.id }, items, liens);
-      liste.push({ numero: n || '', title: ad.subject || ad.title || '', photo: (Array.isArray(ad.images) && typeof ad.images[0] === 'string' && ad.images[0]) || null });
+      const e = etatEnLigneLbc(ad, { enVente: (x) => annonceLbcEnVente(x, vendues), lectures: ls.lectures || {}, maintenant: Date.now() });
+      liste.push({ numero: n || '', title: ad.subject || ad.title || '', photo: (Array.isArray(ad.images) && typeof ad.images[0] === 'string' && ad.images[0]) || null, etat: e.etat === 'enligne' ? 'enligne' : 'aconfirmer', lu: Number.isFinite(e.lu) ? e.lu : null });
     }
     return liste;
   } catch (_) { return null; }
@@ -63382,6 +63388,13 @@ function LeboncoinScreen() {
     // propre bloc (vendue ici, encore sur Vinted ?).
     const vendusLbc = annoncesLbcVendues(ventesLbc);
     const liveAds = lbcAds.filter(ad => annonceLbcEnVente(ad, vendusLbc) && aLui(ad));
+    // (6 nov.) CE QU'ON COMPTE « EN LIGNE » : la règle de Vinted appliquée à
+    // Leboncoin (src/enLigneLbc.js) — la lecture COMPLÈTE de « Mes annonces » de
+    // son compte, de moins de 24 h. Plus vieille ou jamais faite ⇒ « à confirmer »
+    // (hors du compte, rien effacé). `liveAds` (la règle partagée) reste ce qui
+    // PROTÈGE : file à publier, « à retirer » — une annonce à confirmer peut
+    // encore être en ligne (sens sûr).
+    const bilanLbc = bilanEnLigneLbc(lbcAds.filter(aLui), { enVente: (ad) => annonceLbcEnVente(ad, vendusLbc), lectures: (lbcRows && lbcRows[0] && lbcRows[0].lectures) || {}, maintenant: Date.now() });
     // (22 oct.) Ce qui n'est plus compté en ligne : plus vue dans une liste
     // COMPLÈTE de son compte, ou mise en pause depuis VRM. Rien n'est effacé ;
     // l'écran le dit, une fois. Et les N° dont l'annonce est sortie : plus rien
@@ -63652,7 +63665,7 @@ function LeboncoinScreen() {
     // (capture de la page) : `lbcUser` seul comptait 0 annonce par compte.
     for (const ad of liveAds) { const k = String(ad.account || ad.lbcUser || '?'); (parCompte[k] = parCompte[k] || []).push(ad); }
     if (!estActif()) return;
-    setData({ catalogueAds: lbcAds.filter(aLui), catalogueVentes: ventesLbc, sortiesLbc: sortiesLbc.map((a) => { const q = lbcSortieDe(a); return { id: String(a.id), plusVueAt: q === 'plusvue' ? a.plusVueAt : null, pauseAt: q === 'pause' ? a.pauseAt : null, compte: String(a.account || a.lbcUser || '') }; }), lecturesLbc, pasRevues: pasRevues.length, pasRevuesJours: pasRevues.length ? Math.floor(Math.min(...pasRevues.map(lbcJoursSansVoir))) : 0, liensPoses, liensMain: liens, preuveKO, aConfirmer: aConfirmerIds.size, echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu: lbcJamaisLu || (lbcRows !== null && liveAds.length === 0), lbcKO: lbcRows === null, vendues, nEnLigne: online.length, nNumerotees, queue, removals, unlinked: unlinkedAsk, nonRelieesSansJumelle, ventesSansJumelle, doublons, aRelierVentes, ventesLbcKO, numsConnus: [...keysKnown], liveAds, autoMatched, retirees, repub: (preuveKO || ventesLbcKO || postedRows === null || lbcRows === null) ? null : repub, repubKO, lbcAccounts, lbcConnecte, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan, prep });
+    setData({ catalogueAds: lbcAds.filter(aLui), catalogueVentes: ventesLbc, sortiesLbc: sortiesLbc.map((a) => { const q = lbcSortieDe(a); return { id: String(a.id), plusVueAt: q === 'plusvue' ? a.plusVueAt : null, pauseAt: q === 'pause' ? a.pauseAt : null, compte: String(a.account || a.lbcUser || '') }; }), lecturesLbc, pasRevues: pasRevues.length, pasRevuesJours: pasRevues.length ? Math.floor(Math.min(...pasRevues.map(lbcJoursSansVoir))) : 0, liensPoses, liensMain: liens, preuveKO, aConfirmer: aConfirmerIds.size, echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu: lbcJamaisLu || (lbcRows !== null && liveAds.length === 0), lbcKO: lbcRows === null, vendues, nEnLigne: online.length, nNumerotees, queue, removals, unlinked: unlinkedAsk, nonRelieesSansJumelle, ventesSansJumelle, doublons, aRelierVentes, ventesLbcKO, numsConnus: [...keysKnown], liveAds, autoMatched, retirees, repub: (preuveKO || ventesLbcKO || postedRows === null || lbcRows === null) ? null : repub, repubKO, lbcAccounts, lbcConnecte, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: bilanLbc.enLigne.length, lbcAConfirmer: { n: bilanLbc.aConfirmer.length, ids: bilanLbc.aConfirmer.map((a) => String(a.id)), lu: bilanLbc.comptes.reduce((m, c) => (Number.isFinite(c.lu) && (m == null || c.lu < m) ? c.lu : m), null), jamais: bilanLbc.comptes.some((c) => !Number.isFinite(c.lu)) }, limit: pd.limit, plan: pd.plan, prep });
     setLoading(false);
   };
   useEffect(() => {
@@ -63766,10 +63779,15 @@ function LeboncoinScreen() {
     else toast('Cet article n’est pas dans ta file « À publier » Leboncoin (déjà publié, retiré de Leboncoin, vendu ou plus en ligne sur Vinted).');
   }, [data]);
   const [repubOuvert, setRepubOuvert] = useState(false);
-  const n = data ? Math.max(data.postedCount, data.lbcCount) : 0;
+  // (6 nov.) Le nombre affiché = les annonces EN LIGNE (src/enLigneLbc.js) ; les
+  // « à confirmer » sont dites à côté, jamais comptées. La jauge de la limite,
+  // elle, reste prudente : marques « publiée » ou annonces pas encore sorties.
+  const nAConf = data && data.lbcAConfirmer ? data.lbcAConfirmer.n : 0;
+  const n = data ? data.lbcCount : 0;
+  const nQuota = data ? Math.max(data.postedCount, data.lbcCount + nAConf) : 0;
   const lim = data ? (data.limit || null) : null;
-  const pct = lim ? Math.min(100, Math.round((n / lim) * 100)) : 0;
-  const barCol = lim ? (n >= lim ? C.danger : n >= lim - 3 ? C.warn : INV_STATUS.online.color) : C.muted;
+  const pct = lim ? Math.min(100, Math.round((nQuota / lim) * 100)) : 0;
+  const barCol = lim ? (nQuota >= lim ? C.danger : nQuota >= lim - 3 ? C.warn : INV_STATUS.online.color) : C.muted;
   // (16 oct.) Mise en page dans l'identité de l'app : cartes blanches à ombre
   // douce, titres courts, une colonne plus large sur ordinateur (elle faisait
   // 600 px et tout s'empilait en pavés).
@@ -63918,7 +63936,7 @@ function LeboncoinScreen() {
         </div>
       ) : null}
       {repubOuvert && data && Array.isArray(data.repub) && <RepublierLeboncoin liste={data.repub} exclues={data.repubKO || {}} onClose={() => setRepubOuvert(false)} onFini={reload}/>}
-      {data && <AnnoncesLeboncoin owner={AUTH.user?.id||''} floute={(ad) => lbcFloute(lbcOuvert, ad && (ad.account || ad.lbcUser))} annonces={data.catalogueAds} ventes={data.catalogueVentes} lectureKO={data.lbcKO} numeroDe={numeroAnnonceLbc} sortieDe={lbcSortieDe} onSupprimer={supprEtat() === 'ok' ? supprimerSurLbc : null} enVol={pauseEnVol ? String(pauseEnVol) : null}/>}
+      {data && <AnnoncesLeboncoin owner={AUTH.user?.id||''} floute={(ad) => lbcFloute(lbcOuvert, ad && (ad.account || ad.lbcUser))} aConfirmerDe={(ad) => !!(data.lbcAConfirmer && data.lbcAConfirmer.ids.includes(String(ad && ad.id)))} annonces={data.catalogueAds} ventes={data.catalogueVentes} lectureKO={data.lbcKO} numeroDe={numeroAnnonceLbc} sortieDe={lbcSortieDe} onSupprimer={supprEtat() === 'ok' ? supprimerSurLbc : null} enVol={pauseEnVol ? String(pauseEnVol) : null}/>}
       {/* ⚠️ UNE LECTURE RATÉE SE DIT UNE FOIS (§7). L'écran la disait jusqu'à quatre
           fois (ventes Leboncoin, compteur, preuve de vente, file vide) et, sur une
           lecture ratée de ses annonces Leboncoin, il affirmait « je n'ai pas encore
@@ -63946,11 +63964,32 @@ function LeboncoinScreen() {
             une offre (main) — mais elle porte aussi « plus comptées en ligne » et
             « pas revues » (lot Leboncoin) : sans limite connue, ces deux lignes
             disparaissaient. Elle s'affiche dès que l'une des quatre a quelque chose à dire. */}
-        {(lim || data.plan || (data.sortiesLbc || []).length > 0 || data.pasRevues > 0) && <Card className="vrm-lbc-compteur">
+        {(lim || data.plan || (data.sortiesLbc || []).length > 0 || data.pasRevues > 0 || nAConf > 0) && <Card className="vrm-lbc-compteur">
+          {/* (6 nov.) « 0 » qui veut dire « je ne sais pas » s'écrit « — » (§5) :
+              aucune annonce confirmée en ligne, mais des annonces à confirmer. */}
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-            <span className="vrm-display" style={{ fontSize: 20, fontWeight: 700, color: C.text }}>{(data.lbcJamaisLu || data.lbcKO) && !data.postedCount ? '—' : n}</span>
-            <span style={{ fontSize: 15, color: C.muted, fontWeight: 500 }}>annonce{n > 1 ? 's' : ''} sur Leboncoin{lim ? ` / ${lim}` : ''}</span>
+            <span className="vrm-display" data-lbc-en-ligne={data.lbcKO || (n === 0 && nAConf > 0) ? '' : String(n)} style={{ fontSize: 20, fontWeight: 700, color: C.text }}>{data.lbcKO || (data.lbcJamaisLu && !data.postedCount) || (n === 0 && nAConf > 0) ? '—' : n}</span>
+            <span style={{ fontSize: 15, color: C.muted, fontWeight: 500 }}>annonce{n > 1 ? 's' : ''} en ligne sur Leboncoin{lim ? ` / ${lim}` : ''}</span>
           </div>
+          {/* (6 nov.) « À CONFIRMER » (src/enLigneLbc.js) : la lecture complète de
+              « Mes annonces » de leur compte a plus de 24 h, ou n'a jamais été
+              faite. Dit UNE fois, avec LE geste (selon l'extension d'ici). */}
+          {nAConf > 0 && (() => {
+            const pe = pauseEtat();
+            const A = data.lbcAConfirmer;
+            const quand = A.jamais ? 'jamais lue en entier' : quandLectureLbc(A.lu);
+            const un = nAConf === 1;
+            return (
+              <div data-lbc-a-confirmer={nAConf} style={{ fontSize: 12, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>
+                <b style={{ color: C.warn, fontWeight: 600 }}>{nAConf} à confirmer</b> : ta liste « Mes annonces » est {quand}, je ne sais pas si {un ? 'elle est' : 'elles sont'} encore en ligne — {un ? 'pas comptée' : 'pas comptées'}, rien n'est effacé.{' '}
+                {pe === 'absente'
+                  ? <>Sur l'ordinateur où l'extension est installée, ouvre « Mes annonces » sur leboncoin.fr, sur chacun de tes comptes.</>
+                  : pe === 'retard'
+                    ? <>Mets l'extension à jour, puis ouvre « Mes annonces » sur leboncoin.fr, sur chacun de tes comptes.</>
+                    : <><a href={LIEN_MES_ANNONCES_LBC} target="_blank" rel="noreferrer" data-lbc-ouvrir-mes-annonces="" style={{ color: C.accentTexte || C.accent, fontWeight: 600, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', minHeight: 44 }}>Ouvrir « Mes annonces » sur leboncoin.fr ↗</a> — sur chacun de tes comptes ; l'extension relit la liste en entier.</>}
+              </div>
+            );
+          })()}
           {data.lbcJamaisLu && !data.postedCount && (
             <div style={{ fontSize: 12, color: C.warn, fontWeight: 600, marginTop: 5, lineHeight: 1.5 }}>
               Je n'ai pas encore vu tes annonces Leboncoin. Ouvre la page de <b>tes annonces</b> sur leboncoin.fr une fois, avec l'extension : je les lirai au passage.
@@ -63962,7 +64001,7 @@ function LeboncoinScreen() {
           {data.plan ? <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, marginTop: 2 }}>Offre : {data.plan}</div> : null}
           {lim ? (<>
             <div style={{ height: 8, borderRadius: 999, background: C.border, overflow: 'hidden', marginTop: 9 }}><div style={{ width: pct + '%', height: '100%', background: barCol, borderRadius: 999 }} /></div>
-            <div style={{ fontSize: 12, fontWeight: 700, marginTop: 5, color: barCol }}>{n >= lim ? 'Limite atteinte' : n >= lim - 3 ? 'Tu approches de ta limite' : `Il te reste ${lim - n} annonce${lim - n > 1 ? 's' : ''}`}</div>
+            <div style={{ fontSize: 12, fontWeight: 700, marginTop: 5, color: barCol }}>{nQuota >= lim ? 'Limite atteinte' : nQuota >= lim - 3 ? 'Tu approches de ta limite' : `Il te reste ${lim - nQuota} annonce${lim - nQuota > 1 ? 's' : ''}`}</div>
           </>) : null}
           {/* (22 oct.) Une liste COMPLÈTE de son compte ne montre plus certaines
               annonces : elles ne sont plus comptées en ligne. On dit combien et
@@ -63983,7 +64022,7 @@ function LeboncoinScreen() {
           })()}
           {/* (22 oct.) Pas revues depuis plus de 7 jours : on ne sait pas si elles
               y sont encore. Le geste qui tranche, selon l'extension d'ici. */}
-          {data.pasRevues > 0 && (() => {
+          {data.pasRevues > 0 && !nAConf && (() => {
             const pe = pauseEtat();
             return (
               <div data-lbc-pas-revues={data.pasRevues} style={{ fontSize: 12, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>

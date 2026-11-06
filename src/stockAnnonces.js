@@ -80,7 +80,10 @@ export function annoncesVcStock({ lst, ventes = null, auto = null, maintenant = 
 //            `masquees` : déjà sans celles déclarées parties (`masqueesPresentes`).
 //   numeros : { [idAnnonce]: { numero, photo? } } — la fiche de chaque annonce Vinted
 //   ebay   : null (pas su) | { liste: [{ numero, title, photo }], illisibles: [nom] }
-//   lbc    : null (pas su) | [{ numero, title, photo }]
+//   lbc    : null (pas su) | [{ numero, title, photo, etat?, lu? }] — (6 nov.) `etat`
+//            'aconfirmer' = la règle « en ligne » de Leboncoin (src/enLigneLbc.js)
+//            ne peut pas la confirmer (lecture complète de « Mes annonces » de
+//            plus de 24 h, ou jamais faite) : présente, pas comptée en ligne
 //   vestiaire : la sortie de `annoncesVcStock` (null pas su · { lue: false } jamais
 //            lu) ; `undefined` = Vestiaire pas demandé (appelant d'avant)
 //   vendus : Set de clés — N° PROUVÉS vendus (`vrm_stock_vendus`) : une annonce eBay
@@ -115,13 +118,17 @@ export function annoncesActuelles({ vinted, numeros, ebay, lbc, vestiaire, vendu
     if (arr(c.aConfirmer).length) aConfirmerComptes.push({ uid: String(c.uid || ''), plateforme: 'vinted', nom: String(c.nom || c.uid || ''), n: arr(c.aConfirmer).length, lu: Number.isFinite(c.lu) ? c.lu : null });
   }
   const autres = (liste, plat) => {
+    let nAc = 0, luAc = null, jamais = false;
     for (const a of arr(liste)) {
       const numero = a && a.numero != null ? String(a.numero).trim() : '';
       const k = numero ? cle(numero) : '';
       if (!k) { sansNumero[plat] += 1; continue; }
       if (vendus && vendus.has(k)) continue;
-      parts.push({ id: plat + ':' + k, cle: k, numero, titre: String((a && a.title) || ''), photo: (a && a.photo) || null, plat, compte: '', etat: 'enligne' });
+      const etat = a && a.etat === 'aconfirmer' ? 'aconfirmer' : 'enligne';
+      if (etat === 'aconfirmer') { nAc++; if (!Number.isFinite(a.lu)) jamais = true; else if (luAc == null || a.lu < luAc) luAc = a.lu; }
+      parts.push({ id: plat + ':' + k, cle: k, numero, titre: String((a && a.title) || ''), photo: (a && a.photo) || null, plat, compte: '', etat });
     }
+    if (nAc) aConfirmerComptes.push({ uid: '', plateforme: plat, nom: plat === 'leboncoin' ? 'Leboncoin' : plat, n: nAc, lu: jamais ? null : luAc });
   };
   if (ebay == null) manque.push({ plateforme: 'ebay', nom: 'eBay', raison: 'pas lu' });
   else {
