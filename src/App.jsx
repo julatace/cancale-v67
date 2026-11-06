@@ -35,7 +35,7 @@ import { creerBrouillonsReglages, dateImportValide } from './brouillonsReglages.
 import { filtrerReglages } from './rechercheReglages.js';
 import { preparerApercusModes } from './apercusBordereaux.js';
 import { actionsReglages } from './reglagesActions.js';
-import FavorisVinted from './FavorisVinted.jsx';
+// (6 nov., vitesse 2) FavorisVinted : chargé à la demande (voir `aLaDemande`).
 import PiloteFavorisAuto from './PiloteFavorisAuto.jsx';
 import RepartitionAnneau from './RepartitionAnneau.jsx';
 import AnnoncesLeboncoin from './AnnoncesLeboncoin.jsx';
@@ -61,11 +61,13 @@ import {avecSuiviDuSujet,finsDesLignes,sortiParSuivis,sortiParSuivi,suiviDeLigne
 import {ligneTransporteur,texteCodePostalMr,carrierLisible,carrierNonLu,nomTransporteur,LECTURE_SERVEUR_TRANSP,heureParis} from '../api/_lib/transporteurs.js';
 import PhotoProfil,{AvatarCompte} from './profil/AvatarPersonnel.jsx';
 import PorteConfidentialite from './PorteConfidentialite.jsx';
-import {qrMfa} from './qrMfa.js';
+// (6 nov., vitesse 2) qrMfa (et son générateur de QR, ~50 Ko) : importé à la demande, à l'activation.
 import {conflitAdresseCompte} from './receptionEmail.js';
-import SuiviReceptionEmails from './ReceptionEmails.jsx';
+// (6 nov., vitesse 2) SuiviReceptionEmails (Réglages → E-mails) : à la demande ; sa feuille de style reste ICI.
+import './reception-emails.css';
 import EspaceEmails from './EspaceEmails.jsx';
-import JournalEmails, {EntreeJournalEmails} from './JournalEmails.jsx';
+// (6 nov., vitesse 2) JournalEmails (Réglages → E-mails) : à la demande ; sa feuille de style reste ICI.
+import './journal-emails.css';
 import RecusEmail from "./RecusEmail.jsx";
 import VuesVentes from "./VuesVentes.jsx";
 import BordereauxAuto from "./BordereauxAuto.jsx";
@@ -105,7 +107,9 @@ import { poserLienVc, defaireLienVc, numerosABarrer, marquerBarre, lienDe, produ
 import FeuilleLienVc from "./LienVestiaire.jsx";
 import { preuvesFriseVc, preuvesFriseEbay } from "./friseSites.js";
 import { suggestionsAchat, tousAchatsLibres, tousAchatsLibresDetail, filtresAchats, etiquetteLot, liensParAchat, lotDe, prixIndicatifLot, ecritureLot, suggestionsSaisieSerie } from "./suggestionsAchat.js";
-import AchatsOutils from "./AchatsOutils.jsx";
+// (6 nov., vitesse 2) AchatsOutils : à la demande ; ses feuilles de style restent ICI, à la même place (même ordre).
+import './styles-annonces-outils.css';
+import './styles-achats-outils.css';
 import { CLE_FOURNISSEURS, lireRegistre, avecFournisseur, sansFournisseur, avecAchatGros, sansAchatGros, avecRepartition, achatGros, reliesDuLot, partsDuLot, planPrixGros, ecrituresPrixGros, ecritureLienGros, ecritureDelierGros, origineDuPrix, horsRattachables, avecHors, sansHors, avecGardes, bilanFournisseurs, eurosC as eurosFo } from "./fournisseurs.js";
 import { articlesParAchat, delaisMiseEnLigne, dateReception, estLot as estLotAchat, nombreLot, totalARepartir, ecrituresRepartition, annulationRepartition, ecritureLienAchat, prixAchatCentimes, achatSansCout } from "./achatsSourcing.js";
 import { boostRentable, SEUIL_BOOST } from "./boostRentable.js";
@@ -115,10 +119,10 @@ import CeQuiRapporte from "./design/CeQuiRapporte.jsx";
 import { requeteDeLaVoix } from "./rechercheVocale.js";
 import { articlesQuiDorment, seuilValide } from "./quiDorment.js";
 import QuiDorment from "./design/QuiDorment.jsx";
-import OffresVestiaire from "./OffresVestiaire.jsx";
+// (6 nov., vitesse 2) OffresVestiaire : à la demande.
 import { offresVestiaire, euros } from "./offresVestiaire.js";
 import PorteMonnaie from "./PorteMonnaie.jsx";
-import Dac7Comptes from "./Dac7Comptes.jsx";
+// (6 nov., vitesse 2) Dac7Comptes : à la demande.
 import { dac7ParCompte, indexComptesVentes, emailsFiscaux, blocagesFiscauxVinted, csvDac7, pdfDac7, nomFichierDac7 } from "./dac7Comptes.js";
 import { porteMonnaieParCompte } from "./porteMonnaie.js";
 import { versementsDuReleve, completerVersementsParReleve } from "./versementReleve.js";
@@ -134,6 +138,50 @@ const Operations = lazy(() => import("./operations/Operations.jsx"));
 const Communaute = lazy(() => import("./communaute/Communaute.jsx"));
 // (5 nov.) L'écran « E-mails » : boîte de réception + « Relier ma boîte » (src/BoiteEmails.jsx).
 const BoiteEmails = lazy(() => import("./BoiteEmails.jsx"));
+// ── (6 nov., vitesse 2) LES ÉCRANS ET FEUILLES CHARGÉS À LA DEMANDE ─────────
+// Mesuré (`npx vite build`, analyse des morceaux) : le morceau `App` pesait
+// 3 832 Ko (1 194 Ko compressés), téléchargé et compilé EN ENTIER avant le
+// premier écran, iPhone compris. App.jsx lui-même en fait l'essentiel (le
+// découper est un chantier à part) ; mais des écrans et feuilles écrits dans
+// LEUR fichier, qu'un seul écran montre, y voyageaient aussi (Favoris, factures
+// Pro, outils d'Achats, fiche d'une paire, « Publier ailleurs », « Changer le
+// prix », emballage, scanner, DAC7, offres Vestiaire, recherche eBay, et le
+// générateur de QR de la double vérification). Ils partent dans des morceaux
+// chargés quand l'écran qui s'en sert les rend (`React.lazy`), derrière un
+// squelette sobre. Leurs feuilles de style restent importées ICI, à la place
+// de l'ancien import (le même ordre : le CSS du morceau `App` est inchangé).
+// ⚠️ Une règle PURE dont l'app a besoin sans l'écran (`repereAdmis`) vit dans
+//    son propre fichier : sinon l'import statique ramène tout le morceau.
+// ⚠️ Un morceau qui ne se charge pas (déploiement entre-temps) : `vite:preloadError`
+//    relit la page (src/main.jsx) ; une vraie panne de réseau tombe sur le
+//    filet de l'écran, comme Room3D ou Communauté.
+function MorceauAttente({ feuille = false }) {
+  return feuille
+    // Une feuille (portail plein écran) : une pastille discrète en bas, rien d'autre.
+    ? <div role="status" aria-live="polite" aria-busy="true" data-morceau-attente="" style={{ position: 'fixed', left: '50%', bottom: 'calc(24px + env(safe-area-inset-bottom, 0px))', transform: 'translateX(-50%)', zIndex: 2147483000, padding: '8px 14px', borderRadius: 999, background: 'rgba(0,0,0,.72)', color: '#fff', fontSize: 13, pointerEvents: 'none' }}>Ouverture…</div>
+    : <SqueletteChargement count={3}/>;
+}
+function aLaDemande(charger, feuille = false) {
+  const Paresseux = lazy(charger);
+  return function MorceauALaDemande(props) {
+    return <Suspense fallback={<MorceauAttente feuille={feuille}/>}><Paresseux {...props}/></Suspense>;
+  };
+}
+const FavorisVinted = aLaDemande(() => import('./FavorisVinted.jsx'));
+const AchatsOutils = aLaDemande(() => import('./AchatsOutils.jsx'));
+const OffresVestiaire = aLaDemande(() => import('./OffresVestiaire.jsx'));
+const Dac7Comptes = aLaDemande(() => import('./Dac7Comptes.jsx'));
+const RechercheEbay = aLaDemande(() => import('./ebayRecherche.jsx'));
+const FicheFacturation = aLaDemande(() => import('./FacturePro.jsx').then((m) => ({ default: m.FicheFacturation })));
+const ListeFacturesPro = aLaDemande(() => import('./FacturePro.jsx').then((m) => ({ default: m.ListeFacturesPro })));
+const FactureVente = aLaDemande(() => import('./FacturePro.jsx').then((m) => ({ default: m.FactureVente })));
+const ScannerColis = aLaDemande(() => import('./ScannerColis.jsx'), true);
+const ModeEmballage = aLaDemande(() => import('./ModeEmballage.jsx'), true);
+const FichePaire = aLaDemande(() => import('./FichePaire.jsx'), true);
+const PrixPartout = aLaDemande(() => import('./PrixPartout.jsx'), true);
+const PublierAilleurs = aLaDemande(() => import('./PublierAilleurs.jsx'), true);
+const SuiviReceptionEmails = aLaDemande(() => import('./ReceptionEmails.jsx'));
+const JournalEmails = aLaDemande(() => import('./JournalEmails.jsx'));
 import { createPortal, flushSync } from "react-dom";
 // (5 nov., chantier B) Les composants partagés et l'écriture unique des euros (docs/passation/2026-11-05-chantier-b.md).
 import { montant, fmt as fmtMontant, fmtE as fmtEMontant, fmtE0 as fmtE0Montant, prixTxt as prixTxtMontant } from "./format.js";
@@ -190,8 +238,17 @@ import { relanceProposable, numeroSorti } from './ebayRelance.js';
 // journée, Ventes, le rappel du matin, le rappel du soir et le widget (§11).
 import {DELAI_EXPEDITION_J, limiteExpedition, lireDateLimite, echeanceLimite, texteLimiteEnvoi, bordsParTransaction} from '../api/_lib/limite-envoi.js';
 import { photoArticle, photoCommande, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from "./photosArticles.js";
-import {appelerEbay,ResponsiveChatPortal,EbayCommande,EbayMessages,EbayOffres,EbayAgent,EbayEvaluations,EbayRetours,EbayPromotion,EbayAchats} from "./ebayGestion.jsx";
-import RechercheEbay,{repereAdmis} from "./ebayRecherche.jsx";
+// (6 nov., vitesse 2) Les écrans eBay (src/ebayGestion.jsx) : à la demande. Ce dont l'app
+// a besoin sans eux vient de leurs fichiers (`appelerEbay`, le portail des conversations) ;
+// leur feuille de style reste ICI, à la place de l'ancien import (même ordre).
+import {appelerEbay} from "./ebayRequetes.js";
+import {ResponsiveChatPortal} from "./ChatPortal.jsx";
+import "./ebay-interface.css";
+const _ecranEbay = (nom) => aLaDemande(() => import("./ebayGestion.jsx").then((m) => ({ default: m[nom] })));
+const EbayCommande = _ecranEbay("EbayCommande"), EbayMessages = _ecranEbay("EbayMessages"), EbayOffres = _ecranEbay("EbayOffres"), EbayAgent = _ecranEbay("EbayAgent");
+const EbayEvaluations = _ecranEbay("EbayEvaluations"), EbayRetours = _ecranEbay("EbayRetours"), EbayPromotion = _ecranEbay("EbayPromotion"), EbayAchats = _ecranEbay("EbayAchats");
+// (6 nov., vitesse 2) RechercheEbay : à la demande ; sa règle pure `repereAdmis` vit dans repereEbay.js.
+import {repereAdmis} from "./repereEbay.js";
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
 import { captchaActif, routeProtegee, jetonCaptcha, etatCaptcha, abonnerCaptcha, consommerCaptcha, corpsAvecCaptcha, monterWidget, MSG_CAPTCHA_ATTENTE, MSG_CAPTCHA_REFUS, MSG_CAPTCHA_ERREUR } from "./captcha.js";
 import { boutiqueIci, boutiqueOrion, estAndroid, pageExtensionsIci, nomNavigateurIci, mobileIci, LIENS_BOUTIQUES, LIEN_FIREFOX_ANDROID, LIEN_ORION_FICHIER, NOTICE_ORION, phraseNavigateur, motsNavigateur } from "./navigateurExtension.js";
@@ -203,7 +260,8 @@ import { boutiqueIci, boutiqueOrion, estAndroid, pageExtensionsIci, nomNavigateu
 // Relu à CHAQUE phrase (revue du 5 nov.) : un repère posé après le chargement
 // du module (window.KAGI) est vu quand même — jamais figé au démarrage.
 const NAV = new Proxy({}, { get: (_, k) => motsNavigateur()[k] });
-import { FicheFacturation, FactureVente, ListeFacturesPro, relireFactures } from "./FacturePro.jsx";
+// (6 nov., vitesse 2) FacturePro : à la demande ; sa feuille de style reste ICI (même ordre).
+import "./facture-pro.css";
 import { etatFacturation, factureDepuisVente, pdfFacturX, nomFichierFacture, recapEReporting, recapCsv, recapJson, eurDe, frJour } from "./facturationElectronique.js";
 import { lireSuperPdp, appelSuperPdp, enBase64, libelleEnvoi, ENV_LIBELLE } from "./superpdp.js";
 import { lirePhotoroom, appelPhotoroom, phraseVerif, phraseSansReponse, dateCourte, LIEN_CLE, LIEN_TARIFS } from "./photoroomCle.js";
@@ -243,7 +301,8 @@ const TOURNEE_SUR_JOURNEE = false;
 const JOURNEE_AVEC_WIDGETS = false;
 import { UneLigne } from "./UneLigne.jsx";
 import { GlisserVente, useDeposeDiffere, BarreAnnulerDepose } from "./GlisserDepose.jsx";
-import ScannerColis from "./ScannerColis.jsx";
+// (6 nov., vitesse 2) ScannerColis : à la demande ; sa feuille de style reste ICI (même ordre).
+import "./design/scanner.css";
 import { beneficeLigneVente, texteBenefice, euros as eurosLigne } from "./beneficeLigne.js";
 import { friseVente, phraseVente, eurosRecap, ETATS_HORS_PARCOURS } from "./recapVente.js";
 import { auCentreDeVerification } from "./verificationArticle.js";
@@ -273,8 +332,10 @@ import "./styles-annonces-coherence.css";   // (5 nov., chantier C) Annonces : b
 import { colonnesColis, SITES_COLIS } from "./colisColonnes.js";
 import { fusionEntreeVente, parcoursPaire } from "./fichePaire.js";
 import { etatNumeroColis } from "./emballage.js";
-import ModeEmballage from "./ModeEmballage.jsx";
-import FichePaire from "./FichePaire.jsx";
+// (6 nov., vitesse 2) ModeEmballage : à la demande ; sa feuille de style reste ICI (même ordre).
+import "./styles-emballage.css";
+// (6 nov., vitesse 2) FichePaire : à la demande ; ses feuilles de style restent ICI (même ordre).
+import "./styles-fiche-paire.css";
 import { SITES_TACHE, TACHES_SITE, estTacheSite, siteDeTache, sectionDeTache, sousSections, subDeTache, redirigerOnglet, filtreRetenu, retenirFiltre } from "./navigationTache.js";
 import { lireCible, selecteursCible, phraseAbsente, attrCible } from "./cibleNotif.js";
 import { fusionnerLigne, fusion3, egal as egalStable, CLE_POOL, CLES_FICHES } from "./fusionNuage.js";
@@ -299,9 +360,10 @@ import { carteArgentJournee } from "./journeeArgent.js";
 import { CLE_MODELES, lireModeles } from "./modelesDescription.js";
 import { MesModeles, InsererModele } from "./ModelesDescription.jsx";
 import { CLE_REGLAGE_ETIQUETTE, PLACES as PLACES_ETIQUETTE, FORMES as FORMES_ETIQUETTE, QUESTIONS as QUESTIONS_ETIQUETTE, ANNONCE_EXEMPLE, lireReglageEtiquette, etiquetteDe, poserEtiquette, retirerEtiquette, proposition as propositionEtiquette } from "./etiquetteNumero.js";
-import PrixPartout from "./PrixPartout.jsx";
+// (6 nov., vitesse 2) PrixPartout : à la demande (sa feuille de style est déjà plus haut).
 import SelecteurSites, { LogoSite } from "./SelecteurSites.jsx";
-import PublierAilleurs from "./PublierAilleurs.jsx";
+// (6 nov., vitesse 2) PublierAilleurs : à la demande ; sa feuille de style reste ICI (même ordre).
+import "./styles-publier-ailleurs.css";
 import { SITES_PUBLIER, apercuEnvoi, manquesEnvoi, etatsPaire, partoutLeMeme, lienVu, chercherPaires } from "./publierAilleurs.js";
 import { optionsSelecteur, nomCompteVente, identiteCompteVente, annuaireLbc, ongletSansDonnee, nomPlateforme, logoPlateforme } from "./plateformes.js";
 import { MR_SELECT, lireColisMondialRelay, suivisAvecMondialRelay, accordCodes, codeDuCompteMr, ouTrouverQr, ilYa as ilYaLecture, compteDuRetrait, indexAchatsAutresSites } from "./retraitQr.js";
@@ -1935,6 +1997,62 @@ function ligneCommandes(r) {
   return { id: r.id, updated_at: r.updated_at, cap: r.cap, data };
 }
 function idsCommandes(uids) { return (uids || []).flatMap((u) => [`harvest_${u}_orders_sold`, `harvest_${u}_orders_purchased`]); }
+// ── LES DRESSINGS ET LES AUTRES LIGNES D'UN COMPTE : LA MÊME PROJECTION ──────
+// (6 nov., vitesse 2) Mesuré sur sa base (lecture seule, `length(data::text)`) :
+// les lignes `harvest_*_listings` pèsent ~298 Ko, dont ~46 Ko d'un compte qui
+// n'est plus lié, et étaient lues en `select=id,data` / `select=data` à quatre
+// endroits (recherche, « Tout sur le N° », Leboncoin, « Le prix qui marche »),
+// plus `fetchHarvest` (dressing, boîte de réception) en `select=data`. Ce que le
+// code lit d'une ligne : sa date de capture, la marque « vidée par toi » et le
+// `payload` — exactement ce que `ligneCommandes` rebâtit (le reste de `data` :
+// `uid`, `type`, `domain`, `nItems`, jamais lu ; l'identifiant vient de `id`).
+// ⚠️ Le `payload` d'un dressing, c'est ~99 % de la ligne (la liste des annonces) :
+//    la projection ne retire que l'enveloppe. Le gain vient surtout de ne lire
+//    QUE les comptes voulus (`lireDressings`).
+const SEL_MOISSON = 'id,updated_at,cap:data->>capturedAt,supprime:data->supprime,payload:data->payload';
+const idsDressings = (uids) => (uids || []).map((u) => `harvest_${u}_listings`);
+// Les dressings, projetés et rebâtis (`ligneCommandes`). `lire(q)` rend le
+// tableau lu ou `null` (pas su). `uids` (identifiants Vinted, chiffres seuls) ⇒
+// `id=in.(…)` — ⚠️ §4.1 : une réponse VIDE pour ces comptes n'est pas une
+// réponse ⇒ relue par motif, comme avant ; un identifiant qui n'est pas un
+// nombre ⇒ le motif aussi (l'appelant filtre ensuite, comme avant). `exclure` ⇒
+// le motif SANS ces comptes (`id=not.in.(…)`, ceux que l'écran écarte de toute
+// façon). Rend les lignes, ou `null` (pas su).
+async function lireDressings(lire, { uids = null, exclure = null } = {}) {
+  const rebatir = (rows) => (Array.isArray(rows) ? rows.map(ligneCommandes) : null);
+  const u = Array.isArray(uids) ? [...new Set(uids.map(String))] : null;
+  if (u && u.length && u.every((x) => /^\d+$/.test(x))) {
+    const l = await lire(`app_data?id=in.(${idsDressings(u).join(',')})&select=${SEL_MOISSON}`);
+    if (!Array.isArray(l)) return null;
+    if (l.length) return rebatir(l);
+  }
+  const x = Array.isArray(exclure) ? [...new Set(exclure.map(String))].filter((v) => /^\d+$/.test(v)) : [];
+  return rebatir(await lire(`app_data?id=like.harvest_*_listings${x.length ? `&id=not.in.(${idsDressings(x).join(',')})` : ''}&select=${SEL_MOISSON}`));
+}
+// Les comptes liés que l'écran connaît (`vinted_accounts`), sinon ceux de la
+// dernière lecture sur cet appareil (`vrm_comptes_lies`), sinon `null` (pas su :
+// l'appelant lit tout, comme avant). Jamais une décision de compte : seulement
+// QUOI lire.
+function uidsLies(liste) {
+  const l = Array.isArray(liste) ? liste.map((a) => String((a && a.vinted_user_id) || '')).filter(Boolean) : [];
+  if (l.length) return [...new Set(l)];
+  return comptesLiesMemorises((AUTH.user && AUTH.user.id) || 'local');
+}
+// Les ACHATS (`orders_purchased`, la seule liste des commandes) des comptes
+// liés. Même règle que les dressings : réponse vide ⇒ relue par motif (§4.1),
+// comptes pas sus ⇒ tous. `null` = pas su. (6 nov., vitesse 2 : la cloche « où
+// ranger », le registre des achats et l'export lisaient les achats de TOUS les
+// comptes jamais captés — ~100 Ko d'anciens comptes au banc.)
+async function lireAchatsLies(uids) {
+  const sel = 'select=id,orders:data->payload->my_orders';
+  const u = Array.isArray(uids) ? [...new Set(uids.map(String))] : null;
+  if (u && u.length && u.every((x) => /^\d+$/.test(x))) {
+    const l = await lireTout(`id=in.(${u.map((x) => `harvest_${x}_orders_purchased`).join(',')})&${sel}`).catch(() => null);
+    if (!Array.isArray(l)) return null;
+    if (l.length) return l;
+  }
+  return lireTout(`id=like.harvest_*_orders_purchased&${sel}`).catch(() => null);
+}
 // Les comptes liés de la DERNIÈRE lecture réussie de `vinted_accounts`, sur cet
 // appareil et pour CE vendeur : seulement pour savoir QUOI précharger avant que
 // la liste n'arrive. Ce n'est jamais une décision : un compte lié depuis est lu
@@ -4438,12 +4556,14 @@ const fetchHarvest = async (uid, type, opts = {}) => {
 const fetchHarvestBrut = async (uid, type, opts = {}) => {
   busyStart();
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${uid}_${type}&select=data,updated_at,cap:data->>capturedAt`, {
+    // (6 nov., vitesse 2) Projetée (§4.4, `SEL_MOISSON`) : date de capture,
+    // marque « vidée par toi » et `payload` — tout ce qui est lu plus bas.
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${uid}_${type}&select=${SEL_MOISSON}`, {
       headers: sbAuth(),
     });
     if (!res.ok) return null;
     const rows = await res.json();
-    const row = rows[0];
+    const row = Array.isArray(rows) && rows[0] ? ligneCommandes(rows[0]) : undefined;
     // 5.167 (11 octobre) : le dressing d'un compte, LÀ OÙ IL EST LU, passe par la
     // règle « en ligne » — la lecture complète la plus récente (son dressing ou
     // sa lecture publique), sans les supprimées, et « à confirmer » au-delà de
@@ -31272,7 +31392,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
               pouvait QUE échouer. Il relit maintenant les reçus arrivés par
               email — la source qui remplit vraiment cet écran. */}
           <Btn small outline color={C.muted} disabled={fetching}
-            onClick={async()=>{ setFetching(true); try{ const r=await relireFactures(DEPS_FACTURE); if(r) toast('Factures relues'); else toast('Les factures n\'ont pas pu être relues — réessaie dans un instant.'); } finally { setFetching(false); } }}
+            onClick={async()=>{ setFetching(true); try{ const r=await import('./FacturePro.jsx').then((m)=>m.relireFactures(DEPS_FACTURE)).catch(()=>null); if(r) toast('Factures relues'); else toast('Les factures n\'ont pas pu être relues — réessaie dans un instant.'); } finally { setFetching(false); } }}
             style={{display:'inline-flex',alignItems:'center',gap:5}}>
             <Icon name="sync" size={13}/>{fetching?'Chargement…':'Relire les factures'}
           </Btn>
@@ -38500,12 +38620,17 @@ const libelleYm = (ym) => { const [a, m] = String(ym).split('-'); return `${MOIS
 // Les sources des écrans, telles quelles ; lectures en base PAGINÉES (`lireTout`)
 // et PROJETÉES (jamais `select=data`). Une source ratée ⇒ sa feuille dit « — ».
 // Rien ne part ailleurs : le zip est téléchargé sur l'appareil.
+// (6 nov., vitesse 2) Les achats des comptes LIÉS seulement (`lireAchatsLies`) — les
+// mêmes que le registre des achats et les totaux de Comptabilité (« un compte
+// retiré n'entre dans aucun total ») : la liste des comptes lue d'abord, puis
+// leurs seules lignes. Liste illisible ⇒ tous, comme avant.
 async function sourcesExportDonnees() {
   const rel = load('vrm_stats_ventes', null), urs = load('vinted_urssaf_mois', null);
   const fiches = load('vinted_annonce_numeros', null);
+  const comptesLus = fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=vinted_user_id,login`, { headers: sbAuth() }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
   const [lignesAchats, comptesV, factures] = await Promise.all([
-    lireTout('id=like.harvest_*_orders_purchased&select=id,orders:data->payload->my_orders').catch(() => null),
-    fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=vinted_user_id,login`, { headers: sbAuth() }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    comptesLus.then((c) => lireAchatsLies(Array.isArray(c) ? uidsLies(c) : null)),
+    comptesLus,
     lireTout('id=like.email_invoice_*&select=id,number:data->>number,status:data->>status,emiseLe:data->>emiseLe,tx:data->>transaction,annuleePar:data->>annuleePar,type:data->>type').catch(() => null),
   ]);
   const login = new Map((Array.isArray(comptesV) ? comptesV : []).map((c) => [String(c.vinted_user_id), String(c.login || '')]));
@@ -38580,10 +38705,14 @@ function useDeclarablesCompta({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, 
 // la vente elle-même. Les achats sont lus comme « Exporter mes données » :
 // paginés (`lireTout`), PROJETÉS (jamais `select=data`), avec leur reçu relié
 // par SON n° de transaction. Une lecture ratée ⇒ « — » et le manque nommé.
+// (6 nov., vitesse 2) Seulement les achats des comptes LIÉS (`lireAchatsLies`), comme
+// les recettes d'à côté (`useVentesCoque`, comptes liés) : la liste des comptes lue
+// d'abord. Illisible ⇒ tous, comme avant ; réponse vide ⇒ relue par motif (§4.1).
 const lireAchatsRegistre = async () => {
+  const comptesLus = fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=vinted_user_id,login`, { headers: sbAuth() }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
   const [lignes, comptesV] = await Promise.all([
-    lireTout('id=like.harvest_*_orders_purchased&select=id,orders:data->payload->my_orders').catch(() => null),
-    fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=vinted_user_id,login`, { headers: sbAuth() }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    comptesLus.then((c) => lireAchatsLies(Array.isArray(c) ? uidsLies(c) : null)),
+    comptesLus,
   ]);
   if (!Array.isArray(lignes)) return null;
   const login = new Map((Array.isArray(comptesV) ? comptesV : []).map((c) => [String(c.vinted_user_id), String(c.login || '')]));
@@ -63605,7 +63734,12 @@ function LeboncoinScreen() {
     const blkRows = await sbGet('app_data?id=eq.vrm_blocked_accounts&select=data');
     ((blkRows && blkRows[0] && blkRows[0].data && blkRows[0].data.uids) || []).forEach((u) => offAcc.add(String(u)));
     const lost = main.vinted_pairs_lost || {};
-    const listRowsBrut = await sbGet('app_data?id=like.harvest_*_listings&select=id,data');
+    // (6 nov., vitesse 2) Projetés (§4.4), sans les comptes que l'écran écarte de
+    // toute façon (`offAcc` : masqués, supprimés — chacun de leurs usages plus bas
+    // les saute). Les autres, liés ou non, restent : la file doit être celle de
+    // l'extension (`buildLbcData` lit tous les comptes, §11), et « vendue sur
+    // Vinted → à retirer » a besoin de l'état de chaque annonce.
+    const listRowsBrut = await lireDressings(sbGet, { exclure: [...offAcc] });
     // 5.167 (11 octobre) : seulement ce qui est EN LIGNE d'après la lecture la
     // plus récente de chaque compte — la même règle que l'écran Annonces et que
     // la file de l'extension (`enLigneDesLignes`, §11). Celles « à confirmer »
@@ -64982,11 +65116,32 @@ const compterNonLuesNotifs = async () => {
 const CLE_RANGER_VUS = 'vrm_ranger_vus', CLE_RANGER_PROPOSES = 'vrm_ranger_proposes';
 const lireRangerLocal = (k) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v && typeof v === 'object' && !Array.isArray(v) ? v : null; } catch (_) { return null; } };
 const ecrireRangerLocal = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} };
+// Les achats des comptes donnés, s'ils viennent d'être lus (`cachedRow('o:uid')`, encore
+// frais) : au format de `lireAchatsLies` (`{ id, orders }`). `null` dès qu'UN compte
+// manque, n'a pas répondu, ou qu'aucune ligne d'achats n'est revenue (§4.1 : une liste
+// vide n'est pas une réponse) — l'appelant lit alors lui-même.
+async function achatsDejaLus(uids) {
+  if (!Array.isArray(uids) || !uids.length) return null;
+  const entrees = uids.map((u) => _rowCache.get(`o:${u}`));
+  if (entrees.some((e) => !e || (Date.now() - e.at) >= ROW_TTL_MS)) return null;
+  const parts = await Promise.all(entrees.map((e) => e.promesse.catch(() => null)));
+  if (!parts.every(Array.isArray)) return null;
+  const lignes = parts.flat().filter((r) => r && /_orders_purchased$/.test(String(r.id || '')))
+    .map((r) => ({ id: r.id, orders: (r.data && r.data.payload && r.data.payload.my_orders) || [] }));
+  return lignes.length ? lignes : null;
+}
 async function calculerOuRanger() {
   if (!isCloudReady()) return null;
   const meubles = load('vrm_meubles', null), slots = load('vrm_slots', null);
   const caseLibre = premiereCaseMeubles({ meubles, slots });
-  const lignes = await lireTout('id=like.harvest_*_orders_purchased&select=id,orders:data->payload->my_orders').catch(() => null);
+  // (6 nov., vitesse 2) Les achats des comptes LIÉS seulement (la dernière liste lue
+  // sur cet appareil, `vrm_comptes_lies`) : un achat d'un compte retiré n'arrive
+  // plus chez lui. Pas sue ⇒ tous ; réponse vide ⇒ relue par motif (§4.1).
+  // Et d'abord ceux que le démarrage VIENT de lire (le préchargement range les commandes
+  // de chaque compte lié dans `cachedRow('o:uid')`, 60 s) : la cloche part 4 s après
+  // l'arrivée du nuage, elle les trouve là — aucune relecture (~800 Ko sur sa base).
+  const uids = uidsLies(null);
+  const lignes = (await achatsDejaLus(uids)) || (await lireAchatsLies(uids));
   if (!Array.isArray(lignes)) return null;
   const recup = load('vinted_pickup_done', {}) || {};
   const achats = lignes.flatMap((r) => (Array.isArray(r && r.orders) ? r.orders : []));
@@ -66042,7 +66197,8 @@ function DoubleVerification({ onEtat } = {}) {
       else setMsg({ t: (r.json && (r.json.msg || r.json.message)) ? `Le service de connexion a refusé : « ${r.json.msg || r.json.message} ». Rien n'est activé.` : `Le service de connexion a refusé (erreur ${r.status}). Rien n'est activé.`, ton: 'err' });
       return;
     }
-    setCode(''); setCours({ etape: 'qr', id: String(r.json.id), qr: qrMfa(t), secret: String(t.secret || ''), nom: n, ajout });
+    const qr = await import('./qrMfa.js').then((m) => m.qrMfa(t)).catch(() => '');   // (6 nov., vitesse 2) à la demande
+    setCode(''); setCours({ etape: 'qr', id: String(r.json.id), qr, secret: String(t.secret || ''), nom: n, ajout });
   };
   const annulerActivation = async () => {
     const id = cours && cours.id; setCours(null); setCode(''); setMsg(null);
@@ -69971,7 +70127,9 @@ function AppCoeur() {
     // rien n'est écarté (pas su).
     const okUid=comptesRecherche(vintedAccounts);
     const duCompte=(r)=>{ if(!okUid) return true; const m=/^harvest_([^_]+)_/.exec(String(r&&r.id||'')); return !m || okUid.has(m[1]); };
-    const lst=(await lireLignesEnLigne((await sb('app_data?id=like.harvest_*_listings&select=id,data')||[]).filter(duCompte))).lignes;   // 5.167 : la règle « en ligne » (§11)
+    // (6 nov., vitesse 2) Les dressings des SEULS comptes cherchés, projetés
+    // (`lireDressings` : vide ⇒ relus par motif, puis filtrés comme avant).
+    const lst=(await lireLignesEnLigne((await lireDressings(sb,{uids:okUid?[...okUid]:null})||[]).filter(duCompte))).lignes;   // 5.167 : la règle « en ligne » (§11)
     for(const r of lst){ const p=(r.data&&r.data.payload)||{}; for(const it of (p.items||[])){ if(!it.is_closed&&!it.is_hidden&&!it.is_draft) online.add(String(it.id)); } }
     // (6 nov., vague 2) Les commandes des SEULS comptes cherchés (`id=in.`), et
     // seulement leur liste (`data->payload->my_orders`, §4.4) : avant, toutes les
@@ -70036,7 +70194,10 @@ function AppCoeur() {
     // Le Stock vit dans SA ligne (`vrm_room`) : la copie de l'appareil peut
     // manquer (purgée à la remise à zéro, appareil neuf) — on la lit ici.
     const [lstRows, soldRows, txnItem, bE, bL, lbcRows, cE, planLu]=await Promise.all([
-      sb('app_data?id=like.harvest_*_listings&select=id,data'),
+      // (6 nov., vitesse 2) Projetés (§4.4), TOUS les comptes, exprès : la fiche
+      // d'un N° vendu par un ancien compte garde ses vues, favoris et date de mise
+      // en ligne (`stats`, `crees`), lus dans le dressing quel qu'il soit.
+      lireDressings(sb),
       // (6 nov.) Projetée (§4.4). TOUS les comptes, exprès : « Tout sur le N° »
       // retrouve aussi une vente d'un ancien compte (rien n'y filtre les ventes).
       sb('app_data?id=like.harvest_*_orders_sold&select=id,mo:data->payload->my_orders'),
@@ -70347,7 +70508,10 @@ function AppCoeur() {
     for(const r of so){ for(const o of (Array.isArray(r&&r.mo)?r.mo:[])){
       const t=String(o.transaction_id||o.id||''); if(t&&seen.has(t)) continue; if(t) seen.add(t);
       if(/finalis/i.test(o.status||'')) sold.push(o); } }
-    const lst=(await lireLignesEnLigne(await sb('app_data?id=like.harvest_*_listings&select=data')||[])).lignes;   // 5.167 : la règle « en ligne » (§11)
+    // (6 nov., vitesse 2) Projetés, et seulement les comptes LIÉS : seules leurs
+    // annonces peuvent être « en ligne » à l'écran Annonces (qui ne lit que
+    // `vinted_accounts`). Liste pas sue ⇒ tous, comme avant.
+    const lst=(await lireLignesEnLigne(await lireDressings(sb,{uids:uidsLies(vintedAccounts)})||[])).lignes;   // 5.167 : la règle « en ligne » (§11)
     const online=[]; for(const r of lst){ const p=(r.data&&r.data.payload)||{};
       for(const it of (p.items||[])){ if(!it.is_closed&&!it.is_hidden&&!it.is_draft) online.push(it); } }
     const g = grouperPrixMarche(sold, online);
