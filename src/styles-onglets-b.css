@@ -24,4 +24,4 @@
 .vrm-s2d-pastille.is-libre { color: var(--vrm-muted, #8E8E93); outline: 1.5px dashed color-mix(in srgb, var(--vrm-muted, #8E8E93) 55%, transparent); outline-offset: -1.5px; font-weight: 400; font-size: 13px; }
 .vrm-s2d-pastille.is-rangee { background: rgba(0, 0, 0, .62); color: #FFFFFF; }
 .vrm-s2d-pastille.is-vendue { background: var(--vrm-accent, #0071E3); color: var(--vrm-on-accent, #FFFFFF); }
-.vrm-s2d-pastille.is-plusenligne { background: var(--vrm-warn, #B25000); color: #FFFFFF; }
+.vrm-s2d-pastille.is-plusenligne { background: var(--vrm-warn, #B25000); color: var(--vrm-on-warn, #FFFFFF); }

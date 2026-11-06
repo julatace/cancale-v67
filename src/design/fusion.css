@@ -20,7 +20,9 @@
   --fu-carte: #ffffff;
   --fu-encre: #1d1d1f;
   --fu-gris: #6e6e73;
-  --fu-gris2: #8e8e93;
+  /* (6 nov., finition) le gris 2 porte du TEXTE (comptes, dates, compteurs) : #8e8e93 ne tenait
+     que 2,9:1 sur le fond #f2f2f7 — #6e6e73 tient 4,6:1 (AA), le gris secondaire de themeMineral. */
+  --fu-gris2: #6e6e73;
   --fu-gris3: #aeaeb2;
   --fu-piste: #e5e5ea;
   --fu-case: #f2f2f7;
@@ -138,7 +140,7 @@ button.vrm-fu-case:focus-visible { outline: 2px solid var(--fu-bleu); outline-of
 .vrm-fu-frise { list-style: none; margin: 0; padding: 0; display: flex; gap: 5px; min-width: 0; }
 .vrm-fu-seg { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .vrm-fu-seg > i { display: block; height: 5px; border-radius: 3px; background: var(--fu-piste); transition: background-color .25s ease; }
-.vrm-fu-seg > span { font: 600 11px/1.2 var(--vrm-police); color: var(--fu-gris3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-fu-seg > span { font: 600 11px/1.2 var(--vrm-police); color: var(--fu-gris); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vrm-fu-seg[data-fait="1"] > i { background: var(--fu-bleu); }
 /* (5 nov., revue 2.20) L'encre n'est qu'au MOT de la dernière étape faite ; l'étape en
    cours reste neutre (piste, mot gris) sauf un geste à faire (ambre). */
@@ -565,7 +567,7 @@ html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-tete .vrm-fu-cas
 /* « À faire · N gestes » */
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-titre-section { display: flex; justify-content: space-between; align-items: baseline; margin: 0 !important; padding: 18px 0 8px !important; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-titre-section .vrm-day-titre-section { font: 700 20px/1.2 var(--vrm-police) !important; letter-spacing: 0 !important; margin: 0 !important; color: var(--fu-encre) !important; }
-html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-titre-section > span { font: 600 13px/1.2 var(--vrm-police) !important; color: #8e8e93 !important; }
+html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-titre-section > span { font: 600 13px/1.2 var(--vrm-police) !important; color: var(--fu-gris) !important; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task-list > :is(.vrm-day-task, [data-alertes-argent] > .vrm-day-task) {
   min-height: 0 !important; gap: 12px !important; padding: 12px 14px !important; border-radius: 20px !important;
   box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 6px 20px rgba(0,0,0,.05) !important; background: var(--fu-carte) !important;

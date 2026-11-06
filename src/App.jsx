@@ -12780,7 +12780,7 @@ function ExtEnRetard({ onNav }) {
            un Chrome (un profil) par compte Vinted : ⟳ dans CHACUN. */
       detail={"1. Télécharge le zip ci-contre. 2. Dézippe-le : tu obtiens un dossier « VRM-extension » — mets-le à la place de l'ancien, au même endroit et avec le même nom. 3. PUIS, dans CHAQUE navigateur où l'extension est installée (chaque profil) : ouvre sa page des extensions (chrome://extensions sur Chrome), garde une seule carte VRM, et recharge-la (⟳ sur Chrome) — sinon le navigateur garde l'ancien code. 4. Recharge une page Vinted : la capture repart avec la nouvelle version."}
       action={<a href={`/VRM-extension.zip?v=${EXT_ATTENDUE}`} download
-        style={{display:'inline-block',border:'none',background:C.warn,color:'#fff',borderRadius:12,padding:'9px 15px',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap',textDecoration:'none'}}>
+        style={{display:'inline-block',border:'none',background:C.warn,color:C.onWarn||'#fff',borderRadius:12,padding:'9px 15px',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap',textDecoration:'none'}}>
         Télécharger la {EXT_ATTENDUE}
       </a>}
       style={{marginBottom:14}}/>
@@ -36352,7 +36352,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
               <div className="vrm-aide" style={{fontSize:12,color:C.muted,marginBottom:6}}>Ces annonces sont dans ton stock Vinted mais leur numéro n'est pas dans le stock.</div>
               <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
                 {enLignePasGarage.slice(0,ecartsMax).map(n=>(
-                  <span key={n} style={{background:C.warn,color:'#fff',borderRadius:6,padding:'3px 8px',fontSize:12,fontWeight:500}}>{n}</span>
+                  <span key={n} style={{background:C.warn,color:C.onWarn||'#fff',borderRadius:6,padding:'3px 8px',fontSize:12,fontWeight:500}}>{n}</span>
                 ))}
               </div>
               {enLignePasGarage.length>ecartsMax && (
