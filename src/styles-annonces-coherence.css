@@ -247,6 +247,14 @@ html body .vrm-act .vrm-act-pb a { color: var(--vrm-accent-texte, #0066CC); }
 .vrm-ann-neufs-num { flex: none; display: flex; align-items: center; min-height: 44px; }
 .vrm-ann-neufs-num [data-edition] > span { border-bottom: 0 !important; }
 .vrm-ann-neufs-nom { flex: 1; min-width: 0; font-size: 13px; color: var(--vrm-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* (6 nov.) Le prix d'achat au même geste : une seconde rangée sous le titre, alignée sur lui. */
+.vrm-ann-neufs-ligne { flex-wrap: wrap; row-gap: 4px; }
+.vrm-ann-neufs-prix { flex: 1 0 100%; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-left: 46px; box-sizing: border-box; min-width: 0; }
+.vrm-ann-neufs-prix-connu { font-size: 12px; color: var(--vrm-muted); font-variant-numeric: tabular-nums; }
+.vrm-ann-neufs-prix-champ { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--vrm-muted); min-height: 44px; }
+.vrm-ann-neufs-prix-champ input { width: 92px; height: 36px; box-sizing: border-box; border: 1px solid var(--vrm-line, rgba(0,0,0,.12)); border-radius: 10px; padding: 0 8px; background: transparent; color: var(--vrm-ink); font: inherit; font-size: 16px; outline: none; }
+.vrm-ann-neufs-prix-champ input:focus { border-color: var(--vrm-accent, #0071E3); }
+.vrm-ann-neufs-prix .vrm-b { max-width: 100%; }
 /* Au téléphone : la phrase du prix d'achat dans l'infobulle, la ligne reste UNE ligne. */
 @media (max-width: 767px) {
   .vrm-ann-achats-sous { display: none; }

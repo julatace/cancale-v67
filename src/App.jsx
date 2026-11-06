@@ -78,6 +78,7 @@ import { etatAnnonceVinted, enVerificationVinted, raisonPasSelectionnable, actio
 // (6 nov., vague 2) Remettre en vente une vente annulée avant l'envoi ; relier l'achat des annonces numérotées.
 import { annuleesChezToi, paireARemettre, fichesAnciennesAnnulees, ligneJournee as ligneAnnuleesJournee, etatRemise, VERDICT_MOTEUR as VERDICT_REMISE } from "./annuleesChezToi.js";
 import { fileSansAchat, aRelierJournee, meilleureSuggestion, texteSuggestion } from "./achatsARelier.js";
+import { prixAchatSaisi, ecriturePrixSaisi, prixADemander, suggestionNumerotage, MONTANT_ILLISIBLE } from "./prixAuNumerotage.js";
 import "./vague2-ventes.css";
 import { etatCycle, cartesSupprimees, majVusEnLigne, indexPresentes, montantSaisi as montantCycle, CHOIX as CHOIX_CYCLE, LIBELLE_CHOIX } from "./cycleArticle.js";
 import { chezMoiProposables } from "./propositionsSites.js";
@@ -2558,10 +2559,21 @@ function AskTextSheet({ q, close }) {
       {corps.length > 0 && (
         <div style={{fontSize:13,color:C.muted,marginTop:6,lineHeight:1.55,whiteSpace:'pre-wrap'}}>{corps.join('\n')}</div>
       )}
+      {/* (6 nov.) Une suggestion PROPOSÉE à côté du champ (le prix d'achat au
+          numérotage : « Relier · 32 € ») : SON tap rend { relier: true }, l'appelant
+          relie par l'écriture de « Relier un achat ». Le champ reste vide. */}
+      {q.suggestion ? (
+        <div className="vrm-ask-sugg" data-ask-suggestion="" style={{display:'flex',alignItems:'center',gap:10,marginTop:12,padding:'8px 10px',border:`1px solid ${C.border}`,borderRadius:12,background:C.card}}>
+          {q.suggestion.photo ? <PhotoVinted src={q.suggestion.photo} alt="" loading="lazy" style={{width:40,height:40,borderRadius:8,objectFit:'cover',flexShrink:0}}/> : null}
+          <span style={{flex:1,minWidth:0,fontSize:13,color:C.muted,lineHeight:1.4,overflow:'hidden',textOverflow:'ellipsis',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical'}}>{q.suggestion.detail}</span>
+          <Bouton variante="secondaire" icone="link" data-ask-relier="" onClick={() => close({ relier: true })} style={{flexShrink:0}}>{q.suggestion.bouton}</Bouton>
+        </div>
+      ) : null}
       <form onSubmit={(e) => { e.preventDefault(); close(v); }}>
         <input ref={ref} value={v} onChange={e => setV(e.target.value)}
           placeholder={q.placeholder || ''}
-          inputMode={q.numeric ? 'numeric' : undefined}
+          data-ask-champ={q.data || undefined}
+          inputMode={q.decimal ? 'decimal' : q.numeric ? 'numeric' : undefined}
           style={{width:'100%',boxSizing:'border-box',marginTop:14,border:`1px solid ${C.border}`,borderRadius:12,background:C.surface,color:C.text,fontSize:17,fontWeight:600,padding:'12px 13px',fontFamily:'inherit',outline:'none'}}/>
         <div style={{display:'flex',gap:9,marginTop:12}}>
           <Bouton variante="discret" onClick={() => close(null)} style={{flex:1}}>
@@ -12104,14 +12116,8 @@ const lirePhotosAchatsHors = async () => {
     return m;
   } catch (_) { return null; }
 };
-// Le prix tapé, relu en centimes (« 12,5 » → « 12,50 »). `undefined` = vide,
-// `null` = illisible (on refuse, on ne devine pas).
-const prixAchatSaisi = (v) => {
-  const t = String(v == null ? '' : v).trim();
-  if (!t) return undefined;
-  const c = centimes(t.replace(/\s|€/g, ''));
-  return (c == null || c < 0) ? null : (c / 100).toFixed(2).replace('.', ',');
-};
+// Le prix tapé, relu en centimes (« 12,5 » → « 12,50 ») : `prixAchatSaisi`,
+// importé de src/prixAuNumerotage.js — la même lecture pour toutes les saisies.
 const prixAchatHorsNombre = (b) => { const p = parseFloat(String(b && b.price != null ? b.price : '').replace(',', '.')); return isNaN(p) ? null : p; };
 
 function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifier, onSupprimer, paires, prochainNumero, onPrixParNumero }) {
@@ -14497,7 +14503,7 @@ function PrixMiniFeuille({ choisies, onPoser, onClose }) {
 // LA meilleure suggestion de `suggestionsAchat` (marque et taille obligatoires, achat
 // antérieur à la mise en ligne, lots). « Relier » écrit au prix du reçu (`propositionDe`),
 // « Saisir » le prix qu'il tape, « Plus tard » la range en fin de file. SON tap, toujours.
-function AchatsARelier({ file, achats, liens, propositionDe, onRelier, onSaisir, onPlusTard, onChoisir, compteDe }) {
+function AchatsARelier({ file, achats, liens, propositionDe, onRelier, onSaisir, onPlusTard, onChoisir, compteDe, onSerie = null }) {
   const lignes = useMemo(() => (Array.isArray(file) ? file.map((x) => {
     const sugg = Array.isArray(achats) ? meilleureSuggestion({ item: x.item, achats, liens, marqueDe: extractBrand, couleursDe: extractColors, modeleDe: extractModel }) : null;
     const p = sugg ? propositionDe(sugg.achat) : null;
@@ -14510,6 +14516,7 @@ function AchatsARelier({ file, achats, liens, propositionDe, onRelier, onSaisir,
   return (
     <section className="vrm-ar" data-ar={lignes.length} data-ar-sugg={achats === undefined ? '' : String(nSugg)} aria-label="Annonces sans achat relié">
       <p className="vrm-ar-tete">{achats === undefined ? `${lignes.length} annonce${lignes.length > 1 ? 's' : ''} · ${PAS_SU.enCours.toLowerCase()}` : `${lignes.length} annonce${lignes.length > 1 ? 's' : ''} · ${nSugg} avec une suggestion`}{achats !== undefined && nSugg < lignes.length ? <span> · une suggestion : même marque, même taille, achetée avant la mise en ligne</span> : null}</p>
+      {onSerie ? <div className="vrm-ar-serie"><Bouton variante="secondaire" icone="pencil" data-ar-serie="" onClick={onSerie}>Saisie en série des prix d’achat</Bouton></div> : null}
       <ul className="vrm-ar-liste">
         {lignes.map((l) => {
           const it = l.item, t = l.texte, num = l.fiche && l.fiche.numero;
@@ -46228,24 +46235,49 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // le seul moment où la paire est sous la main. Mesuré : 8 paires sur 401
   // seulement en portaient un. « Plus tard » laisse vide — mieux vaut un blanc
   // qu'un faux (§5), rien n'est jamais deviné.
+  // (6 nov., sa décision) UNE ÉCRITURE pour tout prix TAPÉ (src/prixAuNumerotage.js) :
+  // la feuille du numérotage, la saisie en série (`setBuyForKey`), « Saisir » de la
+  // file Sans achat relié, la ligne « mise en ligne numérotée par VRM ». Vide ⇒ RIEN
+  // n'est écrit ; illisible ⇒ rien, on le dit ; sinon { buyPrice, buyFromId: null,
+  // buyFrom: null } dans la fiche, et le miroir par N° (`vinted_buyprice_by_num`, qui
+  // survit à la vente). `cible` : l'annonce (objet : `updatePair`, qui pose aussi
+  // titre, photo et compte sur la fiche) ou la clé d'une fiche existante (saisie en
+  // série). `numero` : celui qu'on vient de poser (la fiche relue ici ne l'a pas
+  // encore). Rend { etat, patch }.
+  const ecrirePrixTape = (cible, texte, numero) => {
+    const w = ecriturePrixSaisi(texte);
+    if (w.etat === 'illisible') toast(MONTANT_ILLISIBLE);
+    if (w.etat !== 'ok') return w;
+    const k = String(cible && typeof cible === 'object' ? cible.id : cible);
+    if (cible && typeof cible === 'object') updatePair(cible, w.patch);
+    else setNumeros(prev => { const u = { ...prev, [k]: { ...(prev[k] || {}), ...w.patch } }; save('vinted_annonce_numeros', u); return u; });
+    const num = String((numero != null ? numero : (numeros[k] || {}).numero) || '').trim();
+    if (num) setBuyByNum(prev => { const u = { ...prev, [num]: w.patch.buyPrice }; save('vinted_buyprice_by_num', u); return u; });
+    return w;
+  };
   const demanderPrixAchat = async (item, numeroPose) => {
-    if (buyOf(item) != null) return;                       // déjà un prix saisi
-    const e = effEntry(item);
-    if (e && e.buyFromId) return;                          // déjà relié à un achat
+    if (!prixADemander(effEntry(item), buyOf(item))) return;   // prix connu ou achat relié
+    // Une suggestion d'achat (la règle de « Sans achat relié » : marque ET taille,
+    // achat antérieur à la mise en ligne) est PROPOSÉE à côté du champ, jamais posée
+    // dedans. Les achats captés sont relus (relecture seule, aucun appel Vinted) ;
+    // s'ils tardent plus d'1,5 s, la feuille s'ouvre sans suggestion.
+    let sugg = null;
+    try {
+      const achats = await Promise.race([chargerAchats(), new Promise((r) => setTimeout(() => r(null), 1500))]);
+      const s = Array.isArray(achats) && achats.length ? meilleureSuggestion({ item, achats, liens: liensParAchat(numeros, saleOv), marqueDe: extractBrand, couleursDe: extractColors, modeleDe: extractModel }) : null;
+      const aff = s ? suggestionNumerotage(texteSuggestion(s, propositionSuggestion(s.achat)), montant) : null;
+      if (aff) sugg = { achat: s.achat, aff: { ...aff, photo: orderPhoto(s.achat) || '' } };
+    } catch (_) { sugg = null; }
     const rep = await askText({
       title: `Prix d'achat de la N°${numeroPose} ?`,
-      desc: `Tu viens de numéroter « ${item.title || item.brand || 'cet article'} ». Si tu l'as sous la main, note ce que tu l'as payé — sinon « Plus tard », tu le mettras quand tu veux.`,
-      value: '', placeholder: 'ex : 25 ou 12,50', ok: 'Enregistrer', cancel: 'Plus tard',
+      desc: `Tu viens de numéroter « ${item.title || item.brand || 'cet article'} ». Note ce que tu l'as payé — tu peux le mettre plus tard.`,
+      value: '', placeholder: 'ex : 25 ou 12,50', decimal: true, data: 'prix-numerotage', ok: 'Enregistrer', cancel: 'Plus tard',
+      suggestion: sugg ? sugg.aff : null,
     });
-    if (rep == null) return;                               // « Plus tard » / fermé
-    const v = String(rep).trim();
-    if (v === '') return;
-    const n = parseFloat(v.replace(',', '.'));
-    if (!isFinite(n) || n < 0) { toast('Un prix, ce sont des chiffres (ex : 25 ou 12,50).'); return; }
-    // Même écriture que le champ « achat » de la carte : un prix posé à la main
-    // n'est pas « relié à un achat » (on efface buyFromId/buyFrom).
-    updatePair(item, { buyPrice: v, buyFromId: null, buyFrom: null });
-    toast(`Prix d'achat enregistré : ${fmtE(n)}`);
+    if (rep == null) return;                               // « Plus tard » / fermé : rien d'écrit
+    if (typeof rep === 'object') { if (rep.relier && sugg) await relierAchatAnnonce(item, sugg.achat); return; }
+    const w = ecrirePrixTape(item, rep, numeroPose);
+    if (w.etat === 'ok') toast(`Prix d'achat enregistré : ${w.patch.buyPrice} €`);
   };
   // (5 nov.) UN N° CHANGÉ À LA MAIN (12 → 40), à la mise en ligne ou après :
   // l'ancien est peut-être déjà écrit sur le carton. Il passe dans « N° à écrire
@@ -47014,8 +47046,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const blocNouveaux = () => numerosNeufs.length > 0 && (
     <div className="vrm-ann-neufs" data-num-neufs={numerosNeufs.length}>
       <div className="vrm-ann-neufs-tete">{numerosNeufs.length > 1 ? `${numerosNeufs.length} mises en ligne numérotées par VRM` : 'Une mise en ligne numérotée par VRM'}</div>
-      <div className="vrm-ann-neufs-phrase">Touche le N° pour en mettre un autre (celui de ton carton, par exemple).</div>
-      {numerosNeufs.slice(0, 6).map((it) => { const f = numeros[it.id] || {}; return (
+      <div className="vrm-ann-neufs-phrase">Touche le N° pour en mettre un autre (celui de ton carton, par exemple). Le prix d'achat est facultatif : tu peux le mettre plus tard.</div>
+      {numerosNeufs.slice(0, 6).map((it) => { const f = numeros[it.id] || {};
+        // (6 nov.) LE PRIX D'ACHAT AU MÊME GESTE (src/prixAuNumerotage.js) : un champ vide,
+        // jamais pré-rempli ; une suggestion d'achat est PROPOSÉE à côté (« Relier · 32 € »),
+        // SON tap relie. Écrit par `ecrirePrixTape`, l'écriture de la saisie en série.
+        const aPrix = !prixADemander(f, prixAchatDe(f, buyByNum));
+        const sg = !aPrix && Array.isArray(fillBuyAchats.items) && fillBuyAchats.items.length ? meilleureSuggestion({ item: it, achats: fillBuyAchats.items, liens: liensAchats, marqueDe: extractBrand, couleursDe: extractColors, modeleDe: extractModel }) : null;
+        const sgAff = sg ? suggestionNumerotage(texteSuggestion(sg, propositionSuggestion(sg.achat)), montant) : null;
+        return (
         <div key={it.id} data-num-neuf={String(it.id)} className="vrm-ann-neufs-ligne">
           {it.photo ? <PhotoVinted src={it.photo} alt="" loading="lazy" decoding="async" className="vrm-ann-neufs-photo"/> : <PhotoVide taille={36} rayon={12}/>}
           <span className="vrm-ann-neufs-num">
@@ -47023,6 +47062,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </span>
           <span className="vrm-ann-neufs-nom">{it.title || '—'}</span>
           <Bouton variante="secondaire" taille="petit" data-num-neuf-ok={String(it.id)} onClick={() => vuNeuf([[it.id, f.numero]])} style={{ flexShrink: 0 }}>C'est bon</Bouton>
+          <div className="vrm-ann-neufs-prix" data-num-neuf-prix={aPrix ? 'connu' : 'vide'}>
+            {aPrix ? <span className="vrm-ann-neufs-prix-connu">{prixAchatDe(f, buyByNum) != null ? `Prix d'achat ${montant(prixAchatDe(f, buyByNum))}` : 'Achat relié'}</span> : <>
+              <label className="vrm-ann-neufs-prix-champ">
+                <span>Prix d'achat</span>
+                <ChampSaisie value="" data-prix-neuf={String(it.id)} onCommit={(v) => ecrirePrixTape(it, v, f.numero)} placeholder="facultatif" inputMode="decimal" aria-label={`Prix d'achat de la N°${f.numero}`}/>
+                <span aria-hidden="true">€</span>
+              </label>
+              {sgAff ? <Bouton variante="discret" taille="petit" icone="link" data-num-neuf-relier={String(sg.achat.transaction_id)} title={sgAff.detail} onClick={() => relierAchatAnnonce(it, sg.achat)}>{sgAff.bouton}</Bouton> : null}
+            </>}
+          </div>
         </div>); })}
       {numerosNeufs.length > 1 && <Bouton variante="discret" data-num-neufs-tout="" onClick={() => vuNeuf(numerosNeufs.map((it) => [it.id, (numeros[it.id] || {}).numero]))}>{numerosNeufs.length > 6 ? `Tout est bon (${numerosNeufs.length})` : 'Tout est bon'}</Bouton>}
     </div>);
@@ -50365,6 +50414,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fillBuyAchats.items, accounts]);
   useEffect(() => { if (fillBuyOpen) chargerAchats(); }, [fillBuyOpen, chargerAchats]);
+  // (6 nov.) « Mise en ligne numérotée par VRM » ouverte : les achats captés sont relus
+  // (relecture seule) pour PROPOSER une suggestion à côté du prix d'achat de chaque ligne.
+  useEffect(() => { if (neufsOuverts && numerosNeufs.length && accounts.length && !fillBuyAchats.items) chargerAchats(); /* eslint-disable-next-line */ }, [neufsOuverts, numerosNeufs.length, accounts.length]);
   // (30 oct.) Combien il en restait à l'ouverture : la saisie en série dit
   // combien sont faites depuis, avec UNE barre (« où j'en suis »).
   const fillBuyN0 = useRef(0);
@@ -50623,12 +50675,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // « Saisir » : le prix qu'il tape (jamais deviné), sans achat relié — l'écriture de la case de la carte.
   const saisirPrixAnnonce = async (it) => {
     const e = numeros[it.id] || {};
-    const t = await askText({ title: "Prix d'achat", desc: `${e.numero ? `N°${e.numero} · ` : ''}${it.title || ''}`, numeric: true, value: '', ok: VERBES.enregistrer, cancel: VERBES.annuler });
+    const t = await askText({ title: "Prix d'achat", desc: `${e.numero ? `N°${e.numero} · ` : ''}${it.title || ''}`, decimal: true, value: '', ok: VERBES.enregistrer, cancel: VERBES.annuler });
     if (t == null) return;
-    const p = prixAchatSaisi(t);
-    if (p === undefined) return;
-    if (p === null) { toast('Un montant en euros (ex : 25 ou 25,50).'); return; }
-    updatePair(it, { buyPrice: p, buyFromId: null, buyFrom: null });
+    ecrirePrixTape(it, t);   // la même écriture que la saisie en série et le numérotage
   };
   // Le prix PROPOSÉ d'une suggestion (reçu juste, sinon l'article seul ; jamais pour un lot).
   const propositionSuggestion = (a) => (a ? propositionPrixAchat({ identite: { achat: a, par: 'suggestion' }, ventilationDe: ventilationDeTx, estLot: estLotPropose }) : null);
@@ -50951,18 +51000,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       : 'dans chaque transporteur, le plus pressé est en haut ; 1 attend encore son bordereau.';
   };
 
-  const setBuyForKey = (key, val) => {
-    setNumeros(prev => {
-      const u = { ...prev };
-      const cur = u[key] || {};
-      const v = String(val || '').trim();
-      // Saisir un prix à la main efface le lien vers un achat (sinon la carte
-      // afficherait un achat qui n'a plus rien à voir avec le chiffre saisi).
-      u[key] = { ...cur, buyPrice: v, buyFromId: null, buyFrom: null };
-      save('vinted_annonce_numeros', u);
-      return u;
-    });
-  };
+  // La saisie en série : l'écriture de tout prix tapé (`ecrirePrixTape`, src/prixAuNumerotage.js).
+  // (6 nov.) Avant : le texte brut (« 25 € env. » enregistré tel quel) et un champ vidé
+  // écrivait '' en effaçant le lien vers l'achat. Vide ⇒ rien ; illisible ⇒ rien, dit.
+  const setBuyForKey = (key, val) => { ecrirePrixTape(key, val); };
   const [showReport, setShowReport] = useState(false);
   const [reportMonth, setReportMonth] = useState(() => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; });
   const [moisOuvert, setMoisOuvert] = useState(false);
@@ -53436,8 +53477,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           if (lj) jobs.push({ id: 'remettre-en-vente', n: lj.n, icon: 'restore', color: C.text, court: lj.court, detail: lj.detail, title: lj.court, photos: lj.photos.length ? lj.photos : null, tab: 'cat_ventes', prio: 2.6, avant: () => demanderVue('annulees') }); }
         // (6 nov., vague 2 · point 4) Les annonces numérotées sans achat relié : le nombre, une fois ;
         // « Voir » ouvre Annonces sur « Sans achat relié » (une suggestion par annonce, SON tap relie).
+        // (6 nov., prix au numérotage) C'est AUSSI la carte des paires numérotées TOUTES SEULES par
+        // VRM sans prix d'achat (même liste : en ligne, numérotée, ni prix ni achat) : une seule
+        // carte, qui le dit ; la file porte « Saisie en série » (la porte du chiffre faux, §5).
         { const nR = fileAchat ? aRelierJournee(fileAchat) : 0;
-          if (nR > 0) jobs.push({ id: 'achat-a-relier', n: nR, icon: 'link', color: C.text, court: `${nR} annonce${nR > 1 ? 's' : ''} sans achat relié`, detail: 'Une suggestion par annonce : ton tap relie', title: `${nR} annonce${nR > 1 ? 's' : ''} sans achat relié`, tab: 'cat_annonces', prio: 3.4, avant: () => demanderVue('sansachat') }); }
+          if (nR > 0) jobs.push({ id: 'achat-a-relier', n: nR, icon: 'link', color: C.text, court: `${nR} annonce${nR > 1 ? 's' : ''} numérotée${nR > 1 ? 's' : ''} sans prix d’achat`, detail: 'Saisis le prix ou relie l’achat (une suggestion par annonce, ou la saisie en série)', title: `${nR} annonce${nR > 1 ? 's' : ''} numérotée${nR > 1 ? 's' : ''} sans prix d’achat`, tab: 'cat_annonces', prio: 3.4, avant: () => demanderVue('sansachat') }); }
         jobs.sort((a,b)=>a.prio-b.prio);
         // RÉSULTAT DU JOUR : les paires VENDUES aujourd'hui (pas l'argent viré,
         // qui arrive plusieurs jours après). Source = les emails de vente, la
@@ -56804,7 +56848,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             onDetailBrouillons={()=>setBrouillonsOpen(true)}/>
         ) : annSort==='sansachat' ? (
           <AchatsARelier file={fileAchat} achats={fillBuyAchats.loading && !fillBuyAchats.items ? undefined : (fillBuyAchats.items || (accounts.length ? undefined : []))} liens={liensAchats}
-            propositionDe={propositionSuggestion} onRelier={relierAchatAnnonce} onSaisir={saisirPrixAnnonce} onPlusTard={poserAchatPlusTard}
+            propositionDe={propositionSuggestion} onRelier={relierAchatAnnonce} onSaisir={saisirPrixAnnonce} onPlusTard={poserAchatPlusTard} onSerie={()=>setFillBuyOpen(true)}
             onChoisir={(it)=>openPicker({ ...it, _dateRef: (()=>{ const t=Number(it.createdTs); return Number.isFinite(t)&&t>0 ? new Date(t<1e12?t*1000:t).toISOString() : null; })() })} compteDe={(a)=>a&&a._acc?accNameOf(a._acc):''}/>
         ) : annSort==='masquees' ? (
           <AnnoncesMasquees Photo={PhotoVinted} res={listings.masquees==null ? (listings.loading ? undefined : null) : masqueesParCompte(annMasquees, { numeroDe:(id)=>(numeros[id]||{}).numero||'', nomDe:(a)=>a?accNameOf(a):'' })}/>
@@ -56905,7 +56949,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       </div>
                       <div className="vrm-fiche-cell vrm-fiche-achat" data-fiche-achat={achatConnu?'connu':'inconnu'} style={cell}>
                         <span className="vrm-fiche-etat-haut"><span style={lib}>Prix d'achat</span><Icon name="pencil" size={12} style={{color:C.muted,flexShrink:0}}/></span>
-                        <EnLigne data="achat" value={buy} onCommit={v=>updatePair(item,{buyPrice:v,buyFromId:null,buyFrom:null})} inputMode="decimal" placeholder={achat!=null&&!isNaN(achat)?String(achat):'€'} largeur={72}
+                        <EnLigne data="achat" value={buy} onCommit={v=>String(v??'').trim() ? ecrirePrixTape(item, v) : updatePair(item,{buyPrice:'',buyFromId:null,buyFrom:null})} inputMode="decimal" placeholder={achat!=null&&!isNaN(achat)?String(achat):'€'} largeur={72}
                           titre="Prix d'achat — cliquer pour le saisir" rendu={<span style={{...valeur,fontSize:15}}>{achat!=null&&!isNaN(achat)?prixCourt(achat):'—'}</span>}/>
                       </div>
                     </div>
