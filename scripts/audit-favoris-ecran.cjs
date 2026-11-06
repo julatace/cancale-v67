@@ -124,7 +124,7 @@ async function controles() {
   const sansId = E.articlesFavoris({ lignes: [{ id: 'z', nom: '', body: 'x a marqué ton article y comme favori', lien: 'https://www.vinted.fr/inbox/9', date: new Date(T0).toISOString() }], article: () => ({ titre: 'NON' }), maintenant: T0 });
   dit(sansId.cartes[0].titre === '' && !sansId.cartes[0].numero, 'sans /items/<id> : ni titre ni N° deviné');
   const ap = E.apercuMessageFavori({ message: 'Salut {username} !', offre: { mode: 'pct', valeur: 10, arrondi: false }, exemple: { pseudo: 'lea_75', prix: 50 }, personnaliser: (m, p) => m.replace('{username}', p), prixOffre: () => '45.00' });
-  dit(ap.texte === 'Salut lea_75 !' && ap.offre === '50 € → 45 €', 'aperçu : le vrai texte sur un vrai favori, l’offre sur un vrai prix', JSON.stringify(ap));
+  dit(ap.texte === 'Salut lea_75 !' && String(ap.offre).replace(/\u00a0/g, ' ') === '50 € → 45 €', 'aperçu : le vrai texte sur un vrai favori, l’offre sur un vrai prix', JSON.stringify(ap));
   dit(!Object.values(E.RAISONS_ECRAN).some((r) => /paire/i.test(r.texte)), 'jamais « paire » dans les raisons (« article »)');
 }
 

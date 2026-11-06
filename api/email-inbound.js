@@ -632,7 +632,7 @@ function familleConnue(subject, from) {
   if (/a mis en ligne un nouvel article/i.test(s)) return "nouvel article d'un membre suivi";
   // ⚠️ 76 emails « MISE EN DEMEURE … » manquaient à cette famille (mesuré le
   // 30 août) : c'est SON courrier sortant vers Vinted, pas un email à traiter.
-  if (/Demande de motivation|Contestation formelle|DEMANDE URGENTE|r[ée]examen humain|MISE EN DEMEURE|intervention humaine|contestation/i.test(s)) return 'ton propre email envoyé à Vinted';
+  if (/Demande de motivation|Contestation formelle|DEMANDE URGENTE|r[ée]examen humain|MISE EN DEMEURE|intervention humaine|contestation/i.test(s)) return 'ton propre e-mail envoyé à Vinted';
   // ⚠️ « Le transfert bancaire est en cours » (15 emails) = le porte-monnaie
   // Vinted qui se vide vers SA banque. Ce n'est PAS une vente finalisée : le
   // ranger dans `email_final_*` compterait l'argent DEUX FOIS (une fois quand la
