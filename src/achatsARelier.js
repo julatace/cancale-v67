@@ -32,11 +32,25 @@ export function sansAchatRelie(fiche, prixAchat) {
   return !(p != null && Number.isFinite(Number(p)));
 }
 
-// La file : [{ id, item, fiche, plusTard }] — ses annonces en ligne (`annonces`,
-// la liste de la grille), celles qu'il a remises « plus tard » à la fin, chaque
-// groupe dans l'ordre de mise en ligne (la plus ancienne d'abord : celle qui
-// dort le plus). `plusTard` = { [id]: at }.
-export function fileSansAchat({ annonces, numeros, prixAchat, plusTard = null } = {}) {
+// (6 nov., finitions) « PLUS TARD » REVIENT AU BOUT DE 7 JOURS. La date est posée à
+// SON clic (`vrm_achat_plus_tard`, synchronisé) : pendant 7 jours l'annonce reste en
+// fin de file et hors du nombre de Ma journée ; ensuite elle revient (nombre et
+// place), et la ligne dit « reportée le … ». Une date illisible ne garde rien de
+// côté (« pas su » ne vaut pas « reportée ») : l'annonce est comptée.
+export const PLUS_TARD_JOURS = 7;
+export function etatPlusTard(v, maintenant = Date.now()) {
+  if (v == null || v === false || v === '') return null;
+  const t = Date.parse(typeof v === 'string' ? v : String((v && v.at) || ''));
+  if (!Number.isFinite(t)) return { reporte: false, le: null, revient: null };
+  const revient = t + PLUS_TARD_JOURS * 86400e3;
+  return { reporte: Number(maintenant) < revient, le: new Date(t).toISOString(), revient: new Date(revient).toISOString() };
+}
+
+// La file : [{ id, item, fiche, plusTard, reporteLe, revientLe }] — ses annonces en
+// ligne (`annonces`, la liste de la grille), celles qu'il a remises « plus tard »
+// (depuis moins de 7 jours) à la fin, chaque groupe dans l'ordre de mise en ligne
+// (la plus ancienne d'abord : celle qui dort le plus). `plusTard` = { [id]: at }.
+export function fileSansAchat({ annonces, numeros, prixAchat, plusTard = null, maintenant = Date.now() } = {}) {
   const out = [];
   const vus = new Set();
   for (const it of (Array.isArray(annonces) ? annonces : [])) {
@@ -45,11 +59,12 @@ export function fileSansAchat({ annonces, numeros, prixAchat, plusTard = null } 
     const e = numeros && numeros[id];
     if (!sansAchatRelie(e, prixAchat)) continue;
     const t = Number(it.createdTs); const ts = Number.isFinite(t) && t > 0 ? (t < 1e12 ? t * 1000 : t) : null;
-    out.push({ id, item: it, fiche: e, plusTard: !!(plusTard && plusTard[id]), ts });
+    const pt = etatPlusTard(plusTard && plusTard[id], maintenant);
+    out.push({ id, item: it, fiche: e, plusTard: !!(pt && pt.reporte), reporteLe: pt ? pt.le : null, revientLe: pt && pt.reporte ? pt.revient : null, ts });
   }
   return out.sort((a, b) => (Number(a.plusTard) - Number(b.plusTard)) || ((a.ts ?? Infinity) - (b.ts ?? Infinity)));
 }
-// Le nombre que Ma journée dit : la file, sans les « plus tard ».
+// Le nombre que Ma journée dit : la file, sans les « plus tard » (de moins de 7 jours).
 export const aRelierJournee = (file) => (Array.isArray(file) ? file.filter((x) => !x.plusTard).length : 0);
 
 // La cible d'une annonce pour `suggestionsAchat` : ses CHAMPS d'abord (marque,

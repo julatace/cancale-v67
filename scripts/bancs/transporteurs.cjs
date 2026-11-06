@@ -197,10 +197,28 @@ const ouvrirJournee = async (pg, errs) => {
 };
 // Rouge (le danger des deux thèmes, #C0392B / #FF6B6B) — jamais sur ces lignes (§7).
 const ROUGE_JS = `(v) => { const m = /rgba?\\(([\\d.]+),\\s*([\\d.]+),\\s*([\\d.]+)/.exec(v || ''); if (!m) return false; const r=+m[1], g=+m[2], b=+m[3]; return r > 150 && g < 120 && b < 120 && r - g > 80 && Math.abs(g - b) < 40; }`;
-const lire = (pg) => pg.evaluate((rougeSrc) => {
+// (6 nov.) Depuis le 3 nov. (« À retirer au style de À envoyer », src/CarteRelais.jsx `LigneRetraitF`),
+// le détail d'un colis — n° de suivi, date limite, ligne du transporteur, nouvelles de Vinted — ne
+// s'écrit qu'une fois la ligne TOUCHÉE (`.vrm-rpf-ouvrir`), et « À vérifier · N » est replié
+// (`<details>`). Le banc fait le geste de Julien avant de lire : il ouvre chaque ligne et chaque
+// groupe replié de « À retirer » (rien n'est lu dans une ligne fermée, rien n'est supposé).
+const deplier = async (pg) => {
+  for (let tour = 0; tour < 3; tour++) {
+    const n = await pg.evaluate(() => {
+      let k = 0;
+      for (const d of document.querySelectorAll('[data-cc-colonne="retirer"] details:not([open])')) { d.open = true; k++; }
+      for (const b of document.querySelectorAll('[data-cc-colonne="retirer"] .vrm-rpf-ouvrir[aria-expanded="false"]')) { b.click(); k++; }
+      return k;
+    });
+    if (!n) break;
+    await pg.waitForTimeout(250);
+  }
+};
+const lire = async (pg) => { await deplier(pg); return lireBrut(pg); };
+const lireBrut = (pg) => pg.evaluate((rougeSrc) => {
   const rouge = new Function('return ' + rougeSrc)();
   // (2 nov., colis clair) Colis → « À retirer » : le lieu est l'en-tête du point de la carte.
-  const lieuDuGroupe = (el) => { const p = el.closest('[data-relais-point]'); const d = p && p.querySelector('.vrm-rp-tete'); return d ? d.innerText : ''; };
+  const lieuDuGroupe = (el) => { const p = el.closest('[data-relais-point]'); const d = p && p.querySelector('.vrm-rpf-tete, .vrm-rp-tete'); return d ? d.innerText : ''; };
   const ligneT = (c) => { const x = c.querySelector('.vrm-transp'); return x ? { etat: x.getAttribute('data-transp'), etatLu: x.getAttribute('data-transp-etat'), t: x.innerText, color: getComputedStyle(x).color, court: x.hasAttribute('data-transp-court') } : null; };
   const cartes = [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-cc-carte]:not([data-hors-compte])')].map((c) => {
     const s0 = c.querySelector('[data-rp-suivi]'); const s = s0 ? { getAttribute: () => s0.getAttribute('data-rp-suivi') || null } : null;
@@ -210,7 +228,9 @@ const lire = (pg) => pg.evaluate((rougeSrc) => {
       codePasLu: (c.querySelector('[data-colis-code-pas-lu]') || {}).getAttribute ? c.querySelector('[data-colis-code-pas-lu]').getAttribute('data-colis-code-pas-lu') : null };
   });
   const verif = [...document.querySelectorAll('[data-retirer-a-verifier] [data-cc-carte]')].map((x) => ({ suivi: (x.querySelector('[data-rp-suivi]') || { getAttribute: () => null }).getAttribute('data-rp-suivi'), raison: x.getAttribute('data-a-verifier-raison'), transp: ligneT(x), t: x.innerText }));
-  const repartis = [...document.querySelectorAll('[data-repartis] [data-reparti-suivi]')].map((x) => ({ suivi: x.getAttribute('data-reparti-suivi'), transp: ligneT(x), t: x.innerText }));
+  // (6 nov.) Sous Colis, un reparti est une ligne COURTE (3 nov., « Argent à vérifier ») : son état est
+  // la puce ambre « Remboursement à vérifier », pas une ligne du transporteur (`court`, `puce`).
+  const repartis = [...document.querySelectorAll('[data-repartis] [data-reparti-suivi]')].map((x) => { const pu = x.querySelector('.vrm-rpf-puce.is-ambre'); return { suivi: x.getAttribute('data-reparti-suivi'), transp: ligneT(x), t: x.innerText, court: x.classList.contains('vrm-reparti-court'), puce: pu ? { t: pu.innerText, color: getComputedStyle(pu).color } : null }; });
   const zones = [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-cc-carte], [data-a-verifier], [data-repartis], [data-transp-mr], [data-transp-mr-refus], [data-transp-passu], [data-transp-non-lu]')];
   const rougesVus = [];
   // La pastille de MARQUE d'un transporteur (CarrierBadge : titre + graisse 900,
@@ -301,8 +321,10 @@ async function navigateur() {
         dit(!carte('12345601') && q && q.raison === 'transporteur' && q.transp && q.transp.etatLu === 'incident' && /a quitté le point relais/.test(q.transp.t), `${nom} A : « a quitté le point relais sans être retiré » ⇒ « à vérifier », jamais « à retirer »`, q ? `${q.raison} · ${q.transp && q.transp.t}` : 'absent de « à vérifier »');
         dit(q && q.transp && q.transp.color === ambre, `${nom} A : sa ligne du transporteur est en AMBRE`, q && q.transp && q.transp.color);
         const rp = r.repartis.find((x) => x.suivi === '12345602');
-        dit(!carte('12345602') && rp && rp.transp && rp.transp.etatLu === 'retour_expediteur' && /ne te déplace pas/.test(rp.transp.t), `${nom} A : « repart chez l'expéditeur » (transporteur seul) ⇒ dans « repartis », « ne te déplace pas »`, rp ? rp.transp && rp.transp.t : 'absent de « repartis »');
-        dit(rp && rp.transp && rp.transp.color === ambre, `${nom} A : la ligne d'un retour est en AMBRE`, rp && rp.transp && rp.transp.color);
+        // Forme longue (Achats) : la ligne du transporteur « ne te déplace pas ». Forme courte (Colis, 3 nov.) :
+        // la ligne est dans « Argent à vérifier » (hors de « À retirer » : rien à aller chercher), sa puce dit le geste.
+        dit(!carte('12345602') && rp && (rp.court ? !!rp.puce && /Remboursement à vérifier/.test(rp.puce.t) : (rp.transp && rp.transp.etatLu === 'retour_expediteur' && /ne te déplace pas/.test(rp.transp.t))), `${nom} A : « repart chez l'expéditeur » (transporteur seul) ⇒ dans « repartis », jamais « à retirer »`, rp ? (rp.court ? 'court · ' + (rp.puce && rp.puce.t) : rp.transp && rp.transp.t) : 'absent de « repartis »');
+        dit(rp && (rp.court ? rp.puce && rp.puce.color === ambre : rp.transp && rp.transp.color === ambre), `${nom} A : la ligne d'un retour est en AMBRE`, rp && (rp.court ? rp.puce && rp.puce.color : rp.transp && rp.transp.color));
         const c3 = carte('12345603');
         dit(c3 && /tabac banc/i.test(c3.lieu), `${nom} A : « en transit » par e-mail, DISPONIBLE plus tard chez le transporteur ⇒ dans « À retirer », au point du transporteur (TABAC BANC)`, c3 ? c3.lieu.replace(/\s+/g, ' ').slice(0, 80) : 'pas de carte');
         dit(c3 && c3.limite === 'vers' && c3.limiteVers === dans(6) && /À retirer vers le/.test(c3.t), `${nom} A : sa limite déduite est dite « vers le », jamais « jusqu'au »`, c3 && `${c3.limite} ${c3.limiteVers}`);
@@ -320,9 +342,12 @@ async function navigateur() {
         // phrase partout (§7) : une ligne jamais lue n'écrit RIEN sur la carte (rien n'est affirmé).
         dit(jamais && !jamais.transp, `${nom} A : ligne JAMAIS LUE : rien d'affirmé sur la carte (pas de ligne du transporteur)`, jamais && jamais.transp && jamais.transp.t);
         // (tour 2 n° 2) Le geste est dit UNE fois en tête, la carte n'en garde que l'état.
-        dit(cpi && cpi.transp && cpi.transp.etat === 'cp-inconnu' && /code postal du point relais inconnu/.test(cpi.transp.t) && !/N° de suivi ajoutés/.test(cpi.transp.t), `${nom} A : « code postal inconnu » sur la carte, sans le geste (dit en tête)`, cpi && cpi.transp && cpi.transp.t);
-        dit(r.cpTete.length === 1 && r.cpTete[0].k === 'inconnu' && r.cpTete[0].n === '1' && /N° de suivi ajoutés/.test(r.cpTete[0].t), `${nom} A : « code postal inconnu » : le GESTE (l'ajouter avec son code postal) dit UNE fois en tête de liste`, JSON.stringify(r.cpTete));
-        dit(r.hAjouter != null && r.hAjouter >= 43.5, `${nom} A : le geste « Ajouter un n° de suivi » fait 44 px`, String(r.hAjouter));
+        dit(cpi && cpi.transp && cpi.transp.etat === 'cp-inconnu' && /code postal du point relais inconnu/.test(cpi.transp.t) && !/Ajouter un n° de suivi|N° de suivi ajoutés/.test(cpi.transp.t), `${nom} A : « code postal inconnu » sur la carte, sans le geste (dit en tête)`, cpi && cpi.transp && cpi.transp.t);
+        dit(r.cpTete.length === 1 && r.cpTete[0].k === 'inconnu' && r.cpTete[0].n === '1' && /« … »/.test(r.cpTete[0].t) && /Ajouter un n° de suivi/.test(r.cpTete[0].t) && !/Achats → À retirer/.test(r.cpTete[0].t), `${nom} A : « code postal inconnu » : le GESTE (l'ajouter avec son code postal) dit UNE fois en tête de liste, au chemin qui existe (« … » de Colis)`, JSON.stringify(r.cpTete));
+        // (6 nov.) Le geste vit sous « … » de Colis (5 nov., barre du haut stable) : le banc fait ce que dit la
+        // phrase — il touche « … » — puis mesure le bouton (visible, 44 px). Le remettre caché ⇒ 0 ⇒ rouge.
+        const hAjouter = r.hAjouter >= 43.5 ? r.hAjouter : await (async () => { await pg.click('[data-colis-outils-bascule]').catch(() => {}); await pg.waitForTimeout(400); return pg.evaluate(() => { const e = document.querySelector('[data-suivi-ajouter]'); return e ? e.getBoundingClientRect().height : null; }); })();
+        dit(hAjouter != null && hAjouter >= 43.5, `${nom} A : le geste « Ajouter un n° de suivi » (après « … ») fait 44 px`, String(hAjouter));
         const inc = r.verif.find((x) => x.suivi === 'XW000000004TS');
         dit(inc && inc.transp && inc.transp.t.includes(`« ${LIB_INCONNU} »`) && /statut que VRM ne connaît pas/.test(inc.transp.t), `${nom} A : un statut inconnu est recopié TEL QUEL, et ce n'est pas « à retirer »`, inc ? inc.transp && inc.transp.t : 'absent de « à vérifier »');
         dit(inc && inc.transp && inc.transp.color === ambre, `${nom} A : un statut inconnu est en AMBRE`, inc && inc.transp && inc.transp.color);
@@ -475,7 +500,7 @@ async function navigateur() {
       // un vrai colis à retirer (e-mail avec code), d'un compte qui n'a aucune commande reliée.
       track('email_track_chronopost_XW000000077TS', { carrier: 'chronopost', suivi: 'XW000000077TS', subject: 'Votre colis est disponible dans votre Relais Pickup', code: '777700', lieu: RELAIS, limite: dans(3) }),
     ];
-    const lireE = (pg) => pg.evaluate(() => {
+    const lireEBrut = (pg) => pg.evaluate(() => {
       const conv = (el) => [...el.querySelectorAll('a[href*="/inbox/"]')].map((a) => (a.getAttribute('href') || '').split('/inbox/')[1]);
       // (2 nov., colis clair) Colis → « À retirer » : cartes par point, « à vérifier » en bas.
       const cartes = [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-cc-carte]:not([data-hors-compte])')].map((c) => { const s0 = c.querySelector('[data-rp-suivi]'); const s = s0 && s0.getAttribute('data-rp-suivi') ? { getAttribute: () => s0.getAttribute('data-rp-suivi') } : null; const lt = c.querySelector('[data-colis-limite-transp]'); return { suivi: s ? s.getAttribute('data-colis-suivi') : null, conv: conv(c), t: c.innerText, limTransp: lt ? lt.getAttribute('data-colis-limite') : null, limTxt: lt ? lt.innerText : '' }; });
@@ -490,6 +515,7 @@ async function navigateur() {
         texte: document.body.innerText, deborde: document.documentElement.scrollWidth > window.innerWidth + 1,
       };
     });
+    const lireE = async (pg) => { await deplier(pg); return lireEBrut(pg); };
     for (const [nom, vp, sombre] of tailles) {
       await essaie(`E ${nom}`, async () => {
         const ROWS = ROWS_E();
@@ -557,18 +583,22 @@ async function navigateur() {
       ROWS.push({ id: 'harvest_111_suivi_9708', data: { v: 1, tx: '9708', source: 'journey', capturedAt: j(0.05), transporteur: null, suivi: '1792999999999001', etapes: [{ t: 'Ton colis est disponible au point relais', at: j(0.2) }], dernier: { t: 'Ton colis est disponible au point relais', at: j(0.2) }, forme: {} } });
       const { ctx, pg, errs } = await preparer(b, { width: 390, height: 844 }, false, { rows: ROWS });
       await ouvrirAchats(pg, errs);
+      await deplier(pg);
       const x = await pg.evaluate(() => {
-        const bloc = document.querySelector('[data-en-verification]');
+        // (3 nov.) L'achat « en cours de vérification » est une LIGNE de « À vérifier » (`r:c:`), ouverte par le banc ;
+        // l'ancien bloc `data-en-verification` vaut encore s'il est là.
+        const bloc = document.querySelector('[data-en-verification]') || document.querySelector('[data-en-verification-tx="9707"]');
         // (2 nov., colis clair) « transporteur pas encore connu » est dit UNE fois, en tête
         // du groupe de la carte (son point, ou « À vérifier ») — jamais sur chaque carte.
         const carte = [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-cc-carte]')].find((c) => /:9708$/.test(c.getAttribute('data-cc-carte') || ''));
         const groupe = carte ? (carte.closest('[data-retirer-a-verifier]') || carte.closest('[data-relais-point]')) : null;
-        const l0 = groupe ? groupe.querySelector('[data-transp="transporteur-inconnu"]') : null;
+        // (3 nov.) Une ligne ouverte dit tout ce qui la concerne (`data-rp-detail`) : la phrase y est, sinon en tête du groupe.
+        const l0 = (carte && carte.querySelector('[data-transp="transporteur-inconnu"]')) || (groupe ? groupe.querySelector('[data-transp="transporteur-inconnu"]') : null);
         const l = l0 ? { getAttribute: () => 'transporteur-inconnu', innerText: l0.innerText } : null;
         return { bloc: bloc ? bloc.innerText : null, ligne: l ? { etat: l.getAttribute('data-transp'), t: l.innerText } : null, trouve: !!carte };
       });
       dit(x.bloc != null && !/extension/i.test(x.bloc), 'F n° 4 : le bloc « en cours de vérification » ne promet rien de l\'extension (le geste vit dans « Suivi Vinted », gardé par sa version)', (x.bloc || 'absent').replace(/\s+/g, ' ').slice(0, 220));
-      dit(x.trouve && x.ligne && x.ligne.etat === 'transporteur-inconnu', 'F n° 5 : un achat dont le suivi Vinted donne un n° sans transporteur ⇒ l\'en-tête de son groupe dit « transporteur pas encore connu », jamais rien', x.ligne ? `${x.ligne.etat} « ${x.ligne.t} »` : (x.trouve ? 'aucune ligne' : 'carte introuvable'));
+      dit(x.trouve && x.ligne && x.ligne.etat === 'transporteur-inconnu', 'F n° 5 : un achat dont le suivi Vinted donne un n° sans transporteur ⇒ sa ligne ouverte (ou l\'en-tête de son groupe) dit « transporteur pas encore connu », jamais rien', x.ligne ? `${x.ligne.etat} « ${x.ligne.t} »` : (x.trouve ? 'aucune ligne' : 'carte introuvable'));
       dit(!errs.length, 'F n° 4-5 : aucune erreur d\'app', errs[0]);
       await ctx.close();
     });
@@ -584,6 +614,7 @@ async function navigateur() {
         sv.data.etapes = [sv.data.dernier];
         const { ctx, pg, errs } = await preparer(b, { width: 390, height: 844 }, false, { rows: ROWS });
         await ouvrirAchats(pg, errs);
+        await deplier(pg);
         const x = await pg.evaluate(() => {
           const carte = [...document.querySelectorAll('[data-cc-colonne="retirer"] [data-cc-carte]')].find((c) => /:9703$/.test(c.getAttribute('data-cc-carte') || '') || [...c.querySelectorAll('a[href*="/inbox/"]')].some((a) => /\/inbox\/7703/.test(a.getAttribute('href') || '')));
           return carte ? { nv: !!carte.querySelector('[data-nouvelle-vinted]'), transp: !!carte.querySelector('.vrm-transp') } : null;
@@ -619,7 +650,10 @@ async function navigateur() {
       const ach = ROWS.find((x) => x.id === 'harvest_111_orders_purchased');
       for (let i = 0; i < 1779; i++) ach.data.payload.my_orders.push({ transaction_id: 800000 + i, conversation_id: 900000 + i, title: 'Achat reçu ' + i, price: { amount: '20', currency_code: 'EUR' }, status: 'Commande finalisée', transaction_user_status: 'completed', date: j(30 + (i % 200)) });
       const { ctx, pg, errs } = await preparer(b, { width: 390, height: 844 }, false, { rows: ROWS });
-      await ouvrirAchats(pg, errs);
+      // (1er nov.) `cat_achats` mène aux colis à retirer (Colis) ; l'écran Achats est `vue=achats`.
+      await pg.goto(`http://localhost:${PORT}/?tab=cat_achats&vue=achats`, { waitUntil: 'domcontentloaded' });
+      await pg.locator('[data-achats-onglet="recus"][data-n]').first().waitFor({ timeout: 20000 }).catch(async (e) => { console.log('ÉCRAN : ' + (await pg.locator('body').innerText()).slice(0, 1200)); throw e; });
+      await pg.waitForTimeout(1200);
       const x = await pg.evaluate(() => {
         const btns = [...document.querySelectorAll('[data-achats-onglet]')];
         // Une ligne = le libellé et le nombre côte à côte (même milieu vertical), rien de

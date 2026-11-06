@@ -89,6 +89,10 @@ export const ACTIONS_SELECTION = [
   // « à la main » (les quatre tuiles restent celles des moteurs, chantier C).
   { k: 'mini', titre: 'Prix mini…', desc: '« Accepter dès » (et « Refuser sous ») sur les annonces cochées, calculés depuis leur prix.', etats: ['en-ligne'], robot: false, lien: true, multiComptes: true },
 ];
+// Ce qui se lance au nom d'UN compte (dit d'un mot quand la sélection en mélange deux),
+// et le mot court d'une action permise sur plusieurs comptes.
+const PAR_COMPTE = 'Republier, modifier, brouillon, mise en ligne';
+const COURT = { mini: 'Prix mini', main: 'Republier à la main' };
 // Les quatre tuiles de la feuille, dans l'ordre (« à la main » est un lien à part).
 export const ACTIONS_TUILES = ACTIONS_SELECTION.filter((A) => !A.lien).map((A) => A.k);
 const POUR_ETAT = { 'en-ligne': 'les annonces en ligne', brouillon: 'les brouillons', masquee: 'les annonces masquées', verification: 'les annonces en vérification' };
@@ -110,13 +114,13 @@ export function actionsPossibles({ selection, chrome, capOk, nomCompte } = {}) {
   const nom = (u) => (nomCompte && nomCompte(u)) || (u ? `compte ${u}` : 'compte inconnu');
   const comptes = [...new Set(sel.map((x) => String(x.uid || '')))];
   const parEtat = {}; for (const x of sel) parEtat[x.etat] = (parEtat[x.etat] || 0) + 1;
-  return ACTIONS_SELECTION.map((A) => {
+  const res = ACTIONS_SELECTION.map((A) => {
     const ids = sel.map((x) => String(x.id));
     let raison = '';
     if (!sel.length) raison = 'Coche au moins une annonce.';
     else if (A.multiComptes) { /* une écriture dans ses fiches : le compte ne décide rien */ }
     else if (A.parPaire) { if (comptes.includes('')) raison = sel.length > 1 ? 'VRM ne sait pas à quel compte est l’une de ces annonces.' : 'VRM ne sait pas à quel compte est cette annonce.'; }
-    else if (comptes.length > 1) raison = `Ta sélection mélange ${comptes.length} comptes (${comptes.map(nom).join(', ')}) : une action se lance sur un seul compte à la fois.`;
+    else if (comptes.length > 1) raison = `Ta sélection mélange ${comptes.length} comptes (${comptes.map(nom).join(', ')}). ${PAR_COMPTE} : un compte à la fois.`;
     else if (comptes[0] === '') raison = 'VRM ne sait pas à quel compte est cette annonce.';
     if (!raison && sel.length) {
       const hors = Object.keys(parEtat).filter((e) => !A.etats.includes(e));
@@ -132,6 +136,15 @@ export function actionsPossibles({ selection, chrome, capOk, nomCompte } = {}) {
     }
     return { k: A.k, titre: A.titre, desc: A.desc, ok: !raison, raison, ids, robot: !!A.robot };
   });
+  // (6 nov., finitions) Deux comptes : la phrase commune disait « une action se lance sur un
+  // seul compte » alors que « Prix mini… » (une écriture dans ses fiches) part quand même. Elle
+  // dit ce qui reste POSSIBLE — seulement s'il l'est vraiment (un brouillon coché ne le permet pas).
+  if (comptes.length > 1) {
+    // « Prix mini… » (une écriture dans ses fiches) et « à la main » (une paire à la fois, chacune son compte).
+    const possibles = res.filter((x) => x.ok && (((A) => A.multiComptes || A.parPaire)(ACTIONS_SELECTION.find((A) => A.k === x.k) || {}))).map((x) => COURT[x.k] || x.titre);
+    if (possibles.length) for (const x of res) if (!x.ok && /^Ta sélection mélange/.test(x.raison)) x.raison = x.raison.replace(/\.$/, '') + ` · ${possibles.join(', ')} : possible.`;
+  }
+  return res;
 }
 
 // (5 nov., chantier C — revue 2.5) LA RAISON SE DIT UNE FOIS, EN TÊTE.

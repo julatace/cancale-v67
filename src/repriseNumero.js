@@ -53,6 +53,45 @@ export function repriseNumerosRecreation({ enLigneIds, numeros, recrees, numeroV
   return out;
 }
 
+// (6 nov., finitions) UN N° D'ARCHIVE (« B… », migration 013) NE SE REDONNE JAMAIS : une paire
+// remise en vente (vente annulée avant l'envoi, « Remettre en vente ») dont le carton porte un
+// ancien N° reçoit un N° NEUF sur sa nouvelle annonce. Le carton dit encore « B230 » : la paire
+// entre dans « nouveaux numéros à écrire sur tes cartons » — la MÊME liste que les doublons
+// réglés et les N° changés à la main (`reattribue` sur la fiche, `reattribueAEcrire` d'App.jsx),
+// jusqu'à « C'est écrit ». Pas une seconde règle : ceci ne fait que poser ce `reattribue`.
+//  - `anciens` = { ancienId: numéro d'archive } — seulement les remises que VRM accompagne
+//    (`vrm_repub_main`, `numArchive` posé quand il ouvre « Remettre en vente ») ;
+//  - `recrees` = { nouvelId: ancienId } (la table de reprise : SON clic « C'est celle-ci ») ;
+//  - la nouvelle doit être EN LIGNE, seule pour son ancienne (deux ⇒ on ne devine pas), porter
+//    un N° neuf (reprenable, différent), et n'avoir jamais eu de `reattribue` (une fois : après
+//    « C'est écrit » rien ne revient).
+// Rend { nouvelId: { de, vers } }. Fonction PURE.
+export function archivesAEcrire({ enLigneIds, recrees, numeros, anciens, reprenable, cle }) {
+  const out = {};
+  if (!recrees || typeof recrees !== 'object' || !anciens || typeof anciens !== 'object') return out;
+  const enLigne = new Set((enLigneIds || []).map(String));
+  const k = cle || ((n) => String(n == null ? '' : n).trim().toUpperCase());
+  const ok = reprenable || ((n) => !!String(n || '').trim());
+  const parAncien = {};
+  for (const nid of Object.keys(recrees)) {
+    if (!enLigne.has(String(nid))) continue;
+    const a = String(recrees[nid] || ''); if (!a || a === String(nid)) continue;
+    (parAncien[a] = parAncien[a] || []).push(String(nid));
+  }
+  for (const a of Object.keys(parAncien)) {
+    const de = String(anciens[a] == null ? '' : anciens[a]).trim();
+    if (!de || ok(de)) continue;                               // pas un N° d'archive : la reprise s'en charge
+    if (parAncien[a].length !== 1) continue;                   // ambigu : on ne devine pas
+    const nid = parAncien[a][0];
+    const f = (numeros || {})[nid];
+    const vers = f && String(f.numero || '').trim();
+    if (!vers || !ok(vers) || k(vers) === k(de)) continue;     // pas encore de N° neuf
+    if (f.reattribue) continue;                                // déjà dit (ou « C'est écrit »)
+    out[nid] = { de, vers };
+  }
+  return out;
+}
+
 // Lit la table nouvelId → ancienId depuis les lignes de l'extension.
 // `brouillons` : [{id:'vinted_brouillon_X', anc, item}] ; `coffres` : [{id:'coffre_uid_X', r}].
 export function tableRecrees(brouillons, coffres) {

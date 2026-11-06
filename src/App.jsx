@@ -80,7 +80,7 @@ import { previsionUrssaf } from './previsionUrssaf.js';
 import { annulationsParCompte } from './annulationsCompte.js';
 import { notesParCompte } from './notesRecues.js';
 import { toutSurLeNumero, lireNumeroCherche } from "./rechercheNumero.js";
-import { repriseNumerosRecreation, tableRecrees } from "./repriseNumero.js";
+import { repriseNumerosRecreation, tableRecrees, archivesAEcrire } from "./repriseNumero.js";
 import { etatAnnonceVinted, enVerificationVinted, raisonPasSelectionnable, actionsPossibles, raisonCommune, ACTIONS_TUILES, ETATS_ANNONCE, liensRepubMain, fusionLiensRecrees, lusDuDressing, candidatsNouvelle, etatSuiviMain, minisSelection, ecritureMini } from "./annoncesActions.js";
 // (6 nov.) LES réglages de Republier — atelier ET « à la main » : une source, une règle par notion.
 import { CLE_REGLAGES_REPUB, TITRE_VINTED_MAX, PHOTO_NEUTRE, CURSEURS_PHOTO, REDUCTIONS_RAPIDES, MODES_TITRE, bornerPhoto, photoNeutre, cssApercuPhoto, dessinerPhotoReglee, appliquerCouleursPixels, nomPhotoReglee, lotAppliquePrix, lotAppliqueTitre, lireReglagesRepub, reglagesGardes, reglagesAOuverture, resumeGardes, apercuRepub, annonceRepubliee, resumeReglages, tirerLettre, prixChange, titreChange } from "./republierReglages.js";
@@ -15023,11 +15023,12 @@ function AchatsARelier({ file, achats, liens, propositionDe, onRelier, onSaisir,
           const prix = (() => { const v = it.price && typeof it.price === 'object' ? it.price.amount : it.price; const n = Number(String(v == null ? '' : v).replace(',', '.')); return Number.isFinite(n) && n > 0 ? n : null; })();
           const relierTxt = t && t.proposition ? `${VERBES.relier} · ${montant(t.proposition.centimes / 100)}` : VERBES.relier;
           return (
-            <li key={l.id} className="vrm-ar-ligne" data-ar-ligne={l.id} data-ar-plus-tard={l.plusTard ? '1' : undefined} data-ar-sugg-tx={l.sugg ? String(l.sugg.achat.transaction_id) : ''}>
+            <li key={l.id} className="vrm-ar-ligne" data-ar-ligne={l.id} data-ar-plus-tard={l.plusTard ? '1' : undefined} data-ar-reportee={l.reporteLe ? String(l.reporteLe).slice(0, 10) : undefined} data-ar-sugg-tx={l.sugg ? String(l.sugg.achat.transaction_id) : ''}>
               <div className="vrm-ar-annonce">
                 {it.photo ? <PhotoVinted src={it.photo} alt="" className="vrm-ar-photo" loading="lazy"/> : <PhotoVide taille={48}/>}
                 <span className="vrm-ar-centre"><span className="vrm-ar-nom">{num ? <Numero n={num} taille="petit"/> : null}<span className="vrm-ar-titre">{it.title || 'Sans titre'}</span></span>
-                  <span className="vrm-ar-sous">{[prix != null ? montant(prix) : '', l.plusTard ? 'remise à plus tard' : ''].filter(Boolean).join(' · ')}</span></span>
+                  {/* (6 nov., finitions) La date de SON « Plus tard » est dite ; au bout de 7 jours l'annonce revient. */}
+                  <span className="vrm-ar-sous">{[prix != null ? montant(prix) : '', l.reporteLe ? `reportée le ${jour(l.reporteLe)}${l.plusTard && l.revientLe ? ` · revient le ${jour(l.revientLe)}` : ''}` : ''].filter(Boolean).join(' · ')}</span></span>
               </div>
               {l.sugg ? (
                 <div className="vrm-ar-sugg" data-ar-rang={l.sugg.rang}>
@@ -16764,7 +16765,7 @@ function rechercheParNumero(q, numData, comptes) {
     plan: ((load('vrm_meubles', []) || []).length ? (lu(nd.plan) || {}) : lu(nd.plan)),
     archive: archiveNumeros(),
   }, {
-    cleNum, conflits: conflitsDeNumeros,
+    cleNum, conflits: (p) => conflitsDeNumeros(p, GROUPES_DEUX_FOIS),
     ouStock: ouStockNumero,
     numEbayLigne: numLigneEbay,
     numEbayAnnonce: (a) => numEbayLu(a && a.sku, a && a.itemId, null, a && a.depuis),
@@ -35424,7 +35425,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
           </div>
           {tri.map((k) => { const f = ficheParCle[k]; const ou = f && ouEst(f);
             return (
-              <button type="button" key={k} data-cible={k} onClick={() => { if (f && ou) montrer(f); else if (f) setModal({ type: 'fiche', cle: k }); }}
+              <button type="button" key={k} data-aller-chercher={k} onClick={() => { if (f && ou) montrer(f); else if (f) setModal({ type: 'fiche', cle: k }); }}
                 style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 8, padding: '6px 4px', minHeight: 44, background: 'transparent', border: 'none', borderTop: `1px solid ${C.line}`, color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 15 }}>
                 <b style={{ minWidth: 48 }}>N°{f ? f.numero : k}</b>
                 <span style={{ flex: 1, minWidth: 0, color: ou ? C.text : C.muted, fontWeight: ou ? 600 : 400 }}>{ou ? `${ou.meuble.name} · rangée ${ou.rangee}, colonne ${ou.colonne}` : (f ? 'pas encore rangé' : 'plus en stock')}</span>
@@ -36995,13 +36996,26 @@ const tailleDansTitre = (titre, taille) => {
 // pas être « la mauvaise paire qui s'expédie ». Elle garde son numéro dans
 // `porteursNum` (jamais réattribué, §5) mais ne compte PLUS comme un porteur
 // en conflit. Reste rouge un vrai conflit entre deux articles EN VENTE.
-function conflitsDeNumeros(porteurs) {
+// ⚠️ 6 NOV. (finitions) — UNE PAIRE EN LIGNE DEUX FOIS N'EST PAS DEUX PAIRES. Deux annonces
+// (ou plus) que la carte AMBRE de Ma journée dit « la même paire en ligne deux fois »
+// (src/enLigneDeuxFois.js : PHOTO EXACTE ou `recreeDe`, jamais le titre, jamais le N° seul)
+// sont UNE paire, un carton : le rouge ne s'allume pas, la carte ambre suffit (« supprimes-en
+// une »). `memePaires` = les groupes d'annonces de CETTE carte, tels qu'elle les affiche
+// (ids) : seule une carte qui S'AFFICHE dispense. Une lecture pas prête, un compte pas relu
+// depuis 24 h, une annonce masquée ou « à confirmer », un compte écarté : la carte se tait,
+// donc le rouge reste. Et deux cases du garage restent toujours rouges (deux cartons).
+function conflitsDeNumeros(porteurs, memePaires = null) {
   // Deux porteurs (dédoublonnés par type:id) qui sont la MÊME paire, PROUVÉ :
-  // une vente et une annonce, l'identité de la vente = l'id de l'annonce.
+  // une vente et une annonce, l'identité de la vente = l'id de l'annonce ;
+  // ou des annonces seules qu'un groupe de la carte ambre réunit.
   function memePaireProuvee(paires) {
     const uniq = [];
     const vus = new Set();
     for (const x of (paires || [])) { const k = x.type + ':' + x.id; if (!vus.has(k)) { vus.add(k); uniq.push(x); } }
+    if (uniq.length >= 2 && uniq.every(x => x.type === 'annonce') && Array.isArray(memePaires)) {
+      const ids = uniq.map(x => String(x.id));
+      return memePaires.some(g => Array.isArray(g) && ids.every(id => g.some(y => String(y) === id)));
+    }
     if (uniq.length !== 2) return false;
     const v = uniq.find(x => x.type === 'vente'), a = uniq.find(x => x.type === 'annonce');
     if (!v || !a) return false;
@@ -37024,6 +37038,10 @@ function conflitsDeNumeros(porteurs) {
   return out.sort((a, b) => triNum(a.numero, b.numero));
 }
 // </conflits-numeros-regle>
+// (6 nov., finitions) Les groupes « en ligne deux fois » que la carte ambre de Ma journée AFFICHE,
+// publiés par `Comptabilite` (qui les calcule) et lus par « Tout sur le N° » : le rouge y suit la
+// MÊME règle (§11). Vide tant que la carte n'est pas calculée ⇒ le rouge comme avant.
+let GROUPES_DEUX_FOIS = [];
 // <doublons-reattribuer-regle>
 // ⚠️⚠️ 20 OCTOBRE — DÉCISION DE JULIEN : « pour les numéros qui ont été en
 // double, je veux que l'app fasse elle-même les changements : elle redonne des
@@ -46831,6 +46849,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (6 nov., vague 2 · point 4) « Plus tard » dans « Sans achat relié » : { [itemId]: at }.
   const [achatPlusTard, setAchatPlusTard] = useStateCle('vrm_achat_plus_tard', () => { const v = load('vrm_achat_plus_tard', {}); return v && typeof v === 'object' ? v : {}; });
   const poserAchatPlusTard = (id) => setAchatPlusTard((prev) => { const u = { ...(prev || {}), [String(id)]: new Date().toISOString() }; save('vrm_achat_plus_tard', u); return u; });
+  // (6 nov., finitions) Sur un appareil NEUF, ces deux clés arrivent du nuage APRÈS le montage : sans cette
+  // relecture, « Plus tard » et « Déjà remise en vente » posés ailleurs restaient vides ici (mesuré au banc
+  // vague2-ventes, scène P). La règle des données lues au montage : ne remplacer que ce qui est resté VIDE.
+  useEffect(() => onCloudReady(() => {
+    const lu = (k) => { const w = load(k, {}); return w && typeof w === 'object' ? w : {}; };
+    setAnnuleesReglees((v) => (v && Object.keys(v).length) ? v : lu('vrm_annulees_reglees'));
+    setAchatPlusTard((v) => (v && Object.keys(v).length) ? v : lu('vrm_achat_plus_tard'));
+  }), []);
   // (revue du 5 nov.) Un lien posé à la main n'entre pas tant que l'ancienne est
   // ENCORE chez lui sur Vinted sous une autre forme (masquée, à confirmer,
   // brouillon : la reprise ne regarde que l'« en ligne ») — sinon deux paires
@@ -47156,7 +47182,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
   // Conflits : un même numéro sur deux paires présentes = la mauvaise chaussure
   // part à l'expédition. C'est LE risque n°1 (§19) — on le montre en rouge.
-  const conflitsNum = useMemo(() => conflitsDeNumeros(porteursNum), [porteursNum]);
+  // (6 nov., finitions) Les groupes que la carte ambre « en ligne deux fois » AFFICHE (même
+  // paire PROUVÉE : photo exacte ou `recreeDe`) : ils ne sont pas « deux paires sous un N° ».
+  // `enLigneDeux` pas prêt ⇒ aucun groupe ⇒ le rouge comme avant (rien n'est dispensé sur un « pas su »).
+  const groupesDeuxFois = useMemo(() => (enLigneDeux && Array.isArray(enLigneDeux.vinted)
+    ? enLigneDeux.vinted.map((g) => (g.annonces || []).filter((a) => a.plat === 'vinted').map((a) => String(a.id)))
+    : []), [enLigneDeux]);
+  const conflitsNum = useMemo(() => conflitsDeNumeros(porteursNum, groupesDeuxFois), [porteursNum, groupesDeuxFois]);
+  useEffect(() => { GROUPES_DEUX_FOIS = groupesDeuxFois; }, [groupesDeuxFois]);
   // ── CHANGER LE NUMÉRO D'UNE PAIRE À LA MAIN ────────────────────────────────
   // Julien : « on peut donner la possibilité aux gens de changer de numéro, et
   // lorsqu'ils mettent un numéro qui a déjà été attribué, il demande si c'était
@@ -47970,7 +48003,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {aEcrireCarton.map((it) => { const f = numeros[it.id] || {}; const etq = etiquetteSurVinted(f.numero, f.reattribue.de, it.title); return (
         <div key={it.id} data-a-ecrire={String(it.id)} data-a-ecrire-de={f.reattribue.de} data-a-ecrire-vers={f.numero} data-a-ecrire-main={f.reattribue.main ? '1' : '0'} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '6px 0', borderTop: `1px solid ${C.border}` }}>
           <span style={{ fontSize: 13, color: C.text, flex: '1 1 200px', minWidth: 0 }}><s style={{ color: C.text2 }}>N°{f.reattribue.de}</s> → <b>N°{f.numero}</b> · {String(it.title || '').slice(0, 48)}
-            <span style={{ display: 'block', fontSize: 12, color: C.text2, marginTop: 2 }}>{f.reattribue.main ? 'Changé par toi' : 'Doublon réglé par VRM'}{etq ? <> · <span data-a-ecrire-vinted={etq.geste}>{etq.geste === 'remplacer' ? <>sur Vinted, remplace « {etq.ancienne} » par « {etq.etiquette} » {etq.ou}</> : etq.geste === 'ajouter' ? <>sur Vinted, ajoute « {etq.etiquette} » {etq.ou}</> : etq.geste === 'autre' ? <>sur Vinted, remplace l’ancien N° {etq.ou} par « {etq.etiquette} »</> : <>sur Vinted, si l’annonce porte « {etq.ancienne} » {etq.ou}, remplace-le par « {etq.etiquette} »</>}</span></> : null}</span></span>
+            <span style={{ display: 'block', fontSize: 12, color: C.text2, marginTop: 2 }}>{f.reattribue.main ? 'Changé par toi' : f.reattribue.archive ? 'Ancien numéro : il ne se redonne pas' : 'Doublon réglé par VRM'}{etq ? <> · <span data-a-ecrire-vinted={etq.geste}>{etq.geste === 'remplacer' ? <>sur Vinted, remplace « {etq.ancienne} » par « {etq.etiquette} » {etq.ou}</> : etq.geste === 'ajouter' ? <>sur Vinted, ajoute « {etq.etiquette} » {etq.ou}</> : etq.geste === 'autre' ? <>sur Vinted, remplace l’ancien N° {etq.ou} par « {etq.etiquette} »</> : <>sur Vinted, si l’annonce porte « {etq.ancienne} » {etq.ou}, remplace-le par « {etq.etiquette} »</>}</span></> : null}</span></span>
           {etq ? <button type="button" data-a-ecrire-copier={etq.etiquette} onClick={() => { try { navigator.clipboard.writeText(etq.etiquette); toast(`« ${etq.etiquette} » copié`); } catch (_) {} }} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 12, padding: '0 12px', minHeight: 44, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Copier « {etq.etiquette} »</button> : null}
           <button type="button" onClick={() => marquerReattribueEcrit(it)} style={{ border: `1px solid ${C.border}`, background: C.card, color: C.text, borderRadius: 12, padding: '0 12px', minHeight: 44, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>C'est écrit</button>
           {it._vrmMasquee ? <button type="button" data-masquee-partie={String(it.id)} onClick={() => masqueePlusLa(it)} style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 12, padding: '0 12px', minHeight: 44, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Elle n'est plus là</button> : null}
@@ -50236,6 +50269,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (pk && !byPhoto[pk]) byPhoto[pk] = String(num);
       changed = true;
     }
+    // (6 nov., finitions) Une paire remise en vente dont le carton porte un N° d'ARCHIVE (B…) :
+    // sa nouvelle annonce a un N° neuf ⇒ « nouveaux numéros à écrire sur tes cartons »
+    // (src/repriseNumero.js `archivesAEcrire` ; la liste est `reattribueAEcrire`, inchangée).
+    if (recreesEff) {
+      const anciensArchive = {};
+      for (const [anc, s] of Object.entries(repubMain || {})) if (s && s.annulee && s.numArchive) anciensArchive[anc] = String(s.numArchive);
+      const ae = archivesAEcrire({ enLigneIds: items.map((x) => x.id), recrees: recreesEff, numeros: nextNum, anciens: anciensArchive, reprenable: numeroReprenable, cle: cleNum });
+      for (const nid of Object.keys(ae)) { nextNum[nid] = { ...nextNum[nid], reattribue: { de: ae[nid].de, vers: ae[nid].vers, at: new Date().toISOString(), archive: true } }; changed = true; }
+    }
     // Auto-réparation : on consigne dans « used » TOUS les numéros connus
     // (annonces + ventes) pour qu'aucun ne soit jamais réattribué, même a
     // posteriori. Converge (ne re-déclenche pas une fois « used » complet).
@@ -51559,7 +51601,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ni prix d'achat connu (`prixAchatDe`) ; « Plus tard » en fin de file et hors du nombre
   // de Ma journée. Compte exclu écarté (comme la grille).
   const fileAchat = useMemo(() => (Array.isArray(listings.items)
-    ? fileSansAchat({ annonces: listings.items.filter((it) => it && !acctOffOf(it)), numeros, prixAchat: (e) => { const a = prixAchatDe(e, buyByNum); return a != null && !isNaN(a) ? a : null; }, plusTard: achatPlusTard })
+    ? fileSansAchat({ annonces: listings.items.filter((it) => it && !acctOffOf(it)), numeros, prixAchat: (e) => { const a = prixAchatDe(e, buyByNum); return a != null && !isNaN(a) ? a : null; }, plusTard: achatPlusTard, maintenant: Date.now() })
     : null),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [listings.items, numeros, buyByNum, achatPlusTard]);
@@ -59037,6 +59079,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 : vers ? <span className="vrm-rp-sous" data-colis-limite="vers" data-colis-limite-vers={String(vers)}>À retirer vers le {new Date(String(vers).slice(0,10)+'T00:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'})} (estimé : le transporteur ne donne pas la date)</span>
                 : <span className="vrm-rp-sous" data-colis-limite="inconnue">Date limite inconnue</span>)}
               {(su || (plusieursComptesRet && cpt)) ? <span className="vrm-rp-suivi" data-rp-suivi={su} data-colis-compte={cpt}>{[su ? `n° ${su}` : '', plusieursComptesRet && cpt ? `compte ${cpt}` : ''].filter(Boolean).join(' · ')}</span> : null}
+              {/* (6 nov.) « Pas su » se dit (§5) : depuis le 3 nov. la ligne ne montre le transporteur que LU ;
+                  quand le suivi Vinted ne le nomme pas, la ligne ouverte le dit (l'ancien en-tête de groupe). */}
+              {x.trInconnu ? <span className="vrm-rp-sous" data-transp="transporteur-inconnu">Transporteur pas encore connu : le suivi Vinted ne le nomme pas</span> : null}
               {/* (5 nov.) LE COMPTE QUAND ON LE SAIT (src/retraitQr.js, `compteDuRetrait`) : le compte Mondial Relay
                   où il a été lu, sinon l'adresse qui a reçu l'e-mail — et « dans aucun compte Mondial Relay » quand
                   tous ses comptes relus sont complets et qu'aucun ne le porte. Jamais deviné. */}
@@ -59271,10 +59316,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             )}
           </>);
         })()}
-        {/* ⚠️ Un colis déjà expédié qui traîne ici vient presque toujours d'une
-            capture ancienne (statut figé), pas d'un défaut. On le dit (§11, même
-            message partout). */}
-        <div className="vrm-colis-fraicheur" style={{padding:'0 2px',marginBottom:10}}><FraicheurDonnees jours={liveStats && liveStats.dataAgeJours} compte={liveStats && liveStats.dataAgeCompte} comptes={liveStats && liveStats.dataAgeComptes} siAJour={false}/></div>
+        {/* (6 nov., finitions) La fraîcheur des lectures est dite UNE fois sur Colis (§7) : la puce
+            « N comptes à relire » du haut (`data-comptes-a-relire`, la même source `liveStats.dataAge*`,
+            elle ouvre les comptes). L'ancienne ligne du bas (`FraicheurDonnees`) n'est plus rendue — elle
+            était cachée par fusion.css, et redisait la même chose quand la carte du haut manquait. */}
         {/* Sans compte relié, le geste est déjà dit à la place des colonnes (une fois, §7). */}
         {!colisSansCompte && <NoAcc/>}
         {/* (2 nov.) « À envoyer » seulement : sous « À retirer », aucun colis à envoyer n'est redit. */}
@@ -61866,7 +61911,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const cands = candidatsNouvelle({ ancienId:paire.id, uid:paire.uid, enLigne:enLigneMap, numeros, suivis:repubMain, recrees:recreesNum||{}, debut: s && s.at ? Date.parse(s.at) : 0 });
         // Une remise en vente se suit même sans N° à reprendre : désigner la nouvelle la clôt.
         const etatS = paire.annulee ? ({ 'a-remettre':'attente', 'en-cours': s && s.nouvelId ? 'lie' : 'attente', fait:'fait' })[etatRemise(s, { num:paire.numero, reprenable:numeroReprenable, numeros, cle:cleNum })] : etatSuiviMain(s, { numeros, cle: cleNum });
-        const marque = paire.annulee ? { annulee:true, tx:paire.tx } : {};
+        const marque = paire.annulee ? { annulee:true, tx:paire.tx, ...(paire.archive && paire.numAffiche ? { numArchive:String(paire.numAffiche) } : {}) } : {};
         const debut = ()=>{ if (!s && (paire.numero || paire.annulee)) poserRepubMain(paire.id, { uid:paire.uid, num:paire.numero||'', titre:paire.titre||'', domain:paire.domain, at:new Date().toISOString(), ...marque }); };
         // (6 nov.) Le prix d'achat (le plancher de la baisse, la même règle que Republier : jamais dessous).
         const flM = prixAchatDe(numeros[paire.id]||{}, buyByNum);
@@ -72044,7 +72089,7 @@ function AppCoeur() {
             if(age!=null && age>=30) sleepCount+=1;
             if(!nums[it.id] || !nums[it.id].numero) noNumCount+=1;
             const nn=String((nums[it.id]||{}).numero||'').trim();
-            if(nn) (numPorteurs[nn]=numPorteurs[nn]||[]).push(it.title||'');
+            if(nn) (numPorteurs[nn]=numPorteurs[nn]||[]).push({ id:String(it.id), t:it.title||'' });
           }
         }
       }
@@ -72387,7 +72432,9 @@ function AppCoeur() {
       // et les messages auront leur propre onglet (captation + envoi, comme
       // Vintex). Ne pas les remettre dans la cloche.
       // Actions GRATUITES pour vendre plus (jamais de « booster » payant ici) :
-      const numDbl=Object.entries(numPorteurs).filter(([,v])=>v.length>1);
+      // (6 nov., finitions) Des annonces que la carte ambre « en ligne deux fois » réunit (même paire
+      // PROUVÉE) ne sont pas « deux paires » : la règle du bloc rouge (`GROUPES_DEUX_FOIS`, §11).
+      const numDbl=Object.entries(numPorteurs).filter(([,v])=>v.length>1 && !GROUPES_DEUX_FOIS.some(g=>Array.isArray(g) && v.every(x=>g.some(y=>String(y)===x.id))));
       // (5 nov.) L'agent eBay est arrêté (sa décision) : plus de ligne « paires pour eBay » ici.
       if(numDbl.length>0) items.push({icon:'🚨', ic:'alert', text:`${numDbl.length} numéro${numDbl.length>1?'s':''} porté${numDbl.length>1?'s':''} par deux annonces (N°${numDbl.map(([n])=>n).slice(0,3).join(', N°')}) — la mauvaise paire peut partir`, n:numDbl.length, tab:'cat_annonces', dv:'num', annonces:true});
       if(noNumCount>0)   items.push({icon:'🔢', ic:'tag', text:`${noNumCount} annonce${noNumCount>1?'s':''} sans numéro`, n:noNumCount, tab:'cat_annonces', jr:true, annonces:true, job:'sans-numero'});

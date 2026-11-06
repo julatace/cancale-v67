@@ -121,7 +121,6 @@
 /* Colis : le choix de l'imprimante et son explication sur une seule ligne. */
 .vrm-app-shell .vrm-colis-imprimante { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; }
 .vrm-app-shell .vrm-colis-imprimante > .vrm-colis-imprimante-aide { margin-top: 0 !important; }
-.vrm-app-shell .vrm-colis-fraicheur:empty { display: none; }
 
 /* ── Toute l'app (26 octobre) : un titre d'écran identique à celui de la barre du
    haut ne se répète pas sur téléphone (« Colis » écrit deux fois à 60 px). Les

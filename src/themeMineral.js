@@ -71,7 +71,9 @@ export const MINERAL_DARK = Object.freeze({
 // Mesuré au pire point — l'arrêt le plus clair, sous le voile d'une case : en sombre, le gris
 // d'avant (blanc à 62-65 %) ne tenait que 3,4-3,6:1 sur le haut du dégradé #2A5385 ; à 82 % il
 // tient 4,7:1 (5,9:1 hors case). En clair, 70 % tient 5,1:1 sur #1F3A5F sous une case.
-// `scripts/audit-carte-sombre.cjs` recalcule ces rapports depuis CES jetons.
+// (6 nov., finitions) Le « — » d'une carte sombre (un chiffre pas su) est en `surSombre2`, partout,
+// la carte Compta comprise (une règle la forçait au blanc plein) ; plus aucun blanc translucide à la main.
+// `scripts/audit-vague3-ecrans.cjs` (K) recalcule ces rapports depuis CES jetons.
 // Les portails (détails de vente, fenêtres) héritent du document : mêmes jetons
 // que la coque, sans seconde palette à entretenir dans les feuilles CSS.
 export function variablesTheme(t,sombre=false){return {

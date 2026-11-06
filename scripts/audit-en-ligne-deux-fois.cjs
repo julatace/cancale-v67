@@ -18,7 +18,10 @@
 //   · le règlement des doublons ne renumérote pas deux annonces de même photo
 //     exacte (la même paire), mais renumérote toujours deux paires différentes ;
 //   · Ma journée passe par la règle, avec les annonces EN LIGNE seulement, et la
-//     feuille ne supprime rien (aucun envoi, aucune commande).
+//     feuille ne supprime rien (aucun envoi, aucune commande) ;
+//   · (6 nov., finitions) le bloc ROUGE (`conflitsDeNumeros`, exécuté) se tait pour les
+//     groupes que la carte ambre affiche — et seulement pour eux : même N° seul, lecture
+//     pas sûre ⇒ le rouge reste.
 //   node scripts/audit-en-ligne-deux-fois.cjs                 la règle du dépôt
 //   node scripts/audit-en-ligne-deux-fois.cjs --mutation=NOM  une règle réaffaiblie
 //   node scripts/audit-en-ligne-deux-fois.cjs --prouve        chaque mutation doit rougir
@@ -49,6 +52,8 @@ const MUTATIONS = {
   'manque-tu': ['regle', "    if (r !== 'ok') { manque.push({ plateforme: 'vinted', uid: String(c.uid || ''), nom: String(c.nom || c.uid || ''), raison: r }); continue; }",
     "    if (r !== 'ok') { continue; }"],
   'doublon-renumerote': ['app', "    if (annonces.length === 2) { const pk = annonces.map((x) => String((fiches[x.id] || {}).photoK || '')); if (pk[0] && pk[0] === pk[1]) continue; }\n", ''],
+  'rouge-ignore-groupes': ['app', 'conflitsDeNumeros(porteursNum, groupesDeuxFois)', 'conflitsDeNumeros(porteursNum)'],
+  'rouge-groupes-de-tout': ['app', "    ? enLigneDeux.vinted.map((g) => (g.annonces || []).filter((a) => a.plat === 'vinted').map((a) => String(a.id)))", "    ? [...enLigneDeux.vinted, ...(enLigneDeux.numeroSeul || [])].map((g) => (g.annonces || []).filter((a) => a.plat === 'vinted').map((a) => String(a.id)))"],
   'journee-a-confirmer': ['app', "        enLigne: listings.items.filter((it) => String(it && it._acc && it._acc.vinted_user_id) === uid) };",
     "        enLigne: [...listings.items, ...(listings.aConfirmer || [])].filter((it) => String(it && it._acc && it._acc.vinted_user_id) === uid) };"],
 };
@@ -89,6 +94,9 @@ if (arg.includes('--prouve')) {
   const mCle = dCle >= 0 ? [appSrc.slice(dCle, appSrc.indexOf('\n};\n', dCle) + 4)] : null;
   vm.runInContext([appSrc.slice(deb, finPk + 3), mCle ? mCle[0] : '', appSrc.slice(a, b),
     'this.photoKey = photoKey; this.doublonsAReattribuer = doublonsAReattribuer; this.cleNum = typeof cleNum === "function" ? cleNum : null;'].join('\n'), ctx);
+  // Le VRAI bloc rouge (<conflits-numeros-regle>), pour juger ce que la carte ambre lui fait taire.
+  { const c1 = appSrc.indexOf('// <conflits-numeros-regle>'), c2 = appSrc.indexOf('// </conflits-numeros-regle>');
+    if (c1 >= 0 && c2 > c1) vm.runInContext("const triNum = (a, b) => String(a).localeCompare(String(b), 'fr', { numeric: true });\n" + appSrc.slice(c1, c2) + '\nthis.conflitsDeNumeros = conflitsDeNumeros;', ctx); }
   const photoKey = ctx.photoKey;
   const cle = ctx.cleNum || ((v) => { let s = String(v == null ? '' : v).trim().toUpperCase().replace(/[\s\-_.]/g, ''); if (/^\d+$/.test(s)) s = String(parseInt(s, 10)); return s; });
 
@@ -190,6 +198,41 @@ if (arg.includes('--prouve')) {
     dit(deux.length === 1 && deux[0].id === '8004', 'deux annonces au N°22, photos différentes : la plus récente reçoit un numéro neuf (règle du 20 oct. inchangée)', JSON.stringify(deux));
     const sansPk = f(conflit('23', ['8005', '8006']), { 8005: { numero: '23', numberedAt: '2026-11-01' }, 8006: { numero: '23', numberedAt: '2026-11-02' } });
     dit(sansPk.length === 1, 'sans photo connue : la règle du 20 oct. joue (une absence de photo n’est pas une identité)', JSON.stringify(sansPk));
+  });
+
+  if (R) await essaie('K · le rouge se tait pour UNE paire en ligne deux fois (6 nov., finitions)', () => {
+    const rouge = ctx.conflitsDeNumeros;
+    if (typeof rouge !== 'function') { dit(false, 'conflitsDeNumeros introuvable'); return; }
+    const sans = (s) => s.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+    const app = sans(appSrc);
+    const dG = app.indexOf('const groupesDeuxFois = useMemo(');
+    const corpsG = dG >= 0 ? app.slice(dG, app.indexOf('[enLigneDeux]);', dG)) : '';
+    // La MÊME transformation que l'app (groupes affichés → ids) — sinon l'audit jugerait une fiction.
+    const groupes = (r) => (r && Array.isArray(r.vinted) ? r.vinted.map((g) => (g.annonces || []).filter((a) => a.plat === 'vinted').map((a) => String(a.id))) : []);
+    dit(/enLigneDeux\.vinted\.map\(\(g\) => \(g\.annonces \|\| \[\]\)\.filter\(\(a\) => a\.plat === 'vinted'\)\.map\(\(a\) => String\(a\.id\)\)\)/.test(corpsG) && !/numeroSeul|sites/.test(corpsG), 'les groupes sont ceux que la carte ambre AFFICHE (`enLigneDeux.vinted`), jamais `numeroSeul` ni `sites`', corpsG.slice(0, 200));
+    dit(/const conflitsNum = useMemo\(\(\) => conflitsDeNumeros\(porteursNum, groupesDeuxFois\), \[porteursNum, groupesDeuxFois\]\)/.test(app) && app.indexOf('const enLigneDeux = useMemo(') < dG, 'le bloc rouge (`conflitsNum`) reçoit ces groupes ; `enLigneDeux` est calculé AVANT (TDZ)');
+    const porteurs = (n, ids) => ({ [n]: ids.map((id) => ({ type: 'annonce', titre: 'Jordan', id })) });
+    // recreeDe, même N° : la carte ambre le dit ⇒ pas de rouge.
+    const fC = { 3001: { numero: '7', photoK: '05_r/1' }, 3002: { numero: '7', photoK: '05_s/2', recreeDe: '3001' } };
+    const rC = lancer({ vinted: [compte('111', [ann('3001', 'Jordan', ph('05_r', '1')), ann('3002', 'Jordan', ph('05_s', '2'))])], fiches: fC });
+    dit(rC.vinted.length === 1 && rouge(porteurs('7', ['3001', '3002']), groupes(rC)).length === 0, 'recréée (`recreeDe`), N°7 sur les deux : la carte ambre la dit ⇒ PAS de rouge', JSON.stringify(groupes(rC)));
+    dit(rouge(porteurs('7', ['3001', '3002'])).length === 1, '… sans la carte : le rouge (rien n’est dispensé d’office)');
+    // photo exacte, même N°.
+    const fP = { 9001: { numero: '50', photoK: '05_k/1' }, 9002: { numero: '50', photoK: '05_k/1' } };
+    const rP = lancer({ vinted: [compte('111', [ann('9001', 'Samba', ph('05_k', '1'))]), compte('222', [ann('9002', 'Samba', ph('05_k', '1', 'f310'))])], fiches: fP });
+    dit(rP.vinted.length === 1 && rouge(porteurs('50', ['9001', '9002']), groupes(rP)).length === 0, 'même PHOTO EXACTE, N°50 sur deux comptes : la carte ambre ⇒ PAS de rouge', JSON.stringify(groupes(rP)));
+    // même N° seul (photos différentes) : deux paires peut-être ⇒ rouge.
+    const fD = { 4001: { numero: '33', photoK: '05_m/1' }, 4002: { numero: '33', photoK: '05_n/2' } };
+    const rD = lancer({ vinted: [compte('111', [ann('4001', 'Puma', ph('05_m', '1'))]), compte('222', [ann('4002', 'Puma', ph('05_n', '2'))])], fiches: fD });
+    dit(rouge(porteurs('33', ['4001', '4002']), groupes(rD)).length === 1, 'même N° seul, photos différentes : le ROUGE reste (peut-être deux paires)', JSON.stringify(groupes(rD)));
+    // lecture de 30 h : la carte se tait ⇒ le rouge reste.
+    const rV = lancer({ vinted: [compte('111', [ann('9001', 'Samba', ph('05_k', '1'))]), compte('222', [ann('9002', 'Samba', ph('05_k', '1'))], { lu: MAINT - 30 * H })], fiches: fP });
+    dit(rV.vinted.length === 0 && rouge(porteurs('50', ['9001', '9002']), groupes(rV)).length === 1, 'un compte lu il y a 30 h : la carte se tait, le ROUGE reste (jamais les deux muets)', JSON.stringify(groupes(rV)));
+    // 50 annonces au même titre sous un même N° : jamais dispensées par le titre.
+    const f50 = {}, l50 = [];
+    for (let i = 0; i < 50; i++) { const id = String(9100000 + i); f50[id] = { numero: '60', photoK: `05_t${i}/1` }; l50.push(ann(id, 'Nike Dunk Low Panda 42', ph(`05_t${i}`, '1'))); }
+    const r50 = lancer({ vinted: [compte('111', l50)], fiches: f50 });
+    dit(rouge(porteurs('60', Object.keys(f50)), groupes(r50)).length === 1, '50 annonces au même titre sous le N°60 : rouge (jamais par le titre)');
   });
 
   await essaie('J · Ma journée et la feuille', () => {

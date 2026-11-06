@@ -7,7 +7,8 @@
 // (extractBrand / extractColors / extractModel, extraits de src/App.jsx) :
 //   F  la file « Sans achat relié » : en ligne, numérotée, ni achat relié ni prix
 //      connu (un prix saisi à la main n'y est pas : rien à relier) ; « Plus tard »
-//      en fin de file et hors du nombre de Ma journée ;
+//      en fin de file et hors du nombre de Ma journée PENDANT 7 JOURS (date posée à
+//      son clic), puis l'annonce revient (6 nov., finitions), « reportée le … » dit ;
 //   G  LA meilleure suggestion : la règle de « Relier un achat » (`suggestionsAchat`)
 //      — marque ET taille, achat antérieur à la mise en ligne, les CHAMPS de
 //      l'annonce d'abord ; 50 annonces identiques : une proposition chacune, AUCUN
@@ -27,6 +28,13 @@ const MUTS = {
   'sans-numero': ['src/achatsARelier.js', "  if (!e || !String(e.numero || '').trim()) return false;", '  if (!e) return false;'],
   'plus-tard-compte': ['src/achatsARelier.js', 'export const aRelierJournee = (file) => (Array.isArray(file) ? file.filter((x) => !x.plusTard).length : 0);', 'export const aRelierJournee = (file) => (Array.isArray(file) ? file.length : 0);'],
   'plus-tard-devant': ['src/achatsARelier.js', '(Number(a.plusTard) - Number(b.plusTard)) || ', ''],
+  // (6 nov., finitions) « Plus tard » ne revient plus jamais (le défaut d'avant) / revient tout de suite / sans date ⇒ reportée.
+  'plus-tard-eternel': ['src/achatsARelier.js', "  return { reporte: Number(maintenant) < revient,", "  return { reporte: true,"],
+  'plus-tard-jamais': ['src/achatsARelier.js', "  return { reporte: Number(maintenant) < revient,", "  return { reporte: false,"],
+  'plus-tard-illisible-reporte': ['src/achatsARelier.js', "  if (!Number.isFinite(t)) return { reporte: false, le: null, revient: null };", "  if (!Number.isFinite(t)) return { reporte: true, le: null, revient: null };"],
+  'app-sans-horloge': ['src/App.jsx', 'plusTard: achatPlusTard, maintenant: Date.now() })', 'plusTard: achatPlusTard, maintenant: 0 })'],
+  'app-pas-relu-au-nuage': ['src/App.jsx', "    setAchatPlusTard((v) => (v && Object.keys(v).length) ? v : lu('vrm_achat_plus_tard'));\n", ''],
+  'app-date-tue': ['src/App.jsx', "l.reporteLe ? `reportée le ${jour(l.reporteLe)}", "l.plusTard ? `remise à plus tard"],
   'sans-date': ['src/achatsARelier.js', "dateRef: ms != null ? new Date(ms).toISOString() : null, curTx: ''", "dateRef: null, curTx: ''"],
   'champs-ignores': ['src/achatsARelier.js', "marque: x.brand || x.brand_title || '', taille: x.size || x.size_title || '',", "marque: '', taille: '',"],
   'lot-propose': ['src/achatsARelier.js', '    proposition: proposition && Number.isSafeInteger(proposition.centimes) ? proposition : null,', '    proposition: proposition || { centimes: 9000, source: "achat" },'],
@@ -81,9 +89,19 @@ const { extractBrand: marqueDe, extractColors: couleursDe, extractModel: modeleD
   dit(!f.some((x) => x.id === '3'), 'F2 un prix saisi à la main (sans achat Vinted) ⇒ pas dans la file');
   dit(!f.some((x) => x.id === '4'), 'F3 un achat déjà relié ⇒ pas dans la file');
   dit(!f.some((x) => x.id === '5'), 'F4 sans N° ⇒ pas dans cette file (c’est « Sans numéro »)');
-  const ft = A.fileSansAchat({ annonces, numeros, prixAchat, plusTard: { 2: 'x' } });
-  dit(ft.map((x) => x.id).join(',') === '1,2' && ft[1].plusTard, 'F5 « Plus tard » ⇒ en fin de file (toujours visible)');
+  const MAINT = T0 + 30 * J;
+  const ilYa = (j) => new Date(MAINT - j * J).toISOString();
+  const ft = A.fileSansAchat({ annonces, numeros, prixAchat, plusTard: { 2: ilYa(2) }, maintenant: MAINT });
+  dit(ft.map((x) => x.id).join(',') === '1,2' && ft[1].plusTard, 'F5 « Plus tard » (il y a 2 j) ⇒ en fin de file (toujours visible)');
   dit(A.aRelierJournee(ft) === 1 && A.aRelierJournee(f) === 2 && A.aRelierJournee(null) === 0, 'F6 Ma journée : le nombre sans les « plus tard »');
+  // (6 nov., finitions) Au bout de 7 jours, elle REVIENT : dans le nombre, à sa place, « reportée le … » dit.
+  const f8 = A.fileSansAchat({ annonces, numeros, prixAchat, plusTard: { 2: ilYa(8) }, maintenant: MAINT });
+  dit(f8.map((x) => x.id).join(',') === '2,1' && !f8[0].plusTard && A.aRelierJournee(f8) === 2 && f8[0].reporteLe === ilYa(8), 'F7 « Plus tard » il y a 8 j ⇒ revenue : comptée dans Ma journée, à sa place, la date de report gardée', JSON.stringify(f8.map((x) => [x.id, x.plusTard, x.reporteLe])));
+  const f6 = A.fileSansAchat({ annonces, numeros, prixAchat, plusTard: { 2: ilYa(6.9) }, maintenant: MAINT });
+  dit(A.aRelierJournee(f6) === 1 && f6[1].revientLe === new Date(Date.parse(ilYa(6.9)) + 7 * J).toISOString(), 'F8 il y a 6,9 j ⇒ encore de côté, « revient le » = la date + 7 j', JSON.stringify(f6[1]));
+  const fx = A.fileSansAchat({ annonces, numeros, prixAchat, plusTard: { 2: 'x' }, maintenant: MAINT });
+  dit(A.aRelierJournee(fx) === 2 && !fx.find((x) => x.id === '2').plusTard, 'F9 une date illisible ne met rien de côté (« pas su » ne vaut pas « reportée ») : comptée', JSON.stringify(fx.map((x) => [x.id, x.plusTard])));
+  dit(A.PLUS_TARD_JOURS === 7 && A.etatPlusTard(null) === null && A.etatPlusTard(ilYa(1), MAINT).reporte === true && A.etatPlusTard(ilYa(7.01), MAINT).reporte === false, 'F10 la règle : 7 jours, rien posé ⇒ rien');
 
   console.log('\n── G. La meilleure suggestion (la règle de « Relier un achat »)');
   const achats = [ach(1, 'Adidas Spezial noire 42.5', 30), ach(2, 'Adidas Spezial noire 42.5', 2), ach(3, 'Adidas Spezial bleue 42.5', 40), ach(4, 'Adidas Samba noire 42.5', 50), ach(5, 'Adidas Spezial noire 43', 60)];
@@ -120,6 +138,9 @@ const { extractBrand: marqueDe, extractColors: couleursDe, extractModel: modeleD
   const ecr = iE >= 0 ? APP.slice(iE, APP.indexOf('\n  };', iE)) : '';
   dit(/await ecritureRelierAchat\(a\)/.test(rel) && /updatePair\(it, w\)/.test(rel) && /propositionPrixAchat\(\{ identite: \{ achat: a, par: 'choix' \}, ventilationDe: ventilationDeTx \}\)/.test(ecr) && /ecritureLot\(a, saisi/.test(ecr), 'S3 « Relier » : l’écriture de « Relier un achat » (prix du reçu ; un lot demande le prix de l’article)');
   dit(/onPlusTard=\{poserAchatPlusTard\}/.test(APP) && /const poserAchatPlusTard = \(id\) => setAchatPlusTard/.test(APP) && !/poserAchatPlusTard[^\n]*buyPrice/.test(APP), 'S4 « Plus tard » ne pose aucun prix');
+  dit(/const poserAchatPlusTard = \(id\) => setAchatPlusTard\(\(prev\) => \{ const u = \{ \.\.\.\(prev \|\| \{\}\), \[String\(id\)\]: new Date\(\)\.toISOString\(\) \}; save\('vrm_achat_plus_tard', u\)/.test(APP) && /'vrm_achat_plus_tard',/.test(APP), 'S7 « Plus tard » : la DATE de son clic, synchronisée (`vrm_achat_plus_tard`)');
+  dit(/useEffect\(\(\) => onCloudReady\(\(\) => \{\s*const lu = [\s\S]{0,300}?setAchatPlusTard\(\(v\) => \(v && Object\.keys\(v\)\.length\) \? v : lu\('vrm_achat_plus_tard'\)\)/.test(APP), 'S9 un appareil neuf relit « Plus tard » quand le nuage arrive (seulement si resté vide)');
+  dit(/plusTard: achatPlusTard, maintenant: Date\.now\(\) \}\)/.test(APP) && /l\.reporteLe \? `reportée le \$\{jour\(l\.reporteLe\)\}/.test(APP) && /data-ar-reportee=/.test(APP), 'S8 la file lit l’heure (elle revient au bout de 7 jours) et la ligne dit « reportée le … »');
   dit(/if \(nR > 0\) jobs\.push\(\{ id: 'achat-a-relier'/.test(APP) && /aRelierJournee\(fileAchat\)/.test(APP), 'S5 Ma journée dit le nombre, une fois');
   dit(!/useEffect\([^;]*relierAchatAnnonce/.test(APP) && !/useEffect\([^\n]*meilleureSuggestion/.test(APP), 'S6 rien ne relie tout seul (aucun effet ne relie)');
 
