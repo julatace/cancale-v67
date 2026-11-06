@@ -189,7 +189,11 @@ const ECRANS = [
           const r = rail.getBoundingClientRect();
           return { n: bs.length, railBas: Math.round(r.bottom), railH: Math.round(r.height), defile: !!defilant,
             coupees: bs.filter((e) => { const x = e.getBoundingClientRect(); return x.bottom > innerHeight + .5 || x.bottom > r.bottom + .5; }).map((e) => e.innerText.trim()),
-            petites: bs.filter((e) => e.getBoundingClientRect().height < 33.5).map((e) => e.innerText.trim() + ' ' + Math.round(e.getBoundingClientRect().height)) };
+            // (6 nov.) Le plancher suit la densité de la colonne (3012b3df, 1er nov. après-midi,
+            // styles-finition.css : « 1-2 : les entrées gardent 34 px ; 3-4 : 30 puis 28 px — seulement
+            // quand, sinon, une ligne serait coupée »). Hors densité 3-4, 34 px reste exigé.
+            densite: rail.getAttribute('data-rail-densite') || '0',
+            petites: bs.filter((e) => e.getBoundingClientRect().height < ({ 3: 29.5, 4: 27.5 }[rail.getAttribute('data-rail-densite')] || 33.5)).map((e) => e.innerText.trim() + ' ' + Math.round(e.getBoundingClientRect().height)) };
         });
         await shot(pg, nom(vp, false, 'colonne'));
         dit(!!avant && avant.n >= 10 && avant.railH <= vp.height + 1, 'la colonne est rendue et ne dépasse pas la hauteur de l’écran', JSON.stringify(avant));
@@ -207,7 +211,7 @@ const ECRANS = [
           return out;
         });
         dit(atteintes.length === 0, 'chaque entrée (Paramètres compris) s’atteint EN ENTIER, sans être coupée par le bas', atteintes.join(' · '));
-        dit(avant && avant.petites.length === 0, 'aucune entrée sous 34 px de haut (une rangée de navigation à la souris)', avant && avant.petites.join(' · '));
+        dit(avant && avant.petites.length === 0, 'aucune entrée sous 34 px de haut (30/28 px seulement en densité 3/4, quand sinon une ligne serait coupée)', avant && `densité ${avant.densite}${avant.petites.length ? ' — ' + avant.petites.join(' · ') : ''}`);
         dit(errs.length === 0, 'aucune erreur', errs.join(' | ').slice(0, 160));
         await ctx.close();
       });
