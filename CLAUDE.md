@@ -556,10 +556,6 @@ sans la fonction.
 
 - **6 nov. · SMS Mondial Relay** : casiers annoncés par SMS ⇒ Raccourcis POST `/api/widget?mode=sms` (jeton `vrm_sms_token`, le vendeur = le jeton), rangés comme les e-mails. `docs/passation/2026-11-06-sms-colis.md`. Geste : Réglages → SMS Mondial Relay.
 
-- **6 nov. · Sauvegarde + prix au numérotage** : copie nocturne chiffrée du `public` (gpg, artefact 30 j, dépôt PUBLIC ⇒ jamais en clair), essai de restauration le dimanche (`scripts/sauvegarde/`) ; prix d'achat demandé à chaque N° par UNE écriture (`src/prixAuNumerotage.js`, vide ⇒ rien), carte Ma journée fusionnée. `docs/passation/2026-11-06-sauvegarde-prix.md`. Geste : poser `SUPABASE_DB_URL` (Session pooler) et `SAUVEGARDE_PHRASE` dans les secrets GitHub, puis Run workflow.
-
-- **6 nov. · Extension 5.323** : ventes/achats FUSIONNÉS par n° de transaction (une vente du matin jetée « plus pauvre », 320 lues contre 2 000) ; relevé du porte-monnaie par `wallet/invoices/current`, l'app date une vente par SON n° seulement ; capture brute Vestiaire COUPÉE. `docs/passation/2026-11-06-extension-5323.md`. Geste : installer la 5.323, ouvrir Porte-monnaie → Historique sur Vinted ; confirmer la suppression des 40 `vc_brut_*`.
-
 
 
 
