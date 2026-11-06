@@ -16,7 +16,9 @@ const ilYa = (j) => new Date(MAINTENANT - j * 86400000).toISOString();
 const A = '111', S = '199082413';
 const ACCOUNTS = [{ id: 1, vinted_user_id: A, login: 'compte_vivant', domain: 'www.vinted.fr', refresh_token: 'r', updated_at: new Date(MAINTENANT).toISOString() }];
 const ROWS = [
-  { id: 'main', data: { vinted_annonce_numeros: {
+  // (6 nov.) Le bouton « Stream » n'est dans l'en-tête que s'il est choisi
+  // (Réglages → Mode stream → « Afficher le bouton Stream ») : ce banc le choisit.
+  { id: 'main', data: { vrm_stream_regles: { v: 1, bouton: true }, vinted_annonce_numeros: {
     '9001': { numero: 'B12', title: 'Nike Sacai blanche', accountId: S },
     '9002': { numero: '3', title: 'Adidas Spezial bleue', accountId: A },
   } } },

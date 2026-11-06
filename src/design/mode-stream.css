@@ -37,3 +37,13 @@
 .vrm-stream-apercu-l { font: 500 15px/1.4 var(--vrm-police, system-ui); overflow-wrap: anywhere; }
 .vrm-stream-apercu-l[data-apercu-entiere="1"] { filter: blur(4px); }
 .vrm-stream-essai { margin-top: 8px; width: 100%; box-sizing: border-box; min-height: 44px; padding: 10px 12px; border-radius: 12px; font: 400 15px/1.4 var(--vrm-police, system-ui); resize: vertical; }
+
+/* (6 nov.) L'aperçu des photos : deux vignettes inventées, l'une floutée (son
+   article a un mot du programme), l'autre nette. Le flou lui-même est la règle
+   d'index.html (le même que sur les écrans). */
+.vrm-stream-photos-apercu { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; margin-top: 10px; }
+.vrm-stream-photos-apercu > small { flex: 1 0 100%; font: 400 13px/1.4 var(--vrm-police, system-ui); }
+.vrm-stream-apercu-photo { margin: 0; width: 120px; display: flex; flex-direction: column; gap: 4px; }
+.vrm-stream-apercu-photo > span { display: block; width: 120px; height: 90px; border-radius: 10px; overflow: hidden; }
+.vrm-stream-apercu-photo img { display: block; width: 120px; height: 90px; }
+.vrm-stream-apercu-photo > figcaption { font: 400 12px/1.3 var(--vrm-police, system-ui); overflow-wrap: anywhere; }

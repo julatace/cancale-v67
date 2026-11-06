@@ -396,6 +396,19 @@
     [data-stream="1"][data-stream-codes="1"] [data-stream-image="code"],
     [data-stream="1"][data-stream-codes="1"] img[alt^="QR de retrait"],
     [data-stream="1"] [data-mfa-qr] { filter: blur(14px) !important; }
+    /* (6 nov.) Les PHOTOS d'article concernées par ses mots (ou toutes, selon son
+       réglage) : un flou FORT (une marque sur la chaussure ne se relit pas), gardé
+       dans le cadre de la photo (clip-path coupe le halo du flou). L'œil des
+       montants (data-stream="m") ne floute que les champs de montant. L'aperçu de
+       Réglages → Mode stream (data-apercu-photo) montre CE flou-là, le même. */
+    [data-stream="1"] [data-stream-photo],
+    [data-apercu-photo="floue"] img { filter: blur(22px) saturate(.7) !important; clip-path: inset(0 round 6px); user-select: none; }
+    /* Une photo en GRAND (visionneuse « Agrandir », recadrage du studio : ceux qui
+       disent leur article, data-stream-article) : 22 px laissaient la forme d'un
+       logo de 700 px se deviner — le flou y est doublé. */
+    [data-stream="1"] [data-stream-article] [data-stream-photo],
+    [data-stream="1"] [data-stream-article][data-stream-photo] { filter: blur(48px) saturate(.6) !important; }
+    [data-stream="m"] [data-stream-flou] { filter: blur(6px) !important; user-select: none; }
 </style>
 </head>
 <body><div id="root"></div>

@@ -34,7 +34,9 @@ const ECRANS = ['journee', 'annonces', 'ventes', 'plat_vinted', 'cat_bord', 'mes
 
 let ko = 0;
 const dit = (bon, quoi, det) => { if (!bon) ko++; console.log(`${bon ? 'OK  ' : 'KO  '}${quoi}${!bon && det ? ' — ' + String(det).slice(0, 300) : ''}`); };
-const base = () => ({ lignes: JSON.parse(JSON.stringify(NV.JEU_LIGNES)), comptes: NV.JEU_COMPTES, ecritures: 0 });
+// (6 nov.) Le bouton « Stream » n'est dans l'en-tête que s'il est choisi (Réglages →
+// Mode stream → « Afficher le bouton Stream ») : ce banc le choisit, dans `main`.
+const base = () => { const lignes = JSON.parse(JSON.stringify(NV.JEU_LIGNES)); const m = lignes.find((l) => l.id === 'main'); m.data.vrm_stream_regles = { v: 1, bouton: true }; return { lignes, comptes: NV.JEU_COMPTES, ecritures: 0 }; };
 const capture = async (pg, nom) => { if (!SHOTS) return; fs.mkdirSync(SHOTS, { recursive: true }); await pg.screenshot({ path: path.join(SHOTS, nom + '.png') }).catch(() => {}); };
 // Un montant lisible : un chiffre suivi de « € » (ou « k€ »), ou « € » suivi d'un chiffre.
 const MONTANTS = (pg) => pg.evaluate(() => {
