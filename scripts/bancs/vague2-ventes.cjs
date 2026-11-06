@@ -249,7 +249,7 @@ async function passe(nav, { W, theme }) {
     const doublon = await o.pg.evaluate(() => !!document.querySelector('[data-ann-filtre]'));
     dit(!doublon, 'A', `${T} le nombre de la file n’est pas redit par la ligne « N annonces affichées »`);
     await capture(o.pg, nomS('sans-achat'));
-    dit(!(lignesMain(o.base).vinted_annonce_numeros || {})['51001'].buyFromId, 'A', `${T} rien n’est relié avant SON tap`);
+    dit(!((lignesMain(o.base).vinted_annonce_numeros || {})['51001'] || {}).buyFromId, 'A', `${T} rien n’est relié avant SON tap`);
     await clic(o.pg, '[data-ar-relier="7300001"]');
     const ecrit = await ecriture(o.base, (m) => { const e = (m.vinted_annonce_numeros || {})['51001']; return e && String(e.buyFromId) === '7300001' && Number(String(e.buyPrice).replace(',', '.')) === 32; });
     dit(ecrit, 'A', `${T} SON tap « Relier » écrit le lien et le prix (32 €)`, JSON.stringify((lignesMain(o.base).vinted_annonce_numeros || {})['51001']));
@@ -258,7 +258,7 @@ async function passe(nav, { W, theme }) {
     await o.pg.waitForTimeout(800);
     const b = await o.pg.evaluate(() => [...document.querySelectorAll('[data-ar-ligne]')].map((x) => x.getAttribute('data-ar-ligne') + (x.hasAttribute('data-ar-plus-tard') ? '*' : '')));
     dit(b.length === 2 && b[b.length - 1] === '51002*', 'A', `${T} 51001 sort de la file ; « Plus tard » range 51002 en fin de file`, JSON.stringify(b));
-    const pt = lignesMain(o.base).vinted_annonce_numeros['51002'];
+    const pt = (lignesMain(o.base).vinted_annonce_numeros || {})['51002'] || {};
     dit(!pt.buyPrice && !pt.buyFromId, 'A', `${T} « Plus tard » n’écrit aucun prix`, JSON.stringify(pt));
     dit(!o.journal.erreurs.length, 'G', `${T} Sans achat relié : aucune erreur JS`, o.journal.erreurs.join(' ¦ '));
     await o.ctx.close();
@@ -281,14 +281,16 @@ async function passe(nav, { W, theme }) {
     await attendre(o.pg, '[data-prix-mini]', 6000);
     await o.pg.waitForTimeout(400);
     const lire = () => o.pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-mini-ligne]')].map((x) => [x.getAttribute('data-mini-ligne'), { mini: x.getAttribute('data-mini-valeur'), refus: x.getAttribute('data-mini-refus'), sous: x.hasAttribute('data-mini-sous') }])));
-    const m1 = await lire();
+    const vide = { mini: null, refus: null, sous: false };
+    const sur = (m) => new Proxy(m || {}, { get: (o, k) => o[k] || vide });   // un banc ne meurt pas : une ligne absente se lit vide
+    const m1 = sur(await lire());
     dit(m1['51001'] && m1['51001'].mini === '54' && m1['51003'].mini === '34' && m1['52001'].mini === '108', 'M', `${T} − 10 % arrondi : 60 → 54, 38 → 34, 120 → 108`, JSON.stringify(m1));
     dit(m1['51003'].sous && !m1['51001'].sous && !m1['52001'].sous, 'M', `${T} 34 € sous un achat de 35 € : la ligne le dit`, JSON.stringify(m1));
     const av = await ambre(o.pg, '[data-mini-sous-achat]');
     dit(av && av.ambre, 'M', `${T} « sous ton prix d’achat » en ambre (un geste à regarder)`, JSON.stringify(av));
     await clic(o.pg, '[data-mini-refus-on]');
     await o.pg.waitForTimeout(300);
-    const m2 = await lire();
+    const m2 = sur(await lire());
     dit(m2['51001'].refus === '42' && m2['52001'].refus === '84', 'M', `${T} « Refuser sous » − 30 % : 42, 84 (toujours sous le mini)`, JSON.stringify(m2));
     const g = await GENERAL(o.pg, tel, '[data-prix-mini]');
     dit(!g.rouges.length && !g.debord && (!tel || !g.petits.length), 'G', `${T} Prix mini : ni rouge, ni débord, 44 px`, JSON.stringify(g));

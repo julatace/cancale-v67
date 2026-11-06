@@ -14424,7 +14424,7 @@ function AchatsARelier({ file, achats, liens, propositionDe, onRelier, onSaisir,
   const jour = (d) => { const t = Date.parse(d || ''); return Number.isFinite(t) ? new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: new Date(t).getFullYear() === new Date().getFullYear() ? undefined : 'numeric' }) : ''; };
   return (
     <section className="vrm-ar" data-ar={lignes.length} data-ar-sugg={achats === undefined ? '' : String(nSugg)} aria-label="Annonces sans achat relié">
-      <p className="vrm-ar-tete">{achats === undefined ? `${lignes.length} annonce${lignes.length > 1 ? 's' : ''} · ${PAS_SU.enCours.toLowerCase()}` : `${lignes.length} annonce${lignes.length > 1 ? 's' : ''} · ${nSugg} avec une suggestion`}</p>
+      <p className="vrm-ar-tete">{achats === undefined ? `${lignes.length} annonce${lignes.length > 1 ? 's' : ''} · ${PAS_SU.enCours.toLowerCase()}` : `${lignes.length} annonce${lignes.length > 1 ? 's' : ''} · ${nSugg} avec une suggestion`}{achats !== undefined && nSugg < lignes.length ? <span> · une suggestion : même marque, même taille, achetée avant la mise en ligne</span> : null}</p>
       <ul className="vrm-ar-liste">
         {lignes.map((l) => {
           const it = l.item, t = l.texte, num = l.fiche && l.fiche.numero;
@@ -14443,7 +14443,7 @@ function AchatsARelier({ file, achats, liens, propositionDe, onRelier, onSaisir,
                   <span className="vrm-ar-centre"><span className="vrm-ar-titre">{t.titre || 'Achat sans titre'}</span>
                     <span className="vrm-ar-sous">{[jour(t.date), compteDe(l.sugg.achat), t.lot ? 'lot : le prix de cet article te sera demandé' : t.proposition ? (t.proposition.source === 'recu' ? 'prix du reçu' : 'article seul') : (t.prixLu != null ? `payé ${montant(t.prixLu)}` : '')].filter(Boolean).join(' · ')}</span></span>
                 </div>
-              ) : <div className="vrm-ar-sans" data-ar-sans-sugg="">{achats === undefined ? PAS_SU.enCours : 'Aucune suggestion sûre (même marque, même taille, achetée avant la mise en ligne)'}</div>}
+              ) : <div className="vrm-ar-sans" data-ar-sans-sugg="">{achats === undefined ? PAS_SU.enCours : 'Aucune suggestion'}</div>}
               <div className="vrm-ar-gestes">
                 {l.sugg ? <Bouton variante="secondaire" icone="link" data-ar-relier={String(l.sugg.achat.transaction_id)} onClick={() => onRelier(it, l.sugg.achat)}>{relierTxt}</Bouton>
                   : <Bouton variante="secondaire" icone="link" data-ar-choisir="" disabled={achats === undefined} onClick={() => onChoisir(it)}>Choisir un achat</Bouton>}
