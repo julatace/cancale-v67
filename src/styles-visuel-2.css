@@ -163,24 +163,22 @@ html body .vrm-app-shell .vrm-main .vrm-eb-gestes .vrm-b[data-relier-ouvrir]::be
 }
 @media (hover: hover) and (pointer: fine) { html body .vrm-app-shell .vrm-main .vrm-eb-gestes .vrm-b[data-relier-ouvrir]:hover { background: var(--vrm-card2) !important; } }
 
-/* ══ 3. LA BARRE DU HAUT FLOUTÉE ET LE GRAND TITRE QUI SE REPLIE (téléphone) ══
-   Comme Mail et Réglages : en haut de page la barre est transparente et le grand
-   titre (34 px) est posé dessous ; au défilement le CONTENU passe sous une barre
-   de verre (flou + saturation), un filet d'un demi-pixel apparaît et le titre
-   revient en petit (17/600) au centre de la barre, pendant que le grand titre
-   s'efface. L'en-tête ne prend plus de place dans la colonne : il flotte, la page
-   commence dessous (même position qu'avant, au pixel). */
+/* ══ 3. LA BARRE DU HAUT ET LE GRAND TITRE QUI SE REPLIE (téléphone) ══════
+   Comme Mail et Réglages : en haut de page la barre se fond dans le fond et le grand
+   titre (34 px) est posé dessous ; au défilement la barre prend un filet d'un
+   demi-pixel, le titre revient en
+   petit (17/600) au centre, pendant que le grand titre s'efface.
+   ⚠️ L'en-tête RESTE dans la colonne (sticky, au-dessus de `.vrm-main`) : le faire
+   flotter pour que le contenu passe SOUS le verre faisait sauter la carte sombre de
+   Colis de 149 px pendant le chargement (banc `chargement`, CLS 0,106 contre 0,012 —
+   mesuré avec et sans). Le contenu sous le verre est à reprendre avec la coque. */
 @media (max-width: 767px), (max-width: 1023px) and (hover: none), (max-width: 1023px) and (pointer: coarse), (max-width: 1023px) and (pointer: none) {
-  html body .vrm-app-shell { position: relative; }
   html body .vrm-app-shell > .vrm-app-header {
-    position: absolute !important; top: 0; left: 0; right: 0; z-index: 50;
-    background: transparent !important; border-bottom: .5px solid transparent !important;
-    transition: background-color 200ms ease-out, border-color 200ms ease-out, -webkit-backdrop-filter 200ms ease-out, backdrop-filter 200ms ease-out;
+    border-bottom: .5px solid transparent !important;
+    transition: background-color 200ms ease-out, border-color 200ms ease-out;
   }
-  html body .vrm-app-shell > main.vrm-main { padding-top: calc(52px + env(safe-area-inset-top, 0px)) !important; scroll-padding-top: calc(64px + env(safe-area-inset-top, 0px)) !important; }
   html body .vrm-app-shell > .vrm-app-header.is-defile {
-    background: color-mix(in srgb, var(--vrm-bg) 72%, transparent) !important;
-    -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
+    background: var(--vrm-bg) !important;   /* rien ne passe dessous (voir ⚠️) : un verre ne montrerait que le fond */
     border-bottom-color: var(--vrm-hair) !important;
   }
   /* Le petit titre revient dans la barre, seulement quand le grand est parti. */
@@ -188,17 +186,12 @@ html body .vrm-app-shell .vrm-main .vrm-eb-gestes .vrm-b[data-relier-ouvrir]::be
     display: block !important; grid-column: 2; opacity: 1; transform: none;
     font-size: var(--vrm-t17); font-weight: 600; letter-spacing: -.02em; color: var(--vrm-ink) !important;
   }
-  /* Ma journée : la barre prend le noir de la tête sombre (maquette Fusion) ; défilée,
-     elle devient un verre SOMBRE. */
+  /* Ma journée : la barre garde le noir de la tête sombre (maquette Fusion), défilée aussi. */
   html body .vrm-app-shell:has(.vrm-main .vrm-fu-journee) > .vrm-app-header { background: #1d1d1f !important; }
-  html body .vrm-app-shell:has(.vrm-main .vrm-fu-journee) > .vrm-app-header.is-defile { background: rgba(29,29,31,.72) !important; border-bottom-color: rgba(255,255,255,.08) !important; }
+  html body .vrm-app-shell:has(.vrm-main .vrm-fu-journee) > .vrm-app-header.is-defile { background: #1d1d1f !important; border-bottom-color: rgba(255,255,255,.08) !important; }
   html body .vrm-app-shell:has(.vrm-main .vrm-fu-journee) > .vrm-app-header.is-defile .vrm-hdr-titre { color: #fff !important; }
 }
-/* Sans transparence voulue (réglage d'accessibilité) : une barre pleine. */
-@media (prefers-reduced-transparency: reduce) {
-  html body .vrm-app-shell > .vrm-app-header.is-defile { background: var(--vrm-bg) !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
-  html body .vrm-app-shell:has(.vrm-main .vrm-fu-journee) > .vrm-app-header.is-defile { background: #1d1d1f !important; }
-}
+
 /* Le grand titre s'efface au fil des 56 premiers pixels défilés (le navigateur le fait
    seul, lié au défilement — aucun calcul à chaque image). Mouvement réduit : le fondu
    seul, sans glissement. Un navigateur qui ne sait pas le faire garde le titre net. */
