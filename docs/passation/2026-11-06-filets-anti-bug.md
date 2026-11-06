@@ -40,13 +40,25 @@ premier et sont répartis entre les parts (`AUDITS_PART=k/n`). Un audit rouge es
 (décision de Julien en attente). Ils sont **lancés quand même** (« rouge connu ») ;
 repassés au vert, le lanceur dit « exception à retirer » ; une exception dont l'audit
 n'existe plus fait échouer.
+Les **bancs** rouges connus vivent dans le même fichier (clé `bancs`), mais **par
+ligne** : chaque exception porte l'expression de SES lignes rouges (`rouges`) ; une
+ligne rouge nouvelle rend le banc rouge pour de bon. Deux, rouges **à l'identique sur
+l'arbre d'avant** (rejoués des deux côtés) : `navigation-tache` J (compteurs de la
+colonne) et `iphone-reprise` B7/R3 (balayage, recherche rouverte). À corriger dans leur
+chantier, pas à masquer.
+
+Des audits lisent les versions d'extension publiées dans `origin/main` : le job
+`audits` prend toute l'histoire (`fetch-depth: 0`).
 
 **Les zips de `public/`** : des audits les régénèrent (mesuré : `VRM-extension.zip`,
 `VRM-Orion*.zip/xpi`). Le lanceur le signale sans échouer ; le job remet `public/`
 (`git checkout -- public/`, `if: always()`).
 
-**Mesures locales (6 nov.)** : 316 audits, 312 verts, 2 rouges connus, 1 instable
-(`recherche-unique`), 1 trop long à 240 s (`renum-b`, d'où le délai porté à 900 s).
+**Mesures locales (6 nov.)** : première passe, 316 audits en 785 s (4 à la fois),
+312 verts, 2 rouges connus, 1 instable (`recherche-unique`), 1 trop long à 240 s
+(`renum-b`, d'où le délai porté à 900 s). **Dernière passe (code final) : 319 audits
+en 957 s, 316 verts, 2 rouges connus, 1 rouge — `audit-boite-emails`, qui cherchait
+`tab==='emails'&&<Suspense` : il accepte maintenant le garde-fou autour (corrigé, vert).**
 Les 8 bancs du lot : `nouveau-vendeur` dépasse 10 min sur la machine chargée (il rend
 chaque écran à 2 largeurs × 2 thèmes) — d'où sa part à lui et un délai de 20 min par
 banc ; les autres ont tourné vert (navigation-tache, colis-retirer-propre…) mais leurs
@@ -281,10 +293,15 @@ obligatoires (§1, étape 4).
 
 - `npm run build` vert ; `audit-fonctions-api`, `audit-coherence`, `audit-secrets` verts ;
   le lot des 16 audits proches de la coque (composants, boutons, tdz, lectures…) vert.
-- Tous les audits : voir § 1 (et la dernière passe, en fin de session, dans le rapport).
-- Garde-fous, « ne nuit pas » : texte et nœuds identiques sur Ma journée, Ventes, Colis
-  (390 et 1512), avant contre après ; l'ensemble des lectures : voir la dernière ligne
-  du rapport de session.
+- Tous les audits : § 1 (dernière passe : 316 verts + 2 rouges connus, boite-emails corrigé).
+- Garde-fous, « ne nuit pas » (`garde-ecrans.cjs`, `MESURE=` / `COMPARER=`, dist d'avant
+  contre dist d'après, Ma journée · Ventes · Colis à 390 et 1512, `MESURE_ATTENTE=15000`) :
+  **texte identique, nœuds identiques, ENSEMBLE des lectures identique sur les 6 écrans**
+  (de 35 à 60 lectures différentes selon l'écran). Le NOMBRE de lectures bouge avec
+  l'horloge (le même dist d'avant deux fois : 71 puis 75) : il est dit, pas jugé. Avec
+  6 s d'attente seulement, la machine chargée laissait parfois deux lectures différées
+  hors de la fenêtre (`ebay_messages`, `email_sale_*`) : c'est l'horloge, pas le garde-fou
+  (à 15 s, avant = après, et avant = avant).
 
 ## Fichiers
 
