@@ -140,6 +140,29 @@ export function suggestionsAchat({ cible, achats, liens, marqueDe, couleursDe, m
   return out.slice(0, max).map(({ da, ...r }) => r);
 }
 
+// ── La SAISIE EN SÉRIE (« Prix d'achat à compléter ») : la MÊME règle (6 nov.) ─
+// Avant, la saisie en série classait les achats par un barème (`scoreAchatPrep` de
+// l'app) où le TITRE seul suffisait (marque + couleur + titre identique passaient
+// le seuil sans taille) et où un achat POSTÉRIEUR à l'annonce pouvait être proposé
+// (vague 2, point 7). Une notion, une règle (§11) : chaque ligne passe par
+// `suggestionsAchat` — marque ET taille obligatoires, modèle et couleur
+// contradictoires écartés, achat antérieur à la mise en ligne (ou à la vente),
+// remboursés écartés, déjà reliés écartés sauf un LOT jusqu'à son nombre.
+//   lignes : [{ key, titre, marque?, taille?, couleur?, dateRef? }] (dateRef = la
+//            date la plus ANCIENNE connue de l'article : mise en ligne, vente, N° posé).
+// Rend { [key]: [{ achat, rang, sur }] } — `sur` = les trois critères (rang 1).
+export function suggestionsSaisieSerie({ lignes, achats, liens, marqueDe, couleursDe, modeleDe = null, max = 3 } = {}) {
+  const out = {};
+  if (!Array.isArray(lignes) || !Array.isArray(achats) || !achats.length) return out;
+  for (const l of lignes) {
+    if (!l || l.key == null) continue;
+    const s = suggestionsAchat({ cible: { titre: l.titre || '', marque: l.marque || '', taille: l.taille || '', couleur: l.couleur || '', dateRef: l.dateRef || null, curTx: '' },
+      achats, liens, marqueDe, couleursDe, modeleDe, max });
+    if (s.length) out[String(l.key)] = s.map((x) => ({ ...x, sur: x.rang === 1 }));
+  }
+  return out;
+}
+
 // ── « Voir tous les achats » ────────────────────────────────────────────────
 // Les achats pas encore reliés (un lot reste tant qu'il n'est pas complet), sans
 // les remboursés, les plus récents d'abord. q : mot dans le titre, la marque ou

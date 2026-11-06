@@ -184,7 +184,11 @@ const debordement = (pg) => pg.evaluate(() => document.documentElement.scrollWid
           // (5 nov., chantier C — revue 2.5) La raison commune se dit UNE fois, en tête de la
           //  feuille (`[data-actions-raison]`), plus sous chaque action : le contrôle lit la tête.
           const teteMix = await pg.$eval('[data-actions-raison]', (x) => x.textContent).catch(() => '');
-          dit(mix.length === 5 && mix.every(([, ok]) => ok === 'non') && /2 comptes/.test(teteMix), `A ${T} deux comptes mélangés ⇒ rien ne se lance, la raison dite`, mix.map((x) => x[0] + ':' + x[1]).join(' ') + ' / ' + teteMix);
+          // (6 nov., vague 2) « Prix mini… » n'agit au nom d'aucun compte (une écriture dans ses fiches) :
+          //  il reste possible ; tout ce qui agit au nom d'un compte reste grisé.
+          const parCompte = mix.filter(([k]) => k !== 'mini');
+          dit(parCompte.length === 5 && parCompte.every(([, ok]) => ok === 'non') && /2 comptes/.test(teteMix), `A ${T} deux comptes mélangés ⇒ rien ne se lance au nom d’un compte, la raison dite`, mix.map((x) => x[0] + ':' + x[1]).join(' ') + ' / ' + teteMix);
+          dit(mix.some(([k, ok]) => k === 'mini' && ok === 'oui'), `A ${T} « Prix mini… » reste possible sur deux comptes (rien ne part chez Vinted)`, mix.map((x) => x[0] + ':' + x[1]).join(' '));
           await fermerFeuille(pg, '[data-actions-selection]');
           // A/V — deux annonces en ligne du compte de Chrome
           await cocher(pg, '9301'); await cocher(pg, '9103');
