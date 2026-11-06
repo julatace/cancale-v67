@@ -136,9 +136,11 @@ export function ligneJournee(liste) {
   const l = Array.isArray(liste) ? liste : [];
   if (!l.length) return null;
   const n = l.length, sans = l.filter((x) => x.sansNum).length, enCours = l.filter((x) => x.etat === 'en-cours').length;
+  // Ma journée parle d'« articles » (il vend aussi des sacs, `enArticles`) : des mots
+  // sans genre, et courts (une ligne au téléphone). « Paire pas reliée » est dit sur la vente.
   const court = `${n} vente${n > 1 ? 's' : ''} annulée${n > 1 ? 's' : ''} avant l’envoi`;
-  const morceaux = [n > 1 ? 'Les paires sont chez toi : remets-les en vente' : 'La paire est chez toi : remets-la en vente'];
+  const morceaux = ['À remettre en vente'];
   if (enCours) morceaux.push(`${enCours} en cours`);
-  if (sans) morceaux.push(`${sans} paire${sans > 1 ? 's' : ''} pas reliée${sans > 1 ? 's' : ''}`);
+  if (sans) morceaux.push(`${sans} sans N°`);
   return { n, court, detail: morceaux.join(' · '), photos: l.map((x) => x.photo).filter(Boolean) };
 }

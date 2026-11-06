@@ -126,7 +126,7 @@ const sansCommentaires = (t) => t.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/
 
   console.log('\n── J. Ma journée');
   const j = A.ligneJournee(l);
-  dit(j && j.n === 3 && /3 ventes annulées avant l’envoi/.test(j.court) && /1 paire pas reliée/.test(j.detail), 'J1 une ligne : le nombre, « paire pas reliée » nommé', JSON.stringify(j));
+  dit(j && j.n === 3 && /3 ventes annulées avant l’envoi/.test(j.court) && /1 sans N°/.test(j.detail) && !/paire/.test(j.court + j.detail), 'J1 une ligne : le nombre, la vente sans N° nommée (des mots d’« articles », §Ma journée)', JSON.stringify(j));
   dit(A.ligneJournee([]) === null && A.ligneJournee(null) === null, 'J2 rien à remettre ⇒ aucune ligne');
 
   console.log('\n── M. Le verdict du moteur (extension LUE, jamais modifiée)');
