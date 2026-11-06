@@ -16,7 +16,7 @@ const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_m
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
-const PORT = 4331;
+const PORT = Number(process.env.BANC_PORT) || 4331;
 
 const auj = new Date();
 const jour = (d) => new Date(auj.getFullYear(), auj.getMonth(), d, 12).toISOString();
