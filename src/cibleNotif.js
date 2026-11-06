@@ -35,10 +35,14 @@
 //
 //   cible=offre    conv=<id> compte=<uid>               Messages · la conversation ouverte, l'offre en évidence
 //   cible=vcvente  vc=<productId Vestiaire>              Ventes · Vestiaire · la vente
+//   cible=case     meuble=<id du meuble> i=<n° de case>  Stock · LA case (sélectionnée, défilée,
+//                  éclairée) — « Ranger » (une vente, une fiche, « Où ranger à l'arrivée ») et
+//                  « Voir au stock » (6 nov., vague 3). Identité = la PLACE (meuble + case), jamais
+//                  le titre ; une case vide se vise aussi (là où ranger).
 
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
 const COLONNES = ['prets', 'attente', 'retirer', 'partis'];
-const TYPES = ['conv', 'offre', 'offres', 'vente', 'vcvente', 'colis', 'retrait', 'colonne', 'achat', 'urssaf', 'doublon'];
+const TYPES = ['conv', 'offre', 'offres', 'vente', 'vcvente', 'colis', 'retrait', 'colonne', 'achat', 'urssaf', 'doublon', 'case'];
 const propre = (v) => { const s = String(v == null ? '' : v).trim(); return ID.test(s) ? s : ''; };
 // Échappe une valeur d'attribut CSS (les identités sont déjà filtrées par `ID`).
 const q = (s) => String(s).replace(/["\\]/g, '\\$&');
@@ -56,6 +60,7 @@ export function lireCible(params) {
   const type = String(g('cible') || '');
   if (!TYPES.includes(type)) return null;
   const c = { type, tx: propre(g('tx')), suivi: propre(g('suivi')), conv: propre(g('conv')), compte: propre(g('compte')), num: propre(g('num')), vc: propre(g('vc')), colonne: COLONNES.includes(g('colonne')) ? g('colonne') : '', plat: ['ebay', 'leboncoin'].includes(g('plat')) ? g('plat') : '' };
+  if (type === 'case') { c.meuble = propre(g('meuble')); const i = String(g('i') == null ? '' : g('i')).trim(); c.i = /^\d{1,4}$/.test(i) ? String(Number(i)) : ''; if (!c.meuble || !c.i) return null; }
   if ((type === 'conv' || type === 'offre') && !c.conv) return null;
   if (type === 'vcvente' && !c.vc) return null;
   if ((type === 'vente' || type === 'colis' || type === 'achat') && !c.tx) return null;
@@ -98,6 +103,7 @@ export function jetonsCible(c) {
     case 'achat': return [`achat:${c.tx}`];
     case 'urssaf': return ['urssaf'];
     case 'doublon': { const n = c.num ? cleNumCible(c.num) : ''; return n ? [`doublon:${c.plat || 'ebay'}:${n}`] : [`doublon:${c.plat || 'ebay'}`]; }
+    case 'case': return c.meuble && c.i ? [`case:${c.meuble}:${c.i}`] : [];
     default: return [];
   }
 }
@@ -160,6 +166,8 @@ function selecteursAnciens(c) {
           : (n ? [`[data-ebay-doublon="${q(n)}"]`, `[data-ebay-doublon-ailleurs="${q(n)}"]`] : ['[data-ebay-a-retirer]', '[data-ebay-a-retirer-ailleurs]']),
         ouvrir: null, deplier: [] };
     }
+    // (6 nov., vague 3) La case du Stock : son repli d'ancien attribut est `data-case-ici`.
+    case 'case': return { essais: c.meuble && c.i ? [`[data-case-ici="${q(c.meuble)}:${q(c.i)}"]`] : [], ouvrir: null, deplier: [] };
     default: return { essais: [], ouvrir: null, deplier: [] };
   }
 }
@@ -184,10 +192,11 @@ export function phraseAbsente(c) {
     // Ne promet pas « réglée » : la ligne peut manquer parce que la liste n'est
     // pas encore relue. Le geste est dit.
     case 'doublon': return 'Cette paire n\u2019est plus dans la liste « à retirer » : la double vente est sans doute déjà réglée. Vérifie dans tes annonces de la plateforme si tu as un doute.';
+    case 'case': return 'Cette case n\u2019est plus sur tes meubles : le meuble a peut-être été modifié ou supprimé.';
     default: return '';
   }
 }
 
 // Les paramètres d'adresse qui portent une cible : retirés de la barre
 // d'adresse une fois lus (un rechargement ne rejoue pas la cible).
-export const PARAMS_CIBLE = ['cible', 'tx', 'suivi', 'conv', 'compte', 'num', 'vc', 'colonne', 'plat', 'vue'];
+export const PARAMS_CIBLE = ['cible', 'tx', 'suivi', 'conv', 'compte', 'num', 'vc', 'colonne', 'plat', 'vue', 'meuble', 'i'];

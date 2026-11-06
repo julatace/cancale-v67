@@ -177,9 +177,12 @@ const toucher = async (pg, tel, sel) => { if (tel) await pg.tap(sel); else await
             await pg.waitForSelector('[data-meuble="mA"]', { timeout: 15000 }).catch(() => {});
             await pg.waitForTimeout(900);
             if (attendu === 'range') {
+              // (6 nov., vague 3) La N°1 a sa case : « Voir au stock » la SÉLECTIONNE (et `CibleNotif` la
+              // défile et l'éclaire) au lieu d'ouvrir la recherche — la règle jugée reste « N°1 visée ».
               const q = await pg.evaluate(() => { const i = document.querySelector('[data-stock-recherche] input'); return i ? i.value : null; });
               const res = await pg.evaluate(() => !!document.querySelector('[data-stock-res="1"]'));
-              dit(q === '1' && res, `${t} : C — « Voir au stock » arrive sur les étagères avec N°1 cherchée`, `${q} ${res}`);
+              const vise = await pg.evaluate(() => !!document.querySelector('[data-case-num="1"][data-case-vise]'));
+              dit((q === '1' && res) || vise, `${t} : C — « Voir au stock » arrive sur les étagères avec N°1 visée`, `${q} ${res} ${vise}`);
             } else {
               const pris = await pg.evaluate(() => { const el = document.querySelector('[data-a-ranger="3"]'); return el ? el.getAttribute('aria-pressed') : null; });
               dit(pris === 'true', `${t} : C — « Ranger au stock » arrive avec N°3 prise en main`, String(pris));
