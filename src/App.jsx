@@ -16376,7 +16376,7 @@ function rechercheParNumero(q, numData, comptes) {
     plan: ((load('vrm_meubles', []) || []).length ? (lu(nd.plan) || {}) : lu(nd.plan)),
     archive: archiveNumeros(),
   }, {
-    cleNum, conflits: conflitsDeNumeros,
+    cleNum, conflits: (p) => conflitsDeNumeros(p, GROUPES_DEUX_FOIS),
     ouStock: ouStockNumero,
     numEbayLigne: numLigneEbay,
     numEbayAnnonce: (a) => numEbayLu(a && a.sku, a && a.itemId, null, a && a.depuis),
@@ -36376,6 +36376,10 @@ function conflitsDeNumeros(porteurs, memePaires = null) {
   return out.sort((a, b) => triNum(a.numero, b.numero));
 }
 // </conflits-numeros-regle>
+// (6 nov., finitions) Les groupes « en ligne deux fois » que la carte ambre de Ma journée AFFICHE,
+// publiés par `Comptabilite` (qui les calcule) et lus par « Tout sur le N° » : le rouge y suit la
+// MÊME règle (§11). Vide tant que la carte n'est pas calculée ⇒ le rouge comme avant.
+let GROUPES_DEUX_FOIS = [];
 // <doublons-reattribuer-regle>
 // ⚠️⚠️ 20 OCTOBRE — DÉCISION DE JULIEN : « pour les numéros qui ont été en
 // double, je veux que l'app fasse elle-même les changements : elle redonne des
@@ -46477,6 +46481,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     ? enLigneDeux.vinted.map((g) => (g.annonces || []).filter((a) => a.plat === 'vinted').map((a) => String(a.id)))
     : []), [enLigneDeux]);
   const conflitsNum = useMemo(() => conflitsDeNumeros(porteursNum, groupesDeuxFois), [porteursNum, groupesDeuxFois]);
+  useEffect(() => { GROUPES_DEUX_FOIS = groupesDeuxFois; }, [groupesDeuxFois]);
   // ── CHANGER LE NUMÉRO D'UNE PAIRE À LA MAIN ────────────────────────────────
   // Julien : « on peut donner la possibilité aux gens de changer de numéro, et
   // lorsqu'ils mettent un numéro qui a déjà été attribué, il demande si c'était

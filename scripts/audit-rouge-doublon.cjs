@@ -121,6 +121,7 @@ function juger(depot) {
     dit(/uniq\.every\(x => x\.type === 'annonce'\) && Array\.isArray\(memePaires\)/.test(regle) && /ids\.every\(id => g\.some\(/.test(regle), 'R6 `conflitsDeNumeros` dispense des annonces qu’un groupe de la carte ambre réunit TOUTES (jamais une partie)', regle.slice(0, 200));
     dit(/const conflitsNum = useMemo\(\(\) => conflitsDeNumeros\(porteursNum, groupesDeuxFois\)/.test(app) && /const groupesDeuxFois = useMemo\(\(\) => \(enLigneDeux && Array\.isArray\(enLigneDeux\.vinted\)/.test(app), 'R6 le bloc rouge reçoit les groupes de la carte ambre (`enLigneDeux.vinted`)');
     dit(/\{conflitsNum\.length > 0 && \(/.test(app) && /if\(conflitsNum\.length\)\{/.test(app), 'R6 le bloc rouge de Colis et la ligne de Ma journée lisent `conflitsNum` (une seule règle)');
+    dit(/conflits: \(p\) => conflitsDeNumeros\(p, GROUPES_DEUX_FOIS\)/.test(app) && /useEffect\(\(\) => \{ GROUPES_DEUX_FOIS = groupesDeuxFois; \}, \[groupesDeuxFois\]\)/.test(app), 'R6 « Tout sur le N° » suit la même règle (les groupes publiés par Ma journée)');
   }
   if (process.env.DETAIL) console.log(JSON.stringify(parDette, null, 1));
   dit(usagesDoublon >= 5, `R3 le jeton doublon sert bien au doublon de N° (${usagesDoublon} usages)`);
@@ -143,6 +144,7 @@ function mutations() {
     ['R4 la redirection des doublons des feuilles retirée', { 'src/design/jetons.css': jet.replace(/--vrm-danger:\s*var\(--vrm-doublon\)/, '--vrm-x: 0') }],
     ['R5 un rouge en dur dans une feuille de la zone', { 'src/styles-coque.css': coque + '\n.vrm-essai { color: #E5484D; }\n' }],
     ['R6 le rouge ignore la carte ambre', { 'src/App.jsx': app.replace('conflitsDeNumeros(porteursNum, groupesDeuxFois)', 'conflitsDeNumeros(porteursNum)') }],
+    ['R6 « Tout sur le N° » ignore la carte ambre', { 'src/App.jsx': app.replace('conflits: (p) => conflitsDeNumeros(p, GROUPES_DEUX_FOIS),', 'conflits: conflitsDeNumeros,') }],
     ['R6 un groupe partiel suffit', { 'src/App.jsx': app.replace('ids.every(id => g.some(', 'ids.some(id => g.some(') }],
     ['R5 un rouge en dur de plus dans App.jsx', { 'src/App.jsx': app.replace('let C = THEMES.light;', "let C = THEMES.light; const ROUGE_ESSAI = 'rgb(229, 72, 77)';") }],
   ];
