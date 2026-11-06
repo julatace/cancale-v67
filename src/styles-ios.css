@@ -1,0 +1,100 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   LES RANGÉES « RÉGLAGES » D'iOS ET LE « ⓘ » EN FEUILLE (6 nov., v36-visuel)
+   Julien, sur Annonces · eBay : « c'est catastrophique, on dirait du travail
+   bâclé ». Composants : src/composants/Ios.jsx ; le « ⓘ » : `Pourquoi` (App.jsx).
+   Règle d'écriture : sur une liste ou une carte, au plus UNE ligne
+   d'explication ; le reste s'ouvre en feuille. Jetons seulement (--vrm-*).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Le groupe : titre en petites capitales, carte aux coins continus ── */
+.vrm-ios-groupe { margin: 28px 0 0; }
+.vrm-ios-groupe:first-child { margin-top: 0; }
+.vrm-ios-groupe-titre {
+  margin: 0 16px 8px; font-size: 13px; font-weight: 400; line-height: 1.3;
+  letter-spacing: .01em; text-transform: uppercase; color: var(--vrm-muted, #6E6E73);
+}
+.vrm-ios-carte {
+  background: var(--vrm-surface, #fff); border-radius: 14px; overflow: hidden;
+  box-shadow: 0 0 0 .5px var(--vrm-hair, rgba(0,0,0,.06));
+}
+.vrm-ios-groupe-pied { margin: 8px 16px 0; font-size: 13px; line-height: 1.38; color: var(--vrm-muted, #6E6E73); }
+
+/* ── La rangée : 44 px au moins, le filet commence APRÈS l'icône ── */
+.vrm-ios-rangee { position: relative; display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 14px 0 0; }
+.vrm-ios-rangee + .vrm-ios-rangee::before {
+  content: ''; position: absolute; top: 0; right: 0; left: 16px; height: .5px;
+  background: var(--vrm-line, #E5E5EA);
+}
+.vrm-ios-rangee:has(.vrm-ios-icone) + .vrm-ios-rangee:has(.vrm-ios-icone)::before { left: 58px; }
+.vrm-ios-rangee-zone {
+  flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 12px;
+  min-height: 48px; padding: 10px 0 10px 16px; margin: 0; border: 0; background: none;
+  color: inherit; text-align: left; font: inherit; border-radius: 0; box-shadow: none;
+}
+button.vrm-ios-rangee-zone { cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background-color 120ms ease-out; }
+button.vrm-ios-rangee-zone:active { background: var(--vrm-card2, #F2F2F7); transform: none; }
+@media (hover: hover) and (pointer: fine) { button.vrm-ios-rangee-zone:hover { background: color-mix(in srgb, var(--vrm-card2, #F2F2F7) 60%, transparent); } }
+button.vrm-ios-rangee-zone:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: -2px; }
+.vrm-ios-icone {
+  flex: 0 0 30px; width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center;
+  background: var(--vrm-card2, #F2F2F7); color: var(--vrm-ink, #1D1D1F);
+}
+.vrm-ios-texte { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.vrm-ios-titre { font-size: 16px; font-weight: 400; line-height: 1.3; color: var(--vrm-ink, #1D1D1F); letter-spacing: -.01em; }
+.vrm-ios-detail {
+  font-size: 13px; line-height: 1.3; color: var(--vrm-muted, #6E6E73);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.vrm-ios-valeur {
+  flex: 0 0 auto; max-width: 46%; font-size: 15px; color: var(--vrm-muted, #6E6E73);
+  font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.vrm-ios-valeur[data-ton="geste"] { color: var(--vrm-warn, #B25000); font-weight: 600; }
+.vrm-ios-chevron { flex: 0 0 auto; color: var(--vrm-muted, #6E6E73); opacity: .55; display: grid; place-items: center; }
+
+/* ── L'interrupteur d'iOS : 51 × 31, pouce blanc, piste verte NON — l'accent ── */
+.vrm-ios-switch {
+  position: relative; flex: 0 0 51px; width: 51px; height: 31px; min-height: 31px; padding: 0; margin: 0;
+  border: 0; border-radius: 999px; background: var(--vrm-line, #E5E5EA); cursor: pointer;
+  transition: background-color 200ms ease-out; box-shadow: none;
+}
+.vrm-ios-switch::after { /* la cible au doigt : 44 px de haut sans pousser la rangée */
+  content: ''; position: absolute; inset: -7px -4px;
+}
+.vrm-ios-switch[aria-checked="true"] { background: var(--vrm-accent, #0071E3); }
+.vrm-ios-switch:disabled { opacity: .45; cursor: default; }
+.vrm-ios-switch:active { transform: none; }
+.vrm-ios-switch-pouce {
+  position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff;
+  box-shadow: 0 3px 8px rgba(0,0,0,.15), 0 1px 1px rgba(0,0,0,.16), 0 3px 1px rgba(0,0,0,.06);
+  transition: transform 240ms cubic-bezier(.32,.72,0,1);
+}
+.vrm-ios-switch[aria-checked="true"] .vrm-ios-switch-pouce { transform: translateX(20px); }
+.vrm-ios-switch:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .vrm-ios-switch, .vrm-ios-switch-pouce { transition: none; } }
+
+/* ── LE « ⓘ » : il SUIT le titre (jamais seul sur sa ligne), le texte s'ouvre en feuille ── */
+.vrm-main .vrm-pourquoi, .vrm-pourquoi { display: inline !important; width: auto; margin: 0; padding: 0; border: 0; background: none; }
+/* Mesuré le 6 nov. : une règle commune des replis posait `display:flex` sur le
+   <summary> — un bloc DANS un <details> en ligne : le « ⓘ » tombait seul sur sa
+   ligne. Il reste un bloc-en-ligne, cible de 44 px reprise par des marges négatives. */
+.vrm-main .vrm-pourquoi > summary, .vrm-pourquoi > summary {
+  display: inline-block !important; vertical-align: baseline; white-space: nowrap; text-align: center;
+  width: auto !important; min-width: 0 !important; min-height: 0 !important; height: auto;
+  padding: 14px 10px !important; margin: -14px -6px -14px -4px !important; line-height: 16px;
+  color: var(--vrm-muted, #6E6E73); font-size: 15px; font-weight: 400; cursor: pointer;
+}
+.vrm-main .vrm-pourquoi.vrm-pourquoi-ecrit > summary, .vrm-pourquoi.vrm-pourquoi-ecrit > summary { padding: 14px 4px !important; margin: -14px 0 !important; font-size: 13px; }
+.vrm-main .vrm-pourquoi > summary::after { content: none !important; }
+.vrm-pourquoi[open] > div.vrm-pourquoi-texte { display: none !important; }
+.vrm-pourquoi:not([open]) > div.vrm-pourquoi-texte { display: none; }
+/* La feuille d'explication : le texte à lire, posé (17 px, interligne 1,47 — le Corps d'iOS). */
+.vrm-feuille-info { padding: 4px 20px 24px; font-size: 17px; line-height: 1.47; color: var(--vrm-ink, #1D1D1F); letter-spacing: -.01em; }
+.vrm-feuille-info b, .vrm-feuille-info strong { font-weight: 600; }
+.vrm-feuille-info a { color: var(--vrm-accent-texte, #0066CC); }
+
+/* ── Une alerte en rangée : icône · titre court · une ligne · UN geste ── */
+.vrm-alerte-ligne { display: flex; align-items: center; gap: 12px; }
+.vrm-alerte-ligne-texte { flex: 1 1 auto; min-width: 0; }
+.vrm-alerte-ligne-titre { font-size: 16px; font-weight: 600; line-height: 1.3; color: var(--vrm-ink, #1D1D1F); letter-spacing: -.01em; }
+.vrm-alerte-ligne-sous { font-size: 13px; line-height: 1.35; color: var(--vrm-muted, #6E6E73); margin-top: 2px; }

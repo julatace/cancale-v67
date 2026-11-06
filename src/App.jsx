@@ -371,6 +371,9 @@ import { CLE_REGLAGE_ETIQUETTE, PLACES as PLACES_ETIQUETTE, FORMES as FORMES_ETI
 import SelecteurSites, { LogoSite } from "./SelecteurSites.jsx";
 // (6 nov., vitesse 2) PublierAilleurs : à la demande ; sa feuille de style reste ICI (même ordre).
 import "./styles-publier-ailleurs.css";
+import "./styles-ios.css";       // (6 nov., v36-visuel) rangées « Réglages » d'iOS, « ⓘ » en feuille
+import "./styles-visuel.css";    // (6 nov., v36-visuel) la direction : photos héros, chiffres, rythme 8 px
+import { GroupeIos, RangeeIos } from "./composants/Ios.jsx";
 import { SITES_PUBLIER, apercuEnvoi, manquesEnvoi, etatsPaire, partoutLeMeme, lienVu, chercherPaires } from "./publierAilleurs.js";
 import { optionsSelecteur, nomCompteVente, identiteCompteVente, annuaireLbc, ongletSansDonnee, nomPlateforme, logoPlateforme } from "./plateformes.js";
 import { MR_SELECT, lireColisMondialRelay, suivisAvecMondialRelay, accordCodes, codeDuCompteMr, ouTrouverQr, ilYa as ilYaLecture, compteDuRetrait, indexAchatsAutresSites } from "./retraitQr.js";
@@ -20896,8 +20899,19 @@ const COULEUR_PLATEFORME = { vinted: '#007782', leboncoin: '#EC5A13', ebay: '#00
 // au bout du titre : le titre et les gestes restent, le POURQUOI s'ouvre au clic.
 // Ce qui dit un RISQUE propre à la donnée (une règle d'offre, une raison qui
 // distingue une ligne) reste visible — seul le texte fixe se replie.
-function Pourquoi({ children, label = 'Pourquoi ?', ecrit = false }) {
-  return <details className={'vrm-pourquoi' + (ecrit ? ' vrm-pourquoi-ecrit' : '')} data-pourquoi>{ecrit ? <summary>ⓘ {label}</summary> : <summary aria-label={label} title={label}>ⓘ</summary>}<div>{children}</div></details>;
+// (6 nov., v36-visuel — Julien : « des murs de texte », un « ⓘ » orphelin sous le
+// paragraphe) Le « ⓘ » SUIT le texte (en ligne, styles-ios.css) et ouvre une FEUILLE
+// (SheetShell) : le texte se lit posé, jamais déplié au milieu d'une liste. Le texte
+// reste dans le <details> (caché) : `open` dit qu'il est montré, `textContent` le porte.
+function Pourquoi({ children, label = 'Pourquoi ?', ecrit = false, titre = '' }) {
+  const [ouvert, setOuvert] = useState(false);
+  const ouvrir = (e) => { e.preventDefault(); e.stopPropagation(); setOuvert(true); };
+  const tete = titre || (label && !/^pourquoi ?\??$/i.test(label) ? label : 'En savoir plus');
+  return <details className={'vrm-pourquoi' + (ecrit ? ' vrm-pourquoi-ecrit' : '')} data-pourquoi open={ouvert}>
+    {ecrit ? <summary onClick={ouvrir}>ⓘ {label}</summary> : <summary aria-label={label} title={label} onClick={ouvrir}>ⓘ</summary>}
+    <div className="vrm-pourquoi-texte">{children}</div>
+    {ouvert && <SheetShell onClose={() => setOuvert(false)} titre={tete} z={12000} data-pourquoi-feuille=""><div className="vrm-feuille-info">{children}</div></SheetShell>}
+  </details>;
 }
 // (17 oct.) LES VENTES, MÊME QUAND IL N'Y EN A PAS ENCORE — Julien : « même s'il
 // n'y a pas de ventes tu peux faire comme Vinted : ventes en cours, finalisées,
@@ -24235,7 +24249,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
     <div className="vrm-pa-entree vrm-eb-vendre" data-ebay-vendre="">
       <button type="button" data-poster="ebay" onClick={() => setOuvert(true)}>
         <span aria-hidden="true" style={{ flexShrink: 0, width: 32, height: 32, borderRadius: 10, background: `${C.accent}15`, color: C.accentTexte || C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="tag" size={17}/></span>
-        <span>Vendre sur eBay<small>Choisis une annonce Vinted : VRM prépare l’annonce eBay, tu vérifies, tu publies</small></span>
+        <span>Vendre sur eBay<small>VRM prépare l’annonce, tu vérifies, tu publies</small></span>
         <span aria-hidden="true">›</span>
       </button>
     </div>
@@ -25791,7 +25805,8 @@ function EbayBrouillons({ brouillons, connected, paires = [], onModifier, onPlan
   };
   const etatListe = brouillons === undefined ? 'charge' : brouillons === null ? 'pas-su' : 'lu';
   const btn = { border: `1px solid ${E.border}`, background: 'transparent', color: E.text, borderRadius: 12, padding: '8px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' };
-  if (etatListe === 'lu' && !liste.length) return <div data-ebay-brouillons="lu" data-nb="0" style={{ fontSize: 12, color: E.muted, margin: '12px 2px 0', lineHeight: 1.5 }}>Aucun brouillon eBay.{connected === true ? <> Prépare une annonce ci-dessus et « Enregistrer en brouillon » : tu pourras la vérifier, puis la programmer.</> : null}</div>;
+  // (6 nov., v36-visuel) Une ligne ; le « comment » derrière le « ⓘ ».
+  if (etatListe === 'lu' && !liste.length) return <div data-ebay-brouillons="lu" data-nb="0" className="vrm-note-ligne" style={{ fontSize: 13, color: E.muted, margin: '16px 2px 0', lineHeight: 1.4 }}>Aucun brouillon eBay{connected === true ? <>{' '}<Pourquoi label="Préparer un brouillon" titre="Les brouillons eBay">Prépare une annonce avec « Vendre sur eBay » et « Enregistrer en brouillon » : tu pourras la vérifier, puis la programmer.</Pourquoi></> : null}</div>;
   return (
     <div data-ebay-brouillons={etatListe} data-nb={liste.length} style={{ background: E.card, border: `1px solid ${E.border}`, borderRadius: 14, padding: '12px 14px', marginTop: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
@@ -26495,6 +26510,7 @@ function EbayInactives({ comptesEbay, tick, vue = '*', connected, ventes, dejaSu
   // undefined en cours · null registre illisible · { lignes: [{compte, ligne}] }
   const [lu, setLu] = React.useState(undefined);
   const [voirTout, setVoirTout] = React.useState(false);
+  const [ficheIna, setFicheIna] = React.useState(null);   // (6 nov.) la fiche d'une inactive (feuille)
   React.useEffect(() => {
     if (comptesEbay === undefined) return undefined;
     if (comptesEbay === null) { setLu(null); return undefined; }
@@ -26589,6 +26605,14 @@ function EbayInactives({ comptesEbay, tick, vue = '*', connected, ventes, dejaSu
       : sortie ? 'sortie du stock'
       : deja ? (deja.etat === 'programmee' ? 'déjà programmée de nouveau sur eBay' : 'déjà de nouveau en vente sur eBay')
       : surVinted ? 'encore en ligne sur Vinted' : '';
+    // (6 nov.) La pastille : l'état en deux ou trois mots (la phrase entière : la fiche).
+    const etatCourt = vendue ? `vendue sur ${vendue}`
+      : retraitAuto ? `vendue sur ${retraitAuto.ou || 'Vinted'}`
+      : memeEnLigne ? 'à relire'
+      : relancee ? 'remise en vente'
+      : sortie ? 'sortie du stock'
+      : deja ? (deja.etat === 'programmee' ? 'reprogrammée' : 'de nouveau en vente')
+      : surVinted ? 'sur Vinted' : '';
     return (
       <div key={(l._compte || '') + l.itemId} data-ebay-inactive={l.itemId} data-inactive-num={n || ''} data-inactive-fin={finJour}
         data-inactive-compte={l._compte || ''}
@@ -26597,22 +26621,30 @@ function EbayInactives({ comptesEbay, tick, vue = '*', connected, ventes, dejaSu
         {...(retraitAuto ? { 'data-inactive-retrait-auto': '1' } : {})}
         {...(memeEnLigne || relancee || deja ? { 'data-inactive-deja': memeEnLigne ? 'a-relire' : relancee ? 'relancee' : (deja.etat || 'en-vente') } : {})}
         {...(surVinted ? { 'data-inactive-vinted': 'en-ligne' } : {})}
-        style={{ display: 'flex', flexWrap: 'wrap', gap: '0 10px', alignItems: 'center', padding: '6px 0', borderTop: `1px solid ${E.border}` }}>
-        <PhotoVente src={l.photo || null} size={44} />
-        <div style={{ flex: '1 1 180px', minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: E.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}><span style={{ color: n ? E.text : E.muted, fontWeight: 700 }}>{n ? `N°${n}` : 'pas reliée'}</span> · {l.title || l.itemId}</div>
-          <div style={{ fontSize: 12, color: E.muted, marginTop: 2 }}>
-            {/* (revue) Le prix avec SA devise, la règle de la carte des annonces (§11). */}
-            {Number.isFinite(prix) && prix > 0 ? <><span data-inactive-prix="1">{prixEbayTexte(prix, l.currency)}</span>{' · '}</> : ''}
-            {finJour ? `terminée le ${jourParisTexte(finJour)}` : 'date de fin inconnue'}
-            {Number.isInteger(l.observateurs) && l.observateurs > 0 ? ` · ${l.observateurs} observateur${l.observateurs > 1 ? 's' : ''}` : ''}
-            {melange ? ` · ${nomCompteEbay((comptesEbay || []).find((c) => c.ref === l._compte) || { pseudo: l._pseudo })}` : ''}
-            {etatLigne ? <span data-inactive-etat="1">{` · ${etatLigne}`}</span> : null}
-          </div>
-        </div>
-        {url && (relancer && !(infos[l.itemId] && infos[l.itemId].ton === 'ok')
-          ? <button type="button" data-inactive-relancer={url} disabled={!!geste} onClick={() => remettre(l, n)} style={{ ...lienS, background: 'none', border: 'none', cursor: geste ? 'default' : 'pointer', fontFamily: 'inherit', opacity: geste && geste !== String(l.itemId) ? 0.5 : 1 }}>{geste === String(l.itemId) ? 'eBay…' : 'Remettre en vente'}</button>
-          : <a href={url} target="_blank" rel="noreferrer" data-inactive-voir={url} style={lienS}>Voir sur eBay ↗</a>)}
+        data-inactive-lien={url || ''} className="vrm-eb-ina-ligne">
+        {/* (6 nov., v36-visuel — Julien : « des lignes de 3-4 lignes de texte gris, Voir sur
+            eBay sur chaque ligne ») UNE rangée : photo · titre · « terminée le … » ·
+            une pastille d'état COURTE · chevron. Toute la rangée ouvre la FICHE (feuille) :
+            la phrase entière de l'état, les observateurs, « Voir sur eBay ». La phrase
+            entière reste lue par VoiceOver (vrm-sr). « Remettre en vente » reste le geste. */}
+        <button type="button" className="vrm-eb-ina-zone" data-inactive-ouvrir={l.itemId} onClick={() => setFicheIna({ l, n, prix, etatLigne, url, finJour })}>
+          <PhotoVente src={l.photo || null} size={48} />
+          <span className="vrm-eb-ina-texte">
+            <span className="vrm-eb-ina-titre">{l.title || l.itemId}</span>
+            <span className="vrm-eb-ina-sous">
+              {etatLigne ? <><span className="vrm-pastille-etat" data-ton={vendue || retraitAuto ? 'fin' : undefined} data-inactive-etat="1">{etatCourt}<span className="vrm-sr">{` · ${etatLigne}`}</span></span>{' '}</> : null}
+              <span style={{ color: n ? E.text : E.muted, fontWeight: n ? 600 : 400 }}>{n ? `N°${n}` : 'pas reliée'}</span>{' · '}
+              {/* (revue) Le prix avec SA devise, la règle de la carte des annonces (§11). */}
+              {Number.isFinite(prix) && prix > 0 ? <><span data-inactive-prix="1">{prixEbayTexte(prix, l.currency)}</span>{' · '}</> : ''}
+              {finJour ? `${etatLigne ? '' : 'terminée le '}${jourParisTexte(finJour).replace(/^\S+ /, '')}` : 'date de fin inconnue'}
+              {melange ? ` · ${nomCompteEbay((comptesEbay || []).find((c) => c.ref === l._compte) || { pseudo: l._pseudo })}` : ''}
+            </span>
+          </span>
+          <span className="vrm-ios-chevron" aria-hidden="true"><svg width="8" height="13" viewBox="0 0 8 13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m1.5 1.5 5 5-5 5"/></svg></span>
+        </button>
+        {url && relancer && !(infos[l.itemId] && infos[l.itemId].ton === 'ok') && (
+          <button type="button" className="vrm-b vrm-b-secondaire vrm-eb-ina-geste" data-inactive-relancer={url} disabled={!!geste} onClick={() => remettre(l, n)} style={{ opacity: geste && geste !== String(l.itemId) ? 0.5 : 1 }}>{geste === String(l.itemId) ? 'eBay…' : 'Remettre en vente'}</button>
+        )}
         {infos[l.itemId] && infos[l.itemId].texte ? <div role="status" data-inactive-resultat={infos[l.itemId].ton} style={{ flexBasis: '100%', fontSize: 12, color: infos[l.itemId].ton === 'ko' ? E.warn : infos[l.itemId].ton === 'ok' ? E.text : E.muted, paddingLeft: 54, lineHeight: 1.45 }}>{infos[l.itemId].texte}</div> : null}
       </div>
     );
@@ -26637,9 +26669,9 @@ function EbayInactives({ comptesEbay, tick, vue = '*', connected, ventes, dejaSu
       {...(anciennes.length ? { 'data-inactives-anciennes': anciennes.map((x) => x.compte.ref).join(','), ...(plusVieille != null ? { 'data-inactives-lue-le': partsParis(plusVieille).date } : {}) } : {})}
       {...(attenteVerif > 0 ? { 'data-inactives-verif': attenteVerif } : {})}
       {...(pasSuDitAilleurs || (attenteVerif > 0 && verifDiteAilleurs) ? { 'data-inactives-dit': 'ecran' } : {})}
-      style={{ background: E.card, border: `1px solid ${E.border}`, borderRadius: 14, padding: '12px 14px', marginTop: 12 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
-        <div style={{ flex: '1 1 auto', fontSize: 17, fontWeight: 800, color: E.text }}>
+      className="vrm-eb-inactives">
+      <div className="vrm-eb-inactives-tete">
+        <div className="vrm-eb-inactives-titre">
           Inactives sur eBay{entiere ? ` (${lignes.length})` : plafond ? ` (au moins ${lignes.length})` : ''}{' '}
           <Pourquoi label="Inactives : pourquoi VRM ne remet rien en vente">Les annonces terminées sans vente ces {INACTIVES_JOURS} derniers jours, telles qu'eBay les garde. VRM ne les remet pas en vente lui-même : une remise en vente peut coûter des frais d'insertion chez eBay — c'est toi qui décides, sur eBay.</Pourquoi>
         </div>
@@ -26651,13 +26683,27 @@ function EbayInactives({ comptesEbay, tick, vue = '*', connected, ventes, dejaSu
         : 'Pas encore lue — elle se lit avec la relecture eBay (toute seule, l\'app ouverte).'}</div>}
       {etat === 'pas-su' && !pasSuDitAilleurs && <div data-inactives-note="pas-su" data-inactives-illisibles={illisibles.map((c) => c.ref).join(',')} style={{ fontSize: 13, color: E.warn, lineHeight: 1.5 }}>Je n'ai pas pu lire tes annonces inactives{illisibles.length && Array.isArray(comptesEbay) && comptesEbay.length >= 2 ? ` (${nomsDe(illisibles)})` : ''} — rien n'est perdu, réessaie dans un instant.</div>}
       {noteVide && <div data-inactives-note="vide" style={{ ...petit, fontSize: 13 }}>Aucune annonce terminée sans vente ces {INACTIVES_JOURS} derniers jours{plusieurs && fraichesVides.length < comptesVue.length ? ` sur ${nomsDe(fraichesVides.map((x) => x.compte))}` : ''}.</div>}
+      {/* (6 nov.) Une ligne ; « elle a pu changer… » derrière le « ⓘ ». */}
       {anciennes.length > 0 && <div data-inactives-note="ancienne" style={petit}>{anciennes.length === 1
-        ? `Lue ${quandCap(anciennes[0].cap)}${plusieurs ? ` (${nomCompteEbay(anciennes[0].compte)})` : ''} — pas relue depuis : elle a pu changer sur eBay. La remise en vente se fait sur eBay.`
-        : `Lues ${anciennes.map((x) => `${quandCap(x.cap)} (${nomCompteEbay(x.compte)})`).join(', ')} — pas relues depuis : elles ont pu changer sur eBay. La remise en vente se fait sur eBay.`}</div>}
+        ? `Lue ${quandCap(anciennes[0].cap)}${plusieurs ? ` (${nomCompteEbay(anciennes[0].compte)})` : ''} — pas relue depuis`
+        : `Lues ${anciennes.map((x) => `${quandCap(x.cap)} (${nomCompteEbay(x.compte)})`).join(', ')} — pas relues depuis`}{' '}<Pourquoi label="Liste pas relue" titre="Inactives pas relues">{anciennes.length === 1 ? 'Elle a pu changer sur eBay.' : 'Elles ont pu changer sur eBay.'} La remise en vente se fait sur eBay.</Pourquoi></div>}
       {etat === 'lu' && !anciennes.length && <div data-inactives-fenetre="1" style={petit}>Terminées sans vente ces {INACTIVES_JOURS} derniers jours.</div>}
       {jamais.length > 0 && lues.length > 0 && <div data-inactives-note="partielle" style={petit}>{sousEtatJamais === 'non-rendue' ? 'Pas encore rendue par eBay' : 'Pas encore lue'} pour {nomsDe(jamais)}{sousEtatJamais === 'non-rendue' ? '' : ' — elle se lit avec la relecture eBay'}.</div>}
       {attenteVerif > 0 && !verifDiteAilleurs && <div data-inactives-verif-texte="1" style={{ fontSize: 12, color: E.warn, lineHeight: 1.5, marginBottom: 4 }}>Je n'ai pas encore pu vérifier si {attenteVerif > 1 ? `${attenteVerif} de ces articles sont vendus` : 'un de ces articles est vendu'} ailleurs{nonDits.length ? ` (${nonDits.join(', ')})` : ''} : « Remettre en vente » revient dès que c'est vérifié.</div>}
-      {rendues}
+      <div className="vrm-eb-ina-liste">{rendues}</div>
+      {ficheIna && (
+        <SheetShell onClose={() => setFicheIna(null)} titre={ficheIna.l.title || ficheIna.l.itemId} sousTitre={ficheIna.n ? `N°${ficheIna.n}` : 'pas reliée à un article'} data-inactive-fiche={ficheIna.l.itemId}>
+          <div className="vrm-feuille-info">
+            <GroupeIos>
+              {Number.isFinite(ficheIna.prix) && ficheIna.prix > 0 && <RangeeIos titre="Prix" valeur={prixEbayTexte(ficheIna.prix, ficheIna.l.currency)} />}
+              <RangeeIos titre="Terminée" valeur={ficheIna.finJour ? jourParisTexte(ficheIna.finJour) : 'date inconnue'} />
+              {Number.isInteger(ficheIna.l.observateurs) && ficheIna.l.observateurs > 0 && <RangeeIos titre="Observateurs" valeur={String(ficheIna.l.observateurs)} />}
+            </GroupeIos>
+            {ficheIna.etatLigne ? <p style={{ margin: '16px 4px 0' }}>{ficheIna.etatLigne.charAt(0).toUpperCase() + ficheIna.etatLigne.slice(1)}.</p> : null}
+            {ficheIna.url && <div style={{ marginTop: 20 }}><a href={ficheIna.url} target="_blank" rel="noreferrer" data-inactive-voir={ficheIna.url} className="vrm-b vrm-b-secondaire" style={{ width: '100%', boxSizing: 'border-box' }}>Voir sur eBay ↗</a></div>}
+          </div>
+        </SheetShell>
+      )}
       {!voirTout && lignes.length > INACTIVES_PAGE && (
         <button type="button" data-inactives-plus="1" onClick={() => setVoirTout(true)}
           style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, marginTop: 4, border: `1px solid ${E.border}`, background: 'transparent', color: E.text, borderRadius: 12, padding: '0 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
@@ -27046,6 +27092,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   const [relitRegles, setRelitRegles] = React.useState(false);
   const [relitVentes, setRelitVentes] = React.useState(false);
   const [toutesOuvert, setToutesOuvert] = React.useState(false);       // le panneau « Une règle pour toutes »
+  const [reglagesEbay, setReglagesEbay] = React.useState(null);        // (6 nov.) la feuille « Réglages eBay » : null · 'liste' · 'regle'
   const [illisiblesAnnonces, setIllisiblesAnnonces] = React.useState([]);   // comptes dont les annonces n'ont pas pu être lues
   const [comptesStatut, setComptesStatut] = React.useState(undefined);      // {cle,pseudo,principal,relie}[] — la route
   const [connected, setConnected] = React.useState(undefined); // true/false/null(pas su)/undefined(en cours)
@@ -27760,26 +27807,29 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   // réglage, pas une action du moment. L'état se dit d'abord, en un mot, et ce
   // qu'il fait EN SON NOM ; tant que le nuage n'a pas répondu, on ne dit ni
   // « allumé » ni « éteint » (sur un appareil neuf, « éteint » serait un faux).
+  // (6 nov., v36-visuel — Julien : « Retrait automatique : ALLUMÉ » en paragraphe de
+  // 9 lignes avec « Éteindre ») UNE RANGÉE d'iOS : l'icône, le nom, l'état en un
+  // mot (+ ce qui a été retiré en son nom), un « ⓘ » qui dit ce qu'il fait en son
+  // nom, l'INTERRUPTEUR. Allumer garde sa confirmation (`basculerRetraitAuto`) ;
+  // tant que le nuage n'a pas répondu, ni « allumé » ni « éteint » (« … »).
+  const etatAuto = !reglageAutoLu ? 'pas-lu' : retraitAuto ? 'allume' : 'eteint';
   const reglageAuto = (
-    <div data-ebay-retrait-auto={!reglageAutoLu ? 'pas-lu' : retraitAuto ? 'allume' : 'eteint'} style={{ ...bloc(), display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-        <div style={{ flex: '1 1 200px', minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: E.text }}>Retrait automatique d'eBay : <span data-ebay-retrait-etat={!reglageAutoLu ? 'pas-lu' : retraitAuto ? 'allume' : 'eteint'} style={{ fontWeight: 800 }}>{!reglageAutoLu ? '…' : retraitAuto ? 'ALLUMÉ' : 'ÉTEINT'}</span></div>
-          <div data-ebay-retrait-auto-regle style={{ fontSize: 12, color: E.muted, lineHeight: 1.45 }}>{!reglageAutoLu
-            ? 'Je relis ton réglage…'
-            : retraitAuto
-              ? 'VRM retire TOUT SEUL d\'eBay, sans te demander, un article prouvé vendu sur Vinted dont l\'annonce porte le N° — dès que VRM est ouvert, sur n\'importe lequel de tes appareils. Une annonce eBay terminée ne revient pas : si la vente Vinted est annulée ensuite, il faudra la republier. Tu ne l\'as pas voulu ? « Éteindre ».'
-              : 'VRM te montre les articles à retirer, c\'est toi qui cliques.'}</div>
-        </div>
-        <button type="button" data-ebay-retrait-auto-bouton disabled={!reglageAutoLu} onClick={basculerRetraitAuto} style={{ ...lienE, opacity: reglageAutoLu ? 1 : 0.5 }}>{retraitAuto ? 'Éteindre' : 'Allumer'}</button>
-      </div>
-      {Array.isArray(journalAuto) && journalAuto.length > 0 && (
-        <div data-ebay-retraits-faits={journalAuto.length} style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, borderTop: `1px solid ${E.border}`, paddingTop: 6 }}>
-          Retirées en ton nom : {journalAuto.slice(0, 5).map((x) => `${x.sku || x.itemId}${x.titre ? ' · ' + x.titre : ''} (${new Date(x.at).toLocaleDateString('fr-FR')})`).join(' — ')}{journalAuto.length > 5 ? ` — et ${journalAuto.length - 5} autre${journalAuto.length - 5 > 1 ? 's' : ''}` : ''}
-        </div>
-      )}
-      {journalAuto === null && retraitAuto && <div style={{ fontSize: 12, color: E.muted }}>Je n'ai pas pu relire la liste de ce qui a été retiré en ton nom — rouvre l'écran dans un moment.</div>}
-    </div>
+    <RangeeIos data-ebay-retrait-auto={etatAuto} icone={<Icon name="trash" size={17}/>} titre="Retrait automatique"
+      detail={<><span data-ebay-retrait-etat={etatAuto}>{!reglageAutoLu ? '…' : retraitAuto ? 'Allumé' : 'Éteint'}</span>{Array.isArray(journalAuto) && journalAuto.length > 0 ? ` · ${journalAuto.length} retirée${journalAuto.length > 1 ? 's' : ''} en ton nom` : ''}</>}
+      apres={<Pourquoi label="Le retrait automatique" titre="Retrait automatique d'eBay">
+        <div data-ebay-retrait-auto-regle>{!reglageAutoLu
+          ? 'Je relis ton réglage…'
+          : retraitAuto
+            ? 'VRM retire TOUT SEUL d\'eBay, sans te demander, un article prouvé vendu sur Vinted dont l\'annonce porte le N° — dès que VRM est ouvert, sur n\'importe lequel de tes appareils. Une annonce eBay terminée ne revient pas : si la vente Vinted est annulée ensuite, il faudra la republier. Tu ne l\'as pas voulu ? Éteins l\'interrupteur.'
+            : 'VRM te montre les articles à retirer, c\'est toi qui cliques.'}</div>
+        {Array.isArray(journalAuto) && journalAuto.length > 0 && (
+          <div data-ebay-retraits-faits={journalAuto.length} style={{ marginTop: 12, color: E.muted, fontSize: 15 }}>
+            Retirées en ton nom : {journalAuto.slice(0, 5).map((x) => `${x.sku || x.itemId}${x.titre ? ' · ' + x.titre : ''} (${new Date(x.at).toLocaleDateString('fr-FR')})`).join(' — ')}{journalAuto.length > 5 ? ` — et ${journalAuto.length - 5} autre${journalAuto.length - 5 > 1 ? 's' : ''}` : ''}
+          </div>
+        )}
+        {journalAuto === null && retraitAuto && <div style={{ marginTop: 12, color: E.muted, fontSize: 15 }}>Je n'ai pas pu relire la liste de ce qui a été retiré en ton nom — rouvre l'écran dans un moment.</div>}
+      </Pourquoi>}
+      interrupteur={{ on: reglageAutoLu ? retraitAuto : null, onChange: () => basculerRetraitAuto(), disabled: !reglageAutoLu, label: 'Retrait automatique d\'eBay', attrs: { 'data-ebay-retrait-auto-bouton': '' } }} />
   );
   // ── 2. CE QUI N'A PAS PU ÊTRE LU, DIT UNE FOIS (§7) ────────────────────────
   // « Pas su » ne vaut pas « rien à retirer » : sans les ventes Vinted, une
@@ -27892,9 +27942,11 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
             Le titre court, le compte en petit, UNE phrase (le geste) ; le pourquoi
             replié. Chaque vente : son titre LISIBLE (deux lignes), son compte, le
             bordereau s'il peut se commander d'ici, « Ouvrir sur Vinted ». */}
-        <div style={{ fontSize: 15, fontWeight: 600, color: E.text, lineHeight: 1.3 }}>{nSansPreuve} vente{un ? '' : 's'} Vinted pas encore reliée{un ? '' : 's'} à {un ? 'son' : 'leur'} annonce</div>
-        <div style={{ fontSize: 12, color: E.muted, marginTop: 2 }}>{noms.join(', ')}</div>
-        <div style={{ fontSize: 13, color: E.muted, lineHeight: 1.5, marginTop: 6 }}>{geste} <Pourquoi label="Pourquoi">Tant que ce n'est pas fait, VRM ne peut pas te dire de retirer {un ? 'sa' : 'leur'} paire d'eBay quand elle se vend sur Vinted.</Pourquoi></div>
+        {/* (6 nov., v36-visuel — Julien : « un mur de texte ») Le titre et son « ⓘ »,
+            UNE ligne (le compte · le geste en trois mots), la liste. La phrase
+            entière du geste et le pourquoi s'ouvrent en feuille (textContent les porte). */}
+        <div className="vrm-alerte-ligne-titre">{nSansPreuve} vente{un ? '' : 's'} Vinted pas encore reliée{un ? '' : 's'} à {un ? 'son' : 'leur'} annonce{' '}<Pourquoi label="Que faire" titre={`Vente${un ? '' : 's'} pas encore reliée${un ? '' : 's'}`}>{geste} Tant que ce n'est pas fait, VRM ne peut pas te dire de retirer {un ? 'sa' : 'leur'} paire d'eBay quand elle se vend sur Vinted.</Pourquoi></div>
+        <div className="vrm-alerte-ligne-sous" data-ebay-sans-preuve-court="">{noms.join(', ')} · {promet ? `se relie toute seule ${quand}` : ailleurs ? 'à relier depuis ton ordinateur' : cap === 'retard' ? `mets l'extension à jour (${EXT_ATTENDUE})` : blocage ? 'l\'extension ne peut pas la lire' : 'je vérifie l\'extension…'}</div>
         <div style={{ display: 'flex', flexDirection: 'column', marginTop: 8 }}>
           {sansPreuve.map((v) => (
             <div key={v.uid + ':' + v.tx} data-ebay-sans-preuve-vente={v.tx} className="vrm-eb-sanspreuve-vente">
@@ -27962,14 +28014,19 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   // « Voir le retrait automatique » : il est PLUS HAUT (dans les alertes). On y
   // va, et on met le focus sur son bouton — rien n'est allumé ici (allumer
   // garde sa propre confirmation), aucune requête.
+  // (6 nov.) Depuis la feuille « Règle d'offre » : elle se ferme d'abord, puis
+  // l'écran va à la rangée du retrait automatique (sur l'écran, sous la liste).
   const versRetraitAuto = () => {
-    try {
-      const reduit = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      const bloc0 = document.querySelector('[data-ebay-retrait-auto]');
-      if (bloc0 && bloc0.scrollIntoView) bloc0.scrollIntoView({ behavior: reduit ? 'auto' : 'smooth', block: 'center' });
-      const b = document.querySelector('[data-ebay-retrait-auto-bouton]');
-      if (b) b.focus({ preventScroll: true });
-    } catch (_) {}
+    setReglagesEbay(null);
+    setTimeout(() => {
+      try {
+        const reduit = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const bloc0 = document.querySelector('[data-ebay-retrait-auto]');
+        if (bloc0 && bloc0.scrollIntoView) bloc0.scrollIntoView({ behavior: reduit ? 'auto' : 'smooth', block: 'center' });
+        const b = document.querySelector('[data-ebay-retrait-auto-bouton]');
+        if (b) b.focus({ preventScroll: true });
+      } catch (_) {}
+    }, 360);
   };
   // Les annonces dont la règle n'a pas pu être lue : la raison se dit ICI, une
   // fois (sur la carte elle serait la même partout, §7).
@@ -28040,18 +28097,19 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
       style={{ ...lienE, opacity: porteGrisee ? 0.55 : 1, cursor: porteGrisee ? 'default' : 'pointer' }}>{regles === undefined ? 'Lecture des règles…' : (toutesOuvert ? 'Fermer « Une règle pour toutes »' : 'Une règle pour toutes')}</button>
   );
   const blocEngagement = (connues.length > 0 || peutEtreRegle.length > 0) && (
-    <div data-regles-engagement={connues.length} data-regles-engagement-peut-etre={peutEtreRegle.length} style={{ ...bloc(E.warn), fontSize: 13, color: E.text, lineHeight: 1.5 }}>
+    <div data-regles-engagement={connues.length} data-regles-engagement-peut-etre={peutEtreRegle.length} className="vrm-ebay-regle-detail" style={{ fontSize: 15, color: E.text, lineHeight: 1.47, marginBottom: 16 }}>
       <div>
         {connues.length > 0
           ? <>Règle d'offre active sur <b>{connues.length} annonce{connues.length > 1 ? 's' : ''}</b>{peutEtreRegle.length > 0 ? <>, et <b>peut-être sur {peutEtreRegle.length} autre{peutEtreRegle.length > 1 ? 's' : ''}</b> (VRM ne l'a pas relue — dit plus bas)</> : null} : eBay accepte, sans te demander, toute offre à partir du montant fixé</>
           : <>eBay tient <b>peut-être une règle d'offre sur {peutEtreRegle.length} annonce{peutEtreRegle.length > 1 ? 's' : ''}</b> (VRM ne l'a pas relue — dit plus bas) : si elle y est, eBay accepte, sans te demander, toute offre à partir de son montant</>}
         {' '}— une offre acceptée est une vente, au prix de l'offre. En dessous, l'offre t'arrive sur eBay.{vieillesRegles > 0 ? ` Dont ${vieillesRegles} lue${vieillesRegles > 1 ? 's' : ''} il y a plus de 7 jours.` : ''}
       </div>
-      <div data-regles-fenetre-ventes {...(ventesAge.etat === 'lu' ? { 'data-regles-ventes-age-h': String(ventesAge.h) } : {})} style={{ marginTop: 6, color: ventesVieilles ? E.warn : E.muted, fontSize: 12 }}>
+      <div data-regles-fenetre-ventes {...(ventesAge.etat === 'lu' ? { 'data-regles-ventes-age-h': String(ventesAge.h) } : {})} style={{ marginTop: 12, color: ventesVieilles ? E.warn : E.muted, fontSize: 13, lineHeight: 1.45 }}>
         eBay vend sans attendre VRM : VRM ne voit cette vente qu'en relisant tes ventes eBay — {ventesAge.etat === 'lu' ? `dernière lecture il y a ${ventesAge.h < 1 ? 'moins d\'une heure' : (ventesAge.h < 48 ? `${ventesAge.h} h` : `${Math.floor(ventesAge.h / 24)} jours`)}` : (ventesAge.etat === 'jamais' ? 'pas encore lues' : (ventesAge.etat === 'illisible' ? 'je n\'ai pas pu savoir quand' : 'lecture en cours'))}.
-        {' '}<button type="button" data-regles-relire-ventes disabled={relitVentes} onClick={relireVentesEbay} style={{ ...lienE, padding: '5px 9px', fontSize: 12, opacity: relitVentes ? 0.6 : 1 }}>{relitVentes ? 'Lecture…' : 'Relire mes ventes eBay'}</button>
+        {/* (6 nov.) Le bouton sur SA ligne, jamais au milieu d'une phrase. */}
+        <div style={{ marginTop: 8 }}><button type="button" data-regles-relire-ventes disabled={relitVentes} onClick={relireVentesEbay} className="vrm-b vrm-b-secondaire" style={{ opacity: relitVentes ? 0.6 : 1 }}>{relitVentes ? 'Lecture…' : 'Relire mes ventes eBay'}</button></div>
       </div>
-      <div data-regles-fenetre style={{ marginTop: 6, color: E.muted, fontSize: 12 }}>
+      <div data-regles-fenetre style={{ marginTop: 12, color: E.muted, fontSize: 13, lineHeight: 1.45 }}>
         Si un de ces articles se vend sur Vinted, VRM ne le retire d'eBay que quand tu ouvres VRM et que la vente Vinted a été captée{retraitAuto ? '' : ' — et seulement si le retrait automatique est allumé : sinon c\'est toi qui cliques'}. Entre les deux, eBay peut encore accepter une offre ici.
       </div>
       {!retraitAuto && <div style={{ marginTop: 6 }}><button type="button" data-regles-vers-retrait onClick={versRetraitAuto} style={{ ...lienE, padding: '5px 9px', fontSize: 12 }}>Voir le retrait automatique</button></div>}
@@ -28108,13 +28166,27 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     dvVue.aRetirerEbayAilleurs.length && { k: 'retirer-ailleurs', urg: true, sel: '[data-ebay-a-retirer-ailleurs]', cta: 'Voir', txt: `${dvVue.aRetirerEbayAilleurs.length} paire${plurCons(dvVue.aRetirerEbayAilleurs.length)} vendue${plurCons(dvVue.aRetirerEbayAilleurs.length)} ${ouVenduesTexte(dvVue.aRetirerEbayAilleurs)}, encore en vente ici — à retirer d'eBay` },
     dvVue.aAnnulerEbay.length && { k: 'annuler', urg: true, sel: '[data-ebay-a-annuler]', cta: 'Voir', txt: `${dvVue.aAnnulerEbay.length} programmée${plurCons(dvVue.aAnnulerEbay.length)} sur eBay, déjà vendue${plurCons(dvVue.aAnnulerEbay.length)} ailleurs — à annuler` },
     dvVue.aRetirerVinted.length && { k: 'retirer-vinted', urg: true, sel: '[data-ebay-retirer-vinted]', cta: 'Voir', txt: `${dvVue.aRetirerVinted.length} vendue${plurCons(dvVue.aRetirerVinted.length)} sur eBay, encore sur Vinted — à retirer là-bas` },
-    setRelierAnn.size && { k: 'relier', filtre: 'relier', cta: 'Filtrer', txt: `${setRelierAnn.size} annonce${plurCons(setRelierAnn.size)} à relier à un article — sans ce lien, VRM ne peut pas la retirer quand elle se vend` },
-    nDortAnn && { k: 'dorment', filtre: 'dorment', cta: 'Filtrer', txt: `${nDortAnn} paire${plurCons(nDortAnn)} en ligne depuis plus de 30 jours — baisse le prix${nEligCons ? ' ou fais une offre aux observateurs' : ''}` },
+    setRelierAnn.size && { k: 'relier', filtre: 'relier', cta: 'Filtrer', txt: `${setRelierAnn.size} annonce${plurCons(setRelierAnn.size)} à relier à un article — sinon VRM ne peut pas la retirer à la vente` },
+    nDortAnn && { k: 'dorment', filtre: 'dorment', cta: 'Filtrer', txt: `${nDortAnn} paire${plurCons(nDortAnn)} en ligne depuis plus de 30 jours — baisse le prix${nEligCons ? ' ou fais une offre' : ''}` },
   ].filter(Boolean);
   const allerConseil = (c) => () => {
     if (c.filtre) { setFiltreAnn(c.filtre); setAnnMax(60); }
     try { const el = document.querySelector(c.sel || '.vrm-ebay-outils'); if (el) el.scrollIntoView({ behavior: (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) ? 'auto' : 'smooth', block: 'center' }); } catch (_) {}
   };
+  // (6 nov., v36-visuel) La rangée « Règle d'offre » : l'état en un mot (le nombre
+  // d'annonces où eBay accepte seul), une ligne, l'ambre SEULEMENT s'il y a un
+  // geste (relecture ratée, lot interrompu, ventes pas vérifiées, ventes eBay pas
+  // relues depuis longtemps, une règle peut-être posée). Le reste : sa feuille.
+  const gesteRegle = !!(relectureRegles || lotInterrompu || bloqueCommun === 'pas-su' || risqueRegle || ((connues.length > 0 || peutEtreRegle.length > 0) && ventesVieilles));
+  const valRegle = regles === undefined ? '…' : connues.length ? `${connues.length} annonce${connues.length > 1 ? 's' : ''}` : peutEtreRegle.length ? `peut-être ${peutEtreRegle.length}` : pasSuRegle.length ? 'à relire' : 'aucune';
+  const detailRegle = (connues.length || peutEtreRegle.length)
+    ? (ventesVieilles ? 'tes ventes eBay sont à relire' : 'eBay accepte seul à partir de ton montant')
+    : pasSuRegle.length ? `${pasSuRegle.length} pas encore lue${pasSuRegle.length > 1 ? 's' : ''}` : 'eBay accepte seul à partir de ton montant';
+  const rangeeRegle = (
+    <RangeeIos data-ebay-reglage-regle={connues.length} icone={<Icon name="euro" size={17}/>} titre="Règle d’offre" detail={detailRegle}
+      valeur={valRegle} ton={gesteRegle ? 'geste' : undefined}
+      onClick={() => setReglagesEbay((v) => (v === 'liste' ? 'liste>regle' : 'regle'))} />
+  );
   return wrap(<>
     {head(itemsVue.length)}
     {(compteUnique || melangeAnnonces) && <div className="vrm-plat-intro" style={{ color: E.muted, fontSize: 12, marginBottom: 12 }}>{compteUnique ? `Sur ton compte eBay ${compteUnique}.` : `Sur tes ${new Set(itemsVue.map((a) => a._compte)).size} comptes eBay.`}</div>}
@@ -28147,8 +28219,14 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     {lignePasSu}
     {ligneSansPreuve}
     <div className="vrm-ebay-outils" style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '0 0 10px' }}>
-      <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Chercher un article (titre, N°, SKU)…" aria-label="Chercher une annonce eBay" data-ebay-recherche
-        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 12, border: `1px solid ${E.border}`, background: E.card, color: E.text, fontSize: 13, fontFamily: 'inherit' }} />
+      <div className="vrm-ebay-recherche-ligne">
+        <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Chercher (titre, N°, SKU)" aria-label="Chercher une annonce eBay" data-ebay-recherche
+          style={{ flex: '1 1 auto', minWidth: 0, boxSizing: 'border-box', padding: '9px 12px', borderRadius: 12, border: `1px solid ${E.border}`, background: E.card, color: E.text, fontSize: 13, fontFamily: 'inherit' }} />
+        {/* (6 nov.) Les réglages de l'écran, en feuille (règle d'offre, retrait automatique). */}
+        <button type="button" className="vrm-icon-control vrm-ebay-reglages-bouton" aria-label="Réglages eBay" title="Réglages eBay" data-ebay-reglages-ouvrir="" data-geste={gesteRegle ? '1' : undefined} onClick={() => setReglagesEbay('liste')}>
+          <Icon name="gear" size={20}/>
+        </button>
+      </div>
       {chipsAnn.length > 1 && (
         // (6 nov.) La forme UNIQUE des filtres de l'app (`.vrm-filtres`, celle de Ventes).
         <div className="vrm-rangee vrm-filtres" role="group" aria-label="Filtrer les annonces eBay" style={{ display: 'flex', gap: 6 }}>
@@ -28186,27 +28264,42 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
       <div style={{ color: E.muted, fontSize: 13, textAlign: 'center', padding: '16px 0' }}>Aucune annonce ne correspond{qnAnn ? ' à cette recherche' : ' à ce filtre'}. <button type="button" onClick={() => { setQ(''); setFiltreAnn('toutes'); }} style={{ ...lienE, padding: '3px 9px', marginLeft: 6 }}>Tout voir</button></div>
     )}
     <div className="vrm-ebay-suite">
+    {/* (6 nov., v36-visuel — Julien : « des murs de texte ») UNE ligne chacune ;
+        la phrase entière derrière le « ⓘ » (le sens ne change pas, il se lit au toucher). */}
     {nSans > 0 && (
-      <div className="vrm-plat-note" data-ebay-sans-observateur={nSans} style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, margin: '0 2px 8px' }}>
-        {nElig ? `Offre aux observateurs possible sur ${nElig} annonce${nElig > 1 ? 's' : ''} · ` : ''}pas d'observateur à qui l'envoyer pour {nElig ? (nSans === 1 ? "l'autre" : `les ${nSans} autres`) : (nSans === 1 ? 'cette annonce' : `ces ${nSans} annonces`)} pour l'instant.
+      <div className="vrm-plat-note vrm-note-ligne" data-ebay-sans-observateur={nSans} style={{ fontSize: 13, color: E.muted, lineHeight: 1.4, margin: '16px 2px 0' }}>
+        {nElig ? `Offre aux observateurs : ${nElig} annonce${nElig > 1 ? 's' : ''} sur ${nElig + nSans}` : 'Offre aux observateurs : personne pour l’instant'}{' '}
+        <Pourquoi label="Offre aux observateurs" titre="Offre aux observateurs">{nElig ? `Offre aux observateurs possible sur ${nElig} annonce${nElig > 1 ? 's' : ''} · ` : ''}pas d'observateur à qui l'envoyer pour {nElig ? (nSans === 1 ? "l'autre" : `les ${nSans} autres`) : (nSans === 1 ? 'cette annonce' : `ces ${nSans} annonces`)} pour l'instant.</Pourquoi>
       </div>
     )}
     {dvVue.nonReliees.length > 0 && (
-      <div className="vrm-plat-note" data-ebay-non-reliees={dvVue.nonReliees.length} style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, margin: '0 2px 10px' }}>
-        <b style={{ color: E.text }}>{dvVue.nonReliees.length} annonce{dvVue.nonReliees.length > 1 ? 's' : ''} pas reliée{dvVue.nonReliees.length > 1 ? 's' : ''} à un article</b>{nonRelieesRegle > 0 ? <span data-ebay-non-reliees-regles={nonRelieesRegle} style={{ color: E.warn }}> — {nonRelieesRegle} avec{nonRelieesPeutEtre ? ' peut-être' : ''} une règle d'offre : si eBay en vend une, VRM ne saura pas laquelle retirer de Vinted</span> : null} <Pourquoi>Sans ce lien, VRM ne peut pas te dire de {dvVue.nonReliees.length > 1 ? 'les' : 'la'} retirer d'ici quand l'article se vend sur Vinted. « Relier à un article » sur sa carte — c'est toi qui choisis.{dvVue.nonReliees.some(skuEbayDouteux) ? ` ${dvVue.nonReliees.filter(skuEbayDouteux).length === 1 ? 'Une d\'elles porte' : `${dvVue.nonReliees.filter(skuEbayDouteux).length} d'entre elles portent`} une référence VRM dont le numéro a été redonné depuis (panne du 18 octobre) ou est porté par deux articles : VRM ne la compte plus, ni comme « en vente », ni pour le retrait automatique, tant que tu ne l'as pas reliée (sa fiche le dit).` : ''}</Pourquoi>
+      <div className="vrm-plat-note vrm-note-ligne" data-ebay-non-reliees={dvVue.nonReliees.length} style={{ fontSize: 13, color: E.muted, lineHeight: 1.4, margin: '8px 2px 0' }}>
+        <b style={{ color: E.text, fontWeight: 600 }}>{dvVue.nonReliees.length} annonce{dvVue.nonReliees.length > 1 ? 's' : ''} pas reliée{dvVue.nonReliees.length > 1 ? 's' : ''} à un article</b>{nonRelieesRegle > 0 ? <span data-ebay-non-reliees-regles={nonRelieesRegle} style={{ color: E.warn }}> · {nonRelieesRegle} avec{nonRelieesPeutEtre ? ' peut-être' : ''} une règle d'offre</span> : null}{' '}
+        <Pourquoi label="Annonces pas reliées" titre="Annonces pas reliées">{nonRelieesRegle > 0 ? `${nonRelieesRegle} avec${nonRelieesPeutEtre ? ' peut-être' : ''} une règle d'offre : si eBay en vend une, VRM ne saura pas laquelle retirer de Vinted. ` : ''}Sans ce lien, VRM ne peut pas te dire de {dvVue.nonReliees.length > 1 ? 'les' : 'la'} retirer d'ici quand l'article se vend sur Vinted. « Relier à un article » sur sa carte — c'est toi qui choisis.{dvVue.nonReliees.some(skuEbayDouteux) ? ` ${dvVue.nonReliees.filter(skuEbayDouteux).length === 1 ? 'Une d\'elles porte' : `${dvVue.nonReliees.filter(skuEbayDouteux).length} d'entre elles portent`} une référence VRM dont le numéro a été redonné depuis (panne du 18 octobre) ou est porté par deux articles : VRM ne la compte plus, ni comme « en vente », ni pour le retrait automatique, tant que tu ne l'as pas reliée (sa fiche le dit).` : ''}</Pourquoi>
       </div>
     )}
       {outilsSuite(bloqueCommun === 'pas-su' ? [...pasSu, ...pasSuVentes] : pasSu)}
     </div>
-    {/* ── Réglages & sécurité de cet écran — DÉMOTÉS sous la liste (26 oct.) ──
-        « ça part dans tous les sens » : la règle d'offre et le retrait
-        automatique sont des RÉGLAGES/états, pas des actions du moment. La liste
-        passe en premier, eux en dessous, groupés et annoncés. Rien n'est caché —
-        chaque bloc garde ses data-* et son texte (les bancs les lisent par
-        attribut, pas par position). Les ALERTES urgentes (vendue ici → retire
-        là) restent en haut, dans {alertes}. */}
-    <div className="vrm-ebay-reglages" style={{ marginTop: 20, paddingTop: 14, borderTop: `1px solid ${E.border}` }}>
-      <div style={{ fontSize: 11, color: E.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, margin: '0 2px 12px' }}>Réglages &amp; sécurité de cet écran</div>
+    {/* ── Réglages eBay (6 nov., v36-visuel — Julien : « catastrophique, on dirait du
+        travail bâclé ») ── Ce qui était « Réglages & sécurité de cet écran » (une carte
+        à bord ambre de 10 lignes, un bouton au milieu d'une phrase, le retrait
+        automatique en paragraphe de 9 lignes) devient un GROUPE de rangées d'iOS :
+        « Règle d'offre » (l'état en un mot, ambre seulement s'il y a un geste) ouvre
+        sa FEUILLE, où vivent toutes les phrases d'avant, mot pour mot ; « Retrait
+        automatique » a son interrupteur et son « ⓘ ». Aucune règle ne change (§3) :
+        mêmes data-*, mêmes textes, mêmes confirmations. Les ALERTES urgentes
+        (vendue ici → retire là) restent en haut, dans {alertes}. */}
+    <GroupeIos className="vrm-ebay-reglages" titre="Réglages eBay" data-ebay-reglages="">
+      {rangeeRegle}
+      {reglageAuto}
+    </GroupeIos>
+    {reglagesEbay && (
+      <SheetShell onClose={() => { if (!lotEnCours) setReglagesEbay(null); }} titre={reglagesEbay === 'liste' ? 'Réglages eBay' : 'Règle d’offre'} maxWidth={560} data-ebay-reglages-feuille={reglagesEbay}>
+        <div className="vrm-ebay-reglages-feuille">
+          {reglagesEbay === 'liste' ? (
+            <GroupeIos>{rangeeRegle}{reglageAuto}</GroupeIos>
+          ) : (<>
+          {reglagesEbay === 'liste>regle' && <button type="button" className="vrm-lien-action vrm-ebay-reglages-retour" onClick={() => setReglagesEbay('liste')}>‹ Réglages eBay</button>}
       {blocEngagement}
       {lignePasSuRegle}
       {!blocEngagement && !lignePasSuRegle && porteToutes && <div style={{ margin: '0 2px 10px' }}>{porteToutes}</div>}
@@ -28231,8 +28324,10 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
           onDebut={() => { setLotInterrompu(null); try { sessionStorage.removeItem('vrm_regles_lot_interrompu'); } catch (_) {} }}
           onFini={async () => { if (comptesEbay) { const RG = await lireReglesEbay(comptesEbay); setRegles(RG); } }} />
       )}
-      {reglageAuto}
-    </div>
+          </>)}
+        </div>
+      </SheetShell>
+    )}
   </>);
 }
 // (17 oct.) Les achats eBay sont lus (Trading GetMyeBayBuying) : `EbayAchats`
