@@ -117,6 +117,8 @@ import Dac7Comptes from "./Dac7Comptes.jsx";
 import { dac7ParCompte, indexComptesVentes, emailsFiscaux, blocagesFiscauxVinted, csvDac7, pdfDac7, nomFichierDac7 } from "./dac7Comptes.js";
 import { porteMonnaieParCompte } from "./porteMonnaie.js";
 import { versementsDuReleve, completerVersementsParReleve } from "./versementReleve.js";
+import { aDaterParAnnee, anneeSureDeVente, tsVenteADater, periodeADater } from './aDaterAnnee.js';
+import { prochainGesteAnnonces } from './prochainGesteAnnonces.js';
 import AnnoncesMasquees from "./AnnoncesMasquees.jsx";
 import { BoutonCentreNotifs, FeuilleCentreNotifs } from "./CentreNotifs.jsx";
 import { nombreNonLues, marquerLues, fusionnerLus } from "./journalNotifs.js";
@@ -38990,8 +38992,9 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
         <div data-micro-seuils="lu" data-micro-ca={String(j.ca)} data-micro-partiel={j.partiel ? '1' : ''} data-micro-tva={j.tva.etat} data-micro-plafond={j.plafond.etat} data-micro-projection={j.projection == null ? '' : String(j.projection)}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
             <span style={sTitre}>Tes seuils {j.annee}</span>
-            <span style={{ fontSize: 13, color: C.muted }}>Reçu en {j.annee} : <b className="vrm-display" style={{ color: C.text, fontSize: 17 }}>{am}{eurMicro(j.ca)}</b></span>
+            <span style={{ fontSize: 13, color: C.muted }}>Reçu en {j.annee} : <b className="vrm-display" style={{ color: C.text, fontSize: 17 }}>{am}{eurMicro(j.ca)}</b><SourceChiffre id="seuils-ca">La somme des mois de {j.annee} de ton chiffre d’affaires déclaré ({j.mois} mois portent des ventes), toutes plateformes, daté au jour du versement — la même ligne que « Déclarer »{j.aDaterSur ? <>, plus {j.aDaterSur.n} vente{j.aDaterSur.n > 1 ? 's' : ''} vendue{j.aDaterSur.n > 1 ? 's' : ''} en {j.annee} pas encore datée{j.aDaterSur.n > 1 ? 's' : ''} ({eurMicro(j.aDaterSur.ca)})</> : null}.</SourceChiffre></span>
           </div>
+          {j.aDaterSur ? <div data-micro-adater-sur={String(j.aDaterSur.n)} style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>Dont {j.aDaterSur.n} vente{j.aDaterSur.n > 1 ? 's' : ''} vendue{j.aDaterSur.n > 1 ? 's' : ''} en {j.annee} sans date de versement ({eurMicro(j.aDaterSur.ca)}) : finalisée{j.aDaterSur.n > 1 ? 's' : ''}, donc reçue{j.aDaterSur.n > 1 ? 's' : ''} en {j.annee}, mais dans aucun mois.</div> : null}
           {j.partiel ? <div data-micro-partiel-texte="" style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>C'est un minimum : {j.raisons.join(' · ')}.</div> : null}
           <div style={{ marginTop: 14 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 13, marginBottom: 6 }}>
@@ -40354,6 +40357,14 @@ function FraisParSiteCarte({ periode, ebayCommandes }) {
   const b = bornesPeriode(periode, Date.now());
   const F = fraisParPlateforme({ releve: releve ? releve.l : null, ebay: Array.isArray(ebayCommandes) ? ebayCommandes : null, packs: compta && compta.packs, de: b.de, a: b.a, excluAutre, R: { commandeEbayEngagee } });
   if (!F.sites.length) return null;
+  // (6 nov.) Aucun site lu : une ligne, pas trois rangées de « pas lu — — » (moins de cartes,
+  // celles qui servent). Le geste qui la remplit est dit.
+  if (F.sites.every((x) => x.passu)) return (
+    <section className="vrm-frais-sites" data-frais-sites={b.type} data-frais-tous-passu="" style={{ padding: '14px 18px', background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, boxShadow: 'none', display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '4px 12px' }}>
+      <h2 className="vrm-display" data-titre-section="" style={{ margin: 0, fontSize: 17, fontWeight: 700, letterSpacing: '-.02em', color: C.text }}>Frais par site</h2>
+      <span style={{ fontSize: 13, color: C.muted }}>Pas encore calculés : ils se lisent dans le relevé de tes ventes, fait par l’écran Ventes. Ouvre-le une fois.</span>
+    </section>
+  );
   const grille = { display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,96px) minmax(0,64px)', columnGap: 10, alignItems: 'center' };
   return (
     <section className="vrm-frais-sites" data-frais-sites={b.type} data-frais-total={String(Math.round(F.total * 100))} data-frais-partiel={F.partiel ? '1' : undefined}
@@ -40963,35 +40974,61 @@ function PrevisionUrssafCarte({ onNav }) {
     );
   }
   const caTxt = montantARecopier(P.ca);
+  // (6 nov.) « DÉCLARER CE MOIS » EN TROIS ÉTAPES — Julien : « on doit être beaucoup plus
+  // accompagné ». 1 · ce qui est sûr (le montant à recopier, ses cotisations) ; 2 · ce qui
+  // manque et le geste qui le complète ; 3 · recopier sur le site, puis « J'ai déclaré ».
+  // Chaque chiffre a son « ? » : la phrase vient de la MÊME ligne publiée que lui
+  // (`ligne.mois` des mois de la période, `tauxUrssaf()`), jamais d'un second calcul.
+  const moisP = Array.isArray(ligne && ligne.mois) ? ligne.mois.filter((m) => m && (P.mois || []).includes(m.ym)) : [];
+  const nP = moisP.reduce((t, m) => t + (Number(m.n) || 0), 0);
+  const parP = {};
+  for (const m of moisP) for (const [k, v] of Object.entries(m.par || {})) parP[k] = (parP[k] || 0) + (Number(v && v.n) || 0);
+  const parTxt = Object.entries(parP).filter(([, n]) => n > 0).map(([k, n]) => `${n} ${k}`).join(', ');
+  const periodeAd = P.aDater > 0 ? periodeADater(ligne && ligne.aDater) : '';
+  const tauxTxt = String(tauxUrssaf()).replace('.', ',');
   return (
-    <section className={'vrm-urssaf-geste' + (urgent ? ' is-urgent' : '')} {...attrs} aria-label={`Déclaration URSSAF ${P.label}`}>
+    <section className={'vrm-urssaf-geste' + (urgent ? ' is-urgent' : '')} {...attrs} data-urssaf-parcours="3" aria-label={`Déclaration URSSAF ${P.label}`}>
       <div className="vrm-urssaf-geste-tete">
-        <h3>À recopier sur l’URSSAF</h3>
-        <span data-urssaf-echeance={P.daysLeft == null ? '' : String(P.daysLeft)}>{periode} · avant le {date}{jour ? ` · ${jour}` : ''}</span>
+        <h3>Déclarer {P.label}</h3>
+        <span data-urssaf-echeance={P.daysLeft == null ? '' : String(P.daysLeft)}>avant le {date}{jour ? ` · ${jour}` : ''}</span>
       </div>
+      <div className="vrm-urssaf-etape" data-urssaf-etape="1"><span className="vrm-urssaf-num" aria-hidden="true">1</span><b>Ce qui est sûr</b><small>à recopier sur l’URSSAF</small></div>
       <div className="vrm-urssaf-ligne" data-urssaf-ligne="ca" data-eur={P.ca == null ? '' : String(P.ca)}>
-        <span className="vrm-urssaf-lib"><b>Chiffre d’affaires</b><small>ventes de marchandises · reçu sur la période</small></span>
+        <span className="vrm-urssaf-lib"><b>Chiffre d’affaires <SourceChiffre id="ca">{P.ca == null ? <>Il se calcule dans l’écran Ventes, à partir de tes ventes lues : ouvre-le une fois.</> : <>La somme de tes {nP} vente{nP > 1 ? 's' : ''} finalisée{nP > 1 ? 's' : ''}{parTxt ? ` (${parTxt})` : ''} dont l’argent t’a été versé en {P.label} : Vinted au jour où la transaction passe « finalisée », Leboncoin au jour de la vente, eBay au jour de la commande payée. Seulement les comptes que tu as choisis ; une vente déjà déclarée reste dans le mois où tu l’as déclarée. Le même calcul que Ventes.</>}</SourceChiffre></b><small>ventes de marchandises · reçu sur la période</small></span>
         <span className="vrm-urssaf-val">{P.ca == null ? '—' : <>{P.partiel ? <small>au moins </small> : null}{fmt(P.ca)}</>}</span>
         {P.ca != null ? <button type="button" className="vrm-urssaf-copier" data-urssaf-copier="ca" data-urssaf-texte={caTxt} aria-label={`Copier ${caTxt}`} onClick={() => copier('ca', caTxt)}>{copie === 'ca' ? VERBES.copie : VERBES.copier}</button> : <span className="vrm-urssaf-copier-vide" aria-hidden="true"/>}
       </div>
       <div className="vrm-urssaf-ligne" data-urssaf-ligne="cotis" data-eur={P.apayer == null ? '' : String(P.apayer)}>
-        <span className="vrm-urssaf-lib"><b>Cotisations</b><small>estimation VRM · {String(tauxUrssaf()).replace('.', ',')} % : à comparer avec le site</small></span>
+        <span className="vrm-urssaf-lib"><b>Cotisations <SourceChiffre id="cotis">{P.apayer == null ? <>Elles se calculent sur le chiffre d’affaires, pas encore calculé.</> : <>{fmt(P.ca)} × {tauxTxt} % (ton taux : Ta micro-entreprise → Ton taux) = {fmt(P.apayer)}. Une estimation pour vérifier : le site de l’URSSAF fait foi.</>}</SourceChiffre></b><small>estimation VRM · {tauxTxt} % : à comparer avec le site</small></span>
         <span className="vrm-urssaf-val">{P.apayer == null ? '—' : <>{P.partiel ? <small>au moins </small> : null}{fmt(P.apayer)}</>}</span>
         <span className="vrm-urssaf-copier-vide" aria-hidden="true"/>
       </div>
+      <div className="vrm-urssaf-etape" data-urssaf-etape="2"><span className="vrm-urssaf-num" aria-hidden="true">2</span><b>Ce qui manque</b></div>
       {(P.ca == null || P.partiel || P.aDater > 0) ? (
         <div className="vrm-urssaf-manque" data-urssaf-manque={P.aDater > 0 ? String(P.aDater) : P.ca == null ? 'passu' : 'partiel'}>
-          {P.ca == null ? <>Pas encore calculé : ouvre l’écran Ventes une fois.</>
-            : P.aDater > 0 ? <><span>{P.aDater} vente{P.aDater > 1 ? 's' : ''} sans date de versement : pas dans ce montant.</span><Bouton variante="discret" data-urssaf-dater="" onClick={() => vers('compta-ca')}>{P.aDater > 1 ? 'Les dater' : 'La dater'}</Bouton></>
+          {P.ca == null ? <><span>Pas encore calculé : ouvre l’écran Ventes une fois.</span>{onNav ? <Bouton variante="discret" data-urssaf-ventes="" onClick={() => onNav('cat_ventes')}>Ouvrir Ventes</Bouton> : null}</>
+            : P.aDater > 0 ? <><span>{P.aDater} vente{P.aDater > 1 ? 's' : ''} sans date de versement : pas dans ce montant.{periodeAd ? <> Elles ont été <span data-urssaf-adater-periode="">{periodeAd}</span> ; une vente versée en {P.label} y manquerait : vérifie-les avant de déclarer.</> : null}</span><Bouton variante="discret" data-urssaf-dater="" onClick={() => vers('compta-ca')}>{P.aDater > 1 ? 'Les dater' : 'La dater'}</Bouton></>
             : <>Il manque des ventes pas encore lues : ce montant est un minimum.</>}
         </div>
-      ) : null}
+      ) : <div className="vrm-urssaf-manque" data-urssaf-rien-manque="">Rien : toutes tes ventes finalisées sont datées et lues. Le montant est complet.</div>}
+      <div className="vrm-urssaf-etape" data-urssaf-etape="3"><span className="vrm-urssaf-num" aria-hidden="true">3</span><b>Déclarer</b><small>{aNoter.length ? 'recopie le montant sur le site, puis note-le ici' : 'déjà noté ici'}</small></div>
       <div className="vrm-urssaf-gestes">
         <Bouton variante="secondaire" href="https://www.autoentrepreneur.urssaf.fr" target="_blank" rel="noopener noreferrer" data-fu-declarer-urssaf="" data-urssaf-site="">Ouvrir l’URSSAF ↗</Bouton>
         {aNoter.length ? <Bouton variante="primaire" data-fu-geste="" data-urssaf-cest-declare={aNoter[0]} onClick={() => demanderDeclaration(aNoter[0], onNav)}>J’ai déclaré</Bouton> : null}
       </div>
     </section>
   );
+}
+// (6 nov.) « D'OÙ VIENT CE CHIFFRE ? » — un « ? » à côté d'un chiffre, qui déplie UNE
+// phrase écrite par l'appelant à partir de la MÊME source que le chiffre (§5 : la
+// phrase qui explique un chiffre vient de la même source que lui). 44 px au doigt
+// (la zone de toucher déborde du rond dessiné).
+function SourceChiffre({ id, children }) {
+  const [ouvert, setOuvert] = React.useState(false);
+  return <>
+    <button type="button" className="vrm-source-q" data-source-chiffre={id} aria-expanded={ouvert} aria-label="D’où vient ce chiffre ?" onClick={(e) => { e.stopPropagation(); setOuvert((v) => !v); }}>?</button>
+    {ouvert ? <span className="vrm-source-texte" role="note" data-source-texte={id}>{children}</span> : null}
+  </>;
 }
 function ComptaFusion({ compta, onNav }) {
   const { pub, etat, B } = useBeneficeCalcul(compta, 'mois');
@@ -46315,6 +46352,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       for (const l of aDater) { const q = parAd[l.plateforme] || (parAd[l.plateforme] = { n: 0, ca: 0 }); q.n += 1; q.ca += l.eur; }
       for (const k in parAd) parAd[k].ca = r2(parAd[k].ca);
       const ad = { n: aDater.length, ca: r2(aDater.reduce((t, l) => t + l.eur, 0)), par: parAd };
+      // (6 nov.) Par ANNÉE DE VENTE et la période où elles ont été vendues (src/aDaterAnnee.js) :
+      // le CA de l'année y lit la part PROUVÉE (vendue et lue finalisée la même année), Compta
+      // dit « vendues de … à … ». Aucun mois n'en change (§5).
+      { const R = aDaterParAnnee(aDater); ad.annees = R.annees; if (R.de != null) { ad.de = R.de; ad.a = R.a; } }
       // (1er nov., audit A2) Vestiaire est LU (ses ventes au montant sûr sont dans
       // les mois) ou pas su ; ce qui n'est compté nulle part (`nonComptees`) est
       // publié avec le reste : le widget, la carte URSSAF et le rappel du 1er
@@ -53770,7 +53811,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // toutes plateformes, sur les MÊMES lignes et le même mois que le CA déclaré
         // de Compta (`declarables`, `l.ym`) — jamais un second calcul (§11).
         const anIci = String(new Date().getFullYear());
-        const caAnnee = declarables ? declarables.lignes.reduce((x, l) => (l && String(l.ym || '').startsWith(anIci)) ? x + l.eur : x, 0) : null;
+        // (6 nov.) + ses ventes à dater VENDUES cette année : versées cette année (src/aDaterAnnee.js,
+        // la règle de Compta) ; seules les autres laissent « au moins ».
+        const adSurAn = declarables && Array.isArray(declarables.aDater) ? declarables.aDater.filter((l) => l && String(anneeSureDeVente(tsVenteADater(l), Date.now())) === anIci) : [];
+        const caAnnee = declarables ? declarables.lignes.reduce((x, l) => (l && String(l.ym || '').startsWith(anIci)) ? x + l.eur : x, 0) + adSurAn.reduce((x, l) => x + l.eur, 0) : null;
         const adVinted = declarables ? declarables.aDater.filter(l => l.plateforme === 'Vinted').length : 0;
         // (30 oct.) Des ventes finalisées sans date de versement ne sont dans aucun mois :
         // « Reçu » et le CA de l'année sont alors des MINIMUMS — la couverture se dit à côté (§5).
@@ -54179,8 +54223,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               )}
               <div className="vrm-jc-cell" data-ca-annee={caAnnee==null?'':Math.round(caAnnee*100)} data-ca-non-comptees={recuNonComptees.length || undefined} title={`Chiffre d'affaires ${anIci} : tes ventes versées cette année, toutes plateformes (le CA déclaré).${phraseNcRecu ? ` Au moins : pas dans ce chiffre — ${phraseNcRecu}.` : ''}`}>
                 <div className="vrm-jc-l">CA {anIci}</div>
-                <div className="vrm-jc-v">{declarables === undefined ? <span className="vrm-jc-montant vrm-jc-vide">…</span> : <Montant v={(adTous > 0 || phraseNcRecu) && !(caAnnee > 0) ? null : caAnnee}/>}</div>
-                {(adTous > 0 || phraseNcRecu) && <div className="vrm-jc-sous" data-ca-adater={adTous || undefined}>{caAnnee > 0 ? 'au moins' : adTous > 0 ? `${adTous} à dater` : 'non comptées'}</div>}
+                <div className="vrm-jc-v">{declarables === undefined ? <span className="vrm-jc-montant vrm-jc-vide">…</span> : <Montant v={((adTous - adSurAn.length) > 0 || phraseNcRecu) && !(caAnnee > 0) ? null : caAnnee}/>}</div>
+                {((adTous - adSurAn.length) > 0 || phraseNcRecu) && <div className="vrm-jc-sous" data-ca-adater={(adTous - adSurAn.length) || undefined}>{caAnnee > 0 ? 'au moins' : (adTous - adSurAn.length) > 0 ? `${adTous - adSurAn.length} à dater` : 'non comptées'}</div>}
               </div>
             </div>
           </div>
@@ -57070,10 +57114,30 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const m = annBase.length;
             const n = m ? annBase.filter(it=>{ const a = prixAchatDe(numeros[it.id]||{}, buyByNum); return a!=null && !isNaN(a); }).length : 0;
             const vuePrix = !['selection','brouillons','masquees','sleeping','sansachat'].includes(annSort);   // (6 nov.) « Sans achat relié » dit déjà sa file
-            const prixManque = vuePrix && m > 0 && n < m;
+            // (6 nov.) LE PROCHAIN GESTE EN TÊTE (src/prochainGesteAnnonces.js) : un geste, celui
+            // qui compte le plus, avec son bouton — sur la liste de toujours (pas dans une vue filtrée).
+            const geste = annSort === 'oldest' && !annSearch.trim() && listings.items && !listings.error
+              ? prochainGesteAnnonces({ aVerifier: aVerifierCarton.length, sansNum: annStats.sansNum, prixConnus: n, prixTotal: m, dorment: annStats.sleeping })
+              : null;
+            const faireGeste = () => {
+              if (!geste) return;
+              if (geste.cle === 'prix') { setFillBuyOpen(true); return; }
+              if (geste.cle === 'sansnum') { setAnnSort('nonum'); return; }
+              if (geste.cle === 'dorment') { setAnnSort('sleeping'); return; }
+              try { const el = document.querySelector('[data-numeros-a-verifier]'); if (el) { el.open = true; el.scrollIntoView({ block: 'start', behavior: 'smooth' }); } } catch (_) {}
+            };
+            const ligneGeste = geste ? (
+              <div className="vrm-ann-geste" data-ann-prochain-geste={geste.cle} role="status">
+                <span className="vrm-ann-geste-texte"><b>Prochain geste</b><span>{geste.texte}</span></span>
+                <Bouton variante="discret" data-ann-prochain-geste-bouton="" onClick={faireGeste}>{geste.bouton}</Bouton>
+              </div>
+            ) : null;
+            // « Prix d'achat N/M » se dit une fois (§7) : dans le geste quand c'est lui.
+            const prixManque = vuePrix && m > 0 && n < m && !(geste && geste.cle === 'prix');
             const nN = numerosNeufs.length;
-            if (!prixManque && !nN) return null;
+            if (!prixManque && !nN) return ligneGeste;
             return (<>
+              {ligneGeste}
               <div className="vrm-ann-avis" data-ann-avis="">
                 {prixManque && (
                   <div className="vrm-ann-achats" data-ann-achats={`${n}/${m}`} role="status">
@@ -65058,19 +65122,37 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     // emails et la sécurité : son titre dit maintenant ce qu'il contient, et
     // « Import des emails Vinted » vient à côté de « Réception des emails »
     // (il était dans Comptabilité, loin de l'autre réglage des emails).
-    { id:'comptes', titre:`Comptes et ${Lbas.emails}`, items:[
-      { id:'liens', type:'nav', ic:'link', lib:L.comptesLies, desc:'Pseudos et adresses de tes comptes', onClick:()=>setTab('vintedaccounts') },
-      { id:'connexions', type:'panneau', ic:'pulse', lib:'État des connexions', desc:'Ce qui marche, ce qui attend un geste', titreInterne:true, el:<ConnexionsSetting key={AUTH.user?.id||'sans-session'} comptes={comptes||[]} onComptes={()=>setTab('vintedaccounts')} onPlateforme={versPlateforme}/> },
+    // (6 nov.) PARAMÈTRES PAR INTENTION — Julien : « tout doit être simplifié, on doit être
+    // beaucoup plus accompagné ». Les groupes disent ce qu'on vient faire (Mes comptes, Mes
+    // e-mails, Notifications, Mon abonnement, Sécurité et sauvegarde, Aide), et chaque ligne
+    // dit en UNE phrase ce que fait le réglage. Les `id` et les attributs `data-*` ne bougent
+    // pas (bancs, recherche) ; seuls les titres, l'ordre et les phrases changent.
+    { id:'comptes', titre:'Mes comptes', items:[
+      { id:'liens', type:'nav', ic:'link', lib:L.comptesLies, desc:'Tes comptes Vinted, Leboncoin, Vestiaire et eBay : lesquels comptent dans tes chiffres.', onClick:()=>setTab('vintedaccounts') },
+      { id:'connexions', type:'panneau', ic:'pulse', lib:'État des connexions', desc:'Pour chaque compte : ce qui est relu, ce qui attend un geste de toi.', titreInterne:true, el:<ConnexionsSetting key={AUTH.user?.id||'sans-session'} comptes={comptes||[]} onComptes={()=>setTab('vintedaccounts')} onPlateforme={versPlateforme}/> },
       // (31 oct., soir) L'ancien « eBay → Compte » : connexion et comptes eBay reliés.
-      ebayCompte && { id:'ebay', type:'panneau', ic:'shop', lib:'Comptes eBay', desc:'Connexion à eBay, comptes reliés', el:ebayCompte },
+      ebayCompte && { id:'ebay', type:'panneau', ic:'shop', lib:'Comptes eBay', desc:'Connecter eBay à VRM et choisir les comptes reliés.', el:ebayCompte },
+    ]},
+    { id:'emails-reglages', titre:'Mes e-mails', items:[
       // (5 nov., chantier G, revue 2.24) UN seul écran « E-mails » : l'ancien sous-écran est devenu
       // l'onglet « Relier ma boîte » de l'écran E-mails ; Paramètres y MÈNE (plus de second écran ici).
-      { id:'adresses', type:'nav', ic:'mail', lib:L.emails, desc:'Relier ma boîte, tes adresses, ce que VRM en a fait', onClick:()=>{ ouvrirEmailsRelier('reception'); setTab('emails'); }, data:{ 'data-reglage-emails':'', 'data-sous-ouvrir':'adresses' } },   // l'attribut d'avant reste : « Paramètres → E-mails » se touche au même endroit
-      proprioInst && { id:'import', type:'panneau', nu:true, ic:'calendar', lib:'Import des e-mails Vinted', desc:'Date de début de l’historique', el:<EmailStartSetting key={AUTH.user?.id||'sans-session'} nu/> },
-      { id:'securite', type:'panneau', ic:'shield', lib:'Sécurité des données', desc:'Qui peut lire et écrire tes données', el:<SecuriteSetting/> },
+      { id:'adresses', type:'nav', ic:'mail', lib:L.emails, desc:'Relier ta boîte pour que VRM lise tes ventes, colis et codes de retrait.', onClick:()=>{ ouvrirEmailsRelier('reception'); setTab('emails'); }, data:{ 'data-reglage-emails':'', 'data-sous-ouvrir':'adresses' } },   // l'attribut d'avant reste : « Paramètres → E-mails » se touche au même endroit
+      proprioInst && { id:'import', type:'panneau', nu:true, ic:'calendar', lib:'Import des e-mails Vinted', desc:'À partir de quelle date VRM relit tes anciens e-mails.', el:<EmailStartSetting key={AUTH.user?.id||'sans-session'} nu/> },
+    ]},
+    { id:'notifications', titre:'Notifications', items:[
+      { id:'push', type:'panneau', ic:'bell2', lib:'Notifications du téléphone', titreInterne:true,
+        desc: nMuetsPush > 0 ? <span style={{color:C.warn,fontWeight:600}}>{nMuetsPush} compte{nMuetsPush>1?'s':''} sans e-mail : pas de notification</span> : 'Être prévenu sur ton téléphone d’une vente, d’une offre ou d’un colis.',
+        el:<><PushSetting/><div style={{height:12}}/><PushPrefsSetting comptes={comptes} onMuets={setNMuetsPush}/><RelancesEssaiSetting/></> },
+      // Alertes locales (l'ancien bouton 🔔 du haut) : bandeau + notification
+      // quand l'app est OUVERTE (ventes comptabilisées, factures reçues).
+      { id:'alertes', type:'switch', ic:'alert', lib:"Alertes dans l'app", desc:'Un bandeau pour tes ventes et factures, quand l’app est ouverte.', on:!!notifEnabled, onClick:onToggleNotif, data:{ 'data-reglage-alertes': notifEnabled ? 'on' : 'off' } },
+    ]},
+    // « Mon abonnement » : l'onglet du haut, joignable depuis la liste (le même écran, §11).
+    MULTI_USER && AUTH.user && { id:'abonnement-lien', titre:'Mon abonnement', items:[
+      { id:'abonnement-ouvrir', type:'nav', ic:'cash', lib:'Mon abonnement', desc:'Ton offre, ta carte, tes factures, et l’arrêt si tu veux.', onClick:()=>setVue('abonnement'), data:{ 'data-reglage-abonnement':'' } },
     ]},
     MULTI_USER && { id:'stock', titre:'Stock et rangement', items:[
-      { id:'numeros', type:'panneau', nu:true, ic:'tag', lib:'Numéros de rangement', desc:'Format des prochains numéros', val:valNumeros, el:<NumerosSetting nu onStock={()=>setTab('garage')}/> },
+      { id:'numeros', type:'panneau', nu:true, ic:'tag', lib:'Numéros de rangement', desc:'Comment s’écrivent les numéros de tes prochaines paires.', val:valNumeros, el:<NumerosSetting nu onStock={()=>setTab('garage')}/> },
       // ⛔ Réponse automatique aux messages Vinted retirée (16 oct., sa décision).
       // ⛔ Détourage des photos retiré des Paramètres (17 oct., sa décision) :
       //    il n'existe plus que pour Vestiaire Collective, qui l'exige, sans réglage.
@@ -65080,63 +65162,56 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     ], pied: <button type="button" className="vrm-lien-action vrm-set-lien" data-reglage-organisation="" onClick={()=>setTab('organisation')}>Organisation<Icon name="chevron" size={13}/></button>},
     // (3 nov.) Les textes types insérés en un tap dans une description.
     { id:'annonces-reglages', titre:'Annonces', items:[
-      { id:'modeles', type:'panneau', nu:true, ic:'pencil', lib:'Mes modèles', val:String(lireModelesRanges().length || ''), data:{ 'data-reglage-modeles':'' }, el:<ModelesSetting/> },
-    ]},
-    { id:'notifications', titre:'Notifications', items:[
-      { id:'push', type:'panneau', ic:'bell2', lib:'Notifications du téléphone', titreInterne:true,
-        desc: nMuetsPush > 0 ? <span style={{color:C.warn,fontWeight:600}}>{nMuetsPush} compte{nMuetsPush>1?'s':''} sans e-mail : pas de notification</span> : null,
-        el:<><PushSetting/><div style={{height:12}}/><PushPrefsSetting comptes={comptes} onMuets={setNMuetsPush}/><RelancesEssaiSetting/></> },
-      // Alertes locales (l'ancien bouton 🔔 du haut) : bandeau + notification
-      // quand l'app est OUVERTE (ventes comptabilisées, factures reçues).
-      { id:'alertes', type:'switch', ic:'alert', lib:"Alertes dans l'app", desc:'Ventes et factures, quand l’app est ouverte.', on:!!notifEnabled, onClick:onToggleNotif, data:{ 'data-reglage-alertes': notifEnabled ? 'on' : 'off' } },
+      { id:'modeles', type:'panneau', nu:true, ic:'pencil', lib:'Mes modèles', desc:'Des textes prêts à insérer d’un geste dans une description.', val:String(lireModelesRanges().length || ''), data:{ 'data-reglage-modeles':'' }, el:<ModelesSetting/> },
     ]},
     { id:'impression', titre:'Impression', items:[
-      { id:'imprimante', type:'panneau', nu:true, ic:'printer', lib:'Imprimante et bordereaux', desc:'Papier et aperçus', val: imprimanteChoisie() === 'thermique' ? 'Thermique · 10×15' : 'Normale · A4', el:<ImprimanteSetting nu/> },
+      { id:'imprimante', type:'panneau', nu:true, ic:'printer', lib:'Imprimante et bordereaux', desc:'Le papier de ton imprimante, pour des bordereaux à la bonne taille.', val: imprimanteChoisie() === 'thermique' ? 'Thermique · 10×15' : 'Normale · A4', el:<ImprimanteSetting nu/> },
     ]},
     { id:'compta', titre:'Compta', items:[
       // (1er nov.) À droite, le statut CHOISI (lu dans `vinted_regime`, jamais deviné) :
       // « À choisir » tant qu'il ne l'a pas posé — avant, il fallait ouvrir pour savoir.
-      { id:'regime', type:'panneau', nu:true, ic:'receipt', lib:L.statut, desc:'Taux des rapports', val:valRegime, data:{ 'data-reglage-regime': regimeFiscal() || 'aucun' }, el:<RegimeSetting nu/> },
+      { id:'regime', type:'panneau', nu:true, ic:'receipt', lib:L.statut, desc:'Ton statut fiscal : il fixe le taux de tes cotisations URSSAF.', val:valRegime, data:{ 'data-reglage-regime': regimeFiscal() || 'aucun' }, el:<RegimeSetting nu/> },
       // Julien, 1er oct. : « les ventes masquées, je veux que ce soit dans les
       // paramètres, pas sous Factures ». L'écran reste monté, joignable ici.
       // (1er nov.) Depuis le 29 oct. une VENTE ne se masque plus : la ligne disait
       // encore « Ventes et achats masqués » pour un écran qui ne liste que des achats.
-      { id:'masques', type:'nav', ic:'eyeOff', lib:'Achats masqués', desc:'Retirés de la compta, à réafficher', onClick:()=>setTab('masques'), data:{ 'data-reglage-masques':'' } },
+      { id:'masques', type:'nav', ic:'eyeOff', lib:'Achats masqués', desc:'Les achats que tu as retirés de la compta, à réafficher.', onClick:()=>setTab('masques'), data:{ 'data-reglage-masques':'' } },
       // (31 oct., soir) La porte « Compléter les prix d'achat » revient ici (retirée par la
       // refonte du 31 oct.) : même destination — Annonces · Vinted, saisie en série ouverte.
-      { id:'prixachat', type:'nav', ic:'cash', lib:"Compléter les prix d'achat", desc:'Saisie en série, pour un bénéfice juste', onClick:()=>{DEMANDE_SAISIE_PRIX.on=true;setTab('vinted_annonces');} },
+      { id:'prixachat', type:'nav', ic:'cash', lib:"Compléter les prix d'achat", desc:'Les saisir à la suite : sans eux, le bénéfice n’est qu’un minimum.', onClick:()=>{DEMANDE_SAISIE_PRIX.on=true;setTab('vinted_annonces');} },
 
     ]},
     { id:'affichage', titre:'Affichage', items:[
-      { id:'sombre', type:'switch', ic:'moon', lib:'Mode sombre', on:!!dark, onClick:toggleDark, data:{ 'data-reglage-sombre': dark ? 'on' : 'off' } },
+      { id:'sombre', type:'switch', ic:'moon', lib:'Mode sombre', desc:'Fond sombre, plus doux le soir.', on:!!dark, onClick:toggleDark, data:{ 'data-reglage-sombre': dark ? 'on' : 'off' } },
       // (5 nov.) Le mode stream PROGRAMMÉ : son sous-écran (catégories, mots, aperçu).
       // (5 nov., chantier H) L'interrupteur DANS la liste (le même état que « Stream » en
       // haut : un réglage), et son programme dans un sous-écran à son nom — le titre
       // « Mode stream » n'est plus écrit deux fois dans le sous-écran.
-      { id:'stream-on', type:'switch', ic:'stream', lib:'Mode stream', on:!!streamOn, onClick:()=>poserStream(!streamOn), data:{ 'data-reglage-stream-on': streamOn ? 'on' : 'off' } },
-      { id:'stream', type:'panneau', nu:true, ic:'filter', lib:'Ce que le stream cache', data:{ 'data-reglage-stream': streamOn ? 'on' : 'off' }, el:<ReglagesStream/> },
-      { id:'zoom', type:'panneau', nu:true, ic:'texte', lib:"Taille de l'affichage", val:valZoom, el:<ZoomSetting nu/> },
+      { id:'stream-on', type:'switch', ic:'stream', lib:'Mode stream', desc:'Cache tes montants, pseudos et adresses quand tu filmes ton écran.', on:!!streamOn, onClick:()=>poserStream(!streamOn), data:{ 'data-reglage-stream-on': streamOn ? 'on' : 'off' } },
+      { id:'stream', type:'panneau', nu:true, ic:'filter', lib:'Ce que le stream cache', desc:'Choisir les mots, marques et comptes à cacher.', data:{ 'data-reglage-stream': streamOn ? 'on' : 'off' }, el:<ReglagesStream/> },
+      { id:'zoom', type:'panneau', nu:true, ic:'texte', lib:"Taille de l'affichage", desc:'Agrandir ou réduire les textes de VRM.', val:valZoom, el:<ZoomSetting nu/> },
       urlWidget && { id:'widget', type:'panneau', nu:true, ic:'chart', lib:'Widget iPhone', desc:'Ton lien privé pour Scriptable', el:widget },
     ]},
-    { id:'sauvegarde', titre:'Sauvegarde', items:[
-      { id:'donnees', type:'action', ic:'doc', lib:'Exporter mes données', onClick:exporterMesDonnees, data:{ 'data-exporter-donnees':'' } },
-      { id:'export', type:'action', ic:'archive', lib:'Sauvegarde complète', desc:'Réglages, numéros et données captées.', onClick:onExport, data:{ 'data-reglage-sauvegarde':'' } },
-      { id:'restaurer', type:'action', ic:'restore', lib:'Restaurer une sauvegarde', onClick:onImport },
+    { id:'sauvegarde', titre:'Sécurité et sauvegarde', items:[
+      { id:'securite', type:'panneau', ic:'shield', lib:'Sécurité des données', desc:'Vérifier que toi seul peux lire et écrire tes données.', el:<SecuriteSetting/> },
+      { id:'donnees', type:'action', ic:'doc', lib:'Exporter mes données', desc:'Tes ventes, achats et annonces dans un fichier, pour toi.', onClick:exporterMesDonnees, data:{ 'data-exporter-donnees':'' } },
+      { id:'export', type:'action', ic:'archive', lib:'Sauvegarde complète', desc:'Tout VRM (réglages, numéros, données) dans un fichier à garder.', onClick:onExport, data:{ 'data-reglage-sauvegarde':'' } },
+      { id:'restaurer', type:'action', ic:'restore', lib:'Restaurer une sauvegarde', desc:'Remettre VRM tel qu’il était dans une sauvegarde.', onClick:onImport },
     ], pied: (
       <span data-derniere-sauvegarde={derniereSauvegarde.old ? 'ancienne' : 'recente'} style={{color: derniereSauvegarde.old ? C.warn : C.muted, fontWeight: derniereSauvegarde.old ? 600 : 400}}>
         {derniereSauvegarde.t ? `Dernière sauvegarde : ${derniereSauvegarde.days===0?"aujourd'hui":derniereSauvegarde.days===1?'hier':`il y a ${derniereSauvegarde.days} j`}${derniereSauvegarde.old?' · à refaire':''}` : 'Jamais sauvegardé — touche « Sauvegarde complète »'}
       </span>
     )},
-    {id:'aide',titre:'Besoin d’aide ?',items:[
+    {id:'aide',titre:'Aide',items:[
       // (2 nov.) La visite en bulles, rejouée sur son clic (src/VisiteBulles.jsx).
-      { id:'visite', type:'action', ic:'play', lib:'Revoir la visite', desc:'Les onglets de VRM, un par un', onClick:()=>{ try { window.dispatchEvent(new Event('vrm:visite')); } catch (_) {} }, data:{ 'data-reglage-visite':'' } },
+      { id:'visite', type:'action', ic:'play', lib:'Revoir la visite', desc:'Les onglets de VRM présentés un par un.', onClick:()=>{ try { window.dispatchEvent(new Event('vrm:visite')); } catch (_) {} }, data:{ 'data-reglage-visite':'' } },
       // (6 nov.) Un bouton : le message part avec l'écran, les versions, le navigateur
       // et les plantages de cet appareil — et il voit tout avant d'envoyer.
-      { id:'signaler', type:'action', ic:'send', lib:'Signaler un problème', onClick:()=>setSignaler(true), data:{ 'data-reglage-signaler':'' } },
+      { id:'signaler', type:'action', ic:'send', lib:'Signaler un problème', desc:'Dire ce qui ne va pas : tu vois tout ce qui part avant d’envoyer.', onClick:()=>setSignaler(true), data:{ 'data-reglage-signaler':'' } },
       // La liste des signalements reçus : au PROPRIÉTAIRE de l'installation seul
       // (le serveur refuse tout autre compte).
       proprioInst && { id:'signalements', type:'panneau', nu:true, ic:'chat', lib:'Signalements reçus', data:{ 'data-reglage-signalements':'' }, el:<SignalementsRecus entetes={enTeteSession} Bouton={Bouton} PanneEl={EtatPanne}/> },
-      {id:'depannage',type:'panneau',nu:true,ic:'help',lib:'Résoudre un problème',desc:'E-mails, comptes, impression',el:<div className="vrm-settings-help">
+      {id:'depannage',type:'panneau',nu:true,ic:'help',lib:'Résoudre un problème',desc:'Les gestes à faire quand un e-mail, un compte ou une impression coince.',el:<div className="vrm-settings-help">
       <details><summary>Je ne reçois pas mes e-mails</summary><p>Vérifie l’adresse associée au compte Vinted, sa confirmation, puis le transfert depuis ta messagerie. L’historique reçu permet de distinguer un e-mail absent d’un e-mail à vérifier.</p><Bouton variante="secondaire" onClick={()=>{ ouvrirEmailsRelier('reception'); setTab('emails'); }}>{L.relierBoite}</Bouton></details>
       <details><summary>Mon compte Vinted n’apparaît pas</summary><p>Connecte le compte attendu sur Vinted et vérifie que l’extension utilise ton compte VRM. Actualise ensuite les comptes liés et contrôle le pseudo. N’ajoute pas les données d’un autre vendeur.</p><Bouton variante="secondaire" onClick={()=>setTab('vintedaccounts')}>Voir mes comptes liés</Bouton></details>
       <details><summary>Mon bordereau s’imprime mal</summary><p>Choisis le papier correspondant à ton imprimante, ouvre un aperçu puis contrôle l’échelle d’impression. Le numéro doit rester dans un espace blanc. En cas d’échec d’un lot, relance uniquement les fichiers refusés.</p><Bouton variante="secondaire" onClick={()=>ouvrirSous('imprimante')}>Vérifier l’impression</Bouton></details>

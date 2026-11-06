@@ -12,7 +12,7 @@ let src = fs.readFileSync(path.join(ICI, 'src', 'microEntreprise.js'), 'utf8');
 const muter = (a, b) => { if (!src.includes(a)) { console.error('ancre absente :', a); process.exit(2); } src = src.replace(a, b); };
 if (mut === 'ancien-plafond') muter('plafondVente: 203100', 'plafondVente: 188700');
 if (mut === 'tva-sans-majore') muter("else if (cur.ca > s.tvaMajore) tvaEtat = 'majore_depasse';\n", '');
-if (mut === 'partiel-ignore') muter('return { ca: r2(ca), mois, partiel: raisons.length > 0, raisons };', 'return { ca: r2(ca), mois, partiel: false, raisons };');
+if (mut === 'partiel-ignore') muter('return { ca: r2(ca), mois, partiel: raisons.length > 0, raisons,', 'return { ca: r2(ca), mois, partiel: false, raisons,');
 if (mut === 'mois-meme') muter('const ouvre = new Date(ps.getFullYear(), ps.getMonth() + 1, 1);\n      const limite = new Date(ps.getFullYear(), ps.getMonth() + 2, 0);', 'const ouvre = new Date(ps.getFullYear(), ps.getMonth(), 1);\n      const limite = new Date(ps.getFullYear(), ps.getMonth() + 1, 0);');
 if (mut === 'vl-devine') muter("const lib = o.liberatoire === 'oui' || o.liberatoire === 'non' ? o.liberatoire : null;", "const lib = o.liberatoire === 'non' ? 'non' : 'oui';");
 if (mut === 'projection-proche') muter("(tvaEtat === 'ok' || tvaEtat === 'proche')", "tvaEtat === 'ok'");
