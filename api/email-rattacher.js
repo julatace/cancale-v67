@@ -487,7 +487,7 @@ export default async function handler(req, res) {
       if (q.texte) {res.status(200).json(await lireTexteEmail({owner,url:SUPABASE_URL,headers:HEADERS,id:String(q.texte)}));return;}
       // (5 nov.) La boîte de réception : UN email (sujet, expéditeur, date, texte, pièces).
       if (q.lire) {res.status(200).json(await lireEmailBoite({owner,url:SUPABASE_URL,headers:HEADERS,id:String(q.lire)}));return;}
-      res.status(200).json(await lireJournalEmail({owner,url:SUPABASE_URL,headers:HEADERS,page:q.page,etat:String(q.etat||''),type:String(q.type||''),adresse:String(q.adresse||''),boite:String(q.boite||''),cherche:String(q.cherche||''),compteSeul:String(q.compte||'')==='1'}));
+      res.status(200).json(await lireJournalEmail({owner,url:SUPABASE_URL,headers:HEADERS,page:q.page,etat:String(q.etat||''),type:String(q.type||''),adresse:String(q.adresse||''),boite:String(q.boite||''),cherche:String(q.cherche||''),compteSeul:String(q.compte||'')==='1',nonlus:String(q.nonlus||'')==='1',parPage:Number.parseInt(q.parPage,10)||undefined}));
     } catch (e) { if (e && (e.message === 'identifiant' || e.message === 'rubrique')) res.status(400).json({ok:false,error:e.message}); else indispo(res); }
     return;
   }

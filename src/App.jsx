@@ -251,6 +251,7 @@ import { relanceProposable, numeroSorti } from './ebayRelance.js';
 // journée, Ventes, le rappel du matin, le rappel du soir et le widget (§11).
 import {DELAI_EXPEDITION_J, limiteExpedition, lireDateLimite, echeanceLimite, texteLimiteEnvoi, bordsParTransaction} from '../api/_lib/limite-envoi.js';
 import { photoArticle, photoCommande, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from "./photosArticles.js";
+import { ecrireEmailsLus } from "./emailsLusEcriture.js";
 // (6 nov., vitesse 2) Les écrans eBay (src/ebayGestion.jsx) : à la demande. Ce dont l'app
 // a besoin sans eux vient de leurs fichiers (`appelerEbay`, le portail des conversations) ;
 // leur feuille de style reste ICI, à la place de l'ancien import (même ordre).
@@ -72072,6 +72073,8 @@ function AppCoeur() {
   const ventesEmailCoque = useVentesEmailFraiches(ventesCoque, ventesKO, vintedAccounts,
     (u) => compteEcarte(u, new Set(hAccCoqueCle ? hAccCoqueCle.split(',') : []), panelOffCoque || {}), hAccCoqueCle + '|' + JSON.stringify(panelOffCoque || {}) + '|' + masquesTick);
   const ventesCoqueEmail = useMemo(() => avecVentesEmail(ventesCoque, ventesEmailCoque), [ventesCoque, ventesEmailCoque]);
+  // (6 nov., v36) E-mails : la photo de la paire d'un bordereau, PAR SON n° de transaction (§5).
+  const photoEmailParTx = useMemo(() => { const m = new Map(); for (const o of (Array.isArray(ventesCoqueEmail) ? ventesCoqueEmail : [])) { const tx = o && o.transaction_id; if (tx == null || m.has(String(tx))) continue; const ph = photosVenteVintedCandidates(o)[0]; if (ph) m.set(String(tx), ph); } return (e) => { const r = e && e.resume; return (r && r.t === 'bordereau' && r.tx && m.get(String(r.tx))) || null; }; }, [ventesCoqueEmail]);
   const [versementsCoque, setVersementsCoque] = useState(undefined);
   useEffect(() => { let mort = false; fetchVersementsVinted().then((m) => { if (!mort) setVersementsCoque(m); }).catch(() => { if (!mort) setVersementsCoque(null); }); return () => { mort = true; }; }, [ventesCoque]);
   const liveStatsVus = useMemo(() => {
@@ -73565,7 +73568,8 @@ function AppCoeur() {
         {/* (5 nov., chantier G, revue 2.24) UN seul écran « E-mails » : son onglet « Relier ma boîte » porte
             l'ancien sous-écran de Paramètres (`EmailsSetting` : aperçu, journal, adresses, à rattacher) sous
             l'accompagnement animé. Une demande venue d'ailleurs (`DEMANDE_ADRESSES`) l'ouvre directement. */}
-        {tab==='emails'&&<GardeEcran nom="emails"><Suspense fallback={<p role="status" style={{padding:20}}>{PAS_SU.enCours}</p>}><EcranEmails comptes={vintedAccounts} headers={sbAuth} delies={load('vrm_recus_delies',{})||{}} FermeAuRetour={FermeAuRetour}
+        {tab==='emails'&&<GardeEcran nom="emails"><Suspense fallback={<p role="status" style={{padding:20}}>{PAS_SU.enCours}</p>}><EcranEmails comptes={vintedAccounts} headers={sbAuth} delies={load('vrm_recus_delies',{})||{}} FermeAuRetour={FermeAuRetour} photoDe={photoEmailParTx}
+          ecrireLus={(g)=>ecrireEmailsLus(g,{url:SUPABASE_URL,entetes:sbAuth,avecOwner:withOwner,owner:AUTH.user&&AUTH.user.id,cloisonne:CLOISONNE})}
           vueInitiale={DEMANDE_ADRESSES.on?'relier':'boite'}
           reglages={<><AdressesSansCompte comptes={vintedAccounts}/><EmailsSetting onComptes={()=>setTab('vintedaccounts')}/></>}
           onAller={(u)=>{try{window.dispatchEvent(new CustomEvent('vrm:aller',{detail:u}));}catch(_){}}}
