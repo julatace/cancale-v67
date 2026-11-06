@@ -52,26 +52,29 @@ button.vrm-ios-rangee-zone:focus-visible { outline: 2px solid var(--vrm-accent, 
 .vrm-ios-valeur[data-ton="geste"] { color: var(--vrm-warn, #B25000); font-weight: 600; }
 .vrm-ios-chevron { flex: 0 0 auto; color: var(--vrm-muted, #6E6E73); opacity: .55; display: grid; place-items: center; }
 
-/* ── L'interrupteur d'iOS : 51 × 31, pouce blanc, piste verte NON — l'accent ── */
-.vrm-ios-switch {
-  position: relative; flex: 0 0 51px; width: 51px; height: 31px; min-height: 31px; padding: 0; margin: 0;
-  border: 0; border-radius: 999px; background: var(--vrm-line, #E5E5EA); cursor: pointer;
-  transition: background-color 200ms ease-out; box-shadow: none;
+/* ── L'interrupteur d'iOS : piste 51 × 31, pouce blanc, l'accent quand il est allumé ──
+   Mesuré le 6 nov. : la règle de base des boutons impose 44 px de haut au doigt — la piste
+   devenait un ovale de 51 × 44. Le BOUTON garde ses 44 px (la cible), la PISTE est son
+   ::before de 31 px, centrée. */
+:root body .vrm-ios-switch {
+  position: relative; flex: 0 0 51px; width: 51px; height: 44px; min-height: 44px; padding: 0; margin: 0;
+  border: 0; border-radius: 0; background: transparent !important; cursor: pointer; box-shadow: none;
 }
-.vrm-ios-switch::after { /* la cible au doigt : 44 px de haut sans pousser la rangée */
-  content: ''; position: absolute; inset: -7px -4px;
+.vrm-ios-switch::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 31px; margin-top: -15.5px; border-radius: 999px;
+  background: var(--vrm-line, #E5E5EA); transition: background-color 200ms ease-out;
 }
-.vrm-ios-switch[aria-checked="true"] { background: var(--vrm-accent, #0071E3); }
+.vrm-ios-switch[aria-checked="true"]::before { background: var(--vrm-accent, #0071E3); }
 .vrm-ios-switch:disabled { opacity: .45; cursor: default; }
 .vrm-ios-switch:active { transform: none; }
 .vrm-ios-switch-pouce {
-  position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff;
+  position: absolute; top: 50%; left: 2px; margin-top: -13.5px; width: 27px; height: 27px; border-radius: 50%; background: #fff;
   box-shadow: 0 3px 8px rgba(0,0,0,.15), 0 1px 1px rgba(0,0,0,.16), 0 3px 1px rgba(0,0,0,.06);
   transition: transform 240ms cubic-bezier(.32,.72,0,1);
 }
 .vrm-ios-switch[aria-checked="true"] .vrm-ios-switch-pouce { transform: translateX(20px); }
-.vrm-ios-switch:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: 2px; }
-@media (prefers-reduced-motion: reduce) { .vrm-ios-switch, .vrm-ios-switch-pouce { transition: none; } }
+.vrm-ios-switch:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: 2px; border-radius: 999px; }
+@media (prefers-reduced-motion: reduce) { .vrm-ios-switch::before, .vrm-ios-switch-pouce { transition: none; } }
 
 /* ── LE « ⓘ » : il SUIT le titre (jamais seul sur sa ligne), le texte s'ouvre en feuille ── */
 .vrm-main .vrm-pourquoi, .vrm-pourquoi { display: inline !important; width: auto; margin: 0; padding: 0; border: 0; background: none; }

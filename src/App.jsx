@@ -26641,7 +26641,8 @@ function EbayInactives({ comptesEbay, tick, vue = '*', connected, ventes, dejaSu
             <span className="vrm-eb-ina-titre">{l.title || l.itemId}</span>
             <span className="vrm-eb-ina-sous">
               {etatLigne ? <><span className="vrm-pastille-etat" data-ton={vendue || retraitAuto ? 'fin' : undefined} data-inactive-etat="1">{etatCourt}<span className="vrm-sr">{` · ${etatLigne}`}</span></span>{' '}</> : null}
-              <span style={{ color: n ? E.text : E.muted, fontWeight: n ? 600 : 400 }}>{n ? `N°${n}` : 'pas reliée'}</span>{' · '}
+              {/* « pas reliée » cède la place à la pastille (la fiche le redit dans son sous-titre). */}
+              {n ? <><span style={{ color: E.text, fontWeight: 600 }}>{`N°${n}`}</span>{' · '}</> : etatLigne ? null : <><span style={{ color: E.muted }}>pas reliée</span>{' · '}</>}
               {/* (revue) Le prix avec SA devise, la règle de la carte des annonces (§11). */}
               {Number.isFinite(prix) && prix > 0 ? <><span data-inactive-prix="1">{prixEbayTexte(prix, l.currency)}</span>{' · '}</> : ''}
               {finJour ? `${etatLigne ? '' : 'terminée le '}${jourParisTexte(finJour).replace(/^\S+ /, '')}` : 'date de fin inconnue'}

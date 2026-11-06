@@ -247,3 +247,7 @@ button.vrm-notice-zone:focus-visible { outline: 2px solid var(--vrm-accent, #007
   .vrm-main :is(.vrm-toutes-liste, .vrm-buy-list, .vrm-eb-ina-liste, .vrm-ann-grid.vrm-fiches, .vrm-ios-carte) > :nth-child(6) { animation-delay: 150ms; }
   .vrm-main :is(.vrm-toutes-liste, .vrm-buy-list, .vrm-eb-ina-liste, .vrm-ann-grid.vrm-fiches, .vrm-ios-carte) > :nth-child(n+7) { animation-delay: 180ms; }
 }
+/* La pastille d'une inactive vit dans sa ligne de détail : jamais coupée, le reste cède. */
+.vrm-eb-ina-sous .vrm-pastille-etat { max-width: none; margin-right: 6px; padding: 1px 7px; font-size: 12px; vertical-align: 1px; }
+/* (banc jetons-coherence J4, rouge d'avant ce chantier) Une phrase n'a pas de chiffres à colonnes. */
+:root body .vrm-main .vrm-colis-prochain-txt { font-variant-numeric: normal; }
