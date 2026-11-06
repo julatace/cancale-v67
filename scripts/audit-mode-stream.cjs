@@ -11,7 +11,8 @@
 //   3. « toutes les annonces qui contiennent… » cache la LIGNE ;
 //   4. un montant coupé en deux nœuds est caché ;
 //   5. l'app : le bouton « Stream » remplace l'œil des montants et la pastille
-//      rouge (§7), il est RENDU dans l'en-tête ; le programme est synchronisé
+//      rouge (§7), il est RENDU dans l'en-tête (6 nov. : seulement s'il est choisi
+//      dans les réglages ; sinon l'œil des montants revient) ; le programme est synchronisé
 //      (SYNC_KEYS), l'interrupteur propre à l'appareil ; la notification système
 //      passe par la règle ; l'ancien flou (streamFlou.js) n'existe plus ; le CSS
 //      floute lignes, bordereaux et QR.
@@ -92,7 +93,9 @@ async function audit(fichiers, bavard) {
   // ── 5. Le branchement dans l'app ──────────────────────────────────────────
   const app = fs.readFileSync(fichiers.app, 'utf8').replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, '');
   const html = fs.readFileSync(fichiers.html, 'utf8');
-  dit(!/data-bouton-montants|function BoutonMontants|<BoutonMontants/.test(app), '5.1 l\'œil « cacher les montants » est retiré');
+  // (6 nov.) Le bouton « Stream » n'apparaît que s'il est choisi dans les réglages ;
+  // sans lui, l'œil des montants revient (stream-photos, audit-stream-photos.cjs).
+  dit(/\(reglesStream\.bouton \|\| streamOn\) \? <BoutonStream\/>/.test(app) && /\(!reglesStream\.bouton \|\| montantsCaches\) \? <BoutonMontants\/>/.test(app), '5.1 l\'œil des montants ne revient que sans le bouton « Stream » (6 nov.)');
   dit(!/data-stream-pastille|function PastilleStream/.test(app), '5.2 la pastille ROUGE du stream est retirée (rouge = doublon de N° seulement)');
   dit((app.match(/<BoutonStream\/>/g) || []).length === 1 && /data-bouton-stream=""/.test(app), '5.3 le bouton « Stream » est RENDU, une fois, dans l\'en-tête');
   const sync = (/const SYNC_KEYS = \[([\s\S]*?)\];/.exec(app) || ['', ''])[1];
@@ -141,7 +144,8 @@ const MUTATIONS = [
   ['regle', "const cat = /^acheteurs/.test(nom) ? 'acheteurs' : 'comptes';", "const cat = 'comptes';", 'case pseudos sans effet'],
   ['regle', "if (r.adresses) { motifsI.push(EMAIL, TEL, RUE); motifsC.push(CP_VILLE); }", "if (r.adresses) { motifsI.push(EMAIL, TEL); }", 'adresses postales montrées'],
   ['regle', "if (r.numeros) motifsC.push(IBAN, CARTE, SIRET);", "", 'IBAN montré'],
-  ['app', 'className="vrm-sensible" data-stream-type="code" style={{fontSize:qrView.img?34:44', 'style={{fontSize:qrView.img?34:44', 'code en grand (QR) sans marqueur'],
+  // (6 nov.) Le code en grand a changé de forme (chantier D, « En grand ») : la mutation suit.
+  ['app', '<span className="vrm-eg-code-v vrm-sensible" data-stream-type="code">{qrView.code}</span>', '<span className="vrm-eg-code-v">{qrView.code}</span>', 'code en grand (QR) sans marqueur'],
   ['regle', "const m = R.montants ? masquerSuite(t, voisins) : t;", "const m = t.map((x) => R.montants ? masquerTexte(x) : x);", 'montant coupé en deux nœuds'],
   ['regle', "return /\\S/.test(s) ? s.replace(/\\S[\\s\\S]*\\S|\\S/, MASQUE) : s;", "return s;", 'bloc sensible montré'],
 ];

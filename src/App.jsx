@@ -202,7 +202,7 @@ import { libellePlage, phrasePlage } from "./periodeCalendrier.js";
 import { installerLecturesPartagees } from "./lecturesPartagees.js";
 import { installerFiltreSupprimes, sansComptesSupprimes, lireSupprimes, CLE_SUPPRIMES } from "./comptesSupprimes.js";
 import { lectureComplete, construirePhoto, ecrirePhoto, lirePhoto, listeDuSoir, joursAvantJour, heurePhoto, adresseQrLocale, CACHE_QR } from "./journeeHorsLigne.js";
-import { jetonsStream, demarrerStream, poserReglesStream, normaliserRegles, compilerRegle, masquerTexteStream, textePourStream, regleCourante, regleApercu, ligneACacher, CATEGORIES as STREAM_CATEGORIES, LISTES as STREAM_LISTES, nettoyerMots, CLE_STREAM, CLE_STREAM_REGLES, REGLES_DEFAUT as STREAM_DEFAUT } from "./modeStream.js";
+import { jetonsStream, demarrerStream, demarrerMontants, photoACacherSelon, poserReglesStream, normaliserRegles, compilerRegle, masquerTexteStream, textePourStream, regleCourante, regleApercu, ligneACacher, CATEGORIES as STREAM_CATEGORIES, LISTES as STREAM_LISTES, nettoyerMots, CLE_STREAM, CLE_STREAM_REGLES, REGLES_DEFAUT as STREAM_DEFAUT } from "./modeStream.js";
 import { DISCORD_ERREURS } from "./communaute/discordErreurs.js";
 import { ecouterPartage } from "./communaute/accompagnement.js";
 import { noterTicketDiscord, ecouterDiscord, suivreCodeDiscord, etatCodeDiscord, reprendreDiscord, oublierTicketDiscord } from "./communaute/discordAttente.js";
@@ -12528,24 +12528,39 @@ const LBC_ORANGE = '#EC5A13';
 let _reglesStreamEnAttente = null;
 const lireReglesStreamIci = () => _reglesStreamEnAttente || normaliserRegles(load(CLE_STREAM_REGLES, {}));
 const streamActif = () => {
-  try {
-    // (5 nov.) L'œil « cacher les montants » (4 nov.) allumé sur cet appareil ⇒ le
-    // mode stream l'est aussi (il cache les montants par défaut) — une fois.
-    if (localStorage.getItem(CLE_MONTANTS_CACHES) === '1') { localStorage.removeItem(CLE_MONTANTS_CACHES); localStorage.setItem(CLE_STREAM, '1'); }
-    return localStorage.getItem(CLE_STREAM) === '1';
-  } catch (_) { return false; }
+  try { return localStorage.getItem(CLE_STREAM) === '1'; } catch (_) { return false; }
 };
 const poserStream = (on) => {
   try { localStorage.setItem(CLE_STREAM, on ? '1' : '0'); } catch (_) {}
   try { demarrerStream(on); } catch (_) {}
   try { window.dispatchEvent(new CustomEvent('vrm:stream', { detail: !!on })); } catch (_) {}
 };
+// (6 nov.) L'ŒIL « cacher les montants » REVIENT quand le bouton « Stream » n'est
+// pas affiché (Julien, 6 nov. : le bouton n'apparaît que si on le choisit dans les
+// paramètres) — sans lui, on ne pourrait plus cacher ses chiffres d'un geste. La
+// même règle (src/modeStream.js), réduite aux montants. Propre à l'appareil
+// (`vrm_montants_caches`, la clé du 4 nov. : un appareil qui l'avait allumée le
+// retrouve). (La conversion « œil allumé ⇒ stream allumé » du 5 nov. est retirée :
+// l'œil existe de nouveau.)
+const montantsActif = () => {
+  try { const v = localStorage.getItem(CLE_MONTANTS_CACHES); return v === '1' || v === 'true'; } catch (_) { return false; }
+};
+const poserMontants = (on) => {
+  try { if (on) localStorage.setItem(CLE_MONTANTS_CACHES, '1'); else localStorage.removeItem(CLE_MONTANTS_CACHES); } catch (_) {}
+  try { demarrerMontants(on); } catch (_) {}
+  try { window.dispatchEvent(new CustomEvent('vrm:montants', { detail: !!on })); } catch (_) {}
+};
 // ⚠️ Posé AU CHARGEMENT du module, avant le premier rendu : allumé, aucune image
 //    ne montre ce qu'il a caché (pas d'attente d'un effet React).
-try { poserReglesStream(lireReglesStreamIci()); demarrerStream(streamActif()); } catch (_) {}
+try { poserReglesStream(lireReglesStreamIci()); demarrerMontants(montantsActif()); demarrerStream(streamActif()); } catch (_) {}
 const useStream = () => {
   const [on, setOn] = React.useState(streamActif);
   React.useEffect(() => { const f = (e) => setOn(!!(e && e.detail)); window.addEventListener('vrm:stream', f); return () => window.removeEventListener('vrm:stream', f); }, []);
+  return on;
+};
+const useMontantsCaches = () => {
+  const [on, setOn] = React.useState(montantsActif);
+  React.useEffect(() => { const f = (e) => setOn(!!(e && e.detail)); window.addEventListener('vrm:montants', f); return () => window.removeEventListener('vrm:montants', f); }, []);
   return on;
 };
 // Le programme, suivi : relu à l'arrivée du nuage et à chaque sauvegarde (un autre
@@ -15116,8 +15131,10 @@ function PhotoEditor({ refPhoto, refTitle, onClose, toast }) {
             </div>
           ) : (
             <div>
-              <div style={{display:'flex',justifyContent:'center'}}>
-                <canvas ref={canvasRef}
+              {/* (6 nov.) La photo recadrée est une photo d'article : en mode stream,
+                  floutée selon le titre de SA paire (src/modeStream.js). */}
+              <div style={{display:'flex',justifyContent:'center'}} data-stream-article={refTitle || ''}>
+                <canvas ref={canvasRef} data-stream-photo-cible=""
                   onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp}
                   onTouchStart={onDown} onTouchMove={onMove} onTouchEnd={onUp}
                   style={{width:'100%',maxWidth:DW,height:'auto',borderRadius:12,border:`1px solid ${C.border}`,background:'#fff',touchAction:'none',cursor:'grab'}}/>
@@ -20513,7 +20530,7 @@ function PhotoArticleAgrandissable({src,titre,children}) {
     <button ref={bouton} type="button" className="vrm-photo-open" aria-label={`Agrandir la photo de ${titre || 'cet article'}`} onClick={()=>{ const image=bouton.current?.querySelector('img'); setAffichee(image?.complete&&image.naturalWidth>0?image.currentSrc:url);setOuverte(true); }}>{children}<span aria-hidden="true"><Icon name="search" size={12}/></span></button>
     {ouverte && createPortal(<div className="vrm-photo-viewer" onClick={()=>setOuverte(false)} onKeyDown={e=>{if(e.key==='Escape'){e.stopPropagation();setOuverte(false);}if(e.key==='Tab'){e.preventDefault();fermer.current?.focus();}}}>
       <FermeAuRetour fermer={()=>setOuverte(false)}/>
-      <div role="dialog" aria-modal="true" aria-label={`Photo de ${titre || 'l’article'}`} className="vrm-photo-panel" onClick={e=>e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" aria-label={`Photo de ${titre || 'l’article'}`} className="vrm-photo-panel" data-stream-article={titre || ''} onClick={e=>e.stopPropagation()}>
         <div><span>{titre || 'Photo de l’article'}</span><button className="vrm-icon-control" ref={fermer} type="button" aria-label="Fermer la photo" onClick={()=>setOuverte(false)}><Icon name="close" size={22}/></button></div>
         <PhotoVinted src={affichee || url} alt={titre || 'Article'} style={{width:'100%',height:'100%',objectFit:'contain',minHeight:0}}/>
       </div>
@@ -66500,6 +66517,9 @@ const STREAM_AIDE_LISTE = {
   contient: 'La ligne entière (texte et photo) est cachée.',
 };
 const STREAM_EX_LISTE = { marques: 'Ex. une marque', prefixes: 'Ex. les 3 premières lettres', contient: 'Ex. un modèle' };
+// (6 nov.) La photo d'EXEMPLE de l'aperçu : une chaussure dessinée, un « LOGO »
+// inventé — jamais une vraie photo de ses annonces dans une démonstration.
+const STREAM_PHOTO_EXEMPLE = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 90"><rect width="120" height="90" fill="#e8ecf2"/><path d="M12 62c0-6 4-10 10-11l24-5c6-1 10-6 14-11l6-7c3-3 8-2 10 1l5 9c3 5 9 8 15 9l9 2c5 1 8 5 8 10v5H12z" fill="#1d1d1f"/><rect x="12" y="66" width="101" height="8" rx="4" fill="#fff" stroke="#1d1d1f" stroke-width="2"/><text x="44" y="60" font-family="Arial,Helvetica,sans-serif" font-weight="700" font-size="12" fill="#fff">LOGO</text></svg>');
 function ListeMotsStream({ id, titre, mots, onChange }) {
   const [saisie, setSaisie] = React.useState('');
   const ajouter = () => {
@@ -66538,6 +66558,12 @@ function ReglagesStream() {
   // programme affiché. Une ligne « annonce entière » se cache d'un bloc.
   const R = regleApercu(regles, { comptes_apercu: ['ton_compte'], acheteurs_apercu: ['acheteur_exemple'] });
   const marque = regles.marques[0] || 'Marque';
+  // (6 nov.) Les photos de l'aperçu : la MÊME règle (`photoACacherSelon`). Sans
+  // aucun mot programmé, l'aperçu prend « Marque » pour exemple (dit sous les photos).
+  const sansMot = !regles.marques.length && !regles.prefixes.length && !regles.contient.length;
+  const Rp = sansMot ? regleApercu({ ...regles, marques: ['Marque'] }, {}) : R;
+  const motPhoto = regles.marques[0] || regles.contient[0] || (regles.prefixes[0] ? regles.prefixes[0] + 'ina' : 'Marque');
+  const photosEx = [`${motPhoto} Air Max 90 · taille 42`, 'Autre paire · taille 41'];
   const lignes = [
     `${marque} Air Max 90 · taille 42 · 89,00 €`,
     'Vendue sur ton_compte à acheteur_exemple',
@@ -66551,8 +66577,15 @@ function ReglagesStream() {
     <div className="vrm-stream-reglages" data-stream-reglages="">
       <div className="vrm-set-ligne" data-stream-reglage={on ? 'on' : 'off'}>
         <IconeReglage name="stream"/>
-        <span className="vrm-set-lib"><b style={{color:C.text}}>Mode stream</b><small style={{color:C.muted}}>Sur cet appareil. Le bouton « Stream » en haut de l’écran fait la même chose.</small></span>
+        <span className="vrm-set-lib"><b style={{color:C.text}}>Mode stream</b><small style={{color:C.muted}}>{regles.bouton ? 'Sur cet appareil. Le bouton « Stream » en haut de l’écran fait la même chose.' : 'Sur cet appareil.'}</small></span>
         <Interrupteur on={on} label="Mode stream" onClick={() => poserStream(!on)}/>
+      </div>
+      {/* (6 nov.) Julien : « pour le bouton stream tu peux faire une option qui
+          n'apparaît que si on le sélectionne dans les paramètres ». Éteint par défaut ;
+          synchronisé avec le programme. Sans lui, l'œil en haut cache les montants. */}
+      <div className="vrm-set-ligne" data-stream-option="bouton" data-stream-bouton={regles.bouton ? '1' : '0'}>
+        <span className="vrm-set-lib"><b style={{color:C.text}}>Afficher le bouton Stream</b><small style={{color:C.muted}}>{regles.bouton ? 'En haut de l’écran, à la place de l’œil des montants.' : 'Sinon, l’œil en haut de l’écran cache les montants.'}{on && !regles.bouton ? ' Le bouton reste affiché tant que le mode stream est allumé.' : ''}</small></span>
+        <Interrupteur on={!!regles.bouton} label="Afficher le bouton Stream" onClick={() => changer({ bouton: !regles.bouton })}/>
       </div>
       <h3 className="vrm-stream-h" style={{color:C.muted}}>Ce qui est caché</h3>
       <div className="vrm-stream-cats">
@@ -66565,12 +66598,38 @@ function ReglagesStream() {
       </div>
       <h3 className="vrm-stream-h" style={{color:C.muted}}>Tes mots</h3>
       {STREAM_LISTES.map(([k, lib]) => <ListeMotsStream key={k} id={k} titre={lib} mots={regles[k]} onChange={(l) => changer({ [k]: l })}/>)}
+      {/* (6 nov.) Julien : « je veux que on puisse aussi flouter les photos en lien
+          avec ce que on veut cacher ». La règle des photos est celle du texte
+          (src/modeStream.js, `photoACacherSelon`). */}
+      <h3 className="vrm-stream-h" style={{color:C.muted}}>Photos</h3>
+      <div className="vrm-stream-cats">
+        <div className="vrm-set-ligne" data-stream-option="photos" data-stream-cache={regles.photos ? '1' : '0'}>
+          <span className="vrm-set-lib"><b style={{color:C.text}}>Flouter aussi les photos</b><small style={{color:C.muted}}>Les photos des articles qui ont une de tes marques ou un de tes mots.</small></span>
+          <Interrupteur on={!!regles.photos} label="Flouter aussi les photos" onClick={() => changer({ photos: !regles.photos })}/>
+        </div>
+        <div className="vrm-set-ligne" data-stream-option="photosToutes" data-stream-cache={regles.photosToutes ? '1' : '0'}>
+          <span className="vrm-set-lib"><b style={{color:C.text}}>Flouter toutes les photos</b><small style={{color:C.muted}}>Toutes les photos d’articles, quels que soient tes mots.</small></span>
+          <Interrupteur on={!!regles.photosToutes} label="Flouter toutes les photos" onClick={() => changer({ photosToutes: !regles.photosToutes })}/>
+        </div>
+      </div>
       <h3 className="vrm-stream-h" style={{color:C.muted}}>Aperçu</h3>
       <div className="vrm-stream-apercu" data-stream-apercu="" style={{background:C.bg,border:`1px solid ${C.border}`}}>
         {lignes.map((t, i) => {
           const entiere = ligneACacher(t, R);
           return <div key={i} className="vrm-stream-apercu-l" data-apercu-entiere={entiere ? '1' : '0'} style={{color:C.text}}>{entiere ? '•••' : masquerTexteStream(t, R)}</div>;
         })}
+      </div>
+      <div className="vrm-stream-photos-apercu" data-stream-libre="" data-stream-apercu-photos="">
+        {photosEx.map((t) => {
+          const floue = photoACacherSelon(t, Rp);
+          return (
+            <figure key={t} className="vrm-stream-apercu-photo" data-apercu-photo={floue ? 'floue' : 'nette'}>
+              <span style={{border:`1px solid ${C.border}`}}><img src={STREAM_PHOTO_EXEMPLE} alt="" width={120} height={90}/></span>
+              <figcaption style={{color:C.muted}}>{masquerTexteStream(t, Rp)}</figcaption>
+            </figure>
+          );
+        })}
+        <small style={{color:C.muted}}>{sansMot ? 'Exemple avec la marque « Marque ». ' : ''}{regles.photosToutes ? 'Toutes les photos sont floutées.' : regles.photos ? 'Photo inventée : floutée quand l’article a un de tes mots.' : 'Les photos ne sont pas floutées.'}</small>
       </div>
       <textarea className="vrm-stream-essai" value={essai} onChange={(e) => setEssai(e.target.value)} rows={2} placeholder="Essaie un texte : il s’affiche ci-dessus comme à l’écran" aria-label="Essayer un texte"
         style={{background:C.bg,color:C.text,border:`1px solid ${C.border}`}}/>
@@ -66589,6 +66648,19 @@ function BoutonStream() {
       <Icon name="stream" size={21}/>
       <span className="vrm-hbtn-stream-lib">Stream</span>
       {on && <span className="vrm-hbtn-stream-pt" aria-hidden="true"/>}
+    </button>
+  );
+}
+// (6 nov.) L'ŒIL « cacher les montants » (4 nov.) REVIENT quand le bouton
+// « Stream » n'est pas affiché (réglage éteint par défaut) : sans lui, plus aucun
+// moyen de cacher ses chiffres d'un geste. La même règle, réduite aux montants.
+function BoutonMontants() {
+  const cache = useMontantsCaches();
+  const lib = cache ? 'Montrer les montants' : 'Cacher les montants';
+  return (
+    <button className="vrm-hbtn" type="button" data-bouton-montants="" data-montants-caches={cache ? '1' : '0'} data-stream-libre=""
+      aria-pressed={cache} aria-label={lib} title={lib} onClick={() => poserMontants(!cache)}>
+      <Icon name={cache ? 'eyeOff' : 'eye'} size={21}/>
     </button>
   );
 }
@@ -69372,7 +69444,9 @@ function AppCoeur() {
   const streamOn = useStream();
   // (5 nov.) Le programme synchronisé est suivi ICI, pas seulement dans Réglages :
   // le nuage qui arrive (un autre appareil l'a changé) change la règle tout de suite.
-  useReglesStream();
+  // (6 nov.) Il dit aussi si le bouton « Stream » s'affiche (`bouton`).
+  const reglesStream = useReglesStream();
+  const montantsCaches = useMontantsCaches();
   const entreprise = useEntreprise();
   React.useEffect(() => { demarrerStream(streamOn); }, [streamOn]);
   // (5 nov.) Les pseudos des acheteurs eBay, et les noms de ses comptes Leboncoin
@@ -71312,8 +71386,14 @@ function AppCoeur() {
                 écrans (Julien, 5 octobre). Voir `EtatActions`. */}
             {MULTI_USER && <EtatActions onNav={setTab} ordi={ordi} sombre={eD} comptes={!accountsLoaded ? undefined : baseKO ? null : vintedAccounts}/>}
             {/* (5 nov.) « Stream » remplace l'œil des montants : la règle programmée
-                (src/modeStream.js) cache montants, marques, comptes, pseudos… */}
-            <BoutonStream/>
+                (src/modeStream.js) cache montants, marques, comptes, pseudos…
+                (6 nov.) Le bouton n'apparaît que s'il est choisi dans Réglages → Mode
+                stream (« Afficher le bouton Stream », éteint par défaut). Allumé, il
+                RESTE tant que le mode stream l'est (le décocher en filmant ne doit pas
+                tout montrer d'un coup, ni laisser le mode sans bouton pour l'éteindre).
+                Sans lui, l'œil des montants revient (et reste tant qu'il est allumé). */}
+            {(reglesStream.bouton || streamOn) ? <BoutonStream/> : null}
+            {(!reglesStream.bouton || montantsCaches) ? <BoutonMontants/> : null}
             {/* (5 nov.) La cloche : ce que VRM a envoyé (src/CentreNotifs.jsx). */}
             {AUTH.user && <CentreNotifsCoque onReglages={()=>setTab('settings')}/>}
             {!ordi && <button className="vrm-hbtn" type="button" data-recherche-zone="" data-recherche-loupe="" onClick={()=>{ if(gsOpen) fermerRecherche(); else ouvrirRecherche(); }} title="Rechercher" aria-label="Rechercher une paire" aria-expanded={gsOpen} aria-controls="vrm-recherche-resultats">

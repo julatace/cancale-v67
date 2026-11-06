@@ -50,9 +50,16 @@ export const LISTES = [
 ];
 const MAX_MOTS = 60, MIN_MOT = 2, MAX_LONG = 40;
 
+// (6 nov.) Trois réglages qui ne sont pas des catégories du texte :
+//   · `bouton` : le bouton « Stream » de l'en-tête — ÉTEINT par défaut (Julien,
+//     6 nov. : « une option qui n'apparaît que si on le sélectionne dans les
+//     paramètres ») ; seul un `true` explicite le montre ;
+//   · `photos` : flouter les photos des articles concernés par SES mots — ALLUMÉ
+//     par défaut (« pas su » ne montre rien) ; seul un `false` explicite l'éteint ;
+//   · `photosToutes` : flouter TOUTES les photos d'article — seul un `true` explicite.
 export const REGLES_DEFAUT = Object.freeze({
   v: 1, montants: true, comptes: true, acheteurs: true, adresses: true, numeros: true, codes: true, bordereaux: true,
-  marques: [], prefixes: [], contient: [],
+  marques: [], prefixes: [], contient: [], bouton: false, photos: true, photosToutes: false,
 });
 
 // Un mot de liste : sans espaces autour, 2 à 40 caractères, sans doublon (casse ignorée).
@@ -76,6 +83,9 @@ export function normaliserRegles(r) {
   const out = { v: 1 };
   for (const [k] of CATEGORIES) out[k] = s[k] !== false;
   for (const [k] of LISTES) out[k] = nettoyerMots(s[k]);
+  out.bouton = s.bouton === true;
+  out.photos = s.photos !== false;
+  out.photosToutes = s.photosToutes === true;
   return out;
 }
 
@@ -138,8 +148,51 @@ export function compilerRegle(regles, groupes) {
     reMots: reSur(mots.length ? `(^|[^${L}])((?:${tri(r.marques).map(motif).join('|') || '(?!)'})(?![${L}])|(?:${tri(r.contient).map(motif).join('|') || '(?!)'})[${L}'’_-]*)` : '', 'giu'),
     rePrefixes: reSur(r.prefixes.length ? `(^|[^${L}])((?:${tri(r.prefixes).map(motif).join('|')})[${L}'’_.-]*)` : '', 'giu'),
     reLigne: reSur(r.contient.length ? `(^|[^${L}])(?:${tri(r.contient).map(motif).join('|')})` : '', 'iu'),
+    // (6 nov.) LES PHOTOS — la MÊME source que le texte : ses marques (mot entier),
+    // ses « commence par… » et ses « annonce entière qui contient… », avec les mêmes
+    // motifs. Une photo d'article est floutée quand le texte de SON article tombe
+    // sous l'un d'eux (`photoACacherSelon`). Les pseudos et noms de comptes n'en
+    // font pas partie : ils s'écrivent sur presque chaque ligne (la catégorie
+    // « comptes » est cochée par défaut) et auraient flouté toutes les photos —
+    // c'est le rôle de « Flouter toutes les photos ».
+    rePhoto: reSur(mots.length || r.prefixes.length ? `(^|[^${L}])(?:${[
+      ...(r.marques.length ? [`(?:${tri(r.marques).map(motif).join('|')})(?![${L}])`] : []),
+      ...(r.contient.length ? [`(?:${tri(r.contient).map(motif).join('|')})`] : []),
+      ...(r.prefixes.length ? [`(?:${tri(r.prefixes).map(motif).join('|')})`] : []),
+    ].join('|')})` : '', 'iu'),
+    photos: r.photos, photosToutes: r.photosToutes,
+    _memoPhoto: new Map(),
     regles: r,
   };
+}
+
+// (6 nov.) Le texte d'un ARTICLE : une phrase, ou une fiche (titre, marque,
+// description, compte…) dont on prend les textes — jamais une adresse de photo
+// (« …/nike-air.jpg » n'est pas l'article).
+export function texteArticle(article, profondeur = 0) {
+  if (article == null || profondeur > 3) return '';
+  if (typeof article === 'string') return /^(https?:|blob:|data:)/i.test(article.trim()) ? '' : article;
+  if (typeof article === 'number') return String(article);
+  if (Array.isArray(article)) return article.map((x) => texteArticle(x, profondeur + 1)).filter(Boolean).join(' · ');
+  if (typeof article === 'object') return Object.values(article).map((x) => texteArticle(x, profondeur + 1)).filter(Boolean).join(' · ');
+  return '';
+}
+
+// (6 nov.) CETTE PHOTO D'ARTICLE EST-ELLE À FLOUTER, selon la règle `R` ?
+// « Flouter toutes les photos » ⇒ oui ; « Flouter aussi les photos » éteint ⇒ non ;
+// sinon : le texte de l'article tombe sous un mot du programme (marque, « commence
+// par… », « annonce entière qui contient… »). Même règle compilée que le texte.
+export function photoACacherSelon(article, R) {
+  if (!R) return false;
+  if (R.photosToutes) return true;
+  if (!R.photos || !R.rePhoto) return false;
+  const t = texteArticle(article);
+  if (!t) return false;
+  const memo = R._memoPhoto;
+  if (memo) { const d = memo.get(t); if (d !== undefined) return d; }
+  const oui = R.rePhoto.test(t);
+  if (memo) { if (memo.size > 5000) memo.clear(); memo.set(t, oui); }
+  return oui;
 }
 
 // Tout ce qui n'est pas un montant, dans un texte seul.
@@ -189,10 +242,20 @@ const _groupes = new Map();
 let _regles = REGLES_DEFAUT;
 let _R = null;
 let _actif = false;
+// (6 nov.) L'ŒIL « cacher les montants » revient quand le bouton « Stream » est
+// caché (réglage `bouton` éteint) : la MÊME règle, réduite aux montants (aucun
+// pseudo, aucune marque, aucune photo). Propre à l'appareil, comme le stream.
+let _montantsSeuls = false;
 let _retirer = null;
 const recompiler = () => { _R = compilerRegle(_regles, _groupes); };
+const R_MONTANTS = compilerRegle({ montants: true, comptes: false, acheteurs: false, adresses: false, numeros: false, codes: false, bordereaux: false, photos: false }, {});
+R_MONTANTS.seulMontants = true;
 
 export function regleCourante() { if (!_R) recompiler(); return _R; }
+// La règle posée sur la page : le programme en mode stream, les montants seuls
+// avec l'œil, rien sinon.
+export function regleEffective() { return _actif ? regleCourante() : _montantsSeuls ? R_MONTANTS : null; }
+export function montantsSeulsAllumes() { return _montantsSeuls; }
 // L'aperçu : la règle d'un programme pas encore enregistré, avec les jetons connus
 // et ceux d'EXEMPLE (jamais un vrai pseudo dans une démonstration).
 export function regleApercu(regles, exemples) {
@@ -203,9 +266,16 @@ export function regleApercu(regles, exemples) {
 export function streamAllume() { return _actif; }
 
 // Un texte à montrer HORS de la page (notification système, titre d'onglet) :
-// caché si le mode stream est allumé.
+// caché si le mode stream est allumé (ou les montants seuls, avec l'œil).
 export function textePourStream(texte) {
-  return _actif ? masquerTexteStream(texte, regleCourante()) : String(texte == null ? '' : texte);
+  const R = regleEffective();
+  return R ? masquerTexteStream(texte, R) : String(texte == null ? '' : texte);
+}
+
+// (6 nov.) La photo de cet article, à l'écran, MAINTENANT : floutée seulement en
+// mode stream (jamais avec l'œil des montants, jamais éteint).
+export function photoACacher(article) {
+  return _actif ? photoACacherSelon(article, regleCourante()) : false;
 }
 
 // Les écrans publient les jetons qu'ils connaissent (pseudos de ses comptes, des
@@ -232,21 +302,24 @@ function poserAttributs() {
   if (typeof document === 'undefined') return;
   const d = document.documentElement;
   try {
-    d.setAttribute('data-stream', _actif ? '1' : '0');
+    // '1' : mode stream · 'm' : l'œil, les montants seuls · '0' : rien.
+    d.setAttribute('data-stream', _actif ? '1' : _montantsSeuls ? 'm' : '0');
     const R = regleCourante();
     if (_actif && R.bordereaux) d.setAttribute('data-stream-bordereaux', '1'); else d.removeAttribute('data-stream-bordereaux');
     if (_actif && R.codes) d.setAttribute('data-stream-codes', '1'); else d.removeAttribute('data-stream-codes');
   } catch (_) {}
 }
 
-export function demarrerStream(on) {
-  _actif = !!on;
+function appliquer() {
   poserAttributs();
   if (typeof document === 'undefined' || !document.body) return;
-  if (_actif && !_retirer) _retirer = installerStream(document.body, regleCourante);
-  else if (_actif && _retirer) _retirer.repasser();
-  if (!_actif && _retirer) { const r = _retirer; _retirer = null; r.arreter(); }
+  const on = _actif || _montantsSeuls;
+  if (on && !_retirer) _retirer = installerStream(document.body, () => regleEffective() || R_MONTANTS);
+  else if (on && _retirer) _retirer.repasser();
+  if (!on && _retirer) { const r = _retirer; _retirer = null; r.arreter(); }
 }
+export function demarrerStream(on) { _actif = !!on; appliquer(); }
+export function demarrerMontants(on) { _montantsSeuls = !!on; appliquer(); }
 
 // ── LA COUCHE DOM ───────────────────────────────────────────────────────────
 // (Les `<option>` d'un menu SONT montrées : leur texte suit la règle ; la valeur ne change pas.)
@@ -292,6 +365,8 @@ function ligneDe(el, racine) {
 // `data-stream-type="acheteur"` suit la case des pseudos, `"code"` celle des codes,
 // `"compte"` celle de ses comptes ; sans type, toujours caché).
 function enBloc(el, R) {
+  // (6 nov.) L'œil des montants ne cache QUE les montants : aucun bloc.
+  if (R && R.seulMontants) return false;
   for (let e = el; e; e = e.parentElement) {
     if (e.hasAttribute(NOTRE_LIGNE)) return true;
     if (e.classList && e.classList.contains('vrm-sensible')) {
@@ -305,6 +380,44 @@ function enBloc(el, R) {
   return false;
 }
 
+// ── (6 nov.) LES PHOTOS D'ARTICLE ─────────────────────────────────────────
+// Une photo d'article : une image d'adresse distante, `blob:` ou `data:` (vignettes
+// d'annonces, ventes, achats, colis, messages, fiches, stock, eBay, Leboncoin,
+// Vestiaire, la visionneuse « Agrandir »), ou un élément marqué à la main
+// (`data-stream-photo-cible`). PAS une photo : les logos de VRM et des sites
+// (fichiers de l'app, `.vrm-brand-icon`…), les QR et bordereaux (déjà floutés
+// selon leurs cases, `data-stream-image`), le QR de la double vérification.
+const PHOTO = 'img, [data-stream-photo-cible]';
+const NOTRE_PHOTO = 'data-stream-photo';
+function estPhotoArticle(el) {
+  if (el.hasAttribute('data-stream-photo-cible')) return true;
+  if (el.closest('[data-stream-libre], [data-stream-image], [data-mfa-qr]')) return false;
+  if (el.matches('.vrm-brand-icon, .vrm-brand-asset, .vrm-logo')) return false;
+  const alt = el.getAttribute('alt') || '';
+  if (/^QR\b/.test(alt)) return false;
+  const src = el.getAttribute('src') || '';
+  return /^(https?:|blob:|data:image\/)/i.test(src);
+}
+// Le texte de l'ARTICLE d'une photo : celui que l'écran a posé à la main
+// (`data-stream-article` : la visionneuse, une fiche), sinon le texte de SA ligne
+// (carte d'annonce, vente, colis, conversation — `ligneDe`, la règle des lignes
+// entières), sinon le premier ancêtre proche qui porte du texte. Toujours le texte
+// d'ORIGINE (avant « ••• ») — `texteDe` le relit.
+function articleDe(img, racine, texteDe, altDe) {
+  const alt = altDe(img);
+  const marque = img.closest('[data-stream-article]');
+  if (marque) return (marque.getAttribute('data-stream-article') || '') + ' · ' + alt;
+  const l = ligneDe(img, racine);
+  if (l && l !== img) { const t = texteDe(l); if (/\S/.test(t)) return t + ' · ' + alt; }
+  let e = (l || img).parentElement;
+  for (let i = 0; e && e !== racine && i < 6; i++, e = e.parentElement) {
+    if (/^(MAIN|BODY|HTML)$/.test(e.tagName)) break;
+    const t = texteDe(e);
+    if (/\S/.test(t)) return t + ' · ' + alt;
+  }
+  return alt;
+}
+
 // Pose la règle sur `racine` (document.body) ; rend { arreter, repasser }.
 // `lire()` rend la règle compilée du moment.
 export function installerStream(racine, lire) {
@@ -313,14 +426,18 @@ export function installerStream(racine, lire) {
   const origine = new Map();   // nœud de texte → { o, m }
   // (revue du 5 nov.) Les attributs qui S'AFFICHENT : l'infobulle `title` et le
   // texte d'attente d'un champ (`placeholder` : « achat 35 € (auto) » se lisait).
-  const ATTRS = ['title', 'placeholder'];
+  // (6 nov.) Et le texte alternatif d'une image (`alt` : « Photo de Nike Air Max »
+  // se lisait au lecteur d'écran et dans une capture du DOM).
+  // `aria-label` : ce que dit le lecteur d'écran (« Agrandir la photo de Nike… »).
+  const ATTRS = ['title', 'placeholder', 'alt', 'aria-label'];
   const titres = new Map();    // « attribut » → Map(élément → { o, m })
   for (const a of ATTRS) titres.set(a, new Map());
   const lignes = new Set();
   const flous = new Set();
+  const photos = new Set();
   let arrete = false;
   const obs = new MutationObserver(() => passer());
-  const brancher = () => obs.observe(racine, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['title', 'placeholder', 'value'] });
+  const brancher = () => obs.observe(racine, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['title', 'placeholder', 'value', 'alt', 'aria-label', 'src', 'data-stream-article'] });
   const passer = () => {
     if (arrete) return;
     obs.disconnect();
@@ -350,14 +467,46 @@ export function installerStream(racine, lire) {
         else if (origine.has(n)) { if (n.nodeValue !== textes[i]) n.nodeValue = textes[i]; origine.delete(n); }
       }
       for (const n of origine.keys()) if (!n.isConnected) origine.delete(n);
-      // 3. Les attributs affichés (`title` au survol, `placeholder` dans un champ vide).
+      // 2 bis. (6 nov.) Les photos d'article : floutées quand SON article tombe sous
+      //    la règle (`photoACacherSelon`, la même règle compilée que le texte).
+      const aFlouter = new Set();
+      if (R.photosToutes || (R.photos && R.rePhoto)) {
+        const orig = new Map();
+        for (let i = 0; i < noeuds.length; i++) orig.set(noeuds[i], textes[i]);
+        const cache = new Map();
+        const texteDe = (el) => {
+          let t = cache.get(el);
+          if (t !== undefined) return t;
+          const parts = [];
+          const w2 = doc.createTreeWalker(el, 4);
+          for (let n = w2.nextNode(); n; n = w2.nextNode()) { const o = orig.get(n); parts.push(o !== undefined ? o : (n.nodeValue || '')); if (parts.length > 400) break; }
+          t = parts.join(' ');
+          cache.set(el, t);
+          return t;
+        };
+        const altCarte = titres.get('alt');
+        const altDe = (el) => { const d = altCarte.get(el), cur = el.getAttribute('alt') || ''; return d && cur === d.m ? d.o : cur; };
+        for (const el of racine.querySelectorAll(PHOTO)) {
+          if (!estPhotoArticle(el)) continue;
+          if (R.photosToutes || photoACacherSelon(articleDe(el, racine, texteDe, altDe), R)) aFlouter.add(el);
+        }
+      }
+      for (const el of photos) if (!aFlouter.has(el)) el.removeAttribute(NOTRE_PHOTO);
+      for (const el of aFlouter) if (!el.hasAttribute(NOTRE_PHOTO)) el.setAttribute(NOTRE_PHOTO, '');
+      photos.clear(); for (const el of aFlouter) photos.add(el);
+      // 3. Les attributs affichés (`title` au survol, `placeholder` dans un champ vide,
+      //    `alt` d'une image).
       for (const a of ATTRS) {
         const carte = titres.get(a), vus = new Set();
         for (const el of racine.querySelectorAll('[' + a + ']')) {
           if (el.closest('[data-stream-libre]')) continue;
           const d = carte.get(el), cur = el.getAttribute(a);
           const o = d && cur === d.m ? d.o : cur;
-          const v = enBloc(el, R) ? toutMasquer(o) : masquerTexteStream(o, R);
+          // Le texte alternatif d'un QR (« QR de retrait ») ne dit rien de secret ; il
+          // reste tel quel (le CSS le reconnaît à son début).
+          if (a === 'alt' && /^QR\b/.test(o)) { if (d) carte.delete(el); continue; }
+          // Une photo floutée ne garde aucun texte alternatif lisible.
+          const v = enBloc(el, R) || (a === 'alt' && photos.has(el)) ? toutMasquer(o) : masquerTexteStream(o, R);
           vus.add(el);
           if (v !== o) { carte.set(el, { o, m: v }); if (cur !== v) el.setAttribute(a, v); }
           else if (d) { if (cur !== o) el.setAttribute(a, o); carte.delete(el); }
@@ -394,7 +543,8 @@ export function installerStream(racine, lire) {
       for (const [a, carte] of titres) for (const [el, d] of carte) if (el.isConnected && el.getAttribute(a) === d.m) el.setAttribute(a, d.o);
       for (const l of lignes) l.removeAttribute(NOTRE_LIGNE);
       for (const c of flous) c.removeAttribute(NOTRE_FLOU);
-      origine.clear(); for (const carte of titres.values()) carte.clear(); lignes.clear(); flous.clear();
+      for (const el of photos) el.removeAttribute(NOTRE_PHOTO);
+      origine.clear(); for (const carte of titres.values()) carte.clear(); lignes.clear(); flous.clear(); photos.clear();
     },
   };
 }
