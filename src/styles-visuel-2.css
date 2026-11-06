@@ -145,10 +145,12 @@ html body .vrm-app-shell .vrm-main .vrm-eb-prix { font-size: var(--vrm-t17); fon
    gris identiques ; « … » reste au gris secondaire. Toujours 44 px au doigt. */
 html body .vrm-app-shell .vrm-main .vrm-eb-gestes .vrm-b[data-relier-ouvrir] {
   background: transparent !important; border: 0 !important; box-shadow: none !important; color: var(--vrm-ink) !important;
-  padding: 0 6px 0 8px !important; gap: 5px; font-size: var(--vrm-t15) !important; font-weight: 600 !important;
+  padding: 0 4px 0 6px !important; gap: 4px; font-size: 14px !important; font-weight: 600 !important; min-width: 0 !important;
 }
+/* « … » : 44 × 44 sans marge intérieure, le titre de la paire garde la place. */
+html body .vrm-app-shell .vrm-main .vrm-eb-gestes .vrm-b[data-ebay-carte-plus] { min-width: 44px !important; width: 44px; padding: 0 !important; }
 html body .vrm-app-shell .vrm-main .vrm-eb-gestes .vrm-b[data-relier-ouvrir]::before {
-  content: ''; width: 15px; height: 15px; flex: none; background: currentColor; opacity: .55;
+  content: ''; width: 13px; height: 13px; flex: none; background: currentColor; opacity: .55;
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.5 1.5'/%3E%3Cpath d='M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.5-1.5'/%3E%3C/svg%3E") center / contain no-repeat;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.5 1.5'/%3E%3Cpath d='M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.5-1.5'/%3E%3C/svg%3E") center / contain no-repeat;
 }
@@ -218,7 +220,7 @@ html body .vrm-app-shell .vrm-main .vrm-market-space .vrm-screen-head h2.vrm-dis
 html body .vrm-app-shell .vrm-main :is(.vrm-rpf-section-titre, .vrm-eb-inactives-titre) { font-size: var(--vrm-t22) !important; font-weight: 700 !important; letter-spacing: -.022em !important; line-height: 1.2; }
 html body .vrm-app-shell .vrm-main .vrm-rpf-section-n { font-size: var(--vrm-t17); font-weight: 400; color: var(--vrm-muted); font-variant-numeric: tabular-nums; }
 /* ══ 5. LE CHIFFRE QUI ROULE (CarteMois → ChiffreRoule) ═══════════════════ */
-.vrm-roule { display: inline-block; }
+.vrm-roule, .vrm-fu-carte[data-fu-colis-retirer] .vrm-fu-case span.vrm-roule { display: inline-block; font: inherit !important; color: inherit; letter-spacing: inherit; }
 @media (prefers-reduced-motion: no-preference) {
   @keyframes vrm-chiffre-monte { from { opacity: 0; transform: translateY(.4em); filter: blur(3px); } to { opacity: 1; transform: none; filter: none; } }
   .vrm-roule.is-neuf { animation: vrm-chiffre-monte 380ms var(--vrm-sortie) both; }
