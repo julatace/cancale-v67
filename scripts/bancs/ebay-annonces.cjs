@@ -333,7 +333,9 @@ const lire = (pg) => pg.evaluate(() => {
     offres: [...document.querySelectorAll('[data-offre-ouvrir]')].map((e) => ({ id: e.getAttribute('data-offre-ouvrir'), t: e.textContent })),
     relierBtn: a('[data-relier-ouvrir]', 'data-relier-ouvrir'),
     sansObs: document.querySelectorAll('[data-ebay-sans-observateur]').length,
-    sansObsTxt: (txt.match(/pas d.observateur à qui l.envoyer/g) || []).length,
+    // (6 nov., v36-visuel) La phrase entière vit derrière le « ⓘ » de la ligne (une ligne visible) :
+    // on la compte dans le TEXTE de l'écran (textContent), une fois, jamais sur une carte.
+    sansObsTxt: (((document.querySelector('.vrm-main') || document.body).textContent || '').match(/pas d.observateur à qui l.envoyer/g) || []).length,
     pasSu: [...document.querySelectorAll('[data-ebay-pas-su]')].map((e) => e.textContent),
     pasReliee: (txt.match(/pas reliée/g) || []).length,
     sansPreuve: [...document.querySelectorAll('[data-ebay-ventes-sans-preuve]')].map((e) => ({ n: e.getAttribute('data-ebay-ventes-sans-preuve'), geste: e.getAttribute('data-ebay-sans-preuve-geste'), t: e.textContent,
