@@ -98,9 +98,8 @@ const capture = async (pg, nom) => { if (!SHOTS) return; fs.mkdirSync(SHOTS, { r
           await pg.locator('[data-source-chiffre="ca"]').first().click();
           await pg.waitForTimeout(250);
           const q = await pg.evaluate(() => { const b = document.querySelector('[data-source-chiffre="ca"]'); const r = b.getBoundingClientRect(); const t = (document.querySelector('[data-source-texte="ca"]') || {}).innerText || ''; return { t, exp: b.getAttribute('aria-expanded'), w: r.width, h: r.height }; });
-          dit(q.exp === 'true' && /La somme de tes \d+ vente/.test(q.t), `K1 ${T} : le « ? » du chiffre d’affaires dit d’où il vient`, q.t.slice(0, 120));
-          const nPub = (() => { const lab = pub && pub.mois; return lab; })();
-          dit(!!nPub, `K1 ${T} : la phrase lit la ligne publiée`);
+          dit(q.exp === 'true' && /La somme de (ta vente|tes \d+ ventes)/.test(q.t), `K1 ${T} : le « ? » du chiffre d’affaires dit d’où il vient`, q.t.slice(0, 120));
+          dit(q.w > 0 && q.w <= 24 && q.h <= 24, `K1 ${T} : le « ? » reste un petit rond (la cible de 44 px est autour, pas dessinée)`, `${q.w}×${q.h}`);
         } else dit(true, `K1 ${T} : période en cours (carte prévision) — étapes non jugées ce jour`);
         dit(K.caSeuils != null && Math.round(Number(K.caSeuils) * 100) === moisAn + 14000, `K2 ${T} : « Reçu en ${an} » = mois datés + 2 × 70 € vendus cette année, jamais datés au mois`, `${K.caSeuils} vs ${(moisAn + 14000) / 100}`);
         dit(K.sur === '2', `K2 ${T} : la part prouvée est DITE (« Dont 2 ventes vendues en ${an}… »)`, K.sur);

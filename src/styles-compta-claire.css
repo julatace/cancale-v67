@@ -144,13 +144,15 @@ html body .vrm-app-shell .vrm-main button.vrm-urssaf-copier:active { transform: 
 .vrm-main .vrm-urssaf-num { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--vrm-line); font-size: 12px; font-weight: 700; color: var(--vrm-ink); font-variant-numeric: tabular-nums; flex: none; align-self: center; }
 .vrm-main .vrm-urssaf-etape + .vrm-urssaf-ligne, .vrm-main .vrm-urssaf-etape + .vrm-urssaf-manque, .vrm-main .vrm-urssaf-etape + .vrm-urssaf-gestes { border-top: 0; padding-top: 4px; margin-top: 0; }
 /* « D'où vient ce chiffre ? » : un rond de 22 px dessiné, 44 px au doigt. */
-html body .vrm-app-shell .vrm-main button.vrm-source-q {
-  position: relative; display: inline-block; vertical-align: 1px; width: 20px; height: 20px; min-width: 0; min-height: 0; margin-left: 6px; padding: 0;
+:root:root body .vrm-app-shell .vrm-main button.vrm-source-q[aria-label] {
+  /* !important : la règle générale des boutons au doigt (44 px) agrandissait le rond dessiné ;
+     la cible de 44 px est portée par ::after. */
+  position: relative; display: inline-block; vertical-align: 1px; width: 20px !important; height: 20px !important; min-width: 0 !important; min-height: 0 !important; margin-left: 6px; padding: 0 !important;
   border-radius: 50%; border: 1px solid var(--vrm-line); background: transparent; color: var(--vrm-muted);
   font: 700 12px/18px var(--vrm-police); text-align: center; cursor: pointer;
 }
-html body .vrm-app-shell .vrm-main button.vrm-source-q::after { content: ''; position: absolute; inset: -12px; }
-html body .vrm-app-shell .vrm-main button.vrm-source-q[aria-expanded="true"] { color: var(--vrm-ink); border-color: var(--vrm-ink); }
+:root:root body .vrm-app-shell .vrm-main button.vrm-source-q[aria-label]::after { content: ''; position: absolute; inset: -12px; }
+:root:root body .vrm-app-shell .vrm-main button.vrm-source-q[aria-label][aria-expanded="true"] { color: var(--vrm-ink); border-color: var(--vrm-ink); }
 .vrm-main .vrm-source-texte { display: block; margin-top: 6px; font-size: 13px; font-weight: 400; line-height: 1.45; color: var(--vrm-muted); white-space: normal; }
 
 /* Bilan du mois et délai de paiement : des rangées de 44 px, un chiffre par rangée. */
