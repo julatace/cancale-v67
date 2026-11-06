@@ -20,6 +20,12 @@
 // pas des défauts de l'app, ils noieraient les vrais).
 const FILE = 'vrm_plantages_attente';
 const ENVOYES = 'vrm_plantages_envoyes';
+// (6 nov.) « Signaler un problème » joint les 5 derniers plantages de CET
+// appareil. La file ci-dessus se vide dès que la base confirme : on garde donc
+// à part les 5 dernières entrées NOTÉES (déjà nettoyées, sans la pile), sur
+// l'appareil seulement — elles ne partent que dans un signalement, qu'il voit.
+const RECENTS = 'vrm_plantages_recents';
+export const RECENTS_MAX = 5;
 const MAX_ATTENTE = 10;
 const UNE_HEURE = 3600e3;
 let notesCetteOuverture = 0;
@@ -101,9 +107,19 @@ export function noterPlantage(err, contexte = {}) {
     const file = lire(FILE, []);
     file.push(entree);
     ecrire(FILE, file.slice(-MAX_ATTENTE));
+    const lus = lire(RECENTS, []);
+    const recents = Array.isArray(lus) ? lus : [];
+    recents.push({ message: entree.message, ecran: entree.ecran, origine: entree.origine, version: entree.version, at: entree.at });
+    ecrire(RECENTS, recents.slice(-RECENTS_MAX));
     try { window.dispatchEvent(new CustomEvent('vrm:plantage')); } catch (_) {}
     return entree;
   } catch (_) { return null; }
+}
+
+// Les 5 derniers plantages notés sur cet appareil, du plus ancien au plus récent.
+export function derniersPlantages() {
+  const r = lire(RECENTS, []);
+  return Array.isArray(r) ? r.filter((x) => x && typeof x === 'object' && x.message).slice(-RECENTS_MAX) : [];
 }
 
 // Vide la file vers la base. `envoyer(ligne)` rend true quand la base a

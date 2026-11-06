@@ -131,6 +131,12 @@ controle('/api/sante', () => {
   const pasBool = clesSante.filter((k) => typeof j[k] !== 'boolean');
   if (pasBool.length) return `clé(s) qui ne sont pas un oui/non : ${pasBool.join(', ')}`;
   if (j.serviceKey !== true) return 'SUPABASE_SERVICE_KEY n’est pas posée sur Vercel : rappels, e-mails et notifications se taisent';
+  // (6 nov.) L'état que montre la page publique /etat : une panne qu'elle affiche
+  // doit aussi faire échouer ce contrôle (la page dit « nous sommes prévenus »).
+  if (j.etat && typeof j.etat === 'object') {
+    const pannes = ['base', 'emails', 'notifications'].filter((k) => j.etat[k] === 'panne');
+    if (pannes.length) return `la page /etat affiche une panne : ${pannes.join(', ')}`;
+  }
   return true;
 });
 controle('confidentialité fermée sans session', () => {

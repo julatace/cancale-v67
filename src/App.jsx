@@ -143,7 +143,8 @@ import VisiteBulles from "./VisiteBulles.jsx";
 import { CLE_VISITE } from "./visiteBulles.js";
 import { PHRASES_ECRAN } from "./phrasesEcran.js";
 import { VAPID_PUBLIC_KEY } from "./vapid.js";
-import { noterPlantage, viderPlantages, ecouterViolationsCspDans } from "./plantages.js";
+import { noterPlantage, viderPlantages, ecouterViolationsCspDans, derniersPlantages } from "./plantages.js";
+import { SignalerProbleme as SignalerProblemeBase, SignalerProblemeFeuille as SignalerProblemeFeuilleBase, SignalementsRecus } from "./composants/SignalerProbleme.jsx";
 import * as photosVinted from "./photosVinted.js";
 import { MINERAL, MINERAL_DARK, variablesTheme } from "./themeMineral.js";
 import { candidatsVenteSansAnnonce } from "./candidatsVente.js";
@@ -2443,6 +2444,41 @@ const Z_MESSAGES = 30000;
 function SheetShell(props) {
   return <SheetShellBase {...props} FermeAuRetour={FermeAuRetour}/>;
 }
+
+// ── « SIGNALER UN PROBLÈME » (6 nov., src/composants/SignalerProbleme.jsx) ────
+// L'écran ouvert et celui d'avant (Paramètres est souvent ouvert APRÈS avoir vu
+// le problème ailleurs) : tenus par App à chaque changement d'onglet.
+const ECRANS_VUS = { courant: '', avant: '' };
+const noterEcranVu = (t) => { if (!t || t === ECRANS_VUS.courant) return; ECRANS_VUS.avant = ECRANS_VUS.courant; ECRANS_VUS.courant = String(t); };
+// Ce qui part avec le message — l'appareil, jamais une donnée du vendeur :
+// l'écran, la version de l'app (celle des plantages, `BUILD_ID`), la version de
+// l'extension si elle a répondu ICI, le navigateur (`motsNavigateur`), la
+// taille d'écran, les 5 derniers plantages de cet appareil (src/plantages.js).
+const contexteSignalement = (ecran) => {
+  const nav = motsNavigateur();
+  let taille = null;
+  try { taille = { largeur: Math.round(window.innerWidth), hauteur: Math.round(window.innerHeight) }; } catch (_) {}
+  return {
+    ecran: ecran || ECRANS_VUS.courant || '',
+    ecranAvant: ecran && ecran !== ECRANS_VUS.courant ? ECRANS_VUS.courant : ECRANS_VUS.avant,
+    version: BUILD_ID,
+    extension: vmrExtVersion() || null,
+    navigateur: nav.connu ? nav.nom : 'inconnu',
+    ecranTaille: taille,
+    plantages: derniersPlantages(),
+  };
+};
+// Le relais de l'app : le bouton et sa feuille, avec le vrai contexte. Réutilisable
+// par un garde-fou d'écran : `<SignalerProbleme ecran={tab}/>`.
+function SignalerProbleme({ ecran, ...props }) {
+  return <SignalerProblemeBase Feuille={SheetShell} Bouton={Bouton} entetes={enTeteSession} contexte={() => contexteSignalement(ecran)} {...props}/>;
+}
+function SignalerProblemeFeuille({ ecran, ...props }) {
+  return <SignalerProblemeFeuilleBase Feuille={SheetShell} Bouton={Bouton} entetes={enTeteSession} contexte={() => contexteSignalement(ecran)} {...props}/>;
+}
+// Une notification « problème signalé » (`?tab=settings&section=signalements`)
+// ouvre la liste dans Paramètres — une fois, puis la demande est consommée.
+const DEMANDE_SIGNALEMENTS = { on: false };
 
 // ── RANGER UNE VRAIE PAIRE (feuille du garage 3D) ──────────────────────────
 // Julien : « tu peux sélectionner lesquels tu ranges ici, la taille… vraiment
@@ -64842,11 +64878,15 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   // (5 nov., chantier G, revue 2.24) Les e-mails ne sont plus un sous-écran d'ici : la demande
   // « ouvre mes adresses » (`DEMANDE_ADRESSES`) est servie par l'écran E-mails, onglet « Relier ma boîte ».
   const [sous, setSous] = React.useState(null);       // l'id du sous-écran ouvert (téléphone)
+  // (6 nov.) « Signaler un problème » : la feuille (src/composants/SignalerProbleme.jsx).
+  const [signaler, setSignaler] = React.useState(false);
   const racine = React.useRef(null);
   const ouvrirSous = (id) => { setSous(id); try { racine.current && racine.current.scrollIntoView({ block: 'start' }); } catch (_) {} };
   // (31 oct., soir) Un lien vers l'ancien « eBay → Compte » (`?tab=plat_ebay&section=compte`)
   // ouvre le panneau « Comptes eBay » — une fois, puis la demande est consommée.
   React.useEffect(()=>{ if(ouvrir==='ebay'&&ebayCompte){ setVueBrute('reglages'); setSous('ebay'); if(onOuvert) onOuvert(); } /* eslint-disable-next-line */ },[ouvrir,!!ebayCompte]);
+  // (6 nov.) La notification « problème signalé » ouvre la liste (propriétaire seul).
+  React.useEffect(()=>{ if(DEMANDE_SIGNALEMENTS.on&&proprioInst){ DEMANDE_SIGNALEMENTS.on=false; setVueBrute('reglages'); setSous('signalements'); setTimeout(()=>{ try{ const el=document.getElementById('reglages-aide'); if(el) el.scrollIntoView({block:'start'}); }catch(_){} },50); } },[proprioInst]);
   const versPlateforme=(p)=>{ if(p==='plat_ebay'&&ebayCompte){ setVueBrute('reglages'); ouvrirSous('ebay'); return; } if(onPlateforme) onPlateforme(p); };
   const fermerSous = () => { const id = sous; setSous(null); setTimeout(() => { try { const l = racine.current && racine.current.querySelector(`[data-sous-ouvrir="${id}"]`); if (l) { l.scrollIntoView({ block: 'center' }); l.focus({preventScroll:true}); } } catch (_) {} }, 0); };
   const setVue = (v) => { setVueBrute(v); setSous(null); try { localStorage.setItem('vrm_reglages_vue', v); } catch (_) {} };
@@ -65023,6 +65063,12 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     {id:'aide',titre:'Besoin d’aide ?',items:[
       // (2 nov.) La visite en bulles, rejouée sur son clic (src/VisiteBulles.jsx).
       { id:'visite', type:'action', ic:'play', lib:'Revoir la visite', desc:'Les onglets de VRM, un par un', onClick:()=>{ try { window.dispatchEvent(new Event('vrm:visite')); } catch (_) {} }, data:{ 'data-reglage-visite':'' } },
+      // (6 nov.) Un bouton : le message part avec l'écran, les versions, le navigateur
+      // et les plantages de cet appareil — et il voit tout avant d'envoyer.
+      { id:'signaler', type:'action', ic:'send', lib:'Signaler un problème', onClick:()=>setSignaler(true), data:{ 'data-reglage-signaler':'' } },
+      // La liste des signalements reçus : au PROPRIÉTAIRE de l'installation seul
+      // (le serveur refuse tout autre compte).
+      proprioInst && { id:'signalements', type:'panneau', nu:true, ic:'chat', lib:'Signalements reçus', data:{ 'data-reglage-signalements':'' }, el:<SignalementsRecus entetes={enTeteSession} Bouton={Bouton} PanneEl={EtatPanne}/> },
       {id:'depannage',type:'panneau',nu:true,ic:'help',lib:'Résoudre un problème',desc:'E-mails, comptes, impression',el:<div className="vrm-settings-help">
       <details><summary>Je ne reçois pas mes e-mails</summary><p>Vérifie l’adresse associée au compte Vinted, sa confirmation, puis le transfert depuis ta messagerie. L’historique reçu permet de distinguer un e-mail absent d’un e-mail à vérifier.</p><Bouton variante="secondaire" onClick={()=>{ ouvrirEmailsRelier('reception'); setTab('emails'); }}>{L.relierBoite}</Bouton></details>
       <details><summary>Mon compte Vinted n’apparaît pas</summary><p>Connecte le compte attendu sur Vinted et vérifie que l’extension utilise ton compte VRM. Actualise ensuite les comptes liés et contrôle le pseudo. N’ajoute pas les données d’un autre vendeur.</p><Bouton variante="secondaire" onClick={()=>setTab('vintedaccounts')}>Voir mes comptes liés</Bouton></details>
@@ -65124,6 +65170,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       {/* (5 nov., chantier H) Appelée, pas montée : `<AcctSheet/>` était un composant
           RECRÉÉ à chaque rendu — chaque lettre tapée remontait la feuille. */}
       {AcctSheet()}
+      {signaler && <SignalerProblemeFeuille onClose={()=>setSignaler(false)}/>}
       {ouvert ? (
         // ── SOUS-ÉCRAN (téléphone) ──
         <div className="vrm-set-nav">
@@ -67418,6 +67465,8 @@ class EcranGardeFou extends React.Component {
               style={{border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:12,padding:'9px 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>📋 Copier l'erreur</button>
             <button type="button" onClick={()=>location.reload()}
               style={{border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:12,padding:'9px 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Recharger l'app</button>
+            {/* (6 nov.) Signaler, en un bouton : l'écran tombé et ce plantage partent avec. */}
+            <SignalerProbleme ecran={String(this.props.resetKey || '')} taille="petit"/>
           </div>
         </div>
       </div>
@@ -68981,6 +69030,8 @@ function AppCoeur() {
   // lisible ⇒ Ma journée, comme avant.
   const [reprise0]=useState(()=>{ try{ return lireReprise(stockageParcours(), AUTH.user?.id||readSession()?.user?.id||'', ONGLETS_LIENS, window.location.search); }catch(_){ return null; } });
   const [tab,setTabBrut]=useState(()=>reprise0?reprise0.tab:'journee');
+  // (6 nov.) L'écran ouvert et celui d'avant, pour « Signaler un problème ».
+  noterEcranVu(tab);
   // (27 oct., « des effets entre les pages ») Changer d'écran se VOIT : le
   // contenu arrive en fondu, d'un léger glissé (styles-mouvement.css). Rien
   // n'est remonté — on rejoue une classe sur `<main>` — et rien ne bouge si
@@ -69220,6 +69271,7 @@ function AppCoeur() {
       if(p.get('cloche')==='1'){ try{ sessionStorage.setItem('vrm_ouvrir_cloche','1'); }catch(_){} try{ window.dispatchEvent(new Event('vrm:centre-notifs')); }catch(_){} }
       if(t&&TABS_OK.includes(t)){ const site=p.get('site'), section=p.get('section'), vue=p.get('vue');
       if(site&&estTacheSite(t)&&siteDeTache(t,site)===site) subVoulue.current=site; else if(section&&/^[a-z]{2,12}$/.test(section)&&(t.startsWith('plat_')||t==='compta'||t==='dashboard')) subVoulue.current=section;
+      if(t==='settings'&&section==='signalements') DEMANDE_SIGNALEMENTS.on=true;
       if(vue==='achats'){ demanderVue('achats'); } else if(vue==='retraits'){ demanderVue('retraits'); } else if(vue==='favoris') demanderVue('favoris');
       // (1er nov.) `cat_achats` mène aux colis à retirer (dans Colis) ; avec `vue=achats`, c'est l'écran Achats.
       const tt=(t==='cat_achats'&&vue==='achats')?'achats':t;

@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { readFileSync } from 'node:fs';
 // __BUILD__ = horodatage du build, injecté à la compilation. Sert de « version »
 // visible dans l'app pour diagnostiquer les problèmes de cache/mise à jour.
 // ⚠️ ON INJECTE L'ISO COMPLET, PAS UNE CHAÎNE DÉJÀ MISE EN FORME. La version
@@ -25,8 +26,21 @@ const allegerIndex = () => ({
       .replace(/\n[ \t]*(?=\n)/g, ''),
   },
 });
+// (6 nov.) La page d'état publique (public/etat.html) dit la version de
+// l'extension SERVIE. Elle est lue au build dans le manifeste du dossier que le
+// zip publié contient (audit-extension-zip tient zip = dossier), et posée à côté
+// de la page : `/etat-version.json`. Rien à tenir à la main à chaque version.
+const versionEtat = () => ({
+  name: 'vrm-etat-version',
+  apply: 'build',
+  generateBundle() {
+    let extension = null;
+    try { const v = JSON.parse(readFileSync(new URL('./vinted-sync-extension/manifest.json', import.meta.url), 'utf8')).version; if (/^\d+\.\d+\.\d+$/.test(v)) extension = v; } catch (_) {}
+    this.emitFile({ type: 'asset', fileName: 'etat-version.json', source: JSON.stringify({ extension }) });
+  },
+});
 export default defineConfig({
-  plugins: [react(), allegerIndex()],
+  plugins: [react(), allegerIndex(), versionEtat()],
   define: { __BUILD__: JSON.stringify(BUILD) },
   build: {
     // Cible moderne : moins de transformations/polyfills → bundle plus léger et

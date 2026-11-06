@@ -34,6 +34,11 @@ import {verifierConfidentialite} from './_lib/confidentialite.js';
 //                                 (migration 018) — voir api/_lib/communaute.js
 //   /api/compte?mode=entreprise&siret= (GET, session) le NOM de l'entreprise
 //                                 d'un SIREN/SIRET (registre public, sans clé)
+//   /api/compte?mode=signalement  (GET/POST, session) « SIGNALER UN PROBLÈME » :
+//                                 POST envoyer (rangé chez le propriétaire de
+//                                 l'installation, 5/h/compte, notifié) ; GET la
+//                                 liste et POST {action:'traite'} au PROPRIÉTAIRE
+//                                 seul — voir api/_lib/signalement.js
 //   /api/compte?mode=fermer       (POST, session) FERMER MON COMPTE : résilie,
 //                                 efface ses données, puis son compte (refusé au
 //                                 propriétaire de l'installation)
@@ -66,6 +71,10 @@ import {routeFavoris} from './_lib/favoris.js';
 import {effacerFavorisDe} from './_lib/favoris-confidentialite.js';
 import { traiterAppareils, lireJournal } from './_lib/securite-compte.js';
 import { PROPRIETAIRE_NEUTRE } from './_lib/proprietaire-email.js';
+import { envoyerSignalement, listerSignalements, marquerTraite } from './_lib/signalement.js';
+import { etatPublic } from './_lib/etat-public.js';
+import { sendPushToAll, pushConfigure } from './_lib/push.js';
+import { contexteVendeur } from './_lib/owner.js';
 import { configurationRelances, lireJeton as lireJetonRelance, ecrireChoix as ecrireChoixRelance, lireChoix as lireChoixRelance, lireEnvois as lireEnvoisRelance } from './_lib/relances-essai.js';
 
 export const config = { api: { bodyParser: false } };
@@ -1246,9 +1255,30 @@ async function relances(req, res) {
   });
 }
 
-// ── Santé : seulement des OUI/NON (route publique) ──────────────────────────
-function sante(req, res) {
+// ── « SIGNALER UN PROBLÈME » (6 nov., api/_lib/signalement.js) ───────────────
+// La session d'abord : l'identifiant du compte VRM est celui de SA session,
+// jamais un champ du corps. Le reste (où c'est rangé, l'anti-abus, la
+// notification, la liste du propriétaire) vit dans la règle.
+async function signalement(req, res) {
+  const utilisateur = await vendeurExige(req, res);
+  if (!utilisateur) return;
+  if (req.method === 'GET') { const r = await listerSignalements({ utilisateur }); return repondre(res, r.code, r.corps); }
+  const corps = await lireCorpsJson(req);
+  if (!corps || typeof corps !== 'object') return repondre(res, 400, { ok: false, raison: 'corps' });
+  if (corps.action === 'traite') { const r = await marquerTraite({ utilisateur, corps }); return repondre(res, r.code, r.corps); }
+  const r = await envoyerSignalement({ utilisateur, corps, pousser: (notif, proprio) => contexteVendeur.run({ owner: proprio }, () => sendPushToAll(notif)) });
+  return repondre(res, r.code, r.corps);
+}
+
+// ── Santé : des OUI/NON (route publique), et l'état de la page /etat ─────────
+// (6 nov.) `etat` : base · e-mails · notifications ('ok' | 'panne' | 'inconnu')
+// et l'heure de la vérification, pour public/etat.html — aucune donnée d'un
+// vendeur (api/_lib/etat-public.js). LÉGER : une requête de deux scalaires,
+// gardée 30 s en mémoire, et 30 s au cache de Vercel (`s-maxage`).
+async function sante(req, res) {
   res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=30');
+  const etat = await etatPublic({ pushPret: pushConfigure(), anon: ANON });
   return repondre(res, 200, {
     ok: true,
     serviceKey: !!process.env.SUPABASE_SERVICE_KEY,
@@ -1258,6 +1288,7 @@ function sante(req, res) {
     stripe: stripePret(),
     stripeWebhook: !!process.env.STRIPE_WEBHOOK_SECRET,
     relancesEssai: configurationRelances().pret,
+    etat,
   });
 }
 
@@ -1305,6 +1336,8 @@ export default async function handler(req, res) {
   if (mode === 'entreprise') return m === 'GET' ? entreprise(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   if (mode === 'discord-deja') return m === 'GET' ? discordDeja(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   if (mode === 'fermer') return m === 'POST' ? fermerCompte(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
+  // (6 nov.) « Signaler un problème » : envoyer (tous), lire et « Traité » (le propriétaire).
+  if (mode === 'signalement') return (m === 'GET' || m === 'POST') ? signalement(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   // (4 nov.) Paramètres → Mon compte : « Appareils connectés » et « Ce que VRM a fait ».
   if (mode === 'appareils') return (m === 'GET' || m === 'POST') ? appareils(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'journal') return m === 'GET' ? journalVrm(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
