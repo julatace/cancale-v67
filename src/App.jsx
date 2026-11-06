@@ -39,6 +39,8 @@ import { actionsReglages } from './reglagesActions.js';
 import PiloteFavorisAuto from './PiloteFavorisAuto.jsx';
 import RepartitionAnneau from './RepartitionAnneau.jsx';
 import AnnoncesLeboncoin from './AnnoncesLeboncoin.jsx';
+import { bilanEnLigneLbc, etatEnLigneLbc, quandLectureLbc, LIEN_MES_ANNONCES_LBC } from './enLigneLbc.js';
+import './ebay-annonces.css';
 import {suivreReceptionLeboncoin,lireReceptionLeboncoin} from './rafraichissementLeboncoin.js';
 import { STYLE_FLOU, compteLbcOuvert, lbcFloute, compteVcOuvert, vcFloute } from './flouCompte.js';
 import DiagnosticLeboncoin from './DiagnosticLeboncoin.jsx';
@@ -24223,9 +24225,17 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
   const eur=n=>n==null?'—':(Math.round(n*100)/100).toFixed(2).replace('.',',')+' €';
   const condLabel = (EBAY_CONDITIONS.find(([v]) => v === cond) || [, 'Occasion'])[1];
   if (!ouvert) return (
-    <button type="button" data-poster="ebay" onClick={() => setOuvert(true)} style={{ marginTop: 10, width: '100%', border: 'none', background: C.accent, color:C.onAccent, borderRadius: 999, padding: '14px 16px', fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-      <Icon name="tag" size={17}/> Vendre un article sur eBay
-    </button>
+    // (6 nov.) UNE entrée pour vendre sur eBay : elle remplace le gros bouton
+    // « Vendre un article sur eBay » ET l'entrée « Publier une annonce Vinted sur
+    // eBay » (qui menait au même formulaire, `DEMANDE_EBAY_PAIRE`). Le choix de
+    // l'article se fait dedans (ses annonces Vinted numérotées).
+    <div className="vrm-pa-entree vrm-eb-vendre" data-ebay-vendre="">
+      <button type="button" data-poster="ebay" onClick={() => setOuvert(true)}>
+        <span aria-hidden="true" style={{ flexShrink: 0, width: 32, height: 32, borderRadius: 10, background: `${C.accent}15`, color: C.accentTexte || C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="tag" size={17}/></span>
+        <span>Vendre sur eBay<small>Choisis une annonce Vinted : VRM prépare l’annonce eBay, tu vérifies, tu publies</small></span>
+        <span aria-hidden="true">›</span>
+      </button>
+    </div>
   );
   return (
     <div ref={racine} data-publier-brouillon-id={brouillonId || ''} style={{ marginTop: 10, border: `1px solid ${C.border}`, borderRadius: 14, background: C.bg || C.card, overflow: 'hidden', boxShadow: C.shadow, scrollMarginTop: 12 }}>
@@ -25528,46 +25538,60 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
   const desc = String(d.description || '').replace(/&lt;br&gt;|<br\s*\/?>/gi, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
   const chip = { fontSize: 11, color: E.text, background: E.card2, border: `1px solid ${E.border}`, borderRadius: 999, padding: '3px 9px', whiteSpace: 'nowrap' };
   return (
-    <div className="vrm-ebay-carte" data-regle-envoi={envoiRegle || undefined} style={{ borderTop: first ? 'none' : `1px solid ${E.border}` }}>
-      <div onClick={() => setOpen(o => !o)} role="button" tabIndex={0} data-ebay-carte-ouvrir={it.itemId}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(o => !o); } }}
-        className="vrm-ebay-carte-tete" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', cursor: 'pointer' }}>
-        <PhotoVente src={it.photo} size={64} />
-        <div style={{ flex: '1 1 auto', minWidth: 0 }}>
-          <div style={{ fontWeight: 600, fontSize: 13, color: E.text, lineHeight: 1.25, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{it.title || '(sans titre)'}</div>
-          <div style={{ fontSize: 12, color: E.muted, marginTop: 2 }}>
-            {/* Le lien à la paire : la pastille distingue, pas une phrase par carte (§7). */}
-            <span data-relie={numero} data-sku-douteux={!numero && skuEbayDouteux(it) ? String(it.sku) : undefined} style={{ fontWeight: 700, color: numero ? E.text : E.warn }} title={!numero && skuEbayDouteux(it) ? `Sa référence ${it.sku} ne désigne plus sûrement un article (numéro redonné depuis, ou porté par deux articles) : relie-la toi-même.` : undefined}>{numero ? `N°${numero}` : skuEbayDouteux(it) ? `${it.sku} à vérifier · pas reliée` : 'pas reliée'}</span>
-            {obs != null ? ` · ${obs} observateur${obs > 1 ? 's' : ''}` : ''}
-            {nb ? ` · ${nb} photo${nb > 1 ? 's' : ''}` : ''}
-            {j != null ? ` · en ligne depuis ${j} j` : ''}
-            {compteNom ? <span data-ebay-carte-compte style={{ color: E.muted }}>{` · ${compteNom}`}</span> : null}
-          </div>
-        </div>
-        <div style={{ textAlign: 'right', flexShrink: 0 }}>
-          <div className="vrm-display" data-ebay-prix={prixVuN != null ? prixVuN.toFixed(2) : ''} style={{ fontSize: 17, fontWeight: 800, color: E.text }}>{euro(prixCarte)}</div>
-          {/* (16 octobre, revue) « détails ▼ » est remplacé par le bouton « ⋯ »
-              de la rangée d'actions ; ce bloc vide garde la forme que la
-              feuille de style de la carte attend (prix, puis une ligne). */}
-          <div aria-hidden="true" />
+    <div className="vrm-eb-carte" data-regle-envoi={envoiRegle || undefined} data-ouverte={open ? '1' : undefined}>
+      {/* ── (6 nov., Julien : « eBay, c'est vraiment pas ouf ») LA CARTE : photo ·
+          titre (2 lignes) · N° · prix ; UNE ligne d'état ; UN geste (« Relier »
+          quand le lien manque) et « … » pour la fiche. « Pas reliée » n'est plus
+          écrit en ambre sur chaque carte : le filtre « À relier » et la note sous
+          la liste le disent UNE fois (§7). La règle d'offre, la suppression, la
+          modification et l'offre aux observateurs vivent dans la fiche. ── */}
+      <div className="vrm-eb-tete">
+        <button type="button" className="vrm-eb-ouvrir" data-ebay-carte-ouvrir={it.itemId} aria-expanded={open} onClick={() => setOpen((o) => !o)}
+          aria-label={`${it.title || 'Annonce eBay'}${numero ? ` — N°${numero}` : ''} — ${open ? 'fermer la fiche' : 'ouvrir la fiche'}`}>
+          <PhotoVente src={it.photo} size={56} />
+          <span className="vrm-eb-texte">
+            <span className="vrm-eb-titre">{it.title || '(sans titre)'}</span>
+            <span className="vrm-eb-meta" data-relie={numero} data-sku-douteux={!numero && skuEbayDouteux(it) ? String(it.sku) : undefined}>
+              {numero ? <Numero n={numero} taille="petit" /> : null}
+              <span className="vrm-eb-etat" data-ebay-etat={supprimee ? 'supprimee' : 'enligne'}>{[supprimee ? 'supprimée d’eBay' : (j != null ? `en ligne · ${j} j` : 'en ligne'), nb ? `${nb} photo${nb > 1 ? 's' : ''}` : '', obs ? `${obs} observateur${obs > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ')}{compteNom ? <span data-ebay-carte-compte="">{` · ${compteNom}`}</span> : null}</span>
+            </span>
+          </span>
+        </button>
+        <div className="vrm-eb-droite">
+          <span className="vrm-eb-prix" data-ebay-prix={prixVuN != null ? prixVuN.toFixed(2) : ''}>{euro(prixCarte)}</span>
+          <span className="vrm-eb-gestes">
+            {!numero && !supprimee && <Bouton variante="secondaire" taille="petit" data-relier-ouvrir={it.itemId} aria-label={`Relier à un article : ${it.title || it.itemId}`} onClick={() => { setRelierOuvert((o) => !o); setOffreOuverte(false); setRegleOuverte(false); dire(''); }}>Relier</Bouton>}
+            <Bouton variante="discret" taille="petit" icone="more" data-ebay-carte-plus={it.itemId} aria-expanded={open} aria-label={open ? "Fermer la fiche de l'annonce" : "Fiche de l'annonce : modifier, règle d'offre, supprimer"} onClick={() => setOpen((o) => !o)} />
+          </span>
         </div>
       </div>
-      {/* ── (16 octobre, revue) UNE rangée d'actions : le geste principal
-          (relier quand le lien manque, sinon l'offre aux observateurs), les
-          autres en lien texte, la règle d'offre sur la même rangée, et « ⋯ »
-          pour le reste (modifier, détails). Avant : deux ou trois boutons
-          pleine hauteur empilés par carte. ── */}
-      <div data-ebay-carte-actions={it.itemId} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '2px 10px', padding: '0 14px 10px 14px' }}>
-      {/* (26 octobre) Julien : « sur eBay je veux pouvoir supprimer les annonces ».
-          Le geste était caché dans la carte dépliée : il est sur la carte. */}
-      <button type="button" data-ebay-supprimer={it.itemId} disabled={saving || supprimee} onClick={terminer} style={{ ...btnE, border: 'none', background: 'transparent', padding: '8px 4px', minHeight: 44, color: E.muted, textDecoration: 'underline', textUnderlineOffset: 3 }}>{supprimee ? 'Supprimée d’eBay' : 'Supprimer d’eBay'}</button>
-      {msg && !open && <span data-ebay-supprimer-msg={it.itemId} style={{ fontSize: 12, color: E.muted }}>{msg}</span>}
-      {!numero && <button type="button" data-relier-ouvrir={it.itemId} onClick={() => { setRelierOuvert((o) => !o); setOffreOuverte(false); setRegleOuverte(false); dire(''); }} style={btnE}>Relier à un article</button>}
-      {eligible === true && <button type="button" data-offre-ouvrir={it.itemId} onClick={() => { setOffreOuverte((o) => !o); setRelierOuvert(false); setRegleOuverte(false); dire(''); }} aria-label={obs ? `Faire une offre aux ${obs} observateur${obs > 1 ? 's' : ''}` : 'Faire une offre aux observateurs'} style={btnE}>{obs ? `Offre aux ${obs} observateur${obs > 1 ? 's' : ''}` : 'Offre aux observateurs'}</button>}
-      {/* ── (9 octobre) LA RÈGLE D'OFFRE : une ligne, ou une porte. Trois
-          états — « pas su » n'affiche AUCUN montant et ne dit pas « aucune ».
-          La raison d'un « pas su » se dit UNE fois au-dessus de la liste (§7). */}
-      {et && (() => {
+      {relierOuvert && (
+        <div data-relier-panneau={it.itemId} className="vrm-eb-panneau" style={{ background: E.card2, borderRadius: 12, padding: '11px 12px' }}>
+          <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, marginBottom: 8 }}>Quel article est en vente dans cette annonce ? C'est toi qui choisis : VRM ne le devine pas d'après le titre.</div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: choix.length ? 2 : 0 }}>
+            <input value={numSaisi} onChange={(e) => setNumSaisi(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') relier(numSaisi); }} data-relier-num={it.itemId}
+              inputMode={clavierNum()} placeholder="N° de l'article" aria-label="N° de l'article" style={{ ...inpE, width: 140 }} />
+            <button type="button" data-relier-valider={it.itemId} disabled={!!geste || !numSaisi.trim()} onClick={() => relier(numSaisi)} style={{ ...btnE, opacity: (geste || !numSaisi.trim()) ? 0.5 : 1 }}>{geste === 'relier' ? 'Envoi…' : 'Relier'}</button>
+          </div>
+          {choix.map((p) => (
+            <button key={p.id} type="button" data-relier-paire={p.num} disabled={!!geste} onClick={() => relier(p.num)}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left', border: `1px solid ${E.border}`, borderRadius: 12, background: E.card, padding: '7px 9px', marginTop: 6, cursor: 'pointer', fontFamily: 'inherit' }}>
+              <PhotoVente src={p.cover || (p.photos || [])[0]} size={38} />
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: 'block', fontSize: 13, fontWeight: 700, color: E.text }}>N°{p.num}{p.memePhoto ? <span style={{ color: E.accentSoft, fontWeight: 600 }}> · même photo</span> : null}</span>
+                <span style={{ display: 'block', fontSize: 12, color: E.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.title || '—'}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+      {info && <div data-ebay-info={it.itemId} data-ebay-info-ton={infoTon || (/^✓/.test(info) ? 'ok' : 'warn')} style={{ fontSize: 12, color: (infoTon ? infoTon === 'ok' : /^✓/.test(info)) ? E.text : E.warn, margin: '0 16px 11px', lineHeight: 1.45 }}>{info}{lienEbayInfo && url ? <> <a href={url} target="_blank" rel="noreferrer" style={{ color: E.accentSoft, fontWeight: 700 }}>Voir sur eBay ↗</a></> : null}</div>}
+      {open && (
+        <div className="vrm-eb-fiche" data-ebay-fiche={it.itemId}>
+          {/* La référence VRM d'une annonce « à vérifier » : dite ICI, sur la fiche
+              de cette annonce — plus en ambre sur la liste (§7). */}
+          {!numero && skuEbayDouteux(it) && <div className="vrm-eb-regle" data-ebay-sku-douteux-fiche={String(it.sku)}>Sa référence {it.sku} ne désigne plus sûrement un article (numéro redonné depuis, ou porté par deux articles) : VRM ne la compte pas. Relie-la toi-même (« Relier »).</div>}
+          {et && (() => {
         const age = ageRegleJ(et), vieille = regleVieille(et);
         const attrs = { 'data-regle-offre-ligne': it.itemId, 'data-regle-offre': et.etat };
         if (et.etat === 'connue') { attrs['data-regle-accepte'] = Number(et.accepte).toFixed(2); attrs['data-regle-refuse'] = et.refuse != null ? Number(et.refuse).toFixed(2) : ''; if (vieille) attrs['data-regle-age'] = String(age); }
@@ -25587,24 +25611,22 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
               : (et.etat === 'pas-su' ? '—' : null)));
         const btnR = { ...btnE, border: 'none', background: 'transparent', color: E.accentSoft, padding: '6px 2px', fontSize: 13, fontWeight: 700, opacity: (gesteBloque || envoiRegle) ? 0.45 : 1, cursor: (gesteBloque || envoiRegle) ? 'default' : 'pointer' };
         return (
-          <div {...attrs} style={{ order: 2, flex: '1 1 100%', minWidth: 0, fontSize: 13, color: E.muted, lineHeight: 1.45 }}>
+          <div {...attrs} className="vrm-eb-regle">
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: (montant === '—' || montant == null) ? 'nowrap' : 'wrap' }}>
-              {montant != null && <span style={{ minWidth: 0 }}>Offres reçues : {montant}</span>}
+              {montant != null && <span style={{ minWidth: 0 }}>Offres : {montant}</span>}
               {et.etat === 'connue'
                 ? <button type="button" data-regle-modifier={it.itemId} disabled={gesteBloque || !!envoiRegle} onClick={ouvrirRegle} style={btnR}>Modifier</button>
                 : <button type="button" data-regle-ouvrir={it.itemId} disabled={gesteBloque || !!envoiRegle} onClick={ouvrirRegle} style={{ ...btnR, whiteSpace: 'nowrap' }}>Définir une règle</button>}
+              {onRelire && <button type="button" data-ebay-regle-relire-carte={it.itemId} onClick={async()=>{await onRelire();setRelectureNecessaire(false);}} style={btnR}>{relectureNecessaire?'Vérifier sur eBay':'Relire'}</button>}
               {bloquee && regleEngage(et) && <button type="button" data-regle-retirer-direct={it.itemId} disabled={!!envoiRegle || enLot} onClick={retirerRegle} style={{ ...btnR, opacity: (envoiRegle || enLot) ? 0.45 : 1, cursor: (envoiRegle || enLot) ? 'default' : 'pointer' }}>{envoiRegle === 'retrait' ? 'Envoi…' : 'Retirer la règle'}</button>}
             </div>
             {bloquee && bloquee.t && <div data-regle-bloquee-texte={bloquee.k} style={{ fontSize: 12, color: E.warn, marginTop: 4 }}>{bloquee.t}</div>}
           </div>
         );
       })()}
-      <button type="button" data-ebay-carte-plus={it.itemId} aria-label={open ? "Masquer les détails de l'annonce" : "Plus d'actions et détails de l'annonce"} aria-expanded={open} onClick={() => setOpen((o) => !o)}
-        style={{ ...btnE, order: 1, marginLeft: 'auto', border: 'none', background: 'transparent', color: E.muted, padding: '6px 10px', fontSize: 17, lineHeight: 1, minWidth: 44 }}>{open ? '×' : '⋯'}</button>
-      </div>
       {regleOuverte && et && (
         <div data-regle-panneau={it.itemId} {...(regleSignal === 'prix-change' ? { 'data-regle-prix-change': '1' } : {})} {...(regleSignal === 'existante' ? { 'data-regle-existante': '1' } : {})}
-          style={{ margin: '0 14px 12px', background: E.card2, borderRadius: 12, padding: '11px 12px' }}>
+          style={{ margin: '0 0 12px', background: E.card2, borderRadius: 12, padding: '11px 12px' }}>
           <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, marginBottom: 8 }}>
             {prixVuN ? <>Prix de l'annonce : <b style={{ color: E.text }}>{eurEbay(prixVuN)}</b>. </> : null}Une offre égale ou supérieure au montant ci-dessous est acceptée par eBay sans te demander : l'article est vendu à ce prix. En dessous, l'offre t'arrive sur eBay.
             {et.etat === 'pas-su' && et.raison === 'offres-inconnues' && et.lu
@@ -25637,28 +25659,31 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
           </div>
         </div>
       )}
-      {relierOuvert && (
-        <div data-relier-panneau={it.itemId} style={{ margin: '0 14px 12px', background: E.card2, borderRadius: 12, padding: '11px 12px' }}>
-          <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, marginBottom: 8 }}>Quel article est en vente dans cette annonce ? C'est toi qui choisis : VRM ne le devine pas d'après le titre.</div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: choix.length ? 2 : 0 }}>
-            <input value={numSaisi} onChange={(e) => setNumSaisi(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') relier(numSaisi); }} data-relier-num={it.itemId}
-              inputMode={clavierNum()} placeholder="N° de l'article" aria-label="N° de l'article" style={{ ...inpE, width: 140 }} />
-            <button type="button" data-relier-valider={it.itemId} disabled={!!geste || !numSaisi.trim()} onClick={() => relier(numSaisi)} style={{ ...btnE, opacity: (geste || !numSaisi.trim()) ? 0.5 : 1 }}>{geste === 'relier' ? 'Envoi…' : 'Relier'}</button>
-          </div>
-          {choix.map((p) => (
-            <button key={p.id} type="button" data-relier-paire={p.num} disabled={!!geste} onClick={() => relier(p.num)}
-              style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left', border: `1px solid ${E.border}`, borderRadius: 12, background: E.card, padding: '7px 9px', marginTop: 6, cursor: 'pointer', fontFamily: 'inherit' }}>
-              <PhotoVente src={p.cover || (p.photos || [])[0]} size={38} />
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ display: 'block', fontSize: 13, fontWeight: 700, color: E.text }}>N°{p.num}{p.memePhoto ? <span style={{ color: E.accentSoft, fontWeight: 600 }}> · même photo</span> : null}</span>
-                <span style={{ display: 'block', fontSize: 12, color: E.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.title || '—'}</span>
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
-      {offreOuverte && eligible === true && (
-        <div data-offre-panneau={it.itemId} style={{ margin: '0 14px 12px', background: E.card2, borderRadius: 12, padding: '11px 12px' }}>
+          {!edit ? (
+            <div className="vrm-eb-fiche-gestes">
+              <Bouton variante="secondaire" taille="petit" icone="pencil" data-ebay-revise-ouvrir={it.itemId} disabled={supprimee} onClick={() => { setEdit(true);setMsg('');setPrice(null);setQty(String(it.qty ?? ''));setTitreEdite(it.title || '');setDescEditee(descSimple); }}>Modifier l’annonce</Bouton>
+              {eligible === true && <Bouton variante="secondaire" taille="petit" data-offre-ouvrir={it.itemId} onClick={() => { setOffreOuverte((o) => !o); setRelierOuvert(false); setRegleOuverte(false); dire(''); }} aria-label={obs ? `Faire une offre aux ${obs} observateur${obs > 1 ? 's' : ''}` : 'Faire une offre aux observateurs'}>{obs ? `Offre aux ${obs} observateur${obs > 1 ? 's' : ''}` : 'Offre aux observateurs'}</Bouton>}
+              {/* Le lien se change ici (la confirmation dit « tu pourras la
+                  changer ») ; il ne s'affiche en façade que quand il MANQUE. */}
+              {numero && <Bouton variante="discret" taille="petit" icone="link" data-relier-changer={it.itemId} onClick={() => { setRelierOuvert((o) => !o); setOffreOuverte(false); setRegleOuverte(false); dire(''); }}>Changer l’article relié</Bouton>}
+              {url && <Bouton variante="discret" taille="petit" href={url} target="_blank" rel="noreferrer">Voir sur eBay ↗</Bouton>}
+              {/* (26 octobre) Julien : « sur eBay je veux pouvoir supprimer les annonces ».
+                  Dans la fiche (6 nov.), toujours derrière la confirmation « sans retour ». */}
+              <Bouton variante="danger" taille="petit" icone="trash" data-ebay-supprimer={it.itemId} disabled={saving || supprimee} onClick={terminer}>{supprimee ? 'Supprimée d’eBay' : 'Supprimer d’eBay'}</Bouton>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+              <label style={{ fontSize: 12, color: E.muted }}>Prix {it.currency || it.detail?.currency || '—'}<br /><input value={champPrix} onChange={e => setPrice(e.target.value)} inputMode="decimal" data-ebay-revise-prix={it.itemId} style={inpE} /></label>
+              <label style={{ fontSize: 12, color: E.muted }}>Stock<br /><input value={qty} onChange={e => setQty(e.target.value)} inputMode="numeric" data-ebay-revise-stock={it.itemId} style={{ ...inpE, width: 72 }} /></label>
+              <button type="button" data-ebay-revise-enregistrer={it.itemId} onClick={enregistrer} disabled={saving} style={{ border: 'none', background: E.accent, color: '#fff', borderRadius: 12, padding: '10px 14px', fontSize: 13, fontWeight: 700, cursor: saving ? 'default' : 'pointer', fontFamily: 'inherit', opacity: saving ? 0.6 : 1 }}>{saving ? 'Envoi…' : 'Enregistrer'}</button>
+              <label style={{fontSize:12,color:E.muted,flex:'1 1 100%'}}>Titre<input aria-label="Titre de l’annonce eBay" maxLength={80} value={titreEdite} onChange={e=>setTitreEdite(e.target.value)} style={{...inpE,width:'100%',marginTop:4}}/></label>
+              <label style={{fontSize:12,color:E.muted,flex:'1 1 100%'}}>Description<ChipsModeles valeur={descEditee} surChange={setDescEditee} champ={refDescEbM} vars={{ titre:titreEdite, numero, prix:Number(it.price) }}/><textarea ref={refDescEbM} aria-label="Description de l’annonce eBay" value={descEditee} onChange={e=>setDescEditee(e.target.value)} rows={4} style={{...inpE,width:'100%',marginTop:4}}/></label>
+              <button type="button" onClick={enregistrerTexte} disabled={saving} style={btnE}>Enregistrer le texte</button>
+              <button className="vrm-b vrm-b-discret" type="button" onClick={() => { setEdit(false); setMsg(''); }} style={{ border: `1px solid ${E.border}`, background: 'transparent', color: E.muted, borderRadius: 12, padding: '10px 12px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
+            </div>
+          )}
+          {offreOuverte && eligible === true && (
+        <div data-offre-panneau={it.itemId} style={{ margin: '10px 0 0', background: E.card2, borderRadius: 12, padding: '11px 12px' }}>
           <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, marginBottom: 8 }}>eBay envoie l'offre aux personnes qui suivent l'annonce, valable 48 h. Si l'une accepte, l'article est vendu à ce prix.</div>
           <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <label style={{ fontSize: 12, color: E.muted }}>Remise %<br /><input value={remise} onChange={(e) => setRemise(e.target.value)} inputMode="numeric" data-offre-remise={it.itemId} style={{ ...inpE, width: 76 }} /></label>
@@ -25677,11 +25702,16 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
           </div>
         </div>
       )}
-      {info && <div data-ebay-info={it.itemId} data-ebay-info-ton={infoTon || (/^✓/.test(info) ? 'ok' : 'warn')} style={{ fontSize: 12, color: (infoTon ? infoTon === 'ok' : /^✓/.test(info)) ? E.text : E.warn, margin: '0 14px 11px', lineHeight: 1.45 }}>{info}{lienEbayInfo && url ? <> <a href={url} target="_blank" rel="noreferrer" style={{ color: E.accentSoft, fontWeight: 700 }}>Voir sur eBay ↗</a></> : null}</div>}
-      {open && (
-        <div style={{ padding: '0 14px 13px 14px' }}>
+          {/* (9 octobre) Une règle d'offre connue : le nouveau prix la touche peut-être. */}
+          {edit && et && et.etat === 'connue' && prixChange && (
+            <div data-regle-rappel={it.itemId} style={{ fontSize: 12, color: E.muted, marginTop: 7, lineHeight: 1.45 }}>
+              Ta règle d'offre : eBay accepte dès {eurEbay(et.accepte)} — {Math.round(et.accepte / prixTape * 100)} % du nouveau prix. Changer le prix peut la faire tomber : VRM la relit après et te le dit.
+            </div>
+          )}
+          {/* Couleur FIXÉE (9 octobre) : jamais le vert ni le rouge (§7). */}
+          {msg && <div data-ebay-revise-msg={it.itemId} data-ebay-revise-ton={msgTon} style={{ fontSize: 12, color: msgTon === 'ok' ? E.text : E.warn, marginTop: 7 }}>{msg}</div>}
           {(d.categoryName || d.condition) && (
-            <div style={{ fontSize: 12, color: E.muted, marginBottom: 8, lineHeight: 1.45 }}>
+            <div style={{ fontSize: 12, color: E.muted, margin: '12px 0 8px', lineHeight: 1.45 }}>
               {d.condition ? <>État : <b style={{ color: E.text }}>{d.condition}</b></> : null}
               {d.categoryName ? <>{d.condition ? ' · ' : ''}Catégorie : <b style={{ color: E.text }}>{String(d.categoryName).split(':').pop()}</b></> : null}
             </div>
@@ -25692,35 +25722,6 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
             </div>
           )}
           {desc && <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, marginBottom: 10 }}>{desc.slice(0, 280)}{desc.length > 280 ? '…' : ''}</div>}
-          {/* ── Modifier prix / stock ── */}
-          {!edit ? (
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-              <button type="button" data-ebay-revise-ouvrir={it.itemId} onClick={() => { setEdit(true);setMsg('');setPrice(null);setQty(String(it.qty ?? ''));setTitreEdite(it.title || '');setDescEditee(descSimple); }} style={{ border: `1px solid ${E.border}`, background: 'transparent', color: E.text, borderRadius: 12, padding: '8px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Modifier l’annonce</button>
-              {/* Le lien se change ici (la confirmation dit « tu pourras la
-                  changer ») ; il ne s'affiche en façade que quand il MANQUE. */}
-              {numero && <button type="button" data-relier-changer={it.itemId} onClick={() => { setRelierOuvert((o) => !o); setOffreOuverte(false); setRegleOuverte(false); dire(''); }} style={btnE}>Changer la paire reliée</button>}
-              {onRelire && <button type="button" data-ebay-regle-relire-carte={it.itemId} onClick={async()=>{await onRelire();setRelectureNecessaire(false);}} style={btnE}>{relectureNecessaire?'Vérifier la règle sur eBay':'Actualiser la règle d’offre'}</button>}
-              {url && <a href={url} target="_blank" rel="noreferrer" style={{ color: E.accentSoft, fontWeight: 700, fontSize: 13, textDecoration: 'none' }}>Voir sur eBay ↗</a>}
-            </div>
-          ) : (
-            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-              <label style={{ fontSize: 12, color: E.muted }}>Prix {it.currency || it.detail?.currency || '—'}<br /><input value={champPrix} onChange={e => setPrice(e.target.value)} inputMode="decimal" data-ebay-revise-prix={it.itemId} style={inpE} /></label>
-              <label style={{ fontSize: 12, color: E.muted }}>Stock<br /><input value={qty} onChange={e => setQty(e.target.value)} inputMode="numeric" data-ebay-revise-stock={it.itemId} style={{ ...inpE, width: 72 }} /></label>
-              <button type="button" data-ebay-revise-enregistrer={it.itemId} onClick={enregistrer} disabled={saving} style={{ border: 'none', background: E.accent, color: '#fff', borderRadius: 12, padding: '10px 14px', fontSize: 13, fontWeight: 700, cursor: saving ? 'default' : 'pointer', fontFamily: 'inherit', opacity: saving ? 0.6 : 1 }}>{saving ? 'Envoi…' : 'Enregistrer'}</button>
-              <label style={{fontSize:12,color:E.muted,flex:'1 1 100%'}}>Titre<input aria-label="Titre de l’annonce eBay" maxLength={80} value={titreEdite} onChange={e=>setTitreEdite(e.target.value)} style={{...inpE,width:'100%',marginTop:4}}/></label>
-              <label style={{fontSize:12,color:E.muted,flex:'1 1 100%'}}>Description<ChipsModeles valeur={descEditee} surChange={setDescEditee} champ={refDescEbM} vars={{ titre:titreEdite, numero, prix:Number(it.price) }}/><textarea ref={refDescEbM} aria-label="Description de l’annonce eBay" value={descEditee} onChange={e=>setDescEditee(e.target.value)} rows={4} style={{...inpE,width:'100%',marginTop:4}}/></label>
-              <button type="button" onClick={enregistrerTexte} disabled={saving} style={btnE}>Enregistrer le texte</button>
-              <button className="vrm-b vrm-b-discret" type="button" onClick={() => { setEdit(false); setMsg(''); }} style={{ border: `1px solid ${E.border}`, background: 'transparent', color: E.muted, borderRadius: 12, padding: '10px 12px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
-            </div>
-          )}
-          {/* (9 octobre) Une règle d'offre connue : le nouveau prix la touche peut-être. */}
-          {edit && et && et.etat === 'connue' && prixChange && (
-            <div data-regle-rappel={it.itemId} style={{ fontSize: 12, color: E.muted, marginTop: 7, lineHeight: 1.45 }}>
-              Ta règle d'offre : eBay accepte dès {eurEbay(et.accepte)} — {Math.round(et.accepte / prixTape * 100)} % du nouveau prix. Changer le prix peut la faire tomber : VRM la relit après et te le dit.
-            </div>
-          )}
-          {/* Couleur FIXÉE (9 octobre) : jamais le vert ni le rouge (§7). */}
-          {msg && <div data-ebay-revise-msg={it.itemId} data-ebay-revise-ton={msgTon} style={{ fontSize: 12, color: msgTon === 'ok' ? E.text : E.warn, marginTop: 7 }}>{msg}</div>}
           {specs.length === 0 && !d.categoryName && !desc && <div style={{ fontSize: 12, color: E.muted, marginTop: 8 }}>Caractéristiques pas encore captées pour cette annonce — rouvre-la sur eBay.</div>}
         </div>
       )}
@@ -27884,16 +27885,21 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
             puis une liste dont chaque ligne a la MÊME forme (titre à gauche, lien
             texte à droite) — avant, les liens étaient des boutons placés de deux
             façons selon la longueur du titre. */}
-        <div style={{ fontSize: 13, fontWeight: 700, color: E.text }}>{nSansPreuve} vente{un ? '' : 's'} Vinted pas encore reliée{un ? '' : 's'} à {un ? 'son' : 'leur'} annonce <span style={{ fontWeight: 500, color: E.muted }}>· {noms.join(', ')}</span></div>
-        <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, marginTop: 3 }}>Tant que ce n'est pas fait, VRM ne peut pas te dire de retirer {un ? 'sa' : 'leur'} paire d'eBay. {geste}</div>
-        <div style={{ display: 'flex', flexDirection: 'column', marginTop: 6 }}>
+        {/* (6 nov., Julien : « une ligne Adidas Ha… [Bordereau] ouvrir sur Vinted »)
+            Le titre court, le compte en petit, UNE phrase (le geste) ; le pourquoi
+            replié. Chaque vente : son titre LISIBLE (deux lignes), son compte, le
+            bordereau s'il peut se commander d'ici, « Ouvrir sur Vinted ». */}
+        <div style={{ fontSize: 15, fontWeight: 600, color: E.text, lineHeight: 1.3 }}>{nSansPreuve} vente{un ? '' : 's'} Vinted pas encore reliée{un ? '' : 's'} à {un ? 'son' : 'leur'} annonce</div>
+        <div style={{ fontSize: 12, color: E.muted, marginTop: 2 }}>{noms.join(', ')}</div>
+        <div style={{ fontSize: 13, color: E.muted, lineHeight: 1.5, marginTop: 6 }}>{geste} <Pourquoi label="Pourquoi">Tant que ce n'est pas fait, VRM ne peut pas te dire de retirer {un ? 'sa' : 'leur'} paire d'eBay quand elle se vend sur Vinted.</Pourquoi></div>
+        <div style={{ display: 'flex', flexDirection: 'column', marginTop: 8 }}>
           {sansPreuve.map((v) => (
-            <div key={v.uid + ':' + v.tx} data-ebay-sans-preuve-vente={v.tx} style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, minHeight: 44, borderTop: `1px solid ${E.border}` }}>
-              <span style={{ flex: '1 1 0', minWidth: 0, fontWeight: 600, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v.titre || `vente n° ${v.tx}`}{parCompte.size > 1 ? <span style={{ color: E.muted, fontWeight: 500 }}> · {nom(v.uid)}</span> : null}{v.bordCapte && <span data-ebay-sans-preuve-bord-capte={v.tx} style={{ color: E.muted, fontWeight: 500, fontSize: 12 }}> · bordereau déjà là (Ventes)</span>}</span>
+            <div key={v.uid + ':' + v.tx} data-ebay-sans-preuve-vente={v.tx} className="vrm-eb-sanspreuve-vente">
+              <span className="vrm-eb-sanspreuve-titre">{v.titre || `Vente n° ${v.tx}`}{(parCompte.size > 1 || v.bordCapte) ? <small>{parCompte.size > 1 ? nom(v.uid) : ''}{v.bordCapte && <span data-ebay-sans-preuve-bord-capte={v.tx}>{parCompte.size > 1 ? ' · ' : ''}bordereau déjà là (Ventes)</span>}</small> : null}</span>
               {aBouton(v) && (
                 <BoutonBordereau uid={v.uid} tx={String(v.tx)} conv={v.conv} login={nom(v.uid)} aGenerer pdf={false} sansRepli onFait={() => setPreuveRelue((n) => n + 1)} />
               )}
-              <a href={lienVente(v)} target="_blank" rel="noreferrer" style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', minHeight: 44, padding: '0 2px', fontSize: 13, fontWeight: 700, color: E.accentSoft, textDecoration: 'none', whiteSpace: 'nowrap' }}>ouvrir sur Vinted ↗</a>
+              <a href={lienVente(v)} target="_blank" rel="noreferrer" style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', minHeight: 44, padding: '0 2px', fontSize: 13, fontWeight: 600, color: E.accentSoft, textDecoration: 'none', whiteSpace: 'nowrap' }}>Ouvrir sur Vinted ↗</a>
             </div>
           ))}
         </div>
@@ -28109,16 +28115,27 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   return wrap(<>
     {head(itemsVue.length)}
     {(compteUnique || melangeAnnonces) && <div className="vrm-plat-intro" style={{ color: E.muted, fontSize: 12, marginBottom: 12 }}>{compteUnique ? `Sur ton compte eBay ${compteUnique}.` : `Sur tes ${new Set(itemsVue.map((a) => a._compte)).size} comptes eBay.`}</div>}
+    {/* (6 nov., Julien : « eBay, c'est vraiment pas ouf ») « À FAIRE » : chaque
+        ligne EST le geste (toute la ligne se touche) — elle filtre la liste
+        (« À relier », « Qui dorment » : appuyée, elle le montre ; retouchée, tout
+        revient) ou mène au bloc. Plus de boutons « Filtrer » / « Voir ». Le texte :
+        ce qu'il faut faire, puis pourquoi, en petit. */}
     {conseils.length > 0 && (
-      <div data-ebay-conseils={conseils.length} style={{ ...bloc(), marginBottom: 12 }}>
-        <div style={{ fontSize: 13, fontWeight: 800, color: E.text }}>À faire sur eBay</div>
-        {conseils.slice(0, 4).map((c, i) => (
-          <div key={c.k} data-ebay-conseil={c.k} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 0', borderTop: i ? `1px solid ${E.border}` : 'none' }}>
-            <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', background: c.urg ? E.warn : E.accentSoft, flexShrink: 0 }} />
-            <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: E.text, lineHeight: 1.4 }}>{c.txt}</span>
-            <button type="button" data-ebay-conseil-go={c.k} onClick={allerConseil(c)} style={{ ...lienE, padding: '4px 11px', fontSize: 12, flexShrink: 0 }}>{c.cta}</button>
-          </div>
-        ))}
+      <div className="vrm-eb-afaire" data-ebay-conseils={conseils.length}>
+        <div className="vrm-eb-afaire-titre">À faire sur eBay</div>
+        {conseils.slice(0, 4).map((c) => {
+          const [tete, ...raison] = String(c.txt).split(' — ');
+          const actif = !!c.filtre && filtreAnn === c.filtre;
+          return (
+            <button key={c.k} type="button" className="vrm-eb-afaire-ligne" data-ebay-conseil={c.k} data-ebay-conseil-go={c.k} data-urgent={c.urg ? '1' : undefined}
+              {...(c.filtre ? { 'aria-pressed': actif } : {})}
+              onClick={c.filtre && actif ? () => { setFiltreAnn('toutes'); setAnnMax(60); } : allerConseil(c)}>
+              <span className="vrm-eb-afaire-point" aria-hidden="true" />
+              <span>{tete}{raison.length ? <small>{raison.join(' — ')}</small> : null}</span>
+              <Icon name="chevron" size={14} style={{ flexShrink: 0, color: E.muted, opacity: 0.7, transform: actif ? 'rotate(90deg)' : 'none' }} />
+            </button>
+          );
+        })}
       </div>
     )}
     {publier}
@@ -28130,10 +28147,11 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
       <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Chercher un article (titre, N°, SKU)…" aria-label="Chercher une annonce eBay" data-ebay-recherche
         style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 12, border: `1px solid ${E.border}`, background: E.card, color: E.text, fontSize: 13, fontFamily: 'inherit' }} />
       {chipsAnn.length > 1 && (
-        <div className="vrm-rangee" style={{ gap: 8 }}>
+        // (6 nov.) La forme UNIQUE des filtres de l'app (`.vrm-filtres`, celle de Ventes).
+        <div className="vrm-rangee vrm-filtres" role="group" aria-label="Filtrer les annonces eBay" style={{ display: 'flex', gap: 6 }}>
           {chipsAnn.map(([k, label, n]) => (
             <button key={k} type="button" data-ebay-filtre={k} aria-pressed={filtreAnn === k} onClick={() => setFiltreAnn(k)}
-              style={{ ...lienE, padding: '5px 11px', whiteSpace: 'nowrap', fontWeight: filtreAnn === k ? 800 : 600, color: filtreAnn === k ? E.accentSoft : E.muted, borderColor: filtreAnn === k ? E.accentSoft : E.border }}>{label} {n}</button>
+              style={{ whiteSpace: 'nowrap', flexShrink: 0, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>{label} <span style={{ fontVariantNumeric: 'tabular-nums', opacity: 0.75 }}>{n}</span></button>
           ))}
         </div>
       )}
@@ -28172,7 +28190,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     )}
     {dvVue.nonReliees.length > 0 && (
       <div className="vrm-plat-note" data-ebay-non-reliees={dvVue.nonReliees.length} style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, margin: '0 2px 10px' }}>
-        <b style={{ color: E.text }}>{dvVue.nonReliees.length} annonce{dvVue.nonReliees.length > 1 ? 's' : ''} pas reliée{dvVue.nonReliees.length > 1 ? 's' : ''} à un article</b>{nonRelieesRegle > 0 ? <span data-ebay-non-reliees-regles={nonRelieesRegle} style={{ color: E.warn }}> — {nonRelieesRegle} avec{nonRelieesPeutEtre ? ' peut-être' : ''} une règle d'offre : si eBay en vend une, VRM ne saura pas laquelle retirer de Vinted</span> : null} <Pourquoi>Sans ce lien, VRM ne peut pas te dire de {dvVue.nonReliees.length > 1 ? 'les' : 'la'} retirer d'ici quand l'article se vend sur Vinted. « Relier à un article » sur sa carte — c'est toi qui choisis.{dvVue.nonReliees.some(skuEbayDouteux) ? ' Une annonce marquée « à vérifier » porte une référence VRM dont le numéro a été redonné depuis (panne du 18 octobre) ou est porté par deux articles : VRM ne la compte plus, ni comme « en vente », ni pour le retrait automatique, tant que tu ne l\'as pas reliée.' : ''}</Pourquoi>
+        <b style={{ color: E.text }}>{dvVue.nonReliees.length} annonce{dvVue.nonReliees.length > 1 ? 's' : ''} pas reliée{dvVue.nonReliees.length > 1 ? 's' : ''} à un article</b>{nonRelieesRegle > 0 ? <span data-ebay-non-reliees-regles={nonRelieesRegle} style={{ color: E.warn }}> — {nonRelieesRegle} avec{nonRelieesPeutEtre ? ' peut-être' : ''} une règle d'offre : si eBay en vend une, VRM ne saura pas laquelle retirer de Vinted</span> : null} <Pourquoi>Sans ce lien, VRM ne peut pas te dire de {dvVue.nonReliees.length > 1 ? 'les' : 'la'} retirer d'ici quand l'article se vend sur Vinted. « Relier à un article » sur sa carte — c'est toi qui choisis.{dvVue.nonReliees.some(skuEbayDouteux) ? ` ${dvVue.nonReliees.filter(skuEbayDouteux).length === 1 ? 'Une d\'elles porte' : `${dvVue.nonReliees.filter(skuEbayDouteux).length} d'entre elles portent`} une référence VRM dont le numéro a été redonné depuis (panne du 18 octobre) ou est porté par deux articles : VRM ne la compte plus, ni comme « en vente », ni pour le retrait automatique, tant que tu ne l'as pas reliée (sa fiche le dit).` : ''}</Pourquoi>
       </div>
     )}
       {outilsSuite(bloqueCommun === 'pas-su' ? [...pasSu, ...pasSuVentes] : pasSu)}
@@ -35186,8 +35204,8 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   const vcSansNum = aa ? (aa.vcSansNumero || []) : [];
   const vcNonDites = aa ? (aa.vcNonJugees || []) : [];
   const aConfVoir = aa ? aa.aConfirmerComptes.filter((c) => !filtreCompte || c.uid === filtreCompte) : [];
-  const aConfTxt = aConfVoir.map((c) => (c.plateforme === 'vestiaire' ? (c.vieille ? `Vestiaire, ${depuisQuand(c.lu)}` : 'Vestiaire, plus vues dans ta dernière liste') : `${c.nom}, ${depuisQuand(c.lu)}`)).join(' ; ');
-  const aConfGeste = [aConfVoir.some((c) => c.plateforme !== 'vestiaire') ? 'plus de 24 h : repasse sur Vinted avec ce compte' : '', aConfVoir.some((c) => c.plateforme === 'vestiaire') ? 'ouvre « Mes articles » sur Vestiaire' : ''].filter(Boolean).join(' ; ');
+  const aConfTxt = aConfVoir.map((c) => (c.plateforme === 'vestiaire' ? (c.vieille ? `Vestiaire, ${depuisQuand(c.lu)}` : 'Vestiaire, plus vues dans ta dernière liste') : c.plateforme === 'leboncoin' ? `Leboncoin, ${quandLectureLbc(c.lu)}` : `${c.nom}, ${depuisQuand(c.lu)}`)).join(' ; ');
+  const aConfGeste = [aConfVoir.some((c) => c.plateforme === 'vinted') ? 'plus de 24 h : repasse sur Vinted avec ce compte' : '', aConfVoir.some((c) => c.plateforme === 'vestiaire') ? 'ouvre « Mes articles » sur Vestiaire' : '', aConfVoir.some((c) => c.plateforme === 'leboncoin') ? 'ouvre « Mes annonces » sur leboncoin.fr' : ''].filter(Boolean).join(' ; ');
   const blocResume = (
     <Card style={{ padding: '13px 14px' }}>
       <div className="vrm-s2d-resume" data-stock-actuelles={lecture === undefined ? 'encours' : (aa && aa.su ? nAffiche : 'passu')} data-stock-au-moins={aa && aa.auMoins ? '1' : '0'} data-stock-a-confirmer={aa && aa.su ? nAConf : undefined} data-stock-masquees={aa && aa.su ? nMasq : undefined} data-stock-rangees={aa && aa.su ? nRangees : undefined}>
@@ -62660,11 +62678,15 @@ async function lbcListingsSession() {
 // (5 nov.) Les annonces Leboncoin EN VENTE (la règle `annonceLbcEnVente`, §11)
 // avec leur N° par IDENTITÉ (`numeroLbcIdentite` : lien posé à la main, référence
 // VRM — jamais le « nXXX » d'un titre). Seulement ses annonces reliées à VRM
-// (référence ou lien). Rend `[{ numero, title, photo }]`, ou `null` = pas su.
+// (référence ou lien). Rend `[{ numero, title, photo, etat, lu }]`, ou `null` = pas su.
 // Lue par Annonces (les paires présentes) et par le Stock (annonces actuelles).
+// (6 nov.) `etat` : la règle « en ligne » de Leboncoin (src/enLigneLbc.js) —
+// 'enligne' (lecture complète de « Mes annonces » de moins de 24 h) ou
+// 'aconfirmer' (plus vieille, ou jamais faite) ; `lu` = sa date (ms | null).
 async function lireLbcEnVente() {
   try {
-    const items = await lbcAnnoncesSession();
+    const ls = await lbcListingsSession();
+    const items = ls ? ls.items : null;
     if (!items) return null;
     const vr = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`, { headers: sbAuth() });
     if (!vr.ok) return null;
@@ -62676,7 +62698,8 @@ async function lireLbcEnVente() {
       if (!annonceLbcEnVente(ad, vendues)) continue;
       if (!(ad.ref || ad.customRef || (liens[String(ad.id)] != null && String(liens[String(ad.id)]).trim()))) continue;   // pas une de ses annonces reliées
       const n = numeroLbcIdentite({ itemId: ad.id }, items, liens);
-      liste.push({ numero: n || '', title: ad.subject || ad.title || '', photo: (Array.isArray(ad.images) && typeof ad.images[0] === 'string' && ad.images[0]) || null });
+      const e = etatEnLigneLbc(ad, { enVente: (x) => annonceLbcEnVente(x, vendues), lectures: ls.lectures || {}, maintenant: Date.now() });
+      liste.push({ numero: n || '', title: ad.subject || ad.title || '', photo: (Array.isArray(ad.images) && typeof ad.images[0] === 'string' && ad.images[0]) || null, etat: e.etat === 'enligne' ? 'enligne' : 'aconfirmer', lu: Number.isFinite(e.lu) ? e.lu : null });
     }
     return liste;
   } catch (_) { return null; }
@@ -64065,6 +64088,13 @@ function LeboncoinScreen() {
     // propre bloc (vendue ici, encore sur Vinted ?).
     const vendusLbc = annoncesLbcVendues(ventesLbc);
     const liveAds = lbcAds.filter(ad => annonceLbcEnVente(ad, vendusLbc) && aLui(ad));
+    // (6 nov.) CE QU'ON COMPTE « EN LIGNE » : la règle de Vinted appliquée à
+    // Leboncoin (src/enLigneLbc.js) — la lecture COMPLÈTE de « Mes annonces » de
+    // son compte, de moins de 24 h. Plus vieille ou jamais faite ⇒ « à confirmer »
+    // (hors du compte, rien effacé). `liveAds` (la règle partagée) reste ce qui
+    // PROTÈGE : file à publier, « à retirer » — une annonce à confirmer peut
+    // encore être en ligne (sens sûr).
+    const bilanLbc = bilanEnLigneLbc(lbcAds.filter(aLui), { enVente: (ad) => annonceLbcEnVente(ad, vendusLbc), lectures: (lbcRows && lbcRows[0] && lbcRows[0].lectures) || {}, maintenant: Date.now() });
     // (22 oct.) Ce qui n'est plus compté en ligne : plus vue dans une liste
     // COMPLÈTE de son compte, ou mise en pause depuis VRM. Rien n'est effacé ;
     // l'écran le dit, une fois. Et les N° dont l'annonce est sortie : plus rien
@@ -64335,7 +64365,7 @@ function LeboncoinScreen() {
     // (capture de la page) : `lbcUser` seul comptait 0 annonce par compte.
     for (const ad of liveAds) { const k = String(ad.account || ad.lbcUser || '?'); (parCompte[k] = parCompte[k] || []).push(ad); }
     if (!estActif()) return;
-    setData({ catalogueAds: lbcAds.filter(aLui), catalogueVentes: ventesLbc, sortiesLbc: sortiesLbc.map((a) => { const q = lbcSortieDe(a); return { id: String(a.id), plusVueAt: q === 'plusvue' ? a.plusVueAt : null, pauseAt: q === 'pause' ? a.pauseAt : null, compte: String(a.account || a.lbcUser || '') }; }), lecturesLbc, pasRevues: pasRevues.length, pasRevuesJours: pasRevues.length ? Math.floor(Math.min(...pasRevues.map(lbcJoursSansVoir))) : 0, liensPoses, liensMain: liens, preuveKO, aConfirmer: aConfirmerIds.size, echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu: lbcJamaisLu || (lbcRows !== null && liveAds.length === 0), lbcKO: lbcRows === null, vendues, nEnLigne: online.length, nNumerotees, queue, removals, unlinked: unlinkedAsk, nonRelieesSansJumelle, ventesSansJumelle, doublons, aRelierVentes, ventesLbcKO, numsConnus: [...keysKnown], liveAds, autoMatched, retirees, repub: (preuveKO || ventesLbcKO || postedRows === null || lbcRows === null) ? null : repub, repubKO, lbcAccounts, lbcConnecte, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: liveAds.length, limit: pd.limit, plan: pd.plan, prep });
+    setData({ catalogueAds: lbcAds.filter(aLui), catalogueVentes: ventesLbc, sortiesLbc: sortiesLbc.map((a) => { const q = lbcSortieDe(a); return { id: String(a.id), plusVueAt: q === 'plusvue' ? a.plusVueAt : null, pauseAt: q === 'pause' ? a.pauseAt : null, compte: String(a.account || a.lbcUser || '') }; }), lecturesLbc, pasRevues: pasRevues.length, pasRevuesJours: pasRevues.length ? Math.floor(Math.min(...pasRevues.map(lbcJoursSansVoir))) : 0, liensPoses, liensMain: liens, preuveKO, aConfirmer: aConfirmerIds.size, echecLecture: echecLecture || listRowsBrut === null, lbcJamaisLu: lbcJamaisLu || (lbcRows !== null && liveAds.length === 0), lbcKO: lbcRows === null, vendues, nEnLigne: online.length, nNumerotees, queue, removals, unlinked: unlinkedAsk, nonRelieesSansJumelle, ventesSansJumelle, doublons, aRelierVentes, ventesLbcKO, numsConnus: [...keysKnown], liveAds, autoMatched, retirees, repub: (preuveKO || ventesLbcKO || postedRows === null || lbcRows === null) ? null : repub, repubKO, lbcAccounts, lbcConnecte, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: bilanLbc.enLigne.length, lbcAConfirmer: { n: bilanLbc.aConfirmer.length, ids: bilanLbc.aConfirmer.map((a) => String(a.id)), lu: bilanLbc.comptes.reduce((m, c) => (Number.isFinite(c.lu) && (m == null || c.lu < m) ? c.lu : m), null), jamais: bilanLbc.comptes.some((c) => !Number.isFinite(c.lu)) }, limit: pd.limit, plan: pd.plan, prep });
     setLoading(false);
   };
   useEffect(() => {
@@ -64449,10 +64479,15 @@ function LeboncoinScreen() {
     else toast('Cet article n’est pas dans ta file « À publier » Leboncoin (déjà publié, retiré de Leboncoin, vendu ou plus en ligne sur Vinted).');
   }, [data]);
   const [repubOuvert, setRepubOuvert] = useState(false);
-  const n = data ? Math.max(data.postedCount, data.lbcCount) : 0;
+  // (6 nov.) Le nombre affiché = les annonces EN LIGNE (src/enLigneLbc.js) ; les
+  // « à confirmer » sont dites à côté, jamais comptées. La jauge de la limite,
+  // elle, reste prudente : marques « publiée » ou annonces pas encore sorties.
+  const nAConf = data && data.lbcAConfirmer ? data.lbcAConfirmer.n : 0;
+  const n = data ? data.lbcCount : 0;
+  const nQuota = data ? Math.max(data.postedCount, data.lbcCount + nAConf) : 0;
   const lim = data ? (data.limit || null) : null;
-  const pct = lim ? Math.min(100, Math.round((n / lim) * 100)) : 0;
-  const barCol = lim ? (n >= lim ? C.danger : n >= lim - 3 ? C.warn : INV_STATUS.online.color) : C.muted;
+  const pct = lim ? Math.min(100, Math.round((nQuota / lim) * 100)) : 0;
+  const barCol = lim ? (nQuota >= lim ? C.danger : nQuota >= lim - 3 ? C.warn : INV_STATUS.online.color) : C.muted;
   // (16 oct.) Mise en page dans l'identité de l'app : cartes blanches à ombre
   // douce, titres courts, une colonne plus large sur ordinateur (elle faisait
   // 600 px et tout s'empilait en pavés).
@@ -64601,7 +64636,15 @@ function LeboncoinScreen() {
         </div>
       ) : null}
       {repubOuvert && data && Array.isArray(data.repub) && <RepublierLeboncoin liste={data.repub} exclues={data.repubKO || {}} onClose={() => setRepubOuvert(false)} onFini={reload}/>}
-      {data && <AnnoncesLeboncoin owner={AUTH.user?.id||''} floute={(ad) => lbcFloute(lbcOuvert, ad && (ad.account || ad.lbcUser))} annonces={data.catalogueAds} ventes={data.catalogueVentes} lectureKO={data.lbcKO} numeroDe={numeroAnnonceLbc} sortieDe={lbcSortieDe} onSupprimer={supprEtat() === 'ok' ? supprimerSurLbc : null} enVol={pauseEnVol ? String(pauseEnVol) : null}/>}
+      {data && <AnnoncesLeboncoin owner={AUTH.user?.id||''} floute={(ad) => lbcFloute(lbcOuvert, ad && (ad.account || ad.lbcUser))} aConfirmerDe={(ad) => !!(data.lbcAConfirmer && data.lbcAConfirmer.ids.includes(String(ad && ad.id)))} confirmer={nAConf > 0 ? (() => {
+        const pe = pauseEtat(), A = data.lbcAConfirmer;
+        return <>{A.jamais ? 'Ta liste « Mes annonces » n’a jamais été lue en entier' : `Ta liste « Mes annonces » a été ${quandLectureLbc(A.lu)}`} : je ne sais pas si ces annonces sont encore en ligne. Elles sont « à confirmer » — pas comptées, rien n’est effacé.{' '}
+          {pe === 'absente'
+            ? <>Sur l’ordinateur où l’extension est installée, ouvre « Mes annonces » sur leboncoin.fr, sur chacun de tes comptes.</>
+            : pe === 'retard'
+              ? <>Mets l’extension à jour, puis ouvre « Mes annonces » sur leboncoin.fr, sur chacun de tes comptes.</>
+              : <><a href={LIEN_MES_ANNONCES_LBC} target="_blank" rel="noreferrer" data-lbc-ouvrir-mes-annonces="">Ouvrir « Mes annonces » sur leboncoin.fr ↗</a> — sur chacun de tes comptes : l’extension relit la liste en entier.</>}</>;
+      })() : null} annonces={data.catalogueAds} ventes={data.catalogueVentes} lectureKO={data.lbcKO} numeroDe={numeroAnnonceLbc} sortieDe={lbcSortieDe} onSupprimer={supprEtat() === 'ok' ? supprimerSurLbc : null} enVol={pauseEnVol ? String(pauseEnVol) : null}/>}
       {/* ⚠️ UNE LECTURE RATÉE SE DIT UNE FOIS (§7). L'écran la disait jusqu'à quatre
           fois (ventes Leboncoin, compteur, preuve de vente, file vide) et, sur une
           lecture ratée de ses annonces Leboncoin, il affirmait « je n'ai pas encore
@@ -64629,10 +64672,15 @@ function LeboncoinScreen() {
             une offre (main) — mais elle porte aussi « plus comptées en ligne » et
             « pas revues » (lot Leboncoin) : sans limite connue, ces deux lignes
             disparaissaient. Elle s'affiche dès que l'une des quatre a quelque chose à dire. */}
-        {(lim || data.plan || (data.sortiesLbc || []).length > 0 || data.pasRevues > 0) && <Card className="vrm-lbc-compteur">
+        {(lim || data.plan || (data.sortiesLbc || []).length > 0 || data.pasRevues > 0 || nAConf > 0) && <Card className="vrm-lbc-compteur">
+          {/* (6 nov.) « 0 » qui veut dire « je ne sais pas » s'écrit « — » (§5) :
+              aucune annonce confirmée en ligne, mais des annonces à confirmer. */}
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-            <span className="vrm-display" style={{ fontSize: 20, fontWeight: 700, color: C.text }}>{(data.lbcJamaisLu || data.lbcKO) && !data.postedCount ? '—' : n}</span>
-            <span style={{ fontSize: 15, color: C.muted, fontWeight: 500 }}>annonce{n > 1 ? 's' : ''} sur Leboncoin{lim ? ` / ${lim}` : ''}</span>
+            <span className="vrm-display" data-lbc-en-ligne={data.lbcKO || (n === 0 && nAConf > 0) ? '' : String(n)} style={{ fontSize: 20, fontWeight: 700, color: C.text }}>{data.lbcKO || (data.lbcJamaisLu && !data.postedCount) || (n === 0 && nAConf > 0) ? '—' : n}</span>
+            <span style={{ fontSize: 15, color: C.muted, fontWeight: 500 }}>annonce{n > 1 ? 's' : ''} en ligne sur Leboncoin{lim ? ` / ${lim}` : ''}</span>
+            {/* (6 nov.) « À CONFIRMER » (src/enLigneLbc.js) : le nombre ici ; la raison
+                et le geste UNE fois, en tête de « Mes annonces » (là où sont les cartes). */}
+            {nAConf > 0 && <span data-lbc-a-confirmer={nAConf} style={{ fontSize: 15, color: C.warn, fontWeight: 600 }}>· {nAConf} à confirmer</span>}
           </div>
           {data.lbcJamaisLu && !data.postedCount && (
             <div style={{ fontSize: 12, color: C.warn, fontWeight: 600, marginTop: 5, lineHeight: 1.5 }}>
@@ -64645,7 +64693,7 @@ function LeboncoinScreen() {
           {data.plan ? <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, marginTop: 2 }}>Offre : {data.plan}</div> : null}
           {lim ? (<>
             <div style={{ height: 8, borderRadius: 999, background: C.border, overflow: 'hidden', marginTop: 9 }}><div style={{ width: pct + '%', height: '100%', background: barCol, borderRadius: 999 }} /></div>
-            <div style={{ fontSize: 12, fontWeight: 700, marginTop: 5, color: barCol }}>{n >= lim ? 'Limite atteinte' : n >= lim - 3 ? 'Tu approches de ta limite' : `Il te reste ${lim - n} annonce${lim - n > 1 ? 's' : ''}`}</div>
+            <div style={{ fontSize: 12, fontWeight: 700, marginTop: 5, color: barCol }}>{nQuota >= lim ? 'Limite atteinte' : nQuota >= lim - 3 ? 'Tu approches de ta limite' : `Il te reste ${lim - nQuota} annonce${lim - nQuota > 1 ? 's' : ''}`}</div>
           </>) : null}
           {/* (22 oct.) Une liste COMPLÈTE de son compte ne montre plus certaines
               annonces : elles ne sont plus comptées en ligne. On dit combien et
@@ -64666,7 +64714,7 @@ function LeboncoinScreen() {
           })()}
           {/* (22 oct.) Pas revues depuis plus de 7 jours : on ne sait pas si elles
               y sont encore. Le geste qui tranche, selon l'extension d'ici. */}
-          {data.pasRevues > 0 && (() => {
+          {data.pasRevues > 0 && !nAConf && (() => {
             const pe = pauseEtat();
             return (
               <div data-lbc-pas-revues={data.pasRevues} style={{ fontSize: 12, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>
@@ -72646,7 +72694,6 @@ function AppCoeur() {
           {sec==='promo'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayPromotion key={'pr-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/>}</EbayActionCompte></div>}
           {sec==='achats'&&<EbayAchatsOnglet headers={enTeteSession} panelOff={panelOffCoque} vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}/>}
           {sec==='offres'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayOffres key={ref} cible={ebayCible?.compte===ref && ebayCible.section==='offres'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref} onAnnonces={()=>allerSec('annonces')}/>}</EbayActionCompte></div>}
-          {sec==='annonces'&&!baseKO&&<EntreePublierAilleurs site="ebay"/>}
           {sec==='annonces'&&<EbayAnnonces baseKO={baseKO} comptes={vintedAccounts} vue={ebayVueEff} comptesEbay={comptesEbay}/>}
         </section>); };
   // Compte eBay : un panneau des Paramètres (« Comptes eBay »), dans le skin eBay.

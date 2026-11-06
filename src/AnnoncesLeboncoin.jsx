@@ -17,7 +17,7 @@ function Photo({src}) {
 // (`onSupprimer` : l'extension de ce Chrome sait le faire), sur une annonce
 // encore en ligne ou en pause — jamais sur une vendue ou déjà retirée. Le parent
 // confirme (« sans retour ») et envoie ; ici on ne fait que proposer le geste.
-const SUPPRIMABLE = new Set(['active','pause','inconnu']);
+const SUPPRIMABLE = new Set(['active','aconfirmer','pause','inconnu']);
 // (29 oct., « mêmes méthodes d'affichage que Vinted ») Sous le titre, les
 // CHIFFRES de l'annonce quand Leboncoin les a donnés (statistiques lues par
 // l'extension sur sa page de statistiques : favoris, vues, messages) et depuis
@@ -32,14 +32,18 @@ export function chiffresAnnonceLbc(ad) {
  if (Number.isFinite(s.messages)) out.push(pluriel(s.messages, 'message'));
  return out.join(' · ');
 }
-export default function AnnoncesLeboncoin({annonces=[],ventes={},lectureKO=false,numeroDe=null,owner='',sortieDe=null,onSupprimer=null,enVol=null,floute=null}) {
+// (6 nov.) `aConfirmerDe(ad)` : la règle « en ligne » de Leboncoin
+// (src/enLigneLbc.js) ; `confirmer` : la raison et le geste (rendus par l'écran,
+// qui sait l'état de l'extension), dits UNE fois en tête de la liste (§7).
+export default function AnnoncesLeboncoin({annonces=[],ventes={},lectureKO=false,numeroDe=null,owner='',sortieDe=null,onSupprimer=null,enVol=null,floute=null,aConfirmerDe=null,confirmer=null}) {
  // (31 oct.) `floute(ad)` : l'annonce d'un AUTRE compte que le compte Leboncoin
  // ouvert reste visible, estompée (le même STYLE_FLOU que Vinted, §11).
  const estFloute=ad=>typeof floute==='function'&&!!floute(ad);
  const [recherche,setRecherche]=useState(''),[filtre,setFiltre]=useState('toutes');
- const lignes=useMemo(()=>annonces.map(ad=>({ad,num:(numeroDe&&numeroDe(ad))||'',...etatAnnonceLeboncoin(ad,ventes,sortieDe)})),[annonces,ventes,numeroDe,sortieDe]);
- const choix=[['toutes','Toutes'],['active','Actives'],['pause','En pause'],['vendue','Vendues'],['autres','Retirées et autres']];
- const visibles=lignes.filter(l=>(filtre==='toutes'||(filtre==='autres'?!['active','pause','vendue'].includes(l.etat):l.etat===filtre))
+ const lignes=useMemo(()=>annonces.map(ad=>({ad,num:(numeroDe&&numeroDe(ad))||'',...etatAnnonceLeboncoin(ad,ventes,sortieDe,aConfirmerDe)})),[annonces,ventes,numeroDe,sortieDe,aConfirmerDe]);
+ const choix=[['toutes','Toutes'],['active','En ligne'],['aconfirmer','À confirmer'],['pause','En pause'],['vendue','Vendues'],['autres','Retirées et autres']];
+ const CONNUS=['active','aconfirmer','pause','vendue'];
+ const visibles=lignes.filter(l=>(filtre==='toutes'||(filtre==='autres'?!CONNUS.includes(l.etat):l.etat===filtre))
   && [l.ad.subject,l.ad.title,l.ad.accountName,l.num?'N°'+l.num:''].join(' ').toLocaleLowerCase('fr').includes(recherche.trim().toLocaleLowerCase('fr')));
  const compteDe=ad=>String(ad?.account||ad?.lbcUser||'non-attribue');
  const comptesBilan=[...new Map(annonces.map(ad=>[compteDe(ad),{uid:compteDe(ad),nom:ad.accountName||(compteDe(ad)==='non-attribue'?'Compte Leboncoin non attribué':compteDe(ad))}])).values()];
@@ -48,8 +52,9 @@ export default function AnnoncesLeboncoin({annonces=[],ventes={},lectureKO=false
   <BilanSynchronisation owner={owner} sources={bilan}/>
   <header><div><h2>Mes annonces</h2></div><span>{lectureKO?'Lecture indisponible':`${lignes.length} reçue${lignes.length>1?'s':''}`}</span></header>
   {lectureKO?<p role="status">Impossible de relire tes annonces. L’historique reste conservé.</p>:<>
+   {confirmer&&lignes.some(l=>l.etat==='aconfirmer')&&<p className="vrm-lbc-catalog-confirmer" data-lbc-confirmer-phrase="">{confirmer}</p>}
    <input type="search" aria-label="Rechercher une annonce Leboncoin" placeholder="Rechercher un article, un compte…" value={recherche} onChange={e=>setRecherche(e.target.value)}/>
-   <div className="vrm-lbc-catalog-filtres" role="group" aria-label="État des annonces Leboncoin">{choix.map(([id,nom])=><button key={id} type="button" aria-pressed={filtre===id} onClick={()=>setFiltre(id)}>{nom}<span>{id==='toutes'?lignes.length:lignes.filter(l=>id==='autres'?!['active','pause','vendue'].includes(l.etat):l.etat===id).length}</span></button>)}</div>
+   <div className="vrm-lbc-catalog-filtres" role="group" aria-label="État des annonces Leboncoin">{choix.filter(([id])=>id!=='aconfirmer'||lignes.some(l=>l.etat==='aconfirmer')).map(([id,nom])=><button key={id} type="button" aria-pressed={filtre===id} onClick={()=>setFiltre(id)}>{nom}<span>{id==='toutes'?lignes.length:lignes.filter(l=>id==='autres'?!CONNUS.includes(l.etat):l.etat===id).length}</span></button>)}</div>
    {!visibles.length?<p className="vrm-lbc-catalog-vide">{lignes.length?'Aucune annonce dans cette sélection.':'Aucune annonce'}</p>:
     <ul>{visibles.map(({ad,num,etat,label,livraison,suivi})=>{const lien=lienAnnonceLeboncoin(ad);return <li key={ad.id} data-lbc-catalog-id={ad.id} data-lbc-catalog-etat={etat} data-flou={estFloute(ad)?'1':'0'} style={estFloute(ad)?STYLE_FLOU:undefined}>
      <Photo key={ad.images?.[0]||ad.id} src={ad.images?.[0]}/><div className="vrm-lbc-catalog-info"><strong>{ad.subject||ad.title||'Annonce sans titre'}</strong><small>{ad.accountName||'Compte sans nom'}{num?<span data-lbc-catalog-num={num}>{` · N°${num}`}</span>:''}{etat==='active'&&dateCourte(ad.publieeLe)?<span data-lbc-catalog-depuis="">{` · en ligne depuis le ${dateCourte(ad.publieeLe)}`}</span>:''}</small><div><span data-etat={etat}>{label}</span>{suivi&&<small>{livraison?'Livraison':'Vente'} · {suivi}</small>}{chiffresAnnonceLbc(ad)&&<small data-lbc-catalog-chiffres="">{chiffresAnnonceLbc(ad)}</small>}</div></div>
