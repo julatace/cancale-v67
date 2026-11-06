@@ -110,9 +110,12 @@ const projette = (row, sel) => {
       dit(await pg.evaluate(()=>JSON.parse(localStorage.getItem('vrm_imprimante')))==='normale', `${largeur} : retour au format A4 cohérent`);
       dit(await pg.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1), `${largeur} : aucun débordement horizontal`);
       await pg.screenshot({path:`/tmp/vrm-parametres-${largeur}.png`,fullPage:true});
-      await pg.evaluate(()=>window.dispatchEvent(new Event('vrm:ouvrir-adresses')));
-      await pg.waitForSelector('[data-reglage-adresses]',{state:'visible'});
-      dit(await pg.locator('[data-reglages-disposition]').getAttribute('data-sous-ecran-ouvert')==='adresses', `${largeur} : un raccourci ouvre les adresses au lieu de défiler vers un panneau caché`);
+      // (5 nov., chantiers G et H) Les adresses ne sont plus un sous-écran de Paramètres : la
+      // ligne « E-mails » MÈNE à l'écran E-mails (« Relier ma boîte »), au lieu d'un panneau caché.
+      await pg.locator('[data-sous-retour]').click().catch(() => {});
+      await pg.locator('[data-reglage-emails]').first().click();
+      await pg.waitForSelector('.vrm-main[data-ecran="emails"]',{timeout:15000}).catch(() => {});
+      dit(await pg.evaluate(()=>(document.querySelector('.vrm-main')||{}).getAttribute?.('data-ecran'))==='emails', `${largeur} : un raccourci ouvre les adresses (l'écran E-mails) au lieu de défiler vers un panneau caché`);
     }
     dit(errs.length === 0, 'aucune erreur d’app', errs.join(' | ').slice(0, 160));
     await ctx.close();

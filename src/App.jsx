@@ -64444,7 +64444,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
 
       {!ouvert && <>
         {profil}
-        {voirReglages && <ActionsReglages comptes={comptes||[]} onOuvrir={id=>id==='comptes'?setTab('vintedaccounts'):ouvrirSous(id)}/>}
+        {voirReglages && <ActionsReglages comptes={comptes||[]} onOuvrir={id=>id==='comptes'?setTab('vintedaccounts'):id==='adresses'?(ouvrirEmailsRelier('reception'),setTab('emails')):ouvrirSous(id)}/>}
         {/* (5 nov., chantier H) LE champ de recherche de l'app (`ChampRecherche`). */}
         {voirReglages && <ChampRecherche valeur={rechercheReglage} onChange={setRechercheReglage} placeholder={`Rechercher dans ${titreRetour}`} label="Rechercher dans les paramètres" className="vrm-set-recherche" data-recherche-reglages=""/>}
         {(() => {

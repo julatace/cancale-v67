@@ -104,7 +104,7 @@ const mesurer = (pg, mobile) => pg.evaluate((mobile) => {
     deb: document.documentElement.scrollWidth - document.documentElement.clientWidth,
     tombe: /pas pu s'afficher|Cannot access|is not defined/.test(document.body.innerText),
     petites,
-    sous: [...document.querySelectorAll('[data-sous-ouvrir]')].filter(visible).map((e) => e.getAttribute('data-sous-ouvrir')),
+    sous: [...document.querySelectorAll('[data-sous-ouvrir][aria-haspopup]')].filter(visible).map((e) => e.getAttribute('data-sous-ouvrir')),   // (5 nov., chantier H) un SOUS-ÉCRAN s'ouvre (aria-haspopup) ; « E-mails » mène à son écran (chantier G)
     panneauxVisibles: [...document.querySelectorAll('[data-sous-ecran]')].filter(visible).length,
     disposition: racine ? racine.getAttribute('data-reglages-disposition') : null,
   };

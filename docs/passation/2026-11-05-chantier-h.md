@@ -165,7 +165,11 @@ en cours de route). Rien dans `vinted-sync-extension/`, `public/` remis à l'ide
 - Bancs adaptés (ils jugeaient l'ancien rendu, pas la règle) : `reglages-premium` (la photo est
   DANS la carte du profil : « même lettre » devient « une seule lettre ») ; `parametres-guides`
   (la croix de `ChampRecherche` au lieu du bouton « Effacer la recherche des paramètres ») ;
-  `attente-email` (« Changer mon e-mail »).
+  `attente-email` (« Changer mon e-mail ») ; après la fusion du chantier G (E-mails = un écran,
+  la ligne « E-mails » de Paramètres y mène) : `reglages-premium` ne compte comme sous-écran
+  que ce qui en ouvre un (`aria-haspopup`), `parametres-guides` touche « E-mails » et attend
+  l'écran E-mails ; « À terminer → Vérifier » (adresses à confirmer) mène à l'écran E-mails
+  (il ouvrait un sous-écran qui n'existe plus : le bouton ne faisait rien).
 - Voisins et audits, base (`claude/project-review-nsk5su`, arbre construit à part) → après :
   `jetons-coherence` 3 rouges (Stock, « au moins » en tnum, hors zone) → vert sur l'intégré ;
   `composants` 274/0 ; `audit-rouge-doublon`, `audit-composants`, `audit-identite`,
