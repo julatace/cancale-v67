@@ -57,7 +57,11 @@ const ACCS = [{ id: 1, vinted_user_id: '111', login: 'compte_test', domain: 'www
 const MAIN = { vinted_annonce_numeros: { 9102: { numero: '42' }, 9103: { numero: '43' }, 9104: { numero: '44' }, 9110: { numero: '45' }, 9301: { numero: '50' } } };
 const lignes = (etat) => {
   // L'ancienne n'est plus en ligne : Vinted la rend fermée (même nombre d'annonces lues : une lecture plus courte ne remplacerait pas la plus riche, §4.2).
-  const i111 = ITEMS_111.map((x) => ((x.id === 9102 && etat.sans9102) || (x.id === 9110 && etat.sans9110) ? { ...x, is_closed: true } : x));
+  // (6 nov.) Les « nouvelles » annonces sont datées au moment où la page les LIT, pas au lancement du
+  // banc : sous charge, une vue passait 10 min après le départ et la règle « mise en ligne bien avant
+  // qu'il commence » (candidatsNouvelle) les écartait — un faux rouge de minuterie.
+  const mnt = Math.floor(Date.now() / 1000); const frais = { 9120: 60, 9121: 50 };
+  const i111 = ITEMS_111.map((x) => ((x.id === 9102 && etat.sans9102) || (x.id === 9110 && etat.sans9110) ? { ...x, is_closed: true } : x)).map((x) => (frais[x.id] ? { ...x, created_at_ts: mnt - frais[x.id] } : x));
   return [
     { id: 'main', data: MAIN },
     { id: 'harvest_111_listings', data: { capturedAt: auj.toISOString(), payload: { items: i111, pagination: { total_entries: i111.length } } } },

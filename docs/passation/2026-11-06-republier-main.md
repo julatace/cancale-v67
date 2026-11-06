@@ -109,15 +109,51 @@ Règles tenues : rien d'automatique côté Vinted, aucune suppression, identité
   qui partagerait, `filtreReglages` recopié dans annoncesActions) et 8 règles affaiblies (bornes
   qui divergent de l'extension, rotation oubliée, baisse ignorée, N° oublié, lettre empilée,
   plancher oublié, prix pas lu = 0, valeur inconnue gardée).
-- Arbre d'avant (`git archive 46f18482`) : RESULTATS_AVANT
+- Arbre d'avant (`git archive 46f18482`, l'audit copié dedans) : **10 rouges sur 13** — pas
+  seulement « module absent » : l'atelier et la main n'ont pas de source commune, App.jsx et
+  annoncesActions.js portent chacun leur copie (prix, filtre, rotation), clé non synchronisée,
+  rien n'est dit. Divergence MESURÉE sur cet arbre (sa `filtreReglages` contre la
+  `reglagesPhotoSurs` de l'extension, exécutées) : zoom 1,8 réglé dans l'atelier ⇒ la main
+  téléchargeait une photo zoomée à 1,5, l'extension à 1,8 ; lumière 1,55 ⇒ la main 1,55,
+  l'extension 1,5.
+- Banc `republier-main` sur le build de l'arbre d'avant (390 clair) : rouge — l'atelier ne dit
+  pas « Mêmes réglages », n'écrit aucune clé commune, rien de « gardé » ; « Republier à la main »
+  sur deux paires est refusé (« Une annonce à la fois : coche-n'en qu'une », capture regardée) et
+  le parcours s'arrête.
 - `audit-annonces-actions` 63/63 (B5 « à la main » plusieurs, B19 comptes mélangés, B20 compte
   inconnu, E1 bornes de l'extension) ; `--prouve` 21/21.
 - Verts : `audit-coherence`, `audit-identite`, `audit-etiquette-numero`, `audit-republier`,
   `audit-republier-question`, `audit-republier-plusieurs-chrome`, `audit-tdz`, `audit-variables`,
   `audit-boutons`, `audit-icones`, `audit-rouge-doublon`, `audit-chrome-en-dur`.
 - Banc `scripts/bancs/republier-main.cjs` (données inventées, 390 tactile et 1512, clair et
-  sombre) : RESULTATS_BANC
-- Bancs voisins : RESULTATS_VOISINS
+  sombre ; photos du CDN servies par une vraie petite image) — par vue : régler dans l'atelier
+  (−10 %, zoom 1,2, lettre) ⇒ clé commune écrite, « Gardés : … » dit ; « à la main » sur deux
+  paires : « Paire 1/2 », cinq étapes, la feuille à l'écran, −10 %/zoom/lettre déjà réglés,
+  44,10 €, aperçu photo `scale(1.2)`, description « … boîte d'origine.\n\nN°42\n\n{lettre} »,
+  « Copier » ⇒ « 44,10 » dans le presse-papiers et « Copié », un seul bouton principal à
+  l'étape 4, lien `https://www.vinted.fr/items/new` en nouvel onglet, « Paire suivante · 2/2 »
+  (54 €, ancienne lettre « q » retirée), puis l'inverse (−20 % à la main ⇒ l'atelier à −20 %,
+  39,20 €), « Modifier prix ou titre » neutre, rien parti chez Vinted, 44 px, aucun débordement,
+  aucune erreur. Résultat : 390 clair, 390 sombre, 1512 clair **0 rouge** (96 OK) ; 1512 sombre
+  rejoué sur le build final avec 390 clair (`VUES=390-clair,1512-sombre`) : **65 OK, 0 rouge**.
+  Captures regardées (390/1512, clair/sombre : réglages, photos, texte, Vinted, relier, atelier).
+  ⚠️ Machine partagée très chargée pendant ce chantier (charge 40 à 60 sur 4 cœurs) : l'entrée
+  de la feuille (320 ms) prenait plusieurs secondes ; le banc attend qu'elle soit posée et
+  VÉRIFIE qu'elle est à l'écran (une feuille restée sous le bord passait tous les contrôles du DOM).
+- Bancs voisins, sur le build final :
+  · `vague2-ventes` (scène R, « Remettre en vente » ouvre la main) : **vert** (lecture du N° :
+    `[data-main-num]`, le titre de la feuille n'écrit plus le N° une seconde fois) ;
+  · `annonces-actions` : 116 OK, 1 rouge en 1512 sombre à l'étape R (« Republier s'ouvre… »,
+    avant toute feuille « à la main » : un clic qui a agi sous charge, puis le repli du banc ne
+    trouve plus la tuile). Corrigé dans ce banc : B/A « à la main » possible sur plusieurs et sur
+    deux comptes ; les « nouvelles » annonces datées à la LECTURE (sous charge, une vue passait
+    10 min après le départ et `candidatsNouvelle` les écartait : faux rouge de minuterie) ;
+  · `republier` (atelier) : 2 rouges au 1er passage, 9 au 2ᵉ, sur le MÊME build — minuteries
+    sous charge (journal pris « en pleine file », clics à 30 s). Le rouge constant, « 1 article
+    sur tes autres comptes » au lieu de « paire », vient d'un texte que ce chantier ne touche pas
+    (déjà dans 46f18482). Les contrôles du banc sur les réglages de l'atelier (−10 % ⇒ 44,10 €,
+    plancher 47 €, zoom 1,2 dans l'aperçu, une photo par annonce, pas de réglage par annonce)
+    sont verts aux deux passages. À rejouer sur une machine calme.
 
 ## 4. Ce qui reste
 
