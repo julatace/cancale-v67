@@ -550,18 +550,12 @@ sans la fonction.
 
 - **6 nov. · Vague 3 écrans** : fraîcheur une voix (Annonces), « Ranger » vise sa case (cible `case`), compte exclu hors de Statistiques (`useCompteEcarte`), carte sombre aux jetons `surSombre*` (4,5:1). `docs/passation/2026-11-06-vague3-ecrans.md`.
 
-- **6 nov. · Charge (v36)** : suppression eBay sans O(N) (0 ligne par notification d'inconnu ; `vrm_ebay_cibles`, migration **026 NON appliquée**, chemin filtré sans elle) ; factures du script Gmail en petites marches ; `src/rythmeLectures.js` : rien onglet caché, ×5 sans geste depuis 10 min (Mac au repos ~6 → 0,7 lecture/min). `docs/passation/2026-11-06-charge.md`. Geste : appliquer la 026.
-
-- **6 nov. · Vague 3, en ligne deux fois** : carte ambre de Ma journée quand une paire (photo exacte ou `recreeDe`, jamais le titre ni le N° seul) est en ligne deux fois sur Vinted ; supprimer sur SON clic (`src/enLigneDeuxFois.js`). `docs/passation/2026-11-06-vague3-en-ligne-deux-fois.md`.
-
-- **6 nov. · Vente vue par e-mail** : n° prouvé + compte lié + après la lecture d'`orders_sold` ⇒ ligne « Vue par e-mail » dans Ventes et VENDU (jamais CA déclaré), remplacée par la ligne Vinted ; indicateur « ventes relues hier » ; cause extension (2 000 en base) décrite. `docs/passation/2026-11-06-vente-email-fraiche.md`.
-- **6 nov. · Vague 2 vitesse** : `vinted_item_details` lue fiche par fiche (`lireFichesPage`), commandes projetées sans `orders_bought` ni anciens comptes (`SEL_COMMANDES`, `vrm_comptes_lies`) ; −700 Ko par écran au banc, même texte ; `audit-lectures-lourdes`. `docs/passation/2026-11-06-vague2-vitesse.md`.
-- **6 nov. · Republier à la main = réglages de l'atelier** : une source (`src/republierReglages.js`) ; retouche photo et lettre gardées et synchronisées (`vrm_republier_reglages`), baisse de prix et titre repartent de « Garder » à chaque ouverture (sa règle du 29 oct.) ; N° posé selon `vrm_num_vinted` ; feuille en 5 étapes, plusieurs paires une à une. `docs/passation/2026-11-06-republier-main.md`. Geste : essayer une série à la main.
 
 
 
 
-- **6 nov. · Vague 2 Ventes (v36)** : « Remettre en vente » une vente annulée avant l'envoi (« à la main » depuis le coffre : `recreerVinted` supprime toujours l'ancienne ; N° repris, archive ⇒ neuf) ; « Prix mini… » sur une sélection ; Annonces « Sans achat relié » ; saisie en série sur `suggestionsAchat` ; Ventes : « Prix d'achat N/M » une fois. `docs/passation/2026-11-06-vague2-ventes.md`. Geste : Ventes → Annulées.
+
+
 
 
 
