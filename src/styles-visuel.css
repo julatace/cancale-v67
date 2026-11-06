@@ -71,7 +71,7 @@
 .vrm-eb-ina-zone > :first-child { border-radius: 10px; overflow: hidden; flex-shrink: 0; }
 .vrm-eb-ina-texte { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .vrm-eb-ina-titre { font-size: 15px; font-weight: 600; line-height: 1.25; color: var(--vrm-ink, #1D1D1F); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -.01em; }
-.vrm-eb-ina-sous { font-size: 13px; line-height: 1.3; color: var(--vrm-muted, #6E6E73); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.vrm-eb-ina-sous { font-size: 13px; line-height: 1.3; color: var(--vrm-muted, #6E6E73); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vrm-eb-ina-geste { margin: 0 14px 10px 76px; }
 .vrm-eb-ina-ligne [data-inactive-resultat] { flex-basis: 100%; padding: 0 14px 10px 76px !important; }
 
@@ -157,3 +157,77 @@ button.vrm-notice-zone:focus-visible { outline: 2px solid var(--vrm-accent, #007
 .vrm-main > div:has(> .vrm-carte-alerte:last-child) { padding-bottom: 12px !important; }
 /* « Remboursement à vérifier · 19,64 € » : le montant ne se coupe jamais (il passe à la ligne). */
 .vrm-main .vrm-reparti-court .vrm-rpf-puce { white-space: normal; height: auto; min-height: 22px; padding: 3px 8px; line-height: 1.3; }
+
+/* ══ LA DIRECTION : « la paire avant tout » ════════════════════════════════
+   1. Les listes sont des groupes iOS (inset grouped) : une carte blanche aux
+      coins continus, des filets qui commencent APRÈS la photo, la photo plus
+      grande (64 px, coins de 12 px) — on reconnaît une paire à sa photo.
+   2. L'état d'une ligne est une PASTILLE discrète (gris d'encre ; ambre pour
+      un geste) au lieu d'un mot coloré flottant.
+   3. Les chiffres en exergue sont serrés (SF Pro Display, -0,03 em).
+   4. Une cascade légère à l'arrivée d'une liste, le toucher qui s'enfonce,
+      le mouvement réduit respecté.                                            */
+
+/* ── Ventes · « Tous » au téléphone ── */
+@media (max-width: 1023px) {
+  :root body .vrm-app-shell .vrm-main .vrm-toutes-liste {
+    background: var(--vrm-surface); border-radius: 16px; box-shadow: var(--vrm-ombre-carte); overflow: hidden; padding: 2px 0;
+  }
+  :root body .vrm-app-shell .vrm-main .vrm-toutes-ligne { position: relative; border-bottom: 0 !important; padding-left: 12px !important; padding-right: 14px !important; }
+  :root body .vrm-app-shell .vrm-main .vrm-toutes-ligne + .vrm-toutes-ligne::before {
+    content: ''; position: absolute; top: 0; left: 88px; right: 0; height: .5px; background: var(--vrm-line); pointer-events: none;
+  }
+  :root body .vrm-app-shell .vrm-main .vrm-toutes-photo { width: 64px !important; height: 64px !important; border-radius: 12px !important; overflow: hidden; flex-shrink: 0; }
+  :root body .vrm-app-shell .vrm-main .vrm-toutes-photo img { width: 100%; height: 100%; object-fit: cover; }
+  html body .vrm-app-shell .vrm-main .vrm-toutes-etat {
+    display: inline-block; width: max-content; max-width: 100%; margin-top: 5px; padding: 2px 8px; border-radius: 999px;
+    font-size: 12px; font-weight: 600; line-height: 1.35; background: var(--vrm-card2); color: var(--vrm-muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  html body .vrm-app-shell .vrm-main .vrm-toutes-etat[data-ton="action"] { background: var(--vrm-warn-soft); color: var(--vrm-warn); }
+  :root body .vrm-app-shell .vrm-main .vrm-toutes-ligne:active { background: var(--vrm-card2) !important; }
+}
+
+/* ── Achats : la même liste ── */
+@media (max-width: 1023px) {
+  .vrm-main .vrm-buy-list { background: var(--vrm-surface); border-radius: 16px; box-shadow: var(--vrm-ombre-carte); overflow: hidden; border: 0 !important; }
+  .vrm-main .vrm-buy-list .vrm-buy-row { position: relative; border: 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; margin: 0 !important; }
+  .vrm-main .vrm-buy-list .vrm-buy-row + .vrm-buy-row::before { content: ''; position: absolute; top: 0; left: 88px; right: 0; height: .5px; background: var(--vrm-line); }
+  .vrm-main .vrm-buy-ph { width: 64px !important; height: 64px !important; border-radius: 12px !important; overflow: hidden; }
+  .vrm-main .vrm-buy-ph img { width: 100%; height: 100%; object-fit: cover; }
+  .vrm-main .vrm-buy-statut { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 999px; background: var(--vrm-card2); font-weight: 600; }
+  .vrm-main .vrm-buy-title { font-size: 15px !important; font-weight: 600 !important; letter-spacing: -.01em; }
+}
+
+/* ── Annonces : la grille façon Photos — la photo carrée, coins continus, ombre douce ── */
+:root body .vrm-app-shell .vrm-main .vrm-ann-grid.vrm-fiches .vrm-ann-card.vrm-fiche {
+  border: 0 !important; border-radius: 16px !important; box-shadow: var(--vrm-ombre-carte) !important; overflow: hidden;
+  transition: transform 160ms var(--vrm-ease-sortie);
+}
+:root body .vrm-app-shell .vrm-main .vrm-ann-grid.vrm-fiches .vrm-fiche-photo img { transition: transform 300ms var(--vrm-ease-sortie); }
+@media (hover: hover) and (pointer: fine) {
+  :root body .vrm-app-shell .vrm-main .vrm-ann-grid.vrm-fiches .vrm-ann-card.vrm-fiche:hover .vrm-fiche-photo img { transform: scale(1.03); }
+}
+
+/* ── Les chiffres en exergue : serrés comme SF Pro Display ── */
+.vrm-main .vrm-display, .vrm-main [class*="carte-mois"] [class*="valeur"], .vrm-main .vrm-fu-grand { letter-spacing: -.03em; }
+
+/* ── Le toucher : la carte s'enfonce à peine (Emil : 0,97–0,98), jamais sur un défilement ── */
+@media (hover: none) {
+  .vrm-main :is(.vrm-ann-card.vrm-fiche, .vrm-notice, .vrm-carte-alerte):active { transform: scale(.985); transition: transform 100ms ease-out; }
+}
+
+/* ── La cascade : une liste qui arrive entre en léger décalé (6 px, 220 ms, 30 ms
+      d'écart, les 10 premières lignes seulement — jamais un blocage). ── */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes vrm-entree-ligne { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .vrm-main :is(.vrm-toutes-liste > .vrm-toutes-ligne, .vrm-buy-list > .vrm-buy-row, .vrm-eb-ina-liste > .vrm-eb-ina-ligne, .vrm-ann-grid.vrm-fiches > .vrm-ann-card, .vrm-ios-carte > .vrm-ios-rangee):nth-child(-n+10) {
+    animation: vrm-entree-ligne 220ms var(--vrm-ease-sortie) both;
+  }
+  .vrm-main :is(.vrm-toutes-liste, .vrm-buy-list, .vrm-eb-ina-liste, .vrm-ann-grid.vrm-fiches, .vrm-ios-carte) > :nth-child(2) { animation-delay: 30ms; }
+  .vrm-main :is(.vrm-toutes-liste, .vrm-buy-list, .vrm-eb-ina-liste, .vrm-ann-grid.vrm-fiches, .vrm-ios-carte) > :nth-child(3) { animation-delay: 60ms; }
+  .vrm-main :is(.vrm-toutes-liste, .vrm-buy-list, .vrm-eb-ina-liste, .vrm-ann-grid.vrm-fiches, .vrm-ios-carte) > :nth-child(4) { animation-delay: 90ms; }
+  .vrm-main :is(.vrm-toutes-liste, .vrm-buy-list, .vrm-eb-ina-liste, .vrm-ann-grid.vrm-fiches, .vrm-ios-carte) > :nth-child(5) { animation-delay: 120ms; }
+  .vrm-main :is(.vrm-toutes-liste, .vrm-buy-list, .vrm-eb-ina-liste, .vrm-ann-grid.vrm-fiches, .vrm-ios-carte) > :nth-child(6) { animation-delay: 150ms; }
+  .vrm-main :is(.vrm-toutes-liste, .vrm-buy-list, .vrm-eb-ina-liste, .vrm-ann-grid.vrm-fiches, .vrm-ios-carte) > :nth-child(n+7) { animation-delay: 180ms; }
+}

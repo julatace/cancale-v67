@@ -47,7 +47,7 @@ button.vrm-ios-rangee-zone:focus-visible { outline: 2px solid var(--vrm-accent, 
 }
 .vrm-ios-valeur {
   flex: 0 0 auto; max-width: 46%; font-size: 15px; color: var(--vrm-muted, #6E6E73);
-  font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .vrm-ios-valeur[data-ton="geste"] { color: var(--vrm-warn, #B25000); font-weight: 600; }
 .vrm-ios-chevron { flex: 0 0 auto; color: var(--vrm-muted, #6E6E73); opacity: .55; display: grid; place-items: center; }

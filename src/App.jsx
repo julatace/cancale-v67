@@ -58074,8 +58074,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <summary style={{ fontSize: 15, fontWeight: 700, color: C.text }}>
               {aVerifierCarton.length} numéro{aVerifierCarton.length > 1 ? 's' : ''} à vérifier
             </summary>
-            <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5, margin: '2px 0 6px' }}>
-              Du 11 au 18 octobre, tes numéros ne s'enregistraient plus dans le nuage : en rouvrant l'app, des articles ont reçu un nouveau numéro, parfois celui d'un autre article. <b style={{ color: C.text }}>Seule l'étiquette de l'article dit le vrai.</b> Pour chaque article : confirme le numéro, ou tape celui que tu as écrit sur son étiquette. N'imprime pas leur bordereau avant (le N° y est tamponné).
+            {/* (6 nov., v36-visuel) Une ligne ; le récit de la panne derrière le « ⓘ ». */}
+            <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.45, margin: '2px 0 6px' }}>
+              <b style={{ color: C.text, fontWeight: 600 }}>Seule l'étiquette de l'article dit le vrai.</b>{' '}
+              <Pourquoi label="Pourquoi vérifier" titre="Numéros à vérifier">Du 11 au 18 octobre, tes numéros ne s'enregistraient plus dans le nuage : en rouvrant l'app, des articles ont reçu un nouveau numéro, parfois celui d'un autre article. Pour chaque article : confirme le numéro, ou tape celui que tu as écrit sur son étiquette. N'imprime pas leur bordereau avant (le N° y est tamponné).</Pourquoi>
             </div>
             {ebayVerif && !ebayVerif.ko && ebayVerif.annonces.length > 0 && (
               <div data-verif-ebay style={{ fontSize: 12, color: C.muted, lineHeight: 1.5, marginBottom: 4 }}>
