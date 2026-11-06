@@ -417,7 +417,9 @@ class Film {
     // Zoomé en portrait : l'ancre descend, pour laisser la place au titre.
     if (ay != null) cible.ay = ay; else if (this.format === 'portrait' && s > this.repos.s * 1.05) cible.ay = 610;
     // Zoomé en paysage : l'écran glisse à droite, la colonne des titres reste libre.
-    if (this.format === 'paysage' && s > this.repos.s * 1.05) cible.ax = 735;
+    // Paysage : l'écran garde toute sa largeur (×0,92 au plus) et reste dans la moitié
+    // droite, la colonne des titres reste libre ; la caméra ne bouge qu'en hauteur.
+    if (this.format === 'paysage') { cible.fx = TEL.EW / 2; cible.s = Math.min(cible.s, 0.92); if (cible.s > this.repos.s * 1.05) cible.ax = 760; }
     this.bouger(cible, dur, ease);
   }
   bouger(cible, dur = 1, ease = 'doux') {
