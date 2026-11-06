@@ -482,3 +482,14 @@ export function codeSurLigne(e) {
   const r = e && e.resume && typeof e.resume === 'object' ? e.resume : null;
   return r && r.t === 'suivi' && r.st === 'available' && r.sens !== 'sortant' && typeof r.code === 'string' && r.code.trim() ? codeLisible(r.code) : '';
 }
+
+// ── L'ADRESSE DE L'EXPÉDITEUR, LISIBLE ───────────────────────────────────────
+// Un e-mail transféré par iCloud porte une adresse réécrite (« x_at_vinted_fr_ab12…@icloud.com
+// (x@vinted.fr.ab12….cd34) ») : on montre l'adresse d'ORIGINE écrite entre parenthèses, sans
+// ses deux suffixes techniques. Seulement l'affichage : le rangement ne lit jamais ce champ (§5).
+export function adresseLisible(from) {
+  const f = String(from || '');
+  const m = /\(([^\s()@]+@[^\s()]+?)\.[a-z0-9]{8,}\.[a-z0-9]{6,}\)/i.exec(f);
+  if (m) return m[1];
+  return (f.match(/[^\s<>"'()]+@[^\s<>"'()]+/) || [''])[0];
+}

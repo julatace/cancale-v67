@@ -41,7 +41,7 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { RUBRIQUES_BOITE, rubriqueEmail } from '../api/_lib/boite-email.js';
-import { expediteurLisible, dateEmail, poidsLisible, ceQueVrmAFait, titreSimple, titreEnClair, groupesParJour, siteExpediteur, ligneEmail, gesteAmbre, monogramme, empiler, carteHeros, gestesEmail, lireCorps, lieuLisible, codeSurLigne } from './boiteEmails.js';
+import { expediteurLisible, dateEmail, poidsLisible, ceQueVrmAFait, titreSimple, titreEnClair, groupesParJour, siteExpediteur, ligneEmail, gesteAmbre, monogramme, empiler, carteHeros, gestesEmail, lireCorps, lieuLisible, codeSurLigne, adresseLisible } from './boiteEmails.js';
 import { requeteJsonBornee } from './requeteJsonBornee.js';
 import { LogoSite } from './SelecteurSites.jsx';
 import { LogoTransporteur } from './PastilleTransporteur.jsx';
@@ -56,7 +56,6 @@ const PAR_PAGE = 50;
 const formeListe = (j) => j && j.ok === true && Array.isArray(j.emails) && j.compteurs && typeof j.compteurs.sur === 'number';
 const heure = (v) => { const t = Date.parse(v || ''); return Number.isFinite(t) ? new Date(t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : ''; };
 const quandLong = (v) => { const t = Date.parse(v || ''); return Number.isFinite(t) ? new Date(t).toLocaleString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'date non lue'; };
-const adresseDe = (from) => (String(from || '').match(/[^\s<>"'()]+@[^\s<>"'()]+/) || [''])[0];
 const reduitMvt = () => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; } };
 // Une liste qui a plus d'une minute : « Actualiser » devient utile.
 const VIEILLE = 60e3;
@@ -277,7 +276,7 @@ function Lecture({ id, entetes, delies, onFermer, onAller, onNum, plein, FermeAu
               <p className="vrm-boite-doux">{gestes.some((g) => g.k === 'colis') ? 'Le bordereau s’imprime depuis sa carte, dans Colis.' : 'Pour imprimer un bordereau ou un reçu : Colis ou Achats.'}</p></>}
         </section>
         <p className="vrm-boite-meta" data-boite-meta="">
-          <span data-boite-de="">De <b>{expediteurLisible(e.from)}</b>{adresseDe(e.from) ? ` (${adresseDe(e.from)})` : ''}</span>
+          <span data-boite-de="">De <b>{expediteurLisible(e.from)}</b>{adresseLisible(e.from) ? ` (${adresseLisible(e.from)})` : ''}</span>
           <span aria-hidden="true"> · </span>
           <span data-boite-recu="">Reçu sur {e.adresses && e.adresses.length ? e.adresses.join(', ') : 'une adresse non lue'}{e.compte ? ` (${e.compte.nom})` : e.compteAmbigu ? ' (plusieurs comptes)' : ''}</span>
           <span aria-hidden="true"> · </span>

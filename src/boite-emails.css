@@ -76,6 +76,19 @@
 /* Opaque (pas de flou sous un en-tête qui colle : mesuré au défilement, il coûtait
    des images à 1512 px) ; un filet fin le détache des lignes qui passent dessous. */
 .vrm-boite-jour-titre{position:sticky;top:0;z-index:3;margin:0;padding:14px 16px 6px;font-size:15px;font-weight:700;letter-spacing:-.01em;color:var(--bx-encre);background:var(--bx-carte);box-shadow:0 .5px 0 var(--bx-fin)}
+/* L'arrivée de la liste : les 10 premières lignes glissent de 6 px, 30 ms d'écart (la même
+   cascade que le reste de l'app, v36-visuel) ; coupée en mouvement réduit. */
+.vrm-boite-liste>.vrm-boite-jour:first-child>ul>.vrm-boite-item:nth-child(-n+10){animation:vrm-boite-cascade .22s var(--bx-sortie) both}
+@keyframes vrm-boite-cascade{from{transform:translateY(6px);opacity:0}}
+.vrm-boite-liste>.vrm-boite-jour:first-child>ul>.vrm-boite-item:nth-child(2){animation-delay:30ms}
+.vrm-boite-liste>.vrm-boite-jour:first-child>ul>.vrm-boite-item:nth-child(3){animation-delay:60ms}
+.vrm-boite-liste>.vrm-boite-jour:first-child>ul>.vrm-boite-item:nth-child(4){animation-delay:90ms}
+.vrm-boite-liste>.vrm-boite-jour:first-child>ul>.vrm-boite-item:nth-child(5){animation-delay:120ms}
+.vrm-boite-liste>.vrm-boite-jour:first-child>ul>.vrm-boite-item:nth-child(6){animation-delay:150ms}
+.vrm-boite-liste>.vrm-boite-jour:first-child>ul>.vrm-boite-item:nth-child(7){animation-delay:180ms}
+.vrm-boite-liste>.vrm-boite-jour:first-child>ul>.vrm-boite-item:nth-child(8){animation-delay:210ms}
+.vrm-boite-liste>.vrm-boite-jour:first-child>ul>.vrm-boite-item:nth-child(9){animation-delay:240ms}
+.vrm-boite-liste>.vrm-boite-jour:first-child>ul>.vrm-boite-item:nth-child(10){animation-delay:270ms}
 /* Une ligne. Le filet est DÉCALÉ (il commence au texte, sous aucun avatar). */
 .vrm-boite-item{position:relative;overflow:hidden;isolation:isolate}
 .vrm-boite-jour ul>.vrm-boite-item+.vrm-boite-item::before,.vrm-boite-pile-liste>.vrm-boite-item+.vrm-boite-item::before{content:"";position:absolute;z-index:2;left:72px;right:0;top:0;border-top:.5px solid var(--bx-filet);pointer-events:none}
@@ -387,7 +400,7 @@
 .vrm-relier-vrm small{font-size:12px;animation:vrm-relier-chiffre .3s 2.5s both}
 @keyframes vrm-relier-recoit{50%{transform:scale(1.08)}100%{transform:none}}
 @media(prefers-reduced-motion:reduce){
-  .vrm-relier *,.vrm-relier *::before,.vrm-relier *::after,.vrm-boite-lecture,.vrm-boite-feuille,.vrm-boite-feuille .vrm-boite-lecture,.vrm-boite-squelette,.vrm-boite-squelette *,.vrm-boite-lecture-attente i,.vrm-boite-tourne,.vrm-boite-avis,.vrm-boite-pile-chevron,.vrm-boite-glisse-fond svg,.vrm-boite-msg-pied summary::after{animation:none!important;transition:none!important}
+  .vrm-relier *,.vrm-relier *::before,.vrm-relier *::after,.vrm-boite-lecture,.vrm-boite-feuille,.vrm-boite-feuille .vrm-boite-lecture,.vrm-boite-squelette,.vrm-boite-squelette *,.vrm-boite-lecture-attente i,.vrm-boite-tourne,.vrm-boite-avis,.vrm-boite-pile-chevron,.vrm-boite-glisse-fond svg,.vrm-boite-msg-pied summary::after,.vrm-boite-item{animation:none!important;transition:none!important}
   .vrm-boite-avis{transform:translateX(-50%)}
   .vrm-boite button,.vrm-boite-feuille button{transition:none}
   .vrm-boite button:active:not(:disabled),.vrm-boite-feuille button:active:not(:disabled){transform:none}
