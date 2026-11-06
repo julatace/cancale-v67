@@ -45,20 +45,20 @@
 .vrm-pil-sous { font-size: 13px; color: var(--pil-sous); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vrm-pil.is-alerte .vrm-pil-titre { color: var(--pil-alerte); font-weight: 600; }
 
-.vrm-pil-action {
+.vrm-pil .vrm-pil-action {
   flex: 0 0 auto; min-height: 44px; min-width: 44px; padding: 0 16px;
   border: 0; border-radius: 22px; background: transparent;
   color: var(--pil-action); font: inherit; font-weight: 600; cursor: pointer;
   -webkit-tap-highlight-color: transparent; touch-action: manipulation;
   transition: transform 140ms cubic-bezier(.23,1,.32,1), background-color 140ms ease;
 }
-.vrm-pil-action:active { transform: scale(.96); background: rgba(255,255,255,.10); }
-@media (hover: hover) and (pointer: fine) { .vrm-pil-action:hover { background: rgba(255,255,255,.08); } }
-.vrm-pil-action:focus-visible { outline: 2px solid var(--pil-action); outline-offset: 2px; }
+.vrm-pil .vrm-pil-action:active { transform: scale(.96); background: rgba(255,255,255,.10); }
+@media (hover: hover) and (pointer: fine) { .vrm-pil .vrm-pil-action:hover { background: rgba(255,255,255,.08); } }
+.vrm-pil .vrm-pil-action:focus-visible { outline: 2px solid var(--pil-action); outline-offset: 2px; }
 
 @media (prefers-reduced-motion: reduce) {
   .vrm-pil, .vrm-pil.is-sortie { transform: none; transition: opacity 160ms ease; }
   @starting-style { .vrm-pil { transform: none; } .vrm-pil-zone[data-pilule-place="haut"] .vrm-pil { transform: none; } }
-  .vrm-pil-action { transition: none; }
-  .vrm-pil-action:active { transform: none; }
+  .vrm-pil .vrm-pil-action { transition: none; }
+  .vrm-pil .vrm-pil-action:active { transform: none; }
 }
