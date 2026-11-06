@@ -34,7 +34,7 @@ const MUTATIONS = {
   'geste vente sans identité valide': [['src/boiteEmails.js', "r.av !== 'analyse' && IDENT.test(String(r.tx || ''))", 'true']],
   'balises gardées dans le message': [['src/boiteEmails.js', "const t = retirerBalises(texte).replace(INVISIBLES", 'const t = String(texte).replace(INVISIBLES']],
   'lien javascript: gardé': [['src/boiteEmails.js', "d = /^https?:$/.test(u.protocol) ? u.hostname.replace(/^www\\./, '') : '';", "d = u.hostname || u.protocol;"], ['src/boiteEmails.js', 'const LIEN = /\\bhttps?:\\/\\/', 'const LIEN = /\\b(?:https?:\\/\\/|javascript:)']],
-  'tout lu par défaut quand la ligne manque': [['api/_lib/emails-lus.js', 'const jusqua = Math.max(ms(LUS_DEPUIS), ms(d.jusqua) || 0);', 'const jusqua = Date.now() + 864e5;']],
+  'tout lu par défaut quand la ligne manque': [['api/_lib/emails-lus.js', 'const jusqua = ms(d.jusqua) != null ? ms(d.jusqua) : ms(LUS_DEPUIS);', 'const jusqua = Date.now() + 864e5;']],
   'pas su compté comme lu': [['api/_lib/emails-lus.js', '  if (!etat) return null;\n  const k = cleLu', '  if (!etat) return true;\n  const k = cleLu']],
   'nonlu oublié': [['api/_lib/emails-lus.js', "else if (g.k === 'nonlu') { e.lus.delete(k); if (t <= e.jusqua) e.nonlus.set(k, t); }", "else if (g.k === 'nonlu') { e.lus.delete(k); }"]],
   'écriture malgré une lecture ratée': [['src/emailsLusEcriture.js', "      if (!r.ok) return false;\n      const j = await r.json();\n      if (!Array.isArray(j)) return false;\n      ligne = j[0] || null;\n    } catch (_) { return false; }", "      ligne = r.ok ? ((await r.json())[0] || null) : null;\n    } catch (_) { ligne = null; }"]],

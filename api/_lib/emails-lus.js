@@ -35,7 +35,8 @@ const paires = (l, max) => (Array.isArray(l) ? l : [])
 export function etatLus(data) {
   if (data === null) return null;
   const d = data && typeof data === 'object' ? data : {};
-  const jusqua = Math.max(ms(LUS_DEPUIS), ms(d.jusqua) || 0);
+  // Sans ligne (jamais rien touché) : la mise en service. Avec une ligne : SON `jusqua`.
+  const jusqua = ms(d.jusqua) != null ? ms(d.jusqua) : ms(LUS_DEPUIS);
   return { jusqua, lus: new Map(paires(d.lus, LUS_MAX)), nonlus: new Map(paires(d.nonlus, NONLUS_MAX)) };
 }
 // Lu ? (`e` : { id, at }). `null` si l'état n'est pas su.

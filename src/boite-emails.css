@@ -63,13 +63,14 @@
 @keyframes vrm-boite-tourne{to{transform:rotate(360deg)}}
 .vrm-boite-couverture{margin:8px 0 0;font-size:13px;color:var(--bx-doux)}
 
-/* La liste : un jour = une section (rendue seulement quand elle approche de l'écran),
-   son titre COLLE en haut tant que ses e-mails défilent. */
+/* La liste : un jour = une section, son titre COLLE en haut tant que ses e-mails
+   défilent. (Pas de `content-visibility` : il vidait le texte des lignes hors écran
+   pour la recherche de la page, le mode stream et les outils d'accessibilité.) */
 .vrm-boite-liste{margin:0}
-.vrm-boite-jour{content-visibility:auto;contain-intrinsic-size:auto 640px}
 .vrm-boite-jour ul{list-style:none;margin:0;padding:0}
-.vrm-boite-jour-titre{position:sticky;top:0;z-index:3;margin:0;padding:14px 16px 6px;font-size:15px;font-weight:700;letter-spacing:-.01em;color:var(--bx-encre);background:var(--bx-carte);background:color-mix(in srgb,var(--bx-carte) 88%,transparent);-webkit-backdrop-filter:saturate(180%) blur(16px);backdrop-filter:saturate(180%) blur(16px)}
-@media(prefers-reduced-transparency:reduce){.vrm-boite-jour-titre{background:var(--bx-carte);-webkit-backdrop-filter:none;backdrop-filter:none}}
+/* Opaque (pas de flou sous un en-tête qui colle : mesuré au défilement, il coûtait
+   des images à 1512 px) ; un filet fin le détache des lignes qui passent dessous. */
+.vrm-boite-jour-titre{position:sticky;top:0;z-index:3;margin:0;padding:14px 16px 6px;font-size:15px;font-weight:700;letter-spacing:-.01em;color:var(--bx-encre);background:var(--bx-carte);box-shadow:0 .5px 0 var(--bx-fin)}
 /* Une ligne. Le filet est DÉCALÉ (il commence au texte, sous aucun avatar). */
 .vrm-boite-item{position:relative;overflow:hidden;isolation:isolate}
 .vrm-boite-jour ul>.vrm-boite-item+.vrm-boite-item::before,.vrm-boite-pile-liste>.vrm-boite-item+.vrm-boite-item::before{content:"";position:absolute;z-index:2;left:72px;right:0;top:0;border-top:.5px solid var(--bx-filet);pointer-events:none}
@@ -116,8 +117,9 @@
 .vrm-boite-ligne[data-boite-rien="1"] .vrm-boite-essentiel{color:var(--bx-doux)}
 /* La photo de la paire (reliée par identité) et le code de retrait, à droite. */
 .vrm-boite-vignette{grid-row:1;grid-column:4;align-self:center;width:44px;height:44px;border-radius:12px;object-fit:cover;background:var(--bx-gris);margin-top:20px}
-.vrm-boite-ligne[data-boite-a-code="1"] .vrm-boite-essentiel,.vrm-boite-ligne[data-boite-a-code="1"] .vrm-boite-ligne-pied{padding-right:128px}
-.vrm-boite .vrm-boite-puce-code{position:absolute;z-index:2;right:12px;bottom:10px;display:flex;align-items:center;gap:6px;min-height:44px;padding:0 10px 0 12px;border:0;border-radius:12px;background:var(--bx-gris);color:var(--bx-encre)}
+/* Le code : sous le texte de la ligne, en gros chiffres, un bouton à lui (copier). */
+.vrm-boite .vrm-boite-ligne[data-boite-a-code="1"]{padding-bottom:64px}
+.vrm-boite .vrm-boite-puce-code{position:absolute;z-index:2;left:72px;bottom:12px;display:flex;align-items:center;gap:8px;min-height:44px;max-width:calc(100% - 88px);padding:0 12px 0 14px;border:0;border-radius:12px;background:var(--bx-gris);color:var(--bx-encre)}
 .vrm-boite-puce-chiffres{font-size:20px;font-weight:700;letter-spacing:.02em;font-variant-numeric:tabular-nums;white-space:nowrap;line-height:1}
 .vrm-boite-puce-ic{display:grid;place-items:center;color:var(--bx-doux)}
 .vrm-boite-puce-code[data-copie="1"]{background:var(--bx-encre);color:var(--bx-carte)}

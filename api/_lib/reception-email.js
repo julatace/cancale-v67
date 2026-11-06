@@ -74,10 +74,11 @@ export async function lireJournalEmail({owner,url,headers,fetcher=fetch,page=0,e
  // réception) : sinon « Ventes 7 » s'affichait à côté d'une liste filtrée sur une
  // adresse qui n'en a que 3. Ils ne suivent NI l'état NI la rubrique (ce sont
  // eux qui les comptent). `compteurs.adresse` dit sur quelle adresse ils portent.
- const etats=lire(`owner=eq.${o}&id=like.email_reception_*${parAdresse?'&'+parAdresse:''}&select=id,at:data->>at,etat:data->>etat,type:data->>type,code:data->resume->>code&order=data->>at.desc,id.asc&limit=${JOURNAL_COMPTES+1}`);
+ const etats=lire(`owner=eq.${o}&id=like.email_reception_*${parAdresse?'&'+parAdresse:''}&select=${compteSeul?'':'id,at:data->>at,'}etat:data->>etat,type:data->>type,code:data->resume->>code&order=data->>at.desc,id.asc&limit=${JOURNAL_COMPTES+1}`);
  const portee=c=>parAdresse?{...c,adresse:adr}:c;
+ // Les compteurs seuls (Colis) : deux scalaires par ligne, sans les lus (une lecture).
+ if(compteSeul){const l=await etats;const c=compter(l,null);delete c.nonLus;return {ok:true,compteurs:portee(c)};}
  const lus=lireLus(lire,o);
- if(compteSeul){const [l,el]=await Promise.all([etats,lus]);return {ok:true,compteurs:portee(compter(l,el))};}
  const pp=PAGES_PERMISES.includes(Number(parPage))?Number(parPage):JOURNAL_PAGE;
  // « Non lus » : les lignes rangées APRÈS `jusqua` (bornées) + celles qu'il a remises
  // non lues, filtrées par la même règle ; la page est découpée ici. État pas su ⇒ 503 côté route.

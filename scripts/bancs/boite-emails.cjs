@@ -65,12 +65,12 @@ const E = [
 ];
 for (let i = 8; i <= 26; i++) E.push({ id: id(i), at: H(3000 + i * 40), etat: 'integre', type: i % 2 ? 'offre' : 'suivi', subject: i % 2 ? `Nouvelle offre ${i}` : `Votre colis ${i} est en route`, from: i % 2 ? 'Vinted <no-reply@vinted.fr>' : 'Chronopost <suivi@chronopost.fr>', resume: i % 2 ? { v: 1, t: 'offre', mt: '30' } : { v: 1, t: 'suivi', s: 'CH' + i, st: 'transit' }, pj: 0 });
 E.forEach((e, i) => { e.adresses = [i % 3 === 2 ? 'second@exemple.test' : 'vendeuse@exemple.test']; e.compte = { id: String(i % 3 === 2 ? 2 : 1), nom: i % 3 === 2 ? 'compte-deux' : 'compte-un' }; e.compteAmbigu = false; e.sourceDate = null; });
-const RUB = (e) => (e.type === 'suivi' && e.resume && e.resume.code ? 'codes' : ['vente', 'finalisation', 'vente-vestiaire'].includes(e.type) ? 'ventes' : e.type === 'achat' ? 'achats' : ['suivi', 'bordereau'].includes(e.type) ? 'colis' : 'autres');
+const RUB = (e) => (e.type === 'suivi' && e.resume && e.resume.code ? 'codes' : ['vente', 'finalisation', 'vente-vestiaire'].includes(e.type) ? 'ventes' : e.type === 'achat' ? 'achats' : ['suivi', 'bordereau'].includes(e.type) ? 'colis' : e.type === 'offre' ? 'offres' : 'autres');   // (6 nov., v36) + « Offres »
 const dans = (e, r) => !r || (r === 'colis' ? ['colis', 'codes'].includes(RUB(e)) : RUB(e) === r);
-const parRubrique = { ventes: 0, achats: 0, codes: 0, colis: 0, autres: 0 }; E.forEach((e) => { const r = RUB(e); parRubrique[r]++; if (r === 'codes') parRubrique.colis++; });
+const parRubrique = { ventes: 0, achats: 0, codes: 0, colis: 0, offres: 0, autres: 0 }; E.forEach((e) => { const r = RUB(e); parRubrique[r]++; if (r === 'codes') parRubrique.colis++; });
 const COMPTEURS = { sur: E.length, plus: false, integre: 25, aVerifier: 1, erreur: 0, incompris: 1, parRubrique };
 // (revue du 5 nov.) La route compte sur l'adresse choisie et le dit (`adresse`).
-const compteursDe = (adr) => { if (!adr) return COMPTEURS; const l = E.filter((e) => e.adresses.includes(adr)); const pr = { ventes: 0, achats: 0, codes: 0, colis: 0, autres: 0 }; l.forEach((e) => { const r = RUB(e); pr[r]++; if (r === 'codes') pr.colis++; }); return { ...COMPTEURS, sur: l.length, parRubrique: pr, adresse: adr }; };
+const compteursDe = (adr) => { if (!adr) return COMPTEURS; const l = E.filter((e) => e.adresses.includes(adr)); const pr = { ventes: 0, achats: 0, codes: 0, colis: 0, offres: 0, autres: 0 }; l.forEach((e) => { const r = RUB(e); pr[r]++; if (r === 'codes') pr.colis++; }); return { ...COMPTEURS, sur: l.length, parRubrique: pr, adresse: adr }; };
 const TEXTE = {
   [id(1)]: 'Bonjour,​\n\n\n\nVotre colis est disponible au Relais Tabac du Port.\nCode de retrait : 418205\nSuivre : https://suivi.exemple.test/' + 'x'.repeat(120) + '\n<img src=x onerror="window.__xss=1"><b>gras</b> &amp; &lt;img src=y onerror="window.__xss=2"&gt;fin<div style="color:red',
   [id(2)]: 'Ton bordereau est prêt. N° de transaction : 12345678901',
@@ -159,7 +159,7 @@ const journal = (appels) => appels.filter((a) => a.chemin === '/api/email-rattac
           const ranges = await lignes.evaluateAll((l) => l.map((x) => ({ id: x.dataset.boiteEmail, titre: (x.querySelector('[data-boite-quoi]') || {}).innerText || '', essentiel: ((x.querySelector('[data-boite-essentiel]') || {}).innerText || '').replace(/\s+/g, ' ').trim(), geste: x.dataset.boiteGeste || '', mot: ((x.querySelector('[data-boite-geste-mot]') || {}).innerText || '').replace(/\s+/g, ' ').trim(), proche: x.dataset.boiteProche === '1' })));
           const rid = Object.fromEntries(ranges.map((x) => [x.id, x]));
           const attendu = {
-            [id(1)]: ['Colis à retirer', 'code 418 205 · Relais Tabac du Port', 'retrait', 'avant le 9 nov.', false],
+            [id(1)]: ['Colis à retirer', 'Relais Tabac du Port', 'retrait', 'avant le 9 nov.', false],   // (v36) le code est SOUS la ligne, en grand (bouton « copier »)
             [id(2)]: ['Vendu', 'N°42 · Nike Air Max 90', 'bordereau', 'bordereau prêt', false],
             [id(27)]: ['Vendu sur Vestiaire', 'tu reçois 82,40 € · Jordan 1 Mid', 'envoi', 'à envoyer avant le 6 nov. (demain)', true],
             [id(3)]: ['Vendu', 'N°17 · 55 € · Adidas Samba', '', '', false],
@@ -181,7 +181,7 @@ const journal = (appels) => appels.filter((a) => a.chemin === '/api/email-rattac
           const chrono = E.find((e) => /Chronopost/.test(e.from) && parId[e.id]);
           const colore = (c) => { const n = (String(c).match(/\d+(\.\d+)?/g) || []).slice(0, 3).map(Number); return n.length === 3 && Math.max(...n) - Math.min(...n) > 12; };
           const fondsColores = marques.filter((x) => x.ok && colore(x.fond));
-          dit(marques.every((x) => x.ok && x.cache && x.gauche && x.taille >= 32) && mq[id(2)].logo === 'vinted' && mq[id(27)].logo === 'vestiaire' && mq[id(1)].k === 'monogramme' && mq[id(1)].mono === 'MR' && !!chrono && mq[chrono.id].mono === 'C' && fondsColores.length === 0, `${nom} : la marque de l'expéditeur à GAUCHE de chaque ligne (≥ 32 px) — logo du site, monogramme neutre (« MR », « C ») pour un transporteur, aucun fond de couleur`, JSON.stringify([mq[id(1)], mq[id(2)], fondsColores.slice(0, 1)]));
+          dit(marques.every((x) => x.ok && x.cache && x.gauche && x.taille >= 32) && mq[id(2)].logo === 'vinted' && mq[id(27)].logo === 'vestiaire' && ['monogramme', 'transporteur'].includes(mq[id(1)].k) && mq[id(1)].mono === 'MR' && !!chrono && mq[chrono.id].mono === 'C' && fondsColores.length === 0, `${nom} : la marque de l'expéditeur à GAUCHE de chaque ligne (≥ 32 px) — logo du site, monogramme neutre (« MR », « C ») pour un transporteur, aucun fond de couleur`, JSON.stringify([mq[id(1)], mq[id(2)], fondsColores.slice(0, 1)]));
           // L'heure alignée à droite, sur la ligne de la nature ; le transporteur et le compte en dessous.
           const heures = await lignes.evaluateAll((l) => l.map((x) => { const t = x.querySelector('time'), q = x.querySelector('[data-boite-quoi]'), tx = x.querySelector('.vrm-boite-ligne-txt'); if (!t || !q || !tx) return null; const rt = t.getBoundingClientRect(), rq = q.getBoundingClientRect(), rx = tx.getBoundingClientRect(); return { droite: Math.abs(rt.right - rx.right) <= 1, ligne: rt.top < rq.bottom && rt.bottom > rq.top }; }));
           const heureLue = /\b15:58\b/.test(parId[id(1)].texte) && /compte-un/.test(parId[id(1)].texte) && /Mondial Relay/.test(parId[id(1)].texte);
@@ -205,7 +205,7 @@ const journal = (appels) => appels.filter((a) => a.chemin === '/api/email-rattac
             out.pieds = [...racine.querySelectorAll('.vrm-boite-ligne-pied')].filter((p) => [p, ...p.children].some((g) => g !== p && new Set([...g.children].map((c) => Math.round(c.getBoundingClientRect().top))).size > 1) || [...p.children].some((c) => /^\s*·/.test(c.innerText))).length;
             out.noms = coupes('.vrm-boite-exp-nom, .vrm-boite-compte-nom, .vrm-boite-ligne-pied > *');
             out.codes = [...racine.querySelectorAll('.vrm-boite-code')].filter((c) => c.getBoundingClientRect().right > c.parentElement.getBoundingClientRect().right + 1).length;
-            out.sansCode = [...racine.querySelectorAll('[data-rubrique="codes"]')].filter((x) => !x.querySelector('.vrm-boite-code')).length;
+            out.sansCode = [...racine.querySelectorAll('[data-rubrique="codes"]')].filter((x) => !x.parentElement.querySelector('[data-boite-code-copier]')).length;   // (v36) le code : un bouton à côté de la ligne
             const row = racine.querySelector('.vrm-boite-rubriques');
             const mask = (n) => getComputedStyle(n).webkitMaskImage || getComputedStyle(n).maskImage || 'none';
             out.rangee = { deborde: row.scrollWidth > row.clientWidth + 1, droite: row.dataset.bordDroite || '', gauche: row.dataset.bordGauche || '', mask: mask(row).slice(0, 60) };
@@ -240,7 +240,7 @@ const journal = (appels) => appels.filter((a) => a.chemin === '/api/email-rattac
             const bs = [...row.querySelectorAll('[data-boite-rubrique]')];
             return { ox: getComputedStyle(row).overflowX, wrap: getComputedStyle(row).flexWrap, tops: [...new Set(bs.map((x) => Math.round(x.getBoundingClientRect().top)))].length, h: Math.min(...bs.map((x) => x.getBoundingClientRect().height)), n: bs.map((x) => [x.dataset.boiteRubrique, (x.querySelector('[data-boite-n]') || {}).textContent || null]), sw: row.scrollWidth, cw: row.clientWidth };
           });
-          const attendu = { tout: String(E.length), ventes: String(parRubrique.ventes), achats: String(parRubrique.achats), codes: String(parRubrique.codes), colis: String(parRubrique.colis), autres: String(parRubrique.autres), 'a-verifier': String(COMPTEURS.aVerifier) };   // (6 nov., onglets C) + la pastille « À vérifier »
+          const attendu = { tout: String(E.length), ventes: String(parRubrique.ventes), achats: String(parRubrique.achats), codes: String(parRubrique.codes), colis: String(parRubrique.colis), offres: String(parRubrique.offres), 'a-verifier': String(COMPTEURS.aVerifier) };   // (6 nov., onglets C) + la pastille « À vérifier »
           const nOk = r.n.every(([k, v]) => v === attendu[k]);
           dit(nOk && r.h >= 44 && r.tops === 1 && r.wrap === 'nowrap' && ['auto', 'scroll'].includes(r.ox), `${nom} : rubriques — une rangée (une seule ligne), 44 px au doigt, le nombre de CHAQUE rubrique, défilement si ça ne rentre pas`, JSON.stringify(r));
           if (tactile) {
@@ -263,7 +263,7 @@ const journal = (appels) => appels.filter((a) => a.chemin === '/api/email-rattac
         dit(dj && dj.q.boite === 'codes' && await lignes.count() === 1, `${nom} : « Codes de retrait » envoyé à la route, une ligne`, JSON.stringify(dj && dj.q));
         await b.locator('[data-boite-rubrique="colis"]').click(); await pg.waitForTimeout(500);
         dit(journal(appels).at(-1).q.boite === 'colis' && (await lignes.evaluateAll((l) => l.every((x) => ['colis', 'codes'].includes(x.dataset.rubrique)))), `${nom} : « Colis » montre colis et codes`);
-        for (const r of ['ventes', 'achats', 'autres']) {
+        for (const r of ['ventes', 'achats', 'offres']) {
           await b.locator(`[data-boite-rubrique="${r}"]`).click(); await pg.waitForTimeout(400);
           dit(journal(appels).at(-1).q.boite === r && (await lignes.count()) > 0 && (await lignes.evaluateAll((l, rr) => l.every((x) => x.dataset.rubrique === rr), r)), `${nom} : « ${r} » filtré`);
         }
@@ -352,11 +352,12 @@ const journal = (appels) => appels.filter((a) => a.chemin === '/api/email-rattac
             const q = (s) => a.querySelector(s);
             const h = q('[data-boite-haut]'), ti = q('[data-boite-titre]'), bt = q('[data-boite-haut] button[data-boite-objet]'), co = q('[data-boite-corps]'), pi = q('[data-boite-pieces]'), me = q('[data-boite-meta]');
             const avant = (x, y) => !!(x && y && (x.compareDocumentPosition(y) & Node.DOCUMENT_POSITION_FOLLOWING));
-            return { titre: ti ? ti.innerText.trim() : '', details: (q('.vrm-boite-details') || {}).innerText || '', code: (q('[data-boite-code]') || {}).innerText || '', tCode: q('[data-boite-code] b') ? parseFloat(getComputedStyle(q('[data-boite-code] b')).fontSize) : 0, tTitre: ti ? parseFloat(getComputedStyle(ti).fontSize) : 0, tCorps: co ? parseFloat(getComputedStyle(co).fontSize) : 0, tMeta: me ? parseFloat(getComputedStyle(me).fontSize) : 0, bouton: !!bt, ordre: avant(h, co) && avant(co, pi) && avant(pi, me), premier: h && a.querySelector('h2,h3') === ti };
+            return { titre: ti ? ti.innerText.trim() : '', details: (q('.vrm-boite-details') || {}).innerText || '', code: (q('[data-boite-code]') || {}).innerText || '', tCode: q('.vrm-boite-billet-chiffres') ? parseFloat(getComputedStyle(q('.vrm-boite-billet-chiffres')).fontSize) : 0, heros: (q('[data-boite-heros]') || {}).innerText || '', tTitre: ti ? parseFloat(getComputedStyle(ti).fontSize) : 0, tCorps: co ? parseFloat(getComputedStyle(co).fontSize) : 0, tMeta: me ? parseFloat(getComputedStyle(me).fontSize) : 0, bouton: !!bt, ordre: avant(h, co) && avant(co, pi) && avant(pi, me), premier: h && a.querySelector('h2,h3') === ti };
           });
           // (v33) Le code de retrait EN GRAND (ce qu'on montre au relais), écrit une seule fois.
-          dit(/Code de retrait\s*418\s205/.test(o.code) && o.tCode >= 28 && !/418/.test(o.details), `${nom} : lecture d’un colis à retirer — le code EN GRAND (≥ 28 px), une seule fois en haut`, JSON.stringify({ code: o.code, tCode: o.tCode, details: o.details }));
-          dit(o.titre === 'Colis à retirer' && /^Relais Tabac du Port · avant le 9 nov\.$/.test(o.details.replace(/\s+/g, " ")) && o.tTitre >= 20 && o.tTitre > o.tCorps && o.bouton && o.premier && o.ordre && o.tMeta <= 13, `${nom} : lecture — en haut, en gros, ce que c’est et le bouton ; puis le message, les pièces jointes, et « De · Reçu sur · date » en petit à la fin`, JSON.stringify(o));
+          // (v36) Le code vit dans la carte « ce qu'il faut savoir » (façon carte d'embarquement), 44 px.
+          dit(/418\s205/.test(o.code) && /Code de retrait/i.test(o.heros) && o.tCode >= 28 && !/418/.test(o.details), `${nom} : lecture d’un colis à retirer — le code EN GRAND (≥ 28 px), une seule fois en haut`, JSON.stringify({ code: o.code, tCode: o.tCode, details: o.details }));
+          dit(o.titre === 'Colis à retirer' && /Relais Tabac du Port/.test(o.heros) && /9 nov\./.test(o.heros) && !/Relais Tabac|9 nov/.test(o.details) && o.tTitre >= 20 && o.tTitre > o.tCorps && o.bouton && o.premier && o.ordre && o.tMeta <= 13, `${nom} : lecture — en haut, en gros, ce que c’est et le bouton ; puis le message, les pièces jointes, et « De · Reçu sur · date » en petit à la fin`, JSON.stringify(o));
           const t = await lec.innerText();
           dit(!/arrivée dans VRM|adresse de réception\)/i.test(t), `${nom} : lecture sans « (arrivée dans VRM) »`, (t.match(/arrivée dans VRM/) || [''])[0]);
         }

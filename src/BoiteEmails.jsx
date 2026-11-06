@@ -138,7 +138,7 @@ function PuceCode({ code, grande = false, onCopie }) {
   return <button type="button" className={'vrm-boite-puce-code' + (grande ? ' is-grande' : '')} data-boite-code-copier={brut} data-copie={copie ? '1' : undefined}
     aria-label={copie ? `Code ${code} copié` : `Copier le code de retrait ${code}`}
     onClick={async (ev) => { ev.stopPropagation(); const ok = await copier(brut); setCopie(ok); if (onCopie) onCopie(ok); }}>
-    <span className="vrm-boite-puce-chiffres vrm-sensible" data-stream-type="code">{code}</span>
+    {grande ? null : <span className="vrm-boite-puce-chiffres vrm-sensible" data-stream-type="code">{code}</span>}
     <span className="vrm-boite-puce-ic" aria-hidden="true">{copie ? Ic.coche : Ic.copier}</span>
     <span className="vrm-boite-sr" aria-live="polite">{copie ? 'Copié' : ''}</span>
   </button>;
@@ -317,8 +317,9 @@ const Ligne = memo(function Ligne({ e, delies, ouvert, lu, photo, onOuvrir, onLu
     if (!gs || !gs.parti) { if (ev && ev.currentTarget) delete ev.currentTarget.dataset.appui; return; }
     const v = gs.dx / Math.max(1, performance.now() - gs.t0);
     const bascule = gs.dx > SEUIL_GLISSE || (gs.dx > 24 && v > 0.6);
+    // La ligne revient en place (avec son code), d'un mouvement de tiroir.
     const el = ref.current;
-    if (el) { el.style.transition = reduitMvt() ? 'none' : 'transform .34s cubic-bezier(.32,.72,0,1)'; el.style.transform = ''; }
+    for (const n of [el, el && el.parentElement && el.parentElement.querySelector('.vrm-boite-puce-code')]) if (n) { n.style.transition = reduitMvt() ? 'none' : 'transform .34s cubic-bezier(.32,.72,0,1)'; n.style.transform = ''; }
     if (fond.current) fond.current.dataset.actif = '0';
     if (bascule && lu !== null) onLu(e, pasLu);
     setTimeout(() => { glisse.current = false; }, 0);
@@ -337,7 +338,8 @@ const Ligne = memo(function Ligne({ e, delies, ouvert, lu, photo, onOuvrir, onLu
         if (!gs.parti) { if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { geste.current = null; delete ev.currentTarget.dataset.appui; return; } if (dx < 10) return; gs.parti = true; glisse.current = true; delete ev.currentTarget.dataset.appui; try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch (_) {} }
         // Au-delà du seuil, la ligne résiste (jamais un arrêt sec).
         const d = Math.max(0, dx); const x = d <= 96 ? d : 96 + ((d - 96) * 0.35);
-        gs.dx = d; ev.currentTarget.style.transition = 'none'; ev.currentTarget.style.transform = `translateX(${x}px)`;
+        gs.dx = d;
+        for (const n of [ev.currentTarget, ev.currentTarget.parentElement.querySelector('.vrm-boite-puce-code')]) if (n) { n.style.transition = 'none'; n.style.transform = `translateX(${x}px)`; }
         if (fond.current) fond.current.dataset.actif = d > SEUIL_GLISSE ? '1' : '0';
       }}
       onPointerUp={relacher} onPointerCancel={relacher} onPointerLeave={(ev) => { if (!geste.current) delete ev.currentTarget.dataset.appui; }}>
