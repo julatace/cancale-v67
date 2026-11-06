@@ -151,7 +151,7 @@ import {colisLbcAPoster,lbcColisAPoster,totalColis,colisLbcVendeur} from '../api
 import {CLE_COMPTES_EXCLUS,excluAutreDe,estExclu,basculerExclu,compteDeVente,exclusNormes} from '../api/_lib/comptes-exclus.js';
 import {PLATEFORMES_COMPTES,etatCompteLie,ageLecture,comptesLbcLies,comptesVcLies,comptesEbayLies,refDeLigneEbay,nomCompteLie,LIBELLE_ETAT} from './comptesLies.js';
 import { lignesFraicheur } from './fraicheurComptes.js';
-import { premiereCaseLibre as premiereCaseMeubles, achatsArrives, notifsOuRanger } from './ouRanger.js';
+import { premiereCaseLibre as premiereCaseMeubles, achatsArrives, notifsOuRanger, caseEnMots } from './ouRanger.js';
 import './comptes-lies.css';
 import './centre-notifs.css';
 import './comptes-securite.css';
@@ -7274,6 +7274,28 @@ const compteEcarte = (uid, masques, panneau) => {
   if (pa[k] === false) return false;
   return (masques && masques.has(k)) || pa[k] === true;
 };
+// (6 nov., vague 3) LE PRÉDICAT « COMPTE VINTED ÉCARTÉ » D'UN ÉCRAN QUI VIT LONGTEMPS — UNE source :
+// `vinted_accounts_hidden` (synchronisé), `panel_accounts_off` (passé par la coque) et les comptes
+// supprimés pour de bon (`lireSupprimes`). ⚠️ Lu au MONTAGE seulement, il était faux : Statistiques
+// se monte avant que la ligne `main` arrive du nuage (`load` rend alors `[]`) et le memo ne se
+// relisait plus — le compte masqué restait dans « Annulations » et « Notes reçues » (banc
+// vague3-ecrans, point X). Il se relit à l'arrivée du nuage et à chaque « Masquer ».
+function useCompteEcarte(panelOff) {
+  const [tick, setTick] = React.useState(0);
+  React.useEffect(() => {
+    const f = (e) => { const k = e && e.detail && e.detail.k; if (k === 'vinted_accounts_hidden' || k === CLE_SUPPRIMES) setTick((t) => t + 1); };
+    window.addEventListener('vrm:save', f);
+    const stop = onCloudReady(() => setTick((t) => t + 1));
+    return () => { window.removeEventListener('vrm:save', f); if (typeof stop === 'function') stop(); };
+  }, []);
+  return React.useMemo(() => {
+    const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+    const sup = lireSupprimes();
+    const ecarte = (u) => sup.has(String(u)) || compteEcarte(u, hAcc, panelOff || {});
+    ecarte.cle = [...hAcc].sort().join(',') + '|' + [...sup].sort().join(',') + '|' + JSON.stringify(panelOff || {});
+    return ecarte;
+  }, [panelOff, tick]); // eslint-disable-line react-hooks/exhaustive-deps
+}
 // (3 nov.) LES COMPTES LEBONCOIN, VESTIAIRE ET eBAY ÉCARTÉS DES TOTAUX — le même
 // choix que les comptes Vinted sélectionnés, rangé dans `vrm_comptes_exclus`
 // (synchronisé) et jugé par UNE règle (api/_lib/comptes-exclus.js, §11). Chaque
@@ -16335,7 +16357,12 @@ function BarreHaut({ champ, poserSlot }) {
 // dans n'importe quel <a href=…>point relais</a> ») : on n'affiche que le texte, jamais une balise.
 const texteSansBalises = (t) => String(t == null ? '' : t).replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
 const CIBLE_NOTIF = { c: null, tab: null, at: 0 };
-const poserCible = (c, tab) => { CIBLE_NOTIF.c = c || null; CIBLE_NOTIF.tab = tab || null; CIBLE_NOTIF.at = Date.now(); try { window.dispatchEvent(new Event('vrm:cible-notif')); } catch (_) {} };
+const poserCible = (c, tab) => {
+  CIBLE_NOTIF.c = c || null; CIBLE_NOTIF.tab = tab || null; CIBLE_NOTIF.at = Date.now();
+  // (6 nov., vague 3) Une case du Stock est aussi SÉLECTIONNÉE par le Stock (pas seulement éclairée).
+  if (c && c.type === 'case' && c.meuble && c.i !== '' && c.i != null) { DEMANDE_STOCK_CASE.m = String(c.meuble); DEMANDE_STOCK_CASE.i = Number(c.i); DEMANDE_STOCK_CASE.at = Date.now(); try { window.dispatchEvent(new Event('vrm:stock-case')); } catch (_) {} }
+  try { window.dispatchEvent(new Event('vrm:cible-notif')); } catch (_) {}
+};
 function CibleNotif({ tab, sub }) {
   const [absente, setAbsente] = React.useState(null);
   const [jeton, setJeton] = React.useState(0);
@@ -20396,7 +20423,11 @@ function RetirerArgent({ liveStats }) {
     </div>
   );
 }
-function VintedResume({ liveStats, baseKO, siAJour = true, sauf = null, sansMontants = false }) {
+// (6 nov., vague 3 — revue 2.30) `sansFraicheur` : l'écran a DÉJÀ sa voix de fraîcheur (Annonces :
+// `FraicheurAnnonces`, la date du dressing, celle qui gouverne la liste). La tête de Vinted s'y tait :
+// une seule source, une seule phrase par écran (§7) — on lisait « 2 comptes pas relus depuis 3 j »
+// au-dessus de « 12 annonces à confirmer — dernière lecture il y a 4 j », les mêmes comptes deux fois.
+function VintedResume({ liveStats, baseKO, siAJour = true, sauf = null, sansMontants = false, sansFraicheur = false }) {
   // ⚠️ §7 : pendant une panne, le résumé NE répète PAS la ligne « Je n'ai pas pu
   //    lire » — le bloc de la coque la dit déjà, et la liste en dessous
   //    (Comptabilite) porte la sienne. Deux lignes ici = « la panne dite trois
@@ -20424,7 +20455,7 @@ function VintedResume({ liveStats, baseKO, siAJour = true, sauf = null, sansMont
     </div></ResumePlateforme>}
     {/* (18 oct.) Hors du repli : sur téléphone le résumé est replié, et une capture
         ancienne y était cachée — une alerte qu'on ne voit pas n'en est pas une. */}
-    {(() => {
+    {!sansFraicheur && (() => {
       // (28 oct.) Sur Ventes, un compte dont les ventes n'ont PAS pu être lues est
       // déjà dit par le bandeau « compte non chargé » de la liste : la ligne de
       // fraîcheur ne le redit pas (une cause, une phrase — §7). Ailleurs, rien
@@ -31669,6 +31700,12 @@ function SortisDuStock({ plan, planLu, ecrire }) {
 // aller chercher, puis ouvre le Stock. Au niveau MODULE (comme
 // DEMANDE_SAISIE_PRIX) : au moment du clic, le Stock n'est pas monté.
 const DEMANDE_STOCK_CHERCHE = { nums: null, at: 0 };
+// (6 nov., vague 3 — « Ranger » ouvrait le Stock sans viser la case) LA CASE VISÉE : un meuble et
+// une case (`{ m, i }`). Posée par `poserCible` (une cible `case` : la cloche « Où ranger à
+// l'arrivée », un lien `?tab=garage&cible=case&meuble=…&i=…`) ou par le Stock lui-même (« Voir au
+// stock », « Ranger au stock ») ; le Stock la SÉLECTIONNE (`is-vise`, `data-case-vise`) et
+// `CibleNotif` la défile et l'éclaire — la même mise en évidence que partout (src/cibleNotif.js).
+const DEMANDE_STOCK_CASE = { m: null, i: null, at: 0 };
 // (19 oct.) Colis → « Suivi et message à l'acheteur » d'une vente eBay : la
 // commande à ouvrir dans eBay → Ventes. Au niveau MODULE (l'écran eBay n'est pas
 // monté au moment du clic) ; lue une fois, valable 30 s.
@@ -33820,14 +33857,36 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   const setZoom = (z) => { setZoomEtat(z); try { localStorage.setItem('vrm_meubles_zoom', z); } catch (_) {} };
   const caseMax = ZOOMS[zoom] || 64;
   const [place, setPlace] = React.useState(null);           // cleNum en cours de pose
+  // (6 nov., vague 3) LA CASE VISÉE ({ m, i }) — sélectionnée jusqu'au prochain toucher d'une case.
+  const lireDemandeCase = () => { const d = DEMANDE_STOCK_CASE; if (d.m == null || Date.now() - d.at > 120000) return null; const c = { m: String(d.m), i: Number(d.i) }; d.m = null; d.i = null; return c; };
+  const [choisie, setChoisie] = React.useState(lireDemandeCase);
+  React.useEffect(() => { const f = () => { const c = lireDemandeCase(); if (c) setChoisie(c); }; window.addEventListener('vrm:stock-case', f); return () => window.removeEventListener('vrm:stock-case', f); }, []);
+  const viserCase = (m, i) => poserCible({ type: 'case', meuble: String(m), i: String(i) }, 'garage');
   // (5 nov., revue) « Voir au stock » (Annonces, Ventes, Ma journée) cherche ce
   // N° ; « Ranger au stock » le prend en main : il ne reste qu'à toucher la case.
   // Avant, ces deux gestes arrivaient sur un Stock vide de toute demande (ils
   // ne parlaient qu'à l'ancienne grille et à la pièce 3D, plus affichées).
-  React.useEffect(() => { if (locate != null && String(locate).trim()) { setQ(String(locate)); setCibles([]); } }, [locate]);
+  // (6 nov., vague 3) Un N° qui a SA case : la case est sélectionnée, défilée et éclairée (avant, la
+  // recherche s'ouvrait et la case restait hors de l'écran) ; sans case, la recherche comme avant.
+  React.useEffect(() => {
+    if (locate == null || !String(locate).trim()) return;
+    const k = cleNum(locate); const s0 = k && slots[k];
+    if (s0 && s0.m != null && Number.isInteger(Number(s0.i)) && meubles.some((x) => String(x.id) === String(s0.m))) { setQ(''); setCibles([k]); viserCase(s0.m, Number(s0.i)); }
+    else { setQ(String(locate)); setCibles([]); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locate]);
+  // « Ranger au stock » : la PREMIÈRE CASE LIBRE est proposée (la règle de « Où ranger à l'arrivée »,
+  // src/ouRanger.js, jamais une seconde) — sélectionnée, défilée, éclairée ; toucher une case y range
+  // la paire (celle-ci ou une autre : c'est lui qui choisit).
   React.useEffect(() => {
     if (placeNum == null || !String(placeNum).trim()) return;
-    const k = cleNum(placeNum); if (k) { setPlace(k); setQ(''); toast(`Touche la case où tu ranges N°${placeNum}.`); }
+    const k = cleNum(placeNum);
+    if (k) {
+      setPlace(k); setQ('');
+      const libre = premiereCaseMeubles({ meubles, slots });
+      if (libre) { viserCase(libre.meubleId, libre.i); toast(`Touche la case où tu ranges N°${placeNum} — proposée : ${caseEnMots(libre)}.`); }
+      else toast(`Touche la case où tu ranges N°${placeNum}.`);
+    }
     if (onPlaced) onPlaced();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [placeNum]);
@@ -34071,6 +34130,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     toast(`N°${f.numero} sortie du stock — son numéro reste pris, jamais redonné.`, 'ok');
   };
   const cliquerCase = (mid, i) => {
+    setChoisie(null);
     const occ = occupant(mid, i);
     if (place) { const p = place; setPlace(null); poser(p, mid, i); return; }
     if (occ) setModal({ type: 'fiche', cle: cleDeFiche(occ) });
@@ -34112,7 +34172,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     const nVenduesIci = Array.from({ length: total(m) }).filter((_, i) => { const o = occupant(m.id, i); return o && (estVendu(o) || rangeeEtat(o) === 'plusenligne'); }).length;
     // Pendant une recherche, un meuble où rien ne correspond se replie : celui
     // qui contient l'article remonte sous les yeux.
-    const replie = cherche && nIci === 0 && meubles.length > 1;
+    const replie = cherche && nIci === 0 && meubles.length > 1 && !(choisie && choisie.m === String(m.id));
     const casesPl = planchesCases(m.planches, m.cols, m.rows);
     const gap = zoom === 'loin' ? 4 : 6;
     return (
@@ -34133,8 +34193,9 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
           {Array.from({ length: m.cols }).map((_, c) => <span key={'c' + c} data-regle-col={c + 1} className="vrm-s2d-regle">{c + 1}</span>)}
           {Array.from({ length: total(m) }).map((_, i) => {
             const occ = occupant(m.id, i); const sold = occ && estVendu(occ); const kOcc = occ ? cleDeFiche(occ) : null;
-            const vise = kOcc && (flash === kOcc || cibles.includes(kOcc) || (filtre && correspond(occ)));
-            const dim = occ ? ((cherche && !vise) || (filtreActif && !cherche && !correspondFiltre(occ))) : cherche;
+            const estChoisie = !!(choisie && choisie.m === String(m.id) && choisie.i === i);
+            const vise = estChoisie || (kOcc && (flash === kOcc || cibles.includes(kOcc) || (filtre && correspond(occ))));
+            const dim = estChoisie ? false : occ ? ((cherche && !vise) || (filtreActif && !cherche && !correspondFiltre(occ))) : cherche;
             const pl = placeDansMeubles(i, m);
             const hors = !!occ && rangeeEtat(occ) === 'plusenligne';
             const etat = hors && !sold ? 'plusenligne' : etatCase(occ, { vendus, cle: cleNum });
@@ -34144,7 +34205,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
               <React.Fragment key={i}>
               {pl.colonne === 1 && <span data-regle-rang={pl.rangee} className="vrm-s2d-regle">{pl.rangee}</span>}
               <button type="button" onClick={() => cliquerCase(m.id, i)} aria-label={occ ? `N°${occ.numero}${sold ? ' (vendue, à sortir)' : (hors ? ' (plus en ligne)' : '')} — rangée ${pl.rangee}, colonne ${pl.colonne}` : `Case vide — rangée ${pl.rangee}, colonne ${pl.colonne}`} title={`Rangée ${pl.rangee}, colonne ${pl.colonne}`}
-                data-case-num={kOcc || undefined} data-case-vise={vise ? '' : undefined} data-case-etat={etat} data-case-ici={m.id + ':' + i} data-tombe={kOcc && tombes[kOcc] ? tombes[kOcc] : undefined} className={classes}
+                data-case-num={kOcc || undefined} data-case-vise={vise ? '' : undefined} data-case-choisie={estChoisie ? '' : undefined} aria-current={estChoisie ? 'location' : undefined} data-cible={attrCible(['case', m.id, i])} data-case-etat={etat} data-case-ici={m.id + ':' + i} data-tombe={kOcc && tombes[kOcc] ? tombes[kOcc] : undefined} className={classes}
                 {...(occ ? dragProps(kOcc) : {})} {...dropProps(m.id, i)}
                 style={kOcc && tombes[kOcc] ? { '--vrm-tombe': `calc(${-tombes[kOcc]} * (100% + ${gap}px))` } : undefined}>
                 {occ ? <Vignette f={occ} sold={sold} hors={hors} /> : <span className="vrm-s2d-plus" aria-hidden="true">+</span>}
@@ -39496,11 +39557,7 @@ function AnnulationsEtNotes({ b, panelOff }) {
   const { ventes, ko } = useVentesCoque();
   const [profils, setProfils] = React.useState(undefined);
   React.useEffect(() => { let mort = false; lireProfilsNotes().then((x) => { if (!mort) setProfils(x); }); return () => { mort = true; }; }, []);
-  const ecarteUid = React.useMemo(() => {
-    const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
-    const sup = lireSupprimes();
-    return (u) => sup.has(String(u)) || compteEcarte(u, hAcc, panelOff || {});
-  }, [panelOff]);
+  const ecarteUid = useCompteEcarte(panelOff);   // (6 nov.) suit le nuage et « Masquer » (vague 3, point X)
   const comptes = React.useMemo(() => {
     let lies = [];
     try { const a = JSON.parse(localStorage.getItem('vinted_accounts') || 'null'); if (Array.isArray(a)) lies = a; } catch (_) {}
@@ -39580,6 +39637,7 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
   const { ventes: ventesCoque } = useVentesCoque();
   const [nuage, setNuage] = React.useState(() => isCloudReady());
   React.useEffect(() => onCloudReady(() => setNuage(true)), []);
+  const ecarteStats = useCompteEcarte(panelOff);   // (6 nov.) une source pour les comptes écartés (Boost, Offres)
 
   const vendu = liveStats ? liveStats.venduLignes : undefined;
   const manque = (liveStats && liveStats.venduManque) || [];
@@ -39628,7 +39686,6 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
   // contre non boostées du MÊME modèle sûr (`boostRentable`, src/boostRentable.js).
   const boost = React.useMemo(() => {
     if (!Array.isArray(ventesCoque) || !extras || !nuage) return null;
-    const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
     let fiches = null;
     try { fiches = load('vinted_annonce_numeros', {}) || {}; } catch (_) { fiches = null; }
     return boostRentable({
@@ -39636,10 +39693,10 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
       modeleDe: (it) => modeleSur((it && it.brand) || '', (it && it.title) || ''),
       dateMiseEnLigne: (it) => dateMiseEnLigneMs(it, extras.dates || null),
       estAnnulee: (o) => classifyOrderStatus(o.status) === 'cancelled',
-      ecarte: (o) => compteEcarte(o && o._acc && o._acc.vinted_user_id, hAcc, panelOff || {}),
+      ecarte: (o) => ecarteStats(o && o._acc && o._acc.vinted_user_id),
       montantVente: montantCommande,
     });
-  }, [ventesCoque, extras, nuage, panelOff, b]);
+  }, [ventesCoque, extras, nuage, ecarteStats, b]);
 
   // (4 nov.) LES OFFRES (src/statsOffres.js) : lues quand la carte paraît
   // (lecture projetée, ~1,2 Mo de messages, une fois par dix minutes).
@@ -39656,13 +39713,12 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
   }, []);
   const offres = React.useMemo(() => {
     if (offresBrut === undefined || vendu === undefined) return null;
-    const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
-    const ecarte = (uid) => compteEcarte(uid, hAcc, panelOff || {});
+    const ecarte = ecarteStats;
     const convs = Array.isArray(offresBrut.convs) ? offresBrut.convs.filter((c) => !ecarte(c.compte)) : null;
     const lectures = offresBrut.lectures ? Object.fromEntries(Object.entries(offresBrut.lectures).filter(([u]) => !ecarte(u))) : {};
     const ventes = Array.isArray(vendu) ? vendu.filter((l) => l.plateforme === 'Vinted') : null;
     return statsOffres({ convs, lectures, ventes, txn: offresBrut.txn, de: b.de, a: b.a, maintenant });
-  }, [offresBrut, vendu, panelOff, b, maintenant]);
+  }, [offresBrut, vendu, ecarteStats, b, maintenant]);
   const nomCompteOffres = (uid) => {
     const labels = load('vinted_account_labels', {}) || {};
     if (labels[uid]) return labels[uid];
@@ -63967,7 +64023,9 @@ function CentreNotifsCoque({ onReglages }) {
     ecrireRangerLocal(CLE_RANGER_PROPOSES, p);
     setARanger((l) => (Array.isArray(l) ? l.filter((x) => x.tx !== r.tx) : l));
   }, []);
-  const ranger = React.useCallback((r) => { rangeFait(r); try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=garage' })); } catch (_) {} }, [rangeFait]);
+  // (6 nov., vague 3) « Ranger » mène à LA case proposée (cible `case`, src/cibleNotif.js) : le Stock
+  // la sélectionne, la défile et l'éclaire — avant, il ouvrait le Stock sans la viser.
+  const ranger = React.useCallback((r) => { rangeFait(r); const c = r && r.case; const q = c && c.meubleId != null && Number.isInteger(Number(c.i)) ? `?tab=garage&cible=case&meuble=${encodeURIComponent(c.meubleId)}&i=${Number(c.i)}` : '?tab=garage'; try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: q })); } catch (_) {} }, [rangeFait]);
   useEffect(() => {
     let vivant = true;
     const compter = () => { if (document.visibilityState === 'hidden') return; compterNonLuesNotifs().then((v) => { if (vivant) setNonLues(v); }); };
@@ -70966,7 +71024,7 @@ function AppCoeur() {
               désormais dans LA carte sombre de chaque page (« Modifier ») : la bande ne les redit plus
               (§7) ; la ligne de fraîcheur reste. */}
           {(sec==='ventes'||sec==='annonces'||sec==='achats'||sec==='messages') && <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte} messages={sec==='messages'}/>}
-          {!achats && sec!=='messages' && <VintedResume liveStats={liveStatsVus} baseKO={baseKO} siAJour={sec!=='annonces'} sansMontants sauf={(sec || 'ventes') === 'ventes' ? (liveStatsVus && liveStatsVus.venduManque) : null}/>}
+          {!achats && sec!=='messages' && <VintedResume liveStats={liveStatsVus} baseKO={baseKO} siAJour={sec!=='annonces'} sansFraicheur={sec==='annonces'} sansMontants sauf={(sec || 'ventes') === 'ventes' ? (liveStatsVus && liveStatsVus.venduManque) : null}/>}
           {!baseKO && (sec==='annonces'||achats) && (() => {
             const uid = compteEffectif(compteSel, compteConnecte, (u) => (comptesChoisissables || []).some((a) => String(a.vinted_user_id) === u));
             if (achats) return null; // (3 nov.) la carte d'Achats vit dans l'écran Achats (ses chiffres d'achat)

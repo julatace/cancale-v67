@@ -30,7 +30,14 @@
   --fu-ambre-fond: #fff4e5;
   --fu-ombre: 0 1px 2px rgba(0,0,0,.04), 0 6px 20px rgba(0,0,0,.05);
   --fu-ombre-sombre: 0 12px 30px rgba(0,0,0,.18);
-  --fu-sombre: radial-gradient(120% 90% at 100% 0%, #1f3a5f 0%, #1d1d1f 55%);
+  /* (6 nov., vague 3) LA CARTE SOMBRE : son fond, son voile de case et ses deux encres sont des
+     JETONS de src/themeMineral.js (`carteSombre`, `caseSombre`, `surSombre`, `surSombre2`, posés en
+     `--vrm-*` par la coque) ; le texte secondaire tient 4,5:1 au point le plus clair du dégradé,
+     sous le voile d'une case (audit-carte-sombre, banc vague3-ecrans K). Le repli = le clair. */
+  --fu-sombre: var(--vrm-carte-sombre, radial-gradient(120% 90% at 100% 0%, #1f3a5f 0%, #1d1d1f 55%));
+  --fu-case-sombre: var(--vrm-case-sombre, rgba(255,255,255,.1));
+  --fu-sur-sombre: var(--vrm-sur-sombre, #fff);
+  --fu-sur-sombre-2: var(--vrm-sur-sombre-2, rgba(255,255,255,.7));
   --fu-filet: rgba(0,0,0,.06);
   --fu-r-carte: 20px;
   --fu-r-sombre: 24px;
@@ -54,7 +61,7 @@
   /* (5 nov., chantier E1, revue 2.3) La nuit, la carte sombre finissait en #1c1c1e — la couleur
      exacte des cartes blanches du mode sombre : elle s'y fondait. Elle garde sa teinte bleu nuit
      jusqu'en bas (une surface À ELLE, comme la carte d'un widget d'iOS) et un liseré clair. */
-  --fu-sombre: radial-gradient(120% 90% at 100% 0%, #2a5385 0%, #1b2d45 50%, #15233a 100%);
+  --fu-sombre: var(--vrm-carte-sombre, radial-gradient(120% 90% at 100% 0%, #2a5385 0%, #1b2d45 50%, #15233a 100%));
   --fu-filet: rgba(255,255,255,.08);
 }
 
@@ -84,30 +91,30 @@ html body .vrm-app-shell:has(.vrm-main .vrm-fu-ecran) { background-color: var(--
 .vrm-fu-carte-txt { min-width: 0; flex: 1 1 auto; }
 /* (5 nov., chantier E1, revue 3.2) UNE règle pour les surtitres des cartes sombres : celle du
    bonjour de Ma journée — une phrase (jamais de capitales), 13/600, blanc à 62 %. */
-.vrm-fu-surtitre { display: block; font: 600 13px/1.3 var(--vrm-police); color: rgba(255,255,255,.62); text-transform: none; letter-spacing: normal; }
+.vrm-fu-surtitre { display: block; font: 600 13px/1.3 var(--vrm-police); color: var(--fu-sur-sombre-2); text-transform: none; letter-spacing: normal; }
 .vrm-fu-grand {
   margin-top: 4px; font: 800 38px/1.08 var(--vrm-police); letter-spacing: -.03em; color: #fff;
   font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden;
 }
-.vrm-fu-grand.is-vide { color: rgba(255,255,255,.7); }
-.vrm-fu-grand .vrm-fu-borne { font-size: 15px; font-weight: 600; letter-spacing: 0; color: rgba(255,255,255,.65); margin-right: 6px; vertical-align: .55em; }
+.vrm-fu-grand.is-vide { color: var(--fu-sur-sombre-2); }
+.vrm-fu-grand .vrm-fu-borne { font-size: 15px; font-weight: 600; letter-spacing: 0; color: var(--fu-sur-sombre-2); margin-right: 6px; vertical-align: .55em; }
 .vrm-fu-grand .vrm-jc-montant, .vrm-fu-grand .vrm-jc-eur { color: inherit !important; font: inherit !important; letter-spacing: inherit !important; }
-.vrm-fu-sous { margin-top: 6px; font: 500 13px/1.4 var(--vrm-police); color: rgba(255,255,255,.7); }
+.vrm-fu-sous { margin-top: 6px; font: 500 13px/1.4 var(--vrm-police); color: var(--fu-sur-sombre-2); }
 .vrm-fu-sous b { color: #fff; font-weight: 600; }
 .vrm-fu-sous button { all: unset; cursor: pointer; color: #fff; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: rgba(255,255,255,.35); }
 .vrm-fu-courbe { flex: none; margin-top: 6px; }
 .vrm-fu-cases { display: grid; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); gap: 8px; }
 .vrm-fu-case {
   all: unset; box-sizing: border-box; min-width: 0; min-height: 56px;
-  padding: 10px 12px; border-radius: 14px; background: rgba(255,255,255,.1);
+  padding: 10px 12px; border-radius: 14px; background: var(--fu-case-sombre);
   display: flex; flex-direction: column; justify-content: center; gap: 2px; color: #fff;
 }
 button.vrm-fu-case { cursor: pointer; transition: background-color .15s ease; }
 @media (hover: hover) { button.vrm-fu-case:hover { background: rgba(255,255,255,.16); } }
 button.vrm-fu-case:focus-visible { outline: 2px solid var(--fu-bleu); outline-offset: 2px; }
 .vrm-fu-case b { display: block; font: 700 20px/1.15 var(--vrm-police); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.vrm-fu-case b.is-vide { color: rgba(255,255,255,.7); }
-.vrm-fu-case > span { font: 500 12px/1.3 var(--vrm-police); color: rgba(255,255,255,.65); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-fu-case b.is-vide { color: var(--fu-sur-sombre-2); }
+.vrm-fu-case > span { font: 500 12px/1.3 var(--vrm-police); color: var(--fu-sur-sombre-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* (5 nov., chantier A, revue 3.1) La casse des tuiles : une majuscule en tête, partout (« Dernier jour », « Avec code », « À vérifier »). */
 .vrm-fu-case > span::first-letter { text-transform: uppercase; }
 .vrm-fu-case .vrm-jc-montant, .vrm-fu-case .vrm-jc-eur { color: inherit !important; font: inherit !important; }
@@ -120,9 +127,9 @@ button.vrm-fu-case:focus-visible { outline: 2px solid var(--fu-bleu); outline-of
 @media (max-width: 360px) { .vrm-fu-grand { font-size: 34px; } .vrm-fu-case { padding: 9px 9px; } .vrm-fu-case b { font-size: 17px; } }
 /* (4 nov.) L'objectif du mois : une barre fine sous les cases, rien d'autre. */
 .vrm-fu-objectif { display: flex; flex-direction: column; gap: 6px; }
-.vrm-fu-objectif-ligne { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font: 500 12px/1.3 var(--vrm-police); color: rgba(255,255,255,.65); }
+.vrm-fu-objectif-ligne { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font: 500 12px/1.3 var(--vrm-police); color: var(--fu-sur-sombre-2); }
 .vrm-fu-objectif-ligne > b { font: 600 13px/1.3 var(--vrm-police); color: #fff; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.vrm-fu-objectif-sur { color: rgba(255,255,255,.65); font-weight: 500; }
+.vrm-fu-objectif-sur { color: var(--fu-sur-sombre-2); font-weight: 500; }
 .vrm-fu-objectif-piste { height: 4px; border-radius: 999px; background: rgba(255,255,255,.14); overflow: hidden; }
 .vrm-fu-objectif-piste > span { display: block; height: 100%; border-radius: 999px; background: var(--fu-bleu); transition: width .4s cubic-bezier(.23,1,.32,1); }
 @media (prefers-reduced-motion: reduce) { .vrm-fu-objectif-piste > span { transition: none; } }
@@ -168,9 +175,9 @@ html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-greeting.vrm-fu-t
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-greeting.vrm-fu-tete :is(.vrm-day-hello, .vrm-day-date, .vrm-day-todo, .vrm-phrase-ecran) {
   display: block !important; flex: none !important; margin: 0 !important; white-space: normal !important; color: inherit !important;
 }
-html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-greeting.vrm-fu-tete .vrm-day-date { font: 600 13px/1.3 var(--vrm-police) !important; color: rgba(255,255,255,.62) !important; }
+html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-greeting.vrm-fu-tete .vrm-day-date { font: 600 13px/1.3 var(--vrm-police) !important; color: var(--fu-sur-sombre-2) !important; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-greeting.vrm-fu-tete .vrm-day-hello { margin-top: 2px !important; font: 800 34px/1.1 var(--vrm-police) !important; letter-spacing: -.03em !important; color: #fff !important; }
-html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-greeting.vrm-fu-tete :is(.vrm-day-todo, .vrm-phrase-ecran) { margin-top: 6px !important; font: 500 13px/1.4 var(--vrm-police) !important; color: rgba(255,255,255,.66) !important; }
+html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-greeting.vrm-fu-tete :is(.vrm-day-todo, .vrm-phrase-ecran) { margin-top: 6px !important; font: 500 13px/1.4 var(--vrm-police) !important; color: var(--fu-sur-sombre-2) !important; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-greeting.vrm-fu-tete .vrm-day-date + .vrm-day-todo::before { content: none !important; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-greeting.vrm-fu-tete .vrm-day-todo b { color: #fff !important; font-weight: 600 !important; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-greeting.vrm-fu-tete .vrm-day-todo + .vrm-phrase-ecran, html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-greeting.vrm-fu-tete .vrm-phrase-ecran + .vrm-day-todo { margin-top: 2px !important; }
@@ -192,14 +199,14 @@ html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-greeting.vrm-fu-t
 @media (max-width: 420px) {
   html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-greeting.vrm-fu-tete .vrm-day-hello { font-size: 28px !important; }
 }
-.vrm-fu-tete .vrm-fu-bonjour { font: 600 13px/1.3 var(--vrm-police); color: rgba(255,255,255,.62); }
+.vrm-fu-tete .vrm-fu-bonjour { font: 600 13px/1.3 var(--vrm-police); color: var(--fu-sur-sombre-2); }
 .vrm-fu-tete .vrm-fu-titre-tete { margin: 2px 0 0; font: 800 34px/1.1 var(--vrm-police); letter-spacing: -.03em; color: #fff; }
-.vrm-fu-tete .vrm-fu-date { margin-top: 4px; font: 500 13px/1.35 var(--vrm-police); color: rgba(255,255,255,.62); }
+.vrm-fu-tete .vrm-fu-date { margin-top: 4px; font: 500 13px/1.35 var(--vrm-police); color: var(--fu-sur-sombre-2); }
 .vrm-fu-tete .vrm-fu-date b { color: #fff; font-weight: 600; }
-.vrm-fu-tete .vrm-w-modifier { position: absolute !important; top: 14px !important; right: 14px !important; min-height: 44px; padding: 0 12px; color: rgba(255,255,255,.8) !important; background: transparent; border: 0; font: 600 15px var(--vrm-police) !important; cursor: pointer; transform: none !important; }
+.vrm-fu-tete .vrm-w-modifier { position: absolute !important; top: 14px !important; right: 14px !important; min-height: 44px; padding: 0 12px; color: var(--fu-sur-sombre-2) !important; background: transparent; border: 0; font: 600 15px var(--vrm-police) !important; cursor: pointer; transform: none !important; }
 .vrm-fu-semaine { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; margin: 2px 0 0; padding: 0; list-style: none; }
 .vrm-fu-jour { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }
-.vrm-fu-jour > span { font: 700 11px/1 var(--vrm-police); color: rgba(255,255,255,.72); text-transform: uppercase; letter-spacing: .02em; }
+.vrm-fu-jour > span { font: 700 11px/1 var(--vrm-police); color: var(--fu-sur-sombre-2); text-transform: uppercase; letter-spacing: .02em; }
 .vrm-fu-jour > b { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font: 700 15px/1 var(--vrm-police); color: #fff; background: rgba(255,255,255,.08); font-variant-numeric: tabular-nums; position: relative; }
 .vrm-fu-jour[data-vendu]:not([data-vendu="0"]) > b::after { content: ''; position: absolute; bottom: 4px; left: 50%; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: rgba(255,255,255,.75); }
 .vrm-fu-jour[data-futur] > b { background: transparent; color: rgba(255,255,255,.38); }
@@ -212,16 +219,16 @@ html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-greeting.vrm-fu-t
   box-sizing: border-box; min-width: 0; min-height: 64px; padding: 12px 14px !important; margin: 0 !important; border: 0 !important;
   border-radius: 14px !important; background: rgba(255,255,255,.1) !important; color: #fff !important; display: flex; flex-direction: column; gap: 2px;
 }
-.vrm-fu-tete .vrm-fu-cases .vrm-jc-cell :is(.vrm-jc-l, .vrm-jc-l-lien) { order: 0; font: 500 12px/1.3 var(--vrm-police) !important; color: rgba(255,255,255,.65) !important; text-decoration: none !important; text-transform: none !important; letter-spacing: 0 !important; }
+.vrm-fu-tete .vrm-fu-cases .vrm-jc-cell :is(.vrm-jc-l, .vrm-jc-l-lien) { order: 0; font: 500 12px/1.3 var(--vrm-police) !important; color: var(--fu-sur-sombre-2) !important; text-decoration: none !important; text-transform: none !important; letter-spacing: 0 !important; }
 .vrm-fu-tete .vrm-fu-cases .vrm-jc-cell .vrm-jc-v { order: 1; font: 800 28px/1.15 var(--vrm-police) !important; color: #fff !important; letter-spacing: -.03em; }
 .vrm-fu-tete .vrm-fu-cases .vrm-jc-cell .vrm-jc-v :is(.vrm-jc-montant, .vrm-jc-eur) { color: inherit !important; font: inherit !important; letter-spacing: inherit !important; }
-.vrm-fu-tete .vrm-fu-cases .vrm-jc-cell .vrm-jc-sous { order: 2; font: 500 12px/1.35 var(--vrm-police) !important; color: rgba(255,255,255,.62) !important; }
+.vrm-fu-tete .vrm-fu-cases .vrm-jc-cell .vrm-jc-sous { order: 2; font: 500 12px/1.35 var(--vrm-police) !important; color: var(--fu-sur-sombre-2) !important; }
 .vrm-fu-tete .vrm-fu-cases .vrm-jc-cell .vrm-jc-sous :is(button, a) { color: #fff !important; font-weight: 600 !important; background: none !important; border: 0 !important; padding: 0 !important; min-height: 0 !important; text-decoration: underline; text-underline-offset: 2px; }
 .vrm-fu-tete .vrm-fu-cases .vrm-jc-cell .vrm-jc-choix { order: 3; }
 .vrm-fu-tete .vrm-fu-case.is-jour b { font-size: 28px; font-weight: 800; letter-spacing: -.03em; }
 .vrm-fu-tete .vrm-fu-case.is-jour > span { font-size: 12px; }
 .vrm-fu-tete .vrm-fu-case.is-jour { min-height: 64px; padding: 12px 14px; }
-.vrm-fu-tete .vrm-fu-case.is-jour .vrm-fu-case-sous { font: 500 12px/1.35 var(--vrm-police); color: rgba(255,255,255,.62); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-fu-tete .vrm-fu-case.is-jour .vrm-fu-case-sous { font: 500 12px/1.35 var(--vrm-police); color: var(--fu-sur-sombre-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* « Bénéfice » d'abord le libellé, puis le montant : dans la case « jour », pareil. */
 .vrm-fu-tete .vrm-fu-case.is-jour { justify-content: flex-start; }
 .vrm-fu-tete .vrm-fu-case.is-jour > span:first-child { order: 0; }
@@ -504,12 +511,12 @@ html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-compta-he
 /* La carte sombre */
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte {
   background: var(--fu-sombre) !important; box-shadow: var(--fu-ombre-sombre) !important; border-radius: var(--fu-r-sombre) !important;
-  padding: 22px 20px 10px !important; color: #fff !important; --vrm-b-lien: #fff; --vrm-ink: #fff; --vrm-muted: rgba(255,255,255,.66); --vrm-line: rgba(255,255,255,.14);
+  padding: 22px 20px 10px !important; color: #fff !important; --vrm-b-lien: #fff; --vrm-ink: #fff; --vrm-muted: var(--fu-sur-sombre-2); --vrm-line: rgba(255,255,255,.14);
 }
-html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte .vrm-compta-libelle { color: rgba(255,255,255,.6) !important; text-transform: uppercase; letter-spacing: .06em; font-size: 12px !important; }
+html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte .vrm-compta-libelle { color: var(--fu-sur-sombre-2) !important; text-transform: uppercase; letter-spacing: .06em; font-size: 12px !important; }
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte .vrm-compta-hero { color: #fff !important; font-size: 44px !important; }
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte .vrm-compta-hero[data-eur=""] { color: rgba(255,255,255,.5) !important; }
-html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte :is(.vrm-compta-phrase, small, .vrm-set-lib small) { color: rgba(255,255,255,.7) !important; }
+html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte :is(.vrm-compta-phrase, small, .vrm-set-lib small) { color: var(--fu-sur-sombre-2) !important; }
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte :is(b, .vrm-display, summary, .vrm-set-lib b) { color: #fff !important; }
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte [data-benef-manque] { color: #ffc773 !important; }
 html body .vrm-app-shell .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte :is(.vrm-compta-geste button, .vrm-compta-geste a, .vrm-lien-action, [data-depenses-choix] button),
@@ -528,7 +535,7 @@ html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-fu-compta
 .vrm-fu-seg[data-derniere] > span { color: var(--fu-encre) !important; font-weight: 600 !important; }
 .vrm-fu-seg[data-cours][data-ton="urgent"] > span { color: var(--fu-ambre-txt) !important; }
 .vrm-fu-barre > span, .vrm-fu-panneau-tete span, .vrm-fu-titre-section span { color: var(--fu-gris) !important; }
-.vrm-fu-jour[data-futur] > b { color: rgba(255,255,255,.7) !important; }
+.vrm-fu-jour[data-futur] > b { color: var(--fu-sur-sombre-2) !important; }
 :root:not([data-theme="dark"]) { --fu-ambre-txt: #B25000; }
 
 /* ══ 11. MA JOURNÉE = LA MAQUETTE FusionJournee, à l'identique (2 nov., 22 h) ══
@@ -539,12 +546,12 @@ html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-greeting.vrm-fu
   background: radial-gradient(120% 100% at 100% 0%, #1f3a5f 0%, #1d1d1f 60%) !important;
 }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-greeting.vrm-fu-tete .vrm-day-hello {
-  font: 600 13px/1.25 var(--vrm-police) !important; letter-spacing: 0 !important; color: rgba(255,255,255,.6) !important; margin: 0 !important; padding: 0 !important;
+  font: 600 13px/1.25 var(--vrm-police) !important; letter-spacing: 0 !important; color: var(--fu-sur-sombre-2) !important; margin: 0 !important; padding: 0 !important;
 }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-tete .vrm-fu-titre-tete { margin: 2px 0 14px !important; font: 800 34px/1.12 var(--vrm-police) !important; letter-spacing: -.03em !important; color: #fff !important; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-semaine { display: flex !important; gap: 4px !important; margin: 0 !important; max-width: none !important; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-jour { flex: 1 1 0; gap: 6px; }
-html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-jour > span { font: 600 11px/1.2 var(--vrm-police) !important; color: rgba(255,255,255,.72) !important; text-transform: none !important; letter-spacing: 0 !important; }
+html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-jour > span { font: 600 11px/1.2 var(--vrm-police) !important; color: var(--fu-sur-sombre-2) !important; text-transform: none !important; letter-spacing: 0 !important; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-jour[data-auj] > span { color: #fff !important; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-jour > b { width: 34px !important; height: 34px !important; font: 700 15px/1 var(--vrm-police) !important; background: rgba(255,255,255,.08) !important; color: #fff !important; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-jour[data-auj] > b { background: #fff !important; color: #1d1d1f !important; }
@@ -553,10 +560,10 @@ html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-tete > .vrm-fu-c
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-tete .vrm-fu-case.is-jour {
   all: unset; box-sizing: border-box; display: block !important; min-height: 0 !important; padding: 12px !important; border-radius: 14px !important; background: rgba(255,255,255,.1) !important; color: #fff; cursor: pointer; min-width: 0;
 }
-html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-tete .vrm-fu-case.is-jour > span { display: block; font: 500 12px/1.3 var(--vrm-police) !important; color: rgba(255,255,255,.65) !important; }
+html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-tete .vrm-fu-case.is-jour > span { display: block; font: 500 12px/1.3 var(--vrm-police) !important; color: var(--fu-sur-sombre-2) !important; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-tete .vrm-fu-case.is-jour > b { display: block; font: 800 28px/1.2 var(--vrm-police) !important; letter-spacing: -.02em !important; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-tete .vrm-fu-case.is-jour > b.is-vide { color: rgba(255,255,255,.7); }
-html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-tete .vrm-fu-case.is-jour .vrm-fu-borne { font-size: 17px; margin-right: 3px; vertical-align: .2em; color: rgba(255,255,255,.65); }
+html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-tete .vrm-fu-case.is-jour > b.is-vide { color: var(--fu-sur-sombre-2); }
+html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-tete .vrm-fu-case.is-jour .vrm-fu-borne { font-size: 17px; margin-right: 3px; vertical-align: .2em; color: var(--fu-sur-sombre-2); }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-tete .vrm-fu-case.is-jour:focus-visible { outline: 2px solid var(--fu-bleu); outline-offset: 2px; }
 /* « À faire · N gestes » */
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-titre-section { display: flex; justify-content: space-between; align-items: baseline; margin: 0 !important; padding: 18px 0 8px !important; }
@@ -724,8 +731,8 @@ html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran :is(.vrm-compt
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte { padding: 18px 18px 18px !important; display: flex !important; flex-direction: column !important; gap: 0 !important; }
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte .vrm-compta-libelle { margin: 0 !important; }
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte .vrm-compta-hero { font: 800 38px/1.08 var(--vrm-police) !important; letter-spacing: -.03em !important; margin-top: 4px; }
-html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte .vrm-fu-compta-sous { margin: 6px 0 0 !important; font: 500 13px/1.4 var(--vrm-police) !important; color: rgba(255,255,255,.7) !important; }
-html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte .vrm-fu-compta-sous button { all: unset; cursor: pointer; color: rgba(255,255,255,.7) !important; font: inherit !important; text-decoration: none !important; }
+html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte .vrm-fu-compta-sous { margin: 6px 0 0 !important; font: 500 13px/1.4 var(--vrm-police) !important; color: var(--fu-sur-sombre-2) !important; }
+html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte .vrm-fu-compta-sous button { all: unset; cursor: pointer; color: var(--fu-sur-sombre-2) !important; font: inherit !important; text-decoration: none !important; }
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-fu-compta-cases { margin-top: 12px; }
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-fu-compta-cases .vrm-fu-case b { color: #fff !important; }
 @media (min-width: 768px) { html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte .vrm-compta-hero { font-size: 44px !important; } }
@@ -867,7 +874,7 @@ html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) [data-ventes-controles] >
      lisible (720 px), centrée — la tête sombre puis UNE liste « À faire ». */
   html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee { max-width: var(--vrm-largeur-journee, 720px) !important; margin-inline: auto !important; width: 100% !important; grid-template-columns: minmax(0, 1fr) !important; }
 }
-html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-tete .vrm-fu-case.is-jour .vrm-fu-couv { font-size: 13px; font-weight: 600; letter-spacing: 0; color: rgba(255,255,255,.65); }
+html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-tete .vrm-fu-case.is-jour .vrm-fu-couv { font-size: 13px; font-weight: 600; letter-spacing: 0; color: var(--fu-sur-sombre-2); }
 
 /* ══ 17. CRITIQUE DU 3 NOV. (#10, #11) — Ma journée au gabarit de la maquette ══
    Pastilles 42 / rayon 13 / 800 17 px : ambre = dû aujourd'hui (seule couleur, §7),
@@ -1107,14 +1114,14 @@ html:not([data-colis-outils]) body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) [
 .vrm-fu-modifier {
   all: unset; box-sizing: border-box; position: absolute; top: 6px; right: 6px; z-index: 2;
   min-height: 44px; min-width: 44px; padding: 0 12px; border-radius: 12px; display: grid; place-items: center;
-  font: 600 13px/1 var(--vrm-police); color: rgba(255,255,255,.72); cursor: pointer;
+  font: 600 13px/1 var(--vrm-police); color: var(--fu-sur-sombre-2); cursor: pointer;
 }
 @media (hover: hover) { .vrm-fu-modifier:hover { color: #fff; background: rgba(255,255,255,.08); } }
 .vrm-fu-modifier:focus-visible { outline: 2px solid var(--fu-bleu); outline-offset: 2px; }
 .a-action > .vrm-fu-carte-tete .vrm-fu-surtitre { padding-right: 76px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vrm-fu-carte-nu { position: relative; display: flex; flex-direction: column; gap: 14px; min-width: 0; color: #fff; }
 .vrm-fu-carte-nu .vrm-fu-modifier { top: -10px; right: -8px; }
-.vrm-fu-sous-nom { color: rgba(255,255,255,.7); }
+.vrm-fu-sous-nom { color: var(--fu-sur-sombre-2); }
 /* Dans la tête de Ma journée : les chiffres prennent la place des deux cases d'avant. */
 .vrm-fu-tete > .vrm-carte-stats { min-width: 0; }
 @media (min-width: 1024px) {
@@ -1135,7 +1142,7 @@ html:not([data-colis-outils]) body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) [
 .vrm-carte-place > span { font: 500 12px/1.2 var(--vrm-police); color: var(--fu-gris, #6e6e73); }
 .vrm-carte-place > b { font: 600 15px/1.25 var(--vrm-police); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vrm-carte-place[aria-pressed="true"] { background: var(--fu-sombre, #1d1d1f); color: #fff; box-shadow: none; }
-.vrm-carte-place[aria-pressed="true"] > span { color: rgba(255,255,255,.65); }
+.vrm-carte-place[aria-pressed="true"] > span { color: var(--fu-sur-sombre-2); }
 .vrm-carte-periodes { display: flex; gap: 6px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-top: 4px; padding-bottom: 2px; }
 .vrm-carte-periodes::-webkit-scrollbar { display: none; }
 .vrm-carte-periodes > button { flex: none; }
@@ -1256,7 +1263,7 @@ html body .vrm-app-shell .vrm-main .vrm-day-layout .vrm-cycle-carte > .vrm-cycle
 html body .vrm-app-shell .vrm-fu-carte-haut > .vrm-fu-modifier { position: static !important; flex: none; min-height: 44px !important; min-width: 44px !important; height: auto !important; padding: 0 12px !important; }
 .vrm-fu-carte.a-rangee > .vrm-fu-carte-tete .vrm-fu-surtitre { padding-right: 0; }
 /* Un « — » dit sa raison sous le libellé (§5) ; un montant laisse son manque nommé. */
-.vrm-fu-case > .vrm-fu-case-raison { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; margin-top: 1px; font: 500 11px/1.3 var(--vrm-police); color: rgba(255,255,255,.62); white-space: normal; overflow: hidden; overflow-wrap: anywhere; }
+.vrm-fu-case > .vrm-fu-case-raison { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; margin-top: 1px; font: 500 11px/1.3 var(--vrm-police); color: var(--fu-sur-sombre-2); white-space: normal; overflow: hidden; overflow-wrap: anywhere; }
 .vrm-fu-tete .vrm-fu-cases { align-items: stretch; }
 /* Un toucher se sent (feedback au doigt, jamais sur la souris seule). */
 button.vrm-fu-case { transition: background-color .15s ease, transform .16s cubic-bezier(.23,1,.32,1); }
