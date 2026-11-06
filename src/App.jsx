@@ -28568,7 +28568,7 @@ function ClePhotoroom({ cadre = true }) {
 
       {formulaire && (
         <form data-photoroom-form="" onSubmit={(e) => { e.preventDefault(); poser(); }} style={{ display: 'grid', gap: 8 }}>
-          <label htmlFor="vrm-photoroom-cle" style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{remplacer ? 'Colle ta nouvelle clé' : 'Colle ta clé API Photoroom'}</label>
+          <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}><label htmlFor="vrm-photoroom-cle">{remplacer ? 'Colle ta nouvelle clé' : 'Colle ta clé API Photoroom'}</label>{' '}<Pourquoi titre="Ta clé Photoroom">VRM la vérifie chez Photoroom (sans dépenser d'image), puis la range chiffrée. Tu n'en reverras que les 4 derniers caractères.</Pourquoi></span>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <input id="vrm-photoroom-cle" data-photoroom-champ="" value={val} onChange={(e) => setVal(e.target.value)} type="password" autoComplete="off" spellCheck={false} autoCapitalize="off"
               placeholder="Ta clé Photoroom" aria-label="Clé API Photoroom"
@@ -28576,7 +28576,6 @@ function ClePhotoroom({ cadre = true }) {
             <button type="submit" data-photoroom-enregistrer="" disabled={!!occupe || !val.trim()} style={{ ...bouton(true), opacity: (occupe || !val.trim()) ? 0.55 : 1 }}>{occupe === 'poser' ? 'Vérification…' : 'Vérifier et ranger'}</button>
             {remplacer && <button className="vrm-b vrm-b-discret" type="button" onClick={() => { setRemplacer(false); setVal(''); }} style={bouton(false)}>Annuler</button>}
           </div>
-          <div style={ligneFine}>VRM la vérifie chez Photoroom (sans dépenser d'image), puis la range chiffrée. Tu n'en reverras que les 4 derniers caractères.</div>
         </form>
       )}
 
@@ -39773,10 +39772,13 @@ function LigneProfil({ titre, aide, children, attr }) {
   return (
     <div className="vrm-micro-ligne" {...(attr || {})} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '12px 0', borderTop: `1px solid ${C.border}` }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px 12px', flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 15, fontWeight: 600, color: C.text }}>{titre}</span>
+        {/* (6 nov., v36-visuel-2) Une explication en phrase (texte seul) suit le titre en « ⓘ » (une
+            feuille) au lieu d'un paragraphe de 3 à 4 lignes ; une aide qui porte une QUESTION à
+            trancher (élément) reste à l'écran. */}
+        <span style={{ fontSize: 15, fontWeight: 600, color: C.text }}>{titre}{typeof aide === 'string' ? <>{' '}<Pourquoi titre={titre}>{aide}</Pourquoi></> : null}</span>
         {children}
       </div>
-      {aide ? <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>{aide}</div> : null}
+      {aide && typeof aide !== 'string' ? <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>{aide}</div> : null}
     </div>
   );
 }
@@ -39860,8 +39862,7 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
   const profil = (
     <Card style={sCarte}>
       <div data-micro-profil={vl || 'passu'}>
-        <div style={sTitre}>Ton profil URSSAF</div>
-        <div style={{ fontSize: 13, color: C.muted, marginTop: 2, marginBottom: 6, lineHeight: 1.5 }}>VRM ne lit pas ton espace URSSAF : dis-lui tes options, il calcule le reste. Tu les retrouves sur autoentrepreneur.urssaf.fr, rubrique « Mon compte ».</div>
+        <div style={{ ...sTitre, marginBottom: 6 }}>Ton profil URSSAF{' '}<Pourquoi titre="Ton profil URSSAF">VRM ne lit pas ton espace URSSAF : dis-lui tes options, il calcule le reste. Tu les retrouves sur autoentrepreneur.urssaf.fr, rubrique « Mon compte ».</Pourquoi></div>
         <LigneProfil titre="Tu déclares" attr={{ 'data-micro-freq': freq }} aide={phraseRythme(freq, now) + " L'URSSAF ne propose que ces deux rythmes (pas d'annuel)."}>
           <Segmente label="Rythme de déclaration" value={freq} onChange={poserFreq}
             options={[{ v: 'mensuel', l: 'Par mois', data: { 'data-micro-freq-choix': 'mensuel' } }, { v: 'trimestriel', l: 'Par trimestre', data: { 'data-micro-freq-choix': 'trimestriel' } }]} />
@@ -39898,11 +39899,10 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
   const calendrier = (
     <Card style={sCarte}>
       <div data-micro-calendrier={freq}>
-        <div style={sTitre}>Ton calendrier</div>
-        <div style={{ fontSize: 13, color: C.muted, marginTop: 2, lineHeight: 1.5 }}>
+        <div style={sTitre}>Ton calendrier{' '}<Pourquoi titre="Ton calendrier">
           {freq === 'mensuel' ? 'Le chiffre d\'affaires d\'un mois se déclare et se paie le mois suivant.' : 'Le chiffre d\'affaires d\'un trimestre se déclare et se paie le mois qui suit le trimestre.'}
           {vl === 'oui' ? ' Ton impôt (1 %) part en même temps.' : vl === 'non' ? ' Ton impôt sur le revenu se paie à part (déclaration de revenus).' : ''}
-        </div>
+        </Pourquoi></div>
         <div style={{ display: 'flex', flexDirection: 'column', marginTop: 8 }}>
           {cal.map((p, i) => {
             const notee = regPret && p.ym.every((ym) => moisDeclare(regLu, ym));
@@ -39964,7 +39964,7 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
               <span style={{ position: 'absolute', left: 0 }}>0</span>
               <span style={{ position: 'absolute', right: `${100 - j.seuils.tvaBase / j.seuils.tvaMajore * 100}%`, transform: 'translateX(50%)', whiteSpace: 'nowrap' }}>{eurRond(j.seuils.tvaBase)}</span>
             </div>
-            <div style={{ fontSize: 11, color: C.muted }}>Le trait marque le seuil ; la barre va jusqu'au seuil majoré ({eurRond(j.seuils.tvaMajore)}).</div>
+            <div style={{ fontSize: 12, color: C.muted }}>Le trait : le seuil{' '}<Pourquoi titre="Franchise de TVA">Le trait marque le seuil ; la barre va jusqu'au seuil majoré ({eurRond(j.seuils.tvaMajore)}).</Pourquoi></div>
             <div data-micro-tva-texte="" style={{ fontSize: 13, color: j.tva.etat === 'ok' ? C.muted : C.text, marginTop: 6, lineHeight: 1.5 }}>{tvaTxt}</div>
           </div>
           <div style={{ marginTop: 16 }}>
@@ -56778,11 +56778,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             le bas, alors que c'est exactement ce qu'on vient chercher quand on
             part au relais. Ils reviennent tels quels sur En route / Reçus /
             Tous, où ils filtrent vraiment quelque chose. */}
-        {buysBase.length>0 && aFilter!=='attente' && <PeriodePicker value={periode} onChange={setPeriode} titre="Période des achats" datation="Date d’achat"/>}
+        {/* (6 nov., v36-visuel-2) La recherche et la période sur UNE ligne (la période sans valeur =
+            son icône seule, le libellé reste lu au lecteur d'écran) : la liste remonte d'un cran. */}
+        {buysBase.length>0 && aFilter!=='attente' && <div className="vrm-achats-filtres">
         {buysBase.length>0 && aFilter!=='attente' && (
           <label className="vrm-msg-search vrm-achats-search" style={{color:C.muted}}><Icon name="search" size={16}/><input type="search" aria-label="Rechercher un achat" value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="Titre, N°, vendeur"
             style={{color:C.text,background:'transparent',border:0,boxShadow:'none'}}/></label>
         )}
+        <PeriodePicker value={periode} onChange={setPeriode} titre="Période des achats" datation="Date d’achat"/></div>}
         {/* ── LES CHIFFRES DE L'ACHAT (l'écran n'en avait AUCUN) ─────────────────
             « C'est mon métier, fais ça comme un pro. » L'écran Ventes porte
             quatre chiffres depuis toujours ; Achats, zéro — alors que l'achat,
@@ -57757,12 +57760,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           );
           return (
             <div className="vrm-achats-bloc" data-repartis={rendus.length} style={{background:C.card,border:`1px solid ${C.border}`}}>
-              <div className="vrm-achats-bloc-t" style={{color:C.text}}>
-                <span aria-hidden="true" style={{color:C.warn,display:'inline-flex',verticalAlign:'-3px',marginRight:6}}><Icon name="alert" size={16}/></span>
-                {rendus.length} colis {rendus.length>1?'sont repartis':'est reparti'} chez {rendus.length>1?'leurs vendeurs':'son vendeur'}{tot>0 && <> — <span data-montant="" style={{whiteSpace:'nowrap'}}>{auMoins?'au moins ':''}{tot.toFixed(2).replace('.',',')} €</span> à vérifier</>}
-              </div>
-              <div className="vrm-achats-bloc-p" style={{color:C.muted}}>
-                L'article ne viendra pas. Vérifie le remboursement dans la conversation Vinted de la commande.
+              {/* (6 nov., v36-visuel-2) Une carte d'alerte : icône · titre court + « ⓘ » (le pourquoi) ·
+                  UNE ligne (le montant à vérifier) — plus 4 lignes de phrase avant la liste. */}
+              <div className="vrm-achats-bloc-t vrm-alerte-tete" style={{color:C.text}}>
+                <span aria-hidden="true" className="vrm-alerte-icone"><Icon name="alert" size={15}/></span>
+                <span className="vrm-alerte-ligne-texte">
+                  <span className="vrm-alerte-ligne-titre">{rendus.length} colis {rendus.length>1?'repartis':'reparti'} chez {rendus.length>1?'leurs vendeurs':'son vendeur'}{' '}<Pourquoi titre="Colis reparti">L'article ne viendra pas. Vérifie le remboursement dans la conversation Vinted de la commande.</Pourquoi></span>
+                  <span className="vrm-alerte-ligne-sous">{tot>0 ? <><span data-montant="" style={{whiteSpace:'nowrap'}}>{auMoins?'au moins ':''}{montant(tot)}</span> à vérifier</> : 'Remboursement à vérifier'}</span>
+                </span>
               </div>
               <div className="vrm-achats-bloc-liste">
                 {rendus.slice(0,8).map((r,ix)=>{
@@ -57788,11 +57793,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{fontSize:15,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.title||'Achat'}</div>
                         <div style={{fontSize:12,color:C.muted,marginTop:2}}>
-                          {montantCommande(o).toFixed(2).replace('.',',')} €{isFinite(j) ? ` · commandé il y a ${j} jour${j>1?'s':''}` : ''}{st?` · ${st}`:''}
+                          {montant(montantCommande(o))}{isFinite(j) ? ` · commandé il y a ${j} jour${j>1?'s':''}` : ''}{st?` · ${st}`:''}
                         </div>
                         {(()=>{ const su = r.t ? suiviDeLigne(r.t) : suivisAchat(o, indexSuivisAchats)[0]; const e = entreeSuiviAchat(o); return su ? <LigneTransporteur transp={transpMap} suivi={su} carrier={(r.t && r.t.carrier) || (e && e.transporteur) || transporteurDeForme(su) || ''}/> : null; })()}
                       </div>
-                      {href && <Bouton variante="discret" className="vrm-pickup-lien" href={href} target="_blank" rel="noreferrer" style={{flexShrink:0}}>Ouvrir la conversation ↗</Bouton>}
+                      {href && <Bouton variante="discret" className="vrm-pickup-lien" href={href} target="_blank" rel="noreferrer" style={{flexShrink:0}}>Conversation ↗</Bouton>}
                     </div>
                   );
                 })}
@@ -65052,7 +65057,8 @@ function LeboncoinScreen() {
           <div style={{ fontSize: 13, fontWeight: 800, color: C.text }}>À faire sur Leboncoin</div>
           {conseilsLbc.slice(0, 4).map((c, i) => (
             <div key={c.k} data-lbc-conseil={c.k} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 0', borderTop: i ? `1px solid ${C.border}` : 'none' }}>
-              <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', background: c.urg ? C.warn : C.accentSoft, flexShrink: 0 }} />
+              {/* (6 nov., v36-visuel-2) Une icône de Réglages par geste (au lieu d'un point bleu) ; l'ambre au geste pressé. */}
+              <span aria-hidden="true" className="vrm-lbc-conseil-icone" data-urgent={c.urg ? '1' : undefined}><Icon name={{ publier: 'tag', 'relier-ventes': 'link', doublons: 'alert' }[c.k] || 'trash'} size={16}/></span>
               <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: C.text, lineHeight: 1.4 }}>{c.txt}</span>
               <button type="button" data-lbc-conseil-go={c.k} onClick={allerLbc(c)} style={{ border: `1px solid ${C.border}`, background: 'transparent', borderRadius: 12, padding: '4px 11px', fontSize: 12, fontWeight: 600, color: C.text, cursor: 'pointer', flexShrink: 0 }}>Voir</button>
             </div>
@@ -65119,7 +65125,7 @@ function LeboncoinScreen() {
         <div data-repub-lbc-porte={data.repub === null ? 'pas-su' : String(data.repub.length)} style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '12px 16px', marginBottom: 14 }}>
           <div style={{ flex: '1 1 220px', minWidth: 0 }}>
             <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Republier sur Leboncoin</div>
-            <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.45 }}>{data.repub === null ? "Je n'ai pas pu vérifier lesquelles peuvent l'être (une lecture a échoué) — clique « ↻ Actualiser »." : `Supprimer puis remettre une annonce comme neuve, une à la fois. ${data.repub.length} annonce${data.repub.length > 1 ? 's' : ''} peu${data.repub.length > 1 ? 'vent' : 't'} l'être.`}</div>
+            <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.45 }}>{data.repub === null ? "Je n'ai pas pu vérifier lesquelles peuvent l'être (une lecture a échoué) — clique « ↻ Actualiser »." : <>{`${data.repub.length} annonce${data.repub.length > 1 ? 's' : ''} peu${data.repub.length > 1 ? 'vent' : 't'} l'être`}{' '}<Pourquoi titre="Republier sur Leboncoin">Supprimer puis remettre une annonce comme neuve, une à la fois.</Pourquoi></>}</div>
           </div>
           {data.repub !== null && <button type="button" data-repub-lbc-ouvrir="" onClick={() => setRepubOuvert(true)} style={{ minHeight: 44, padding: '0 16px', borderRadius: 12, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Choisir les annonces…</button>}
         </div>
@@ -65488,7 +65494,7 @@ function LeboncoinScreen() {
                     <div className="vrm-apub-corps">
                       <div className="vrm-apub-ligne1">
                         <span className="vrm-apub-num">N°{q.numero}</span>
-                        <span className="vrm-apub-prix">{q.prix != null ? q.prix.toFixed(2).replace('.', ',') + ' €' : '—'}</span>
+                        <span className="vrm-apub-prix">{montant(q.prix)}</span>
                       </div>
                       <div className="vrm-apub-titre">{q.title || '—'}</div>
                       <div className="vrm-apub-pastilles">

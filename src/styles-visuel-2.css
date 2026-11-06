@@ -234,6 +234,70 @@ html body .vrm-app-shell .vrm-main .vrm-fu-pile .vrm-pile-plus { right: -4px; bo
   html body .vrm-app-shell .vrm-main .vrm-fu-pile .vrm-pile-v { animation: vrm-pile-pose 460ms var(--vrm-sortie) both; animation-delay: calc(var(--k) * 60ms); }
 }
 
+html body .vrm-app-shell .vrm-main .vrm-fu-pile.vrm-pile:not(.is-pile) { width: 68px; }
+
+/* ══ 5 ter. ACHATS ══════════════════════════════════════════════════════════ */
+/* La recherche et la période sur une ligne ; sans période choisie, la période est son icône. */
+html body .vrm-app-shell .vrm-main .vrm-achats-filtres { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
+html body .vrm-app-shell .vrm-main .vrm-achats-filtres > .vrm-achats-search { flex: 1 1 200px; margin: 0 !important; min-width: 0; }
+html body .vrm-app-shell .vrm-main .vrm-achats-filtres > .vrm-period { flex: none; margin: 0 !important; }
+html body .vrm-app-shell .vrm-main .vrm-achats-filtres .vrm-cal-declencheur[data-periode-valeur=""] { width: 44px; min-width: 44px; padding: 0 !important; justify-content: center; }
+html body .vrm-app-shell .vrm-main .vrm-achats-filtres .vrm-cal-declencheur[data-periode-valeur=""] [data-periode-libelle] {
+  position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+}
+/* Le bloc « colis reparti » : une carte d'alerte comme les autres (icône, titre + ⓘ, une ligne). */
+html body .vrm-app-shell .vrm-main .vrm-achats-bloc[data-repartis] { border: 0 !important; border-radius: var(--vrm-r-carte) !important; box-shadow: var(--vrm-ombre-carte); }
+html body .vrm-app-shell .vrm-main .vrm-achats-bloc[data-repartis] .vrm-alerte-ligne-titre { font-size: var(--vrm-t15); }
+html body .vrm-app-shell .vrm-main .vrm-achats-bloc[data-repartis] .vrm-alerte-ligne-sous { font-variant-numeric: tabular-nums; }
+
+/* « Ajouter un QR Mondial Relay » (Colis) : une rangée de carte, plus une phrase flottante. */
+html body .vrm-app-shell .vrm-main .vrm-mr-bloc > .vrm-repli > summary {
+  background: var(--vrm-surface); border-radius: var(--vrm-r-carte); box-shadow: var(--vrm-ombre-carte);
+  min-height: 52px; padding: 0 16px !important; font-size: var(--vrm-t15) !important; font-weight: 400 !important; color: var(--vrm-ink) !important;
+}
+html body .vrm-app-shell .vrm-main .vrm-mr-bloc > .vrm-repli[open] > summary { border-radius: var(--vrm-r-carte) var(--vrm-r-carte) 0 0; }
+
+/* ══ 5 quater. LEBONCOIN ════════════════════════════════════════════════════ */
+/* « Publier une annonce Vinted sur … » (Leboncoin, eBay, Vestiaire) : une ligne de titre. */
+html body .vrm-app-shell .vrm-main .vrm-pa-entree > button { border: 0 !important; box-shadow: var(--vrm-ombre-carte) !important; border-radius: var(--vrm-r-carte) !important; }
+html body .vrm-app-shell .vrm-main .vrm-pa-entree > button > span:nth-child(2) { font-size: var(--vrm-t15) !important; font-weight: 600; letter-spacing: -.01em; line-height: 1.3; }
+html body .vrm-app-shell .vrm-main .vrm-pa-entree > button > span:nth-child(2) small { font-size: var(--vrm-t13) !important; font-weight: 400; }
+/* « Actualiser » : une action de texte discrète au bord droit, plus une pilule seule. */
+html body .vrm-app-shell .vrm-main .vrm-lbc-tete { margin-bottom: 4px !important; }
+html body .vrm-app-shell .vrm-main .vrm-lbc-tete > button { border: 0 !important; background: transparent !important; color: var(--vrm-muted) !important; font-size: var(--vrm-t13) !important; min-height: 44px; }
+/* « À faire sur Leboncoin » : le groupe de Réglages d'eBay (icône par geste, filets décalés). */
+html body .vrm-app-shell .vrm-main [data-lbc-conseils] { border: 0 !important; box-shadow: var(--vrm-ombre-carte) !important; border-radius: var(--vrm-r-carte) !important; padding: 14px 16px 6px !important; }
+html body .vrm-app-shell .vrm-main [data-lbc-conseils] > div:first-child { font-size: var(--vrm-t15) !important; font-weight: 600 !important; letter-spacing: -.01em; }
+html body .vrm-app-shell .vrm-main [data-lbc-conseils] [data-lbc-conseil] { gap: 12px !important; min-height: 56px; padding: 8px 0 !important; position: relative; border-top: 0 !important; }
+html body .vrm-app-shell .vrm-main [data-lbc-conseils] [data-lbc-conseil] + [data-lbc-conseil]::before { content: ''; position: absolute; top: 0; left: 42px; right: 0; height: .5px; background: var(--vrm-line); }
+html body .vrm-app-shell .vrm-main [data-lbc-conseils] [data-lbc-conseil] > span:nth-child(2) { font-size: var(--vrm-t15) !important; }
+html body .vrm-app-shell .vrm-main [data-lbc-conseils] [data-lbc-conseil-go] { border: 0 !important; background: var(--vrm-card2) !important; border-radius: 999px !important; min-height: 44px; padding: 0 16px !important; font-size: var(--vrm-t15) !important; }
+.vrm-lbc-conseil-icone { flex: 0 0 30px; width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; background: var(--vrm-card2); color: var(--vrm-ink); }
+.vrm-lbc-conseil-icone[data-urgent="1"] { background: var(--vrm-warn-soft); color: var(--vrm-warn); }
+/* « Republier sur Leboncoin » : une carte comme les autres (titre, une ligne + ⓘ, le geste). */
+html body .vrm-app-shell .vrm-main [data-repub-lbc-porte] { border: 0 !important; box-shadow: var(--vrm-ombre-carte); border-radius: var(--vrm-r-carte) !important; }
+html body .vrm-app-shell .vrm-main [data-repub-lbc-porte] [data-repub-lbc-ouvrir] { border: 0 !important; background: var(--vrm-card2) !important; border-radius: 999px !important; font-size: var(--vrm-t15) !important; }
+/* La file « à publier » : des cartes plus courtes — les vignettes (le nombre de photos est
+   déjà dans sa pastille) quittent le téléphone ; les liens ne sont plus soulignés. */
+html body .vrm-app-shell .vrm-main .vrm-apub-carte { border: 0 !important; border-radius: var(--vrm-r-carte) !important; box-shadow: var(--vrm-ombre-carte) !important; padding: 12px 14px !important; gap: 10px; }
+html body .vrm-app-shell .vrm-main .vrm-apub-carte .vrm-apub-photo { width: 72px !important; height: 72px !important; border: 0 !important; }
+html body .vrm-app-shell .vrm-main .vrm-apub-titre { font-size: var(--vrm-t15); }
+html body .vrm-app-shell .vrm-main .vrm-apub-prix { font-size: var(--vrm-t17); font-weight: 600; }
+html body .vrm-app-shell .vrm-main .vrm-apub-num { border: 0 !important; background: var(--vrm-card2) !important; }
+html body .vrm-app-shell .vrm-main .vrm-apub-pastille { border: 0 !important; background: var(--vrm-card2) !important; font-size: 12px; padding: 4px 8px; }
+html body .vrm-app-shell .vrm-main .vrm-apub-gestes { border-top: .5px solid var(--vrm-line) !important; gap: 4px 16px; }
+html body .vrm-app-shell .vrm-main .vrm-apub-lien { text-decoration: none !important; color: var(--vrm-ink) !important; font-size: var(--vrm-t13) !important; }
+@media (max-width: 767px) { html body .vrm-app-shell .vrm-main .vrm-apub-vignettes:not(:has(.vrm-apub-plus)) { display: none; } }
+/* « Mes annonces » : la note « ⓘ » suit le titre ; les filtres défilent sur UNE rangée. */
+html body .vrm-app-shell .vrm-main .vrm-lbc-catalog { border: 0 !important; border-radius: var(--vrm-r-carte) !important; box-shadow: var(--vrm-ombre-carte); }
+html body .vrm-app-shell .vrm-main .vrm-lbc-catalog header > div { display: flex; align-items: baseline; gap: 6px; }
+html body .vrm-app-shell .vrm-main .vrm-lbc-catalog header .vrm-lbc-catalog-note { padding: 0 !important; border: 0 !important; display: inline !important; font-size: var(--vrm-t15); }
+html body .vrm-app-shell .vrm-main .vrm-lbc-catalog h2 { font-size: var(--vrm-t22) !important; font-weight: 700; letter-spacing: -.022em; }
+html body .vrm-app-shell .vrm-main .vrm-lbc-catalog-filtres { flex-wrap: nowrap !important; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: auto; }
+html body .vrm-app-shell .vrm-main .vrm-lbc-catalog-filtres::-webkit-scrollbar { display: none; }
+html body .vrm-app-shell .vrm-main .vrm-lbc-catalog-filtres button { border: 0 !important; background: var(--vrm-card2) !important; border-radius: 999px !important; padding: 0 14px !important; white-space: nowrap; font-size: var(--vrm-t15) !important; }
+html body .vrm-app-shell .vrm-main .vrm-lbc-catalog-filtres button[aria-pressed="true"] { background: var(--vrm-ink) !important; color: var(--vrm-bg) !important; }
+
 /* ══ 6. LES ÉTATS VIDES ILLUSTRÉS (src/composants/Illustration.jsx) ═══════ */
 .vrm-illustration { display: block; color: var(--vrm-muted); opacity: .9; }
 html body .vrm-app-shell .vrm-main .vrm-vide-dessin { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; padding: 24px 16px; }
