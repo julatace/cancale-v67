@@ -54,7 +54,7 @@
 .vrm-boite-rubriques button[aria-pressed=true] .vrm-boite-nonlus-point{background:var(--bx-carte)}
 .vrm-boite-ligne-outils{display:flex;flex-wrap:nowrap;gap:4px 8px;align-items:center;margin-top:8px;min-width:0}
 .vrm-boite-compte{position:relative;display:block;flex:0 1 auto;min-width:0;max-width:100%}
-.vrm-boite-ligne-outils>.vrm-boite-compte{max-width:58%}
+.vrm-boite-ligne-outils>.vrm-boite-compte{max-width:calc(100% - 136px)}
 .vrm-boite .vrm-boite-ligne-outils>button{flex:0 0 auto;white-space:nowrap}
 .vrm-boite .vrm-boite-compte select{-webkit-appearance:none;appearance:none;width:auto;max-width:100%;overflow:hidden;white-space:nowrap;border-radius:999px;border-color:transparent;background:var(--bx-gris);padding:0 36px 0 14px;font-weight:500;text-overflow:ellipsis}
 .vrm-boite-compte-chevron{position:absolute;right:14px;top:50%;margin-top:-6px;pointer-events:none;color:var(--bx-doux)}

@@ -70,7 +70,7 @@ async function ouvrir(nav, base, { viewport, tactile, sombre, reduit = false, st
   await pg.clock.setFixedTime(MAINTENANT);
   const erreurs = []; pg.on('pageerror', (e) => erreurs.push('page: ' + e.message));
   pg.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource|net::ERR|favicon/i.test(m.text())) erreurs.push('console: ' + m.text().slice(0, 200)); });
-  await pg.addInitScript(([s, sombre, stream]) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_bienvenue_vue', '1'); localStorage.setItem('vrm_visite_vue', '1'); localStorage.setItem('vinted_dark', sombre ? 'true' : 'false'); if (stream) localStorage.setItem('vrm_stream', 'true'); } catch (_) {} window.__aller = []; window.addEventListener('vrm:aller', (e) => window.__aller.push(e.detail)); }, [SESSION, sombre, stream]);
+  await pg.addInitScript(([s, sombre, stream]) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_bienvenue_vue', '1'); localStorage.setItem('vrm_visite_vue', '1'); localStorage.setItem('vinted_dark', sombre ? 'true' : 'false'); if (stream) localStorage.setItem('vrm_stream', '1'); } catch (_) {} window.__aller = []; window.addEventListener('vrm:aller', (e) => window.__aller.push(e.detail)); }, [SESSION, sombre, stream]);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ access_token: 'jeton-de-banc', refresh_token: 'r', expires_in: 3600, user: SESSION.user }) }));
   const ecritures = [];
@@ -221,6 +221,16 @@ async function inspecter(pg, nom, racine = '[data-boite-emails]') {
         const vu = await pg.evaluate((c) => document.body.innerText.includes(c), code ? code.data.resume.code : 'zzz');
         await pg.screenshot({ path: path.join(CAPT, 'stream-390.png') });
         dit(code && !vu, 'mode stream : aucun code de retrait lisible dans la boîte');
+        // …ni dans l'e-mail ouvert (la carte d'embarquement, le bouton « copier »).
+        const l = pg.locator(`[data-boite-email="${code.id}"]`);
+        if (await l.count()) {
+          await l.scrollIntoViewIfNeeded(); await l.click();
+          await pg.locator('[data-boite-heros="retrait"]').waitFor({ timeout: 8000 });
+          await pg.waitForTimeout(400);
+          const carte = await pg.locator('[data-boite-heros="retrait"]').innerText();
+          await pg.screenshot({ path: path.join(CAPT, 'stream-lecture-390.png') });
+          dit(!carte.includes(code.data.resume.code.slice(0, 3) + ' ' + code.data.resume.code.slice(3)) && !carte.includes(code.data.resume.code), 'mode stream : la carte du retrait cache le code', carte.replace(/\n/g, ' | ').slice(0, 160));
+        } else dit(false, 'mode stream : la ligne du code est trouvée');
         await ctx.close();
       });
     }
@@ -238,7 +248,8 @@ async function regles(pg, nom, base, { tactile, appels }) {
   await pg.evaluate(() => { const p = document.querySelector('[data-boite-email]'); if (p) p.scrollIntoView({ block: 'center' }); });
   // R1. La ligne vient du résumé rangé, jamais du sujet.
   const lignes = await pg.locator('[data-boite-email]').evaluateAll((l) => l.map((x) => ({ id: x.dataset.boiteEmail, quoi: (x.querySelector('[data-boite-quoi]') || {}).textContent || '', texte: x.innerText, code: x.dataset.boiteACode === '1', lu: x.dataset.lu })));
-  const sujet = lignes.filter((x) => { const d = parId.get(x.id); return d && d.subject && d.subject.length > 12 && x.texte.includes(d.subject); });
+  // (Un sujet qui dit mot pour mot la nature tirée du résumé — « Commande mise à jour » — n'est pas une fuite.)
+  const sujet = lignes.filter((x) => { const d = parId.get(x.id); return d && d.subject && d.subject.length > 12 && d.subject.trim() !== x.quoi.trim() && x.texte.includes(d.subject); });
   dit(lignes.length > 100 && !sujet.length, `${nom} : R1 aucune ligne n'écrit le sujet brut (${lignes.length} lignes)`, JSON.stringify(sujet.slice(0, 2)));
   // R2. Le code sur la ligne SEULEMENT s'il est lu (colis à retirer).
   const attendu = (d) => !!(d && d.resume && d.resume.t === 'suivi' && d.resume.st === 'available' && d.resume.sens !== 'sortant' && typeof d.resume.code === 'string' && d.resume.code.trim());
