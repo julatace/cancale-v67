@@ -209,6 +209,7 @@ import ChoixPeriode from "./ChoixPeriode.jsx";
 import { libellePlage, phrasePlage } from "./periodeCalendrier.js";
 import { installerLecturesPartagees } from "./lecturesPartagees.js";
 import { rythme } from "./rythmeLectures.js";
+import { comptesARelire } from "./sondeVentes.js";
 import { installerFiltreSupprimes, sansComptesSupprimes, lireSupprimes, CLE_SUPPRIMES } from "./comptesSupprimes.js";
 import { lectureComplete, construirePhoto, ecrirePhoto, lirePhoto, listeDuSoir, joursAvantJour, heurePhoto, adresseQrLocale, CACHE_QR } from "./journeeHorsLigne.js";
 import { jetonsStream, demarrerStream, demarrerMontants, photoACacherSelon, poserReglesStream, normaliserRegles, compilerRegle, masquerTexteStream, textePourStream, regleCourante, regleApercu, ligneACacher, CATEGORIES as STREAM_CATEGORIES, LISTES as STREAM_LISTES, nettoyerMots, CLE_STREAM, CLE_STREAM_REGLES, REGLES_DEFAUT as STREAM_DEFAUT } from "./modeStream.js";
@@ -241,7 +242,7 @@ import CarteMois from "./design/CarteMois.jsx";
 import CarteStats from "./design/CarteStats.jsx";
 import CarteOffres from "./design/CarteOffres.jsx";
 import { statsOffres } from "./statsOffres.js";
-import { CLE_CARTE_STATS, raisonCourte, recuPublieEntre, valeurObjectif } from "./design/carteChiffres.js";
+import { CLE_CARTE_STATS, raisonCourte, recuPublieEntre, valeurObjectif, reglageDePage, publicationColisFraiche } from "./design/carteChiffres.js";
 import { CHIFFRES as CHIFFRES_CARTE } from "./design/carteChiffres.js";
 import { CLE_OBJECTIF, lireObjectif, lireSaisieObjectif, objectifAEnregistrer, progressionObjectif } from "./objectifMois.js";
 import { courtFusion, enArticles } from "./design/tacheCourte.js";
@@ -40397,8 +40398,9 @@ function JournalSemaineCarte({ liveStats }) {
   const [ship, pret] = useLigneSynchro('vinted_ship_done', lireShipDone);
   const [lbcF] = useLigneSynchro('vrm_lbc_colis_done', lireLbcDone);
   const [vcF] = useLigneSynchro('vrm_vc_colis_done', lireVcDone);
-  const vendu = liveStats && !liveStats.venduPasSu && Array.isArray(liveStats.venduLignes)
-    ? { lignes: liveStats.venduLignes, manque: [...(liveStats.venduManque || []), ...(liveStats.venduEnAttente ? ['lecture en cours'] : [])], nonComptees: liveStats.venduNonComptees || [] } : null;
+  // (6 nov., onglets A) `undefined` = en cours (« lecture… »), `null` = pas su (`venduEtat`).
+  const vendu = venduEtat(liveStats) !== 'lu' ? (venduEtat(liveStats) === 'pasSu' ? null : undefined)
+    : { lignes: liveStats.venduLignes, manque: [...(liveStats.venduManque || []), ...(liveStats.venduEnAttente ? ['lecture en cours'] : [])], nonComptees: liveStats.venduNonComptees || [] };
   const J = journalSemaine({ vendu, joursBenef: pub, colisFaits: pret ? { vinted: ship, lbc: lbcF, vc: vcF } : {}, R: REGLES_JOURNAL });
   const [replie, setReplieB] = React.useState(() => { try { return repliePourSemaine(localStorage.getItem('vrm_journal_replie'), J.lundi); } catch (_) { return false; } });
   const basculer = () => { const n = !replie; setReplieB(n); try { if (n) localStorage.setItem('vrm_journal_replie', J.lundi); else localStorage.removeItem('vrm_journal_replie'); } catch (_) {} };
@@ -41364,6 +41366,9 @@ function BeneficeMoisCourt() {
 // coque, publications de Ventes et de Colis, la lecture du bénéfice de Compta) et
 // les RÈGLES propriétaires passées telles quelles — aucun chiffre recalculé.
 // ══════════════════════════════════════════════════════════════════════════════
+// (6 nov., onglets A) Les chiffres que la carte d'Achats montre (grand chiffre et cases), d'après SON réglage :
+// un onglet d'étape ne redit pas un nombre déjà écrit au-dessus (§7).
+const idsCarteAchats = () => { try { const r = reglageDePage(lireReglageCarte(), 'achats', { depense: {}, enroute: {}, recus: {} }); return new Set(r ? [r.g && r.g.id, ...(r.c || []).map((x) => x && x.id)].filter(Boolean) : []); } catch (_) { return new Set(); } };
 const lireReglageCarte = () => { try { const v = load(CLE_CARTE_STATS, null); return v && typeof v === 'object' && v.pages && typeof v.pages === 'object' ? v : null; } catch (_) { return null; } };
 function useReglageCarte() {
   const [v, setV] = React.useState(lireReglageCarte);
@@ -41444,6 +41449,8 @@ const lirePub = (cle) => () => { try { const v = load(cle, null); return v && ty
 const lireColisAPoster = lirePub('vrm_colis_aposter'), lireColisARetirer = lirePub('vrm_colis_retirer'), lirePairesDorment = lirePub('vrm_paires_dorment');
 // Les sources : `liveStats` = celui de la coque (`liveStatsVus` : les lignes de
 // `ventesFaites`, le porte-monnaie, les annonces), le reste = les publications.
+// L'état de « vendu » dans le `liveStats` de la coque : 'encours' (pas encore là) · 'pasSu' · 'lu'.
+const venduEtat = (liveStats) => !liveStats ? 'encours' : liveStats.venduPasSu ? 'pasSu' : Array.isArray(liveStats.venduLignes) ? 'lu' : 'encours';
 function useSourcesCarte(liveStats) {
   const [compta] = useLigneSynchro('vrm_compta', lireComptaSynchro);
   const [pub, pret] = useLigneSynchro('vrm_benefice_jours', lireBeneficeJours);
@@ -41454,8 +41461,11 @@ function useSourcesCarte(liveStats) {
   const [dorment] = useLigneSynchro('vrm_paires_dorment', lirePairesDorment);
   const etat = pub ? 'lu' : (pret ? 'passu' : 'encours');
   return React.useMemo(() => ({
-    vendu: liveStats && !liveStats.venduPasSu && Array.isArray(liveStats.venduLignes)
-      ? { lignes: liveStats.venduLignes, manque: liveStats.venduManque || [], enAttente: !!liveStats.venduEnAttente, nonComptees: liveStats.venduNonComptees || [] } : null,
+    // (6 nov., onglets A) TROIS ÉTATS (§5) : la coque pas encore revenue (`liveStats` absent, ou
+    // sans ses lignes) = `undefined`, « lecture… » ; `venduPasSu` = `null`, « pas lu ». Avant,
+    // les deux disaient « pas lu » : à chaque ouverture, la carte annonçait une panne.
+    vendu: venduEtat(liveStats) !== 'lu' ? (venduEtat(liveStats) === 'pasSu' ? null : undefined)
+      : { lignes: liveStats.venduLignes, manque: liveStats.venduManque || [], enAttente: !!liveStats.venduEnAttente, nonComptees: liveStats.venduNonComptees || [] },
     beneficeDe: (p) => ({ B: beneficeDe({ pub, compta, ligneUrssaf, regime }, p), etat }),
     joursBenef: pub, etatBenef: etat, ligneUrssaf, colisAPoster, colisARetirer, dorment, live: liveStats || null,
   }), [liveStats, pub, etat, compta, ligneUrssaf, regime, colisAPoster, colisARetirer, dorment]);
@@ -44535,6 +44545,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // renvoie. Le laisser dans « En route » faisait attendre une livraison qui
     // ne viendra jamais (1 cas mesuré sur les 26).
     if (/annul|rembours|refus|retour/i.test(s)) return 'annule';
+    // (6 nov., onglets A) « Transaction suspendue - en attente de vérification » : rien n'est EN
+    // ROUTE (sur sa base, l'achat était livré le 28 oct. et Ma journée le disait « Transaction
+    // suspendue » pendant qu'Achats et Colis le comptaient « en route »). Une étape à part :
+    // ni en route, ni arrivé ; il reste dans « Tous » avec son statut.
+    if (/suspend/i.test(s)) return 'suspendue';
     if (isAtRelayStatus(s)) return 'relais';
     if (purchasePhase(s) === 'completed') return 'recu';
     return 'route';
@@ -50440,7 +50455,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         vinted: toShip.length, ebay: eb ? eb.length : null, leboncoin: lb ? lb.length : null, vestiaire: vc ? vc.length : null,
         nePasPoster: colisEb ? colisEb.nePasPoster.length : null, at: Date.now() };
       const avant = load('vrm_colis_aposter', null);
-      if (!avant || avant.total !== v.total || avant.enRetard !== v.enRetard || avant.ebay !== v.ebay || avant.leboncoin !== v.leboncoin || avant.vestiaire !== v.vestiaire || avant.nePasPoster !== v.nePasPoster) {
+      // (6 nov., onglets A) Et une fois l'heure même sans changement : le badge et la carte ne croient
+      // qu'une publication de moins de 12 h (`publicationColisFraiche`) — un nombre stable restait
+      // daté de la veille alors que l'écran qui le compte était ouvert.
+      if (!avant || avant.total !== v.total || avant.enRetard !== v.enRetard || avant.ebay !== v.ebay || avant.leboncoin !== v.leboncoin || avant.vestiaire !== v.vestiaire || avant.nePasPoster !== v.nePasPoster || !(Date.now() - (Number(avant.at) || 0) < 3600000)) {
         save('vrm_colis_aposter', v);
         try { window.dispatchEvent(new CustomEvent('vrm:colis')); } catch (_) {}
       }
@@ -53696,7 +53714,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             'Regarde-les dans Colis.',
           ].filter(Boolean).join(' ');
           tuiles.retirer = { ...tuiles.retirer, aVerifier: nv + nc };
-          jobs.push({ id: nv ? 'retrait-a-verifier' : 'retrait-en-verification', n: nv || nc, nRelier: nc, icon:'box', color: nv ? C.warn : C.muted,
+          // (6 nov., onglets A, §7) Les raisons SANS leur nombre, pour quand la case « À retirer » dit déjà
+          // « + N à vérifier » (sur sa base : « + 34 à vérifier » puis « Colis à vérifier · 34 délais dépassés »).
+          const raisonsSansN = [nD ? pl(nD, 'délai dépassé', 'délais dépassés') : '', nT ? pl(nT, 'incident', 'incidents') : '', nc ? `pas encore ${pl(nc, 'relié', 'reliés')}` : ''].filter(Boolean).join(' · ');
+          jobs.push({ id: nv ? 'retrait-a-verifier' : 'retrait-en-verification', n: nv || nc, nRelier: nc, icon:'box', color: nv ? C.warn : C.muted, detailSansN: raisonsSansN,
             photos: [...av.map(x => x && x.o ? orderPhoto(x.o) : null), ...(pickupUnion.aConfirmer || []).map(o => orderPhoto(o))],
             title: `${nv + nc} colis à vérifier`, court: 'Colis à vérifier', detail: raisons, plein: long,
             tab:'retraits', prio:0.6 });
@@ -53718,6 +53739,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           } else if (tuiles.envoyer) tuiles.envoyer = { ...tuiles.envoyer, emballer: null, presses: null };
           for (const j of jobs) if (j.id === 'retrait-a-verifier' || j.id === 'retrait-en-verification') {
             if (!retirerVu) { j.court = null; j.title = `${j.title} — ${j.detail}`; j.detail = null; }
+            else if (j.detailSansN) j.detail = j.detailSansN;
           }
           if (!retirerVu && tuiles.retirer) tuiles.retirer = { ...tuiles.retirer, aVerifier: 0 };
         }
@@ -55481,8 +55503,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // partiel (les colis d'e-mail manqueraient) présenté comme complet.
             // (31 oct., soir) Sur « Achats », plus d'étape « À retirer » : c'est
             // l'écran voisin, « Colis à retirer » (pas deux fois la même chose).
+            // (6 nov., onglets A, §7) LE MÊME NOMBRE UNE FOIS. Sur sa base : la carte disait « 28 En
+            // route · 1806 Arrivés » et, juste dessous, les onglets « En route 28 · Arrivés 1,8 k » (deux
+            // écritures du même nombre). Un onglet dont la carte du haut montre le chiffre se tait ;
+            // `data-n` reste (le nombre de l'onglet, pour qui le lit).
+            const surCarte = (dansPlateforme && !baseKO) ? idsCarteAchats() : null;
+            const dejaDit = (id) => !!surCarte && surCarte.has(id === 'route' ? 'enroute' : id);
             return [...(modeListeAchats?[]:[['attente','À retirer',tracking===null?'—':pickupUnion.total]]),['route','En route',n.route],['recus','Arrivés',n.recu],['all','Tous',null]].map(([id,label,cnt])=>(
-            <button type="button" key={id} className="vrm-seg-btn" data-achats-onglet={id} data-n={cnt==null?undefined:String(cnt)} onClick={()=>setAFilter(id)} aria-pressed={aFilter===id} aria-label={cnt?`${label} ${cnt}`:undefined} style={{whiteSpace:'nowrap'}}>{label}{cnt?<span className="vrm-seg-n" title={String(cnt)}> {cnt>=1000?`${(Math.floor(cnt/100)/10).toLocaleString('fr-FR')} k`:cnt}</span>:null}</button>
+            <button type="button" key={id} className="vrm-seg-btn" data-achats-onglet={id} data-n={cnt==null?undefined:String(cnt)} onClick={()=>setAFilter(id)} aria-pressed={aFilter===id} aria-label={cnt?`${label} ${cnt}`:undefined} style={{whiteSpace:'nowrap'}}>{label}{cnt&&!dejaDit(id)?<span className="vrm-seg-n" title={String(cnt)}> {cnt>=1000?`${(Math.floor(cnt/100)/10).toLocaleString('fr-FR')} k`:cnt}</span>:null}</button>
           )); })()}
         </div>
         {!baseKO && <button type="button" className="vrm-icon-control vrm-achats-plus" data-achats-plus={achatsOutilsOuverts?'ouvert':'ferme'} aria-expanded={achatsOutilsOuverts} aria-controls="vrm-achats-outils" aria-label="Plus : fournisseurs, délai, lots" title="Fournisseurs · Délai · Lots" onClick={()=>setAchatsOutilsOuverts(v=>!v)}><Icon name="more" size={20}/></button>}
@@ -56657,7 +56685,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <span style={{whiteSpace:'nowrap'}}>{o.date?dateFr(o.date, new Date(o.date).getFullYear()===new Date().getFullYear() ? {day:'numeric',month:'short'} : {day:'numeric',month:'short',year:'numeric'}):''}
                   {/* DEPUIS COMBIEN DE TEMPS : « dois-je m'inquiéter ? ». Au-delà de
                       trois semaines, en rouge — le moment de relancer le vendeur. */}
-                  {!cancelled && !st.retour && st.step>=1 && st.step<4 && (()=>{ const t=tsCommande(o); if(!t) return null; const j=Math.floor((Date.now()-t)/86400000); if(j<2) return null; const tard=j>ACHAT_RETARD_J; return <span style={{fontWeight:tard?700:500,color:tard?C.warn:C.muted,whiteSpace:'normal'}}> · depuis {j} j{tard?' — relance le vendeur':''}</span>; })()}</span>
+                  {/* (6 nov., onglets A) AU RELAIS, ce qui compte est le temps passé AU RELAIS (le point le
+                      renvoie au bout de quelques jours), pas l'âge de la commande — et « relance le vendeur »
+                      n'a pas de sens pour un colis qui attend au point. Sur sa base : « 16 oct. · depuis 20 j »
+                      pour un colis arrivé le 28 oct. L'arrivée est celle LUE dans l'e-mail du colis
+                      (`arriveLe`, relié par identité) ; pas lue ⇒ rien d'écrit. */}
+                  {!cancelled && !st.retour && st.step===3 && (()=>{ const a=Date.parse((tk&&tk.arriveLe)||''); if(!Number.isFinite(a)) return null; const j=Math.max(0,Math.floor((Date.now()-a)/86400000)); return <span data-achat-au-relais={j} style={{fontWeight:500,color:C.muted,whiteSpace:'normal'}}> · au relais {j===0?'depuis aujourd’hui':`depuis ${j} j`}</span>; })()}
+                  {!cancelled && !st.retour && st.step>=1 && st.step<3 && (()=>{ const t=tsCommande(o); if(!t) return null; const j=Math.floor((Date.now()-t)/86400000); if(j<2) return null; const tard=j>ACHAT_RETARD_J; return <span style={{fontWeight:tard?700:500,color:tard?C.warn:C.muted,whiteSpace:'normal'}}> · depuis {j} j{tard?' — relance le vendeur':''}</span>; })()}</span>
                   {tk && tk.lieu && st.step===3 && <span style={{color:C.text}} title={tk.lieu}>· {(cleanLieu(tk.lieu).nom || tk.lieu)}</span>}
                   {numA!=null && <span title="Numéro de l'article (lien avec l'annonce / la vente)" style={{fontWeight:600,color:C.text}}>N°{numA}</span>}
                   {o._fromEmail && <span title="Reconstituée depuis l'email — pas encore confirmée par Vinted" style={{fontSize:11,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:12,padding:'0 6px'}}>email</span>}
@@ -68947,8 +68981,12 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
     if (voit('vestiaire') && vc && vc.ventes) {
       for (const [id, v] of Object.entries(vc.ventes)) {
         if (!v) continue;
+        // (6 nov., onglets A) Le montant de la ligne = celui que « vendu » compte (`montantRecuVc`, ce que
+        // Vestiaire te verse) ; pas sûr ⇒ rien d'écrit. Avant : la ligne était muette (203,23 € comptés
+        // dans la carte du haut, aucun montant sur la vente).
+        const recuVc = montantRecuVc(v);
         out.push({ cle: 'vestiaire:' + id, site: 'vestiaire', id, titre: v.titre || v.title || 'Vente Vestiaire', t: ts(v.date) ?? ts(v.premiereVue),
-          prix: null, devise: 'EUR', etat: v.aExpedier ? L.aEnvoyer : (v.etat || ''), compte: nomCompteVente('vestiaire', v, {}),
+          prix: recuVc && recuVc.eur != null ? recuVc.eur : null, devise: 'EUR', etat: v.aExpedier ? L.aEnvoyer : (v.etat || ''), compte: nomCompteVente('vestiaire', v, {}),
           num: numVcVente(v, vc.liens, numerosVcEffectifs()), photo: photoArticle(v) || null });
       }
     }
@@ -69998,7 +70036,7 @@ function AppCoeur() {
   // Le badge de Colis : le nombre PUBLIÉ par l'écran qui a toutes les sources
   // (`vrm_colis_aposter`, §11), s'il a moins de 12 h — sinon AUCUN badge (pas
   // su ≠ 0, et jamais un nombre recalculé ici qui contredirait Colis).
-  const lireColisBadge=()=>{ const pub=load('vrm_colis_aposter',null); return (pub && Number.isFinite(pub.total) && Date.now()-(Number(pub.at)||0)<12*3600000) ? pub.total : null; };
+  const lireColisBadge=()=>{ const pub=load('vrm_colis_aposter',null); return (pub && Number.isFinite(pub.total) && Number(pub.at) > 0 && publicationColisFraiche(pub)) ? pub.total : null; };
   // (31 oct., soir) Le compteur de « Colis à retirer » : le nombre PUBLIÉ par
   // l'écran des retraits (`vrm_colis_retirer`, §11), même règle de fraîcheur.
   const lireRetraitsBadge=()=>{ const pub=load('vrm_colis_retirer',null); return (pub && Number.isFinite(pub.total) && Date.now()-(Number(pub.at)||0)<12*3600000) ? pub.total : null; };
@@ -70819,17 +70857,33 @@ function AppCoeur() {
     const t = setInterval(() => { const k = new Date().toDateString(); setJourCle(p => (p === k ? p : k)); }, 60000);
     return () => clearInterval(t);
   }, []);
+  // (6 nov., onglets A — panne « 0 € aujourd'hui », src/sondeVentes.js) La date de capture de la
+  // ligne `orders_sold` que la COQUE a lue, compte par compte : sa sonde relit un compte dont la
+  // ligne a été réécrite depuis (l'extension, sur un autre appareil). `_harvestSeen` ne suffit pas :
+  // l'écran Ventes le met à jour par SA relecture, la coque n'aurait plus rien vu bouger.
+  const capVentesCoque = useRef({});
   useEffect(() => {
-    const f = async (e) => {
-      const d = e && e.detail;
-      if (!d || d.type !== 'maj' || d.quoi !== 'ventes' || !d.uid) return;
-      const uid = String(d.uid);
+    if (!Array.isArray(ventesCoque)) return;
+    for (const a of (vintedAccounts || [])) {
+      const u = String((a && a.vinted_user_id) || ''); const t = u ? _harvestSeen[`${u}_orders_sold`] : NaN;
+      if (u && Number.isFinite(t) && !(capVentesCoque.current[u] >= t)) capVentesCoque.current[u] = t;
+    }
+  }, [ventesCoque, vintedAccounts]);
+  useEffect(() => {
+    let vivant = true;
+    const relireVentesCompte = async (uid) => {
       const a = (vintedAccounts || []).find(x => String(x.vinted_user_id) === uid);
       if (!a) return;
       try { _rowCache.delete(`o:${uid}`); } catch (_) {}
       const sold = await fetchVintedOrders(a, 'sold', 1, 'all');
+      if (!vivant) return;
       setVentesKO(ko => { const n = new Set(ko); if (sold.ok) n.delete(uid); else n.add(uid); return [...n]; });
       if (!sold.ok) return;
+      { const t = _harvestSeen[`${uid}_orders_sold`]; if (Number.isFinite(t)) capVentesCoque.current[uid] = t; }
+      // ⚠️ La lecture complète gardée pour les signaux d'annonces (`perAccRef`) prend la relecture :
+      // sans ça, le signal suivant recalculait les ventes depuis l'ANCIENNE ligne et la vente
+      // relue disparaissait de nouveau.
+      if (perAccRef.current && Array.isArray(perAccRef.current.perAcc)) perAccRef.current = { ...perAccRef.current, perAcc: perAccRef.current.perAcc.map(p => (p && p.a && String(p.a.vinted_user_id) === uid) ? { ...p, sold } : p) };
       setVentesCoque(prev => {
         if (prev === undefined) return prev;                    // pas encore lu : l'effet principal s'en charge
         const autres = (Array.isArray(prev) ? prev : []).filter(o => String(o && o._acc && o._acc.vinted_user_id) !== uid);
@@ -70839,8 +70893,27 @@ function AppCoeur() {
         return [...autres, ...neuves];
       });
     };
+    const f = (e) => {
+      const d = e && e.detail;
+      if (!d || d.type !== 'maj' || d.quoi !== 'ventes' || !d.uid) return;
+      relireVentesCompte(String(d.uid));
+    };
     window.addEventListener('vrm:ext', f);
-    return () => window.removeEventListener('vrm:ext', f);
+    // LA SONDE : la date de capture de chaque `orders_sold`, en scalaire (la MÊME adresse que la
+    // sonde de l'écran Ventes et l'âge des ventes : une lecture partagée), au rythme commun et au
+    // réveil de l'app ; un compte dont la ligne est plus récente que la lecture de la coque est relu.
+    const sonde = async () => {
+      if (document.hidden || !Object.keys(capVentesCoque.current).length) return;
+      try {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_orders_sold&select=id,cap:meta->>capturedAt`, { headers: sbAuth() });
+        if (!r.ok || !vivant) return;
+        const rows = await r.json();
+        for (const uid of comptesARelire(rows, capVentesCoque.current, (vintedAccounts || []).map(a => String(a.vinted_user_id)))) await relireVentesCompte(uid);
+      } catch (_) {}
+    };
+    const t = setInterval(() => { if (rythme().doitLire('sonde-ventes-coque', 60000)) sonde(); }, 60000);
+    const reveil = rythme().surReveil(() => { rythme().noter('sonde-ventes-coque'); sonde(); });
+    return () => { vivant = false; window.removeEventListener('vrm:ext', f); clearInterval(t); reveil(); };
   }, [vintedAccounts]);
   // ⚠️⚠️ « RIEN LU » NE VAUT PAS « RIEN » (revue du 5 octobre). Quand AUCUNE
   //    lecture de ventes n'a abouti, la boucle d'au-dessus a quand même posé
