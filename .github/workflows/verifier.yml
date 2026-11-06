@@ -1,0 +1,141 @@
+name: Vérifier avant fusion
+# (6 nov., filet 1 « l'app ne bug jamais ») Sur chaque PR vers main : la
+# construction, TOUS les audits (scripts/lancer-audits.cjs, en trois parts
+# parallèles), un lot de bancs principaux sur l'app RENDUE (Chromium), et les
+# mêmes bancs sous WebKit (le moteur de Safari, non bloquant au début).
+# Aucun secret, aucune donnée réelle, rien n'est écrit en production : les
+# audits et les bancs servent une fausse base et des données INVENTÉES.
+# Les rouges CONNUS hors périmètre sont listés, avec leur raison et leur date,
+# dans scripts/audits-exceptions.json (lancés quand même, rapportés).
+# Pour que ce contrôle BLOQUE une fusion : règle de protection de la branche
+# `main` (pas-à-pas : docs/passation/2026-11-06-filets-anti-bug.md).
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: verifier-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  construire:
+    name: Construire
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+          retention-days: 2
+
+  audits:
+    name: Audits (part ${{ matrix.part }}/3)
+    needs: construire
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+      - name: Installer Chromium (audits qui exécutent une page) et Postgres (audits SQL)
+        run: |
+          npx playwright install --with-deps chromium
+          # Les audits et les bancs visent /opt/pw-browsers/chromium (le conteneur des sessions).
+          sudo mkdir -p /opt/pw-browsers
+          sudo ln -sf "$(node -e 'console.log(require("playwright").chromium.executablePath())')" /opt/pw-browsers/chromium
+          ls /usr/lib/postgresql/*/bin/initdb >/dev/null 2>&1 || (sudo apt-get update && sudo apt-get install -y postgresql)
+      - name: Lancer les audits
+        env:
+          AUDITS_PART: ${{ matrix.part }}/3
+          AUDITS_PARALLELE: '4'
+          AUDITS_TIMEOUT_S: '900'
+        run: node scripts/lancer-audits.cjs
+      - name: Remettre public/ comme il était (des audits régénèrent les zips)
+        if: always()
+        run: git checkout -- public/ && git status --short
+
+  bancs:
+    name: Bancs principaux (Chromium, part ${{ matrix.part }}/3)
+    needs: construire
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # nouveau-vendeur seul : le plus long (chaque écran, 2 largeurs, 2 thèmes).
+          - part: 1
+            lot: nouveau-vendeur garde-ecrans
+          - part: 2
+            lot: navigation-tache ventes-e2 journee-coherence morceau-perime
+          - part: 3
+            lot: colis-retirer-propre annonces-actions iphone-reprise argent-mois
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+      - name: Installer Chromium
+        run: |
+          npx playwright install --with-deps chromium
+          sudo mkdir -p /opt/pw-browsers
+          sudo ln -sf "$(node -e 'console.log(require("playwright").chromium.executablePath())')" /opt/pw-browsers/chromium
+          echo "VRM_CHROMIUM_PATH=/opt/pw-browsers/chromium" >> "$GITHUB_ENV"
+      - name: Lancer les bancs
+        env:
+          BANCS_PORT_BASE: '10000'
+        run: node scripts/lancer-bancs.cjs ${{ matrix.lot }}
+
+  bancs-webkit:
+    # (6 nov., filet 6) Safari : trois bancs sous WebKit. NON BLOQUANT au début
+    # (continue-on-error) : on apprend d'abord ce que WebKit voit de différent ;
+    # à rendre bloquant quand il est vert plusieurs fois de suite (la passation le dit).
+    name: Bancs sous WebKit (Safari, non bloquant)
+    needs: construire
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+      - name: Installer WebKit
+        run: npx playwright install --with-deps webkit
+      - name: Lancer les bancs sous WebKit
+        env:
+          NAVIGATEUR: webkit
+          BANCS_PORT_BASE: '10030'
+        run: node scripts/lancer-bancs.cjs nouveau-vendeur iphone-reprise colis-retirer-propre

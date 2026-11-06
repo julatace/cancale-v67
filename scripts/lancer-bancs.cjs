@@ -8,7 +8,8 @@
 // le dépôt public). Chaque banc reçoit son port (BANCS_PORT_BASE + rang, 10001
 // par défaut) et une durée maximale ; le lanceur rend 1 si un banc est rouge.
 //   BANCS_PORT_BASE   premier port (défaut 10000 : les bancs prennent 10001…)
-//   BANCS_TIMEOUT_S   durée maximale d'un banc (défaut 600)
+//   BANCS_TIMEOUT_S   durée maximale d'un banc (défaut 1200 : nouveau-vendeur rend
+//                     ~20 écrans × 2 largeurs × 2 thèmes, plus de 10 min sur une machine chargée)
 //   NAVIGATEUR        chromium (défaut) ou webkit : passé aux bancs qui le
 //                     savent (nouveau-vendeur, iphone-reprise, colis-retirer-propre)
 // Sans argument : le lot de la CI (LOT ci-dessous).
@@ -24,7 +25,7 @@ const LOT = ['nouveau-vendeur', 'navigation-tache', 'ventes-e2', 'colis-retirer-
   'annonces-actions', 'journee-coherence', 'iphone-reprise', 'argent-mois', 'garde-ecrans', 'morceau-perime'];
 const noms = process.argv.slice(2).length ? process.argv.slice(2) : LOT;
 const BASE = Number(process.env.BANCS_PORT_BASE) || 10000;
-const TIMEOUT_MS = (Number(process.env.BANCS_TIMEOUT_S) || 600) * 1000;
+const TIMEOUT_MS = (Number(process.env.BANCS_TIMEOUT_S) || 1200) * 1000;
 
 function lancer(nom, port) {
   return new Promise((resolve) => {

@@ -30,6 +30,14 @@ let ko = 0;
 const dit = (bon, quoi, det) => { if (!bon) ko++; console.log(`${bon ? 'OK  ' : 'KO  '}${quoi}${!bon && det ? ' — ' + String(det).slice(0, 500) : ''}`); };
 const base = () => ({ lignes: JSON.parse(JSON.stringify(NV.JEU_LIGNES)), comptes: NV.JEU_COMPTES, ecritures: 0 });
 
+// E-mails : dans la barre latérale à l'ordinateur ; au téléphone, sous « Plus » (les tuiles).
+async function versEmails(pg, tel) {
+  if (!tel) { await pg.locator('.vrm-sidebar [data-nav-entree="emails"]').first().click(); return; }
+  const plus = pg.locator('.vrm-tabbar button[aria-label="Plus"]').first();
+  if (await plus.count()) { await plus.click(); await pg.waitForTimeout(500); }
+  const tuile = pg.locator('[data-nav-entree="emails"]:visible').first();
+  if (await tuile.count()) await tuile.click();
+}
 async function scenario(nav, { W, panne }) {
   const T = `[${W}px ${panne ? 'panne' : 'déploiement'}]`;
   const tel = W < 600;
@@ -45,6 +53,10 @@ async function scenario(nav, { W, panne }) {
       etat.charges.add(p);
       return route.fallback();
     });
+    // Le nouveau déploiement est en ligne dès que la page se RECHARGE (Vercel bascule
+    // d'un coup) : la page relue vise alors des fichiers qui existent. En « panne »,
+    // les fichiers restent introuvables même après.
+    ctx.on('request', (r) => { if (!panne && etat.deploye && r.resourceType() === 'document') etat.deploye = false; });
     return ctx;
   };
   const bv = base();
@@ -55,20 +67,15 @@ async function scenario(nav, { W, panne }) {
   await o.pg.waitForTimeout(3000);
   // La mise en ligne.
   etat.deploye = true;
-  const lien = o.pg.locator(tel ? '[data-nav-entree="emails"]' : '.vrm-sidebar [data-nav-entree="emails"]').first();
-  const aLien = await lien.count();
-  if (aLien) await lien.click();
-  else await o.pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '/?tab=emails' })));
+  await versEmails(o.pg, tel);
   await o.pg.waitForTimeout(2500);
-  if (!panne) etat.deploye = false;            // le nouveau déploiement sert ses fichiers
   await o.pg.waitForLoadState('domcontentloaded').catch(() => {});
   await o.pg.waitForSelector('.vrm-main', { timeout: 20000 }).catch(() => {});
   await o.pg.waitForTimeout(2500);
   // Après le rechargement, l'app peut être revenue ailleurs : on rouvre E-mails.
   const surEmails = await o.pg.evaluate(() => (document.querySelector('.vrm-main') || { getAttribute: () => '' }).getAttribute('data-ecran') === 'emails');
   if (!surEmails) {
-    const l2 = o.pg.locator(tel ? '[data-nav-entree="emails"]' : '.vrm-sidebar [data-nav-entree="emails"]').first();
-    if (await l2.count()) await l2.click(); else await o.pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '/?tab=emails' })));
+    await versEmails(o.pg, tel);
     await o.pg.waitForTimeout(2500);
   }
   await o.pg.waitForTimeout(4000);   // la file des plantages part vers la base 3 s après

@@ -84,7 +84,9 @@ const controle = (nom, ok, detail) => {
           await pg.waitForFunction(() => (document.getElementById('root') || {}).innerText && document.getElementById('root').innerText.trim().length > 200, null, { timeout: 30000 }).catch(() => {});
           const v = await pg.evaluate(() => ({ titre: document.title, n: ((document.getElementById('root') || {}).innerText || '').trim().length }));
           controle(`${T} : la page d’accueil est rendue (${v.n} caractères)`, v.n > 200, JSON.stringify(v));
-          controle(`${T} : son titre est celui du dépôt`, !titreAttendu || v.titre === titreAttendu, `« ${v.titre} » au lieu de « ${titreAttendu} »`);
+          // L'accueil pose son propre titre une fois rendu (le <title> servi, celui
+          // d'index.html, est jugé par verifier-production.mjs) : il dit « VRM ».
+          controle(`${T} : son titre dit VRM (page rendue par l’app, pas une page d’erreur)`, /^VRM\b/.test(v.titre || ''), `« ${v.titre} » (servi : « ${titreAttendu} »)`);
         } else {
           const vu = await pg.waitForSelector('#vrm-cx-titre-formulaire', { timeout: 45000 }).then(() => true).catch(() => false);
           const v = await pg.evaluate(() => ({ n: ((document.getElementById('root') || {}).innerText || '').trim().length, texte: ((document.getElementById('root') || {}).innerText || '').slice(0, 160) }));

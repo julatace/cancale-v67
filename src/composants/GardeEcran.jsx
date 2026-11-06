@@ -27,6 +27,7 @@
 // vrm.center) ; sert au banc `scripts/bancs/garde-ecrans.cjs`.
 // ═══════════════════════════════════════════════════════════════════════════
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { noterPlantage } from '../plantages.js';
 
 const versionBuild = () => (typeof __BUILD__ !== 'undefined' ? String(__BUILD__) : '');
@@ -77,7 +78,13 @@ export class GardeEcran extends React.Component {
       </div>
     );
     if (!feuille) return <div className="vrm-garde-ecran-hote">{carte}</div>;
-    return <div className="vrm-garde-feuille" data-garde-feuille={String(nom || '')}>{carte}</div>;
+    // Par un PORTAIL (§7) : un parent qui porte un `transform` ou un
+    // `backdrop-filter` (la barre de recherche, l'île du haut) enfermerait sinon
+    // le voile « plein écran » dans sa propre boîte.
+    const voile = <div className="vrm-garde-feuille" data-garde-feuille={String(nom || '')}>{carte}</div>;
+    // Dans la coque (`.vrm-app-shell`, qui porte les couleurs du thème), sinon sur <body>.
+    try { if (typeof document !== 'undefined' && document.body) return createPortal(voile, document.querySelector('.vrm-app-shell') || document.body); } catch (_) {}
+    return voile;
   }
 }
 

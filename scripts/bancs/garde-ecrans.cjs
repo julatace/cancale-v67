@@ -81,8 +81,8 @@ const aller = async (pg, tel, id) => {
   let b = pg.locator(sel).first();
   if (!(await b.count()) && tel) {
     // Au téléphone, l'écran peut être sous « Plus » (les tuiles au-dessus de la barre).
-    const plus = pg.locator('.vrm-mobile-nav [data-nav-plus], .vrm-mobile-nav button:has-text("Plus")').first();
-    if (await plus.count()) { await plus.click(); await pg.waitForTimeout(400); b = pg.locator(`[data-nav-entree="${id}"]`).first(); }
+    const plus = pg.locator('.vrm-tabbar button[aria-label="Plus"]').first();
+    if (await plus.count()) { await plus.click(); await pg.waitForTimeout(400); b = pg.locator(`[data-nav-entree="${id}"]:visible`).first(); }
   }
   if (!(await b.count())) return false;
   await b.click(); await pg.waitForTimeout(1500); return true;
@@ -140,13 +140,21 @@ async function tournee(nav, W) {
     e = await etat(o.pg);
     dit(!e.garde.length && e.ecran === 'ventes', `${T} P6 un autre site s'ouvre sans quitter Ventes`, JSON.stringify(e));
   } else dit(false, `${T} (contrôle du banc) le filtre « Vinted » de Ventes est là`);
-  // P5 — une feuille plante : la recherche.
+  // P5 — une feuille plante : la recherche. D'abord la recherche NORMALE, pour
+  // savoir ce que la coque montre quand elle est ouverte (au téléphone, la barre
+  // du bas peut s'effacer derrière le clavier) : le garde-fou ne doit rien y changer.
+  await o.pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:fiche-article', { detail: '1' })));
+  await o.pg.waitForTimeout(1200);
+  const normale = await etat(o.pg);
+  await o.pg.keyboard.press('Escape').catch(() => {});
+  await o.pg.locator('.vrm-hdr-recherche-fermer').first().click({ timeout: 2000 }).catch(() => {});
+  await o.pg.waitForTimeout(600);
   await plante(o.pg, 'recherche');
   await o.pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:fiche-article', { detail: '1' })));
   await o.pg.waitForTimeout(1200);
   e = await etat(o.pg);
   await capture(o.pg, `garde-${W}-recherche-plante`);
-  dit(e.gardeFeuille.includes('recherche') && !e.dernierFilet && e.entete && e.nav, `${T} P5 la recherche plantée : une feuille qui le dit, la coque et la navigation restent`, JSON.stringify(e));
+  dit(e.gardeFeuille.includes('recherche') && !e.dernierFilet && e.entete && e.nav === normale.nav, `${T} P5 la recherche plantée : une feuille qui le dit, la coque et la navigation restent comme avec la recherche normale`, JSON.stringify({ plantee: e, normale }));
   await plante(o.pg, null);
   await o.pg.locator('[data-garde-feuille="recherche"] [data-garde-fermer]').first().click().catch(() => {});
   await o.pg.waitForTimeout(800);
