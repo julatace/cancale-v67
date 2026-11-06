@@ -209,6 +209,11 @@ self.addEventListener('fetch', event => {
   if (url.pathname.startsWith('/api/')) return;
   // Ne jamais mettre un lien de récupération en cache ni le remplacer par la coque privée.
   if (url.pathname === '/recuperation.html' || url.pathname.startsWith('/recuperation.')) return;
+  // (6 nov.) La page d'état publique (/etat, public/etat.html) : une vraie page
+  // statique — la navigation ci-dessous la rangerait sous « / » à la place de
+  // l'app (comme les pages légales). Elle va au réseau, sans cache : un état
+  // gardé en cache dirait « Tout fonctionne » d'hier.
+  if (url.pathname === '/etat' || url.pathname.startsWith('/etat.') || url.pathname === '/etat-version.json') return;
 
   // On ne gère que le GET même origine ; le reste (POST, cross-origin) au réseau.
   if (req.method !== 'GET' || url.origin !== self.location.origin) return;

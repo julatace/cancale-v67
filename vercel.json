@@ -36,6 +36,10 @@
       "destination": "/api/compte?mode=sante"
     },
     {
+      "source": "/etat",
+      "destination": "/etat.html"
+    },
+    {
       "source": "/api/stripe-webhook",
       "destination": "/api/compte?mode=webhook"
     },
