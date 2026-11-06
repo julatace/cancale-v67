@@ -188,7 +188,7 @@ async function assurerFeuille(pg, sel, action) {
     await rangee.click().catch(() => {});
     await (pg.__o ? pg.__o.waitForSelector : pg.waitForSelector.bind(pg))('[data-ebay-reglages-feuille]', { timeout: 5000 }).catch(() => {});
     await pg.waitForTimeout(450);
-  } else if (action && ouverte && !/data-ebay-reglages|data-pourquoi|role=|getByRole/.test(sel)) {
+  } else if (action && ouverte && !/data-ebay-reglages|data-pourquoi|role=|getByRole|z-index/.test(sel)) {   // une confirmation (z-index) se pose PAR-DESSUS : on ne ferme rien
     await pg.keyboard.press('Escape').catch(() => {});
     await pg.waitForFunction(() => !document.querySelector('[data-ebay-reglages-feuille]'), null, { timeout: 4000 }).catch(() => {});
     await pg.waitForTimeout(200);
