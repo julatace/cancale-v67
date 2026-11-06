@@ -145,8 +145,9 @@ const CONTRASTE = (pg) => pg.evaluate(() => {
   };
   const out = [];
   // La carte sombre (`CarteMois`) et la tête de Ma journée (même fond, `CarteStats` « nu » dedans).
-  for (const carte of document.querySelectorAll('.vrm-main .vrm-fu-carte, .vrm-main .vrm-fu-tete')) {
-    if (!vis(carte) || carte.parentElement.closest('.vrm-fu-carte, .vrm-fu-tete')) continue;
+  // (6 nov., finitions) + la carte sombre de Compta (`.vrm-compta-carte[data-fu-carte]`, une CarteStats nue dedans).
+  for (const carte of document.querySelectorAll('.vrm-main .vrm-fu-carte, .vrm-main .vrm-fu-tete, .vrm-main .vrm-compta-carte[data-fu-carte]')) {
+    if (!vis(carte) || carte.parentElement.closest('.vrm-fu-carte, .vrm-fu-tete, .vrm-compta-carte[data-fu-carte]')) continue;
     const page = carte.getAttribute('data-carte-stats') || carte.className.split(/\s+/).filter((c) => c.startsWith('vrm-fu-') && c !== 'vrm-fu-carte').join('.') || 'carte';
     const tw = document.createTreeWalker(carte, NodeFilter.SHOW_TEXT);
     const vus = new Set();
@@ -340,7 +341,7 @@ async function tourneeX(nav, { W, theme }) {
 async function tourneeK(nav, { W, theme }) {
   const T = `[K ${W}px ${theme}]`;
   const o = await ouvrir(nav, { W, theme, lignes: jeu(), tab: 'ventes' });
-  const ecrans = [['Ventes', '?tab=ventes', '[data-carte-stats]'], ['Annonces', '?tab=annonces&site=vinted', '[data-carte-stats]'], ['Colis', '?tab=cat_bord', '.vrm-fu-carte'], ['Ma journée', '?tab=journee', '.vrm-fu-tete'], ['Ventes Leboncoin', '?tab=ventes&site=leboncoin', '.vrm-fu-carte'], ['Compta', '?tab=compta', '.vrm-compta-carte']];
+  const ecrans = [['Ventes', '?tab=ventes', '[data-carte-stats]'], ['Annonces', '?tab=annonces&site=vinted', '[data-carte-stats]'], ['Colis', '?tab=cat_bord', '.vrm-fu-carte'], ['Ma journée', '?tab=journee', '.vrm-fu-tete'], ['Compta', '?tab=compta', '.vrm-compta-carte'], ['Ventes Leboncoin', '?tab=ventes&site=leboncoin', '.vrm-fu-carte']];
   for (const [nom, q, sel] of ecrans) {
     await allerTab(o.pg, q);
     await o.pg.waitForSelector(sel, { timeout: 15000 }).catch(() => {});
