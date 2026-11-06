@@ -54,6 +54,10 @@ const RAPPORT = process.env.RAPPORT || '';
 const ECRANS = (process.env.ECRANS || 'journee,ventes,annonces,messages,achats,retraits,cat_bord,compta,dashboard,emails,settings,vintedaccounts,communaute,plat_leboncoin,plat_ebay,plat_vestiaire,garage').split(',');
 const VUES = (process.env.VUES || '390-clair,390-sombre,1512-clair,1512-sombre,390-grand120,390-grand150').split(',');
 const FEUILLES = process.env.FEUILLES !== '0';
+// axe-core (audit automatique WCAG 2.1 AA) : pris dans node_modules s'il y est, sinon par
+// AXE=chemin/vers/axe.min.js (`npm pack axe-core` hors du dépôt). Absent ⇒ les contrôles
+// maison seuls, et le banc le DIT (jamais un vert silencieux).
+const AXE = (() => { try { return fs.readFileSync(process.env.AXE || require.resolve('axe-core/axe.min.js', { paths: [RACINE] }), 'utf8'); } catch (_) { return null; } })();
 
 const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/json', '.woff2': 'font/woff2', '.ico': 'image/x-icon' };
 const srv = http.createServer((q, r) => {
@@ -384,6 +388,15 @@ const court = (a, n = 6) => JSON.stringify(a.slice(0, n)).slice(0, 900);
       if (tel) dit(!mes.cibles.length, `${nom} A2 cibles ≥ 44 px affichés`, court(mes.cibles, 6));
       dit(mes.dialogues.every((d) => d.nom), `${nom} A3 chaque feuille ouverte a un nom`, court(mes.dialogues.filter((d) => !d.nom)));
     }
+    // A5 axe-core : aucune violation « serious » ou « critical » (WCAG 2.1 A et AA). Le contraste
+    // est déjà jugé par S1 (fonds composés, opacités) ; axe le rejuge aussi.
+    if (!grand && AXE) {
+      const ax = await pg.evaluate(async (code) => { if (!window.axe) { const s = document.createElement('script'); s.textContent = code; document.head.appendChild(s); }
+        const res = await window.axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] }, resultTypes: ['violations'] });
+        return res.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical').map((v) => ({ id: v.id, impact: v.impact, n: v.nodes.length, cible: v.nodes.slice(0, 2).map((x) => String(x.target).slice(0, 90)), resume: (v.nodes[0] && v.nodes[0].failureSummary || '').slice(0, 160) })); }, AXE).catch((e) => [{ id: 'axe-erreur', resume: String(e.message || e).slice(0, 120) }]);
+      r.axe = ax;
+      dit(!ax.length, `${nom} A5 axe-core : aucune violation sérieuse`, court(ax, 4));
+    } else if (!grand && !AXE && vue === VUES[0] && ecran === ECRANS[0]) console.log('  ⓘ axe-core absent (AXE=…/axe.min.js) : contrôles maison seuls');
     if (vue === '1512-clair') { const sans = await focusVisible(pg); r.focus = sans; dit(!sans.length, `${nom} A4 focus visible au clavier (12 arrêts)`, court(sans)); }
     // Grand texte
     if (tel && !grand && !sombre) policeNormale[ecran] = mes.taillePolice;
