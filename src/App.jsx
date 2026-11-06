@@ -32120,7 +32120,8 @@ async function lireCandidatsPhoto(comptes) {
   const uidDe = (r) => (/^harvest_([^_]+)_listings$/.exec(String((r && r.id) || '')) || [])[1] || null;
   const fiches = load('vinted_annonce_numeros', {}) || {};
   let rows = null;
-  try { const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_listings&select=id,data`, { headers: sbAuth() }); const j = r.ok ? await r.json() : null; rows = Array.isArray(j) ? j : null; } catch (_) { rows = null; }
+  // (6 nov.) La lecture projetée des dressings (`lireDressings`, vitesse 2) : jamais la ligne entière.
+  try { const j = await lireDressings((q) => lireBaseRelue(`${SUPABASE_URL}/rest/v1/${q}`), { uids: okUid ? [...okUid] : null }); rows = Array.isArray(j) ? j : null; } catch (_) { rows = null; }
   const preuves = await lirePreuvesVenteVinted().catch(() => null);
   if (rows === null && !Object.keys(fiches).length) return null;
   const labels = load('vinted_account_labels', {}) || {};
@@ -65781,7 +65782,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'signaler', type:'action', ic:'send', lib:'Signaler un problème', onClick:()=>setSignaler(true), data:{ 'data-reglage-signaler':'' } },
       // La liste des signalements reçus : au PROPRIÉTAIRE de l'installation seul
       // (le serveur refuse tout autre compte).
-      proprioInst && { id:'signalements', type:'panneau', nu:true, ic:'chat', lib:'Signalements reçus', data:{ 'data-reglage-signalements':'' }, el:<SignalementsRecus entetes={enTeteSession} Bouton={Bouton} PanneEl={EtatPanne}/> },
+      proprioInst && { id:'signalements', type:'panneau', nu:true, ic:'info', lib:'Signalements reçus', data:{ 'data-reglage-signalements':'' }, el:<SignalementsRecus entetes={enTeteSession} Bouton={Bouton} PanneEl={EtatPanne}/> },
       {id:'depannage',type:'panneau',nu:true,ic:'help',lib:'Résoudre un problème',desc:'E-mails, comptes, impression',el:<div className="vrm-settings-help">
       <details><summary>Je ne reçois pas mes e-mails</summary><p>Vérifie l’adresse associée au compte Vinted, sa confirmation, puis le transfert depuis ta messagerie. L’historique reçu permet de distinguer un e-mail absent d’un e-mail à vérifier.</p><Bouton variante="secondaire" onClick={()=>{ ouvrirEmailsRelier('reception'); setTab('emails'); }}>{L.relierBoite}</Bouton></details>
       <details><summary>Mon compte Vinted n’apparaît pas</summary><p>Connecte le compte attendu sur Vinted et vérifie que l’extension utilise ton compte VRM. Actualise ensuite les comptes liés et contrôle le pseudo. N’ajoute pas les données d’un autre vendeur.</p><Bouton variante="secondaire" onClick={()=>setTab('vintedaccounts')}>Voir mes comptes liés</Bouton></details>
