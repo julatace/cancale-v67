@@ -1904,6 +1904,20 @@ export async function modeScript(mode, req, res) {
     return;
   }
   if (mode === 'factures' && req.method === 'GET') {
+    // (6 nov., charge) Le script Gmail demande ce mode CHAQUE MINUTE (1 433 fois
+    // en 24 h), qu'il y ait une facture ou non. Avant : la fiche entière (logo
+    // compris) et toutes les factures en file, à chaque fois. Maintenant, par
+    // petites marches, et on s'arrête dès qu'il n'y a rien à faire :
+    //   1. facturation allumée ? (un scalaire) — non ⇒ fini (1 lecture) ;
+    //   2. une facture en file ? (leurs `id` seulement) — non ⇒ fini (2 lectures) ;
+    //   3. seulement alors la fiche et les factures, comme avant.
+    // « Pas su » à n'importe quelle marche ⇒ 503 (jamais « aucune facture »).
+    const actifRows = await lireLignes('id=eq.vrm_pro_facture&select=actif:data->actif');
+    if (actifRows === null) { res.status(503).json({ ok: false, error: 'base-injoignable' }); return; }
+    if (!(actifRows[0] && actifRows[0].actif)) { res.status(200).json({ ok: true, actif: false, factures: [] }); return; }
+    const enFile = await lireLignes('id=like.email_invoice_*&data->>status=eq.queued&select=id');
+    if (enFile === null) { res.status(503).json({ ok: false, error: 'base-injoignable' }); return; }
+    if (!enFile.length) { res.status(200).json({ ok: true, actif: true, factures: [] }); return; }
     const [cfgRows, rows] = await Promise.all([
       lireLignes('id=eq.vrm_pro_facture&select=data'),
       lireLignes('id=like.email_invoice_*&data->>status=eq.queued&select=id,data'),
