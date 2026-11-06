@@ -18,6 +18,7 @@ let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 catch (_) { ({ chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 const { metaVersData } = require('./_meta.cjs');
+const { getPath } = require('./_minipgrest.cjs');
 const fs = require('fs'), http = require('http');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 4861;
@@ -96,7 +97,8 @@ const ouvrir = async (b, vp, prenom, ventesKO = false) => {
       if (/^[a-z]+:data->[a-z]+$/i.test(sel)) { const [al, src] = sel.split(':'); return { [al]: (r.data || {})[src.split('->')[1]] }; }
       if (/^[a-z]+:data->/i.test(sel)) {
         const o = {};
-        for (const champ of sel.split(',')) { const m = /^([a-z]+):data->(.+)$/i.exec(champ); if (!m) continue; let v = r.data; for (const p of m[2].split(/->>?/)) v = v == null ? v : v[p]; o[m[1]] = (v != null && /->>/.test(m[2])) ? String(v) : v; }
+        // (6 nov.) chemin JSON lu comme PostgREST (getPath : `->>` = texte, absent ⇒ null) ; `alias:data->>x` était lu comme la clé « >x », toujours absente (§6.3).
+        for (const champ of sel.split(',')) { const m = /^([a-z_]+):(data->.+)$/i.exec(champ); if (!m) continue; o[m[1]] = getPath(r, m[2]); }
         return o;
       }
       return { ...r, updated_at: cap, cap: r.data.capturedAt };
