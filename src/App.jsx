@@ -9407,15 +9407,15 @@ function PhotoVinted({ src, repli, onError, onLoad, style, loading, ...reste }) 
     if (onError) { try { onError(); } catch (_) {} }
   }, [definitive, src]);
   if (!vinted) {
-    return <img src={src} loading={loading} style={style} {...reste} onLoad={onLoad}
+    return <img src={src} loading={loading} style={style} alt="" {...reste} onLoad={onLoad}
       onError={onError ? () => { try { onError(); } catch (_) {} } : undefined}/>;
   }
   if (etat === 'ok') {
-    return <img src={photosVinted.blobDe(src)} style={style} {...reste} data-photo-vinted="secours" data-photo-origine={src} onLoad={onLoad}
+    return <img src={photosVinted.blobDe(src)} style={style} alt="" {...reste} data-photo-vinted="secours" data-photo-origine={src} onLoad={onLoad}
       onError={() => photosVinted.echecBlob(src)}/>;
   }
   if (etat === 'natif') {
-    return <img src={src} referrerPolicy="no-referrer" loading={loading || 'lazy'} style={style} {...reste} data-photo-vinted="natif"
+    return <img src={src} referrerPolicy="no-referrer" loading={loading || 'lazy'} style={style} alt="" {...reste} data-photo-vinted="natif"
       onLoad={(e) => { photosVinted.chargeNatif(src); if (onLoad) onLoad(e); }}
       onError={() => photosVinted.echecNatif(src)}/>;
   }
@@ -41272,14 +41272,14 @@ function ComparerMoisCarte({ liveStats }) {
         <h2 className="vrm-display" data-titre-section="" style={{ flex: '1 1 auto', margin: 0, fontSize: 20, fontWeight: 700, letterSpacing: '-.02em', color: C.text }}>Comparer</h2>
         <Segmente label="Comparer avec" value={K.mode} onChange={setMode} options={[{ v: 'precedent', l: 'Mois d’avant', data: { 'data-comparer-choix': 'precedent' } }, { v: 'an', l: 'Il y a un an', data: { 'data-comparer-choix': 'an' } }]}/>
       </div>
-      <div role="row" style={{ ...grille, fontSize: 11, color: C.muted, fontWeight: 600, padding: '4px 0' }}>
+      <div style={{ ...grille, fontSize: 11, color: C.muted, fontWeight: 600, padding: '4px 0' }}>
         <span/>
         <span style={{ textAlign: 'right', ...chiffre }} data-comparer-col="a">{colA}</span>
         <span style={{ textAlign: 'right', ...chiffre }} data-comparer-col="b">{colB}</span>
         <span style={{ textAlign: 'right' }}>Écart</span>
       </div>
       {K.lignes.map((Lg) => (
-        <div role="row" key={Lg.cle} data-comparer-ligne={Lg.cle} data-a={cents(Lg.a.valeur, Lg.type)} data-b={cents(Lg.b.valeur, Lg.type)} data-ecart={cents(Lg.ecart, Lg.type)} data-pct={Lg.pct == null ? '' : String(Lg.pct)}
+        <div key={Lg.cle} data-comparer-ligne={Lg.cle} data-a={cents(Lg.a.valeur, Lg.type)} data-b={cents(Lg.b.valeur, Lg.type)} data-ecart={cents(Lg.ecart, Lg.type)} data-pct={Lg.pct == null ? '' : String(Lg.pct)}
           data-a-partiel={Lg.a.partiel ? '1' : undefined} data-b-partiel={Lg.b.partiel ? '1' : undefined}
           data-a-raison={Lg.a.valeur == null ? (Lg.a.raison || 'pasSu') : undefined} data-b-raison={Lg.b.valeur == null ? (Lg.b.raison || 'pasSu') : undefined}
           style={{ ...grille, minHeight: 44, borderTop: `1px solid ${C.border}` }}>
@@ -66658,7 +66658,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
           // perdait (l'onglet choisi n'était pas le blanc).
           <div role="tablist" aria-label="Paramètres" data-onglets-reglages="" className="vrm-seg vrm-seg-plein vrm-set-onglets">
             {[['reglages','Réglages'],['compte','Mon compte'],...(AUTH.user?[['abonnement','Abonnement']]:[])].map(([k,l]) => (
-              <button key={k} type="button" role="tab" className="vrm-seg-btn" aria-selected={vue===k} aria-pressed={vue===k} data-vue={k} onClick={()=>setVue(k)}>
+              <button key={k} type="button" role="tab" className="vrm-seg-btn" aria-selected={vue===k} data-vue={k} onClick={()=>setVue(k)}>
                 {l}
               </button>
             ))}
