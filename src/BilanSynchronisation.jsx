@@ -51,7 +51,17 @@ export default function BilanSynchronisation({ owner, sources, onNav }) {
         at: Date.now(),
       });
   }, [owner, empreinte]);
-  if (!owner || vue?.owner !== owner) return null;
+  if (!owner) return null;
+  // (6 nov., « de vrais écrans de chargement ») Pendant la première lecture, la ligne
+  // garde SA place (même forme, repliée) : elle n'arrive plus en poussant ce qui suit.
+  if (vue?.owner !== owner)
+    return (
+      <details className="vrm-bilan-sync" data-bilan-synchronisation="" data-bilan-attente="">
+        <summary>
+          Données <span>Lecture…</span>
+        </summary>
+      </details>
+    );
   // Filter during render as well: effects run after the account list changes.
   const permis = new Set(
     sources.flatMap((s) =>

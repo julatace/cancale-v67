@@ -1,6 +1,7 @@
 import {normAdresse,estAdresseCollectrice,sansEtiquette} from './proprietaire-email.js';
 import {filtreBoite,rubriqueConnue,rubriqueEmail,RUBRIQUES_BOITE,PIECES_MAX} from './boite-email.js';
 import {TEXTE_MAX} from './resume-email.js';
+import {LUS_ID,etatLus,estLu} from './emails-lus.js';
 // Une règle (§11) : à quel compte Vinted une adresse de réception appartient.
 // Lue par la réception ET par le journal — l'adresse décide, jamais le texte.
 function reglesComptes({registre,main,comptes,etats}){
@@ -47,7 +48,13 @@ export function filtreRecherche(q){
  const motif='*'+m.split(' ').join('*')+'*';
  return 'or='+encodeURIComponent('('+['data->>subject','data->>from','data->resume->>a','data->resume->>code','data->resume->>s'].map(c=>`${c}.ilike."${motif}"`).join(',')+')');
 }
-export async function lireJournalEmail({owner,url,headers,fetcher=fetch,page=0,etat='',type='',adresse='',boite='',cherche='',compteSeul=false}){
+// (6 nov., v36) La boîte : `nonlus=1` (seulement les non-lus, la règle
+// api/_lib/emails-lus.js) et `parPage` (20 ou 50 : la boîte charge 50 lignes par
+// page, le journal de Réglages garde 20). Chaque ligne porte `lu` (true · false ·
+// null = la ligne des lus n'a pas pu être lue — jamais « lu » par défaut).
+export const PAGES_PERMISES=[20,50];
+const lireLus=async(lire,o)=>{try{const l=await lire(`owner=eq.${o}&id=eq.${LUS_ID}&select=data&limit=1`);return etatLus(l[0]&&l[0].data&&typeof l[0].data==='object'?l[0].data:undefined);}catch(_){return null;}};
+export async function lireJournalEmail({owner,url,headers,fetcher=fetch,page=0,etat='',type='',adresse='',boite='',cherche='',compteSeul=false,nonlus=false,parPage=JOURNAL_PAGE}){
  if(!owner || owner==='00000000-0000-0000-0000-000000000000')throw Error('connexion-requise');
  const lire=lecteur({url,headers,fetcher}),o=encodeURIComponent(owner);
  const p=Math.max(0,Math.min(50,Number.parseInt(page,10)||0));
@@ -67,31 +74,50 @@ export async function lireJournalEmail({owner,url,headers,fetcher=fetch,page=0,e
  // réception) : sinon « Ventes 7 » s'affichait à côté d'une liste filtrée sur une
  // adresse qui n'en a que 3. Ils ne suivent NI l'état NI la rubrique (ce sont
  // eux qui les comptent). `compteurs.adresse` dit sur quelle adresse ils portent.
- const etats=lire(`owner=eq.${o}&id=like.email_reception_*${parAdresse?'&'+parAdresse:''}&select=etat:data->>etat,type:data->>type,code:data->resume->>code&order=data->>at.desc,id.asc&limit=${JOURNAL_COMPTES+1}`);
+ const etats=lire(`owner=eq.${o}&id=like.email_reception_*${parAdresse?'&'+parAdresse:''}&select=${compteSeul?'':'id,at:data->>at,'}etat:data->>etat,type:data->>type,code:data->resume->>code&order=data->>at.desc,id.asc&limit=${JOURNAL_COMPTES+1}`);
  const portee=c=>parAdresse?{...c,adresse:adr}:c;
- if(compteSeul){const l=await etats;return {ok:true,compteurs:portee(compter(l))};}
- const [lignes,l,[registre,main,comptes,etatsC]]=await Promise.all([
-  lire(`owner=eq.${o}&id=like.email_reception_*${f}&select=${PROJECTION}&order=data->>at.desc,id.asc&limit=${JOURNAL_PAGE+1}&offset=${p*JOURNAL_PAGE}`),
-  etats,lectureComptes(lire,owner),
+ // Les compteurs seuls (Colis) : deux scalaires par ligne, sans les lus (une lecture).
+ if(compteSeul){const l=await etats;const c=compter(l,null);delete c.nonLus;return {ok:true,compteurs:portee(c)};}
+ const lus=lireLus(lire,o);
+ const pp=PAGES_PERMISES.includes(Number(parPage))?Number(parPage):JOURNAL_PAGE;
+ // « Non lus » : les lignes rangées APRÈS `jusqua` (bornées) + celles qu'il a remises
+ // non lues, filtrées par la même règle ; la page est découpée ici. État pas su ⇒ 503 côté route.
+ const lireNonLus=async()=>{
+  const el=await lus;if(!el)throw Error('lus-indisponibles');
+  const iso=new Date(el.jusqua).toISOString();
+  const ats=[...el.nonlus.values()].sort((a,b)=>b-a).slice(0,60).map(t=>new Date(t).toISOString());
+  const [apres,remis]=await Promise.all([
+   lire(`owner=eq.${o}&id=like.email_reception_*${f}&data->>at=gt.${encodeURIComponent(iso)}&select=${PROJECTION}&order=data->>at.desc,id.asc&limit=600`),
+   ats.length?lire(`owner=eq.${o}&id=like.email_reception_*${f}&data->>at=in.(${ats.map(a=>encodeURIComponent('"'+a+'"')).join(',')})&select=${PROJECTION}&limit=60`):Promise.resolve([]),
+  ]);
+  const vus=new Set(),tous=[];for(const x of [...apres,...remis]){if(vus.has(x.id))continue;vus.add(x.id);if(estLu({id:x.id,at:x.at},el)===false)tous.push(x);}
+  tous.sort((a,b)=>String(b.at||'').localeCompare(String(a.at||''))||String(a.id).localeCompare(String(b.id)));
+  return tous.slice(p*pp,p*pp+pp+1);
+ };
+ const [lignes,l,[registre,main,comptes,etatsC],el]=await Promise.all([
+  nonlus?lireNonLus():lire(`owner=eq.${o}&id=like.email_reception_*${f}&select=${PROJECTION}&order=data->>at.desc,id.asc&limit=${pp+1}&offset=${p*pp}`),
+  etats,lectureComptes(lire,owner),lus,
  ]);
  const {correspondances,declarees,associes,adresseSuivie}=reglesComptes({registre,main,comptes,etats:etatsC});
  const date=v=>Number.isFinite(Date.parse(v))?new Date(v).toISOString():null;
- const emails=lignes.slice(0,JOURNAL_PAGE).map(x=>{
+ const emails=lignes.slice(0,pp).map(x=>{
   const adresses=[...new Set((Array.isArray(x.adresses)?x.adresses:[]).map(adresseSuivie))].slice(0,5);
   const lies=[...new Map(adresses.flatMap(associes).map(c=>[c.id,c])).values()];
   const r=x.resume&&typeof x.resume==='object'&&!Array.isArray(x.resume)?x.resume:null;
-  return {id:String(x.id),at:date(x.at),sourceDate:date(x.sourceDate),etat:['integre','a-verifier','erreur'].includes(x.etat)?x.etat:'a-verifier',type:String(x.type||'information').slice(0,40),subject:String(x.subject||'').slice(0,200),from:String(x.from||'').slice(0,160),adresses,compte:lies.length===1?{id:lies[0].id,nom:lies[0].nom}:null,compteAmbigu:lies.length>1,resume:r&&JSON.stringify(r).length<=600?r:null,pj:Array.isArray(x.pieces)?Math.min(x.pieces.length,PIECES_MAX):null};
+  return {id:String(x.id),at:date(x.at),sourceDate:date(x.sourceDate),etat:['integre','a-verifier','erreur'].includes(x.etat)?x.etat:'a-verifier',type:String(x.type||'information').slice(0,40),subject:String(x.subject||'').slice(0,200),from:String(x.from||'').slice(0,160),adresses,compte:lies.length===1?{id:lies[0].id,nom:lies[0].nom}:null,compteAmbigu:lies.length>1,resume:r&&JSON.stringify(r).length<=600?r:null,pj:Array.isArray(x.pieces)?Math.min(x.pieces.length,PIECES_MAX):null,lu:estLu({id:x.id,at:x.at},el)};
  });
  const adresses=[...new Set([...declarees,...Object.values(correspondances).map(normAdresse).filter(a=>a.includes('@')&&!estAdresseCollectrice(a))])].map(a=>{const c=associes(a);return {adresse:a,nom:c.length===1?c[0].nom:''};});
- return {ok:true,page:p,parPage:JOURNAL_PAGE,suite:lignes.length>JOURNAL_PAGE,emails,compteurs:portee(compter(l)),adresses,cherche:parMots?motsRecherche(cherche):''};
+ return {ok:true,page:p,parPage:pp,suite:lignes.length>pp,emails,compteurs:portee(compter(l,el)),adresses,cherche:parMots?motsRecherche(cherche):'',nonlus:!!nonlus,lus:el?'lu':'pas-su',dernierAt:!parAdresse&&l[0]&&Number.isFinite(Date.parse(l[0].at))?new Date(l[0].at).toISOString():null};
 }
-function compter(l){
+function compter(l,el){
  const lignes=l.slice(0,JOURNAL_COMPTES);
  const n=k=>lignes.filter(k).length;
  // (5 nov.) Par rubrique de la boîte : la même règle que l'étiquette (`rubriqueEmail`).
  const parRubrique={};for(const {id} of RUBRIQUES_BOITE)if(id)parRubrique[id]=0;
  for(const x of lignes){const r=rubriqueEmail({type:x.type,resume:x.code?{code:String(x.code)}:null});parRubrique[r]++;if(r==='codes')parRubrique.colis++;}
- return {sur:lignes.length,plus:l.length>JOURNAL_COMPTES,integre:n(x=>x.etat==='integre'),aVerifier:n(x=>x.etat!=='integre'&&x.etat!=='erreur'),erreur:n(x=>x.etat==='erreur'),incompris:n(x=>x.type==='ignoré'),parRubrique};
+ // (6 nov., v36) Les non-lus parmi ces mêmes lignes (`null` si l'état des lus n'est pas su).
+ const nonLus=el?lignes.filter(x=>estLu({id:x.id,at:x.at},el)===false).length:null;
+ return {sur:lignes.length,plus:l.length>JOURNAL_COMPTES,nonLus,integre:n(x=>x.etat==='integre'),aVerifier:n(x=>x.etat!=='integre'&&x.etat!=='erreur'),erreur:n(x=>x.etat==='erreur'),incompris:n(x=>x.type==='ignoré'),parRubrique};
 }
 // Le texte gardé d'UN email (sur son clic). L'id est celui de SA ligne de
 // suivi ; la lecture est filtrée par son propriétaire. Absent ⇒ null (classé

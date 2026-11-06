@@ -22,14 +22,18 @@ export const RUBRIQUES_BOITE = [
   { id: 'achats', mot: 'Achats' },
   { id: 'codes', mot: 'Codes de retrait' },
   { id: 'colis', mot: 'Colis' },
+  // (6 nov., v36) Les offres reçues ont leur rubrique (le `type` posé au classement) :
+  // 98 des 940 e-mails mesurés le 5 nov., noyées jusque-là dans « Autres ».
+  { id: 'offres', mot: 'Offres' },
   { id: 'autres', mot: 'Autres' },
 ];
 const TYPES = {
   ventes: ['vente', 'finalisation', 'vente-vestiaire'],
   achats: ['achat'],
   colis: ['suivi', 'bordereau'],
+  offres: ['offre'],
 };
-const PRINCIPAUX = [...TYPES.ventes, ...TYPES.achats, ...TYPES.colis];
+const PRINCIPAUX = [...TYPES.ventes, ...TYPES.achats, ...TYPES.colis, ...TYPES.offres];
 const aUnCode = (resume) => !!(resume && typeof resume === 'object' && !Array.isArray(resume) && typeof resume.code === 'string' && resume.code.trim());
 
 // La rubrique PRINCIPALE d'un email (une seule, pour l'étiquette de la ligne).
@@ -39,6 +43,7 @@ export function rubriqueEmail(e) {
   if (TYPES.ventes.includes(t)) return 'ventes';
   if (TYPES.achats.includes(t)) return 'achats';
   if (TYPES.colis.includes(t)) return 'colis';
+  if (TYPES.offres.includes(t)) return 'offres';
   return 'autres';
 }
 // Un email est-il montré sous ce filtre ? (« Colis » montre aussi les codes.)
@@ -56,6 +61,7 @@ export function filtreBoite(rubrique) {
     case 'ventes': return `data->>type=in.(${liste(TYPES.ventes)})`;
     case 'achats': return `data->>type=in.(${liste(TYPES.achats)})`;
     case 'colis': return `data->>type=in.(${liste(TYPES.colis)})`;
+    case 'offres': return `data->>type=in.(${liste(TYPES.offres)})`;
     case 'codes': return 'data->>type=eq.suivi&data->resume->>code=not.is.null';
     case 'autres': return `data->>type=not.in.(${liste(PRINCIPAUX)})`;
     default: return '';

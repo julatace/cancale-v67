@@ -46,6 +46,10 @@ import { STYLE_FLOU, compteLbcOuvert, lbcFloute, compteVcOuvert, vcFloute } from
 import DiagnosticLeboncoin from './DiagnosticLeboncoin.jsx';
 import {preparerLiaisonOAuth,lireLiaisonOAuth,resultatLiaisonPermis} from './auth/liaisonOAuth.js';
 import { SqueletteChargement } from "./Chargement.jsx";
+import { AttenteEcran, useEssentiel } from './AttenteEcran.jsx';
+import { SqLignes } from './Squelette.jsx';
+import { usePreparation, useEnPreparation } from './preparations.js';
+import { souvenir, retenir } from './memoireEcrans.js';
 import ConnexionsCompte from './auth/ConnexionsCompte.jsx';
 import {etatColisDepuisTexte,normaliserSuivi} from '../api/_lib/etat-colis-email.js';
 import {FAMILLES as FAMILLES_NOTIF,familleActive as familleNotifActive,reglageCalme,heureValide} from '../api/_lib/notif-textes.js';
@@ -255,6 +259,7 @@ import { relanceProposable, numeroSorti } from './ebayRelance.js';
 // journée, Ventes, le rappel du matin, le rappel du soir et le widget (§11).
 import {DELAI_EXPEDITION_J, limiteExpedition, lireDateLimite, echeanceLimite, texteLimiteEnvoi, bordsParTransaction} from '../api/_lib/limite-envoi.js';
 import { photoArticle, photoCommande, demandesPhotosVentes, photosTransactionsLues, photosVenteVintedCandidates, choisirPhotoDisponible } from "./photosArticles.js";
+import { ecrireEmailsLus } from "./emailsLusEcriture.js";
 // (6 nov., vitesse 2) Les écrans eBay (src/ebayGestion.jsx) : à la demande. Ce dont l'app
 // a besoin sans eux vient de leurs fichiers (`appelerEbay`, le portail des conversations) ;
 // leur feuille de style reste ICI, à la place de l'ancien import (même ordre).
@@ -390,6 +395,8 @@ import { MR_SELECT, lireColisMondialRelay, suivisAvecMondialRelay, accordCodes, 
 import ExpliqueMondialRelay, { LecturesMondialRelay } from "./ExpliqueMondialRelay.jsx";
 import { CLE_QR_POSES, jugerQrCapture, dessinerQrCapture, avecQrPoses, titreQrAbsent, qrParCapture, messageQrCapture, cleSuiviQr } from "./qrCapture.js";
 import { lireFile, noterSaisie, instantane, acquitter, compterEnAttente, nuagePlusRecent, fusionAuChargement, oublierCle, CLE_FILE, HORS_FILE } from "./fileEnvoi.js";
+import { creerGestes, creerEcrivainLocal, ecrireOps, clesDe, vueDesOps } from "./gesteAnnulable.js";
+import { PiluleAnnuler } from "./PiluleAnnuler.jsx";
 // La migration qui cloisonne les vendeurs, lue depuis LE fichier (pas recopiée) :
 // deux copies finiraient par diverger, et c'est le genre de texte qu'on colle
 // dans une base de production sans le relire.
@@ -3434,13 +3441,20 @@ const fusionALaSauvegarde = (k, v) => {
   const f = fusion3(b, v, n);
   return { v: f === undefined ? v : f, fusionne: true };
 };
-const save = (k,v) => {
+// (6 nov., v36) `quand(ok, raison)` : l'issue LOCALE de cette sauvegarde (le geste
+// annulable, src/gesteAnnulable.js, attend d'elle de savoir si l'appareil l'a
+// gardée). Une sauvegarde remplacée par une plus récente de la même clé rend
+// son issue avec elle (la valeur gardée porte les deux).
+const _saveQuand = {};
+const _rendreQuand = (k, ok, raison) => { const l = _saveQuand[k]; delete _saveQuand[k]; if (l) for (const f of l) { try { f(ok, raison); } catch (_) {} } };
+const save = (k,v,quand) => {
   if (SYNC_KEYS.includes(k)) { _settingsRevision++; try { window.dispatchEvent(new Event('vrm:reglage-attente')); } catch (_) {} }
   const owner = AUTH.user?.id;
+  if (typeof quand === 'function') (_saveQuand[k] || (_saveQuand[k] = [])).push(quand);
   if (_saveTimers[k]) clearTimeout(_saveTimers[k]);
   else if (SYNC_KEYS.includes(k)) { try { const t = localStorage.getItem(k); _saveAvant[k] = t == null ? undefined : t; } catch (_) { delete _saveAvant[k]; } }
   _saveTimers[k] = setTimeout(() => {
-    if (AUTH.user?.id !== owner || (owner && readSession()?.user?.id !== owner)) { delete _saveTimers[k]; delete _saveAvant[k]; return; }
+    if (AUTH.user?.id !== owner || (owner && readSession()?.user?.id !== owner)) { delete _saveTimers[k]; delete _saveAvant[k]; _rendreQuand(k, false, 'le compte VRM a changé'); return; }
     // (2 nov.) Ce que le navigateur portait AVANT ce geste : la base de la file
     // d'envoi tant que cet onglet n'a pas encore lu le nuage.
     let avantTxt; try { avantTxt = localStorage.getItem(k); } catch (_) { avantTxt = undefined; }
@@ -3449,9 +3463,11 @@ const save = (k,v) => {
     try { localStorage.setItem(k,txt); _failedLocalSaves.delete(k); try { if(noterChangements(sessionStorage,owner,k,_lireJson(avantTxt),r.v))window.dispatchEvent(new Event('vrm:modification-notee')); } catch (_) {} }
     catch (_) {
       delete _saveTimers[k]; _failedLocalSaves.set(k,{owner,v:r.v});
+      _rendreQuand(k, false, 'le stockage de cet appareil a refusé la modification');
       _emitSync('error','le stockage de cet appareil a refusé la modification'); return;
     }
     delete _saveTimers[k];
+    _rendreQuand(k, true);
     // (2 nov.) LA FILE D'ENVOI (src/fileEnvoi.js) : le geste est noté avec la
     // base de sa fusion, et il y reste jusqu'à ce que le nuage l'ACCEPTE — l'app
     // fermée avant le retour du réseau, le chargement suivant le rejoue au lieu
@@ -3471,6 +3487,36 @@ const save = (k,v) => {
     if (SYNC_KEYS.includes(k)) cloudPush(); // declenche la synchro cloud
   }, 500);
 };
+
+// ── « ANNULER » PARTOUT, GESTES INSTANTANÉS (6 nov., v36, src/gesteAnnulable.js) ─
+// Un geste INTERNE à VRM s'affiche tout de suite, son écriture part par `save`
+// (une file par clé, chaque écriture relit la clé et n'y pose que SA sous-valeur),
+// et la pilule (`PiluleAnnuler`) offre « Annuler » 5 s. « Enregistré » seulement
+// quand le nuage a ACCEPTÉ une écriture partie après le geste ; refusé ⇒ l'écran
+// revient en arrière (« Pas enregistré — Réessayer ») ; pas de réponse ⇒ « pas
+// encore envoyé », gardé sur l'appareil (la file d'envoi le renverra).
+// ⚠️ Jamais pour un geste qui part chez un tiers (Vinted, eBay, Leboncoin,
+// Vestiaire, e-mail, facture) : il garde sa confirmation.
+const _gestes = creerGestes();
+const _ecrivainVrm = creerEcrivainLocal({
+  lire: (k) => { let t; try { t = localStorage.getItem(k); } catch (_) { return undefined; } if (t == null) return null; try { return JSON.parse(t); } catch (_) { return undefined; } },
+  sauver: (k, v, quand) => save(k, v, quand),
+  estSynchro: (k) => SYNC_KEYS.includes(k) && !!AUTH.user?.id && !!CLOISONNE,
+  revision: () => _settingsRevision,
+  confirme: () => _settingsConfirmed,
+  abonnerSync: (fn) => onSyncChange((st) => fn(st, _syncInfo.raison)),
+});
+// `ops` : les sous-valeurs posées (src/gesteAnnulable.js) ; `setters` : { [clé]: setState }
+// de l'écran (optionnel : un écran qui relit la clé à sa sauvegarde suit seul).
+const gesteVrm = (texte, ops, setters = {}, apres = null) => _gestes.lancer({
+  texte, cles: clesDe(ops),
+  vue: (sens) => { vueDesOps(ops, setters)(sens); if (typeof apres === 'function') { try { apres(sens); } catch (_) {} } },
+  ecrire: (sens) => ecrireOps({ ops, sens, lire: _ecrivainVrm.lire, ecrire: _ecrivainVrm.ecrire }),
+});
+function PiluleAnnulerCoque() {
+  const enHaut = React.useSyncExternalStore(abonnerFeuilles, uneFeuilleOuverte);
+  return <PiluleAnnuler gestes={_gestes} enHaut={enHaut}/>;
+}
 
 // localStorage est partagé entre les onglets : le changement de vendeur
 // doit fermer l'ancien écran avant toute autre sauvegarde différée.
@@ -10165,6 +10211,9 @@ const _ecoutesVc = new Set();
 const signalerVc = () => { for (const f of _ecoutesVc) { try { f(); } catch (_) {} } };
 // Une clé Vestiaire posée par un geste : visible tout de suite, synchronisée par `save`.
 const vcPoser = (k, v) => { _vcMem[k] = v; save(k, v); signalerVc(); };
+// (6 nov., v36) L'écran d'un geste annulable sur une clé Vestiaire : la copie en mémoire, sans écrire
+// (l'écriture part par la file du geste, src/gesteAnnulable.js).
+const vcSetter = (k) => (f) => { _vcMem[k] = f(vcCarte(k)); signalerVc(); };
 // (3 nov.) Les N° des annonces Vestiaire tels qu'ils s'AFFICHENT et s'identifient :
 // le N° donné par VRM, remplacé par celui de l'annonce Vinted quand il les a
 // reliées (`vrm_vc_liens`, src/lienVestiaire.js). Le N° donné reste dans
@@ -20740,7 +20789,9 @@ function PremiersPas({ onNav, titreNeuf, introNeuf, dansGuide = false }) {
 // En mode exemple : rien (le bandeau dit déjà « Brancher mes comptes »).
 const CLE_GUIDE_MASQUE = 'vrm_guide_masque';
 function useReceptionEmails(actif) {
-  const [l, setL] = React.useState(undefined);
+  // (6 nov.) La dernière réponse LUE (src/memoireEcrans.js) : revenir sur Ma journée ne fait plus
+  // disparaître puis réapparaître le guide ; la lecture repart et remplace en place.
+  const [l, setL] = React.useState(() => souvenir('guide:emails', AUTH.user?.id));
   React.useEffect(() => {
     if (!actif) return undefined;
     let stop = false;
@@ -20748,6 +20799,7 @@ function useReceptionEmails(actif) {
       try {
         const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_reception_*&select=id&limit=1`, { headers: sbAuth(), cache: 'no-store' });
         const j = r.ok ? await r.json() : null;
+        if (Array.isArray(j)) retenir('guide:emails', AUTH.user?.id, j);
         if (!stop) setL(Array.isArray(j) ? j : null);
       } catch (_) { if (!stop) setL(null); }
     })();
@@ -22190,7 +22242,8 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
   // la liste « à poster » et descend dans « Déjà postés », sans être perdu.
   const [lbcDone, setLbcDone] = React.useState(() => (typeof load === 'function' ? (load('vrm_lbc_colis_done', {}) || {}) : {}));
   const estFait = (o) => !!(o && lbcDone[o.txId]);
-  const toggleFait = (o) => { if (!o || o.txId == null) return; setLbcDone(prev => { const u = { ...prev }; if (u[o.txId]) delete u[o.txId]; else u[o.txId] = Date.now(); if (typeof save === 'function') save('vrm_lbc_colis_done', u); return u; }); };
+  // (6 nov., v36) Geste annulable (src/gesteAnnulable.js) : l'écran suit, la pilule offre « Annuler ».
+  const toggleFait = (o) => { if (!o || o.txId == null) return; const id = String(o.txId), avant = lbcDone[id] != null ? lbcDone[id] : lbcDone[o.txId]; gesteVrm(avant ? 'Colis remis à poster' : 'Colis fait', [{ k: 'vrm_lbc_colis_done', type: 'cle', id, apres: avant ? undefined : Date.now(), avant }], { vrm_lbc_colis_done: setLbcDone }); };
   // ── IMPRESSION DU BORDEREAU « EXACTEMENT COMME VINTED » (Julien, 3 oct.) ────
   // Le tampon N° + titre est posé à l'emplacement APPRIS pour ce format (taille
   // de page = transporteur + forme), puis une modale permet de le DÉPLACER si
@@ -28832,7 +28885,7 @@ function BlocBarrerVc({ titres = {} }) {
     <h3>{liste.length > 1 ? `${liste.length} N° à barrer` : 'Un N° à barrer'}</h3>
     {liste.map((x) => <div key={x.productId} className="vrm-lvc-barrer-ligne" data-vc-barrer={x.productId} data-vc-barrer-de={x.de} data-vc-barrer-vers={x.vers}>
       <span><s>N°{x.de}</s> → <b>N°{x.vers}</b>{titres[x.productId] ? ` · ${String(titres[x.productId]).slice(0, 48)}` : ''}</span>
-      <button type="button" className="vrm-lvc-geste" data-vc-barre={x.productId} onClick={() => vcPoser('vrm_vc_liens', marquerBarre(vcCarte('vrm_vc_liens'), x.productId))}>C'est écrit</button>
+      <button type="button" className="vrm-lvc-geste" data-vc-barre={x.productId} onClick={() => { const e = lienDe(vcCarte('vrm_vc_liens'), x.productId); if (e) gesteVrm(`N°${x.de} barré`, [{ k: 'vrm_vc_liens', type: 'champs', id: String(x.productId), apres: { ecrit: new Date().toISOString() }, avant: { ecrit: e.ecrit } }], { vrm_vc_liens: vcSetter('vrm_vc_liens') }); }}>C'est écrit</button>
     </div>)}
   </section>;
 }
@@ -29392,7 +29445,7 @@ function LigneVenteVc({ v, fait, enV, flou, i = 0 }) {
         {v.aExpedier && !fait && v.bordereau ? <div className="vrm-recap-principal vrm-rangee-bord" data-rangee-bord=""><PastilleTransporteur t={trV} C={C} data-recap-transporteur=""/><BoutonImprimerVc v={v} grand/></div> : null}
         {!(v.aExpedier&&!fait)&&v.bordereau?.id?<BoutonImprimerVc v={v} lectureSeule/>:null}
         <div className="vrm-recap-grille">
-          {v.aExpedier ? <Bouton variante="secondaire" icone="check" data-geste="fait" data-vc-fait={v.id} onClick={() => marquerVc('vrm_vc_colis_done', v.id, !fait)}>{fait ? '↺ Pas encore' : 'Colis fait'}</Bouton> : null}
+          {v.aExpedier ? <Bouton variante="secondaire" icone="check" data-geste="fait" data-vc-fait={v.id} onClick={() => gesteVrm(fait ? 'Colis remis à envoyer' : 'Colis fait', [{ k: 'vrm_vc_colis_done', type: 'cle', id: String(v.id), apres: fait ? undefined : Date.now(), avant: vcCarte('vrm_vc_colis_done')[String(v.id)] }], { vrm_vc_colis_done: vcSetter('vrm_vc_colis_done') })}>{fait ? '↺ Pas encore' : 'Colis fait'}</Bouton> : null}
           {v.num ? <Bouton variante="secondaire" icone="doc" data-recap-fiche={v.num} aria-label={`Fiche N°${v.num}`} onClick={() => { fermer(); window.dispatchEvent(new CustomEvent('vrm:fiche-article', { detail: v.num })); }}>Fiche de l’article</Bouton> : null}
         </div>
       </section>
@@ -35050,6 +35103,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   // ⇒ « Vendues à sortir », sinon ⇒ « Plus en ligne » (`classerRangees`) — et si
   // une lecture qui pourrait la porter manque, on ne dit RIEN d'elle (« pas su »).
   const [lecture, setLecture] = React.useState(undefined);   // undefined = en cours
+  useEssentiel('stock', lecture);                            // (6 nov.) l'écran Stock attend ses annonces actuelles (src/AttenteEcran.jsx)
   const vcLocStock = useVcLocal();                           // les N° Vestiaire (donnés, reliés) : redessine quand ils changent
   const cleComptesStock = (accounts || []).map((a) => String((a && a.vinted_user_id) || '')).filter(Boolean).sort().join(',');
   React.useEffect(() => {
@@ -35465,7 +35519,8 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
           {lecture === undefined ? '…' : (aa && aa.su ? <>{aa.auMoins ? <span style={{ fontSize: 15, fontWeight: 600 }}>au moins </span> : null}{nAffiche}</> : '—')}
           <small>{nAffiche === 1 && aa && aa.su ? 'annonce actuelle' : 'annonces actuelles'}{filtreActif ? ' (filtrées)' : ''}</small>
         </div>
-        {lecture === undefined && <div className="vrm-s2d-resume-l">Je lis tes annonces Vinted, Leboncoin, eBay et Vestiaire…</div>}
+        {/* (6 nov.) La lecture garde la place des lignes qui suivront (trois lignes) : le Stock ne saute plus quand elles arrivent. */}
+        {lecture === undefined && <div className="vrm-s2d-resume-l" data-stock-resume-attente="" style={{ minHeight: 'calc(3 * 1.45em)' }}>Je lis tes annonces Vinted, Leboncoin, eBay et Vestiaire…</div>}
         {lecture && !aa.su && <div className="vrm-s2d-resume-l" data-stock-passu="">Je n'ai pas pu lire tes annonces{manqueTxt ? ` (${manqueTxt})` : ''} — rien n'est perdu, c'est la lecture qui a échoué. Ouvre Vinted {NAV.dans} avec l'extension, puis reviens ici.</div>}
         {aa && aa.su && <div className="vrm-s2d-resume-l">
           {nAffiche > 0 ? <><b>{nRangees}</b> rangée{nRangees > 1 ? 's' : ''} · <b>{nAffiche - nRangees - nSansNum}</b> pas encore rangée{nAffiche - nRangees - nSansNum > 1 ? 's' : ''}</> : 'Aucune annonce en ligne lue'}
@@ -41748,6 +41803,7 @@ function ComptaAjout({ ouvert, onClick, libelle, data }) {
 // états : `encours` (nuage pas arrivé) · `passu` (jamais publié) · `lu`.
 const PERIODES_BENEF = [['mois', 'Mois'], ['trimestre', 'Trimestre'], ['annee', 'Année']];
 const lireBeneficeJours = () => { try { const v = load('vrm_benefice_jours', null); return v && v.jours && typeof v.jours === 'object' ? v : null; } catch (_) { return null; } };
+const CLES_BENEFICE = ['vrm_benefice_jours'];
 function useLigneSynchro(cle, lire) {
   const [v, setV] = React.useState(lire);
   const [pret, setPret] = React.useState(() => isCloudReady());
@@ -41832,7 +41888,9 @@ const beneficeDe = ({ pub, compta, ligneUrssaf, regime }, periode) => (pub ? ben
 function useBeneficeCalcul(compta, periode) {
   const [pub, pret] = useLigneSynchro('vrm_benefice_jours', lireBeneficeJours);
   const ligneUrssaf = useLigneUrssaf();
-  const etat = pub ? 'lu' : (pret ? 'passu' : 'encours');
+  // (6 nov.) Jamais publié mais un écran ouvert le prépare : « en cours » (src/preparations.js).
+  const prepB = useEnPreparation(CLES_BENEFICE);
+  const etat = pub ? 'lu' : (pret && !prepB.has('vrm_benefice_jours') ? 'passu' : 'encours');
   const regime = useRegimeFiscal();
   const B = beneficeDe({ pub, compta, ligneUrssaf, regime }, periode);
   return { pub, etat, B };
@@ -42429,6 +42487,7 @@ const lireColisAPoster = lirePub('vrm_colis_aposter'), lireColisARetirer = lireP
 // `ventesFaites`, le porte-monnaie, les annonces), le reste = les publications.
 // L'état de « vendu » dans le `liveStats` de la coque : 'encours' (pas encore là) · 'pasSu' · 'lu'.
 const venduEtat = (liveStats) => !liveStats ? 'encours' : liveStats.venduPasSu ? 'pasSu' : Array.isArray(liveStats.venduLignes) ? 'lu' : 'encours';
+const CLES_PREPAREES = ['vrm_paires_dorment', 'vrm_colis_retirer', 'vrm_benefice_jours', 'vinted_urssaf_mois'];
 function useSourcesCarte(liveStats) {
   const [compta] = useLigneSynchro('vrm_compta', lireComptaSynchro);
   const [pub, pret] = useLigneSynchro('vrm_benefice_jours', lireBeneficeJours);
@@ -42437,7 +42496,9 @@ function useSourcesCarte(liveStats) {
   const [colisAPoster] = useLigneSynchro('vrm_colis_aposter', lireColisAPoster);
   const [colisARetirer] = useLigneSynchro('vrm_colis_retirer', lireColisARetirer);
   const [dorment] = useLigneSynchro('vrm_paires_dorment', lirePairesDorment);
-  const etat = pub ? 'lu' : (pret ? 'passu' : 'encours');
+  const prep = useEnPreparation(CLES_PREPAREES);
+  // (6 nov.) Jamais publié mais un écran ouvert le prépare : « lecture… » (src/preparations.js).
+  const etat = pub ? 'lu' : (pret && !prep.has('vrm_benefice_jours') ? 'passu' : 'encours');
   return React.useMemo(() => ({
     // (6 nov., onglets A) TROIS ÉTATS (§5) : la coque pas encore revenue (`liveStats` absent, ou
     // sans ses lignes) = `undefined`, « lecture… » ; `venduPasSu` = `null`, « pas lu ». Avant,
@@ -42446,7 +42507,9 @@ function useSourcesCarte(liveStats) {
       : { lignes: liveStats.venduLignes, manque: liveStats.venduManque || [], enAttente: !!liveStats.venduEnAttente, nonComptees: liveStats.venduNonComptees || [] },
     beneficeDe: (p) => ({ B: beneficeDe({ pub, compta, ligneUrssaf, regime }, p), etat }),
     joursBenef: pub, etatBenef: etat, ligneUrssaf, colisAPoster, colisARetirer, dorment, live: liveStats || null,
-  }), [liveStats, pub, etat, compta, ligneUrssaf, regime, colisAPoster, colisARetirer, dorment]);
+    // (6 nov.) Une publication absente que l'écran ouvert est en train de préparer : « lecture… ».
+    enPreparation: { dorment: prep.has('vrm_paires_dorment'), retirer: prep.has('vrm_colis_retirer'), urssaf: prep.has('vinted_urssaf_mois') },
+  }), [liveStats, pub, etat, compta, ligneUrssaf, regime, colisAPoster, colisARetirer, dorment, prep]);
 }
 // Le liveStats de la coque, donné à toute carte sans le passer de main en main
 // (les écrans eBay ou Vestiaire ne le reçoivent pas) : la MÊME valeur que Ma journée.
@@ -42460,6 +42523,12 @@ function CarteStatsApp({ page, liveStats, sel = null, locaux = null, ici = null,
   const [objectif, poserObjectif] = useObjectifMois();
   const liveCoque = React.useContext(LiveStatsCarte);
   const base = useSourcesCarte(liveStats || liveCoque);
+  // (6 nov.) La carte attend ses chiffres avec l'écran (src/AttenteEcran.jsx) : « vendu » pas encore
+  // là, un bénéfice ou une publication que l'écran ouvert prépare encore — jamais « pas lu » puis la valeur.
+  useEssentiel('carte', (base.vendu === undefined || base.etatBenef === 'encours'
+    || (base.enPreparation.dorment && !base.dorment) || (base.enPreparation.retirer && !base.colisARetirer)
+    || (base.enPreparation.urssaf && !base.ligneUrssaf)
+    || Object.values(locaux || {}).some((x) => x && x.enCours)) ? undefined : true);
   const sources = locaux ? { ...base, locaux } : base;
   return <CarteStats owner={AUTH.user?.id||''} page={page} sel={sel || { site: 'toutes', compte: null, periode: null }} sources={sources} regles={REGLES_CARTE} reglage={reglage} poser={poser} objectif={objectif} poserObjectif={poserObjectif} FermeAuRetour={FermeAuRetour} extra={{ ici, attrs }} {...rest}/>;
 }
@@ -43972,6 +44041,17 @@ const cleComptesVinted = (accs) => [...new Set((accs || []).map(a => String((a &
 // réouverture de l'app), donc les listes s'affichent INSTANTANÉMENT après un
 // reload au lieu de re-solliciter Supabase. Purge auto par TTL (3 min).
 const _acctCache = (()=>{ try{ const raw=sessionStorage.getItem('vrm_acct_cache'); if(raw){ const o=JSON.parse(raw); const now=Date.now(); Object.keys(o).forEach(k=>{ if(!o[k]||now-o[k].ts>=_CACHE_TTL) delete o[k]; }); return o; } }catch(_){} return {}; })();
+// (6 nov.) L'état de départ d'une liste de commandes, depuis ce cache — EXACTEMENT ce que
+// `loadOrders` poserait (même entrée : même version, moins de 3 min, mêmes comptes), sinon
+// « pas encore lu ». Rien n'est lu ni écrit ici.
+const etatOrdersDuCache = (type, accounts) => {
+  try {
+    const c = _acctCache[type];
+    if (c && c.v === _CACHE_V && Array.isArray(c.items) && Date.now() - c.ts < _CACHE_TTL && c.comptes === cleComptesVinted(accounts))
+      return { loading: false, items: c.items, failed: c.failed, failedUids: c.failedUids, comptes: c.comptes };
+  } catch (_) {}
+  return { loading: false, items: null };
+};
 // ⚠️ (16 oct., « app plus rapide ») Chaque rangement (ventes, achats, annonces,
 // conversations) réécrivait TOUT le cache dans `sessionStorage` — quatre
 // `JSON.stringify` de plus en plus gros à l'ouverture (mesuré au profileur,
@@ -44079,7 +44159,7 @@ function ListeComptes({ id, valeur, options, onChange, note, skin, attrs }) {
     </div>
   );
 }
-function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', compteConnecte = '', alertes = null, cycle = null, onCycle = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false }) {
+function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', compteConnecte = '', alertes = null, alertesLues = true, cycle = null, onCycle = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false }) {
   // (3 nov.) Les cartes « supprimé de Vinted » déjà répondues sur cet écran
   // (elles partent tout de suite, la coque recalcule ensuite) et la réponse en cours.
   const [cycleRepondus, setCycleRepondus] = useState({});
@@ -44449,7 +44529,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     setHiddenSales(new Set(VENTES_MASQUEES_AUCUNE().map(String)));
     setCloudReady(true);
   }), []);
-  const [emailBords, setEmailBords] = useState(null); // bordereaux reçus par email (pipeline usevrm)
+  // (6 nov.) Revenir sur l'écran : la dernière liste LUE (src/memoireEcrans.js), relue aussitôt en place.
+  const [emailBords, setEmailBordsBrut] = useState(() => souvenir('emailBords', AUTH.user?.id) || null); // bordereaux reçus par email (pipeline usevrm)
+  const emailBordsDeMemoire = useRef(emailBords !== null);
+  const setEmailBords = (v) => { emailBordsDeMemoire.current = false; if (Array.isArray(v)) retenir('emailBords', AUTH.user?.id, v); setEmailBordsBrut(v); };
   const [emailBordsKO, setEmailBordsKO] = useState(false); // la lecture a échoué : « pas su », jamais « aucun »
   // Une lecture ratée se RETENTE toute seule (20 s), tant qu'elle n'a pas réussi.
   useEffect(() => {
@@ -44671,13 +44754,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return { numero: lk.numero }; // au moins le N°, même si l'annonce n'existe plus
   };
   const isBordPrinted = (b) => !!bordsPrinted[bordKey(b)];
+  // (6 nov., v36) Le bouton « Marquer imprimé » / « ✓ Imprimé » : geste annulable (src/gesteAnnulable.js).
   const toggleBordPrinted = (b) => {
     const k = bordKey(b); if (!k) return;
-    setBordsPrinted(prev => {
-      const u = { ...prev };
-      if (u[k]) delete u[k]; else u[k] = new Date().toISOString();
-      save('vinted_bords_printed', u); return u;
-    });
+    const avant = bordsPrinted[k];
+    gesteVrm(avant ? 'Remis dans « à imprimer »' : 'Marqué imprimé', [{ k: 'vinted_bords_printed', type: 'cle', id: k, apres: avant ? undefined : new Date().toISOString(), avant }], { vinted_bords_printed: setBordsPrinted });
   };
   // Bordereau reçu pour une annonce = la paire est VENDUE, même si la synchro
   // Vinted (extension) ne l'a pas encore reflété. PAR IDENTITÉ SEULEMENT (§5) :
@@ -44784,25 +44865,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }, [lotOuvert]);
   // Colis RETIRÉS à la main (par n° de suivi) : disparaissent de « à retirer ».
   const [collected, setCollected] = useStateCle('vrm_colis_collected', () => new Set(load('vrm_colis_collected', [])));
-  const [lastCollected, setLastCollected] = useState(null); // dernier colis retiré → bandeau « Annuler »
   const [qrView, setQrView] = useState(null); // colis affiché en grand pour le scan { title, code, suivi, carrier, img }
   // ⚠️ QUAND le colis a été coché — le Set seul ne le dit pas, et sans la date on
   //    ne peut pas le garder EN GRIS « le temps que ce soit confirmé ». Clé à
   //    part pour ne rien casser : un colis coché avant ce changement n'a pas de
   //    date, il se comporte simplement comme avant (il disparaît).
   const [collectedAt, setCollectedAt] = useStateCle('vrm_colis_collected_at', () => load('vrm_colis_collected_at', {}));
-  const markCollected = (t) => {
-    const k = colisKey(t);
-    setCollected(prev => { const n = new Set(prev); n.add(k); save('vrm_colis_collected', [...n]); return n; });
-    setCollectedAt(prev => { const u = { ...prev, [k]: new Date().toISOString() }; save('vrm_colis_collected_at', u); return u; });
-    setLastCollected(t);
+  // (6 nov., v36) « J'ai retiré » / « Remettre » : gestes annulables (src/gesteAnnulable.js) —
+  // l'écran suit tout de suite, la pilule offre « Annuler » (l'ancien bandeau et son minuteur sont partis).
+  const gesteCollecte = (t, oui) => {
+    const k = colisKey(t); if (!k) return;
+    const ops = [{ k: 'vrm_colis_collected', type: 'ensemble', id: k, apres: oui, avant: collected.has(k) },
+      { k: 'vrm_colis_collected_at', type: 'cle', id: k, apres: oui ? new Date().toISOString() : undefined, avant: collectedAt[k] }];
+    gesteVrm(oui ? 'Colis retiré' : 'Colis remis dans « à retirer »', ops, { vrm_colis_collected: setCollected, vrm_colis_collected_at: setCollectedAt });
   };
-  const unmarkCollected = (t) => {
-    const k = colisKey(t);
-    setCollected(prev => { const n = new Set(prev); n.delete(k); save('vrm_colis_collected', [...n]); return n; });
-    setCollectedAt(prev => { if (prev[k] == null) return prev; const u = { ...prev }; delete u[k]; save('vrm_colis_collected_at', u); return u; });
-    setLastCollected(null);
-  };
+  const markCollected = (t) => gesteCollecte(t, true);
+  const unmarkCollected = (t) => gesteCollecte(t, false);
   // Tout marquer retiré en un tap (les transporteurs n'envoient pas d'email « récupéré »).
   const markAllCollected = (list) => { setCollected(prev => { const n = new Set(prev); (list || []).forEach(t => n.add(colisKey(t))); save('vrm_colis_collected', [...n]); return n; }); };
   const isCollected = (t) => collected.has(colisKey(t));
@@ -44909,7 +44987,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     setQrAjout({ suivi: k, etat: 'retire', msg: 'QR retiré.' });
   };
   // Le bandeau « Colis retiré · Annuler » se referme tout seul au bout de 6 s.
-  useEffect(() => { if (!lastCollected) return; const id = setTimeout(() => setLastCollected(null), 6000); return () => clearTimeout(id); }, [lastCollected]);
   // Reçu authentique (facture d'achat reçue par email Vinted) correspondant à un
   // achat. On privilégie TOUJOURS ce vrai reçu au justificatif généré par l'app.
   // Recherche par ordre de fiabilité : (1) n° de transaction, (2) titre exact,
@@ -45540,8 +45617,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Statut Vinted PRÉCIS = source de vérité automatique (Vinted le met à jour tout
   // seul quand tu expédies / récupères). Utilisé pour « à retirer » et « à expédier ».
   // (les deux tests vivent au niveau module — une seule définition, cf. plus haut)
-  const [sales, setSales] = useState({ loading:false, items:null });
-  const [buys, setBuys] = useState({ loading:false, items:null });
+  // (6 nov.) Revenir sur l'écran : la liste en cache (la même entrée que `loadOrders` servirait
+  // une milliseconde plus tard) est là DÈS le premier rendu — plus de squelette d'une image.
+  const [sales, setSales] = useState(() => etatOrdersDuCache('sold', accounts));
+  const [buys, setBuys] = useState(() => etatOrdersDuCache('purchased', accounts));
   // (6 nov.) LES VENTES VUES PAR E-MAIL, PAS ENCORE RELUES SUR VINTED
   // (src/venteEmailFraiche.js) : la liste de l'écran et VENDU les lisent ; tout
   // le reste (Colis, numéros, bordereaux, verrous) lit `sales.items`, la liste
@@ -45787,7 +45866,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Vinted, pas un rapprochement (§24). On ouvre donc toujours SA conversation,
   // même quand l'extension n'est pas encore passée.
   const lienConv = (o) => { const c = o && o.conversation_id; return c ? `https://www.vinted.fr/inbox/${c}` : ''; };
-  const markPickupDone = (o) => { const k = String(o.transaction_id||''); if(!k) return; setPickupDone(prev=>{ const u={...prev,[k]:new Date().toISOString()}; save('vinted_pickup_done',u); return u; }); };
+  const markPickupDone = (o) => { const k = String(o.transaction_id||''); if(!k) return; gesteVrm('Colis retiré', [{ k: 'vinted_pickup_done', type: 'cle', id: k, apres: new Date().toISOString(), avant: pickupDone[k] }], { vinted_pickup_done: setPickupDone }); };
   const unmarkPickupDone = (o) => { const k = String(o.transaction_id||''); if(!k) return; setPickupDone(prev=>{ const u={...prev}; delete u[k]; save('vinted_pickup_done',u); return u; }); };
   const markAllPickupDone = (list) => { setPickupDone(prev=>{ const u={...prev}; (list||[]).forEach(o=>{ if(o.transaction_id!=null) u[String(o.transaction_id)]=new Date().toISOString(); }); save('vinted_pickup_done',u); return u; }); };
   // Bordereaux masqués à la main (ex. doublon / non relié qu'on ne veut plus voir).
@@ -46633,6 +46712,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const marquerColisFait = (o, b) => { if (o && !isShipDone(o)) toggleShipDone(o); if (b) markBordShipped(b); };
   // (1er nov.) « Déposé » de Ventes (bouton et glissé) : le MÊME geste.
   const marquerPoste = marquerColisFait;
+  // (6 nov., v36) « Déposé » / « Pas encore déposé » de la carte Colis : les MÊMES deux marqueurs
+  // (la vente et son bordereau), en geste annulable (src/gesteAnnulable.js). Défaire ne retire que
+  // le marqueur posé à la main — jamais ce que Vinted dit du colis.
+  const gesteColisFait = (o, b, oui) => {
+    const k = o && o.transaction_id != null ? String(o.transaction_id) : null, kb = b ? bordKey(b) : null;
+    const ops = [];
+    if (k && (oui ? !shipDone[k] : !!shipDone[k])) ops.push({ k: 'vinted_ship_done', type: 'cle', id: k, apres: oui ? Date.now() : undefined, avant: shipDone[k] });
+    if (kb && (oui || isBordShippedManual(b))) ops.push({ k: 'vinted_bords_shipped', type: 'cle', id: kb, apres: oui ? 1 : undefined, avant: bordsShipped[kb] });
+    if (!ops.length) return;
+    gesteVrm(oui ? 'Colis déposé' : 'Colis remis dans « à envoyer »', ops, { vinted_ship_done: setShipDone, vinted_bords_shipped: setBordsShipped });
+  };
   // (voir isBordDone plus bas : « colis fait » à la main, ou expédié d'après
   // Vinted (auto), OU marqué « expédié » à la main (statut Vinted en retard).
   // ── QUAND UN BORDEREAU SORT-IL DE LA LISTE ? ─────────────────────────────
@@ -47151,10 +47241,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   });
   // (6 nov., vague 2 · point 1) « Déjà remise en vente » (SON clic) : { [tx]: at }.
   const [annuleesReglees, setAnnuleesReglees] = useStateCle('vrm_annulees_reglees', () => { const v = load('vrm_annulees_reglees', {}); return v && typeof v === 'object' ? v : {}; });
-  const poserAnnuleeReglee = (tx) => setAnnuleesReglees((prev) => { const u = { ...(prev || {}), [String(tx)]: new Date().toISOString() }; save('vrm_annulees_reglees', u); return u; });
+  const poserAnnuleeReglee = (tx) => gesteVrm('Noté : VRM ne la propose plus', [{ k: 'vrm_annulees_reglees', type: 'cle', id: String(tx), apres: new Date().toISOString(), avant: (annuleesReglees || {})[String(tx)] }], { vrm_annulees_reglees: setAnnuleesReglees });
   // (6 nov., vague 2 · point 4) « Plus tard » dans « Sans achat relié » : { [itemId]: at }.
   const [achatPlusTard, setAchatPlusTard] = useStateCle('vrm_achat_plus_tard', () => { const v = load('vrm_achat_plus_tard', {}); return v && typeof v === 'object' ? v : {}; });
-  const poserAchatPlusTard = (id) => setAchatPlusTard((prev) => { const u = { ...(prev || {}), [String(id)]: new Date().toISOString() }; save('vrm_achat_plus_tard', u); return u; });
+  const poserAchatPlusTard = (id) => gesteVrm('Mise de côté — elle revient dans 7 jours', [{ k: 'vrm_achat_plus_tard', type: 'cle', id: String(id), apres: new Date().toISOString(), avant: (achatPlusTard || {})[String(id)] }], { vrm_achat_plus_tard: setAchatPlusTard });
   // (6 nov., finitions) Sur un appareil NEUF, ces deux clés arrivent du nuage APRÈS le montage : sans cette
   // relecture, « Plus tard » et « Déjà remise en vente » posés ailleurs restaient vides ici (mesuré au banc
   // vague2-ventes, scène P). La règle des données lues au montage : ne remplacer que ce qui est resté VIDE.
@@ -48301,10 +48391,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             )}
           </div>
   );
+  // (6 nov., v36) Geste annulable : seuls `reattribue.ecrit` et `cartonVerifie` de LA fiche changent
+  // (jamais son N°, §5) ; « Annuler » ⇒ la ligne revient dans « à écrire sur tes cartons ».
   const marquerReattribueEcrit = (it) => {
     const f = numeros[String(it.id)] || {};
     if (!f.reattribue) return;
-    updatePair(it, { reattribue: { ...f.reattribue, ecrit: new Date().toISOString() }, cartonVerifie: new Date().toISOString() });
+    const at = new Date().toISOString();
+    gesteVrm(`N°${f.numero} : c'est écrit`, [{ k: 'vinted_annonce_numeros', type: 'champs', id: String(it.id), apres: { reattribue: { ...f.reattribue, ecrit: at }, cartonVerifie: at }, avant: { reattribue: f.reattribue, cartonVerifie: f.cartonVerifie } }], { vinted_annonce_numeros: setNumeros });
   };
   const blocAEcrire = () => aEcrireCarton.length > 0 && (
     <div data-numeros-a-ecrire={aEcrireCarton.length} style={{ background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn || '#B25000'}`, borderRadius: 12, padding: '10px 12px', marginBottom: 12 }}>
@@ -49912,6 +50005,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   useEffect(() => { if ((curSub==='annonces'||curSub==='journee'||curSub==='bordereaux'||curSub==='messages') && accounts.length && (listings.items===null || (listings.comptes && listings.comptes!==cleComptes))) loadListings(); /* eslint-disable-next-line */ }, [sub, cleComptes]);
   useEffect(() => { if ((curSub==='annonces'||curSub==='journee') && emailSales===null) fetchEmailSales().then(setEmailSales); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if ((curSub==='messages'||curSub==='journee') && accounts.length && (convs.items===null || (convs.comptes && convs.comptes!==cleComptes))) loadConvs(); /* eslint-disable-next-line */ }, [sub, cleComptes]);
+  // (6 nov.) Ce que CET écran a lu, annoncé à son attente (src/AttenteEcran.jsx) : une liste
+  // lue (même vide) ou une lecture ratée est une réponse ; sans compte lié, rien à attendre.
+  const repondu = (x) => ((x && (Array.isArray(x.items) || x.error)) || (accountsReady && !accounts.length) || baseKO) ? true : undefined;
+  const litAchats = curSub==='achats'||curSub==='journee'||curSub==='bordereaux';
+  const litAnnonces = curSub==='annonces'||curSub==='journee'||curSub==='bordereaux'||curSub==='messages';
+  useEssentiel('ventes', repondu(sales));
+  useEssentiel(litAchats ? 'achats' : null, repondu(buys));
+  useEssentiel(litAnnonces ? 'annonces' : null, repondu(listings));
+  useEssentiel((curSub==='messages'||curSub==='journee') ? 'messages' : null, repondu(convs));
+  // Colis : les bordereaux (captés et reçus par e-mail) lus, ou leur lecture ratée.
+  useEssentiel(curSub==='bordereaux' ? 'bordereaux' : null, ((labelsPrets && (emailBords !== null || emailBordsKO)) || (accountsReady && !accounts.length) || baseKO) ? true : undefined);
+  // (6 nov.) Les chiffres que CET écran publie (§11) : tant qu'il les prépare, une carte
+  // qui ne les a jamais reçus dit « lecture… », jamais « pas lu » (src/preparations.js).
+  usePreparation('vrm_paires_dorment', litAnnonces && accounts.length > 0, Array.isArray(listings.items) && !listings.loading);
+  usePreparation('vrm_colis_retirer', litAchats && accounts.length > 0, Array.isArray(buys.items));
+  usePreparation('vrm_benefice_jours', accounts.length > 0, Array.isArray(sales.items));
+  usePreparation('vinted_urssaf_mois', accounts.length > 0, Array.isArray(sales.items));
+  const prepCompta = useEnPreparation(CLES_PREPAREES);
   // Les résumés : seulement sur Messages, relus quand la liste change, au plus une
   // fois par minute (une lecture de ~1 400 lignes, en scalaires).
   useEffect(() => {
@@ -49924,7 +50035,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return () => { fini = true; };
     /* eslint-disable-next-line */
   }, [sub, convs.items, cleComptes]);
-  useEffect(() => { if ((curSub==='bordereaux'||curSub==='annonces'||curSub==='ventes'||curSub==='journee'||curSub==='achats') && emailBords===null) fetchEmailBordereaux().then(v => { if (v) { setEmailBords(v); setEmailBordsKO(false); } else setEmailBordsKO(true); }); /* eslint-disable-next-line */ }, [sub]);
+  useEffect(() => { if ((curSub==='bordereaux'||curSub==='annonces'||curSub==='ventes'||curSub==='journee'||curSub==='achats') && (emailBords===null || emailBordsDeMemoire.current)) fetchEmailBordereaux().then(v => { if (v) { setEmailBords(v); setEmailBordsKO(false); } else setEmailBordsKO(true); }); /* eslint-disable-next-line */ }, [sub]);
   // Détecte un bordereau PDF capté par l'extension (téléchargé sur Vinted) et
   // encore frais (< 60 min) → on affiche un bandeau « tamponner en 1 clic ».
   useEffect(() => { (async () => {
@@ -55654,6 +55765,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 );
               };
               if (loading) return null;
+              // (6 nov.) Les actions du jour de la coque (la cloche) pas encore rangées : la liste
+              // n'arrive pas geste par geste — sa place, en lignes de chargement, puis la liste d'un bloc.
+              // Et jamais « Rien à faire… : pas lu » pendant qu'elles se lisent.
+              if (!alertesLues) return (
+                <section className="vrm-fu-afaire" aria-label="À faire" aria-busy="true" data-afaire-attente="">
+                  <div className="vrm-fu-titre-section"><h2 className="vrm-day-titre-section">À faire</h2></div>
+                  <SqLignes n={3} montant={false}/>
+                </section>
+              );
               // (5 nov., chantier E1, §5) « Rien à faire » ne se dit que sur ce qui a été LU : une case
               // pas lue (« — ») n'est pas une case à zéro. Sinon la ligne nomme ce qui manque.
               const pasLus = T.filter((x) => x.pasSu).map((x) => x.l);
@@ -56148,7 +56268,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {num && aExpedier(o) && !hidden && inGarage(num) ? <Bouton variante="secondaire" icone="pin" onClick={()=>{fermer();onLocate&&onLocate(num);}} aria-label="Voir au stock">Voir au stock</Bouton> : null}
                     {isLotTitle(o.title) ? <Bouton variante="secondaire" icone="box" onClick={async(ev)=>{ lotOrigineRef.current = ev.currentTarget; setLotView({loading:true,order:o,items:[]}); const items=await fetchLotItems(o._acc,o.transaction_id); setLotView({loading:false,order:o,items}); }} title="Voir les paires du lot" aria-label="Voir les paires du lot">Voir le lot</Bouton> : null}
                     {annChez && annChez.item ? <Bouton variante="secondaire" icone="sync" data-recap-remettre={txL} onClick={()=>{ fermer(); remettreEnVente(annChez); }}>{annChez.etat === 'en-cours' ? 'Reprendre la remise en vente' : 'Remettre en vente'}</Bouton> : null}
-                    {annChez ? <Bouton variante="discret" data-recap-remise-faite={txL} title="Tu l’as déjà remise en vente toi-même : VRM ne le redit plus" onClick={()=>{ poserAnnuleeReglee(txL); toast('Noté : VRM ne la propose plus'); }}>Déjà remise en vente</Bouton> : null}
+                    {annChez ? <Bouton variante="discret" data-recap-remise-faite={txL} title="Tu l’as déjà remise en vente toi-même : VRM ne le redit plus" onClick={()=>poserAnnuleeReglee(txL)}>Déjà remise en vente</Bouton> : null}
                     {!annChez && st==='cancelled' && num && saleOutcome(o)==='rembourse' && !isPairLost(num) ? <Bouton variante="secondaire" onClick={()=>markPairLost(num,o)} title={`Tu as remboursé l'acheteur. Si l'article ne revient PAS, déclare-le perdu : le N°${num} sera libéré et sa case au garage vidée.`} aria-label="Déclarer l'article perdu">Article perdu ?</Bouton> : null}
                     {num && isPairLost(num) ? <Bouton variante="discret" onClick={()=>unmarkPairLost(num)} title={`Annuler : l'article N°${num} est finalement revenu.`} aria-label="Annuler article perdu">Il est revenu</Bouton> : null}
                   </div>
@@ -56535,6 +56655,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             (les nombres des onglets, `phaseReception`), À retirer (`vrm_colis_retirer`). Aucun nombre recalculé. */}
         {dansPlateforme && !modeRetraits && !baseKO && (() => {
           const lu = Array.isArray(buys.items);
+          // (6 nov.) Les achats se lisent encore : « lecture… » (jamais « pas lu » qui deviendrait un nombre),
+          // et la carte attend avec l'écran (src/AttenteEcran.jsx).
+          const enLecture = !lu && !buys.error ? { raisonCourte: 'lecture…', enCours: true } : {};
           const m0 = new Date(); m0.setDate(1);
           const duMois = { from: m0, to: new Date() };
           const annule = achatAnnule;   // (3 nov.) la règle de « Dépensé », partagée avec le registre des achats (src/registres.js)
@@ -56543,9 +56666,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const n = { route: 0, recu: 0 }; if (lu) buysBase.forEach((o) => { const ph = phaseReception(o); if (n[ph] != null) n[ph]++; });
           return <CarteStatsApp page="achats" aide liveStats={liveStats} className="vrm-fu-ecran" ici="achats" onNav={onNav} sel={{ site: 'toutes', compte: null, periode: null }}
             locaux={{
-              depense: { nom: 'Dépensé du mois', court: 'Dépensé', type: 'eur', aide: 'Tes achats du mois, hors annulés et remboursés (le montant payé).', valeur: depense, quand: (() => { const m = m0.toLocaleDateString('fr-FR', { month: 'long' }); return m.charAt(0).toUpperCase() + m.slice(1); })(), attrs: { 'data-n': lu ? String(mois.length) : '' } },
-              enroute: { nom: 'En route', court: 'En route', type: 'n', aide: 'Tes achats payés ou expédiés, pas encore arrivés au point relais.', valeur: lu ? n.route : null, attrs: { 'data-n': lu ? String(n.route) : '' } },
-              recus: { nom: 'Arrivés', court: 'Arrivés', type: 'n', aide: 'Tes achats livrés ou finalisés, depuis toujours.', valeur: lu ? n.recu : null, attrs: { 'data-n': lu ? String(n.recu) : '' } },
+              depense: { nom: 'Dépensé du mois', court: 'Dépensé', type: 'eur', aide: 'Tes achats du mois, hors annulés et remboursés (le montant payé).', valeur: depense, ...enLecture, quand: (() => { const m = m0.toLocaleDateString('fr-FR', { month: 'long' }); return m.charAt(0).toUpperCase() + m.slice(1); })(), attrs: { 'data-n': lu ? String(mois.length) : '' } },
+              enroute: { nom: 'En route', court: 'En route', type: 'n', aide: 'Tes achats payés ou expédiés, pas encore arrivés au point relais.', valeur: lu ? n.route : null, ...enLecture, attrs: { 'data-n': lu ? String(n.route) : '' } },
+              recus: { nom: 'Arrivés', court: 'Arrivés', type: 'n', aide: 'Tes achats livrés ou finalisés, depuis toujours.', valeur: lu ? n.recu : null, ...enLecture, attrs: { 'data-n': lu ? String(n.recu) : '' } },
             }}/>;
         })()}
         {/* (5 nov.) Pourquoi des codes manquent (l'extension les lit dans les conversations, sur le
@@ -59570,7 +59693,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 locaux={{
                   imprimer: { nom: 'Bordereaux à imprimer', court: 'à imprimer', type: 'n', valeur: nPrets, titre: nDejaImpr > 0 ? `Bordereaux reçus pas encore imprimés (${nDejaImpr} déjà imprimé${nDejaImpr > 1 ? 's' : ''}, à déposer)` : 'Bordereaux reçus, pas encore imprimés', onClick: nPrets > 0 ? () => onOngletColis && onOngletColis('envoyer') : undefined, attrs: { 'data-n': String(nPrets) } },
                   deposes: { nom: 'Colis déposés aujourd’hui', court: deposes > 1 ? 'déposés' : 'déposé', type: 'n', valeur: deposes, titre: "Colis marqués « Colis fait » aujourd'hui", attrs: { 'data-n': String(deposes) } },
-                  retirer: { nom: 'À retirer', court: 'à retirer', type: 'n', valeur: nRet, partiel: retPartiel && nRet != null, affiche: nRet == null ? undefined : `${nRet}${retPartiel ? '+' : ''}`, titre: retPartiel && nRet != null ? `Au moins ${nRet} : les e-mails de suivi n'ont pas pu être lus` : 'Colis arrivés à aller chercher', onClick: () => onOngletColis && onOngletColis('retirer'), attrs: { 'data-n': nRet == null ? '' : String(nRet) } },
+                  retirer: { nom: 'À retirer', court: 'à retirer', type: 'n', valeur: nRet, partiel: retPartiel && nRet != null, affiche: nRet == null ? undefined : `${nRet}${retPartiel ? '+' : ''}`, ...(nRet == null && prepCompta.has('vrm_colis_retirer') ? { raisonCourte: 'lecture…', enCours: true } : {}), titre: retPartiel && nRet != null ? `Au moins ${nRet} : les e-mails de suivi n'ont pas pu être lus` : 'Colis arrivés à aller chercher', onClick: () => onOngletColis && onOngletColis('retirer'), attrs: { 'data-n': nRet == null ? '' : String(nRet) } },
                 }}/>
               ); })()}
             {/* (31 oct., soir) + « Leboncoin » quand il y a un compte : ses colis ont
@@ -60451,10 +60574,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {/* « Colis fait » marque LES DEUX (la vente et le bordereau) :
                           deux marqueurs pour un même carton, c'était deux chiffres
                           qui divergeaient. */}
-                      <button type="button" onClick={()=>{
-                        if (posted) { if(o) { if(isShipDone(o)) toggleShipDone(o); } if(b && isBordShippedManual(b)) unmarkBordShipped(b); }
-                        else marquerColisFait(o, b);
-                      }} title={posted?'Le colis est encore chez toi : il revient dans « À envoyer »':'Marquer déposé : il passe dans « Envoyés »'} data-geste="fait"
+                      <button type="button" onClick={()=>gesteColisFait(o, b, !posted)} title={posted?'Le colis est encore chez toi : il revient dans « À envoyer »':'Marquer déposé : il passe dans « Envoyés »'} data-geste="fait"
                         className="vrm-colis-sec vrm-colis-ter" style={{...sec,border:`1px solid ${C.border}`,background:posted?C.bg:'transparent',color:posted?C.text:C.muted}}>
                         {posted?'Pas encore déposé':'Déposé'}
                       </button>
@@ -62526,16 +62646,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         );
       })()}
 
-      {/* ── Bandeau « Annuler » après avoir retiré un colis (mise à jour immédiate) ── */}
-      {lastCollected && (
-        <div style={{position:'fixed',left:16,right:16,bottom:'calc(90px + env(safe-area-inset-bottom))',zIndex:1300,display:'flex',justifyContent:'center',pointerEvents:'none'}}>
-          <div style={{pointerEvents:'auto',display:'flex',alignItems:'center',gap:12,background:'#111',color:'#fff',borderRadius:12,padding:'10px 12px 10px 16px',boxShadow:'0 6px 20px rgba(0,0,0,0.3)',maxWidth:420,width:'100%'}}>
-            <span style={{flex:1,fontSize:13,fontWeight:500,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>✓ Colis retiré</span>
-            <button type="button" onClick={()=>unmarkCollected(lastCollected)} style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:'transparent',color:INV_STATUS.online.color,borderRadius:12,padding:'5px 14px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
-            <button type="button" onClick={()=>setLastCollected(null)} aria-label="Fermer" style={{flexShrink:0,border:'none',background:'transparent',color:'#aaa',fontSize:20,cursor:'pointer',lineHeight:1,padding:'0 4px'}}>×</button>
-          </div>
-        </div>
-      )}
+      {/* ── Bandeau « Annuler » après « J'ai retiré » : remplacé le 6 nov. (v36) par la pilule commune
+          (src/PiluleAnnuler.jsx, montée dans la coque) — `markCollected` est un geste annulable. ── */}
     </div>
   );
 }
@@ -70077,7 +70189,7 @@ export default function App() {
   //    double vérification) restaient CLAIRS dans une app réglée en sombre —
   //    sur un document déjà sombre (index.html lit `vinted_dark`). Même source.
   C = load('vinted_dark', false) ? THEMES.dark : THEMES.light;
-  if (MULTI_USER && !authState.ready) return <div style={{minHeight:'100vh',background:C.bg}}/>;
+  if (MULTI_USER && !authState.ready) return <div data-demarrage-attente="" style={{minHeight:'100vh',background:C.bg}}/>;
   const bypass = false; // Aucun accès direct à une boutique partagée.
   if (MULTI_USER && !bypass && (!authState.session || RECOVERY_PENDING)) return <AuthScreen/>;
   // Double vérification (16 octobre) : un compte qui l'a activée et une session
@@ -70389,6 +70501,22 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
   );
 }
 
+// (6 nov.) LES DONNÉES ESSENTIELLES DE CHAQUE ÉCRAN (src/AttenteEcran.jsx) : tant que l'une
+// manque, l'écran montre son squelette (au plus ~2,5 s), puis il arrive d'un bloc. Celles de la
+// coque (`comptes`, `nuage`, `sites`, `stats`) ; celles que l'écran lit lui-même (`ventes`,
+// `achats`, `annonces`, `messages`, `bordereaux`), `stock` (Stock) et `carte` (la carte sombre)
+// s'annoncent depuis les composants qui les lisent (useEssentiel) — une donnée qu'aucun composant
+// monté n'annonce n'est pas attendue. Un écran absent d'ici s'ouvre tout de suite.
+const ESSENTIELS_ECRAN = {
+  journee: ['comptes', 'nuage', 'stats', 'notifs', 'carte', 'ventes', 'achats', 'annonces', 'messages'],
+  ventes: ['comptes', 'nuage', 'sites', 'stats', 'carte', 'ventes'],
+  annonces: ['comptes', 'nuage', 'sites', 'stats', 'carte', 'annonces'],
+  achats: ['comptes', 'nuage', 'sites', 'carte', 'achats'],
+  messages: ['comptes', 'nuage', 'sites', 'messages', 'annonces'],
+  cat_bord: ['comptes', 'nuage', 'sites', 'carte', 'ventes', 'achats', 'bordereaux'],
+  garage: ['comptes', 'nuage', 'stock'],
+  compta: ['comptes', 'nuage', 'stats', 'carte'],
+};
 function AppCoeur() {
   // En mode solo (MULTI_USER=false) `authState.ready` est vrai d'emblée et
   // l'app démarre directement : rien ne change pour un usage à un seul vendeur.
@@ -71003,6 +71131,8 @@ function AppCoeur() {
   const [notifBanner,setNotifBanner]=useState(null); // {ventes, factures} ou null
   const [vintedNotif,setVintedNotif]=useState(null); // {messages, ventes} nouveautés Vinted à l'ouverture
   const [notifItems,setNotifItems]=useState([]); // actions du jour (Ma journée, tableau de bord, Collectif)
+  // (6 nov.) Un premier passage COMPLET (nuage arrivé) a-t-il rangé les actions du jour ? Ma journée l'attend.
+  const [notifsLus,setNotifsLus]=useState(false);
   // (3 nov.) « N°x supprimé de Vinted » (src/cycleArticle.js) : `undefined` en cours · `null` pas su · { cartes, total, pasSu }.
   const [cycleCartes,setCycleCartes]=useState(undefined);
   const [menuOpen,setMenuOpen]=useState(false);
@@ -71134,6 +71264,9 @@ function AppCoeur() {
   // « Comptes liés », ce qui laissait les onglets vides tant qu'on n'y était pas
   // passé. C'est une lecture Supabase légère (pas un appel Vinted, aucun risque).
   const [accountsLoaded,setAccountsLoaded]=useState(false);
+  // (6 nov.) Un passage qui ne finit jamais (lecture pendue, erreur) ne bloque rien : au plus 20 s après les
+  // comptes, Ma journée montre ce qu'elle sait (comme avant).
+  useEffect(()=>{ if(!accountsLoaded||notifsLus) return undefined; const t=setTimeout(()=>setNotifsLus(true),20000); return ()=>clearTimeout(t); },[accountsLoaded,notifsLus]);
   // ⚠️ TROIS ÉTATS, comme partout ailleurs (panneau de sécurité, `extSait`,
   //    `acctHealth`) : on charge · la base a répondu · la base n'a pas répondu.
   //    Sans le troisième, « je n'ai pas pu lire » s'affiche comme « il n'y a
@@ -72238,6 +72371,8 @@ function AppCoeur() {
   const ventesEmailCoque = useVentesEmailFraiches(ventesCoque, ventesKO, vintedAccounts,
     (u) => compteEcarte(u, new Set(hAccCoqueCle ? hAccCoqueCle.split(',') : []), panelOffCoque || {}), hAccCoqueCle + '|' + JSON.stringify(panelOffCoque || {}) + '|' + masquesTick);
   const ventesCoqueEmail = useMemo(() => avecVentesEmail(ventesCoque, ventesEmailCoque), [ventesCoque, ventesEmailCoque]);
+  // (6 nov., v36) E-mails : la photo de la paire d'un bordereau, PAR SON n° de transaction (§5).
+  const photoEmailParTx = useMemo(() => { const m = new Map(); for (const o of (Array.isArray(ventesCoqueEmail) ? ventesCoqueEmail : [])) { const tx = o && o.transaction_id; if (tx == null || m.has(String(tx))) continue; const ph = photosVenteVintedCandidates(o)[0]; if (ph) m.set(String(tx), ph); } return (e) => { const r = e && e.resume; return (r && r.t === 'bordereau' && r.tx && m.get(String(r.tx))) || null; }; }, [ventesCoqueEmail]);
   const [versementsCoque, setVersementsCoque] = useState(undefined);
   useEffect(() => { let mort = false; fetchVersementsVinted().then((m) => { if (!mort) setVersementsCoque(m); }).catch(() => { if (!mort) setVersementsCoque(null); }); return () => { mort = true; }; }, [ventesCoque]);
   const liveStatsVus = useMemo(() => {
@@ -72827,6 +72962,7 @@ function AppCoeur() {
       // Une liste identique ne se repose pas : un tableau neuf re-rendait toute
       // la coque et l'écran ouvert pour rien à chaque recalcul (22 oct.).
       setNotifItems(prev => JSON.stringify(prev) === JSON.stringify(items) ? prev : items);
+      if(nuageAuDepart) setNotifsLus(true);
       // Le mémo des conversations reste borné (les plus récentes gardées).
       { const ks=Object.keys(nextSeen); if(ks.length>4000){ const garde={}; ks.slice(-4000).forEach(k=>{ garde[k]=nextSeen[k]; }); save('vinted_notif_seen_convs',garde); } else save('vinted_notif_seen_convs',nextSeen); }
       // ⚠️⚠️ « ~300 NOTIFICATIONS À L'OUVERTURE » (3 octobre). Les nouvelles
@@ -72877,10 +73013,24 @@ function AppCoeur() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[vintedAccounts, nuagePret, preuveTick]);
 
+  // (6 nov.) LES DONNÉES ESSENTIELLES QUE LA COQUE LIT ELLE-MÊME (src/AttenteEcran.jsx) :
+  // `undefined` = lecture en cours ; tout le reste (lu, ou `null` = pas su) est une réponse.
+  // Placé APRÈS tout ce qu'il lit (§4.6).
+  const essentielsCoque = {
+    comptes: (accountsLoaded || baseKO) ? true : undefined,
+    nuage: nuagePret ? true : undefined,
+    sites: (sitesLus !== undefined && comptesEbay !== undefined) ? true : undefined,
+    // La carte du mois (`liveStats`) : calculée dès que les ventes de la coque sont lues ;
+    // sans compte (ou base injoignable), il n'y a rien à attendre.
+    // « vendu » n'y est que quand ses lignes sont là (ou dites pas sues) : la carte dirait « lecture… ».
+    stats: ((liveStatsVus && (Array.isArray(liveStatsVus.venduLignes) || liveStatsVus.venduPasSu)) || baseKO || (accountsLoaded && !(vintedAccounts || []).length)) ? true : undefined,
+    // Les actions du jour (la cloche, « À faire » de Ma journée, les pastilles de la navigation).
+    notifs: (notifsLus || baseKO || (accountsLoaded && !(vintedAccounts || []).length)) ? true : undefined,
+  };
   // Multi-vendeurs : tant qu'on ne sait pas qui est là, on n'affiche rien (un
   // écran de connexion qui clignote avant de disparaître fait « bug »), et sans
   // session on affiche la porte d'entrée au lieu de l'app.
-  if (MULTI_USER && !authState.ready) return <div style={{minHeight:'100vh',background:C.bg}}/>;
+  if (MULTI_USER && !authState.ready) return <div data-demarrage-attente="" style={{minHeight:'100vh',background:C.bg}}/>;
   // PORTE DE SECOURS — n'existe QUE tant que la base n'est pas cloisonnée.
   // Raison : si la création de compte coince (email de confirmation qui
   // n'arrive pas, fournisseur pas encore activé…), Julien serait enfermé hors
@@ -73296,6 +73446,7 @@ function AppCoeur() {
           chargement, sur n'importe quel écran. */}
       <TopProgress/>
       <Toaster/>
+      <PiluleAnnulerCoque/>
       <DefilementPartout/>
       {/* Fenêtre de confirmation maison (askConfirm). Sans ce montage, l'app
           retomberait silencieusement sur la boîte grise du navigateur. */}
@@ -73508,6 +73659,9 @@ function AppCoeur() {
             sur la coque, pour tous les écrans (src/photosVinted.js). */}
         {!baseKO && <PhotosBloquees/>}
         <BlocNumerosPerimes/>
+        {/* (6 nov.) L'ÉCRAN ATTEND SES DONNÉES ESSENTIELLES (src/AttenteEcran.jsx) : monté mais
+            invisible, son squelette à sa place, puis il arrive d'un bloc — au plus ~2,5 s. */}
+        <AttenteEcran key={tab} ecran={tab} memoire={((authState.user && authState.user.id) || '') + ':' + tab} ordi={ordi} attendus={ESSENTIELS_ECRAN[tab] || []} donnees={essentielsCoque}>
         {tab==='settings'&&<GardeEcran nom="settings" resetKey={platSub}><SettingsScreen setTab={setTab} onPlateforme={plat=>{subVoulue.current=plat==='plat_leboncoin'?'annonces':'compte';setTab(plat);}} ebayCompte={ebayCompteReglage} ouvrir={platSub==='ebay'?'ebay':null} onOuvert={()=>setPlatSub('reglages')} comptes={vintedAccounts}
 
           notifEnabled={notifEnabled}
@@ -73693,7 +73847,7 @@ function AppCoeur() {
             annoncer « 🎉 Tout est à jour ! » pendant la panne, c'est-à-dire
             précisément l'écran qu'il ouvre le matin. Corriger « partout » se
             vérifie au rendu, écran par écran, pas en lisant le code. */}
-        {tab==='journee'&&<GardeEcran nom="journee"><Comptabilite key="journee" panelOff={panelOffCoque} accounts={vintedAccounts} only="journee" alertes={notifItems} cycle={cycleCartes} onCycle={()=>setPreuveTick(t=>t+1)} liveStats={liveStatsVus} onNav={setTab} baseKO={baseKO} accountsReady={accountsLoaded} premierJour={premierJour} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/></GardeEcran>}
+        {tab==='journee'&&<GardeEcran nom="journee"><Comptabilite key="journee" panelOff={panelOffCoque} accounts={vintedAccounts} only="journee" alertes={notifItems} alertesLues={notifsLus||baseKO||(accountsLoaded&&!vintedAccounts.length)} cycle={cycleCartes} onCycle={()=>setPreuveTick(t=>t+1)} liveStats={liveStatsVus} onNav={setTab} baseKO={baseKO} accountsReady={accountsLoaded} premierJour={premierJour} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/></GardeEcran>}
         {/* ⚠️ « Bienvenue 👋 · connecte ton compte Vinted pour commencer » à
             quelqu'un qui a neuf comptes : c'est ce qu'il voyait quand la base
             ne répondait pas. `baseKO` distingue « aucun compte » de « je n'ai
@@ -73731,7 +73885,8 @@ function AppCoeur() {
         {/* (5 nov., chantier G, revue 2.24) UN seul écran « E-mails » : son onglet « Relier ma boîte » porte
             l'ancien sous-écran de Paramètres (`EmailsSetting` : aperçu, journal, adresses, à rattacher) sous
             l'accompagnement animé. Une demande venue d'ailleurs (`DEMANDE_ADRESSES`) l'ouvre directement. */}
-        {tab==='emails'&&<GardeEcran nom="emails"><Suspense fallback={<p role="status" style={{padding:20}}>{PAS_SU.enCours}</p>}><EcranEmails comptes={vintedAccounts} headers={sbAuth} delies={load('vrm_recus_delies',{})||{}} FermeAuRetour={FermeAuRetour}
+        {tab==='emails'&&<GardeEcran nom="emails"><Suspense fallback={<p role="status" style={{padding:20}}>{PAS_SU.enCours}</p>}><EcranEmails comptes={vintedAccounts} headers={sbAuth} delies={load('vrm_recus_delies',{})||{}} FermeAuRetour={FermeAuRetour} photoDe={photoEmailParTx}
+          ecrireLus={(g)=>ecrireEmailsLus(g,{url:SUPABASE_URL,entetes:sbAuth,avecOwner:withOwner,owner:AUTH.user&&AUTH.user.id,cloisonne:CLOISONNE})}
           vueInitiale={DEMANDE_ADRESSES.on?'relier':'boite'}
           reglages={<><AdressesSansCompte comptes={vintedAccounts}/><EmailsSetting onComptes={()=>setTab('vintedaccounts')}/></>}
           onAller={(u)=>{try{window.dispatchEvent(new CustomEvent('vrm:aller',{detail:u}));}catch(_){}}}
@@ -73779,6 +73934,7 @@ function AppCoeur() {
           </section></GardeEcran>
         )}
         {tab==='vintedaccounts'&&<GardeEcran nom="vintedaccounts"><VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts} baseKO={baseKO} onRetour={()=>setTab('settings')}/></GardeEcran>}
+        </AttenteEcran>
         </>)}
         </GardeEcran>
         </BarreHautSlot.Provider>

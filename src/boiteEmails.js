@@ -244,6 +244,16 @@ export function joursAvant(lim, maintenant = Date.now()) {
 const ECHEANCE = /^(?:à envoyer )?avant le /;
 const GESTES_MOTS = { 'bordereau prêt': 'bordereau', 'bordereau à prendre sur Vinted': 'bordereau', 'à faire sur Vinted': 'action', 'à lire': 'verifier' };
 const rang = (x) => (/^(?:code |N°)/.test(x) ? 0 : /€$/.test(x) ? 1 : 2);
+// (6 nov., v36) Sur la LIGNE, la nature tient en quelques mots (la lecture garde la
+// phrase entière) : les familles longues rangées au classement, raccourcies — une mise
+// en forme du même champ, rien d'ajouté.
+const NATURE_COURTE = {
+  'Virement du porte-monnaie vers ta banque': 'Virement vers ta banque',
+  'Achat livré, à vérifier avant la date limite': 'Achat livré à vérifier',
+  "Nouvel article d'un membre suivi": 'Nouvel article suivi',
+  "Remboursement d'un de tes achats": 'Remboursement',
+  'Ton acheteur a retiré son colis': 'Colis retiré par l’acheteur',
+};
 export function ligneEmail(e, delies = {}, maintenant = Date.now()) {
   const t = titreSimple(e, delies);
   const r = e && e.resume && typeof e.resume === 'object' ? e.resume : null;
@@ -269,7 +279,217 @@ export function ligneEmail(e, delies = {}, maintenant = Date.now()) {
   // Un e-mail que VRM n'a pas su ranger : « à vérifier » prime (ambre).
   if (e && e.etat && e.etat !== 'integre' && e.etat !== 'reessai') geste = { k: 'verifier', mot: e.etat === 'erreur' ? 'en attente' : 'à vérifier', proche: false, passe: false };
   const essentiel = garde.map((x, i) => [rang(x), i, x]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map((x) => x[2]);
-  return { titre: t.titre, essentiel, geste, rien: !!t.rien && !geste };
+  return { titre: NATURE_COURTE[t.titre] || t.titre, essentiel, geste, rien: !!t.rien && !geste };
 }
 // Un geste qui mérite l'ambre : délai proche (< 48 h), ou à vérifier.
 export const gesteAmbre = (g) => !!(g && !g.passe && (g.proche || g.k === 'verifier'));
+
+// ════════════════════════════════════════════════════════════════════════════
+// (6 nov., v36 — Julien : « continue à améliorer la boîte mail de l'app, c'est
+// pas ouf » ; « je veux vraiment quelque chose de plus visuel, de beaucoup plus
+// beau ».) Les règles PURES de la boîte façon Mail : le lieu lisible, les piles
+// d'e-mails identiques, la carte « ce qu'il faut savoir », les gestes par
+// identité et le message d'origine rendu proprement. Toujours UNE source : le
+// résumé rangé au classement (jamais le sujet), le texte gardé (jamais du HTML).
+// ════════════════════════════════════════════════════════════════════════════
+
+// ── LE LIEU, LISIBLE ─────────────────────────────────────────────────────────
+// « RELAIS DU MARCHÉ, 12 RUE DES EMBRUNS, 35000 EXEMPLEVILLE » ⇒ { nom: « Relais du
+// Marché », adresse: « 12 Rue des Embruns, 35000 Exempleville » }. Seulement une MISE EN
+// FORME du lieu LU (casse, segments) : rien n'est ajouté, rien n'est deviné. Le
+// nom = les segments avant le premier qui commence par un numéro ou un mot de voie.
+const PETITS = new Set(['de', 'du', 'des', 'la', 'le', 'les', 'et', 'à', 'au', 'aux', 'en', 'sur', 'sous', 'd', 'l']);
+const VOIE = /^(?:\d|rue\b|avenue\b|av\.?\s|bd\b|boulevard\b|place\b|chemin\b|all[ée]e\b|route\b|quai\b|impasse\b|cours\b|rond[- ]point\b|zone\b|za\b|zi\b|centre commercial\b|lieu[- ]dit\b)/i;
+function casse(s) {
+  const t = String(s || '').trim();
+  if (!t || /[a-zà-ÿ]/.test(t)) return t;            // déjà en casse mixte : tel quel
+  const bas = t.toLocaleLowerCase('fr');
+  return bas.replace(/(^|[\s\-'’/(])([\p{L}])([\p{L}]*)/gu, (m, a, l, reste, i) => a + (i > 0 && PETITS.has(l + reste) ? l : l.toLocaleUpperCase('fr')) + reste);
+}
+export function lieuLisible(lieu) {
+  const s = String(lieu == null ? '' : lieu).replace(/\s+/g, ' ').trim();
+  if (!s) return null;
+  const segs = s.split(',').map((x) => x.trim()).filter(Boolean);
+  let i = segs.findIndex((x, k) => k > 0 && VOIE.test(x));
+  if (i < 0) i = segs.length;
+  const vus = new Set(), noms = [];
+  for (const x of segs.slice(0, i)) { const k = x.toLocaleLowerCase('fr'); if (!vus.has(k)) { vus.add(k); noms.push(casse(x)); } }
+  return { nom: noms.join(' · ') || casse(segs[0]), adresse: segs.slice(i).map(casse).join(', ') };
+}
+
+// ── LA DATE LIMITE, EN JOURS ────────────────────────────────────────────────
+// { date: « 10 nov. », jours: n | null, mot: « dans 4 j » / « demain » / …, proche, passe }.
+export function limiteLue(lim, maintenant = Date.now()) {
+  const s = String(lim == null ? '' : lim).trim();
+  if (!s) return null;
+  const n = joursAvant(s, maintenant);
+  const date = jourCourt(s);
+  const mot = n == null ? '' : n < 0 ? 'délai passé' : n === 0 ? 'aujourd’hui' : n === 1 ? 'demain' : `dans ${n} j`;
+  return { date, jours: n, mot, proche: n === 0 || n === 1, passe: n != null && n < 0 };
+}
+
+// ── CE QU'IL FAUT SAVOIR (la carte en tête d'un e-mail ouvert) ──────────────
+// Rend { genre, titre, montant, montantMot, article, num, code, lieu, limite,
+// transporteur, de } — chaque champ LU dans le résumé, absent sinon.
+// `genre` : retrait · vente · bordereau · offre · achat · argent · colis · info.
+export function carteHeros(e, delies = {}, maintenant = Date.now()) {
+  const r = e && e.resume && typeof e.resume === 'object' ? e.resume : null;
+  const t = titreSimple(e || {}, delies);
+  const base = { titre: t.titre, genre: 'info' };
+  if (!r || t.titre === 'En cours de rangement') return base;
+  const prixLu = (m) => { const x = String(m == null ? '' : m).trim(); return x ? `${x.replace('.', ',')} €` : ''; };
+  const num = r.n && !r.nt ? String(r.n) : '';     // §5 : un N° retrouvé par le titre n'est jamais écrit
+  const tr = r.tr && r.tr !== 'autre' ? String(r.tr) : '';
+  switch (r.t) {
+    case 'suivi':
+      if (r.st === 'available' && r.sens !== 'sortant') return { ...base, genre: 'retrait', code: codeSurLigne(e), lieu: lieuLisible(r.lieu), limite: limiteLue(r.lim, maintenant), transporteur: tr };
+      return { ...base, genre: 'colis', transporteur: tr };
+    case 'bordereau': return r.av === 'analyse' ? base : { ...base, genre: 'bordereau', article: r.a || '', num };
+    case 'vente': return r.av === 'analyse' ? base : { ...base, genre: 'vente', montant: prixLu(r.px), montantMot: r.px ? 'vendu' : '', article: r.a || '', num };
+    case 'vente-vestiaire': return r.av === 'analyse' ? base : { ...base, genre: 'vente', montant: prixLu(r.mt), montantMot: r.mt ? 'tu reçois' : '', article: r.a || '', limite: limiteLue(r.lim, maintenant) };
+    case 'offre': return { ...base, genre: 'offre', montant: prixLu(r.mt), montantMot: r.mt ? 'proposé' : '', article: r.a || '' };
+    case 'achat': return { ...base, genre: 'achat', montant: prixLu(r.px), montantMot: r.px ? 'payé' : '', article: r.a || '' };
+    case 'finalisation': return { ...base, genre: 'argent', montant: prixLu(r.mt), montantMot: r.mt ? 'versé sur ton porte-monnaie' : '', article: r.a || '' };
+    case 'favori': case 'message': return { ...base, article: r.a || '' };
+    default: return base;
+  }
+}
+
+// ── LES GESTES, PAR IDENTITÉ (§5) ───────────────────────────────────────────
+// Le geste principal reste `objetRelie` (n° de suivi, n° de transaction, N° lu) ;
+// s'y ajoutent les autres chemins tenus par la MÊME identité lue dans le résumé :
+// la vente (n° de transaction d'un bordereau), la vente Vestiaire (n° d'annonce).
+// Une offre n'a pas d'identité de conversation dans le résumé : le seul geste est
+// d'ouvrir le filtre « Offres » de Messages, dit comme tel (jamais « Voir l'offre »).
+const IDENT = /^[A-Za-z0-9_-]{1,40}$/;
+export function gestesEmail(e, delies = {}) {
+  const r = e && e.resume && typeof e.resume === 'object' ? e.resume : null;
+  const o = objetRelie(e, delies);
+  const l = [];
+  if (o) l.push({ ...o, principal: true });
+  if (r && r.t === 'bordereau' && r.av !== 'analyse' && IDENT.test(String(r.tx || ''))) l.push({ k: 'vente', url: `?tab=cat_ventes&cible=vente&tx=${encodeURIComponent(r.tx)}`, mot: 'Voir la vente', ident: `vente n° ${r.tx}` });
+  if (r && r.t === 'vente-vestiaire' && r.av !== 'analyse' && IDENT.test(String(r.p || ''))) l.push({ k: 'vcvente', url: `?tab=cat_ventes&cible=vcvente&vc=${encodeURIComponent(r.p)}`, mot: 'Voir la vente Vestiaire', ident: `annonce Vestiaire n° ${r.p}` });
+  if (r && r.t === 'offre') l.push({ k: 'offres', url: '?tab=cat_msg&cible=offres', mot: 'Ouvrir les offres dans Messages', ident: '' });
+  if (l.length && !l.some((x) => x.principal)) l[0] = { ...l[0], principal: true };
+  return l;
+}
+
+// ── LES PILES (comme Mail regroupe un fil) ──────────────────────────────────
+// Dans un même jour, une RAFALE d'au moins 3 e-mails consécutifs qui disent la
+// même chose (même nature, même essentiel, même geste, même compte) ne fait
+// qu'UNE ligne : « Commande mise à jour · 11 e-mails ». Rien n'est caché : la
+// pile se déplie au toucher, chaque e-mail garde sa ligne. Un e-mail porteur d'un
+// code ne s'empile jamais avec un autre (chaque code diffère : l'essentiel le dit).
+export const PILE_MIN = 3;
+export function empiler(emails, delies = {}, maintenant = Date.now()) {
+  const out = [];
+  const signe = (e) => { const l = ligneEmail(e, delies, maintenant); return JSON.stringify([l.titre, l.essentiel, l.geste && l.geste.mot, l.rien, e.compte ? e.compte.id : '', e.compteAmbigu ? 1 : 0]); };
+  const l = Array.isArray(emails) ? emails : [];
+  let i = 0;
+  while (i < l.length) {
+    const s = signe(l[i]);
+    let j = i + 1;
+    while (j < l.length && signe(l[j]) === s) j++;
+    if (j - i >= PILE_MIN) out.push({ k: 'pile', cle: 'pile:' + l[i].id, emails: l.slice(i, j) });
+    else for (let k = i; k < j; k++) out.push({ k: 'email', cle: l[k].id, e: l[k] });
+    i = j;
+  }
+  return out;
+}
+
+// ── LE MESSAGE D'ORIGINE, RENDU PROPREMENT ───────────────────────────────────
+// Le texte gardé à la réception (≤ 1 500 caractères, sans HTML) porte les traces
+// de sa conversion : lignes coupées à 76 caractères (une ligne qui finit par une
+// espace continue sur la suivante — « format=flowed »), « *gras* », « [image:
+// Instagram] », points orphelins, mentions légales en pied. Rend des BLOCS que
+// l'écran dessine en éléments React — AUCUN HTML injecté, jamais :
+//   { k: 'p' | 'li' | 'etiquette' | 'note', n?, parts: [{ t, gras?, lien? }] }
+// et `pied` : les mentions de l'expéditeur, à part (repliées à l'écran — rien
+// n'est retiré). Une balise restée dans le texte part (`retirerBalises`) ; un lien
+// n'est gardé que s'il est en http(s) (jamais `javascript:`).
+const PIED = /^(?:Cet e-mail t['’]a été envoyé par|Cet e-mail vous a été envoyé|Vous pouvez consulter toutes les informations relatives|Si tu ne souhaites plus recevoir|Nous sommes tenus de t['’]envoyer|Vous recevez cet e-mail|Pour vous désabonner|MONDIAL RELAY, \d|SASU au capital|TRANSPORTEUR INVENTÉ)/i;
+const IMAGE = /\[image:[^\]]*\]/gi;
+const TETE = /^E-mail Vinted$/i;
+const PUCE = /^(?:[-•–]\s+|(\d{1,2})[.)]\s+)/;
+const LIEN = /\bhttps?:\/\/[^\s<>()"'\]]+[^\s<>()"'\].,;:!?»)]/g;
+function morceaux(ligne) {
+  const parts = [];
+  const pousse = (t, o = {}) => {
+    if (!t) return;
+    LIEN.lastIndex = 0; let m, k = 0;
+    while ((m = LIEN.exec(t))) {
+      if (m.index > k) parts.push({ t: t.slice(k, m.index), ...o });
+      let d = ''; try { const u = new URL(m[0]); d = /^https?:$/.test(u.protocol) ? u.hostname.replace(/^www\./, '') : ''; } catch (_) {}
+      parts.push(d ? { t: d, lien: m[0], ...o } : { t: m[0], ...o });
+      k = m.index + m[0].length;
+    }
+    if (k < t.length) parts.push({ t: t.slice(k), ...o });
+  };
+  const re = /\*{1,2}([^*\n]*[^*\s\n][^*\n]*?)\s*\*{1,2}/g;
+  let m, k = 0;
+  while ((m = re.exec(ligne))) { if (m.index > k) pousse(ligne.slice(k, m.index)); pousse(m[1].trim(), { gras: true }); k = m.index + m[0].length; }
+  if (k < ligne.length) pousse(ligne.slice(k));
+  // Un astérisque resté seul (« **.* ») n'est que la trace d'un gras : retiré.
+  return parts.map((p) => ({ ...p, t: p.t.replace(/\*+/g, '').replace(/\s+/g, ' ') })).filter((p) => p.t.trim() || p.lien);
+}
+export function lireCorps(texte) {
+  if (typeof texte !== 'string') return null;
+  const t = retirerBalises(texte).replace(INVISIBLES, '').replace(SEPARATEURS, '\n').replace(/\r/g, '').replace(IMAGE, ' ').replace(/\*{3,}(?=\d)/g, '•••• ');
+  // 1. Les lignes « coulées » : une ligne qui finit par une espace continue sur la suivante.
+  const jointes = [];
+  for (const brut of t.split('\n')) {
+    const n = jointes.length;
+    if (n && /[ \t]$/.test(jointes[n - 1]) && jointes[n - 1].trim() && brut.trim() && !PUCE.test(brut.trim()) && (jointes[n - 1].trim().length >= 55 || /^[a-zà-ÿ]/.test(brut.trim()))) jointes[n - 1] = jointes[n - 1].replace(/[ \t]+$/, ' ') + brut.replace(/^[ \t]+/, '');
+    else jointes.push(brut);
+  }
+  // 2. Les paragraphes ; un paragraphe coupé au milieu d'une phrase (le suivant
+  //    commence par une minuscule) est recollé.
+  const paras = [];
+  for (const p of jointes.join('\n').split(/\n\s*\n/)) {
+    const x = p.split('\n').map((l) => l.replace(/[ \t ]+/g, ' ').trim()).filter((l) => l && !/^[.·•\-–—]$/.test(l) && !(TETE.test(l) && !paras.length));
+    if (!x.length) continue;
+    const prec = paras[paras.length - 1];
+    if (prec && /^[a-zà-ÿ]/.test(x[0]) && !/[.!?:»)…]$/.test(prec[prec.length - 1])) { prec[prec.length - 1] += ' ' + x[0]; prec.push(...x.slice(1)); }
+    else paras.push(x);
+  }
+  // 3. Les blocs, puis le pied (à part, jamais retiré).
+  const blocs = [], pied = [];
+  let dansPied = false;
+  for (const p of paras) {
+    p.forEach((l, i) => {
+      if (TETE.test(l) && !blocs.length) return;
+      if (!dansPied && PIED.test(l)) dansPied = true;
+      if (dansPied) { pied.push(l); return; }
+      const puce = PUCE.exec(l);
+      const corps = puce ? l.slice(puce[0].length) : l;
+      // Une ligne en capitales, courte, sans chiffre : une étiquette (« CODE DE RETRAIT ») —
+      // sauf juste après une autre (« POINT RELAIS » puis « RELAIS DU MARCHÉ » : la valeur).
+      const capitale = l.length <= 32 && !/[a-zà-ÿ\d]/.test(l) && /[A-ZÀ-Ý]{3}/.test(l);
+      const precE = blocs.length && blocs[blocs.length - 1].k === 'etiquette';
+      const k = puce ? 'li' : /^Vinted te transfère cet e-mail/i.test(l) ? 'note' : capitale && !precE ? 'etiquette' : 'p';
+      const parts = morceaux(corps);
+      if (parts.length) blocs.push({ k, ...(puce && puce[1] ? { n: Number(puce[1]) } : {}), parts, fin: i === p.length - 1 });
+    });
+  }
+  return { blocs, pied: pied.join(' ').replace(/\s+([.,])/g, '$1').replace(/\s{2,}/g, ' ').trim() };
+}
+
+// ── LE CODE DE RETRAIT SUR LA LIGNE ─────────────────────────────────────────
+// Seulement LU (le `code` du résumé rangé), seulement pour un colis À RETIRER
+// (arrivé, pas un colis que TON acheteur retire) ; sinon '' — jamais tiré du sujet
+// ni du texte (« pas su » ≠ « oui »).
+export function codeSurLigne(e) {
+  const r = e && e.resume && typeof e.resume === 'object' ? e.resume : null;
+  return r && r.t === 'suivi' && r.st === 'available' && r.sens !== 'sortant' && typeof r.code === 'string' && r.code.trim() ? codeLisible(r.code) : '';
+}
+
+// ── L'ADRESSE DE L'EXPÉDITEUR, LISIBLE ───────────────────────────────────────
+// Un e-mail transféré par iCloud porte une adresse réécrite (« x_at_vinted_fr_ab12…@icloud.com
+// (x@vinted.fr.ab12….cd34) ») : on montre l'adresse d'ORIGINE écrite entre parenthèses, sans
+// ses deux suffixes techniques. Seulement l'affichage : le rangement ne lit jamais ce champ (§5).
+export function adresseLisible(from) {
+  const f = String(from || '');
+  const m = /\(([^\s()@]+@[^\s()]+?)\.[a-z0-9]{8,}\.[a-z0-9]{6,}\)/i.exec(f);
+  if (m) return m[1];
+  return (f.match(/[^\s<>"'()]+@[^\s<>"'()]+/) || [''])[0];
+}
