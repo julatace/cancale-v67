@@ -95,7 +95,7 @@ const sansCommentaires = (t) => t.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/
 
     console.log('\n── P. La suggestion proposée');
     const p1 = M.suggestionNumerotage({ titre: 'Nike Air Max 90', proposition: { centimes: 3290, source: 'recu' }, lot: false, prixLu: 35 }, null);
-    dit(p1 && p1.bouton === 'Relier · 32,90 €' && /prix du reçu/.test(p1.detail), 'P1 « Relier · 32,90 € » (le prix du reçu), détail dit d’où vient le montant', JSON.stringify(p1));
+    dit(p1 && String(p1.bouton).replace(/\u00a0/g, ' ') === 'Relier · 32,90 €' && /prix du reçu/.test(p1.detail), 'P1 « Relier · 32,90 € » (le prix du reçu), détail dit d’où vient le montant', JSON.stringify(p1));
     dit(p1 && Object.keys(p1).sort().join(',') === 'bouton,detail', 'P2 un bouton et une ligne — aucune valeur à mettre dans le champ', JSON.stringify(p1 && Object.keys(p1)));
     const p2 = M.suggestionNumerotage({ titre: 'Lot 3 paires', proposition: { centimes: 9000, source: 'achat' }, lot: true, prixLu: 90 }, null);
     dit(p2 && p2.bouton === 'Relier' && /lot/.test(p2.detail), 'P3 un LOT ⇒ « Relier » sans montant (le prix de CET article sera demandé)', JSON.stringify(p2));
