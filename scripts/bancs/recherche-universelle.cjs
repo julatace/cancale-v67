@@ -290,7 +290,7 @@ const ouvrirLoupe = async (pg, tel) => {
         await pg.waitForTimeout(200);
         await pg.locator('[data-recherche-resultat="facture"]').first().click();
         await pg.waitForTimeout(1500);
-        const fa = await pg.evaluate(() => ({ url: location.search, h: [...document.querySelectorAll('h1,h2')].map((x) => x.textContent.trim()).join(' | ').slice(0, 120), champ: [...document.querySelectorAll('input')].map((i) => i.value).filter(Boolean) }));
+        const fa = await pg.evaluate(() => ({ url: location.search, h: [...document.querySelectorAll('h1,h2')].map((x) => x.textContent.trim()).join(' | ').slice(0, 120), champ: [...document.querySelectorAll('input:not([data-recherche-champ])')].map((i) => i.value).filter(Boolean) }));
         dit(/Factures|Comptabilit/i.test(fa.h) && !fa.champ.includes('PRO-2026-0007'), `${TT} la facture Pro ouvre Factures (liste des Pro en tête, aucune recherche « 0 résultat » posée)`, JSON.stringify(fa));
         // Champ vide après un résultat ouvert : la recherche récente est là.
         await ouvrirLoupe(pg, tel);
