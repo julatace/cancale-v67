@@ -178,7 +178,7 @@ html body button.vrm-champ-recherche-bouton:focus-visible { outline: 2px solid v
 
 /* ── 5. LA PASTILLE N° (Numero) ─────────────────────────────────────────────── */
 html body .vrm-num {
-  display: inline-flex; align-items: baseline; gap: 1px; flex: none; box-sizing: border-box;
+  display: inline-block; white-space: nowrap; flex: none; /* (5 nov.) inline-block : « N°31 » se copie d’un seul tenant */ box-sizing: border-box;
   padding: 2px 7px; border-radius: 6px;
   background: #1D1D1F; color: #FFFFFF;
   font: 700 13px/1.25 var(--vrm-police, inherit); font-variant-numeric: tabular-nums; letter-spacing: 0;

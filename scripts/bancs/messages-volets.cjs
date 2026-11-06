@@ -12,6 +12,7 @@
 //      montre CELLE du fil (N°80, 120 €, 11 favoris · 120 vues, Meuble C), jamais
 //      l'autre ; une conversation SANS item_id, au même titre, dit « Pas reliée »
 //      et ne montre aucun N° ;
+//   (5 nov., chantier G) Le N° est la pastille commune `Numero` (deux morceaux en boîte flexible : « N°\n80 » en innerText) : on lit `N°\s*80`.
 //   3. la carte d'offre : « Offre de 100 € — ton mini : 105 € » (le mini posé à
 //      côté du N°), Refuser · Proposer 105 € · Accepter, dans cet ordre (3 nov. :
 //      la contre-offre en un tap, X = SON mini arrondi à l'euro supérieur) ;
@@ -156,7 +157,7 @@ const boite = (pg, sel) => pg.evaluate((s) => { const e = document.querySelector
       const fiche = await r.pg.evaluate(() => { const e = document.querySelector('.vrm-msg-fiche'); return e ? { etat: e.getAttribute('data-fiche-conv'), item: e.getAttribute('data-fiche-item'), num: e.getAttribute('data-fiche-num'), txt: e.innerText } : null; });
       dit(fiche && fiche.etat === 'reliee' && fiche.item === '801' && fiche.num === '80', 'la fiche est celle de l’annonce du fil (item_id 801, N°80)', JSON.stringify(fiche));
       const t = (fiche && fiche.txt) || '';
-      dit(/N°80/.test(t) && /120\s?€/.test(t) && /11 favoris/.test(t) && /120 vues/.test(t) && /Meuble C/.test(t) && /42/.test(t) && /boutique_test/.test(t), 'elle porte son prix, sa taille, le compte, le N°, sa place dans « Mes meubles » et favoris · vues', t.replace(/\n/g, ' | '));
+      dit(/N°\s*80/.test(t) && /120\s?€/.test(t) && /11 favoris/.test(t) && /120 vues/.test(t) && /Meuble C/.test(t) && /42/.test(t) && /boutique_test/.test(t), 'elle porte son prix, sa taille, le compte, le N°, sa place dans « Mes meubles » et favoris · vues', t.replace(/\n/g, ' | '));
       dit(!/N°81|130\s?€|3 favoris|Meuble D/.test(t), 'rien de l’autre annonce au même titre (N°81, 130 €, 3 favoris, Meuble D)');
       const offre = await r.pg.evaluate(() => { const e = document.querySelector('.vrm-chat-offre-traiter'); if (!e) return null; const bs = [...e.querySelectorAll('.vrm-chat-offre-actions button')].map((x) => ({ g: x.getAttribute('data-offre-geste'), t: x.innerText.trim(), l: x.getBoundingClientRect().left, y: x.getBoundingClientRect().top }));
         return { mini: e.getAttribute('data-offre-mini'), contre: e.getAttribute('data-offre-contre'), tete: (e.querySelector('.vrm-chat-offre-tete') || {}).innerText || '', bs }; });
@@ -208,7 +209,7 @@ const boite = (pg, sel) => pg.evaluate((s) => { const e = document.querySelector
       const P = await boite(r.pg, '.vrm-chat-panel');
       dit(P && P.vis && P.w >= 389 && P.h >= 800 && P.t <= 1, 'le fil prend tout l’écran', JSON.stringify(P));
       const carte = await r.pg.evaluate(() => { const c = document.querySelector('[data-fil-paire]'); return c ? { item: c.getAttribute('data-fil-paire'), txt: c.innerText } : null; });
-      dit(carte && carte.item === '801' && /Salomon XT-6/.test(carte.txt) && /42/.test(carte.txt) && /120\s?€/.test(carte.txt) && /Vinted/.test(carte.txt) && /boutique_test/.test(carte.txt) && /Meuble C/.test(carte.txt) && /N°80/.test(carte.txt) && !/N°81|Meuble D/.test(carte.txt), 'en tête du fil : la paire (titre · taille, prix · site · compte · rangement, N°80)', JSON.stringify(carte));
+      dit(carte && carte.item === '801' && /Salomon XT-6/.test(carte.txt) && /42/.test(carte.txt) && /120\s?€/.test(carte.txt) && /Vinted/.test(carte.txt) && /boutique_test/.test(carte.txt) && /Meuble C/.test(carte.txt) && /N°\s*80/.test(carte.txt) && !/N°81|Meuble D/.test(carte.txt), 'en tête du fil : la paire (titre · taille, prix · site · compte · rangement, N°80)', JSON.stringify(carte));
       const ordre = await r.pg.evaluate(() => [...document.querySelectorAll('.vrm-chat-offre-actions button')].map((x) => x.getAttribute('data-offre-geste')).join(','));
       dit(ordre === 'refuser,proposer,accepter', 'la carte d’offre au téléphone : Refuser · Proposer 105 € · Accepter', ordre);
       const bt = await r.pg.evaluate(() => [...document.querySelectorAll('.vrm-chat-offre-actions button')].map((x) => { const b = x.getBoundingClientRect(); return { r: Math.round(b.right), h: Math.round(b.height), t: x.innerText, plein: x.scrollWidth <= x.clientWidth + 1 }; }));

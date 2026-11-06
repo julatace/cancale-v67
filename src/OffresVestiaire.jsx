@@ -6,13 +6,19 @@
 // APPRIS (recette vue sur SA réponse faite à la main) et que l'extension le
 // sait ; sinon « Répondre sur Vestiaire ↗ ». Accepter et Refuser demandent une
 // confirmation (accepter vend l'article). Rien ne part sans son clic.
+// (5 nov., chantier G) Une offre reçue qui expire dans moins de 6 h (`expireBientot`,
+// échéance LUE) : son temps restant en AMBRE, une seule fois dans Messages — la
+// pastille « offre 180 € » de la liste reste neutre. Les offres VINTED n'expirent pas :
+// rien de tel pour elles. Vignette vide = `PhotoVide`, N° = `Numero`, liens au style du pied.
 import React from 'react';
-import { GESTES_OFFRE, etatGeste, prixContre, euros, resteAvant, etiquetteOffre } from './offresVestiaire.js';
+import { GESTES_OFFRE, etatGeste, prixContre, euros, resteAvant, etiquetteOffre, expireBientot } from './offresVestiaire.js';
+import { PhotoVide } from './composants/PhotoVide.jsx';
+import { Numero } from './composants/Numero.jsx';
 
 const NOM = { accepter: 'Accepter', refuser: 'Refuser', contre: 'Contre-offre' };
 const CONFIRME = { accepter: 'Confirmer : vendre', refuser: 'Confirmer le refus' };
 
-function CarteOffre({ o, recettes, cap, numDe, envoyer, Photo }) {
+function CarteOffre({ o, recettes, cap, numDe, envoyer, Photo, maintenant }) {
   const [enCours, setEnCours] = React.useState('');
   const [confirme, setConfirme] = React.useState('');
   const [contre, setContre] = React.useState(null);      // null fermé · texte
@@ -29,17 +35,19 @@ function CarteOffre({ o, recettes, cap, numDe, envoyer, Photo }) {
     if (r && r.accepte === true && r.etape === 'fait') setContre(null);
   };
   const lien = o.lien || 'https://fr.vestiairecollective.com/';
+  const bientot = expireBientot(o, maintenant);
   return (
-    <li className="vrm-of-carte" data-vc-offre={o.id} data-vc-offre-produit={o.produit} data-vc-offre-prets={prets.join(',')}>
+    <li className="vrm-of-carte" data-vc-offre={o.id} data-vc-offre-produit={o.produit} data-vc-offre-prets={prets.join(',')} data-vc-offre-bientot={bientot ? '1' : undefined}>
       <div className="vrm-of-tete">
-        {o.photo && Photo ? <Photo src={o.photo} className="vrm-of-photo" alt=""/> : <span className="vrm-of-photo" aria-hidden="true"/>}
+        {o.photo && Photo ? <Photo src={o.photo} className="vrm-of-photo" alt=""/> : <PhotoVide className="vrm-of-photo" taille={52}/>}
         <span className="vrm-of-centre">
-          <span className="vrm-of-nom">{num ? <b className="vrm-of-num">N°{num}</b> : null}{o.titre || 'Article Vestiaire'}</span>
+          <span className="vrm-of-nom">{num ? <Numero n={num} taille="petit" className="vrm-of-num"/> : null}<span className="vrm-of-titre-article">{o.titre || 'Article Vestiaire'}</span></span>
           <span className="vrm-of-sous">
             <span className="vrm-of-bloc">prix {euros(o.initial)}</span>
             {o.net != null ? <> · <span className="vrm-of-bloc">tu touches {euros(o.net)}</span></> : null}
-            {o.expire != null ? <> · <span className="vrm-of-bloc" data-vc-offre-reste="">reste {resteAvant(o.expire)}</span></> : null}
           </span>
+          {/* Le temps restant LU, sur sa ligne : en ambre (et dit « expire dans ») sous 6 h. */}
+          {o.expire != null ? <span className={'vrm-of-reste' + (bientot ? ' is-bientot' : '')} data-vc-offre-reste="">{bientot ? `expire dans ${resteAvant(o.expire, maintenant)}` : `reste ${resteAvant(o.expire, maintenant)}`}</span> : null}
         </span>
         <span className="vrm-of-prix" data-vc-offre-cents={o.offre == null ? '' : String(o.offre)}>{euros(o.offre)}</span>
       </div>
@@ -61,7 +69,7 @@ function CarteOffre({ o, recettes, cap, numDe, envoyer, Photo }) {
         </div>
       )}
       {prets.length < GESTES_OFFRE.length && (
-        <a className="vrm-of-lien" data-vc-offre-ailleurs={GESTES_OFFRE.filter((g) => !prets.includes(g)).map((g) => g + ':' + etats[g].etat).join(',')} href={lien} target="_blank" rel="noreferrer">Répondre sur Vestiaire ↗</a>
+        <a className="vrm-of-lien vrm-pied-lien" data-pied-lien="repondre-vc" data-vc-offre-ailleurs={GESTES_OFFRE.filter((g) => !prets.includes(g)).map((g) => g + ':' + etats[g].etat).join(',')} href={lien} target="_blank" rel="noreferrer">Répondre sur Vestiaire ↗</a>
       )}
       {res ? <div className="vrm-of-resultat" role="status" data-vc-offre-resultat={res.ton}>{res.texte}</div> : null}
     </li>
@@ -69,25 +77,29 @@ function CarteOffre({ o, recettes, cap, numDe, envoyer, Photo }) {
 }
 
 export default function OffresVestiaire({ etat, recettes, cap, numDe, envoyer, Photo }) {
+  // Le temps restant reste vrai écran ouvert : relu chaque minute (rien n'est relu sur le réseau).
+  const [maintenant, setMaintenant] = React.useState(() => Date.now());
+  React.useEffect(() => { const t = setInterval(() => setMaintenant(Date.now()), 60000); return () => clearInterval(t); }, []);
   if (!etat || etat.etat !== 'lu') return null;
   const A = etat.aTrancher, W = etat.enAttente;
   if (!A.length && !W.length) return null;
   return (
     <section className="vrm-of" data-vc-offres={A.length} data-vc-offres-attente={W.length}>
       {A.length > 0 && <>
-        <h3 className="vrm-of-titre">Offres<span className="vrm-of-n">{A.length}</span></h3>
-        <ul className="vrm-of-liste">{A.map((o) => <CarteOffre key={o.id} o={o} recettes={recettes} cap={cap} numDe={numDe} envoyer={envoyer} Photo={Photo}/>)}</ul>
+        <h3 className="vrm-of-titre">Offres reçues<span className="vrm-of-n">{A.length}</span></h3>
+        <ul className="vrm-of-liste">{A.map((o) => <CarteOffre key={o.id} o={o} recettes={recettes} cap={cap} numDe={numDe} envoyer={envoyer} Photo={Photo} maintenant={maintenant}/>)}</ul>
       </>}
-      {W.length > 0 && (
+      {W.length > 0 && (<>
+        <h3 className="vrm-of-titre vrm-of-titre-second">Tes offres envoyées<span className="vrm-of-n">{W.length}</span></h3>
         <ul className="vrm-of-attente" data-vc-offres-envoyees={W.length}>
           {W.slice(0, 6).map((o) => (
             <li key={o.id} className="vrm-of-ligne" data-vc-offre-envoyee={o.id}>
               <span className="vrm-of-ligne-nom">{(numDe && numDe(o.produit)) ? `N°${numDe(o.produit)} · ` : ''}{o.titre || 'Article Vestiaire'}</span>
-              <span className="vrm-of-ligne-etat">ton offre {euros(o.dernierCents)}{o.expire != null ? ` · ${resteAvant(o.expire)}` : ''}</span>
+              <span className="vrm-of-ligne-etat">{euros(o.dernierCents)}{o.expire != null ? ` · reste ${resteAvant(o.expire, maintenant)}` : ''}</span>
             </li>
           ))}
         </ul>
-      )}
+      </>)}
     </section>
   );
 }

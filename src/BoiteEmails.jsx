@@ -44,6 +44,7 @@ import { codeLisible } from './journalEmail.js';
 import { requeteJsonBornee } from './requeteJsonBornee.js';
 import { LogoSite } from './SelecteurSites.jsx';
 import RelierBoite from './RelierBoite.jsx';
+import { EtatPanne } from './composants/EtatPanne.jsx';
 import './boite-emails.css';
 
 const formeListe = (j) => j && j.ok === true && Array.isArray(j.emails) && j.compteurs && typeof j.compteurs.sur === 'number';
@@ -116,7 +117,8 @@ function Lecture({ id, entetes, delies, onFermer, onAller, onNum, plein, FermeAu
         <button type="button" className="vrm-boite-retour" data-boite-fermer="" onClick={onFermer}>{plein ? <><span className="vrm-boite-chevron" aria-hidden="true">‹</span>Boîte de réception</> : 'Fermer'}</button>
       </div>
       {m === undefined && <div className="vrm-boite-lecture-attente" role="status"><span className="vrm-boite-sr">Ouverture de l’e-mail…</span><i/><i/><i/></div>}
-      {m === null && <div className="vrm-boite-etat-bloc" role="alert" data-boite-lecture-etat="pas-su"><p className="vrm-boite-etat-titre">E-mail pas ouvert</p><p>— la lecture n’a pas abouti. Rien n’est perdu : il reste rangé.</p><button type="button" className="vrm-boite-principal" onClick={() => setEssai((n) => n + 1)}>Réessayer</button></div>}
+      {/* (5 nov., chantier G, revue 1.10) La panne d'une lecture : `EtatPanne`, UN « Réessayer ». */}
+      {m === null && <EtatPanne className="vrm-boite-panne" role="alert" data-boite-lecture-etat="pas-su" quoi="Cet e-mail" raison="La lecture n’a pas abouti. Rien n’est perdu : il reste rangé." onReessayer={() => setEssai((n) => n + 1)}/>}
       {m && !e && <div className="vrm-boite-etat-bloc" data-boite-lecture-etat="absent"><p className="vrm-boite-etat-titre">Cet e-mail n’est plus dans ta boîte VRM.</p></div>}
       {e && <>
         <header className="vrm-boite-haut" data-boite-haut="" data-etat={lu.etat}>
@@ -321,7 +323,7 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier }) {
               </button>;
             })}
           </div>
-          {(choixCompte || vieille) && <div className="vrm-boite-ligne-outils">
+          {(choixCompte || (vieille && pages !== null)) && <div className="vrm-boite-ligne-outils">
             {choixCompte && <label className="vrm-boite-compte">
               <span className="vrm-boite-sr">Compte</span>
               <select value={adresse} onChange={(ev) => { setAdresse(ev.target.value); setOuvert(''); }} data-boite-adresse="" aria-label="Compte">
@@ -330,14 +332,16 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier }) {
               </select>
               <svg className="vrm-boite-compte-chevron" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="m3 4.5 3 3 3-3" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </label>}
-            {vieille && <button type="button" className="vrm-boite-actualiser" data-boite-actualiser="" onClick={() => charger(0)} disabled={lecture} title={luA ? `Lue à ${heure(new Date(luA).toISOString())}` : undefined}>
+            {/* (5 nov., revue 3.8) Jamais « Actualiser » à côté de « Réessayer » : une boîte en panne n'a que SON geste. */}
+            {vieille && pages !== null && <button type="button" className="vrm-boite-actualiser" data-boite-actualiser="" onClick={() => charger(0)} disabled={lecture} title={luA ? `Lue à ${heure(new Date(luA).toISOString())}` : undefined}>
               <span className={lecture ? 'vrm-boite-tourne' : undefined}><IconeActualiser/></span>{lecture ? 'Lecture…' : 'Actualiser'}
             </button>}
           </div>}
           {phrase && <p className="vrm-boite-couverture" data-boite-sur={c.sur} data-boite-sur-adresse={c.adresse || ''}>{phrase}</p>}
         </div>
         {pages === undefined && <Squelette/>}
-        {pages === null && <Etat k="panne" role="alert" titre="Boîte pas lue" texte={`— ${panne || 'VRM n’a pas pu lire ta boîte.'} Rien n’est perdu : tes e-mails restent rangés.`} gestes={[{ k: 'reessayer', mot: 'Réessayer', f: () => charger(0) }]}/>}
+        {/* (5 nov., chantier G, revue 1.10) La panne de la boîte : `EtatPanne` (la raison, UN « Réessayer »). */}
+        {pages === null && <EtatPanne className="vrm-boite-panne" role="alert" data-boite-etat="panne" data-boite="pas-su" quoi="Ta boîte VRM" raison={`${panne || 'VRM n’a pas pu lire ta boîte.'} Rien n’est perdu : tes e-mails restent rangés.`} onReessayer={() => charger(0)}/>}
         {vide && adresse && <Etat k="compte-vide" titre={`Aucun e-mail reçu sur ${nomCompte(adresse)}${rubrique ? ` dans « ${motRubrique} »` : ''}`} texte={rubrique ? 'Les autres rubriques en ont peut-être.' : `Rien n’est encore arrivé sur ${adresse}. Si tu attends des e-mails de ce compte, vérifie le transfert dans sa messagerie.`}
           gestes={[rubrique ? { k: 'tout', mot: 'Voir toutes les rubriques', f: () => setRubrique('') } : { k: 'relier', mot: 'Relier ma boîte', f: onRelier }, { k: 'comptes', mot: 'Tous les comptes', f: () => setAdresse('') }]}/>}
         {vide && !adresse && rubrique && <Etat k="rubrique-vide" titre={`Aucun e-mail dans « ${motRubrique} »`} texte="Ils arriveront ici dès que tes e-mails en parleront." gestes={[{ k: 'tout', mot: 'Voir tout', f: () => setRubrique('') }]}/>}
@@ -350,7 +354,7 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier }) {
             </ul>
           </section>)}
         </div>}
-        {pages && pages.suiteKO && <p className="vrm-boite-etat" role="alert">— la suite n’a pas pu être lue. <button type="button" onClick={() => charger((pages.page || 0) + 1)}>Réessayer</button></p>}
+        {pages && pages.suiteKO && <EtatPanne compact className="vrm-boite-panne" role="alert" data-boite-suite="pas-su" quoi="La suite de ta boîte" raison="Les e-mails ci-dessus restent lus." onReessayer={() => charger((pages.page || 0) + 1)}/>}
         {pages && pages.suite && <button type="button" className="vrm-boite-plus" data-boite-plus="" disabled={lecture} onClick={() => charger((pages.page || 0) + 1)}>{lecture ? 'Lecture…' : 'Voir plus'}</button>}
       </div>
       {large && <div className="vrm-boite-lecture-col">
@@ -362,16 +366,38 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier }) {
   );
 }
 
+// (5 nov., chantier G, revue 2.24) UN seul écran « E-mails ». L'onglet « Relier ma boîte »
+// porte, en tête, l'ancien sous-écran de Paramètres (`reglages` : est-ce que mes e-mails
+// arrivent, le journal, mes adresses, les e-mails à rattacher — rendu par App.jsx, ses
+// lectures et ses écritures inchangées), puis l'accompagnement animé (`RelierBoite`).
+// Paramètres → E-mails et toute demande « ouvre mes adresses » (`vrm:ouvrir-adresses`)
+// ouvrent cet onglet.
 const VUES = [['boite', 'Boîte de réception'], ['relier', 'Relier ma boîte']];
-export default function BoiteEmails({ headers, delies = {}, onAller, onNum, onAdresses, FermeAuRetour, vueInitiale = 'boite' }) {
+export default function BoiteEmails({ headers, delies = {}, onAller, onNum, onAdresses, FermeAuRetour, vueInitiale = 'boite', reglages = null }) {
   const [vue, setVue] = useState(VUES.some(([k]) => k === vueInitiale) ? vueInitiale : 'boite');
+  const haut = useRef(null);
+  useEffect(() => {
+    const f = () => setVue('relier');
+    window.addEventListener('vrm:ouvrir-adresses', f);
+    return () => window.removeEventListener('vrm:ouvrir-adresses', f);
+  }, []);
+  const versAdresses = () => {
+    if (onAdresses) onAdresses();
+    try { const reduit = window.matchMedia('(prefers-reduced-motion: reduce)').matches; haut.current && haut.current.scrollIntoView({ block: 'start', behavior: reduit ? 'auto' : 'smooth' }); } catch (_) {}
+  };
   return (
     <section className="vrm-boite" data-boite-emails="" data-vue={vue}>
       <div className="vrm-boite-vues" role="tablist" aria-label="E-mails">
         {VUES.map(([k, mot]) => <button key={k} type="button" role="tab" aria-selected={vue === k} data-boite-vue={k} onClick={() => setVue(k)}>{mot}</button>)}
       </div>
       {vue === 'boite' && <Boite headers={headers} delies={delies} onAller={onAller} onNum={onNum} FermeAuRetour={FermeAuRetour} onRelier={() => setVue('relier')}/>}
-      {vue === 'relier' && <RelierBoite onAdresses={onAdresses}/>}
+      {vue === 'relier' && <div className="vrm-boite-relier" data-boite-relier="">
+        {reglages ? <div ref={haut} className="vrm-boite-reglages" data-boite-reglages="">{reglages}</div> : null}
+        <section className="vrm-boite-guide" aria-label="Faire suivre tes e-mails, pas à pas" data-boite-guide="">
+          {reglages ? <h2 className="vrm-boite-guide-titre">Faire suivre tes e-mails, pas à pas</h2> : null}
+          <RelierBoite onAdresses={onAdresses ? versAdresses : undefined}/>
+        </section>
+      </div>}
     </section>
   );
 }

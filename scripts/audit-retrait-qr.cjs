@@ -148,7 +148,8 @@ const MUTATIONS = [
   ['module', 'A1 : rien lu ⇒ liste vide', (s) => s.replace('if (!Array.isArray(rows)) return null;', 'if (!Array.isArray(rows)) return { comptes: [], colis: [], ignores: 0 };')],
   ['app', 'E4 : photo par le titre', (s) => s.replace('const ph = (t && t._o) ||', 'const ph = buysBase.find(o => normTitle(o.title) === normTitle(t.artTitle)) || (t && t._o) ||')],
   ['app', 'E2 : pickupUnion sur les e-mails seuls', (s) => s.replace('const fins = finsColis(trackingRetrait,', 'const fins = finsColis(tracking,')],
-  ['app', 'E6 : rouge remis sur la date limite', (s) => s.replace("color:'#B25000',textAlign:'center'}}>", "color:j<=2?'#c53030':'#B25000',textAlign:'center'}}>")],
+  // (5 nov., chantier D) « En grand » passe en SheetShell : la date limite est une ligne `is-ambre` — l'ancre suit.
+  ['app', 'E6 : rouge remis sur la date limite', (s) => s.replace("<li className={lim.j <= 1 ? 'is-ambre' : ''}", "<li style={{color:lim.j<=2?'#c53030':undefined}} className={lim.j <= 1 ? 'is-ambre' : ''}")],
   ['app', 'E5 : QR seulement en mode qr', (s) => s.replace('if (t.qrB64) { setQrView', "if (r.mode === 'qr' && t.qrB64) { setQrView")],
 ];
 

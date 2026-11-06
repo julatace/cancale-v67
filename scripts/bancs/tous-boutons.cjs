@@ -219,7 +219,7 @@ const ECRANS = (tel) => [
   { nom: 'tournee', url: '?tab=journee', prep: async (pg) => { const o = pg.locator('[data-tournee-ouvrir]'); if (await o.count()) { await o.first().click(); await pg.waitForTimeout(700); } }, portee: '[data-tournee-plein]', refaire: true },
   ...['vinted', 'leboncoin', 'ebay', 'vestiaire'].map((s) => ({ nom: 'annonces.' + s, url: '?tab=annonces&site=' + s })),
   { nom: 'annonces.ebay.promo', url: '?tab=plat_ebay&section=promo' },
-  { nom: 'republier', url: '?tab=journee', prep: async (pg) => { await ouvrirEntreeNav(pg, tel, 'republier'); await pg.waitForSelector('[data-actions-menu]', { timeout: 8000 }).catch(() => {}); }, portee: '.vrm-sheet, [role="dialog"]', refaire: true },
+  { nom: 'republier', url: '?tab=journee', prep: async (pg) => { await ouvrirEntreeNav(pg, tel, 'republier'); await pg.waitForSelector('[data-selection-vue]', { timeout: 8000 }).catch(() => {}); }, portee: '[data-selection-vue]', refaire: true },   // (5 nov., chantier C) l'entrée « Republier » mène à la vue « Sélectionner » (plus de feuille « Republier et brouillons »)
   ...['toutes', 'vinted', 'leboncoin', 'ebay', 'vestiaire'].map((s) => ({ nom: 'ventes.' + s, url: '?tab=ventes&site=' + s })),
   { nom: 'ventes.ebay.agent', url: '?tab=plat_ebay&section=agent' },
   { nom: 'ventes.ebay.offres', url: '?tab=plat_ebay&section=offres' },
@@ -344,7 +344,8 @@ const nomDe = (tab) => (NOMS[tab] || [])[0] || '';
 // voir s'ouvrir trop tard sous charge). Une feuille posée par `FermeAuRetour`
 // (SheetShell…) se reconnaît à `history.state.vrmFeuille`.
 const FEUILLES = [
-  { nom: 'Republier (colonne)', url: '?tab=journee', ouvrir: (pg) => pg.locator('[data-nav-entree="republier"]').first().click(), sel: '[data-actions-menu]' },
+  // (5 nov., chantier C) La feuille « Republier et brouillons » n'existe plus : la feuille d'Annonces jugée ici est « … » d'une carte.
+  { nom: 'Autres gestes d’une annonce (« … »)', url: '?tab=cat_annonces', ouvrir: (pg) => pg.locator('[data-fiche-menu-ouvrir]').first().click(), sel: '[data-fiche-menu]' },
   { nom: 'Synchronisation', url: '?tab=journee', ouvrir: (pg) => pg.locator('.vrm-sync-status').first().click(), sel: '[data-sync-panneau]' },
   { nom: 'Prix d’achat à compléter (Ma journée)', url: '?tab=journee', ouvrir: (pg) => pg.locator('[data-stock-completer]').first().click(), sel: null },
   { nom: 'Relier un achat (Ventes)', url: '?tab=ventes&site=vinted', ouvrir: (pg) => pg.locator('[data-cout-vente-relier]').first().click(), sel: null },

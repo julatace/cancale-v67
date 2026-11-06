@@ -173,7 +173,7 @@ const piedHonnete = (p, re) => p && p.impossible && !p.champ && re.test(p.ouvrir
       dit(v.ok, 'trois volets côte à côte : la liste, le fil, la fiche', JSON.stringify(v));
       const f1 = await fiche(r.pg); const t = (f1 && f1.txt) || '';
       dit(f1 && f1.etat === 'reliee' && f1.item === '2001' && f1.num === '80', 'la fiche est celle de l’ItemID de l’échange (2001, N°80 par son SKU)', JSON.stringify(f1 && { e: f1.etat, i: f1.item, n: f1.num }));
-      dit(/N°80/.test(t) && /120\s?€/.test(t) && /11 observateurs/.test(t) && /Meuble C/.test(t) && /eBay/.test(t), 'elle porte son prix, le N°, sa place dans « Mes meubles » et ses observateurs', t.replace(/\n/g, ' | '));
+      dit(/N°\s*80/.test(t) && /120\s?€/.test(t) && /11 observateurs/.test(t) && /Meuble C/.test(t) && /eBay/.test(t), 'elle porte son prix, le N°, sa place dans « Mes meubles » et ses observateurs', t.replace(/\n/g, ' | '));
       dit(!/N°81|130\s?€|3 observateurs|Meuble D/.test(t), 'rien de l’autre annonce au même titre (N°81, 130 €, 3 observateurs, Meuble D)');
       const bulles = await r.pg.evaluate(() => [...document.querySelectorAll('.vrm-chat-panel .vrm-bulle')].map((x) => x.getAttribute('data-bulle')));
       dit(bulles.join() === 'acheteur,moi', 'le fil : la question de l’acheteur puis SA réponse, en bulles', bulles.join());
@@ -211,7 +211,7 @@ const piedHonnete = (p, re) => p && p.impossible && !p.champ && re.test(p.ouvrir
       dit(v.ok, 'trois volets côte à côte : la liste, le fil, la fiche', JSON.stringify(v));
       const f1 = await fiche(r.pg); const t = (f1 && f1.txt) || '';
       dit(f1 && f1.etat === 'reliee' && f1.num === '80' && f1.item === '900001', 'la fiche est celle de la référence VRM de l’article (N°80)', JSON.stringify(f1 && { e: f1.etat, i: f1.item, n: f1.num }));
-      dit(/Salomon XT-6/.test(t) && /N°80/.test(t) && /11 favoris/.test(t) && /Meuble C/.test(t) && !/N°81|3 favoris|Meuble D/.test(t), 'elle porte le titre, le N°, ses favoris, sa place — rien de N°81', t.replace(/\n/g, ' | '));
+      dit(/Salomon XT-6/.test(t) && /N°\s*80/.test(t) && /11 favoris/.test(t) && /Meuble C/.test(t) && !/N°81|3 favoris|Meuble D/.test(t), 'elle porte le titre, le N°, ses favoris, sa place — rien de N°81', t.replace(/\n/g, ' | '));
       const bulles = await r.pg.evaluate(() => [...document.querySelectorAll('.vrm-chat-panel [data-vc-msg] .vrm-bulle')].map((x) => x.getAttribute('data-bulle') + (x.querySelector('time') ? '+h' : '')));
       dit(bulles.join() === 'acheteur+h,moi+h,acheteur+h', 'le fil : trois bulles, chacune avec son heure', bulles.join());
       const p1 = await pied(r.pg);

@@ -28,7 +28,8 @@ export function Courbe({ valeurs, largeur = 96, hauteur = 46 }) {
   );
 }
 
-// cases : [{ cle, n, l, titre, onClick, attrs }] — `n` peut être un nœud.
+// cases : [{ cle, n, l, titre, raison, onClick, attrs }] — `n` peut être un nœud ; `raison` :
+// la raison courte d'un « — » (ou le manque nommé d'un montant), sous le libellé.
 // (3 nov., carte réglable) `action` : un bouton discret en haut à droite (« Modifier ») ;
 // `nu` : la carte sans fond à elle, posée dans une tête déjà sombre (Ma journée, Compta) ;
 // `grandAttrs` : les attributs du grand chiffre (posés sur le chiffre même, « — » compris).
@@ -52,13 +53,23 @@ export default function CarteMois({ surtitre, valeur, sous = null, cases = [], c
     ro.observe(el.parentElement || el);
     return () => ro.disconnect();
   }, [valeur, vide]);
+  // (5 nov., chantier E1, revue 2.11) « Modifier » chevauchait la courbe de Ventes (posé en
+  // absolu au-dessus d'elle). Sur une carte à elle, il est DANS la rangée du surtitre : la
+  // courbe et le grand chiffre commencent dessous, rien ne peut plus passer sous lui. Posée
+  // nue dans une tête (Ma journée), la tête le place sur la ligne de son titre.
+  const enRangee = !nu && !!action;
   return (
-    <section className={(nu ? 'vrm-fu-carte-nu' : 'vrm-fu-carte') + (action ? ' a-action' : '') + (className ? ' ' + className : '')} {...(nu ? {} : { 'data-fu-carte': '' })} {...attrs}>
+    <section className={(nu ? 'vrm-fu-carte-nu' : 'vrm-fu-carte') + (action ? ' a-action' : '') + (enRangee ? ' a-rangee' : '') + (className ? ' ' + className : '')} {...(nu ? {} : { 'data-fu-carte': '' })} {...attrs}>
       {enHaut}
-      {action}
+      {enRangee ? (
+        <div className="vrm-fu-carte-haut">
+          {surtitre ? <span className="vrm-fu-surtitre">{surtitre}</span> : <span />}
+          {action}
+        </div>
+      ) : action}
       <div className="vrm-fu-carte-tete">
         <div className="vrm-fu-carte-txt">
-          {surtitre ? <span className="vrm-fu-surtitre">{surtitre}</span> : null}
+          {surtitre && !enRangee ? <span className="vrm-fu-surtitre">{surtitre}</span> : null}
           <div ref={grandRef} className={'vrm-fu-grand' + (vide ? ' is-vide' : '')} {...(grandAttrs || {})}>{vide ? '—' : valeur}</div>
           {sous ? <div className="vrm-fu-sous">{sous}</div> : null}
         </div>
@@ -67,7 +78,7 @@ export default function CarteMois({ surtitre, valeur, sous = null, cases = [], c
       {cases.length ? (
         <div className="vrm-fu-cases" style={{ '--n': cases.length }}>
           {cases.map((c) => {
-            const corps = <><b className={c.n == null ? 'is-vide' : undefined}>{c.n == null ? '—' : c.n}</b><span>{c.l}</span></>;
+            const corps = <><b className={c.n == null ? 'is-vide' : undefined}>{c.n == null ? '—' : c.n}</b><span>{c.l}</span>{c.raison ? <small className="vrm-fu-case-raison" data-carte-raison="">{c.raison}</small> : null}</>;
             return c.onClick
               ? <button key={c.cle} type="button" className="vrm-fu-case" data-fu-case={c.cle} title={c.titre} onClick={c.onClick} {...(c.attrs || {})}>{corps}</button>
               : <div key={c.cle} className="vrm-fu-case" data-fu-case={c.cle} title={c.titre} {...(c.attrs || {})}>{corps}</div>;

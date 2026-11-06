@@ -51,7 +51,10 @@
   --fu-ambre-fond: rgba(255,159,10,.12);
   --fu-ombre: 0 0 0 1px rgba(255,255,255,.05);
   --fu-ombre-sombre: 0 0 0 1px rgba(255,255,255,.07), 0 12px 30px rgba(0,0,0,.5);
-  --fu-sombre: radial-gradient(120% 90% at 100% 0%, #1f3a5f 0%, #1c1c1e 58%);
+  /* (5 nov., chantier E1, revue 2.3) La nuit, la carte sombre finissait en #1c1c1e — la couleur
+     exacte des cartes blanches du mode sombre : elle s'y fondait. Elle garde sa teinte bleu nuit
+     jusqu'en bas (une surface À ELLE, comme la carte d'un widget d'iOS) et un liseré clair. */
+  --fu-sombre: radial-gradient(120% 90% at 100% 0%, #2a5385 0%, #1b2d45 50%, #15233a 100%);
   --fu-filet: rgba(255,255,255,.08);
 }
 
@@ -79,7 +82,9 @@ html body .vrm-app-shell:has(.vrm-main .vrm-fu-ecran) { background-color: var(--
 /* (3 nov., cas extrêmes) Un montant à 5 chiffres ne se coupe jamais en « 35 211,9… » :
    CarteMois réduit la taille jusqu'à ce qu'il tienne à côté de la courbe (mesuré). */
 .vrm-fu-carte-txt { min-width: 0; flex: 1 1 auto; }
-.vrm-fu-surtitre { display: block; font: 600 12px/1.3 var(--vrm-police); color: rgba(255,255,255,.6); text-transform: uppercase; letter-spacing: .06em; }
+/* (5 nov., chantier E1, revue 3.2) UNE règle pour les surtitres des cartes sombres : celle du
+   bonjour de Ma journée — une phrase (jamais de capitales), 13/600, blanc à 62 %. */
+.vrm-fu-surtitre { display: block; font: 600 13px/1.3 var(--vrm-police); color: rgba(255,255,255,.62); text-transform: none; letter-spacing: normal; }
 .vrm-fu-grand {
   margin-top: 4px; font: 800 38px/1.08 var(--vrm-police); letter-spacing: -.03em; color: #fff;
   font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden;
@@ -128,9 +133,9 @@ button.vrm-fu-case:focus-visible { outline: 2px solid var(--fu-bleu); outline-of
 .vrm-fu-seg > i { display: block; height: 5px; border-radius: 3px; background: var(--fu-piste); transition: background-color .25s ease; }
 .vrm-fu-seg > span { font: 600 11px/1.2 var(--vrm-police); color: var(--fu-gris3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vrm-fu-seg[data-fait="1"] > i { background: var(--fu-bleu); }
-.vrm-fu-seg[data-fait="1"] > span { color: var(--fu-encre); }
-.vrm-fu-seg[data-cours] > i { background: var(--fu-encre); }
-.vrm-fu-seg[data-cours] > span { color: var(--fu-encre); }
+/* (5 nov., revue 2.20) L'encre n'est qu'au MOT de la dernière étape faite ; l'étape en
+   cours reste neutre (piste, mot gris) sauf un geste à faire (ambre). */
+.vrm-fu-seg[data-derniere] > span { color: var(--fu-encre); }
 .vrm-fu-seg[data-cours][data-ton="urgent"] > i { background: var(--fu-ambre); }
 .vrm-fu-seg[data-cours][data-ton="urgent"] > span { color: var(--fu-ambre-txt); }
 @media (prefers-reduced-motion: reduce) { .vrm-fu-seg > i { transition: none; } }
@@ -520,7 +525,7 @@ html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-fu-compta
    Tout TEXTE gris passe à 4,5:1 au moins : le gris le plus clair (#aeaeb2,
    #8e8e93) ne sert plus qu'aux pistes et aux formes, jamais aux mots. */
 .vrm-fu-seg > span { color: var(--fu-gris) !important; font-size: 11px !important; font-weight: 500 !important; }
-.vrm-fu-seg[data-fait="1"] > span, .vrm-fu-seg[data-cours] > span { color: var(--fu-encre) !important; font-weight: 600 !important; }
+.vrm-fu-seg[data-derniere] > span { color: var(--fu-encre) !important; font-weight: 600 !important; }
 .vrm-fu-seg[data-cours][data-ton="urgent"] > span { color: var(--fu-ambre-txt) !important; }
 .vrm-fu-barre > span, .vrm-fu-panneau-tete span, .vrm-fu-titre-section span { color: var(--fu-gris) !important; }
 .vrm-fu-jour[data-futur] > b { color: rgba(255,255,255,.7) !important; }
@@ -585,11 +590,18 @@ html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task 
 html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task-action-mot { display: inline !important; }
 /* La tête, bord à bord sous la barre du haut (téléphone) ; carte arrondie sur ordinateur. */
 @media (max-width: 767px) {
-  html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-greeting.vrm-fu-tete { width: 100vw !important; box-sizing: border-box !important; margin: -24px 0 0 calc(50% - 50vw) !important; padding-left: 16px !important; padding-right: 16px !important; }
+  /* (5 nov., chantier E1, revue 2.2) 20 px sous la tête : la carte Semaine passait sous son arrondi. */
+  html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-greeting.vrm-fu-tete { width: 100vw !important; box-sizing: border-box !important; margin: -24px 0 20px calc(50% - 50vw) !important; padding-left: 16px !important; padding-right: 16px !important; }
   html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-fu-titre-section { padding-left: 0 !important; }
 }
 @media (min-width: 768px) {
-  html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-greeting.vrm-fu-tete { border-radius: 24px !important; padding: 26px 28px 24px !important; }
+  html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-greeting.vrm-fu-tete { border-radius: 24px !important; padding: 26px 28px 24px !important; margin-bottom: 20px !important; }
+}
+/* (5 nov., chantier E1, revue 2.3) La nuit, la tête finissait en #1d1d1f sur des cartes #1c1c1e :
+   fondue. Elle descend vers le bleu nuit des cartes sombres ; son HAUT reste celui de la barre du
+   téléphone (#1d1d1f, la tête y est bord à bord : aucune couture). */
+:root[data-theme="dark"] body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-greeting.vrm-fu-tete {
+  background: linear-gradient(180deg, rgba(21,35,58,0) 0%, rgba(21,35,58,0) 25%, #15233a 100%), radial-gradient(120% 100% at 100% 0%, #1f3a5f 0%, #1d1d1f 60%) !important;
 }
 
 /* « Vendus ailleurs » sous « À faire » : une carte de la même famille, alignée à gauche. */
@@ -1233,3 +1245,78 @@ html body .vrm-app-shell .vrm-main .vrm-day-layout .vrm-cycle-carte > .vrm-cycle
 .vrm-rpf-double > summary::-webkit-details-marker { display: none; }
 .vrm-rpf-double[open] .vrm-rpf-chevron { transform: rotate(90deg); }
 .vrm-rpf-double { padding-bottom: 4px; }
+
+/* ══ E1. MA JOURNÉE ET LES CARTES SOMBRES (5 nov., revue de cohérence 2.1–2.4, 2.11, 1.7, 3.2) ══
+   Récit : docs/passation/2026-11-05-chantier-e1.md ; banc scripts/bancs/journee-coherence.cjs. */
+/* « Modifier » dans la rangée du surtitre (CarteMois `a-rangee`) : plus jamais au-dessus de la
+   courbe. La rangée ne grandit pas la carte (marges négatives = la cible de 44 px déborde dans
+   le retrait, comme un bouton de barre d'iOS). */
+.vrm-fu-carte-haut { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; margin: -12px -12px -10px 0; }
+.vrm-fu-carte-haut > .vrm-fu-surtitre { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html body .vrm-app-shell .vrm-fu-carte-haut > .vrm-fu-modifier { position: static !important; flex: none; min-height: 44px !important; min-width: 44px !important; height: auto !important; padding: 0 12px !important; }
+.vrm-fu-carte.a-rangee > .vrm-fu-carte-tete .vrm-fu-surtitre { padding-right: 0; }
+/* Un « — » dit sa raison sous le libellé (§5) ; un montant laisse son manque nommé. */
+.vrm-fu-case > .vrm-fu-case-raison { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; margin-top: 1px; font: 500 11px/1.3 var(--vrm-police); color: rgba(255,255,255,.62); white-space: normal; overflow: hidden; overflow-wrap: anywhere; }
+.vrm-fu-tete .vrm-fu-cases { align-items: stretch; }
+/* Un toucher se sent (feedback au doigt, jamais sur la souris seule). */
+button.vrm-fu-case { transition: background-color .15s ease, transform .16s cubic-bezier(.23,1,.32,1); }
+button.vrm-fu-case:active { transform: scale(.97); background: rgba(255,255,255,.16); }
+@media (prefers-reduced-motion: reduce) { button.vrm-fu-case:active { transform: none; } }
+
+/* La carte « Semaine » : une carte blanche de la famille « À faire ». Le titre, un résumé quand
+   elle est repliée, un chevron de repli (fermé ›, ouvert ⌄) ; aucun filet. */
+html body .vrm-app-shell .vrm-main .vrm-day-layout .vrm-journal-semaine {
+  box-sizing: border-box; margin: 0 0 4px !important; padding: 0 16px !important; min-width: 0;
+  background: var(--fu-carte) !important; border: 0 !important; border-radius: var(--fu-r-carte) !important; box-shadow: var(--fu-ombre) !important;
+}
+html body .vrm-app-shell .vrm-main .vrm-journal-semaine > .vrm-js-bascule {
+  all: unset; box-sizing: border-box; width: 100%; min-height: 52px; display: flex; align-items: center; gap: 10px; cursor: pointer;
+  color: var(--fu-encre); -webkit-tap-highlight-color: transparent;
+}
+html body .vrm-app-shell .vrm-main .vrm-journal-semaine > .vrm-js-bascule:focus-visible { outline: 2px solid var(--fu-bleu); outline-offset: 2px; border-radius: 12px; }
+.vrm-js-titre { flex: 0 1 auto; min-width: 0; font: 600 17px/1.3 var(--vrm-police); letter-spacing: -.01em; color: var(--fu-encre); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-js-resume { flex: none; margin-left: auto; font: 500 15px/1.3 var(--vrm-police); color: var(--fu-gris); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vrm-js-chevron { flex: none; width: 20px; height: 20px; display: grid; place-items: center; color: var(--fu-gris2); transition: transform .2s cubic-bezier(.23,1,.32,1); }
+.vrm-js-bascule[aria-expanded="true"] > .vrm-js-chevron { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) { .vrm-js-chevron { transition: none; } }
+.vrm-js-cases { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 12px; padding: 0 0 16px; }
+@media (min-width: 600px) { .vrm-js-cases { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.vrm-js-case { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.vrm-js-l { font: 500 13px/1.3 var(--vrm-police); color: var(--fu-gris); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-js-v { font: 700 22px/1.2 var(--vrm-police); letter-spacing: -.02em; color: var(--fu-encre); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-js-v.is-vide { color: var(--fu-gris2); }
+.vrm-js-sous { font: 500 12px/1.3 var(--vrm-police); color: var(--fu-gris); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* La feuille « Vendus ailleurs » (SheetShell) : le détail de la vérification, sans cadre de repli. */
+html body .vrm-va-feuille.vrm-bilan-sync { border: 0 !important; padding: 0 !important; margin: 0 !important; background: transparent !important; font-size: 15px; }
+/* Une annonce = une carte blanche : la vignette (photo, sinon `PhotoVide`), le N° et le titre,
+   la raison en une phrase, puis les deux gestes sur leur rangée (le principal d'abord). */
+html body .vrm-va-feuille.vrm-bilan-sync > p { margin: 0 0 10px; font-size: 13px; line-height: 1.4; color: var(--fu-gris); opacity: 1; }
+html body .vrm-va-feuille.vrm-bilan-sync article { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 4px 12px; align-items: start; margin: 0 0 10px; padding: 14px; border: 0; border-radius: 20px; background: var(--fu-carte); box-shadow: var(--fu-ombre); }
+html body .vrm-va-feuille.vrm-bilan-sync article > div:not(.vrm-vendu-photo) { min-width: 0; }
+html body .vrm-va-feuille.vrm-bilan-sync article strong { display: block; font: 600 15px/1.3 var(--vrm-police); color: var(--fu-encre); }
+html body .vrm-va-feuille.vrm-bilan-sync article small { font-size: 13px; color: var(--fu-gris); opacity: 1; }
+html body .vrm-va-feuille .vrm-va-gestes { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+html body .vrm-va-feuille.vrm-bilan-sync button, html body .vrm-va-feuille.vrm-bilan-sync a { min-height: 44px; box-sizing: border-box; border: 0; border-radius: 12px; display: inline-flex; align-items: center; padding: 0 14px; background: var(--fu-case); color: var(--fu-encre); font: 600 15px/1 var(--vrm-police); text-decoration: none; }
+html body .vrm-va-feuille.vrm-bilan-sync a { background: transparent; color: var(--vrm-accent-texte); }
+html body .vrm-va-feuille .vrm-vendu-photo { width: 44px; height: 44px; border-radius: 12px; overflow: hidden; }
+html body .vrm-va-feuille .vrm-vendu-photo img { border-radius: 12px; }
+/* La semaine et les chiffres respirent : 20 px entre les jours et « Aujourd'hui ». */
+html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-tete > .vrm-carte-stats { margin-top: 20px; }
+/* La feuille « Modifier » dans `SheetShell` : fond gris d'iOS, listes blanches, choix espacés. */
+html body .vrm-fs.vrm-carte-feuille { background: var(--fu-fond, #f2f2f7); color: var(--fu-encre, #1d1d1f); }
+.vrm-carte-feuille-corps { display: flex; flex-direction: column; gap: 8px; }
+/* Une carte d'alerte (dans `[data-alertes-argent]`, en `display: contents`) a la même géométrie
+   que les autres : son texte commence au même endroit (il était décalé de 15 px). */
+:root body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task-list [data-alertes-argent] > .vrm-day-task { min-height: 0 !important; gap: 12px !important; padding: 12px 14px !important; border-radius: 20px !important; }
+/* Un point sous les jours où il a vendu (le nombre et le montant dans l'infobulle). */
+:root:root body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-jour[data-vendu]:not([data-vendu="0"]) > b::after {
+  content: '' !important; position: absolute; bottom: 4px; left: 50%; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: rgba(255,255,255,.8);
+}
+:root:root body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-jour[data-auj][data-vendu]:not([data-vendu="0"]) > b::after { background: #1d1d1f; }
+:root:root body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-jour > b { position: relative; }
+/* Le calendrier de la feuille « Modifier » (ChoixPeriode, au doigt une feuille à lui) passe AU-DESSUS
+   de la feuille (z 20000) — la règle d'avant visait l'ancien voile `.vrm-carte-voile`. */
+body:has(.vrm-fs.vrm-carte-feuille) .vrm-cal-voile { z-index: 20001 !important; }
+body:has(.vrm-fs.vrm-carte-feuille) .vrm-cal-feuille { z-index: 20002 !important; }
+html body .vrm-va-feuille.vrm-bilan-sync > button { margin: 0 0 12px; }
