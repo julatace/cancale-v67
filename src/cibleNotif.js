@@ -104,6 +104,7 @@ export function jetonsCible(c) {
     case 'urssaf': return ['urssaf'];
     case 'doublon': { const n = c.num ? cleNumCible(c.num) : ''; return n ? [`doublon:${c.plat || 'ebay'}:${n}`] : [`doublon:${c.plat || 'ebay'}`]; }
     case 'case': return c.meuble && c.i ? [`case:${c.meuble}:${c.i}`] : [];
+    case 'annonce': return c.id ? [`annonce:${c.id}`] : [];
     default: return [];
   }
 }
@@ -118,7 +119,10 @@ const parJeton = (c) => jetonsCible(c).map((j) => `[data-cible~="${q(j)}"]`);
 export function selecteursCible(c) {
   if (!c) return { essais: [], ouvrir: null, deplier: [], puis: null };
   const r = selecteursAnciens(c);
-  return { puis: null, ...r, essais: [...new Set([...parJeton(c), ...r.essais])] };
+  // (6 nov., recherche) `appuyer` : le bouton À TOUCHER une fois l'élément ouvert —
+  // un colis trouvé par SON code de retrait passe « En grand » (le code et le QR).
+  const appuyer = c.type === 'retrait' && c.grand ? '[data-colis-plein-ecran]' : null;
+  return { puis: null, ...r, appuyer, essais: [...new Set([...parJeton(c), ...r.essais])] };
 }
 function selecteursAnciens(c) {
   switch (c.type) {
@@ -168,6 +172,8 @@ function selecteursAnciens(c) {
     }
     // (6 nov., vague 3) La case du Stock : son repli d'ancien attribut est `data-case-ici`.
     case 'case': return { essais: c.meuble && c.i ? [`[data-case-ici="${q(c.meuble)}:${q(c.i)}"]`] : [], ouvrir: null, deplier: [] };
+    // (6 nov., recherche) Une annonce sans N° : SA carte dans Annonces (l'id Vinted de l'annonce).
+    case 'annonce': return { essais: c.id ? [`[data-carte-annonce="${q(c.id)}"]`] : [], ouvrir: null, deplier: [] };
     default: return { essais: [], ouvrir: null, deplier: [] };
   }
 }
@@ -193,6 +199,7 @@ export function phraseAbsente(c) {
     // pas encore relue. Le geste est dit.
     case 'doublon': return 'Cette paire n\u2019est plus dans la liste « à retirer » : la double vente est sans doute déjà réglée. Vérifie dans tes annonces de la plateforme si tu as un doute.';
     case 'case': return 'Cette case n\u2019est plus sur tes meubles : le meuble a peut-être été modifié ou supprimé.';
+    case 'annonce': return "Cette annonce n'est pas dans la liste affichée : regarde le compte et les filtres choisis, ou repasse sur Vinted.";
     default: return '';
   }
 }

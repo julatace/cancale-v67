@@ -73,7 +73,7 @@ export const MAX_PAR_GROUPE = 25;
 //             colis: [{ id, suivi, code, code2, lieu, art, status, sens, carrier, at }] }
 //           (6 nov.) fiches: { [idAnnonce]: { numero, title, photo, price, buyPrice, accountId, brand, size } },
 //           annonces: [{ id, title, brand, size, price, photo, uid }] (en ligne, lues) — `null` = pas lues,
-//           factures: [{ id, number, titre, acheteur, montant, date, pro }],
+//           factures: [{ id, number, refs (autres identités : n° de l'article), titre, acheteur, montant, date, pro }],
 //           numerosTx: { [transaction]: N° } (la correction posée à la main, sinon transaction → annonce → fiche)
 // Chaque source peut manquer (null/undefined) : on indexe ce qu'on a.
 export function indexRecherche(sources) {
@@ -159,7 +159,7 @@ export function indexRecherche(sources) {
     const titre = str(x.titre);
     const ach = str(x.acheteur).trim();
     entrees.push({ type: 'facture', cle: 'facture:' + (x.pro ? 'p:' : 'l:') + str(x.id || x.number), id: str(x.id), tx: alnum(x.tx), o: null, x, titre, t: normaliser(titre),
-      numero: '', facture: str(x.number), nums: x.number ? [alnum(x.number)] : [], photo: '',
+      numero: '', facture: str(x.number), nums: [x.number, ...(Array.isArray(x.refs) ? x.refs : [])].map(alnum).filter((v) => v.length >= 3), photo: '',
       pseudos: ach ? [normaliser(ach)] : [], pseudosAff: ach ? [ach] : [], suivis: [], codes: [], montants: montantsDe(x.montant), date: str(x.date) });
   }
   return { entrees, n: entrees.length, annoncesLues: !!annoncesLues };
