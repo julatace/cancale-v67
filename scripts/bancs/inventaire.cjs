@@ -164,12 +164,12 @@ async function taper(pg, tel, txt, { ok = false } = {}) {
   await pg.waitForTimeout(250);
 }
 // Ce qui est sous le centre d'un élément (un geste refusé dit QUI le couvre : un banc rapporte).
-const dessous = (pg, sel) => pg.evaluate((sel) => {
-  const el = document.querySelector(sel); if (!el) return 'absent';
+const dessous = (pg, sel) => pg.locator(sel).first().evaluate((el) => {
+  const vu = getComputedStyle(el); const fs = el.closest(".vrm-fs"); const tf = fs ? getComputedStyle(fs).transform : "";
   const r = el.getBoundingClientRect(); const x = r.left + r.width / 2, y = r.top + r.height / 2;
   const h = document.elementFromPoint(x, y);
-  return `${Math.round(x)},${Math.round(y)} ⇒ ${h ? (h.tagName + '.' + String(h.className || '').slice(0, 60) + ' ' + [...h.attributes].filter((a) => a.name.startsWith('data-')).map((a) => a.name).join(' ')) : 'rien'}${h && (h === el || el.contains(h)) ? ' (lui-même)' : ''}`;
-}, sel);
+  return `${Math.round(x)},${Math.round(y)} ⇒ ${h ? (h.tagName + '.' + String(h.className || '').slice(0, 60) + ' ' + [...h.attributes].filter((a) => a.name.startsWith('data-')).map((a) => a.name).join(' ')) : 'rien'}${h && (h === el || el.contains(h)) ? ' (lui-même)' : ''}`
+  + ` · vh ${window.innerHeight} · top ${Math.round(r.top)} h ${Math.round(r.height)} · ${vu.visibility}/${vu.pointerEvents} · feuille ${tf}`; }, null, { timeout: 3000 });
 async function cliquer(pg, tel, sel, timeout = 30000) {
   try { if (tel) await pg.tap(sel, { timeout }); else await pg.click(sel, { timeout }); }
   catch (e) { throw new Error(`${sel} : ${String(e && e.message).split('\n')[0]} — sous le doigt : ${await dessous(pg, sel).catch(() => '?')}`); }
