@@ -59162,6 +59162,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {/* (6 nov.) « Pas su » se dit (§5) : depuis le 3 nov. la ligne ne montre le transporteur que LU ;
                   quand le suivi Vinted ne le nomme pas, la ligne ouverte le dit (l'ancien en-tête de groupe). */}
               {x.trInconnu ? <span className="vrm-rp-sous" data-transp="transporteur-inconnu">Transporteur pas encore connu : le suivi Vinted ne le nomme pas</span> : null}
+              {/* (6 nov.) Un « à vérifier » dit POURQUOI dans son détail (la raison de `raisonAVerifier`, la même que sa puce) ;
+                  « peut-être en double » est expliqué une fois en tête de sa section. */}
+              {x.horsCompte && x.raisonVerif && x.raisonCode !== 'doute_meme_relais' ? <span className="vrm-rp-sous" data-colis-raison-verif={x.raisonCode || ''}>{`À vérifier : ${x.raisonVerif}`}</span> : null}
               {/* (5 nov.) LE COMPTE QUAND ON LE SAIT (src/retraitQr.js, `compteDuRetrait`) : le compte Mondial Relay
                   où il a été lu, sinon l'adresse qui a reçu l'e-mail — et « dans aucun compte Mondial Relay » quand
                   tous ses comptes relus sont complets et qu'aucun ne le porte. Jamais deviné. */}
@@ -59209,6 +59212,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const d = new Date(String(lim).slice(0, 10) + 'T12:00:00');
             return Number.isFinite(d.getTime()) ? { t: `jusqu’au ${d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}`, code: 'date' } : null; };
           const statutAVerifier = (x) => { const r = String(x.raisonVerif || '') + ' ' + String(x.raisonCode || '');
+            // (6 nov.) Deux sources datées qui se contredisent (api/_lib/etat-colis.js) : ni « incident » ni « retour ».
+            if (/rien ne l[’']explique/i.test(r)) return 'Contradiction';
             if (/instance|non r[ée]clam|retour|exp[ée]diteur|renvoy/i.test(r)) return 'Retour à l’expéditeur ?';
             if (/m[eê]me colis|m[eê]me relais|doute|pas encore relu|\brelier\b|\breli[ée]s?\b/i.test(r)) return 'À relier';
             if (/incident|probl|transporteur/i.test(r)) return 'Incident';

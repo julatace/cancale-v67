@@ -1134,7 +1134,7 @@ export function ligneTransporteur(t, carrier, maintenant = Date.now(), { preuve 
   const luMs = msDe(t.lu);
   if (t.etat && luMs != null && preuve && lectureEnRetard(preuveDeTransp(t), preuve)) {
     const quand = preuve.source === 'sms' ? 'le SMS' : 'l’e-mail';
-    return { etatAffiche: 'en-retard', texte: `${nom} : « ${propre(t.libelle, 120) || '—'} » · lu ${ageCourt(maintenant - luMs)}, avant l’arrivée`, consequence: `pas encore relu depuis — ${quand} d’arrivée fait foi`, ambre: false, age: maintenant - luMs };
+    return { etatAffiche: 'en-retard', texte: `${nom} : « ${propre(t.libelle, 120) || '—'} » · lu ${ageCourt(maintenant - luMs)}, avant l’arrivée`, consequence: `pas encore relu depuis : ${quand} d’arrivée fait foi`, ambre: false, age: maintenant - luMs };
   }
   if (t.etat && luMs != null) {
     const age = maintenant - luMs;
