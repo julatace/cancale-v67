@@ -70717,7 +70717,7 @@ function AppCoeur() {
     const seenS=new Set(); for(const r of so){ for(const o of (Array.isArray(r.mo)?r.mo:[])){ const t=String(o.transaction_id||o.id||''); if(t&&!seenS.has(t)){ seenS.add(t); sold.push(o); } } }
     const po=await commandes('purchased');
     const seenP=new Set(); for(const r of po){ for(const o of (Array.isArray(r.mo)?r.mo:[])){ const t=String(o.transaction_id||o.id||''); if(t&&!seenP.has(t)){ seenP.add(t); bought.push(o); } } }
-    const lp=await sb('app_data?id=eq.vinted_lbc_posted&select=data'); ((lp&&lp[0]&&lp[0].data&&lp[0].data.ids)||[]).forEach(x=>lbc.add(String(x)));
+    const lp=await sb('app_data?id=eq.vinted_lbc_posted&select=ids:data->ids'); ((lp&&lp[0]&&Array.isArray(lp[0].ids)&&lp[0].ids)||[]).forEach(x=>lbc.add(String(x)));   // (6 nov., v36) projetée : la liste seule (§4.4)
     // (3 nov.) LA RECHERCHE UNIQUE (src/rechercheUnique.js) : pseudo de l'acheteur et
     // n° de transaction écrits dans le MÊME e-mail de vente, n° de suivi du bordereau de
     // la vente, colis des e-mails de transporteur (suivi, code de retrait). Scalaires
