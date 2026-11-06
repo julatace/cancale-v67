@@ -47,7 +47,7 @@ const v = (tx, titre, j) => ({ transaction_id: tx, title: titre, price: { amount
 const VENTES = [v(8001, 'Adidas Samba OG taille 41', 0.2), v(8002, 'Nike Air Max 90 taille 42', 0.4), v(8003, 'Nike Dunk Low taille 44', 0.6), v(8004, 'New Balance 550 taille 43', 0.8), v(8005, 'Asics Gel-1130 taille 40', 1)];
 // 8005 : son e-mail de DÉPÔT (sortant) le fait partir de « À envoyer » ; son transporteur se juge au récapitulatif (R2).
 const ATTENDU_V = { 8001: 'chronopost', 8002: 'mondialrelay', 8003: 'pas-lu', 8004: 'vinted' };
-const SUIVI_V = { 8001: 'XW123456789FR', 8002: '12345678', 8003: '', 8004: '1234567890123456', 8005: '04100000000009' };
+const SUIVI_V = { 8001: 'XW123456789TS', 8002: '12345678', 8003: '', 8004: '1234567890123456', 8005: '04100000000009' };
 const ACHATS = [{ transaction_id: 9501, conversation_id: 7901, title: 'Vans Old Skool taille 41', price: { amount: '40', currency_code: 'EUR' }, status: RELAIS_ST, transaction_user_status: 'needs_action', date: ilYa(2) }];
 const ACCOUNTS = [{ id: 1, vinted_user_id: '111', login: 'compte_banc', domain: 'www.vinted.fr', updated_at: iso(M) }];
 const transp = (carrier, suivi, o) => ({ id: `transp_${carrier}_${suivi}`, data: { v: 1, rev: 1, carrier, suivi, etat: 'en_route', detail: null, etatAt: ilYa(0.5), libelle: 'En cours d’acheminement', lieuNom: '', lieuVille: '', lieuCp: '', limite: null, limiteSure: false, lu: ilYa(0.05), source: 'serveur', essai: ilYa(0.05), essaiRes: 'ok', essais: 1, voie: 'vg-v3', fini: false, ...o } });
