@@ -88,7 +88,13 @@ const PHOTOS = (pg) => pg.evaluate((cachee) => {
   for (const el of document.querySelectorAll('[alt], [aria-label], [title]')) for (const a of ['alt', 'aria-label', 'title']) { const v = el.getAttribute(a); if (v && re.test(v) && !el.closest('[data-stream-libre]')) fuites.push(a + '=' + v.slice(0, 60)); }
   return { photos: out, fuites: fuites.slice(0, 5), nFuites: fuites.length, texte: re.test(document.body.innerText || ''), stream: document.documentElement.getAttribute('data-stream') };
 }, CACHEE);
-const aller = async (pg, tab, ms = 2400) => { await pg.goto(`http://localhost:${NV.PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('.vrm-main', { timeout: 15000 }).catch(() => {}); await attendre(ms); };
+// Un écran d'articles attend que les lectures soient arrivées (une photo du banc
+// à l'écran, 15 s au plus) : sous charge, « pas lu » passait pour un écran vide.
+const aller = async (pg, tab, ms = 2400) => {
+  await pg.goto(`http://localhost:${NV.PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('.vrm-main', { timeout: 15000 }).catch(() => {});
+  if (!/^settings/.test(tab)) await pg.waitForFunction(() => [...document.images].some((i) => /banc-photo/.test(decodeURIComponent(i.getAttribute('src') || ''))), null, { timeout: 15000 }).catch(() => {});
+  await attendre(ms);
+};
 const tete = (pg) => pg.evaluate(() => {
   const vis = (x) => { if (!x) return null; const r = x.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), vis: r.width > 0 && r.height > 0, presse: x.getAttribute('aria-pressed') }; };
   return { stream: document.querySelectorAll('.vrm-app-header [data-bouton-stream]').length, oeil: document.querySelectorAll('.vrm-app-header [data-bouton-montants]').length, bStream: vis(document.querySelector('.vrm-app-header [data-bouton-stream]')), bOeil: vis(document.querySelector('.vrm-app-header [data-bouton-montants]')), racine: document.documentElement.getAttribute('data-stream') };
