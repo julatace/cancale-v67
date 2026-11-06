@@ -157,6 +157,9 @@ const ouvrir = async (b, tel, tab, options = {}) => {
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
   await pg.goto(`http://localhost:${PORT}/${tab ? '?tab=' + tab : ''}`, { waitUntil: 'domcontentloaded' });
   await pg.waitForFunction(() => document.querySelector('.vrm-main') || /pas pu s'afficher/.test(document.body.innerText), null, { timeout: 15000 }).catch(() => {});
+  // (6 nov., « de vrais écrans de chargement ») L'écran attend ses données derrière son
+  // squelette (src/AttenteEcran.jsx, au plus ~2,5 s) : on juge l'écran OUVERT, pas son squelette.
+  await pg.waitForFunction(() => !document.querySelector('[data-attente="attente"]'), null, { timeout: 10000 }).catch(() => {});
   await pg.waitForTimeout(2800);
   return { ctx, pg, errs };
 };
