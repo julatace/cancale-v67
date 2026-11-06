@@ -58,8 +58,8 @@ poussé, rien dans `vinted-sync-extension/`, `public/` intact.
   compte ouvert ni extension (une écriture dans ses fiches) ; grisée hors « en ligne ».
 - Feuille `PrixMiniFeuille` : − X % ou − X € (`Segmente`), **arrondi à l'euro, jamais
   au-dessus du prix** ; « Refuser sous » en option, toujours sous le mini (sinon pas posé,
-  dit) ; prix pas lu ⇒ rien ; **« sous ton prix d'achat » en ambre** quand un prix d'achat
-  CONNU est dépassé (son choix, rien n'est bloqué).
+  dit) ; prix pas lu ⇒ rien ; **« sous ton prix d'achat » en ambre** quand le mini passe
+  sous un prix d'achat CONNU (son choix, rien n'est bloqué).
 - « Poser » → confirmation qui liste **N° · prix → mini (· refus)**, puis `updatePair(it,
   ecritureMini(l))` — le chemin de la carte (`min`/`refuse`), un entier que l'extension lit
   (`Number(min)`). `refuse` n'est écrit que si l'option est cochée.
@@ -72,7 +72,8 @@ poussé, rien dans `vinted-sync-extension/`, `public/` intact.
   **« Relier · 32 € »** (l'écriture de « Relier un achat » : prix du reçu, sinon l'article
   seul ; un lot demande le prix de l'article) · **« Saisir »** (le prix tapé) · **« Plus
   tard »** (en fin de file, hors du nombre de Ma journée ; `vrm_achat_plus_tard`). Sans
-  suggestion : « Choisir un achat » (le sélecteur). SON tap relie, toujours.
+  suggestion : « Aucune suggestion » + « Choisir un achat » (le sélecteur) ; la règle
+  (même marque, même taille, achetée avant) est dite une fois, en tête. SON tap relie, toujours.
 - **Ma journée** : « N annonces sans achat relié » → Annonces · Sans achat relié.
 - L'écriture de « Relier » est sortie du sélecteur (`ecritureRelierAchat`) : sélecteur, file
   et saisie en série écrivent pareil (§11).
@@ -93,7 +94,35 @@ poussé, rien dans `vinted-sync-extension/`, `public/` intact.
 - La case « Achat · à saisir » de chaque ligne passe en **gris** (`styles-ventes-ligne.css`).
 
 ## Preuves
-PREUVES_ICI
+- `npm run build` vert ; `public/` intact ; rien dans `vinted-sync-extension/`.
+- **Un audit par règle** (exécuté ; base = arbre `git archive` de 162659a6, audit copié dedans ;
+  `--prouve` = chaque mutation réaffaiblit la règle) :
+
+  | audit | après | base | mutations |
+  |---|---|---|---|
+  | `audit-annulees-chez-toi` (neuf) | 36/36 | 7 rouges (module absent + branchement) | **12/12** rouges |
+  | `audit-prix-mini` (neuf) | 23/23 | 6 rouges | **10/10** |
+  | `audit-achats-a-relier` (neuf) | 22/22 | 6 rouges | **10/10** |
+  | `audit-ventes-prix-achat` (neuf) | 9/9 | 7 rouges | **5/5** |
+  | `audit-suggestions-achat` (étendu : F, la saisie en série) | 43/43 | 1 rouge (F0) | **13/13** (4 neuves) |
+  | `audit-annonces-actions` (B2/B15 suivent `multiComptes`, B16-B18 neufs) | 61/61 | — | **20/20** (l'ancre `chrome_passu_oui` ne mordait plus, base comprise : réparée) |
+
+- **Banc** `scripts/bancs/vague2-ventes.cjs` (données INVENTÉES, harnais `nouveau-vendeur`,
+  `BANC_PORT` 9460 ; 390 tactile et 1512, clair et sombre ; scènes R, J, A, M, S + B, G) :
+  **après : 154 verts, 0 rouge** (R 24, B 6, J 12, A 36, M 34, S 8, G 34).
+  **Base (dist de 162659a6) : 68 rouges / 42 verts** (R 16, B 6, J 12, A 18, S 4, M 8, G 4 — le
+  passage M s'y arrêtait sur une ligne absente ; le banc est depuis robuste : **M rejoué sur la
+  base : 30 rouges / 4 verts**). Captures regardées (hors dépôt) :
+  `scratchpad/shots-final/v2-{390,1512}-{clair,sombre}-{ventes-bandeau,ventes-remise,remise-main,saisie-serie,journee,sans-achat,actions-mini,prix-mini,prix-mini-confirmation}.png`.
+- **Audits demandés, verts** : `annonces-coherence` (29, `--prouve` 15/15), `ventes-e2` (29,
+  `--prouve` 13/13), `journee-coherence` (30), `annonces-actions` (61), `suggestions-achat` (43),
+  `moteur-offres` (24), `offres-garde` (25), `identite`, `coherence`, `icones`, `fonctions-api`,
+  `rouge-doublon`, `composants` ; et `tdz`, `variables`, `journee-court` (60), `argent-a-venir`
+  (51), `statuts`, `boutons`. `fusion-echelle --verifier` : les 8 mêmes fichiers que la base
+  (`vague2-ventes.css` dans l'échelle).
+- **Bancs voisins (après)** : `ventes-e2` 0 rouge · `annonces-coherence` 126 verts, 0 rouge ·
+  `journee-coherence` 0 rouge · `annonces-actions` 0 rouge (adapté : sur deux comptes, tout ce qui
+  agit au nom d'un compte reste grisé ; « Prix mini… » reste possible — contrôle neuf).
 
 ## Ce qui reste
 - **Le moteur ne remet pas en vente une annonce fermée** : si Julien le veut un jour, il
