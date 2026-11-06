@@ -169,6 +169,50 @@ async function validerRevision(pg,id){
  try{await confirmation.waitFor({timeout:800});}catch(_){return;}
  await confirmation.click();
 }
+// (6 nov., v36-visuel) LA RÈGLE D'OFFRE VIT DANS SA FEUILLE. Julien : « catastrophique,
+// on dirait du travail bâclé » — la carte ambre de 10 lignes (engagement, fenêtre des
+// ventes, « Relire mes ventes eBay », « Une règle pour toutes », pas su…) est devenue
+// la rangée « Règle d'offre » de « Réglages eBay », qui ouvre une FEUILLE : mêmes
+// data-*, mêmes textes, mêmes gestes. Le banc juge la RÈGLE, pas la place : avant de
+// lire ou de toucher un `[data-regles-…]`, il ouvre la feuille (comme Julien touche la
+// rangée) ; avant de toucher autre chose (une carte), il la referme (Échap). Une feuille
+// absente (aucune annonce, donc aucune rangée) ne s'ouvre pas : le compte reste 0.
+const SEL_FEUILLE = /\[data-regles-/;
+async function assurerFeuille(pg, sel, action) {
+  if (typeof sel !== 'string') return;
+  const ouverte = !!(await pg.$('[data-ebay-reglages-feuille]').catch(() => null));
+  if (SEL_FEUILLE.test(sel)) {
+    if (ouverte) return;
+    const rangee = await pg.$('[data-ebay-reglage-regle] button').catch(() => null);
+    if (!rangee) return;
+    await rangee.click().catch(() => {});
+    await pg.waitForSelector('[data-ebay-reglages-feuille]', { timeout: 5000 }).catch(() => {});
+    await pg.waitForTimeout(450);
+  } else if (action && ouverte && !/data-ebay-reglages|data-pourquoi|role=|getByRole/.test(sel)) {
+    await pg.keyboard.press('Escape').catch(() => {});
+    await pg.waitForFunction(() => !document.querySelector('[data-ebay-reglages-feuille]'), null, { timeout: 4000 }).catch(() => {});
+    await pg.waitForTimeout(200);
+  }
+}
+function avecFeuilleReglages(pg) {
+  const lire = ['$', '$$', '$eval', '$$eval', 'waitForSelector', 'getAttribute', 'textContent', 'innerText', 'isVisible'];
+  const agir = ['click', 'fill', 'check', 'uncheck', 'selectOption', 'hover', 'tap', 'dblclick'];
+  for (const m of [...lire, ...agir]) {
+    const orig = pg[m].bind(pg);
+    pg[m] = async (sel, ...r) => { await assurerFeuille(pg, sel, agir.includes(m)); return orig(sel, ...r); };
+  }
+  const origLoc = pg.locator.bind(pg);
+  pg.locator = (sel, ...r) => {
+    const loc = origLoc(sel, ...r);
+    return new Proxy(loc, { get(t, p) {
+      const v = t[p];
+      if (typeof v !== 'function') return v;
+      if (['first', 'last', 'nth', 'locator', 'filter', 'getByRole', 'getByText'].includes(p)) return (...a) => { const sous = v.apply(t, a); return new Proxy(sous, this); };
+      return async (...a) => { await assurerFeuille(pg, sel, agir.includes(p)); return v.apply(t, a); };
+    } });
+  };
+  return pg;
+}
 async function ouvrir(b, vp, c) {
   preparer(c);
   const ctx = await b.newContext({ viewport: vp, locale: 'fr-FR', ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
@@ -275,7 +319,7 @@ async function ouvrir(b, vp, c) {
     if (body.action === 'limites') return j({ ok: true, quantite: 10, montant: 500, devise: 'EUR', inscrit: true });
     return j({ ok: true });
   });
-  return { ctx, pg, errs };
+  return { ctx, pg: avecFeuilleReglages(pg), errs };
 }
 const feuille = (pg) => pg.locator('div[style*="z-index: 2000"]');
 // (31 oct., soir) Plus d'espace eBay à part : « Annonces » / « Ventes » sont les
