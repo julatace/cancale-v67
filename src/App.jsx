@@ -234,6 +234,7 @@ import { PileVignettes } from "./design/PileVignettes.jsx";
 import Frise from "./design/Frise.jsx";
 import { friseVenteFusion, friseColisFusion, friseVenteLue, ETAPES_VENTE_FUSION } from "./design/friseFusion.js";
 import { etapesTournee, arretsTournee, gestesDepuis } from "./tournee.js";
+import { joursAttente, texteAttente as texteAttenteVente, ordrePreparation, titreEnGrand, groupesTournee } from "./colisEnvoi.js";
 import "./styles-barre-haut.css";
 import "./styles-recherche.css";
 import "./annonces-selection.css";
@@ -28494,18 +28495,18 @@ function CarteColisVc({ v, imprime, fait }) {
         <div style={{ flex: '1 1 150px', minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
             {/* (3 nov.) Le N° dans le titre, comme la carte d'un colis Vinted : la même carte pour tous les sites. */}
-            <span className="vrm-colis-titre" title={titre} style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600, lineHeight: 1.35, color: C.text, letterSpacing: '-.01em', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{v.num ? `N°${v.num} · ` : ''}{titre}</span>
-            {verse != null ? <span className="vrm-display vrm-colis-prix" data-vc-colis-verse={verse.toFixed(2)} title="Ce que Vestiaire te verse" style={{ flexShrink: 0, fontSize: 17, fontWeight: 700, color: C.text, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-.02em' }}>{verse.toFixed(2).replace('.', ',')} €</span> : null}
+            <span className="vrm-colis-titre" title={titre} style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600, lineHeight: 1.35, color: C.text, letterSpacing: '-.01em', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', overflowWrap: 'anywhere' }}>{v.num ? <><Numero n={v.num} taille="petit"/>{' '}</> : null}{titre}</span>
+            {verse != null ? <span className="vrm-display vrm-colis-prix" data-vc-colis-verse={verse.toFixed(2)} title="Ce que Vestiaire te verse" style={{ flexShrink: 0, fontSize: 17, fontWeight: 700, color: C.text, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', letterSpacing: '-.02em' }}>{montant(verse)}</span> : null}
           </div>
           <div style={{ fontSize: 12, color: C.muted, marginTop: 6, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
             {v.num
-              ? <span className="vrm-colis-num" style={{ fontSize: 12, fontWeight: 700, color: C.text, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 999, padding: '2px 9px', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>N°{v.num}</span>
+              ? null
               : <span className="vrm-colis-num" title="Le numéro arrive dès que VRM a relu tes annonces Vestiaire." style={{ fontSize: 12, fontWeight: 600, color: C.warn, background: 'transparent', border: `1px dashed ${C.warn}88`, borderRadius: 999, padding: '2px 9px', flexShrink: 0, whiteSpace: 'nowrap' }}>N° en attente</span>}
             <span style={{ fontWeight: 600 }}>Vestiaire</span>
           </div>
           <div style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>
-            <span data-colis-dates="">{v.date ? <span className="vrm-colis-vendue">{`vendue le ${dateCourteVc(v.date)}`}{urg ? ' · ' : ''}</span> : ''}{urg ? <span data-colis-limite-texte="" style={{ color: j != null && j <= 1 ? C.warn : C.muted, fontWeight: j != null && j <= 1 ? 600 : 500 }}>{urg}</span> : null}</span>
-            {fait ? <span style={{ color: C.text, fontWeight: 600 }}> · ✓ posté</span> : null}
+            <span data-colis-dates="">{urg ? <span data-colis-limite-texte="" style={{ color: j != null && j <= 1 ? C.warn : C.muted, fontWeight: j != null && j <= 1 ? 600 : 500 }}>{urg}</span> : null}{v.date && joursAttente(v.date) != null ? <span className="vrm-colis-vendue" data-colis-attente={joursAttente(v.date)} title={`Vendue le ${dateCourteVc(v.date)}`}>{urg ? ' · ' : ''}{texteAttenteVente(joursAttente(v.date))}</span> : null}</span>
+            {fait ? <span style={{ color: C.text, fontWeight: 600 }}> · déposé</span> : null}
           </div>
           {/* Le transporteur est écrit UNE fois : la pastille à côté du bouton bordereau. */}
           {v.suivi ? <div data-vc-colis-transport="" style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>suivi {v.suivi}</div> : null}
@@ -28526,8 +28527,8 @@ function CarteColisVc({ v, imprime, fait }) {
         </div>
         {v.bordereau ? <button type="button" data-geste="imprime" data-vc-imprime={v.id} onClick={() => marquerVc('vrm_vc_imprimes', v.id, !imprime)} title={imprime ? 'Remettre en « à imprimer »' : 'Marquer comme imprimé'}
           className="vrm-colis-sec vrm-colis-ter" style={{ ...sec, border: `1px solid ${C.border}`, background: imprime ? C.bg : 'transparent', color: imprime ? C.text : C.muted }}>{imprime ? '✓ Imprimé' : 'Marquer imprimé'}</button> : null}
-        <button type="button" data-geste="fait" data-vc-fait={v.id} onClick={() => marquerVc('vrm_vc_colis_done', v.id, !fait)} title={fait ? 'Annuler « colis fait »' : 'Marquer comme posté → il sort de la liste'}
-          className="vrm-colis-sec vrm-colis-ter" style={{ ...sec, border: `1px solid ${C.border}`, background: fait ? C.bg : 'transparent', color: fait ? C.text : C.muted }}>{fait ? '↺ Pas encore' : '✓ Colis fait'}</button>
+        <button type="button" data-geste="fait" data-vc-fait={v.id} onClick={() => marquerVc('vrm_vc_colis_done', v.id, !fait)} title={fait ? 'Le colis est encore chez toi : il revient dans « À envoyer »' : 'Marquer déposé : il passe dans « Envoyés »'}
+          className="vrm-colis-sec vrm-colis-ter" style={{ ...sec, border: `1px solid ${C.border}`, background: fait ? C.bg : 'transparent', color: fait ? C.text : C.muted }}>{fait ? 'Pas encore déposé' : 'Déposé'}</button>
       </div>
     </div>
   );
@@ -28547,7 +28548,7 @@ function CarteColisSite({ ident, site, photo, titre, num, sous, sousAmbre = fals
         </div>
         <div style={{ flex: '1 1 150px', minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-            <span className="vrm-colis-titre" title={titre} style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600, lineHeight: 1.35, color: C.text, letterSpacing: '-.01em', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{num ? `N°${num} · ` : ''}{titre}</span>
+            <span className="vrm-colis-titre" title={titre} style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600, lineHeight: 1.35, color: C.text, letterSpacing: '-.01em', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', overflowWrap: 'anywhere' }}>{num ? <><Numero n={num} taille="petit"/>{' '}</> : null}{titre}</span>
           </div>
           <div style={{ fontSize: 12, color: C.muted, marginTop: 6, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
             <span data-colis-dates="" style={{ flex: '0 1 auto', minWidth: 0 }}><span data-colis-limite-texte="" style={{ overflowWrap: 'anywhere', color: sousAmbre ? C.warn : C.muted, fontWeight: sousAmbre ? 600 : 500 }}>{sous}</span></span>
@@ -43317,7 +43318,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // identité (`cmdParColis` : n° de suivi, conversation ou code de retrait), sinon aucune.
     const ph = (t && t._o) || (pickupUnion && pickupUnion.cmdParColis && pickupUnion.cmdParColis.get(colisKey(t))) || {};
     const base = {
-      title: t.artTitle || (t.subject || 'Colis'), code: codeRetrait(t.code), code2: codeRetrait(t.code2), suivi: t.suivi || '',
+      // (5 nov., revue 2.22) Le titre : l'article relié par identité (sa commande), sinon le titre
+      // d'article porté par l'e-mail, sinon « Colis <transporteur> » — jamais le sujet de l'e-mail
+      // (« Votre colis … est disponible dans votre Point Relais »), src/colisEnvoi.js.
+      title: titreEnGrand({ article: ph && ph.title, artTitle: t.artTitle, transporteur: r.carrier || carrierName(t.carrier) }), code: codeRetrait(t.code), code2: codeRetrait(t.code2), suivi: t.suivi || '',
       limite: t.limite || '', consigne: !!t.consigne,
       carrier: t.carrier || '', carrierName: r.carrier, lieu: cleanLieu(t.lieu).display || '',
       photo: t.photo || orderPhoto(ph) || null,
@@ -50602,13 +50606,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const ouSontLesPresses = (u) => {
     // (19 oct.) La liste se trie maintenant par vente la plus récente : la
     // phrase ne promet plus « en haut », elle dit où le voir (sur sa ligne).
-    if (!u.presseAttente) return 'le délai est écrit sur la ligne de chaque colis.';
-    // ⚠️ La phrase est déjà introduite par un tiret (« 1 demain — … ») : une
-    //    seconde incise entre tirets la rendait illisible. Une virgule suffit.
-    if (!u.pressePret) return u.presseAttente > 1
-      ? `ils attendent encore leur bordereau, plus bas dans « En attente de leur bordereau ».`
-      : `il attend encore son bordereau, plus bas dans « En attente de leur bordereau ».`;
-    return `${u.pressePret} dans « Prêts à imprimer », ${u.presseAttente} plus bas dans « En attente de leur bordereau ».`;
+    // (5 nov., chantier D) Les groupes « Prêts à imprimer » / « En attente de leur bordereau » n'existent
+    // plus (la liste est rangée par transporteur, le plus pressé d'abord) : la phrase disait où
+    // chercher dans des groupes absents. Elle dit l'ordre réel, une fois.
+    if (!u.presseAttente) return 'dans chaque transporteur, le plus pressé est en haut.';
+    return u.presseAttente > 1
+      ? `dans chaque transporteur, le plus pressé est en haut ; ${u.presseAttente} attendent encore leur bordereau.`
+      : 'dans chaque transporteur, le plus pressé est en haut ; 1 attend encore son bordereau.';
   };
 
   const setBuyForKey = (key, val) => {
@@ -51681,14 +51685,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return L;
   };
   const [scanOuvert, setScanOuvert] = useState(false);
+  // (5 nov.) « … » de Colis : un état React (aria-expanded vrai à chaque rendu) posé sur la racine
+  // pour les règles de fusion.css ; il se range quand on quitte Colis.
+  const [outilsColis, setOutilsColis] = useState(false);
+  useEffect(() => {
+    const r = document.documentElement; r.toggleAttribute('data-colis-outils', !!outilsColis && curSub === 'bordereaux');
+    return () => { r.removeAttribute('data-colis-outils'); };
+  }, [outilsColis, curSub]);
+  // (5 nov.) « Tournée de dépôt » : la feuille des colis à envoyer, par transporteur.
+  const [tourneeDepot, setTourneeDepot] = useState(false);
   // « Déposé » : LE geste existant (`marquerColisFait` pour Vinted, « Colis fait » Vestiaire),
   // différé de 5 s avec « Annuler » (`useDeposeDiffere`, celui de Ventes) ; écran quitté ⇒ écrit.
+  // (5 nov.) Leboncoin aussi (la tournée) : sa coche « Colis fait » de toujours (`vrm_lbc_colis_done`).
+  const deposerLbc = (txId) => { if (txId == null) return; const u = { ...(load('vrm_lbc_colis_done', {}) || {}) }; if (!u[txId]) { u[txId] = Date.now(); save('vrm_lbc_colis_done', u); } majLbcFait(); };
   const deposeScan = useDeposeDiffere(
-    (x) => { if (!x) return; if (x.site === 'vinted') marquerColisFait(x.o, x.b); else if (x.site === 'vestiaire') marquerVc('vrm_vc_colis_done', x.v.id, true); },
+    (x) => { if (!x) return; if (x.site === 'vinted') marquerColisFait(x.o, x.b); else if (x.site === 'vestiaire') marquerVc('vrm_vc_colis_done', x.v.id, true); else if (x.site === 'leboncoin') deposerLbc(x.txId); },
     undefined,
     (x) => {
       if (!x) return;
       if (x.site === 'vestiaire') { marquerVc('vrm_vc_colis_done', x.v.id, true); return; }
+      if (x.site === 'leboncoin') { deposerLbc(x.txId); return; }
       const k = x.o && x.o.transaction_id != null ? String(x.o.transaction_id) : '';
       if (k) { const u = { ...(load('vinted_ship_done', {}) || {}), ...(shipDoneRef.current || {}) }; if (!u[k]) { u[k] = Date.now(); save('vinted_ship_done', u); } }
       const kb = x.b ? bordKey(x.b) : null;
@@ -51877,7 +51893,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (lbl && lbl.octets) {
       const age = lbl.capturedAt ? (Date.now()-new Date(lbl.capturedAt).getTime())/60000 : 999;
       const mins = Math.max(0, Math.round(age));
-      if (age<60 && await askConfirm(`📄 Tamponner en 1 clic le bordereau téléchargé il y a ${mins} min, avec le N°${numero} (${title}) ?\n\nOK = oui (auto) · Annuler = choisir un fichier`)) {
+      if (age<60 && await askConfirm({ title: `Tamponner le bordereau téléchargé il y a ${mins} min ?`, desc: `Avec le N°${numero} (${title}).`, ok: "Tamponner", cancel: "Choisir un fichier" })) {
         try { await processBordereau(numero, title, lbl.octets); return; } catch(_){}
       }
     }
@@ -51989,7 +52005,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   let colisSansCompte = false;
   // (2 nov.) L'onglet de Colis montré à CE rendu (« À envoyer » / « À retirer ») : posé
   // par l'en-tête, lu par les blocs qui suivent (chaque colis une fois).
-  let ongletColisVu = 'envoyer';
+  let ongletColisVu = 'envoyer'; let nEnvoyesVu = 0;   // (5 nov.) le nombre d'« Envoyés », posé par l'en-tête, lu par l'état vide d'« À envoyer »
   // ── (3 nov., Julien : « je veux des colis ENVOYÉS, et dans un autre onglet ») ──────────────
   // LES COLIS ENVOYÉS, TOUS SITES : aucune règle neuve, les listes qui existaient déjà —
   //  · Vinted : le bloc « Partis » d'avant (une vente plus « à expédier » dont l'état Vinted est
@@ -52015,8 +52031,32 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   const trNomColis = (x) => { if (x.__autre) return x.trNom; const t = transporteurVente(x.b); return (t && t.nom) || 'Autres'; };
   const estPosteColis = (x) => !!(x.o ? isShipDone(x.o) : isBordShippedManual(x.b));
+  // (5 nov., chantier D) « TEMPS DE PRÉPARATION » : depuis combien de jours chaque vente attend son
+  // envoi — jours de calendrier depuis la date de VENTE lue (src/colisEnvoi.js), jamais deviné : une
+  // vente sans date lue n'a pas de nombre. Vinted `o.date`, Vestiaire `v.date`, eBay `creationDate`,
+  // Leboncoin `at` (la date relevée par l'extension).
+  const dateVenteColis = (x) => {
+    if (!x) return null;
+    if (x.__autre === 'vc') return x.v && x.v.date;
+    if (x.__autre === 'eb') return x.x && x.x.ordre && x.x.ordre.creationDate;
+    if (x.__autre === 'lbc') return x.o && (x.o.at || x.o.date);
+    return x.o && x.o.date;
+  };
+  const attenteColis = (x) => joursAttente(dateVenteColis(x));
+  // Le mot de l'app est « envoyer » (src/libelles.js) : la phrase de limite partagée avec le serveur
+  // (`texteLimiteEnvoi`, api/_lib/limite-envoi.js, rappels et widget) dit « poster » ; l'écran la traduit.
+  // (« \b » ne voit pas le « à » : la limite de mot se lit sur le début ou une espace.) L'heure garde
+  // son « h » sur la même ligne (espace insécable : « 12 h » ne se coupe plus en « 12 / h »).
+  const texteEnvoiColis = (t) => String(t || '').replace(/(^|\s)à poster(?=\s|$)/g, '$1à envoyer').replace(/(^|\s)pour poster(?=\s|$)/g, '$1pour l’envoyer').replace(/(\d) h\b/g, '$1 h');
+  // (5 nov.) Le compte d'un colis ne se dit que s'il y en a plusieurs (un seul compte : la même étiquette
+  // sur chaque carte ne distingue rien, §7).
+  const plusieursComptesColis = (accounts || []).length > 1;
+  // L'ordre de l'écran ET de « Tout imprimer » : la limite la plus proche d'abord (LUE dans l'e-mail du
+  // bordereau quand on l'a, sinon l'estimation vente + 7 j — `dl`), à limite égale la vente la plus
+  // ANCIENNE ; puis par transporteur, dans l'ordre de leur premier colis (src/lotTransporteurs.js).
+  const rangerColisEnvoi = (tous, trNom) => rangerParTransporteur(ordrePreparation(tous, { jours: (x) => x.dl, attente: attenteColis }), { trNom, jours: (x) => x.dl });
   // Les colis à envoyer rangés comme l'écran : le plus pressé d'abord, puis par transporteur.
-  const colisAEnvoyerRanges = () => { const { exTout, autresColis } = colisAEnvoyerBase(); return rangerParTransporteur([...exTout.filter(x => !estPosteColis(x)), ...autresColis], { trNom: trNomColis, jours: (x) => x.dl }); };
+  const colisAEnvoyerRanges = () => { const { exTout, autresColis } = colisAEnvoyerBase(); return rangerColisEnvoi([...exTout.filter(x => !estPosteColis(x)), ...autresColis], trNomColis); };
   const LIMITE_ENVOYES_J = 45;
   const listeEnvoyes = () => {
     const out = [];
@@ -57421,7 +57461,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // (3 nov.) « Envoyés · N » : le nombre de cartes de l'onglet (la même liste, `listeEnvoyes`).
           // Ventes Vinted pas encore lues ⇒ pas de nombre (jamais un 0 inventé, §5).
           const envoyesL = listeEnvoyes();
-          const nEnvoyes = (voitSite('vinted') && !Array.isArray(sales.items)) ? null : envoyesL.length;
+          const nEnvoyes = (voitSite('vinted') && !Array.isArray(sales.items)) ? null : envoyesL.length; nEnvoyesVu = nEnvoyes || 0;
           const ordiColis = (() => { try { return window.matchMedia('(min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine)').matches; } catch (_) { return false; } })();
           const nPretsVue = ((vue.colonnes.find(c => c.cle === 'prets') || {}).cartes || []).length;
           // Les gestes d'UN colis à retirer, sur SA carte : son code une fois
@@ -57548,17 +57588,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           return (<>
             <ScreenHead icon="doc" title="Colis" date={dateJourFr(new Date())} sous={PHRASES_ECRAN.colis ? <span className="vrm-phrase-ecran" data-phrase-ecran="colis">{PHRASES_ECRAN.colis}</span> : null}
               desc="Ce que Vinted attend de toi, capté par l'extension. Le bordereau manquant est généré tout seul quand tu passes sur Vinted, puis déposé ici. Un colis parti disparaît sans rien cocher."
-              right={<>
-                {/* (2 nov., 22 h) « … » : les outils de Colis (imprimer les prêts, Emballer, Tout générer,
-                    l'imprimante) ne s'affichent plus d'office (maquette FusionColis) ; un toucher les montre,
-                    à leur place, un second les range. */}
-                <button type="button" className="vrm-fu-plus" data-colis-outils-bascule="" aria-label="Outils des colis" aria-expanded="false"
-                  onClick={(ev)=>{ const r = document.documentElement; const o = !r.hasAttribute('data-colis-outils'); r.toggleAttribute('data-colis-outils', o); ev.currentTarget.setAttribute('aria-expanded', o ? 'true' : 'false'); }}><Icon name="more" size={20}/></button>
-                {/* (3 nov., choix de Julien n° 2) « Tout imprimer » : TOUJOURS visible (il était caché derrière « … » :
-                    le banc `lot-bordereaux` ne pouvait plus le toucher) ; un PDF, toutes plateformes, par transporteur. */}
-                {(onglet === 'envoyer' || onglet === 'envoyes') ? <Bouton variante="secondaire" icone="scan" className="vrm-colis-scanner" data-colis-scanner="" aria-label="Scanner" onClick={() => setScanOuvert(true)}><span className="vrm-colis-scanner-l">Scanner</span></Bouton> : null}
-                {onglet === 'envoyer' && nLot>0 ? <Bouton variante="primaire" icone="printer" data-lot-ouvrir="1" data-imprimer-prets={nLot} onClick={ouvrirLot} disabled={batchBusy}>{batchBusy?'Préparation…':'Tout imprimer'}</Bouton> : null}
-              </>}/>
+              right={
+                /* (5 nov., revue 2.21) LA BARRE DU HAUT NE SAUTE PLUS : les trois mêmes boutons, à la même
+                   place, sur « À envoyer », « Envoyés » et « À retirer » (avant : « Tout imprimer » et
+                   « Scanner » apparaissaient et disparaissaient d'un onglet à l'autre, « … » était un rond
+                   d'une autre forme). Une forme (`Bouton`, même hauteur, même rayon). « Tout imprimer » est
+                   le geste principal tant qu'un bordereau est prêt ; sinon il reste à sa place, grisé, et
+                   dit pourquoi. « … » montre les outils de Colis (Emballer, Tout générer) à leur place. */
+                <div className="vrm-colis-barre" data-colis-barre="">
+                  <Bouton variante="secondaire" icone="scan" className="vrm-colis-scanner" data-colis-barre-btn="scanner" data-colis-scanner="" aria-label="Scanner un bordereau" title="Scanner le code-barres d’un bordereau : le colis passe en « déposé »" onClick={() => setScanOuvert(true)}><span className="vrm-colis-scanner-l">Scanner</span></Bouton>
+                  <Bouton variante={nLot > 0 ? 'primaire' : 'secondaire'} icone="printer" data-colis-barre-btn="imprimer" data-lot-ouvrir={nLot > 0 ? '1' : '0'} data-imprimer-prets={nLot}
+                    title={nLot > 0 ? `${nLot} bordereau${nLot > 1 ? 'x' : ''} prêt${nLot > 1 ? 's' : ''} : un PDF, rangé par transporteur` : 'Aucun bordereau prêt à imprimer pour l’instant'}
+                    onClick={ouvrirLot} disabled={batchBusy || nLot === 0}>{batchBusy ? 'Préparation…' : 'Tout imprimer'}</Bouton>
+                  <Bouton variante="secondaire" icone="more" data-colis-barre-btn="outils" data-colis-outils-bascule="" aria-label="Outils des colis" aria-expanded={outilsColis ? 'true' : 'false'} title="Outils des colis"
+                    onClick={() => setOutilsColis((v) => !v)}/>
+                </div>
+              }/>
             {/* (2 nov., style « Fusion ») LA CARTE « AUJOURD'HUI ». Le grand chiffre est le
                 nombre de colis À ENVOYER publié par cet écran (`vrm_colis_aposter`, celui de Ma
                 journée et du sélecteur, « au moins » si un site n'est pas lu) ; « à imprimer » =
@@ -57730,7 +57775,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             })}
           </div>
         )}
-        {voitSite('vinted') && emailBordsKO && emailBords===null && <div data-bords-ko style={{marginBottom:10}}><LignePanne>Les bordereaux reçus par email n'ont pas pu être lus pour l'instant — rien n'est perdu. Un colis « en attente de bordereau » ci-dessous a peut-être déjà le sien : l'écran réessaie tout seul.</LignePanne></div>}
+        {/* (5 nov., chantier D) Les pannes de Colis ont une forme : `EtatPanne` (« pas su pour l'instant », la raison, le geste). */}
+        {voitSite('vinted') && emailBordsKO && emailBords===null && <div data-bords-ko style={{marginBottom:10}}><EtatPanne compact quoi="Tes bordereaux reçus par e-mail" raison="Rien n’est perdu : un colis sans bordereau ci-dessous a peut-être déjà le sien. L’écran réessaie tout seul."/></div>}
         {voitSite('vinted') && (()=>{
           if (sales.loading && emailBords===null) return <div style={{fontSize:12,color:C.muted,marginBottom:10}}>Chargement des colis à envoyer…</div>;
           const ex = expeditions();
@@ -57759,9 +57805,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // Sans compte relié ni colis : le geste est dit en tête, pas « aucun envoi ».
           if (colisSansCompte) return null;
           const uRecap = urgenceColis();
-          // Sans geste visible au téléphone (l'imprimante y est cachée, styles-telephone.css).
+          // Sans geste visible (eBay, urgence, « Tout générer », lot) : le récapitulatif n'est que lu.
+          // (5 nov., revue 2.21) Le réglage d'imprimante est dans Paramètres → Imprimante et bordereaux
+          // (il était ici en double) : plus rien d'autre à montrer dans ce bloc.
           const recapSansGeste = !(nEb>0) && !(uRecap.total && uRecap.total>=aPoster.length) && !(aGenItems.length>0) && !lot;
-          const recapVide = recapSansGeste && !(avecPdf.length>0);
+          const recapVide = recapSansGeste;
           // (2 nov., colis clair) Le seul geste visible est « Tout générer (N) » : pas de
           // bloc gris autour d'un bouton seul (l'imprimante est cachée au téléphone).
           const recapSeulBouton = !recapVide && !(nEb>0) && !(uRecap.total && uRecap.total>=aPoster.length) && !lot;
@@ -57816,25 +57864,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const basculer = (cle) => setLot(x => { const c = new Set(x.coches); if (c.has(cle)) c.delete(cle); else c.add(cle); return { ...x, coches: c }; });
                   const fmtD = (o) => { const t = Date.parse(o && o.date); return Number.isFinite(t) ? new Date(t).toLocaleDateString('fr-FR', { day:'numeric', month:'short' }) : 'date inconnue'; };
                   return (
-                    <div data-noswipe="1" data-lot={L.length} role="dialog" aria-modal="true" aria-label="Bordereaux à imprimer"
-                      onClick={e=>{ if(e.target===e.currentTarget) setLot(null); }}
-                      style={{position:'fixed',inset:0,zIndex:9000,background:'rgba(0,0,0,.45)',display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
-                      <FermeAuRetour fermer={()=>setLot(null)}/>
-                      <div style={{background:C.card,color:C.text,borderRadius:12,width:'100%',maxWidth:560,maxHeight:'86vh',display:'flex',flexDirection:'column',boxShadow:C.shadowLg||'0 16px 48px rgba(0,0,0,.2)'}}>
-                        <div style={{padding:'16px 18px 10px',borderBottom:`1px solid ${C.border}`}}>
-                          <div style={{fontSize:17,fontWeight:700}}>{lot.echecs.length ? `${lot.echecs.length} bordereau${lot.echecs.length>1?'x':''} pas imprimé${lot.echecs.length>1?'s':''}` : 'Bordereaux à imprimer'}</div>
-                        </div>
+                    /* (5 nov., chantier D) « Tout imprimer » ouvre la feuille unique (`SheetShell` : poignée,
+                       titre, croix de 44 px, retour du navigateur) au lieu d'un calque fait main. */
+                    <SheetShell onClose={()=>setLot(null)} maxWidth={560} z={9000} className="vrm-lot" data-noswipe="1" data-lot={L.length} aria-label="Bordereaux à imprimer"
+                      titre={lot.echecs.length ? `${lot.echecs.length} bordereau${lot.echecs.length>1?'x':''} pas imprimé${lot.echecs.length>1?'s':''}` : 'Bordereaux à imprimer'}>
                         <>{lot.echecs.length>0&&<p role="alert" className="vrm-preparation-note">Seuls les bordereaux en échec sont sélectionnés. Les PDF préparés avec succès ne seront pas repris.</p>}</><div className="vrm-preparation-etapes" aria-label="Préparation des colis"><span>1 · {nb} sélectionné(s)</span><span>2 · {controle.verifies}/{nb} article(s) contrôlé(s)</span><span>3 · Préparer les PDF</span></div>
                         <RecapSelection lignes={L} coches={lot.coches}/>
                         <p className="vrm-preparation-note">Compare le numéro et la photo avec l’article physique. Cocher « Article contrôlé » ne marque pas le colis expédié.</p>
                         {batchBusy&&progressionLot&&<div className="vrm-preparation-progression" role="status">{progressionLot.etape==='lecture'?`Lecture des PDF : ${progressionLot.fait}/${progressionLot.total}`:'Préparation du document groupé…'}<progress {...(progressionLot.etape==='lecture'?{value:progressionLot.fait,max:progressionLot.total}:{})}/></div>}
-                        <div style={{display:'flex',gap:12,flexWrap:'wrap',padding:'10px 18px',fontSize:12,color:C.muted}}>
+                        <div style={{display:'flex',gap:12,flexWrap:'wrap',padding:'10px 0',fontSize:12,color:C.muted,alignItems:'center'}} className="vrm-lot-outils">
                           <span role="status">{nb} sélectionné{nb>1?'s':''} sur {L.length}</span>
                           <button type="button" disabled={batchBusy} onClick={()=>setLot(x=>({...x,coches:new Set(L.filter(l=>l.cochable!==false).map(l=>l.cle))}))}>Tout sélectionner</button>
                           <button type="button" disabled={batchBusy} onClick={()=>setLot(x=>({...x,coches:new Set()}))}>Tout décocher</button>
                           <span>Décocher ne supprime aucun bordereau.</span>
                         </div>
-                        <div style={{overflowY:'auto',minHeight:0,flex:'1 1 auto',padding:'4px 18px'}}>
+                        <div className="vrm-lot-liste" style={{padding:'4px 0'}}>
                           {L.map((l, il) => {
                             const o = l.e ? l.e.o : null, coche = lot.coches.has(l.cle);
                             const num = l.num || '';
@@ -57867,47 +57911,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             );
                           })}
                         </div>
-                        <div style={{display:'flex',gap:8,justifyContent:'flex-end',flexWrap:'wrap',padding:'12px 18px',borderTop:`1px solid ${C.border}`}}>
-                          <button type="button" onClick={()=>setLot(null)} style={{order:-2,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,padding:'10px 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Fermer</button>
-                          <button type="button" data-imprime="1" data-lot-imprimer={nb} disabled={!nb || batchBusy} onClick={()=>batchBordereaux(new Set(lot.coches))}
-                            style={{border:'none',background:C.accent,color:C.onAccent,borderRadius:12,padding:'10px 16px',fontSize:13,fontWeight:700,cursor:nb?'pointer':'default',opacity:nb&&!batchBusy?1:0.5,fontFamily:'inherit'}}>
-                            {batchBusy?'Préparation…':lot.echecs.length?`Réessayer (${nb})`:`Imprimer ${nb} bordereau${nb>1?'x':''}`}
-                          </button>
+                        {/* (5 nov., chantier D) Le pied reste visible en bas de la feuille (collé), deux gestes de
+                            la même forme (`Bouton`) ; « Fermer » est la croix de la feuille (plus de second bouton). */}
+                        <div className="vrm-lot-pied">
                           {/* (4 nov.) « Placer le tampon » : la feuille de chaque type de bordereau du lot s'ouvre, même déjà gardé. */}
-                          <button type="button" data-imprime="1" data-lot-placer={nb} disabled={!nb || batchBusy} onClick={()=>batchBordereaux(new Set(lot.coches), true)}
-                            style={{order:-1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,padding:'10px 14px',fontSize:13,fontWeight:600,cursor:nb?'pointer':'default',opacity:nb&&!batchBusy?1:0.5,fontFamily:'inherit'}}>Placer le tampon</button>
+                          <Bouton variante="secondaire" data-imprime="1" data-lot-placer={nb} disabled={!nb || batchBusy} onClick={()=>batchBordereaux(new Set(lot.coches), true)}>Placer le tampon</Bouton>
+                          <Bouton variante="primaire" icone="printer" data-imprime="1" data-lot-imprimer={nb} disabled={!nb || batchBusy} onClick={()=>batchBordereaux(new Set(lot.coches))}>
+                            {batchBusy?'Préparation…':lot.echecs.length?`Réessayer (${nb})`:`Imprimer ${nb} bordereau${nb>1?'x':''}`}
+                          </Bouton>
                         </div>
-                      </div>
-                    </div>
+                    </SheetShell>
                   );
                 })()}
               </div>
-              {/* Retiré le 30 septembre (Julien) : « 1 imprime, colle, dépose et
-                  clique sur fait, ça sert à rien, tu peux enlever ». */}
-              {/* ── QUELLE IMPRIMANTE ? ────────────────────────────────────────
-                  Demande du 15 septembre. MESURÉ sur ses 148 bordereaux : la
-                  page A4 porte l'étiquette ET la fiche destinataire ET la pub du
-                  transporteur, séparées par une ligne de découpe. En thermique on
-                  ne garde que l'étiquette — et seulement quand on SAIT où elle
-                  est (97 % des siens) ; sinon la page part entière, et l'écran
-                  le dit après coup. Une zone devinée de travers, c'est un
-                  code-barres coupé, donc un colis qui ne part pas.
-                  ⚠️ UNE SEULE phrase sous les deux pastilles (§7) : ce qui
-                  distingue, c'est la pastille active, pas un texte par ligne. */}
-              {avecPdf.length>0 && (
-                <div className="vrm-colis-imprimante" style={{flexBasis:'100%',marginTop:4,paddingTop:14,borderTop:`1px solid ${C.border}`}}>
-                  <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
-                    <span style={{fontSize:11,color:C.muted,fontWeight:600,letterSpacing:'.07em',textTransform:'uppercase'}}>Imprimante</span>
-                    <Segmente label="Imprimante" className="vrm-segment" value={imprimante} onChange={choisirImprimante}
-                      options={[{v:'normale',l:'Normale (A4)'},{v:'thermique',l:'Thermique'}]}/>
-                  </div>
-                  <details className="vrm-label-help vrm-colis-imprimante-aide" style={{marginTop:8,marginBottom:0}}><summary>{imprimante==="thermique"?"L’étiquette seule, ton N° en bas":"Une feuille par bordereau"}</summary><div style={{fontSize:12,color:C.muted,lineHeight:1.5,paddingTop:4}}>
-                    {imprimante==='thermique'
-                      ? <>L'étiquette seule, <b>au format 10 × 15 cm</b>, sans la fiche destinataire ni la pub du transporteur, avec ton <b>N° en petit en bas</b>. Si l'étiquette n'est pas repérable sur un bordereau, il part <b>entier</b> — et c'est écrit à la fin. Aperçus de chaque type : Paramètres → Imprimante et bordereaux.</>
-                      : <>La page complète, une <b>feuille par bordereau</b>. Si ton imprimante sort du recto-verso, décoche-le dans sa fenêtre d'impression : le PDF le demande, le pilote peut passer outre.</>}
-                  </div></details>
-                </div>
-              )}
             </div>
           );
         })()}
@@ -57942,15 +57958,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const one = pending.length===1 ? pending[0] : null;
           const e = one ? effEntry(one) : null; const num = e?.numero || '';
           return (
-            <div style={{border:`1px solid ${INV_STATUS.online.color}`,background:`${INV_STATUS.online.color}12`,borderRadius:12,padding:'10px 13px',marginBottom:10,display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
-              <span style={{fontSize:20}}>🆕</span>
-              <div style={{flex:1,minWidth:160}}>
-                <div style={{fontSize:13,fontWeight:700,color:INV_STATUS.online.color}}>Bordereau téléchargé il y a {freshLabel.mins} min ({freshLabel.name})</div>
-                {one
-                  ? <div style={{fontSize:11,color:C.text,marginTop:1}}>Prêt à tamponner pour <b>{num?`N°${num} · `:''}{one.title}</b> — un tap et c'est fait.</div>
-                  : <div style={{fontSize:11,color:C.text,marginTop:1}}>Clique le bouton <b>📄</b> sur la vente concernée → il se <b>tamponne tout seul</b> avec le N° (pas besoin de rechoisir le fichier).</div>}
+            /* (5 nov., chantier D) Neutre (plus le vert hors palette ni les emojis 🆕 📄) : une carte de la
+               surface, l'icône du document, une phrase, un geste de 44 px. */
+            <div data-colis-bordereau-frais="" style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'10px 12px 10px 14px',marginBottom:10,display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+              <span aria-hidden="true" style={{display:'flex',color:C.muted,flexShrink:0}}><Icon name="doc" size={20}/></span>
+              <div style={{flex:'1 1 200px',minWidth:0}}>
+                <div style={{fontSize:14,fontWeight:600,color:C.text}}>Bordereau téléchargé il y a {freshLabel.mins} min</div>
+                <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.4,overflowWrap:'anywhere'}}>{one
+                  ? <>Pour {num ? <><Numero n={num} taille="petit"/>{' '}</> : null}{one.title} · {freshLabel.name}</>
+                  : <>{freshLabel.name} · touche « J’ai le PDF » sur la vente concernée : il se tamponne avec son N°.</>}</div>
               </div>
-              {one && <button type="button" onClick={()=>startBordereau(num, one.title, freshLabel.acc, one.transaction_id)} style={{flexShrink:0,border:'none',background:C.accent,color:C.onAccent,borderRadius:12,padding:'9px 13px',cursor:'pointer',fontSize:13,fontWeight:600,fontFamily:'inherit'}}>📄 Tamponner{num?` N°${num}`:''}</button>}
+              {one && <Bouton variante="secondaire" icone="doc" onClick={()=>startBordereau(num, one.title, freshLabel.acc, one.transaction_id)}>Tamponner</Bouton>}
             </div>
           );
         })()}
@@ -57977,9 +57995,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   compte au lieu de laisser croire à une contradiction. */}
               <div style={{display:'flex',alignItems:'baseline',gap:7,flexWrap:'wrap'}}>
                 <span style={{fontSize:17,fontWeight:700,color:C.warn,letterSpacing:-0.3}}>{total}</span>
-                <span style={{fontSize:13,fontWeight:600,color:C.text}}>à poster en priorité{overdue?' — du retard':''}</span>
+                <span style={{fontSize:13,fontWeight:600,color:C.text}}>à envoyer en priorité{overdue?' · du retard':''}</span>
               </div>
-              <div style={{fontSize:11,color:C.text,marginTop:2}}>{parts.join(' · ')} — {ouSontLesPresses(u)}</div>
+              <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.4}}>{parts.join(' · ')} — {ouSontLesPresses(u)}</div>
             </div>
           );
         })()}
@@ -58045,19 +58063,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             distingue. */}
         {/* (3 nov.) Les ventes Vestiaire à envoyer sont dans LA liste ci-dessous (« tout va être ensemble ») ;
             leurs « Colis fait » sont dans l'onglet « Envoyés ». Reste ici : Vestiaire illisible, dit. */}
-        {only === 'bordereaux' && voitSite('vestiaire') && colisVestiaire(vcEtat) === null ? <div data-colis-vestiaire="passu" style={{ marginBottom: 10 }}><LignePanne>Les colis Vestiaire n'ont pas pu être lus pour l'instant. Rien n'est perdu : rouvre Colis dans un moment.</LignePanne></div> : null}
+        {only === 'bordereaux' && voitSite('vestiaire') && colisVestiaire(vcEtat) === null ? <div data-colis-vestiaire="passu" style={{ marginBottom: 10 }}><EtatPanne compact quoi="Tes colis Vestiaire" raison="Rien n’est perdu : rouvre Colis dans un moment."/></div> : null}
         {/* (31 oct.) Les emails reçus et ce que VRM en a fait — l'ambre quand un
             email attend un geste (bordereau au N° deviné, reçu sans n°…). */}
         {/* (2 nov., colis clair) « Tes emails, ce que VRM en a fait » n'est pas un geste
             du moment : il est descendu SOUS la liste (plus bas). */}
-        {voitSite('ebay') && colisEb === null && <div data-colis-ebay="passu" style={{marginBottom:10}}><LignePanne>Les ventes eBay n'ont pas pu être lues pour l'instant — un colis eBay à poster n'est peut-être pas dans ce compte. Rien n'est perdu : rouvre Colis dans un moment.</LignePanne></div>}
+        {voitSite('ebay') && colisEb === null && <div data-colis-ebay="passu" style={{marginBottom:10}}><EtatPanne compact quoi="Tes ventes eBay" raison="Un colis eBay à envoyer manque peut-être à cette liste. Rien n’est perdu : rouvre Colis dans un moment."/></div>}
         {/* (3 nov., Julien : « tout va être ensemble ») Les ventes eBay à poster ne sont plus un bloc à part :
             elles sont dans LA liste ci-dessous, sous leur transporteur, avec la même carte que les autres
             (l'étiquette se prend dans eBay : l'acheteur a payé le port, §2.8). Reste ici l'âge de la lecture. */}
         {voitSite('ebay') && colisEb && colisEb.aPoster.length>0 && ebayLuA && Math.floor((Date.now() - ebayLuA) / 3600000) >= 6 ? (() => { const ageH = Math.floor((Date.now() - ebayLuA) / 3600000);
           return <p className="vrm-colis-note-ebay" data-colis-ebay-age={ageH} style={{fontSize:12,color:C.muted,lineHeight:1.45,margin:'0 2px 10px'}}>Commandes eBay lues il y a {ageH >= 48 ? `${Math.floor(ageH/24)} j` : `${ageH} h`} : une vente plus récente ou un colis déjà parti n'y est peut-être pas. eBay → Compte → Rafraîchir.</p>; })() : null}
         {voitSite('vinted') && sales.loading && !sales.items && <Skeleton variant="row" count={4}/>}
-        {voitSite('vinted') && sales.error && <LoadError onRetry={()=>loadOrders('sold',setSales,true)}/>}
+        {voitSite('vinted') && sales.error && <div data-colis-ventes="passu" style={{marginBottom:10}}><EtatPanne compact quoi="Tes ventes Vinted" raison="Les colis à envoyer ne sont pas connus tant qu’elles ne sont pas lues." onReessayer={()=>loadOrders('sold',setSales,true)}/></div>}
         {(()=>{
           // ⚠️ 30 septembre (Julien : « les bordereaux doivent s'enlever quand
           // les ventes sont expédiées ») : un colis coché « colis fait » QUITTE
@@ -58088,14 +58106,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           else if (!ex.length && colisSansCompte) return lignePostes;
           // (2 nov., audit des données ; limites n°3) Comptes ou ventes pas encore lus
           // (base lente) : « aucun colis » n'est pas su — on le dit, jamais un rien.
+          // (5 nov.) Ventes en panne : la panne est dite UNE fois au-dessus (`EtatPanne`, avec « Réessayer »).
+          else if (!ex.length && sales.error) return lignePostes;
           else if (!ex.length && (accountsReady !== true || (accounts.length > 0 && sales.items == null))) return (<>{lignePostes}
-            <div data-colis-lecture="" style={{fontSize:13,color:C.muted,textAlign:'center',padding:'22px 16px',lineHeight:1.6}}>{sales.error ? 'Tes ventes Vinted n’ont pas pu être lues : les colis à envoyer ne sont pas connus.' : 'Je lis tes ventes…'}</div></>
+            <div data-colis-lecture="" role="status" style={{fontSize:13,color:C.muted,textAlign:'center',padding:'22px 16px',lineHeight:1.6}}>{PAS_SU.enCours}</div></>
           );
+          // (5 nov., chantier D) L'état vide dit quoi attendre, en une phrase, et ce qui vit ailleurs.
           else if (!ex.length) return (<>{lignePostes}
-            <div data-colis-aucun="" style={{fontSize:13,color:C.muted,textAlign:'center',padding:'22px 16px',lineHeight:1.6}}>
-              Aucun colis à envoyer.<br/>
-              <span style={{fontSize:12}}>Dès que Vinted te demande un envoi, l'article apparaît ici — l'extension le capte sans que tu fasses rien.</span>
-            </div></>
+            <div data-colis-aucun="" className="vrm-colis-vide-envoi">
+              <span className="vrm-colis-vide-titre">Aucun colis à envoyer</span>
+              <span className="vrm-colis-vide-sous">Une vente à envoyer apparaît ici dès que l’extension la lit.</span>
+              {nEnvoyesVu ? <Bouton variante="secondaire" data-colis-voir-envoyes="" onClick={() => onOngletColis && onOngletColis('envoyes')}>Voir les envoyés</Bouton> : null}
+            </div>
+            {/* La tournée ouverte quand le dernier colis vient d'être déposé : elle le dit, puis se ferme sur SON geste. */}
+            {tourneeDepot ? <SheetShell onClose={() => setTourneeDepot(false)} titre="Tournée de dépôt" maxWidth={560} data-tournee-sheet="">
+              <div className="vrm-colis-vide-envoi" data-tournee-fini=""><span className="vrm-colis-vide-titre">Tout est déposé</span><span className="vrm-colis-vide-sous">Plus aucun colis à déposer pour l’instant.</span></div>
+            </SheetShell> : null}</>
           );
           // (2 nov.) `nowrap` : à 1512 px « Marquer imprimé » passait sur deux lignes dans son bouton.
           const sec = { flexShrink:0, borderRadius:12, padding:'0 14px', minHeight:44, boxSizing:'border-box', cursor:'pointer', fontSize:13, fontWeight:600, fontFamily:'inherit', whiteSpace:'nowrap' };
@@ -58151,6 +58177,84 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   trois colis visibles au lieu de six, sur l'écran où il travaille
                   quand il prépare ses cartons. `minmax(min(430px,100%), 1fr)` —
                   le `min()` évite qu'une piste de 430 px déborde un téléphone. */}
+              {/* (5 nov., chantier D) La tournée de dépôt AU-DESSUS de la liste (la liste s'ouvre par son intertitre) :
+                  les mêmes colis, rangés par la même règle que la liste (`rangerColisEnvoi`). */}
+              {(() => {
+                const trNomDe = trNomColis;
+                const exT = rangerColisEnvoi([...ex, ...autresColis], trNomDe);
+                // ── (5 nov., chantier D) LA TOURNÉE DE DÉPÔT ─────────────────────────────────────────
+                // Les colis À ENVOYER de cette liste (les mêmes, dans le même ordre), regroupés par
+                // transporteur — le réseau où on les dépose. Le point de dépôt précis d'un colis n'est relié
+                // à lui par aucune identité : jamais deviné, c'est dit une fois. Chaque colis UNE fois, par
+                // SA clé (n° de transaction, id Vestiaire, transaction Leboncoin — jamais le titre) ;
+                // « Déposé » est le geste existant (`deposeScan` : « Colis fait », annulable 5 s) et le
+                // scanner existant s'ouvre d'ici. eBay : l'étiquette vient d'eBay, le dépôt s'y suit.
+                const faitsVc = vcCarte('vrm_vc_colis_done') || {};
+                const faitsLbc = load('vrm_lbc_colis_done', {}) || {};
+                const tourneeItems = exT.map((x) => {
+                  const att = attenteColis(x);
+                  if (x.__autre === 'vc') return faitsVc[x.v.id] ? null : { cle: 'vc:' + x.v.id, site: 'vestiaire', v: x.v, num: x.v.num || '', titre: x.v.titre || 'Article Vestiaire', photo: x.v.photo || null, att, pret: !!(x.v.bordereau || x.v.etiquette), x };
+                  if (x.__autre === 'eb') return { cle: x.key, site: 'ebay', num: x.x.ordre ? (numLigneEbay(x.x.ordre, (x.x.ordre.lineItems || [])[0]) || '') : '', titre: x.x.titre || `Commande ${x.x.orderId}`, photo: x.x.ordre ? photoCommande(x.x.ordre) : null, lien: lienCommandeEbay(x.x.orderId, x.x.compte), att, pret: true, x };
+                  if (x.__autre === 'lbc') { if (faitsLbc[x.x.txId]) return null; const f = x.x.itemId ? (load('vinted_annonce_numeros', {}) || {})[x.x.itemId] : null;
+                    return { cle: 'lbc:' + x.x.txId, site: 'leboncoin', txId: x.x.txId, num: (f && f.numero != null) ? String(f.numero).trim() : '', titre: x.x.titre || (x.o && x.o.title) || '(sans titre)', photo: photoArticle(x.o || {}), att, pret: !!(x.o && x.o.label && x.o.label.voucherUrl), x }; }
+                  const o = x.o, b = x.b; if (o ? isShipDone(o) : isBordShippedManual(b)) return null;
+                  return { cle: 'v:' + (x.txn || x.key), site: 'vinted', o, b, num: (b ? numForBord(b) : '') || (o ? (effEntry(o)?.numero || '') : ''), titre: (o && o.title) || (b && (b.modele || b.article)) || 'Colis', photo: o ? orderPhoto(o) : bordPhoto(b), att, pret: !!x.pret, x };
+                }).filter(Boolean);
+                const groupesT = groupesTournee(tourneeItems, { trNom: (t) => trNomDe(t.x), cle: (t) => t.cle });
+                const enAttenteT = deposeScan.attente ? String(deposeScan.attente.cle) : '';
+                const tourneeEl = (tourneeItems.length || tourneeDepot) ? (
+                  <div key="__tournee" className="vrm-tournee-tete" >
+                    {tourneeItems.length ? <Bouton variante="secondaire" icone="pin" data-tournee-ouvrir={tourneeItems.length} onClick={() => setTourneeDepot(true)}>Tournée de dépôt</Bouton> : null}
+                    {tourneeDepot ? (
+                      <SheetShell onClose={() => setTourneeDepot(false)} titre="Tournée de dépôt" maxWidth={560} data-tournee-sheet=""
+                        sousTitre={(() => { const m0 = new Date(); m0.setHours(0, 0, 0, 0); const d = gestesDepuis(shipDone, m0.getTime()); return `${tourneeItems.length} colis à déposer${d ? ` · ${d} déjà déposé${d > 1 ? "s" : ""} aujourd’hui` : ""}`; })()}>
+                        <div className="vrm-tournee">
+                          <div className="vrm-tournee-haut">
+                            <p className="vrm-tournee-note">Dépose chaque groupe dans un point de son transporteur. Le point précis n’est pas lu par VRM.</p>
+                            <Bouton variante="secondaire" icone="scan" data-tournee-scanner="" onClick={() => setScanOuvert(true)}>Scanner</Bouton>
+                          </div>
+                          {!groupesT.length ? <div className="vrm-colis-vide-envoi" data-tournee-fini=""><span className="vrm-colis-vide-titre">Tout est déposé</span><span className="vrm-colis-vide-sous">Plus aucun colis à déposer pour l’instant.</span></div> : null}
+                          {groupesT.map((g) => {
+                            const trG = g.colis[0].x.__autre ? g.colis[0].x.tr : transporteurVente(g.colis[0].x.b);
+                            return (
+                              <section key={g.nom} className="vrm-tournee-groupe" data-tournee-groupe={g.nom} data-n={g.colis.length}>
+                                <div className="vrm-fu-groupe-transp">
+                                  <span className="vrm-fu-groupe-tuile" aria-hidden="true">{trG && trG.cle ? <LogoTransporteur cle={trG.cle} taille={22} repli={<Icon name="truck" size={15}/>}/> : <Icon name="box" size={16}/>}</span>
+                                  <h3>{g.nom}</h3>
+                                  <span>{g.colis.length} colis</span>
+                                </div>
+                                <ul className="vrm-tournee-liste">
+                                  {g.colis.map((t) => {
+                                    const enAttente = enAttenteT === t.cle;
+                                    const peutDeposer = t.site !== 'ebay' && t.pret;
+                                    return (
+                                      <li key={t.cle} className={'vrm-tournee-colis' + (enAttente ? ' is-attente' : '')} data-tournee-colis={t.cle} data-etat={enAttente ? 'attente' : 'a-deposer'}>
+                                        <span className="vrm-tournee-photo">{t.photo && !imgMortes.has(t.photo) ? <PhotoVinted src={t.photo} alt="" loading="lazy" onError={() => noterImgMorte(t.photo)}/> : <PhotoVide taille={44} remplir/>}</span>
+                                        <span className="vrm-tournee-quoi">
+                                          <span className="vrm-tournee-titre">{t.num ? <><Numero n={t.num} taille="petit"/>{' '}</> : null}{t.titre}</span>
+                                          <span className="vrm-tournee-sous">{enAttente ? 'Déposé · annulable quelques secondes' : t.site === 'ebay' ? 'Étiquette eBay : le dépôt se suit dans eBay' : !t.pret ? 'Bordereau pas encore là' : texteAttenteVente(t.att) || '—'}</span>
+                                        </span>
+                                        {enAttente
+                                          ? <Bouton variante="discret" data-tournee-annuler={t.cle} onClick={deposeScan.annuler}>Annuler</Bouton>
+                                          : t.site === 'ebay'
+                                            ? <Bouton variante="discret" href={t.lien} target="_blank" rel="noreferrer" data-tournee-ebay={t.cle}>eBay</Bouton>
+                                            : !peutDeposer ? null
+                                            : <Bouton variante="secondaire" data-tournee-depose={t.cle} title="Marquer ce colis déposé"
+                                                onClick={() => deposeScan.demander(t.cle, t.site === 'vinted' ? { site: 'vinted', cle: t.cle, o: t.o, b: t.b, num: t.num, titre: t.titre } : t.site === 'vestiaire' ? { site: 'vestiaire', cle: t.cle, v: t.v, num: t.num, titre: t.titre } : { site: 'leboncoin', cle: t.cle, txId: t.txId, num: t.num, titre: t.titre }, t.num ? `N°${t.num}` : t.titre)}>Déposé</Bouton>}
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              </section>
+                            );
+                          })}
+                        </div>
+                      </SheetShell>
+                    ) : null}
+                  </div>
+                ) : null;
+                return tourneeEl;
+              })()}
               <div className="vrm-colis-grille" data-cible="colonne:prets colonne:attente" data-colis-lignes="1" style={{display:'flex',flexDirection:'column',gap:6}}>
               {(()=>{
                 // (2 nov., 22 h, maquette FusionColis) LES COLIS RANGÉS PAR TRANSPORTEUR : un en-tête
@@ -58161,7 +58265,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 // tri stable), puis les transporteurs dans l'ordre de leur premier colis.
                 // (3 nov.) La règle partagée avec « Tout imprimer » (src/lotTransporteurs.js).
                 const tous = [...ex, ...autresColis];
-                const exT = rangerParTransporteur(tous, { trNom: trNomDe, jours: (x) => x.dl });
+                const exT = rangerColisEnvoi(tous, trNomDe);
                 const nParT = {}; tous.forEach((x) => { const k = trNomDe(x); nParT[k] = (nParT[k] || 0) + 1; });
                 const primaireBleu = {flex:'1 1 160px',maxWidth:340,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,border:'none',background:C.accent,color:'#fff',borderRadius:12,padding:'0 16px',minHeight:44,cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit',textDecoration:'none',boxSizing:'border-box'};
                 const carteAutre = (e) => {
@@ -58196,7 +58300,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       ? <button type="button" data-imprime="1" data-imprime-lbc={x.txId} className="vrm-colis-primaire" onClick={() => onColisLeboncoin && onColisLeboncoin()} title="Bordereau Leboncoin tamponné (titre + N°)" style={primaireBleu}><Icon name="printer" size={16}/><span className="vrm-lib-long">Imprimer le bordereau</span><span className="vrm-lib-court">Imprimer</span></button>
                       : <a data-generer-lbc={x.txId} href={`https://www.leboncoin.fr/compte/part/transaction/${encodeURIComponent(x.txId)}`} target="_blank" rel="noreferrer" className="vrm-colis-primaire" title="Le bordereau se génère sur Leboncoin" style={{...primaireBleu,background:C.card2||C.bg,color:C.text}}><Icon name="printer" size={16}/><span className="vrm-lib-long">Générer sur Leboncoin</span><span className="vrm-lib-court">Générer</span></a>}
                     gestes={<button type="button" data-geste="fait" data-lbc-fait={x.txId} className="vrm-colis-sec vrm-colis-ter" onClick={() => { const u = { ...fait }; if (u[x.txId]) delete u[x.txId]; else u[x.txId] = Date.now(); save('vrm_lbc_colis_done', u); majLbcFait(); }}
-                      style={{...sec,border:`1px solid ${C.border}`,background:'transparent',color:C.muted}}>✓ Colis fait</button>}/>;
+                      style={{...sec,border:`1px solid ${C.border}`,background:'transparent',color:C.muted}}>Déposé</button>}/>;
                 };
                 return exT.map((e,ix)=>{
                 const ouvreT = ix === 0 || trNomDe(exT[ix-1]) !== trNomDe(e);
@@ -58205,7 +58309,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <React.Fragment key={e.key}>
                     {ouvreT && (
                       <div data-groupe-transp={trNomDe(e)} className="vrm-fu-groupe-transp" style={{gridColumn:'1 / -1'}}>
-                        <span className="vrm-fu-groupe-tuile" aria-hidden="true">{trG && trG.cle ? <LogoTransporteur cle={trG.cle} taille={22}/> : <Icon name="box" size={16}/>}</span>
+                        <span className="vrm-fu-groupe-tuile" aria-hidden="true">{trG && trG.cle ? <LogoTransporteur cle={trG.cle} taille={22} repli={<Icon name="truck" size={15}/>}/> : <Icon name="box" size={16}/>}</span>
                         <h3>{trNomDe(e)}</h3>
                         <span>{nParT[trNomDe(e)]} colis</span>
                       </div>
@@ -58243,8 +58347,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 // L'étape en cours est ambre seulement si la limite d'envoi est aujourd'hui/demain.
                 const pvC = o ? preuvesFriseDe(o) : null;
                 const imprimeC = !!((e.txn && bordsPrinted[e.txn]) || (b && isBordPrinted(b)));
-                const fuColis = friseColisFusion({ imprime: imprimeC, depose: posted || !!(pvC && pvC.bougeLu), enroute: !!(pvC && pvC.bougeLu), livre: !!(pvC && pvC.livreeLue) }, { geste: dl != null && dl <= 1 && !posted });
+                const fuColis = friseColisFusion({ imprime: imprimeC, depose: posted || !!(pvC && pvC.bougeLu), enroute: !!(pvC && pvC.bougeLu), livre: !!(pvC && pvC.livreeLue) }, { geste: dl != null && dl <= 1 && !posted && (imprimeC || pdf) });  // (5 nov.) ambre seulement si l'étape en cours est FAISABLE (sans bordereau, rien à imprimer)
                 const acc = o ? o._acc : null;
+                const att = attenteColis(e);
                 // Une charnière de groupe : le premier colis d'un groupe porte
                 // son intertitre (voir `groupeDe` plus haut). C'est ce qui rend
                 // le compte du haut vérifiable — « 10 en retard · 3 aujourd'hui
@@ -58258,43 +58363,48 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <React.Fragment key={e.key}>
                   {ouvreT && (
                     <div data-groupe-transp={trNomDe(e)} className="vrm-fu-groupe-transp" style={{gridColumn:'1 / -1'}}>
-                      <span className="vrm-fu-groupe-tuile" aria-hidden="true">{trG && trG.cle ? <LogoTransporteur cle={trG.cle} taille={22}/> : <Icon name="box" size={16}/>}</span>
+                      <span className="vrm-fu-groupe-tuile" aria-hidden="true">{trG && trG.cle ? <LogoTransporteur cle={trG.cle} taille={22} repli={<Icon name="truck" size={15}/>}/> : <Icon name="box" size={16}/>}</span>
                       <h3>{trNomDe(e)}</h3>
                       <span>{nParT[trNomDe(e)]} colis</span>
                     </div>
                   )}
-                  <div data-bord-card data-cible={attrCible(['colis',e.txn])} data-groupe-carte={grp} data-transporteur={cleStatTransporteur(trV)} data-tx-colis={e.txn||''} data-colis-ident={'v:'+(e.txn||e.key)} data-limite={e.lim&&e.lim.limite||''} data-limite-heure={e.lim&&e.lim.heure||''} data-jours={dl==null?'':String(dl)} className="vrm-colis-carte" style={{padding:'14px',border:`1px solid ${dl!=null&&dl<0?C.warn+'66':C.border}`,background:C.card,borderRadius:12,opacity:posted?0.55:1}}>
+                  <div data-bord-card data-cible={attrCible(['colis',e.txn])} data-groupe-carte={grp} data-transporteur={cleStatTransporteur(trV)} data-tx-colis={e.txn||''} data-colis-ident={'v:'+(e.txn||e.key)} data-limite={e.lim&&e.lim.limite||''} data-limite-heure={e.lim&&e.lim.heure||''} data-jours={dl==null?'':String(dl)} data-attente-j={att == null ? '' : String(att)} className="vrm-colis-carte" style={{padding:'14px',border:`1px solid ${e.lim && e.lim.retard ? C.warn+'66' : C.border}`,background:C.card,borderRadius:12,opacity:posted?0.55:1}}>
                     <div style={{display:'flex',gap:12,alignItems:'flex-start'}}>
                       <div className="vrm-colis-photo" style={{width:64,height:80,borderRadius:12,background:C.card2||C.bg,border:`1px solid ${C.border}`,boxSizing:'border-box',flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                         {ph?<PhotoVinted src={ph} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
                       </div>
                       <div style={{flex:'1 1 150px',minWidth:0}}>
                         <div style={{display:'flex',alignItems:'flex-start',gap:10}}>
-                          <span className="vrm-colis-titre" title={titre} style={{flex:1,minWidth:0,fontSize:15,fontWeight:600,lineHeight:1.35,color:C.text,letterSpacing:'-.01em',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{num ? `N°${num} · ` : ''}{titre}</span>
-                          {o && o.price && <span className="vrm-display vrm-colis-prix" style={{flexShrink:0,fontSize:17,fontWeight:700,color:C.text,whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums',letterSpacing:'-.02em'}}>{(parseFloat(o.price.amount ?? o.price)||0).toFixed(2).replace('.',',')} €</span>}
+                          {/* (5 nov., chantier D) Le N° en pastille (`Numero`, la forme de toute l'app ; rouge
+                              seulement quand deux articles le portent) DANS le titre, une fois — il était écrit
+                              deux fois (« N°31 · … » puis une pastille « N°31 » dessous). */}
+                          <span className="vrm-colis-titre" title={titre} style={{flex:1,minWidth:0,fontSize:15,fontWeight:600,lineHeight:1.35,color:C.text,letterSpacing:'-.01em',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden',overflowWrap:'anywhere'}}>{num ? <><Numero n={num} taille="petit" etat={conflitsNum.some(x => String(x.numero) === String(num)) ? 'doublon' : undefined} className="vrm-colis-titre-num"/>{' '}</> : null}{titre}</span>
+                          {o && o.price && <span className="vrm-display vrm-colis-prix" style={{flexShrink:0,fontSize:17,fontWeight:700,color:C.text,whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums',letterSpacing:'-.02em'}}>{montant(o.price, { etrangere: 'ecarter' })}</span>}
                         </div>
-                        <div style={{fontSize:12,color:C.muted,marginTop:6,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
-                          {num
-                            ? <span className="vrm-colis-num" style={{fontSize:12,fontWeight:700,color:C.text,background:C.bg,border:`1px solid ${C.border}`,borderRadius:999,padding:'2px 9px',flexShrink:0,fontVariantNumeric:'tabular-nums'}}>N°{num}</span>
-                            : <span className="vrm-colis-num" title="Le numéro arrive dès que l'article est relié à une annonce numérotée. Tu peux le poser à la main." style={{fontSize:12,fontWeight:600,color:C.warn,background:'transparent',border:`1px dashed ${C.warn}88`,borderRadius:999,padding:'2px 9px',flexShrink:0,whiteSpace:'nowrap'}}>N° en attente</span>}
-                          {acc ? <AcctTag acc={acc} name={accNameOf(acc)}/> : (b && b.account ? <span style={{display:'inline-flex',alignItems:'center',gap:4,background:`${C.muted}22`,color:C.muted,fontSize:11,fontWeight:600,padding:'2px 7px',borderRadius:12,whiteSpace:'nowrap'}}>{b.account}</span> : null)}
-                        </div>
+                        {(!num || (plusieursComptesColis && (acc || (b && b.account)))) ? <div style={{fontSize:12,color:C.muted,marginTop:6,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                          {!num ? <span className="vrm-colis-num" title="Le numéro arrive dès que l'article est relié à une annonce numérotée. Tu peux le poser à la main." style={{fontSize:12,fontWeight:600,color:C.warn,background:'transparent',border:`1px dashed ${C.warn}88`,borderRadius:999,padding:'2px 9px',flexShrink:0,whiteSpace:'nowrap'}}>N° en attente</span> : null}
+                          {!plusieursComptesColis ? null : acc ? <AcctTag acc={acc} name={accNameOf(acc)}/> : (b && b.account ? <span style={{display:'inline-flex',alignItems:'center',gap:4,background:`${C.muted}22`,color:C.muted,fontSize:11,fontWeight:600,padding:'2px 7px',borderRadius:12,whiteSpace:'nowrap'}}>{b.account}</span> : null)}
+                        </div> : null}
                         <div style={{fontSize:12,color:C.muted,marginTop:6,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>
                           {/* (2 nov.) La date de vente et la date limite dans UN texte : en
                               deux éléments d'une rangée qui passe à la ligne, la seconde
-                              ligne commençait par « · » (390 px). Le point reste collé. */}
+                              ligne commençait par « · » (390 px). Le point reste collé.
+                              (5 nov., chantier D) + LE TEMPS DE PRÉPARATION : depuis combien de jours la
+                              vente attend (`attenteColis`, date de vente lue). La limite LUE dit le retard ;
+                              l'attente reste neutre (une date estimée n'est jamais « en retard », §5). */}
                           {(o && o.date) || urgTxt ? <span data-colis-dates="" style={{flex:'0 1 auto',minWidth:0}}>
-                            {urgTxt && <span data-colis-limite-texte="" style={{overflowWrap:'anywhere',color:urgCol,fontWeight:dl!=null&&dl<=1?600:500}}>{urgTxt}</span>}
+                            {urgTxt && <span data-colis-limite-texte="" style={{overflowWrap:'anywhere',color:urgCol,fontWeight:dl!=null&&dl<=1?600:500}}>{texteEnvoiColis(urgTxt)}</span>}
+                            {att != null ? <span data-colis-attente={att}>{urgTxt ? ' · ' : ''}{texteAttenteVente(att)}</span> : null}
                           </span> : null}
                           {cell
-                            ? <button type="button" onClick={()=>onLocate&&onLocate(num)} style={{flexShrink:0,border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',padding:0,fontSize:12,fontFamily:'inherit'}}>· {garageCellLabel(cell)}</button>
+                            ? <button type="button" onClick={()=>onLocate&&onLocate(num)} style={{flexShrink:0,border:'none',background:'transparent',color:C.accentTexte||C.text,fontWeight:600,cursor:'pointer',padding:0,fontSize:12,fontFamily:'inherit'}}>· {garageCellLabel(cell)}</button>
                             /* ⚠️ Même règle que sur les Ventes (§11) : « pas rangée »
                                sur CHAQUE carte ne dit rien tant que le garage est
                                vide (mesuré : 0 case posée). Dès qu'une paire y est,
                                la mention redevient un écart qui se remarque. */
                             : ((num && garageUtilise) ? <span style={{flexShrink:0,display:'inline-flex',alignItems:'center',gap:3}}>· <Icon name="home" size={12}/>pas rangée</span> : null)}
                           {inv && <span title="Compte pro : la facture reçue par email sera imprimée avec le bordereau" style={{flexShrink:0,display:'inline-flex',alignItems:'center',gap:3,color:C.text,fontSize:12,fontWeight:600,whiteSpace:'nowrap'}}>· Facture {inv.number||''}</span>}
-                          {posted && <span style={{flexShrink:0,color:C.text,fontWeight:600}}>· ✓ posté</span>}
+                          {posted && <span style={{flexShrink:0,color:C.text,fontWeight:600}}>· déposé</span>}
                         </div>
                         {/* Le numéro de l'email vient d'un rapprochement par titre,
                             celui de la transaction est une identité : quand les deux
@@ -58414,9 +58524,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <button type="button" onClick={()=>{
                         if (posted) { if(o) { if(isShipDone(o)) toggleShipDone(o); } if(b && isBordShippedManual(b)) unmarkBordShipped(b); }
                         else marquerColisFait(o, b);
-                      }} title={posted?'Annuler « colis fait »':'Marquer comme posté → il sort de la liste'} data-geste="fait"
+                      }} title={posted?'Le colis est encore chez toi : il revient dans « À envoyer »':'Marquer déposé : il passe dans « Envoyés »'} data-geste="fait"
                         className="vrm-colis-sec vrm-colis-ter" style={{...sec,border:`1px solid ${C.border}`,background:posted?C.bg:'transparent',color:posted?C.text:C.muted}}>
-                        {posted?'↺ Pas encore':'✓ Colis fait'}
+                        {posted?'Pas encore déposé':'Déposé'}
                       </button>
                       {b && b.suivi && <a href={trackUrl(trV.cle||'', b.suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis n°${b.suivi}`} data-geste="suivre" className="vrm-colis-sec vrm-colis-ter" style={{...sec,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,textDecoration:'none',display:'inline-flex',alignItems:'center'}}><Icon name="truck" size={13} style={{marginRight:5}}/>Suivre</a>}
                       {capte && <span className="vrm-colis-source" style={{fontSize:12,color:C.muted,fontWeight:500,flexBasis:'100%'}}>Bordereau récupéré chez Vinted par l'extension{b && b.hasPdf ? ' · confirmé par l\'email' : ''}</span>}
@@ -58438,16 +58548,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const nums = [...new Set(ex.filter(x => !estPoste(x)).map(x => (x.b ? numForBord(x.b) : '') || (x.o ? (effEntry(x.o)?.numero || '') : '')).map(n => String(n || '').trim()).filter(Boolean))];
                 if (!nums.length) return null;
                 return (
-                  <button type="button" data-colis-stock={nums.length} onClick={() => { DEMANDE_STOCK_CHERCHE.nums = nums; DEMANDE_STOCK_CHERCHE.at = Date.now(); onNav && onNav('garage'); }}
-                    style={{alignSelf:'flex-start',display:'inline-flex',alignItems:'center',gap:8,border:`1px solid ${C.border}`,borderRadius:12,background:C.card,color:C.text,padding:'0 14px',minHeight:44,fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-                    <Icon name="home" size={16}/>{/* (1er nov.) sans le nombre : c'est celui des colonnes (§7) */}{nums.length>1?'Où sont ces articles':'Où est cet article'} dans le stock
-                  </button>
+                  /* (5 nov., chantier D) La forme commune (`Bouton` secondaire, texte à l'encre : le « discret » bleu tombe à 4,2:1 sur le gris de la page). */
+                  <Bouton variante="secondaire" icone="home" data-colis-stock={nums.length} style={{alignSelf:'flex-start',marginTop:6}} onClick={() => { DEMANDE_STOCK_CHERCHE.nums = nums; DEMANDE_STOCK_CHERCHE.at = Date.now(); onNav && onNav('garage'); }}>
+                    {/* (1er nov.) sans le nombre : c'est celui des colonnes (§7) */}{nums.length>1?'Où sont ces articles':'Où est cet article'} dans le stock
+                  </Bouton>
                 );
               })()}
             </div>
           );
         })()}
-        {ongletColisVu === 'envoyer' && only === 'bordereaux' ? <div className="vrm-colis-bas" style={{marginTop:14}}><EntreeJournalEmails headers={sbAuth} onOuvrir={(f)=>{demanderJournalEmails(f); onNav && onNav('emails');}}/></div> : null}
+        {/* (5 nov., revue 2.21) « Tes emails, ce que VRM en a fait » n'est plus dans Colis : un lien
+            technique, pas un geste d'envoi. Le journal reste dans E-mails. */}
         {/* ── PARTIS : CE QUE VINTED SUIT APRÈS TON ENVOI (4 octobre) ───────────
             Julien : « en transit, colis à faire, vendu… ». Colis ne montrait que
             ce qu'il reste à POSTER : un colis parti disparaissait de l'écran, et
@@ -58470,7 +58581,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div data-bords-faits={faits.length} style={{fontSize:12,color:C.muted,marginTop:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'9px 12px'}}>
               <span style={{color:C.text,fontWeight:600}}>{faits.length} bordereau{faits.length>1?'x':''} déjà traité{faits.length>1?'s':''}</span>
               <span style={{flex:1,minWidth:0}}>retiré{faits.length>1?'s':''} tout seul{faits.length>1?'s':''} dès que Vinted confirme.</span>
-              <button type="button" data-bords-faits-voir="" onClick={()=>setShowBordDone(v=>!v)} style={{border:'none',background:'transparent',color:C.blue||C.accent,fontWeight:600,cursor:'pointer',fontSize:12,padding:0,fontFamily:'inherit',minWidth:44}}>{showBordDone?'masquer':'voir'}</button>
+              <button type="button" data-bords-faits-voir="" onClick={()=>setShowBordDone(v=>!v)} style={{border:'none',background:'transparent',color:C.accentTexte||C.text,fontWeight:600,cursor:'pointer',fontSize:13,padding:'0 4px',fontFamily:'inherit',minWidth:44,minHeight:44}}>{showBordDone?'Masquer':'Voir'}</button>
             </div>
           );
         })()}
@@ -58481,13 +58592,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               .map((b,i)=>(
                 <div key={i} style={{display:'flex',gap:10,alignItems:'center',padding:'8px 10px',border:`1px solid ${C.border}`,background:C.card,borderRadius:12,opacity:0.7}}>
                   <div style={{width:38,height:38,borderRadius:12,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                    {bordPhoto(b)?<PhotoVinted src={bordPhoto(b)} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:17}}>📄</span>}
+                    {bordPhoto(b)?<PhotoVinted src={bordPhoto(b)} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<PhotoVide taille={38} remplir/>}
                   </div>
                   <div style={{flex:'1 1 120px',minWidth:0}}>
                     <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{numForBord(b)?`N°${numForBord(b)} · `:''}{b.modele||b.article||'Bordereau'}</div>
                     <div style={{fontSize:11,color:C.muted}}>{b.receivedAt?`reçu le ${new Date(b.receivedAt).toLocaleDateString('fr-FR')}`:''}</div>
                   </div>
-                  {b.hasPdf && <button type="button" data-imprime="1" onClick={async ()=>{ const lu=await lirePdfLigne(b._row); if(!lu||!lu.octets){libererOngletPdf();toast(messagePdfManquant(lu));return;} processBordereau(numForBord(b), b.modele||b.article||'', lu.octets); }} style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:12,padding:'6px 10px',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:'inherit'}}>🖨 Réimprimer</button>}
+                  {b.hasPdf && <button type="button" data-imprime="1" onClick={async ()=>{ const lu=await lirePdfLigne(b._row); if(!lu||!lu.octets){libererOngletPdf();toast(messagePdfManquant(lu));return;} processBordereau(numForBord(b), b.modele||b.article||'', lu.octets); }} style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:12,padding:'6px 10px',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:'inherit'}}><Icon name="printer" size={14} style={{verticalAlign:'-2px',marginRight:6}}/>Réimprimer</button>}
                 </div>
               ))}
           </div>
@@ -58510,7 +58621,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <RetoursEnCoursBloc res={retoursSuivis} site={siteColis} nomCompte={accNameOf} plusieursComptes={(accounts||[]).length>1} onRecu={basculerRetourRecu} onRemettre={remettreEnStock} onMasquer={masquerRetour} onAnnulerRemise={annulerRemise}/>
           </>;
           const L = listeEnvoyes().filter((x) => !(x.site === 'vinted' && x.o && retoursTx.has(String(x.o.transaction_id))));
-          if (!L.length) return <>{retoursHaut}<p className="vrm-colis-vide" data-colis-envoyes="0" data-colis-partis="0">Aucun colis envoyé ces {LIMITE_ENVOYES_J} derniers jours.</p></>;
+          if (!L.length) return <>{retoursHaut}<div className="vrm-colis-vide-envoi" data-colis-envoyes="0" data-colis-partis="0"><span className="vrm-colis-vide-titre">Aucun colis envoyé</span><span className="vrm-colis-vide-sous">Ces {LIMITE_ENVOYES_J} derniers jours. Un colis marqué « Déposé » arrive ici, jusqu’à sa livraison.</span></div></>;
           const plusieursComptes = (accounts || []).length > 1;
           const nomT = (x) => (x.tr && x.tr.nom) || 'Autres';
           const ordreT = new Map(); L.forEach((x) => { const k = nomT(x); if (!ordreT.has(k)) ordreT.set(k, ordreT.size); });
@@ -58521,7 +58632,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const sousDe = (x) => {
             if (x.type === 'coche') { const np = x.np; const depuis = np ? (np.heures < 48 ? `${np.heures} h` : `${Math.floor(np.heures/24)} j`) : '';
               return { t: np ? `Vinted ne l’a pas vu partir${depuis ? ` · coché il y a ${depuis}` : ''}${np.limiteDepassee ? ' · date limite dépassée' : ''}` : 'Coché « Colis fait »', ambre: !!np }; }
-            if (x.type === 'parti') { const retour = /Retour/.test(x.st.label); return { t: `${x.st.label}${x.j != null ? ` · vendue il y a ${x.j} j` : ''}${plusieursComptes && x.o._acc ? ` · ${accNameOf(x.o._acc)}` : ''}`, ambre: retour, aide: x.st.aide }; }
+            // (5 nov., chantier D) Les mots de l'app (src/libelles.js) : « En route » (plus « En transit »), « Livré »
+            // pour un colis ; l'étiquette brute de Vinted reste dans `data-parti` (les règles la lisent).
+            if (x.type === 'parti') { const retour = /Retour/.test(x.st.label); const mot = { 'En transit': 'En route', 'Livrée': 'Livré', 'Au relais': 'Au relais de l’acheteur' }[x.st.label] || x.st.label; return { t: `${mot}${x.j != null ? ` · ${x.j === 0 ? 'vendue aujourd’hui' : `vendue il y a ${x.j} j`}` : ''}${plusieursComptes && x.o._acc ? ` · ${accNameOf(x.o._acc)}` : ''}`, ambre: retour, aide: x.st.aide }; }
             if (x.type === 'vc') return { t: 'Vestiaire · coché « Colis fait »', ambre: false };
             return { t: `Leboncoin · ${lbcExpediee(x.lo) ? (x.lo.stepLabel || 'en livraison') : 'coché « Colis fait »'}`, ambre: false };
           };
@@ -58535,15 +58648,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const tx = x.o ? String(x.o.transaction_id) : '';
                   const annuler = x.type === 'coche'
                     ? <button type="button" data-annuler-poste={tx || (x.e && x.e.key)} className="vrm-colis-sec" onClick={()=>{ if(x.o && isShipDone(x.o)) toggleShipDone(x.o); if(x.b && isBordShippedManual(x.b)) unmarkBordShipped(x.b); }}
-                        title="Le colis est encore chez toi : il revient dans « à envoyer », avec son bordereau" style={{flexShrink:0,minHeight:44,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,padding:'0 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>↺ Pas encore posté</button>
+                        title="Le colis est encore chez toi : il revient dans « À envoyer », avec son bordereau" style={{flexShrink:0,minHeight:44,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,padding:'0 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>Pas encore déposé</button>
                     : x.type === 'vc'
-                      ? <button type="button" data-vc-fait={x.v.id} className="vrm-colis-sec" onClick={() => marquerVc('vrm_vc_colis_done', x.v.id, false)} style={{flexShrink:0,minHeight:44,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,padding:'0 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>↺ Pas encore posté</button>
+                      ? <button type="button" data-vc-fait={x.v.id} className="vrm-colis-sec" onClick={() => marquerVc('vrm_vc_colis_done', x.v.id, false)} style={{flexShrink:0,minHeight:44,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,padding:'0 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}} title="Le colis est encore chez toi : il revient dans « À envoyer »">Pas encore déposé</button>
                       : null;
                   return (
                     <React.Fragment key={x.cle}>
                       {ouvreT && (
                         <div data-groupe-transp={nomT(x)} className="vrm-fu-groupe-transp">
-                          <span className="vrm-fu-groupe-tuile" aria-hidden="true">{x.tr && x.tr.cle ? <LogoTransporteur cle={x.tr.cle} taille={22}/> : <Icon name="box" size={16}/>}</span>
+                          <span className="vrm-fu-groupe-tuile" aria-hidden="true">{x.tr && x.tr.cle ? <LogoTransporteur cle={x.tr.cle} taille={22} repli={<Icon name="truck" size={15}/>}/> : <Icon name="box" size={16}/>}</span>
                           <h3>{nomT(x)}</h3>
                           <span>{nParT[nomT(x)]} colis</span>
                         </div>
@@ -58556,12 +58669,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             {x.photo && !imgMortes.has(x.photo) ? <PhotoVinted src={x.photo} alt="" loading="lazy" decoding="async" onError={()=>noterImgMorte(x.photo)} style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
                           </div>
                           <div style={{flex:'1 1 150px',minWidth:0}}>
-                            <div><span className="vrm-colis-titre" title={x.titre} style={{display:'block',fontSize:15,fontWeight:600,lineHeight:1.3,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{x.num ? `N°${x.num} · ` : ''}{x.titre}</span></div>
+                            <div><span className="vrm-colis-titre" title={x.titre} style={{display:'block',fontSize:15,fontWeight:600,lineHeight:1.3,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{x.num ? <><Numero n={x.num} taille="petit"/>{' '}</> : null}{x.titre}</span></div>
                             <span data-colis-envoye-etat="" title={so.aide || undefined} style={{display:'block',marginTop:4,fontSize:13,fontWeight:so.ambre ? 600 : 500,color:so.ambre ? C.warn : C.muted,lineHeight:1.35}}>{so.t}</span>
                           </div>
                         </div>
                         <Frise etapes={frise} cle={x.cle} className="vrm-colis-frise" label="Où en est le colis"/>
-                        {annuler ? <div className="vrm-colis-actions" style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:10}}>{annuler}</div> : null}
+                        {/* (5 nov., chantier D) « Suivre » sur un colis parti dont le n° est lu (le bordereau) : le geste qu'on y vient chercher. */}
+                        {(() => { const su = (x.b && x.b.suivi) || (x.v && x.v.suivi) || ''; const suivre = su ? <BoutonSuivreColis transporteur={(x.tr && x.tr.cle) || ''} suivi={su} enLigne court attrs={{'data-colis-envoye-suivre': x.cle}}/> : null;
+                          return (annuler || suivre) ? <div className="vrm-colis-actions" style={{display:'flex',gap:8,justifyContent:'flex-end',flexWrap:'wrap',marginTop:10}}>{suivre}{annuler}</div> : null; })()}
                       </div>
                     </React.Fragment>
                   );
@@ -58573,7 +58688,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       </>)}
 
       {curSub==='bordereaux' && scanOuvert ? <ScannerColis trouver={trouverScan} onDeposer={(x) => deposeScan.demander(x.cle, x, x.num ? `N°${x.num}` : x.titre)} onFermer={() => setScanOuvert(false)} attente={deposeScan.attente} onAnnuler={deposeScan.annuler} zIndex={Z_CONFIRMATION - 2}><FermeAuRetour fermer={() => setScanOuvert(false)}/></ScannerColis> : null}
-      {curSub==='bordereaux' && !scanOuvert ? <BarreAnnulerDepose attente={deposeScan.attente} onAnnuler={deposeScan.annuler} zIndex={Z_CONFIRMATION - 1}/> : null}
+      {curSub==='bordereaux' && !scanOuvert && !tourneeDepot ? <BarreAnnulerDepose attente={deposeScan.attente} onAnnuler={deposeScan.annuler} zIndex={Z_CONFIRMATION - 1}/> : null}
       {/* Modale : relier un achat (depuis Annonces) */}
       {/* Modale : relier un achat (depuis Annonces) */}
       {pickerFor && createPortal(
@@ -60389,92 +60504,68 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       <input ref={qrFichierRef} type="file" accept="image/*" tabIndex={-1} aria-hidden="true" data-colis-qr-fichier=""
         style={{position:'fixed',left:-9999,top:0,width:1,height:1,opacity:0,pointerEvents:'none'}}
         onChange={(e) => { const f = e.target.files && e.target.files[0]; ajouterQrCapture(f || null); }}/>
-      {/* ── QR de retrait en PLEIN ÉCRAN (pour scanner au point relais) ── */}
-      {qrView && (
-        <div onClick={()=>setQrView(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.82)',zIndex:1400,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
-          <FermeAuRetour fermer={()=>setQrView(null)}/>
+      {/* ── « EN GRAND » : le code et le QR de retrait, tendus au comptoir ou au casier ──────────────
+          (5 nov., revue 2.22) La feuille unique (`SheetShell`) en variante LUMINEUSE : blanche même la
+          nuit (un écran sombre se lit mal sous un néon), la poignée, la croix de 44 px, le retour du
+          navigateur. Son titre est l'article (relié par identité) ou « Colis <transporteur> » — jamais le
+          sujet d'un e-mail (`titreEnGrand`). Une phrase par idée : la façon de présenter le colis est
+          dite UNE fois (dans l'encadré « QR … » quand il y en a un, sinon sous le code). Aucun emoji. */}
+      {qrView && (()=>{
+        const cn = qrView.carrierName || carrierName(qrView.carrier);
+        const ck = carrierKey(qrView.carrier) || '';
+        const avecAbsent = !qrView.img && qrView.mode !== 'home' && !!qrView.qrOu;
+        const phraseMode = qrView.mode === 'home' ? `${cn} livre à ton adresse : rien à retirer au comptoir.`
+          : qrView.code2 ? (qrView.img ? 'Scanne le QR au casier, ou saisis l’identifiant puis le code d’ouverture.' : 'Saisis l’identifiant puis le code d’ouverture sur l’écran du casier.')
+          : (qrView.consigne && qrView.code) ? 'Saisis ce code sur l’écran du casier.'
+          : qrView.real ? 'Présente ce QR au comptoir : le scan suffit.'
+          : qrView.code ? 'Donne ce code au comptoir avec ta pièce d’identité.'
+          : 'Ni QR ni code reçus : donne le numéro de colis et ta pièce d’identité.';
+        const lim = (() => { if (!qrView.limite) return null; const j = Math.ceil((new Date(qrView.limite + 'T23:59:59') - Date.now()) / 86400000); if (!Number.isFinite(j)) return null;
+          const d = new Date(qrView.limite + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+          return { j, t: j < 0 ? 'Délai de retrait dépassé' : j === 0 ? 'Dernier jour pour le retirer' : j === 1 ? 'À retirer demain au plus tard' : `À retirer avant le ${d} · encore ${j} j` }; })();
+        const compteTxt = qrView.compte && (qrView.compte.libelle || qrView.compte.horsComptes)
+          ? (qrView.compte.source === 'mondialrelay' ? `Compte Mondial Relay · ${qrView.compte.libelle}` : [qrView.compte.libelle ? `Reçu sur ${qrView.compte.libelle}` : 'Reçu par e-mail', qrView.compte.horsComptes ? 'dans aucun de tes comptes Mondial Relay relus' : ''].filter(Boolean).join(' · '))
+          : '';
+        const accordTxt = qrView.accord ? (qrView.accord === 'confirme' ? 'Code confirmé par ton compte Mondial Relay' : (qrView.code && qrView.code===qrView.codeMr) ? 'Code de ton compte Mondial Relay (plus récent que l’e-mail)' : 'Code de l’e-mail (reçu après la lecture de ton compte Mondial Relay)') : '';
+        return (
+        <SheetShell lumineuse onClose={() => setQrView(null)} titre={qrView.title} sousTitre={qrView.lieu || null} maxWidth={440} z={Z_CONFIRMATION - 3}
+          className="vrm-eg" aria-label="Code et QR de retrait" data-qr-plein="" data-qr-plein-code={qrView.code || ''} data-qr-plein-img={qrView.img ? '1' : '0'} data-qr-plein-source={qrView.source || ''}>
           <GardeEcranAllume/>
-          <div onClick={e=>e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Code et QR de retrait" data-qr-plein="" data-qr-plein-code={qrView.code||''} data-qr-plein-img={qrView.img?'1':'0'} data-qr-plein-source={qrView.source||''}
-            style={{background:'#fff',width:'100%',maxWidth:420,maxHeight:'calc(100dvh - 32px)',overflowY:'auto',boxSizing:'border-box',borderRadius:12,padding:'22px 20px 18px',display:'flex',flexDirection:'column',alignItems:'center',gap:14,boxShadow:'0 12px 40px rgba(0,0,0,0.4)'}}>
-            {qrView.photo && <PhotoVinted src={qrView.photo} alt="" loading="lazy" style={{width:64,height:64,borderRadius:12,objectFit:'cover',border:'1px solid #E5E5EA'}}/>}
-            <div style={{fontSize:15,fontWeight:700,color:'#111',textAlign:'center',lineHeight:1.3}}>{qrView.title}</div>
-            {/* Vrai QR uniquement (Chronopost). Si l'image hébergée ne charge
-                pas, on bascule sur le code — surtout pas sur un QR fabriqué. */}
-            {qrView.img && (
-              <img src={qrView.img} alt="QR de retrait"
-                onError={qrView.hosted ? (()=>setQrView(v=>v?{...v,img:null,real:false,hosted:false}:v)) : undefined}
-                style={{width:'86%',maxWidth:300,aspectRatio:'1',objectFit:'contain',imageRendering:'pixelated'}}/>
-            )}
-            {/* Consigne Pickup : DEUX codes — Identifiant + Code d'ouverture — à
-                saisir au casier (ou scanner le QR ci-dessus). */}
-            {qrView.code2 && (
-              <div style={{textAlign:'center'}}>
-                <div style={{fontSize:11,color:'#888',textTransform:'uppercase',letterSpacing:1.5,fontWeight:600}}>Identifiant</div>
-                <div className="vrm-sensible" data-stream-type="code" style={{fontSize:qrView.img?22:28,fontWeight:700,color:'#111',fontFamily:'monospace',letterSpacing:2,lineHeight:1.1}}>{qrView.code2}</div>
-              </div>
-            )}
-            {qrView.code && (
-              <div style={{textAlign:'center'}}>
-                <div style={{fontSize:11,color:'#888',textTransform:'uppercase',letterSpacing:1.5,fontWeight:600}}>{qrView.code2?"Code d'ouverture":'Code de retrait'}</div>
-                {/* Sans QR, LE code est ce qu'on présente au comptoir : il passe en grand. */}
-                <div className="vrm-sensible" data-stream-type="code" style={{fontSize:qrView.img?34:44,fontWeight:700,color:'#111',fontFamily:'monospace',letterSpacing:3,lineHeight:1.1}}>{qrView.code}</div>
-              </div>
-            )}
-            {!qrView.img && !qrView.code && qrView.suivi && (
-              <div style={{textAlign:'center'}}>
-                <div style={{fontSize:11,color:'#888',textTransform:'uppercase',letterSpacing:1.5,fontWeight:600}}>Numéro de colis</div>
-                <div style={{fontSize:28,fontWeight:700,color:'#111',fontFamily:'monospace',letterSpacing:2,lineHeight:1.1}}>{qrView.suivi}</div>
-              </div>
-            )}
-            {/* (5 nov.) Pas de QR : dit, avec où le trouver (jamais un QR fabriqué). Mondial Relay : « QR dans
-                l'app Mondial Relay » et « Ajouter le QR » — SA capture de l'app, posée sur CE colis. */}
-            {!qrView.img && qrView.mode!=='home' && qrView.qrOu && <div data-qr-plein-absent={carrierKey(qrView.carrier)||''} style={{fontSize:12,color:'#444',textAlign:'center',lineHeight:1.45,background:'#F5F5F7',borderRadius:12,padding:'8px 12px'}}><strong>{titreQrAbsent(carrierKey(qrView.carrier))}</strong> · {qrView.qrOu}</div>}
-            {!qrView.img && qrView.mode!=='home' && qrView._t && qrParCapture(carrierKey(qrView.carrier)) && suiviDeLigne(qrView._t) && (
-              <button type="button" data-qr-plein-ajouter="" onClick={()=>choisirCaptureQr(qrView._t)} aria-label="Ajouter le QR (capture de l’app Mondial Relay)"
-                style={{border:'1px solid #ddd',borderRadius:12,background:'#fff',color:'#111',fontSize:14,fontWeight:600,padding:'10px 16px',minHeight:44,cursor:'pointer',fontFamily:'inherit'}}>Ajouter le QR (capture de l’app)</button>
-            )}
-            {qrView._t && qrAjout && qrAjout.suivi && qrAjout.suivi === suiviDeLigne(qrView._t) && <div role="status" data-qr-plein-ajout={qrAjout.etat} style={{fontSize:12,color:['pose','lecture','retire'].includes(qrAjout.etat)?'#444':'#B25000',textAlign:'center',lineHeight:1.45}}>{qrAjout.msg}</div>}
-            {qrView.img && qrView.source==='capture' && qrView._t && (
-              <div data-qr-plein-capture="" style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8,flexWrap:'wrap',fontSize:12,color:'#444',textAlign:'center'}}>
+          <div className="vrm-eg-corps">
+            {qrView.photo ? <PhotoVinted src={qrView.photo} alt="" loading="lazy" className="vrm-eg-photo"/> : null}
+            {/* Vrai QR uniquement. Si l'image hébergée ne charge pas, on bascule sur le code — jamais un QR fabriqué. */}
+            {qrView.img ? <img className="vrm-eg-qr" src={qrView.img} alt="QR de retrait"
+              onError={qrView.hosted ? (() => setQrView(v => v ? { ...v, img: null, real: false, hosted: false } : v)) : undefined}/> : null}
+            {/* Consigne Pickup : DEUX codes — Identifiant + Code d'ouverture. */}
+            {qrView.code2 ? <div className="vrm-eg-code is-second"><span className="vrm-eg-code-l">Identifiant</span><span className="vrm-eg-code-v vrm-sensible" data-stream-type="code">{qrView.code2}</span></div> : null}
+            {qrView.code ? <div className={'vrm-eg-code' + (qrView.img ? ' avec-qr' : '')}><span className="vrm-eg-code-l">{qrView.code2 ? 'Code d’ouverture' : 'Code de retrait'}</span><span className="vrm-eg-code-v vrm-sensible" data-stream-type="code">{qrView.code}</span></div> : null}
+            {!qrView.img && !qrView.code && qrView.suivi ? <div className="vrm-eg-code is-suivi"><span className="vrm-eg-code-l">Numéro de colis</span><span className="vrm-eg-code-v">{qrView.suivi}</span></div> : null}
+            {/* Pas de QR : dit, avec où le trouver (src/retraitQr.js). Mondial Relay : « Ajouter le QR » — SA capture de l'app. */}
+            {avecAbsent ? <div className="vrm-eg-absent" data-qr-plein-absent={ck}><strong>{titreQrAbsent(ck)}</strong><span>{qrView.qrOu}</span></div> : <p className="vrm-eg-mode">{phraseMode}</p>}
+            {!qrView.img && qrView.mode !== 'home' && qrView._t && qrParCapture(ck) && suiviDeLigne(qrView._t)
+              ? <Bouton variante="secondaire" icone="image" plein data-qr-plein-ajouter="" onClick={() => choisirCaptureQr(qrView._t)} aria-label="Ajouter le QR (capture de l’app Mondial Relay)">Ajouter le QR (capture de l’app)</Bouton> : null}
+            {qrView._t && qrAjout && qrAjout.suivi && qrAjout.suivi === suiviDeLigne(qrView._t) ? <p role="status" className={'vrm-eg-note' + (['pose', 'lecture', 'retire'].includes(qrAjout.etat) ? '' : ' is-ambre')} data-qr-plein-ajout={qrAjout.etat}>{qrAjout.msg}</p> : null}
+            {qrView.img && qrView.source === 'capture' && qrView._t ? (
+              <div className="vrm-eg-capture" data-qr-plein-capture="">
                 <span>QR de ta capture de l’app Mondial Relay</span>
-                <button type="button" data-qr-plein-retirer="" onClick={()=>retirerQrPose(qrView._t)} style={{border:'1px solid #ddd',borderRadius:12,background:'#fff',color:'#111',fontSize:13,fontWeight:600,padding:'8px 14px',minHeight:44,cursor:'pointer',fontFamily:'inherit'}}>Retirer ce QR</button>
-              </div>
-            )}
-            {qrView.accord && <div data-qr-plein-accord={qrView.accord} style={{fontSize:12,color:'#444',textAlign:'center'}}>{qrView.accord==='confirme'?'Code confirmé par ton compte Mondial Relay':(qrView.code && qrView.code===qrView.codeMr)?'Code de ton compte Mondial Relay (plus récent que l’e-mail)':'Code de l’e-mail (reçu après la lecture de ton compte Mondial Relay)'}</div>}
-            {qrView.compte && (qrView.compte.libelle || qrView.compte.horsComptes) && <div data-qr-plein-compte={qrView.compte.source} style={{fontSize:12,color:'#666',textAlign:'center'}}>{qrView.compte.source==='mondialrelay'?`Compte Mondial Relay · ${qrView.compte.libelle}`:[qrView.compte.libelle?`Reçu sur ${qrView.compte.libelle}`:'Reçu par e-mail',qrView.compte.horsComptes?'dans aucun de tes comptes Mondial Relay relus':''].filter(Boolean).join(' · ')}</div>}
-            {qrView.lieu && <div style={{fontSize:13,fontWeight:600,color:'#111',textAlign:'center',lineHeight:1.35}}>{qrView.lieu}</div>}
-            {qrView.limite && (()=>{ const j=Math.ceil((new Date(qrView.limite+'T23:59:59')-Date.now())/86400000);
-              return <div style={{fontSize:12,fontWeight:700,color:'#B25000',textAlign:'center'}}>
-                {j<0?'délai de retrait dépassé':j===0?'dernier jour pour le retirer':j===1?'⏰ à retirer demain':`🗓 à retirer avant le ${new Date(qrView.limite).toLocaleDateString('fr-FR')} · ${j} j`}
-              </div>; })()}
-            {qrView.suivi && (qrView.img || qrView.code) && <div style={{fontSize:11,color:'#666'}}>{qrView.carrier?`${carrierName(qrView.carrier)} · `:''}n° {qrView.suivi}</div>}
-            <div style={{fontSize:11,color:'#999',textAlign:'center',lineHeight:1.4}}>
-              {(()=>{ const cn=qrView.carrierName||carrierName(qrView.carrier);
-                if(qrView.mode==='home') return `${cn} livre à ton adresse : rien à retirer au comptoir.`;
-                if(qrView.code2) return qrView.img
-                  ? `Consigne Pickup : scanne le QR au casier, ou saisis l'identifiant puis le code d'ouverture.`
-                  : `Consigne Pickup : saisis l'identifiant puis le code d'ouverture sur l'écran du casier. Pas de comptoir.`;
-                if(qrView.consigne && qrView.code) return `Consigne Pickup : saisis ce code sur l'écran du casier. Pas de comptoir.`;
-                if(qrView.real) return `QR ${cn} — présente-le au comptoir, le scan suffit.`;
-                if(qrView.code && carrierKey(qrView.carrier)==='mondialrelay') return `Donne ce code au comptoir avec ta pièce d'identité : il suffit.`;
-                if(qrView.code) return `${cn} fonctionne au CODE (pas de QR). Donne ce code au comptoir avec ta pièce d'identité.`;
-                return `Ni QR ni code reçus. Donne le numéro ci-dessus et ta pièce d'identité à ${cn}.`; })()}
-            </div>
-            {/* Le suivi du transporteur. ⚠️ (5 nov.) Plus « Ouvrir Mondial Relay (QR) » : le site de Mondial
-                Relay ne montre PAS le QR (« c'est que dans l'app ») — le lien suit le colis, rien de plus. */}
-            {qrView.suivi && (
-              <a href={trackUrl(qrView.carrier, qrView.suivi)} target="_blank" rel="noreferrer"
-                style={{textDecoration:'none',border:'1px solid #ddd',borderRadius:12,background:'#fff',color:'#111',fontSize:13,fontWeight:600,padding:'9px 16px'}}>
-                🔍 Suivre le colis
-              </a>
-            )}
-            {/* (5 nov.) LA LUMINOSITÉ : un site ne peut pas la régler (aucune API web) — on le dit, et l'écran
-                reste allumé tant que la vue est ouverte (Wake Lock, quand le navigateur le permet). */}
-            {qrView.img && <div data-qr-plein-luminosite="" style={{fontSize:11,color:'#666',textAlign:'center',lineHeight:1.45}}>☀︎ Monte la luminosité au maximum avant de présenter le QR : le lecteur du relais lit mal un écran sombre. VRM ne peut pas la régler à ta place ; l’écran reste allumé tant que cette vue est ouverte.</div>}
-            <button type="button" onClick={()=>setQrView(null)} style={{border:'none',borderRadius:12,background:'#111',color:'#fff',fontSize:15,fontWeight:600,padding:'11px 22px',minHeight:44,cursor:'pointer',fontFamily:'inherit',width:'100%'}}>Fermer</button>
+                <Bouton variante="secondaire" taille="petit" data-qr-plein-retirer="" onClick={() => retirerQrPose(qrView._t)}>Retirer ce QR</Bouton>
+              </div>) : null}
+            {/* Les faits du colis, une ligne chacun : l'échéance (ambre seulement si le geste est dû : aujourd'hui,
+                demain ou dépassée, §7), le transporteur et son n°, le compte, l'accord des codes. */}
+            <ul className="vrm-eg-faits">
+              {lim ? <li className={lim.j <= 1 ? 'is-ambre' : ''} data-qr-plein-limite={lim.j}>{lim.t}</li> : null}
+              {qrView.suivi && (qrView.img || qrView.code) ? <li>{qrView.carrier ? `${carrierName(qrView.carrier)} · ` : ''}n° {qrView.suivi}</li> : null}
+              {compteTxt ? <li data-qr-plein-compte={qrView.compte.source}>{compteTxt}</li> : null}
+              {accordTxt ? <li data-qr-plein-accord={qrView.accord}>{accordTxt}</li> : null}
+            </ul>
+            {/* La luminosité : aucune API web ne la règle — on le dit ; l'écran reste allumé (Wake Lock). */}
+            {qrView.img ? <p className="vrm-eg-note" data-qr-plein-luminosite="">Monte la luminosité au maximum : le lecteur du relais lit mal un écran sombre. L’écran reste allumé tant que cette vue est ouverte.</p> : null}
+            {/* Le suivi du transporteur (le site de Mondial Relay ne montre PAS le QR : le lien suit le colis, rien de plus). */}
+            {qrView.suivi ? <Bouton variante="secondaire" icone="truck" plein href={trackUrl(qrView.carrier, qrView.suivi)} target="_blank" rel="noreferrer" data-qr-plein-suivre="">Suivre le colis</Bouton> : null}
           </div>
-        </div>
-      )}
+        </SheetShell>
+        );
+      })()}
 
       {/* ── Bandeau « Annuler » après avoir retiré un colis (mise à jour immédiate) ── */}
       {lastCollected && (
