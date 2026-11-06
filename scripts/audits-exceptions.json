@@ -25,12 +25,6 @@
       "rouges": "^(M 1512 sombre proposées : la nouvelle du MÊME compte|1512 sombre le parcours s’arrête — page\\.\\$eval: Failed to find element matching selector \"\\[data-main-lier=\"9120\"\\]\")",
       "raison": "Deux rouges À L'IDENTIQUE sur l'arbre d'avant 46f18482 (« proposées » à 1512 sombre, `data-main-lier=9120` introuvable). Les arrêts sur délai (« Timeout 30000ms ») vus ici sur un conteneur surchargé, des deux côtés, NE sont PAS couverts : s'ils reviennent en CI, c'est un rouge à regarder.",
       "depuis": "2026-11-06"
-    },
-    {
-      "banc": "iphone-reprise",
-      "rouges": "^(B7 (390×844|375×667) (clair|sombre) : un balayage au milieu change toujours d'onglet|R3 390 (clair|sombre) : rouverte, même écran, même filtre, même recherche)",
-      "raison": "B7 (balayage Ventes → Colis) et R3 (recherche rouverte) rouges À L'IDENTIQUE sur l'arbre d'avant 46f18482 (6 lignes, conteneur chargé) : à rejouer en CI ; à corriger ou retirer, pas à masquer.",
-      "depuis": "2026-11-06"
     }
   ]
 }
