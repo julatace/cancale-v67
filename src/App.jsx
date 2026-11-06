@@ -40210,7 +40210,7 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
     ? tuile('delai', 'Temps pour vendre', '—', 'pas encore calculé', { 'data-sv-etat': 'passu' })
     : extras === undefined ? tuile('delai', 'Temps pour vendre', '—', 'je lis tes annonces…', { 'data-sv-etat': 'encours' })
       : datesPasSu ? tuile('delai', 'Temps pour vendre', '—', 'annonces pas pu être lues', { 'data-sv-etat': 'passu' })
-        : !Dl || Dl.nDelai === 0 ? tuile('delai', 'Temps pour vendre', '—', Dl && Dl.n ? `aucune des ${pl(Dl.n, 'vente')} Vinted n’a de date de mise en ligne` : 'aucune vente Vinted finalisée', { 'data-sv-etat': 'lu', 'data-sv-mediane': '', 'data-sv-couv': Dl ? `0/${Dl.n}` : '0/0' })
+        : !Dl || Dl.nDelai === 0 ? tuile('delai', 'Temps pour vendre', '—', Dl && Dl.n ? (Dl.n === 1 ? 'ta vente Vinted n’a pas de date de mise en ligne' : `aucune de tes ${Dl.n} ventes Vinted n’a de date de mise en ligne`) : 'aucune vente Vinted finalisée', { 'data-sv-etat': 'lu', 'data-sv-mediane': '', 'data-sv-couv': Dl ? `0/${Dl.n}` : '0/0' })
           : tuile('delai', 'Temps pour vendre', joursLong(Dl.mediane), `la moitié de tes articles partent plus vite${Dl.nDelai < Dl.n ? ` · ${Dl.nDelai} ventes datées sur ${Dl.n}` : ''}`,
             { 'data-sv-etat': 'lu', 'data-sv-mediane': Dl.mediane, 'data-sv-couv': `${Dl.nDelai}/${Dl.n}` }, 'Vinted seulement : Leboncoin et eBay ne donnent pas la date de mise en ligne.');
   const enLigneTxt = texteEnLigne(liveStats);
