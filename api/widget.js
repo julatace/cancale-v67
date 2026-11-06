@@ -14,6 +14,7 @@ import { retirerPublie, etatRetrait } from './_lib/retrait-colis.js';
 // (6 nov.) Les SMS de Mondial Relay (POST ?mode=sms, jeton `vrm_sms_token`) : api/_lib/sms-mondialrelay.js.
 import { routeSms } from './_lib/sms-mondialrelay.js';
 import { suiviDeLigne, finDeLigne, finsDesLignes, sortiParSuivis, arriveesDeLigne, relireLigneMeta, SELECT_SUIVI_META, SELECT_TRANSP_META, ligneTranspDeMeta, leverGarde } from './_lib/suivi-colis.js';
+import { preuveDeTransp, contredit } from './_lib/etat-colis.js';
 // api/widget.js
 // ────────────────────────────────────────────────────────────────────────────
 // DONNÉES DU WIDGET écran d'accueil (app Scriptable sur iPhone).
@@ -480,6 +481,8 @@ function sortisDepuisPhoto(pub, retires, pickupDone, txBuy, lu) {
   const dispoSuivi = new Set((dispo || []).filter((x) => x && x.se !== 'sortant').map(suiviDeLigne).filter(Boolean));
   const fins = Array.isArray(partis) ? finsDuWidget(lu) : null;
   const tDispo = transpDispoDe(lu);
+  // (6 nov.) Toutes les lignes du transporteur, par n° : la règle d'état datée (api/_lib/etat-colis.js).
+  const tParN = new Map((lu && Array.isArray(lu.transp) ? lu.transp : []).filter((t) => t && t.suivi).map((t) => [normSuivi(t.suivi), t]));
   return (cle, c) => {
     if (cle.startsWith('e:')) {
       const k = normSuivi(cle.slice(2));
@@ -490,6 +493,10 @@ function sortisDepuisPhoto(pub, retires, pickupDone, txBuy, lu) {
       // transporteur ⇒ « à vérifier » (avant : compté sorti, il disparaissait).
       const so = issueDesFins([k], fins, c); if (so) return so;
       if (!lu || !Array.isArray(lu.transp)) return null;            // le transporteur pas lu : pas su
+      // (6 nov.) « En route » chez le transporteur, daté APRÈS l'arrivée SÛRE publiée : la même
+      // contradiction que l'app (`fusionTransporteur`) ⇒ « à vérifier », jamais compté ni sorti.
+      { const tr = tParN.get(k); const arr = Number(c && c[1]) || 0;
+        if (tr && arr > 0 && c[4] !== 0 && contredit(preuveDeTransp(tr), { etat: 'disponible', at: arr, source: 'email' })) return 'a_verifier'; }
       return (dispoSuivi.has(k) || tDispo.has(k)) ? false : true;   // un e-mail OU le transporteur le dit encore là
     }
     if (cle.startsWith('v:')) {

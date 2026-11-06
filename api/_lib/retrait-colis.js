@@ -290,6 +290,21 @@ export function etatRetrait({ limite = null, arriveeMs = null, transporteur = ''
 }
 export const estAVerifier = (e) => !!e && (e.etat === 'delai_depasse' || e.etat === 'trop_long');
 
+// (6 nov., statut des colis) LA DATE LIMITE ESTIMÉE QUAND AUCUNE N'EST LUE : le jour
+// (Paris) de l'arrivée + la garde MESURÉE de SON transporteur (Mondial Relay 5 j,
+// Vinted Go 6 j, Chronopost 4 j). Seulement un transporteur LU (une clé de la table) et
+// une arrivée connue : sinon null — « Date limite inconnue », jamais une garde d'un
+// autre transporteur prêtée à ce colis. C'est la même borne que `etatRetrait` (au-delà :
+// « à vérifier ») ; elle se DIT « estimée », jamais « en retard » ni « dernier jour ».
+// Rend { jour: 'AAAA-MM-JJ', garde, estimee: true } ou null.
+export function limiteEstimee({ arriveeMs = null, transporteur = '' } = {}) {
+  const g = GARDE_PAR_TRANSPORTEUR[String(transporteur || '').toLowerCase().trim()];
+  if (!Number.isFinite(g) || !Number.isFinite(arriveeMs) || arriveeMs <= 0) return null;
+  const j0 = tJour(jourDe(arriveeMs)); if (j0 == null) return null;
+  const d = new Date(j0 + g * 86400000);
+  return { jour: `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`, garde: g, estimee: true };
+}
+
 // Pour TRIER les points relais (jamais affiché) : les jours qui restent si la
 // limite est écrite, sinon ce qui reste de la garde la plus longue mesurée.
 export function urgenceTri(e) {

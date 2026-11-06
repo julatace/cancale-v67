@@ -29,6 +29,7 @@ import { normaliserSuivi, etatColisDepuisTexte } from './etat-colis-email.js';
 import { arriveeColisEmail } from './arrivee-colis.js';
 import { etatRetrait, lieuDepuisExtrait, limiteRetraitDepuisTexte, LIEU_AU_FUTUR, joursAvantLimite, jourParis } from './retrait-colis.js';
 import { codeRetraitTournure, codeImpossible } from './code-retrait-email.js';
+import { preuveDeLigne, preuveDeTransp, contredit, lectureEnRetard, etatProuve } from './etat-colis.js';
 // (24 oct.) LE STATUT LU CHEZ LE TRANSPORTEUR (api/_lib/transporteurs.js) : une
 // ligne `transp_{transporteur}_{n°}` par n°, écrite par le SERVEUR seul. Elle se
 // joint aux e-mails PAR LE N° — jamais réécrite dans une ligne `email_track_*`.
@@ -280,6 +281,15 @@ export function fusionTransporteur(l, t, maintenant = Date.now()) {
   if (!l || !t || !t.etat) return l;
   const st = l.status != null ? l.status : l.s;
   const at = msDe(t.etatAt), luMs = msDe(t.lu);
+  // (6 nov.) LA RÈGLE D'ÉTAT DATÉE (api/_lib/etat-colis.js) : une ligne « disponible » que le
+  // transporteur dit « en route » — lecture faite AVANT l'arrivée ⇒ en retard (dit tel quel, le
+  // colis reste à retirer) ; événement daté APRÈS l'arrivée ⇒ contradiction (« à vérifier »).
+  if (st === 'available' && t.etat === 'en_route') {
+    const preuve = preuveDeLigne(l), p = preuveDeTransp(t);
+    if (contredit(p, preuve)) { const e = etatProuve([preuve, p]); return { ...l, transp: t, transpContradiction: true, transpConflit: (e && e.conflit && e.conflit.raison) || '' }; }
+    if (lectureEnRetard(p, preuve)) return { ...l, transp: t, transpEnRetard: true };
+    return l;
+  }
   if (t.etat !== 'disponible') return l;
   const em = dernierEmailMs(l);
   const recent = luMs != null && maintenant - luMs < DISPO_LEVE_GARDE_MS ? luMs : null;
@@ -550,6 +560,9 @@ export function rappelsRetraitDuJour({ lignes = [], collectes = [], envoyes = []
     const st = l.status != null ? l.status : l.s;
     if (st !== 'available' || finDeLigne(l)) continue;
     if ((l.sens != null ? l.sens : l.se) === 'sortant') continue;
+    // (6 nov.) Le transporteur le dit « en route » APRÈS son arrivée (`fusionTransporteur`, règle
+    // datée) : l'app le range « à vérifier » — aucun « dernier jour » ne part pour lui.
+    if (l.transpContradiction) continue;
     const k = suiviDeLigne(l); if (!k || vus.has(k)) continue;
     if (envoyesN.has(k)) continue;
     const brut = String((l.suivi != null ? l.suivi : l.su) || (l.subject != null ? l.subject : l.sj) || '').trim();
