@@ -53,8 +53,8 @@ async function scenario(f) {
   await f.toucher('[data-tampon-imprimer]', { avant: 0.4, apres: 0.5 });
   f.titre('Imprimé. Prêt à déposer.', { duree: 2.6 });
   await f.jouer(0.4);
-  await f.viser('texte:BORDEREAU', { zoom: P ? 1.38 : 1.05, dur: 1.0 });
-  await f.jouer(1.2);
+  // (le PDF s'affiche dans la visionneuse du navigateur : aucune cible dans la page)
+  await f.jouer(2.2);
   await f.fin('Ta journée de revente, en une page.', 3.0);
 }
 
