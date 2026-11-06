@@ -14,6 +14,8 @@
 //     `publierChiffre` / `retirerChiffre`. Un écran démonté retire ses chiffres.
 //     `undefined` (en cours) ou `null` (pas su) ⇒ AUCUN conseil : « pas su » ne
 //     vaut pas « oui ».
+//  ⚠️ AUCUN NOMBRE DANS LA BULLE : l'écran l'affiche déjà à côté du bouton pointé
+//     (§7 : le même nombre ne s'écrit pas deux fois sur un écran).
 //  ⚠️ PEU, ET JAMAIS DEUX FOIS DE SUITE. 2 conseils par jour, 1 par écran et par
 //     jour ; « Plus tard », ou le geste fait, ⇒ pas avant 3 jours ; « Ne plus
 //     montrer » ⇒ jamais ; un conseil `uneFois` ne paraît qu'une fois.
@@ -43,7 +45,6 @@ const VUS_GARDES = 40;
 
 const fini = (x) => typeof x === 'number' && Number.isFinite(x);
 const estObjet = (o) => !!o && typeof o === 'object' && !Array.isArray(o);
-const plur = (n, s, p) => `${n} ${n > 1 ? p : s}`;
 
 // ── 1. LES CHIFFRES PUBLIÉS ──────────────────────────────────────────────────
 // Un tableau noir partagé : l'écran écrit, la bulle lit. `undefined` retire.
@@ -81,7 +82,7 @@ export const CONSEILS = [
     quand: (v) => estObjet(v) && fini(v.nLot) && v.nLot >= 1 && v.presse === true,
     cibles: ['[data-colis-barre-btn="imprimer"]'],
     titre: 'Un envoi presse',
-    texte: (v) => `${plur(v.nLot, 'bordereau est prêt', 'bordereaux sont prêts')} : un seul PDF, rangé par transporteur.`,
+    texte: (v) => `${v.nLot > 1 ? 'Ils partent' : 'Il part'} en un seul PDF, rangé par transporteur.`,
     geste: 'Tout imprimer',
   },
   {
@@ -96,8 +97,8 @@ export const CONSEILS = [
     cle: 'ebay-relier', chiffre: 'ebay.aRelier',
     quand: (v) => fini(v) && v >= 1,
     cibles: ['[data-ebay-filtre="relier"]'],
-    titre: (v) => (v > 1 ? `${v} annonces eBay à relier` : 'Une annonce eBay à relier'),
-    texte: 'Reliée à son article, VRM la retire d’eBay quand elle se vend ailleurs.',
+    titre: (v) => (v > 1 ? 'Des annonces eBay à relier' : 'Une annonce eBay à relier'),
+    texte: (v) => (v > 1 ? 'Reliées à leur article, VRM les retire d’eBay quand elles se vendent ailleurs.' : 'Reliée à son article, VRM la retire d’eBay quand elle se vend ailleurs.'),
     geste: 'Voir lesquelles',
   },
   {
@@ -105,15 +106,15 @@ export const CONSEILS = [
     quand: (v) => estObjet(v) && fini(v.n) && fini(v.m) && v.m >= 5 && v.m - v.n >= 5,
     cibles: ['[data-ann-achats-completer]', '[data-ann-prochain-geste="prix"] [data-ann-prochain-geste-bouton]'],
     titre: 'Des prix d’achat manquent',
-    texte: (v) => `${v.m - v.n} sur ${v.m} : sans eux, ton bénéfice reste incomplet.`,
+    texte: 'Sans eux, ton bénéfice reste incomplet : saisis-les d’un coup.',
     geste: 'Saisie en série',
   },
   {
     cle: 'dorment', chiffre: 'annonces.dorment',
     quand: (v) => fini(v) && v >= 1,
     cibles: ['[data-vue-relancer]'],
-    titre: (v) => (v > 1 ? `${v} paires dorment` : 'Une paire dort'),
-    texte: 'En ligne depuis plus de 30 jours : regarde-les, tu choisis quoi faire.',
+    titre: (v) => (v > 1 ? 'Des paires dorment' : 'Une paire dort'),
+    texte: (v) => `En ligne depuis plus de 30 jours : ${v > 1 ? 'regarde-les' : 'regarde-la'}, tu choisis quoi faire.`,
     geste: 'Voir les paires',
   },
   {

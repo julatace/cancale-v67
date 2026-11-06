@@ -239,9 +239,13 @@ if (process.argv.includes('--prouve')) {
     const classes = c.cibles.flatMap((s) => [...s.matchAll(/\.([a-z][a-z0-9-]+)/g)].map((m) => m[1]));
     const tout = app + lire(path.join(RACINE, 'src/GuideDemarrage.jsx'));
     dit(attrs.every((a) => tout.includes(a)) && classes.every((k) => tout.includes(k)), `« ${c.cle} » : sa cible existe dans le source (${c.cibles[0]})`, attrs.concat(classes).filter((a) => !tout.includes(a)).join(', '));
-    const mots = [c.titre, c.texte].map((x) => (typeof x === 'function' ? x(c.cle === 'prix-achat' ? { n: 1, m: 9 } : c.cle === 'colis-imprimer' ? { nLot: 2 } : 2) : x)).join(' ');
+    // Des valeurs reconnaissables (17, 3/20, 7 sur 41…) : aucune ne doit se retrouver dans la bulle.
+    const exemple = { 'prix-achat': { n: 3, m: 20 }, 'colis-imprimer': { nLot: 17, presse: true }, 'prix-mini': { offresAuto: true, nbMini: 7, total: 41 }, inventaire: { jamais: true, numeros: 43 } }[c.cle] ?? 17;
+    const dire = (x) => (typeof x === 'function' ? x(exemple) : x);
+    const mots = [dire(c.titre), dire(c.texte)].join(' ');
     dit(!/évaluation|sans réponse|prix conseillé|jamais arriv|pas arriv/i.test(mots), `« ${c.cle} » : aucun sujet refusé par Julien (§3)`, mots);
-    dit(String(mots).split(/[.!?]/).filter((x) => x.trim()).length <= 2 && String(typeof c.texte === 'function' ? c.texte(c.cle === 'prix-achat' ? { n: 1, m: 9 } : c.cle === 'colis-imprimer' ? { nLot: 2 } : 2) : c.texte).length <= 90, `« ${c.cle} » : une phrase courte`);
+    dit(String(dire(c.texte)).split(/[.!?]/).filter((x) => x.trim()).length <= 1 && String(dire(c.texte)).length <= 90, `« ${c.cle} » : une phrase courte`, dire(c.texte));
+    dit(!/\b(17|20|41|43|7)\b/.test(mots), `« ${c.cle} » : aucun nombre de l’écran redit dans la bulle (§7)`, mots);
   }
   dit(/<Conseils\b[\s\S]{0,400}tour:\s*!!\(bienvenue \|\| visite \|\| \(premierJour && !load\(CLE_VISITE/.test(app), 'monté avec `tour` = Bienvenue, visite, ou une personne neuve qui ne l’a pas vue');
   dit(/<Conseils\b[\s\S]{0,500}exemple:\s*exempleActif\(\)[\s\S]{0,80}stream:\s*!!streamOn/.test(app), 'le mode exemple et le mode stream font taire les conseils');

@@ -36,6 +36,7 @@ const CAPTURES = process.env.BANC_CAPTURES || '';
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json', '.woff2': 'font/woff2' };
 const SESSION = { access_token: 'jeton-de-banc', refresh_token: 'r', expires_at: Date.now() + 3600e3, user: { id: '11111111-2222-3333-4444-555555555555', email: 'banc@exemple.fr' } };
 const COMPTES = [{ vinted_user_id: '777', login: 'vendeuse', owner: SESSION.user.id }];
+const { metaVersData } = require('./_meta.cjs');
 const UA_IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1';
 
 let ko = 0;
@@ -47,7 +48,21 @@ const srv = http.createServer((q, r) => {
 });
 
 // base : { main, acc (la ligne vrm_accompagnement ou null), ecritures: [], lectureKO }
-async function page(nav, { telephone, base, sombre = false, reduit = false, tab = 'journee' }) {
+// Une ligne servie comme PostgREST : `select=` projeté (`a:data->b->>c`), `data` entier sinon.
+const projette = (row, sel) => {
+  if (!sel || sel === '*' || /^(id,)?data$|^data,|^id,data/.test(sel)) return { ...row, updated_at: new Date().toISOString(), cap: row.data && row.data.capturedAt };
+  const out = {};
+  for (const part of sel.split(',')) {
+    const m = /^(?:([^:]+):)?(.+)$/.exec(part.trim()); if (!m) continue;
+    const src = m[2], alias = m[1] || src.split(/->>|->/).pop();
+    if (src === 'id') { out[alias] = row.id; continue; }
+    if (src === 'data') { out[alias] = row.data; continue; }
+    let v = row.data; for (const seg of src.replace(/^(data|meta)(->>|->)/, '').split(/->>|->/)) v = v == null ? null : v[seg];
+    out[alias] = v == null ? null : (src.includes('->>') && typeof v === 'object' ? JSON.stringify(v) : v);
+  }
+  return out;
+};
+async function page(nav, { telephone, base, sombre = false, reduit = false, tab = 'journee', pont = true }) {
   const ctx = await nav.newContext({ ...(telephone ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2, userAgent: UA_IPHONE } : { viewport: { width: 1512, height: 950 } }), reducedMotion: reduit ? 'reduce' : 'no-preference', colorScheme: sombre ? 'dark' : 'light' });
   const pg = await ctx.newPage();
   const erreurs = []; pg.on('pageerror', (e) => erreurs.push(String(e.message || e).slice(0, 200)));
@@ -67,12 +82,12 @@ async function page(nav, { telephone, base, sombre = false, reduit = false, tab 
       const dire = () => { try { window.postMessage({ __vmr: 'ready', version: '5.200.0' }, '*'); } catch (_) {} };
       let n = 0; const t = setInterval(() => { dire(); if (++n > 40) clearInterval(t); }, 250);
     }
-  }, [SESSION, sombre, !telephone]);
+  }, [SESSION, sombre, !telephone && pont]);
   await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ access_token: 'jeton-de-banc', refresh_token: 'r', expires_in: 3600, user: SESSION.user }) }));
   await pg.route('**/rest/v1/**', (r) => {
     const u = decodeURIComponent(r.request().url()); const m = r.request().method();
     const json = (d, st = 200) => r.fulfill({ status: st, contentType: 'application/json', headers: { 'content-range': '0-0/0' }, body: JSON.stringify(d) });
-    if (/vinted_accounts/.test(u) && m === 'GET') return json(COMPTES);
+    if (/vinted_accounts/.test(u) && m === 'GET') return json(base.comptes || COMPTES);
     // ── LA LIGNE vrm_accompagnement, tenue comme PostgREST (comparer-et-échanger sur rev).
     if (/app_data/.test(u) && /id=eq\.vrm_accompagnement/.test(u)) {
       if (m === 'GET') { base.lectures++; if (base.lectureKO) return json({ message: 'panne de banc' }, 500); return json(base.acc ? [{ data: base.acc }] : []); }
@@ -96,6 +111,17 @@ async function page(nav, { telephone, base, sombre = false, reduit = false, tab 
       return json([], 201);
     }
     if (/app_data/.test(u) && /id=eq\.main/.test(u) && m === 'GET') return json([{ id: 'main', owner: SESSION.user.id, data: base.main, updated_at: new Date().toISOString() }]);
+    // Les autres lignes du scénario (annonces lues…), servies avec leur projection.
+    if (/app_data/.test(u) && m === 'GET' && Array.isArray(base.lignes)) {
+      const v = decodeURIComponent(metaVersData(r.request().url()));
+      const sel = (/[?&]select=([^&]*)/.exec(v) || [])[1] || null;
+      const eq = /[?&]id=eq\.([^&]*)/.exec(v), inn = /[?&]id=in\.\(([^)]*)\)/.exec(v), lk = /[?&]id=like\.([^&]*)/.exec(v);
+      let rows = null;
+      if (eq) rows = base.lignes.filter((x) => x.id === eq[1]);
+      else if (inn) { const ids = inn[1].split(','); rows = base.lignes.filter((x) => ids.includes(x.id)); }
+      else if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); rows = base.lignes.filter((x) => re.test(x.id)); }
+      if (rows) return json(rows.map((x) => projette(x, sel)));
+    }
     if (/app_data/.test(u) && /id=eq\.main/.test(u) && m === 'PATCH') { try { const b = JSON.parse(r.request().postData() || '{}'); if (b && b.data) base.main = b.data; } catch (_) {} return json([{ id: 'main' }]); }
     return json([]);
   });
@@ -143,7 +169,8 @@ const etatDe = (base, cle) => (base.acc && base.acc.etats && base.acc.etats[cle]
   await new Promise((ok) => srv.listen(PORT, ok));
   const nav = await chromium.launch({ executablePath: process.env.BANC_CHROMIUM || '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader'] });
   try {
-    for (const telephone of [false, true]) {
+    // BANC_SEUL=annonces : le scénario A seul (mise au point).
+    for (const telephone of (process.env.BANC_SEUL === "annonces" ? [] : [false, true])) {
       const W = telephone ? 390 : 1512; const CLE = telephone ? 'ecran-accueil' : 'extension';
       for (const sombre of [false, true]) {
         const T = `[${W} ${sombre ? 'sombre' : 'clair'}]`;
@@ -237,6 +264,36 @@ const etatDe = (base, cle) => (base.acc && base.acc.etats && base.acc.etats[cle]
         if (await attendreBulle(m.pg)) { const b = await lireBulle(m.pg); dit(!/entre/.test(b.anim), `${T} C9 mouvement réduit : un fondu, rien ne bouge`, b.anim); }
         else dit(false, `${T} C9 : la bulle n'a pas paru`);
         await m.ctx.close(); }
+    }
+    // ── A : un conseil D'ÉCRAN — Annonces, « Des prix d'achat manquent » (1 connu sur 8).
+    for (const telephone of [false, true]) {
+      const W = telephone ? 390 : 1512; const T = `[${W} Annonces]`;
+      const s0 = Math.floor(Date.now() / 1000);
+      const items = [...Array(8)].map((_, i) => ({ id: 9101 + i, title: `Paire d’essai ${i + 1} taille 42`, price: { amount: String(40 + i) + '.0', currency_code: 'EUR' }, is_closed: false, is_draft: false, is_hidden: false, photo: null, brand_title: 'Marque', size_title: '42', status: 'Très bon état', created_at_ts: s0 - (2 + i) * 86400, favourite_count: 0, view_count: 3 }));
+      const numeros = Object.fromEntries(items.map((it, i) => [it.id, { numero: String(11 + i), ...(i === 0 ? { buyPrice: '30' } : {}) }]));
+      const bA = { ...baseNeuve(), comptes: [{ id: 1, vinted_user_id: '111', login: 'compte_essai', domain: 'www.vinted.fr', owner: SESSION.user.id, updated_at: new Date().toISOString() }] };
+      bA.main = { ...bA.main, vinted_annonce_numeros: numeros };
+      bA.lignes = [{ id: 'harvest_111_listings', data: { capturedAt: new Date().toISOString(), payload: { items, pagination: { total_entries: items.length } } } }];
+      const a = await page(nav, { telephone, base: bA, tab: 'annonces', pont: false });
+      const vue = await attendreBulle(a.pg, 15000);
+      dit(vue, `${T} la bulle paraît sur Annonces`);
+      if (vue) {
+        await a.pg.waitForFunction(() => [...document.querySelectorAll('.vrm-conseil-bulle, .vrm-conseil-halo')].every((e) => e.getAnimations().every((x) => x.playState === 'finished')), null, { timeout: 5000 }).catch(() => {});
+        const b = await lireBulle(a.pg);
+        dit(b.cle === 'prix-achat' && /manquent/.test(b.titre), `${T} « Des prix d’achat manquent » (7 sur 8)`, `${b.cle} · ${b.titre}`);
+        dit(b.pointe && b.cotes && b.dedans && b.auDessusBarre && b.halo, `${T} la pointe tombe dans « Compléter », la bulle tient, au-dessus de la barre`, JSON.stringify(b));
+        await capture(a.pg, `conseils-${W}-annonces`);
+        await a.pg.locator('[data-conseil-geste]').click(); await a.pg.waitForTimeout(1200);
+        const feuille = await a.pg.evaluate(() => !!document.querySelector('[aria-modal="true"]'));
+        dit(feuille && Number.isFinite(etatDe(bA, 'prix-achat').fait), `${T} « Saisie en série » ouvre la saisie (le bouton de l’écran) et le geste est écrit`, `feuille=${feuille} ${JSON.stringify(etatDe(bA, 'prix-achat'))}`);
+        await capture(a.pg, `conseils-${W}-annonces-geste`);
+      }
+      dit(a.erreurs.length === 0, `${T} aucune erreur JS`, a.erreurs.join(' ¦ '));
+      await a.ctx.close();
+      // Le même écran, un conseil déjà vu ici aujourd'hui : plus rien (1 par écran et par jour).
+      const a2 = await page(nav, { telephone, base: bA, tab: 'annonces', pont: false });
+      dit(!(await attendreBulle(a2.pg, 6000)), `${T} rechargé : plus de bulle sur Annonces aujourd’hui`);
+      await a2.ctx.close();
     }
   } catch (e) { dit(false, 'le banc a pu aller au bout', String(e.message).slice(0, 300)); }
   await nav.close(); srv.close();
