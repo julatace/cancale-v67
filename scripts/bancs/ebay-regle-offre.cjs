@@ -180,13 +180,13 @@ async function validerRevision(pg,id){
 const SEL_FEUILLE = /\[data-regles-/;
 async function assurerFeuille(pg, sel, action) {
   if (typeof sel !== 'string') return;
-  const ouverte = !!(await pg.$('[data-ebay-reglages-feuille]').catch(() => null));
+  const ouverte = !!(await (pg.__o ? pg.__o.$ : pg.$.bind(pg))('[data-ebay-reglages-feuille]').catch(() => null));
   if (SEL_FEUILLE.test(sel)) {
     if (ouverte) return;
-    const rangee = await pg.$('[data-ebay-reglage-regle] button').catch(() => null);
+    const rangee = await (pg.__o ? pg.__o.$ : pg.$.bind(pg))('[data-ebay-reglage-regle] button').catch(() => null);
     if (!rangee) return;
     await rangee.click().catch(() => {});
-    await pg.waitForSelector('[data-ebay-reglages-feuille]', { timeout: 5000 }).catch(() => {});
+    await (pg.__o ? pg.__o.waitForSelector : pg.waitForSelector.bind(pg))('[data-ebay-reglages-feuille]', { timeout: 5000 }).catch(() => {});
     await pg.waitForTimeout(450);
   } else if (action && ouverte && !/data-ebay-reglages|data-pourquoi|role=|getByRole/.test(sel)) {
     await pg.keyboard.press('Escape').catch(() => {});
@@ -198,7 +198,7 @@ function avecFeuilleReglages(pg) {
   const lire = ['$', '$$', '$eval', '$$eval', 'waitForSelector', 'getAttribute', 'textContent', 'innerText', 'isVisible'];
   const agir = ['click', 'fill', 'check', 'uncheck', 'selectOption', 'hover', 'tap', 'dblclick'];
   for (const m of [...lire, ...agir]) {
-    const orig = pg[m].bind(pg);
+    const orig = pg[m].bind(pg); pg.__o = pg.__o || {}; pg.__o[m] = orig;   // les originaux : la garde ne s'appelle pas elle-même
     pg[m] = async (sel, ...r) => { await assurerFeuille(pg, sel, agir.includes(m)); return orig(sel, ...r); };
   }
   const origLoc = pg.locator.bind(pg);
