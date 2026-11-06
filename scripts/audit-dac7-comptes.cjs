@@ -158,9 +158,11 @@ async function texteDuPdf(octets) {
   ventes.push(vinted('222', 2100, 40, D(2025, 11, 20))); versements[2100] = D(2026, 0, 5);           // vendue 2025, VERSÉE 2026 ⇒ 2026
   ventes.push(vinted('222', 2101, 77, D(2025, 11, 10))); versements[2101] = D(2025, 11, 15);         // versée 2025 ⇒ pas 2026
   // 28 × 70 = 1 960 + 40 = 2 000,00 € pile, 29 ventes ⇒ sous.
-  // 444 : 29 ventes (900 €) + 1 finalisée SANS date de versement, vendue en octobre 2026 ⇒ atteintSi.
+  // 444 : 29 ventes (900 €) + 1 finalisée SANS date de versement, vendue le 20 déc. 2025 ⇒ atteintSi
+  // (6 nov. : vendue en 2026 et lue en 2026, elle serait VERSÉE en 2026 — src/aDaterAnnee.js — et comptée ;
+  // vendue fin 2025, son versement peut tomber en 2025 ou en 2026 : « peut-être », jamais dans la partie sûre).
   for (let i = 0; i < 29; i++) { ventes.push(vinted('444', 4000 + i, 900 / 29, D(2026, 5, 1 + (i % 25)))); versements[4000 + i] = D(2026, 5, 2 + (i % 25)); }
-  ventes.push(vinted('444', 4100, 50, D(2026, 9, 20)));                                               // à dater, de 2026
+  ventes.push(vinted('444', 4100, 50, D(2025, 11, 20)));                                              // à dater, peut-être de 2026
   ventes.push(vinted('444', 4101, 60, D(2024, 2, 3)));                                                // à dater, vendue en 2024 ⇒ pas 2026
   // 555 : 3 ventes + 1 au prix illisible ⇒ jamais « sous ».
   for (let i = 0; i < 3; i++) { ventes.push(vinted('555', 5000 + i, 20, D(2026, 6, 2 + i))); versements[5000 + i] = D(2026, 6, 4 + i); }

@@ -48,6 +48,7 @@
 //     tard le 31 janvier, ce qu'elle a transmis pour l'année d'avant.
 // ─────────────────────────────────────────────────────────────────────────────
 import { DAC7, verdictDac7, PLATEFORMES } from './seuilsAnnee.js';
+import { anneeSureDeVente } from './aDaterAnnee.js';
 import { eurosTexte, jourFr } from './registres.js';
 import { compteDeVente, SANS_COMPTE_VC } from '../api/_lib/comptes-exclus.js';
 
@@ -162,6 +163,9 @@ export function dac7ParCompte({ decl, annee, compteDe = () => null, comptes = []
     if (exclu.has(cleCarte(q.plateforme, q.cle))) continue;
     const c = cts(l.eur); if (c == null) continue;
     const k = carte(q.plateforme, q.cle, q.nom);
+    // (6 nov.) Vendue cette année et lue finalisée cette année ⇒ versée cette
+    // année (src/aDaterAnnee.js) : comptée, jamais « peut-être ».
+    if (anneeSureDeVente(tsV, maintenant) === annee) { k.n += 1; k.centimes += c; k.lignes.push({ ...ligneExport({ ...l, ts: tsV }, c / 100, 'vendue cette année, versement pas encore daté'), date: jourFr(tsV) }); continue; }
     k.nAd += 1; k.ctsAd += c;
     k.aDater.push({ ...ligneExport({ ...l, ts: tsV || null }, c / 100, 'pas encore datée'), date: tsV ? jourFr(tsV) : '' });
   }

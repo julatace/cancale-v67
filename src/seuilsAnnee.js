@@ -18,7 +18,7 @@
 //    VRM ne sait pas si une plateforme additionne plusieurs comptes d'une même
 //    personne : ici, TOUS les comptes sélectionnés d'une plateforme ensemble
 //    (le détail compte par compte Vinted reste dans Ventes → Registre annuel).
-import { caAnnee, seuilsDe } from './microEntreprise.js';
+import { caAnnee, seuilsDe, aDaterSurDansAnnee } from './microEntreprise.js';
 
 export const DAC7 = { ventes: 30, centimes: 200000 };
 export const PLATEFORMES = ['Vinted', 'Leboncoin', 'eBay', 'Vestiaire'];
@@ -107,6 +107,10 @@ export const dac7ParPlateforme = ({ ligne, annee } = {}) => {
       const q = de(p); q.n += Number(v.n) || 0; q.centimes += c;
     }
   }
+  // (6 nov.) Les ventes à dater VENDUES cette année (et lues finalisées cette
+  // année) y sont versées : comptées, retirées des « peut-être » (src/aDaterAnnee.js).
+  const sur = aDaterSurDansAnnee(ligne, annee);
+  if (sur) for (const [p, v] of Object.entries(sur.par)) { const c = cts(v && v.ca); if (!v || !isFinite(c)) continue; const q = de(p); q.n += Number(v.n) || 0; q.centimes += c; }
   const adPar = (ligne.aDater && ligne.aDater.par) || {};
   const ncPar = (ligne.nonComptees && ligne.nonComptees.par) || {};
   const noms = [...new Set([...PLATEFORMES.filter((p) => p in src || acc[p]), ...Object.keys(acc)])];
@@ -114,7 +118,8 @@ export const dac7ParPlateforme = ({ ligne, annee } = {}) => {
     const q = acc[p] || { plateforme: p, n: 0, centimes: 0 };
     if (src[p] === 'pasSu') return { plateforme: p, etat: 'passu', n: null, centimes: null, nAd: 0, ctsAd: 0, nNc: 0, verdict: null, reste: null };
     const ad = adPar[p] || {};
-    const nAd = Number(ad.n) || 0, ctsAd = nAd ? (cts(ad.ca) || 0) : 0;
+    const sp = (sur && sur.par[p]) || {};
+    const nAd = Math.max(0, (Number(ad.n) || 0) - (Number(sp.n) || 0)), ctsAd = nAd ? Math.max(0, (cts(ad.ca) || 0) - (cts(sp.ca) || 0)) : 0;
     let nNc = 0;
     for (const [k, v] of Object.entries(ncPar)) if (k.split('|')[0] === p) nNc += Number(v) || 0;
     const manque = nAd > 0 || nNc > 0;

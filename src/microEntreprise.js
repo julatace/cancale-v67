@@ -43,6 +43,24 @@ const r2 = (x) => Math.round(x * 100) / 100;
 // la micro-entreprise). Trois états : `null` sans ligne (pas su — jamais 0),
 // sinon `{ ca, mois, partiel, raisons }`. Partiel : une plateforme pas lue,
 // des ventes sans date de versement (elles peuvent être de cette année).
+// (6 nov.) Des ventes « à dater » VENDUES cette année et lues finalisées cette
+// année sont VERSÉES cette année (src/aDaterAnnee.js : le versement tombe entre
+// la vente et la lecture) : elles entrent dans le CA de l'ANNÉE (`aDaterSur`,
+// dit à l'écran), jamais dans un mois. Seules les autres restent « au moins ».
+// La part PROUVÉE de l'année `annee` dans une ligne publiée : ses ventes à dater
+// vendues cette année-là, quand la publication (`at`, une lecture complète) est
+// de la MÊME année. Rend `{ n, ca, par }` ou `null` (rien de prouvé, ou une
+// publication d'avant cette règle : rien ne change).
+export const aDaterSurDansAnnee = (ligne, annee) => {
+  const ad = ligne && ligne.aDater;
+  if (!ad || !ad.annees || typeof ad.annees !== 'object') return null;
+  const at = Number(ligne.at);
+  if (!(at > 0) || new Date(at).getFullYear() !== Number(annee)) return null;
+  const q = ad.annees[String(annee)];
+  if (!q || !(Number(q.n) > 0) || !Number.isFinite(Number(q.ca))) return null;
+  return { n: Number(q.n), ca: Number(q.ca), par: q.par && typeof q.par === 'object' ? q.par : {} };
+};
+
 export const caAnnee = (ligne, annee) => {
   if (!ligne || !Array.isArray(ligne.mois)) return null;
   let ca = 0, mois = 0;
@@ -52,17 +70,20 @@ export const caAnnee = (ligne, annee) => {
     if (!isFinite(v)) continue;
     ca += v; mois += 1;
   }
+  const sur = aDaterSurDansAnnee(ligne, annee);
+  if (sur) ca += sur.ca;
   const raisons = [];
   const src = ligne.sources || {};
   const pasSu = Object.keys(src).filter((k) => src[k] === 'pasSu');
   if (pasSu.length) raisons.push(`${pasSu.join(' et ')} pas lu${pasSu.length > 1 ? 's' : ''}`);
-  if (ligne.aDater && Number(ligne.aDater.n) > 0) raisons.push(`${ligne.aDater.n} vente${ligne.aDater.n > 1 ? 's' : ''} sans date de versement`);
+  const nAdReste = (ligne.aDater ? Number(ligne.aDater.n) || 0 : 0) - (sur ? sur.n : 0);
+  if (nAdReste > 0) raisons.push(`${nAdReste} vente${nAdReste > 1 ? 's' : ''} sans date de versement`);
   // (1er nov., audits A2/A10) Les ventes dont l'argent ne se lit pas (prix
   // Vinted pas lu, montant Vestiaire pas sûr…) : publiées à part par l'écran
   // Ventes (`nonComptees`), elles font du CA de l'année un MINIMUM, dit.
   const nc = ligne.nonComptees && Number(ligne.nonComptees.n);
   if (nc > 0) raisons.push(`${nc} vente${nc > 1 ? 's' : ''} dont l'argent ne se lit pas (${Object.keys(ligne.nonComptees.par || {}).map((k) => k.split('|')[0]).filter((x, i, a) => a.indexOf(x) === i).join(', ') || 'plateforme non dite'})`);
-  return { ca: r2(ca), mois, partiel: raisons.length > 0, raisons };
+  return { ca: r2(ca), mois, partiel: raisons.length > 0, raisons, aDaterSur: sur ? { n: sur.n, ca: r2(sur.ca) } : null };
 };
 
 // Un seuil : où on en est, et ce que ça veut dire. `ca` est un MINIMUM quand
@@ -105,7 +126,7 @@ export const jaugeSeuils = ({ ligne, now = new Date() } = {}) => {
 
   const projTva = projection != null && projection > s.tvaBase && (tvaEtat === 'ok' || tvaEtat === 'proche');
   const projPlafond = projection != null && projection > s.plafondVente && (plafond.etat === 'ok' || plafond.etat === 'proche');
-  return { annee, seuils: s, ca: cur.ca, mois: cur.mois, partiel: cur.partiel, raisons: cur.raisons,
+  return { annee, seuils: s, ca: cur.ca, mois: cur.mois, partiel: cur.partiel, raisons: cur.raisons, aDaterSur: cur.aDaterSur || null,
     caPrec: prec ? prec.ca : null, projection, projTva, projPlafond, tva, plafond };
 };
 
