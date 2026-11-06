@@ -108,7 +108,13 @@ const lire = (pg) => pg.evaluate(() => {
   const s = rt && rt.querySelector('[data-suivre-colis]');
   return {
     bloc: bl ? bl.getAttribute('data-colis-vestiaire') : null, route: rt ? rt.getAttribute('data-colis-vestiaire-route') : null,
-    ventes: [...document.querySelectorAll('[data-vc-colis]')].map((x) => ({ id: x.getAttribute('data-vc-colis'), num: x.getAttribute('data-vc-colis-num'), lim: x.getAttribute('data-vc-colis-limite'), t: x.innerText })),
+    // (6 nov.) `etiquette: true` = le bordereau est chez Vestiaire (« Bordereau sur Vestiaire », ff92f91c),
+    // un bordereau rangé par VRM = le bouton d'impression : les deux disent « disponible ».
+    // Depuis le 3 nov. (c2f4245f) tous les sites sont dans UNE liste, la même carte pour chacun :
+    // plus de section Vestiaire (`data-colis-vestiaire` ne reste que pour la panne). Le bordereau se lit
+    // sur la carte par son crochet : bouton d'impression (`data-vc-imprimer`) ou `data-vc-colis-bordereau`.
+    ventes: [...document.querySelectorAll('[data-vc-colis]')].map((x) => ({ id: x.getAttribute('data-vc-colis'), num: x.getAttribute('data-vc-colis-num'), lim: x.getAttribute('data-vc-colis-limite'), t: x.innerText,
+      bord: x.querySelector('[data-vc-imprimer]') ? 'disponible' : ((x.querySelector('[data-vc-colis-bordereau]') || { getAttribute: () => null }).getAttribute('data-vc-colis-bordereau')) })),
     achats: [...document.querySelectorAll('[data-vc-route]')].map((x) => x.getAttribute('data-vc-route')),
     suivre: s ? s.href : '', h: s ? s.getBoundingClientRect().height : 0,
     panne: document.querySelectorAll('[data-colis-vestiaire="passu"]').length,
@@ -137,12 +143,12 @@ const jobs = (pg) => pg.evaluate(() => ({ env: (document.querySelector('[data-jo
           await pg.waitForTimeout(3000);
           const c = await lire(pg);
           if (mode === 'lu') {
-            dit(c.bloc === '2' && c.ventes.map((v) => v.id).sort().join() === 'V1,V2', 'Colis : les 2 ventes Vestiaire à envoyer, pas celle déjà partie', JSON.stringify(c.ventes.map((v) => v.id)));
+            dit(c.ventes.length === 2 && c.ventes.map((v) => v.id).sort().join() === 'V1,V2', 'Colis : les 2 ventes Vestiaire à envoyer, pas celle déjà partie', JSON.stringify(c.ventes.map((v) => v.id)));
             const v1 = c.ventes.find((v) => v.id === 'V1') || {}, v2 = c.ventes.find((v) => v.id === 'V2') || {};
-            dit(v1.num === '401' && v1.lim && /demain/.test(v1.t) && /bordereau disponible/i.test(v1.t), 'V1 : N°401 (référence VRM), à envoyer demain, bordereau disponible', v1.t);
+            dit(v1.num === '401' && v1.lim && /demain/.test(v1.t) && (v1.bord === 'disponible' || v1.bord === 'vestiaire'), 'V1 : N°401 (référence VRM), à envoyer demain, bordereau disponible', `${v1.bord} · ${String(v1.t).replace(/\n/g, ' ').slice(0, 80)}`);
             // (2 nov., soir) « un numéro par annonce » : V2, sans référence, reçoit le N° de SON
             // produit (900002), du plus haut + 1 (401 et 403, références lues, sont pris) — jamais un titre deviné.
-            dit(v2.num === '404' && /bordereau : pas su/i.test(v2.t), 'V2 : sans référence ⇒ le N° neuf de son produit (404), bordereau « pas su »', `${v2.num} · ${v2.t}`);
+            dit(v2.num === '404' && v2.bord === 'pas-su', 'V2 : sans référence ⇒ le N° neuf de son produit (404), bordereau « pas su »', `${v2.num} · ${v2.bord}`);
             dit(c.route === null && !c.achats.length, '« À envoyer » : aucun achat en route (ce qui arrive n’est pas à envoyer)', JSON.stringify(c.achats));
             await pg.click('[data-colis-onglet-choix="retirer"]'); await pg.waitForTimeout(800);
             const r = await lire(pg);
@@ -153,12 +159,14 @@ const jobs = (pg) => pg.evaluate(() => ({ env: (document.querySelector('[data-jo
             dit(!vide, 'jamais « Aucun colis à envoyer » sous deux colis Vestiaire à envoyer (« Aucun colis Vinted à envoyer »)', String(vide));
           } else if (mode === 'panne') {
             dit(c.panne === 1 && !c.ventes.length, 'pas su : Colis le dit UNE fois, aucune vente inventée', JSON.stringify(c));
-          } else dit(c.bloc === null && c.panne === 0, 'jamais lu : rien de Vestiaire dans Colis', JSON.stringify(c));
+          } else dit(!c.ventes.length && c.panne === 0, 'jamais lu : rien de Vestiaire dans Colis', JSON.stringify(c));
           await sain(pg, 'Colis');
         });
         await essaie('Ma journée ' + mode, async () => {
           await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
-          await pg.waitForSelector('[data-tuile="envoyer"]', { timeout: 15000, state: 'attached' });
+          // (6 nov.) Une carte à zéro ne prend plus de place (2 nov., maquette FusionJournee) : sans colis à
+          // envoyer, il n'y a pas de tuile « envoyer » — on attend la tête de Ma journée, puis les gestes.
+          await pg.waitForSelector(mode === 'lu' ? '[data-tuile="envoyer"]' : '.vrm-day-greeting', { timeout: 15000, state: 'attached' });
           await pg.waitForTimeout(3000);
           const t = await jobs(pg);
           if (mode === 'lu') {

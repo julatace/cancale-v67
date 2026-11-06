@@ -61,6 +61,10 @@ const EXCEPTIONS = [
   ['E4', /./, /aria-current=page/, 'l’entrée de l’écran déjà ouvert : la retoucher ne change rien, c’est voulu'],
   ['E4', /./, /aria-pressed=true/, 'le filtre déjà choisi : le retoucher ne change rien, c’est voulu'],
   ['E4', /./, /aria-selected=true/, 'l’onglet déjà choisi : le retoucher ne change rien, c’est voulu'],
+  // (6 nov.) Le choix déjà coché d'un groupe radio (`role=radio` `aria-checked=true`, ex. Paramètres → Numéros
+  // « Nulle part », réglage par défaut) : le retoucher ne change rien, comme aria-pressed / aria-selected.
+  // Un radio NON coché qui ne fait rien reste rouge (l'exception ne vise que `aria-checked=true`).
+  ['E4', /./, /aria-checked=true/, 'le choix déjà coché d’un groupe radio : le retoucher ne change rien, c’est voulu'],
   ['E8', /^parametres$/, /^texte\|Réglages$/, 'l’onglet « Réglages » DANS Paramètres (à côté de « Mon compte » et « Abonnement », 4 oct.) : une section, pas un autre nom de l’écran'],
   ['E9', /^statistiques/, /^g\|[a-zéû]+ \d{4} ·/, 'une barre du graphique des mois : 12 barres sur 390 px, la hauteur (124 px) fait la cible ; le montant est aussi écrit sous le graphique'],
   ['E4', /./, /^button\|Fermer ce message/, 'un message (toast) : il se ferme tout seul, le banc l’a déjà vu partir'],
@@ -267,7 +271,7 @@ const ENUMERER = ([portee, exclure, marquer]) => {
     if (!e.getClientRects().length || rr.width < 1 || rr.height < 1 || cs.visibility === 'hidden' || Number(cs.opacity) === 0) continue;
     const txt = (e.getAttribute('aria-label') || e.innerText || e.getAttribute('title') || '').replace(/\s+/g, ' ').trim().slice(0, 60);
     const datas = [...e.attributes].filter((a) => /^data-/.test(a.name) && !/^data-banc/.test(a.name) && a.value.length < 30).map((a) => a.name + '=' + a.value).sort().join(' ');
-    const etats = ['aria-current', 'aria-pressed', 'aria-selected', 'aria-expanded'].filter((a) => e.hasAttribute(a)).map((a) => a + '=' + e.getAttribute(a)).join(' ');
+    const etats = ['aria-current', 'aria-pressed', 'aria-selected', 'aria-checked', 'aria-expanded'].filter((a) => e.hasAttribute(a)).map((a) => a + '=' + e.getAttribute(a)).join(' ');
     const base = e.tagName.toLowerCase() + '|' + txt + '|' + datas + '|' + etats + (e.classList.contains('vrm-lien-texte') ? ' vrm-lien-texte' : '');
     compte[base] = (compte[base] || 0) + 1;
     const sig = base + '#' + compte[base];
@@ -348,15 +352,33 @@ const nomDe = (tab) => (NOMS[tab] || [])[0] || '';
 const FEUILLES = [
   // (5 nov., chantier C) La feuille « Republier et brouillons » n'existe plus : la feuille d'Annonces jugée ici est « … » d'une carte.
   { nom: 'Autres gestes d’une annonce (« … »)', url: '?tab=cat_annonces', ouvrir: (pg) => pg.locator('[data-fiche-menu-ouvrir]').first().click(), sel: '[data-fiche-menu]' },
-  { nom: 'Synchronisation', url: '?tab=journee', ouvrir: (pg) => pg.locator('.vrm-sync-status').first().click(), sel: '[data-sync-panneau]' },
-  { nom: 'Prix d’achat à compléter (Ma journée)', url: '?tab=journee', ouvrir: (pg) => pg.locator('[data-stock-completer]').first().click(), sel: null },
-  { nom: 'Relier un achat (Ventes)', url: '?tab=ventes&site=vinted', ouvrir: (pg) => pg.locator('[data-cout-vente-relier]').first().click(), sel: null },
+  // (6 nov.) Le nuage n'est dans l'en-tête QUE si une sauvegarde a raté ou une lecture n'a pas
+  // répondu (chantier H, docs/passation/2026-11-05-chantier-h.md « En-tête », `SYNC_PROBLEME`) :
+  // le banc sert la vraie forme de la panne (503 + HTML) à la lecture de `main`, puis ouvre le panneau.
+  { nom: 'Synchronisation', url: '?tab=journee', avant: (pg) => pg.route('**/rest/v1/app_data**', (r) => (r.request().method() === 'GET' && /[?&]id=eq\.main(&|$)/.test(r.request().url()) && /[?&]select=(owner,)?data(,updated_at)?(&|$)/.test(decodeURIComponent(r.request().url()))
+    ? r.fulfill({ status: 503, contentType: 'text/html', body: '<html>503</html>' }) : r.fallback())),
+  ouvrir: (pg) => pg.locator('.vrm-sync-status').first().click({ timeout: 15000 }), sel: '[data-sync-panneau]' },
+  // (6 nov.) Ma journée n'a plus la grille de widgets (et son « N à compléter ») depuis le
+  // 2 nov. (`JOURNEE_AVEC_WIDGETS = false`, « la maquette n'a que la tête et À faire ») ; la
+  // saisie en série s'ouvre du bandeau « Prix d'achat N/M » d'Annonces (chantier C,
+  // docs/passation/2026-11-05-chantier-c.md).
+  // Le bandeau « Prix d'achat N/M · Compléter », ou — quand c'est LE geste à faire (6 nov.,
+  // docs/passation/2026-11-06-onglets-d.md, « Prochain geste ») — son bouton : la même feuille.
+  { nom: 'Prix d’achat à compléter (Annonces)', url: '?tab=cat_annonces', ouvrir: (pg) => pg.locator('[data-ann-achats-completer], [data-ann-prochain-geste="prix"] [data-ann-prochain-geste-bouton]').first().click(), sel: null },
+  // (6 nov.) Deux commandes par vente, « le reste dans … » (c6b2e1ea, critique du 3 nov.) :
+  // « Relier un achat » est derrière le « … » de la ligne (`data-vente-plus`) quand il n'est pas à vue.
+  { nom: 'Relier un achat (Ventes)', url: '?tab=ventes&site=vinted', ouvrir: async (pg) => {
+    const r = pg.locator('[data-cout-vente-relier]').first();
+    if (!(await r.isVisible())) await pg.locator('[data-fu-forme]').filter({ has: pg.locator('[data-cout-vente-relier]') }).first().locator('[data-vente-plus]').click();
+    await r.click();
+  }, sel: null },
   { nom: 'Nouvelle facture (Factures)', url: '?tab=compta&section=factures', ouvrir: (pg) => pg.getByRole('button', { name: /Nouvelle facture/ }).first().click(), sel: null },
 ];
 async function verifierFeuilles(b) {
   for (const F of FEUILLES) {
     const { ctx, pg } = await ouvrirPage(b, false);
     try {
+      if (F.avant) await F.avant(pg);
       await pg.goto(`http://localhost:${PORT}/${F.url}`, { waitUntil: 'domcontentloaded' }); await attendreCoque(pg);
       await F.ouvrir(pg);
       const ouverte = () => pg.evaluate((sel) => (sel ? !!document.querySelector(sel) : !!(history.state || {}).vrmFeuille), F.sel);

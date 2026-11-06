@@ -118,6 +118,13 @@
 }
 /* `plein` : la piste prend toute la largeur, les segments la partagent (Achats). */
 .vrm-seg-plein { width: 100%; }
+/* (6 nov.) `vrm-seg-grille` : des segments qui ne tiennent pas sur une ligne de téléphone passent en
+   deux colonnes, jamais un choix coupé par le bord (Colis → « … » → « Suivre un colis par son n° » :
+   « Autre » sortait de l'écran à 390 px, banc suivi-colis H). */
+@media (max-width: 480px) {
+  :root .vrm-seg.vrm-seg-grille:not(#vrm-seg) { display: grid !important; grid-auto-flow: row !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; overflow: visible !important; }
+  :root .vrm-seg.vrm-seg-grille > .vrm-seg-btn:not(#vrm-seg) { min-width: 0 !important; width: 100%; }
+}
 
 /* ── LES FILTRES : une seule pastille (revue du 16 oct.) ────────────────────
    Pastille neutre ; l'active est à l'encre pleine en clair, une surface élevée

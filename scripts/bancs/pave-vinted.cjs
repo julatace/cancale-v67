@@ -164,10 +164,15 @@ const attendTrouve = async (pg) => { for (let i = 0; i < 30; i++) { const e = aw
         await tape(pg, '51'); await pg.keyboard.press('Enter'); await pg.waitForTimeout(500);
         const apres = await pg.evaluate(() => ({ url: location.search, sec: (document.querySelector('[data-section][aria-current="page"],[data-section][aria-pressed="true"]') || { getAttribute: () => '' }).getAttribute('data-section'), focus: document.activeElement ? document.activeElement.tagName : '' }));
         dit(apres.url === avant.url && apres.sec === avant.sec && !/INPUT|TEXTAREA/.test(apres.focus), 'un N° tapé hors d’un champ ne fait rien (ni focus, ni onglet)', JSON.stringify({ avant, apres }));
-        await pg.click('input[aria-label="Rechercher dans les ventes Vinted"]'); await pg.keyboard.press('7');
-        const v = await pg.$eval('input[aria-label="Rechercher dans les ventes Vinted"]', (x) => x.value);
+        // (6 nov.) Ventes n'a plus sa propre recherche à l'écran (décision du 2 nov., 22 h,
+        // b3d5ed7b, src/design/fusion.css §13 : « ni recherche et période » sur Ventes ; la
+        // recherche de la barre du haut cherche un N°). La règle reste : un chiffre tapé dans
+        // LA recherche visible de l'écran y reste.
+        const rech = pg.locator('[data-ventes-recherche] input:visible, [data-recherche-champ]:visible').first();
+        await rech.click(); await pg.keyboard.press('7');
+        const v = await rech.inputValue();
         dit(v === '7', 'un chiffre tapé dans la recherche y reste (c’est elle qui cherche un N°)', v);
-        await pg.fill('input[aria-label="Rechercher dans les ventes Vinted"]', '');
+        await rech.fill(''); await pg.keyboard.press('Escape');
       });
       console.log('\n── Colis, 1512 px');
       await allerA(pg, 'cat_bord', '[data-bord-card][data-tx-colis="501"]');
@@ -196,10 +201,10 @@ const attendTrouve = async (pg) => { for (let i = 0; i < 30; i++) { const e = aw
         await tape(pg, '51'); await pg.keyboard.press('Enter'); await pg.waitForTimeout(500);
         const apres = await pg.evaluate(() => ({ url: location.search, sec: (document.querySelector('[data-section][aria-current="page"],[data-section][aria-pressed="true"]') || { getAttribute: () => '' }).getAttribute('data-section'), focus: document.activeElement ? document.activeElement.tagName : '' }));
         dit(apres.url === avant.url && apres.sec === avant.sec && !/INPUT|TEXTAREA/.test(apres.focus), 'un N° tapé hors d’un champ ne fait rien (ni focus, ni onglet)', JSON.stringify({ avant, apres }));
-        await pg.click('input[aria-label="Rechercher une annonce"]'); await pg.keyboard.press('7');
-        const v = await pg.$eval('input[aria-label="Rechercher une annonce"]', (x) => x.value);
+        await pg.click('[data-ann-recherche] input'); await pg.keyboard.press('7');
+        const v = await pg.$eval('[data-ann-recherche] input', (x) => x.value);
         dit(v === '7', 'un chiffre tapé dans la recherche y reste (c’est elle qui cherche un N°)', v);
-        await pg.fill('input[aria-label="Rechercher une annonce"]', '');
+        await pg.fill('[data-ann-recherche] input', '');
       });
       // Les lignes PUBLIÉES par un écran (§11 : widget_stats, vrm_colis_*, et
       // depuis le 29 oct. `lbc_a_retirer`, le résumé pour le logo VRM sur
