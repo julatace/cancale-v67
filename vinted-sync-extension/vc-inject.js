@@ -1352,38 +1352,15 @@
     } finally { offreEnCours = false; }
   }); } catch (_) {}
 
-  // ── 5.315 (2 nov., Julien : « une extension qui capte TOUT Vestiaire dès que je
-  //    vais sur un onglet, pour après pouvoir capter toutes les infos — les ventes,
-  //    les bordereaux, etc. ») — LA RÉPONSE ENTIÈRE, GARDÉE TELLE QUELLE.
-  //    Rien n'est DEMANDÉ à Vestiaire : on garde ce que la page charge déjà, sur
-  //    SON compte, dans SON onglet (aucune requête de plus, aucun geste simulé).
-  //    · toute réponse JSON 2xx de vestiairecollective.com (≤ 400 Ko) ;
-  //    · les données de la page (`__NEXT_DATA__`) à chaque chargement ;
-  //    · tout PDF que la page reçoit (un bordereau), d'où qu'il vienne (≤ 3 Mo).
-  //    Les paramètres d'adresse qui ressemblent à un secret sont masqués ici ; les
-  //    clés secrètes du contenu sont retirées par le fond avant d'écrire.
-  const BRUT_MAX = 400000;
-  const PDF_MAX = 3 * 1024 * 1024;
-  const SECRET_PARAM = /token|key|sig|signature|auth|session|password|secret|code|jwt/i;
-  const adresseBrut = (url) => { try { const x = new URL(url, location.origin); for (const k of [...x.searchParams.keys()]) if (SECRET_PARAM.test(k)) x.searchParams.set(k, '_'); return (x.hostname + x.pathname + x.search).slice(0, 400); } catch (_) { return ''; } };
-  function noteBrut(url, meth, statut, texte, sorte) {
-    try {
-      if (!DE_VC(url) || typeof texte !== 'string' || !texte || texte.length > BRUT_MAX) return;
-      const u = adresseBrut(url); if (!u) return;
-      post({ kind: 'vcbrut', url: u, methode: String(meth || 'GET').toUpperCase().slice(0, 8), statut: Number(statut) || 0, sorte: sorte || 'api', texte, page: (location.pathname || '').slice(0, 200), moi: moiId });
-    } catch (_) {}
-  }
-  function notePdf(url, statut, octets) {
-    try {
-      if (!octets || !octets.byteLength || octets.byteLength > PDF_MAX) return;
-      const b = new Uint8Array(octets);
-      if (!(b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46)) return;   // « %PDF »
-      let bin = ''; for (let i = 0; i < b.length; i += 0x8000) bin += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
-      post({ kind: 'vcpdf', url: adresseBrut(url), statut: Number(statut) || 0, b64: btoa(bin), page: (location.pathname || '').slice(0, 200), moi: moiId });
-    } catch (_) {}
-  }
-  const noteDonneesPage = () => { try { const el = document.getElementById('__NEXT_DATA__'); if (el && el.textContent) noteBrut(location.href, 'PAGE', 200, el.textContent, 'page'); } catch (_) {} };
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', noteDonneesPage, { once: true }); else setTimeout(noteDonneesPage, 0);
+  // ⛔ 5.323 (6 nov., Julien : « coupe la capture Vestiaire ») — LA CAPTURE BRUTE
+  //    DE LA 5.315 EST RETIRÉE. Elle envoyait au fond la réponse JSON ENTIÈRE de
+  //    chaque appel Vestiaire, les données de page (`__NEXT_DATA__`) et tout PDF
+  //    reçu (bordereaux) : noms, e-mails, adresses, téléphones d'acheteurs partaient
+  //    dans `vc_brut_*` (`audit-vc-recon` rouge). Personne ne les lisait : chaque
+  //    fonction Vestiaire a son propre lecteur ci-dessus (annonces, ventes, achats,
+  //    messages, offres, suivi, recettes apprises), qui ne garde que ses champs.
+  //    ⚠️ NE PAS la remettre (ni une « liste noire » de clés : c'est une liste
+  //    blanche par fonction qui protège, jamais un filtre après coup).
 
   const origFetch = window.fetch;
   if (origFetch) {
@@ -1402,8 +1379,7 @@
             if ((DE_VC(url) || DE_STREAM(url)) && /^(POST|PUT)$/i.test(String(meth))) noteEnvoi(url, meth, res.status, corpsEnvoye, ent);
             if (DE_STREAM(url) && res.status >= 200 && res.status < 300 && /json/i.test(String(ct || ''))) res.clone().text().then((t) => noteStream(url, meth, res.status, t)).catch(() => {});
             // 5.299 : une réponse d'ERREUR (401, 404, 500…) n'est ni une liste, ni un compte, ni un schéma.
-            if (res.status >= 200 && res.status < 300 && /pdf/i.test(String(ct || ''))) res.clone().arrayBuffer().then((o) => notePdf(url, res.status, o)).catch(() => {});
-            if (DE_VC(url) && res.status >= 200 && res.status < 300 && /json/i.test(String(ct || ''))) res.clone().text().then((t) => { if (/^(POST|PUT|PATCH)$/i.test(String(meth))) noteReponseOffre(url, meth, res.status, corpsEnvoye, ent, t); else noteOffres(url, meth, t); noteBrut(url, meth, res.status, t, 'api'); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); noteTimeline(url, t); noteCompteur(url, t); noteMessages(url, t); noteFluxMessages(url, t); noteCanal(url, meth, t); noteFil(url, t); noteAchats(url, t); notePublication(url, meth, res.status, t); }).catch(() => {});
+            if (DE_VC(url) && res.status >= 200 && res.status < 300 && /json/i.test(String(ct || ''))) res.clone().text().then((t) => { if (/^(POST|PUT|PATCH)$/i.test(String(meth))) noteReponseOffre(url, meth, res.status, corpsEnvoye, ent, t); else noteOffres(url, meth, t); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); noteTimeline(url, t); noteCompteur(url, t); noteMessages(url, t); noteFluxMessages(url, t); noteCanal(url, meth, t); noteFil(url, t); noteAchats(url, t); notePublication(url, meth, res.status, t); }).catch(() => {});
           } catch (_) {}
         }).catch(() => {});
       } catch (_) {}
@@ -1428,8 +1404,7 @@
             try { t = this.responseType === 'json' ? (this.response == null ? null : JSON.stringify(this.response)) : (this.responseType === '' || this.responseType === 'text') ? this.responseText : null; } catch (_) { t = null; }
             if ((DE_VC(url) || DE_STREAM(url)) && /^(POST|PUT)$/i.test(String(this.__vcMeth || ''))) noteEnvoi(url, this.__vcMeth, this.status, this.__vcCorps, this.__vcH);
             if (t && DE_STREAM(url) && this.status >= 200 && this.status < 300 && /json/i.test(String(ct || ''))) noteStream(url, this.__vcMeth, this.status, t);
-            if (this.status >= 200 && this.status < 300 && /pdf/i.test(String(ct || '')) && this.response instanceof ArrayBuffer) notePdf(url, this.status, this.response);
-            if (t && this.status >= 200 && this.status < 300 && /json/i.test(String(ct || ''))) { if (DE_VC(url) && /^(POST|PUT|PATCH)$/i.test(String(this.__vcMeth || ''))) noteReponseOffre(url, this.__vcMeth, this.status, this.__vcCorps, this.__vcH, t); else if (DE_VC(url)) noteOffres(url, this.__vcMeth, t); noteBrut(url, this.__vcMeth, this.status, t, 'api'); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); noteTimeline(url, t); noteCompteur(url, t); noteMessages(url, t); noteFluxMessages(url, t); noteCanal(url, this.__vcMeth, t); noteFil(url, t); noteAchats(url, t); notePublication(url, this.__vcMeth, this.status, t); }
+            if (t && this.status >= 200 && this.status < 300 && /json/i.test(String(ct || ''))) { if (DE_VC(url) && /^(POST|PUT|PATCH)$/i.test(String(this.__vcMeth || ''))) noteReponseOffre(url, this.__vcMeth, this.status, this.__vcCorps, this.__vcH, t); else if (DE_VC(url)) noteOffres(url, this.__vcMeth, t); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); noteTimeline(url, t); noteCompteur(url, t); noteMessages(url, t); noteFluxMessages(url, t); noteCanal(url, this.__vcMeth, t); noteFil(url, t); noteAchats(url, t); notePublication(url, this.__vcMeth, this.status, t); }
           } catch (_) {}
         });
       } catch (_) {}
