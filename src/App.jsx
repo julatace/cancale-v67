@@ -74,7 +74,7 @@ import { annulationsParCompte } from './annulationsCompte.js';
 import { notesParCompte } from './notesRecues.js';
 import { toutSurLeNumero, lireNumeroCherche } from "./rechercheNumero.js";
 import { repriseNumerosRecreation, tableRecrees } from "./repriseNumero.js";
-import { etatAnnonceVinted, enVerificationVinted, raisonPasSelectionnable, actionsPossibles, ETATS_ANNONCE, liensRepubMain, fusionLiensRecrees, lusDuDressing, candidatsNouvelle, etatSuiviMain, filtreReglages, nomPhotoReglee, appliquerCouleursPixels } from "./annoncesActions.js";
+import { etatAnnonceVinted, enVerificationVinted, raisonPasSelectionnable, actionsPossibles, raisonCommune, ACTIONS_TUILES, ETATS_ANNONCE, liensRepubMain, fusionLiensRecrees, lusDuDressing, candidatsNouvelle, etatSuiviMain, filtreReglages, nomPhotoReglee, appliquerCouleursPixels } from "./annoncesActions.js";
 import { etatCycle, cartesSupprimees, majVusEnLigne, indexPresentes, montantSaisi as montantCycle, CHOIX as CHOIX_CYCLE, LIBELLE_CHOIX } from "./cycleArticle.js";
 import { chezMoiProposables } from "./propositionsSites.js";
 import { retraitsEbayAutoAilleursPermis, RAISON_RETRAIT_AILLEURS } from "./retraitAilleurs.js";
@@ -237,6 +237,7 @@ import { etapesTournee, arretsTournee, gestesDepuis } from "./tournee.js";
 import "./styles-barre-haut.css";
 import "./styles-recherche.css";
 import "./annonces-selection.css";
+import "./styles-annonces-coherence.css";   // (5 nov., chantier C) Annonces : barre, carte, feuille Actions
 import { colonnesColis, SITES_COLIS } from "./colisColonnes.js";
 import { fusionEntreeVente, parcoursPaire } from "./fichePaire.js";
 import { etatNumeroColis } from "./emballage.js";
@@ -14066,7 +14067,7 @@ async function demanderQuestionRepub(q, titre) {
 // propose, selon la sélection… ». Règles : `src/annoncesActions.js`. Les moteurs
 // sont ceux qui existent (`RepublierVinted` / `ACTIONS_REPUB`) : la sélection
 // ne fait que choisir, rien ne part d'ici.
-function ChoixAnnoncesVinted({ filtre = 'tout', annonces, sel, setSel, charge, brLecture, onActions, suivis = [], onSuivi }) {
+function ChoixAnnoncesVinted({ filtre = 'tout', annonces, sel, setSel, charge, brLecture, onActions, suivis = [], onSuivi, onDetailBrouillons }) {
   const liste = (annonces || []).filter((a) => filtre !== 'brouillon' || a.etat === 'brouillon');
   const cle = (a) => a.uid + ':' + a.id;
   const coches = new Set((sel || []).map((x) => x.uid + ':' + x.id));
@@ -14085,16 +14086,18 @@ function ChoixAnnoncesVinted({ filtre = 'tout', annonces, sel, setSel, charge, b
     <section className="vrm-sel" data-selection-vue={filtre} data-selection-n={liste.length}>
       {suivis.length > 0 && suivis.map((s) => (
         <div key={s.ancienId} data-suivi-main={s.ancienId} data-suivi-main-etat={s._etat} className="vrm-act-paire">
-          <span><b>{s.num ? `N°${s.num} ` : ''}{s.titre || 'Annonce'}</b> — republiée à la main : {s._etat === 'lie' ? 'nouvelle annonce désignée ; le N° passe dessus dès que l’ancienne n’est plus du tout sur Vinted.' : 'choisis la nouvelle annonce pour lui remettre son N°.'}</span>
+          <span className="vrm-act-paire-nom">{s.num ? <Numero n={s.num} taille="petit"/> : null}<b>{s.titre || 'Annonce'}</b></span>
+          <span>Republiée à la main : {s._etat === 'lie' ? 'nouvelle annonce désignée ; le N° passe dessus dès que l’ancienne n’est plus du tout sur Vinted.' : 'choisis la nouvelle annonce pour lui remettre son N°.'}</span>
           <div className="vrm-b-rangee" style={{ justifyContent: 'flex-start' }}><Bouton variante="discret" data-suivi-main-reprendre={s.ancienId} onClick={() => onSuivi && onSuivi(s)}>Reprendre</Bouton></div>
         </div>
       ))}
-      <div className="vrm-sel-tete">
-        <span>{filtre === 'brouillon' ? 'Tes brouillons Vinted, compte par compte. ' : ''}Coche des annonces, puis <b>Actions</b>.</span>
-        {nCoches > 0 && <Bouton variante="discret" data-selection-vider onClick={() => setSel([])}>Tout décocher ({nCoches})</Bouton>}
+      <div className="vrm-sel-tete" data-sel-tete="">
+        <span>{filtre === 'brouillon' ? 'Tes brouillons Vinted, compte par compte. Coche-les, puis ' : 'Coche des annonces d’un même compte, puis '}<b>Actions</b>{filtre === 'brouillon' ? ' : mettre en ligne.' : ' : republier, modifier prix ou titre, mettre en brouillon ou en ligne.'}</span>
+        {nCoches > 0 && <Bouton variante="discret" data-selection-vider onClick={() => setSel([])}>Tout décocher</Bouton>}
+        {filtre === 'brouillon' && onDetailBrouillons ? <Bouton variante="discret" data-brouillons-detail="" onClick={onDetailBrouillons}>Un par un</Bouton> : null}
       </div>
-      {charge ? <div className="vrm-sel-vide" data-selection-charge="">Lecture de tes annonces…</div>
-        : !liste.length ? <div className="vrm-sel-vide" data-selection-vide="">{filtre === 'brouillon' ? (brLecture ? 'Lecture de tes brouillons…' : 'Aucun brouillon lu dans tes dressings Vinted.') : 'Aucune annonce à sélectionner.'}</div>
+      {charge ? <div className="vrm-sel-vide" data-selection-charge="">{PAS_SU.enCours}</div>
+        : !liste.length ? <div className="vrm-sel-vide" data-selection-vide="">{filtre === 'brouillon' ? (brLecture ? PAS_SU.enCours : 'Aucun brouillon lu dans tes dressings Vinted. Un brouillon enregistré sur vinted.fr apparaît ici à ta prochaine visite.') : 'Aucune annonce lue. Ouvre vinted.fr sur ton compte : tes annonces arrivent ici.'}</div>
         : groupes.map((g) => (
           <div key={g.uid || 'x'} className="vrm-sel-groupe" data-selection-compte={g.uid} data-selection-compte-n={g.items.length}>
             <div className="vrm-sel-compte"><b>{g.compte}</b><span className="vrm-sel-n">{g.items.length} annonce{g.items.length > 1 ? 's' : ''}</span>
@@ -14107,10 +14110,10 @@ function ChoixAnnoncesVinted({ filtre = 'tout', annonces, sel, setSel, charge, b
                 <li key={cle(a)}>
                   <label className="vrm-sel-ligne" data-selection-annonce={a.id} data-selection-etat={a.etat} data-sel-coche={on ? '1' : '0'} aria-disabled={off ? 'true' : undefined} title={off ? a.raisonPas : undefined}>
                     <input type="checkbox" className="vrm-sel-case" checked={on} disabled={off} onChange={() => basculer(a)} aria-label={`Sélectionner ${a.titre || 'cette annonce'}`}/>
-                    {a.photo ? <PhotoVinted src={a.photo} alt="" className="vrm-sel-photo" loading="lazy"/> : <span className="vrm-sel-photo" aria-hidden="true"/>}
+                    {a.photo ? <PhotoVinted src={a.photo} alt="" className="vrm-sel-photo" loading="lazy"/> : <PhotoVide taille={52} className="vrm-sel-photo"/>}
                     <span className="vrm-sel-centre">
-                      <span className="vrm-sel-nom">{a.numero ? <span className="vrm-sel-num">N°{a.numero}</span> : null}{a.titre || 'Sans titre'}</span>
-                      <span className="vrm-sel-sous"><span className="vrm-sel-etat" data-etat-annonce={a.etat}>{ETATS_ANNONCE[a.etat] || a.etat}</span><span>{prixTxt(a.prix)}</span></span>
+                      <span className="vrm-sel-nom">{a.numero ? <Numero n={a.numero} taille="petit" className="vrm-sel-num"/> : null}<span className="vrm-sel-titre">{a.titre || 'Sans titre'}</span></span>
+                      <span className="vrm-sel-sous"><span className="vrm-sel-etat" data-etat-annonce={a.etat}>{ETATS_ANNONCE[a.etat] || a.etat}</span><span className="vrm-sel-prix">{prixTxt(a.prix)}</span></span>
                       {off && <span className="vrm-sel-raison" data-selection-raison="">{a.raisonPas}</span>}
                     </span>
                   </label>
@@ -14136,31 +14139,49 @@ function ActionsSelectionFeuille({ choisies, actions, onLancer, onClose }) {
   });
   const nManque = verifs.filter((v) => v.pbs.length).length;
   const lien = (a) => `https://${a.domain || 'www.vinted.fr'}/items/${a.id}/edit`;
+  // (5 nov., chantier C — revue 2.5) UNE feuille, QUATRE tuiles (Republier · Modifier
+  // prix ou titre · Mettre en brouillon · Mettre en ligne) ; la raison commune se dit
+  // UNE fois en tête (`raisonCommune`), sous une tuile ne reste que SA raison.
+  // « Republier à la main » n'est pas une cinquième tuile : un lien discret dessous.
+  const tuiles = ACTIONS_TUILES.map((k) => actions.find((x) => x.k === k)).filter(Boolean);
+  const main = actions.find((x) => x.k === 'main');
+  const { tete, parTuile } = raisonCommune(actions);
+  // Ce que VRM n'a pas lu : la MÊME phrase sur chaque paire ⇒ une fois, sous la liste.
+  const cleNL = (l) => l.join(', ');
+  const nlCommun = verifs.length > 1 && verifs.every((v) => v.nonLus.length && cleNL(v.nonLus) === cleNL(verifs[0].nonLus)) ? verifs[0].nonLus : null;
+  const n = choisies.length;
   return (
-    <SheetShell onClose={onClose} maxWidth={520}>
-      <div className="vrm-act" data-actions-selection={choisies.length}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <h2 className="vrm-act-titre">Actions · {choisies.length} annonce{choisies.length > 1 ? 's' : ''}</h2>
-          <button type="button" onClick={onClose} aria-label="Fermer" style={{ border: 'none', background: 'transparent', color: C.muted, fontSize: 22, minWidth: 44, minHeight: 44, cursor: 'pointer' }}>✕</button>
+    <SheetShell onClose={onClose} maxWidth={520} titre={`Actions · ${n} annonce${n > 1 ? 's' : ''}`}>
+      <div className="vrm-act" data-actions-selection={n} data-actions-tuiles={tuiles.length}>
+        {tete ? <p className="vrm-act-raison" data-actions-raison="" role="status">{tete}</p> : null}
+        <div className="vrm-act-tuiles">
+          {tuiles.map((x) => { const sous = parTuile[x.k] || ''; return (
+            <button key={x.k} type="button" className="vrm-act-choix" data-action-sel={x.k} data-action-sel-ok={x.ok ? 'oui' : 'non'} aria-disabled={x.ok ? undefined : 'true'} title={x.ok ? undefined : x.raison}
+              onClick={() => { if (!x.ok) { toast(x.raison); return; } onLancer(x.k); }}>
+              <b>{x.titre}</b>
+              {sous ? <span>{sous}</span> : null}
+            </button>
+          ); })}
         </div>
-        {actions.map((x) => (
-          <button key={x.k} type="button" className="vrm-act-choix" data-action-sel={x.k} data-action-sel-ok={x.ok ? 'oui' : 'non'} aria-disabled={x.ok ? undefined : 'true'} title={x.ok ? undefined : x.raison}
-            onClick={() => { if (!x.ok) { toast(x.raison); return; } onLancer(x.k); }}>
-            <b>{x.titre}</b>
-            <span>{x.ok ? x.desc : x.raison}</span>
-          </button>
-        ))}
+        {main ? (
+          <div className="vrm-act-main" data-action-sel="main" data-action-sel-ok={main.ok ? 'oui' : 'non'}>
+            <Bouton variante="discret" disabled={!main.ok} title={main.ok ? main.desc : main.raison} onClick={() => { if (main.ok) onLancer('main'); }}>{main.titre}</Bouton>
+            {main.ok || main.raison !== tete ? <span>{main.ok ? 'Sans l’extension : VRM te prépare tout, tu publies toi-même.' : main.raison}</span> : null}
+          </div>
+        ) : null}
         <div className="vrm-act-verif" data-avant-lancer={nManque}>
-          <div className="vrm-main-etape">Avant de lancer : {nManque ? `${nManque} annonce${nManque > 1 ? 's' : ''} sur ${verifs.length} ${nManque > 1 ? 'ont' : 'a'} un manque` : 'rien ne manque dans ce que VRM a lu'}</div>
+          <div className="vrm-main-etape">Avant de lancer{nManque ? ` · ${nManque} sur ${verifs.length} à corriger` : ''}</div>
           {verifs.map(({ a, pbs, nonLus }) => (
             <div key={a.uid + ':' + a.id} className="vrm-act-paire" data-act-paire={a.id} data-act-manque={pbs.length} data-act-codes={pbs.map((p) => p.code).join(',')}>
-              <b>{a.numero ? `N°${a.numero} · ` : ''}{a.titre || 'Sans titre'}</b>
-              {pbs.length ? pbs.map((p) => (
+              <div className="vrm-act-paire-nom">{a.numero ? <Numero n={a.numero} taille="petit"/> : null}<b>{a.titre || 'Sans titre'}</b>{pbs.length ? null : <span className="vrm-act-ok" aria-label="Rien ne manque dans ce que VRM a lu"><Icon name="check" size={14}/></span>}</div>
+              {pbs.map((p) => (
                 <div key={p.code} className="vrm-act-pb" data-act-pb={p.code}><span>{p.texte}{p.geste ? ` — ${p.geste}` : ''}</span><a href={lien(a)} target="_blank" rel="noreferrer">Corriger sur Vinted ↗</a></div>
-              )) : <div className="vrm-act-muet">✓ Rien ne manque dans ce que VRM a lu.</div>}
-              {nonLus.length > 0 && <div className="vrm-act-muet" data-act-non-lus={nonLus.length}>Pas lu par VRM : {nonLus.join(', ')}. L’extension les vérifie au lancement et demande ce qui manque.</div>}
+              ))}
+              {nonLus.length > 0 && !nlCommun && <div className="vrm-act-muet" data-act-non-lus={nonLus.length}>Pas lu par VRM : {nonLus.join(', ')}.</div>}
             </div>
           ))}
+          {nlCommun ? <div className="vrm-act-muet" data-act-non-lus-commun={nlCommun.length}>Pas lu par VRM : {nlCommun.join(', ')}. L’extension les vérifie au lancement et demande ce qui manque.</div>
+            : verifs.some((v) => v.nonLus.length) ? <div className="vrm-act-muet">L’extension vérifie au lancement ce que VRM n’a pas lu et demande ce qui manque.</div> : null}
         </div>
       </div>
     </SheetShell>
@@ -43014,6 +43035,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [passportFor, setPassportFor] = useState(null); // { it, e, num } → modale « Passeport de la paire »
   // (1er nov.) Téléphone : les fiches dont « Plus d'actions » est ouvert (par id d'annonce).
   const [fichesOuvertes, setFichesOuvertes] = useState(() => new Set());
+  // (5 nov., chantier C) La feuille « … » d'UNE carte d'annonce (clé `uid_id`), ou null.
+  const [ficheMenu, setFicheMenu] = useState(null);
+  // (5 nov., chantier C) La liste « N nouveaux N° posés par VRM », dépliée sous la ligne d’avis.
+  const [neufsOuverts, setNeufsOuverts] = useState(false);
   // ── Atelier de republication ──────────────────────────────────────────────
   // Brouillons de nouvelles versions d'annonces : clé = id d'annonce wardrobe,
   // valeur = { title, desc, price, versions:[{title,desc,price,at,scoreBefore,scoreAfter}], updatedAt }.
@@ -43708,7 +43733,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const basculerOffresAuto = async () => {
     if (offresAuto) { setOffresAuto(false); save('vinted_offres_auto', false); return; }
     const ok = await askConfirm({ title: 'Accepter les offres tout seul sur Vinted ?',
-      desc: "Dès qu'une offre atteint le « mini » d'une annonce, VRM l'accepte à ta place, pas tout de suite : entre 3 et 20 minutes après l'avoir vue, tiré au hasard (une à la fois, uniquement le compte ouvert dans le navigateur de l'extension, plafond 50/h). L'extension doit rester ouverte pendant ce délai.\n\n⚠️ Important : sur Vinted, un programme qui accepte peut être vu comme un robot — c'est un risque pour le compte, que tu prends en l'allumant. Sur eBay c'est sans risque (réglage natif), pas sur Vinted.\n\nPose un « mini » sur les annonces que tu veux laisser partir à ce prix.",
+      desc: "Dès qu'une offre atteint le « mini » d'une annonce, VRM l'accepte à ta place, pas tout de suite : entre 3 et 20 minutes après l'avoir vue, tiré au hasard (une à la fois, uniquement le compte ouvert dans le navigateur de l'extension, plafond 50/h). L'extension doit rester ouverte pendant ce délai.\n\n⚠️ Important : sur Vinted, un programme qui accepte peut être vu comme un robot — c'est un risque pour le compte, que tu prends en l'allumant. Sur eBay c'est sans risque (réglage natif), pas sur Vinted.\n\nRemplis « Accepter dès » sur les annonces que tu veux laisser partir à ce prix.",
       ok: 'Oui, accepter tout seul', cancel: 'Annuler' });
     if (!ok) return;
     setOffresAuto(true); save('vinted_offres_auto', true);
@@ -46680,20 +46705,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }).sort((a, b) => String((numeros[b.id] || {}).numberedAt).localeCompare(String((numeros[a.id] || {}).numberedAt)));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [annoncesPresentes, numeros, neufsVus]);
+  // (5 nov., chantier C) Une LIGNE repliée (rien n'y est urgent : le N° posé par VRM est juste,
+  // on le change si on veut) — quatre lignes ouvertes poussaient le premier article sous
+  // l'écran du téléphone (y = 904, banc fusion-app F4). Dedans : la pastille `Numero` (plus de
+  // « N°2 » en bleu, 3,6:1 la nuit), `PhotoVide`, les boutons partagés.
   const blocNouveaux = () => numerosNeufs.length > 0 && (
-    <div data-num-neufs={numerosNeufs.length} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', marginBottom: 12 }}>
-      <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{numerosNeufs.length > 1 ? `${numerosNeufs.length} mises en ligne numérotées par VRM` : 'Une mise en ligne numérotée par VRM'}</div>
-      <div style={{ fontSize: 12, color: C.text2, margin: '3px 0 6px', lineHeight: 1.45 }}>Touche le N° pour en mettre un autre (celui de ton carton, par exemple).</div>
+    <div className="vrm-ann-neufs" data-num-neufs={numerosNeufs.length}>
+      <div className="vrm-ann-neufs-tete">{numerosNeufs.length > 1 ? `${numerosNeufs.length} mises en ligne numérotées par VRM` : 'Une mise en ligne numérotée par VRM'}</div>
+      <div className="vrm-ann-neufs-phrase">Touche le N° pour en mettre un autre (celui de ton carton, par exemple).</div>
       {numerosNeufs.slice(0, 6).map((it) => { const f = numeros[it.id] || {}; return (
-        <div key={it.id} data-num-neuf={String(it.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderTop: `1px solid ${C.border}` }}>
-          <div style={{ width: 36, height: 36, borderRadius: 10, background: C.bg, flexShrink: 0, overflow: 'hidden' }}>{it.photo ? <PhotoVinted src={it.photo} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : null}</div>
-          <span style={{ flexShrink: 0, minHeight: 44, display: 'flex', alignItems: 'center', fontSize: 15, fontWeight: 700, color: C.text, fontVariantNumeric: 'tabular-nums' }}>
-            <EnLigne data="numero-neuf" value={f.numero} onCommit={(v, avant) => poserNumero(it, v, avant)} inputMode={clavierNum()} placeholder={String(nextNumero)} largeur={56} titre="Changer ce numéro" rendu={`N°${f.numero}`}/>
+        <div key={it.id} data-num-neuf={String(it.id)} className="vrm-ann-neufs-ligne">
+          {it.photo ? <PhotoVinted src={it.photo} alt="" loading="lazy" decoding="async" className="vrm-ann-neufs-photo"/> : <PhotoVide taille={36} rayon={12}/>}
+          <span className="vrm-ann-neufs-num">
+            <EnLigne data="numero-neuf" value={f.numero} onCommit={(v, avant) => poserNumero(it, v, avant)} inputMode={clavierNum()} placeholder={String(nextNumero)} largeur={56} titre="Changer ce numéro" rendu={<Numero n={f.numero} titre={`Numéro ${f.numero} — le changer`}/>}/>
           </span>
-          <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.title || '—'}</span>
-          <button type="button" data-num-neuf-ok={String(it.id)} onClick={() => vuNeuf([[it.id, f.numero]])} style={{ flexShrink: 0, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 12, padding: '0 12px', minHeight: 44, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>C'est bon</button>
+          <span className="vrm-ann-neufs-nom">{it.title || '—'}</span>
+          <Bouton variante="secondaire" taille="petit" data-num-neuf-ok={String(it.id)} onClick={() => vuNeuf([[it.id, f.numero]])} style={{ flexShrink: 0 }}>C'est bon</Bouton>
         </div>); })}
-      {numerosNeufs.length > 1 && <button type="button" data-num-neufs-tout="" onClick={() => vuNeuf(numerosNeufs.map((it) => [it.id, (numeros[it.id] || {}).numero]))} style={{ marginTop: 6, border: 'none', background: 'transparent', color: C.accentTexte, padding: 0, minHeight: 44, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>{numerosNeufs.length > 6 ? `Tout est bon (${numerosNeufs.length})` : 'Tout est bon'}</button>}
+      {numerosNeufs.length > 1 && <Bouton variante="discret" data-num-neufs-tout="" onClick={() => vuNeuf(numerosNeufs.map((it) => [it.id, (numeros[it.id] || {}).numero]))}>{numerosNeufs.length > 6 ? `Tout est bon (${numerosNeufs.length})` : 'Tout est bon'}</Bouton>}
     </div>);
   const confirmerCarton = async (it) => {
     const f = numeros[it.id] || {};
@@ -52074,7 +52103,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ouvert, à l'évènement `vrm:vue`.
   React.useEffect(()=>{
     const appliquer=()=>{
-      if(only==='annonces' && prendreVue('republier')) setActionsOpen(true);
+      if(only==='annonces' && prendreVue('republier')) setAnnSort('selection');   // (5 nov., chantier C) l'entrée « Republier » mène à « Sélectionner », puis Actions
       if(only==='annonces' && prendreVue('dorment')) setAnnSort('sleeping');
       if(only==='messages' && prendreVue('favoris')) setZoneMessages('favoris');
       if(only==='achats' && !modeRetraits && prendreVue('achats')) setAFilter('all');
@@ -55984,45 +56013,39 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             change pas (`basculerOffresAuto` : confirmation à l'allumage, éteint par défaut).
             Seul ce qui demande un GESTE reste visible : l'extension qui ne peut pas. */}
         <div className="vrm-workbar vrm-ann-workbar">
-        {listings.items?.length>0 && <div className="vrm-ann-toolbar" style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}}>
-            <div className="vrm-ann-search"><Icon name="search" size={17}/>
-            <input aria-label="Rechercher une annonce" value={annSearch} onChange={e=>setAnnSearch(e.target.value)} placeholder="Rechercher"
-              style={{flex:'1 1 180px',minWidth:0,border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 12px',fontSize:13,background:C.card,color:C.text,outline:'none'}}/>
-            {annSearch && <button className="vrm-icon-control" type="button" aria-label="Effacer la recherche d’annonces" onClick={()=>setAnnSearch('')}><Icon name="close" size={16}/></button>}
-            <MicDictee onText={(t)=>setAnnSearch(t)} titre="Dicter la recherche"/></div>
-            <select className="vrm-ann-tri" aria-label="Trier les annonces" value={annSort} onChange={e=>setAnnSort(e.target.value)}
-              style={{border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 10px',fontSize:13,background:C.card,color:C.text,cursor:'pointer',fontWeight:500}}>
+        {/* (5 nov., chantier C — revue 2.10) LA BARRE D'OUTILS : une forme pour tout.
+            La recherche partagée (`ChampRecherche`, micro intégré), puis trois boutons du
+            MÊME dessin (fond teinté, rayon des commandes, 36 px souris / 44 px doigt) :
+            Trier · Republier… · ⋯ Outils. Au téléphone, une rangée : recherche, puis les
+            trois en icône (leur nom dans aria-label). Styles : styles-annonces-coherence.css. */}
+        {listings.items?.length>0 && <div className="vrm-ann-toolbar vrm-annbar" data-ann-barre="">
+            <ChampRecherche className="vrm-annbar-recherche" valeur={annSearch} onChange={setAnnSearch} placeholder="Rechercher" label="Rechercher une annonce (titre, marque, N°)" micro data-ann-recherche=""/>
+            <div className="vrm-annbar-gestes">
+            <label className="vrm-annbar-bouton vrm-annbar-tri" data-ann-tri={annSort} title="Trier les annonces">
+              <Icon name="filter" size={17}/>
+              <span className="vrm-annbar-mot">{({oldest:'Les plus anciennes',recent:'Ordre Vinted',price_desc:'Prix décroissant',price_asc:'Prix croissant',favs:'Plus de favoris',views:'Plus de vues',boost:'Vues sans favoris',sleeping:'En ligne depuis longtemps',nonum:'Sans numéro'})[annSort] || 'Trier'}</span>
+            <select className="vrm-ann-tri" aria-label="Trier les annonces" value={['oldest','recent','price_desc','price_asc','favs','views','boost','sleeping','nonum'].includes(annSort)?annSort:''} onChange={e=>setAnnSort(e.target.value)}>
+              {!['oldest','recent','price_desc','price_asc','favs','views','boost','sleeping','nonum'].includes(annSort) && <option value="" disabled>Trier</option>}
               <option value="oldest">Les plus anciennes</option>
               <option value="recent">Ordre Vinted</option>
-              <option value="price_desc">Prix ↓</option>
-              <option value="price_asc">Prix ↑</option>
+              <option value="price_desc">Prix décroissant</option>
+              <option value="price_asc">Prix croissant</option>
               {(annStats.hasFav || annSort==='favs') && <option value="favs">Plus de favoris</option>}
               {(annStats.hasView || annSort==='views') && <option value="views">Plus de vues</option>}
               {(annStats.hasView || annSort==='boost') && <option value="boost">Vues sans favoris</option>}
               {(annStats.sleeping>0 || annSort==='sleeping') && <option value="sleeping">En ligne depuis longtemps</option>}
               <option value="nonum">Sans numéro</option>
             </select>
-            {/* L'interrupteur « Auto N° » a été retiré : la numérotation est désormais
-                toujours active (voir la déclaration de `autoNum`). */}
-            {/* Outils ponctuels regroupés : « Répartir un lot » et « Audit stock »
-                ne servent pas tous les jours et encombraient la barre. */}
-            {/* (28 oct.) « Republier » : UN bouton, demandé par Julien — il remplace
-                « Lots » et « File de publication » du menu (deux écrans qui ne se
-                parlaient pas). */}
-            {/* (28 oct.) Republier et Brouillons dans leur propre groupe : sur téléphone, la
-                grille de la barre plaçait tout bouton direct dans la case de 44 px du micro
-                (« Republier » écrasé, « Brouillons » posé dessus). */}
-            <div className="vrm-ann-actions" style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-            {/* (28 oct., 5.252) UN bouton « Actions » (sa demande) : le menu porte
-                republier, modifier sur place, brouillon → en ligne, en ligne → brouillon. */}
-            <Bouton icone="sync" data-actions-ouvrir aria-haspopup="dialog" onClick={()=>setActionsOpen(true)} style={{whiteSpace:'nowrap'}}>Republier…{brVinted.liste && brVinted.liste.length ? ` · ${brVinted.liste.length} brouillon${brVinted.liste.length>1?'s':''}` : ''}</Bouton>
-            {nRefaire > 0 && <button type="button" data-refaire-ouvrir={nRefaire} onClick={()=>setRefaireOpen(true)}
-              style={{border:`1px solid ${C.warn}`,borderRadius:12,padding:'8px 12px',minHeight:40,fontSize:13,fontWeight:600,background:'transparent',color:C.text,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>{nRefaire} brouillon{nRefaire>1?'s':''} à refaire</button>}
-            </div>
-            {!repubAction && <CompteRenduOperation onRefaire={()=>setRefaireOpen(true)} onReprendre={(act, ids)=>{ setRepubReprise(ids); setRepubAction(act); }} />}
-            <div className="vrm-ann-outils" style={{position:'relative'}}>
-              <button type="button" aria-label="Outils" onClick={(e)=>{ try { const r=e.currentTarget.getBoundingClientRect(); setAnnToolsCote(r.right>=246?'droite':'gauche'); } catch(_){} setAnnToolsOpen(v=>!v); }} aria-expanded={annToolsOpen} title="Outils : répartir un lot, audit du stock"
-                style={{border:`1px solid ${annToolsOpen?C.accent:C.border}`,borderRadius:12,padding:'8px 12px',fontSize:13,fontWeight:600,background:annToolsOpen?`${C.accent}12`:'transparent',color:annToolsOpen?C.accent:C.text,cursor:'pointer',fontFamily:'inherit'}}>⋯<span className="vrm-ann-outils-mot"> Outils</span></button>
+            </label>
+            {/* (5 nov., chantier C — revue 2.5) « Republier… » mène à la vue « Sélectionner » :
+                on coche, puis UNE feuille « Actions » (Republier · Modifier prix ou titre ·
+                Mettre en brouillon · Mettre en ligne). L'ancienne feuille « Republier et
+                brouillons » (un second chemin, d'autres mots) est retirée. */}
+            <button type="button" className="vrm-annbar-bouton" data-actions-ouvrir="" aria-pressed={annSort==='selection'} title="Republier : coche les annonces, puis Actions"
+              onClick={()=>setAnnSort('selection')}><Icon name="sync" size={17}/><span className="vrm-annbar-mot">Republier…</span></button>
+            <div className="vrm-ann-outils">
+              <button type="button" className="vrm-annbar-bouton" aria-label="Outils" onClick={(e)=>{ try { const r=e.currentTarget.getBoundingClientRect(); setAnnToolsCote(r.right>=246?'droite':'gauche'); } catch(_){} setAnnToolsOpen(v=>!v); }} aria-expanded={annToolsOpen} title="Outils : offres automatiques, répartir un lot, studio photo, inventaire, audit du stock">
+                <Icon name="more" size={17}/><span className="vrm-annbar-mot vrm-ann-outils-mot">Outils</span></button>
               {annToolsOpen && (<>
                 <div className="vrm-menu-voile" onClick={()=>setAnnToolsOpen(false)} style={{position:'fixed',inset:0,zIndex:70}}/>
                 {/* Le menu s'ancrait à GAUCHE du bouton, posé au bord droit de la ligne :
@@ -56039,7 +56062,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const ext = offresAuto ? extSait('offresgarde') : 'ok';
           // (29 oct., revue) Court, et il passe à la ligne s'il le faut : au téléphone il
           // était coupé (« Allumées · 2 annonces avec u… ») — justement le nombre.
-          const etat = !offresAuto ? 'Éteintes' : nbMini === 0 ? 'Allumées · aucun mini posé' : `Allumées · ${nbMini} annonce${nbMini > 1 ? 's' : ''} avec mini`;
+          const etat = !offresAuto ? 'Éteintes' : nbMini === 0 ? 'Allumées · aucun « Accepter dès » rempli' : `Allumées · ${nbMini} annonce${nbMini > 1 ? 's' : ''} avec « Accepter dès »`;
           return (
           <div data-offres-auto-carte data-offres-auto-etat={offresAuto ? 'on' : 'off'} data-offres-auto-mini={offresAuto ? String(nbMini) : undefined} className={`vrm-offres-auto${offresAuto ? ' on' : ''}`}>
             <div className="vrm-offres-auto-ligne">
@@ -56056,7 +56079,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
             {offresInfo && (
               <div id="vrm-offres-auto-detail" className="vrm-offres-auto-detail" data-offres-auto-detail>
-                <p>Pose un <b>« mini »</b> sur une annonce : une offre qui l’atteint est acceptée toute seule, entre 3 et 20 min après, une à la fois, sur le compte ouvert dans le navigateur de l'extension. Sous ton <b>{'« refuse < »'}</b>, elle est refusée ; entre les deux, c’est toi qui négocies.</p>
+                <p>Remplis <b>« Accepter dès »</b> sur une annonce : une offre qui l’atteint est acceptée toute seule, entre 3 et 20 min après, une à la fois, sur le compte ouvert dans le navigateur de l'extension. Sous <b>« Refuser sous »</b>, elle est refusée ; entre les deux, c’est toi qui négocies.</p>
                 {offresAuto && (
                   <div data-offre-refus className="vrm-offres-auto-refus">
                     <label htmlFor="vrm-offre-refus-msg">Message quand VRM refuse <span>(vide = refus sans message)</span></label>
@@ -56081,7 +56104,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {k:'studio', icon:'camera', lab:'Studio photo', desc:'Cadre guide à la prise de vue, détourage sans envoi', on:()=>{ setAnnToolsOpen(false); setStudioOpen(true); }},
                     {k:'inv', icon:'box', lab:'Inventaire physique', desc:'Les paires qui doivent être chez toi, par numéro', on:()=>{ setAnnToolsOpen(false); setInventOpen(true); }},
                     {k:'aud', icon:'search', lab:'Audit du stock', desc:'Retrouver les paires mal rangées', on:()=>{ setAnnToolsOpen(false); setAuditOpen(true); }},
-                    {k:'fillbuy', icon:'euro', lab:"Compléter les prix d'achat", desc:`${fillBuyRows.length} article${fillBuyRows.length>1?'s':''} sans coût — le bénéfice est faux sans eux`, on:()=>{ setAnnToolsOpen(false); setFillBuyOpen(true); }},
+                    /* (5 nov., chantier C — revue 2.7) « Compléter les prix d'achat » n'est plus
+                       dans ce menu : le bandeau « Prix d'achat · N/M → Compléter », au-dessus de
+                       la grille, est la seule porte (le même nombre ne s'écrit pas deux fois). */
                     /* « Rédiger une annonce (IA) » retiré le 30 septembre (Julien : « ça ne
                        va pas servir »). */
                     /* ⚠️ « Renuméroter à la suite » A ÉTÉ RETIRÉ DU MENU (23 août 2026).
@@ -56090,33 +56115,40 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                        les boîtes. Le code de la modale reste, mais plus rien ne l'ouvre.
                        Ne pas le remettre sans son accord explicite. */
                   ].map(t=>(
-                    <button key={t.k} type="button" onClick={t.on} style={{display:'flex',alignItems:'center',gap:10,textAlign:'left',border:'none',background:'transparent',borderRadius:12,padding:'9px 10px',cursor:'pointer',fontFamily:'inherit'}}>
-                      <span aria-hidden="true" style={{flexShrink:0,display:'flex',color:C.muted}}><Icon name={t.icon} size={18}/></span>
-                      <span style={{minWidth:0}}>
-                        <span style={{display:'block',fontSize:15,fontWeight:600,color:C.text}} title={t.desc}>{t.lab}</span>
-                      </span>
+                    <button key={t.k} type="button" className="vrm-annbar-outil" data-outil-annonces={t.k} onClick={t.on} title={t.desc}>
+                      <span aria-hidden="true" className="vrm-annbar-outil-icone"><Icon name={t.icon} size={18}/></span>
+                      <span className="vrm-annbar-outil-mot">{t.lab}</span>
                     </button>
                   ))}
                 </div>
               </>)}
             </div>
+            </div>
+            {nRefaire > 0 && <Bouton variante="secondaire" taille="petit" className="vrm-annbar-refaire" data-refaire-ouvrir={nRefaire} onClick={()=>setRefaireOpen(true)}>{nRefaire} brouillon{nRefaire>1?'s':''} à refaire</Bouton>}
+            {!repubAction && <CompteRenduOperation onRefaire={()=>setRefaireOpen(true)} onReprendre={(act, ids)=>{ setRepubReprise(ids); setRepubAction(act); }} />}
           </div>}
 
         {(listings.items?.length>0 || annMasquees.length>0 || (brVinted.liste||[]).length>0) && <div className="vrm-stock-views vrm-filtres" role="group" aria-label="Vues rapides des annonces">
-          <button type="button" aria-pressed={annSort==='oldest'&&!annSearch.trim()} onClick={()=>{setAnnSort('oldest');setAnnSearch('');}}>Tout le stock</button>
-          <button type="button" aria-pressed={annSort==='nonum'} onClick={()=>setAnnSort('nonum')}>Sans numéro</button>
-          {annStats.sleeping>0 && <button type="button" aria-pressed={annSort==='sleeping'} onClick={()=>setAnnSort('sleeping')}>À relancer</button>}
-          {/* (4 nov.) Les annonces masquées par Vinted, compte par compte (toujours chez toi, pas « en ligne »). */}
-          {(annMasquees.length>0 || annSort==='masquees') && <button type="button" data-vue-masquees={annMasquees.length} aria-pressed={annSort==='masquees'} onClick={()=>setAnnSort('masquees')}>Masquées<span className="vrm-of-n">{annMasquees.length}</span></button>}
+          {/* (5 nov., chantier C — revue 2.10) « Sélectionner » en DEUXIÈME : au téléphone, la
+              rangée défile et le coupait au bord (« Séle… »). « Tout le stock » devient « Toutes »
+              (le Stock est un autre écran). */}
+          <button type="button" data-vue-toutes="" aria-pressed={annSort==='oldest'&&!annSearch.trim()} onClick={()=>{setAnnSort('oldest');setAnnSearch('');}}>Toutes</button>
+          {/* (5 nov.) « Sélectionner » : en ligne, brouillons et masquées ensemble, puis UNE feuille « Actions ». */}
+          <button type="button" data-vue-selection aria-pressed={annSort==='selection'} onClick={()=>setAnnSort('selection')}>Sélectionner{selAnn.length ? <span className="vrm-of-n">{selAnn.length}</span> : null}</button>
           {/* (5 nov., Julien : « les annonces en brouillon doivent apparaître dans Annonces,
               avec leur marque « brouillon » ») Ses brouillons, compte par compte, à cocher. */}
           {((brVinted.liste||[]).length>0 || annSort==='brouillons') && <button type="button" data-vue-brouillons={(brVinted.liste||[]).length} aria-pressed={annSort==='brouillons'} onClick={()=>setAnnSort('brouillons')}>Brouillons<span className="vrm-of-n">{(brVinted.liste||[]).length}</span></button>}
-          {/* (5 nov.) « Sélectionner » : en ligne, brouillons et masquées ensemble, puis UN carré « Actions possibles ». */}
-          <button type="button" data-vue-selection aria-pressed={annSort==='selection'} onClick={()=>setAnnSort('selection')}>Sélectionner{selAnn.length ? <span className="vrm-of-n">{selAnn.length}</span> : null}</button>
+          {/* (4 nov.) Les annonces masquées par Vinted, compte par compte (toujours chez toi, pas « en ligne »). */}
+          {(annMasquees.length>0 || annSort==='masquees') && <button type="button" data-vue-masquees={annMasquees.length} aria-pressed={annSort==='masquees'} onClick={()=>setAnnSort('masquees')}>Masquées<span className="vrm-of-n">{annMasquees.length}</span></button>}
+          <button type="button" aria-pressed={annSort==='nonum'} onClick={()=>setAnnSort('nonum')}>Sans numéro{annStats.sansNum>0 ? <span className="vrm-of-n">{annStats.sansNum}</span> : null}</button>
+          {annStats.sleeping>0 && <button type="button" aria-pressed={annSort==='sleeping'} onClick={()=>setAnnSort('sleeping')}>À relancer</button>}
         </div>}
-        {(annSearch.trim() || annSort!=='oldest') && <div className="vrm-filter-recap" role="status">
-          <span>{(()=>{ const k = annSort==='masquees' ? annMasquees.length : (annSort==='selection'||annSort==='brouillons') ? annSelectionnables.filter(a=>annSort!=='brouillons'||a.etat==='brouillon').length : annShown.length; return `${k} annonce${k>1?'s':''} dans cette sélection`; })()}</span>
-          <button type="button" onClick={()=>{setAnnSearch('');setAnnSort('oldest');}}>Réinitialiser les annonces</button>
+        {/* (5 nov., chantier C — revue 2.9) « sélection » ne nomme plus que les cases cochées :
+            le filtre dit « affichées ». Dans les vues à cocher (Sélectionner, Brouillons), leur
+            propre tête dit déjà quoi faire : pas de ligne de filtre en plus. */}
+        {(annSearch.trim() || annSort!=='oldest') && annSort!=='selection' && annSort!=='brouillons' && <div className="vrm-filter-recap" role="status" data-ann-filtre="">
+          <span>{(()=>{ const k = annSort==='masquees' ? annMasquees.length : annShown.length; return `${k} annonce${k>1?'s':''} affichée${k>1?'s':''}`; })()}</span>
+          <button type="button" onClick={()=>{setAnnSearch('');setAnnSort('oldest');}}>Tout afficher</button>
         </div>}
 
         </div>
@@ -56161,7 +56193,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             </div>
             {numDoublons.map(g => (
               <div key={g.numero} style={{marginTop:10,paddingTop:9,borderTop:`1px solid ${C.border}`}}>
-                <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:6}}>N°{g.numero}</div>
+                <div style={{marginBottom:6}}><Numero n={g.numero} etat="doublon" taille="petit"/></div>
                 {g.items.map(it => (
                   <div key={it.id} style={{display:'flex',alignItems:'center',gap:9,marginBottom:6}}>
                     {it.photo && <PhotoVinted src={it.photo} alt="" style={{width:34,height:34,borderRadius:12,objectFit:'cover',flexShrink:0}}/>}
@@ -56169,16 +56201,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div style={{fontSize:12,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{it.title}</div>
                       <div style={{fontSize:11,color:C.muted}}><AcctTag acc={it._acc} name={accNameOf(it._acc)}/>{it._vrmMasquee ? <span data-doublon-masquee> · masquée par Vinted, toujours chez toi</span> : null}</div>
                     </div>
-                    <button type="button" onClick={async ()=>{
+                    {/* (5 nov., chantier C) Les deux gestes du doublon : le bouton partagé (plus de bordure bleue faite main). */}
+                    <Bouton variante="secondaire" taille="petit" style={{flexShrink:0}} title={`Donner le N°${nextNumero} (neuf) à cet article`} onClick={async ()=>{
                       const libre = String(nextNumero);
                       if (!await askConfirm({ title:`Donner le N°${libre} à cet article ?`, desc:`« ${it.title} »\n\nIl quitte le N°${g.numero}, qui reste à l'autre article. Pense à changer l'étiquette de la boîte.`, ok:`Passer au N°${libre}` })) return;
                       setNumeros(prev => { const u={...prev}; u[it.id]={...(u[it.id]||{}), numero:libre, manuelAt:new Date().toISOString()}; save('vinted_annonce_numeros',u); return u; });
                       recordUsed(libre);   // le numéro est pris à vie (§5.40)
                       toast(`✓ Cet article est maintenant le N°${libre}.`);
-                    }} style={{flexShrink:0,border:`1px solid ${C.accent}`,background:'transparent',color:C.accentTexte,borderRadius:12,padding:'5px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-                      → N°{nextNumero}
-                    </button>
-                    {it._vrmMasquee ? <button type="button" data-masquee-partie={String(it.id)} onClick={()=>masqueePlusLa(it)} style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,padding:'5px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Elle n'est plus là</button> : null}
+                    }}>Passer au N°{nextNumero}</Bouton>
+                    {it._vrmMasquee ? <Bouton variante="secondaire" taille="petit" data-masquee-partie={String(it.id)} onClick={()=>masqueePlusLa(it)} style={{flexShrink:0}}>Elle n'est plus là</Bouton> : null}
                   </div>
                 ))}
               </div>
@@ -56246,18 +56277,47 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           return <FraicheurAnnonces lues={listings.lues} enLigne={enLigne} noms={noms} supprimees={listings.supprimees} aConfirmer={annAConfirmer} numeros={numeros} activite={liveStats && liveStats.annActivite}/>;
         })()}
         {listings.loading && !listings.items && <Skeleton variant="card" count={6}/>}
-        {listings.error && <LoadError onRetry={()=>loadListings(true)}/>}
+        {listings.error && <EtatPanne quoi="Tes annonces Vinted" data-ann-panne="" onReessayer={()=>loadListings(true)}/>}
         {/* Aucune annonce en ligne MAIS des annonces à confirmer : la ligne du
             dessus le dit déjà, avec le geste (§7 — une cause, une phrase). */}
         {listings.items && !listings.error && listings.items.length===0 && !annAConfirmer.length && (
           <EmptyState icon="tag" title="Aucune annonce en ligne"
             desc="Ouvre ta boutique sur vinted.fr une fois, avec l'extension active : tes annonces remonteront ici automatiquement."
-            action={<a href="https://www.vinted.fr/member/general/settings" target="_blank" rel="noreferrer" style={{display:'inline-block',background:C.accent,color:C.onAccent,textDecoration:'none',fontWeight:600,fontSize:13,padding:'10px 16px',borderRadius:12}}>Ouvrir Vinted ↗</a>}/>
+            action={<Bouton variante="primaire" href="https://www.vinted.fr/member/general/settings" target="_blank" rel="noreferrer">Ouvrir Vinted ↗</Bouton>}/>
         )}
         {listings.items && !listings.error && listings.items.length===0 && blocMasquees()}
           {blocAEcrire()}
           <BlocBarrerVc/>
-          {blocNouveaux()}
+          {/* (5 nov., chantier C — revue 2.7) UNE ligne d'avis en tête de la liste :
+              « Prix d'achat N/M · Compléter » (plus l'ambre sur chaque carte ; N/M compté sur
+              les annonces en ligne, §5 : la couverture dite, « Compléter » ouvre la saisie en
+              série) et « N nouveaux N° · Vérifier » (la liste se déplie dessous). Une ligne, pas
+              deux blocs : au téléphone le premier article reste dans le premier écran (fusion-app F4). */}
+          {(()=>{
+            const m = annBase.length;
+            const n = m ? annBase.filter(it=>{ const a = prixAchatDe(numeros[it.id]||{}, buyByNum); return a!=null && !isNaN(a); }).length : 0;
+            const vuePrix = !['selection','brouillons','masquees','sleeping'].includes(annSort);
+            const prixManque = vuePrix && m > 0 && n < m;
+            const nN = numerosNeufs.length;
+            if (!prixManque && !nN) return null;
+            return (<>
+              <div className="vrm-ann-avis" data-ann-avis="">
+                {prixManque && (
+                  <div className="vrm-ann-achats" data-ann-achats={`${n}/${m}`} role="status">
+                    <span className="vrm-ann-achats-texte"><span className="vrm-ann-achats-nom">Prix d’achat</span><span className="vrm-ann-achats-n">{n}/{m}</span><span className="vrm-ann-achats-sous">connus</span></span>
+                    <Bouton variante="discret" data-ann-achats-completer="" title="Le bénéfice ne compte que les prix d’achat connus" onClick={()=>setFillBuyOpen(true)}>Compléter</Bouton>
+                  </div>
+                )}
+                {nN > 0 && (
+                  <button type="button" className="vrm-ann-avis-neufs" data-num-neufs-ouvrir={nN} aria-expanded={neufsOuverts} onClick={()=>setNeufsOuverts(v=>!v)}
+                    title="Les N° que VRM vient de poser sur tes dernières mises en ligne : vérifie-les ou change-les">
+                    <span><b>{nN}</b> {nN > 1 ? 'nouveaux N°' : 'nouveau N°'}</span><span className="vrm-ann-avis-voir">{neufsOuverts ? 'Fermer' : 'Vérifier'}</span><Icon name="chevron" size={14} className="vrm-ann-avis-chevron" style={{transform:neufsOuverts?'rotate(-90deg)':'rotate(90deg)',transition:'transform .15s'}}/>
+                  </button>
+                )}
+              </div>
+              {neufsOuverts && blocNouveaux()}
+            </>);
+          })()}
           {aVerifierCarton.length > 0 && (
           <details data-numeros-a-verifier={aVerifierCarton.length} className="vrm-repli" open style={{ background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn || '#B25000'}`, borderRadius: 12, padding: '4px 12px 10px', marginBottom: 12 }}>
             <summary style={{ fontSize: 15, fontWeight: 700, color: C.text }}>
@@ -56292,7 +56352,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {(annSort==='selection' || annSort==='brouillons') ? (
           <ChoixAnnoncesVinted filtre={annSort==='brouillons' ? 'brouillon' : 'tout'} annonces={annSelectionnables} sel={selAnn} setSel={setSelAnn}
             charge={listings.items==null && listings.loading} brLecture={brVinted.liste==null}
-            onActions={()=>setActionsSelOpen(true)} suivis={suivisMainVisibles} onSuivi={(a)=>setRepubMainOuvert(a)}/>
+            onActions={()=>setActionsSelOpen(true)} suivis={suivisMainVisibles} onSuivi={(a)=>setRepubMainOuvert(a)}
+            onDetailBrouillons={()=>setBrouillonsOpen(true)}/>
         ) : annSort==='masquees' ? (
           <AnnoncesMasquees Photo={PhotoVinted} res={listings.masquees==null ? (listings.loading ? undefined : null) : masqueesParCompte(annMasquees, { numeroDe:(id)=>(numeros[id]||{}).numero||'', nomDe:(a)=>a?accNameOf(a):'' })}/>
         ) : annSort==='sleeping' ? (
@@ -56365,7 +56426,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div className="vrm-ann-card vrm-fiche" key={it._acc.vinted_user_id+'_'+it.id} data-carte-annonce={it.id} data-fiche="29oct" data-fiche-ouverte={ouverte?'1':'0'} style={{borderRadius:12,background:C.card,border:`1px solid ${soldBord?C.warn:C.border}`,boxShadow:C.shadow||'none',display:'flex',flexDirection:'column',overflow:'hidden',...(estFloute(it)?STYLE_FLOU:null)}}>
                 <div className="vrm-ann-overview" style={{display:'flex',flexDirection:'column',position:'relative'}}>
                   <a className="vrm-fiche-photo" data-fiche-photo href={urlFiche||undefined} target={urlFiche?'_blank':undefined} rel="noreferrer" title={urlFiche?"Ouvrir l'annonce sur Vinted":undefined} style={{display:'flex',alignItems:'center',justifyContent:'center',position:'relative',background:C.bg}}>
-                    {it.photo?<PhotoVinted src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={28} style={{color:C.muted,opacity:.55}}/>}
+                    {it.photo?<PhotoVinted src={it.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<PhotoVide remplir rayon={0}/>}
                     {it._vrmAConfirmer && <span data-ann-a-confirmer="" title="Ce compte n'a pas été relu depuis plus de 24 h : cette annonce était en ligne à la dernière lecture. Ouvre vinted.fr sur ce compte pour le vérifier." style={{position:'absolute',right:10,top:10,fontSize:11,fontWeight:600,whiteSpace:'nowrap',color:C.text,background:C.card,border:`1px solid ${C.warn || C.border}`,borderRadius:999,padding:'4px 9px'}}>À confirmer{it._vrmAConfirmerLu ? ` · lu ${new Date(it._vrmAConfirmerLu).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}` : ''}</span>}
                     {it.promoted===true && <span data-boostee title="Vinted dit que cette annonce est boostée en ce moment" style={{position:'absolute',left:10,bottom:10,fontSize:11,fontWeight:600,whiteSpace:'nowrap',color:C.text,background:C.card,border:`1px solid ${C.border}`,borderRadius:999,padding:'4px 9px'}}>Boostée</span>}
                   </a>
@@ -56374,9 +56435,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       fixe. HORS du lien de la photo (un bouton dans un lien ne se
                       touche pas) ; la MÊME édition en place qu'avant (`EnLigne`,
                       `poserNumero`) — un tap sur la pastille, on tape, Entrée. */}
-                  <span className="vrm-fiche-num" data-fiche-num={num||''} style={{position:'absolute',left:10,top:10,zIndex:1,display:'flex',alignItems:'center',minHeight:28,boxSizing:'border-box',fontSize:15,fontWeight:500,color:num?C.text:C.muted,background:C.bg,borderRadius:999,padding:'0 11px'}}>
+                  {/* (5 nov., chantier C — revue 2.8) La pastille partagée `Numero` (rayon 6,
+                      chiffres alignés ; jamais blanche en sombre), la même que partout. */}
+                  <span className="vrm-fiche-numero" data-fiche-num={num||''}>
                     <EnLigne data="numero" value={num} onCommit={(v,avant)=>poserNumero(item,v,avant)} inputMode={clavierNum()} placeholder={String(nextNumero)} largeur={46}
-                      titre="Numéro de rangement (écrit sur la boîte) — cliquer pour le changer" rendu={num?`N°${num}`:'+ N°'}/>
+                      titre="Numéro de rangement (écrit sur la boîte) — cliquer pour le changer" rendu={num?<Numero n={num} taille="grand" titre={`Numéro ${num} — le changer`}/>:<span className="vrm-fiche-num-vide">+ N°</span>}/>
                   </span>
                   <div className="vrm-ann-ledger-info" style={{display:'flex',flexDirection:'column',gap:8}}>
                     <div data-titre style={{fontSize:15,fontWeight:600,color:C.text,lineHeight:1.35,overflowWrap:'anywhere'}}>{it.title||it.brand||'—'}{tailleHorsTitre ? <span data-titre-taille=""> · {tailleHorsTitre}</span> : null}</div>
@@ -56397,23 +56460,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {/* Les chiffres, TOUS libellés ; « — » quand on ne sait pas, jamais 0 (§7). */}
                     <div data-chiffres className="vrm-fiche-chiffres" style={{display:'grid',gridTemplateColumns:'repeat(4,minmax(0,1fr))',gap:6}}>
                       <div className="vrm-fiche-cell" style={cell} title="Prix mini : une offre à ce montant ou plus est mise en avant pour l'accepter en 1 tap — et, si tu as activé l'acceptation automatique, acceptée à ta place">
-                        <span style={lib}>mini</span>
+                        <span style={lib}>Accepter dès</span>
                         <EnLigne data="min" value={e.min??''} onCommit={v=>updatePair(item,{min:v})} inputMode="decimal" placeholder="€" largeur={56}
                           titre="Prix mini d'acceptation d'offre — cliquer pour le saisir" rendu={<span style={valeur}>{mn!=null&&isFinite(mn)&&mn>0?prixCourt(mn):'—'}</span>}/>
                       </div>
                       <div className="vrm-fiche-cell" style={cell} title="Seuil de refus : si l'acceptation auto est activée, une offre SOUS ce montant est refusée toute seule (avec ton message, si tu en as écrit un)">
-                        <span style={lib}>{'refuse <'}</span>
+                        <span style={lib}>Refuser sous</span>
                         <EnLigne data="refuse" value={e.refuse??''} onCommit={v=>updatePair(item,{refuse:v})} inputMode="decimal" placeholder="€" largeur={56}
                           titre="Seuil de refus d'offre — cliquer pour le saisir" rendu={<span style={valeur}>{rf!=null&&isFinite(rf)&&rf>0?prixCourt(rf):'—'}</span>}/>
                       </div>
                       <div className="vrm-fiche-cell" style={cell} title="Coût d'un boost / mise en avant payée sur cette annonce (déduit de la marge et du bénéfice)">
-                        <span style={lib}>boost</span>
+                        <span style={lib}>Boost payé</span>
                         <EnLigne data="boost" value={e.fees ?? ''} onCommit={v=>updatePair(item,{fees:v})} inputMode="decimal" placeholder="€" largeur={56}
                           titre="Boost payé — cliquer pour le saisir" rendu={<span style={valeur}>{boost>0?prixCourt(boost):'—'}</span>}/>
                       </div>
                       <div className="vrm-fiche-cell" style={cell} title="Si elle part à ce prix : prix − achat − boost">
-                        <span style={lib}>marge</span>
-                        <span data-marge={marge==null?'':String(marge)} style={{...valeur,color:marge!=null&&marge<0?C.warn:marge==null?C.muted:C.text}}>{marge==null?'—':`${marge>=0?'+':''}${marge} €`}</span>
+                        <span style={lib}>Marge</span>
+                        <span data-marge={marge==null?'':String(marge)} style={{...valeur,color:marge!=null&&marge<0?C.warn:marge==null?C.muted:C.text}}>{marge==null?'—':montant(marge,{signe:true})}</span>
                       </div>
                     </div>
                     <div data-etat-ligne style={{fontSize:12,color:C.muted,display:'flex',alignItems:'center',flexWrap:'wrap',gap:'4px 12px',minWidth:0}}>
@@ -56436,7 +56499,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {/* Téléphone seulement (caché sur ordinateur, où tout reste à la vue). */}
                     <button type="button" className="vrm-fiche-plus-bouton" data-fiche-plus-bouton="" aria-expanded={ouverte} aria-controls={idRepli}
                       onClick={()=>setFichesOuvertes(x=>{ const n=new Set(x); const k=String(it.id); if(n.has(k)) n.delete(k); else n.add(k); return n; })}>
-                      <span>{ouverte ? 'Moins d’actions' : 'Plus d’actions'}</span><Icon name="chevron" size={14} style={{transform:ouverte?'rotate(-90deg)':'rotate(90deg)',transition:'transform .15s'}}/>
+                      <span>{ouverte ? 'Moins de détails' : 'Détails et gestes'}</span><Icon name="chevron" size={14} style={{transform:ouverte?'rotate(-90deg)':'rotate(90deg)',transition:'transform .15s'}}/>
                     </button>
                   </div>
                 </div>
@@ -56444,13 +56507,31 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     relié, le stock, Leboncoin (la file et sa préparation), les gestes. */}
                 <div className="vrm-fiche-plus" id={idRepli} data-fiche-plus style={{display:'flex',flexDirection:'column',gap:8,borderTop:`1px solid ${C.border}`}}>
                   <AchatRelie entry={e} numero={num}/>
-                  <div className="vrm-fiche-gestes" data-fiche-gestes style={{display:'flex',flexWrap:'wrap',alignItems:'center',gap:6}}>
+                  {/* (5 nov., chantier C — revue 2.6) DEUX gestes à la vue, le reste dans « … ».
+                      La carte d'ordinateur portait neuf boutons. « Changer le prix » et « Baisser
+                      à X € » ne font plus qu'un (le prix conseillé est dit DANS le geste, sans
+                      bleu : l'accent reste rare, §7). « … » ouvre une feuille : la file
+                      Leboncoin, Relier un achat, Passeport, Relier à Vestiaire, Histoire ·
+                      Dupliquer, Marquer vendue — les MÊMES gestes, les mêmes écritures. */}
+                  <div className="vrm-fiche-gestes" data-fiche-gestes="" data-fiche-gestes-n={num ? 2 : 1}>
+                    {num
+                      ? <button type="button" className="vrm-fiche-geste vrm-fiche-geste-prix" data-annonce-prix-partout={num} onClick={()=>{ try { window.dispatchEvent(new CustomEvent('vrm:prix-partout',{detail:String(num)})); } catch (_) {} }} style={geste}
+                          title={sugg!=null && sugg < Number(it.price) ? `Elle dort : ${sugg} € serait un prix plus juste (−15 %)` : 'Le prix de ce N° sur tous les sites où il est en ligne'}>
+                          Changer le prix{sugg!=null && sugg < Number(it.price) ? <span className="vrm-fiche-geste-sous" data-prix-conseille={sugg}>{montant(sugg)} conseillé</span> : null}</button>
+                      : <a className="vrm-fiche-geste vrm-fiche-geste-prix" href={urlFiche ? `${urlFiche.replace(/\/$/,'')}/edit` : undefined} target="_blank" rel="noreferrer" data-annonce-prix-vinted="" style={geste}
+                          title="Sans N°, le prix se change sur Vinted">Changer le prix ↗{sugg!=null && sugg < Number(it.price) ? <span className="vrm-fiche-geste-sous" data-prix-conseille={sugg}>{montant(sugg)} conseillé</span> : null}</a>}
                     {num && (
                       <button type="button" className="vrm-fiche-geste" data-fiche-stock={atGarage?'range':'a-ranger'} onClick={()=>atGarage?(onLocate&&onLocate(num)):(onStore&&onStore(num))} style={geste}
                         title={atGarage?`La N°${num} est rangée dans ton stock — la voir`:`La N°${num} n'est pas encore rangée dans ton stock — la ranger`}>
                         <Icon name="box" size={14}/>{atGarage?'Voir au stock':'Ranger au stock'}
                       </button>
                     )}
+                    <button type="button" className="vrm-fiche-geste vrm-fiche-geste-plus" data-fiche-menu-ouvrir={String(it.id)} aria-haspopup="dialog" aria-label="Autres gestes" title="Autres gestes : Leboncoin, relier un achat, passeport, Vestiaire, histoire, marquer vendue"
+                      onClick={()=>setFicheMenu(String(it._acc.vinted_user_id)+'_'+String(it.id))} style={geste}><Icon name="more" size={18}/></button>
+                  </div>
+                  {ficheMenu===String(it._acc.vinted_user_id)+'_'+String(it.id) && (
+                  <SheetShell onClose={()=>setFicheMenu(null)} maxWidth={420} titre={it.title||it.brand||'Annonce'} sousTitre={num ? <Numero n={num} taille="petit"/> : 'Sans N° : touche « + N° » sur la photo'} data-fiche-menu={String(it.id)}>
+                  <div className="vrm-fiche-menu" onClickCapture={(ev)=>{ const b = ev.target && ev.target.closest && ev.target.closest('button,a'); if (b && !b.hasAttribute('data-fiche-place')) setTimeout(()=>setFicheMenu(null), 0); }}>
                     {MP_PLACES_UI.map(pl => {
                       const on = mpChoisi(e, pl.cle);
                       // (29 oct., revue) Une paire PROUVÉE sur Leboncoin (`ailleurs` : la
@@ -56473,15 +56554,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         </button>
                       );
                     })}
-                    <button type="button" className="vrm-fiche-geste" onClick={()=>openPicker(item)} style={geste}>Relier un achat</button>
-                    <button type="button" className="vrm-fiche-geste" onClick={()=>setPassportFor({it,e,num})} style={geste}>Passeport</button>
-                    {/* (3 nov.) Le prix de CE N° sur tous ses sites, et sa copie (N° neuf). */}
-                    {num && <button type="button" className="vrm-fiche-geste" data-annonce-prix-partout={num} onClick={()=>{ try { window.dispatchEvent(new CustomEvent('vrm:prix-partout',{detail:String(num)})); } catch (_) {} }} style={geste}>Changer le prix</button>}
+                    <button type="button" className="vrm-fiche-geste" data-fiche-relier-achat="" onClick={()=>openPicker(item)} style={geste}>Relier un achat</button>
+                    <button type="button" className="vrm-fiche-geste" data-fiche-passeport="" onClick={()=>setPassportFor({it,e,num})} style={geste}>Passeport</button>
                     {num && <GesteLienVcVinted it={it} num={num} style={geste}/>}
+                    {/* (3 nov.) L'histoire de CE N° et sa copie (N° neuf). */}
                     {num && <button type="button" className="vrm-fiche-geste" data-annonce-histoire={num} onClick={()=>{ try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire',{detail:String(num)})); } catch (_) {} }} style={geste}>Histoire · Dupliquer</button>}
-                    <button type="button" className="vrm-fiche-geste" onClick={async ()=>{ if(await askConfirm('Marquer cet article VENDU et le retirer des annonces ?')) markSold(it.id); }} title="Marquer vendue : la retire des annonces tout de suite (sans attendre la synchro Vinted)" style={geste}>Marquer vendue</button>
-                    {sugg!=null && sugg < Number(it.price) && <a className="vrm-fiche-geste" href={it.url||undefined} target="_blank" rel="noreferrer" title="Ouvrir l'annonce sur Vinted pour baisser le prix" style={{...geste,border:`1px solid ${C.accent}`,background:`${C.accent}14`,color:C.accentTexte}}>Baisser à {sugg} {cur(it.currency)} ↗</a>}
+                    <button type="button" className="vrm-fiche-geste" data-fiche-vendue="" onClick={async ()=>{ if(await askConfirm('Marquer cet article VENDU et le retirer des annonces ?')) markSold(it.id); }} title="Marquer vendue : la retire des annonces tout de suite (sans attendre la synchro Vinted)" style={geste}>Marquer vendue</button>
                   </div>
+                  </SheetShell>
+                  )}
                   {/* (29 oct., revue) « il lui faut un N° pour aller sur Leboncoin »
                       était écrit sur CHAQUE fiche sans N° (§7) : la pastille « + N° »
                       de la fiche le montre déjà, et la raison se dit UNE fois
@@ -56512,8 +56593,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               RETIRÉ avec l'acceptation automatique des offres (5 octobre, à sa
               demande) : il n'y a plus rien à appliquer. */}
           {numeroReprises.length > 0 && (
-            <div style={{marginBottom:10,background:`${C.blue||C.accent}0e`,border:`1px solid ${C.blue||C.accent}55`,borderRadius:12,padding:'10px 12px'}}>
-              <div style={{fontSize:13,fontWeight:700,color:C.blue||C.accent,marginBottom:2}}>♻️ {numeroReprises.length} article{numeroReprises.length>1?'s':''} déjà connu{numeroReprises.length>1?'s':''} ?</div>
+            <div data-reprises-num={numeroReprises.length} style={{marginBottom:10,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px'}}>
+              <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:2}}>{numeroReprises.length} article{numeroReprises.length>1?'s':''} déjà connu{numeroReprises.length>1?'s':''} ?</div>
               {/* ⚠️ Une paire VENDUE n'est jamais remise à son ancien numéro toute
                   seule : elle est partie, et si elle revient (litige, retour) elle
                   revient dans un autre carton. On le PROPOSE, il tranche. */}
@@ -56522,14 +56603,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {numeroReprises.slice(0,8).map((r,i)=>(
                   <div key={i} style={{display:'flex',alignItems:'center',gap:9,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'7px 9px'}}>
                     <div style={{width:34,height:34,borderRadius:12,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                      {r.item.photo?<PhotoVinted src={r.item.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:15}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
+                      {r.item.photo?<PhotoVinted src={r.item.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<PhotoVide taille={34} rayon={0}/>}
                     </div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.item.title}</div>
-                      <div style={{fontSize:11,color:C.muted,fontWeight:500,marginTop:1}}>N°{r.current.numero} (neuf) → <b style={{color:C.blue||C.accent}}>N°{r.orphan.e.numero}</b>{garageCellOf(garageGrid,r.orphan.e.numero)?` · ${garageCellLabel(garageCellOf(garageGrid,r.orphan.e.numero))}`:''}</div>
-                      {r.vendue && <div style={{fontSize:11,color:C.warn,fontWeight:600,marginTop:2}}>⚠️ cet article a été VENDU sous le N°{r.orphan.e.numero} — ne le remets que s'il t'est revenu et qu'il est dans sa boîte</div>}
+                      <div style={{fontSize:11,color:C.muted,fontWeight:500,marginTop:2,display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}><Numero n={r.current.numero} taille="petit"/> (neuf) → <Numero n={r.orphan.e.numero} taille="petit"/>{garageCellOf(garageGrid,r.orphan.e.numero)?` · ${garageCellLabel(garageCellOf(garageGrid,r.orphan.e.numero))}`:''}</div>
+                      {r.vendue && <div style={{fontSize:11,color:C.warn,fontWeight:600,marginTop:2}}>Cet article a été VENDU sous le N°{r.orphan.e.numero} — ne le remets que s'il t'est revenu et qu'il est dans sa boîte</div>}
                     </div>
-                    <button type="button" onClick={()=>applyReprise(r)} style={{flexShrink:0,border:'none',background:C.blue||C.accent,color:'#fff',borderRadius:12,padding:'7px 10px',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:'inherit'}}>Remettre N°{r.orphan.e.numero}</button>
+                    <Bouton variante="secondaire" taille="petit" onClick={()=>applyReprise(r)} style={{flexShrink:0}}>Remettre N°{r.orphan.e.numero}</Bouton>
                   </div>
                 ))}
               </div>
@@ -56556,7 +56637,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {annStats.aRecapturer>0 && <span data-prepa-resume={annStats.aRecapturer} data-prepa-commun={annStats.prepaCommun||''} title={`${annStats.pretLbc} article(s) ont TOUTES leurs photos + une description captées — prêts pour Leboncoin. ${annStats.aRecapturer} n'ont pas encore toutes leurs photos : tu n'as rien à rouvrir — passe simplement sur Vinted connecté sur leurs comptes (extension à jour) et l'extension les complète toute seule, quelques annonces par visite. Si l'une reste incomplète après plusieurs passages, rouvre-la pour forcer.`} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:12,padding:'4px 11px'}}>{annStats.aRecapturer} à recapturer pour Leboncoin</span>}
             {/* Une paire qui dort se rattrape : de l'ambre, jamais du rouge (§5.56). */}
             {annStats.sleeping>0 && <button type="button" onClick={()=>setAnnSort('sleeping')} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:12,padding:'4px 11px',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:5}}><Icon name="sleep" size={13}/>{annStats.sleeping} qui dorment{annStats.sleepingVal>0?` · ${annStats.sleepingVal.toFixed(0)} €`:''}</button>}
-            <button type="button" onClick={()=>setShowLister(true)} title="Prix conseillé + titre & description prêts à coller" style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.accentTexte,background:C.card,border:`1px solid ${C.accent}`,borderRadius:12,padding:'4px 12px',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:5}}><Icon name="spark" size={13}/>Aide à la vente</button>
+            <Bouton variante="secondaire" taille="petit" icone="spark" onClick={()=>setShowLister(true)} title="Prix conseillé + titre & description prêts à coller" style={{flexShrink:0}}>Aide à la vente</Bouton>
           </div>
           {/* ── CONSEILS ET SIGNALEMENTS : repliés ─────────────────────────
               Cinq bandeaux s'empilaient ici avant la liste des annonces (vendues
@@ -60085,39 +60166,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </SheetShell>
         );
       })()}
-      {actionsOpen && (()=>{
-        const nBr = brVinted.liste ? brVinted.liste.length : 0;
-        const nPret = brVinted.liste ? brVinted.liste.filter(b=>b._place==='proposable').length : 0;
-        const ent = [
-          ...(nRefaire ? [{ k:'refaire', t:`Brouillons à refaire · ${nRefaire}`, d:'Un passage par brouillon n’est pas allé au bout : le refaire depuis ce qui est enregistré dans VRM.', cap:'refaire' }] : []),
-          { k:'recreer', t:'Republier', d:'Supprimer et recréer : favoris et vues repartent de zéro.', cap:'recreer' },
-          { k:'modifier', t:'Modifier prix ou titre', d:'Sur place : favoris et vues gardés.', cap:'republiermodif' },
-          { k:'enLigne', t:'Brouillons → en ligne', d: nBr ? `${nPret} prêt${nPret>1?'s':''} à mettre en ligne sur ${nBr} brouillon${nBr>1?'s':''}${brVinted.uidChrome ? ` (compte ouvert ${NAV.dansNu})` : ''}.` : 'Aucun brouillon sur Vinted.', cap:'brouillon', vide: !nBr },
-          { k:'versBrouillon', t:'En ligne → brouillon', d:'Retirer de la vente, gardé en brouillon (favoris et vues perdus).', cap:'versbrouillon' },
-          { k:'voir', t:`Voir mes brouillons${nBr?` · ${nBr}`:''}`, d:'Ouvrir, mettre en ligne ou retirer un brouillon.' },
-        ];
-        return (
-          <SheetShell onClose={()=>setActionsOpen(false)} maxWidth={460}>
-            <div data-actions-menu style={{display:'flex',flexDirection:'column',gap:8}}>
-              <div style={{display:'flex',alignItems:'center',gap:8}}>
-                <h2 style={{margin:0,fontSize:17,fontWeight:700,color:C.text,flex:1}}>Republier et brouillons</h2>
-                <button type="button" onClick={()=>setActionsOpen(false)} aria-label="Fermer" style={{border:'none',background:'transparent',color:C.muted,fontSize:22,minWidth:44,minHeight:44,cursor:'pointer'}}>✕</button>
-              </div>
-              {/* (30 oct.) La cause commune (extension à mettre à jour) se dit UNE fois en tête ;
-                  une entrée qu'on ne peut pas lancer est grisée avec sa raison, jamais cachée. */}
-              {(()=>{ const manque = ent.filter(e=>e.cap && extSait(e.cap)!=='ok').map(e=>EXT_CAPACITES[e.cap]).filter(Boolean).sort(cmpVersion); return manque.length ? <div data-actions-maj data-version-min={manque[manque.length-1]} style={{fontSize:13,color:C.warn,lineHeight:1.4}}>Mets l'extension à jour</div> : null; })()}
-              {ent.map(e=>{ const capOk = !e.cap || extSait(e.cap)==='ok'; const off = !capOk || !!e.vide; return (
-                <button key={e.k} type="button" data-action={e.k} data-action-ok={capOk?'oui':'non'} aria-disabled={off?'true':undefined} title={!capOk ? `Demande l'extension VRM ${EXT_CAPACITES[e.cap]} ou plus récente` : e.vide ? 'Aucun brouillon sur Vinted' : undefined}
-                  onClick={()=>{ if (off) return; setActionsOpen(false); if(e.k==='voir') setBrouillonsOpen(true); else if(e.k==='refaire') setRefaireOpen(true); else setRepubAction(e.k); }}
-                  style={{display:'flex',flexDirection:'column',alignItems:'flex-start',gap:3,textAlign:'left',padding:'12px 14px',minHeight:56,border:'none',borderRadius:12,background:'var(--vrm-b-teinte)',color:C.text,cursor:off?'default':'pointer',fontFamily:'inherit',opacity:off?.5:1}}>
-                  <span style={{fontSize:15,fontWeight:700}}>{e.t}</span>
-                  <span style={{fontSize:13,color:C.muted,fontWeight:400,lineHeight:1.4}}>{e.d}</span>
-                </button>
-              ); })}
-            </div>
-          </SheetShell>
-        );
-      })()}
+      {/* (5 nov., chantier C — revue 2.5) La feuille « Republier et brouillons » est
+          RETIRÉE : c'était un second chemin vers les mêmes moteurs, avec d'autres mots
+          (« Brouillons → en ligne », « En ligne → brouillon »). « Republier… » et l'entrée
+          « Republier » du menu mènent à « Sélectionner » ; la feuille « Actions » est la
+          seule. « Voir mes brouillons » vit dans la vue Brouillons (« Un par un ») ;
+          « N brouillons à refaire » reste dans la barre d'outils. */}
       {actionsSelOpen && (()=>{
         // (5 nov.) Le carré « Actions possibles » de SA sélection (src/annoncesActions.js).
         const idx = new Map(annSelectionnables.map(a=>[a.uid+':'+a.id, a]));

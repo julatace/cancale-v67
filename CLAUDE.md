@@ -506,6 +506,8 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 
+- **5 nov. · Chantier C (Annonces)** : une feuille « Actions » (Republier · Modifier prix ou titre · Mettre en brouillon · Mettre en ligne, raison dite une fois), carte = 2 gestes + « … », bandeau « Prix d'achat N/M », Numero/PhotoVide partout. `docs/passation/2026-11-05-chantier-c.md`. Geste : cocher deux annonces → Actions.
+
 - **5 nov. · Chantier E1 (Ma journée, cartes sombres)** : « N gestes » = toutes les cartes, « Vendus ailleurs » et « N°x vendue, toujours rangée » dans la liste, « Voir » seul verbe, Semaine propre, tête lisible la nuit, « Modifier » hors de la courbe, « — » avec sa raison (Reçu « à dater »). `docs/passation/2026-11-05-chantier-e1.md`.
 
 - **5 nov. · Chantier G (v35)** : Messages (filtres `.vrm-filtres`, liens de pied, colonne 368-420 px), UN écran E-mails (Paramètres y mène), `EtatPanne` E-mails/Communauté/Messages, offre Vestiaire < 6 h en ambre (jamais Vinted). `docs/passation/2026-11-05-chantier-g.md`.

@@ -152,9 +152,12 @@ const visible = (pg, sel) => pg.evaluate(([s, h]) => {
       { const { ctx, pg, errs } = await page(b, vp);
         try {
           await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
+          // (5 nov., chantier C — revue 2.5) La feuille « Republier et brouillons » est retirée :
+          //  « Voir mes brouillons » vit dans la vue Brouillons (« Un par un ») — la MÊME feuille.
           const bouton = pg.locator('[data-actions-ouvrir]').first();
           await bouton.waitFor({ state: 'visible', timeout: 15000 });
-          await bouton.click(); await pg.locator('[data-action="voir"]').click();
+          const vueBr = async () => { await pg.locator('[data-vue-brouillons]').first().click(); await pg.waitForSelector('[data-selection-vue="brouillon"]', { timeout: 6000 }); };
+          await vueBr(); await pg.locator('[data-brouillons-detail]').first().click();
           await pg.locator('[data-brouillons-vinted]').waitFor({ state: 'visible', timeout: 5000 });
           await pg.locator('[data-brouillon="9601"]').waitFor({ timeout: 5000 }).catch(() => {});
           await pg.waitForTimeout(400);
@@ -179,18 +182,32 @@ const visible = (pg, sel) => pg.evaluate(([s, h]) => {
           await pg.screenshot({ path: path.join(CAPT, `brouillons-voir-${vp.width}.png`) });
           await pg.locator('[data-brouillons-vinted] [aria-label="Fermer"]').click().catch(() => {});
           await pg.waitForTimeout(300);
-          // L'atelier « Brouillons → en ligne ».
-          await bouton.click(); await pg.locator('[data-action="enLigne"]').click();
-          await pg.locator('[data-republier]').waitFor({ state: 'visible', timeout: 5000 });
-          await pg.locator('[data-republier-paire="9601"]').waitFor({ timeout: 5000 }).catch(() => {});
-          const coche = async (id) => { const l = pg.locator(`[data-republier-paire="${id}"] input[type=checkbox]`); return (await l.count()) ? (await l.isDisabled() ? 'grisé' : 'cochable') : 'absent'; };
-          const c9601 = await coche('9601'), c9401 = await coche('9401'), c9201 = await coche('9201'), c9602 = await coche('9602');
+          // « Mettre en ligne » (chantier C) : depuis la vue Brouillons, on coche, puis la feuille
+          //  « Actions ». Les MÊMES règles, jugées là où elles vivent désormais : un autre compte ⇒
+          //  rien ne part (raison dite, les comptes nommés) ; un brouillon sans lecture récente ⇒
+          //  « à vérifier sur Vinted » dans « Avant de lancer » ; un brouillon disparu n'est pas là.
+          await vueBr();
+          await pg.locator('[data-selection-annonce="9601"]').waitFor({ timeout: 5000 }).catch(() => {});
+          const coche = async (id) => { const l = pg.locator(`[data-selection-annonce="${id}"] input[type=checkbox]`); return (await l.count()) ? (await l.isDisabled() ? 'grisé' : 'cochable') : 'absent'; };
+          const c9601 = await coche('9601'), c9602 = await coche('9602');
           dit(c9601 === 'cochable', 'atelier : le brouillon prouvé du compte de Chrome se coche', c9601);
-          dit(c9401 === 'grisé' && /autre_compte/.test(await pg.locator('[data-republier-paire="9401"]').innerText().catch(() => '')), 'atelier : le brouillon de l’autre compte est MONTRÉ, grisé, son compte nommé', c9401);
-          dit(c9201 === 'grisé' && /vérifier sur Vinted/i.test(await pg.locator('[data-republier-paire="9201"]').innerText().catch(() => '')), 'atelier : le brouillon sans lecture récente est grisé, « à vérifier sur Vinted »', c9201);
           dit(c9602 === 'absent', 'atelier : le brouillon disparu n’est pas proposé', c9602);
-          await pg.locator('[data-republier-tout]').click().catch(() => {});
-          await pg.locator('[data-republier-suivant]').click();
+          const ouvrirActions = async () => { await pg.locator('[data-actions-possibles]').click(); await pg.waitForSelector('[data-actions-selection]', { timeout: 4000 }); };
+          const fermerActions = async () => { await pg.locator('[data-actions-selection]').locator('xpath=ancestor::*[@role="dialog"][1]').locator('button[aria-label="Fermer"]').first().click().catch(() => pg.keyboard.press('Escape')); await pg.waitForTimeout(300); };
+          await pg.locator('[data-selection-annonce="9601"] input').check(); await pg.locator('[data-selection-annonce="9401"] input').check();
+          await ouvrirActions();
+          const mix = await pg.evaluate(() => ({ ok: (document.querySelector('[data-action-sel="enLigne"]') || {}).getAttribute && document.querySelector('[data-action-sel="enLigne"]').getAttribute('data-action-sel-ok'), tete: (document.querySelector('[data-actions-raison]') || {}).textContent || '' }));
+          dit(mix.ok === 'non' && /autre_compte/.test(mix.tete), 'atelier : le brouillon de l’autre compte ne part pas avec lui, son compte nommé', JSON.stringify(mix));
+          await fermerActions();
+          await pg.locator('[data-selection-annonce="9401"] input').uncheck(); await pg.locator('[data-selection-annonce="9201"] input').check();
+          await ouvrirActions();
+          const v9201 = await pg.locator('[data-act-paire="9201"]').innerText().catch(() => '');
+          dit(/vérifier sur Vinted/i.test(v9201), 'atelier : le brouillon sans lecture récente est « à vérifier sur Vinted » avant de lancer', v9201);
+          await fermerActions();
+          await pg.locator('[data-selection-annonce="9201"] input').uncheck();
+          await ouvrirActions();
+          await pg.locator('[data-action-sel="enLigne"]').click();
+          await pg.locator('[data-republier]').waitFor({ state: 'visible', timeout: 5000 });
           await pg.locator('[data-republier-confirme]').check();
           await pg.screenshot({ path: path.join(CAPT, `brouillons-atelier-${vp.width}.png`) });
           await pg.locator('[data-republier-lancer]').click();
@@ -209,13 +226,17 @@ const visible = (pg, sel) => pg.evaluate(([s, h]) => {
           await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
           const bouton = pg.locator('[data-actions-ouvrir]').first();
           await bouton.waitFor({ state: 'visible', timeout: 15000 });
-          await bouton.click(); await pg.locator('[data-action="recreer"]').click();
+          // (5 nov., chantier C) « Republier… » mène à « Sélectionner » : on coche, dans cet ordre,
+          //  9102 (N°42) puis 9103 (N°43), puis « Actions » → « Republier » ; le moteur s'ouvre
+          //  après « Choisir » (sur CES paires). La suite du parcours ne change pas.
+          await bouton.click();
+          await pg.waitForSelector('[data-selection-vue]', { timeout: 6000 });
+          await pg.locator('[data-selection-annonce="9102"]').waitFor({ timeout: 5000 });
+          await pg.locator('[data-selection-annonce="9102"] input').check();
+          await pg.locator('[data-selection-annonce="9103"] input').check();
+          await pg.locator('[data-actions-possibles]').click();
+          await pg.locator('[data-action-sel="recreer"]').click();
           await pg.locator('[data-republier]').waitFor({ state: 'visible', timeout: 5000 });
-          await pg.locator('[data-republier-paire="9102"]').waitFor({ timeout: 5000 });
-          // Deux paires, dans cet ordre : 9102 (N°42) puis 9103 (N°43).
-          await pg.locator('[data-republier-paire="9102"]').click();
-          await pg.locator('[data-republier-paire="9103"]').click();
-          await pg.locator('[data-republier-suivant]').click();
           await pg.locator('[data-republier-apercu="9102"]').waitFor({ timeout: 4000 });
           await pg.locator('[data-republier-suivant]').click();
           await pg.locator('[data-republier-lancer]').waitFor({ timeout: 4000 });
