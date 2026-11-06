@@ -74,7 +74,7 @@ pas (plan Hobby : 12 fonctions).
 était un état de la coque — chaque lettre redessinait TOUTE l'app (240-600 ms par
 lettre sur Ma journée, même sans résultat). Il vit maintenant dans le fil de la
 loupe : seuls le champ et le panneau se redessinent. **Frappe → ligne peinte :
-médiane 32 ms, pire 135 ms (36 mesures, 390/1512, clair/sombre)**.
+médiane 26-32 ms, pire 121-135 ms selon le passage (36 mesures, 390/1512, clair/sombre)**.
 
 ## Lectures
 
@@ -104,7 +104,8 @@ encore `email_track_*&select=id,data` (lignes de suivi, petites, mais entières)
   `audit-recherche-numero`, `audit-recherche-vocale`, `audit-cibles-notif`,
   `audit-flux-divers`, `audit-mode-stream`, `audit-garde-ecrans` : verts.
 - Banc `scripts/bancs/recherche-universelle.cjs` (390/1512, clair/sombre + mode
-  stream) : vert ; captures `$TMPDIR/loupe-*.png` regardées (champ vide, pseudo,
+  stream) : **233 contrôles verts** (frappe → ligne peinte : médiane 26 ms, pire
+  121 ms) ; sur le build de l'arbre d'avant : **67 rouges** ; captures `$TMPDIR/loupe-*.png` regardées (champ vide, pseudo,
   code, montant, e-mail, 50 jumelles, « En grand », récents, stream).
   `litiges-recherche`, `recherche-numero`, `recherche-photo` : verts.
   `recherche-en-place` : 2 rouges à 1512 (« défilement 88 → 0 ») — **les mêmes sur
