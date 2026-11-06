@@ -22430,7 +22430,7 @@ function useRelectureTransporteurs() {
   React.useEffect(() => {
     const tic = () => { try { if (document.visibilityState === 'hidden') return; } catch (_) {} relireTransporteursSiVieux(); };
     tic();
-    const t = setInterval(() => { if (rythme().doitLire('transp', RELECTURE_TRANSP_MS)) tic(); }, 60000);
+    const t = setInterval(() => { if (rythme().doitLire('transp', 60000)) tic(); }, 60000);
     document.addEventListener('visibilitychange', tic);
     window.addEventListener('focus', tic);
     return () => { clearInterval(t); document.removeEventListener('visibilitychange', tic); window.removeEventListener('focus', tic); };

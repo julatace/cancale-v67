@@ -126,7 +126,7 @@ async function brancher(ctx, journal) {
 function doublonsEnVol(liste) {
   const pire = {};
   const parCle = {};
-  for (const e of liste) (parCle[e.cle] = parCle[e.cle] || []).push(e);
+  for (const e of liste) if (e.cle.startsWith('GET ')) (parCle[e.cle] = parCle[e.cle] || []).push(e);   // des LECTURES
   for (const [k, l] of Object.entries(parCle)) {
     let max = 1;
     for (const a of l) { const n = l.filter((b) => b.t <= a.t && (b.fin || Infinity) > a.t).length; if (n > max) max = n; }
