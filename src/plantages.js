@@ -26,7 +26,30 @@ let notesCetteOuverture = 0;
 
 // Ce qui n'est PAS un défaut de l'app. (5 nov.) `kagi.executeCallback` : le pont d'Orion lui-même
 // (10 des 15 plantages relevés le 5 nov.), pas VRM.
-const BRUIT = /ResizeObserver loop|^Script error\.?$|Failed to fetch|NetworkError|Load failed|AbortError|The (user|operation) aborted|chrome-extension:\/\/|moz-extension:\/\/|safari-(web-)?extension:\/\/|Importing a module script failed|error loading dynamically imported module|Failed to update a ServiceWorker|kagi\.executeCallback/i;
+export const BRUIT = /ResizeObserver loop|^Script error\.?$|Failed to fetch|NetworkError|Load failed|AbortError|The (user|operation) aborted|chrome-extension:\/\/|moz-extension:\/\/|safari-(web-)?extension:\/\/|Importing a module script failed|error loading dynamically imported module|Failed to update a ServiceWorker|kagi\.executeCallback/i;
+
+// ── UN MORCEAU D'UN ANCIEN DÉPLOIEMENT N'EST PAS UN PLANTAGE (6 nov., filet 3) ──
+// Après une mise en ligne, une page restée ouverte demande des fichiers qui
+// n'existent plus (`/assets/App-<ancien>.css` : « Unable to preload CSS »,
+// mesuré sur iOS Safari le 6 nov.). main.jsx la RECHARGE (`vite:preloadError`) :
+// c'est rattrapé, ce n'est pas un défaut de l'app. Noté comme plantage, il
+// noyait les vrais (et la veille du cron l'aurait signalé à chaque déploiement).
+// Il est COMPTÉ À PART, sur l'appareil (`vrm_morceaux_perimes` : nombre, dernier
+// message, date) — pas un octet de plus vers la base. Vercel Hobby n'a pas la
+// « Skew Protection » ; le service worker garde déjà les morceaux chargés, pas
+// ceux qu'une page n'avait jamais demandés (docs/passation/2026-11-06-filets-anti-bug.md).
+export const MORCEAU_PERIME = /Unable to preload CSS|Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module|Loading (CSS )?chunk [\w-]+ failed|is not a valid JavaScript MIME type/i;
+export const estMorceauPerime = (m) => MORCEAU_PERIME.test(String(m || ''));
+const MORCEAUX = 'vrm_morceaux_perimes';
+export function compterMorceauPerime(err) {
+  try {
+    const message = nettoyer((err && (err.message || err.reason)) || err).slice(0, 200);
+    const avant = lire(MORCEAUX, null);
+    const n = ((avant && Number(avant.n)) || 0) + 1;
+    ecrire(MORCEAUX, { n, message, at: new Date().toISOString() });
+    return n;
+  } catch (_) { return null; }
+}
 
 // ⚠️ Revue adverse du 4 octobre : la première version laissait passer un login
 //    cité par le navigateur (« reading 'julatace3535' »), un téléphone espacé,
@@ -65,6 +88,7 @@ const ecrire = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } c
 export function noterPlantage(err, contexte = {}) {
   try {
     const message = nettoyer((err && (err.message || err.reason)) || err).slice(0, 300);
+    if (message && estMorceauPerime(message)) { compterMorceauPerime(err); return null; }
     if (!message || BRUIT.test(message)) return null;
     const pileBrute = String((err && err.stack) || '');
     // Le bruit se juge sur la frame qui a LEVÉ, pas sur toute la pile : une

@@ -3,7 +3,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import Accueil from './Accueil.jsx';
 import { DemarrageVRM } from './Chargement.jsx';
-import { ecouterPlantages, ecouterViolationsCsp, noterPlantage } from './plantages.js';
+import { ecouterPlantages, ecouterViolationsCsp, noterPlantage, compterMorceauPerime } from './plantages.js';
 // Le journal des plantages écoute dès le démarrage : une erreur AVANT que l'app
 // soit montée est justement celle qu'aucun écran ne montre (src/plantages.js).
 // ⚠️ (22 oct., revue) L'ÉCRAN SE LIT DANS L'HISTORIQUE : l'app retire `?tab=` de
@@ -43,6 +43,10 @@ if (typeof window !== 'undefined') {
     try { dernier = Number(sessionStorage.getItem('vrm_recharge_morceau')) || 0; } catch (_) {}
     if (Date.now() - dernier < 60000) return;
     try { sessionStorage.setItem('vrm_recharge_morceau', String(Date.now())); } catch (_) { return; }
+    // (6 nov., filet 3) Compté À PART (src/plantages.js), jamais noté comme plantage :
+    // c'est rattrapé par le rechargement. Dans la minute, l'erreur repart telle quelle
+    // (vraie panne de réseau) et `noterPlantage` la compte à part elle aussi.
+    compterMorceauPerime(ev && ev.payload);
     ev.preventDefault();
     window.location.reload();
   });

@@ -1,0 +1,15 @@
+{
+  "_lire": "Les audits ROUGES CONNUS, hors du périmètre d'une fusion ordinaire. Ils restent LANCÉS par scripts/lancer-audits.cjs (rapportés « rouge connu ») mais ne bloquent pas la fusion. Chaque entrée dit pourquoi et depuis quand ; le jour où l'audit repasse au vert, le lanceur dit « exception à retirer ». Ne jamais ajouter une exception pour faire passer une PR : corriger l'audit ou le code.",
+  "exceptions": [
+    {
+      "audit": "audit-chemin-json-guillemets.cjs",
+      "raison": "Il juge vinted-sync-extension/ (un chemin JSON `->n` nu au-delà d'un entier) : la correction est dans l'extension, qui se livre en version numérotée (zip, §6) — chantier à part.",
+      "depuis": "2026-11-06"
+    },
+    {
+      "audit": "audit-vc-recon.cjs",
+      "raison": "Relevé Vestiaire (vcRecon) : deux contrôles rouges en attente d'une décision de Julien sur ce que l'extension doit relever.",
+      "depuis": "2026-11-06"
+    }
+  ]
+}
