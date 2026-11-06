@@ -201,7 +201,11 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
           '« Tous » : les ventes des trois comptes, chacune marquée de SON compte (le pseudo est sur la ligne : la liste en mélange plusieurs)', JSON.stringify(v.map((x) => [x.id, x.c])));
         // ⚠️ l'étiquette est en `textTransform: uppercase` : innerText rend
         // « 3 COMPTES » — on lit sans la casse (le piège de « POINT RELAIS »).
-        dit(/623,00\s*€/.test(r) && /3 comptes/i.test(r), 'le résumé « Tous » dit le total ET sur combien de comptes il porte (80 + 210 + 333 = 623 €, 3 comptes)', r.replace(/\s+/g, ' '));
+        // (6 nov.) Le résumé est la carte sombre réglable (3 nov., 2705c0c5) : son périmètre se dit en 1 à 3
+        // mots (`perimetre`, src/design/carteChiffres.js : période · site · compte) et « Tous » n'y nomme
+        // aucun compte ; chaque vente, elle, porte SON compte (contrôle plus haut). La règle reste : le
+        // total de « Tous » = les trois comptes (623 €), et aucun compte seul n'y est nommé.
+        dit(/\b623(,00)?\s*€/.test(r) && !/paire_(perso|pro|trois)/.test(r), 'le résumé « Tous » porte le total des trois comptes (80 + 210 + 333 = 623 €), sans nommer un compte seul', r.replace(/\s+/g, ' '));
       });
       await essaie('compte 2 : ventes', async () => {
         await choisirVue(pg, K2);
@@ -209,7 +213,7 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         const vue = await pg.$eval('[data-ebay-vue]', (e) => e.getAttribute('data-ebay-vue')).catch(() => '');
         const txt = await pg.evaluate(() => document.body.innerText);
         dit(vue === K2 && v.length === 1 && v[0].id === '22-0002', '« compte 2 » : SA vente et elle seule', JSON.stringify(v.map((x) => x.id)));
-        dit(/210,00\s*€/.test(r) && !/623/.test(r) && /paire_pro/i.test(r), 'le résumé ne porte que sur ce compte (210 €), nommé', r.replace(/\s+/g, ' '));
+        dit(/\b210(,00)?\s*€/.test(r) && !/623/.test(r) && /paire_pro/i.test(r), 'le résumé ne porte que sur ce compte (210 €), nommé', r.replace(/\s+/g, ' '));
         dit(!/333,00/.test(txt) && !/80,00\s*€/.test(txt) && !/11-0001|33-0003/.test(txt), 'aucun montant des comptes 1 et 3 ne se glisse à l\'écran (ni 80 €, ni 333 €)');
         const memo = await pg.evaluate(() => localStorage.getItem('vrm_ebay_vue'));
         dit(/bbbbbbbbbbbbbbb2/.test(String(memo)), 'le choix est mémorisé (réglage synchronisé `vrm_ebay_vue`)', String(memo));
@@ -248,6 +252,7 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         dit(g === 'deja-en-ligne' && dis === true && envois.filter((x) => x.action === 'publish').length === 0,
           'la N°30, en vente sur le compte 1, reste BLOQUÉE à la publication sur le compte 2 — même vue réglée sur « compte 2 » : rien n\'est envoyé', `${g} · grisé=${dis}`);
       });
+      const passerVerif = async (pg) => { const v = pg.locator('[data-verif-publier]'); if (await v.first().waitFor({ timeout: 2500 }).then(() => true).catch(() => false)) { await v.first().click(); await pg.waitForTimeout(300); } };
       await essaie('publier une paire libre', async () => {
         await sousOnglet(pg, 'Ventes'); await sousOnglet(pg, 'Annonces');
         await pg.waitForSelector('[data-poster="ebay"]', { timeout: 8000 });
@@ -258,13 +263,15 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         await pg.waitForSelector('text=Catégorie eBay', { timeout: 8000 });
         await pg.fill('input[placeholder="ex. 74"]', '92');
         await pg.waitForFunction(() => !document.querySelector('[data-publier-garde="en-cours"]'), null, { timeout: 10000 }).catch(() => {});
-        await pg.locator('button:has-text("Publier sur eBay")').click({ timeout: 5000 });
+        // (6 nov.) Depuis le 3 nov. (b07530a5), l'annonce est VÉRIFIÉE avant publication : ici « 2 photos
+        // seulement » ⇒ « Publier quand même » (`data-verif-publier`), puis la confirmation du compte.
+        await pg.locator('button:has-text("Publier sur eBay")').click({ timeout: 5000 }); await passerVerif(pg);
         await feuille(pg).getByRole('button', { name: 'Oui, publier' }).waitFor({ timeout: 5000 });
         const titre = await feuille(pg).innerText();
         await feuille(pg).getByRole('button', { name: 'Annuler' }).click();
         await pg.waitForTimeout(300);
         dit(/paire_pro/.test(titre) && envois.filter((x) => x.action === 'publish').length === 0, 'la confirmation NOMME le compte (« paire_pro ») ; Annuler n\'envoie rien', titre.split('\n')[0]);
-        await pg.locator('button:has-text("Publier sur eBay")').click({ timeout: 5000 });
+        await pg.locator('button:has-text("Publier sur eBay")').click({ timeout: 5000 }); await passerVerif(pg);
         await feuille(pg).getByRole('button', { name: 'Oui, publier' }).click({ timeout: 5000 });
         await pg.waitForTimeout(900);
         const p = envois.filter((x) => x.action === 'publish');
@@ -309,6 +316,9 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         await pg.waitForTimeout(1500);
         const d = envois.filter((x) => x.action === 'deconnecter');
         dit(d.length === 1 && d[0].compte === K3 && d[0].confirme === true, 'Oui ⇒ UN envoi, pour le compte 3 seulement, confirmé', JSON.stringify(d));
+        // (6 nov.) « Compte » mène à Paramètres → Comptes eBay (un écran à part, sans sélecteur de vue) :
+        // on revient sur eBay, comme Julien, et on lit la vue et le sélecteur là où ils vivent.
+        if (!(await pg.$('#vrm-sel-compte-ebay'))) { await pg.goto(`http://localhost:${PORT}/?tab=plat_ebay`, { waitUntil: 'domcontentloaded' }); await pg.waitForSelector('[data-ebay-vue]', { timeout: 15000 }).catch(() => {}); await pg.waitForTimeout(600); }
         const vue = await pg.$eval('[data-ebay-vue]', (e) => e.getAttribute('data-ebay-vue')).catch(() => '');
         const opts = await pg.$$eval('#vrm-sel-compte-ebay option', (l) => l.map((o) => o.value));
         dit(vue === '*' && opts.length === 3 && !opts.includes(K3), 'la vue réglée sur le compte déconnecté retombe sur « Tous » ; il sort du sélecteur', `${vue} · ${JSON.stringify(opts)}`);
@@ -328,7 +338,7 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         const sel = (await pg.$$('#vrm-sel-compte-ebay')).length;
         const r = await resume(pg);
         dit(sel === 0, 'un seul compte eBay ⇒ AUCUN sélecteur', String(sel));
-        dit(/80,00\s*€/.test(r) && !/comptes?\b|paire_/i.test(r), 'le résumé est celui d\'avant (80 €, sans « N comptes »)', r.replace(/\s+/g, ' '));
+        dit(/\b80(,00)?\s*€/.test(r) && !/comptes?\b|paire_/i.test(r), 'le résumé est celui d\'avant (80 €, sans « N comptes »)', r.replace(/\s+/g, ' '));
         await sousOnglet(pg, 'Annonces');
         await pg.waitForSelector('[data-ebay-annonce]', { timeout: 10000 });
         const a = await annonces(pg);
