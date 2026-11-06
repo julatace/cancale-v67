@@ -161,6 +161,7 @@ async function passe(nav, { W, theme }) {
       const a = await ambre(o.pg, '.vrm-sale-row[data-tx="62002"] .vrm-ledger-sale-achat[data-achat-etat="manque"]');
       dit(a && !a.ambre, 'B', `${T} la case « Achat » d’une vente sans prix est grise (plus d’ambre répété)`, JSON.stringify(a));
     }
+    await o.pg.locator('[data-ventes-avis]').first().scrollIntoViewIfNeeded().catch(() => {});
     await capture(o.pg, nomS('ventes-bandeau'));
     await o.pg.getByRole('button', { name: /^Annulées/ }).first().click().catch(() => {});
     await attendre(o.pg, '[data-remise-vente]', 12000);
@@ -218,6 +219,7 @@ async function passe(nav, { W, theme }) {
     dit(j.a.n === 1 && j.a.val === '3', 'J', `${T} « 3 annonces sans achat relié » : une ligne`, JSON.stringify(j.a));
     const g = await GENERAL(o.pg, tel, '[data-job="remettre-en-vente"], [data-job="achat-a-relier"]');
     dit(!g.rouges.length && !g.debord && (!tel || !g.petits.length), 'G', `${T} Ma journée : ni rouge, ni débord, 44 px`, JSON.stringify(g));
+    await o.pg.locator('[data-job="remettre-en-vente"]').first().scrollIntoViewIfNeeded().catch(() => {});
     await capture(o.pg, nomS('journee'));
     await clic(o.pg, '[data-job="remettre-en-vente"]');
     const vu = await attendre(o.pg, '[data-remise-vente]', 20000);
@@ -243,6 +245,9 @@ async function passe(nav, { W, theme }) {
     dit(/32\s?€/.test(a.relier), 'A', `${T} « Relier » montre le prix qu’il écrira`, a.relier);
     const g = await GENERAL(o.pg, tel, '[data-ar]');
     dit(!g.rouges.length && !g.debord && (!tel || !g.petits.length), 'G', `${T} Sans achat relié : ni rouge, ni débord, 44 px`, JSON.stringify(g));
+    await o.pg.locator('[data-ar]').first().scrollIntoViewIfNeeded().catch(() => {});
+    const doublon = await o.pg.evaluate(() => !!document.querySelector('[data-ann-filtre]'));
+    dit(!doublon, 'A', `${T} le nombre de la file n’est pas redit par la ligne « N annonces affichées »`);
     await capture(o.pg, nomS('sans-achat'));
     dit(!(lignesMain(o.base).vinted_annonce_numeros || {})['51001'].buyFromId, 'A', `${T} rien n’est relié avant SON tap`);
     await clic(o.pg, '[data-ar-relier="7300001"]');

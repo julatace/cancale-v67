@@ -14303,7 +14303,8 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, onDebut, onLier,
     <SheetShell onClose={onClose} maxWidth={560}>
       <div className="vrm-act" data-repub-main={paire.id} data-repub-main-etat={etatSuivi}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <h2 className="vrm-act-titre">Republier à la main · {paire.numero ? `N°${paire.numero} ` : ''}{paire.titre || 'annonce'}</h2>
+          {/* (6 nov., vague 2) Une vente annulée avant l'envoi se « remet en vente » ; son N° (même d'archive) la nomme. */}
+          <h2 className="vrm-act-titre">{paire.annulee ? 'Remettre en vente' : 'Republier à la main'} · {(paire.numero || paire.numAffiche) ? `N°${paire.numero || paire.numAffiche} ` : ''}{paire.titre || 'annonce'}</h2>
           <button type="button" onClick={onClose} aria-label="Fermer" style={{ border: 'none', background: 'transparent', color: C.muted, fontSize: 22, minWidth: 44, minHeight: 44, cursor: 'pointer' }}>✕</button>
         </div>
         <div className="vrm-act-muet">Compte <b style={{ color: C.text }}>{paire.compte}</b>. Rien ne part chez Vinted d’ici : tu publies toi-même, VRM t’accompagne.</div>
@@ -14423,7 +14424,7 @@ function AchatsARelier({ file, achats, liens, propositionDe, onRelier, onSaisir,
   const jour = (d) => { const t = Date.parse(d || ''); return Number.isFinite(t) ? new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: new Date(t).getFullYear() === new Date().getFullYear() ? undefined : 'numeric' }) : ''; };
   return (
     <section className="vrm-ar" data-ar={lignes.length} data-ar-sugg={achats === undefined ? '' : String(nSugg)} aria-label="Annonces sans achat relié">
-      <p className="vrm-ar-tete">{achats === undefined ? `${lignes.length} annonce${lignes.length > 1 ? 's' : ''} · ${PAS_SU.enCours.toLowerCase()}` : `${lignes.length} annonce${lignes.length > 1 ? 's' : ''} · ${nSugg} avec une suggestion`}<span> · ton tap relie, rien ne se relie tout seul</span></p>
+      <p className="vrm-ar-tete">{achats === undefined ? `${lignes.length} annonce${lignes.length > 1 ? 's' : ''} · ${PAS_SU.enCours.toLowerCase()}` : `${lignes.length} annonce${lignes.length > 1 ? 's' : ''} · ${nSugg} avec une suggestion`}</p>
       <ul className="vrm-ar-liste">
         {lignes.map((l) => {
           const it = l.item, t = l.texte, num = l.fiche && l.fiche.numero;
@@ -56478,8 +56479,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* (5 nov., chantier C — revue 2.9) « sélection » ne nomme plus que les cases cochées :
             le filtre dit « affichées ». Dans les vues à cocher (Sélectionner, Brouillons), leur
             propre tête dit déjà quoi faire : pas de ligne de filtre en plus. */}
-        {(annSearch.trim() || annSort!=='oldest') && annSort!=='selection' && annSort!=='brouillons' && <div className="vrm-filter-recap" role="status" data-ann-filtre="">
-          <span>{(()=>{ const k = annSort==='masquees' ? annMasquees.length : annSort==='sansachat' ? (fileAchat ? fileAchat.length : 0) : annShown.length; return `${k} annonce${k>1?'s':''} affichée${k>1?'s':''}`; })()}</span>
+        {(annSearch.trim() || annSort!=='oldest') && annSort!=='selection' && annSort!=='brouillons' && annSort!=='sansachat' && <div className="vrm-filter-recap" role="status" data-ann-filtre="">
+          <span>{(()=>{ const k = annSort==='masquees' ? annMasquees.length : annShown.length; return `${k} annonce${k>1?'s':''} affichée${k>1?'s':''}`; })()}</span>
           <button type="button" onClick={()=>{setAnnSearch('');setAnnSort('oldest');}}>Tout afficher</button>
         </div>}
 
