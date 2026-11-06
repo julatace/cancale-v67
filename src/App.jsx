@@ -59,6 +59,7 @@ import {achatDuColis,suivisAchat,entreeIndexAchat} from './liensColis.js';
 import {achatParConversation, regrouperArrivees} from '../api/_lib/achat-arrive-relais.js';
 import {indexCodesSuivis, finParIdentite, fusionnerParCode} from './retraitPreuves.js';
 import {arriveesRelues} from './arriveesRelues.js';
+import { preuveDeLigne } from '../api/_lib/etat-colis.js';
 import {avecSuiviDuSujet,finsDesLignes,sortiParSuivis,sortiParSuivi,suiviDeLigne,lienSuivi,codePostalLu,nouvelleVinted,transporteurDeForme,colisInternational,suiviValide,TRANSPORTEURS_SAISIE,normaliserCodePostal,idSuiviManuel,relireLigneSuivi,finDeCommandeAchat,fusionTransporteur,ligneDuTransporteur,ligneDeSuiviTransporteur,leverGarde,SELECT_TRANSP_META,ligneTranspDeMeta,sensDeLigne,incidentDeSuivis,incidentDeLigne,repartiAffichable,nomTransporteurSuivi} from '../api/_lib/suivi-colis.js';
 import {ligneTransporteur,texteCodePostalMr,carrierLisible,carrierNonLu,nomTransporteur,LECTURE_SERVEUR_TRANSP,heureParis} from '../api/_lib/transporteurs.js';
 import PhotoProfil,{AvatarCompte} from './profil/AvatarPersonnel.jsx';
@@ -235,7 +236,7 @@ import {marcheDuCompte as marcheEbayDuCompte, MARCHE_DEFAUT as MARCHE_EBAY_DEFAU
 import {arriveeColisEmail, arriveeColisVinted, jourLocal, texteArrivee} from '../api/_lib/arrivee-colis.js';
 import {transactionDeLaLigne, indexRecusParTransaction, recuDeLAchat, bilanRecusAchat} from '../api/_lib/recu-achat.js';
 import {codeRetraitTournure} from '../api/_lib/code-retrait-email.js';
-import {etatRetrait, estAVerifier, urgenceTri, lieuDepuisExtrait, limiteRetraitDepuisTexte, LIEU_AU_FUTUR, GARDE_MAX_J, gardeDe} from '../api/_lib/retrait-colis.js';
+import {etatRetrait, estAVerifier, urgenceTri, lieuDepuisExtrait, limiteRetraitDepuisTexte, LIEU_AU_FUTUR, GARDE_MAX_J, gardeDe, limiteEstimee} from '../api/_lib/retrait-colis.js';
 import {aConfirmerVisibles, texteLimite, motAConfirmer} from './aConfirmer.js';
 import { relanceProposable, numeroSorti } from './ebayRelance.js';
 // La date limite d'envoi AVEC son heure (22 octobre) : UNE règle pour Colis, Ma
@@ -21332,7 +21333,7 @@ const ligneTranspDe = (transp, suivi) => {
 // (tour 2 n° 5) Un n° de forme Vinted Go (16 chiffres, 13 caractères) que le
 // suivi Vinted rattache à Vinted Go (`carrier` rangé) a sa ligne (« pas encore
 // lu », « lu », « pas su ») comme les autres — `carrierLisible`.
-function LigneTransporteur({ transp, suivi, carrier, style, court = false, limiteCarte = '' }) {
+function LigneTransporteur({ transp, suivi, carrier, style, court = false, limiteCarte = '', preuve = null }) {
   if (!Array.isArray(transp) && !(transp instanceof Map)) return null;
   const k = normaliserSuivi(suivi); if (!k) return null;
   const t = ligneTranspDe(transp, k);
@@ -21351,7 +21352,12 @@ function LigneTransporteur({ transp, suivi, carrier, style, court = false, limit
   // dès que le SERVEUR le lit (`LECTURE_SERVEUR_TRANSP`, la même valeur que le
   // serveur, §11) ; sinon la tête de liste dit le geste une fois.
   if (!t && c === 'mondialrelay' && !LECTURE_SERVEUR_TRANSP.mondialrelay && extSait('transp') !== 'ok') return null;
-  const l = ligneTransporteur(t, c);
+  // (6 nov.) Un n° postal international (S10 d'un autre pays) dont la ligne n'a JAMAIS été lue :
+  // elle n'est que la trace d'une ancienne devinette (« Chronopost »), pas une réponse — rien.
+  if (t && !t.lu && !t.etat && colisInternational(k)) return null;
+  // (6 nov.) `preuve` : ce que la ligne du colis prouve elle-même (`preuveDeLigne`) — une lecture
+  // faite AVANT l'arrivée et qui dit « en route » est dite en retard (api/_lib/etat-colis.js).
+  const l = ligneTransporteur(t, c, Date.now(), { preuve });
   const age = Number.isFinite(l.age) ? String(Math.max(0, Math.round(l.age / 60000))) : '';
   return <div className="vrm-transp" data-transp={l.etatAffiche} data-transp-etat={(t && t.etat) || ''} data-transp-age={age} data-transp-suivi={k}
     style={{fontSize:12,color:l.ambre?C.warn:C.muted,marginTop:3,lineHeight:1.4,overflowWrap:'anywhere',...(style||{})}}>
@@ -21521,6 +21527,8 @@ const raisonAVerifier = (x) => {
   if (!x || !x.e) return 'à voir';
   // (24 oct.) Ce que dit le TRANSPORTEUR (son libellé recopié tel quel).
   if (x.e.etat==='transporteur') {
+    // (6 nov.) La raison écrite par la règle d'état datée (api/_lib/etat-colis.js) quand c'est elle qui tranche.
+    if (x.e.contradiction && x.e.raison) return `${x.e.raison} — vérifie avant de te déplacer`;
     if (x.e.contradiction) return "le transporteur le dit disponible, un e-mail dit qu'il repart — vérifie avant de te déplacer";
     const i = x.e.incident; const nom = nomTransporteur((i && i.carrier) || (x.t && carrierLisible(x.t.carrier, x.t.suivi)) || '');
     return i && i.libelle ? `${nom} dit « ${String(i.libelle).slice(0,120)} »` : `${nom} signale un problème`;
@@ -45874,6 +45882,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // (24 oct.) Une lecture « disponible » de moins de 6 h chez le transporteur
       // lève une « à vérifier » qui ne vient QUE de la garde (jamais une date
       // limite lue et dépassée : `leverGarde`).
+      // (6 nov.) LA RÈGLE D'ÉTAT DATÉE (api/_lib/etat-colis.js, via `fusionTransporteur`) : le
+      // transporteur dit « en route » avec un événement daté APRÈS l'arrivée de cet e-mail (et aucune fin prouvée plus haut) — rien ne
+      // l'explique ⇒ « à vérifier », la raison dite ; jamais « à retirer » sur une seule voix.
+      if (t.transpContradiction && t.status === 'available') { aVerifier.push({ kind: 'email', t, e: { etat: 'transporteur', contradiction: true, raison: t.transpConflit || '' }, o: cmd }); continue; }
       const e = leverGarde(etatColisEmail(t, maintenant), t, maintenant);
       if (estAVerifier(e)) { aVerifier.push({ kind: 'email', t, e, o: cmd }); continue; }
       // Colis RÉELLEMENT à retirer = on sait OÙ aller, ou on a un code, ou un QR
@@ -59142,7 +59154,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {!x.horsCompte && (jl != null
                 ? <span className={'vrm-rp-sous' + (jl <= 1 ? ' is-ambre' : '')} data-colis-limite={String(lim).slice(0,10)} data-colis-limite-transp={t ? undefined : ''}>{texteLimiteRetrait(jl, lim, limAt)}</span>
                 : vers ? <span className="vrm-rp-sous" data-colis-limite="vers" data-colis-limite-vers={String(vers)}>À retirer vers le {new Date(String(vers).slice(0,10)+'T00:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'})} (estimé : le transporteur ne donne pas la date)</span>
-                : <span className="vrm-rp-sous" data-colis-limite="inconnue">Date limite inconnue</span>)}
+                : (() => { // (6 nov.) Aucune date LUE : la garde de SON transporteur (lu), dite « estimée » (api/_lib/retrait-colis.js).
+                    const est = limiteEstimee({ arriveeMs: arr && arr.ms, transporteur: carrierKey(t ? t.carrier : ((ev && ev.carrier) || '')) || '' });
+                    return est ? <span className="vrm-rp-sous" data-colis-limite="estimee" data-colis-limite-estimee={est.jour}>{`Vers le ${est.jour.slice(8, 10)}/${est.jour.slice(5, 7)} (estimé : ${nomTransporteur(carrierKey(t ? t.carrier : ev.carrier))} garde un colis ${est.garde} jours)`}</span>
+                      : <span className="vrm-rp-sous" data-colis-limite="inconnue">Date limite inconnue</span>; })())}
               {(su || (plusieursComptesRet && cpt)) ? <span className="vrm-rp-suivi" data-rp-suivi={su} data-colis-compte={cpt}>{[su ? `n° ${su}` : '', plusieursComptesRet && cpt ? `compte ${cpt}` : ''].filter(Boolean).join(' · ')}</span> : null}
               {/* (6 nov.) « Pas su » se dit (§5) : depuis le 3 nov. la ligne ne montre le transporteur que LU ;
                   quand le suivi Vinted ne le nomme pas, la ligne ouverte le dit (l'ancien en-tête de groupe). */}
@@ -59173,7 +59188,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <LigneNouvelleVinted nv={nvUtile(nouvelleDe(pickupUnion.cmdParColis && pickupUnion.cmdParColis.get(colisKey(t))), x)} transp={transpMap} suivi={suiviDeLigne(t)}/>
                   {/* « pas encore lu chez le transporteur » sur chaque carte serait la même phrase
                       partout (§7) : la ligne ne s'écrit que quand le transporteur a répondu. */}
-                  {transpMap && transpMap.get(normaliserSuivi(suiviDeLigne(t))) ? <LigneTransporteur transp={transpMap} suivi={suiviDeLigne(t)} carrier={t.carrier} court limiteCarte={t.limite || t.limiteVers || ''}/> : null}
+                  {transpMap && transpMap.get(normaliserSuivi(suiviDeLigne(t))) ? <LigneTransporteur transp={transpMap} suivi={suiviDeLigne(t)} carrier={t.carrier} court limiteCarte={t.limite || t.limiteVers || ''} preuve={preuveDeLigne(t)}/> : null}
                 </>
                 : o ? (() => { const su2 = suivisAchat(o, indexSuivisAchats)[0] || ''; const e2 = entreeSuiviAchat(o); return <>
                   <LigneNouvelleVinted nv={nvUtile(nouvelleDe(o), x)} transp={transpMap} suivi={su2}/>

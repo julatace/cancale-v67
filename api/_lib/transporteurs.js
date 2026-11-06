@@ -33,6 +33,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { texteArrivee } from './notif-textes.js';
 import { normaliserSuivi } from './etat-colis-email.js';
+import { preuveDeTransp, lectureEnRetard } from './etat-colis.js';
 
 // ── LES TRANSPORTEURS LUS, LEURS VOIES, LEURS NOMS ──────────────────────────
 export const CARRIERS_LUS = ['mondialrelay', 'chronopost', 'vinted'];
@@ -1123,10 +1124,18 @@ const AMBRE = new Set(['retour_expediteur', 'incident', 'inconnu']);
 // `t` : la ligne `transp_` (ou undefined : jamais lue). Rend
 // { etatAffiche, texte, consequence, ambre, age } — `etatAffiche` ∈
 // 'lu' · 'passu' · 'jamais' · 'cp-inconnu' · 'expire' · 'introuvable'.
-export function ligneTransporteur(t, carrier, maintenant = Date.now()) {
+// (6 nov.) `preuve` (facultatif) : ce que prouve la ligne du colis elle-même ({ etat, at },
+// `preuveDeLigne`, api/_lib/etat-colis.js). Une lecture faite AVANT cette preuve et qui dit
+// moins (« en route » d'un colis dont l'e-mail « disponible » est arrivé après) est EN RETARD :
+// elle se dit telle quelle, sans conséquence (`etatAffiche: 'en-retard'`) — jamais l'état du colis.
+export function ligneTransporteur(t, carrier, maintenant = Date.now(), { preuve = null } = {}) {
   const nom = nomTransporteur((t && t.carrier) || carrier);
   if (!t) return { etatAffiche: 'jamais', texte: `${nom} : pas encore lu chez le transporteur`, consequence: '', ambre: false, age: null };
   const luMs = msDe(t.lu);
+  if (t.etat && luMs != null && preuve && lectureEnRetard(preuveDeTransp(t), preuve)) {
+    const quand = preuve.source === 'sms' ? 'le SMS' : 'l’e-mail';
+    return { etatAffiche: 'en-retard', texte: `${nom} : « ${propre(t.libelle, 120) || '—'} » · lu ${ageCourt(maintenant - luMs)}, avant l’arrivée`, consequence: `pas encore relu depuis — ${quand} d’arrivée fait foi`, ambre: false, age: maintenant - luMs };
+  }
   if (t.etat && luMs != null) {
     const age = maintenant - luMs;
     const dernierRate = t.essaiRes && t.essaiRes !== 'ok';

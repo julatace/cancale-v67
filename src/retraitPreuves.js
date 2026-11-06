@@ -71,3 +71,17 @@ export function fusionnerParCode(liste, { codeDe, suiviDe, score = () => 0, fusi
   if (!retire.size) return liste;
   return (liste || []).filter((t) => !retire.has(t)).map((t) => remplace.get(t) || t);
 }
+
+// ── (6 nov., statut des colis) « PEUT-ÊTRE EN DOUBLE », EXPLIQUÉ UNE FOIS ──────────
+// Mesuré sur sa base : 19 moitiés Vinted (« Ton achat t'attend… ») au point où des colis du
+// transporteur sont arrivés les mêmes jours, sans AUCUNE identité commune (ni n° de suivi, ni
+// code, ni commande relue : 18 arrivent sur une adresse qu'aucun compte relié ne porte). La
+// section ne disait que « À relier » sur chaque ligne. La phrase dit le fait, pourquoi ils ne
+// comptent pas, et le geste — une fois, en tête de section (§7). `n` : le nombre de lignes.
+export function explicationEnDouble(n) {
+  if (!Number.isFinite(n) || n <= 0) return '';
+  const un = n === 1;
+  return `${un ? 'Vinted annonce ce colis' : `Vinted annonce ces ${n} colis`} à un point où un colis du transporteur est arrivé à 3 jours près, sans rien qui les relie (ni n° de suivi, ni code, ni achat relu). `
+    + `${un ? 'C’est sans doute le même carton vu deux fois : il ne compte pas.' : 'Ce sont sans doute les mêmes cartons vus deux fois : ils ne comptent pas.'} `
+    + 'Pour les relier : relis sur Vinted le compte de l’achat, ou relie l’adresse qui reçoit ces e-mails (E-mails → Relier ma boîte).';
+}
