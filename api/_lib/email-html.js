@@ -317,3 +317,25 @@ export function origineLue(ligne, { type, resume, at } = {}, maintenant = Date.n
   if (!r.ok) return r.trop ? { etat: 'trop', octets: r.octets } : { etat: 'absent', raison: 'non-garde' };
   return { etat: 'garde', html: r.html, images: r.images, pixels: Number(ligne.pixels) || 0, sombre: r.sombre };
 }
+
+// ── LA PURGE À 30 JOURS (cron du matin, api/ship-reminders.js) ─────────────────
+// Une requête, TOUS les vendeurs (clé de service), qui ne peut viser QUE des lignes
+// `email_html_*` : la date copiée dans `meta` (migration 004, aucune décompression
+// de `data`), sinon la date de création (`updated_at` garde la création, §4.3).
+// `select=id` : la réponse ne porte que des identifiants (jamais le HTML purgé).
+// Rend { fait:true, retirees, avant } ou { fait:false, … } — ne lève jamais : une
+// purge ratée ne casse rien (la lecture refuse déjà une ligne de plus de 30 jours,
+// et le cron de demain repasse).
+export function requetePurgeHtml(avant) {
+  const a = encodeURIComponent(new Date(avant).toISOString());
+  return `app_data?id=like.${PREFIXE_HTML}*&or=(meta->>at.lt.${a},and(meta->>at.is.null,updated_at.lt.${a}))&select=id`;
+}
+export async function purgerHtml({ url, headers, fetcher = fetch, maintenant = Date.now() }) {
+  const avant = limitePurge(maintenant);
+  try {
+    const r = await fetcher(`${url}/rest/v1/${requetePurgeHtml(avant)}`, { method: 'DELETE', headers: { ...headers, Prefer: 'return=representation' } });
+    if (!r || !r.ok) return { fait: false, statut: r ? r.status : null, avant };
+    let j = null; try { j = await r.json(); } catch (_) { j = null; }
+    return { fait: true, retirees: Array.isArray(j) ? j.length : null, avant };
+  } catch (e) { return { fait: false, erreur: String((e && e.message) || e).slice(0, 200), avant }; }
+}

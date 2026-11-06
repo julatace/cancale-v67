@@ -3,6 +3,7 @@ import {etatColisDepuisTexte,conserverRetrait,annonceArriveeFuture} from './_lib
 import { accuseEmail, empreinteEmail } from "./_lib/accuse-email.js";
 import { resumeClassement, texteBorne } from "./_lib/resume-email.js";
 import { listePieces } from "./_lib/boite-email.js";
+import { ligneHtml, idHtml } from "./_lib/email-html.js";
 // api/email-inbound.js
 // ────────────────────────────────────────────────────────────────────────────
 // PIPELINE EMAIL UNIVERSEL (remplace l'Apps Script Gmail, marche pour TOUS les
@@ -163,7 +164,7 @@ async function repondre(res, code, corps) {
     const verification = corps.quarantaine || corps.garde || corps.type === "ignoré" || !!resume.av;
     const cle = empreinteEmail(contexte.messageId);
     const texte = !incident ? texteBorne(contexte.texte) : '';
-    await supabaseUpsert([{id: `email_reception_${cle}`, data: {
+    const range = await supabaseUpsert([{id: `email_reception_${cle}`, data: {
       ...contexte.reception, at: new Date().toISOString(),
       etat: incident ? "erreur" : verification ? "a-verifier" : "integre",
       type: String(corps.type || "information"),
@@ -174,6 +175,12 @@ async function repondre(res, code, corps) {
     // Le texte lisible (borné, sans HTML) vit dans SA ligne : la liste ne le lit
     // jamais, « Voir le texte » le lit un email à la fois.
     ...(texte ? [{ id: `email_texte_${cle}`, data: { texte, at: new Date().toISOString() } }] : [])]);
+    // (6 nov., décision de Julien) Le HTML d'origine ASSAINI des seuls e-mails « à
+    // geste », dans SA ligne, 30 jours (api/_lib/email-html.js). APRÈS le rangement
+    // confirmé, et à part : c'est un confort d'affichage — une écriture ratée ici ne
+    // fait pas répondre 503 (l'e-mail EST rangé, son texte aussi) ; l'écran retombe
+    // sur le texte remis en forme.
+    if (range && !incident) await garderHtmlOrigine(cle, String(corps.type || 'information'), resume, contexte.html);
   }
   if (code < 400 && ecritureRatee()) {
     res.status(503).json({
@@ -184,6 +191,23 @@ async function repondre(res, code, corps) {
   }
   const accuse = code>=200&&code<300 ? accuseEmail(contexteVendeur.getStore()?.messageId,corps,contexteVendeur.getStore()?.empreinteEmail) : null;
   res.status(code).json(accuse?{...corps,reception:accuse}:corps);
+}
+
+// Le HTML d'origine assaini (une ligne `email_html_{empreinte}`), sans jamais marquer
+// l'e-mail « pas rangé » : ni lecture, ni 503 — au pire, pas de mise en page.
+async function garderHtmlOrigine(cle, type, resume, html) {
+  try {
+    const id = idHtml(cle), owner = proprietaireCourant();
+    if (!id || !owner) return false;
+    const data = ligneHtml({ type, resume, html, at: new Date().toISOString() });
+    if (!data) return false;
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
+      method: 'POST',
+      headers: { ...sbCle(SUPABASE_KEY), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify([{ owner, id, data }]),
+    }).catch(() => null);
+    return !!(r && r.ok);
+  } catch (_) { return false; }
 }
 
 async function supabaseUpsert(rows) {
@@ -2048,7 +2072,7 @@ export async function traiterEmail(req, res) {
   // ni acheteur, ni article. Mesuré sur les 184 offres archivées : le pseudo de
   // l'acheteur est vide sur TOUTES, et le montant sur une bonne partie.
   const corpsTexte = texteUtile(mail);
-  { const st = contexteVendeur.getStore(); if (st) st.texte = corpsTexte; }
+  { const st = contexteVendeur.getStore(); if (st) { st.texte = corpsTexte; st.html = typeof mail.html === 'string' ? mail.html : ''; } }
   const rawForDetect = `${mail.from}\n${mail.to}\n${subject}\n${corpsTexte}`;
   const acc = await detectAccount(rawForDetect);
   // Date de RÉCEPTION de l'email : celle d'origine si on rejoue un email conservé
