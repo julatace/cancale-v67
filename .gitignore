@@ -22,4 +22,4 @@ undefined/
 
 # Captures écrites par certains bancs : jamais dans le dépôt (public)
 scripts/bancs/captures/
-dist.*/
+dist.*
