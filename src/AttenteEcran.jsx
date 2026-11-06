@@ -28,6 +28,11 @@ import { Squelette } from './Squelette.jsx';
 
 export const PLAFOND_ATTENTE_MS = 2500;
 const Ctx = React.createContext(null);
+// (6 nov., v36-raccords) L'écran est-il MONTRÉ ? Faux tant qu'il attend (monté, caché) :
+// un conseil (src/Conseils.jsx) ne se décide pas sur un écran que personne ne voit encore.
+// Hors d'une attente : vrai.
+const VisibleCtx = React.createContext(true);
+export function useEcranMontre() { return React.useContext(VisibleCtx); }
 
 // L'écran dit qu'une donnée essentielle est là (`valeur !== undefined`).
 // Hors d'une attente (écran sans attente, feuille), ne fait rien.
@@ -93,7 +98,7 @@ export function AttenteEcran({ ecran, attendus = [], donnees = null, ordi = fals
   return <div className="vrm-attente" data-attente={visible ? (tout ? 'pret' : 'plafond') : 'attente'} data-attente-ecran={ecran} data-attente-manque={manquent.join(' ') || undefined}>
     {!visible && <Squelette ecran={ecran} ordi={ordi} data-demarrage-attente=""/>}
     <div className={visible ? (aAttendu.current ? 'vrm-attente-pret' : undefined) : 'vrm-attente-cache'} aria-hidden={visible ? undefined : 'true'}>
-      <Ctx.Provider value={ctx}>{children}</Ctx.Provider>
+      <Ctx.Provider value={ctx}><VisibleCtx.Provider value={visible}>{children}</VisibleCtx.Provider></Ctx.Provider>
     </div>
   </div>;
 }

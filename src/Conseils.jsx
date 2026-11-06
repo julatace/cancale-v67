@@ -21,9 +21,14 @@ import {
   choisirConseil, raisonSilence, modifierMemoire, noterVu, noterReponse,
   couperConseils, revoirConseils, normaliserMemoire, placerConseil,
 } from './accompagnement.js';
+import { useEcranMontre } from './AttenteEcran.jsx';
 
 // ── Le chiffre publié par un écran ───────────────────────────────────────────
-export function ChiffreConseil({ cle, valeur }) {
+// (6 nov., v36-raccords) Un écran qui attend ses données (src/AttenteEcran.jsx) est monté
+// mais caché : son chiffre ne se publie qu'une fois l'écran MONTRÉ (sinon le conseil se
+// décidait sur une cible invisible, n'en trouvait pas, et ne se redécidait plus).
+export function ChiffreConseil({ cle, valeur: brute }) {
+  const valeur = useEcranMontre() ? brute : undefined;
   const json = (() => { try { return JSON.stringify(valeur === undefined ? '__undef__' : valeur); } catch (_) { return String(valeur); } })();
   useEffect(() => { publierChiffre(cle, valeur); }, [cle, json]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => retirerChiffre(cle), [cle]);
