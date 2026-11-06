@@ -310,20 +310,20 @@ html body .vrm-app-shell .vrm-main .vrm-lbc-catalog-filtres button[aria-pressed=
    après la photo. Chaque rangée garde ses photos en pile, son titre, sa ligne et son
    geste ; l'ambre reste au geste pressé. */
 @media (max-width: 1023px) {
-  html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task-list {
+  :root:root body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task-list {
     gap: 0 !important; background: var(--fu-carte, var(--vrm-surface)) !important; border-radius: var(--fu-r-carte, 20px) !important;
     box-shadow: var(--fu-ombre, var(--vrm-ombre-carte)) !important; overflow: hidden !important;
   }
-  :root[data-theme="dark"] body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task-list { background: #1c1c1e !important; }
-  html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task-list > .vrm-day-task,
-  :root body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task-list [data-alertes-argent] > .vrm-day-task {
+  :root:root[data-theme="dark"] body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task-list { background: #1c1c1e !important; }
+  :root:root body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task-list > .vrm-day-task,
+  :root:root body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task-list [data-alertes-argent] > .vrm-day-task {
     position: relative; background: transparent !important; box-shadow: none !important; border-radius: 0 !important;
   }
-  html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task-list .vrm-day-task + .vrm-day-task::before,
-  html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task-list [data-alertes-argent] + .vrm-day-task::before {
+  :root:root body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task-list .vrm-day-task + .vrm-day-task::before,
+  :root:root body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task-list [data-alertes-argent] + .vrm-day-task::before {
     content: ''; position: absolute; top: 0; left: 74px; right: 0; height: .5px; background: var(--vrm-line); pointer-events: none;
   }
-  :root[data-theme="dark"] body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task-list .vrm-day-task + .vrm-day-task::before { background: #38383A; }
+  :root:root[data-theme="dark"] body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task-list .vrm-day-task + .vrm-day-task::before { background: #38383A; }
 }
 
 /* ══ 5 sexies. UNE CARTE « GESTE » (`Card` au cadre ambre) ══════════════════
@@ -347,6 +347,17 @@ html body .vrm-app-shell .vrm-main [data-verif-carton] > div:last-child > button
 html body .vrm-app-shell .vrm-main [data-verif-carton] > div:last-child > input { flex: 1 1 60px; min-width: 0; width: auto !important; border: 0 !important; background: var(--vrm-card2) !important; font-size: 16px !important; }
 html body .vrm-app-shell .vrm-main [data-verif-carton] > div:last-child > button:nth-of-type(2) { flex: none; }
 @media (max-width: 400px) { html body .vrm-app-shell .vrm-main [data-verif-carton] > div:last-child { padding-left: 0; } }
+
+/* « Données · Voir le détail » : une rangée de carte (icône de synchronisation, libellé, état,
+   chevron) — plus un bloc gris flottant ; et la note se range au-dessus de « Mes annonces ». */
+html body .vrm-app-shell .vrm-main .vrm-lbc-catalog > .vrm-bilan-sync { margin: 0 16px 8px !important; }
+html body .vrm-app-shell .vrm-main details.vrm-bilan-sync:not([open]) {
+  background: var(--vrm-surface) !important; border: 0 !important; border-radius: var(--vrm-r-carte) !important; box-shadow: var(--vrm-ombre-carte); margin-bottom: 12px !important; padding: 0 !important;
+}
+html body .vrm-app-shell .vrm-main details.vrm-bilan-sync > summary { min-height: 48px; padding: 0 16px !important; font-size: var(--vrm-t15) !important; font-weight: 400 !important; color: var(--vrm-ink) !important; }
+html body .vrm-app-shell .vrm-main details.vrm-bilan-sync > summary span { font-size: var(--vrm-t15) !important; color: var(--vrm-muted) !important; }
+/* Une annonce Leboncoin sans photo : une vignette basse (le dessin), plus un carré vide de 170 px. */
+html body .vrm-app-shell .vrm-main .vrm-lbc-catalog .vrm-lbc-catalog-photo-empty { aspect-ratio: 16 / 9 !important; height: auto !important; max-height: 110px; }
 
 /* ══ 5 octies. VESTIAIRE · « Mettre en vente » : les deux gestes en pilules d'iOS ══ */
 html body .vrm-app-shell .vrm-main :is([data-vc-preparer], [data-vc-marquer]) { border: 0 !important; border-radius: 999px !important; min-height: 44px; padding: 0 16px !important; font-size: var(--vrm-t15) !important; }

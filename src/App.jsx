@@ -57927,7 +57927,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 )}
               </div>
               {/* Prix à deux décimales et une virgule (jamais « 21.0 € » brut). */}
-              <div className="vrm-buy-price" style={{color:C.text}}>{montantCommande(o).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})}{' '}{cur(o.price?.currency_code)}</div>
+              <div className="vrm-buy-price" style={{color:C.text}}>{montant(montantCommande(o), { devise: o.price?.currency_code || 'EUR' })}</div>
               {/* Actions rapides : suivre · code en accès direct ; le reste dans un
                   menu « … » (attestations, étiquette SKU, note interne, masquer). */}
               {(() => {
