@@ -105,7 +105,10 @@
 .vrm-boite-marque.is-grande .vrm-logo-site{width:24px;height:24px}
 .vrm-boite-marque .vrm-logo-site[data-logo-site="ebay"]{width:30px;height:30px;margin:0}
 .vrm-boite-marque [data-transporteur-logo]{box-shadow:none!important;border-radius:999px!important}
+/* La tuile d'un transporteur est BLANCHE (son logo est dessiné pour le blanc, comme la
+   pastille de Colis) : son monogramme de repli reste à l'encre foncée, même la nuit. */
 .vrm-boite-marque[data-marque="transporteur"]{background:#FFFFFF}
+.vrm-boite-marque[data-marque="transporteur"] .vrm-boite-mono{color:#1D1D1F}
 .vrm-boite-mono{font-size:13px;font-weight:600;letter-spacing:.02em;line-height:1;color:var(--bx-encre)}
 .vrm-boite-ligne-txt{display:grid;gap:1px;min-width:0}
 .vrm-boite-ligne-haut{display:flex;align-items:baseline;gap:8px;min-width:0}

@@ -97,7 +97,71 @@ le cadrage vient de la demande et de la passation ; aucune couleur nouvelle pos�
   Feuille opaque qui monte avec un léger ressort (`linear()`, repli : courbe des tiroirs).
 
 ## Preuves
-(remplies plus bas, section « Mesures et bancs »)
+- `npm run build` vert. `fusion-echelle --verifier` : `boite-emails.css` dans l'échelle (les autres
+  fichiers rouges sont ceux de la base). Détecteur `impeccable detect` : un seul signal, le curseur
+  de la scène animée de « Relier ma boîte » (`border-right` d'un caret de frappe), pas une barre.
+- **`audit-boite-mail` (NEUF) : 38/38** — M1 du résumé jamais du sujet (sujet piégé), M2 code sur
+  la ligne seulement lu, M3 gestes par identité, M4 message SANS HTML (`<script>`, `<iframe>`,
+  `on…=`, entités, `javascript:`), M5 règle des lus, M6 la VRAIE `lireJournalEmail` sur une base
+  servie dans sa forme (`_minipgrest`), M7 écriture (lecture ratée ⇒ rien écrit ; conflit relu et
+  rejoué), M8 piles. `--prouve` : **13/13 mutations attrapées**. Sur l'arbre d'avant (704bdaf2,
+  extrait à part) : plante (module absent) — les mutations font la preuve.
+- **Banc `scripts/bancs/boite-mail.cjs` (NEUF)** — 950 e-mails inventés aux proportions mesurées
+  (`_fx-boite-mail.cjs`), la VRAIE route, 390 tactile et 1512, clair et sombre + mode stream :
+  **104 verts / 0 rouge**. Sa copie réelle (hors dépôt, 971 e-mails, `BANC_FX`) : **96 / 0**. Règles
+  jugées : R1 aucun sujet brut sur ~940 lignes, R2 code ⇔ code lu + copie d'un toucher (sans ouvrir),
+  R3 point bleu, ouvrir = lu écrit et relu par la règle, R4 gestes portant SON identité, R5 texte
+  piégé inerte, R6 glisser = lu sans ouvrir, R7 « Non lus » côté route + « Marquer ceux-ci lus »,
+  R8 piles dépliées ; stream : aucun code lisible (liste et carte). Zéro erreur console, zéro
+  « undefined/NaN/null », rien qui dépasse, 44 px partout (liens dans le texte exceptés). **Arbre
+  d'avant** (banc copié dedans) : R2, R3 rouges puis l'écran lève (aucun non-lu à trouver).
+- **Bancs voisins** : `boite-emails` **282 / 0** (attendus mis à jour pour les règles changées :
+  rubrique Offres, code sous la ligne et dans la carte, avatar transporteur, titre de lecture à
+  côté de l'avatar, lien court cliquable) ; `onglets-c` **148 / 0**.
+- Audits verts : `boite-emails` 82, `email-formes` 17, `coherence` 219, `identite` 57, `secrets`,
+  `csp` 41, `tdz`, `journal-emails` 58 (Colis : toujours UNE lecture, deux scalaires), `relier-compte`
+  44, `comptes-emails-ligne`, `adresse-sans-compte`, `fonctions-api` (12/12), `icones`,
+  `lectures-lourdes`, `bancs`. `export-donnees` X6 rouge **déjà sur la base** (non touché).
+
+### Mesures avant → après (banc, Chromium logiciel ; écarts de ±20 % d'une passe à l'autre)
+Inventé (950 e-mails) :
+
+| contexte | 1re ligne (ms) | boîte entière (ms) | défilement (images/s) | tâches longues (n · ms) | nœuds | ouvrir (médiane ms) |
+|---|---|---|---|---|---|---|
+| 390 clair | 4663 → 4498 | 48606 → 11531 | 49 → 52 | 13 · 1536 → 6 · 707 | 12097 → 9004 | 931 → 724 |
+| 1512 clair | 2005 → 1956 | 70771 → 11943 | 15 → 26 | 172 · 28577 → 68 · 8577 | 12103 → 9012 | 1360 → 937 |
+| 390 sombre | 1660 → 1703 | 41082 → 4891 | 49 → 62 | 10 · 1195 → 0 · 0 | 12097 → 9004 | 952 → 446 |
+| 1512 sombre | 2592 → 1861 | 65118 → 7931 | 36 → 54 | 49 · 5442 → 2 · 225 | 12103 → 9012 | 847 → 568 |
+
+Sa copie (971 e-mails) :
+
+| contexte | 1re ligne (ms) | boîte entière (ms) | défilement (images/s) | tâches longues (n · ms) | nœuds | ouvrir (médiane ms) |
+|---|---|---|---|---|---|---|
+| 390 clair | 2803 → 2408 | 39338 → 5961 | 50 → 60 | 20 · 1397 → 1 · 80 | 12757 → 13760 | 1090 → 566 |
+| 1512 clair | 3255 → 2273 | 64264 → 10799 | 16 → 50 | 195 · 27775 → 20 · 1634 | 12763 → 13768 | 1105 → 740 |
+| 390 sombre | 3133 → 1747 | 40562 → 6952 | 47 → 61 | 19 · 1686 → 2 · 147 | 12757 → 13760 | 938 → 542 |
+| 1512 sombre | 1394 → 1266 | 28861 → 5975 | 46 → 54 | 23 · 1677 → 10 · 708 | 12763 → 13768 | 674 → 542 |
+
+« Boîte entière » : avant, 47 touchers de « Voir plus » (20 par page) ; après, la suite vient au
+défilement (50 par page). Défauts de vitesse trouvés et corrigés en route, mesurés : un flou sous
+les en-têtes de jour collants (11 images/s à 1512), `content-visibility` (vidait le texte des lignes
+hors écran : banc rouge, recherche de page et stream aveugles), des lignes mémoïsées qui se
+redessinaient à chaque rendu de l'app (`delies` et `ecrireLus` neufs à chaque fois), et
+l'observateur de la suite qui avait la page pour racine (rogné par le `<main>` qui défile, il ne
+voyait jamais la sentinelle à 1512) — racine = le conteneur qui défile vraiment.
+
+Captures et planches regardées (hors dépôt, scratchpad de la session `bm/`) : `planche-invente-390`,
+`planche-invente-1512`, `planche-reel-390`, `planche-reel-1512` (avant | après), et `apres-*/`
+(`nonlus-*`, `pile-*`, `stream-*`). Vu sur capture et corrigé : monogramme blanc sur tuile blanche la
+nuit (transporteur), « sur <article> » répété sous la carte d'une offre, heure de pile sur deux
+lignes, menu des comptes coupé, natures longues sur deux lignes.
+
+### Alignement avec `v36-visuel`
+Sa passation (branche `v36-visuel`) : listes en groupes iOS, filets après la photo, pas de barre
+latérale, cascade d'arrivée (6 px, 220 ms, 30 ms, 10 lignes), une ligne d'explication au plus. Ici :
+la même cascade, la barre ambre du bandeau « comptes à relier » retirée, filets décalés. Ses
+composants (`src/composants/Ios.jsx`) ne sont pas sur cette branche : rien n'en dépend ici ; à
+l'intégration, la boîte peut prendre ses jetons d'espacement (`--vrm-entre-sections`).
 
 ## Ce qui reste / à décider par Julien
 - **Le HTML d'origine** (mise en page de Vinted, photo de l'article dans l'e-mail) n'est pas gardé

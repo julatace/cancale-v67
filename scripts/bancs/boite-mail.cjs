@@ -150,6 +150,7 @@ async function inspecter(pg, nom, racine = '[data-boite-emails]') {
   try {
     for (const sombre of [false, true]) for (const [viewport, tactile] of [[{ width: 390, height: 844 }, true], [{ width: 1512, height: 950 }, false]]) {
       const w = viewport.width, nom = `${w}-${sombre ? 'sombre' : 'clair'}`;
+      if (process.env.BANC_CTX && !process.env.BANC_CTX.split(',').includes(nom)) continue;   // un seul contexte, pour rejouer une mesure
       await essaie('boîte ' + nom, async () => {
         const base = neuveBase();
         const { ctx, pg, erreurs, appels, tPremiere } = await ouvrir(nav, base, { viewport, tactile, sombre });
@@ -212,7 +213,7 @@ async function inspecter(pg, nom, racine = '[data-boite-emails]') {
         await ctx.close();
       });
     }
-    if (SEUL !== 'mesures') {
+    if (SEUL !== 'mesures' && !process.env.BANC_CTX) {
       await essaie('stream', async () => {
         const base = neuveBase();
         const { ctx, pg } = await ouvrir(nav, base, { viewport: { width: 390, height: 844 }, tactile: true, sombre: false, stream: true });
@@ -235,7 +236,9 @@ async function inspecter(pg, nom, racine = '[data-boite-emails]') {
       });
     }
   } finally {
-    fs.writeFileSync(path.join(CAPT, 'mesures.json'), JSON.stringify(mesures, null, 1));
+    // Une mesure rejouée s'AJOUTE à celles du dossier (un contexte à la fois).
+    let anciennes = []; try { if (process.env.BANC_CTX) anciennes = JSON.parse(fs.readFileSync(path.join(CAPT, 'mesures.json'), 'utf8')).filter((x) => !process.env.BANC_CTX.split(',').includes(x.nom)); } catch (_) {}
+    fs.writeFileSync(path.join(CAPT, 'mesures.json'), JSON.stringify([...anciennes, ...mesures], null, 1));
     await nav.close(); srv.close();
     console.log(`\n${ok} verts, ${ko} rouges`);
     process.exitCode = ko ? 1 : 0;
