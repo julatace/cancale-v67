@@ -191,7 +191,7 @@ async function mesurer(nav, sortie) {
     lectures = 0;
     await o.pg.reload({ waitUntil: 'domcontentloaded' });
     await o.pg.waitForSelector('.vrm-main', { timeout: 20000 }).catch(() => {});
-    await o.pg.waitForTimeout(6000);
+    await o.pg.waitForTimeout(Number(process.env.MESURE_ATTENTE) || 6000);   // MESURE_ATTENTE : machine chargée ⇒ plus long
     const m = await o.pg.evaluate(() => {
       const main = document.querySelector('.vrm-main');
       // Les heures relatives (« il y a 2 min ») bougent avec l'horloge : retirées.

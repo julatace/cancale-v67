@@ -48,6 +48,11 @@ jobs:
         part: [1, 2, 3]
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Toute l'histoire, `origin/main` compris : des audits comparent aux versions
+          # d'extension PUBLIÉES (scripts/_versions-publiees.cjs, audit-extension-zip,
+          # audit-republier --prouve lit l'arbre d'origin/main).
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22

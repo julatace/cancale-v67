@@ -11,5 +11,14 @@
       "raison": "Relevé Vestiaire (vcRecon) : deux contrôles rouges en attente d'une décision de Julien sur ce que l'extension doit relever.",
       "depuis": "2026-11-06"
     }
+  ],
+  "_lire_bancs": "Les bancs ROUGES CONNUS (scripts/lancer-bancs.cjs) : seulement les lignes rouges qui répondent à `rouges` ; une ligne rouge nouvelle rend le banc rouge pour de bon.",
+  "bancs": [
+    {
+      "banc": "iphone-reprise",
+      "rouges": "^(B7 (390×844|375×667) (clair|sombre) : un balayage au milieu change toujours d'onglet|R3 390 (clair|sombre) : rouverte, même écran, même filtre, même recherche)",
+      "raison": "B7 (balayage Ventes → Colis) et R3 (recherche rouverte) rouges À L'IDENTIQUE sur l'arbre d'avant 46f18482 (6 lignes, conteneur chargé) : à rejouer en CI ; à corriger ou retirer, pas à masquer.",
+      "depuis": "2026-11-06"
+    }
   ]
 }
