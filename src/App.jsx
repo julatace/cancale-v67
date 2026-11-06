@@ -288,7 +288,13 @@ import { lirePhotoroom, appelPhotoroom, phraseVerif, phraseSansReponse, dateCour
 // décide à qui appartient un email) — jamais une seconde normalisation ici.
 import { normAdresse, ADRESSE_COLLECTRICE, estAdresseCollectrice } from "../api/_lib/proprietaire-email.js";
 import { retoursEnCours, retoursPourSite, remiseEnStock, retourAReceptionner, numsRemisEnStock, LIBELLE_ETAPE, ETAPES_RETOUR, numeroDuRetourVinted } from "./retoursStock.js";
-import { indexMemo as indexRechercheMemo, chercherPartout, destinationResultat } from "./rechercheUnique.js";
+import { indexMemo as indexRechercheMemo, chercherPartout, destinationResultat, suggestions as suggestionsRecherche, montantCherche } from "./rechercheUnique.js";
+// (6 nov., v36) La loupe universelle : les adaptateurs de l'écran (src/rechercheEcran.js).
+import { Vivant as RechercheVivante } from "./LoupeVivante.jsx";
+import { FIL_RECHERCHE, poserTexteRecherche, piloterEmails, memoSur, annoncesDesLignes, numerosDesVentes, facturesPourRecherche, emailsDeLaReponse, motPastille, MOTIFS as MOTIFS_RECHERCHE, lireRecents, noterRecent, oublierRecents, demanderOuverture, prendreDemande, requeteEmails } from "./rechercheEcran.js";
+import { ligneEmail, siteExpediteur, monogramme } from "./boiteEmails.js";
+import { expediteurLisible } from "./journalEmail.js";
+import { requeteJsonBornee } from "./requeteJsonBornee.js";
 import { litigesEnCours, litigeDeVente, requeteEmailsLitiges, texteLimite as texteLimiteLitige, LIBELLE_GENRE as LIBELLE_LITIGE } from "./litiges.js";
 import { rangerParTransporteur, ordreDesGroupes, ordonnerLot } from "./lotTransporteurs.js";
 import { trouverParScan } from "./scanColis.js";
@@ -17158,6 +17164,9 @@ function CibleNotif({ tab, sub }) {
         if (fini) return; try { const r = x.getBoundingClientRect(); const H = window.innerHeight || 800; if (r.top < 0 || (r.bottom > H - 90 && r.height < H - 160)) defiler(x, 'auto'); } catch (_) {}
       }, ms)));
       ouvrirEl(el);
+      // (6 nov., recherche) Le bouton à toucher une fois ouvert (« En grand » d'un colis
+      // trouvé par SON code) : cherché dans l'élément visé seulement, touché UNE fois.
+      if (sel.appuyer) { const t2 = Date.now(); let fait = false; const appuyer = () => { if (fait) return; const x = trouver() || courant; let b = null; try { b = x && x.querySelector(sel.appuyer); } catch (_) {} if (b && vu(b)) { fait = true; try { b.click(); } catch (_) {} return; } if (Date.now() - t2 < 5000) minuteurs.push(setTimeout(appuyer, 200)); }; minuteurs.push(setTimeout(appuyer, 450)); }
       // (5 nov.) Ce qu'il faut AUSSI montrer une fois ouvert (l'offre dans le fil).
       // (revue du 5 nov.) Seule une offre EN COURS porte le crochet (`data-cible="offre"` posé
       // sur la carte quand le fil a une offre) : la carte « Faire une offre » d'un fil sans offre
@@ -31484,6 +31493,8 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
   const [search,setSearch]=useState('');
   const [zone,setZone]=useState('attente'); // 'attente' | 'comptabilisees'
   const [page,setPage]=useState(null);
+  // (6 nov., v36) Une facture choisie dans la loupe : l'écran s'ouvre cherché sur SON n°.
+  useEffect(()=>{ const f=()=>{ const n=prendreDemande('facture'); if(n){ setSearchInput(n); setSearch(n); setPage(null); } }; f(); window.addEventListener('vrm:recherche-ouvrir',f); return ()=>window.removeEventListener('vrm:recherche-ouvrir',f); },[]);
   const [showAll,setShowAll]=useState(false);
   const [showForm,setShowForm]=useState(false);
   const [showSettings,setShowSettings]=useState(false);
@@ -70964,7 +70975,12 @@ function AppCoeur() {
   // (16 oct.) Vide ce qui reste des comptes supprimés définitivement (Shopcancale).
   useEffect(()=>onCloudReady(()=>{ purgerComptesSupprimes(); }),[]);
   const [gsOpen,setGsOpen]=useState(false);
-  const [gsQ,setGsQ]=useState('');
+  // (6 nov., v36) LA LOUPE UNIVERSELLE : le texte tapé, « Voir les N autres » et les
+  // e-mails trouvés vivent dans le FIL de la loupe (src/rechercheEcran.js), hors de la
+  // coque : une lettre ne redessine que le champ et le panneau (`RechercheVivante`),
+  // jamais toute l'app (mesuré au banc : ~240 ms par lettre sur Ma journée avant).
+  const setGsQ=poserTexteRecherche;
+  const [gsRecents,setGsRecents]=useState(()=>lireRecents());
   // (6 nov.) CHERCHER PAR PHOTO : la feuille (src/RecherchePhoto.jsx), ouverte par
   // l'appareil photo de la loupe ou du Stock (`vrm:recherche-photo`).
   const [rpOuvert,setRpOuvert]=useState(false);
@@ -71006,6 +71022,10 @@ function AppCoeur() {
     // (`lireDressings` : vide ⇒ relus par motif, puis filtrés comme avant).
     const lst=(await lireLignesEnLigne((await lireDressings(sb,{uids:okUid?[...okUid]:null})||[]).filter(duCompte))).lignes;   // 5.167 : la règle « en ligne » (§11)
     for(const r of lst){ const p=(r.data&&r.data.payload)||{}; for(const it of (p.items||[])){ if(!it.is_closed&&!it.is_hidden&&!it.is_draft) online.add(String(it.id)); } }
+    // (6 nov., v36) Les annonces en ligne elles-mêmes (id, titre, marque, taille, prix,
+    // photo) : la loupe trouve une annonce sans N° et allume « en ligne » sur une fiche
+    // par l'id de SON annonce. Rien relu : les lignes déjà lues ci-dessus.
+    const annonces=annoncesDesLignes(lst);
     // (6 nov., vague 2) Les commandes des SEULS comptes cherchés (`id=in.`), et
     // seulement leur liste (`data->payload->my_orders`, §4.4) : avant, toutes les
     // lignes de tous les comptes jamais captés, entières, filtrées ici ensuite.
@@ -71022,7 +71042,7 @@ function AppCoeur() {
     const seenS=new Set(); for(const r of so){ for(const o of (Array.isArray(r.mo)?r.mo:[])){ const t=String(o.transaction_id||o.id||''); if(t&&!seenS.has(t)){ seenS.add(t); sold.push(o); } } }
     const po=await commandes('purchased');
     const seenP=new Set(); for(const r of po){ for(const o of (Array.isArray(r.mo)?r.mo:[])){ const t=String(o.transaction_id||o.id||''); if(t&&!seenP.has(t)){ seenP.add(t); bought.push(o); } } }
-    const lp=await sb('app_data?id=eq.vinted_lbc_posted&select=data'); ((lp&&lp[0]&&lp[0].data&&lp[0].data.ids)||[]).forEach(x=>lbc.add(String(x)));
+    const lp=await sb('app_data?id=eq.vinted_lbc_posted&select=ids:data->ids'); ((lp&&lp[0]&&Array.isArray(lp[0].ids)&&lp[0].ids)||[]).forEach(x=>lbc.add(String(x)));   // (6 nov., v36) projetée : la liste seule (§4.4)
     // (3 nov.) LA RECHERCHE UNIQUE (src/rechercheUnique.js) : pseudo de l'acheteur et
     // n° de transaction écrits dans le MÊME e-mail de vente, n° de suivi du bordereau de
     // la vente, colis des e-mails de transporteur (suivi, code de retrait). Scalaires
@@ -71033,8 +71053,24 @@ function AppCoeur() {
       lireTout('id=like.email_bord_*&select=tx:meta->>transaction,suivi:meta->>suivi').catch(()=>null),
       lireTout('id=like.email_track_*&select=id,suivi:meta->>suivi,code:meta->>code,code2:meta->>code2,lieu:meta->>lieu,status:meta->>status,sens:meta->>sens,art:meta->>artTitle,carrier:meta->>carrier,at:meta->>receivedAt').catch(()=>null),
     ]);
-    setGsData({online,sold,bought,lbc,pseudos,bordereaux,colis});
+    // (6 nov., v36) Les factures Pro (`email_invoice_*`), en scalaires — la lecture de l'écran Factures.
+    const facturesPro=await fetchProInvoices({ metadata: true }).catch(()=>null);
+    setGsData({online,sold,bought,lbc,pseudos,bordereaux,colis,annonces,facturesPro});
   })(); /* eslint-disable-next-line */ },[gsOpen]);
+  // (6 nov., v36) LES E-MAILS DE LA LOUPE : le moteur de l'écran E-mails (côté base, sur
+  // TOUTES ses lignes, `filtreRecherche`) — pas de second moteur. Une requête par
+  // pause de frappe (250 ms), la précédente ANNULÉE ; un montant n'y va pas.
+  // Mesuré le 6 nov. sur sa base (lecture seule) : 992 e-mails, le filtre en 7 ms.
+  useEffect(()=>{
+    if(!gsOpen) return undefined;
+    return piloterEmails({ fil: FIL_RECHERCHE, delai: 250, actif: ()=>!!AUTH.user, montant: (q)=>montantCherche(q)!=null,
+      chercher: async (m, signal)=>{ const r=await requeteJsonBornee(`/api/email-rattacher?mode=journal&page=0&cherche=${encodeURIComponent(m)}`,{headers:sbAuth(),cache:'no-store',signal},8000); return r.ok?r.json:null; },
+      apres: (liste)=>jetonsStream('acheteurs_recherche_emails',liste.map(x=>x.email&&x.email.resume&&x.email.resume.de)) });
+  },[gsOpen]);
+  // Le mode stream reconnaît aussi les pseudos que la loupe a lus (e-mails de vente) et
+  // les acheteurs des factures, où qu'ils s'écrivent (src/modeStream.js).
+  useEffect(()=>{ if(gsData) jetonsStream('acheteurs_recherche',(gsData.pseudos||[]).map(p=>p&&p.pseudo)); },[gsData]);
+  useEffect(()=>{ jetonsStream('acheteurs_factures',(Array.isArray(invoices)?invoices:[]).map(i=>i&&i.buyerName)); },[invoices]);
   // ── « TOUT SUR LE N° » (21 octobre) : les sources de la recherche par
   // numéro, lues UNE fois à l'ouverture de la recherche. Chaque source rend
   // `null` quand la base n'a pas répondu (« pas su » ≠ « rien », §4.1) : la
@@ -73306,106 +73342,153 @@ function AppCoeur() {
 
   // ── LA RECHERCHE EN PLACE (31 oct.) : les résultats, un panneau sous le champ ──
   // (6 nov., filet 2) Le panneau se calcule SOUS son garde-fou (`Differe`) : une erreur ici ne fait plus tomber la coque.
-  const panneauRecherche = !gsOpen ? null : <GardeEcran nom="recherche" feuille onFermer={fermerRecherche}><Differe rendre={()=>{
-        const q = gsQ.trim().toLowerCase();
-        const numeros = load('vinted_annonce_numeros', {});
-        const listCache = (_acctCache['listings'] && _acctCache['listings'].items) || [];
+  const panneauRecherche = !gsOpen ? null : <GardeEcran nom="recherche" feuille onFermer={fermerRecherche}><RechercheVivante rendre={(fil, gsQLent)=>{
+        const gsMax = fil.max && fil.max.q === gsQLent ? fil.max.m : {};
+        const setGsMax = (f) => FIL_RECHERCHE.poser((s) => ({ ...s, max: { q: gsQLent, m: f(s.max && s.max.q === gsQLent ? s.max.m : {}) } }));
+        const gsEmails = fil.emails;
+        // (6 nov., v36) LA LOUPE UNIVERSELLE : la frappe reste fluide — le calcul suit la
+        // valeur DIFFÉRÉE (`gsQLent`, React la reprend quand il a le temps), l'index est
+        // mémorisé tant que ses sources sont les mêmes objets (`memoSur`, `indexMemo`).
+        const qBrut = gsQLent;
+        const q = qBrut.trim().toLowerCase();
+        const okUid = memoSur('gs-comptes', [vintedAccounts], () => comptesRecherche(vintedAccounts));
+        // Les fiches N° : relues seulement quand le texte rangé change (le même texte ⇒ le même objet).
+        let brutFiches = null; try { brutFiches = localStorage.getItem('vinted_annonce_numeros'); } catch (_) {}
+        const fichesToutes = memoSur('gs-fiches', [brutFiches], () => load('vinted_annonce_numeros', {}) || {});
+        const fiches = memoSur('gs-fiches-cpt', [fichesToutes, okUid], () => { if (!okUid) return fichesToutes; const o = {}; for (const [id, e] of Object.entries(fichesToutes)) if (!e || !e.accountId || okUid.has(String(e.accountId))) o[id] = e; return o; });
         const soldCache = ((_acctCache['sold'] && _acctCache['sold'].items) || []).length ? _acctCache['sold'].items : (gsData && gsData.sold) || [];
         const buyCache = ((_acctCache['purchased'] && _acctCache['purchased'].items) || []).length ? _acctCache['purchased'].items : (gsData && gsData.bought) || [];
-        const onlineIds = new Set([...listCache.map(it=>String(it.id)), ...((gsData && [...gsData.online]) || [])]);
+        let brutOv = null; try { brutOv = localStorage.getItem('vinted_sale_overrides'); } catch (_) {}
+        const numerosTx = memoSur('gs-ntx', [fichesToutes, numData && numData.txnItem, brutOv], () => numerosDesVentes(fichesToutes, numData && numData.txnItem, load('vinted_sale_overrides', {}) || {}));
+        const factures = memoSur('gs-fac', [invoices, gsData && gsData.facturesPro], () => facturesPourRecherche(invoices, gsData && gsData.facturesPro));
         const lbcSet = (gsData && gsData.lbc) || new Set();
         const garageBoxOf = (numero)=>{ for(const [box,arr] of Object.entries(garageGrid||{})){ if(Array.isArray(arr)&&arr.some(v=>String(v).trim()===String(numero))) return box; } return null; };
-        const hit = (s)=> q && String(s||'').toLowerCase().includes(q);
-        let pairs=[], ventes=[], achats=[], colisT=[], trouve=null;
-        const kNumQ = lireNumeroCherche(gsQ, { cleNum }, [prefixeNumeros(), archiveNumeros()]);
-        if(q){
-          // Paires numérotées (index principal : N°, titre, marque).
-          const okUid = comptesRecherche(vintedAccounts);
-          pairs = Object.entries(numeros).map(([id,e])=>({id, ...e}))
-            .filter(e=> !okUid || !e.accountId || okUid.has(String(e.accountId)))
-            .filter(e=> hit(e.numero) || hit(e.title) || hit(extractBrand(e.title||'')))
-            .filter(e=> !kNumQ || cleNum(e.numero||'')!==kNumQ)   // la paire exacte est dans « Tout sur le N° »
-            .map(e=>{ const box=garageBoxOf(e.numero); const online=onlineIds.has(String(e.id)); const onLbc=lbcSet.has(String(e.id))||lbcSet.has(String(e.numero)); return {...e, box, online, onLbc}; })
-            .sort((a,b)=>(parseInt(a.numero,10)||0)-(parseInt(b.numero,10)||0))
-            .slice(0,40);
-          const numeredIds = new Set(pairs.map(p=>String(p.id)));
-          // (3 nov.) Une seule recherche pour le reste : pseudo, n° de suivi, code de retrait,
-          // n° de transaction, titre (src/rechercheUnique.js, index mémorisé). Le titre ne
-          // sert qu'à CHERCHER : chaque ligne ouvre SA vente, SON achat, SON colis.
-          const idx = indexRechercheMemo({ ventes: soldCache, achats: buyCache, pseudos: gsData && gsData.pseudos, bordereaux: gsData && gsData.bordereaux, colis: gsData && gsData.colis });
-          trouve = chercherPartout(idx, gsQ);
-          ventes = trouve.groupes.vente; achats = trouve.groupes.achat; colisT = trouve.groupes.colis;
-        }
-        const total = pairs.length+ventes.length+achats.length+colisT.length;
-        // (31 oct.) Une ligne mène à SON élément (la vente ouverte, la carte du colis).
-        const go=(tab,cible)=>{ setGsOpen(false); if(cible) poserCible(cible, redirigerOnglet(tab, null, ONGLETS_DEPLACES).tab); setTab(tab); };
-        // Un NUMÉRO tapé (« 128 », « B128 », « n128 ») : le bloc « Tout sur le
-        // N° » passe devant, par identité (src/rechercheNumero.js).
-        // (3 nov.) Un nombre long (≥ 5 chiffres) qui EST un code de retrait, un n° de suivi
-        // ou de transaction exact : « Tout sur le N°482913 — jamais servi » ne s'affiche pas
-        // par-dessus (le N° reste cherché dès qu'aucune identité exacte ne répond).
-        const identiteExacte = !!(trouve && Object.values(trouve.groupes).some(g => g.some(r => r.exact && r.par !== 'pseudo')));
-        const estNumQ = !!kNumQ && !(identiteExacte && /^\d{5,}$/.test(kNumQ));
-        // Revue du 16 octobre : la recherche écrivait le statut BRUT de Vinted
-        // (« Le paiement a été validé ») et la date en 15/10/2026, quand la carte
-        // de la même vente dit « À expédier · 15 oct. ». Même règle (`etapeVente`,
-        // `etapeAchat`), même forme de date que les cartes.
+        const idx = indexRechercheMemo({ ventes: soldCache, achats: buyCache, pseudos: gsData && gsData.pseudos, bordereaux: gsData && gsData.bordereaux, colis: gsData && gsData.colis, fiches, annonces: gsData ? gsData.annonces : null, factures, numerosTx });
+        const kNumQ = lireNumeroCherche(qBrut, { cleNum }, [prefixeNumeros(), archiveNumeros()]);
+        // Une seule recherche pour tout : N° (partiel), pseudo, n° de suivi, code de retrait,
+        // n° de transaction, n° de facture, montant, titre / marque / taille. Le titre ne sert
+        // qu'à CHERCHER : chaque ligne ouvre SON objet par son identité (src/rechercheUnique.js).
+        const trouve = q ? chercherPartout(idx, qBrut, { numero: kNumQ, max: { paire: gsMax.paire || 12, vente: gsMax.vente || 8, achat: gsMax.achat || 8, colis: gsMax.colis || 8, annonce: gsMax.annonce || 8, facture: gsMax.facture || 6 } }) : null;
+        // Un NUMÉRO tapé (« 128 », « B128 », « n128 ») : le bloc « Tout sur le N° » passe devant,
+        // par identité (src/rechercheNumero.js). (3 nov.) Un nombre long (≥ 5 chiffres) qui EST un
+        // code de retrait, un n° de suivi ou de transaction exact : « Tout sur le N°482913 — jamais
+        // servi » ne s'affiche pas par-dessus.
+        const identiteExacte = !!(trouve && Object.values(trouve.groupes).some(g => g.some(r => r.exact && r.par !== 'pseudo' && r.par !== 'numero')));
+        // (6 nov.) Idem quand ce nombre long est trouvé dans un e-mail (un code de retrait lu).
+        const mailsTrouves = !!(gsEmails && Array.isArray(gsEmails.liste) && gsEmails.liste.length && gsEmails.q === requeteEmails(qBrut.trim()));
+        const estNumQ = !!kNumQ && !((identiteExacte || mailsTrouves) && /^\d{5,}$/.test(kNumQ));
+        // La fiche du N° exact est déjà dans « Tout sur le N° » : pas deux fois.
+        const groupe = (t) => !trouve ? [] : (t === 'paire' && estNumQ ? trouve.groupes.paire.filter(r => !(r.par === 'numero' && r.exact)) : trouve.groupes[t]);
+        const totalDe = (t) => !trouve ? 0 : (t === 'paire' && estNumQ ? trouve.totaux.paire - trouve.groupes.paire.filter(r => r.par === 'numero' && r.exact).length : trouve.totaux[t]);
+        const mails = gsEmails && gsEmails.q === requeteEmails(qBrut.trim()) ? gsEmails : null;
+        const listeMails = mails && Array.isArray(mails.liste) ? mails.liste : [];
+        const total = trouve ? ['paire','vente','achat','colis','annonce','facture'].reduce((n,t)=>n+groupe(t).length,0) + listeMails.length : 0;
         const shipDoneGs = load('vinted_ship_done', {}) || {};
         const posteMain = (o) => !!(o && shipDoneGs[String(o.transaction_id)]);
         const jourCourt = (d) => { const t = new Date(d); return isNaN(t.getTime()) ? '' : t.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }); };
         const numBadge=(n)=> <span style={{flexShrink:0,minWidth:26,height:26,borderRadius:12,background:C.accent,color:C.onAccent,fontSize:12,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',padding:'0 5px'}}>{n?`#${n}`:'—'}</span>;
-        const thumb=(src,fb)=> <div style={{width:44,height:44,borderRadius:12,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{src?<PhotoVinted src={src} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>{fb||<Icon name="image" size={18} style={{color:C.muted,opacity:.55}}/>}</span>}</div>;
+        const thumb=(src,fb)=> <div style={{width:44,height:44,borderRadius:12,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>{src?<PhotoVinted src={src} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20,display:'flex'}}>{fb||<Icon name="image" size={18} style={{color:C.muted,opacity:.55}}/>}</span>}</div>;
+        // Où mène une ligne : SON objet, par son identité (`destinationResultat`).
+        const ouvrir = (r, type) => {
+          const d = type === 'email' ? { tab: 'emails', email: r.id } : destinationResultat(r); if (!d) return;
+          if (qBrut.trim()) setGsRecents(noterRecent(qBrut.trim()));
+          setGsOpen(false);
+          if (d.fiche) { setFicheNum(String(d.fiche)); return; }
+          if (d.facture) demanderOuverture('facture', d.facture);
+          if (d.email) demanderOuverture('email', d.email);
+          if (type === 'achat') demanderVue('achats'); if (type === 'vente') subVoulue.current = 'vinted';
+          if (d.cible) poserCible(d.cible, redirigerOnglet(d.tab, null, ONGLETS_DEPLACES).tab);
+          setTab(d.tab);
+        };
+        // La pastille : PAR QUOI la ligne est trouvée. Un pseudo et un code suivent les
+        // cases du mode stream (`vrm-sensible`, src/modeStream.js).
+        const pastille = (r) => { const mot = motPastille(r); if (!mot) return null;
+          const sensible = r.par === 'pseudo' ? 'acheteur' : r.par === 'code' ? 'code' : null;
+          return <span className={'vrm-recherche-par' + (sensible ? ' vrm-sensible' : '')} data-stream-type={sensible || undefined} data-recherche-par-valeur={String(r.valeur)} style={{flexShrink:1,minWidth:0,maxWidth:'40%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.text,background:C.bg,borderRadius:999,padding:'4px 9px'}}>{mot}</span>; };
+        const styleLigne = {width:'100%',minHeight:44,display:'flex',alignItems:'center',gap:11,padding:'9px 10px',marginBottom:6,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,cursor:'pointer',fontFamily:'inherit',textAlign:'left'};
+        const ligneTexte = (titre, info) => (<div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:13,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{titre}</div>
+          <div data-recherche-info="" style={{fontSize:12,color:C.muted,fontWeight:500,marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{info}</div>
+        </div>);
+        // UNE ligne de résultat, quel que soit son type : vignette · titre · une ligne d'info · pastille · ›
+        const ligne = (r, type, i) => { const e = r.e; const o = e.o; const c = e.c || {};
+          let vignette, titre, info, etat = '';
+          if (type === 'paire') {
+            const box = garageBoxOf(e.numero); const onLbc = lbcSet.has(String(e.id)) || lbcSet.has(String(e.numero));
+            vignette = <>{numBadge(e.numero)}{thumb(e.photo)}</>;
+            titre = e.titre || '(sans titre)';
+            etat = e.enLigne === true ? 'En ligne' : e.enLigne === false ? 'Pas en ligne sur Vinted' : '';
+            info = [etat, onLbc ? 'Leboncoin' : '', box != null ? 'Au garage' : '', e.f && e.f.buyPrice ? `achat ${prixCourt(String(e.f.buyPrice).replace(',', '.'))}` : '', e.f && e.f.price ? prixCourt(String(e.f.price).replace(',', '.')) : ''].filter(Boolean).join(' · ');
+          } else if (type === 'annonce') {
+            vignette = <>{numBadge(null)}{thumb(e.photo)}</>;
+            titre = e.titre || '(sans titre)'; etat = 'En ligne · sans N°';
+            info = [etat, e.a && (e.a.brand || e.a.size) ? [e.a.brand, e.a.size].filter(Boolean).join(' ') : '', e.montants[0] ? prixCourt(e.montants[0] / 100) : ''].filter(Boolean).join(' · ');
+          } else if (type === 'facture') {
+            vignette = thumb(null, <Icon name="doc" size={18} style={{color:C.muted}}/>);
+            titre = e.titre || `Facture ${e.facture}`;
+            info = [`Facture ${e.facture}`, e.x && e.x.pro ? 'Pro' : '', e.date ? jourCourt(e.date) : '', e.montants[0] ? prixCourt(e.montants[0] / 100) : ''].filter(Boolean).join(' · ');
+          } else {
+            etat = type==='vente' ? etapeVente(o, { poste: posteMain }).label : type==='achat' ? etapeAchat(o, null).label : ({ available:'À retirer', retour:'Reparti', delivered:'Retiré' }[c.status] || (c.lieu ? String(c.lieu).split(',')[0] : (c.carrier || '')));
+            vignette = type === 'colis' ? thumb(null, <LogoTransporteur cle={carrierKey(c.carrier || '')} taille={26} repli={<Icon name="box" size={18} style={{color:C.muted}}/>}/>) : thumb(e.photo || (o ? orderPhoto(o) : null));
+            titre = e.titre || (type==='colis' ? (c.carrier ? `Colis ${c.carrier}` : 'Colis') : '(sans titre)');
+            info = [etat, e.numero ? `N°${e.numero}` : '', e.date ? jourCourt(e.date) : '', type !== 'colis' && e.montants && e.montants[0] ? prixCourt(e.montants[0] / 100) : ''].filter(Boolean).join(' · ');
+          }
+          return (
+            <button key={type+(e.cle||i)} type="button" className="vrm-recherche-ligne" onClick={()=>ouvrir(r, type)} data-recherche-resultat={type} data-recherche-par={r.par} title={MOTIFS_RECHERCHE[r.par] || motifRecherche(r.par)} data-recherche-cle={e.cle}
+              data-recherche-vente={type==='vente'&&e.tx?e.tx:undefined} data-recherche-achat={type==='achat'&&e.tx?e.tx:undefined} data-recherche-num={e.numero || undefined} data-recherche-statut={etat || undefined}
+              style={styleLigne}>
+              {vignette}{ligneTexte(titre, info)}{pastille(r)}
+              <span style={{fontSize:17,color:C.muted}}>›</span>
+            </button>); };
+        // Un e-mail trouvé par le moteur de l'écran E-mails : sa nature, l'essentiel, sa date.
+        const ligneMail = (x, i) => { const em = x.email; const l = ligneEmail(em, load('vrm_recus_delies',{})||{});
+          const site = siteExpediteur(em.from);
+          const marque = site ? <span style={{display:'flex',color:C.text}}><LogoSite site={site}/></span> : <span style={{fontSize:13,fontWeight:700,color:C.muted}}>{monogramme(expediteurLisible(em.from))}</span>;
+          return (
+            <button key={x.cle||i} type="button" className="vrm-recherche-ligne" onClick={()=>ouvrir(x, 'email')} data-recherche-resultat="email" data-recherche-cle={x.cle} title="Ouvrir l’e-mail" style={styleLigne}>
+              {thumb(null, marque)}
+              {ligneTexte(l.titre, [l.essentiel.slice(0, 2).join(' · '), jourCourt(em.sourceDate || em.at)].filter(Boolean).join(' · '))}
+              <span style={{fontSize:17,color:C.muted}}>›</span>
+            </button>); };
+        const entete = (lib, n, cle) => <div className="vrm-recherche-groupe" data-recherche-entete={cle} style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,margin:'14px 2px 6px'}}>{lib}{n != null ? ` (${n})` : ''}</div>;
+        const plus = (type, reste) => reste > 0 ? <button type="button" className="vrm-lien-action" data-recherche-plus={type} onClick={()=>setGsMax(m=>({...m,[type]:500}))} style={{minHeight:44,width:'100%',border:0,background:'transparent',color:C.accentTexte,fontFamily:'inherit',fontSize:13,fontWeight:600,cursor:'pointer',textAlign:'left',padding:'0 10px'}}>Voir les {reste} autres</button> : null;
+        const GROUPES = [['paire','Paires'],['vente','Ventes'],['achat','Achats'],['colis','Colis'],['annonce','Annonces sans N°'],['facture','Factures']];
+        // Champ vide : les recherches récentes (cet appareil — tues en mode stream, une
+        // recherche tapée peut être un pseudo) et des suggestions tirées de ce qui est lu.
+        const sugg = !q ? suggestionsRecherche(idx, { n: 3 }) : null;
         return (
-        <div className="vrm-global-search vrm-recherche-panneau" id="vrm-recherche-resultats" data-recherche-panneau="" data-recherche-q={q} role="region" aria-label="Résultats de la recherche"
+        <div className="vrm-global-search vrm-recherche-panneau" id="vrm-recherche-resultats" data-recherche-panneau="" data-recherche-q={q} data-recherche-pret={gsData ? '1' : '0'} role="region" aria-label="Résultats de la recherche"
           style={ordi?{background:C.bg,borderColor:C.border}:{top:hautRecherche,background:C.bg,borderColor:C.border}} onMouseDown={e=>{ if(e.target===e.currentTarget) e.preventDefault(); }}>
           <FermeAuRetour fermer={()=>setGsOpen(false)}/>
           <div className="vrm-recherche-corps">
-            {!q && <div data-recherche-vide="" hidden/>}
-            {q && total===0 && !estNumQ && <div data-recherche-rien="" style={{padding:'14px 12px',textAlign:'left',color:C.muted,fontSize:13}}>{gsData?'Aucun résultat':'…'}</div>}
-            {q && estNumQ && <ToutSurLeNumero q={gsQ} numData={numData} comptes={vintedAccounts} onNav={go} onFiche={(n)=>setFicheNum(String(n))} onChercher={(n)=>setGsQ(String(n))} onStock={(n)=>{ setGsOpen(false); setGarageLocate(String(n)); DEMANDE_STOCK_CHERCHE.nums=[String(n)]; DEMANDE_STOCK_CHERCHE.at=Date.now(); setTab('garage'); }}/>}
-            {pairs.length>0 && <div style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,margin:'12px 2px 6px'}}>Paires numérotées ({pairs.length})</div>}
-            {pairs.map(p=>(
-              <button key={'p'+p.id} type="button" onClick={()=>{ if(p.box!=null){ setGsOpen(false); setGarageLocate(String(p.numero)); setTab('garage'); } else go(p.online?'cat_annonces':'cat_ventes'); }}
-                style={{width:'100%',minHeight:44,display:'flex',alignItems:'center',gap:11,padding:'9px 10px',marginBottom:6,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
-                {numBadge(p.numero)}
-                {thumb(p.photo)}
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:13,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.title||'(sans titre)'}</div>
-                  <div style={{fontSize:12,color:C.muted,fontWeight:500,marginTop:2,display:'flex',gap:8,flexWrap:'wrap'}}>
-                    <span style={{color:p.online?INV_STATUS.online.color:C.muted}}>{p.online?'🟢 En ligne':'⚪ Retirée'}</span>
-                    {p.onLbc && <span style={{color:LBC_ORANGE}}>🟠 Leboncoin</span>}
-                    {p.box!=null && <span style={{color:C.accentTexte}}>Au garage</span>}
-                    {p.buyPrice && <span>achat {prixCourt(String(p.buyPrice).replace(',', '.'))}</span>}
-                    {p.price && <span>· {prixCourt(String(p.price).replace(',', '.'))}</span>}
-                  </div>
-                </div>
-                <span style={{fontSize:17,color:C.muted}}>›</span>
-              </button>
-            ))}
-            {/* (3 nov.) Les résultats de la recherche unique, groupés par type : chaque ligne
-                dit PAR QUOI elle a été trouvée (pseudo, suivi, code, transaction) et ouvre
-                SON écran par son identité (`destinationResultat`). */}
-            {[['vente','Ventes',ventes],['achat','Achats',achats],['colis','Colis',colisT]].map(([type,lib,liste])=> liste.length ? (
-              <div key={type} data-recherche-groupe={type} data-recherche-n={liste.length}>
-                <div className="vrm-recherche-groupe" style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,margin:'14px 2px 6px'}}>{lib} ({liste.length})</div>
-                {liste.map((r,i)=>{ const e=r.e; const o=e.o; const c=e.c||{};
-                  const etat = type==='vente' ? etapeVente(o, { poste: posteMain }).label : type==='achat' ? etapeAchat(o, null).label : ({ available:'À retirer', retour:'Reparti', delivered:'Retiré' }[c.status] || (c.lieu ? String(c.lieu).split(',')[0] : (c.carrier || '')));
-                  const quand = e.date ? jourCourt(e.date) : '';
-                  const par = r.par==='titre' || r.par==='title' ? motifRecherche(r.par) : r.par==='numero' ? motifRecherche(r.par) : r.par==='pseudo' ? r.valeur : r.par==='suivi' ? `Suivi ${r.valeur}` : r.par==='code' ? `Code ${r.valeur}` : r.par==='transaction' ? `N° ${r.valeur}` : '';
-                  const ouvrir = ()=>{ const d=destinationResultat(r); if(!d) return; setGsOpen(false); if(type==='achat') demanderVue('achats'); if(type==='vente') subVoulue.current='vinted'; if(d.cible) poserCible(d.cible, redirigerOnglet(d.tab, null, ONGLETS_DEPLACES).tab); setTab(d.tab); };
-                  return (
-                  <button key={type+(e.cle||i)} type="button" className="vrm-recherche-ligne" onClick={ouvrir} data-recherche-resultat={type} data-recherche-par={r.par} title={motifRecherche(r.par)} data-recherche-cle={e.cle}
-                    data-recherche-vente={type==='vente'&&e.tx?e.tx:undefined} data-recherche-achat={type==='achat'&&e.tx?e.tx:undefined}
-                    style={{width:'100%',minHeight:44,display:'flex',alignItems:'center',gap:11,padding:'9px 10px',marginBottom:6,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
-                    {thumb(o ? orderPhoto(o) : null, type==='colis' ? <Icon name="box" size={18} style={{color:C.muted}}/> : null)}
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:13,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{e.titre || (type==='colis' ? (c.carrier ? `Colis ${c.carrier}` : 'Colis') : '(sans titre)')}</div>
-                      <div data-recherche-statut={etat} style={{fontSize:12,color:C.muted,fontWeight:500,marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{[etat, quand].filter(Boolean).join(' · ')}</div>
-                    </div>
-                    {par ? <span className="vrm-recherche-par" data-recherche-par-valeur={r.valeur} style={{flexShrink:1,minWidth:0,maxWidth:'40%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.text,background:C.bg,borderRadius:999,padding:'4px 9px'}}>{par}</span> : null}
-                    <span style={{fontSize:17,color:C.muted}}>›</span>
-                  </button>); })}
-              </div>) : null)}
+            {!q && <div data-recherche-vide="">
+              {!streamOn && gsRecents.length > 0 && <div data-recherche-recents="">
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>{entete('Récentes', null, 'recents')}<button type="button" className="vrm-lien-action" data-recherche-oublier="" onClick={()=>setGsRecents(oublierRecents())} style={{minHeight:44,border:0,background:'transparent',color:C.muted,fontFamily:'inherit',fontSize:12,cursor:'pointer'}}>Effacer</button></div>
+                <div style={{display:'flex',flexWrap:'wrap',gap:6}}>{gsRecents.map(t=><button key={t} type="button" data-recherche-recent={t} onClick={()=>{ setGsQ(t); try{ gsChampRef.current&&gsChampRef.current.focus({preventScroll:true}); }catch(_){} }}
+                  style={{minHeight:44,display:'inline-flex',alignItems:'center',gap:6,padding:'0 12px',border:`1px solid ${C.border}`,borderRadius:999,background:C.card,color:C.text,fontFamily:'inherit',fontSize:13,cursor:'pointer',maxWidth:'100%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}><Icon name="clock" size={14} style={{color:C.muted}}/>{t}</button>)}</div>
+              </div>}
+              {sugg && sugg.colis.length > 0 && <div data-recherche-suggestions="colis">{entete('Colis à retirer', null, 'sugg-colis')}{sugg.colis.map((r,i)=>ligne(r,'colis',i))}</div>}
+              {sugg && sugg.ventes.length > 0 && <div data-recherche-suggestions="ventes">{entete('Dernières ventes', null, 'sugg-ventes')}{sugg.ventes.map((r,i)=>ligne(r,'vente',i))}</div>}
+            </div>}
+            {q && total===0 && !estNumQ && !(mails && mails.liste === undefined) && <div data-recherche-rien="" style={{padding:'14px 12px',textAlign:'left',color:C.muted,fontSize:13}}>{gsData?'Aucun résultat':'…'}</div>}
+            {q && estNumQ && <ToutSurLeNumero q={qBrut} numData={numData} comptes={vintedAccounts} onNav={(tab,cible)=>{ setGsOpen(false); if(cible) poserCible(cible, redirigerOnglet(tab, null, ONGLETS_DEPLACES).tab); setTab(tab); }} onFiche={(n)=>setFicheNum(String(n))} onChercher={(n)=>setGsQ(String(n))} onStock={(n)=>{ setGsOpen(false); setGarageLocate(String(n)); DEMANDE_STOCK_CHERCHE.nums=[String(n)]; DEMANDE_STOCK_CHERCHE.at=Date.now(); setTab('garage'); }}/>}
+            {/* Les résultats, groupés par type : chaque ligne dit PAR QUOI elle a été trouvée et
+                ouvre SON objet par son identité. 50 paires au même titre = 50 lignes (« Voir les N autres »). */}
+            {q && GROUPES.map(([type,lib])=>{ const liste = groupe(type); if (!liste.length) return null; const n = totalDe(type);
+              return (<div key={type} data-recherche-groupe={type} data-recherche-n={liste.length} data-recherche-total={n}>
+                {entete(lib, n, type)}
+                {liste.map((r,i)=>ligne(r,type,i))}
+                {plus(type, n - liste.length)}
+              </div>); })}
+            {q && mails && (mails.liste === undefined
+              ? <div data-recherche-groupe-attente="email" style={{padding:'10px 12px',color:C.muted,fontSize:12}}>Je cherche dans tes e-mails…</div>
+              : mails.liste === null
+                ? <div data-recherche-mails-ko="" style={{padding:'10px 12px',color:C.muted,fontSize:12}}>E-mails : la recherche n’a pas répondu — rien n’est perdu, réessaie dans un instant.</div>
+                : listeMails.length ? <div data-recherche-groupe="email" data-recherche-n={listeMails.length}>
+                    {entete('E-mails', mails.suite ? `${listeMails.length}+` : listeMails.length, 'email')}
+                    {listeMails.map(ligneMail)}
+                    {mails.suite ? <button type="button" className="vrm-lien-action" data-recherche-plus="email" onClick={()=>{ setGsOpen(false); setTab('emails'); }} style={{minHeight:44,width:'100%',border:0,background:'transparent',color:C.accentTexte,fontFamily:'inherit',fontSize:13,fontWeight:600,cursor:'pointer',textAlign:'left',padding:'0 10px'}}>Tous les e-mails…</button> : null}
+                  </div> : null)}
           </div>
         </div>
         );
@@ -73417,14 +73500,14 @@ function AppCoeur() {
   // (3 nov.) La voix : ce que le navigateur a reconnu passe par `requeteDeLaVoix`
   // (« numéro 124 », « cent vingt-quatre » ⇒ 124 ; « B 125 » ⇒ B125 ; sinon le texte).
   const dicterRecherche = (t) => { const r = requeteDeLaVoix(t); if (!r.requete) return; setGsQ(r.requete); if (!gsOpen) setGsOpen(true); };
-  const champRecherche = (mobile) => (
+  const champRecherche = (mobile) => <RechercheVivante rendre={(fil)=>(
     <input ref={gsChampRef} type="search" className="vrm-recherche-champ" data-recherche-champ="" enterKeyHint="search" autoComplete="off" spellCheck={false}
-      aria-label={mobile ? 'Rechercher : N°, pseudo, suivi, code, titre' : 'Rechercher une paire'} placeholder={mobile ? 'N°, pseudo, suivi, code…' : 'N°, pseudo, n° de suivi, code de retrait, titre…'}
+      aria-label={mobile ? 'Rechercher : N°, pseudo, suivi, code, titre' : 'Rechercher une paire'} placeholder={mobile ? 'N°, pseudo, suivi, code…' : 'N°, pseudo, suivi, code de retrait, montant, titre…'}
       role="combobox" aria-autocomplete="list" aria-expanded={gsOpen} aria-controls="vrm-recherche-resultats" aria-keyshortcuts={mobile ? undefined : '/'}
-      title={mobile ? undefined : 'Rechercher : N°, pseudo, n° de suivi, code de retrait, n° de transaction, titre (touche /)'}
-      value={gsQ} onChange={e=>{ setGsQ(e.target.value); if(!gsOpen) setGsOpen(true); }} onFocus={()=>{ if(!gsOpen) setGsOpen(true); }}
+      title={mobile ? undefined : 'Rechercher : N°, pseudo, n° de suivi, code de retrait, n° de transaction, montant, facture, e-mail, titre, marque, taille (touche /)'}
+      value={fil.q} onChange={e=>{ setGsQ(e.target.value); if(!gsOpen) setGsOpen(true); }} onFocus={()=>{ if(!gsOpen) setGsOpen(true); }}
       onKeyDown={e=>{ if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); fermerRecherche(); } }}/>
-  );
+  )}/>;
   const champRechercheOrdi = (
     <div className="vrm-recherche" data-recherche-zone="" data-recherche-ouverte={gsOpen?'1':'0'}>
       <label className="vrm-barre-recherche" data-barre-recherche="">
@@ -73432,8 +73515,8 @@ function AppCoeur() {
         {champRecherche(false)}
         <MicDictee nu titre="Chercher à la voix" onText={dicterRecherche}/>
         <BoutonPhotoRecherche/>
-        {gsQ ? <button type="button" className="vrm-recherche-effacer" aria-label="Effacer la recherche" onClick={()=>{ setGsQ(''); try{ gsChampRef.current&&gsChampRef.current.focus(); }catch(_){} }}><Icon name="close" size={14}/></button>
-          : <kbd className="vrm-barre-kbd">/</kbd>}
+        <RechercheVivante rendre={(fil)=> fil.q ? <button type="button" className="vrm-recherche-effacer" aria-label="Effacer la recherche" onClick={()=>{ setGsQ(''); try{ gsChampRef.current&&gsChampRef.current.focus(); }catch(_){} }}><Icon name="close" size={14}/></button>
+          : <kbd className="vrm-barre-kbd">/</kbd>}/>
       </label>
       {panneauRecherche}
     </div>
