@@ -56,8 +56,7 @@ html body .vrm-app-shell .vrm-main .vrm-rpf-titre { font-size: var(--vrm-t15); f
 @container (max-width: 480px) {
   html body .vrm-app-shell .vrm-main .vrm-rpf-ligne:not(.vrm-reparti-court) > .vrm-rpf-rang { flex-wrap: wrap; row-gap: 6px; column-gap: 8px; padding: 12px 0; }
   html body .vrm-app-shell .vrm-main .vrm-rpf-ligne:not(.vrm-reparti-court) > .vrm-rpf-rang > .vrm-rpf-ouvrir { flex: 1 1 100%; gap: 12px; }
-  html body .vrm-app-shell .vrm-main .vrm-rpf-ligne:not(.vrm-reparti-court) > .vrm-rpf-rang > :is(.vrm-rpf-code, .vrm-rpf-retire) { height: 36px; min-height: 36px; padding: 0 14px !important; font-size: var(--vrm-t15) !important; position: relative; }
-  html body .vrm-app-shell .vrm-main .vrm-rpf-ligne:not(.vrm-reparti-court) > .vrm-rpf-rang > :is(.vrm-rpf-code, .vrm-rpf-retire)::after { content: ''; position: absolute; inset: -4px -2px; } /* 44 px au doigt */
+  html body .vrm-app-shell .vrm-main .vrm-rpf-ligne:not(.vrm-reparti-court) > .vrm-rpf-rang > :is(.vrm-rpf-code, .vrm-rpf-retire) { padding: 0 16px !important; font-size: var(--vrm-t15) !important; } /* 44 px au doigt, affichés (§7) */
   html body .vrm-app-shell .vrm-main .vrm-rpf-ligne:not(.vrm-reparti-court) > .vrm-rpf-rang > .vrm-rpf-ouvrir + :is(.vrm-rpf-code, .vrm-rpf-retire) { margin-left: 68px; }
   html body .vrm-app-shell .vrm-main .vrm-rpf-detail { padding-left: 68px; }
 }
@@ -90,3 +89,67 @@ html body .vrm-app-shell .vrm-main [data-numeros-a-ecrire] [data-a-ecrire] butto
 }
 html body .vrm-app-shell .vrm-main [data-numeros-a-ecrire] [data-a-ecrire] { border-top: .5px solid var(--vrm-line) !important; padding: 10px 0 !important; }
 html body .vrm-app-shell .vrm-main [data-numeros-a-ecrire] .vrm-alerte-ligne-titre { font-size: var(--vrm-t17); white-space: normal; }
+
+/* ══ 2. eBAY · ANNONCES (et Leboncoin, Vestiaire : « Chiffres ») ═══════════ */
+
+/* « Chiffres › » : une rangée de Réglages — tuile d'icône, libellé à l'encre, chevron —
+   alignée sur les cartes (elle flottait en gris pâle géant, collée au bord). */
+@media (max-width: 767px) {
+  html body .vrm-app-shell .vrm-main .vrm-market-space > .vrm-platform-summary > summary,
+  html body .vrm-app-shell .vrm-main .vrm-platform-summary > summary {
+    display: flex !important; align-items: center; gap: 12px; min-height: 52px; padding: 0 16px !important;
+    font-size: var(--vrm-t17) !important; font-weight: 400 !important; letter-spacing: -.01em; color: var(--vrm-ink) !important;
+  }
+  html body .vrm-app-shell .vrm-main .vrm-platform-summary > summary::before {
+    content: ''; flex: 0 0 30px; width: 30px; height: 30px; border-radius: 8px; background: var(--vrm-card2);
+  }
+  html body .vrm-app-shell .vrm-main .vrm-platform-summary > summary > .vrm-summary-short { flex: 1 1 auto; position: relative; }
+  html body .vrm-app-shell .vrm-main .vrm-platform-summary > summary > .vrm-summary-short::before {
+    content: ''; position: absolute; left: -35px; top: 50%; width: 16px; height: 16px; margin-top: -8px; background: var(--vrm-ink);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 3v18h18'/%3E%3Cpath d='m7 15 4-4 3 3 5-6'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 3v18h18'/%3E%3Cpath d='m7 15 4-4 3 3 5-6'/%3E%3C/svg%3E") center / contain no-repeat;
+  }
+}
+
+/* « À faire sur eBay » : un groupe de Réglages — une icône par geste (lier, endormie…),
+   l'ambre seulement sur le geste pressé ; le filet commence après l'icône. */
+html body .vrm-app-shell .vrm-main .vrm-eb-afaire { border: 0 !important; border-radius: var(--vrm-r-carte); box-shadow: var(--vrm-ombre-carte); }
+html body .vrm-app-shell .vrm-main .vrm-eb-afaire-titre { padding: 14px 16px 2px; font-size: var(--vrm-t15); font-weight: 600; color: var(--vrm-ink); letter-spacing: -.01em; }
+html body .vrm-app-shell .vrm-main .vrm-eb-afaire-ligne { position: relative; gap: 12px; min-height: 60px; padding: 10px 14px 10px 16px; border-top: 0 !important; font-size: var(--vrm-t15); }
+html body .vrm-app-shell .vrm-main .vrm-eb-afaire-ligne + .vrm-eb-afaire-ligne::before { content: ''; position: absolute; top: 0; left: 58px; right: 0; height: .5px; background: var(--vrm-line); }
+html body .vrm-app-shell .vrm-main .vrm-eb-afaire-ligne small { font-size: var(--vrm-t13); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html body .vrm-app-shell .vrm-main .vrm-eb-afaire-point.vrm-eb-afaire-icone {
+  width: 30px; height: 30px; flex: 0 0 30px; border-radius: 8px; display: grid; place-items: center;
+  background: var(--vrm-card2); color: var(--vrm-ink);
+}
+html body .vrm-app-shell .vrm-main .vrm-eb-afaire-ligne[data-urgent="1"] .vrm-eb-afaire-icone { background: var(--vrm-warn-soft); color: var(--vrm-warn); }
+
+/* La liste : un groupe iOS — carte blanche aux coins continus, photo 64 px, filets
+   qui commencent APRÈS la photo, le prix en titre (17/600, chiffres alignés). */
+html body .vrm-app-shell .vrm-main .vrm-ebay-liste { background: var(--vrm-surface); border-radius: var(--vrm-r-carte); box-shadow: var(--vrm-ombre-carte); overflow: hidden; border: 0 !important; }
+html body .vrm-app-shell .vrm-main .vrm-ebay-liste .vrm-eb-carte { position: relative; border-top: 0 !important; }
+html body .vrm-app-shell .vrm-main .vrm-ebay-liste > * + * > .vrm-eb-carte::before,
+html body .vrm-app-shell .vrm-main .vrm-ebay-liste > .vrm-eb-carte + .vrm-eb-carte::before {
+  content: ''; position: absolute; top: 0; left: 92px; right: 0; height: .5px; background: var(--vrm-line); pointer-events: none;
+}
+html body .vrm-app-shell .vrm-main .vrm-eb-tete { padding: 12px 12px 12px 16px; gap: 12px; }
+html body .vrm-app-shell .vrm-main .vrm-eb-ouvrir { min-height: 64px; }
+html body .vrm-app-shell .vrm-main .vrm-eb-ouvrir > :first-child,
+html body .vrm-app-shell .vrm-main .vrm-eb-ouvrir > :first-child img {
+  width: 64px !important; height: 64px !important; min-width: 64px; border-radius: 12px !important; object-fit: cover;
+}
+html body .vrm-app-shell .vrm-main .vrm-eb-titre { font-size: var(--vrm-t15); }
+html body .vrm-app-shell .vrm-main .vrm-eb-meta { font-size: var(--vrm-t13); }
+html body .vrm-app-shell .vrm-main .vrm-eb-prix { font-size: var(--vrm-t17); font-weight: 600; letter-spacing: -.02em; padding-right: 4px; }
+/* « Relier » : une action de texte à l'encre précédée de son maillon — plus cinq pavés
+   gris identiques ; « … » reste au gris secondaire. Toujours 44 px au doigt. */
+html body .vrm-app-shell .vrm-main .vrm-eb-gestes .vrm-b[data-relier-ouvrir] {
+  background: transparent !important; border: 0 !important; box-shadow: none !important; color: var(--vrm-ink) !important;
+  padding: 0 6px 0 8px !important; gap: 5px; font-size: var(--vrm-t15) !important; font-weight: 600 !important;
+}
+html body .vrm-app-shell .vrm-main .vrm-eb-gestes .vrm-b[data-relier-ouvrir]::before {
+  content: ''; width: 15px; height: 15px; flex: none; background: currentColor; opacity: .55;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.5 1.5'/%3E%3Cpath d='M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.5-1.5'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.5 1.5'/%3E%3Cpath d='M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.5-1.5'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+@media (hover: hover) and (pointer: fine) { html body .vrm-app-shell .vrm-main .vrm-eb-gestes .vrm-b[data-relier-ouvrir]:hover { background: var(--vrm-card2) !important; } }

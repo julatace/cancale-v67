@@ -22900,7 +22900,10 @@ const eurEbay = (n) => (Math.round(n * 100) / 100).toFixed(2).replace('.', ',') 
 // (23 octobre, revue) Un prix eBay avec SA devise : « 95,00 € », « 95,00 USD »,
 // devise inconnue ⇒ aucun symbole. UNE règle pour la carte des annonces et les
 // inactives (§11) — `eurEbay` ajoutait « € » à un prix en dollars (« 95,00 € USD »).
-const prixEbayTexte = (n, c) => Number(n).toFixed(2).replace('.', ',') + (c ? ` ${c === 'EUR' ? '€' : c}` : '');
+// (6 nov., v36-visuel-2) La règle unique des euros (`montant`, src/format.js) : les centimes
+// seulement s'ils existent (« 84 € », « 74,50 € ») ; SA devise dite (« 95 USD ») ; devise
+// inconnue ⇒ aucun symbole (« 60 »). Jamais convertie (§1).
+const prixEbayTexte = (n, c) => { const t = montant(Number(n), { devise: c || 'EUR' }); return c ? t : t.replace(/\s€$/, ''); };
 // Les lignes à montrer pour une vérification : la programmation TOUJOURS (son
 // montant, ou « pas su » quand eBay ne l'a pas annoncée sur une annonce
 // programmée), la mise en vente, puis tout autre frais non nul.
@@ -28299,7 +28302,9 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
             <button key={c.k} type="button" className="vrm-eb-afaire-ligne" data-ebay-conseil={c.k} data-ebay-conseil-go={c.k} data-urgent={c.urg ? '1' : undefined}
               {...(c.filtre ? { 'aria-pressed': actif } : {})}
               onClick={c.filtre && actif ? () => { setFiltreAnn('toutes'); setAnnMax(60); } : allerConseil(c)}>
-              <span className="vrm-eb-afaire-point" aria-hidden="true" />
+              {/* (6 nov., v36-visuel-2) Une icône de Réglages par geste (lier, endormie, retirer…) au
+                  lieu d'une puce grise ; l'ambre reste au geste pressé (`data-urgent`). */}
+              <span className="vrm-eb-afaire-point vrm-eb-afaire-icone" aria-hidden="true"><Icon name={{ relier: 'link', dorment: 'sleep', annuler: 'clock' }[c.k] || 'trash'} size={16} /></span>
               <span>{tete}{raison.length ? <small>{raison.join(' — ')}</small> : null}</span>
               <Icon name="chevron" size={14} style={{ flexShrink: 0, color: E.muted, opacity: 0.7, transform: actif ? 'rotate(90deg)' : 'none' }} />
             </button>
