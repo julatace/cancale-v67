@@ -305,6 +305,23 @@ const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom
     dit(/requeteDeLaVoix/.test(ecran) && /Micro \?/.test(ecran), 'I7 la saisie vocale du navigateur (gratuite, §2.9), seulement si elle existe');
   });
 
+  await essaie('I9 — aucune couleur hors des jetons (§7)', () => {
+    const CSS = path.join(RACINE, 'src', 'styles-inventaire.css');
+    const css = fs.existsSync(CSS) ? fs.readFileSync(CSS, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '') : '';
+    const ecran = fs.existsSync(ECRAN) ? fs.readFileSync(ECRAN, 'utf8').replace(/^[ \t]*\/\/[^\n]*/gm, '') : '';
+    const LITTERAL = /#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\(|\b(?:green|lime|red|orange|blue|yellow|teal)\b/;
+    dit(!!css && !LITTERAL.test(css), 'I9 styles-inventaire.css : aucune couleur écrite en dur (seulement les jetons --vrm-*)', (css.match(LITTERAL) || [])[0]);
+    dit(!/--vrm-inv-[a-z-]*\s*:/.test(css), 'I9 aucune couleur propre à l’inventaire (pas de jeton --vrm-inv-*)', (css.match(/--vrm-inv-[a-z-]*\s*:[^;]*/) || [])[0]);
+    const vars = [...css.matchAll(/var\(\s*(--[a-z0-9-]+)/g)].map((m) => m[1]);
+    const JETONS = new Set(['--vrm-ink', '--vrm-muted', '--vrm-faint', '--vrm-hair', '--vrm-bar', '--vrm-accent', '--vrm-accent-texte', '--vrm-on-accent', '--vrm-card2', '--vrm-line', '--vrm-surface', '--vrm-bg', '--vrm-warn', '--vrm-warn-soft', '--vrm-doublon']);
+    const hors = vars.filter((v) => !JETONS.has(v));
+    dit(vars.length > 0 && hors.length === 0, 'I9 chaque couleur est un jeton de la coque (encre, gris, accent, ambre, rouge du doublon)', hors.join(', '));
+    dit(/\[data-inv-retour="attendu"\] \.vrm-inv-retour-t \{ color: var\(--vrm-ink\); \}/.test(css) && /\[data-inv-etat="attendu"\] \.vrm-inv-point \{ background: var\(--vrm-ink\); \}/.test(css), 'I9 « attendu » est neutre : l’encre');
+    dit(/t: '✓ Attendu'/.test(ecran), 'I9 « attendu » se dit par la coche ✓ et le mot (pas par une couleur)');
+    const rouge = css.split('\n').filter((l) => /--vrm-doublon/.test(l));
+    dit(rouge.length > 0 && rouge.every((l) => /vrm-inv-double/.test(l)), 'I9 le rouge seulement sur un doublon de N° (.vrm-inv-double)', rouge.join(' | '));
+  });
+
   console.log(`\n${n - ko}/${n} contrôles verts`);
   process.exit(ko ? 1 : 0);
 })();

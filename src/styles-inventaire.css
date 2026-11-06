@@ -1,13 +1,12 @@
 /* ══ L'INVENTAIRE (6 nov., Stock → « Inventaire ») ═══════════════════════════
    Une feuille au téléphone, à une main : le retour du dernier N° en grand, le
    champ et « OK » sous le pouce, cibles de 44 px au moins.
-   Les tons (demande de Julien pour CE geste) : VERT pour « attendu » — le seul
-   endroit de l'app où ce vert existe, une confirmation d'un coup d'œil devant
-   les cartons, sans geste à faire ; AMBRE (`--vrm-warn`) pour « en trop » et
-   « vendu, à sortir » (un geste à faire) ; ROUGE (`--vrm-doublon`) seulement
-   pour deux paires sous un même N° (§5, §7) ; neutre pour « pas su ». */
-.vrm-inv { --vrm-inv-vu: #248A3D; --vrm-inv-vu-fond: #EAF6EC; }
-:root[data-theme="dark"] .vrm-inv { --vrm-inv-vu: #30D158; --vrm-inv-vu-fond: #10261A; }
+   Les tons (§7, AUCUNE couleur hors des jetons de la coque) : « attendu » est
+   NEUTRE — l'encre, la coche ✓ et le mot (rien à faire, donc rien qui appelle
+   l'œil) ; AMBRE (`--vrm-warn`) pour « en trop » et « vendu, à sortir » (un geste
+   à faire) ; ROUGE (`--vrm-doublon`) seulement pour deux paires sous un même N°
+   (§5) ; « pas su » en gris secondaire. ⚠️ Pas de vert : il avait été posé le
+   6 nov. sur une consigne de coordination, pas de Julien, et retiré le jour même. */
 .vrm-inv-corps { display: flex; flex-direction: column; gap: 12px; padding: 4px 0 calc(env(safe-area-inset-bottom, 0px) + 8px); color: var(--vrm-ink); }
 .vrm-inv-intro { margin: 0; font-size: 15px; line-height: 1.45; }
 .vrm-inv-note, .vrm-inv-sync, .vrm-inv-aide { margin: 0; font-size: 13px; line-height: 1.45; color: var(--vrm-muted); }
@@ -20,7 +19,7 @@
 .vrm-inv-case-nom { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 14px; line-height: 1.3; text-align: center; }
 .vrm-inv-case-nom small { color: var(--vrm-muted); font-size: 12px; overflow-wrap: anywhere; }
 .vrm-inv-notee { margin-left: 6px; white-space: nowrap; }
-.vrm-inv-notee[data-inv-notee-vue="1"] { color: var(--vrm-inv-vu); font-weight: 600; }
+.vrm-inv-notee[data-inv-notee-vue="1"] { color: var(--vrm-ink); font-weight: 600; }
 .vrm-inv-pas { width: 44px; height: 44px; border: 0; border-radius: 10px; background: var(--vrm-card2); color: var(--vrm-ink); font: inherit; font-size: 22px; line-height: 1; cursor: pointer; }
 .vrm-inv-pas:disabled { opacity: .35; cursor: default; }
 
@@ -31,8 +30,9 @@
 .vrm-inv-retour-t { font-size: 19px; font-weight: 700; }
 .vrm-inv-retour-s { font-size: 13px; line-height: 1.4; color: var(--vrm-muted); overflow-wrap: anywhere; }
 .vrm-inv-retour .vrm-b { grid-column: 1 / -1; margin-top: 8px; justify-self: start; }
-.vrm-inv-retour[data-inv-retour="attendu"] { border-color: var(--vrm-inv-vu); background: var(--vrm-inv-vu-fond); }
-.vrm-inv-retour[data-inv-retour="attendu"] .vrm-inv-retour-t { color: var(--vrm-inv-vu); }
+.vrm-inv-retour[data-inv-retour="attendu"] { border-color: var(--vrm-ink); }
+.vrm-inv-retour[data-inv-retour="attendu"] .vrm-inv-retour-t { color: var(--vrm-ink); }
+.vrm-inv-retour[data-inv-retour="passu"] .vrm-inv-retour-t { color: var(--vrm-muted); }
 .vrm-inv-retour[data-inv-retour="trop"], .vrm-inv-retour[data-inv-retour="vendu"] { border-color: var(--vrm-warn); background: var(--vrm-warn-soft); }
 .vrm-inv-retour[data-inv-retour="trop"] .vrm-inv-retour-t, .vrm-inv-retour[data-inv-retour="vendu"] .vrm-inv-retour-t { color: var(--vrm-warn); }
 .vrm-inv-retour.vrm-inv-double { border-color: var(--vrm-doublon); }
@@ -57,7 +57,7 @@
 .vrm-inv-ligne-t small { color: var(--vrm-muted); font-size: 12px; overflow-wrap: anywhere; }
 .vrm-inv-ligne-g { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
 .vrm-inv-point { width: 10px; height: 10px; border-radius: 50%; background: var(--vrm-line); }
-.vrm-inv-ligne[data-inv-etat="attendu"] .vrm-inv-point { background: var(--vrm-inv-vu); }
+.vrm-inv-ligne[data-inv-etat="attendu"] .vrm-inv-point { background: var(--vrm-ink); }
 .vrm-inv-ligne[data-inv-etat="trop"] .vrm-inv-point, .vrm-inv-ligne[data-inv-etat="vendu"] .vrm-inv-point { background: var(--vrm-warn); }
 .vrm-inv-ligne[data-inv-etat="trop"] .vrm-inv-ligne-t b, .vrm-inv-ligne[data-inv-etat="vendu"] .vrm-inv-ligne-t b, .vrm-inv-ligne[data-inv-etat="manque"] .vrm-inv-ligne-t b { color: var(--vrm-warn); }
 .vrm-inv-ligne.vrm-inv-double .vrm-inv-point { background: var(--vrm-doublon); }

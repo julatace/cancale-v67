@@ -1,7 +1,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 //  L'INVENTAIRE — Stock → « Inventaire » (6 nov. 2026, vague 1, demande de Julien)
 //  Il passe devant ses cartons et tape (ou dit) chaque N° : retour immédiat —
-//  vert « attendu », ambre « en trop » ou « vendu, à sortir », rouge SEULEMENT
+//  « ✓ Attendu » à l'encre (neutre), ambre « en trop » ou « vendu, à sortir », rouge SEULEMENT
 //  deux paires sous un même N° (§7), neutre « pas su » —, « Annuler le dernier »,
 //  case par case s'il a des meubles. « Terminer » donne le bilan : ce qui MANQUE,
 //  ce qui est EN TROP, ce qui est VENDU MAIS ENCORE RANGÉ, avec les gestes.
@@ -47,10 +47,10 @@ export function motJugement(j) {
   if (j.etat === 'illisible') return { t: 'Pas un N°', s: 'Tape le numéro écrit sur le carton (125, B125…)' };
   const dbl = j.doublon ? ' · porté par deux paires : vérifie les deux cartons' : '';
   if (j.etat === 'attendu') {
-    if (j.raison === 'gardee') return { t: 'Attendu', s: `Tu l’avais gardé « encore là »${dbl}` };
+    if (j.raison === 'gardee') return { t: '✓ Attendu', s: `Tu l’avais gardé « encore là »${dbl}` };
     const u = j.unite || {};
     const ou = (u.plateformes || []).map((x) => NOM_PLAT[x] || x).join(' et ');
-    return { t: 'Attendu', s: `${u.titre ? u.titre + ' · ' : ''}${u.etat === 'masquee' ? 'masquée par Vinted, toujours chez toi' : (u.etat === 'aconfirmer' ? 'à confirmer (lecture ancienne) — le voilà' : (ou ? 'en ligne sur ' + ou : 'en ligne'))}${dbl}` };
+    return { t: '✓ Attendu', s: `${u.titre ? u.titre + ' · ' : ''}${u.etat === 'masquee' ? 'masquée par Vinted, toujours chez toi' : (u.etat === 'aconfirmer' ? 'à confirmer (lecture ancienne) — le voilà' : (ou ? 'en ligne sur ' + ou : 'en ligne'))}${dbl}` };
   }
   if (j.etat === 'vendu') return { t: 'Vendu — à sortir', s: j.parti === true ? `VRM croit le colis déjà parti : vérifie (retour ?)${dbl}` : `Sors-le pour l’envoi${dbl}` };
   if (j.etat === 'trop') return { t: 'En trop', s: `${RAISON_TROP[j.raison] || 'VRM ne l’attend pas'}${dbl}` };

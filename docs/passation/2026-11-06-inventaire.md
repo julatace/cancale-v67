@@ -25,7 +25,7 @@ Rien de `vinted-sync-extension/` ni de `public/` n'a été touché. Aucune migra
 | `src/InventaireStock.jsx` | l'écran (saisie, retour immédiat, case par case, bilan) — aucune règle recalculée |
 | `src/styles-inventaire.css` | son dessin (jetons de la coque, cibles 44 px et plus) |
 | `src/App.jsx` | `StockMeubles` fabrique l'attendu depuis SES lectures et monte l'écran ; `lireLigneInventaire` / `ecrireLigneInventaire` ; `useInventaireEnCours` (Ma journée) ; publication `vrm_num_doublons` |
-| `scripts/audit-inventaire.cjs` | l'audit (63 contrôles, 17 mutations) |
+| `scripts/audit-inventaire.cjs` | l'audit (69 contrôles, 17 mutations) |
 | `scripts/bancs/inventaire.cjs` | le banc de rendu (390 tactile, 1512 souris, clair, sombre) |
 
 ## Les règles (et pourquoi)
@@ -97,8 +97,8 @@ le 29 oct. (§3). **Ici, c'est le geste même de l'inventaire**, et il reste con
 - Pavé numérique (`inputmode="numeric"`), gros chiffres ; le pavé de l'iPhone n'a pas de
   touche Entrée : le grand bouton **OK** à côté du champ fait la même chose, sous le pouce.
 - « ABC » bascule sur le clavier texte pour un N° à lettres (B125), « 123 » revient.
-- Retour immédiat, en grand : **vert « Attendu »**, **ambre « En trop » / « Vendu — à
-  sortir »**, **rouge seulement « deux paires sous un même N° »**, neutre « Pas su » ;
+- Retour immédiat, en grand : **« ✓ Attendu » à l'encre (neutre)**, **ambre « En trop » /
+  « Vendu — à sortir »**, **rouge seulement « deux paires sous un même N° »**, gris « Pas su » ;
   la phrase dit pourquoi (titre, site, « masquée par Vinted », raison de l'en trop…).
 - « Annuler N°x » retire la dernière saisie (une annulation est une pierre tombale : elle
   tient aussi quand un autre appareil fusionne).
@@ -108,12 +108,16 @@ le 29 oct. (§3). **Ici, c'est le geste même de l'inventaire**, et il reste con
 - **Case par case** (s'il a des meubles) : « Tout le stock | Case par case » ; en case par
   case, ‹ case › et « Notées ici : N°12 ✓, N°40 » ; chaque saisie porte sa case.
 
-### ⚠️ Décision de couleur — le VERT
-§7 : une seule couleur d'accent, rare. La demande de CE geste dit « vert attendu » : c'est
-une confirmation d'un coup d'œil devant les cartons, qui ne demande aucun geste. Le vert
-existe donc **seulement dans `styles-inventaire.css`** (`--vrm-inv-vu` : #248A3D en clair,
-4,6:1 sur blanc ; #30D158 en sombre), sur le retour « Attendu » et le point des lignes
-attendues. Ne pas le réutiliser ailleurs sans sa demande.
+### ⚠️ Décision de couleur — PAS de vert (§7)
+Une première version posait un vert sur « Attendu » : il venait d'une consigne de
+coordination, **pas de Julien**, et §7 n'admet qu'un accent rare + l'ambre + le rouge du
+doublon. Il a été **retiré** le jour même : « Attendu » est **neutre** — l'encre, la coche ✓
+et le mot (rien à faire, donc rien qui appelle l'œil). `styles-inventaire.css` n'emploie que
+les jetons de la coque (`--vrm-ink`, `--vrm-muted`, `--vrm-line`, `--vrm-surface`,
+`--vrm-card2`, `--vrm-accent`, `--vrm-warn`, `--vrm-warn-soft`, `--vrm-doublon`) :
+`audit-inventaire` I9 l'exige (aucune couleur en dur, aucun jeton `--vrm-inv-*`, le rouge
+seulement sous `.vrm-inv-double`), et le banc juge chaque couleur CALCULÉE de la feuille.
+**Ne pas remettre de vert.**
 
 ## La ligne `vrm_inventaire` — l'inventaire survit à la fermeture
 
@@ -137,7 +141,7 @@ Session = { id, debut, finAt, reprisAt, n, saisies: { [sid]: { k, s, at, c?, d? 
 
 ## Les preuves
 
-### Audit `node scripts/audit-inventaire.cjs` — 63/63 verts
+### Audit `node scripts/audit-inventaire.cjs` — 69/69 verts
 Exécute la vraie règle sur un attendu fabriqué par la **vraie** `annoncesActuelles`
 (trois comptes Vinted : un frais, un vieux de 3 jours, un en panne ; eBay ; gardée ; vendue
 encore lue en ligne ; archive B125 en ligne ; conflit sur N°2) :
@@ -156,7 +160,8 @@ encore lue en ligne ; archive B125 en ligne ; conflit sur N°2) :
 - I7 App.jsx : l'attendu = `aa.articles`/`aa.manque`/`jugeable`/`vrm_stock_vendus`, la
   ligne en comparer-et-échanger, aucun N° écrit, « N° + Entrée » dans l'inventaire, les
   deux entrées (Stock, Ma journée), `vrm_num_doublons` publié APRÈS `conflitsNum` (TDZ) ;
-- I8 case par case : vue dans une case, notée dans une autre ⇒ « pas dans sa case ».
+- I8 case par case : vue dans une case, notée dans une autre ⇒ « pas dans sa case » ;
+- I9 aucune couleur hors des jetons (rien en dur, aucun `--vrm-inv-*`, « Attendu » à l'encre avec ✓, rouge seulement sous `.vrm-inv-double`) — rouge 5 fois sur le commit au vert `ea752837`.
 
 **Mutations** (`--prouve`) : **17/17 attrapées** — clé brute (« 007 »), lettre ignorée
 (B125 = 125), vendue jugée attendue, pas su dit en trop, ventes nulles = aucune, « à
@@ -175,11 +180,13 @@ l'arbre d'avant : **12 rouges** (tout I7 : l'app ne la branchait nulle part).
 Vestiaire lu et vide, N°7 prouvée vendue, N°2 en conflit, N°60 numérotée et plus en ligne.
 La ligne `vrm_inventaire` est servie comme PostgREST (GET projeté, POST 409, PATCH gardé
 par `data->>rev`).
-- **A** « 1 » + Entrée ⇒ VERT ; « 007 » + OK ⇒ N°7, AMBRE « Vendu — à sortir » (avec sa
+- **A** « 1 » + Entrée ⇒ « ✓ Attendu » à l'encre ; « 007 » + OK ⇒ N°7, AMBRE « Vendu — à sortir » (avec sa
   case) ; « 125 » ⇒ « Pas su » neutre (B125 ≠ 125, et un compte n'est pas lu : jamais « en
   trop ») ; « 60 » ⇒ AMBRE « En trop » ; « ABC » + « b125 » ⇒ B125 attendue ; « 2 » ⇒ ROUGE
   (le seul) ; « Annuler » ; « 1 » deux fois ⇒ « Déjà compté ». Les couleurs sont jugées sur la
-  TEINTE CALCULÉE du rendu, pas sur un nom de classe.
+  TEINTE CALCULÉE du rendu, pas sur un nom de classe ; et TOUTES les couleurs calculées de la
+  feuille (texte, fond, bords), saisie et bilan, sont neutres, bleu d'accent ou ambre — le
+  rouge seulement dans un doublon de N°.
 - **B** enregistré dans la ligne (rev monte), **rechargement** ⇒ reprend (6 N° vus), **autre
   appareil** (stockage vide) ⇒ retrouvé par la ligne.
 - **C** bilan : manquent N°3 et N°40 (jamais N°30, du compte pas lu, NOMMÉ) ; en trop N°60 ;
@@ -192,7 +199,7 @@ par `data->>rev`).
 - **F** aucune erreur de page, aucun défilement horizontal.
 
 Captures regardées (accueil, saisie, vendu, doublon, bilan, Ma journée, panne, dans les
-quatre combinaisons) : lisibles en clair et en sombre, le vert seulement sur « Attendu », le
+quatre combinaisons) : lisibles en clair et en sombre, « ✓ Attendu » à l'encre, le
 rouge seulement sur N°2, l'ambre sur « en trop »/« vendu », rien de coupé à 390 px.
 
 ⚠️ Sous forte charge de la machine (audits en parallèle, mémoire pleine), le rendu

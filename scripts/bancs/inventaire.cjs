@@ -1,10 +1,12 @@
 // Banc : L'INVENTAIRE DU STOCK (6 nov. 2026, src/InventaireStock.jsx, src/inventaire.js)
 //
 // Rendu réel, données INVENTÉES (dépôt public), 390 tactile et 1512 souris, clair et sombre :
-//   A  Stock → « Inventaire » → « Commencer » ; « 1 » + Entrée ⇒ VERT « attendu » ;
+//   A  Stock → « Inventaire » → « Commencer » ; « 1 » + Entrée ⇒ « ✓ Attendu » à l'ENCRE (neutre) ;
 //      « 007 » + OK ⇒ AMBRE « vendu — à sortir » (N°7 prouvée vendue) ; « 125 » ⇒ neutre
 //      « pas su » (B125 ≠ 125, et un compte n'est pas lu : jamais « en trop ») ; « 60 »
-//      (numérotée, plus en annonce) ⇒ AMBRE « en trop » ; « b125 » ⇒ VERT (B125 en ligne) ;
+//      (numérotée, plus en annonce) ⇒ AMBRE « en trop » ; « b125 » ⇒ attendu (B125 en ligne) ;
+//      et dans toute la feuille, AUCUNE teinte hors des jetons (§7 : neutre, bleu d'accent,
+//      ambre ; le rouge seulement sur un doublon de N°) — jugé sur les couleurs CALCULÉES ;
 //      « 2 » ⇒ ROUGE (N°2 portée par deux paires, `vrm_num_doublons`) — le seul rouge ;
 //      « Annuler » retire le dernier ; les couleurs sont lues sur le rendu (teinte calculée) ;
 //   B  l'inventaire SURVIT : rechargement de la page, puis un AUTRE appareil (stockage
@@ -152,7 +154,29 @@ const teinte = (rgb) => {
   if (mx !== mn) { const d = mx - mn; s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn); if (mx === r) h = (g - bb) / d + (g < bb ? 6 : 0); else if (mx === g) h = (bb - r) / d + 2; else h = (r - g) / d + 4; h *= 60; }
   return { h, s };
 };
-const famille = (t) => (!t || t.s < 0.3 ? 'neutre' : (t.h >= 90 && t.h <= 160 ? 'vert' : (t.h >= 20 && t.h <= 50 ? 'ambre' : ((t.h >= 345 || t.h <= 12) ? 'rouge' : 'autre'))));
+const famille = (t) => (!t || t.s < 0.3 ? 'neutre' : (t.h >= 90 && t.h <= 160 ? 'vert' : (t.h >= 20 && t.h <= 50 ? 'ambre' : ((t.h >= 345 || t.h <= 12) ? 'rouge' : (t.h >= 195 && t.h <= 225 ? 'bleu' : 'autre')))));
+// Toutes les couleurs CALCULÉES de la feuille d'inventaire (texte, fond, bords, pas les
+// transparentes) : chacune doit être neutre, le bleu d'accent ou l'ambre ; le rouge
+// seulement dans un doublon de N° (.vrm-inv-double, pastille `doublon`). Rend les fautes.
+const horsJetons = (pg) => pg.evaluate(() => {
+  const out = [];
+  const lire = (c) => { const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?/.exec(c || ''); return m && (m[4] == null || Number(m[4]) > 0.05) ? [Number(m[1]), Number(m[2]), Number(m[3])] : null; };
+  const fam = ([r, g, b]) => { r /= 255; g /= 255; b /= 255; const mx = Math.max(r, g, b), mn = Math.min(r, g, b); let h = 0, s = 0; const l = (mx + mn) / 2;
+    if (mx !== mn) { const d = mx - mn; s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn); if (mx === r) h = (g - b) / d + (g < b ? 6 : 0); else if (mx === g) h = (b - r) / d + 2; else h = (r - g) / d + 4; h *= 60; }
+    return s < 0.3 ? 'neutre' : (h >= 20 && h <= 50 ? 'ambre' : ((h >= 345 || h <= 12) ? 'rouge' : (h >= 195 && h <= 225 ? 'bleu' : 'autre:' + Math.round(h)))); };
+  for (const el of document.querySelectorAll('[data-inventaire], [data-inventaire] *')) {
+    const cs = getComputedStyle(el);
+    for (const prop of ['color', 'backgroundColor', 'borderTopColor', 'borderLeftColor']) {
+      if (prop.startsWith('border') && parseFloat(cs[prop.replace('Color', 'Width')]) === 0) continue;
+      const c = lire(cs[prop]); if (!c) continue;
+      const f = fam(c);
+      const dbl = !!el.closest('.vrm-inv-double, [data-num-etat="doublon"]');
+      if (f === 'neutre' || f === 'bleu' || f === 'ambre' || (f === 'rouge' && dbl)) continue;
+      out.push(`${el.tagName}.${String(el.className).slice(0, 40)} ${prop} ${cs[prop]} (${f})`);
+    }
+  }
+  return out;
+});
 const lireRetour = (pg) => pg.evaluate(() => {
   const el = document.querySelector('[data-inv-retour]'); if (!el) return null;
   const t = el.querySelector('.vrm-inv-retour-t');
@@ -206,7 +230,8 @@ async function ouvrirInventaire(pg, tel) {
         dit(im === 'numeric', `${t} : A — clavier numérique (inputmode=numeric)${focus ? ', champ prêt' : ''}`, im);
         await taper(pg, tel, '1');
         let r = await lireRetour(pg);
-        dit(r && r.etat === 'attendu' && famille(teinte(r.couleur)) === 'vert', `${t} : A — « 1 » + Entrée ⇒ VERT « attendu »`, JSON.stringify(r));
+        const encre = await pg.evaluate(() => { const d = document.createElement('span'); d.style.color = 'var(--vrm-ink)'; document.querySelector('[data-inventaire]').appendChild(d); const c = getComputedStyle(d).color; d.remove(); return c; });
+        dit(r && r.etat === 'attendu' && famille(teinte(r.couleur)) === 'neutre' && r.couleur === encre && /✓ Attendu/.test(r.texte), `${t} : A — « 1 » + Entrée ⇒ « ✓ Attendu » à l'encre (neutre, aucune couleur nouvelle)`, JSON.stringify({ r, encre }));
         await taper(pg, tel, '007', { ok: true });
         r = await lireRetour(pg);
         dit(r && r.etat === 'vendu' && famille(teinte(r.couleur)) === 'ambre' && /N°7/.test(r.texte), `${t} : A — « 007 » + OK ⇒ N°7, AMBRE « vendu — à sortir »`, JSON.stringify(r));
@@ -238,6 +263,8 @@ async function ouvrirInventaire(pg, tel) {
         // Les couleurs des autres états : jamais rouge hors doublon.
         const rouges = await pg.evaluate(() => [...document.querySelectorAll('[data-inv-ligne]')].filter((li) => li.getAttribute('data-inv-etat') !== 'doublon').map((li) => getComputedStyle(li.querySelector('.vrm-inv-point')).backgroundColor));
         dit(rouges.every((c) => famille(teinte(c)) !== 'rouge'), `${t} : A — aucun point rouge hors du doublon`, rouges.join(' '));
+        const fautes = await horsJetons(pg);
+        dit(fautes.length === 0, `${t} : A — aucune teinte hors des jetons dans la feuille (neutre, accent, ambre ; rouge au doublon)`, fautes.slice(0, 4).join(' | '));
         await shot(pg, nomShot('saisie'));
         await pg.waitForFunction(() => { const el = document.querySelector('[data-inv-sync]'); return el && el.getAttribute('data-inv-sync') === 'ok'; }, null, { timeout: 10000 }).catch(() => {});
         const sy = await pg.getAttribute('[data-inv-sync]', 'data-inv-sync');
@@ -285,6 +312,8 @@ async function ouvrirInventaire(pg, tel) {
         dit(bil && bil.manque.join(',') === '3,40', `${t} : C — manquent : N°3 (Vinted) et N°40 (eBay) ; jamais N°30 (compte pas lu)`, JSON.stringify(bil && bil.manque));
         dit(bil && bil.trop.join(',') === '60' && bil.vendus.join(',') === '7' && bil.doublons.join(',') === '2' && bil.passu.join(',') === '125', `${t} : C — en trop : N°60 · vendue rangée : N°7 · deux paires : N°2 · pas su : 125`, JSON.stringify(bil));
         dit(bil && /compte_pas_lu/.test(bil.lectures), `${t} : C — le compte pas lu est NOMMÉ dans le bilan`, bil && bil.lectures);
+        const fautesB = await horsJetons(pg);
+        dit(fautesB.length === 0, `${t} : C — aucune teinte hors des jetons dans le bilan`, fautesB.slice(0, 4).join(' | '));
         await shot(pg, nomShot('bilan'));
         const sortir = await pg.$('[data-inv-sortir="7"]');
         dit(!!sortir, `${t} : C — N°7 vendue rangée : « Je l'ai sortie » (le geste du Stock)`);
