@@ -180,7 +180,7 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         dit(!petits.length, 'la section « Objectif » : 44 px au doigt', petits.join(' | '));
         if (SHOTS) await pg.locator('[data-carte-feuille]').first().screenshot({ path: path.join(SHOTS, `feuille-objectif-${nom}.png`) }).catch(() => {});
         await pg.locator('[data-carte-objectif-ok]').first().click();
-        await pg.locator('[data-carte-fermer]').first().click();
+        await pg.locator('[data-carte-feuille] [data-feuille-croix]').first().click();
         await pg.waitForTimeout(500);
         let o = await barre(pg, 'ventes');
         dit(o && o.type === 'ca' && o.cible === '50000' && o.valeur === '29700' && o.pct === '59' && !o.atteint, 'CA 500 € : la barre dit 297 € (le vendu du mois, TOUS les sites) ⇒ 59 %', JSON.stringify(o));
@@ -197,7 +197,7 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         await pg.locator('[data-carte-objectif-type="ventes"]').first().click();
         await pg.locator('[data-carte-objectif-saisie]').first().fill('4');
         await pg.locator('[data-carte-objectif-ok]').first().click();
-        await pg.locator('[data-carte-fermer]').first().click();
+        await pg.locator('[data-carte-feuille] [data-feuille-croix]').first().click();
         await pg.waitForTimeout(400);
         o = await barre(pg, 'ventes');
         dit(o && o.type === 'ventes' && o.valeur === '4' && o.pct === '100' && o.atteint === '1', 'Nombre de ventes 4 : 4 ventes ce mois (3 Vinted + 1 Leboncoin) ⇒ atteint', JSON.stringify(o));

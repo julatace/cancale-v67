@@ -241,3 +241,13 @@ form.vrm-cm-discord-moi { display: block !important; }
 .vrm-cm-detail li > div { min-width: 0; flex: 1 1 60%; }
 .vrm-cm-detail b { overflow-wrap: anywhere; }
 @media (max-width: 420px) { .vrm-cm-tableau th, .vrm-cm-tableau td { padding: 8px 3px; } .vrm-cm-tableau { font-size: 12px; } }
+
+/* (5 nov., chantier G) Les onglets de la Communauté au dessin du choix segmenté de
+   l'app (piste remplie, segment choisi en aplat : blanc le jour, #636366 la nuit) —
+   l'actif n'est plus un trou NOIR sur la carte en mode sombre. */
+.vrm-communaute .vrm-cm-onglets { background: var(--seg-piste, rgba(118,118,128,.12)); border: 0; border-radius: 14px; padding: 3px; gap: 2px; }
+.vrm-communaute .vrm-cm-onglet { border-radius: 12px; color: var(--cm-encre); font-weight: 600; font-size: 13px; transition: background-color 160ms ease-out; }
+.vrm-communaute .vrm-cm-onglet[aria-pressed="true"] { background: var(--seg-actif, #fff); color: var(--seg-actif-texte, #1d1d1f); box-shadow: var(--seg-actif-ombre, none); }
+@media (pointer: fine) { .vrm-communaute .vrm-cm-onglet { min-height: 36px; } }
+.vrm-communaute .vrm-cm-onglet:active { opacity: .7; }
+.vrm-communaute > .vrm-etat-panne { margin: 0 0 12px; }

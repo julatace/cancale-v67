@@ -116,7 +116,7 @@ const projette = (row, sel) => {
     const v4 = ap.find((x) => x.cle === '9004');
     dit(v4 && !v4.coche && v4.ancienne, 'la vente d’il y a un mois est DÉCOCHÉE et dit pourquoi (pas d’impression silencieuse d’archives)', JSON.stringify(v4));
     dit(ap.filter((x) => x.coche).length === 3, 'les trois ventes récentes sont cochées', JSON.stringify(ap));
-    const bouton = await pg.$('button[data-imprime="1"]');
+    const bouton = await pg.$('[data-lot] button[data-lot-imprimer]');   // (5 nov., chantier D) la feuille est un portail : le premier « data-imprime » de la page est une carte
     dit(!!bouton && (await bouton.getAttribute('data-lot-imprimer')) === '3', 'le bouton imprime EXACTEMENT les cochés (3)', bouton ? await bouton.getAttribute('data-lot-imprimer') : 'absent');
     if (bouton) {
       await pg.locator('[data-lot-ligne="9001"] input').nth(1).check();

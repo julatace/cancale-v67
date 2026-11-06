@@ -302,8 +302,13 @@ VRM n'achète **jamais** une étiquette, ne pose **jamais** « livraison gratuit
 - « Prêt à imprimer » est porté par la ligne (`pret`) ; Colis se range sur ce qu'il
   PEUT faire (prêts · en attente · partis).
 - « À expédier » : une règle (`aExpedier`, la même dans l'app, l'extension et
-  `api/widget.js`) sur le champ machine `transaction_user_status` ; sur un ACHAT,
-  `needs_action` veut dire « à retirer ».
+  `api/widget.js`) sur le champ machine `transaction_user_status`. ⚠️ Sur un ACHAT,
+  `needs_action` veut dire « une action », PAS « à retirer » (« Commande livrée ! » et « non
+  réclamée » le portent) : seul le statut « au point relais » (`isAtRelayStatus`) compte.
+- **À retirer** = preuve d'arrivée ET aucune fin prouvée par AUCUNE identité du colis (son n°,
+  le n° de SA commande, son code de retrait) ; une moitié Vinted sans identité au point d'un
+  colis du transporteur est « peut-être en double », jamais comptée (`src/retraitPreuves.js`,
+  `regrouperArrivees`). Un point = une carte.
 - Date limite : celle de l'email du bordereau (heure de Paris) ; vente + 7 j n'est
   qu'une **estimation** (un plancher), jamais « en retard ». Règle :
   `api/_lib/limite-envoi.js`.
@@ -501,6 +506,23 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 
+- **5 nov. · Ventes (E2)** : revue 2.12-2.30 ; « Compte qui vend le mieux » dans Statistiques seul ; alerte d'annulations par compte. `docs/passation/2026-11-05-chantier-e2.md`.
+
+- **5 nov. · Chantier H, coque (v35)** : en-tête = pastille de couleur (plus « ⓘ »), nuage seulement en panne ; « Dernière capture » = source de la liste ; Paramètres (icônes distinctes, Organisation en lien, plus de carte dans la carte, Statut) ; icônes de nav distinctes, un badge par colis ; cloche sur SheetShell + « Où ranger à l'arrivée » (`src/ouRanger.js`). `docs/passation/2026-11-05-chantier-h.md`.
+- **5 nov. · Chantier D, Colis côté envoi (v35)** : frise à l'encre sur la dernière étape faite ; barre du haut stable (Scanner · Tout imprimer · …) ; « En grand » en SheetShell lumineuse (titre = article ou « Colis <transporteur> ») ; « Tournée de dépôt » et « attend depuis N j » ; « Déposé », « En route ». `docs/passation/2026-11-05-chantier-d.md`. Geste : essayer la tournée au relais.
+
+- **5 nov. · Chantier C (Annonces)** : une feuille « Actions » (Republier · Modifier prix ou titre · Mettre en brouillon · Mettre en ligne, raison dite une fois), carte = 2 gestes + « … », bandeau « Prix d'achat N/M », Numero/PhotoVide partout. `docs/passation/2026-11-05-chantier-c.md`. Geste : cocher deux annonces → Actions.
+
+- **5 nov. · Chantier E1 (Ma journée, cartes sombres)** : « N gestes » = toutes les cartes, « Vendus ailleurs » et « N°x vendue, toujours rangée » dans la liste, « Voir » seul verbe, Semaine propre, tête lisible la nuit, « Modifier » hors de la courbe, « — » avec sa raison (Reçu « à dater »). `docs/passation/2026-11-05-chantier-e1.md`.
+
+- **5 nov. · Chantier G (v35)** : Messages (filtres `.vrm-filtres`, liens de pied, colonne 368-420 px), UN écran E-mails (Paramètres y mène), `EtatPanne` E-mails/Communauté/Messages, offre Vestiaire < 6 h en ambre (jamais Vinted). `docs/passation/2026-11-05-chantier-g.md`.
+- **5 nov. · Chantier F, Compta et Statistiques (v35)** : cartes vides repliées en une ligne, sous-onglets sous le titre, statut choisi à UN endroit, « — » + raison (Comparer, À déclarer) ; « À recopier sur l'URSSAF » (Copier), Bilan du mois (PDF), Délai de paiement par site. `docs/passation/2026-11-05-chantier-f.md`. Geste : déclarer depuis « À recopier ».
+- **5 nov. · Petits plus (v34)** : accueil = vrais navigateurs (`navigateursServis`, Orion « en essai ») ; guide iPhone dans Notifications ; notif « compte Vinted pas relu » (Rappels, 1/jour) ; contrôle de prod (titre, santé, version extension). `docs/passation/2026-11-05-petits-plus.md`.
+
+- **5 nov. · Stock + Vestiaire, registre + gros** : le Stock compte les annonces Vestiaire en ligne (N° par identité, `vrm_vc_liens` compris ; sans N° ou lecture absente/vieille nommée) ; registre des achats : un achat en gros = UNE ligne (total + frais, jamais ses parts). Passations stock-annonces et fournisseurs. Geste : ouvrir « Mes articles » sur Vestiaire.
+
+- **5 nov. · Chantier A, jetons (v33)** : un bleu (`accent` aplat #0071E3/#0A84FF texte blanc, `accentTexte` liens) ; `danger` = ambre, rouge = jeton `doublon` seul (`audit-rouge-doublon`) ; `.vrm-seg-btn` = une règle (styles-coque) ; site : logo seul ; tnum aux nombres. `docs/passation/2026-11-05-chantier-a.md`.
+
 - **5 nov. · Intégration lot 2** : mode stream, iPhone et reprise, Stock (annonces actuelles, 2D), Fournisseurs fusionnés ; une liste d'écrans (`ONGLETS_LIENS`, avec E-mails), la fiche dit « achat en gros » (règle `origineDuPrix`). Branche `integration-lot2`.
 - **5 nov. · Mode stream** : bouton « Stream » à la place de l'œil des montants ; UNE règle programmée (montants, marques, « commence par », annonce entière « qui contient », comptes, acheteurs, adresses, IBAN) réécrit le texte partout, programme synchronisé ; revue : pseudos en mots entiers, codes de retrait cachés partout. `docs/passation/2026-11-05-mode-stream.md`. Geste : Réglages → Mode stream, écrire ses marques.
 - **5 nov. · iPhone et reprise** : barre du bas revue (4 tâches + 5ᵉ place qui dit l'écran ouvert, « Plus » en tuiles au-dessus de la barre, retour = fermer, bord laissé au système) ; l'app rouverte revient au même écran, section, filtres, défilement (appareil, par vendeur ; `?tab=` gagne) ; rail coupé sur Edge = bloc « Recharger » borné à 1360 px, couvre tout (revue). `docs/passation/2026-11-05-iphone-reprise.md`. Geste : essayer sur l'iPhone.
@@ -522,14 +544,8 @@ sans la fonction.
 - **5 nov. · Notifications et essai** : sept types, heures calmes, regroupement, cloche « centre des notifications » (lu/non lu, ouvre l'objet) ; e-mails j1/j3/j6 de l'essai par le cron du matin, désinscription en un clic ; revue : cloche = liste après purge, chemins des e-mails, heure limite du cron. `docs/passation/2026-11-05-notifications-relances.md`. Geste : poser les variables `RELANCES_*` sur Vercel.
 - **5 nov. · DAC7 par compte** : Compta → Le détail → « DAC7 » (N/30, /2 000 €, rapport ou où le trouver, PDF/tableur). `docs/passation/2026-11-05-dac7-comptes.md`.
 - **5 nov. · Communauté → Groupes** : groupes d'accompagnement (code/lien, validation par le créateur, partage choisi par le membre — rien par défaut, chiffres, détail — révocable et effacé ; relecture : total partiel dit, renvoi après effacement, verrou révocation/publication) ; migration **025 NON appliquée** (l'onglet le dit). `docs/passation/2026-11-05-communaute-groupes.md`. Geste : appliquer la 025.
-- **5 nov. · Réveil** : fin des heures calmes ⇒ une notification « ce qui est arrivé pendant » (`?moment=reveil`, GitHub toutes les 30 min). `docs/passation/2026-11-05-reveil-heures-calmes.md`. Geste : secret `CRON_SECRET` dans GitHub.
-- **5 nov. · Relais Vinted** : un « relire » relit la copie captée, plus le serveur ; relais freiné (24/30 min/compte, sur l'appareil ET au serveur, tous appareils). `docs/passation/2026-11-05-frein-relais-vinted.md`.
-- **5 nov. · Numéros** : fiche numérotée du nuage jamais retirée par la fusion (plus de bloc « Recharger »). `docs/passation/2026-11-05-numeros-autre-appareil.md` ; demandes du jour : `demandes-2026-11-05.md`.
-- **5 nov. · Orion 5.322.0** : base 5.319 confirmée installable par Julien, moteur/adaptateur repris ; seul le popup change hors versions, pour rester sur Vinted après connexion. Voir `docs/passation/2026-11-05-orion-base-validee.md`.
-- **5 nov. · Référence Orion 5.319.0** : archives originales de 61304faf remises séparément, SHA-256 vérifiés ; refus persistant en 5.321, cause non établie et ancienne version installée inconnue. Diff complet : `docs/passation/2026-11-05-orion-comparaison-reference.md`.
-- **5 nov. · Paquets 5.321.0** : archives normalisées 644/755 (la 5.320 exportait des fichiers 600), contrôle depuis sources privées, tous formats. Refus Orion réel non reproduit sur appareil ; `docs/passation/2026-11-05-orion-paquet.md`.
-- **5 nov. · Extension 5.320.0** : mot de passe sans ouverture automatique de VRM, rappels/promesses Orion et délais de connexion ; capture après session conservée, limites écran d’accueil/iOS expliquées. Voir `docs/passation/2026-11-05-orion-connexion.md`. Installer le nouveau paquet Orion.
-- **4 nov. · Finitions bureau** : ventes en colonnes, fil lisible à 1024/1280, filtres et paramètres, téléphone conservé ; voir `docs/passation/2026-11-04-finitions-bureau.md`. Google Cloud reste à configurer par administrateur.
+
+
 
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
@@ -564,9 +580,6 @@ vérifier par `curl https://vrm.center/api/sante`.
 
 ### Décisions et chantiers (octobre–novembre 2026)
 Une ligne par chantier. Le récit complet des lignes du 31 oct. au 2 nov. est, mot pour mot, dans `docs/passation/etat-detaille-2026-10-31-au-11-02.md`.
-- **4 nov.** — **Extension 5.319.0** : offres Vestiaire dans Messages (montant, « tu touches », temps restant ; Accepter/Contre-offre/Refuser seulement une fois le geste APPRIS d'une réponse faite à la main, sinon « Répondre sur Vestiaire ↗ » ; `vcoffres`, `vcoffrerepondre`) ; Compta → Porte-monnaie Vinted par compte (lu, jamais déduit ; « au moins » si un compte manque) ; Annonces → « Masquées » (`is_hidden`, lien Corriger) ; avis Vinted lus 1×/24 h (`avis`, `harvest_{uid}_feedbacks`). `audit-vc-offres` 16/16, `audit-argent-offres-masquees` 13/13, `audit-avis-vinted`. À décider : purge de `wreq…payouts` du 13 oct. (bank_account_id) et noms d'acheteurs dans `vc_brut_*`. → historiques vestiaire, vinted-extension, compta. Geste : installer la 5.319.0, répondre une fois à la main à une offre Vestiaire.
-- **4 nov.** — « Tout imprimer » : Vestiaire et Leboncoin ont TOUJOURS leur ligne cochable (cochée si bordereau, sinon « Sans bordereau » ambre et nommée dans le lot ; Leboncoin au téléphone = sans bordereau, PDF lu par l'extension de l'ordinateur), eBay grisé jamais cochable (`src/lotSelection.js`) ; à l'impression, la feuille du tampon s'ouvre UNE fois par type de bordereau du lot, la place vaut pour tous ceux du type, « Placer le tampon » redemande tout, Annuler n'imprime rien. `audit-selection-bordereaux` 9/9, banc `selection-bordereaux` 54 (11 rouges sur main). → historique colis-retraits. Geste : cocher une vente Vestiaire dans « Tout imprimer » et placer le tampon.
-- **4 nov.** — Compta : prévision de la prochaine échéance URSSAF en tête de « Combien je dois déclarer ? » (« au moins » + « N à dater », mois déclarés pas recomptés, rythme jamais supposé) — la carte « Prochaine déclaration » était CACHÉE par fusion.css ; « Tes seuils 2026 » : projection seulement sur mois finis et total complet, DAC7 par plateforme (`src/seuilsAnnee.js`, `src/previsionUrssaf.js`) ; Statistiques : annulations par compte (Vinted ; autres sites « pas comptés ») et notes reçues lues du profil (`feedback_reputation`), avis détaillés à lire par l'extension 5.319 (`src/annulationsCompte.js`, `src/notesRecues.js`). 4 audits rouges sur main, bancs `seuils-prevision` 32, `annulations-notes` 30. → historiques compta, interface-stock. Geste : ouvrir Comptabilité puis le bas de Statistiques.
 - **Avant le 20 oct.** — `docs/passation/etat-detaille-2026-10-31-au-11-02.md` (fin) et `docs/journal-2026.md`.
 
 ---

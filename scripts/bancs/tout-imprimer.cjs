@@ -127,7 +127,7 @@ async function scenario(b, nom, vue, LIGNES) {
   // ARRÊTE le lot — « Un article, son numéro ou son état a changé », le garde-fou `verifierContexte`.)
   // ⚠️ Course de l'app (avant ce chantier, règle des ventes à poster) : une vente lue AVANT sa transaction reçoit
   // un N° auto (`autoAssigned`), remplacé par celui de son annonce dès que la transaction arrive. On attend la fin.
-  const nums = await pg.waitForFunction(() => { const t = document.body.innerText; return ['N°21', 'N°22', 'N°23', 'N°24', 'N°25'].every((n) => t.includes(n)) && !['N°27', 'N°28', 'N°29', 'N°30'].some((n) => t.includes(n)) && /N°\d+ · Foxtrot/.test(t); }, null, { timeout: 45000 }).then(() => true).catch(() => false);
+  const nums = await pg.waitForFunction(() => { const t = document.body.innerText; return ['N°21', 'N°22', 'N°23', 'N°24', 'N°25'].every((n) => t.includes(n)) && !['N°27', 'N°28', 'N°29', 'N°30'].some((n) => t.includes(n)) && /N°\d+\s+(· )?Foxtrot/.test(t); }, null, { timeout: 45000 }).then(() => true).catch(() => false);
   dit(nums, `${nom} : les N° des ventes Vinted sont lus (transaction → annonce → fiche) avant le lot`);
   await pg.waitForTimeout(800);
   if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `tout-imprimer-${nom}-colis.png`) });

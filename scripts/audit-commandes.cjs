@@ -13,7 +13,8 @@ for(const file of fs.readdirSync(path.join(root,'src')).filter(f=>f.endsWith('.j
    const label=attr('aria-label')||attr('aria-labelledby')||attr('title');
    const nom=label?.value?.type==='StringLiteral'?label.value.value:label?'[nom calculé]':text;
    const type=attr('type')?.value?.value;
-   items.push({file,line:n.loc.start.line,scope,nom,type,disabled:has('disabled'),expanded:has('aria-expanded'),selected:has('aria-pressed')||has('aria-current')||has('aria-checked'),delegue:attrs.some(a=>a.type==='JSXSpreadAttribute'),action:attrs.some(a=>/^on[A-Z]/.test(a.name?.name||'')),ambigu:!label&&(!text||!/[a-zA-ZÀ-ÿ0-9]/.test(text))});
+   items.push({file,line:n.loc.start.line,scope,nom,type,disabled:has('disabled'),expanded:has('aria-expanded'),selected:has('aria-pressed')||has('aria-current')||has('aria-checked'),delegue:attrs.some(a=>a.type==='JSXSpreadAttribute'),action:attrs.some(a=>/^on[A-Z]/.test(a.name?.name||'')),ambigu:(!label&&(!text||!/[a-zA-ZÀ-ÿ0-9]/.test(text)))||(label?.value?.type==='StringLiteral'&&!/[a-zA-ZÀ-ÿ0-9]/.test(label.value.value))});
+  // (6 nov., v36) un nom écrit en dur sans lettre ni chiffre (« + », « ✕ ») n'est pas un nom.
   }
   for(const[k,v]of Object.entries(n)){if(['loc','start','end','extra'].includes(k))continue;if(Array.isArray(v))v.forEach(x=>walk(x,scope));else if(v&&typeof v==='object')walk(v,scope);}
  }

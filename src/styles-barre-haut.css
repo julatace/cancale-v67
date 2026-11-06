@@ -31,3 +31,13 @@
 @media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
   .vrm-main:has(> .vrm-barre-haut) :is(.vrm-tete-row, .vrm-sous-ile) { padding-right: 0; }
 }
+
+/* ── (5 nov., chantier H — revue 2.32) Le logo d'un SITE dans la navigation :
+   monochrome, à la couleur du texte de l'entrée (comme le sélecteur de site). */
+.vrm-nav-logo {
+  display: inline-block; flex: none; background-color: currentColor;
+  -webkit-mask: var(--vrm-ss-logo) center / contain no-repeat; mask: var(--vrm-ss-logo) center / contain no-repeat;
+}
+/* Le logo d'eBay EST son nom écrit, aplati : il lui faut plus de largeur. */
+.vrm-nav-logo[data-nav-logo="ebay"] { transform: scale(1.45); }
+.vrm-nav-logo[data-nav-logo="leboncoin"] { transform: scale(.92); }

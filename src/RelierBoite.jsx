@@ -163,7 +163,7 @@ export default function RelierBoite({ onAdresses }) {
         </div>
         {copie && <p role="status" className="vrm-relier-doux">{copie}</p>}
         <p className="vrm-relier-doux">Avant ou après, déclare et confirme ton adresse personnelle : c’est elle qui dit que ces e-mails sont à toi.</p>
-        {onAdresses && <button type="button" className="vrm-relier-lien" data-relier-adresses="" onClick={onAdresses}>Mes adresses de réception <span aria-hidden="true">→</span></button>}
+        {onAdresses && <button type="button" className="vrm-relier-lien vrm-pied-lien" data-pied-lien="adresses" data-relier-adresses="" onClick={onAdresses}>Mes adresses de réception <span aria-hidden="true">→</span></button>}
       </section>
     </div>
   );

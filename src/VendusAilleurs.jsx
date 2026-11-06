@@ -4,6 +4,17 @@ import {
   conserverRetraitsNonConfirmes,
 } from "./bilanSynchronisation.js";
 import "./bilanSynchronisation.css";
+import { PhotoVide } from "./composants/PhotoVide.jsx";
+// (5 nov., chantier E2) Le composant seul (sa place dans Ma journée appartient à E1) :
+// « Rien à retirer » plutôt que « 0 annonce à vérifier » (revue 3.5), des pluriels
+// justes, une date de lecture courte, une vignette vide dessinée comme partout
+// (`PhotoVide`), et des commandes de 44 px au doigt (ventes-e2.css).
+const pluriel = (n, un, plusieurs) => `${n} ${n > 1 ? plusieurs : un}`;
+const dateCourte = (t) => {
+  const d = new Date(t);
+  if (!Number.isFinite(d.getTime())) return "";
+  return `${d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" })} à ${d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`;
+};
 // Keep unresolved alerts when navigating to the platform to handle a withdrawal.
 // This memory belongs to one logged-in owner and is never persisted.
 let memoire = { owner: null, vue: {} };
@@ -11,13 +22,12 @@ function retrouver(owner) {
   if (memoire.owner !== owner) memoire = { owner, vue: {} };
   return memoire.vue;
 }
-export default function VendusAilleurs({
-  owner,
-  ownerActuel,
-  charger,
-  onNav,
-  PhotoVinted,
-}) {
+// (5 nov., chantier E1) La lecture est un CROCHET : Ma journée la lance au
+// montage (« Vendus ailleurs » n'y est une carte de « À faire » que s'il y a
+// quelque chose à vérifier) ; le repli d'origine (`VendusAilleurs`) la garde
+// paresseuse. La mémoire est la même (par propriétaire, jamais rangée) : une
+// lecture par session, « Revérifier » relit.
+export function useVerifVendusAilleurs({ owner, ownerActuel, charger }) {
   const [vue, setVue] = React.useState(() => retrouver(owner)),
     gen = React.useRef(0),
     source = React.useRef();
@@ -78,6 +88,17 @@ export default function VendusAilleurs({
     }
   };
   const v = vue.owner === owner ? vue : {};
+  return { v, lire };
+}
+
+export default function VendusAilleurs({
+  owner,
+  ownerActuel,
+  charger,
+  onNav,
+  PhotoVinted,
+}) {
+  const { v, lire } = useVerifVendusAilleurs({ owner, ownerActuel, charger });
   return (
     <details
       className="vrm-bilan-sync"
@@ -93,10 +114,22 @@ export default function VendusAilleurs({
           {v.charge
             ? "Vérification…"
             : v.lignes
-              ? `${v.lignes.length} annonce${v.lignes.length > 1 ? "s" : ""} à vérifier`
+              ? v.lignes.length
+                ? pluriel(v.lignes.length, "annonce à retirer", "annonces à retirer")
+                : "Rien à retirer"
               : "Vérifier"}
         </span>
       </summary>
+      <VendusAilleursDetail v={v} lire={lire} onNav={onNav} PhotoVinted={PhotoVinted} />
+    </details>
+  );
+}
+
+// Le détail : le corps du repli, ou de la feuille de Ma journée — les annonces à
+// retirer, chacune avec son lien et « Gérer le retrait ».
+export function VendusAilleursDetail({ v, lire, onNav, PhotoVinted }) {
+  return (
+    <>
       <p>Reliés par référence VRM, jamais par titre — retire-les sur leur plateforme.</p>
       <button type="button" disabled={v.charge} onClick={lire}>
         {v.charge ? "Lecture…" : "Revérifier les annonces"}
@@ -104,9 +137,8 @@ export default function VendusAilleurs({
       {v.erreur && <p role="alert">{v.erreur}</p>}
       {v.confirmes > 0 && (
         <p role="status">
-          {v.confirmes} annonce{v.confirmes > 1 ? "s" : ""} confirmée
-          {v.confirmes > 1 ? "s" : ""} hors vente depuis la dernière
-          vérification.
+          {pluriel(v.confirmes, "annonce confirmée", "annonces confirmées")} hors
+          vente depuis la dernière vérification.
         </p>
       )}
       {v.manques?.length > 0 && (
@@ -117,15 +149,17 @@ export default function VendusAilleurs({
       )}
       {v.ambigus > 0 && (
         <p>
-          {v.ambigus} correspondance(s) ambiguë(s) écartée(s). Vérifie les
-          numéros de rangement avant de retirer une annonce.
+          {pluriel(v.ambigus, "correspondance ambiguë écartée", "correspondances ambiguës écartées")}.
+          Vérifie les numéros de rangement avant de retirer une annonce.
         </p>
       )}
       {v.lignes?.map((a) => (
         <article key={[a.plateforme, a.compte, a.id].join(":")}>
           <div className="vrm-vendu-photo">
-            {a.photo && PhotoVinted && (
+            {a.photo && PhotoVinted ? (
               <PhotoVinted src={a.photo} alt="" loading="lazy" />
+            ) : (
+              <PhotoVide remplir />
             )}
           </div>
           <div>
@@ -136,7 +170,8 @@ export default function VendusAilleurs({
               {a.aConfirmer
                 ? "Ancienne alerte à vérifier · vendu sur "
                 : "Vendu sur "}
-              {[...new Set(a.ventes.map((x) => x.plateforme))].join(", ")} ·
+              {[...new Set(a.ventes.map((x) => x.plateforme))].join(", ")}
+              {" · "}
               {a.aConfirmer
                 ? "retrait non confirmé sur "
                 : "encore proposé sur "}
@@ -146,24 +181,24 @@ export default function VendusAilleurs({
               {a.compteNom || a.compte || "Compte sans nom"} · annonce {a.id}
             </small>
             {a.capture && Number.isFinite(new Date(a.capture).getTime()) && (
-              <small>
-                Dernière lecture : {new Date(a.capture).toLocaleString("fr-FR")}
-              </small>
+              <small>Lu le {dateCourte(a.capture)}</small>
             )}
           </div>
-          {a.lien && (
-            <a href={a.lien} target="_blank" rel="noreferrer">
-              Ouvrir l’annonce ↗
-            </a>
-          )}
-          <button type="button" onClick={() => onNav?.(a.onglet)}>
-            Gérer le retrait
-          </button>
+          <div className="vrm-va-gestes">
+            <button type="button" onClick={() => onNav?.(a.onglet)}>
+              Gérer le retrait
+            </button>
+            {a.lien && (
+              <a href={a.lien} target="_blank" rel="noreferrer">
+                Ouvrir l’annonce ↗
+              </a>
+            )}
+          </div>
         </article>
       ))}
       {v.lignes?.length === 0 && (
         <p>Aucune correspondance à retirer dans les données récupérées.</p>
       )}
-    </details>
+    </>
   );
 }

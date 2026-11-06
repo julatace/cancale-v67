@@ -26,6 +26,7 @@ import { texteRappelRetrait } from './suivi-colis.js';
 import { notificationUrssaf } from './rappel-urssaf.js';
 import { texteBilan } from './bilan-semaine.js';
 import { notificationDoubleVente } from './double-vente.js';
+import { texteComptesARelire } from './comptes-a-relire.js';
 
 const court = (t, n) => { const x = String(t || ''); return x.length > n ? x.slice(0, n - 1).trimEnd() + '…' : x; };
 
@@ -141,11 +142,12 @@ export const APERCUS_NOTIF = {
     ],
   },
   rappels: {
-    quoi: 'La veille au soir (colis à poster demain), la déclaration URSSAF à faire, le bilan de la semaine.',
+    quoi: 'La veille au soir (colis à poster demain), la déclaration URSSAF à faire, le bilan de la semaine, un compte Vinted pas relu depuis plus de 24 h.',
     exemples: [
       { ...texteSoir({ n: 3, auMoins: false, retard: 0, demain: 1, heureDemain: '12:00' }), mene: 'Colis · À envoyer' },
       ...(URSSAF && URSSAF.envoyer ? [{ ...deux(URSSAF), mene: 'Comptabilité · ta déclaration' }] : []),
       { ...deux(BILAN), mene: 'Ma journée' },
+      { ...texteComptesARelire([{ nom: EX.compte, age: 'il y a 2 j' }]), mene: 'Paramètres · Comptes liés' },
     ],
   },
 };

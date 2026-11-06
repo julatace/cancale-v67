@@ -174,7 +174,11 @@ async function sectionAnnonces(b, vp, sombre) {
     if (tel) {
       dit(ferme.bouton && ferme.expanded === 'false' && ferme.boutonH >= 43.5, `A ${nom} · fiche fermée : « Plus d'actions » touchable (44 px au doigt)`, JSON.stringify(ferme));
       dit(!ferme.chiffres && !ferme.plus && !ferme.jauge && !ferme.achatConnuVu, `A ${nom} · fiche fermée : ni cases (mini, refuse, boost, marge), ni gestes, ni jauge, ni prix d'achat CONNU`, JSON.stringify(ferme));
-      dit(ferme.achatManquantVu && ferme.ambre && ferme.ambre !== ferme.neutre, `A ${nom} · fiche fermée : le prix d'achat MANQUANT reste à la vue, en ambre`, JSON.stringify(ferme));
+      // (5 nov., chantier C — revue 2.7) Le prix d'achat manquant ne s'écrit plus en ambre sur
+      //  CHAQUE fiche : un bandeau « Prix d'achat · N/M → Compléter » le dit une fois, en tête.
+      //  Le contrôle d'avant jugeait l'ancien rendu voulu (ambre par fiche), que la revue retire.
+      const bandeauAchats = await pg.$eval('[data-ann-achats]', (x) => x.getAttribute('data-ann-achats')).catch(() => '');
+      dit(!ferme.achatManquantVu && /^\d+\/\d+$/.test(bandeauAchats), `A ${nom} · fiche fermée : le prix d'achat MANQUANT est dit une fois, par le bandeau en tête (${bandeauAchats})`, JSON.stringify(ferme));
       dit(/Neuf avec étiquette/.test(ferme.etatCourt || ''), `A ${nom} · fiche fermée : l'état dans la ligne discrète`, ferme.etatCourt);
       for (const id of ['9201', '9202', '9206']) await pg.click(`[data-carte-annonce="${id}"] [data-fiche-plus-bouton]`, { timeout: 5000 });
       await pg.waitForFunction(() => document.querySelector('[data-carte-annonce="9201"] [data-fiche-plus-bouton]').getAttribute('aria-expanded') === 'true', null, { timeout: 5000 }).catch(() => {});
@@ -228,7 +232,34 @@ async function sectionAnnonces(b, vp, sombre) {
     dit(r.achatEtat === 'connu' && r.achat2 === 'inconnu', `A ${nom} · le prix d'achat dit connu / inconnu selon la fiche`, `${r.achatEtat} / ${r.achat2}`);
     dit(r.detailsGerer === 0, `A ${nom} · plus de « ⋯ Gérer l'annonce » replié`, r.detailsGerer);
     const noms = r.gestes.map((g) => g.t).join(' | ');
-    dit(r.plusVisible && /Passeport/.test(noms) && /Marquer vendue/.test(noms) && /Relier un achat/.test(noms), `A ${nom} · ce qui était dans « ⋯ » est à la vue (gestes)`, noms);
+    // (5 nov., chantier C — revue 2.6) La carte d'ordinateur portait neuf gestes : DEUX à la vue
+    //  (« Changer le prix », le stock) et « … », qui ouvre une feuille avec les autres. Le
+    //  contrôle d'avant (« tout à la vue ») jugeait l'ancien rendu voulu ; il juge désormais que
+    //  chaque geste reste ATTEIGNABLE : à la vue, ou dans la feuille « … » de la carte.
+    const feuilleFiche = async (id) => {
+      const o = pg.locator(`[data-carte-annonce="${id}"] [data-fiche-menu-ouvrir]`).first();
+      if (!(await o.count())) return null;
+      await o.click({ timeout: 5000 }).catch(() => o.evaluate((x) => x.click()));
+      await pg.waitForSelector('[data-fiche-menu]', { timeout: 5000 }).catch(() => {});
+      const f = await pg.evaluate(() => { const m = document.querySelector('[data-fiche-menu]'); if (!m) return null;
+        const l = [...m.querySelectorAll('.vrm-fiche-menu > button, .vrm-fiche-menu > a')];
+        const b = m.querySelector('[data-fiche-place="lbc"]'); const t = l.find((x) => /Passeport/.test(x.textContent));
+        return { noms: l.map((x) => x.textContent.trim()).join(' | '), place: b ? { etat: b.getAttribute('data-fiche-place-etat'), couleur: getComputedStyle(b).color, bord: getComputedStyle(b).borderTopColor, fond: getComputedStyle(b).backgroundColor, voisinCouleur: t ? getComputedStyle(t).color : '', voisinBord: t ? getComputedStyle(t).borderTopColor : '', voisinFond: t ? getComputedStyle(t).backgroundColor : '' } : null }; });
+      // La croix de la feuille (SheetShell) ; on attend qu'elle soit PARTIE (sinon son voile prend les clics suivants).
+      for (let i = 0; i < 3 && await pg.locator('[data-fiche-menu]').count(); i++) {
+        const x = pg.locator('[role="dialog"] button[aria-label="Fermer"]').last();
+        if (await x.count()) await x.click({ timeout: 3000 }).catch(() => pg.keyboard.press('Escape')); else await pg.keyboard.press('Escape');
+        await pg.locator('[data-fiche-menu]').first().waitFor({ state: 'detached', timeout: 2000 }).catch(() => {});
+      }
+      // Plus aucune feuille ni voile au-dessus de la grille (le clic suivant doit toucher la carte).
+      await pg.waitForFunction(() => !document.querySelector('[role="dialog"]') && !document.querySelector('.vrm-fs-voile'), null, { timeout: 3000 }).catch(() => {});
+      await pg.waitForTimeout(400);
+      return f;
+    };
+    const f9201 = await feuilleFiche('9201'), f9202 = await feuilleFiche('9202');
+    const nomsF = f9201 ? f9201.noms : '';
+    dit(r.plusVisible && /Changer le prix/.test(noms) && r.gestes.length <= 3 && /Passeport/.test(nomsF) && /Marquer vendue/.test(nomsF) && /Relier un achat/.test(nomsF), `A ${nom} · deux gestes à la vue, les autres dans « … » (rien de perdu)`, `${noms} || ${nomsF}`);
+    r.place9201 = !!(f9201 && f9201.place); r.place9202 = f9202 && f9202.place;
     // (revue) La préparation Leboncoin : l'état COMMUN (« photos pas encore captées »,
     // 4 paires sur 5) se dit UNE fois au-dessus ; sur la fiche, seul ce qui distingue.
     const textes = r.prepa.map((x) => x.t); const doublon = textes.find((t, i) => textes.indexOf(t) !== i);

@@ -10,8 +10,7 @@
 .vrm-set { padding:8px 16px 56px; max-width:640px; margin:0 auto; box-sizing:border-box; }
 .vrm-set-tete { display:flex; align-items:center; min-height:44px; margin:4px 0 16px; }
 .vrm-set-h1 { font-size:28px; font-weight:700; letter-spacing:-.03em; line-height:1.15; margin:0; }
-.vrm-set-seg { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:2px; padding:2px; border-radius:12px; margin:0 0 28px; }
-.vrm-set-seg > button { border:0; border-radius:12px; min-height:36px !important; font-size:13px; font-weight:600; font-family:inherit; cursor:pointer; transition:background-color .15s ease, color .15s ease; }
+.vrm-set-seg, .vrm-set-onglets { margin:0 0 28px; }
 .vrm-set-groupe { margin:0 0 32px; }
 .vrm-set-titre { font-size:13px; font-weight:600; letter-spacing:0; margin:0 0 8px 16px; line-height:1.3; }
 .vrm-set-liste { border-radius:12px; overflow:hidden; }
@@ -63,7 +62,7 @@ button.vrm-set-ligne:active { background:var(--vrm-set-appui, rgba(0,0,0,.05)); 
 @media(min-width:1024px) {
   .vrm-set { max-width:1080px; padding:24px 32px 72px; }
   .vrm-set-h1 { font-size:34px; letter-spacing:-.035em; }
-  .vrm-set-seg { max-width:320px; }
+  .vrm-set-seg, .vrm-set-onglets { max-width:420px; }
   .vrm-set-cols { display:grid; grid-template-columns:200px minmax(0,1fr); gap:48px; align-items:start; }
   .vrm-set-sommaire { position:sticky; top:16px; display:flex; flex-direction:column; gap:2px; }
   .vrm-set-sommaire > a { display:flex; align-items:center; min-height:36px; padding:0 12px; border-radius:12px; font-size:13px; font-weight:500; text-decoration:none; }
@@ -89,7 +88,6 @@ button.vrm-set-ligne:active { background:var(--vrm-set-appui, rgba(0,0,0,.05)); 
 .vrm-main [data-photo-profil]>div{flex-wrap:wrap;}
 
 .vrm-main .vrm-switch[aria-checked="true"]::before{background:var(--gestion-accent,#0071E3);}
-@media(max-width:767px){.vrm-main .vrm-set-seg>button{font-size:12px!important;min-width:0;padding-inline:4px!important;}}
 
 /* Aide commune aux paramètres et au rangement : repliable, sans masquer les actions. */
 .vrm-settings-intro { margin:0 0 18px; font-size:13px; line-height:1.6; }
@@ -108,15 +106,13 @@ button.vrm-set-ligne:active { background:var(--vrm-set-appui, rgba(0,0,0,.05)); 
 /* Un seul niveau visible : les longues configurations s’ouvrent au clic. */
 .vrm-set {max-width:820px;}
 .vrm-set-tete {margin-bottom:8px;}
-.vrm-set-seg {margin-bottom:20px;}
+.vrm-set-seg, .vrm-set .vrm-set-onglets {margin-bottom:20px;}
 .vrm-set-groupe {margin-bottom:20px;}
 .vrm-set-lib > b {font-size:15px;font-weight:600;}
 .vrm-set-val {font-size:12px;max-width:28%;}
 .vrm-set-ligne {min-height:64px;}
-.vrm-settings-search {display:flex;align-items:center;gap:10px;border:1px solid;border-radius:12px;padding:0 14px;margin-bottom:20px;}
-.vrm-settings-search input {background:transparent;border:0;min-height:44px;min-width:0;width:100%;font:inherit;font-size:15px;outline-offset:3px;}
 .vrm-set [data-sous-ecran][hidden] {display:none!important;}
-@media(max-width:767px){.vrm-settings-search input {font-size:17px;}.vrm-set-lib > small {font-size:12px;}.vrm-set-val{max-width:24%;}.vrm-set-ligne{gap:9px;padding-inline:12px;}}
+@media(max-width:767px){.vrm-set-lib > small {font-size:12px;}.vrm-set-val{max-width:34%;}.vrm-set-ligne{gap:9px;padding-inline:12px;}}
 .vrm-settings-status{font-size:12px;line-height:1.5;margin:0 0 16px;}
 .vrm-settings-status small{display:block;font-size:11px;margin-top:3px;}
 .vrm-settings-status button:not(.vrm-b){margin-left:8px;min-height:36px;font:inherit;}
@@ -138,7 +134,6 @@ button.vrm-set-ligne:active { background:var(--vrm-set-appui, rgba(0,0,0,.05)); 
 .vrm-settings-next button:not(.vrm-b){min-height:44px;padding:8px 14px;border:1px solid;border-radius:12px;background:transparent;font:inherit;cursor:pointer;}
 .vrm-setting-applique{font-size:12px;line-height:1.5;margin-top:10px;}
 @media(max-width:420px){.vrm-numeros-recap{grid-template-columns:1fr;gap:5px;}.vrm-numeros-recap small{margin-top:5px;}}
-.vrm-settings-search button{min-height:44px;flex-shrink:0;padding:6px 8px;border:0;background:transparent;font:inherit;font-size:12px;cursor:pointer;}
 .vrm-settings-search-info{font-size:12px;line-height:1.5;margin:-6px 0 16px;}
 .vrm-settings-draft{font-size:12px;line-height:1.6;padding:10px 12px;border:1px solid currentColor;border-radius:12px;}
 .vrm-connexions-entete{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;}
@@ -176,3 +171,74 @@ button.vrm-set-ligne:active { background:var(--vrm-set-appui, rgba(0,0,0,.05)); 
 .vrm-tampon-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:8px;}
 .vrm-tampon-actions>*{flex:0 1 auto;min-width:120px;}
 @media(max-width:767px){.vrm-tampon-voile{padding:0;}.vrm-tampon-feuille{max-width:none;height:100dvh;max-height:none;border-radius:0;padding:max(8px,env(safe-area-inset-top)) 16px max(16px,env(safe-area-inset-bottom));}.vrm-tampon-zone{flex:1;align-items:center;padding:22px 6px;}.vrm-tampon-actions>*{flex:1 1 0;}}
+
+/* ══ (5 nov.) CHANTIER H — Paramètres propre (revue de cohérence 2.31) ════════
+   · UNE carte par groupe : le GROUPE n'est plus une carte (il en portait une, la
+     liste une autre dedans — « carte dans la carte », jetons.css §3 les visait
+     toutes les deux) ; le titre du groupe se pose sur le fond, comme sur iOS.
+   · La colonne s'aligne sur les autres écrans à l'ordinateur (à gauche, sous le
+     titre, plus centrée avec 60 px de vide à gauche).
+   · « Enregistrement… » dans la ligne du titre, à droite, sans prendre de place.
+   · La carte du profil porte la photo (un seul avatar). */
+:root:root body .vrm-app-shell .vrm-main .vrm-set .vrm-set-groupe:not(#h) {
+  background-color: transparent !important; box-shadow: none !important; border-radius: 0 !important; border-color: transparent !important;
+}
+.vrm-set .vrm-set-titre { margin: 0 0 8px 16px; font-size: 13px; font-weight: 600; letter-spacing: 0; }
+.vrm-set .vrm-set-pied { margin: 8px 16px 0; }
+.vrm-set-tete { gap: 12px; justify-content: space-between; }
+.vrm-set-tete > .vrm-set-h1 { min-width: 0; }
+.vrm-set-tete > .vrm-settings-status, .vrm-set-nav > .vrm-settings-status {
+  margin: 0 0 0 auto; flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 28px;
+  font-size: 12px; line-height: 1.2; white-space: nowrap; max-width: 55%;
+}
+.vrm-set-tete > .vrm-settings-status > span:last-of-type, .vrm-set-nav > .vrm-settings-status > span:last-of-type { overflow: hidden; text-overflow: ellipsis; }
+.vrm-settings-status-pt { width: 7px; height: 7px; border-radius: 999px; background: currentColor; opacity: .55; flex: none; animation: vrm-set-souffle 1.4s ease-in-out infinite; }
+@keyframes vrm-set-souffle { 50% { opacity: .2; } }
+@media (prefers-reduced-motion: reduce) { .vrm-settings-status-pt { animation: none; } }
+/* Le lien sous un groupe (« Organisation ») : texte d'action, cible 44 px. */
+html body .vrm-set button.vrm-set-lien {
+  display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 2px; margin: -6px 0 -10px;
+  border: 0 !important; background: transparent !important; box-shadow: none !important; cursor: pointer;
+  color: var(--vrm-accent-texte, #0066CC) !important; font: 600 15px/1 var(--vrm-police, inherit);
+}
+html body .vrm-set button.vrm-set-lien:active { opacity: .55; }
+/* La carte du profil : identité en haut, la photo dessous, dans la même carte. */
+.vrm-set-profil { flex-wrap: wrap; }
+.vrm-set-profil > span:nth-child(2) { flex: 1 1 0; min-width: 0; }
+.vrm-set-profil-photo { flex: 1 0 100%; min-width: 0; }
+.vrm-set-profil-photo [data-photo-profil] { font-size: 13px; }
+/* Une ligne : appui visible au toucher, chevron qui glisse d'un rien au survol. */
+button.vrm-set-ligne { transition: background-color .12s ease; }
+@media (hover: hover) and (pointer: fine) { button.vrm-set-ligne:hover .vrm-set-chev { transform: translateX(2px); } }
+.vrm-set-chev { transition: transform .15s ease; }
+/* L'icône de la ligne : même gris que le texte secondaire, jamais une couleur. */
+.vrm-set-ic svg { stroke-width: 1.7; }
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
+  /* La largeur des autres écrans (styles-bureau.css : 1360) — Paramètres était à
+     1120, CENTRÉ : sa colonne commençait 46 px plus à droite que tous les titres. */
+  :root .vrm-app-shell .vrm-main[data-ecran="settings"] { --vrm-largeur-contenu: 1360px; }
+  :root:root body .vrm-app-shell .vrm-main .vrm-set { padding-left: 16px !important; padding-right: 16px !important; }
+  /* Les listes gardent une largeur de lecture, ALIGNÉES à gauche sous le titre. */
+  .vrm-set > :not(.vrm-fs-cadre):not(.vrm-set-onglets) { max-width: 880px; }
+  .vrm-set > .vrm-set-onglets { max-width: 420px; }
+}
+@media (max-width: 767px) {
+  .vrm-set-tete > .vrm-settings-status { max-width: 46%; }
+}
+.vrm-set .vrm-set-recherche { margin: 0 0 20px; }
+/* (5 nov., chantier H — fusion-app F6) Le TEXTE bleu de Paramètres et de Comptes liés
+   (« ‹ Paramètres », « Ouvrir », « Supprimer des données… ») est le bleu « lien »
+   (accentTexte, 5,3:1 en clair, 5,8:1 en sombre) — l'aplat #0071E3 tombait à 4,2:1
+   sur le gris, 3,6:1 la nuit. Le jeton partagé `--vrm-b-lien` vaut encore l'aplat
+   (styles-boutons.css, hors zone) : il est redéfini ICI pour ces deux écrans. */
+.vrm-app-shell .vrm-main:is([data-ecran="settings"], [data-ecran="vintedaccounts"]),
+.vrm-app-shell .vrm-main .vrm-set { --vrm-b-lien: var(--vrm-accent-texte, #0066CC); }
+/* Au téléphone, les trois onglets de Paramètres gardent la cible du doigt (44 px),
+   même sans écran tactile déclaré (fenêtre étroite). */
+@media (max-width: 767px) {
+  :root .vrm-set-onglets.vrm-seg > .vrm-seg-btn:not(#vrm-seg) { min-height: 44px !important; }
+}
+/* Les onglets de Paramètres respirent avant la première carte (la règle commune du
+   segmenté pose `margin: 0`). */
+:root .vrm-set .vrm-set-onglets.vrm-seg:not(#vrm-seg) { margin: 0 0 20px; }
+.vrm-set-rien { padding: 8px 16px 0; }

@@ -14,6 +14,8 @@ import {useBrouillonCommande} from './brouillonsCommandesEbay.js';
 import {useConversationFocus} from './conversationFocus.js';
 import {createPortal} from 'react-dom';
 import React,{useEffect,useState,useRef} from 'react';
+// (5 nov., chantier G) Messages · eBay : « Actualiser » est le bouton commun (jetons), plus un bouton aux couleurs écrites en dur.
+import {BoutonBase} from './composants/Bouton.jsx';
 
 export function ResponsiveChatPortal({children}){
  const [mobile,setMobile]=useState(()=>window.matchMedia('(max-width:767px)').matches);
@@ -134,7 +136,7 @@ export function EbayMessages({compte='principal',owner,cible,onClearCible,header
  const paireSel=selected && paireDe?paireDe(selected):null;
  const codes=selected?codesRetraitEbay([selected.body,...(selected.responses || [])]):[];
  const q=historySearch.toLowerCase();
- return <section data-messagerie-site="ebay"><div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}><h2 className="vrm-ebay-titre-onglet" style={{margin:0,fontSize:22,color:C.text}}>Messages eBay</h2><button type="button" disabled={busy} onClick={()=>{cibleOuverte.current=null;charger();}} style={{...S.button,marginLeft:'auto'}}>Actualiser</button></div><Erreur message={message}/>
+ return <section data-messagerie-site="ebay"><div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}><h2 className="vrm-ebay-titre-onglet" style={{margin:0,fontSize:22,color:C.text}}>Messages eBay</h2><BoutonBase variante="secondaire" taille="petit" occupe={busy} onClick={()=>{cibleOuverte.current=null;charger();}} style={{marginLeft:'auto'}}>Actualiser</BoutonBase></div><Erreur message={message}/>
   {cible && <p style={{fontSize:12}}>Message sélectionné <button type="button" onClick={onClearCible}>Voir tous les échanges</button>{rows && !rows.some(m=>String(m.id)===cible.id) && <span role="status"> · Cet échange n’est pas dans la page lue. Charge la suite ou actualise.</span>}</p>}
   <div className="vrm-message-workspace"><div className="vrm-inbox-column">{Array.isArray(rows) && rows.length>0 && <input type="search" aria-label="Rechercher un message eBay" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Rechercher un échange…" style={{...S.input,marginBottom:10}}/>}
    <div className="vrm-seg vrm-ebay-q-vue" role="group" aria-label="Échanges eBay" style={{marginBottom:10}}>{[['questions','Questions'],['tout','Tout']].map(([v,l])=><button key={v} type="button" className="vrm-seg-btn" aria-pressed={vue===v} data-ebay-vue={v} onClick={()=>setVue(v)}>{l}</button>)}</div>

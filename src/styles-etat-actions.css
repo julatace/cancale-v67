@@ -74,3 +74,15 @@
 @media (prefers-reduced-motion: reduce) {
   .vrm-etat-panneau, .vrm-etat-pastille .vrm-etat-point, .vrm-etat-chevron { animation: none !important; transition: none !important; }
 }
+
+/* (5 nov., chantier H) Au téléphone, le panneau a SA croix (on ne savait pas comment
+   le refermer, sinon en touchant à côté) — la même que les feuilles : rond gris, 44 px. */
+.vrm-etat-tete { position: relative; }
+html body button.vrm-etat-fermer {
+  position: absolute; top: -10px; right: -10px; width: 44px; height: 44px; min-width: 44px; min-height: 44px; padding: 0; margin: 0;
+  display: grid; place-items: center; border: 0 !important; border-radius: 999px !important; background: transparent !important; box-shadow: none !important;
+  color: var(--vrm-muted) !important; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+html body button.vrm-etat-fermer::before { content: ''; position: absolute; width: 30px; height: 30px; border-radius: 999px; background: var(--fu-remplir, rgba(118,118,128,.12)); z-index: -1; }
+html body button.vrm-etat-fermer:active { opacity: .6; }
+.vrm-etat-panneau:not(.ordi) .vrm-etat-titre { padding-right: 36px; }

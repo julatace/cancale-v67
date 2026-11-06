@@ -733,3 +733,94 @@ Paramètres → Comptes liés ; couper l'interrupteur d'un compte qu'il ne veut 
 - **4 nov.** — Un seul N° pour un article sur Vinted ET Vestiaire : « Relier à Vinted / à Vestiaire » sur SON clic + confirmation, le N° Vinted reste, l'ancien N° Vestiaire n'est jamais redonné et passe dans « N° à barrer », « Délier » rend l'état d'avant (`main.vrm_vc_liens`, lu aussi par widget/rappels/e-mail) ; frise Vendue → Postée → Livrée → Payée sur Vestiaire et eBay, étapes prouvées seulement (`src/friseSites.js`). `audit-lien-vc` 11/11, `audit-frise-sites` 6/6, banc `lien-vc-frise` 62. → historiques vestiaire, numéros. Geste : relier un article en double, barrer l'ancien N°.
 - **4 nov.** — Compta → Registres : livre des recettes (`ventesDeclarables`, daté au versement, « à dater » listées à part, comptes exclus dehors) et registre des achats (reçu juste au centime, sinon prix saisis des fiches reliées, sinon « article seul » ⇒ « au moins » ; dépenses jamais dedans), PDF + tableur (`src/registres.js`) ; Statistiques : « Bénéfice » de l'année par la règle de Compta, « Marge », « bénéfice brut » nommé. `audit-registres` 10/10 mutations, banc `registres` 84. → historique compta. Geste : télécharger les registres 2026 et les relire.
 - **4 nov.** — **Extension 5.318.0** : Messages · Leboncoin lit les conversations (`lbcfil`) et y répond sur SON clic une fois la recette d'envoi APPRISE d'un envoi fait à la main (`lbcrepondre`, compte de l'onglet, 50/h, pause 429/403 ; sinon « Répondre sur Leboncoin ↗ ») ; eBay → Inactives : « Remettre en vente » vérifiée par eBay puis confirmée, seulement le n° d'annonce envoyé (même prix, même livraison gérée, SKU gardé) (`api/_lib/ebay-relance.js`). `audit-ebay-relance`, `audit-lbc-repondre`, banc `lbc-repondre`. → historiques ebay et leboncoin. Geste : installer la 5.318.0, puis envoyer UNE réponse à la main sur leboncoin.fr.
+
+<!-- déplacé de CLAUDE.md §9 le 5 nov. (limite de 60 Ko, chantiers A et B) -->
+- **4 nov. · Finitions bureau** : ventes en colonnes, fil lisible à 1024/1280, filtres et paramètres, téléphone conservé ; voir `docs/passation/2026-11-04-finitions-bureau.md`. Google Cloud reste à configurer par administrateur.
+- **4 nov.** — **Extension 5.319.0** : offres Vestiaire dans Messages (montant, « tu touches », temps restant ; Accepter/Contre-offre/Refuser seulement une fois le geste APPRIS d'une réponse faite à la main, sinon « Répondre sur Vestiaire ↗ » ; `vcoffres`, `vcoffrerepondre`) ; Compta → Porte-monnaie Vinted par compte (lu, jamais déduit ; « au moins » si un compte manque) ; Annonces → « Masquées » (`is_hidden`, lien Corriger) ; avis Vinted lus 1×/24 h (`avis`, `harvest_{uid}_feedbacks`). `audit-vc-offres` 16/16, `audit-argent-offres-masquees` 13/13, `audit-avis-vinted`. À décider : purge de `wreq…payouts` du 13 oct. (bank_account_id) et noms d'acheteurs dans `vc_brut_*`. → historiques vestiaire, vinted-extension, compta. Geste : installer la 5.319.0, répondre une fois à la main à une offre Vestiaire.
+- **4 nov.** — « Tout imprimer » : Vestiaire et Leboncoin ont TOUJOURS leur ligne cochable (cochée si bordereau, sinon « Sans bordereau » ambre et nommée dans le lot ; Leboncoin au téléphone = sans bordereau, PDF lu par l'extension de l'ordinateur), eBay grisé jamais cochable (`src/lotSelection.js`) ; à l'impression, la feuille du tampon s'ouvre UNE fois par type de bordereau du lot, la place vaut pour tous ceux du type, « Placer le tampon » redemande tout, Annuler n'imprime rien. `audit-selection-bordereaux` 9/9, banc `selection-bordereaux` 54 (11 rouges sur main). → historique colis-retraits. Geste : cocher une vente Vestiaire dans « Tout imprimer » et placer le tampon.
+- **4 nov.** — Compta : prévision de la prochaine échéance URSSAF en tête de « Combien je dois déclarer ? » (« au moins » + « N à dater », mois déclarés pas recomptés, rythme jamais supposé) — la carte « Prochaine déclaration » était CACHÉE par fusion.css ; « Tes seuils 2026 » : projection seulement sur mois finis et total complet, DAC7 par plateforme (`src/seuilsAnnee.js`, `src/previsionUrssaf.js`) ; Statistiques : annulations par compte (Vinted ; autres sites « pas comptés ») et notes reçues lues du profil (`feedback_reputation`), avis détaillés à lire par l'extension 5.319 (`src/annulationsCompte.js`, `src/notesRecues.js`). 4 audits rouges sur main, bancs `seuils-prevision` 32, `annulations-notes` 30. → historiques compta, interface-stock. Geste : ouvrir Comptabilité puis le bas de Statistiques.
+## 5 novembre — Audits rouges du 5 nov. (branche locale `v34-audits-rouges`, depuis `claude/project-review-nsk5su`)
+
+Quinze audits étaient rouges sur `claude/project-review-nsk5su`. Pour chacun : vrai défaut de l'app
+(corrigé au plus petit) ou audit périmé (mis à la forme d'aujourd'hui, la MÊME règle, prouvé par
+mutation). Rien n'a été touché dans `vinted-sync-extension/` ni dans les zips de `public/`.
+
+| audit | cause | nature | correction | preuve |
+|---|---|---|---|---|
+| `registres` | `pdfjs-dist/legacy/build/pdf.mjs` introuvable : la dépendance n'a JAMAIS été dans `package.json` (elle traînait installée à la main) | dépendance manquante | `pdfjs-dist` 4.10.38 en devDependency exacte (lu aussi par `audit-dac7-comptes` et des bancs) | après `npm ci` : 46/46 ; « au moins » retiré du PDF ⇒ R6 rouge |
+| `entree-publier-ailleurs` | lit `dist/` : pas de build sur la machine | ni l'un ni l'autre | `npm run build` | vert après le build |
+| `bilan-semaine` §6 | l'écran Notifications rend les FAMILLES de `api/_lib/notif-textes.js` depuis d957146e (3 nov.), plus de `{ id:'bilan', def:true }` | audit périmé | la règle exécutée : `decisionNotif({}, 'bilan')`, famille du bilan dans `GROUPES_NOTIF` et allumée par défaut, l'écran rend `FAMILLES`/`familleActive` du serveur, pour chaque catégorie l'état montré = la décision du serveur | 4 mutations rouges (Rappels `def:false`, bilan hors `FAMILLE_DE`, liste locale dans l'écran, Rappels absent de l'écran) |
+| `chemin-json-guillemets` | `api/_lib/securite-compte.js` : `data->groupes->${uid}` NU | vrai défaut (latent) | `->${encodeURIComponent('"' + userId + '"')}` ; `audit-comptes-securite` 4.17 attend la forme | la faute du serveur disparaît du rouge ; reste `background.js:16034` (extension, voir plus bas) |
+| `chiffres` | 2ef727df (libellés `NOM_BENEFICE_BRUT`/`NOM_APRES_FRAIS`), e0385ee3 (`escrowJ`, « À venir »), f1001d7a (bouton « Afficher les N suivantes · x/y », remise à 60 au changement de filtre seulement) | audit périmé | mêmes règles sur la forme actuelle (fenêtre de la carte 2 400 car.) | 5 mutations de l'app, 5 rouges |
+| `donnees-ecrans` D7 | a7f1fac4 compte aussi par compte : `{ prixPasLu++; if(cc) cc.nPrixPasLu++; }` | audit périmé | regex et mutation D7 à la forme ; la mutation « Lie un compte » n'a plus de cible (phrase retirée le 3 nov.) | `--mutations` 12/12 |
+| `ebay-route` [INA] | 1a81a91c : « Remettre en vente » sur son clic confirmé (`handleRelance`) ; `RelistedItemID` (champ lu) compté comme un appel | audit périmé | Relist*/AddItem seulement dans `handleRelance`, `confirme:true` avant tout appel, Relist après la vérification à blanc, seules `relanceverif`/`relancer` y mènent | 3 mutations rouges |
+| `numerotation-lecteurs` | 1a81a91c ajoute `relancer` à `avecVersion` | audit périmé | `publish` et `programmer` toujours exigés, d'autres gestes permis ; mutation suivie | `--mutation=ebay-sans-version` rouge ; retirer `programmer` rouge |
+| `photos-vinted` | deux `<img>` neufs hors de la liste fermée : `PhotosEbayEditeur :: e.apercu` (blob: du fichier choisi, 24d409ad) et l'icône locale de l'aperçu des notifications (0d961728) | liste fermée pas tenue | ajoutés AVEC leur raison | `img-brut` rouge ; une source inconnue dans l'aperçu rouge |
+| `politique-hotes` | le navigateur contacte TOUT SEUL jsDelivr pour ZXing (scanner) et Tesseract (tickets) et 12 domaines de transporteurs (leurs favicons) sans que la politique le dise ; le reste = liens d'un clic | vrai défaut (politique) + liste | ligne jsDelivr : quatre outils ; une ligne « logos des transporteurs » ; date de mise à jour 5 nov. ; liens classés « lien » | `--prouve` 11/11 dont 2 neuves. **Julien : relire `public/legal/confidentialite.html`** |
+| `qui-dorment` | 0b293942 (« Masquées ») : `) : annSort==='sleeping' ? (<QuiDorment` dans une chaîne de ternaires | audit périmé | même règle (liste dans cette vue, grille dans le dernier « sinon ») | mutation rouge ; `--prouve` 4/4 |
+| `statut-transporteurs` | 217cf4dd : toute arrivée s'écrit « 📍 … t'attend » ; l'audit comptait les titres « disponible » | audit périmé | l'arrivée reconnue par la clé du fait (`tag` = `relais-{n°}-…`) | réservation `push_dedup` retirée ⇒ rouge ; « disponible » ne notifie plus ⇒ 5 rouges |
+| `vc-offres` O5 | échéance de la fixture écrite en dur (`2026-11-05T19:23:33Z`) : passée, le fond refuse (« expiree », règle juste) | audit dépendant de l'horloge | échéance = heure du banc + 7 j ; un contrôle NEUF « offre EXPIRÉE ⇒ rien ne part » | mutation `fondExpiree` rouge ; `--prouve` 17/17 |
+| `vendeur-neutre` B | la consigne « À poser sur Vercel… » (carte des e-mails de l'essai, 5a5c6648) est sous `{r.proprietaire ? …}`, réponse du serveur ; l'audit ne reconnaissait que `proprio` | audit périmé | `x.proprietaire` reconnu comme condition « propriétaire » | condition remplacée ⇒ rouge |
+| `vc-recon` | voir plus bas | défaut de l'extension | NON corrigé (hors branche) | reste rouge |
+
+### Ce qui reste rouge (extension, pas touchée ici)
+- `chemin-json-guillemets` : `vinted-sync-extension/background.js:16034`
+  `sbGet(\`app_data?id=eq.vc_offres&select=o:data->offres->${cleOffreVc(nego)}\`)`. La clé est `n<id>`
+  (jamais numérique) : PostgREST la lit comme une clé, sans défaut constaté ; la règle veut
+  `->"${cleOffreVc(nego)}"`. Une version d'extension à monter.
+- `vc-recon` (CONFIDENTIALITÉ) : la capture brute 5.315 (sa demande du 2 nov. « capte tout Vestiaire »)
+  fait sortir de la page la réponse ENTIÈRE. Chemin : `vc-inject.js:1369` `noteBrut` ⇒
+  `post({ kind:'vcbrut', url, texte })` (`window.postMessage(…, '*')`, toute réponse JSON 2xx ≤ 400 Ko et
+  `__NEXT_DATA__`) ⇒ `vc.js:45` ⇒ `chrome.runtime.sendMessage({ action:'vcBrut' })` ⇒
+  `background.js:2700` ⇒ `rangerVcBrut` (15532) ⇒ upsert `app_data` `vc_brut_{empreinte}`.
+  `sansSecretsVc` ne vide que les clés jetons/mot de passe/carte/`iban`/`bic` : nom, e-mail, adresse,
+  téléphone et messages de l'acheteur, n° de commande et UUID de membre sont écrits en base ; un IBAN
+  sous un autre nom de clé aussi. C'est la décision attendue de Julien (« noms d'acheteurs dans
+  `vc_brut_*` », §9 du 4 nov.) : l'audit n'a pas été assoupli.
+
+- `retrait` (rouge aussi au premier passage, hors de la liste des quinze) : « l'écran Achats dit pourquoi
+  les codes manquent » cherche `<ExtEnRetard` dans les 1 800 premiers caractères de l'écran Achats ; il y
+  est toujours (`src/App.jsx` vers 53555) mais à 3 700 caractères du début : fenêtre de l'audit trop
+  courte, pas un défaut de l'app. Zone « écran Achats » d'une autre branche : décrit, pas touché.
+
+### Passage complet
+`npm run build` vert, puis les 288 `scripts/audit-*.cjs` (240 s chacun) : 3 rouges — `chemin-json-guillemets`
+(extension), `vc-recon` (extension, confidentialité), `retrait` (fenêtre de l'audit, écran Achats).
+
+### Constaté en passant
+- `PUSH_DEFAUT` (`api/_lib/push.js`) n'est plus lu par aucune décision (`decisionNotif` décide) et
+  contredit les familles (`message:false`, `facture:false` alors que leurs familles sonnent par défaut) :
+  table morte, trompeuse.
+- La carte « À venir / À virer » de Ma journée n'apparaît que s'il y a de l'argent À VENIR : un vendeur
+  qui n'a que de l'argent À VIRER ne la voit pas (non corrigé, non jugé par un audit).
+
+<!-- déplacé de CLAUDE.md §9 le 5 nov. au soir (limite de 60 Ko) -->
+- **5 nov. · Réveil** : fin des heures calmes ⇒ une notification « ce qui est arrivé pendant » (`?moment=reveil`, GitHub toutes les 30 min). `docs/passation/2026-11-05-reveil-heures-calmes.md`. Geste : secret `CRON_SECRET` dans GitHub.
+- **5 nov. · Audits rouges** : 15 → 3 (politique : ZXing, Tesseract, logos transporteurs déclarés ; `pdfjs-dist` en devDependency) ; restent 2 extension + `retrait` (Achats). `historique-divers.md` « Audits rouges du 5 nov. ». Julien : relire `public/legal/confidentialite.html`, décider `vc_brut_*`.
+- **5 nov. · Achats et à retirer** : 33 → 10 sur sa copie (fin par le n° de la commande et le code ; doubles possibles à part ; un point = une carte) ; Achats : une carte, outils dans « … », « Arrivé ». `docs/passation/2026-11-05-achats-retraits.md`. Geste : dire à quel compte appartient l'adresse qui reçoit 16 e-mails Vinted.
+- **5 nov. · Chantier B (composants partagés)** : `montant()` (src/format.js, « — » si pas su, alias fmt/fmtE/fmtE0/prixTxt), `src/libelles.js`, SheetShell unique (portail, opaque dès la 1re image, poignée), ChampRecherche, PhotoVide, Numero, EtatPanne, Bouton « danger » ambre ; écrans pas adaptés (C à H). API : `docs/passation/2026-11-05-chantier-b.md`.
+- **5 nov. · Relais Vinted** : un « relire » relit la copie captée, plus le serveur ; relais freiné (24/30 min/compte, sur l'appareil ET au serveur, tous appareils). `docs/passation/2026-11-05-frein-relais-vinted.md`.
+- **5 nov. · Numéros** : fiche numérotée du nuage jamais retirée par la fusion (plus de bloc « Recharger »). `docs/passation/2026-11-05-numeros-autre-appareil.md` ; demandes du jour : `demandes-2026-11-05.md`.
+- **5 nov. · Orion 5.322.0** : base 5.319 confirmée installable par Julien, moteur/adaptateur repris ; seul le popup change hors versions, pour rester sur Vinted après connexion. Voir `docs/passation/2026-11-05-orion-base-validee.md`.
+- **5 nov. · Référence Orion 5.319.0** : archives originales de 61304faf remises séparément, SHA-256 vérifiés ; refus persistant en 5.321, cause non établie et ancienne version installée inconnue. Diff complet : `docs/passation/2026-11-05-orion-comparaison-reference.md`.
+- **5 nov. · Paquets 5.321.0** : archives normalisées 644/755 (la 5.320 exportait des fichiers 600), contrôle depuis sources privées, tous formats. Refus Orion réel non reproduit sur appareil ; `docs/passation/2026-11-05-orion-paquet.md`.
+- **5 nov. · Extension 5.320.0** : mot de passe sans ouverture automatique de VRM, rappels/promesses Orion et délais de connexion ; capture après session conservée, limites écran d’accueil/iOS expliquées. Voir `docs/passation/2026-11-05-orion-connexion.md`. Installer le nouveau paquet Orion.
+
+## 6 novembre — Audits après intégration v35 (branche locale `v36-audits-integration`, depuis `claude/project-review-nsk5su` 162659a6)
+
+Après la fusion des chantiers v35 (C, D, E1, E2, F, G, H), quatre audits étaient rouges, et
+`audit-frein-relais-serveur` l'était parfois sous charge. Rien touché dans `vinted-sync-extension/` ni `public/`.
+
+| audit | cause | nature | correction | preuve |
+|---|---|---|---|---|
+| `brouillons-proposables` | le chantier C a retiré la feuille « Republier et brouillons » (son « N prêts sur M brouillons ») | audit périmé | même règle sur la forme actuelle : le compte `nPrets` de « Voir mes brouillons » (qui ouvre « En mettre plusieurs en ligne ») filtre `_place === 'proposable'`, la feuille « Actions » NOMME un brouillon pas proposable, aucun compte sur `_etat === 'pret'` | `--prouve` 12/12 (2 mutations neuves : compte sur `_etat`, Actions qui nomme le mauvais) |
+| `chiffres` (×4) | E1 : la carte passe par `carteArgentJournee` (src/journeeArgent.js), plus d'`escrowJ && escrowJ.dispo > 0` ; E2 : « Afficher les 120 suivantes · encore 107 après » au lieu de « · 60/287 » | audit périmé | carte : `escrowJ` = porte-monnaie lu, la règle EXÉCUTÉE rend le `dispo` à côté de l'à-venir (aussi seul, « pas lu » = `null`), la moitié « virer » écrit `K.virer.valeur` ; bouton : son JSX est RENDU par Babel (287/60, 65/60, 61/60) et ses nombres doivent couvrir exactement ce qui n'est pas dessiné (ou dire le total) | 8 mutations (app et règle), 8 rouges |
+| `commandes` | le bouton « rattacher » de la fiche fournisseur (bb4d63ad) n'a pour nom propre qu'un « + » (le reste vient de `LigneHors`) | régression (nom de bouton) | `aria-label` « Rattacher l'achat « … » à ce fournisseur » (src/AchatsOutils.jsx) ; l'audit refuse aussi un nom en dur sans lettre | 162659a6 rouge, après vert, nom retiré ⇒ rouge, nom « + » ⇒ rouge |
+| `qr-capture-mr` E2/E4 | D a refait « En grand » : `const ck = carrierKey(qrView.carrier)` puis `titreQrAbsent(ck)` ; `() => retirerQrPose(...)` avec espaces | audit périmé | E2 juge le titre dans la vue en grand (direct ou par la constante du transporteur), E4 tolère les espaces et exige « Retirer ce QR » ; la mutation D3 (« Ouvrir Mondial Relay (QR) ») visait l'ancien lien : recâblée sur le `Bouton` | `--prouve` 20/20 (3 neuves) |
+| `frein-relais-serveur` §2 | seul : vert 3 fois sur 3 ; sous charge les cinq appels n'ont pas la même milliseconde. `prendrePlaceRelais` ne comptait que `t <= maintenant` : une instance dont l'heure était prise 2 ms AVANT celle qui venait d'écrire ne voyait pas sa place, prenait la même dernière place ET l'effaçait en réécrivant (25 requêtes, 24 comptées) | vrai défaut (révélé par la charge) | src/freinRelaisVinted.js : une place compte si `|maintenant − t| <` la fenêtre (une date absurde reste ignorée) ; §5 neuf, déterministe (horloges croisées) | 162659a6 : §5 rouge à chaque passage ; après : 16 passages parallèles verts ; `--muter=horloge` rouge |
+
+Passage final : `npm run build`, les 4 audits + `frein-relais-serveur`/`frein-relais-vinted`, `coherence`,
+`identite`, `icones`, `fonctions-api` verts ; bancs `annonces-coherence`, `brouillons-avancee`,
+`journee-coherence`, `ventes-e2`, `colis-envoi`, `colis-qr` (ports 9401–9406) verts. `fournisseurs` (écran
+touché par le nom du bouton) était rouge AVANT ce changement, au premier sélecteur : depuis la revue 2.16 d'Achats,
+les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abord, puis 112/112.

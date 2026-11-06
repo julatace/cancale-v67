@@ -162,17 +162,15 @@ async function versJournal(pg) {
         // Le lien ouvre l'onglet.
         await j.locator('[data-journal-filtre="tout"]').click(); await j.locator('[data-journal-type]').selectOption(''); await pg.waitForTimeout(400);
         await ligne(1).locator('[data-journal-lien="cat_bord"]').click();
-        await pg.locator('[data-journal-entree]').waitFor();
-        dit(await pg.locator('[data-journal-entree]').isVisible(), `${w} : « Ouvrir Colis » mène à Colis`);
-        // Depuis Colis : l'entrée ambre ouvre le journal filtré.
-        const entree = pg.locator('[data-journal-entree]');
-        await pg.waitForFunction(() => { const e = document.querySelector('[data-journal-entree]'); return e && e.dataset.n !== ''; });
-        dit((await entree.innerText()).includes('3 à vérifier'), `${w} : Colis — « 3 à vérifier » en ambre`, await entree.innerText());
-        await entree.scrollIntoViewIfNeeded(); await entree.screenshot({ path: path.join(CAPT, `colis-entree-${w}.png`) });
-        await entree.locator('button').click();
-        await pg.locator('[data-journal-emails] .vrm-journal-ligne').first().waitFor();
+        // (5 nov., chantier D, revue 2.21) Colis n'a plus l'entrée « Tes emails, ce que VRM en a fait » (un lien
+        // technique, pas un geste d'envoi) : on juge que le lien mène à Colis (sa barre du haut), et que l'entrée
+        // n'y est plus. Le journal reste joignable par E-mails (le reste de ce banc).
+        await pg.locator('[data-colis-barre], [data-colis-sans-compte]').first().waitFor();
+        dit(await pg.locator('[data-colis-barre], [data-colis-sans-compte]').first().isVisible(), `${w} : « Ouvrir Colis » mène à Colis`);
+        dit(!(await pg.$('[data-journal-entree]')), `${w} : Colis n'a plus l'entrée « Tes emails » (revue 2.21)`);
+        await pg.goBack().catch(() => {});
+        await pg.locator('[data-journal-emails] .vrm-journal-ligne').first().waitFor({ timeout: 8000 }).catch(() => {});
         await pg.waitForTimeout(300);
-        dit(await pg.locator('[data-journal-filtre="a-verifier"]').getAttribute('aria-pressed') === 'true' && journal[journal.length - 1].etat === 'a-verifier', `${w} : depuis Colis, le journal s'ouvre sur « À vérifier »`);
         const debord = await pg.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1);
         dit(!debord, `${w} : aucun débordement horizontal`);
         const petits = await pg.locator('[data-journal-emails] button, [data-journal-emails] select').evaluateAll((l) => l.filter((x) => x.offsetParent && x.getBoundingClientRect().height < 43.5).map((x) => x.textContent.trim().slice(0, 30)));

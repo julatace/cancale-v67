@@ -69,7 +69,9 @@ for (const [nom, motif, pourquoi] of REGLES) {
       // expliquer ce qui a été retiré, et ne sont pas des valeurs actives.
       const l = lignes[i];
       if (/^\s*(\/\/|\*|#)/.test(l)) continue;
-      if (motif.test(l)) trouves.push(path.relative(R, f) + ':' + (i + 1));
+      // (5 nov.) Une donnée INVENTÉE pour une démonstration se signale par le mot
+      // « Exemple » (ou « -Test ») dans la valeur même : jamais une vraie adresse.
+      if (motif.test(l) && !/Exemple|Ville-Test|exemple\.test/.test((l.match(motif) || [''])[0])) trouves.push(path.relative(R, f) + ':' + (i + 1));
     }
   }
   trouves.length ? nok(nom, pourquoi + ' → ' + trouves.slice(0, 4).join(', ')) : ok(nom);

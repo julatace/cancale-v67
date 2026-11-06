@@ -665,8 +665,13 @@ async function rendre(b, { mode, connecte, tel = false, vrm = null, session = fa
     console.log('── TÉLÉPHONE, base qui ne rend pas le diagnostic');
     { const r = await rendre(b, { mode: 'absente', connecte: '111', tel: true, diagKO: true });
       const p = await r.panneau(); await r.pg.waitForTimeout(600);
-      const der = await r.pg.evaluate(() => { const x = document.querySelector('[data-etat-derniere]'); return x ? { e: x.getAttribute('data-etat-derniere'), t: x.innerText } : null; });
-      dit(p && der && der.e === 'passu' && !/il y a/.test(der.t), '« pas su » quand la base ne répond pas — aucune date inventée', JSON.stringify(der));
+      // (5 nov., chantier H — revue 2.29) « Dernière capture » lit la MÊME source que la liste des
+      // comptes (leurs relectures) ; la ligne de diagnostic ne sert plus qu'à la version. Ici seule
+      // la ligne de diagnostic ne répond pas : la date, s'il y en a une, est celle de la liste (lue),
+      // jamais inventée ; sans relecture lue, « pas su ».
+      const der = await r.pg.evaluate(() => { const x = document.querySelector('[data-etat-derniere]'); const ages = [...document.querySelectorAll('[data-fraicheur-compte="vinted"]')].map((l) => l.innerText); return x ? { e: x.getAttribute('data-etat-derniere'), src: x.getAttribute('data-etat-derniere-source'), t: x.innerText, ages } : null; });
+      const ilya = der && (/il y a [^.(]+/.exec(der.t) || [''])[0].trim();
+      dit(p && der && (der.src === 'comptes' ? (der.e === 'lue' && !!ilya && der.ages.some((a) => a.includes(ilya.replace(/^il y a /, '')))) : (der.e === 'passu' && !/il y a/.test(der.t))), '« pas su » quand la base ne répond pas — aucune date inventée (la date dite est celle de la liste des comptes)', JSON.stringify(der));
       await r.ctx.close(); }
 
     // ── 5.188 : FIREFOX (ordinateur et Android) — pas de canal adressé ──────
@@ -712,8 +717,10 @@ async function rendre(b, { mode, connecte, tel = false, vrm = null, session = fa
       dit(p && p.dedans && /ordinateur/.test(p.txt) && /colis|bordereaux déjà reçus/.test(p.txt), 'son panneau tient dans l’écran, dit OÙ agir et ce qui marche déjà ici', JSON.stringify(p && p.txt).slice(0, 200));
       // Le seul fait qu'un téléphone puisse savoir de l'extension de l'ordinateur.
       await r.pg.waitForTimeout(600);
-      const der = await r.pg.evaluate(() => { const x = document.querySelector('[data-etat-derniere]'); return x ? { e: x.getAttribute('data-etat-derniere'), t: x.innerText } : null; });
-      dit(der && der.e === 'lue' && /il y a 5 h/.test(der.t) && /5\.143\.0/.test(der.t), 'et il dit QUAND l’extension (de l’ordinateur) a écrit pour la dernière fois, et sa version', JSON.stringify(der));
+      // (5 nov., chantier H — revue 2.29) La date : la relecture la plus récente de ses comptes (la
+      // liste juste au-dessus), sinon la ligne de diagnostic (5 h) ; la version : la ligne de diagnostic.
+      const der = await r.pg.evaluate(() => { const x = document.querySelector('[data-etat-derniere]'); return x ? { e: x.getAttribute('data-etat-derniere'), src: x.getAttribute('data-etat-derniere-source'), t: x.innerText } : null; });
+      dit(der && der.e === 'lue' && (der.src === 'comptes' ? /il y a \d+ (min|h|j)|à l'instant/.test(der.t) : /il y a 5 h/.test(der.t)) && /5\.143\.0/.test(der.t), 'et il dit QUAND l’extension (de l’ordinateur) a écrit pour la dernière fois, et sa version', JSON.stringify(der));
       dit(v.sw <= v.cw + 1, 'aucun débordement horizontal', `${v.sw} > ${v.cw}`);
       await r.pg.screenshot({ path: path.join(require('os').tmpdir(), 'pont-390.png') });
       await r.ctx.close(); }

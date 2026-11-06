@@ -14,7 +14,11 @@
 //      ou si une étape PLUS LOIN l'est. « Pas su » n'est jamais « oui ».
 //  L'étape EN COURS est la première non faite (aucune si tout est fait). Son ton
 //  est « urgent » (ambre) seulement quand l'écran dit qu'un geste est à faire
-//  (§7 : l'ambre est la couleur d'un geste à faire), sinon l'encre.
+//  (§7 : l'ambre est la couleur d'un geste à faire), sinon neutre (`attente`).
+//  (5 nov., revue 2.20) L'ENCRE NE VA QU'À LA DERNIÈRE ÉTAPE FAITE (`derniere`) :
+//  l'étape suivante, à l'encre, se lisait comme faite — « Livré » sur un colis en
+//  route, « Imprimé » sur un colis dont rien n'est imprimé. Rien de fait ⇒ aucune
+//  encre ; l'étape en cours ne dit qu'elle est la suivante (ou le geste, en ambre).
 // ════════════════════════════════════════════════════════════════════════════
 
 export const ETAPES_VENTE_FUSION = [
@@ -33,7 +37,9 @@ export const ETAPES_COLIS_FUSION = [
 
 const avecCours = (etapes, geste) => {
   const i = etapes.findIndex((e) => !e.fait);
-  if (i >= 0) { etapes[i].cours = true; etapes[i].ton = geste ? 'urgent' : 'encre'; }
+  if (i >= 0) { etapes[i].cours = true; etapes[i].ton = geste ? 'urgent' : 'attente'; }
+  const d = etapes.map((e) => !!e.fait).lastIndexOf(true);
+  etapes.forEach((e, k) => { e.derniere = k === d; });
   return etapes;
 };
 

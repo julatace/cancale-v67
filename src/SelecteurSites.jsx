@@ -3,15 +3,20 @@
 // UNE forme, partout où l'on choisit un site : Annonces, Ventes, Achats,
 // Messages, Colis. Chaque segment porte le LOGO du site (servi localement,
 // dessiné en masque : il prend la couleur du texte — aucune couleur de marque,
-// §7 « une seule couleur d'accent, et elle est rare ») et son nom ; au
-// téléphone, quand la rangée est pleine, seul le segment choisi garde son nom
-// (le logo suffit à reconnaître les autres ; le nom reste dans `aria-label`).
+// §7 « une seule couleur d'accent, et elle est rare »). (5 nov., chantier A, revue
+// 1.3) Le LOGO SEUL ; le nom n'est écrit que sur le site CHOISI, au téléphone comme
+// à l'ordinateur (le logo suffit à reconnaître les autres ; le nom reste dans
+// `aria-label` et l'infobulle). Le logo d'eBay EST son nom (le mot « ebay ») : il
+// n'en porte jamais un second (« eBay eBay »).
 // Les règles (quels sites, dans quel ordre) : `src/plateformes.js`.
 // Garde les classes `vrm-filtres vrm-filtre-site` (la forme segmentée iOS de
 // l'app) et `data-filtre-site` / `data-site` que lisent les bancs.
 import React from 'react';
 import './styles-selecteur-sites.css';
 import { logoPlateforme } from './plateformes.js';
+
+// Les sites dont le logo est le mot lui-même : le nom écrit à côté le doublerait.
+const LOGO_EST_LE_NOM = new Set(['ebay']);
 
 export default function SelecteurSites({ id, options = [], valeur, onChoix, label = 'Filtrer par site' }) {
   if (!Array.isArray(options) || options.length < 2) return null;
@@ -25,7 +30,7 @@ export default function SelecteurSites({ id, options = [], valeur, onChoix, labe
             {o.logo
               ? <span className="vrm-ss-logo" data-logo-site={o.id} aria-hidden="true" style={{ '--vrm-ss-logo': `url("${o.logo}")` }}/>
               : <span className="vrm-ss-logo vrm-ss-tous" data-logo-site="toutes" aria-hidden="true"><i/><i/><i/><i/></span>}
-            <span className="vrm-ss-nom">{o.court || o.nom}</span>
+            {valeur === o.id && !(o.logo && LOGO_EST_LE_NOM.has(o.id)) ? <span className="vrm-ss-nom">{o.court || o.nom}</span> : null}
           </span>
         </button>
       ))}

@@ -114,7 +114,7 @@ export function ComparaisonComptesVinted({
         Comparer mes comptes Vinted <span>{rows.length} compte{rows.length > 1 ? 's' : ''}</span>
       </summary>
       <p>
-        <b>{periode}</b> · ventes finalisées, à leur date de vente (masquées exclues).
+        <b>{periode}</b> · ventes finalisées, à leur date de vente.
       </p>
       <button type="button" onClick={charger}>
         Actualiser tous les comptes
@@ -138,7 +138,7 @@ export function ComparaisonComptesVinted({
               <th>CA connu</th>
               <th>Bénéfice calculable</th>
               <th>Stock actuel</th>
-              <th>À expédier</th>
+              <th>À envoyer</th>
             </tr>
           </thead>
           <tbody>
@@ -158,7 +158,7 @@ export function ComparaisonComptesVinted({
                     {r.couvertes}/{r.ventes} ventes : achat et frais confirmés
                   </small>
                 </td>
-                <td>{stockDisponible ? r.stock : `≥ ${r.stock}`}</td>
+                <td>{stockDisponible ? r.stock : `au moins ${r.stock}`}</td>
                 <td>{r.taches}</td>
               </tr>
             ))}

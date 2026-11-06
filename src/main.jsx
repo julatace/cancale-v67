@@ -53,16 +53,10 @@ const App = React.lazy(() => import('./App.jsx'));
 // Le film de la page d'accueil (`?film`, export MP4) est un morceau à part : un
 // visiteur de la page ne le télécharge jamais, et `?film` ne charge pas l'app.
 const Film = React.lazy(() => import('./AccueilFilm.jsx'));
-// Polices HÉBERGÉES SUR LE SITE (30 sept.) : charger Google Fonts envoyait
-// l'adresse IP de chaque visiteur à Google (recommandation CNIL, jugement
-// LG München 3 O 17493/20). Mêmes familles, même rendu, plus aucun tiers.
-import '@fontsource/inter/400.css';
-import '@fontsource/inter/500.css';
-import '@fontsource/inter/600.css';
-import '@fontsource/inter/700.css';
-import '@fontsource/space-grotesk/500.css';
-import '@fontsource/space-grotesk/600.css';
-import '@fontsource/space-grotesk/700.css';
+// Les polices : celle du SYSTÈME (SF Pro sur iPhone et Mac, styles-vitrine.css), aucune
+// police téléchargée. (5 nov., chantier A) Inter et Space Grotesk, hébergées ici depuis
+// le 30 sept. pour ne plus appeler Google Fonts, n'étaient plus dessinées nulle part
+// depuis le style Apple du 2 nov. : retirées (des centaines de Ko à chaque chargement).
 // Direction claire « Minéral » (codex) : chargée après les polices, elle ajuste
 // le fond clair, le focus, la sélection et une classe de bouton opt-in.
 import './styles-mineral.css';
@@ -119,6 +113,9 @@ import './styles-bureau.css';
 import './design/mode-stream.css';
 // (5 nov.) La barre du bas revue (téléphone seul) : le panneau « Plus » en tuiles au-dessus de la barre — en tout dernier.
 import './styles-barre-iphone.css';
+// (5 nov., chantier B) Les composants partagés (SheetShell, ChampRecherche, PhotoVide, Numero,
+// EtatPanne, bouton « danger » ambre) — après tout le reste : ils portent leur propre forme.
+import './styles-composants.css';
 import { suivreRangeesDefilantes } from './rangeesDefilantes.js';
 if (typeof document !== 'undefined') { if (document.body) suivreRangeesDefilantes(); else document.addEventListener('DOMContentLoaded', suivreRangeesDefilantes); }
 
@@ -137,7 +134,7 @@ class DernierFilet extends React.Component {
       fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' };
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 22,
-        fontFamily: 'Inter, system-ui, sans-serif', background: '#F2F2F7', color: '#1C1C1E' }}>
+        fontFamily: '-apple-system, BlinkMacSystemFont, system-ui, sans-serif', background: '#F2F2F7', color: '#1C1C1E' }}>
         <div style={{ maxWidth: 420, width: '100%', background: '#fff', border: '1px solid #E5E5EA', borderRadius: 20, padding: '20px 18px' }}>
           <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>L'application n'a pas pu démarrer</div>
           <div style={{ fontSize: 13, color: '#636366', lineHeight: 1.5, marginBottom: 12 }}>

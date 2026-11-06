@@ -32,7 +32,13 @@ export function prendrePlaceRelais(uid, maintenant, stock) {
   if (!k || !stock) return { ok: false, resteMs: FENETRE_MS };
   let tout;
   try { tout = lire(stock); } catch (_) { return { ok: false, resteMs: FENETRE_MS }; }
-  const garde = (Array.isArray(tout[k]) ? tout[k] : []).filter((t) => Number.isFinite(t) && t <= maintenant && maintenant - t < FENETRE_MS);
+  // (6 nov., v36) Une place datée un peu APRÈS `maintenant` est celle d'un autre appareil
+  // (ou d'une autre instance du serveur) dont l'heure a été prise plus tard : elle COMPTE
+  // et elle est GARDÉE. Avec `t <= maintenant`, une requête dont l'heure avait été prise
+  // 2 ms plus tôt ne la voyait pas, prenait la même dernière place et l'effaçait en
+  // réécrivant (`audit-frein-relais-serveur`, horloges croisées). Seule une date
+  // absurde (plus d'une fenêtre dans le futur) est ignorée.
+  const garde = (Array.isArray(tout[k]) ? tout[k] : []).filter((t) => Number.isFinite(t) && Math.abs(maintenant - t) < FENETRE_MS);
   if (garde.length >= MAX_PAR_FENETRE) return { ok: false, resteMs: FENETRE_MS - (maintenant - Math.min(...garde)) };
   garde.push(maintenant);
   const suite = {};

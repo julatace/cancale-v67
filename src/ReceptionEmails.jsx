@@ -4,6 +4,8 @@ import {typesEmail,destinationEmail} from './receptionEmail.js';
 import './reception-emails.css';
 import {reponseReception,gestesEmails,ceQueVrmAFait,arriveesParAdresse} from './emailsApercu.js';
 import {requeteJsonBornee} from './requeteJsonBornee.js';
+import {EtatPanne} from './composants/EtatPanne.jsx';
+import {ChampRecherche} from './composants/ChampRecherche.jsx';
 const date=v=>v?new Date(v).toLocaleString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'Pas encore mesuré';
 const Picto=({nom,...props})=><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>{nom==='refresh'?<><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6.1 6.1a8 8 0 0 1 13 2.4M4.9 15.5a8 8 0 0 0 13 2.4"/></>:nom==='chevron'?<path d="m9 5 7 7-7 7"/>:<><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m4 7 8 6 8-6"/></>}</svg>;
 const libelles={integre:'Rangé','a-verifier':'À vérifier',erreur:'En attente'};
@@ -47,13 +49,13 @@ export default function ReceptionEmails({owner,headers,quarantaine,onVerifier,th
 
  {Array.isArray(d.adresses)&&d.adresses.length>0&&<div className="vrm-reception-comptes"><label htmlFor="vrm-reception-compte">Compte / adresse</label><select id="vrm-reception-compte" value={adresse} onChange={e=>{setAdresse(e.target.value);setMax(10);}}><option value="toutes">Tous mes comptes et adresses</option>{d.adresses.map(a=><option key={a.adresse} value={a.adresse}>{a.comptes?.length===1?a.comptes[0].nom+' · ':''}{a.adresse}{a.comptes?.length>1?' · association à corriger':''}</option>)}</select>{adresse!=='toutes'&&<small>{d.adresses.find(a=>a.adresse===adresse)?.declaree===false?'Adresse à déclarer dans « Comptes et transfert ».':`Réception sur ${adresse}. Les autres comptes restent accessibles dans la liste.`}</small>}</div>}
 
- <div className="vrm-reception-filtres"><input type="search" aria-label="Rechercher dans la réception des emails" placeholder="Sujet, compte, expéditeur…" value={recherche} onChange={e=>{setRecherche(e.target.value);setMax(10);}}/>{filtre!=='tous'&&<button type="button" onClick={()=>setFiltre('tous')}>Tous les états</button>}</div>
+ <div className="vrm-reception-filtres"><ChampRecherche valeur={recherche} onChange={v=>{setRecherche(v);setMax(10);}} label="Rechercher dans la réception des emails" placeholder="Sujet, compte, expéditeur…" voix="brut"/>{filtre!=='tous'&&<button type="button" className="vrm-pied-lien" onClick={()=>setFiltre('tous')}>Tous les états</button>}</div>
  {!liste.length&&<p>{emails.length?'Aucun e-mail ne correspond.':'Aucun e-mail suivi pour l’instant.'}</p>}
  <ul className="vrm-reception-liste">{liste.slice(0,max).map(e=><li key={e.id}><details><summary aria-label={`${e.subject} · ${libelles[e.etat]} · détails et conservation`}><span className="vrm-reception-email-picto"><Picto/></span><span className="vrm-reception-email-titre"><strong>{e.subject}</strong><small className="vrm-reception-email-meta"><span className="vrm-reception-compte-nom" title={e.compte?.nom||''}>{e.compte?.nom||(e.compteAmbigu?'Compte ambigu':'Compte à identifier')}</span>{e.compte?.bloque&&<span className="vrm-reception-bloque" title={e.compte.etatLuLe?`État Vinted observé le ${date(e.compte.etatLuLe)}`:'Blocage confirmé par le profil Vinted'}>Bloqué</span>}<span>{typesEmail[e.type]||'Information'} · {date(e.at)}</span></small></span><span className="vrm-reception-etat" data-etat={e.etat}>{libelles[e.etat]}</span><Picto nom="chevron" className="vrm-reception-chevron"/></summary><div className="vrm-reception-contenu">{e.adresses?.length>0&&<p><b>Adresses de réception</b> · {e.adresses.join(' · ')}</p>}{e.adresses?.length>1&&<p>Plusieurs adresses de ta boutique figurent dans ce mail : aucun compte unique n’est déduit.</p>}{e.compte?.bloque&&<p>Blocage signalé par le profil Vinted{e.compte.etatLuLe?` · état lu le ${date(e.compte.etatLuLe)}`:''}.</p>}{!e.compte&&<p>{e.compteAmbigu?'Plusieurs comptes sont associés aux adresses de ce mail. Aucun n’est choisi arbitrairement.':'Associe cette adresse au bon compte dans Comptes liés. Le nom n’est pas deviné depuis le texte du mail.'}</p>}<p><b>Expéditeur</b> · {e.from||'Non renseigné'}</p>{e.sourceDate&&<p>Mail daté du {date(e.sourceDate)}</p>}{e.raison&&<p>{e.raison}</p>}<p>{destinationEmail(e)}</p><p className="vrm-reception-note">VRM garde cet e-mail : rien n’est supprimé (l’original reste aussi dans ta messagerie).</p></div></details></li>)}</ul>
  {liste.length>max&&<button type="button" onClick={()=>setMax(n=>n+10)}>Afficher les suivants</button>}
  </details>}
  </div>
- <div hidden={section==='reception'}> {section==='configuration'&&guideOuvert&&<button type="button" className="vrm-email-fermer-guide" onClick={onFermerGuide}>Fermer le guide</button>}{d?<ConfigurerTransfert adresses={d.adresses||[]} preuves={preuves} onComptes={onComptes} onDeclarer={onDeclarer} onConfirmer={onConfirmer} onActualiser={charger} ouvert={section==='configuration'&&guideOuvert} adresseInitiale={adresseGuide} onChoixAdresse={onAdresseGuide}/>:<p role={erreur?'alert':'status'}>{erreur?'La configuration n’a pas pu être lue.':'Lecture de la configuration…'}{erreur&&<button type="button" onClick={charger}>Réessayer</button>}</p>}</div>
+ <div hidden={section==='reception'}> {section==='configuration'&&guideOuvert&&<button type="button" className="vrm-email-fermer-guide" onClick={onFermerGuide}>Fermer le guide</button>}{d?<ConfigurerTransfert adresses={d.adresses||[]} preuves={preuves} onComptes={onComptes} onDeclarer={onDeclarer} onConfirmer={onConfirmer} onActualiser={charger} ouvert={section==='configuration'&&guideOuvert} adresseInitiale={adresseGuide} onChoixAdresse={onAdresseGuide}/>:erreur?<EtatPanne role="alert" quoi="Le transfert de tes adresses" raison="La lecture n’a pas abouti. Rien n’est perdu." onReessayer={()=>charger(true)}/>:<p role="status">Lecture du transfert…</p>}</div>
  </section>;
 }
 
@@ -70,13 +72,17 @@ function ApercuEmails({d,erreur,lecture,maintenant,quarantaine,preuves,onActuali
  const aller=(g)=>{if(g.vers==='a-traiter')return onVerifier?.();if(g.vers==='journal')return onJournal?.(g.etat||'','');onOnglet?.(g.vers);};
  // « Rien à faire » ne se dit que si tout ce qui pourrait demander un geste a été LU.
  const toutLu=d&&Array.isArray(quarantaine)&&(preuves!==undefined);
+ // (5 nov., chantier G, revues 1.10 et 3.8) Une panne se dit par `EtatPanne` (la raison, UN
+ // « Réessayer ») ; « Actualiser » ne s'affiche jamais à côté de « Réessayer ».
  return <div className="vrm-emails-apercu" data-emails-apercu="" data-reponse={rep.etat}>
-  <section className="vrm-apercu-reponse" data-apercu-reponse={rep.etat} role={erreur&&!d?'alert':undefined} aria-live="polite">
+  {erreur&&!d
+   ?<EtatPanne role="alert" data-apercu-reponse={rep.etat} quoi="La réception de tes e-mails" raison="La lecture n’a pas abouti. Rien n’est perdu : tes e-mails restent rangés." onReessayer={onActualiser}/>
+   :<section className="vrm-apercu-reponse" data-apercu-reponse={rep.etat} aria-live="polite">
    <span className="vrm-apercu-pastille" aria-hidden="true"/>
    <div className="vrm-apercu-reponse-texte"><h3>{rep.titre}</h3>{rep.phrase&&<p data-apercu-dernier="">{rep.phrase}</p>}</div>
-   <button type="button" className="vrm-apercu-actualiser" onClick={onActualiser} disabled={lecture}>{lecture?'Lecture…':erreur?'Réessayer':'Actualiser'}</button>
-  </section>
-  {erreur&&d&&<p role="alert" className="vrm-apercu-alerte">Je n’ai pas pu relire la réception{d?' : ce qui suit date de la dernière lecture':''}. <button type="button" onClick={onActualiser} disabled={lecture}>Réessayer</button></p>}
+   {!erreur&&<button type="button" className="vrm-apercu-actualiser" onClick={onActualiser} disabled={lecture}>{lecture?'Lecture…':'Actualiser'}</button>}
+  </section>}
+  {erreur&&d&&<EtatPanne compact role="alert" className="vrm-apercu-alerte" quoi="La relecture de la réception" raison="Ce qui suit date de la dernière lecture." onReessayer={onActualiser}/>}
   {d&&(gestes.length>0
    ?<section className="vrm-apercu-bloc" data-apercu-gestes={gestes.length}><h4>À faire</h4><ul className="vrm-apercu-lignes">{gestes.map(g=><li key={g.k} data-apercu-geste={g.k} data-n={g.n}><span>{g.phrase}</span><button type="button" className="vrm-apercu-geste" aria-label={g.vers==='a-traiter'?'Vérifier les emails mis de côté':`${g.bouton} : ${g.phrase}`} onClick={()=>aller(g)}>{g.bouton}</button></li>)}</ul></section>
    :toutLu?<p className="vrm-apercu-rien" data-apercu-gestes="0">Rien à faire de ton côté.</p>:null)}

@@ -144,3 +144,85 @@ html body .vrm-ebay-q-nav.vrm-seg > button.vrm-seg-btn,
    gauche, marquée « Offre » avec son montant — le prix d'avant barré, en sourdine. */
 .vrm-msg-extrait .vrm-msg-offre-der { display: inline-block; vertical-align: baseline; }
 .vrm-msg-offre-der .vrm-msg-offre-ancien { font-weight: 500; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   (5 nov., chantier G — revue de cohérence 2.23) MESSAGES, UNE FORME
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* À l'ordinateur, une colonne de conversations assez large pour un pseudo
+   entier (« mathilde_sneakers_collection », 28 signes) : 380-420 px, la fiche
+   rend la place (240-272 px), le fil garde le reste. */
+/* (Plus spécifique que la règle de styles-bureau.css, qui posait 300 px fixes à 1440 px et plus.) */
+@media (min-width: 1024px) {
+  :root body .vrm-message-workspace:not(#_):has(> .vrm-msg-fiche) {
+    grid-template-columns: minmax(368px, 420px) minmax(0, 1fr) minmax(240px, 272px) !important;
+  }
+  :root body .vrm-message-workspace:not(#_):not(:has(> .vrm-msg-fiche)) { grid-template-columns: minmax(368px, 420px) minmax(0, 1fr) !important; }
+}
+
+/* La ligne d'une conversation : le pseudo a TOUTE sa ligne (l'heure à
+   droite) ; le compte est sur la ligne de la paire, où il cède la place. */
+html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-l1 > .vrm-msg-name { flex: 0 1 auto; min-width: 0; }
+html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-paire { display: flex !important; align-items: center; gap: 6px; min-width: 0; }
+html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-paire > .vrm-msg-paire-t { flex: 0 1 auto; min-width: 0; }
+html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-paire > .vrm-msg-acc { flex: 0 10 auto; min-width: 3ch; max-width: 60%; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-paire > .vrm-msg-etat { flex: none; }
+
+/* Le champ de recherche commun, posé en tête de la liste. */
+html body .vrm-inbox-column > .vrm-champ-recherche.vrm-msg-recherche { margin: 0 0 12px; width: 100%; }
+html body .vrm-msg-recherche-portee { display: flex; flex-wrap: wrap; align-items: center; gap: 0 8px; margin: -4px 0 8px; font-size: 13px; color: var(--vrm-muted); }
+
+/* La barre des filtres : les pastilles (`.vrm-filtres`, leur dessin vient de
+   jetons.css) puis la relecture, en icône, au bout. */
+html body .vrm-msg-bar { align-items: flex-start; }
+html body .vrm-msg-bar > .vrm-inbox-filters.vrm-filtres { flex: 1 1 auto; min-width: 0; }
+html body .vrm-msg-bar > .vrm-msg-refresh { flex: none; }
+
+/* ── UN STYLE DE LIEN EN PIED (2.23) ───────────────────────────────────
+   « Afficher les suivantes », « La remettre », « Réessayer », « Ouvrir sur
+   Leboncoin ↗ », « Répondre sur Vestiaire ↗ », « Modifier »… : encre, 15/600,
+   sans soulignement ni aplat, 44 px de cible, l'appui se voit. Jamais l'accent
+   (§7 : il est rare). */
+html body .vrm-pied-lien,
+html body .vrm-app-shell .vrm-main .vrm-pied-lien:not(#_) {
+  display: inline-flex !important; align-items: center; gap: 6px; min-height: 44px !important; padding: 0 2px !important; margin: 0;
+  border: 0 !important; background: transparent !important; box-shadow: none !important; border-radius: 8px !important;
+  color: var(--vrm-ink) !important; font: 600 15px/1.2 var(--vrm-police, inherit) !important; text-decoration: none !important;
+  cursor: pointer; -webkit-tap-highlight-color: transparent; transition: opacity 120ms ease-out;
+}
+html body .vrm-pied-lien:active { opacity: .55; }
+@media (hover: hover) and (pointer: fine) { html body .vrm-pied-lien:hover { opacity: .7; } }
+html body .vrm-pied-lien:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: 2px; }
+html body .vrm-pied-lien .vrm-pied-lien-n { font-weight: 500; font-size: 13px; color: var(--vrm-muted); font-variant-numeric: tabular-nums; }
+html body .vrm-msg-more.vrm-pied-lien { display: flex !important; width: 100%; justify-content: center; margin-top: 4px; }
+html body .vrm-msg-retirees { display: flex; flex-wrap: wrap; align-items: center; gap: 0 12px; }
+
+/* Les réponses rapides : des pastilles qui se prennent au doigt. */
+html body .vrm-qr-puce { min-height: 36px; box-sizing: border-box; }
+html body .vrm-qr-puce .vrm-icon-control { width: 36px; height: 36px; min-height: 36px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; }
+@media (pointer: coarse), (hover: none) {
+  html body .vrm-qr-puce { min-height: 44px; }
+  html body .vrm-qr-puce > button:first-child { min-height: 44px !important; }
+  html body .vrm-qr-puce .vrm-icon-control { width: 44px; height: 44px; min-height: 44px; }
+}
+
+/* Une ligne de conversation répond au toucher tout de suite. */
+html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-list .vrm-inbox-row { transition: opacity 120ms ease-out; -webkit-tap-highlight-color: transparent; }
+html body :is([data-messagerie], [data-messagerie-site]) .vrm-msg-list .vrm-inbox-row:active { opacity: .6; }
+
+/* ── MESSAGES · VESTIAIRE : les offres reçues (5 nov., chantier G) ───────
+   Le temps restant sur sa ligne ; sous 6 h (`expireBientot`), en AMBRE — la
+   seule fois dans Messages (la pastille « offre » de la liste reste neutre). */
+html body .vrm-of .vrm-of-reste { font-size: 13px; color: var(--vrm-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+html body .vrm-of .vrm-of-reste.is-bientot { color: var(--vrm-warn); font-weight: 600; }
+html body .vrm-of .vrm-of-nom { display: flex; align-items: center; gap: 6px; min-width: 0; }
+html body .vrm-of .vrm-of-nom > .vrm-of-titre-article { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html body .vrm-of .vrm-of-nom > .vrm-num { flex: none; margin: 0; }
+html body .vrm-of .vrm-photo-vide.vrm-of-photo { width: 52px; height: 64px; }
+html body .vrm-of .vrm-of-titre-second { margin-top: 14px; font-size: 15px; }
+html body .vrm-of .vrm-of-lien.vrm-pied-lien { align-self: flex-start; }
+@media (max-width: 600px) { html body .vrm-of .vrm-photo-vide.vrm-of-photo { width: 44px; height: 56px; } }
+/* Messages · Vestiaire prend toute la largeur de l'écran : l'espace du site centre ses
+   enfants (`align-items: center`), la liste se rétrécissait à son contenu (402→1352 px
+   à 1512, au lieu du bord du titre). */
+html body .vrm-market-space > :is([data-messagerie-site="vestiaire"], [data-vc-ext]) { align-self: stretch; width: auto; }

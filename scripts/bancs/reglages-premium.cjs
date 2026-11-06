@@ -104,7 +104,7 @@ const mesurer = (pg, mobile) => pg.evaluate((mobile) => {
     deb: document.documentElement.scrollWidth - document.documentElement.clientWidth,
     tombe: /pas pu s'afficher|Cannot access|is not defined/.test(document.body.innerText),
     petites,
-    sous: [...document.querySelectorAll('[data-sous-ouvrir]')].filter(visible).map((e) => e.getAttribute('data-sous-ouvrir')),
+    sous: [...document.querySelectorAll('[data-sous-ouvrir][aria-haspopup]')].filter(visible).map((e) => e.getAttribute('data-sous-ouvrir')),   // (5 nov., chantier H) un SOUS-ÉCRAN s'ouvre (aria-haspopup) ; « E-mails » mène à son écran (chantier G)
     panneauxVisibles: [...document.querySelectorAll('[data-sous-ecran]')].filter(visible).length,
     disposition: racine ? racine.getAttribute('data-reglages-disposition') : null,
   };
@@ -194,10 +194,13 @@ async function interrupteurs(pg, T) {
               const c = document.querySelector('[data-photo-profil]');
               const ent = document.querySelector('[data-profil-compte] .vrm-set-avatar');
               const lettre = (e) => (e ? e.innerText : '').trim().slice(0, 1);
-              return c ? { double: !!c.closest('.vrm-set-liste'), lettre: lettre(c.querySelector('span')), tete: lettre(ent) } : null;
+              // (5 nov., chantier H) La photo se change DANS la carte du profil (`data-photo-profil="nu"`) :
+              // un seul avatar, celui de l'en-tête — la règle « même lettre » devient « une seule lettre ».
+              const nu = c && c.getAttribute('data-photo-profil') === 'nu';
+              return c ? { double: !!c.closest('.vrm-set-liste'), nu, dansProfil: !!c.closest('[data-profil-compte]'), lettre: nu ? lettre(ent) : lettre(c.querySelector('span')), tete: lettre(ent) } : null;
             });
             dit(!!p && !p.double, `${T} : la photo de profil n’est pas enfermée dans une seconde carte`, JSON.stringify(p));
-            dit(!!p && !!p.tete && p.lettre === p.tete, `${T} : la photo de profil a la même lettre de repli que l’en-tête`, JSON.stringify(p));
+            dit(!!p && !!p.tete && p.lettre === p.tete && (!p.nu || p.dansProfil), `${T} : la photo de profil a la même lettre de repli que l’en-tête (une seule, dans la carte du profil)`, JSON.stringify(p));
           }
           // Chaque sous-écran : rendu, sans débordement (ni petite cible au doigt), puis retour.
           {

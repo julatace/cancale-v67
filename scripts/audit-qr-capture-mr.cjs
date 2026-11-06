@@ -133,9 +133,19 @@ async function verifier(src, bavard) {
     const app = sansCommentaires(src.app);
     const iT = app.indexOf('const trackingRetrait = useMemo('), iP = app.indexOf("useStateCle(CLE_QR_POSES");
     dit(iP > 0 && iT > iP && /avecQrPoses\(suivisAvecMondialRelay\(tracking, mrColis\), qrPoses,/.test(app), 'E1 les QR posés nourrissent les lignes de suivi (une règle), déclarés AVANT (§4.6)');
-    dit(/titreQrAbsent\(carrierKey\(tr\)\)/.test(app) && /titreQrAbsent\(carrierKey\(qrView\.carrier\)\)/.test(app) && !/<strong>QR pas reçu<\/strong>/.test(app), 'E2 carte et vue en grand : « QR dans l’app Mondial Relay » (plus « QR pas reçu » écrit en dur)');
+    // (6 nov., v36) Depuis le chantier D (« En grand » refait), la vue en grand lit le
+    // transporteur UNE fois (`const ck = carrierKey(qrView.carrier) || ''`) et écrit
+    // `titreQrAbsent(ck)`. On juge la RÈGLE : le titre « QR absent » de la vue en grand
+    // vient de `titreQrAbsent` appliqué au transporteur DE CE colis (directement ou par
+    // une constante qui le porte), jamais un texte en dur.
+    const vueGrand = (() => { const i = app.indexOf('{qrView && (()=>{'); return i < 0 ? '' : app.slice(i, app.indexOf('</SheetShell>', i)); })();
+    const cstCk = (vueGrand.match(/const (\w+) = carrierKey\(qrView\.carrier\)(?: \|\| '')?;/) || [])[1];
+    const grandOk = /titreQrAbsent\(carrierKey\(qrView\.carrier\)\)/.test(vueGrand) || (!!cstCk && new RegExp('<strong>\\{titreQrAbsent\\(' + cstCk + '\\)\\}</strong>').test(vueGrand));
+    dit(/titreQrAbsent\(carrierKey\(tr\)\)/.test(app) && grandOk && !/<strong>QR pas reçu<\/strong>/.test(app), 'E2 carte et vue en grand : « QR dans l’app Mondial Relay » (plus « QR pas reçu » écrit en dur)');
     dit(/data-colis-qr-ajouter=""/.test(app) && /data-qr-plein-ajouter=""/.test(app) && /qrParCapture\(carrierKey\(t\.carrier\)\)/.test(app), 'E3 « Ajouter le QR (capture) » sur la carte et dans « En grand », Mondial Relay seulement');
-    dit(/data-qr-plein-retirer=""[^>]*onClick=\{\(\)=>retirerQrPose\(qrView\._t\)\}/.test(app), 'E4 « Retirer ce QR » sur son clic');
+    // (6 nov., v36) Les espaces autour de la flèche ne sont pas la règle : le bouton
+    // « Retirer ce QR » de la vue en grand appelle `retirerQrPose` sur CE colis, à son clic.
+    dit(/data-qr-plein-retirer=""[^>]*onClick=\{\s*\(\)\s*=>\s*retirerQrPose\(qrView\._t\)\s*\}[^>]*>Retirer ce QR</.test(vueGrand), 'E4 « Retirer ce QR » sur son clic');
     const appels = app.match(/dessinerQrCapture\(([^,)]*)/g) || [];
     dit(appels.length === 1 && /dessinerQrCapture\(j\.contenu$/.test(appels[0]) && !/from ['"]qrcode-generator['"]/.test(app) && !/\bqrcode\(/.test(app), 'E5 la recopie ne reçoit QUE le contenu jugé (jamais le code ni le n°) ; aucun générateur de QR dans l’app', appels.join(' | '));
     const aj = app.slice(app.indexOf('const ajouterQrCapture = async'), app.indexOf('const retirerQrPose ='));
@@ -160,10 +170,14 @@ const MUTATIONS = [
   ['rqr', 'D1 : QR lu dans un compte accepté', (s) => s.replace('code: c.code || null, code2: null, qrB64: null, qrType: null,', "code: c.code || null, code2: null, qrB64: 'iVBORw0KGgo=', qrType: 'image/png',")],
   ['rqr', 'D2 : l’ancienne phrase (site ou application)', (s) => s.replace("mondialrelay: 'Le code suffit au comptoir.',", "mondialrelay: 'Il est dans ton compte Mondial Relay (site ou application). Au comptoir, le code suffit.',")],
   ['explique', 'D3 : l’animation promet les QR du compte', (s) => s.replace('ouvre le colis et fais une capture d’écran de son QR.', 'VRM récupère tes colis et leurs QR.')],
-  ['app', 'D3 : « Ouvrir Mondial Relay (QR) » remis', (s) => s.replace("                🔍 Suivre le colis\n", "                {qrView.carrier==='mondialrelay' && !qrView.img ? '📱 Ouvrir Mondial Relay (QR)' : '🔍 Suivre le colis'}\n")],
+  // (6 nov., v36) « En grand » refait (chantier D) : le lien de suivi est un `Bouton`.
+  ['app', 'D3 : « Ouvrir Mondial Relay (QR) » remis', (s) => s.replace('data-qr-plein-suivre="">Suivre le colis</Bouton>', "data-qr-plein-suivre=\"\">{qrView.carrier==='mondialrelay' && !qrView.img ? 'Ouvrir Mondial Relay (QR)' : 'Suivre le colis'}</Bouton>")],
   ['app', 'E5 : un QR fabriqué depuis le code', (s) => s.replace("dessinerQrCapture(j.contenu, libs || {})", 'dessinerQrCapture(codeRetrait(t.code) || j.contenu, libs || {})')],
   ['app', 'E6 : posé quel que soit le jugement', (s) => s.replace("if (j.etat === 'pose') {\n      const p = { contenu: j.contenu", "if (true) {\n      const p = { contenu: j.contenu")],
   ['app', 'E2 : « QR pas reçu » en dur sur la carte', (s) => s.replace('<strong>{titreQrAbsent(carrierKey(tr))}</strong>', '<strong>QR pas reçu</strong>')],
+  ['app', 'E2 : « QR pas reçu » en dur dans « En grand »', (s) => s.replace('<strong>{titreQrAbsent(ck)}</strong>', '<strong>QR pas reçu</strong>')],
+  ['app', 'E2 : « En grand » juge un autre transporteur', (s) => s.replace("const ck = carrierKey(qrView.carrier) || '';", "const ck = 'colissimo';")],
+  ['app', 'E4 : « Retirer ce QR » ne retire rien', (s) => s.replace('onClick={() => retirerQrPose(qrView._t)}>Retirer ce QR', 'onClick={() => setQrView(null)}>Retirer ce QR')],
   ['lire', 'E8 : ZXing chargé d’un CDN', (s) => s.replace("const { default: jsQR } = await import('jsqr');", "const s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/umd/index.min.js'; const { default: jsQR } = await import('jsqr');")],
   ['doc', 'D5 : la spécification remet un champ qr', (s) => s.replace('"code": "<code de retrait>",', '"code": "<code de retrait>", "qr": { "type": "image/png" },')],
 ];

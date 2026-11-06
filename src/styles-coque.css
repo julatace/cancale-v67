@@ -58,58 +58,66 @@
 .vrm-market-heading .vrm-brand-icon { width: 28px; height: 28px; object-fit: contain; }
 @media (min-width: 1024px) { .vrm-market-heading { padding: 10px 16px 14px; } .vrm-market-heading .vrm-brand-icon { width: 32px; height: 32px; } }
 
-/* ── SOUS-ONGLETS D'UNE PLATEFORME : contrôle segmenté ─────────────────── */
+/* ── LE CONTRÔLE SEGMENTÉ : UNE RÈGLE, ICI SEULEMENT (5 nov., chantier A) ──
+   Revue de cohérence 1.3 : `.vrm-seg-btn` était redéfini dans six feuilles ; la
+   dernière (jetons.css) l'écrasait à 4 px de retrait latéral — « Mois » et
+   « Année » collés au bord à 1512 px, « Semaine » coupé au téléphone. UNE forme :
+     · piste neutre (le remplissage d'iOS), rayon 14 ; segment rayon 12 ;
+     · retrait latéral 14 px, libellé 13/600 sur UNE ligne, jamais rogné : un
+       segment prend la largeur de ses mots (`flex: 1 0 auto`) ; la piste défile
+       si l'écran est trop étroit, elle ne coupe rien ;
+     · 36 px à la souris, 44 px au doigt (la cible) ;
+     · segment choisi en aplat (blanc en clair, #636366 en sombre), texte encre ;
+       jamais un segment bleu plein (§7 : l'accent ne marque pas une sélection).
+   Les états `aria-current` (navigation) et `aria-pressed` (`Segmente`, un choix
+   d'écran) ont la même forme. La spécificité (`:not(#vrm-seg)`) passe devant les
+   anciennes règles restées hors de cette feuille ; n'en ajoute pas ailleurs :
+   le banc `jetons-coherence` mesure le retrait, la hauteur et les libellés. */
+:root {
+  --seg-piste: rgba(118,118,128,.12); --seg-actif: #ffffff; --seg-actif-texte: #1d1d1f;
+  --seg-actif-ombre: 0 1px 2px rgba(0,0,0,.08), 0 2px 6px rgba(0,0,0,.06);
+}
+:root[data-theme="dark"] { --seg-piste: rgba(118,118,128,.24); --seg-actif: #636366; --seg-actif-texte: #ffffff; --seg-actif-ombre: none; }
 .vrm-seg-cadre { padding: 0 16px 12px; min-width: 0; }
-.vrm-seg {
-  display: flex; gap: 2px; padding: 3px; margin: 0; border: 0;
-  border-radius: var(--vrm-r-md);
-  /* La piste est un voile NEUTRE tiré du texte secondaire du thème (lisible
-     sur le fond clair comme sur le sombre, eBay compris : son skin suit le thème). */
-  background: var(--seg-piste, color-mix(in srgb, var(--vrm-muted) 13%, transparent));
-  overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain;
-  scroll-padding-inline: 3px;
+:root .vrm-seg:not(#vrm-seg) {
+  display: flex !important; gap: 2px !important; padding: 3px !important; margin: 0; border: 0 !important;
+  box-sizing: border-box !important; min-height: 0 !important; border-radius: 14px !important;
+  background: var(--seg-piste) !important; box-shadow: none !important;
+  overflow-x: auto !important; scrollbar-width: none; overscroll-behavior-x: contain; scroll-padding-inline: 3px;
+  -webkit-mask-image: none !important; mask-image: none !important;
+  --seg-ink: var(--vrm-ink); --seg-muted: var(--vrm-ink);
 }
 .vrm-seg::-webkit-scrollbar { display: none; }
-.vrm-seg-btn {
-  flex: 1 0 auto; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  min-height: 34px; padding: 0 14px; border: 0; border-radius: 12px;
-  background: transparent; color: var(--seg-muted);
-  font-size: 13px; font-weight: 600; letter-spacing: -.005em; white-space: nowrap; cursor: pointer;
-  transition: background-color .18s var(--vrm-ease-out, ease), color .18s ease, box-shadow .18s ease;
+:root .vrm-seg > .vrm-seg-btn:not(#vrm-seg) {
+  flex: 1 0 auto !important; min-width: max-content !important; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  box-sizing: border-box !important; height: auto !important; min-height: 36px !important; padding: 0 14px !important; margin: 0 !important;
+  border: 0 !important; border-radius: 12px !important; background: transparent !important; box-shadow: none !important;
+  color: var(--seg-ink) !important; font: 600 13px/1.2 var(--vrm-police) !important; letter-spacing: -.005em !important;
+  white-space: nowrap !important; overflow: visible !important; text-overflow: clip !important; cursor: pointer;
+  transition: background-color .18s var(--vrm-ease-out, ease), box-shadow .18s ease;
 }
-.vrm-seg-btn[aria-current="page"] {
-  background: var(--seg-on, var(--vrm-surface)); color: var(--seg-ink);
-  box-shadow: 0 1px 2px rgba(0,0,0,.10), 0 0 0 .5px rgba(0,0,0,.05);
+:root .vrm-seg > .vrm-seg-btn:not(#vrm-seg):is([aria-current="page"], [aria-pressed="true"]) {
+  background: var(--seg-actif) !important; color: var(--seg-actif-texte) !important; box-shadow: var(--seg-actif-ombre) !important;
 }
 .vrm-seg-btn:active:not(:disabled) { transform: none; }
-:root[data-theme="dark"] .vrm-seg-btn[aria-current="page"] { background: var(--seg-on, color-mix(in srgb, var(--vrm-muted) 26%, var(--vrm-surface))); }
-.vrm-seg-point { width: 6px; height: 6px; border-radius: 99px; background: var(--seg-point); flex-shrink: 0; }
-@media (max-width: 767px) { .vrm-seg-btn { padding: 0 10px; min-width: 44px; } }
-@media (min-width: 768px) {
-  .vrm-seg { width: fit-content; max-width: 100%; }
-  .vrm-seg-btn { flex: 0 0 auto; padding: 0 18px; }
-}
-@media (hover: hover) and (pointer: fine) {
-  .vrm-seg-btn:not([aria-current]):not([aria-pressed="true"]):hover { color: var(--seg-ink); filter: none; }
-}
-/* Le MÊME contrôle sert aux choix d'un écran (imprimante, période, taille de
-   l'affichage, détourage, vues du stock) : `Segmente` pose aria-pressed au lieu
-   d'aria-current. Jamais de segment bleu plein (§7 : l'accent ne marque pas une
-   sélection) — revue du 16 oct., trois formes pour une fonction. */
-.vrm-seg { --seg-ink: var(--vrm-ink); --seg-muted: var(--vrm-muted); }
-.vrm-seg-btn[aria-pressed="true"] {
-  background: var(--seg-on, var(--vrm-surface)); color: var(--seg-ink);
-  box-shadow: 0 1px 2px rgba(0,0,0,.10), 0 0 0 .5px rgba(0,0,0,.05);
-}
-:root[data-theme="dark"] .vrm-seg-btn[aria-pressed="true"] { background: var(--seg-on, color-mix(in srgb, var(--vrm-muted) 26%, var(--vrm-surface))); }
 .vrm-seg-btn:disabled { opacity: .45; cursor: not-allowed; }
+.vrm-seg-point { width: 6px; height: 6px; border-radius: 99px; background: var(--seg-point); flex-shrink: 0; }
+.vrm-seg-n { font-variant-numeric: tabular-nums; }
+@media (hover: hover) and (pointer: fine) {
+  :root .vrm-seg > .vrm-seg-btn:not(#vrm-seg):not([aria-current]):not([aria-pressed="true"]):hover { background: color-mix(in srgb, var(--seg-actif) 45%, transparent) !important; }
+}
+/* Au doigt : 44 px, la cible. Le téléphone se reconnaît AUSSI à sa largeur (≤ 767 px, la règle
+   de toute l'app) : Chromium émulé en mobile ne répond pas toujours `pointer: coarse` — mesuré
+   le 5 nov. par le banc `composants`, le segmenté hors de `.vrm-main` restait à 36 px. */
+@media (max-width: 767px), (pointer: coarse), (hover: none) {
+  :root .vrm-seg > .vrm-seg-btn:not(#vrm-seg) { min-height: 44px !important; }
+}
+/* À l'ordinateur, la piste ne prend que la place de ses segments. */
+@media (min-width: 768px) {
+  :root .vrm-seg:not(#vrm-seg):not(.vrm-seg-plein) { width: fit-content; max-width: 100%; }
+}
+/* `plein` : la piste prend toute la largeur, les segments la partagent (Achats). */
 .vrm-seg-plein { width: 100%; }
-.vrm-seg-plein > .vrm-seg-btn { flex: 1 1 0; min-width: 0; padding-inline: 8px; }
-/* Segments à parts égales : un libellé long (« Photo de couverture » à 390 px)
-   passe à la ligne au lieu de déborder sur son voisin (revue visuelle du 17 oct.). */
-.vrm-seg-plein > .vrm-seg-btn { white-space: normal; text-align: center; line-height: 1.2; overflow-wrap: anywhere; }
-.vrm-seg > .vrm-seg-btn { min-height: 34px; }
-@media (max-width: 767px), (max-width: 1023px) and (hover: none), (max-width: 1023px) and (pointer: coarse), (max-width: 1023px) and (pointer: none) { .vrm-main .vrm-seg > .vrm-seg-btn { min-height: 44px !important; padding-block: 0 !important; } }
 
 /* ── LES FILTRES : une seule pastille (revue du 16 oct.) ────────────────────
    Pastille neutre ; l'active est à l'encre pleine en clair, une surface élevée
@@ -246,23 +254,19 @@
     color: var(--vrm-ink) !important; position: relative; cursor: pointer;
   }
   .vrm-hbtn[aria-pressed="true"], .vrm-hbtn[aria-expanded="true"] { background: var(--vrm-card2) !important; }
-  /* L'état « puis-je agir sur Vinted ? » : un « i » au trait, avec la PASTILLE
-     d'état en coin (comme un badge iOS) — la couleur dit l'état, le texte est
-     dans le panneau qui s'ouvre. */
+  /* (5 nov., chantier H — revue 2.28) L'état « puis-je agir sur Vinted ? » : une
+     PASTILLE DE COULEUR, plus un « ⓘ » (une icône de plus sans libellé). Le point
+     dit l'état par sa couleur — encre : tu peux agir ; gris : rien à faire ici ;
+     ambre (avec son halo) : un geste à faire (§7). Le texte est dans le panneau ;
+     le nom lu reste en aria-label. Cible de 44 px. */
   .vrm-app-header [data-etat-actions] > span:not([aria-hidden]) { display: none; }
-  .vrm-app-header [data-etat-actions] > span[aria-hidden] {
-    position: absolute; top: 11px; right: 10px; width: 8px !important; height: 8px !important;
-    box-shadow: 0 0 0 2px var(--vrm-bg);
+  .vrm-app-header [data-etat-actions] > span.vrm-etat-point[aria-hidden] {
+    position: static; display: block; width: 12px !important; height: 12px !important; border-radius: 999px !important;
+    opacity: 1 !important; box-shadow: 0 0 0 5px color-mix(in srgb, var(--etat-ton) 16%, transparent) !important;
+    transition: background-color .2s ease, box-shadow .2s ease;
   }
-  .vrm-app-header.is-defile [data-etat-actions] > span[aria-hidden] { box-shadow: 0 0 0 2px var(--vrm-surface); }
-  /* (5 nov.) Le point de coin ne se montre que s'il y a un geste à faire : tout
-     va bien ⇒ le « i » seul, sans couleur. */
-  .vrm-app-header [data-etat-actions]:not([data-etat-ton="attention"]) > span[aria-hidden] { display: none; }
-  .vrm-app-header [data-etat-actions]::after {
-    content: 'i'; display: grid; place-items: center; width: 19px; height: 19px;
-    border: 1.6px solid currentColor; border-radius: 50%;
-    font: 600 12px/1 'Inter', system-ui, sans-serif; font-style: normal;
-  }
+  .vrm-app-header [data-etat-actions][data-etat-ton="attention"] > span.vrm-etat-point[aria-hidden] { box-shadow: 0 0 0 5px color-mix(in srgb, var(--etat-ton) 26%, transparent) !important; }
+  .vrm-app-header [data-etat-actions]:active > span.vrm-etat-point[aria-hidden] { transform: scale(.9); }
   .vrm-app-header [data-stream-pastille] { font-size: 0 !important; gap: 0 !important; }
   .vrm-app-header [data-stream-pastille] > span { width: 10px !important; height: 10px !important; }
 
@@ -289,7 +293,7 @@
     font-size: 11px; font-weight: 500; letter-spacing: 0; line-height: 1.1;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
   }
-  .vrm-tab[aria-current="page"] { color: var(--vrm-accent); }
+  .vrm-tab[aria-current="page"] { color: var(--vrm-accent-texte, var(--vrm-accent)); }
   .vrm-tab[aria-current="page"] .vrm-nav-label { font-weight: 600; }
 
   /* Le contenu ne réserve plus la zone sûre : la barre la porte déjà. */
@@ -373,7 +377,7 @@
 .vrm-sheet-badge { flex-shrink: 0; font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 6px; background: var(--vrm-card2); color: var(--vrm-muted); }
 .vrm-sheet-row[aria-current="page"] { font-weight: 600; }
 .vrm-sheet-row[aria-current="page"] .vrm-sheet-ic,
-.vrm-sheet-row[aria-current="page"] .vrm-sheet-fin { color: var(--vrm-accent); }
+.vrm-sheet-row[aria-current="page"] .vrm-sheet-fin { color: var(--vrm-accent-texte, var(--vrm-accent)); }
 @media (hover: hover) and (pointer: fine) { .vrm-sheet-row:hover { background: var(--vrm-card2); filter: none; } }
 @media (prefers-reduced-motion: reduce) {
   .vrm-sheet, .vrm-sheet-voile, .vrm-hdr-titre { animation: none !important; transition: none !important; }

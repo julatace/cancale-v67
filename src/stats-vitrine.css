@@ -15,6 +15,7 @@
 .vrm-stats-vitrine .vrm-sv-tuile,
 .vrm-stats-vitrine .vrm-sv-boost-case { background: var(--vrm-surface); border-radius: 12px; padding: 14px 14px 13px; min-width: 0; }
 .vrm-stats-vitrine .vrm-sv-tuile-lib { font-size: 11px; color: var(--vrm-muted); font-weight: 500; }
+.vrm-stats-vitrine .vrm-sv-tuile-lib::first-letter, .vrm-stats-vitrine .vrm-of-tuile > span::first-letter { text-transform: uppercase; }   /* (5 nov.) une majuscule en tête */
 .vrm-stats-vitrine .vrm-sv-tuile-val { font-size: 20px; font-weight: 700; letter-spacing: -.02em; color: var(--vrm-ink); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; line-height: 1.25; }
 .vrm-stats-vitrine .vrm-sv-tuile-val[data-vide] { color: var(--vrm-muted); }
 .vrm-stats-vitrine .vrm-sv-tuile-sous { font-size: 11px; color: var(--vrm-muted); margin-top: 4px; line-height: 1.4; }
@@ -63,7 +64,6 @@
 
 /* Le sélecteur de période, à droite du titre (la piste de `Segmente`). */
 .vrm-sv-periode { min-width: 240px; }
-.vrm-sv-periode .vrm-seg-btn { font-size: 13px; padding: 0 22px; min-height: 40px; flex: 1 1 0; }
 
 /* La grille 12 colonnes de Statistiques (≥ 1200 px, styles-gestion.css) : le bloc
    de la maquette prend la 2ᵉ rangée, le reste descend d'une rangée. */
@@ -86,7 +86,6 @@
   .vrm-stats-vitrine { margin-top: 0; }
   .vrm-stats-vitrine .vrm-sv-tuile-val { white-space: normal; overflow-wrap: anywhere; }
   .vrm-sv-periode { min-width: 0; width: 100%; }
-  .vrm-sv-periode .vrm-seg-btn { min-height: 44px; }
   .vrm-stats-vitrine .vrm-sv-boost { gap: 8px; }
   .vrm-stats-vitrine .vrm-sv-boost-case { padding: 12px 10px; }
   .vrm-stats-vitrine .vrm-sv-boost-case .vrm-sv-tuile-val { font-size: 15px; }
@@ -140,9 +139,10 @@
 .vrm-stats-vitrine .vrm-of-tuile > b { font-size: 20px; font-weight: 700; letter-spacing: -.02em; color: var(--vrm-ink); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.25; }
 .vrm-stats-vitrine .vrm-of-tuile > b[data-vide] { color: var(--vrm-muted); }
 .vrm-stats-vitrine .vrm-of-table { display: flex; flex-direction: column; }
-.vrm-stats-vitrine .vrm-of-ligne { display: grid; grid-template-columns: minmax(0, 1.6fr) repeat(5, minmax(0, 1fr)); gap: 8px; align-items: baseline; padding: 9px 0; border-top: 1px solid var(--vrm-line); font-size: 13px; color: var(--vrm-ink); font-variant-numeric: tabular-nums; }
-.vrm-stats-vitrine .vrm-of-ligne > span:not(.vrm-of-nom) { text-align: right; white-space: nowrap; }
+.vrm-stats-vitrine .vrm-of-ligne { display: grid; grid-template-columns: minmax(0, 1.6fr) repeat(5, minmax(0, 1fr)); gap: 8px; align-items: baseline; padding: 9px 0; border-top: 1px solid var(--vrm-line); font-size: 13px; color: var(--vrm-ink); }
+.vrm-stats-vitrine .vrm-of-ligne > span:not(.vrm-of-nom) { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .vrm-stats-vitrine .vrm-of-entete { border-top: 0; padding-top: 0; font-size: 11px; color: var(--vrm-muted); font-weight: 500; }
+.vrm-stats-vitrine .vrm-of-entete > span:not(.vrm-of-nom) { font-variant-numeric: normal; }
 .vrm-stats-vitrine .vrm-of-entete > span { font-size: 11px !important; font-weight: 500 !important; color: var(--vrm-muted) !important; letter-spacing: 0 !important; }
 .vrm-stats-vitrine .vrm-of-nom { min-width: 0; display: flex; flex-direction: column; }
 .vrm-stats-vitrine .vrm-of-nom > b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -154,4 +154,37 @@
   .vrm-stats-vitrine .vrm-of-ligne > .vrm-of-nom { grid-column: 1 / -1; flex-direction: row; gap: 8px; align-items: baseline; }
   .vrm-stats-vitrine .vrm-of-ligne > span:not(.vrm-of-nom) { text-align: left; }
   .vrm-stats-vitrine .vrm-of-entete > .vrm-of-nom { display: none; }
+}
+
+/* ── (5 nov., chantier F, revue 2.25) UNE CARTE VIDE SE REPLIE EN UNE LIGNE ──
+   Lecture en cours, pas su, rien sur la période : le titre et la raison sur une
+   rangée de 44 px au moins, sans grand titre ni grand blanc. Elle ne s'étire
+   jamais à la hauteur de sa voisine de rangée. */
+html .vrm-stats-vitrine .vrm-sv-carte.vrm-sv-repliee {
+  flex-direction: row; flex-wrap: wrap; align-items: baseline;
+  justify-content: flex-start; gap: 2px 14px;
+  min-height: 44px; padding: 12px 14px; box-sizing: border-box;
+}
+html .vrm-stats-vitrine .vrm-sv-repliee-titre {
+  margin: 0; font-size: 15px; font-weight: 600; line-height: 1.3; letter-spacing: -.01em;
+  color: var(--vrm-ink); flex: 0 1 auto; min-width: 0;
+}
+html .vrm-stats-vitrine .vrm-sv-repliee-raison {
+  font-size: 13px; line-height: 1.4; color: var(--vrm-muted); text-align: left;
+  flex: 1 1 200px; min-width: 0;
+}
+/* Dans une rangée de cartes, la carte repliée garde sa hauteur d'une ligne (elle ne s'étire pas). */
+html .vrm-stats-vitrine .vrm-sv-rangee > .vrm-sv-repliee { align-self: start; }
+@media (max-width: 599px) {
+  html .vrm-stats-vitrine .vrm-sv-repliee-raison { flex-basis: 100%; }
+}
+/* Le choix « Vue d'ensemble · Prix qui marche », sous le grand titre. */
+.vrm-stats-sous-nav { margin-top: 4px; }
+@media (max-width: 599px) { .vrm-stats-vitrine .vrm-sv-sous-titre { margin-bottom: 2px; } }
+.vrm-stats-sous-nav .vrm-seg { margin: 0; }
+/* (5 nov., chantier F) Au téléphone, la note d'une carte passe SOUS son titre (le titre ne se
+   coupe plus en deux lignes pour lui laisser la place). */
+@media (max-width: 599px) {
+  .vrm-stats-vitrine .vrm-sv-carte-tete { flex-wrap: wrap; row-gap: 2px; }
+  .vrm-stats-vitrine .vrm-sv-carte-tete .vrm-sv-note { white-space: normal; flex-basis: 100%; }
 }

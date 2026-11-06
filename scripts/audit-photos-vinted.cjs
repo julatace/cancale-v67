@@ -154,6 +154,9 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
       'OsmMap :: tileUrl(t.x, t.y)': 'tuiles de carte OpenStreetMap',
       'AbonnementRequis :: "/vrm-logo-96.png"': 'logo de l’app (fichier du site, logo officiel)',
       'DemarrageVRM :: "/vrm-icon-v4-192.png"': 'icône officielle locale au démarrage, aucune URL distante',
+      // (5 nov.) deux <img> arrivés après la liste (24d409ad, 0d961728) :
+      'PhotosEbayEditeur :: e.apercu': 'photo prise ou choisie sur l’appareil pour eBay (5 nov.) : `apercu` = URL.createObjectURL(fichier) posée au choix du fichier (blob: local), jamais une adresse Vinted',
+      'LigneFamilleNotif :: "/vrm-icon-v4-192.png"': 'icône de l’app (fichier du site) dans l’aperçu d’une notification, Paramètres → Notifications',
       'PorteConfidentialite :: "/vrm-icon-v4-192.png"': 'icône de l’app v4 (fichier du site)',
       'AbonnementRequis :: "/vrm-logo-v4-192.png"': 'logo de l’app v4 (fichier du site, logo officiel)',
       'Accueil :: "/vrm-logo-v4-192.png"': 'logo de l’app v4 (fichier du site, logo officiel)',

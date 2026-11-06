@@ -104,6 +104,10 @@ async function passe(b, nom, ctxOpts, sombre) {
 
 async function parcours(pg, nom, errs, ecrits) {
   const outils = pg.locator('[data-aso-outils]');
+  // (6 nov., v36) Depuis la revue 2.16 (Achats), Fournisseurs · Délai · Lots sont derrière « … ».
+  const plus = pg.locator('[data-achats-plus="ferme"]');
+  await plus.waitFor({ timeout: 25000 }).catch(() => {});
+  if (await plus.count()) await plus.first().click();
   await outils.waitFor({ timeout: 25000 }).catch(() => {});
   if (!(await outils.count())) { dit(false, `${nom} · l'écran Achats est rendu`); await pg.screenshot({ path: path.join(SC, `z-fo-${nom}-ko.png`), fullPage: true }); console.log(errs.slice(0, 3).join('\n')); return; }
 

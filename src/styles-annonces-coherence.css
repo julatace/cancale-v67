@@ -1,0 +1,265 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   ANNONCES — CHANTIER C (5 nov., revue de cohérence 2.5 à 2.10)
+   ═══════════════════════════════════════════════════════════════════════════
+   Importé par App.jsx (le paquet de l'app arrive APRÈS les feuilles de
+   main.jsx) : à spécificité égale il l'emporte ; contre les couches d'avant qui
+   posent `!important` (styles-mineral, -epure, -iphone, design/jetons), les
+   sélecteurs ci-dessous montent d'un cran.
+   §7 : une couleur d'accent, rare (rien ici n'est bleu sauf la case cochée,
+   annonces-selection.css) ; l'ambre seulement pour un geste ; aucun rouge.
+   Cibles : 36 px à la souris, 44 px au doigt. */
+
+/* ── 1. LA BARRE D'OUTILS (2.10) : recherche · Trier · Republier… · ⋯ ─────── */
+:root:root:root body .vrm-app-shell .vrm-main .vrm-ann-toolbar.vrm-annbar,
+:root:root:root body .vrm-main .vrm-ann-toolbar.vrm-annbar {
+  display: flex !important; flex-wrap: wrap !important; align-items: center !important; gap: 8px !important;
+  grid-template-columns: none !important; margin: 0 0 12px !important; padding: 0 !important;
+  background: transparent !important; border: 0 !important; box-shadow: none !important; border-radius: 0 !important;
+}
+:root:root:root body .vrm-main .vrm-ann-toolbar.vrm-annbar > .vrm-annbar-recherche { flex: 1 1 260px !important; order: 0 !important; grid-column: auto !important; min-width: 0; width: auto; }
+:root:root:root body .vrm-main .vrm-ann-toolbar.vrm-annbar > .vrm-annbar-gestes {
+  display: flex !important; align-items: center; gap: 8px; flex: none; order: 1 !important; grid-column: auto !important;
+}
+:root:root:root body .vrm-main .vrm-ann-toolbar.vrm-annbar > :not(.vrm-annbar-recherche):not(.vrm-annbar-gestes) { order: 2 !important; flex-basis: 100%; }
+:root:root:root body .vrm-main .vrm-ann-toolbar.vrm-annbar > .vrm-annbar-refaire { flex-basis: auto; }
+
+/* Les trois boutons : UN dessin (le fond teinté des boutons secondaires). */
+:root:root:root body .vrm-main .vrm-annbar .vrm-annbar-bouton {
+  position: relative; display: inline-flex !important; align-items: center; justify-content: center; gap: 7px;
+  box-sizing: border-box; height: 36px !important; min-height: 36px !important; min-width: 36px !important; width: auto !important;
+  margin: 0 !important; padding: 0 14px !important; border: 0 !important; border-radius: 12px !important;
+  background: var(--vrm-b-teinte, rgba(118,118,128,.12)) !important; box-shadow: none !important;
+  color: var(--vrm-ink, #1D1D1F) !important; font: 600 13px/1 var(--vrm-police, inherit) !important; letter-spacing: -.005em;
+  white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent; text-indent: 0 !important;
+  transition: transform .12s cubic-bezier(.23, 1, .32, 1), background-color .15s ease;
+}
+:root:root:root body .vrm-main .vrm-annbar .vrm-annbar-bouton > svg { flex: none; color: var(--vrm-muted, #6E6E73); }
+:root:root:root body .vrm-main .vrm-annbar .vrm-annbar-bouton:active { transform: scale(.97); }
+:root:root:root body .vrm-main .vrm-annbar .vrm-annbar-bouton:is([aria-pressed="true"], [aria-expanded="true"]) {
+  background: var(--vrm-b-teinte-f, rgba(118,118,128,.2)) !important;
+}
+:root:root:root body .vrm-main .vrm-annbar .vrm-annbar-bouton:is([aria-pressed="true"], [aria-expanded="true"]) > svg { color: var(--vrm-ink, #1D1D1F); }
+@media (hover: hover) and (pointer: fine) {
+  :root:root:root body .vrm-main .vrm-annbar .vrm-annbar-bouton:hover { background: var(--vrm-b-teinte-f, rgba(118,118,128,.2)) !important; }
+}
+:root:root:root body .vrm-main .vrm-annbar .vrm-annbar-bouton:focus { outline: none !important; }
+:root:root:root body .vrm-main .vrm-annbar .vrm-annbar-bouton:has(select:focus-visible),
+:root:root:root body .vrm-main .vrm-annbar .vrm-annbar-bouton:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3) !important; outline-offset: 2px; }
+/* Trier : la liste native du système (au doigt comme à la souris), posée sur le bouton. */
+:root:root:root body .vrm-main .vrm-annbar .vrm-annbar-tri > select.vrm-ann-tri {
+  position: absolute !important; inset: 0 !important; width: 100% !important; height: 100% !important; min-width: 0 !important; min-height: 0 !important;
+  margin: 0 !important; padding: 0 !important; opacity: 0 !important; border: 0 !important; background: transparent !important;
+  cursor: pointer; font-size: 17px !important; -webkit-appearance: none; appearance: none; color: inherit !important; text-indent: 0 !important;
+}
+:root:root:root body .vrm-main .vrm-annbar .vrm-annbar-tri > select.vrm-ann-tri option { color: var(--vrm-ink); background: var(--vrm-surface); }
+:root:root:root body .vrm-main .vrm-annbar .vrm-ann-outils { position: relative; width: auto !important; }
+/* Le menu « Outils » : des lignes de 44 px. */
+:root:root:root body .vrm-main .vrm-annbar .vrm-annbar-outil {
+  display: flex !important; align-items: center; gap: 10px; width: 100%; min-height: 44px !important; margin: 0 !important; padding: 0 10px !important;
+  border: 0 !important; border-radius: 12px !important; background: transparent !important; box-shadow: none !important;
+  color: var(--vrm-ink) !important; font: 600 15px/1.2 var(--vrm-police, inherit) !important; text-align: left; cursor: pointer;
+}
+:root:root:root body .vrm-main .vrm-annbar .vrm-annbar-outil-icone { display: flex; flex: none; color: var(--vrm-muted); }
+@media (hover: hover) and (pointer: fine) {
+  :root:root:root body .vrm-main .vrm-annbar .vrm-annbar-outil:hover { background: var(--vrm-b-teinte) !important; }
+}
+:root:root:root body .vrm-main .vrm-annbar .vrm-annbar-outil:active { background: var(--vrm-b-teinte-f) !important; }
+
+/* Au doigt : 44 px. Au téléphone : UNE rangée — la recherche, puis les trois en icône. */
+@media (pointer: coarse), (max-width: 767px) {
+  :root:root:root body .vrm-main .vrm-annbar .vrm-annbar-bouton { height: 44px !important; min-height: 44px !important; min-width: 44px !important; }
+}
+@media (max-width: 767px) {
+  :root:root:root body .vrm-main .vrm-ann-toolbar.vrm-annbar { gap: 6px !important; }
+  :root:root:root body .vrm-main .vrm-ann-toolbar.vrm-annbar > .vrm-annbar-recherche { flex: 1 1 0 !important; }
+  :root:root:root body .vrm-main .vrm-ann-toolbar.vrm-annbar > .vrm-annbar-gestes { gap: 6px; }
+  :root:root:root body .vrm-main .vrm-annbar .vrm-annbar-bouton { width: 44px !important; padding: 0 !important; }
+  :root:root:root body .vrm-main .vrm-annbar .vrm-annbar-mot { display: none !important; }
+  :root:root:root body .vrm-main .vrm-annbar .vrm-annbar-bouton > svg { color: var(--vrm-ink, #1D1D1F); }
+}
+
+/* ── 2. LE BANDEAU « PRIX D'ACHAT · N/M → COMPLÉTER » (2.7) ─────────────────
+   Neutre (un fait qu'on complète quand on veut), une ligne au-dessus de la grille. */
+/* La ligne d'avis : un cadre, deux cases côte à côte (prix d'achat · nouveaux N°). */
+.vrm-ann-avis {
+  display: flex; align-items: stretch; box-sizing: border-box; margin: 0 0 12px; min-height: 48px;
+  border-radius: 14px; background: var(--vrm-surface, #FFFFFF); box-shadow: inset 0 0 0 1px var(--vrm-line, rgba(0,0,0,.08));
+}
+.vrm-ann-avis > * + * { border-left: 1px solid var(--vrm-line, rgba(0,0,0,.08)) !important; }
+.vrm-ann-achats {
+  flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 4px 10px; box-sizing: border-box;
+  padding: 2px 4px 2px 14px; min-height: 48px;
+}
+html body .vrm-ann-avis > button.vrm-ann-avis-neufs {
+  flex: 0 0 auto; display: flex !important; align-items: center; gap: 8px; min-height: 48px !important; margin: 0 !important;
+  padding: 0 14px !important; border: 0 !important; border-radius: 0 14px 14px 0 !important; background: transparent !important; box-shadow: none !important;
+  color: var(--vrm-ink) !important; font: 400 15px/1.2 var(--vrm-police, inherit) !important; cursor: pointer; white-space: nowrap;
+}
+html body .vrm-ann-avis > button.vrm-ann-avis-neufs:only-child { flex: 1 1 auto; justify-content: space-between; border-radius: 14px !important; }
+html body .vrm-ann-avis > button.vrm-ann-avis-neufs b { font-weight: 700; font-variant-numeric: tabular-nums; }
+.vrm-ann-avis-voir { font-size: 13px; font-weight: 600; color: var(--vrm-accent-texte, #0066CC); }
+html body .vrm-ann-avis > button.vrm-ann-avis-neufs[aria-expanded="true"] .vrm-ann-avis-voir { color: var(--vrm-muted); }
+html body .vrm-ann-avis > button.vrm-ann-avis-neufs:active { background: var(--vrm-b-teinte) !important; }
+.vrm-ann-achats-texte { flex: 1 1 auto; min-width: 0; display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 8px; line-height: 1.3; }
+.vrm-ann-achats-nom { font-size: 15px; font-weight: 600; color: var(--vrm-ink); }
+.vrm-ann-achats-n { font-size: 15px; font-weight: 700; color: var(--vrm-ink); font-variant-numeric: tabular-nums; }
+.vrm-ann-achats-sous { font-size: 13px; color: var(--vrm-muted); }
+.vrm-ann-achats > .vrm-b { flex: none; }
+
+/* ── 3. LA CARTE (2.6, 2.7, 2.8) ─────────────────────────────────────────── */
+/* Le N° sur la photo : la pastille partagée `Numero`, posée seule (plus de
+   pilule blanche autour, plus d'encre claire en sombre). */
+:root:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-numero {
+  position: absolute; left: 10px; top: 10px; z-index: 1; display: flex; align-items: center;
+}
+:root:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-numero button[data-edition]:not(#vrm-aucun) {
+  display: flex !important; align-items: center; justify-content: flex-start; min-height: 36px !important; min-width: 44px !important;
+  margin: 0 !important; padding: 0 !important; border: 0 !important; background: transparent !important; color: inherit !important; cursor: pointer;
+}
+:root:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-numero [data-edition] > span { border-bottom: 0 !important; }
+:root:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-numero .vrm-num { box-shadow: 0 1px 3px rgba(0,0,0,.18); }
+:root:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-numero input {
+  height: 32px; padding: 0 8px !important; border-radius: 6px !important; border: 0 !important;
+  background: var(--vrm-surface) !important; color: var(--vrm-ink) !important; box-shadow: 0 1px 3px rgba(0,0,0,.18);
+}
+/* Sans N° : une pastille neutre, translucide (le geste se voit sans crier). */
+.vrm-fiche-num-vide {
+  display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border-radius: 6px;
+  background: color-mix(in srgb, var(--vrm-surface, #FFFFFF) 88%, transparent); color: var(--vrm-ink, #1D1D1F);
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  font: 600 13px/1 var(--vrm-police, inherit); box-shadow: 0 1px 3px rgba(0,0,0,.14);
+}
+@media (pointer: coarse), (max-width: 767px) {
+  :root:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-numero button[data-edition]:not(#vrm-aucun) { min-height: 44px !important; }
+}
+/* Sans photo : la case `PhotoVide` prend toute la photo. */
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche a.vrm-fiche-photo > .vrm-photo-vide { position: absolute; inset: 0; width: 100%; height: 100%; }
+:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche a.vrm-fiche-photo > .vrm-photo-vide > svg { width: 40px; height: 40px; }
+
+/* Le prix d'achat sur la carte : une case comme les autres, GRISE (le bandeau
+   en tête porte le geste ; l'ambre sur chaque carte criait 0/12 fois). */
+:root:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-fiche-achat="inconnu"] {
+  border-color: var(--vrm-line) !important; background: var(--vrm-bg) !important;
+}
+:root:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-fiche-achat="inconnu"] .vrm-fiche-etat-haut > span:first-child { color: var(--vrm-muted) !important; }
+/* Au téléphone, fermée, la fiche ne montre plus la case « prix d'achat » manquante :
+   le bandeau en tête le dit une fois. */
+@media (max-width: 767px) {
+  :root:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche[data-fiche-ouverte="0"] [data-fiche-duo] { display: none !important; }
+}
+
+/* Les gestes : deux à la vue, puis « … » (une case carrée). */
+:root:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-gestes {
+  display: flex !important; flex-wrap: nowrap !important; align-items: stretch; gap: 6px !important;
+}
+:root:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-gestes > .vrm-fiche-geste {
+  min-height: 40px !important; border: 0 !important; background: var(--vrm-b-teinte, rgba(118,118,128,.12)) !important;
+  color: var(--vrm-ink) !important; justify-content: center; transition: transform .12s cubic-bezier(.23, 1, .32, 1);
+}
+:root:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-gestes > .vrm-fiche-geste-prix { flex: 1 1 auto; min-width: 0; flex-direction: column; gap: 1px !important; line-height: 1.15; padding: 4px 12px !important; }
+:root:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-gestes > [data-fiche-stock] { flex: 0 1 auto; }
+:root:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-gestes > .vrm-fiche-geste-plus { flex: none; width: 44px; padding: 0 !important; }
+:root:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-gestes > .vrm-fiche-geste:active { transform: scale(.97); }
+@media (hover: hover) and (pointer: fine) {
+  :root:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-gestes > .vrm-fiche-geste:hover { background: var(--vrm-b-teinte-f, rgba(118,118,128,.2)) !important; }
+}
+@media (pointer: coarse), (max-width: 767px) {
+  :root:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-gestes > .vrm-fiche-geste { min-height: 44px !important; }
+}
+/* Une carte étroite (deux colonnes au téléphone) : « Changer le prix » sur sa ligne,
+   le stock et « … » dessous — rien d'écrasé. */
+@media (max-width: 767px) {
+  :root:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-gestes { flex-wrap: wrap !important; }
+  :root:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-gestes > .vrm-fiche-geste-prix { flex: 1 1 100% !important; }
+  :root:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-gestes > [data-fiche-stock] { flex: 1 1 0 !important; min-width: 0; padding: 0 8px !important; overflow: hidden; text-overflow: ellipsis; }
+}
+/* Les libellés des cases chiffrées : en entier, sur deux lignes s'il le faut (jamais « Accepter … »). */
+:root:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-chiffres] .vrm-fiche-cell > span:first-child {
+  white-space: normal !important; overflow: visible !important; text-overflow: clip !important; line-height: 1.2;
+}
+:root:root body .vrm-main .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-gestes > .vrm-fiche-geste > svg { flex: none; }
+.vrm-fiche-geste-sous { display: block; font-size: 11px; font-weight: 500; color: var(--vrm-muted); white-space: nowrap; }
+
+/* La feuille « … » d'une carte : des lignes de 44 px, pleine largeur. */
+.vrm-fiche-menu { display: flex; flex-direction: column; gap: 2px; }
+html body .vrm-fiche-menu > .vrm-fiche-geste,
+html body .vrm-fiche-menu > button,
+html body .vrm-fiche-menu > a {
+  display: flex !important; align-items: center; justify-content: flex-start; gap: 10px; width: 100%; box-sizing: border-box;
+  min-height: 48px !important; margin: 0 !important; padding: 0 12px !important; border: 0 !important; border-radius: 12px !important;
+  background: transparent !important; color: var(--vrm-ink) !important; font: 600 15px/1.25 var(--vrm-police, inherit) !important;
+  text-align: left; white-space: normal !important; cursor: pointer; text-decoration: none;
+}
+html body .vrm-fiche-menu > :is(button, a):active { background: var(--vrm-b-teinte-f) !important; }
+@media (hover: hover) and (pointer: fine) {
+  html body .vrm-fiche-menu > :is(button, a):hover { background: var(--vrm-b-teinte) !important; }
+}
+html body .vrm-fiche-menu > [data-fiche-place][aria-pressed="false"] { color: var(--vrm-muted) !important; }
+
+/* ── 4. LA FEUILLE « ACTIONS » (2.5) ────────────────────────────────────────── */
+.vrm-act-raison {
+  margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--vrm-b-teinte, rgba(118,118,128,.12));
+  font-size: 13px; line-height: 1.45; color: var(--vrm-ink);
+}
+.vrm-act-tuiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+html body .vrm-act .vrm-act-choix { min-height: 64px; justify-content: center; transition: transform .12s cubic-bezier(.23, 1, .32, 1); }
+html body .vrm-act .vrm-act-choix:not([aria-disabled="true"]):active { transform: scale(.98); }
+html body .vrm-act .vrm-act-choix[aria-disabled="true"] { opacity: .5; }
+html body .vrm-act .vrm-act-choix span { font-size: 12px; }
+.vrm-act-main { display: flex; align-items: center; flex-wrap: wrap; gap: 0 10px; font-size: 12px; color: var(--vrm-muted); line-height: 1.4; }
+.vrm-act-main > .vrm-b { flex: none; }
+/* « Republier à la main » grisé : en gris, jamais un bleu éteint illisible la nuit. */
+html body .vrm-act-main > .vrm-b:disabled { color: var(--vrm-muted) !important; opacity: 1 !important; }
+.vrm-act-paire-nom { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.vrm-act-paire-nom > b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-act-ok { display: inline-flex; margin-left: auto; color: var(--vrm-muted); flex: none; }
+html body .vrm-act .vrm-act-pb a { color: var(--vrm-accent-texte, #0066CC); }
+@media (max-width: 420px) {
+  .vrm-act-tuiles { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ── 5. SÉLECTIONNER (2.8) ──────────────────────────────────────────────────── */
+.vrm-sel-nom { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.vrm-sel-nom > .vrm-num { margin: 0; }
+.vrm-sel-titre { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-sel-prix { font-variant-numeric: tabular-nums; }
+.vrm-sel-ligne > .vrm-photo-vide.vrm-sel-photo { height: 64px; border-radius: 12px; }
+.vrm-sel-ligne { transition: transform .12s cubic-bezier(.23, 1, .32, 1); }
+.vrm-sel-ligne:not([aria-disabled="true"]):active { transform: scale(.985); }
+
+/* ── 6. LE BLEU « LIEN » DE LA ZONE ───────────────────────────────────────────
+   Les boutons discrets lisent `--vrm-b-lien`, qui vaut l'APLAT (#0071E3/#0A84FF :
+   3,6:1 sur la carte sombre, banc fusion-app F6). Dans l'écran Annonces et ses
+   feuilles, le texte bleu est le bleu « lien » (`--vrm-accent-texte`), lisible dans
+   les deux thèmes — par la variable, comme Compta (styles-compta-claire). */
+.vrm-main:has(.vrm-annbar), .vrm-main .vrm-sel, .vrm-act, .vrm-fiche-menu { --vrm-b-lien: var(--vrm-accent-texte, #0066CC); }
+
+
+/* ── 7. « N NOUVEAUX N° POSÉS PAR VRM » : la liste dépliée sous la ligne d'avis ── */
+.vrm-ann-neufs {
+  margin: -4px 0 12px; padding: 10px 14px 8px; border-radius: 14px; box-sizing: border-box;
+  background: var(--vrm-surface, #FFFFFF); box-shadow: inset 0 0 0 1px var(--vrm-line, rgba(0,0,0,.08));
+}
+.vrm-ann-neufs-tete { font-size: 15px; font-weight: 600; color: var(--vrm-ink); }
+.vrm-ann-neufs-phrase { font-size: 12px; color: var(--vrm-muted); line-height: 1.45; margin: 2px 0 6px; }
+.vrm-ann-neufs-ligne { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid var(--vrm-line); }
+.vrm-ann-neufs-photo { width: 36px; height: 36px; border-radius: 12px; object-fit: cover; flex: none; }
+.vrm-ann-neufs-num { flex: none; display: flex; align-items: center; min-height: 44px; }
+.vrm-ann-neufs-num [data-edition] > span { border-bottom: 0 !important; }
+.vrm-ann-neufs-nom { flex: 1; min-width: 0; font-size: 13px; color: var(--vrm-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Au téléphone : la phrase du prix d'achat dans l'infobulle, la ligne reste UNE ligne. */
+@media (max-width: 767px) {
+  .vrm-ann-achats-sous { display: none; }
+  .vrm-ann-achats-nom, .vrm-ann-achats-n { font-size: 13px; }
+  html body .vrm-ann-avis > button.vrm-ann-avis-neufs { padding: 0 12px !important; font-size: 13px !important; }
+}
+html body .vrm-ann-avis > button.vrm-ann-avis-neufs > svg { display: none; flex: none; color: var(--vrm-muted); }
+.vrm-ann-achats-nom, .vrm-ann-achats-n { white-space: nowrap; }
+@media (max-width: 767px) {
+  html body .vrm-ann-avis > button.vrm-ann-avis-neufs .vrm-ann-avis-voir { display: none; }
+  html body .vrm-ann-avis > button.vrm-ann-avis-neufs > svg { display: block; }
+  /* Le premier article dans le premier écran (fusion-app F4) : un peu moins d'air entre la carte du haut et la barre. */
+  :root body .vrm-app-shell .vrm-main .vrm-ann-workbar { margin-top: -16px !important; margin-bottom: 8px !important; }
+  .vrm-ann-avis, .vrm-ann-achats { min-height: 44px; }
+  html body .vrm-ann-avis > button.vrm-ann-avis-neufs { min-height: 44px !important; }
+}

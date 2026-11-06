@@ -1290,7 +1290,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 .vrm-chart-compare { display:flex; flex-wrap:wrap; justify-content:space-between; gap:4px 12px; font-size:13px; color:var(--vrm-muted); padding-top:6px; }
 .vrm-chart-compare strong { font-weight:500; font-variant-numeric:tabular-nums; max-width:100%; overflow-wrap:anywhere; }
 .vrm-filter-recap { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:12px; color:var(--vrm-muted); }
-.vrm-filter-recap button,.vrm-chat-shortcuts button { background:transparent; border:0; color:var(--vrm-accent); font:600 12px/1.4 Inter,system-ui,sans-serif; cursor:pointer; padding:8px 0; }
+.vrm-filter-recap button,.vrm-chat-shortcuts button { background:transparent; border:0; color:var(--vrm-accent-texte); font:600 12px/1.4 Inter,system-ui,sans-serif; cursor:pointer; padding:8px 0; }
 .vrm-chat-shortcuts { flex-shrink:0; padding:0 16px; border-bottom:1px solid var(--vrm-line); }
 .vrm-msg-article { display:block; color:var(--vrm-muted); font-size:12px; line-height:1.4; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin:2px 0; }
 .vrm-shared-sale .vrm-sale-price { min-width:0; }
@@ -1401,3 +1401,16 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
 /* Read feedback belongs to the conversation header, without moving its history. */
 .vrm-chat-read { padding:8px 14px; margin:0; flex-shrink:0; overflow-wrap:anywhere; }
 .vrm-chat-sync:disabled { opacity:.5; cursor:wait; }
+
+/* (5 nov., revue 2.15-2.16) Achats : la barre des étapes et « … » (Fournisseurs · Délai · Lots) sur une ligne. */
+.vrm-achats-barre { display:flex; align-items:center; gap:8px; margin:0 0 16px; }
+.vrm-achats-barre > .vrm-seg { flex:1 1 auto; min-width:0; }
+.vrm-achats-plus { flex:0 0 44px; width:44px; height:44px; display:grid; place-items:center; border:0; border-radius:var(--r-pilule, 999px); background:var(--fu-remplir, rgba(118,118,128,.12)); color:inherit; cursor:pointer; transition:transform 160ms cubic-bezier(.23,1,.32,1); }
+.vrm-achats-plus:active { transform:scale(.97); }
+.vrm-achats-plus[aria-expanded="true"] { background:var(--fu-remplir-fort, rgba(118,118,128,.2)); }
+.vrm-achats-outils { margin:0 0 12px; }
+
+/* (5 nov.) Achats : un titre long tient sur deux lignes ; le message d'une liste vide. */
+.vrm-main .vrm-buy-title { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere; }
+.vrm-achats-vide { display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px; min-height:44px; margin:4px 0 14px; font-size:15px; }
+.vrm-achats-vide .vrm-lien-action { min-height:44px; border:0; background:transparent; padding:0; font:inherit; font-weight:600; color:var(--fu-lien, #0066cc); cursor:pointer; }

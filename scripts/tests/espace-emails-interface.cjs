@@ -14,7 +14,7 @@ const { build } = require("esbuild"),
     stdin: {
       resolveDir: root,
       loader: "jsx",
-      contents: `import React,{useState,useEffect,useRef}from'react';import{createRoot}from'react-dom/client';import EspaceEmails from'./src/EspaceEmails.jsx';import SuiviReceptionEmails from'./src/ReceptionEmails.jsx';import{normAdresse,ADRESSE_COLLECTRICE}from'./api/_lib/proprietaire-email.js';
+      contents: `import React,{useState,useEffect,useRef}from'react';import{createRoot}from'react-dom/client';import EspaceEmails from'./src/EspaceEmails.jsx';import SuiviReceptionEmails from'./src/ReceptionEmails.jsx';import{normAdresse,ADRESSE_COLLECTRICE}from'./api/_lib/proprietaire-email.js';import{EtatPanne}from'./src/composants/EtatPanne.jsx';import{ChampRecherche}from'./src/composants/ChampRecherche.jsx';import{PAS_SU,L,VERBES}from'./src/libelles.js';
 const C={text:'#223d41',muted:'#647676',bg:'#f2f5f0',card:'#fff',border:'#dce4de',accent:'#315e62',warn:'#946d27',danger:'#a33c36',onAccent:'#fff'};
 const useStateCle=(k,f)=>useState(f),load=()=>({}),save=()=>{},onCloudReady=()=>()=>{},JournalEmails=()=>null,Avancement=()=>null,compteAvancement=()=>'',phrasePersonne=()=>null,askText=async()=>'',SUPABASE_URL='',SB_CONFLICT='',withOwner=x=>x,enTeteSession=()=>({}),demanderPreuveAdresse=async()=>({etat:null}),estAdresseCollectrice=()=>false;
 const AUTH={user:{id:'a'}},DEMANDE_ADRESSES={on:false},Icon=()=> <span aria-hidden="true">·</span>,REGLAGE_PAS_LU='Lecture indisponible';
@@ -135,15 +135,15 @@ const root=createRoot(document.getElementById('root'));window.afficher=()=>root.
         "les autres emails restent accessibles",
       );
       await p
-        .getByLabel("Rechercher dans les emails à rattacher")
+        .getByLabel("Rechercher dans les e-mails à rattacher")
         .fill("exceptionnel");
       check((await lignes.count()) === 1, "recherche sur le motif");
       await p
-        .getByLabel("Rechercher dans les emails à rattacher")
+        .getByLabel("Rechercher dans les e-mails à rattacher")
         .fill("introuvable");
       check(
         await p
-          .getByText("Aucun email ne correspond à cette recherche.")
+          .getByText("Aucun e-mail ne correspond à cette recherche.")
           .isVisible(),
         "recherche vide explicitée",
       );
@@ -186,7 +186,7 @@ const root=createRoot(document.getElementById('root'));window.afficher=()=>root.
       await nav.getByRole("button", { name: /À rattacher/ }).click();
       check(
         await p
-          .getByText("Aucun email à rattacher pour le moment.")
+          .getByText("Aucun e-mail à rattacher pour le moment.")
           .isVisible(),
         "état vide distinct de la panne",
       );

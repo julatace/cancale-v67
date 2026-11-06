@@ -1,0 +1,214 @@
+/* ══ LES COMPOSANTS PARTAGÉS (5 novembre, chantier B de la revue de cohérence) ══
+   SheetShell (.vrm-fs-*), ChampRecherche (.vrm-champ-recherche-*), PhotoVide
+   (.vrm-photo-vide), Numero (.vrm-num), EtatPanne (.vrm-etat-panne-*), et la
+   variante « danger » (ambre) de Bouton. Composants : src/composants/*.jsx ;
+   API : docs/passation/2026-11-05-chantier-b.md.
+   Échelle fermée de jetons.css : tailles 11·12·13·15·17·20…, graisses 400–800,
+   rayons 6 · 12 · 14 · 20 · 999. Couleurs : les variables de la coque
+   (`variablesTheme`, src/themeMineral.js). Aucun rouge hors du N° en doublon (§7).
+   Chargé APRÈS toutes les autres feuilles (main.jsx). Les sélecteurs sont
+   doublés sous `.vrm-app-shell .vrm-main` là où styles-epure/iphone/mineral
+   visent les champs et boutons de l'écran avec !important. */
+
+/* ── 1. LA FEUILLE (SheetShell) ─────────────────────────────────────────────── */
+.vrm-fs-cadre {
+  position: fixed; inset: 0; display: flex; align-items: flex-end; justify-content: center;
+  pointer-events: none;
+}
+.vrm-fs-voile {
+  position: absolute; inset: 0; pointer-events: auto;
+  background: rgba(0,0,0,.46); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+  /* Sans « fill » : après le fondu d'entrée, l'opacité posée par le geste (le voile
+     s'éclaircit à mesure que la feuille descend) reprend la main. */
+  animation: vrm-fs-voile-entree .2s ease-out;
+}
+@keyframes vrm-fs-voile-entree { from { opacity: 0; } to { opacity: 1; } }
+/* La feuille : OPAQUE dès la première image, n'anime que `transform` (src/composants/SheetShell.jsx). */
+.vrm-fs {
+  position: relative; pointer-events: auto; box-sizing: border-box;
+  display: flex; flex-direction: column;
+  width: 100%; max-height: 86vh; max-height: 86dvh;
+  background: var(--vrm-bg, #F2F2F7); color: var(--vrm-ink, #1D1D1F);
+  opacity: 1;
+  border-radius: 20px 20px 0 0;
+  box-shadow: var(--o-flottant, 0 6px 16px rgba(0,0,0,.08), 0 24px 56px rgba(0,0,0,.14));
+  outline: none;
+  will-change: transform;
+  font-family: var(--vrm-police, inherit);
+}
+.vrm-fs:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: -2px; }
+/* La poignée : 36 × 5, prise au doigt sur 44 px (la zone déborde de 20 px
+   au-dessus du bord : on attrape le haut de la feuille sans viser). */
+.vrm-fs-poignee-zone {
+  position: relative; flex: none; display: flex; justify-content: center;
+  padding: 10px 0 17px; cursor: grab; touch-action: none;
+  -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+}
+.vrm-fs-poignee-zone::before { content: ''; position: absolute; left: 0; right: 0; top: -20px; height: 20px; }
+.vrm-fs-poignee-zone:active { cursor: grabbing; }
+.vrm-fs-poignee { display: block; width: 36px; height: 5px; border-radius: 999px; background: var(--vrm-line, #C7C7CC); }
+:root[data-theme="dark"] .vrm-fs-poignee { background: #48484A; }
+/* Le titre et la croix : la tête se prend aussi au doigt (la croix, non). */
+.vrm-fs-tete {
+  flex: none; display: flex; align-items: flex-start; gap: 12px;
+  padding: 0 10px 12px 18px; margin-top: -8px; touch-action: none;
+  -webkit-user-select: none; user-select: none;
+}
+.vrm-fs-tete-texte { flex: 1 1 auto; min-width: 0; padding-top: 9px; }
+html body .vrm-fs-titre {
+  margin: 0; font: 700 20px/1.2 var(--vrm-police, inherit); letter-spacing: -.02em; color: var(--vrm-ink, #1D1D1F);
+  overflow-wrap: anywhere;
+}
+html body .vrm-fs-sous-titre { margin: 3px 0 0; font: 400 13px/1.35 var(--vrm-police, inherit); color: var(--vrm-muted, #6E6E73); }
+/* La croix : une ICÔNE dans un rond gris (celle d'iOS), cible 44 × 44. */
+html body button.vrm-fs-croix {
+  flex: none; display: grid; place-items: center; box-sizing: border-box;
+  width: 44px; height: 44px; min-width: 44px; min-height: 44px; margin: 0; padding: 0;
+  border: 0 !important; border-radius: 999px !important; background: transparent !important; box-shadow: none !important;
+  color: var(--vrm-muted, #6E6E73) !important; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.vrm-fs-croix-rond {
+  display: grid; place-items: center; width: 30px; height: 30px; border-radius: 999px;
+  background: var(--fu-remplir, rgba(118,118,128,.12)); transition: background-color .12s ease, transform .1s ease;
+}
+@media (hover: hover) and (pointer: fine) { html body button.vrm-fs-croix:hover .vrm-fs-croix-rond { background: var(--fu-remplir-fort, rgba(118,118,128,.2)); } }
+html body button.vrm-fs-croix:active .vrm-fs-croix-rond { transform: scale(.94); }
+html body button.vrm-fs-croix:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3) !important; outline-offset: -4px; }
+/* Le corps défile seul (la poignée et la croix restent à leur place). */
+.vrm-fs-corps {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  padding: 0 18px calc(18px + env(safe-area-inset-bottom));
+}
+/* À partir de 768 px, la feuille garde ses coins bas arrondis quand elle ne
+   touche pas les bords (maxWidth plus étroit que l'écran). */
+@media (min-width: 768px) {
+  .vrm-fs-cadre { padding: 0 16px; }
+}
+/* Mouvement réduit : rien ne glisse (le voile fond toujours — une opacité n'est
+   pas un mouvement). */
+@media (prefers-reduced-motion: reduce) {
+  .vrm-fs { will-change: auto; }
+}
+/* Transparence réduite : le voile sans flou. */
+@media (prefers-reduced-transparency: reduce) {
+  .vrm-fs-voile { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(0,0,0,.6); }
+}
+/* LA VARIANTE LUMINEUSE (« En grand ») : blanc forcé, MÊME en sombre — les
+   jetons sont redéfinis sur la feuille, tout ce qui les lit dedans suit. */
+.vrm-fs.vrm-fs-lumineuse,
+:root[data-theme="dark"] .vrm-fs.vrm-fs-lumineuse {
+  --vrm-bg: #FFFFFF; --vrm-surface: #FFFFFF; --vrm-card2: #F2F2F7; --vrm-ink: #1D1D1F; --vrm-muted: #6E6E73;
+  --vrm-faint: #6E6E73; --vrm-line: #E5E5EA; --vrm-hair: rgba(0,0,0,.06); --vrm-photo: #F2F2F7;
+  --vrm-accent: #0066CC; --vrm-on-accent: #FFFFFF; --vrm-warn: #B25000; --vrm-warn-soft: #FFF4E5;
+  --fu-remplir: rgba(118,118,128,.12); --fu-remplir-fort: rgba(118,118,128,.2);
+  --vrm-b-teinte: rgba(0,102,204,.08); --vrm-b-teinte-f: rgba(0,102,204,.14); --vrm-b-encre: #1D1D1F; --vrm-b-lien: #0066CC;
+  color-scheme: light;
+  background: #FFFFFF; color: #1D1D1F;
+}
+:root[data-theme="dark"] .vrm-fs.vrm-fs-lumineuse .vrm-fs-poignee { background: #C7C7CC; }
+
+/* ── 2. LE BOUTON « DANGER » = AMBRE (Bouton variante="danger") ─────────────── */
+.vrm-b-danger,
+.vrm-app-shell .vrm-main .vrm-b.vrm-b-danger {
+  background: rgba(178,80,0,.1) !important; color: var(--vrm-warn, #B25000) !important;
+}
+:root[data-theme="dark"] .vrm-b-danger,
+:root[data-theme="dark"] .vrm-app-shell .vrm-main .vrm-b.vrm-b-danger { background: rgba(255,179,64,.14) !important; }
+@supports (color: color-mix(in srgb, red 10%, transparent)) {
+  .vrm-b-danger, .vrm-app-shell .vrm-main .vrm-b.vrm-b-danger { background: color-mix(in srgb, var(--vrm-warn, #B25000) 11%, transparent) !important; }
+}
+@media (hover: hover) and (pointer: fine) {
+  .vrm-b-danger:not(:disabled):hover,
+  .vrm-app-shell .vrm-main .vrm-b.vrm-b-danger:not(:disabled):hover { filter: none; background: rgba(178,80,0,.16) !important; }
+  :root[data-theme="dark"] .vrm-b-danger:not(:disabled):hover { background: rgba(255,179,64,.2) !important; }
+}
+
+/* ── 3. LE CHAMP DE RECHERCHE (ChampRecherche) ──────────────────────────────── */
+.vrm-champ-recherche,
+.vrm-app-shell .vrm-main .vrm-champ-recherche {
+  --cr-h: 36px;
+  position: relative; display: flex; align-items: center; box-sizing: border-box;
+  width: 100%; min-width: 0; min-height: var(--cr-h); padding: 0 0 0 10px;
+  border-radius: 12px; background: var(--fu-remplir, rgba(118,118,128,.12)); color: var(--vrm-ink, #1D1D1F);
+}
+@media (pointer: coarse), (max-width: 767px) {
+  .vrm-champ-recherche, .vrm-app-shell .vrm-main .vrm-champ-recherche { --cr-h: 44px; }
+}
+.vrm-champ-recherche:focus-within { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: 2px; }
+.vrm-champ-recherche-loupe { flex: none; display: grid; place-items: center; width: 22px; margin-right: 6px; color: var(--vrm-muted, #6E6E73); pointer-events: none; }
+/* Spécificité (0,8,2) : styles-epure, styles-iphone et styles-mineral teintent et
+   arrondissent chaque <input> de l'écran avec !important (jusqu'à 0,4,1) ; le champ
+   porte son propre dessin (un seul cadre : celui du champ entier). */
+:root body .vrm-champ-recherche input.vrm-champ-recherche-saisie:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=hidden]) {
+  flex: 1 1 auto; min-width: 0; width: 100%; box-sizing: border-box;
+  min-height: var(--cr-h) !important; height: var(--cr-h); margin: 0; padding: 0 8px 0 0 !important;
+  border: 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; outline: none !important;
+  color: inherit; font: 400 15px/1.2 var(--vrm-police, inherit) !important; letter-spacing: -.01em;
+  -webkit-appearance: none; appearance: none;
+}
+@media (pointer: coarse), (max-width: 767px) {
+  :root body .vrm-champ-recherche input.vrm-champ-recherche-saisie:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=hidden]) { font-size: 17px !important; }   /* iOS ne zoome pas à 16 px et plus */
+}
+.vrm-champ-recherche-saisie::placeholder { color: var(--vrm-muted, #6E6E73); opacity: 1; }
+.vrm-champ-recherche-saisie::-webkit-search-cancel-button,
+.vrm-champ-recherche-saisie::-webkit-search-decoration { -webkit-appearance: none; display: none; }
+html body button.vrm-champ-recherche-bouton,
+html body .vrm-app-shell .vrm-main button.vrm-champ-recherche-bouton {
+  flex: none; display: grid; place-items: center; box-sizing: border-box;
+  width: var(--cr-h); min-width: var(--cr-h); height: var(--cr-h); min-height: var(--cr-h) !important; margin: 0; padding: 0 !important;
+  border: 0 !important; border-radius: 12px !important; background: transparent !important; box-shadow: none !important;
+  color: var(--vrm-muted, #6E6E73) !important; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.vrm-champ-recherche-rond {
+  display: grid; place-items: center; width: 17px; height: 17px; border-radius: 999px;
+  background: var(--vrm-muted, #6E6E73); color: var(--vrm-surface, #FFFFFF); opacity: .85;
+}
+html body button.vrm-champ-recherche-micro[data-micro-ecoute="1"] { color: var(--vrm-accent, #0071E3) !important; }
+html body button.vrm-champ-recherche-bouton:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3) !important; outline-offset: -4px; }
+
+/* ── 4. LA VIGNETTE SANS PHOTO (PhotoVide) ──────────────────────────────────── */
+.vrm-photo-vide {
+  display: inline-grid; place-items: center; flex: none; box-sizing: border-box; overflow: hidden;
+  background: var(--vrm-photo, #F2F2F7); color: var(--vrm-muted, #6E6E73);
+  box-shadow: inset 0 0 0 1px var(--vrm-hair, rgba(0,0,0,.06));
+  vertical-align: middle;
+}
+.vrm-photo-vide > svg { opacity: .55; }
+.vrm-photo-vide-remplir { display: grid; width: 100%; height: 100%; }
+
+/* ── 5. LA PASTILLE N° (Numero) ─────────────────────────────────────────────── */
+html body .vrm-num {
+  display: inline-block; white-space: nowrap; flex: none; /* (5 nov.) inline-block : « N°31 » se copie d’un seul tenant */ box-sizing: border-box;
+  padding: 2px 7px; border-radius: 6px;
+  background: #1D1D1F; color: #FFFFFF;
+  font: 700 13px/1.25 var(--vrm-police, inherit); font-variant-numeric: tabular-nums; letter-spacing: 0;
+  white-space: nowrap; vertical-align: baseline;
+}
+html body .vrm-num-prefixe { font-weight: 600; opacity: .72; margin-right: 1px; }
+html body .vrm-num-petit { padding: 1px 6px; font-size: 12px; }
+html body .vrm-num-grand { padding: 3px 9px; font-size: 17px; }
+:root[data-theme="dark"] body .vrm-num { background: #48484A; color: #F5F5F7; }
+/* Le SEUL rouge de l'app : deux articles présents sous ce N° (§5, §7). */
+html body .vrm-num[data-num-etat="doublon"] { background: var(--vrm-doublon); color: #FFFFFF; }
+:root[data-theme="dark"] body .vrm-num[data-num-etat="doublon"] { background: var(--vrm-doublon); color: #000000; }
+/* À vérifier sur son carton : un geste à faire, en ambre. */
+html body .vrm-num[data-num-etat="aVerifier"] { background: #B25000; color: #FFFFFF; }
+:root[data-theme="dark"] body .vrm-num[data-num-etat="aVerifier"] { background: #FFB340; color: #000000; }
+/* Dans la feuille lumineuse, la pastille reprend la forme claire. */
+:root[data-theme="dark"] body .vrm-fs-lumineuse .vrm-num:not([data-num-etat]) { background: #1D1D1F; color: #FFFFFF; }
+
+/* ── 6. L'ÉTAT « PAS SU » (EtatPanne) ───────────────────────────────────────── */
+.vrm-etat-panne {
+  display: flex; align-items: center; gap: 12px 16px; flex-wrap: wrap; box-sizing: border-box;
+  padding: 14px 16px; border-radius: 14px;
+  background: var(--vrm-surface, #FFFFFF); color: var(--vrm-ink, #1D1D1F);
+  box-shadow: inset 0 0 0 1px var(--vrm-line, #E5E5EA);
+}
+.vrm-etat-panne-texte { flex: 1 1 220px; min-width: 0; }
+html body .vrm-etat-panne-phrase { margin: 0; font: 600 15px/1.3 var(--vrm-police, inherit); color: var(--vrm-ink, #1D1D1F); overflow-wrap: anywhere; }
+html body .vrm-etat-panne-raison { margin: 3px 0 0; font: 400 13px/1.4 var(--vrm-police, inherit); color: var(--vrm-muted, #6E6E73); overflow-wrap: anywhere; }
+.vrm-etat-panne-bouton { flex: none; }
+.vrm-etat-panne-compact { padding: 10px 12px; box-shadow: none; background: transparent; }
+@media (max-width: 767px) {
+  .vrm-etat-panne-bouton, .vrm-app-shell .vrm-main .vrm-b.vrm-etat-panne-bouton { flex: 1 1 100%; }
+}

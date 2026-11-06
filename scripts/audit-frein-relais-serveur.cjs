@@ -6,8 +6,9 @@
 // `owner=eq.`, garde `data->>rev=eq.`/`is.null`, POST 201/409, PATCH qui rend
 // les lignes touchées). On compte les requêtes parties vers vinted.fr.
 // Données inventées (le dépôt est public).
-// Mutations : `--muter=sans-frein` (la route ne demande plus de place) et
-// `--muter=sans-garde` (l'écriture ne compare plus `rev`) doivent finir en rouge.
+// Mutations : `--muter=sans-frein` (la route ne demande plus de place),
+// `--muter=sans-garde` (l'écriture ne compare plus `rev`) et `--muter=horloge`
+// (une place datée après `maintenant` ne compte plus) doivent finir en rouge.
 'use strict';
 const fs = require('node:fs'), path = require('node:path'), os = require('node:os');
 const R = path.join(__dirname, '..');
@@ -82,6 +83,7 @@ const faireRes = () => { const r = { code: 0, corps: null, setHeader() {}, statu
       let t = fs.readFileSync(path.join(R, f), 'utf8');
       if (MUTER === 'sans-frein' && f === 'api/vinted-proxy.js') t = t.replace('const place = await prendrePlaceServeur(', 'const place = { ok: true } || await prendrePlaceServeur(');
       if (MUTER === 'sans-garde' && f === 'api/_lib/frein-relais-serveur.js') t = t.replace('`app_data?${filtre}&${garde}&select=id`', '`app_data?${filtre}&select=id`');
+      if (MUTER === 'horloge' && f === 'src/freinRelaisVinted.js') t = t.replace('Number.isFinite(t) && Math.abs(maintenant - t) < FENETRE_MS', 'Number.isFinite(t) && t <= maintenant && maintenant - t < FENETRE_MS');
       fs.writeFileSync(path.join(racine, f), t);
     }
     fs.writeFileSync(path.join(racine, 'package.json'), '{"type":"module"}');
@@ -127,6 +129,37 @@ const faireRes = () => { const r = { code: 0, corps: null, setHeader() {}, statu
     reinit(); panne.ecrire = true;
     const r2 = await appel('111');
     dit(r2.code === 503 && vinted === 0, `réserve pas écrite ⇒ 503, rien vers Vinted (${r2.code}, ${vinted})`);
+  }
+
+  // (6 nov., v36) Le §2 ci-dessus échouait SOUS CHARGE seulement : cinq appels lancés
+  // ensemble ne prennent pas tous la même milliseconde, et une instance dont l'heure a
+  // été prise 2 ms AVANT celle qui vient d'écrire ne voyait pas sa place (`t <= maintenant`),
+  // prenait la même dernière place et l'effaçait en réécrivant. Ici, sans hasard : deux
+  // horloges croisées, jouées l'une après l'autre sur la vraie règle.
+  console.log('5. Deux instances aux horloges croisées (déterministe)');
+  {
+    const { prendrePlaceServeur } = await import('file://' + path.join(racine, 'api', '_lib', 'frein-relais-serveur.js'));
+    // Une base en mémoire de la même forme : PATCH gardé par `data->>rev=eq.` (0 ligne si
+    // la révision a bougé), sans garde il écrit.
+    const base = (depart) => {
+      const b = { l: depart };
+      b.io = {
+        lire: async () => (b.l ? [{ rev: String(b.l.rev), t: b.l.t }] : []),
+        inserer: async (x) => { if (b.l) return 0; b.l = JSON.parse(JSON.stringify(x.data)); return 1; },
+        modifier: async (chemin, corps) => { if (!b.l) return 0; const m = /data->>rev=eq\.(\d+)/.exec(chemin); if (m && String(b.l.rev) !== m[1]) return 0; b.l = JSON.parse(JSON.stringify(corps.data)); return 1; },
+      };
+      return b;
+    };
+    const B0 = base(null), io = B0.io;
+    const T = Date.parse('2026-11-06T10:00:00Z');
+    for (let i = 0; i < 23; i++) await prendrePlaceServeur(io, VENDEUR, '111', T + i);
+    const A = await prendrePlaceServeur(io, VENDEUR, '111', T + 100);
+    const B = await prendrePlaceServeur(io, VENDEUR, '111', T + 98);
+    dit(A.ok && !B.ok && B.raison === 'frein', `la dernière place n'est prise qu'une fois (A ${A.ok}, B ${B.ok})`);
+    const l = B0.l;
+    dit(l && l.t.includes(T + 100) && l.t.length === 24, `la place de A n'est pas effacée (${l ? l.t.length : 0} places)`);
+    const loin = await prendrePlaceServeur(base({ rev: 1, t: Array.from({ length: 24 }, (_, i) => T + 3 * 3600e3 + i) }).io, VENDEUR, '111', T);
+    dit(loin.ok, 'une date absurde (des heures dans le futur) ne bloque pas le compte');
   }
 
   console.log(`\n${ok} ✅ · ${ko} ❌`);
