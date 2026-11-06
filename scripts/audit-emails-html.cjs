@@ -49,7 +49,7 @@ const MUTATIONS = {
   'lien javascript: gardé': [['api/_lib/email-html.js', "if (/^https?:\\/\\/[^/\\\\]/i.test(u) || /^mailto:[^:]/i.test(u) || /^tel:[+\\d(]/i.test(u)) return u.slice(0, 2000);", 'return u;']],
   'script gardé': [['api/_lib/email-html.js', "const BRUT = new Set(['script', ", "const BRUT = new Set(["]],
   'images distantes chargées d’avance': [['api/_lib/email-html.js', "else { out.unshift(['data-vrm-src', im.distante]); compte.images++; }", "else { out.unshift(['src', im.distante]); compte.images++; }"]],
-  'pixel de suivi gardé': [['api/_lib/email-html.js', "|| (im.distante && ADRESSE_PIXEL.test(im.distante))) return { retirer: 'pixel' };", ") return { retirer: 'pixel' };"], ['api/_lib/email-html.js', "if ((lw != null && lw <= 2)", "if (false && (lw != null && lw <= 2)"]],
+  'pixel de suivi gardé': [['api/_lib/email-html.js', "if ((lw != null && lw <= 2) || (lh != null && lh <= 2) || estCache(style) || (im.distante && ADRESSE_PIXEL.test(im.distante))) return { retirer: 'pixel' };", "if (false) return { retirer: 'pixel' };"]],
   'url() du CSS gardée': [['api/_lib/email-html.js', ".replace(/\\b(?:url|image-set", ".replace(/\\b(?:urlXX|image-set"]],
   'plafond oublié': [['api/_lib/email-html.js', 'if (octets > HTML_MAX) return { ok: false, trop: true, octets };', '']],
   'HTML de tous les e-mails': [['api/_lib/email-html.js', "  const t = String(type || '');\n  if (TYPES_GESTE.has(t)) return true;", '  return true;']],
@@ -134,6 +134,14 @@ const iso = (jours) => new Date(MAINT - jours * 864e5).toISOString();
       if (f.length) restes.push(`${nom} : ${f.join(', ')}`);
       if (r.ok && H.assainirHtml(sortie).html !== sortie) restes.push(`${nom} : pas stable`);
     }
+    // Ce qui vit DANS un élément supprimé avec son contenu (script, iframe, title…)
+    // ne ressort pas non plus en texte.
+    const ENFOUIS = ['script', 'script majuscules', 'svg script', 'svg onload', 'math', 'iframe', 'frame', 'object', 'title', 'template', 'plaintext', 'nul', 'commentaire', 'textarea'];
+    for (const [nom, html] of VECTEURS) {
+      if (!ENFOUIS.includes(nom)) continue;
+      const r = H.assainirHtml(html);
+      if (r.ok && /__xss/.test(r.html)) restes.push(`${nom} : son contenu ressort en texte`);
+    }
     dit(VECTEURS.length >= 40 && restes.length === 0, `H1 aucun des ${VECTEURS.length} vecteurs connus ne survit (lecteur indépendant, sortie stable)`, restes.slice(0, 6).join(' | '));
     const v = H.assainirHtml(VENTE_HTML);
     dit(v.ok && fautes(v.html).length === 0 && H.assainirHtml(v.html).html === v.html, 'H1 l’e-mail de vente inventé : sortie propre et stable', v.ok ? fautes(v.html).join(', ') : JSON.stringify(v));
@@ -198,6 +206,7 @@ const iso = (jours) => new Date(MAINT - jours * 864e5).toISOString();
         tentatives.push(lot.map((x) => x.id));
         if (etat.ecritureKO) return rep('<html>503</html>', 503);
         if (etat.htmlKO && lot.some((x) => String(x.id).startsWith('email_html_'))) return rep('<html>503</html>', 503);
+        if (etat.receptionKO && lot.some((x) => String(x.id).startsWith('email_reception_'))) return rep('<html>503</html>', 503);
         lot.forEach((x) => ecrites.push({ id: x.id, owner: x.owner || '', data: x.data }));
         return rep('', 201);
       }
@@ -227,6 +236,8 @@ const iso = (jours) => new Date(MAINT - jours * 864e5).toISOString();
     dit(k.code === 200 && k.suivi && !k.html && k.tentatives.some((l) => l.some((id) => String(id).startsWith('email_html_'))), 'H4 HTML pas écrit (panne) : l’e-mail reste rangé, 200 — jamais 503 pour un confort d’affichage', String(k.code));
     const p = await envoyer(VENTE, { ecritureKO: true });
     dit(p.code === 503 && !p.tentatives.some((l) => l.some((id) => String(id).startsWith('email_html_'))), 'H4 rangement raté : 503 et aucun HTML tenté', `${p.code} ${JSON.stringify(p.tentatives)}`);
+    const q = await envoyer(VENTE, { receptionKO: true });
+    dit(q.code === 503 && !q.tentatives.some((l) => l.some((id) => String(id).startsWith('email_html_'))), 'H4 seule la ligne de rangement ratée : 503, et le HTML n’est pas écrit à côté d’un e-mail pas rangé', `${q.code} ${JSON.stringify(q.tentatives).slice(0, 200)}`);
     const i = await envoyer({ from: 'inconnu@exemple.test', subject: 'Une forme jamais vue', text: 'Rien de connu ici.', html: VENTE_HTML });
     dit(i.code === 200 && i.suivi && !i.html && !i.tentatives.some((l) => l.some((id) => String(id).startsWith('email_html_'))), 'H4 un e-mail sans geste (incompris) n’écrit pas de HTML', String(i.code));
     const g = await envoyer({ ...VENTE, html: '<table>' + '<tr><td>Ligne inventée de commande</td></tr>'.repeat(9000) + '</table>' });
