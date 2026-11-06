@@ -597,7 +597,7 @@ html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task-
 /* La tête, bord à bord sous la barre du haut (téléphone) ; carte arrondie sur ordinateur. */
 @media (max-width: 767px) {
   /* (5 nov., chantier E1, revue 2.2) 20 px sous la tête : la carte Semaine passait sous son arrondi. */
-  html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-greeting.vrm-fu-tete { width: 100vw !important; box-sizing: border-box !important; margin: -24px 0 20px calc(50% - 50vw) !important; padding-left: 16px !important; padding-right: 16px !important; }
+  html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-greeting.vrm-fu-tete { width: var(--vrm-vw100, 100vw) !important; box-sizing: border-box !important; margin: -24px 0 20px calc(50% - var(--vrm-vw100, 100vw) / 2) !important; padding-left: 16px !important; padding-right: 16px !important; }
   html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-fu-titre-section { padding-left: 0 !important; }
 }
 @media (min-width: 768px) {

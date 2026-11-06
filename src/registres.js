@@ -213,7 +213,7 @@ export function registreDesAchats({ achats = null, hors = [], fiches = null, ven
 export const eurosTexte = (x) => {
   const c = cts(x); if (c == null) return '—';
   const n = Math.abs(c);
-  return (c < 0 ? '−' : '') + String(Math.floor(n / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ',' + String(n % 100).padStart(2, '0') + ' €';
+  return (c < 0 ? '−' : '') + String(Math.floor(n / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ',' + String(n % 100).padStart(2, '0') + '\u00a0€';
 };
 const tableurNb = (x) => (x == null || !Number.isFinite(Number(x)) ? '' : (Math.round(Number(x) * 100) / 100).toFixed(2).replace('.', ','));
 const SOURCE = { recu: 'Reçu', saisi: 'Saisi', article: 'Article seul' };

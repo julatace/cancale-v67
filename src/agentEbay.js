@@ -362,7 +362,7 @@ export function comprendrePhrase(texte, opts = {}) {
   if ((m = new RegExp(`(?:a plus de|plus de|au[- ]dessus de|a partir de|minimum|min|superieure? a|plus cher que|>=?)\\s*${MOT_NB}${PAS_JOURS}${EUR}`).exec(t))) { const n = nombre(m[1]); if (n != null) regles.prixMin = n; ote(m); }
   if ((m = new RegExp(`(?:a moins de|moins de|en dessous de|au[- ]dessous de|sous|jusqu a|maximum|max|inferieure? a|<=?)\\s*${MOT_NB}${PAS_JOURS}${EUR}`).exec(t))) { const n = nombre(m[1]); if (n != null) regles.prixMax = n; ote(m); }
   if (regles.prixMin != null || regles.prixMax != null) {
-    const f = (n) => String(n).replace('.', ',') + ' €';
+    const f = (n) => String(n).replace('.', ',') + '\u00a0€';
     compris.push(regles.prixMin != null && regles.prixMax != null ? `prix Vinted entre ${f(regles.prixMin)} et ${f(regles.prixMax)}` : regles.prixMin != null ? `prix Vinted à partir de ${f(regles.prixMin)}` : `prix Vinted jusqu’à ${f(regles.prixMax)}`);
   }
   const comptes = Array.isArray(opts.comptes) ? opts.comptes : [];
@@ -416,7 +416,7 @@ export function appliquerPhrase(regles, compris, phrase) {
 // Les règles en clair (ce qu'on lui MONTRE, avant et après l'avoir gardé).
 export function texteRegles(regles, opts = {}) {
   const r = normaliserReglesAgent(regles);
-  const f = (n) => String(Math.round(n * 100) / 100).replace('.', ',') + ' €';
+  const f = (n) => String(Math.round(n * 100) / 100).replace('.', ',') + '\u00a0€';
   const l = [];
   const quoi = [];
   if (r.marques.length) quoi.push(r.marques.join(', '));

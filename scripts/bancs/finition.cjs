@@ -119,8 +119,8 @@ function mesurer(opts) {
     for (let i = pile.length - 1; i >= 0; i--) b = sur(pile[i], b);
     return b;
   };
-  // Un élément est-il dans une rangée faite pour défiler (ou clippée exprès) ?
-  const dansDefilant = (e) => { for (let x = e.parentElement; x && x !== document.body; x = x.parentElement) { const s = getComputedStyle(x); if (/(auto|scroll|hidden|clip)/.test(s.overflowX)) return true; } return false; };
+  // Un élément est-il dans une rangée faite pour défiler ? (Un bloc coupé par un parent « overflow: hidden » SORT de l'écran : il compte.)
+  const dansDefilant = (e) => { for (let x = e.parentElement; x && x !== document.body; x = x.parentElement) { const s = getComputedStyle(x); if (/(auto|scroll)/.test(s.overflowX)) return true; } return false; };
   const fixeHorsEcran = (e) => { for (let x = e; x && x.nodeType === 1; x = x.parentElement) { const s = getComputedStyle(x); if (s.transform && s.transform !== 'none' && (s.position === 'fixed' || s.position === 'absolute')) { const r = x.getBoundingClientRect(); if (r.right <= 0 || r.left >= W || r.bottom <= 0 || r.top >= H) return true; } } return false; };
 
   // 1. Les textes visibles
@@ -259,7 +259,11 @@ function mesurer(opts) {
       if (e.scrollWidth > e.clientWidth + 2 && e.clientWidth > 0) out.coupes.push({ t: (e.innerText || '').trim().slice(0, 50), sel: sel(e), sw: e.scrollWidth, cw: e.clientWidth });
     }
     // Deux textes l'un sur l'autre : boîtes de texte d'éléments différents qui se croisent nettement.
-    const bx = boites.flatMap(({ e, rr, t }) => rr.map((r) => ({ e, r, t }))).filter((b) => b.r.width > 3 && b.r.height > 6);
+    // Un texte dans une barre fixe ou collante (barre du bas, en-tête) : le contenu passe dessous, c'est voulu.
+    const flottant = (e) => { for (let x = e; x && x.nodeType === 1; x = x.parentElement) { const p = getComputedStyle(x).position; if (p === 'fixed' || p === 'sticky') return true; } return false; };
+    // Un texte caché par le défilement d'un parent (« overflow » auto/hidden) n'est pas vu : sa boîte ne compte pas.
+    const clipVisible = (e, r) => { for (let x = e.parentElement; x && x !== document.documentElement; x = x.parentElement) { const st = getComputedStyle(x); if (st.overflow === 'visible' && st.overflowX === 'visible' && st.overflowY === 'visible') continue; const c = x.getBoundingClientRect(); if (r.bottom <= c.top + 1 || r.top >= c.bottom - 1 || r.right <= c.left + 1 || r.left >= c.right - 1) return false; } return true; };
+    const bx = boites.filter(({ e }) => !flottant(e)).flatMap(({ e, rr, t }) => rr.map((r) => ({ e, r, t }))).filter((b) => b.r.width > 3 && b.r.height > 6 && b.r.top >= 0 && b.r.bottom <= H && clipVisible(b.e, b.r));
     for (let i = 0; i < bx.length && out.chevauche.length < 20; i++) for (let j = i + 1; j < bx.length; j++) {
       const a = bx[i], b = bx[j]; if (a.e === b.e || a.e.contains(b.e) || b.e.contains(a.e)) continue;
       const ix = Math.min(a.r.right, b.r.right) - Math.max(a.r.left, b.r.left), iy = Math.min(a.r.bottom, b.r.bottom) - Math.max(a.r.top, b.r.top);
@@ -312,7 +316,7 @@ const court = (a, n = 6) => JSON.stringify(a.slice(0, n)).slice(0, 900);
     const grand = /^grand(\d+)$/.exec(mode || '');
     const tel = l === '390';
     const m = monde();
-    const ctx = await b.newContext({ viewport: VP[l], colorScheme: sombre ? 'dark' : 'light', locale: 'fr-FR', timezoneId: 'Europe/Paris', serviceWorkers: 'block', ...(tel ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}) });
+    const ctx = await b.newContext({ viewport: VP[l], colorScheme: sombre ? 'dark' : 'light', reducedMotion: 'reduce', locale: 'fr-FR', timezoneId: 'Europe/Paris', serviceWorkers: 'block', ...(tel ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}) });
     await ctx.clock.install({ time: new Date(m.maintenant) });
     await servirBase(ctx, m);
     const session = { access_token: m.jeton, refresh_token: 'r', expires_at: Date.parse(m.maintenant) + 864e5, user: { id: m.uid, email: m.email } };
@@ -336,6 +340,7 @@ const court = (a, n = 6) => JSON.stringify(a.slice(0, n)).slice(0, 900);
     await pg.waitForSelector('.vrm-main', { timeout: 45000 }).catch(() => {});
     await pg.waitForTimeout(3500);
     await pg.evaluate(() => document.fonts && document.fonts.ready).catch(() => {});
+    if (process.env.MONTRER) console.log('   ⓘ', JSON.stringify(await pg.evaluate((q) => [...document.querySelectorAll(q)].slice(0, 3).map((e) => { const c = getComputedStyle(e); const r = e.getBoundingClientRect(); return ({ html: e.outerHTML.slice(0, 300), w: c.width, ml: c.marginLeft, mr: c.marginRight, pos: c.position, l: c.left, inset: c.inset, r: [r.left, r.right], zoom: c.zoom, parentW: e.parentElement && getComputedStyle(e.parentElement).width }); }), process.env.MONTRER)));
     const garde = await pg.evaluate(() => /pas pu s.afficher|Quelque chose s.est mal passé|Recharger l.app/i.test(document.body.innerText));
     const nom = `${ecran} · ${vue}`;
     const mes = await pg.evaluate(mesurer, { tactile: tel, sombre: true, coupes: !!grand || tel });
@@ -377,7 +382,7 @@ const court = (a, n = 6) => JSON.stringify(a.slice(0, n)).slice(0, 900);
     ];
     for (const sombre of [false, true]) for (const [id, tab, q] of OUVRIR) {
       const m = monde();
-      const ctx = await b.newContext({ viewport: VP['390'], colorScheme: sombre ? 'dark' : 'light', locale: 'fr-FR', timezoneId: 'Europe/Paris', serviceWorkers: 'block', isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+      const ctx = await b.newContext({ viewport: VP['390'], colorScheme: sombre ? 'dark' : 'light', reducedMotion: 'reduce', locale: 'fr-FR', timezoneId: 'Europe/Paris', serviceWorkers: 'block', isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
       await ctx.clock.install({ time: new Date(m.maintenant) });
       await servirBase(ctx, m);
       const session = { access_token: m.jeton, refresh_token: 'r', expires_at: Date.parse(m.maintenant) + 864e5, user: { id: m.uid, email: m.email } };

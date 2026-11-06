@@ -366,7 +366,7 @@ export function apercuMessageFavori({message='',offre=null,exemple=null,personna
   if(offre&&offre.mode){
     const prix=Number(exemple?.prix);
     const apres=Number.isFinite(prix)&&prix>0?prixOffre(prix,offre):null;
-    const eur=x=>Number(x).toFixed(2).replace('.',',').replace(/,00$/,'')+' €';
+    const eur=x=>Number(x).toFixed(2).replace('.',',').replace(/,00$/,'')+'\u00a0€';
     if(apres)offreTxt=`${eur(prix)} → ${eur(apres)}`;
     else if(offre.mode==='pct')offreTxt=`Offre −${offre.valeur}\u00a0%`;
     else if(offre.mode==='euros')offreTxt=`Offre −${eur(offre.valeur)}`;

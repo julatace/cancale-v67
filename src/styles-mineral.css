@@ -488,7 +488,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
    il porte maintenant son cercle, centré dans sa zone de 44 px. */
 .vrm-pickup-method > summary { position:relative; color:var(--vrm-muted); }
 .vrm-pickup-method > summary::before { content:''; position:absolute; inset:0; margin:auto; width:20px; height:20px; box-sizing:border-box; border:1.5px solid currentColor; border-radius:50%; pointer-events:none; }
-.vrm-pickup-method > div { position:absolute; right:0; top:44px; width:min(280px,calc(100vw - 64px)); padding:12px !important; border:1px solid var(--vrm-line) !important; border-radius:12px; background:var(--vrm-surface); box-shadow:0 4px 16px #0002; }
+.vrm-pickup-method > div { position:absolute; right:0; top:44px; width:min(280px,calc(var(--vrm-vw100, 100vw) - 64px)); padding:12px !important; border:1px solid var(--vrm-line) !important; border-radius:12px; background:var(--vrm-surface); box-shadow:0 4px 16px #0002; }
 .vrm-pickup-location-label { display:none; }
 .vrm-pickup-card { position:relative; border:0 !important; border-radius:0 !important; margin-bottom:0 !important; padding:12px !important; }
 .vrm-pickup-card + .vrm-pickup-card { border-top:1px solid var(--vrm-line) !important; }
@@ -829,7 +829,7 @@ summary.vrm-sidebar-label { cursor:pointer; min-height:32px; }
   .vrm-buy-act > .vrm-buy-quick { display:none; }
   .vrm-main .vrm-buy-act > .vrm-buy-more { width:44px; height:44px; min-height:44px !important; min-width:44px; }
   .vrm-buy-menu-tel { display:flex !important; }
-  .vrm-buy-menu { min-width:min(280px, calc(100vw - 32px)); }
+  .vrm-buy-menu { min-width:min(280px, calc(var(--vrm-vw100, 100vw) - 32px)); }
   .vrm-buy-retour > a { width:100%; justify-content:center; }
 }
 

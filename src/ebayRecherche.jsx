@@ -109,7 +109,7 @@ const cleOctets = (owner) => 'vrm_ebay_octets_' + (owner || 'local');
 const lireOctets = (owner) => { try { const o = JSON.parse(localStorage.getItem(cleOctets(owner)) || 'null'); return o && o.jour === jourParis() ? o : null; } catch (_) { return null; } };
 const noterOctets = (owner, oct) => { if (!oct) return null; try { const a = lireOctets(owner) || { jour: jourParis(), n: 0, ebay: 0, vrm: 0 }; const o = { jour: a.jour, n: a.n + 1, ebay: a.ebay + (Number(oct.ebay) || 0), vrm: a.vrm + (Number(oct.vrm) || 0) }; localStorage.setItem(cleOctets(owner), JSON.stringify(o)); return o; } catch (_) { return null; } };
 
-const eur = (c) => (Number.isFinite(c) ? (c / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €' : '—');
+const eur = (c) => (Number.isFinite(c) ? (c / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '\u00a0€' : '—');
 const ko = (n) => (Number.isFinite(n) ? (Math.max(1, Math.round(n / 102.4)) / 10).toLocaleString('fr-FR') + ' Ko' : '—');
 const heure = (iso) => { const t = Date.parse(iso || ''); return Number.isFinite(t) ? new Date(t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : ''; };
 

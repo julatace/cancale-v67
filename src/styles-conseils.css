@@ -26,7 +26,7 @@
 
 .vrm-conseil-bulle {
   position: absolute; pointer-events: auto; box-sizing: border-box;
-  width: min(320px, calc(100vw - 32px));
+  width: min(320px, calc(var(--vrm-vw100, 100vw) - 32px));
   padding: 16px 16px 8px; border-radius: 18px;
   background: var(--c-carte); color: var(--c-encre);
   border: 1px solid var(--c-filet);

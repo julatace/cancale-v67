@@ -295,7 +295,7 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
     return <span className="vrm-fa-photo" style={{'--t':taille+'px'}}>{c.photo&&PhotoVinted?<PhotoVinted src={c.photo} alt="" loading="lazy" repli={vide}/>:vide}</span>;};
   const pile=c=>{const n=c.personnes.length,vus=c.personnes.slice(0,3);
     return <span className="vrm-fa-pile" data-fav-personnes={n} aria-label={`${n} favori${n>1?'s':''}`}>{vus.map(x=><i key={x.id} className={x.initiale?'':'is-vide'} title={x.pseudo||undefined} data-fav-initiale={x.initiale||''}>{x.initiale}</i>)}{n>3&&<i className="is-plus">+{n-3}</i>}</span>;};
-  const prixTexte=v=>v==null?'':Number(v).toFixed(2).replace('.',',').replace(/,00$/,'')+' €';
+  const prixTexte=v=>v==null?'':Number(v).toFixed(2).replace('.',',').replace(/,00$/,'')+'\u00a0€';
   const carteDetail=detail?cartes.find(c=>c.cle===detail)||null:null;
   const chargeEnCours=etat.charge&&!data;
   const sansCompte=!uid||!owner;

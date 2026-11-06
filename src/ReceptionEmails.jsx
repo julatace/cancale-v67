@@ -41,7 +41,7 @@ export default function ReceptionEmails({owner,headers,quarantaine,onVerifier,th
  const emails=d?.emails||[],q=recherche.trim().toLocaleLowerCase('fr');
  const parAdresse=emails.filter(e=>adresse==='toutes'||e.adresses?.includes(adresse));
  const liste=parAdresse.filter(e=>(filtre==='tous'||e.etat===filtre)&&(!q||[e.subject,e.from,e.compte?.nom,...(e.adresses||[]),e.raison,typesEmail[e.type]||e.type].join(' ').toLocaleLowerCase('fr').includes(q)));
- return <section ref={zone} style={{'--card':theme.card,'--text':theme.text,'--border':theme.border,'--muted':theme.muted}} className="vrm-reception" aria-label="Réception des emails" data-reception-emails="" data-mode={section}>
+ return <section ref={zone} style={{'--card':theme.card,'--text':theme.text,'--border':theme.border,'--muted':theme.muted}} className="vrm-reception" aria-label="Réception des e-mails" data-reception-emails="" data-mode={section}>
  <div hidden={section==='configuration'}>
  <ApercuEmails d={erreur&&!d?null:d} erreur={erreur} lecture={lecture} maintenant={maintenant} quarantaine={quarantaine} preuves={preuves} onActualiser={()=>charger(true)} onVerifier={onVerifier} onJournal={onJournal} onOnglet={onOnglet}/>
  {d&&<details className="vrm-repli vrm-reception-repli" data-reception-liste="">

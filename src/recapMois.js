@@ -29,7 +29,7 @@ const c2 = (x) => (x == null || !isFinite(Number(x)) ? null : Math.round(Number(
 export const eurosTexte = (x) => {
   const c = c2(x); if (c == null) return '—';
   const n = Math.abs(c);
-  return (c < 0 ? '−' : '') + String(Math.floor(n / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ',' + String(n % 100).padStart(2, '0') + ' €';
+  return (c < 0 ? '−' : '') + String(Math.floor(n / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ',' + String(n % 100).padStart(2, '0') + '\u00a0€';
 };
 const tableur = (x) => (x == null || !isFinite(Number(x)) ? '' : (Math.round(Number(x) * 100) / 100).toFixed(2).replace('.', ','));
 const jour = (t) => { const d = new Date(t); return isNaN(d) ? '' : `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`; };

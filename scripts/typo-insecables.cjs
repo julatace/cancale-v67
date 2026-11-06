@@ -69,7 +69,8 @@ function chemins(src, ast) {
             const i = m.index;
             const avant = brut.slice(0, i);
             // Après « ${…} » (gabarit) ou « {…} » (JSX : le texte suit une expression) : l'expression vaut un mot.
-            const apresExpr = (i === 0 && (premier || (genre === 'jsx' && src[debut - 1] === '}')));
+            // … ou une chaîne collée à droite d'un `+` (« n.toFixed(2) + ' €' »).
+            const apresExpr = (i === 0 && (premier || (genre === 'jsx' && src[debut - 1] === '}') || (parent && parent.type === 'BinaryExpression' && parent.operator === '+' && parent.right === n)));
             if (!apresExpr && !avantOk.test(avant)) continue;
             // « ? » et « ! » collés à une expression JS (« a ? b ») ne sont pas du texte : on reste dans du texte.
             if (signe === '%' && !/\d$/.test(avant) && !apresExpr) continue;

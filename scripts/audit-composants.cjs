@@ -110,6 +110,7 @@ function categorie(nom, v, avant, apres, M) {
   const cats = [];
   if (/ (€|[A-Z]{3})$/.test(a) && /\u00a0(€|[A-Z]{3})$/.test(apres)) { a = a.replace(/ (€|[A-Z]{3})$/, '\u00a0$1'); cats.push('espace insécable avant la devise'); }
   if (/^-0(,00)?\u00a0€$/.test(a)) { a = a.replace(/^-/, ''); cats.push('« -0 » ⇒ « 0 »'); }
+  if (/^-?\d{4,}/.test(a) && a.replace(/\B(?=(\d{3})+(?!\d))(?=\d*[,\u00a0])/g, '\u202f') !== a) { const g = a.replace(/^(-?)(\d+)/, (m, sg, d) => sg + d.replace(/\B(?=(\d{3})+(?!\d))/g, '\u202f')); if (g !== a) { a = g; cats.push('milliers groupés'); } }
   if (/,00\u00a0€$/.test(a)) { a = a.replace(/,00\u00a0€$/, '\u00a0€'); cats.push('centimes inutiles'); }
   return a === apres && cats.length ? cats.join(' + ') : null;
 }
@@ -168,7 +169,7 @@ async function audit(M, bavard) {
     console.log('');
   }
   // Un nombre lu ne change que par ses centimes inutiles (le cœur de la consigne).
-  const nombresTouches = ecarts.filter((e) => /^-?[\d.]+(e[+-]?\d+)?$/.test(e.v) && !/centimes|-0|insécable/.test(e.c || ''));
+  const nombresTouches = ecarts.filter((e) => /^-?[\d.]+(e[+-]?\d+)?$/.test(e.v) && !/centimes|-0|insécable|milliers/.test(e.c || ''));
   dit(nombresTouches.length === 0, 'aucun nombre lu ne change autrement que par ses centimes inutiles (ou un « -0 »)', nombresTouches.map((e) => e.nom + '(' + e.v + ')').join(', '));
 
   // ── 3. Les mots ────────────────────────────────────────────────────────────

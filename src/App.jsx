@@ -2948,7 +2948,7 @@ function PanneauSync({ onFermer, onReglages }) {
   const sec = i.reprise ? Math.max(0, Math.round((i.reprise - Date.now()) / 1000)) : null;
   return (
     <div data-sync-panneau={i.etat} role="dialog" aria-label="Synchronisation" data-noswipe="1"
-      style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, zIndex: 9500, width: 'min(320px, calc(100vw - 32px))', background: C.card, color: C.text, border: `1px solid ${C.border}`, borderRadius: 14, boxShadow: C.shadowLg || '0 16px 48px rgba(0,0,0,.18)', padding: '14px 16px', fontSize: 13, lineHeight: 1.5, textAlign: 'left' }}>
+      style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, zIndex: 9500, width: 'min(320px, calc(var(--vrm-vw100, 100vw) - 32px))', background: C.card, color: C.text, border: `1px solid ${C.border}`, borderRadius: 14, boxShadow: C.shadowLg || '0 16px 48px rgba(0,0,0,.18)', padding: '14px 16px', fontSize: 13, lineHeight: 1.5, textAlign: 'left' }}>
       <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4, letterSpacing: '-.01em' }}>{titre}</div>
       {i.okAt && <div style={{ color: C.muted }}>Dernière sauvegarde réussie à {h(i.okAt)}.</div>}
       {!i.okAt && i.etat !== 'synced' && <div style={{ color: C.muted }}>Aucune sauvegarde réussie depuis l’ouverture de l’app.</div>}
@@ -6639,7 +6639,7 @@ const libelleJour = (t) => {
   const hier = new Date(auj); hier.setDate(auj.getDate() - 1);
   if (jour(d) === jour(hier)) return 'Hier';
   const opts = { weekday: 'long', day: 'numeric', month: 'long' }; if (d.getFullYear() !== auj.getFullYear()) opts.year = 'numeric';
-  return d.toLocaleDateString('fr-FR', opts);
+  return d.toLocaleDateString('fr-FR', opts).replace(/(^|\s)1(?= \p{L})/u, '$11er'); // « 1er novembre », jamais « 1 novembre »
 };
 const cleJour = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
@@ -6976,7 +6976,7 @@ const rappelUrssaf = ({ freq, now = new Date(), declare = null, ligne = null, ta
   const text = proche
     ? `Déclaration URSSAF ${due.label} à faire avant le ${date} (${quand})`
     : `Nouveau mois : déclaration URSSAF ${due.label} à faire avant le ${date}`;
-  const eur = (n) => Number(n).toFixed(2).replace('.', ',') + ' €';
+  const eur = (n) => Number(n).toFixed(2).replace('.', ',') + '\u00a0€';
   const sub = apayer == null
     ? 'Le montant se calcule dans Ventes (ouvre-le une fois).'
     : `${partiel ? 'Au moins ' : ''}${eur(ca)} reçus · à payer ≈ ${partiel ? 'au moins ' : ''}${eur(apayer)}`;
@@ -7798,7 +7798,7 @@ const joursSemaine = (vendues, recues, maintenant = Date.now()) => {
   for (let i = 0; i < 7; i++) {
     const d = new Date(lundi); d.setDate(lundi.getDate() + i);
     const j = { cle: cleJourLocal(d.getTime()), jour: ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'][d.getDay()], num: d.getDate(),
-      long: d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }), futur: d.getTime() > d0.getTime(), auj: d.getTime() === d0.getTime(),
+      long: dateJourFr(d), futur: d.getTime() > d0.getTime(), auj: d.getTime() === d0.getTime(),
       vendu: { n: 0, eur: 0 }, recu: recues ? { n: 0, eur: 0 } : null };
     J.push(j); par[j.cle] = j;
   }
@@ -11998,7 +11998,7 @@ const fmt  = fmtMontant;
 // Revue du 16 octobre : « 65 € » sur une ligne, « 65,00 € » ou « +12,00€ »
 // juste à côté. UNE forme pour les écrans Ventes et Annonces — l'entier quand
 // le montant est rond, sinon deux décimales, toujours une espace avant €.
-const prixCourt = (n) => { const v = Number(n); if (n == null || n === '' || !isFinite(v)) return '—'; const c = Math.round(v * 100) / 100; return (Number.isInteger(c) ? String(c) : c.toFixed(2).replace('.', ',')) + ' €'; };
+const prixCourt = (n) => { const v = Number(n); if (n == null || n === '' || !isFinite(v)) return '—'; const c = Math.round(v * 100) / 100; return (Number.isInteger(c) ? String(c) : c.toFixed(2).replace('.', ',')) + '\u00a0€'; };
 const fmtN = n => isNaN(+n)?'—':Number(n).toFixed(2).replace('.',',');
 const uid  = () => Math.random().toString(36).slice(2,9);
 const tod  = () => new Date().toLocaleDateString('fr-FR');
@@ -16792,7 +16792,7 @@ function ReceptionEmails({ tracking, comptes, colisParTransporteur }) {
             confirmé non plus) : gris, comme une sonde qui n'a pas encore de
             quoi répondre. */}
         <span aria-hidden="true" style={{color:muetsTr?C.warn:aucunEmailDeSuivi?C.muted:(C.ok||C.accent),display:'flex'}}><Icon name={muetsTr?'alert':aucunEmailDeSuivi?'clock':'check'} size={14}/></span>
-        Réception des emails{muetsTr>0 ? ` · ${muetsTr} transporteur${muetsTr>1?'s':''} silencieux`
+        Réception des e-mails{muetsTr>0 ? ` · ${muetsTr} transporteur${muetsTr>1?'s':''} silencieux`
           : aucunEmailDeSuivi ? ' · aucun email de suivi reçu pour l’instant' : ' · tout arrive'}
       </summary>
       <div style={{marginTop:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'10px 12px'}}>{detail}</div>
@@ -20222,7 +20222,7 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
         <div ref={panneauEtat} className={`vrm-etat-panneau${ordi ? ' ordi' : ''}`} data-etat-panneau={st.niveau} data-etat-ton={ton} role="dialog" aria-label="Ce que VRM peut faire depuis cette page"
           style={{ '--etat-ton': couleurTon, position: ordi ? 'absolute' : 'fixed', right: ordi ? 0 : 12, left: ordi ? undefined : 12, top: ordi ? 'calc(100% + 10px)' : 'calc(64px + env(safe-area-inset-top))',
             ...(ordi ? {} : { maxHeight: 'calc(100dvh - 76px - env(safe-area-inset-top) - env(safe-area-inset-bottom))', overflowY: 'auto', overscrollBehavior: 'contain' }),
-            width: ordi ? 380 : undefined, maxWidth: 'calc(100vw - 24px)', zIndex: 80, background: C.card, color: C.text, border: `1px solid ${C.border}`,
+            width: ordi ? 380 : undefined, maxWidth: 'calc(var(--vrm-vw100, 100vw) - 24px)', zIndex: 80, background: C.card, color: C.text, border: `1px solid ${C.border}`,
             borderRadius: 14, padding: '14px 16px', fontSize: 13, lineHeight: 1.45, textAlign: 'left', whiteSpace: 'normal',
             boxShadow: '0 1px 2px rgba(0,0,0,.10),0 16px 40px rgba(0,0,0,.18)' }}>
           <div className="vrm-etat-tete" data-etat-tete>
@@ -22151,7 +22151,7 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
   const aGenerer = aExpedier.filter(o => !(o.label && o.label.voucherUrl)); // bordereau à générer
   const postes = colis.filter(o => lbcExpediee(o) || estFait(o));
   const lbcUrl = (o) => `https://www.leboncoin.fr/compte/part/transaction/${encodeURIComponent(o.txId)}`;
-  const euro = (p) => p == null ? '' : (Number(p) / 100).toFixed(2).replace('.', ',') + ' €';
+  const euro = (p) => p == null ? '' : (Number(p) / 100).toFixed(2).replace('.', ',') + '\u00a0€';
   // ── LE N° (SKU) D'UN COLIS LEBONCOIN ──────────────────────────────────────
   // ⚠️ Le colis porte l'`itemId` LEBONCOIN (pas l'id Vinted) : il ne se retrouve
   // dans `vinted_annonce_numeros` (clé = id Vinted) que si les deux coïncident.
@@ -22316,7 +22316,7 @@ const lbcExpediee = o => {
   if(/(?:a|avant) (?:envoyer|expedier)|attente (?:de |du )?(?:depot|expedition|prise en charge)/.test(t))return false;
   return /in[_ -]?transit|out[_ -]?for[_ -]?delivery|shipped|dispatched|collected|en cours de livraison|colis (?:envoye|depose|remis)|expedie(?:e|s)?\b|pris en charge|collecte par/.test(t);
 };
-const lbcEuro = (p) => p == null ? '' : (Number(p) / 100).toFixed(2).replace('.', ',') + ' €';
+const lbcEuro = (p) => p == null ? '' : (Number(p) / 100).toFixed(2).replace('.', ',') + '\u00a0€';
 // Carte d'une transaction Leboncoin — comme Vinted : photo · titre · statut +
 // transporteur · prix. Partagée par Ventes ET Achats (§11 : une seule forme).
 function CarteLbc({ o, num = '', benef = null, floute = false, compte = undefined }) {
@@ -22501,7 +22501,7 @@ function AchatsLeboncoin({ lbcVentes = { achats: [] } }) {
   const enRoute = actives.filter(o => !lbcFinalisee(o));
   const annules = achats.filter(lbcAnnulee);
   const somme = (arr) => arr.reduce((s, o) => s + (o.price != null ? Number(o.price) / 100 : 0), 0);
-  const fmt2 = (n) => n.toFixed(2).replace('.', ',') + ' €';
+  const fmt2 = (n) => n.toFixed(2).replace('.', ',') + '\u00a0€';
   // (28 oct.) Le plus récent d'abord, comme les achats Vinted ; une date
   // illisible en dernier. L'année est dite quand ce n'est pas celle-ci.
   const tsAchat = (o) => { const t = o && o.dateVente ? Date.parse(o.dateVente) : NaN; return isNaN(t) ? -Infinity : t; };
@@ -22902,7 +22902,7 @@ function departDePreregle(p, maintenant) {
 // Lus PAR NOM par le serveur (`frais.total` = ListingFee, le total) ; un nom
 // qu'on ne connaît pas s'affiche tel quel plutôt que d'être deviné.
 const NOMS_FRAIS_EBAY = { InsertionFee: 'mise en vente', SchedulingFee: 'programmation', GalleryFee: 'galerie', GalleryPlusFee: 'galerie plus', SubtitleFee: 'sous-titre', BoldFee: 'gras', FeaturedFee: 'mise en avant', InternationalInsertionFee: 'mise en vente internationale', ListingDesignerFee: 'modèle d\'annonce' };
-const eurEbay = (n) => (Math.round(n * 100) / 100).toFixed(2).replace('.', ',') + ' €';
+const eurEbay = (n) => (Math.round(n * 100) / 100).toFixed(2).replace('.', ',') + '\u00a0€';
 // (23 octobre, revue) Un prix eBay avec SA devise : « 95,00 € », « 95,00 USD »,
 // devise inconnue ⇒ aucun symbole. UNE règle pour la carte des annonces et les
 // inactives (§11) — `eurEbay` ajoutait « € » à un prix en dollars (« 95,00 € USD »).
@@ -24341,7 +24341,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
   const jumelles = React.useMemo(() => jumellesParPhoto(paires, (k) => !!(dejaSurEbay && typeof dejaSurEbay.has === 'function' && dejaSurEbay.has(k) && !(dejaSurEbay.get(k) || {}).via)), [paires, dejaSurEbay]);
   const listePaires = paires.filter(p => { const j = jumelles.get(String(p.id)); if (j && j.gardeId !== String(p.id)) return false; const q = pairQ.trim().toLowerCase(); return !q || p.num.includes(q) || (p.title || '').toLowerCase().includes(q) || String(p.taille).toLowerCase().includes(q); });
   const nJumellesMasquees = paires.filter(p => { const j = jumelles.get(String(p.id)); return j && j.gardeId !== String(p.id); }).length;
-  const eur=n=>n==null?'—':(Math.round(n*100)/100).toFixed(2).replace('.',',')+' €';
+  const eur=n=>n==null?'—':(Math.round(n*100)/100).toFixed(2).replace('.',',')+'\u00a0€';
   const condLabel = (EBAY_CONDITIONS.find(([v]) => v === cond) || [, 'Occasion'])[1];
   if (!ouvert) return (
     // (6 nov.) UNE entrée pour vendre sur eBay : elle remplace le gros bouton
@@ -25086,7 +25086,7 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
               // (9 octobre) Un solde PAR compte eBay : l'argent de deux comptes
               // ne s'additionne pas en un chiffre qu'eBay ne montre nulle part.
               const nomS = Array.isArray(comptesEbay) && comptesEbay.length >= 2 ? ` · ${nomCompteEbay(cpt)}` : '';
-              const eur = (n) => (Math.round(n * 100) / 100).toFixed(2).replace('.', ',') + ' €';
+              const eur = (n) => (Math.round(n * 100) / 100).toFixed(2).replace('.', ',') + '\u00a0€';
               if (solde && solde.reason === 'scope') return (
                 <div key={cpt.ref} style={{ border: `1px solid ${C.warn}`, background: `${C.warn}10`, borderRadius: 12, padding: '10px 12px', marginBottom: 10, fontSize: 13, color: C.text, lineHeight: 1.5 }}>
                   L'accès aux paiements{nomS} n'est pas autorisé. Tes annonces et ventes restent accessibles.
@@ -25125,7 +25125,7 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
                 de Vinted. */}
             {(() => {
               const ords = data.orders || [];
-              const eur = (n) => (Math.round(n * 100) / 100).toFixed(2).replace('.', ',') + ' €';
+              const eur = (n) => (Math.round(n * 100) / 100).toFixed(2).replace('.', ',') + '\u00a0€';
               const val = (o) => Number((o && o.pricingSummary && o.pricingSummary.total && o.pricingSummary.total.value) || 0) || 0;
               const paye = (o) => String((o && o.orderPaymentStatus) || '').toUpperCase() === 'PAID';
               const livre = (o) => String((o && o.orderFulfillmentStatus) || '').toUpperCase() === 'FULFILLED';
@@ -25379,7 +25379,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
   const remiseN = /^\d{1,2}$/.test(String(remise).trim()) ? parseInt(remise, 10) : NaN;
   const remiseOk = Number.isInteger(remiseN) && remiseN >= 5 && remiseN <= 50;
   const prixRemise = (isFinite(prixBase) && prixBase > 0 && remiseOk) ? Math.round(prixBase * (100 - remiseN)) / 100 : null;
-  const eurE = (n) => (Math.round(n * 100) / 100).toFixed(2).replace('.', ',') + ' €';
+  const eurE = (n) => (Math.round(n * 100) / 100).toFixed(2).replace('.', ',') + '\u00a0€';
   // Les observateurs : `WatchCount` d'eBay. Les captures d'avant le rangeaient
   // sous `vues` (le mot était faux : ce sont des personnes qui SUIVENT
   // l'annonce, pas des vues). Absent ⇒ on ne donne pas de nombre.
@@ -27777,7 +27777,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   };
   const bloc = (bord) => ({ background: E.card, border: `1px solid ${bord || E.border}`, borderRadius: 14, padding: '12px 14px', marginBottom: 12 });
   const lienE = { flexShrink: 0, border: `1px solid ${E.border}`, borderRadius: 12, padding: '7px 11px', fontSize: 13, fontWeight: 700, color: E.text, background: 'transparent', textDecoration: 'none', cursor: 'pointer', fontFamily: 'inherit' };
-  const euroE = (v) => { const n = Number(v); return isFinite(n) ? n.toFixed(2).replace('.', ',') + ' €' : ''; };
+  const euroE = (v) => { const n = Number(v); return isFinite(n) ? n.toFixed(2).replace('.', ',') + '\u00a0€' : ''; };
   // ── CE QU'ON VOIT : le compte choisi, ou tous (9 octobre). Les alertes sont
   //    CALCULÉES sur tous les comptes (`dv`) ; on n'en montre ici que celles du
   //    compte affiché — et celles des autres comptes sont COMPTÉES, une ligne :
@@ -28775,7 +28775,7 @@ function AnnoncesVestiaire() {
                 <div className="vrm-lbc-catalog-info">
                   <strong>{it.titre || (num ? `N°${num}` : 'Annonce sans titre lu')}</strong>
                   <small>{num ? <span data-vc-annonce-numtxt="">N°{num}</span> : etat === 'retiree' ? 'Sans N° (retirée)' : 'N° en attente'}{extra ? ` · ${extra}` : ''}</small>
-                  <div><span data-etat={etat === 'en-ligne' ? 'active' : etat === 'vendue' ? 'vendue' : 'autre'} title={brut ? `Vestiaire écrit « ${brut} »` : undefined}>{label}</span></div>
+                  <div><span data-etat={etat === 'en-ligne' ? 'active' : etat === 'vendue' ? 'vendue' : 'autre'} title={brut ? 'État lu sur Vestiaire' : undefined}>{label}</span></div>
                   {/* (3 nov.) Un seul N° pour l'article aussi en ligne sur Vinted : SON toucher relie. */}
                   {lienDe(vcLoc.liens, id)
                     ? <button type="button" className="vrm-lvc-geste" data-vc-delier={id} onClick={() => defaireVc(id)}>Délier Vinted</button>
@@ -28783,7 +28783,7 @@ function AnnoncesVestiaire() {
                       ? <button type="button" className="vrm-lvc-geste" data-vc-relier={id} onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:lien-vc', { detail: { sens: 'vc', id, num: num || '', titre: it.titre || '', photo: it.photo || '', site: 'Vestiaire' } })); } catch (_) {} }}>Relier à Vinted</button>
                       : null}
                 </div>
-                <b data-vc-annonce-prix={it.prix ? String(it.prix.valeur) : ''} title={it.prix && it.prix.cle ? `Prix lu sur « ${it.prix.cle} »` : undefined}>{prix}</b>
+                <b data-vc-annonce-prix={it.prix ? String(it.prix.valeur) : ''} title={it.prix && it.prix.cle ? 'Prix lu sur Vestiaire' : undefined}>{prix}</b>
               </li>
             );
           })}</ul>
@@ -32142,7 +32142,7 @@ async function buildFacturXBytes(inv, ent){
     const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
     const W=595.28, M=50, dark=rgb(0.13,0.13,0.13), gray=rgb(0.42,0.42,0.42), green=rgb(0.15,0.66,0.36);
     const T=(t,x,y,{s=10,b=false,c=dark,right=false}={})=>{ const f=b?bold:font; const str=String(t==null?'':t); const w=f.widthOfTextAtSize(str,s); page.drawText(str,{x:right?x-w:x,y,size:s,font:f,color:c}); };
-    const eur=(+inv.sellPrice||0).toFixed(2).replace('.',',')+' €';
+    const eur=(+inv.sellPrice||0).toFixed(2).replace('.',',')+'\u00a0€';
     try{
       let logoSrc=logoFacture(ent);
       const m=/^data:image\/(png|jpe?g);base64,(.+)$/i.exec(String(logoSrc||''));
@@ -35769,7 +35769,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     {blocListe}
 
     {/* (30 oct.) Pièce vide : créer un meuble est LE geste de l'écran (primaire) ; ensuite il redevient secondaire. */}
-    <button className={`vrm-b ${meubles.length ? 'vrm-b-secondaire' : 'vrm-b-primaire'}`} type="button" data-creer-meuble="" onClick={() => setModal({ type: 'meuble' })} style={{ alignSelf: meubles.length ? 'stretch' : 'flex-start' }}>+ Créer un meuble</button>
+    <button className={`vrm-b ${meubles.length ? 'vrm-b-secondaire' : 'vrm-b-primaire'}`} type="button" data-creer-meuble="" onClick={() => setModal({ type: 'meuble' })} style={{ alignSelf: meubles.length ? 'stretch' : 'flex-start' }}>+ Ajouter un meuble</button>
     {meubles.length > 0 && (explication
       ? <StockExplication onFermer={() => setExplication(false)} />
       : <button className="vrm-b vrm-b-discret" type="button" data-stock-explication-ouvrir="" onClick={() => setExplication(true)} style={{ alignSelf: 'center' }}>Comment ça marche ?</button>)}
@@ -37096,7 +37096,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
               <input defaultValue={labels[acc.vinted_user_id] || ''} placeholder={acc.login || `#${uid}`} aria-label="Nom affiché"
                 onBlur={(e) => { const v = e.target.value.trim(); const u = { ...labels, [acc.vinted_user_id]: v }; if (!v) delete u[acc.vinted_user_id]; setLabels(u); save('vinted_account_labels', u); }}
                 style={{width:'100%',maxWidth:320,boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',fontSize:15,fontFamily:'inherit',background:C.surface,color:C.text}}/>
-              <input value={acctEmails[uid] || ''} onChange={e=>setAcctEmail(acc.vinted_user_id, e.target.value)} placeholder="Email du compte" aria-label="Email du compte"
+              <input value={acctEmails[uid] || ''} onChange={e=>setAcctEmail(acc.vinted_user_id, e.target.value)} placeholder="E-mail du compte" aria-label="E-mail du compte"
                 style={{width:'100%',maxWidth:320,boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',fontSize:15,fontFamily:'inherit',background:C.surface,color:C.text}}/>
               <input type="tel" inputMode="tel" value={acctPhones[uid] || ''} onChange={e=>setAcctPhone(acc.vinted_user_id, e.target.value)} placeholder="Téléphone du compte" aria-label="Téléphone du compte"
                 style={{width:'100%',maxWidth:320,boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',fontSize:15,fontFamily:'inherit',background:C.surface,color:C.text}}/>
@@ -40093,7 +40093,7 @@ function SuiviUrssaf({ onNav, sansTitre = false }) {
             : a.periodes === 1 ? <>{a.annee} : {freq === 'mensuel' ? '1 mois noté « déclaré »' : '1 période notée « déclarée »'} — son détail est juste en dessous.</>
             : <>{a.annee} : <b style={{ color: C.text }}>{eur(a.ca)}</b> déclarés sur {a.n} mois · {a.paye != null ? <>cotisations payées <b style={{ color: C.text }}>{eur(a.paye)}</b></> : <>cotisations ≈ <b style={{ color: C.text }}>{eur(a.estime)}</b> (estimées : note ce que tu as payé avec « Compléter »)</>}</>}
         </div>
-        {suivi.enRetard > 0 ? <div data-suivi-retard-texte="" style={{ fontSize: 13, color: C.text, marginTop: 8, lineHeight: 1.5 }}>{suivi.enRetard === 1 ? '1 période passée n\'est' : `${suivi.enRetard} périodes passées ne sont`} pas notée{suivi.enRetard > 1 ? 's' : ''} « déclarée »{(() => { const n = suivi.lignes.filter((l) => l.etat === 'a_declarer').length; return n ? <span data-suivi-a-declarer={n}> (et {n === 1 ? '1 autre est' : `${n} autres sont`} à déclarer maintenant)</span> : null; })()}. Si tu l'as déjà déclarée sur l'URSSAF, touche « Noter ma déclaration » ; sinon, déclare-la vite (une déclaration en retard peut coûter une pénalité).</div> : null}
+        {suivi.enRetard > 0 ? <div data-suivi-retard-texte="" style={{ fontSize: 13, color: C.text, marginTop: 8, lineHeight: 1.5 }}>{suivi.enRetard === 1 ? '1 période passée n\'est' : `${suivi.enRetard} périodes passées ne sont`} pas notée{suivi.enRetard > 1 ? 's' : ''} « déclarée »{(() => { const n = suivi.lignes.filter((l) => l.etat === 'a_declarer').length; return n ? <span data-suivi-a-declarer={n}> (et {n === 1 ? '1 autre est' : `${n} autres sont`} à déclarer maintenant)</span> : null; })()}.{suivi.enRetard > 1 ? " Si tu les as déjà déclarées sur l'URSSAF, touche « Noter ma déclaration » ; sinon, déclare-les vite" : " Si tu l'as déjà déclarée sur l'URSSAF, touche « Noter ma déclaration » ; sinon, déclare-la vite"} (une déclaration en retard peut coûter une pénalité).</div> : null}
         {(() => {
           const aNoter = suivi.lignes.filter((l) => l.etat === 'en_retard' || l.etat === 'a_declarer').flatMap((l) => l.aNoter);
           return aNoter.length >= 2 ? (
@@ -49457,7 +49457,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   const baisserSurEbay = async (e, rp) => {
     if (!e || !e.itemId || !(e.sugg > 0)) return;
-    const prix = (n) => Number(n).toFixed(2).replace('.', ',') + ' €';
+    const prix = (n) => Number(n).toFixed(2).replace('.', ',') + '\u00a0€';
     const num = rp && numeros[rp.it.id] ? numeros[rp.it.id].numero : '';
     const g = prixCompatibleRegle(e.sugg, e.regle); if (!g.ok) return;
     const okc = await askConfirm({ title: `Baisser le prix sur eBay : ${prix(e.prixActuel)} → ${prix(e.sugg)} ?`,
@@ -55587,7 +55587,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     const lignesJ = liveStats && !liveStats.venduPasSu && Array.isArray(liveStats.venduLignes) ? liveStats.venduLignes : null;
                     const f = new Date(d); f.setDate(f.getDate()+1);
                     const bj = lignesJ ? bilanLignes(lignesJ, d.getTime(), f.getTime()-1) : null;
-                    const nom = d.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
+                    const nom = dateJourFr(d);
                     return (
                       <li key={k} className="vrm-fu-jour" data-auj={k===0?'':undefined} data-vendu={bj ? String(bj.n) : undefined}
                         title={bj && bj.n > 0 ? `${nom} · ${bj.n} vente${bj.n>1?'s':''} · ${montant(bj.eur)}` : nom}>
@@ -56986,7 +56986,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             inventé (§5/§7). */}
                         <details className="vrm-pickup-details"><summary>Détails de l’achat</summary>{(()=>{ const m=montantCommande(o); const dt=o.date?new Date(o.date):null;
                           const jour = dt && !isNaN(dt.getTime()) ? dt.toLocaleDateString('fr-FR') : '';
-                          const bits=[]; if(m>0) bits.push(m.toFixed(2).replace('.',',')+' €'); if(jour) bits.push('commandé le '+jour);
+                          const bits=[]; if(m>0) bits.push(m.toFixed(2).replace('.',',')+'\u00a0€'); if(jour) bits.push('commandé le '+jour);
                           return bits.length ? <div style={{fontSize:11,color:C.muted,marginTop:1}}>{bits.join(' · ')}</div> : null;
                         })()}</details>
                         {/* L'adresse est déjà en tête du bloc : ici on ne met que
@@ -58055,7 +58055,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     visible jusqu'à 1452 ; 390 px : 274→504), leurs noms coupés, sans erreur.
                     Il s'ancre à droite comme le menu de l'écran Ventes — sauf si le bouton,
                     passé à la ligne, est trop près du bord gauche pour cela. */}
-                <div className="vrm-menu-flottant" data-outils-annonces="" style={{position:'absolute',...(annToolsCote==='gauche'?{left:0}:{right:0}),top:'calc(100% + 6px)',zIndex:71,minWidth:230,maxWidth:'calc(100vw - 32px)',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',padding:6,display:'flex',flexDirection:'column',gap:2}}>
+                <div className="vrm-menu-flottant" data-outils-annonces="" style={{position:'absolute',...(annToolsCote==='gauche'?{left:0}:{right:0}),top:'calc(100% + 6px)',zIndex:71,minWidth:230,maxWidth:'calc(var(--vrm-vw100, 100vw) - 32px)',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',padding:6,display:'flex',flexDirection:'column',gap:2}}>
                   <div className="vrm-outils-annonces-haut" data-outils-haut="">
         {listings.items?.length>0 && (() => {
           const nbMini = nbAccepterDes(annBase, numeros);
@@ -58476,7 +58476,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       chiffres alignés ; jamais blanche en sombre), la même que partout. */}
                   <span className="vrm-fiche-numero" data-fiche-num={num||''}>
                     <EnLigne data="numero" value={num} onCommit={(v,avant)=>poserNumero(item,v,avant)} inputMode={clavierNum()} placeholder={String(nextNumero)} largeur={46}
-                      titre="Numéro de rangement (écrit sur la boîte) — cliquer pour le changer" rendu={num?<Numero n={num} taille="grand" titre={`Numéro ${num} — le changer`}/>:<span className="vrm-fiche-num-vide">+ N°</span>}/>
+                      titre="Numéro de rangement (écrit sur la boîte) — touche pour le changer" rendu={num?<Numero n={num} taille="grand" titre={`Numéro ${num} — le changer`}/>:<span className="vrm-fiche-num-vide">+ N°</span>}/>
                   </span>
                   <div className="vrm-ann-ledger-info" style={{display:'flex',flexDirection:'column',gap:8}}>
                     <div data-titre style={{fontSize:15,fontWeight:600,color:C.text,lineHeight:1.35,overflowWrap:'anywhere'}}>{it.title||it.brand||'—'}{tailleHorsTitre ? <span data-titre-taille=""> · {tailleHorsTitre}</span> : null}</div>
@@ -58491,25 +58491,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div className="vrm-fiche-cell vrm-fiche-achat" data-fiche-achat={achatConnu?'connu':'inconnu'} style={cell}>
                         <span className="vrm-fiche-etat-haut"><span style={lib}>Prix d'achat</span><Icon name="pencil" size={12} style={{color:C.muted,flexShrink:0}}/></span>
                         <EnLigne data="achat" value={buy} onCommit={v=>String(v??'').trim() ? ecrirePrixTape(item, v) : updatePair(item,{buyPrice:'',buyFromId:null,buyFrom:null})} inputMode="decimal" placeholder={achat!=null&&!isNaN(achat)?String(achat):'€'} largeur={72}
-                          titre="Prix d'achat — cliquer pour le saisir" rendu={<span style={{...valeur,fontSize:15}}>{achat!=null&&!isNaN(achat)?prixCourt(achat):'—'}</span>}/>
+                          titre="Prix d'achat — touche pour le saisir" rendu={<span style={{...valeur,fontSize:15}}>{achat!=null&&!isNaN(achat)?prixCourt(achat):'—'}</span>}/>
                       </div>
                     </div>
                     {/* Les chiffres, TOUS libellés ; « — » quand on ne sait pas, jamais 0 (§7). */}
                     <div data-chiffres className="vrm-fiche-chiffres" style={{display:'grid',gridTemplateColumns:'repeat(4,minmax(0,1fr))',gap:6}}>
-                      <div className="vrm-fiche-cell" style={cell} title="Prix mini : une offre à ce montant ou plus est mise en avant pour l'accepter en 1 tap — et, si tu as activé l'acceptation automatique, acceptée à ta place">
+                      <div className="vrm-fiche-cell" style={cell} title="Prix mini : une offre à ce montant ou plus est mise en avant pour l'accepter d'un geste — et, si tu as activé l'acceptation automatique, acceptée à ta place">
                         <span style={lib}>Accepter dès</span>
                         <EnLigne data="min" value={e.min??''} onCommit={v=>updatePair(item,{min:v})} inputMode="decimal" placeholder="€" largeur={56}
-                          titre="Prix mini d'acceptation d'offre — cliquer pour le saisir" rendu={<span style={valeur}>{mn!=null&&isFinite(mn)&&mn>0?prixCourt(mn):'—'}</span>}/>
+                          titre="Prix mini d'acceptation d'offre — touche pour le saisir" rendu={<span style={valeur}>{mn!=null&&isFinite(mn)&&mn>0?prixCourt(mn):'—'}</span>}/>
                       </div>
-                      <div className="vrm-fiche-cell" style={cell} title="Seuil de refus : si l'acceptation auto est activée, une offre SOUS ce montant est refusée toute seule (avec ton message, si tu en as écrit un)">
+                      <div className="vrm-fiche-cell" style={cell} title="Seuil de refus : si l'acceptation auto est activée, une offre sous ce montant est refusée toute seule (avec ton message, si tu en as écrit un)">
                         <span style={lib}>Refuser sous</span>
                         <EnLigne data="refuse" value={e.refuse??''} onCommit={v=>updatePair(item,{refuse:v})} inputMode="decimal" placeholder="€" largeur={56}
-                          titre="Seuil de refus d'offre — cliquer pour le saisir" rendu={<span style={valeur}>{rf!=null&&isFinite(rf)&&rf>0?prixCourt(rf):'—'}</span>}/>
+                          titre="Seuil de refus d'offre — touche pour le saisir" rendu={<span style={valeur}>{rf!=null&&isFinite(rf)&&rf>0?prixCourt(rf):'—'}</span>}/>
                       </div>
                       <div className="vrm-fiche-cell" style={cell} title="Coût d'un boost / mise en avant payée sur cette annonce (déduit de la marge et du bénéfice)">
                         <span style={lib}>Boost payé</span>
                         <EnLigne data="boost" value={e.fees ?? ''} onCommit={v=>updatePair(item,{fees:v})} inputMode="decimal" placeholder="€" largeur={56}
-                          titre="Boost payé — cliquer pour le saisir" rendu={<span style={valeur}>{boost>0?prixCourt(boost):'—'}</span>}/>
+                          titre="Boost payé — touche pour le saisir" rendu={<span style={valeur}>{boost>0?prixCourt(boost):'—'}</span>}/>
                       </div>
                       <div className="vrm-fiche-cell" style={cell} title="Si elle part à ce prix : prix − achat − boost">
                         <span style={lib}>Marge</span>
@@ -59250,7 +59250,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <button type="button" data-cible="offres" data-offres-au-mini={nAuDessusMini} onClick={()=>{setMessageFilter('offres');setConvMax(40);}} style={{display:'flex',gap:8,alignItems:'center',width:'100%',textAlign:'left',fontSize:13,color:C.text,lineHeight:1.4,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'10px 12px',minHeight:44,marginBottom:10,cursor:'pointer'}}>
                   {/* (5 nov., chantier G) Neutre : l'accent reste rare (§7) ; la carte se touche, le chevron le dit. */}
                   <span aria-hidden="true" style={{flexShrink:0,color:C.muted,display:'inline-flex'}}><Icon name="tag" size={15}/></span>
-                  <span style={{flex:1,minWidth:0}}><b>{nAuDessusMini} offre{nAuDessusMini>1?'s':''} au-dessus de ton prix mini</b> — accepte en 1 tap. <span style={{color:C.muted}}>{offresAuto ? "Acceptation automatique activée." : "Rien n'est accepté tout seul."}</span></span>
+                  <span style={{flex:1,minWidth:0}}><b>{nAuDessusMini} offre{nAuDessusMini>1?'s':''} au-dessus de ton prix mini</b> — accepte-les d'un geste. <span style={{color:C.muted}}>{offresAuto ? "Acceptation automatique activée." : "Rien n'est accepté tout seul."}</span></span>
                   <span aria-hidden="true" style={{flexShrink:0,color:C.muted,fontSize:17}}>›</span>
                 </button>
               )}
@@ -59354,7 +59354,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             chaque pastille se prend au doigt (44 px) ; « + Ajouter » neutre (l'accent reste rare, §7). */}
         <div className="vrm-qr-boite" data-reponses-rapides={quickReplies.length} style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'10px 12px',marginBottom:12}}>
           <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
-            <span style={{fontSize:13,color:C.muted,flex:1,lineHeight:1.4}}>Un tap copie le message ; dans une conversation, il remplit la réponse.</span>
+            <span style={{fontSize:13,color:C.muted,flex:1,lineHeight:1.4}}>Touche un message pour le copier ; dans une conversation, il remplit la réponse.</span>
             <button type="button" className="vrm-pied-lien" data-pied-lien="qr-modifier" onClick={()=>setShowQR(v=>!v)}>{showQR?'Terminer':VERBES.modifier}</button>
           </div>
           <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
@@ -60943,9 +60943,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {annual.months.map((m,i)=>{ const b=m.ca-m.cout-m.frais; return (
                       <tr key={i} style={{borderTop:`1px solid ${C.border}`,color:C.text,textAlign:'right'}}>
                         <td style={{textAlign:'left',padding:'5px 6px',textTransform:'capitalize'}}>{m.label}</td>
-                        <td style={{padding:'5px 6px'}}>{m.ca?m.ca.toFixed(0)+' €':'—'}</td>
-                        <td style={{padding:'5px 6px',color:C.muted}}>{m.cout?m.cout.toFixed(0)+' €':'—'}</td>
-                        <td style={{padding:'5px 6px',fontWeight:500,color:m.nbCout?(b>=0?INV_STATUS.online.color:C.danger):C.muted}}>{m.nbCout?(b>=0?'+':'')+b.toFixed(0)+' €':'—'}</td>
+                        <td style={{padding:'5px 6px'}}>{m.ca?m.ca.toFixed(0)+'\u00a0€':'—'}</td>
+                        <td style={{padding:'5px 6px',color:C.muted}}>{m.cout?m.cout.toFixed(0)+'\u00a0€':'—'}</td>
+                        <td style={{padding:'5px 6px',fontWeight:500,color:m.nbCout?(b>=0?INV_STATUS.online.color:C.danger):C.muted}}>{m.nbCout?(b>=0?'+':'')+b.toFixed(0)+'\u00a0€':'—'}</td>
                         <td style={{padding:'5px 6px',color:C.muted}}>{m.nb||'—'}</td>
                       </tr>
                     );})}
@@ -66725,6 +66725,7 @@ const applyZoom = (z) => {
     // et on la redivise, ce qui compose les zooms à chaque appel.
     d.style.zoom = ''; d.style.minWidth = '';
     d.style.setProperty('--vrm-zoom', '1');
+    d.style.removeProperty('--vrm-vw100'); d.style.removeProperty('--vrm-dezoom');
     // Le texte en grand de l'APPAREIL (src/grandTexte.js) multiplie la densité choisie.
     const g = echelleTexte(); marquerGrandTexte(g);
     let f = parseFloat(z) || 1;
@@ -66738,6 +66739,11 @@ const applyZoom = (z) => {
       d.style.zoom = String(f);
       d.style.setProperty('--vrm-zoom', String(f));
       d.style.minWidth = Math.round(w / f) + 'px';
+      // Sous un zoom, « 100vw » vaut la largeur de l'écran AVANT zoom (il déborde) :
+      // les feuilles lisent la largeur de mise en page ici. La barre du bas garde
+      // sa taille d'origine (comme iOS : ses libellés ne suivent pas le texte en grand).
+      d.style.setProperty('--vrm-vw100', Math.round(w / f) + 'px');
+      d.style.setProperty('--vrm-dezoom', String(Math.round(1000 / f) / 1000));
     }
   } catch (_) {}
 };
@@ -67223,7 +67229,7 @@ function JournalVrm() {
   const vus = filtrerJournal(etat.evenements, { compte, type });
   const jours = [];
   for (const e of vus.slice(0, n)) {
-    const j = e.at ? new Date(e.at).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }) : 'En cours';
+    const j = e.at ? dateJourFr(new Date(e.at)) : 'En cours';
     if (!jours.length || jours[jours.length - 1].j !== j) jours.push({ j, l: [] });
     jours[jours.length - 1].l.push(e);
   }
@@ -70011,7 +70017,7 @@ function ConnexionsSetting({comptes=[],onComptes,onPlateforme}) {
     <section className="vrm-connexion-source" data-connexion="capture" style={{borderColor:C.border}}><h3>Ce que l’extension a lu</h3><strong>{capture.titre}</strong>{capture.date&&<time dateTime={capture.date}>{dateLisible(capture.date)}</time>}<p style={{color:C.muted}}>Pour la rafraîchir : ouvre le compte sur sa plateforme, extension active.</p></section>
     <SuiviComptes comptes={comptes} lignes={capt?.lignes||null} onComptes={onComptes}/>
     {onPlateforme&&<div className="vrm-connexions-actions"><Bouton variante="secondaire" onClick={()=>onPlateforme('plat_leboncoin')}>Comptes Leboncoin</Bouton><Bouton variante="secondaire" onClick={()=>onPlateforme('plat_ebay')}>Comptes eBay</Bouton></div>}
-    <section className="vrm-connexion-source" data-connexion="emails" style={{borderColor:C.border}}><h3>Emails reçus</h3><strong>{emails.titre}</strong>{emails.date&&<time dateTime={emails.date}>{dateLisible(emails.date)}</time>}<p style={{color:C.muted}}>La date du dernier arrivé, pas la preuve que chaque transfert marche. Détail : « Réception des emails ».</p></section>
+    <section className="vrm-connexion-source" data-connexion="emails" style={{borderColor:C.border}}><h3>E-mails reçus</h3><strong>{emails.titre}</strong>{emails.date&&<time dateTime={emails.date}>{dateLisible(emails.date)}</time>}<p style={{color:C.muted}}>La date du dernier arrivé, pas la preuve que chaque transfert marche. Détail : « Réception des emails ».</p></section>
     {((Array.isArray(drift)&&drift.length>0)||(Array.isArray(plantages)&&plantages.length>0))&&<details className="vrm-connexion-source" style={{borderColor:C.border}}><summary>Incidents et détails pour l’assistance</summary>
       {Array.isArray(drift)&&drift.length>0&&<p>Le format de certaines réponses est à vérifier : {[...new Set(drift.map(x=>nomFamille(x.type)))].join(', ')}.</p>}
       {Array.isArray(plantages)&&plantages.length>0&&<p data-plantages={plantages.length}>{plantages.length} incident(s) observé(s) ces 7 derniers jours. Dernier : {plantages[0].message} · {dateLisible(plantages[0].at)}.</p>}
@@ -70056,7 +70062,7 @@ function EcranMasques({ comptes, ordi }) {
     toast('Réaffiché — il compte de nouveau dans la compta.');
   };
   const liste = onglet === 'ventes' ? vMasq : aMasq;
-  const eur = (o) => { const v = o && (o.price && o.price.amount != null ? Number(o.price.amount) : null); return v != null && isFinite(v) ? v.toFixed(2).replace('.', ',') + ' €' : ''; };
+  const eur = (o) => { const v = o && (o.price && o.price.amount != null ? Number(o.price.amount) : null); return v != null && isFinite(v) ? v.toFixed(2).replace('.', ',') + '\u00a0€' : ''; };
   return (
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
       <ScreenHead icon="eyeOff" title="Masqués" desc="Les achats que tu as retirés de la compta — réaffiche-les d'un clic."/>
@@ -73194,7 +73200,7 @@ function AppCoeur() {
               VentesLeboncoin/AchatsLeboncoin), les Colis, et « À publier ».
               L'onglet Achats est toujours là : sans achat capté, il dit pourquoi
               (jamais lu ≠ lu et vide), il ne reste jamais blanc. */}
-          {(() => { const ar = lbcArgent(lbcVentes); const e2 = (n) => n.toFixed(2).replace('.', ',') + ' €';
+          {(() => { const ar = lbcArgent(lbcVentes); const e2 = (n) => n.toFixed(2).replace('.', ',') + '\u00a0€';
             const note = (ar.actives && lbcVentes.maj)
               ? `Lu ${ilYaCourt(lbcVentes.maj)}`
               : null;

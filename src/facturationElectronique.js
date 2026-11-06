@@ -201,7 +201,7 @@ export const pdfFacturX = async (f, v) => {
     const w = fo.widthOfTextAtSize(str, s);
     page.drawText(str, { x: droite ? x - w : x, y, size: s, font: fo, color: c });
   };
-  const eur = (c) => (c / 100).toFixed(2).replace('.', ',') + ' €';
+  const eur = (c) => (c / 100).toFixed(2).replace('.', ',') + '\u00a0€';
   page.drawRectangle({ x: 0, y: 838, width: W, height: 4, color: accent });
   let y = 790;
   T('FACTURE', M, y, { s: 24, b: true });

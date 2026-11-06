@@ -34,7 +34,7 @@ export const ACHAT_SANS_COUT = /annul|cancel|refus|rembours|retour|suspend|[ée]
 const euros = (c) => {
   const n = Math.abs(c);
   const e = String(Math.floor(n / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-  return (c < 0 ? '−' : '') + e + ',' + String(n % 100).padStart(2, '0') + ' €';
+  return (c < 0 ? '−' : '') + e + ',' + String(n % 100).padStart(2, '0') + '\u00a0€';
 };
 export const texteCentimes = (c) => (Number.isSafeInteger(c) ? euros(c) : '');
 

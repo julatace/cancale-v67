@@ -382,7 +382,7 @@ export function eurosC(c) {
   if (c == null || !Number.isFinite(c)) return '—';
   const n = Math.abs(Math.round(c)), e = Math.floor(n / 100), r = n % 100;
   const ent = String(e).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-  return (c < 0 ? '−' : '') + ent + (r ? ',' + String(r).padStart(2, '0') : '') + ' €';
+  return (c < 0 ? '−' : '') + ent + (r ? ',' + String(r).padStart(2, '0') : '') + '\u00a0€';
 }
 // « 300 € » · « au moins 300 € » (un prix illisible) · « — » (rien de lisible).
 export function texteDepense(l) {
