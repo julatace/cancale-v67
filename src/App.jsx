@@ -386,6 +386,8 @@ import { MR_SELECT, lireColisMondialRelay, suivisAvecMondialRelay, accordCodes, 
 import ExpliqueMondialRelay, { LecturesMondialRelay } from "./ExpliqueMondialRelay.jsx";
 import { CLE_QR_POSES, jugerQrCapture, dessinerQrCapture, avecQrPoses, titreQrAbsent, qrParCapture, messageQrCapture, cleSuiviQr } from "./qrCapture.js";
 import { lireFile, noterSaisie, instantane, acquitter, compterEnAttente, nuagePlusRecent, fusionAuChargement, oublierCle, CLE_FILE, HORS_FILE } from "./fileEnvoi.js";
+import { creerGestes, creerEcrivainLocal, ecrireOps, clesDe, vueDesOps } from "./gesteAnnulable.js";
+import { PiluleAnnuler } from "./PiluleAnnuler.jsx";
 // La migration qui cloisonne les vendeurs, lue depuis LE fichier (pas recopiée) :
 // deux copies finiraient par diverger, et c'est le genre de texte qu'on colle
 // dans une base de production sans le relire.
@@ -3427,13 +3429,20 @@ const fusionALaSauvegarde = (k, v) => {
   const f = fusion3(b, v, n);
   return { v: f === undefined ? v : f, fusionne: true };
 };
-const save = (k,v) => {
+// (6 nov., v36) `quand(ok, raison)` : l'issue LOCALE de cette sauvegarde (le geste
+// annulable, src/gesteAnnulable.js, attend d'elle de savoir si l'appareil l'a
+// gardée). Une sauvegarde remplacée par une plus récente de la même clé rend
+// son issue avec elle (la valeur gardée porte les deux).
+const _saveQuand = {};
+const _rendreQuand = (k, ok, raison) => { const l = _saveQuand[k]; delete _saveQuand[k]; if (l) for (const f of l) { try { f(ok, raison); } catch (_) {} } };
+const save = (k,v,quand) => {
   if (SYNC_KEYS.includes(k)) { _settingsRevision++; try { window.dispatchEvent(new Event('vrm:reglage-attente')); } catch (_) {} }
   const owner = AUTH.user?.id;
+  if (typeof quand === 'function') (_saveQuand[k] || (_saveQuand[k] = [])).push(quand);
   if (_saveTimers[k]) clearTimeout(_saveTimers[k]);
   else if (SYNC_KEYS.includes(k)) { try { const t = localStorage.getItem(k); _saveAvant[k] = t == null ? undefined : t; } catch (_) { delete _saveAvant[k]; } }
   _saveTimers[k] = setTimeout(() => {
-    if (AUTH.user?.id !== owner || (owner && readSession()?.user?.id !== owner)) { delete _saveTimers[k]; delete _saveAvant[k]; return; }
+    if (AUTH.user?.id !== owner || (owner && readSession()?.user?.id !== owner)) { delete _saveTimers[k]; delete _saveAvant[k]; _rendreQuand(k, false, 'le compte VRM a changé'); return; }
     // (2 nov.) Ce que le navigateur portait AVANT ce geste : la base de la file
     // d'envoi tant que cet onglet n'a pas encore lu le nuage.
     let avantTxt; try { avantTxt = localStorage.getItem(k); } catch (_) { avantTxt = undefined; }
@@ -3442,9 +3451,11 @@ const save = (k,v) => {
     try { localStorage.setItem(k,txt); _failedLocalSaves.delete(k); try { if(noterChangements(sessionStorage,owner,k,_lireJson(avantTxt),r.v))window.dispatchEvent(new Event('vrm:modification-notee')); } catch (_) {} }
     catch (_) {
       delete _saveTimers[k]; _failedLocalSaves.set(k,{owner,v:r.v});
+      _rendreQuand(k, false, 'le stockage de cet appareil a refusé la modification');
       _emitSync('error','le stockage de cet appareil a refusé la modification'); return;
     }
     delete _saveTimers[k];
+    _rendreQuand(k, true);
     // (2 nov.) LA FILE D'ENVOI (src/fileEnvoi.js) : le geste est noté avec la
     // base de sa fusion, et il y reste jusqu'à ce que le nuage l'ACCEPTE — l'app
     // fermée avant le retour du réseau, le chargement suivant le rejoue au lieu
@@ -3464,6 +3475,36 @@ const save = (k,v) => {
     if (SYNC_KEYS.includes(k)) cloudPush(); // declenche la synchro cloud
   }, 500);
 };
+
+// ── « ANNULER » PARTOUT, GESTES INSTANTANÉS (6 nov., v36, src/gesteAnnulable.js) ─
+// Un geste INTERNE à VRM s'affiche tout de suite, son écriture part par `save`
+// (une file par clé, chaque écriture relit la clé et n'y pose que SA sous-valeur),
+// et la pilule (`PiluleAnnuler`) offre « Annuler » 5 s. « Enregistré » seulement
+// quand le nuage a ACCEPTÉ une écriture partie après le geste ; refusé ⇒ l'écran
+// revient en arrière (« Pas enregistré — Réessayer ») ; pas de réponse ⇒ « pas
+// encore envoyé », gardé sur l'appareil (la file d'envoi le renverra).
+// ⚠️ Jamais pour un geste qui part chez un tiers (Vinted, eBay, Leboncoin,
+// Vestiaire, e-mail, facture) : il garde sa confirmation.
+const _gestes = creerGestes();
+const _ecrivainVrm = creerEcrivainLocal({
+  lire: (k) => { let t; try { t = localStorage.getItem(k); } catch (_) { return undefined; } if (t == null) return null; try { return JSON.parse(t); } catch (_) { return undefined; } },
+  sauver: (k, v, quand) => save(k, v, quand),
+  estSynchro: (k) => SYNC_KEYS.includes(k) && !!AUTH.user?.id && !!CLOISONNE,
+  revision: () => _settingsRevision,
+  confirme: () => _settingsConfirmed,
+  abonnerSync: (fn) => onSyncChange((st) => fn(st, _syncInfo.raison)),
+});
+// `ops` : les sous-valeurs posées (src/gesteAnnulable.js) ; `setters` : { [clé]: setState }
+// de l'écran (optionnel : un écran qui relit la clé à sa sauvegarde suit seul).
+const gesteVrm = (texte, ops, setters = {}, apres = null) => _gestes.lancer({
+  texte, cles: clesDe(ops),
+  vue: (sens) => { vueDesOps(ops, setters)(sens); if (typeof apres === 'function') { try { apres(sens); } catch (_) {} } },
+  ecrire: (sens) => ecrireOps({ ops, sens, lire: _ecrivainVrm.lire, ecrire: _ecrivainVrm.ecrire }),
+});
+function PiluleAnnulerCoque() {
+  const enHaut = React.useSyncExternalStore(abonnerFeuilles, uneFeuilleOuverte);
+  return <PiluleAnnuler gestes={_gestes} enHaut={enHaut}/>;
+}
 
 // localStorage est partagé entre les onglets : le changement de vendeur
 // doit fermer l'ancien écran avant toute autre sauvegarde différée.
@@ -10158,6 +10199,9 @@ const _ecoutesVc = new Set();
 const signalerVc = () => { for (const f of _ecoutesVc) { try { f(); } catch (_) {} } };
 // Une clé Vestiaire posée par un geste : visible tout de suite, synchronisée par `save`.
 const vcPoser = (k, v) => { _vcMem[k] = v; save(k, v); signalerVc(); };
+// (6 nov., v36) L'écran d'un geste annulable sur une clé Vestiaire : la copie en mémoire, sans écrire
+// (l'écriture part par la file du geste, src/gesteAnnulable.js).
+const vcSetter = (k) => (f) => { _vcMem[k] = f(vcCarte(k)); signalerVc(); };
 // (3 nov.) Les N° des annonces Vestiaire tels qu'ils s'AFFICHENT et s'identifient :
 // le N° donné par VRM, remplacé par celui de l'annonce Vinted quand il les a
 // reliées (`vrm_vc_liens`, src/lienVestiaire.js). Le N° donné reste dans
@@ -22031,7 +22075,8 @@ function LeboncoinColis({ lbcVentes = { ventes: [] } }) {
   // la liste « à poster » et descend dans « Déjà postés », sans être perdu.
   const [lbcDone, setLbcDone] = React.useState(() => (typeof load === 'function' ? (load('vrm_lbc_colis_done', {}) || {}) : {}));
   const estFait = (o) => !!(o && lbcDone[o.txId]);
-  const toggleFait = (o) => { if (!o || o.txId == null) return; setLbcDone(prev => { const u = { ...prev }; if (u[o.txId]) delete u[o.txId]; else u[o.txId] = Date.now(); if (typeof save === 'function') save('vrm_lbc_colis_done', u); return u; }); };
+  // (6 nov., v36) Geste annulable (src/gesteAnnulable.js) : l'écran suit, la pilule offre « Annuler ».
+  const toggleFait = (o) => { if (!o || o.txId == null) return; const id = String(o.txId), avant = lbcDone[id] != null ? lbcDone[id] : lbcDone[o.txId]; gesteVrm(avant ? 'Colis remis à poster' : 'Colis fait', [{ k: 'vrm_lbc_colis_done', type: 'cle', id, apres: avant ? undefined : Date.now(), avant }], { vrm_lbc_colis_done: setLbcDone }); };
   // ── IMPRESSION DU BORDEREAU « EXACTEMENT COMME VINTED » (Julien, 3 oct.) ────
   // Le tampon N° + titre est posé à l'emplacement APPRIS pour ce format (taille
   // de page = transporteur + forme), puis une modale permet de le DÉPLACER si
@@ -28673,7 +28718,7 @@ function BlocBarrerVc({ titres = {} }) {
     <h3>{liste.length > 1 ? `${liste.length} N° à barrer` : 'Un N° à barrer'}</h3>
     {liste.map((x) => <div key={x.productId} className="vrm-lvc-barrer-ligne" data-vc-barrer={x.productId} data-vc-barrer-de={x.de} data-vc-barrer-vers={x.vers}>
       <span><s>N°{x.de}</s> → <b>N°{x.vers}</b>{titres[x.productId] ? ` · ${String(titres[x.productId]).slice(0, 48)}` : ''}</span>
-      <button type="button" className="vrm-lvc-geste" data-vc-barre={x.productId} onClick={() => vcPoser('vrm_vc_liens', marquerBarre(vcCarte('vrm_vc_liens'), x.productId))}>C'est écrit</button>
+      <button type="button" className="vrm-lvc-geste" data-vc-barre={x.productId} onClick={() => { const e = lienDe(vcCarte('vrm_vc_liens'), x.productId); if (e) gesteVrm(`N°${x.de} barré`, [{ k: 'vrm_vc_liens', type: 'champs', id: String(x.productId), apres: { ecrit: new Date().toISOString() }, avant: { ecrit: e.ecrit } }], { vrm_vc_liens: vcSetter('vrm_vc_liens') }); }}>C'est écrit</button>
     </div>)}
   </section>;
 }
@@ -29233,7 +29278,7 @@ function LigneVenteVc({ v, fait, enV, flou, i = 0 }) {
         {v.aExpedier && !fait && v.bordereau ? <div className="vrm-recap-principal vrm-rangee-bord" data-rangee-bord=""><PastilleTransporteur t={trV} C={C} data-recap-transporteur=""/><BoutonImprimerVc v={v} grand/></div> : null}
         {!(v.aExpedier&&!fait)&&v.bordereau?.id?<BoutonImprimerVc v={v} lectureSeule/>:null}
         <div className="vrm-recap-grille">
-          {v.aExpedier ? <Bouton variante="secondaire" icone="check" data-geste="fait" data-vc-fait={v.id} onClick={() => marquerVc('vrm_vc_colis_done', v.id, !fait)}>{fait ? '↺ Pas encore' : 'Colis fait'}</Bouton> : null}
+          {v.aExpedier ? <Bouton variante="secondaire" icone="check" data-geste="fait" data-vc-fait={v.id} onClick={() => gesteVrm(fait ? 'Colis remis à envoyer' : 'Colis fait', [{ k: 'vrm_vc_colis_done', type: 'cle', id: String(v.id), apres: fait ? undefined : Date.now(), avant: vcCarte('vrm_vc_colis_done')[String(v.id)] }], { vrm_vc_colis_done: vcSetter('vrm_vc_colis_done') })}>{fait ? '↺ Pas encore' : 'Colis fait'}</Bouton> : null}
           {v.num ? <Bouton variante="secondaire" icone="doc" data-recap-fiche={v.num} aria-label={`Fiche N°${v.num}`} onClick={() => { fermer(); window.dispatchEvent(new CustomEvent('vrm:fiche-article', { detail: v.num })); }}>Fiche de l’article</Bouton> : null}
         </div>
       </section>
@@ -44512,13 +44557,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return { numero: lk.numero }; // au moins le N°, même si l'annonce n'existe plus
   };
   const isBordPrinted = (b) => !!bordsPrinted[bordKey(b)];
+  // (6 nov., v36) Le bouton « Marquer imprimé » / « ✓ Imprimé » : geste annulable (src/gesteAnnulable.js).
   const toggleBordPrinted = (b) => {
     const k = bordKey(b); if (!k) return;
-    setBordsPrinted(prev => {
-      const u = { ...prev };
-      if (u[k]) delete u[k]; else u[k] = new Date().toISOString();
-      save('vinted_bords_printed', u); return u;
-    });
+    const avant = bordsPrinted[k];
+    gesteVrm(avant ? 'Remis dans « à imprimer »' : 'Marqué imprimé', [{ k: 'vinted_bords_printed', type: 'cle', id: k, apres: avant ? undefined : new Date().toISOString(), avant }], { vinted_bords_printed: setBordsPrinted });
   };
   // Bordereau reçu pour une annonce = la paire est VENDUE, même si la synchro
   // Vinted (extension) ne l'a pas encore reflété. PAR IDENTITÉ SEULEMENT (§5) :
@@ -44625,25 +44668,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }, [lotOuvert]);
   // Colis RETIRÉS à la main (par n° de suivi) : disparaissent de « à retirer ».
   const [collected, setCollected] = useStateCle('vrm_colis_collected', () => new Set(load('vrm_colis_collected', [])));
-  const [lastCollected, setLastCollected] = useState(null); // dernier colis retiré → bandeau « Annuler »
   const [qrView, setQrView] = useState(null); // colis affiché en grand pour le scan { title, code, suivi, carrier, img }
   // ⚠️ QUAND le colis a été coché — le Set seul ne le dit pas, et sans la date on
   //    ne peut pas le garder EN GRIS « le temps que ce soit confirmé ». Clé à
   //    part pour ne rien casser : un colis coché avant ce changement n'a pas de
   //    date, il se comporte simplement comme avant (il disparaît).
   const [collectedAt, setCollectedAt] = useStateCle('vrm_colis_collected_at', () => load('vrm_colis_collected_at', {}));
-  const markCollected = (t) => {
-    const k = colisKey(t);
-    setCollected(prev => { const n = new Set(prev); n.add(k); save('vrm_colis_collected', [...n]); return n; });
-    setCollectedAt(prev => { const u = { ...prev, [k]: new Date().toISOString() }; save('vrm_colis_collected_at', u); return u; });
-    setLastCollected(t);
+  // (6 nov., v36) « J'ai retiré » / « Remettre » : gestes annulables (src/gesteAnnulable.js) —
+  // l'écran suit tout de suite, la pilule offre « Annuler » (l'ancien bandeau et son minuteur sont partis).
+  const gesteCollecte = (t, oui) => {
+    const k = colisKey(t); if (!k) return;
+    const ops = [{ k: 'vrm_colis_collected', type: 'ensemble', id: k, apres: oui, avant: collected.has(k) },
+      { k: 'vrm_colis_collected_at', type: 'cle', id: k, apres: oui ? new Date().toISOString() : undefined, avant: collectedAt[k] }];
+    gesteVrm(oui ? 'Colis retiré' : 'Colis remis dans « à retirer »', ops, { vrm_colis_collected: setCollected, vrm_colis_collected_at: setCollectedAt });
   };
-  const unmarkCollected = (t) => {
-    const k = colisKey(t);
-    setCollected(prev => { const n = new Set(prev); n.delete(k); save('vrm_colis_collected', [...n]); return n; });
-    setCollectedAt(prev => { if (prev[k] == null) return prev; const u = { ...prev }; delete u[k]; save('vrm_colis_collected_at', u); return u; });
-    setLastCollected(null);
-  };
+  const markCollected = (t) => gesteCollecte(t, true);
+  const unmarkCollected = (t) => gesteCollecte(t, false);
   // Tout marquer retiré en un tap (les transporteurs n'envoient pas d'email « récupéré »).
   const markAllCollected = (list) => { setCollected(prev => { const n = new Set(prev); (list || []).forEach(t => n.add(colisKey(t))); save('vrm_colis_collected', [...n]); return n; }); };
   const isCollected = (t) => collected.has(colisKey(t));
@@ -44750,7 +44790,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     setQrAjout({ suivi: k, etat: 'retire', msg: 'QR retiré.' });
   };
   // Le bandeau « Colis retiré · Annuler » se referme tout seul au bout de 6 s.
-  useEffect(() => { if (!lastCollected) return; const id = setTimeout(() => setLastCollected(null), 6000); return () => clearTimeout(id); }, [lastCollected]);
   // Reçu authentique (facture d'achat reçue par email Vinted) correspondant à un
   // achat. On privilégie TOUJOURS ce vrai reçu au justificatif généré par l'app.
   // Recherche par ordre de fiabilité : (1) n° de transaction, (2) titre exact,
@@ -45628,7 +45667,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Vinted, pas un rapprochement (§24). On ouvre donc toujours SA conversation,
   // même quand l'extension n'est pas encore passée.
   const lienConv = (o) => { const c = o && o.conversation_id; return c ? `https://www.vinted.fr/inbox/${c}` : ''; };
-  const markPickupDone = (o) => { const k = String(o.transaction_id||''); if(!k) return; setPickupDone(prev=>{ const u={...prev,[k]:new Date().toISOString()}; save('vinted_pickup_done',u); return u; }); };
+  const markPickupDone = (o) => { const k = String(o.transaction_id||''); if(!k) return; gesteVrm('Colis retiré', [{ k: 'vinted_pickup_done', type: 'cle', id: k, apres: new Date().toISOString(), avant: pickupDone[k] }], { vinted_pickup_done: setPickupDone }); };
   const unmarkPickupDone = (o) => { const k = String(o.transaction_id||''); if(!k) return; setPickupDone(prev=>{ const u={...prev}; delete u[k]; save('vinted_pickup_done',u); return u; }); };
   const markAllPickupDone = (list) => { setPickupDone(prev=>{ const u={...prev}; (list||[]).forEach(o=>{ if(o.transaction_id!=null) u[String(o.transaction_id)]=new Date().toISOString(); }); save('vinted_pickup_done',u); return u; }); };
   // Bordereaux masqués à la main (ex. doublon / non relié qu'on ne veut plus voir).
@@ -46474,6 +46513,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const marquerColisFait = (o, b) => { if (o && !isShipDone(o)) toggleShipDone(o); if (b) markBordShipped(b); };
   // (1er nov.) « Déposé » de Ventes (bouton et glissé) : le MÊME geste.
   const marquerPoste = marquerColisFait;
+  // (6 nov., v36) « Déposé » / « Pas encore déposé » de la carte Colis : les MÊMES deux marqueurs
+  // (la vente et son bordereau), en geste annulable (src/gesteAnnulable.js). Défaire ne retire que
+  // le marqueur posé à la main — jamais ce que Vinted dit du colis.
+  const gesteColisFait = (o, b, oui) => {
+    const k = o && o.transaction_id != null ? String(o.transaction_id) : null, kb = b ? bordKey(b) : null;
+    const ops = [];
+    if (k && (oui ? !shipDone[k] : !!shipDone[k])) ops.push({ k: 'vinted_ship_done', type: 'cle', id: k, apres: oui ? Date.now() : undefined, avant: shipDone[k] });
+    if (kb && (oui || isBordShippedManual(b))) ops.push({ k: 'vinted_bords_shipped', type: 'cle', id: kb, apres: oui ? 1 : undefined, avant: bordsShipped[kb] });
+    if (!ops.length) return;
+    gesteVrm(oui ? 'Colis déposé' : 'Colis remis dans « à envoyer »', ops, { vinted_ship_done: setShipDone, vinted_bords_shipped: setBordsShipped });
+  };
   // (voir isBordDone plus bas : « colis fait » à la main, ou expédié d'après
   // Vinted (auto), OU marqué « expédié » à la main (statut Vinted en retard).
   // ── QUAND UN BORDEREAU SORT-IL DE LA LISTE ? ─────────────────────────────
@@ -46992,10 +47042,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   });
   // (6 nov., vague 2 · point 1) « Déjà remise en vente » (SON clic) : { [tx]: at }.
   const [annuleesReglees, setAnnuleesReglees] = useStateCle('vrm_annulees_reglees', () => { const v = load('vrm_annulees_reglees', {}); return v && typeof v === 'object' ? v : {}; });
-  const poserAnnuleeReglee = (tx) => setAnnuleesReglees((prev) => { const u = { ...(prev || {}), [String(tx)]: new Date().toISOString() }; save('vrm_annulees_reglees', u); return u; });
+  const poserAnnuleeReglee = (tx) => gesteVrm('Noté : VRM ne la propose plus', [{ k: 'vrm_annulees_reglees', type: 'cle', id: String(tx), apres: new Date().toISOString(), avant: (annuleesReglees || {})[String(tx)] }], { vrm_annulees_reglees: setAnnuleesReglees });
   // (6 nov., vague 2 · point 4) « Plus tard » dans « Sans achat relié » : { [itemId]: at }.
   const [achatPlusTard, setAchatPlusTard] = useStateCle('vrm_achat_plus_tard', () => { const v = load('vrm_achat_plus_tard', {}); return v && typeof v === 'object' ? v : {}; });
-  const poserAchatPlusTard = (id) => setAchatPlusTard((prev) => { const u = { ...(prev || {}), [String(id)]: new Date().toISOString() }; save('vrm_achat_plus_tard', u); return u; });
+  const poserAchatPlusTard = (id) => gesteVrm('Mise de côté — elle revient dans 7 jours', [{ k: 'vrm_achat_plus_tard', type: 'cle', id: String(id), apres: new Date().toISOString(), avant: (achatPlusTard || {})[String(id)] }], { vrm_achat_plus_tard: setAchatPlusTard });
   // (6 nov., finitions) Sur un appareil NEUF, ces deux clés arrivent du nuage APRÈS le montage : sans cette
   // relecture, « Plus tard » et « Déjà remise en vente » posés ailleurs restaient vides ici (mesuré au banc
   // vague2-ventes, scène P). La règle des données lues au montage : ne remplacer que ce qui est resté VIDE.
@@ -48142,10 +48192,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             )}
           </div>
   );
+  // (6 nov., v36) Geste annulable : seuls `reattribue.ecrit` et `cartonVerifie` de LA fiche changent
+  // (jamais son N°, §5) ; « Annuler » ⇒ la ligne revient dans « à écrire sur tes cartons ».
   const marquerReattribueEcrit = (it) => {
     const f = numeros[String(it.id)] || {};
     if (!f.reattribue) return;
-    updatePair(it, { reattribue: { ...f.reattribue, ecrit: new Date().toISOString() }, cartonVerifie: new Date().toISOString() });
+    const at = new Date().toISOString();
+    gesteVrm(`N°${f.numero} : c'est écrit`, [{ k: 'vinted_annonce_numeros', type: 'champs', id: String(it.id), apres: { reattribue: { ...f.reattribue, ecrit: at }, cartonVerifie: at }, avant: { reattribue: f.reattribue, cartonVerifie: f.cartonVerifie } }], { vinted_annonce_numeros: setNumeros });
   };
   const blocAEcrire = () => aEcrireCarton.length > 0 && (
     <div data-numeros-a-ecrire={aEcrireCarton.length} style={{ background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn || '#B25000'}`, borderRadius: 12, padding: '10px 12px', marginBottom: 12 }}>
@@ -55988,7 +56041,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {num && aExpedier(o) && !hidden && inGarage(num) ? <Bouton variante="secondaire" icone="pin" onClick={()=>{fermer();onLocate&&onLocate(num);}} aria-label="Voir au stock">Voir au stock</Bouton> : null}
                     {isLotTitle(o.title) ? <Bouton variante="secondaire" icone="box" onClick={async(ev)=>{ lotOrigineRef.current = ev.currentTarget; setLotView({loading:true,order:o,items:[]}); const items=await fetchLotItems(o._acc,o.transaction_id); setLotView({loading:false,order:o,items}); }} title="Voir les paires du lot" aria-label="Voir les paires du lot">Voir le lot</Bouton> : null}
                     {annChez && annChez.item ? <Bouton variante="secondaire" icone="sync" data-recap-remettre={txL} onClick={()=>{ fermer(); remettreEnVente(annChez); }}>{annChez.etat === 'en-cours' ? 'Reprendre la remise en vente' : 'Remettre en vente'}</Bouton> : null}
-                    {annChez ? <Bouton variante="discret" data-recap-remise-faite={txL} title="Tu l’as déjà remise en vente toi-même : VRM ne le redit plus" onClick={()=>{ poserAnnuleeReglee(txL); toast('Noté : VRM ne la propose plus'); }}>Déjà remise en vente</Bouton> : null}
+                    {annChez ? <Bouton variante="discret" data-recap-remise-faite={txL} title="Tu l’as déjà remise en vente toi-même : VRM ne le redit plus" onClick={()=>poserAnnuleeReglee(txL)}>Déjà remise en vente</Bouton> : null}
                     {!annChez && st==='cancelled' && num && saleOutcome(o)==='rembourse' && !isPairLost(num) ? <Bouton variante="secondaire" onClick={()=>markPairLost(num,o)} title={`Tu as remboursé l'acheteur. Si l'article ne revient PAS, déclare-le perdu : le N°${num} sera libéré et sa case au garage vidée.`} aria-label="Déclarer l'article perdu">Article perdu ?</Bouton> : null}
                     {num && isPairLost(num) ? <Bouton variante="discret" onClick={()=>unmarkPairLost(num)} title={`Annuler : l'article N°${num} est finalement revenu.`} aria-label="Annuler article perdu">Il est revenu</Bouton> : null}
                   </div>
@@ -60291,10 +60344,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       {/* « Colis fait » marque LES DEUX (la vente et le bordereau) :
                           deux marqueurs pour un même carton, c'était deux chiffres
                           qui divergeaient. */}
-                      <button type="button" onClick={()=>{
-                        if (posted) { if(o) { if(isShipDone(o)) toggleShipDone(o); } if(b && isBordShippedManual(b)) unmarkBordShipped(b); }
-                        else marquerColisFait(o, b);
-                      }} title={posted?'Le colis est encore chez toi : il revient dans « À envoyer »':'Marquer déposé : il passe dans « Envoyés »'} data-geste="fait"
+                      <button type="button" onClick={()=>gesteColisFait(o, b, !posted)} title={posted?'Le colis est encore chez toi : il revient dans « À envoyer »':'Marquer déposé : il passe dans « Envoyés »'} data-geste="fait"
                         className="vrm-colis-sec vrm-colis-ter" style={{...sec,border:`1px solid ${C.border}`,background:posted?C.bg:'transparent',color:posted?C.text:C.muted}}>
                         {posted?'Pas encore déposé':'Déposé'}
                       </button>
@@ -62366,16 +62416,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         );
       })()}
 
-      {/* ── Bandeau « Annuler » après avoir retiré un colis (mise à jour immédiate) ── */}
-      {lastCollected && (
-        <div style={{position:'fixed',left:16,right:16,bottom:'calc(90px + env(safe-area-inset-bottom))',zIndex:1300,display:'flex',justifyContent:'center',pointerEvents:'none'}}>
-          <div style={{pointerEvents:'auto',display:'flex',alignItems:'center',gap:12,background:'#111',color:'#fff',borderRadius:12,padding:'10px 12px 10px 16px',boxShadow:'0 6px 20px rgba(0,0,0,0.3)',maxWidth:420,width:'100%'}}>
-            <span style={{flex:1,fontSize:13,fontWeight:500,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>✓ Colis retiré</span>
-            <button type="button" onClick={()=>unmarkCollected(lastCollected)} style={{flexShrink:0,border:`1px solid ${INV_STATUS.online.color}`,background:'transparent',color:INV_STATUS.online.color,borderRadius:12,padding:'5px 14px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
-            <button type="button" onClick={()=>setLastCollected(null)} aria-label="Fermer" style={{flexShrink:0,border:'none',background:'transparent',color:'#aaa',fontSize:20,cursor:'pointer',lineHeight:1,padding:'0 4px'}}>×</button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -73130,6 +73170,7 @@ function AppCoeur() {
           chargement, sur n'importe quel écran. */}
       <TopProgress/>
       <Toaster/>
+      <PiluleAnnulerCoque/>
       <DefilementPartout/>
       {/* Fenêtre de confirmation maison (askConfirm). Sans ce montage, l'app
           retomberait silencieusement sur la boîte grise du navigateur. */}

@@ -257,8 +257,8 @@ function texteApp() {
   const brut = fs.readFileSync(APP, 'utf8');
   const s = brut.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
   dit(/from\s+["']\.\/gesteAnnulable\.js["']/.test(s), '11a. App.jsx importe src/gesteAnnulable.js');
-  dit(/const save = \(k,\s*v,\s*quand\)/.test(s) && /quand\(true\)/.test(s) && /quand\(false/.test(s), '11b. `save` rend son issue locale (quand(true|false))');
-  const n = (s.match(/gesteVrm\(\s*['"`]/g) || []).length;
+  dit(/const save = \(k,\s*v,\s*quand\)/.test(s) && /_rendreQuand\(k, true\)/.test(s) && /_rendreQuand\(k, false/.test(s), '11b. `save` rend son issue locale (quand(true|false))');
+  const n = (s.match(/[^\w.]gesteVrm\(/g) || []).length;
   dit(n >= 8, `11c. au moins 8 gestes branchés (${n})`);
   dit(/<PiluleAnnuler\b/.test(s), '11d. la pilule est rendue');
   dit(!/lastCollected &&/.test(s), '11e. l’ancien bandeau « Colis retiré » (son propre minuteur) n’est plus rendu');

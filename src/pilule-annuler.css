@@ -1,0 +1,64 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   LA PILULE « ANNULER » (6 nov., v36) — src/PiluleAnnuler.jsx
+   Une pilule sombre (encre) au-dessus de la barre du bas, comme le « Annuler »
+   d'iOS : le texte en blanc, l'action en bleu Apple (la seule couleur, rare),
+   l'échec en ambre (§7 : le rouge n'est que pour deux paires sous un N°).
+   Entrée 220 ms (ease-out fort), sortie plus vive 160 ms ; mouvement réduit ⇒
+   fondu seul. Cibles au doigt 44 px.
+   ════════════════════════════════════════════════════════════════════════════ */
+.vrm-pil-zone {
+  position: fixed; left: 0; right: 0; z-index: 30000;
+  bottom: calc(92px + env(safe-area-inset-bottom));
+  display: flex; justify-content: center; padding: 0 16px;
+  pointer-events: none;
+}
+.vrm-pil-zone[data-pilule-place="haut"] { bottom: auto; top: calc(12px + env(safe-area-inset-top)); }
+@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+  .vrm-pil-zone { bottom: 24px; }
+}
+
+.vrm-pil {
+  --pil-fond: #1D1D1F; --pil-texte: #FFFFFF; --pil-sous: rgba(255,255,255,.72); --pil-action: #2997FF; --pil-alerte: #FFB340;
+  pointer-events: auto;
+  display: flex; align-items: center; gap: 10px;
+  min-height: 52px; max-width: 440px; width: 100%; box-sizing: border-box;
+  padding: 4px 4px 4px 16px;
+  border-radius: 26px;
+  background: var(--pil-fond); color: var(--pil-texte);
+  box-shadow: 0 10px 30px rgba(0,0,0,.22), 0 1px 2px rgba(0,0,0,.18);
+  font-family: inherit; font-size: 15px; font-weight: 500; line-height: 1.3;
+  letter-spacing: -0.01em;
+  opacity: 1; transform: translateY(0) scale(1);
+  transition: opacity 220ms cubic-bezier(.23,1,.32,1), transform 220ms cubic-bezier(.23,1,.32,1);
+}
+@starting-style { .vrm-pil { opacity: 0; transform: translateY(10px) scale(.97); } }
+.vrm-pil-zone[data-pilule-place="haut"] .vrm-pil { transition-property: opacity, transform; }
+@starting-style { .vrm-pil-zone[data-pilule-place="haut"] .vrm-pil { opacity: 0; transform: translateY(-10px) scale(.97); } }
+.vrm-pil.is-sortie { opacity: 0; transform: translateY(6px) scale(.98); transition-duration: 160ms; pointer-events: none; }
+
+:root[data-theme="dark"] .vrm-pil { --pil-fond: #3A3A3C; --pil-action: #409CFF; --pil-alerte: #FFB340; box-shadow: 0 10px 30px rgba(0,0,0,.5), inset 0 0 0 .5px rgba(255,255,255,.12); }
+
+.vrm-pil-ic { flex: 0 0 auto; color: var(--pil-texte); opacity: .9; }
+.vrm-pil-ic.is-alerte { color: var(--pil-alerte); opacity: 1; }
+.vrm-pil-txt { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; padding: 6px 0; }
+.vrm-pil-titre { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-pil-sous { font-size: 13px; color: var(--pil-sous); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-pil.is-alerte .vrm-pil-titre { color: var(--pil-alerte); font-weight: 600; }
+
+.vrm-pil-action {
+  flex: 0 0 auto; min-height: 44px; min-width: 44px; padding: 0 16px;
+  border: 0; border-radius: 22px; background: transparent;
+  color: var(--pil-action); font: inherit; font-weight: 600; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  transition: transform 140ms cubic-bezier(.23,1,.32,1), background-color 140ms ease;
+}
+.vrm-pil-action:active { transform: scale(.96); background: rgba(255,255,255,.10); }
+@media (hover: hover) and (pointer: fine) { .vrm-pil-action:hover { background: rgba(255,255,255,.08); } }
+.vrm-pil-action:focus-visible { outline: 2px solid var(--pil-action); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .vrm-pil, .vrm-pil.is-sortie { transform: none; transition: opacity 160ms ease; }
+  @starting-style { .vrm-pil { transform: none; } .vrm-pil-zone[data-pilule-place="haut"] .vrm-pil { transform: none; } }
+  .vrm-pil-action { transition: none; }
+  .vrm-pil-action:active { transform: none; }
+}
