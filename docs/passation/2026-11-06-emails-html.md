@@ -110,7 +110,8 @@ le **plafond permanent** (~18 Mo de texte au pire du rythme actuel ; pessimiste,
   `retrait-*`, `piege-*`, `stream-390`. Vu et corrigé : le fond `body` de l'e-mail perdu (anneau clair
   autour de la carte sombre) ⇒ le `<body>` d'origine retrouve ses attributs ; l'échelle posée sur
   l'enveloppe, pas sur `body`.
-- Bancs voisins : `boite-mail` **104/0**, `boite-emails` (voir rapport). Audits verts : `boite-mail` 38,
+- Bancs voisins : `boite-mail` **104/0**, `boite-emails` **282/0** (un premier passage 281/1 : « offres filtré » à 1512 clair, attente fixe de
+  400 ms du banc après le toucher de la pastille — vert au passage suivant, filtres non touchés ici). Audits verts : `boite-mail` 38,
   `boite-emails` 82, `email-formes`, `csp`, `secrets`, `fonctions-api`, `lectures-lourdes`, `coherence`,
   `journal-emails` 58, `tdz`, `icones`, `bancs`. `export-donnees` X6 rouge **déjà sur la base** (non touché).
   `npm run build` vert.
