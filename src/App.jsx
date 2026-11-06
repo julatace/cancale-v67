@@ -202,6 +202,11 @@ import { L, Lbas, VERBES, PAS_SU } from "./libelles.js";
 import Bienvenue from "./Bienvenue.jsx";
 import VisiteBulles from "./VisiteBulles.jsx";
 import { CLE_VISITE } from "./visiteBulles.js";
+// (6 nov.) L'ACCOMPAGNEMENT : une bulle, au plus, sur le vrai bouton d'un geste utile,
+// quand un chiffre que l'écran affiche déjà le justifie (src/accompagnement.js).
+import Conseils, { ChiffreConseil, useReglageConseils } from "./Conseils.jsx";
+import { LIGNE_ACCOMPAGNEMENT } from "./accompagnement.js";
+import { estIphoneSafari, estInstallee } from "./guideIphone.js";
 // (6 nov.) VRM ouvert à des clients : le mode exemple (données inventées, en mémoire
 // seulement) et le guide de démarrage (quatre étapes cochées sur une preuve lue).
 import { exempleActif, entrerModeExemple, sortirModeExemple } from "./modeExemple.js";
@@ -311,7 +316,7 @@ import { beneficeLigneVente, texteBenefice, euros as eurosLigne } from "./benefi
 import { friseVente, phraseVente, eurosRecap, ETATS_HORS_PARCOURS } from "./recapVente.js";
 import { auCentreDeVerification } from "./verificationArticle.js";
 import { ligneEmailsCompte } from "./emailsCompteLie.js";
-import { prochainGesteColis, bordereauxAImprimer } from "./prochainGesteColis.js";
+import { prochainGesteColis, bordereauxAImprimer, gesteEnvoi } from "./prochainGesteColis.js";
 import "./styles-onglets-b.css";
 import { comptesARelier, boitesQuiArrivent, phraseARelier } from "./relierCompte.js";
 import { adressesSansCompte, comptesSansAdresse, relierAdresse, CLE_ADRESSES_ACHETEUR } from "./adressesSansCompte.js";
@@ -2632,6 +2637,9 @@ function SignalerProblemeFeuille({ ecran, ...props }) {
 // Une notification « problème signalé » (`?tab=settings&section=signalements`)
 // ouvre la liste dans Paramètres — une fois, puis la demande est consommée.
 const DEMANDE_SIGNALEMENTS = { on: false };
+// (6 nov.) Un conseil (src/accompagnement.js, `action: 'reglages:…'`) ouvre un panneau de
+// Paramètres : la demande est servie au montage de l'écran, ou tout de suite s'il est ouvert.
+const DEMANDE_REGLAGE_SOUS = { id: null };
 
 // ── RANGER UNE VRAIE PAIRE (feuille du garage 3D) ──────────────────────────
 // Julien : « tu peux sélectionner lesquels tu ranges ici, la taille… vraiment
@@ -12676,6 +12684,17 @@ function NotifsMuettes({ onNav }) {
 // les réglages — illisible pour quelqu'un qui n'est pas développeur.
 // ⚠️ Ne s'affiche QUE sur un navigateur où l'extension est là ET annonce sa
 // version : sur téléphone, ou tant que le pont n'a pas répondu, on ne dit rien.
+// (6 nov.) Combien d'annonces portent un « Accepter dès » (le seuil des offres automatiques) :
+// la carte « Offres automatiques » et le conseil « Offres automatiques sans seuil » (§11).
+const nbAccepterDes = (annonces, numeros) => (annonces || []).filter((it) => { const v = Number(String(((numeros || {})[it.id] || {}).min ?? '').replace(',', '.')); return isFinite(v) && v > 0; }).length;
+// La règle du bandeau, une fois (§11) : présente ET (muette OU plus vieille qu'attendu).
+const extEstEnRetard = (ext) => !!(ext && ext.on && (!ext.v || extEnRetard(ext.v)));
+// (6 nov.) Le même état, publié pour le conseil « Ton extension est en retard » (src/accompagnement.js).
+function ChiffreConseilExtension() {
+  const [ext, setExt] = useState(() => ({ on: vmrExtPresent(), v: vmrExtVersion() }));
+  useEffect(() => onVmrExt(() => setExt({ on: vmrExtPresent(), v: vmrExtVersion() })), []);
+  return <ChiffreConseil cle="coque.extension" valeur={!ext.on ? 'absente' : extEstEnRetard(ext) ? 'retard' : 'ok'}/>;
+}
 function ExtEnRetard({ onNav }) {
   const [ext, setExt] = useState(() => ({ on: vmrExtPresent(), v: vmrExtVersion() }));
   useEffect(() => onVmrExt(() => setExt({ on: vmrExtPresent(), v: vmrExtVersion() })), []);
@@ -12684,7 +12703,7 @@ function ExtEnRetard({ onNav }) {
   // que ça ». `extEnRetard` exigeait `!!v` : l'extension la plus en retard
   // était précisément la seule à ne rien déclencher.
   const muette = ext.on && !ext.v;
-  if (!ext.on || (!muette && !extEnRetard(ext.v))) return null;
+  if (!extEstEnRetard(ext)) return null;
   return (
     <Notice tone="warn" icon="alert"
       title="Ton extension VRM est en retard"
@@ -28149,6 +28168,8 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     <div className="vrm-ebay-outils" style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '0 0 10px' }}>
       <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Chercher un article (titre, N°, SKU)…" aria-label="Chercher une annonce eBay" data-ebay-recherche
         style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 12, border: `1px solid ${E.border}`, background: E.card, color: E.text, fontSize: 13, fontFamily: 'inherit' }} />
+      {/* (6 nov.) Pour le conseil « Annonces eBay à relier » : le compte du filtre « À relier ». */}
+      <ChiffreConseil cle="ebay.aRelier" valeur={setRelierAnn.size}/>
       {chipsAnn.length > 1 && (
         // (6 nov.) La forme UNIQUE des filtres de l'app (`.vrm-filtres`, celle de Ventes).
         <div className="vrm-rangee vrm-filtres" role="group" aria-label="Filtrer les annonces eBay" style={{ display: 'flex', gap: 6 }}>
@@ -34629,6 +34650,71 @@ const ecrireLigneInventaire = async ({ existe, rev, data }) => {
     return Array.isArray(j) && j.length === 0 ? 'conflit' : 'ko';
   } catch (_) { return 'ko'; }
 };
+// ── (6 nov.) L'ACCOMPAGNEMENT : SA ligne `vrm_accompagnement` (src/accompagnement.js) ──
+// Le même motif que l'inventaire (§5) : `null` sur une lecture ratée (RIEN ne s'écrit
+// alors — `modifierMemoire`), 'ok' · 'conflit' · 'ko' à l'écriture, comparer-et-échanger
+// sur `data.rev`. Une ligne légère (quelques dates) : lue entière.
+const lireLigneAccompagnement = async () => {
+  if (!AUTH.user) return null;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${LIGNE_ACCOMPAGNEMENT}${filtreInventaire()}&select=data`, { headers: sbAuth(), cache: 'no-store' });
+    if (!r.ok) return null;
+    const j = await r.json();
+    if (!Array.isArray(j) || j.length > 1) return null;
+    if (!j[0]) return { existe: false, data: {} };
+    const d = j[0].data;
+    return { existe: true, data: d && typeof d === 'object' && !Array.isArray(d) ? d : {} };
+  } catch (_) { return null; }
+};
+const ecrireLigneAccompagnement = async ({ existe, rev, data }) => {
+  if (!AUTH.user) return 'ko';
+  try {
+    if (!existe) {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data`, {
+        method: 'POST', headers: { ...sbAuth(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify([withOwner({ id: LIGNE_ACCOMPAGNEMENT, data })]),
+      });
+      if (r.ok) return 'ok';
+      return r.status === 409 ? 'conflit' : 'ko';
+    }
+    const garde = rev == null ? 'data->>rev=is.null' : `data->>rev=eq.${rev}`;
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${LIGNE_ACCOMPAGNEMENT}${filtreInventaire()}&${garde}&select=id`, {
+      method: 'PATCH', headers: { ...sbAuth(), 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify({ data, updated_at: new Date().toISOString() }),
+    });
+    if (!r.ok) return 'ko';
+    const j = await r.json().catch(() => null);
+    if (Array.isArray(j) && j.length === 1) return 'ok';
+    return Array.isArray(j) && j.length === 0 ? 'conflit' : 'ko';
+  } catch (_) { return 'ko'; }
+};
+// (6 nov.) Le conseil « Ton premier inventaire » (src/accompagnement.js) : SA ligne relue
+// (scalaires : y a-t-il un inventaire en cours, et d'anciens ?), et la copie de cet appareil.
+// Lecture ratée ⇒ `null` (pas su ⇒ aucun conseil). Jamais fait = ni en cours, ni ancien.
+function ChiffreInventaire({ numeros }) {
+  const [jamais, setJamais] = React.useState(undefined);
+  React.useEffect(() => {
+    let vivant = true;
+    const lire = async () => {
+      let local = false;
+      try { const t = localStorage.getItem('vrm_inventaire_local_' + (AUTH.user?.id || 'anon')); const d = t ? JSON.parse(t) : null; local = !!(d && (d.courant || (Array.isArray(d.anciens) && d.anciens.length))); } catch (_) {}
+      if (local) { if (vivant) setJamais(false); return; }
+      if (!AUTH.user) { if (vivant) setJamais(null); return; }
+      try {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${LIGNE_INVENTAIRE}${filtreInventaire()}&select=c:data->courant->>id,a:data->anciens->0->>id`, { headers: sbAuth(), cache: 'no-store' });
+        if (!r.ok) { if (vivant) setJamais(null); return; }
+        const j = await r.json();
+        if (!Array.isArray(j)) { if (vivant) setJamais(null); return; }
+        const l = j[0];
+        if (vivant) setJamais(!l || (!l.c && !l.a));
+      } catch (_) { if (vivant) setJamais(null); }
+    };
+    lire();
+    window.addEventListener('vrm:inventaire', lire);
+    return () => { vivant = false; window.removeEventListener('vrm:inventaire', lire); };
+  }, []);
+  return <ChiffreConseil cle="stock.inventaire" valeur={jamais === undefined || numeros === undefined ? undefined : (jamais === null || numeros === null ? null : { jamais, numeros })}/>;
+}
 // Ma journée : « Inventaire en cours » — la copie de CET appareil d'abord, puis la ligne
 // (des scalaires projetés, jamais la ligne entière). `null` = rien en cours (ou pas su).
 function useInventaireEnCours(actif) {
@@ -35438,6 +35524,8 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   );
 
   return (<>
+    {/* (6 nov.) Pour le conseil « Ton premier inventaire » : les N° des annonces actuelles (lus seulement). */}
+    <ChiffreInventaire numeros={aa ? aa.articles.filter((a) => a.cle).length : (lecture === undefined ? undefined : null)}/>
     {elInventaire}
     {blocResume}
     {blocCherche}
@@ -36280,10 +36368,13 @@ function CarteCompteLie({ plateforme, id, nom, photo, etat, age, type, inclus, o
 function ComptesMuetsColis({ accounts, onNav }) {
   const etat = useEtatEmailsComptes(accounts);
   const muets = etat && etat.etat === 'lu' ? (etat.muets || []) : [];
-  if (!muets.length) return null;
+  // (6 nov.) Pour le conseil « Un compte sans e-mail » : le nombre LU seulement (« pas su » ⇒ rien).
+  const chiffre = <ChiffreConseil cle="colis.comptesMuets" valeur={etat === undefined ? undefined : etat && etat.etat === 'lu' ? muets.length : null}/>;
+  if (!muets.length) return chiffre;
   const noms = muets.map((l) => l.login).filter(Boolean);
   return (
     <div className="vrm-colis-prochain is-second" data-colis-comptes-muets={muets.length}>
+      {chiffre}
       <span className="vrm-colis-prochain-txt">{muets.length > 1 ? `${muets.length} comptes n’envoient aucun e-mail à VRM` : `Le compte ${noms[0] || 'Vinted'} n’envoie aucun e-mail à VRM`}<span className="vrm-colis-prochain-sous"> — {muets.length > 1 ? 'leurs' : 'ses'} codes de retrait et bordereaux n’arrivent pas ici</span></span>
       {onNav ? <button type="button" className="vrm-lien-action" data-colis-comptes-muets-ouvrir="" onClick={() => onNav('vintedaccounts')}>Relier {muets.length > 1 ? 'leurs boîtes' : 'sa boîte'}</button> : null}
     </div>
@@ -57679,7 +57770,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div className="vrm-menu-flottant" data-outils-annonces="" style={{position:'absolute',...(annToolsCote==='gauche'?{left:0}:{right:0}),top:'calc(100% + 6px)',zIndex:71,minWidth:230,maxWidth:'calc(100vw - 32px)',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',padding:6,display:'flex',flexDirection:'column',gap:2}}>
                   <div className="vrm-outils-annonces-haut" data-outils-haut="">
         {listings.items?.length>0 && (() => {
-          const nbMini = (annBase || []).filter((it) => { const v = Number(String(((numeros || {})[it.id] || {}).min ?? '').replace(',', '.')); return isFinite(v) && v > 0; }).length;
+          const nbMini = nbAccepterDes(annBase, numeros);
           // (2 nov.) `offresgarde` (5.308) : une extension plus ancienne accepterait une
           // offre sur une paire vendue ailleurs — elle est dite « à mettre à jour ».
           const ext = offresAuto ? extSait('offresgarde') : 'ok';
@@ -57766,7 +57857,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <button type="button" aria-pressed={annSort==='nonum'} onClick={()=>setAnnSort('nonum')}>Sans numéro{annStats.sansNum>0 ? <span className="vrm-of-n">{annStats.sansNum}</span> : null}</button>
           {/* (6 nov., vague 2 · point 4) Les annonces numérotées dont l'achat n'est pas relié (src/achatsARelier.js). */}
           {((fileAchat && fileAchat.length > 0) || annSort==='sansachat') && <button type="button" data-vue-sans-achat={fileAchat ? fileAchat.length : ''} aria-pressed={annSort==='sansachat'} onClick={()=>setAnnSort('sansachat')}>Sans achat relié{fileAchat && fileAchat.length ? <span className="vrm-of-n">{fileAchat.length}</span> : null}</button>}
-          {annStats.sleeping>0 && <button type="button" aria-pressed={annSort==='sleeping'} onClick={()=>setAnnSort('sleeping')}>À relancer</button>}
+          {annStats.sleeping>0 && <button type="button" data-vue-relancer={annStats.sleeping} aria-pressed={annSort==='sleeping'} onClick={()=>setAnnSort('sleeping')}>À relancer</button>}
+          {/* (6 nov.) Pour les conseils (src/accompagnement.js) : les nombres de cet écran, lus
+              seulement (liste pas chargée ou en erreur ⇒ rien). */}
+          <ChiffreConseil cle="annonces.dorment" valeur={Array.isArray(listings.items) && !listings.error ? annStats.sleeping : undefined}/>
+          <ChiffreConseil cle="annonces.prixMini" valeur={Array.isArray(listings.items) && !listings.error ? { offresAuto: offresAuto === true, nbMini: nbAccepterDes(annBase, numeros), total: (annBase || []).length } : undefined}/>
         </div>}
         {/* (5 nov., chantier C — revue 2.9) « sélection » ne nomme plus que les cases cochées :
             le filtre dit « affichées ». Dans les vues à cocher (Sélectionner, Brouillons), leur
@@ -57943,8 +58038,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // « Prix d'achat N/M » se dit une fois (§7) : dans le geste quand c'est lui.
             const prixManque = vuePrix && m > 0 && n < m && !(geste && geste.cle === 'prix');
             const nN = numerosNeufs.length;
-            if (!prixManque && !nN) return ligneGeste;
+            // (6 nov.) Pour le conseil « Des prix d'achat manquent » : le N/M de cette ligne, lu seulement.
+            const chiffrePrix = <ChiffreConseil cle="annonces.prixAchat" valeur={Array.isArray(listings.items) && !listings.error ? { n, m } : undefined}/>;
+            if (!prixManque && !nN) return <>{chiffrePrix}{ligneGeste}</>;
             return (<>
+              {chiffrePrix}
               {ligneGeste}
               <div className="vrm-ann-avis" data-ann-avis="">
                 {prixManque && (
@@ -59222,6 +59320,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <Bouton variante={nLot > 0 ? 'primaire' : 'secondaire'} icone="printer" data-colis-barre-btn="imprimer" data-lot-ouvrir={nLot > 0 ? '1' : '0'} data-imprimer-prets={nLot}
                     title={nLot > 0 ? `${nLot} bordereau${nLot > 1 ? 'x' : ''} prêt${nLot > 1 ? 's' : ''} : un PDF, rangé par transporteur` : 'Aucun bordereau prêt à imprimer pour l’instant'}
                     onClick={ouvrirLot} disabled={batchBusy || nLot === 0}>{batchBusy ? 'Préparation…' : 'Tout imprimer'}</Bouton>
+                  {/* (6 nov.) Pour le conseil « Un envoi presse » (src/accompagnement.js) : le compte du bouton,
+                      et la règle de « Prochain geste » (`gesteEnvoi`) — un bordereau pour aujourd'hui ou demain. */}
+                  <ChiffreConseil cle="colis.imprimer" valeur={baseKO ? null : { nLot, presse: !!gesteEnvoi({ aImprimer: bordereauxAImprimer(lignesImpr).map((l) => ({ jours: l.e && Number.isFinite(l.e.dl) ? l.e.dl : null })) }, { urgentSeul: true }) }}/>
                   <Bouton variante="secondaire" icone="more" data-colis-barre-btn="outils" data-colis-outils-bascule="" aria-label="Outils des colis" aria-expanded={outilsColis ? 'true' : 'false'} title="Outils des colis"
                     onClick={() => setOutilsColis((v) => !v)}/>
                 </div>
@@ -65926,11 +66027,15 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   const [sous, setSous] = React.useState(null);       // l'id du sous-écran ouvert (téléphone)
   // (6 nov.) « Signaler un problème » : la feuille (src/composants/SignalerProbleme.jsx).
   const [signaler, setSignaler] = React.useState(false);
+  // (6 nov.) Les conseils (src/Conseils.jsx) : l'interrupteur et « Revoir », sur SA ligne.
+  const [conseilsOn, basculerConseils, revoirLesConseils] = useReglageConseils({ lire: lireLigneAccompagnement, ecrire: ecrireLigneAccompagnement });
   const racine = React.useRef(null);
   const ouvrirSous = (id) => { setSous(id); try { racine.current && racine.current.scrollIntoView({ block: 'start' }); } catch (_) {} };
   // (31 oct., soir) Un lien vers l'ancien « eBay → Compte » (`?tab=plat_ebay&section=compte`)
   // ouvre le panneau « Comptes eBay » — une fois, puis la demande est consommée.
   React.useEffect(()=>{ if(ouvrir==='ebay'&&ebayCompte){ setVueBrute('reglages'); setSous('ebay'); if(onOuvert) onOuvert(); } /* eslint-disable-next-line */ },[ouvrir,!!ebayCompte]);
+  // (6 nov.) Un conseil ouvre un panneau (« Voir comment ») : `DEMANDE_REGLAGE_SOUS`.
+  React.useEffect(()=>{ const servir=()=>{ const id=DEMANDE_REGLAGE_SOUS.id; if(!id) return; DEMANDE_REGLAGE_SOUS.id=null; setVueBrute('reglages'); ouvrirSous(id); setTimeout(()=>{ try{ const el=document.querySelector(`[data-sous-ouvrir="${id}"]`)||document.querySelector(`[data-sous-panneau="${id}"]`); if(el&&el.getClientRects().length) el.scrollIntoView({block:'center'}); }catch(_){} },60); }; servir(); window.addEventListener('vrm:reglage-sous',servir); return ()=>window.removeEventListener('vrm:reglage-sous',servir); /* eslint-disable-next-line */ },[]);
   // (6 nov.) La notification « problème signalé » ouvre la liste (propriétaire seul).
   React.useEffect(()=>{ if(DEMANDE_SIGNALEMENTS.on&&proprioInst){ DEMANDE_SIGNALEMENTS.on=false; setVueBrute('reglages'); setSous('signalements'); setTimeout(()=>{ try{ const el=document.getElementById('reglages-aide'); if(el) el.scrollIntoView({block:'start'}); }catch(_){} },50); } },[proprioInst]);
   const versPlateforme=(p)=>{ if(p==='plat_ebay'&&ebayCompte){ setVueBrute('reglages'); ouvrirSous('ebay'); return; } if(onPlateforme) onPlateforme(p); };
@@ -66126,6 +66231,12 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     {id:'aide',titre:'Aide',items:[
       // (2 nov.) La visite en bulles, rejouée sur son clic (src/VisiteBulles.jsx).
       { id:'visite', type:'action', ic:'play', lib:'Revoir la visite', desc:'Les onglets de VRM présentés un par un.', onClick:()=>{ try { window.dispatchEvent(new Event('vrm:visite')); } catch (_) {} }, data:{ 'data-reglage-visite':'' } },
+      // (6 nov.) L'accompagnement : une bulle sur le bon bouton, deux par jour au plus (src/accompagnement.js).
+      // « Pas su » (ligne pas lue) : l'interrupteur ne ment pas, la phrase le dit.
+      { id:'conseils', type:'switch', ic:'spark', lib:'Conseils', desc: conseilsOn === null ? 'Pas pu lire ce réglage — touche pour réessayer.' : 'Une bulle sur le bon bouton quand un geste t’aiderait.', on:conseilsOn === true,
+        onClick:()=>{ if (conseilsOn === null) { try { window.dispatchEvent(new Event('vrm:accompagnement')); } catch (_) {} return; } if (conseilsOn === undefined) return; basculerConseils().then((r)=>{ if(r.etat==='ko') toast('Pas pu enregistrer — réessaie.'); }); },
+        data:{ 'data-reglage-conseils': conseilsOn === true ? 'on' : conseilsOn === false ? 'off' : 'pas-su' } },
+      { id:'conseils-revoir', type:'action', ic:'sync', lib:'Revoir les conseils', desc:'Ceux que tu as passés ou masqués pourront revenir.', onClick:()=>{ revoirLesConseils().then((r)=>toast(r.etat==='ok' ? 'Les conseils pourront revenir.' : 'Pas pu enregistrer — réessaie.')); }, data:{ 'data-reglage-conseils-revoir':'' } },
       // (6 nov.) Un bouton : le message part avec l'écran, les versions, le navigateur
       // et les plantages de cet appareil — et il voit tout avant d'envoyer.
       { id:'signaler', type:'action', ic:'send', lib:'Signaler un problème', desc:'Dire ce qui ne va pas : tu vois tout ce qui part avant d’envoyer.', onClick:()=>setSignaler(true), data:{ 'data-reglage-signaler':'' } },
@@ -70887,6 +70998,7 @@ function AppCoeur() {
     return ()=>{ vivant=false; clearTimeout(t); if(typeof stop==='function') stop(); };
   },[premierJour,bienvenue]);
   useEffect(()=>{ const o=()=>setVisite(true); window.addEventListener('vrm:visite',o); return ()=>window.removeEventListener('vrm:visite',o); },[]);
+
   const [liveStats,setLiveStats]=useState(null); // résumé Vinted en direct pour l'accueil
   // (29 oct., revue) Le point « nouveau » de l'onglet Messages suit le geste
   // « Retirer » / « Les remettre » TOUT DE SUITE (il ne bougeait qu'au prochain
@@ -73492,6 +73604,14 @@ function AppCoeur() {
         onTerminer={()=>{ save('vrm_bienvenue_vue',{at:new Date().toISOString()}); setBienvenue(false); if(tab!=='journee') setTab('journee'); }}/></GardeEcran>}
       {visite && !bienvenue && <GardeEcran nom="visite" feuille onFermer={()=>setVisite(false)}><VisiteBulles z={Z_CONFIRMATION}
         onTerminer={(raison)=>{ setVisite(false); if(raison!=='rien') save(CLE_VISITE,{at:new Date().toISOString(),fin:raison}); }}/></GardeEcran>}
+      {/* (6 nov.) L'ACCOMPAGNEMENT (src/Conseils.jsx) : une bulle au plus, jamais pendant
+          Bienvenue ni la visite (ni pour une personne neuve qui ne l'a pas encore vue). */}
+      <GardeEcran nom="conseils"><Conseils ecran={tab} lire={lireLigneAccompagnement} ecrire={ecrireLigneAccompagnement} z={8500}
+        contexte={{ pret: !!accountsLoaded && nuagePret && !baseKO, tour: !!(bienvenue || visite || (premierJour && !load(CLE_VISITE,null))), exemple: exempleActif(), stream: !!streamOn, telephone: !ordi }}
+        onEchec={(m)=>toast(m)}
+        onAction={(a)=>{ if(String(a).startsWith('reglages:')){ DEMANDE_REGLAGE_SOUS.id=String(a).slice(9); if(tab==='settings'){ try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} } else setTab('settings'); } }}/></GardeEcran>
+      {/* Les chiffres que la COQUE publie pour les conseils (la même règle que leurs bandeaux). */}
+      {ordi ? <ChiffreConseilExtension/> : <ChiffreConseil cle="coque.iphone" valeur={estIphoneSafari() ? (estInstallee() ? 'installee' : 'a-installer') : 'autre'}/>}
       <MemoireDefilement ecran={`${tab}:${(tab.startsWith('plat_')||estTacheSite(tab))?platSub:''}`}/>
       {/* Une seule navigation à la fois : latérale sur ordinateur, en bas sur
           téléphone. Jamais les deux — c'est la même liste d'écrans. */}
