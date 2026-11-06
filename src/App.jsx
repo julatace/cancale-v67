@@ -284,7 +284,8 @@ import { normAdresse, ADRESSE_COLLECTRICE, estAdresseCollectrice } from "../api/
 import { retoursEnCours, retoursPourSite, remiseEnStock, retourAReceptionner, numsRemisEnStock, LIBELLE_ETAPE, ETAPES_RETOUR, numeroDuRetourVinted } from "./retoursStock.js";
 import { indexMemo as indexRechercheMemo, chercherPartout, destinationResultat, suggestions as suggestionsRecherche, montantCherche } from "./rechercheUnique.js";
 // (6 nov., v36) La loupe universelle : les adaptateurs de l'écran (src/rechercheEcran.js).
-import { memoSur, annoncesDesLignes, numerosDesVentes, facturesPourRecherche, emailsDeLaReponse, motPastille, MOTIFS as MOTIFS_RECHERCHE, lireRecents, noterRecent, oublierRecents, demanderOuverture, prendreDemande, requeteEmails } from "./rechercheEcran.js";
+import { Vivant as RechercheVivante } from "./LoupeVivante.jsx";
+import { FIL_RECHERCHE, poserTexteRecherche, memoSur, annoncesDesLignes, numerosDesVentes, facturesPourRecherche, emailsDeLaReponse, motPastille, MOTIFS as MOTIFS_RECHERCHE, lireRecents, noterRecent, oublierRecents, demanderOuverture, prendreDemande, requeteEmails } from "./rechercheEcran.js";
 import { ligneEmail, siteExpediteur, monogramme } from "./boiteEmails.js";
 import { expediteurLisible } from "./journalEmail.js";
 import { requeteJsonBornee } from "./requeteJsonBornee.js";
@@ -70647,15 +70648,12 @@ function AppCoeur() {
   // (16 oct.) Vide ce qui reste des comptes supprimés définitivement (Shopcancale).
   useEffect(()=>onCloudReady(()=>{ purgerComptesSupprimes(); }),[]);
   const [gsOpen,setGsOpen]=useState(false);
-  const [gsQ,setGsQ]=useState('');
-  // (6 nov., v36) LA LOUPE UNIVERSELLE : le calcul suit la valeur DIFFÉRÉE (la frappe ne
-  // l'attend jamais), « Voir les N autres » par groupe, les recherches récentes de
-  // l'appareil, et les e-mails cherchés par le moteur de l'écran E-mails.
-  const gsQLent=React.useDeferredValue(gsQ);
-  const [gsMax,setGsMax]=useState({});
-  useEffect(()=>{ setGsMax({}); },[gsQ]);
+  // (6 nov., v36) LA LOUPE UNIVERSELLE : le texte tapé, « Voir les N autres » et les
+  // e-mails trouvés vivent dans le FIL de la loupe (src/rechercheEcran.js), hors de la
+  // coque : une lettre ne redessine que le champ et le panneau (`RechercheVivante`),
+  // jamais toute l'app (mesuré au banc : ~240 ms par lettre sur Ma journée avant).
+  const setGsQ=poserTexteRecherche;
   const [gsRecents,setGsRecents]=useState(()=>lireRecents());
-  const [gsEmails,setGsEmails]=useState(null);   // null : rien demandé · { q, liste: undefined (en cours) | null (pas su) | [...] }
   // (6 nov.) CHERCHER PAR PHOTO : la feuille (src/RecherchePhoto.jsx), ouverte par
   // l'appareil photo de la loupe ou du Stock (`vrm:recherche-photo`).
   const [rpOuvert,setRpOuvert]=useState(false);
@@ -70738,13 +70736,19 @@ function AppCoeur() {
   // Mesuré le 6 nov. sur sa base (lecture seule) : 992 e-mails, le filtre en 7 ms.
   useEffect(()=>{
     if(!gsOpen) return undefined;
-    const q=gsQ.trim(); const m=requeteEmails(q);
-    if(!m || montantCherche(q)!=null || !AUTH.user){ setGsEmails(null); return undefined; }
-    setGsEmails(e=>(e&&e.q===m&&e.liste!==undefined)?e:{q:m,liste:undefined});
-    const ctl=new AbortController();
-    const t=setTimeout(async()=>{ try{ const r=await requeteJsonBornee(`/api/email-rattacher?mode=journal&page=0&cherche=${encodeURIComponent(m)}`,{headers:sbAuth(),cache:'no-store',signal:ctl.signal},8000); if(ctl.signal.aborted) return; const liste=r.ok?emailsDeLaReponse(r.json):null; setGsEmails({q:m,liste,suite:!!(r.json&&r.json.suite)}); if(liste) jetonsStream('acheteurs_recherche_emails',liste.map(x=>x.email&&x.email.resume&&x.email.resume.de)); }catch(_){ if(!ctl.signal.aborted) setGsEmails({q:m,liste:null}); } },250);
-    return ()=>{ clearTimeout(t); ctl.abort(); };
-  },[gsOpen,gsQ]);
+    let t=null, ctl=null, dernier=null;
+    const lancer=()=>{
+      const s=FIL_RECHERCHE.lire(); const q=s.q.trim(); const m=requeteEmails(q);
+      if(m===dernier) return; dernier=m;
+      clearTimeout(t); if(ctl) ctl.abort(); ctl=null;
+      if(!m || montantCherche(q)!=null || !AUTH.user){ if(s.emails!==null) FIL_RECHERCHE.poser({emails:null}); return; }
+      if(!(s.emails&&s.emails.q===m&&s.emails.liste!==undefined)) FIL_RECHERCHE.poser({emails:{q:m,liste:undefined}});
+      const c=new AbortController(); ctl=c;
+      t=setTimeout(async()=>{ try{ const r=await requeteJsonBornee(`/api/email-rattacher?mode=journal&page=0&cherche=${encodeURIComponent(m)}`,{headers:sbAuth(),cache:'no-store',signal:c.signal},8000); if(c.signal.aborted) return; const liste=r.ok?emailsDeLaReponse(r.json):null; FIL_RECHERCHE.poser({emails:{q:m,liste,suite:!!(r.json&&r.json.suite)}}); if(liste) jetonsStream('acheteurs_recherche_emails',liste.map(x=>x.email&&x.email.resume&&x.email.resume.de)); }catch(_){ if(!c.signal.aborted) FIL_RECHERCHE.poser({emails:{q:m,liste:null}}); } },250);
+    };
+    lancer(); const stop=FIL_RECHERCHE.abonner(lancer);
+    return ()=>{ stop(); clearTimeout(t); if(ctl) ctl.abort(); };
+  },[gsOpen]);
   // Le mode stream reconnaît aussi les pseudos que la loupe a lus (e-mails de vente) et
   // les acheteurs des factures, où qu'ils s'écrivent (src/modeStream.js).
   useEffect(()=>{ if(gsData) jetonsStream('acheteurs_recherche',(gsData.pseudos||[]).map(p=>p&&p.pseudo)); },[gsData]);
@@ -72998,7 +73002,10 @@ function AppCoeur() {
 
   // ── LA RECHERCHE EN PLACE (31 oct.) : les résultats, un panneau sous le champ ──
   // (6 nov., filet 2) Le panneau se calcule SOUS son garde-fou (`Differe`) : une erreur ici ne fait plus tomber la coque.
-  const panneauRecherche = !gsOpen ? null : <GardeEcran nom="recherche" feuille onFermer={fermerRecherche}><Differe rendre={()=>{
+  const panneauRecherche = !gsOpen ? null : <GardeEcran nom="recherche" feuille onFermer={fermerRecherche}><RechercheVivante rendre={(fil, gsQLent)=>{
+        const gsMax = fil.max && fil.max.q === gsQLent ? fil.max.m : {};
+        const setGsMax = (f) => FIL_RECHERCHE.poser((s) => ({ ...s, max: { q: gsQLent, m: f(s.max && s.max.q === gsQLent ? s.max.m : {}) } }));
+        const gsEmails = fil.emails;
         // (6 nov., v36) LA LOUPE UNIVERSELLE : la frappe reste fluide — le calcul suit la
         // valeur DIFFÉRÉE (`gsQLent`, React la reprend quand il a le temps), l'index est
         // mémorisé tant que ses sources sont les mêmes objets (`memoSur`, `indexMemo`).
@@ -73151,14 +73158,14 @@ function AppCoeur() {
   // (3 nov.) La voix : ce que le navigateur a reconnu passe par `requeteDeLaVoix`
   // (« numéro 124 », « cent vingt-quatre » ⇒ 124 ; « B 125 » ⇒ B125 ; sinon le texte).
   const dicterRecherche = (t) => { const r = requeteDeLaVoix(t); if (!r.requete) return; setGsQ(r.requete); if (!gsOpen) setGsOpen(true); };
-  const champRecherche = (mobile) => (
+  const champRecherche = (mobile) => <RechercheVivante rendre={(fil)=>(
     <input ref={gsChampRef} type="search" className="vrm-recherche-champ" data-recherche-champ="" enterKeyHint="search" autoComplete="off" spellCheck={false}
-      aria-label={mobile ? 'Rechercher : N°, pseudo, suivi, code, titre' : 'Rechercher une paire'} placeholder={mobile ? 'N°, pseudo, suivi, code…' : 'N°, pseudo, n° de suivi, code de retrait, titre…'}
+      aria-label={mobile ? 'Rechercher : N°, pseudo, suivi, code, titre' : 'Rechercher une paire'} placeholder={mobile ? 'N°, pseudo, suivi, code…' : 'N°, pseudo, suivi, code de retrait, montant, titre…'}
       role="combobox" aria-autocomplete="list" aria-expanded={gsOpen} aria-controls="vrm-recherche-resultats" aria-keyshortcuts={mobile ? undefined : '/'}
-      title={mobile ? undefined : 'Rechercher : N°, pseudo, n° de suivi, code de retrait, n° de transaction, titre (touche /)'}
-      value={gsQ} onChange={e=>{ setGsQ(e.target.value); if(!gsOpen) setGsOpen(true); }} onFocus={()=>{ if(!gsOpen) setGsOpen(true); }}
+      title={mobile ? undefined : 'Rechercher : N°, pseudo, n° de suivi, code de retrait, n° de transaction, montant, facture, e-mail, titre, marque, taille (touche /)'}
+      value={fil.q} onChange={e=>{ setGsQ(e.target.value); if(!gsOpen) setGsOpen(true); }} onFocus={()=>{ if(!gsOpen) setGsOpen(true); }}
       onKeyDown={e=>{ if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); fermerRecherche(); } }}/>
-  );
+  )}/>;
   const champRechercheOrdi = (
     <div className="vrm-recherche" data-recherche-zone="" data-recherche-ouverte={gsOpen?'1':'0'}>
       <label className="vrm-barre-recherche" data-barre-recherche="">
@@ -73166,8 +73173,8 @@ function AppCoeur() {
         {champRecherche(false)}
         <MicDictee nu titre="Chercher à la voix" onText={dicterRecherche}/>
         <BoutonPhotoRecherche/>
-        {gsQ ? <button type="button" className="vrm-recherche-effacer" aria-label="Effacer la recherche" onClick={()=>{ setGsQ(''); try{ gsChampRef.current&&gsChampRef.current.focus(); }catch(_){} }}><Icon name="close" size={14}/></button>
-          : <kbd className="vrm-barre-kbd">/</kbd>}
+        <RechercheVivante rendre={(fil)=> fil.q ? <button type="button" className="vrm-recherche-effacer" aria-label="Effacer la recherche" onClick={()=>{ setGsQ(''); try{ gsChampRef.current&&gsChampRef.current.focus(); }catch(_){} }}><Icon name="close" size={14}/></button>
+          : <kbd className="vrm-barre-kbd">/</kbd>}/>
       </label>
       {panneauRecherche}
     </div>

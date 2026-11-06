@@ -183,6 +183,12 @@ const ouvrirLoupe = async (pg, tel) => {
       const { ctx, pg, errs, lectures, journal } = await preparer(b, vp, { sombre });
       await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
       await pg.waitForTimeout(2500);
+      if (process.env.BANC_SONDE) {
+        // Sonde (diagnostic) : le temps de quelques frappes, rien d'autre.
+        await ouvrirLoupe(pg, tel); await pg.waitForTimeout(500);
+        for (const q of ['zzzzqq', 'zzzzqqx', 'samba og taille 37', 'nike', 'poupacho', 'zzzzqq']) { const m = await mesurer(pg, q, '[data-recherche-q="' + q.toLowerCase() + '"]'); console.log('SONDE', TT, q, m.ms + ' ms'); await pg.waitForTimeout(400); }
+        await ctx.close(); continue;
+      }
       await essaie('champ vide', async () => {
         await ouvrirLoupe(pg, tel);
         await pg.waitForTimeout(500);

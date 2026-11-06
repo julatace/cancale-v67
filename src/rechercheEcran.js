@@ -137,6 +137,26 @@ export function prendreDemande(quoi) {
 
 // ── LE MOT ENVOYÉ AU MOTEUR DES E-MAILS : rien pour un montant ni moins de 2 lettres
 // (la route n'en ferait rien) — la même réduction que `motsRecherche` côté serveur. ──
+// ── LE FIL DE LA LOUPE : ce qui change à CHAQUE LETTRE vit hors de la coque ──
+// (6 nov., mesuré au banc) Le texte tapé était un état de la coque (`AppCoeur`) :
+// chaque lettre redessinait TOUTE l'app (l'écran derrière compris) — ~240 ms par
+// lettre sur Ma journée au banc, avant même de chercher. Le texte, « Voir les N
+// autres » et les e-mails trouvés vivent dans ce petit magasin : seuls le champ et
+// le panneau (`Vivant`, src/LoupeVivante.jsx) se redessinent à la frappe.
+export function creerFil(init) {
+  let etat = init;
+  const abonnes = new Set();
+  return {
+    lire: () => etat,
+    poser: (p) => { const n = typeof p === 'function' ? p(etat) : { ...etat, ...p }; if (!n || n === etat) return; etat = n; for (const f of [...abonnes]) { try { f(); } catch (_) {} } },
+    abonner: (f) => { abonnes.add(f); return () => { abonnes.delete(f); }; },
+  };
+}
+// q : le texte tapé · emails : null (rien demandé) | { q, liste: undefined (en cours) | null (pas su) | [...], suite }
+// · max : { q, m: { type: n } } — « Voir les N autres », valable pour CE texte seulement.
+export const FIL_RECHERCHE = creerFil({ q: '', emails: null, max: { q: '', m: {} } });
+export const poserTexteRecherche = (v) => FIL_RECHERCHE.poser((s) => { const q = str(v); return q === s.q ? s : { ...s, q }; });
+
 export function requeteEmails(q) {
   const t = str(q).normalize('NFC').replace(/[^\p{L}\p{N} @._'’-]+/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
   return t.length >= 2 ? t : '';
