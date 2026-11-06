@@ -133,7 +133,9 @@ function enregistreur() {
     }
     R.dernierTick = t;
   };
-  const go = () => { tick(); setInterval(tick, 100); };
+  // Un squelette monté, même une seule image (entre deux relevés de 100 ms) : noté par un observateur.
+  const voirSq = () => { try { new MutationObserver((ms) => { for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1 && (n.matches('[data-squelette],.vrm-skeleton') || n.querySelector('[data-squelette],.vrm-skeleton'))) { R.sqMonte = (R.sqMonte || 0) + 1; const q = n.matches('[data-squelette],.vrm-skeleton') ? n : n.querySelector('[data-squelette],.vrm-skeleton'); R.sqQui = (q.getAttribute('data-squelette') || q.className || '').slice(0, 60); return; } }).observe(document.getElementById('root') || document.body, { childList: true, subtree: true }); } catch (_) {} };
+  const go = () => { tick(); setInterval(tick, 100); voirSq(); };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else go();
 }
 
@@ -226,7 +228,7 @@ async function ouvrir(b, combo, tab, opts = {}) {
     const nav = (t) => pg.evaluate((t) => { const tel = innerWidth < 600; const b = document.querySelector((tel ? '.vrm-mobile-nav ' : '.vrm-sidebar ') + `[data-nav-entree="${t}"]`) || document.querySelector(`[data-nav-entree="${t}"]`); if (!b) return false; b.click(); return true; }, t);
     const ok1 = await nav('ventes'); await calme(Date.now());
     const avant = await pg.evaluate(() => window.__chg.ech.length);
-    const tClic = await pg.evaluate(() => Math.round(performance.now()));
+    const tClic = await pg.evaluate(() => { window.__chg.sqMonte = 0; return Math.round(performance.now()); });
     const ok2 = await nav(tab); await calme(Date.now());
     const R2 = await pg.evaluate(() => window.__chg);
     const apres = R2.ech.slice(avant);
@@ -236,7 +238,7 @@ async function ouvrir(b, combo, tab, opts = {}) {
       const A = new Set(a), B = new Set(b2);
       console.log(`    [retour] ${apres[i].t - tClic} ms${apres[i].sq ? ' squelette' : ''} − ${JSON.stringify(a.filter((x) => !B.has(x)).slice(0, 5)).slice(0, 200)} + ${JSON.stringify(b2.filter((x) => !A.has(x)).slice(0, 5)).slice(0, 200)}`);
     }
-    res.retour = { nav: ok1 && ok2, changements: chg, squelette: apres.some((e) => e.sq), cls: Math.round(R2.shifts.filter((s) => s.t >= tClic).reduce((a, s) => a + s.v, 0) * 1000) / 1000 };
+    res.retour = { nav: ok1 && ok2, changements: chg, sqMonte: R2.sqMonte || 0, sqQui: R2.sqQui || '', squelette: apres.some((e) => e.sq) || (R2.sqMonte || 0) > 0, cls: Math.round(R2.shifts.filter((s) => s.t >= tClic).reduce((a, s) => a + s.v, 0) * 1000) / 1000 };
   }
   await ctx.close();
   return res;
@@ -295,7 +297,7 @@ function analyser(R) {
         }
         if (r.retour) {
           dit(r.retour.nav, `${combo.nom} ${tab} : la navigation Ventes → ${tab} a eu lieu`);
-          dit(!r.retour.squelette && r.retour.changements <= 1 && r.retour.cls <= 0.01, `${combo.nom} ${tab} : un écran déjà vu revient sans squelette ni clignotement`, `${r.retour.changements} changement(s), CLS ${r.retour.cls}${r.retour.squelette ? ', squelette' : ''}`);
+          dit(!r.retour.squelette && r.retour.changements <= 1 && r.retour.cls <= 0.01, `${combo.nom} ${tab} : un écran déjà vu revient sans squelette ni clignotement`, `${r.retour.changements} changement(s), CLS ${r.retour.cls}${r.retour.squelette ? ', squelette ' + (r.retour.sqQui || '') : ''}`);
         }
       }
     }

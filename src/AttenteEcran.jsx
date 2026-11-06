@@ -17,9 +17,9 @@
 //    · Plafond : ~2,5 s après le montage, l'écran s'ouvre avec ce qui est sûr ;
 //      ses emplacements encore vides gardent leur « chargement » (jamais un « pas
 //      lu » qui deviendra une valeur, §5 « pas su ne vaut pas oui »).
-//    · Revenir sur un écran déjà vu : ses données sont en mémoire (cache des
-//      lectures) ; elles se signalent dans la même passe de rendu, AVANT que
-//      l'image ne soit peinte — l'écran revient tel quel, sans squelette.
+//    · Revenir sur un écran déjà vu (ouvert avec ses données dans cette page) :
+//      aucun squelette, l'écran revient avec ce qu'il a en mémoire (cache des
+//      lectures, src/memoireEcrans.js) et se complète en place.
 //  Tant qu'un écran attend, son squelette porte `data-demarrage-attente` : à
 //  l'ouverture de l'app, l'écran de démarrage (src/demarrage.js) reste devant.
 // ════════════════════════════════════════════════════════════════════════════
@@ -47,11 +47,17 @@ export function useAttentePlafond() {
   return !!(ctx && ctx.plafond);
 }
 
-export function AttenteEcran({ ecran, attendus = [], donnees = null, ordi = false, plafondMs = PLAFOND_ATTENTE_MS, children }) {
+// Les écrans déjà OUVERTS avec leurs données dans cette page (par vendeur) : y revenir
+// ne remonte pas le squelette — l'écran revient avec ce qu'il a en mémoire et se
+// complète en place (les lectures en cache se reposent dans les millisecondes qui suivent).
+const VUS = new Set();
+
+export function AttenteEcran({ ecran, attendus = [], donnees = null, ordi = false, plafondMs = PLAFOND_ATTENTE_MS, memoire = '', children }) {
   const recus = React.useRef({});
   const [, rafraichir] = React.useState(0);
   const [plafond, setPlafond] = React.useState(false);
-  const [ouvert, setOuvert] = React.useState(false);
+  const cleVu = memoire || ecran;
+  const [ouvert, setOuvert] = React.useState(() => VUS.has(cleVu));
   const aAttendu = React.useRef(false);
   const signaler = React.useCallback((id, nom, la) => {
     const m = recus.current[nom] || (recus.current[nom] = new Map());
@@ -73,6 +79,8 @@ export function AttenteEcran({ ecran, attendus = [], donnees = null, ordi = fals
   const visible = ouvert || tout || plafond;
   // Une fois ouvert, il le reste.
   React.useLayoutEffect(() => { if (visible && !ouvert) setOuvert(true); }, [visible, ouvert]);
+  // Ouvert par ses données (pas par le plafond) : la prochaine fois, il revient sans squelette.
+  React.useEffect(() => { if (tout && attendus.length) VUS.add(cleVu); }, [tout, cleVu, attendus.length]);
   if (!visible) aAttendu.current = true;
   React.useEffect(() => {
     if (ouvert) return undefined;

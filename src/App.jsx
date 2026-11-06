@@ -43740,6 +43740,17 @@ const cleComptesVinted = (accs) => [...new Set((accs || []).map(a => String((a &
 // réouverture de l'app), donc les listes s'affichent INSTANTANÉMENT après un
 // reload au lieu de re-solliciter Supabase. Purge auto par TTL (3 min).
 const _acctCache = (()=>{ try{ const raw=sessionStorage.getItem('vrm_acct_cache'); if(raw){ const o=JSON.parse(raw); const now=Date.now(); Object.keys(o).forEach(k=>{ if(!o[k]||now-o[k].ts>=_CACHE_TTL) delete o[k]; }); return o; } }catch(_){} return {}; })();
+// (6 nov.) L'état de départ d'une liste de commandes, depuis ce cache — EXACTEMENT ce que
+// `loadOrders` poserait (même entrée : même version, moins de 3 min, mêmes comptes), sinon
+// « pas encore lu ». Rien n'est lu ni écrit ici.
+const etatOrdersDuCache = (type, accounts) => {
+  try {
+    const c = _acctCache[type];
+    if (c && c.v === _CACHE_V && Array.isArray(c.items) && Date.now() - c.ts < _CACHE_TTL && c.comptes === cleComptesVinted(accounts))
+      return { loading: false, items: c.items, failed: c.failed, failedUids: c.failedUids, comptes: c.comptes };
+  } catch (_) {}
+  return { loading: false, items: null };
+};
 // ⚠️ (16 oct., « app plus rapide ») Chaque rangement (ventes, achats, annonces,
 // conversations) réécrivait TOUT le cache dans `sessionStorage` — quatre
 // `JSON.stringify` de plus en plus gros à l'ouverture (mesuré au profileur,
@@ -45311,8 +45322,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Statut Vinted PRÉCIS = source de vérité automatique (Vinted le met à jour tout
   // seul quand tu expédies / récupères). Utilisé pour « à retirer » et « à expédier ».
   // (les deux tests vivent au niveau module — une seule définition, cf. plus haut)
-  const [sales, setSales] = useState({ loading:false, items:null });
-  const [buys, setBuys] = useState({ loading:false, items:null });
+  // (6 nov.) Revenir sur l'écran : la liste en cache (la même entrée que `loadOrders` servirait
+  // une milliseconde plus tard) est là DÈS le premier rendu — plus de squelette d'une image.
+  const [sales, setSales] = useState(() => etatOrdersDuCache('sold', accounts));
+  const [buys, setBuys] = useState(() => etatOrdersDuCache('purchased', accounts));
   // (6 nov.) LES VENTES VUES PAR E-MAIL, PAS ENCORE RELUES SUR VINTED
   // (src/venteEmailFraiche.js) : la liste de l'écran et VENDU les lisent ; tout
   // le reste (Colis, numéros, bordereaux, verrous) lit `sales.items`, la liste
@@ -73302,7 +73315,7 @@ function AppCoeur() {
         <BlocNumerosPerimes/>
         {/* (6 nov.) L'ÉCRAN ATTEND SES DONNÉES ESSENTIELLES (src/AttenteEcran.jsx) : monté mais
             invisible, son squelette à sa place, puis il arrive d'un bloc — au plus ~2,5 s. */}
-        <AttenteEcran key={tab} ecran={tab} ordi={ordi} attendus={ESSENTIELS_ECRAN[tab] || []} donnees={essentielsCoque}>
+        <AttenteEcran key={tab} ecran={tab} memoire={((authState.user && authState.user.id) || '') + ':' + tab} ordi={ordi} attendus={ESSENTIELS_ECRAN[tab] || []} donnees={essentielsCoque}>
         {tab==='settings'&&<GardeEcran nom="settings" resetKey={platSub}><SettingsScreen setTab={setTab} onPlateforme={plat=>{subVoulue.current=plat==='plat_leboncoin'?'annonces':'compte';setTab(plat);}} ebayCompte={ebayCompteReglage} ouvrir={platSub==='ebay'?'ebay':null} onOuvert={()=>setPlatSub('reglages')} comptes={vintedAccounts}
 
           notifEnabled={notifEnabled}
