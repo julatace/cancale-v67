@@ -111,7 +111,9 @@ la remplace, date du paiement. L'envoi est refusé tant qu'une manque (fiche inc
 | … sur l'arbre d'avant (`eeac9f1d`) | **rouge** (la route d'avant numérote une vente sans preuve, l'audit lève) |
 | … 16 mutations (fenêtre 24 h, deux acheteurs, deux ventes, montant, acheteur du navigateur, émission sans preuve, envoi sans preuve, preuve pas relue, Cc retiré, Reply-To retiré, plafond retiré, SMTP pas vérifié, journal pas tenu, témoin de l'aperçu, mention 293 B, numéro sans CAS) | **16/16 rouges** |
 | `scripts/bancs/facture-pro.cjs` (390 tactile et 1512, clair et sombre) | **128 verts** (captures regardées) |
-| … sur l'arbre d'avant | voir le rapport de session |
+| … sur l'arbre d'avant (dist d'avant) | **rouge partout** (390 clair et 1512 sombre : 7 scénarios sur 7 en échec — aucun bouton ni raison sur la ligne, pas de « Ma facture ») ; arrêté après deux passes |
+| `bancs/reglages.cjs` (bouton renommé « Ma facture ») | 6 KO, **les mêmes 6 sur l'arbre d'avant** (préexistants) ; les contrôles « facturation Pro » passent |
+| `bancs/compact.cjs` (preuve semée : `receivedAt` +60 s, `prix`, `uid`) | rouge AVANT la partie facture, **déjà rouge sur l'arbre d'avant** (« ligne repliée … photo 60×60 », puis « accueil compact ») — la partie facture n'a pas pu être jouée |
 | `npm run build`, `audit-coherence`, `audit-identite`, `audit-fonctions-api` (12), `audit-secrets`, `audit-tdz`, `audit-routes-revue`, `audit-vendeur-neutre`, `audit-mentions-paiement` | verts |
 
 ## Gestes de Julien
