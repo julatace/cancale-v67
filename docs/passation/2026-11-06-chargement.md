@@ -228,3 +228,11 @@ lent ; tout ≤ 0,009. Mutation (les trois corrections retirées, build à part)
 3 rouges d'avant (0,036 · 0,045 · 0,012). Bancs `nouveau-vendeur`, `navigation-tache` 163/163,
 `onglets-a` 29/29, `garde-ecrans`, `statut-colis` 81/81, `conseils`, `colis-retirer-propre`
 120/120 verts.
+
+Après fusion de v36-visuel-2 (même jour) : Colis → À retirer avait DEUX corrections du même
+vide de 68 px (visuel-2 : bas de « À retirer » à 12 px ; raccords : marge −12 sur « Argent à
+vérifier ») ⇒ 0 px. Une seule règle désormais : le bas de « À retirer » à 0
+(`styles-visuel-2.css`), la marge de section de la grille unique (28 px) fait l'air ; la
+correction de `fusion.css` est retirée. `colis-retirer-propre` : 28,28,28,28,28,28 (120/120) ;
+sans la règle ⇒ 68, rouge. Le banc juge chaque écart (20–40 px) : 40 y passerait, 28 est le
+rythme des autres sections.
