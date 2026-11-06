@@ -95,27 +95,14 @@ Chromium). **Les quatre branches sont sauvegardées sur GitHub** sous `claude/at
     c'est la semaine passée annoncée comme telle (alors le dire) ou une erreur. Vérifier
     aussi que « Colis envoyés 0 » n'est pas un 0 qui veut dire « pas su » (§5).
 
-### 1.3 `claude/attente-v36-emails-html` — garder le HTML d'origine des e-mails 30 jours
-- Demande : la boîte mail affiche le message d'origine, pas seulement le texte.
-- Fait :
-  - HTML assaini rangé à part à la réception (ligne `email_html_*`, après le rangement,
-    jamais de 503 à cause de lui) ;
-  - relu et ré-assaini à l'ouverture d'UN e-mail ;
-  - purgé à 30 jours par le cron du matin ;
-  - affiché dans un cadre isolé (sandbox sans scripts, CSP propre, images seulement sur
-    geste, à la largeur de l'écran), masqué en mode stream, écarté de l'export complet ;
-  - audit `emails-html` : 54 contrôles, vecteurs XSS jugés par un lecteur indépendant,
-    19/19 mutations attrapées ;
-  - banc `emails-html` : 66 verts.
-- **Reste** :
-  - finir les bancs touchés (boîte mail, e-mails, export), un à la fois ;
-  - écrire la passation ;
-  - merge, PR, mise en ligne.
-- ⚠️ Avant la mise en ligne, relire soi-même :
-  - l'assainissement (`api/_lib/…`, nom dans la branche) : aucune balise `script`,
-    `iframe`, `object`, `form`, aucun `on*`, aucun `javascript:` ;
-  - le cadre : `sandbox` SANS `allow-scripts` ni `allow-same-origin`.
-- Le compte des fonctions `api/` doit rester ≤ 12 (`audit-fonctions-api`).
+### 1.3 ✅ E-mails HTML 30 jours — FUSIONNÉ dans `claude/project-review-nsk5su` (7 nov., 0 h 55)
+Agent fini (sha c9728aef). Fusionné, build et audits verts (`emails-html`, `boite-mail`, `boite-emails`, `csp`,
+`secrets`, `fonctions-api` = 12, `lectures-lourdes`, `coherence`, `identite`, `tdz`, `variables`),
+bancs `emails-html` 67/0 et `boite-mail` 104/0. Détail : `docs/passation/2026-11-06-emails-html.md`.
+Cadre `sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"`, SANS `allow-scripts` (vérifié).
+**Reste : seulement la mise en ligne** (elle part avec la PR de cette passation si GitHub répond ; sinon la
+session suivante ouvre la PR de `claude/project-review-nsk5su`). Rien de rétroactif : seuls les e-mails reçus
+après la mise en ligne gardent leur mise en page.
 
 ### 1.4 `claude/attente-v36-hors-reseau` — Colis sans réseau, temps réels des vendeurs (FINI)
 - Passation dans la branche : `docs/passation/2026-11-06-hors-reseau.md` (tableau
@@ -137,7 +124,7 @@ Chromium). **Les quatre branches sont sauvegardées sur GitHub** sous `claude/at
     `mesures-terrain`, puis PR.
 - Vérifier la politique de confidentialité (mise à jour dans la branche) : collecte anonyme.
 
-**Ordre conseillé** : 1.4 (fini) → 1.3 → 1.2 → 1.1 en dernier (c'est elle qui touche le
+**Ordre conseillé** : 1.4 (fini) → 1.2 → 1.1 (1.3 est déjà fusionné) en dernier (c'est elle qui touche le
 plus de texte : la fusionner après les autres évite des centaines de conflits).
 
 ---
