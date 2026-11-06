@@ -224,6 +224,9 @@ import { GlisserVente, useDeposeDiffere, BarreAnnulerDepose } from "./GlisserDep
 import ScannerColis from "./ScannerColis.jsx";
 import { beneficeLigneVente, texteBenefice, euros as eurosLigne } from "./beneficeLigne.js";
 import { friseVente, phraseVente, eurosRecap, ETATS_HORS_PARCOURS } from "./recapVente.js";
+import { auCentreDeVerification } from "./verificationArticle.js";
+import { ligneEmailsCompte } from "./emailsCompteLie.js";
+import { adressesSansCompte, comptesSansAdresse, relierAdresse, CLE_ADRESSES_ACHETEUR } from "./adressesSansCompte.js";
 // (2 nov.) Le style « Fusion » : la carte sombre du mois et la frise de suivi (src/design/).
 import CarteMois from "./design/CarteMois.jsx";
 import CarteStats from "./design/CarteStats.jsx";
@@ -2044,6 +2047,9 @@ const SYNC_KEYS = [
   // (« Ce n'est pas ça ») : { [id de la ligne du reçu]: { tx, at } }. Rien n'est
   // supprimé ; « Relier à nouveau » retire la clé.
   'vrm_recus_delies',
+  // (6 nov.) Les adresses de réception qu'IL a marquées « compte acheteur » (E-mails →
+  // Relier ma boîte) : { [adresse]: { at } } — elles ne se signalent plus « sans compte ».
+  'vrm_adresses_acheteur',
   // (29 oct.) L'agent eBay qui demande : ses réglages, le résumé lu par Ma journée
   // et la notification du matin, ce qu'il a publié aujourd'hui (et « pas maintenant »).
   'vrm_agent_ebay_regles','vrm_agent_ebay_resume','vrm_agent_ebay_jour','vrm_agent_ebay_incertains',
@@ -4691,6 +4697,7 @@ const familleEmail = (subject, from) => {
   if (/transfert bancaire|virement bancaire/i.test(s)) return 'virement du porte-monnaie vers ta banque';
   if (/@team\.vinted|newsletter/i.test(f) || /rentr[ée]e|d[ée]couvre|inspire|nouveaut[ée]s/i.test(s)) return 'newsletter Vinted';
   if (/bienvenue|confirme ton adresse|mot de passe/i.test(s)) return 'email de compte Vinted';
+  if (/^Suppression de vos annonces/i.test(s) && /leboncoin/i.test(f + ' ' + s)) return 'annonce Leboncoin supprimée';
   return '';
 };
 // ⚠️ LA DESCRIPTION QUE L'APP NE VOYAIT PAS (23 août).
@@ -20978,8 +20985,8 @@ function FiltresVentes({ value, onChange, search, onSearch, cancelled = false, d
 // « Vendue · Postée · Livrée · Payée »), projetée par `friseVenteFusion` des étapes PROUVÉES de
 // `friseVente` (aucune règle neuve). Le bordereau n'est plus une 5ᵉ étape : une ligne de détail
 // (« Bordereau reçu le 2 nov. »), seulement s'il est prouvé. Les dates des étapes faites suivent.
-function RecapFrise({ etapes, cle = '' }) {
-  const f = friseVenteFusion(etapes);
+function RecapFrise({ etapes, cle = '', verification = false }) {
+  const f = friseVenteFusion(etapes, { verification });
   if (!f) return null;
   const jour = (t) => new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
   const bord = etapes.find((x) => x.cle === 'bordereau');
@@ -35170,7 +35177,7 @@ function useComptesAutresSites(actif = true) {
 }
 // UNE carte pour chaque compte, quelle que soit la plateforme. Les attributs
 // `data-compte-*` sont ce que lisent les bancs (jamais un libellé, §6.4).
-function CarteCompteLie({ plateforme, id, nom, photo, etat, age, type, inclus, onInclus, action, secondaire, etatVinted, enfants }) {
+function CarteCompteLie({ plateforme, id, nom, photo, etat, age, type, inclus, onInclus, action, secondaire, etatVinted, enfants, emails = null }) {
   const libre = LIBELLE_ETAT[etat] || '';
   return (
     <div className="vrm-cl-carte" data-compte-lie={plateforme} data-compte-id={id} data-compte-etat={etat} data-compte-inclus={inclus == null ? '' : inclus ? '1' : '0'}>
@@ -35191,8 +35198,24 @@ function CarteCompteLie({ plateforme, id, nom, photo, etat, age, type, inclus, o
           </label>
         )}
       </div>
+      {emails}
       {(action || secondaire) && <div className="vrm-cl-actions">{action}{secondaire}</div>}
       {enfants}
+    </div>
+  );
+}
+// (6 nov., vague 2, point 5) LA LIGNE « E-MAILS » D'UNE CARTE VINTED : la règle des
+// comptes sans e-mail (`etatEmailsComptes`, celle de Notifications et d'Achats — §11),
+// projetée par `ligneEmailsCompte` (src/emailsCompteLie.js). Le geste n'apparaît que
+// sur un compte MUET prouvé : il ouvre E-mails → Relier ma boîte, sur les adresses.
+function LigneEmailsCompte({ ligne }) {
+  if (!ligne) return null;
+  const relier = () => { ouvrirEmailsRelier('adresses'); try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: 'emails' })); } catch (_) {} };
+  return (
+    <div className="vrm-cl-emails" data-compte-emails={ligne.etat} data-compte-emails-jours={ligne.jours != null ? String(ligne.jours) : undefined}>
+      <span className="vrm-cl-emails-lib">{L.emails}</span>
+      <span className={'vrm-cl-emails-txt' + (ligne.geste ? ' is-geste' : '')}>{ligne.texte}</span>
+      {ligne.geste && <button type="button" className="vrm-lien-action vrm-cl-emails-geste" data-compte-emails-relier="" onClick={relier}>{L.relierBoite.replace(/\bma\b/, 'sa')}</button>}
     </div>
   );
 }
@@ -35687,6 +35710,9 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
   const ouvertChrome = (() => { const v = vintedDeChrome(); return v && v.uid ? String(v.uid) : ''; })();
   const santes = accounts.map(acctHealth);
   const nbActifs = santes.filter(s=>s.etat==='ok').length, nbBannis = santes.filter(s=>s.etat==='bad').length;
+  // (6 nov., vague 2) Les e-mails de chaque compte : la règle des comptes muets (§11).
+  const etatEmails = useEtatEmailsComptes(accounts);
+  const emailsDe = (uid) => ligneEmailsCompte(etatEmails.etat, (etatEmails.lignes || []).find((l) => l.uid === String(uid)) || null);
   const carteVinted = (acc) => {
     const uid = String(acc.vinted_user_id);
     const h = acctHealth(acc);
@@ -35700,6 +35726,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
       <CarteCompteLie key={uid} plateforme="vinted" id={uid} nom={nomAff} photo={photosProfil[uid] || ''} etat={etat} age={ageLecture(lastCap[uid], Date.now())}
         type={pro == null ? '' : pro ? 'pro' : 'particulier'} inclus={!hiddenAccts.has(uid)} onInclus={() => toggleAcctCompta(acc.vinted_user_id)}
         etatVinted={{ etat: h.etat === 'bad' ? 'banni' : h.etat === 'exclu' ? 'masque' : 'actif', source: h.source || '', hint: h.hint }}
+        emails={<LigneEmailsCompte ligne={emailsDe(uid)}/>}
         action={<a className="vrm-b vrm-b-discret vrm-cl-bouton" href={`https://www.vinted.fr/member/${encodeURIComponent(uid)}`} target="_blank" rel="noreferrer" data-compte-action="ouvrir">Ouvrir</a>}
         enfants={(
           <details data-gerer-compte="" className="vrm-cl-gerer">
@@ -48030,7 +48057,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       livree: { lu: livreeLue, t: null },
       argent: { lu: finalisee, t: versement },
     });
-    return { s, tus, vs, horsParcours, bordE, bordC, posteMain, finalisee, versement, etapes, bougeLu, livreeLue };
+    // (6 nov.) La Vérification de l'article : lue sur l'état de CETTE transaction (src/verificationArticle.js).
+    const verification = !horsParcours && auCentreDeVerification(o);
+    return { s, tus, vs, horsParcours, bordE, bordC, posteMain, finalisee, versement, etapes, bougeLu, livreeLue, verification };
   };
   // Suit l'ENSEMBLE des comptes (`cleComptes`), pas leur nombre : un compte lié
   // ou retiré relit (le cache ne sert plus une liste qui ne le couvre pas).
@@ -54299,14 +54328,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // étapes) et la ligne (quatre segments, `friseVenteFusion`) passent par la
             // MÊME `friseVente` — une règle, deux formes.
             const preuvesFrise = preuvesFriseDe(o);
-            const fuEtapes = preuvesFrise.etapes ? friseVenteFusion(preuvesFrise.etapes, { geste: peutDeposer }) : null;
+            const fuEtapes = preuvesFrise.etapes ? friseVenteFusion(preuvesFrise.etapes, { geste: peutDeposer, verification: preuvesFrise.verification }) : null;
             // Le transporteur : la règle de la pastille (`transporteurVente` → `transporteurDuColis`), la même que le tiroir.
             const fuTransp = transporteurVente(preuvesFrise.bordE);
             const fuPdf = !!(labelsCaptes[txL] || bordParTx[txL]);
             const recapVente = ({ titreId, fermerRef, fermer }) => {
               const { s, tus, vs, horsParcours, bordE, bordC, posteMain, finalisee, versement, etapes } = preuvesFrise;
               const aExp = !hidden && st !== 'cancelled' && aExpedier(o) && !posteMain;
-              const phrase = phraseVente({ etat: vs.label, aide: vs.aide, etapes: etapes || [], aExpedier: aExp, posteMain });
+              const phrase = phraseVente({ etat: vs.label, aide: vs.aide, etapes: etapes || [], aExpedier: aExp, posteMain, verification: preuvesFrise.verification });
               const jourCourt = (t) => t == null ? '' : new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
               const taille = String((e && e.size) || o.size || '').trim();
               const nom = o.title || '(sans titre)';
@@ -54357,7 +54386,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <Bouton variante="secondaire" className="vrm-b-petit" href={l.geste.url} target="_blank" rel="noreferrer" data-litige-geste={l.geste.url}>{l.geste.libelle} ↗</Bouton>
                     </div>); })() : null}
                   {/* (3 nov., critique #6) La frise de la ligne, mêmes 4 étapes et mêmes mots ; « Bordereau » en détail. */}
-                  {etapes ? <RecapFrise etapes={etapes} cle={txL}/> : null}
+                  {etapes ? <RecapFrise etapes={etapes} cle={txL} verification={preuvesFrise.verification}/> : null}
                 </section>
                 <section className="vrm-recap-argent" aria-label="L'argent">
                   <h3 className="vrm-recap-titre">L'argent</h3>
@@ -67200,6 +67229,95 @@ const PREUVE_LIGNE = {
   // même » envoie le lien (si Apple le laisse passer, l'adresse est prouvée).
   impossible: { t: "relais Apple « Masquer mon adresse » : pas confirmée — ses emails sont mis de côté", alerte: true, geste: 'Essayer quand même' },
 };
+// ── « ADRESSE SANS COMPTE » (6 nov., vague 2, point 5) ──────────────────────
+// En tête de E-mails → Relier ma boîte. La règle est dans src/adressesSansCompte.js :
+// SES e-mails rangés (`email_reception_*`, l'adresse de RÉCEPTION a décidé qu'ils
+// sont à lui) arrivés sur une adresse qu'aucun compte Vinted ne porte. Deux gestes,
+// sur SON clic : « Relier un compte » (le registre existant `vinted_account_emails`,
+// ligne `main` à son nom, une adresse = un compte) et « C'est un compte acheteur »
+// (`vrm_adresses_acheteur`, réversible). Le compte n'est JAMAIS deviné.
+// Lecture : deux scalaires par ligne (date, adresses), jamais `select=data` (§4.4),
+// toutes les pages (`lireTout`). Pas su ⇒ `EtatPanne`, jamais « aucune ».
+function AdressesSansCompte({ comptes }) {
+  const [lignes, setLignes] = useState(undefined);
+  const [declarees, setDeclarees] = useState(undefined);
+  const [comptesEmails, setComptesEmails] = useState(() => (isCloudReady() ? (load('vinted_account_emails', {}) || {}) : undefined));
+  const [acheteurs, setAcheteurs] = useState(() => load(CLE_ADRESSES_ACHETEUR, {}) || {});
+  const [choix, setChoix] = useState('');
+  const charger = React.useCallback(async () => {
+    setLignes(undefined); setDeclarees(undefined);
+    const [l, d] = await Promise.all([
+      lireTout('id=like.email_reception_*&select=at:data->>at,adresses:data->adresses', { strict: true }).catch(() => null),
+      lireReglage('vrm_email_owners'),
+    ]);
+    setLignes(Array.isArray(l) ? l : null);
+    setDeclarees(d === null ? null : ((d && d.adresses) || {}));
+  }, []);
+  useEffect(() => { charger(); }, [charger]);
+  useEffect(() => {
+    const relire = () => { setComptesEmails(load('vinted_account_emails', {}) || {}); setAcheteurs(load(CLE_ADRESSES_ACHETEUR, {}) || {}); };
+    const off = onCloudReady(relire);
+    const f = (e) => { const k = e && e.detail && e.detail.k; if (k === 'vinted_account_emails' || k === CLE_ADRESSES_ACHETEUR) relire(); };
+    window.addEventListener('vrm:save', f);
+    return () => { off(); window.removeEventListener('vrm:save', f); };
+  }, []);
+  const liste = adressesSansCompte({ lignes, declarees, comptesEmails, acheteurs });
+  const libres = comptesSansAdresse(comptes, comptesEmails);
+  const nomCompte = (a) => (a && (load('vinted_account_labels', {}) || {})[String(a.vinted_user_id)]) || (a && a.login) || `#${a && a.vinted_user_id}`;
+  const relier = async (adresse, compte) => {
+    const u = relierAdresse(comptesEmails, compte.vinted_user_id, adresse);
+    if (!u) { toast('Cette adresse ou ce compte est déjà relié — change-le dans Comptes liés → Gérer.'); return; }
+    const ok = await askConfirm({ title: `Relier ${adresse} à ${nomCompte(compte)} ?`, desc: `Les e-mails qui arrivent sur cette adresse seront ceux du compte ${nomCompte(compte)} (ventes, bordereaux, messages). Tu peux le changer dans Comptes liés → Gérer.`, ok: 'Relier', cancel: 'Annuler' });
+    if (!ok) return;
+    save('vinted_account_emails', u); setComptesEmails(u); setChoix('');
+    toast(`${adresse} est reliée à ${nomCompte(compte)}.`);
+  };
+  const acheteur = async (adresse) => {
+    const ok = await askConfirm({ title: 'C’est un compte acheteur ?', desc: `${adresse} sert à acheter : aucun compte vendeur à relier. VRM ne la signalera plus ici. Ses e-mails restent rangés comme avant.`, ok: 'Oui, acheteur', cancel: 'Annuler' });
+    if (!ok) return;
+    const n = { ...(load(CLE_ADRESSES_ACHETEUR, {}) || {}), [normAdresse(adresse)]: { at: new Date().toISOString() } };
+    save(CLE_ADRESSES_ACHETEUR, n); setAcheteurs(n);
+  };
+  const annulerAcheteur = (adresse) => { const n = { ...(load(CLE_ADRESSES_ACHETEUR, {}) || {}) }; delete n[adresse]; save(CLE_ADRESSES_ACHETEUR, n); setAcheteurs(n); };
+  const marquees = Object.keys(acheteurs || {});
+  const jour = (d) => { const t = Date.parse(d || ''); return Number.isFinite(t) ? new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : ''; };
+  if (liste === undefined) return null;   // en cours : rien ne s'affirme, rien ne clignote
+  if (liste === null) return <div className="vrm-sans-compte" data-adresses-sans-compte="pas-su"><EtatPanne compact quoi="Les adresses sans compte" raison="Tes e-mails ou tes adresses n’ont pas pu être lus. Rien n’est changé." onReessayer={charger}/></div>;
+  if (!liste.length && !marquees.length) return null;
+  return (
+    <section className="vrm-sans-compte" data-adresses-sans-compte={liste.length} aria-label="Adresses sans compte">
+      {liste.map((x) => (
+        <div key={x.adresse} className="vrm-sans-compte-ligne" data-adresse-sans-compte={x.adresse} data-adresse-sans-compte-n={x.n}>
+          <div className="vrm-sans-compte-tete">
+            <span className="vrm-sans-compte-titre">Adresse sans compte : {x.n} e-mail{x.n > 1 ? 's' : ''}</span>
+            <span className="vrm-sans-compte-adresse vrm-sensible" data-stream-type="adresse">{x.adresse}</span>
+            <span className="vrm-sans-compte-aide">Aucun compte Vinted ne porte cette adresse{x.dernier ? ` · dernier e-mail le ${jour(x.dernier)}` : ''} : ses ventes, bordereaux et messages ne disent pas de quel compte ils viennent.</span>
+          </div>
+          <div className="vrm-sans-compte-gestes">
+            <Bouton variante="secondaire" data-relier-compte={x.adresse} aria-expanded={choix === x.adresse} onClick={() => setChoix((c) => (c === x.adresse ? '' : x.adresse))}>Relier un compte</Bouton>
+            <Bouton variante="discret" data-compte-acheteur={x.adresse} onClick={() => acheteur(x.adresse)}>C’est un compte acheteur</Bouton>
+          </div>
+          {choix === x.adresse && (
+            <div className="vrm-sans-compte-choix" data-relier-choix-liste={libres.length}>
+              {libres.length
+                ? <>
+                    <span className="vrm-sans-compte-aide">Quel compte Vinted reçoit ses e-mails sur cette adresse ?</span>
+                    {libres.map((a) => <Bouton key={a.vinted_user_id} variante="secondaire" data-relier-choix={String(a.vinted_user_id)} onClick={() => relier(x.adresse, a)}>{nomCompte(a)}</Bouton>)}
+                  </>
+                : <span className="vrm-sans-compte-aide" data-relier-aucun="">Tous tes comptes Vinted ont déjà une adresse — change-la dans Comptes liés → Gérer.</span>}
+            </div>
+          )}
+        </div>
+      ))}
+      {marquees.length > 0 && (
+        <details className="vrm-sans-compte-acheteurs" data-adresses-acheteur={marquees.length}>
+          <summary>{marquees.length} adresse{marquees.length > 1 ? 's' : ''} marquée{marquees.length > 1 ? 's' : ''} « compte acheteur »</summary>
+          {marquees.map((a) => <div key={a} className="vrm-sans-compte-acheteur"><span className="vrm-sensible" data-stream-type="adresse">{a}</span><button type="button" className="vrm-lien-action" data-annuler-acheteur={a} onClick={() => annulerAcheteur(a)}>Annuler</button></div>)}
+        </details>
+      )}
+    </section>
+  );
+}
 // (`estRelaisApple`, déclarée plus haut, sert aussi ici — une règle, §11.)
 function EmailsSetting({onComptes}) {
   // ⚠️ `undefined` = en cours · `null` = la base n'a pas répondu · objet = lu.
@@ -71464,7 +71582,7 @@ function AppCoeur() {
             l'accompagnement animé. Une demande venue d'ailleurs (`DEMANDE_ADRESSES`) l'ouvre directement. */}
         {tab==='emails'&&<Suspense fallback={<p role="status" style={{padding:20}}>{PAS_SU.enCours}</p>}><BoiteEmails headers={sbAuth} delies={load('vrm_recus_delies',{})||{}} FermeAuRetour={FermeAuRetour}
           vueInitiale={DEMANDE_ADRESSES.on?'relier':'boite'}
-          reglages={<EmailsSetting onComptes={()=>setTab('vintedaccounts')}/>}
+          reglages={<><AdressesSansCompte comptes={vintedAccounts}/><EmailsSetting onComptes={()=>setTab('vintedaccounts')}/></>}
           onAller={(u)=>{try{window.dispatchEvent(new CustomEvent('vrm:aller',{detail:u}));}catch(_){}}}
           onNum={(n)=>{try{window.dispatchEvent(new CustomEvent('vrm:fiche-article',{detail:String(n)}));}catch(_){}}}
           onAdresses={()=>{ouvrirEmailsRelier('adresses');}}/></Suspense>}

@@ -31,9 +31,11 @@ import { texteComptesARelire } from './comptes-a-relire.js';
 const court = (t, n) => { const x = String(t || ''); return x.length > n ? x.slice(0, n - 1).trimEnd() + '…' : x; };
 
 // 💸 Une vente Vinted (e-mail « Ton article s'est vendu »).
-export const texteVendu = ({ article = '', prix = '', compte = '' } = {}) => ({
+// (6 nov.) `verification` : la vente « avec Vérification de l'article » (l'e-mail
+// ne donne pas de prix — il n'est jamais deviné) ; le colis part au centre de Vinted.
+export const texteVendu = ({ article = '', prix = '', compte = '', verification = false } = {}) => ({
   title: '💸 Vendu !',
-  body: `${article || 'Article'}${prix ? ` — ${prix} €` : ''}${compte ? ` (${compte})` : ''}`,
+  body: `${article || 'Article'}${prix ? ` — ${prix} €` : ''}${compte ? ` (${compte})` : ''}${verification ? ' — avec Vérification de l’article : envoi au centre de vérification de Vinted' : ''}`,
 });
 // 💰 L'argent d'une vente arrive (e-mail « Transaction finalisée »).
 export const texteArgentRecu = ({ montant = '', article = '', compte = '' } = {}) => ({
