@@ -64305,6 +64305,20 @@ const compterNonLuesNotifs = async () => {
 const CLE_RANGER_VUS = 'vrm_ranger_vus', CLE_RANGER_PROPOSES = 'vrm_ranger_proposes';
 const lireRangerLocal = (k) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v && typeof v === 'object' && !Array.isArray(v) ? v : null; } catch (_) { return null; } };
 const ecrireRangerLocal = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} };
+// Les achats des comptes donnés, s'ils viennent d'être lus (`cachedRow('o:uid')`, encore
+// frais) : au format de `lireAchatsLies` (`{ id, orders }`). `null` dès qu'UN compte
+// manque, n'a pas répondu, ou qu'aucune ligne d'achats n'est revenue (§4.1 : une liste
+// vide n'est pas une réponse) — l'appelant lit alors lui-même.
+async function achatsDejaLus(uids) {
+  if (!Array.isArray(uids) || !uids.length) return null;
+  const entrees = uids.map((u) => _rowCache.get(`o:${u}`));
+  if (entrees.some((e) => !e || (Date.now() - e.at) >= ROW_TTL_MS)) return null;
+  const parts = await Promise.all(entrees.map((e) => e.promesse.catch(() => null)));
+  if (!parts.every(Array.isArray)) return null;
+  const lignes = parts.flat().filter((r) => r && /_orders_purchased$/.test(String(r.id || '')))
+    .map((r) => ({ id: r.id, orders: (r.data && r.data.payload && r.data.payload.my_orders) || [] }));
+  return lignes.length ? lignes : null;
+}
 async function calculerOuRanger() {
   if (!isCloudReady()) return null;
   const meubles = load('vrm_meubles', null), slots = load('vrm_slots', null);
@@ -64312,7 +64326,11 @@ async function calculerOuRanger() {
   // (6 nov., vitesse 2) Les achats des comptes LIÉS seulement (la dernière liste lue
   // sur cet appareil, `vrm_comptes_lies`) : un achat d'un compte retiré n'arrive
   // plus chez lui. Pas sue ⇒ tous ; réponse vide ⇒ relue par motif (§4.1).
-  const lignes = await lireAchatsLies(uidsLies(null));
+  // Et d'abord ceux que le démarrage VIENT de lire (le préchargement range les commandes
+  // de chaque compte lié dans `cachedRow('o:uid')`, 60 s) : la cloche part 4 s après
+  // l'arrivée du nuage, elle les trouve là — aucune relecture (~800 Ko sur sa base).
+  const uids = uidsLies(null);
+  const lignes = (await achatsDejaLus(uids)) || (await lireAchatsLies(uids));
   if (!Array.isArray(lignes)) return null;
   const recup = load('vinted_pickup_done', {}) || {};
   const achats = lignes.flatMap((r) => (Array.isArray(r && r.orders) ? r.orders : []));
