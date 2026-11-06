@@ -42,8 +42,11 @@ const MUTATIONS = {
   'groupe-borne': ['regle', "const maxDe = (t) => (max && typeof max === 'object' ? (Number.isFinite(max[t]) ? max[t] : MAX_PAR_GROUPE) : max);", 'const maxDe = () => MAX_PAR_GROUPE;'],
   'vente-num-titre': ['ecran', "for (const [tx, item] of Object.entries(txnItem)) { const f = F[str(item)];", "for (const [tx, item] of Object.entries(txnItem)) { const f = Object.values(F)[0];"],
   'emails-vide': ['ecran', "if (!j || j.ok !== true || !Array.isArray(j.emails)) return null;", "if (!j || j.ok !== true || !Array.isArray(j.emails)) return [];"],
-  'sans-delai': ['app', "jetonsStream('acheteurs_recherche_emails',liste.map(x=>x.email&&x.email.resume&&x.email.resume.de)); }catch(_){ if(!ctl.signal.aborted) setGsEmails({q:m,liste:null}); } },250);", "jetonsStream('acheteurs_recherche_emails',liste.map(x=>x.email&&x.email.resume&&x.email.resume.de)); }catch(_){ if(!ctl.signal.aborted) setGsEmails({q:m,liste:null}); } },0);"],
-  'sans-annulation': ['app', 'return ()=>{ clearTimeout(t); ctl.abort(); };', 'return ()=>{ clearTimeout(t); };'],
+  'sans-delai': ['app', 'return piloterEmails({ fil: FIL_RECHERCHE, delai: 250,', 'return piloterEmails({ fil: FIL_RECHERCHE, delai: 0,'],
+  'sans-annulation': ['ecran', 'minuterie.annuler(t); t = null; if (ctl) ctl.abort(); ctl = null;', 'minuterie.annuler(t); t = null; ctl = null;'],
+  'minuteur-garde': ['ecran', 'minuterie.annuler(t); t = null; if (ctl) ctl.abort(); ctl = null;', 'if (ctl) ctl.abort(); ctl = null;'],
+  'montant-aux-emails': ['ecran', "if (!m || montant(q) || !actif())", "if (!m || !actif())"],
+  'coque-redessinee': ['app', 'const setGsQ=poserTexteRecherche;', "const [gsQ,setGsQ]=useState('');"],
   'factures-entieres': ['app', 'const facturesPro=await fetchProInvoices({ metadata: true })', 'const facturesPro=await fetchProInvoices()'],
   'pseudo-en-clair': ['app', "const sensible = r.par === 'pseudo' ? 'acheteur' : r.par === 'code' ? 'code' : null;", 'const sensible = null;'],
   'recents-en-stream': ['app', '{!streamOn && gsRecents.length > 0 &&', '{gsRecents.length > 0 &&'],
@@ -257,6 +260,36 @@ function sansCommentaires(t) {
     dit(Array.isArray(E.lireRecents(casse)) && Array.isArray(E.noterRecent('x', casse)) && Array.isArray(E.oublierRecents(casse)), 'un stockage bloqué (navigation privée) ne fait rien tomber');
   });
 
+  await (async () => {
+    // LE PILOTE DES E-MAILS, EXÉCUTÉ : minuterie et requête simulées.
+    try {
+      const fil = E.creerFil({ q: '', emails: null, max: { q: '', m: {} } });
+      const minut = []; const minuterie = { poser: (f, ms) => { const x = { f, ms, mort: false }; minut.push(x); return x; }, annuler: (x) => { if (x) x.mort = true; } };
+      const appels = [], signaux = [];
+      const chercher = async (m, signal) => { appels.push(m); signaux.push(signal); return { ok: true, emails: [{ id: 'email_reception_' + 'a'.repeat(16) }], suite: false }; };
+      const stop = E.piloterEmails({ fil, chercher, minuterie, delai: 250, montant: (q) => R.montantCherche(q) != null });
+      for (const q of ['g', 'ge', 'gel', 'gel-', 'gel-k', 'gel-ka']) fil.poser({ q });
+      const vivants = minut.filter((x) => !x.mort);
+      dit(vivants.length === 1 && vivants[0].ms >= 150, `pilote : six lettres tapées ⇒ UN minuteur vivant (${vivants.length}), pause ${vivants[0] && vivants[0].ms} ms`, minut.map((x) => x.mort));
+      dit(fil.lire().emails && fil.lire().emails.q === 'gel-ka' && fil.lire().emails.liste === undefined, 'pilote : « en cours » posé pour le dernier texte');
+      await vivants[0].f();
+      dit(appels.join() === 'gel-ka' && Array.isArray(fil.lire().emails.liste) && fil.lire().emails.liste.length === 1, 'pilote : une seule requête, pour le texte final ; la liste est posée', appels);
+      fil.poser({ q: 'gel-kay' });
+      const t2 = minut.filter((x) => !x.mort).pop();
+      const p2 = t2.f(); fil.poser({ q: 'gel-kaya' });
+      await p2;
+      dit(signaux[1] && signaux[1].aborted === true, 'pilote : une lettre de plus ANNULE la requête en vol', signaux.map((x) => x && x.aborted));
+      dit(fil.lire().emails && fil.lire().emails.q === 'gel-kaya', 'pilote : la réponse annulée n’écrase pas le texte suivant', fil.lire().emails);
+      const n0 = minut.length; fil.poser({ q: '52 €' });
+      dit(minut.length === n0 && fil.lire().emails === null, 'pilote : un montant n’envoie rien chez les e-mails');
+      const panne = E.creerFil({ q: '', emails: null, max: { q: '', m: {} } }); const mt = []; const minut2 = { poser: (f) => { mt.push(f); return f; }, annuler: () => {} };
+      E.piloterEmails({ fil: panne, minuterie: minut2, chercher: async () => { throw new Error('réseau'); } });
+      panne.poser({ q: 'asics' }); await mt[mt.length - 1]();
+      dit(panne.lire().emails && panne.lire().emails.liste === null, 'pilote : une panne ⇒ « pas su » (null), jamais « aucun e-mail »', panne.lire().emails);
+      stop();
+    } catch (e) { ko++; n++; console.log('❌ le pilote des e-mails a levé : ' + e.message); }
+  })();
+
   essaie('le code de l’écran', () => {
     const A = sansCommentaires(src.app);
     const i0 = A.indexOf('const [gsData,setGsData]=useState(null);'), i1 = A.indexOf('const [numData,setNumData]=useState(null);');
@@ -269,11 +302,10 @@ function sansCommentaires(t) {
     const P = sansCommentaires(fs.readFileSync(F_RECEPTION, 'utf8'));
     const proj = (/const PROJECTION='([^']*)'/.exec(P) || [])[1] || '';
     dit(proj && !proj.split(',').some((x) => /^(?:\w+:)?data$/.test(x.trim())), 'la route des e-mails projette (ni corps, ni texte, ni pièce)', proj);
-    const fx = (/useEffect\(\(\)=>\{\s*if\(!gsOpen\) return undefined;\s*const q=gsQ\.trim\(\); const m=requeteEmails\(q\);[\s\S]*?\},\[gsOpen,gsQ\]\);/.exec(A) || [''])[0];
-    dit(/new AbortController\(\)/.test(fx) && /signal:ctl\.signal/.test(fx) && /return \(\)=>\{ clearTimeout\(t\); ctl\.abort\(\); \};/.test(fx), 'frappe : la requête e-mails précédente est ANNULÉE (AbortController) à chaque lettre');
-    dit(/\},(\d{3})\);\s*return/.test(fx) && Number((/\},(\d{3})\);\s*return/.exec(fx) || [])[1]) >= 150, 'frappe : une requête e-mails par pause de frappe (≥ 150 ms), jamais par lettre', (/\},(\d+)\);\s*return/.exec(fx) || [])[1]);
-    dit(/montantCherche\(q\)!=null/.test(fx), 'un montant ne part pas chez les e-mails');
-    dit(/const gsQLent=React\.useDeferredValue\(gsQ\);/.test(A) && /const qBrut = gsQLent;/.test(A), 'frappe : le panneau suit la valeur DIFFÉRÉE (le champ n’attend jamais le calcul)');
+    dit(/return piloterEmails\(\{ fil: FIL_RECHERCHE, delai: (\d+),/.test(A) && Number((/return piloterEmails\(\{ fil: FIL_RECHERCHE, delai: (\d+),/.exec(A) || [])[1]) >= 150 && /montant: \(q\)=>montantCherche\(q\)!=null/.test(A) && /\{headers:sbAuth\(\),cache:'no-store',signal\}/.test(A), 'l’écran branche le pilote des e-mails : pause ≥ 150 ms, montant écarté, requête annulable (signal)', (/delai: (\d+)/.exec(A) || [])[1]);
+    const V = fs.existsSync(path.join(RAC, 'src', 'LoupeVivante.jsx')) ? sansCommentaires(fs.readFileSync(path.join(RAC, 'src', 'LoupeVivante.jsx'), 'utf8')) : '';
+    dit(/useSyncExternalStore\(FIL_RECHERCHE\.abonner/.test(V) && /const qLent = React\.useDeferredValue\(s\.q\);/.test(V) && /<RechercheVivante rendre=\{\(fil, gsQLent\)=>\{/.test(A) && /const qBrut = gsQLent;/.test(A), 'frappe : le panneau suit le texte DIFFÉRÉ du fil (la lettre s’affiche d’abord)');
+    dit(/const setGsQ=poserTexteRecherche;/.test(A) && !/const \[gsQ,setGsQ\]=useState/.test(A) && /value=\{fil\.q\}/.test(A), 'frappe : le texte tapé n’est PAS un état de la coque (une lettre ne redessine que le champ et le panneau)');
     dit(/const sensible = r\.par === 'pseudo' \? 'acheteur' : r\.par === 'code' \? 'code' : null;/.test(A) && /'vrm-recherche-par' \+ \(sensible \? ' vrm-sensible' : ''\)/.test(A), 'mode stream : la pastille d’un pseudo / d’un code suit les cases du stream (`vrm-sensible`)');
     dit(/\{!streamOn && gsRecents\.length > 0 &&/.test(A), 'mode stream : les recherches récentes sont tues');
     dit(/jetonsStream\('acheteurs_recherche',/.test(A), 'mode stream : les pseudos lus par la loupe sont des jetons à cacher');

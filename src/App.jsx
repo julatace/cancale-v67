@@ -285,7 +285,7 @@ import { retoursEnCours, retoursPourSite, remiseEnStock, retourAReceptionner, nu
 import { indexMemo as indexRechercheMemo, chercherPartout, destinationResultat, suggestions as suggestionsRecherche, montantCherche } from "./rechercheUnique.js";
 // (6 nov., v36) La loupe universelle : les adaptateurs de l'écran (src/rechercheEcran.js).
 import { Vivant as RechercheVivante } from "./LoupeVivante.jsx";
-import { FIL_RECHERCHE, poserTexteRecherche, memoSur, annoncesDesLignes, numerosDesVentes, facturesPourRecherche, emailsDeLaReponse, motPastille, MOTIFS as MOTIFS_RECHERCHE, lireRecents, noterRecent, oublierRecents, demanderOuverture, prendreDemande, requeteEmails } from "./rechercheEcran.js";
+import { FIL_RECHERCHE, poserTexteRecherche, piloterEmails, memoSur, annoncesDesLignes, numerosDesVentes, facturesPourRecherche, emailsDeLaReponse, motPastille, MOTIFS as MOTIFS_RECHERCHE, lireRecents, noterRecent, oublierRecents, demanderOuverture, prendreDemande, requeteEmails } from "./rechercheEcran.js";
 import { ligneEmail, siteExpediteur, monogramme } from "./boiteEmails.js";
 import { expediteurLisible } from "./journalEmail.js";
 import { requeteJsonBornee } from "./requeteJsonBornee.js";
@@ -70736,18 +70736,9 @@ function AppCoeur() {
   // Mesuré le 6 nov. sur sa base (lecture seule) : 992 e-mails, le filtre en 7 ms.
   useEffect(()=>{
     if(!gsOpen) return undefined;
-    let t=null, ctl=null, dernier=null;
-    const lancer=()=>{
-      const s=FIL_RECHERCHE.lire(); const q=s.q.trim(); const m=requeteEmails(q);
-      if(m===dernier) return; dernier=m;
-      clearTimeout(t); if(ctl) ctl.abort(); ctl=null;
-      if(!m || montantCherche(q)!=null || !AUTH.user){ if(s.emails!==null) FIL_RECHERCHE.poser({emails:null}); return; }
-      if(!(s.emails&&s.emails.q===m&&s.emails.liste!==undefined)) FIL_RECHERCHE.poser({emails:{q:m,liste:undefined}});
-      const c=new AbortController(); ctl=c;
-      t=setTimeout(async()=>{ try{ const r=await requeteJsonBornee(`/api/email-rattacher?mode=journal&page=0&cherche=${encodeURIComponent(m)}`,{headers:sbAuth(),cache:'no-store',signal:c.signal},8000); if(c.signal.aborted) return; const liste=r.ok?emailsDeLaReponse(r.json):null; FIL_RECHERCHE.poser({emails:{q:m,liste,suite:!!(r.json&&r.json.suite)}}); if(liste) jetonsStream('acheteurs_recherche_emails',liste.map(x=>x.email&&x.email.resume&&x.email.resume.de)); }catch(_){ if(!c.signal.aborted) FIL_RECHERCHE.poser({emails:{q:m,liste:null}}); } },250);
-    };
-    lancer(); const stop=FIL_RECHERCHE.abonner(lancer);
-    return ()=>{ stop(); clearTimeout(t); if(ctl) ctl.abort(); };
+    return piloterEmails({ fil: FIL_RECHERCHE, delai: 250, actif: ()=>!!AUTH.user, montant: (q)=>montantCherche(q)!=null,
+      chercher: async (m, signal)=>{ const r=await requeteJsonBornee(`/api/email-rattacher?mode=journal&page=0&cherche=${encodeURIComponent(m)}`,{headers:sbAuth(),cache:'no-store',signal},8000); return r.ok?r.json:null; },
+      apres: (liste)=>jetonsStream('acheteurs_recherche_emails',liste.map(x=>x.email&&x.email.resume&&x.email.resume.de)) });
   },[gsOpen]);
   // Le mode stream reconnaît aussi les pseudos que la loupe a lus (e-mails de vente) et
   // les acheteurs des factures, où qu'ils s'écrivent (src/modeStream.js).

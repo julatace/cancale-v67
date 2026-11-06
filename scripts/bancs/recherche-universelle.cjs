@@ -145,7 +145,7 @@ async function sain(pg, ecran) {
 }
 // La frappe, MESURÉE dans la page : la valeur posée comme React la lit (événement
 // `input`), puis le temps jusqu'à ce que le sélecteur attendu soit peint.
-const mesurer = (pg, q, sel) => pg.evaluate(async ({ q, sel }) => {
+const mesurer = (pg, q, selQ) => pg.evaluate(async ({ q, sel }) => {
   const el = document.querySelector('[data-recherche-champ]');
   const poser = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
   const t0 = performance.now();
@@ -159,7 +159,7 @@ const mesurer = (pg, q, sel) => pg.evaluate(async ({ q, sel }) => {
   });
   await new Promise((r) => requestAnimationFrame(() => r()));
   return { ms: Math.round(performance.now() - t0), vu };
-}, { q, sel });
+}, { q, sel: selQ.startsWith('[data-recherche-q=') ? selQ : `[data-recherche-q="${q.trim().toLowerCase()}"] ${selQ}` });
 const res = (pg) => pg.evaluate(() => ({
   r: [...document.querySelectorAll('[data-recherche-resultat]')].map((x) => ({ type: x.getAttribute('data-recherche-resultat'), par: x.getAttribute('data-recherche-par'), cle: x.getAttribute('data-recherche-cle'), num: x.getAttribute('data-recherche-num'), h: Math.round(x.getBoundingClientRect().height), pastille: (x.querySelector('.vrm-recherche-par') || {}).textContent || '' })),
   groupes: Object.fromEntries([...document.querySelectorAll('[data-recherche-groupe]')].map((g) => [g.getAttribute('data-recherche-groupe'), { n: +g.getAttribute('data-recherche-n'), total: g.getAttribute('data-recherche-total') }])),
@@ -189,7 +189,9 @@ const ouvrirLoupe = async (pg, tel) => {
         for (const q of ['zzzzqq', 'zzzzqqx', 'samba og taille 37', 'nike', 'poupacho', 'zzzzqq']) { const m = await mesurer(pg, q, '[data-recherche-q="' + q.toLowerCase() + '"]'); console.log('SONDE', TT, q, m.ms + ' ms'); await pg.waitForTimeout(400); }
         await ctx.close(); continue;
       }
+      let nLu0 = 0;
       await essaie('champ vide', async () => {
+        nLu0 = lectures.length;   // ce que lit la loupe, à partir de son ouverture
         await ouvrirLoupe(pg, tel);
         await pg.waitForTimeout(500);
         const v = await pg.evaluate(() => ({ colis: [...document.querySelectorAll('[data-recherche-suggestions="colis"] [data-recherche-resultat]')].map((x) => x.getAttribute('data-recherche-cle')), ventes: document.querySelectorAll('[data-recherche-suggestions="ventes"] [data-recherche-resultat]').length, recents: !!document.querySelector('[data-recherche-recents]') }));
@@ -205,7 +207,9 @@ const ouvrirLoupe = async (pg, tel) => {
           ['52 €', '[data-recherche-par="montant"]', (x) => x.r.filter((r) => r.type === 'vente').map((r) => r.cle).join() === 'vente:22999990001', '« 52 € » ⇒ la vente à 52,00 € seulement'],
           ['52.5', '[data-recherche-cle="achat:23999990001"]', (x) => x.r.some((r) => r.cle === 'achat:23999990001' && r.par === 'montant'), '« 52.5 » ⇒ l’achat à 52,50 €'],
           ['samba og taille 37', '[data-recherche-groupe="vente"]', (x) => x.groupes.vente && x.r.filter((r) => r.type === 'vente').length > 0, 'mots du titre ⇒ les ventes'],
-          ['onitsuka 44,5', '[data-recherche-cle="annonce:libre7"]', (x) => x.r.filter((r) => r.type === 'annonce').map((r) => r.cle).join() === 'annonce:libre7', 'marque + taille ⇒ L’annonce sans N°'],
+          // L'app numérote toute annonce qui n'a pas de N° (§5) : au banc, « libre7 » a reçu le sien ;
+          // elle sort alors en paire — toujours UNE ligne, celle de SON annonce.
+          ['onitsuka 44,5', '[data-recherche-cle$=":libre7"]', (x) => x.r.filter((r) => r.type === 'annonce' || r.type === 'paire').map((r) => r.cle.replace(/^\w+:/, '')).join() === 'libre7', 'marque + taille (champs de l’annonce) ⇒ L’annonce, une ligne'],
           ['PRO-2026-0007', '[data-recherche-resultat="facture"]', (x) => x.r.filter((r) => r.type === 'facture').length === 1, 'n° de facture ⇒ SA facture'],
           ['913377', '[data-recherche-resultat="email"]', (x) => x.r.some((r) => r.type === 'email' && r.cle === 'email:' + ID321), 'code dans un e-mail ⇒ L’e-mail (moteur de l’écran E-mails)'],
         ];
@@ -220,7 +224,7 @@ const ouvrirLoupe = async (pg, tel) => {
           dit(x.sw <= x.cw + 1, `${TT} « ${q} » : aucun débordement`, `${x.sw} > ${x.cw}`);
           if (['poupacho', '500123', '52 €', '913377'].includes(q)) await pg.screenshot({ path: path.join(SHOTS, `loupe-${q.replace(/[^a-z0-9]/gi, '')}-${suf}.png`) });
         }
-        const m = await mesurer(pg, '141', '[data-recherche-panneau] [data-tout-num]');
+        const m = await mesurer(pg, '141', '[data-tout-num]');
         await pg.waitForTimeout(300);
         const x = await res(pg);
         dit(m.vu && x.tout && (x.groupes.paire ? x.r.every((r) => r.type !== 'paire' || r.num !== '141') : true), `${TT} « 141 » : « Tout sur le N° » devant, la N°141 pas deux fois`, JSON.stringify(x.groupes));
@@ -242,12 +246,13 @@ const ouvrirLoupe = async (pg, tel) => {
       await essaie('frappe lettre à lettre', async () => {
         await pg.locator('[data-recherche-champ]').first().fill('');
         const avant = journal.n;
-        await pg.locator('[data-recherche-champ]').first().pressSequentially('gel-kayano', { delay: 45 });
+        await pg.locator('[data-recherche-champ]').first().pressSequentially('mr8800321', { delay: 45 });
         await pg.waitForTimeout(900);
         const x = await res(pg);
-        dit(journal.n - avant <= 2, `${TT} « gel-kayano » tapé lettre à lettre : ${journal.n - avant} requête(s) e-mails, pas une par lettre`, journal.q.slice(avant).join(' | '));
-        dit(x.r.some((r) => r.type === 'email' && r.cle === 'email:' + ID321), `${TT} … et l’e-mail de l’article est trouvé`);
+        dit(journal.n - avant <= 2, `${TT} « mr8800321 » (n° de suivi d’un e-mail) tapé lettre à lettre : ${journal.n - avant} requête(s) e-mails, pas une par lettre`, journal.q.slice(avant).join(' | '));
+        dit(x.r.some((r) => r.type === 'email' && r.cle === 'email:' + ID321), `${TT} … et L’e-mail de ce suivi est trouvé`);
       });
+      const nLectures = lectures.length;   // la recherche seule (l'écran ouvert ensuite a ses propres lectures)
       await essaie('ouvrir', async () => {
         // Une paire ⇒ SA fiche.
         await mesurer(pg, 'jordan chicago', '[data-recherche-groupe="paire"]');
@@ -296,7 +301,7 @@ const ouvrirLoupe = async (pg, tel) => {
         await pg.screenshot({ path: path.join(SHOTS, `loupe-recents-${suf}.png`) });
         await sain(pg, `${TT} loupe`);
       });
-      const lourdes = lectures.filter((u) => /select=([^&]*)/.test(u) && /(?:^|,)(?:\w+:)?data(?:,|$)/.test((/select=([^&]*)/.exec(u) || [])[1]) && /harvest_.*_(?:orders|listings)|email_(?:track|invoice|reception)/.test(u));
+      const lourdes = lectures.slice(nLu0, nLectures).filter((u) => /select=([^&]*)/.test(u) && /(?:^|,)(?:\w+:)?data(?:,|$)/.test((/select=([^&]*)/.exec(u) || [])[1]) && /harvest_.*_(?:orders|listings)|email_(?:track|invoice|reception)/.test(u));
       dit(!lourdes.length, `${TT} aucune ligne lourde lue entière pendant la recherche (commandes, dressings, factures, e-mails)`, lourdes.slice(0, 2).join(' | ').slice(0, 240));
       dit(errs.length === 0, `${TT} aucune erreur de page`, errs.join(' | ').slice(0, 200));
       await ctx.close();

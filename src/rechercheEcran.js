@@ -157,6 +157,36 @@ export function creerFil(init) {
 export const FIL_RECHERCHE = creerFil({ q: '', emails: null, max: { q: '', m: {} } });
 export const poserTexteRecherche = (v) => FIL_RECHERCHE.poser((s) => { const q = str(v); return q === s.q ? s : { ...s, q }; });
 
+// ── LES E-MAILS DE LA LOUPE : une requête par PAUSE de frappe, la précédente ANNULÉE ──
+// Suit le fil : à chaque texte nouveau, le minuteur repart (`delai`) et la requête en
+// vol est annulée (`AbortController`). Un montant, moins de 2 caractères ou pas de
+// session (`actif()` faux) ⇒ rien n'est envoyé. `chercher(mot, signal)` rend la
+// réponse JSON de la route de l'écran E-mails (ou lève) ; une réponse illisible ou
+// une panne ⇒ `liste: null` (pas su), jamais « aucun e-mail ». Rend l'arrêt.
+export function piloterEmails({ fil = FIL_RECHERCHE, chercher, actif = () => true, delai = 250, montant = () => false, apres = () => {}, minuterie = { poser: (f, ms) => setTimeout(f, ms), annuler: (t) => clearTimeout(t) } } = {}) {
+  let t = null, ctl = null, dernier = null;
+  const lancer = () => {
+    const s = fil.lire(); const q = str(s.q).trim(); const m = requeteEmails(q);
+    if (m === dernier) return; dernier = m;
+    minuterie.annuler(t); t = null; if (ctl) ctl.abort(); ctl = null;
+    if (!m || montant(q) || !actif()) { if (s.emails !== null) fil.poser({ emails: null }); return; }
+    if (!(s.emails && s.emails.q === m && s.emails.liste !== undefined)) fil.poser({ emails: { q: m, liste: undefined } });
+    const c = new AbortController(); ctl = c;
+    t = minuterie.poser(async () => {
+      try {
+        const j = await chercher(m, c.signal);
+        if (c.signal.aborted) return;
+        const liste = emailsDeLaReponse(j);
+        fil.poser({ emails: { q: m, liste, suite: !!(j && j.suite) } });
+        if (liste) apres(liste);
+      } catch (_) { if (!c.signal.aborted) fil.poser({ emails: { q: m, liste: null } }); }
+    }, delai);
+  };
+  lancer();
+  const stop = fil.abonner(lancer);
+  return () => { stop(); minuterie.annuler(t); if (ctl) ctl.abort(); };
+}
+
 export function requeteEmails(q) {
   const t = str(q).normalize('NFC').replace(/[^\p{L}\p{N} @._'’-]+/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
   return t.length >= 2 ? t : '';
