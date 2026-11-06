@@ -23,6 +23,28 @@ export const motEtatVente = (label) => {
 // Vinted · vendeuse_a 124 € »). Un seul groupe ⇒ le total seul, et le groupe
 // devient une phrase sans montant (« Vinted · vendeuse_a · 2 ventes »).
 // → { lignes: [groupes à écrire avec leur montant], resume: groupe | null }
+// ── LE PRIX D'ACHAT SE DIT UNE FOIS, EN TÊTE (6 nov., vague 2) ───────────────
+// La ligne Vinted à l'ordinateur répétait « Achat · à saisir » en ambre sur chaque
+// vente (E2, « ce qui reste »). Comme dans Annonces (chantier C, `data-ann-achats`) :
+// UN bandeau « Prix d'achat N/M connus · Compléter », la case de la ligne en gris.
+// M = les ventes affichées qui ont un coût : ni annulées (aucun coût à poser), ni
+// masquées, ni dans une autre devise ; N = celles dont le prix d'achat est connu,
+// par la règle de la ligne (`achatConnu(o)`, `beneficeLigneVente(...).achat != null`).
+// → { n, m } quand il en manque, sinon null (tout est connu, ou rien à compter).
+// Exécuté par scripts/audit-ventes-prix-achat.cjs.
+export function bandeauPrixAchat(ventes, { annulee, masquee = null, achatConnu } = {}) {
+  let m = 0, n = 0;
+  for (const o of (Array.isArray(ventes) ? ventes : [])) {
+    if (!o || o.transaction_id == null) continue;
+    if (typeof annulee === 'function' && annulee(o)) continue;
+    if (typeof masquee === 'function' && masquee(o)) continue;
+    const dv = o.price && o.price.currency_code; if (dv && dv !== 'EUR') continue;
+    m++;
+    if (typeof achatConnu === 'function' && achatConnu(o)) n++;
+  }
+  return m && n < m ? { n, m } : null;
+}
+
 export const lignesAVenir = (groupes) => {
   const g = Array.isArray(groupes) ? groupes.filter(Boolean) : [];
   if (g.length <= 1) return { lignes: [], resume: g[0] || null };

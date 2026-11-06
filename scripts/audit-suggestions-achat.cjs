@@ -25,6 +25,11 @@ const MUTS = {
   'deja-relie': ["if (!n) return true;", 'return true;'],
   'rembourse': ["if (!a || !txDe(a) || achatAnnule(a) || !achatDisponible(a, liens, cible.curTx)) continue;\n    const t", "if (!a || !txDe(a) || !achatDisponible(a, liens, cible.curTx)) continue;\n    const t"],
   'lot-sans-fin': ["return l.lot && (l.n == null || n < l.n);", 'return l.lot;'],
+  // (6 nov., vague 2 · point 7) La saisie en série passe par la MÊME règle.
+  'serie-sans-date': ["const s = suggestionsAchat({ cible: { titre: l.titre || '', marque: l.marque || '', taille: l.taille || '', couleur: l.couleur || '', dateRef: l.dateRef || null, curTx: '' },", "const s = suggestionsAchat({ cible: { titre: l.titre || '', marque: l.marque || '', taille: l.taille || '', couleur: l.couleur || '', dateRef: null, curTx: '' },"],
+  'serie-sur-rang2': ['if (s.length) out[String(l.key)] = s.map((x) => ({ ...x, sur: x.rang === 1 }));', 'if (s.length) out[String(l.key)] = s.map((x) => ({ ...x, sur: true }));'],
+  'app-bareme': ['    const s = suggestionsSaisieSerie({ lignes: fillBuyRows.map((r) => ({ key: r.key, titre: r.titre, marque: r.marque, taille: r.taille, dateRef: r.dateRef })),', '    const s0 = scoreAchatPrep; const s = suggestionsSaisieSerie({ lignes: fillBuyRows.map((r) => ({ key: r.key, titre: r.titre })),', 'App.jsx'],
+  'app-lien-brut': ["onClick={()=>relierAchatCle(r.key,p)}", "onClick={()=>linkBuyForKey(r.key,p)}", 'App.jsx'],
   'prix-lot-devine': ["if (!String(saisi == null ? '' : saisi).trim() || !Number.isFinite(v) || v <= 0) return null;", "if (!Number.isFinite(v) || v <= 0) { const p = prixDe(achat), l0 = lotDe(achat); if (p == null || !l0.n) return null; return ecritureLot(achat, String(p / l0.n), { accNom, photo }); }"],
 };
 if (process.argv.includes('--prouve')) {
@@ -36,13 +41,14 @@ if (process.argv.includes('--prouve')) {
   console.log(`${n}/${Object.keys(MUTS).length} mutations attrapées`); process.exit(n === Object.keys(MUTS).length ? 0 : 1);
 }
 let MOD = path.join(R, 'src', 'suggestionsAchat.js');
+let APP_F = path.join(R, 'src', 'App.jsx');
 const MUT = (process.argv.find((a) => a.startsWith('--mutation=')) || '').split('=')[1];
 if (MUT) {
   const d = fs.mkdtempSync(path.join(os.tmpdir(), 'sugg-'));
   fs.cpSync(path.join(R, 'src'), path.join(d, 'src'), { recursive: true, filter: (s) => !/node_modules/.test(s) });
-  const f = path.join(d, 'src', 'suggestionsAchat.js'); const s = fs.readFileSync(f, 'utf8');
+  const f = path.join(d, 'src', MUTS[MUT][2] || 'suggestionsAchat.js'); const s = fs.readFileSync(f, 'utf8');
   if (!s.includes(MUTS[MUT][0])) { console.log('motif introuvable : ' + MUT); process.exit(2); }
-  fs.writeFileSync(f, s.replace(MUTS[MUT][0], MUTS[MUT][1])); MOD = f;
+  fs.writeFileSync(f, s.replace(MUTS[MUT][0], MUTS[MUT][1])); MOD = path.join(d, 'src', 'suggestionsAchat.js'); APP_F = path.join(d, 'src', 'App.jsx');
   console.log('⚠️  MUTATION « ' + MUT + ' » — doit rougir');
 }
 let ok = 0, ko = 0;
@@ -121,6 +127,28 @@ const { extractBrand: marqueDe, extractColors: couleursDe, extractModel: modeleD
   dit(S.tousAchatsLibres({ achats: liste, liens: new Map(), compte: 'arthur', compteDe }).length === 2, 'R3 filtre par compte');
   const m = new Date(T0 - 40 * J).toISOString().slice(0, 7);
   dit(S.tousAchatsLibres({ achats: liste, liens: new Map(), mois: m }).map((a) => a.transaction_id).join() === '3001', 'R4 filtre par mois');
+
+  console.log('\n── F. La saisie en série (« Prix d’achat à compléter ») : la MÊME règle (6 nov., vague 2 · 7)');
+  if (typeof S.suggestionsSaisieSerie !== 'function') dit(false, 'F0 `suggestionsSaisieSerie` existe (src/suggestionsAchat.js)');
+  else {
+    const serie = (lignes, achats, liens = new Map()) => S.suggestionsSaisieSerie({ lignes, achats, liens, marqueDe, couleursDe, modeleDe });
+    const ref = new Date(T0).toISOString();
+    // Avant (le barème `scoreAchatPrep`) : marque + couleur + titre identique passaient sans taille.
+    dit(!serie([{ key: 'a', titre: 'Adidas Spezial noire', dateRef: ref }], [ach(20, 'Adidas Spezial noire')]).a, 'F1 le titre seul ne suffit plus : sans taille, aucune piste (même titre identique)');
+    dit(!serie([{ key: 'b', titre: 'Adidas Spezial noire 42.5', dateRef: ref }], [ach(21, 'Adidas Spezial noire 42.5', +2)]).b, 'F2 un achat POSTÉRIEUR à l’article n’est jamais proposé');
+    const f3 = serie([{ key: 'c', titre: 'Spezial', marque: 'Adidas', taille: '42,5', dateRef: ref }], [ach(22, 'Adidas Spezial noire 42.5')]);
+    dit(f3.c && f3.c.length === 1 && f3.c[0].rang === 2 && f3.c[0].sur === false, 'F3 la marque et la taille des CHAMPS de l’annonce comptent ; sans couleur commune lue ⇒ « à vérifier », jamais « C’est ça »', JSON.stringify(f3));
+    const f4 = serie([{ key: 'd', titre: 'Adidas Spezial noire 42,5', dateRef: ref }], [ach(23, 'Adidas Spezial noire 42.5')]);
+    dit(f4.d && f4.d[0].sur === true, 'F4 marque + taille + couleur ⇒ « C’est ça » (rang 1)');
+    const lot = ach(24, 'Lot 3 articles adidas spezial noire 42.5', -30, { price: { amount: '90.0' } });
+    dit(!!serie([{ key: 'e', titre: 'Adidas Spezial noire 42,5', dateRef: ref }], [lot], new Map([['24', 2]])).e && !serie([{ key: 'e', titre: 'Adidas Spezial noire 42,5', dateRef: ref }], [lot], new Map([['24', 3]])).e, 'F5 un LOT reste proposé jusqu’à son nombre d’articles (2/3 oui, 3/3 non)');
+    dit(!serie([{ key: 'f', titre: 'Adidas Spezial noire 42,5', dateRef: ref }], [ach(25, 'Adidas Spezial noire 42.5', -3, { status: 'Commande remboursée' })]).f, 'F6 un achat remboursé n’est jamais proposé');
+    const APPS = fs.readFileSync(APP_F, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
+    const i = APPS.indexOf('const fillBuySugg = useMemo(() => {'); const corps = i >= 0 ? APPS.slice(i, APPS.indexOf('}, [fillBuyOpen', i)) : '';
+    dit(/suggestionsSaisieSerie\(\{ lignes: fillBuyRows\.map\(\(r\) => \(\{ key: r\.key, titre: r\.titre, marque: r\.marque, taille: r\.taille, dateRef: r\.dateRef \}\)\)/.test(corps) && !/scoreAchatPrep|scoreAchat\(/.test(corps), 'F7 la saisie en série (`fillBuySugg`) passe par `suggestionsSaisieSerie`, plus par le barème', corps.slice(0, 160));
+    dit(/onClick=\{\(\)=>relierAchatCle\(r\.key,p\)\}/.test(APPS) && !/linkBuyForKey\(/.test(APPS), 'F8 SON tap sur une piste relie par l’écriture de « Relier un achat » (un lot demande le prix de l’article)');
+    dit(/dateRef: ds\.length \? new Date\(Math\.min\(\.\.\.ds\)\)\.toISOString\(\) : null/.test(APPS), 'F9 la borne de chaque ligne : la date la plus ANCIENNE connue de l’article (mise en ligne, vente, N° posé)');
+  }
 
   console.log('\n── A. Le module n’écrit nulle part');
   const src = fs.readFileSync(MOD, 'utf8').replace(/\/\/.*$/gm, '');

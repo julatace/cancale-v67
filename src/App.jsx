@@ -87,7 +87,7 @@ import {formaterMontantEbay} from './montantsEbay.js';
 import {cibleEbay} from "./ebayParcours.js";
 import {centimes,coutsVente,beneficePaire,champsCharges} from "./beneficePaire.js";
 import {argentAVenir,aVenirPour,texteDatePrevue} from './argentAVenir.js';
-import { motEtatVente, lignesAVenir, comptesQuiAnnulent, fenetreAnnulations } from './ventesEcran.js';
+import { motEtatVente, lignesAVenir, comptesQuiAnnulent, fenetreAnnulations, bandeauPrixAchat } from './ventesEcran.js';
 import './ventes-e2.css';
 import {comparerMois,ymEnFace} from './comparerMois.js';
 import {fraisParPlateforme,texteCouverture} from './fraisPlateformes.js';
@@ -54416,13 +54416,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             affichées qui ont un coût (pas les annulées, ni une autre devise), avec la règle de la ligne
             (`beneficeLigneVente`). La case « Achat » de chaque ligne passe en gris (plus d'ambre répété). */}
         {Array.isArray(sales.items) && !sales.error && (()=>{
-          let m = 0, n = 0;
-          for (const o of ventesAffichees) {
-            if (!o || o.transaction_id == null || isHidden(o) || classifyOrderStatus(o.status) === 'cancelled') continue;
-            const dv = o.price?.currency_code; if (dv && dv !== 'EUR') continue;
-            m++; if (beneficeLigneVente(o.price?.amount, effEntry(o), { annulee: false }).achat != null) n++;
-          }
-          if (!m || n >= m) return null;
+          const bd = bandeauPrixAchat(ventesAffichees, { annulee: (o) => classifyOrderStatus(o.status) === 'cancelled', masquee: isHidden,
+            achatConnu: (o) => beneficeLigneVente(o.price?.amount, effEntry(o), { annulee: false }).achat != null });
+          if (!bd) return null;
+          const { n, m } = bd;
           return (
             <div className="vrm-ann-avis vrm-ventes-avis" data-ventes-avis="">
               <div className="vrm-ann-achats" data-ventes-achats={`${n}/${m}`} role="status">
