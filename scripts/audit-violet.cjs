@@ -39,7 +39,6 @@ const EXCEPTIONS = {
     ['conic-gradient(red,orange,yellow,lime,cyan,blue,magenta', "roue des teintes du sélecteur de couleur LIBRE (Stock 3D, murs) : c'est lui qui choisit"],
   ],
   'src/facturePro/regle.js': [
-    ["'#6b3fa0'", "une des six couleurs d'impression qu'IL peut choisir pour SES factures Pro (chantier v36-facture-pro, en cours) — à lui demander (passation visuel-2 §5)"],
   ],
 };
 const excepte = (rel, l) => (EXCEPTIONS[rel] || []).some(([bout]) => l.includes(bout));
