@@ -25,7 +25,7 @@ Rien de `vinted-sync-extension/` ni de `public/` n'a été touché. Aucune migra
 | `src/InventaireStock.jsx` | l'écran (saisie, retour immédiat, case par case, bilan) — aucune règle recalculée |
 | `src/styles-inventaire.css` | son dessin (jetons de la coque, cibles 44 px et plus) |
 | `src/App.jsx` | `StockMeubles` fabrique l'attendu depuis SES lectures et monte l'écran ; `lireLigneInventaire` / `ecrireLigneInventaire` ; `useInventaireEnCours` (Ma journée) ; publication `vrm_num_doublons` |
-| `scripts/audit-inventaire.cjs` | l'audit (61 contrôles, 16 mutations) |
+| `scripts/audit-inventaire.cjs` | l'audit (63 contrôles, 17 mutations) |
 | `scripts/bancs/inventaire.cjs` | le banc de rendu (390 tactile, 1512 souris, clair, sombre) |
 
 ## Les règles (et pourquoi)
@@ -137,7 +137,7 @@ Session = { id, debut, finAt, reprisAt, n, saisies: { [sid]: { k, s, at, c?, d? 
 
 ## Les preuves
 
-### Audit `node scripts/audit-inventaire.cjs` — 61/61 verts
+### Audit `node scripts/audit-inventaire.cjs` — 63/63 verts
 Exécute la vraie règle sur un attendu fabriqué par la **vraie** `annoncesActuelles`
 (trois comptes Vinted : un frais, un vieux de 3 jours, un en panne ; eBay ; gardée ; vendue
 encore lue en ligne ; archive B125 en ligne ; conflit sur N°2) :
@@ -155,20 +155,52 @@ encore lue en ligne ; archive B125 en ligne ; conflit sur N°2) :
   création rev 1 ;
 - I7 App.jsx : l'attendu = `aa.articles`/`aa.manque`/`jugeable`/`vrm_stock_vendus`, la
   ligne en comparer-et-échanger, aucun N° écrit, « N° + Entrée » dans l'inventaire, les
-  deux entrées (Stock, Ma journée), `vrm_num_doublons` publié APRÈS `conflitsNum` (TDZ).
+  deux entrées (Stock, Ma journée), `vrm_num_doublons` publié APRÈS `conflitsNum` (TDZ) ;
+- I8 case par case : vue dans une case, notée dans une autre ⇒ « pas dans sa case ».
 
-**Mutations** (`--prouve`) : **16/16 attrapées** — clé brute (« 007 »), lettre ignorée
+**Mutations** (`--prouve`) : **17/17 attrapées** — clé brute (« 007 »), lettre ignorée
 (B125 = 125), vendue jugée attendue, pas su dit en trop, ventes nulles = aucune, « à
 confirmer » ⇒ manque, vendue ⇒ manque, **réunion par le titre**, gardée oubliée, conflit
 oublié, 2ᵉ carton oublié, annulée comptée, fusion qui écrase, lecture KO qui écrit, conflit
-de `rev` pris pour un succès, reprise ignorée.
+de `rev` pris pour un succès, reprise ignorée, case par case ignorée.
 
 **Arbre d'avant** (`git archive` du commit de départ `477adf56`, audit copié dedans, lancé
 depuis cet arbre) : rouge (« src/inventaire.js absent »). Avec la seule règle recopiée dans
 l'arbre d'avant : **12 rouges** (tout I7 : l'app ne la branchait nulle part).
 
-### Banc `scripts/bancs/inventaire.cjs`
-Voir la fin de ce fichier (résultats et captures regardées).
+### Banc `scripts/bancs/inventaire.cjs` — 112/112 OK (390 tactile et 1512 souris, clair et sombre)
+`npm run build`, puis `BANC_PORT=103xx SHOT=<dossier>/inv node scripts/bancs/inventaire.cjs`
+(`BANC_SEUL=390|1512` pour une seule largeur). Données inventées : deux comptes Vinted
+(`compte_banc` lu, `compte_pas_lu` dont la lecture RATE), une annonce eBay (SKU VRM-40),
+Vestiaire lu et vide, N°7 prouvée vendue, N°2 en conflit, N°60 numérotée et plus en ligne.
+La ligne `vrm_inventaire` est servie comme PostgREST (GET projeté, POST 409, PATCH gardé
+par `data->>rev`).
+- **A** « 1 » + Entrée ⇒ VERT ; « 007 » + OK ⇒ N°7, AMBRE « Vendu — à sortir » (avec sa
+  case) ; « 125 » ⇒ « Pas su » neutre (B125 ≠ 125, et un compte n'est pas lu : jamais « en
+  trop ») ; « 60 » ⇒ AMBRE « En trop » ; « ABC » + « b125 » ⇒ B125 attendue ; « 2 » ⇒ ROUGE
+  (le seul) ; « Annuler » ; « 1 » deux fois ⇒ « Déjà compté ». Les couleurs sont jugées sur la
+  TEINTE CALCULÉE du rendu, pas sur un nom de classe.
+- **B** enregistré dans la ligne (rev monte), **rechargement** ⇒ reprend (6 N° vus), **autre
+  appareil** (stockage vide) ⇒ retrouvé par la ligne.
+- **C** bilan : manquent N°3 et N°40 (jamais N°30, du compte pas lu, NOMMÉ) ; en trop N°60 ;
+  vendue rangée N°7 avec « Je l'ai sortie » ; deux paires N°2 ; pas su 125 ; aucune fiche
+  numérotée modifiée.
+- **D** Ma journée (autre appareil) : « Inventaire en cours · 6 N° vus » ; « Voir » ouvre le
+  Stock sur l'inventaire.
+- **E** lecture de la ligne en panne (500) : 0 écriture envoyée, saisie gardée sur
+  l'appareil, « Pas encore enregistré dans le nuage » dit.
+- **F** aucune erreur de page, aucun défilement horizontal.
+
+Captures regardées (accueil, saisie, vendu, doublon, bilan, Ma journée, panne, dans les
+quatre combinaisons) : lisibles en clair et en sombre, le vert seulement sur « Attendu », le
+rouge seulement sur N°2, l'ambre sur « en trop »/« vendu », rien de coupé à 390 px.
+
+⚠️ Sous forte charge de la machine (audits en parallèle, mémoire pleine), le rendu
+swiftshader à 1512 px n'avance plus les animations d'entrée de la DEUXIÈME feuille (la
+confirmation « Terminer ? » restait sous l'écran : `translateY(179px)`, `currentTime 0`) ;
+le banc dit alors ce qui couvre le geste (`dessous`). Machine au calme : vert. Ce n'est
+pas un défaut de l'app (une seule fois, sans charge, tout passe), mais un banc lancé à
+côté d'autres rougira là.
 
 ### Audits demandés
 `npm run build` vert ; `audit-identite`, `audit-coherence`, `audit-rouge-doublon`,
