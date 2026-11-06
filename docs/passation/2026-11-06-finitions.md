@@ -34,6 +34,9 @@ non lue (aucune mesure n'en avait besoin). Sources : les « Ce qui reste » de
 « Ta sélection mélange 2 comptes (a, b). Republier, modifier, brouillon, mise en ligne : un compte à la
 fois · Prix mini : possible. » — « Prix mini : possible » n'est dit que s'il l'est vraiment (un
 brouillon coché le grise : la phrase s'arrête à « un compte à la fois »).
+Après la fusion de `claude/project-review-nsk5su` (« Republier à la main » permis sur plusieurs comptes,
+`parPaire`) : « … : un compte à la fois · Republier à la main, Prix mini : possible. » (`audit-annonces-actions`
+B21/B22, banc `annonces-actions` 137 verts, `republier-main` 133 verts).
 
 ## 4. Colis : la ligne de fraîcheur du bas n'est plus rendue
 `<div className="vrm-colis-fraicheur">…FraicheurDonnees…</div>` retiré du rendu, et ses trois règles CSS
