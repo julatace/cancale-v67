@@ -75,10 +75,13 @@ fiches 349 → ~79 Ko, commandes du démarrage 2,11 → 1,68 Mo.
 Les 108 Ko « jamais montrés » qui restent ne viennent PAS de la lecture des commandes
 (contrôle à 0) : c'est la cloche « où ranger » (voir plus bas).
 
-Contrôles nouveaux du banc, ROUGES sur 162659a6 et verts après : aucune lecture entière
-de ces lignes ; au plus la moitié de `vinted_item_details` ; la lecture des commandes ne
-rapporte aucune ligne jamais montrée (appareil connu) ; Ma journée « appareil neuf » au
-même texte.
+Contrôles nouveaux du banc, ROUGES sur 162659a6 et verts après (deux passages complets
+de l'après) : aucune lecture entière de ces lignes ; au plus la moitié de
+`vinted_item_details` ; la lecture des commandes ne rapporte aucune ligne jamais montrée
+(appareil connu : 0 Ko ; appareil neuf : 189 Ko d'anciens comptes, voulu — on ne sait pas
+encore quels comptes sont liés) ; Ma journée « appareil neuf » au même texte.
+Le nombre de lectures varie d'un passage à l'autre sur la machine partagée (Ventes 390 px :
+84 puis 87 ; « lectures identiques » 7 à 10 aussi sur l'avant) : aucune lecture n'est ajoutée.
 
 **Texte rendu identique** (`VITESSE_TEXTES` / `VITESSE_REFERENCE`) sur Ma journée,
 Ventes, Annonces, Achats, Colis, Messages, tableau de bord, aux deux tailles. ⚠️ À
@@ -100,7 +103,11 @@ marche, `ligneCommandes` sans la marque « vidée »).
 `_minipgrest`, `_base-ecritures`, `_base-volume` et 14 bancs à projection locale ;
 `_meta.cjs` gagne `fichesDePage` (ebay-form, ebay-un-clic rendaient `[{data}]` quel que
 soit le `select=`). `ligneCommandes` lit telle quelle une ligne rendue entière (une
-fausse base qui ne projette pas).
+fausse base qui ne projette pas). Lancés avant (arbre 162659a6) et après, ports 9553-9559 :
+ebay-form, ebay-un-clic, vendu-recu, facture-achat, annonces-carte, recherche-numero,
+lbc-comme-vinted — **mêmes verdicts ligne à ligne** (leurs rouges existaient avant ;
+facture-achat compte un 503 de plus sur le compte en panne : la lecture par compte qui
+prend le relais).
 
 ## Rouges du banc qui existaient AVANT (non traités ici)
 
