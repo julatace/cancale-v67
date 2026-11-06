@@ -77,7 +77,9 @@ import { annulationsParCompte } from './annulationsCompte.js';
 import { notesParCompte } from './notesRecues.js';
 import { toutSurLeNumero, lireNumeroCherche } from "./rechercheNumero.js";
 import { repriseNumerosRecreation, tableRecrees } from "./repriseNumero.js";
-import { etatAnnonceVinted, enVerificationVinted, raisonPasSelectionnable, actionsPossibles, raisonCommune, ACTIONS_TUILES, ETATS_ANNONCE, liensRepubMain, fusionLiensRecrees, lusDuDressing, candidatsNouvelle, etatSuiviMain, filtreReglages, nomPhotoReglee, appliquerCouleursPixels, minisSelection, ecritureMini } from "./annoncesActions.js";
+import { etatAnnonceVinted, enVerificationVinted, raisonPasSelectionnable, actionsPossibles, raisonCommune, ACTIONS_TUILES, ETATS_ANNONCE, liensRepubMain, fusionLiensRecrees, lusDuDressing, candidatsNouvelle, etatSuiviMain, minisSelection, ecritureMini } from "./annoncesActions.js";
+// (6 nov.) LES réglages de Republier — atelier ET « à la main » : une source, une règle par notion.
+import { CLE_REGLAGES_REPUB, TITRE_VINTED_MAX, PHOTO_NEUTRE, CURSEURS_PHOTO, REDUCTIONS_RAPIDES, MODES_TITRE, bornerPhoto, photoNeutre, cssApercuPhoto, dessinerPhotoReglee, appliquerCouleursPixels, nomPhotoReglee, lotAppliquePrix, lotAppliqueTitre, lireReglagesRepub, reglagesGardes, reglagesAOuverture, resumeGardes, apercuRepub, annonceRepubliee, resumeReglages, tirerLettre, prixChange, titreChange } from "./republierReglages.js";
 // (6 nov., vague 2) Remettre en vente une vente annulée avant l'envoi ; relier l'achat des annonces numérotées.
 import { annuleesChezToi, paireARemettre, fichesAnciennesAnnulees, ligneJournee as ligneAnnuleesJournee, etatRemise, VERDICT_MOTEUR as VERDICT_REMISE } from "./annuleesChezToi.js";
 import { fileSansAchat, aRelierJournee, meilleureSuggestion, texteSuggestion } from "./achatsARelier.js";
@@ -264,6 +266,7 @@ import { joursAttente, texteAttente as texteAttenteVente, ordrePreparation, titr
 import "./styles-barre-haut.css";
 import "./styles-recherche.css";
 import "./annonces-selection.css";
+import "./republier-main.css";
 import "./styles-annonces-coherence.css";   // (5 nov., chantier C) Annonces : barre, carte, feuille Actions
 import { colonnesColis, SITES_COLIS } from "./colisColonnes.js";
 import { fusionEntreeVente, parcoursPaire } from "./fichePaire.js";
@@ -2145,6 +2148,9 @@ const SYNC_KEYS = [
   // (5 nov.) « Republier à la main, accompagné » : { [ancienId]: { uid, num, titre, at, nouvelId?, lieAt? } }.
   // Le lien nouvelle → ancienne est posé par SON clic (src/annoncesActions.js).
   'vrm_repub_main',
+  // (6 nov.) LES réglages de Republier (photos, prix, titre, lettre) : les mêmes pour
+  // l'atelier et « Republier à la main », sur tous ses appareils (src/republierReglages.js).
+  'vrm_republier_reglages',
   // (6 nov., vague 2) « Déjà remise en vente » posé par SON clic sur une vente annulée
   // avant l'envoi ({ [tx]: at }), et les annonces « Plus tard » de « Sans achat relié »
   // ({ [itemId]: at }) : le même état sur tous ses appareils. Aucun prix, aucun N°.
@@ -13416,43 +13422,8 @@ function AtelierBrouillon({ it, e, k, draft, onSave, onClose }) {
 //     (1) ajustement ou prix commun → (2) arrondi → (3) terminaison → (4) plancher.
 //   · le plancher (§19) : jamais sous le prix d'achat. Sous lui ⇒ ramené au
 //     plancher ET signalé — mieux vaut un prix qui tient qu'un prix qui perd.
-const TITRE_VINTED_MAX = 100; // limite d'un titre d'article Vinted — on SIGNALE au-delà, on ne coupe JAMAIS
-function lotAppliqueTitre(base, op) {
-  let t = String(base == null ? '' : base);
-  const v = String(op.valeur == null ? '' : op.valeur);
-  if (op.mode === 'prefixe') { if (v && !t.startsWith(v)) t = v + t; }          // pas de doublon
-  else if (op.mode === 'suffixe') { if (v && !t.endsWith(v)) t = t + v; }       // pas de doublon
-  else if (op.mode === 'remplacer') { const c = String(op.chercher == null ? '' : op.chercher); if (c) t = t.split(c).join(v); }
-  else if (op.mode === 'supprimer') { const c = String(op.chercher == null ? '' : op.chercher); if (c) t = t.split(c).join(''); }
-  else if (op.mode === 'inserer') { const pos = Math.max(0, Math.min(t.length, Math.round(Number(op.pos)) || 0)); t = t.slice(0, pos) + v + t.slice(pos); }
-  return t.replace(/\s{2,}/g, ' ').trim();     // on nettoie les espaces doublés (ex. un mot supprimé) — jamais on ne coupe
-}
-function lotAppliquePrix(base, op, floor) {
-  const flags = [];
-  let p = Number(base);
-  if (!isFinite(p)) p = 0;
-  // 1. ajustement OU prix commun
-  if (op.base === 'commun') { const c = Number(String(op.commun).replace(',', '.')); if (isFinite(c)) p = c; }
-  else if (op.base === 'pct') { const d = Number(String(op.delta).replace(',', '.')); if (isFinite(d)) p = p * (1 + d / 100); }
-  else if (op.base === 'fixe') { const d = Number(String(op.delta).replace(',', '.')); if (isFinite(d)) p = p + d; }
-  // 2. arrondi
-  if (op.arrondi && op.arrondi !== 'aucun') {
-    const pas = op.arrondi === 'euro' ? 1 : op.arrondi === '5' ? 5 : 10;
-    const f = op.sens === 'sup' ? Math.ceil : op.sens === 'inf' ? Math.floor : Math.round;
-    p = f(p / pas) * pas;
-  }
-  // 3. terminaison
-  if (op.fin && op.fin !== 'aucune') {
-    const dec = op.fin === '00' ? 0 : op.fin === '50' ? 0.5 : op.fin === '90' ? 0.9 : 0.99;
-    p = Math.floor(p) + dec;
-  }
-  // 4. plancher (§19) — jamais sous le prix d'achat
-  let sousPlancher = false;
-  if (floor != null && isFinite(floor) && p < floor) { p = floor; sousPlancher = true; flags.push('plancher'); }
-  p = Math.round(p * 100) / 100;     // devise : deux décimales
-  if (p <= 0) flags.push('invalide');
-  return { prix: p, sousPlancher, flags };
-}
+// (6 nov.) `TITRE_VINTED_MAX`, `lotAppliqueTitre` et `lotAppliquePrix` vivent dans
+// src/republierReglages.js : UNE règle pour cet atelier, Republier et « à la main ».
 function AtelierLots({ candidats, onSave, onClose }) {
   const [sel, setSel] = useState(() => new Set());
   const [q, setQ] = useState('');
@@ -14105,7 +14076,40 @@ const REPUB_ESP_DEFAUT = 30;   // secondes entre deux annonces (borné par fileC
 // les paires à ~12 s d'écart. Le rythme « Comme Vintex » tire 8 à 16 s au hasard ;
 // c'est le choix par défaut tant qu'il n'en a pas retenu un autre.
 const REPUB_ESP_VINTEX = [8, 16];
-const REPUB_REG_DEF = { rot: 0, bright: 1, contrast: 1, sat: 1, zoom: 1 };
+const REPUB_REG_DEF = PHOTO_NEUTRE;   // (6 nov.) src/republierReglages.js
+// (6 nov., Julien : « régler comme quand c'est VRM qui fait ») LES réglages de Republier,
+// lus et écrits par l'atelier ET par « Republier à la main ». (6 nov., décision qui respecte
+// la sienne du 29 oct. : « le prix ne change plus par défaut ») Seuls la PHOTO et la LETTRE
+// sont gardés et synchronisés (`vrm_republier_reglages`, `reglagesGardes`) ; la baisse de
+// PRIX et le TITRE repartent de « Garder » / « Ne pas changer » à chaque ouverture
+// (`reglagesAOuverture`). `encours` : ceux de la même ouverture (paire suivante à la main).
+// La première fois, les réglages photo que « à la main » gardait sur l'appareil
+// (`vrm_main_reglages`) sont repris. `poser(patch | (courant) => patch)` : plusieurs
+// poses dans le même geste s'enchaînent (le courant est tenu dans une référence).
+const lireGardesStockes = (encours = null) => reglagesAOuverture(load(CLE_REGLAGES_REPUB, null), load('vrm_main_reglages', null), encours);
+function useReglagesRepub(encours = null) {
+  const [r, setR] = useState(() => lireGardesStockes(encours));
+  const courant = React.useRef(r);
+  const touche = React.useRef(false);
+  // Le nuage relu (ouverture, autre appareil) ne change que ce qui est GARDÉ : le prix et le
+  // titre de CETTE ouverture restent ceux qu'il est en train de choisir.
+  const relire = () => { const g = lireGardesStockes(); const n = { ...courant.current, photo: g.photo, lettre: g.lettre }; courant.current = n; setR(n); };
+  useEffect(() => onCloudReady(() => { if (!touche.current) relire(); }), []);   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const f = (e) => { const d = e && e.detail; if (!(d && d.k === CLE_REGLAGES_REPUB && d.distant)) return; relire(); };
+    window.addEventListener('vrm:save', f);
+    return () => window.removeEventListener('vrm:save', f);
+  }, []);   // eslint-disable-line react-hooks/exhaustive-deps
+  const poser = React.useCallback((patch) => {
+    touche.current = true;
+    const c = courant.current; const p = typeof patch === 'function' ? patch(c) : patch;
+    const n = lireReglagesRepub({ ...c, ...(p || {}) });
+    courant.current = n; setR(n);
+    // Jamais un prix ni un titre dans la clé commune : ils ne survivent pas à la feuille.
+    save(CLE_REGLAGES_REPUB, reglagesGardes(n));
+  }, []);
+  return [r, poser];
+}
 // (28 oct., 5.252, sa demande : « un bouton Actions dans lequel on a republier,
 // mettre de brouillon à en ligne, de en ligne à brouillon, plein de choses »)
 // UN parcours (choisir → modifier → lancer, temps fixe ou aléatoire, une à la fois)
@@ -14484,14 +14488,35 @@ function ActionsSelectionFeuille({ choisies, actions, onLancer, onClose }) {
     </SheetShell>
   );
 }
-// ══ REPUBLIER À LA MAIN, ACCOMPAGNÉ (5 nov.) ═════════════════════════════════
-// Julien : « l'app donne les photos modifiées (avec les réglages choisis au
+// ══ REPUBLIER À LA MAIN, ACCOMPAGNÉ (5 nov. ; refait le 6 nov.) ════════════════
+// Julien (5 nov.) : « l'app donne les photos modifiées (avec les réglages choisis au
 // préalable), le titre, la description, tout ce qu'il faut ; une fois republiée
-// à la main, l'app remet le N° sur la nouvelle annonce ». Rien ne part chez
-// Vinted d'ici. Le N° : SON clic désigne la nouvelle annonce (une identité,
-// jamais un titre) ; la reprise est la règle des republications
-// (`repriseNumerosRecreation`) — elle attend que l'ancienne ne soit plus en ligne.
-function RepublierALaMain({ paire, suivi, candidats, etatSuivi, onDebut, onLier, onDelier, onRelire, onClose }) {
+// à la main, l'app remet le N° sur la nouvelle annonce ». (6 nov.) « je veux que on
+// puisse régler comme quand c'est VRM qui fait, pareil améliore l'interface ».
+// Rien ne part chez Vinted d'ici. Les RÉGLAGES sont ceux de l'atelier Republier
+// (`useReglagesRepub`, synchronisés) et chaque valeur copiée sort de LA règle de
+// l'atelier (`annonceRepubliee` → `apercuRepub`, la lettre, puis le N° posé selon
+// `vrm_num_vinted`) ; chaque photo, du MÊME dessin (`dessinerPhotoReglee`).
+// Cinq étapes numérotées (Réglages · Photos · Texte · Mettre en ligne · Relier), la
+// progression en tête ; plusieurs paires : une à la fois (« paire 2/5 », Suivante).
+// Le N° : SON clic désigne la nouvelle annonce (une identité, jamais un titre) ; la
+// reprise est la règle des republications (`repriseNumerosRecreation`) — elle attend
+// que l'ancienne ne soit plus du tout sur Vinted.
+// `l` : le mot court de la progression (cinq tiennent sur 390 px) ; `t` : le titre de l'étape.
+const ETAPES_MAIN = [
+  { k: 'reglages', l: 'Réglages', t: 'Réglages' },
+  { k: 'photos', l: 'Photos', t: 'Photos' },
+  { k: 'texte', l: 'Texte', t: 'Texte à copier' },
+  { k: 'vinted', l: 'Vinted', t: 'Mettre en ligne sur Vinted' },
+  { k: 'relier', l: 'Relier', t: 'Relier la nouvelle annonce' },
+];
+const lireEtiquetteVinted = () => lireReglageEtiquette(load(CLE_REGLAGE_ETIQUETTE, null));
+// iPhone : le menu de partage avec des FICHIERS (« Enregistrer les images ») ; ailleurs, le téléchargement.
+const peutPartagerFichiers = (files) => { try { return !!(typeof navigator !== 'undefined' && navigator.share && navigator.canShare && navigator.canShare({ files })); } catch (_) { return false; } };
+const partageFichiersPossible = () => { try { return !!(typeof navigator !== 'undefined' && navigator.share && navigator.canShare); } catch (_) { return false; } };
+// Le prix à COLLER dans Vinted (« 44,10 », « 49 ») — jamais « 0 » pour un prix pas lu.
+const prixACopier = (p) => (p == null || !(Number(p) > 0) ? '' : (Number.isInteger(Number(p)) ? String(Number(p)) : Number(p).toFixed(2).replace('.', ',')));
+function RepublierALaMain({ paire, suivi, candidats, etatSuivi, onDebut, onLier, onDelier, onRelire, onClose, rang = null, onSuivante = null, encours = null }) {
   const [fiche, setFiche] = useState(undefined);   // undefined lecture · null pas su · objet lu (vide si rien rangé)
   useEffect(() => {
     let vivant = true;
@@ -14506,118 +14531,293 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, onDebut, onLier,
     })();
     return () => { vivant = false; };
   }, [paire.uid, paire.id]);
-  const presets = (() => { const p = load('vrm_photo_presets', []); return Array.isArray(p) ? p.filter((x) => x && x.nom && x.r) : []; })();
-  // Les réglages choisis AU PRÉALABLE : gardés sur l'appareil d'une fois sur l'autre.
-  const [reg, setReg] = useState(() => { const v = load('vrm_main_reglages', null); return { ...REPUB_REG_DEF, ...(v && typeof v === 'object' ? v : {}) }; });
-  useEffect(() => { save('vrm_main_reglages', reg); }, [reg]);   // eslint-disable-line react-hooks/exhaustive-deps
-  const [dl, setDl] = useState(null);   // { fait, rate, total, encours }
+  // LES réglages de l'atelier (une source) et l'endroit du N° (Réglages → Numéros).
+  const [regs, poserRegs] = useReglagesRepub(encours);
+  const [etq, setEtq] = useState(lireEtiquetteVinted);
+  useEffect(() => {
+    const f = () => setEtq(lireEtiquetteVinted());
+    const off = onCloudReady(f);
+    window.addEventListener('vrm-num-vinted', f);
+    const g = (e) => { const d = e && e.detail; if (d && d.k === CLE_REGLAGE_ETIQUETTE) f(); };
+    window.addEventListener('vrm:save', g);
+    return () => { if (typeof off === 'function') off(); window.removeEventListener('vrm-num-vinted', f); window.removeEventListener('vrm:save', g); };
+  }, []);
+  const [lettre] = useState(() => tirerLettre());   // une lettre par paire (comme l'atelier)
+  const [etape, setEtape] = useState(() => (suivi ? 'relier' : 'reglages'));
+  const [vues, setVues] = useState(() => new Set());
+  const [ouvert, setOuvert] = useState(!!suivi);
+  const [copies, setCopies] = useState(() => new Set());
   const [copie, setCopie] = useState('');
+  const [ph, setPh] = useState(null);   // { fichiers, fait, rate, total, encours, enregistre }
+  const presets = (() => { const p = load('vrm_photo_presets', []); return Array.isArray(p) ? p.filter((x) => x && x.nom && x.r) : []; })();
   const f = fiche || {};
   const photos = (Array.isArray(f.photos) && f.photos.length ? f.photos : (paire.photo ? [paire.photo] : [])).map((p) => (typeof p === 'string' ? p : (p && (p.url || p.full_size_url)) || '')).filter(Boolean).slice(0, 20);
-  const titre = String(f.title || paire.titre || '');
-  const desc = String(f.desc || '');
-  const prixV = f.price != null && f.price !== '' ? Number(f.price) : paire.prix;
-  const fx = filtreReglages(reg);
-  const cssReg = { width: '100%', height: '100%', objectFit: 'cover', filter: fx.filtre, transform: `rotate(${fx.rot}deg) scale(${fx.zoom})` };
-  // « Copié » seulement si la copie a eu lieu (une promesse rejetée ne passe pas par catch sans await).
-  const copier = async (k, t) => { try { await navigator.clipboard.writeText(String(t || '')); setCopie(k); setTimeout(() => setCopie((c) => (c === k ? '' : c)), 1600); } catch (_) { toast('Copie impossible ici : sélectionne le texte et copie-le.'); } };
-  const telecharger = async () => {
-    setDl({ fait: 0, rate: 0, total: photos.length, encours: true });
-    let fait = 0, rate = 0;
-    for (let i = 0; i < photos.length; i++) {
-      let ok = false;
+  const prixLu = f.price != null && f.price !== '' && Number(f.price) > 0 ? Number(f.price) : (paire.prix != null && Number(paire.prix) > 0 ? Number(paire.prix) : null);
+  const titreLu = String(f.title || paire.titre || '');
+  // L'annonce TELLE QU'ELLE PARTIRA : la règle de l'atelier, puis le N° (src/republierReglages.js).
+  const ann = annonceRepubliee({ titre: titreLu, description: String(f.desc || ''), prix: prixLu, floor: paire.floor, numero: paire.numero }, regs, { lettre, etiquette: etq });
+  const marque = String(f.brand || paire.marque || ''), taille = String(f.size || paire.taille || ''), etatA = String(f.etat || paire.condition || '');
+  const placeN = (PLACES_ETIQUETTE.find((x) => x.v === etq.place) || PLACES_ETIQUETTE[0]);
+  const cssPh = { width: '100%', height: '100%', objectFit: 'cover', ...cssApercuPhoto(regs.photo) };
+  // Des photos préparées valent pour UN réglage : un réglage changé les refait.
+  const clePhoto = JSON.stringify(regs.photo);
+  useEffect(() => { setPh((p) => (p && p.pour !== clePhoto ? null : p)); }, [clePhoto]);
+  const aller = (k) => { setVues((v) => new Set(v).add(etape)); setEtape(k); };
+  const iE = ETAPES_MAIN.findIndex((x) => x.k === etape);
+  const copier = async (k, t) => {
+    try { await navigator.clipboard.writeText(String(t || '')); setCopie(k); setCopies((s) => new Set(s).add(k)); setTimeout(() => setCopie((c) => (c === k ? '' : c)), 1600); }
+    catch (_) { toast('Copie impossible ici : sélectionne le texte et copie-le.'); }
+  };
+  // ── Les photos : le MÊME dessin que l'atelier (`dessinerPhotoReglee`), une par une.
+  const preparer = async () => {
+    const total = photos.length, pour = clePhoto, r = regs.photo; const fichiers = []; let rate = 0;
+    setPh({ fichiers: [], fait: 0, rate: 0, total, encours: true, pour });
+    for (let i = 0; i < total; i++) {
       try {
         const data = await chargerPhotoBoite(photos[i]);
-        if (data) {
-          const img = new Image(); img.src = data; await img.decode();
-          const w = img.naturalWidth, h = img.naturalHeight;
-          const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
-          const ctx = cv.getContext('2d');
-          const filtreNatif = typeof ctx.filter === 'string';
-          ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
-          if (filtreNatif) ctx.filter = fx.filtre;
-          ctx.translate(w / 2, h / 2); ctx.rotate(fx.rot * Math.PI / 180); ctx.scale(fx.zoom, fx.zoom);
-          ctx.drawImage(img, -w / 2, -h / 2);
-          if (!filtreNatif) { ctx.setTransform(1, 0, 0, 1, 0, 0); const id = ctx.getImageData(0, 0, w, h); appliquerCouleursPixels(id.data, reg); ctx.putImageData(id, 0, 0); }
-          const blob = await new Promise((ok2) => cv.toBlob(ok2, 'image/jpeg', 0.92));
-          if (blob) { const u = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = u; a.download = nomPhotoReglee(paire.numero, i); document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 4000); ok = true; }
-        }
-      } catch (_) { ok = false; }
-      if (ok) fait++; else rate++;
-      setDl({ fait, rate, total: photos.length, encours: i < photos.length - 1 });
+        if (!data) throw new Error('pas lue');
+        const img = new Image(); img.src = data; await img.decode();
+        const w = img.naturalWidth, h = img.naturalHeight;
+        const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+        const ctx = cv.getContext('2d');
+        if (dessinerPhotoReglee(ctx, img, w, h, r) === 'pixels') { ctx.setTransform(1, 0, 0, 1, 0, 0); const id = ctx.getImageData(0, 0, w, h); appliquerCouleursPixels(id.data, r); ctx.putImageData(id, 0, 0); }
+        const blob = await new Promise((ok) => cv.toBlob(ok, 'image/jpeg', 0.92));
+        if (!blob) throw new Error('toile');
+        fichiers.push(new File([blob], nomPhotoReglee(paire.numero, i), { type: 'image/jpeg' }));
+      } catch (_) { rate++; }
+      setPh({ fichiers: fichiers.slice(), fait: fichiers.length, rate, total, encours: i < total - 1, pour });
     }
+    return fichiers;
   };
-  const curseur = (lab, cle, min, max, pas) => (
-    <label key={cle} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, minHeight: 44 }}>
-      <span style={{ width: 92, flexShrink: 0, color: C.muted }}>{lab}</span>
-      <input type="range" min={min} max={max} step={pas} value={reg[cle]} data-main-reglage={cle} onChange={(ev) => setReg((r) => ({ ...r, [cle]: Number(ev.target.value) }))} style={{ flex: 1, accentColor: C.accent }} />
-      <span style={{ width: 46, textAlign: 'right', color: C.text, fontVariantNumeric: 'tabular-nums' }}>{cle === 'rot' ? `${reg.rot}°` : `${Math.round(reg[cle] * 100)} %`}</span>
-    </label>
-  );
-  const champ = (k, lab, val) => (
-    <div className="vrm-main-champ" data-main-champ={k}>
-      <div className="vrm-main-champ-tete"><span>{lab}</span>{val ? <Bouton variante="secondaire" className="vrm-b-petit" data-main-copier={k} onClick={() => copier(k, val)}>{copie === k ? '✓ Copié' : 'Copier'}</Bouton> : null}</div>
-      <div className="vrm-main-valeur">{val || '—'}</div>
+  const telecharger = (fichiers) => fichiers.forEach((fi) => { const u = URL.createObjectURL(fi); const a = document.createElement('a'); a.href = u; a.download = fi.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 4000); });
+  const enregistrer = async () => {
+    const pretes = ph && !ph.encours && ph.pour === clePhoto && ph.fichiers.length ? ph.fichiers : null;
+    if (pretes) {
+      // Le menu de partage s'ouvre DANS le geste (Safari l'exige) : sur iPhone, « Enregistrer les images ».
+      if (peutPartagerFichiers(pretes)) {
+        try { await navigator.share({ files: pretes, title: paire.numero ? `N°${paire.numero}` : 'Photos' }); setPh((p) => ({ ...p, enregistre: 'partage' })); }
+        catch (e) { if (!(e && e.name === 'AbortError')) { telecharger(pretes); setPh((p) => ({ ...p, enregistre: 'telecharge' })); } }
+        return;
+      }
+      telecharger(pretes); setPh((p) => ({ ...p, enregistre: 'telecharge' })); return;
+    }
+    const fichiers = await preparer();
+    if (!fichiers.length) return;
+    // Partage possible : le bouton dit maintenant « Enregistrer » — un second toucher ouvre le menu.
+    if (peutPartagerFichiers(fichiers)) return;
+    telecharger(fichiers); setPh((p) => ({ ...p, enregistre: 'telecharge' }));
+  };
+  const nPh = photos.length;
+  const pretes = ph && !ph.encours && ph.pour === clePhoto && ph.fichiers.length > 0;
+  const libellePhotos = ph && ph.encours ? `Photo ${Math.min(ph.total, ph.fait + ph.rate + 1)} sur ${ph.total}…`
+    : pretes && peutPartagerFichiers(ph.fichiers) ? (ph.enregistre ? 'Enregistrer à nouveau' : `Enregistrer les ${ph.fichiers.length} photo${ph.fichiers.length > 1 ? 's' : ''}`)
+    : pretes && ph.enregistre ? 'Télécharger à nouveau'
+    : partageFichiersPossible() ? `Préparer les ${nPh} photo${nPh > 1 ? 's' : ''} réglée${nPh > 1 ? 's' : ''}`
+    : `Télécharger les ${nPh} photo${nPh > 1 ? 's' : ''} réglée${nPh > 1 ? 's' : ''}`;
+  // ── Ce qui est fait (la progression en tête) : un geste fait, jamais deviné.
+  const champsTexte = [['titre', ann.titre], ['description', ann.description], ['prix', prixACopier(ann.prix)]].filter(([, v]) => v);
+  const fait = {
+    reglages: vues.has('reglages'),
+    photos: !!(ph && ph.enregistre),
+    texte: champsTexte.length > 0 && champsTexte.every(([k]) => copies.has(k)),
+    vinted: ouvert,
+    relier: etatSuivi === 'lie' || etatSuivi === 'fait',
+  };
+  const nFait = ETAPES_MAIN.filter((x) => fait[x.k]).length;
+  // ── Les réglages (les MÊMES que l'atelier : listes et bornes de src/republierReglages.js).
+  const p = regs.prix, modeT = regs.titre.mode;
+  const rapide = p.base === 'pct' && REDUCTIONS_RAPIDES.includes(String(p.delta).trim());
+  const choixPrix = (v) => poserRegs((c) => (v === 'aucun' ? { prix: { ...c.prix, base: 'aucun' } }
+    : v === 'autre' ? (c.prix.base === 'aucun' || (c.prix.base === 'pct' && REDUCTIONS_RAPIDES.includes(String(c.prix.delta).trim())) ? { prix: { ...c.prix, base: 'pct', delta: '' } } : {})
+    : { prix: { ...c.prix, base: 'pct', delta: v } }));
+  const regNeutre = photoNeutre(regs.photo);
+  const neutreTout = regNeutre && !prixChange(regs) && !titreChange(regs) && !regs.lettre;
+  const champCopiable = (k, lab, val, vide, multi = false) => (
+    <div className="vrm-rm-champ" data-main-champ={k} data-main-copie={copies.has(k) ? '1' : undefined} data-main-vide={val ? undefined : '1'}>
+      <div className="vrm-rm-champ-tete">
+        <span>{lab}</span>
+        {val ? <Bouton variante={copies.has(k) ? 'discret' : 'secondaire'} icone={copie === k ? 'check' : 'copy'} data-main-copier={k} aria-label={`Copier ${lab.toLowerCase()}`} onClick={() => copier(k, val)}>{copie === k ? 'Copié' : copies.has(k) ? 'Recopier' : 'Copier'}</Bouton> : null}
+      </div>
+      <div className={`vrm-main-valeur${multi ? ' vrm-rm-multi' : ''}`}>{val || <span className="vrm-rm-muet">{vide}</span>}</div>
     </div>
   );
   const nouvelleUrl = `https://${paire.domain || 'www.vinted.fr'}/items/new`;
   const nomNouvelle = suivi && suivi.nouvelId ? (((candidats || []).find((c) => String(c.id) === String(suivi.nouvelId)) || {}).titre || suivi.nouveauTitre || '') : '';
+  const numVu = paire.numero || paire.numAffiche || '';
+  const derniere = !rang || rang.i >= rang.n - 1;
+  const suivante = ETAPES_MAIN[iE + 1];
+  const section = (k, enfants) => { const i = ETAPES_MAIN.findIndex((x) => x.k === k); return <section className="vrm-rm-section" data-main-section={k} hidden={etape !== k} aria-labelledby={`vrm-rm-t-${k}`}><h3 className="vrm-rm-titre" id={`vrm-rm-t-${k}`}>{i + 1}. {ETAPES_MAIN[i].t}</h3>{enfants}</section>; };
   return (
-    <SheetShell onClose={onClose} maxWidth={560}>
-      <div className="vrm-act" data-repub-main={paire.id} data-repub-main-etat={etatSuivi}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {/* (6 nov., vague 2) Une vente annulée avant l'envoi se « remet en vente » ; son N° (même d'archive) la nomme. */}
-          <h2 className="vrm-act-titre">{paire.annulee ? 'Remettre en vente' : 'Republier à la main'} · {(paire.numero || paire.numAffiche) ? `N°${paire.numero || paire.numAffiche} ` : ''}{paire.titre || 'annonce'}</h2>
-          <button type="button" onClick={onClose} aria-label="Fermer" style={{ border: 'none', background: 'transparent', color: C.muted, fontSize: 22, minWidth: 44, minHeight: 44, cursor: 'pointer' }}>✕</button>
+    <SheetShell onClose={onClose} maxWidth={600} className="vrm-rm-feuille" titre={paire.annulee ? 'Remettre en vente' : 'Republier à la main'}
+      sousTitre={rang ? `Paire ${rang.i + 1}/${rang.n}` : undefined}
+      data-repub-main={paire.id} data-repub-main-etat={etatSuivi} data-main-etape={etape} data-main-rang={rang ? `${rang.i + 1}/${rang.n}` : undefined}>
+      {/* La paire : son N°, son titre, son compte — une fois, en tête. */}
+      <div className="vrm-rm-paire">
+        <span className="vrm-rm-paire-photo">{photos[0] ? <PhotoVinted src={photos[0]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : <PhotoVide remplir/>}</span>
+        <div className="vrm-rm-paire-texte">
+          <div className="vrm-rm-paire-nom">{numVu ? <Numero n={numVu} data-main-num={numVu}/> : null}<span>{titreLu || 'Annonce sans titre'}</span></div>
+          <div className="vrm-rm-paire-sous">Compte <b>{paire.compte}</b> · tu publies toi-même, rien ne part d’ici</div>
         </div>
-        <div className="vrm-act-muet">Compte <b style={{ color: C.text }}>{paire.compte}</b>. Rien ne part chez Vinted d’ici : tu publies toi-même, VRM t’accompagne.</div>
-        {fiche === undefined && <div className="vrm-act-muet" data-main-lecture="">Lecture de ce que VRM a enregistré…</div>}
-        {fiche === null && <div className="vrm-act-muet" data-main-passu="">VRM n’a pas pu lire ce qu’il a enregistré de cette annonce : le titre et le prix viennent de ton dressing, la description manque.</div>}
-        <div className="vrm-main-etape">1. Les photos{photos.length ? ` · ${photos.length}` : ''}</div>
-        {photos.length ? <div className="vrm-main-photos" data-main-photos={photos.length}>{photos.map((u, i) => <div key={i}><PhotoVinted src={u} alt="" style={cssReg}/></div>)}</div> : <div className="vrm-act-muet" data-main-sans-photo="">VRM n’a aucune photo de cette annonce : ouvre-la sur Vinted pour qu’il les lise.</div>}
-        {presets.length > 0 && <div className="vrm-b-rangee" style={{ justifyContent: 'flex-start' }}>{presets.map((p) => <Bouton key={p.nom} variante="secondaire" className="vrm-b-petit" data-main-preset={p.nom} onClick={() => setReg({ ...REPUB_REG_DEF, ...p.r })}>{p.nom}</Bouton>)}</div>}
-        <details className="vrm-repli" data-main-reglages="">
-          <summary>Régler les photos (rotation, lumière, contraste…)</summary>
-          {curseur('Rotation', 'rot', -15, 15, 1)}{curseur('Lumière', 'bright', 0.5, 1.6, 0.05)}{curseur('Contraste', 'contrast', 0.5, 1.6, 0.05)}{curseur('Saturation', 'sat', 0, 2, 0.05)}{curseur('Zoom', 'zoom', 1, 1.5, 0.05)}
-          <Bouton variante="discret" data-main-neutre onClick={() => setReg({ ...REPUB_REG_DEF })}>Remettre à zéro</Bouton>
-        </details>
-        {photos.length > 0 && <div className="vrm-b-rangee" style={{ justifyContent: 'flex-start' }}><Bouton variante="secondaire" data-main-telecharger={photos.length} disabled={!!(dl && dl.encours)} onClick={telecharger}>{dl && dl.encours ? `Photo ${Math.min(dl.total, dl.fait + dl.rate + 1)} sur ${dl.total}…` : `Télécharger les ${photos.length} photo${photos.length > 1 ? 's' : ''} réglée${photos.length > 1 ? 's' : ''}`}</Bouton></div>}
-        {dl && !dl.encours && <div className="vrm-act-muet" data-main-dl-fait={dl.fait} data-main-dl-rate={dl.rate}>{dl.fait} photo{dl.fait > 1 ? 's' : ''} téléchargée{dl.fait > 1 ? 's' : ''}{dl.rate ? ` · ${dl.rate} pas lue${dl.rate > 1 ? 's' : ''} (réessaie, ou enregistre-la depuis Vinted)` : ''}.</div>}
-        <div className="vrm-main-etape">2. Le texte, à copier</div>
-        {champ('titre', 'Titre', titre)}
-        {champ('description', 'Description', desc)}
-        {!desc && fiche !== undefined && <div className="vrm-act-muet" data-main-sans-desc="">VRM n’a pas la description : copie-la depuis l’annonce sur Vinted.</div>}
-        {champ('prix', 'Prix', Number.isFinite(prixV) && prixV > 0 ? String(prixV).replace('.', ',') : '')}
-        {champ('marque', 'Marque', String(f.brand || paire.marque || ''))}
-        {champ('taille', 'Taille', String(f.size || paire.taille || ''))}
-        {champ('etat', 'État', String(f.etat || paire.condition || ''))}
-        <div className="vrm-main-etape">3. Publier sur Vinted</div>
-        <div className="vrm-b-rangee" style={{ justifyContent: 'flex-start' }}><Bouton variante="primaire" data-main-ouvrir-vinted href={nouvelleUrl} target="_blank" rel="noopener noreferrer" onClick={() => onDebut()}>Ouvrir Vinted — nouvelle annonce ↗</Bouton></div>
+      </div>
+      {/* La progression : cinq étapes, la courante pleine, une étape FAITE cochée. */}
+      <ol className="vrm-rm-etapes" aria-label={`Étape ${iE + 1} sur ${ETAPES_MAIN.length}`} data-main-fait={nFait}>
+        {ETAPES_MAIN.map((x, i) => (
+          <li key={x.k}>
+            <button type="button" className="vrm-rm-etape" data-main-aller={x.k} data-main-etape-fait={fait[x.k] ? '1' : undefined} aria-current={etape === x.k ? 'step' : undefined} onClick={() => aller(x.k)}>
+              <span className="vrm-rm-pastille" aria-hidden="true">{fait[x.k] && etape !== x.k ? <Icon name="check" size={13}/> : i + 1}</span>
+              <span className="vrm-rm-etape-mot">{x.l}</span>
+            </button>
+          </li>
+        ))}
+      </ol>
+      {fiche === undefined && <div className="vrm-rm-muet" data-main-lecture="">Lecture de ce que VRM a enregistré…</div>}
+      {fiche === null && <div className="vrm-rm-note" data-main-passu="">VRM n’a pas pu lire ce qu’il a enregistré de cette annonce : le titre et le prix viennent de ton dressing, la description manque.</div>}
+
+      {section('reglages', <>
+        <p className="vrm-rm-memes" data-main-memes-reglages={resumeGardes(regs).join(' · ')}>
+          <b>Mêmes réglages que Republier.</b> La retouche des photos et la lettre valent aussi quand VRM republie pour toi, et l’inverse, sur tous tes appareils. Le prix et le titre repartent de « Garder » à chaque ouverture{rang ? ' (ils valent pour toutes les paires de cette série)' : ''}.
+        </p>
+        <div className="vrm-rm-bloc" data-main-bloc="photos">
+          <div className="vrm-rm-bloc-tete"><b>Photos</b><span>{regNeutre ? 'telles quelles' : 'retouchées'} · vaut pour toutes</span></div>
+          {nPh ? <div className="vrm-rm-bande" data-main-apercu-photos={nPh}>{photos.slice(0, 4).map((u, i) => <div key={i} className="vrm-rm-vignette"><PhotoVinted src={u} alt="" style={cssPh}/></div>)}{nPh > 4 ? <div className="vrm-rm-vignette vrm-rm-plus">+{nPh - 4}</div> : null}</div> : null}
+          {presets.length > 0 && <div className="vrm-rm-puces">{presets.map((x) => <Bouton key={x.nom} variante="secondaire" data-main-preset={x.nom} onClick={() => poserRegs({ photo: { ...PHOTO_NEUTRE, ...x.r } })}>{x.nom}</Bouton>)}</div>}
+          <details className="vrm-repli" data-main-reglages="">
+            <summary>{regNeutre ? 'Retoucher (redresser, lumière, contraste…)' : 'Modifier la retouche'}</summary>
+            {CURSEURS_PHOTO.map((c) => (
+              <label key={c.cle} className="vrm-rm-curseur">
+                <span>{c.l}</span>
+                <input type="range" min={c.min} max={c.max} step={c.pas} value={regs.photo[c.cle]} data-main-reglage={c.cle} onChange={(ev) => { const v = Number(ev.target.value); poserRegs((x) => ({ photo: { ...x.photo, [c.cle]: v } })); }}/>
+                <span className="vrm-rm-val">{c.cle === 'rot' ? `${regs.photo.rot}°` : `${Math.round(regs.photo[c.cle] * 100)} %`}</span>
+              </label>
+            ))}
+            {!regNeutre && <Bouton variante="discret" data-main-neutre="" onClick={() => poserRegs({ photo: { ...PHOTO_NEUTRE } })}>Photos d’origine</Bouton>}
+          </details>
+        </div>
+        <div className="vrm-rm-bloc" data-main-bloc="prix">
+          <div className="vrm-rm-bloc-tete"><b>Prix</b><span>jamais sous le prix d’achat</span></div>
+          <div className="vrm-filtres vrm-rm-puces" role="group" aria-label="Baisse du prix">
+            {[['aucun', 'Garder'], ...REDUCTIONS_RAPIDES.map((v) => [v, `−${v.slice(1)} %`]), ['autre', 'Autre…']].map(([v, l]) => {
+              const actif = v === 'aucun' ? p.base === 'aucun' : v === 'autre' ? (p.base !== 'aucun' && !rapide) : (p.base === 'pct' && String(p.delta).trim() === v);
+              return <button key={v} type="button" data-main-reduc={v} aria-pressed={actif} onClick={() => choixPrix(v)}>{l}</button>;
+            })}
+          </div>
+          {p.base !== 'aucun' && !rapide && <div className="vrm-rm-ligne">
+            <select value={p.base} aria-label="Type de baisse" data-main-prix-type="" onChange={(ev) => { const v = ev.target.value; poserRegs((c) => ({ prix: { ...c.prix, base: v } })); }}>
+              <option value="pct">Baisser d’un pourcentage</option>
+              <option value="fixe">Baisser d’un montant en €</option>
+              <option value="commun">Mettre toutes au même prix</option>
+            </select>
+            {(p.base === 'pct' || p.base === 'fixe') && <input value={String(p.delta).replace(/^-/, '')} inputMode="decimal" data-main-delta="" placeholder={p.base === 'pct' ? 'ex. 12 (= −12 %)' : 'ex. 5 (= −5 €)'} aria-label={p.base === 'pct' ? 'Baisse en %' : 'Baisse en €'} onChange={(ev) => { const v = ev.target.value.replace(/[^0-9.,]/g, ''); poserRegs((c) => ({ prix: { ...c.prix, delta: v ? '-' + v : '' } })); }}/>}
+            {p.base === 'commun' && <input value={p.commun} inputMode="decimal" data-main-commun="" placeholder="Prix (€)" aria-label="Prix pour toutes" onChange={(ev) => { const v = ev.target.value; poserRegs((c) => ({ prix: { ...c.prix, commun: v } })); }}/>}
+          </div>}
+          {p.base !== 'aucun' && <label className="vrm-rm-case"><input type="checkbox" data-main-arrondi="" checked={p.arrondi === 'euro'} onChange={(ev) => { const on = ev.target.checked; poserRegs((c) => ({ prix: { ...c.prix, arrondi: on ? 'euro' : 'aucun', fin: 'aucune' } })); }}/><span>Arrondir à l’euro (44,10 € → 44 €)</span></label>}
+          <div className="vrm-rm-resultat" data-main-prix-resultat={ann.prix != null ? Math.round(ann.prix * 100) : ''}>
+            {ann.prixAvant == null ? <span className="vrm-rm-muet">Prix pas lu par VRM : reprends celui de l’annonce sur Vinted.</span>
+              : ann.prix !== ann.prixAvant ? <>{montant(ann.prixAvant)} → <b>{montant(ann.prix)}</b>{ann.plancher ? <span className="vrm-rm-ambre"> · ramené à ton prix d’achat</span> : null}</>
+              : <>{montant(ann.prix)} · inchangé</>}
+          </div>
+        </div>
+        <div className="vrm-rm-bloc" data-main-bloc="titre">
+          <div className="vrm-rm-bloc-tete"><b>Titre</b><span>jamais coupé</span></div>
+          <select value={modeT} aria-label="Changer le titre" data-main-titre-mode="" onChange={(ev) => { const v = ev.target.value; poserRegs((c) => ({ titre: { ...c.titre, mode: v } })); }}>
+            {MODES_TITRE.map((m) => <option key={m.v} value={m.v}>{m.l}</option>)}
+          </select>
+          {(modeT === 'remplacer' || modeT === 'supprimer') && <input value={regs.titre.chercher} placeholder="Texte à trouver" aria-label="Texte à trouver" onChange={(ev) => { const v = ev.target.value; poserRegs((c) => ({ titre: { ...c.titre, chercher: v } })); }}/>}
+          {(modeT === 'prefixe' || modeT === 'suffixe' || modeT === 'remplacer') && <input value={regs.titre.valeur} placeholder={modeT === 'remplacer' ? 'Par' : 'Texte à ajouter'} aria-label="Texte" data-main-titre-valeur="" onChange={(ev) => { const v = ev.target.value; poserRegs((c) => ({ titre: { ...c.titre, valeur: v } })); }}/>}
+          {(titreChange(regs) || ann.etiquette.pose && etq.place.startsWith('titre')) && <div className="vrm-rm-resultat" data-main-titre-resultat="">{ann.titre || <span className="vrm-rm-muet">titre vide</span>}{ann.tropLong ? <span className="vrm-rm-ambre"> · {ann.titre.length}/{TITRE_VINTED_MAX} : Vinted le refusera, raccourcis-le</span> : null}</div>}
+        </div>
+        <div className="vrm-rm-bloc" data-main-bloc="description">
+          <div className="vrm-rm-bloc-tete"><b>Description</b><span>reprise mot pour mot</span></div>
+          <label className="vrm-rm-case"><input type="checkbox" data-main-lettre="" checked={regs.lettre} onChange={(ev) => { const on = ev.target.checked; poserRegs({ lettre: on }); }}/><span>Ajouter une lettre au hasard tout en bas{regs.lettre ? <> (ici : « {lettre} »)</> : null}</span></label>
+          <div className="vrm-rm-muet" data-main-etiquette={ann.etiquette.pose ? ann.etiquette.place : (ann.etiquette.refus ? 'refus' : 'aucune')}>
+            {etq.place === 'aucune' ? 'Le N° n’est pas écrit dans l’annonce (Réglages → Numéros).'
+              : ann.etiquette.pose ? <>Le N° « {ann.etiquette.texte} » est posé {placeN.ou} (Réglages → Numéros).</>
+              : ann.etiquette.refus === 'pas de numéro' ? 'Cette paire n’a pas de N° à écrire dans l’annonce.'
+              : <span className="vrm-rm-ambre">N° pas posé : {ann.etiquette.refus}.</span>}
+          </div>
+        </div>
+        {!neutreTout && <Bouton variante="discret" data-main-reglages-zero="" onClick={() => poserRegs(lireReglagesRepub(null))}>Tout remettre à zéro</Bouton>}
+      </>)}
+
+      {section('photos', <>
+        {nPh ? <div className="vrm-main-photos" data-main-photos={nPh}>{photos.map((u, i) => <div key={i}><PhotoVinted src={u} alt={`Photo ${i + 1}`} style={cssPh}/></div>)}</div>
+          : <div className="vrm-rm-note" data-main-sans-photo="">VRM n’a aucune photo de cette annonce : ouvre-la sur Vinted pour qu’il les lise.</div>}
+        {nPh > 0 && <>
+          <p className="vrm-rm-muet">{regNeutre ? 'Les photos telles qu’enregistrées' : 'Les photos avec ta retouche (Réglages)'}, nommées {nomPhotoReglee(paire.numero, 0)}{nPh > 1 ? `, ${nomPhotoReglee(paire.numero, 1)}${nPh > 2 ? '…' : ''}` : ''}.{partageFichiersPossible() ? ' Sur iPhone : « Enregistrer les images » les met dans Photos.' : ''}</p>
+          <div className="vrm-b-rangee vrm-rm-gauche"><Bouton variante={pretes && !ph.enregistre ? 'primaire' : 'secondaire'} icone="image" data-main-telecharger={nPh} occupe={!!(ph && ph.encours)} disabled={!!(ph && ph.encours)} onClick={enregistrer}>{libellePhotos}</Bouton></div>
+        </>}
+        {ph && !ph.encours && <div className="vrm-rm-muet" data-main-dl-fait={ph.fait} data-main-dl-rate={ph.rate} role="status">
+          {ph.enregistre === 'partage' ? `${ph.fait} photo${ph.fait > 1 ? 's' : ''} envoyée${ph.fait > 1 ? 's' : ''} au menu de partage` : ph.enregistre ? `${ph.fait} photo${ph.fait > 1 ? 's' : ''} téléchargée${ph.fait > 1 ? 's' : ''}` : `${ph.fait} photo${ph.fait > 1 ? 's' : ''} prête${ph.fait > 1 ? 's' : ''}`}
+          {ph.rate ? <span className="vrm-rm-ambre"> · {ph.rate} pas lue{ph.rate > 1 ? 's' : ''} (réessaie, ou enregistre-la depuis Vinted)</span> : null}.
+        </div>}
+      </>)}
+
+      {section('texte', <>
+        {/* L'annonce telle qu'elle partira : la règle de l'atelier, le N° posé. */}
+        <article className="vrm-rm-apercu" data-main-apercu="" data-main-prix-final={ann.prix != null ? Math.round(ann.prix * 100) : ''}>
+          <div className="vrm-rm-apercu-photo">{photos[0] ? <PhotoVinted src={photos[0]} alt="" style={cssPh}/> : <PhotoVide remplir/>}{nPh > 1 ? <span className="vrm-rm-apercu-n">1/{nPh}</span> : null}</div>
+          <div className="vrm-rm-apercu-corps">
+            <div className="vrm-rm-apercu-prix">{ann.prix != null ? <>{montant(ann.prix)}{ann.prix !== ann.prixAvant && ann.prixAvant != null ? <s>{montant(ann.prixAvant)}</s> : null}</> : <span className="vrm-rm-muet">prix pas lu</span>}</div>
+            <div className="vrm-rm-apercu-titre">{ann.titre || 'Sans titre'}</div>
+            <div className="vrm-rm-apercu-sous">{[marque, taille, etatA].filter(Boolean).join(' · ') || 'marque, taille, état : pas lus'}</div>
+            <div className="vrm-rm-apercu-desc" data-main-apercu-desc="">{ann.description || <span className="vrm-rm-muet">Pas de description enregistrée.</span>}</div>
+          </div>
+        </article>
+        <p className="vrm-rm-muet">Touche « Copier », puis colle dans Vinted. {champsTexte.length ? `${champsTexte.filter(([k]) => copies.has(k)).length} sur ${champsTexte.length} copiés.` : ''}</p>
+        {champCopiable('titre', 'Titre', ann.titre, 'pas lu')}
+        {champCopiable('description', 'Description', ann.description, 'VRM n’a pas la description : copie-la depuis l’annonce sur Vinted.', true)}
+        {champCopiable('prix', 'Prix (€)', prixACopier(ann.prix), 'pas lu : reprends celui de l’annonce sur Vinted')}
+        <div className="vrm-rm-trio">
+          {champCopiable('marque', 'Marque', marque, 'pas lue')}
+          {champCopiable('taille', 'Taille', taille, 'pas lue')}
+          {champCopiable('etat', 'État', etatA, 'pas lu')}
+        </div>
+      </>)}
+
+      {section('vinted', <>
+        <ol className="vrm-rm-liste">
+          <li>Sur Vinted, connecté sur <b>{paire.compte}</b> : « Vendre ».</li>
+          <li>Ajoute les {nPh || ''} photo{nPh > 1 ? 's' : ''} enregistrée{nPh > 1 ? 's' : ''}{fait.photos ? '' : <span className="vrm-rm-ambre"> (pas encore enregistrées : étape 2)</span>}.</li>
+          <li>Colle le titre, la description, le prix{fait.texte ? '' : <span className="vrm-rm-ambre"> (pas tout copié : étape 3)</span>}.</li>
+          <li>Choisis {[marque, taille, etatA].filter(Boolean).join(' · ') || 'la marque, la taille et l’état'}, puis « Ajouter ».</li>
+        </ol>
+        <div className="vrm-b-rangee vrm-rm-gauche"><Bouton variante="primaire" data-main-ouvrir-vinted="" href={nouvelleUrl} target="_blank" rel="noopener noreferrer" onClick={() => { onDebut(); setOuvert(true); setVues((v) => new Set(v).add('vinted')); setEtape('relier'); }}>Ouvrir Vinted — nouvelle annonce ↗</Bouton></div>
         {/* (6 nov., vague 2 · point 1) Une vente annulée avant l'envoi : l'ancienne annonce est FERMÉE
             chez Vinted (vendue puis annulée, mesuré) — rien à supprimer, jamais deux fois en vente. */}
         {paire.annulee
-          ? <div className="vrm-act-muet" data-main-annulee={paire.tx || ''}>L’ancienne annonce est fermée chez Vinted (vente annulée) : rien à supprimer.</div>
-          : <div className="vrm-act-muet">Quand la nouvelle est en ligne, supprime l’ancienne sur Vinted : sinon la même paire est en vente deux fois.</div>}
-        <div className="vrm-main-etape">4. {paire.annulee && !paire.numero ? 'Désigner la nouvelle annonce' : `Remettre le N°${paire.numero ? ` ${paire.numero}` : ''} sur la nouvelle annonce`}</div>
-        {paire.annulee && !paire.numero && etatSuivi !== 'fait' ? <div className="vrm-act-muet" data-main-num-neuf={paire.archive ? 'archive' : 'sans'}>{paire.archive ? `Le N°${paire.numAffiche} est un ancien numéro : il ne se redonne pas. La nouvelle annonce recevra un N° neuf, à écrire sur son carton.` : 'Paire pas reliée : cette vente n’a pas de N°. La nouvelle annonce en recevra un, comme toute annonce.'}</div> : null}
-        {paire.annulee && !paire.numero && etatSuivi === 'fait' ? <div data-main-n-fait="" style={{ fontSize: 13, color: C.text }}>✓ Nouvelle annonce désignée : la vente annulée est remise en vente.</div>
-          : !paire.numero && !paire.annulee ? <div className="vrm-act-muet" data-main-sans-num="">Cette annonce n’a pas de N° : la nouvelle en recevra un, comme toute annonce.</div>
-          : etatSuivi === 'fait' ? <div data-main-n-fait="" style={{ fontSize: 13, color: C.text }}>✓ La nouvelle annonce porte le N°{paire.numero}.</div>
-          : etatSuivi === 'lie' ? <div className="vrm-act-paire" data-main-lie={suivi.nouvelId}>
+          ? <div className="vrm-rm-muet" data-main-annulee={paire.tx || ''}>L’ancienne annonce est fermée chez Vinted (vente annulée) : rien à supprimer.</div>
+          : <div className="vrm-rm-note">Quand la nouvelle est en ligne, supprime l’ancienne sur Vinted : sinon la même paire est en vente deux fois. VRM ne supprime rien.</div>}
+      </>)}
+
+      {section('relier', <>
+        {paire.numero && etatSuivi !== 'fait' ? <p className="vrm-rm-muet" data-main-but="">Le N°{paire.numero} passera sur la nouvelle annonce : le même carton.</p> : null}
+        {paire.annulee && !paire.numero && etatSuivi !== 'fait' ? <div className="vrm-rm-muet" data-main-num-neuf={paire.archive ? 'archive' : 'sans'}>{paire.archive ? `Le N°${paire.numAffiche} est un ancien numéro : il ne se redonne pas. La nouvelle annonce recevra un N° neuf, à écrire sur son carton.` : 'Paire pas reliée : cette vente n’a pas de N°. La nouvelle annonce en recevra un, comme toute annonce.'}</div> : null}
+        {paire.annulee && !paire.numero && etatSuivi === 'fait' ? <div className="vrm-rm-fait" data-main-n-fait=""><Icon name="check" size={16}/> Nouvelle annonce désignée : la vente annulée est remise en vente.</div>
+          : !paire.numero && !paire.annulee ? <div className="vrm-rm-muet" data-main-sans-num="">Cette annonce n’a pas de N° : la nouvelle en recevra un, comme toute annonce.</div>
+          : etatSuivi === 'fait' ? <div className="vrm-rm-fait" data-main-n-fait=""><Icon name="check" size={16}/> La nouvelle annonce porte le N°{paire.numero}.</div>
+          : etatSuivi === 'lie' ? <div className="vrm-rm-lie" data-main-lie={suivi.nouvelId}>
               <span>Nouvelle annonce désignée{nomNouvelle ? ` : « ${nomNouvelle} »` : ''}. {paire.annulee ? `Le N°${paire.numero} passe dessus à la prochaine lecture de tes annonces.` : `Le N°${paire.numero} passe dessus dès que l’ancienne n’est plus du tout sur Vinted — ni en ligne, ni masquée, ni en brouillon (supprime-la sur Vinted, puis rouvre Annonces).`}</span>
-              <div className="vrm-b-rangee" style={{ justifyContent: 'flex-start' }}><Bouton variante="discret" data-main-delier onClick={onDelier}>Ce n’est pas elle</Bouton></div>
+              <div className="vrm-b-rangee vrm-rm-gauche"><Bouton variante="discret" data-main-delier="" onClick={onDelier}>Ce n’est pas elle</Bouton></div>
             </div>
           : <>
-              <div className="vrm-act-muet">Une fois publiée, choisis-la ici : c’est toi qui la désignes, VRM ne devine pas.</div>
+              <div className="vrm-rm-muet">{ouvert ? 'Une fois publiée, choisis-la ici : c’est toi qui la désignes, VRM ne devine pas.' : 'Publie d’abord la nouvelle annonce (étape 4), puis choisis-la ici : c’est toi qui la désignes, VRM ne devine pas.'}</div>
               {(candidats || []).length ? <ul className="vrm-sel-liste" data-main-candidats={candidats.length}>{candidats.slice(0, 12).map((c) => (
                 <li key={c.id}><div className="vrm-sel-ligne" style={{ cursor: 'default' }} data-main-candidat={c.id}>
-                  {c.photo ? <PhotoVinted src={c.photo} alt="" className="vrm-sel-photo"/> : <span className="vrm-sel-photo" aria-hidden="true"/>}
-                  <span className="vrm-sel-centre"><span className="vrm-sel-nom">{c.titre || 'Sans titre'}</span><span className="vrm-sel-sous">{c.prix != null ? `${String(c.prix).replace('.', ',')} €` : 'sans prix'}{c.numero ? ` · N°${c.numero} (auto)` : ''}</span></span>
-                  <Bouton variante="secondaire" className="vrm-b-petit" data-main-lier={c.id} onClick={() => onLier(c)}>C’est celle-ci</Bouton>
+                  <span className="vrm-sel-photo vrm-rm-cadre">{c.photo ? <PhotoVinted src={c.photo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : <PhotoVide remplir/>}</span>
+                  <span className="vrm-sel-centre"><span className="vrm-sel-nom">{c.titre || 'Sans titre'}</span><span className="vrm-sel-sous">{c.prix != null ? montant(c.prix) : 'sans prix'}{c.numero ? ` · N°${c.numero} (auto)` : ''}</span></span>
+                  <Bouton variante="secondaire" icone="link" data-main-lier={c.id} onClick={() => onLier(c)}>C’est celle-ci</Bouton>
                 </div></li>))}</ul>
-                : <div className="vrm-act-muet" data-main-aucun-candidat="">Aucune nouvelle annonce de {paire.compte} lue depuis que tu as commencé.</div>}
-              <div className="vrm-b-rangee" style={{ justifyContent: 'flex-start' }}><Bouton variante="discret" data-main-relire onClick={onRelire}>Relire mes annonces</Bouton></div>
+                : <div className="vrm-rm-muet" data-main-aucun-candidat="">Aucune nouvelle annonce de {paire.compte} lue depuis que tu as commencé.</div>}
+              <div className="vrm-b-rangee vrm-rm-gauche"><Bouton variante="discret" data-main-relire="" onClick={onRelire}>Relire mes annonces</Bouton></div>
             </>}
+      </>)}
+
+      {/* Le pied : revenir, aller à l'étape suivante ; à la dernière, la paire suivante. */}
+      <div className="vrm-rm-pied">
+        {iE > 0 ? <Bouton variante="discret" data-main-retour="" onClick={() => aller(ETAPES_MAIN[iE - 1].k)}>Retour</Bouton> : <span/>}
+        {suivante ? <Bouton variante={suivante.k === 'relier' ? 'secondaire' : 'primaire'} data-main-suivant={suivante.k} onClick={() => aller(suivante.k)}>{`Suivant : ${suivante.l}`}</Bouton>
+          : !derniere && onSuivante ? <Bouton variante="primaire" data-main-suivante={`${rang.i + 2}/${rang.n}`} onClick={() => onSuivante({ prix: regs.prix, titre: regs.titre })}>{`Paire suivante · ${rang.i + 2}/${rang.n}`}</Bouton>
+          : <Bouton variante={fait.relier ? 'primaire' : 'secondaire'} data-main-terminer="" onClick={onClose}>{fait.relier ? 'Terminer' : 'Fermer'}</Bouton>}
       </div>
     </SheetShell>
   );
@@ -14743,14 +14943,28 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   const [etape, setEtape] = useState(() => (depart && Array.isArray(reprise) && reprise.length ? depart : 'choix'));
   const [sel, setSel] = useState(() => new Set(Array.isArray(reprise) ? reprise.map(String) : []));
   const [q, setQ] = useState('');
-  const [tMode, setTMode] = useState('aucun');
-  const [tVal, setTVal] = useState('');
-  const [tChe, setTChe] = useState('');
-  const [pBase, setPBase] = useState('aucun');   // (29 oct.) rien ne baisse sans son clic
-  const [pDelta, setPDelta] = useState('');
-  const [pCommun, setPCommun] = useState('');
-  const [pArr, setPArr] = useState('aucun');
-  const [pFin, setPFin] = useState('aucune');
+  // (6 nov.) Les réglages (photos, prix, titre, lettre) de « Republier » et « En ligne →
+  // brouillon » sont CEUX de « Republier à la main » (`useReglagesRepub`, synchronisés) :
+  // la retouche photo et la lettre réglées ici valent là-bas (gardées, synchronisées).
+  // (29 oct., et décision du 6 nov.) Rien ne baisse sans son clic : le PRIX et le TITRE
+  // repartent de « Garder » / « Ne pas changer » à CHAQUE ouverture, jamais gardés.
+  // « Modifier prix ou titre » a des réglages à lui, tous neutres à chaque ouverture.
+  const partage = action === 'recreer' || action === 'versBrouillon';
+  const [regsP, poserRegsP] = useReglagesRepub();
+  const [regsL, setRegsL] = useState(() => lireReglagesRepub(null));
+  const regsLRef = React.useRef(regsL);
+  const regs = partage ? regsP : regsL;
+  const poserR = partage ? poserRegsP : (patch) => { const c = regsLRef.current; const n = lireReglagesRepub({ ...c, ...(typeof patch === 'function' ? patch(c) : patch) }); regsLRef.current = n; setRegsL(n); };
+  const tMode = regs.titre.mode, tVal = regs.titre.valeur, tChe = regs.titre.chercher;
+  const setTMode = (v) => poserR((c) => ({ titre: { ...c.titre, mode: v } }));
+  const setTVal = (v) => poserR((c) => ({ titre: { ...c.titre, valeur: v } }));
+  const setTChe = (v) => poserR((c) => ({ titre: { ...c.titre, chercher: v } }));
+  const { base: pBase, delta: pDelta, commun: pCommun, arrondi: pArr, fin: pFin } = regs.prix;
+  const setPBase = (v) => poserR((c) => ({ prix: { ...c.prix, base: v } }));
+  const setPDelta = (v) => poserR((c) => ({ prix: { ...c.prix, delta: v } }));
+  const setPCommun = (v) => poserR((c) => ({ prix: { ...c.prix, commun: v } }));
+  const setPArr = (v) => poserR((c) => ({ prix: { ...c.prix, arrondi: v } }));
+  const setPFin = (v) => poserR((c) => ({ prix: { ...c.prix, fin: v } }));
   const [esp, setEsp] = useState(REPUB_ESP_DEFAUT);
   // (28 oct., sa demande) Temps ALÉATOIRE entre deux paires, entre SON minimum et
   // SON maximum (en minutes) — c'est lui qui le choisit et qui lance (§3, l'atelier).
@@ -14788,12 +15002,14 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   const [ordre, setOrdre] = useState(null);          // null = l'ordre de sa sélection
   // (28 oct.) Réglages photo, communs à la sélection : les VALEURS de l'aperçu
   // (CSS), refaites en pixels par l'extension à partir de l'ORIGINAL.
-  const [reg, setReg] = useState(() => ({ ...REPUB_REG_DEF }));
+  const reg = regs.photo;
+  const setReg = (v) => poserR((c) => ({ photo: typeof v === 'function' ? v(c.photo) : v }));
   // (28 oct., sa demande) UN réglage pour toutes les photos de toutes les
   // annonces choisies ; une photo par annonce à l'écran (pas d'encombrement).
   // (28 oct., sa demande) La description part TELLE QUELLE ; en option, UNE
   // lettre au hasard tout en bas de chacune (tirée ici, montrée sur la ligne).
-  const [lettreOn, setLettreOn] = useState(false);
+  const lettreOn = regs.lettre;
+  const setLettreOn = (v) => poserR({ lettre: !!v });
   // (28 oct., sa demande : « ça met en brouillon puis ça publie ») Allumé par défaut
   // quand l'extension sait le faire ; il peut repasser à la création directe.
   const [viaBrouillonChoix, setViaBrouillon] = useState(true);
@@ -14801,9 +15017,9 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   // décocher la case annonçait « créée directement en ligne » et figeait la file Vinted 1 à 3 min.
   const viaBrouillon = extSait('republierpage') === 'ok' ? true : viaBrouillonChoix;
   const [lettres, setLettres] = useState({});
-  const tirerLettres = (ids) => { const o = {}; ids.forEach((id) => { o[id] = 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)]; }); setLettres(o); };
+  const tirerLettres = (ids) => { const o = {}; ids.forEach((id) => { o[id] = tirerLettre(); }); setLettres(o); };
   const presets = (() => { const p = load('vrm_photo_presets', []); return Array.isArray(p) ? p.filter((x) => x && x.nom && x.r) : []; })();
-  const regNeutre = Object.keys(REPUB_REG_DEF).every((k) => Number(reg[k]) === REPUB_REG_DEF[k]);
+  const regNeutre = photoNeutre(reg);
   const busy = React.useRef(false);
   const bas = (s) => String(s || '').toLowerCase();
   // (28 oct.) Comme les outils du marché : on republie d'abord les paires qui
@@ -14817,19 +15033,14 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   const recente = (a) => a.recreeAt != null && Date.now() - a.recreeAt < RECREE_RECENT_MS;
   const ilYa = (t) => { const h = Math.max(1, Math.round((Date.now() - t) / 3600e3)); return h < 48 ? `${h} h` : `${Math.round(h / 24)} j`; };
   const toggle = (id) => setSel((s) => { const u = new Set(s); u.has(id) ? u.delete(id) : u.add(id); return u; });
-  const opT = { mode: tMode, valeur: tVal, chercher: tChe, pos: '0' };
-  const opP = { base: pBase, delta: pDelta, commun: pCommun, arrondi: pArr, sens: 'proche', fin: pFin };
-  const changeT = tMode !== 'aucun';
-  const changeP = pBase !== 'aucun' || pArr !== 'aucun' || pFin !== 'aucune';
-  const apercu = (a) => {
-    const nt = changeT ? lotAppliqueTitre(a.titre, opT) : a.titre;
-    const np = changeP && a.prix != null ? lotAppliquePrix(a.prix, opP, a.floor) : null;
-    const prix = np && np.prix > 0 && np.prix !== a.prix ? np.prix : null;
-    const titre = nt && nt !== a.titre ? nt : null;
-    return { titre, prix, plancher: !!(np && np.sousPlancher), tropLong: !!(titre && titre.length > TITRE_VINTED_MAX), invalide: !!(changeT && !nt) };
-  };
+  // (6 nov.) L'aperçu : LA règle de src/republierReglages.js (celle de « à la main » aussi).
+  const apercu = (a) => apercuRepub(a, regs);
   // L'ordre de SA sélection (un Set garde l'ordre des clics).
   const choisies = [...sel].map((id) => annonces.find((a) => a.id === id)).filter(Boolean);
+  // (6 nov.) La lettre est un réglage GARDÉ (le même qu'à la main) : allumée à l'ouverture,
+  // chaque annonce choisie qui n'en a pas encore en reçoit une, tirée et montrée dans l'aperçu.
+  const cleChoisies = choisies.map((a) => a.id).join(',');
+  React.useEffect(() => { if (!lettreOn) return; setLettres((o) => { const manque = choisies.filter((a) => !o[a.id]); if (!manque.length) return o; const n = { ...o }; manque.forEach((a) => { n[a.id] = tirerLettre(); }); return n; }); }, [lettreOn, cleChoisies]);   // eslint-disable-line react-hooks/exhaustive-deps
   // Recréer EST le geste : une paire sans changement part aussi (nouvelle annonce, mêmes infos).
   const aFaireSel = choisies.filter((a) => { if (a.bloque) return false; if (action === 'enLigne') return true; const x = apercu(a); if (action === 'modifier' && x.prix == null && !x.titre) return false; return !x.tropLong && !x.invalide; });
   // (28 oct., sa demande) L'ORDRE DE REMISE EN LIGNE : celui de sa sélection, ou
@@ -14955,7 +15166,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
     const q2 = questionRepubOk(r && r.question) && !(r.question.champ in reponses) ? r.question : null;
     setSt((p) => ({ ...p, [a.id]: { etat, code: (r && r.code) || '', raison: (r && r.raison) || (etat === 'echec' ? "l'extension n'a pas répondu" : ''), nouveau: r && r.nouveau, jusqua: r && r.jusqua, question: q2, reponses } }));
   };
-  const cssReg = { filter: `brightness(${reg.bright}) contrast(${reg.contrast}) saturate(${reg.sat})`, transform: `rotate(${reg.rot}deg) scale(${reg.zoom})`, transformOrigin: 'center center' };
+  const cssReg = cssApercuPhoto(reg);   // (6 nov.) la même chaîne que « à la main » et l'extension
   const curseur = (lab, cle, min, max, pas) => (
     <label key={cle} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, minHeight: 44 }}>
       <span style={{ width: 92, flexShrink: 0, color: C.muted }}>{lab}</span>
@@ -15082,6 +15293,13 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
             </div>
           </>}
           {etape === 'modif' && <>
+            {/* (6 nov.) UNE source de réglages pour l'atelier et « Republier à la main » : dit
+                une fois, avec ce qui est gardé (une baisse gardée se voit avant tout geste). */}
+            {partage && (() => { const neutre = regNeutre && !regs.lettre; return (
+              <div className="vrm-repub-memes" data-republier-memes-reglages={neutre ? 'neutre' : resumeGardes(regs).join(' · ')}>
+                <span><b>Mêmes réglages que « Republier à la main »</b> : la retouche des photos et la lettre valent aussi là-bas, sur tous tes appareils ; le prix et le titre repartent de « Garder » à chaque ouverture.{neutre ? '' : <> Gardés : {resumeGardes(regs).join(' · ')}.</>}</span>
+                {!neutre && <Bouton variante="discret" data-republier-reglages-zero onClick={() => poserR({ photo: { ...PHOTO_NEUTRE }, lettre: false })}>Tout remettre à zéro</Bouton>}
+              </div>); })()}
             {recree && <div data-republier-photos data-republier-photos-css={cssReg.transform + ' ' + cssReg.filter} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <span style={maj}>Photos</span>
               <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
@@ -15095,11 +15313,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
               {/* (30 oct.) Cinq curseurs toujours dépliés pour un réglage rare : repliés. */}
               <details className="vrm-repli" data-republier-retouche={regNeutre ? 'non' : 'oui'}>
                 <summary style={summ}>{regNeutre ? 'Photos telles quelles · retoucher' : 'Photos retouchées · modifier'}</summary>
-                {curseur('Redresser', 'rot', -15, 15, 0.5)}
-                {curseur('Luminosité', 'bright', 0.5, 1.5, 0.01)}
-                {curseur('Contraste', 'contrast', 0.5, 1.5, 0.01)}
-                {curseur('Saturation', 'sat', 0, 2, 0.01)}
-                {curseur('Zoom', 'zoom', 1, 2, 0.01)}
+                {CURSEURS_PHOTO.map((c) => curseur(c.l, c.cle, c.min, c.max, c.pas))}
                 {(presets.length > 0 || !regNeutre) && <div className="vrm-b-rangee" style={{ justifyContent: 'flex-start', marginTop: 4 }}>
                   {presets.map((p) => <Bouton key={p.nom} className="vrm-b-petit" data-republier-preset={p.nom} onClick={() => setReg({ ...REPUB_REG_DEF, ...p.r })}>{p.nom}</Bouton>)}
                   {!regNeutre && <Bouton variante="discret" data-republier-reglage-zero onClick={() => setReg({ ...REPUB_REG_DEF })}>Photos d'origine</Bouton>}
@@ -15141,12 +15355,12 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
                   par bouton : garder le prix, ou baisser de 5, 10, 15, 20 %. Le reste
                   (autre %, en €, même prix pour toutes) est replié dans « Autre ». */}
               <div data-republier-reductions className="vrm-filtres" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {[['aucun', 'Garder le prix'], ['-5', '−5 %'], ['-10', '−10 %'], ['-15', '−15 %'], ['-20', '−20 %'], ['autre', 'Autre…']].map(([v, l]) => {
-                  const actif = v === 'aucun' ? pBase === 'aucun' : v === 'autre' ? (pBase === 'fixe' || pBase === 'commun' || (pBase === 'pct' && !['-5', '-10', '-15', '-20'].includes(String(pDelta).trim()))) : (pBase === 'pct' && String(pDelta).trim() === v);
-                  return <button key={v} type="button" data-republier-reduc={v} aria-pressed={actif} onClick={() => { if (v === 'aucun') setPBase('aucun'); else if (v === 'autre') { if (pBase === 'aucun' || ['-5', '-10', '-15', '-20'].includes(String(pDelta).trim())) { setPBase('pct'); setPDelta(''); } } else { setPBase('pct'); setPDelta(v); } }} style={{ minHeight: 44, padding: '0 14px', fontSize: 15, cursor: 'pointer', fontFamily: 'inherit' }}>{l}</button>;
+                {[['aucun', 'Garder le prix'], ...REDUCTIONS_RAPIDES.map((v) => [v, `−${v.slice(1)} %`]), ['autre', 'Autre…']].map(([v, l]) => {
+                  const actif = v === 'aucun' ? pBase === 'aucun' : v === 'autre' ? (pBase === 'fixe' || pBase === 'commun' || (pBase === 'pct' && !REDUCTIONS_RAPIDES.includes(String(pDelta).trim()))) : (pBase === 'pct' && String(pDelta).trim() === v);
+                  return <button key={v} type="button" data-republier-reduc={v} aria-pressed={actif} onClick={() => { if (v === 'aucun') setPBase('aucun'); else if (v === 'autre') { if (pBase === 'aucun' || REDUCTIONS_RAPIDES.includes(String(pDelta).trim())) { setPBase('pct'); setPDelta(''); } } else { setPBase('pct'); setPDelta(v); } }} style={{ minHeight: 44, padding: '0 14px', fontSize: 15, cursor: 'pointer', fontFamily: 'inherit' }}>{l}</button>;
                 })}
               </div>
-              {pBase !== 'aucun' && !(pBase === 'pct' && ['-5', '-10', '-15', '-20'].includes(String(pDelta).trim())) && <div data-republier-autre style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              {pBase !== 'aucun' && !(pBase === 'pct' && REDUCTIONS_RAPIDES.includes(String(pDelta).trim())) && <div data-republier-autre style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                 <select data-republier-prix value={pBase} onChange={(ev) => setPBase(ev.target.value)} aria-label="Type de baisse" style={{ ...champ, flex: '1 1 200px' }}>
                   <option value="pct">Baisser d'un pourcentage</option>
                   <option value="fixe">Baisser d'un montant en €</option>
@@ -15165,11 +15379,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
               <span style={maj}>Titre</span>
               <select data-republier-titre value={tMode} onChange={(ev) => setTMode(ev.target.value)} aria-label="Changer le titre" style={champ}>
-                <option value="aucun">Ne pas changer le titre</option>
-                <option value="prefixe">Ajouter au début</option>
-                <option value="suffixe">Ajouter à la fin</option>
-                <option value="remplacer">Remplacer un texte</option>
-                <option value="supprimer">Supprimer un texte</option>
+                {MODES_TITRE.map((m) => <option key={m.v} value={m.v}>{m.l}</option>)}
               </select>
               {(tMode === 'remplacer' || tMode === 'supprimer') && <input value={tChe} onChange={(ev) => setTChe(ev.target.value)} placeholder="Texte à trouver" style={champ} />}
               {(tMode === 'prefixe' || tMode === 'suffixe' || tMode === 'remplacer') && <input value={tVal} onChange={(ev) => setTVal(ev.target.value)} placeholder={tMode === 'remplacer' ? 'Par' : 'Texte à ajouter'} style={champ} />}
@@ -43754,6 +43964,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [actionsSelOpen, setActionsSelOpen] = useState(false);
   const [repubDepart, setRepubDepart] = useState(false);
   const [repubMainOuvert, setRepubMainOuvert] = useState(null);
+  // (6 nov.) Plusieurs annonces « à la main » : traitées une par une ({ liste, i }, « paire 2/5 »).
+  const [repubMainFile, setRepubMainFile] = useState(null);
   const [miniSel, setMiniSel] = useState(null);   // (6 nov., vague 2) « Prix mini… » : les annonces cochées // l'annonce republiée à la main (objet de la sélection)
   const [photoEdit, setPhotoEdit] = useState(null); // { refPhoto, refTitle } → éditeur de photo (recadrer/zoomer)
   const [auditOpen, setAuditOpen] = useState(false); // modale « Audit d'inventaire »
@@ -61242,7 +61454,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           capOk: (cap)=>extSait(cap)==='ok', nomCompte: (u)=>{ const a=(accounts||[]).find(x=>String(x.vinted_user_id)===String(u)); return a ? accNameOf(a) : ''; } });
         return <ActionsSelectionFeuille choisies={choisies} actions={actions} onClose={()=>setActionsSelOpen(false)}
           onLancer={(k)=>{ setActionsSelOpen(false);
-            if (k==='main') { const a=choisies[0]; if (a) { setRepubMainOuvert(a); } return; }
+            if (k==='main') { const a=choisies[0]; if (a) { setRepubMainFile(choisies.length>1 ? { liste:choisies, i:0 } : null); setRepubMainOuvert(a); } return; }
             if (k==='mini') { setMiniSel(choisies); return; }
             setRepubReprise(choisies.map(a=>a.id)); setRepubDepart(true); setRepubCle(c=>c+1); setRepubAction(k); }}/>;
       })()}
@@ -61273,7 +61485,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const etatS = paire.annulee ? ({ 'a-remettre':'attente', 'en-cours': s && s.nouvelId ? 'lie' : 'attente', fait:'fait' })[etatRemise(s, { num:paire.numero, reprenable:numeroReprenable, numeros, cle:cleNum })] : etatSuiviMain(s, { numeros, cle: cleNum });
         const marque = paire.annulee ? { annulee:true, tx:paire.tx } : {};
         const debut = ()=>{ if (!s && (paire.numero || paire.annulee)) poserRepubMain(paire.id, { uid:paire.uid, num:paire.numero||'', titre:paire.titre||'', domain:paire.domain, at:new Date().toISOString(), ...marque }); };
-        return <RepublierALaMain paire={paire} suivi={s} candidats={cands} etatSuivi={etatS} onDebut={debut} onClose={()=>setRepubMainOuvert(null)} onRelire={()=>loadListings(true)}
+        // (6 nov.) Le prix d'achat (le plancher de la baisse, la même règle que Republier : jamais dessous).
+        const flM = prixAchatDe(numeros[paire.id]||{}, buyByNum);
+        const paireM = { ...paire, floor: flM!=null && !isNaN(flM) ? Number(flM) : null };
+        // Plusieurs paires : une à la fois, la file tenue ici (la feuille repart à zéro pour chacune).
+        const fileM = repubMainFile && repubMainFile.liste && repubMainFile.liste.length > 1 ? repubMainFile : null;
+        const rangM = fileM ? { i:fileM.i, n:fileM.liste.length } : null;
+        const fermerM = ()=>{ setRepubMainOuvert(null); setRepubMainFile(null); };
+        // La paire suivante garde le prix et le titre choisis dans CETTE ouverture (pas au-delà).
+        const suivanteM = fileM && fileM.i < fileM.liste.length-1 ? (encours)=>{ const j=fileM.i+1; setRepubMainFile({ ...fileM, i:j, encours: encours||null }); setRepubMainOuvert(fileM.liste[j]); } : null;
+        return <RepublierALaMain key={paire.uid+':'+paire.id} paire={paireM} rang={rangM} onSuivante={suivanteM} encours={fileM ? fileM.encours || null : null} suivi={s} candidats={cands} etatSuivi={etatS} onDebut={debut} onClose={fermerM} onRelire={()=>loadListings(true)}
           onDelier={()=>poserRepubMain(paire.id, { nouvelId:null, nouveauTitre:null, lieAt:null })}
           onLier={async (c)=>{ const ok = await askConfirm({ title:'C’est bien la même paire ?', desc:`« ${c.titre||'Sans titre'} » est la nouvelle annonce de « ${paire.titre||'l’ancienne'} ».${paire.numero?`\nLe N°${paire.numero} passera dessus dès que l’ancienne ne sera plus du tout sur Vinted.`:''}`, ok:'Oui, c’est elle' });
             if (!ok) return; if (!s) debut(); poserRepubMain(paire.id, { uid:paire.uid, num:paire.numero||'', titre:paire.titre||'', nouvelId:String(c.id), nouveauTitre:c.titre||'', lieAt:new Date().toISOString(), ...marque, ...(s?{}:{ at:new Date().toISOString() }) }); }}/>;
