@@ -216,8 +216,20 @@ carton dit N°… » (la paire avait déjà son N°, la carte Ma journée la rat
   seconde carte Ma journée).
 - **Arbre d'avant** (`git archive 46f18482`) : 13 rouges sur 15 (le module n'existe pas,
   aucun branchement).
-- `scripts/bancs/prix-numerotage.cjs` (390 tactile et 1512, clair et sombre) : voir le
-  résultat et les captures dans le rapport de la session.
+- `scripts/bancs/prix-numerotage.cjs` (390 tactile et 1512, clair et sombre) : **132
+  contrôles verts** — feuille au N° posé (champ vide, clavier décimal, « Relier · 28 € »
+  proposé, « 25 € env. » ⇒ rien d'écrit, « Plus tard » ⇒ rien, « 18 » ⇒ « 18,00 » + miroir
+  par N°, « Relier » ⇒ l'achat relié, nuage relu), ligne « mise en ligne » (champ vide,
+  « Relier · 30 € », « 32,5 » ⇒ « 32,50 » au nuage), Ma journée (UNE carte « 4 annonces
+  numérotées sans prix d'achat »), file → « Saisie en série » (champ vidé ⇒ rien, « 40 » ⇒
+  « 40,00 »), 44 px, aucun défilement de côté, aucune erreur. Captures regardées (feuille
+  390 clair/sombre, ligne 1512 sombre, Ma journée, file). **Sur le build de l'arbre d'avant**
+  (46f18482) : 49 rouges dès 390 clair (pas de champ marqué, pas de suggestion, pas de prix
+  sur la ligne, carte « sans achat relié », pas de « Saisie en série »).
+  Note de banc : à 1512 px sous swiftshader, Playwright n'obtient jamais « stable » sur un
+  bouton de la feuille (fond flouté ; mesuré immobile) — le banc finit par Tab + Entrée.
+  Constat au passage (pas touché) : Ma journée peut dire « 3 annonces sans numéro » alors que
+  ces 3 annonces viennent d'être numérotées toutes seules au chargement.
 - Verts : `npm run build`, `audit-identite`, `audit-coherence`, `audit-chiffres`,
   `audit-benefice`, `audit-benefice-unique`, `audit-achats-a-relier`.
 
