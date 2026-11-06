@@ -312,6 +312,8 @@ const Ligne = memo(function Ligne({ e, delies, ouvert, lu, photo, onOuvrir, onLu
   const pasLu = lu === false;
   // Le glisser (au doigt seulement ; le défilement vertical reste natif).
   const ref = useRef(null), fond = useRef(null), geste = useRef(null), glisse = useRef(false);
+  // Le fond « Lu / Non lu » n'existe que pendant le glisser (950 lignes : autant de nœuds en moins).
+  const [fondVu, setFondVu] = useState(false);
   const relacher = (ev) => {
     const gs = geste.current; geste.current = null;
     if (!gs || !gs.parti) { if (ev && ev.currentTarget) delete ev.currentTarget.dataset.appui; return; }
@@ -323,9 +325,10 @@ const Ligne = memo(function Ligne({ e, delies, ouvert, lu, photo, onOuvrir, onLu
     if (fond.current) fond.current.dataset.actif = '0';
     if (bascule && lu !== null) onLu(e, pasLu);
     setTimeout(() => { glisse.current = false; }, 0);
+    setTimeout(() => setFondVu(false), reduitMvt() ? 0 : 360);
   };
   return <li className="vrm-boite-item" data-pas-lu={pasLu ? '1' : undefined}>
-    {lu !== null && <span ref={fond} className="vrm-boite-glisse-fond" aria-hidden="true" data-actif="0">{Ic.lu}<span>{pasLu ? 'Lu' : 'Non lu'}</span></span>}
+    {fondVu && lu !== null && <span ref={fond} className="vrm-boite-glisse-fond" aria-hidden="true" data-actif="0">{Ic.lu}<span>{pasLu ? 'Lu' : 'Non lu'}</span></span>}
     <button ref={ref} type="button" className="vrm-boite-ligne" data-boite-email={e.id} data-rubrique={r} data-etat={e.etat} data-lu={lu === null ? undefined : lu ? '1' : '0'}
       data-boite-geste={g ? g.k : undefined} data-boite-proche={g && g.proche ? '1' : undefined} data-boite-rien={l.rien ? '1' : undefined} data-boite-a-code={code ? '1' : undefined} data-boite-a-photo={photo ? '1' : undefined}
       aria-current={ouvert ? 'true' : undefined}
@@ -335,7 +338,7 @@ const Ligne = memo(function Ligne({ e, delies, ouvert, lu, photo, onOuvrir, onLu
       onPointerMove={(ev) => {
         const gs = geste.current; if (!gs) return;
         const dx = ev.clientX - gs.x, dy = ev.clientY - gs.y;
-        if (!gs.parti) { if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { geste.current = null; delete ev.currentTarget.dataset.appui; return; } if (dx < 10) return; gs.parti = true; glisse.current = true; delete ev.currentTarget.dataset.appui; try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch (_) {} }
+        if (!gs.parti) { if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { geste.current = null; delete ev.currentTarget.dataset.appui; return; } if (dx < 10) return; gs.parti = true; glisse.current = true; setFondVu(true); delete ev.currentTarget.dataset.appui; try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch (_) {} }
         // Au-delà du seuil, la ligne résiste (jamais un arrêt sec).
         const d = Math.max(0, dx); const x = d <= 96 ? d : 96 + ((d - 96) * 0.35);
         gs.dx = d;
@@ -511,11 +514,13 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
     for (const e of (pages && pages.emails) || []) if (lusLocaux.has(e.id) && typeof e.lu === 'boolean' && lusLocaux.get(e.id) !== e.lu) n += lusLocaux.get(e.id) ? -1 : 1;
     return Math.max(0, n);
   }, [c, pages, lusLocaux]);
+  // L'app repasse une fonction neuve à chaque rendu : on la lit au moment du geste.
+  const ecrire = useRef(ecrireLus); ecrire.current = ecrireLus;
   const poserLu = useCallback((liste, valeur, gestes) => {
     setLusLocaux((m) => { const n = new Map(m); for (const e of liste) n.set(e.id, valeur); return n; });
-    if (!ecrireLus) return;
-    Promise.resolve(ecrireLus(gestes)).then((ok) => { if (!ok) setAvis('Pas enregistré sur tes autres appareils — réessaie dans un moment.'); }).catch(() => setAvis('Pas enregistré sur tes autres appareils — réessaie dans un moment.'));
-  }, [ecrireLus]);
+    if (!ecrire.current) return;
+    Promise.resolve(ecrire.current(gestes)).then((ok) => { if (!ok) setAvis('Pas enregistré sur tes autres appareils — réessaie dans un moment.'); }).catch(() => setAvis('Pas enregistré sur tes autres appareils — réessaie dans un moment.'));
+  }, []);
   const onLu = useCallback((e, valeur) => poserLu([e], valeur, [{ k: valeur ? 'lu' : 'nonlu', id: e.id, at: e.at }]), [poserLu]);
   const ouvrir = useCallback((e) => { setOuvert(e.id); if (luDe(e) === false) onLu(e, true); }, [luDe, onLu]);
   const filtreActif = !!(rubrique || adresse || aVerif || cherche || nonLus);
@@ -551,12 +556,20 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
   // La suite se charge au défilement (une sentinelle en bas de la liste).
   const sentinelle = useRef(null);
   const suiteRef = useRef(null); suiteRef.current = () => { if (pages && pages.suite && !pages.suiteKO && !lecture) charger((pages.page || 0) + 1); };
+  // Réarmée à chaque page lue et à chaque fin de lecture : un observateur neuf dit tout de
+  // suite si la sentinelle est déjà proche (sinon, restée visible pendant une lecture, elle
+  // ne « réapparaissait » jamais et la suite ne venait plus — mesuré au banc).
   useEffect(() => {
-    const n = sentinelle.current; if (!n || typeof IntersectionObserver === 'undefined') return undefined;
-    const io = new IntersectionObserver((l) => { if (l.some((x) => x.isIntersecting)) suiteRef.current(); }, { rootMargin: '900px 0px' });
+    const n = sentinelle.current; if (!n || typeof IntersectionObserver === 'undefined' || lecture) return undefined;
+    // La racine : le conteneur qui défile VRAIMENT (la coque fait défiler son <main>) — sa
+    // marge d'avance ne vaut que pour lui (avec la page pour racine, la sentinelle restait
+    // rognée par le <main> et la suite ne venait jamais à 1512 px — mesuré au banc).
+    let racine = null;
+    for (let p = n.parentElement; p && p !== document.body; p = p.parentElement) { const o = getComputedStyle(p).overflowY; if (o === 'auto' || o === 'scroll') { racine = p; break; } }
+    const io = new IntersectionObserver((l) => { if (l.some((x) => x.isIntersecting)) suiteRef.current(); }, { root: racine, rootMargin: '900px 0px' });
     io.observe(n);
     return () => io.disconnect();
-  }, [pages && pages.suite, groupes.length]);
+  }, [pages, lecture]);
   const photoLigne = useCallback((e) => (photoDe ? photoDe(e) : null), [photoDe]);
   const rendreEmail = (e) => <Ligne key={e.id} e={e} delies={delies} ouvert={ouvert === e.id} lu={luDe(e)} photo={photoLigne(e)} onOuvrir={ouvrir} onLu={onLu} maintenant={maintenant}/>;
   const nPastille = (id) => (filtre || !complet ? null : Number.isFinite(parR[id]) ? parR[id] : null);
@@ -644,7 +657,12 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
 const VUES = [['boite', 'Boîte de réception'], ['relier', 'Relier ma boîte']];
 // (6 nov., v36) `ecrireLus(gestes)` : l'écriture des lus (src/emailsLusEcriture.js) ;
 // `photoDe(e)` : la photo de la paire reliée PAR IDENTITÉ (n° de transaction), ou `null`.
-export default function BoiteEmails({ headers, delies = {}, onAller, onNum, onAdresses, FermeAuRetour, vueInitiale = 'boite', reglages = null, aRelier, boites = [], compteInitial = '', lireDernier, ecrireLus, photoDe }) {
+export default function BoiteEmails({ headers, delies: deliesRecus = {}, onAller, onNum, onAdresses, FermeAuRetour, vueInitiale = 'boite', reglages = null, aRelier, boites = [], compteInitial = '', lireDernier, ecrireLus, photoDe }) {
+  // L'app repasse un objet neuf à chaque rendu : on le garde tant que son CONTENU ne
+  // change pas (sinon les 950 lignes mémoïsées se redessinent à chaque tic de l'app).
+  const deliesCle = JSON.stringify(deliesRecus || {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const delies = useMemo(() => deliesRecus || {}, [deliesCle]);
   const [vue, setVue] = useState(VUES.some(([k]) => k === vueInitiale) ? vueInitiale : (compteInitial ? 'relier' : 'boite'));
   const [compte, setCompte] = useState(String(compteInitial || ''));
   const [relies, setRelies] = useState(() => new Set());
