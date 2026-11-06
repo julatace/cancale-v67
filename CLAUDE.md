@@ -508,6 +508,8 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 
+- **6 nov. · Onglets A (Ma journée, Ventes, Achats)** : « 0 € aujourd'hui » corrigé (la coque relit ses ventes par sa sonde, `src/sondeVentes.js`, le même « aujourd'hui » partout sans recharger) ; « lecture… » au lieu de « pas lu » pendant la lecture ; « Colis envoyés » jamais 0 sans gestes ; achat suspendu hors « en route » ; un nombre une fois ; « ? » « D'où viennent ces chiffres » (`AIDE_CHIFFRES`). `docs/passation/2026-11-06-onglets-a.md`. Geste : toucher le « ? » de Ventes.
+
 - **6 nov. · Filets anti-bug (v36)** : `verifier.yml` sur chaque PR (build, tous les audits en 3 parts — rouges connus dans `scripts/audits-exceptions.json` —, bancs, WebKit non bloquant), un garde-fou par écran et par feuille (`GardeEcran`), morceau d'un ancien déploiement compté à part (jamais un plantage), veille des plantages au cron du matin (propriétaire seul), `controle-prod.yml` après mise en ligne (lecture seule). `docs/passation/2026-11-06-filets-anti-bug.md`. Geste : rendre le contrôle obligatoire (règle de branche `main`, pas-à-pas dans la passation).
 
 - **6 nov. · Films (motion design)** : la VRAIE app filmée image par image, données inventées (`scripts/films/`, vidéos hors dépôt). `docs/passation/2026-11-06-films.md`. Geste : regarder et publier.

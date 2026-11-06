@@ -20787,7 +20787,7 @@ function KpiVentes({ tuiles, note, plateforme, compte = null }) {
   }
   return (
     <div className="vrm-kpi-ventes vrm-fu-ecran vrm-fu-ventes-site" data-ventes-kpi={plateforme}>
-      <CarteStatsApp page={plateforme} locaux={locaux} ici="cat_ventes" sel={{ site: plateforme, compte, periode: null }}/>
+      <CarteStatsApp page={plateforme} aide locaux={locaux} ici="cat_ventes" sel={{ site: plateforme, compte, periode: null }}/>
       {note ? <div className="vrm-kpi-ventes-note">{note}</div> : null}
     </div>
   );
@@ -54851,7 +54851,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     (`chiffreBenefice`, la lecture de Compta), vendu du mois, reçu du mois. Les attributs que
                     les bancs lisent restent sur LEUR chiffre (`data-fu-vendu-jour`, `data-journee-benef…`). */}
                 {!premierJour && (
-                  <CarteStatsApp page="journee" liveStats={liveStats} nu ici="journee" onNav={onNav}
+                  <CarteStatsApp page="journee" aide liveStats={liveStats} nu ici="journee" onNav={onNav}
                     sel={{ site: 'toutes', compte: null, periode: null }}
                     attrsDe={(x) => {
                       if (x.place.id === 'vendu' && x.p === 'jour') return { 'data-fu-vendu-jour': x.valeur == null || ventesPasLues ? '' : String(Math.round(x.valeur * 100)) };
@@ -55115,7 +55115,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const ts = (x) => { if (!x) return null; const t = x instanceof Date ? x : new Date(x); return isNaN(t.getTime()) ? null : t; };
           const pf = periode && (periode.from || periode.to) ? (() => { const f = ts(periode.from), t = ts(periode.to); if (f) f.setHours(0, 0, 0, 0); const fin = t ? new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1).getTime() : null; return { de: f ? f.getTime() : 0, a: fin, label: libellePeriode(periode) }; })() : null;
           return (
-            <CarteStatsApp page="ventes" liveStats={liveStats} className="vrm-fu-ecran vrm-fu-ventes" ici="cat_ventes" onNav={onNav}
+            <CarteStatsApp page="ventes" aide liveStats={liveStats} className="vrm-fu-ecran vrm-fu-ventes" ici="cat_ventes" onNav={onNav}
               sel={{ site: 'vinted', compte: compteCarte(selEff, accounts), periode: pf }}
               clics={{ aposter: () => setVFilter((v) => v === 'aexpedier' ? 'all' : 'aexpedier') }}
               attrsDe={(x) => x.place.id === 'vendu' && (x.p === 'mois' || (pf && x.p === pf)) ? { 'data-fu-vendu-mois': x.valeur == null ? '' : String(Math.round(x.valeur * 100)), 'data-fu-partiel': x.partiel ? '1' : undefined, 'data-fu-pas-su': x.valeur == null ? '1' : undefined } : x.place.id === 'aposter' ? { 'data-n': x.valeur == null ? '' : String(x.valeur), 'aria-pressed': vFilter === 'aexpedier' } : null}
@@ -55860,11 +55860,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const mois = lu ? buysBase.filter((o) => !annule(o) && dansPeriode(o, duMois)) : [];
           const depense = lu ? mois.reduce((a, o) => a + montantCommande(o), 0) : null;
           const n = { route: 0, recu: 0 }; if (lu) buysBase.forEach((o) => { const ph = phaseReception(o); if (n[ph] != null) n[ph]++; });
-          return <CarteStatsApp page="achats" liveStats={liveStats} className="vrm-fu-ecran" ici="achats" onNav={onNav} sel={{ site: 'toutes', compte: null, periode: null }}
+          return <CarteStatsApp page="achats" aide liveStats={liveStats} className="vrm-fu-ecran" ici="achats" onNav={onNav} sel={{ site: 'toutes', compte: null, periode: null }}
             locaux={{
-              depense: { nom: 'Dépensé du mois', court: 'Dépensé', type: 'eur', valeur: depense, quand: (() => { const m = m0.toLocaleDateString('fr-FR', { month: 'long' }); return m.charAt(0).toUpperCase() + m.slice(1); })(), attrs: { 'data-n': lu ? String(mois.length) : '' } },
-              enroute: { nom: 'En route', court: 'En route', type: 'n', valeur: lu ? n.route : null, attrs: { 'data-n': lu ? String(n.route) : '' } },
-              recus: { nom: 'Arrivés', court: 'Arrivés', type: 'n', valeur: lu ? n.recu : null, attrs: { 'data-n': lu ? String(n.recu) : '' } },
+              depense: { nom: 'Dépensé du mois', court: 'Dépensé', type: 'eur', aide: 'Tes achats du mois, hors annulés et remboursés (le montant payé).', valeur: depense, quand: (() => { const m = m0.toLocaleDateString('fr-FR', { month: 'long' }); return m.charAt(0).toUpperCase() + m.slice(1); })(), attrs: { 'data-n': lu ? String(mois.length) : '' } },
+              enroute: { nom: 'En route', court: 'En route', type: 'n', aide: 'Tes achats payés ou expédiés, pas encore arrivés au point relais.', valeur: lu ? n.route : null, attrs: { 'data-n': lu ? String(n.route) : '' } },
+              recus: { nom: 'Arrivés', court: 'Arrivés', type: 'n', aide: 'Tes achats livrés ou finalisés, depuis toujours.', valeur: lu ? n.recu : null, attrs: { 'data-n': lu ? String(n.recu) : '' } },
             }}/>;
         })()}
         {/* (5 nov.) Pourquoi des codes manquent (l'extension les lit dans les conversations, sur le
@@ -72059,7 +72059,7 @@ function AppCoeur() {
     <section className="vrm-market-space" aria-label="Vestiaire" data-tache-vestiaire={t} style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
       <ExtVestiaireCompte/>
       {baseKO ? <LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>
-        : t==='ventes' ? <><CarteStatsApp page="vestiaire" className="vrm-fu-ecran" ici="cat_ventes" onNav={setTab} sel={{ site: 'vestiaire', compte: null, periode: null }}/><VentesVestiaire comptes={vintedAccounts}/></>
+        : t==='ventes' ? <><CarteStatsApp page="vestiaire" aide className="vrm-fu-ecran" ici="cat_ventes" onNav={setTab} sel={{ site: 'vestiaire', compte: null, periode: null }}/><VentesVestiaire comptes={vintedAccounts}/></>
         : t==='annonces' ? <>
             <EntreePublierAilleurs site="vestiaire"/>
             <AnnoncesVestiaire/>
@@ -72091,7 +72091,7 @@ function AppCoeur() {
               même forme que les rubriques de l'app (`PlatSubNav`). */}
           {sous && <div className="vrm-tache-sous" data-tache-sous={t+'.'+site}><PlatSubNav sub={sec} setSub={(x)=>{ setEbayCible(null); setPlatSub(subDeTache(site,x)); }} sections={sous}/></div>}
         </div>
-        {site==='toutes' && t==='ventes' && !baseKO && <div style={{padding:'12px 16px 0'}}><CarteStatsApp page="ventes-toutes" className="vrm-fu-ecran" ici="cat_ventes" onNav={setTab} sel={{ site: 'toutes', compte: null, periode: null }}/></div>}
+        {site==='toutes' && t==='ventes' && !baseKO && <div style={{padding:'12px 16px 0'}}><CarteStatsApp page="ventes-toutes" aide className="vrm-fu-ecran" ici="cat_ventes" onNav={setTab} sel={{ site: 'toutes', compte: null, periode: null }}/></div>}
         {site==='toutes' && t==='ventes' && !baseKO && <div className="vrm-a-venir-hote" style={{padding:'12px 16px 0'}}><ArgentAVenirCarte A={liveStatsVus && liveStatsVus.aVenir}/></div>}
         {/* (6 nov., filet 2) La section d'un site tombe seule : le titre et le filtre des sites restent, on change de site. */}
         <GardeEcran nom={t+':'+site} resetKey={platSub}>

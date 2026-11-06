@@ -70,6 +70,27 @@ export const CHIFFRES = {
   masquees:   { nom: 'Annonces masquées', court: 'masquées', type: 'n', periodes: null, sites: ['toutes', 'vinted'], compte: true, vinted: true, aller: 'annonces', titre: 'Masquées par Vinted : toujours chez toi, pas en ligne. Une lecture de plus de 24 h est à confirmer (« au moins »).' },
   dorment:    { nom: 'Annonces qui dorment', court: 'qui dorment', type: 'n', periodes: null, sites: ['toutes', 'vinted'], compte: false, vinted: true, aller: 'annonces' },
 };
+// (6 nov., onglets A) « D'OÙ VIENT CE CHIFFRE ? » — une phrase par chiffre, rangée AVEC sa
+// définition (§5 : la phrase qui explique un chiffre vient de la même source que lui). La
+// feuille « ? » de la carte (`CarteStats`, prop `aide`) la lit, à côté de la valeur et de sa raison.
+export const AIDE_CHIFFRES = {
+  vendu: 'Tes ventes de la période, à la date de la vente, sur tous tes sites. Les annulées et les comptes que tu as écartés ne comptent pas.',
+  ventes: 'Le nombre de ces mêmes ventes (la règle de « vendu »).',
+  panier: 'Le montant moyen de tes ventes des 30 derniers jours.',
+  recu: 'L’argent versé par tes sites, au jour du versement : c’est ce que tu déclares. Une vente finalisée sans date de versement n’est dans aucun mois (« à dater ») — l’extension relève ces dates quand tu ouvres Vinted.',
+  benefice: 'Tes ventes finalisées moins leurs prix d’achat, les frais, tes dépenses et l’URSSAF : le calcul de Compta.',
+  brut: 'Tes ventes finalisées moins leurs prix d’achat — sans dépenses ni URSSAF.',
+  declarer: 'Le chiffre d’affaires à déclarer à l’URSSAF : l’argent reçu (le calcul de Compta).',
+  urssaf: CHIFFRES.urssaf.titre,
+  finalisees: 'Tes ventes finalisées sur la période (Compta).',
+  aposter: 'Les colis à envoyer, comptés par l’écran Colis (tous tes sites). Ouvre Colis pour les imprimer.',
+  retirer: 'Les colis à aller chercher, comptés par l’écran Colis (e-mails des transporteurs et suivis Vinted).',
+  attente: 'L’argent que tes sites te doivent encore : les ventes en cours, pas encore versées.',
+  dispo: 'Le solde disponible de ton porte-monnaie Vinted, relu par l’extension.',
+  enligne: 'Tes annonces en ligne, d’après la dernière lecture complète de ton dressing (de moins de 24 h).',
+  masquees: CHIFFRES.masquees.titre,
+  dorment: 'Tes annonces en ligne depuis plus de 30 jours (l’écran Annonces).',
+};
 export const IDS_CHIFFRES = Object.keys(CHIFFRES);
 
 // ── LES PAGES ET LEUR DÉFAUT (maquettes Fusion) ─────────────────────────────
