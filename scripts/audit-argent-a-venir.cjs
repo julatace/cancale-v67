@@ -216,7 +216,10 @@ const charger = async (texte, nom) => {
   dit(/const aVenirCoque = \(x\) => argentAVenir\(/.test(A0) && /etatTx: TXN_ETATS_LU === false \? null : etatTxn/.test(A0), 'avec les règles d’App.jsx et l’état des transactions');
   dit(/fetchVersementsVinted\(\)\.then\(\(m\) => \{ if \(!mort\) setVersementsCoque\(m\)/.test(A0), 'la coque lit les dates de versement (450)');
   dit(/const aVenirJ = aVenirPour\(liveStats && liveStats\.aVenir\);/.test(A0), 'Ma journée (carte et tendance) lit la règle');
-  dit(/sec==='ventes' && !baseKO && <div className="vrm-a-venir-hote"[^\n]*<ArgentAVenirCarte A=\{liveStatsVus && liveStatsVus\.aVenir\} plateforme="Vinted"\/>/.test(A0) && /site==='toutes' && t==='ventes' && !baseKO && <div className="vrm-a-venir-hote"[^\n]*<ArgentAVenirCarte A=\{liveStatsVus && liveStatsVus\.aVenir\}\/>/.test(A0), 'Ventes (Vinted, et tous les sites) monte la carte « À venir » en tête');
+  // (5 nov., chantier E2) Sur Ventes · Vinted la carte passe SOUS la carte du mois, dans l'écran
+  // (Comptabilite, `dansPlateforme`, le `liveStats` de la coque) : le même ordre que « Tous ».
+  // Ce contrôle juge qu'elle est montée sur les deux écrans, avec la règle de la coque — plus sa ligne.
+  dit(/dansPlateforme && !baseKO && <div className="vrm-a-venir-hote"[^\n]*<ArgentAVenirCarte A=\{liveStats && liveStats\.aVenir\} plateforme="Vinted"\/>/.test(A0) && /site==='toutes' && t==='ventes' && !baseKO && <div className="vrm-a-venir-hote"[^\n]*<ArgentAVenirCarte A=\{liveStatsVus && liveStatsVus\.aVenir\}\/>/.test(A0), 'Ventes (Vinted, et tous les sites) monte la carte « À venir » sous la carte du mois');
   dit(!/Argent en attente \(estimation\)/.test(A0), 'plus d’« estimation » sur les statuts de la liste dans Ventes');
   dit(/const attV = aVenirPour\(liveStats && liveStats\.aVenir, \{ plateforme: 'Vinted' \}\);/.test(A0), 'le résumé Vinted lit la part Vinted de la règle');
   dit(/const aV = aVenirPour\(liveStatsVus\.aVenir\);\s*if \(aV\.valeur != null && !aV\.partiel\) base0\.enAttente/.test(A0), 'le widget prend la règle, seulement complète');

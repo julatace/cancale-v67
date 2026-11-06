@@ -506,6 +506,8 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 
+- **5 nov. · Ventes (E2)** : revue 2.12-2.30 ; « Compte qui vend le mieux » dans Statistiques seul ; alerte d'annulations par compte. `docs/passation/2026-11-05-chantier-e2.md`.
+
 - **5 nov. · Chantier H, coque (v35)** : en-tête = pastille de couleur (plus « ⓘ »), nuage seulement en panne ; « Dernière capture » = source de la liste ; Paramètres (icônes distinctes, Organisation en lien, plus de carte dans la carte, Statut) ; icônes de nav distinctes, un badge par colis ; cloche sur SheetShell + « Où ranger à l'arrivée » (`src/ouRanger.js`). `docs/passation/2026-11-05-chantier-h.md`.
 - **5 nov. · Chantier D, Colis côté envoi (v35)** : frise à l'encre sur la dernière étape faite ; barre du haut stable (Scanner · Tout imprimer · …) ; « En grand » en SheetShell lumineuse (titre = article ou « Colis <transporteur> ») ; « Tournée de dépôt » et « attend depuis N j » ; « Déposé », « En route ». `docs/passation/2026-11-05-chantier-d.md`. Geste : essayer la tournée au relais.
 
