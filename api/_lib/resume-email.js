@@ -64,7 +64,7 @@ export function resumeClassement(code, corps, extra) {
     }
     case 'vente': {
       if (c.garde) { r = { t, av: 'analyse' }; break; }
-      r = { t, a: court(x.article), px: court(c.prix, 12), n: court(c.numero, 12), ps: court(c.pseudo, 30), fac: c.facture && c.facture.number ? court(c.facture.number, 30) : undefined };
+      r = { t, a: court(x.article), px: court(c.prix, 12), n: court(c.numero, 12), ps: court(c.pseudo, 30), fac: c.facture && c.facture.number ? court(c.facture.number, 30) : undefined, vf: c.verification ? 1 : undefined };
       break;
     }
     case 'offre': r = { t, mt: court(c.montant, 12), de: court(c.de, 30), a: court(c.article) }; break;

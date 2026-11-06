@@ -749,12 +749,15 @@ export default async function handler(req, res) {
     //    si cette photo manque ou date d'un autre mois — sinon le widget
     //    resterait bloqué sur le mois précédent tant que l'app n'est pas ouverte.
     //    `moneySource` dit laquelle a servi (le widget peut l'afficher).
-    let moneyMonth = 0, salesMonth = 0;
+    let moneyMonth = 0, salesMonth = 0, sansPrixEmails = 0;
     for (const s of sales) {
       if (String(s.receivedAt || '').slice(0, 7) !== ym) continue;
       salesMonth += 1;
       const p = parseFloat(String(s.prix || '').replace(',', '.'));
       if (!isNaN(p) && p > 0) moneyMonth += p;
+      // (6 nov.) Une vente « avec Vérification de l'article » : l'e-mail ne donne
+      // pas de prix (jamais deviné) ⇒ le repli sur les e-mails dit « au moins ».
+      else sansPrixEmails += 1;
     }
     let moneySource = 'emails';
     const snapMois = snap && snap.updatedAt ? String(snap.updatedAt).slice(0, 7) : null;
@@ -766,7 +769,7 @@ export default async function handler(req, res) {
     // (1er nov., audits A2/A10) Des ventes du mois dont l'argent ne se lit pas
     // (prix Vinted pas lu, montant Vestiaire pas sûr) : publiées par l'app à
     // côté du montant ⇒ « au moins » (jamais un total partiel présenté complet).
-    const moneyNonComptees = moneySource === 'app' ? (Number(snap.caMoisNonComptees) || 0) : null;
+    const moneyNonComptees = moneySource === 'app' ? (Number(snap.caMoisNonComptees) || 0) : (sansPrixEmails > 0 ? sansPrixEmails : null);
     // Argent REÇU ce mois : la ligne publiée par l'app (voir `recuDuMoisPublie`),
     // plus les emails de finalisation — une seule règle, celle de Ma journée.
     const recu = recuDuMoisPublie(m.vinted_urssaf_mois, ym);

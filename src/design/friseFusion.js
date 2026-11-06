@@ -21,6 +21,8 @@
 //  encre ; l'étape en cours ne dit qu'elle est la suivante (ou le geste, en ambre).
 // ════════════════════════════════════════════════════════════════════════════
 
+import { ETAPE_CENTRE } from '../verificationArticle.js';
+
 export const ETAPES_VENTE_FUSION = [
   ['vendue', 'Vendue', 'vendue'],
   ['postee', 'Postée', 'deposee'],
@@ -44,13 +46,23 @@ const avecCours = (etapes, geste) => {
 };
 
 // `etapes5` : la sortie de `friseVente` (jamais recalculée ici).
-export function friseVenteFusion(etapes5, { geste = false } = {}) {
+// (6 nov., vague 2) `verification` : l'état de LA transaction dit « Envoi au centre
+// de vérification » (src/verificationArticle.js, `auCentreDeVerification`) ⇒ une
+// étape « Au centre de vérification » entre Postée et Livrée. Elle n'a pas de
+// preuve à elle : faite seulement si « Livrée » l'est (déduite, la même loi) ;
+// sinon c'est l'étape en cours une fois le colis posté. Sans l'état lu, rien.
+export function friseVenteFusion(etapes5, { geste = false, verification = false } = {}) {
   if (!Array.isArray(etapes5) || !etapes5.length) return null;
   const par = Object.fromEntries(etapes5.map((e) => [e.cle, e]));
   const etapes = ETAPES_VENTE_FUSION.map(([cle, label, source]) => {
     const e = par[source] || null;
     return { cle, label, fait: !!(e && e.fait), preuve: e ? e.preuve : null, t: e ? e.t : null, cours: false, ton: '' };
   });
+  if (verification === true) {
+    const i = etapes.findIndex((e) => e.cle === 'livree');
+    const apres = etapes.slice(i).some((e) => e.fait);
+    etapes.splice(i, 0, { cle: ETAPE_CENTRE.cle, label: ETAPE_CENTRE.label, court: ETAPE_CENTRE.court, fait: apres, preuve: apres ? 'deduite' : null, t: null, cours: false, ton: '' });
+  }
   return avecCours(etapes, geste);
 }
 

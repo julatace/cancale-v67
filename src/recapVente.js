@@ -65,12 +65,15 @@ export function friseVente(preuves = {}) {
 // La phrase d'état, en clair : { gras, suite }. `etat` = l'étiquette de la vente
 // (`etapeVente(o).label`, la même règle que la liste), `aide` son explication.
 // Elle ne redit AUCUNE date (la frise les porte : un nombre une seule fois, §7).
-export function phraseVente({ etat = '', aide = '', etapes = [], aExpedier = false, posteMain = false } = {}) {
+// (6 nov.) `verification` : l'état de LA transaction dit « Envoi au centre de
+// vérification » (src/verificationArticle.js) — le colis passe par Vinted avant l'acheteur.
+export function phraseVente({ etat = '', aide = '', etapes = [], aExpedier = false, posteMain = false, verification = false } = {}) {
   if (ETATS_HORS_PARCOURS.includes(etat)) return { gras: `${etat}.`, suite: aide || '' };
   const ici = etapes.find((e) => e.ici);
   const cle = ici ? ici.cle : null;
   if (cle === 'argent') return { gras: 'Terminée.', suite: "L'acheteur a confirmé : l'argent est versé sur ton porte-monnaie Vinted." };
   if (cle === 'livree') return { gras: 'Livrée.', suite: "L'argent arrive quand l'acheteur confirme que tout va bien." };
+  if (verification && cle === 'deposee') return { gras: 'Vers le centre de vérification.', suite: "Vinted vérifie l'article, puis l'envoie à l'acheteur." };
   if (etat === 'Au relais') return { gras: 'Au point relais.', suite: "L'acheteur doit aller la retirer." };
   if (cle === 'deposee') return posteMain && etat === 'Posté'
     ? { gras: 'Déposée.', suite: "Vinted confirmera l'envoi au premier passage chez le transporteur." }
