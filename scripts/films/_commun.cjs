@@ -344,17 +344,22 @@ class Film {
   // pendant le chargement sans qu'aucune image ne soit tournée.
   async coupe(modifier, { tab, fondu = 0.5, attente = 2.5 } = {}) {
     if (modifier) modifier(this.monde);
-    await this.pg.evaluate((src) => {
-      const a = document.getElementById('app'); const b = a.cloneNode(false);
-      b.id = 'app-suite'; b.style.opacity = '0'; b.src = src; a.after(b);
-    }, `/?tab=${tab || this.tab}`);
-    const fin = Date.now() + 30000;
-    for (;;) {
-      await this.pg.clock.runFor(100); await this.pg.waitForTimeout(40);
-      const ok = await this.pg.evaluate(() => { const d = document.getElementById('app-suite').contentDocument; return !!(d && d.querySelector('.vrm-main')); });
-      if (ok || Date.now() > fin) break;
+    // `tab` peut être une liste : les premiers écrans s'ouvrent dans l'app cachée (ils publient).
+    const tabs = Array.isArray(tab) ? tab : [tab || this.tab];
+    for (let n = 0; n < tabs.length; n++) {
+      await this.pg.evaluate(([src, premier]) => {
+        if (premier) { const a = document.getElementById('app'); const b = a.cloneNode(false); b.id = 'app-suite'; b.style.opacity = '0'; b.src = src; a.after(b); }
+        else document.getElementById('app-suite').src = src;
+      }, [`/?tab=${tabs[n]}`, n === 0]);
+      await this.pg.waitForTimeout(300);
+      const fin = Date.now() + 30000;
+      for (;;) {
+        await this.pg.clock.runFor(100); await this.pg.waitForTimeout(40);
+        const ok = await this.pg.evaluate(() => { const d = document.getElementById('app-suite').contentDocument; return !!(d && d.readyState === 'complete' && d.querySelector('.vrm-main')); });
+        if (ok || Date.now() > fin) break;
+      }
+      for (let k = 0; k < attente * 10; k++) { await this.pg.clock.runFor(100); await this.pg.waitForTimeout(60); }
     }
-    for (let k = 0; k < attente * 10; k++) { await this.pg.clock.runFor(100); await this.pg.waitForTimeout(60); }
     const nouvelle = await (await this.pg.$('#app-suite')).contentFrame();
     const ancienne = this._app;
     this._app = nouvelle;
@@ -394,7 +399,7 @@ class Film {
     // Le texte reste net jusqu'à ×2 (rastérisé à chaque image, mesuré) ; au-delà, l'écran ne se lit plus.
     // Par défaut, l'écran entier reste dans l'image en largeur (aucun mot coupé au bord) :
     // ×1,38 en portrait. Un plan serré sur un petit objet centré le demande (`zmax`).
-    const zmax = zmaxPlan || Number(process.env.ZMAX) || (this.format === 'portrait' ? 1.38 : 1.25);
+    const zmax = zmaxPlan || Number(process.env.ZMAX) || (this.format === 'portrait' ? 1.38 : 1.12);
     const s = Math.min(zmax, zoom != null ? zoom : Math.max(this.repos.s, (this.F.w * cadre) / Math.max(40, r.w)));
     let fx = r.x + r.w / 2 + dx;
     // Le cadre ne montre jamais le fond sur un côté quand l'écran est plus large que l'image.
@@ -403,6 +408,8 @@ class Film {
     const cible = { fx, fy: r.y + r.h / 2 + dy, s };
     // Zoomé en portrait : l'ancre descend, pour laisser la place au titre.
     if (ay != null) cible.ay = ay; else if (this.format === 'portrait' && s > this.repos.s * 1.05) cible.ay = 610;
+    // Zoomé en paysage : l'écran glisse à droite, la colonne des titres reste libre.
+    if (this.format === 'paysage' && s > this.repos.s * 1.05) cible.ax = 735;
     this.bouger(cible, dur, ease);
   }
   bouger(cible, dur = 1, ease = 'doux') {

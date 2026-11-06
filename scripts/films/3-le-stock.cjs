@@ -15,21 +15,22 @@ async function scenario(f) {
   f.titre('Ton stock, comme chez toi.', { sous: 'Tes meubles, tes étagères, une case par paire.', duree: 3.4 });
   await f.jouer(0.5);
   await f.entree(1.2);
-  await f.jouer(0.4);
+  await f.jouer(0.4); f.cle('ouverture');
   // Les étagères.
   await f.defilerVers('[data-meuble="m1"]', { marge: 70, dur: 1.2 });
   f.titre('Chaque paire a *sa* case.', { sous: 'Son N° dessus : tu la trouves sans chercher.', duree: 3.6 });
   await f.viser('[data-meuble="m1"]', { zoom: P ? 1.32 : 1.0, dur: 1.1 });
   await f.jouer(2.0); f.cle('etagere');
   // Une paire arrive : la toucher, puis une case vide.
-  f.titre('Une paire arrive ?', { sous: 'Touche-la, puis une case libre.', duree: 4.6 });
+  f.titre('Une paire arrive ?', { sous: 'Touche-la, puis une case libre.', duree: 7.0 });
   f.repos_(0.8);
   await f.defilerVers('texte:À ranger', { marge: 40, dur: 1.0 });
   await f.toucher('button[aria-label^="Ranger l’article N°12"]', { viser: { zoom: P ? 1.35 : 1.0, dur: 0.8 }, apres: 0.3 });
   await f.defilerVers('[data-meuble="m2"]', { marge: 120, dur: 0.9 });
   await f.viser('[data-meuble="m2"]', { zoom: P ? 1.35 : 1.0, dur: 0.8 });
-  await f.toucher('[data-case-ici="m2:4"]', { apres: 0.9 });
-  f.cle('rangee');
+  await f.toucher('[data-case-ici="m2:4"]', { apres: 0.7 });
+  await f.viser('[data-case-ici="m2:4"]', { zoom: P ? 1.75 : 1.12, zmax: 1.75, dur: 0.9 });
+  await f.jouer(0.3); f.cle('rangee');
   await f.jouer(0.4);
   // Vendue : sa case s'allume.
   f.titre('Vendue : sa case *s’allume*.', { sous: 'Tu sais où la prendre pour le colis.', duree: 3.8 });
@@ -43,7 +44,7 @@ async function scenario(f) {
     const suite = monde({ partis: ['81002'] });
     const main = m.lignes.find((l) => l.id === 'main');
     m.lignes = suite.lignes.map((l) => (l.id === 'main' ? main : l));
-  }, { tab: 'garage', fondu: 0.6 });
+  }, { tab: ['annonces', 'garage'], fondu: 0.6 });
   await f.defilerVers('[data-stock-sortis-meubles]', { marge: 90, dur: 1.0 });
   await f.viser('[data-stock-sortis-meubles]', { zoom: P ? 1.4 : 1.05, dur: 1.0 });
   await f.jouer(1.8); f.cle('liberee');

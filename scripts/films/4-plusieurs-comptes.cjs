@@ -16,7 +16,7 @@ async function scenario(f) {
   await f.jouer(1.0); f.cle('ouverture');
   // Le sélecteur à logos.
   f.titre('Un site d’un geste.', { duree: 3.6 });
-  await f.viser('[data-site="toutes"]', { zoom: P ? 1.5 : 1.1, dur: 1.0, dx: 120 });
+  await f.viser('[data-site="toutes"]', { zoom: P ? 1.38 : 1.1, dur: 1.0 });
   await f.jouer(0.3);
   await f.toucher('[data-site="leboncoin"]', { apres: 0.7 });
   await f.toucher('[data-site="ebay"]', { apres: 0.7 }); f.cle('logos');
@@ -32,7 +32,8 @@ async function scenario(f) {
   await f.toucher('.vrm-nav-more', { apres: 0.35 });
   await f.toucher('.vrm-plus-tuile[data-nav-entree="compta"]', { apres: 0.5 });
   await f.attendreQue('[data-prevision-carte="lu"]', 4);
-  f.titre('Le chiffre à recopier sur l’URSSAF.', { sous: 'Daté au jour du versement, tous sites compris.', duree: 4.8 });
+  f.titre('Le chiffre à recopier sur l’URSSAF.', { sous: 'Daté au jour du versement, tous sites compris.', duree: 5.4 });
+  await f.jouer(0.8); f.cle('compta');
   await f.defilerVers('[data-prevision-carte]', { marge: 30, dur: 1.0 });
   await f.viser('[data-prevision-carte]', { zoom: P ? 1.3 : 1.0, dur: 1.0, dy: -40 });
   await f.jouer(1.0);
