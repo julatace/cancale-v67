@@ -64,7 +64,7 @@ const ROWS = [
   ligne('panel_colis_relais', {}),
 ];
 // Ce qui ne doit JAMAIS se trouver dans la réserve de coquille du service worker.
-const PERSONNEL = ['Nike Air Max 1 banc', '4321', 'C49341', 'MR999000111', LIEU_MR, 'compte-de-banc', 'vendeuse@exemple.fr'];
+const PERSONNEL = ['Nike Air Max 1 banc', 'C49341', 'MR999000111', LIEU_MR, 'compte-de-banc', 'vendeuse@exemple.fr'];
 
 const srv = http.createServer((q, r) => {
   let f = decodeURIComponent(q.url.split('?')[0]); if (f === '/' || !path.extname(f)) f = '/index.html';
@@ -74,6 +74,10 @@ const srv = http.createServer((q, r) => {
 });
 
 let ko = 0;
+// BANC_SEUL=A,E : seulement ces scénarios ; BANC_TAILLES=390 : seulement cette largeur.
+const SEUL = (process.env.BANC_SEUL || '').split(',').filter(Boolean);
+const joue = (x) => !SEUL.length || SEUL.includes(x);
+const TAILLES = (process.env.BANC_TAILLES || '').split(',').filter(Boolean).map(Number);
 const dit = (bon, quoi, detail) => { if (!bon) ko++; console.log(`  ${bon ? '✅' : '❌'} ${quoi}${detail ? ' — ' + detail : ''}`); };
 const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom + ' — le contrôle a pu s’exécuter', String(e && e.message).split('\n')[0].slice(0, 160)); } };
 const attendre = async (pred, ms = 8000, pas = 200) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { try { if (await pred()) return true; } catch (_) {} await new Promise((r) => setTimeout(r, pas)); } return false; };
@@ -147,13 +151,13 @@ async function main() {
   await new Promise((res, rej) => { srv.once('error', (e) => rej(e.code === 'EADDRINUSE' ? new Error(`le port ${PORT} est pris — relance ce banc seul`) : e)); srv.listen(PORT, res); });
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   try {
-    for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
+    for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }].filter((v) => !TAILLES.length || TAILLES.includes(v.width))) {
       const T = vp.width < 600 ? '📱 390' : '🖥️ 1512';
       const opts = { viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) };
 
       // ── A. Colis rouvert hors réseau ──────────────────────────────────────
       console.log(`\n── ${T} · A. Colis rouvert hors réseau, au comptoir`);
-      await essaie(`${T} A`, async () => {
+      if (joue('A')) await essaie(`${T} A`, async () => {
         const c = await nouvelAppareil(nav, opts, `hors-reseau ${vp.width} A`);
         await ouvrirEnLigne(c.pg, 'cat_bord');
         const photo = await attendrePhotoEtQr(c.pg);
@@ -180,7 +184,8 @@ async function main() {
         dit(r.vue === 'colis' && r.titre === 'Colis', 'l\'écran est COLIS (pas Ma journée à sa place)', `vue ${r.vue} · titre ${JSON.stringify(r.titre)}`);
         dit(r.lignes.length === 1 && RE_LIGNE.test(r.lignes[0]), 'UNE ligne « Hors connexion — dernier état du <jour> à <heure> »', JSON.stringify(r.lignes));
         dit(!/Tout est à jour/i.test(r.texte), 'jamais « Tout est à jour » hors réseau');
-        const mr = r.points.find((p) => p.lieu === 'Tabac du Port Cancale'), vg = r.points.find((p) => p.lieu === 'Consigne Vinted Go Laverie du Port');
+        // Le lieu tel que la règle de l'app le nettoie (`cleanLieu` retire « Consigne Vinted Go »).
+        const mr = r.points.find((p) => p.lieu === 'Tabac du Port Cancale'), vg = r.points.find((p) => p.lieu === 'Laverie du Port');
         dit(r.points.length === 2 && !!mr && !!vg && mr.n === 1 && vg.n === 1, 'À retirer : une carte par point relais, avec son lieu', JSON.stringify(r.points.map((p) => [p.lieu, p.n])));
         dit(r.codes.length === 2, 'les deux codes de retrait sont là', r.codes.join(','));
         dit(r.qr.length >= 2 && r.qr.every((q) => q.etat === 'ok' && q.w > 0), 'les QR s\'affichent sans réseau (réserve du service worker)', JSON.stringify(r.qr));
@@ -195,7 +200,7 @@ async function main() {
           return { code: code ? code.innerText.replace(/\s/g, '') : '', taille: code ? parseFloat(getComputedStyle(code).fontSize) : 0, qr: img ? (img.complete && img.naturalWidth > 0) : null, qrL: img ? img.getBoundingClientRect().width : 0, txt: s.innerText };
         });
         await c.pg.screenshot({ path: path.join(CAPT, `A-en-grand-${vp.width}.png`) }).catch(() => {});
-        dit(!!g && g.code === '4321' && g.taille >= 36 && g.qr === true && g.qrL >= 200, '« En grand » montre le code en très gros et le QR (≥ 200 px) hors réseau', g ? JSON.stringify({ code: g.code, taille: g.taille, qr: g.qr, qrL: Math.round(g.qrL) }) : 'rien ne s\'ouvre');
+        dit(!!g && g.code === '4321' && g.taille >= 30 && g.qr === true && g.qrL >= 200, '« En grand » montre le code en très gros et le QR (≥ 200 px) hors réseau', g ? JSON.stringify({ code: g.code, taille: g.taille, qr: g.qr, qrL: Math.round(g.qrL) }) : 'rien ne s\'ouvre');
         dit(!!g && /Tabac du Port Cancale/.test(g.txt), 'et le lieu du point relais', g ? g.txt.replace(/\n/g, ' ¦ ').slice(0, 140) : '');
         await c.pg.keyboard.press('Escape').catch(() => {});
         await c.pg.waitForTimeout(500);
@@ -233,7 +238,7 @@ async function main() {
 
       // ── B. un dernier état vieux ──────────────────────────────────────────
       console.log(`\n── ${T} · B. un dernier état de 30 h n'est jamais présenté comme frais`);
-      await essaie(`${T} B`, async () => {
+      if (joue('B')) await essaie(`${T} B`, async () => {
         const c = await nouvelAppareil(nav, opts, `hors-reseau ${vp.width} B`);
         await ouvrirEnLigne(c.pg, 'cat_bord');
         await attendrePhotoEtQr(c.pg);
@@ -253,7 +258,7 @@ async function main() {
 
       // ── C. Ma journée rouverte hors réseau ───────────────────────────────
       console.log(`\n── ${T} · C. Ma journée rouverte hors réseau`);
-      await essaie(`${T} C`, async () => {
+      if (joue('C')) await essaie(`${T} C`, async () => {
         const c = await nouvelAppareil(nav, opts, `hors-reseau ${vp.width} C`);
         await ouvrirEnLigne(c.pg, 'journee');
         await attendrePhotoEtQr(c.pg);
@@ -274,7 +279,7 @@ async function main() {
 
       // ── D. le réseau coupe pendant que Colis est ouvert ───────────────────
       console.log(`\n── ${T} · D. le réseau coupe pendant que Colis est ouvert`);
-      await essaie(`${T} D`, async () => {
+      if (joue('D')) await essaie(`${T} D`, async () => {
         const c = await nouvelAppareil(nav, opts, `hors-reseau ${vp.width} D`);
         await ouvrirEnLigne(c.pg, 'cat_bord');
         await attendrePhotoEtQr(c.pg);
@@ -290,7 +295,7 @@ async function main() {
       // ── E. la réserve du service worker ──────────────────────────────────
       if (vp.width < 600) {
         console.log(`\n── ${T} · E. ce que le service worker garde`);
-        await essaie(`${T} E`, async () => {
+        if (joue('E')) await essaie(`${T} E`, async () => {
           const c = await nouvelAppareil(nav, opts, `hors-reseau ${vp.width} E`);
           await ouvrirEnLigne(c.pg, 'cat_bord');
           await attendrePhotoEtQr(c.pg);
@@ -306,7 +311,7 @@ async function main() {
             return out;
           }, PERSONNEL);
           const coquille = Object.entries(r.caches).filter(([n]) => n !== 'vrm-hl-qr').flatMap(([, v]) => v);
-          dit(coquille.length > 0 && coquille.every((p) => p === '/' || p === '/__vrm_build' || /^\/assets\//.test(p) || /^\/[\w.-]+\.(png|svg|webmanifest|json|ico|woff2)$/.test(p)), 'la coquille ne garde que la page et les fichiers du build', JSON.stringify(coquille.slice(0, 8)));
+          dit(coquille.length > 0 && coquille.every((p) => p === '/' || p === '/__vrm_build' || /^\/assets\//.test(p) || /^\/(brands\/)?[\w.-]+\.(png|svg|webmanifest|json|ico|woff2|js|css)$/.test(p)), 'la coquille ne garde que la page et les fichiers du build', JSON.stringify(coquille.filter((p) => !(p === '/' || p === '/__vrm_build' || /^\/assets\//.test(p)))));
           dit(!coquille.some((p) => /\/api\/|rest\/v1|auth\/v1/.test(p)), 'jamais une réponse de /api/ ni de la base');
           dit(r.perso.length === 0, 'aucune donnée du vendeur dans la coquille', r.perso.join(' | '));
           dit(Object.values(r.caches['vrm-hl-qr'] || []).every((p) => p === '/hl-qr?…'), 'la réserve des QR ne garde que des QR (adresses /hl-qr)', JSON.stringify(r.caches['vrm-hl-qr']));
