@@ -87,8 +87,9 @@ html body .vrm-app-shell .vrm-main a.vrm-rpf-rang-lien:focus-visible { outline: 
 
 /* Le bas de « À retirer » portait 40 px de marge intérieure (le cadre de l’écran Colis) : avec les 28 px d’une
    section, « Argent à vérifier » tombait à 68 px de « En route » (banc colis-retirer-propre, rouge AVANT ce chantier
-   aussi — mesuré sur la base). 12 + 28 = 40 px : le rythme des autres sections. */
-html body .vrm-app-shell .vrm-main div:has(> section.vrm-colis-retirer) { padding-bottom: 12px !important; }
+   aussi — mesuré sur la base). (v36-raccords) 0 + 28 = 28 px : exactement la grille des autres sections
+   (28, 28, 28…) — une seule règle d'espacement, la marge de la section ; plus de correction ailleurs. */
+html body .vrm-app-shell .vrm-main div:has(> section.vrm-colis-retirer) { padding-bottom: 0 !important; }
 /* La carte « Nouveau N° pour un carton » : ses boutons en pilules grises d'iOS. */
 html body .vrm-app-shell .vrm-main [data-numeros-a-ecrire] [data-a-ecrire] button {
   border: 0 !important; background: var(--vrm-card2) !important; border-radius: 999px !important; padding: 0 16px !important;
