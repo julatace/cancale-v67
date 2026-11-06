@@ -15,6 +15,12 @@
   "_lire_bancs": "Les bancs ROUGES CONNUS (scripts/lancer-bancs.cjs) : seulement les lignes rouges qui répondent à `rouges` ; une ligne rouge nouvelle rend le banc rouge pour de bon.",
   "bancs": [
     {
+      "banc": "annonces-actions",
+      "rouges": "^(M 1512 sombre proposées : la nouvelle du MÊME compte|1512 sombre le parcours s’arrête — page\\.\\$eval: Failed to find element matching selector \"\\[data-main-lier=\"9120\"\\]\")",
+      "raison": "Deux rouges À L'IDENTIQUE sur l'arbre d'avant 46f18482 (« proposées » à 1512 sombre, `data-main-lier=9120` introuvable). Les arrêts sur délai (« Timeout 30000ms ») vus ici sur un conteneur surchargé, des deux côtés, NE sont PAS couverts : s'ils reviennent en CI, c'est un rouge à regarder.",
+      "depuis": "2026-11-06"
+    },
+    {
       "banc": "navigation-tache",
       "rouges": "^J\\. compteurs de la colonne = les nombres PUBLIÉS",
       "raison": "J (compteurs de la colonne : annonces 4 contre la cloche) rouge À L'IDENTIQUE sur l'arbre d'avant 46f18482 (162 verts, 1 rouge des deux côtés) : à corriger dans un chantier Navigation, pas à masquer.",
