@@ -367,7 +367,7 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
         [-w / 2 + t, w / 2 - t].forEach(px => { const p = box(t, ht, t, m); p.position.set(px, ht / 2, 0); g.add(p); });
         const bar = shadowize(new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, w - 2 * t, 10), metalMat)); bar.rotation.z = Math.PI / 2; bar.position.set(0, ht * 0.86, 0); g.add(bar);
         const top = box(w, t, d, m); top.position.set(0, ht - t / 2, 0); g.add(top);
-        const cols = ['#c94f4f', '#4f6fc9', '#4fae8f', '#d4a24b', '#8a5fb0', '#c96f9f'], cn = Math.max(3, Math.round(w * 1.6));
+        const cols = ['#c94f4f', '#4f6fc9', '#4fae8f', '#d4a24b', '#7d8f5a', '#c96f9f'], cn = Math.max(3, Math.round(w * 1.6));
         for (let i = 0; i < cn; i++) { const cx = -w / 2 + t + (i + 0.5) * ((w - 2 * t) / cn); const ch = ht * 0.5 * (0.8 + ((i * 7) % 5) / 10); const cl = box((w - 2 * t) / cn * 0.72, ch, d * 0.5, flatMat(cols[i % cols.length], 0.9)); cl.position.set(cx, ht * 0.86 - ch / 2, 0); g.add(cl); }
         return g;
       };
@@ -457,7 +457,7 @@ function Room3D({ items, room, poly, hi, sel, canMove, onOpen, onSelect, onCellT
           nb.userData = { maxCase: 'barre_' + r, texte: 'max ' + n }; g.add(nb);
         }
         const ghostM = new THREE.MeshStandardMaterial({ color: '#9aa3ad', roughness: 0.9, transparent: true, opacity: 0.22, depthWrite: false });
-        const habits = ['#4f6fc9', '#c94f4f', '#4fae8f', '#d4a24b', '#8a5fb0', '#5f7f9b'];
+        const habits = ['#4f6fc9', '#c94f4f', '#4fae8f', '#d4a24b', '#7d8f5a', '#5f7f9b'];
         for (let r = 0; r < nr; r++) for (let c = 0; c < nc; c++) {
           const by = barY(r);
           const cx = -w / 2 + 0.04 + (c + 0.5) * pasC, key = r + '_' + c, a = ((slots || {})[key] || []).map(v => String(v)).filter(Boolean);

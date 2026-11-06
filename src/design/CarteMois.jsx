@@ -6,6 +6,7 @@
 // « — » (pas su), jamais 0.
 import React, { useLayoutEffect, useRef } from 'react';
 import { cheminMonotone } from '../courbeMonotone.js';
+import { PileVignettes } from './PileVignettes.jsx';
 
 // La courbe : des valeurs (une par jour), dessinées sans sommet inventé
 // (interpolation monotone), remplissage dégradé. Moins de trois points ⇒ rien (deux points font un trait plat, pas une tendance — critique du 3 nov., #12).
@@ -28,12 +29,29 @@ export function Courbe({ valeurs, largeur = 96, hauteur = 46 }) {
   );
 }
 
+// ── LE CHIFFRE QUI ROULE (6 nov., v36-visuel-2) ─────────────────────────────
+// Comme Wallet et Fitness : quand le grand chiffre CHANGE (une vente arrive, la
+// lecture se termine), le nouveau monte en place (0,4 em, un léger flou, 380 ms,
+// courbe de sortie). Le premier rendu ne bouge pas ; un rendu au même chiffre ne
+// bouge pas. ⚠️ Le texte reste UN nœud (jamais un caractère par élément) : le mode
+// stream cache un montant par nœuds voisins (`masquerSuite`) — « 6 », « 0 », « 8 »
+// séparés laisseraient lire « 60 ». Mouvement réduit : rien (styles-visuel-2.css).
+const texteDe = (n) => (n == null || typeof n === 'boolean') ? '' : (typeof n === 'string' || typeof n === 'number') ? String(n)
+  : Array.isArray(n) ? n.map(texteDe).join('') : React.isValidElement(n) ? texteDe(n.props && n.props.children) : '';
+export function ChiffreRoule({ valeur }) {
+  const prec = useRef(null);
+  const texte = texteDe(valeur);
+  const change = prec.current != null && prec.current !== texte;
+  React.useEffect(() => { prec.current = texte; }, [texte]);
+  return <span key={texte} className={'vrm-roule' + (change ? ' is-neuf' : '')}>{valeur}</span>;
+}
+
 // cases : [{ cle, n, l, titre, raison, onClick, attrs }] — `n` peut être un nœud ; `raison` :
 // la raison courte d'un « — » (ou le manque nommé d'un montant), sous le libellé.
 // (3 nov., carte réglable) `action` : un bouton discret en haut à droite (« Modifier ») ;
 // `nu` : la carte sans fond à elle, posée dans une tête déjà sombre (Ma journée, Compta) ;
 // `grandAttrs` : les attributs du grand chiffre (posés sur le chiffre même, « — » compris).
-export default function CarteMois({ surtitre, valeur, sous = null, cases = [], courbe = null, enHaut = null, children = null, className = '', action = null, nu = false, grandAttrs = null, ...attrs }) {
+export default function CarteMois({ surtitre, valeur, sous = null, cases = [], courbe = null, pile = null, enHaut = null, children = null, className = '', action = null, nu = false, grandAttrs = null, ...attrs }) {
   const vide = valeur == null || valeur === '';
   // (3 nov., cas extrêmes) Un montant à 5 chiffres (« 35 211,97 € ») ne se coupe jamais
   // en « 35 211,9… » : la taille descend d'un pixel à la fois jusqu'à ce qu'il tienne
@@ -74,16 +92,20 @@ export default function CarteMois({ surtitre, valeur, sous = null, cases = [], c
       <div className="vrm-fu-carte-tete">
         <div className="vrm-fu-carte-txt">
           {surtitre && !enRangee ? <span className="vrm-fu-surtitre">{surtitre}</span> : null}
-          <div ref={grandRef} className={'vrm-fu-grand' + (vide ? ' is-vide' : '')} {...(grandAttrs || {})}>{vide ? '—' : valeur}</div>
+          <div ref={grandRef} className={'vrm-fu-grand' + (vide ? ' is-vide' : '')} {...(grandAttrs || {})}>{vide ? '—' : <ChiffreRoule valeur={valeur} />}</div>
           {sous ? <div className="vrm-fu-sous">{sous}</div> : null}
         </div>
         {courbe && courbe.length ? <Courbe valeurs={courbe} /> : null}
+        {/* (6 nov., v36-visuel-2) Les paires du chiffre, en pile (l'écran passe LEURS photos, par
+            identité — `PileVignettes` n'en cherche aucune) ; jamais à côté d'une courbe. */}
+        {!(courbe && courbe.length) && pile && Array.isArray(pile.srcs) && pile.srcs.some(Boolean) && pile.Photo
+          ? <PileVignettes className="vrm-fu-pile" srcs={pile.srcs} n={pile.n || 0} Photo={pile.Photo} mortes={pile.mortes} onMorte={pile.onMorte} data-fu-pile="" /> : null}
       </div>
       {cases.length ? (
         <div className="vrm-fu-cases" style={{ '--n': cases.length }}>
           {cases.map((c) => {
             if (c.raison) raisonsVues.current.add(c.cle);
-            const corps = <><b className={c.n == null ? 'is-vide' : undefined}>{c.n == null ? '—' : c.n}</b><span>{c.l}</span>{c.raison ? <small className="vrm-fu-case-raison" data-carte-raison="">{c.raison}</small> : raisonsVues.current.has(c.cle) ? <small className="vrm-fu-case-raison" aria-hidden="true">{'\u00a0'}</small> : null}</>;
+            const corps = <><b className={c.n == null ? 'is-vide' : undefined}>{c.n == null ? '—' : <ChiffreRoule valeur={c.n} />}</b><span>{c.l}</span>{c.raison ? <small className="vrm-fu-case-raison" data-carte-raison="">{c.raison}</small> : raisonsVues.current.has(c.cle) ? <small className="vrm-fu-case-raison" aria-hidden="true">{'\u00a0'}</small> : null}</>;
             return c.onClick
               ? <button key={c.cle} type="button" className="vrm-fu-case" data-fu-case={c.cle} title={c.titre} onClick={c.onClick} {...(c.attrs || {})}>{corps}</button>
               : <div key={c.cle} className="vrm-fu-case" data-fu-case={c.cle} title={c.titre} {...(c.attrs || {})}>{corps}</div>;

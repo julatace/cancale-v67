@@ -3,7 +3,9 @@ import React,{useMemo,useState} from 'react';
 import {etatAnnonceLeboncoin,lienAnnonceLeboncoin} from './etatAnnonceLeboncoin.js';
 import './annonces-leboncoin.css';
 import {STYLE_FLOU} from './flouCompte.js';
-const euros = n => n != null && n !== '' && /^\d+(\.\d+)?$/.test(String(n)) && Number.isFinite(Number(n)) ? new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR'}).format(Number(n)) : '—';
+import {montant} from './format.js';
+// (6 nov., v36-visuel-2) La règle unique des euros (`montant`) : « 90 € », jamais « 90,00 € ».
+const euros = n => n != null && n !== '' && /^\d+(\.\d+)?$/.test(String(n)) && Number.isFinite(Number(n)) ? montant(Number(n)) : '—';
 function Photo({src}) {
  const [ko,setKo]=useState(false);
  let url='';try {const u=new URL(src);if(u.protocol==='https:'&&!u.username&&!u.password)url=u.href;}catch{}
@@ -50,7 +52,7 @@ export default function AnnoncesLeboncoin({annonces=[],ventes={},lectureKO=false
  const bilan=[{id:'lbc-annonces',libelle:'Annonces Leboncoin',comptes:comptesBilan,items:annonces.map(ad=>({id:ad.id,compte:compteDe(ad),titre:ad.subject||ad.title,valeurs:[ad.price,ad.status,ad.pauseAt,ad.plusVueAt,ad.images?.[0],ad.images?.length]})),erreur:lectureKO,partiel:true,revision:annonces.map(ad=>ad.seenAt)}];
  return <section className="vrm-lbc-catalog" aria-label="Mes annonces Leboncoin">
   <BilanSynchronisation owner={owner} sources={bilan}/>
-  <header><div><h2>Mes annonces</h2></div><span>{lectureKO?'Lecture indisponible':`${lignes.length} reçue${lignes.length>1?'s':''}`}</span></header>
+  <header><div><h2>Mes annonces</h2>{!lectureKO?<details className="vrm-pourquoi vrm-lbc-catalog-note" data-pourquoi><summary aria-label="D’où viennent ces états ?" title="D’où viennent ces états ?">ⓘ</summary><div>Les états reflètent la dernière lecture. « Gérer » ouvre l’annonce sur Leboncoin ; une annonce absente d’une page n’est pas supprimée de ton historique.</div></details>:null}</div><span>{lectureKO?'Lecture indisponible':`${lignes.length} reçue${lignes.length>1?'s':''}`}</span></header>
   {lectureKO?<p role="status">Impossible de relire tes annonces. L’historique reste conservé.</p>:<>
    {confirmer&&lignes.some(l=>l.etat==='aconfirmer')&&<p className="vrm-lbc-catalog-confirmer" data-lbc-confirmer-phrase="">{confirmer}</p>}
    <input type="search" aria-label="Rechercher une annonce Leboncoin" placeholder="Rechercher un article, un compte…" value={recherche} onChange={e=>setRecherche(e.target.value)}/>
@@ -61,7 +63,7 @@ export default function AnnoncesLeboncoin({annonces=[],ventes={},lectureKO=false
      <b>{euros(ad.price)}</b><div className="vrm-lbc-catalog-gestes">{lien&&<a href={lien} target="_blank" rel="noreferrer" aria-label={`Gérer l’annonce : ${ad.subject||ad.title||ad.id}`}>Gérer <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M7 17 17 7M7 7h10v10"/></svg></a>}
      {typeof onSupprimer==='function'&&SUPPRIMABLE.has(etat)&&ad.status!=='deleted'&&<button type="button" data-lbc-supprimer={ad.id} disabled={!!enVol} onClick={()=>onSupprimer({id:String(ad.id),numero:num,title:ad.subject||ad.title||'',prix:ad.price})} aria-label={`Supprimer de Leboncoin : ${ad.subject||ad.title||ad.id}`}>{enVol===String(ad.id)?'Suppression…':'Supprimer'}</button>}</div>
     </li>;})}</ul>}
-   <details className="vrm-pourquoi vrm-lbc-catalog-note" data-pourquoi><summary aria-label="D’où viennent ces états ?" title="D’où viennent ces états ?">ⓘ</summary><div>Les états reflètent la dernière lecture. « Gérer » ouvre l’annonce sur Leboncoin ; une annonce absente d’une page n’est pas supprimée de ton historique.</div></details>
+
   </>}
  </section>;
 }

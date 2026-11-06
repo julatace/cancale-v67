@@ -388,7 +388,9 @@ import SelecteurSites, { LogoSite } from "./SelecteurSites.jsx";
 import "./styles-publier-ailleurs.css";
 import "./styles-ios.css";       // (6 nov., v36-visuel) rangées « Réglages » d'iOS, « ⓘ » en feuille
 import "./styles-visuel.css";    // (6 nov., v36-visuel) la direction : photos héros, chiffres, rythme 8 px
+import "./styles-visuel-2.css";  // (6 nov., v36-visuel-2) de « propre » à « beau » : échelle, matière, barre floutée, mouvement
 import { GroupeIos, RangeeIos } from "./composants/Ios.jsx";
+import Illustration, { depuisIcone } from "./composants/Illustration.jsx";   // (6 nov., v36-visuel-2) les dessins des états vides
 import { SITES_PUBLIER, apercuEnvoi, manquesEnvoi, etatsPaire, partoutLeMeme, lienVu, chercherPaires } from "./publierAilleurs.js";
 import { optionsSelecteur, nomCompteVente, identiteCompteVente, annuaireLbc, ongletSansDonnee, nomPlateforme, logoPlateforme } from "./plateformes.js";
 import { MR_SELECT, lireColisMondialRelay, suivisAvecMondialRelay, accordCodes, codeDuCompteMr, ouTrouverQr, ilYa as ilYaLecture, compteDuRetrait, indexAchatsAutresSites } from "./retraitQr.js";
@@ -12826,7 +12828,9 @@ function Notice({ tone='info', icon, title, value, desc, detail, action, style={
 function Card({children,style={}}) {
   // Rayon plus généreux + ombre douce : une carte doit se poser SUR le fond,
   // pas être découpée dedans au cutter.
-  return <div className="vrm-surface" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:20,boxShadow:C.shadow,...style}}>{children}</div>;
+  // (6 nov., v36-visuel-2) Le ton se DIT (`data-ton`) : la feuille de style pose la matière (carte élevée,
+  // sans cadre) et garde à une carte « geste » (cadre ambre posé par l'écran) son anneau ambre.
+  return <div className="vrm-surface" data-ton={style && style.borderColor === C.warn ? 'geste' : undefined} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:20,boxShadow:C.shadow,...style}}>{children}</div>;
 }
 function Badge({children,color}) {
   const tone = color || C.muted;
@@ -16770,8 +16774,8 @@ function ReceptionEmails({ tracking, comptes, colisParTransporteur }) {
     return (
       <Notice tone="warn" icon="alert"
         value={nInc}
-        title={`email${nInc>1?'s':''} reçu${nInc>1?'s':''} que l'app n'a pas su classer`}
-        desc="Ils sont conservés entiers, rien n'est perdu — mais aucune action n'en a été tirée."
+        title={`e-mail${nInc>1?'s':''} pas classé${nInc>1?'s':''}`}
+        desc="Conservés entiers, rien n’est perdu — aucune action tirée."
         detail={detail}/>
     );
   }
@@ -16808,7 +16812,9 @@ function EmptyState({ icon, title, desc, action }) {
     <div className="vrm-empty-state" style={{textAlign:'center',padding:'34px 20px',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,boxShadow:C.shadow||'none'}}>
       {/* (1er nov., finition) Un nom d'icône au trait (jeu de la barre), dans un
           disque neutre — plus d'emoji ni de pavé teinté d'accent (§7). */}
-      <div className="vrm-empty-ic" aria-hidden="true" style={{width:48,height:48,margin:'0 auto 12px',borderRadius:'50%',background:C.card2||C.bg,color:C.muted,display:'flex',alignItems:'center',justifyContent:'center',fontSize:22}}>{ICON_PATHS[icon] ? <Icon name={icon} size={22}/> : icon}</div>
+      {/* (6 nov., v36-visuel-2) Un petit dessin au trait (src/composants/Illustration.jsx), le même
+          pour la même idée partout — plus une icône dans un disque. Décoratif : la phrase dit tout. */}
+      <div className="vrm-empty-ic vrm-empty-dessin" aria-hidden="true" style={{margin:'0 auto 8px',color:C.muted,display:'flex',justifyContent:'center'}}><Illustration nom={depuisIcone(icon)} taille={120}/></div>
       <div style={{fontSize:15,fontWeight:700,color:C.text,letterSpacing:-0.3}}>{title}</div>
       {desc && <div style={{fontSize:12,color:C.muted,marginTop:5,lineHeight:1.5,maxWidth:340,marginLeft:'auto',marginRight:'auto'}}>{desc}</div>}
       {action && <div style={{marginTop:14}}>{action}</div>}
@@ -22909,7 +22915,10 @@ const eurEbay = (n) => (Math.round(n * 100) / 100).toFixed(2).replace('.', ',') 
 // (23 octobre, revue) Un prix eBay avec SA devise : « 95,00 € », « 95,00 USD »,
 // devise inconnue ⇒ aucun symbole. UNE règle pour la carte des annonces et les
 // inactives (§11) — `eurEbay` ajoutait « € » à un prix en dollars (« 95,00 € USD »).
-const prixEbayTexte = (n, c) => Number(n).toFixed(2).replace('.', ',') + (c ? ` ${c === 'EUR' ? '€' : c}` : '');
+// (6 nov., v36-visuel-2) La règle unique des euros (`montant`, src/format.js) : les centimes
+// seulement s'ils existent (« 84 € », « 74,50 € ») ; SA devise dite (« 95 USD ») ; devise
+// inconnue ⇒ aucun symbole (« 60 »). Jamais convertie (§1).
+const prixEbayTexte = (n, c) => { const t = montant(Number(n), { devise: c || 'EUR' }); return c ? t : t.replace(/\s€$/, ''); };
 // Les lignes à montrer pour une vérification : la programmation TOUJOURS (son
 // montant, ou « pas su » quand eBay ne l'a pas annoncée sur une annonce
 // programmée), la mise en vente, puis tout autre frais non nul.
@@ -28270,7 +28279,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     dvVue.aAnnulerEbay.length && { k: 'annuler', urg: true, sel: '[data-ebay-a-annuler]', cta: 'Voir', txt: `${dvVue.aAnnulerEbay.length} programmée${plurCons(dvVue.aAnnulerEbay.length)} sur eBay, déjà vendue${plurCons(dvVue.aAnnulerEbay.length)} ailleurs — à annuler` },
     dvVue.aRetirerVinted.length && { k: 'retirer-vinted', urg: true, sel: '[data-ebay-retirer-vinted]', cta: 'Voir', txt: `${dvVue.aRetirerVinted.length} vendue${plurCons(dvVue.aRetirerVinted.length)} sur eBay, encore sur Vinted — à retirer là-bas` },
     setRelierAnn.size && { k: 'relier', filtre: 'relier', cta: 'Filtrer', txt: `${setRelierAnn.size} annonce${plurCons(setRelierAnn.size)} à relier à un article — sinon VRM ne peut pas la retirer à la vente` },
-    nDortAnn && { k: 'dorment', filtre: 'dorment', cta: 'Filtrer', txt: `${nDortAnn} paire${plurCons(nDortAnn)} en ligne depuis plus de 30 jours — baisse le prix${nEligCons ? ' ou fais une offre' : ''}` },
+    nDortAnn && { k: 'dorment', filtre: 'dorment', cta: 'Filtrer', txt: `${nDortAnn} paire${plurCons(nDortAnn)} qui dor${nDortAnn > 1 ? 'ment' : 't'} depuis plus de 30 j — baisse le prix${nEligCons ? ' ou fais une offre' : ''}` },
   ].filter(Boolean);
   const allerConseil = (c) => () => {
     if (c.filtre) { setFiltreAnn(c.filtre); setAnnMax(60); }
@@ -28308,7 +28317,9 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
             <button key={c.k} type="button" className="vrm-eb-afaire-ligne" data-ebay-conseil={c.k} data-ebay-conseil-go={c.k} data-urgent={c.urg ? '1' : undefined}
               {...(c.filtre ? { 'aria-pressed': actif } : {})}
               onClick={c.filtre && actif ? () => { setFiltreAnn('toutes'); setAnnMax(60); } : allerConseil(c)}>
-              <span className="vrm-eb-afaire-point" aria-hidden="true" />
+              {/* (6 nov., v36-visuel-2) Une icône de Réglages par geste (lier, endormie, retirer…) au
+                  lieu d'une puce grise ; l'ambre reste au geste pressé (`data-urgent`). */}
+              <span className="vrm-eb-afaire-point vrm-eb-afaire-icone" aria-hidden="true"><Icon name={{ relier: 'link', dorment: 'sleep', annuler: 'clock' }[c.k] || 'trash'} size={16} /></span>
               <span>{tete}{raison.length ? <small>{raison.join(' — ')}</small> : null}</span>
               <Icon name="chevron" size={14} style={{ flexShrink: 0, color: E.muted, opacity: 0.7, transform: actif ? 'rotate(90deg)' : 'none' }} />
             </button>
@@ -28569,7 +28580,7 @@ function ClePhotoroom({ cadre = true }) {
 
       {formulaire && (
         <form data-photoroom-form="" onSubmit={(e) => { e.preventDefault(); poser(); }} style={{ display: 'grid', gap: 8 }}>
-          <label htmlFor="vrm-photoroom-cle" style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{remplacer ? 'Colle ta nouvelle clé' : 'Colle ta clé API Photoroom'}</label>
+          <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}><label htmlFor="vrm-photoroom-cle">{remplacer ? 'Colle ta nouvelle clé' : 'Colle ta clé API Photoroom'}</label>{' '}<Pourquoi titre="Ta clé Photoroom">VRM la vérifie chez Photoroom (sans dépenser d'image), puis la range chiffrée. Tu n'en reverras que les 4 derniers caractères.</Pourquoi></span>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <input id="vrm-photoroom-cle" data-photoroom-champ="" value={val} onChange={(e) => setVal(e.target.value)} type="password" autoComplete="off" spellCheck={false} autoCapitalize="off"
               placeholder="Ta clé Photoroom" aria-label="Clé API Photoroom"
@@ -28577,7 +28588,6 @@ function ClePhotoroom({ cadre = true }) {
             <button type="submit" data-photoroom-enregistrer="" disabled={!!occupe || !val.trim()} style={{ ...bouton(true), opacity: (occupe || !val.trim()) ? 0.55 : 1 }}>{occupe === 'poser' ? 'Vérification…' : 'Vérifier et ranger'}</button>
             {remplacer && <button className="vrm-b vrm-b-discret" type="button" onClick={() => { setRemplacer(false); setVal(''); }} style={bouton(false)}>Annuler</button>}
           </div>
-          <div style={ligneFine}>VRM la vérifie chez Photoroom (sans dépenser d'image), puis la range chiffrée. Tu n'en reverras que les 4 derniers caractères.</div>
         </form>
       )}
 
@@ -28983,7 +28993,8 @@ function EntreePublierAilleurs({ site }) {
     <div className="vrm-pa-entree" data-pa-entree={site}>
       <button type="button" onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:publier-ailleurs', { detail: { site } })); } catch (_) {} }}>
         <LogoSite site="vinted"/>
-        <span>Publier une annonce Vinted sur {nomPlateforme(site)}<small>Vérifier · ce qui part · publier · suivi</small></span>
+        {/* (6 nov., v36-visuel-2) Le titre tient sur UNE ligne au téléphone ; le logo Vinted dit d'où part l'annonce. */}
+        <span>Publier sur {nomPlateforme(site)}<small>Une annonce Vinted · vérifier, publier, suivre</small></span>
         <span aria-hidden="true">›</span>
       </button>
     </div>
@@ -39767,17 +39778,21 @@ function useFreqUrssaf() {
   return f;
 }
 const lireOptionsMicro = () => optionsMicro(load('vrm_micro_options', null));
-const eurMicro = (n) => n == null ? '—' : `${Number(n).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} €`;
+// (6 nov., v36-visuel-2) La règle unique des euros : centimes seulement s'ils existent (« 1 395 € »).
+const eurMicro = (n) => n == null ? '—' : montant(Number(n));
 const eurRond = (n) => `${Math.round(Number(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} €`;
 const pctFr = (n) => `${String(n).replace('.', ',')} %`;
 function LigneProfil({ titre, aide, children, attr }) {
   return (
     <div className="vrm-micro-ligne" {...(attr || {})} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '12px 0', borderTop: `1px solid ${C.border}` }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px 12px', flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 15, fontWeight: 600, color: C.text }}>{titre}</span>
+        {/* (6 nov., v36-visuel-2) Une explication en phrase (texte seul) suit le titre en « ⓘ » (une
+            feuille) au lieu d'un paragraphe de 3 à 4 lignes ; une aide qui porte une QUESTION à
+            trancher (élément) reste à l'écran. */}
+        <span style={{ fontSize: 15, fontWeight: 600, color: C.text }}>{titre}{typeof aide === 'string' ? <>{' '}<Pourquoi titre={titre}>{aide}</Pourquoi></> : null}</span>
         {children}
       </div>
-      {aide ? <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>{aide}</div> : null}
+      {aide && typeof aide !== 'string' ? <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>{aide}</div> : null}
     </div>
   );
 }
@@ -39861,8 +39876,7 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
   const profil = (
     <Card style={sCarte}>
       <div data-micro-profil={vl || 'passu'}>
-        <div style={sTitre}>Ton profil URSSAF</div>
-        <div style={{ fontSize: 13, color: C.muted, marginTop: 2, marginBottom: 6, lineHeight: 1.5 }}>VRM ne lit pas ton espace URSSAF : dis-lui tes options, il calcule le reste. Tu les retrouves sur autoentrepreneur.urssaf.fr, rubrique « Mon compte ».</div>
+        <div style={{ ...sTitre, marginBottom: 6 }}>Ton profil URSSAF{' '}<Pourquoi titre="Ton profil URSSAF">VRM ne lit pas ton espace URSSAF : dis-lui tes options, il calcule le reste. Tu les retrouves sur autoentrepreneur.urssaf.fr, rubrique « Mon compte ».</Pourquoi></div>
         <LigneProfil titre="Tu déclares" attr={{ 'data-micro-freq': freq }} aide={phraseRythme(freq, now) + " L'URSSAF ne propose que ces deux rythmes (pas d'annuel)."}>
           <Segmente label="Rythme de déclaration" value={freq} onChange={poserFreq}
             options={[{ v: 'mensuel', l: 'Par mois', data: { 'data-micro-freq-choix': 'mensuel' } }, { v: 'trimestriel', l: 'Par trimestre', data: { 'data-micro-freq-choix': 'trimestriel' } }]} />
@@ -39899,11 +39913,10 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
   const calendrier = (
     <Card style={sCarte}>
       <div data-micro-calendrier={freq}>
-        <div style={sTitre}>Ton calendrier</div>
-        <div style={{ fontSize: 13, color: C.muted, marginTop: 2, lineHeight: 1.5 }}>
+        <div style={sTitre}>Ton calendrier{' '}<Pourquoi titre="Ton calendrier">
           {freq === 'mensuel' ? 'Le chiffre d\'affaires d\'un mois se déclare et se paie le mois suivant.' : 'Le chiffre d\'affaires d\'un trimestre se déclare et se paie le mois qui suit le trimestre.'}
           {vl === 'oui' ? ' Ton impôt (1 %) part en même temps.' : vl === 'non' ? ' Ton impôt sur le revenu se paie à part (déclaration de revenus).' : ''}
-        </div>
+        </Pourquoi></div>
         <div style={{ display: 'flex', flexDirection: 'column', marginTop: 8 }}>
           {cal.map((p, i) => {
             const notee = regPret && p.ym.every((ym) => moisDeclare(regLu, ym));
@@ -39965,7 +39978,7 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux }) {
               <span style={{ position: 'absolute', left: 0 }}>0</span>
               <span style={{ position: 'absolute', right: `${100 - j.seuils.tvaBase / j.seuils.tvaMajore * 100}%`, transform: 'translateX(50%)', whiteSpace: 'nowrap' }}>{eurRond(j.seuils.tvaBase)}</span>
             </div>
-            <div style={{ fontSize: 11, color: C.muted }}>Le trait marque le seuil ; la barre va jusqu'au seuil majoré ({eurRond(j.seuils.tvaMajore)}).</div>
+            <div style={{ fontSize: 12, color: C.muted }}>Le trait : le seuil{' '}<Pourquoi titre="Franchise de TVA">Le trait marque le seuil ; la barre va jusqu'au seuil majoré ({eurRond(j.seuils.tvaMajore)}).</Pourquoi></div>
             <div data-micro-tva-texte="" style={{ fontSize: 13, color: j.tva.etat === 'ok' ? C.muted : C.text, marginTop: 6, lineHeight: 1.5 }}>{tvaTxt}</div>
           </div>
           <div style={{ marginTop: 16 }}>
@@ -42481,7 +42494,7 @@ const REGLES_CARTE = { bilanLignes, rythmeVendu, chiffreBenefice, chiffreBrut, b
 // `page` : une clé de PAGES_CARTE ; `sel` : { site, compte: {uid, login, nom} | null, periode } ;
 // `locaux` : les cases propres de la page ({ id → { nom, court, type, valeur, partiel, onClick, attrs, affiche } }) ;
 // `ici` : l'onglet où l'on est (une case n'y renvoie pas).
-function CarteStatsApp({ page, liveStats, sel = null, locaux = null, ici = null, attrs = null, ...rest }) {
+function CarteStatsApp({ page, liveStats, sel = null, locaux = null, ici = null, attrs = null, pile = null, ...rest }) {
   const [reglage, poser] = useReglageCarte();
   const [objectif, poserObjectif] = useObjectifMois();
   const liveCoque = React.useContext(LiveStatsCarte);
@@ -42493,7 +42506,7 @@ function CarteStatsApp({ page, liveStats, sel = null, locaux = null, ici = null,
     || (base.enPreparation.urssaf && !base.ligneUrssaf)
     || Object.values(locaux || {}).some((x) => x && x.enCours)) ? undefined : true);
   const sources = locaux ? { ...base, locaux } : base;
-  return <CarteStats owner={AUTH.user?.id||''} page={page} sel={sel || { site: 'toutes', compte: null, periode: null }} sources={sources} regles={REGLES_CARTE} reglage={reglage} poser={poser} objectif={objectif} poserObjectif={poserObjectif} FermeAuRetour={FermeAuRetour} extra={{ ici, attrs }} {...rest}/>;
+  return <CarteStats owner={AUTH.user?.id||''} page={page} sel={sel || { site: 'toutes', compte: null, periode: null }} sources={sources} regles={REGLES_CARTE} reglage={reglage} poser={poser} objectif={objectif} poserObjectif={poserObjectif} FermeAuRetour={FermeAuRetour} extra={{ ici, attrs, pile }} {...rest}/>;
 }
 // Le compte choisi, dit pour la carte : { uid, login, nom } ou null (tous).
 const compteCarte = (uid, accounts) => {
@@ -43551,9 +43564,9 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
 //   ambre, accent bleu) — sinon un compte sain porte un point rouge qui se lit
 //   comme une alarme, et « une fausse alerte fait cesser de lire les vraies ».
 //   L'ancienne palette violait 3 fois (bleu≈accent, rouge≈danger, ambre≈warn).
-//   Ces 8 teintes sont toutes loin des couleurs réservées (des deux thèmes) et
+//   Ces 6 teintes (6 nov., v36-visuel-2 : plus aucun violet ni indigo, §3 — audit-violet.cjs) sont toutes loin des couleurs réservées (des deux thèmes) et
 //   distinctes entre elles — vérifié par `audit-couleurs-comptes.cjs`.
-const ACCT_COLORS = ['#9b51e0','#27ae60','#00b8a9','#e056fd','#9acd32','#17a9c9','#6c5ce7','#e8529a'];
+const ACCT_COLORS = ['#27ae60','#00b8a9','#9acd32','#17a9c9','#5f7f9b','#8e8e93'];
 const acctColor = (uid) => { let h=0; const s=String(uid||''); for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0; return ACCT_COLORS[h%ACCT_COLORS.length]; };
 // ── « RETOURS EN COURS » (Colis, 21 octobre) ─────────────────────────────────
 // Rend la sortie de `retoursEnCours` (src/retoursStock.js) — aucune règle ici.
@@ -48375,7 +48388,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // barre ambre à gauche ; le titre et son « ⓘ » (le geste détaillé), la liste. Le geste
     // en une ligne reste sous le titre — « barre l'ancien, écris le nouveau ».
     <div data-numeros-a-ecrire={aEcrireCarton.length} className="vrm-carte-alerte" style={{ background: C.card, borderRadius: 14, padding: '12px 16px 4px' }}>
-      <div className="vrm-alerte-tete"><span aria-hidden="true" className="vrm-alerte-icone"><Icon name="pencil" size={15}/></span><span className="vrm-alerte-ligne-texte"><span className="vrm-alerte-ligne-titre">{aEcrireCarton.length > 1 ? `${aEcrireCarton.length} nouveaux numéros à écrire sur tes cartons` : 'Un nouveau numéro à écrire sur un carton'}{' '}<Pourquoi label="Écrire le nouveau numéro" titre="Le nouveau numéro">{aEcrireCarton.every((it) => ((numeros[it.id] || {}).reattribue || {}).main) ? 'Si le carton porte encore l’ancien numéro, barre-le et écris le nouveau.' : 'Barre l’ancien numéro sur le carton et écris le nouveau.'} L'ancien ne sera jamais redonné.</Pourquoi></span>
+      <div className="vrm-alerte-tete"><span aria-hidden="true" className="vrm-alerte-icone"><Icon name="pencil" size={15}/></span><span className="vrm-alerte-ligne-texte"><span className="vrm-alerte-ligne-titre">{/* (6 nov., v36-visuel-2) Le titre tient sur UNE ligne au téléphone (« ⓘ » compris) : le geste est dessous. */}{aEcrireCarton.length > 1 ? `${aEcrireCarton.length} nouveaux N° pour tes cartons` : 'Nouveau N° pour un carton'}{' '}<Pourquoi label="Écrire le nouveau numéro" titre="Le nouveau numéro">{aEcrireCarton.every((it) => ((numeros[it.id] || {}).reattribue || {}).main) ? 'Si le carton porte encore l’ancien numéro, barre-le et écris le nouveau.' : 'Barre l’ancien numéro sur le carton et écris le nouveau.'} L'ancien ne sera jamais redonné.</Pourquoi></span>
       <span className="vrm-alerte-ligne-sous">Barre l’ancien, écris le nouveau.</span></span></div>
       {aEcrireCarton.map((it) => { const f = numeros[it.id] || {}; const etq = etiquetteSurVinted(f.numero, f.reattribue.de, it.title); return (
         <div key={it.id} data-a-ecrire={String(it.id)} data-a-ecrire-de={f.reattribue.de} data-a-ecrire-vers={f.numero} data-a-ecrire-main={f.reattribue.main ? '1' : '0'} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '6px 0', borderTop: `1px solid ${C.border}` }}>
@@ -55618,6 +55631,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {!premierJour && (
                   <CarteStatsApp page="journee" aide liveStats={liveStats} nu ici="journee" onNav={onNav}
                     sel={{ site: 'toutes', compte: null, periode: null }}
+                    pile={(() => { const auj = new Date().toDateString(); const v = dernieresVentes.filter((o) => o._t && new Date(o._t).toDateString() === auj);
+                      return v.length ? { srcs: v.map((o) => orderPhoto(o)), n: v.length, Photo: PhotoVinted, mortes: imgMortes, onMorte: noterImgMorte } : null; })()}
                     attrsDe={(x) => {
                       if (x.place.id === 'vendu' && x.p === 'jour') return { 'data-fu-vendu-jour': x.valeur == null || ventesPasLues ? '' : String(Math.round(x.valeur * 100)) };
                       if (x.place.id === 'benefice' && x.p === 'mois') { const B = x.B, e2 = (v) => v == null ? '' : String(Math.round(v * 100) / 100);
@@ -55769,7 +55784,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const pasLus = T.filter((x) => x.pasSu).map((x) => x.l);
               if (nGestes === 0) return pasLus.length
                 ? <p className="vrm-fu-vide" data-tout-a-jour="" data-pas-lu={pasLus.join(', ')}>Rien à faire dans ce qui est lu · {pasLus.join(', ').toLowerCase()} : pas lu</p>
-                : <p className="vrm-fu-vide" data-tout-a-jour="">Rien à faire</p>;
+                : <div className="vrm-fu-vide vrm-vide-dessin" data-tout-a-jour=""><Illustration nom="basket" taille={96}/><p>Rien à faire</p></div>;
               return (
                 <section className="vrm-fu-afaire" aria-label="À faire">
                   <div className="vrm-fu-titre-section"><h2 className="vrm-day-titre-section">À faire</h2><span data-fu-gestes={nGestes}>{nGestes} geste{nGestes > 1 ? 's' : ''}</span></div>
@@ -56052,7 +56067,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {sales.error && <EtatPanne quoi="Tes ventes Vinted" raison="La lecture n’a pas répondu. Rien n’est perdu." onReessayer={()=>loadOrders('sold',setSales,true)}/>}
         {/* (5 nov., chantier E2) L'état vide dit ce qui va se passer : TOUTES les ventes arrivent ici
             (pas seulement les finalisées, comme le disait l'ancienne phrase). */}
-        {sales.items && !sales.error && sales.items.length===0 && <div className="vrm-toutes-vide" data-ventes-vide=""><p className="vrm-toutes-vide-titre">Aucune vente pour l’instant</p><p>Dès qu’un article part sur Vinted, il apparaît ici avec son état et son bordereau.</p></div>}
+        {sales.items && !sales.error && sales.items.length===0 && <div className="vrm-toutes-vide vrm-vide-dessin" data-ventes-vide=""><Illustration nom="etiquette" taille={110}/><p className="vrm-toutes-vide-titre">Aucune vente pour l’instant</p><p>Dès qu’un article part sur Vinted, il apparaît ici avec son état et son bordereau.</p></div>}
         {/* ⚠️ SUR ORDINATEUR, LA LISTE SE RANGE EN DEUX COLONNES.
             Une ligne de vente de 980 px pour une photo, un titre et un
             prix, c'est le meme defaut que les cartes d'action de Ma
@@ -56798,11 +56813,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             le bas, alors que c'est exactement ce qu'on vient chercher quand on
             part au relais. Ils reviennent tels quels sur En route / Reçus /
             Tous, où ils filtrent vraiment quelque chose. */}
-        {buysBase.length>0 && aFilter!=='attente' && <PeriodePicker value={periode} onChange={setPeriode} titre="Période des achats" datation="Date d’achat"/>}
+        {/* (6 nov., v36-visuel-2) La recherche et la période sur UNE ligne (la période sans valeur =
+            son icône seule, le libellé reste lu au lecteur d'écran) : la liste remonte d'un cran. */}
+        {buysBase.length>0 && aFilter!=='attente' && <div className="vrm-achats-filtres">
         {buysBase.length>0 && aFilter!=='attente' && (
           <label className="vrm-msg-search vrm-achats-search" style={{color:C.muted}}><Icon name="search" size={16}/><input type="search" aria-label="Rechercher un achat" value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="Titre, N°, vendeur"
             style={{color:C.text,background:'transparent',border:0,boxShadow:'none'}}/></label>
         )}
+        <PeriodePicker value={periode} onChange={setPeriode} titre="Période des achats" datation="Date d’achat"/></div>}
         {/* ── LES CHIFFRES DE L'ACHAT (l'écran n'en avait AUCUN) ─────────────────
             « C'est mon métier, fais ça comme un pro. » L'écran Ventes porte
             quatre chiffres depuis toujours ; Achats, zéro — alors que l'achat,
@@ -56926,7 +56944,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             seulement quand tout est lu (e-mails de suivi, achats) : pas su ≠ rien. */}
         {modeRetraits && !retraitsOutils && !baseKO && tracking!==null && !trackingKO && Array.isArray(buys.items) && !buys.error && pickupUnion.total===0
           && !(pickupUnion.aVerifier||[]).length && !(pickupUnion.aConfirmer||[]).length && !(aConfirmer.etat==='lu' && aConfirmer.liste.length) && (
-          <div data-retraits-vide="" style={{fontSize:13,color:C.muted,padding:'18px 0',lineHeight:1.5}}>Aucun colis à aller chercher pour l'instant.</div>
+          <div data-retraits-vide="" className="vrm-vide-dessin" style={{fontSize:13,color:C.muted,padding:'18px 0',lineHeight:1.5}}><Illustration nom="boite" taille={110}/><p>Aucun colis à aller chercher pour l'instant.</p></div>
         )}
         {(()=>{
           // (2 nov.) Sous Colis → « À retirer », chaque colis et son code sont dans la
@@ -57758,24 +57776,33 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const href = o ? lienConv(o) : (t && t.suivi ? trackUrl(t.carrier || '', String(t.suivi)) : '');
                 return (
                   <div key={o ? 'nr' + o.transaction_id : 'nrt' + ((t && t.suivi) || ix)} className="vrm-rpf-ligne vrm-reparti-court" {...(o ? { 'data-reparti-tx': String(o.transaction_id) } : { 'data-reparti-suivi': (t && t.suivi) || '' })}>
-                    <div className="vrm-rpf-rang" style={{cursor:'default'}}>
+                    {/* (6 nov., v36-visuel-2) Une rangée de Wallet : la puce dit l'état en court (une ligne,
+                        jamais coupée), le MONTANT vit à droite comme un prix ; toute la rangée ouvre la
+                        conversation de LA commande (↗) — plus de « Ouvrir » qui serrait la puce sur 2 lignes. */}
+                    {(() => { const corps = (<>
                       <span className={'vrm-rpf-vignette' + (ph && !imgMortes.has(ph) ? '' : ' is-sans')} aria-hidden="true">{ph && !imgMortes.has(ph) ? <PhotoVinted src={ph} alt="" loading="lazy" onError={() => noterImgMorte(ph)}/> : null}</span>
                       <span className="vrm-rpf-quoi"><span className="vrm-rpf-titre">{o ? (o.title || 'Achat') : `${carrierName(t && t.carrier)} · n° ${(t && t.suivi) || ''}`}</span>
-                        <span className="vrm-rpf-puces"><span className="vrm-rpf-puce is-ambre" data-montant="">Remboursement à vérifier{m > 0 ? ` · ${m.toFixed(2).replace('.', ',')} €` : ''}</span></span></span>
-                      {href ? <a className="vrm-rpf-code" href={href} target="_blank" rel="noreferrer" data-reparti-ouvrir="" style={{display:'inline-flex',alignItems:'center',textDecoration:'none'}}>Ouvrir</a> : null}
-                    </div>
+                        <span className="vrm-rpf-puces"><span className="vrm-rpf-puce is-ambre">Remboursement à vérifier</span></span></span>
+                      {m > 0 ? <b className="vrm-rpf-montant" data-montant="">{montant(m)}</b> : null}
+                      {href ? <span className="vrm-rpf-sortie" aria-hidden="true">↗</span> : null}
+                    </>);
+                    return href
+                      ? <a className="vrm-rpf-rang vrm-rpf-rang-lien" href={href} target="_blank" rel="noreferrer" data-reparti-ouvrir="" aria-label={`Ouvrir la conversation : ${o ? (o.title || 'achat') : 'colis'}, remboursement à vérifier${m > 0 ? ' ' + montant(m) : ''}`}>{corps}</a>
+                      : <div className="vrm-rpf-rang" style={{cursor:'default'}}>{corps}</div>; })()}
                   </div>); })}
             </div>
             </section>
           );
           return (
             <div className="vrm-achats-bloc" data-repartis={rendus.length} style={{background:C.card,border:`1px solid ${C.border}`}}>
-              <div className="vrm-achats-bloc-t" style={{color:C.text}}>
-                <span aria-hidden="true" style={{color:C.warn,display:'inline-flex',verticalAlign:'-3px',marginRight:6}}><Icon name="alert" size={16}/></span>
-                {rendus.length} colis {rendus.length>1?'sont repartis':'est reparti'} chez {rendus.length>1?'leurs vendeurs':'son vendeur'}{tot>0 && <> — <span data-montant="" style={{whiteSpace:'nowrap'}}>{auMoins?'au moins ':''}{tot.toFixed(2).replace('.',',')} €</span> à vérifier</>}
-              </div>
-              <div className="vrm-achats-bloc-p" style={{color:C.muted}}>
-                L'article ne viendra pas. Vérifie le remboursement dans la conversation Vinted de la commande.
+              {/* (6 nov., v36-visuel-2) Une carte d'alerte : icône · titre court + « ⓘ » (le pourquoi) ·
+                  UNE ligne (le montant à vérifier) — plus 4 lignes de phrase avant la liste. */}
+              <div className="vrm-achats-bloc-t vrm-alerte-tete" style={{color:C.text}}>
+                <span aria-hidden="true" className="vrm-alerte-icone"><Icon name="alert" size={15}/></span>
+                <span className="vrm-alerte-ligne-texte">
+                  <span className="vrm-alerte-ligne-titre">{rendus.length} colis {rendus.length>1?'repartis':'reparti'} chez {rendus.length>1?'leurs vendeurs':'son vendeur'}{' '}<Pourquoi titre="Colis reparti">L'article ne viendra pas. Vérifie le remboursement dans la conversation Vinted de la commande.</Pourquoi></span>
+                  <span className="vrm-alerte-ligne-sous">{tot>0 ? <><span data-montant="" style={{whiteSpace:'nowrap'}}>{auMoins?'au moins ':''}{montant(tot)}</span> à vérifier</> : 'Remboursement à vérifier'}</span>
+                </span>
               </div>
               <div className="vrm-achats-bloc-liste">
                 {rendus.slice(0,8).map((r,ix)=>{
@@ -57801,11 +57828,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{fontSize:15,fontWeight:500,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.title||'Achat'}</div>
                         <div style={{fontSize:12,color:C.muted,marginTop:2}}>
-                          {montantCommande(o).toFixed(2).replace('.',',')} €{isFinite(j) ? ` · commandé il y a ${j} jour${j>1?'s':''}` : ''}{st?` · ${st}`:''}
+                          {montant(montantCommande(o))}{isFinite(j) ? ` · commandé il y a ${j} jour${j>1?'s':''}` : ''}{st?` · ${st}`:''}
                         </div>
                         {(()=>{ const su = r.t ? suiviDeLigne(r.t) : suivisAchat(o, indexSuivisAchats)[0]; const e = entreeSuiviAchat(o); return su ? <LigneTransporteur transp={transpMap} suivi={su} carrier={(r.t && r.t.carrier) || (e && e.transporteur) || transporteurDeForme(su) || ''}/> : null; })()}
                       </div>
-                      {href && <Bouton variante="discret" className="vrm-pickup-lien" href={href} target="_blank" rel="noreferrer" style={{flexShrink:0}}>Ouvrir la conversation ↗</Bouton>}
+                      {href && <Bouton variante="discret" className="vrm-pickup-lien" href={href} target="_blank" rel="noreferrer" style={{flexShrink:0}}>Conversation ↗</Bouton>}
                     </div>
                   );
                 })}
@@ -57931,7 +57958,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 )}
               </div>
               {/* Prix à deux décimales et une virgule (jamais « 21.0 € » brut). */}
-              <div className="vrm-buy-price" style={{color:C.text}}>{montantCommande(o).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})}{' '}{cur(o.price?.currency_code)}</div>
+              <div className="vrm-buy-price" style={{color:C.text}}>{montant(montantCommande(o), { devise: o.price?.currency_code || 'EUR' })}</div>
               {/* Actions rapides : suivre · code en accès direct ; le reste dans un
                   menu « … » (attestations, étiquette SKU, note interne, masquer). */}
               {(() => {
@@ -59676,6 +59703,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   cases={[{ cle: 'dernier', n: nD, l: 'd’ici demain', attrs: { 'data-n': String(nD) } }, { cle: 'code', n: nC, l: 'avec code', attrs: { 'data-n': String(nC) } }, { cle: 'verifier', n: nV, l: 'à vérifier', attrs: { 'data-n': String(nV) } }]}/>; }
               return (
               <CarteMois className="vrm-fu-ecran vrm-fu-colis" surtitre="Aujourd'hui" data-fu-colis-retirer={nRet == null ? '' : String(nRet)}
+                pile={nRet ? { srcs: ((parPoint && parPoint.points) || []).flatMap((p) => (p.arrives || []).filter((c) => !c.horsCompte).map((c) => c.photo)), n: nRet, Photo: PhotoVinted, mortes: imgMortes, onMorte: noterImgMorte } : null}
                 valeur={nRet == null ? null : <>{retPartiel ? <span className="vrm-fu-borne">au moins</span> : null}{nRet} colis</>}
                 sous={nRet == null ? 'Je lis tes colis…' : nRet === 0 ? 'Rien à aller chercher' : 'à retirer'}
                 cases={[
@@ -59762,7 +59790,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   return <div className="vrm-mr-bloc" data-mr-bloc="" data-mr-sans-qr={sansQr} data-mr-lu={mrColis === undefined ? 'en-cours' : mrColis === null ? 'pas-su' : 'lu'}>
                     <LecturesMondialRelay mr={mrColis}/>
                     <details className="vrm-repli" data-mr-explique="">
-                      <summary>{`Ajouter un QR Mondial Relay${sansQr ? ` · ${sansQr} colis sans QR` : ''}`}</summary>
+                      {/* (6 nov., v36-visuel-2) Une rangée : le geste à gauche, le nombre en valeur à droite (une ligne). */}
+                      <summary><span className="vrm-mr-titre">Ajouter un QR Mondial Relay</span>{sansQr ? <span className="vrm-mr-valeur"> · {sansQr} sans QR</span> : null}</summary>
                       <ExpliqueMondialRelay/>
                     </details>
                   </div>; })()}
@@ -65072,7 +65101,8 @@ function LeboncoinScreen() {
           <div style={{ fontSize: 13, fontWeight: 800, color: C.text }}>À faire sur Leboncoin</div>
           {conseilsLbc.slice(0, 4).map((c, i) => (
             <div key={c.k} data-lbc-conseil={c.k} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 0', borderTop: i ? `1px solid ${C.border}` : 'none' }}>
-              <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', background: c.urg ? C.warn : C.accentSoft, flexShrink: 0 }} />
+              {/* (6 nov., v36-visuel-2) Une icône de Réglages par geste (au lieu d'un point bleu) ; l'ambre au geste pressé. */}
+              <span aria-hidden="true" className="vrm-lbc-conseil-icone" data-urgent={c.urg ? '1' : undefined}><Icon name={{ publier: 'tag', 'relier-ventes': 'link', doublons: 'alert' }[c.k] || 'trash'} size={16}/></span>
               <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: C.text, lineHeight: 1.4 }}>{c.txt}</span>
               <button type="button" data-lbc-conseil-go={c.k} onClick={allerLbc(c)} style={{ border: `1px solid ${C.border}`, background: 'transparent', borderRadius: 12, padding: '4px 11px', fontSize: 12, fontWeight: 600, color: C.text, cursor: 'pointer', flexShrink: 0 }}>Voir</button>
             </div>
@@ -65139,7 +65169,7 @@ function LeboncoinScreen() {
         <div data-repub-lbc-porte={data.repub === null ? 'pas-su' : String(data.repub.length)} style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '12px 16px', marginBottom: 14 }}>
           <div style={{ flex: '1 1 220px', minWidth: 0 }}>
             <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Republier sur Leboncoin</div>
-            <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.45 }}>{data.repub === null ? "Je n'ai pas pu vérifier lesquelles peuvent l'être (une lecture a échoué) — clique « ↻ Actualiser »." : `Supprimer puis remettre une annonce comme neuve, une à la fois. ${data.repub.length} annonce${data.repub.length > 1 ? 's' : ''} peu${data.repub.length > 1 ? 'vent' : 't'} l'être.`}</div>
+            <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.45 }}>{data.repub === null ? "Je n'ai pas pu vérifier lesquelles peuvent l'être (une lecture a échoué) — clique « ↻ Actualiser »." : <>{`${data.repub.length} annonce${data.repub.length > 1 ? 's' : ''} peu${data.repub.length > 1 ? 'vent' : 't'} l'être`}{' '}<Pourquoi titre="Republier sur Leboncoin">Supprimer puis remettre une annonce comme neuve, une à la fois.</Pourquoi></>}</div>
           </div>
           {data.repub !== null && <button type="button" data-repub-lbc-ouvrir="" onClick={() => setRepubOuvert(true)} style={{ minHeight: 44, padding: '0 16px', borderRadius: 12, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Choisir les annonces…</button>}
         </div>
@@ -65508,7 +65538,7 @@ function LeboncoinScreen() {
                     <div className="vrm-apub-corps">
                       <div className="vrm-apub-ligne1">
                         <span className="vrm-apub-num">N°{q.numero}</span>
-                        <span className="vrm-apub-prix">{q.prix != null ? q.prix.toFixed(2).replace('.', ',') + ' €' : '—'}</span>
+                        <span className="vrm-apub-prix">{montant(q.prix)}</span>
                       </div>
                       <div className="vrm-apub-titre">{q.title || '—'}</div>
                       <div className="vrm-apub-pastilles">
@@ -65750,7 +65780,7 @@ function LigneVerifCarton({ it, fiche, preuve, onConfirmer, onCorriger, onPlusLa
       </div>
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
         <button type="button" disabled={occupe} onClick={() => agir(() => onConfirmer(it))} style={{ padding: '7px 10px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>C'est bien le N°{fiche.numero}</button>
-        <input value={v} onChange={(e) => setV(e.target.value)} inputMode="numeric" placeholder="ou le vrai N°" aria-label={`Numéro écrit sur l'étiquette de ${it.title}`}
+        <input value={v} onChange={(e) => setV(e.target.value)} inputMode="numeric" placeholder="Autre N°" aria-label={`Numéro écrit sur l'étiquette de ${it.title}`}
           onKeyDown={(e) => { if (e.key === 'Enter' && v.trim()) agir(() => onCorriger(it, v)); }}
           style={{ width: 118, padding: '7px 9px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 13 }}/>
         <button type="button" disabled={occupe || !v.trim()} onClick={() => agir(() => onCorriger(it, v))} style={{ padding: '7px 10px', borderRadius: 12, border: 'none', background: C.text, color: C.card, fontSize: 13, fontWeight: 600, cursor: v.trim() ? 'pointer' : 'default', opacity: v.trim() ? 1 : 0.5 }}>Corriger</button>

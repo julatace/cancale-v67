@@ -629,7 +629,7 @@ const ligne = (s, id) => s.lignes.find((l) => l.id === id) || {};
         dit(ligne(s, '120000000041').fin === parisJour(nuit) && parisJour(nuit) !== nuit.slice(0, 10),
           `${T} terminée à 23 h 30 UTC ⇒ « terminée le » au jour de PARIS (le lendemain)`, `${ligne(s, '120000000041').fin} · UTC ${nuit.slice(0, 10)} · Paris ${parisJour(nuit)}`);
         const usd = ligne(s, '120000000042').prix, sans = ligne(s, '120000000043').prix;
-        dit(/^95,00 USD$/.test(usd.trim()) && /^60,00$/.test(sans.trim()),
+        dit(/^95(,00)? USD$/.test(usd.trim()) && /^60(,00)?$/.test(sans.trim()),   // (6 nov., v36-visuel-2) `montant()` : les centimes seulement s'ils existent
           `${T} le prix avec SA devise : « 95,00 USD » (jamais « 95,00 € USD »), devise inconnue ⇒ aucun symbole`, JSON.stringify([usd, sans, (ligne(s, '120000000042').texte || '').replace(/\n/g, ' / '), (ligne(s, '120000000043').texte || '').replace(/\n/g, ' / ')]));
         await ctx.close();
       });
