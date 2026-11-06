@@ -125,9 +125,12 @@ nBenef === 2 ? ok('Rapports mensuel ET annuel : bénéfice sur le coût connu')
 // Dix étiquettes prêtes, annoncées nulle part sur l'écran qu'il ouvre en premier.
 {
   const i = app.indexOf('const pretsImpr');
-  const F = i < 0 ? '' : app.slice(i, i + 900);
+  const i0 = app.lastIndexOf('const cImpr', i);
+  const F = i < 0 ? '' : app.slice(i0 > 0 && i - i0 < 400 ? i0 : i, i + 900);
   F ? ok('« Expédier N colis » compte ce qui est imprimable') : nok('la carte doit compter les bordereaux prêts');
-  /prêt\$\{pretsImpr>1\?'s':''\} à imprimer|prêts? à imprimer/.test(F)
+  // (6 nov., audit des chiffres) « à imprimer » = pas encore imprimés, la règle de Colis
+  // (`compteAImprimer` sur `bordereauxAImprimer(lignesLot())`), plus « prêts » (imprimés compris).
+  (/compteAImprimer\(\{\s*local:\s*bordereauxAImprimer\(lignesLot\(\)\)/.test(F) && /\$\{pretsImpr\}[^`]*à imprimer/.test(F))
     ? ok('et le dit dans son sous-titre')
     : nok('le sous-titre doit annoncer les bordereaux prêts à imprimer');
   // ⚠️ « le code arrive par email » laissait croire qu'il n'y a rien à faire.

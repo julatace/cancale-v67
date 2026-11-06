@@ -332,7 +332,7 @@ import { beneficeLigneVente, texteBenefice, euros as eurosLigne } from "./benefi
 import { friseVente, phraseVente, eurosRecap, ETATS_HORS_PARCOURS } from "./recapVente.js";
 import { auCentreDeVerification } from "./verificationArticle.js";
 import { ligneEmailsCompte } from "./emailsCompteLie.js";
-import { prochainGesteColis, bordereauxAImprimer, gesteEnvoi } from "./prochainGesteColis.js";
+import { prochainGesteColis, bordereauxAImprimer, gesteEnvoi, compteAImprimer } from "./prochainGesteColis.js";
 import "./styles-onglets-b.css";
 import { comptesARelier, boitesQuiArrivent, phraseARelier } from "./relierCompte.js";
 import { adressesSansCompte, comptesSansAdresse, relierAdresse, CLE_ADRESSES_ACHETEUR } from "./adressesSansCompte.js";
@@ -50079,11 +50079,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     try {
       const ex = expeditions();
       const aPoster = ex.filter(e => !(e.o && isShipDone(e.o)));
-      const v = { prets: aPoster.filter(e => e.pret).length, total: aPoster.length, at: Date.now() };
+      // (6 nov., audit des chiffres) + `aImprimer` : les prêts PAS ENCORE imprimés, la case
+      // « À imprimer » de Colis (`bordereauxAImprimer`) — ce que Ma journée doit redire.
+      const v = { prets: aPoster.filter(e => e.pret).length, aImprimer: bordereauxAImprimer(lignesLot()).length, total: aPoster.length, at: Date.now() };
       const avant = load('vrm_colis_prets', null);
-      if (!avant || avant.prets !== v.prets || avant.total !== v.total) save('vrm_colis_prets', v);
+      if (!avant || avant.prets !== v.prets || avant.aImprimer !== v.aImprimer || avant.total !== v.total) save('vrm_colis_prets', v);
     } catch (_) {}
-  /* eslint-disable-next-line */ }, [sub, labelsPrets, sales.items, emailBords, labelsCaptes, numeros]);
+  /* eslint-disable-next-line */ }, [sub, labelsPrets, sales.items, emailBords, labelsCaptes, numeros, bordsPrinted, shipDone]);
   // Identité certaine des ventes (transaction → annonce). Une seule lecture, en
   // scalaires : elle sert au N°, au bordereau, au prix d'achat et à la photo.
   // `txnPret` = la lecture des identités « transaction → annonce » a répondu
@@ -54576,15 +54578,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           //    Colis a PUBLIÉ ; à défaut on garde ce qu'on sait, mais on ne le
           //    présente plus comme un total (§5 : un total partiel présenté
           //    comme complet est pire qu'un total absent).
-          const localPrets = expeditions().filter(e => !(e.o && isShipDone(e.o))
-            && ((e.b && e.b.hasPdf) || (e.txn && labelsCaptes[e.txn]))).length;
+          // (6 nov., audit des chiffres) « À IMPRIMER » = la case de Colis : les bordereaux reçus PAS
+          // ENCORE imprimés (`bordereauxAImprimer` sur `lignesLot`, la même liste), publiés par Colis
+          // (`vrm_colis_prets.aImprimer`) — avant : « 5 prêts » ici (imprimés compris, e-mails seuls,
+          // sans « au moins ») pour « 4 à imprimer » sur Colis, même base (src/prochainGesteColis.js).
           const pub = labelsPrets ? null : load('vrm_colis_prets', null);
-          // La ligne publiée ne vaut que si elle parle du MÊME lot de colis.
-          const exact = labelsPrets || !!(pub && pub.total === toShip.length);
-          const pretsImpr = (!labelsPrets && pub && pub.total === toShip.length)
-            ? Math.max(pub.prets, localPrets) : localPrets;
-          const combien = `${exact?'':'au moins '}${pretsImpr} bordereau${pretsImpr>1?'x':''} prêt${pretsImpr>1?'s':''} à imprimer`;
-          const sub = late>0 && pretsImpr>0 ? `${late} en retard · ${exact?'':'au moins '}${pretsImpr} prêt${pretsImpr>1?'s':''} à imprimer`
+          const cImpr = compteAImprimer({ local: bordereauxAImprimer(lignesLot()).length, complet: labelsPrets, pub, totalAPoster: toShip.length });
+          const exact = cImpr.exact;
+          const pretsImpr = cImpr.n;
+          const combien = `${exact?'':'au moins '}${pretsImpr} bordereau${pretsImpr>1?'x':''} à imprimer`;
+          const sub = late>0 && pretsImpr>0 ? `${late} en retard · ${exact?'':'au moins '}${pretsImpr} à imprimer`
             : late>0 ? `${late} en retard — à poster en priorité`
             : pretsImpr>0 ? `${combien}${exact?' — le reste attend le sien':''}`
             : 'Bordereau + article au stock, coche par colis';
@@ -55302,11 +55305,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const gesteCase = (x) => {
           const e = x.id === 'envoyer' && !x.pasSu && x.t && x.t.emballer;
           if (!e) return null;
-          const n = x.t.n || 0;
           return (
             <Bouton variante="secondaire" icone="box" className="vrm-b-petit vrm-day-case-geste" data-job="emballer" data-n={e.n} title={e.phrase}
               onClick={()=>{ DEMANDE_EMBALLAGE.at = Date.now(); if (onNav) onNav('cat_bord'); }}>
-              {e.n >= n ? 'Emballer' : `Emballer les ${e.n} prêts`}
+              {/* (6 nov., audit des chiffres) `e.n` = « à imprimer » : le nombre n'est pas redit ici */}Emballer
             </Bouton>
           );
         };
@@ -55775,7 +55777,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     data-presses={x.id === 'envoyer' && x.t && x.t.presses ? String(x.t.presses.n) : undefined} data-limite-heure={x.id === 'envoyer' && x.t && x.t.presses ? x.t.presses.heure : undefined} data-a-verifier={x.id === 'retirer' && x.t && x.t.aVerifier ? String(x.t.aVerifier) : undefined}
                     title={titreCase(x)} onClick={()=>{ if (x.id === 'envoyer' && nPretsJournee > 0) _pendingBordPrint = true; if (onNav) onNav(x.tab); }}>
                     <PileVignettes srcs={photosCase[x.id]} n={x.t.n} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name={icCase[x.id] || x.ic} size={20}/>}/>
-                    <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{presse && !(so && so.ambre) ? <span className="vrm-fu-point" data-fu-point="" aria-hidden="true"/> : null}{libCase(x.id, x.t.n) || x.l}</span>{so ? <span className={'vrm-day-task-note' + (so.ambre ? ' is-urgent' : '')} data-sous-ligne={so.cle}>{so.texte}</span> : (x.id === 'envoyer' && nPretsJournee > 0) ? <span className="vrm-day-task-note">{nPretsJournee} prêt{nPretsJournee > 1 ? 's' : ''} à imprimer</span> : null}</span>
+                    <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{presse && !(so && so.ambre) ? <span className="vrm-fu-point" data-fu-point="" aria-hidden="true"/> : null}{libCase(x.id, x.t.n) || x.l}</span>{so ? <span className={'vrm-day-task-note' + (so.ambre ? ' is-urgent' : '')} data-sous-ligne={so.cle}>{so.texte}</span> : (x.id === 'envoyer' && nPretsJournee > 0) ? <span className="vrm-day-task-note" data-journee-a-imprimer={nPretsJournee} data-exact={tuiles.envoyer.emballer.exact ? '1' : '0'}>{tuiles.envoyer.emballer.exact ? '' : 'au moins '}{nPretsJournee} à imprimer</span> : null}</span>
                     <span className={'vrm-day-task-action' + (x.id === 'envoyer' && nPretsJournee > 0 ? ' is-principal' : '')} data-fu-principal={x.id === 'envoyer' && nPretsJournee > 0 ? '' : undefined}><span className="vrm-day-task-action-mot">{gesteCaseF[x.id] || VERBES.voir}</span></span>
                   </button>
                 );
@@ -59894,7 +59896,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // (19 oct.) Les ventes eBay à poster entrent dans le total (le même
           // nombre que Ma journée et la cloche, §11). eBay illisible ⇒ « au moins ».
           const nEb = colisEb && colisEb.aPoster ? colisEb.aPoster.length : 0;
-          const tot = aPoster.length + nEb;
+          // (6 nov., audit des chiffres) + Leboncoin et Vestiaire : le MÊME total que la carte
+          // « Aujourd'hui » de cet écran (`vrm_colis_aposter`) — il disait 11 sous une carte à 12.
+          const nAutresRecap = (colisAutres.leboncoin ? colisAutres.leboncoin.length : 0) + (colisAutres.vestiaire ? colisAutres.vestiaire.length : 0);
+          const tot = aPoster.length + nEb + nAutresRecap;
+          // « À imprimer » = pas encore imprimés (la case de la carte, `bordereauxAImprimer`).
+          const nAImprRecap = bordereauxAImprimer(lignesLot()).length;
           // Sans compte relié ni colis : le geste est dit en tête, pas « aucun envoi ».
           if (colisSansCompte) return null;
           const uRecap = urgenceColis();
@@ -59929,7 +59936,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <div style={{fontSize:13,color:C.muted,marginTop:8,lineHeight:1.45}}>
                     {aPoster.length>0
                       ? (!lectureComplete && avecPdf.length===0) ? 'Je lis encore tes bordereaux…'
-                      : `${lectureComplete?'':'au moins '}${avecPdf.length} bordereau${avecPdf.length>1?'x':''} prêt${avecPdf.length>1?'s':''} à imprimer${lectureComplete && aPoster.length-avecPdf.length>0 && !(emailBordsKO && emailBords===null)?` · ${aPoster.length-avecPdf.length} en attente de bordereau`:''}${proNb>0?` · ${proNb} avec facture (pro)`:''}${lectureComplete?'':' — je n’ai pas encore pu lire tous tes bordereaux'}`
+                      : `${lectureComplete?'':'au moins '}${nAImprRecap} bordereau${nAImprRecap>1?'x':''} à imprimer${avecPdf.length-nAImprRecap>0?` · ${avecPdf.length-nAImprRecap} déjà imprimé${avecPdf.length-nAImprRecap>1?'s':''}`:''}${lectureComplete && aPoster.length-avecPdf.length>0 && !(emailBordsKO && emailBords===null)?` · ${aPoster.length-avecPdf.length} en attente de bordereau`:''}${proNb>0?` · ${proNb} avec facture (pro)`:''}${lectureComplete?'':' — je n’ai pas encore pu lire tous tes bordereaux'}`
                       : nEb ? '' : (sales.error && !(sales.items||[]).length) ? 'Tes ventes Vinted n\'ont pas pu être lues : « aucun » n\'est pas su (voir dessous).' : 'Vinted ne te demande aucun envoi en ce moment.'}
                     {nEb>0 && <span>{aPoster.length>0?' · ':''}{nEb} vente{nEb>1?'s':''} eBay</span>}
                     {colisEb === null && <span data-colis-recap-ebay-ligne="passu">{tot>0?' · ':''}ventes eBay pas lues pour l'instant</span>}
@@ -60307,7 +60314,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {tourneeItems.length ? <Bouton variante="secondaire" icone="pin" data-tournee-ouvrir={tourneeItems.length} onClick={() => setTourneeDepot(true)}>Tournée de dépôt</Bouton> : null}
                     {tourneeDepot ? (
                       <SheetShell onClose={() => setTourneeDepot(false)} titre="Tournée de dépôt" maxWidth={560} data-tournee-sheet=""
-                        sousTitre={(() => { const m0 = new Date(); m0.setHours(0, 0, 0, 0); const d = gestesDepuis(shipDone, m0.getTime()); return `${tourneeItems.length} colis à déposer${d ? ` · ${d} déjà déposé${d > 1 ? "s" : ""} aujourd’hui` : ""}`; })()}>
+                        sousTitre={(() => { const m0 = new Date(); m0.setHours(0, 0, 0, 0); const d = gestesDepuis(shipDone, m0.getTime()); // (6 nov., audit des chiffres) « à déposer » = les colis qui ONT leur bordereau (ceux qu'on peut
+                          // déposer) ; une vente qui attend le sien est dite à part, jamais comptée « à déposer ».
+                          const nDep = tourneeItems.filter((t) => t.pret).length, nAtt = tourneeItems.length - nDep;
+                          return `${nDep} colis à déposer${nAtt ? ` · ${nAtt} ${nAtt > 1 ? 'attendent leur' : 'attend son'} bordereau` : ''}${d ? ` · ${d} déjà déposé${d > 1 ? "s" : ""} aujourd’hui` : ""}`; })()}>
                         <div className="vrm-tournee">
                           <div className="vrm-tournee-haut">
                             <p className="vrm-tournee-note">Dépose chaque groupe dans un point de son transporteur. Le point précis n’est pas lu par VRM.</p>
