@@ -148,6 +148,11 @@ const capture = async (pg, nom, sel) => { if (!SHOTS) return; fs.mkdirSync(SHOTS
       const A = await attrs(pg, '[data-a-venir]');
       const att = Math.round((A_VENIR_VINTED + VC_MONTANT) * 100);
       dit(A && A['a-venir-site'] === 'toutes' && Number(A['a-venir']) === att && A['a-venir-n'] === '3', `A : Ventes · Tous — « À venir » = ${att / 100} € sur 3 ventes (Vinted + Vestiaire)`, JSON.stringify(A));
+      // (6 nov.) Le détail par compte est replié : le total seul, puis le détail au toucher.
+      const replieAvant = await pg.evaluate(() => ({ ferme: !!document.querySelector('[data-a-venir-replier="ferme"]'), lignes: document.querySelectorAll('[data-a-venir-ligne]').length }));
+      dit(replieAvant.ferme && replieAvant.lignes === 0, 'A : le détail par compte est replié (le total seul)', JSON.stringify(replieAvant));
+      await pg.click('[data-a-venir-replier="ferme"]').catch(() => {});
+      await pg.waitForSelector('[data-a-venir-ligne]', { timeout: 5000 }).catch(() => {});
       const lignes = await pg.evaluate(() => [...document.querySelectorAll('[data-a-venir-ligne]')].map((e) => ({ s: e.getAttribute('data-a-venir-ligne'), c: e.getAttribute('data-a-venir-compte'), eur: e.getAttribute('data-a-venir-eur'), prevu: e.getAttribute('data-a-venir-prevu') })));
       dit(lignes.length === 3 && lignes.some((l) => l.s === 'Vinted' && l.c === 'atelier_sneak' && l.eur === '7000') && lignes.some((l) => l.s === 'Vinted' && l.c === 'paris_kicks' && l.eur === '4550'), 'A : une ligne par site et par compte', JSON.stringify(lignes));
       const vc = lignes.find((l) => l.s === 'Vestiaire');
