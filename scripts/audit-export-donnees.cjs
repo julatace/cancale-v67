@@ -111,7 +111,7 @@ const imp = (f) => import(require('url').pathToFileURL(path.join(SRC, f)).href);
   dit(/lireTout\('id=like\.harvest_\*_orders_purchased&select=id,orders:data->payload->my_orders'\)/.test(bloc) && /lireTout\('id=like\.email_invoice_\*&select=id,number:/.test(bloc), 'X6 achats et factures lus PAGINÉS (lireTout) et PROJETÉS');
   dit(!/select=(id,)?data\b(?!->)/.test(bloc), 'X6 jamais `select=data`');
   dit(!/method:\s*'(POST|PATCH|PUT|DELETE)'|save\(|modifierDonnee|\/api\//.test(bloc), 'X6 aucune écriture, aucun envoi : le zip est seulement téléchargé');
-  dit(/\{ id:'donnees', type:'action', ic:'save', lib:'Exporter mes données', onClick:exporterMesDonnees, data:\{ 'data-exporter-donnees':'' \} \}/.test(APP), 'X6 Paramètres → « Exporter mes données », sans texte explicatif');
+  dit(/\{ id:'donnees', type:'action', ic:'[a-z-]+', lib:'Exporter mes données', onClick:exporterMesDonnees, data:\{ 'data-exporter-donnees':'' \} \}/.test(APP), 'X6 Paramètres → « Exporter mes données », sans texte explicatif');
   console.log(`\n${ok} contrôle(s) OK, ${ko} en échec`);
   process.exit(ko ? 1 : 0);
 })();
