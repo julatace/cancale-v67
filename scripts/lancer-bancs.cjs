@@ -20,7 +20,7 @@ const fs = require('fs');
 const { spawn } = require('child_process');
 
 const RACINE = path.join(__dirname, '..');
-// Mesuré le 6 nov. (4 cœurs, seuls) : voir docs/passation/2026-11-06-filets-anti-bug.md.
+// Les parts et les durées : docs/passation/2026-11-06-filets-anti-bug.md (§1).
 const LOT = ['nouveau-vendeur', 'navigation-tache', 'ventes-e2', 'colis-retirer-propre',
   'annonces-actions', 'journee-coherence', 'iphone-reprise', 'argent-mois', 'garde-ecrans', 'morceau-perime'];
 const noms = process.argv.slice(2).length ? process.argv.slice(2) : LOT;

@@ -32,19 +32,24 @@ if (process.env.COMPARER) {
   for (const cle of Object.keys(a)) {
     const x = a[cle], y = b[cle];
     if (!y) { console.log(`KO  ${cle} : absent de la seconde mesure`); ecarts++; continue; }
-    for (const k of ['texte', 'noeuds', 'lectures', 'ecritures']) {
-      const same = k === 'texte' ? x[k] === y[k] : x[k] === y[k];
+    // `lectures` et `ecritures` (des NOMBRES) bougent avec l'horloge : dits, jamais jugés.
+    console.log(`··  ${cle} lectures ${x.lectures} / ${y.lectures}, écritures ${x.ecritures} / ${y.ecritures} (selon l'horloge, non jugés)`);
+    for (const k of ['texte', 'noeuds', 'formes']) {
+      const same = k === 'formes' ? JSON.stringify(x[k] || null) === JSON.stringify(y[k] || null) : x[k] === y[k];
       if (!same) {
         ecarts++;
         if (k === 'texte') {
           const lx = x.texte.split('\n'), ly = y.texte.split('\n');
           const diff = lx.filter((l) => !ly.includes(l)).slice(0, 4).concat(['→'], ly.filter((l) => !lx.includes(l)).slice(0, 4));
           console.log(`KO  ${cle} texte différent : ${diff.join(' ¦ ')}`);
+        } else if (k === 'formes') {
+          const a1 = new Set(x.formes || []), b1 = new Set(y.formes || []);
+          console.log(`KO  ${cle} lectures différentes : en moins ${[...a1].filter((u) => !b1.has(u)).slice(0, 3).join(' ¦ ')} · en plus ${[...b1].filter((u) => !a1.has(u)).slice(0, 3).join(' ¦ ')}`);
         } else console.log(`KO  ${cle} ${k} : ${x[k]} ≠ ${y[k]}`);
-      } else console.log(`OK  ${cle} ${k} identique${k === 'texte' ? ` (${x.texte.length} caractères)` : ` (${x[k]})`}`);
+      } else console.log(`OK  ${cle} ${k} identique${k === 'texte' ? ` (${x.texte.length} caractères)` : k === 'formes' ? ` (${(x.formes || []).length} lectures différentes)` : ` (${x[k]})`}`);
     }
   }
-  console.log(ecarts ? `\n❌ ${ecarts} écart(s)` : '\n✅ mêmes textes, mêmes nœuds, mêmes lectures et écritures');
+  console.log(ecarts ? `\n❌ ${ecarts} écart(s)` : '\n✅ mêmes textes, mêmes nœuds, les mêmes lectures (ensemble des requêtes différentes)');
   process.exit(ecarts ? 1 : 0);
 }
 
@@ -172,8 +177,16 @@ async function mesurer(nav, sortie) {
   for (const W of LARGEURS) for (const tab of ['journee', 'ventes', 'cat_bord']) {
     const bv = base();
     let lectures = 0;
+    const formes = new Set();
     const o = await NV.ouvrir(nav, { W, sombre: false, base: bv, tab });
-    o.pg.on('request', (r) => { if (/\/rest\/v1\//.test(r.url()) && r.method() === 'GET') lectures++; });
+    // Le NOMBRE de lectures dépend de l'horloge (relectures périodiques : mesuré, le
+    // même dist/ deux fois donne 71 puis 75) ; l'ENSEMBLE des lectures différentes
+    // (adresse sans dates ni nombres) ne dépend que du code : c'est lui qui juge.
+    o.pg.on('request', (r) => {
+      if (!/\/rest\/v1\//.test(r.url()) || r.method() !== 'GET') return;
+      lectures++;
+      formes.add(decodeURIComponent(r.url().replace(/^https?:\/\/[^/]+/, '')).replace(/\d{4}-\d\d-\d\dT[\d:.]+Z?/g, 'DATE').replace(/\d+/g, 'N'));
+    });
     // On recharge : le compteur voit TOUTES les lectures depuis l'ouverture.
     lectures = 0;
     await o.pg.reload({ waitUntil: 'domcontentloaded' });
@@ -185,7 +198,7 @@ async function mesurer(nav, sortie) {
       const t = ((main && main.innerText) || '').replace(/\b\d{1,2}[:h]\d{2}\b/g, 'HH:MM').replace(/il y a \d+ ?(s|min|h|j)\b/g, 'il y a N');
       return { texte: t, noeuds: main ? main.querySelectorAll('*').length : 0 };
     });
-    res[`${tab}@${W}`] = { ...m, lectures, ecritures: bv.ecritures };
+    res[`${tab}@${W}`] = { ...m, lectures, formes: [...formes].sort(), ecritures: bv.ecritures };
     console.log(`MESURE ${tab}@${W} : ${m.texte.length} caractères, ${m.noeuds} nœuds, ${lectures} lectures, ${bv.ecritures} écritures`);
     await o.ctx.close();
   }
