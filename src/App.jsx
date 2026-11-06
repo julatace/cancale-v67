@@ -68107,7 +68107,7 @@ function ListeMotsStream({ id, titre, mots, onChange }) {
         <input type="text" value={saisie} onChange={(e) => setSaisie(e.target.value)} placeholder={STREAM_EX_LISTE[id]} aria-label={titre}
           autoCapitalize="none" autoCorrect="off" spellCheck={false} maxLength={200}
           style={{background:C.bg,color:C.text,border:`1px solid ${C.border}`}}/>
-        <Bouton type="submit" disabled={!saisie.trim()} data-stream-ajouter={id}>Ajouter</Bouton>
+        <Bouton type="submit" disabled={!saisie.trim()} title={saisie.trim() ? undefined : 'Écris d’abord dans le champ à côté ce qu’il faut cacher.'} data-stream-ajouter={id}>Ajouter</Bouton>
       </form>
     </div>
   );
