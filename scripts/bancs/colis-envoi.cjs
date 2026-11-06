@@ -43,15 +43,15 @@ const ACCOUNTS = [{ id: 1, vinted_user_id: '111', login: 'compte_a', domain: 'ww
 const LONG = 'Nike Air Force 1 Low Triple White édition limitée collaboration très longue description sans espace ni fin';
 // tx, titre, n° de suivi (sa forme dit le transporteur), N°, âge de la vente (jours), PDF, date limite lue
 const V = [
-  { tx: 9301, titre: 'Air Max 90 blanche 42', suivi: 'XA123456789FR', num: '31', age: 1, pdf: true },
-  { tx: 9302, titre: 'Air Max 90 blanche 42', suivi: 'XB223456789FR', num: '32', age: 3, pdf: true },
+  { tx: 9301, titre: 'Air Max 90 blanche 42', suivi: 'XW123456789TS', num: '31', age: 1, pdf: true },
+  { tx: 9302, titre: 'Air Max 90 blanche 42', suivi: 'XW223456789TS', num: '32', age: 3, pdf: true },
   { tx: 9303, titre: 'Samba noire 40', suivi: '', num: '33', age: 9, pdf: false },
   { tx: 9304, titre: 'Gel 1130 argent 41', suivi: '41234567', num: '34', age: 2, pdf: true, limite: `${jourFr(1)} à 12:00` },
   { tx: 9305, titre: LONG, suivi: '42234567', num: '35', age: 6, pdf: true },
 ];
 const PARTIS = [
   { tx: 9306, titre: 'Forum Low 43', suivi: '43234567', num: '36', age: 4, status: 'Colis en transit' },
-  { tx: 9307, titre: 'Club C 44', suivi: 'XC323456789FR', num: '37', age: 6, status: 'Colis livré' },
+  { tx: 9307, titre: 'Club C 44', suivi: 'XW323456789TS', num: '37', age: 6, status: 'Colis livré' },
 ];
 // L'ordre attendu de « À envoyer » (par transporteur, la plus pressée d'abord, à limite égale la plus ancienne).
 const ORDRE = ['9303', '9305', '9304', '9302', '9301'];

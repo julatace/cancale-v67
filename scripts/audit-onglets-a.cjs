@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // AUDIT : MA JOURNÉE, VENTES, ACHATS — LES ÉCARTS MESURÉS SUR SA BASE (6 nov.)
-//   node scripts/audit-onglets-a.cjs [--mutation=sonde|encours|colis|aposter|frais|format|suspendue|segment|vc|relais|verifier]
+//   node scripts/audit-onglets-a.cjs [--mutation=sonde|encours|colis|aposter|frais|format|suspendue|segment|vc|relais|verifier|milliers|aide]
 // ═══════════════════════════════════════════════════════════════════════════
 // Ses données (copie lecture seule, hors dépôt) servies à l'app construite, chaque chiffre
 // comparé à un recalcul indépendant. Chaque écart est reproduit ici sur des données
@@ -19,6 +19,8 @@
 //  V. Ventes · Tous : la vente Vestiaire sans montant alors que « vendu » la compte.
 //  R. Achat au relais : « depuis 20 j » (âge de la commande) et « relance le vendeur ».
 //  D. Ma journée : « + 34 à vérifier » et « Colis à vérifier · 34 délais dépassés ».
+//  N. Le grand chiffre « 1514,33 € » au-dessus de « 2 122,93 € » (milliers).
+//  A. « ? » de la carte : une phrase par chiffre, rangée avec sa définition.
 process.env.TZ = 'Europe/Paris';
 const fs = require('fs'), path = require('path'), os = require('os');
 const R = process.env.VRM_RACINE || path.join(__dirname, '..');
@@ -26,7 +28,7 @@ const MUT = (process.argv.find((a) => a.startsWith('--mutation=')) || '').split(
 let ko = 0, ok = 0;
 const dit = (c, m, d) => { if (c) ok++; else ko++; if (!c || process.env.BAVARD) console.log((c ? '  ✅ ' : '  ❌ ') + m + (d ? ' — ' + d : '')); };
 const lire = (f) => { try { return fs.readFileSync(path.join(R, f), 'utf8'); } catch (_) { return ''; } };
-const src = { sonde: lire('src/sondeVentes.js'), carte: lire('src/design/carteChiffres.js'), journal: lire('src/journalSemaine.js'), app: lire('src/App.jsx') };
+const src = { stats: lire('src/design/CarteStats.jsx'), sonde: lire('src/sondeVentes.js'), carte: lire('src/design/carteChiffres.js'), journal: lire('src/journalSemaine.js'), app: lire('src/App.jsx') };
 const muter = (cle, avant, apres) => { if (!src[cle].includes(avant)) { console.log('❌ mutation impossible : ' + avant.slice(0, 90)); process.exit(2); } src[cle] = src[cle].replace(avant, apres); };
 const MUTS = {
   sonde: ['sonde', 'if (cap > deja) out.push(uid);', ''],
@@ -40,6 +42,8 @@ const MUTS = {
   vc: ['app', 'prix: recuVc && recuVc.eur != null ? recuVc.eur : null, devise:', 'prix: null, devise:'],
   relais: ['app', '!cancelled && !st.retour && st.step>=1 && st.step<3 &&', '!cancelled && !st.retour && st.step>=1 && st.step<4 &&'],
   verifier: ['app', 'else if (j.detailSansN) j.detail = j.detailSansN;', ''],
+  milliers: ['stats', '? montant(x.valeur) : euros(x.valeur)', '? fmt(x.valeur) : euros(x.valeur)'],
+  aide: ['carte', "  vendu: 'Tes ventes de la période", "  vendux: 'Tes ventes de la période"],
 };
 if (MUT) { if (!MUTS[MUT]) { console.log('❌ mutation inconnue : ' + MUT); process.exit(2); } muter(...MUTS[MUT]); }
 const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
@@ -121,6 +125,12 @@ const charger = async (texte, nom) => {
   dit(/st\.step===3 && \(\(\)=>\{ const a=Date\.parse\(\(tk&&tk\.arriveLe\)\|\|''\)/.test(app) && /st\.step>=1 && st\.step<3 &&/.test(app), 'R1. au relais : le temps AU RELAIS (arrivée lue), jamais « relance le vendeur »');
   dit(/else if \(j\.detailSansN\) j\.detail = j\.detailSansN;/.test(app), 'D1. « à vérifier » dit une fois : la ligne garde ses raisons sans le nombre de la case');
 
+  // ── N, A. La carte ────────────────────────────────────────────────────────
+  dit(/\? montant\(x\.valeur\) : euros\(x\.valeur\)/.test(src.stats), 'N1. le grand chiffre sépare les milliers (« 1 514,33 € »)');
+  const sansAide = M.IDS_CHIFFRES.filter((id) => !(M.AIDE_CHIFFRES && typeof M.AIDE_CHIFFRES[id] === 'string' && M.AIDE_CHIFFRES[id].length > 20));
+  dit(!sansAide.length, 'A1. chaque chiffre de la carte a sa phrase « d’où il vient »', sansAide.join(', '));
+  dit(/aide \? <button type="button" className="vrm-fu-aide"/.test(src.stats) && /function FeuilleAide/.test(src.stats), 'A2. la carte porte le « ? » (sur demande de la page) et sa feuille');
+  dit((app.match(/<CarteStatsApp page=("[^"]+"|\{plateforme\}) aide /g) || []).length >= 6, 'A3. Ma journée, Ventes (tous les sites, Vinted, Leboncoin/eBay, Vestiaire) et Achats demandent le « ? »', String((app.match(/<CarteStatsApp page=("[^"]+"|\{plateforme\}) aide /g) || []).length));
   console.log(`${ko ? '❌' : '✅'} audit-onglets-a : ${ok} vert(s), ${ko} rouge(s)${MUT ? ' [mutation ' + MUT + ']' : ''}`);
   process.exit(ko ? 1 : 0);
 })().catch((e) => { console.log('❌ audit-onglets-a : ' + e.message); process.exit(1); });

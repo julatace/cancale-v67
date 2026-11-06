@@ -1114,7 +1114,7 @@ export function texteNotifTransp(t, ch) {
 export function texteCodePostalMr({ cherche = 0, inconnu = 0 } = {}) {
   const out = [];
   if (cherche > 0) out.push(`Mondial Relay : VRM cherche le code postal du point relais (${cherche} colis) — il essaie seul les codes postaux de tes points relais, rien à faire.`);
-  if (inconnu > 0) out.push(`Mondial Relay : code postal du point relais inconnu (${inconnu} colis) — ajoute ce n° avec son code postal dans « N° de suivi ajoutés » (Achats → À retirer).`);
+  if (inconnu > 0) out.push(`Mondial Relay : code postal du point relais inconnu (${inconnu} colis) — ajoute ce n° avec son code postal : « … » en haut de Colis, puis « + Ajouter un n° de suivi ».`);
   return out;
 }
 // ══ CE QUE DIT LA CARTE D'UN COLIS (l'app) ═══════════════════════════════════

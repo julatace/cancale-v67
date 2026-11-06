@@ -51,6 +51,8 @@ import { accesVendeur } from './_lib/abonnement.js';
 import { passageRelances } from './_lib/relances-essai.js';
 // (5 nov.) « Compte Vinted pas relu » : la règle (api/_lib/comptes-a-relire.js).
 import { comptesARelire, dernieresCaptures, texteComptesARelire, decisionRelecture, CAT_RELECTURE, ID_MEMO_RELECTURE, SELECT_CAPTURES } from './_lib/comptes-a-relire.js';
+// (6 nov., filet 4) La veille des plantages : le propriétaire prévenu d'un type JAMAIS VU (api/_lib/veille-plantages.js).
+import { passageVeillePlantages, ID_MEMO_VEILLE } from './_lib/veille-plantages.js';
 // Après 240 s de cron, aucun e-mail de l'essai ne COMMENCE (la fonction s'arrête à 300 s).
 const RELANCES_JUSQUA_MS = 240000;
 
@@ -875,6 +877,23 @@ async function traiterVendeurSoir() {
   return { ...out, bilan, ebayRelu: resumeRelecture(relu), transporteurs: transp };
 }
 
+// ── LA VEILLE DES PLANTAGES (6 nov., filet 4) ─────────────────────────────────
+// Une lecture PROJETÉE (jamais `select=data`, §4.4), filtrée par la base sur la
+// date copiée dans `meta` (migration 004), paginée ; TOUS les vendeurs (un écran
+// mort chez un autre vendeur doit se voir). Le mémo et la notification : au nom
+// du PROPRIÉTAIRE de l'installation (VRM_OWNER_UID), jamais d'un vendeur.
+const SELECT_VEILLE = 'owner,id,message:data->>message,ecran:data->>ecran,navigateur:data->>navigateur,version:data->>version,origine:data->>origine,at:data->>at';
+async function veilleDesPlantages(maintenant = Date.now()) {
+  const proprietaire = process.env.VRM_OWNER_UID || '';
+  return contexteVendeur.run({ owner: proprietaire }, () => passageVeillePlantages({
+    proprietaire, maintenant,
+    lireMemo: () => getRow(ID_MEMO_VEILLE),
+    lireLignes: (depuisIso) => fetchPaginated(`app_data?id=like.plantage_*&meta->>at=gte.${encodeURIComponent(depuisIso)}&select=${SELECT_VEILLE}`),
+    ecrireMemo: (memo) => ecrireDedup(ID_MEMO_VEILLE, memo),
+    envoyer: (notif) => sendPushToAll(notif),
+  }));
+}
+
 export default async function handler(req, res) {
   // CRON_SECRET est obligatoire : un endpoint public ne doit pas déclencher des envois.
   // (Vercel envoie « Authorization: Bearer <CRON_SECRET> » sur les crons).
@@ -931,7 +950,11 @@ export default async function handler(req, res) {
     // échouer les rappels déjà partis.
     let relances = null;
     if (!soir && !reveil) { try { relances = await passageRelances({ jusqua: debutCron + RELANCES_JUSQUA_MS }); } catch (e) { relances = { erreur: String((e && e.message) || e).slice(0, 200) }; } }
-    res.status(echecs ? 500 : 200).json({ ok: !echecs, ...(soir ? { moment: 'soir' } : reveil ? { moment: 'reveil' } : {}), vendeurs: owners.length, echecs, bilans, ...(relances ? { relances } : {}) });
+    // (6 nov., filet 4) La veille des plantages, le MATIN seulement ; une panne
+    // ne fait pas échouer les rappels déjà partis (elle est dite dans la réponse).
+    let veille = null;
+    if (!soir && !reveil) { try { veille = await veilleDesPlantages(debutCron); } catch (e) { veille = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; } }
+    res.status(echecs ? 500 : 200).json({ ok: !echecs, ...(soir ? { moment: 'soir' } : reveil ? { moment: 'reveil' } : {}), vendeurs: owners.length, echecs, bilans, ...(relances ? { relances } : {}), ...(veille ? { veille } : {}) });
   } catch (e) {
     // Une tâche planifiée qui répond 200 sur une panne n'apparaît nulle part :
     // le tableau de bord la compte réussie, et les rappels d'expédition

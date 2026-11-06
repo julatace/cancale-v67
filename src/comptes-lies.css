@@ -70,3 +70,10 @@ html body .vrm-app-shell .vrm-sans-compte .vrm-b { min-height: 44px; }
 .vrm-sans-compte-acheteur { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; font: 500 13px/1.4 var(--vrm-police); color: var(--fu-encre); overflow-wrap: anywhere; }
 .vrm-sans-compte-acheteur .vrm-lien-action { min-height: 44px; }
 @media (max-width: 420px) { .vrm-sans-compte-gestes > * { flex: 1 1 100%; } }
+/* (6 nov., onglets C) Colis : un compte dont les e-mails n'arrivent pas, avec des colis à
+   envoyer — une ligne ambre (un geste à faire), LE geste « Relier la boîte de <compte> ». */
+.vrm-colis-arelier { display: grid; gap: 6px; margin: 0 0 12px; padding: 10px 14px; border-radius: 14px; border-left: 3px solid var(--fu-ambre-txt, #B25000); background: color-mix(in srgb, var(--fu-ambre-txt, #B25000) 8%, transparent); }
+.vrm-colis-arelier-ligne { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; min-width: 0; }
+.vrm-colis-arelier-txt { flex: 1 1 220px; min-width: 0; font: 500 14px/1.4 var(--vrm-police); color: var(--fu-encre, inherit); overflow-wrap: anywhere; }
+.vrm-colis-arelier-txt b { color: var(--fu-ambre-txt, #B25000); font-weight: 600; }
+html body .vrm-app-shell .vrm-colis-arelier .vrm-lien-action { min-height: 44px; padding: 0 2px; border: none; background: transparent; font: 600 14px/1.2 var(--vrm-police); color: var(--vrm-accent-texte, #0066CC); cursor: pointer; text-align: left; }

@@ -12,7 +12,8 @@ import React from 'react';
 import CarteMois from './CarteMois.jsx';
 import { SheetShell } from '../composants/SheetShell.jsx';
 import { montant } from '../format.js';
-import { CHIFFRES, NOM_PERIODE, PAGES_CARTE, PLAGE_IDS, clePeriode, chiffresProposes, courbeVendu, defDe, horsSelection, libelleCase, nomPeriode, periodeDefaut, raisonCourte, reglageAEnregistrer, reglageDePage, valeursCarte, valeurChiffre, valeurObjectif } from './carteChiffres.js';
+import './aideCarte.css';
+import { AIDE_CHIFFRES, CHIFFRES, NOM_PERIODE, PAGES_CARTE, PLAGE_IDS, clePeriode, chiffresProposes, courbeVendu, defDe, horsSelection, libelleCase, nomPeriode, periodeDefaut, raisonCourte, reglageAEnregistrer, reglageDePage, valeursCarte, valeurChiffre, valeurObjectif } from './carteChiffres.js';
 import { TYPES_OBJECTIF, lireSaisieObjectif, objectifAEnregistrer, objectifSurPage, progressionObjectif } from '../objectifMois.js';
 import ChoixPeriode from '../ChoixPeriode.jsx';
 import { raccourcisCarte, etiquettePlage, cleJour } from '../periodeCalendrier.js';
@@ -47,7 +48,9 @@ const affiche = (x, fmt, grand) => {
   if (x.valeur == null) return null;
   const t = (x.def && x.def.type) || 'n';
   // Dans une case : les centimes tant que ça tient (moins de 1 000 €), l'euro rond au-delà (jamais rogné).
-  const corps = t === 'eur' ? ((grand || Math.abs(Number(x.valeur)) < 1000) ? fmt(x.valeur) : euros(x.valeur)) : String(x.valeur);
+  // (6 nov., onglets A) Les milliers séparés comme partout ailleurs : « 1 514,33 € », pas « 1514,33 € »
+  // (le `fmt` des règles est sans séparateur) ; une case de 1 000 € ou plus reste à l'euro.
+  const corps = t === 'eur' ? ((grand || Math.abs(Number(x.valeur)) < 1000) ? montant(x.valeur) : euros(x.valeur)) : String(x.valeur);
   if (!x.partiel) return corps;
   // (3 nov.) Jamais « ≥ » sur une case : le chiffre seul, « au moins » dans son titre (`titreDe`).
   return grand ? <><span className="vrm-fu-borne">au moins</span>{corps}</> : corps;
@@ -100,8 +103,36 @@ export function BarreObjectif({ prog, fmt }) {
   );
 }
 
-export default function CarteStats({ owner = '', page, sel, sources, regles, reglage, poser, attrsDe = null, onNav = null, nu = false, className = '', FermeAuRetour = null, sous = null, extra = {}, clics = null, objectif = null, poserObjectif = null }) {
+// (6 nov., onglets A) « ? » : d'où vient chaque chiffre de la carte — sa phrase (rangée avec sa
+// définition, `AIDE_CHIFFRES` ou `aide` d'une case propre à la page), la valeur montrée, et ce qui
+// manque (la même phrase que son infobulle, `titreDe`). Rien n'est recalculé ici.
+function FeuilleAide({ page, places, fmt, fermer, FermeAuRetour, surtitre }) {
+  return (
+    <SheetShell titre="D’où viennent ces chiffres" sousTitre={surtitre || ''} onClose={fermer} FermeAuRetour={FermeAuRetour}
+      z={20000} maxWidth={560} className="vrm-carte-aide-feuille" data-noswipe="" data-carte-aide-feuille={page}>
+      <dl className="vrm-carte-aide">
+        {places.map((x) => {
+          const nom = x.def ? (x.def.local ? (x.def.nom || x.def.court) : x.def.nom) : '';
+          const phrase = (x.def && x.def.local ? x.def.aide : AIDE_CHIFFRES[x.place.id]) || '';
+          const v = affiche(x, fmt, false);
+          const etat = titreDe(x);
+          const note = !etat || etat === nom ? '' : etat.startsWith(nom + ' : ') ? majuscule(etat.slice(nom.length + 3)) : etat;
+          return (
+            <div key={x.place.id + (x.p && typeof x.p === 'string' ? '-' + x.p : '')} className="vrm-carte-aide-ligne" data-carte-aide-chiffre={x.place.id}>
+              <dt><span>{majuscule(nom)}</span><b>{v == null ? '—' : (x.partiel ? <>au moins {v}</> : v)}</b></dt>
+              {phrase ? <dd>{phrase}</dd> : null}
+              {note ? <dd className="vrm-carte-aide-etat">{note}</dd> : null}
+            </div>
+          );
+        })}
+      </dl>
+    </SheetShell>
+  );
+}
+
+export default function CarteStats({ owner = '', page, sel, sources, regles, reglage, poser, attrsDe = null, onNav = null, nu = false, className = '', FermeAuRetour = null, sous = null, extra = {}, clics = null, objectif = null, poserObjectif = null, aide = false }) {
   const [ouvert, setOuvert] = React.useState(false);
+  const [aideOuverte, setAideOuverte] = React.useState(false);
   const locaux = (sources && sources.locaux) || null;
   const V = valeursCarte(page, reglage, sources, sel, regles);
   if (!V) return null;
@@ -129,7 +160,7 @@ export default function CarteStats({ owner = '', page, sel, sources, regles, reg
         action={modifier}
         grandAttrs={{ ...attrsDeValeur(g, page), ...(g.attrs || {}), ...(g.def && g.def.local && g.def.attrs ? g.def.attrs : {}), title: titreDe(g), ...(plus(g) || {}) }}
         valeur={affiche(g, fmt, true)}
-        sous={sous || <span className="vrm-fu-sous-nom">{g.def ? (g.def.local ? (g.def.court || g.def.nom) : g.def.court) : ''}</span>}
+        sous={sous || <span className="vrm-fu-sous-nom">{g.def ? (g.def.local ? (g.def.court || g.def.nom) : g.def.court) : ''}{aide ? <button type="button" className="vrm-fu-aide" data-carte-aide={page} aria-label="D’où viennent ces chiffres ?" title="D’où viennent ces chiffres ?" onClick={() => setAideOuverte(true)}><span aria-hidden="true">?</span></button> : null}</span>}
         courbe={courbe && courbe.length > 1 ? courbe : null}
         cases={V.c.map((x) => ({
           cle: x.place.id + (x.p && typeof x.p === 'string' ? '-' + x.p : ''),
@@ -146,6 +177,7 @@ export default function CarteStats({ owner = '', page, sel, sources, regles, reg
         }))}>
         {prog ? <BarreObjectif prog={prog} fmt={fmt} /> : null}
       </CarteMois>
+      {aide && aideOuverte ? <FeuilleAide page={page} places={[g, ...V.c]} fmt={fmt} fermer={() => setAideOuverte(false)} FermeAuRetour={FermeAuRetour} surtitre={V.perimetre} /> : null}
       {ouvert ? <FeuilleCarte owner={owner} page={page} sel={sel} sources={sources} regles={regles} reglage={reglage} poser={poser} locaux={locaux} fermer={() => setOuvert(false)} FermeAuRetour={FermeAuRetour} objectif={objectif} poserObjectif={poserObjectif} /> : null}
     </>
   );

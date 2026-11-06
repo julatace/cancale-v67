@@ -39,7 +39,9 @@ const MUTATIONS = {
   chrome_passu_oui: { f: 'src', m: (s) => s.replace("if (chrome === undefined) raison", "if (false) raison") },
   candidats_tous_comptes: { f: 'src', m: (s) => s.replace(".filter((it) => it && String(it.uid || '') === u && String(it.id) !== anc", ".filter((it) => it && String(it.id) !== anc") },
   candidats_main: { f: 'src', m: (s) => s.replace("return !(e && String(e.numero || '').trim() && (!e.auto || e.manuelAt));", 'return true;') },
-  seule_ignore: { f: 'src', m: (s) => s.replace("else if (A.seule && sel.length > 1) raison", "else if (false) raison") },
+  // (6 nov.) « à la main » prend plusieurs annonces (une par une dans la feuille) : chacune doit avoir SON compte.
+  parpaire_compte_inconnu: { f: 'src', m: (s) => s.replace("else if (A.parPaire) { if (comptes.includes('')) raison", "else if (A.parPaire) { if (false) raison") },
+  parpaire_melange_bloque: { f: 'src', m: (s) => s.replace('robot: false, parPaire: true, lien: true },', 'robot: false, lien: true },') },
   desc_non_jugee: { f: 'verif', m: (s) => s.replace("if (d == null || d < DESCRIPTION_MIN) pose('description'", "if (false) pose('description'") },
   non_lu_juge: { f: 'verif', m: (s) => s.replace("if (x.couleur !== undefined && x.couleur !== null && vide(x.couleur)) pose('couleur', 'Couleur absente');", "if (vide(x.couleur)) pose('couleur', 'Couleur absente');") },
   // (revue du 5 nov.) G : chaque défaut corrigé, réaffaibli, doit repasser au rouge.
@@ -52,6 +54,10 @@ const MUTATIONS = {
   app_presentes_ignorees: { f: 'app', m: (s) => s.replace('liensRepubMain(repubMain, { presentes: pres, dejaRecrees: recreesNum || {} })', 'liensRepubMain(repubMain)') },
   app_liens_ignores: { f: 'app', m: (s) => s.replace('recrees: recreesEff,', 'recrees: recreesNum,') },
   app_sans_depart: { f: 'app', m: (s) => s.split(" depart={repubDepart?'modif':null}").join('') },
+  // (6 nov., finitions) La phrase à deux comptes retombe dans l'à-peu-près : « Prix mini » tu, ou dit possible sans l'être.
+  mini_possible_tu: { f: 'src', m: (s) => s.replace("if (possibles.length) for (const x of res)", "if (false) for (const x of res)") },
+  mini_toujours_dit: { f: 'src', m: (s) => s.replace("res.filter((x) => x.ok && (", "res.filter((x) => (") },
+  phrase_d_avant: { f: 'src', m: (s) => s.replace("). ${PAR_COMPTE} : un compte à la fois.`", ") : une action se lance sur un seul compte à la fois.`") },
 };
 
 async function charger(src) {
@@ -84,9 +90,19 @@ async function auditer(sources) {
   { const a = L([{ id: '1', uid: '111', etat: 'en-ligne' }, { id: '2', uid: '222', etat: 'en-ligne' }]);
     // (6 nov., vague 2) « Prix mini… » (`multiComptes`) n'agit pas au nom d'un compte : une écriture
     // dans ses fiches. Toutes les AUTRES actions restent bloquées par le mélange des comptes.
-    const parCompte = Object.values(a).filter((x) => x.k !== 'mini');
-    dit(parCompte.length >= 5 && parCompte.every((x) => !x.ok && /2 comptes/.test(x.raison) && /compte_a/.test(x.raison) && /compte_b/.test(x.raison)), 'B2 deux comptes mélangés ⇒ aucune action qui agit au nom d’un compte, les comptes nommés', a.recreer.raison);
-    dit(a.mini && a.mini.ok && a.mini.robot === false, 'B16 « Prix mini… » sur deux comptes ⇒ possible (rien ne part chez Vinted, aucun robot)', a.mini && a.mini.raison); }
+    // (6 nov.) « à la main » non plus : rien ne part chez Vinted, chaque paire dit son compte.
+    const parCompte = Object.values(a).filter((x) => x.k !== 'mini' && x.k !== 'main');
+    dit(parCompte.length >= 4 && parCompte.every((x) => !x.ok && /2 comptes/.test(x.raison) && /compte_a/.test(x.raison) && /compte_b/.test(x.raison)), 'B2 deux comptes mélangés ⇒ aucune action qui agit au nom d’un compte, les comptes nommés', a.recreer.raison);
+    dit(a.mini && a.mini.ok && a.mini.robot === false, 'B16 « Prix mini… » sur deux comptes ⇒ possible (rien ne part chez Vinted, aucun robot)', a.mini && a.mini.raison);
+    dit(a.main && a.main.ok && a.main.robot === false, 'B19 « à la main » sur deux comptes ⇒ possible, une paire à la fois dans la feuille (rien ne part d’ici)', a.main && a.main.raison); }
+  { const a = L([{ id: '1', uid: '111', etat: 'en-ligne' }, { id: '2', uid: '', etat: 'en-ligne' }]);
+    dit(a.main && !a.main.ok && /compte/.test(a.main.raison), 'B20 « à la main » : une annonce au compte inconnu ⇒ grisé, raison dite (on ne relie pas sans compte)', a.main && a.main.raison); }
+    // (6 nov., finitions) La phrase commune dit JUSTE : ce qui se lance au nom d'un compte, et ce qui reste possible.
+    { const tete = R.raisonCommune(Object.values(L([{ id: '1', uid: '111', etat: 'en-ligne' }, { id: '2', uid: '222', etat: 'en-ligne' }]))).tete;
+      dit(/Republier, modifier, brouillon, mise en ligne : un compte à la fois/.test(tete) && /Prix mini[^.]*: possible/.test(tete) && /à la main[^.]*: possible/.test(tete) && !/une action se lance sur un seul compte/.test(tete), 'B21 deux comptes : « Republier, modifier, brouillon, mise en ligne : un compte à la fois · Prix mini, Republier à la main : possible »', tete); }
+  { const a = L([{ id: '1', uid: '111', etat: 'brouillon' }, { id: '2', uid: '222', etat: 'en-ligne' }]);
+    const tete = R.raisonCommune(Object.values(a)).tete;
+    dit(a.mini && !a.mini.ok && /un compte à la fois/.test(tete) && !/Prix mini[^.]*: possible/.test(tete), 'B22 deux comptes et un brouillon coché : « Prix mini » n’est PAS dit possible (il ne l’est pas)', tete); }
   { const a = L([{ id: '5', uid: '111', etat: 'brouillon' }]);
     dit(a.mini && !a.mini.ok && /en ligne/.test(a.mini.raison), 'B17 « Prix mini… » sur un brouillon ⇒ grisé (une offre n’arrive que sur une annonce en ligne), raison dite', a.mini && a.mini.raison);
     const sel = R.ACTIONS_SELECTION.filter((A) => A.multiComptes);
@@ -94,7 +110,7 @@ async function auditer(sources) {
   { const a = L([{ id: '1', uid: '111', etat: 'en-ligne' }, { id: '3', uid: '111', etat: 'en-ligne' }]);
     dit(a.recreer.ok && a.modifier.ok && a.versBrouillon.ok, 'B3 en ligne, compte de Chrome ⇒ republier, modifier, en ligne → brouillon possibles');
     dit(!a.enLigne.ok && /en ligne/.test(a.enLigne.raison), 'B4 « brouillon → en ligne » grisé sur des annonces en ligne, raison dite', a.enLigne.raison);
-    dit(!a.main.ok && /une/i.test(a.main.raison), 'B5 « à la main » : une annonce à la fois', a.main.raison);
+    dit(a.main.ok && a.main.ids.join(',') === '1,3', 'B5 « à la main » : plusieurs annonces, dans l’ordre de ses clics (une par une dans la feuille)', a.main.raison);
     dit(a.recreer.ids.join(',') === '1,3', 'B6 les identifiants partent dans l’ordre de ses clics'); }
   { const a = L([{ id: '5', uid: '111', etat: 'brouillon' }]);
     dit(a.enLigne.ok && !a.recreer.ok && !a.versBrouillon.ok && !a.modifier.ok, 'B7 un brouillon ⇒ seulement « brouillon → en ligne » (et « à la main »)');
@@ -153,14 +169,15 @@ async function auditer(sources) {
   { const n = V.champsNonJuges({ titre: 'x', prix: 3 }, 'vinted'); dit(n.includes('la couleur') && n.includes('la catégorie') && !n.includes('le titre'), 'D6 ce que VRM n’a pas lu est nommé à part', n.join(', ')); }
   dit(V.champsNonJuges({ famille: 'sacs' }, 'vinted').every((x) => x !== 'la taille') && V.champsNonJuges({}, 'lbc').length === 0, 'D7 un sac n’a pas de taille à lire ; hors Vinted, rien');
   // ── E ──
-  { const f = R.filtreReglages({ rot: 90, zoom: 4, bright: 9 }); dit(f.rot === 15 && f.zoom === 1.5 && /brightness\(1\.6\)/.test(f.filtre), 'E1 réglages bornés (±15°, zoom 1,5, lumière 160 %)'); }
+  // (6 nov.) Les bornes sont celles de l'atelier ET de l'extension (`reglagesPhotoSurs`) : zoom 2, lumière 150 %.
+  { const f = R.filtreReglages({ rot: 90, zoom: 4, bright: 9 }); dit(f.rot === 15 && f.zoom === 2 && /brightness\(1\.5\)/.test(f.filtre), 'E1 réglages bornés comme l’extension (±15°, zoom 2, lumière 150 %)'); }
   { const d = new Uint8ClampedArray([10, 20, 30, 255]); R.appliquerCouleursPixels(d, {}); dit(d.join() === '10,20,30,255', 'E2 réglages neutres ⇒ pixels intacts');
     const d2 = new Uint8ClampedArray([100, 100, 100, 255]); R.appliquerCouleursPixels(d2, { bright: 1.2 }); dit(d2[0] === 120 && d2[3] === 255, 'E3 lumière +20 % ⇒ +20 % (l’opacité intacte)', d2.join()); }
   dit(R.nomPhotoReglee('B42', 0) === 'VRM-B42-01.jpg' && R.nomPhotoReglee('', 9) === 'VRM-annonce-10.jpg', 'E4 photos nommées VRM-{N°}-{rang}.jpg');
   // ── F ── l'app
   const app = sources.app;
   dit(/actionsPossibles\(\{ selection:/.test(app) && /<ChoixAnnoncesVinted /.test(app) && /<ActionsSelectionFeuille /.test(app), 'F1 la sélection et le carré « Actions possibles » sont rendus');
-  dit(/recrees: recreesEff,/.test(app) && /fusionLiensRecrees\(recreesNum, liensRepubMain\(repubMain, \{ presentes: pres, dejaRecrees: recreesNum \|\| \{\} \}\)\)/.test(app), 'F2 la table de SES liens s’ajoute à celle de l’extension (même règle de reprise), anciennes encore présentes écartées');
+  dit(/repriseNumerosRecreation\(\{[\s\S]{0,600}?recrees: recreesEff,/.test(app) && /fusionLiensRecrees\(recreesNum, liensRepubMain\(repubMain, \{ presentes: pres, dejaRecrees: recreesNum \|\| \{\} \}\)\)/.test(app), 'F2 la table de SES liens s’ajoute à celle de l’extension (même règle de reprise), anciennes encore présentes écartées');
   dit(/depart=\{repubDepart\?'modif':null\}/.test(app) && /depart=\{repubDepart\?'envoi':null\}/.test(app), 'F3 Republier ouvert depuis la sélection commence après « Choisir »');
   dit(/'vrm_repub_main',/.test(app.slice(app.indexOf('const SYNC_KEYS'), app.indexOf('const SYNC_KEYS') + 30000)), 'F4 `vrm_repub_main` est synchronisé');
   dit(/problemesAnnonce\(a\.verif \|\| \{\}, 'vinted'\)/.test(app) && /champsNonJuges\(a\.verif/.test(app), 'F5 le carré dit, paire par paire, ce qui manque (la règle de « vérifier avant »)');

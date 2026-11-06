@@ -1,0 +1,36 @@
+{
+  "_lire": "Les audits ROUGES CONNUS, hors du périmètre d'une fusion ordinaire. Ils restent LANCÉS par scripts/lancer-audits.cjs (rapportés « rouge connu ») mais ne bloquent pas la fusion. Chaque entrée dit pourquoi et depuis quand ; le jour où l'audit repasse au vert, le lanceur dit « exception à retirer ». Ne jamais ajouter une exception pour faire passer une PR : corriger l'audit ou le code.",
+  "exceptions": [
+    {
+      "audit": "audit-chemin-json-guillemets.cjs",
+      "raison": "Il juge vinted-sync-extension/ (un chemin JSON `->n` nu au-delà d'un entier) : la correction est dans l'extension, qui se livre en version numérotée (zip, §6) — chantier à part.",
+      "depuis": "2026-11-06"
+    },
+    {
+      "audit": "audit-vc-recon.cjs",
+      "raison": "Relevé Vestiaire (vcRecon) : deux contrôles rouges en attente d'une décision de Julien sur ce que l'extension doit relever.",
+      "depuis": "2026-11-06"
+    }
+  ],
+  "_lire_bancs": "Les bancs ROUGES CONNUS (scripts/lancer-bancs.cjs) : seulement les lignes rouges qui répondent à `rouges` ; une ligne rouge nouvelle rend le banc rouge pour de bon.",
+  "bancs": [
+    {
+      "banc": "argent-mois",
+      "rouges": "^C : les choix font 44 px — \\[\\{\"t\":\"Mois d’avant\",\"h\":36\\},\\{\"t\":\"Il y a un an\",\"h\":36\\}\\]",
+      "raison": "« Mois d’avant » / « Il y a un an » à 36 px au lieu de 44 (cible au doigt, §7) : rouge À L'IDENTIQUE sur l'arbre d'avant 46f18482 (102 verts, 2 rouges des deux côtés). À corriger dans Compta, pas à masquer.",
+      "depuis": "2026-11-06"
+    },
+    {
+      "banc": "annonces-actions",
+      "rouges": "^(M 1512 sombre proposées : la nouvelle du MÊME compte|1512 sombre le parcours s’arrête — page\\.\\$eval: Failed to find element matching selector \"\\[data-main-lier=\"9120\"\\]\")",
+      "raison": "Deux rouges À L'IDENTIQUE sur l'arbre d'avant 46f18482 (« proposées » à 1512 sombre, `data-main-lier=9120` introuvable). Les arrêts sur délai (« Timeout 30000ms ») vus ici sur un conteneur surchargé, des deux côtés, NE sont PAS couverts : s'ils reviennent en CI, c'est un rouge à regarder.",
+      "depuis": "2026-11-06"
+    },
+    {
+      "banc": "iphone-reprise",
+      "rouges": "^(B7 (390×844|375×667) (clair|sombre) : un balayage au milieu change toujours d'onglet|R3 390 (clair|sombre) : rouverte, même écran, même filtre, même recherche)",
+      "raison": "B7 (balayage Ventes → Colis) et R3 (recherche rouverte) rouges À L'IDENTIQUE sur l'arbre d'avant 46f18482 (6 lignes, conteneur chargé) : à rejouer en CI ; à corriger ou retirer, pas à masquer.",
+      "depuis": "2026-11-06"
+    }
+  ]
+}

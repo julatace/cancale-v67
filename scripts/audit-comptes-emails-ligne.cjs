@@ -28,7 +28,8 @@ const MUTATIONS = {
   'geste-partout': [['src/emailsCompteLie.js', "      return { etat: 'recoit', texte: 'reçoit ses e-mails', geste: false };", "      return { etat: 'recoit', texte: 'reçoit ses e-mails', geste: true };"]],
   'carte-sans-ligne': [['src/App.jsx', '      {emails}\n      {(action || secondaire)', '      {(action || secondaire)']],
   'regle-a-part': [['src/App.jsx', "  const etatEmails = useEtatEmailsComptes(accounts);", "  const etatEmails = { etat: 'lu', lignes: accounts.map((a) => ({ uid: String(a.vinted_user_id), statut: 'recoit' })) };"]],
-  'geste-ailleurs': [['src/App.jsx', "  const relier = () => { ouvrirEmailsRelier('adresses');", "  const relier = () => { "]],
+  // (6 nov., onglets C) Le geste passe par `relierBoiteDe(uid)` (le pas-à-pas DE CE compte, E-mails).
+  'geste-ailleurs': [['src/App.jsx', "  const relier = () => relierBoiteDe(uid);", "  const relier = () => {};"]],
 };
 if (process.argv.includes('--prouve')) prouver(__filename, R, MUTATIONS);
 else {
@@ -84,9 +85,11 @@ function chargeApp(noms) {
     dit(/emails = null/.test(carte) && /\{emails\}/.test(carte), 'E4 `CarteCompteLie` rend la ligne « E-mails »');
     const ecran = (/function VintedAccounts\([\s\S]*?\n\}\n/.exec(APP) || [''])[0];
     dit(/const etatEmails = useEtatEmailsComptes\(accounts\);/.test(ecran), 'E4 Comptes liés lit la MÊME règle que Notifications et Achats (`useEtatEmailsComptes`)');
-    dit(/emails=\{<LigneEmailsCompte ligne=\{emailsDe\(uid\)\}\/>\}/.test(ecran) && /ligneEmailsCompte\(etatEmails\.etat,/.test(ecran), 'E4 chaque carte Vinted porte SA ligne (par uid)');
+    dit(/emails=\{<LigneEmailsCompte ligne=\{emailsDe\(uid\)\} uid=\{uid\}[^>]*\/>\}/.test(ecran) && /ligneEmailsCompte\(etatEmails\.etat,/.test(ecran), 'E4 chaque carte Vinted porte SA ligne (par uid)');
     const ligne = (/function LigneEmailsCompte\([\s\S]*?\n\}/.exec(APP) || [''])[0];
-    dit(/ligne\.geste && <button/.test(ligne) && /ouvrirEmailsRelier\('adresses'\)/.test(ligne) && /detail: 'emails'/.test(ligne), 'E4 le geste n’apparaît que sur un compte muet et ouvre E-mails → Relier ma boîte (adresses)');
+    // (6 nov., onglets C) Le geste ouvre E-mails → Relier ma boîte sur le pas-à-pas DE CE compte (`relierBoiteDe`).
+    const relierDe = (/function relierBoiteDe\([^\n]*\n/.exec(APP) || [''])[0];
+    dit(/ligne\.geste && <button/.test(ligne) && /relierBoiteDe\(uid\)/.test(ligne) && /vrm:relier-compte/.test(relierDe) && /detail:'emails'/.test(relierDe), 'E4 le geste n’apparaît que sur un compte muet et ouvre E-mails → Relier ma boîte, sur CE compte');
     dit(/data-compte-emails=\{ligne\.etat\}/.test(ligne), 'E4 l’état est porté par `data-compte-emails` (les bancs jugent la règle, pas le libellé)');
   });
 

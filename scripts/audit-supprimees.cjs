@@ -178,6 +178,12 @@ function lecteurAnnoncesApp(ligne, ids) {
   // levait et l'écran rendait [] (§6.3). Absente d'un code d'avant : rien à charger.
   const lc = /const lectureDressingComplete = [\s\S]*?\n\};\n/.exec(F.app);
   const complete = lc ? lc[0] : '';
+  // 6 nov. (vitesse 2) : `fetchHarvestBrut` lit la ligne PROJETÉE (`SEL_MOISSON`) et la
+  // rebâtit (`ligneCommandes`). Sans elles le lecteur levait et l'écran rendait [] (§6.3).
+  // Absentes d'un code d'avant : rien à charger.
+  const sm = /const SEL_MOISSON = '[^']*';\n/.exec(F.app);
+  const lcm = /function ligneCommandes\(r\) \{[\s\S]*?\n\}\n/.exec(F.app);
+  const moisson = (sm ? sm[0] : '') + (lcm ? lcm[0] : '');
   const ctx = { console, Date, JSON, Number, isNaN, isFinite, Array, Object, String, Map, Set, SUPABASE_URL: 'https://base.test', sbAuth: () => ({}),
     busyStart() {}, busyEnd() {}, load: (k, d) => d, _harvestSeen: {}, _supprRetirees: {}, lireSupprimees: async () => ids, lireEnLigneTous: async () => [], lecturesPubliquesKO: () => false,   // (5.167 revue : `dressingEnLigne` dit si les lectures publiques ont pu être lues)
    
@@ -193,7 +199,7 @@ function lecteurAnnoncesApp(ligne, ids) {
   const lb = fs.existsSync(fbp) ? /export function lectureBrouillons\([\s\S]*?\n\}\n/.exec(fs.readFileSync(fbp, 'utf8')) : null;
   const brouillons = lb ? 'const fini = (v) => typeof v === "number" && isFinite(v);\n' + lb[0].replace(/^export /, '') : '';
   vm.createContext(ctx);
-  vm.runInContext(`${harvestTs}\n${videe}\n${regle}\n${enligne}\n${masquees}\n${retirees}\n${complete}\n${brouillons}\n${dressingEnLigne}\n${brut}\n;this.lire = fetchHarvestBrut;`, ctx);
+  vm.runInContext(`${moisson}\n${harvestTs}\n${videe}\n${regle}\n${enligne}\n${masquees}\n${retirees}\n${complete}\n${brouillons}\n${dressingEnLigne}\n${brut}\n;this.lire = fetchHarvestBrut;`, ctx);
   return ctx.lire;
 }
 

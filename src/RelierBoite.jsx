@@ -12,7 +12,7 @@
 //    automatique ne démarre pas.
 import React, { useEffect, useMemo, useState } from 'react';
 import { ADRESSE_COLLECTRICE } from '../api/_lib/proprietaire-email.js';
-import { MESSAGERIES, EXPEDITEURS, ADRESSE_EXEMPLE, BOITE_VRM_EXEMPLE, regleFiltre } from './relierBoite.js';
+import { MESSAGERIES, EXPEDITEURS, ADRESSE_EXEMPLE, BOITE_VRM_EXEMPLE, regleFiltre, motsScene } from './relierBoite.js';
 
 const DUREE_ETAPE = 4200;
 const reduit = () => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; } };
@@ -27,6 +27,8 @@ function Icone({ quoi }) {
 // La scène : une fenêtre de messagerie INVENTÉE (aucun logo, aucune marque).
 function Scene({ messagerie, etape, expediteur, regle }) {
   const s = etape.scene;
+  // (6 nov., onglets C) Les mots viennent d'UNE table (`motsScene`) : Gmail, Yahoo, relais d'Apple, règles.
+  const w = motsScene(messagerie.regle, expediteur);
   return (
     <div className="vrm-relier-scene" data-scene={s} aria-hidden="true">
       <div className="vrm-relier-fenetre">
@@ -41,18 +43,18 @@ function Scene({ messagerie, etape, expediteur, regle }) {
             {s === 'reglages' && <div className="vrm-relier-menu">
               <span className="vrm-relier-curseur"/>
               <div className="vrm-relier-squelette"><i/><i/><i/></div>
-              <div className="vrm-relier-menu-liste"><span>Affichage</span><span className="is-cible">{messagerie.regle === 'filtre' ? 'Voir tous les paramètres' : 'Réglages · Règles'}</span><span>Thème</span></div>
+              <div className="vrm-relier-menu-liste"><span>Affichage</span><span className="is-cible">{w.menu}</span><span>Thème</span></div>
             </div>}
             {s === 'adresse' && <div className="vrm-relier-form">
-              <span className="vrm-relier-libelle">{messagerie.regle === 'filtre' ? 'Adresse de transfert' : 'Nouvelle règle'}</span>
-              <span className="vrm-relier-champ"><span className="vrm-relier-tape" style={{ '--n': (messagerie.regle === 'filtre' ? BOITE_VRM_EXEMPLE : `De : ${expediteur.mot}`).length }}>{messagerie.regle === 'filtre' ? BOITE_VRM_EXEMPLE : `De : ${expediteur.mot}`}</span></span>
-              <span className="vrm-relier-bouton-fen">{messagerie.regle === 'filtre' ? 'Ajouter' : 'Suivant'}</span>
+              <span className="vrm-relier-libelle">{w.libAdresse}</span>
+              <span className="vrm-relier-champ"><span className="vrm-relier-tape" style={{ '--n': w.champAdresse.length }}>{w.champAdresse}</span></span>
+              <span className="vrm-relier-bouton-fen">{w.bouton}</span>
             </div>}
             {s === 'code' && <div className="vrm-relier-code">
-              <span className="vrm-relier-libelle">{messagerie.regle === 'filtre' ? 'Code de validation (exemple)' : 'Garder une copie dans ma boîte'}</span>
-              {messagerie.regle === 'filtre'
+              <span className="vrm-relier-libelle">{w.libCode}</span>
+              {w.code
                 ? <span className="vrm-relier-cases">{'482913'.split('').map((c, i) => <b key={i} style={{ '--i': i }}>{c}</b>)}</span>
-                : <span className="vrm-relier-coche"><Icone quoi="ok"/> Copie gardée</span>}
+                : <span className="vrm-relier-coche"><Icone quoi="ok"/> {w.coche}</span>}
             </div>}
             {s === 'filtre' && (() => {
               // Gmail : le champ « De » porte toute la règle ; ailleurs, une règle PAR expéditeur.
@@ -79,8 +81,11 @@ function Scene({ messagerie, etape, expediteur, regle }) {
   );
 }
 
-export default function RelierBoite({ onAdresses }) {
-  const [mid, setMid] = useState('gmail');
+// (6 nov., onglets C) `messagerieInitiale` : la messagerie suggérée par l'adresse
+// d'un compte (`messagerieDeAdresse`) quand le pas-à-pas s'ouvre POUR un compte
+// (src/RelierCompte.jsx) ; il peut toujours en choisir une autre.
+export default function RelierBoite({ onAdresses, messagerieInitiale = 'gmail' }) {
+  const [mid, setMid] = useState(() => (MESSAGERIES.some((x) => x.id === messagerieInitiale) ? messagerieInitiale : 'gmail'));
   const [choisis, setChoisis] = useState(() => EXPEDITEURS.map((x) => x.id));
   const [focus, setFocus] = useState('');
   const [i, setI] = useState(0);
@@ -89,6 +94,7 @@ export default function RelierBoite({ onAdresses }) {
   const [tour, setTour] = useState(0);
   const [lecture, setLecture] = useState(() => !reduit());
   const [copie, setCopie] = useState('');
+  useEffect(() => { if (MESSAGERIES.some((x) => x.id === messagerieInitiale)) { setMid(messagerieInitiale); setI(0); } }, [messagerieInitiale]);
   const m = MESSAGERIES.find((x) => x.id === mid) || MESSAGERIES[0];
   const etapes = m.etapes;
   const etape = etapes[Math.min(i, etapes.length - 1)];
@@ -108,6 +114,9 @@ export default function RelierBoite({ onAdresses }) {
     try { await navigator.clipboard.writeText(texte); setCopie(`${quoi} copiée.`); }
     catch (_) { setCopie('Sélectionne le texte affiché pour le copier.'); }
   };
+  // Yahoo (toute la boîte) et le relais d'Apple : pas de règle d'expéditeur ; le relais ne
+  // fait pas suivre à VRM mais à une de SES boîtes (l'adresse de VRM n'y sert pas).
+  const sansRegle = m.regle === 'transfert' || m.regle === 'relais';
   const basculer = (id) => setChoisis((l) => (l.includes(id) ? l.filter((x) => x !== id) : [...l, id]));
   return (
     <div className="vrm-relier" data-relier-boite="" data-messagerie={m.id}>
@@ -136,7 +145,7 @@ export default function RelierBoite({ onAdresses }) {
         </div>
       </div>
 
-      <section className="vrm-relier-bloc" aria-label="Les expéditeurs à faire suivre">
+      {!sansRegle && <section className="vrm-relier-bloc" aria-label="Les expéditeurs à faire suivre">
         <h3>Les expéditeurs à faire suivre</h3>
         <p className="vrm-relier-doux">Touche un expéditeur pour voir sa règle dans l’animation. Décoche ceux que tu n’utilises pas.</p>
         <ul className="vrm-relier-exp">
@@ -147,24 +156,24 @@ export default function RelierBoite({ onAdresses }) {
             </button>
           </li>)}
         </ul>
-      </section>
+      </section>}
 
-      <section className="vrm-relier-bloc" aria-label="À copier dans ta messagerie">
+      {m.regle !== 'relais' && <section className="vrm-relier-bloc" aria-label="À copier dans ta messagerie">
         <h3>À copier dans ta messagerie</h3>
         <div className="vrm-relier-copier">
           <span>L’adresse de VRM</span>
           <code data-relier-adresse="">{ADRESSE_COLLECTRICE}</code>
           <button type="button" onClick={() => copier(ADRESSE_COLLECTRICE, 'Adresse')}>Copier</button>
         </div>
-        <div className="vrm-relier-copier">
+        {!sansRegle && <div className="vrm-relier-copier">
           <span>{m.regle === 'filtre' ? 'Le champ « De » du filtre' : 'Une règle par expéditeur'}{focus ? ` · ${EXPEDITEURS.find((x) => x.id === focus).nom}` : ''}</span>
           {regle.lignes.length ? <code data-relier-regle="">{m.regle === 'filtre' ? regle.texte : regle.lignes.join('\n')}</code> : <code data-relier-regle="">Coche au moins un expéditeur.</code>}
           <button type="button" disabled={!regle.texte} onClick={() => copier(regle.texte, 'Règle')}>Copier</button>
-        </div>
+        </div>}
         {copie && <p role="status" className="vrm-relier-doux">{copie}</p>}
         <p className="vrm-relier-doux">Avant ou après, déclare et confirme ton adresse personnelle : c’est elle qui dit que ces e-mails sont à toi.</p>
         {onAdresses && <button type="button" className="vrm-relier-lien vrm-pied-lien" data-pied-lien="adresses" data-relier-adresses="" onClick={onAdresses}>Mes adresses de réception <span aria-hidden="true">→</span></button>}
-      </section>
+      </section>}
     </div>
   );
 }

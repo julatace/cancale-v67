@@ -1,0 +1,14 @@
+/* (6 nov., onglets A) « ? » de la carte des chiffres : d'où vient chaque chiffre.
+   Le bouton est la cible au doigt (44 px, marges négatives : la ligne ne grandit pas) ; le rond
+   visible (20 px) est son enfant — la règle des cibles tactiles agrandit le bouton, jamais le rond. */
+html body .vrm-fu-sous button.vrm-fu-aide { all: unset; box-sizing: border-box; display: inline-grid; place-items: center; width: 44px; height: 44px; min-width: 44px; min-height: 44px; margin: -12px -12px -12px -6px; vertical-align: middle; cursor: pointer; -webkit-tap-highlight-color: transparent; text-decoration: none; }
+html body .vrm-fu-sous button.vrm-fu-aide > span { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--fu-sur-sombre-2); color: var(--fu-sur-sombre-2); font: 700 12px/1 var(--vrm-police); }
+@media (hover: hover) { html body .vrm-fu-sous button.vrm-fu-aide:hover > span { color: #fff; box-shadow: inset 0 0 0 1.5px #fff; } }
+html body .vrm-fu-sous button.vrm-fu-aide:focus-visible { outline: none; }
+html body .vrm-fu-sous button.vrm-fu-aide:focus-visible > span { outline: 2px solid var(--fu-bleu); outline-offset: 2px; }
+.vrm-carte-aide { margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.vrm-carte-aide-ligne { padding: 12px 14px; border-radius: 14px; background: var(--fu-carte, #fff); box-shadow: inset 0 0 0 1px var(--fu-filet, rgba(0,0,0,.08)); min-width: 0; }
+.vrm-carte-aide-ligne > dt { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font: 600 15px/1.3 var(--vrm-police); color: var(--fu-encre, #1d1d1f); }
+.vrm-carte-aide-ligne > dt > b { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vrm-carte-aide-ligne > dd { margin: 4px 0 0; font: 400 13px/1.45 var(--vrm-police); color: var(--fu-gris, #6e6e73); overflow-wrap: anywhere; }
+.vrm-carte-aide-ligne > dd.vrm-carte-aide-etat { color: var(--fu-encre, #1d1d1f); }

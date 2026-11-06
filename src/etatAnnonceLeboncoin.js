@@ -4,7 +4,12 @@
 // annonce absente d'une lecture COMPLÈTE plus récente de « Mes annonces »
 // (`plusVueAt`) ou mise en pause (`pauseAt`) n'est plus « Active », même si son
 // dernier `status` lu le disait. Jamais « vendue » sur une absence.
-export function etatAnnonceLeboncoin(ad, ventes = [], sortieDe = null) {
+// (6 nov.) `aConfirmerDe(ad)` : la règle « en ligne » de Leboncoin
+// (src/enLigneLbc.js — la lecture complète de « Mes annonces » de son compte a
+// plus de 24 h, ou n'a jamais été faite). Une annonce que son dernier état dit
+// « active » mais que cette règle ne peut pas confirmer n'est plus « Active » :
+// « À confirmer » (ni en ligne, ni partie — rien n'est effacé).
+export function etatAnnonceLeboncoin(ad, ventes = [], sortieDe = null, aConfirmerDe = null) {
  const transactions = Array.isArray(ventes) ? ventes : Object.values(ventes || {});
  const vente = transactions.filter(v => v && v.isSeller === true && v.itemId != null && String(v.itemId) === String(ad?.id)
   && !/annul|cancel|refund|rembours/i.test([v.stepStatus,v.parcelStatus,v.stepLabel].join(' ')))
@@ -24,6 +29,7 @@ export function etatAnnonceLeboncoin(ad, ventes = [], sortieDe = null) {
  const sortie = etat==='vendue' || etat==='retiree' ? null : (typeof sortieDe==='function' ? sortieDe(ad) : null);
  if (sortie==='plusvue') {etat='plusvue';label='Plus dans « Mes annonces »';}
  else if (sortie==='pause') {etat='pause';label='En pause';}
+ if (etat==='active' && typeof aConfirmerDe==='function' && aConfirmerDe(ad)) {etat='aconfirmer';label='À confirmer';}
  const suivi=vente ? String(vente.stepLabel || vente.parcelStatus || '').slice(0,160) : '';
  const livraison=vente && (vente.parcelStatus || /colis|livr|expedi|transit|parcel|deliver|ship/i.test(suivi)) ? suivi : '';
  return {etat,label,livraison,suivi};
