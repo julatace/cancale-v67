@@ -41109,7 +41109,8 @@ function PrevisionUrssafCarte({ onNav }) {
   const nP = moisP.reduce((t, m) => t + (Number(m.n) || 0), 0);
   const parP = {};
   for (const m of moisP) for (const [k, v] of Object.entries(m.par || {})) parP[k] = (parP[k] || 0) + (Number(v && v.n) || 0);
-  const parTxt = Object.entries(parP).filter(([, n]) => n > 0).map(([k, n]) => `${n} ${k}`).join(', ');
+  const parL = Object.entries(parP).filter(([, n]) => n > 0);
+  const parTxt = parL.length > 1 ? parL.map(([k, n]) => `${n} ${k}`).join(', ') : '';   // une seule plateforme : rien à détailler
   const periodeAd = P.aDater > 0 ? periodeADater(ligne && ligne.aDater) : '';
   const tauxTxt = String(tauxUrssaf()).replace('.', ',');
   return (
@@ -65254,9 +65255,10 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       {it.ic && <IconeReglage name={it.ic}/>}
       <span className="vrm-set-lib">
         <b style={{color:C.text}}>{it.lib}</b>
-        {/* (3 nov., critique #1.4) Une ligne de Réglages = son nom (et une VALEUR à droite) ; la
-            2ᵉ ligne d'explication n'est plus rendue, sauf une alerte (un élément, pas une phrase). */}
-        {it.desc && typeof it.desc !== 'string' && <small style={{color:C.muted}}>{it.desc}</small>}
+        {/* (6 nov., onglets D) « Chaque réglage dit en une phrase ce qu'il fait » (demande du 6 nov.,
+            qui remplace la critique #1.4 du 3 nov.) : la phrase revient, UNE ligne grise, courte ;
+            une alerte (un élément) garde sa couleur. */}
+        {it.desc && <small className="vrm-set-desc" data-reglage-phrase={typeof it.desc === 'string' ? '' : 'alerte'} style={{color:C.muted}}>{it.desc}</small>}
       </span>
       {it.val != null && it.val !== '' && <span className="vrm-set-val" style={{color:C.muted}}>{it.val}</span>}
       {it.type === 'switch' && <Interrupteur on={it.on} label={it.lib} onClick={it.onClick} {...(it.data || {})}/>}
@@ -65357,13 +65359,13 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // Alertes locales (l'ancien bouton 🔔 du haut) : bandeau + notification
       // quand l'app est OUVERTE (ventes comptabilisées, factures reçues).
       // (6 nov.) Les colis en casier que Mondial Relay n'annonce que par SMS : jeton + pas-à-pas Raccourcis.
-      { id:'sms-colis', type:'panneau', nu:true, ic:'chat', lib:'SMS Mondial Relay', desc:'Faire lire à VRM les SMS de Mondial Relay pour tes colis en casier.', val: etatJetonSms(jetonSms) === 'actif' ? 'Activé' : etatJetonSms(jetonSms) === 'coupe' ? 'Coupé' : 'À activer', data:{ 'data-reglage-sms':etatJetonSms(jetonSms) },
+      { id:'sms-colis', type:'panneau', nu:true, ic:'truck', lib:'SMS Mondial Relay', desc:'Faire lire à VRM les SMS de Mondial Relay pour tes colis en casier.', val: etatJetonSms(jetonSms) === 'actif' ? 'Activé' : etatJetonSms(jetonSms) === 'coupe' ? 'Coupé' : 'À activer', data:{ 'data-reglage-sms':etatJetonSms(jetonSms) },
         el:<SmsColisSetting jeton={jetonSms} onJeton={(v)=>{ save('vrm_sms_token', v); setJetonSms(v); }} toast={toast}/> },
       { id:'alertes', type:'switch', ic:'alert', lib:"Alertes dans l'app", desc:'Un bandeau pour tes ventes et factures, quand l’app est ouverte.', on:!!notifEnabled, onClick:onToggleNotif, data:{ 'data-reglage-alertes': notifEnabled ? 'on' : 'off' } },
     ]},
     // « Mon abonnement » : l'onglet du haut, joignable depuis la liste (le même écran, §11).
     MULTI_USER && AUTH.user && { id:'abonnement-lien', titre:'Mon abonnement', items:[
-      { id:'abonnement-ouvrir', type:'nav', ic:'cash', lib:'Mon abonnement', desc:'Ton offre, ta carte, tes factures, et l’arrêt si tu veux.', onClick:()=>setVue('abonnement'), data:{ 'data-reglage-abonnement':'' } },
+      { id:'abonnement-ouvrir', type:'nav', ic:'wallet', lib:'Mon abonnement', desc:'Ton offre, ta carte, tes factures, et l’arrêt si tu veux.', onClick:()=>setVue('abonnement'), data:{ 'data-reglage-abonnement':'' } },
     ]},
     MULTI_USER && { id:'stock', titre:'Stock et rangement', items:[
       { id:'numeros', type:'panneau', nu:true, ic:'tag', lib:'Numéros de rangement', desc:'Comment s’écrivent les numéros de tes prochaines paires.', val:valNumeros, el:<NumerosSetting nu onStock={()=>setTab('garage')}/> },
