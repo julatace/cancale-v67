@@ -154,7 +154,8 @@ import {annoncesVcEnLigne,stockVestiaire,retraitsVestiaire,VC_VENTE_ETAPES,VC_AN
 import {colisLbcAPoster,lbcColisAPoster,totalColis,colisLbcVendeur} from '../api/_lib/colis-sites.js';
 import {CLE_COMPTES_EXCLUS,excluAutreDe,estExclu,basculerExclu,compteDeVente,exclusNormes} from '../api/_lib/comptes-exclus.js';
 import {PLATEFORMES_COMPTES,etatCompteLie,ageLecture,comptesLbcLies,comptesVcLies,comptesEbayLies,refDeLigneEbay,nomCompteLie,LIBELLE_ETAT} from './comptesLies.js';
-import { lignesFraicheur } from './fraicheurComptes.js';
+import { lignesFraicheur, quandRelu } from './fraicheurComptes.js';
+import { ventesEmailFraiches, avecVentesEmail, requeteVentesEmail, gesteVenteEmail, STATUT_VENTE_EMAIL } from './venteEmailFraiche.js';
 import { premiereCaseLibre as premiereCaseMeubles, achatsArrives, notifsOuRanger } from './ouRanger.js';
 import './comptes-lies.css';
 import './centre-notifs.css';
@@ -4734,6 +4735,64 @@ function useVentesCoque() {
   }, []);
   return { ventes: _ventesCoquePub.ventes, ko: _ventesCoquePub.ko };
 }
+// ── LA VENTE VUE PAR E-MAIL, PAS ENCORE RELUE SUR VINTED (6 nov.) ───────────
+// La règle vit dans src/venteEmailFraiche.js (a · b · c, identité = n° de
+// transaction). Ici : UNE lecture projetée des e-mails de vente récents,
+// partagée par la coque (Vendu, « Tous ») et l'écran Ventes (la liste, Vendu) —
+// gardée 60 s, une seule requête en vol. `null` = pas su ⇒ aucune ligne ajoutée
+// (la liste Vinted reste ce qu'elle est : rien n'est retiré).
+const _ventesEmailLu = { at: 0, rows: undefined, vol: null };
+const lireVentesEmail = () => {
+  if (_ventesEmailLu.rows !== undefined && Date.now() - _ventesEmailLu.at < 60000) return Promise.resolve(_ventesEmailLu.rows);
+  if (_ventesEmailLu.vol) return _ventesEmailLu.vol;
+  _ventesEmailLu.vol = (async () => {
+    let rows = null;
+    try { const r = await lireTout(requeteVentesEmail(Date.now()), { strict: true }); rows = Array.isArray(r) ? r : null; } catch (_) { rows = null; }
+    _ventesEmailLu.rows = rows; _ventesEmailLu.at = Date.now(); _ventesEmailLu.vol = null;
+    return rows;
+  })();
+  return _ventesEmailLu.vol;
+};
+// La dernière lecture de la liste des ventes de chaque compte (`capturedAt`,
+// rangée par `fetchHarvestOrders` dans `_harvestSeen`) — jamais `updated_at`.
+const lecturesVentesVinted = (comptes) => {
+  const out = {};
+  for (const a of (comptes || [])) { const u = String((a && a.vinted_user_id) || ''); const t = u ? _harvestSeen[`${u}_orders_sold`] : NaN; if (Number.isFinite(t)) out[u] = t; }
+  return out;
+};
+// `ventes` : la liste Vinted lue (tableau) · `ko` : uid pas lus · `comptes` : comptes liés ·
+// `ecarte(uid)` : écarté par son choix · `cleEcarte` : ce qui fait changer `ecarte`.
+function useVentesEmailFraiches(ventes, ko, comptes, ecarte, cleEcarte) {
+  const [mails, setMails] = useState(undefined);
+  useEffect(() => {
+    if (!Array.isArray(ventes)) return undefined;
+    let mort = false;
+    lireVentesEmail().then((r) => { if (!mort) setMails(r); });
+    return () => { mort = true; };
+  }, [ventes]);
+  const cleKo = (Array.isArray(ko) ? ko : []).map(String).sort().join(',');
+  const cleComptesV = (comptes || []).map((a) => String((a && a.vinted_user_id) || '')).join(',');
+  return useMemo(() => ventesEmailFraiches({ mails, comptes, ecarte, ventes, ko, lectures: lecturesVentesVinted(comptes) }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [mails, ventes, cleKo, cleComptesV, cleEcarte]);
+}
+// La ligne d'une vente vue par e-mail : ce qu'elle est, depuis quand la liste
+// n'a pas été relue, et LE geste (où la relire — le navigateur nommé par
+// `motsNavigateur`, ou l'ordinateur de l'extension quand elle n'est pas ici).
+function NoteVenteEmail({ o }) {
+  const lu = Number(o && o._lectureVentes);
+  // La date dite comme dans l'indicateur des comptes (`quandRelu`, une règle) : « hier 15 h 11 ».
+  const quand = Number.isFinite(lu) ? quandRelu(lu) : '';
+  const dans = vmrExtPresent() ? NAV.dans : 'sur l’ordinateur où est l’extension VRM';
+  return (
+    <div className="vrm-vente-email" data-vente-email={String(o.transaction_id)} data-vente-email-lu={Number.isFinite(lu) ? String(lu) : ''} data-sans-glisse=""
+      style={{ fontSize: 13, lineHeight: 1.45, color: C.muted, overflowWrap: 'anywhere' }}>
+      <span style={{ color: C.text, fontWeight: 600 }}>{STATUT_VENTE_EMAIL}</span>
+      {quand ? <> · ventes de ce compte relues {quand}</> : null}
+      <br/><span data-vente-email-geste="" style={{ color: C.warn }}>{gesteVenteEmail(dans).replace(/^./, (c) => c.toUpperCase())}.</span>
+    </div>
+  );
+}
 // ⚠️ LA MÊME RÈGLE À LA LECTURE (leçon §5.37).
 // Les emails déjà en base n'ont pas de champ `famille` — ils ne seront jamais
 // réécrits. Sans cette copie côté app, le compteur continuerait d'annoncer
@@ -7582,6 +7641,9 @@ const aExpedier = (o) => {
 // expédier ». Les deux lisent maintenant ces fonctions.
 function etapeVente(o, { poste = () => false, expediee = null } = {}) {
   const s = o.status || ''; const tus = tusDe(o);
+  // (6 nov.) Vue par e-mail, pas encore dans la liste lue chez Vinted (src/venteEmailFraiche.js) :
+  // aucun état deviné — elle le dit.
+  if (o._venteEmail) return { label: 'Vue par e-mail', color: C.warn, step: 1, aide: STATUT_VENTE_EMAIL + '.' };
   // « Commande non réclamée - Retournée à l'expéditeur » n'est PAS un
   // remboursement établi (le mot « expéditeur » faisait conclure « expédiée
   // puis remboursée ») : la paire revient, Vinted rembourse souvent tout seul.
@@ -19386,6 +19448,7 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
   // l'OUVERTURE du panneau seulement (il vit sur chaque écran) — trois états :
   // undefined on lit · null pas su · objet lu.
   const [caps, setCaps] = React.useState(undefined);
+  const [capsDetail, setCapsDetail] = React.useState(null);   // (6 nov.) ventes / annonces par compte
   const [etatsComptes, setEtatsComptes] = React.useState(undefined);
   const [autresSites] = useComptesAutresSites(ouvert);
   const [exclus] = useComptesExclus();
@@ -19393,7 +19456,7 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
   React.useEffect(() => { if (!ouvert) return undefined; let stop = false;
     lireDerniereCaptureExt().then((d) => { if (!stop) setDerniere(d); });
     setCaps(undefined); setEtatsComptes(undefined);
-    lireDernieresCaptures().then((d) => { if (!stop) setCaps(d); });
+    lireCapturesDetail().then((d) => { if (!stop) { setCaps(d ? d.by : null); setCapsDetail(d || null); } });
     fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_comptes_etat&select=c:data->comptes`, { headers: sbAuth() })
       .then((r) => (r.ok ? r.json() : null)).then((rows) => { if (stop) return; setEtatsComptes(Array.isArray(rows) ? ((rows[0] && rows[0].c && typeof rows[0].c === 'object') ? rows[0].c : {}) : null); })
       .catch(() => { if (!stop) setEtatsComptes(null); });
@@ -19545,7 +19608,8 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
     if (Array.isArray(comptes) && caps) for (const a of comptes) {
       const uid = String((a && a.vinted_user_id) || ''); if (!uid) continue;
       const ev = etatsComptes && etatsComptes[uid];
-      l.push({ plateforme: 'vinted', id: uid, nom: a.login || '', lu: caps[uid] || null, ouvert: ouvertIci === uid && st.niveau === 'ok', banni: !!(ev && ev.etat === 'banni'), masque: masques.has(uid) });
+      l.push({ plateforme: 'vinted', id: uid, nom: a.login || '', lu: caps[uid] || null, ouvert: ouvertIci === uid && st.niveau === 'ok', banni: !!(ev && ev.etat === 'banni'), masque: masques.has(uid),
+        ventesLu: capsDetail && capsDetail.ventes ? (capsDetail.ventes[uid] || null) : null, annoncesLu: capsDetail && capsDetail.annonces ? (capsDetail.annonces[uid] || null) : null });
     }
     for (const p of ['leboncoin', 'vestiaire', 'ebay']) {
       const liste = autresSites && autresSites[p];
@@ -19624,7 +19688,7 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
           <div className="vrm-etat-comptes" data-fraicheur-comptes={encoursComptes ? 'encours' : passuComptes.length ? 'partiel' : 'lu'}>
             <div className="vrm-etat-comptes-titre">Tes comptes · dernière relecture</div>
             {!encoursComptes && lignesComptes.map((c) => (
-              <div key={c.plateforme + ':' + c.id} className="vrm-etat-compte-ligne" data-fraicheur-compte={c.plateforme} data-fraicheur-id={c.id} data-fraicheur-etat={c.etat} data-fraicheur-geste={c.geste ? '1' : '0'}>
+              <div key={c.plateforme + ':' + c.id} className="vrm-etat-compte-ligne" data-fraicheur-compte={c.plateforme} data-fraicheur-id={c.id} data-fraicheur-etat={c.etat} data-fraicheur-geste={c.geste ? '1' : '0'} data-fraicheur-ventes-retard={c.ventesRetard ? String(c.ventesRetard.lu) : undefined}>
                 <b className="vrm-sensible">{c.nom}</b> <span className="vrm-etat-compte-site">{nomPlateforme(c.plateforme)}</span>
                 <span className="vrm-etat-compte-age"> — {c.quand}</span>
                 {c.bloque ? <span className="vrm-etat-compte-bloque" style={{ color: c.geste ? C.warn : C.muted }}> · {c.bloque}</span> : null}
@@ -35329,12 +35393,27 @@ const URL_SITE_COMPTE = { vinted: 'https://www.vinted.fr/', vestiaire: 'https://
 //    dressing, faite avec la session d'un AUTRE compte — comptée, elle faisait
 //    dire « À jour » à un compte figé depuis trois jours. `ligneDeSaSession`.
 async function lireDernieresCaptures() {
+  const d = await lireCapturesDetail();
+  return d ? d.by : null;
+}
+// (6 nov.) La MÊME lecture, avec la date de deux lignes par compte : sa liste de
+// VENTES (`orders_sold`) et ses ANNONCES (`listings`). Mesuré le 6 nov. : un
+// compte relu à 07:50 (annonces, boîte, profil) avait ses ventes figées à la
+// veille 15 h 11 — « relu il y a 2 min » cachait la vente du matin. Le panneau
+// de l'indicateur le dit (`ligneFraicheur`, src/fraicheurComptes.js).
+async function lireCapturesDetail() {
   try {
     const rows = await lireTout('id=like.harvest_*&select=id,updated_at,cap:meta->>capturedAt&meta->>supprime=is.null');
     if (!rows) return null;
-    const by = {};
-    rows.forEach(r => { const m = ligneDeSaSession(r && r.id); if (!m) return; const t = harvestTs(r) || 0; if (t && (!by[m[1]] || t > by[m[1]])) by[m[1]] = t; });
-    return by;
+    const by = {}, ventes = {}, annonces = {};
+    rows.forEach(r => {
+      const m = ligneDeSaSession(r && r.id); if (!m) return; const t = harvestTs(r) || 0; if (!t) return;
+      if (!by[m[1]] || t > by[m[1]]) by[m[1]] = t;
+      const id = String(r.id);
+      if (id === `harvest_${m[1]}_orders_sold`) ventes[m[1]] = t;
+      else if (id === `harvest_${m[1]}_listings`) annonces[m[1]] = t;
+    });
+    return { by, ventes, annonces };
   } catch (_) { return null; }
 }
 // `actif` (5 nov.) : le panneau de l'indicateur ne lit ces lignes qu'OUVERT —
@@ -37586,6 +37665,11 @@ const TITRE_CARTE_CA = 'Vendu et reçu';
 function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts, dansRepli = false }) {
   const excluAutre = useExcluAutre();
   const { ventes, ko } = useVentesCoque();
+  // (6 nov.) VENDU compte aussi les ventes vues par e-mail pas encore relues (src/venteEmailFraiche.js) ;
+  // REÇU (daté au versement) ne les voit jamais.
+  const hAccCle = [...new Set((load('vinted_accounts_hidden', []) || []).map(String))].sort().join(',');
+  const ventesEmailCa = useVentesEmailFraiches(ventes, ko, accounts, (u) => compteEcarte(u, new Set(hAccCle ? hAccCle.split(',') : []), panelOff || {}), hAccCle + '|' + JSON.stringify(panelOff || {}));
+  const ventesVendu = React.useMemo(() => avecVentesEmail(ventes, ventesEmailCa), [ventes, ventesEmailCa]);
   const [datesLbc] = useLigneSynchro('vrm_lbc_dates', lireDatesLbc);
   const ventesVc = useVentesVestiaire();
   const [periode, setPeriode] = React.useState(() => { try { const v = localStorage.getItem('vrm_compta_periode'); return PERIODES_CA.some(([k]) => k === v) ? v : 'mois'; } catch (_) { return 'mois'; } });
@@ -37606,7 +37690,7 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
     const lbc = lbcCoqueLu === true ? avecDatesLbc(((lbcVentes && lbcVentes.ventes) || []), datesLbc) : [];
     const ebay = Array.isArray(ebayCommandes) ? ebayCommandes : [];
     const vestiaire = ventesVc || [];
-    const vf = ventesFaites({ vinted: ventes, lbc, ebay, vestiaire, cachee: (o) => hTx.has(String(o && o.transaction_id)) || ecarte(uidDe(o)), excluAutre });
+    const vf = ventesFaites({ vinted: ventesVendu || ventes, lbc, ebay, vestiaire, cachee: (o) => hTx.has(String(o && o.transaction_id)) || ecarte(uidDe(o)), excluAutre });
     const decl = ventesDeclarables({ vinted: ventes, lbc, ebay, vestiaire, masquee: (o) => hTx.has(String(o && o.transaction_id)), exclu: (o) => ecarte(uidDe(o)), excluAutre, versements: versements || {} });
     let finSansDate = 0;
     const finalise = [];
@@ -37627,7 +37711,7 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
     // (1er nov., audits A2/A10) Les ventes dont l'argent ne se lit pas : dites, jamais 0 €.
     return { etat: 'lu', vendu: vf.lignes, finalise, recu, aDater, venduSansDate: vf.sansDate, venduEbayEcartees: vf.ecartees || 0, finSansDate, manque, attente, venduNonComptees: vf.nonComptees || [], recuNonComptees: (decl.ecartees || []).filter((x) => x && x.manque) };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ventes, ko, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, versements, accounts, tick, datesLbc, ventesVc, excluAutre]);
+  }, [ventes, ventesVendu, ko, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, versements, accounts, tick, datesLbc, ventesVc, excluAutre]);
   const lignes = calc.etat === 'lu' ? caParPeriodes({ vendu: calc.vendu, finalise: calc.finalise, recu: calc.recu }, periode, 6) : null;
   const cur = lignes ? lignes[0] : null;
   // Les périodes d'avant, sans les plus anciennes toutes vides (même règle qu'avant).
@@ -44310,6 +44394,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (les deux tests vivent au niveau module — une seule définition, cf. plus haut)
   const [sales, setSales] = useState({ loading:false, items:null });
   const [buys, setBuys] = useState({ loading:false, items:null });
+  // (6 nov.) LES VENTES VUES PAR E-MAIL, PAS ENCORE RELUES SUR VINTED
+  // (src/venteEmailFraiche.js) : la liste de l'écran et VENDU les lisent ; tout
+  // le reste (Colis, numéros, bordereaux, verrous) lit `sales.items`, la liste
+  // Vinted seule — une ligne e-mail n'y numérote ni n'y expédie rien.
+  const ventesEmail = useVentesEmailFraiches(sales.items, sales.failedUids, accounts, acctOff, [...hiddenAccts].sort().join(',') + '|' + JSON.stringify(panelAcctOff || {}));
+  const ventesListe = useMemo(() => avecVentesEmail(sales.items, ventesEmail), [sales.items, ventesEmail]);
   // Colis marqués « récupéré » À LA MAIN (par transaction) : disparaissent de « à
   // retirer » sans attendre que Vinted mette à jour. Synchronisé.
   const [pickupDone, setPickupDone] = useStateCle('vinted_pickup_done', () => load('vinted_pickup_done', {}));
@@ -46020,9 +46110,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }, [declarables, lbcLu, lbcVentes, ebayCmd, datesLbc, declUrssaf, ventesVc, excluAutre]);
   // Les ventes FAITES, toutes plateformes (`ventesFaites`) : « Vendu aujourd'hui »,
   // « Vendu ce mois » et la colonne VENDU du graphique.
-  const vendus = useMemo(() => ventesFaites({ vinted: sales.items || [], lbc: lbcLu ? avecDatesLbc(lbcVentes.ventes, datesLbc) : [], ebay: ebayCmd || [], vestiaire: ventesVc || [], cachee: isHidden, excluAutre }),
+  // (6 nov.) Avec les ventes vues par e-mail pas encore relues (`ventesListe`) : vendues, datées.
+  const vendus = useMemo(() => ventesFaites({ vinted: ventesListe || [], lbc: lbcLu ? avecDatesLbc(lbcVentes.ventes, datesLbc) : [], ebay: ebayCmd || [], vestiaire: ventesVc || [], cachee: isHidden, excluAutre }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [sales.items, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, datesLbc, ventesVc, excluAutre]);
+    [ventesListe, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, datesLbc, ventesVc, excluAutre]);
   // VENDU sur une période (aujourd'hui, ce mois) — sur `vendus`, la même liste
   // que le graphique : la carte et la colonne du jour ne peuvent pas diverger.
   const bilanVentes = React.useCallback((depuisTs, jusquaTs) => bilanLignes(vendus.lignes, depuisTs, jusquaTs), [vendus]);
@@ -46432,7 +46523,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // `STYLE_FLOU` : UNE définition, partagée avec Leboncoin (src/flouCompte.js, §11).
   const ventesAffichees = useMemo(() => {
     const uidV = o => String((o && o._acc && o._acc.vinted_user_id) || (o && o._uid) || '');
-    let arr = (sales.items || [])
+    let arr = (ventesListe || [])
     .filter(o => showHidden ? true : !isHidden(o))
     .filter(o => { const st = classifyOrderStatus(o.status);
       // ⚠️ « Commande non réclamée - Retournée à l'expéditeur » : le colis
@@ -46450,6 +46541,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // « En cours » mélangeait les colis à poster et ceux déjà partis : ce sont
       // deux questions différentes (« qu'est-ce que je dois faire ? » / « qu'est-ce
       // qui est en route ? »). Deux filtres, la même règle que Colis (§11).
+      // (6 nov.) Une vente vue par e-mail n'est ni « à expédier » ni « en transit » : son
+      // état n'est pas encore lu chez Vinted (Colis ne la compte pas non plus).
+      if (o._venteEmail && (vFilter === 'aexpedier' || vFilter === 'transit')) return false;
       if (vFilter === 'aexpedier') return aExpedier(o) && !isShipDone(o);
       if (vFilter === 'transit') return (st === 'pending' || revient) && !(aExpedier(o) && !isShipDone(o));
       if (vFilter === 'encours') return st === 'pending';
@@ -46475,7 +46569,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (c) arr = [...arr].sort((a,b) => { const ac = uidV(a)===c, bc = uidV(b)===c; return ac===bc ? 0 : (ac ? -1 : 1); }); }
     return arr;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [sales.items, showHidden, hiddenSales, hiddenAccts, blockedAccts, vFilter, ordSearchDiff, periode, numeros, saleOv, shipDone, compteSel, compteConnecte, selEff]);
+    }, [ventesListe, showHidden, hiddenSales, hiddenAccts, blockedAccts, vFilter, ordSearchDiff, periode, numeros, saleOv, shipDone, compteSel, compteConnecte, selEff]);
   // Combien on en DESSINE. Le reste s'ouvre d'un bouton : rien n'est perdu, et
   // le compte total est écrit dessus.
   const [ventesMax, setVentesMax] = useVueSession('ventes-limite',60);
@@ -54596,7 +54690,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // (1er nov.) « DÉPOSÉ » : seulement une vente À EXPÉDIER, pas encore cochée.
             const txL = String(o.transaction_id);
             const deposeIci = !!(deposeVente.attente && deposeVente.attente.cle === txL);
-            const peutDeposer = !hidden && st!=='cancelled' && aExpedier(o) && !isShipDone(o) && o.transaction_id!=null;
+            // (6 nov.) Une vente vue par e-mail, pas encore relue sur Vinted : aucun geste d'envoi
+            // ici (ni « Déposé », ni bordereau) tant que Vinted n'a pas rendu son état.
+            const peutDeposer = !o._venteEmail && !hidden && st!=='cancelled' && aExpedier(o) && !isShipDone(o) && o.transaction_id!=null;
             const libDepose = num ? `N°${num}` : (o.title || '');
             const gesteCout = coutManque ? <CoutAchatVente surLigne propose={propPrix} onUtiliser={propPrix ? ()=>appliquerProposition('v:'+o.transaction_id, propPrix) : null} onSaisir={p=>setSaleOverride(o.transaction_id,{buyPrice:p})}
                   onRelier={()=>{ const idf = identiteAnnonce(o); openPicker(idf ? { id: idf, title: o.title, photo: photo, price: sell, _acc: o._acc, _dateRef: o.date } : { id: '_v'+o.transaction_id, _saleTx: String(o.transaction_id), title: o.title, photo: photo, price: sell, _acc: o._acc, _dateRef: o.date }); }}/> : null;
@@ -54752,7 +54848,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <LigneVenteCompacte montantCentimes={sell!=null?Math.round(sell*100):undefined} numerosArticle={num?[num]:[]} plateforme="vinted" photo={photo} photoNoeud={photo?<PhotoVenteSources {...photoSourcesProps} data-photo-vente="ligne" style={{width:28,height:36,borderRadius:12,objectFit:'cover',flexShrink:0}}/>:null} titre={(()=>{ const t=String((e&&e.size)||o.size||'').trim(); const nom=t&&!tailleDansTitre(o.title,t)?`${o.title} · taille ${t}`:o.title; return nom; })()} numTitre={num||''}
                 {...gp} benef={benefLigne} recap={recapVente} data-depose-attente={deposeIci?'1':undefined}
                 data-fu-ligne="" fusion={{ prix: montant(sell, { devise: o.price?.currency_code || 'EUR' }), nom: String(o.title||'').replace(/[\s,·-]*(?:taille|t\.?)\s*[\d.,/ ]+(?:\s*(?:eu|fr|us|uk))?\s*$/i,'').trim() || o.title, num, site: 'vinted', siteNom: 'Vinted', taille: String((e&&e.size)||o.size||'').trim() || ((String(o.title||'').match(/taille\s*([\d.,/]+)/i)||[])[1]||'') }} frise={fuEtapes ? <Frise etapes={fuEtapes} cle={txL} className="vrm-fu-ligne-frise" label="Où en est la vente"/> : null}
-                bas={peutDeposer ? <>
+                bas={o._venteEmail ? <NoteVenteEmail o={o}/> : peutDeposer ? <>
                   {/* (2 nov., 22 h 30) Une vente à expédier porte TOUJOURS la rangée de la maquette : la puce du
                       transporteur et le bouton bordereau (« Imprimer le bordereau » si le PDF est là, sinon
                       « Générer le bordereau », l'extension) ; « Déposé » vient après. */}
@@ -70452,6 +70548,12 @@ function AppCoeur() {
   // des chiffres, Ma journée, Ventes et le widget. Les dates de versement Vinted
   // (450) et l'état de chaque transaction (TXN_ETATS, rempli par la même lecture)
   // écartent les ventes déjà versées que la LISTE dit encore « en cours ».
+  // (6 nov.) Les ventes vues par e-mail, pas encore relues sur Vinted (src/venteEmailFraiche.js) :
+  // elles entrent dans VENDU (et la liste « Tous »), jamais dans l'argent à venir ni le CA déclaré.
+  const hAccCoqueCle = [...new Set((load('vinted_accounts_hidden', []) || []).map(String))].sort().join(',');
+  const ventesEmailCoque = useVentesEmailFraiches(ventesCoque, ventesKO, vintedAccounts,
+    (u) => compteEcarte(u, new Set(hAccCoqueCle ? hAccCoqueCle.split(',') : []), panelOffCoque || {}), hAccCoqueCle + '|' + JSON.stringify(panelOffCoque || {}) + '|' + masquesTick);
+  const ventesCoqueEmail = useMemo(() => avecVentesEmail(ventesCoque, ventesEmailCoque), [ventesCoque, ventesEmailCoque]);
   const [versementsCoque, setVersementsCoque] = useState(undefined);
   useEffect(() => { let mort = false; fetchVersementsVinted().then((m) => { if (!mort) setVersementsCoque(m); }).catch(() => { if (!mort) setVersementsCoque(null); }); return () => { mort = true; }; }, [ventesCoque]);
   const liveStatsVus = useMemo(() => {
@@ -70463,7 +70565,7 @@ function AppCoeur() {
       const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
       const ecarte = (uid) => compteEcarte(uid, hAcc, panelOffCoque);
       const cachee = (o) => hTx.has(String(o && o.transaction_id)) || ecarte(o && o._acc && o._acc.vinted_user_id);
-      const v = ventesFaites({ vinted: ventesCoque, lbc: lbcCoqueLu === true ? avecDatesLbc(((lbcVentes && lbcVentes.ventes) || []), lireDatesLbc()) : [], ebay: Array.isArray(ebayCommandes) ? ebayCommandes : [], vestiaire: ventesVcCoque || [], cachee, excluAutre: excluAutreCoque });
+      const v = ventesFaites({ vinted: ventesCoqueEmail, lbc: lbcCoqueLu === true ? avecDatesLbc(((lbcVentes && lbcVentes.ventes) || []), lireDatesLbc()) : [], ebay: Array.isArray(ebayCommandes) ? ebayCommandes : [], vestiaire: ventesVcCoque || [], cachee, excluAutre: excluAutreCoque });
       const r = resumeVendu(v.lignes);
       const loginDe = (uid) => { const a = (vintedAccounts || []).find(x => String(x.vinted_user_id) === String(uid)); return (a && a.login) || String(uid); };
       const venduManque = [
@@ -70488,7 +70590,7 @@ function AppCoeur() {
           manqueVinted: ventesKO.filter(uid => !ecarte(uid)).map(loginDe) }) };
     } catch (_) { return liveStats; }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [liveStats, ventesCoque, ventesKO, lbcVentes, lbcCoqueLu, ebayCommandes, panelOffCoque, nuagePret, masquesTick, jourCle, vintedAccounts, datesLbcTick, ventesVcCoque, excluAutreCoque, versementsCoque]);
+  }, [liveStats, ventesCoque, ventesCoqueEmail, ventesKO, lbcVentes, lbcCoqueLu, ebayCommandes, panelOffCoque, nuagePret, masquesTick, jourCle, vintedAccounts, datesLbcTick, ventesVcCoque, excluAutreCoque, versementsCoque]);
   // Le widget : écrit quand ce qu'il afficherait CHANGE (pas à chaque rendu),
   // et SEULEMENT un « vendu » complet : sources pas encore revenues, illisibles
   // ou un compte manquant ⇒ on n'écrit pas, l'iPhone garde la dernière photo
@@ -71188,7 +71290,7 @@ function AppCoeur() {
         {site==='toutes' && t==='ventes' && !baseKO && <div className="vrm-a-venir-hote" style={{padding:'12px 16px 0'}}><ArgentAVenirCarte A={liveStatsVus && liveStatsVus.aVenir}/></div>}
         {site==='toutes'
           ? (baseKO ? <div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>
-            : <VentesToutes sites={sitesPresents} ventesVinted={ventesCoque} ventesKO={ventesKO} comptes={vintedAccounts} panelOff={panelOffCoque} lbcVentes={lbcVentes} lbcLu={lbcCoqueLu} ebayTous={ebayCmdTous}
+            : <VentesToutes sites={sitesPresents} ventesVinted={ventesCoqueEmail} ventesKO={ventesKO} comptes={vintedAccounts} panelOff={panelOffCoque} lbcVentes={lbcVentes} lbcLu={lbcCoqueLu} ebayTous={ebayCmdTous}
                 onOuvrir={(l)=>{ if(l.site==='ebay'){ DEMANDE_EBAY_CIBLE.compte=l.compteRef||null; DEMANDE_EBAY_CIBLE.id=l.id; DEMANDE_EBAY_CIBLE.at=Date.now(); setTab('ebay_ventes'); return; } setPlatSub(l.site); }}/>)
           : (sitesPresents && !sitesPresents.has(site)) ? <OngletManque site={site} onglet={t} onNav={setTab}/>
           : site==='vinted' ? rendreVinted(sec)
