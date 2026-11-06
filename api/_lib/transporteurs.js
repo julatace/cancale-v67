@@ -919,10 +919,14 @@ export const jamaisLueAvecSucces = (t) => !!t && !t.lu && !t.etat && !t.fini
   && (Number(t.essais) || 0) < FERMETURE_ESSAIS_MAX;
 // Le transporteur d'un n° par sa forme (le même que suivi-colis.js, sans
 // l'importer : pas de cycle).
+// ⚠️ (6 nov.) Seule la forme PROPRE à Chronopost (« XW/ZW + 9 chiffres + TS/SP »)
+// le nomme : un n° postal international (S10, « CP…IE ») n'est PAS Chronopost —
+// interrogé chez Chronopost, il laissait une ligne `transp_chronopost_…` jamais
+// lue, que l'écran prenait pour le transporteur (voir suivi-colis.js).
 function transporteurDeFormeT(n) {
   const s = normaliserSuivi(n);
   if (/^\d{8}$/.test(s)) return 'mondialrelay';
-  if (/^[A-Z]{2}\d{9}[A-Z]{2}$/.test(s)) return 'chronopost';
+  if (/^[XZ]W\d{9}(?:TS|SP)$/.test(s)) return 'chronopost';
   if (/^VGS\d{8,}$/.test(s)) return 'vinted';
   return '';
 }

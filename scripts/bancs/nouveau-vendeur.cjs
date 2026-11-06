@@ -23,7 +23,10 @@ require('./_porte-banc.cjs');
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
 const path = require('path'), http = require('http'), fs = require('fs');
-const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
+const PW = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
+const { chromium } = PW;
+// (6 nov., filet 6) `NAVIGATEUR=webkit` : le moteur de Safari (_navigateur.cjs).
+const { lancer } = require('./_navigateur.cjs');
 const { metaVersData } = require('./_meta.cjs');
 const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 4983;
@@ -308,7 +311,7 @@ async function tournee(nav, { W, sombre, scenario, base }) {
 module.exports = { ouvrir, INSPECTE, JEU_LIGNES, JEU_COMPTES, srv, PORT };
 if (require.main === module) (async () => {
   await new Promise((ok) => srv.listen(PORT, ok));
-  const nav = await chromium.launch({ executablePath: process.env.BANC_CHROMIUM || '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader', '--no-proxy-server'] });
+  const nav = await lancer(PW, { executablePath: process.env.BANC_CHROMIUM || '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader', '--no-proxy-server'] });
   try {
     for (const W of LARGEURS) for (const theme of THEMES) {
       const sombre = theme === 'sombre';

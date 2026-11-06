@@ -123,6 +123,20 @@ function poser(pw) {
   };
   const lpc = c.launchPersistentContext.bind(c);
   c.launchPersistentContext = async (d, o, ...r) => surContexte(await lpc(d, chemin(o), ...r));
+  // (6 nov., filet 6) La même porte sur WebKit (`NAVIGATEUR=webkit`, _navigateur.cjs) :
+  // sans elle, un banc lancé sous WebKit restait sur l'écran de connexion.
+  const w = pw.webkit;
+  if (w && !w.__vrmPorte) {
+    w.__vrmPorte = true;
+    const wl = w.launch.bind(w);
+    w.launch = async (...a) => {
+      const b = await wl(...a);
+      const nc = b.newContext.bind(b), np = b.newPage.bind(b);
+      b.newContext = async (...x) => surContexte(await nc(...x));
+      b.newPage = async (...x) => { const p = await np(...x); try { await p.addInitScript(script()); } catch (_) {} return p; };
+      return b;
+    };
+  }
 }
 try { poser(require('playwright')); } catch (_) {}
 // (22 oct.) La plupart des bancs lancent `/home/user/cancale-v67/node_modules/playwright`

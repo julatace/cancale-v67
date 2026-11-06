@@ -240,7 +240,7 @@ const journal = (appels) => appels.filter((a) => a.chemin === '/api/email-rattac
             const bs = [...row.querySelectorAll('[data-boite-rubrique]')];
             return { ox: getComputedStyle(row).overflowX, wrap: getComputedStyle(row).flexWrap, tops: [...new Set(bs.map((x) => Math.round(x.getBoundingClientRect().top)))].length, h: Math.min(...bs.map((x) => x.getBoundingClientRect().height)), n: bs.map((x) => [x.dataset.boiteRubrique, (x.querySelector('[data-boite-n]') || {}).textContent || null]), sw: row.scrollWidth, cw: row.clientWidth };
           });
-          const attendu = { tout: String(E.length), ventes: String(parRubrique.ventes), achats: String(parRubrique.achats), codes: String(parRubrique.codes), colis: String(parRubrique.colis), autres: String(parRubrique.autres) };
+          const attendu = { tout: String(E.length), ventes: String(parRubrique.ventes), achats: String(parRubrique.achats), codes: String(parRubrique.codes), colis: String(parRubrique.colis), autres: String(parRubrique.autres), 'a-verifier': String(COMPTEURS.aVerifier) };   // (6 nov., onglets C) + la pastille « À vérifier »
           const nOk = r.n.every(([k, v]) => v === attendu[k]);
           dit(nOk && r.h >= 44 && r.tops === 1 && r.wrap === 'nowrap' && ['auto', 'scroll'].includes(r.ox), `${nom} : rubriques — une rangée (une seule ligne), 44 px au doigt, le nombre de CHAQUE rubrique, défilement si ça ne rentre pas`, JSON.stringify(r));
           if (tactile) {
@@ -434,7 +434,8 @@ const journal = (appels) => appels.filter((a) => a.chemin === '/api/email-rattac
         await b.locator('[data-boite-vue="relier"]').click();
         const rel = pg.locator('[data-relier-boite]');
         await rel.waitFor();
-        dit(await rel.locator('[data-relier-messagerie]').count() === 5 && await rel.locator('[data-relier-exp]').count() === 8, `${nom} : Relier — 5 messageries, 8 expéditeurs`);
+        // (6 nov., onglets C) + Yahoo et « Masquer mon adresse » d'Apple : 7 messageries.
+        dit(await rel.locator('[data-relier-messagerie]').count() === 7 && await rel.locator('[data-relier-exp]').count() === 8, `${nom} : Relier — 7 messageries, 8 expéditeurs`);
         const anim = await rel.locator('.vrm-relier-scene').first().evaluate((n) => [...n.querySelectorAll('*')].some((x) => getComputedStyle(x).animationName !== 'none'));
         dit(anim, `${nom} : la scène est animée (CSS)`);
         for (const m of ['icloud', 'outlook', 'fai', 'autre', 'gmail']) { await rel.locator(`[data-relier-messagerie="${m}"]`).click(); await pg.waitForTimeout(150); }

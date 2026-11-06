@@ -48,7 +48,10 @@
 'use strict';
 require('./_porte-banc.cjs');
 const path = require('path');
-const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
+const PW = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
+const { chromium } = PW;
+// (6 nov., filet 6) `NAVIGATEUR=webkit` : le moteur de Safari (_navigateur.cjs).
+const { lancer } = require('./_navigateur.cjs');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -147,7 +150,8 @@ const ouvrirPage = async (ctx, query = '') => {
   return { pg, errs };
 };
 const capture = async (pg, nom) => { if (!CAPTURES) return; try { fs.mkdirSync(CAPTURES, { recursive: true }); await pg.screenshot({ path: path.join(CAPTURES, nom + '.png'), fullPage: false }); } catch (_) {} };
-const ecran = (pg) => pg.evaluate(() => {
+const CHAMP_ANNONCES = '[data-ann-recherche] input, input[aria-label="Rechercher une annonce"]';
+const ecran = (pg) => pg.evaluate((CHAMP_ANNONCES) => {
   const m = document.querySelector('.vrm-main');
   const t = document.querySelector('[data-tache]');
   const actif = document.querySelector('.vrm-tabbar > [aria-current="page"]');
@@ -157,11 +161,14 @@ const ecran = (pg) => pg.evaluate(() => {
     barre: actif ? (actif.getAttribute('data-nav-entree') || 'plus') : '',
     colis: (document.querySelector('[data-colis-onglet]') || { getAttribute: () => '' }).getAttribute('data-colis-onglet'),
     puce: (document.querySelector('[data-compte-puce][data-actif="1"]') || { getAttribute: () => '' }).getAttribute('data-compte-puce'),
-    recherche: (document.querySelector('input[aria-label="Rechercher une annonce"]') || { value: null }).value,
+    // Le champ de recherche d'Annonces par son crochet `data-ann-recherche` (le libellé a changé
+    // le 5 nov., chantier C : « Rechercher une annonce (titre, marque, N°) ») ; l'ancien libellé
+    // reste pour juger un arbre d'avant.
+    recherche: (document.querySelector(CHAMP_ANNONCES) || { value: null }).value,
     defile: m ? Math.round(m.scrollTop) : -1,
     url: location.href,
   };
-});
+}, CHAMP_ANNONCES);
 // Un balayage au doigt, en évènements tactiles DE LA PAGE : seul VRM les voit
 // (le navigateur n'y joue pas son propre « retour » de bord d'écran), on juge
 // donc ce que fait VRM, et lui seul.
@@ -203,7 +210,7 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
 
 (async () => {
   await new Promise((res) => srv.listen(PORT, res));
-  const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader'] });
+  const b = await lancer(PW, { executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader'] });
   try {
     if (!PARTIE || PARTIE === 'B') for (const sombre of [false, true]) for (const mode of ['tel', 'se']) {
       const qui = `${mode === 'se' ? '375×667' : '390×844'} ${sombre ? 'sombre' : 'clair'}`;
@@ -262,15 +269,33 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         dit(vus.every((v) => v.e === v.id && !v.coupe), `B6 ${qui} : Messages, Stock, Achats, Stats, Communauté, Réglages — la 5ᵉ place dit l'écran, libellé entier`, JSON.stringify(vus));
         // B7 · balayages
         await toucher(pg, '.vrm-tabbar [data-nav-entree="ventes"]');
+        // Le milieu de l'écran, HORS d'une commande : un geste qui part d'un bouton, d'un lien,
+        // d'un champ ou d'une rangée qui défile de côté appartient à ce qu'il touche (règle
+        // `gesteHorsNavigation` d'App.jsx, 16 oct.). Le point fixe (200, 420) tombait depuis
+        // le 5 nov. sur une case-bouton de la carte du haut de Ventes : le banc mesurait la
+        // mise en page, pas la règle. On cherche donc une hauteur où le doigt ne touche aucune
+        // commande, au milieu (x 200) comme au bord (x 4 : sinon « le bord est laissé au
+        // système » passerait sans rien prouver) ; s'il n'y en a aucune, c'est rouge.
+        const y7 = await pg.evaluate(() => {
+          const commande = (n) => { for (let k = 0; n && n !== document.body && k < 40; k++, n = n.parentElement) {
+            if (n.matches && n.matches('button, a, input, textarea, select, label, [contenteditable="true"], [role="button"], [role="tab"], [role="link"], [role="slider"], [data-noswipe]')) return true;
+            const cs = getComputedStyle(n); if (cs.position === 'fixed') return true;
+            if (n.scrollWidth > n.clientWidth + 2 && (cs.overflowX === 'auto' || cs.overflowX === 'scroll')) return true;
+          } return false; };
+          const barre = (document.querySelector('.vrm-tabbar') || { getBoundingClientRect: () => ({ top: innerHeight }) }).getBoundingClientRect().top;
+          for (let y = 160; y < barre - 20; y += 12) { const e = document.elementFromPoint(200, y), g = document.elementFromPoint(4, y); if (e && g && e.closest('.vrm-main') && g.closest('.vrm-main') && !commande(e) && !commande(g)) return y; }
+          return null;
+        });
+        dit(y7 != null, `B7 ${qui} : au milieu de Ventes, il existe une place hors de toute commande pour balayer`, String(y7));
         const avant7 = await ecran(pg);
-        await balayer(ctx, pg, 4, 220, 420);
+        await balayer(ctx, pg, 4, 220, y7 == null ? 420 : y7);
         const e7 = await ecran(pg);
         // Le bord appartient au système (le « retour » de Safari sur iPhone) :
         // VRM ne doit PAS y ajouter son changement d'onglet (l'onglet voisin).
         dit(avant7.ecran === 'ventes' && e7.ecran === 'ventes', `B7 ${qui} : un balayage parti du bord gauche est laissé au système (VRM ne change pas d'onglet)`, JSON.stringify({ avant: avant7.ecran, apres: e7.ecran }));
-        await balayer(ctx, pg, 200, 40, 420);
+        await balayer(ctx, pg, 200, 40, y7 == null ? 420 : y7);
         const e7b = await ecran(pg);
-        dit(e7b.ecran === 'cat_bord', `B7 ${qui} : un balayage au milieu change toujours d'onglet (Ventes → Colis)`, JSON.stringify(e7b));
+        dit(e7b.ecran === 'cat_bord', `B7 ${qui} : un balayage au milieu (hors d'une commande) change toujours d'onglet (Ventes → Colis)`, JSON.stringify({ y: y7, ...e7b }));
         // B8 · retoucher l'onglet courant
         await toucher(pg, '.vrm-tabbar [data-nav-entree="annonces"]');
         await pg.evaluate(() => { document.querySelector('.vrm-main').scrollTop = 400; }); await pg.waitForTimeout(300);
@@ -322,8 +347,10 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         // R3 · Annonces : recherche + défilement, app rouverte
         await toucher(pg, '.vrm-tabbar [data-nav-entree="annonces"]');
         await toucher(pg, '[data-filtre-site] button[data-site="vinted"]');
-        const champ = pg.locator('input[aria-label="Rechercher une annonce"]').first();
-        if (await champ.count()) { await champ.fill('taille'); await pg.waitForTimeout(600); await pg.evaluate(() => document.activeElement && document.activeElement.blur()); }
+        const champ = pg.locator(CHAMP_ANNONCES).first();
+        const champLa = (await champ.count()) > 0;
+        dit(champLa, `R3 ${qui} : le champ de recherche d'Annonces est là (sinon la reprise de la recherche n'est pas jugée)`);
+        if (champLa) { await champ.fill('taille'); await pg.waitForTimeout(600); await pg.evaluate(() => document.activeElement && document.activeElement.blur()); }
         await pg.waitForTimeout(400);
         await pg.evaluate(() => { document.querySelector('.vrm-main').scrollTop = 600; }); await pg.waitForTimeout(500);
         const r3avant = await ecran(pg);

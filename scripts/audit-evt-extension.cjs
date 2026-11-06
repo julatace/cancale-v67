@@ -13,8 +13,9 @@
 //   2. CODE DE RETRAIT : un code NEUF rangé dans `panel_colis_relais` prévient
 //      l'app (`maj · retrait`), par les trois chemins (direct, conversation
 //      passive, `capterRetraits`) ; un code inchangé ou une écriture ratée, non.
-//   3. CAPTURE PLUS PAUVRE (voie active) : refusée, AUCUN `maj · ventes`, et le
-//      refus est COMPTÉ (`ignore_partiel_actif_<type>`).
+//   3. FENÊTRE PARTIELLE DE VENTES (voie active, 5.323) : FUSIONNÉE par n° de
+//      transaction (la neuve rangée, rien de perdu), UN `maj · ventes`, compté
+//      (`fusion_<type>`) ; relue sans rien de neuf : « rien » (`inchange`).
 //   4. « RELIS MES VENTES » : une lecture ou une écriture ratée RELÂCHE la garde
 //      des 90 s (ramenée à 20 s : la demande suivante réessaie, jamais en
 //      rafale) et la commande ne prétend pas avoir rafraîchi ; Vinted qui
@@ -231,15 +232,22 @@ const retrait = (code) => ({ tx: TX, item: '5550001', titre: 'Paire essai', phot
     dit(a.evts('retrait').length === 1 && String(a.evts('retrait')[0].uid) === UID, "capterRetraits : le code rangé prévient l'app (maj · retrait)", JSON.stringify(a.j.evts));
   });
 
-  // ── 3. LA CAPTURE PLUS PAUVRE (voie active) ───────────────────────────────
-  await essaie('plus pauvre', async () => {
+  // ── 3. UNE FENÊTRE PARTIELLE DE VENTES (voie active) — 5.323 ───────────────
+  // Avant la 5.323 : refusée « plus pauvre » (2 contre 5) — c'est ainsi que la
+  // vente du 6 nov. au matin a été jetée (320 lues contre 2 000 rangées). Elle
+  // se FUSIONNE désormais par n° de transaction : la neuve est rangée, les
+  // 5 restent, l'app est prévenue une fois.
+  const ventesDe = (txs, total) => ({ my_orders: txs.map((t) => commande(String(t), 'Le paiement a été validé')), pagination: { total_entries: total, total_pages: 1 } });
+  const T0 = Number(TX);
+  await essaie('fenêtre partielle', async () => {
     const lignes = { [`harvest_${UID}_orders_sold`]: { nItems: 5, payload: listeVentes(5) } };
     const a = faireCtx({ lignes });
-    await a.ctx.storeHarvestRow(UID, 'orders_sold', listeVentes(2, 9), 'www.vinted.fr');
+    await a.ctx.storeHarvestRow(UID, 'orders_sold', ventesDe([T0 + 10, T0], 9), 'www.vinted.fr');
     await a.calme();
-    dit(!a.j.posts.some((p) => p.ids.includes(`harvest_${UID}_orders_sold`)), 'une capture plus pauvre (2 contre 5) ne remplace pas la bonne', JSON.stringify(a.j.posts.map((p) => p.ids)));
-    dit(a.evts('ventes').length === 0, "et elle n'annonce AUCUNE vente à l'app", JSON.stringify(a.j.evts));
-    dit(a.compteur('ignore_partiel_actif_orders_sold') === 1, 'et le refus est COMPTÉ (ignore_partiel_actif_orders_sold = 1)', JSON.stringify(a.cles()));
+    const l = ((a.lignes[`harvest_${UID}_orders_sold`] || {}).payload || {}).my_orders || [];
+    dit(l.length === 6 && String(l[0].transaction_id) === String(T0 + 10), 'une fenêtre de 2 (dont 1 neuve) devant 5 rangées : la neuve est rangée en tête, les 5 restent (6)', `${l.length} · ${l.map((o) => o.transaction_id).join(',')}`);
+    dit(a.evts('ventes').length === 1, "et l'app est prévenue UNE fois", JSON.stringify(a.j.evts));
+    dit(a.compteur('fusion_orders_sold') === 1, 'et la fusion est COMPTÉE (fusion_orders_sold = 1)', JSON.stringify(a.cles()));
   });
 
   // ── 4. « RELIS MES VENTES » ───────────────────────────────────────────────
@@ -288,16 +296,24 @@ const retrait = (code) => ({ tx: TX, item: '5550001', titre: 'Paire essai', phot
     dit(r > 0 && r <= 25000, 'et la garde est relâchée (quelques secondes, pas 90)', `reste ${Math.round(r / 1000)} s`);
     dit(a.evts('ventes').length === 0, "aucune vente annoncée à l'app", JSON.stringify(a.j.evts));
   });
-  await essaie('ventes · plus pauvre', async () => {
+  await essaie('ventes · fenêtre déjà rangée', async () => {
+    // 5.323 : la même fenêtre relue (rien de neuf), déjà rangée par nous il y a
+    // moins d'une heure : ni relecture de la base ni réécriture — « rien », avec la raison.
     const lignes = { [`harvest_${UID}_orders_sold`]: { nItems: 5, payload: listeVentes(5) } };
-    const a = faireCtx({ lignes, vinted: () => ({ ok: true, status: 200, json: listeVentes(2, 9) }) });
+    const a = faireCtx({ lignes, vinted: () => ({ ok: true, status: 200, json: ventesDe([T0 + 20, T0], 9) }) });
+    await a.envoyer(CMD);
+    const fin1 = await a.finir(`ventes:${UID}`);
+    await attendre(20);
+    dit(fin1 && fin1.etape === 'fait', 'la première lecture partielle range la vente neuve → « fait »', JSON.stringify(fin1));
+    await vieillir(a, 91000);
+    const ev = a.evts('ventes').length, ecr = a.j.posts.length;
     await a.envoyer(CMD);
     const fin = await a.finir(`ventes:${UID}`);
     await attendre(20);
-    dit(fin && fin.etape === 'rien' && fin.raison === 'plus-pauvre', 'lu mais plus pauvre : « rien » avec la raison — jamais « fait »', JSON.stringify(fin));
-    dit(a.evts('ventes').length === 0, "aucune vente annoncée à l'app", JSON.stringify(a.j.evts));
+    dit(fin && fin.etape === 'rien' && fin.raison === 'inchange', 'relue sans rien de neuf : « rien » avec la raison — jamais « fait »', JSON.stringify(fin));
+    dit(a.evts('ventes').length === ev && !a.j.posts.slice(ecr).some((p) => p.ids.includes(`harvest_${UID}_orders_sold`)), "aucune réécriture, aucune vente annoncée à l'app", JSON.stringify(a.j.evts.slice(ev)));
     const r = await reste(a);
-    dit(r >= 85000, "un refus « plus pauvre » n'est pas un échec : la garde entière reste", `reste ${Math.round(r / 1000)} s`);
+    dit(r >= 85000, "« rien de neuf » n'est pas un échec : la garde entière reste", `reste ${Math.round(r / 1000)} s`);
   });
   await essaie('ventes · succès', async () => {
     const a = faireCtx({ vinted: () => ({ ok: true, status: 200, json: listeVentes(2) }) });
