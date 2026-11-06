@@ -200,6 +200,7 @@ import { etatVinted, NIVEAU_ETAT_MAX } from "./carteAnnonce.js";
 import ChoixPeriode from "./ChoixPeriode.jsx";
 import { libellePlage, phrasePlage } from "./periodeCalendrier.js";
 import { installerLecturesPartagees } from "./lecturesPartagees.js";
+import { rythme } from "./rythmeLectures.js";
 import { installerFiltreSupprimes, sansComptesSupprimes, lireSupprimes, CLE_SUPPRIMES } from "./comptesSupprimes.js";
 import { lectureComplete, construirePhoto, ecrirePhoto, lirePhoto, listeDuSoir, joursAvantJour, heurePhoto, adresseQrLocale, CACHE_QR } from "./journeeHorsLigne.js";
 import { jetonsStream, demarrerStream, poserReglesStream, normaliserRegles, compilerRegle, masquerTexteStream, textePourStream, regleCourante, regleApercu, ligneACacher, CATEGORIES as STREAM_CATEGORIES, LISTES as STREAM_LISTES, nettoyerMots, CLE_STREAM, CLE_STREAM_REGLES, REGLES_DEFAUT as STREAM_DEFAUT } from "./modeStream.js";
@@ -3117,10 +3118,13 @@ const relireNuage = (opts = {}) => {
     try {
       // Un envoi en cours ou prévu fera lui-même la fusion (il relit sur un refus).
       if (_pushEnVol || _cloudTimer) return false;
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${SUPABASE_ROW}&owner=eq.${encodeURIComponent(owner)}&select=rev:data->>rev,maj:updated_at`, { headers: sbAuth(), cache: 'no-store' });
+      // (6 nov., charge) La VERSION de la numérotation vient dans la MÊME lecture
+      // scalaire (même ligne, même minute) : une lecture de moins par minute.
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${SUPABASE_ROW}&owner=eq.${encodeURIComponent(owner)}&select=rev:data->>rev,maj:updated_at,vnum:data->vrm_numerotation->>version`, { headers: sbAuth(), cache: 'no-store' });
       if (!r.ok) return false;
       const rows = await r.json();
       if (!Array.isArray(rows) || rows.length > 1) return false;
+      if (rows.length === 1 || !_snapNuage.existe) appliquerVersionLue(rows[0] ? rows[0].vnum : null);
       if (!rows[0] && _snapNuage.existe) return false;   // ligne connue relue absente : pas su
       const revLue = rows[0] && rows[0].rev != null && rows[0].rev !== '' ? Number(rows[0].rev) : null;
       const majLue = rows[0] ? (rows[0].maj || null) : null;
@@ -3151,7 +3155,10 @@ if (typeof window !== 'undefined') {
   const renvoyerFile = () => { if (!isCloudReady() || _pushBloque || _pushEnVol || _cloudTimer || !fileNonVide()) return false; _repriseN = 0; reprendreSyncMaintenant(); return true; };
   document.addEventListener('visibilitychange', () => { if (document.visibilityState !== 'visible') return; if (renvoyerFile()) return; relireNuage(); });
   window.addEventListener('pageshow', (e) => { if (e && e.persisted) relireNuage({ force: true }); });
-  setInterval(() => { if (document.visibilityState === 'visible') relireNuage(); }, 60 * 1000);
+  // (6 nov., charge) Au rythme commun (src/rythmeLectures.js) : rien pour un
+  // onglet caché, plus lentement quand personne n'y touche, tout de suite au réveil.
+  setInterval(() => { if (rythme().doitLire('nuage', 60 * 1000)) relireNuage(); }, 60 * 1000);
+  rythme().surReveil(() => { rythme().noter('nuage'); relireNuage(); });
   // Un AUTRE onglet de ce navigateur a écrit une clé synchronisée : le
   // navigateur la porte déjà, les écrans de cet onglet se réveillent.
   window.addEventListener('storage', (e) => { if (e && e.key && SYNC_KEYS.includes(e.key) && AUTH.user?.id && readSession()?.user?.id === AUTH.user.id) { noterAvantDistant(e.key, e.oldValue); emettreClesRelues([e.key]); } });
@@ -9762,6 +9769,14 @@ const etatVersionNumerotation = () => _verNum;
 // Lue en même temps que la ligne entière au chargement : c'est une vraie lecture.
 const noterVersionChargee = () => _emitVerNum({ etat: 'ok', at: Date.now(), nuage: versionNumerotation() });
 let _verNumEnVol = null;
+// Une version LUE (par cette lecture-ci, ou par la relecture scalaire du nuage
+// qui la porte depuis le 6 nov.) : la même règle dans les deux cas.
+const appliquerVersionLue = (brut) => {
+  const v = brut != null && String(brut) !== '' ? Number(brut) : null;
+  // « Périmé » est définitif pour cet écran : seul un rechargement le lève.
+  if (_verNum.etat === 'perime') _emitVerNum({ at: Date.now(), nuage: v });
+  else _emitVerNum({ etat: v === versionNumerotation() ? 'ok' : 'perime', at: Date.now(), nuage: v });
+};
 const verifierVersionNumerotation = () => {
   if (_verNumEnVol) return _verNumEnVol;
   _verNumEnVol = (async () => {
@@ -9770,10 +9785,7 @@ const verifierVersionNumerotation = () => {
       if (!r.ok) throw new Error('http ' + r.status);
       const rows = await r.json();
       if (!Array.isArray(rows)) throw new Error('forme');
-      const v = rows[0] && rows[0].v != null && String(rows[0].v) !== '' ? Number(rows[0].v) : null;
-      // « Périmé » est définitif pour cet écran : seul un rechargement le lève.
-      if (_verNum.etat === 'perime') _emitVerNum({ at: Date.now(), nuage: v });
-      else _emitVerNum({ etat: v === versionNumerotation() ? 'ok' : 'perime', at: Date.now(), nuage: v });
+      appliquerVersionLue(rows[0] ? rows[0].v : null);
     } catch (_) {
       if (_verNum.etat !== 'perime') _emitVerNum({ etat: 'passu', essaiAt: Date.now() });
     }
@@ -22286,6 +22298,11 @@ const RECUL_EBAY_MS = [10, 20, 40, 60].map((m) => m * 60000);
 const RECUL_EBAY_SANS_CONNEXION_MS = 6 * 3600 * 1000;
 const VOL_EBAY_MS = 2 * 60 * 1000;
 const _capEbay = new Map();            // ref → capturedAt connu (cet onglet)
+// (6 nov., charge) « Aucun compte eBay relié » (le principal implicite, ligne
+// absente) est une RÉPONSE lue : on ne la redemande pas avant
+// RELECTURE_EBAY_MS. Avant : une lecture par minute, toute la journée, chez un
+// vendeur sans eBay. Connecter un compte passe par la route, qui relit elle-même.
+const _sansEbay = new Map();            // ref → date de la lecture « absent »
 let _relectureEbayVol = null;
 const lireLocalJson = (k) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v && typeof v === 'object' ? v : {}; } catch (_) { return {}; } };
 const ecrireLocalJson = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} };
@@ -22303,6 +22320,8 @@ function relireEbaySiVieux() {
         const r = recul[c.ref];
         if (r && Number(r.prochain) > maintenant) return false;
         const cap = _capEbay.get(c.ref);
+        const sans = _sansEbay.get(c.ref);
+        if (sans && maintenant - sans < RELECTURE_EBAY_MS) return false;
         return !(cap && maintenant - cap < RELECTURE_EBAY_MS);
       });
       if (!candidats.length) return { fait: 0, raison: 'frais' };
@@ -22313,7 +22332,7 @@ function relireEbaySiVieux() {
       const aRelire = [];
       for (const { compte, ligne } of lu.lignes) {
         if (ligne === undefined) continue;                       // pas su : on ne devine pas
-        if (compte.implicite && ligne === null) continue;        // aucun compte eBay relié
+        if (compte.implicite && ligne === null) { _sansEbay.set(compte.ref, maintenant); continue; }   // aucun compte eBay relié
         const cap = ligne ? (Number(ligne.capturedAt) || Date.parse(ligne.capturedAt || '') || 0) : 0;
         if (cap && maintenant - cap < RELECTURE_EBAY_MS) { _capEbay.set(compte.ref, cap); continue; }
         aRelire.push(compte);
@@ -22347,7 +22366,7 @@ function useRelectureEbay() {
   React.useEffect(() => {
     const tic = () => { try { if (document.visibilityState === 'hidden') return; } catch (_) {} relireEbaySiVieux(); };
     tic();
-    const t = setInterval(tic, 60000);
+    const t = setInterval(() => { if (rythme().doitLire('ebay-relecture', 60000)) tic(); }, 60000);
     document.addEventListener('visibilitychange', tic);
     window.addEventListener('focus', tic);
     return () => { clearInterval(t); document.removeEventListener('visibilitychange', tic); window.removeEventListener('focus', tic); };
@@ -22411,7 +22430,7 @@ function useRelectureTransporteurs() {
   React.useEffect(() => {
     const tic = () => { try { if (document.visibilityState === 'hidden') return; } catch (_) {} relireTransporteursSiVieux(); };
     tic();
-    const t = setInterval(tic, 60000);
+    const t = setInterval(() => { if (rythme().doitLire('transp', RELECTURE_TRANSP_MS)) tic(); }, 60000);
     document.addEventListener('visibilitychange', tic);
     window.addEventListener('focus', tic);
     return () => { clearInterval(t); document.removeEventListener('visibilitychange', tic); window.removeEventListener('focus', tic); };
@@ -42618,7 +42637,10 @@ const listeComptesChangee = (avant, apres) => {
   const sig = (l) => (Array.isArray(l) ? l : []).map((a) => String((a && a.vinted_user_id) ?? '') + '=' + String((a && a.login) || '')).filter((x) => x[0] !== '=').sort().join('|');
   return sig(avant) !== sig(apres);
 };
-const RELIRE_COMPTES_PERIODE_MS = 120000;   // écran visible : au plus toutes les 2 min
+// (6 nov., charge) 5 min au lieu de 2 : un compte ajouté dans CE navigateur est
+// signalé tout de suite par l'extension (`vrm:ext` · comptes) ; ailleurs, le
+// retour sur l'onglet relit déjà (RELIRE_COMPTES_RETOUR_MS).
+const RELIRE_COMPTES_PERIODE_MS = 5 * 60000;   // écran visible : au plus toutes les 5 min
 const RELIRE_COMPTES_RETOUR_MS = 30000;     // retour au premier plan
 const RELIRE_COMPTES_INCONNU_MS = 5000;     // l'extension parle d'un compte inconnu
 const cleComptesVinted = (accs) => [...new Set((accs || []).map(a => String((a && a.vinted_user_id) ?? '')).filter(Boolean))].sort().join(',');
@@ -48797,8 +48819,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     document.addEventListener('visibilitychange', onVis);
     demander();
     sonde();
-    const t = setInterval(sonde, 60000);
-    return () => { window.removeEventListener('vrm:ext', ecoute); window.removeEventListener('vrm:transp-maj', transpMaj); document.removeEventListener('visibilitychange', onVis); clearInterval(t); signalAnnonces.arreter(); };
+    // (6 nov., charge) Au rythme commun : plus lentement quand personne ne
+    // touche l'écran, tout de suite quand la main revient.
+    const t = setInterval(() => { if (rythme().doitLire('sonde-ventes', 60000)) sonde(); }, 60000);
+    const reveil = rythme().surReveil(() => { rythme().noter('sonde-ventes'); sonde(); });
+    return () => { window.removeEventListener('vrm:ext', ecoute); window.removeEventListener('vrm:transp-maj', transpMaj); document.removeEventListener('visibilitychange', onVis); clearInterval(t); reveil(); signalAnnonces.arreter(); };
   /* eslint-disable-next-line */ }, [curSub, cleComptes]);
   // ── COLIS ↔ ACHAT : rapprochement UNIQUE ou RIEN ──────────────────────────
   // Un email de suivi ne porte que le titre de l'article : il n'y a pas d'autre
@@ -63978,7 +64003,10 @@ function CentreNotifsCoque({ onReglages }) {
     let vivant = true;
     const compter = () => { if (document.visibilityState === 'hidden') return; compterNonLuesNotifs().then((v) => { if (vivant) setNonLues(v); }); };
     compter();
-    const t = setInterval(compter, 120000);
+    // (6 nov., charge) La pastille se recompte toutes les 5 min (au lieu de 2),
+    // au rythme commun ; une notification arrive d'abord sur le téléphone, et
+    // ouvrir l'app, revenir sur l'onglet ou lire une entrée recomptent aussitôt.
+    const t = setInterval(() => { if (rythme().doitLire('cloche', 5 * 60000)) compter(); }, 60000);
     const ouvrir = () => { try { sessionStorage.removeItem('vrm_ouvrir_cloche'); } catch (_) {} setOuvert(true); };
     try { if (sessionStorage.getItem('vrm_ouvrir_cloche') === '1') ouvrir(); } catch (_) {}
     window.addEventListener('focus', compter);
@@ -69487,7 +69515,7 @@ function AppCoeur() {
     };
     const visible=()=>typeof document==='undefined'||document.visibilityState!=='hidden';
     const surVue=()=>{ if(visible()) relire(RELIRE_COMPTES_RETOUR_MS); };
-    const t=setInterval(()=>{ if(visible()) relire(RELIRE_COMPTES_PERIODE_MS); },RELIRE_COMPTES_PERIODE_MS);
+    const t=setInterval(()=>{ if(visible() && rythme().doitLire('comptes-vinted',RELIRE_COMPTES_PERIODE_MS)) relire(RELIRE_COMPTES_PERIODE_MS); },60000);
     window.addEventListener('vrm:ext',surExt);
     document.addEventListener('visibilitychange',surVue);
     return ()=>{ stop=true; clearInterval(t); window.removeEventListener('vrm:ext',surExt); document.removeEventListener('visibilitychange',surVue); };
@@ -69640,7 +69668,11 @@ function AppCoeur() {
   // écran ne reçoit jamais `visibilitychange`, d'où l'horloge aussi.
   useEffect(() => {
     if (!synced) return;
-    const t = setInterval(() => { verifierVersionNumerotation(); }, 60 * 1000);
+    // (6 nov., charge) Plus pour un onglet caché (5,8 % de ses lectures : une par
+    // minute, jour et nuit) ; une version relue depuis moins d'une période + 50 s
+    // (par la relecture du nuage, qui la porte à chaque passage) n'est pas relue. Numéroter ou imprimer
+    // relisent toujours d'abord ce qui a vieilli (`numerotationPermise`).
+    const t = setInterval(() => { if (Date.now() - (etatVersionNumerotation().at || 0) < rythme().periodeEffective(60 * 1000) + 50 * 1000) return; if (rythme().doitLire('version-num', 60 * 1000)) verifierVersionNumerotation(); }, 60 * 1000);
     const vis = () => { if (document.visibilityState === 'visible') verifierVersionNumerotation(); };
     document.addEventListener('visibilitychange', vis);
     return () => { clearInterval(t); document.removeEventListener('visibilitychange', vis); };

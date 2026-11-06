@@ -36,6 +36,20 @@
 //      idempotente : une commande déjà anonymisée ne se réécrit pas).
 // L'identité est TOUJOURS une égalité exacte (pseudo eBay, sans casse ;
 // EIASToken) — jamais une ressemblance (§5).
+//
+// (6 novembre, charge) eBay envoie CETTE notification pour TOUS ses
+// utilisateurs du monde (~3/min, 4 640 en 24 h) ; presque aucun n'est chez
+// nous. Chaque notification relisait le registre `ebay_comptes` de TOUS les
+// vendeurs (O(nombre de vendeurs) lignes rendues) et parcourait toutes les
+// lignes `app_data` (aucun index sur `id` seul) — deux fois. Désormais :
+//   · avec la migration 026 (`vrm_ebay_cibles`, index sur les identités eBay
+//     rangées) : UNE lecture indexée rend seulement les lignes où ce pseudo ou
+//     cette clé figurent — 0 la plupart du temps ;
+//   · sans elle (fonction absente : 404), le chemin d'avant, mais filtré PAR LA
+//     BASE : le registre n'est rendu que s'il contient le pseudo ou la clé
+//     (`ilike`, un sur-ensemble : la règle exacte ci-dessous trie ensuite).
+// Ni la règle ni l'obligation ne changent : tout ce qui est rendu passe par la
+// même égalité exacte, une lecture ratée ⇒ 503 (eBay renvoie).
 // ────────────────────────────────────────────────────────────────────────────
 import crypto from 'crypto';
 
@@ -172,6 +186,36 @@ const ID_COMMANDES = /^ebay_orders(?:_[0-9a-f]{16})?$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const PSEUDO_SUR = /^[A-Za-z0-9._-]{1,64}$/;
 
+// ── QUI EST CONCERNÉ ? (migration 026) ───────────────────────────────────────
+// `{ ok:true, lignes:[{owner,id}] }` · `{ absente:true }` (fonction pas encore
+// créée : chemin sans elle) · `null` (pas su). La fonction rend les lignes
+// `ebay_orders*` et `ebay_comptes` dont une identité rangée (pseudo en
+// minuscules sans espaces autour, clé de compte) est dans `ids`.
+// L'absence est retenue 10 min par instance (pas une sonde par notification).
+const RPC_CIBLES = 'vrm_ebay_cibles';
+let _rpcAbsenteJusqua = 0;
+export function oublierRpcEbay() { _rpcAbsenteJusqua = 0; }
+async function lireCibles(base, cle, sbCle, ids, fetcher, maintenant = Date.now()) {
+  if (_rpcAbsenteJusqua > maintenant) return { absente: true };
+  let r;
+  try {
+    r = await fetcher(`${base}/rest/v1/rpc/${RPC_CIBLES}`, { method: 'POST', headers: { ...sbCle(cle), 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ p_ids: ids }) });
+  } catch (_) { return null; }
+  // PostgREST : fonction inconnue ⇒ 404 (PGRST202). Rien d'autre ne vaut « absente ».
+  if (r.status === 404) {
+    let j = null; try { j = await r.json(); } catch (_) {}
+    if (j && j.code === 'PGRST202') { _rpcAbsenteJusqua = maintenant + 10 * 60 * 1000; return { absente: true }; }
+    return null;
+  }
+  if (!r.ok) return null;
+  let j; try { j = await r.json(); } catch (_) { return null; }
+  // 1 000 lignes = le plafond silencieux de Supabase (§4.5) : « pas su ».
+  if (!Array.isArray(j) || j.length >= 1000) return null;
+  return { ok: true, lignes: j };
+}
+// L'identité telle que la fonction la range : minuscules, sans espaces autour.
+export const idRangee = (v) => String(v == null ? '' : v).trim().toLowerCase();
+
 // Toutes les lignes d'une requête, TOUS vendeurs (clé de service), par pages
 // de 1 000 (§4.5 : Supabase coupe sans le dire). `null` = pas su.
 async function lireToutesLignes(base, cle, sbCle, requete, fetcher) {
@@ -239,11 +283,24 @@ export async function traiterSuppressionEbay(req, dep) {
   // limitée par les règles de la base, « rien trouvé » ne voudrait rien dire.
   if (!cleService) return { status: 503, body: { ok: false, reason: 'sans-cle', error: 'Clé de service absente — rien n\'a été effacé, eBay renverra la notification.' } };
 
+  const cleEias = eias ? cleCompteDe(eias) : '';
+  // 0. Qui est concerné ? Avec la migration 026 : une lecture indexée. Le
+  //    pseudo n'y sert que s'il est « sûr » (lettres, chiffres, . _ -) : un
+  //    autre (jamais vu chez eBay) passe par le chemin complet.
+  let cibles = null;
+  if (!u || PSEUDO_SUR.test(u)) {
+    const ids = [...new Set([u ? idRangee(u) : '', cleEias].filter(Boolean))];
+    const c = await lireCibles(supabaseUrl, cleService, sbCle, ids, fetcher);
+    if (c === null) return { status: 503, body: { ok: false, reason: 'base', error: 'La base n\'a pas répondu — rien n\'a été effacé, eBay renverra la notification.' } };
+    if (c.ok) cibles = c.lignes.filter((l) => l && UUID.test(String(l.owner || '')));
+  }
+
   // 1. Les commandes où il figure (acheteur ou vendeur).
   let commandes = 0;
   if (u) {
     const filtre = PSEUDO_SUR.test(u) ? `&data->>orders=ilike.${encodeURIComponent('*' + u + '*')}` : '';
-    const lignes = await lireToutesLignes(supabaseUrl, cleService, sbCle, `id=like.ebay_orders*&select=owner,id${filtre}&order=owner.asc,id.asc`, fetcher);
+    const lignes = cibles ? cibles.filter((l) => ID_COMMANDES.test(String(l.id || '')))
+      : await lireToutesLignes(supabaseUrl, cleService, sbCle, `id=like.ebay_orders*&select=owner,id${filtre}&order=owner.asc,id.asc`, fetcher);
     if (!lignes) return { status: 503, body: { ok: false, reason: 'base', error: 'La base n\'a pas répondu — rien n\'a été effacé, eBay renverra la notification.' } };
     for (const l of lignes) {
       if (!l || !UUID.test(String(l.owner || '')) || !ID_COMMANDES.test(String(l.id || ''))) continue;
@@ -254,9 +311,20 @@ export async function traiterSuppressionEbay(req, dep) {
     }
   }
 
-  // 2. Un vendeur relié à VRM dont c'est le compte eBay.
-  const cleEias = eias ? cleCompteDe(eias) : '';
-  const registres = await lireToutesLignes(supabaseUrl, cleService, sbCle, 'id=eq.ebay_comptes&select=owner,comptes:data->comptes&order=owner.asc', fetcher);
+  // 2. Un vendeur relié à VRM dont c'est le compte eBay. Seuls les registres
+  //    qui PEUVENT le porter sont lus : ceux que la fonction désigne, ou (sans
+  //    elle) ceux dont le texte contient son pseudo ou sa clé — un sur-ensemble
+  //    (`ilike` ignore la casse, `_` y vaut n'importe quel caractère) que la
+  //    règle exacte (`cible`) trie ensuite. Pseudo « pas sûr » ⇒ tout est lu.
+  let requeteRegistres = 'id=eq.ebay_comptes&select=owner,comptes:data->comptes&order=owner.asc';
+  if (cibles) {
+    const owners = [...new Set(cibles.filter((l) => l.id === 'ebay_comptes').map((l) => String(l.owner)))];
+    requeteRegistres = owners.length ? `${requeteRegistres}&owner=in.(${owners.join(',')})` : '';
+  } else if (!u || PSEUDO_SUR.test(u)) {
+    const motifs = [u, cleEias].filter(Boolean).map((x) => `data->>comptes.ilike.*${x}*`);
+    requeteRegistres = motifs.length ? `${requeteRegistres}&or=(${encodeURIComponent(motifs.join(','))})` : '';
+  }
+  const registres = requeteRegistres ? await lireToutesLignes(supabaseUrl, cleService, sbCle, requeteRegistres, fetcher) : [];
   if (!registres) return { status: 503, body: { ok: false, reason: 'base', error: 'La base n\'a pas répondu — eBay renverra la notification.' } };
   const cible = (e) => !!e && ((cleEias && e.cle === cleEias) || (u && memeId(e.pseudo, u)));
   let vendeurs = 0;
