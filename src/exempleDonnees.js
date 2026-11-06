@@ -43,7 +43,7 @@ export function jeuExemple(now = Date.now()) {
     { id: 'harvest_111_inbox', data: { capturedAt: iso(0.01), payload: { conversations: [conv(301, 'acheteuse_lyon', 'Vous feriez 50 € ?', true, 3), conv(302, 'marc.b', 'Merci, bien reçu !', false, 30)] } } },
     { id: 'harvest_222_inbox', data: { capturedAt: iso(0.02), payload: { conversations: [conv(401, 'sneaker_fan', 'Toujours disponible en 42 ?', true, 6)] } } },
     { id: 'email_bord_62000', data: { transaction: '62000', filename: 'bordereau-62000.pdf', pdfB64: 'JVBERi0x', modele: V1[0].title, account: 'vendeuse_a', receivedAt: iso(0.2), dateLimite: new Date(now + 3 * 86400000).toLocaleDateString('fr-FR') + ' 10 h 00', type: 'vinted' } },
-    { id: 'panel_colis_relais', data: { 73000: { code: 'K48291', lieu: 'Le Fournil, 8 Rue de la Paix, 35000 Rennes, France', at: iso(0.5), url: 'https://www.vinted.fr/inbox/84000' } } },
+    { id: 'panel_colis_relais', data: { 73000: { code: 'K48291', lieu: 'Le Fournil, 8 Rue de la Paix, 35000 Rennes, France', at: iso(0.5) } } },
     { id: 'email_track_mondialrelay_40817263', data: { carrier: 'mondialrelay', status: 'disponible', suivi: '40817263', code: '582913', lieu: 'Le Fournil\n8 Rue de la Paix\n35000 Rennes', subject: 'Votre colis est disponible', receivedAt: iso(1), arriveLe: iso(1), dateLimite: new Date(now + 5 * 86400000).toISOString() } },
     { id: 'harvest_111_billing', data: { capturedAt: iso(0.01), payload: { user_balance: { available_amount: { amount: '64.0' }, escrow_amount: { amount: '120.0' } } } } },
     { id: 'lbc_accounts', data: { accounts: { lbcA: { id: 'lbcA', name: 'Ma boutique', sessionAt: iso(1) } } } },

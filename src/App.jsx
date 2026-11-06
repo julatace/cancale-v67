@@ -20041,14 +20041,19 @@ function useNumerosGuide() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return n;
 }
-function GuideDemarrageApp({ onNav, comptes, plein = false }) {
-  const { etape } = useEtapePont();
+// Le pont n'est interrogé que pour la carte d'accueil (`plein`) : un compte relié
+// prouve déjà l'extension, Ma journée ne questionne pas l'extension pour rien.
+function GuidePont({ children }) { const { etape } = useEtapePont(); return children(etape); }
+function GuideDemarrageApp(props) {
+  if (exempleActif()) return null;
+  return props.plein ? <GuidePont>{(etape) => <GuideDemarrageCarte {...props} etape={etape}/>}</GuidePont> : <GuideDemarrageCarte {...props} etape={null}/>;
+}
+function GuideDemarrageCarte({ onNav, comptes, plein = false, etape }) {
   const sansSouris = useSansSouris();
-  const emails = useReceptionEmails(!exempleActif());
-  const nNum = useNumerosGuide();
   const [masque, setMasque] = React.useState(() => !!load(CLE_GUIDE_MASQUE, null));
   React.useEffect(() => onCloudReady(() => setMasque(!!load(CLE_GUIDE_MASQUE, null))), []);
-  if (exempleActif()) return null;
+  const emails = useReceptionEmails(plein || !masque);
+  const nNum = useNumerosGuide();
   const guide = etatGuide({ extension: preuveExtension(etape, comptes), vinted: preuveListe(comptes), emails: preuveListe(emails), numeros: preuveNombre(nNum) });
   if (!plein && (guide.fini || masque || !guide.courante)) return null;
   const sansCompte = Array.isArray(comptes) && comptes.length === 0;

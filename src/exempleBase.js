@@ -119,8 +119,9 @@ export function filtrer(rows, params) {
 // rend `{ status, body, headers }` — jamais d'exception.
 // `table` = { lignes: [...] } (muté sur place par les écritures).
 export function servirTable(table, { methode = 'GET', url, entetes = {}, corps = null, owner = null }) {
-  const u = new URL(metaVersData(decodeURIComponent(url)), 'https://exemple.invalid');
-  const p = u.searchParams;
+  // `url` est un chemin (`/rest/v1/app_data?…`) : seuls ses paramètres comptent.
+  const brut = metaVersData(decodeURIComponent(url));
+  const p = new URLSearchParams(brut.includes('?') ? brut.slice(brut.indexOf('?') + 1) : '');
   const prefer = String(entetes.Prefer || entetes.prefer || '');
   const json = (status, b, extra) => ({ status, body: b, headers: { 'content-type': 'application/json', ...(extra || {}) } });
   if (methode === 'GET' || methode === 'HEAD') {
