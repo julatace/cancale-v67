@@ -61,7 +61,7 @@ function construire({ n = 950, seed = 7 } = {}) {
   const total = NATURES.reduce((s, [, p]) => s + p, 0);
   const nature = () => { let x = r() * total; for (const [k, p] of NATURES) { if ((x -= p) <= 0) return k; } return 'connu'; };
   let t = MAINTENANT - 8 * 60e3;
-  let rafale = 0, rafaleNat = '';
+  let rafale = 0, rafaleNat = '', dernierAdr = null, rafaleAdr = false;
   for (let i = 0; i < n; i++) {
     // Les rafales (11 « commande mise à jour » en une minute, 7 favoris…) — mesurées.
     let nat;
@@ -69,7 +69,9 @@ function construire({ n = 950, seed = 7 } = {}) {
     else { nat = nature(); if ((nat === 'connu' || nat === 'favori' || nat === 'suivi-sans') && r() < 0.18) { rafale = 2 + Math.floor(r() * 8); rafaleNat = nat; } t -= (17 * 864e5 / n) * (0.4 + r() * 1.2); }
     const at = iso(t);
     const ancien = t < Date.UTC(2026, 9, 31, 20, 0);   // rangé avant le résumé (31 oct.)
-    const a = pick(ARTICLES), adr = r() < 0.08 ? [ADRESSES[0], ADRESSES[1]] : [pick(ADRESSES)];
+    // Une rafale arrive sur la MÊME boîte (comme chez lui : 11 « commande mise à jour » d'un compte en une minute).
+    const a = pick(ARTICLES), adr = rafaleAdr && rafale >= 0 && nat === rafaleNat && dernierAdr ? dernierAdr : (r() < 0.08 ? [ADRESSES[0], ADRESSES[1]] : [pick(ADRESSES)]);
+    dernierAdr = adr; rafaleAdr = rafale > 0;
     let type, from, subject, resume = null, etat = 'integre', texte = '', pieces = ancien ? undefined : [];
     const code = String(100000 + Math.floor(r() * 899999));
     const lim = iso(t + (2 + Math.floor(r() * 6)) * 864e5).slice(0, 10);

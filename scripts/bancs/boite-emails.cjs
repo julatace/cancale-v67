@@ -342,7 +342,10 @@ const journal = (appels) => appels.filter((a) => a.chemin === '/api/email-rattac
         dit((await lec.locator('[data-boite-sujet]').innerText()) === 'Votre colis 12345678 est disponible' && /Mondial Relay/.test(await lec.locator('[data-boite-de]').innerText()) && /noreply@mondialrelay\.fr/.test(await lec.locator('[data-boite-de]').innerText()) && /2026/.test(await lec.locator('[data-boite-date]').innerText()) && /vendeuse@exemple\.test/.test(await lec.locator('[data-boite-recu]').innerText()), `${nom} : le sujet d’origine reste visible ; expéditeur, date, adresse de réception`);
         const corps = await lec.locator('[data-boite-corps="lu"]').innerText();
         // ── CLARTÉ 6 : aucune balise affichée en texte, aucune exécutée ; le texte reste.
-        dit(/\[lien suivi\.exemple\.test\]/.test(corps) && !/\n\n\n/.test(corps) && !/<\s*\/?\s*[a-z!]/i.test(corps) && !/&(amp|lt|gt|quot);/.test(corps) && /gras & fin/.test(corps) && await lec.locator('[data-boite-corps] img, [data-boite-corps] b').count() === 0 && !(await pg.evaluate(() => window.__xss)), `${nom} : message nettoyé — balises (<img …>, <b>, &lt;img&gt;, balise coupée) retirées, jamais exécutées, le texte gardé`, JSON.stringify(corps.slice(-80)));
+        // (v36) Le lien interminable devient un LIEN court (son domaine), ouvert ailleurs — jamais du HTML rendu.
+        const lienCourt = await lec.locator('[data-boite-corps] a[data-boite-lien]').evaluateAll((l) => l.map((a) => [a.textContent, a.getAttribute('href'), a.getAttribute('target'), a.getAttribute('rel')]));
+        dit(lienCourt.length === 1 && lienCourt[0][0] === 'suivi.exemple.test' && /^https:\/\/suivi\.exemple\.test\//.test(lienCourt[0][1]) && lienCourt[0][2] === '_blank' && /noopener/.test(lienCourt[0][3]), `${nom} : un lien interminable devient son domaine, ouvert ailleurs (noopener)`, JSON.stringify(lienCourt));
+        dit(/suivi\.exemple\.test/.test(corps) && !/\n\n\n/.test(corps) && !/<\s*\/?\s*[a-z!]/i.test(corps) && !/&(amp|lt|gt|quot);/.test(corps) && /gras & fin/.test(corps) && await lec.locator('[data-boite-corps] img, [data-boite-corps] b').count() === 0 && !(await pg.evaluate(() => window.__xss)), `${nom} : message nettoyé — balises (<img …>, <b>, &lt;img&gt;, balise coupée) retirées, jamais exécutées, le texte gardé`, JSON.stringify(corps.slice(-80)));
         dit(await lec.locator('[data-boite-pieces="0"]').count() === 1, `${nom} : « aucune pièce jointe » quand on a lu qu’il n’y en a pas`);
         const objet = lec.locator('[data-boite-objet="retrait"]');
         dit(await objet.count() === 1 && /^Voir le colis à retirer/.test((await objet.innerText()).trim()), `${nom} : « Voir le colis à retirer » (identité : n° de suivi)`, await objet.innerText());
@@ -378,7 +381,7 @@ const journal = (appels) => appels.filter((a) => a.chemin === '/api/email-rattac
           // (v33) Marges de 16 px, le bouton principal pleine largeur au doigt.
           const mise = await lec.evaluate((a) => {
             const r = (s) => { const n = a.querySelector(s); return n ? n.getBoundingClientRect() : null; };
-            const ti = r('[data-boite-titre]'), bt = r('[data-boite-objet]'), me = r('[data-boite-message], .vrm-boite-message'), ret = r('[data-boite-fermer]');
+            const ti = r('[data-boite-haut]'), bt = r('[data-boite-objet]'), me = r('[data-boite-message], .vrm-boite-message'), ret = r('[data-boite-fermer]');
             return { titreG: ti && Math.round(ti.left), boutonG: bt && Math.round(bt.left), boutonD: bt && Math.round(innerWidth - bt.right), boutonH: bt && Math.round(bt.height), messageG: me && Math.round(me.left), retourH: ret && Math.round(ret.height), retourG: ret && Math.round(ret.left) };
           });
           dit(mise.titreG === 16 && mise.boutonG === 16 && mise.boutonD === 16 && mise.boutonH >= 44 && mise.messageG === 16 && mise.retourH >= 44 && mise.retourG <= 16, `${nom} : lecture — marges de 16 px, le bouton principal pleine largeur (≥ 44 px), le retour au doigt en haut à gauche`, JSON.stringify(mise));
