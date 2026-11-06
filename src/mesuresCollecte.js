@@ -21,6 +21,7 @@
 // l'appareil, `vrm_mesures_lot`). Sans session, rien ne part.
 import { lotVide, ajouterMesure, normaliserLot, typeAppareil, ENVOI_MIN_MS, ecranValide } from './mesuresTerrain.js';
 import { estMorceauPerime } from './plantages.js';
+import { SELECTEUR_ATTENTE } from './demarrage.js';
 
 export const CLE_LOT = 'vrm_mesures_lot';
 export const CLE_ENVOI = 'vrm_mesures_envoi_at';
@@ -45,11 +46,13 @@ function noter(ecran, metrique, valeur) {
   ecrireJson(CLE_LOT, normaliserLot(lot) || null);
 }
 
-// L'écran est-il UTILE ? Du contenu dans `<main>`, aucun squelette, aucun
-// écran de démarrage.
+// L'écran est-il UTILE ? Du contenu dans `<main>`, aucune ATTENTE au sens de
+// l'écran de démarrage (`SELECTEUR_ATTENTE`, src/demarrage.js — la même règle :
+// squelette d'un écran qui attend ses données essentielles, morceau en
+// téléchargement, session ou boutique en vérification), aucun squelette.
 export function ecranUtile(doc = document) {
   try {
-    if (doc.querySelector('[data-demarrage-vrm]')) return false;
+    if (doc.querySelector(SELECTEUR_ATTENTE)) return false;
     const m = doc.querySelector('main.vrm-main') || doc.querySelector('main');
     if (!m) return false;
     if (m.querySelector('.vrm-skeleton')) return false;

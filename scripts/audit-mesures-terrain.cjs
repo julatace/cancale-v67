@@ -28,7 +28,7 @@
 const fs = require('fs'), path = require('path'), os = require('os');
 const { pathToFileURL } = require('url');
 const R = path.join(__dirname, '..');
-const FICHIERS = ['src/mesuresTerrain.js', 'src/mesuresCollecte.js', 'src/plantages.js', 'api/_lib/mesures-terrain.js', 'api/_lib/signalement.js', 'api/_lib/cle.js', 'api/_lib/veille-plantages.js'];
+const FICHIERS = ['src/mesuresTerrain.js', 'src/mesuresCollecte.js', 'src/plantages.js', 'src/demarrage.js', 'api/_lib/mesures-terrain.js', 'api/_lib/signalement.js', 'api/_lib/cle.js', 'api/_lib/veille-plantages.js'];
 
 // Ce qui ne doit JAMAIS sortir de l'appareil ni être rangé.
 const PERSO = ['jean.dupont@gmail.com', 'julatace3535', '7200000001', 'FR7630006000011234567890189', '120,00', 'https://www.vinted.fr/items/7200000001', '0612345678',
