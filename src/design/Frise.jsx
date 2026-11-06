@@ -6,6 +6,8 @@
 // `data-fu-frise` porte l'identité (n° de transaction), chaque segment son
 // `data-fu-etape`, `data-fait` (1/0), `data-preuve`, `data-cours` : le banc juge
 // la règle sur ces attributs, jamais sur un libellé.
+// (6 nov.) Une étape au libellé long (`court`, « Au centre de vérification ») écrit
+// son mot court sous le trait (cinq segments à 390 px) ; le nom entier reste lu.
 import React from 'react';
 
 export default function Frise({ etapes, cle = '', label = 'Où en est-elle', className = '' }) {
@@ -17,7 +19,7 @@ export default function Frise({ etapes, cle = '', label = 'Où en est-elle', cla
           data-cours={e.cours ? '' : undefined} data-ton={e.cours ? e.ton : undefined} data-derniere={e.derniere ? '' : undefined}
           aria-current={e.cours ? 'step' : undefined}>
           <i aria-hidden="true" />
-          <span>{e.label}<span className="vrm-fu-sr">{e.fait ? ' : fait' : e.cours ? ' : en cours' : ' : à venir'}</span></span>
+          <span title={e.court ? e.label : undefined}>{e.court ? <><span aria-hidden="true">{e.court}</span><span className="vrm-fu-sr">{e.label}</span></> : e.label}<span className="vrm-fu-sr">{e.fait ? ' : fait' : e.cours ? ' : en cours' : ' : à venir'}</span></span>
         </li>
       ))}
     </ol>

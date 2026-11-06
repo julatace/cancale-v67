@@ -50,7 +50,9 @@ export function journalSemaine({ maintenant = Date.now(), vendu, joursBenef, col
   const { debut, fin } = S;
   const out = { lundi: S.lundi, dimanche: S.dimanche, debut, fin, titre: titreSemaine(S.lundi) };
 
-  if (!vendu || !Array.isArray(vendu.lignes)) { out.ventes = pasSu('pasSu'); out.vendu = pasSu('pasSu'); }
+  // (6 nov., onglets A, §5) `vendu` undefined = la coque n'a pas encore rendu ses ventes : « lecture… ».
+  if (vendu === undefined) { out.ventes = pasSu('encours'); out.vendu = pasSu('encours'); }
+  else if (!vendu || !Array.isArray(vendu.lignes)) { out.ventes = pasSu('pasSu'); out.vendu = pasSu('pasSu'); }
   else {
     const r = R.bilanLignes(vendu.lignes, debut, fin - 1);
     const nc = (vendu.nonComptees || []).filter((x) => x && x.ts != null && x.ts >= debut && x.ts < fin);
@@ -70,11 +72,23 @@ export function journalSemaine({ maintenant = Date.now(), vendu, joursBenef, col
 
   const tables = [colisFaits.vinted, colisFaits.lbc, colisFaits.vc];
   if (tables.some((t) => t === null || t === undefined)) out.colis = pasSu('pasSu');
+  else if (vendu === undefined) out.colis = pasSu('encours');
   else {
     const n = tables.reduce((t, x) => t + compterGestes(x, debut, fin), 0);
     const ebaySemaine = vendu && Array.isArray(vendu.lignes) && vendu.lignes.some((l) => l && l.plateforme === 'eBay' && l.ts >= debut && l.ts < fin);
-    const manque = ebaySemaine ? ['eBay'] : [];
-    out.colis = manque.length && !(n > 0) ? { ...pasSu('partiel'), manque } : { valeur: n, partiel: manque.length > 0, manque, raison: '' };
+    // (6 nov., onglets A) « 0 COLIS ENVOYÉS » ÉTAIT UN « PAS SU ». Ses gestes « Colis fait » sont la
+    // seule date d'envoi ; mesuré sur sa base : 26 gestes depuis l'été, 0 la semaine passée, pour
+    // une vingtaine de ventes Vinted à envoyer. Une vente Vinted vendue dans la semaine ou les 7
+    // jours d'avant, sans geste NULLE PART (ni avant, ni pendant, ni après), a pu partir pendant la
+    // semaine sans être notée : le nombre n'est plus qu'un minimum (« au moins »), et zéro geste
+    // ⇒ « — » avec sa raison — jamais « 0 » présenté comme un fait (§5).
+    const t7 = debut - 7 * 86400000;
+    const notes = colisFaits.vinted || {};
+    const nonNotees = vendu && Array.isArray(vendu.lignes) ? vendu.lignes.filter((l) => l && l.plateforme === 'Vinted' && l.tx && l.ts >= t7 && l.ts < fin
+      && !Object.prototype.hasOwnProperty.call(notes, String(l.tx))).length : 0;
+    const ventesLues = !!(vendu && Array.isArray(vendu.lignes));
+    const manque = [...(ebaySemaine ? ['eBay'] : []), ...(nonNotees ? ['envois pas notés'] : []), ...(ventesLues ? [] : ['ventes pas lues'])];
+    out.colis = manque.length && !(n > 0) ? { ...pasSu(nonNotees ? 'nonNotes' : 'partiel'), manque, nonNotees } : { valeur: n, partiel: manque.length > 0, manque, raison: '', nonNotees };
   }
   return out;
 }

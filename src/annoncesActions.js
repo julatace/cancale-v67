@@ -77,6 +77,13 @@ export const ACTIONS_SELECTION = [
   { k: 'enLigne', titre: 'Mettre en ligne', desc: 'Le brouillon part tel qu’il est enregistré sur Vinted.', etats: ['brouillon'], robot: true, cap: 'brouillon' },
   // Pas une cinquième tuile : un lien discret sous les quatre (rien ne part chez Vinted d'ici).
   { k: 'main', titre: 'Republier à la main', desc: 'VRM te donne les photos réglées, le titre, la description et le prix ; puis remet le N° sur la nouvelle annonce.', etats: ['en-ligne', 'masquee', 'brouillon'], robot: false, seule: true, lien: true },
+  // (6 nov., vague 2 · point 2) « Prix mini… » : poser « Accepter dès » (et, s'il le
+  // veut, « Refuser sous ») sur TOUTES les annonces cochées, depuis leur prix. Rien
+  // ne part chez Vinted (une écriture dans ses fiches, `updatePair` … `min`/`refuse`,
+  // la même que la case de la carte) : ni robot, ni compte du navigateur, et
+  // plusieurs comptes à la fois sont permis. Un lien sous les quatre tuiles, comme
+  // « à la main » (les quatre tuiles restent celles des moteurs, chantier C).
+  { k: 'mini', titre: 'Prix mini…', desc: '« Accepter dès » (et « Refuser sous ») sur les annonces cochées, calculés depuis leur prix.', etats: ['en-ligne'], robot: false, lien: true, multiComptes: true },
 ];
 // Les quatre tuiles de la feuille, dans l'ordre (« à la main » est un lien à part).
 export const ACTIONS_TUILES = ACTIONS_SELECTION.filter((A) => !A.lien).map((A) => A.k);
@@ -103,10 +110,11 @@ export function actionsPossibles({ selection, chrome, capOk, nomCompte } = {}) {
     const ids = sel.map((x) => String(x.id));
     let raison = '';
     if (!sel.length) raison = 'Coche au moins une annonce.';
+    else if (A.multiComptes) { /* une écriture dans ses fiches : le compte ne décide rien */ }
     else if (comptes.length > 1) raison = `Ta sélection mélange ${comptes.length} comptes (${comptes.map(nom).join(', ')}) : une action se lance sur un seul compte à la fois.`;
     else if (comptes[0] === '') raison = 'VRM ne sait pas à quel compte est cette annonce.';
     else if (A.seule && sel.length > 1) raison = 'Une annonce à la fois : coche-n’en qu’une.';
-    else {
+    if (!raison && sel.length) {
       const hors = Object.keys(parEtat).filter((e) => !A.etats.includes(e));
       if (hors.length) raison = `Seulement pour ${A.etats.map((e) => POUR_ETAT[e]).join(' ou ')} : ta sélection contient ${hors.map((e) => COMPTE_ETAT(parEtat[e], e)).join(', ')}.`;
     }
@@ -244,4 +252,68 @@ export function appliquerCouleursPixels(data, r) {
     data[i] = R * 255; data[i + 1] = G * 255; data[i + 2] = B * 255;
   }
   return data;
+}
+
+// ── « PRIX MINI… » SUR UNE SÉLECTION (6 nov., vague 2 · point 2) ───────────────
+// Mesuré (5 nov., lecture seule) : moteur d'offres allumé, ~11 offres par jour,
+// 5 annonces sur 60 avec un « Accepter dès ». Le poser une carte à la fois était
+// le frein. Règle PURE (exécutée par scripts/audit-prix-mini.cjs) :
+//   · mini = prix − X % ou prix − X €, ARRONDI À L'EURO, jamais au-dessus du prix
+//     (un arrondi qui passerait au-dessus du prix ⇒ l'euro du dessous) ;
+//   · « Refuser sous » en option, par la même règle, et TOUJOURS sous le mini
+//     (sinon il n'est pas posé, et c'est dit sur la ligne) ;
+//   · prix pas lu ⇒ rien n'est posé sur cette annonce (dit) ; mini sous 1 € ⇒ rien ;
+//   · sous un prix d'achat CONNU ⇒ la ligne le dit (`sousAchat`) : rien n'est
+//     bloqué, c'est SON choix, mais il le voit avant de confirmer.
+// L'extension lit `min`/`refuse` par `Number(...)` : on écrit un entier (« 54 »),
+// jamais « 54,5 » (illisible pour elle).
+export const MINI_MODES = ['pct', 'eur'];
+export function valeurReduction(v, mode) {
+  const t = String(v == null ? '' : v).replace(/\s/g, '').replace(',', '.').replace(/[%€]/g, '');
+  if (!/^\d+(\.\d+)?$/.test(t)) return null;
+  const n = Number(t);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  if (mode === 'pct' && n >= 100) return null;
+  return n;
+}
+export function miniDepuisPrix(prix, mode, valeur) {
+  const p = Number(prix); const x = valeurReduction(valeur, mode);
+  if (!(Number.isFinite(p) && p > 0) || x == null || !MINI_MODES.includes(mode)) return null;
+  const brut = mode === 'pct' ? p * (1 - x / 100) : p - x;
+  let m = Math.round(brut);
+  if (m > p) m = Math.floor(p);
+  return m >= 1 ? m : null;
+}
+//   annonces : [{ id, numero, titre, prix, achat }] (achat : prix d'achat connu, ou null)
+//   mini     : { mode, valeur } ; refuse : null | { mode, valeur }
+// Rend { lignes: [{ id, numero, titre, prix, mini, refuse, sousAchat, raison }], aPoser, erreur }.
+export function minisSelection({ annonces, mini, refuse = null } = {}) {
+  const liste = Array.isArray(annonces) ? annonces.filter((a) => a && a.id != null) : [];
+  const m = mini || {};
+  if (!MINI_MODES.includes(m.mode) || valeurReduction(m.valeur, m.mode) == null) return { lignes: [], aPoser: 0, erreur: m.mode === 'pct' ? 'Une réduction entre 1 et 99 %.' : 'Une réduction en euros (ex : 5).' };
+  const avecRefus = !!(refuse && String(refuse.valeur == null ? '' : refuse.valeur).trim() !== '');
+  if (avecRefus && (!MINI_MODES.includes(refuse.mode) || valeurReduction(refuse.valeur, refuse.mode) == null)) return { lignes: [], aPoser: 0, erreur: 'Le seuil « Refuser sous » est illisible.' };
+  const lignes = liste.map((a) => {
+    const prix = Number(a.prix);
+    const base = { id: String(a.id), numero: a.numero ? String(a.numero) : '', titre: String(a.titre || ''), prix: Number.isFinite(prix) && prix > 0 ? prix : null, mini: null, refuse: null, sousAchat: false, raison: '' };
+    if (base.prix == null) return { ...base, raison: 'prix pas lu : rien n’est posé' };
+    const mn = miniDepuisPrix(base.prix, m.mode, m.valeur);
+    if (mn == null) return { ...base, raison: 'mini sous 1 € : rien n’est posé' };
+    let rf = null, raison = '';
+    if (avecRefus) {
+      rf = miniDepuisPrix(base.prix, refuse.mode, refuse.valeur);
+      if (rf != null && rf >= mn) { rf = null; raison = '« Refuser sous » pas posé : il doit rester sous le mini'; }
+    }
+    const achat = a.achat == null || a.achat === '' ? null : Number(a.achat);
+    return { ...base, mini: mn, refuse: rf, sousAchat: achat != null && Number.isFinite(achat) && mn < achat, raison };
+  });
+  return { lignes, aPoser: lignes.filter((l) => l.mini != null).length, erreur: '' };
+}
+// L'écriture d'une ligne (rien quand le mini n'est pas posé). `refuse` n'est
+// écrit que si l'option est cochée : sinon le seuil existant reste tel quel.
+export function ecritureMini(l, { avecRefus = false } = {}) {
+  if (!l || l.mini == null) return null;
+  const w = { min: String(l.mini) };
+  if (avecRefus && l.refuse != null) w.refuse = String(l.refuse);
+  return w;
 }

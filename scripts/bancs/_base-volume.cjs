@@ -36,9 +36,21 @@ const MODELES = ['samba', 'spezial', 'air max 1', 'xt-6', 'gazelle', '550', 'gel
 const STATUTS_V = ['Commande finalisée', 'Commande finalisée', 'Commande finalisée', 'Le paiement a été validé', 'Colis en cours d\'acheminement', 'Remboursement effectué'];
 const STATUTS_A = ['Commande finalisée', 'Colis déposé en bureau de Poste ou point relais', 'Colis en cours d\'acheminement', 'Commande finalisée'];
 
-function fabriquer({ comptes = 7 } = {}) {
+// ── `volumeReel` (6 nov., vague 2 « vitesse ») : le POIDS mesuré le 6 nov. sur
+//    sa base (lecture seule, `pg_column_size` / `length(data::text)`), sans une
+//    donnée copiée :
+//    · `vinted_item_details` : 281 fiches, ~349 Ko de texte (photos 278 Ko,
+//      descriptions 27 Ko) — ici une fiche par annonce du dressing + 57 vieilles ;
+//    · `orders_sold` / `orders_purchased` des comptes LIÉS : ~96 Ko et ~90 Ko par
+//      ligne (au lieu de ~35 Ko) ;
+//    · `orders_bought` (4 lignes, ~61 Ko chacune, jamais lues par l'app) et
+//      `wreq_*_orders_*` (6 petites) que le motif `harvest_*_orders_*` attrape ;
+//    · 5 ANCIENS comptes (plus dans `vinted_accounts`) qui gardent leurs lignes
+//      de commandes (~15 Ko vendues, ~20 Ko achetées).
+//    Sans l'option, la base est EXACTEMENT celle d'avant (les autres bancs).
+function fabriquer({ comptes = 7, volumeReel = false } = {}) {
   graine = 42;
-  const accounts = [], rows = [];
+  const accounts = [], rows = [], detailsReels = [];
   const numeros = {};
   let num = 1, tx = 22000000000, item = 7000000000, conv = 18000000000;
   for (let a = 0; a < comptes; a++) {
@@ -68,7 +80,7 @@ function fabriquer({ comptes = 7 } = {}) {
       const it = item++;
       sold.push({ transaction_id: t, title: `${MARQUES[i % 6]} ${MODELES[i % 8]} taille ${37 + (i % 9)}`, price: { amount: String(25 + (i * 11) % 80) + '.0', currency_code: 'EUR' },
         status: st, date: d, item_id: it, transaction_user_status: st === 'Le paiement a été validé' ? 'needs_action' : (st === 'Commande finalisée' ? 'completed' : 'waiting'),
-        photo: { url: `https://images1.vinted.net/t/${it}/f800/v.jpeg?s=abc` }, _pad: pad(200) });
+        photo: { url: `https://images1.vinted.net/t/${it}/f800/v.jpeg?s=abc` }, _pad: pad(volumeReel ? 1250 : 200) });
       rows.push({ id: `harvest_${uid}_txn_${t}`, data: { capturedAt: iso(i * J), payload: { transaction: { id: t, item_id: it, status: st === 'Commande finalisée' ? 450 : 300,
         status_title: st, status_updated_at: d, shipment: { status_title: 'Livré' }, item: { id: it, title: 'x' }, _pad: pad(6800) } } } });
       // Bordereau capté par l'extension, avec PDF (~100 Ko) — les 3 plus récents.
@@ -85,8 +97,14 @@ function fabriquer({ comptes = 7 } = {}) {
       rows.push({ id: `harvest_${uid}_txn_${t}`, data: { capturedAt: iso(i * J), payload: { transaction: { id: t, item_id: items[i % items.length].id, status: 1, status_title: '', _pad: pad(6800) } } } });
     }
     const achats = [];
-    for (let i = 0; i < 80; i++) achats.push({ transaction_id: tx++, conversation_id: conv++, title: `${MARQUES[i % 6]} achat ${i}`, price: { amount: '21.0', currency_code: 'EUR' }, status: STATUTS_A[i % 4], date: iso(i * J), _pad: pad(200) });
+    for (let i = 0; i < 80; i++) achats.push({ transaction_id: tx++, conversation_id: conv++, title: `${MARQUES[i % 6]} achat ${i}`, price: { amount: '21.0', currency_code: 'EUR' }, status: STATUTS_A[i % 4], date: iso(i * J), _pad: pad(volumeReel ? 900 : 200) });
     rows.push({ id: `harvest_${uid}_orders_purchased`, data: { capturedAt: frais(120000), nItems: achats.length, payload: { my_orders: achats } } });
+    if (volumeReel) {
+      // La ligne `orders_bought` (bug de capture : elle porte des VENTES) — jamais lue.
+      if (a < 4) rows.push({ id: `harvest_${uid}_orders_bought`, data: { capturedAt: frais(120000), nItems: 40, payload: { my_orders: sold.slice(0, 40).map((o) => ({ ...o, _pad: pad(1300) })) } } });
+      if (a < 6) rows.push({ id: `harvest_${uid}_wreq_escrow_orders_api_v2_read_educations`, data: { capturedAt: frais(120000), payload: { educations: [] } } });
+      detailsReels.push(...items.map((x) => x.id));
+    }
     // Boîte de réception (~24 Ko) et conversations (~190 × 2,4 Ko).
     const convs = [];
     for (let i = 0; i < 50; i++) convs.push({ id: conv + i, unread: i < 3, updated_at: iso(i * 3600000), opposite_user: { id: 9000 + i, login: 'acheteur' + i }, item_count: 1, description: 'Bonjour, est-elle dispo ?', _pad: pad(300) });
@@ -103,7 +121,29 @@ function fabriquer({ comptes = 7 } = {}) {
   // Suivis de colis par email (~180, petits).
   for (let i = 0; i < 180; i++) rows.push({ id: `email_track_mondialrelay_${100000 + i}`, data: { carrier: 'mondialrelay', tracking: String(100000 + i), status: i % 3 ? 'transit' : 'livre', receivedAt: iso(i * J), _pad: pad(200) } });
   rows.push({ id: 'email_journal', data: { entries: Array.from({ length: 80 }, (_, i) => ({ at: iso(i * 3600000), type: 'message', to: 'x@y.fr' })) } });
-  rows.push({ id: 'vinted_item_details', data: Object.fromEntries(Array.from({ length: 120 }, (_, i) => [String(7000000000 + i), { desc: pad(800), photos: ['https://images1.vinted.net/t/a/f800/1.jpeg'] }])) });
+  if (!volumeReel) rows.push({ id: 'vinted_item_details', data: Object.fromEntries(Array.from({ length: 120 }, (_, i) => [String(7000000000 + i), { desc: pad(800), photos: ['https://images1.vinted.net/t/a/f800/1.jpeg'] }])) });
+  else {
+    // Une fiche lue sur la page pour chaque annonce du dressing, + 57 vieilles
+    // (annonces parties depuis) : 281 fiches, ~1,2 Ko chacune, dont ~1 Ko de photos.
+    const ids = [...detailsReels, ...Array.from({ length: 57 }, (_, i) => 6900000000 + i)];
+    const fiche = (id, i) => ({
+      description: i % 9 === 0 ? '' : `Paire ${i} en très bon état, portée quelques fois, boîte d'origine. Envoi soigné sous 48 h.`,
+      photos: Array.from({ length: 8 }, (_, k) => `https://images1.vinted.net/tc/01_00${k}${id}/f800/${1700000000 + i * 8 + k}.jpeg?s=0123456789abcdef0123456789abcdef01234567`),
+      photoIds: Array.from({ length: 8 }, (_, k) => 9000000000 + i * 8 + k),
+      codes: { brand_id: 53, size_id: 776 + (i % 10), status_id: 2 }, couleur: 'Blanc',
+      readAt: frais(3600000), pageAt: frais(3600000), modifAt: iso(i * J), pageFormat: 'v2',
+    });
+    rows.push({ id: 'vinted_item_details', data: Object.fromEntries(ids.map((id, i) => [String(id), fiche(id, i)])) });
+    // Les ANCIENS comptes : plus dans `vinted_accounts`, leurs lignes restent.
+    for (let v = 0; v < 5; v++) {
+      const uid = String(2800000000 + v * 777);
+      const vieux = (n, p) => Array.from({ length: n }, (_, i) => ({ transaction_id: 15000000000 + v * 1000 + p * 500 + i, conversation_id: 16000000000 + v * 1000 + p * 500 + i, title: `Ancienne paire ${i}`,
+        price: { amount: '40.0', currency_code: 'EUR' }, status: 'Commande finalisée', date: iso((400 + i) * J), transaction_user_status: 'completed', _pad: pad(300) }));
+      rows.push({ id: `harvest_${uid}_orders_sold`, data: { capturedAt: iso(300 * J), nItems: 30, payload: { my_orders: vieux(30, 0) } } });
+      rows.push({ id: `harvest_${uid}_orders_purchased`, data: { capturedAt: iso(300 * J), nItems: 40, payload: { my_orders: vieux(40, 1) } } });
+      if (v < 2) rows.push({ id: `harvest_${uid}_orders_bought`, data: { capturedAt: iso(300 * J), nItems: 5, payload: { my_orders: vieux(5, 0) } } });
+    }
+  }
   // La ligne main : ~100 Ko, dont les numéros.
   const main = [{ id: 'main', data: { vinted_annonce_numeros: numeros, vinted_used_nums: Object.values(numeros).map((x) => Number(x.num)),
     vinted_sale_overrides: Object.fromEntries(Array.from({ length: 200 }, (_, i) => [String(22000000000 + i), { note: pad(80) }])), vinted_accounts_hidden: [], vinted_prenom: '', _pad: pad(40000) } }];
@@ -112,7 +152,8 @@ function fabriquer({ comptes = 7 } = {}) {
 
 // ── PostgREST, ce que l'app en utilise ───────────────────────────────────────
 const lireChemin = (o, chemin) => {
-  const segs = chemin.split(/->>|->/).filter(Boolean);
+  // Une clé entre guillemets (`data->"7000000000"`) est une CLÉ, comme chez PostgREST.
+  const segs = chemin.split(/->>|->/).filter(Boolean).map((x) => x.replace(/^"(.*)"$/, '$1'));
   let v = o;
   for (const s of segs) v = v == null ? undefined : v[s];
   return v;

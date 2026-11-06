@@ -98,6 +98,7 @@ const COUPLES = {
   'src/App.jsx|www.mondialrelay.fr': ['lien', LIEN],
   'src/App.jsx|www.vinted.fr': ['lien', LIEN],
   'src/OutilsArticlesVinted.jsx|www.vinted.fr': ['lien', LIEN],
+  'src/EnLigneDeuxFois.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir sur Vinted » l’annonce en trop (Ma journée, « en ligne deux fois »)'],
   'src/SynchronisationVinted.jsx|www.vinted.fr': ['lien', LIEN],
   'src/ebayGestion.jsx|www.ebay.fr': ['lien', LIEN],
   'src/ConfigurerTransfert.jsx|mail.google.com': ['lien', LIEN],
@@ -139,6 +140,7 @@ const COUPLES = {
   'src/prixPartout.js|www.leboncoin.fr': ['lien', LIEN + ' — l’annonce Leboncoin de Changer le prix'],
   'src/prixPartout.js|fr.vestiairecollective.com': ['lien', LIEN + ' — Vestiaire, « À faire sur le site »'],
   'src/communaute/accompagnement.js|vrm.center': ['vrm', 'VRM lui-même (origine par défaut du lien d’invitation)'],
+  'src/smsColis.js|vrm.center': ['vrm', 'VRM lui-même (adresse de la route SMS à coller dans Raccourcis)'],
   // (24 oct.) Le SERVEUR lit le statut public des colis (api/_lib/transporteurs-lecture.js).
   'api/_lib/transporteurs-lecture.js|ws.chronopost.fr': ['politique', 'transp'],
   'api/_lib/transporteurs-lecture.js|carrier.vintedgo.com': ['politique', 'transp'],

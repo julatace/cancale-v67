@@ -1,0 +1,43 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   « RECEVOIR LES SMS MONDIAL RELAY » (6 novembre) — src/SmsColis.jsx
+   Le style du guide iPhone (variables --fu-*, clair et sombre par la racine) :
+   encre et gris, le bleu seulement sur LE geste de chaque dessin (§7). Ambre
+   pour un essai raté (un geste à faire). Cibles au doigt : celles de `Bouton`.
+   ════════════════════════════════════════════════════════════════════════════ */
+.vrm-sc { color: var(--fu-encre, #1d1d1f); min-width: 0; }
+.vrm-sc-intro { margin: 0 0 12px; font-size: 13px; line-height: 1.5; color: var(--fu-gris, #6e6e73); }
+.vrm-sc-intro b { color: var(--fu-encre, #1d1d1f); font-weight: 600; }
+.vrm-sc-bloc { display: flex; flex-direction: column; gap: 8px; margin: 0 0 14px; min-width: 0; }
+.vrm-sc-etat { font-size: 15px; font-weight: 600; }
+.vrm-sc-lib { font-size: 13px; font-weight: 600; margin-top: 4px; }
+.vrm-sc-lib small { font-weight: 400; color: var(--fu-gris, #6e6e73); }
+.vrm-sc-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; line-height: 1.5; background: var(--fu-case, #f2f2f7); border-radius: 12px; padding: 10px 12px; overflow-wrap: anywhere; word-break: break-all; }
+.vrm-sc-gestes { display: flex; flex-wrap: wrap; gap: 8px; }
+.vrm-sc-confirme { display: flex; flex-direction: column; gap: 8px; background: var(--fu-case, #f2f2f7); border-radius: 12px; padding: 10px 12px; font-size: 13px; line-height: 1.45; }
+.vrm-sc-essai { font-size: 13px; line-height: 1.45; font-weight: 600; }
+.vrm-sc-essai.is-ambre { color: var(--fu-ambre-txt, var(--vrm-warn, #b25000)); }
+.vrm-sc-sous { margin: 0; font-size: 13px; line-height: 1.45; color: var(--fu-gris, #6e6e73); }
+
+.vrm-sc-etapes { list-style: none; margin: 4px 0 12px; padding: 0; display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); }
+.vrm-sc-etape { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; align-items: start; background: var(--fu-case, #f2f2f7); border-radius: 12px; padding: 10px 12px 10px 10px; min-width: 0; }
+.vrm-sc-dessin { width: 96px; }
+.vrm-sc-dessin svg { display: block; width: 100%; height: auto; }
+.vrm-sc-texte { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.vrm-sc-n { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 999px; background: var(--fu-encre, #1d1d1f); color: var(--fu-carte, #fff); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; margin-bottom: 4px; }
+.vrm-sc-etape-titre { font-size: 15px; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
+.vrm-sc-mots { margin: 4px 0 0; padding-left: 18px; font-size: 13px; line-height: 1.45; color: var(--fu-gris, #6e6e73); overflow-wrap: anywhere; }
+.vrm-sc-mots li { margin: 2px 0; }
+@media (min-width: 900px) {
+  .vrm-sc-etapes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.vrm-sc svg .sc-ecran { fill: var(--fu-carte, #fff); stroke: var(--fu-gris3, #aeaeb2); stroke-width: 1.2; }
+.vrm-sc svg .sc-ligne { fill: var(--fu-gris3, #aeaeb2); }
+.vrm-sc svg .sc-pale { opacity: .55; }
+.vrm-sc svg .sc-barre { fill: var(--fu-piste, #e5e5ea); }
+.vrm-sc svg .sc-choix { fill: var(--fu-carte, #fff); stroke: var(--fu-bleu, #0071e3); stroke-width: 1.5; }
+.vrm-sc svg .sc-accent { fill: var(--fu-bleu, #0071e3); }
+.vrm-sc svg .sc-blanc { stroke: #fff; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+.vrm-sc svg .sc-trait { stroke: var(--fu-gris3, #aeaeb2); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+.vrm-sc svg .sc-trait-accent { stroke: var(--fu-bleu, #0071e3); stroke-width: 1.6; stroke-linejoin: round; fill: none; }
+.vrm-sc svg .sc-rond { fill: none; stroke: var(--fu-gris3, #aeaeb2); stroke-width: 1.4; }

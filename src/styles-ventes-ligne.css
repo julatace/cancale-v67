@@ -14,7 +14,9 @@ html body .vrm-app-shell .vrm-main .vrm-sale-row[data-benef-cols] > button.vrm-l
 .vrm-ledger-sale-benef, .vrm-ledger-sale-achat { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 600; color: var(--vrm-ink); }
 .vrm-ledger-sale-benef[data-benef-etat="achat"], .vrm-ledger-sale-benef[data-benef-etat="illisible"], .vrm-ledger-sale-benef[data-benef-etat="prix"] { color: var(--vrm-muted); font-weight: 500; }
 .vrm-ledger-sale-benef .vrm-benef-borne { display: block; font-size: 11px; line-height: 1.2; font-weight: 500; color: var(--vrm-muted); }
-.vrm-ledger-sale-achat[data-achat-etat="manque"] { color: var(--vrm-warn); font-weight: 600; }
+/* (6 nov., vague 2) Le prix d'achat qui manque se dit UNE fois, en tête de Ventes (« Prix d'achat
+   N/M · Compléter ») : la case de chaque ligne est grise, plus l'ambre répété sur chaque vente. */
+.vrm-ledger-sale-achat[data-achat-etat="manque"] { color: var(--vrm-muted); font-weight: 500; }
 .vrm-ventes-entete { display: none; }
 @media (min-width: 768px) {
   html body .vrm-app-shell .vrm-main .vrm-sale-row[data-benef-cols] > button.vrm-ledger-sale-toggle {

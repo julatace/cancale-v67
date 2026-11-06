@@ -148,6 +148,11 @@ const capture = async (pg, nom, sel) => { if (!SHOTS) return; fs.mkdirSync(SHOTS
       const A = await attrs(pg, '[data-a-venir]');
       const att = Math.round((A_VENIR_VINTED + VC_MONTANT) * 100);
       dit(A && A['a-venir-site'] === 'toutes' && Number(A['a-venir']) === att && A['a-venir-n'] === '3', `A : Ventes · Tous — « À venir » = ${att / 100} € sur 3 ventes (Vinted + Vestiaire)`, JSON.stringify(A));
+      // (6 nov.) Le détail par compte est replié : le total seul, puis le détail au toucher.
+      const replieAvant = await pg.evaluate(() => ({ ferme: !!document.querySelector('[data-a-venir-replier="ferme"]'), lignes: document.querySelectorAll('[data-a-venir-ligne]').length }));
+      dit(replieAvant.ferme && replieAvant.lignes === 0, 'A : le détail par compte est replié (le total seul)', JSON.stringify(replieAvant));
+      await pg.click('[data-a-venir-replier="ferme"]').catch(() => {});
+      await pg.waitForSelector('[data-a-venir-ligne]', { timeout: 5000 }).catch(() => {});
       const lignes = await pg.evaluate(() => [...document.querySelectorAll('[data-a-venir-ligne]')].map((e) => ({ s: e.getAttribute('data-a-venir-ligne'), c: e.getAttribute('data-a-venir-compte'), eur: e.getAttribute('data-a-venir-eur'), prevu: e.getAttribute('data-a-venir-prevu') })));
       dit(lignes.length === 3 && lignes.some((l) => l.s === 'Vinted' && l.c === 'atelier_sneak' && l.eur === '7000') && lignes.some((l) => l.s === 'Vinted' && l.c === 'paris_kicks' && l.eur === '4550'), 'A : une ligne par site et par compte', JSON.stringify(lignes));
       const vc = lignes.find((l) => l.s === 'Vestiaire');
@@ -206,8 +211,17 @@ const capture = async (pg, nom, sel) => { if (!SHOTS) return; fs.mkdirSync(SHOTS
       await pg.click('[data-comparer-choix="precedent"]'); await pg.waitForTimeout(300);
       const F = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-frais-site]')].map((e) => [e.getAttribute('data-frais-site'), { eur: e.getAttribute('data-frais-eur'), pct: e.getAttribute('data-frais-pct'), lus: e.getAttribute('data-frais-lus') }])));
       dit(!!(await pg.$('[data-frais-sites]')) && F.Leboncoin && F.Leboncoin.eur === '499' && F.Leboncoin.pct === '', 'C : « Frais par site » : le pack Leboncoin du mois (4,99 €), pas de % sans vente', JSON.stringify(F));
+      // Les choix de « Comparer » sont un `Segmente` : la règle commune du segmenté
+      // (styles-coque.css, chantier A du 5 nov. : « 36 px à la souris, 44 px au doigt »).
+      // Au doigt (390 tactile) : 44 px, la cible (§7). À la souris (1512) : la hauteur du
+      // segmenté commun, jamais une forme à part — le banc exigeait 44 partout, écrit le
+      // 4 nov. quand le segmenté faisait 44 px à la souris aussi.
       const petits = await cibles(pg, '[data-comparer] button');
-      dit(!petits.length, 'C : les choix font 44 px', JSON.stringify(petits));
+      if (T.hasTouch) dit(!petits.length, 'C : au doigt, les choix font 44 px', JSON.stringify(petits));
+      else {
+        const seg = await pg.evaluate(() => [...document.querySelectorAll('[data-comparer] button')].filter((e) => e.offsetParent).map((e) => ({ t: (e.innerText || '').trim().slice(0, 30), h: Math.round(e.getBoundingClientRect().height), commun: e.matches('.vrm-seg > .vrm-seg-btn') })));
+        dit(seg.length >= 2 && seg.every((x) => x.commun && x.h >= 36), 'C : à la souris, les choix suivent le segmenté commun (≥ 36 px)', JSON.stringify(seg));
+      }
       dit(T.vp.width > 500 || (await deborde(pg)) <= 1, 'C : aucun débordement à 390 px', String(await deborde(pg)));
       await capture(pg, `C-frais-${T.nom}`, '[data-frais-sites]');
       // Le mois d'avant ENTIER : frais saisis (pack Vinted 2,30 €) sur la période « Mois » d'avant n'est pas affichée ici ;

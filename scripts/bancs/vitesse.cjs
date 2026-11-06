@@ -18,7 +18,10 @@ require('./_porte-banc.cjs');
 //  Lancer : npm run build && node scripts/bancs/vitesse.cjs
 //  `VITESSE_DETAIL=1` imprime chaque requête ; `PORT=…` change le port.
 //  `VITESSE_TEXTES=dir` écrit le texte rendu ; `VITESSE_REFERENCE=dir` le compare
-//  à celui d'un autre build (Ma journée).
+//  à celui d'un autre build (chaque écran ouvert, 6 nov.).
+//  `BANC_PORT` (ou `PORT`) change le port ; `VITESSE_VOLUME=ancien` sert la base
+//  d'avant le 6 nov. (sans le poids réel des commandes et des fiches de page) ;
+//  `VITESSE_MEMOIRE=0` ouvre comme sur un appareil neuf (aucun compte lié retenu).
 // ════════════════════════════════════════════════════════════════════════════
 const path = require('path'), fs = require('fs'), http = require('http');
 let chromium;
@@ -26,13 +29,30 @@ try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', '
 catch (_) { ({ chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 const { fabriquer, repondre } = require('./_base-volume.cjs');
 const DIST = path.join(__dirname, '..', '..', 'dist');
-const PORT = Number(process.env.PORT) || 4871;
+const PORT = Number(process.env.BANC_PORT || process.env.PORT) || 4871;
 const DETAIL = !!process.env.VITESSE_DETAIL;
 const RTT = 150;            // ms — un aller-retour vers Supabase depuis la France (mesuré : 165–536 ms)
 const DEBIT = 2_000_000;    // octets/s — une 4G correcte
 const CPU = Number(process.env.VITESSE_CPU || 4);   // téléphone : processeur 4× plus lent qu'un ordinateur (émulation Chrome)
 
-const base = fabriquer();
+const base = fabriquer({ volumeReel: process.env.VITESSE_VOLUME !== 'ancien' });
+// ── LES LIGNES LOURDES LUES POUR RIEN (6 nov., vague 2 « vitesse ») ──────────
+// Mesuré sur sa base (lecture seule) : `vinted_item_details` ~349 Ko, lue
+// ENTIÈRE à trois endroits pour ~60 fiches ; les commandes (~2,1 Mo) lues
+// entières pour TOUS les comptes jamais captés, `orders_bought` et `wreq_*`
+// compris, puis filtrées dans l'app. On note, par écran, les octets de ces deux
+// familles, et ceux des lignes qu'aucun écran ne montre (ancien compte,
+// `orders_bought`, `wreq_*`).
+const UIDS_LIES = new Set(base.accounts.map((a) => String(a.vinted_user_id)));
+const POIDS_FICHES = JSON.stringify((base.rows.find((r) => r.id === 'vinted_item_details') || {}).data || {}).length;
+const UID_BANC = process.env.BANC_SESSION_UID || '0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b';
+const MEMOIRE = process.env.VITESSE_MEMOIRE !== '0';
+const horsEcran = (id) => { const m = /^harvest_(\d+)_(.*)$/.exec(String(id || '')); return !!(m && /orders/.test(m[2]) && (!UIDS_LIES.has(m[1]) || !/^orders_(sold|purchased)$/.test(m[2]))); };
+const visePoids = (u) => /vinted_item_details/.test(u) ? 'fiches' : (/harvest_[^&]*_orders_/.test(u) ? 'commandes' : '');
+// Une lecture qui rapatrie la ligne ENTIÈRE : `select=` qui nomme `data` seul.
+const selectEntier = (u) => { const m = /[?&]select=([^&]*)/.exec(u); return !!m && m[1].split(',').some((x) => /^(?:[^:]+:)?data$/.test(x.trim())); };
+// La famille de commandes de TOUS les comptes en une lecture (le préchargement).
+const estFamille = (u) => /id=like\.harvest_\*_orders_\*/.test(u) || /or=\(id\.like\.harvest_\*_orders_sold/.test(u) || new Set([...u.matchAll(/harvest_(\d+)_orders_/g)].map((m) => m[1])).size > 1;
 // Les achats « déposés en point relais » de la base : les seuls dont Ma journée
 // a besoin du n° de suivi (`vintedToPickup`).
 const ACHATS_AU_RELAIS = base.rows.filter((r) => /_orders_purchased$/.test(r.id)).reduce((n, r) => n + (((r.data || {}).payload || {}).my_orders || []).filter((o) => /point relais/i.test(o.status || '')).length, 0);
@@ -81,6 +101,9 @@ async function ouvrir(b, vp, tab, attendre, frappe, opts = {}) {
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
+  // L'appareil de tous les jours : les comptes liés de la dernière ouverture sont
+  // retenus (`vrm_comptes_lies`). Ignoré par un build qui ne le connaît pas.
+  if (opts.memoire !== false && MEMOIRE) await pg.addInitScript(([qui, uids]) => { try { localStorage.setItem('vrm_comptes_lies', JSON.stringify({ qui, uids })); } catch (_) {} }, [UID_BANC, [...UIDS_LIES]]);
   if (opts.rendus) await pg.addInitScript(crochetRendus, opts.rendus);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   if (vp.width < 600 && CPU > 1) { const cdp = await ctx.newCDPSession(pg); await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU }); }
@@ -108,7 +131,7 @@ async function ouvrir(b, vp, tab, attendre, frappe, opts = {}) {
     // `couperFamille` : la lecture de TOUTES les commandes en une fois (le
     // préchargement du démarrage) échoue — l'app doit retomber sur la lecture
     // par compte et rendre EXACTEMENT le même écran.
-    if (opts.couperFamille && /id=like\.harvest_\*_orders_\*&select=id,data/.test(decodeURIComponent(url))) {
+    if (opts.couperFamille && estFamille(decodeURIComponent(url))) {
       noter({ m: 'GET', url, range: h.range || '', debut, fin: debut + RTT, octets: 0, pdf: 0, coupe: true });
       await new Promise((r) => setTimeout(r, RTT));
       return route.fulfill({ status: 503, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<html>503</html>' });
@@ -117,7 +140,9 @@ async function ouvrir(b, vp, tab, attendre, frappe, opts = {}) {
     const body = JSON.stringify(rep.body);
     const pdf = (body.match(/JVBERi0x*/g) || []).reduce((a, s) => a + s.length, 0);
     const delai = RTT + Math.round(body.length / DEBIT * 1000);
-    const e = { m: 'GET', url, range: h.range || '', debut, fin: debut + delai, octets: body.length, pdf };
+    const du = decodeURIComponent(url);
+    const hors = Array.isArray(rep.body) ? rep.body.filter((x) => x && horsEcran(x.id)).reduce((a, x) => a + JSON.stringify(x).length, 0) : 0;
+    const e = { m: 'GET', url, range: h.range || '', debut, fin: debut + delai, octets: body.length, pdf, poids: visePoids(du), entier: !!visePoids(du) && selectEntier(du), hors };
     noter(e);
     await new Promise((r) => setTimeout(r, delai));
     return route.fulfill({ status: rep.status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', ...(rep.headers || {}) }, body });
@@ -210,19 +235,26 @@ function bilan(nom, r) {
   // La chaîne jusqu'aux VENTES (ce que le héros de Ma journée attend) : à quelle
   // profondeur part la lecture des commandes (par compte, ou toutes à la fois)
   // qui a servi. Avant le 16 octobre : sonde → comptes → commandes = 3.
-  const estVentes = (x) => !x.coupe && /id=like\.harvest_[^&]*_orders_[%*]&select=id,data/.test(dec(x));
+  const estVentes = (x) => !x.coupe && /harvest_[^&]*_orders_(?:[%*]|sold)[^&]*&select=id,(?:data|updated_at)/.test(dec(x));
   const profVentes = tri.reduce((m, x, i) => (estVentes(x) && (r.utile == null || x.debut < r.utile) ? Math.max(m, prof[i]) : m), 0);
   // Balayages complets de la famille des transactions (la requête la plus
   // coûteuse de la base, `pg_stat_statements`) : on compte la PREMIÈRE page.
   const txn = gets.filter((x) => /id=like\.harvest_[%*]_txn_[%*]/.test(dec(x)) && (!x.range || /^0-/.test(x.range))).length;
   const supprParCompte = gets.filter((x) => /id=eq\.harvest_\d+_supprimees/.test(dec(x))).length;
+  const fiches = gets.filter((x) => x.poids === 'fiches'), commandes = gets.filter((x) => x.poids === 'commandes');
+  const octFiches = fiches.reduce((a, x) => a + x.octets, 0), octCommandes = commandes.reduce((a, x) => a + x.octets, 0);
+  const entieres = gets.filter((x) => x.entier), octHors = gets.reduce((a, x) => a + (x.hors || 0), 0);
+  // Les lignes jamais montrées que rapporte la lecture des COMMANDES de l'écran
+  // (le préchargement, puis la lecture par compte) — celle que ce chantier juge.
+  const octHorsCommandes = gets.filter(estVentes).reduce((a, x) => a + (x.hors || 0), 0);
   console.log(`  ${nom.padEnd(26)} utile ${String(r.utile ?? '—').padStart(6)} ms · calme ${String(fin).padStart(6)} ms · ${String(gets.length).padStart(3)} lectures · ${String(Math.round(octets / 1024)).padStart(6)} Ko · PDF ${Math.round(pdf / 1024)} Ko · en double ${enDouble} · ${profondeur} allers-retours à la suite · ${txn} balayage(s) des transactions`);
+  console.log(`     fiches de page ${Math.round(octFiches / 1024)} Ko en ${fiches.length} lecture(s) · commandes ${Math.round(octCommandes / 1024)} Ko en ${commandes.length} lecture(s) · ${entieres.length} lecture(s) de ligne entière · ${Math.round(octHors / 1024)} Ko de lignes qu'aucun écran ne montre, dont ${Math.round(octHorsCommandes / 1024)} Ko par la lecture des commandes`);
   if (DETAIL) {
     for (const x of tri) console.log(`      ${String(x.debut).padStart(6)}→${String(x.fin).padStart(6)} ${String(Math.round(x.octets / 1024)).padStart(5)} Ko ${decodeURIComponent(x.url.replace(/^https?:\/\/[^/]+\/rest\/v1\//, '')).slice(0, 170)} ${x.range}`);
     for (const [k, n] of doublons) console.log(`      ×${n} ${decodeURIComponent(k).slice(0, 170)}`);
   }
   if (profVentes) console.log(`     ventes lues au ${profVentes}ᵉ aller-retour à la suite · héros ${JSON.stringify(r.heros || [])}`);
-  return { utile: r.utile, fin, n: gets.length, octets, pdf, enDouble, profondeur, txn, supprParCompte, profVentes };
+  return { utile: r.utile, fin, n: gets.length, octets, pdf, enDouble, profondeur, txn, supprParCompte, profVentes, octFiches, nFiches: fiches.length, octCommandes, nCommandes: commandes.length, entieres: entieres.map((x) => decodeURIComponent(x.url).replace(/^.*\/rest\/v1\//, '').slice(0, 120)), octHors, octHorsCommandes };
 }
 
 // ⚠️ PLAFONDS MESURÉS le 16 octobre (base inventée, 7 comptes). Avant les
@@ -283,6 +315,23 @@ const ECRANS = [
         // (une projection, partagée) et la preuve de vente (une autre). Avant : 2 à 7.
         dit(m.txn <= 2, `${vp.width} px · ${tab} : la famille des transactions balayée deux fois au plus`, `${m.txn}`);
         dit(m.supprParCompte === 0, `${vp.width} px · ${tab} : les suppressions lues en une lecture, pas une par compte`, `${m.supprParCompte}`);
+        // (6 nov.) Ni `vinted_item_details`, ni une ligne de commandes lue ENTIÈRE (§4.4).
+        dit(m.entieres.length === 0, `${vp.width} px · ${tab} : aucune fiche de page ni ligne de commandes lue entière (select=data)`, m.entieres.join(' | ') || 'aucune');
+        // Les fiches de page : seulement celles des annonces montrées (au plus la moitié de la ligne).
+        dit(m.octFiches <= POIDS_FICHES / 2, `${vp.width} px · ${tab} : au plus la moitié de vinted_item_details rapatriée`, `${Math.round(m.octFiches / 1024)} Ko sur ${Math.round(POIDS_FICHES / 1024)} Ko`);
+        // Les commandes d'un ancien compte, `orders_bought` et `wreq_*` : jamais montrées, jamais lues
+        // (sur l'appareil de tous les jours ; au premier passage, voir Ma journée « appareil neuf »).
+        // ⚠️ Mesuré : d'AUTRES lectures, déjà projetées, lisent encore les achats de
+        // tous les comptes (la cloche « où ranger », ~100 Ko ici) — chiffre imprimé,
+        // hors de ce contrôle (voir la passation du 6 nov., « ce qui reste »).
+        if (MEMOIRE) dit(m.octHorsCommandes === 0, `${vp.width} px · ${tab} : la lecture des commandes ne rapporte aucune ligne qu'aucun écran ne montre (ancien compte, orders_bought, wreq)`, `${Math.round(m.octHorsCommandes / 1024)} Ko`);
+        if (process.env.VITESSE_REFERENCE && tab !== 'journee') {
+          const norm = (t) => String(t || '').replace(/\s+/g, ' ').trim();
+          let ref = null; try { ref = fs.readFileSync(path.join(process.env.VITESSE_REFERENCE, vp.width + '-' + tab + '.txt'), 'utf8'); } catch (_) {}
+          const a = norm(r.lu.texte), c = norm(ref);
+          let i = 0; while (i < a.length && a[i] === c[i]) i++;
+          dit(ref != null && a === c, `${vp.width} px · ${tab} : texte rendu identique à celui de l'autre build (${process.env.VITESSE_REFERENCE})`, ref == null ? 'pas de référence' : a === c ? `${a.length} caractères` : `écart au caractère ${i} : « ${a.slice(Math.max(0, i - 40), i + 60)} » ≠ « ${c.slice(Math.max(0, i - 40), i + 60)} »`);
+        }
         if (tab === 'journee') {
           // ── CE QUE LES AJOUTS DU 21-22 OCTOBRE FAISAIENT LIRE ET RENDRE EN TROP (22 oct.) ──
           // Mesuré par bissection (une construction par fusion de `main`) : Ma
@@ -354,6 +403,16 @@ const ECRANS = [
           const a = norm(r.lu.texte), c = norm(r2.lu.texte);
           let i = 0; while (i < a.length && a[i] === c[i]) i++;
           dit(!r2.errs.length && !r2.lu.tombe && a === c, `${vp.width} px · journee : texte rendu IDENTIQUE, préchargement ou lecture par compte`, a === c ? `${a.length} caractères` : `écart au caractère ${i} : « ${a.slice(Math.max(0, i - 40), i + 60)} » ≠ « ${c.slice(Math.max(0, i - 40), i + 60)} »`);
+          // (6 nov.) Le même écran sur un APPAREIL NEUF (aucun compte lié retenu) :
+          // le préchargement lit ventes et achats de tous, jamais `orders_bought`.
+          if (MEMOIRE) {
+            const r3 = await ouvrir(b, vp, tab, att, null, { memoire: false });
+            const m3 = bilan(tab + ' (appareil neuf)', r3);
+            const t3 = norm(r3.lu.texte);
+            dit(!r3.errs.length && !r3.lu.tombe && t3 === a, `${vp.width} px · journee : texte rendu IDENTIQUE sur un appareil neuf`, t3 === a ? `${a.length} caractères` : 'écart');
+            dit(m3.entieres.length === 0, `${vp.width} px · journee (appareil neuf) : aucune ligne lue entière`, m3.entieres.join(' | ') || 'aucune');
+            res[vp.width + ':journee-neuf'] = m3;
+          }
           const h2 = r2.heros.filter((x) => x.v != null);
           dit(h.length && h2.length && h[h.length - 1].v === h2[h2.length - 1].v, `${vp.width} px · journee : même « vendu ce mois » par les deux chemins`, `${h.length ? h[h.length - 1].v : '—'} / ${h2.length ? h2[h2.length - 1].v : '—'}${finale ? ' · ' + finale.slice(0, 30) : ''}`);
         }

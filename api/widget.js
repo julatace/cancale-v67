@@ -11,6 +11,8 @@ import { numerosVcAvecLiens } from './_lib/vestiaire-regle.js';
 // du matin et du rappel du soir (§11, 22 octobre).
 import { bordsParTransaction, compterEcheances, lireDateLimite } from './_lib/limite-envoi.js';
 import { retirerPublie, etatRetrait } from './_lib/retrait-colis.js';
+// (6 nov.) Les SMS de Mondial Relay (POST ?mode=sms, jeton `vrm_sms_token`) : api/_lib/sms-mondialrelay.js.
+import { routeSms } from './_lib/sms-mondialrelay.js';
 import { suiviDeLigne, finDeLigne, finsDesLignes, sortiParSuivis, arriveesDeLigne, relireLigneMeta, SELECT_SUIVI_META, SELECT_TRANSP_META, ligneTranspDeMeta, leverGarde } from './_lib/suivi-colis.js';
 // api/widget.js
 // ────────────────────────────────────────────────────────────────────────────
@@ -624,6 +626,10 @@ export default async function handler(req, res) {
   // adresse. Dès que la clé existe, la route est fermée sans clé valide.
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('Referrer-Policy', 'no-referrer');
+  // (6 nov.) LES SMS DE MONDIAL RELAY envoyés par SON automatisation Raccourcis :
+  // une autre clé (`vrm_sms_token`, qui ÉCRIT), une autre règle — jamais la clé du
+  // widget (lecture seule, et servie sans clé à un vendeur unique en transition).
+  if (String((req.query && req.query.mode) || '') === 'sms') return routeSms(req, res, { url: SUPABASE_URL, key: SUPABASE_KEY });
   try {
     // ⚠️ MULTI-VENDEURS : on résout SON owner par la clé AVANT toute lecture, et
     //    on enveloppe tout le calcul dans son contexte → chaque `scoped(…)` se
@@ -749,12 +755,15 @@ export default async function handler(req, res) {
     //    si cette photo manque ou date d'un autre mois — sinon le widget
     //    resterait bloqué sur le mois précédent tant que l'app n'est pas ouverte.
     //    `moneySource` dit laquelle a servi (le widget peut l'afficher).
-    let moneyMonth = 0, salesMonth = 0;
+    let moneyMonth = 0, salesMonth = 0, sansPrixEmails = 0;
     for (const s of sales) {
       if (String(s.receivedAt || '').slice(0, 7) !== ym) continue;
       salesMonth += 1;
       const p = parseFloat(String(s.prix || '').replace(',', '.'));
       if (!isNaN(p) && p > 0) moneyMonth += p;
+      // (6 nov.) Une vente « avec Vérification de l'article » : l'e-mail ne donne
+      // pas de prix (jamais deviné) ⇒ le repli sur les e-mails dit « au moins ».
+      else sansPrixEmails += 1;
     }
     let moneySource = 'emails';
     const snapMois = snap && snap.updatedAt ? String(snap.updatedAt).slice(0, 7) : null;
@@ -766,7 +775,7 @@ export default async function handler(req, res) {
     // (1er nov., audits A2/A10) Des ventes du mois dont l'argent ne se lit pas
     // (prix Vinted pas lu, montant Vestiaire pas sûr) : publiées par l'app à
     // côté du montant ⇒ « au moins » (jamais un total partiel présenté complet).
-    const moneyNonComptees = moneySource === 'app' ? (Number(snap.caMoisNonComptees) || 0) : null;
+    const moneyNonComptees = moneySource === 'app' ? (Number(snap.caMoisNonComptees) || 0) : (sansPrixEmails > 0 ? sansPrixEmails : null);
     // Argent REÇU ce mois : la ligne publiée par l'app (voir `recuDuMoisPublie`),
     // plus les emails de finalisation — une seule règle, celle de Ma journée.
     const recu = recuDuMoisPublie(m.vinted_urssaf_mois, ym);

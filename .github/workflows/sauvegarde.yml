@@ -1,0 +1,113 @@
+name: Sauvegarde quotidienne de la base
+# Chaque nuit : copie du schéma public de la base Supabase (pg_dump, lecture
+# seule), chiffrée (gpg AES-256, phrase en secret), gardée 30 jours comme
+# artefact. Le dimanche (et à chaque lancement à la main) : essai de
+# restauration de la copie du jour dans un Postgres JETABLE de la machine
+# GitHub, puis comptage des lignes famille par famille.
+#
+# ⚠️ Le dépôt est PUBLIC : toute personne connectée à GitHub peut télécharger
+# les artefacts et lire les journaux. D'où : copie TOUJOURS chiffrée, phrase
+# jamais dans le dépôt, journaux sans aucun contenu ni compte par famille.
+# Secrets à poser par Julien (Settings → Secrets and variables → Actions) :
+#   SUPABASE_DB_URL     URL « Session pooler » de Supabase (port 5432, IPv4)
+#   SAUVEGARDE_PHRASE   phrase de chiffrement (20 caractères ou plus)
+# Pas-à-pas et restauration : docs/passation/2026-11-06-sauvegarde-prix.md.
+# Rien ici n'écrit sur la vraie base.
+on:
+  schedule:
+    - cron: '23 2 * * *'
+  workflow_dispatch:
+    inputs:
+      essai:
+        description: "Faire aussi l'essai de restauration"
+        type: boolean
+        default: true
+permissions:
+  contents: read
+concurrency:
+  group: sauvegarde-base
+  cancel-in-progress: false
+jobs:
+  sauvegarde:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    outputs:
+      nom: ${{ steps.copie.outputs.nom }}
+      majeur: ${{ steps.outils.outputs.majeur }}
+      dimanche: ${{ steps.jour.outputs.dimanche }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Vérifier que les deux secrets sont posés
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SAUVEGARDE_PHRASE: ${{ secrets.SAUVEGARDE_PHRASE }}
+        run: |
+          manque=""
+          [ -n "$SUPABASE_DB_URL" ] || manque="$manque SUPABASE_DB_URL"
+          [ -n "$SAUVEGARDE_PHRASE" ] || manque="$manque SAUVEGARDE_PHRASE"
+          if [ -n "$manque" ]; then
+            echo "::error::Secret(s) absent(s) :$manque. Geste : GitHub → julatace/cancale-v67 → Settings → Secrets and variables → Actions → New repository secret. Pas-à-pas : docs/passation/2026-11-06-sauvegarde-prix.md"
+            exit 1
+          fi
+      - name: Installer les outils PostgreSQL à la version du serveur
+        id: outils
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-common gnupg > /dev/null
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y > /dev/null
+          majeur="$(psql "$SUPABASE_DB_URL" -X -Atc 'show server_version_num' | cut -c1-2)"
+          case "$majeur" in ''|*[!0-9]*) echo "::error::La base ne répond pas (URL, mot de passe, ou URL « Direct » au lieu de « Session pooler »)."; exit 1;; esac
+          sudo apt-get install -y -qq "postgresql-client-$majeur" > /dev/null
+          echo "PG_BIN=/usr/lib/postgresql/$majeur/bin" >> "$GITHUB_ENV"
+          echo "majeur=$majeur" >> "$GITHUB_OUTPUT"
+      - name: Copier, compter, chiffrer, relire
+        id: copie
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SAUVEGARDE_PHRASE: ${{ secrets.SAUVEGARDE_PHRASE }}
+          DOSSIER_SORTIE: ${{ runner.temp }}/sauvegarde
+        run: bash scripts/sauvegarde/sauvegarder.sh
+      - name: Garder la copie chiffrée 30 jours
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.copie.outputs.nom }}
+          path: ${{ runner.temp }}/sauvegarde/*.tar.gpg
+          retention-days: 30
+          compression-level: 0
+          if-no-files-found: error
+      - name: Dimanche ?
+        id: jour
+        run: echo "dimanche=$([ "$(date -u +%u)" = 7 ] && echo oui || echo non)" >> "$GITHUB_OUTPUT"
+
+  essai-restauration:
+    needs: sauvegarde
+    if: needs.sauvegarde.outputs.dimanche == 'oui' || inputs.essai
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reprendre la copie du jour (chiffrée)
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.sauvegarde.outputs.nom }}
+          path: ${{ runner.temp }}/copie
+      - name: Monter un Postgres jetable sur cette machine
+        env:
+          MAJEUR: ${{ needs.sauvegarde.outputs.majeur }}
+        run: |
+          docker run -d --name pg-jetable -e POSTGRES_PASSWORD=jetable -p 127.0.0.1:5432:5432 "postgres:$MAJEUR" > /dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-common gnupg > /dev/null
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y > /dev/null
+          sudo apt-get install -y -qq "postgresql-client-$MAJEUR" > /dev/null
+          echo "PG_BIN=/usr/lib/postgresql/$MAJEUR/bin" >> "$GITHUB_ENV"
+          for i in $(seq 1 30); do pg_isready -h 127.0.0.1 -p 5432 -q && break; sleep 2; done
+          pg_isready -h 127.0.0.1 -p 5432
+      - name: Déchiffrer, restaurer, compter famille par famille
+        env:
+          SAUVEGARDE_PHRASE: ${{ secrets.SAUVEGARDE_PHRASE }}
+          CIBLE_URL: postgresql://postgres:jetable@127.0.0.1:5432/postgres
+        run: |
+          FICHIER="$(ls "$RUNNER_TEMP"/copie/*.tar.gpg | head -1)" bash scripts/sauvegarde/essai-restauration.sh

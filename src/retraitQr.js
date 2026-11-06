@@ -198,7 +198,8 @@ export function compteDuRetrait(t, mr) {
   if (!t) return null;
   const recu = Array.isArray(t.recuSur) ? t.recuSur.filter(Boolean) : (typeof t.recuSur === 'string' && t.recuSur ? [t.recuSur] : []);
   if (t.mrCompte && t.mrCompte.libelle) return { source: 'mondialrelay', libelle: t.mrCompte.libelle, aussiEmail: t.source !== 'mondialrelay-compte' || !!t.aussiEmail, adresse: recu[0] || '' };
-  if (t._o || t.synthetique || t.source === 'mondialrelay-compte') return null;
+  // (6 nov.) Un colis annoncé par SMS n'a pas d'adresse de réception : la carte le dit (« Reçu par SMS »).
+  if (t._o || t.synthetique || t.source === 'mondialrelay-compte' || t.source === 'sms') return null;
   const mrLus = mr && Array.isArray(mr.comptes) ? mr.comptes : [];
   const recuMs = Date.parse(t.receivedAt || t.emailAt || '');
   const horsComptes = String(t.carrier || '') === 'mondialrelay' && mrLus.length > 0 && Number.isFinite(recuMs)

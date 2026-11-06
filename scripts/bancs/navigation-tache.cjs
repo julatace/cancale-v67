@@ -219,7 +219,11 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
           const plat = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sidebar [data-nav-groupe="Plateformes"] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')));
           dit(plat.join('|') === 'plat_ebay|plat_leboncoin|plat_vestiaire', 'J. colonne, « Plateformes » : eBay · Leboncoin · Vestiaire', plat.join('|'));
           const cpt = await pg.evaluate(() => { const o = Object.fromEntries([...document.querySelectorAll('.vrm-sidebar [data-badge-nav]')].map((b) => [b.getAttribute('data-badge-nav'), b.getAttribute('data-badge-n')])); try { o.pubR = String(JSON.parse(localStorage.getItem('vrm_colis_retirer')).total); } catch (_) {} return o; });
-          dit(cpt.ventes === String(col.pub) && cpt.cat_bord === String(col.pub) && cpt.annonces === '4', 'J. compteurs de la colonne = les nombres PUBLIÉS (à poster ; annonces : les 4 sans numéro de la cloche)', JSON.stringify(cpt));
+          // (5 nov., chantier H — revue 2.32) UN COLIS SE COMPTE UNE FOIS (§7 : le même nombre ne
+          // s'écrit jamais deux fois sur un écran) : les colis à poster portent le badge de Colis,
+          // l'écran qui les envoie ; Ventes ne le recopie plus (`audit-coque-parametres`,
+          // mutation « badge double »). Le banc exigeait encore la copie sur Ventes.
+          dit(!cpt.ventes && cpt.cat_bord === String(col.pub) && cpt.annonces === '4', 'J. compteurs de la colonne = les nombres PUBLIÉS (à poster, sur Colis SEULEMENT — jamais recopié sur Ventes ; annonces : les 4 sans numéro de la cloche)', JSON.stringify(cpt));
           dit(!cpt.plat_ebay && !cpt.plat_leboncoin && !cpt.messages, 'J. aucun compteur sans nombre connu (eBay, Leboncoin, Messages)', JSON.stringify(cpt));
           dit(new Set(col.toutes).size === col.toutes.length, 'A. aucune entrée deux fois dans la colonne', col.toutes.join('|'));
           dit(col.toutes[col.toutes.length - 1] === 'settings', 'A. Paramètres en bas', col.toutes.join('|'));

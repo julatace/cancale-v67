@@ -353,14 +353,37 @@ export const sortiParSuivi = (ligne, fins) => { const a = arriveesDeLigne(ligne)
 export const incidentDeLigne = (ligne, fins) => { const a = arriveesDeLigne(ligne); return incidentDeSuivis([suiviDeLigne(ligne)], fins, a.arrivee, { borne: a.borne }); };
 
 // ── LE TRANSPORTEUR D'UN N° TAPÉ À LA MAIN : PAR SA FORME ────────────────────
-// Mesuré sur ses 193 n° : 8 chiffres = Mondial Relay (117) ; 2 lettres + 9
-// chiffres + 2 lettres = Chronopost (43) ; « VGS… » = Vinted Go. Le reste est
-// AMBIGU (14 chiffres : Chronopost 16 fois, Vinted Go 8, DPD 1 ; 16 chiffres :
-// Vinted Go) ⇒ null : on DEMANDE, on ne devine pas.
+// Mesuré sur ses 193 n° : 8 chiffres = Mondial Relay (117) ; « VGS… » = Vinted
+// Go. Le reste est AMBIGU (14 chiffres : Chronopost 16 fois, Vinted Go 8, DPD 1 ;
+// 16 chiffres : Vinted Go) ⇒ null : on DEMANDE, on ne devine pas.
+// ⚠️ (6 nov.) « 2 LETTRES + 9 CHIFFRES + 2 LETTRES » N'EST PAS CHRONOPOST : c'est la
+//    forme POSTALE INTERNATIONALE (UPU S10), dont les deux dernières lettres disent
+//    le PAYS. Mesuré sur sa base : l'achat au n° « CP…IE » (An Post, Irlande, lu par
+//    Vinted sans transporteur nommé) s'affichait « Chronopost » au Tabavap — Julien
+//    l'a pris pour son colis Mondial Relay du même point. Ses vrais n° Chronopost
+//    (50 lignes, toutes venues d'un e-mail ou d'une lecture Chronopost) ont la forme
+//    PROPRE à Chronopost « XW/ZW + 9 chiffres + TS/SP » (TS et SP ne sont pas des
+//    pays) : seule celle-là nomme Chronopost. Un S10 d'un pays ≠ France ⇒ « Colis
+//    international (<pays>) » (`colisInternational`), jamais un transporteur ; un
+//    S10 « …FR » ⇒ rien (La Poste ou Chronopost : on ne choisit pas).
+export const FORME_CHRONOPOST_PROPRE = /^[XZ]W\d{9}(?:TS|SP)$/;
+export const PAYS_S10 = Object.freeze({ FR: 'France', IE: 'Irlande', GB: 'Royaume-Uni', DE: 'Allemagne', ES: 'Espagne', IT: 'Italie', BE: 'Belgique', NL: 'Pays-Bas', PT: 'Portugal', LU: 'Luxembourg', AT: 'Autriche', PL: 'Pologne', CH: 'Suisse', SE: 'Suède', DK: 'Danemark', FI: 'Finlande', CZ: 'Tchéquie', SK: 'Slovaquie', SI: 'Slovénie', HU: 'Hongrie', RO: 'Roumanie', BG: 'Bulgarie', GR: 'Grèce', HR: 'Croatie', LT: 'Lituanie', LV: 'Lettonie', EE: 'Estonie', CY: 'Chypre', MT: 'Malte', MC: 'Monaco', US: 'États-Unis', CA: 'Canada', CN: 'Chine', JP: 'Japon', HK: 'Hong Kong' });
+// Le PAYS d'un n° postal international (S10), quand ses deux dernières lettres en
+// nomment un ; sinon null (« TS », « SP » de Chronopost ne sont pas des pays).
+export function paysColisS10(n) {
+  const m = /^[A-Z]{2}\d{9}([A-Z]{2})$/.exec(normaliserSuivi(n));
+  return m && PAYS_S10[m[1]] ? m[1] : null;
+}
+// « Colis international (Irlande) » — LU dans le n° lui-même (son pays), jamais un
+// transporteur. '' pour un n° français ou qui n'est pas un S10.
+export function colisInternational(n) {
+  const p = paysColisS10(n);
+  return p && p !== 'FR' ? `Colis international (${PAYS_S10[p]})` : '';
+}
 export function transporteurDeForme(n) {
   const s = normaliserSuivi(n);
   if (/^\d{8}$/.test(s)) return 'mondialrelay';
-  if (/^[A-Z]{2}\d{9}[A-Z]{2}$/.test(s)) return 'chronopost';
+  if (FORME_CHRONOPOST_PROPRE.test(s)) return 'chronopost';
   if (/^VGS\d{8,}$/.test(s)) return 'vinted';
   return null;
 }

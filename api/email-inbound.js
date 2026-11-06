@@ -27,6 +27,7 @@ import { sendPushToAll, pushCategorieActive } from './_lib/push.js';
 import { texteArrivee } from './_lib/notif-textes.js';
 import { colisPerdu } from './_lib/etat-colis-email.js';
 import { DESTINATIONS, conversationDeLEmail } from './_lib/lien-notif.js';
+import { estSuppressionLbc, lireSuppressionLbc, texteSuppressionLbc, jourParis, CAT_LBC_SUPPRESSION, FAMILLE_LBC_SUPPRESSION } from './_lib/lbc-suppression.js';
 // (5 nov.) Les textes des notifications : fabriqués là où l'aperçu de Paramètres → Notifications les lit.
 import { texteVendu, texteArgentRecu, texteVenduVestiaire, texteBordereau, texteOffre, texteMessage, texteAnnulation } from './_lib/notif-apercus.js';
 import { stampBordereau } from './_lib/stamp.js';
@@ -346,8 +347,33 @@ function parseSaleEmail({ subject, text, html, attachments }) {
   data.pro = MARQUE_PRO.test(cleanBody) || MARQUE_PRO.test(htmlToText(html) || '');
   data.transaction = transactionVentePro(cleanBody, attachments);
 
-  return (data.pseudo && data.prix) ? data : null;
+  // ── (6 nov.) LA VENTE « AVEC VÉRIFICATION DE L'ARTICLE » ──────────────────
+  // Mesuré sur sa base (2 e-mails gardés « reconnu vente, analyse impossible »,
+  // 2 et 3 nov.) : sujet « Tu as vendu un article sur Vinted ! (avec
+  // Vérification de l’article) », corps « <pseudo> a acheté <titre> taille
+  // <t>. » puis « … envoyer la commande à notre centre de vérification sous
+  // 5 jours ». AUCUN prix dans l'e-mail : l'ancienne règle exigeait un prix et
+  // gardait l'e-mail sans rien en faire (ni vente, ni notification, ni anti
+  // double vente). Le prix n'est JAMAIS deviné : il reste vide (« pas su »),
+  // la vente porte `verification: true`. Une forme qui n'a ni pseudo ni titre
+  // reste « analyse impossible » (gardée entière, jamais jetée).
+  data.verification = VERIF_ARTICLE.test(String(subject || '')) || CENTRE_VERIF.test(cleanBody);
+  if (data.verification && !data.prix && !data.designation) {
+    const d3 = cleanBody.match(/a\s+achet[éeè]\s+([\s\S]{2,200}?)\.\s*(?:\n|Si\s+l['’]article|$)/i);
+    if (d3) data.designation = stripBrackets(d3[1].trim().replace(/\s+/g, ' '));
+    const n3 = data.designation.match(/[nN][º°]?(\d{2,6})(?!\d)/);
+    if (n3 && !data.numero) {
+      data.numero = n3[1];
+      data.designation = data.designation.replace(/-?\s*[nN][º°]?\d{2,6}(?!\d)/, '').trim().replace(/\s+/g, ' ');
+    }
+  }
+  if (!data.verification) delete data.verification;
+
+  return (data.pseudo && (data.prix || (data.verification && data.designation))) ? data : null;
 }
+// La mention de Vinted, au sujet OU au corps (les deux sont lus, un seul suffit).
+const VERIF_ARTICLE = /V[ée]rification\s+de\s+l['’]article/i;
+const CENTRE_VERIF = /centre\s+de\s+v[ée]rification/i;
 
 function parseBordereauEmail({ subject, text, html, attachments }) {
   const body = text || '';
@@ -620,6 +646,9 @@ function familleConnue(subject, from) {
   if (/^Re:\s*$/i.test(s) && /vinted\.fr/i.test(f)) return 'questionnaire du support Vinted';
   if (/@team\.vinted|newsletter/i.test(f) || /rentr[ée]e|d[ée]couvre|inspire|nouveaut[ée]s/i.test(s)) return 'newsletter Vinted';
   if (/bienvenue|confirme ton adresse|mot de passe/i.test(s)) return 'email de compte Vinted';
+  // (6 nov.) Leboncoin « Suppression de vos annonces » (api/_lib/lbc-suppression.js) :
+  // la même famille côté app (`familleEmail`) pour les e-mails déjà gardés.
+  if (/^Suppression de vos annonces/i.test(s) && /leboncoin/i.test(f + ' ' + s)) return 'annonce Leboncoin supprimée';
   return '';
 }
 
@@ -1875,6 +1904,20 @@ export async function modeScript(mode, req, res) {
     return;
   }
   if (mode === 'factures' && req.method === 'GET') {
+    // (6 nov., charge) Le script Gmail demande ce mode CHAQUE MINUTE (1 433 fois
+    // en 24 h), qu'il y ait une facture ou non. Avant : la fiche entière (logo
+    // compris) et toutes les factures en file, à chaque fois. Maintenant, par
+    // petites marches, et on s'arrête dès qu'il n'y a rien à faire :
+    //   1. facturation allumée ? (un scalaire) — non ⇒ fini (1 lecture) ;
+    //   2. une facture en file ? (leurs `id` seulement) — non ⇒ fini (2 lectures) ;
+    //   3. seulement alors la fiche et les factures, comme avant.
+    // « Pas su » à n'importe quelle marche ⇒ 503 (jamais « aucune facture »).
+    const actifRows = await lireLignes('id=eq.vrm_pro_facture&select=actif:data->actif');
+    if (actifRows === null) { res.status(503).json({ ok: false, error: 'base-injoignable' }); return; }
+    if (!(actifRows[0] && actifRows[0].actif)) { res.status(200).json({ ok: true, actif: false, factures: [] }); return; }
+    const enFile = await lireLignes('id=like.email_invoice_*&data->>status=eq.queued&select=id');
+    if (enFile === null) { res.status(503).json({ ok: false, error: 'base-injoignable' }); return; }
+    if (!enFile.length) { res.status(200).json({ ok: true, actif: true, factures: [] }); return; }
     const [cfgRows, rows] = await Promise.all([
       lireLignes('id=eq.vrm_pro_facture&select=data'),
       lireLignes('id=like.email_invoice_*&data->>status=eq.queued&select=id,data'),
@@ -2446,7 +2489,7 @@ export async function traiterEmail(req, res) {
         data.numero = jn.numero; if (jn.numeroTitre) data.numeroTitre = jn.numeroTitre; }
       await supabaseUpsert([{ id: `email_sale_${key}`, data: { type: 'vente', ...data, account: acc.login || '', uid: acc.uid || '', receivedAt: now } }]);
       // Notif push : vente en temps réel, même app fermée et ordi éteint.
-      try { await pushOnce({ ...texteVendu({ article: data.designation, prix: data.prix, compte: acc.login }), tag: `sale-${key}`, url: DESTINATIONS.vente({ tx: data.transaction }) }, 'vente'); } catch (_) {}
+      try { await pushOnce({ ...texteVendu({ article: data.designation, prix: data.prix, compte: acc.login, verification: !!data.verification }), tag: `sale-${key}`, url: DESTINATIONS.vente({ tx: data.transaction }) }, 'vente'); } catch (_) {}
       await notifierDoubleVente(data.numero, data.designation);
       // Vente PRO (la mention de Vinted) avec l'e-mail de l'acheteur et sa
       // transaction : on garde le formulaire de retour pour la facture que le
@@ -2460,7 +2503,7 @@ export async function traiterEmail(req, res) {
       } catch (_) {}
       { const st = contexteVendeur.getStore(); if (st) st.resumeExtra = { article: data.designation }; }
       await logEmail({ type: 'vente', subject, from: mail.from, prix: data.prix, numero: data.numero, facture: facture ? facture.number : null });
-      await repondre(res, 200, { ok: true, type: 'vente', pseudo: data.pseudo, prix: data.prix, numero: data.numero, facture });
+      await repondre(res, 200, { ok: true, type: 'vente', pseudo: data.pseudo, prix: data.prix, numero: data.numero, facture, ...(data.verification ? { verification: true } : {}) });
       return;
     }
 
@@ -2648,6 +2691,21 @@ export async function traiterEmail(req, res) {
         await repondre(res, 200, { ok: true, type: 'action', famille });
         return;
       }
+    }
+
+    // 8) (6 nov.) LEBONCOIN « SUPPRESSION DE VOS ANNONCES » (api/_lib/lbc-suppression.js).
+    //    Mesuré : l'e-mail ne porte AUCUNE identité d'annonce (le titre n'en est
+    //    pas une, §5) ⇒ rien n'est retiré ni relié ; l'e-mail est gardé (famille
+    //    reconnue) et UNE notification « Rappels » par jour dit le geste qui
+    //    apporte l'identité : ouvrir « Mes annonces » sur Leboncoin.
+    if (estSuppressionLbc({ subject, from: mail.from, text: corpsTexte })) {
+      const lu = lireSuppressionLbc({ text: corpsTexte });
+      await garderInconnu(corpsBrut, mail, 'connu, notifié', FAMILLE_LBC_SUPPRESSION);
+      try { await pushOnce({ ...texteSuppressionLbc(lu), tag: `lbc-suppression-${jourParis()}`, url: DESTINATIONS.lbcAnnonces(), _cat: CAT_LBC_SUPPRESSION }); } catch (_) {}
+      { const st = contexteVendeur.getStore(); if (st) st.resumeExtra = { article: lu.titre }; }
+      await logEmail({ type: 'action', subject, from: mail.from, famille: FAMILLE_LBC_SUPPRESSION, article: lu.titre });
+      await repondre(res, 200, { ok: true, type: 'action', famille: FAMILLE_LBC_SUPPRESSION, identite: null });
+      return;
     }
 
     // ⚠️ « Ignoré » ne veut pas dire « jeté ». Un email qu'aucune règle ne

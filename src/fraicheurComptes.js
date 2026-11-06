@@ -29,7 +29,35 @@ function gesteRelire(plateforme, dans) {
   return '';
 }
 
-// Une ligne : { plateforme, id, nom, etat, age, quand, bloque, geste }.
+// ── LES VENTES PLUS VIEILLES QUE LES ANNONCES (6 novembre) ──────────────────
+// Mesuré le 6 nov. : un compte Vinted relu à 07:50 (annonces, boîte, profil)
+// avait sa liste de VENTES figée à la veille 15 h 11 — la ligne disait « ouvert
+// ici · relu à chaque passage » pendant que la vente du matin manquait à Ventes.
+// Quand la liste des ventes (`orders_sold`) a plus d'une heure de retard sur
+// les annonces (`listings`) du même compte, la ligne le DIT, avec l'heure, et
+// le geste (où la relire). Une date manquante ne dit rien (« pas su »).
+export const RETARD_VENTES_MS = 60 * 60 * 1000;
+const tsDe = (v) => { const t = typeof v === 'number' ? v : Date.parse(String(v || '')); return Number.isFinite(t) && t > 0 ? t : null; };
+export function ventesEnRetard(ventesLu, annoncesLu) {
+  const v = tsDe(ventesLu), a = tsDe(annoncesLu);
+  return v != null && a != null && a - v > RETARD_VENTES_MS;
+}
+// « aujourd'hui 9 h 05 », « hier 15 h 11 », « le 3 nov. 15 h 11 » — heure de Paris.
+const PARIS = 'Europe/Paris';
+const jourParis = (t) => new Date(t).toLocaleDateString('fr-CA', { timeZone: PARIS });   // AAAA-MM-JJ
+export function quandRelu(t, maintenant = Date.now()) {
+  const x = tsDe(t); if (x == null) return '';
+  const p = new Intl.DateTimeFormat('fr-FR', { timeZone: PARIS, hour: 'numeric', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(x));
+  const h = (p.find((q) => q.type === 'hour') || {}).value, m = (p.find((q) => q.type === 'minute') || {}).value;
+  const heure = `${Number(h)} h ${m}`;
+  const j = jourParis(x), auj = jourParis(maintenant), hier = jourParis(maintenant - 86400000);
+  if (j === auj) return `aujourd’hui ${heure}`;
+  if (j === hier) return `hier ${heure}`;
+  return `le ${new Date(x).toLocaleDateString('fr-FR', { timeZone: PARIS, day: 'numeric', month: 'short' })} ${heure}`;
+}
+export const gesteRelireVentes = (dans) => `ouvre Vinted › Mes commandes sur ce compte${dans ? ' ' + dans : ''}`;
+
+// Une ligne : { plateforme, id, nom, etat, age, quand, bloque, geste, ventesRetard }.
 //   · `c` : { plateforme, id, nom?, lu, ouvert?, delie?, banni?, masque?, horsTotaux? }
 //   · `quand` : la relecture, telle qu'écrite (« ouvert ici », « relu il y a 3 h »,
 //     « jamais relu ») ; `bloque` : ce qui bloque et le geste, ou '' — l'écran
@@ -58,8 +86,19 @@ export function ligneFraicheur(c, { maintenant = Date.now(), dans = 'dans ce nav
     bloque = etat === 'a-relire' && plateforme === 'ebay' ? `eBay n’a rien rendu depuis — ${gesteRelire(plateforme, dans)}` : gesteRelire(plateforme, dans);
     geste = true;
   }
+  // (6 nov.) Ses VENTES en retard sur ses annonces : dit, daté, avec le geste —
+  // « relu à chaque passage » (ouvert ici) serait faux pour elles.
+  let ventesRetard = null;
+  if (plateforme === 'vinted' && !c.masque && etat !== 'banni' && etat !== 'delie' && ventesEnRetard(c.ventesLu, c.annoncesLu)) {
+    const lu = tsDe(c.ventesLu);
+    const v = `ventes relues ${quandRelu(lu, maintenant)}`;
+    ventesRetard = { lu, texte: v };
+    if (etat === 'ouvert' || !bloque) bloque = `${v} — ${gesteRelireVentes(dans)}`;
+    else bloque = `${bloque} · ${v}`;
+    geste = true;
+  }
   if (c.horsTotaux && !c.masque) bloque = bloque ? `${bloque} · hors des totaux (ton choix)` : 'hors des totaux (ton choix)';
-  return { plateforme, id: String(c.id), nom, etat, age, quand, bloque, geste };
+  return { plateforme, id: String(c.id), nom, etat, age, quand, bloque, geste, ventesRetard };
 }
 
 // Toutes les lignes, dans l'ordre : ce qui demande un geste d'abord, puis le

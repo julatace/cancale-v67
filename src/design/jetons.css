@@ -181,7 +181,7 @@
 :where(.vrm-app-shell) button { color: inherit; background-color: var(--fu-remplir); }
 :where(.vrm-app-shell) ::selection { background: rgba(0,113,227,.22); }
 /* Les jours de la semaine sur la carte sombre : lisibles (0,5 tombait à 4,1:1). */
-:root:root body .vrm-app-shell .vrm-fu-jour > span { color: rgba(255,255,255,.72) !important; }
+:root:root body .vrm-app-shell .vrm-fu-jour > span { color: var(--fu-sur-sombre-2) !important; }
 /* Un lien bleu posé sur la carte sombre : en blanc (le bleu y tombait à 2,5:1). */
 :root:root body .vrm-app-shell :is(.vrm-fu-carte, .vrm-fu-tete) :is(a, button.vrm-lien-action) { color: #ffffff !important; }
 

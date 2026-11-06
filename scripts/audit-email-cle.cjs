@@ -24,6 +24,13 @@ const dit = (c, m, d) => { if (!c) ko++; console.log(`${c ? '✅' : '❌'} ${m}$
 const OWNER = '74eea6e7-0000-4000-8000-000000000001';
 const lus = []; const ecrites = [];
 let lectureKO = false;
+// (6 nov., charge) La fausse base sert la FORME demandée (projection `select=`) :
+// `actif:data->actif` rend `{actif}`, `select=id` rend `{id}` seulement.
+let factActive = true, enFile = true;
+const FACTURES = () => enFile ? [
+  { id: 'email_invoice_1', data: { status: 'queued', number: 'F-1', buyerEmail: 'acheteur@exemple.test', html: '<p>F-1</p>' } },
+  { id: 'email_invoice_2', data: { status: 'queued', number: 'F-2', html: '<p>sans email</p>' } },
+] : [];
 global.fetch = async (url, opts = {}) => {
   const u = decodeURIComponent(String(url));
   const methode = opts.method || 'GET';
@@ -34,11 +41,8 @@ global.fetch = async (url, opts = {}) => {
   if (lectureKO) return new Response('<html>522</html>', { status: 522, headers: { 'content-type': 'text/html' } });
   let corps = [];
   if (/id=eq\.vrm_email_config/.test(u)) corps = [{ data: { startDate: '2026-07-10' } }];
-  else if (/id=eq\.vrm_pro_facture/.test(u)) corps = [{ data: { actif: true, nom: 'Boutique test', logo: '' } }];
-  else if (/id=like\.email_invoice_\*/.test(u)) corps = [
-    { id: 'email_invoice_1', data: { status: 'queued', number: 'F-1', buyerEmail: 'acheteur@exemple.test', html: '<p>F-1</p>' } },
-    { id: 'email_invoice_2', data: { status: 'queued', number: 'F-2', html: '<p>sans email</p>' } },
-  ];
+  else if (/id=eq\.vrm_pro_facture/.test(u)) corps = /select=actif:data->actif(&|$)/.test(u) ? [{ actif: factActive }] : [{ data: { actif: factActive, nom: 'Boutique test', logo: 'data:image/png;base64,AAAA' } }];
+  else if (/id=like\.email_invoice_\*/.test(u)) corps = /select=id(&|$)/.test(u) ? FACTURES().map((f) => ({ id: f.id })) : FACTURES();
   else if (/id=eq\.email_invoice_1/.test(u)) corps = [{ id: 'email_invoice_1', data: { status: 'queued', number: 'F-1', buyerEmail: 'acheteur@exemple.test', montant: 42 } }];
   return new Response(JSON.stringify(corps), { status: 200, headers: { 'content-type': 'application/json' } });
 };
@@ -80,6 +84,19 @@ const faireRes = () => { const r = { code: null, corps: null }; r.status = (n) =
   const f = (r.corps && r.corps.factures) || [];
   dit(r.code === 200 && r.corps.actif === true && f.length === 1 && f[0].id === 'email_invoice_1', 'les factures en attente avec un email d\'acheteur partent au script — et seulement elles', JSON.stringify(f.map((x) => x.id)));
   dit(lus.some((u) => /email_invoice_\*/.test(u) && /data->>status=eq\.queued/.test(u)), 'la base ne rend que les factures EN ATTENTE (pas tout l\'historique)');
+  // (6 nov., charge) Le script demande ce mode CHAQUE MINUTE : sans facture à
+  // envoyer, ni la fiche (logo compris) ni le contenu des factures ne sont lus.
+  factActive = false; lus.length = 0;
+  r = await appel({ mode: 'factures', key: 'cle-de-banc-123' });
+  const lusInactif = lus.filter((u) => !/select=owner&limit=1/.test(u));
+  dit(r.code === 200 && r.corps.actif === false && lusInactif.length === 1 && !lusInactif.some((u) => /select=data|select=id,data/.test(u)),
+    'facturation coupée : UNE petite lecture (un scalaire), rien d\'autre', `${lusInactif.length} lecture(s) : ${lusInactif.join(' | ').slice(0, 160)}`);
+  factActive = true; enFile = false; lus.length = 0;
+  r = await appel({ mode: 'factures', key: 'cle-de-banc-123' });
+  const lusVide = lus.filter((u) => !/select=owner&limit=1/.test(u));
+  dit(r.code === 200 && r.corps.actif === true && Array.isArray(r.corps.factures) && r.corps.factures.length === 0 && lusVide.length === 2 && !lusVide.some((u) => /select=data|select=id,data/.test(u)),
+    'facturation allumée, rien en file : deux petites lectures, ni la fiche ni les factures', `${lusVide.length} lecture(s)`);
+  enFile = true;
   ecrites.length = 0;
   r = await appel({ mode: 'facture-envoyee', key: 'cle-de-banc-123' }, 'POST', { id: 'email_invoice_1' });
   const e = ecrites.find((x) => x.id === 'email_invoice_1');

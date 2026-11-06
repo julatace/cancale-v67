@@ -52,6 +52,9 @@ export const FAMILLE_DE = {
   // (5 nov.) Un compte Vinted gardé dans les totaux pas relu depuis plus de 24 h
   // (api/_lib/comptes-a-relire.js) : un rappel, une fois par jour au plus.
   relecture: 'rappels',
+  // (6 nov.) Leboncoin « Suppression de vos annonces » : ouvrir « Mes annonces »
+  // (api/_lib/lbc-suppression.js), une fois par jour au plus.
+  lbcsuppression: 'rappels',
 };
 // Un type NEUF hérite du réglage de la famille d'où il sort tant qu'il n'est pas
 // posé lui-même : il avait coupé « Ventes », la double vente reste coupée ; il
