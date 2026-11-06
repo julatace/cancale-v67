@@ -64069,7 +64069,11 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     { id:'affichage', titre:'Affichage', items:[
       { id:'sombre', type:'switch', ic:'moon', lib:'Mode sombre', on:!!dark, onClick:toggleDark, data:{ 'data-reglage-sombre': dark ? 'on' : 'off' } },
       // (5 nov.) Le mode stream PROGRAMMÉ : son sous-écran (catégories, mots, aperçu).
-      { id:'stream', type:'panneau', nu:true, ic:'stream', lib:'Mode stream', val: streamOn ? 'Allumé' : 'Éteint', data:{ 'data-reglage-stream': streamOn ? 'on' : 'off' }, el:<ReglagesStream/> },
+      // (5 nov., chantier H) L'interrupteur DANS la liste (le même état que « Stream » en
+      // haut : un réglage), et son programme dans un sous-écran à son nom — le titre
+      // « Mode stream » n'est plus écrit deux fois dans le sous-écran.
+      { id:'stream-on', type:'switch', ic:'stream', lib:'Mode stream', on:!!streamOn, onClick:()=>poserStream(!streamOn), data:{ 'data-reglage-stream-on': streamOn ? 'on' : 'off' } },
+      { id:'stream', type:'panneau', nu:true, ic:'filter', lib:'Ce que le stream cache', data:{ 'data-reglage-stream': streamOn ? 'on' : 'off' }, el:<ReglagesStream/> },
       { id:'zoom', type:'panneau', nu:true, ic:'texte', lib:"Taille de l'affichage", val:valZoom, el:<ZoomSetting nu/> },
       urlWidget && { id:'widget', type:'panneau', nu:true, ic:'chart', lib:'Widget iPhone', desc:'Ton lien privé pour Scriptable', el:widget },
     ]},

@@ -142,6 +142,11 @@ en cours de route). Rien dans `vinted-sync-extension/`, `public/` remis à l'ide
     données… ») : aplat #0071E3 (4,2:1 / 3,6:1) → bleu lien `accentTexte` (`--vrm-b-lien` redéfini
     sur ces deux écrans — `fusion-app` F6 vert dans la zone).
 46. CSS mort de l'ancien champ de recherche des réglages → retiré.
+47. Mode stream : une ligne « Mode stream » qui ouvrait un sous-écran redisant « Mode stream »
+    → l'interrupteur DANS la liste (même état que « Stream » en haut) + « Ce que le stream cache »
+    (le programme) — `reglages-premium` passe de 4 rouges (base) à 0.
+48. Panneau du statut : « Régime fiscal » → `L.statut` ; le renvoi de la Compta dit
+    « Paramètres → Statut ».
 
 ## Preuves
 - `npm run build` vert.
@@ -161,10 +166,17 @@ en cours de route). Rien dans `vinted-sync-extension/`, `public/` remis à l'ide
   DANS la carte du profil : « même lettre » devient « une seule lettre ») ; `parametres-guides`
   (la croix de `ChampRecherche` au lieu du bouton « Effacer la recherche des paramètres ») ;
   `attente-email` (« Changer mon e-mail »).
-- Voisins et audits demandés : voir la fin (comparaison base/après).
+- Voisins et audits, base (`claude/project-review-nsk5su`, arbre construit à part) → après :
+  `jetons-coherence` 3 rouges (Stock, « au moins » en tnum, hors zone) → vert sur l'intégré ;
+  `composants` 274/0 ; `audit-rouge-doublon`, `audit-composants`, `audit-identite`,
+  `audit-icones`, `audit-fonctions-api`, `audit-coherence` (dans le dépôt), `audit-mode-stream`,
+  `audit-stock-2d` : verts avant et après ; bancs `centre-notifs` 98/0 → 98/0, `mode-stream`
+  vert → vert, `parametres-guides` 27 → 27, `nuage` vert → vert, `reglages-premium` 4 rouges →
+  197/0, `pont` : ses deux contrôles « dernière capture » adaptés à la source unique (2.29),
+  vert sur l'arbre intégré.
 - Captures (hors dépôt, regardées) : avant
   `scratchpad/h/shots-avant/` et `scratchpad/h/shots-banc-avant/`, après
-  `scratchpad/h/shots-banc-apres/` et `scratchpad/h/shots-v4/` (`ch-entete-*`, `ch-pastille-*`,
+  `scratchpad/h/shots-banc-apres/`, `scratchpad/h/shots-v4/` et `scratchpad/h/shots-final/` (`ch-entete-*`, `ch-pastille-*`,
   `ch-nuage-*`, `ch-reglages-*`, `ch-moncompte-*`, `ch-plus-*`, `ch-cloche-ranger-*`).
 
 ## Ce qui reste
