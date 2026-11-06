@@ -65,6 +65,12 @@ Des audits lisent les versions d'extension publiées dans `origin/main` : le job
 (`renum-b`, d'où le délai porté à 900 s). **Dernière passe (code final) : 319 audits
 en 957 s, 316 verts, 2 rouges connus, 1 rouge — `audit-boite-emails`, qui cherchait
 `tab==='emails'&&<Suspense` : il accepte maintenant le garde-fou autour (corrigé, vert).**
+Durées mesurées ici (machine chargée, un banc à la fois, nouveau code / arbre d'avant) :
+nouveau-vendeur 709 / 714 s (vert des deux côtés), navigation-tache 571 / 570 s,
+annonces-actions 625 / 616 s, iphone-reprise 392 s, journee-coherence 208 / 217 s,
+argent-mois 137 / 132 s, garde-ecrans 93 s, morceau-perime 86 s, colis-retirer-propre 70 s
+⇒ les parts font ~13 à ~20 min ICI ; en CI (4 cœurs pour soi) elles devraient tomber
+nettement sous la cible.
 Les 8 bancs du lot : `nouveau-vendeur` dépasse 10 min sur la machine chargée (il rend
 chaque écran à 2 largeurs × 2 thèmes) — d'où sa part à lui et un délai de 20 min par
 banc ; les autres ont tourné vert (navigation-tache, colis-retirer-propre…) mais leurs
