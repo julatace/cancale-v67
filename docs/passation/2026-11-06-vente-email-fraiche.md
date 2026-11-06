@@ -135,7 +135,9 @@ page passe (voir la cause) : le geste dit où regarder, la cause est dans l'exte
   1512 px, clair et sombre — une ligne pour la vente fraîche, aucune pour les cinq autres
   e-mails, aucun geste d'envoi, rien de coupé ; VENDU du mois +72 € (exactement), le même
   une fois la liste relue ; l'indicateur dit les ventes du compte 111 en retard, pas celles
-  du 222. Captures regardées. Sur le `dist/` d'avant : voir le rapport de la session.
+  du 222. Captures regardées. Sur le `dist/` de l'arbre d'avant (`BANC_DIST`, 390 et 1512,
+  clair) : **18 rouges** — aucune ligne pour la vente du matin, VENDU inchangé (188 € avec ou
+  sans l'e-mail), l'indicateur muet.
 - `npm run build`, `audit-identite`, `audit-coherence`, `audit-chiffres`, `audit-urssaf`,
   `audit-statuts`, `audit-tdz`, `audit-chrome-en-dur`, `audit-double-vente` : verts.
 
