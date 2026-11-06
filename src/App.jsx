@@ -34411,7 +34411,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     const onKey = (e) => {
       if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
       const t = e.target; if (t && (t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName))) return;
-      if (document.querySelector('[data-stock-modale]')) return;
+      if (document.querySelector('[data-stock-modale]') || document.querySelector('[data-inventaire]')) return;   // l'inventaire garde ses chiffres
       const m = /^(?:Digit|Numpad)(\d)$/.exec(e.code || '');
       if (!m) return;
       e.preventDefault(); setQ(m[1]); setCibles([]);

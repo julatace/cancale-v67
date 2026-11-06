@@ -67,6 +67,8 @@ const MUTATIONS = {
   'lecture-ko-ecrit': ["    if (!l || typeof l !== 'object') return { ok: false, raison: 'lecture', data: null, ecrit: false };", "    if (!l || typeof l !== 'object') l = { existe: true, data: {} };"],
   // Un conflit de `rev` pris pour un succès (l'autre appareil écrasé).
   'conflit-ignore': ["    if (r === 'ok') return { ok: true, raison: '', data: fusion, ecrit: true };", "    if (r === 'ok' || r === 'conflit') return { ok: true, raison: '', data: fusion, ecrit: true };"],
+  // Case par case : la case vue n'est plus comparée à la case notée.
+  'place-ignoree': ["      if (sl && sl.m != null && !e.cases.has(String(sl.m) + ':' + Number(sl.i))) pasASaPlace.push", "      if (false) pasASaPlace.push"],
   // « Terminé » ne se défait plus : « Reprendre » ne rouvre pas.
   'reprise-ignoree': ["export const enCours = (session) => estObjet(session) && !(Number(session.finAt) > Number(session.reprisAt || 0));", "export const enCours = (session) => estObjet(session) && !(Number(session.finAt) > 0);"],
 };
@@ -96,8 +98,13 @@ const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom
     const m = MUTATIONS[mut]; if (!m) { console.log('mutation inconnue : ' + mut); process.exit(2); }
     const src = fs.readFileSync(REGLE, 'utf8');
     if (!src.includes(m[0])) { console.log('❌ ancre de mutation introuvable : ' + mut); process.exit(1); }
-    // La copie vit À CÔTÉ de l'original (ses imports relatifs restent justes).
-    fichier = path.join(RACINE, 'src', `.inventaire-mutation-${mut}-${process.pid}.js`);
+    // La copie vit dans un dossier temporaire qui reproduit src/ et api/_lib/ (ses
+    // imports relatifs restent justes, et rien n'est jamais écrit dans le dépôt).
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-inventaire-'));
+    fs.mkdirSync(path.join(dir, 'src')); fs.mkdirSync(path.join(dir, 'api', '_lib'), { recursive: true });
+    fs.copyFileSync(path.join(RACINE, 'api', '_lib', 'numerotation.js'), path.join(dir, 'api', '_lib', 'numerotation.js'));
+    fs.writeFileSync(path.join(dir, 'package.json'), '{"type":"module"}');
+    fichier = path.join(dir, 'src', 'inventaire.js');
     fs.writeFileSync(fichier, src.replace(m[0], m[1]));
   }
   let R, S, N;
@@ -105,8 +112,8 @@ const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom
     R = await import(pathToFileURL(fichier).href);
     S = await import(pathToFileURL(path.join(RACINE, 'src', 'stockAnnonces.js')).href);
     N = await import(pathToFileURL(path.join(RACINE, 'api', '_lib', 'numerotation.js')).href);
-  } catch (e) { console.log('❌ la règle ne se charge pas : ' + e.message); if (fichier !== REGLE) try { fs.unlinkSync(fichier); } catch (_) {} process.exit(1); }
-  finally { if (fichier !== REGLE) try { fs.unlinkSync(fichier); } catch (_) {} }
+  } catch (e) { console.log('❌ la règle ne se charge pas : ' + e.message); process.exit(1); }
+  finally { if (fichier !== REGLE) try { fs.rmSync(path.dirname(path.dirname(fichier)), { recursive: true, force: true }); } catch (_) {} }
   const cle = N.cleNum;
 
   // ── L'attendu, fabriqué par la VRAIE chaîne du Stock (`annoncesActuelles`) ──
@@ -215,6 +222,16 @@ const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom
     const b = R.bilanInventaire({ session: s, stock: plein, cle });
     dit(b.doublons.map((v) => v.k + ':' + v.raison).join(',') === '1:cartons,2:conflit', 'I5 « 2ᵉ carton » dit sur N°1 et le conflit de N°2 ⇒ les deux en rouge, rien d’autre', JSON.stringify(b.doublons.map((v) => v.k + ':' + v.raison)));
     dit(R.compterVus(s) === 3, 'I5 un 2ᵉ carton compte un carton de plus (3)', String(R.compterVus(s)));
+  });
+
+  await essaie('I8 — case par case', () => {
+    let s = R.nouvelleSession({ maintenant: 1, id: 'inv-c' });
+    s = R.ajouterSaisie(s, { k: '1', at: 2, sid: 'a', c: 'm1:5' });   // N°1 est notée dans m1:1
+    s = R.ajouterSaisie(s, { k: '40', at: 3, sid: 'b', c: 'm1:5' });  // N°40 n'a pas de case notée
+    const b = R.bilanInventaire({ session: s, stock: plein, cle });
+    dit(b.pasASaPlace.length === 1 && b.pasASaPlace[0].k === '1' && b.pasASaPlace[0].notee.m === 'm1' && b.pasASaPlace[0].notee.i === 1, 'I8 N°1 vue dans m1:5, notée dans m1:1 ⇒ « pas dans sa case » ; N°40 (sans case notée) non', JSON.stringify(b.pasASaPlace.map((v) => [v.k, v.notee])));
+    let s2 = R.nouvelleSession({ maintenant: 1, id: 'inv-c2' }); s2 = R.ajouterSaisie(s2, { k: '1', at: 2, sid: 'a', c: 'm1:1' });
+    dit(R.bilanInventaire({ session: s2, stock: plein, cle }).pasASaPlace.length === 0, 'I8 N°1 vue dans SA case ⇒ rien à dire');
   });
 
   await essaie('I6 — la session et son écriture', async () => {

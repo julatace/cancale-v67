@@ -163,10 +163,21 @@ async function taper(pg, tel, txt, { ok = false } = {}) {
   if (ok) await toucher(pg, tel, '[data-inv-valider]'); else await pg.press('[data-inv-champ]', 'Enter');
   await pg.waitForTimeout(250);
 }
+// Ce qui est sous le centre d'un élément (un geste refusé dit QUI le couvre : un banc rapporte).
+const dessous = (pg, sel) => pg.evaluate((sel) => {
+  const el = document.querySelector(sel); if (!el) return 'absent';
+  const r = el.getBoundingClientRect(); const x = r.left + r.width / 2, y = r.top + r.height / 2;
+  const h = document.elementFromPoint(x, y);
+  return `${Math.round(x)},${Math.round(y)} ⇒ ${h ? (h.tagName + '.' + String(h.className || '').slice(0, 60) + ' ' + [...h.attributes].filter((a) => a.name.startsWith('data-')).map((a) => a.name).join(' ')) : 'rien'}${h && (h === el || el.contains(h)) ? ' (lui-même)' : ''}`;
+}, sel);
+async function cliquer(pg, tel, sel, timeout = 30000) {
+  try { if (tel) await pg.tap(sel, { timeout }); else await pg.click(sel, { timeout }); }
+  catch (e) { throw new Error(`${sel} : ${String(e && e.message).split('\n')[0]} — sous le doigt : ${await dessous(pg, sel).catch(() => '?')}`); }
+}
 async function ouvrirInventaire(pg, tel) {
   await pg.waitForSelector('[data-stock-inventaire-ouvrir]', { timeout: 25000 });
   await pg.waitForTimeout(800);
-  await toucher(pg, tel, '[data-stock-inventaire-ouvrir]');
+  await cliquer(pg, tel, '[data-stock-inventaire-ouvrir]');
   await pg.waitForSelector('[data-inventaire]', { timeout: 10000 });
 }
 
@@ -175,7 +186,9 @@ async function ouvrirInventaire(pg, tel) {
   const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom + ' : le scénario a tourné jusqu’au bout', String(e && e.message).split('\n')[0].slice(0, 300)); } };
   try {
     b = await chromium.launch({ executablePath: CHROMIUM, args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
-    for (const tel of [true, false]) for (const sombre of [false, true]) {
+    // BANC_SEUL=390|1512 : une seule largeur (pour chercher un défaut).
+    const tailles = process.env.BANC_SEUL === '390' ? [true] : (process.env.BANC_SEUL === '1512' ? [false] : [true, false]);
+    for (const tel of tailles) for (const sombre of [false, true]) {
       const t = `${tel ? '390 tactile' : '1512 souris'} ${sombre ? 'sombre' : 'clair'}`;
       const nomShot = (x) => (tel ? '390' : '1512') + (sombre ? '-sombre' : '-clair') + '-' + x;
       const base = nouvelleBase();
@@ -264,8 +277,9 @@ async function ouvrirInventaire(pg, tel) {
         dit(n3 === '6', `${t} : B — un autre appareil (stockage vide) retrouve l'inventaire par la ligne (6 N° vus)`, String(n3));
         await toucher(pg, tel, '[data-inv-terminer]');
         await pg.waitForTimeout(400);
-        const conf = await pg.$('button:has-text("Voir le bilan")');
-        if (conf) await conf.click();
+        await pg.waitForSelector('button:has-text("Voir le bilan")', { timeout: 8000 });
+        await pg.waitForTimeout(500);
+        await cliquer(pg, tel, 'button:has-text("Voir le bilan")');
         await pg.waitForSelector('[data-inv-vue="bilan"]', { timeout: 8000 }).catch(() => {});
         const bil = await pg.evaluate(() => { const el = document.querySelector('[data-inv-vue="bilan"]'); if (!el) return null; const l = (s) => [...el.querySelectorAll(`[data-inv-section="${s}"] [data-inv-bilan]`)].map((x) => x.getAttribute('data-inv-bilan')); return { manque: l('manque'), trop: l('trop'), vendus: l('vendus'), doublons: l('doublons'), passu: l('passu'), lectures: (el.querySelector('[data-inv-lectures-manquent]') || {}).innerText || '' }; });
         dit(bil && bil.manque.join(',') === '3,40', `${t} : C — manquent : N°3 (Vinted) et N°40 (eBay) ; jamais N°30 (compte pas lu)`, JSON.stringify(bil && bil.manque));
