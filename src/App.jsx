@@ -214,6 +214,8 @@ import { estIphoneSafari, estInstallee } from "./guideIphone.js";
 // (6 nov.) VRM ouvert à des clients : le mode exemple (données inventées, en mémoire
 // seulement) et le guide de démarrage (quatre étapes cochées sur une preuve lue).
 import { exempleActif, entrerModeExemple, sortirModeExemple } from "./modeExemple.js";
+// (6 nov., v36) Les temps réels chez les vendeurs, anonymes et agrégés (src/mesuresCollecte.js).
+import { demarrerMesures, mesuresEcran } from "./mesuresCollecte.js";
 import { GuideDemarrage, BandeauExemple } from "./GuideDemarrage.jsx";
 import { etatGuide, preuveExtension, preuveListe, preuveNombre, compterNumeros } from "./guideDemarrage.js";
 import { PHRASES_ECRAN } from "./phrasesEcran.js";
@@ -1072,6 +1074,9 @@ const onAuthChange = (fn) => { _authListeners.push(fn); return () => { _authList
 const _emitAuth = () => { _authListeners.forEach(fn => { try { fn(AUTH); } catch (_) {} }); };
 
 const readSession = () => { try { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch { return null; } };
+// (6 nov., v36) La session était-elle là au chargement de la page ? Sinon le « premier écran utile »
+// de l'ouverture compterait la saisie du mot de passe : il n'est pas mesuré (src/mesuresCollecte.js).
+const SESSION_AU_CHARGEMENT = (() => { try { return !!(readSession() || {}).access_token; } catch (_) { return false; } })();
 const writeSession = (s) => {
   if (AUTH.user?.id !== s?.user?.id) {
     vuesSession.clear(); try{const garder=!AUTH.user?.id&&s?.user?.id?s.user.id:null; viderParcours(sessionStorage,garder); viderParcours(localStorage,garder);}catch(_){} _prechargeComptes=null;
@@ -70466,6 +70471,9 @@ function AppCoeur() {
   const [tab,setTabBrut]=useState(()=>reprise0?reprise0.tab:'journee');
   // (6 nov.) L'écran ouvert et celui d'avant, pour « Signaler un problème ».
   noterEcranVu(tab);
+  // (6 nov., v36) Et pour les temps réels : une visite d'écran par onglet ouvert.
+  mesuresEcran(tab);
+  useEffect(() => { if (!exempleActif()) demarrerMesures({ jeton: () => (exempleActif() ? '' : String((readSession() || {}).access_token || '')), ouverture: SESSION_AU_CHARGEMENT }); }, []);
   // (27 oct., « des effets entre les pages ») Changer d'écran se VOIT : le
   // contenu arrive en fondu, d'un léger glissé (styles-mouvement.css). Rien
   // n'est remonté — on rejoue une classe sur `<main>` — et rien ne bouge si

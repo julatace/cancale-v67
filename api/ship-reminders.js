@@ -52,7 +52,9 @@ import { passageRelances } from './_lib/relances-essai.js';
 // (5 nov.) « Compte Vinted pas relu » : la règle (api/_lib/comptes-a-relire.js).
 import { comptesARelire, dernieresCaptures, texteComptesARelire, decisionRelecture, CAT_RELECTURE, ID_MEMO_RELECTURE, SELECT_CAPTURES } from './_lib/comptes-a-relire.js';
 // (6 nov., filet 4) La veille des plantages : le propriétaire prévenu d'un type JAMAIS VU (api/_lib/veille-plantages.js).
-import { passageVeillePlantages, ID_MEMO_VEILLE } from './_lib/veille-plantages.js';
+import { passageVeillePlantages, ID_MEMO_VEILLE, passageVeilleLenteurs, ID_MEMO_LENTEURS } from './_lib/veille-plantages.js';
+// (6 nov., v36) Les temps réels des vendeurs (agrégats journaliers, api/_lib/mesures-terrain.js).
+import { idJour as idJourMesures } from './_lib/mesures-terrain.js';
 // Après 240 s de cron, aucun e-mail de l'essai ne COMMENCE (la fonction s'arrête à 300 s).
 const RELANCES_JUSQUA_MS = 240000;
 
@@ -894,6 +896,25 @@ async function veilleDesPlantages(maintenant = Date.now()) {
   }));
 }
 
+// (6 nov., v36) LA VEILLE DES LENTEURS : les deux derniers jours d'agrégats du
+// PROPRIÉTAIRE (deux lignes bornées, `h` seul projeté), un p75 qui se dégrade de
+// plus de 30 % ⇒ une notification à lui (api/_lib/veille-plantages.js).
+async function veilleDesLenteurs(maintenant = Date.now()) {
+  const proprietaire = process.env.VRM_OWNER_UID || '';
+  return contexteVendeur.run({ owner: proprietaire }, () => passageVeilleLenteurs({
+    proprietaire, maintenant,
+    lireMemo: () => getRow(ID_MEMO_LENTEURS),
+    lireJours: async (jours) => {
+      const rows = await fetchPaginated(`app_data?owner=eq.${proprietaire}&id=in.(${jours.map(idJourMesures).join(',')})&select=id,h:data->h`);
+      if (!Array.isArray(rows)) return null;
+      const out = {}; for (const j of jours) { const r = rows.find((x) => x && x.id === idJourMesures(j)); out[j] = r && r.h && typeof r.h === 'object' ? r.h : null; }
+      return out;
+    },
+    ecrireMemo: (memo) => ecrireDedup(ID_MEMO_LENTEURS, memo),
+    envoyer: (notif) => sendPushToAll(notif),
+  }));
+}
+
 export default async function handler(req, res) {
   // CRON_SECRET est obligatoire : un endpoint public ne doit pas déclencher des envois.
   // (Vercel envoie « Authorization: Bearer <CRON_SECRET> » sur les crons).
@@ -954,7 +975,10 @@ export default async function handler(req, res) {
     // ne fait pas échouer les rappels déjà partis (elle est dite dans la réponse).
     let veille = null;
     if (!soir && !reveil) { try { veille = await veilleDesPlantages(debutCron); } catch (e) { veille = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; } }
-    res.status(echecs ? 500 : 200).json({ ok: !echecs, ...(soir ? { moment: 'soir' } : reveil ? { moment: 'reveil' } : {}), vendeurs: owners.length, echecs, bilans, ...(relances ? { relances } : {}), ...(veille ? { veille } : {}) });
+    // (6 nov., v36) Les lenteurs, le MATIN seulement ; une panne n'empêche rien d'autre.
+    let lenteurs = null;
+    if (!soir && !reveil) { try { lenteurs = await veilleDesLenteurs(debutCron); } catch (e) { lenteurs = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; } }
+    res.status(echecs ? 500 : 200).json({ ok: !echecs, ...(soir ? { moment: 'soir' } : reveil ? { moment: 'reveil' } : {}), vendeurs: owners.length, echecs, bilans, ...(relances ? { relances } : {}), ...(veille ? { veille } : {}), ...(lenteurs ? { lenteurs } : {}) });
   } catch (e) {
     // Une tâche planifiée qui répond 200 sur une panne n'apparaît nulle part :
     // le tableau de bord la compte réussie, et les rappels d'expédition
