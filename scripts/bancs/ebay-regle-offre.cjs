@@ -300,11 +300,27 @@ const sousOnglet = async (pg, nom) => {
   if (t === 'annonces') { const c = pg.locator('[data-tache-sous] [data-section="annonces"]'); if (await c.count() && (await c.first().getAttribute('aria-current')) !== 'page') await c.first().click(); }
   await pg.waitForTimeout(900);
 };
+// (6 nov.) Ouvrir la fiche d'une annonce (« … ») — sans la refermer si elle l'est déjà.
+async function ouvrirFiche(pg, id) {
+  const bt = pg.locator(`[data-ebay-carte-plus="${id}"]`);
+  if (await bt.count() && (await bt.first().getAttribute('aria-expanded')) !== 'true') await bt.first().click();
+  await pg.waitForSelector(`[data-ebay-fiche="${id}"]`, { timeout: 5000 });
+}
+async function ouvrirFiches(pg) {
+  for (let k = 0; k < 40; k++) {
+    const bt = pg.locator('[data-ebay-carte-plus][aria-expanded="false"]');
+    if (!(await bt.count())) break;
+    await bt.first().click(); await pg.waitForTimeout(60);
+  }
+}
 async function allerAnnonces(pg) {
   await pg.goto(`http://localhost:${PORT}/?tab=plat_ebay`, { waitUntil: 'domcontentloaded' });
   await pg.waitForSelector('#vrm-sel-compte-ebay', { timeout: 15000 });
   await sousOnglet(pg, 'Annonces');
   await pg.waitForSelector('[data-ebay-annonce]', { timeout: 12000 });
+  // (6 nov.) La règle d'offre vit dans la FICHE de chaque annonce (« … ») : le
+  // banc les ouvre toutes avant de lire, comme Julien touche « … ».
+  await ouvrirFiches(pg);
   // (11 octobre) Le VERDICT des ventes, rendu — jamais un délai : tant que les
   // ventes ne sont pas vérifiées, l'app grise « Définir / Modifier » (à raison).
   // Une attente fixe de 1,2 s faisait cliquer un bouton encore grisé quand la
@@ -728,7 +744,7 @@ async function finPage(pg, errs, quoi) {
         await sousOnglet(pg, 'Ventes');
         const n = regleoffres().length; lacher(); await pg.waitForTimeout(1500);
         dit(n === 2 && regleoffres().length === 2, `[9] ${T} changer de sous-onglet pendant le 2ᵉ envoi : plus AUCUN envoi après`, `${n} → ${regleoffres().length}`);
-        await sousOnglet(pg, 'Annonces'); await pg.waitForSelector('[data-ebay-annonce]', { timeout: 8000 }); await pg.waitForTimeout(600);
+        await sousOnglet(pg, 'Annonces'); await pg.waitForSelector('[data-ebay-annonce]', { timeout: 8000 }); await ouvrirFiches(pg); await pg.waitForTimeout(600);
         const li = await pg.$eval('[data-regles-lot-interrompu]', (e) => e.getAttribute('data-regles-lot-interrompu')).catch(() => null);
         dit(li === '2', `[9] ${T} au retour : « le dernier lot a été interrompu : 2 annonces non envoyées »`, String(li));
         await ctx.close();
@@ -779,7 +795,7 @@ async function finPage(pg, errs, quoi) {
             { body: { ok: true, ack: 'Success', regle: { lecture: { lu: true, offresActives: true, accepte: 72, refuse: 60, devise: 'EUR', prix: 85, offresFaites: 2, lueA: Date.now() }, tombee: false, avant: { accepte: 72, refuse: 60 } } } },
           ] } });
         await allerAnnonces(pg);
-        const ouvrirEdit = async () => { await pg.click(`[data-ebay-carte-ouvrir="${A.A1}"]`); await pg.waitForSelector(`[data-ebay-revise-ouvrir="${A.A1}"]`, { timeout: 5000 }); await pg.click(`[data-ebay-revise-ouvrir="${A.A1}"]`); await pg.waitForSelector(`[data-ebay-revise-prix="${A.A1}"]`, { timeout: 5000 }); };
+        const ouvrirEdit = async () => { await ouvrirFiche(pg, A.A1); await pg.waitForSelector(`[data-ebay-revise-ouvrir="${A.A1}"]`, { timeout: 5000 }); await pg.click(`[data-ebay-revise-ouvrir="${A.A1}"]`); await pg.waitForSelector(`[data-ebay-revise-prix="${A.A1}"]`, { timeout: 5000 }); };
         await ouvrirEdit();
         await pg.fill(`[data-ebay-revise-prix="${A.A1}"]`, '72'); await validerRevision(pg,A.A1); await pg.waitForTimeout(500);
         const msg1 = await pg.$eval(`[data-ebay-revise-msg="${A.A1}"]`, (e) => e.innerText).catch(() => '');
@@ -802,7 +818,7 @@ async function finPage(pg, errs, quoi) {
             { status: 422, body: { ok: false, error: 'Invalid AutoAccept price.', erreurs: [{ code: '23004', severite: 'Error', message: 'Invalid AutoAccept price.' }] } },
           ] } });
         await allerAnnonces(pg);
-        const ouvrirEdit = async () => { if (!await pg.locator(`[data-ebay-revise-ouvrir="${A.A1}"]`).count()) await pg.click(`[data-ebay-carte-ouvrir="${A.A1}"]`); await pg.waitForSelector(`[data-ebay-revise-ouvrir="${A.A1}"]`, { timeout: 5000 }); await pg.click(`[data-ebay-revise-ouvrir="${A.A1}"]`); await pg.waitForSelector(`[data-ebay-revise-prix="${A.A1}"]`, { timeout: 5000 }); };
+        const ouvrirEdit = async () => { await ouvrirFiche(pg, A.A1); await pg.waitForSelector(`[data-ebay-revise-ouvrir="${A.A1}"]`, { timeout: 5000 }); await pg.click(`[data-ebay-revise-ouvrir="${A.A1}"]`); await pg.waitForSelector(`[data-ebay-revise-prix="${A.A1}"]`, { timeout: 5000 }); };
         await ouvrirEdit();
         await pg.fill(`[data-ebay-revise-prix="${A.A1}"]`, '85'); await validerRevision(pg,A.A1); await pg.waitForTimeout(700);
         const msg = await pg.$eval(`[data-ebay-revise-msg="${A.A1}"]`, (e) => e.innerText).catch(() => '');
@@ -826,7 +842,7 @@ async function finPage(pg, errs, quoi) {
         // inchangé » : rien ne part, et c'est dit — jamais « ✓ Modifié sur eBay ».
         const { ctx, pg } = await ouvrir(b, vp);
         await allerAnnonces(pg);
-        await pg.click(`[data-ebay-carte-ouvrir="${A.A2}"]`); await pg.waitForSelector(`[data-ebay-revise-ouvrir="${A.A2}"]`, { timeout: 5000 });
+        await ouvrirFiche(pg, A.A2); await pg.waitForSelector(`[data-ebay-revise-ouvrir="${A.A2}"]`, { timeout: 5000 });
         await pg.click(`[data-ebay-revise-ouvrir="${A.A2}"]`); await pg.waitForSelector(`[data-ebay-revise-prix="${A.A2}"]`, { timeout: 5000 });
         const vus = [];
         for (const tape of ['72 €', '0', 'abc']) {
@@ -981,7 +997,7 @@ async function finPage(pg, errs, quoi) {
           await allerAnnonces(pg); await ouvrirPanneau(pg, A.A2);
           await saisir(pg, A.A2, 'accepte', seuil); await poser(pg, A.A2);
           const prixCarte = await carte(pg, A.A2).locator('[data-ebay-prix]').getAttribute('data-ebay-prix').catch(() => '');
-          await pg.click(`[data-ebay-carte-ouvrir="${A.A2}"]`); await pg.waitForSelector(`[data-ebay-revise-ouvrir="${A.A2}"]`, { timeout: 5000 });
+          await ouvrirFiche(pg, A.A2); await pg.waitForSelector(`[data-ebay-revise-ouvrir="${A.A2}"]`, { timeout: 5000 });
           await pg.click(`[data-ebay-revise-ouvrir="${A.A2}"]`); await pg.waitForSelector(`[data-ebay-revise-prix="${A.A2}"]`, { timeout: 5000 });
           const champ = await pg.inputValue(`[data-ebay-revise-prix="${A.A2}"]`);
           const champN = Number(String(champ).trim().replace(',', '.'));
@@ -1163,7 +1179,7 @@ async function finPage(pg, errs, quoi) {
         for (const actives of [null, false]) {
           const { ctx, pg } = await ouvrir(b, vp, { scen: { ['revise:' + A.A1]: [{ body: { ok: true, ack: 'Success', regle: { lecture: { lu: true, offresActives: actives, accepte: 72, refuse: 60, devise: 'EUR', prix: 85, offresFaites: 2, lueA: Date.now() }, tombee: false, avant: { accepte: 72, refuse: 60 } } } }] } });
           await allerAnnonces(pg);
-          await pg.click(`[data-ebay-carte-ouvrir="${A.A1}"]`); await pg.waitForSelector(`[data-ebay-revise-ouvrir="${A.A1}"]`, { timeout: 5000 });
+          await ouvrirFiche(pg, A.A1); await pg.waitForSelector(`[data-ebay-revise-ouvrir="${A.A1}"]`, { timeout: 5000 });
           await pg.click(`[data-ebay-revise-ouvrir="${A.A1}"]`); await pg.waitForSelector(`[data-ebay-revise-prix="${A.A1}"]`, { timeout: 5000 });
           await pg.fill(`[data-ebay-revise-prix="${A.A1}"]`, '85'); await validerRevision(pg,A.A1);
           await pg.waitForSelector(`[data-ebay-revise-msg="${A.A1}"]`, { timeout: 8000 }).catch(() => {});

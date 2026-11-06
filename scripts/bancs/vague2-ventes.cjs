@@ -35,7 +35,9 @@ const PORT = NV.PORT;
 const liste = (v, d) => String(process.env[v] || d).split(',').map((x) => x.trim()).filter(Boolean);
 const LARGEURS = liste('LARGEURS', '390,1512').map(Number);
 const THEMES = liste('THEMES', 'clair,sombre');
-const SCENES = liste('SCENES', 'R,J,A,M,S');
+// (6 nov., finitions) P : « Plus tard » revient au bout de 7 jours ; N : un N° d'archive remis en vente
+// entre dans « nouveaux numéros à écrire sur tes cartons » (docs/passation/2026-11-06-finitions.md).
+const SCENES = liste('SCENES', 'R,J,A,M,S,P,N');
 const SHOTS = process.env.SHOTS || '';
 
 let ko = 0;
@@ -146,7 +148,70 @@ async function passe(nav, { W, theme }) {
   const sombre = theme === 'sombre', tel = W < 600;
   const T = `[${W}px ${theme}]`;
   const nomS = (x) => `v2-${W}-${theme}-${x}`;
-  const ouvrir = async (tab) => { const base = { lignes: jeu(), comptes: COMPTES, ecritures: 0 }; const o = await NV.ouvrir(nav, { W, sombre, base, tab }); await o.pg.waitForTimeout(1500); return { ...o, base }; };
+  const ouvrir = async (tab, modif = null) => { const lignes = jeu(); if (modif) modif(lignes); const base = { lignes, comptes: COMPTES, ecritures: 0 }; const o = await NV.ouvrir(nav, { W, sombre, base, tab }); await o.pg.waitForTimeout(1500); return { ...o, base }; };
+  const mainDe = (l) => l.find((x) => x.id === 'main').data;
+
+  // ── P (6 nov., finitions) : « Plus tard » revient au bout de 7 jours ──
+  // 51001 reportée il y a 8 jours (revenue), 51002 il y a 2 jours (encore de côté) ; 52001 jamais reportée.
+  if (SCENES.includes('P')) {
+    const report = (l) => { mainDe(l).vrm_achat_plus_tard = { 51001: iso(8), 51002: iso(2) }; };
+    const o = await ouvrir('journee', report);
+    await attendre(o.pg, '[data-job="achat-a-relier"]', 20000);
+    await calme(o.pg);
+    const j = await o.pg.evaluate(() => { const e = document.querySelector('[data-job="achat-a-relier"]'); return e ? { n: e.getAttribute('data-n'), t: e.innerText.replace(/\s+/g, ' ') } : null; });
+    dit(j && j.n === '2', 'P', `${T} Ma journée : « 2 annonces sans achat relié » — reportée il y a 8 j, elle REVIENT ; il y a 2 j, elle reste de côté`, JSON.stringify(j));
+    await o.pg.locator('[data-job="achat-a-relier"]').first().scrollIntoViewIfNeeded().catch(() => {});
+    await capture(o.pg, nomS('plus-tard-journee'));
+    dit(!o.journal.erreurs.length, 'G', `${T} Plus tard (Ma journée) : aucune erreur JS`, o.journal.erreurs.join(' ¦ '));
+    await o.ctx.close();
+    const a = await ouvrir('cat_annonces', report);
+    await attendre(a.pg, '[data-vue-sans-achat]', 20000);
+    const f0 = await a.pg.evaluate(() => (document.querySelector('[data-vue-sans-achat]') || { getAttribute: () => null }).getAttribute('data-vue-sans-achat'));
+    await clic(a.pg, '[data-vue-sans-achat]');
+    await attendre(a.pg, '[data-ar-ligne]', 8000);
+    await a.pg.waitForTimeout(800); await calme(a.pg);
+    const l = await a.pg.evaluate(() => [...document.querySelectorAll('[data-ar-ligne]')].map((x) => ({ id: x.getAttribute('data-ar-ligne'), pt: x.hasAttribute('data-ar-plus-tard'), rep: x.getAttribute('data-ar-reportee'), sous: ((x.querySelector('.vrm-ar-sous') || {}).textContent || '').trim(), gestePlusTard: !!x.querySelector('[data-ar-plus-tard-geste]') })));
+    const p = Object.fromEntries(l.map((x) => [x.id, x]));
+    dit(l.map((x) => x.id + (x.pt ? '*' : '')).join(',') === '51001,52001,51002*', 'P', `${T} la file : 51001 revenue à SA place (la plus ancienne), 51002 encore en fin de file`, JSON.stringify(l.map((x) => x.id + (x.pt ? '*' : ''))));
+    dit(p['51001'] && p['51001'].rep === iso(8).slice(0, 10) && /reportée le/.test(p['51001'].sous) && !/revient/.test(p['51001'].sous) && p['51001'].gestePlusTard, 'P', `${T} 51001 dit « reportée le … » (et « Plus tard » se repose)`, JSON.stringify(p['51001']));
+    dit(p['51002'] && /reportée le .+ · revient le /.test(p['51002'].sous) && !p['51002'].gestePlusTard, 'P', `${T} 51002 dit « reportée le … · revient le … »`, JSON.stringify(p['51002']));
+    dit(f0 === '3', 'P', `${T} le filtre compte toujours les 3 (une reportée reste visible)`, f0);
+    await a.pg.locator('[data-ar]').first().scrollIntoViewIfNeeded().catch(() => {});
+    await capture(a.pg, nomS('plus-tard-file'));
+    const g = await GENERAL(a.pg, tel, '[data-ar]');
+    dit(!g.rouges.length && !g.debord, 'G', `${T} Plus tard (file) : ni rouge, ni débord`, JSON.stringify(g));
+    dit(!a.journal.erreurs.length, 'G', `${T} Plus tard (file) : aucune erreur JS`, a.journal.erreurs.join(' ¦ '));
+    await a.ctx.close();
+  }
+
+  // ── N (6 nov., finitions) : la vente 62101 (N° d'archive B230) remise en vente ──
+  // SON clic a désigné la nouvelle annonce 51006 (`vrm_repub_main`, `numArchive`). Elle reçoit un N°
+  // NEUF ; l'ancien B230 est écrit sur le carton : « nouveaux numéros à écrire sur tes cartons »
+  // (la liste `reattribueAEcrire`) jusqu'à « C'est écrit ».
+  if (SCENES.includes('N')) {
+    const o = await ouvrir('cat_annonces', (l) => {
+      mainDe(l).vrm_repub_main = { 51901: { uid: '111', num: '', titre: 'Converse Chuck 70 noire taille 41', domain: 'www.vinted.fr', at: iso(0.3), annulee: true, tx: '62101', numArchive: 'B230', nouvelId: '51006', nouveauTitre: 'Converse Chuck 70 noire taille 41', lieAt: iso(0.2) } };
+      l.find((x) => x.id === 'harvest_111_listings').data.payload.items.push(annonce(51006, 'Converse Chuck 70 noire taille 41', 48, 0.25, { brand_title: 'Converse', size_title: '41' }));
+    });
+    const vu = await attendre(o.pg, '[data-a-ecrire="51006"]', 25000);
+    await calme(o.pg);
+    const e = await o.pg.evaluate(() => { const x = document.querySelector('[data-a-ecrire="51006"]'); return x ? { de: x.getAttribute('data-a-ecrire-de'), vers: x.getAttribute('data-a-ecrire-vers'), t: x.innerText.replace(/\s+/g, ' ') } : null; });
+    // L'écriture de la fiche part au rythme de la sauvegarde : on l'attend (jamais un délai fixe seul).
+    await ecriture(o.base, (m) => { const f = (m.vinted_annonce_numeros || {})['51006']; return f && f.reattribue; }, 15000);
+    const fiche = (lignesMain(o.base).vinted_annonce_numeros || {})['51006'] || {};
+    dit(vu && e && e.de === 'B230' && e.vers && /^\d+$/.test(e.vers) && e.vers === String(fiche.numero), 'N', `${T} la nouvelle annonce a un N° NEUF et entre dans « à écrire sur tes cartons » : B230 → N°${e && e.vers}`, JSON.stringify({ e, fiche }));
+    dit(e && /Ancien numéro : il ne se redonne pas/.test(e.t) && /C.est écrit/.test(e.t), 'N', `${T} la ligne dit pourquoi (« Ancien numéro : il ne se redonne pas ») et porte « C’est écrit »`, e && e.t);
+    dit(fiche.reattribue && fiche.reattribue.archive === true && fiche.reattribue.de === 'B230', 'N', `${T} écrit sur la fiche par la règle existante (\`reattribue\`, archive)`, JSON.stringify(fiche.reattribue));
+    await o.pg.locator('[data-a-ecrire="51006"]').first().scrollIntoViewIfNeeded().catch(() => {});
+    await capture(o.pg, nomS('archive-a-ecrire'));
+    await o.pg.locator('[data-a-ecrire="51006"] button').filter({ hasText: /C.est écrit/ }).first().click().catch(() => {});
+    const ecrit = await ecriture(o.base, (m) => { const f = (m.vinted_annonce_numeros || {})['51006']; return f && f.reattribue && f.reattribue.ecrit; });
+    await o.pg.waitForTimeout(1500);
+    const reste = await o.pg.evaluate(() => !!document.querySelector('[data-a-ecrire="51006"]'));
+    dit(ecrit && !reste, 'N', `${T} « C’est écrit » : la ligne sort, et ne revient pas`, JSON.stringify({ ecrit, reste }));
+    dit(!o.journal.erreurs.length, 'G', `${T} Archive à écrire : aucune erreur JS`, o.journal.erreurs.join(' ¦ '));
+    await o.ctx.close();
+  }
 
   // ── R + B : Ventes · Vinted ──
   if (SCENES.includes('R')) {
@@ -184,7 +249,7 @@ async function passe(nav, { W, theme }) {
     await clic(o.pg, '.vrm-sale-row[data-tx="62100"] [data-remettre-vente]');
     const sheet = await attendre(o.pg, '[data-repub-main="51900"]', 6000);
     await o.pg.waitForTimeout(1200);
-    const s = await o.pg.evaluate(() => { const f = document.querySelector('[data-repub-main]'); if (!f) return null; return { annulee: !!f.querySelector('[data-main-annulee]'), supprime: /supprime l’ancienne/.test(f.innerText), titre: (f.querySelector('h2') || {}).textContent || '', desc: !!(f.querySelector('[data-main-champ="description"] .vrm-main-valeur') || {}).textContent && /deux fois/.test(f.querySelector('[data-main-champ="description"] .vrm-main-valeur').textContent) }; });
+    const s = await o.pg.evaluate(() => { const f = document.querySelector('[data-repub-main]'); if (!f) return null; return { annulee: !!f.querySelector('[data-main-annulee]'), supprime: /supprime l’ancienne/.test(f.innerText), titre: ((f.querySelector('h2') || {}).textContent || '') + ' ' + ((f.querySelector('[data-main-num]') || {}).textContent || ''), desc: !!(f.querySelector('[data-main-champ="description"] .vrm-main-valeur') || {}).textContent && /deux fois/.test(f.querySelector('[data-main-champ="description"] .vrm-main-valeur').textContent) }; });
     dit(sheet && s && s.annulee && !s.supprime && /N°7/.test(s.titre) && s.desc, 'R', `${T} le geste ouvre « Republier à la main » depuis le coffre : N°7, description, « rien à supprimer »`, JSON.stringify(s));
     dit(o.base.ecritures === avant, 'R', `${T} ouvrir la remise n’écrit rien (jamais automatique : SON clic sur Vinted)`, `${avant} → ${o.base.ecritures}`);
     await capture(o.pg, nomS('remise-main'));

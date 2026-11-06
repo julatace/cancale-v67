@@ -52,6 +52,7 @@ let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 catch (_) { ({ chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 const { metaVersData } = require('./_meta.cjs');
+const { getPath } = require('./_minipgrest.cjs');
 const fs = require('fs'), http = require('http');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 8940;
@@ -130,9 +131,15 @@ const ouvrir = async (b, tel, tab, options = {}) => {
         for (const champ of sel.split(',')) {
           if (champ === 'id') { o.id = r.id; continue; }
           if (champ === 'data') { o.data = r.data; continue; }
-          const m = /^([a-z_]+):data->(.+)$/i.exec(champ); if (!m) continue;
-          let v = r.data; for (const p of m[2].split(/->>?/)) v = v == null ? v : v[p];
-          o[m[1]] = (v != null && /->>/.test(m[2])) ? String(v) : v;
+          if (champ === 'updated_at') { o.updated_at = cap; continue; }
+          // (6 nov.) Le chemin JSON se lit comme PostgREST (`getPath` du mini PostgREST
+          // des bancs : `->>` = texte, absent ⇒ `null`). Le banc lisait
+          // `cap:data->>capturedAt` comme la clé « >capturedAt », toujours absente :
+          // depuis la lecture projetée des dressings (vitesse 2, `SEL_MOISSON`), le
+          // dressing servi n'avait plus de date de lecture — « à confirmer », donc hors
+          // des annonces sans numéro de la cloche. Une fiction (§6.3), pas l'app.
+          const m = /^([a-z_]+):(data->.+)$/i.exec(champ); if (!m) continue;
+          o[m[1]] = getPath(r, m[2]);
         }
         return o;
       }
@@ -218,7 +225,12 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
           dit(exp.join('|') === 'garage|achats|emails' && !col.toutes.includes('retraits'), 'J. colonne, « Gérer » : Stock, Achats, E-mails ; aucune entrée « Colis à retirer »', exp.join('|'));
           const plat = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sidebar [data-nav-groupe="Plateformes"] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')));
           dit(plat.join('|') === 'plat_ebay|plat_leboncoin|plat_vestiaire', 'J. colonne, « Plateformes » : eBay · Leboncoin · Vestiaire', plat.join('|'));
-          const cpt = await pg.evaluate(() => { const o = Object.fromEntries([...document.querySelectorAll('.vrm-sidebar [data-badge-nav]')].map((b) => [b.getAttribute('data-badge-nav'), b.getAttribute('data-badge-n')])); try { o.pubR = String(JSON.parse(localStorage.getItem('vrm_colis_retirer')).total); } catch (_) {} return o; });
+          // (6 nov.) La cloche se calcule après ses lectures (passage asynchrone) : sur une
+          // machine chargée, 2,8 s ne suffisaient pas toujours (rouge intermittent, mesuré
+          // sur 505fe3e6 avec quatre bancs en parallèle, vert seul). On attend SON résultat
+          // (§6.5 : jamais un délai fixe), borné ; absent au bout, le contrôle reste rouge.
+          await pg.waitForFunction(() => document.querySelector('.vrm-sidebar [data-badge-nav="annonces"]'), null, { timeout: 15000 }).catch(() => {});
+          const cpt =await pg.evaluate(() => { const o = Object.fromEntries([...document.querySelectorAll('.vrm-sidebar [data-badge-nav]')].map((b) => [b.getAttribute('data-badge-nav'), b.getAttribute('data-badge-n')])); try { o.pubR = String(JSON.parse(localStorage.getItem('vrm_colis_retirer')).total); } catch (_) {} return o; });
           // (5 nov., chantier H — revue 2.32) UN COLIS SE COMPTE UNE FOIS (§7 : le même nombre ne
           // s'écrit jamais deux fois sur un écran) : les colis à poster portent le badge de Colis,
           // l'écran qui les envoie ; Ventes ne le recopie plus (`audit-coque-parametres`,

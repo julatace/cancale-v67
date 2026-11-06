@@ -15,6 +15,10 @@
 // annonces) sont rouges ; seule la vente dont l'identité (`item`) EST l'annonce
 // est dispensée. Et `doublonsAReattribuer` (20 oct.) ne devine rien : une vente
 // sans identité ne fait renuméroter aucune annonce.
+// (6 nov., finitions) UNE PAIRE EN LIGNE DEUX FOIS : des annonces qu'un groupe de la carte
+// ambre « en ligne deux fois » réunit (photo exacte ou `recreeDe`, src/enLigneDeuxFois.js)
+// ne sont pas deux paires — pas de rouge ; tout autre cas (groupe absent, partiel, deux
+// cases, une annonce de plus) reste rouge.
 // `--prouve` : chaque réaffaiblissement (le titre revient, l'identité ignorée,
 // deux ventes dispensées, la vente sans identité renumérote) doit rendre
 // l'audit ROUGE.
@@ -32,6 +36,10 @@ const MUTATIONS = {
   deux_ventes: (s) => s.replace("if (!v || !a) return false;", "if (!v) return false; if (!a) { const w = uniq.find(x => x !== v); return !!(w && w.item != null && String(w.item) === String(v.item)); }"),
   // Une vente sans identité fait renuméroter l'annonce (on devinerait).
   doublon_devine: (s) => s.replace('      if (!item) continue;\n', ''),
+  // (6 nov.) Le groupe ambre ignoré (le rouge revient sur une paire prouvée) / un groupe PARTIEL dispense.
+  groupe_ignore: (s) => s.replace('if (uniq.length >= 2 && uniq.every(x => x.type === \'annonce\') && Array.isArray(memePaires)) {', 'if (false) {'),
+  groupe_partiel: (s) => s.replace('return memePaires.some(g => Array.isArray(g) && ids.every(id => g.some(y => String(y) === id)));', 'return memePaires.some(g => Array.isArray(g) && ids.some(id => g.some(y => String(y) === id)));'),
+  groupe_sans_annonces: (s) => s.replace("uniq.every(x => x.type === 'annonce') && Array.isArray(memePaires)", 'Array.isArray(memePaires)'),
 };
 const prouve = process.argv.includes('--prouve');
 
@@ -58,7 +66,7 @@ function lancer(src) {
   }
   const ctx = {}; vm.createContext(ctx);
   try { vm.runInContext(code, ctx); } catch (e) { console.log('❌ chargement : ' + e.message); return 1; }
-  const regle = (p) => { try { return ctx.regle(p); } catch (e) { return { erreur: e.message }; } };
+  const regle = (p, g) => { try { return ctx.regle(p, g); } catch (e) { return { erreur: e.message }; } };
   const nums = (r) => Array.isArray(r) ? r.map(c => String(c.numero)) : ['ERREUR ' + (r && r.erreur)];
   // doublonsAReattribuer (20 oct.), extraite telle quelle.
   let doublons = null;
@@ -126,6 +134,26 @@ function lancer(src) {
   verifie(nums(r).includes('40'), 'vente + son annonce + une troisième au même titre', JSON.stringify(nums(r)));
   r = regle({ '40': [annonce('777', T), { type: 'annonce', titre: T, id: '777', aConfirmer: true }] });
   verifie(nums(r).length === 0, 'la même annonce lue deux fois (en ligne + à confirmer) : une paire', JSON.stringify(nums(r)));
+
+  console.log('Une paire EN LIGNE DEUX FOIS, prouvée et dite par la carte ambre = pas de rouge (6 nov.)');
+  r = regle({ '7': [annonce('3001', 'Jordan'), annonce('3002', 'Jordan')] }, [['3001', '3002']]);
+  verifie(nums(r).length === 0, 'deux annonces au N°7 que la carte ambre réunit (même paire) : pas de rouge', JSON.stringify(nums(r)));
+  r = regle({ '7': [annonce('3001', 'Jordan'), annonce('3002', 'Jordan'), cas('A-1')] }, [['3001', '3002']]);
+  verifie(nums(r).length === 0, '… rangée dans sa case : toujours une paire', JSON.stringify(nums(r)));
+  r = regle({ '7': [annonce('3001', 'Jordan'), annonce('3002', 'Jordan')] }, []);
+  verifie(nums(r).includes('7'), 'la carte ambre se tait (lecture pas sûre, compte écarté…) : le rouge reste', JSON.stringify(nums(r)));
+  r = regle({ '7': [annonce('3001', 'Jordan'), annonce('3002', 'Jordan')] });
+  verifie(nums(r).includes('7'), 'aucun groupe passé : le rouge reste (comme avant)', JSON.stringify(nums(r)));
+  r = regle({ '7': [annonce('3001', 'Jordan'), annonce('3002', 'Jordan'), annonce('3003', 'Jordan')] }, [['3001', '3002']]);
+  verifie(nums(r).includes('7'), 'une TROISIÈME annonce hors du groupe : deux paires, rouge', JSON.stringify(nums(r)));
+  r = regle({ '7': [annonce('3001', 'Jordan'), annonce('3009', 'Jordan')] }, [['3001', '3002']]);
+  verifie(nums(r).includes('7'), 'un groupe qui ne contient qu’une des deux : rouge', JSON.stringify(nums(r)));
+  r = regle({ '7': [annonce('3001', 'Jordan'), annonce('3002', 'Jordan'), cas('A-1'), cas('B-2')] }, [['3001', '3002']]);
+  verifie(nums(r).includes('7'), 'la même paire, mais le N° dans DEUX cases (deux cartons) : rouge', JSON.stringify(nums(r)));
+  r = regle({ '7': [annonce('3001', 'Jordan'), vente('t7', 'Jordan', '3009')] }, [['3001', '3009']]);
+  verifie(nums(r).includes('7'), 'une vente à poster et une autre annonce : le groupe ne dispense que des ANNONCES — rouge', JSON.stringify(nums(r)));
+  r = regle({ '43': [annonce('a3', 'XT-6 40'), vente('t3', 'XT-6 40', 'a3')] }, [['x1', 'x2']]);
+  verifie(nums(r).length === 0, 'des groupes passés n’ôtent rien à la règle d’avant : une vente et SON annonce restent une paire', JSON.stringify(nums(r)));
 
   console.log('Doublons réglés seuls (20 oct.) — sans rien deviner');
   if (!doublons) verifie(false, 'doublonsAReattribuer se charge');

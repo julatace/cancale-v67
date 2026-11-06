@@ -108,7 +108,11 @@ const imp = (f) => import(require('url').pathToFileURL(path.join(SRC, f)).href);
   const a = APP.indexOf('async function sourcesExportDonnees()'), b = APP.indexOf('const telechargerFichier = (contenu, nom, type) =>', a);
   const bloc = a > 0 && b > a ? APP.slice(a, b).replace(/\/\/.*$/gm, '') : '';
   dit(!!bloc, 'X6 la lecture des sources existe');
-  dit(/lireTout\('id=like\.harvest_\*_orders_purchased&select=id,orders:data->payload->my_orders'\)/.test(bloc) && /lireTout\('id=like\.email_invoice_\*&select=id,number:/.test(bloc), 'X6 achats et factures lus PAGINÉS (lireTout) et PROJETÉS');
+  // (6 nov., vitesse 2) Les achats : ceux des comptes liés, par `lireAchatsLies` (paginée, projetée) — on juge SA lecture.
+  const la = (() => { const i = APP.indexOf('async function lireAchatsLies('); const j = APP.indexOf('\n}', i); return i >= 0 && j > i ? APP.slice(i, j) : ''; })();
+  const achatsLus = /lireTout\('id=like\.harvest_\*_orders_purchased&select=id,orders:data->payload->my_orders'\)/.test(bloc)
+    || (/lireAchatsLies\(/.test(bloc) && /select=id,orders:data->payload->my_orders/.test(la) && /lireTout\(`id=in\./.test(la) && /lireTout\(`id=like\.harvest_\*_orders_purchased/.test(la));
+  dit(achatsLus && /lireTout\('id=like\.email_invoice_\*&select=id,number:/.test(bloc), 'X6 achats et factures lus PAGINÉS (lireTout) et PROJETÉS');
   dit(!/select=(id,)?data\b(?!->)/.test(bloc), 'X6 jamais `select=data`');
   dit(!/method:\s*'(POST|PATCH|PUT|DELETE)'|save\(|modifierDonnee|\/api\//.test(bloc), 'X6 aucune écriture, aucun envoi : le zip est seulement téléchargé');
   dit(/\{ id:'donnees', type:'action', ic:'[a-z-]+', lib:'Exporter mes données', onClick:exporterMesDonnees, data:\{ 'data-exporter-donnees':'' \} \}/.test(APP), 'X6 Paramètres → « Exporter mes données », sans texte explicatif');

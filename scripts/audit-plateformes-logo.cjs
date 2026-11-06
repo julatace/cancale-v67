@@ -182,7 +182,10 @@ const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   dit(/if \(ann && ann\.accountName && idAnn === id\) return/.test(APP), 'D18 Leboncoin : le nom d’une annonce seulement si elle porte LE MÊME compte (jamais un voisin)');
   dit(!/compte=\{compteVenteEbay\(o, comptesEbay\)\} sous=\{\(o\._pseudo/.test(APP) && !/meta=\{<>\{statut\}[^\n]*_pseudo/.test(APP), 'D19 eBay : le pseudo écrit une fois (ni dans `sous`, ni dans le détail)');
   dit(/<OngletManque site=\{site\} onglet=\{t\}/.test(APP) && /<OngletManque site=\{siteColis\} onglet="colis"/.test(APP), 'D9 un site sans compte : l’onglet dit ce qui manque et le geste (tâches et Colis)');
-  dit(/<EntreePublierAilleurs site="leboncoin"\/>/.test(APP) && /<EntreePublierAilleurs site="ebay"\/>/.test(APP) && /<EntreePublierAilleurs site="vestiaire"\/>/.test(APP), 'D10 « Publier ailleurs » joignable depuis Annonces · Leboncoin, eBay, Vestiaire');
+  // (6 nov., Julien : « eBay, c'est vraiment pas ouf ») Sur eBay, « Publier une annonce
+  // Vinted sur eBay » et « Vendre un article sur eBay » menaient au MÊME formulaire
+  // (`DEMANDE_EBAY_PAIRE`) : UNE entrée, « Vendre sur eBay » (`data-ebay-vendre`).
+  dit(/<EntreePublierAilleurs site="leboncoin"\/>/.test(APP) && (/<EntreePublierAilleurs site="ebay"\/>/.test(APP) || /data-ebay-vendre=""[\s\S]{0,200}data-poster="ebay"/.test(APP)) && /<EntreePublierAilleurs site="vestiaire"\/>/.test(APP), 'D10 « Publier ailleurs » joignable depuis Annonces · Leboncoin, eBay (« Vendre sur eBay »), Vestiaire');
   dit(/receptionDe=\{receptionAchatMs\}/.test(APP) && /const receptionAchatMs = React\.useCallback/.test(APP), 'D11 « Relier un achat » reçoit la date de réception lue (règle `dateReception`)');
 
   // (relecture du 5 nov.) « Relier un achat » s'ouvre depuis Ventes/Annonces : les dates de

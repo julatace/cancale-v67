@@ -1,0 +1,82 @@
+/* ── eBay → ANNONCES : LA CARTE (6 nov. 2026) ────────────────────────────────
+   Julien (captures iPhone) : « eBay, c'est vraiment pas ouf, les visuels peuvent
+   être clairement améliorés ». Chaque carte empilait quatre gestes en vrac sous
+   le texte (colonne décalée de 92 px), « pas reliée » en ambre sur chaque ligne,
+   la règle d'offre et « Modifier » sur la liste — une hauteur énorme.
+   Maintenant (§7, une forme par fonction) : photo · titre (2 lignes) · N° ·
+   prix ; UNE ligne d'état ; UN geste (« Relier » quand le lien manque) et « … »
+   qui ouvre la fiche (règle d'offre, modifier, offre aux observateurs, voir sur
+   eBay, supprimer — confirmé). Les classes `vrm-eb-*` sont neuves : les
+   anciennes règles `.vrm-ebay-carte*` (styles-mineral, styles-vitrine, en
+   !important) ne s'y appliquent plus. Couleurs : les jetons du thème
+   (clair / sombre choisi, `vinted_dark`), jamais une teinte en dur. */
+.vrm-eb-carte { border-top: 1px solid var(--vrm-line); }
+.vrm-ebay-liste > div:first-child > .vrm-eb-carte { border-top: 0; }
+.vrm-eb-tete { display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 16px; min-width: 0; }
+.vrm-eb-ouvrir {
+  flex: 1 1 auto; min-width: 0; min-height: 56px; display: flex; align-items: center; gap: 12px;
+  margin: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.vrm-eb-ouvrir:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: 2px; border-radius: 12px; }
+.vrm-eb-texte { min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.vrm-eb-titre {
+  font-size: 15px; font-weight: 600; line-height: 1.3; letter-spacing: -.01em; color: var(--vrm-ink);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere;
+}
+.vrm-eb-meta { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12px; line-height: 1.3; color: var(--vrm-muted); }
+.vrm-eb-etat { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.vrm-eb-droite { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.vrm-eb-prix { font-size: 17px; font-weight: 700; letter-spacing: -.02em; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--vrm-ink); padding-right: 6px; }
+.vrm-eb-gestes { display: flex; align-items: center; gap: 2px; }
+/* La fiche : sous la tête, alignée sur le texte de la carte (pas une colonne décalée). */
+.vrm-eb-fiche { padding: 2px 16px 14px; }
+.vrm-eb-regle { font-size: 13px; color: var(--vrm-muted); line-height: 1.45; padding: 6px 0 8px; font-variant-numeric: tabular-nums; }
+.vrm-eb-regle b { color: var(--vrm-ink); font-weight: 600; }
+.vrm-eb-fiche-gestes { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.vrm-eb-fiche-gestes [data-ebay-supprimer] { margin-left: auto; }
+.vrm-eb-panneau { margin: 0 16px 12px; }
+@media (max-width: 600px) {
+  .vrm-eb-tete { gap: 10px; padding: 10px 6px 10px 14px; }
+  .vrm-eb-ouvrir { gap: 10px; }
+  .vrm-eb-fiche { padding: 2px 14px 14px; }
+  .vrm-eb-fiche-gestes [data-ebay-supprimer] { margin-left: 0; }
+}
+
+/* ── LA TÊTE DE L'ÉCRAN : « À faire », « Vendre », la vente Vinted pas reliée ── */
+.vrm-eb-afaire { border: 1px solid var(--vrm-line); background: var(--vrm-surface); border-radius: 14px; margin: 0 0 12px; overflow: hidden; }
+.vrm-eb-afaire-titre { font-size: 13px; font-weight: 600; color: var(--vrm-muted); padding: 12px 16px 4px; }
+.vrm-eb-afaire-ligne {
+  width: 100%; display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 8px 12px 8px 16px; box-sizing: border-box;
+  margin: 0; border: 0; border-top: 1px solid var(--vrm-line); background: none; color: var(--vrm-ink); font: inherit; font-size: 14px; line-height: 1.35; text-align: left; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.vrm-eb-afaire-titre + .vrm-eb-afaire-ligne { border-top: 0; }
+.vrm-eb-afaire-ligne > span:nth-child(2) { flex: 1 1 auto; min-width: 0; }
+.vrm-eb-afaire-ligne b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.vrm-eb-afaire-ligne small { display: block; font-size: 12px; color: var(--vrm-muted); margin-top: 1px; }
+.vrm-eb-afaire-point { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--vrm-muted); }
+.vrm-eb-afaire-ligne[data-urgent="1"] .vrm-eb-afaire-point { background: var(--vrm-warn, #B25000); }
+.vrm-eb-afaire-ligne[aria-pressed="true"] { background: var(--vrm-card2); }
+.vrm-eb-afaire-ligne .vrm-eb-chevron { flex-shrink: 0; color: var(--vrm-muted); opacity: .7; }
+@media (hover: hover) and (pointer: fine) { .vrm-eb-afaire-ligne:hover { background: var(--vrm-card2); } }
+.vrm-eb-afaire-ligne:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: -2px; }
+
+/* La vente Vinted pas encore reliée : une phrase, le geste, une ligne par vente. */
+.vrm-eb-sanspreuve-vente { display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 44px; border-top: 1px solid var(--vrm-line); }
+.vrm-eb-sanspreuve-titre { flex: 1 1 0; min-width: 0; font-size: 14px; font-weight: 600; line-height: 1.3; color: var(--vrm-ink); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.vrm-eb-sanspreuve-titre small { display: block; font-size: 12px; font-weight: 500; color: var(--vrm-muted); }
+
+/* « Vendre sur eBay » : la forme de l'entrée « Publier ailleurs » (une ligne, une flèche), dans la colonne de l'écran. */
+.vrm-ebay-annonces .vrm-pa-entree.vrm-eb-vendre { margin: 0 0 12px; width: auto; }
+.vrm-ebay-annonces .vrm-eb-vendre button { min-height: 60px; font-weight: 600; }
+/* L'ancien gros bouton encre (styles-mobile-studio, styles-mineral en !important) ne s'applique plus à l'entrée. */
+.vrm-main .vrm-ebay-annonces .vrm-eb-vendre [data-poster="ebay"] {
+  background: var(--vrm-surface) !important; color: var(--vrm-ink) !important; border: 1px solid var(--vrm-line) !important;
+  border-radius: 14px !important; font-size: 15px !important; min-height: 60px !important; width: 100% !important; margin: 0 !important; padding: 8px 14px !important;
+  box-shadow: none !important;
+}
+.vrm-main .vrm-ebay-annonces .vrm-eb-vendre [data-poster="ebay"] small { color: var(--vrm-muted); font-weight: 400; margin-top: 1px; }
+.vrm-main .vrm-ebay-annonces .vrm-eb-vendre [data-poster="ebay"] > span:last-child { color: var(--vrm-muted); font-size: 20px; }
+/* « … » : un geste discret, à l'encre secondaire — l'accent reste rare (§7). */
+.vrm-main .vrm-eb-gestes .vrm-b[data-ebay-carte-plus] { color: var(--vrm-muted) !important; }

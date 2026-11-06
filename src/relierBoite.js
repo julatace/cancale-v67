@@ -74,6 +74,29 @@ export const MESSAGERIES = [
       { scene: 'code', titre: 'Garde une copie', geste: 'Choisis l’option qui garde aussi le message dans ta boîte, si elle existe.' },
       { scene: 'flux', titre: 'C’est en place', geste: 'Les menus changent d’une version à l’autre : si un nom ne correspond pas, cherche « filtre », « règle » ou « transfert ».' },
     ] },
+  // (6 nov., onglets C) Yahoo : le transfert automatique est réservé à Yahoo Mail Plus
+  // (payant) depuis le 15 janv. 2021, et il fait suivre TOUTE la boîte, sans filtre
+  // (help.yahoo.com/kb/SLN35503.html, SLN36684.html). On le DIT, avec le geste gratuit.
+  { id: 'yahoo', nom: 'Yahoo Mail', famille: 'Yahoo', regle: 'transfert',
+    etapes: [
+      { scene: 'reglages', titre: 'Le transfert de Yahoo est payant', geste: 'Yahoo ne fait suivre les e-mails qu’avec Yahoo Mail Plus, et il envoie alors TOUTE la boîte (pas seulement Vinted).' },
+      { scene: 'flux', titre: 'Le plus simple, gratuit', geste: 'Dans les paramètres du compte Vinted, remplace l’adresse e-mail par celle d’une boîte déjà reliée à VRM (Gmail ou iCloud).' },
+      { scene: 'adresse', titre: 'Avec Yahoo Mail Plus', geste: 'Sur ordinateur, dans Yahoo Mail : la roue → « Plus de paramètres » → « Boîtes aux lettres » → ta boîte → « Transfert » → colle l’adresse de VRM.' },
+      { scene: 'code', titre: 'Vérifie le transfert', geste: 'Yahoo envoie un lien de vérification à l’adresse de VRM. Si l’option « Transfert » n’apparaît pas, elle n’est pas disponible pour ton compte.' },
+    ] },
+  // (6 nov., onglets C) L'adresse « Masquer mon adresse » d'Apple (…@privaterelay.appleid.com) :
+  // ce n'est pas une boîte, c'est un relais. Apple fait suivre ses e-mails vers UNE boîte
+  // (« Transférer à ») ; il suffit que ce soit une boîte déjà reliée à VRM. Sources :
+  // support.apple.com/102571 (Se connecter avec Apple : « Transférer à », transfert par
+  // développeur) et support.apple.com/102548 (Masquer mon adresse e-mail, iCloud+).
+  // Mesuré le 6 nov. : les trois comptes Vinted sans aucun e-mail utilisent ce relais.
+  { id: 'relais-apple', nom: 'Masquer mon adresse (Apple)', famille: 'Adresse relais d’Apple', regle: 'relais',
+    etapes: [
+      { scene: 'reglages', titre: 'Ouvre « Masquer mon adresse »', geste: 'Sur l’iPhone : Réglages → ton nom → iCloud → « Masquer mon adresse e-mail ».' },
+      { scene: 'adresse', titre: 'Choisis où Apple fait suivre', geste: '« Transférer à » → choisis une boîte qui arrive DÉJÀ à VRM. Seules les adresses de ton compte Apple sont proposées.' },
+      { scene: 'code', titre: 'Le transfert doit être activé pour Vinted', geste: 'Réglages → ton nom → Connexion et sécurité → « Se connecter avec Apple » → Vinted : le transfert des e-mails doit être activé.' },
+      { scene: 'flux', titre: 'C’est en place', geste: 'Le prochain e-mail de Vinted pour ce compte arrive dans cette boîte, qui le fait suivre à VRM.' },
+    ] },
   { id: 'autre', nom: 'Autre messagerie', famille: 'Toutes les autres', regle: 'regles',
     etapes: [
       { scene: 'reglages', titre: 'Ouvre les paramètres', geste: 'Cherche « Paramètres », « Préférences » ou la roue.' },
@@ -90,10 +113,42 @@ export function regleFiltre(messagerie, ids) {
   const choisis = EXPEDITEURS.filter((x) => (ids || []).includes(x.id));
   if (!choisis.length) return { lignes: [], texte: '' };
   const m = MESSAGERIES.find((x) => x.id === messagerie) || MESSAGERIES[MESSAGERIES.length - 1];
+  // Yahoo (toute la boîte) et le relais d'Apple : aucune règle d'expéditeur à poser.
+  if (m.regle === 'transfert' || m.regle === 'relais') return { lignes: [], texte: '' };
   if (m.regle === 'filtre') {
     const texte = choisis.length === 1 ? choisis[0].mot : `${choisis.map((x) => x.mot).join(' OR ')}`;
     return { lignes: [texte], texte };
   }
   const lignes = choisis.map((x) => `L’expéditeur contient « ${x.mot} »`);
   return { lignes, texte: choisis.map((x) => x.mot).join('\n') };
+}
+
+// (6 nov., onglets C) Les mots de la scène animée selon la façon dont la messagerie
+// fait suivre : `filtre` (Gmail : adresse de transfert, code, filtre), `transfert`
+// (Yahoo : toute la boîte), `relais` (Apple : « Transférer à »), `regles` (une règle
+// par expéditeur). Pur : l'écran les dessine.
+export function motsScene(regle, expediteur) {
+  const de = `De : ${(expediteur && expediteur.mot) || 'vinted'}`;
+  if (regle === 'relais') return { menu: 'Masquer mon adresse e-mail', libAdresse: 'Transférer à', champAdresse: ADRESSE_EXEMPLE, bouton: 'OK', libCode: 'Vinted · transfert des e-mails', code: false, coche: 'Activé' };
+  if (regle === 'filtre' || regle === 'transfert') return { menu: regle === 'filtre' ? 'Voir tous les paramètres' : 'Plus de paramètres', libAdresse: 'Adresse de transfert', champAdresse: BOITE_VRM_EXEMPLE, bouton: regle === 'filtre' ? 'Ajouter' : 'Vérifier', libCode: 'Code de validation (exemple)', code: true, coche: '' };
+  return { menu: 'Réglages · Règles', libAdresse: 'Nouvelle règle', champAdresse: de, bouton: 'Suivant', libCode: 'Garder une copie dans ma boîte', code: false, coche: 'Copie gardée' };
+}
+
+// La messagerie d'une adresse, lue sur son DOMAINE : une SUGGESTION pour ouvrir le
+// bon pas-à-pas (il peut en choisir une autre) — jamais une identité.
+const DOMAINES = [
+  ['relais-apple', /^privaterelay\.appleid\.com$/],
+  ['gmail', /^(?:gmail|googlemail)\.com$/],
+  ['icloud', /^(?:icloud|me|mac)\.com$/],
+  ['outlook', /^(?:outlook|hotmail|live|msn)\.[a-z.]+$/],
+  ['yahoo', /^(?:yahoo\.[a-z.]+|ymail\.com)$/],
+  ['fai', /^(?:orange|wanadoo|sfr|neuf|free|aliceadsl|bbox)\.fr$/],
+];
+export function messagerieDeAdresse(adresse) {
+  const a = String(adresse || '').trim().toLowerCase();
+  const i = a.lastIndexOf('@');
+  if (i < 1) return 'autre';
+  const d = a.slice(i + 1);
+  for (const [id, re] of DOMAINES) if (re.test(d)) return id;
+  return 'autre';
 }

@@ -48,7 +48,10 @@
 'use strict';
 require('./_porte-banc.cjs');
 const path = require('path');
-const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
+const PW = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
+const { chromium } = PW;
+// (6 nov., filet 6) `NAVIGATEUR=webkit` : le moteur de Safari (_navigateur.cjs).
+const { lancer } = require('./_navigateur.cjs');
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http');
 const DIST = path.join(__dirname, '..', '..', 'dist');
@@ -207,7 +210,7 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
 
 (async () => {
   await new Promise((res) => srv.listen(PORT, res));
-  const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader'] });
+  const b = await lancer(PW, { executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader'] });
   try {
     if (!PARTIE || PARTIE === 'B') for (const sombre of [false, true]) for (const mode of ['tel', 'se']) {
       const qui = `${mode === 'se' ? '375×667' : '390×844'} ${sombre ? 'sombre' : 'clair'}`;

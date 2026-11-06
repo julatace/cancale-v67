@@ -17,11 +17,9 @@ import React,{useEffect,useState,useRef} from 'react';
 // (5 nov., chantier G) Messages · eBay : « Actualiser » est le bouton commun (jetons), plus un bouton aux couleurs écrites en dur.
 import {BoutonBase} from './composants/Bouton.jsx';
 
-export function ResponsiveChatPortal({children}){
- const [mobile,setMobile]=useState(()=>window.matchMedia('(max-width:767px)').matches);
- useEffect(()=>{const m=window.matchMedia('(max-width:767px)'),change=()=>setMobile(m.matches);m.addEventListener('change',change);return()=>m.removeEventListener('change',change);},[]);
- return mobile?createPortal(children,document.body):children;
-}
+// (6 nov., vitesse 2) Le portail des conversations vit dans ChatPortal.jsx : Messages
+// (Vinted) s'en sert sans charger les écrans eBay (chargés à la demande). Ré-exporté.
+export {ResponsiveChatPortal} from './ChatPortal.jsx';
 
 export {appelerEbay} from './ebayRequetes.js';
 const styleUI=C=>({input:{width:'100%',padding:'9px 10px',border:`1px solid ${C.border}`,borderRadius:12,color:C.text,background:C.card,fontFamily:'inherit',fontSize:13,boxSizing:'border-box'},button:{padding:'9px 12px',border:`1px solid ${C.border}`,borderRadius:12,color:C.text,background:C.card,fontFamily:'inherit',fontSize:12,fontWeight:600,cursor:'pointer'},label:{display:'grid',gap:5,fontSize:12,color:C.muted}});

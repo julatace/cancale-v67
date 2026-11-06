@@ -304,6 +304,14 @@ async function versAnnoncesEbay(pg) {
   await pg.waitForSelector('[data-ebay-annonce]', { timeout: 15000 }).catch(() => {});
   await pg.waitForSelector('[data-ebay-retirer-vinted]', { timeout: 6000 }).catch(() => {});
   await pg.waitForTimeout(1200);
+  // (6 nov.) L'offre aux observateurs et « Changer l'article relié » vivent dans
+  // la FICHE de chaque annonce (« … ») : le banc les ouvre, comme Julien.
+  for (let k = 0; k < 40; k++) {
+    const bt = pg.locator('[data-ebay-carte-plus][aria-expanded="false"]');
+    if (!(await bt.count())) break;
+    await bt.first().click(); await pg.waitForTimeout(60);
+  }
+  await pg.waitForTimeout(300);
 }
 // ⚠️ Une feuille de confirmation se pose sur un voile FLOUTÉ (backdrop-filter) :
 //    en rendu logiciel (swiftshader), à 1512 px sur une page longue, chaque
@@ -487,7 +495,8 @@ const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scroll
         const relie = await pg.$eval('[data-ebay-annonce="110000000002"] [data-relie]', (e) => e.getAttribute('data-relie')).catch(() => null);
         dit(relie === '21', 'la carte affiche désormais la N°21', String(relie));
         // Un lien posé se CHANGE (la confirmation le promet) : depuis le détail.
-        await pg.click('[data-ebay-annonce="110000000003"] [role="button"]');
+        // (6 nov.) Le détail est la FICHE (« … ») — ouverte, jamais refermée ici.
+        { const bt = pg.locator('[data-ebay-carte-plus="110000000003"]'); if ((await bt.getAttribute('aria-expanded')) !== 'true') await bt.click(); }
         await pg.click('[data-relier-changer="110000000003"]', { timeout: 5000 });
         const panneau = await pg.$('[data-relier-panneau="110000000003"]');
         dit(!!panneau && !envois.some((x) => x.action === 'sku' && x.itemId === '110000000003'),

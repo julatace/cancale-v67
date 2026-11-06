@@ -20,6 +20,9 @@
 //      la carte ≥ 4,5:1 (3:1 pour un grand texte) contre le POINT LE PLUS CLAIR de son
 //      fond (l'arrêt le plus clair du dégradé, avec les voiles translucides au-dessus :
 //      la case à 10 % de blanc) ; et la couleur vient des jetons (`--vrm-sur-sombre*`).
+//   (6 nov., finitions) F : sur Colis, l'ancienne ligne de fraîcheur du bas n'est même plus RENDUE
+//      (elle était cachée par fusion.css) ; K : le « — » de la carte Compta lit l'encre des vides
+//      (`--vrm-sur-sombre-2`), plus le blanc plein.
 //  Réglages : `BANC_PORT` (9600–9649, 9610 par défaut), `LARGEURS=390,1512`,
 //  `THEMES=clair,sombre`, `POINTS=F,S,X,K`, `SHOTS=<dossier>` (captures à REGARDER),
 //  `BANC_DIST` (un autre dist/, pour juger la base). Un banc ne meurt pas : il rapporte.
@@ -142,8 +145,9 @@ const CONTRASTE = (pg) => pg.evaluate(() => {
   };
   const out = [];
   // La carte sombre (`CarteMois`) et la tête de Ma journée (même fond, `CarteStats` « nu » dedans).
-  for (const carte of document.querySelectorAll('.vrm-main .vrm-fu-carte, .vrm-main .vrm-fu-tete')) {
-    if (!vis(carte) || carte.parentElement.closest('.vrm-fu-carte, .vrm-fu-tete')) continue;
+  // (6 nov., finitions) + la carte sombre de Compta (`.vrm-compta-carte[data-fu-carte]`, une CarteStats nue dedans).
+  for (const carte of document.querySelectorAll('.vrm-main .vrm-fu-carte, .vrm-main .vrm-fu-tete, .vrm-main .vrm-compta-carte[data-fu-carte]')) {
+    if (!vis(carte) || carte.parentElement.closest('.vrm-fu-carte, .vrm-fu-tete, .vrm-compta-carte[data-fu-carte]')) continue;
     const page = carte.getAttribute('data-carte-stats') || carte.className.split(/\s+/).filter((c) => c.startsWith('vrm-fu-') && c !== 'vrm-fu-carte').join('.') || 'carte';
     const tw = document.createTreeWalker(carte, NodeFilter.SHOW_TEXT);
     const vus = new Set();
@@ -223,6 +227,12 @@ async function tourneeF(nav, { W, theme }) {
     const v = await VOIX(o.pg);
     await capture(o.pg, `v3-F-${nom.replace(/[^a-z]/gi, '')}-${W}-${theme}`);
     dit(v.length === 1, 'F', `${T} ${nom} : la fraîcheur des lectures dite par UNE voix (${v.length})`, JSON.stringify(v));
+    if (nom === 'Colis') {
+      // (6 nov., finitions) Une phrase par écran (§7) : la ligne du bas n'est plus rendue du tout — cachée, elle
+      // redisait la puce quand la carte du haut manquait. Aucune `FraicheurDonnees` dans le DOM de Colis.
+      const dom = await o.pg.evaluate(() => ({ ligne: document.querySelectorAll('.vrm-colis-fraicheur').length, puce: document.querySelectorAll('[data-comptes-a-relire]').length, phrase: [...document.querySelectorAll('.vrm-main [data-fraicheur-comptes]')].filter((e) => !e.classList.contains('vrm-etat-comptes')).length }));
+      dit(dom.ligne === 0 && dom.phrase === 0 && dom.puce === 1, 'F', `${T} Colis : l'ancienne ligne de fraîcheur n'est plus RENDUE (même cachée) ; la puce seule parle`, JSON.stringify(dom));
+    }
   }
   dit(!o.journal.erreurs.length, 'F0', `${T} aucune erreur JS`, o.journal.erreurs.join(' ¦ '));
   await o.ctx.close();
@@ -331,7 +341,7 @@ async function tourneeX(nav, { W, theme }) {
 async function tourneeK(nav, { W, theme }) {
   const T = `[K ${W}px ${theme}]`;
   const o = await ouvrir(nav, { W, theme, lignes: jeu(), tab: 'ventes' });
-  const ecrans = [['Ventes', '?tab=ventes', '[data-carte-stats]'], ['Annonces', '?tab=annonces&site=vinted', '[data-carte-stats]'], ['Colis', '?tab=cat_bord', '.vrm-fu-carte'], ['Ma journée', '?tab=journee', '.vrm-fu-tete'], ['Ventes Leboncoin', '?tab=ventes&site=leboncoin', '.vrm-fu-carte']];
+  const ecrans = [['Ventes', '?tab=ventes', '[data-carte-stats]'], ['Annonces', '?tab=annonces&site=vinted', '[data-carte-stats]'], ['Colis', '?tab=cat_bord', '.vrm-fu-carte'], ['Ma journée', '?tab=journee', '.vrm-fu-tete'], ['Compta', '?tab=compta', '.vrm-compta-carte'], ['Ventes Leboncoin', '?tab=ventes&site=leboncoin', '.vrm-fu-carte']];
   for (const [nom, q, sel] of ecrans) {
     await allerTab(o.pg, q);
     await o.pg.waitForSelector(sel, { timeout: 15000 }).catch(() => {});
@@ -342,6 +352,13 @@ async function tourneeK(nav, { W, theme }) {
     if (W === 1512 || nom === 'Ventes') await capture(o.pg, `v3-K-${nom.replace(/[^a-z]/gi, '')}-${W}-${theme}`, false);
     dit(m.length > 0, 'K', `${T} ${nom} : (contrôle du banc) une carte sombre est mesurée (${m.length} textes)`);
     dit(!mauvais.length, 'K', `${T} ${nom} : chaque texte de la carte sombre ≥ 4,5:1 (3:1 grand) sur son pire fond`, mauvais.slice(0, 6).map((x) => `${x.r}:1 ${x.fs}px « ${x.texte} » ${x.couleur} (${x.page})`).join(' ¦ '));
+    if (nom === 'Compta') {
+      // (6 nov., finitions) Le « — » d'un chiffre pas su : l'encre des vides (le jeton), comme sur toutes les cartes sombres.
+      const v = await o.pg.evaluate(() => { const e = document.querySelector('.vrm-main .vrm-compta-carte .vrm-fu-grand.is-vide'); const s = getComputedStyle(document.documentElement); return e ? { t: e.textContent.trim(), couleur: getComputedStyle(e).color, jeton: s.getPropertyValue('--vrm-sur-sombre-2').trim() } : null; });
+      const nums = (c) => (String(c || '').match(/[\d.]+/g) || []).map(Number).join(',');
+      dit(!!v && v.t === '—', 'K', `${T} Compta : (contrôle du banc) la carte rend un « — » (bénéfice pas su)`, JSON.stringify(v));
+      dit(!!v && nums(v.couleur) === nums(v.jeton), 'K', `${T} Compta : le « — » lit le jeton --vrm-sur-sombre-2 (plus le blanc plein)`, JSON.stringify(v));
+    }
   }
   // La couleur des textes secondaires vient des jetons (`--vrm-sur-sombre-2`), pas d'un blanc écrit à la main.
   const jet = await o.pg.evaluate(() => {

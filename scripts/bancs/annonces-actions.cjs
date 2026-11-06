@@ -10,7 +10,8 @@
 //   A. une sélection ⇒ UN carré « Actions possibles » : deux comptes mélangés ⇒
 //      tout grisé, raison dite ; deux annonces en ligne du compte de Chrome ⇒
 //      republier, modifier, en ligne → brouillon ; brouillon → en ligne grisé ; « à
-//      la main » une à la fois ; un brouillon ⇒ « brouillon → en ligne » ;
+//      la main » possible sur plusieurs (une par une, 6 nov.) ; un brouillon ⇒
+//      « brouillon → en ligne » ;
 //   V. AVANT de lancer, paire par paire, ce qui manque (description trop courte,
 //      couleur absente) avec le geste et le lien « Corriger sur Vinted » ;
 //   R. lancer ouvre le moteur existant (Republier) sur CES annonces, à l'étape
@@ -29,7 +30,7 @@
 const path = require('path'), fs = require('fs'), http = require('http'), os = require('os');
 const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
-const DIST = path.join(__dirname, '..', '..', 'dist');
+const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT || process.env.PORT) || 7943;
 const SHOTS = process.env.SHOTS || os.tmpdir();
 const CHROMIUM = process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium';
@@ -56,7 +57,11 @@ const ACCS = [{ id: 1, vinted_user_id: '111', login: 'compte_test', domain: 'www
 const MAIN = { vinted_annonce_numeros: { 9102: { numero: '42' }, 9103: { numero: '43' }, 9104: { numero: '44' }, 9110: { numero: '45' }, 9301: { numero: '50' } } };
 const lignes = (etat) => {
   // L'ancienne n'est plus en ligne : Vinted la rend fermée (même nombre d'annonces lues : une lecture plus courte ne remplacerait pas la plus riche, §4.2).
-  const i111 = ITEMS_111.map((x) => ((x.id === 9102 && etat.sans9102) || (x.id === 9110 && etat.sans9110) ? { ...x, is_closed: true } : x));
+  // (6 nov.) Les « nouvelles » annonces sont datées au moment où la page les LIT, pas au lancement du
+  // banc : sous charge, une vue passait 10 min après le départ et la règle « mise en ligne bien avant
+  // qu'il commence » (candidatsNouvelle) les écartait — un faux rouge de minuterie.
+  const mnt = Math.floor(Date.now() / 1000); const frais = { 9120: 60, 9121: 50 };
+  const i111 = ITEMS_111.map((x) => ((x.id === 9102 && etat.sans9102) || (x.id === 9110 && etat.sans9110) ? { ...x, is_closed: true } : x)).map((x) => (frais[x.id] ? { ...x, created_at_ts: mnt - frais[x.id] } : x));
   return [
     { id: 'main', data: MAIN },
     { id: 'harvest_111_listings', data: { capturedAt: auj.toISOString(), payload: { items: i111, pagination: { total_entries: i111.length } } } },
@@ -186,9 +191,14 @@ const debordement = (pg) => pg.evaluate(() => document.documentElement.scrollWid
           const teteMix = await pg.$eval('[data-actions-raison]', (x) => x.textContent).catch(() => '');
           // (6 nov., vague 2) « Prix mini… » n'agit au nom d'aucun compte (une écriture dans ses fiches) :
           //  il reste possible ; tout ce qui agit au nom d'un compte reste grisé.
-          const parCompte = mix.filter(([k]) => k !== 'mini');
-          dit(parCompte.length === 5 && parCompte.every(([, ok]) => ok === 'non') && /2 comptes/.test(teteMix), `A ${T} deux comptes mélangés ⇒ rien ne se lance au nom d’un compte, la raison dite`, mix.map((x) => x[0] + ':' + x[1]).join(' ') + ' / ' + teteMix);
+          // (6 nov.) « à la main » non plus (rien ne part d'ici ; une paire à la fois, chacune dit son compte).
+          const parCompte = mix.filter(([k]) => k !== 'mini' && k !== 'main');
+          dit(parCompte.length === 4 && parCompte.every(([, ok]) => ok === 'non') && /2 comptes/.test(teteMix), `A ${T} deux comptes mélangés ⇒ rien ne se lance au nom d’un compte, la raison dite`, mix.map((x) => x[0] + ':' + x[1]).join(' ') + ' / ' + teteMix);
           dit(mix.some(([k, ok]) => k === 'mini' && ok === 'oui'), `A ${T} « Prix mini… » reste possible sur deux comptes (rien ne part chez Vinted)`, mix.map((x) => x[0] + ':' + x[1]).join(' '));
+          dit(mix.some(([k, ok]) => k === 'main' && ok === 'oui'), `A ${T} « à la main » reste possible sur deux comptes (une paire à la fois, chacune avec son compte)`, mix.map((x) => x[0] + ':' + x[1]).join(' '));
+          // (6 nov., finitions) La phrase de tête dit JUSTE : ce qui se lance au nom d'un compte, et « Prix mini » possible.
+          dit(/Republier, modifier, brouillon, mise en ligne : un compte à la fois/.test(teteMix) && /Prix mini[^.]*: possible/.test(teteMix) && /à la main[^.]*: possible/.test(teteMix) && !/une action se lance sur un seul compte/.test(teteMix), `A ${T} deux comptes : la tête dit « … : un compte à la fois · Prix mini, Republier à la main : possible »`, teteMix);
+          if (vp.width < 600 && !sombre) await pg.screenshot({ path: nomF('deux-comptes') });
           await fermerFeuille(pg, '[data-actions-selection]');
           // A/V — deux annonces en ligne du compte de Chrome
           await cocher(pg, '9301'); await cocher(pg, '9103');
@@ -196,7 +206,8 @@ const debordement = (pg) => pg.evaluate(() => document.documentElement.scrollWid
           await pg.waitForSelector('[data-actions-selection="2"]', { timeout: 4000 });
           const oks = Object.fromEntries(await pg.$$eval('[data-action-sel]', (l) => l.map((x) => [x.getAttribute('data-action-sel'), x.getAttribute('data-action-sel-ok')])));
           dit(oks.recreer === 'oui' && oks.modifier === 'oui' && oks.versBrouillon === 'oui', `A ${T} republier, en ligne avec modifications, en ligne → brouillon possibles`, JSON.stringify(oks));
-          dit(oks.enLigne === 'non' && oks.main === 'non', `A ${T} « brouillon → en ligne » et « à la main » grisés (raison dite)`, JSON.stringify(oks));
+          // (6 nov.) « à la main » prend plusieurs annonces : une par une dans la feuille (« paire 1/2 »).
+          dit(oks.enLigne === 'non' && oks.main === 'oui', `A ${T} « brouillon → en ligne » grisé (raison dite), « à la main » possible sur les deux`, JSON.stringify(oks));
           const v = Object.fromEntries(await pg.$$eval('[data-act-paire]', (l) => l.map((x) => [x.getAttribute('data-act-paire'), x.getAttribute('data-act-codes')])));
           dit(/description/.test(v['9103'] || '') && v['9102'] === '', `V ${T} avant de lancer : la paire 9103 dit « description », la 9102 rien`, JSON.stringify(v));
           // K — `null` du dressing = pas lu : jamais « Couleur absente » / « Catégorie absente ».

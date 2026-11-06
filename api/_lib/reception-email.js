@@ -33,7 +33,21 @@ const lectureComptes=(lire,owner)=>Promise.all([
 export const JOURNAL_PAGE=20, JOURNAL_COMPTES=200;
 export const JOURNAL_TYPES={colis:['suivi'],bordereau:['bordereau'],vente:['vente','finalisation','vente-vestiaire'],achat:['achat'],messages:['offre','message','favori','action'],incompris:['ignoré'],autre:['connu-sans-action','information']};
 const PROJECTION='id,at:data->>at,etat:data->>etat,type:data->>type,subject:data->>subject,from:data->>from,sourceDate:data->>sourceDate,adresses:data->adresses,resume:data->resume,pieces:data->pieces';
-export async function lireJournalEmail({owner,url,headers,fetcher=fetch,page=0,etat='',type='',adresse='',boite='',compteSeul=false}){
+// (6 nov., onglets C) LA RECHERCHE de la boîte : quelques mots cherchés dans ce que
+// la ligne de suivi porte déjà (sujet, expéditeur, article lu, code de retrait, n°
+// de suivi) — côté base, sur TOUTES ses lignes (jamais « dans les 20 chargées »).
+// Le texte est réduit à des lettres, chiffres, espaces et `@ . _ - '` (aucune
+// virgule, parenthèse ni guillemet), puis mis entre guillemets : rien ne peut sortir
+// du filtre PostgREST. Moins de 2 caractères ⇒ aucun filtre.
+export function motsRecherche(q){
+ return String(q||'').normalize('NFC').replace(/[^\p{L}\p{N} @._'’-]+/gu,' ').replace(/\s+/g,' ').trim().slice(0,60);
+}
+export function filtreRecherche(q){
+ const m=motsRecherche(q);if(m.length<2)return '';
+ const motif='*'+m.split(' ').join('*')+'*';
+ return 'or='+encodeURIComponent('('+['data->>subject','data->>from','data->resume->>a','data->resume->>code','data->resume->>s'].map(c=>`${c}.ilike."${motif}"`).join(',')+')');
+}
+export async function lireJournalEmail({owner,url,headers,fetcher=fetch,page=0,etat='',type='',adresse='',boite='',cherche='',compteSeul=false}){
  if(!owner || owner==='00000000-0000-0000-0000-000000000000')throw Error('connexion-requise');
  const lire=lecteur({url,headers,fetcher}),o=encodeURIComponent(owner);
  const p=Math.max(0,Math.min(50,Number.parseInt(page,10)||0));
@@ -46,6 +60,8 @@ export async function lireJournalEmail({owner,url,headers,fetcher=fetch,page=0,e
  const adr=normAdresse(adresse);
  const parAdresse=adr&&adr.includes('@')&&adr.length<=254?`data->adresses=cs.${encodeURIComponent(JSON.stringify([adr]))}`:'';
  if(parAdresse)filtres.push(parAdresse);
+ const parMots=filtreRecherche(cherche);
+ if(parMots)filtres.push(parMots);
  const f=filtres.length?'&'+filtres.join('&'):'';
  // (revue du 5 nov.) Les compteurs suivent le COMPTE choisi (adresse de
  // réception) : sinon « Ventes 7 » s'affichait à côté d'une liste filtrée sur une
@@ -67,7 +83,7 @@ export async function lireJournalEmail({owner,url,headers,fetcher=fetch,page=0,e
   return {id:String(x.id),at:date(x.at),sourceDate:date(x.sourceDate),etat:['integre','a-verifier','erreur'].includes(x.etat)?x.etat:'a-verifier',type:String(x.type||'information').slice(0,40),subject:String(x.subject||'').slice(0,200),from:String(x.from||'').slice(0,160),adresses,compte:lies.length===1?{id:lies[0].id,nom:lies[0].nom}:null,compteAmbigu:lies.length>1,resume:r&&JSON.stringify(r).length<=600?r:null,pj:Array.isArray(x.pieces)?Math.min(x.pieces.length,PIECES_MAX):null};
  });
  const adresses=[...new Set([...declarees,...Object.values(correspondances).map(normAdresse).filter(a=>a.includes('@')&&!estAdresseCollectrice(a))])].map(a=>{const c=associes(a);return {adresse:a,nom:c.length===1?c[0].nom:''};});
- return {ok:true,page:p,parPage:JOURNAL_PAGE,suite:lignes.length>JOURNAL_PAGE,emails,compteurs:portee(compter(l)),adresses};
+ return {ok:true,page:p,parPage:JOURNAL_PAGE,suite:lignes.length>JOURNAL_PAGE,emails,compteurs:portee(compter(l)),adresses,cherche:parMots?motsRecherche(cherche):''};
 }
 function compter(l){
  const lignes=l.slice(0,JOURNAL_COMPTES);

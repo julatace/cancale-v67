@@ -44,6 +44,8 @@ import { codeLisible } from './journalEmail.js';
 import { requeteJsonBornee } from './requeteJsonBornee.js';
 import { LogoSite } from './SelecteurSites.jsx';
 import RelierBoite from './RelierBoite.jsx';
+import RelierCompte from './RelierCompte.jsx';
+import { phraseARelier } from './relierCompte.js';
 import { EtatPanne } from './composants/EtatPanne.jsx';
 import './boite-emails.css';
 
@@ -243,10 +245,35 @@ function useBords(ref, dep) {
   }, [ref, dep]);
 }
 
+// ── LES COMPTES DONT LES E-MAILS N'ARRIVENT PAS (6 nov., onglets C) ─────────
+// En tête de la boîte (et de « Relier ma boîte ») : la règle des comptes muets
+// (une PREUVE : des ventes sans leur e-mail), projetée par src/relierCompte.js.
+// UN geste par compte : « Relier la boîte de <compte> ». Rien si la lecture n'a
+// pas abouti (on n'accuse personne sur une panne) ou si tout arrive.
+function ARelier({ comptes, onRelier }) {
+  if (!Array.isArray(comptes) || !comptes.length) return null;
+  const n = comptes.length;
+  return <div className="vrm-boite-arelier" data-boite-a-relier={n} role="note">
+    <p className="vrm-boite-arelier-titre"><b>{n > 1 ? `${n} comptes n’envoient aucun e-mail à VRM` : 'Un compte n’envoie aucun e-mail à VRM'}</b> — {n > 1 ? 'leurs' : 'ses'} codes de retrait, bordereaux et messages n’arrivent pas.</p>
+    <ul>
+      {comptes.map((c) => <li key={c.uid} data-boite-a-relier-compte={c.uid}>
+        <span className="vrm-boite-arelier-qui"><b>{c.login}</b> · {phraseARelier(c)}</span>
+        <button type="button" className="vrm-boite-principal" data-boite-relier-compte={c.uid} onClick={() => onRelier(c.uid)}>Relier la boîte de {c.login}</button>
+      </li>)}
+    </ul>
+  </div>;
+}
+
 // ── LA BOÎTE ─────────────────────────────────────────────────────────────────
-function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier }) {
+function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete = null }) {
   const [rubrique, setRubrique] = useState('');
   const [adresse, setAdresse] = useState('');
+  // (6 nov., onglets C) « À vérifier » (l'état de la ligne, `etat=a-verifier` côté base) et la
+  // RECHERCHE (côté base, sur toutes ses lignes : api/_lib/reception-email.js `filtreRecherche`).
+  const [aVerif, setAVerif] = useState(false);
+  const [saisie, setSaisie] = useState('');
+  const [cherche, setCherche] = useState('');
+  useEffect(() => { const t = setTimeout(() => setCherche(saisie.trim().length >= 2 ? saisie.trim() : ''), 350); return () => clearTimeout(t); }, [saisie]);
   const [pages, setPages] = useState(undefined);
   const [lecture, setLecture] = useState(false);
   const [ouvert, setOuvert] = useState('');
@@ -266,6 +293,7 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier }) {
     try {
       const q = new URLSearchParams({ mode: 'journal', page: String(page) });
       if (rubrique) q.set('boite', rubrique); if (adresse) q.set('adresse', adresse);
+      if (aVerif) q.set('etat', 'a-verifier'); if (cherche) q.set('cherche', cherche);
       const r = await requeteJsonBornee(`/api/email-rattacher?${q}`, { headers: entetes(), cache: 'no-store' });
       statut = r.status;
       if (g !== gen.current) return;
@@ -275,7 +303,7 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier }) {
       if (page === 0) { setLuA(Date.now()); setVieille(false); }
     } catch (err) { if (g === gen.current) { if (page === 0) { setPages(null); setPanne(raisonPanne(err, statut)); } else setPages((p) => (p ? { ...p, suiteKO: true } : p)); } }
     finally { if (g === gen.current) setLecture(false); }
-  }, [rubrique, adresse, entetes]);
+  }, [rubrique, adresse, aVerif, cherche, entetes]);
   useEffect(() => { charger(0); }, [charger]);
   // « Actualiser » n'apparaît que quand la liste a plus d'une minute (au retour
   // dans l'app ou après une minute ouverte) : il ne relit RIEN tout seul.
@@ -302,7 +330,9 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier }) {
   // La phrase sous les filtres : seulement quand les nombres ne disent pas
   // tout (compte choisi, ou des e-mails plus anciens pas comptés — §5 « un total
   // partiel ne se présente jamais comme complet »).
-  const phrase = c && parR ? (c.plus ? `Les nombres ne comptent que tes ${c.sur} derniers e-mails${c.adresse ? ` de ${nomCompte(c.adresse)}` : ''}.` : c.adresse ? `Les nombres sont ceux de ${nomCompte(c.adresse)}.` : '') : '';
+  const filtre = !!(cherche || aVerif);
+  const phrase = cherche ? `Recherche « ${cherche} » dans le sujet, l’expéditeur, l’article, le code et le n° de suivi${adresse ? ` de ${nomCompte(adresse)}` : ''}.`
+    : c && parR ? (c.plus ? `Les nombres ne comptent que tes ${c.sur} derniers e-mails${c.adresse ? ` de ${nomCompte(c.adresse)}` : ''}.` : c.adresse ? `Les nombres sont ceux de ${nomCompte(c.adresse)}.` : '') : '';
   const rangee = useRef(null);
   useBords(rangee, parR ? 1 : 0);
   const choisir = (id, bouton) => {
@@ -314,14 +344,24 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier }) {
   return (
     <div className="vrm-boite-corps-ecran" data-boite-large={large ? '1' : '0'} data-boite-ouvert={ouvert ? '1' : '0'}>
       <div className="vrm-boite-liste-col">
+        {tete}
         <div className="vrm-boite-filtres">
+          <label className="vrm-boite-cherche" data-boite-cherche={cherche ? '1' : '0'}>
+            <span className="vrm-boite-sr">Chercher un e-mail</span>
+            <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.6"/><path d="m13 13 4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
+            <input type="search" value={saisie} onChange={(ev) => { setSaisie(ev.target.value); setOuvert(''); }} placeholder="Article, code, n° de suivi…" aria-label="Chercher un e-mail" data-boite-cherche-champ="" enterKeyHint="search" autoComplete="off"/>
+          </label>
           <div ref={rangee} className="vrm-boite-rubriques vrm-rangee" role="group" aria-label="Trier les e-mails">
             {RUBRIQUES_BOITE.map(({ id, mot }) => {
-              const n = id ? (parR && Number.isFinite(parR[id]) ? parR[id] : null) : (c && parR && !c.plus ? c.sur : null);
+              // Les nombres sont ceux de la boîte : ils ne suivent ni la recherche ni « à vérifier » (dit, pas montrés).
+              const n = filtre ? null : id ? (parR && Number.isFinite(parR[id]) ? parR[id] : null) : (c && parR && !c.plus ? c.sur : null);
               return <button key={id || 'tout'} type="button" aria-pressed={rubrique === id} data-boite-rubrique={id || 'tout'} onClick={(ev) => choisir(id, ev.currentTarget)}>
                 <span>{mot}</span>{n != null ? <span className="vrm-boite-n" data-boite-n={n}>{n}</span> : null}
               </button>;
             })}
+            {(aVerif || (c && c.aVerifier > 0)) && <button type="button" aria-pressed={aVerif} data-boite-rubrique="a-verifier" className="vrm-boite-averif-pastille" onClick={() => { setAVerif((v) => !v); setOuvert(''); }}>
+              <span>À vérifier</span>{!filtre && c && c.aVerifier > 0 ? <span className="vrm-boite-n" data-boite-n={c.aVerifier}>{c.aVerifier}</span> : null}
+            </button>}
           </div>
           {(choixCompte || (vieille && pages !== null)) && <div className="vrm-boite-ligne-outils">
             {choixCompte && <label className="vrm-boite-compte">
@@ -337,15 +377,17 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier }) {
               <span className={lecture ? 'vrm-boite-tourne' : undefined}><IconeActualiser/></span>{lecture ? 'Lecture…' : 'Actualiser'}
             </button>}
           </div>}
-          {phrase && <p className="vrm-boite-couverture" data-boite-sur={c.sur} data-boite-sur-adresse={c.adresse || ''}>{phrase}</p>}
+          {phrase && <p className="vrm-boite-couverture" data-boite-sur={c ? c.sur : undefined} data-boite-sur-adresse={(c && c.adresse) || ''}>{phrase}</p>}
         </div>
         {pages === undefined && <Squelette/>}
         {/* (5 nov., chantier G, revue 1.10) La panne de la boîte : `EtatPanne` (la raison, UN « Réessayer »). */}
         {pages === null && <EtatPanne className="vrm-boite-panne" role="alert" data-boite-etat="panne" data-boite="pas-su" quoi="Ta boîte VRM" raison={`${panne || 'VRM n’a pas pu lire ta boîte.'} Rien n’est perdu : tes e-mails restent rangés.`} onReessayer={() => charger(0)}/>}
-        {vide && adresse && <Etat k="compte-vide" titre={`Aucun e-mail reçu sur ${nomCompte(adresse)}${rubrique ? ` dans « ${motRubrique} »` : ''}`} texte={rubrique ? 'Les autres rubriques en ont peut-être.' : `Rien n’est encore arrivé sur ${adresse}. Si tu attends des e-mails de ce compte, vérifie le transfert dans sa messagerie.`}
+        {vide && cherche && <Etat k="recherche-vide" titre={`Aucun e-mail pour « ${cherche} »`} texte="Essaie un autre mot : le nom de l’article, un code de retrait, un n° de suivi ou l’expéditeur." gestes={[{ k: 'effacer', mot: 'Effacer la recherche', f: () => { setSaisie(''); setCherche(''); } }]}/>}
+        {vide && !cherche && aVerif && <Etat k="rien-a-verifier" titre="Rien à vérifier" texte="Tous les e-mails de cette vue sont rangés." gestes={[{ k: 'tout', mot: 'Voir tout', f: () => setAVerif(false) }]}/>}
+        {vide && !filtre && adresse && <Etat k="compte-vide" titre={`Aucun e-mail reçu sur ${nomCompte(adresse)}${rubrique ? ` dans « ${motRubrique} »` : ''}`} texte={rubrique ? 'Les autres rubriques en ont peut-être.' : `Rien n’est encore arrivé sur ${adresse}. Si tu attends des e-mails de ce compte, vérifie le transfert dans sa messagerie.`}
           gestes={[rubrique ? { k: 'tout', mot: 'Voir toutes les rubriques', f: () => setRubrique('') } : { k: 'relier', mot: 'Relier ma boîte', f: onRelier }, { k: 'comptes', mot: 'Tous les comptes', f: () => setAdresse('') }]}/>}
-        {vide && !adresse && rubrique && <Etat k="rubrique-vide" titre={`Aucun e-mail dans « ${motRubrique} »`} texte="Ils arriveront ici dès que tes e-mails en parleront." gestes={[{ k: 'tout', mot: 'Voir tout', f: () => setRubrique('') }]}/>}
-        {vide && !adresse && !rubrique && <Etat k="vide" titre="Ta boîte VRM est vide" texte="Relie ta boîte : chaque e-mail de Vinted, des transporteurs ou des autres sites que tu transfères à VRM arrivera ici, déjà rangé." gestes={[{ k: 'relier', mot: 'Relier ma boîte', f: onRelier }]}/>}
+        {vide && !filtre && !adresse && rubrique && <Etat k="rubrique-vide" titre={`Aucun e-mail dans « ${motRubrique} »`} texte="Ils arriveront ici dès que tes e-mails en parleront." gestes={[{ k: 'tout', mot: 'Voir tout', f: () => setRubrique('') }]}/>}
+        {vide && !filtre && !adresse && !rubrique && <Etat k="vide" titre="Ta boîte VRM est vide" texte="Relie ta boîte : chaque e-mail de Vinted, des transporteurs ou des autres sites que tu transfères à VRM arrivera ici, déjà rangé." gestes={[{ k: 'relier', mot: 'Relier ma boîte', f: onRelier }]}/>}
         {groupes.length > 0 && <div className="vrm-boite-liste" data-boite-liste="">
           {groupes.map((g) => <section key={g.cle} className="vrm-boite-jour" data-boite-jour={g.mot} aria-label={g.mot}>
             <h2 className="vrm-boite-jour-titre">{g.mot}</h2>
@@ -373,14 +415,33 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier }) {
 // Paramètres → E-mails et toute demande « ouvre mes adresses » (`vrm:ouvrir-adresses`)
 // ouvrent cet onglet.
 const VUES = [['boite', 'Boîte de réception'], ['relier', 'Relier ma boîte']];
-export default function BoiteEmails({ headers, delies = {}, onAller, onNum, onAdresses, FermeAuRetour, vueInitiale = 'boite', reglages = null }) {
-  const [vue, setVue] = useState(VUES.some(([k]) => k === vueInitiale) ? vueInitiale : 'boite');
+// (6 nov., onglets C) `aRelier` : les comptes dont les e-mails n'arrivent pas (src/relierCompte.js —
+// `undefined` en cours · `null` pas su · tableau) ; `compteInitial` : le compte à relier demandé
+// ailleurs (Comptes liés, Colis, Ma journée — `vrm:relier-compte`) ; `lireDernier(login)` : la date
+// du dernier e-mail rangé au nom d'un compte (la preuve de la vérification) ; `boites` : les boîtes
+// qui arrivent déjà à VRM.
+export default function BoiteEmails({ headers, delies = {}, onAller, onNum, onAdresses, FermeAuRetour, vueInitiale = 'boite', reglages = null, aRelier, boites = [], compteInitial = '', lireDernier }) {
+  const [vue, setVue] = useState(VUES.some(([k]) => k === vueInitiale) ? vueInitiale : (compteInitial ? 'relier' : 'boite'));
+  const [compte, setCompte] = useState(String(compteInitial || ''));
+  // Les comptes cochés « relié » ici (preuve lue) sortent tout de suite du bandeau.
+  const [relies, setRelies] = useState(() => new Set());
   const haut = useRef(null);
+  const guide = useRef(null);
   useEffect(() => {
     const f = () => setVue('relier');
+    const g = (ev) => { const u = String((ev && ev.detail) || ''); setVue('relier'); if (u) setCompte(u); };
     window.addEventListener('vrm:ouvrir-adresses', f);
-    return () => window.removeEventListener('vrm:ouvrir-adresses', f);
+    window.addEventListener('vrm:relier-compte', g);
+    return () => { window.removeEventListener('vrm:ouvrir-adresses', f); window.removeEventListener('vrm:relier-compte', g); };
   }, []);
+  const aRelierListe = Array.isArray(aRelier) ? aRelier : [];
+  const bandeau = aRelierListe.filter((c) => !relies.has(c.uid));
+  const compteOuvert = compte && aRelierListe.some((c) => c.uid === compte) ? compte : '';
+  const relierCompte = (uid) => {
+    setCompte(String(uid)); setVue('relier');
+    try { const reduit = window.matchMedia('(prefers-reduced-motion: reduce)').matches; setTimeout(() => { if (guide.current) guide.current.scrollIntoView({ block: 'start', behavior: reduit ? 'auto' : 'smooth' }); }, 30); } catch (_) {}
+  };
+  const noterRelie = useCallback((uid) => setRelies((s) => (s.has(uid) ? s : new Set([...s, uid]))), []);
   const versAdresses = () => {
     if (onAdresses) onAdresses();
     try { const reduit = window.matchMedia('(prefers-reduced-motion: reduce)').matches; haut.current && haut.current.scrollIntoView({ block: 'start', behavior: reduit ? 'auto' : 'smooth' }); } catch (_) {}
@@ -390,13 +451,21 @@ export default function BoiteEmails({ headers, delies = {}, onAller, onNum, onAd
       <div className="vrm-boite-vues" role="tablist" aria-label="E-mails">
         {VUES.map(([k, mot]) => <button key={k} type="button" role="tab" aria-selected={vue === k} data-boite-vue={k} onClick={() => setVue(k)}>{mot}</button>)}
       </div>
-      {vue === 'boite' && <Boite headers={headers} delies={delies} onAller={onAller} onNum={onNum} FermeAuRetour={FermeAuRetour} onRelier={() => setVue('relier')}/>}
+      {vue === 'boite' && <Boite headers={headers} delies={delies} onAller={onAller} onNum={onNum} FermeAuRetour={FermeAuRetour} onRelier={() => setVue('relier')}
+        tete={<ARelier comptes={bandeau} onRelier={relierCompte}/>}/>}
       {vue === 'relier' && <div className="vrm-boite-relier" data-boite-relier="">
+        {/* (6 nov., onglets C) Un compte choisi : SON pas-à-pas en premier (avec la vérification) ;
+            sinon les comptes à relier, puis les réglages et le pas-à-pas général — jamais deux scènes. */}
+        <div ref={guide}>
+          {compteOuvert
+            ? <RelierCompte comptes={aRelierListe} uid={compteOuvert} onChoisir={setCompte} boites={boites} lireDernier={lireDernier} onRelie={noterRelie} onAdresses={onAdresses ? versAdresses : undefined}/>
+            : <ARelier comptes={bandeau} onRelier={relierCompte}/>}
+        </div>
         {reglages ? <div ref={haut} className="vrm-boite-reglages" data-boite-reglages="">{reglages}</div> : null}
-        <section className="vrm-boite-guide" aria-label="Faire suivre tes e-mails, pas à pas" data-boite-guide="">
+        {!compteOuvert && <section className="vrm-boite-guide" aria-label="Faire suivre tes e-mails, pas à pas" data-boite-guide="">
           {reglages ? <h2 className="vrm-boite-guide-titre">Faire suivre tes e-mails, pas à pas</h2> : null}
           <RelierBoite onAdresses={onAdresses ? versAdresses : undefined}/>
-        </section>
+        </section>}
       </div>}
     </section>
   );

@@ -181,7 +181,10 @@ if (arg.includes('--prouve')) {
   dit(/<SheetShell onClose=\{onFermer\} titre="Notifications"/.test(C) && !/createPortal/.test(C) && !/vrm-cn-voile/.test(C), 'la cloche passe par SheetShell (poignée, croix, portail) — plus de calque fait main');
   const coque = bloc('async function calculerOuRanger()', 'function CentreNotifsCoque');
   dit(coque && !/\bsave\(|fetch\([^)]*method|POST|pushNotif/.test(coque), '« Où ranger » n’écrit rien en base et n’envoie rien au téléphone (lecture projetée seulement)', coque.slice(0, 80));
-  dit(/select=id,orders:data->payload->my_orders/.test(coque) && !/select=data[^-]/.test(coque), 'les achats sont lus PROJETÉS (jamais `select=data`, §4.4)');
+  // (6 nov., vitesse 2) Les achats des comptes liés passent par `lireAchatsLies` (projetée, paginée) : on juge SA lecture.
+  const achatsLies = bloc('async function lireAchatsLies(', '\n}');
+  const projete = (s) => /select=id,orders:data->payload->my_orders/.test(s) && !/select=data[^-]/.test(s);
+  dit((projete(coque) || (/lireAchatsLies\(/.test(coque) && projete(achatsLies) && /lireTout\(/.test(achatsLies))) && !/select=data[^-]/.test(coque), 'les achats sont lus PROJETÉS (jamais `select=data`, §4.4)');
 
   console.log(`\n${ko ? '❌' : '✅'} audit-coque-parametres : ${n - ko}/${n}`);
   process.exit(ko ? 1 : 0);

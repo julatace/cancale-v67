@@ -65,7 +65,7 @@ export function raisonPasSelectionnable(etat) {
 // Les actions, dans l'ordre du carré. `etats` = les états qu'elle accepte ;
 // `robot` = elle part chez Vinted par l'extension (compte de Chrome exigé) ;
 // `cap` = la capacité d'extension qu'elle demande (`EXT_CAPACITES` de l'app) ;
-// `seule` = une annonce à la fois.
+// `parPaire` = plusieurs annonces, traitées une par une (comptes mélangés permis).
 // (5 nov., chantier C — revue 2.5) QUATRE libellés, les mêmes partout : ceux de
 // l'ancienne feuille « Republier et brouillons » qui parlaient à Julien
 // (« Modifier prix ou titre ») et deux verbes pour les passages d'état — plus de
@@ -76,7 +76,11 @@ export const ACTIONS_SELECTION = [
   { k: 'versBrouillon', titre: 'Mettre en brouillon', desc: 'Retirée de la vente, gardée dans tes brouillons Vinted.', etats: ['en-ligne'], robot: true, cap: 'versbrouillon' },
   { k: 'enLigne', titre: 'Mettre en ligne', desc: 'Le brouillon part tel qu’il est enregistré sur Vinted.', etats: ['brouillon'], robot: true, cap: 'brouillon' },
   // Pas une cinquième tuile : un lien discret sous les quatre (rien ne part chez Vinted d'ici).
-  { k: 'main', titre: 'Republier à la main', desc: 'VRM te donne les photos réglées, le titre, la description et le prix ; puis remet le N° sur la nouvelle annonce.', etats: ['en-ligne', 'masquee', 'brouillon'], robot: false, seule: true, lien: true },
+  // (6 nov., sa demande : « régler comme quand c'est VRM qui fait ») Plusieurs annonces à
+  // la fois, traitées UNE PAR UNE dans la feuille (« paire 2/5 », Suivante) ; chacune dit
+  // son compte : rien ne part chez Vinted d'ici, le compte de Chrome ne décide rien.
+  // `parPaire` : comptes mélangés permis, mais chaque annonce doit avoir SON compte connu.
+  { k: 'main', titre: 'Republier à la main', desc: 'VRM te donne les photos réglées, le titre, la description et le prix (mêmes réglages que Republier) ; puis remet le N° sur la nouvelle annonce.', etats: ['en-ligne', 'masquee', 'brouillon'], robot: false, parPaire: true, lien: true },
   // (6 nov., vague 2 · point 2) « Prix mini… » : poser « Accepter dès » (et, s'il le
   // veut, « Refuser sous ») sur TOUTES les annonces cochées, depuis leur prix. Rien
   // ne part chez Vinted (une écriture dans ses fiches, `updatePair` … `min`/`refuse`,
@@ -85,6 +89,10 @@ export const ACTIONS_SELECTION = [
   // « à la main » (les quatre tuiles restent celles des moteurs, chantier C).
   { k: 'mini', titre: 'Prix mini…', desc: '« Accepter dès » (et « Refuser sous ») sur les annonces cochées, calculés depuis leur prix.', etats: ['en-ligne'], robot: false, lien: true, multiComptes: true },
 ];
+// Ce qui se lance au nom d'UN compte (dit d'un mot quand la sélection en mélange deux),
+// et le mot court d'une action permise sur plusieurs comptes.
+const PAR_COMPTE = 'Republier, modifier, brouillon, mise en ligne';
+const COURT = { mini: 'Prix mini', main: 'Republier à la main' };
 // Les quatre tuiles de la feuille, dans l'ordre (« à la main » est un lien à part).
 export const ACTIONS_TUILES = ACTIONS_SELECTION.filter((A) => !A.lien).map((A) => A.k);
 const POUR_ETAT = { 'en-ligne': 'les annonces en ligne', brouillon: 'les brouillons', masquee: 'les annonces masquées', verification: 'les annonces en vérification' };
@@ -106,14 +114,14 @@ export function actionsPossibles({ selection, chrome, capOk, nomCompte } = {}) {
   const nom = (u) => (nomCompte && nomCompte(u)) || (u ? `compte ${u}` : 'compte inconnu');
   const comptes = [...new Set(sel.map((x) => String(x.uid || '')))];
   const parEtat = {}; for (const x of sel) parEtat[x.etat] = (parEtat[x.etat] || 0) + 1;
-  return ACTIONS_SELECTION.map((A) => {
+  const res = ACTIONS_SELECTION.map((A) => {
     const ids = sel.map((x) => String(x.id));
     let raison = '';
     if (!sel.length) raison = 'Coche au moins une annonce.';
     else if (A.multiComptes) { /* une écriture dans ses fiches : le compte ne décide rien */ }
-    else if (comptes.length > 1) raison = `Ta sélection mélange ${comptes.length} comptes (${comptes.map(nom).join(', ')}) : une action se lance sur un seul compte à la fois.`;
+    else if (A.parPaire) { if (comptes.includes('')) raison = sel.length > 1 ? 'VRM ne sait pas à quel compte est l’une de ces annonces.' : 'VRM ne sait pas à quel compte est cette annonce.'; }
+    else if (comptes.length > 1) raison = `Ta sélection mélange ${comptes.length} comptes (${comptes.map(nom).join(', ')}). ${PAR_COMPTE} : un compte à la fois.`;
     else if (comptes[0] === '') raison = 'VRM ne sait pas à quel compte est cette annonce.';
-    else if (A.seule && sel.length > 1) raison = 'Une annonce à la fois : coche-n’en qu’une.';
     if (!raison && sel.length) {
       const hors = Object.keys(parEtat).filter((e) => !A.etats.includes(e));
       if (hors.length) raison = `Seulement pour ${A.etats.map((e) => POUR_ETAT[e]).join(' ou ')} : ta sélection contient ${hors.map((e) => COMPTE_ETAT(parEtat[e], e)).join(', ')}.`;
@@ -128,6 +136,15 @@ export function actionsPossibles({ selection, chrome, capOk, nomCompte } = {}) {
     }
     return { k: A.k, titre: A.titre, desc: A.desc, ok: !raison, raison, ids, robot: !!A.robot };
   });
+  // (6 nov., finitions) Deux comptes : la phrase commune disait « une action se lance sur un
+  // seul compte » alors que « Prix mini… » (une écriture dans ses fiches) part quand même. Elle
+  // dit ce qui reste POSSIBLE — seulement s'il l'est vraiment (un brouillon coché ne le permet pas).
+  if (comptes.length > 1) {
+    // « Prix mini… » (une écriture dans ses fiches) et « à la main » (une paire à la fois, chacune son compte).
+    const possibles = res.filter((x) => x.ok && (((A) => A.multiComptes || A.parPaire)(ACTIONS_SELECTION.find((A) => A.k === x.k) || {}))).map((x) => COURT[x.k] || x.titre);
+    if (possibles.length) for (const x of res) if (!x.ok && /^Ta sélection mélange/.test(x.raison)) x.raison = x.raison.replace(/\.$/, '') + ` · ${possibles.join(', ')} : possible.`;
+  }
+  return res;
 }
 
 // (5 nov., chantier C — revue 2.5) LA RAISON SE DIT UNE FOIS, EN TÊTE.
@@ -220,39 +237,10 @@ export function etatSuiviMain(s, { numeros, enLigneIds, cle } = {}) {
 }
 
 // ── LES PHOTOS RÉGLÉES (republier à la main) ───────────────────────────────
-// Les VALEURS des réglages (les mêmes que Republier : rotation, lumière,
-// contraste, saturation, zoom) traduites pour une toile 2D. Pur : la toile est
-// dessinée par l'app.
-export const REGLAGES_NEUTRES = { rot: 0, bright: 1, contrast: 1, sat: 1, zoom: 1 };
-export function filtreReglages(r) {
-  const x = { ...REGLAGES_NEUTRES, ...(r || {}) };
-  const b = (v, min, max) => Math.min(max, Math.max(min, Number(v) || 0));
-  return {
-    filtre: `brightness(${b(x.bright, 0.5, 1.6)}) contrast(${b(x.contrast, 0.5, 1.6)}) saturate(${b(x.sat, 0, 2)})`,
-    rot: b(x.rot, -15, 15), zoom: b(x.zoom, 1, 1.5),
-  };
-}
-export function nomPhotoReglee(num, i) {
-  const n = String(num || '').replace(/[^0-9A-Za-z]/g, '');
-  return `VRM-${n || 'annonce'}-${String(i + 1).padStart(2, '0')}.jpg`;
-}
-// Repli quand la toile ne sait pas filtrer (`ctx.filter` absent : Safari) : la
-// même lumière, le même contraste, la même saturation, pixel par pixel (formules
-// des filtres CSS). `data` = Uint8ClampedArray RGBA, modifié en place.
-export function appliquerCouleursPixels(data, r) {
-  const x = { ...REGLAGES_NEUTRES, ...(r || {}) };
-  const br = Number(x.bright) || 1, ct = Number(x.contrast) || 1, sa = Number.isFinite(Number(x.sat)) ? Number(x.sat) : 1;
-  if (br === 1 && ct === 1 && sa === 1) return data;
-  const ic = 0.5 - 0.5 * ct;
-  for (let i = 0; i < data.length; i += 4) {
-    let R = data[i] / 255 * br, G = data[i + 1] / 255 * br, B = data[i + 2] / 255 * br;
-    R = R * ct + ic; G = G * ct + ic; B = B * ct + ic;
-    const l = 0.213 * R + 0.715 * G + 0.072 * B;
-    R = l + (R - l) * sa; G = l + (G - l) * sa; B = l + (B - l) * sa;
-    data[i] = R * 255; data[i + 1] = G * 255; data[i + 2] = B * 255;
-  }
-  return data;
-}
+// (6 nov.) Plus de copie ici : la règle des photos réglées est CELLE de l'atelier
+// Republier (src/republierReglages.js — bornes de l'extension, un réglage pour
+// toutes). Ces noms restent pour les lecteurs d'avant.
+export { PHOTO_NEUTRE as REGLAGES_NEUTRES, filtrePhoto as filtreReglages, nomPhotoReglee, appliquerCouleursPixels } from './republierReglages.js';
 
 // ── « PRIX MINI… » SUR UNE SÉLECTION (6 nov., vague 2 · point 2) ───────────────
 // Mesuré (5 nov., lecture seule) : moteur d'offres allumé, ~11 offres par jour,

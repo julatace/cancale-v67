@@ -16,6 +16,10 @@
 //      couleurs de MARQUE (logos de transporteur, Google), et hors de la DETTE nommée
 //      ci-dessous (fichier par fichier, plafond qui ne peut que baisser : chaque ligne dit
 //      quel chantier la retire). Un nouveau rouge, où que ce soit, rougit l'audit.
+//   R6 (6 nov., finitions) le bloc rouge ne s'allume que pour DEUX paires : `conflitsNum` reçoit
+//      les groupes que la carte AMBRE « en ligne deux fois » affiche (même paire prouvée : photo
+//      exacte ou `recreeDe`) — la carte ambre suffit, jamais le rouge ET l'ambre pour une paire ;
+//      et le rouge du bloc Colis / de Ma journée vient bien de `conflitsNum` (une seule règle).
 //  On juge la RÈGLE (teinte calculée), pas l'orthographe : #f00, #E5484D, rgb(229,72,77)…
 //  `--mutation` rejoue les 5 règles sur des copies affaiblies : chacune DOIT rougir.
 //    node scripts/audit-rouge-doublon.cjs [--mutation]
@@ -110,6 +114,16 @@ function juger(depot) {
       }
     });
   }
+  // R6 — une paire en ligne deux fois n'est pas « deux paires » (la carte ambre suffit).
+  {
+    const app = sansCommentaires(lire('src/App.jsx'), false);
+    const regle = (/function conflitsDeNumeros\(porteurs, memePaires = null\) \{[\s\S]*?\n\}/.exec(app) || [''])[0];
+    dit(/uniq\.every\(x => x\.type === 'annonce'\) && Array\.isArray\(memePaires\)/.test(regle) && /ids\.every\(id => g\.some\(/.test(regle), 'R6 `conflitsDeNumeros` dispense des annonces qu’un groupe de la carte ambre réunit TOUTES (jamais une partie)', regle.slice(0, 200));
+    dit(/const conflitsNum = useMemo\(\(\) => conflitsDeNumeros\(porteursNum, groupesDeuxFois\)/.test(app) && /const groupesDeuxFois = useMemo\(\(\) => \(enLigneDeux && Array\.isArray\(enLigneDeux\.vinted\)/.test(app), 'R6 le bloc rouge reçoit les groupes de la carte ambre (`enLigneDeux.vinted`)');
+    dit(/\{conflitsNum\.length > 0 && \(/.test(app) && /if\(conflitsNum\.length\)\{/.test(app), 'R6 le bloc rouge de Colis et la ligne de Ma journée lisent `conflitsNum` (une seule règle)');
+    dit(/const numDbl=Object\.entries\(numPorteurs\)\.filter\(\(\[,v\]\)=>v\.length>1 && !GROUPES_DEUX_FOIS\.some\(g=>Array\.isArray\(g\) && v\.every\(/.test(app), 'R6 l’alerte « N° porté par deux annonces » (cloche, Ma journée) se tait aussi pour UNE paire en ligne deux fois');
+    dit(/conflits: \(p\) => conflitsDeNumeros\(p, GROUPES_DEUX_FOIS\)/.test(app) && /useEffect\(\(\) => \{ GROUPES_DEUX_FOIS = groupesDeuxFois; \}, \[groupesDeuxFois\]\)/.test(app), 'R6 « Tout sur le N° » suit la même règle (les groupes publiés par Ma journée)');
+  }
   if (process.env.DETAIL) console.log(JSON.stringify(parDette, null, 1));
   dit(usagesDoublon >= 5, `R3 le jeton doublon sert bien au doublon de N° (${usagesDoublon} usages)`);
   for (const [rel, v] of Object.entries(parDette)) {
@@ -130,6 +144,10 @@ function mutations() {
     ['R4 un doublon repasse à C.danger', { 'src/App.jsx': app.replace("color:a.dv==='num'?C.doublon:C.warn", "color:a.dv==='num'?C.danger:C.warn") }],
     ['R4 la redirection des doublons des feuilles retirée', { 'src/design/jetons.css': jet.replace(/--vrm-danger:\s*var\(--vrm-doublon\)/, '--vrm-x: 0') }],
     ['R5 un rouge en dur dans une feuille de la zone', { 'src/styles-coque.css': coque + '\n.vrm-essai { color: #E5484D; }\n' }],
+    ['R6 le rouge ignore la carte ambre', { 'src/App.jsx': app.replace('conflitsDeNumeros(porteursNum, groupesDeuxFois)', 'conflitsDeNumeros(porteursNum)') }],
+    ['R6 « Tout sur le N° » ignore la carte ambre', { 'src/App.jsx': app.replace('conflits: (p) => conflitsDeNumeros(p, GROUPES_DEUX_FOIS),', 'conflits: conflitsDeNumeros,') }],
+    ['R6 l’alerte de la cloche ignore la carte ambre', { 'src/App.jsx': app.replace("v.length>1 && !GROUPES_DEUX_FOIS.some(g=>Array.isArray(g) && v.every(x=>g.some(y=>String(y)===x.id)))", 'v.length>1') }],
+    ['R6 un groupe partiel suffit', { 'src/App.jsx': app.replace('ids.every(id => g.some(', 'ids.some(id => g.some(') }],
     ['R5 un rouge en dur de plus dans App.jsx', { 'src/App.jsx': app.replace('let C = THEMES.light;', "let C = THEMES.light; const ROUGE_ESSAI = 'rgb(229, 72, 77)';") }],
   ];
   let ko = 0;
