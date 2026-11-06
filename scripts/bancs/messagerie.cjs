@@ -397,7 +397,7 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
       const of = r.execs.find((x) => x.method === 'POST' && /offers$/.test(x.endpoint));
       dit(of && of.endpoint === '/api/v2/transactions/9001/offers' && of.body && of.body.offer && of.body.offer.price === '50', 'faire une offre envoie le prix saisi sur la bonne transaction', JSON.stringify(of));
       const txt = await r.pg.evaluate(() => document.body.innerText);
-      dit(/Offre de 50,00 € envoyée/.test(txt), 'et le dit');
+      dit(/Offre de 50,00\s€ envoyée/.test(txt), 'et le dit');
       // Réponses : double clic, texte édité pendant l'attente et retour incertain.
       const champ=r.pg.getByRole('textbox',{name:'Réponse à la conversation'});
       await champ.fill('Premier message synthétique');

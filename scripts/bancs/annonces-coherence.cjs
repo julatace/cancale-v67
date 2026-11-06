@@ -224,7 +224,7 @@ async function vueSelection(pg) {
           if (tel) await pg.evaluate((id) => { const c = document.querySelector(`[data-carte-annonce="${id}"]`); const bt = c && c.querySelector('[data-fiche-plus-bouton][aria-expanded="false"]'); if (bt) bt.click(); }, carteTest);
           await pg.waitForTimeout(250);
           const prixGeste = await pg.evaluate((id) => { const c = document.querySelector(`[data-carte-annonce="${id}"]`); const p = c && c.querySelector('[data-annonce-prix-partout], [data-annonce-prix-vinted]'); return p ? { t: p.innerText.replace(/\s+/g, ' '), conseil: (p.querySelector('[data-prix-conseille]') || {}).textContent || '' } : null; }, carteTest);
-          dit(prixGeste && /Changer le prix/.test(prixGeste.t) && /102 € conseillé/.test(prixGeste.conseil), `G ${T} la paire qui dort : « Changer le prix » dit le prix conseillé (102 €), sans bouton à part`, JSON.stringify(prixGeste));
+          dit(prixGeste && /Changer le prix/.test(prixGeste.t) && /102\s€ conseillé/.test(prixGeste.conseil), `G ${T} la paire qui dort : « Changer le prix » dit le prix conseillé (102 €), sans bouton à part`, JSON.stringify(prixGeste));
           await clic(pg, `[data-carte-annonce="${carteTest}"] [data-fiche-menu-ouvrir]`);
           await pg.waitForSelector('[data-fiche-menu]', { timeout: 4000 }).catch(() => {});
           const menu = await pg.evaluate(() => { const m = document.querySelector('[data-fiche-menu]'); if (!m) return null; const l = [...m.querySelectorAll('.vrm-fiche-menu > button, .vrm-fiche-menu > a')]; return { n: l.length, t: l.map((x) => x.textContent.trim()), h: l.map((x) => Math.round(x.getBoundingClientRect().height)), num: !!m.querySelector('.vrm-num') }; });

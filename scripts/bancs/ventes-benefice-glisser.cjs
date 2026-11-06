@@ -134,7 +134,7 @@ async function main() {
           return [e.getAttribute('data-tx'), { cols: e.hasAttribute('data-benef-cols'), b: bn && bn.getAttribute('data-benef-ligne'), et: bn && bn.getAttribute('data-benef-etat'), txt: bn && bn.innerText.trim(), a: ac && ac.getAttribute('data-achat-ligne'), cout: !!e.querySelector('[data-gestes-ligne] [data-cout-vente="ligne"]') }];
         })));
         dit(L['9201'] && L['9201'].b === '4700' && L['9201'].et === 'ok' && L['9201'].a === '3800', `${T} 9201 : 85 − 38 = +47,00 € (frais confirmés)`, JSON.stringify(L['9201']));
-        dit(L['9202'] && L['9202'].b === '4050' && L['9202'].et === 'partiel' && /^au plus\s+\+40,50 €$/.test(L['9202'].txt), `${T} 9202 : 95 − 52 − 2,50 = +40,50 €, frais pas confirmés ⇒ « au plus »`, JSON.stringify(L['9202']));
+        dit(L['9202'] && L['9202'].b === '4050' && L['9202'].et === 'partiel' && /^au plus\s+\+40,50\s€$/.test(L['9202'].txt), `${T} 9202 : 95 − 52 − 2,50 = +40,50 €, frais pas confirmés ⇒ « au plus »`, JSON.stringify(L['9202']));
         dit(L['9203'] && L['9203'].b === '' && L['9203'].et === 'achat' && L['9203'].txt === '—' && L['9203'].cout, `${T} 9203 : prix d'achat inconnu ⇒ « — », le geste « Prix d'achat » sur la ligne`, JSON.stringify(L['9203']));
         dit(L['9205'] && L['9205'].b === '3300' && L['9205'].et === 'ok', `${T} 9205 : 60 − 27 = +33,00 €`, JSON.stringify(L['9205']));
         // Une vente annulée n'est pas dans la liste par défaut (filtre « Annulées ») ; si elle y est, sans bénéfice.

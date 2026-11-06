@@ -419,7 +419,7 @@ const attendre = async (pg, fn, arg, ms = 8000) => { const t0 = Date.now(); whil
       if (sc.recu) {
         // Le reçu servi a la forme réelle : la feuille porte le détail (port,
         // vendeur…) et jamais « € € » (un prix rangé avec son « € »).
-        dit(/Frais de port/.test(r.texte) && /Vendeur/.test(r.texte) && /42,70 €/.test(r.texte) && !/€\s*€/.test(r.texte), `[${tag}] ${sc.nom} : le reçu servi a la forme réelle (détail, vendeur, « 42,70 € », jamais « € € »)`, r.texte.slice(0, 160));
+        dit(/Frais de port/.test(r.texte) && /Vendeur/.test(r.texte) && /42,70\s€/.test(r.texte) && !/€\s*€/.test(r.texte), `[${tag}] ${sc.nom} : le reçu servi a la forme réelle (détail, vendeur, « 42,70 € », jamais « € € »)`, r.texte.slice(0, 160));
       }
       if (process.env.CAPTURES) { fs.mkdirSync(process.env.CAPTURES, { recursive: true }); await pg.screenshot({ path: path.join(process.env.CAPTURES, `${W}-${sc.nom.replace(/[^\w]+/g, '_')}.png`) }).catch(() => {}); }
       // « Retour » ferme la feuille (une entrée d'historique à elle) sans changer de section.

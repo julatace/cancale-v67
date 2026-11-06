@@ -176,7 +176,7 @@ const CODES = /currency_code|[a-z]+_message\b|msg-status|<a\s|<br|<p>|gray_box|c
         })));
         dit(Object.keys(L).length === 8, 'les huit conversations sont listées', JSON.stringify(Object.keys(L)));
         const l503 = L['503'] || {}, l501 = L['501'] || {}, l502 = L['502'] || {}, l504 = L['504'] || {}, l505 = L['505'] || {};
-        dit(/Vous feriez 30 € \?/.test(l503.extrait || '') && l503.kind === 'message', 'l’extrait est le VRAI dernier message (pas le titre de l’annonce)', JSON.stringify(l503.extrait));
+        dit(/Vous feriez 30\s€ \?/.test(l503.extrait || '') && l503.kind === 'message', 'l’extrait est le VRAI dernier message (pas le titre de l’annonce)', JSON.stringify(l503.extrait));
         dit(!/Air Max 90 blanc 43/.test(l503.extrait || '') && /Air Max 90 blanc 43/.test(l503.txt || ''), 'le titre de la paire reste sur SA ligne, jamais dans l’extrait', (l503.txt || '').replace(/\n/g, ' | '));
         dit(l501.offre && l501.offre.m === '40' && l501.offre.sens === 'envoyee' && /Ton offre/.test(l501.offre.txt) && /40/.test(l501.offre.txt) && /55/.test(l501.offre.txt), 'son offre en dernier : « Ton offre 40 € » (55 € barré) à SA conversation', JSON.stringify(l501.offre));
         dit(!/Salomon XT-6 noir 42/.test(l501.extrait || ''), 'pas le titre de la paire en guise de message', JSON.stringify(l501.extrait));

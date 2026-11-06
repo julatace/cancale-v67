@@ -193,14 +193,14 @@ const caseIci = (pg, ici) => pg.evaluate((ici) => { const el = document.querySel
           await pg.waitForTimeout(500);
           const et = await pg.evaluate(() => { const o = {}; document.querySelectorAll('[data-etat-ligne]').forEach((el) => { o[el.getAttribute('data-etat-ligne')] = { val: el.getAttribute('data-etat-val'), borne: el.getAttribute('data-etat-borne') || '', src: el.getAttribute('data-etat-source') || '', txt: el.innerText.replace(/\s+/g, ' ') }; }); return o; });
           const pa = et['prix-achat'] || {}, rl = et['reception-en-ligne'] || {}, rp = et['republications'] || {}, av = et['achat-vente'] || {}, lv = et['en-ligne-vente'] || {};
-          dit(pa.val === '4000' && pa.src === 'relie' && /40 €/.test(pa.txt), `${t} : VII — prix d'achat 40 €, achat relié`, JSON.stringify(pa));
+          dit(pa.val === '4000' && pa.src === 'relie' && /40\s€/.test(pa.txt), `${t} : VII — prix d'achat 40 €, achat relié`, JSON.stringify(pa));
           dit(rl.val === '2' && rl.borne === 'au-plus' && /au plus 2 j/.test(rl.txt), `${t} : VII — réception (3 oct.) → mise en ligne (5 oct.) : « au plus 2 j » (l'annonce d'origine n'a pas de date)`, JSON.stringify(rl));
           dit(rp.val === '1', `${t} : VII — 1 republication vue par VRM`, JSON.stringify(rp));
           // Achat → vente, mise en ligne → vente : un nombre seulement si la lecture le permet, sinon « — » et la raison.
           const honnete = (l) => (l.val !== '' && l.val != null) || (/—/.test(l.txt) && l.txt.replace(/.*—/, '').trim().length > 3);
           dit(honnete(av) && honnete(lv), `${t} : VII — achat → vente et mise en ligne → vente : un nombre, ou « — » avec sa raison`, `${av.txt} | ${lv.txt}`);
           if (lv.val !== '' && lv.val != null) dit(/au-moins/.test(lv.borne) && /au moins/.test(lv.txt), `${t} : VII — mise en ligne → vente est « au moins » (origine sans date)`, lv.borne);
-          const deux = await pg.evaluate(() => { const t = [...document.querySelectorAll('[data-fiche-paire] .vrm-fp-tuiles, [data-fiche-etat-article]')].map((x) => x.innerText).join(' '); return (t.match(/40 €/g) || []).length; });
+          const deux = await pg.evaluate(() => { const t = [...document.querySelectorAll('[data-fiche-paire] .vrm-fp-tuiles, [data-fiche-etat-article]')].map((x) => x.innerText).join(' '); return (t.match(/40\s€/g) || []).length; });
           dit(deux === 1, `${t} : VII — le prix d'achat n'est écrit qu'une fois entre les tuiles et « L'état » (§7)`, String(deux));
           await shot(pg, (tel ? '390' : '1512') + (sombre ? '-sombre' : '-clair') + '-etat');
         }
