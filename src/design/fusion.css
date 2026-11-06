@@ -38,7 +38,6 @@
   --fu-case-sombre: var(--vrm-case-sombre, rgba(255,255,255,.1));
   --fu-sur-sombre: var(--vrm-sur-sombre, #fff);
   --fu-sur-sombre-2: var(--vrm-sur-sombre-2, rgba(255,255,255,.7));
-  --fu-sur-sombre-3: var(--vrm-sur-sombre-3, rgba(255,255,255,.55));
   --fu-filet: rgba(0,0,0,.06);
   --fu-r-carte: 20px;
   --fu-r-sombre: 24px;
@@ -515,7 +514,6 @@ html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q
 }
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte .vrm-compta-libelle { color: var(--fu-sur-sombre-2) !important; text-transform: uppercase; letter-spacing: .06em; font-size: 12px !important; }
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte .vrm-compta-hero { color: #fff !important; font-size: 44px !important; }
-html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte .vrm-compta-hero[data-eur=""] { color: var(--fu-sur-sombre-3) !important; }
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte :is(.vrm-compta-phrase, small, .vrm-set-lib small) { color: var(--fu-sur-sombre-2) !important; }
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte :is(b, .vrm-display, summary, .vrm-set-lib b) { color: #fff !important; }
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran [data-compta-q="gagne"] > .vrm-compta-carte [data-benef-manque] { color: #ffc773 !important; }
@@ -1126,8 +1124,11 @@ html:not([data-colis-outils]) body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) [
 @media (min-width: 1024px) {
   .vrm-fu-tete > .vrm-carte-stats { grid-column: 2; grid-row: 1 / span 2; align-self: end; }
 }
-/* La case de Compta : la carte sombre est la boîte autour, la nôtre s'y pose nue. */
-.vrm-compta-carte > .vrm-carte-stats .vrm-fu-grand { color: #fff; }
+/* La case de Compta : la carte sombre est la boîte autour, la nôtre s'y pose nue.
+   (6 nov., finitions) Le « — » d'un chiffre pas su garde l'encre des vides de TOUTES les cartes
+   sombres (`.vrm-fu-grand.is-vide`, le jeton --fu-sur-sombre-2) : cette règle le forçait au blanc plein. */
+.vrm-compta-carte > .vrm-carte-stats .vrm-fu-grand:not(.is-vide) { color: #fff; }
+.vrm-compta-carte > .vrm-carte-stats .vrm-fu-grand.is-vide { color: var(--fu-sur-sombre-2); }
 
 /* La feuille « Modifier » */
 .vrm-carte-voile { z-index: 20000; }

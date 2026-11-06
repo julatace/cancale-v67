@@ -14,9 +14,9 @@
 //      « N comptes à relire »), aucune feuille ne la cache plus ;
 //   D  (point 5) `data-cible` reste le crochet des notifications : la liste « À aller
 //      chercher » du Stock porte `data-aller-chercher` ;
-//   K  (point 6) plus de blanc translucide écrit à la main pour les jours futurs de Ma
-//      journée ni pour le « — » de la carte Compta : le jeton `surSombre3`, ≥ 3:1 (grand
-//      texte) au pire point, dans les deux thèmes ;
+//   K  (point 6) plus de blanc translucide écrit à la main (jours futurs de Ma journée : il
+//      n'y en a pas ; « — » de la carte Compta) : le « — » rendu lit le jeton `surSombre2`,
+//      comme toutes les cartes sombres (≥ 4,5:1 au pire point, deux thèmes) ;
 //   T  (point 8) la phrase « code postal inconnu » nomme le geste qui EXISTE (« … » de Colis,
 //      « + Ajouter un n° de suivi »), plus « Achats → À retirer » (écran qui n'existe plus).
 'use strict';
@@ -82,17 +82,20 @@ function verifier(M, dit) {
   const st = (/<div data-stock-cibles=\{cibles\.length\}[\s\S]*?<\/div>\); \}\)\(\)\}/.exec(app) || [''])[0];
   dit(!!st && /data-aller-chercher=\{k\}/.test(st) && !/data-cible=/.test(st), 'D', 'la liste « À aller chercher » porte `data-aller-chercher`, plus `data-cible` (le crochet des notifications)', st.slice(0, 160));
   // ── K (point 6)
+  // Les deux blancs « écrits à la main » visaient des éléments qui n'existent plus : aucun jour futur
+  // (la semaine de Ma journée = les 7 derniers jours) et plus de `.vrm-compta-hero` dans la carte
+  // « gagné » (CarteStatsApp depuis le 3 nov.). Le « — » RENDU de cette carte est `.vrm-fu-grand.is-vide`,
+  // que `.vrm-compta-carte > .vrm-carte-stats .vrm-fu-grand { color: #fff }` forçait au blanc plein.
   for (const [nom, t] of [['clair', Th.MINERAL], ['sombre', Th.MINERAL_DARK]]) {
-    if (!t || !t.surSombre3) { dit(false, 'K', `${nom} : le jeton surSombre3 existe`); continue; }
-    const clair = rgba(t.carteSombreClair), fg = rgba(t.surSombre3), caseFond = sur(rgba(t.caseSombre), clair);
+    const clair = rgba(t.carteSombreClair), fg = rgba(t.surSombre2), caseFond = sur(rgba(t.caseSombre), clair);
     const rF = ratio(sur(fg, clair), clair), rC = ratio(sur(fg, caseFond), caseFond);
-    dit(rF >= 3 && rC >= 3, 'K', `${nom} : surSombre3 (le « — » en grand texte) ≥ 3:1 au pire point (fond ${rF.toFixed(2)}:1, case ${rC.toFixed(2)}:1)`);
+    dit(rF >= 4.5 && rC >= 4.5, 'K', `${nom} : le « — » prend surSombre2, ≥ 4,5:1 au pire point (fond ${rF.toFixed(2)}:1, case ${rC.toFixed(2)}:1 ; un grand texte n'en demande que 3)`);
   }
-  const vars = Th.variablesTheme ? Th.variablesTheme(Th.MINERAL_DARK, true) : {};
-  dit(!!vars['--vrm-sur-sombre-3'], 'K', 'variablesTheme pose --vrm-sur-sombre-3');
   const fus = T['src/design/fusion.css'].replace(/\/\*[\s\S]*?\*\//g, '');
-  dit(/--fu-sur-sombre-3:\s*var\(--vrm-sur-sombre-3/.test(fus) && /\.vrm-compta-hero\[data-eur=""\] \{ color: var\(--fu-sur-sombre-3\) !important; \}/.test(fus), 'K', 'le « — » vide de la carte Compta lit le jeton (--fu-sur-sombre-3)');
-  dit(!/rgba\(255,\s*255,\s*255,\s*\.(38|5)\)\s*(!important)?;?\s*\}/.test(fus.split('\n').filter((l) => /color:\s*rgba\(255,\s*255,\s*255/.test(l)).join('\n')), 'K', 'fusion.css : plus de texte blanc à 38 % ou 50 % écrit à la main');
+  dit(/\.vrm-compta-carte > \.vrm-carte-stats \.vrm-fu-grand:not\(\.is-vide\) \{ color: #fff; \}/.test(fus) && /\.vrm-compta-carte > \.vrm-carte-stats \.vrm-fu-grand\.is-vide \{ color: var\(--fu-sur-sombre-2\); \}/.test(fus) && !/\.vrm-compta-carte > \.vrm-carte-stats \.vrm-fu-grand \{ color: #fff; \}/.test(fus), 'K', 'le « — » de la carte Compta lit le jeton (--fu-sur-sombre-2), comme toutes les cartes sombres — plus forcé au blanc');
+  dit(/\.vrm-fu-grand\.is-vide \{ color: var\(--fu-sur-sombre-2\); \}/.test(fus), 'K', 'la règle commune des vides (`.vrm-fu-grand.is-vide`) lit le jeton');
+  const blancs = fus.split('\n').filter((l) => /color:\s*rgba\(255,\s*255,\s*255,\s*\.(38|5)\)/.test(l));
+  dit(!blancs.length, 'K', 'fusion.css : plus de texte blanc à 38 % ou 50 % écrit à la main', blancs.join(' ¦ ').slice(0, 200));
   dit(!/data-futur/.test(fus) && !/data-futur/.test(app), 'K', 'aucune règle pour un « jour futur » qui n’existe pas (la semaine de Ma journée = les 7 derniers jours)');
   // ── T (point 8)
   const tx = typeof texteCp === 'function' ? texteCp({ inconnu: 1 }).join(' ') : '';
@@ -109,8 +112,9 @@ const MUTATIONS = [
   ['N', 'l’app ne pose plus `reattribue`', 'src/App.jsx', (t) => t.replace('reattribue: { de: ae[nid].de, vers: ae[nid].vers, at: new Date().toISOString(), archive: true }', 'archiveAEcrire: ae[nid]')],
   ['C', 'la ligne du bas remise', 'src/App.jsx', (t) => t.replace("        {!colisSansCompte && <NoAcc/>}", "        <div className=\"vrm-colis-fraicheur\"><FraicheurDonnees jours={liveStats && liveStats.dataAgeJours} siAJour={false}/></div>\n        {!colisSansCompte && <NoAcc/>}")],
   ['D', '`data-cible` remis sur les N° du Stock', 'src/App.jsx', (t) => t.replace('key={k} data-aller-chercher={k} onClick', 'key={k} data-cible={k} onClick')],
-  ['K', 'le « — » remis en blanc à la main', 'src/design/fusion.css', (t) => t.replace('.vrm-compta-hero[data-eur=""] { color: var(--fu-sur-sombre-3) !important; }', '.vrm-compta-hero[data-eur=""] { color: rgba(255,255,255,.5) !important; }')],
-  ['K', 'jeton trop pâle (38 %)', 'src/themeMineral.js', (t) => t.split("surSombre3:'rgba(255,255,255,.55)'").join("surSombre3:'rgba(255,255,255,.38)'")],
+  ['K', 'le « — » de Compta reforcé au blanc', 'src/design/fusion.css', (t) => t.replace('.vrm-compta-carte > .vrm-carte-stats .vrm-fu-grand:not(.is-vide) { color: #fff; }', '.vrm-compta-carte > .vrm-carte-stats .vrm-fu-grand { color: #fff; }')],
+  ['K', 'un blanc à 50 % remis à la main', 'src/design/fusion.css', (t) => t.replace('.vrm-fu-grand.is-vide { color: var(--fu-sur-sombre-2); }', '.vrm-fu-grand.is-vide { color: rgba(255,255,255,.5); }')],
+  ['K', 'le jour futur à 38 % remis', 'src/design/fusion.css', (t) => t + '\n.vrm-fu-jour[data-futur] > b { background: transparent; color: rgba(255,255,255,.38); }\n'],
   ['T', 'la phrase d’avant (Achats → À retirer)', 'api/_lib/transporteurs.js', (t) => t.replace('— ajoute ce n° avec son code postal : « … » en haut de Colis, puis « + Ajouter un n° de suivi ».', '— ajoute ce n° avec son code postal dans « N° de suivi ajoutés » (Achats → À retirer).')],
   ['T', '« transporteur pas encore connu » tu', 'src/App.jsx', (t) => t.replace('{x.trInconnu ? <span className="vrm-rp-sous" data-transp="transporteur-inconnu">', '{false ? <span className="vrm-rp-sous" data-transp="transporteur-inconnu">')],
 ];

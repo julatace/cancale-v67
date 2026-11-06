@@ -47,7 +47,7 @@ export const MINERAL = Object.freeze({
  chromeGradient:'#F2F2F7',photo:'#F2F2F7',
  s1:'#0071E3',s2:'#8DB8F2',selection:'#0071E3',
  carteSombre:'radial-gradient(120% 90% at 100% 0%, #1f3a5f 0%, #1d1d1f 55%)',carteSombreClair:'#1F3A5F',
- caseSombre:'rgba(255,255,255,.1)',surSombre:'#FFFFFF',surSombre2:'rgba(255,255,255,.7)',surSombre3:'rgba(255,255,255,.55)'
+ caseSombre:'rgba(255,255,255,.1)',surSombre:'#FFFFFF',surSombre2:'rgba(255,255,255,.7)'
 });
 // Le sombre d'iOS : noir pur, cartes #1C1C1E, cases #2C2C2E, filets #38383A ; l'aplat
 // #0A84FF au texte BLANC (comme iOS ; 3,65:1, AA grand texte), les liens #409CFF
@@ -63,7 +63,7 @@ export const MINERAL_DARK = Object.freeze({
  chromeGradient:'#000000',photo:'#2C2C2E',
  s1:'#0A84FF',s2:'#64B0FF',selection:'#0A84FF',
  carteSombre:'radial-gradient(120% 90% at 100% 0%, #2a5385 0%, #1b2d45 50%, #15233a 100%)',carteSombreClair:'#2A5385',
- caseSombre:'rgba(255,255,255,.1)',surSombre:'#FFFFFF',surSombre2:'rgba(255,255,255,.82)',surSombre3:'rgba(255,255,255,.55)'
+ caseSombre:'rgba(255,255,255,.1)',surSombre:'#FFFFFF',surSombre2:'rgba(255,255,255,.82)'
 });
 // (6 nov., vague 3) LA CARTE SOMBRE (`CarteStats` / `CarteMois`, la tête de Ma journée) : son fond
 // (`carteSombre`, dont `carteSombreClair` est l'arrêt le PLUS CLAIR), le voile d'une case
@@ -71,9 +71,8 @@ export const MINERAL_DARK = Object.freeze({
 // Mesuré au pire point — l'arrêt le plus clair, sous le voile d'une case : en sombre, le gris
 // d'avant (blanc à 62-65 %) ne tenait que 3,4-3,6:1 sur le haut du dégradé #2A5385 ; à 82 % il
 // tient 4,7:1 (5,9:1 hors case). En clair, 70 % tient 5,1:1 sur #1F3A5F sous une case.
-// (6 nov., finitions) `surSombre3` : l'encre d'un VIDE en GRAND texte (le « — » de la carte
-// Compta, 44 px) — 3:1 suffit à un grand texte ; à 55 % il tient 3,05:1 au pire point (sombre,
-// sous une case) et 3,6-4,7:1 hors case. Jamais pour un petit texte (`surSombre2`).
+// (6 nov., finitions) Le « — » d'une carte sombre (un chiffre pas su) est en `surSombre2`, partout,
+// la carte Compta comprise (elle le forçait au blanc plein).
 // `scripts/audit-vague3-ecrans.cjs` (K) recalcule ces rapports depuis CES jetons.
 // Les portails (détails de vente, fenêtres) héritent du document : mêmes jetons
 // que la coque, sans seconde palette à entretenir dans les feuilles CSS.
@@ -82,5 +81,5 @@ export function variablesTheme(t,sombre=false){return {
  '--vrm-muted':t.muted,'--vrm-faint':t.faint,'--vrm-hair':t.hair,'--vrm-bar':t.bar,
  '--vrm-accent':t.accent,'--vrm-accent-texte':t.accentTexte,'--vrm-on-accent':t.onAccent,'--vrm-card2':t.card2,'--vrm-line':t.border,'--vrm-surface':t.card,'--vrm-bg':t.bg,
  '--vrm-danger':t.danger,'--vrm-doublon':t.doublon,'--vrm-warn':t.warn,'--vrm-warn-soft':t.warnSoft,'--vrm-photo':t.photo,
- '--vrm-carte-sombre':t.carteSombre,'--vrm-case-sombre':t.caseSombre,'--vrm-sur-sombre':t.surSombre,'--vrm-sur-sombre-2':t.surSombre2,'--vrm-sur-sombre-3':t.surSombre3,
+ '--vrm-carte-sombre':t.carteSombre,'--vrm-case-sombre':t.caseSombre,'--vrm-sur-sombre':t.surSombre,'--vrm-sur-sombre-2':t.surSombre2,
 };}

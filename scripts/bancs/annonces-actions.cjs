@@ -29,7 +29,7 @@
 const path = require('path'), fs = require('fs'), http = require('http'), os = require('os');
 const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
-const DIST = path.join(__dirname, '..', '..', 'dist');
+const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT || process.env.PORT) || 7943;
 const SHOTS = process.env.SHOTS || os.tmpdir();
 const CHROMIUM = process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium';
@@ -189,6 +189,9 @@ const debordement = (pg) => pg.evaluate(() => document.documentElement.scrollWid
           const parCompte = mix.filter(([k]) => k !== 'mini');
           dit(parCompte.length === 5 && parCompte.every(([, ok]) => ok === 'non') && /2 comptes/.test(teteMix), `A ${T} deux comptes mélangés ⇒ rien ne se lance au nom d’un compte, la raison dite`, mix.map((x) => x[0] + ':' + x[1]).join(' ') + ' / ' + teteMix);
           dit(mix.some(([k, ok]) => k === 'mini' && ok === 'oui'), `A ${T} « Prix mini… » reste possible sur deux comptes (rien ne part chez Vinted)`, mix.map((x) => x[0] + ':' + x[1]).join(' '));
+          // (6 nov., finitions) La phrase de tête dit JUSTE : ce qui se lance au nom d'un compte, et « Prix mini » possible.
+          dit(/Republier, modifier, brouillon, mise en ligne : un compte à la fois/.test(teteMix) && /Prix mini : possible/.test(teteMix) && !/une action se lance sur un seul compte/.test(teteMix), `A ${T} deux comptes : la tête dit « … : un compte à la fois · Prix mini : possible »`, teteMix);
+          if (vp.width < 600 && !sombre) await pg.screenshot({ path: nomF('deux-comptes') });
           await fermerFeuille(pg, '[data-actions-selection]');
           // A/V — deux annonces en ligne du compte de Chrome
           await cocher(pg, '9301'); await cocher(pg, '9103');
