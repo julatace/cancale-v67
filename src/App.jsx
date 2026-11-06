@@ -46,6 +46,10 @@ import { STYLE_FLOU, compteLbcOuvert, lbcFloute, compteVcOuvert, vcFloute } from
 import DiagnosticLeboncoin from './DiagnosticLeboncoin.jsx';
 import {preparerLiaisonOAuth,lireLiaisonOAuth,resultatLiaisonPermis} from './auth/liaisonOAuth.js';
 import { SqueletteChargement } from "./Chargement.jsx";
+import { AttenteEcran, useEssentiel } from './AttenteEcran.jsx';
+import { SqLignes } from './Squelette.jsx';
+import { usePreparation, useEnPreparation } from './preparations.js';
+import { souvenir, retenir } from './memoireEcrans.js';
 import ConnexionsCompte from './auth/ConnexionsCompte.jsx';
 import {etatColisDepuisTexte,normaliserSuivi} from '../api/_lib/etat-colis-email.js';
 import {FAMILLES as FAMILLES_NOTIF,familleActive as familleNotifActive,reglageCalme,heureValide} from '../api/_lib/notif-textes.js';
@@ -20582,7 +20586,9 @@ function PremiersPas({ onNav, titreNeuf, introNeuf, dansGuide = false }) {
 // En mode exemple : rien (le bandeau dit déjà « Brancher mes comptes »).
 const CLE_GUIDE_MASQUE = 'vrm_guide_masque';
 function useReceptionEmails(actif) {
-  const [l, setL] = React.useState(undefined);
+  // (6 nov.) La dernière réponse LUE (src/memoireEcrans.js) : revenir sur Ma journée ne fait plus
+  // disparaître puis réapparaître le guide ; la lecture repart et remplace en place.
+  const [l, setL] = React.useState(() => souvenir('guide:emails', AUTH.user?.id));
   React.useEffect(() => {
     if (!actif) return undefined;
     let stop = false;
@@ -20590,6 +20596,7 @@ function useReceptionEmails(actif) {
       try {
         const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.email_reception_*&select=id&limit=1`, { headers: sbAuth(), cache: 'no-store' });
         const j = r.ok ? await r.json() : null;
+        if (Array.isArray(j)) retenir('guide:emails', AUTH.user?.id, j);
         if (!stop) setL(Array.isArray(j) ? j : null);
       } catch (_) { if (!stop) setL(null); }
     })();
@@ -34892,6 +34899,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   // ⇒ « Vendues à sortir », sinon ⇒ « Plus en ligne » (`classerRangees`) — et si
   // une lecture qui pourrait la porter manque, on ne dit RIEN d'elle (« pas su »).
   const [lecture, setLecture] = React.useState(undefined);   // undefined = en cours
+  useEssentiel('stock', lecture);                            // (6 nov.) l'écran Stock attend ses annonces actuelles (src/AttenteEcran.jsx)
   const vcLocStock = useVcLocal();                           // les N° Vestiaire (donnés, reliés) : redessine quand ils changent
   const cleComptesStock = (accounts || []).map((a) => String((a && a.vinted_user_id) || '')).filter(Boolean).sort().join(',');
   React.useEffect(() => {
@@ -35307,7 +35315,8 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
           {lecture === undefined ? '…' : (aa && aa.su ? <>{aa.auMoins ? <span style={{ fontSize: 15, fontWeight: 600 }}>au moins </span> : null}{nAffiche}</> : '—')}
           <small>{nAffiche === 1 && aa && aa.su ? 'annonce actuelle' : 'annonces actuelles'}{filtreActif ? ' (filtrées)' : ''}</small>
         </div>
-        {lecture === undefined && <div className="vrm-s2d-resume-l">Je lis tes annonces Vinted, Leboncoin, eBay et Vestiaire…</div>}
+        {/* (6 nov.) La lecture garde la place des lignes qui suivront (trois lignes) : le Stock ne saute plus quand elles arrivent. */}
+        {lecture === undefined && <div className="vrm-s2d-resume-l" data-stock-resume-attente="" style={{ minHeight: 'calc(3 * 1.45em)' }}>Je lis tes annonces Vinted, Leboncoin, eBay et Vestiaire…</div>}
         {lecture && !aa.su && <div className="vrm-s2d-resume-l" data-stock-passu="">Je n'ai pas pu lire tes annonces{manqueTxt ? ` (${manqueTxt})` : ''} — rien n'est perdu, c'est la lecture qui a échoué. Ouvre Vinted {NAV.dans} avec l'extension, puis reviens ici.</div>}
         {aa && aa.su && <div className="vrm-s2d-resume-l">
           {nAffiche > 0 ? <><b>{nRangees}</b> rangée{nRangees > 1 ? 's' : ''} · <b>{nAffiche - nRangees - nSansNum}</b> pas encore rangée{nAffiche - nRangees - nSansNum > 1 ? 's' : ''}</> : 'Aucune annonce en ligne lue'}
@@ -41590,6 +41599,7 @@ function ComptaAjout({ ouvert, onClick, libelle, data }) {
 // états : `encours` (nuage pas arrivé) · `passu` (jamais publié) · `lu`.
 const PERIODES_BENEF = [['mois', 'Mois'], ['trimestre', 'Trimestre'], ['annee', 'Année']];
 const lireBeneficeJours = () => { try { const v = load('vrm_benefice_jours', null); return v && v.jours && typeof v.jours === 'object' ? v : null; } catch (_) { return null; } };
+const CLES_BENEFICE = ['vrm_benefice_jours'];
 function useLigneSynchro(cle, lire) {
   const [v, setV] = React.useState(lire);
   const [pret, setPret] = React.useState(() => isCloudReady());
@@ -41674,7 +41684,9 @@ const beneficeDe = ({ pub, compta, ligneUrssaf, regime }, periode) => (pub ? ben
 function useBeneficeCalcul(compta, periode) {
   const [pub, pret] = useLigneSynchro('vrm_benefice_jours', lireBeneficeJours);
   const ligneUrssaf = useLigneUrssaf();
-  const etat = pub ? 'lu' : (pret ? 'passu' : 'encours');
+  // (6 nov.) Jamais publié mais un écran ouvert le prépare : « en cours » (src/preparations.js).
+  const prepB = useEnPreparation(CLES_BENEFICE);
+  const etat = pub ? 'lu' : (pret && !prepB.has('vrm_benefice_jours') ? 'passu' : 'encours');
   const regime = useRegimeFiscal();
   const B = beneficeDe({ pub, compta, ligneUrssaf, regime }, periode);
   return { pub, etat, B };
@@ -42271,6 +42283,7 @@ const lireColisAPoster = lirePub('vrm_colis_aposter'), lireColisARetirer = lireP
 // `ventesFaites`, le porte-monnaie, les annonces), le reste = les publications.
 // L'état de « vendu » dans le `liveStats` de la coque : 'encours' (pas encore là) · 'pasSu' · 'lu'.
 const venduEtat = (liveStats) => !liveStats ? 'encours' : liveStats.venduPasSu ? 'pasSu' : Array.isArray(liveStats.venduLignes) ? 'lu' : 'encours';
+const CLES_PREPAREES = ['vrm_paires_dorment', 'vrm_colis_retirer', 'vrm_benefice_jours', 'vinted_urssaf_mois'];
 function useSourcesCarte(liveStats) {
   const [compta] = useLigneSynchro('vrm_compta', lireComptaSynchro);
   const [pub, pret] = useLigneSynchro('vrm_benefice_jours', lireBeneficeJours);
@@ -42279,7 +42292,9 @@ function useSourcesCarte(liveStats) {
   const [colisAPoster] = useLigneSynchro('vrm_colis_aposter', lireColisAPoster);
   const [colisARetirer] = useLigneSynchro('vrm_colis_retirer', lireColisARetirer);
   const [dorment] = useLigneSynchro('vrm_paires_dorment', lirePairesDorment);
-  const etat = pub ? 'lu' : (pret ? 'passu' : 'encours');
+  const prep = useEnPreparation(CLES_PREPAREES);
+  // (6 nov.) Jamais publié mais un écran ouvert le prépare : « lecture… » (src/preparations.js).
+  const etat = pub ? 'lu' : (pret && !prep.has('vrm_benefice_jours') ? 'passu' : 'encours');
   return React.useMemo(() => ({
     // (6 nov., onglets A) TROIS ÉTATS (§5) : la coque pas encore revenue (`liveStats` absent, ou
     // sans ses lignes) = `undefined`, « lecture… » ; `venduPasSu` = `null`, « pas lu ». Avant,
@@ -42288,7 +42303,9 @@ function useSourcesCarte(liveStats) {
       : { lignes: liveStats.venduLignes, manque: liveStats.venduManque || [], enAttente: !!liveStats.venduEnAttente, nonComptees: liveStats.venduNonComptees || [] },
     beneficeDe: (p) => ({ B: beneficeDe({ pub, compta, ligneUrssaf, regime }, p), etat }),
     joursBenef: pub, etatBenef: etat, ligneUrssaf, colisAPoster, colisARetirer, dorment, live: liveStats || null,
-  }), [liveStats, pub, etat, compta, ligneUrssaf, regime, colisAPoster, colisARetirer, dorment]);
+    // (6 nov.) Une publication absente que l'écran ouvert est en train de préparer : « lecture… ».
+    enPreparation: { dorment: prep.has('vrm_paires_dorment'), retirer: prep.has('vrm_colis_retirer'), urssaf: prep.has('vinted_urssaf_mois') },
+  }), [liveStats, pub, etat, compta, ligneUrssaf, regime, colisAPoster, colisARetirer, dorment, prep]);
 }
 // Le liveStats de la coque, donné à toute carte sans le passer de main en main
 // (les écrans eBay ou Vestiaire ne le reçoivent pas) : la MÊME valeur que Ma journée.
@@ -42302,6 +42319,12 @@ function CarteStatsApp({ page, liveStats, sel = null, locaux = null, ici = null,
   const [objectif, poserObjectif] = useObjectifMois();
   const liveCoque = React.useContext(LiveStatsCarte);
   const base = useSourcesCarte(liveStats || liveCoque);
+  // (6 nov.) La carte attend ses chiffres avec l'écran (src/AttenteEcran.jsx) : « vendu » pas encore
+  // là, un bénéfice ou une publication que l'écran ouvert prépare encore — jamais « pas lu » puis la valeur.
+  useEssentiel('carte', (base.vendu === undefined || base.etatBenef === 'encours'
+    || (base.enPreparation.dorment && !base.dorment) || (base.enPreparation.retirer && !base.colisARetirer)
+    || (base.enPreparation.urssaf && !base.ligneUrssaf)
+    || Object.values(locaux || {}).some((x) => x && x.enCours)) ? undefined : true);
   const sources = locaux ? { ...base, locaux } : base;
   return <CarteStats owner={AUTH.user?.id||''} page={page} sel={sel || { site: 'toutes', compte: null, periode: null }} sources={sources} regles={REGLES_CARTE} reglage={reglage} poser={poser} objectif={objectif} poserObjectif={poserObjectif} FermeAuRetour={FermeAuRetour} extra={{ ici, attrs }} {...rest}/>;
 }
@@ -43814,6 +43837,17 @@ const cleComptesVinted = (accs) => [...new Set((accs || []).map(a => String((a &
 // réouverture de l'app), donc les listes s'affichent INSTANTANÉMENT après un
 // reload au lieu de re-solliciter Supabase. Purge auto par TTL (3 min).
 const _acctCache = (()=>{ try{ const raw=sessionStorage.getItem('vrm_acct_cache'); if(raw){ const o=JSON.parse(raw); const now=Date.now(); Object.keys(o).forEach(k=>{ if(!o[k]||now-o[k].ts>=_CACHE_TTL) delete o[k]; }); return o; } }catch(_){} return {}; })();
+// (6 nov.) L'état de départ d'une liste de commandes, depuis ce cache — EXACTEMENT ce que
+// `loadOrders` poserait (même entrée : même version, moins de 3 min, mêmes comptes), sinon
+// « pas encore lu ». Rien n'est lu ni écrit ici.
+const etatOrdersDuCache = (type, accounts) => {
+  try {
+    const c = _acctCache[type];
+    if (c && c.v === _CACHE_V && Array.isArray(c.items) && Date.now() - c.ts < _CACHE_TTL && c.comptes === cleComptesVinted(accounts))
+      return { loading: false, items: c.items, failed: c.failed, failedUids: c.failedUids, comptes: c.comptes };
+  } catch (_) {}
+  return { loading: false, items: null };
+};
 // ⚠️ (16 oct., « app plus rapide ») Chaque rangement (ventes, achats, annonces,
 // conversations) réécrivait TOUT le cache dans `sessionStorage` — quatre
 // `JSON.stringify` de plus en plus gros à l'ouverture (mesuré au profileur,
@@ -43921,7 +43955,7 @@ function ListeComptes({ id, valeur, options, onChange, note, skin, attrs }) {
     </div>
   );
 }
-function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', compteConnecte = '', alertes = null, cycle = null, onCycle = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false }) {
+function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', compteConnecte = '', alertes = null, alertesLues = true, cycle = null, onCycle = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false }) {
   // (3 nov.) Les cartes « supprimé de Vinted » déjà répondues sur cet écran
   // (elles partent tout de suite, la coque recalcule ensuite) et la réponse en cours.
   const [cycleRepondus, setCycleRepondus] = useState({});
@@ -44291,7 +44325,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     setHiddenSales(new Set(VENTES_MASQUEES_AUCUNE().map(String)));
     setCloudReady(true);
   }), []);
-  const [emailBords, setEmailBords] = useState(null); // bordereaux reçus par email (pipeline usevrm)
+  // (6 nov.) Revenir sur l'écran : la dernière liste LUE (src/memoireEcrans.js), relue aussitôt en place.
+  const [emailBords, setEmailBordsBrut] = useState(() => souvenir('emailBords', AUTH.user?.id) || null); // bordereaux reçus par email (pipeline usevrm)
+  const emailBordsDeMemoire = useRef(emailBords !== null);
+  const setEmailBords = (v) => { emailBordsDeMemoire.current = false; if (Array.isArray(v)) retenir('emailBords', AUTH.user?.id, v); setEmailBordsBrut(v); };
   const [emailBordsKO, setEmailBordsKO] = useState(false); // la lecture a échoué : « pas su », jamais « aucun »
   // Une lecture ratée se RETENTE toute seule (20 s), tant qu'elle n'a pas réussi.
   useEffect(() => {
@@ -45382,8 +45419,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Statut Vinted PRÉCIS = source de vérité automatique (Vinted le met à jour tout
   // seul quand tu expédies / récupères). Utilisé pour « à retirer » et « à expédier ».
   // (les deux tests vivent au niveau module — une seule définition, cf. plus haut)
-  const [sales, setSales] = useState({ loading:false, items:null });
-  const [buys, setBuys] = useState({ loading:false, items:null });
+  // (6 nov.) Revenir sur l'écran : la liste en cache (la même entrée que `loadOrders` servirait
+  // une milliseconde plus tard) est là DÈS le premier rendu — plus de squelette d'une image.
+  const [sales, setSales] = useState(() => etatOrdersDuCache('sold', accounts));
+  const [buys, setBuys] = useState(() => etatOrdersDuCache('purchased', accounts));
   // (6 nov.) LES VENTES VUES PAR E-MAIL, PAS ENCORE RELUES SUR VINTED
   // (src/venteEmailFraiche.js) : la liste de l'écran et VENDU les lisent ; tout
   // le reste (Colis, numéros, bordereaux, verrous) lit `sales.items`, la liste
@@ -49754,6 +49793,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   useEffect(() => { if ((curSub==='annonces'||curSub==='journee'||curSub==='bordereaux'||curSub==='messages') && accounts.length && (listings.items===null || (listings.comptes && listings.comptes!==cleComptes))) loadListings(); /* eslint-disable-next-line */ }, [sub, cleComptes]);
   useEffect(() => { if ((curSub==='annonces'||curSub==='journee') && emailSales===null) fetchEmailSales().then(setEmailSales); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if ((curSub==='messages'||curSub==='journee') && accounts.length && (convs.items===null || (convs.comptes && convs.comptes!==cleComptes))) loadConvs(); /* eslint-disable-next-line */ }, [sub, cleComptes]);
+  // (6 nov.) Ce que CET écran a lu, annoncé à son attente (src/AttenteEcran.jsx) : une liste
+  // lue (même vide) ou une lecture ratée est une réponse ; sans compte lié, rien à attendre.
+  const repondu = (x) => ((x && (Array.isArray(x.items) || x.error)) || (accountsReady && !accounts.length) || baseKO) ? true : undefined;
+  const litAchats = curSub==='achats'||curSub==='journee'||curSub==='bordereaux';
+  const litAnnonces = curSub==='annonces'||curSub==='journee'||curSub==='bordereaux'||curSub==='messages';
+  useEssentiel('ventes', repondu(sales));
+  useEssentiel(litAchats ? 'achats' : null, repondu(buys));
+  useEssentiel(litAnnonces ? 'annonces' : null, repondu(listings));
+  useEssentiel((curSub==='messages'||curSub==='journee') ? 'messages' : null, repondu(convs));
+  // Colis : les bordereaux (captés et reçus par e-mail) lus, ou leur lecture ratée.
+  useEssentiel(curSub==='bordereaux' ? 'bordereaux' : null, ((labelsPrets && (emailBords !== null || emailBordsKO)) || (accountsReady && !accounts.length) || baseKO) ? true : undefined);
+  // (6 nov.) Les chiffres que CET écran publie (§11) : tant qu'il les prépare, une carte
+  // qui ne les a jamais reçus dit « lecture… », jamais « pas lu » (src/preparations.js).
+  usePreparation('vrm_paires_dorment', litAnnonces && accounts.length > 0, Array.isArray(listings.items) && !listings.loading);
+  usePreparation('vrm_colis_retirer', litAchats && accounts.length > 0, Array.isArray(buys.items));
+  usePreparation('vrm_benefice_jours', accounts.length > 0, Array.isArray(sales.items));
+  usePreparation('vinted_urssaf_mois', accounts.length > 0, Array.isArray(sales.items));
+  const prepCompta = useEnPreparation(CLES_PREPAREES);
   // Les résumés : seulement sur Messages, relus quand la liste change, au plus une
   // fois par minute (une lecture de ~1 400 lignes, en scalaires).
   useEffect(() => {
@@ -49766,7 +49823,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return () => { fini = true; };
     /* eslint-disable-next-line */
   }, [sub, convs.items, cleComptes]);
-  useEffect(() => { if ((curSub==='bordereaux'||curSub==='annonces'||curSub==='ventes'||curSub==='journee'||curSub==='achats') && emailBords===null) fetchEmailBordereaux().then(v => { if (v) { setEmailBords(v); setEmailBordsKO(false); } else setEmailBordsKO(true); }); /* eslint-disable-next-line */ }, [sub]);
+  useEffect(() => { if ((curSub==='bordereaux'||curSub==='annonces'||curSub==='ventes'||curSub==='journee'||curSub==='achats') && (emailBords===null || emailBordsDeMemoire.current)) fetchEmailBordereaux().then(v => { if (v) { setEmailBords(v); setEmailBordsKO(false); } else setEmailBordsKO(true); }); /* eslint-disable-next-line */ }, [sub]);
   // Détecte un bordereau PDF capté par l'extension (téléchargé sur Vinted) et
   // encore frais (< 60 min) → on affiche un bandeau « tamponner en 1 clic ».
   useEffect(() => { (async () => {
@@ -55495,6 +55552,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 );
               };
               if (loading) return null;
+              // (6 nov.) Les actions du jour de la coque (la cloche) pas encore rangées : la liste
+              // n'arrive pas geste par geste — sa place, en lignes de chargement, puis la liste d'un bloc.
+              // Et jamais « Rien à faire… : pas lu » pendant qu'elles se lisent.
+              if (!alertesLues) return (
+                <section className="vrm-fu-afaire" aria-label="À faire" aria-busy="true" data-afaire-attente="">
+                  <div className="vrm-fu-titre-section"><h2 className="vrm-day-titre-section">À faire</h2></div>
+                  <SqLignes n={3} montant={false}/>
+                </section>
+              );
               // (5 nov., chantier E1, §5) « Rien à faire » ne se dit que sur ce qui a été LU : une case
               // pas lue (« — ») n'est pas une case à zéro. Sinon la ligne nomme ce qui manque.
               const pasLus = T.filter((x) => x.pasSu).map((x) => x.l);
@@ -56376,6 +56442,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             (les nombres des onglets, `phaseReception`), À retirer (`vrm_colis_retirer`). Aucun nombre recalculé. */}
         {dansPlateforme && !modeRetraits && !baseKO && (() => {
           const lu = Array.isArray(buys.items);
+          // (6 nov.) Les achats se lisent encore : « lecture… » (jamais « pas lu » qui deviendrait un nombre),
+          // et la carte attend avec l'écran (src/AttenteEcran.jsx).
+          const enLecture = !lu && !buys.error ? { raisonCourte: 'lecture…', enCours: true } : {};
           const m0 = new Date(); m0.setDate(1);
           const duMois = { from: m0, to: new Date() };
           const annule = achatAnnule;   // (3 nov.) la règle de « Dépensé », partagée avec le registre des achats (src/registres.js)
@@ -56384,9 +56453,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const n = { route: 0, recu: 0 }; if (lu) buysBase.forEach((o) => { const ph = phaseReception(o); if (n[ph] != null) n[ph]++; });
           return <CarteStatsApp page="achats" aide liveStats={liveStats} className="vrm-fu-ecran" ici="achats" onNav={onNav} sel={{ site: 'toutes', compte: null, periode: null }}
             locaux={{
-              depense: { nom: 'Dépensé du mois', court: 'Dépensé', type: 'eur', aide: 'Tes achats du mois, hors annulés et remboursés (le montant payé).', valeur: depense, quand: (() => { const m = m0.toLocaleDateString('fr-FR', { month: 'long' }); return m.charAt(0).toUpperCase() + m.slice(1); })(), attrs: { 'data-n': lu ? String(mois.length) : '' } },
-              enroute: { nom: 'En route', court: 'En route', type: 'n', aide: 'Tes achats payés ou expédiés, pas encore arrivés au point relais.', valeur: lu ? n.route : null, attrs: { 'data-n': lu ? String(n.route) : '' } },
-              recus: { nom: 'Arrivés', court: 'Arrivés', type: 'n', aide: 'Tes achats livrés ou finalisés, depuis toujours.', valeur: lu ? n.recu : null, attrs: { 'data-n': lu ? String(n.recu) : '' } },
+              depense: { nom: 'Dépensé du mois', court: 'Dépensé', type: 'eur', aide: 'Tes achats du mois, hors annulés et remboursés (le montant payé).', valeur: depense, ...enLecture, quand: (() => { const m = m0.toLocaleDateString('fr-FR', { month: 'long' }); return m.charAt(0).toUpperCase() + m.slice(1); })(), attrs: { 'data-n': lu ? String(mois.length) : '' } },
+              enroute: { nom: 'En route', court: 'En route', type: 'n', aide: 'Tes achats payés ou expédiés, pas encore arrivés au point relais.', valeur: lu ? n.route : null, ...enLecture, attrs: { 'data-n': lu ? String(n.route) : '' } },
+              recus: { nom: 'Arrivés', court: 'Arrivés', type: 'n', aide: 'Tes achats livrés ou finalisés, depuis toujours.', valeur: lu ? n.recu : null, ...enLecture, attrs: { 'data-n': lu ? String(n.recu) : '' } },
             }}/>;
         })()}
         {/* (5 nov.) Pourquoi des codes manquent (l'extension les lit dans les conversations, sur le
@@ -59411,7 +59480,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 locaux={{
                   imprimer: { nom: 'Bordereaux à imprimer', court: 'à imprimer', type: 'n', valeur: nPrets, titre: nDejaImpr > 0 ? `Bordereaux reçus pas encore imprimés (${nDejaImpr} déjà imprimé${nDejaImpr > 1 ? 's' : ''}, à déposer)` : 'Bordereaux reçus, pas encore imprimés', onClick: nPrets > 0 ? () => onOngletColis && onOngletColis('envoyer') : undefined, attrs: { 'data-n': String(nPrets) } },
                   deposes: { nom: 'Colis déposés aujourd’hui', court: deposes > 1 ? 'déposés' : 'déposé', type: 'n', valeur: deposes, titre: "Colis marqués « Colis fait » aujourd'hui", attrs: { 'data-n': String(deposes) } },
-                  retirer: { nom: 'À retirer', court: 'à retirer', type: 'n', valeur: nRet, partiel: retPartiel && nRet != null, affiche: nRet == null ? undefined : `${nRet}${retPartiel ? '+' : ''}`, titre: retPartiel && nRet != null ? `Au moins ${nRet} : les e-mails de suivi n'ont pas pu être lus` : 'Colis arrivés à aller chercher', onClick: () => onOngletColis && onOngletColis('retirer'), attrs: { 'data-n': nRet == null ? '' : String(nRet) } },
+                  retirer: { nom: 'À retirer', court: 'à retirer', type: 'n', valeur: nRet, partiel: retPartiel && nRet != null, affiche: nRet == null ? undefined : `${nRet}${retPartiel ? '+' : ''}`, ...(nRet == null && prepCompta.has('vrm_colis_retirer') ? { raisonCourte: 'lecture…', enCours: true } : {}), titre: retPartiel && nRet != null ? `Au moins ${nRet} : les e-mails de suivi n'ont pas pu être lus` : 'Colis arrivés à aller chercher', onClick: () => onOngletColis && onOngletColis('retirer'), attrs: { 'data-n': nRet == null ? '' : String(nRet) } },
                 }}/>
               ); })()}
             {/* (31 oct., soir) + « Leboncoin » quand il y a un compte : ses colis ont
@@ -69915,7 +69984,7 @@ export default function App() {
   //    double vérification) restaient CLAIRS dans une app réglée en sombre —
   //    sur un document déjà sombre (index.html lit `vinted_dark`). Même source.
   C = load('vinted_dark', false) ? THEMES.dark : THEMES.light;
-  if (MULTI_USER && !authState.ready) return <div style={{minHeight:'100vh',background:C.bg}}/>;
+  if (MULTI_USER && !authState.ready) return <div data-demarrage-attente="" style={{minHeight:'100vh',background:C.bg}}/>;
   const bypass = false; // Aucun accès direct à une boutique partagée.
   if (MULTI_USER && !bypass && (!authState.session || RECOVERY_PENDING)) return <AuthScreen/>;
   // Double vérification (16 octobre) : un compte qui l'a activée et une session
@@ -70227,6 +70296,22 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
   );
 }
 
+// (6 nov.) LES DONNÉES ESSENTIELLES DE CHAQUE ÉCRAN (src/AttenteEcran.jsx) : tant que l'une
+// manque, l'écran montre son squelette (au plus ~2,5 s), puis il arrive d'un bloc. Celles de la
+// coque (`comptes`, `nuage`, `sites`, `stats`) ; celles que l'écran lit lui-même (`ventes`,
+// `achats`, `annonces`, `messages`, `bordereaux`), `stock` (Stock) et `carte` (la carte sombre)
+// s'annoncent depuis les composants qui les lisent (useEssentiel) — une donnée qu'aucun composant
+// monté n'annonce n'est pas attendue. Un écran absent d'ici s'ouvre tout de suite.
+const ESSENTIELS_ECRAN = {
+  journee: ['comptes', 'nuage', 'stats', 'notifs', 'carte', 'ventes', 'achats', 'annonces', 'messages'],
+  ventes: ['comptes', 'nuage', 'sites', 'stats', 'carte', 'ventes'],
+  annonces: ['comptes', 'nuage', 'sites', 'stats', 'carte', 'annonces'],
+  achats: ['comptes', 'nuage', 'sites', 'carte', 'achats'],
+  messages: ['comptes', 'nuage', 'sites', 'messages', 'annonces'],
+  cat_bord: ['comptes', 'nuage', 'sites', 'carte', 'ventes', 'achats', 'bordereaux'],
+  garage: ['comptes', 'nuage', 'stock'],
+  compta: ['comptes', 'nuage', 'stats', 'carte'],
+};
 function AppCoeur() {
   // En mode solo (MULTI_USER=false) `authState.ready` est vrai d'emblée et
   // l'app démarre directement : rien ne change pour un usage à un seul vendeur.
@@ -70838,6 +70923,8 @@ function AppCoeur() {
   const [notifBanner,setNotifBanner]=useState(null); // {ventes, factures} ou null
   const [vintedNotif,setVintedNotif]=useState(null); // {messages, ventes} nouveautés Vinted à l'ouverture
   const [notifItems,setNotifItems]=useState([]); // actions du jour (Ma journée, tableau de bord, Collectif)
+  // (6 nov.) Un premier passage COMPLET (nuage arrivé) a-t-il rangé les actions du jour ? Ma journée l'attend.
+  const [notifsLus,setNotifsLus]=useState(false);
   // (3 nov.) « N°x supprimé de Vinted » (src/cycleArticle.js) : `undefined` en cours · `null` pas su · { cartes, total, pasSu }.
   const [cycleCartes,setCycleCartes]=useState(undefined);
   const [menuOpen,setMenuOpen]=useState(false);
@@ -70969,6 +71056,9 @@ function AppCoeur() {
   // « Comptes liés », ce qui laissait les onglets vides tant qu'on n'y était pas
   // passé. C'est une lecture Supabase légère (pas un appel Vinted, aucun risque).
   const [accountsLoaded,setAccountsLoaded]=useState(false);
+  // (6 nov.) Un passage qui ne finit jamais (lecture pendue, erreur) ne bloque rien : au plus 20 s après les
+  // comptes, Ma journée montre ce qu'elle sait (comme avant).
+  useEffect(()=>{ if(!accountsLoaded||notifsLus) return undefined; const t=setTimeout(()=>setNotifsLus(true),20000); return ()=>clearTimeout(t); },[accountsLoaded,notifsLus]);
   // ⚠️ TROIS ÉTATS, comme partout ailleurs (panneau de sécurité, `extSait`,
   //    `acctHealth`) : on charge · la base a répondu · la base n'a pas répondu.
   //    Sans le troisième, « je n'ai pas pu lire » s'affiche comme « il n'y a
@@ -72664,6 +72754,7 @@ function AppCoeur() {
       // Une liste identique ne se repose pas : un tableau neuf re-rendait toute
       // la coque et l'écran ouvert pour rien à chaque recalcul (22 oct.).
       setNotifItems(prev => JSON.stringify(prev) === JSON.stringify(items) ? prev : items);
+      if(nuageAuDepart) setNotifsLus(true);
       // Le mémo des conversations reste borné (les plus récentes gardées).
       { const ks=Object.keys(nextSeen); if(ks.length>4000){ const garde={}; ks.slice(-4000).forEach(k=>{ garde[k]=nextSeen[k]; }); save('vinted_notif_seen_convs',garde); } else save('vinted_notif_seen_convs',nextSeen); }
       // ⚠️⚠️ « ~300 NOTIFICATIONS À L'OUVERTURE » (3 octobre). Les nouvelles
@@ -72714,10 +72805,24 @@ function AppCoeur() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[vintedAccounts, nuagePret, preuveTick]);
 
+  // (6 nov.) LES DONNÉES ESSENTIELLES QUE LA COQUE LIT ELLE-MÊME (src/AttenteEcran.jsx) :
+  // `undefined` = lecture en cours ; tout le reste (lu, ou `null` = pas su) est une réponse.
+  // Placé APRÈS tout ce qu'il lit (§4.6).
+  const essentielsCoque = {
+    comptes: (accountsLoaded || baseKO) ? true : undefined,
+    nuage: nuagePret ? true : undefined,
+    sites: (sitesLus !== undefined && comptesEbay !== undefined) ? true : undefined,
+    // La carte du mois (`liveStats`) : calculée dès que les ventes de la coque sont lues ;
+    // sans compte (ou base injoignable), il n'y a rien à attendre.
+    // « vendu » n'y est que quand ses lignes sont là (ou dites pas sues) : la carte dirait « lecture… ».
+    stats: ((liveStatsVus && (Array.isArray(liveStatsVus.venduLignes) || liveStatsVus.venduPasSu)) || baseKO || (accountsLoaded && !(vintedAccounts || []).length)) ? true : undefined,
+    // Les actions du jour (la cloche, « À faire » de Ma journée, les pastilles de la navigation).
+    notifs: (notifsLus || baseKO || (accountsLoaded && !(vintedAccounts || []).length)) ? true : undefined,
+  };
   // Multi-vendeurs : tant qu'on ne sait pas qui est là, on n'affiche rien (un
   // écran de connexion qui clignote avant de disparaître fait « bug »), et sans
   // session on affiche la porte d'entrée au lieu de l'app.
-  if (MULTI_USER && !authState.ready) return <div style={{minHeight:'100vh',background:C.bg}}/>;
+  if (MULTI_USER && !authState.ready) return <div data-demarrage-attente="" style={{minHeight:'100vh',background:C.bg}}/>;
   // PORTE DE SECOURS — n'existe QUE tant que la base n'est pas cloisonnée.
   // Raison : si la création de compte coince (email de confirmation qui
   // n'arrive pas, fournisseur pas encore activé…), Julien serait enfermé hors
@@ -73345,6 +73450,9 @@ function AppCoeur() {
             sur la coque, pour tous les écrans (src/photosVinted.js). */}
         {!baseKO && <PhotosBloquees/>}
         <BlocNumerosPerimes/>
+        {/* (6 nov.) L'ÉCRAN ATTEND SES DONNÉES ESSENTIELLES (src/AttenteEcran.jsx) : monté mais
+            invisible, son squelette à sa place, puis il arrive d'un bloc — au plus ~2,5 s. */}
+        <AttenteEcran key={tab} ecran={tab} memoire={((authState.user && authState.user.id) || '') + ':' + tab} ordi={ordi} attendus={ESSENTIELS_ECRAN[tab] || []} donnees={essentielsCoque}>
         {tab==='settings'&&<GardeEcran nom="settings" resetKey={platSub}><SettingsScreen setTab={setTab} onPlateforme={plat=>{subVoulue.current=plat==='plat_leboncoin'?'annonces':'compte';setTab(plat);}} ebayCompte={ebayCompteReglage} ouvrir={platSub==='ebay'?'ebay':null} onOuvert={()=>setPlatSub('reglages')} comptes={vintedAccounts}
 
           notifEnabled={notifEnabled}
@@ -73530,7 +73638,7 @@ function AppCoeur() {
             annoncer « 🎉 Tout est à jour ! » pendant la panne, c'est-à-dire
             précisément l'écran qu'il ouvre le matin. Corriger « partout » se
             vérifie au rendu, écran par écran, pas en lisant le code. */}
-        {tab==='journee'&&<GardeEcran nom="journee"><Comptabilite key="journee" panelOff={panelOffCoque} accounts={vintedAccounts} only="journee" alertes={notifItems} cycle={cycleCartes} onCycle={()=>setPreuveTick(t=>t+1)} liveStats={liveStatsVus} onNav={setTab} baseKO={baseKO} accountsReady={accountsLoaded} premierJour={premierJour} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/></GardeEcran>}
+        {tab==='journee'&&<GardeEcran nom="journee"><Comptabilite key="journee" panelOff={panelOffCoque} accounts={vintedAccounts} only="journee" alertes={notifItems} alertesLues={notifsLus||baseKO||(accountsLoaded&&!vintedAccounts.length)} cycle={cycleCartes} onCycle={()=>setPreuveTick(t=>t+1)} liveStats={liveStatsVus} onNav={setTab} baseKO={baseKO} accountsReady={accountsLoaded} premierJour={premierJour} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/></GardeEcran>}
         {/* ⚠️ « Bienvenue 👋 · connecte ton compte Vinted pour commencer » à
             quelqu'un qui a neuf comptes : c'est ce qu'il voyait quand la base
             ne répondait pas. `baseKO` distingue « aucun compte » de « je n'ai
@@ -73617,6 +73725,7 @@ function AppCoeur() {
           </section></GardeEcran>
         )}
         {tab==='vintedaccounts'&&<GardeEcran nom="vintedaccounts"><VintedAccounts accounts={vintedAccounts} setAccounts={setVintedAccounts} baseKO={baseKO} onRetour={()=>setTab('settings')}/></GardeEcran>}
+        </AttenteEcran>
         </>)}
         </GardeEcran>
         </BarreHautSlot.Provider>

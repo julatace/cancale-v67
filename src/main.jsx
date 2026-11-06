@@ -7,6 +7,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import Accueil from './Accueil.jsx';
 import { DemarrageVRM } from './Chargement.jsx';
+import { suivreDemarrage } from './demarrage.js';
 import { ecouterPlantages, ecouterViolationsCsp, noterPlantage, compterMorceauPerime } from './plantages.js';
 // Le journal des plantages écoute dès le démarrage : une erreur AVANT que l'app
 // soit montée est justement celle qu'aucun écran ne montre (src/plantages.js).
@@ -211,6 +212,9 @@ function Racine() {
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode><DernierFilet><Racine /></DernierFilet></React.StrictMode>
 );
+// (6 nov.) L'écran de démarrage d'index.html part quand la page montre autre chose
+// qu'une attente (src/demarrage.js) — l'écran d'ouverture prêt, l'accueil, la connexion.
+suivreDemarrage();
 
 // PWA : enregistre le service worker (app installable + consultable hors-ligne).
 // Best-effort — si le navigateur ne le supporte pas, l'app fonctionne pareil.
