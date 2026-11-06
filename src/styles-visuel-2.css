@@ -264,7 +264,7 @@ html body .vrm-app-shell .vrm-main .vrm-mr-bloc > .vrm-repli > summary {
 }
 html body .vrm-app-shell .vrm-main .vrm-mr-bloc > .vrm-repli > summary { display: flex !important; align-items: center; gap: 0; white-space: nowrap; }
 html body .vrm-app-shell .vrm-main .vrm-mr-bloc .vrm-mr-titre { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-html body .vrm-app-shell .vrm-main .vrm-mr-bloc .vrm-mr-valeur { flex: 1 0 auto; color: var(--vrm-muted); font-variant-numeric: tabular-nums; }
+html body .vrm-app-shell .vrm-main .vrm-mr-bloc .vrm-mr-valeur { flex: 1 0 auto; margin-left: .3em; color: var(--vrm-muted); font-variant-numeric: tabular-nums; }
 html body .vrm-app-shell .vrm-main .vrm-mr-bloc > .vrm-repli[open] > summary { border-radius: var(--vrm-r-carte) var(--vrm-r-carte) 0 0; }
 
 /* ══ 5 quater. LEBONCOIN ════════════════════════════════════════════════════ */
