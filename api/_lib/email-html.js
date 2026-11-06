@@ -79,7 +79,7 @@ const VIDES = new Set(['br', 'col', 'hr', 'img', 'wbr']);
 const BRUT = new Set(['script', 'style', 'textarea', 'title', 'xmp', 'iframe', 'noembed', 'noframes', 'noscript']);
 const AVEC_CONTENU = new Set(['svg', 'math', 'object', 'applet', 'template', 'select', 'frameset', 'audio', 'video', 'canvas', 'map', 'picture', 'head']);
 const ATTR_COMMUNS = new Set(['align', 'valign', 'bgcolor', 'border', 'cellpadding', 'cellspacing', 'color', 'colspan', 'rowspan', 'dir', 'face', 'height', 'width', 'hspace', 'vspace', 'size', 'style', 'title', 'lang', 'class', 'role', 'nowrap', 'scope', 'span', 'start', 'type', 'summary', 'abbr', 'headers', 'datetime', 'reversed', 'open']);
-const ATTR_PROPRES = { a: new Set(['href']), img: new Set(['src', 'alt', 'data-vrm-src']) };
+const ATTR_PROPRES = { a: new Set(['href']), img: new Set(['src', 'alt', 'data-vrm-src']), div: new Set(['data-vrm-corps']) };
 
 // ── DÉCODER CE QUE LE NAVIGATEUR DÉCODERA (pour JUGER) ──────────────────────
 const NOMMEES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: '\u00a0', tab: '\t', newline: '\n', colon: ':', sol: '/', lpar: '(', rpar: ')', period: '.', comma: ',', semi: ';', equals: '=', excl: '!', num: '#', percnt: '%', bsol: '\\', ast: '*', plus: '+', quest: '?', lowbar: '_', hyphen: '-', dash: '-' };
@@ -208,6 +208,7 @@ function attributs(nom, attrs, compte) {
     if (an === 'href') { const u = lienPermis(v); if (u) out.push(['href', u]); else compte.liensRetires++; continue; }
     if (an === 'src' || an === 'data-vrm-src') { if (src == null) src = v; continue; }
     if (an === 'alt') { alt = decoderAttr(v).slice(0, 300); continue; }
+    if (an === 'data-vrm-corps') { out.push(['data-vrm-corps', '']); continue; }   // le corps d'origine (relu : stable)
     const d = decoderAttr(v).replace(/[\u0000-\u001f]/g, '').slice(0, 300);
     if (an === 'width') w = px(d);
     if (an === 'height') h = px(d);
@@ -284,7 +285,9 @@ export function assainirHtml(entree) {
     if (pile.length > 400) break;          // une imbrication absurde ne fait pas tomber la route
   }
   for (let p = pile.length - 1; p >= 0; p--) o.push(pile[p] === 'div-corps' ? '</div>' : `</${pile[p]}>`);
-  const html = o.join('').trim();
+  // Les blancs laissés autour des balises retirées, resserrés (sortie stable : relue, identique).
+  let html = o.join('').trim();
+  if (!/<pre\b/i.test(html)) html = html.replace(/[ \t\r\f]*\n\s*/g, '\n').replace(/[ \t]{2,}/g, ' ');
   const octets = Buffer.byteLength(html, 'utf8');
   if (!html) return { ok: false, vide: true };
   if (octets > HTML_MAX) return { ok: false, trop: true, octets };
