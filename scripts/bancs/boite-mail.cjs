@@ -121,7 +121,10 @@ async function inspecter(pg, nom, racine = '[data-boite-emails]') {
     const mots = (txt.match(/\b(undefined|NaN|null|\[object Object\]|currency_code)\b/g) || []);
     const largeur = document.documentElement.clientWidth;
     const deborde = document.scrollingElement.scrollWidth > largeur + 1;
-    const hors = [...document.querySelectorAll('[data-boite-emails] *, [data-boite-feuille] *')].filter((n) => vis(n) && !n.closest('.vrm-boite-rubriques, [data-boite-defile]') && n.getBoundingClientRect().right > largeur + 1).map((n) => (n.className && String(n.className).slice(0, 40)) || n.tagName).slice(0, 5);
+    // Un élément qui dépasse la page SANS être rogné par un parent (overflow) se voit coupé.
+    const rogne = (n) => { for (let p = n.parentElement; p && p !== document.body; p = p.parentElement) { const o = getComputedStyle(p); if (/hidden|clip|auto|scroll/.test(o.overflowX) && p.getBoundingClientRect().right <= largeur + 1) return true; } return false; };
+    const feuille = document.querySelector('[data-boite-feuille]');
+    const hors = [...document.querySelectorAll(feuille ? '[data-boite-feuille] *' : '[data-boite-emails] *')].filter((n) => vis(n) && n.getBoundingClientRect().right > largeur + 1 && !rogne(n)).map((n) => (n.className && String(n.className).slice(0, 40)) || n.tagName).slice(0, 5);
     const petits = [...document.querySelectorAll('[data-boite-emails] button, [data-boite-emails] select, [data-boite-emails] a[href], [data-boite-feuille] button, [data-boite-feuille] a[href]')]
       .filter((n) => vis(n) && !n.closest('[aria-hidden="true"]')).filter((n) => { const b = n.getBoundingClientRect(); return b.height < 43.5 || b.width < 43.5; }).map((n) => (n.innerText || n.getAttribute('aria-label') || n.className || '').trim().slice(0, 30)).slice(0, 6);
     return { mots, deborde, hors, petits };
@@ -160,7 +163,7 @@ async function inspecter(pg, nom, racine = '[data-boite-emails]') {
           if (n >= recus.length) break;
           const plus = pg.locator('[data-boite-plus]');
           if (await plus.count() && await plus.isEnabled().catch(() => false)) await plus.click({ timeout: 3000 }).catch(() => {});
-          await pg.evaluate(() => { const s = document.querySelector('[data-boite-defile]') || document.scrollingElement; s.scrollTop = s.scrollHeight; window.scrollTo(0, document.scrollingElement.scrollHeight); });
+          await pg.evaluate(() => { const l = document.querySelectorAll('[data-boite-email]'); const d = l[l.length - 1]; if (d) d.scrollIntoView({ block: 'end' }); });
           await pg.waitForTimeout(250);
         }
         const nTotal = await pg.locator('[data-boite-email]').count();
@@ -169,17 +172,20 @@ async function inspecter(pg, nom, racine = '[data-boite-emails]') {
         const def = await pg.evaluate(async () => {
           const longues = []; let obs;
           try { obs = new PerformanceObserver((l) => { for (const e of l.getEntries()) longues.push(e.duration); }); obs.observe({ type: 'longtask', buffered: false }); } catch (_) {}
-          const s = document.querySelector('[data-boite-defile]') || document.scrollingElement;
-          s.scrollTop = 0; window.scrollTo(0, 0);
+          // Le conteneur qui défile vraiment (la coque fait défiler son <main>, pas la page).
+          const premier = document.querySelector('[data-boite-email]');
+          let s = document.scrollingElement;
+          for (let p = premier && premier.parentElement; p; p = p.parentElement) { const o = getComputedStyle(p).overflowY; if (/auto|scroll/.test(o) && p.scrollHeight > p.clientHeight + 4) { s = p; break; } }
+          s.scrollTop = 0;
           const t0 = performance.now(); let images = 0;
-          await new Promise((fin) => { const pas = () => { images++; const avant = s.scrollTop; s.scrollTop += 120; window.scrollBy(0, 120); if (s.scrollTop === avant && window.scrollY + innerHeight >= document.scrollingElement.scrollHeight - 2) return fin(); if (images > 2400) return fin(); requestAnimationFrame(pas); }; requestAnimationFrame(pas); });
+          await new Promise((fin) => { const pas = () => { images++; const avant = s.scrollTop; s.scrollTop += 120; if (s.scrollTop === avant) return fin(); if (images > 2400) return fin(); requestAnimationFrame(pas); }; requestAnimationFrame(pas); });
           const dt = performance.now() - t0; if (obs) obs.disconnect();
           return { ms: Math.round(dt), images, imgParS: Math.round(images / (dt / 1000)), longues: longues.length, longuesMs: Math.round(longues.reduce((a, b) => a + b, 0)), noeuds: document.querySelectorAll('[data-boite-emails] *').length };
         });
         mesures.push({ nom, tPremiere, nTotal, tToute, ...def });
         console.log(`  ⏱  ${nom} : 1re ligne ${tPremiere} ms · ${nTotal} lignes chargées en ${tToute} ms · défilement ${def.images} images en ${def.ms} ms (${def.imgParS}/s), ${def.longues} tâches longues (${def.longuesMs} ms), ${def.noeuds} nœuds`);
         dit(nTotal >= Math.min(recus.length, 900), `${nom} : la boîte entière se charge (${nTotal}/${recus.length})`);
-        await pg.evaluate(() => { const s = document.querySelector('[data-boite-defile]') || document.scrollingElement; s.scrollTop = 0; window.scrollTo(0, 0); });
+        await pg.evaluate(() => { const p = document.querySelector('[data-boite-email]'); if (p) p.scrollIntoView({ block: 'center' }); });
         await pg.waitForTimeout(300);
         // Un e-mail de chaque nature, ouvert.
         for (const [k, x] of NATURES) {
