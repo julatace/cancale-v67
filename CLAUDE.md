@@ -506,6 +506,7 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 
+- **5 nov. · Chantier D, Colis côté envoi (v35)** : frise à l'encre sur la dernière étape faite ; barre du haut stable (Scanner · Tout imprimer · …) ; « En grand » en SheetShell lumineuse (titre = article ou « Colis <transporteur> ») ; « Tournée de dépôt » et « attend depuis N j » ; « Déposé », « En route ». `docs/passation/2026-11-05-chantier-d.md`. Geste : essayer la tournée au relais.
 - **5 nov. · Chantier F, Compta et Statistiques (v35)** : cartes vides repliées en une ligne, sous-onglets sous le titre, statut choisi à UN endroit, « — » + raison (Comparer, À déclarer) ; « À recopier sur l'URSSAF » (Copier), Bilan du mois (PDF), Délai de paiement par site. `docs/passation/2026-11-05-chantier-f.md`. Geste : déclarer depuis « À recopier ».
 - **5 nov. · Petits plus (v34)** : accueil = vrais navigateurs (`navigateursServis`, Orion « en essai ») ; guide iPhone dans Notifications ; notif « compte Vinted pas relu » (Rappels, 1/jour) ; contrôle de prod (titre, santé, version extension). `docs/passation/2026-11-05-petits-plus.md`.
 
