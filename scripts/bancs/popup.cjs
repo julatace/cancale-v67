@@ -241,7 +241,7 @@ const ouvrirMdp = async (pg) => { const a = await pg.$('#mdpLien'); if (a) { awa
   // L'autre sens : un mauvais mot de passe n'est PAS un refus captcha.
   await essaie('mauvais mot de passe', async () => {
     const r = await rendre(nav, { ok: true, connecte: false }, { geste: tape, faux: { loginRep: { ok: false, error: 'Email ou mot de passe incorrect.' } } });
-    dit(/Email ou mot de passe incorrect/.test(r.txt) && !r.boutons.includes('captchaLierBtn') && !/plus possible depuis/.test(r.txt), 'un mauvais mot de passe reste un mauvais mot de passe (pas de phrase captcha)', r.txt.replace(/\n/g, ' · ').slice(0, 200));
+    dit(/E-?mail ou mot de passe incorrect/.test(r.txt) && !r.boutons.includes('captchaLierBtn') && !/plus possible depuis/.test(r.txt), 'un mauvais mot de passe reste un mauvais mot de passe (pas de phrase captcha)', r.txt.replace(/\n/g, ' · ').slice(0, 200));
   });
 
   // ── 2. CONNECTÉ — on ne redemande rien ───────────────────────────────────

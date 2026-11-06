@@ -414,7 +414,7 @@ async function fermerParEchap(pg) {
       await essaie('D. somme fausse', async () => {
         await ouvrirDepuisListe(pg, /Botte banc ecart/);
         const f = await lireFeuille(pg);
-        dit(f && f.somme === 'ecart' && f.phraseVisible && /regarde l'email de Vinted/.test(f.phrase), 'D. des lignes qui ne font pas le total : la feuille le DIT', f && `${f.somme} ${JSON.stringify(f.phrase)}`);
+        dit(f && f.somme === 'ecart' && f.phraseVisible && /regarde l'e-?mail de Vinted/.test(f.phrase), 'D. des lignes qui ne font pas le total : la feuille le DIT', f && `${f.somme} ${JSON.stringify(f.phrase)}`);
         await fermerParEchap(pg);
       });
 

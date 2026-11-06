@@ -126,7 +126,7 @@ async function scenarios(nav, taille) {
     await pg.click('form button[type=submit]'); await attendrePhrase(pg);
     const t = await texte(pg), a = await attente(pg), b = await valider(pg);
     dit(!ANGLAIS.test(t), 'aucun message en anglais', (t.match(ANGLAIS) || [''])[0]);
-    dit(!!a && a.n >= 55 && a.n <= 57 && /Par sécurité, un nouvel email ne peut partir que dans un instant/.test(a.txt), 'la phrase française dit la cause et le geste (le nombre est sur le bouton)', a ? `${a.n} · ${a.txt.slice(0, 80)}` : 'aucune phrase');
+    dit(!!a && a.n >= 55 && a.n <= 57 && /Par sécurité, un nouvel e-?mail ne peut partir que dans un instant/.test(a.txt), 'la phrase française dit la cause et le geste (le nombre est sur le bouton)', a ? `${a.n} · ${a.txt.slice(0, 80)}` : 'aucune phrase');
     const nb = Number((/Réessaie dans (\d+) s/.exec((b && b.txt) || '') || [])[1]);
     dit(!!b && b.off && nb >= 55 && nb <= 57, 'le bouton est grisé et dit « Réessaie dans N s » (57 s refusées)', JSON.stringify(b));
     await unSeulDecompte(pg, 'inscription');

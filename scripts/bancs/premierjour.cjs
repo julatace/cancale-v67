@@ -235,7 +235,7 @@ async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lectureP
   dit(/aucun compte Vinted n['’]est encore relié/i.test(neuf.txt), 'la CAUSE de la liste vide est écrite');
   dit(/vinted\.fr/i.test(neuf.txt), 'le geste final (ouvrir vinted.fr) est nommé');
   dit(/chrome:\/\/extensions/i.test(neuf.txt), 'l’installation dans Chrome est expliquée');
-  dit(/même email/i.test(neuf.txt), 'se connecter à l’extension avec le même email est dit — c’est ce qui sépare les vendeurs');
+  dit(/même e-?mail/i.test(neuf.txt), 'se connecter à l’extension avec le même email est dit — c’est ce qui sépare les vendeurs');
   const zip = neuf.liens.find((h) => /VRM-extension\.zip/.test(h || ''));
   dit(!!zip, 'un lien de téléchargement de l’extension est offert');
   // Mini-tuto illustré (26 oct.) : aucune extension ici ⇒ étape 1, l'illustration
@@ -382,7 +382,7 @@ async function rendre(nav, { comptes = [], baseKO = false, prenom = '', lectureP
     //    notion, un domaine) — pas par la phrase qui l'enrobe. « Installe » vs
     //    « Installer » ne dit rien sur la règle (§6.5).
     chrome: /chrome:\/\/extensions/i.test(t),
-    memeMail: /même email/i.test(t),
+    memeMail: /même e-?mail/i.test(t),
     vinted: /vinted\.fr/i.test(t),
   });
   const gb = gestes(bord.txt), gj = gestes(jour.txt);

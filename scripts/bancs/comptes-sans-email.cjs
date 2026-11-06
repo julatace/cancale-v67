@@ -181,7 +181,7 @@ const PAS_MUETS = ['jujuf38', 'compte_neuf', 'llloollllaa', 'dormant', 'une_vent
       await pg.waitForTimeout(500);
       const det = (await pg.locator('details', { has: sum }).first().innerText()).replace(/\s+/g, ' ');
       // §7 (revue du 11 oct.) : déplié, la même chose n'est pas dite deux fois.
-      const nFois = (det.match(/n’envoient? aucun email à VRM/g) || []).length;
+      const nFois = (det.match(/n’envoient? aucun e-?mail à VRM/g) || []).length;
       dit(nFois === 1 && !/déplie pour savoir/i.test(det), `${T} Réglages déplié : « n’envoie(nt) aucun email à VRM » dit UNE fois, et plus « déplie pour savoir lesquels »`, `${nFois} fois · ${(det.match(/.{0,60}déplie pour savoir.{0,10}/) || [''])[0]}`);
       // ⚠️ Jugé dans le BLOC seul : la liste des notifications dessous dit
       //    légitimement « avec le code de retrait » (📍 Colis à retirer).
@@ -234,7 +234,7 @@ const PAS_MUETS = ['jujuf38', 'compte_neuf', 'llloollllaa', 'dormant', 'une_vent
       const lignes = await pg.evaluate((DANGER) => {
         // Les lignes du tableau « Tes comptes Vinted et leurs emails » : login → (texte, couleur).
         const out = {};
-        const titre = [...document.querySelectorAll('div')].find((d) => /^Tes comptes Vinted et leurs emails$/.test((d.textContent || '').trim()));
+        const titre = [...document.querySelectorAll('div')].find((d) => /^Tes comptes Vinted et leurs e-?mails$/.test((d.textContent || '').trim()));
         if (!titre) return out;
         const zone = titre.parentElement;
         for (const row of zone.querySelectorAll('div')) {
@@ -248,14 +248,14 @@ const PAS_MUETS = ['jujuf38', 'compte_neuf', 'llloollllaa', 'dormant', 'une_vent
       }, DANGER);
       console.log(`     ${T} comptes : ${JSON.stringify(lignes)}`);
       const j = lignes.jujuf38 || {};
-      dit(/9 emails?/.test(j.etat || '') && !/aucun email/i.test(j.etat || ''), `${T} Achats : jujuf38 compte ses 9 messages (le journal), pas « aucun email »`, JSON.stringify(j));
+      dit(/9 e-?mails?/.test(j.etat || '') && !/aucun e-?mail/i.test(j.etat || ''), `${T} Achats : jujuf38 compte ses 9 messages (le journal), pas « aucun email »`, JSON.stringify(j));
       const n = lignes.compte_neuf || {};
-      dit(!!n.etat && !n.rouge && !/^aucun email$/i.test(n.etat), `${T} Achats : un compte qui n’a rien vendu n’est pas accusé en rouge`, JSON.stringify(n));
+      dit(!!n.etat && !n.rouge && !/^aucun e-?mail$/i.test(n.etat), `${T} Achats : un compte qui n’a rien vendu n’est pas accusé en rouge`, JSON.stringify(n));
       const rouges = Object.entries(lignes).filter(([, v]) => v.rouge).map(([k]) => k);
       dit(Object.keys(lignes).length >= 6 && !rouges.length, `${T} Achats : aucune ligne de compte en rouge (§7)`, `rouges ${JSON.stringify(rouges)} sur ${Object.keys(lignes).length}`);
       dit(!MUETS.some((l) => lignes[l]), `${T} Achats : la table ne redit pas un compte déjà nommé dans le bloc (§7)`, JSON.stringify(MUETS.filter((l) => lignes[l])));
       const st = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-compte-email]')].map((e) => [e.getAttribute('data-compte-email'), e.getAttribute('data-statut')])));
-      dit(st.une_vente === 'surveiller' && /1 vente sans email depuis le \d{1,2} [a-zéû]+/i.test((lignes.une_vente || {}).etat || ''),
+      dit(st.une_vente === 'surveiller' && /1 vente sans e-?mail depuis le \d{1,2} [a-zéû]+/i.test((lignes.une_vente || {}).etat || ''),
         `${T} Achats : une vente sans email il y a 20 j — « 1 vente sans email depuis le … », pas « aucun email pour l’instant »`, JSON.stringify({ st: st.une_vente, l: lignes.une_vente }));
       dit(st.recentes === 'surveiller' && /moins de 3 jours/.test((lignes.recentes || {}).etat || ''), `${T} Achats : deux ventes d’hier — « leur email peut encore arriver »`, JSON.stringify(lignes.recentes));
       dit(st.dormant === 'calme' && st.compte_neuf === 'calme', `${T} Achats : dormant (ventes d’avant le premier email) et compte neuf : « calme », pas accusés`, JSON.stringify({ dormant: st.dormant, neuf: st.compte_neuf }));
@@ -295,8 +295,8 @@ const PAS_MUETS = ['jujuf38', 'compte_neuf', 'llloollllaa', 'dormant', 'une_vent
     // Jugé sur les COMPTES (une ligne de transporteur « aucun email reçu » est
     // une autre mesure, juste : les suivis, eux, ont été lus).
     const zoneComptes = txt.slice(Math.max(0, txt.indexOf('Tes comptes Vinted et leurs emails')));
-    dit(txt.includes('Tes comptes Vinted et leurs emails') && !/aucun email\b(?! pour l)/i.test(zoneComptes.replace(/aucun email de suivi/gi, '')), 'journal illisible : aucun « aucun email » affirmé sur un compte', (zoneComptes.match(/.{40}aucun email.{40}/i) || [''])[0]);
-    dit(/pas pu lire les emails reçus/.test(txt), 'et l’écran DIT qu’il n’a pas pu lire', '');
+    dit(txt.includes('Tes comptes Vinted et leurs emails') && !/aucun e-?mail\b(?! pour l)/i.test(zoneComptes.replace(/aucun e-?mail de suivi/gi, '')), 'journal illisible : aucun « aucun email » affirmé sur un compte', (zoneComptes.match(/.{40}aucun e-?mail.{40}/i) || [''])[0]);
+    dit(/pas pu lire les e-?mails reçus/.test(txt), 'et l’écran DIT qu’il n’a pas pu lire', '');
     await sain(pg, 'pas su', errs);
     await ctx.close();
   });
