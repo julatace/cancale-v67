@@ -36,8 +36,13 @@ export function politiqueCadre(images) {
 
 // Le document complet posé dans `srcdoc`.
 export function documentCadre(html, { images = false, sombre = false } = {}) {
-  const corps = images ? avecImages(html) : String(html || '');
+  let corps = images ? avecImages(html) : String(html || '');
   const schema = sombre ? 'light dark' : 'light';
+  // Le `<body>` d'origine (rangé en `<div data-vrm-corps …>` par le serveur) retrouve
+  // sa place : ses attributs (déjà assainis, entre guillemets) reviennent sur le vrai
+  // `body`, pour que les règles `body { … }` de l'e-mail (son thème sombre) jouent.
+  let attrsCorps = '';
+  corps = corps.replace(/<div data-vrm-corps=""((?:\s[a-z-]+="[^"<>]*")*)>/, (m, a) => { attrsCorps = a; return '<div data-vrm-corps="">'; });
   return '<!doctype html><html><head><meta charset="utf-8">'
     + `<meta http-equiv="Content-Security-Policy" content="${politiqueCadre(images)}">`
     + '<meta name="referrer" content="no-referrer">'
@@ -47,13 +52,14 @@ export function documentCadre(html, { images = false, sombre = false } = {}) {
     + `:root{color-scheme:${schema}}`
     + 'html,body{margin:0;padding:0}'
     + 'html{overflow:hidden}'
-    + `body{background:${sombre ? 'Canvas' : '#ffffff'};color:${sombre ? 'CanvasText' : '#1d1d1f'};font:15px/1.45 -apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif;-webkit-text-size-adjust:100%;text-size-adjust:100%;overflow-wrap:break-word}`
+    + `html{background:${sombre ? 'Canvas' : '#ffffff'}}`
+    + `body{color:${sombre ? 'CanvasText' : '#1d1d1f'};font:15px/1.45 -apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif;-webkit-text-size-adjust:100%;text-size-adjust:100%;overflow-wrap:break-word}`
     + '.vrm-cadre-corps{padding:14px 14px 18px;box-sizing:border-box}'
     + 'img{max-width:100%;height:auto}'
     + 'img[data-vrm-src]{display:inline-block;min-width:28px;min-height:28px;background:#ececf0;border-radius:4px;color:transparent}'
     + 'a{color:#0071e3}'
     + 'pre{white-space:pre-wrap}'
-    + '</style></head><body><div class="vrm-cadre-corps">'
+    + `</style></head><body${attrsCorps}><div class="vrm-cadre-corps">`
     + corps
     + '</div></body></html>';
 }

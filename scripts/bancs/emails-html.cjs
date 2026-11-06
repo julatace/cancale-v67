@@ -81,7 +81,10 @@ async function ouvrir(nav, base, route, { viewport, tactile, sombre, stream = fa
   const pg = await ctx.newPage(); pg.setDefaultTimeout(15000);
   await pg.clock.setFixedTime(MAINTENANT);
   const erreurs = []; pg.on('pageerror', (e) => erreurs.push('page: ' + e.message));
-  pg.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource|net::ERR|favicon|Content Security Policy/i.test(m.text())) erreurs.push('console: ' + m.text().slice(0, 200)); });
+  // « Blocked script execution in 'about:srcdoc' » : les scripts d'initialisation du BANC
+  // (Playwright les pose dans chaque cadre) refusés par le sandbox — la preuve qu'il tient,
+  // comptée à part, jamais une erreur de l'app.
+  pg.on('console', (m) => { if (/Blocked script execution in 'about:srcdoc'/.test(m.text())) { pg.__bloques = (pg.__bloques || 0) + 1; return; } if (m.type() === 'error' && !/Failed to load resource|net::ERR|favicon|Content Security Policy/i.test(m.text())) erreurs.push('console: ' + m.text().slice(0, 200)); });
   await pg.addInitScript(([s, sombre, stream]) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_bienvenue_vue', '1'); localStorage.setItem('vrm_visite_vue', '1'); localStorage.setItem('vinted_dark', sombre ? 'true' : 'false'); if (stream) localStorage.setItem('vrm_stream', '1'); } catch (_) {} window.__xssAppels = []; window.__xss = (n) => window.__xssAppels.push(String(n)); }, [SESSION, sombre, stream]);
   const distantes = [];
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => {
@@ -133,7 +136,7 @@ const etatCadre = (pg) => pg.evaluate(() => {
   const parent = f.closest('[data-boite-lecture]').getBoundingClientRect();
   const fond = b ? getComputedStyle(b).backgroundColor : '';
   const carte = d && d.querySelector('.carte');
-  return { sandbox: f.getAttribute('sandbox'), echelle: f.getAttribute('data-cadre-echelle'), largeur: Math.round(fb.width), gauche: Math.round(fb.left), droite: Math.round(fb.right), parentDroite: Math.round(parent.right), hauteur: Math.round(fb.height), fond, carte: carte ? getComputedStyle(carte).backgroundColor : null, texte: b ? b.innerText.slice(0, 400) : '', tableau: d ? d.querySelectorAll('table').length : 0, imgs: d ? [...d.querySelectorAll('img')].map((i) => ({ src: i.getAttribute('src') || '', attente: i.getAttribute('data-vrm-src') || '', ok: i.complete && i.naturalWidth > 0 })) : [], liens: d ? [...d.querySelectorAll('a[href]')].map((a) => [a.getAttribute('target'), a.getAttribute('rel')]) : [], scripts: d ? d.querySelectorAll('script, iframe, object, embed, form, meta[http-equiv=refresh], base').length - d.querySelectorAll('meta[http-equiv="Content-Security-Policy"]').length : -1, etat: f.closest('[data-cadre-email]').getAttribute('data-images'), largeurPage: document.documentElement.clientWidth, deborde: document.scrollingElement.scrollWidth > document.documentElement.clientWidth + 1, xss: window.__xssAppels.slice() };
+  return { sandbox: f.getAttribute('sandbox'), echelle: f.getAttribute('data-cadre-echelle'), largeur: Math.round(fb.width), gauche: Math.round(fb.left), droite: Math.round(fb.right), parentDroite: Math.round(parent.right), hauteur: Math.round(fb.height), fond, carte: carte ? getComputedStyle(carte).backgroundColor : null, texte: b ? b.innerText.slice(0, 400) : '', tableau: d ? d.querySelectorAll('table').length : 0, imgs: d ? [...d.querySelectorAll('img')].map((i) => ({ src: i.getAttribute('src') || '', attente: i.getAttribute('data-vrm-src') || '', ok: i.complete && i.naturalWidth > 0 })) : [], liens: d ? [...d.querySelectorAll('a[href]')].map((a) => [a.getAttribute('target'), a.getAttribute('rel')]) : [], scripts: d ? d.querySelectorAll('script, iframe, object, embed, form, input, svg, math, link, base, meta[http-equiv=refresh], [onerror], [onload], [onclick]').length : -1, etat: f.closest('[data-cadre-email]').getAttribute('data-images'), largeurPage: document.documentElement.clientWidth, deborde: document.scrollingElement.scrollWidth > document.documentElement.clientWidth + 1, xss: window.__xssAppels.slice() };
 });
 
 (async () => {
@@ -145,7 +148,6 @@ const etatCadre = (pg) => pg.evaluate(() => {
   const route = await import(path.join(RACINE, 'api', '_lib', 'reception-email.js'));
   const extra = lignesHtml(H);
   const neuveBase = () => ({ rows: [...extra, ...FX.rows].map((x) => ({ ...x })), comptes: FX.comptes.slice() });
-  const vieux = FX.rows.filter((x) => x.id.startsWith('email_reception_') && x.data.type === 'vente').sort((a, b) => String(b.data.at).localeCompare(String(a.data.at)))[0];
 
   for (const [vw, tactile] of [[{ width: 390, height: 844 }, true], [{ width: 1512, height: 945 }, false]]) {
     for (const sombre of [false, true]) {
@@ -166,7 +168,8 @@ const etatCadre = (pg) => pg.evaluate(() => {
         dit(c && c.sandbox && !/allow-scripts/.test(c.sandbox) && c.scripts === 0, `${nom} E1 cadre isolé (sandbox sans scripts), aucun élément actif dedans`, c && c.sandbox);
         dit(c && c.liens.length >= 2 && c.liens.every(([t, r]) => t === '_blank' && /noopener/.test(r) && /noreferrer/.test(r)), `${nom} E1 les liens s'ouvrent ailleurs (noopener noreferrer)`);
         dit(c && c.etat === 'bloquees' && distantes.length === 0 && c.imgs.every((i) => !i.src && /^https:/.test(i.attente)), `${nom} E2 aucune image distante demandée avant le geste`, distantes.join(' | '));
-        if (sombre) dit(c && /rgb\(255, 255, 255\)/.test(c.fond), `${nom} E3 la nuit, fond CLAIR dans le cadre (l'e-mail n'a pas de thème sombre)`, c && c.fond);
+        const clair = (x) => { const m = /rgba?\((\d+), (\d+), (\d+)/.exec(x || ''); return m ? (0.2126 * m[1] + 0.7152 * m[2] + 0.0722 * m[3]) > 200 : false; };
+        if (sombre) dit(c && clair(c.fond), `${nom} E3 la nuit, fond CLAIR dans le cadre (l'e-mail n'a pas de thème sombre)`, c && c.fond);
         await pg.locator('[data-cadre-afficher-images]').click();
         await pg.waitForFunction(() => { const f = document.querySelector('.vrm-boite-cadre-iframe'); const d = f && f.contentDocument; return d && [...d.querySelectorAll('img')].length && [...d.querySelectorAll('img')].every((i) => i.complete && i.naturalWidth > 0); }, null, { timeout: 8000 }).catch(() => {});
         await pg.waitForTimeout(400);
@@ -198,6 +201,8 @@ const etatCadre = (pg) => pg.evaluate(() => {
         dit(c && c.xss.length === 0 && !distantes.some((u) => /piege\.exemple\.test/.test(u)), `${nom} E4 même images affichées : rien ne s'exécute, rien du piège n'est chargé`, (c && c.xss.join(',')) + ' ' + distantes.filter((u) => /piege/.test(u)).join(' | '));
         await fermer(pg);
         // E5 — un vieil e-mail sans HTML
+        const vieux = await pg.evaluate((ids) => { const l = [...document.querySelectorAll('[data-boite-email][data-rubrique="ventes"]')].find((x) => !ids.includes(x.getAttribute('data-boite-email'))); return l ? { id: l.getAttribute('data-boite-email') } : null; }, Object.values(ID));
+        dit(!!vieux, `${nom} E5 une vente sans mise en page gardée est dans la liste`);
         if (vieux) {
           await ouvrirEmail(pg, vieux.id);
           await pg.waitForTimeout(400);
@@ -205,7 +210,7 @@ const etatCadre = (pg) => pg.evaluate(() => {
           dit(!t.cadre && t.corps, `${nom} E5 un e-mail sans mise en page gardée : le texte remis en forme (${t.origine.join(',') || 'sans note'})`, JSON.stringify(t));
           await fermer(pg);
         }
-        dit(erreurs.length === 0, `${nom} aucune erreur JavaScript ni console`, erreurs.slice(0, 3).join(' | '));
+        dit(erreurs.length === 0, `${nom} aucune erreur JavaScript ni console (scripts du banc refusés par le sandbox : ${pg.__bloques || 0})`, erreurs.slice(0, 3).join(' | '));
         await ctx.close();
       });
     }

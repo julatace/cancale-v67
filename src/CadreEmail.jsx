@@ -29,7 +29,9 @@ export default function CadreEmail({ html, images = 0, sombreEmail = false, appS
     try { d = f && f.contentDocument; } catch (_) { d = null; }
     if (!f || !d || !d.body) return;
     try {
-      const b = d.body;
+      // L'échelle se pose sur l'enveloppe, jamais sur `body` : le fond de l'e-mail
+      // (posé sur body) remplit alors tout le cadre, même réduit.
+      const b = d.querySelector('.vrm-cadre-corps') || d.body;
       b.style.transform = ''; b.style.width = '';
       const large = f.clientWidth || 0;
       const contenu = Math.max(d.documentElement.scrollWidth, b.scrollWidth);
