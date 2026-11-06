@@ -380,7 +380,8 @@ export const valeurChiffre = (id, place, sources, sel, regles, maintenant = Date
   if (id === 'recu') {
     const ym = `${new Date(maintenant).getFullYear()}-${String(new Date(maintenant).getMonth() + 1).padStart(2, '0')}`;
     const R = recuPublie(S.ligneUrssaf, ym, maintenant);
-    if (R.valeur == null) return vide(R.raison, { p });
+    // (6 nov.) Jamais publiée mais l'écran ouvert la prépare : « lecture… », pas « ouvre Ventes ».
+    if (R.valeur == null) return vide(R.raison === 'absente' && S.enPreparation && S.enPreparation.urssaf ? 'encours' : R.raison, { p });
     if (R.partiel && !(R.valeur > 0)) return vide('partiel', { p, manque: R.manque });
     // (5 nov., chantier E1, revue 1.7) Des ventes SANS date de versement (« à dater ») ne
     // sont dans AUCUN mois (§5). Rien de daté ce mois et des ventes à dater : « 0 € » dirait
@@ -407,7 +408,8 @@ export const valeurChiffre = (id, place, sources, sel, regles, maintenant = Date
   }
   if (id === 'retirer') {
     const pub = S.colisARetirer;
-    return pub && Number.isFinite(pub.total) ? { valeur: pub.total, partiel: false, manque: [], hors: '', p: null, raison: '' } : vide('pasSu');
+    // (6 nov.) Absente pendant que l'écran ouvert la prépare : « lecture… », jamais « pas lu ».
+    return pub && Number.isFinite(pub.total) ? { valeur: pub.total, partiel: false, manque: [], hors: '', p: null, raison: '' } : vide(S.enPreparation && S.enPreparation.retirer ? 'encours' : 'pasSu');
   }
   if (id === 'attente' || id === 'dispo' || id === 'enligne') {
     const L = S.live;
@@ -442,7 +444,7 @@ export const valeurChiffre = (id, place, sources, sel, regles, maintenant = Date
   }
   if (id === 'dorment') {
     const pub = S.dorment;
-    if (!pub || !Number.isFinite(pub.n)) return vide('pasSu');
+    if (!pub || !Number.isFinite(pub.n)) return vide(S.enPreparation && S.enPreparation.dorment ? 'encours' : 'pasSu');
     // Moins de dates connues que d'annonces : « au moins » (la règle du bilan de la semaine).
     const partiel = Number.isFinite(pub.datesKnown) && Number.isFinite(pub.total) && pub.datesKnown < pub.total;
     if (partiel && !(pub.n > 0)) return vide('partiel');

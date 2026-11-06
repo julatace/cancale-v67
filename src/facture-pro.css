@@ -59,18 +59,10 @@
 .vrm-fp-vente-ligne span { font-size: 13px; color: var(--vrm-muted); overflow-wrap: anywhere; }
 .vrm-fp-vente-ligne[data-fp-vente="refusee"] span, .vrm-fp-vente-ligne[data-fp-vente="incertaine"] span { color: var(--vrm-warn, #b25000); }
 
-/* ── La feuille ── */
-.vrm-fp-voile { position: fixed; inset: 0; z-index: 1450; background: rgba(0,0,0,.45); display: flex; align-items: flex-end; justify-content: center; }
-.vrm-fp-feuille { width: 100%; max-width: 560px; max-height: 94dvh; background: var(--vrm-bg); color: var(--vrm-ink); border-radius: 18px 18px 0 0; display: flex; flex-direction: column; overflow: hidden; outline: none; }
-.vrm-fp-feuille.is-large { max-width: 720px; }
-.vrm-fp-feuille-tete { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--vrm-line); flex-shrink: 0; }
-.vrm-fp-feuille-tete h2 { margin: 0; font-size: 17px; font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.vrm-fp-retour { width: 44px; height: 44px; border-radius: 12px; border: 1px solid var(--vrm-line); background: var(--vrm-card); color: var(--vrm-ink); font-size: 22px; font-weight: 600; line-height: 1; cursor: pointer; flex-shrink: 0; }
-.vrm-fp-feuille-corps { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 14px 14px calc(16px + env(safe-area-inset-bottom)); display: grid; gap: 14px; align-content: start; }
-@media (min-width: 768px) {
-  .vrm-fp-voile { align-items: center; padding: 24px; }
-  .vrm-fp-feuille { border-radius: 14px; max-height: 90vh; }
-}
+/* ── La feuille (6 nov. : SheetShell) ── */
+.vrm-fs.vrm-fp-fs .vrm-fs-corps { padding: 0; display: flex; flex-direction: column; }
+.vrm-fp-feuille-corps { padding: 4px 16px calc(16px + env(safe-area-inset-bottom)); display: grid; gap: 14px; align-content: start; min-width: 0; }
+.vrm-fp-feuille-corps .vrm-fp-gestes.is-bas { margin: 0 -16px calc(-16px - env(safe-area-inset-bottom)); padding: 12px 16px calc(14px + env(safe-area-inset-bottom)); bottom: calc(-16px - env(safe-area-inset-bottom)); }
 
 /* ── L'aperçu : une page blanche, quelle que soit l'apparence de l'app ── */
 .vrm-fp-apercu { --fp-accent: #1d1d1f; background: #fff; color: #1d1d1f; border: 1px solid var(--vrm-line); border-radius: 12px; padding: 18px 16px; font-size: 12px; line-height: 1.4; display: grid; gap: 12px; min-width: 0; overflow-wrap: anywhere; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
@@ -104,3 +96,59 @@
 .vrm-fp-liste b { grid-area: n; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .vrm-fp-liste span { grid-area: s; font-size: 13px; color: var(--vrm-muted); overflow-wrap: anywhere; }
 .vrm-fp-liste em { grid-area: m; font-style: normal; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* ════ (6 nov.) « Ma facture » : le formulaire à gauche, l'aperçu en direct à droite ════ */
+.vrm-fp-ma-facture { display: grid; gap: 14px; min-width: 0; align-items: start; }
+.vrm-fp-apercu-col { display: grid; gap: 10px; min-width: 0; scroll-margin-top: 72px; }
+.vrm-fp-apercu-tete { display: grid; gap: 2px; }
+.vrm-fp-apercu-tete b { font-size: 15px; font-weight: 600; color: var(--vrm-ink); }
+.vrm-fp-apercu-tete span { font-size: 13px; color: var(--vrm-muted); line-height: 1.4; }
+.vrm-fp-voir-apercu { justify-self: start; margin-top: 8px; }
+@media (min-width: 1000px) {
+  .vrm-fp-ma-facture { grid-template-columns: minmax(0, 1fr) minmax(360px, 440px); }
+  .vrm-fp-apercu-col { position: sticky; top: 84px; max-height: calc(100vh - 100px); overflow-y: auto; overscroll-behavior: contain; padding-bottom: 8px; }
+  .vrm-fp-ma-facture .vrm-fp-voir-apercu { display: none; }
+}
+/* Dans la feuille (« Compléter ma fiche » depuis une vente) : une colonne. */
+.vrm-fp-feuille-corps .vrm-fp-ma-facture { grid-template-columns: minmax(0, 1fr); }
+.vrm-fp-feuille-corps .vrm-fp-apercu-col { position: static; max-height: none; overflow: visible; }
+.vrm-fp-feuille-corps .vrm-fp-ma-facture .vrm-fp-voir-apercu { display: block; }
+/* Un trou : une mention obligatoire pas encore remplie (ambre, jamais rouge). */
+.vrm-fp-a-trou { color: #9a4a00; background: #fff4e5; border-radius: 4px; padding: 0 4px; font-weight: 600; justify-self: start; }
+.vrm-fp-mentions summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-size: 13px; color: var(--vrm-muted); }
+.vrm-fp-mentions ul { margin: 0; padding: 0 0 0 2px; list-style: none; display: grid; gap: 4px; font-size: 13px; color: var(--vrm-ink); }
+.vrm-fp-mentions li[data-ok="0"] { color: var(--vrm-warn, #b25000); }
+.vrm-fp-chiffre { font-variant-numeric: tabular-nums; }
+.vrm-fp-boite { display: grid; gap: 10px; min-width: 0; }
+.vrm-fp-mail { display: grid; gap: 2px; min-width: 0; padding: 10px 12px; border-radius: 12px; background: var(--vrm-bg); border: 1px solid var(--vrm-line); font-size: 13px; color: var(--vrm-ink); }
+.vrm-fp-mail small { font-size: 11px; color: var(--vrm-muted); margin-top: 6px; }
+.vrm-fp-mail small:first-child { margin-top: 0; }
+.vrm-fp-mail b { font-weight: 600; overflow-wrap: anywhere; }
+.vrm-fp-mail span { overflow-wrap: anywhere; }
+.vrm-fp-mail pre { margin: 0; font: inherit; white-space: pre-wrap; overflow-wrap: anywhere; }
+.vrm-fp-dest { margin: 0; display: grid; gap: 2px; }
+.vrm-fp-dest b { font-size: 15px; font-weight: 600; color: var(--vrm-ink); }
+.vrm-fp-dest span { font-size: 13px; color: var(--vrm-muted); overflow-wrap: anywhere; }
+.vrm-fp-journal { list-style: none; margin: 0; padding: 0; display: grid; }
+.vrm-fp-journal li { display: grid; gap: 1px; padding: 8px 0; font-size: 13px; }
+.vrm-fp-journal li + li { border-top: 1px solid var(--vrm-line); }
+.vrm-fp-journal b { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--vrm-ink); }
+.vrm-fp-journal span { color: var(--vrm-muted); overflow-wrap: anywhere; }
+.vrm-fp-journal li[data-fp-journal-etat="refusee"] > span, .vrm-fp-journal li[data-fp-journal-etat="incertaine"] > span { color: var(--vrm-warn, #b25000); }
+.vrm-fp-raison { overflow-wrap: anywhere; }
+
+/* ── Sur la LIGNE de la vente (à côté de la vente, dans la liste) ── */
+.vrm-fp-ligne { display: flex; align-items: center; gap: 8px; min-width: 0; margin-top: 2px; }
+.vrm-fp-ligne-bouton { min-height: 44px; }
+.vrm-fp-ligne-raison { margin: 0; font-size: 12px; line-height: 1.35; color: var(--vrm-muted); overflow-wrap: anywhere; min-width: 0; }
+.vrm-fp-ligne-etat { display: grid; gap: 1px; text-align: left; min-height: 44px; padding: 4px 0; background: transparent; border: 0; color: var(--vrm-ink); font: inherit; cursor: pointer; min-width: 0; }
+.vrm-fp-ligne-etat b { font-size: 13px; font-weight: 600; }
+.vrm-fp-ligne-etat span { font-size: 12px; color: var(--vrm-muted); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.vrm-fp-ligne-etat[data-fp-vente="refusee"] span, .vrm-fp-ligne-etat[data-fp-vente="incertaine"] span { color: var(--vrm-warn, #b25000); }
+
+/* (6 nov.) L'aperçu garde SA taille de texte (la page blanche de la facture), quelle
+   que soit la règle des tableaux de l'app ; les montants ne se coupent jamais. */
+html body .vrm-fp-apercu .vrm-fp-a-table th, html body .vrm-fp-apercu .vrm-fp-a-table td { font-size: 12px; line-height: 1.35; }
+html body .vrm-fp-apercu .vrm-fp-a-table th:nth-child(n+2), html body .vrm-fp-apercu .vrm-fp-a-table td:nth-child(n+2) { white-space: nowrap; }
+html body .vrm-fp-apercu .vrm-fp-a-table th:first-child, html body .vrm-fp-apercu .vrm-fp-a-table td:first-child { width: auto; }
+html body .vrm-fp-apercu .vrm-fp-a-table { table-layout: auto; }

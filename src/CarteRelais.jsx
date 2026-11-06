@@ -35,6 +35,7 @@ import './styles-colis-colonnes.css';
 import PastilleTransporteur from './PastilleTransporteur.jsx';
 import { cleStatTransporteur } from './transporteursVisuels.js';
 import { attrCible } from './cibleNotif.js';
+import { explicationEnDouble } from './retraitPreuves.js';
 
 // (5 nov.) Le crochet d'une notification (`data-cible`, src/cibleNotif.js) : la clé
 // de la ligne EST son identité — « r:v:<tx> » / « r:c:<tx> » (achat Vinted),
@@ -524,6 +525,8 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte, ec
       {parSection.double.length ? (
         <details className="vrm-rpf-section is-repli vrm-rpf-double" data-rp-section="double" data-rp-section-n={parSection.double.length} data-retirer-en-double={parSection.double.length}>
           <summary className="vrm-rpf-section-titre is-repli"><span>Peut-être en double<span className="vrm-rpf-section-n">{parSection.double.length}</span></span><span className="vrm-rpf-chevron" aria-hidden="true">›</span></summary>
+          {/* (6 nov.) Pourquoi « peut-être en double » : une phrase, une fois (src/retraitPreuves.js). */}
+          <p className="vrm-rp-sous vrm-rpf-double-pourquoi" data-double-explication={parSection.double.length}>{explicationEnDouble(parSection.double.length)}</p>
           <div className="vrm-rpf-section-corps"><section className="vrm-rpf-point"><div className="vrm-rpf-liste">{parSection.double.map(({ x }) => ligne(x))}</div></section></div>
         </details>) : null}
       {nRoute ? (

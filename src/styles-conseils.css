@@ -1,0 +1,83 @@
+/* Les conseils (src/Conseils.jsx), 6 nov. Hors de la coque (portail sur <body>) :
+   les couleurs suivent `data-theme` de la racine, comme la visite en bulles.
+   §7 : neutre ; le bleu Apple sur le SEUL geste ; le halo est un anneau léger
+   (pas de voile : l'écran reste vivant, la bulle n'est pas modale).
+   Mouvement : entrée en ressort (`linear()`, dépassement ≈ 1 %, depuis la pointe),
+   sortie 140 ms ; « réduire les animations » ⇒ un fondu, rien ne bouge. */
+.vrm-conseil {
+  --c-carte: #ffffff; --c-encre: #1d1d1f; --c-doux: #6e6e73; --c-filet: rgba(0, 0, 0, .08);
+  --c-accent: #0071E3; --c-anneau: rgba(0, 113, 227, .55); --c-lueur: rgba(0, 113, 227, .14);
+  --c-ressort: linear(0, 0.0526, 0.1724, 0.3177, 0.4632, 0.5948, 0.7063, 0.7959, 0.8648, 0.9158, 0.952, 0.9766, 0.9924, 1.0018, 1.0068, 1.009, 1.0093, 1.0086, 1.0073, 1.006, 1.0046, 1.0035, 1.0025, 1.0017, 1);
+  position: fixed; inset: 0; pointer-events: none; font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+:root[data-theme="dark"] .vrm-conseil {
+  --c-carte: #1c1c1e; --c-encre: #f5f5f7; --c-doux: #aeaeb2; --c-filet: rgba(255, 255, 255, .1);
+  --c-accent: #0A84FF; --c-anneau: rgba(10, 132, 255, .7); --c-lueur: rgba(10, 132, 255, .2);
+}
+
+/* Le halo : un anneau autour du vrai bouton, une respiration à l'entrée, puis calme. */
+.vrm-conseil-halo {
+  position: absolute; border-radius: 14px; pointer-events: none;
+  box-shadow: 0 0 0 2px var(--c-anneau), 0 0 0 7px var(--c-lueur);
+  animation: vrm-conseil-halo .6s cubic-bezier(.23, 1, .32, 1) both;
+}
+@keyframes vrm-conseil-halo { from { opacity: 0; transform: scale(1.12); } to { opacity: 1; transform: none; } }
+
+.vrm-conseil-bulle {
+  position: absolute; pointer-events: auto; box-sizing: border-box;
+  width: min(320px, calc(100vw - 32px));
+  padding: 16px 16px 8px; border-radius: 18px;
+  background: var(--c-carte); color: var(--c-encre);
+  border: 1px solid var(--c-filet);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .06), 0 14px 36px rgba(0, 0, 0, .18);
+  transform-origin: var(--fleche-x, 50%) 0;
+  animation: vrm-conseil-entre .42s var(--c-ressort) both, vrm-conseil-fondu .18s cubic-bezier(.23, 1, .32, 1) both;
+}
+.vrm-conseil-bulle[data-cote="dessus"] { transform-origin: var(--fleche-x, 50%) 100%; animation-name: vrm-conseil-entre-haut, vrm-conseil-fondu; }
+.vrm-conseil-bulle[data-cote="mesure"] { animation: none; }
+@keyframes vrm-conseil-entre { from { transform: translateY(-6px) scale(.94); } to { transform: none; } }
+@keyframes vrm-conseil-entre-haut { from { transform: translateY(6px) scale(.94); } to { transform: none; } }
+@keyframes vrm-conseil-fondu { from { opacity: 0; } to { opacity: 1; } }
+.vrm-conseil[data-sortie] .vrm-conseil-bulle,
+.vrm-conseil[data-sortie] .vrm-conseil-halo {
+  animation: vrm-conseil-sort .14s cubic-bezier(.23, 1, .32, 1) both;
+}
+@keyframes vrm-conseil-sort { from { opacity: 1; transform: none; } to { opacity: 0; transform: scale(.97); } }
+
+.vrm-conseil-fleche {
+  position: absolute; width: 12px; height: 12px; background: var(--c-carte);
+  border: 1px solid var(--c-filet); transform: rotate(45deg);
+}
+.vrm-conseil-bulle[data-cote="dessous"] .vrm-conseil-fleche { top: -7px; left: calc(var(--fleche-x) - 6px); border-bottom: 0; border-right: 0; }
+.vrm-conseil-bulle[data-cote="dessus"] .vrm-conseil-fleche { bottom: -7px; left: calc(var(--fleche-x) - 6px); border-top: 0; border-left: 0; }
+.vrm-conseil-bulle[data-cote="mesure"] .vrm-conseil-fleche { display: none; }
+
+.vrm-conseil-titre { margin: 0 0 4px; font-size: 17px; line-height: 22px; font-weight: 600; letter-spacing: -.012em; }
+.vrm-conseil-texte { margin: 0 0 12px; font-size: 15px; line-height: 20px; color: var(--c-doux); letter-spacing: -.005em; }
+
+/* Le geste en bleu, pleine largeur ; dessous, deux mots discrets, chacun 44 px. */
+.vrm-conseil-pied { display: grid; grid-template-columns: 1fr 1fr; gap: 0 4px; }
+.vrm-conseil-geste, .vrm-conseil-tard, .vrm-conseil-jamais {
+  min-height: 44px; min-width: 44px; border: 0; border-radius: 12px; padding: 0 12px;
+  font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; white-space: nowrap;
+  transition: transform .12s cubic-bezier(.23, 1, .32, 1), background-color .15s ease, color .15s ease;
+}
+.vrm-conseil-geste { grid-column: 1 / -1; background: var(--c-accent); color: #fff; margin-bottom: 2px; }
+.vrm-conseil-tard, .vrm-conseil-jamais { background: transparent; color: var(--c-doux); font-weight: 500; }
+@media (hover: hover) and (pointer: fine) {
+  .vrm-conseil-tard:hover, .vrm-conseil-jamais:hover { color: var(--c-encre); }
+}
+.vrm-conseil-geste:active, .vrm-conseil-tard:active, .vrm-conseil-jamais:active { transform: scale(.97); }
+.vrm-conseil-geste:focus-visible, .vrm-conseil-tard:focus-visible, .vrm-conseil-jamais:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .vrm-conseil-bulle, .vrm-conseil-bulle[data-cote="dessus"] { animation: vrm-conseil-fondu .18s ease both; }
+  .vrm-conseil-halo { animation: vrm-conseil-fondu .18s ease both; }
+  .vrm-conseil[data-sortie] .vrm-conseil-bulle, .vrm-conseil[data-sortie] .vrm-conseil-halo { animation: vrm-conseil-fondu-sort .14s ease both; }
+  .vrm-conseil-geste:active, .vrm-conseil-tard:active, .vrm-conseil-jamais:active { transform: none; }
+}
+@keyframes vrm-conseil-fondu-sort { from { opacity: 1; } to { opacity: 0; } }
+@media (prefers-contrast: more) {
+  .vrm-conseil-bulle { border-color: var(--c-encre); }
+}

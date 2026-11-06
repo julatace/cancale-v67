@@ -1,0 +1,391 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   v36-VISUEL-2 (6 nov.) — DE « PROPRE » À « BEAU »
+   Julien : « c'est catastrophique, on dirait du travail bâclé, je veux quelque
+   chose de parfait et de beau » ; « tu ne peux pas te permettre de me faire un
+   site moyen ». La 1re passe (styles-visuel.css) a retiré le texte ; celle-ci
+   pose la MATIÈRE et le RYTHME des apps d'Apple (Wallet, Fitness, Photos, Mail) :
+     1. une échelle de texte stricte (34/28/22/17/15/13/11 · 700/600/400) ;
+     2. le grand titre qui se replie sous une barre FLOUTÉE (le contenu passe dessous) ;
+     3. des cartes « matériau » (blanches élevées, #1C1C1E la nuit), filets décalés ;
+     4. des pastilles d'UNE ligne, le montant à part, comme un prix ;
+     5. le mouvement : toucher 0,97, chiffre qui roule, feuilles en ressort — et
+        rien de tout ça en mouvement réduit.
+   Aucune couleur nouvelle (§3, §7) : encre, gris, l'ambre d'un geste, le bleu rare.
+   Jetons seulement (--vrm-*). Importée APRÈS styles-visuel.css.
+   Passation : docs/passation/2026-11-06-visuel-2.md
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* L'échelle (iOS : Large Title 34 · Title 1 28 · Title 2 22 · Headline/Body 17 ·
+     Subhead 15 · Footnote 13 · Caption 11). Au-delà de 20 px la police système
+     d'Apple passe d'elle-même en SF Pro Display (font-optical-sizing). */
+  --vrm-t34: 34px; --vrm-t28: 28px; --vrm-t22: 22px; --vrm-t17: 17px; --vrm-t15: 15px; --vrm-t13: 13px; --vrm-t11: 11px;
+  --vrm-ressort: cubic-bezier(.32,.72,0,1);          /* la courbe des tiroirs d'iOS */
+  --vrm-sortie: cubic-bezier(.23,1,.32,1);
+  --vrm-r-carte: 16px;
+  --vrm-remplissage: rgba(118,118,128,.14);   /* le « fill » d'iOS, sur fond comme sur carte */
+}
+:root[data-theme="dark"] { --vrm-remplissage: rgba(118,118,128,.30); }
+
+/* ══ 1. COLIS ══════════════════════════════════════════════════════════════ */
+
+/* L'en-tête d'un point : le NOM a sa ligne (à droite : le nombre de colis), le
+   transporteur et l'adresse passent DESSOUS. Plus jamais « 14 Rue des Glycines,
+   35000 Re… » coincée à côté du nom, ni « Phone C… » serré par « Mondial Relay ». */
+html body .vrm-app-shell .vrm-main .vrm-rpf-point:not(.vrm-rpf-verifier) > .vrm-rpf-tete {
+  display: grid !important; grid-template-columns: auto minmax(0, 1fr) auto; align-items: baseline;
+  column-gap: 8px; row-gap: 2px; padding: 12px 16px 10px !important;
+}
+html body .vrm-app-shell .vrm-main .vrm-rpf-point > .vrm-rpf-tete > :is(.vrm-rpf-ident, .vrm-rpf-meta) { display: contents !important; }
+html body .vrm-app-shell .vrm-main .vrm-rpf-point > .vrm-rpf-tete .vrm-rpf-nom {
+  grid-row: 1; grid-column: 1 / 3; min-width: 0; font-size: var(--vrm-t17); font-weight: 600; letter-spacing: -.02em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+html body .vrm-app-shell .vrm-main .vrm-rpf-point > .vrm-rpf-tete .vrm-rpf-transp { grid-row: 2; grid-column: 1; align-self: center; margin-right: 6px; }
+html body .vrm-app-shell .vrm-main .vrm-rpf-point > .vrm-rpf-tete .vrm-rpf-n { grid-row: 1; grid-column: 3; margin: 0 !important; font-size: var(--vrm-t13); font-weight: 400; color: var(--vrm-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+html body .vrm-app-shell .vrm-main .vrm-rpf-point > .vrm-rpf-tete .vrm-rpf-adr {
+  grid-row: 2; grid-column: 2 / -1; min-width: 0; font-size: var(--vrm-t13); font-weight: 400; color: var(--vrm-muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+html body .vrm-app-shell .vrm-main .vrm-rpf-point > .vrm-rpf-tete .vrm-rpf-transp .vrm-transporteur { font-size: var(--vrm-t13); }
+html body .vrm-app-shell .vrm-main .vrm-rpf-point > .vrm-rpf-tete:not(:has(.vrm-rpf-transp)) .vrm-rpf-adr { grid-column: 1 / -1; }
+
+/* Une ligne de colis : la photo plus grande (56 px), le NOM DE L'ARTICLE garde la
+   place (deux lignes au plus), les gestes passent dessous, alignés sur le texte.
+   Sur une colonne large (ordinateur), tout reste sur une ligne. */
+html body .vrm-app-shell .vrm-main .vrm-rpf-point { container-type: inline-size; }
+html body .vrm-app-shell .vrm-main .vrm-rpf-vignette { width: 56px; height: 56px; border-radius: 12px; }
+html body .vrm-app-shell .vrm-main .vrm-rpf-titre { font-size: var(--vrm-t15); font-weight: 600; letter-spacing: -.01em; line-height: 1.3; }
+@container (max-width: 480px) {
+  html body .vrm-app-shell .vrm-main .vrm-rpf-ligne:not(.vrm-reparti-court) > .vrm-rpf-rang { flex-wrap: wrap; row-gap: 6px; column-gap: 8px; padding: 12px 0; }
+  html body .vrm-app-shell .vrm-main .vrm-rpf-ligne:not(.vrm-reparti-court) > .vrm-rpf-rang > .vrm-rpf-ouvrir { flex: 1 1 100%; gap: 12px; }
+  html body .vrm-app-shell .vrm-main .vrm-rpf-ligne:not(.vrm-reparti-court) > .vrm-rpf-rang > :is(.vrm-rpf-code, .vrm-rpf-retire) { padding: 0 16px !important; font-size: var(--vrm-t15) !important; } /* 44 px au doigt, affichés (§7) */
+  html body .vrm-app-shell .vrm-main .vrm-rpf-ligne:not(.vrm-reparti-court) > .vrm-rpf-rang > .vrm-rpf-ouvrir + :is(.vrm-rpf-code, .vrm-rpf-retire) { margin-left: 68px; }
+  html body .vrm-app-shell .vrm-main .vrm-rpf-detail { padding-left: 68px; }
+}
+/* Les filets d'une liste commencent APRÈS la photo (comme Mail et Réglages). */
+html body .vrm-app-shell .vrm-main .vrm-rpf-ligne { position: relative; border-top: 0 !important; }
+html body .vrm-app-shell .vrm-main .vrm-rpf-ligne + .vrm-rpf-ligne::before {
+  content: ''; position: absolute; top: 0; left: 68px; right: 0; height: .5px; background: var(--vrm-line); pointer-events: none;
+}
+:root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-rpf-ligne + .vrm-rpf-ligne::before { background: #38383A; }
+
+/* Une puce : UNE ligne, jamais coupée ; le montant vit à part, comme un prix. */
+html body .vrm-app-shell .vrm-main .vrm-rpf-puce { white-space: nowrap !important; flex: none; height: 22px !important; min-height: 0 !important; padding: 0 8px !important; line-height: 22px !important; overflow: visible; }
+html body .vrm-app-shell .vrm-main .vrm-rpf-montant {
+  flex: none; margin-left: auto; font-size: var(--vrm-t15); font-weight: 600; color: var(--vrm-ink);
+  font-variant-numeric: tabular-nums; white-space: nowrap; letter-spacing: -.01em;
+}
+html body .vrm-app-shell .vrm-main .vrm-rpf-sortie { flex: none; width: 16px; color: var(--vrm-muted); font-size: 15px; text-align: center; }
+html body .vrm-app-shell .vrm-main a.vrm-rpf-rang-lien {
+  display: flex; align-items: center; gap: 12px; color: inherit; text-decoration: none; cursor: pointer;
+  margin: 0 -14px; padding: 12px 14px; -webkit-tap-highlight-color: transparent; transition: background-color 120ms ease-out;
+}
+html body .vrm-app-shell .vrm-main a.vrm-rpf-rang-lien:active { background: var(--vrm-card2); }
+@media (hover: hover) and (pointer: fine) { html body .vrm-app-shell .vrm-main a.vrm-rpf-rang-lien:hover { background: color-mix(in srgb, var(--vrm-card2) 60%, transparent); } }
+html body .vrm-app-shell .vrm-main a.vrm-rpf-rang-lien:focus-visible { outline: 2px solid var(--vrm-accent); outline-offset: -2px; border-radius: 12px; }
+
+/* Le bas de « À retirer » portait 40 px de marge intérieure (le cadre de l’écran Colis) : avec les 28 px d’une
+   section, « Argent à vérifier » tombait à 68 px de « En route » (banc colis-retirer-propre, rouge AVANT ce chantier
+   aussi — mesuré sur la base). (v36-raccords) 0 + 28 = 28 px : exactement la grille des autres sections
+   (28, 28, 28…) — une seule règle d'espacement, la marge de la section ; plus de correction ailleurs. */
+html body .vrm-app-shell .vrm-main div:has(> section.vrm-colis-retirer) { padding-bottom: 0 !important; }
+/* La carte « Nouveau N° pour un carton » : ses boutons en pilules grises d'iOS. */
+html body .vrm-app-shell .vrm-main [data-numeros-a-ecrire] [data-a-ecrire] button {
+  border: 0 !important; background: var(--vrm-card2) !important; border-radius: 999px !important; padding: 0 16px !important;
+  font-size: var(--vrm-t15) !important; font-weight: 600 !important; color: var(--vrm-ink) !important;
+}
+html body .vrm-app-shell .vrm-main [data-numeros-a-ecrire] [data-a-ecrire] { border-top: .5px solid var(--vrm-line) !important; padding: 10px 0 !important; }
+html body .vrm-app-shell .vrm-main [data-numeros-a-ecrire] .vrm-alerte-ligne-titre { font-size: var(--vrm-t17); white-space: normal; }
+
+/* ══ 2. eBAY · ANNONCES (et Leboncoin, Vestiaire : « Chiffres ») ═══════════ */
+
+/* « Chiffres › » : une rangée de Réglages — tuile d'icône, libellé à l'encre, chevron —
+   alignée sur les cartes (elle flottait en gris pâle géant, collée au bord). */
+@media (max-width: 767px) {
+  html body .vrm-app-shell .vrm-main .vrm-market-space > .vrm-platform-summary > summary,
+  html body .vrm-app-shell .vrm-main .vrm-platform-summary > summary {
+    display: flex !important; align-items: center; gap: 12px; min-height: 52px; padding: 0 16px !important;
+    font-size: var(--vrm-t17) !important; font-weight: 400 !important; letter-spacing: -.01em; color: var(--vrm-ink) !important;
+  }
+  html body .vrm-app-shell .vrm-main .vrm-platform-summary > summary::before {
+    content: ''; flex: 0 0 30px; width: 30px; height: 30px; border-radius: 8px; background: var(--vrm-card2);
+  }
+  html body .vrm-app-shell .vrm-main .vrm-platform-summary > summary > .vrm-summary-short { flex: 1 1 auto; position: relative; }
+  html body .vrm-app-shell .vrm-main .vrm-platform-summary > summary > .vrm-summary-short::before {
+    content: ''; position: absolute; left: -35px; top: 50%; width: 16px; height: 16px; margin-top: -8px; background: var(--vrm-ink);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 3v18h18'/%3E%3Cpath d='m7 15 4-4 3 3 5-6'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 3v18h18'/%3E%3Cpath d='m7 15 4-4 3 3 5-6'/%3E%3C/svg%3E") center / contain no-repeat;
+  }
+}
+
+/* « À faire sur eBay » : un groupe de Réglages — une icône par geste (lier, endormie…),
+   l'ambre seulement sur le geste pressé ; le filet commence après l'icône. */
+html body .vrm-app-shell .vrm-main .vrm-eb-afaire { border: 0 !important; border-radius: var(--vrm-r-carte); box-shadow: var(--vrm-ombre-carte); }
+html body .vrm-app-shell .vrm-main .vrm-eb-afaire-titre { padding: 14px 16px 2px; font-size: var(--vrm-t15); font-weight: 600; color: var(--vrm-ink); letter-spacing: -.01em; }
+html body .vrm-app-shell .vrm-main .vrm-eb-afaire-ligne { position: relative; gap: 12px; min-height: 52px; padding: 8px 14px 8px 16px; border-top: 0 !important; font-size: var(--vrm-t15); }
+html body .vrm-app-shell .vrm-main .vrm-eb-afaire-ligne + .vrm-eb-afaire-ligne::before { content: ''; position: absolute; top: 0; left: 58px; right: 0; height: .5px; background: var(--vrm-line); }
+html body .vrm-app-shell .vrm-main .vrm-eb-afaire-ligne small { font-size: var(--vrm-t13); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html body .vrm-app-shell .vrm-main .vrm-eb-afaire-point.vrm-eb-afaire-icone {
+  width: 30px; height: 30px; flex: 0 0 30px; border-radius: 8px; display: grid; place-items: center;
+  background: var(--vrm-card2); color: var(--vrm-ink);
+}
+html body .vrm-app-shell .vrm-main .vrm-eb-afaire-ligne[data-urgent="1"] .vrm-eb-afaire-icone { background: var(--vrm-warn-soft); color: var(--vrm-warn); }
+
+/* La liste : un groupe iOS — carte blanche aux coins continus, photo 64 px, filets
+   qui commencent APRÈS la photo, le prix en titre (17/600, chiffres alignés). */
+html body .vrm-app-shell .vrm-main .vrm-ebay-liste { background: var(--vrm-surface); border-radius: var(--vrm-r-carte); box-shadow: var(--vrm-ombre-carte); overflow: hidden; border: 0 !important; }
+html body .vrm-app-shell .vrm-main .vrm-ebay-liste .vrm-eb-carte { position: relative; border-top: 0 !important; }
+html body .vrm-app-shell .vrm-main .vrm-ebay-liste > * + * > .vrm-eb-carte::before,
+html body .vrm-app-shell .vrm-main .vrm-ebay-liste > .vrm-eb-carte + .vrm-eb-carte::before {
+  content: ''; position: absolute; top: 0; left: 92px; right: 0; height: .5px; background: var(--vrm-line); pointer-events: none;
+}
+html body .vrm-app-shell .vrm-main .vrm-eb-tete { padding: 12px 12px 12px 16px; gap: 12px; }
+html body .vrm-app-shell .vrm-main .vrm-eb-ouvrir { min-height: 64px; }
+html body .vrm-app-shell .vrm-main .vrm-eb-ouvrir > :first-child,
+html body .vrm-app-shell .vrm-main .vrm-eb-ouvrir > :first-child img {
+  width: 64px !important; height: 64px !important; min-width: 64px; border-radius: 12px !important; object-fit: cover;
+}
+html body .vrm-app-shell .vrm-main .vrm-eb-titre { font-size: var(--vrm-t15); }
+html body .vrm-app-shell .vrm-main .vrm-eb-meta { font-size: var(--vrm-t13); }
+html body .vrm-app-shell .vrm-main .vrm-eb-prix { font-size: var(--vrm-t17); font-weight: 600; letter-spacing: -.02em; padding-right: 4px; }
+/* « Relier » : une action de texte à l'encre précédée de son maillon — plus cinq pavés
+   gris identiques ; « … » reste au gris secondaire. Toujours 44 px au doigt. */
+html body .vrm-app-shell .vrm-main .vrm-eb-gestes .vrm-b[data-relier-ouvrir] {
+  background: transparent !important; border: 0 !important; box-shadow: none !important; color: var(--vrm-ink) !important;
+  padding: 0 4px 0 6px !important; gap: 4px; font-size: 14px !important; font-weight: 600 !important; min-width: 0 !important;
+}
+/* « … » : 44 × 44 sans marge intérieure, le titre de la paire garde la place. */
+html body .vrm-app-shell .vrm-main .vrm-eb-gestes .vrm-b[data-ebay-carte-plus] { min-width: 44px !important; width: 44px; padding: 0 !important; }
+html body .vrm-app-shell .vrm-main .vrm-eb-gestes .vrm-b[data-relier-ouvrir]::before {
+  content: ''; width: 13px; height: 13px; flex: none; background: currentColor; opacity: .55;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.5 1.5'/%3E%3Cpath d='M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.5-1.5'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.5 1.5'/%3E%3Cpath d='M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.5-1.5'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+@media (hover: hover) and (pointer: fine) { html body .vrm-app-shell .vrm-main .vrm-eb-gestes .vrm-b[data-relier-ouvrir]:hover { background: var(--vrm-card2) !important; } }
+
+/* ══ 3. LA BARRE DU HAUT ET LE GRAND TITRE QUI SE REPLIE (téléphone) ══════
+   Comme Mail et Réglages : en haut de page la barre se fond dans le fond et le grand
+   titre (34 px) est posé dessous ; au défilement la barre prend un filet d'un
+   demi-pixel, le titre revient en
+   petit (17/600) au centre, pendant que le grand titre s'efface.
+   ⚠️ L'en-tête RESTE dans la colonne (sticky, au-dessus de `.vrm-main`) : le faire
+   flotter pour que le contenu passe SOUS le verre faisait sauter la carte sombre de
+   Colis de 149 px pendant le chargement (banc `chargement`, CLS 0,106 contre 0,012 —
+   mesuré avec et sans). Le contenu sous le verre est à reprendre avec la coque. */
+@media (max-width: 767px), (max-width: 1023px) and (hover: none), (max-width: 1023px) and (pointer: coarse), (max-width: 1023px) and (pointer: none) {
+  html body .vrm-app-shell > .vrm-app-header {
+    border-bottom: .5px solid transparent !important;
+    transition: background-color 200ms ease-out, border-color 200ms ease-out;
+  }
+  html body .vrm-app-shell > .vrm-app-header.is-defile {
+    background: var(--vrm-bg) !important;   /* rien ne passe dessous (voir ⚠️) : un verre ne montrerait que le fond */
+    border-bottom-color: var(--vrm-hair) !important;
+  }
+  /* Le petit titre revient dans la barre, seulement quand le grand est parti. */
+  html body .vrm-app-shell > .vrm-app-header.is-defile .vrm-hdr-titre {
+    display: block !important; grid-column: 2; opacity: 1; transform: none;
+    font-size: var(--vrm-t17); font-weight: 600; letter-spacing: -.02em; color: var(--vrm-ink) !important;
+  }
+  /* Ma journée : la barre garde le noir de la tête sombre (maquette Fusion), défilée aussi. */
+  html body .vrm-app-shell:has(.vrm-main .vrm-fu-journee) > .vrm-app-header { background: #1d1d1f !important; }
+  html body .vrm-app-shell:has(.vrm-main .vrm-fu-journee) > .vrm-app-header.is-defile { background: #1d1d1f !important; border-bottom-color: rgba(255,255,255,.08) !important; }
+  html body .vrm-app-shell:has(.vrm-main .vrm-fu-journee) > .vrm-app-header.is-defile .vrm-hdr-titre { color: #fff !important; }
+}
+
+/* Le grand titre s'efface au fil des 56 premiers pixels défilés (le navigateur le fait
+   seul, lié au défilement — aucun calcul à chaque image). Mouvement réduit : le fondu
+   seul, sans glissement. Un navigateur qui ne sait pas le faire garde le titre net. */
+@supports (animation-timeline: scroll()) {
+  @keyframes vrm-grand-titre-replie { to { opacity: 0; transform: translateY(-6px) scale(.96); } }
+  @keyframes vrm-grand-titre-fondu { to { opacity: 0; } }
+  @media (max-width: 767px) {
+    html body .vrm-app-shell > main.vrm-main { scroll-timeline: --vrm-page block; }
+    html body .vrm-app-shell .vrm-main .vrm-screen-head .vrm-display {
+      transform-origin: 0 100%;
+      animation: vrm-grand-titre-replie linear both; animation-timeline: --vrm-page; animation-range: 0 56px;
+    }
+  }
+  @media (max-width: 767px) and (prefers-reduced-motion: reduce) {
+    html body .vrm-app-shell .vrm-main .vrm-screen-head .vrm-display { animation-name: vrm-grand-titre-fondu; }
+  }
+}
+
+/* ══ 4. LE GRAND TITRE ET L'ÉCHELLE ═══════════════════════════════════════ */
+html body .vrm-app-shell .vrm-main .vrm-screen-head .vrm-display { letter-spacing: -.025em; line-height: 1.1; }
+@media (max-width: 767px) { html body .vrm-app-shell .vrm-main .vrm-screen-head .vrm-display { font-size: var(--vrm-t34) !important; font-weight: 700 !important; } }
+/* Dans un espace de plateforme, le titre de l'écran (« Annonces eBay (5) ») est un titre de
+   SECTION (22/700) sous le grand titre « Annonces » — jamais deux grands titres l'un sur l'autre. */
+html body .vrm-app-shell .vrm-main .vrm-market-space .vrm-screen-head h2.vrm-display { font-size: var(--vrm-t22) !important; letter-spacing: -.022em; }
+/* Les titres de section (22/700) et leurs compteurs (17, au gris) : une seule forme. */
+html body .vrm-app-shell .vrm-main :is(.vrm-rpf-section-titre, .vrm-eb-inactives-titre) { font-size: var(--vrm-t22) !important; font-weight: 700 !important; letter-spacing: -.022em !important; line-height: 1.2; }
+html body .vrm-app-shell .vrm-main .vrm-rpf-section-n { font-size: var(--vrm-t17); font-weight: 400; color: var(--vrm-muted); font-variant-numeric: tabular-nums; }
+/* ══ 5. LE CHIFFRE QUI ROULE (CarteMois → ChiffreRoule) ═══════════════════ */
+.vrm-roule, .vrm-fu-carte[data-fu-colis-retirer] .vrm-fu-case span.vrm-roule { display: inline-block; font: inherit !important; color: inherit; letter-spacing: inherit; }
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes vrm-chiffre-monte { from { opacity: 0; transform: translateY(.4em); filter: blur(3px); } to { opacity: 1; transform: none; filter: none; } }
+  .vrm-roule.is-neuf { animation: vrm-chiffre-monte 380ms var(--vrm-sortie) both; }
+}
+
+/* ══ 5 bis. LE HÉROS : LES PAIRES DU CHIFFRE EN PILE ══════════════════════
+   Sur la carte sombre (Ma journée : les paires vendues aujourd'hui ; Colis : les colis
+   à retirer), à droite du grand chiffre : 3 photos de 64 px en éventail, bord de la
+   couleur de la carte, ombre douce — comme les souvenirs de Photos. */
+html body .vrm-app-shell .vrm-main .vrm-fu-pile.vrm-pile { width: 96px; height: 76px; align-self: center; margin-right: 2px; }
+html body .vrm-app-shell .vrm-main .vrm-fu-pile .vrm-pile-v { width: 64px; height: 64px; top: 6px; border-radius: 14px; border: 2px solid rgba(255,255,255,.14); box-shadow: 0 6px 16px rgba(0,0,0,.35); background: #2c2c2e; }
+html body .vrm-app-shell .vrm-main .vrm-fu-pile.is-pile .vrm-pile-v { left: calc(var(--k) * 14px); top: 6px; transform: rotate(calc((var(--k) - 1) * 6deg)); transform-origin: 50% 100%; }
+html body .vrm-app-shell .vrm-main .vrm-fu-pile .vrm-pile-plus { right: -4px; bottom: 0; background: rgba(255,255,255,.16); color: #fff; box-shadow: none; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes vrm-pile-pose { from { opacity: 0; transform: translateY(8px) rotate(0deg) scale(.92); } }
+  html body .vrm-app-shell .vrm-main .vrm-fu-pile .vrm-pile-v { animation: vrm-pile-pose 460ms var(--vrm-sortie) both; animation-delay: calc(var(--k) * 60ms); }
+}
+
+html body .vrm-app-shell .vrm-main .vrm-fu-pile.vrm-pile:not(.is-pile) { width: 68px; }
+
+/* ══ 5 ter. ACHATS ══════════════════════════════════════════════════════════ */
+/* La recherche et la période sur une ligne ; sans période choisie, la période est son icône. */
+html body .vrm-app-shell .vrm-main .vrm-achats-filtres { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
+html body .vrm-app-shell .vrm-main .vrm-achats-filtres > .vrm-achats-search { flex: 1 1 200px; margin: 0 !important; min-width: 0; }
+html body .vrm-app-shell .vrm-main .vrm-achats-filtres > .vrm-period { flex: none; margin: 0 !important; }
+html body .vrm-app-shell .vrm-main .vrm-achats-filtres .vrm-cal-declencheur[data-periode-valeur=""] { width: 44px; min-width: 44px; padding: 0 !important; justify-content: center; }
+html body .vrm-app-shell .vrm-main .vrm-achats-filtres .vrm-cal-declencheur[data-periode-valeur=""] [data-periode-libelle] {
+  position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+}
+/* Le bloc « colis reparti » : une carte d'alerte comme les autres (icône, titre + ⓘ, une ligne). */
+html body .vrm-app-shell .vrm-main .vrm-achats-bloc[data-repartis] { border: 0 !important; border-radius: var(--vrm-r-carte) !important; box-shadow: var(--vrm-ombre-carte); }
+html body .vrm-app-shell .vrm-main .vrm-achats-bloc[data-repartis] .vrm-alerte-ligne-titre { font-size: var(--vrm-t15); }
+html body .vrm-app-shell .vrm-main .vrm-achats-bloc[data-repartis] .vrm-alerte-ligne-sous { font-variant-numeric: tabular-nums; }
+html body .vrm-app-shell .vrm-main .vrm-achats-bloc[data-repartis] .vrm-achats-bloc-ligne { display: flex; flex-wrap: nowrap !important; align-items: center; gap: 12px; }
+html body .vrm-app-shell .vrm-main .vrm-achats-bloc[data-repartis] .vrm-achats-bloc-ligne > .vrm-pickup-lien { margin: 0 !important; flex: none; }
+
+/* « Ajouter un QR Mondial Relay » (Colis) : une rangée de carte, plus une phrase flottante. */
+html body .vrm-app-shell .vrm-main .vrm-mr-bloc > .vrm-repli > summary {
+  background: var(--vrm-surface); border-radius: var(--vrm-r-carte); box-shadow: var(--vrm-ombre-carte);
+  min-height: 52px; padding: 0 16px !important; font-size: var(--vrm-t15) !important; font-weight: 400 !important; color: var(--vrm-ink) !important;
+}
+html body .vrm-app-shell .vrm-main .vrm-mr-bloc > .vrm-repli > summary { display: flex !important; align-items: center; gap: 0; white-space: nowrap; }
+html body .vrm-app-shell .vrm-main .vrm-mr-bloc .vrm-mr-titre { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+html body .vrm-app-shell .vrm-main .vrm-mr-bloc .vrm-mr-valeur { flex: 1 0 auto; margin-left: .3em; color: var(--vrm-muted); font-variant-numeric: tabular-nums; }
+html body .vrm-app-shell .vrm-main .vrm-mr-bloc > .vrm-repli[open] > summary { border-radius: var(--vrm-r-carte) var(--vrm-r-carte) 0 0; }
+
+/* ══ 5 quater. LEBONCOIN ════════════════════════════════════════════════════ */
+/* « Publier une annonce Vinted sur … » (Leboncoin, eBay, Vestiaire) : une ligne de titre. */
+html body .vrm-app-shell .vrm-main .vrm-pa-entree[data-pa-entree] > button { border: 0 !important; box-shadow: var(--vrm-ombre-carte) !important; border-radius: var(--vrm-r-carte) !important; }
+html body .vrm-app-shell .vrm-main .vrm-pa-entree[data-pa-entree] > button > span:nth-child(2) { font-size: var(--vrm-t15) !important; font-weight: 600; letter-spacing: -.01em; line-height: 1.3; }
+html body .vrm-app-shell .vrm-main .vrm-pa-entree[data-pa-entree] > button > span:nth-child(2) small { font-size: var(--vrm-t13) !important; font-weight: 400; }
+/* « Actualiser » : une action de texte discrète au bord droit, plus une pilule seule. */
+html body .vrm-app-shell .vrm-main .vrm-lbc-tete { margin-bottom: 4px !important; }
+html body .vrm-app-shell .vrm-main .vrm-lbc-tete > button { border: 0 !important; background: transparent !important; color: var(--vrm-muted) !important; font-size: var(--vrm-t13) !important; min-height: 44px; }
+/* « À faire sur Leboncoin » : le groupe de Réglages d'eBay (icône par geste, filets décalés). */
+html body .vrm-app-shell .vrm-main :is([data-lbc-conseils], .vrm-card:has(> [data-lbc-conseil]), div:has(> [data-lbc-conseil])) { border: 0 !important; box-shadow: var(--vrm-ombre-carte) !important; border-radius: var(--vrm-r-carte) !important; padding: 14px 16px 6px !important; }
+html body .vrm-app-shell .vrm-main div:has(> [data-lbc-conseil]) > div:first-child { font-size: var(--vrm-t15) !important; font-weight: 600 !important; letter-spacing: -.01em; }
+html body .vrm-app-shell .vrm-main [data-lbc-conseil] { gap: 12px !important; min-height: 56px; padding: 8px 0 !important; position: relative; border-top: 0 !important; }
+html body .vrm-app-shell .vrm-main [data-lbc-conseil] + [data-lbc-conseil]::before { content: ''; position: absolute; top: 0; left: 42px; right: 0; height: .5px; background: var(--vrm-line); }
+html body .vrm-app-shell .vrm-main [data-lbc-conseil] > span:nth-child(2) { font-size: var(--vrm-t15) !important; }
+html body .vrm-app-shell .vrm-main [data-lbc-conseil] [data-lbc-conseil-go] { border: 0 !important; background: var(--vrm-card2) !important; border-radius: 999px !important; min-height: 44px; padding: 0 16px !important; font-size: var(--vrm-t15) !important; }
+.vrm-lbc-conseil-icone { flex: 0 0 30px; width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; background: var(--vrm-card2); color: var(--vrm-ink); }
+.vrm-lbc-conseil-icone[data-urgent="1"] { background: var(--vrm-warn-soft); color: var(--vrm-warn); }
+/* La raison de ne pas publier d'ici (« Depuis ton ordinateur ») : une carte, le geste en ambre — plus de barre latérale. */
+html body .vrm-app-shell .vrm-main [data-raison-publier] { border: 0 !important; box-shadow: var(--vrm-ombre-carte); border-radius: 14px !important; }
+html body .vrm-app-shell .vrm-main [data-raison-publier] b { color: var(--vrm-ink); }
+/* « Republier sur Leboncoin » : une carte comme les autres (titre, une ligne + ⓘ, le geste). */
+html body .vrm-app-shell .vrm-main [data-repub-lbc-porte] { border: 0 !important; box-shadow: var(--vrm-ombre-carte); border-radius: var(--vrm-r-carte) !important; }
+html body .vrm-app-shell .vrm-main [data-repub-lbc-porte] [data-repub-lbc-ouvrir] { border: 0 !important; background: var(--vrm-card2) !important; border-radius: 999px !important; font-size: var(--vrm-t15) !important; }
+/* La file « à publier » : des cartes plus courtes — les vignettes (le nombre de photos est
+   déjà dans sa pastille) quittent le téléphone ; les liens ne sont plus soulignés. */
+html body .vrm-app-shell .vrm-main .vrm-apub-carte { border: 0 !important; border-radius: var(--vrm-r-carte) !important; box-shadow: var(--vrm-ombre-carte) !important; padding: 12px 14px !important; gap: 10px; }
+html body .vrm-app-shell .vrm-main .vrm-apub-carte .vrm-apub-photo { width: 72px !important; height: 72px !important; border: 0 !important; }
+html body .vrm-app-shell .vrm-main .vrm-apub-titre { font-size: var(--vrm-t15); }
+html body .vrm-app-shell .vrm-main .vrm-apub-prix { font-size: var(--vrm-t17); font-weight: 600; }
+html body .vrm-app-shell .vrm-main .vrm-apub-num { border: 0 !important; background: var(--vrm-card2) !important; }
+html body .vrm-app-shell .vrm-main .vrm-apub-pastille { border: 0 !important; background: var(--vrm-card2) !important; font-size: 12px; padding: 4px 8px; }
+html body .vrm-app-shell .vrm-main .vrm-apub-gestes { border-top: .5px solid var(--vrm-line) !important; gap: 4px 16px; }
+html body .vrm-app-shell .vrm-main .vrm-apub-lien { text-decoration: none !important; color: var(--vrm-ink) !important; font-size: var(--vrm-t13) !important; }
+@media (max-width: 767px) { html body .vrm-app-shell .vrm-main .vrm-apub-vignettes:not(:has(.vrm-apub-plus)) { display: none; } }
+/* « Mes annonces » : la note « ⓘ » suit le titre ; les filtres défilent sur UNE rangée. */
+html body .vrm-app-shell .vrm-main .vrm-lbc-catalog { border: 0 !important; border-radius: var(--vrm-r-carte) !important; box-shadow: var(--vrm-ombre-carte); }
+html body .vrm-app-shell .vrm-main .vrm-lbc-catalog header > div { display: flex; align-items: baseline; gap: 6px; }
+html body .vrm-app-shell .vrm-main .vrm-lbc-catalog header .vrm-lbc-catalog-note { padding: 0 !important; border: 0 !important; display: inline !important; font-size: var(--vrm-t15); }
+html body .vrm-app-shell .vrm-main .vrm-lbc-catalog h2 { font-size: var(--vrm-t22) !important; font-weight: 700; letter-spacing: -.022em; }
+html body .vrm-app-shell .vrm-main .vrm-lbc-catalog-filtres { flex-wrap: nowrap !important; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: auto; }
+html body .vrm-app-shell .vrm-main .vrm-lbc-catalog-filtres::-webkit-scrollbar { display: none; }
+html body .vrm-app-shell .vrm-main .vrm-lbc-catalog-filtres button { border: 0 !important; background: var(--vrm-remplissage) !important; border-radius: 999px !important; padding: 0 14px !important; white-space: nowrap; font-size: var(--vrm-t15) !important; }
+html body .vrm-app-shell .vrm-main .vrm-lbc-catalog-filtres button[aria-pressed="true"] { background: var(--vrm-ink) !important; color: var(--vrm-bg) !important; }
+
+/* ══ 5 quinquies. MA JOURNÉE : « À FAIRE » EN UNE CARTE À RANGÉES ═══════════
+   Cinq cartes empilées (une ombre chacune) deviennent UN groupe, comme Rappels : une
+   carte blanche (#1C1C1E la nuit), des rangées séparées par un filet qui commence
+   après la photo. Chaque rangée garde ses photos en pile, son titre, sa ligne et son
+   geste ; l'ambre reste au geste pressé. */
+@media (max-width: 1023px) {
+  :root:root body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task-list {
+    gap: 0 !important; background: var(--fu-carte, var(--vrm-surface)) !important; border-radius: var(--fu-r-carte, 20px) !important;
+    box-shadow: var(--fu-ombre, var(--vrm-ombre-carte)) !important; overflow: hidden !important;
+  }
+  :root:root[data-theme="dark"] body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task-list { background: #1c1c1e !important; }
+  :root:root body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task-list > .vrm-day-task,
+  :root:root body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task-list [data-alertes-argent] > .vrm-day-task {
+    position: relative; background: transparent !important; box-shadow: none !important; border-radius: 0 !important;
+  }
+  :root:root body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task-list .vrm-day-task + .vrm-day-task::before,
+  :root:root body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task-list [data-alertes-argent] + .vrm-day-task::before {
+    content: ''; position: absolute; top: 0; left: 74px; right: 0; height: .5px; background: var(--vrm-line); pointer-events: none;
+  }
+  :root:root[data-theme="dark"] body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task-list .vrm-day-task + .vrm-day-task::before { background: #38383A; }
+}
+
+/* ══ 5 sexies. UNE CARTE « GESTE » (`Card` au cadre ambre) ══════════════════
+   design/jetons.css rend toute carte sans cadre (élevée, ombre douce) — le cadre ambre
+   qu'un écran posait pour un geste pressé (vendue ailleurs, à retirer) disparaissait
+   avec. `Card` dit son ton (`data-ton="geste"`) : un anneau ambre fin le garde. */
+:root:root body .vrm-app-shell .vrm-main .vrm-surface[data-ton="geste"] { box-shadow: 0 0 0 1px color-mix(in srgb, var(--vrm-warn) 45%, transparent), var(--vrm-ombre-carte) !important; }
+
+/* ══ 5 septies. ANNONCES ══════════════════════════════════════════════════ */
+/* « Prochain geste » et « Prix d'achat N/M » : des cartes élevées, sans cadre. */
+html body .vrm-app-shell .vrm-main :is(.vrm-ann-geste, .vrm-ann-avis) { border: 0 !important; box-shadow: var(--vrm-ombre-carte) !important; border-radius: var(--vrm-r-carte) !important; }
+/* « N° à vérifier » : une rangée = la paire, puis ses trois gestes TOUJOURS sur une ligne
+   (« C'est bien le N°x » · le champ · « Corriger »), en pilules d'iOS, alignés sur le texte. */
+html body .vrm-app-shell .vrm-main [data-verif-carton] { position: relative; border-top: 0 !important; padding: 12px 0 !important; }
+html body .vrm-app-shell .vrm-main [data-verif-carton] + [data-verif-carton]::before { content: ''; position: absolute; top: 0; left: 58px; right: 0; height: .5px; background: var(--vrm-line); }
+html body .vrm-app-shell .vrm-main [data-verif-carton] > div:last-child {
+  flex: 1 1 100% !important; display: grid !important; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px !important; box-sizing: border-box;
+}
+html body .vrm-app-shell .vrm-main [data-verif-carton] > div:last-child > :is(button, input) {
+  min-height: 44px !important; border-radius: 999px !important; font-size: 14px !important; padding: 0 12px !important; white-space: nowrap; box-sizing: border-box;
+}
+/* Le remplissage d'iOS (gris translucide) : visible sur le fond groupé comme sur une carte, le jour et la nuit. */
+html body .vrm-app-shell .vrm-main [data-verif-carton] > div:last-child > button:first-child { border: 0 !important; background: var(--vrm-remplissage) !important; color: var(--vrm-ink) !important; }
+html body .vrm-app-shell .vrm-main [data-verif-carton] > div:last-child > input { min-width: 0; width: 100% !important; border: 0 !important; background: var(--vrm-surface) !important; box-shadow: inset 0 0 0 .5px var(--vrm-line); font-size: 16px !important; }
+
+/* « Données · Voir le détail » : une rangée de carte (icône de synchronisation, libellé, état,
+   chevron) — plus un bloc gris flottant ; et la note se range au-dessus de « Mes annonces ». */
+html body .vrm-app-shell .vrm-main .vrm-lbc-catalog > .vrm-bilan-sync { margin: 0 16px 8px !important; }
+html body .vrm-app-shell .vrm-main details.vrm-bilan-sync:not([open]) {
+  background: var(--vrm-surface) !important; border: 0 !important; border-radius: var(--vrm-r-carte) !important; box-shadow: var(--vrm-ombre-carte); margin-bottom: 12px !important; padding: 0 !important;
+}
+html body .vrm-app-shell .vrm-main details.vrm-bilan-sync > summary { min-height: 48px; padding: 0 16px !important; font-size: var(--vrm-t15) !important; font-weight: 400 !important; color: var(--vrm-ink) !important; }
+html body .vrm-app-shell .vrm-main details.vrm-bilan-sync > summary span { font-size: var(--vrm-t15) !important; color: var(--vrm-muted) !important; }
+/* « ● Active » : le point à l’encre — l’accent n’est pas une puce d’état (§7 : le bleu est rare). */
+html body .vrm-app-shell .vrm-main .vrm-lbc-catalog-info [data-etat=active]::before, :root[data-theme=dark] body .vrm-app-shell .vrm-main .vrm-lbc-catalog-info [data-etat=active]::before { background: var(--vrm-ink) !important; }
+/* Une annonce Leboncoin sans photo : une vignette basse (le dessin), plus un carré vide de 170 px. */
+html body .vrm-app-shell .vrm-main .vrm-lbc-catalog .vrm-lbc-catalog-photo-empty { aspect-ratio: 16 / 9 !important; height: auto !important; max-height: 110px; }
+
+/* ══ 5 octies. VESTIAIRE · « Mettre en vente » : les deux gestes en pilules d'iOS ══ */
+html body .vrm-app-shell .vrm-main :is([data-vc-preparer], [data-vc-marquer]) { border: 0 !important; border-radius: 999px !important; min-height: 44px; padding: 0 16px !important; font-size: var(--vrm-t15) !important; }
+html body .vrm-app-shell .vrm-main [data-vc-marquer] { background: transparent !important; color: var(--vrm-ink) !important; }
+
+/* ══ 6. LES ÉTATS VIDES ILLUSTRÉS (src/composants/Illustration.jsx) ═══════ */
+.vrm-illustration { display: block; color: var(--vrm-muted); opacity: .9; }
+html body .vrm-app-shell .vrm-main .vrm-vide-dessin { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; padding: 24px 16px; }
+html body .vrm-app-shell .vrm-main .vrm-vide-dessin p { margin: 0; }
+html body .vrm-app-shell .vrm-main .vrm-fu-vide.vrm-vide-dessin { padding: 20px 16px 8px; font-size: var(--vrm-t15); }
+html body .vrm-app-shell .vrm-main .vrm-empty-state { border: 0 !important; box-shadow: var(--vrm-ombre-carte) !important; border-radius: var(--vrm-r-carte) !important; padding: 24px 20px 28px !important; }
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes vrm-dessin-pose { from { opacity: 0; transform: translateY(6px) scale(.97); } to { opacity: .9; transform: none; } }
+  .vrm-illustration { animation: vrm-dessin-pose 420ms var(--vrm-sortie) both; }
+}
+
+/* Tout ce qui se touche s'enfonce à peine (0,97), en 100 ms — jamais sur un défilement. */
+@media (hover: none) and (prefers-reduced-motion: no-preference) {
+  html body .vrm-app-shell .vrm-main :is(.vrm-eb-afaire-ligne, .vrm-rpf-ouvrir, a.vrm-rpf-rang-lien, .vrm-ios-rangee-zone, .vrm-eb-ouvrir, .vrm-fu-case, .vrm-sale-row, .vrm-buy-row):active { transform: scale(.98); transition: transform 100ms ease-out; }
+}

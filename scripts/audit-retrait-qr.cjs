@@ -120,7 +120,8 @@ async function verifier(srcModule, srcApp, bavard) {
   const ov = app.slice(app.indexOf('const openQrView = async'), app.indexOf('const openQrView = async') + 3000);
   dit(!/normTitle/.test(ov), 'E4 la vue en grand ne cherche plus la photo par le titre (§5)');
   dit(/if \(t\.qrB64\) \{ setQrView/.test(ov) && !/r\.mode === 'qr' && t\.qrB64/.test(ov), 'E5 un vrai QR se montre quel que soit le mode du transporteur (Mondial Relay compris)');
-  const iVue = app.indexOf('data-qr-plein=""'), fVue = app.indexOf('{lastCollected && (', iVue);
+  // (6 nov., v36) La vue en grand finit à SA feuille (l'ancien bandeau « Colis retiré » qui la suivait est parti : la pilule « Annuler »).
+  const iVue = app.indexOf('data-qr-plein=""'), fVue = app.indexOf('</SheetShell>', iVue);
   const vue = iVue > 0 && fVue > iVue ? app.slice(iVue, fVue) : '';
   dit(vue.length > 100 && !/#c53030|#ff3b30|#e53e3e|\bred\b|C\.danger/i.test(vue), 'E6 aucun rouge dans la vue en grand (§7 : rouge = deux paires sous un N°)');
   dit(/data-colis-qr-absent=/.test(app) && /ouTrouverQr\(/.test(app), 'E7 un QR absent est dit sur la carte, avec où le trouver');

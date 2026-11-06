@@ -239,7 +239,9 @@ const lire = (pg) => pg.evaluate(() => {
     prix: (e.querySelector('[data-inactive-prix]') || {}).innerText || '',
     relancer: (e.querySelector('[data-inactive-relancer]') || { getAttribute: () => '' }).getAttribute('data-inactive-relancer') || '',
     relancerBouton: !!e.querySelector('button[data-inactive-relancer]'),
-    voir: (e.querySelector('a[data-inactive-voir]') || {}).href || '',
+    // (6 nov., v36-visuel) « Voir sur eBay » vit dans la FICHE de la ligne (la ligne entière l'ouvre) :
+    // la ligne porte le lien de sa fiche (`data-inactive-lien`) ; le scénario C ouvre une fiche et y lit le lien.
+    voir: (e.querySelector('a[data-inactive-voir]') || {}).href || e.getAttribute('data-inactive-lien') || '',
     texte: e.innerText,
   }));
   return {
@@ -354,6 +356,12 @@ const ligne = (s, id) => s.lignes.find((l) => l.id === id) || {};
         dit(r21.vinted === 'en-ligne' && !r22.vinted, `${T} la N°21 est encore en ligne sur Vinted (par identité) ⇒ dit sur sa ligne ; la N°22 (annonce Vinted fermée) ne l'a pas`, JSON.stringify([r21.vinted, r22.vinted]));
         dit(r22.vendue === 'Vinted' && !r22.relancer && r22.voir === 'https://www.ebay.fr/itm/120000000022',
           `${T} la N°22, PROUVÉE vendue sur Vinted ⇒ pas de « Remettre en vente » (seulement « Voir sur eBay »), et c'est dit`, JSON.stringify(r22));
+        // (6 nov., v36-visuel) La ligne ouvre SA fiche : « Voir sur eBay » y mène à SON annonce.
+        await pg.click('[data-inactive-ouvrir="120000000022"]');
+        const lienFiche = await pg.waitForSelector('[data-inactive-fiche="120000000022"] a[data-inactive-voir]', { timeout: 5000 }).then((a) => a.getAttribute('href')).catch(() => '');
+        dit(lienFiche === 'https://www.ebay.fr/itm/120000000022', `${T} toucher la ligne ouvre sa fiche, et « Voir sur eBay » y mène à SON annonce`, lienFiche);
+        await pg.keyboard.press('Escape'); await pg.waitForFunction(() => !document.querySelector('[data-inactive-fiche]'), null, { timeout: 4000 }).catch(() => {});
+        await pg.waitForTimeout(300);
         const r24 = L['120000000024'] || {}, r25 = L['120000000025'] || {};
         dit(r24.deja === 'relancee' && !r24.relancer && !!r24.voir && r25.deja === 'en-vente' && !r25.relancer && !!r25.voir,
           `${T} déjà remise en vente (RelistedItemID) ou déjà de nouveau en vente sur eBay (même N°, AUTRE annonce) ⇒ pas de second « Remettre en vente »`, JSON.stringify([r24.deja, r25.deja]));
@@ -621,7 +629,7 @@ const ligne = (s, id) => s.lignes.find((l) => l.id === id) || {};
         dit(ligne(s, '120000000041').fin === parisJour(nuit) && parisJour(nuit) !== nuit.slice(0, 10),
           `${T} terminée à 23 h 30 UTC ⇒ « terminée le » au jour de PARIS (le lendemain)`, `${ligne(s, '120000000041').fin} · UTC ${nuit.slice(0, 10)} · Paris ${parisJour(nuit)}`);
         const usd = ligne(s, '120000000042').prix, sans = ligne(s, '120000000043').prix;
-        dit(/^95,00 USD$/.test(usd.trim()) && /^60,00$/.test(sans.trim()),
+        dit(/^95(,00)? USD$/.test(usd.trim()) && /^60(,00)?$/.test(sans.trim()),   // (6 nov., v36-visuel-2) `montant()` : les centimes seulement s'ils existent
           `${T} le prix avec SA devise : « 95,00 USD » (jamais « 95,00 € USD »), devise inconnue ⇒ aucun symbole`, JSON.stringify([usd, sans, (ligne(s, '120000000042').texte || '').replace(/\n/g, ' / '), (ligne(s, '120000000043').texte || '').replace(/\n/g, ' / ')]));
         await ctx.close();
       });

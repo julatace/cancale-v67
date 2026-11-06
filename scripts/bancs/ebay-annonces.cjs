@@ -333,14 +333,16 @@ const lire = (pg) => pg.evaluate(() => {
     offres: [...document.querySelectorAll('[data-offre-ouvrir]')].map((e) => ({ id: e.getAttribute('data-offre-ouvrir'), t: e.textContent })),
     relierBtn: a('[data-relier-ouvrir]', 'data-relier-ouvrir'),
     sansObs: document.querySelectorAll('[data-ebay-sans-observateur]').length,
-    sansObsTxt: (txt.match(/pas d.observateur à qui l.envoyer/g) || []).length,
+    // (6 nov., v36-visuel) La phrase entière vit derrière le « ⓘ » de la ligne (une ligne visible) :
+    // on la compte dans le TEXTE de l'écran (textContent), une fois, jamais sur une carte.
+    sansObsTxt: (((document.querySelector('.vrm-main') || document.body).textContent || '').match(/pas d.observateur à qui l.envoyer/g) || []).length,
     pasSu: [...document.querySelectorAll('[data-ebay-pas-su]')].map((e) => e.textContent),
     pasReliee: (txt.match(/pas reliée/g) || []).length,
     sansPreuve: [...document.querySelectorAll('[data-ebay-ventes-sans-preuve]')].map((e) => ({ n: e.getAttribute('data-ebay-ventes-sans-preuve'), geste: e.getAttribute('data-ebay-sans-preuve-geste'), t: e.textContent,
       promesse: e.getAttribute('data-ebay-sans-preuve-promesse'), blocage: e.getAttribute('data-ebay-sans-preuve-blocage'),
       captes: [...e.querySelectorAll('[data-ebay-sans-preuve-bord-capte]')].map((x) => x.getAttribute('data-ebay-sans-preuve-bord-capte')),
       ventes: [...e.querySelectorAll('[data-ebay-sans-preuve-vente]')].map((v) => ({ tx: v.getAttribute('data-ebay-sans-preuve-vente'), t: v.textContent, liens: [...v.querySelectorAll('a[href]')].map((a) => a.href), bord: !!v.querySelector('[data-bouton-bord][data-tx="' + v.getAttribute('data-ebay-sans-preuve-vente') + '"]') })) })),
-    autoEtat: (document.querySelector('[data-ebay-retrait-etat]') || {}).textContent || null,
+    autoEtat: (document.querySelector('[data-ebay-retrait-etat]') || {}).textContent || null, // (6 nov.) l'état en un mot, à la casse d'iOS (« Éteint ») : le banc juge le MOT, pas les capitales
   };
 });
 const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
@@ -383,7 +385,7 @@ const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scroll
         // garde le sien, grisé avec sa raison). Le bouton, quand la commande est
         // possible : voir « génère son bordereau » plus bas.
         dit(vv.length === 1 && !vv[0].bord && !/génère (son|leur) bordereau/.test(v.sansPreuve[0].t), `${vp.width > 600 ? 'sans extension ici' : 'au doigt (téléphone)'} : PAS de bouton « Bordereau » qui ne peut rien commander, ni « génère son bordereau »`, JSON.stringify(vv[0] && vv[0].bord));
-        dit(v.autoEtat === 'ÉTEINT', 'le retrait automatique dit son état en un mot : ÉTEINT', String(v.autoEtat));
+        dit(String(v.autoEtat).toUpperCase() === 'ÉTEINT', 'le retrait automatique dit son état en un mot : ÉTEINT', String(v.autoEtat));
         dit(v.vendues.length === 1 && v.vendues[0].num === '24' && /vinted\.fr\/items\/7004$/.test(v.vendues[0].href),
           'vendue sur eBay ⇒ l\'alerte pour la N°24 mène à SON annonce Vinted (pas la commande annulée N°21, pas la commande sans SKU au titre identique)', JSON.stringify(v.vendues));
         dit(v.offres.length === 1 && v.offres[0].id === '110000000002' && /3 observateurs/.test(v.offres[0].t),
@@ -554,7 +556,7 @@ const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scroll
         dit(memo === 'true', 'confirmé, le réglage est gardé', String(memo));
         const mot = await o.pg.textContent('[data-ebay-retrait-etat]').catch(() => null);
         const expl = await o.pg.textContent('[data-ebay-retrait-auto]').catch(() => '');
-        dit(mot === 'ALLUMÉ' && /TOUT SEUL/.test(expl) && /sans te demander/.test(expl), 'allumé, il le DIT en un mot (ALLUMÉ) et dit ce qu\'il fait en son nom (« tout seul, sans te demander »)', `${mot} · ${String(expl).slice(0, 120)}`);
+        dit(String(mot).toUpperCase() === 'ALLUMÉ' && /TOUT SEUL/.test(expl) && /sans te demander/.test(expl), 'allumé, il le DIT en un mot (ALLUMÉ) et dit ce qu\'il fait en son nom (« tout seul, sans te demander »)', `${mot} · ${String(expl).slice(0, 120)}`);
         await o.pg.goto(`http://localhost:${PORT}/?tab=dashboard`, { waitUntil: 'domcontentloaded' });
         await o.pg.waitForFunction(() => true, null, { timeout: 1000 });
         for (let i = 0; i < 20 && !auto().length; i++) await o.pg.waitForTimeout(500);
@@ -607,7 +609,7 @@ const deborde = (pg) => pg.evaluate(() => ({ sw: document.documentElement.scroll
         await p4.pg.waitForTimeout(1500);
         const fin = await p4.pg.getAttribute('[data-ebay-retrait-auto]', 'data-ebay-retrait-auto').catch(() => null);
         const mot = await p4.pg.textContent('[data-ebay-retrait-etat]').catch(() => null);
-        dit(fin === 'eteint' && mot === 'ÉTEINT', 'éteint dans le nuage, « true » sur l\'appareil ⇒ l\'écran dit ÉTEINT (le réglage du nuage, celui qu\'applique le retrait automatique)', `${fin} · ${mot}`);
+        dit(fin === 'eteint' && String(mot).toUpperCase() === 'ÉTEINT', 'éteint dans le nuage, « true » sur l\'appareil ⇒ l\'écran dit ÉTEINT (le réglage du nuage, celui qu\'applique le retrait automatique)', `${fin} · ${mot}`);
       });
       await p4.ctx.close();
     }

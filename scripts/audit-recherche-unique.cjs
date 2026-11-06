@@ -22,11 +22,13 @@ const SRC = path.join(__dirname, '..', 'src', 'rechercheUnique.js');
 const MUTATIONS = {
   'code-partiel': ['const c = e.codes.find((x) => x === qa);', 'const c = e.codes.find((x) => x.includes(qa));'],
   'tx-court': ['if (!par && chiffres && qa.length >= 5 && e.tx && e.tx.includes(qa))', 'if (!par && chiffres && qa.length >= 1 && e.tx && e.tx.includes(qa))'],
-  accents: [".normalize('NFD').replace(/[\\u0300-\\u036f]/g, '')", ''],
+  // (6 nov.) L'ancre portait « \\u0300 » en toutes lettres : la source a les caractères
+  // eux-mêmes ⇒ « ancre introuvable », compté comme une mutation attrapée. Elle vise la source réelle.
+  accents: [".normalize('NFD').replace(/[\u0300-\u036f]/g, '')", ''],
   memo: ['  if (_memo.cles && _memo.cles.length === cles.length && _memo.cles.every((x, i) => x === cles[i])) return _memo.index;', ''],
   'colis-double': ['    const p = parSuivi.get(k);', '    const p = null;'],
   'mots-ordre': ['if (!par && e.t && mots.every((m) => e.t.includes(m)))', 'if (!par && e.t && e.t.includes(qn))'],
-  max: ['if (g && g.length < max) g.push(t);', 'if (g) g.push(t);'],
+  max: ['if (g && g.length < maxDe(t.e.type)) g.push(t);', 'if (g) g.push(t);'],
   // Le pseudo d'un e-mail attaché par TITRE (la jumelle reçoit aussi le pseudo).
   'pseudo-titre': ["  for (const o of Array.isArray(S.ventes) ? S.ventes : []) commande('vente', o);",
     "  { const vs = Array.isArray(S.ventes) ? S.ventes : []; for (const o of vs) { const tx = alnum(o && o.transaction_id); for (const j of vs) if (j !== o && str(j.title) === str(o.title) && pseudosTx.get(alnum(j.transaction_id))) { if (!pseudosTx.has(tx)) pseudosTx.set(tx, new Set()); for (const p of pseudosTx.get(alnum(j.transaction_id))) pseudosTx.get(tx).add(p); } } for (const o of vs) commande('vente', o); }"],

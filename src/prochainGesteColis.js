@@ -61,7 +61,7 @@ function gesteRetrait(points, { urgentSeul = false } = {}) {
 }
 
 // aImprimer : [{ jours, limite }] — `limite` est la phrase de limite de la ligne (déjà dite sur sa carte).
-function gesteEnvoi(envoi, { urgentSeul = false } = {}) {
+export function gesteEnvoi(envoi, { urgentSeul = false } = {}) {
   const e = envoi || {};
   const imp = (Array.isArray(e.aImprimer) ? e.aImprimer : []).filter(Boolean);
   const plusPresse = [...imp].sort((a, b) => (fini(a.jours) ? a.jours : 1e9) - (fini(b.jours) ? b.jours : 1e9))[0] || null;

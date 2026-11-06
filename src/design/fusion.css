@@ -1212,7 +1212,7 @@ html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) [data-colis-retraits="outi
 :root[data-theme="dark"] .vrm-rpf-point.is-inconnu { background: #1c1c1e !important; }
 :root body .vrm-app-shell .vrm-main .vrm-rpf-point.is-inconnu :is(.vrm-rpf-code, .vrm-rpf-retire, .vrm-rpf-vignette, .vrm-rpf-puce) { background: var(--fu-case, #f2f2f7) !important; }
 :root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-rpf-point.is-inconnu :is(.vrm-rpf-code, .vrm-rpf-retire, .vrm-rpf-vignette, .vrm-rpf-puce) { background: #2c2c2e !important; }
-html body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) [data-colis-retraits="outils"] [data-rp-section="argent"] { margin-top: -12px; } /* (le bas de l’écran Colis porte déjà 40 px : 28 px d’air comme entre les autres sections) */
+/* (6 nov., v36-raccords) L’air avant « Argent à vérifier » : la grille unique (styles-visuel.css, 28 px) — voir styles-visuel-2.css, le bas de « À retirer ». */
 [data-rp-section="avenir"] [data-rp-code-a-venir] { display: none !important; }
 /* (3 nov.) « N°x supprimé de Vinted » : la carte À faire (photo 44 px, titre court, détail)
    et ses trois réponses en pilules de 44 px — à droite sur ordinateur, dessous au téléphone. */

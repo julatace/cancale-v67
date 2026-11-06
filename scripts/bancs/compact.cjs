@@ -16,7 +16,7 @@ const rows = [{id:'harvest_111_orders_sold',data:{capturedAt:maintenant,payload:
 const pixel='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aD1sAAAAASUVORK5CYII=';
 ventes[0].photo={url:'https://images1.vinted.net/test.png'};
 // (2 nov.) La preuve Pro d'une vente : l'e-mail Vinted Pro de SA transaction (src/FacturePro.jsx).
-const preuvesPro=[{id:'email_sale_pro1',data:{type:'vente',pro:true,transaction:'9001',nomComplet:'Acheteuse Banc',adresse:'1 rue X, Rennes, 35000, FR, France',email:'acheteur@example.test',account:compte.login}},{id:'email_sale_pro2',data:{type:'vente',pro:true,transaction:'9002',nomComplet:'Acheteur Banc',adresse:'2 rue Y, Rennes, 35000, FR, France',email:'acheteur2@example.test',account:compte.login}}];
+const preuvesPro=[{id:'email_sale_pro1',data:{type:'vente',pro:true,transaction:'9001',nomComplet:'Acheteuse Banc',adresse:'1 rue X, Rennes, 35000, FR, France',email:'acheteur@example.test',account:compte.login,uid:'111',prix:'95.00',receivedAt:new Date(Date.parse(maintenant)+60000).toISOString()}},{id:'email_sale_pro2',data:{type:'vente',pro:true,transaction:'9002',nomComplet:'Acheteur Banc',adresse:'2 rue Y, Rennes, 35000, FR, France',email:'acheteur2@example.test',account:compte.login,uid:'111',prix:'120.00',receivedAt:new Date(Date.parse(maintenant)+60000).toISOString()}}];
 rows.push(...preuvesPro,
 {id:'lbc_ventes',data:{ventes:{one:{txId:1,isSeller:true,title:'Paire Leboncoin',price:9500,photo:'data:image/png;base64,'+pixel,stepStatus:'done',stepLabel:'Terminé'}}}},
 {id:'ebay_orders',data:{orders:[{orderId:'1',orderPaymentStatus:'PAID',orderFulfillmentStatus:'NOT_STARTED',lineItems:[{title:'Paire eBay',legacyItemId:'12'}],pricingSummary:{total:{value:'95',currency:'EUR'}}}]}},
@@ -130,7 +130,7 @@ const ouvrirVente=async(p)=>{const t=p.locator('.vrm-sale-row .vrm-ledger-sale-t
   await p.goto(base+'/?tab=cat_ventes');await p.locator('.vrm-sale-row').first().waitFor();await ouvrirVente(p);
   let appelsFacture=0;await p.route('**/api/compte?mode=facture-pro',r=>{if(r.request().method()==='POST')appelsFacture++;return r.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,boite:{etat:'aucune'},fournisseurs:{}})});});
   await p.locator('[data-fp-vente="a-faire"]').first().waitFor();
-  check((await p.locator('[data-fp-vente]').count())>0,'facture proposée sur une vente prouvée Pro (e-mail Vinted Pro de SA transaction)');
+  check((await p.locator('[data-fp-vente]').count())>0,'facture proposée sur une vente prouvée Pro (e-mail Vinted Pro de SA transaction, 60 s après, même prix — 6 nov.)');
   await p.locator('[data-fp-vente="a-faire"]').first().click();
   await p.locator('[data-fp-feuille-vente]').first().waitFor();
   check(appelsFacture===0,'ouvrir la facture n’émet ni n’envoie rien');
