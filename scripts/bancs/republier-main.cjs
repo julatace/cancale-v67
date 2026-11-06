@@ -4,15 +4,18 @@
 // Données INVENTÉES (le dépôt est public), 390 px tactile et 1512 px, clair et sombre.
 // Un faux pont d'extension (Chrome ouvert sur le compte 111) note ce qui part. Il exige :
 //   R. régler dans l'ATELIER (Republier : −10 %, zoom 1,2, lettre) ⇒ la feuille « à la
-//      main » s'ouvre avec CES réglages (une source) et le dit (« Mêmes réglages ») ;
+//      main » s'ouvre avec la MÊME retouche et la MÊME lettre (une source) et le dit ;
+//      la baisse, elle, repart de « Garder » (décision du 6 nov. : jamais gardée d'une
+//      ouverture à l'autre, sa règle du 29 oct.) — la clé commune n'a ni prix ni titre ;
 //   E. cinq étapes numérotées, la progression en tête, « paire 1/2 » puis « Suivante » ;
 //   P. les photos : l'aperçu porte le réglage (zoom 1,2) ;
 //   T. le texte tel qu'il partira : prix 44,10 (49 € − 10 %), description avec le N°42
 //      en bas (réglage `vrm_num_vinted`) puis la lettre ; « Copier » met CE texte dans le
 //      presse-papiers et dit « Copié » ;
 //   V. « Ouvrir Vinted » mène à « Relier » ; rien n'est parti chez Vinted ;
-//   I. l'inverse : régler à la main (−20 %) ⇒ l'atelier s'ouvre à −20 % ; « Modifier prix
-//      ou titre » reste neutre (des réglages à lui) ;
+//   I. une baisse choisie à la main (−10 %) vaut pour la paire suivante de la SÉRIE ;
+//      fermée puis rouverte, l'atelier repart de « Garder » (−20 % à la main n'y est pas),
+//      avec la retouche gardée ; « Modifier prix ou titre » reste neutre ;
 //   F. aucun débordement, cibles de 44 px dans la feuille, aucune erreur ; captures.
 // §6.1 : sur le code d'avant, la feuille n'a ni étapes ni « Mêmes réglages » ⇒ rouge.
 const path = require('path'), fs = require('fs'), http = require('http'), os = require('os');
@@ -177,10 +180,10 @@ const petitsDans = (pg, sel) => pg.$$eval(`${sel} button, ${sel} a[href], ${sel}
           await pg.waitForTimeout(300);
           const pA = await pg.getAttribute('[data-republier-apercu="9102"]', 'data-republier-nouveau-prix');
           dit(pA === '4410', `R ${T} atelier : −10 % sur 49 € ⇒ 44,10 €`, pA);
-          let st = null; for (let i = 0; i < 20; i++) { st = await reglagesStockes(pg); if (st && st.prix && st.prix.delta === '-10' && st.lettre) break; await pg.waitForTimeout(150); }
-          dit(st && st.prix && st.prix.base === 'pct' && st.prix.delta === '-10' && st.photo && st.photo.zoom === 1.2 && st.lettre === true, `R ${T} l’atelier écrit SES réglages dans la clé commune (synchronisée)`, JSON.stringify(st));
+          let st = null; for (let i = 0; i < 20; i++) { st = await reglagesStockes(pg); if (st && st.photo && st.photo.zoom === 1.2 && st.lettre) break; await pg.waitForTimeout(150); }
+          dit(st && !('prix' in st) && !('titre' in st) && st.photo && st.photo.zoom === 1.2 && st.lettre === true, `R ${T} la clé commune (synchronisée) reçoit la retouche et la lettre, jamais la baisse ni le titre`, JSON.stringify(st));
           const bandeau = await pg.getAttribute('[data-republier-memes-reglages]', 'data-republier-memes-reglages').catch(() => '');
-          dit(/Prix −10 %/.test(bandeau) && /retouchées/.test(bandeau) && /Lettre/.test(bandeau), `R ${T} ce qui est gardé est dit (« Gardés : … »)`, bandeau);
+          dit(!/Prix/.test(bandeau) && /retouchées/.test(bandeau) && /Lettre/.test(bandeau), `R ${T} ce qui est gardé est dit (« Gardés : Photos retouchées · Lettre en bas »), jamais la baisse`, bandeau);
           await pg.screenshot({ path: nomF('atelier') });
           dit((await pg.evaluate(() => window.__envois.length)) === 0, `R ${T} rien n’est parti (l’atelier attend sa confirmation)`);
           await clic(pg, '[data-republier] button[aria-label="Fermer"]');
@@ -198,9 +201,12 @@ const petitsDans = (pg, sel) => pg.$$eval(`${sel} button, ${sel} a[href], ${sel}
           dit(tete.etapes.join(',') === 'reglages,photos,texte,vinted,relier' && tete.courante === 'reglages' && tete.num === 'N°42', `E ${T} cinq étapes numérotées, la première en cours, le N° de la paire dit une fois`, JSON.stringify(tete));
           // R (suite) : les MÊMES réglages, lus à la main.
           const mm = await pg.getAttribute('[data-main-memes-reglages]', 'data-main-memes-reglages').catch(() => null);
-          dit(mm && /Prix −10 %/.test(mm), `R ${T} « à la main » s’ouvre avec les réglages de l’atelier et le dit (« Mêmes réglages que Republier »)`, mm);
-          const regM = await pg.evaluate(() => ({ reduc: (document.querySelector('[data-main-reduc="-10"]') || {}).getAttribute ? document.querySelector('[data-main-reduc="-10"]').getAttribute('aria-pressed') : null, zoom: (document.querySelector('[data-main-reglage="zoom"]') || {}).value, lettre: (document.querySelector('[data-main-lettre]') || {}).checked, prix: (document.querySelector('[data-main-prix-resultat]') || {}).getAttribute ? document.querySelector('[data-main-prix-resultat]').getAttribute('data-main-prix-resultat') : null }));
-          dit(regM.reduc === 'true' && regM.zoom === '1.2' && regM.lettre === true && regM.prix === '4410', `R ${T} à la main : −10 %, zoom 1,2, lettre cochés ; prix 44,10 €`, JSON.stringify(regM));
+          dit(mm && /retouchées/.test(mm) && /Lettre/.test(mm) && !/Prix/.test(mm), `R ${T} « à la main » s’ouvre avec la retouche et la lettre de l’atelier et le dit (« Mêmes réglages que Republier »)`, mm);
+          const regM = await pg.evaluate(() => ({ reduc: (document.querySelector('[data-main-reduc="aucun"]') || {}).getAttribute ? document.querySelector('[data-main-reduc="aucun"]').getAttribute('aria-pressed') : null, zoom: (document.querySelector('[data-main-reglage="zoom"]') || {}).value, lettre: (document.querySelector('[data-main-lettre]') || {}).checked, prix: (document.querySelector('[data-main-prix-resultat]') || {}).getAttribute ? document.querySelector('[data-main-prix-resultat]').getAttribute('data-main-prix-resultat') : null }));
+          dit(regM.reduc === 'true' && regM.zoom === '1.2' && regM.lettre === true && regM.prix === '4900', `R ${T} à la main : zoom 1,2 et lettre repris de l’atelier ; le prix repart de « Garder » (49 €)`, JSON.stringify(regM));
+          await clic(pg, '[data-main-reduc="-10"]');
+          await pg.waitForTimeout(200);
+          dit((await pg.getAttribute('[data-main-prix-resultat]', 'data-main-prix-resultat')) === '4410', `R ${T} à la main, SON clic « −10 % » ⇒ 44,10 €`);
           dit((await etapeVisible(pg)) === 'reglages', `E ${T} une étape à la fois`, await etapeVisible(pg));
           const p1 = await petitsDans(pg, '[data-repub-main]');
           dit(!p1.length, `F ${T} cibles ≥ 44 px (Réglages)`, p1.join(' | '));
@@ -247,7 +253,7 @@ const petitsDans = (pg, sel) => pg.$$eval(`${sel} button, ${sel} a[href], ${sel}
           await pg.waitForSelector('[data-repub-main="9103"]', { timeout: 5000 }).catch(() => {});
           for (let i = 0; i < 20; i++) { if (!(await pg.$('[data-main-lecture]'))) break; await pg.waitForTimeout(200); }
           const p2 = await pg.evaluate(() => { const f = document.querySelector('[data-repub-main]'); return { id: f && f.getAttribute('data-repub-main'), rang: f && f.getAttribute('data-main-rang'), et: f && f.getAttribute('data-main-etape'), prix: (document.querySelector('[data-main-prix-resultat]') || {}).getAttribute ? document.querySelector('[data-main-prix-resultat]').getAttribute('data-main-prix-resultat') : null, desc: (document.querySelector('[data-main-champ="description"] .vrm-main-valeur') || {}).textContent || '' }; });
-          dit(p2.id === '9103' && p2.rang === '2/2' && p2.et === 'reglages' && p2.prix === '5400', `E ${T} paire 2/2 : la suivante repart de l’étape 1, mêmes réglages (60 € − 10 % = 54 €)`, JSON.stringify(p2));
+          dit(p2.id === '9103' && p2.rang === '2/2' && p2.et === 'reglages' && p2.prix === '5400', `E ${T} paire 2/2 : la suivante repart de l’étape 1, la baisse de la série gardée (60 € − 10 % = 54 €)`, JSON.stringify(p2));
           dit(/semelle propre\.\n\nN°43\n\n[a-z]$/.test(p2.desc) && !/\n\nq\n\n/.test(p2.desc), `T ${T} l’ancienne lettre (« q ») est retirée : jamais deux lettres`, JSON.stringify(p2.desc.slice(-22)));
           // ── I : l'inverse — régler à la main règle l'atelier ─────────────────
           await clic(pg, '[data-main-reduc="-20"]');
@@ -259,8 +265,8 @@ const petitsDans = (pg, sel) => pg.$$eval(`${sel} button, ${sel} a[href], ${sel}
           await actions(pg, 2);
           await clic(pg, '[data-action-sel="recreer"]');
           await pg.waitForSelector('[data-republier-apercu="9102"]', { timeout: 6000 });
-          const inv = await pg.evaluate(() => ({ p: document.querySelector('[data-republier-reduc="-20"]').getAttribute('aria-pressed'), a: document.querySelector('[data-republier-apercu="9102"]').getAttribute('data-republier-nouveau-prix') }));
-          dit(inv.p === 'true' && inv.a === '3920', `I ${T} l’atelier s’ouvre à −20 % (régler dans l’un règle l’autre) : 49 € ⇒ 39,20 €`, JSON.stringify(inv));
+          const inv = await pg.evaluate(() => ({ p: document.querySelector('[data-republier-reduc="aucun"]').getAttribute('aria-pressed'), a: document.querySelector('[data-republier-apercu="9102"]').getAttribute('data-republier-nouveau-prix'), retouche: (document.querySelector('[data-republier-retouche]') || {}).getAttribute ? document.querySelector('[data-republier-retouche]').getAttribute('data-republier-retouche') : null }));
+          dit(inv.p === 'true' && inv.a === '' && inv.retouche === 'oui', `I ${T} rouvert, l’atelier repart de « Garder » (le −20 % de la main ne survit pas à la feuille), la retouche gardée`, JSON.stringify(inv));
           await clic(pg, '[data-republier] button[aria-label="Fermer"]');
           await pg.waitForTimeout(300);
           if (!(await pg.locator('[data-actions-possibles]').count())) { await cocher(pg, '9102'); await cocher(pg, '9103'); }

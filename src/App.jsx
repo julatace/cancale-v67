@@ -76,7 +76,7 @@ import { toutSurLeNumero, lireNumeroCherche } from "./rechercheNumero.js";
 import { repriseNumerosRecreation, tableRecrees } from "./repriseNumero.js";
 import { etatAnnonceVinted, enVerificationVinted, raisonPasSelectionnable, actionsPossibles, raisonCommune, ACTIONS_TUILES, ETATS_ANNONCE, liensRepubMain, fusionLiensRecrees, lusDuDressing, candidatsNouvelle, etatSuiviMain, minisSelection, ecritureMini } from "./annoncesActions.js";
 // (6 nov.) LES réglages de Republier — atelier ET « à la main » : une source, une règle par notion.
-import { CLE_REGLAGES_REPUB, TITRE_VINTED_MAX, PHOTO_NEUTRE, CURSEURS_PHOTO, REDUCTIONS_RAPIDES, MODES_TITRE, bornerPhoto, photoNeutre, cssApercuPhoto, dessinerPhotoReglee, appliquerCouleursPixels, nomPhotoReglee, lotAppliquePrix, lotAppliqueTitre, lireReglagesRepub, apercuRepub, annonceRepubliee, resumeReglages, tirerLettre, prixChange, titreChange } from "./republierReglages.js";
+import { CLE_REGLAGES_REPUB, TITRE_VINTED_MAX, PHOTO_NEUTRE, CURSEURS_PHOTO, REDUCTIONS_RAPIDES, MODES_TITRE, bornerPhoto, photoNeutre, cssApercuPhoto, dessinerPhotoReglee, appliquerCouleursPixels, nomPhotoReglee, lotAppliquePrix, lotAppliqueTitre, lireReglagesRepub, reglagesGardes, reglagesAOuverture, resumeGardes, apercuRepub, annonceRepubliee, resumeReglages, tirerLettre, prixChange, titreChange } from "./republierReglages.js";
 // (6 nov., vague 2) Remettre en vente une vente annulée avant l'envoi ; relier l'achat des annonces numérotées.
 import { annuleesChezToi, paireARemettre, fichesAnciennesAnnulees, ligneJournee as ligneAnnuleesJournee, etatRemise, VERDICT_MOTEUR as VERDICT_REMISE } from "./annuleesChezToi.js";
 import { fileSansAchat, aRelierJournee, meilleureSuggestion, texteSuggestion } from "./achatsARelier.js";
@@ -13899,29 +13899,36 @@ const REPUB_ESP_DEFAUT = 30;   // secondes entre deux annonces (borné par fileC
 // c'est le choix par défaut tant qu'il n'en a pas retenu un autre.
 const REPUB_ESP_VINTEX = [8, 16];
 const REPUB_REG_DEF = PHOTO_NEUTRE;   // (6 nov.) src/republierReglages.js
-// (6 nov., Julien : « régler comme quand c'est VRM qui fait ») LES réglages de Republier
-// (photos, prix, titre, lettre) : UN objet synchronisé (`vrm_republier_reglages`), lu et
-// écrit par l'atelier ET par « Republier à la main » — régler dans l'un règle l'autre.
+// (6 nov., Julien : « régler comme quand c'est VRM qui fait ») LES réglages de Republier,
+// lus et écrits par l'atelier ET par « Republier à la main ». (6 nov., décision qui respecte
+// la sienne du 29 oct. : « le prix ne change plus par défaut ») Seuls la PHOTO et la LETTRE
+// sont gardés et synchronisés (`vrm_republier_reglages`, `reglagesGardes`) ; la baisse de
+// PRIX et le TITRE repartent de « Garder » / « Ne pas changer » à chaque ouverture
+// (`reglagesAOuverture`). `encours` : ceux de la même ouverture (paire suivante à la main).
 // La première fois, les réglages photo que « à la main » gardait sur l'appareil
 // (`vrm_main_reglages`) sont repris. `poser(patch | (courant) => patch)` : plusieurs
 // poses dans le même geste s'enchaînent (le courant est tenu dans une référence).
-const lireReglagesRepubStockes = () => lireReglagesRepub(load(CLE_REGLAGES_REPUB, null), load('vrm_main_reglages', null));
-function useReglagesRepub() {
-  const [r, setR] = useState(lireReglagesRepubStockes);
+const lireGardesStockes = (encours = null) => reglagesAOuverture(load(CLE_REGLAGES_REPUB, null), load('vrm_main_reglages', null), encours);
+function useReglagesRepub(encours = null) {
+  const [r, setR] = useState(() => lireGardesStockes(encours));
   const courant = React.useRef(r);
   const touche = React.useRef(false);
-  useEffect(() => onCloudReady(() => { if (!touche.current) { const n = lireReglagesRepubStockes(); courant.current = n; setR(n); } }), []);
-  // Une relecture du nuage (autre appareil) pendant que la feuille est ouverte.
+  // Le nuage relu (ouverture, autre appareil) ne change que ce qui est GARDÉ : le prix et le
+  // titre de CETTE ouverture restent ceux qu'il est en train de choisir.
+  const relire = () => { const g = lireGardesStockes(); const n = { ...courant.current, photo: g.photo, lettre: g.lettre }; courant.current = n; setR(n); };
+  useEffect(() => onCloudReady(() => { if (!touche.current) relire(); }), []);   // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    const f = (e) => { const d = e && e.detail; if (!(d && d.k === CLE_REGLAGES_REPUB && d.distant)) return; const n = lireReglagesRepubStockes(); courant.current = n; setR(n); };
+    const f = (e) => { const d = e && e.detail; if (!(d && d.k === CLE_REGLAGES_REPUB && d.distant)) return; relire(); };
     window.addEventListener('vrm:save', f);
     return () => window.removeEventListener('vrm:save', f);
-  }, []);
+  }, []);   // eslint-disable-line react-hooks/exhaustive-deps
   const poser = React.useCallback((patch) => {
     touche.current = true;
     const c = courant.current; const p = typeof patch === 'function' ? patch(c) : patch;
     const n = lireReglagesRepub({ ...c, ...(p || {}) });
-    courant.current = n; setR(n); save(CLE_REGLAGES_REPUB, n);
+    courant.current = n; setR(n);
+    // Jamais un prix ni un titre dans la clé commune : ils ne survivent pas à la feuille.
+    save(CLE_REGLAGES_REPUB, reglagesGardes(n));
   }, []);
   return [r, poser];
 }
@@ -14331,7 +14338,7 @@ const peutPartagerFichiers = (files) => { try { return !!(typeof navigator !== '
 const partageFichiersPossible = () => { try { return !!(typeof navigator !== 'undefined' && navigator.share && navigator.canShare); } catch (_) { return false; } };
 // Le prix à COLLER dans Vinted (« 44,10 », « 49 ») — jamais « 0 » pour un prix pas lu.
 const prixACopier = (p) => (p == null || !(Number(p) > 0) ? '' : (Number.isInteger(Number(p)) ? String(Number(p)) : Number(p).toFixed(2).replace('.', ',')));
-function RepublierALaMain({ paire, suivi, candidats, etatSuivi, onDebut, onLier, onDelier, onRelire, onClose, rang = null, onSuivante = null }) {
+function RepublierALaMain({ paire, suivi, candidats, etatSuivi, onDebut, onLier, onDelier, onRelire, onClose, rang = null, onSuivante = null, encours = null }) {
   const [fiche, setFiche] = useState(undefined);   // undefined lecture · null pas su · objet lu (vide si rien rangé)
   useEffect(() => {
     let vivant = true;
@@ -14347,7 +14354,7 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, onDebut, onLier,
     return () => { vivant = false; };
   }, [paire.uid, paire.id]);
   // LES réglages de l'atelier (une source) et l'endroit du N° (Réglages → Numéros).
-  const [regs, poserRegs] = useReglagesRepub();
+  const [regs, poserRegs] = useReglagesRepub(encours);
   const [etq, setEtq] = useState(lireEtiquetteVinted);
   useEffect(() => {
     const f = () => setEtq(lireEtiquetteVinted());
@@ -14489,8 +14496,8 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, onDebut, onLier,
       {fiche === null && <div className="vrm-rm-note" data-main-passu="">VRM n’a pas pu lire ce qu’il a enregistré de cette annonce : le titre et le prix viennent de ton dressing, la description manque.</div>}
 
       {section('reglages', <>
-        <p className="vrm-rm-memes" data-main-memes-reglages={neutreTout ? 'neutre' : resumeReglages(regs).join(' · ')}>
-          <b>Mêmes réglages que Republier.</b> Ce que tu règles ici vaut aussi quand VRM republie pour toi, et l’inverse — sur tous tes appareils.
+        <p className="vrm-rm-memes" data-main-memes-reglages={resumeGardes(regs).join(' · ')}>
+          <b>Mêmes réglages que Republier.</b> La retouche des photos et la lettre valent aussi quand VRM republie pour toi, et l’inverse, sur tous tes appareils. Le prix et le titre repartent de « Garder » à chaque ouverture{rang ? ' (ils valent pour toutes les paires de cette série)' : ''}.
         </p>
         <div className="vrm-rm-bloc" data-main-bloc="photos">
           <div className="vrm-rm-bloc-tete"><b>Photos</b><span>{regNeutre ? 'telles quelles' : 'retouchées'} · vaut pour toutes</span></div>
@@ -14631,7 +14638,7 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, onDebut, onLier,
       <div className="vrm-rm-pied">
         {iE > 0 ? <Bouton variante="discret" data-main-retour="" onClick={() => aller(ETAPES_MAIN[iE - 1].k)}>Retour</Bouton> : <span/>}
         {suivante ? <Bouton variante={suivante.k === 'relier' ? 'secondaire' : 'primaire'} data-main-suivant={suivante.k} onClick={() => aller(suivante.k)}>{`Suivant : ${suivante.l}`}</Bouton>
-          : !derniere && onSuivante ? <Bouton variante="primaire" data-main-suivante={`${rang.i + 2}/${rang.n}`} onClick={onSuivante}>{`Paire suivante · ${rang.i + 2}/${rang.n}`}</Bouton>
+          : !derniere && onSuivante ? <Bouton variante="primaire" data-main-suivante={`${rang.i + 2}/${rang.n}`} onClick={() => onSuivante({ prix: regs.prix, titre: regs.titre })}>{`Paire suivante · ${rang.i + 2}/${rang.n}`}</Bouton>
           : <Bouton variante={fait.relier ? 'primaire' : 'secondaire'} data-main-terminer="" onClick={onClose}>{fait.relier ? 'Terminer' : 'Fermer'}</Bouton>}
       </div>
     </SheetShell>
@@ -14759,9 +14766,10 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   const [q, setQ] = useState('');
   // (6 nov.) Les réglages (photos, prix, titre, lettre) de « Republier » et « En ligne →
   // brouillon » sont CEUX de « Republier à la main » (`useReglagesRepub`, synchronisés) :
-  // régler ici règle là-bas. « Modifier prix ou titre » garde des réglages à lui, neutres
-  // à chaque ouverture (la même annonce, sur place : pas une republication).
-  // (29 oct.) Rien ne baisse sans son clic : neutre tant qu'il n'a rien choisi.
+  // la retouche photo et la lettre réglées ici valent là-bas (gardées, synchronisées).
+  // (29 oct., et décision du 6 nov.) Rien ne baisse sans son clic : le PRIX et le TITRE
+  // repartent de « Garder » / « Ne pas changer » à CHAQUE ouverture, jamais gardés.
+  // « Modifier prix ou titre » a des réglages à lui, tous neutres à chaque ouverture.
   const partage = action === 'recreer' || action === 'versBrouillon';
   const [regsP, poserRegsP] = useReglagesRepub();
   const [regsL, setRegsL] = useState(() => lireReglagesRepub(null));
@@ -15108,10 +15116,10 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
           {etape === 'modif' && <>
             {/* (6 nov.) UNE source de réglages pour l'atelier et « Republier à la main » : dit
                 une fois, avec ce qui est gardé (une baisse gardée se voit avant tout geste). */}
-            {partage && (() => { const neutre = regNeutre && !prixChange(regs) && !titreChange(regs) && !regs.lettre; return (
-              <div className="vrm-repub-memes" data-republier-memes-reglages={neutre ? 'neutre' : resumeReglages(regs).join(' · ')}>
-                <span><b>Mêmes réglages que « Republier à la main »</b> : ce que tu règles ici vaut aussi là-bas, sur tous tes appareils.{neutre ? '' : <> Gardés : {resumeReglages(regs).join(' · ')}.</>}</span>
-                {!neutre && <Bouton variante="discret" data-republier-reglages-zero onClick={() => poserR(lireReglagesRepub(null))}>Tout remettre à zéro</Bouton>}
+            {partage && (() => { const neutre = regNeutre && !regs.lettre; return (
+              <div className="vrm-repub-memes" data-republier-memes-reglages={neutre ? 'neutre' : resumeGardes(regs).join(' · ')}>
+                <span><b>Mêmes réglages que « Republier à la main »</b> : la retouche des photos et la lettre valent aussi là-bas, sur tous tes appareils ; le prix et le titre repartent de « Garder » à chaque ouverture.{neutre ? '' : <> Gardés : {resumeGardes(regs).join(' · ')}.</>}</span>
+                {!neutre && <Bouton variante="discret" data-republier-reglages-zero onClick={() => poserR({ photo: { ...PHOTO_NEUTRE }, lettre: false })}>Tout remettre à zéro</Bouton>}
               </div>); })()}
             {recree && <div data-republier-photos data-republier-photos-css={cssReg.transform + ' ' + cssReg.filter} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <span style={maj}>Photos</span>
@@ -60950,8 +60958,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const fileM = repubMainFile && repubMainFile.liste && repubMainFile.liste.length > 1 ? repubMainFile : null;
         const rangM = fileM ? { i:fileM.i, n:fileM.liste.length } : null;
         const fermerM = ()=>{ setRepubMainOuvert(null); setRepubMainFile(null); };
-        const suivanteM = fileM && fileM.i < fileM.liste.length-1 ? ()=>{ const j=fileM.i+1; setRepubMainFile({ ...fileM, i:j }); setRepubMainOuvert(fileM.liste[j]); } : null;
-        return <RepublierALaMain key={paire.uid+':'+paire.id} paire={paireM} rang={rangM} onSuivante={suivanteM} suivi={s} candidats={cands} etatSuivi={etatS} onDebut={debut} onClose={fermerM} onRelire={()=>loadListings(true)}
+        // La paire suivante garde le prix et le titre choisis dans CETTE ouverture (pas au-delà).
+        const suivanteM = fileM && fileM.i < fileM.liste.length-1 ? (encours)=>{ const j=fileM.i+1; setRepubMainFile({ ...fileM, i:j, encours: encours||null }); setRepubMainOuvert(fileM.liste[j]); } : null;
+        return <RepublierALaMain key={paire.uid+':'+paire.id} paire={paireM} rang={rangM} onSuivante={suivanteM} encours={fileM ? fileM.encours || null : null} suivi={s} candidats={cands} etatSuivi={etatS} onDebut={debut} onClose={fermerM} onRelire={()=>loadListings(true)}
           onDelier={()=>poserRepubMain(paire.id, { nouvelId:null, nouveauTitre:null, lieAt:null })}
           onLier={async (c)=>{ const ok = await askConfirm({ title:'C’est bien la même paire ?', desc:`« ${c.titre||'Sans titre'} » est la nouvelle annonce de « ${paire.titre||'l’ancienne'} ».${paire.numero?`\nLe N°${paire.numero} passera dessus dès que l’ancienne ne sera plus du tout sur Vinted.`:''}`, ok:'Oui, c’est elle' });
             if (!ok) return; if (!s) debut(); poserRepubMain(paire.id, { uid:paire.uid, num:paire.numero||'', titre:paire.titre||'', nouvelId:String(c.id), nouveauTitre:c.titre||'', lieAt:new Date().toISOString(), ...marque, ...(s?{}:{ at:new Date().toISOString() }) }); }}/>;

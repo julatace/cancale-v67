@@ -27,8 +27,8 @@
 // l'atelier repartait de zéro à chaque ouverture, « à la main » gardait les siens
 // sur l'appareil (`vrm_main_reglages`) avec d'AUTRES bornes (zoom 1,5, lumière 1,6 :
 // une photo téléchargée à la main pouvait ne pas être celle que l'extension envoie).
-// Désormais : UN objet synchronisé (`vrm_republier_reglages`, SYNC_KEYS), lu et écrit
-// par les deux ; UNE règle par notion, ici, exécutée par l'atelier ET par « à la main »
+// Désormais : UN objet synchronisé (`vrm_republier_reglages`, SYNC_KEYS : photo et lettre
+// seulement, voir `reglagesGardes`), lu et écrit par les deux ; UNE règle par notion, ici, exécutée par l'atelier ET par « à la main »
 // (scripts/audit-republier-main.cjs exécute ce module et vérifie qu'aucun des deux n'en
 // garde une copie).
 import { poserEtiquette, lireReglageEtiquette } from './etiquetteNumero.js';
@@ -178,6 +178,23 @@ export function lireReglagesRepub(brut, ancienPhoto = null) {
   const photo = bornerPhoto(o.photo && typeof o.photo === 'object' ? o.photo : (ancienPhoto && typeof ancienPhoto === 'object' ? ancienPhoto : PHOTO_NEUTRE));
   return { photo, prix, titre, lettre: o.lettre === true };
 }
+// (6 nov., décision qui respecte la sienne du 29 oct. : « le prix ne change plus par défaut »)
+// GARDÉS d'une ouverture à l'autre (et synchronisés) : la PHOTO et la LETTRE seulement. La
+// baisse de PRIX et le TITRE repartent de « Garder » / « Ne pas changer » à CHAQUE ouverture,
+// dans l'atelier comme à la main ; pendant une ouverture (plusieurs paires « à la main »),
+// ils valent pour toutes les paires.
+// Ce qui s'écrit dans la clé commune : jamais un prix, jamais un titre.
+export function reglagesGardes(reg) {
+  const r = lireReglagesRepub(reg);
+  return { photo: r.photo, lettre: r.lettre };
+}
+// Les réglages à l'OUVERTURE d'une feuille : photo et lettre relues, prix et titre neutres —
+// sauf `encours` (la même ouverture, paire suivante) qui garde ceux qu'il vient de choisir.
+export function reglagesAOuverture(brut, ancienPhoto = null, encours = null) {
+  const g = lireReglagesRepub(brut, ancienPhoto);
+  const e = encours && typeof encours === 'object' ? lireReglagesRepub(encours) : null;
+  return { photo: g.photo, lettre: g.lettre, prix: e ? e.prix : { ...PRIX_NEUTRE }, titre: e ? e.titre : { ...TITRE_NEUTRE } };
+}
 export const prixChange = (reg) => { const p = (reg && reg.prix) || PRIX_NEUTRE; return p.base !== 'aucun' || p.arrondi !== 'aucun' || p.fin !== 'aucune'; };
 export const titreChange = (reg) => !!(reg && reg.titre && reg.titre.mode !== 'aucun');
 
@@ -237,7 +254,13 @@ export function annonceRepubliee(a, reg, { lettre = '', etiquette = null } = {})
   };
 }
 
-// Ce que les réglages font, en mots courts (le bandeau « Mêmes réglages que Republier »).
+// Ce que les réglages GARDÉS font, en mots courts (le bandeau « Mêmes réglages que Republier ») :
+// la photo et la lettre — le prix et le titre ne sont jamais « gardés ».
+export function resumeGardes(reg) {
+  const r = reg || REGLAGES_DEFAUT;
+  return [photoNeutre(r.photo) ? 'Photos d’origine' : 'Photos retouchées', ...(r.lettre ? ['Lettre en bas'] : [])];
+}
+// Tout ce que font les réglages de CETTE ouverture.
 export function resumeReglages(reg) {
   const r = reg || REGLAGES_DEFAUT;
   const out = [];

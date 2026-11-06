@@ -18,6 +18,10 @@
 //      A5 « pas su » reste « pas su » : un prix pas lu reste null, jamais 0 ;
 //      A6 l'objet synchronisé se relit à l'identique (atelier → main), une valeur inconnue
 //         retombe au neutre, l'ancien réglage photo de la main est repris une fois ;
+//      A7 (décision du 6 nov., qui respecte la sienne du 29 oct. : « le prix ne change plus
+//         par défaut ») seuls la PHOTO et la LETTRE sont gardés d'une ouverture à l'autre ;
+//         la baisse de PRIX et le TITRE repartent de « Garder » / « Ne pas changer » à chaque
+//         ouverture — mais valent pour toutes les paires d'une même série à la main ;
 //   B. l'app (src/App.jsx, commentaires retirés) : les deux feuilles lisent LA source
 //      (`useReglagesRepub`), l'atelier calcule par `apercuRepub`, la main par
 //      `annonceRepubliee` et `dessinerPhotoReglee`, AUCUNE copie (ni prix, ni titre, ni
@@ -40,7 +44,13 @@ const MUTATIONS = {
   copie_filtre_main: { f: 'app', m: (s) => s.replace("if (dessinerPhotoReglee(ctx, img, w, h, r) === 'pixels')", "ctx.filter = `brightness(${r.bright})`; ctx.rotate(r.rot * Math.PI / 180); if (false)") },
   copie_apercu_atelier: { f: 'app', m: (s) => s.replace('const apercu = (a) => apercuRepub(a, regs);', 'const apercu = (a) => ({ titre: null, prix: a.prix != null ? Math.round(a.prix * 0.9) : null, plancher: false, tropLong: false, invalide: false });') },
   copie_texte_main: { f: 'app', m: (s) => s.replace('const ann = annonceRepubliee(', 'const ann0 = annonceRepubliee(').replace("  const marque = String(f.brand || paire.marque || '')", "  const ann = { ...ann0, prix: prixLu };\n  const marque = String(f.brand || paire.marque || '')") },
-  reglages_locaux_main: { f: 'app', m: (s) => { const i = s.indexOf('function RepublierALaMain'); return s.slice(0, i) + s.slice(i).replace('const [regs, poserRegs] = useReglagesRepub();', "const [regs, poserRegs] = useState(() => lireReglagesRepub(load('vrm_main_reglages', null)));"); } },
+  reglages_locaux_main: { f: 'app', m: (s) => { const i = s.indexOf('function RepublierALaMain'); return s.slice(0, i) + s.slice(i).replace('const [regs, poserRegs] = useReglagesRepub(encours);', "const [regs, poserRegs] = useState(() => lireReglagesRepub(load('vrm_main_reglages', null)));"); } },
+  // (6 nov.) Une baisse (ou un titre) GARDÉE d'une ouverture à l'autre : rouge.
+  baisse_gardee_regle: { f: 'regle', m: (s) => s.replace('prix: e ? e.prix : { ...PRIX_NEUTRE }, titre: e ? e.titre : { ...TITRE_NEUTRE } };', 'prix: e ? e.prix : g.prix, titre: e ? e.titre : g.titre };') },
+  baisse_gardee_ecrite: { f: 'regle', m: (s) => s.replace('return { photo: r.photo, lettre: r.lettre };', 'return { photo: r.photo, lettre: r.lettre, prix: r.prix, titre: r.titre };') },
+  baisse_gardee_app: { f: 'app', m: (s) => s.replace('save(CLE_REGLAGES_REPUB, reglagesGardes(n));', 'save(CLE_REGLAGES_REPUB, n);') },
+  baisse_relue_nuage: { f: 'app', m: (s) => s.replace('const n = { ...courant.current, photo: g.photo, lettre: g.lettre };', 'const n = lireReglagesRepub(load(CLE_REGLAGES_REPUB, null));') },
+  serie_oublie_prix: { f: 'app', m: (s) => s.replace('onClick={() => onSuivante({ prix: regs.prix, titre: regs.titre })}', 'onClick={() => onSuivante(null)}') },
   reglages_locaux_atelier: { f: 'app', m: (s) => s.replace('const [regsP, poserRegsP] = useReglagesRepub();', 'const [regsP, poserRegsP] = useState(() => lireReglagesRepub(null));') },
   cle_pas_synchro: { f: 'app', m: (s) => s.replace("  'vrm_republier_reglages',\n", '') },
   modifier_partage: { f: 'app', m: (s) => s.replace("const partage = action === 'recreer' || action === 'versBrouillon';", 'const partage = true;') },
@@ -165,15 +175,27 @@ async function auditer(src) {
       dit(!R.prixChange(bizarre) && !R.titreChange(bizarre) && bizarre.photo.zoom === 1 && bizarre.lettre === false, 'A6b une valeur inconnue retombe au neutre (un prix ne change jamais sur un doute)');
       const ancien = R.lireReglagesRepub(null, { zoom: 1.25, rot: 3 });
       dit(ancien.photo.zoom === 1.25 && ancien.photo.rot === 3 && !R.prixChange(ancien), 'A6c l’ancien réglage photo de « à la main » est repris une fois, rien d’autre');
-      dit(R.CLE_REGLAGES_REPUB === 'vrm_republier_reglages', 'A6d une seule clé', R.CLE_REGLAGES_REPUB); }
+      dit(R.CLE_REGLAGES_REPUB === 'vrm_republier_reglages', 'A6d une seule clé', R.CLE_REGLAGES_REPUB);
+      // A7 — ce qui est GARDÉ, ce qui repart de zéro.
+      const ecrit = R.reglagesGardes(pose);
+      dit(!('prix' in ecrit) && !('titre' in ecrit) && ecrit.photo.zoom === 1.2 && ecrit.lettre === true, 'A7 la clé commune ne reçoit que la photo et la lettre, jamais un prix ni un titre', JSON.stringify(ecrit));
+      const ouvre = R.reglagesAOuverture(JSON.parse(JSON.stringify({ ...ecrit, prix: pose.prix, titre: pose.titre })));
+      dit(!R.prixChange(ouvre) && !R.titreChange(ouvre) && ouvre.photo.zoom === 1.2 && ouvre.lettre === true, 'A7b à l’ouverture : prix « Garder », titre « Ne pas changer » (même si une baisse traînait dans la clé) ; photo et lettre gardées', JSON.stringify(ouvre.prix));
+      const serie = R.reglagesAOuverture(ecrit, null, { prix: pose.prix, titre: pose.titre });
+      dit(serie.prix.base === 'pct' && serie.prix.delta === '-15' && serie.titre.mode === 'prefixe', 'A7c dans la même série « à la main », la paire suivante garde la baisse et le titre choisis');
+      const r1 = R.annonceRepubliee({ titre: 'Nike', description: 'x', prix: 49, numero: '' }, ouvre, { etiquette: { place: 'aucune' } });
+      dit(r1.prix === 49, 'A7d une nouvelle ouverture copie le prix tel quel (49 €)', r1.prix); }
   }
   // ── B : le branchement de l'app ──
   const app = sansCommentaires(src.app);
   const main = tranche(app, 'function RepublierALaMain', '\nfunction PrixMiniFeuille');
   const atelier = tranche(app, 'function RepublierVinted(', '\nfunction PhotoEditor(');
   dit(main && atelier, 'B0 les deux feuilles sont dans l’app', `${main.length} / ${atelier.length}`);
-  dit(/const \[regs, poserRegs\] = useReglagesRepub\(\);/.test(main) && /const \[regsP, poserRegsP\] = useReglagesRepub\(\);/.test(atelier), 'B1 la main et l’atelier lisent LA même source (`useReglagesRepub`)');
-  dit(/function useReglagesRepub\(\)/.test(app) && /save\(CLE_REGLAGES_REPUB, n\)/.test(tranche(app, 'function useReglagesRepub()', '\nfunction ')), 'B1b le crochet écrit la clé commune');
+  dit(/const \[regs, poserRegs\] = useReglagesRepub\(encours\);/.test(main) && /const \[regsP, poserRegsP\] = useReglagesRepub\(\);/.test(atelier), 'B1 la main et l’atelier lisent LA même source (`useReglagesRepub`)');
+  { const crochet = tranche(app, 'function useReglagesRepub(', '\nfunction ');
+    dit(/save\(CLE_REGLAGES_REPUB, reglagesGardes\(n\)\)/.test(crochet) && !/save\(CLE_REGLAGES_REPUB, n\)/.test(crochet), 'B1b le crochet n’écrit dans la clé commune que ce qui est gardé (photo, lettre)');
+    dit(/reglagesAOuverture\(load\(CLE_REGLAGES_REPUB/.test(app) && /const n = \{ \.\.\.courant\.current, photo: g\.photo, lettre: g\.lettre \};/.test(crochet), 'B1c à l’ouverture et à la relecture du nuage, le prix et le titre ne viennent jamais de la clé'); }
+  dit(/onSuivante\(\{ prix: regs\.prix, titre: regs\.titre \}\)/.test(main) && /encours=\{fileM \? fileM\.encours \|\| null : null\}/.test(app), 'B1d la paire suivante d’une série garde le prix et le titre de CETTE ouverture');
   dit(/const apercu = \(a\) => apercuRepub\(a, regs\);/.test(atelier) && /cssApercuPhoto\(reg\)/.test(atelier) && /CURSEURS_PHOTO\.map/.test(atelier) && /REDUCTIONS_RAPIDES/.test(atelier) && /MODES_TITRE\.map/.test(atelier), 'B2 l’atelier calcule et règle par la règle commune (aperçu, photo, curseurs, réductions, titres)');
   dit(/const ann = annonceRepubliee\(/.test(main) && /dessinerPhotoReglee\(ctx, img, w, h, r\)/.test(main) && /cssApercuPhoto\(regs\.photo\)/.test(main) && /CURSEURS_PHOTO\.map/.test(main) && /REDUCTIONS_RAPIDES/.test(main) && /MODES_TITRE\.map/.test(main), 'B2b la main copie et dessine par la même règle (texte, toile, aperçu, curseurs, réductions, titres)');
   const copies = [];
