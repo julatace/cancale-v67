@@ -508,6 +508,8 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 
+- **6 nov. · Inventaire (v36)** : Stock → « Inventaire » (et Ma journée si en cours) : il tape les N° vus ⇒ « ✓ Attendu » neutre (pas de vert, §7) · ambre en trop / vendu · rouge deux paires sous un N° ; bilan manque / en trop / vendu rangé ; attendu = celui du Stock, pas su ≠ manque, aucun N° changé ; « N° + Entrée » ICI seulement ; ligne `vrm_inventaire` (rev). `docs/passation/2026-11-06-inventaire.md`. Geste : faire le tour des cartons.
+
 - **6 nov. · Vitesse 2** : dressings projetés (`lireDressings`, comptes liés, vide ⇒ motif), achats des comptes liés (`lireAchatsLies` ; la cloche reprend ceux du démarrage), 15 morceaux à la demande (`aLaDemande` = `React.lazy`, leur CSS reste dans App) ; −700 Ko lus par écran, 1er chargement 1 405 → 1 299 Ko gz. `docs/passation/2026-11-06-vitesse2.md`.
 
 - **6 nov. · Onglets A (Ma journée, Ventes, Achats)** : « 0 € aujourd'hui » corrigé (la coque relit ses ventes par sa sonde, `src/sondeVentes.js`, le même « aujourd'hui » partout sans recharger) ; « lecture… » au lieu de « pas lu » pendant la lecture ; « Colis envoyés » jamais 0 sans gestes ; achat suspendu hors « en route » ; un nombre une fois ; « ? » « D'où viennent ces chiffres » (`AIDE_CHIFFRES`). `docs/passation/2026-11-06-onglets-a.md`. Geste : toucher le « ? » de Ventes.
