@@ -33,3 +33,6 @@
 @media(max-width:767px){.vrm-lbc-catalog li{gap:8px;padding:8px 10px;}.vrm-lbc-catalog header{padding:12px;}.vrm-lbc-catalog header>span{white-space:normal;text-align:right;max-width:90px;}.vrm-lbc-catalog>input{font-size:17px;}.vrm-lbc-catalog-gestes a,.vrm-lbc-catalog-gestes button{font-size:11px;padding:0 4px;}.vrm-lbc-catalog-gestes{flex-direction:column;gap:0;}.vrm-lbc-catalog-info>div small{flex-basis:100%;}}
 /* (6 nov.) « À confirmer » (src/enLigneLbc.js) : la lecture complète de « Mes annonces » a plus de 24 h. Dit UNE fois, en tête ; ambre = un geste à faire (§7). */
 .vrm-lbc-catalog-info [data-etat=aconfirmer]::before{background:var(--vrm-warn,#B25000);}
+.vrm-lbc-catalog>p.vrm-lbc-catalog-confirmer{padding:0 16px 12px;font-size:12px;line-height:1.55;}
+.vrm-lbc-catalog-confirmer a{display:inline-flex;align-items:center;min-height:44px;color:var(--gestion-accent,#0071E3);font-weight:600;text-decoration:none;}
+:root[data-theme=dark] .vrm-lbc-catalog-confirmer a{color:var(--vrm-accent,#8DB8F2);}

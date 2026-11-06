@@ -33,9 +33,9 @@ export function chiffresAnnonceLbc(ad) {
  return out.join(' · ');
 }
 // (6 nov.) `aConfirmerDe(ad)` : la règle « en ligne » de Leboncoin
-// (src/enLigneLbc.js) : la raison et le geste sont dits UNE fois, sur la carte du
-// compteur de l’écran (§7) ; ici, l’état de chaque annonce et le filtre.
-export default function AnnoncesLeboncoin({annonces=[],ventes={},lectureKO=false,numeroDe=null,owner='',sortieDe=null,onSupprimer=null,enVol=null,floute=null,aConfirmerDe=null}) {
+// (src/enLigneLbc.js) ; `confirmer` : la raison et le geste (rendus par l'écran,
+// qui sait l'état de l'extension), dits UNE fois en tête de la liste (§7).
+export default function AnnoncesLeboncoin({annonces=[],ventes={},lectureKO=false,numeroDe=null,owner='',sortieDe=null,onSupprimer=null,enVol=null,floute=null,aConfirmerDe=null,confirmer=null}) {
  // (31 oct.) `floute(ad)` : l'annonce d'un AUTRE compte que le compte Leboncoin
  // ouvert reste visible, estompée (le même STYLE_FLOU que Vinted, §11).
  const estFloute=ad=>typeof floute==='function'&&!!floute(ad);
@@ -52,6 +52,7 @@ export default function AnnoncesLeboncoin({annonces=[],ventes={},lectureKO=false
   <BilanSynchronisation owner={owner} sources={bilan}/>
   <header><div><h2>Mes annonces</h2></div><span>{lectureKO?'Lecture indisponible':`${lignes.length} reçue${lignes.length>1?'s':''}`}</span></header>
   {lectureKO?<p role="status">Impossible de relire tes annonces. L’historique reste conservé.</p>:<>
+   {confirmer&&lignes.some(l=>l.etat==='aconfirmer')&&<p className="vrm-lbc-catalog-confirmer" data-lbc-confirmer-phrase="">{confirmer}</p>}
    <input type="search" aria-label="Rechercher une annonce Leboncoin" placeholder="Rechercher un article, un compte…" value={recherche} onChange={e=>setRecherche(e.target.value)}/>
    <div className="vrm-lbc-catalog-filtres" role="group" aria-label="État des annonces Leboncoin">{choix.filter(([id])=>id!=='aconfirmer'||lignes.some(l=>l.etat==='aconfirmer')).map(([id,nom])=><button key={id} type="button" aria-pressed={filtre===id} onClick={()=>setFiltre(id)}>{nom}<span>{id==='toutes'?lignes.length:lignes.filter(l=>id==='autres'?!CONNUS.includes(l.etat):l.etat===id).length}</span></button>)}</div>
    {!visibles.length?<p className="vrm-lbc-catalog-vide">{lignes.length?'Aucune annonce dans cette sélection.':'Aucune annonce'}</p>:

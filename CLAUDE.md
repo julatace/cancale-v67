@@ -508,6 +508,7 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 
+- **6 nov. · eBay + Leboncoin (v36)** : Leboncoin « en ligne » = la lecture COMPLÈTE de « Mes annonces » de son compte de moins de 24 h (`src/enLigneLbc.js`, règle de Vinted), sinon « à confirmer » hors des totaux (mesuré : 8 « Actives », 0 lecture complète jamais rangée) ; alertes anti double vente inchangées ; carte eBay = photo · titre · N° · prix · une ligne, UN geste + « … » (fiche : règle d'offre, modifier, supprimer). `docs/passation/2026-11-06-ebay-lbc.md` (§3 : correctifs extension à faire). Geste : se reconnecter à Leboncoin et ouvrir « Mes annonces » sur chaque compte.
 - **6 nov. · Ouvrir aux clients** : pas-à-pas `docs/ouvrir-aux-clients.md` (mentions, Supabase SMTP, Vercel Pro, Stripe, verrou `abonnement_obligatoire`) ; « Découvrir avec des exemples » (`src/modeExemple.js` : tout en mémoire, 0 écriture) ; guide de démarrage coché sur preuve (`src/guideDemarrage.js`). `docs/passation/2026-11-06-clients.md`. Geste : suivre le pas-à-pas.
 
 - **6 nov. · SMS Mondial Relay** : casiers annoncés par SMS ⇒ Raccourcis POST `/api/widget?mode=sms` (jeton `vrm_sms_token`, le vendeur = le jeton), rangés comme les e-mails. `docs/passation/2026-11-06-sms-colis.md`. Geste : Réglages → SMS Mondial Relay.
