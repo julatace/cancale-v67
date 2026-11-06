@@ -135,7 +135,7 @@ const MESURE_BRUTE = (pg, { tel, sombre }) => pg.evaluate(({ tel, sombre }) => {
     etats.push({ id: r.getAttribute('data-toutes-id'), vu: !!e, dessous: !!(m && e && e.top >= m.bottom - 1), entier: !!(et && et.scrollWidth <= et.clientWidth + 1 && !/ellipsis/.test(getComputedStyle(et).textOverflow)), dansMeta: !!(meta && et && meta.innerText.includes(et.innerText.trim())), texte: et ? et.innerText.trim() : '' });
   }
   // V3 — « jamais lu » ouvert, et « N sur N résultats ».
-  const jamaisOuverts = [...document.querySelectorAll('[data-toutes-etat-site][data-etat="jamais"]')].filter(vis).map((e) => e.innerText.trim().slice(0, 60));
+  const jamaisOuverts = [...document.querySelectorAll('[data-toutes-etat-site][data-etat="jamais"]')].filter((e) => vis(e) && !e.closest('[data-toutes-vide]')).map((e) => e.innerText.trim().slice(0, 60));
   const replis = [...document.querySelectorAll('[data-toutes-repli]')].map((d) => { const s = d.querySelector('summary'); const r = document.createRange(); r.selectNodeContents(s.querySelector('.vrm-toutes-repli-txt') || s); const lignesTxt = new Set([...r.getClientRects()].filter((x) => x.width > 1).map((x) => Math.round(x.top))).size; return { ouvert: d.open, lignes: lignesTxt, h: Math.round(s.getBoundingClientRect().height), sites: d.getAttribute('data-toutes-repli') }; });
   const resultats = /\d+\s+sur\s+\d+\s+résultats?/i.exec(texteMain);
   // V4 — le pied.

@@ -67754,10 +67754,11 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
   // fraîcheur vit dans la coque, revue 2.30). Une lecture en cours, ratée ou partielle
   // reste écrite, en clair : elle change ce que la liste veut dire.
   const visibles = etats.filter((e) => e[1] === 'lecture' || e[1] === 'pas-su' || e[1] === 'partiel');
-  const jamais = etats.filter((e) => e[1] === 'jamais');
+  const sansCompteVinted = etats.some((e) => e[0] === 'vinted' && e[1] === 'jamais');
+  // Aucun compte Vinted et aucune vente : l'état vide dit déjà ce geste — le repli ne le redit pas.
+  const jamais = etats.filter((e) => e[1] === 'jamais' && !(e[0] === 'vinted' && lignes.length === 0));
   const NOMS_SITES = { vinted: 'Vinted', leboncoin: 'Leboncoin', ebay: 'eBay', vestiaire: 'Vestiaire' };
   const listeNoms = (l) => l.length < 2 ? l.join('') : l.slice(0, -1).join(', ') + ' et ' + l[l.length - 1];
-  const sansCompteVinted = jamais.some((e) => e[0] === 'vinted');
   // L'état d'une vente : le mot retenu (« À envoyer », « En route »), et l'ambre
   // seulement quand il y a un geste à faire (un colis à envoyer, §7).
   const geste = (l) => l.etat === L.aEnvoyer || motEtatVente(l.etat) === L.aEnvoyer;
@@ -67780,7 +67781,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
         ? <div data-toutes-vide="" className="vrm-toutes-vide">
             {enCours ? <p>{PAS_SU.enCours}</p>
               : visibles.some((e) => e[1] === 'pas-su' || e[1] === 'partiel') ? <p>Aucune vente lue : une lecture a échoué (ci-dessus). Rien n’est perdu.</p>
-              : sansCompteVinted ? <><p className="vrm-toutes-vide-titre">Tes ventes arriveront ici</p><p>Installe l’extension VRM sur ton ordinateur, puis ouvre vinted.fr une fois connecté : elle range tes ventes toute seule.</p></>
+              : sansCompteVinted ? <><p className="vrm-toutes-vide-titre">Tes ventes arriveront ici</p><p data-toutes-etat-site="vinted" data-etat="jamais">Vinted : aucun compte relié — installe l’extension VRM sur ton ordinateur, puis ouvre vinted.fr une fois connecté : elle range tes ventes toute seule.</p></>
               : <><p className="vrm-toutes-vide-titre">Aucune vente pour l’instant</p><p>Dès qu’un article part, il apparaît ici, sur tous tes sites.</p></>}
           </div>
         : (
