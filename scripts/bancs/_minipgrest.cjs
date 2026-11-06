@@ -7,7 +7,7 @@ function getPath(row, path){
   for(let i=0;i<segs.length;i++){ const s=segs[i]; if(s==='->'){txt=false;continue;} if(s==='->>'){txt=true;continue;}
     if(v==null) return null;
     if(Array.isArray(v)&&/^-?\d+$/.test(s)){ const n=+s; v=n<0?v[v.length+n]:v[n]; }
-    else v=v[s];
+    else v=v[s.replace(/^"(.*)"$/,'$1')];   // `->"123"` : une CLÉ, comme PostgREST
   }
   if(txt && v!=null && typeof v==='object') return JSON.stringify(v);
   if(txt && v!=null) return String(v);

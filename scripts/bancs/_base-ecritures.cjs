@@ -48,7 +48,7 @@ const reLike = (motif) => {
   }
   return new RegExp(re + '$');
 };
-const lireChemin = (o, chemin) => { let v = o; for (const s of chemin.split(/->>|->/).filter(Boolean)) v = v == null ? undefined : v[s]; return v; };
+const lireChemin = (o, chemin) => { let v = o; for (const s of chemin.split(/->>|->/).filter(Boolean)) v = v == null ? undefined : v[s.replace(/^"(.*)"$/, '$1')]; return v; };
 function filtreValeur(get, expr) {
   let m;
   if (expr === 'is.null') return (r) => get(r) == null;

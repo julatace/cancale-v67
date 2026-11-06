@@ -1883,6 +1883,43 @@ const authBoot = async () => {
 // Un échec rend `null` comme avant (`fetchVintedAccounts`) : AppCoeur dit la panne,
 // jamais « aucun compte ». Le préchargement n'est repris qu'une fois, par le même
 // vendeur, dans les 30 s ; sinon AppCoeur relit.
+// ── LES COMMANDES : SEULEMENT CE QUI SERT (6 nov., vague 2 « vitesse ») ──────
+// Mesuré sur sa base (lecture seule) : la famille `harvest_*_orders_*` pèse
+// ~2,1 Mo de texte. Le motif attrapait aussi les lignes `orders_bought`
+// (~250 Ko, jamais lues : bug de capture, voir `fetchHarvestOrders`), les
+// `wreq_*_orders_*`, et les commandes des ANCIENS comptes (~175 Ko, plus dans
+// `vinted_accounts`, jamais servies). On ne lit plus que `orders_sold` et
+// `orders_purchased`, des comptes liés quand on les connaît, et en PROJECTION
+// (§4.4 : jamais `select=data`) : la liste des commandes, la date de capture et
+// la marque « vidée par toi ». `ligneCommandes` rebâtit la forme que le reste
+// du code lit (`row.data.payload`, `harvestTs`, `ligneVideeParToi`).
+// Le motif `harvest_{uid}_orders_*d` : `sold` et `purchased` finissent par « d »,
+// `orders_bought` par « t » (et les `wreq_*` ne commencent pas par
+// `harvest_{uid}_orders_`) — une seule lecture par `like`, comme avant.
+const SEL_COMMANDES = 'id,updated_at,cap:data->>capturedAt,supprime:data->supprime,payload:data->payload';
+function ligneCommandes(r) {
+  if (!r || typeof r !== 'object') return r;
+  // Une base qui rendrait la ligne ENTIÈRE (aucun alias projeté) : lue telle quelle.
+  if (r.data && typeof r.data === 'object' && !('payload' in r) && !('supprime' in r)) return r;
+  const data = {};
+  if (r.cap != null) data.capturedAt = r.cap;
+  if (r.supprime != null) data.supprime = r.supprime;
+  if (r.payload != null) data.payload = r.payload;
+  return { id: r.id, updated_at: r.updated_at, cap: r.cap, data };
+}
+function idsCommandes(uids) { return (uids || []).flatMap((u) => [`harvest_${u}_orders_sold`, `harvest_${u}_orders_purchased`]); }
+// Les comptes liés de la DERNIÈRE lecture réussie de `vinted_accounts`, sur cet
+// appareil et pour CE vendeur : seulement pour savoir QUOI précharger avant que
+// la liste n'arrive. Ce n'est jamais une décision : un compte lié depuis est lu
+// à part (`fetchHarvestOrdersBrut`), un compte retiré depuis n'est jamais servi.
+const CLE_COMPTES_LIES = 'vrm_comptes_lies';
+function comptesLiesMemorises(qui) {
+  try { const m = JSON.parse(localStorage.getItem(CLE_COMPTES_LIES) || 'null'); if (!m || m.qui !== qui || !Array.isArray(m.uids)) return null;
+    const u = m.uids.map(String); return u.length && u.every((x) => /^\d+$/.test(x)) ? u : null; } catch (_) { return null; }
+}
+function memoriserComptesLies(qui, list) {
+  try { if (!qui || !Array.isArray(list)) return; localStorage.setItem(CLE_COMPTES_LIES, JSON.stringify({ qui, uids: [...new Set(list.map((a) => String((a && a.vinted_user_id) || '')).filter(Boolean))] })); } catch (_) {}
+}
 let _confidentialiteUid='';
 let _prechargeComptes = null;   // { at, qui, promesse }
 let _prechargeLancePour = '';   // le vendeur pour qui le préchargement est déjà parti
@@ -1917,7 +1954,15 @@ const prechargerDemarrage = () => {
     // rendu, le processeur est pris par AppCoeur : une lecture lancée « dès que
     // la liste arrive » ne partait qu'après lui (mesuré : +500 ms au téléphone).
     // `strict` : une page ratée vaut « pas su » (null), jamais une demi-liste.
-    const famille = lireTout('id=like.harvest_*_orders_*&select=id,data,updated_at,cap:data->>capturedAt', { strict: true }).catch(() => null);
+    // (6 nov.) Les comptes liés connus de la dernière ouverture : leurs seules
+    // lignes ; sinon (première ouverture sur cet appareil) ventes + achats de
+    // tous, jamais `orders_bought` ni `wreq_*`. Projeté (§4.4).
+    const memo = comptesLiesMemorises(qui);
+    const famille = lireTout(memo ? `id=in.(${idsCommandes(memo).join(',')})&select=${SEL_COMMANDES}` : `id=like.harvest_*_orders_*d&select=${SEL_COMMANDES}`, { strict: true })
+      .then((rows) => (Array.isArray(rows) ? rows.map(ligneCommandes) : null)).catch(() => null);
+    // Les comptes que la lecture commune couvre. ⚠️ §4.1 : une liste VIDE n'est
+    // pas une réponse — aucune ligne pour les comptes retenus ⇒ chacun est relu à part.
+    const couvre = (rows, uid) => Array.isArray(rows) && (!memo || (rows.length > 0 && memo.includes(String(uid))));
     _prechargeComptes = { at: Date.now(), qui, promesse };
     // Dès que la liste arrive, chaque compte LIÉ reçoit SA part — exactement les
     // lignes que `fetchHarvestOrdersBrut(uid)` aurait rendues (même préfixe) —
@@ -1929,7 +1974,7 @@ const prechargerDemarrage = () => {
       for (const a of list) {
         const uid = a && a.vinted_user_id; if (!uid) continue;
         const pre = `harvest_${uid}_orders_`;
-        try { cachedRow(`o:${uid}`, () => famille.then((rows) => Array.isArray(rows) ? rows.filter((r) => String(r && r.id).startsWith(pre)) : fetchHarvestOrdersBrut(uid))).catch(() => {}); } catch (_) {}
+        try { cachedRow(`o:${uid}`, () => famille.then((rows) => couvre(rows, uid) ? rows.filter((r) => String(r && r.id).startsWith(pre)) : fetchHarvestOrdersBrut(uid))).catch(() => {}); } catch (_) {}
       }
     }).catch(() => {});
   } catch (_) { _prechargeComptes = null; }
@@ -3276,6 +3321,7 @@ const fetchVintedAccounts = async () => {
       list = list.filter(a => !blocked.has(String(a.vinted_user_id)));
       reappeared.forEach(a => { try { fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${encodeURIComponent(a.vinted_user_id)}${filtre}`, { method: 'DELETE', headers: sbAuth() }); } catch (_) {} });
     }
+    memoriserComptesLies(owner, list);   // (6 nov.) ce que le préchargement lira à la prochaine ouverture
     return list;
   } catch (_) { return null; }                 // réseau coupé, DNS, CORS : on ne sait pas
 };
@@ -4708,34 +4754,64 @@ const familleEmail = (subject, from) => {
 // captées n'en ont pas et ne seront pas recaptées tout de suite. Or le texte
 // existe : `vinted_item_details` (les fiches lues sur la page par le panneau)
 // en portait **40 sur 40** au moment de la mesure.
-// ⚠️ UNE seule ligne lue, une fois par chargement de l'écran Annonces, et on ne
-// garde QUE la longueur — le texte complet ne repart jamais dans l'app (§34).
-let _descLensCache = null;
-const fetchDescLens = async () => {
-  if (_descLensCache) return _descLensCache;
+// ⚠️ (6 nov., vague 2 « vitesse ») PLUS JAMAIS LA LIGNE ENTIÈRE (§4.4).
+// Mesuré sur sa base (lecture seule) : `vinted_item_details` porte 281 fiches,
+// ~349 Ko de texte (dont 278 Ko d'adresses de photos), et l'écran Annonces n'en
+// regarde que les ~60 de ses annonces en ligne. Elle était lue en `select=data`
+// à trois endroits (Annonces, Vendre sur eBay, Leboncoin). On ne lit plus que
+// les fiches DEMANDÉES, une par clé (`data->"<id>"`, la clé entre guillemets :
+// sinon PostgREST prend un nombre pour un rang de tableau), par lots qui
+// tiennent dans une adresse courte. Rend `{ id: fiche }` pour les fiches qui
+// existent, `null` si un lot n'a pas pu être lu (« pas su », jamais « aucune »).
+// Une fiche est rendue TELLE QU'ELLE est rangée : le reste du code ne change pas.
+const LOT_FICHES_PAGE = 3500;   // caractères de `select=` par lecture (≈ 120 fiches)
+const lireFichesPage = async (ids, lire) => {
+  const uniq = [...new Set((Array.isArray(ids) ? ids : []).map((x) => String(x == null ? '' : x).trim()).filter((x) => /^\d+$/.test(x)))];
   const out = {};
-  try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_item_details&select=data`, { headers: sbAuth() });
-    if (r.ok) {
-      const rows = await r.json();
-      const d = (rows && rows[0] && rows[0].data) || {};
-      // Le texte marketing de Vinted n'est pas une description (§5.08).
-      const PUB = /une communaut[ée].{0,60}marques|pour chaque achat effectu|thousands of brands|politique de rembours/i;
-      for (const k in d) {
-        const t = String((d[k] && d[k].description) || '').trim();
-        const len = (t && !PUB.test(t)) ? t.length : 0;
-        // Photos EFFECTIVEMENT captées de la page (≤ nPhotos tant que le
-        // carrousel Vinted n'a pas tout livré) : sert au signal « toute
-        // l'annonce captée → prête pour Leboncoin ».
-        const photos = Array.isArray(d[k] && d[k].photos) ? d[k].photos.filter(Boolean) : [];
-        const ph = photos.length;
-        // On garde les URL (petites, pas le texte lourd — §34 vise la description) :
-        // l'atelier en a besoin pour l'aperçu et les réglages photo (tranche 2).
-        if (len || ph) out[String(k)] = { len, ph, photos };
+  if (!uniq.length) return out;
+  const cle = (id, i) => `f${i}:data->${encodeURIComponent('"' + id + '"')}`;
+  const lots = []; let lot = [], long = 0;
+  for (const id of uniq) {
+    const n = cle(id, lot.length).length + 1;
+    if (lot.length && long + n > LOT_FICHES_PAGE) { lots.push(lot); lot = []; long = 0; }
+    long += cle(id, lot.length).length + 1; lot.push(id);
+  }
+  if (lot.length) lots.push(lot);
+  const lireUn = lire || (async (url) => { try { const r = await fetch(url, { headers: sbAuth() }); if (!r.ok) return null; const j = await r.json(); return Array.isArray(j) ? j : null; } catch (_) { return null; } });
+  const res = await Promise.all(lots.map((l) => lireUn(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_item_details&select=${l.map(cle).join(',')}`)));
+  if (res.some((rows) => !Array.isArray(rows))) return null;
+  res.forEach((rows, k) => { const ligne = rows[0]; if (!ligne) return; lots[k].forEach((id, i) => { const f = ligne['f' + i]; if (f != null) out[id] = f; }); });
+  return out;
+};
+// ⚠️ On ne garde QUE la longueur — le texte complet ne repart jamais dans l'app
+// (§34). Une fiche lue est retenue pour la session (par annonce) ; une lecture
+// ratée n'est PAS retenue (relue au prochain chargement de la liste).
+const _descLensParId = new Map();
+const fetchDescLens = async (ids) => {
+  const manquent = [...new Set((ids || []).map(String))].filter((id) => !_descLensParId.has(id));
+  if (manquent.length) {
+    try {
+      const d = await lireFichesPage(manquent);
+      if (d) {
+        // Le texte marketing de Vinted n'est pas une description (§5.08).
+        const PUB = /une communaut[ée].{0,60}marques|pour chaque achat effectu|thousands of brands|politique de rembours/i;
+        for (const k of manquent) {
+          const t = String((d[k] && d[k].description) || '').trim();
+          const len = (t && !PUB.test(t)) ? t.length : 0;
+          // Photos EFFECTIVEMENT captées de la page (≤ nPhotos tant que le
+          // carrousel Vinted n'a pas tout livré) : sert au signal « toute
+          // l'annonce captée → prête pour Leboncoin ».
+          const photos = Array.isArray(d[k] && d[k].photos) ? d[k].photos.filter(Boolean) : [];
+          const ph = photos.length;
+          // On garde les URL (petites, pas le texte lourd — §34 vise la description) :
+          // l'atelier en a besoin pour l'aperçu et les réglages photo (tranche 2).
+          _descLensParId.set(k, (len || ph) ? { len, ph, photos } : null);
+        }
       }
-    }
-  } catch (_) { /* réseau : on se passe du complément */ }
-  _descLensCache = out;
+    } catch (_) { /* réseau : on se passe du complément */ }
+  }
+  const out = {};
+  for (const id of (ids || [])) { const v = _descLensParId.get(String(id)); if (v) out[String(id)] = v; }
   return out;
 };
 const fetchEmailsIncompris = async () => {
@@ -5786,11 +5862,13 @@ const fetchHarvestOrders = async (uid, side, opts = {}) => {
 
 const fetchHarvestOrdersBrut = async (uid) => {
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_${uid}_orders_%25&select=id,data,updated_at,cap:data->>capturedAt`, {
+    // (6 nov.) Ses ventes et ses achats seulement, projetés (voir `SEL_COMMANDES`).
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_${uid}_orders_*d&select=${SEL_COMMANDES}`, {
       headers: sbAuth(),
     });
     if (!res.ok) return null;
-    return await res.json();          // le tri ventes/achats se fait au-dessus
+    const rows = await res.json();
+    return Array.isArray(rows) ? rows.map(ligneCommandes) : null;   // le tri ventes/achats se fait au-dessus
   } catch (_) { return null; }
 };
 // Récupère le dernier bordereau (PDF) capté par l'extension pour ce compte
@@ -23024,11 +23102,11 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
         if (pairCourante.current !== p.id) return;
         if (!(r && r.accepte && r.etape === 'fait')) { setPhotosEtat({ raison: (r && r.raison) || "l'extension n'a pas répondu" }); return; }
         try {
-          const rq = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_item_details&select=d:data->${encodeURIComponent('"' + String(p.id) + '"')}`, { headers: sbAuth() });
-          let rows = rq.ok ? await rq.json() : null;
-          // Une clé numérique (identifiant d'annonce) peut être refusée par la base : la ligne entière, une fois.
-          if (!rq.ok) { const rq2 = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_item_details&select=data`, { headers: sbAuth() }); const r2 = rq2.ok ? await rq2.json() : null; rows = r2 && r2[0] && r2[0].data ? [{ d: r2[0].data[String(p.id)] }] : null; }
-          const d = rows && rows[0] && rows[0].d;
+          // (6 nov.) SA fiche seule, par sa clé (`lireFichesPage`) — plus jamais la
+          // ligne entière en repli (§4.4). Base muette ⇒ « la base ne répond pas ».
+          const fx = await lireFichesPage([p.id]);
+          if (fx === null) throw new Error('base');
+          const d = fx[String(p.id)];
           const lues = Array.isArray(d && d.photos) ? d.photos.map((x) => typeof x === 'string' ? x : (x && (x.url || x.full_size_url)) || '').filter(Boolean) : [];
           if (lues.length) {
             // Seulement si c'est toujours CETTE paire, et sans écraser des photos retirées à la main.
@@ -23810,11 +23888,6 @@ function useEbayPaires(comptes) {
       if (!stop) setEnLigne(Array.isArray(comptes) && !comptes.length ? new Set() : online);
       if (!stop) setToutesLues(Array.isArray(comptes) && !comptes.length ? true : lu.toutesLues === true);
       const PUB = /une communaut[ée].{0,60}marques|pour chaque achat effectu|thousands of brands|politique de rembours/i;
-      let details = {};
-      try {
-        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_item_details&select=data`, { headers: sbAuth() });
-        if (r.ok) { const rows = await r.json(); details = (rows && rows[0] && rows[0].data) || {}; }
-      } catch (_) { /* réseau : on se contente de la couverture */ }
       // (17 oct.) LE COFFRE de l'annonce (`coffre_{uid}_{id}`, écrit par
       // l'extension depuis le détail Vinted) porte la MARQUE telle que Vinted
       // l'a enregistrée (« Nike SB »), l'état, la taille et souvent la
@@ -23832,7 +23905,7 @@ function useEbayPaires(comptes) {
       // « Toujours chez moi » : leur fiche et les photos de leur dernière annonce
       // lue (src/propositionsSites.js). Annonces en ligne pas lues ⇒ aucun (pas su).
       const chezMoi = online ? chezMoiProposables(fiches, chezMoiEntrees(fiches, online)) : new Set();
-      const vus = new Set(), out = [], parCle = new Map();
+      const vus = new Set(), out = [], parCle = new Map(), retenues = [];
       for (const id in fiches) {
         const f = fiches[id] || {}; const n = f.numero != null ? String(f.numero).trim() : '';
         const present = !!(online && (online.has(String(id)) || chezMoi.has(String(id))));
@@ -23841,6 +23914,13 @@ function useEbayPaires(comptes) {
         if (online && !present) continue;      // en ligne ou « toujours chez moi » seulement (vendue/retirée écartée)
         if (!online && presents && !presents.has(cleNum(n))) continue; // à défaut : au moins « en stock » si on le sait
         vus.add(n);
+        retenues.push([id, f, n]);
+      }
+      // (6 nov., vague 2) Les fiches lues sur la page, SEULEMENT pour les paires
+      // retenues (§4.4 : jamais la ligne entière). Illisible ⇒ on se contente de
+      // la couverture, comme avant.
+      const details = (await lireFichesPage(retenues.map(([id]) => id)).catch(() => null)) || {};
+      for (const [id, f, n] of retenues) {
         const cover = f.photo || couvMap[String(id)] || null;
         const dphotos = Array.isArray(details[id] && details[id].photos) ? details[id].photos.map(norm).filter(Boolean) : [];
         const photos = dphotos.length ? dphotos : (cover ? [cover] : []);
@@ -48289,7 +48369,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // Complète la longueur de description pour les annonces captées AVANT que
     // l'extension ne la pose (elle ne coûte qu'une lecture, mise en cache).
     try {
-      const lens = await fetchDescLens();
+      const lens = await fetchDescLens(out.map((it) => it && it.id));
       for (const it of out) {
         const info = lens[String(it.id)];
         if (!info) continue;
@@ -62487,8 +62567,8 @@ function LeboncoinScreen() {
     // lignes `harvest_*_item_*`, captures jusqu'au 9 septembre). Sans cette
     // lecture, l'écran ne peut pas dire avec combien de photos une annonce
     // partirait — et 54 des 59 partiraient avec UNE SEULE.
-    const detRows = await sbGet('app_data?id=eq.vinted_item_details&select=data');
-    const pageDet = (detRows && detRows[0] && detRows[0].data) || {};
+    // (6 nov., vague 2) Lue plus bas, une fiche par annonce en ligne numérotée
+    // (`lireFichesPage`) : jamais la ligne entière (§4.4).
     // ⚠️ « VENDUE » SE PROUVE (§5). Les 400 lignes `harvest_*_txn_*` portent
     //    toutes leur `item_id` : c'est l'identité qui relie une vente à son
     //    annonce. Mesuré : sur 400 annonces fermées, 151 seulement ont une vente
@@ -62547,6 +62627,9 @@ function LeboncoinScreen() {
         online.push({ id: oid, uid, title: it.title, brand: it.brand_title || '', size: it.size_title || '', status: it.status || '', color: [it.color1, it.color2].filter(Boolean).join(' '), price: (it.price && it.price.amount) || it.price || null, photo: (it.photo && it.photo.url) || '', nPhotos: Number.isFinite(it.nPhotos) ? it.nPhotos : (it.photos_count != null ? Number(it.photos_count) : undefined) });
       }
     }
+    // Seules les annonces en ligne NUMÉROTÉES passent par `itemFileLbc` (la file et
+    // Republier) : ce sont les seules fiches lues. Illisible ⇒ `{}` comme avant.
+    const pageDet = (await lireFichesPage(online.filter((o) => { const e = numeros[o.id]; return e && e.numero && String(e.numero).trim() !== ''; }).map((o) => o.id), lireBaseRelue)) || {};
     // ── OÙ EN EST LA PRÉPARATION DE LA PUBLICATION AUTOMATIQUE ────────────────
     // L'extension collecte depuis quatre versions (le catalogue des codes, la
     // config du formulaire dynamique, la forme de ce qui part) et l'app n'en
@@ -68788,10 +68871,22 @@ function AppCoeur() {
     const duCompte=(r)=>{ if(!okUid) return true; const m=/^harvest_([^_]+)_/.exec(String(r&&r.id||'')); return !m || okUid.has(m[1]); };
     const lst=(await lireLignesEnLigne((await sb('app_data?id=like.harvest_*_listings&select=id,data')||[]).filter(duCompte))).lignes;   // 5.167 : la règle « en ligne » (§11)
     for(const r of lst){ const p=(r.data&&r.data.payload)||{}; for(const it of (p.items||[])){ if(!it.is_closed&&!it.is_hidden&&!it.is_draft) online.add(String(it.id)); } }
-    const so=(await sb('app_data?id=like.harvest_*_orders_sold&select=id,data')||[]).filter(duCompte);
-    const seenS=new Set(); for(const r of so){ const p=(r.data&&r.data.payload)||{}; for(const o of (p.my_orders||[])){ const t=String(o.transaction_id||o.id||''); if(t&&!seenS.has(t)){ seenS.add(t); sold.push(o); } } }
-    const po=(await sb('app_data?id=like.harvest_*_orders_purchased&select=id,data')||[]).filter(duCompte);
-    const seenP=new Set(); for(const r of po){ const p=(r.data&&r.data.payload)||{}; for(const o of (p.my_orders||[])){ const t=String(o.transaction_id||o.id||''); if(t&&!seenP.has(t)){ seenP.add(t); bought.push(o); } } }
+    // (6 nov., vague 2) Les commandes des SEULS comptes cherchés (`id=in.`), et
+    // seulement leur liste (`data->payload->my_orders`, §4.4) : avant, toutes les
+    // lignes de tous les comptes jamais captés, entières, filtrées ici ensuite.
+    // Liste des comptes pas encore lue ⇒ tous (pas su : rien n'est écarté).
+    // §4.1 : une réponse VIDE pour les comptes cherchés n'est pas une réponse ⇒
+    // relue par motif, puis filtrée comme avant.
+    const commandes=async(cote)=>{ const sel='&select=id,mo:data->payload->my_orders';
+      const u=okUid?[...okUid].filter(x=>/^\d+$/.test(x)):null;
+      if(u&&u.length!==okUid.size) return (await sb(`app_data?id=like.harvest_*_orders_${cote}${sel}`)||[]).filter(duCompte);
+      if(u&&!u.length) return [];
+      if(u){ const l=await sb(`app_data?id=in.(${u.map(x=>`harvest_${x}_orders_${cote}`).join(',')})${sel}`); if(Array.isArray(l)&&l.length) return l.filter(duCompte); }
+      return (await sb(`app_data?id=like.harvest_*_orders_${cote}${sel}`)||[]).filter(duCompte); };
+    const so=await commandes('sold');
+    const seenS=new Set(); for(const r of so){ for(const o of (Array.isArray(r.mo)?r.mo:[])){ const t=String(o.transaction_id||o.id||''); if(t&&!seenS.has(t)){ seenS.add(t); sold.push(o); } } }
+    const po=await commandes('purchased');
+    const seenP=new Set(); for(const r of po){ for(const o of (Array.isArray(r.mo)?r.mo:[])){ const t=String(o.transaction_id||o.id||''); if(t&&!seenP.has(t)){ seenP.add(t); bought.push(o); } } }
     const lp=await sb('app_data?id=eq.vinted_lbc_posted&select=data'); ((lp&&lp[0]&&lp[0].data&&lp[0].data.ids)||[]).forEach(x=>lbc.add(String(x)));
     // (3 nov.) LA RECHERCHE UNIQUE (src/rechercheUnique.js) : pseudo de l'acheteur et
     // n° de transaction écrits dans le MÊME e-mail de vente, n° de suivi du bordereau de
@@ -68840,7 +68935,9 @@ function AppCoeur() {
     // manquer (purgée à la remise à zéro, appareil neuf) — on la lit ici.
     const [lstRows, soldRows, txnItem, bE, bL, lbcRows, cE, planLu]=await Promise.all([
       sb('app_data?id=like.harvest_*_listings&select=id,data'),
-      sb('app_data?id=like.harvest_*_orders_sold&select=id,data'),
+      // (6 nov.) Projetée (§4.4). TOUS les comptes, exprès : « Tout sur le N° »
+      // retrouve aussi une vente d'un ancien compte (rien n'y filtre les ventes).
+      sb('app_data?id=like.harvest_*_orders_sold&select=id,mo:data->payload->my_orders'),
       (async()=>{ try{ const rows=await lireTout(TXN_META_SELECT,{strict:true}); if(rows===null) return null; noterEtatsTxn(rows); const m={}; for(const r of rows){ if(r&&r.tx&&r.item) m[String(r.tx)]=String(r.item); }
         // (1er nov.) La date de versement (transaction finalisée, 450) — la règle
         // de `fetchVersementsVinted`, lue dans la MÊME réponse (aucune requête de plus).
@@ -68866,7 +68963,7 @@ function AppCoeur() {
       for(const r of lstRows){ const k=/^harvest_(\d+)_listings$/.exec(String((r&&r.id)||'')); const res=k?lu.parCompte.get(k[1]):null; if(!res) continue;
         for(const it of masqueesPresentes(masqueesDuCompte(res.fermees, supp===null?null:(supp.get(k[1])||{}), dateLectureDressing(r)), fichesM, perduesM)) masquees.add(String(it.id)); }
     }catch(_){ enLigne=null; aConfirmer=null; masquees=null; crees=null; } }
-    let ventes=null; if(soldRows){ ventes=[]; const vus=new Set(); for(const r of soldRows){ const p=(r.data&&r.data.payload)||{}; const uid=(/^harvest_(\d+)_orders_sold$/.exec(String((r&&r.id)||''))||[])[1]||null; for(const o of (p.my_orders||[])){ const t=String(o.transaction_id||''); if(t&&!vus.has(t)){ vus.add(t); ventes.push(uid?{...o,_uid:uid}:o); } } } }
+    let ventes=null; if(soldRows){ ventes=[]; const vus=new Set(); for(const r of soldRows){ const p={ my_orders: Array.isArray(r&&r.mo)?r.mo:[] }; const uid=(/^harvest_(\d+)_orders_sold$/.exec(String((r&&r.id)||''))||[])[1]||null; for(const o of (p.my_orders||[])){ const t=String(o.transaction_id||''); if(t&&!vus.has(t)){ vus.add(t); ventes.push(uid?{...o,_uid:uid}:o); } } } }
     const bordereaux=(bE&&bL)?[...bE,...bL].filter(b=>b&&b.tx).map(b=>({tx:String(b.tx),pdf:!!b.pdf&&String(b.pdf)!=='false'})):null;
     let lbcVentes=null, lbcItems=null;
     if(lbcRows){ const v=(lbcRows[0]&&lbcRows[0].ventes)||{}; lbcVentes=Object.entries(v).map(([id,x])=>({...(x||{}),_id:id})).filter(x=>x.isSeller===true);
@@ -69136,15 +69233,16 @@ function AppCoeur() {
   // ── « Le prix qui marche » : chargé À LA DEMANDE (onglet ouvert), une fois ──
   // Lit les ventes FINALISÉES et les annonces en ligne, regroupe par
   // modèle+taille (grouperPrixMarche). `null` = pas encore lu · [] = lu, rien
-  // d'assez dense · échec ⇒ baseKO parle déjà. select=data sur orders_sold /
-  // listings : lignes légères (pas de PDF), §4.4 respecté.
+  // d'assez dense · échec ⇒ baseKO parle déjà. Les commandes projetées (6 nov.) ;
+  // les annonces encore lues entières (lignes `listings`, hors de ce chantier).
   const [pqmData,setPqmData]=useState(null);
   useEffect(()=>{ if(!(tab==='dashboard'&&platSub==='prix') || pqmData!==null) return; (async()=>{
     const sb=async(q)=>{ try{ const r=await fetch(`${SUPABASE_URL}/rest/v1/${q}`,{headers:sbAuth()}); return r.ok?await r.json():null; }catch(_){ return null; } };
-    const so=await sb('app_data?id=like.harvest_*_orders_sold&select=data');
+    // (6 nov.) Projetée (§4.4) : la seule liste des commandes, tous comptes (comme avant).
+    const so=await sb('app_data?id=like.harvest_*_orders_sold&select=mo:data->payload->my_orders');
     if(so===null) return; // pas su ⇒ on laisse `null`, baseKO affiche la panne
     const sold=[]; const seen=new Set();
-    for(const r of so){ const p=(r.data&&r.data.payload)||{}; for(const o of (p.my_orders||[])){
+    for(const r of so){ for(const o of (Array.isArray(r&&r.mo)?r.mo:[])){
       const t=String(o.transaction_id||o.id||''); if(t&&seen.has(t)) continue; if(t) seen.add(t);
       if(/finalis/i.test(o.status||'')) sold.push(o); } }
     const lst=(await lireLignesEnLigne(await sb('app_data?id=like.harvest_*_listings&select=data')||[])).lignes;   // 5.167 : la règle « en ligne » (§11)
