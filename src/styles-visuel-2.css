@@ -115,7 +115,7 @@ html body .vrm-app-shell .vrm-main [data-numeros-a-ecrire] .vrm-alerte-ligne-tit
    l'ambre seulement sur le geste pressé ; le filet commence après l'icône. */
 html body .vrm-app-shell .vrm-main .vrm-eb-afaire { border: 0 !important; border-radius: var(--vrm-r-carte); box-shadow: var(--vrm-ombre-carte); }
 html body .vrm-app-shell .vrm-main .vrm-eb-afaire-titre { padding: 14px 16px 2px; font-size: var(--vrm-t15); font-weight: 600; color: var(--vrm-ink); letter-spacing: -.01em; }
-html body .vrm-app-shell .vrm-main .vrm-eb-afaire-ligne { position: relative; gap: 12px; min-height: 60px; padding: 10px 14px 10px 16px; border-top: 0 !important; font-size: var(--vrm-t15); }
+html body .vrm-app-shell .vrm-main .vrm-eb-afaire-ligne { position: relative; gap: 12px; min-height: 52px; padding: 8px 14px 8px 16px; border-top: 0 !important; font-size: var(--vrm-t15); }
 html body .vrm-app-shell .vrm-main .vrm-eb-afaire-ligne + .vrm-eb-afaire-ligne::before { content: ''; position: absolute; top: 0; left: 58px; right: 0; height: .5px; background: var(--vrm-line); }
 html body .vrm-app-shell .vrm-main .vrm-eb-afaire-ligne small { font-size: var(--vrm-t13); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 html body .vrm-app-shell .vrm-main .vrm-eb-afaire-point.vrm-eb-afaire-icone {
@@ -258,13 +258,16 @@ html body .vrm-app-shell .vrm-main .vrm-mr-bloc > .vrm-repli > summary {
   background: var(--vrm-surface); border-radius: var(--vrm-r-carte); box-shadow: var(--vrm-ombre-carte);
   min-height: 52px; padding: 0 16px !important; font-size: var(--vrm-t15) !important; font-weight: 400 !important; color: var(--vrm-ink) !important;
 }
+html body .vrm-app-shell .vrm-main .vrm-mr-bloc > .vrm-repli > summary { display: flex !important; align-items: center; gap: 0; white-space: nowrap; }
+html body .vrm-app-shell .vrm-main .vrm-mr-bloc .vrm-mr-titre { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+html body .vrm-app-shell .vrm-main .vrm-mr-bloc .vrm-mr-valeur { flex: 1 0 auto; color: var(--vrm-muted); font-variant-numeric: tabular-nums; }
 html body .vrm-app-shell .vrm-main .vrm-mr-bloc > .vrm-repli[open] > summary { border-radius: var(--vrm-r-carte) var(--vrm-r-carte) 0 0; }
 
 /* ══ 5 quater. LEBONCOIN ════════════════════════════════════════════════════ */
 /* « Publier une annonce Vinted sur … » (Leboncoin, eBay, Vestiaire) : une ligne de titre. */
-html body .vrm-app-shell .vrm-main .vrm-pa-entree > button { border: 0 !important; box-shadow: var(--vrm-ombre-carte) !important; border-radius: var(--vrm-r-carte) !important; }
-html body .vrm-app-shell .vrm-main .vrm-pa-entree > button > span:nth-child(2) { font-size: var(--vrm-t15) !important; font-weight: 600; letter-spacing: -.01em; line-height: 1.3; }
-html body .vrm-app-shell .vrm-main .vrm-pa-entree > button > span:nth-child(2) small { font-size: var(--vrm-t13) !important; font-weight: 400; }
+html body .vrm-app-shell .vrm-main .vrm-pa-entree[data-pa-entree] > button { border: 0 !important; box-shadow: var(--vrm-ombre-carte) !important; border-radius: var(--vrm-r-carte) !important; }
+html body .vrm-app-shell .vrm-main .vrm-pa-entree[data-pa-entree] > button > span:nth-child(2) { font-size: var(--vrm-t15) !important; font-weight: 600; letter-spacing: -.01em; line-height: 1.3; }
+html body .vrm-app-shell .vrm-main .vrm-pa-entree[data-pa-entree] > button > span:nth-child(2) small { font-size: var(--vrm-t13) !important; font-weight: 400; }
 /* « Actualiser » : une action de texte discrète au bord droit, plus une pilule seule. */
 html body .vrm-app-shell .vrm-main .vrm-lbc-tete { margin-bottom: 4px !important; }
 html body .vrm-app-shell .vrm-main .vrm-lbc-tete > button { border: 0 !important; background: transparent !important; color: var(--vrm-muted) !important; font-size: var(--vrm-t13) !important; min-height: 44px; }
