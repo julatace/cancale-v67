@@ -244,14 +244,17 @@ function bilan(nom, r) {
   const fiches = gets.filter((x) => x.poids === 'fiches'), commandes = gets.filter((x) => x.poids === 'commandes');
   const octFiches = fiches.reduce((a, x) => a + x.octets, 0), octCommandes = commandes.reduce((a, x) => a + x.octets, 0);
   const entieres = gets.filter((x) => x.entier), octHors = gets.reduce((a, x) => a + (x.hors || 0), 0);
+  // Les lignes jamais montrées que rapporte la lecture des COMMANDES de l'écran
+  // (le préchargement, puis la lecture par compte) — celle que ce chantier juge.
+  const octHorsCommandes = gets.filter(estVentes).reduce((a, x) => a + (x.hors || 0), 0);
   console.log(`  ${nom.padEnd(26)} utile ${String(r.utile ?? '—').padStart(6)} ms · calme ${String(fin).padStart(6)} ms · ${String(gets.length).padStart(3)} lectures · ${String(Math.round(octets / 1024)).padStart(6)} Ko · PDF ${Math.round(pdf / 1024)} Ko · en double ${enDouble} · ${profondeur} allers-retours à la suite · ${txn} balayage(s) des transactions`);
-  console.log(`     fiches de page ${Math.round(octFiches / 1024)} Ko en ${fiches.length} lecture(s) · commandes ${Math.round(octCommandes / 1024)} Ko en ${commandes.length} lecture(s) · ${entieres.length} lecture(s) de ligne entière · ${Math.round(octHors / 1024)} Ko de lignes qu'aucun écran ne montre`);
+  console.log(`     fiches de page ${Math.round(octFiches / 1024)} Ko en ${fiches.length} lecture(s) · commandes ${Math.round(octCommandes / 1024)} Ko en ${commandes.length} lecture(s) · ${entieres.length} lecture(s) de ligne entière · ${Math.round(octHors / 1024)} Ko de lignes qu'aucun écran ne montre, dont ${Math.round(octHorsCommandes / 1024)} Ko par la lecture des commandes`);
   if (DETAIL) {
     for (const x of tri) console.log(`      ${String(x.debut).padStart(6)}→${String(x.fin).padStart(6)} ${String(Math.round(x.octets / 1024)).padStart(5)} Ko ${decodeURIComponent(x.url.replace(/^https?:\/\/[^/]+\/rest\/v1\//, '')).slice(0, 170)} ${x.range}`);
     for (const [k, n] of doublons) console.log(`      ×${n} ${decodeURIComponent(k).slice(0, 170)}`);
   }
   if (profVentes) console.log(`     ventes lues au ${profVentes}ᵉ aller-retour à la suite · héros ${JSON.stringify(r.heros || [])}`);
-  return { utile: r.utile, fin, n: gets.length, octets, pdf, enDouble, profondeur, txn, supprParCompte, profVentes, octFiches, nFiches: fiches.length, octCommandes, nCommandes: commandes.length, entieres: entieres.map((x) => decodeURIComponent(x.url).replace(/^.*\/rest\/v1\//, '').slice(0, 120)), octHors };
+  return { utile: r.utile, fin, n: gets.length, octets, pdf, enDouble, profondeur, txn, supprParCompte, profVentes, octFiches, nFiches: fiches.length, octCommandes, nCommandes: commandes.length, entieres: entieres.map((x) => decodeURIComponent(x.url).replace(/^.*\/rest\/v1\//, '').slice(0, 120)), octHors, octHorsCommandes };
 }
 
 // ⚠️ PLAFONDS MESURÉS le 16 octobre (base inventée, 7 comptes). Avant les
@@ -318,7 +321,10 @@ const ECRANS = [
         dit(m.octFiches <= POIDS_FICHES / 2, `${vp.width} px · ${tab} : au plus la moitié de vinted_item_details rapatriée`, `${Math.round(m.octFiches / 1024)} Ko sur ${Math.round(POIDS_FICHES / 1024)} Ko`);
         // Les commandes d'un ancien compte, `orders_bought` et `wreq_*` : jamais montrées, jamais lues
         // (sur l'appareil de tous les jours ; au premier passage, voir Ma journée « appareil neuf »).
-        if (MEMOIRE) dit(m.octHors === 0, `${vp.width} px · ${tab} : aucune ligne de commandes qu'aucun écran ne montre (ancien compte, orders_bought, wreq)`, `${Math.round(m.octHors / 1024)} Ko`);
+        // ⚠️ Mesuré : d'AUTRES lectures, déjà projetées, lisent encore les achats de
+        // tous les comptes (la cloche « où ranger », ~100 Ko ici) — chiffre imprimé,
+        // hors de ce contrôle (voir la passation du 6 nov., « ce qui reste »).
+        if (MEMOIRE) dit(m.octHorsCommandes === 0, `${vp.width} px · ${tab} : la lecture des commandes ne rapporte aucune ligne qu'aucun écran ne montre (ancien compte, orders_bought, wreq)`, `${Math.round(m.octHorsCommandes / 1024)} Ko`);
         if (process.env.VITESSE_REFERENCE && tab !== 'journee') {
           const norm = (t) => String(t || '').replace(/\s+/g, ' ').trim();
           let ref = null; try { ref = fs.readFileSync(path.join(process.env.VITESSE_REFERENCE, vp.width + '-' + tab + '.txt'), 'utf8'); } catch (_) {}
