@@ -184,7 +184,7 @@ async function passe(nav, { W, theme }) {
     await clic(o.pg, '.vrm-sale-row[data-tx="62100"] [data-remettre-vente]');
     const sheet = await attendre(o.pg, '[data-repub-main="51900"]', 6000);
     await o.pg.waitForTimeout(1200);
-    const s = await o.pg.evaluate(() => { const f = document.querySelector('[data-repub-main]'); if (!f) return null; return { annulee: !!f.querySelector('[data-main-annulee]'), supprime: /supprime l’ancienne/.test(f.innerText), titre: (f.querySelector('h2') || {}).textContent || '', desc: !!(f.querySelector('[data-main-champ="description"] .vrm-main-valeur') || {}).textContent && /deux fois/.test(f.querySelector('[data-main-champ="description"] .vrm-main-valeur').textContent) }; });
+    const s = await o.pg.evaluate(() => { const f = document.querySelector('[data-repub-main]'); if (!f) return null; return { annulee: !!f.querySelector('[data-main-annulee]'), supprime: /supprime l’ancienne/.test(f.innerText), titre: ((f.querySelector('h2') || {}).textContent || '') + ' ' + ((f.querySelector('[data-main-num]') || {}).textContent || ''), desc: !!(f.querySelector('[data-main-champ="description"] .vrm-main-valeur') || {}).textContent && /deux fois/.test(f.querySelector('[data-main-champ="description"] .vrm-main-valeur').textContent) }; });
     dit(sheet && s && s.annulee && !s.supprime && /N°7/.test(s.titre) && s.desc, 'R', `${T} le geste ouvre « Republier à la main » depuis le coffre : N°7, description, « rien à supprimer »`, JSON.stringify(s));
     dit(o.base.ecritures === avant, 'R', `${T} ouvrir la remise n’écrit rien (jamais automatique : SON clic sur Vinted)`, `${avant} → ${o.base.ecritures}`);
     await capture(o.pg, nomS('remise-main'));

@@ -1,0 +1,135 @@
+# 6 nov. 2026 — « Republier à la main » : les mêmes réglages que l'atelier, en cinq étapes
+
+Branche locale `v36-republier-main` (depuis `claude/project-review-nsk5su`), **pas poussée,
+pas de PR**. Ni `vinted-sync-extension/` ni `public/` touchés.
+
+Julien (6 nov., mot pour mot) : « pour les republications à la main c'est bien mais je veux
+que on puisse régler comme quand c'est VRM qui fait comme ça c'est bien, pareil améliore
+l'interface stp ».
+
+## 1. Inventaire EXACT des réglages de l'atelier (lu dans le code, pas supposé)
+
+Atelier = `RepublierVinted`, étape « Modifier », actions `recreer` (Republier) et
+`versBrouillon` (Mettre en brouillon). Ce que l'extension reçoit : `vmrCmdSuivi({ cmd:
+'recreerVinted', prix, titre, plancher, reglages, lettre, viaBrouillon, … })`.
+
+| réglage | où (avant ce chantier) | ce que l'extension en fait | à la main ? |
+|---|---|---|---|
+| **Photos** : redresser ±15°, luminosité 0,5–1,5, contraste 0,5–1,5, saturation 0–2, zoom 1–2 ; UN réglage pour toutes (« Varier » et le réglage par annonce RETIRÉS) ; préréglages nommés `vrm_photo_presets` | état React, **neutre à chaque ouverture** | `reglagesPhotoSurs` (bornes) puis `photoReglee` : fond blanc, filtre, rotation et zoom au centre, JPEG 0,92 | oui |
+| **Prix** : garder · −5/−10/−15/−20 % · autre % · − X € · même prix pour toutes · arrondi à l'euro ; jamais sous le prix d'achat (`plancher`) | état React, neutre à chaque ouverture | prend `prix` tel quel (l'app calcule) | oui |
+| **Titre** : ne pas changer · ajouter au début · à la fin · remplacer · supprimer ; jamais coupé (> 100 : la paire ne part pas) | état React | prend `titre` tel quel | oui |
+| **Description** : reprise mot pour mot ; option « une lettre au hasard tout en bas » (une par annonce) | état React | retire toujours une lettre seule en dernière ligne (`sansLettre`), ajoute `\n\n{lettre}` | oui |
+| Passage par un brouillon | état React | `viaBrouillon` | sans objet (c'est lui qui publie) |
+| Temps entre deux annonces, ordre, « Je confirme » | `vrm_republier_esp` (appareil) | file de l'app | sans objet |
+| **Le N° dans le texte** (`vrm_num_vinted`, src/etiquetteNumero.js) | Réglages → Numéros (synchronisé) | **pas appliqué** : l'extension ne l'écrit pas encore (passation 2026-11-05-numerotation-etiquette, « reste : extension ») | **oui, à la main seulement** (`poserEtiquette`) |
+
+Divergences trouvées : « à la main » avait SES réglages photo (`vrm_main_reglages`, appareil) et
+d'AUTRES bornes (`filtreReglages` : zoom ≤ 1,5, lumière ≤ 1,6) — une photo téléchargée à la main
+pouvait ne pas être celle que l'extension envoie ; aucune baisse de prix, aucun réglage de titre,
+aucune lettre ; le N° jamais posé ; une annonce à la fois.
+
+## 2. Ce qui a changé
+
+**Une source, une règle — `src/republierReglages.js` (neuf).** Bornes et curseurs
+(`CURSEURS_PHOTO`, = `reglagesPhotoSurs` de l'extension), `filtrePhoto`/`cssApercuPhoto`,
+`dessinerPhotoReglee` (les gestes de `photoReglee`), `appliquerCouleursPixels` (Safari),
+`lotAppliquePrix`/`lotAppliqueTitre`/`TITRE_VINTED_MAX` (**déplacés** d'App.jsx : l'atelier des
+lots, Republier et la main les importent), `REDUCTIONS_RAPIDES`, `MODES_TITRE`, `apercuRepub`
+(l'aperçu que l'atelier envoie), `sansLettre`/`descriptionAvecLettre` (la règle de l'extension),
+`annonceRepubliee` (= `apercuRepub` + lettre + `poserEtiquette`), `lireReglagesRepub`
+(une valeur inconnue retombe au neutre), `resumeReglages`.
+`annoncesActions.js` ne garde plus de copie : il ré-exporte `filtreReglages`, `nomPhotoReglee`,
+`appliquerCouleursPixels`.
+
+**Une clé synchronisée `vrm_republier_reglages`** (SYNC_KEYS) : `{ photo, prix, titre, lettre }`,
+lue et écrite par le crochet `useReglagesRepub()` (App.jsx) — l'atelier (Republier, Mettre en
+brouillon) ET « à la main ». Régler dans l'un règle l'autre, sur tous ses appareils ; l'ancien
+réglage photo de la main (`vrm_main_reglages`) est repris une fois. **« Modifier prix ou titre »
+garde des réglages à lui, neutres à chaque ouverture** (même annonce, sur place : pas une
+republication). Dit dans l'interface des deux côtés : atelier « Mêmes réglages que « Republier à
+la main » … Gardés : Photos retouchées · Prix −10 % … » + « Tout remettre à zéro » ; main « Mêmes
+réglages que Republier ».
+
+⚠️ **Décision à confirmer par Julien** : un réglage GARDÉ vaut à la prochaine ouverture (c'est le
+sens de « régler dans l'un règle l'autre »). Le 29 oct. il avait obtenu que « par défaut le prix
+ne change plus » (−10 % d'office). Ici rien n'est d'office : la baisse est la sienne, gardée, dite
+en tête de l'atelier avant tout geste (« Gardés : Prix −10 % »), visible dans l'aperçu et remise à
+zéro d'un toucher. S'il préfère que le PRIX reparte de « Garder » à chaque fois, c'est une ligne
+(`lireReglagesRepub` à l'ouverture de l'atelier pour `prix` seulement).
+
+**L'atelier** n'a changé que de source : ses curseurs, réductions et titres sont lus dans le module
+(`CURSEURS_PHOTO`, `REDUCTIONS_RAPIDES`, `MODES_TITRE`), son aperçu est `apercuRepub`, son aperçu
+photo `cssApercuPhoto`. Une lettre gardée allumée est tirée pour chaque annonce choisie. Ce qui part
+à l'extension est identique à avant pour un même réglage.
+
+**« Republier à la main », refaite** (`RepublierALaMain`, `src/republier-main.css`) : `SheetShell`
+(titre « Republier à la main » / « Remettre en vente », « Paire 2/5 » en sous-titre), la paire en
+tête (photo ou `PhotoVide`, `Numero`, titre, compte), une progression de cinq pastilles
+(courante au bleu, faite cochée — un geste FAIT, jamais deviné), une étape à la fois, un pied collé
+(Retour · « Suivant : … » · à la dernière « Paire suivante · 3/5 » ou « Terminer ») :
+1. **Réglages** — les mêmes que l'atelier (photos + préréglages, prix, titre, lettre), chaque bloc
+   dit son résultat (« 49,00 € → 44,10 € », « ramené à ton prix d'achat » en ambre), et où le N° est
+   posé (« Le N° « N°42 » est posé en bas de la description (Réglages → Numéros) ») ou pourquoi pas ;
+2. **Photos** — l'aperçu réglé ; « Préparer / Enregistrer les N photos » : le MÊME dessin
+   (`dessinerPhotoReglee`) ; iPhone : `navigator.share({ files })` dans le geste (Safari l'exige :
+   préparer, puis « Enregistrer » ouvre le menu de partage) ; ailleurs, téléchargement
+   `VRM-{N°}-01.jpg…` ; « N pas lues » en ambre ;
+3. **Texte à copier** — l'aperçu de l'annonce telle qu'elle partira (photo réglée, prix — l'ancien
+   barré —, titre, marque · taille · état, description avec le N° et la lettre), puis titre,
+   description, prix (« 44,10 »), marque, taille, état : un « Copier » chacun, « Copié » puis
+   « Recopier » ; « pas lu » dit quand VRM ne l'a pas (jamais « 0 ») ;
+4. **Mettre en ligne sur Vinted** — les quatre gestes, ce qui n'est pas encore fait en ambre,
+   « Ouvrir Vinted — nouvelle annonce ↗ » (note le début du suivi, mène à 5) ; « supprime
+   l'ancienne, VRM ne supprime rien » (ou « rien à supprimer » pour une vente annulée) ;
+5. **Relier la nouvelle annonce** — inchangé sur le fond (candidats du même compte, SON clic +
+   confirmation, `liensRepubMain` → `repriseNumerosRecreation`).
+
+**Plusieurs paires** : « à la main » n'est plus limité à une annonce (`parPaire` dans
+`ACTIONS_SELECTION`) ; comptes mélangés permis (rien ne part d'ici, chaque paire nomme son compte),
+mais chaque annonce doit avoir SON compte connu. La file (`repubMainFile`) tient l'ordre de ses
+clics ; chaque paire repart de l'étape 1 avec les mêmes réglages et sa propre lettre.
+
+Règles tenues : rien d'automatique côté Vinted, aucune suppression, identité par N° / identifiant
+(le lien reste SON clic), pas su ⇒ dit.
+
+## 3. Preuves
+
+- `npm run build` vert.
+- `node scripts/audit-republier-main.cjs` : **30 contrôles verts**. Il EXÉCUTE la règle commune ET
+  l'extension : `photoReglee` + `reglagesPhotoSurs` et `sansLettre` sont extraits de
+  `vinted-sync-extension/background.js` et exécutés (fausse toile qui note chaque geste) — mêmes
+  gestes, mêmes bornes que la toile « à la main » et l'aperçu de l'atelier ; un réglage posé
+  dans l'atelier ⇒ même titre et même prix à la main (%, €, arrondi, prix commun, plancher,
+  titre) ; N° dans la description (bas, haut, fin du titre, refus > 100 dit) ; branchement de
+  l'app (les deux feuilles sur `useReglagesRepub`, aucune copie de prix/titre/filtre/rotation
+  dans App.jsx ni annoncesActions.js, clé synchronisée, « Mêmes réglages » dit des deux côtés).
+- `--prouve` : **17/17 mutations rouges**, dont 9 « copies qui divergent » (prix recopié dans
+  App.jsx, filtre et rotation écrits dans la main, aperçu de l'atelier recopié, texte de la main
+  qui ignore la baisse, réglages locaux à la main ou à l'atelier, clé hors SYNC_KEYS, « Modifier »
+  qui partagerait, `filtreReglages` recopié dans annoncesActions) et 8 règles affaiblies (bornes
+  qui divergent de l'extension, rotation oubliée, baisse ignorée, N° oublié, lettre empilée,
+  plancher oublié, prix pas lu = 0, valeur inconnue gardée).
+- Arbre d'avant (`git archive 46f18482`) : RESULTATS_AVANT
+- `audit-annonces-actions` 63/63 (B5 « à la main » plusieurs, B19 comptes mélangés, B20 compte
+  inconnu, E1 bornes de l'extension) ; `--prouve` 21/21.
+- Verts : `audit-coherence`, `audit-identite`, `audit-etiquette-numero`, `audit-republier`,
+  `audit-republier-question`, `audit-republier-plusieurs-chrome`, `audit-tdz`, `audit-variables`,
+  `audit-boutons`, `audit-icones`, `audit-rouge-doublon`, `audit-chrome-en-dur`.
+- Banc `scripts/bancs/republier-main.cjs` (données inventées, 390 tactile et 1512, clair et
+  sombre) : RESULTATS_BANC
+- Bancs voisins : RESULTATS_VOISINS
+
+## 4. Ce qui reste
+
+- **Extension** (non touchée, consigne) : écrire le N° (`vrm_num_vinted`) dans l'annonce lors de
+  `recreerVinted` — aujourd'hui seule la main le pose ; l'audit compare déjà la photo et la lettre
+  à l'extension, il faudra y ajouter l'étiquette quand elle l'écrira.
+- La décision « réglage gardé » pour le PRIX (§2) est à lui faire confirmer.
+- La main ne lit que la description du coffre (l'extension préfère celle de la fiche de l'annonce
+  quand elle est plus longue) : sans description au coffre, la main le dit et renvoie à Vinted.
+
+## Geste de Julien
+
+Annonces → Sélectionner : cocher deux annonces → Actions → Republier, régler (−10 %, une
+retouche) puis fermer ; Actions → « Republier à la main » : les mêmes réglages sont là, suivre les
+cinq étapes ; sur iPhone, étape 2 → « Préparer » puis « Enregistrer les photos ».

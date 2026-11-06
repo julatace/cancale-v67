@@ -10,7 +10,8 @@
 //   A. une sélection ⇒ UN carré « Actions possibles » : deux comptes mélangés ⇒
 //      tout grisé, raison dite ; deux annonces en ligne du compte de Chrome ⇒
 //      republier, modifier, en ligne → brouillon ; brouillon → en ligne grisé ; « à
-//      la main » une à la fois ; un brouillon ⇒ « brouillon → en ligne » ;
+//      la main » possible sur plusieurs (une par une, 6 nov.) ; un brouillon ⇒
+//      « brouillon → en ligne » ;
 //   V. AVANT de lancer, paire par paire, ce qui manque (description trop courte,
 //      couleur absente) avec le geste et le lien « Corriger sur Vinted » ;
 //   R. lancer ouvre le moteur existant (Republier) sur CES annonces, à l'étape
@@ -186,9 +187,11 @@ const debordement = (pg) => pg.evaluate(() => document.documentElement.scrollWid
           const teteMix = await pg.$eval('[data-actions-raison]', (x) => x.textContent).catch(() => '');
           // (6 nov., vague 2) « Prix mini… » n'agit au nom d'aucun compte (une écriture dans ses fiches) :
           //  il reste possible ; tout ce qui agit au nom d'un compte reste grisé.
-          const parCompte = mix.filter(([k]) => k !== 'mini');
-          dit(parCompte.length === 5 && parCompte.every(([, ok]) => ok === 'non') && /2 comptes/.test(teteMix), `A ${T} deux comptes mélangés ⇒ rien ne se lance au nom d’un compte, la raison dite`, mix.map((x) => x[0] + ':' + x[1]).join(' ') + ' / ' + teteMix);
+          // (6 nov.) « à la main » non plus (rien ne part d'ici ; une paire à la fois, chacune dit son compte).
+          const parCompte = mix.filter(([k]) => k !== 'mini' && k !== 'main');
+          dit(parCompte.length === 4 && parCompte.every(([, ok]) => ok === 'non') && /2 comptes/.test(teteMix), `A ${T} deux comptes mélangés ⇒ rien ne se lance au nom d’un compte, la raison dite`, mix.map((x) => x[0] + ':' + x[1]).join(' ') + ' / ' + teteMix);
           dit(mix.some(([k, ok]) => k === 'mini' && ok === 'oui'), `A ${T} « Prix mini… » reste possible sur deux comptes (rien ne part chez Vinted)`, mix.map((x) => x[0] + ':' + x[1]).join(' '));
+          dit(mix.some(([k, ok]) => k === 'main' && ok === 'oui'), `A ${T} « à la main » reste possible sur deux comptes (une paire à la fois, chacune avec son compte)`, mix.map((x) => x[0] + ':' + x[1]).join(' '));
           await fermerFeuille(pg, '[data-actions-selection]');
           // A/V — deux annonces en ligne du compte de Chrome
           await cocher(pg, '9301'); await cocher(pg, '9103');
@@ -196,7 +199,8 @@ const debordement = (pg) => pg.evaluate(() => document.documentElement.scrollWid
           await pg.waitForSelector('[data-actions-selection="2"]', { timeout: 4000 });
           const oks = Object.fromEntries(await pg.$$eval('[data-action-sel]', (l) => l.map((x) => [x.getAttribute('data-action-sel'), x.getAttribute('data-action-sel-ok')])));
           dit(oks.recreer === 'oui' && oks.modifier === 'oui' && oks.versBrouillon === 'oui', `A ${T} republier, en ligne avec modifications, en ligne → brouillon possibles`, JSON.stringify(oks));
-          dit(oks.enLigne === 'non' && oks.main === 'non', `A ${T} « brouillon → en ligne » et « à la main » grisés (raison dite)`, JSON.stringify(oks));
+          // (6 nov.) « à la main » prend plusieurs annonces : une par une dans la feuille (« paire 1/2 »).
+          dit(oks.enLigne === 'non' && oks.main === 'oui', `A ${T} « brouillon → en ligne » grisé (raison dite), « à la main » possible sur les deux`, JSON.stringify(oks));
           const v = Object.fromEntries(await pg.$$eval('[data-act-paire]', (l) => l.map((x) => [x.getAttribute('data-act-paire'), x.getAttribute('data-act-codes')])));
           dit(/description/.test(v['9103'] || '') && v['9102'] === '', `V ${T} avant de lancer : la paire 9103 dit « description », la 9102 rien`, JSON.stringify(v));
           // K — `null` du dressing = pas lu : jamais « Couleur absente » / « Catégorie absente ».

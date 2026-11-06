@@ -14317,12 +14317,13 @@ function ActionsSelectionFeuille({ choisies, actions, onLancer, onClose }) {
 // Le N° : SON clic désigne la nouvelle annonce (une identité, jamais un titre) ; la
 // reprise est la règle des republications (`repriseNumerosRecreation`) — elle attend
 // que l'ancienne ne soit plus du tout sur Vinted.
+// `l` : le mot court de la progression (cinq tiennent sur 390 px) ; `t` : le titre de l'étape.
 const ETAPES_MAIN = [
-  { k: 'reglages', l: 'Réglages' },
-  { k: 'photos', l: 'Photos' },
-  { k: 'texte', l: 'Texte' },
-  { k: 'vinted', l: 'Mettre en ligne' },
-  { k: 'relier', l: 'Relier' },
+  { k: 'reglages', l: 'Réglages', t: 'Réglages' },
+  { k: 'photos', l: 'Photos', t: 'Photos' },
+  { k: 'texte', l: 'Texte', t: 'Texte à copier' },
+  { k: 'vinted', l: 'Vinted', t: 'Mettre en ligne sur Vinted' },
+  { k: 'relier', l: 'Relier', t: 'Relier la nouvelle annonce' },
 ];
 const lireEtiquetteVinted = () => lireReglageEtiquette(load(CLE_REGLAGE_ETIQUETTE, null));
 // iPhone : le menu de partage avec des FICHIERS (« Enregistrer les images ») ; ailleurs, le téléchargement.
@@ -14450,7 +14451,7 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, onDebut, onLier,
     <div className="vrm-rm-champ" data-main-champ={k} data-main-copie={copies.has(k) ? '1' : undefined} data-main-vide={val ? undefined : '1'}>
       <div className="vrm-rm-champ-tete">
         <span>{lab}</span>
-        {val ? <Bouton variante={copies.has(k) ? 'discret' : 'secondaire'} taille="petit" icone={copie === k ? 'check' : 'copy'} data-main-copier={k} aria-label={`Copier ${lab.toLowerCase()}`} onClick={() => copier(k, val)}>{copie === k ? 'Copié' : copies.has(k) ? 'Recopier' : 'Copier'}</Bouton> : null}
+        {val ? <Bouton variante={copies.has(k) ? 'discret' : 'secondaire'} icone={copie === k ? 'check' : 'copy'} data-main-copier={k} aria-label={`Copier ${lab.toLowerCase()}`} onClick={() => copier(k, val)}>{copie === k ? 'Copié' : copies.has(k) ? 'Recopier' : 'Copier'}</Bouton> : null}
       </div>
       <div className={`vrm-main-valeur${multi ? ' vrm-rm-multi' : ''}`}>{val || <span className="vrm-rm-muet">{vide}</span>}</div>
     </div>
@@ -14460,14 +14461,14 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, onDebut, onLier,
   const numVu = paire.numero || paire.numAffiche || '';
   const derniere = !rang || rang.i >= rang.n - 1;
   const suivante = ETAPES_MAIN[iE + 1];
-  const section = (k, enfants) => <section className="vrm-rm-section" data-main-section={k} hidden={etape !== k}>{enfants}</section>;
+  const section = (k, enfants) => { const i = ETAPES_MAIN.findIndex((x) => x.k === k); return <section className="vrm-rm-section" data-main-section={k} hidden={etape !== k} aria-labelledby={`vrm-rm-t-${k}`}><h3 className="vrm-rm-titre" id={`vrm-rm-t-${k}`}>{i + 1}. {ETAPES_MAIN[i].t}</h3>{enfants}</section>; };
   return (
     <SheetShell onClose={onClose} maxWidth={600} className="vrm-rm-feuille" titre={paire.annulee ? 'Remettre en vente' : 'Republier à la main'}
       sousTitre={rang ? `Paire ${rang.i + 1}/${rang.n}` : undefined}
       data-repub-main={paire.id} data-repub-main-etat={etatSuivi} data-main-etape={etape} data-main-rang={rang ? `${rang.i + 1}/${rang.n}` : undefined}>
       {/* La paire : son N°, son titre, son compte — une fois, en tête. */}
       <div className="vrm-rm-paire">
-        {photos[0] ? <PhotoVinted src={photos[0]} alt="" className="vrm-rm-paire-photo"/> : <PhotoVide taille={48}/>}
+        <span className="vrm-rm-paire-photo">{photos[0] ? <PhotoVinted src={photos[0]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : <PhotoVide remplir/>}</span>
         <div className="vrm-rm-paire-texte">
           <div className="vrm-rm-paire-nom">{numVu ? <Numero n={numVu} data-main-num={numVu}/> : null}<span>{titreLu || 'Annonce sans titre'}</span></div>
           <div className="vrm-rm-paire-sous">Compte <b>{paire.compte}</b> · tu publies toi-même, rien ne part d’ici</div>
@@ -14494,7 +14495,7 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, onDebut, onLier,
         <div className="vrm-rm-bloc" data-main-bloc="photos">
           <div className="vrm-rm-bloc-tete"><b>Photos</b><span>{regNeutre ? 'telles quelles' : 'retouchées'} · vaut pour toutes</span></div>
           {nPh ? <div className="vrm-rm-bande" data-main-apercu-photos={nPh}>{photos.slice(0, 4).map((u, i) => <div key={i} className="vrm-rm-vignette"><PhotoVinted src={u} alt="" style={cssPh}/></div>)}{nPh > 4 ? <div className="vrm-rm-vignette vrm-rm-plus">+{nPh - 4}</div> : null}</div> : null}
-          {presets.length > 0 && <div className="vrm-rm-puces">{presets.map((x) => <Bouton key={x.nom} variante="secondaire" taille="petit" data-main-preset={x.nom} onClick={() => poserRegs({ photo: { ...PHOTO_NEUTRE, ...x.r } })}>{x.nom}</Bouton>)}</div>}
+          {presets.length > 0 && <div className="vrm-rm-puces">{presets.map((x) => <Bouton key={x.nom} variante="secondaire" data-main-preset={x.nom} onClick={() => poserRegs({ photo: { ...PHOTO_NEUTRE, ...x.r } })}>{x.nom}</Bouton>)}</div>}
           <details className="vrm-repli" data-main-reglages="">
             <summary>{regNeutre ? 'Retoucher (redresser, lumière, contraste…)' : 'Modifier la retouche'}</summary>
             {CURSEURS_PHOTO.map((c) => (
@@ -14604,7 +14605,7 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, onDebut, onLier,
       </>)}
 
       {section('relier', <>
-        <div className="vrm-rm-bloc-tete"><b>{paire.annulee && !paire.numero ? 'Désigner la nouvelle annonce' : `Remettre le N°${paire.numero ? ` ${paire.numero}` : ''} sur la nouvelle annonce`}</b></div>
+        <p className="vrm-rm-muet" data-main-but="">{paire.annulee && !paire.numero ? 'Désigne la nouvelle annonce : la vente annulée est alors remise en vente.' : paire.numero ? `Désigne la nouvelle annonce : le N°${paire.numero} passe dessus (le même carton).` : 'Désigne la nouvelle annonce, pour la suivre.'}</p>
         {paire.annulee && !paire.numero && etatSuivi !== 'fait' ? <div className="vrm-rm-muet" data-main-num-neuf={paire.archive ? 'archive' : 'sans'}>{paire.archive ? `Le N°${paire.numAffiche} est un ancien numéro : il ne se redonne pas. La nouvelle annonce recevra un N° neuf, à écrire sur son carton.` : 'Paire pas reliée : cette vente n’a pas de N°. La nouvelle annonce en recevra un, comme toute annonce.'}</div> : null}
         {paire.annulee && !paire.numero && etatSuivi === 'fait' ? <div className="vrm-rm-fait" data-main-n-fait=""><Icon name="check" size={16}/> Nouvelle annonce désignée : la vente annulée est remise en vente.</div>
           : !paire.numero && !paire.annulee ? <div className="vrm-rm-muet" data-main-sans-num="">Cette annonce n’a pas de N° : la nouvelle en recevra un, comme toute annonce.</div>
@@ -14617,9 +14618,9 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, onDebut, onLier,
               <div className="vrm-rm-muet">{ouvert ? 'Une fois publiée, choisis-la ici : c’est toi qui la désignes, VRM ne devine pas.' : 'Publie d’abord la nouvelle annonce (étape 4), puis choisis-la ici : c’est toi qui la désignes, VRM ne devine pas.'}</div>
               {(candidats || []).length ? <ul className="vrm-sel-liste" data-main-candidats={candidats.length}>{candidats.slice(0, 12).map((c) => (
                 <li key={c.id}><div className="vrm-sel-ligne" style={{ cursor: 'default' }} data-main-candidat={c.id}>
-                  {c.photo ? <PhotoVinted src={c.photo} alt="" className="vrm-sel-photo"/> : <PhotoVide taille={52}/>}
+                  <span className="vrm-sel-photo vrm-rm-cadre">{c.photo ? <PhotoVinted src={c.photo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : <PhotoVide remplir/>}</span>
                   <span className="vrm-sel-centre"><span className="vrm-sel-nom">{c.titre || 'Sans titre'}</span><span className="vrm-sel-sous">{c.prix != null ? montant(c.prix) : 'sans prix'}{c.numero ? ` · N°${c.numero} (auto)` : ''}</span></span>
-                  <Bouton variante="secondaire" taille="petit" icone="link" data-main-lier={c.id} onClick={() => onLier(c)}>C’est celle-ci</Bouton>
+                  <Bouton variante="secondaire" icone="link" data-main-lier={c.id} onClick={() => onLier(c)}>C’est celle-ci</Bouton>
                 </div></li>))}</ul>
                 : <div className="vrm-rm-muet" data-main-aucun-candidat="">Aucune nouvelle annonce de {paire.compte} lue depuis que tu as commencé.</div>}
               <div className="vrm-b-rangee vrm-rm-gauche"><Bouton variante="discret" data-main-relire="" onClick={onRelire}>Relire mes annonces</Bouton></div>
