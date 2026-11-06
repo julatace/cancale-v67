@@ -275,6 +275,8 @@ import { etatArticle } from "./etatArticle.js";
 import StockExplication from "./StockExplication.jsx";
 import { libererCasesPartis, remettreCase, resteAuStock, etatCase } from "./stockSortie.js";
 import { annoncesActuelles, annoncesVcStock, classerRangees } from "./stockAnnonces.js";
+import { InventaireStock } from "./InventaireStock.jsx";
+import { LIGNE_INVENTAIRE, enCours as inventaireEnCours } from "./inventaire.js";
 import { enLigneDeuxFois, texteCarte as texteEnLigneDeuxFois } from "./enLigneDeuxFois.js";
 import { EnLigneDeuxFoisDetail } from "./EnLigneDeuxFois.jsx";
 import { carteArgentJournee } from "./journeeArgent.js";
@@ -31972,6 +31974,10 @@ const DEMANDE_STOCK_CHERCHE = { nums: null, at: 0 };
 // stock », « Ranger au stock ») ; le Stock la SÉLECTIONNE (`is-vise`, `data-case-vise`) et
 // `CibleNotif` la défile et l'éclaire — la même mise en évidence que partout (src/cibleNotif.js).
 const DEMANDE_STOCK_CASE = { m: null, i: null, at: 0 };
+// (6 nov.) L'INVENTAIRE demandé d'ailleurs (Ma journée « Inventaire en cours ») : le Stock
+// l'ouvre en montant, une fois (valable 2 min). Le bouton du titre du Stock, lui, parle
+// à l'écran déjà monté (`vrm:inventaire-ouvrir`).
+const DEMANDE_STOCK_INVENTAIRE = { at: 0 };
 // (19 oct.) Colis → « Suivi et message à l'acheteur » d'une vente eBay : la
 // commande à ouvrir dans eBay → Ventes. Au niveau MODULE (l'écran eBay n'est pas
 // monté au moment du clic) ; lue une fois, valable 30 s.
@@ -34062,6 +34068,76 @@ function ouDansMeubles(num, meublesArg, slotsArg) {
   return { meuble: m, i: s.i, ...p, libelle: `rangée ${p.rangee}, colonne ${p.colonne}` };
 }
 
+// ── (6 nov.) L'INVENTAIRE : SA ligne `vrm_inventaire` (src/inventaire.js) ──────
+// Lire-fusionner-réécrire en comparer-et-échanger sur `data.rev` (§5, le motif de
+// `ecrireLuNotifs`) : `lireLigneInventaire` rend `null` sur une lecture ratée (RIEN ne
+// s'écrit alors — `enregistrerInventaire`), `{ existe, data }` sinon ;
+// `ecrireLigneInventaire` rend 'ok' · 'conflit' (la ligne a changé : on relit) · 'ko'.
+// Une ligne légère (quelques saisies) : elle est lue entière.
+const filtreInventaire = () => (CLOISONNE && AUTH.user ? `&owner=eq.${encodeURIComponent(AUTH.user.id)}` : '');
+const lireLigneInventaire = async () => {
+  if (!AUTH.user) return null;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${LIGNE_INVENTAIRE}${filtreInventaire()}&select=data`, { headers: sbAuth(), cache: 'no-store' });
+    if (!r.ok) return null;
+    const j = await r.json();
+    if (!Array.isArray(j) || j.length > 1) return null;
+    if (!j[0]) return { existe: false, data: {} };
+    const d = j[0].data;
+    return { existe: true, data: d && typeof d === 'object' && !Array.isArray(d) ? d : {} };
+  } catch (_) { return null; }
+};
+const ecrireLigneInventaire = async ({ existe, rev, data }) => {
+  if (!AUTH.user) return 'ko';
+  try {
+    if (!existe) {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data`, {
+        method: 'POST', headers: { ...sbAuth(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify([withOwner({ id: LIGNE_INVENTAIRE, data })]),
+      });
+      if (r.ok) { try { window.dispatchEvent(new Event('vrm:inventaire')); } catch (_) {} return 'ok'; }
+      return r.status === 409 ? 'conflit' : 'ko';
+    }
+    const garde = rev == null ? 'data->>rev=is.null' : `data->>rev=eq.${rev}`;
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${LIGNE_INVENTAIRE}${filtreInventaire()}&${garde}&select=id`, {
+      method: 'PATCH', headers: { ...sbAuth(), 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify({ data, updated_at: new Date().toISOString() }),
+    });
+    if (!r.ok) return 'ko';
+    const j = await r.json().catch(() => null);
+    if (Array.isArray(j) && j.length === 1) { try { window.dispatchEvent(new Event('vrm:inventaire')); } catch (_) {} return 'ok'; }
+    return Array.isArray(j) && j.length === 0 ? 'conflit' : 'ko';
+  } catch (_) { return 'ko'; }
+};
+// Ma journée : « Inventaire en cours » — la copie de CET appareil d'abord, puis la ligne
+// (des scalaires projetés, jamais la ligne entière). `null` = rien en cours (ou pas su).
+function useInventaireEnCours(actif) {
+  const [v, setV] = React.useState(null);
+  React.useEffect(() => {
+    if (!actif) return undefined;
+    let vivant = true;
+    const lire = async () => {
+      let l = null;
+      try { const t = localStorage.getItem('vrm_inventaire_local_' + (AUTH.user?.id || 'anon')); const d = t ? JSON.parse(t) : null; l = d && d.courant && d.courant.id ? d.courant : null; } catch (_) {}
+      let srv = null;
+      if (AUTH.user) {
+        try {
+          const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${LIGNE_INVENTAIRE}${filtreInventaire()}&select=id:data->courant->>id,n:data->courant->n,debut:data->courant->debut,finAt:data->courant->finAt,reprisAt:data->courant->reprisAt`, { headers: sbAuth(), cache: 'no-store' });
+          if (r.ok) { const j = await r.json(); srv = Array.isArray(j) && j[0] && j[0].id ? j[0] : null; }
+        } catch (_) {}
+      }
+      let c = null;
+      if (l && srv && String(l.id) === String(srv.id)) c = { n: Math.max(Number(l.n) || 0, Number(srv.n) || 0), debut: l.debut, finAt: Math.max(Number(l.finAt) || 0, Number(srv.finAt) || 0), reprisAt: Math.max(Number(l.reprisAt) || 0, Number(srv.reprisAt) || 0) };
+      else c = [l, srv].filter(Boolean).sort((a, b) => (Number(b.debut) || 0) - (Number(a.debut) || 0))[0] || null;
+      if (vivant) setV(c && inventaireEnCours(c) ? { n: Number(c.n) || 0, debut: Number(c.debut) || 0 } : null);
+    };
+    lire();
+    window.addEventListener('vrm:inventaire', lire);
+    return () => { vivant = false; window.removeEventListener('vrm:inventaire', lire); };
+  }, [actif]);
+  return v;
+}
+
 // (5 nov.) LES ANNONCES ACTUELLES, lues pour le Stock par les MÊMES lectures que
 // l'écran Annonces (§11) : chaque compte Vinted gardé par `fetchVintedListings`
 // (la règle <enligne-regle> : en ligne, à confirmer, masquées), eBay
@@ -34157,6 +34233,10 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [placeNum]);
   const [modal, setModal] = React.useState(null);           // {type:'meuble'|'placer'|'fiche', …}
+  // (6 nov.) L'INVENTAIRE (src/InventaireStock.jsx) : ouvert par le bouton « Inventaire »
+  // du titre (`vrm:inventaire-ouvrir`) ou par Ma journée (`DEMANDE_STOCK_INVENTAIRE`).
+  const [inventaire, setInventaire] = React.useState(() => { if (Date.now() - DEMANDE_STOCK_INVENTAIRE.at < 120000) { DEMANDE_STOCK_INVENTAIRE.at = 0; return true; } return false; });
+  React.useEffect(() => { const f = () => setInventaire(true); window.addEventListener('vrm:inventaire-ouvrir', f); return () => window.removeEventListener('vrm:inventaire-ouvrir', f); }, []);
   // Rattrapage nuage (§5.49) : on ne remplace que si resté VIDE — jamais par-dessus
   // un meuble créé ou une case posée pendant le chargement.
   React.useEffect(() => onCloudReady(() => {
@@ -34700,9 +34780,44 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
       </div>
     </Card>) : null;
 
+  // ── (6 nov.) L'INVENTAIRE : l'ATTENDU est celui du Stock, tel quel (une source) ──
+  // Les annonces actuelles (`aa`, la règle unique « en ligne »), les N° prouvés vendus
+  // (`vrm_stock_vendus` — jamais publié ⇒ `null`, pas su), les paires gardées « encore
+  // là », et `jugeable` (la même question que « Plus en ligne »). Les jugements, le
+  // bilan, la fusion et l'écriture sont dans src/inventaire.js. AUCUN N° n'est changé :
+  // l'écran n'écrit que `vrm_inventaire` ; « Je l'ai sortie » est `sortir` d'ici.
+  const elInventaire = inventaire ? (() => {
+    let stockInv;
+    if (lecture === undefined) stockInv = undefined;
+    else if (!aa) stockInv = null;
+    else {
+      const physSig = load('vinted_nums_physiques', null);
+      const dblSig = load('vrm_num_doublons', null);
+      const connues = new Set(Object.keys(fichesParCle));
+      try { (load('vinted_used_numeros', []) || []).forEach((v) => { const c = cleNum(v); if (c) connues.add(c); }); } catch (_) {}
+      try { Object.values(load('vinted_sale_overrides', {}) || {}).forEach((o) => { const c = cleNum(o && o.numero); if (c) connues.add(c); }); } catch (_) {}
+      try { Object.values(vcLocStock.auto || {}).forEach((v) => { const c = cleNum(v); if (c) connues.add(c); }); } catch (_) {}
+      const gardees = {};
+      for (const k of Object.keys(garder)) { const f = (fichesParCle[k] || []).find((x) => !horsCompte(x)); if (f) gardees[k] = { numero: f.numero, titre: f.title || '', photo: f.photo || null }; }
+      stockInv = { su: aa.su, articles: aa.articles, manque: aa.manque,
+        vendus: venduSig && Array.isArray(venduSig.nums) ? vendus : null,
+        physiques: physSig && Array.isArray(physSig.nums) ? new Set(physSig.nums.map((x) => cleNum(x)).filter(Boolean)) : null,
+        garder, gardees, jugeable, connues, archive: archiveNumeros(),
+        doublons: dblSig && Array.isArray(dblSig.nums) ? new Set(dblSig.nums.map((x) => cleNum(x)).filter(Boolean)) : null, slots };
+    }
+    const ficheDe = (k) => ficheParCle[k] || (fichesParCle[k] || [])[0] || null;
+    return <InventaireStock stock={stockInv} meubles={meubles} slots={slots} owner={AUTH.user?.id || ''} cle={cleNum}
+      lire={lireLigneInventaire} ecrire={ecrireLigneInventaire} Feuille={SheetShell} Micro={MicDictee} confirmer={askConfirm} nomsComptes={comptesNoms}
+      onFermer={() => setInventaire(false)}
+      onFiche={(n) => { try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: String(n) })); } catch (_) {} }}
+      onVoirCase={(k) => { const f = ficheDe(k); setInventaire(false); montrer(f ? { ...f, numero: f.numero } : { numero: k }); }}
+      peutSortir={(k) => !!ficheDe(k)} onSortir={(k) => { const f = ficheDe(k); if (f) sortir({ ...f, id: f.id, numero: f.numero, title: f.title || '' }); }}/>;
+  })() : null;
+
   // (5 nov.) Qui découvre : l'explication animée (données inventées), puis le
   // geste. Sans annonce actuelle ni meuble, il n'y a rien d'autre à montrer.
   if (!fiches.length && !meubles.length) return (<>
+    {elInventaire}
     {blocResume}
     <StockExplication />
     {aa && aa.su && !aa.n && <Card style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>{aa.auMoins ? 'Aucune annonce lue pour l’instant — une lecture manque (voir plus haut).' : 'Aucune annonce en ligne en ce moment : dès qu’une annonce est en ligne, elle arrive ici, prête à ranger.'}</Card>}
@@ -34801,6 +34916,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   );
 
   return (<>
+    {elInventaire}
     {blocResume}
     {blocCherche}
     {meubles.length === 0 && <StockExplication />}
@@ -35181,7 +35297,8 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
   let colN=0;
   return (
     <div style={{padding:16,display:'flex',flexDirection:'column',gap:14}}>
-      <ScreenHead icon="home" title="Stock" desc="Tes étagères en 2D : chaque article dans sa case. Cherche un numéro, il te dit le meuble et la case."/>
+      <ScreenHead icon="home" title="Stock" desc="Tes étagères en 2D : chaque article dans sa case. Cherche un numéro, il te dit le meuble et la case."
+        right={<button type="button" className="vrm-b vrm-b-secondaire" data-stock-inventaire-ouvrir="" onClick={() => { try { window.dispatchEvent(new Event('vrm:inventaire-ouvrir')); } catch (_) {} }}>Inventaire</button>}/>
 
       <StockMeubles locate={locate} placeNum={placeNum} onPlaced={onPlaced} accounts={accounts} comptesLus={comptesLus}/>
 
@@ -43083,6 +43200,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (elles partent tout de suite, la coque recalcule ensuite) et la réponse en cours.
   const [cycleRepondus, setCycleRepondus] = useState({});
   const [cycleEnVol, setCycleEnVol] = useState(null);
+  // (6 nov.) Un inventaire du Stock EN COURS (src/inventaire.js) : une carte de Ma journée.
+  const inventaireJournee = useInventaireEnCours(only === 'journee');
   // (3 nov.) « Supprimer de Leboncoin » depuis la carte « à retirer de Leboncoin » :
   // une confirmation qui nomme chaque N°, puis une annonce à la fois ; le premier
   // résultat qui n'est pas « supprimée » arrête tout et se dit.
@@ -47004,6 +47123,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (!meme) save('vrm_stock_vendus', { nums: liste, at: Date.now() });
     } catch (_) {}
   }, [annoncesVendues, numeros, sales.items]);
+  // (6 nov.) PUBLIÉ pour l'inventaire du Stock (src/inventaire.js) : les N° portés
+  // par deux paires présentes (`conflitsNum`, §11 — un seul propriétaire, ici), le
+  // seul rouge de l'inventaire. Clé LOCALE, recalculable. Ventes ou annonces pas
+  // lues, ou liste lue en partie ⇒ on ne publie pas (« pas su » : la dernière valeur reste).
+  useEffect(() => {
+    if (!sales.items || listings.loading || listings.incomplet || !Array.isArray(listings.items)) return;
+    const liste = [...new Set(conflitsNum.map((c) => cleNum(c.numero)).filter(Boolean))].sort();
+    try {
+      const avant = load('vrm_num_doublons', null);
+      const meme = avant && Array.isArray(avant.nums) && avant.nums.join(',') === liste.join(',');
+      if (!meme) save('vrm_num_doublons', { nums: liste, at: Date.now() });
+    } catch (_) {}
+  }, [conflitsNum, sales.items, listings.items, listings.loading, listings.incomplet]);
   // Le tri des comptes et des ventes, le MÊME pour la grille et pour les annonces
   // « à confirmer » (5.167) : une annonce d'un compte exclu, ou prouvée vendue,
   // n'est ni dans l'une ni dans l'autre.
@@ -53690,6 +53822,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // « Voir » ouvre Annonces sur « Sans achat relié » (une suggestion par annonce, SON tap relie).
         { const nR = fileAchat ? aRelierJournee(fileAchat) : 0;
           if (nR > 0) jobs.push({ id: 'achat-a-relier', n: nR, icon: 'link', color: C.text, court: `${nR} annonce${nR > 1 ? 's' : ''} sans achat relié`, detail: 'Une suggestion par annonce : ton tap relie', title: `${nR} annonce${nR > 1 ? 's' : ''} sans achat relié`, tab: 'cat_annonces', prio: 3.4, avant: () => demanderVue('sansachat') }); }
+        // (6 nov.) UN INVENTAIRE DU STOCK EN COURS (src/inventaire.js, sa ligne
+        // `vrm_inventaire`) : « Reprendre » ouvre le Stock sur l'inventaire. Neutre :
+        // rien ne presse, c'est lui qui l'a commencé.
+        if (inventaireJournee) {
+          const nI = inventaireJournee.n;
+          jobs.push({ id: 'inventaire-en-cours', n: nI, icon: 'box', color: C.text, court: 'Inventaire en cours', detail: `${nI} N° vu${nI > 1 ? 's' : ''} — reprends là où tu t’es arrêté`, title: 'Inventaire en cours', sub: `${nI} N° vu${nI > 1 ? 's' : ''} — reprends là où tu t’es arrêté`, tab: 'garage', prio: 2.4, avant: () => { DEMANDE_STOCK_INVENTAIRE.at = Date.now(); } });
+        }
         jobs.sort((a,b)=>a.prio-b.prio);
         // RÉSULTAT DU JOUR : les paires VENDUES aujourd'hui (pas l'argent viré,
         // qui arrive plusieurs jours après). Source = les emails de vente, la
