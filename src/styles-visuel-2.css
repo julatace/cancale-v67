@@ -153,3 +153,99 @@ html body .vrm-app-shell .vrm-main .vrm-eb-gestes .vrm-b[data-relier-ouvrir]::be
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.5 1.5'/%3E%3Cpath d='M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.5-1.5'/%3E%3C/svg%3E") center / contain no-repeat;
 }
 @media (hover: hover) and (pointer: fine) { html body .vrm-app-shell .vrm-main .vrm-eb-gestes .vrm-b[data-relier-ouvrir]:hover { background: var(--vrm-card2) !important; } }
+
+/* ══ 3. LA BARRE DU HAUT FLOUTÉE ET LE GRAND TITRE QUI SE REPLIE (téléphone) ══
+   Comme Mail et Réglages : en haut de page la barre est transparente et le grand
+   titre (34 px) est posé dessous ; au défilement le CONTENU passe sous une barre
+   de verre (flou + saturation), un filet d'un demi-pixel apparaît et le titre
+   revient en petit (17/600) au centre de la barre, pendant que le grand titre
+   s'efface. L'en-tête ne prend plus de place dans la colonne : il flotte, la page
+   commence dessous (même position qu'avant, au pixel). */
+@media (max-width: 767px), (max-width: 1023px) and (hover: none), (max-width: 1023px) and (pointer: coarse), (max-width: 1023px) and (pointer: none) {
+  html body .vrm-app-shell { position: relative; }
+  html body .vrm-app-shell > .vrm-app-header {
+    position: absolute !important; top: 0; left: 0; right: 0; z-index: 50;
+    background: transparent !important; border-bottom: .5px solid transparent !important;
+    transition: background-color 200ms ease-out, border-color 200ms ease-out, -webkit-backdrop-filter 200ms ease-out, backdrop-filter 200ms ease-out;
+  }
+  html body .vrm-app-shell > main.vrm-main { padding-top: calc(52px + env(safe-area-inset-top, 0px)) !important; scroll-padding-top: calc(64px + env(safe-area-inset-top, 0px)) !important; }
+  html body .vrm-app-shell > .vrm-app-header.is-defile {
+    background: color-mix(in srgb, var(--vrm-bg) 72%, transparent) !important;
+    -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
+    border-bottom-color: var(--vrm-hair) !important;
+  }
+  /* Le petit titre revient dans la barre, seulement quand le grand est parti. */
+  html body .vrm-app-shell > .vrm-app-header.is-defile .vrm-hdr-titre {
+    display: block !important; grid-column: 2; opacity: 1; transform: none;
+    font-size: var(--vrm-t17); font-weight: 600; letter-spacing: -.02em; color: var(--vrm-ink) !important;
+  }
+  /* Ma journée : la barre prend le noir de la tête sombre (maquette Fusion) ; défilée,
+     elle devient un verre SOMBRE. */
+  html body .vrm-app-shell:has(.vrm-main .vrm-fu-journee) > .vrm-app-header { background: #1d1d1f !important; }
+  html body .vrm-app-shell:has(.vrm-main .vrm-fu-journee) > .vrm-app-header.is-defile { background: rgba(29,29,31,.72) !important; border-bottom-color: rgba(255,255,255,.08) !important; }
+  html body .vrm-app-shell:has(.vrm-main .vrm-fu-journee) > .vrm-app-header.is-defile .vrm-hdr-titre { color: #fff !important; }
+}
+/* Sans transparence voulue (réglage d'accessibilité) : une barre pleine. */
+@media (prefers-reduced-transparency: reduce) {
+  html body .vrm-app-shell > .vrm-app-header.is-defile { background: var(--vrm-bg) !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+  html body .vrm-app-shell:has(.vrm-main .vrm-fu-journee) > .vrm-app-header.is-defile { background: #1d1d1f !important; }
+}
+/* Le grand titre s'efface au fil des 56 premiers pixels défilés (le navigateur le fait
+   seul, lié au défilement — aucun calcul à chaque image). Mouvement réduit : le fondu
+   seul, sans glissement. Un navigateur qui ne sait pas le faire garde le titre net. */
+@supports (animation-timeline: scroll()) {
+  @keyframes vrm-grand-titre-replie { to { opacity: 0; transform: translateY(-6px) scale(.96); } }
+  @keyframes vrm-grand-titre-fondu { to { opacity: 0; } }
+  @media (max-width: 767px) {
+    html body .vrm-app-shell > main.vrm-main { scroll-timeline: --vrm-page block; }
+    html body .vrm-app-shell .vrm-main .vrm-screen-head .vrm-display {
+      transform-origin: 0 100%;
+      animation: vrm-grand-titre-replie linear both; animation-timeline: --vrm-page; animation-range: 0 56px;
+    }
+  }
+  @media (max-width: 767px) and (prefers-reduced-motion: reduce) {
+    html body .vrm-app-shell .vrm-main .vrm-screen-head .vrm-display { animation-name: vrm-grand-titre-fondu; }
+  }
+}
+
+/* ══ 4. LE GRAND TITRE ET L'ÉCHELLE ═══════════════════════════════════════ */
+html body .vrm-app-shell .vrm-main .vrm-screen-head .vrm-display { letter-spacing: -.025em; line-height: 1.1; }
+@media (max-width: 767px) { html body .vrm-app-shell .vrm-main .vrm-screen-head .vrm-display { font-size: var(--vrm-t34) !important; font-weight: 700 !important; } }
+/* Les titres de section (22/700) et leurs compteurs (17, au gris) : une seule forme. */
+html body .vrm-app-shell .vrm-main :is(.vrm-rpf-section-titre, .vrm-eb-inactives-titre) { font-size: var(--vrm-t22) !important; font-weight: 700 !important; letter-spacing: -.022em !important; line-height: 1.2; }
+html body .vrm-app-shell .vrm-main .vrm-rpf-section-n { font-size: var(--vrm-t17); font-weight: 400; color: var(--vrm-muted); font-variant-numeric: tabular-nums; }
+/* ══ 5. LE CHIFFRE QUI ROULE (CarteMois → ChiffreRoule) ═══════════════════ */
+.vrm-roule { display: inline-block; }
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes vrm-chiffre-monte { from { opacity: 0; transform: translateY(.4em); filter: blur(3px); } to { opacity: 1; transform: none; filter: none; } }
+  .vrm-roule.is-neuf { animation: vrm-chiffre-monte 380ms var(--vrm-sortie) both; }
+}
+
+/* ══ 5 bis. LE HÉROS : LES PAIRES DU CHIFFRE EN PILE ══════════════════════
+   Sur la carte sombre (Ma journée : les paires vendues aujourd'hui ; Colis : les colis
+   à retirer), à droite du grand chiffre : 3 photos de 64 px en éventail, bord de la
+   couleur de la carte, ombre douce — comme les souvenirs de Photos. */
+html body .vrm-app-shell .vrm-main .vrm-fu-pile.vrm-pile { width: 96px; height: 76px; align-self: center; margin-right: 2px; }
+html body .vrm-app-shell .vrm-main .vrm-fu-pile .vrm-pile-v { width: 64px; height: 64px; top: 6px; border-radius: 14px; border: 2px solid rgba(255,255,255,.14); box-shadow: 0 6px 16px rgba(0,0,0,.35); background: #2c2c2e; }
+html body .vrm-app-shell .vrm-main .vrm-fu-pile.is-pile .vrm-pile-v { left: calc(var(--k) * 14px); top: 6px; transform: rotate(calc((var(--k) - 1) * 6deg)); transform-origin: 50% 100%; }
+html body .vrm-app-shell .vrm-main .vrm-fu-pile .vrm-pile-plus { right: -4px; bottom: 0; background: rgba(255,255,255,.16); color: #fff; box-shadow: none; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes vrm-pile-pose { from { opacity: 0; transform: translateY(8px) rotate(0deg) scale(.92); } }
+  html body .vrm-app-shell .vrm-main .vrm-fu-pile .vrm-pile-v { animation: vrm-pile-pose 460ms var(--vrm-sortie) both; animation-delay: calc(var(--k) * 60ms); }
+}
+
+/* ══ 6. LES ÉTATS VIDES ILLUSTRÉS (src/composants/Illustration.jsx) ═══════ */
+.vrm-illustration { display: block; color: var(--vrm-muted); opacity: .9; }
+html body .vrm-app-shell .vrm-main .vrm-vide-dessin { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; padding: 24px 16px; }
+html body .vrm-app-shell .vrm-main .vrm-vide-dessin p { margin: 0; }
+html body .vrm-app-shell .vrm-main .vrm-fu-vide.vrm-vide-dessin { padding: 20px 16px 8px; font-size: var(--vrm-t15); }
+html body .vrm-app-shell .vrm-main .vrm-empty-state { border: 0 !important; box-shadow: var(--vrm-ombre-carte) !important; border-radius: var(--vrm-r-carte) !important; padding: 24px 20px 28px !important; }
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes vrm-dessin-pose { from { opacity: 0; transform: translateY(6px) scale(.97); } to { opacity: .9; transform: none; } }
+  .vrm-illustration { animation: vrm-dessin-pose 420ms var(--vrm-sortie) both; }
+}
+
+/* Tout ce qui se touche s'enfonce à peine (0,97), en 100 ms — jamais sur un défilement. */
+@media (hover: none) and (prefers-reduced-motion: no-preference) {
+  html body .vrm-app-shell .vrm-main :is(.vrm-eb-afaire-ligne, .vrm-rpf-ouvrir, a.vrm-rpf-rang-lien, .vrm-ios-rangee-zone, .vrm-eb-ouvrir, .vrm-fu-case, .vrm-sale-row, .vrm-buy-row):active { transform: scale(.98); transition: transform 100ms ease-out; }
+}

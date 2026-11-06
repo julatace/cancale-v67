@@ -390,6 +390,7 @@ import "./styles-ios.css";       // (6 nov., v36-visuel) rangées « Réglages �
 import "./styles-visuel.css";    // (6 nov., v36-visuel) la direction : photos héros, chiffres, rythme 8 px
 import "./styles-visuel-2.css";  // (6 nov., v36-visuel-2) de « propre » à « beau » : échelle, matière, barre floutée, mouvement
 import { GroupeIos, RangeeIos } from "./composants/Ios.jsx";
+import Illustration, { depuisIcone } from "./composants/Illustration.jsx";   // (6 nov., v36-visuel-2) les dessins des états vides
 import { SITES_PUBLIER, apercuEnvoi, manquesEnvoi, etatsPaire, partoutLeMeme, lienVu, chercherPaires } from "./publierAilleurs.js";
 import { optionsSelecteur, nomCompteVente, identiteCompteVente, annuaireLbc, ongletSansDonnee, nomPlateforme, logoPlateforme } from "./plateformes.js";
 import { MR_SELECT, lireColisMondialRelay, suivisAvecMondialRelay, accordCodes, codeDuCompteMr, ouTrouverQr, ilYa as ilYaLecture, compteDuRetrait, indexAchatsAutresSites } from "./retraitQr.js";
@@ -16771,8 +16772,8 @@ function ReceptionEmails({ tracking, comptes, colisParTransporteur }) {
     return (
       <Notice tone="warn" icon="alert"
         value={nInc}
-        title={`email${nInc>1?'s':''} reçu${nInc>1?'s':''} que l'app n'a pas su classer`}
-        desc="Ils sont conservés entiers, rien n'est perdu — mais aucune action n'en a été tirée."
+        title={`e-mail${nInc>1?'s':''} pas classé${nInc>1?'s':''}`}
+        desc="Conservés entiers, rien n’est perdu — aucune action tirée."
         detail={detail}/>
     );
   }
@@ -16809,7 +16810,9 @@ function EmptyState({ icon, title, desc, action }) {
     <div className="vrm-empty-state" style={{textAlign:'center',padding:'34px 20px',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,boxShadow:C.shadow||'none'}}>
       {/* (1er nov., finition) Un nom d'icône au trait (jeu de la barre), dans un
           disque neutre — plus d'emoji ni de pavé teinté d'accent (§7). */}
-      <div className="vrm-empty-ic" aria-hidden="true" style={{width:48,height:48,margin:'0 auto 12px',borderRadius:'50%',background:C.card2||C.bg,color:C.muted,display:'flex',alignItems:'center',justifyContent:'center',fontSize:22}}>{ICON_PATHS[icon] ? <Icon name={icon} size={22}/> : icon}</div>
+      {/* (6 nov., v36-visuel-2) Un petit dessin au trait (src/composants/Illustration.jsx), le même
+          pour la même idée partout — plus une icône dans un disque. Décoratif : la phrase dit tout. */}
+      <div className="vrm-empty-ic vrm-empty-dessin" aria-hidden="true" style={{margin:'0 auto 8px',color:C.muted,display:'flex',justifyContent:'center'}}><Illustration nom={depuisIcone(icon)} taille={120}/></div>
       <div style={{fontSize:15,fontWeight:700,color:C.text,letterSpacing:-0.3}}>{title}</div>
       {desc && <div style={{fontSize:12,color:C.muted,marginTop:5,lineHeight:1.5,maxWidth:340,marginLeft:'auto',marginRight:'auto'}}>{desc}</div>}
       {action && <div style={{marginTop:14}}>{action}</div>}
@@ -42477,7 +42480,7 @@ const REGLES_CARTE = { bilanLignes, rythmeVendu, chiffreBenefice, chiffreBrut, b
 // `page` : une clé de PAGES_CARTE ; `sel` : { site, compte: {uid, login, nom} | null, periode } ;
 // `locaux` : les cases propres de la page ({ id → { nom, court, type, valeur, partiel, onClick, attrs, affiche } }) ;
 // `ici` : l'onglet où l'on est (une case n'y renvoie pas).
-function CarteStatsApp({ page, liveStats, sel = null, locaux = null, ici = null, attrs = null, ...rest }) {
+function CarteStatsApp({ page, liveStats, sel = null, locaux = null, ici = null, attrs = null, pile = null, ...rest }) {
   const [reglage, poser] = useReglageCarte();
   const [objectif, poserObjectif] = useObjectifMois();
   const liveCoque = React.useContext(LiveStatsCarte);
@@ -42489,7 +42492,7 @@ function CarteStatsApp({ page, liveStats, sel = null, locaux = null, ici = null,
     || (base.enPreparation.urssaf && !base.ligneUrssaf)
     || Object.values(locaux || {}).some((x) => x && x.enCours)) ? undefined : true);
   const sources = locaux ? { ...base, locaux } : base;
-  return <CarteStats owner={AUTH.user?.id||''} page={page} sel={sel || { site: 'toutes', compte: null, periode: null }} sources={sources} regles={REGLES_CARTE} reglage={reglage} poser={poser} objectif={objectif} poserObjectif={poserObjectif} FermeAuRetour={FermeAuRetour} extra={{ ici, attrs }} {...rest}/>;
+  return <CarteStats owner={AUTH.user?.id||''} page={page} sel={sel || { site: 'toutes', compte: null, periode: null }} sources={sources} regles={REGLES_CARTE} reglage={reglage} poser={poser} objectif={objectif} poserObjectif={poserObjectif} FermeAuRetour={FermeAuRetour} extra={{ ici, attrs, pile }} {...rest}/>;
 }
 // Le compte choisi, dit pour la carte : { uid, login, nom } ou null (tous).
 const compteCarte = (uid, accounts) => {
@@ -55593,6 +55596,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {!premierJour && (
                   <CarteStatsApp page="journee" aide liveStats={liveStats} nu ici="journee" onNav={onNav}
                     sel={{ site: 'toutes', compte: null, periode: null }}
+                    pile={(() => { const auj = new Date().toDateString(); const v = dernieresVentes.filter((o) => o._t && new Date(o._t).toDateString() === auj);
+                      return v.length ? { srcs: v.map((o) => orderPhoto(o)), n: v.length, Photo: PhotoVinted, mortes: imgMortes, onMorte: noterImgMorte } : null; })()}
                     attrsDe={(x) => {
                       if (x.place.id === 'vendu' && x.p === 'jour') return { 'data-fu-vendu-jour': x.valeur == null || ventesPasLues ? '' : String(Math.round(x.valeur * 100)) };
                       if (x.place.id === 'benefice' && x.p === 'mois') { const B = x.B, e2 = (v) => v == null ? '' : String(Math.round(v * 100) / 100);
@@ -55744,7 +55749,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const pasLus = T.filter((x) => x.pasSu).map((x) => x.l);
               if (nGestes === 0) return pasLus.length
                 ? <p className="vrm-fu-vide" data-tout-a-jour="" data-pas-lu={pasLus.join(', ')}>Rien à faire dans ce qui est lu · {pasLus.join(', ').toLowerCase()} : pas lu</p>
-                : <p className="vrm-fu-vide" data-tout-a-jour="">Rien à faire</p>;
+                : <div className="vrm-fu-vide vrm-vide-dessin" data-tout-a-jour=""><Illustration nom="basket" taille={96}/><p>Rien à faire</p></div>;
               return (
                 <section className="vrm-fu-afaire" aria-label="À faire">
                   <div className="vrm-fu-titre-section"><h2 className="vrm-day-titre-section">À faire</h2><span data-fu-gestes={nGestes}>{nGestes} geste{nGestes > 1 ? 's' : ''}</span></div>
@@ -56027,7 +56032,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {sales.error && <EtatPanne quoi="Tes ventes Vinted" raison="La lecture n’a pas répondu. Rien n’est perdu." onReessayer={()=>loadOrders('sold',setSales,true)}/>}
         {/* (5 nov., chantier E2) L'état vide dit ce qui va se passer : TOUTES les ventes arrivent ici
             (pas seulement les finalisées, comme le disait l'ancienne phrase). */}
-        {sales.items && !sales.error && sales.items.length===0 && <div className="vrm-toutes-vide" data-ventes-vide=""><p className="vrm-toutes-vide-titre">Aucune vente pour l’instant</p><p>Dès qu’un article part sur Vinted, il apparaît ici avec son état et son bordereau.</p></div>}
+        {sales.items && !sales.error && sales.items.length===0 && <div className="vrm-toutes-vide vrm-vide-dessin" data-ventes-vide=""><Illustration nom="etiquette" taille={110}/><p className="vrm-toutes-vide-titre">Aucune vente pour l’instant</p><p>Dès qu’un article part sur Vinted, il apparaît ici avec son état et son bordereau.</p></div>}
         {/* ⚠️ SUR ORDINATEUR, LA LISTE SE RANGE EN DEUX COLONNES.
             Une ligne de vente de 980 px pour une photo, un titre et un
             prix, c'est le meme defaut que les cartes d'action de Ma
@@ -56901,7 +56906,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             seulement quand tout est lu (e-mails de suivi, achats) : pas su ≠ rien. */}
         {modeRetraits && !retraitsOutils && !baseKO && tracking!==null && !trackingKO && Array.isArray(buys.items) && !buys.error && pickupUnion.total===0
           && !(pickupUnion.aVerifier||[]).length && !(pickupUnion.aConfirmer||[]).length && !(aConfirmer.etat==='lu' && aConfirmer.liste.length) && (
-          <div data-retraits-vide="" style={{fontSize:13,color:C.muted,padding:'18px 0',lineHeight:1.5}}>Aucun colis à aller chercher pour l'instant.</div>
+          <div data-retraits-vide="" className="vrm-vide-dessin" style={{fontSize:13,color:C.muted,padding:'18px 0',lineHeight:1.5}}><Illustration nom="boite" taille={110}/><p>Aucun colis à aller chercher pour l'instant.</p></div>
         )}
         {(()=>{
           // (2 nov.) Sous Colis → « À retirer », chaque colis et son code sont dans la
@@ -59656,6 +59661,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   cases={[{ cle: 'dernier', n: nD, l: 'd’ici demain', attrs: { 'data-n': String(nD) } }, { cle: 'code', n: nC, l: 'avec code', attrs: { 'data-n': String(nC) } }, { cle: 'verifier', n: nV, l: 'à vérifier', attrs: { 'data-n': String(nV) } }]}/>; }
               return (
               <CarteMois className="vrm-fu-ecran vrm-fu-colis" surtitre="Aujourd'hui" data-fu-colis-retirer={nRet == null ? '' : String(nRet)}
+                pile={nRet ? { srcs: ((parPoint && parPoint.points) || []).flatMap((p) => (p.arrives || []).filter((c) => !c.horsCompte).map((c) => c.photo)), n: nRet, Photo: PhotoVinted, mortes: imgMortes, onMorte: noterImgMorte } : null}
                 valeur={nRet == null ? null : <>{retPartiel ? <span className="vrm-fu-borne">au moins</span> : null}{nRet} colis</>}
                 sous={nRet == null ? 'Je lis tes colis…' : nRet === 0 ? 'Rien à aller chercher' : 'à retirer'}
                 cases={[
