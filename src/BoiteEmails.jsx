@@ -50,6 +50,7 @@ import RelierBoite from './RelierBoite.jsx';
 import RelierCompte from './RelierCompte.jsx';
 import { phraseARelier } from './relierCompte.js';
 import { EtatPanne } from './composants/EtatPanne.jsx';
+import { prendreDemande, DEMANDE_RECHERCHE } from './rechercheEcran.js';
 import './boite-emails.css';
 
 const PAR_PAGE = 50;
@@ -461,6 +462,9 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
   const [lecture, setLecture] = useState(false);
   const [ouvert, setOuvert] = useState('');
   const [panne, setPanne] = useState('');
+  // (6 nov., v36) Un e-mail choisi dans la loupe (src/rechercheEcran.js) : il s'ouvre ici,
+  // par l'id de SA ligne — la lecture le relit côté serveur, filtrée par son propriétaire.
+  useEffect(() => { const f = () => { const id = prendreDemande('email'); if (id) setOuvert(id); }; f(); window.addEventListener('vrm:recherche-ouvrir', f); return () => window.removeEventListener('vrm:recherche-ouvrir', f); }, []);
   const [luA, setLuA] = useState(0);
   const [vieille, setVieille] = useState(false);
   const [deplies, setDeplies] = useState(() => new Set());
@@ -670,9 +674,13 @@ export default function BoiteEmails({ headers, delies: deliesRecus = {}, onAller
   useEffect(() => {
     const f = () => setVue('relier');
     const g = (ev) => { const u = String((ev && ev.detail) || ''); setVue('relier'); if (u) setCompte(u); };
+    // (6 nov., v36) Un e-mail demandé par la loupe s'ouvre dans la boîte de réception.
+    const h = () => { if (DEMANDE_RECHERCHE.email) setVue('boite'); };
+    h();
     window.addEventListener('vrm:ouvrir-adresses', f);
     window.addEventListener('vrm:relier-compte', g);
-    return () => { window.removeEventListener('vrm:ouvrir-adresses', f); window.removeEventListener('vrm:relier-compte', g); };
+    window.addEventListener('vrm:recherche-ouvrir', h);
+    return () => { window.removeEventListener('vrm:ouvrir-adresses', f); window.removeEventListener('vrm:relier-compte', g); window.removeEventListener('vrm:recherche-ouvrir', h); };
   }, []);
   const aRelierListe = Array.isArray(aRelier) ? aRelier : [];
   const bandeau = aRelierListe.filter((c) => !relies.has(c.uid));
