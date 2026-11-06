@@ -117,6 +117,13 @@ Avant : 34 rouges sur 2 tailles (dont 2 du banc lui-même, corrigés : le lieu t
   `audit-veille-plantages`, `audit-file-envoi`, `audit-icones`, `audit-signalement` : verts.
   `audit-politique-hotes` : 1 rouge **préexistant** (`src/enLigneLbc.js` →
   www.leboncoin.fr, pas touché ici ; rouge aussi sur l'arbre d'avant).
+- `BANC_PORT=12255 node scripts/bancs/mesures-terrain.cjs` (la vraie app, 390 tactile) :
+  un lot `{v,h,jeton}` part en `text/plain` vers `compte?mode=mesures`, aucune donnée
+  affichée dedans, rien d'autre dans la minute, la visite de Colis attend sur
+  l'appareil ; le panneau du propriétaire lit les agrégats, p75 +50 % marqué — vert.
+- Notifications : `centre-notifs` vert (98), `audit-notifications` vert, `sw-cache` vert ;
+  `notifs-destination` : 9 rouges **préexistants** (« ni écran blanc ni garde-fou »,
+  les mêmes 9 sur la pointe de `claude/project-review-nsk5su` bâtie sans ce chantier).
 
 ## Gestes de Julien
 - Rien à poser pour le hors réseau : ouvrir Colis une fois avec du réseau suffit.
