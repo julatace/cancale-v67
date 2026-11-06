@@ -170,6 +170,9 @@ const attendreNuage = async (b, test) => { for (let i = 0; i < 30; i++) { const 
           dit(ratees.length === 0, `C ${tag} : ${e} — chaque photo ${CACHEE} est floutée (${cibles.length}, flou ≥ 16 px)`, JSON.stringify(ratees));
           dit(trop.length === 0, `C ${tag} : ${e} — aucune photo d'une autre marque n'est floutée (${autres.length} nettes)`, JSON.stringify(trop.map((p) => p.marque)));
           dit(r.nFuites === 0 && !r.texte, `C ${tag} : ${e} — « ${CACHEE} » ne se lit ni dans le texte ni dans alt/aria-label/title`, JSON.stringify({ fuites: r.fuites, texte: r.texte }));
+          // La capture montre une photo floutée ET ses voisines (à regarder).
+          await pg.evaluate(() => { const f = document.querySelector('[data-stream-photo]'); if (f) f.scrollIntoView({ block: 'center' }); });
+          await attendre(300);
           await capture(pg, `C-${tag}-${e}`);
         }
         // La visionneuse « Agrandir » d'une vente Adidas (Ventes · Vinted).
@@ -181,7 +184,7 @@ const attendreNuage = async (b, test) => { for (let i = 0; i < 30; i++) { const 
         const ouvert = await pg.evaluate(([cachee, f]) => { const est = new Function('return ' + f)(); for (const btn of document.querySelectorAll('.vrm-photo-open')) { if (est(btn.querySelector('img'), cachee)) { btn.click(); return true; } } return false; }, [CACHEE, est.toString()]);
         await attendre(600);
         const v = await pg.evaluate(() => { const i = document.querySelector('.vrm-photo-panel img'); if (!i) return null; const f = getComputedStyle(i).filter; return { attr: i.hasAttribute('data-stream-photo'), px: Number((/blur\(([\d.]+)px\)/.exec(f) || [])[1] || 0), alt: i.getAttribute('alt'), titre: (document.querySelector('.vrm-photo-panel') || {}).innerText || '' }; });
-        dit(ouvert && v && v.attr && v.px >= 16, `C ${tag} : la visionneuse « Agrandir » d'une vente ${CACHEE} est floutée`, JSON.stringify({ ouvert, v }));
+        dit(ouvert && v && v.attr && v.px >= 40, `C ${tag} : la visionneuse « Agrandir » d'une vente ${CACHEE} est floutée (flou doublé en grand)`, JSON.stringify({ ouvert, v }));
         dit(v && !/adidas/i.test(v.alt + ' ' + v.titre), `C ${tag} : la visionneuse ne dit pas la marque (titre, alt)`, JSON.stringify(v));
         await capture(pg, `C-${tag}-visionneuse`);
         await pg.keyboard.press('Escape').catch(() => {}); await attendre(300);

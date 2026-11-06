@@ -109,6 +109,8 @@ async function audit(fichiers, bavard) {
   dit(autres.length === 0, '4.7 aucune autre règle de photo dans l\'app (la décision vient de src/modeStream.js)', JSON.stringify(autres));
   dit(/\[data-stream="1"\] \[data-stream-photo\],\s*\[data-apercu-photo="floue"\] img \{ filter: blur\((\d+)px\)/.test(html) && Number((/\[data-stream-photo\],\s*\[data-apercu-photo="floue"\] img \{ filter: blur\((\d+)px\)/.exec(html) || [])[1]) >= 16, '4.8 le CSS floute FORT les photos (et l\'aperçu montre le même flou)');
   dit(/className="vrm-photo-panel" data-stream-article=\{titre \|\| ''\}/.test(app), '4.9 la visionneuse « Agrandir » dit son article');
+  const grand = /\[data-stream="1"\] \[data-stream-article\] \[data-stream-photo\],[^{]*\{ filter: blur\((\d+)px\)/.exec(html);
+  dit(!!grand && Number(grand[1]) >= 40, '4.9 bis une photo en GRAND (visionneuse, recadrage) a un flou doublé', grand && grand[1]);
   dit(/if \(R\.photosToutes \|\| photoACacherSelon\(articleDe\(el, racine, texteDe, altDe\), R\)\) aFlouter\.add\(el\);/.test(regle), '4.10 la couche de la page décide par photoACacherSelon (même règle)');
   dit(/const ATTRS = \[[^\]]*'alt'/.test(regle) && /\(a === 'alt' && photos\.has\(el\)\) \? toutMasquer\(o\)/.test(regle), '4.11 le texte alternatif d\'une photo floutée ne dit rien');
   dit(/el\.closest\('\[data-stream-libre\], \[data-stream-image\], \[data-mfa-qr\]'\)/.test(regle) && /if \(\/\^QR\\b\/\.test\(alt\)\) return false;/.test(regle), '4.12 QR, bordereaux et logos ne sont pas des photos d\'article (leurs flous restent les leurs)');
