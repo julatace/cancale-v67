@@ -23,7 +23,7 @@
   --vrm-b-teinte: rgba(0,0,0,.08);
   --vrm-b-teinte-f: rgba(0,0,0,.14);
   --vrm-b-encre: var(--vrm-ink, #38383A);
-  --vrm-b-lien: var(--vrm-accent, #0071E3);
+  --vrm-b-lien: var(--vrm-accent-texte, #0066CC); /* (5 nov.) texte bleu : le bleu « lien », lisible en clair et en sombre */
   --vrm-b-h: 40px;
 }
 :root[data-theme="dark"] {
