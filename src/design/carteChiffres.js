@@ -284,6 +284,9 @@ export const recuPublieEntre = (publie, { de, a, ym, complet }, maintenant = Dat
 //   chiffreBenefice(B, etat) · chiffreBrut(R) · beneficeDesJours(jours, de, a) ·
 //   debutPeriode(t, p) · decalerPeriode(d, p, k)
 // → { valeur (nombre | null), partiel, manque: [], hors: '', p, attrs }
+// (6 nov., onglets A) UNE règle de fraîcheur pour `vrm_colis_aposter` : la carte et le badge de Colis.
+export const PUB_COLIS_MAX_MS = 12 * 3600000;
+export const publicationColisFraiche = (pub, maintenant = Date.now()) => !!pub && (!Number.isFinite(Number(pub.at)) || pub.at == null || maintenant - Number(pub.at) < PUB_COLIS_MAX_MS);
 export const valeurChiffre = (id, place, sources, sel, regles, maintenant = Date.now()) => {
   const S = sources || {};
   const locaux = S.locaux || null;
@@ -306,6 +309,9 @@ export const valeurChiffre = (id, place, sources, sel, regles, maintenant = Date
 
   if (id === 'vendu' || id === 'ventes' || id === 'panier') {
     const V = S.vendu;
+    // (6 nov., onglets A, §5) `undefined` = les ventes de la coque pas encore là : « lecture… »,
+    // jamais « pas lu » (une panne annoncée à chaque ouverture) ; `null` = pas su.
+    if (V === undefined) return vide('encours', { p });
     if (!V || !Array.isArray(V.lignes)) return vide('pasSu', { p });
     const garde = (l) => (!plateforme || l.plateforme === plateforme) && (!login || (l.plateforme === 'Vinted' && String(l.compte || '') === login));
     const lignes = V.lignes.filter(garde);
@@ -365,7 +371,11 @@ export const valeurChiffre = (id, place, sources, sel, regles, maintenant = Date
   }
   if (id === 'aposter') {
     const pub = S.colisAPoster;
-    if (!pub || !Number.isFinite(pub.total)) return vide('pasSu');
+    // (6 nov., onglets A) La publication n'existe que sur l'appareil qui a ouvert Ma journée, Colis
+    // ou Ventes · Vinted (`vrm_colis_aposter`). Mesuré : l'app rouverte sur Ventes · Tous disait
+    // « À envoyer — pas lu » au-dessus de 11 ventes « À envoyer ». Absente, ou de plus de 12 h (la
+    // règle du badge de Colis : le même nombre ou rien), la case dit le geste (« ouvre Colis »).
+    if (!pub || !Number.isFinite(pub.total) || !publicationColisFraiche(pub, maintenant)) return vide('colis');
     if (site === 'toutes') {
       const manque = ['ebay', 'leboncoin', 'vestiaire'].filter((k) => pub[k] === null).map((k) => NOM_SITE[k]);
       if (manque.length && !(pub.total > 0)) return vide('partiel', { manque });
@@ -428,14 +438,20 @@ export const RAISON_COURTE = {
   pasSu: 'pas lu', encours: 'lecture…', publication: 'pas calculé', achats: 'prix d’achat manquants',
   frais: 'frais pas lus', cotisations: 'statut à choisir', rien: 'rien à compter', aucune: 'aucune vente',
   statut: 'statut à choisir', absente: 'ouvre Ventes', ancienne: 'à relire', 'ancienne-app': 'à relire', illisible: 'pas lu',
+  // (6 nov., onglets A) des envois sans geste « Colis fait » : le nombre n'est pas su.
+  nonNotes: 'envois pas notés',
+  // (6 nov., onglets A) « À envoyer » pas encore compté sur cet appareil (ou plus de 12 h) : le geste.
+  colis: 'ouvre Colis',
 };
+// (6 nov., onglets A) Un nombre de ventes s'écrit comme les autres (« 1 772 », jamais « 1772 »).
+const nFr = (n) => Number(n).toLocaleString('fr-FR');
 export const raisonCourte = (x) => {
   if (!x) return '';
-  if (x.valeur != null) return x.aDater > 0 ? `+ ${x.aDater} à dater` : '';
+  if (x.valeur != null) return x.aDater > 0 ? `+ ${nFr(x.aDater)} à dater` : '';
   if (x.hors) return x.hors;
   // Une case PROPRE à la page dit sa raison elle-même (Compta : « À déclarer » sans statut).
   if (x.def && x.def.local && x.def.raisonCourte) return x.def.raisonCourte;
-  if (x.raison === 'a-dater') return `${x.aDater} à dater`;
+  if (x.raison === 'a-dater') return `${nFr(x.aDater)} à dater`;
   if (x.raison === 'partiel') return x.manque && x.manque.length ? `sans ${x.manque[0]}` : 'pas tout lu';
   return RAISON_COURTE[x.raison] || 'pas lu';
 };
