@@ -41,21 +41,24 @@ lots, Republier et la main les importent), `REDUCTIONS_RAPIDES`, `MODES_TITRE`, 
 `annoncesActions.js` ne garde plus de copie : il ré-exporte `filtreReglages`, `nomPhotoReglee`,
 `appliquerCouleursPixels`.
 
-**Une clé synchronisée `vrm_republier_reglages`** (SYNC_KEYS) : `{ photo, prix, titre, lettre }`,
-lue et écrite par le crochet `useReglagesRepub()` (App.jsx) — l'atelier (Republier, Mettre en
-brouillon) ET « à la main ». Régler dans l'un règle l'autre, sur tous ses appareils ; l'ancien
-réglage photo de la main (`vrm_main_reglages`) est repris une fois. **« Modifier prix ou titre »
-garde des réglages à lui, neutres à chaque ouverture** (même annonce, sur place : pas une
-republication). Dit dans l'interface des deux côtés : atelier « Mêmes réglages que « Republier à
-la main » … Gardés : Photos retouchées · Prix −10 % … » + « Tout remettre à zéro » ; main « Mêmes
-réglages que Republier ».
+**Une clé synchronisée `vrm_republier_reglages`** (SYNC_KEYS) : `{ photo, lettre }` — **jamais un
+prix ni un titre** (`reglagesGardes`). Lue et écrite par le crochet `useReglagesRepub()` (App.jsx)
+— l'atelier (Republier, Mettre en brouillon) ET « à la main ». La retouche photo et la lettre
+réglées dans l'un valent dans l'autre, sur tous ses appareils ; l'ancien réglage photo de la main
+(`vrm_main_reglages`) est repris une fois.
 
-⚠️ **Décision à confirmer par Julien** : un réglage GARDÉ vaut à la prochaine ouverture (c'est le
-sens de « régler dans l'un règle l'autre »). Le 29 oct. il avait obtenu que « par défaut le prix
-ne change plus » (−10 % d'office). Ici rien n'est d'office : la baisse est la sienne, gardée, dite
-en tête de l'atelier avant tout geste (« Gardés : Prix −10 % »), visible dans l'aperçu et remise à
-zéro d'un toucher. S'il préfère que le PRIX reparte de « Garder » à chaque fois, c'est une ligne
-(`lireReglagesRepub` à l'ouverture de l'atelier pour `prix` seulement).
+**Décision (6 nov., coordinateur, qui respecte la sienne du 29 oct. : « le prix ne change plus par
+défaut »)** : la BAISSE DE PRIX et la modification du TITRE repartent de « Garder » / « Ne pas
+changer » à CHAQUE ouverture, dans l'atelier ET à la main (`reglagesAOuverture`) ; une relecture
+du nuage ne les touche pas non plus. Dans une même série « à la main » (paire 2/5…), la baisse et le
+titre choisis valent pour les paires suivantes (`encours`, tenu par la file `repubMainFile`), jamais
+au-delà de la feuille. **« Modifier prix ou titre »** a des réglages à lui, tous neutres à chaque
+ouverture. Dit dans l'interface : atelier « Mêmes réglages que « Republier à la main » : la retouche
+des photos et la lettre valent aussi là-bas … ; le prix et le titre repartent de « Garder » à chaque
+ouverture. Gardés : Photos retouchées · Lettre en bas » + « Tout remettre à zéro » ; main « Mêmes
+réglages que Republier. La retouche des photos et la lettre valent aussi quand VRM republie pour toi
+… Le prix et le titre repartent de « Garder » à chaque ouverture (ils valent pour toutes les paires
+de cette série) ».
 
 **L'atelier** n'a changé que de source : ses curseurs, réductions et titres sont lus dans le module
 (`CURSEURS_PHOTO`, `REDUCTIONS_RAPIDES`, `MODES_TITRE`), son aperçu est `apercuRepub`, son aperçu
@@ -95,7 +98,9 @@ Règles tenues : rien d'automatique côté Vinted, aucune suppression, identité
 ## 3. Preuves
 
 - `npm run build` vert.
-- `node scripts/audit-republier-main.cjs` : **30 contrôles verts**. Il EXÉCUTE la règle commune ET
+- `node scripts/audit-republier-main.cjs` : **36 contrôles verts** (dont A7 et B1b-B1d : la clé ne
+  reçoit que photo et lettre, prix et titre neutres à l'ouverture même si une baisse traînait dans la
+  clé, la série garde ceux de son ouverture). Il EXÉCUTE la règle commune ET
   l'extension : `photoReglee` + `reglagesPhotoSurs` et `sansLettre` sont extraits de
   `vinted-sync-extension/background.js` et exécutés (fausse toile qui note chaque geste) — mêmes
   gestes, mêmes bornes que la toile « à la main » et l'aperçu de l'atelier ; un réglage posé
@@ -103,7 +108,9 @@ Règles tenues : rien d'automatique côté Vinted, aucune suppression, identité
   titre) ; N° dans la description (bas, haut, fin du titre, refus > 100 dit) ; branchement de
   l'app (les deux feuilles sur `useReglagesRepub`, aucune copie de prix/titre/filtre/rotation
   dans App.jsx ni annoncesActions.js, clé synchronisée, « Mêmes réglages » dit des deux côtés).
-- `--prouve` : **17/17 mutations rouges**, dont 9 « copies qui divergent » (prix recopié dans
+- `--prouve` : **22/22 mutations rouges**, dont 5 « une baisse gardée d'une ouverture à l'autre »
+  (module qui la relit, module qui l'écrit, crochet qui écrit tout, relecture du nuage qui la reprend,
+  série qui l'oublie), 9 « copies qui divergent » (prix recopié dans
   App.jsx, filtre et rotation écrits dans la main, aperçu de l'atelier recopié, texte de la main
   qui ignore la baisse, réglages locaux à la main ou à l'atelier, clé hors SYNC_KEYS, « Modifier »
   qui partagerait, `filtreReglages` recopié dans annoncesActions) et 8 règles affaiblies (bornes
@@ -128,12 +135,12 @@ Règles tenues : rien d'automatique côté Vinted, aucune suppression, identité
 - Banc `scripts/bancs/republier-main.cjs` (données inventées, 390 tactile et 1512, clair et
   sombre ; photos du CDN servies par une vraie petite image) — par vue : régler dans l'atelier
   (−10 %, zoom 1,2, lettre) ⇒ clé commune écrite, « Gardés : … » dit ; « à la main » sur deux
-  paires : « Paire 1/2 », cinq étapes, la feuille à l'écran, −10 %/zoom/lettre déjà réglés,
-  44,10 €, aperçu photo `scale(1.2)`, description « … boîte d'origine.\n\nN°42\n\n{lettre} »,
+  paires : « Paire 1/2 », cinq étapes, la feuille à l'écran, zoom/lettre déjà réglés (et, depuis
+  la décision ci-dessous, le prix à « Garder » puis SON clic −10 %), 44,10 €, aperçu photo `scale(1.2)`, description « … boîte d'origine.\n\nN°42\n\n{lettre} »,
   « Copier » ⇒ « 44,10 » dans le presse-papiers et « Copié », un seul bouton principal à
   l'étape 4, lien `https://www.vinted.fr/items/new` en nouvel onglet, « Paire suivante · 2/2 »
-  (54 €, ancienne lettre « q » retirée), puis l'inverse (−20 % à la main ⇒ l'atelier à −20 %,
-  39,20 €), « Modifier prix ou titre » neutre, rien parti chez Vinted, 44 px, aucun débordement,
+  (54 €, ancienne lettre « q » retirée), puis l'atelier rouvert (avant la décision : à −20 % ; depuis : à
+  « Garder », retouche gardée), « Modifier prix ou titre » neutre, rien parti chez Vinted, 44 px, aucun débordement,
   aucune erreur. Résultat : 390 clair, 390 sombre, 1512 clair **0 rouge** (96 OK) ; 1512 sombre
   rejoué sur le build final avec 390 clair (`VUES=390-clair,1512-sombre`) : **65 OK, 0 rouge**.
   Captures regardées (390/1512, clair/sombre : réglages, photos, texte, Vinted, relier, atelier).
@@ -160,12 +167,20 @@ Règles tenues : rien d'automatique côté Vinted, aucune suppression, identité
 - **Extension** (non touchée, consigne) : écrire le N° (`vrm_num_vinted`) dans l'annonce lors de
   `recreerVinted` — aujourd'hui seule la main le pose ; l'audit compare déjà la photo et la lettre
   à l'extension, il faudra y ajouter l'étiquette quand elle l'écrira.
-- La décision « réglage gardé » pour le PRIX (§2) est à lui faire confirmer.
 - La main ne lit que la description du coffre (l'extension préfère celle de la fiche de l'annonce
   quand elle est plus longue) : sans description au coffre, la main le dit et renvoie à Vinted.
 
 ## Geste de Julien
 
-Annonces → Sélectionner : cocher deux annonces → Actions → Republier, régler (−10 %, une
-retouche) puis fermer ; Actions → « Republier à la main » : les mêmes réglages sont là, suivre les
-cinq étapes ; sur iPhone, étape 2 → « Préparer » puis « Enregistrer les photos ».
+Annonces → Sélectionner : cocher deux annonces → Actions → Republier, régler une retouche et la
+lettre puis fermer ; Actions → « Republier à la main » : la même retouche et la même lettre sont là,
+le prix repart de « Garder » (choisir la baisse pour la série), suivre les cinq étapes ; sur iPhone, étape 2 → « Préparer » puis « Enregistrer les photos ».
+
+## Mise à jour (6 nov., décision « prix et titre jamais gardés »)
+
+Commit 5e82ee71 puis la passation : `reglagesGardes` / `reglagesAOuverture` / `resumeGardes`
+(src/republierReglages.js), crochet `useReglagesRepub(encours)`, file `repubMainFile.encours`.
+Banc `republier-main` adapté : la clé commune n'a ni prix ni titre ; à la main, retouche et lettre
+reprises, prix à « Garder » (49 €) puis SON clic −10 % ⇒ 44,10 €, paire 2/2 à 54 € (la série) ;
+rouvert, l'atelier repart de « Garder » (le −20 % de la main ne survit pas), la retouche gardée.
+Résultat sur le build de ce commit (`VUES=390-clair,1512-sombre`) : **67 OK, 0 rouge** ; capture 390 clair regardée (bandeau « Mêmes réglages que Republier … le prix et le titre repartent de « Garder » à chaque ouverture »). Audits : `audit-republier-main` 36 verts, 22/22 mutations ; `audit-annonces-actions` 63 verts, 21/21 ; les douze autres audits listés plus haut verts.

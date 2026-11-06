@@ -507,7 +507,7 @@ sans la fonction.
 ## 9. État actuel et décisions récentes
 
 - **6 nov. · Vague 2 vitesse** : `vinted_item_details` lue fiche par fiche (`lireFichesPage`), commandes projetées sans `orders_bought` ni anciens comptes (`SEL_COMMANDES`, `vrm_comptes_lies`) ; −700 Ko par écran au banc, même texte ; `audit-lectures-lourdes`. `docs/passation/2026-11-06-vague2-vitesse.md`.
-- **6 nov. · Republier à la main = réglages de l'atelier** : une source synchronisée (`vrm_republier_reglages`, `src/republierReglages.js`, photos/prix/titre/lettre ; « Modifier » garde les siens), N° posé selon `vrm_num_vinted`, feuille en 5 étapes, plusieurs paires une à une. `docs/passation/2026-11-06-republier-main.md`. Geste : confirmer qu'une baisse GARDÉE lui convient.
+- **6 nov. · Republier à la main = réglages de l'atelier** : une source (`src/republierReglages.js`) ; retouche photo et lettre gardées et synchronisées (`vrm_republier_reglages`), baisse de prix et titre repartent de « Garder » à chaque ouverture (sa règle du 29 oct.) ; N° posé selon `vrm_num_vinted` ; feuille en 5 étapes, plusieurs paires une à une. `docs/passation/2026-11-06-republier-main.md`. Geste : essayer une série à la main.
 - **5 nov. · Ventes (E2)** : revue 2.12-2.30 ; « Compte qui vend le mieux » dans Statistiques seul ; alerte d'annulations par compte. `docs/passation/2026-11-05-chantier-e2.md`.
 
 - **5 nov. · Chantier H, coque (v35)** : en-tête = pastille de couleur (plus « ⓘ »), nuage seulement en panne ; « Dernière capture » = source de la liste ; Paramètres (icônes distinctes, Organisation en lien, plus de carte dans la carte, Statut) ; icônes de nav distinctes, un badge par colis ; cloche sur SheetShell + « Où ranger à l'arrivée » (`src/ouRanger.js`). `docs/passation/2026-11-05-chantier-h.md`.
