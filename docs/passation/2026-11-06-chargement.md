@@ -207,3 +207,24 @@ Dans le scratchpad de la session (`…/scratchpad/chg/ab2/`) :
   actions du jour dépasse 20 s chez lui.
 - Chiffres de temps : une machine partagée très chargée (charge 10 à 30) ; à refaire sur une
   machine calme pour les temps absolus (les nombres de changements et le CLS, eux, tiennent).
+
+## Raccord du 6 nov. (v36-raccords) — les trois restes de CLS (point 6)
+
+Mesuré en traçant chaque décalage (ses rectangles avant/après) et les frères au-dessus :
+- **Annonces** (0,036 en 4G, 0,045 lent) : la liste paraissait avant la numérotation automatique
+  (qui attend ventes, transactions, N° réservés, republications) ; « sans numéro » (un faux
+  geste), puis les N° posés ouvraient « N numéros à vérifier » au-dessus de la grille. ⇒
+  `numAttente` (Comptabilite) : annonces numérotables sans N° et numérotation pas encore passée
+  (`numPasse`, posé dans l'effet de numérotation, même rendu que les N°) ⇒ la liste garde son
+  squelette ; borné à 8 s.
+- **Colis « À envoyer »** (0,012 lent) : la même arrivée posait « N numéros portés par deux
+  articles » au-dessus de la liste ⇒ même `numAttente` (une fois les ventes lues : avant, c'est
+  leur squelette à elles) ; et la case « À retirer » de la carte perdait sa ligne « lecture… »
+  (−18 px) ⇒ `CarteMois` garde la place d'une ligne de raison déjà dite.
+- **Ventes · Tous** (0,036 lent) : « À venir » (82 px) arrivait au-dessus de la liste ⇒
+  `ArgentAVenirCarte reserve` : pendant la lecture, sa forme repliée en squelette.
+Banc entier (4 combinaisons × 8 écrans) **vert** : Annonces 0,000 · Ventes 0,003 · Colis 0,001 en
+lent ; tout ≤ 0,009. Mutation (les trois corrections retirées, build à part) ⇒ exactement les
+3 rouges d'avant (0,036 · 0,045 · 0,012). Bancs `nouveau-vendeur`, `navigation-tache` 163/163,
+`onglets-a` 29/29, `garde-ecrans`, `statut-colis` 81/81, `conseils`, `colis-retirer-propre`
+120/120 verts.
