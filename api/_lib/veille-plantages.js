@@ -193,6 +193,6 @@ export async function passageVeilleLenteurs({ proprietaire, maintenant = Date.no
   if (!(await ecrireMemo({ jour: hier, n: liste.length, liste: liste.slice(0, 10) }))) return { fait: false, raison: 'mémo pas écrit : rien envoyé (sinon chaque matin)', degradations: liste.length };
   const notif = texteLenteurs(liste, nomEcran);
   let envoi = null;
-  try { envoi = await envoyer({ ...notif, url: '/?tab=settings&section=mesures', tag: 'vrm-veille-lenteurs' }); } catch (e) { envoi = { erreur: String((e && e.message) || e).slice(0, 120) }; }
+  try { envoi = await envoyer({ ...notif, url: '/?tab=settings', tag: 'vrm-veille-lenteurs' }); } catch (e) { envoi = { erreur: String((e && e.message) || e).slice(0, 120) }; }
   return { fait: true, jour: hier, degradations: liste.length, envoye: true, texte: notif.body, envoi };
 }

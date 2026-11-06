@@ -216,6 +216,8 @@ import { estIphoneSafari, estInstallee } from "./guideIphone.js";
 import { exempleActif, entrerModeExemple, sortirModeExemple } from "./modeExemple.js";
 // (6 nov., v36) Les temps réels chez les vendeurs, anonymes et agrégés (src/mesuresCollecte.js).
 import { demarrerMesures, mesuresEcran } from "./mesuresCollecte.js";
+import { MesuresTerrain } from "./composants/MesuresTerrain.jsx";
+import { nomEcran as nomEcranVeille } from "../api/_lib/veille-plantages.js";
 import { GuideDemarrage, BandeauExemple } from "./GuideDemarrage.jsx";
 import { etatGuide, preuveExtension, preuveListe, preuveNombre, compterNumeros } from "./guideDemarrage.js";
 import { PHRASES_ECRAN } from "./phrasesEcran.js";
@@ -69029,6 +69031,9 @@ function SecuriteSetting() {
         d={!ext ? "Normal sur téléphone. Sur l'ordinateur, ouvre l'app dans le navigateur de l'extension."
           : ext.connecte ? "Elle écrira sous ce compte."
           : `Icône de l'extension ${NAV.dansNu} → Compte VRM → ton email et ton mot de passe.`}/>
+      {/* (6 nov., v36) Les temps réels des vendeurs, anonymes et agrégés (src/composants/MesuresTerrain.jsx) :
+          au propriétaire de l'installation seulement (la route refuse les autres). */}
+      {proprio ? <MesuresTerrain entetes={enTeteSession} Bouton={Bouton} PanneEl={EtatPanne} nomEcran={nomEcranVeille}/> : null}
     </div>
   );
 }
