@@ -47,7 +47,9 @@ const FEUILLES = [
   ['visite', /<GardeEcran nom="visite" feuille onFermer=\{\(\)=>setVisite\(false\)\}><VisiteBulles /],
   ['sauvegarde', /<GardeEcran nom="sauvegarde" feuille onFermer=\{\(\)=>setShowBackup\(false\)\}><BackupModal/],
   ['sync', /<GardeEcran nom="sync" feuille onFermer=\{\(\)=>setSyncOuvert\(false\)\}><PanneauSync /],
-  ['recherche', /const panneauRecherche = !gsOpen \? null : <GardeEcran nom="recherche" feuille onFermer=\{fermerRecherche\}><Differe rendre=/],
+  // (6 nov., v36) La loupe se calcule dans `RechercheVivante` (src/LoupeVivante.jsx) : un composant
+  // qui appelle `rendre` pendant SON rendu — sous le garde-fou, comme `Differe`.
+  ['recherche', /const panneauRecherche = !gsOpen \? null : <GardeEcran nom="recherche" feuille onFermer=\{fermerRecherche\}><(?:Differe|RechercheVivante) rendre=/],
 ];
 for (const [nom, re] of FEUILLES) dit(re.test(src), `la feuille « ${nom} » a son garde-fou (calculée SOUS lui : <Differe>)`);
 // Aucune feuille calculée dans la coque elle-même (une IIFE plante la coque, hors de portée de tout garde-fou).

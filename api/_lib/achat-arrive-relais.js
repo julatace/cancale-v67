@@ -53,10 +53,26 @@ export function lieuDeLArrivee(brut) {
 // e-mail ⇒ '' (on ne choisit pas).
 const INBOX = /vinted\.[a-z.]{2,8}(?:\/|%2F)inbox(?:\/|%2F)([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|\d{3,20})(?![0-9a-z-])/gi;
 const SUIVI = /links\.vinted\.com\/(?:e\/)?t\/([A-Za-z0-9_\-+/]{16,}={0,2})/g;
+// ⚠️ (6 nov., statut des colis) LE MÊME DÉCODAGE DANS LE NAVIGATEUR. `Buffer` n'existe
+// que dans Node : l'app (src/arriveesRelues.js, la relecture des e-mails gardés avant
+// le 3 nov.) rendait '' ici, sans erreur — la conversation du lien de suivi était
+// perdue, la ligne prenait une clé d'empreinte (`…_arr-…`) et n'avait plus d'identité.
+// Mesuré sur sa base : 49 e-mails Vinted relus, dont 32 d'achats « Transaction
+// finalisée » — affichés « à vérifier » ou « peut-être en double » au lieu de finis.
+// `atob` (navigateur, Node ≥ 16) + `TextDecoder` pour l'UTF-8 ; `Buffer` sinon.
 function decoder64(b) {
   try {
-    const n = b.replace(/-/g, '+').replace(/_/g, '/').replace(/=+$/, '');
-    return Buffer.from(n + '='.repeat((4 - (n.length % 4)) % 4), 'base64').toString('utf8');
+    let n = b.replace(/-/g, '+').replace(/_/g, '/').replace(/=+$/, '');
+    // Un lien COUPÉ (corps gardé à 2 000 caractères) : un dernier caractère seul ne
+    // porte aucun octet — `Buffer` l'ignore, `atob` refuse tout ; on l'ignore aussi.
+    if (n.length % 4 === 1) n = n.slice(0, -1);
+    const p = n + '='.repeat((4 - (n.length % 4)) % 4);
+    if (typeof atob === 'function') {
+      const bin = atob(p);
+      if (typeof TextDecoder === 'function') { const o = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) o[i] = bin.charCodeAt(i); return new TextDecoder('utf-8').decode(o); }
+      return bin;
+    }
+    return typeof Buffer !== 'undefined' ? Buffer.from(p, 'base64').toString('utf8') : '';
   } catch (_) { return ''; }
 }
 export function conversationVinted(mail) {

@@ -127,3 +127,17 @@ reste dans l'écran (« Plus », collé au bord, garde un anneau entier).
   `data-ann-achats-completer`, `data-vue-relancer`, `data-vue-selection`,
   `data-stock-inventaire-ouvrir`) : à garder en refaisant ces écrans, avec les
   `<ChiffreConseil>` posés à côté des calculs. `audit-conseils` le vérifie.
+
+## Raccord du 6 nov. (v36-raccords) — la bulle d'Annonces ne paraissait plus
+
+Après la fusion de v36-chargement, `conseils.cjs` était rouge sur « [1512 Annonces] / [390
+Annonces] la bulle paraît ». La cible n'avait pas bougé (`[data-ann-prochain-geste="prix"]
+[data-ann-prochain-geste-bouton]` existe et se voit) : l'écran attend ses données dans
+`AttenteEcran`, MONTÉ mais caché (`.vrm-attente-cache`, `aria-hidden`). Son
+`<ChiffreConseil cle="annonces.prixAchat">` publiait déjà ; 1,4 s plus tard le choix ne trouvait
+aucune cible visible et rendait `null` — puis plus rien ne changeait ses dépendances : la bulle
+ne se redécidait jamais. Correction : `AttenteEcran` dit si l'écran est MONTRÉ
+(`useEcranMontre`) et `ChiffreConseil` ne publie qu'à ce moment (hors attente : comme avant). La
+règle d'apparition (`src/accompagnement.js`) est inchangée. Preuves : banc entier vert (4 thèmes
+et tailles + Annonces 390/1512) ; mutation `valeur = brute` ⇒ les 2 rouges reviennent ;
+`audit-conseils` 135 ✓.

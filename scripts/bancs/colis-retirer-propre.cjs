@@ -177,7 +177,7 @@ const ouvrir = async (b, vp, sombre) => {
             carte: (document.querySelector('[data-fu-colis-retirer]') || { getAttribute: () => null }).getAttribute('data-fu-colis-retirer'),
             idents: lignes.map((l) => l.getAttribute('data-cc-carte')),
             comptes: lignes.filter((l) => !l.hasAttribute('data-hors-compte')).length,
-            points: [...document.querySelectorAll('.vrm-rpf-section:not(.is-repli) .vrm-rpf-point')].map((p) => ({ cle: p.getAttribute('data-relais-point'), nom: (p.querySelector('.vrm-rpf-nom') || {}).textContent, adr: (p.querySelector('[data-relais-adresse]') || {}).textContent || '', h: (() => { const a = p.querySelector('.vrm-rpf-nom'), d = p.querySelector('[data-relais-adresse]'); return !d ? 0 : Math.abs(a.getBoundingClientRect().top - d.getBoundingClientRect().top) + Math.abs(a.getBoundingClientRect().height - d.getBoundingClientRect().height) > 8 ? 99 : 0; })(), n: p.querySelectorAll('[data-cc-carte]').length, inconnu: p.classList.contains('is-inconnu') })),
+            points: [...document.querySelectorAll('.vrm-rpf-section:not(.is-repli) .vrm-rpf-point')].map((p) => ({ cle: p.getAttribute('data-relais-point'), nom: (p.querySelector('.vrm-rpf-nom') || {}).textContent, adr: (p.querySelector('[data-relais-adresse]') || {}).textContent || '', h: (() => { const a = p.querySelector('.vrm-rpf-nom'), d = p.querySelector('[data-relais-adresse]'); if (!d) return 0; const ra = a.getBoundingClientRect(), rd = d.getBoundingClientRect(); return rd.top >= ra.bottom - 2 && a.scrollWidth <= a.clientWidth + 1 && rd.height <= 24 ? 0 : 99; })(), n: p.querySelectorAll('[data-cc-carte]').length, inconnu: p.classList.contains('is-inconnu') })),
             rangs: lignes.filter(vis).map((l) => { const r = l.querySelector('.vrm-rpf-ouvrir'); const v = l.querySelector('.vrm-rpf-vignette'); return { id: l.getAttribute('data-cc-carte'), code: !!l.querySelector('[data-rp-code]'), avenir: !!l.querySelector('[data-rp-code-a-venir]'), retire: !!l.querySelector('.vrm-rpf-rang [data-colis-retire]'), ech: (l.querySelector('[data-rp-echeance]') || { getAttribute: () => null }).getAttribute('data-rp-echeance'), statut: (l.querySelector('[data-rp-statut]') || {}).textContent || '', vw: v ? Math.round(v.getBoundingClientRect().width) : 0, boutons: [...l.querySelectorAll('.vrm-rpf-rang button')].map((x) => Math.round(x.getBoundingClientRect().height)), detail: !!l.querySelector('[data-rp-detail]') }; }),
             sections: [...document.querySelectorAll('[data-rp-section]')].map((x) => x.getAttribute('data-rp-section')),
             dansSection: Object.fromEntries([...document.querySelectorAll('.vrm-rpf [data-cc-carte]')].map((l) => [l.getAttribute('data-cc-carte'), (l.closest('[data-rp-section]') || { getAttribute: () => '' }).getAttribute('data-rp-section')])),
@@ -185,7 +185,7 @@ const ouvrir = async (b, vp, sombre) => {
             verif: (() => { const d = document.querySelector('.vrm-rpf-verifier'); return d ? { n: d.getAttribute('data-retirer-a-verifier'), ouvert: d.open } : null; })(),
             enRoute: (document.querySelector('[data-retirer-en-route-sans]') || { getAttribute: () => null }).getAttribute('data-retirer-en-route-sans'),
             relire: (document.querySelector('[data-comptes-a-relire]') || { getAttribute: () => null }).getAttribute('data-comptes-a-relire'),
-            reparti: [...document.querySelectorAll('.vrm-repartis-courts [data-montant]')].filter(vis).map((x) => x.textContent),
+            reparti: [...document.querySelectorAll('.vrm-repartis-courts .vrm-reparti-court')].filter(vis).map((x) => { const p = x.querySelector('.vrm-rpf-puce.is-ambre'), mt = x.querySelector('[data-montant]'); return (p ? p.textContent : '') + ' · ' + (mt && vis(mt) ? mt.textContent : ''); }),
             texte: main ? main.innerText : '', deb: document.documentElement.scrollWidth - window.innerWidth,
             hors: [...document.querySelectorAll('.vrm-main *')].filter((e) => vis(e) && !e.closest('svg,.vrm-rangee,.vrm-filtres,[data-defile],.maplibregl-map') && getComputedStyle(e).position !== 'fixed' && e.getBoundingClientRect().right > window.innerWidth + 1).map((e) => String(e.className).slice(0, 40)).slice(0, 4),
           };
@@ -196,8 +196,10 @@ const ouvrir = async (b, vp, sombre) => {
         if (N) dit(m.carte === String(N), 'la carte sombre dit le même N', `${m.carte} / ${N}`);
         dit(m.comptes === N, 'autant de lignes comptées que N (chaque colis une fois)', `${m.comptes} / ${N}`);
         dit(new Set(m.idents).size === m.idents.length, 'chaque colis UNE fois à l’écran', m.idents.join(','));
-        dit(m.points.every((p) => p.h <= 60), 'nom et adresse du point sur UNE ligne', JSON.stringify(m.points.filter((p) => p.h > 60)));
-        dit(m.rangs.every((r) => r.vw === 44), 'vignette 44 px sur chaque ligne', '');
+        // (6 nov., v36-visuel-2) LA RÈGLE A CHANGÉ (demande du 6 nov. : « l'adresse passe dessous ») : le NOM garde sa ligne,
+        // entier ; l'adresse vit sur la ligne d'en dessous (une ligne). Avant : nom et adresse sur la même ligne, l'adresse rognée.
+        dit(m.points.every((p) => p.h <= 60), 'le nom du point garde sa ligne (entier), l’adresse passe dessous (une ligne)', JSON.stringify(m.points.filter((p) => p.h > 60)));
+        dit(m.rangs.every((r) => r.vw >= 44 && r.vw <= 64), 'vignette de 44 à 64 px sur chaque ligne (56 depuis v36-visuel-2)', JSON.stringify(m.rangs.map((r) => r.vw)));
         dit(m.rangs.every((r) => r.boutons.every((h) => h >= 44)), 'boutons de ligne ≥ 44 px', JSON.stringify(m.rangs.find((r) => r.boutons.some((h) => h < 44))));
         dit(m.rangs.filter((r) => !/^r:/.test(r.id)).every((r) => r.retire), '« J’ai retiré » sur chaque ligne', '');
         dit(m.rangs.every((r) => !r.detail), 'le détail est fermé (il s’ouvre au toucher)');
@@ -248,7 +250,9 @@ const ouvrir = async (b, vp, sombre) => {
           if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `retirer-ville-cancale-${nom}.png`) });
           await pg.locator('[data-retirer-villes] [data-ville=""]').first().click(); await pg.waitForTimeout(400);
           dit(m.relire === '1', '« 1 compte à relire » en puce', m.relire);
-          dit(m.reparti.some((t) => /Remboursement à vérifier · 19,64 €/.test(t)), '« Remboursement à vérifier · 19,64 € »', m.reparti.join(' | '));
+          // (6 nov., v36-visuel-2) La RÈGLE : la ligne dit « Remboursement à vérifier » (puce) ET son montant (`montantCommande`,
+          // écrit par `montant()`), visible — la puce et le montant vivent à part (une puce ne se coupe plus sur 2 lignes).
+          dit(m.reparti.some((t) => /^Remboursement à vérifier · 19,64\u00a0?\s?€$/.test(t.replace(/\u202f/g, ' '))), '« Remboursement à vérifier » et son montant 19,64 €', m.reparti.join(' | '));
           // Ouvrir « À vérifier » : le statut en puce.
           await pg.evaluate(() => { const d = document.querySelector('.vrm-rpf-verifier'); if (d) d.open = true; });
           await pg.waitForTimeout(300);

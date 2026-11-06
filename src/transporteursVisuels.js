@@ -106,7 +106,11 @@ export function transporteurDuColis({ declare = '', suivi = '', transp = null, s
   // (6 nov.) La ligne du transporteur ne NOMME le transporteur que s'il a RÉPONDU
   // (un état lu, une lecture datée) : une ligne `transp_chronopost_…` créée par un
   // essai qui n'a jamais abouti n'est que l'endroit où on a frappé, pas une preuve.
-  const cT = t && (t.lu || t.etat || t.fini) ? cleTransporteur(t.carrier) : null;
+  // ⚠️ (6 nov., statut des colis) `fini` n'est PAS une réponse : le serveur le pose aussi
+  // quand il ABANDONNE (« introuvable » trois fois, suivi expiré — `finiApres`). Mesuré sur sa
+  // base : 3 lignes `transp_chronopost_…IE` « introuvable », fini, jamais lues, nommaient
+  // « Chronopost » sur un colis postal irlandais. Seule une lecture réussie nomme.
+  const cT = t && (t.lu || t.etat) ? cleTransporteur(t.carrier) : null;
   if (cT) return { cle: cT, nom: nomDuTransporteur(cT), source: 'transporteur' };
   let cle = null, source = null;
   const prendre = (c, s) => { if (c && rang(c) > rang(cle)) { cle = c; source = s; } };

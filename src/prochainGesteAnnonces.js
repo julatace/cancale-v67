@@ -18,12 +18,12 @@
 const ok = (n) => Number.isFinite(n) && n > 0;
 
 export function prochainGesteAnnonces({ aVerifier, sansNum, prixConnus, prixTotal, dorment } = {}) {
-  if (ok(aVerifier)) return { cle: 'verifier', n: aVerifier, texte: 'Vérifie les numéros ci-dessous sur l’étiquette de chaque paire, avant d’imprimer leur bordereau.', bouton: 'Vérifier' };
-  if (ok(sansNum)) return { cle: 'sansnum', n: sansNum, texte: sansNum > 1 ? 'Des annonces en ligne n’ont pas de numéro : donne-leur un numéro et écris-le sur leur carton.' : 'Une annonce en ligne n’a pas de numéro : donne-lui un numéro et écris-le sur son carton.', bouton: 'Voir' };
+  if (ok(aVerifier)) return { cle: 'verifier', n: aVerifier, texte: 'Vérifie les numéros sur l’étiquette, avant d’imprimer.', bouton: 'Vérifier' };
+  if (ok(sansNum)) return { cle: 'sansnum', n: sansNum, texte: sansNum > 1 ? 'Des annonces n’ont pas de numéro : donne-leur un N°.' : 'Une annonce n’a pas de numéro : donne-lui un N°.', bouton: 'Voir' };
   if (Number.isFinite(prixTotal) && prixTotal > 0 && Number.isFinite(prixConnus) && prixConnus < prixTotal) {
     const manque = prixTotal - prixConnus;
-    return { cle: 'prix', n: manque, texte: `Prix d’achat ${prixConnus}/${prixTotal} connus : saisis les autres, sinon ton bénéfice n’est qu’un minimum.`, bouton: 'Compléter' };
+    return { cle: 'prix', n: manque, texte: `Prix d’achat ${prixConnus}/${prixTotal} connus : ton bénéfice n’est qu’un minimum.`, bouton: 'Compléter' };
   }
-  if (ok(dorment)) return { cle: 'dorment', n: dorment, texte: 'Des annonces dorment depuis longtemps : relance-les (republier ou baisser le prix).', bouton: 'Voir' };
+  if (ok(dorment)) return { cle: 'dorment', n: dorment, texte: 'Des annonces dorment : republie-les ou baisse le prix.', bouton: 'Voir' };
   return null;
 }
