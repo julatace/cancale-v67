@@ -21695,7 +21695,7 @@ function SuivisManuels({ liste, tracking, achats, accName, relire, etapeDe, tran
               {/* (revue du 24 oct.) LA FORME COMMUNE D'UN CHOIX (§7) : `Segmente` —
                   le segment actif à la règle commune (jamais un bouton blanc plein
                   en sombre). */}
-              <Segmente label="Transporteur" plein value={choisi} onChange={setTr} style={{ marginTop: 6, marginBottom: 0 }}
+              <Segmente label="Transporteur" plein className="vrm-seg-grille" value={choisi} onChange={setTr} style={{ marginTop: 6, marginBottom: 0 }}
                 options={TRANSPORTEURS_SAISIE.map(k => ({ v: k, l: NOMS_CHOIX[k] || NOMS_SAISIE[k], data: { 'data-suivi-choix': k } }))}/>
             </div>
           )}
