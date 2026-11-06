@@ -42,10 +42,16 @@ repassés au vert, le lanceur dit « exception à retirer » ; une exception don
 n'existe plus fait échouer.
 Les **bancs** rouges connus vivent dans le même fichier (clé `bancs`), mais **par
 ligne** : chaque exception porte l'expression de SES lignes rouges (`rouges`) ; une
-ligne rouge nouvelle rend le banc rouge pour de bon. Deux, rouges **à l'identique sur
-l'arbre d'avant** (rejoués des deux côtés) : `navigation-tache` J (compteurs de la
-colonne) et `iphone-reprise` B7/R3 (balayage, recherche rouverte). À corriger dans leur
-chantier, pas à masquer.
+ligne rouge nouvelle rend le banc rouge pour de bon. Quatre, rouges **à l'identique sur
+l'arbre d'avant** (chaque banc rejoué des deux côtés, même machine) :
+`navigation-tache` J (compteurs de la colonne), `iphone-reprise` B7/R3 (balayage,
+recherche rouverte), `argent-mois` C (« Mois d'avant » / « Il y a un an » à 36 px au
+lieu de 44), `annonces-actions` (« proposées » à 1512 sombre, `data-main-lier=9120`
+introuvable). À corriger dans leur chantier, pas à masquer. Verts des deux côtés :
+`ventes-e2`, `journee-coherence`, `colis-retirer-propre` ; et `garde-ecrans`,
+`morceau-perime` verts sur le nouveau code. ⚠️ `annonces-actions` s'arrêtait aussi
+sur délai (« Timeout 30000ms ») sur la machine chargée, des deux côtés : ce n'est PAS
+couvert par l'exception — si ça revient en CI, c'est un rouge à regarder.
 
 Des audits lisent les versions d'extension publiées dans `origin/main` : le job
 `audits` prend toute l'histoire (`fetch-depth: 0`).
