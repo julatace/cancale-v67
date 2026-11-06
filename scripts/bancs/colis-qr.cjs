@@ -232,6 +232,8 @@ const carte = (pg, suivi) => pg.evaluate((k) => {
         // « En grand » sans QR (81000001) : le code en gros, « QR dans l’app », « Ajouter le QR » ; le lien suit le colis.
         await pg.locator('[data-cc-carte="r:e:81000001"] [data-colis-plein-ecran]').first().click();
         await pg.waitForSelector('[data-qr-plein]', { timeout: 5000 }).catch(() => {});
+        // (5 nov., chantier D) « En grand » est une SheetShell qui glisse en entrant : on attend qu'elle soit posée (Chromium sans écran laisse parfois l'animation « running »).
+        await pg.evaluate(() => { try { document.getAnimations().forEach((a) => { try { a.finish(); } catch (_) {} }); } catch (_) {} }); await pg.waitForTimeout(500);
         const v0 = await pg.evaluate(() => { const v = document.querySelector('[data-qr-plein]'); return v ? { code: v.getAttribute('data-qr-plein-code'), img: v.getAttribute('data-qr-plein-img'), absent: v.querySelector('[data-qr-plein-absent]') ? v.querySelector('[data-qr-plein-absent]').textContent : null, ajouter: !!v.querySelector('[data-qr-plein-ajouter]'), txt: v.textContent } : null; });
         dit(v0 && v0.code === '100001' && v0.img === '0' && /^QR dans l’app Mondial Relay/.test(v0.absent || '') && v0.ajouter && !/Ouvrir Mondial Relay \(QR\)/.test(v0.txt) && /Suivre le colis/.test(v0.txt), '« En grand » sans QR : le code, « QR dans l’app Mondial Relay », « Ajouter le QR » ; plus de « Ouvrir Mondial Relay (QR) »', JSON.stringify(v0 && { ...v0, txt: undefined }));
         if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `qr-plein-sans-${tag}.png`) });
@@ -251,7 +253,7 @@ const carte = (pg, suivi) => pg.evaluate((k) => {
         dit(v1 && v1.code === '100001' && v1.img === '1' && v1.src === 'capture' && v1.lum && v1.retirer && v1.ajout === 'pose', '« Ajouter le QR » : la capture lue DANS la page, le QR posé sur CE colis, montré avec le code, « Retirer ce QR »', JSON.stringify(v1 && { ...v1, px: v1.px ? `${v1.px.w}×${v1.px.h}` : null, poses: v1.poses ? Object.keys(v1.poses) : null }));
         dit(reluPage && reluPage.data === CAPTURE_ICI && pose && pose.contenu === CAPTURE_ICI && Object.keys(v1.poses).length === 1, 'le QR affiché, relu par jsQR (Node) sur ses PIXELS, rend exactement le contenu de la capture ; rangé sous SON n° seulement', reluPage ? reluPage.data : 'illisible');
         if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `qr-plein-${tag}.png`) });
-        await pg.locator('[data-qr-plein] button', { hasText: 'Fermer' }).first().click();
+        await pg.locator('[data-qr-plein] [data-feuille-croix], [data-qr-plein] button:has-text("Fermer")').first().click();  // (5 nov., chantier D) la croix de la SheetShell
         await pg.waitForTimeout(300);
         const c1b = await carte(pg, '81000001');
         dit(c1b && c1b.qrSource === 'capture' && !c1b.qrAbsent && !c1b.ajouter, 'la carte de 81000001 porte maintenant le QR de sa capture', JSON.stringify(c1b && { s: c1b.qrSource, a: c1b.qrAbsent }));
@@ -277,7 +279,7 @@ const carte = (pg, suivi) => pg.evaluate((k) => {
         await pg.waitForFunction(() => { try { const p = JSON.parse(localStorage.getItem('vrm_colis_qr_poses') || 'null'); return !!p && !p['81000001']; } catch (_) { return false; } }, null, { timeout: 5000 }).catch(() => {});
         const v3 = await pg.evaluate(() => { const v = document.querySelector('[data-qr-plein]'); let p = null; try { p = JSON.parse(localStorage.getItem('vrm_colis_qr_poses') || 'null'); } catch (_) {} return v ? { img: v.getAttribute('data-qr-plein-img'), ajouter: !!v.querySelector('[data-qr-plein-ajouter]'), poses: p } : null; });
         dit(v3 && v3.img === '0' && v3.ajouter && v3.poses && !v3.poses['81000001'], '« Retirer ce QR » : retiré sur son clic, « Ajouter le QR » revient', JSON.stringify(v3));
-        await pg.locator('[data-qr-plein] button', { hasText: 'Fermer' }).first().click();
+        await pg.locator('[data-qr-plein] [data-feuille-croix], [data-qr-plein] button:has-text("Fermer")').first().click();  // (5 nov., chantier D) la croix de la SheetShell
         const deb = await pg.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
         dit(deb <= 1 && debExp <= 1, 'rien ne déborde', `${deb} / ${debExp}`);
         dit(!errs.length, 'aucune erreur de page', errs.join(' | ').slice(0, 300));

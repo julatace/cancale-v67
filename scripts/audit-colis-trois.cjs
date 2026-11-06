@@ -104,7 +104,7 @@ const dit = (c, m, d) => { n++; if (!c) ko++; console.log(`${c ? '✅' : '❌'} 
   const lot = L.ordonnerLot(lignes, ordre, (l) => l.trNom).map((l) => l.cle);
   dit(lot.join(',') === 'x-b,x-e,x-a,x-c,x-f,x-z', '2c le lot : tous les colis d’un transporteur à la suite, groupes dans l’ordre de l’écran, un transporteur absent à la fin', lot.join(','));
   const lotBloc = app.slice(app.indexOf('const lignesLotTous = () =>'), app.indexOf('const [progressionLot,setProgressionLot]'));
-  dit(/ordonnerLot\(L, ordre/.test(lotBloc) && /colisAEnvoyerRanges\(\)/.test(lotBloc) && /rangerParTransporteur\(tous, \{ trNom: trNomDe/.test(app), '2d App : l’écran et le lot passent par la MÊME règle d’ordre');
+  dit(/ordonnerLot\(L, ordre/.test(lotBloc) && /colisAEnvoyerRanges\(\)/.test(lotBloc) && /rangerParTransporteur\(tous, \{ trNom: trNomDe|rangerColisEnvoi\(tous, trNomDe\)/.test(app) && /colisAEnvoyerRanges = \(\) => \{[^\n]*rangerColisEnvoi\(|colisAEnvoyerRanges = \(\) => \{[^\n]*rangerParTransporteur\(/.test(app), '2d App : l’écran et le lot passent par la MÊME règle d’ordre');
   // (4 nov.) eBay a désormais une ligne GRISÉE dans l'aperçu (sélection) : jamais cochable,
   // jamais dans le PDF — la règle vit dans src/lotSelection.js (audit-selection-bordereaux).
   const selSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'lotSelection.js'), 'utf8');
