@@ -57,7 +57,7 @@
       titre.textContent = 'VRM ne répond pas';
       phrase.textContent = 'Nous sommes prévenus. Réessaie dans quelques minutes : tes données ne sont pas touchées.';
       ['base', 'emails', 'notifications'].forEach(function (k) { poserMorceau(k, 'inconnu'); });
-      poserMorceau('extension', version ? 'ok' : 'inconnu', version || MOTS.inconnu);
+      poserMorceau('extension', version ? 'ok' : 'inconnu', version ? 'Version ' + version : MOTS.inconnu);
       document.getElementById('heure').textContent = heure(new Date().toISOString());
       return;
     }

@@ -506,6 +506,7 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 
+- **6 nov. · Signaler + /etat** : « Signaler un problème » (Paramètres → Besoin d'aide, garde-fou d'écran ; `SignalerProbleme` réutilisable) : aperçu = ce qui part (une règle, `api/_lib/signalement.js`), rangé chez le propriétaire de l'installation, 5/h/compte tenu par la base, push regroupé > 3/h, « Signalements reçus » + Traité (lui seul) ; page publique `vrm.center/etat` (`public/etat.*`, `/api/sante` → `etat`, 30 s). `docs/passation/2026-11-06-signaler-etat.md`. Geste : s'envoyer un essai, ouvrir /etat.
 - **6 nov. · Vague 2 vitesse** : `vinted_item_details` lue fiche par fiche (`lireFichesPage`), commandes projetées sans `orders_bought` ni anciens comptes (`SEL_COMMANDES`, `vrm_comptes_lies`) ; −700 Ko par écran au banc, même texte ; `audit-lectures-lourdes`. `docs/passation/2026-11-06-vague2-vitesse.md`.
 - **5 nov. · Ventes (E2)** : revue 2.12-2.30 ; « Compte qui vend le mieux » dans Statistiques seul ; alerte d'annulations par compte. `docs/passation/2026-11-05-chantier-e2.md`.
 

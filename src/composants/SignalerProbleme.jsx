@@ -93,7 +93,7 @@ export function SignalerProblemeFeuille({ onClose, contexte, entetes, Feuille = 
             <p style={{ ...S.muet, margin: '10px 2px 0' }}>S’y ajoutent l’identifiant de ton compte VRM (pour savoir à qui répondre) et l’heure. Rien d’autre : ni ventes, ni pseudos, ni adresse e-mail, ni montant.</p>
           </section>
 
-          {etat.phase === 'refus' && <p role="alert" data-signalement-refus="" style={{ margin: '14px 0 0', padding: '10px 12px', borderRadius: 12, background: 'var(--vrm-warn-soft)', color: 'var(--vrm-ink)', fontSize: 15, lineHeight: 1.4 }}><b style={{ color: 'var(--vrm-warn)' }}>Pas envoyé.</b> {etat.phrase.replace(/^Pas envoyé : /, '')}</p>}
+          {etat.phase === 'refus' && <p role="alert" data-signalement-refus="" style={{ margin: '14px 0 0', padding: '10px 12px', borderRadius: 12, background: 'var(--vrm-warn-soft)', color: 'var(--vrm-ink)', fontSize: 15, lineHeight: 1.4 }}><b style={{ color: 'var(--vrm-warn)' }}>Pas envoyé.</b> {(() => { const r = etat.phrase.replace(/^Pas envoyé : /, ''); return r.charAt(0).toUpperCase() + r.slice(1); })()}</p>}
           <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
             <Bouton variante="discret" onClick={onClose} style={{ flex: 1 }}>Annuler</Bouton>
             <Bouton variante="primaire" onClick={envoi} occupe={etat.phase === 'envoi'} disabled={!pret} data-signaler-envoyer="" style={{ flex: 2 }}
