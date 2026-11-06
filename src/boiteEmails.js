@@ -294,8 +294,8 @@ export const gesteAmbre = (g) => !!(g && !g.passe && (g.proche || g.k === 'verif
 // ════════════════════════════════════════════════════════════════════════════
 
 // ── LE LIEU, LISIBLE ─────────────────────────────────────────────────────────
-// « MAISON DE LA PRESSE, 40 RUE DU PORT, 35260 CANCALE » ⇒ { nom: « Maison de la
-// Presse », adresse: « 40 Rue du Port, 35260 Cancale » }. Seulement une MISE EN
+// « RELAIS DU MARCHÉ, 12 RUE DES EMBRUNS, 35000 EXEMPLEVILLE » ⇒ { nom: « Relais du
+// Marché », adresse: « 12 Rue des Embruns, 35000 Exempleville » }. Seulement une MISE EN
 // FORME du lieu LU (casse, segments) : rien n'est ajouté, rien n'est deviné. Le
 // nom = les segments avant le premier qui commence par un numéro ou un mot de voie.
 const PETITS = new Set(['de', 'du', 'des', 'la', 'le', 'les', 'et', 'à', 'au', 'aux', 'en', 'sur', 'sous', 'd', 'l']);
@@ -463,7 +463,7 @@ export function lireCorps(texte) {
       const puce = PUCE.exec(l);
       const corps = puce ? l.slice(puce[0].length) : l;
       // Une ligne en capitales, courte, sans chiffre : une étiquette (« CODE DE RETRAIT ») —
-      // sauf juste après une autre (« POINT RELAIS » puis « MAISON DE LA PRESSE » : la valeur).
+      // sauf juste après une autre (« POINT RELAIS » puis « RELAIS DU MARCHÉ » : la valeur).
       const capitale = l.length <= 32 && !/[a-zà-ÿ\d]/.test(l) && /[A-ZÀ-Ý]{3}/.test(l);
       const precE = blocs.length && blocs[blocs.length - 1].k === 'etiquette';
       const k = puce ? 'li' : /^Vinted te transfère cet e-mail/i.test(l) ? 'note' : capitale && !precE ? 'etiquette' : 'p';

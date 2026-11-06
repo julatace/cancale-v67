@@ -42,7 +42,7 @@ const DE = {
   inconnu: 'Un service <contact@service-inconnu.test>',
 };
 const ARTICLES = ['Nike Air Max 90 blanche taille 42', 'Adidas Samba OG noire taille 40', 'Adidas Spezial bleu marine taille 42,5', 'New Balance 550 crème taille 38', 'Nike Dunk Low Panda taille 44', 'Asics Gel-Lyte III taille 41', 'Salomon XT-6 noir taille 42,5', 'Nike P-6000 argent taille 39', 'Adidas Handball Spezial marron taille 38,5', 'Converse Chuck 70 taille 37'];
-const LIEUX = ['RELAIS TABAC DU PORT, 12 RUE DES EMBRUNS, 35000 EXEMPLEVILLE', 'Consigne Vinted Go, Café de la Gare, 3 Place de la Gare, 56000 Exemple-sur-Mer', 'LOCKER 24/7 SUPER MARCHÉ, Rue du Moulin, 35260 ', 'Presse du Marché, 8 avenue des Tilleuls, 29000 Villeneuve-Test'];
+const LIEUX = ['RELAIS TABAC DU PORT, 12 RUE DES EMBRUNS, 35000 EXEMPLEVILLE', 'Consigne Vinted Go, Café de la Gare, 3 Place de la Gare, 56000 Exemple-sur-Mer', 'LOCKER 24/7 SUPER MARCHÉ, Rue du Moulin, 35000 ', 'Presse du Marché, 8 avenue des Tilleuls, 29000 Villeneuve-Test'];
 const PSEUDOS = ['*acheteuse-une*', '*client_deux*', '*paire.trois*', '*sneaker_quatre*'];
 const FAMILLES = ['commande mise à jour (le statut vient de la moisson)', 'commande mise à jour (le statut vient de la moisson)', 'commande mise à jour (le statut vient de la moisson)', 'évaluation', "nouvel article d'un membre suivi", "remboursement d'un de tes achats", 'newsletter Vinted', 'virement du porte-monnaie vers ta banque'];
 
