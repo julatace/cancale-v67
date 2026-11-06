@@ -19,6 +19,7 @@ const rows = [
   { id: 'harvest_111_listings', data: { capturedAt: auj.toISOString(), payload: { items: ITEMS } } },
 ];
 
+const MICRO_ANN = '[data-ann-recherche] [data-champ-recherche-micro], [data-ann-recherche] [data-mic-dictee]';
 let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
 const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom + ' — le contrôle a pu s’exécuter', String(e && e.message).split('\n')[0].slice(0, 140)); } };
@@ -94,13 +95,16 @@ async function main() {
       // ── API présente : le micro est là, dicter remplit la recherche ─────────
       await essaie(`${T} présent`, async () => {
         const { ctx, pg } = await preparer(b, vp, true);
-        await pg.waitForSelector('[data-mic-dictee]', { timeout: 10000 }).catch(() => {});   // l'état, pas un délai (sous charge)
-        const mic = await pg.$('[data-mic-dictee]');
+        // (6 nov.) Le champ de recherche d'Annonces est un `ChampRecherche` (chantier C, 6dd638da) :
+        // SON micro est `data-champ-recherche-micro`, dans `data-ann-recherche`. `[data-mic-dictee]`
+        // pris au hasard sur la page était un autre micro (le texte partait ailleurs).
+        await pg.waitForSelector(MICRO_ANN, { timeout: 10000 }).catch(() => {});   // l'état, pas un délai (sous charge)
+        const mic = await pg.$(MICRO_ANN);
         dit(!!mic, `${T} le micro de dictée est présent quand le navigateur fournit l’API`);
         if (mic) {
           await mic.click();
           await pg.waitForTimeout(250);
-          const val = await pg.$eval('input[aria-label="Rechercher une annonce"]', (el) => el.value);
+          const val = await pg.$eval('[data-ann-recherche] input', (el) => el.value);
           dit(val === 'salomon', `${T} dicter pose le texte reconnu dans la recherche`, JSON.stringify(val));
           const lang = await pg.evaluate(() => window.__SR_LANG);
           dit(lang === 'fr-FR', `${T} la reconnaissance écoute en français`, String(lang));
@@ -111,7 +115,7 @@ async function main() {
       // ── API absente : aucun bouton mort ─────────────────────────────────────
       await essaie(`${T} absent`, async () => {
         const { ctx, pg } = await preparer(b, vp, false);
-        const mic = await pg.$('[data-mic-dictee]');
+        const mic = await pg.$('[data-mic-dictee], [data-champ-recherche-micro]');   // AUCUN micro, d'aucune sorte
         dit(!mic, `${T} sans l’API, AUCUN micro (jamais un bouton mort)`, mic ? 'présent à tort' : '');
         await ctx.close();
       });

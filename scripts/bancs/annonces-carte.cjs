@@ -163,7 +163,10 @@ const projette = (row, sel) => {
       dit(!!c.a && !!c.b && !!c.c, 'les trois cartes en ligne sont rendues');
       if (!c.a || !c.b || !c.c) { await pg.screenshot({ path: path.join(require('os').tmpdir(), 'annonces-dbg-' + vp.width + '.png') }); console.log((await pg.evaluate(() => document.body.innerText)).slice(0, 600)); await ctx.close(); continue; }
       dit(/obsidian lilac/.test(c.a.t), 'le TITRE est sur la carte, pas seulement la marque', c.a.t.split('\n').slice(0, 3).join(' · '));
-      dit(/achat\s*25(,00)?\s*€/.test(c.a.t) && /boost\s*1,95/.test(c.a.t) && /marge\s*\+22/.test(c.a.t), 'achat, boost et marge sont LIBELLÉS (49 − 25 − 1,95 ≈ +22)', (c.a.t.match(/achat[^\n]*/) || [''])[0]);
+      // (6 nov.) La règle : chaque montant porte son LIBELLÉ, juste avant lui. Le chantier C
+      // (6dd638da) les écrit « Prix d'achat », « Boost payé », « Marge » : la casse et le mot
+      // « payé » ne sont pas la règle (§6.4) ; un montant sans libellé reste rouge.
+      dit(/achat\s*25(,00)?\s*€/i.test(c.a.t) && /boost(\s+payé)?\s*1,95/i.test(c.a.t) && /marge\s*\+22/i.test(c.a.t), 'achat, boost et marge sont LIBELLÉS (49 − 25 − 1,95 ≈ +22)', (c.a.t.match(/achat[^\n]*/) || [''])[0]);
       dit(/achat\s*—/.test(c.b.t) && !/achat\s*0,00/.test(c.b.t), 'achat inconnu ⇒ « — », jamais 0');
       dit(c.a.boost && !c.b.boost, '« Boostée » quand Vinted le dit, et rien quand il ne dit rien');
       dit(c.b.aussi && !c.a.aussi, '« Aussi sur Leboncoin » seulement pour la paire PROUVÉE publiée');
@@ -266,29 +269,37 @@ const projette = (row, sel) => {
         dit(!s.a9105, 'G22 : une paire peu suivie (9105, 2 ❤️) n’y est PAS (seuil 3)', s.a9105 ? 'présente à tort' : '');
       } catch (e) { dit(false, 'G22 : le bloc « suivies » se lit', String(e.message).slice(0, 120)); }
       try {
-        await pg.getByLabel('Rechercher une annonce',{exact:true}).fill('aucun-modele-impossible-123456');
+        // (6 nov.) Chantier C (6dd638da) : « Réinitialiser les annonces » s'appelle « Tout afficher »,
+        // sur la ligne du filtre (`data-ann-filtre`) ; le champ porte `data-ann-recherche`.
+        await pg.locator('[data-ann-recherche] input').fill('aucun-modele-impossible-123456');
         await pg.waitForFunction(()=>document.querySelectorAll('.vrm-ann-card').length===0);
-        dit(await pg.getByRole('button',{name:'Réinitialiser les annonces',exact:true}).isVisible(), 'recherche vide : réinitialisation disponible');
+        dit(await pg.locator('[data-ann-filtre] button').isVisible(), 'recherche vide : réinitialisation disponible');
         await pg.getByLabel('Trier les annonces',{exact:true}).selectOption('price_desc');
-        await pg.getByLabel('Rechercher une annonce',{exact:true}).evaluate(e=>e.blur());
+        await pg.locator('[data-ann-recherche] input').evaluate(e=>e.blur());
         const nav=pg.getByRole('navigation',{name:'Navigation principale'});
         // (31 oct., navigation par tâche) Stock est dans « Plus » au téléphone, dans la
         // colonne à l'ordinateur ; on revient par l'onglet Annonces (filtre Vinted retenu).
         if(vp.width<1024){await nav.getByRole('button',{name:'Plus',exact:true}).click();await pg.getByRole('menuitem',{name:'Stock',exact:true}).click();}else await nav.getByRole('button',{name:'Stock',exact:true}).click();
-        await nav.getByRole('button',{name:'Annonces',exact:true}).click();
+        // (6 nov.) Au téléphone l'entrée porte son badge dans son nom (« Annonces · 4 à faire ») :
+        // on juge l'entrée Annonces, pas l'orthographe exacte de son nom (§6.4).
+        await nav.getByRole('button',{name:/^Annonces( · \d+ à faire)?$/}).click();
         await pg.waitForSelector('[data-tache="annonces"][data-tache-site="vinted"]',{timeout:10000}).catch(()=>{});
-        dit(await pg.getByLabel('Rechercher une annonce',{exact:true}).inputValue()==='aucun-modele-impossible-123456', 'recherche d’annonces conservée après le stock');
+        dit(await pg.locator('[data-ann-recherche] input').inputValue()==='aucun-modele-impossible-123456', 'recherche d’annonces conservée après le stock');
         dit(await pg.getByLabel('Trier les annonces',{exact:true}).inputValue()==='price_desc', 'tri d’annonces conservé après le stock');
 
-        await pg.getByRole('button',{name:'Réinitialiser les annonces',exact:true}).click();
+        await pg.locator('[data-ann-filtre] button').click();
         await pg.waitForFunction(()=>document.querySelectorAll('.vrm-ann-card').length>0);
-        dit(await pg.getByLabel('Rechercher une annonce',{exact:true}).inputValue()==='', 'réinitialiser retrouve le stock sans recherche');
+        dit(await pg.locator('[data-ann-recherche] input').inputValue()==='', 'réinitialiser retrouve le stock sans recherche');
         // (27 oct., Julien : « les annonces sont beaucoup trop petites, on ne voit
         // même pas la première photo ») Les annonces sont des FICHES PRODUIT, la
         // première photo en grand. (29 oct., « augmente la taille des photos ») :
         // à l'ordinateur des fiches côte à côte, au téléphone UNE par rangée — la
         // photo sur toute la largeur (≈ 360 px au lieu de 174 à deux par rangée).
         {
+          // (6 nov.) Les fiches entrent en glissant, en décalé (`vrm-fiche-entree`, 30 ms de plus par
+          // fiche, styles-annonces-pro.css) : on mesure la place POSÉE, animations finies — mesurées en
+          // vol, deux fiches d'une même rangée différaient de 2,2 px.
+          await pg.evaluate(()=>Promise.all([...document.querySelectorAll('.vrm-ann-card')].flatMap(e=>e.getAnimations()).map(a=>a.finished.catch(()=>{}))));
           const premier=await pg.locator('.vrm-ann-card').nth(0).boundingBox(), suivant=await pg.locator('.vrm-ann-card').nth(1).boundingBox();
           // (31 oct., style « Vitrine », son choix sur maquette) au téléphone, DEUX
           // fiches par rangée, côte à côte, la photo de 190 px sur toute la largeur
