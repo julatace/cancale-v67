@@ -90,8 +90,8 @@ iframe{position:absolute;left:0;top:${TEL.BARRE}px;width:${TEL.EW}px;height:${TE
 .bloc{position:absolute;${fmt === 'portrait' ? 'left:30px;right:30px;top:58px;text-align:center' : 'left:64px;width:470px;top:50%;transform:translateY(-50%);text-align:left'}}
 .bloc.bas{${fmt === 'portrait' ? 'top:auto;bottom:70px' : ''}}
 .bloc.centre{${fmt === 'portrait' ? 'top:50%;transform:translateY(-50%)' : 'left:0;width:100%;text-align:center'}}
-.t{font-weight:700;letter-spacing:-.025em;line-height:1.08;font-size:${fmt === 'portrait' ? 38 : 48}px;margin:0}
-.s{font-family:'Inter',-apple-system,sans-serif;font-weight:500;letter-spacing:-.01em;line-height:1.35;color:var(--gris);font-size:${fmt === 'portrait' ? 18 : 21}px;margin:${fmt === 'portrait' ? 14 : 18}px 0 0}
+.t{text-wrap:balance;font-weight:700;letter-spacing:-.025em;line-height:1.08;font-size:${fmt === 'portrait' ? 38 : 48}px;margin:0}
+.s{text-wrap:balance;font-family:'Inter',-apple-system,sans-serif;font-weight:500;letter-spacing:-.01em;line-height:1.35;color:var(--gris);font-size:${fmt === 'portrait' ? 18 : 21}px;margin:${fmt === 'portrait' ? 14 : 18}px 0 0}
 .m{display:inline-block;white-space:pre}
 .bleu{color:var(--bleu)}
 #fin{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:${fmt === 'portrait' ? 22 : 18}px;opacity:0;z-index:30;pointer-events:none}
@@ -112,7 +112,7 @@ iframe{position:absolute;left:0;top:${TEL.BARRE}px;width:${TEL.EW}px;height:${TE
   <div id="toucher"></div><div id="onde"></div>
 </div></div></div>
 <div id="titres"><div class="voile" id="voile"></div></div>
-<div id="fin"><img src="/logo-vrm-192.png" alt=""><div class="url">vrm.center</div><div class="phrase" id="finphrase"></div></div>
+<div id="fin"><img src="/vrm-logo-v4-192.png" alt=""><div class="url">vrm.center</div><div class="phrase" id="finphrase"></div></div>
 <script>
 const W=${FORMATS[fmt].w},H=${FORMATS[fmt].h};
 const blocs={};
@@ -305,6 +305,14 @@ class Film {
           for (const k in local) localStorage.setItem(k, typeof local[k] === 'string' ? local[k] : JSON.stringify(local[k]));
           sessionStorage.setItem('film_init', '1');
         }
+        // Trouver une cible : un sélecteur CSS, « texte:Mots » (le plus petit élément
+        // visible qui porte ces mots) ou « haut:sel » (l'ancêtre « carte » de sel).
+        window.__filmQ = (sel) => {
+          const vis = (e) => e && e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden';
+          if (sel.startsWith('texte:')) { const t = sel.slice(6); let best = null; for (const e of document.querySelectorAll('body *')) { if (!vis(e) || !(e.innerText || '').includes(t)) continue; if (!best || best.contains(e)) best = e; } return best; }
+          const m = /^(\d+)@(.+)$/.exec(sel); if (m) return [...document.querySelectorAll(m[2])].filter(vis)[+m[1]] || null;
+          return document.querySelector(sel);
+        };
         // La police : sur iPhone l'app s'affiche en SF Pro (police système) ;
         // ici, Linux n'a pas SF Pro : Inter, sa plus proche parente, la remplace.
         const st = document.createElement('style');
@@ -317,13 +325,43 @@ class Film {
     this.cdp = await this.ctx.newCDPSession(this.pg);
     await this.pg.goto(`http://127.0.0.1:${PORT}/__film/scene-${this.format}.html`, { waitUntil: 'load' });
     await this.pg.evaluate(() => document.fonts.ready);
-    await this.ouvrir(this.tab);
+    // `tab` peut être une liste : les premiers écrans s'ouvrent avant le tournage
+    // (ils publient ce que lit le dernier, comme dans la vraie vie).
+    const tabs = Array.isArray(this.tab) ? this.tab : [this.tab];
+    for (const t of tabs) await this.ouvrir(t);
+    this.tab = tabs[tabs.length - 1];
   }
-  get app() { return this.pg.frames().find((f) => f !== this.pg.mainFrame()); }
+  get app() { return this._app || this.pg.frames().find((f) => f !== this.pg.mainFrame()); }
   async ouvrir(tab) {
     await this.pg.evaluate((src) => { document.getElementById('app').src = src; }, `/?tab=${tab}`);
     await this.pg.waitForFunction(() => { const f = document.getElementById('app'); const d = f && f.contentDocument; return d && d.querySelector('.vrm-main'); }, null, { timeout: 30000 });
     await this.pg.waitForTimeout(2500);
+    this._app = await (await this.pg.$('#app')).contentFrame();
+    await this.teinte();
+  }
+  // UNE COUPE : la base change (le temps a passé dans l'histoire), une seconde app
+  // se charge derrière la première, puis le fondu enchaîné. L'horloge avance
+  // pendant le chargement sans qu'aucune image ne soit tournée.
+  async coupe(modifier, { tab, fondu = 0.5, attente = 2.5 } = {}) {
+    if (modifier) modifier(this.monde);
+    await this.pg.evaluate((src) => {
+      const a = document.getElementById('app'); const b = a.cloneNode(false);
+      b.id = 'app-suite'; b.style.opacity = '0'; b.src = src; a.after(b);
+    }, `/?tab=${tab || this.tab}`);
+    const fin = Date.now() + 30000;
+    for (;;) {
+      await this.pg.clock.runFor(100); await this.pg.waitForTimeout(40);
+      const ok = await this.pg.evaluate(() => { const d = document.getElementById('app-suite').contentDocument; return !!(d && d.querySelector('.vrm-main')); });
+      if (ok || Date.now() > fin) break;
+    }
+    for (let k = 0; k < attente * 10; k++) { await this.pg.clock.runFor(100); await this.pg.waitForTimeout(60); }
+    const nouvelle = await (await this.pg.$('#app-suite')).contentFrame();
+    const ancienne = this._app;
+    this._app = nouvelle;
+    const n = Math.max(1, Math.round(fondu * IPS));
+    for (let k = 1; k <= n; k++) { await this.pg.evaluate((o) => { document.getElementById('app-suite').style.opacity = String(o); }, EASE.doux(k / n)); await this.image(); }
+    await this.pg.evaluate(() => { document.getElementById('app').remove(); const b = document.getElementById('app-suite'); b.id = 'app'; });
+    void ancienne;
     await this.teinte();
   }
   async attendreReel(ms) { await this.pg.waitForTimeout(ms); }
@@ -343,18 +381,20 @@ class Film {
   // du plateau (ax, ay), à l'échelle s.
   async rectDe(sel) {
     const r = await this.app.evaluate((sel) => {
-      const el = typeof sel === 'string' ? document.querySelector(sel) : null;
+      const el = typeof sel === 'string' ? window.__filmQ(sel) : null;
       if (!el) return null; const b = el.getBoundingClientRect(); return { x: b.left, y: b.top, w: b.width, h: b.height };
     }, sel);
     if (!r) return null;
     return { x: r.x, y: r.y + TEL.BARRE, w: r.w, h: r.h };
   }
-  async viser(sel, { zoom = null, cadre = 0.86, dur = 1.1, ease = 'doux', dy = 0, dx = 0, ay = null, part = null } = {}) {
+  async viser(sel, { zoom = null, cadre = 0.86, dur = 1.1, ease = 'doux', dy = 0, dx = 0, ay = null, part = null, zmax: zmaxPlan = null } = {}) {
     let r = sel && typeof sel === 'object' && 'x' in sel ? sel : await this.rectDe(sel);
     if (!r) { console.log(`  (caméra : ${sel} introuvable, plan gardé)`); return; }
     if (part) r = { x: r.x + r.w * part[0], y: r.y + r.h * part[1], w: r.w * (part[2] - part[0]), h: r.h * (part[3] - part[1]) };
     // Le texte reste net jusqu'à ×2 (rastérisé à chaque image, mesuré) ; au-delà, l'écran ne se lit plus.
-    const zmax = Number(process.env.ZMAX) || (this.format === 'portrait' ? 2 : 1.5);
+    // Par défaut, l'écran entier reste dans l'image en largeur (aucun mot coupé au bord) :
+    // ×1,38 en portrait. Un plan serré sur un petit objet centré le demande (`zmax`).
+    const zmax = zmaxPlan || Number(process.env.ZMAX) || (this.format === 'portrait' ? 1.38 : 1.25);
     const s = Math.min(zmax, zoom != null ? zoom : Math.max(this.repos.s, (this.F.w * cadre) / Math.max(40, r.w)));
     let fx = r.x + r.w / 2 + dx;
     // Le cadre ne montre jamais le fond sur un côté quand l'écran est plus large que l'image.
@@ -393,7 +433,7 @@ class Film {
   // ── le toucher ── un VRAI toucher dans l'app, montré par un cercle.
   async toucher(sel, { avant = 0.38, apres = 0.42, viser = false } = {}) {
     if (viser) { await this.viser(sel, viser === true ? {} : viser); await this.jouer((this.camTween && this.camTween.dur) || 0.8); }
-    const visible = () => this.app.evaluate((sel) => { const el = document.querySelector(sel); if (!el) return null; const b = el.getBoundingClientRect(); const at = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2); return !!(at && (el === at || el.contains(at) || at.contains(el) || (el.labels && [...el.labels].some((l) => l.contains(at))))); }, sel);
+    const visible = () => this.app.evaluate((sel) => { const el = window.__filmQ(sel); if (!el) return null; const b = el.getBoundingClientRect(); const at = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2); return !!(at && (el === at || el.contains(at) || at.contains(el) || (el.labels && [...el.labels].some((l) => l.contains(at))))); }, sel);
     const v0 = await visible();
     if (v0 === null) throw new Error(`toucher : ${sel} introuvable dans l'app`);
     if (!v0) { await this.defilerVers(sel, { marge: 260, dur: 0.6 }); await this.jouer(0.15); }
@@ -405,24 +445,24 @@ class Film {
     const pt = await this.pg.evaluate(([x, y]) => { const f = document.getElementById('app').getBoundingClientRect(); const k = f.width / 390; return { x: f.left + (x - 12) * k, y: f.top + (y - 12 - 47) * k }; }, [x, y]);
     const cible = await visible();
     if (cible) await this.pg.touchscreen.tap(pt.x, pt.y);
-    else await this.app.evaluate((sel) => document.querySelector(sel).click(), sel);
+    else await this.app.evaluate((sel) => window.__filmQ(sel).click(), sel);
     await this.jouer(apres);
   }
   // Défiler un conteneur de l'app (ou la page) jusqu'à y, en douceur.
   async defiler(sel, y, dur = 1, ease = 'doux') {
-    const y0 = await this.app.evaluate((sel) => { const e = sel ? document.querySelector(sel) : document.scrollingElement; return e ? e.scrollTop : 0; }, sel);
+    const y0 = await this.app.evaluate((sel) => { const e = sel ? window.__filmQ(sel) : document.scrollingElement; return e ? e.scrollTop : 0; }, sel);
     const yv = typeof y === 'function' ? await y() : y;
     const n = Math.max(1, Math.round(dur * IPS));
     for (let k = 1; k <= n; k++) {
       const v = lerp(y0, yv, (EASE[ease] || EASE.doux)(k / n));
-      await this.app.evaluate(([sel, v]) => { const e = sel ? document.querySelector(sel) : document.scrollingElement; if (e) e.scrollTo({ top: v, behavior: 'instant' }); }, [sel, v]);
+      await this.app.evaluate(([sel, v]) => { const e = sel ? window.__filmQ(sel) : document.scrollingElement; if (e) e.scrollTo({ top: v, behavior: 'instant' }); }, [sel, v]);
       await this.image();
     }
   }
   // Un conteneur défilant de l'app qui contient sel (pour amener sel à l'écran).
   async defilerVers(sel, { marge = 120, dur = 1 } = {}) {
     const info = await this.app.evaluate(([sel, marge]) => {
-      const el = document.querySelector(sel); if (!el) return null;
+      const el = window.__filmQ(sel); if (!el) return null;
       let c = el.parentElement; while (c && c !== document.body) { const s = getComputedStyle(c); if (/(auto|scroll)/.test(s.overflowY) && c.scrollHeight > c.clientHeight + 2) break; c = c.parentElement; }
       const sc = !c || c === document.body ? document.scrollingElement : c;
       if (!sc.id && sc !== document.scrollingElement) sc.setAttribute('data-film-defile', '1');
@@ -434,7 +474,7 @@ class Film {
   }
   async attendreQue(sel, max = 4) {
     for (let i = 0; i < max * IPS; i++) {
-      const ok = await this.app.evaluate((sel) => !!document.querySelector(sel), sel).catch(() => false);
+      const ok = await this.app.evaluate((sel) => !!window.__filmQ(sel), sel).catch(() => false);
       if (ok) return true; await this.image();
     }
     console.log(`  (attendu en vain : ${sel})`); return false;
@@ -463,6 +503,8 @@ class Film {
   }
   async image() {
     for (const a of this.anims) a(this.t);
+    // La barre d'état suit l'app (une feuille qui assombrit le haut, un écran sombre).
+    if (this.i % 6 === 0) await this.teinte();
     await this.pg.evaluate((e) => window.__appliquer(e), this.etat());
     // L'app avance d'une image : ses animations CSS (pas à pas), puis son horloge.
     const dt = 1000 / IPS;
@@ -493,7 +535,9 @@ class Film {
     fs.mkdirSync(path.dirname(fichier), { recursive: true });
     this.fichier = fichier;
     // L'horloge s'arrête : désormais elle n'avance qu'image par image.
-    await this.pg.clock.pauseAt(new Date(Date.parse(await this.pg.evaluate(() => new Date().toISOString())) + 50));
+    // (chaque cadre a sa copie de l'horloge : on part de la plus avancée)
+    const tp = Math.max(await this.pg.evaluate(() => Date.now()), await this.app.evaluate(() => Date.now()));
+    await this.pg.clock.pauseAt(new Date(tp + 400));
     this.i = 0; this.t = 0;
     const { w, h } = this.F;
     this.ff = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(IPS), '-c:v', 'mjpeg', '-i', '-',

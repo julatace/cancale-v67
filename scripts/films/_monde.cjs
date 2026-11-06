@@ -67,7 +67,8 @@ const CATALOGUE = [
 const PHOTO = (cle, vue = 1, id = 'x') => `https://images1.vinted.net/t/${id}/${cle}_${vue}.jpg`;
 const achatDe = (prix) => Math.round(prix * 0.52 / 5) * 5;
 
-function monde() {
+// `partis` : des ventes à expédier dont le colis est parti (le temps a passé).
+function monde({ partis = [] } = {}) {
   const lignes = [];
   const num = {};               // vinted_annonce_numeros
   const details = {};           // vinted_item_details
@@ -107,6 +108,8 @@ function monde() {
   // À expédier : N°23 et N°24 (vendues cette nuit).
   vente({ tx: 81001, i: 22, compte: U[0], statut: STATUT_BORD, tus: 'needs_action', jours: 0.35, n: 23, item: '7122' });
   vente({ tx: 81002, i: 23, compte: U[1], statut: STATUT_AEXP, tus: 'needs_action', jours: 0.6, n: 24, item: '7123' });
+  for (const tx of partis) for (const u of U) for (const o of ventes[u]) if (String(o.transaction_id) === String(tx)) { o.status = STATUT_ROUTE; o.transaction_user_status = 'waiting'; }
+  for (const t of txns) if (partis.includes(String(t.data.payload.transaction.id))) { t.data.payload.transaction.status = 320; t.data.payload.transaction.status_title = STATUT_ROUTE; }
   // En route.
   vente({ tx: 81003, i: 24, compte: U[0], statut: STATUT_ROUTE, tus: 'waiting', jours: 2, n: 25, item: '7124', code: 320 });
   vente({ tx: 81004, i: 25, compte: U[2], statut: STATUT_ROUTE, tus: 'waiting', jours: 3, n: 26, item: '7125', code: 320 });
@@ -164,11 +167,11 @@ function monde() {
   }
   // Les codes de retrait (lus dans les conversations par l'extension).
   lignes.push({ id: 'panel_colis_relais', data: {
-    92001: { code: '480215', lieu: 'Relais du Marché, 14 rue des Halles, 35000 Rennes', transporteur: 'mondialrelay', at: ilYaH(20), url: 'https://www.vinted.fr/inbox/93001' },
-    92002: { code: '731904', lieu: 'Tabac Presse Saint-Hélier, 61 rue Saint-Hélier, 35000 Rennes', transporteur: 'relaiscolis', at: ilYaH(30), url: 'https://www.vinted.fr/inbox/93002' },
+    92001: { code: '480215', lieu: 'Relais du Marché, 14 rue des Glycines, 35000 Rennes', transporteur: 'mondialrelay', at: ilYaH(20), url: 'https://www.vinted.fr/inbox/93001' },
+    92002: { code: '731904', lieu: 'Presse du Canal, 9 quai des Mariniers, 35000 Rennes', transporteur: 'relaiscolis', at: ilYaH(30), url: 'https://www.vinted.fr/inbox/93002' },
   } });
   // Un colis Mondial Relay hors Vinted (e-mail du transporteur), au même point.
-  lignes.push({ id: 'email_track_mondialrelay_57203318', data: { carrier: 'mondialrelay', status: 'disponible', suivi: '57203318', code: '259036', lieu: 'Relais du Marché\n14 rue des Halles\n35000 Rennes', subject: 'Votre colis est disponible', receivedAt: ilYaH(26), arriveLe: ilYaH(26), dateLimite: iso(T0 + 6 * J) } });
+  lignes.push({ id: 'email_track_mondialrelay_57203318', data: { carrier: 'mondialrelay', status: 'disponible', suivi: '57203318', code: '259036', lieu: 'Relais du Marché\n14 rue des Glycines\n35000 Rennes', subject: 'Votre colis est disponible', receivedAt: ilYaH(26), arriveLe: ilYaH(26), dateLimite: iso(T0 + 6 * J) } });
   // Le porte-monnaie.
   lignes.push({ id: `harvest_${U[0]}_billing`, data: { capturedAt: ilYaH(0.15), payload: { user_balance: { available_amount: { amount: '186.40' }, escrow_amount: { amount: '233.00' } } } } });
   // Messages.

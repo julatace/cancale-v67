@@ -29,13 +29,13 @@ async function scenario(f) {
   await f.jouer(0.3);
   await f.toucher('[data-tuile="envoyer"]');
   await f.attendreQue('[data-lot-imprimer]', 3);
-  f.titre('Deux colis à envoyer ce matin.', { duree: 2.4 });
+  f.titre('Deux colis à envoyer.', { duree: 2.4 });
   f.repos_(0.9);
   await f.jouer(1.8);
   // Le N° et la photo, comparés à la paire.
   f.titre('Le N° et la photo, contre la vraie paire.', { sous: 'Jamais la mauvaise chaussure dans le carton.', duree: 4.4 });
   await f.defilerVers('input[aria-label^="Article contrôlé : New"]', { marge: 430, dur: 0.8 });
-  await f.viser('input[aria-label^="Article contrôlé : Asics"]', { zoom: P ? 1.55 : 1.15, dur: 1.0, dx: -110, dy: 20 });
+  await f.viser('input[aria-label^="Article contrôlé : Asics"]', { zoom: P ? 1.38 : 1.05, dur: 1.0, dy: 20 });
   await f.jouer(0.4);
   await f.toucher('input[aria-label^="Article contrôlé : Asics"]', { avant: 0.32, apres: 0.35 });
   await f.toucher('input[aria-label^="Article contrôlé : New"]', { avant: 0.32, apres: 0.5 });
@@ -46,13 +46,15 @@ async function scenario(f) {
   await f.attendreQue('[data-placeur-tampon="pret"]', 8);
   f.titre('Son N° est tamponné sur le bordereau.', { duree: 3.6 });
   await f.jouer(0.4);
-  await f.viser('[data-tampon-scene]', { zoom: P ? 1.9 : 1.4, dur: 1.3, part: [0.05, 0.02, 0.85, 0.42] });
+  await f.viser('[data-tampon-scene]', { zoom: P ? 1.38 : 1.05, dur: 1.2, part: [0, 0, 1, 0.5] });
   await f.jouer(1.9); f.cle('tampon');
   f.repos_(0.9);
   await f.jouer(0.5);
   await f.toucher('[data-tampon-imprimer]', { avant: 0.4, apres: 0.5 });
-  f.titre('Imprimé. Prêt à déposer.', { duree: 2.0 });
-  await f.jouer(1.9);
+  f.titre('Imprimé. Prêt à déposer.', { duree: 2.6 });
+  await f.jouer(0.4);
+  await f.viser('texte:BORDEREAU', { zoom: P ? 1.38 : 1.05, dur: 1.0 });
+  await f.jouer(1.2);
   await f.fin('Ta journée de revente, en une page.', 3.0);
 }
 
