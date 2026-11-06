@@ -56,6 +56,10 @@ sombre, le gris (blanc à 62-65 %) tombait à **3,4-3,6:1** sur #2A5385 ; en cla
   Statistiques), annulations-notes verts. `stock-retrouver` lisait tout `[data-cible]` (la liste « à
   aller chercher » ET maintenant les cases) : il lit `[data-cible]:not([data-case-ici])`.
   `stock-2d-revue` C jugeait « la recherche contient 1 » : il accepte la case N°1 visée (la règle).
+- `fusion-app` limité à Ventes (`BANC_ECRANS='^ventes'`) : **150/0** (le chantier E2 laissait 5 F6 :
+  le gris de la carte sombre). `jetons-coherence` vert. Identiques à l'arbre d'avant (rouges déjà là,
+  hors de cette zone) : `design-fusion` 2 (largeur de Ma journée à 1512), `stock-gestes` 6 (délais),
+  `enligne` 12, `stock-retrouver` 1 (1512 : la case montrée sous la ligne de flottaison).
 - Captures regardées (scratchpad, hors dépôt) : `v3-S-*` (case proposée cerclée), `v3-K-*` sombre.
 
 ## Ce qui reste
