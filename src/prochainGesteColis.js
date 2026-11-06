@@ -1,8 +1,8 @@
 // ════════════════════════════════════════════════════════════════════════════
 //  LE PROCHAIN GESTE DE COLIS, EN UNE PHRASE (6 nov. 2026)
 //  Julien : « on doit être beaucoup plus accompagné par l'app ». En tête de Colis,
-//  UNE phrase dit quoi faire maintenant (« 10 colis à retirer à la Maison de la
-//  Presse — codes prêts », « 3 bordereaux à imprimer — à envoyer avant demain
+//  UNE phrase dit quoi faire maintenant (« Maison de la Presse : 10 colis à retirer
+//  — codes prêts », « 3 bordereaux à imprimer — à envoyer avant demain
 //  10 h ») et UN bouton y mène. Aucune règle neuve : la phrase est fabriquée à
 //  partir des MÊMES listes que les nombres de l'écran (§5, « la phrase qui
 //  explique un chiffre vient de la même source que lui ») :
@@ -34,7 +34,8 @@ function phrasePoint(p, { urgent = false } = {}) {
     : nCode === 0 ? (n > 1 ? 'codes pas encore arrivés' : 'code pas encore arrivé')
       : `${plur(nCode, 'code prêt', 'codes prêts')}, ${n - nCode} à venir`;
   const quand = urgent ? (p.colis.some((c) => fini(c.jours) && c.jours <= 0) ? ' aujourd’hui' : ' d’ici demain') : '';
-  return `${plur(n, 'colis', 'colis')} à retirer${quand} ${p.nom ? `à ${p.nom}` : 'au point relais'} — ${fin}`;
+  // Le nom du point en tête (« Maison de la Presse : … ») : jamais un article deviné (« à la », « au »).
+  return p.nom ? `${p.nom} : ${plur(n, 'colis', 'colis')} à retirer${quand} — ${fin}` : `${plur(n, 'colis', 'colis')} à retirer${quand} au point relais — ${fin}`;
 }
 
 // points : [{ cle, nom, colis: [{ code: bool, jours: number|null }] }] (colis COMPTÉS seulement)

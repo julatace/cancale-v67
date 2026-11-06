@@ -16,3 +16,12 @@
   .vrm-colis-prochain { padding: 10px 12px; }
   .vrm-colis-prochain > button { flex: 1 1 100%; }
 }
+
+/* (6 nov., onglets B) Stock : la légende des cases, une ligne, les couleurs des cases elles-mêmes. */
+.vrm-s2d-legende-l { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; font-size: 13px; color: var(--vrm-muted, #6E6E73); }
+.vrm-s2d-legende-l > span { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.vrm-s2d-pastille { display: grid; place-items: center; min-width: 26px; height: 18px; padding: 0 4px; box-sizing: border-box; border-radius: 6px; font-style: normal; font-size: 10px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.vrm-s2d-pastille.is-libre { color: var(--vrm-muted, #8E8E93); outline: 1.5px dashed color-mix(in srgb, var(--vrm-muted, #8E8E93) 55%, transparent); outline-offset: -1.5px; font-weight: 400; font-size: 13px; }
+.vrm-s2d-pastille.is-rangee { background: rgba(0, 0, 0, .62); color: #FFFFFF; }
+.vrm-s2d-pastille.is-vendue { background: var(--vrm-accent, #0071E3); color: var(--vrm-on-accent, #FFFFFF); }
+.vrm-s2d-pastille.is-plusenligne { background: var(--vrm-warn, #B25000); color: #FFFFFF; }

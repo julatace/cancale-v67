@@ -236,7 +236,7 @@ import { friseVente, phraseVente, eurosRecap, ETATS_HORS_PARCOURS } from "./reca
 import { auCentreDeVerification } from "./verificationArticle.js";
 import { ligneEmailsCompte } from "./emailsCompteLie.js";
 import { prochainGesteColis, bordereauxAImprimer } from "./prochainGesteColis.js";
-import "./colis-prochain.css";
+import "./styles-onglets-b.css";
 import { adressesSansCompte, comptesSansAdresse, relierAdresse, CLE_ADRESSES_ACHETEUR } from "./adressesSansCompte.js";
 // (2 nov.) Le style « Fusion » : la carte sombre du mois et la frise de suivi (src/design/).
 import CarteMois from "./design/CarteMois.jsx";
@@ -34690,7 +34690,9 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     </Card>) : null;
   const blocPasSu = rangeesPasSu.length && aa ? (
     <div data-stock-rangees-passu={rangeesPasSu.length} style={{ fontSize: 12, color: C.muted, lineHeight: 1.45 }}>
-      {rangeesPasSu.length} paire{rangeesPasSu.length > 1 ? 's' : ''} rangée{rangeesPasSu.length > 1 ? 's' : ''} pas vérifiée{rangeesPasSu.length > 1 ? 's' : ''} ({rangeesPasSu.slice(0, 6).map((f) => 'N°' + f.numero).join(', ')}{rangeesPasSu.length > 6 ? '…' : ''}) : {manqueTxt || 'la lecture de son compte manque'}. Je ne dis ni qu'elles sont en ligne, ni qu'elles sont parties.
+      {/* (6 nov., onglets B) La lecture qui manque est déjà NOMMÉE en tête (« pas lu : … ») : elle ne se redit
+          pas ici (§7, une phrase une fois — mesuré sur sa base : « Vestiaire (jamais lu : ouvre… ») deux fois). */}
+      {rangeesPasSu.length} paire{rangeesPasSu.length > 1 ? 's' : ''} rangée{rangeesPasSu.length > 1 ? 's' : ''} pas vérifiée{rangeesPasSu.length > 1 ? 's' : ''} ({rangeesPasSu.slice(0, 6).map((f) => 'N°' + f.numero).join(', ')}{rangeesPasSu.length > 6 ? '…' : ''}) : {aa.manque.length > 0 && manqueTxt ? 'une lecture manque (« pas lu » plus haut)' : (manqueTxt || 'la lecture de son compte manque')}. Je ne dis ni qu'elles sont en ligne, ni qu'elles sont parties.
     </div>) : null;
   // ── La liste de toutes les annonces actuelles, et où chacune est ────────────
   const blocListe = aa && aa.su && articlesVus.length ? (
@@ -34856,7 +34858,14 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
 
     {nEcartes > 0 && <div data-stock-ecartes={nEcartes} style={{ fontSize: 12, color: C.muted }}>{nEcartes} paire{nEcartes > 1 ? 's' : ''} d'un compte retiré ou masqué {nEcartes > 1 ? 'ne sont' : "n'est"} pas montrée{nEcartes > 1 ? 's' : ''} ici.</div>}
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'space-between' }}>
-      <div style={{ flex: '1 1 200px', minWidth: 0 }} />
+      {/* (6 nov., onglets B) CE QUE VEULENT DIRE LES CASES, en une ligne (Julien : « être accompagné ») :
+          les MÊMES classes que les cases (libre, rangée, vendue = l'accent, plus en ligne = l'ambre, §7). */}
+      {meubles.length > 0 ? <div className="vrm-s2d-legende-l" data-stock-legende="" style={{ flex: '1 1 200px', minWidth: 0 }}>
+        <span data-legende="libre"><i className="vrm-s2d-pastille is-libre" aria-hidden="true">+</i>libre</span>
+        <span data-legende="rangee"><i className="vrm-s2d-pastille is-rangee" aria-hidden="true">N°</i>rangée</span>
+        <span data-legende="vendue"><i className="vrm-s2d-pastille is-vendue" aria-hidden="true">N°</i>vendue : à sortir</span>
+        <span data-legende="plusenligne"><i className="vrm-s2d-pastille is-plusenligne" aria-hidden="true">N°</i>plus en ligne</span>
+      </div> : <div style={{ flex: '1 1 200px', minWidth: 0 }} />}
       {/* (30 oct.) Sans meuble, « De loin / De près » ne montrait rien : le choix attend le premier meuble. */}
       {meubles.length > 0 && <div data-meubles-zoom={zoom}><Segmente label="Taille des cases" value={zoom} onChange={setZoom} options={[{ v: 'loin', l: 'De loin', data: { 'data-zoom-choix': 'loin' } }, { v: 'normal', l: 'Normale', data: { 'data-zoom-choix': 'normal' } }, { v: 'pres', l: 'De près', data: { 'data-zoom-choix': 'pres' } }]} /></div>}
     </div>
