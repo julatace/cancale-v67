@@ -501,10 +501,14 @@ sans la fonction.
 | `vcoffres` | `rangerVcOffres` | **5.319.0** (4 nov.) | « tes offres reçues sur Vestiaire » (article, prix, gestes datés, à toi de répondre ; jamais l'acheteur) |
 | `vcoffrerepondre` | `repondreOffreVestiaire` | **5.319.0** (4 nov.) | « Accepter / Refuser / Contre-offre » sur son clic, au nom du compte de l'onglet, dans les 50 actions/h — seulement après une recette APPRISE de son propre geste sur Vestiaire (`vc_offres_recette`) |
 | `avis` | `capterAvis` | **5.319.0** (4 nov.) | « tes avis Vinted reçus (note, date) » : la 1re page de `user_feedbacks`, compte connecté seulement, budget de LECTURE 20/h, une fois par 24 h, rangée dans `harvest_{uid}_feedbacks` ; forme pas encore mesurée (une forme inconnue n'écrit rien) ; aucun rappel d'évaluation |
+| `ventesfusion` | `fusionnerCommandes` | **5.323.0** (6 nov.) | une lecture partielle des ventes/achats se FUSIONNE par n° de transaction (rien perdu) ; fenêtre inchangée < 1 h ni relue ni réécrite |
+| `releveidentite` | `txDeLigneReleve` | **5.323.0** (6 nov.) | relevé du porte-monnaie (`wallet/invoices/current`) rangé sans rien de personnel, `tx` si la ligne porte la vente ; forme inconnue ⇒ `harvest_{uid}_forme_releve` |
 
 ---
 
 ## 9. État actuel et décisions récentes
+
+- **6 nov. · Extension 5.323** : ventes/achats FUSIONNÉS par n° de transaction (une vente du matin jetée « plus pauvre », 320 lues contre 2 000) ; relevé du porte-monnaie par `wallet/invoices/current`, l'app date une vente par SON n° seulement ; capture brute Vestiaire COUPÉE. `docs/passation/2026-11-06-extension-5323.md`. Geste : installer la 5.323, ouvrir Porte-monnaie → Historique sur Vinted ; confirmer la suppression des 40 `vc_brut_*`.
 
 - **6 nov. · Stream (v36)** : bouton « Stream » au choix (Réglages → Mode stream, éteint ; sinon l'œil des montants, qui revient) ; photos d'article floutées par la règle du texte (`photoACacherSelon`), « toutes » au choix. `docs/passation/2026-11-06-stream-photos.md`. Geste : cocher le bouton s'il le veut.
 
@@ -555,7 +559,7 @@ sans la fonction.
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
-**Extension servie : 5.322.0** (4 nov.). **À lire en premier : `docs/passation/2026-11-02-liste.md`.** **Production** : https://vrm.center,
+**Extension servie : 5.323.0** (6 nov.). **À lire en premier : `docs/passation/2026-11-02-liste.md`.** **Production** : https://vrm.center,
 vérifier par `curl https://vrm.center/api/sante`.
 
 ### Gestes encore attendus de Julien

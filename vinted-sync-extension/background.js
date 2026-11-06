@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.322.0';
+const CODE_VERSION = '5.323.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -1458,6 +1458,117 @@ async function inboxFusionnee(rowId, neuf) {
   return fusionnerInbox(avant, neuf);
 }
 
+// ══ LES VENTES ET LES ACHATS SE FUSIONNENT PAR N° DE TRANSACTION (5.323) ═════
+// MESURÉ le 6 novembre (lecture seule, sa base) : une vente faite à 07:50 sur le
+// compte 199082413 n'était pas dans VRM, alors que la visite du matin avait relu
+// annonces, boîte et profil. Le compte a 2 162 ventes chez Vinted
+// (`total_entries`), la ligne `harvest_199082413_orders_sold` en porte 2 000
+// (`nItems`, la lecture de 20 pages × 100 de `inject.js`). Les autres lectures
+// sont PLAFONNÉES plus bas : `rafraichirVentes` 8 × 40 = 320, la moisson de la
+// page 10 × 100 = 1 000. `listePlusRiche` n'écrit que si la lecture est
+// complète (n ≥ 2 162 — jamais atteint) ou au moins aussi longue que la base
+// (2 000) ⇒ ces lectures étaient refusées EN SILENCE (« plus pauvre » :
+// `ignore_partiel_orders_sold` = 1 129, `…_orders_purchased` = 1 071) — et
+// comptées « lues » quand même. La vente du matin était dans la lecture… et
+// jetée. La boîte a eu le même défaut, corrigé de la même façon (5.162).
+// ⇒ Une lecture PARTIELLE des commandes (les pages récentes) se FUSIONNE dans
+//   la liste rangée, par IDENTITÉ (`transaction_id`, §5 — jamais un titre) :
+//   · une transaction lue maintenant remplace sa copie rangée (l'état le plus
+//     frais est celui qu'on vient de lire) ;
+//   · une transaction rangée hors de la fenêtre lue reste TELLE QUELLE — une
+//     lecture partielle n'efface rien (loi 2) ; seule une lecture COMPLÈTE
+//     (n ≥ total annoncé) remplace toute la liste, comme avant ;
+//   · une transaction neuve s'ajoute (en tête si la lecture part de la page 1) ;
+//   · une ligne sans `transaction_id` n'est pas une identité : elle n'est ni
+//     ajoutée ni rapprochée ; une lecture où AUCUNE n'en porte n'écrit rien
+//     (forme inconnue, dit : `ignore_commandes_sans_identite_<type>`) ;
+//   · la ligne rangée illisible (base qui ne répond pas) ⇒ RIEN n'est écrit
+//     (une fenêtre de 320 écraserait les 2 000 — `audit-fusion`).
+// ⚠️ ÉGRESS (§4.4) : fusionner demande de relire la liste rangée (≈ 680 Ko pour
+//    2 000 ventes). Une fenêtre IDENTIQUE à celle qu'on a soi-même fusionnée
+//    il y a moins d'une heure n'est ni relue ni réécrite (`inchange`) ; au-delà
+//    d'une heure elle est réécrite (la date de lecture rajeunit). Une vente
+//    neuve, un statut qui bouge changent la fenêtre : écrits tout de suite.
+//    Aucune requête Vinted de plus : ce sont les lectures qui partaient déjà.
+const FENETRE_CMD = 'vrmFenetreCommandes';          // { [rowId]: { [empreinte]: ms } } (§4.9)
+const FENETRE_CMD_VALIDITE_MS = 60 * 60 * 1000;
+const FENETRE_CMD_MAX = 8;
+const cleTxCommande = (o) => { const t = o && o.transaction_id; return t == null || String(t).trim() === '' ? null : String(t); };
+// La lecture part-elle du HAUT de la liste ? Les trois lecteurs partent de la
+// page 1 et concatènent ; une page profonde SEULE (capture passive d'une page 3)
+// ne vole pas le haut : ses transactions remplacent leur copie en place, une
+// neuve va en queue.
+function lectureDuHaut(neuf) {
+  const pg = (neuf && neuf.pagination) || {};
+  const cp = Number(pg.current_page != null ? pg.current_page : pg.page);
+  const per = Number(pg.per_page);
+  const n = ((neuf && neuf.my_orders) || []).length;
+  return !(isFinite(cp) && cp > 1 && (!isFinite(per) || n <= per));
+}
+function fusionnerCommandes(avant, neuf) {
+  const lus = neuf && Array.isArray(neuf.my_orders) ? neuf.my_orders : null;
+  if (!lus) return null;
+  const fen = new Map();
+  for (const o of lus) { const k = cleTxCommande(o); if (k && !fen.has(k)) fen.set(k, o); }
+  if (!fen.size) return null;                                   // aucune identité : forme inconnue
+  const ranges = avant && Array.isArray(avant.my_orders) ? avant.my_orders : [];
+  const dejaRangees = new Set(ranges.map(cleTxCommande).filter(Boolean));
+  const neuves = [...fen.entries()].filter(([k]) => !dejaRangees.has(k)).map(([, o]) => o);
+  const places = new Set(), corps = [];
+  for (const o of ranges) {
+    const k = cleTxCommande(o);
+    if (k && fen.has(k)) { if (!places.has(k)) { places.add(k); corps.push(fen.get(k)); } }
+    else corps.push(o);                                         // hors fenêtre (ou sans identité) : tel quel
+  }
+  const haut = lectureDuHaut(neuf);
+  const my_orders = haut ? neuves.concat(corps) : corps.concat(neuves);
+  const pagination = (haut || !(avant && avant.pagination)) ? ((neuf && neuf.pagination) || (avant && avant.pagination) || null) : avant.pagination;
+  return Object.assign({}, avant && typeof avant === 'object' ? avant : {}, neuf, { pagination, my_orders });
+}
+// Empreinte d'une fenêtre lue (FNV-1a sur le texte allégé) — elle ne sort jamais du navigateur.
+function empreinteFenetre(liste) {
+  const t = JSON.stringify(liste || []);
+  let h = 0x811c9dc5; for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return t.length.toString(36) + '.' + h.toString(36);
+}
+async function fenetreDejaRangee(rowId, emp) {
+  try {
+    const g = ((await chrome.storage.local.get(FENETRE_CMD))[FENETRE_CMD] || {})[rowId] || {};
+    const at = Number(g[emp] || 0);
+    return at > 0 && Date.now() - at < FENETRE_CMD_VALIDITE_MS;
+  } catch (_) { return false; }                                 // pas su ⇒ on fusionne
+}
+async function noterFenetreRangee(rowId, emp) {
+  try {
+    const tout = (await chrome.storage.local.get(FENETRE_CMD))[FENETRE_CMD] || {};
+    const g = Object.assign({}, tout[rowId] || {}, { [emp]: Date.now() });
+    const garde = Object.entries(g).filter(([, at]) => Date.now() - Number(at) < FENETRE_CMD_VALIDITE_MS)
+      .sort((a, b) => Number(b[1]) - Number(a[1])).slice(0, FENETRE_CMD_MAX);
+    tout[rowId] = Object.fromEntries(garde);
+    await chrome.storage.local.set({ [FENETRE_CMD]: tout });
+  } catch (_) {}
+}
+// Ce qu'il faut écrire pour une lecture de commandes (déjà ALLÉGÉE) :
+//   { payload, emp }   la liste à ranger (complète telle quelle, ou fusionnée) ;
+//   'inchange'         fenêtre identique, rangée par nous il y a moins d'1 h ;
+//   'forme'            aucune identité dans la lecture (rien écrit, dit) ;
+//   null               la base n'a pas répondu (pas su : rien écrit, dit).
+async function commandesARanger(rowId, type, payload) {
+  const lus = payload && Array.isArray(payload.my_orders) ? payload.my_orders : [];
+  const total = Number(payload && payload.pagination && payload.pagination.total_entries);
+  if (isFinite(total) && total > 0 && lus.length >= total) return { payload, emp: null };   // complète : fait foi
+  const emp = empreinteFenetre(lus);
+  if (await fenetreDejaRangee(rowId, emp)) { noterDiag(`fenetre_inchangee_${type}`); return 'inchange'; }
+  const rows = await sbGet(`app_data?id=eq.${encodeURIComponent(rowId)}&select=pg:data->payload->pagination,mo:data->payload->my_orders`);
+  if (rows === null || !Array.isArray(rows)) { noterDiag(`fusion_lecture_ratee_${type}`); return null; }
+  const r0 = rows[0] || null;
+  const avant = r0 ? { pagination: r0.pg || null, my_orders: Array.isArray(r0.mo) ? r0.mo : [] } : null;
+  const f = fusionnerCommandes(avant, payload);
+  if (!f) { noterDiag(`ignore_commandes_sans_identite_${type}`); return 'forme'; }
+  noterDiag(`fusion_${type}`);
+  return { payload: f, emp };
+}
+
 // Les pages d'un même fil se réunissent par identité de message.
 // BEGIN CONVERSATION PARTAGEE
 function fusionnerConversation(avant, neuf) {
@@ -2129,6 +2240,7 @@ async function storeHarvest(domain, type, id, body, sourceUrl=null,tabId=null,so
   // le coffre — une ligne par annonce, lue seulement quand on republie.
   const brut = parsed;
   parsed = alleger(type, parsed);
+  let fenetreCmd = null;   // 5.323 : l'empreinte de la fenêtre de commandes fusionnée (notée une fois rangée)
 
   // ⚠️⚠️ ON NE REMPLACE JAMAIS UN DRESSING PAR UN PLUS PAUVRE.
   // C'est LE défaut qui vidait les annonces. Mesuré en base le 15 août :
@@ -2155,6 +2267,17 @@ async function storeHarvest(domain, type, id, body, sourceUrl=null,tabId=null,so
     const f = await conversationFusionnee(rowId, parsed);
     if (f === null) { noterDiag('conversation_lecture_ou_forme_ratee'); return; }
     parsed = f;
+  } else if ((type === 'orders_sold' || type === 'orders_purchased') && ((parsed && parsed.my_orders) || []).length && lectureDuHaut(parsed)) {
+    // 5.323 : les commandes se FUSIONNENT par n° de transaction (`commandesARanger`).
+    // (Une liste VIDE garde la règle d'avant, plus bas : jamais sur une ligne existante.)
+    // ⚠️ Égress : en passif, seulement une lecture qui part du HAUT (page 1, ou
+    //    les pages concaténées d'`inject.js`). Faire défiler « Mes ventes » charge
+    //    page 2, 3, 4… : chacune relirait et réécrirait toute la liste (≈ 1,3 Mo) ;
+    //    elles gardent la règle d'avant (la lecture concaténée les couvre).
+    const c = await commandesARanger(rowId, type, parsed);
+    if (c === null || c === 'forme' || c === 'inchange') return;   // pas su / forme inconnue (dits) · déjà rangée
+    parsed = c.payload;
+    fenetreCmd = c.emp;
   } else if (CLE_LISTE[type]) {
     const riche = await listePlusRiche(rowId, parsed, CLE_LISTE[type]);
     if (riche === null) return;                   // compteur illisible : pas su, on n'écrase rien (déjà noté)
@@ -2168,7 +2291,7 @@ async function storeHarvest(domain, type, id, body, sourceUrl=null,tabId=null,so
   // Le RELEVÉ part dans sa propre ligne, AVANT le tri ci-dessous : une réponse
   // peut porter les mouvements sans porter de solde, et il n'y a qu'une ligne
   // `billing` par compte — c'est elle qui écrasait le relevé (§5.91).
-  if (type === 'billing') { try { await storeReleve(uid, parsed, domain); } catch (_) {} }
+  if (type === 'billing') { try { await storeReleve(uid, parsed, domain, sourceUrl); } catch (_) {} }
   if (type === 'billing' && !estPorteMonnaie(parsed)) {
     noterDiag('ignore_billing_hors_sujet');
     // ⚠️ LES BOOSTS (3 octobre) : « les boosts, c'est à toi de les capter ».
@@ -2190,6 +2313,7 @@ async function storeHarvest(domain, type, id, body, sourceUrl=null,tabId=null,so
   // Dernière sortie muette possible : l'écriture elle-même. On la mesure aussi,
   // sinon « rien en base » resterait indiscernable de « jamais reçu ».
   noterDiag(`${ecrit === false ? 'ecriture_ratee' : 'ecrit'}_${type || 'inconnu'}`);
+  if (ecrit !== false && fenetreCmd) await noterFenetreRangee(rowId, fenetreCmd);
   noterFlux('vinted', ecrit !== false);
   // Des ventes viennent d'être rangées : l'app ouverte les relit TOUT DE SUITE
   // (« presque instantanément dès que je fais une vente », 2 octobre).
@@ -2696,18 +2820,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       })();
       return true;
     }
-    // 5.315 : TOUT Vestiaire, tel que la page l'a chargé (voir vc-inject.js `noteBrut`).
+    // ⛔ 5.323 (6 nov., sa décision « coupe la capture Vestiaire ») : la capture
+    //    BRUTE de la 5.315 (`vcBrut` / `vcPdf` → `vc_brut_*` / `vc_pdf_*`) est
+    //    retirée — elle rangeait noms, e-mails, adresses, téléphones d'acheteurs.
+    //    Un vieux relais qui l'enverrait encore n'écrit RIEN.
     if (msg && msg.from === 'cancale-vc' && (msg.action === 'vcBrut' || msg.action === 'vcPdf')) {
-      (async () => {
-        try {
-          let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
-          if (!/(^|\.)vestiairecollective\.com$/i.test(hote)) { sendResponse({ ok: false }); return; }
-          const compteOnglet = await compteVcCapture(sender && sender.tab && sender.tab.id, msg.moi);
-          const ok = msg.action === 'vcBrut' ? await rangerVcBrut(msg, compteOnglet) : await rangerVcPdf(msg, compteOnglet);
-          sendResponse({ ok: ok === true });
-        } catch (e) { sendResponse({ ok: false, error: String(e) }); }
-      })();
-      return true;
+      noterDiag('vc_brut_coupe');
+      sendResponse({ ok: false, coupe: true });
+      return false;
     }
     // 5.243 : le catalogue du dépôt Vestiaire (catégories, marques — libellés publics).
     if (msg && msg.from === 'cancale-vc' && msg.action === 'vcCatalogue') {
@@ -4486,22 +4606,75 @@ const PHOTOS_TICK_COOLDOWN_MS = 5 * 60 * 1000;
 // Un mouvement, réduit à ce qui l'identifie et le date. On ne garde pas le
 // libellé complet ni les champs de présentation : ces lignes repartent à chaque
 // lecture (§34), et un relevé se lit sur la date, le sens et le montant.
+// ⚠️ 5.323 (6 nov.) — RIEN DE PERSONNEL, ET L'IDENTITÉ DE LA VENTE QUAND ELLE Y EST.
+//    Une LISTE BLANCHE de champs machine : identifiant, date, montant, devise,
+//    sens (`type`), nature (`entity_type`), son identifiant, « en attente ».
+//    Le libellé (`title`) n'est plus gardé : il peut porter un pseudo ou un titre
+//    d'annonce, et personne ne le lisait (le `subtitle` porte un bout d'IBAN).
+//    `tx` = le n° de TRANSACTION, seulement quand la ligne le PORTE : une clé
+//    `transaction_id`, ou une nature « transaction » et son identifiant. C'est la
+//    seule chose qui permet à l'app de dater une vente par le relevé (§5 : par
+//    identité, jamais par un montant ou une date qui se ressemblent).
+const TX_RELEVE = /^\d{3,20}$/;
+function txDeLigneReleve(l) {
+  const t = l && l.transaction_id != null ? String(l.transaction_id) : '';
+  if (TX_RELEVE.test(t)) return t;
+  if (l && /^transaction$/i.test(String(l.entity_type || '')) && TX_RELEVE.test(String(l.entity_id == null ? '' : l.entity_id))) return String(l.entity_id);
+  return undefined;
+}
 function ligneReleve(l) {
   if (!l || typeof l !== 'object') return null;
   const brut = l.amount && typeof l.amount === 'object' ? l.amount.amount : l.amount;
   const n = parseFloat(String(brut == null ? '' : brut).replace(',', '.'));
   if (!isFinite(n)) return null;                       // sans montant, ce n'est pas un mouvement
   const d = l.date || l.created_at || l.updated_at || null;
+  const dev = l.amount && typeof l.amount === 'object' ? (l.amount.currency_code || l.amount.currency) : l.currency_code;
   return {
-    id: l.id != null ? String(l.id) : undefined,
-    date: d ? String(d) : undefined,
+    id: l.id != null && /^[\w-]{1,40}$/.test(String(l.id)) ? String(l.id) : undefined,
+    date: d && /^\d{4}-\d{2}-\d{2}/.test(String(d)) ? String(d).slice(0, 40) : undefined,
     montant: n,
+    devise: dev && /^[A-Z]{3}$/.test(String(dev)) ? String(dev) : undefined,
     type: l.type ? String(l.type).slice(0, 40) : undefined,
     quoi: l.entity_type ? String(l.entity_type).slice(0, 40) : undefined,
-    ref: l.entity_id != null ? String(l.entity_id) : undefined,
-    titre: l.title ? String(l.title).slice(0, 80) : undefined,
+    ref: l.entity_id != null && /^[\w-]{1,40}$/.test(String(l.entity_id)) ? String(l.entity_id) : undefined,
+    tx: txDeLigneReleve(l),
     attente: l.pending === true ? true : undefined,
   };
+}
+// Où vivent les mouvements ? `invoice_lines` à la racine (l'ancienne réponse de
+// `payouts`), ou un niveau plus bas (la réponse de `wallet/invoices/current`
+// que charge la page « Porte-monnaie », jamais mesurée). Rend l'objet qui
+// PORTE la liste (son `starting_date`, son `invoice_lines_has_more`) ou `null`.
+function porteurDuReleve(p) {
+  if (!p || typeof p !== 'object') return null;
+  if (Array.isArray(p.invoice_lines)) return p;
+  for (const v of Object.values(p)) {
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      if (Array.isArray(v.invoice_lines)) return v;
+      for (const w of Object.values(v)) if (w && typeof w === 'object' && !Array.isArray(w) && Array.isArray(w.invoice_lines)) return w;
+    }
+  }
+  return null;
+}
+// La FORME d'une réponse (chemins de clés + type de feuille, JAMAIS une valeur) —
+// ce qui dira, la première fois qu'elle passe, où vivent les mouvements.
+function formeReponseReleve(x, pre = '', out = [], prof = 0) {
+  if (out.length >= 120 || prof > 5) return out;
+  if (Array.isArray(x)) { out.push(`${pre}[]:${x.length ? 'liste' : 'vide'}`); if (x.length) formeReponseReleve(x[0], pre + '[0]', out, prof + 1); return out; }
+  if (x && typeof x === 'object') { for (const k of Object.keys(x).slice(0, 40)) formeReponseReleve(x[k], pre ? `${pre}.${k}` : k, out, prof + 1); return out; }
+  out.push(`${pre}:${x === null ? 'null' : typeof x}`);
+  return out;
+}
+const RELEVE_FORME_MS = 24 * 60 * 60 * 1000;
+async function noterFormeReleve(uid, payload, sourceUrl) {
+  try {
+    const memo = (await chrome.storage.local.get('vrmReleveForme')).vrmReleveForme || {};
+    if (memo[String(uid)] && Date.now() - Number(memo[String(uid)]) < RELEVE_FORME_MS) return;
+    memo[String(uid)] = Date.now();
+    await chrome.storage.local.set({ vrmReleveForme: memo });
+    let chemin = ''; try { chemin = cheminNormalise(new URL(String(sourceUrl || ''), 'https://www.vinted.fr').pathname).slice(0, 120); } catch (_) {}
+    await supabaseUpsert('app_data', [{ id: `harvest_${uid}_forme_releve`, data: { type: 'forme_releve', uid: String(uid), at: new Date().toISOString(), chemin, forme: formeReponseReleve(payload) } }], 'id');
+  } catch (_) {}
 }
 
 // Le mois que ce relevé décrit. `starting_date` fait foi (c'est Vinted qui le
@@ -4520,10 +4693,27 @@ function moisDuReleve(p) {
 // Range le relevé dans SA ligne, une par compte et par mois. Appelé depuis les
 // deux voies d'écriture (§5.27 : un garde-fou vit dans la fonction qui écrit).
 // Aucune requête Vinted ajoutée : c'est la réponse qu'on a déjà sous la main.
-async function storeReleve(uid, payload, domain) {
+// ⚠️ 5.323 (6 nov.) — MESURÉ : `storeReleve` n'avait JAMAIS rien écrit (aucune
+//    ligne `harvest_*_releve_*`, aucun compteur `releve_*` chez lui). Deux causes :
+//    · `GET /api/v2/users/{id}/payouts` répond 404 sur tous ses comptes (relevé
+//      des chemins vus, 6 nov.) : la moisson ne recevait plus rien ;
+//    · la page « Porte-monnaie » charge `GET /api/v2/wallet/invoices/current`
+//      (vu, 200) — attrapée comme « billing », mais `invoice_lines` n'y est pas
+//      à la racine : la réponse était jetée en silence.
+//    ⇒ Les mouvements sont cherchés un ou deux niveaux plus bas
+//      (`porteurDuReleve`) ; une réponse du porte-monnaie SANS mouvements
+//      lisibles n'écrit rien et le DIT (`releve_forme_inconnue`, sa forme —
+//      noms de clés et types, jamais une valeur — dans `harvest_{uid}_forme_releve`).
+async function storeReleve(uid, payload, domain, sourceUrl) {
   try {
-    const lignes = payload && Array.isArray(payload.invoice_lines) ? payload.invoice_lines : null;
-    if (!lignes || !lignes.length) return false;
+    const porteur = porteurDuReleve(payload);
+    const lignes = porteur ? porteur.invoice_lines : null;
+    if (!lignes) {
+      if (/\/wallet\/invoices|\/payouts(?:[/?]|$)/i.test(String(sourceUrl || ''))) { noterDiag('releve_forme_inconnue'); await noterFormeReleve(uid, payload, sourceUrl); }
+      return false;
+    }
+    if (!lignes.length) return false;
+    payload = Object.assign({}, payload, porteur, { invoice_lines: lignes });
     const mois = moisDuReleve(payload);
     if (!mois) { noterDiag('releve_sans_mois'); echantillonRate('releve', String(uid), JSON.stringify(payload).slice(0, 400)); return false; }
     const propres = lignes.map(ligneReleve).filter(Boolean);
@@ -4548,6 +4738,11 @@ async function storeReleve(uid, payload, domain) {
         type: 'releve', uid: String(uid), mois, domain: domain || 'www.vinted.fr',
         capturedAt: new Date().toISOString(),
         nLignes: propres.length,
+        // 5.323 : combien de mouvements portent l'identité d'une vente (`tx`), et la
+        // FORME des mouvements (noms de clés + types, jamais une valeur) — c'est ce
+        // qui dira la forme réelle d'une ligne de VENTE la première fois qu'elle passe.
+        nTx: propres.filter((l) => l.tx).length,
+        formeLignes: [...new Set(lignes.slice(0, 50).flatMap((l) => formeReponseReleve(l)))].slice(0, 80),
         complet: payload.invoice_lines_has_more === false ? true : undefined,
         // ⚠️ LE RÉSUMÉ EST CALCULÉ ICI, À LA CAPTURE — même motif que le widget
         // (§5.14) : un mois chargé pèse des dizaines de Ko par compte, et l'app
@@ -6922,9 +7117,9 @@ async function storeHarvestRow(uid, type, payload, domain, opts) {
   // fonction qui écrit, pas chez ceux qui l'appellent.
   // Idem côté moisson active — depuis le payload BRUT : l'allègement ne touche
   // pas `billing` aujourd'hui, mais un relevé ne doit pas dépendre de ça.
-  if (type === 'billing') { try { await storeReleve(uid, brut, domain); } catch (_) {} }
+  if (type === 'billing') { try { await storeReleve(uid, brut, domain, opts && opts.source); } catch (_) {} }
   if (type === 'billing' && !estPorteMonnaie(payload)) return 'hors-sujet';
-  let capturePrevue = false;
+  let capturePrevue = false, fenetreCmd = null;
   const maintenant = new Date().toISOString();
   const data = { type, uid, domain: domain || 'www.vinted.fr', capturedAt: maintenant, payload };
   // Même règle que la voie passive : un dressing partiel n'écrase pas un
@@ -6940,6 +7135,17 @@ async function storeHarvestRow(uid, type, payload, domain, opts) {
     payload = f;
     data.payload = payload;
     data.nItems = payload.conversations.length;
+  } else if ((type === 'orders_sold' || type === 'orders_purchased') && ((payload && payload.my_orders) || []).length) {
+    // 5.323 : les commandes se FUSIONNENT par n° de transaction (`commandesARanger`) —
+    // une fenêtre de 320 ou 1 000 n'est plus jetée devant une liste de 2 000.
+    const c = await commandesARanger(`harvest_${uid}_${type}`, type, payload);
+    if (c === null) return 'lecture-ratee';        // la base n'a pas répondu : rien écrit
+    if (c === 'forme') return 'forme-inconnue';    // aucune identité lue : rien écrit (dit) — PAS « lu »
+    if (c === 'inchange') return 'inchange';       // fenêtre déjà rangée par nous il y a < 1 h
+    payload = c.payload;
+    data.payload = payload;
+    data.nItems = payload.my_orders.length;
+    fenetreCmd = c.emp;
   } else if (CLE_LISTE[type]) {
     data.nItems = ((payload && payload[CLE_LISTE[type]]) || []).length;
     // ⚠️ UN REFUS SE COMPTE, COMME SUR LA VOIE PASSIVE (`ignore_partiel_<type>`).
@@ -6970,6 +7176,7 @@ async function storeHarvestRow(uid, type, payload, domain, opts) {
   // 5.294 : la date de la dernière lecture COMPLÈTE du dressing de ce compte,
   // RANGÉE (le rattrapage au retour sur Vinted la lit : `retourSurVinted`).
   if (capturePrevue && ecritRow !== false) await noterCaptureComplete(uid);
+  if (fenetreCmd && ecritRow !== false) await noterFenetreRangee(`harvest_${uid}_${type}`, fenetreCmd);
   if (ecritRow !== false && type === 'orders_sold') notifierApp({ type: 'maj', quoi: 'ventes', uid: String(uid) });
   if (ecritRow !== false && type === 'orders_purchased') notifierApp({ type: 'maj', quoi: 'achats', uid: String(uid) });
   if (ecritRow !== false && type === 'listings') notifierApp({ type: 'maj', quoi: 'annonces', uid: String(uid) });   // 5.165 (voir storeHarvest)
@@ -7208,7 +7415,12 @@ async function pageActiveFetch() {
         // la capture passive le voie : 5 comptes sur 7 n'avaient donc aucun
         // solde. Un appel de plus, depuis SON navigateur, sur une page ou il
         // est deja connecte — c'est le meme profil de trafic qu'une visite.
-        const wallet = pid ? await get('/api/v2/users/' + pid + '/payouts') : null;
+        // ⚠️ 5.323 (6 nov.) — MESURÉ : `users/{id}/payouts` répond 404 sur tous ses
+        //    comptes (relevé des chemins vus). La page « Porte-monnaie » charge
+        //    `wallet/invoices/current` (vu, 200) : c'est ELLE qu'on lit, à la place
+        //    (toujours UN appel, le même que la page) — le relevé du mois en cours
+        //    (`storeReleve`), et le solde s'il le porte.
+        const wallet = await get('/api/v2/wallet/invoices/current');
         return { who: who || null, listings: listings || null, listingsComplet, pid: pid || null, sold: sold || null, bought: bought || null, inbox: inbox || null, wallet: wallet || null, frein };
       }, [csrf, knownPid]);
     const o = res && res[0] && res[0].result;
@@ -7233,11 +7445,13 @@ async function pageActiveFetch() {
   //    AVANT de savoir ce que la base avait répondu : une moisson dont TOUTES les
   //    écritures étaient refusées (400, sans session, 9 octobre) se disait
   //    « Données rafraîchies », et la garde de 5 min restait posée.
-  //    Lu-mais-refusé-plus-pauvre et porte-monnaie hors sujet valent « lu ».
+  //    Porte-monnaie hors sujet et fenêtre de commandes déjà rangée valent « lu ».
+  //    ⚠️ 5.323 : un refus « plus pauvre » ne vaut PLUS « lu » — c'est ce qui
+  //    cachait les 1 129 lectures de ventes jetées (ni « lu », ni échec de la base).
   let stored = false, ratees = 0;
   const range = async (type, data, opts) => {
     const r = await storeHarvestRow(uid, type, data, domain, opts);
-    if (r === 'ecrit' || r === 'plus-pauvre' || r === 'hors-sujet') stored = true; else if (r !== 'erreur-vinted') ratees++;   // 5.193 : un refus de VINTED n'est pas un refus de la base
+    if (r === 'ecrit' || r === 'inchange' || r === 'hors-sujet') stored = true; else if (r !== 'erreur-vinted' && r !== 'plus-pauvre' && r !== 'forme-inconnue') ratees++;   // 5.193 : un refus de VINTED n'est pas un refus de la base
   };
   // ⚠️ NE JAMAIS ECRASER UNE MOISSON PAR DU VIDE. Une session expiree, une
   // page pas encore chargee ou un appel refuse renvoient une LISTE VIDE, pas
@@ -7259,7 +7473,11 @@ async function pageActiveFetch() {
   // Le solde n'est pas une liste : on le range des qu'il porte un montant.
   // `payouts` renvoie `{balance}` là où le porte-monnaie renvoie `{main,escrow}` :
   // sans ce troisième cas, la lecture ajoutée en 4.26 était jetée à l'arrivée.
-  if (estPorteMonnaie(out.wallet)) await range('billing', out.wallet);
+  // 5.323 : la réponse du porte-monnaie (`wallet/invoices/current`) passe par la
+  // voie d'écriture même sans solde — son RELEVÉ est rangé à part (`storeReleve`),
+  // le solde seulement s'il porte un montant (`hors-sujet` sinon, rien d'écrasé).
+  if (estPorteMonnaie(out.wallet) || porteurDuReleve(out.wallet)) await range('billing', out.wallet, { source: '/api/v2/wallet/invoices/current' });
+  else if (out.wallet && typeof out.wallet === 'object') { try { await storeReleve(uid, out.wallet, domain, '/api/v2/wallet/invoices/current'); } catch (_) {} }
   if (stored) { try { chrome.storage.local.set({ lastActiveFetch: Date.now(), activeUid: uid, via: 'page' }); } catch (_) {} }
   noterDiag(stored ? 'moisson_page_rangee' : (ratees ? 'moisson_page_ecriture_ratee' : 'moisson_page_vide'));
   // Lu chez Vinted, refusé par la BASE : ni « rafraîchi », ni repli (§3) — et
@@ -7306,7 +7524,7 @@ async function activeFetchActiveAccount() {
     const range = async (type, data, opts) => {
       if (!(await memeCompte())) return 'abandon';
       const r = await storeHarvestRow(uid, type, data, domain, opts);
-      if (r === 'ecrit' || r === 'plus-pauvre' || r === 'hors-sujet') stored = true; else if (r !== 'erreur-vinted') ratees++;   // 5.193 : un refus de VINTED n'est pas un refus de la base
+      if (r === 'ecrit' || r === 'inchange' || r === 'hors-sujet') stored = true; else if (r !== 'erreur-vinted' && r !== 'plus-pauvre' && r !== 'forme-inconnue') ratees++;   // 5.193 : un refus de VINTED n'est pas un refus de la base
       return r;
     };
     const fin = () => {
@@ -8236,7 +8454,9 @@ let visiteTimer = null;
 //                légitimement rien à écrire) — la garde reste posée ;
 //      · ecrit = des ventes sont arrivées en base ;
 //      · raison ∈ compte · lecture · vinted-freine (429/403) · aucune ·
-//                 plus-pauvre · ecriture.
+//                 plus-pauvre · inchange · forme-inconnue · ecriture.
+// ⚠️ 5.323 : ses 8 pages × 40 (320 ventes) étaient refusées devant les 2 000
+//    rangées (« plus pauvre ») — elles se FUSIONNENT désormais (`commandesARanger`).
 async function rafraichirVentes(uid) {
   const accts = await getStoredAccounts();
   const acc = accts.find(a => String(a.vinted_user_id) === String(uid));
@@ -8259,6 +8479,11 @@ async function rafraichirVentes(uid) {
   const issue = await storeHarvestRow(uid, 'orders_sold', sold, acc.domain || 'www.vinted.fr');
   if (issue === 'ignore') return { ok: true, ecrit: false, raison: 'compte-supprime' };
   if (issue === 'plus-pauvre') return { ok: true, ecrit: false, raison: 'plus-pauvre' };
+  // 5.323 : la même fenêtre, déjà rangée par nous il y a moins d'une heure — rien de neuf.
+  if (issue === 'inchange') return { ok: true, ecrit: false, raison: 'inchange' };
+  // Aucune identité (`transaction_id`) dans la lecture : rien écrit, et ce n'est
+  // pas « lu » ; la garde reste entière (pas de relecture en rafale sur une forme).
+  if (issue === 'forme-inconnue') return { ok: false, ecrit: false, raison: 'forme-inconnue', garder: true };
   if (issue !== 'ecrit') { await poserReculBase(); return { ok: false, ecrit: false, raison: 'ecriture' }; }
   // ⚠️ On vient d'écrire des ventes FRAÎCHES : tout ce que le mémo de visite
   // garde sur ce compte est périmé à la milliseconde près. On le vide.
@@ -15494,67 +15719,15 @@ function ficheVcAnnonce(x, prev, compte, maintenant) {
     statut: String(x.statut || '').slice(0, 40) || prev.statut || '',
     compte: compte || prev.compte || '' };
 }
-// ── 5.315 — TOUT VESTIAIRE, GARDÉ TEL QUEL ──────────────────────────────────
-// Une ligne par ADRESSE (méthode + chemin + paramètres) : `vc_brut_{empreinte}` =
-// { url, methode, sorte, page, compte, at, taille, json } — la DERNIÈRE réponse
-// vue à cette adresse (une adresse revue avec le même contenu n'est pas
-// réécrite avant 30 min). Les clés qui portent un secret (jeton, mot de passe,
-// carte…) sont VIDÉES avant d'écrire. Au plus 3 000 adresses distinctes (au-delà,
-// seules les adresses déjà gardées se mettent à jour) — tenu dans
-// `chrome.storage.local` (le fond MV3 meurt toutes les 30 s, §4.9).
-// Les PDF (bordereaux) : `vc_pdf_{empreinte}` = { url, page, compte, at, taille, b64 }.
-// ⚠️ La base gratuite a une taille : deux budgets. TES données (ce qui porte
-// /me/, commandes, ventes, envois, bordereaux, messages, porte-monnaie…) : 1 500
-// adresses, 400 Ko chacune. Le RESTE (catalogue, pages d'autres vendeurs) :
-// 300 adresses, 100 Ko chacune.
-const VC_BRUT_MIEN = /\/me(\/|\b|$)|order|sale|sold|ship|label|transaction|negotiat|conversation|message|wallet|payout|invoice|return|bordereau|expedi|purchase|bought|account|profile/i;
-const VC_SECRET_CLE = /^(access_?token|refresh_?token|id_?token|token|jwt|password|passwd|secret|api_?key|authorization|cookie|session_?id|csrf|xsrf|card_?number|cardNumber|cvv|cvc|iban|bic)$/i;
-const empreinteVc = (t) => { let h = 0x811c9dc5; for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(36); };
-function sansSecretsVc(x, prof = 0) {
-  if (prof > 40 || x == null || typeof x !== 'object') return x;
-  if (Array.isArray(x)) return x.map((v) => sansSecretsVc(v, prof + 1));
-  const o = {};
-  for (const k of Object.keys(x)) o[k] = VC_SECRET_CLE.test(k) ? '[retiré]' : sansSecretsVc(x[k], prof + 1);
-  return o;
-}
-const _vcBrutVu = new Map();   // empreinte → { c: empreinte du contenu, at } (mémo : perdu, il coûte une écriture)
-async function vcBrutPlace(id, mien) {
-  const cle = mien ? 'vrmVcBrutIds' : 'vrmVcBrutAutres';
-  const g = await chrome.storage.local.get(cle);
-  const ids = Array.isArray(g && g[cle]) ? g[cle] : [];
-  if (ids.includes(id)) return true;
-  if (ids.length >= (mien ? 1500 : 300)) return false;
-  ids.push(id); await chrome.storage.local.set({ [cle]: ids });
-  return true;
-}
-async function rangerVcBrut(m, compte) {
-  const texte = typeof m.texte === 'string' ? m.texte : '';
-  if (!texte || texte.length > 400000) return false;
-  let json; try { json = JSON.parse(texte); } catch (_) { return false; }
-  const cle = `${m.methode || 'GET'} ${m.url || ''}`;
-  const mien = VC_BRUT_MIEN.test(String(m.url || '')) || (m.sorte === 'page' && VC_BRUT_MIEN.test(String(m.page || '')));
-  if (!mien && texte.length > 100000) return false;
-  const id = 'vc_brut_' + empreinteVc(cle);
-  const propre = sansSecretsVc(json);
-  const c = empreinteVc(JSON.stringify(propre));
-  const vu = _vcBrutVu.get(id);
-  if (vu && vu.c === c && Date.now() - vu.at < 30 * 60 * 1000) return true;
-  if (!(await vcBrutPlace(id, mien))) return false;
-  const ok = await supabaseUpsert('app_data', [{ id, data: { url: String(m.url || ''), methode: String(m.methode || 'GET'), sorte: m.sorte === 'page' ? 'page' : 'api', page: String(m.page || ''), compte: compte || '', at: new Date().toISOString(), taille: texte.length, json: propre } }], 'id');
-  if (ok === true) _vcBrutVu.set(id, { c, at: Date.now() });
-  return ok === true;
-}
-async function rangerVcPdf(m, compte) {
-  const b64 = typeof m.b64 === 'string' ? m.b64 : '';
-  if (!b64 || b64.length > 4300000) return false;
-  const id = 'vc_pdf_' + empreinteVc(b64.length + ':' + b64.slice(0, 4000) + b64.slice(-4000));
-  const vu = _vcBrutVu.get(id);
-  if (vu) return true;
-  if (!(await vcBrutPlace(id, true))) return false;
-  const ok = await supabaseUpsert('app_data', [{ id, data: { url: String(m.url || ''), page: String(m.page || ''), compte: compte || '', at: new Date().toISOString(), taille: Math.floor(b64.length * 3 / 4), b64 } }], 'id');
-  if (ok === true) _vcBrutVu.set(id, { c: '', at: Date.now() });
-  return ok === true;
-}
+// ── 5.315 — « TOUT VESTIAIRE, GARDÉ TEL QUEL » : RETIRÉ EN 5.323 ─────────────
+// `rangerVcBrut` / `rangerVcPdf` rangeaient la réponse entière de chaque appel
+// Vestiaire (`vc_brut_*`) et chaque PDF reçu (`vc_pdf_*`) : données personnelles
+// d'acheteurs comprises, filtrées par une LISTE NOIRE de clés (jetons) — rien ne
+// protégeait un nom ou une adresse. Aucun lecteur dans l'app. Coupé sur sa
+// décision du 6 nov. ; les lignes déjà en base sont à supprimer à part, avec sa
+// confirmation (docs/passation/2026-11-06-extension-5323.md). Les registres de
+// places qu'elles tenaient dans le stockage de l'extension sont vidés une fois.
+try { chrome.storage.local.remove(['vrmVcBrutIds', 'vrmVcBrutAutres']); } catch (_) {}
 // ── 5.316 — LE SUIVI D'UNE VENTE VESTIAIRE (et son BORDEREAU) ───────────────
 // `vctimeline` (vc-inject.js) : transporteur, n° de suivi, étapes, paiement
 // estimé, et l'adresse SIGNÉE du bordereau PDF que Vestiaire a déposé. Le fond

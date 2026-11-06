@@ -41,15 +41,7 @@
         chrome.runtime.sendMessage(Object.assign({ from: 'cancale-vc', action: 'vcAnnonces', items, offset: Number(d.offset) || 0, total: typeof d.total === 'number' ? d.total : null, lus: Number(d.lus) || 0, forme: (Array.isArray(d.forme) ? d.forme : []).slice(0, 120).map((c) => String(c).slice(0, 120)) }, suite(d)), () => { void chrome.runtime.lastError; });
         return;
       }
-      // 5.315 : TOUT ce que la page charge (réponse JSON entière, données de page, PDF).
-      if (d.kind === 'vcbrut' && typeof d.texte === 'string' && d.texte.length <= 400000) {
-        chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'vcBrut', url: String(d.url || '').slice(0, 400), methode: String(d.methode || 'GET').slice(0, 8), statut: Number(d.statut) || 0, sorte: d.sorte === 'page' ? 'page' : 'api', page: String(d.page || '').slice(0, 200), texte: d.texte, moi: moiDe(d) }, () => { void chrome.runtime.lastError; });
-        return;
-      }
-      if (d.kind === 'vcpdf' && typeof d.b64 === 'string' && d.b64.length <= 4300000 && /^[A-Za-z0-9+/=]+$/.test(d.b64.slice(0, 200))) {
-        chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'vcPdf', url: String(d.url || '').slice(0, 400), statut: Number(d.statut) || 0, page: String(d.page || '').slice(0, 200), b64: d.b64, moi: moiDe(d) }, () => { void chrome.runtime.lastError; });
-        return;
-      }
+      // ⛔ 5.323 : `vcbrut` / `vcpdf` (la capture brute de la 5.315) ne sont plus relayés — coupée sur sa décision.
       // 5.316 : le suivi d'UNE vente (transporteur, n° de suivi, bordereau PDF signé, étapes).
       if (d.kind === 'vctimeline' && /^\d{3,15}$/.test(String(d.productId || ''))) {
         const et = d.etapes && typeof d.etapes === 'object' ? Object.fromEntries(Object.entries(d.etapes).slice(0, 12).map(([k, v]) => [String(k).slice(0, 30), String(v).slice(0, 20)])) : {};

@@ -334,31 +334,32 @@ async function c10() {
   dit(d && d.complet && d.complet.length === 2, 'C10 · la liste lue en entier fait foi', JSON.stringify(d && d.complet));
   dit(it[0] && it[0].photo === 'https://images.vestiairecollective.com/produit/60001-1_2.jpg', 'C10 · (5.316) la photo : le nom de fichier de Vestiaire sur SON serveur d’images', JSON.stringify(it[0] && it[0].photo));
 }
-// C11 (2 nov., 5.315) — « TOUT VESTIAIRE » : la réponse entière gardée telle quelle,
-// sans secret, un PDF (bordereau) gardé, rien d'un autre site, rien d'une erreur.
+// C11 (2 nov., 5.315 → 6 nov., 5.323) — LA CAPTURE BRUTE EST COUPÉE (sa décision :
+// « coupe la capture Vestiaire »). Une réponse de Vestiaire pleine de données
+// d'acheteur, un PDF de bordereau : RIEN ne part de la page en entier (ni
+// `vcbrut`, ni `vcpdf`), le relais ne relaie rien, et un vieux message
+// `vcBrut`/`vcPdf` arrivé au fond n'écrit AUCUNE ligne. Les lecteurs par
+// fonction (annonces, ventes…) continuent de lire leur liste blanche de champs.
 async function c11() {
   const p = pageVc();
-  const vente = { meta: { count: 1 }, data: [{ id: 'S1', product: { id: 70001, name: 'Paire' }, buyer: { firstname: 'Acheteur' }, shipping: { label: { url: 'https://x/label.pdf' } }, access_token: 'SECRET-JETON', payout: { cents: 9000 } }] };
-  const m1 = (await p.charge(`${API}/users/me/sales?offset=0&limit=20&token=abc`, vente)).filter((x) => x.kind === 'vcbrut');
-  const m2 = (await p.charge(`${API}/users/me/sales/S1`, { erreur: 1 }, 404)).filter((x) => x.kind === 'vcbrut');
-  const m3 = (await p.charge('https://analytics.exemple.test/collect', { a: 1 })).filter((x) => x.kind === 'vcbrut');
+  const vente = { meta: { count: 1 }, data: [{ id: 'S1', product: { id: 70001, name: 'Paire' }, buyer: { firstname: 'Acheteur', email: 'acheteur@exemple.test' }, shipping: { label: { url: 'https://x/label.pdf' } }, access_token: 'SECRET-JETON', payout: { cents: 9000 } }] };
+  const tout1 = await p.charge(`${API}/users/me/sales?offset=0&limit=20&token=abc`, vente);
   const octets = Buffer.from('%PDF-1.4\n bordereau de banc\n%%EOF');
-  const m4 = (await p.route('https://etiquettes.exemple.test/label/S1.pdf', { status: 200, ctype: 'application/pdf', body: '', octets })).filter((x) => x.kind === 'vcpdf');
-  dit(m1.length === 1 && JSON.parse(m1[0].texte).data[0].shipping.label.url === 'https://x/label.pdf' && /token=_/.test(m1[0].url) && !/abc/.test(m1[0].url), 'C11 · une réponse de Vestiaire part ENTIÈRE (bordereau compris), le paramètre secret de l’adresse masqué', JSON.stringify(m1.map((x) => x.url)));
-  dit(!m2.length && !m3.length, 'C11 · ni une réponse d’erreur, ni un autre site', JSON.stringify({ e: m2.length, autre: m3.length }));
-  dit(m4.length === 1 && Buffer.from(m4[0].b64, 'base64').slice(0, 5).toString() === '%PDF-', 'C11 · un PDF reçu par la page (bordereau) est gardé', JSON.stringify(m4.length));
-  // Le relais puis le fond : rangé, SANS le secret du contenu.
+  const tout4 = await p.route('https://etiquettes.exemple.test/label/S1.pdf', { status: 200, ctype: 'application/pdf', body: '', octets });
+  const sorties = [...tout1, ...tout4];
+  dit(!sorties.some((x) => x.kind === 'vcbrut' || x.kind === 'vcpdf'), 'C11 · (5.323) plus aucune réponse ENTIÈRE ni aucun PDF ne quitte la page', JSON.stringify(sorties.map((x) => x.kind)));
+  dit(!JSON.stringify(sorties).includes('acheteur@exemple.test') && !JSON.stringify(sorties).includes('SECRET-JETON'), 'C11 · ni l’e-mail de l’acheteur, ni un jeton, dans quoi que ce soit qui sort', '');
+  // Un VIEUX relais (ou une page) qui enverrait encore la capture : le fond n'écrit rien.
   const f = faireFond({ src: F.src, lignes: {} });
   await f.ctx.noterSessionVc('compteA', 30, []);
   const r = relais();
-  for (const d of [...m1, ...m4]) { const msg = r(Object.assign({}, d, { moi: 'compteA' })).find((y) => y.action === 'vcBrut' || y.action === 'vcPdf'); if (msg) await f.envoyer(msg, senderVc(30)); }
-  const brut = Object.entries(f.lignes).filter(([k]) => /^vc_brut_/.test(k)).map(([, v]) => v);
-  const pdf = Object.entries(f.lignes).filter(([k]) => /^vc_pdf_/.test(k)).map(([, v]) => v);
-  dit(brut.length === 1 && brut[0].json.data[0].payout.cents === 9000 && brut[0].json.data[0].access_token === '[retiré]' && !JSON.stringify(brut[0]).includes('SECRET-JETON') && brut[0].compte === 'compteA', 'C11 · le fond la range (vc_brut_…) : tout le contenu, le jeton retiré, le compte de l’onglet', JSON.stringify(brut[0] && { compte: brut[0].compte, jeton: brut[0].json.data[0].access_token }));
-  dit(pdf.length === 1 && Buffer.from(pdf[0].b64, 'base64').slice(0, 5).toString() === '%PDF-', 'C11 · le bordereau est rangé (vc_pdf_…)', String(pdf.length));
+  const relaye = r({ __tag: 'CANCALE_VC', kind: 'vcbrut', url: 'fr.vestiairecollective.com/api/x', methode: 'GET', statut: 200, sorte: 'api', texte: JSON.stringify(vente), page: '/', moi: 'compteA' });
+  dit(!relaye.some((y) => y.action === 'vcBrut' || y.action === 'vcPdf'), 'C11 · le relais ne relaie plus `vcbrut`', JSON.stringify(relaye.map((y) => y.action)));
   const n0 = Object.keys(f.lignes).length;
-  const msg = r(Object.assign({}, m1[0], { moi: 'compteA' })).find((y) => y.action === 'vcBrut'); await f.envoyer(msg, senderVc(30));
-  dit(Object.keys(f.lignes).length === n0, 'C11 · la même réponse revue ne crée pas de seconde ligne', '');
+  await f.envoyer({ from: 'cancale-vc', action: 'vcBrut', url: 'fr.vestiairecollective.com/api/x', methode: 'GET', statut: 200, sorte: 'api', page: '/', texte: JSON.stringify(vente), moi: 'compteA' }, senderVc(30));
+  await f.envoyer({ from: 'cancale-vc', action: 'vcPdf', url: 'x', statut: 200, page: '/', b64: octets.toString('base64'), moi: 'compteA' }, senderVc(30));
+  const brut = Object.keys(f.lignes).filter((k) => /^vc_(brut|pdf)_/.test(k));
+  dit(!brut.length && Object.keys(f.lignes).length === n0, 'C11 · un vieux message `vcBrut`/`vcPdf` au fond n’écrit AUCUNE ligne (`vc_brut_*`, `vc_pdf_*`)', JSON.stringify(brut));
 }
 // C12 (2 nov., 5.316) — TA VENTE VESTIAIRE COMPLÈTE, sur la forme RÉELLE relevée
 // le 2 nov. (`ots/sales`, `contents/timeline/seller` ; valeurs inventées) : titre,
