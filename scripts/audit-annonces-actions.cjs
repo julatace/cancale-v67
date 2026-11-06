@@ -35,7 +35,8 @@ const MUTATIONS = {
   verif_jamais: { f: 'src', m: (s) => s.replace("if (enVerificationVinted(it)) return 'verification';", '') },
   verif_devinee: { f: 'src', m: (s) => s.replace("return typeof a === 'string' && a.trim() !== '';", "return a === undefined || (typeof a === 'string' && a.trim() !== '');") },
   chrome_ignore: { f: 'src', m: (s) => s.replace("else if (String(chrome) !== comptes[0]) raison", "else if (false) raison") },
-  chrome_passu_oui: { f: 'src', m: (s) => s.replace("else if (chrome === undefined) raison", "else if (false) raison") },
+  // (6 nov.) L'ancre suivait un « else if » qui n'existe plus (la mutation n'agissait sur rien, base comprise).
+  chrome_passu_oui: { f: 'src', m: (s) => s.replace("if (chrome === undefined) raison", "if (false) raison") },
   candidats_tous_comptes: { f: 'src', m: (s) => s.replace(".filter((it) => it && String(it.uid || '') === u && String(it.id) !== anc", ".filter((it) => it && String(it.id) !== anc") },
   candidats_main: { f: 'src', m: (s) => s.replace("return !(e && String(e.numero || '').trim() && (!e.auto || e.manuelAt));", 'return true;') },
   seule_ignore: { f: 'src', m: (s) => s.replace("else if (A.seule && sel.length > 1) raison", "else if (false) raison") },
