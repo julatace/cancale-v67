@@ -260,7 +260,7 @@ export function FicheFacturation({ deps, focus = null, surPrete = null }) {
           {manque.length
             ? <><b>{manque.length === 1 ? 'Il manque une information' : `Il manque ${manque.length} informations`} pour faire une facture conforme</b><span>{manque.map((m) => m.l).join(' · ')}</span></>
             : <><b>Ta fiche est complète</b><span>Chaque vente prouvée d'un compte Pro peut recevoir sa facture.</span></>}
-          <button type="button" className="vrm-b vrm-b-secondaire vrm-fp-voir-apercu" data-fp-voir-apercu="" onClick={() => { try { apercuRef.current && apercuRef.current.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (_) {} }}>Voir l'aperçu</button>
+          <div className="vrm-fp-voir-apercu"><button type="button" className="vrm-b vrm-b-secondaire" data-fp-voir-apercu="" onClick={() => { try { apercuRef.current && apercuRef.current.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (_) {} }}>Voir l'aperçu</button></div>
         </div>
 
         <section className="vrm-fp-section">
@@ -646,7 +646,7 @@ function FeuilleFactureVente({ vente, preuve, facture, avoir, deps, fermer }) {
           <section className="vrm-fp-section" data-fp-destinataire="">
             <h3>Destinataire</h3>
             <p className="vrm-fp-dest vrm-sensible" data-stream-type="acheteur"><b>{preuve.acheteur.nom}</b><span>{preuve.acheteur.email}</span></p>
-            <p className="vrm-fp-muet" data-fp-preuve="ok">Acheteur prouvé : le même n° de transaction ({tx}) sur la vente Vinted et dans l'e-mail de vente Pro, arrivé {preuve.ecartS < 60 ? `${Math.max(0, preuve.ecartS)} s` : `${Math.round(preuve.ecartS / 60)} min`} après la vente (au plus {FENETRE_APRES_S / 60} min), au même montant.</p>
+            <p className="vrm-fp-muet" data-fp-preuve="ok">Acheteur prouvé : le même n° de transaction ({tx}) sur la vente Vinted et dans l'e-mail de vente Pro, arrivé {preuve.ecartS < 0 ? `${-preuve.ecartS} s avant` : preuve.ecartS < 120 ? `${preuve.ecartS} s après` : `${Math.round(preuve.ecartS / 60)} min après`} la vente (au plus {FENETRE_APRES_S / 60} min), au même montant.</p>
           </section>
           <section className="vrm-fp-section">
             <h3>L'article</h3>

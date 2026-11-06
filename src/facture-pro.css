@@ -107,12 +107,12 @@
 @media (min-width: 1000px) {
   .vrm-fp-ma-facture { grid-template-columns: minmax(0, 1fr) minmax(360px, 440px); }
   .vrm-fp-apercu-col { position: sticky; top: 84px; max-height: calc(100vh - 100px); overflow-y: auto; overscroll-behavior: contain; padding-bottom: 8px; }
-  .vrm-fp-voir-apercu { display: none; }
+  .vrm-fp-ma-facture .vrm-fp-voir-apercu { display: none; }
 }
 /* Dans la feuille (« Compléter ma fiche » depuis une vente) : une colonne. */
 .vrm-fp-feuille-corps .vrm-fp-ma-facture { grid-template-columns: minmax(0, 1fr); }
 .vrm-fp-feuille-corps .vrm-fp-apercu-col { position: static; max-height: none; overflow: visible; }
-.vrm-fp-feuille-corps .vrm-fp-voir-apercu { display: inline-flex; }
+.vrm-fp-feuille-corps .vrm-fp-ma-facture .vrm-fp-voir-apercu { display: block; }
 /* Un trou : une mention obligatoire pas encore remplie (ambre, jamais rouge). */
 .vrm-fp-a-trou { color: #9a4a00; background: #fff4e5; border-radius: 4px; padding: 0 4px; font-weight: 600; justify-self: start; }
 .vrm-fp-mentions summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-size: 13px; color: var(--vrm-muted); }
@@ -145,3 +145,10 @@
 .vrm-fp-ligne-etat b { font-size: 13px; font-weight: 600; }
 .vrm-fp-ligne-etat span { font-size: 12px; color: var(--vrm-muted); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .vrm-fp-ligne-etat[data-fp-vente="refusee"] span, .vrm-fp-ligne-etat[data-fp-vente="incertaine"] span { color: var(--vrm-warn, #b25000); }
+
+/* (6 nov.) L'aperçu garde SA taille de texte (la page blanche de la facture), quelle
+   que soit la règle des tableaux de l'app ; les montants ne se coupent jamais. */
+html body .vrm-fp-apercu .vrm-fp-a-table th, html body .vrm-fp-apercu .vrm-fp-a-table td { font-size: 12px; line-height: 1.35; }
+html body .vrm-fp-apercu .vrm-fp-a-table th:nth-child(n+2), html body .vrm-fp-apercu .vrm-fp-a-table td:nth-child(n+2) { white-space: nowrap; }
+html body .vrm-fp-apercu .vrm-fp-a-table th:first-child, html body .vrm-fp-apercu .vrm-fp-a-table td:first-child { width: auto; }
+html body .vrm-fp-apercu .vrm-fp-a-table { table-layout: auto; }
