@@ -109,3 +109,6 @@ html body button.vrm-rm-etape[aria-current="step"] .vrm-rm-pastille { background
   .vrm-rm-apercu { grid-template-columns: 88px minmax(0, 1fr); }
   .vrm-rm-apercu-photo { width: 88px; }
 }
+/* Au doigt comme à la souris : 44 px (Chromium émulé en mobile ne répond pas toujours
+   `pointer: coarse`, mesuré par le banc — la règle de base des boutons restait à 36). */
+html body .vrm-fs.vrm-rm-feuille .vrm-b { min-height: 44px !important; }

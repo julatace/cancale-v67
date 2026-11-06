@@ -133,6 +133,12 @@ const cocher = async (pg, id) => clic(pg, `[data-selection-annonce="${id}"] inpu
 const cocherCase = (pg, sel) => pg.locator(sel).first().evaluate((el) => { if (!el.checked) el.click(); });
 const actions = async (pg, n) => { await clic(pg, '[data-actions-possibles]'); await pg.waitForSelector(`[data-actions-selection="${n}"]`, { timeout: 4000 }); };
 const curseur = (pg, sel, v) => pg.locator(sel).first().evaluate((el, val) => { const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(el, String(val)); el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); }, v);
+// La feuille entre en glissant : on attend la fin de l'entrée, puis on mesure qu'elle est bien À L'ÉCRAN
+// (un rectangle non nul ne suffit pas : une feuille restée sous le bord passe tous les contrôles du DOM).
+const feuillePosee = async (pg) => {
+  await pg.evaluate(() => Promise.race([Promise.all(document.getAnimations().map((a) => a.finished.catch(() => {}))), new Promise((r) => setTimeout(r, 2500))])).catch(() => {});
+  return pg.evaluate(() => { const f = document.querySelector('[data-repub-main]'); if (!f) return null; const r = f.getBoundingClientRect(); return { haut: Math.round(r.top), bas: Math.round(r.bottom), vh: innerHeight }; });
+};
 const reglagesStockes = (pg) => pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_republier_reglages') || 'null'); } catch (_) { return null; } });
 const etapeVisible = (pg) => pg.evaluate(() => { const v = [...document.querySelectorAll('[data-main-section]')].filter((x) => !x.hidden && x.getClientRects().length); return v.map((x) => x.getAttribute('data-main-section')).join(','); });
 const petitsDans = (pg, sel) => pg.$$eval(`${sel} button, ${sel} a[href], ${sel} input[type=checkbox], ${sel} select`, (l) => l.filter((x) => { if (x.closest('[hidden]')) return false; const r = x.getBoundingClientRect(); if (!r.height) return false; const z = x.closest('label') || x; const rz = z.getBoundingClientRect(); return Math.max(r.height, rz.height) < 43.5; }).map((x) => (x.getAttribute('aria-label') || x.textContent || x.tagName).trim().slice(0, 24)));
@@ -175,6 +181,8 @@ const petitsDans = (pg, sel) => pg.$$eval(`${sel} button, ${sel} a[href], ${sel}
           await actions(pg, 2);
           await clic(pg, '[data-action-sel="main"] button');
           await pg.waitForSelector('[data-repub-main="9102"]', { timeout: 6000 });
+          const pose = await feuillePosee(pg);
+          dit(pose && pose.haut >= 0 && pose.haut < pose.vh - 200 && pose.bas <= pose.vh + 1, `F ${T} la feuille est à l’écran (entrée finie)`, JSON.stringify(pose));
           for (let i = 0; i < 20; i++) { if (!(await pg.$('[data-main-lecture]'))) break; await pg.waitForTimeout(200); }
           const tete = await pg.evaluate(() => { const f = document.querySelector('[data-repub-main]'); return { rang: f.getAttribute('data-main-rang'), etapes: [...f.querySelectorAll('[data-main-aller]')].map((x) => x.getAttribute('data-main-aller')), courante: (f.querySelector('[aria-current="step"]') || {}).getAttribute ? f.querySelector('[aria-current="step"]').getAttribute('data-main-aller') : '', sous: (f.querySelector('.vrm-fs-sous-titre') || {}).textContent || '', num: (f.querySelector('[data-main-num]') || {}).textContent || '' }; });
           dit(tete.rang === '1/2' && /Paire 1\/2/.test(tete.sous), `E ${T} deux paires : « Paire 1/2 » en tête`, JSON.stringify(tete));
@@ -187,7 +195,7 @@ const petitsDans = (pg, sel) => pg.$$eval(`${sel} button, ${sel} a[href], ${sel}
           dit((await etapeVisible(pg)) === 'reglages', `E ${T} une étape à la fois`, await etapeVisible(pg));
           const p1 = await petitsDans(pg, '[data-repub-main]');
           dit(!p1.length, `F ${T} cibles ≥ 44 px (Réglages)`, p1.join(' | '));
-          await pg.screenshot({ path: nomF('1-reglages') });
+          await feuillePosee(pg); await pg.screenshot({ path: nomF('1-reglages') });
           // ── P : les photos ───────────────────────────────────────────────────
           await clic(pg, '[data-main-suivant="photos"]');
           await pg.waitForTimeout(250);
@@ -196,7 +204,7 @@ const petitsDans = (pg, sel) => pg.$$eval(`${sel} button, ${sel} a[href], ${sel}
           const faitR = await pg.getAttribute('[data-main-aller="reglages"]', 'data-main-etape-fait').catch(() => null);
           dit(faitR === '1', `E ${T} l’étape passée est cochée dans la progression`, faitR);
           dit(await pg.locator('[data-main-telecharger="2"]').count() === 1, `P ${T} un bouton pour enregistrer les 2 photos réglées`);
-          await pg.screenshot({ path: nomF('2-photos') });
+          await feuillePosee(pg); await pg.screenshot({ path: nomF('2-photos') });
           // ── T : le texte tel qu'il partira ────────────────────────────────────
           await clic(pg, '[data-main-suivant="texte"]');
           await pg.waitForTimeout(250);
@@ -211,11 +219,11 @@ const petitsDans = (pg, sel) => pg.$$eval(`${sel} button, ${sel} a[href], ${sel}
           dit(cp.t === '44,10' && /Copié/.test(cp.lib) && cp.marque === '1', `T ${T} « Copier » met 44,10 dans le presse-papiers et dit « Copié »`, JSON.stringify(cp));
           const p3 = await petitsDans(pg, '[data-repub-main]');
           dit(!p3.length, `F ${T} cibles ≥ 44 px (Texte)`, p3.join(' | '));
-          await pg.screenshot({ path: nomF('3-texte') });
+          await feuillePosee(pg); await pg.screenshot({ path: nomF('3-texte') });
           // ── V : mettre en ligne, relier ──────────────────────────────────────
           await clic(pg, '[data-main-suivant="vinted"]');
           await pg.waitForTimeout(250);
-          await pg.screenshot({ path: nomF('4-vinted') });
+          await feuillePosee(pg); await pg.screenshot({ path: nomF('4-vinted') });
           // §7 : UN bouton principal par écran (ici « Ouvrir Vinted »), le reste en second.
           const prim = await pg.$$eval('[data-repub-main] .vrm-b-primaire', (l) => l.filter((x) => !x.closest('[hidden]') && x.getClientRects().length).map((x) => x.textContent.trim()));
           dit(prim.length === 1 && /Ouvrir Vinted/.test(prim[0]), `F ${T} étape 4 : un seul bouton principal (« Ouvrir Vinted »)`, prim.join(' | '));
@@ -225,7 +233,7 @@ const petitsDans = (pg, sel) => pg.$$eval(`${sel} button, ${sel} a[href], ${sel}
           await pg.waitForTimeout(300);
           dit((await etapeVisible(pg)) === 'relier' && lien && lien.href === 'https://www.vinted.fr/items/new' && lien.cible === '_blank', `V ${T} « Ouvrir Vinted » ouvre la page de dépôt Vinted (nouvel onglet) et mène à « Relier »`, JSON.stringify({ e: await etapeVisible(pg), lien, pop: !!pop }));
           dit(await pg.locator('[data-main-suivante="2/2"]').count() === 1, `E ${T} à la dernière étape : « Paire suivante · 2/2 »`);
-          await pg.screenshot({ path: nomF('5-relier') });
+          await feuillePosee(pg); await pg.screenshot({ path: nomF('5-relier') });
           await clic(pg, '[data-main-suivante="2/2"]');
           await pg.waitForSelector('[data-repub-main="9103"]', { timeout: 5000 }).catch(() => {});
           for (let i = 0; i < 20; i++) { if (!(await pg.$('[data-main-lecture]'))) break; await pg.waitForTimeout(200); }

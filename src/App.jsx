@@ -14591,10 +14591,10 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, onDebut, onLier,
 
       {section('vinted', <>
         <ol className="vrm-rm-liste">
-          <li>Sur Vinted, connecté sur <b>{paire.compte}</b> : « Vendre ».</li>
+          <li>Sur Vinted, connecté sur <b>{paire.compte}</b> : « Vendre ».</li>
           <li>Ajoute les {nPh || ''} photo{nPh > 1 ? 's' : ''} enregistrée{nPh > 1 ? 's' : ''}{fait.photos ? '' : <span className="vrm-rm-ambre"> (pas encore enregistrées : étape 2)</span>}.</li>
           <li>Colle le titre, la description, le prix{fait.texte ? '' : <span className="vrm-rm-ambre"> (pas tout copié : étape 3)</span>}.</li>
-          <li>Choisis {[marque, taille, etatA].filter(Boolean).join(' · ') || 'la marque, la taille et l’état'}, puis « Ajouter ».</li>
+          <li>Choisis {[marque, taille, etatA].filter(Boolean).join(' · ') || 'la marque, la taille et l’état'}, puis « Ajouter ».</li>
         </ol>
         <div className="vrm-b-rangee vrm-rm-gauche"><Bouton variante="primaire" data-main-ouvrir-vinted="" href={nouvelleUrl} target="_blank" rel="noopener noreferrer" onClick={() => { onDebut(); setOuvert(true); setVues((v) => new Set(v).add('vinted')); setEtape('relier'); }}>Ouvrir Vinted — nouvelle annonce ↗</Bouton></div>
         {/* (6 nov., vague 2 · point 1) Une vente annulée avant l'envoi : l'ancienne annonce est FERMÉE
