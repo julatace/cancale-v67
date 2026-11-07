@@ -68790,7 +68790,7 @@ function NumeroEcritSetting({ onAnnonces }) {
             {z.contredits > 0 && <>{' · '}<span data-ne-n="contredits" style={{color:C.warn}}><b>{z.contredits}</b> à vérifier</span></>}
             {z.autres > 0 && <>{' · '}<span data-ne-n="autres"><b>{z.autres}</b> pas pris</span></>}
             <span style={{color:C.muted}}> sur {z.total}</span>
-            {a.doublons.length > 0 && <div data-numero-ecrit-doublons={a.doublons.length} style={{color:C.danger,fontWeight:600}}>{a.doublons.map((d) => `N°${d.cle}`).join(', ')} : sur deux annonces en ligne.</div>}
+            {a.doublons.length > 0 && <div data-numero-ecrit-doublons={a.doublons.length} style={{color:C.doublon,fontWeight:600}}>{a.doublons.map((d) => `N°${d.cle}`).join(', ')} : sur deux annonces en ligne.</div>}
             {amb.length > 0 && <div style={{fontSize:12,color:C.muted}}>Deux numéros : {liste(amb)}</div>}
             {con.length > 0 && <div style={{fontSize:12,color:C.muted}}>N° écrit ≠ N° de VRM : {liste(con)}</div>}
           </div>

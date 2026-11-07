@@ -73,7 +73,7 @@ const NOMS_APP = ['cleNum', 'refVRMDe', 'NUM_OK', 'marqueurNumerotation', 'archi
 const srcApp = NOMS_APP.map((n) => extraire(APP, n, 'App.jsx')).join('\n');
 const ctxApp = {};
 vm.createContext(ctxApp);
-essaie('les règles de l\'app se chargent', () => vm.runInContext('const load = (k, d) => d;\n' + srcApp + `\n;this.R = { cleNum, suggestionsPaires, clesAnnonceLbc, comptesLbcProuves, annonceLbcALui, doublesVenteLbc };`, ctxApp));
+essaie('les règles de l\'app se chargent', () => vm.runInContext('const load = (k, d) => d;\n' + '/* (7 nov.) « Je numérote moi-même » ÉTEINT : src/numeroEcrit.js, jugé par audit-numero-ecrit */ const numeroEcritLbc = () => ""; const numeroEcritActif = () => false;\n' + srcApp + `\n;this.R = { cleNum, suggestionsPaires, clesAnnonceLbc, comptesLbcProuves, annonceLbcALui, doublesVenteLbc };`, ctxApp));
 const R = ctxApp.R || {};
 
 // ── LES RÈGLES DE L'EXTENSION ────────────────────────────────────────────────
