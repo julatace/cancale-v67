@@ -189,3 +189,5 @@ html .vrm-stats-vitrine .vrm-sv-rangee > .vrm-sv-repliee { align-self: start; }
   .vrm-stats-vitrine .vrm-sv-carte-tete { flex-wrap: wrap; row-gap: 2px; }
   .vrm-stats-vitrine .vrm-sv-carte-tete .vrm-sv-note { white-space: normal; flex-basis: 100%; }
 }
+/* (7 nov.) « CA depuis le début » : une 5e case, sur toute la largeur sous les quatre. */
+.vrm-stats-vitrine .vrm-sv-tuiles > [data-sv-tuile="total"] { grid-column: 1 / -1; }

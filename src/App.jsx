@@ -17866,7 +17866,7 @@ function BottomBar({tab,setTab,sites,badges}) {
           <span className="vrm-nav-label">{lib}</span>
         </button>
       );})}
-      <MenuEcrans tab={tabMontre} setTab={(v)=>{ if(typeof v==='function'){ setTab(v); return; } allerA(v); }} bottom sites={sites} badges={badgesBarre} ouvert={plusOuvert} setOuvert={setPlusOuvert}/>
+      <MenuEcrans tab={tab} setTab={setTab} bottom sites={sites} badges={badgesBarre} ouvert={plusOuvert} setOuvert={setPlusOuvert}/>
     </nav>
     </>
   );
@@ -41292,6 +41292,21 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
     : tuile('vendu', 'Vendu', `${partielVendu ? 'au moins ' : ''}${fmt(V.eur)}`,
       <>{pl(V.n, 'vente')}{V.ecart != null && !partielVendu ? <span title={`Comparé à ${nomPrec}${auMemePoint ? ', au même jour' : ''} : ${fmt(V.prec.eur)}`}>{` · ${V.ecart > 0 ? '+' : ''}${V.ecart} % par rapport à ${nomPrec}`}</span> : null}{manque.length ? ` · sans ${manque.join(', ')}` : ''}{ncPeriode.length ? ` · ${ncPeriode.length} non comptée${ncPeriode.length > 1 ? 's' : ''}` : ''}</>,
       { 'data-sv-etat': 'lu', 'data-sv-n': V.n, 'data-sv-eur': cents(V.eur), 'data-sv-prec': cents(V.prec.eur), 'data-sv-ecart': V.ecart == null ? '' : V.ecart, 'data-sv-partiel': partielVendu ? '1' : '0', 'data-sv-non-comptees': ncPeriode.length || undefined }, ncPeriode.length ? `Pas dans ce montant : ${phraseNonComptees(ncPeriode)}` : undefined);
+  // (7 nov., demande de Julien) LE CA DEPUIS LE DÉBUT : la MÊME source que « Vendu »
+  // (`ventesFaites`, date de vente, toutes plateformes, comptes sélectionnés), sans borne
+  // de date. Un site pas lu ou une vente dont l'argent ne se lit pas ⇒ « au moins » (§5) ;
+  // pas lu ⇒ « — ». La date de la première vente lue dit d'où part le total.
+  const tTotal = (() => {
+    if (vendu == null) return tuile('total', 'CA depuis le début', '—', vendu === null ? 'ventes pas pu être lues' : 'je lis tes ventes…', { 'data-sv-etat': vendu === null ? 'passu' : 'encours' });
+    let n = 0, c = 0, premier = null;
+    for (const l of vendu) { if (!l || !isFinite(l.ts) || !(l.ts > 0) || !isFinite(Number(l.eur))) continue; n += 1; c += Math.round(Number(l.eur) * 100); if (premier == null || l.ts < premier) premier = l.ts; }
+    const ncTout = nonCompteesDe(liveStats && liveStats.venduNonComptees, 0, Infinity);
+    const partiel = manque.length > 0 || ncTout.length > 0;
+    const depuis = premier != null ? ` · depuis le ${new Date(premier).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}` : '';
+    return tuile('total', 'CA depuis le début', n === 0 && !partiel ? '0,00 €' : `${partiel ? 'au moins ' : ''}${fmt(c / 100)}`, n === 0 ? 'aucune vente lue pour l’instant' : <>{pl(n, 'vente')}{depuis}</>,
+      { 'data-sv-etat': 'lu', 'data-sv-n': n, 'data-sv-eur': String(c), 'data-sv-partiel': partiel ? '1' : '0' },
+      'Toutes tes ventes, toutes plateformes, à la date de la vente (comme « Vendu »), depuis la première que VRM a lue.');
+  })();
   const tBenef = (() => {
     if (b.type === 'semaine') {
       const R = chiffreBrut(B);
@@ -41349,7 +41364,7 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
   return (
     <div className="vrm-stats-vitrine" data-sv-periode={b.type} data-sv-de={b.de} data-sv-a={b.a}>
       <div className="vrm-sv-sous-titre" data-sv-sous-titre="">{titrePeriodeStats(b)}{auMemePoint ? <span className="vrm-sv-note"> · au même jour</span> : null}</div>
-      <div className="vrm-sv-tuiles">{tVendu}{tBenef}{tDelai}{tEnLigne}</div>
+      <div className="vrm-sv-tuiles">{tVendu}{tBenef}{tDelai}{tEnLigne}{tTotal}</div>
       <div className="vrm-sv-rangee vrm-sv-rangee-3">
         {carte('sv-barres', titreBarres, noteBarres, !barres
           ? vide(vendu === null ? 'Tes ventes n’ont pas pu être lues : aucune barre.' : 'Je lis tes ventes…')
