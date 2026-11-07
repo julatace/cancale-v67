@@ -219,7 +219,7 @@ body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
 :root:root body .vrm-app-shell .vrm-main .vrm-colis-carte .vrm-colis-photo > :is(img, picture, svg) { border-radius: inherit; }
 .vrm-colis-logo-transp {
   position: absolute; right: -5px; bottom: -5px; z-index: 1; display: grid; place-items: center;
-  width: 24px; height: 24px; border-radius: 7px; background: var(--d-carte);
+  width: 24px; height: 24px; border-radius: var(--d-r-num); background: var(--d-carte);
   box-shadow: 0 0 0 2px var(--d-carte), 0 1px 3px rgba(0,0,0,.18); pointer-events: none;
 }
 .vrm-colis-logo-transp > [data-transporteur-logo] { width: 22px !important; height: 22px !important; border-radius: 6px !important; box-shadow: none !important; }
@@ -227,7 +227,7 @@ body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
 /* À retirer : la vignette d'une rangée (48 px) porte le même badge, un cran plus petit. */
 .vrm-rpf-vignette { position: relative; overflow: visible !important; }
 .vrm-rpf-vignette > .vrm-colis-logo-transp { right: -4px; bottom: -4px; width: 20px; height: 20px; border-radius: 6px; }
-.vrm-rpf-vignette > .vrm-colis-logo-transp > [data-transporteur-logo] { width: 18px !important; height: 18px !important; border-radius: 5px !important; }
+.vrm-rpf-vignette > .vrm-colis-logo-transp > [data-transporteur-logo] { width: 18px !important; height: 18px !important; border-radius: var(--d-r-num) !important; }
 .vrm-rpf-vignette > :is(img, picture) { border-radius: inherit; }
 /* La vignette sans photo : un dessin à peine visible, pas un cadre. */
 :root:root body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-carte .vrm-colis-photo:not(:has(img)) { background: var(--d-case) !important; }
