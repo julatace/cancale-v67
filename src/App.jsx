@@ -58771,6 +58771,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {neufsOuverts && blocNouveaux()}
             </>);
           })()}
+          {blocNumeroEcrit()}
           {aVerifierCarton.length > 0 && (
           <details data-numeros-a-verifier={aVerifierCarton.length} className="vrm-repli" open style={{ background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn || '#B25000'}`, borderRadius: 12, padding: '4px 12px 10px', marginBottom: 12 }}>
             <summary style={{ fontSize: 15, fontWeight: 700, color: C.text }}>
@@ -59189,7 +59190,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </div>
           );
         })()}
-        {blocNumeroEcrit()}
         {blocMasquees()}
         {/* Compte bloqué par Vinted : détecté à la synchro (401/403). Ses annonces
             sont retirées automatiquement — on te dit lequel et tu peux le retirer. */}
