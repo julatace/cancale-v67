@@ -17,9 +17,11 @@
 
 const ok = (n) => Number.isFinite(n) && n > 0;
 
-export function prochainGesteAnnonces({ aVerifier, sansNum, prixConnus, prixTotal, dorment } = {}) {
+// (7 nov.) `ecrit` : le vendeur numérote LUI-MÊME dans ses annonces (src/numeroEcrit.js) — VRM ne
+// donne aucun N° : le geste est de l'écrire dans l'annonce.
+export function prochainGesteAnnonces({ aVerifier, sansNum, prixConnus, prixTotal, dorment, ecrit = false } = {}) {
   if (ok(aVerifier)) return { cle: 'verifier', n: aVerifier, texte: 'Vérifie les numéros sur l’étiquette, avant d’imprimer.', bouton: 'Vérifier' };
-  if (ok(sansNum)) return { cle: 'sansnum', n: sansNum, texte: sansNum > 1 ? 'Des annonces n’ont pas de numéro : donne-leur un N°.' : 'Une annonce n’a pas de numéro : donne-lui un N°.', bouton: 'Voir' };
+  if (ok(sansNum)) return { cle: 'sansnum', n: sansNum, texte: ecrit ? (sansNum > 1 ? 'Des annonces n’ont pas de numéro : écris-le à la fin de leur description.' : 'Une annonce n’a pas de numéro : écris-le à la fin de sa description.') : (sansNum > 1 ? 'Des annonces n’ont pas de numéro : donne-leur un N°.' : 'Une annonce n’a pas de numéro : donne-lui un N°.'), bouton: 'Voir' };
   if (Number.isFinite(prixTotal) && prixTotal > 0 && Number.isFinite(prixConnus) && prixConnus < prixTotal) {
     const manque = prixTotal - prixConnus;
     return { cle: 'prix', n: manque, texte: `Prix d’achat ${prixConnus}/${prixTotal} connus : ton bénéfice n’est qu’un minimum.`, bouton: 'Compléter' };

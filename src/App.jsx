@@ -58789,7 +58789,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // (6 nov.) LE PROCHAIN GESTE EN TÊTE (src/prochainGesteAnnonces.js) : un geste, celui
             // qui compte le plus, avec son bouton — sur la liste de toujours (pas dans une vue filtrée).
             const geste = annSort === 'oldest' && !annSearch.trim() && listings.items && !listings.error
-              ? prochainGesteAnnonces({ aVerifier: aVerifierCarton.length, sansNum: annStats.sansNum, prixConnus: n, prixTotal: m, dorment: annStats.sleeping })
+              ? prochainGesteAnnonces({ aVerifier: aVerifierCarton.length, sansNum: annStats.sansNum, prixConnus: n, prixTotal: m, dorment: annStats.sleeping, ecrit: numeroEcritActif() })
               : null;
             const faireGeste = () => {
               if (!geste) return;
