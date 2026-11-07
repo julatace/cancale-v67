@@ -76,7 +76,7 @@ export function moisVinted(m) {
 // Le décalage de Paris (en minutes) à une date donnée — sans bibliothèque.
 function decalageParis(ms) {
   try {
-    const f = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Paris', hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+    const f = globalThis.__vrmFmtLitiges || (globalThis.__vrmFmtLitiges = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Paris', hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }));
     const p = Object.fromEntries(f.formatToParts(new Date(ms)).map((x) => [x.type, x.value]));
     const local = Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day), Number(p.hour) % 24, Number(p.minute));
     return Math.round((local - ms) / 60000);

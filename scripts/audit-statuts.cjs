@@ -82,7 +82,7 @@ const C = { warn: '#a', danger: '#b', muted: '#c', blue: '#d', accent: '#e' };
 const APP_NOMS = ['classifyOrderStatus', 'isAtRelayStatus', 'ACHAT_A_RENVOYER', 'isAwaitingShipStatus', 'needsBordereau', 'PAS_UN_ENVOI', 'tusDe', 'TXN_ETATS', 'noterEtatsTxn', 'etatTxn', 'txnBloqueEnvoi', 'SS_PARTI', 'txnAnnuleeAvantEnvoi', 'COLIS_DEJA_BOUGE', 'aExpedier', 'joursAvantLimiteFr', 'DELAI_EXPEDITION_J', 'limiteExpedition'];
 // (22 oct.) La date limite d'envoi vit dans api/_lib/limite-envoi.js, importée
 // par l'app ET le serveur (§11) : l'audit suit la règle jusqu'à sa définition.
-const LIMITE_NOMS = ['DELAI_EXPEDITION_J', 'FUSEAU', 'J', '_fmt', 'partsParis', 'jourParis', 'jourDecale', 'ecartJours', 'instantParis', 'finDuJour', 'lireDateLimite', 'limiteExpedition', 'echeanceLimite'];
+const LIMITE_NOMS = ['DELAI_EXPEDITION_J', 'FUSEAU', 'J', '_fmt', 'partsParis', 'partsParisCalc', 'jourParis', 'jourDecale', 'ecartJours', 'instantParis', 'finDuJour', 'lireDateLimite', 'limiteExpedition', 'echeanceLimite'];
 const lim = charge('api/_lib/limite-envoi.js', LIMITE_NOMS, {}, { sourceType: 'module', plugins: [] });
 const app = charge('src/App.jsx', APP_NOMS, lim);
 for (const n of ['DELAI_EXPEDITION_J', 'limiteExpedition']) if (app[n] === undefined && lim[n] !== undefined) app[n] = lim[n];

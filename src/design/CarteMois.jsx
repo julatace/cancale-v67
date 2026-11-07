@@ -64,14 +64,27 @@ export default function CarteMois({ surtitre, valeur, sous = null, cases = [], c
   useLayoutEffect(() => {
     const el = grandRef.current;
     if (!el) return undefined;
+    // (7 nov., vitesse) Avant : une boucle qui baissait d'1 px et relisait la mise
+    // en page à chaque tour (jusqu'à 16 recalculs par carte, et à chaque
+    // redimensionnement) — ~1,3 s de gel mesuré au téléphone. Maintenant : une
+    // règle de trois sur la largeur, une seule correction au plus, et rien si la
+    // largeur n'a pas changé.
+    let derniere = -1;
     const ajuste = () => {
+      const largeur = el.clientWidth;
+      if (largeur === derniere) return;
+      derniere = largeur;
       el.style.fontSize = '';
-      let fs = parseFloat(getComputedStyle(el).fontSize) || 38;
-      while (el.scrollWidth > el.clientWidth + 0.5 && fs > 22) { fs -= 1; el.style.fontSize = fs + 'px'; }
+      const base = parseFloat(getComputedStyle(el).fontSize) || 38;
+      const sw = el.scrollWidth;
+      if (!(sw > largeur + 0.5) || largeur <= 0) return;
+      let fs = Math.max(22, Math.floor(base * largeur / sw));
+      el.style.fontSize = fs + 'px';
+      if (el.scrollWidth > el.clientWidth + 0.5 && fs > 22) { fs = Math.max(22, fs - 2); el.style.fontSize = fs + 'px'; }
     };
     ajuste();
     if (typeof ResizeObserver === 'undefined') return undefined;
-    const ro = new ResizeObserver(ajuste);
+    const ro = new ResizeObserver(() => ajuste());
     ro.observe(el.parentElement || el);
     return () => ro.disconnect();
   }, [valeur, vide]);

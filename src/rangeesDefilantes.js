@@ -15,14 +15,17 @@ function juger(el) {
   } catch (_) {}
 }
 
+// (7 nov., vitesse) Regroupé : au plus une mesure toutes les 300 ms (avant : à
+// CHAQUE changement de la page, une relecture de mise en page de toutes les
+// rangées — 1,1 s de gel mesuré au téléphone pendant l'ouverture de Colis).
 let prevu = false;
 function toutJuger() {
   if (prevu) return;
   prevu = true;
-  requestAnimationFrame(() => {
+  setTimeout(() => requestAnimationFrame(() => {
     prevu = false;
     try { document.querySelectorAll(SEL).forEach(juger); } catch (_) {}
-  });
+  }), 300);
 }
 
 export function suivreRangeesDefilantes() {

@@ -22786,7 +22786,18 @@ function autoRemplirAttributs(attributs, { titre, marque, taille, faits = {} }) 
 // 18:00 UTC.
 const FUSEAU_PARIS = 'Europe/Paris';
 let _fmtParis = null;
+// (7 nov., vitesse) Mémoire à la minute (le résultat est à la minute).
+const _memoPartsParis = new Map();
 function partsParis(ms) {
+  const cle = Math.floor(ms / 60000);
+  const vu = _memoPartsParis.get(cle);
+  if (vu) return { ...vu };
+  const r = partsParisCalc(ms);
+  if (_memoPartsParis.size > 20000) _memoPartsParis.clear();
+  _memoPartsParis.set(cle, r);
+  return { ...r };
+}
+function partsParisCalc(ms) {
   if (!_fmtParis) _fmtParis = new Intl.DateTimeFormat('fr-FR', { timeZone: FUSEAU_PARIS, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
   const o = {};
   for (const p of _fmtParis.formatToParts(new Date(ms))) o[p.type] = p.value;
@@ -51994,13 +52005,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const ventilationDeTx = (tx) => { const r = indexRecusAchat.get(String(tx)); return r ? ventilationRecuAchat(r.texte) : null; };
   const propositionsPrix = useMemo(() => {
     const lignes = [];
+    // (7 nov., vitesse) Les clés photo des achats sont calculées UNE fois et
+    // rangées par clé : chaque vente ne regarde plus que les achats de SA photo
+    // (avant : toutes les ventes × tous les achats, ~4 s de gel au téléphone).
+    // Même règle d'identité (`achatParIdentite` reçoit exactement les achats
+    // de cette clé, dans le même ordre).
     const cleDePhoto = (a) => photoKey(orderPhoto(a));
+    const clesAchat = new Map();
+    const cleMemo = (a) => { let k = clesAchat.get(a); if (k === undefined) { k = cleDePhoto(a) || ''; clesAchat.set(a, k); } return k; };
+    const parPhoto = new Map();
+    for (const a of (Array.isArray(achatsIdentite) ? achatsIdentite : [])) { if (!a) continue; const k = cleMemo(a); if (!k) continue; const l = parPhoto.get(k); if (l) l.push(a); else parPhoto.set(k, [a]); }
+    const prisBase = new Set(linkedBuyIds);
     const unePour = (e, photo, venteTx, venteDate, annulee) => {
       const prixConnu = !!(e && e.buyPrice != null && String(e.buyPrice).trim() !== '');
       if (prixConnu || annulee) return null;
       const lie = e && e.buyFromId ? achatRelie(e) : null;
-      const pris = new Set(linkedBuyIds); if (e && e.buyFromId) pris.delete(String(e.buyFromId));
-      const identite = achatParIdentite({ lie, photo, venteTx, venteDate, achats: achatsIdentite, cleDePhoto, pris });
+      const sien = e && e.buyFromId ? String(e.buyFromId) : '';
+      const pris = sien && prisBase.has(sien) ? { has: (x) => x !== sien && prisBase.has(x) } : prisBase;
+      const achats = Array.isArray(achatsIdentite) ? (parPhoto.get(photo) || []) : achatsIdentite;
+      const identite = achatParIdentite({ lie, photo, venteTx, venteDate, achats, cleDePhoto: cleMemo, pris });
       return propositionPrixAchat({ prixConnu, annulee, identite, ventilationDe: ventilationDeTx, estLot: estLotPropose });
     };
     const ventes = [...(sales.items || [])].sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
@@ -53256,9 +53279,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // avec le numéro d'une AUTRE paire, donc la mauvaise chaussure dans le carton.
   // Le chemin par la transaction (bordereau → vente moissonnée → annonce
   // numérotée) est une identité, pas une ressemblance : il passe devant.
-  const numFromTxn = (b) => {
+  function numFromTxn(b) {
     if (!b || b.transaction == null) return '';
-    const so = (sales.items || []).find(o => String(o.transaction_id) === String(b.transaction));
+    // (7 nov., vitesse) Index par transaction, refait seulement quand la liste change
+    // (avant : un balayage de toutes les ventes PAR bordereau, à chaque rendu).
+    const items = sales.items || [];
+    if (numFromTxn._items !== items) { const m = new Map(); for (const o of items) { const k = String(o.transaction_id); if (!m.has(k)) m.set(k, o); } numFromTxn._items = items; numFromTxn._m = m; }
+    const so = numFromTxn._m.get(String(b.transaction));
     if (!so) return '';
     const e = effEntry(so);
     return e && e.numero ? String(e.numero) : '';
