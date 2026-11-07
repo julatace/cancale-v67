@@ -16,6 +16,7 @@ import { routeSms } from './_lib/sms-mondialrelay.js';
 import { suiviDeLigne, finDeLigne, finsDesLignes, sortiParSuivis, arriveesDeLigne, relireLigneMeta, SELECT_SUIVI_META, SELECT_TRANSP_META, ligneTranspDeMeta, leverGarde } from './_lib/suivi-colis.js';
 import { preuveDeTransp, contredit } from './_lib/etat-colis.js';
 import { ordreStable } from './_lib/ordre-stable.js';
+import { vendeurParIndex, ecrireIndexJeton } from './_lib/jeton-index.js';
 // api/widget.js
 // ────────────────────────────────────────────────────────────────────────────
 // DONNÉES DU WIDGET écran d'accueil (app Scriptable sur iPhone).
@@ -110,6 +111,21 @@ async function ownerDuToken(req, res) {
     return null;
   }
   if (!cl) return ''; // une seule boutique : rien ne change
+  const given = String((req.query && (req.query.k || req.query.key)) || req.headers['x-vrm-key'] || '');
+  // (7 nov., audit « 1 000 vendeurs ») L'INDEX DES JETONS (api/_lib/jeton-index.js) :
+  //    une ligne lue par sa clé exacte au lieu de TOUTES les lignes `main`.
+  //    L'index ne fait jamais foi seul : le jeton est re-comparé (durée
+  //    constante) à celui du `main` du vendeur désigné. Sans index (jeton
+  //    d'avant, ou jeton neuf) ⇒ l'ancienne recherche UNE fois, puis l'index.
+  if (given) {
+    const idx = await vendeurParIndex({ url: SUPABASE_URL, headers: HEADERS, genre: 'widget', jeton: given });
+    if (idx === undefined) {
+      res.status(503).json({ erreur: 'base-injoignable', message: "Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui échoue." });
+      return null;
+    }
+    if (idx.etat === 'trouve') return idx.owner;
+    if (idx.etat === 'perime') { res.status(401).json({ error: 'cle invalide' }); return null; }
+  }
   // ⚠️ (1er nov., VRM vendu à d'autres — §4.5) SUPABASE PLAFONNE UNE RÉPONSE À
   //    1 000 LIGNES SANS LE DIRE. Une seule lecture de toutes les lignes `main`
   //    ne voyait que les 1 000 premiers vendeurs : au-delà, la clé du widget
@@ -134,10 +150,14 @@ async function ownerDuToken(req, res) {
     res.status(503).json({ erreur: 'base-injoignable', message: "Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui échoue." });
     return null;
   }
-  const given = String((req.query && (req.query.k || req.query.key)) || req.headers['x-vrm-key'] || '');
   // Un vendeur dont la clé est posée : elle doit correspondre à LA SIENNE.
   const parCle = mains.find((m) => m.vrm_widget_token && memeToken(given, m.vrm_widget_token));
-  if (parCle) return parCle.owner || '';
+  if (parCle) {
+    // Transition : la prochaine fois, l'index (une écriture ratée ne coûte
+    // qu'une nouvelle recherche au passage suivant, jamais la réponse).
+    if (parCle.owner) await ecrireIndexJeton({ url: SUPABASE_URL, headers: HEADERS, genre: 'widget', jeton: given, owner: parCle.owner });
+    return parCle.owner || '';
+  }
   // Aucune correspondance. Un seul vendeur, pas encore de clé → on le sert
   // (transition) ; sinon (clé fausse, ou plusieurs vendeurs) → fermé.
   if (mains.length === 1 && !mains[0].vrm_widget_token) return mains[0].owner || '';
