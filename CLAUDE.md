@@ -510,6 +510,7 @@ sans la fonction.
 
 - **7 nov. · Vitesse au téléphone** : Colis 20 → 6-9 s de gel, Ma journée 11,6 → 3,0 s (CPU ×4) — formateurs de dates créés une fois, `UneLigne` mesurée en groupe, règles d'identité mémorisées pour UN calcul (`memoRendu`), index des suivis ; reste : `Comptabilite` remonté à chaque écran (découpage) et `email_track` lu en entier. `docs/passation/2026-11-07-vitesse.md`. Geste : aucun.
 - **7 nov. · Colis sans réseau : intégration** : branche `claude/attente-v36-hors-reseau` fusionnée ; purge à 90 jours des `mesures_jour_*` du propriétaire au cron du matin (`purgerMesuresAnciennes`, lecture `select=id` paginée, jour lu dans l'id, lecture ratée ⇒ rien supprimé ; `audit-purge-mesures` + `--prouve`). `docs/passation/2026-11-06-hors-reseau.md` §Purge. Geste : couper le réseau sur l'iPhone et rouvrir Colis.
+- **7 nov. · Charge 1 000 vendeurs** : pages triées, jeton widget/SMS par index, `mesures_jour_` en 16 éclats, offres mini bornées, 503 sans clé de service, cron par lots (curseur). `docs/passation/2026-11-07-charge-1000.md`. Geste : migration 026.
 
 - **6 nov. · Audit des chiffres** : « à imprimer » = pas encore imprimés partout (`compteAImprimer`), Tournée « à déposer » = avec bordereau, widget sans colis sans n° (15→12) ; banc `chiffres-coherents`. `docs/passation/2026-11-06-audit-chiffres.md`. Geste : aucun.
 

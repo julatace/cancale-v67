@@ -18,6 +18,7 @@
  *
  *   node scripts/audit-sms-colis.cjs
  */
+process.env.SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'cle-service-audit';   // (7 nov.) sans elle, les routes serveur répondent 503 (api/_lib/cle-service.js)
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
