@@ -22299,7 +22299,7 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre: titreNom, numTitr
       <span className="vrm-ledger-photo-empty">{photoNoeud || <PhotoVente src={photo} size={46} portrait/>}</span>
       {fusion ? <span className="vrm-fu-vente-txt">
         <span className="vrm-fu-vente-l1"><span className="vrm-fu-vente-nom">{fusion.nom || '(sans titre)'}</span><span className="vrm-fu-vente-prix" aria-hidden="true">{fusion.prix || montant}</span></span>
-        <span className="vrm-fu-vente-l2">{fusion.num ? <Numero n={fusion.num} taille="petit" data-fu-num=""/> : null}<span className="vrm-fu-site" data-site={fusion.site || plateforme}>{fusion.siteNom || ''}</span>{compte !== undefined ? <span className="vrm-fu-vente-compte" data-fu-compte="">· <CompteVente compte={compte} plateforme={plateforme} ou="ligne-court"/></span> : null}{fusion.taille ? <span className="vrm-fu-vente-taille" data-fu-taille={fusion.taille}>· {fusion.taille}</span> : null}</span>
+        <span className="vrm-fu-vente-l2">{fusion.num ? <Numero n={fusion.num} taille="petit" data-fu-num=""/> : null}<span className="vrm-fu-site" data-site={fusion.site || plateforme}>{fusion.siteNom || ''}</span>{fusion.transp && fusion.transp.cle ? <span className="vrm-fu-vente-transp" title={fusion.transp.nom || ''} aria-label={fusion.transp.nom || ''} data-fu-transp-ligne={fusion.transp.cle}><LogoTransporteur cle={fusion.transp.cle} taille={16}/></span> : null}{compte !== undefined ? <span className="vrm-fu-vente-compte" data-fu-compte="">· <CompteVente compte={compte} plateforme={plateforme} ou="ligne-court"/></span> : null}{fusion.taille ? <span className="vrm-fu-vente-taille" data-fu-taille={fusion.taille}>· {fusion.taille}</span> : null}</span>
         <span className="vrm-fu-vente-l3" data-ton={ton || undefined}>{etatNoeud || etat}</span>
       </span> : null}
       <span className="vrm-ledger-sale-title" title={titre}><span className="vrm-ledger-sale-nom">{numTitre ? <><Numero n={numTitre} taille="petit" data-titre-num=""/>{' '}{titreNom || '(sans titre)'}</> : (titre || '(sans titre)')}</span>{(sous || compte !== undefined) ? <span className="vrm-ledger-sale-sous" data-vente-sous=""><CompteVente compte={compte} plateforme={plateforme} ou="ligne"/>{compte !== undefined && sous ? ' · ' : ''}{sous}</span> : null}</span>
@@ -56639,7 +56639,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // pas de carte encadrée séparée — style démo, comme Achats).
               <LigneVenteCompacte montantCentimes={sell!=null?Math.round(sell*100):undefined} numerosArticle={num?[num]:[]} plateforme="vinted" photo={photo} photoNoeud={photo?<PhotoVenteSources {...photoSourcesProps} data-photo-vente="ligne" style={{width:28,height:36,borderRadius:12,objectFit:'cover',flexShrink:0}}/>:null} titre={(()=>{ const t=String((e&&e.size)||o.size||'').trim(); const nom=t&&!tailleDansTitre(o.title,t)?`${o.title} · taille ${t}`:o.title; return nom; })()} numTitre={num||''}
                 {...gp} benef={benefLigne} recap={recapVente} data-depose-attente={deposeIci?'1':undefined}
-                data-fu-ligne="" fusion={{ prix: montant(sell, { devise: o.price?.currency_code || 'EUR' }), nom: String(o.title||'').replace(/[\s,·-]*(?:taille|t\.?)\s*[\d.,/ ]+(?:\s*(?:eu|fr|us|uk))?\s*$/i,'').trim() || o.title, num, site: 'vinted', siteNom: 'Vinted', taille: String((e&&e.size)||o.size||'').trim() || ((String(o.title||'').match(/taille\s*([\d.,/]+)/i)||[])[1]||'') }} frise={<>{fuEtapes ? <Frise etapes={fuEtapes} cle={txL} className="vrm-fu-ligne-frise" label="Où en est la vente"/> : null}{(o._fromEmail ? o._txMail : o.transaction_id != null) ? <FactureVenteLigne deps={DEPS_FACTURE} vente={{ tx: String(o._fromEmail ? o._txMail : o.transaction_id), uid: o._acc && o._acc.vinted_user_id, compte: o._acc && o._acc.login, titre: o.title || '', venteLe: o.date || '', commandes: commandesParTx.get(String(o._fromEmail ? o._txMail : o.transaction_id)) || [] }}/> : null}</>}
+                data-fu-ligne="" fusion={{ transp: peutDeposer ? null : fuTransp, prix: montant(sell, { devise: o.price?.currency_code || 'EUR' }), nom: String(o.title||'').replace(/[\s,·-]*(?:taille|t\.?)\s*[\d.,/ ]+(?:\s*(?:eu|fr|us|uk))?\s*$/i,'').trim() || o.title, num, site: 'vinted', siteNom: 'Vinted', taille: String((e&&e.size)||o.size||'').trim() || ((String(o.title||'').match(/taille\s*([\d.,/]+)/i)||[])[1]||'') }} frise={<>{fuEtapes ? <Frise etapes={fuEtapes} cle={txL} className="vrm-fu-ligne-frise" label="Où en est la vente"/> : null}{(o._fromEmail ? o._txMail : o.transaction_id != null) ? <FactureVenteLigne deps={DEPS_FACTURE} vente={{ tx: String(o._fromEmail ? o._txMail : o.transaction_id), uid: o._acc && o._acc.vinted_user_id, compte: o._acc && o._acc.login, titre: o.title || '', venteLe: o.date || '', commandes: commandesParTx.get(String(o._fromEmail ? o._txMail : o.transaction_id)) || [] }}/> : null}</>}
                 bas={o._venteEmail ? <NoteVenteEmail o={o}/> : peutDeposer ? <>
                   {/* (2 nov., 22 h 30) Une vente à expédier porte TOUJOURS la rangée de la maquette : la puce du
                       transporteur et le bouton bordereau (« Imprimer le bordereau » si le PDF est là, sinon
@@ -70739,7 +70739,8 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
         if (!id) continue;
         out.push({ cle: 'leboncoin:' + id, site: 'leboncoin', id, titre: v.title || '(sans titre)', t: ts(v.dateVente) ?? ts(v.txId ? dates[v.txId] : null),
           prix: v.price != null ? euro(Number(v.price) / 100) : null, devise: 'EUR',
-          etat: lbcFinalisee(v) ? 'Finalisée' : 'En cours', compte: compteVenteLbc(v, null, annLbc) || '', num: numeroLbcIdentite(v, null, liens), photo: photoArticle(v) || null });
+          etat: lbcFinalisee(v) ? 'Finalisée' : 'En cours', compte: compteVenteLbc(v, null, annLbc) || '', num: numeroLbcIdentite(v, null, liens), photo: photoArticle(v) || null,
+          tr: transporteurDuColis({ declare: v.deliveryMethod || v.deliveryLabel || '' }) });
       }
     }
     if (voit('ebay') && ebayTous && Array.isArray(ebayTous.items)) {
@@ -70761,7 +70762,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
         const recuVc = montantRecuVc(v);
         out.push({ cle: 'vestiaire:' + id, site: 'vestiaire', id, titre: v.titre || v.title || 'Vente Vestiaire', t: ts(v.date) ?? ts(v.premiereVue),
           prix: recuVc && recuVc.eur != null ? recuVc.eur : null, devise: 'EUR', etat: v.aExpedier ? L.aEnvoyer : (v.etat || ''), compte: nomCompteVente('vestiaire', v, {}),
-          num: numVcVente(v, vc.liens, numerosVcEffectifs()), photo: photoArticle(v) || null });
+          num: numVcVente(v, vc.liens, numerosVcEffectifs()), photo: photoArticle(v) || null, tr: transporteurDuColis({ declare: v.transporteur || '', suivi: v.suivi || '' }) });
       }
     }
     // La plus récente d'abord ; une vente sans date lue va à la fin (jamais datée au hasard).
@@ -70860,12 +70861,12 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
                 <span className="vrm-toutes-titre" aria-hidden="true" style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ display: 'block', fontSize: 15, fontWeight: 600, lineHeight: 1.3, overflowWrap: 'anywhere' }}>{l.titre}</span>
                   <span className="vrm-toutes-meta" style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    <span data-toutes-site=""><LogoSite site={l.site}/>{NOM[l.site]}</span>{l.compte ? <> · <span className="vrm-sensible">{l.compte}</span></> : null} · {jour(l.t)}
+                    <span data-toutes-site=""><LogoSite site={l.site}/>{NOM[l.site]}</span>{l.tr && l.tr.cle ? <span className="vrm-toutes-transp" data-toutes-transp={l.tr.cle} title={l.tr.nom || ''}> · <LogoTransporteur cle={l.tr.cle} taille={14}/></span> : null}{l.compte ? <> · <span className="vrm-sensible">{l.compte}</span></> : null} · {jour(l.t)}
                   </span>
                   {/* (5 nov., revue 2.13) L'état sur SA ligne au téléphone : jamais coupé par l'ellipse de la ligne du dessus. */}
                   {l.etat ? <span className="vrm-toutes-etat" data-toutes-etat={motEtatVente(l.etat)} data-ton={geste(l) ? 'action' : undefined}>{motEtatVente(l.etat)}</span> : null}
                 </span>
-                <span className="vrm-toutes-bureau" aria-hidden="true"><span><b className="vrm-toutes-bureau-site"><LogoSite site={l.site}/>{NOM[l.site]}</b>{l.compte&&<small className="vrm-sensible">{l.compte}</small>}</span><span>{jour(l.t)}</span><span data-ton={geste(l) ? 'action' : undefined}>{l.etat ? motEtatVente(l.etat) : PAS_SU.vide}</span></span>
+                <span className="vrm-toutes-bureau" aria-hidden="true"><span><b className="vrm-toutes-bureau-site"><LogoSite site={l.site}/>{NOM[l.site]}{l.tr && l.tr.cle ? <span className="vrm-toutes-transp" title={l.tr.nom || ''}><LogoTransporteur cle={l.tr.cle} taille={16}/></span> : null}</b>{l.compte&&<small className="vrm-sensible">{l.compte}</small>}</span><span>{jour(l.t)}</span><span data-ton={geste(l) ? 'action' : undefined}>{l.etat ? motEtatVente(l.etat) : PAS_SU.vide}</span></span>
                 <span className="vrm-toutes-montant" aria-hidden="true" style={{ flexShrink: 0, textAlign: 'right' }}>
                   {l.prix != null && <span data-toutes-prix="" style={{ display: 'block', fontSize: 15, fontWeight: 700 }}>{prix(l)}</span>}
                   {l.num ? <span data-toutes-num={l.num} style={{ display: 'block', marginTop: 4 }}><Numero n={l.num} taille="petit"/></span> : null}

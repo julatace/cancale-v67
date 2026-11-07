@@ -248,3 +248,7 @@ html body .vrm-main input.vrm-autre-num{width:118px!important;flex:0 0 118px!imp
  html body .vrm-main .vrm-msg-bar .vrm-inbox-filters::-webkit-scrollbar{display:none;}
  html body .vrm-main .vrm-msg-bar .vrm-inbox-filters>button{flex:0 0 auto;white-space:nowrap;}
 }
+/* (7 nov., demande de Julien) Le logo du transporteur sur la ligne de vente : petit, aligné sur le texte. */
+.vrm-fu-vente-l2 .vrm-fu-vente-transp{display:inline-flex;align-items:center;margin:0 2px 0 6px;vertical-align:middle;}
+.vrm-toutes-transp{display:inline-flex;align-items:center;gap:4px;vertical-align:middle;}
+.vrm-toutes-bureau-site .vrm-toutes-transp{margin-left:6px;}

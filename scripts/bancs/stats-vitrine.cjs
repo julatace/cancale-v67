@@ -243,7 +243,7 @@ const capture=async(pg,nom)=>{
           const manq=a.benef.n-a.benef.ncout;
           dit(!/au moins/.test(bn.texte||'') && (p==='semaine'
               ? /Bénéfice brut/.test(bn.texte||'') && new RegExp(`${a.benef.ncout} ventes? sur ${a.benef.n}`).test(bn.texte||'')
-              : /—/.test(bn.texte||'') && new RegExp(`il manque le prix d.achat de ${manq} ventes? sur ${a.benef.n}`).test(bn.texte||'')),
+              : /—/.test(bn.texte||'') && new RegExp(`il manque le prix d.achat de ${manq} ventes?(?: finalisées?)? sur ${a.benef.n}`).test(bn.texte||'')),
             `${p} : cas partiel dit — jamais « au moins » ; ${p==='semaine'?'« Bénéfice brut », « N sur M »':'« — » et le manque nommé'}`,bn.texte);
           const dl=r.delai||{};
           dit(dl.etat==='lu' && dl.mediane===a.delai.med && dl.couv===a.delai.couv,`${p} : délai médian ${a.delai.med} j, sur ${a.delai.couv}`,JSON.stringify(dl));
