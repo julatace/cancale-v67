@@ -10035,6 +10035,8 @@ const _apercuEcrit = {}; const _ecoutesApercuEcrit = new Set();
 const publierApercuEcrit = (site, v) => { _apercuEcrit[site] = v; _ecoutesApercuEcrit.forEach((f) => { try { f(); } catch (_) {} }); };
 const apercuEcritPublie = (site) => _apercuEcrit[site] || null;
 const ecouterApercuEcrit = (f) => { _ecoutesApercuEcrit.add(f); return () => _ecoutesApercuEcrit.delete(f); };
+// La fiche d'une annonce Vinted dont le N° vient de SON annonce (`decisionEcrite`).
+const ficheEcrite = (cur, it, pk, dec) => ({ ...(cur || {}), numero: dec.numero, title: it.title, photo: it.photo || null, photoK: pk || (cur && cur.photoK) || null, price: it.price ?? null, size: it.size ?? (cur && cur.size) ?? null, accountId: it._acc?.vinted_user_id, numberedAt: (cur && cur.numberedAt) || new Date().toISOString(), auto: false, ...(dec.ecrit ? { ecrit: dec.ecrit, ecritAt: new Date().toISOString() } : {}) });
 // La lecture du N° écrit dans une annonce VINTED : la fin de sa description (lue sur
 // la page, `numEcritDesc`, posée par la liste d'annonces) puis son titre. Vinted ne
 // donne aucun champ de référence chez lui (comptes particuliers, mesuré) : rien d'autre.
@@ -50959,19 +50961,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // Après la remise à zéro : une annonce d'AVANT la coupure (ou sans date)
       // n'est pas numérotée toute seule — seules les annonces republiées le sont.
       if (!annonceNumerotable(it, listingDates)) continue;
-      let num = numeroReprenable(numVentesParIdentite.parItem[String(it.id)])
-             || numeroReprenable(pk && numVentesParIdentite.parPhoto[pk])
-             || null;
-      // (7 nov.) IL NUMÉROTE LUI-MÊME DANS SES ANNONCES (src/numeroEcrit.js) : le N° écrit
+      // (7 nov., `ecritOn` plus bas) IL NUMÉROTE LUI-MÊME DANS SES ANNONCES (src/numeroEcrit.js) : le N° écrit
       // (fin de la description, titre) est pris pour CETTE annonce ; sinon seules les
       // identités (vente de la même annonce, même photo) — jamais un N° neuf, jamais le N°
       // réservé à côté de « Publier ». Deux numéros écrits, un N° d'archive, ou un N° écrit
       // qui contredit l'identité ⇒ RIEN n'est posé (« à vérifier », son clic choisit).
+      let num = numeroReprenable(numVentesParIdentite.parItem[String(it.id)])
+             || numeroReprenable(pk && numVentesParIdentite.parPhoto[pk])
+             || null;
       if (ecritOn) {
         const dec = decisionEcrite({ lecture: lectureEcriteVinted(it), ident: num || numeroReprenable(pk && byPhoto[pk]) || '', reprenable: (k) => !!numeroReprenable(k) });
         if (!dec) continue;
         const n = dec.numero;
-        nextNum[it.id] = { ...(cur || {}), numero: n, title: it.title, photo: it.photo || null, photoK: pk || (cur && cur.photoK) || null, price: it.price ?? null, size: it.size ?? (cur && cur.size) ?? null, accountId: it._acc?.vinted_user_id, numberedAt: (cur && cur.numberedAt) || new Date().toISOString(), auto: false, ...(dec.ecrit ? { ecrit: dec.ecrit, ecritAt: new Date().toISOString() } : {}) };
+        nextNum[it.id] = ficheEcrite(cur, it, pk, dec);
         { const ep = entreePool(n); if (ep != null) nextUsed.add(ep); }
         if (pk && !byPhoto[pk]) byPhoto[pk] = n;
         changed = true;
