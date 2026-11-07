@@ -5,11 +5,6 @@
       "audit": "audit-chemin-json-guillemets.cjs",
       "raison": "Il juge vinted-sync-extension/ (un chemin JSON `->n` nu au-delà d'un entier) : la correction est dans l'extension, qui se livre en version numérotée (zip, §6) — chantier à part.",
       "depuis": "2026-11-06"
-    },
-    {
-      "audit": "audit-vc-recon.cjs",
-      "raison": "Relevé Vestiaire (vcRecon) : deux contrôles rouges en attente d'une décision de Julien sur ce que l'extension doit relever.",
-      "depuis": "2026-11-06"
     }
   ],
   "_lire_bancs": "Les bancs ROUGES CONNUS (scripts/lancer-bancs.cjs) : seulement les lignes rouges qui répondent à `rouges` ; une ligne rouge nouvelle rend le banc rouge pour de bon.",
