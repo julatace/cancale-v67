@@ -47,7 +47,7 @@ const PARIS = 'Europe/Paris';
 const jourParis = (t) => new Date(t).toLocaleDateString('fr-CA', { timeZone: PARIS });   // AAAA-MM-JJ
 export function quandRelu(t, maintenant = Date.now()) {
   const x = tsDe(t); if (x == null) return '';
-  const p = new Intl.DateTimeFormat('fr-FR', { timeZone: PARIS, hour: 'numeric', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(x));
+  const p = (globalThis.__vrmFmtHeureParis || (globalThis.__vrmFmtHeureParis = new Intl.DateTimeFormat('fr-FR', { timeZone: PARIS, hour: 'numeric', minute: '2-digit', hourCycle: 'h23' }))).formatToParts(new Date(x));
   const h = (p.find((q) => q.type === 'hour') || {}).value, m = (p.find((q) => q.type === 'minute') || {}).value;
   const heure = `${Number(h)} h ${m}`;
   const j = jourParis(x), auj = jourParis(maintenant), hier = jourParis(maintenant - 86400000);

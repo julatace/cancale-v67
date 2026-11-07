@@ -515,7 +515,7 @@ async function lireContenu(deps, id) {
   const r = await deps.lireTout(`id=eq.${encodeURIComponent(id)}&select=contenu:data->contenu`, { strict: true });
   return Array.isArray(r) && r[0] && r[0].contenu ? r[0].contenu : null;
 }
-const heureParis = (t) => { try { return new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit' }).format(new Date(t)); } catch (_) { return ''; } };
+const heureParis = (t) => { try { return (globalThis.__vrmFmtHeureFP || (globalThis.__vrmFmtHeureFP = new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit' }))).format(new Date(t)); } catch (_) { return ''; } };
 const motEnvoi = (e, av) => (av && av.emiseLe ? `annulée par l'avoir ${av.numero}` : !e ? 'émise, pas encore envoyée' : e.etat === 'envoyee' ? `envoyée le ${jourParis(e.at)}` : e.etat === 'en-cours' ? 'envoi en cours…' : e.etat === 'incertaine' ? 'envoi incertain — à vérifier' : 'pas envoyée — touche pour voir pourquoi');
 
 // `vente` = { tx, uid, compte, titre, centimes, venteLe, commandes:[ventes Vinted portant ce n°] }.
