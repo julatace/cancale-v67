@@ -17798,6 +17798,18 @@ function remonterEnHaut() {
 // remonter en haut ; un nombre une seule fois.
 function BottomBar({tab,setTab,sites,badges}) {
   const [plusOuvert,setPlusOuvert]=React.useState(false);
+  // (7 nov., fluidité) L'ONGLET TOUCHÉ S'ALLUME TOUT DE SUITE. Avant, toucher un
+  // onglet gelait la barre jusqu'à ce que le nouvel écran soit calculé (jusqu'à
+  // une seconde au téléphone) : on retouchait, croyant que rien ne s'était passé.
+  // Maintenant l'onglet visé s'allume au toucher, et l'écran se calcule en tâche
+  // INTERRUPTIBLE (`startTransition`) : l'écran reste réactif pendant ce temps, et
+  // un second toucher abandonne le calcul en cours au lieu de s'y ajouter. Rien
+  // d'autre ne change : le même `setTab`, le même onglet au bout.
+  const [vise,setVise]=React.useState(null);
+  const [enCours,demarrer]=React.useTransition();
+  React.useEffect(()=>{ if(!enCours) setVise(null); },[enCours,tab]);
+  const allerA=(id)=>{ setVise(id); demarrer(()=>setTab(id)); };
+  const tabMontre=vise||tab;
   const navRef=React.useRef(null);
   // La hauteur de la barre (zone sûre comprise), pour poser le panneau « Plus »
   // juste au-dessus d'elle : `--vrm-barre-bas` sur la racine.
@@ -17843,8 +17855,8 @@ function BottomBar({tab,setTab,sites,badges}) {
     <nav ref={navRef} className="vrm-mobile-nav vrm-tabbar" data-plus-ouvert={plusOuvert?'1':'0'} aria-label="Navigation principale" style={{display:kbOpen?'none':'flex','--vrm-nav-bg':C.sidebar||C.chrome}}>
       {/* (31 oct.) PAR TÂCHE : Journée · Annonces · Ventes · Colis · Plus. Icône
           d'accent et libellé d'encre à l'actif (styles-vitrine.css), 52 px. */}
-      {BOTTOM_TABS.map(t=>{ const on=(BAR_GROUPE[tab]||tab)===t.id; const lib=t.court||t.label; const n=badgesBarre&&typeof badgesBarre[t.id]==='number'&&badgesBarre[t.id]>0?badgesBarre[t.id]:0; return (
-        <button key={t.id} type="button" className="vrm-tab" data-nav-entree={t.id} onClick={()=>{ setPlusOuvert(false); if(on&&t.id===tab) remonterEnHaut(); else setTab(t.id); }} aria-label={lib+(n?` · ${n} à faire`:'')} aria-current={on?'page':undefined}>
+      {BOTTOM_TABS.map(t=>{ const on=(BAR_GROUPE[tabMontre]||tabMontre)===t.id; const lib=t.court||t.label; const n=badgesBarre&&typeof badgesBarre[t.id]==='number'&&badgesBarre[t.id]>0?badgesBarre[t.id]:0; return (
+        <button key={t.id} type="button" className="vrm-tab" data-nav-entree={t.id} onClick={()=>{ setPlusOuvert(false); if(!vise&&(BAR_GROUPE[tab]||tab)===t.id&&t.id===tab) remonterEnHaut(); else allerA(t.id); }} aria-label={lib+(n?` · ${n} à faire`:'')} aria-current={on?'page':undefined}>
           <span aria-hidden="true" className="vrm-tab-ic" style={{position:'relative'}}><NavigationIcon item={t} size={22} style={{strokeWidth:on?2:1.6}}/><BadgeNav t={t} badges={badgesBarre} place="barre"/></span>
           <span className="vrm-nav-label">{lib}</span>
         </button>
