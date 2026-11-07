@@ -123,12 +123,12 @@ async function ouvrir(nav, { liste, reponse, registre, vues = [], tab = 'setting
   // Réglages (chevron) : on l'ouvre, comme lui. Sur ordinateur tout est déplié.
   const sousAdr = pg.locator('[data-sous-ouvrir="adresses"]').first();
   if (await sousAdr.isVisible().catch(() => false)) { await sousAdr.click(); await pg.waitForTimeout(600); }
-  const navEmails=pg.getByRole('navigation',{name:'Rubriques des emails'});if(await navEmails.isVisible().catch(()=>false))await navEmails.getByRole('button',{name:/Comptes et transfert/}).click();
+  const navEmails=pg.getByRole('navigation',{name: /^Rubriques des e-?mails$/});if(await navEmails.isVisible().catch(()=>false))await navEmails.getByRole('button',{name:/Comptes et transfert/}).click();
   return { ctx, pg, erreurs, appels, lecturesRls, etat };
 }
 // Le panneau « Mes adresses de réception », lu sur ce qui est RENDU.
 const panneau = async (pg) => {
-  const nav=pg.getByRole('navigation',{name:'Rubriques des emails'});
+  const nav=pg.getByRole('navigation',{name: /^Rubriques des e-?mails$/});
   await nav.getByRole('button',{name:/Comptes et transfert/}).click();
   const adresses=await pg.evaluate(() => {
   const t=document.querySelector('[data-reglage-adresses]');
@@ -191,7 +191,7 @@ const jobPersonne = (pg) => pg.evaluate(() => [...document.querySelectorAll('[da
         dit(lecturesRls.length === 0, 'la quarantaine n’est plus lue sous RLS (les lignes neutres y sont invisibles)', lecturesRls.join(' · '));
         // « C'est à moi » rejoue CE email, avec la session.
         const avant = appels.length;
-        await pg.getByRole('navigation',{name:'Rubriques des emails'}).getByRole('button',{name:/À rattacher/}).click();
+        await pg.getByRole('navigation',{name: /^Rubriques des e-?mails$/}).getByRole('button',{name:/À rattacher/}).click();
         const b = pg.locator('button', { hasText: "C'est à moi" }).first();
         if (await b.count()) { await b.click(); await pg.waitForTimeout(1500); }
         const post = appels.slice(avant).find((a) => a.m === 'POST');
@@ -244,7 +244,7 @@ const jobPersonne = (pg) => pg.evaluate(() => [...document.querySelectorAll('[da
         dit(!!p2 && /1 e-?mail conservé/.test(p2.texte) && /Julien, banc/.test(p2.texte) && !p2.suggestions.includes(JULIEN),
           'l’adresse déclarée, son email mis de côté lui est proposé (la liste relue)', p2 && p2.texte.replace(/\n/g, ' ').slice(-260));
         const avant = appels.length;
-        await pg.getByRole('navigation',{name:'Rubriques des emails'}).getByRole('button',{name:/À rattacher/}).click();
+        await pg.getByRole('navigation',{name: /^Rubriques des e-?mails$/}).getByRole('button',{name:/À rattacher/}).click();
         const moi = pg.locator('button', { hasText: "C'est à moi" }).first();
         if (await moi.count()) { await moi.click(); await pg.waitForTimeout(1500); }
         const post = appels.slice(avant).find((a) => a.m === 'POST');

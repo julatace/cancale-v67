@@ -100,7 +100,7 @@ const { build } = require("esbuild"),
         true,
       );
       await p
-        .getByLabel("Adresse email", { exact: true })
+        .getByLabel(/^Adresse e-?mail$/)
         .fill("client@exemple.test");
       await p.getByLabel("Mot de passe", { exact: true }).fill("Six123");
       await p
@@ -142,7 +142,7 @@ const { build } = require("esbuild"),
         .waitFor();
       await p.locator(".vrm-cx-aide-confirmation summary").click();
       await p
-        .getByLabel("Lien de confirmation reçu par email")
+        .getByLabel(/Lien de confirmation reçu par e-?mail/)
         .fill("https://exemple.test/?token_hash=fictif");
       await p.evaluate(() => {
         const b = [...document.querySelectorAll("button")].find((b) =>
@@ -195,7 +195,7 @@ const { build } = require("esbuild"),
       await resoudre("connexion", { ok: false, needsConfirm: true });
       await p.locator(".vrm-cx-aide-confirmation summary").click();
       await p
-        .getByLabel("Lien de confirmation reçu par email")
+        .getByLabel(/Lien de confirmation reçu par e-?mail/)
         .fill(
           "https://vrm.center/recuperation.html#type=recovery&token_hash=fictif",
         );
@@ -225,7 +225,7 @@ const { build } = require("esbuild"),
         .getByRole("heading", { name: "Nouveau mot de passe", exact: true })
         .waitFor();
       assert.equal(
-        await p.getByLabel("Adresse email", { exact: true }).count(),
+        await p.getByLabel(/^Adresse e-?mail$/).count(),
         0,
         "Le lien de récupération affiche le bon formulaire avant même le retour global",
       );

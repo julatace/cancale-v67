@@ -85,7 +85,7 @@ async function ouvrir(nav, { viewport, tab = 'settings', tactile = false }) {
 async function versJournal(pg) {
   const sousAdr = pg.locator('[data-sous-ouvrir="adresses"]').first();
   if (await sousAdr.isVisible().catch(() => false)) { await sousAdr.click(); await pg.waitForTimeout(500); }
-  await pg.getByRole('navigation', { name: 'Rubriques des emails' }).getByRole('button', { name: /Journal/ }).click();
+  await pg.getByRole('navigation', { name: /^Rubriques des e-?mails$/ }).getByRole('button', { name: /Journal/ }).click();
   await pg.locator('[data-journal-emails] .vrm-journal-ligne').first().waitFor();
 }
 

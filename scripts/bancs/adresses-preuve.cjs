@@ -101,7 +101,7 @@ async function ouvrir(nav, { registre, vues = [], etats = {}, installation = fal
 const ouvrirAdresses = async (pg) => {
   const s = pg.locator('[data-sous-ouvrir="adresses"]').first();
   if (await s.isVisible().catch(() => false)) { await s.click(); await pg.locator('[data-reglage-adresses]').first().waitFor({ state: 'visible', timeout: 8000 }).catch(() => {}); }
-  const nav = pg.getByRole('navigation',{name:'Rubriques des emails'});
+  const nav = pg.getByRole('navigation',{name: /^Rubriques des e-?mails$/});
   if (!await nav.isVisible().catch(()=>false)) return;
   await nav.getByRole('button',{name:/Comptes et transfert/}).click();
   const aide=pg.locator('.vrm-email-aide-adresses');

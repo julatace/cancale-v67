@@ -91,7 +91,7 @@ const { chromium } = require("playwright"),
           .getByRole("heading", { name: "Nouveau mot de passe", exact: true })
           .waitFor();
         assert.equal(
-          await page.getByLabel("Adresse email", { exact: true }).count(),
+          await page.getByLabel(/^Adresse e-?mail$/).count(),
           0,
         );
         assert.equal(
