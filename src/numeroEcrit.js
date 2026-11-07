@@ -200,6 +200,24 @@ export function etatAnnonce({ lecture, connu = '', refuse = '', reprenable = () 
   return 'a-poser';
 }
 
+// LA DÉCISION, pour une annonce SANS N° chez VRM, quand il numérote lui-même
+// (le réglage allumé). `ident` : le N° que la même paire porte déjà par identité
+// (vente de la même annonce, même photo) ou ''. Rend { numero, ecrit } ou `null`
+// (rien n'est posé). JAMAIS un N° neuf : c'est l'appelant qui n'en a pas le droit.
+//   · deux numéros écrits ⇒ rien ;
+//   · N° écrit d'archive ⇒ rien ; N° écrit ≠ identité ⇒ rien (à vérifier) ;
+//   · N° écrit seul ⇒ lui ; rien d'écrit ⇒ l'identité seule, sinon rien.
+export function decisionEcrite({ lecture, ident = '', reprenable = () => true } = {}) {
+  const k = cleNumero(ident);
+  if (lecture && lecture.etat === 'ambigu') return null;
+  if (lecture && lecture.etat === 'lu') {
+    if (!reprenable(lecture.cle)) return null;
+    if (k && k !== lecture.cle) return null;
+    return { numero: lecture.cle, ecrit: lecture.source || 'texte' };
+  }
+  return k ? { numero: String(ident).trim(), ecrit: null } : null;
+}
+
 // L'APERÇU de toutes ses annonces : `lignes` = [{ id, site, titre, lecture,
 // connu, refuse, numerotable, presente }]. Rend les comptes par état, les lignes
 // classées, et les DOUBLONS : deux annonces présentes au même N° (lu ou connu,

@@ -391,7 +391,7 @@ import { EnLigneDeuxFoisDetail } from "./EnLigneDeuxFois.jsx";
 import { carteArgentJournee } from "./journeeArgent.js";
 import { CLE_MODELES, lireModeles } from "./modelesDescription.js";
 import { MesModeles, InsererModele } from "./ModelesDescription.jsx";
-import { CLE_NUMERO_ECRIT, lireReglageNumeroEcrit, lireNumeroTexte, lireNumeroEcrit, apercuNumeroEcrit, numerosAPoser, PHRASE_ETAT as PHRASE_NUMERO_ECRIT, NOM_SOURCE as NOM_SOURCE_NUMERO } from "./numeroEcrit.js";
+import { CLE_NUMERO_ECRIT, lireReglageNumeroEcrit, lireNumeroTexte, lireNumeroEcrit, apercuNumeroEcrit, decisionEcrite, PHRASE_ETAT as PHRASE_NUMERO_ECRIT, NOM_SOURCE as NOM_SOURCE_NUMERO } from "./numeroEcrit.js";
 import { CLE_REGLAGE_ETIQUETTE, PLACES as PLACES_ETIQUETTE, FORMES as FORMES_ETIQUETTE, QUESTIONS as QUESTIONS_ETIQUETTE, ANNONCE_EXEMPLE, lireReglageEtiquette, etiquetteDe, poserEtiquette, retirerEtiquette, proposition as propositionEtiquette } from "./etiquetteNumero.js";
 // (6 nov., vitesse 2) PrixPartout : à la demande (sa feuille de style est déjà plus haut).
 import SelecteurSites, { LogoSite } from "./SelecteurSites.jsx";
@@ -50968,15 +50968,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // réservé à côté de « Publier ». Deux numéros écrits, un N° d'archive, ou un N° écrit
       // qui contredit l'identité ⇒ RIEN n'est posé (« à vérifier », son clic choisit).
       if (ecritOn) {
-        const lec = lectureEcriteVinted(it);
-        const ident = num || numeroReprenable(pk && byPhoto[pk]) || null;
-        if (lec.etat === 'ambigu') continue;
-        if (lec.etat === 'lu') {
-          if (!numeroReprenable(lec.cle)) continue;
-          if (ident && cleNum(ident) !== lec.cle) continue;
-        } else if (!ident) continue;
-        const n = lec.etat === 'lu' ? lec.cle : String(ident);
-        nextNum[it.id] = { ...(cur || {}), numero: n, title: it.title, photo: it.photo || null, photoK: pk || (cur && cur.photoK) || null, price: it.price ?? null, size: it.size ?? (cur && cur.size) ?? null, accountId: it._acc?.vinted_user_id, numberedAt: (cur && cur.numberedAt) || new Date().toISOString(), auto: false, ...(lec.etat === 'lu' ? { ecrit: lec.source, ecritAt: new Date().toISOString() } : {}) };
+        const dec = decisionEcrite({ lecture: lectureEcriteVinted(it), ident: num || numeroReprenable(pk && byPhoto[pk]) || '', reprenable: (k) => !!numeroReprenable(k) });
+        if (!dec) continue;
+        const n = dec.numero;
+        nextNum[it.id] = { ...(cur || {}), numero: n, title: it.title, photo: it.photo || null, photoK: pk || (cur && cur.photoK) || null, price: it.price ?? null, size: it.size ?? (cur && cur.size) ?? null, accountId: it._acc?.vinted_user_id, numberedAt: (cur && cur.numberedAt) || new Date().toISOString(), auto: false, ...(dec.ecrit ? { ecrit: dec.ecrit, ecritAt: new Date().toISOString() } : {}) };
         { const ep = entreePool(n); if (ep != null) nextUsed.add(ep); }
         if (pk && !byPhoto[pk]) byPhoto[pk] = n;
         changed = true;
