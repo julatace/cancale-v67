@@ -46773,7 +46773,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     return out;
   };
+  // (7 nov., vitesse) Appelée ~15 fois par rendu de Colis / Ma journée pour la même
+  // liste : calculée une fois par calcul synchrone (vidée à la microtâche suivante,
+  // comme `memoRendu`). Les lecteurs ne la modifient pas (filter/map/for seulement).
+  let _expeditionsMemo = null;
   const expeditions = () => {
+    if (_expeditionsMemo) return _expeditionsMemo;
+    const r = expeditionsCalc();
+    _expeditionsMemo = r;
+    queueMicrotask(() => { _expeditionsMemo = null; });
+    return r;
+  };
+  const expeditionsCalc = () => {
     // La table « un bordereau par vente » — la MÊME que `bordsParTxn`, le rappel
     // du matin, le rappel du soir et le widget (`bordsParTransaction`, §11).
     const parTxn = bordsParTransaction(emailBords, isBordHidden);
@@ -46999,7 +47010,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     dup.forEach(d => delete m[d]);
     return m;
   }, [numeros]);
-  const entryKeyByPhoto = (o) => {
+  // (7 nov., vitesse) Mémoire d'UN SEUL RENDU : ces règles d'identité sont
+  // appelées des centaines de fois par rendu pour les mêmes lignes (Colis, Ma
+  // journée : ~0,5 s au téléphone). La mémoire naît à chaque rendu (jamais un
+  // résultat d'un rendu d'avant) : même règle, mêmes valeurs, calculées une fois.
+  // Elle se vide aussitôt le calcul synchrone fini (microtâche) : un effet ou un geste
+  // lancé plus tard recalcule, même si une valeur lue par la règle a bougé entre-temps.
+  const memoRendu = (fn) => { let m = null; return (o) => { if (!o || typeof o !== 'object') return fn(o); if (!m) { m = new WeakMap(); queueMicrotask(() => { m = null; }); } if (m.has(o)) return m.get(o); const r = fn(o); m.set(o, r); return r; }; };
+  const entryKeyByPhoto = memoRendu((o) => {
     const url = o ? orderPhoto(o) : null;
     const pk = photoKey(url);
     let k = (pk && numerosByPhoto[pk]) || null;                  // même fichier = certain
@@ -47010,7 +47028,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // l'histoire.
     if (k && venteApresCoupure(o) && !numeroReprenable((numeros[k] || {}).numero)) return null;
     return k;
-  };
+  });
   // Ids des annonces ENCORE EN LIGNE (wardrobe actif). Une paire en ligne ne peut
   // pas être vendue → on ne lui attribue jamais une vente (sinon un exemplaire
   // identique vendu ferait apparaître « vendue » une paire encore en vente).
@@ -47127,13 +47145,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //   1. l'identifiant d'annonce donné par Vinted (transaction → item_id) ;
   //   2. la photo, qui appartient à une paire et une seule (0 collision mesurée).
   // Le TITRE est volontairement exclu : 22 % des ventes en portent un en double.
-  const identiteAnnonce = (o) => {
+  const identiteAnnonce = memoRendu((o) => {
     if (!o) return null;
     const parVinted = o.transaction_id != null ? txnItem[String(o.transaction_id)] : null;
     if (parVinted) return String(parVinted);
     return entryKeyByPhoto(o) || null;
-  };
-  const resolvedEntry = (o) => {
+  });
+  const resolvedEntry = memoRendu((o) => {
     // Une paire ENCORE EN LIGNE n'est pas vendue : on refuse de l'associer.
     const usable = (key) => (key && numeros[key] && !onlineAnnonceIds.has(String(key))) ? numeros[key] : null;
     // ⚠️ VERROU HÉRITÉ : `vinted_txn_link` est permanent et a longtemps été posé
@@ -47161,7 +47179,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     //    annonces différentes). Un titre ne caractérise donc pas une annonce :
     //    on préfère ne rien attribuer plutôt que désigner la mauvaise boîte.
     return null;
-  };
+  });
   // Corrections MANUELLES par vente (par n° de transaction) : permet d'ajouter un
   // prix d'achat / un N° / un boost DIRECTEMENT sur une vente — même une paire
   // jamais numérotée (orpheline). L'override PRIME sur l'entrée reliée.
@@ -47496,7 +47514,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // pas de paire où écrire, on relie sur la vente elle-même). `AchatRelie` lit
   // `buyFromId`/`buyFrom` — la fusion les fait ressortir (même propriétaire que
   // `choosePick`, §11).
-  const effEntry = (o) => fusionEntreeVente(resolvedEntry(o), (o && o.transaction_id != null) ? saleOv[String(o.transaction_id)] : null, buyByNum);
+  const effEntry = memoRendu((o) => fusionEntreeVente(resolvedEntry(o), (o && o.transaction_id != null) ? saleOv[String(o.transaction_id)] : null, buyByNum));
 
   // ── FIABILITÉ DU NUMÉRO : QUI PORTE PHYSIQUEMENT CE NUMÉRO ? ──────────────
   // Julien : « si le numéro n'est pas le bon, la paire est presque impossible à

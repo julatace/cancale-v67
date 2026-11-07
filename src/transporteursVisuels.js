@@ -100,6 +100,26 @@ const ligneTranspDe = (transp, n) => {
 // `nom` seul (cle null) quand la plateforme écrit un transporteur que VRM ne
 // connaît pas : il est LU, on le recopie tel quel, sans logo.
 // `source` : 'transporteur' · 'plateforme' · 'email' · 'forme' · null.
+// (7 nov., vitesse) Les e-mails de suivi rangés par n° normalisé, une fois par
+// liste (la liste est une valeur : une nouvelle lecture est une nouvelle liste).
+// Avant : chaque colis relisait et renormalisait TOUS les e-mails (Colis :
+// ~0,5 s au téléphone). Mêmes lignes, dans le même ordre.
+const _emailsParSuivi = new WeakMap();
+function emailsDuSuivi(liste, n) {
+  let m = _emailsParSuivi.get(liste);
+  if (!m) {
+    m = new Map();
+    for (const l of liste) {
+      if (!l) continue;
+      const k = normaliserSuivi(l.suivi);
+      if (!k) continue;
+      const a = m.get(k); if (a) a.push(l); else m.set(k, [l]);
+    }
+    _emailsParSuivi.set(liste, m);
+  }
+  return m.get(n) || [];
+}
+
 export function transporteurDuColis({ declare = '', suivi = '', transp = null, suivisEmail = null } = {}) {
   const n = normaliserSuivi(suivi);
   const t = ligneTranspDe(transp, n);
@@ -119,8 +139,7 @@ export function transporteurDuColis({ declare = '', suivi = '', transp = null, s
   if (cD === 'vinted' && CHRONO_STRICT.test(n)) cD = null;
   prendre(cD, 'plateforme');
   if (n && Array.isArray(suivisEmail)) {
-    for (const l of suivisEmail) {
-      if (!l || normaliserSuivi(l.suivi) !== n) continue;
+    for (const l of emailsDuSuivi(suivisEmail, n)) {
       let c = cleTransporteur(l.carrier);
       if (c === 'vinted' && CHRONO_STRICT.test(n)) c = null;
       prendre(c, 'email');
