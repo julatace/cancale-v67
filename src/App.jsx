@@ -9644,7 +9644,12 @@ function PhotosBloquees() {
       <div data-photos-bloquees={d.cause} data-photos-geste={codeGeste} data-photos-perdues={d.morts}
         style={{ display: 'flex', gap: 10, alignItems: 'flex-start', border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '11px 13px', fontSize: 13, lineHeight: 1.5, color: C.text }}>
         <span style={{ flexShrink: 0, marginTop: 1, color: C.muted }}><Icon name="image" size={18}/></span>
-        <span>{cause} {geste}</span>
+        {/* (7 nov., revue UX) UNE ligne (décision du 6 nov. : le reste en feuille). Six lignes en tête de
+            Ma journée, Annonces et Messages poussaient l'écran vers le bas. La cause et le geste complets
+            restent dans « ⓘ » ; le seul geste à faire ICI (recharger) reste écrit sur la ligne. */}
+        <span>{d.cause === 'horsligne' ? "Pas de connexion : les photos reviendront avec le réseau." : "Les photos de Vinted ne s'affichent pas ici."}
+          {codeGeste === 'muette' ? <> <b>Recharge cette page.</b></> : d.cause === 'horsligne' ? null : " Rien n'est touché."}{' '}
+          <Pourquoi titre="Les photos de Vinted">{cause} {geste}</Pourquoi></span>
       </div>
     </div>
   );
@@ -17861,7 +17866,7 @@ function BottomBar({tab,setTab,sites,badges}) {
           <span className="vrm-nav-label">{lib}</span>
         </button>
       );})}
-      <MenuEcrans tab={tab} setTab={(v)=>{ if(typeof v==='function'){ setTab(v); return; } demarrer(()=>setTab(v)); }} bottom sites={sites} badges={badgesBarre} ouvert={plusOuvert} setOuvert={setPlusOuvert}/>
+      <MenuEcrans tab={tabMontre} setTab={(v)=>{ if(typeof v==='function'){ setTab(v); return; } allerA(v); }} bottom sites={sites} badges={badgesBarre} ouvert={plusOuvert} setOuvert={setPlusOuvert}/>
     </nav>
     </>
   );
@@ -41302,7 +41307,8 @@ function StatsVitrine({ liveStats, panelOff, periode }) {
     const CB = chiffreBenefice(BP, etatBP);
     const manquent = BP ? BP.n - BP.nCout : 0;
     const sous = !BP ? (etatBP === 'encours' ? 'je le lis…' : 'pas encore calculé')
-      : CB.raison === 'achats' ? `il manque le prix d’achat de ${manquent} vente${manquent > 1 ? 's' : ''} sur ${BP.n}`
+      // (7 nov., revue UX) « finalisées » écrit : à côté de « Vendu · 35 ventes », « 21 sur 21 » semblait le contredire.
+      : CB.raison === 'achats' ? `il manque le prix d’achat de ${manquent} vente${manquent > 1 ? 's' : ''} finalisée${manquent > 1 ? 's' : ''} sur ${BP.n}`
       : CB.raison === 'frais' ? 'des frais eBay ne sont pas encore connus'
       : CB.raison === 'cotisations' ? 'en attente de ton chiffre déclaré (écran Ventes)'
       : CB.raison === 'rien' ? 'aucune vente finalisée ni dépense sur la période'
@@ -44394,6 +44400,16 @@ function ListeComptes({ id, valeur, options, onChange, note, skin, attrs }) {
   );
 }
 function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', compteConnecte = '', alertes = null, alertesLues = true, cycle = null, onCycle = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false }) {
+  // (7 nov., vitesse) COLIS EN DEUX TEMPS : dessiner 70 cartes d'un coup gelait l'écran
+  // 1 à 2 s au toucher (revue du 7 nov., 4 400 éléments). Les 24 plus pressées sont
+  // dessinées tout de suite ; toutes les autres arrivent juste après, en tâche
+  // interruptible (`startTransition`), sans aucun geste : aucun colis n'est caché.
+  const [colisTous, setColisTous] = useState(false);
+  useEffect(() => {
+    if (colisTous) return undefined;
+    const id = setTimeout(() => React.startTransition(() => setColisTous(true)), 0);
+    return () => clearTimeout(id);
+  }, [colisTous]);
   // (3 nov.) Les cartes « supprimé de Vinted » déjà répondues sur cet écran
   // (elles partent tout de suite, la coque recalcule ensuite) et la réponse en cours.
   const [cycleRepondus, setCycleRepondus] = useState({});
@@ -59978,7 +59994,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               return (
                 <div className={'vrm-colis-prochain' + (g.ambre ? ' is-ambre' : '')} data-colis-prochain={g.cle} data-colis-prochain-onglet={g.onglet || ''} data-colis-prochain-point={g.point || undefined} role="status">
                   <span className="vrm-colis-prochain-txt">{g.partiel ? 'Au moins ' : ''}{g.texte}{g.sous ? <span className="vrm-colis-prochain-sous"> · {g.sous}</span> : null}</span>
-                  {verbe ? <Bouton variante={g.action === 'imprimer' ? 'primaire' : 'secondaire'} data-colis-prochain-agir="" onClick={agir} disabled={g.action === 'imprimer' && (batchBusy || nLot === 0)}>{verbe}</Bouton> : null}
+                  {/* (7 nov., revue UX) « Tout imprimer » (en haut) est déjà le bouton bleu de ce geste : un seul accent par écran (§7). */}
+                  {verbe ? <Bouton variante={g.action === 'imprimer' && nLot > 0 ? 'secondaire' : g.action === 'imprimer' ? 'primaire' : 'secondaire'} data-colis-prochain-agir="" onClick={agir} disabled={g.action === 'imprimer' && (batchBusy || nLot === 0)}>{verbe}</Bouton> : null}
                 </div>);
             })()}
             {!baseKO ? <ComptesMuetsColis accounts={accounts} onNav={onNav}/> : null}
@@ -60697,7 +60714,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     gestes={<button type="button" data-geste="fait" data-lbc-fait={x.txId} className="vrm-colis-sec vrm-colis-ter" onClick={() => { const u = { ...fait }; if (u[x.txId]) delete u[x.txId]; else u[x.txId] = Date.now(); save('vrm_lbc_colis_done', u); majLbcFait(); }}
                       style={{...sec,border:`1px solid ${C.border}`,background:'transparent',color:C.muted}}>Déposé</button>}/>;
                 };
-                return exT.map((e,ix)=>{
+                // (7 nov., vitesse) Les 24 plus pressées d'abord, TOUTES les autres juste après (sans clic : aucun colis caché).
+                return (colisTous ? exT : exT.slice(0, 24)).map((e,ix)=>{
                 const ouvreT = ix === 0 || trNomDe(exT[ix-1]) !== trNomDe(e);
                 const trG = e.__autre ? e.tr : transporteurVente(e.b);
                 if (e.__autre) return (
@@ -66086,7 +66104,7 @@ function LigneVerifCarton({ it, fiche, preuve, onConfirmer, onCorriger, onPlusLa
       </div>
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
         <button type="button" disabled={occupe} onClick={() => agir(() => onConfirmer(it))} style={{ padding: '7px 10px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>C'est bien le N°{fiche.numero}</button>
-        <input value={v} onChange={(e) => setV(e.target.value)} inputMode="numeric" placeholder="Autre N°" aria-label={`Numéro écrit sur l'étiquette de ${it.title}`}
+        <input className="vrm-autre-num" value={v} onChange={(e) => setV(e.target.value)} inputMode="numeric" placeholder="Autre N°" aria-label={`Numéro écrit sur l'étiquette de ${it.title}`}
           onKeyDown={(e) => { if (e.key === 'Enter' && v.trim()) agir(() => onCorriger(it, v)); }}
           style={{ width: 118, padding: '7px 9px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 13 }}/>
         <button type="button" disabled={occupe || !v.trim()} onClick={() => agir(() => onCorriger(it, v))} style={{ padding: '7px 10px', borderRadius: 12, border: 'none', background: C.text, color: C.card, fontSize: 13, fontWeight: 600, cursor: v.trim() ? 'pointer' : 'default', opacity: v.trim() ? 1 : 0.5 }}>Corriger</button>
