@@ -86,7 +86,7 @@ export function emailsDeLaReponse(j) {
 }
 
 // ── LE MOT DE LA PASTILLE : par quoi la ligne a été trouvée ─────────────────
-const eur = (c) => { const v = c / 100; return (Number.isInteger(v) ? String(v) : v.toFixed(2).replace('.', ',')) + ' €'; };
+const eur = (c) => { const v = c / 100; return (Number.isInteger(v) ? String(v) : v.toFixed(2).replace('.', ',')) + '\u00a0€'; };
 export function motPastille(r) {
   if (!r) return '';
   switch (r.par) {
