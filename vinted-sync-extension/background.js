@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.323.0';
+const CODE_VERSION = '5.324.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -3623,6 +3623,9 @@ function prochainNumeroDe(main, resa, maintenant) {
   }
   return pref ? pref + c : String(c);
 }
+// Le réglage de l'app (`vrm_numero_ecrit` : { actif, depuis }) : seul `actif === true`
+// l'allume ; absent ou illisible = éteint (comme avant).
+function numeroEcritAllume(main) { const o = main && main.vrm_numero_ecrit; return !!(o && typeof o === 'object' && o.actif === true); }
 function resaPropre(data, maintenant) {
   const t = Number(maintenant) || Date.now();
   const attente = {}, items = {};
@@ -3654,9 +3657,13 @@ async function reserverNumeroPourOnglet(tabId, domain) {
     if (deja && deja.item) { loc['lie_' + tabId + '_' + deja.at] = deja; delete loc[tabId]; }
     const uid = await activeAccountId(domain);
     if (!uid) return { ok: false, raison: 'compte' };
-    const main = await lireMain(['vinted_used_numeros', 'vinted_annonce_numeros', 'vinted_sale_overrides', 'vrm_num_prefixe']);
+    const main = await lireMain(['vinted_used_numeros', 'vinted_annonce_numeros', 'vinted_sale_overrides', 'vrm_num_prefixe', 'vrm_numero_ecrit']);
     const r = await lireResa();
     if (main === null || r === null) { noterDiag('resa_lecture_ratee'); return { ok: false, raison: 'lecture' }; }
+    // 5.324 (7 nov.) « Je numérote moi-même dans mes annonces » (src/numeroEcrit.js de
+    // l'app) : il écrit SON numéro dans l'annonce, VRM n'en donne plus aucun — aucune
+    // réservation, rien affiché à côté de « Publier ».
+    if (numeroEcritAllume(main)) { noterDiag('resa_numero_ecrit'); return { ok: false, raison: 'ecrit' }; }
     const numero = prochainNumeroDe(main, r);
     r.attente[numero] = { at: new Date().toISOString(), uid: String(uid) };
     if (!(await ecrireResa(r))) { noterDiag('resa_ecriture_ratee'); return { ok: false, raison: 'ecriture' }; }
