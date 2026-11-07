@@ -53,6 +53,8 @@ import { passageRelances } from './_lib/relances-essai.js';
 import { comptesARelire, dernieresCaptures, texteComptesARelire, decisionRelecture, CAT_RELECTURE, ID_MEMO_RELECTURE, SELECT_CAPTURES } from './_lib/comptes-a-relire.js';
 // (6 nov., filet 4) La veille des plantages : le propriétaire prévenu d'un type JAMAIS VU (api/_lib/veille-plantages.js).
 import { passageVeillePlantages, ID_MEMO_VEILLE } from './_lib/veille-plantages.js';
+// (6 nov.) La purge à 30 jours du HTML d'origine des e-mails (api/_lib/email-html.js).
+import { purgerHtml } from './_lib/email-html.js';
 // Après 240 s de cron, aucun e-mail de l'essai ne COMMENCE (la fonction s'arrête à 300 s).
 const RELANCES_JUSQUA_MS = 240000;
 
@@ -954,7 +956,11 @@ export default async function handler(req, res) {
     // ne fait pas échouer les rappels déjà partis (elle est dite dans la réponse).
     let veille = null;
     if (!soir && !reveil) { try { veille = await veilleDesPlantages(debutCron); } catch (e) { veille = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; } }
-    res.status(echecs ? 500 : 200).json({ ok: !echecs, ...(soir ? { moment: 'soir' } : reveil ? { moment: 'reveil' } : {}), vendeurs: owners.length, echecs, bilans, ...(relances ? { relances } : {}), ...(veille ? { veille } : {}) });
+    // (6 nov.) Le HTML d'origine des e-mails (30 jours), le MATIN seulement : une
+    // purge ratée ne fait échouer rien (elle est dite dans la réponse).
+    let purgeHtml = null;
+    if (!soir && !reveil) purgeHtml = await purgerHtml({ url: SUPABASE_URL, headers: HEADERS, maintenant: debutCron });
+    res.status(echecs ? 500 : 200).json({ ok: !echecs, ...(soir ? { moment: 'soir' } : reveil ? { moment: 'reveil' } : {}), vendeurs: owners.length, echecs, bilans, ...(relances ? { relances } : {}), ...(veille ? { veille } : {}), ...(purgeHtml ? { purgeHtml } : {}) });
   } catch (e) {
     // Une tâche planifiée qui répond 200 sur une panne n'apparaît nulle part :
     // le tableau de bord la compte réussie, et les rappels d'expédition

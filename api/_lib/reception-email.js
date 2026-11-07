@@ -2,6 +2,7 @@ import {normAdresse,estAdresseCollectrice,sansEtiquette} from './proprietaire-em
 import {filtreBoite,rubriqueConnue,rubriqueEmail,RUBRIQUES_BOITE,PIECES_MAX} from './boite-email.js';
 import {TEXTE_MAX} from './resume-email.js';
 import {LUS_ID,etatLus,estLu} from './emails-lus.js';
+import {origineLue,PREFIXE_HTML} from './email-html.js';
 // Une règle (§11) : à quel compte Vinted une adresse de réception appartient.
 // Lue par la réception ET par le journal — l'adresse décide, jamais le texte.
 function reglesComptes({registre,main,comptes,etats}){
@@ -136,7 +137,12 @@ export async function lireTexteEmail({owner,url,headers,fetcher=fetch,id}){
 // scalaires projetés (jamais `select=data`, §4.4) + son texte gardé + la liste
 // de ses pièces jointes. Filtré par SON owner. Les pièces : `null` = liste non
 // gardée (email classé avant le 5 nov.), `[]` = aucune pièce lue.
-export async function lireEmailBoite({owner,url,headers,fetcher=fetch,id}){
+// (6 nov.) `html` : le HTML d'origine ASSAINI (api/_lib/email-html.js), lu dans SA
+// ligne `email_html_*` et RÉ-ASSAINI ici — demandé seulement par la lecture d'UN
+// e-mail (jamais par une liste), pas en mode stream. Lecture ratée ⇒ `origine:null`
+// (pas su) : l'e-mail s'ouvre quand même, avec son texte.
+const PROJECTION_HTML='html:data->>html,trop:data->>trop,octets:data->>octets,pixels:data->>pixels,at:data->>at';
+export async function lireEmailBoite({owner,url,headers,fetcher=fetch,id,html=false,maintenant=Date.now()}){
  if(!owner || owner==='00000000-0000-0000-0000-000000000000')throw Error('connexion-requise');
  const m=/^email_reception_([0-9a-f]{16,64})$/.exec(String(id||''));
  if(!m)throw Error('identifiant');
@@ -148,6 +154,8 @@ export async function lireEmailBoite({owner,url,headers,fetcher=fetch,id}){
  ]);
  const x=lignes[0];
  if(!x)return {ok:true,id:m[0],email:null};
+ let origine;
+ if(html){try{const h=await lire(`owner=eq.${o}&id=eq.${PREFIXE_HTML}${m[1]}&select=${PROJECTION_HTML}&limit=1`);origine=origineLue(h[0]||null,{type:x.type,resume:x.resume,at:x.at},maintenant);}catch(_){origine=null;}}
  const {associes,adresseSuivie}=reglesComptes({registre,main,comptes,etats:etatsC});
  const date=v=>Number.isFinite(Date.parse(v))?new Date(v).toISOString():null;
  const adresses=[...new Set((Array.isArray(x.adresses)?x.adresses:[]).map(adresseSuivie))].slice(0,5);
@@ -158,7 +166,7 @@ export async function lireEmailBoite({owner,url,headers,fetcher=fetch,id}){
  // (revue du 5 nov.) La réception ne garde que TEXTE_MAX caractères (+ « … ») :
  // un texte coupé est un EXTRAIT, et l'écran le dit (jamais présenté comme entier).
  const texteCoupe=texte==null?null:texte.length>TEXTE_MAX&&texte.endsWith('…');
- return {ok:true,id:m[0],email:{id:m[0],at:date(x.at),sourceDate:date(x.sourceDate),receivedAt:date(x.receivedAt),etat:['integre','a-verifier','erreur'].includes(x.etat)?x.etat:'a-verifier',type:String(x.type||'information').slice(0,40),subject:String(x.subject||'').slice(0,300),from:String(x.from||'').slice(0,200),adresses,compte:lies.length===1?{id:lies[0].id,nom:lies[0].nom}:null,compteAmbigu:lies.length>1,resume:r&&JSON.stringify(r).length<=600?r:null,pieces,texte,texteCoupe}};
+ return {ok:true,id:m[0],email:{id:m[0],at:date(x.at),sourceDate:date(x.sourceDate),receivedAt:date(x.receivedAt),etat:['integre','a-verifier','erreur'].includes(x.etat)?x.etat:'a-verifier',type:String(x.type||'information').slice(0,40),subject:String(x.subject||'').slice(0,300),from:String(x.from||'').slice(0,200),adresses,compte:lies.length===1?{id:lies[0].id,nom:lies[0].nom}:null,compteAmbigu:lies.length>1,resume:r&&JSON.stringify(r).length<=600?r:null,pieces,texte,texteCoupe,...(html?{origine}:{})}};
 }
 
 // Lecture exclusivement sous le propriétaire authentifié. Aucun corps d’email,

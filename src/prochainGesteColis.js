@@ -26,6 +26,22 @@ export function bordereauxAImprimer(lignes) {
   return (Array.isArray(lignes) ? lignes : []).filter((l) => l && !l.imprime);
 }
 
+// (6 nov., audit des chiffres) « À IMPRIMER » HORS DE COLIS, LA MÊME NOTION. Ma journée disait
+// « 5 prêts à imprimer » quand Colis disait « 4 à imprimer » (mesuré sur sa base) : elle comptait
+// les bordereaux PRÊTS (imprimés compris) et seulement ceux reçus par e-mail (les bordereaux captés
+// par l'extension ne sont lus que par Colis), sans le dire « au moins ». La règle est celle de la
+// case de Colis (`bordereauxAImprimer`) ; Colis la publie (`vrm_colis_prets.aImprimer`) et un autre
+// écran la lit quand elle parle du MÊME lot (`total` = ses colis Vinted à envoyer) — sinon il dit
+// « au moins » ce qu'il sait.
+//   local : le nombre que l'écran sait compter lui-même (minorant) ; complet : il a TOUT lu ;
+//   pub : la publication de Colis ; totalAPoster : ses colis Vinted à envoyer.
+export function compteAImprimer({ local = 0, complet = false, pub = null, totalAPoster = null } = {}) {
+  const n0 = fini(local) ? local : 0;
+  if (complet) return { n: n0, exact: true };
+  if (pub && fini(pub.aImprimer) && fini(pub.total) && pub.total === totalAPoster) return { n: Math.max(pub.aImprimer, n0), exact: true };
+  return { n: n0, exact: false };
+}
+
 // Le geste d'aller chercher : la phrase d'un point.
 function phrasePoint(p, { urgent = false } = {}) {
   const n = p.colis.length;
