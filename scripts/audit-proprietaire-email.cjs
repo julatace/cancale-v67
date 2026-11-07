@@ -9,6 +9,7 @@
 //  Une erreur ici ne se voit pas : l'email part chez un autre vendeur, et celui
 //  qui l'attendait ne saura jamais qu'il a existé.
 // ════════════════════════════════════════════════════════════════════════════
+process.env.SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'cle-service-audit';   // (7 nov.) sans elle, les routes serveur répondent 503 (api/_lib/cle-service.js)
 const path = require('path');
 
 let ko = 0, ok = 0;

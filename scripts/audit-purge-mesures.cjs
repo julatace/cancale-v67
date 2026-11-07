@@ -33,7 +33,9 @@ const MUTATIONS = {
   'JSON illisible pris pour une liste vide': [[LIB, "if (!Array.isArray(j)) return { fait: false, raison: 'lecture', seuil };", "if (!Array.isArray(j)) j = [];"]],
   'lecture select=data': [[LIB, "*&select=id&order=id.asc`", "*&select=id,data&order=id.asc`"]],
   'pas de pagination': [[LIB, "if (j.length < page) break;", "break;"]],
-  'le jour du seuil supprimé': [[LIB, "if (j && j < seuil) out.push(idJour(j));", "if (j && j <= seuil) out.push(idJour(j));"]],
+  'le jour du seuil supprimé': [[LIB, "if (j && j < seuil) out.push(String(id));", "if (j && j <= seuil) out.push(String(id));"]],
+  'éclats jamais purgés': [[LIB, "const RE_ID_JOUR = RE_ID_MESURES;", "const RE_ID_JOUR = /^mesures_jour_(\\d{4}-\\d{2}-\\d{2})$/;"]],
+  'éclat ramené à l’ancienne forme': [[LIB, "if (j && j < seuil) out.push(String(id));", "if (j && j < seuil) out.push(idJour(j));"]],
   '30 jours au lieu de 90': [[LIB, "export const JOURS_GARDES = 90;", "export const JOURS_GARDES = 30;"]],
   'date pas vérifiée': [[LIB, "if (!Number.isFinite(t) || new Date(t).toISOString().slice(0, 10) !== m[1]) return null;", ""]],
   'suppression chez tous les vendeurs': [[LIB, "await fetcher(`${url}/rest/v1/app_data?owner=eq.${p}&id=in.(", "await fetcher(`${url}/rest/v1/app_data?id=in.("]],
@@ -159,6 +161,21 @@ const ligne = (id, owner = PROPRIO) => ({ owner, id, data: { v: 1, h: { lourd: '
     const f2 = fauxFetch(b, { panne: (m) => (m === 'DELETE' ? 500 : 0) });
     let r2; try { r2 = await lancer(f2); } catch (e) { r2 = { leve: String(e) }; }
     vrai(!r2.leve && r2.fait === false && r2.raison === 'suppression', 'P5 suppression ratée ⇒ dite, pas levée');
+  }
+
+  // ── P7. Les éclats (7 nov.) : `mesures_jour_{jour}_{éclat}` ───────────────
+  {
+    const b = [
+      ligne('mesures_jour_' + jourIl(91) + '_a'), ligne('mesures_jour_' + jourIl(91) + '_0'), ligne('mesures_jour_' + jourIl(91)),
+      ligne('mesures_jour_' + jourIl(90) + '_3'), ligne('mesures_jour_' + jourIl(5) + '_f'),
+      ligne('mesures_jour_' + jourIl(200) + '_z'), ligne('mesures_jour_' + jourIl(200) + '_10'),
+    ];
+    const f = fauxFetch(b);
+    const r = await lancer(f);
+    const reste = b.map((l) => l.id);
+    vrai(r.fait === true && r.retirees === 3 && !reste.some((x) => x.startsWith('mesures_jour_' + jourIl(91))), `P7 les éclats d’un vieux jour ET son ancienne ligne sont supprimés (${r.retirees})`);
+    vrai(reste.includes('mesures_jour_' + jourIl(90) + '_3') && reste.includes('mesures_jour_' + jourIl(5) + '_f'), 'P7 les éclats du jour du seuil et des jours récents sont gardés');
+    vrai(reste.includes('mesures_jour_' + jourIl(200) + '_z') && reste.includes('mesures_jour_' + jourIl(200) + '_10'), 'P7 un suffixe qui n’est pas un éclat est gardé');
   }
 
   // ── P6. Le cron du matin ─────────────────────────────────────────────────

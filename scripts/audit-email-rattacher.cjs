@@ -21,6 +21,7 @@
 //  projections `select=`, `meta->>` et la pagination `Range` (§6.3), et qui
 //  coupe à 1 000 lignes sans le dire, comme Supabase (§4.5).
 // ════════════════════════════════════════════════════════════════════════════
+process.env.SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'cle-service-audit';   // (7 nov.) sans elle, les routes serveur répondent 503 (api/_lib/cle-service.js)
 const path = require('path');
 const iSrc = process.argv.indexOf('--src');
 const RACINE = iSrc > 0 ? path.resolve(process.argv[iSrc + 1]) : path.join(__dirname, '..');

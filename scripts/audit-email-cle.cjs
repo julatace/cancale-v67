@@ -16,6 +16,7 @@
 // les deux sens : rien ne s'ouvre sans la bonne clé, et avec elle tout marche —
 // y compris l'arrivée normale d'un email, qui ne doit pas casser tant que la
 // clé n'est pas posée (sinon les emails s'arrêteraient le jour du changement).
+process.env.SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'cle-service-audit';   // (7 nov.) sans elle, les routes serveur répondent 503 (api/_lib/cle-service.js)
 const path = require('path'), fs = require('fs');
 const RACINE = path.join(__dirname, '..');
 let ko = 0;

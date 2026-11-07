@@ -38,6 +38,7 @@
 //  Lancer : node scripts/audit-emails-html.cjs [--prouve]
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
+process.env.SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'cle-service-audit';   // (7 nov.) sans elle, les routes serveur répondent 503 (api/_lib/cle-service.js)
 const path = require('path'), fs = require('fs');
 const R = process.env.AUDIT_RACINE || path.join(__dirname, '..');
 const { prouver, sansCommentaires } = require('./_mutations-audit.cjs');
@@ -202,6 +203,8 @@ const iso = (jours) => new Date(MAINT - jours * 864e5).toISOString();
     global.fetch = async (url, opts = {}) => {
       const u = decodeURIComponent(String(url));
       if (!u.includes('/rest/v1/')) return rep({});
+      // (7 nov.) Avec la clé de service, l'accès du vendeur se demande à la base (rpc) : oui.
+      if (/\/rest\/v1\/rpc\//.test(u)) return rep(true);
       if ((opts.method || 'GET') === 'POST') {
         let lot = []; try { lot = JSON.parse(opts.body || '[]'); } catch (_) {}
         lot = Array.isArray(lot) ? lot : [lot];
