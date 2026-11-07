@@ -71,7 +71,7 @@ const INTERDITS = {
 };
 const LIRE = (pg, interdits) => pg.evaluate((I) => {
   const t = document.body.innerText || '';
-  const montants = t.match(/\d(?:[\d   .,]*\d)?[   ]?(?:[kM][   ]?)?€|€[   ]?\d/g) || [];
+  const montants = t.match(/\d(?:[\d \u00a0\u202f.,]*\d)?[ \u00a0\u202f]?(?:[kM][ \u00a0\u202f]?)?€|€[ \u00a0\u202f]?\d/g) || [];
   const fuites = {};
   for (const [cat, mots] of Object.entries(I)) for (const m of mots) {
     const re = new RegExp(m.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
@@ -144,7 +144,7 @@ const LIRE = (pg, interdits) => pg.evaluate((I) => {
         }));
         dit(p.cats.length >= 7 && p.cats.every((c) => /:1$/.test(c)), `D ${tag} : les catégories, toutes cachées par défaut`, JSON.stringify(p.cats));
         dit(p.listes.join() === 'marques:2,prefixes:1,contient:1', `D ${tag} : SON programme est relu du nuage (marques 2, préfixes 1, contient 1)`, JSON.stringify(p.listes));
-        dit(!/\d[\d   ,.]*\s?€/.test(p.apercu) && /•••/.test(p.apercu) && p.entieres >= 1, `D ${tag} : l'aperçu cache montants et mots, et la ligne « contient » entière`, p.apercu.replace(/\n/g, ' | '));
+        dit(!/\d[\d \u00a0\u202f,.]*\s?€/.test(p.apercu) && /•••/.test(p.apercu) && p.entieres >= 1, `D ${tag} : l'aperçu cache montants et mots, et la ligne « contient » entière`, p.apercu.replace(/\n/g, ' | '));
         await capture(pg, `D-${tag}-reglages`);
         const avant = b.ecritures;
         await pg.click('[data-stream-cat="montants"] button[role="switch"]', { timeout: 5000 }).catch(() => {});

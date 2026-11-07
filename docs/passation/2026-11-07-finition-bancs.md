@@ -19,11 +19,12 @@ rouges (ou sautés) des deux côtés, donc (c).
 
 ## Avancement
 
-43 bancs lancés sur 221 (de `fiche-paire` à `widget-multi`, ordre `LC_ALL=C`).
+61 bancs lancés sur 221 (de `fiche-paire` à `widget-multi`, ordre `LC_ALL=C`).
 
-- **verts** (27) : `filtre-compte`, `finition`, `finition-premium`, `fluidite`, `fournisseurs`, `garde-ecrans`, `gestes-annuler`, `glisser-onglet`, `gros-volumes`, `hors-ligne`, `hors-reseau`, `ia`, `imprimante`, `inscription-fiable`, `inventaire`, `iphone-reprise`, `journal-emails`, `journee-chiffres`, `journee-premium`, `journee-widgets`, `lbc-bordereau`, `lbc-comme-vinted`, `lbc-demarrage`, `lbc-identite-privee`, `lbc-rappel-mise-a-jour`, `lbc-repondre`, `lbc-revue-complete`
-- **(c) rouges identiques sur main** (13) : `fiche-paire`, `file-envoi`, `formes-communes`, `garage3d`, `indicateur-pro`, `jetons-coherence`, `journee-coherence`, `journee-mieux`, `journee-photos`, `lbc-messages`, `lbc-pause`, `lbc-publier-app`, `lbc-relier`
-- **DIFF — à trancher / relancer seuls** : `fusion-app`, `lbc-flou-compte`, `lbc-preuve`
+- **verts** (37) : `filtre-compte`, `finition`, `finition-premium`, `fluidite`, `fournisseurs`, `garde-ecrans`, `gestes-annuler`, `glisser-onglet`, `gros-volumes`, `hors-ligne`, `hors-reseau`, `ia`, `imprimante`, `inscription-fiable`, `inventaire`, `iphone-reprise`, `journal-emails`, `journee-chiffres`, `journee-premium`, `journee-widgets`, `lbc-bordereau`, `lbc-comme-vinted`, `lbc-demarrage`, `lbc-identite-privee`, `lbc-rappel-mise-a-jour`, `lbc-repondre`, `lbc-revue-complete`, `leboncoin`, `litiges-recherche`, `lot-bordereaux`, `messages-emails-communaute`, `messages-lisibles`, `messages-priorite`, `messages-sites`, `mesures-terrain`, `mode-exemple`, `morceau-perime`
+- **(c) rouges identiques sur main** (17) : `fiche-paire`, `file-envoi`, `formes-communes`, `garage3d`, `indicateur-pro`, `jetons-coherence`, `journee-coherence`, `journee-mieux`, `journee-photos`, `lbc-messages`, `lbc-pause`, `lbc-publier-app`, `lbc-relier`, `lbc-supprimer`, `lbcprep`, `messages-volets`, `mobile`
+- **DIFF — à trancher / relancer seuls** : `fusion-app`, `lbc-flou-compte`, `lbc-preuve`, `menu-range`, `messagerie`
+- **NEUF — à trancher / relancer seuls** : `lien-vc-frise`, `mode-stream`
 
 ### Classement à la main
 
@@ -35,6 +36,15 @@ rouges (ou sautés) des deux côtés, donc (c).
 - **(c) `lbc-preuve`** — main s'arrête plus tôt (historique git illisible dans l'archive) ;
   même cause racine des deux côtés : l'écran Leboncoin ne propose rien (« null à publier »),
   les contrôles qui suivent en découlent.
+- **(a) `messagerie`** — la finition a récrit « accepte-les en 1 tap » en « accepte-les d'un
+  geste » : le banc accepte les deux tournures (la règle jugée : un geste, rien tout seul).
+  L'autre rouge (« l'offre de l'acheteur (45 €) est lue dans le fil ») est identique sur main.
+- **(a) `mode-stream`** (et `stream-photos`, même expression) — l'expression qui compte les
+  montants lisibles n'avait que des espaces ORDINAIRES dans ses classes (`[\d   .,]`,
+  `[   ]` : les insécables d'origine s'étaient perdues) : un « 89 € » à l'insécable n'était
+  plus compté. Rouge « éteint d'un tap, les montants reviennent » (0 compté). Les classes
+  disent maintenant `[   ]` : le contrôle « en stream, aucun montant lisible »
+  redevient capable d'échouer (il passait à vide sur un texte à l'insécable).
 - **à relancer seuls** (rouge de transition sous charge, opacité/fond pris en plein
   mouvement) : `fusion-app` (fond rgba(…, 0,353) d'un bouton secondaire en sombre),
   `lbc-flou-compte` (opacité 0,31 sur « rien n'est flouté »).
