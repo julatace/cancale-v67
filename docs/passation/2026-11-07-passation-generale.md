@@ -72,6 +72,26 @@ Chromium). **Les quatre branches sont sauvegardées sur GitHub** sous `claude/at
 - Geste de Julien après la mise en ligne : iPhone → Réglages → Luminosité et affichage →
   Taille du texte plus grande, puis rouvrir VRM.
 
+
+**État au 7 nov., 2 h (agent d'intégration, rapport partiel)** — branche `claude/attente-v36-finition-integ` à
+**`0ebfa35f`**, déjà fusionnée avec la prod du 7 nov. (3cf8d948) :
+- **Audits** : 346 relancés ; 339 verts ; rouges tous déjà rouges AVANT la finition (même nombre de défauts) :
+  `chemin-json-guillemets` (connu), `argent-a-venir`, `export-donnees`, `journee-coherence`, `photos-vinted`,
+  `politique-hotes`. `audit-vc-recon` est vert mais encore listé dans `scripts/audits-exceptions.json` (à retirer).
+- **Bancs** : 155 sur 362 lancés (ordre alphabétique jusqu'à `feuilles-coque`) : 98 verts, 10 verts après
+  adaptation (« e-mail », insécable — jamais affaiblis), 51 déjà rouges sur la prod (liste dans le rapport,
+  ex. `accueil`, `colis`, `csp`, `compta-claire`, `journee-coherence`…), **0 rouge nouveau**.
+- 2 défauts corrigés à la source : `BoiteEmails.jsx` (`replace(' €','')` ⇒ `/\s*€$/`), `rechercheEcran.js`
+  (pastille « au centime » à l'insécable).
+- **RESTE** : lancer les **207 bancs** de `fiche-paire` à `widget-multi` (dont `onglets-a/c/d`, `verif_visuel`,
+  `verif_dark`, `messages-*`, `stats-*`, `registres`, `urssaf`, `recu-achat`, `reception-emails`, `vendeur-neuf`,
+  `popup`, `premierjour`), UN à la fois, en comparant chaque rouge au même banc lancé sur `main` (rouge des deux
+  côtés = (c), pas la faute de la finition). Puis PR. Les outils de file de l'agent étaient dans le scratchpad
+  (perdus) : un simple `for b in …; do BANC_PORT=… timeout 1500 node scripts/bancs/$b.cjs; done` suffit.
+- L'insécable avant « : ; ? ! » n'est PAS appliquée (≈ 2 700 changements, touche 56 textes de `favorisAuto.js`
+  envoyés aux acheteurs et des commentaires CSS) : à faire seulement après la fusion de `v36-hors-reseau`, en
+  excluant `favorisAuto.js`, avec tous les bancs.
+
 ### 1.2 ✅ Audit des chiffres — FUSIONNÉ (7 nov., 1 h 20)
 Agent fini (sha 2082d0e4+02098e01). Détail : `docs/passation/2026-11-06-audit-chiffres.md`.
 - Le « 20 colis à déposer » n'a PAS été reproduit sur une copie réelle : tous les écrans disaient 12 à envoyer
