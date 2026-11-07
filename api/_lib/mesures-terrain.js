@@ -145,3 +145,72 @@ export async function listerMesures({ utilisateur, env = process.env, fetcher = 
   if (!rows) return { code: 503, corps: { ok: false, raison: 'base' } };
   return { code: 200, corps: { ok: true, jours: joursPourPanneau(rows) } };
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LA PURGE À 90 JOURS (7 nov., décision du 6 nov.) — cron du matin
+// ═══════════════════════════════════════════════════════════════════════════
+// Les agrégats `mesures_jour_AAAA-MM-JJ` du PROPRIÉTAIRE de plus de 90 jours
+// s'effacent. Trois règles :
+//   · la lecture est PROJETÉE (`select=id`, jamais `select=data`) et paginée
+//     par `Range` (Supabase plafonne à 1 000 lignes sans le dire) ;
+//   · une lecture ratée (réseau, statut, page illisible, au début ou au milieu)
+//     ne supprime RIEN — on ne supprime que ce qu'on a lu en entier ;
+//   · la date se lit dans l'IDENTIFIANT (jamais `updated_at`, qui ment) : un id
+//     dont le jour n'est pas une vraie date est GARDÉ. Le jour du seuil est gardé
+//     (« plus de 90 jours » = strictement avant).
+export const JOURS_GARDES = 90;
+const RE_ID_JOUR = /^mesures_jour_(\d{4}-\d{2}-\d{2})$/;
+const RE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+// Le jour d'une ligne, lu dans son id ; `null` si ce n'est pas une vraie date.
+export function jourDeId(id) {
+  const m = RE_ID_JOUR.exec(String(id || ''));
+  if (!m) return null;
+  const t = Date.parse(m[1] + 'T12:00:00Z');
+  if (!Number.isFinite(t) || new Date(t).toISOString().slice(0, 10) !== m[1]) return null;
+  return m[1];
+}
+
+// Le premier jour GARDÉ (jour de Paris, il y a 90 jours).
+export const seuilPurgeMesures = (maintenant = Date.now()) => jourParis(maintenant - JOURS_GARDES * 86400000);
+
+// Les ids à supprimer parmi les ids lus (pur : l'audit le juge seul aussi).
+export function idsMesuresAPurger(ids, maintenant = Date.now()) {
+  const seuil = seuilPurgeMesures(maintenant);
+  const out = [];
+  for (const id of Array.isArray(ids) ? ids : []) { const j = jourDeId(id); if (j && j < seuil) out.push(idJour(j)); }
+  return [...new Set(out)];
+}
+
+// `{ url, headers }` : la base et les en-têtes de la clé de service (ceux du cron).
+// Rend { fait, lues, retirees, seuil } ou { fait:false, raison, statut|erreur } :
+// une purge ratée ne fait échouer rien d'autre (le cron la dit dans sa réponse).
+export async function purgerMesuresAnciennes({ url, headers, proprietaire, fetcher = fetch, maintenant = Date.now() }) {
+  const seuil = seuilPurgeMesures(maintenant);
+  const p = String(proprietaire || '').trim().toLowerCase();
+  if (!RE_UUID.test(p)) return { fait: false, raison: 'proprietaire', seuil };
+  // 1. Lire TOUS les ids (projection seule). Une page ratée ⇒ rien n'est supprimé.
+  const ids = []; const page = 1000;
+  try {
+    for (let from = 0; from < 200000; from += page) {
+      const r = await fetcher(`${url}/rest/v1/app_data?owner=eq.${p}&id=like.${PREFIXE_MESURES}*&select=id&order=id.asc`, { headers: { ...headers, 'Range-Unit': 'items', Range: `${from}-${from + page - 1}` } });
+      if (!r || !r.ok) return { fait: false, raison: 'lecture', statut: r ? r.status : null, seuil };
+      let j = null; try { j = await r.json(); } catch (_) { j = null; }
+      if (!Array.isArray(j)) return { fait: false, raison: 'lecture', seuil };
+      for (const x of j) if (x && typeof x.id === 'string') ids.push(x.id);
+      if (j.length < page) break;
+    }
+  } catch (e) { return { fait: false, raison: 'lecture', erreur: String((e && e.message) || e).slice(0, 200), seuil }; }
+  // 2. Supprimer par date (le jour lu dans l'id), par lots bornés, chez le propriétaire seul.
+  const aPurger = idsMesuresAPurger(ids, maintenant);
+  let retirees = 0;
+  for (let i = 0; i < aPurger.length; i += 100) {
+    const lot = aPurger.slice(i, i + 100);
+    try {
+      const r = await fetcher(`${url}/rest/v1/app_data?owner=eq.${p}&id=in.(${lot.join(',')})`, { method: 'DELETE', headers: { ...headers, Prefer: 'return=minimal' } });
+      if (!r || !r.ok) return { fait: false, raison: 'suppression', statut: r ? r.status : null, lues: ids.length, retirees, seuil };
+    } catch (e) { return { fait: false, raison: 'suppression', erreur: String((e && e.message) || e).slice(0, 200), lues: ids.length, retirees, seuil }; }
+    retirees += lot.length;
+  }
+  return { fait: true, lues: ids.length, retirees, seuil };
+}

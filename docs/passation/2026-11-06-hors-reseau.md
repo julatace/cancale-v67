@@ -102,7 +102,25 @@ Avant : 34 rouges sur 2 tailles (dont 2 du banc lui-même, corrigés : le lieu t
 - La politique de confidentialité dit la mesure (une ligne, §2 du tableau). Aucun hôte
   nouveau (même origine) : CSP et `audit-politique-hotes` inchangés pour ça.
 - Les lignes `mesures_jour_*` s'accumulent (≈ quelques Ko par jour) : aucune purge n'est
-  posée (DELETE = geste humain) — à décider.
+  posée (DELETE = geste humain) — à décider. **Décidé le 6 nov., codé le 7 nov. : voir
+  « Purge à 90 jours » ci-dessous.**
+
+### Purge à 90 jours (7 nov., intégration `claude/integ-hors-reseau`)
+- `purgerMesuresAnciennes` (`api/_lib/mesures-terrain.js`), appelée par le cron du MATIN
+  seulement (`api/ship-reminders.js`, ni le soir ni au réveil), avec le propriétaire de
+  l'installation (`proprietaireInstallation`) ; sans propriétaire connu, aucune requête.
+- Lecture PROJETÉE `app_data?owner=eq.<proprio>&id=like.mesures_jour_*&select=id`,
+  paginée par `Range` (1 000/page). Une page ratée (statut, réseau, JSON illisible, page 2
+  après une page 1 pleine) ⇒ **rien n'est supprimé**.
+- Le jour se lit dans l'IDENTIFIANT (`jourDeId`, vraie date vérifiée ; sinon la ligne est
+  gardée) ; supprimé = jour STRICTEMENT avant « aujourd'hui de Paris − 90 j » (le jour du
+  seuil est gardé). Suppression `owner=eq.<proprio>&id=in.(…)`, lots de 100 ; une
+  suppression ratée est dite dans la réponse du cron (`purgeMesures`), jamais levée.
+- Preuve : `node scripts/audit-purge-mesures.cjs` (28 verts, faux PostgREST qui sert la
+  forme réelle : projection, `Range`, plafond 1 000, filtres) et `--prouve` : **12/12
+  mutations rouges** (lecture ratée qui supprime, `select=data`, sans pagination, jour du
+  seuil supprimé, 30 j, date non vérifiée, tous les vendeurs, cron qui ne purge pas ou
+  purge le soir…). Aucune ligne de test dans la base.
 
 ### Preuves
 - `node scripts/audit-mesures-terrain.cjs --prouve` : R1–R13 (jeu riche : e-mail, pseudo,
