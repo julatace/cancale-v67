@@ -430,6 +430,13 @@ async function colisEmailDepuis(pub, retires, today, lu) {
   const fins = finsDuWidget(lu);
   const comptes = new Set();
   let n = 0;
+  // (6 nov., audit des chiffres) UNE LIGNE SANS IDENTITÉ NE SE COMPTE PAS. Mesuré sur sa base :
+  // le widget disait 15 colis à retirer quand l'app en comptait 12 — trois e-mails « Commande mise
+  // à jour » de Vinted (une conversation, aucun n° de suivi) reçus après la photo de l'app, comptés
+  // chacun comme un colis NEUF. Sans n°, rien ne dit que ce n'est pas un colis déjà compté (la règle
+  // de l'app : une moitié Vinted sans identité est « peut-être en double », jamais comptée) : le
+  // nombre devient « au moins » (null, comme une photo incomplète plus bas), jamais un colis de plus.
+  let sansIdentite = 0;
   for (const x of j) {
     if (!x) continue;
     const recu = Date.parse(x.r || '');
@@ -442,8 +449,9 @@ async function colisEmailDepuis(pub, retires, today, lu) {
     const ar = arriveesDeLigne({ ...x, s: 'available' });           // (tour 2 n° 14) une borne n'est jamais une arrivée
     if (sortiParSuivis([suiviDeLigne(x)], fins, ar.arrivee, { borne: ar.borne })) continue;        // retiré, ou reparti depuis son arrivée (même n°)
     const e = etatRetrait({ limite: x.l || null, arriveeMs: arr, transporteur: x.c || '' }, Date.now(), today);
-    if (e.etat === 'a_retirer') { n++; const k = suiviDeLigne(x); if (k) comptes.add(k); }
+    if (e.etat === 'a_retirer') { const k = suiviDeLigne(x); if (!k) { sansIdentite++; continue; } n++; comptes.add(k); }
   }
+  if (sansIdentite) return null;                                     // pas su : « au moins » la photo
   if (!Array.isArray(lu.transp)) return n;                           // le transporteur pas lu : rien de plus à ajouter
   const photo = numsDeLaPhoto(pub);
   const vusN = new Set([...vus].map(normSuivi).filter(Boolean));

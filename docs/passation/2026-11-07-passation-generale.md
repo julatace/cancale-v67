@@ -72,28 +72,19 @@ Chromium). **Les quatre branches sont sauvegardées sur GitHub** sous `claude/at
 - Geste de Julien après la mise en ligne : iPhone → Réglages → Luminosité et affichage →
   Taille du texte plus grande, puis rouvrir VRM.
 
-### 1.2 `claude/attente-v36-audit-chiffres-2` — audit des chiffres de tout le site
-- Demande de Julien : « Plus de fiabilité stp j'ai pas 20 colis à déposer par exemple,
-  audit tout le site ».
-- Fait (commits de la branche) :
-  - « à imprimer » est une seule notion : Ma journée lit les bordereaux PAS ENCORE
-    imprimés publiés par Colis (5 → 4, « au moins » si ce n'est pas sûr) ;
-  - le récapitulatif de Colis passe à 12 avec Vestiaire et Leboncoin ;
-  - Tournée : « à déposer » = les colis qui ont leur bordereau ;
-  - Ma journée lit les bordereaux captés (lecture scalaire) ;
-  - widget : un e-mail de colis SANS n° de suivi arrivé après la photo de l'app ne compte
-    plus un colis à retirer de plus (15 → 12, « au moins »).
-- **Reste** :
-  - finir le passage écran par écran : chaque nombre affiché vient de UNE règle publiée,
-    et le même nombre est identique partout (Ma journée, Colis, widget, cloche, onglets) ;
-  - banc `chiffres-coherents` ;
-  - passation `docs/passation/2026-11-06-audit-chiffres.md` ;
-  - **question posée par moi, pas encore tranchée** : sur Ma journée (banc
-    `litiges-recherche`, capture du 6 nov. au soir), la carte de semaine affichait
-    « **Semaine du 26 oct.** » avec Ventes 0 / CA 0 € / Colis envoyés 0, alors qu'on
-    était le vendredi 6 nov. et que la bande de jours montrait 31 oct.–6 nov. Vérifier si
-    c'est la semaine passée annoncée comme telle (alors le dire) ou une erreur. Vérifier
-    aussi que « Colis envoyés 0 » n'est pas un 0 qui veut dire « pas su » (§5).
+### 1.2 ✅ Audit des chiffres — FUSIONNÉ (7 nov., 1 h 20)
+Agent fini (sha 2082d0e4+02098e01). Détail : `docs/passation/2026-11-06-audit-chiffres.md`.
+- Le « 20 colis à déposer » n'a PAS été reproduit sur une copie réelle : tous les écrans disaient 12 à envoyer
+  (11 déposables). Le « 20 » le plus probable est **« Envoyés · 20 »** juste à côté de « À envoyer · 12 »
+  (chiffre juste, mais se lit de travers) ⇒ **reste : revoir ce libellé** (ex. « Partis ce mois · 20 »).
+- Corrigé : « à imprimer » une seule notion (Ma journée 5 → 4, récap Colis 10 → 4), récap Colis avec
+  Leboncoin/Vestiaire (11 → 12), Tournée « à déposer » = colis avec bordereau (12 → 11), widget « à retirer »
+  15 → 12 (e-mails sans n° de suivi = peut-être en double, « au moins »).
+- « Semaine du 26 oct. » vérifiée : pas d'écart. « Colis envoyés » dit « — envois pas notés » (juste : aucun
+  geste « Colis fait » noté, aucune date d'envoi prouvée).
+- Banc `chiffres-coherents` (27 verts ; 9 rouges sur l'arbre d'avant), ajouté à `verifier.yml`.
+- **Reste aussi** : carte « À envoyer » de Ventes dit « — · ouvre Colis » tant que Colis n'a pas publié ;
+  4 rouges du banc `colis` antérieurs à la session ; fraîcheur (listes de ventes relues à 8 h 40 seulement).
 
 ### 1.3 ✅ E-mails HTML 30 jours — FUSIONNÉ dans `claude/project-review-nsk5su` (7 nov., 0 h 55)
 Agent fini (sha c9728aef). Fusionné, build et audits verts (`emails-html`, `boite-mail`, `boite-emails`, `csp`,
@@ -124,7 +115,7 @@ après la mise en ligne gardent leur mise en page.
     `mesures-terrain`, puis PR.
 - Vérifier la politique de confidentialité (mise à jour dans la branche) : collecte anonyme.
 
-**Ordre conseillé** : 1.4 (fini) → 1.2 → 1.1 (1.3 est déjà fusionné) en dernier (c'est elle qui touche le
+**Ordre conseillé** : 1.4 (fini) → 1.1 (1.2 et 1.3 sont déjà fusionnés) en dernier (c'est elle qui touche le
 plus de texte : la fusionner après les autres évite des centaines de conflits).
 
 ---
