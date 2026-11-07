@@ -4567,8 +4567,8 @@ const viderCacheLignes = () => { _rowCache.clear(); try { viderLecturesMemo(); }
 // est remonté ; chaque réponse relançait le calcul de tout l'écran. `fetchMemo`
 // garde la RÉPONSE d'une lecture GET 60 s (comme `cachedRow`), par adresse ET par
 // session (en-tête Authorization). Garde-fous :
-//   · toute ÉCRITURE vers la base partie de cette page (POST/PATCH/PUT/DELETE vers
-//     /rest/v1/, d'où qu'elle vienne) vide la mémoire avant de partir ;
+//   · toute ÉCRITURE partie de cette page (POST/PATCH/PUT/DELETE vers /rest/v1/ ou
+//     /api/, d'où qu'elle vienne) vide la mémoire à son départ ET à son retour ;
 //   · un avis de l'extension (`vrm:ext`, une donnée a changé), le retour au premier
 //     plan, une relecture du nuage et « Synchroniser » la vident aussi ;
 //   · une réponse ratée (pas ok, réseau, JSON illisible) n'est JAMAIS gardée ;
@@ -4606,7 +4606,16 @@ try {
       try {
         const m = String((init && init.method) || (input && typeof input === 'object' && input.method) || 'GET').toUpperCase();
         const u = typeof input === 'string' ? input : String((input && input.url) || '');
-        if (m !== 'GET' && m !== 'HEAD' && /\/rest\/v1\//.test(u)) viderLecturesMemo();
+        // Une écriture vers notre base, ou vers nos routes serveur (`/api/…` : eBay,
+        // compte, relais écrivent en base côté serveur) : la mémoire se vide au
+        // DÉPART et au RETOUR (une lecture partie pendant l'écriture ne garde pas
+        // l'état d'avant).
+        if (m !== 'GET' && m !== 'HEAD' && (/\/rest\/v1\//.test(u) || /^(\/|https?:\/\/[^/]*vrm\.center\/)api\//.test(u))) {
+          viderLecturesMemo();
+          const p = _fetchBrut(input, init);
+          p.then(viderLecturesMemo, viderLecturesMemo);
+          return p;
+        }
       } catch (_) {}
       return _fetchBrut(input, init);
     };
@@ -6310,7 +6319,7 @@ const fetchCapturedLabel = async (uid) => {
 const fetchLabelFrais = async (uid) => {
   if (!uid) return null;
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${uid}_label_latest&select=capturedAt:meta->>capturedAt,tx:meta->>tx&meta->>_pdf=eq.true`, { headers: sbAuth() });
+    const res = await fetchMemo(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${uid}_label_latest&select=capturedAt:meta->>capturedAt,tx:meta->>tx&meta->>_pdf=eq.true`, { headers: sbAuth() });
     if (!res.ok) return null;                     // « pas su » ≠ « pas de PDF »
     const rows = await res.json();
     return Array.isArray(rows) && rows[0] ? rows[0] : null;
@@ -6335,7 +6344,7 @@ const fetchCapturedLabelMetas = async (uid) => {
     //    C'est LA voie sans déduction pour savoir quelle paire part dans ce carton.
     //    Scalaires uniquement : les octets du PDF ne partent qu'à l'impression (§34).
     // (1er nov.) Toutes les pages ; une page ratée = pas su ≠ aucun bordereau capté.
-    const rows = await lireTout(`id=like.harvest_${uid}_label_%25&select=id,tx:meta->>tx,item:meta->>item,capturedAt:meta->>capturedAt`, { strict: true });
+    const rows = await lireTout(`id=like.harvest_${uid}_label_%25&select=id,tx:meta->>tx,item:meta->>item,capturedAt:meta->>capturedAt`, { strict: true, memo: true });
     return Array.isArray(rows) ? rows : null;
   } catch (_) { return null; }
 };
