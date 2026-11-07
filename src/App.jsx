@@ -17861,7 +17861,7 @@ function BottomBar({tab,setTab,sites,badges}) {
           <span className="vrm-nav-label">{lib}</span>
         </button>
       );})}
-      <MenuEcrans tab={tab} setTab={setTab} bottom sites={sites} badges={badgesBarre} ouvert={plusOuvert} setOuvert={setPlusOuvert}/>
+      <MenuEcrans tab={tab} setTab={(v)=>{ if(typeof v==='function'){ setTab(v); return; } demarrer(()=>setTab(v)); }} bottom sites={sites} badges={badgesBarre} ouvert={plusOuvert} setOuvert={setPlusOuvert}/>
     </nav>
     </>
   );
