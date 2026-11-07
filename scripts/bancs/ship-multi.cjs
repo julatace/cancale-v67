@@ -11,6 +11,7 @@
 //   • les appareils (`push_subs`) lus par vendeur → chacun ses notifications ;
 //   • JAMAIS une lecture globale de `email_bord_*` sans filtre owner.
 // §6.1 : sur le code mono-vendeur (une passe globale), ces exigences TOMBENT.
+process.env.SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'cle-service-banc';   // (7 nov.) sans elle, les routes serveur répondent 503 (api/_lib/cle-service.js)
 const path = require('path');
 const RACINE = path.join(__dirname, '..', '..');
 process.env.CRON_SECRET='cle-banc-rappels';

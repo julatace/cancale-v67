@@ -64,6 +64,7 @@ import { relireLigneMeta, SELECT_SUIVI_META, txDuColis, liensDesLignes, suiviDeL
 import * as T from './transporteurs.js';
 import { envoyerNotifTransp, notifEncoreValable } from './transporteurs-notif.js';
 import { PROPRIETAIRE_NEUTRE } from './proprietaire-email.js';
+import { ordreStable } from './ordre-stable.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || '';
@@ -148,7 +149,7 @@ async function lireTout(chemin) {
   for (let from = 0; from < 200000; from += page) {
     let r;
     try {
-      r = await fetch(`${SUPABASE_URL}/rest/v1/${chemin}${chemin.includes('?') ? '&' : '?'}owner=eq.${encodeURIComponent(owner)}`, { headers: { ...sbCle(SUPABASE_KEY), 'Range-Unit': 'items', Range: `${from}-${from + page - 1}` } });
+      r = await fetch(ordreStable(`${SUPABASE_URL}/rest/v1/${chemin}${chemin.includes('?') ? '&' : '?'}owner=eq.${encodeURIComponent(owner)}`), { headers: { ...sbCle(SUPABASE_KEY), 'Range-Unit': 'items', Range: `${from}-${from + page - 1}` } });
     } catch (_) { return null; }
     if (!r.ok) return null;
     let j; try { j = await r.json(); } catch (_) { return null; }

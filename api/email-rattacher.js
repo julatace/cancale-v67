@@ -35,6 +35,7 @@ import { PROPRIETAIRE_NEUTRE, peutReclamer, pourquoiPersonne, repliInstallation,
 import { PREFIXE_PREUVE, idPreuve, cleLiens, lireLien, verifierJeton, etatAdresse, adresseRetenue, prouveeParCompte, relaisApple, adresseVerifiable, DUREE_LIEN_MS, DELAI_RENVOI_MS, MAX_ENVOIS_ADRESSE_JOUR, MAX_ADRESSES_JOUR, MAX_DEMANDES_VENDEUR_JOUR, idCompteurVendeur, reserverDemande } from './_lib/preuve-adresse.js';
 import { modifierNeutre } from './_lib/neutre-cas.js';
 import { sbCle } from './_lib/cle.js';
+import { repondreSansCleService } from './_lib/cle-service.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const ANON = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
@@ -80,7 +81,7 @@ async function lirePages(requete, compte) {
     let r;
     try {
       if (compte) compte.n++;
-      r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?${requete}&order=id.asc`, {
+      r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?${requete}&order=id.asc,owner.asc`, {
         headers: { ...HEADERS, 'Range-Unit': 'items', Range: `${debut}-${debut + PAGE - 1}` },
       });
     } catch (_) { return null; }
@@ -462,6 +463,8 @@ async function preuveConfirmer(req, res) {
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
+  // (7 nov.) Sans clé de service, la clé publique ne voit rien sous RLS : 503 dit, jamais « rien à faire ».
+  if (repondreSansCleService(res)) return;
   const mode = String((req.query && req.query.mode) || '');
   if (req.method === 'GET' && mode === 'preuves') return preuves(req, res);
   if (req.method === 'POST' && mode === 'preuve-demander') return preuveDemander(req, res);

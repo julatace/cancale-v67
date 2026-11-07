@@ -28,6 +28,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import crypto from 'crypto';
 import { conserverRetrait, normaliserSuivi } from './etat-colis-email.js';
+import { vendeurParIndex, ecrireIndexJeton, memeJeton } from './jeton-index.js';
 import { arriveLeAuRangement } from './arrivee-colis.js';
 import { sbCle } from './cle.js';
 
@@ -189,18 +190,28 @@ export async function routeSms(req, res, { url, key, maintenant = Date.now } = {
   let cl = null;
   try { const r = await fetch(`${url}/rest/v1/app_data?select=owner&limit=1`, { headers: H }); cl = r.ok ? true : (r.status === 400 ? false : null); } catch (_) { cl = null; }
   if (cl !== true) { res.status(503).json({ ok: false, erreur: cl === false ? 'cloisonnement-requis' : 'base-injoignable' }); return; }
-  // LE VENDEUR DU JETON. Filtre exact sur le jeton (format déjà vérifié : aucun
-  // caractère à échapper) ; aucun ⇒ 401 ; deux vendeurs au même jeton ⇒ on ne
-  // choisit pas (409).
-  let lignes = null;
-  try {
-    const r = await fetch(`${url}/rest/v1/app_data?id=eq.main&data->>vrm_sms_token=eq.${k}&select=owner&limit=2`, { headers: H });
-    const j = r.ok ? await r.json() : null; lignes = Array.isArray(j) ? j : null;
-  } catch (_) { lignes = null; }
-  if (lignes === null) { res.status(503).json({ ok: false, erreur: 'base-injoignable' }); return; }
-  if (!lignes.length || !lignes[0].owner) { res.status(401).json({ ok: false, erreur: 'jeton invalide' }); return; }
-  if (lignes.length > 1) { res.status(409).json({ ok: false, erreur: 'jeton ambigu' }); return; }
-  const owner = String(lignes[0].owner);
+  // LE VENDEUR DU JETON. (7 nov., audit « 1 000 vendeurs ») D'abord l'INDEX
+  // (api/_lib/jeton-index.js : une ligne lue par sa clé, le jeton re-comparé en
+  // durée constante à celui du `main` désigné). Sans index (jeton d'avant, ou
+  // jeton neuf) ⇒ l'ancienne recherche UNE fois — filtre exact sur le jeton
+  // (format déjà vérifié : aucun caractère à échapper) ; aucun ⇒ 401 ; deux
+  // vendeurs au même jeton ⇒ on ne choisit pas (409) — puis l'index est écrit.
+  const idx = await vendeurParIndex({ url, headers: H, genre: 'sms', jeton: k });
+  if (idx === undefined) { res.status(503).json({ ok: false, erreur: 'base-injoignable' }); return; }
+  if (idx.etat === 'perime') { res.status(401).json({ ok: false, erreur: 'jeton invalide' }); return; }
+  let owner = idx.etat === 'trouve' ? idx.owner : '';
+  if (!owner) {
+    let lignes = null;
+    try {
+      const r = await fetch(`${url}/rest/v1/app_data?id=eq.main&data->>vrm_sms_token=eq.${k}&select=owner,t:data->>vrm_sms_token&limit=2`, { headers: H });
+      const j = r.ok ? await r.json() : null; lignes = Array.isArray(j) ? j : null;
+    } catch (_) { lignes = null; }
+    if (lignes === null) { res.status(503).json({ ok: false, erreur: 'base-injoignable' }); return; }
+    if (!lignes.length || !lignes[0].owner || !memeJeton(k, lignes[0].t)) { res.status(401).json({ ok: false, erreur: 'jeton invalide' }); return; }
+    if (lignes.length > 1) { res.status(409).json({ ok: false, erreur: 'jeton ambigu' }); return; }
+    owner = String(lignes[0].owner);
+    await ecrireIndexJeton({ url, headers: H, genre: 'sms', jeton: k, owner });
+  }
   const ow = `owner=eq.${encodeURIComponent(owner)}`;
   const nowMs = typeof maintenant === 'function' ? maintenant() : Number(maintenant);
   const lu = lireSmsMondialRelay(corps);
