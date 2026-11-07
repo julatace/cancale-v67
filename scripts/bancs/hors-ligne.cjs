@@ -5,8 +5,8 @@ require('./_porte-banc.cjs');
 //  Au point relais sans 4G, dans le métro : ouvrir VRM sans réseau doit montrer
 //  Ma journée telle qu'à la dernière ouverture RÉUSSIE — colis à expédier, colis
 //  à retirer AVEC leurs codes et QR, la liste du soir — en lecture seule, avec
-//  UNE ligne « Hors ligne — ce que tu vois date de {heure} ; rien ne peut être
-//  envoyé ». Jamais « Tout est à jour » hors ligne.
+//  UNE ligne « Hors connexion — dernier état du {jour} à {heure} » (6 nov., v36 :
+//  les gestes notés partent au retour, banc hors-reseau). Jamais « Tout est à jour ».
 //
 //  Trois scénarios, aux deux tailles (390 tactile, 1512) :
 //   A. lecture COMPLÈTE en ligne → photo écrite → hors ligne (jeton EXPIRÉ) :
@@ -166,8 +166,8 @@ async function main() {
             code: !!document.querySelector('[data-hl-code="4321"]') && !!document.querySelector('[data-hl-code="C49341"]'),
             qr: qrs.length ? qrs.map((q) => ({ etat: q.getAttribute('data-hl-qr'), w: q.naturalWidth || 0 })) : null,
             soir: document.querySelector('[data-hl-soir]') ? document.querySelector('[data-hl-soir]').getAttribute('data-hl-soir-n') : null,
-            gestesActifs: v ? [...v.querySelectorAll('button')].filter((b) => !b.disabled).map((b) => b.innerText) : ['(pas de vue)'],
-            gestes: v ? v.querySelectorAll('[data-hl-geste]').length : 0,
+            gestesActifs: v ? [...v.querySelectorAll('button')].filter((b) => !b.disabled && !b.hasAttribute('data-hl-file') && !b.hasAttribute('data-hl-en-grand-ouvrir')).map((b) => b.innerText) : ['(pas de vue)'],
+            gestes: v ? v.querySelectorAll('[data-hl-geste][data-hl-file]').length : 0,
             texte: document.body.innerText,
             mdp: !!document.querySelector('input[type="password"]'),
             session: !!localStorage.getItem('vrm_session'),
@@ -175,13 +175,17 @@ async function main() {
           };
         });
         dit(r.vue === 'photo', 'hors ligne : Ma journée s\'ouvre sur la photo', 'vue ' + r.vue);
-        dit(r.lignes.length === 1 && /^Hors ligne — ce que tu vois date de .+ ; rien ne peut être envoyé\.?$/.test(r.lignes[0].trim()), 'UNE ligne en tête qui dit de quand ça date et que rien ne part', JSON.stringify(r.lignes));
+        // (6 nov., v36) « Hors connexion — dernier état du <jour> à <heure> » : les gestes
+        // notés hors réseau partent au retour (scripts/bancs/hors-reseau.cjs les suit).
+        dit(r.lignes.length === 1 && /^Hors connexion — dernier état du \d{1,2} \S+ à \d{2}:\d{2}\. Ce que tu notes ici part au retour du réseau\.$/.test(r.lignes[0].trim()), 'UNE ligne en tête qui dit de quel jour et quelle heure date l\'état, et que les gestes partent au retour', JSON.stringify(r.lignes));
         dit(r.colis.length === 1 && /Nike Air Max 1 banc/.test(r.colis[0]), 'le colis à expédier est là', JSON.stringify(r.colis));
         dit(r.code, 'les codes de retrait sont là (4321, C49341)');
         dit(!!r.qr && r.qr.length === 2 && r.qr.every((q) => q.etat === 'ok' && q.w > 0), 'les deux QR (Pickup et Vinted Go) s\'affichent SANS réseau (réserve du service worker)', JSON.stringify(r.qr));
         dit(r.soir === '1', 'la liste du soir dit le colis à poster demain', 'n=' + r.soir);
         dit(!/Tout est à jour/i.test(r.texte), 'jamais « Tout est à jour » hors ligne');
-        dit(r.gestes >= 2 && r.gestesActifs.length === 0, 'aucun geste actif hors ligne (les boutons sont grisés)', `${r.gestes} geste(s) grisé(s) · actifs : ${JSON.stringify(r.gestesActifs)}`);
+        // (6 nov., v36) Hors ligne, un geste actif est une NOTE mise en file (`data-hl-file` :
+        // « Colis fait », « J'ai retiré ») ou « En grand » — jamais un geste qui parle à Vinted.
+        dit(r.gestes >= 2 && r.gestesActifs.length === 0, 'hors ligne, seuls les gestes mis en file et « En grand » sont actifs', `${r.gestes} geste(s) en file · autres actifs : ${JSON.stringify(r.gestesActifs)}`);
         dit(!r.mdp && r.session, 'un jeton expiré hors ligne ne déconnecte pas', `écran de connexion : ${r.mdp} · session : ${r.session}`);
         dit(!r.debordement, 'aucun débordement horizontal');
         await pg.screenshot({ path: path.join(require('os').tmpdir(), `hors-ligne-${vp.width}.png`), fullPage: false }).catch(() => {});
