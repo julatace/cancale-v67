@@ -897,6 +897,22 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 - **6 nov. · SMS Mondial Relay** : casiers annoncés par SMS ⇒ Raccourcis POST `/api/widget?mode=sms` (jeton `vrm_sms_token`, le vendeur = le jeton), rangés comme les e-mails. `docs/passation/2026-11-06-sms-colis.md`. Geste : Réglages → SMS Mondial Relay.
 
-- **6 nov. · Ouvrir aux clients** : pas-à-pas `docs/ouvrir-aux-clients.md` (mentions, Supabase SMTP, Vercel Pro, Stripe, verrou `abonnement_obligatoire`) ; « Découvrir avec des exemples » (`src/modeExemple.js` : tout en mémoire, 0 écriture) ; guide de démarrage coché sur preuve (`src/guideDemarrage.js`). `docs/passation/2026-11-06-clients.md`. Geste : suivre le pas-à-pas.
+
+## Lignes du §9 de CLAUDE.md déplacées le 7 nov. (taille du fichier)
+
+- **6 nov. · Films (motion design)** : la VRAIE app filmée image par image, données inventées (`scripts/films/`, vidéos hors dépôt). `docs/passation/2026-11-06-films.md`. Geste : regarder et publier.
+
+- **6 nov. · Bancs rouges d'avant (v36)** : Facturation Pro ne plante plus (réponse sans boîte = pas su), « Ajouter » du stream dit pourquoi, Statistiques à l'échelle 28/20/15/13/11, transporteurs 2 × 2 au téléphone ; 15 bancs jugent la règle actuelle. `docs/passation/2026-11-06-bancs-preexistants.md`. Geste : aucun.
+### Lignes du §9 de CLAUDE.md déplacées telles quelles (7 nov.)
+
+- **6 nov. · Films (motion design)** : la VRAIE app filmée image par image, données inventées (`scripts/films/`, vidéos hors dépôt). `docs/passation/2026-11-06-films.md`. Geste : regarder et publier.
 
 - **6 nov. · Recherche par photo (v36)** : appareil photo dans la loupe et le Stock ; empreinte locale SANS modèle (`src/empreintePhoto.js` : couleur sans le fond + balance des blancs, grille, bords, hachages), index sur l'appareil par URL exacte, octets par `chargerPhotoBoite` ; 5 propositions « très proche / proche / peu sûr », SON clic ouvre « Tout sur le N° », rien relié ; mesure 3D inventée top 5 100 %, top 1 82,5 %. `docs/passation/2026-11-06-recherche-photo.md`. Geste : l'essayer dans le navigateur de l'extension.
+
+- **6 nov. · Ouvrir aux clients** : pas-à-pas `docs/ouvrir-aux-clients.md` (mentions, Supabase SMTP, Vercel Pro, Stripe, verrou `abonnement_obligatoire`) ; « Découvrir avec des exemples » (`src/modeExemple.js` : tout en mémoire, 0 écriture) ; guide de démarrage coché sur preuve (`src/guideDemarrage.js`). `docs/passation/2026-11-06-clients.md`. Geste : suivre le pas-à-pas.
+
+- **6 nov. · Vitesse 2** : dressings projetés (`lireDressings`, comptes liés, vide ⇒ motif), achats des comptes liés (`lireAchatsLies` ; la cloche reprend ceux du démarrage), 15 morceaux à la demande (`aLaDemande` = `React.lazy`, leur CSS reste dans App) ; −700 Ko lus par écran, 1er chargement 1 405 → 1 299 Ko gz. `docs/passation/2026-11-06-vitesse2.md`.
+
+- **6 nov. · Onglets A (Ma journée, Ventes, Achats)** : « 0 € aujourd'hui » corrigé (la coque relit ses ventes par sa sonde, `src/sondeVentes.js`, le même « aujourd'hui » partout sans recharger) ; « lecture… » au lieu de « pas lu » pendant la lecture ; « Colis envoyés » jamais 0 sans gestes ; achat suspendu hors « en route » ; un nombre une fois ; « ? » « D'où viennent ces chiffres » (`AIDE_CHIFFRES`). `docs/passation/2026-11-06-onglets-a.md`. Geste : toucher le « ? » de Ventes.
+
+- **6 nov. · Filets anti-bug (v36)** : `verifier.yml` sur chaque PR (build, tous les audits en 3 parts — rouges connus dans `scripts/audits-exceptions.json` —, bancs, WebKit non bloquant), un garde-fou par écran et par feuille (`GardeEcran`), morceau d'un ancien déploiement compté à part (jamais un plantage), veille des plantages au cron du matin (propriétaire seul), `controle-prod.yml` après mise en ligne (lecture seule). `docs/passation/2026-11-06-filets-anti-bug.md`. Geste : rendre le contrôle obligatoire (règle de branche `main`, pas-à-pas dans la passation).

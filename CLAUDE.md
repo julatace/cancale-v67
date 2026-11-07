@@ -509,6 +509,8 @@ sans la fonction.
 ## 9. État actuel et décisions récentes
 
 - **6 nov. · Finition (v36)** : espace insécable avant « € » et « % » (`montant()` + 290 textes, `scripts/typo-insecables.cjs`), « e-mail » partout, milliers ; grand texte de l'appareil = échelle de l'app (`src/grandTexte.js`, `src/styles-lisible.css`) ; contrastes AA par les jetons (`onWarn`), axe-core 0 ; banc `finition.cjs`. `docs/passation/2026-11-06-finition.md`. Geste : Taille du texte de l'iPhone plus grande, rouvrir VRM.
+- **7 nov. · Vitesse au téléphone** : Colis 20 → 6-9 s de gel, Ma journée 11,6 → 3,0 s (CPU ×4) — formateurs de dates créés une fois, `UneLigne` mesurée en groupe, règles d'identité mémorisées pour UN calcul (`memoRendu`), index des suivis ; reste : `Comptabilite` remonté à chaque écran (découpage) et `email_track` lu en entier. `docs/passation/2026-11-07-vitesse.md`. Geste : aucun.
+- **7 nov. · Colis sans réseau : intégration** : branche `claude/attente-v36-hors-reseau` fusionnée ; purge à 90 jours des `mesures_jour_*` du propriétaire au cron du matin (`purgerMesuresAnciennes`, lecture `select=id` paginée, jour lu dans l'id, lecture ratée ⇒ rien supprimé ; `audit-purge-mesures` + `--prouve`). `docs/passation/2026-11-06-hors-reseau.md` §Purge. Geste : couper le réseau sur l'iPhone et rouvrir Colis.
 
 - **6 nov. · Audit des chiffres** : « à imprimer » = pas encore imprimés partout (`compteAImprimer`), Tournée « à déposer » = avec bordereau, widget sans colis sans n° (15→12) ; banc `chiffres-coherents`. `docs/passation/2026-11-06-audit-chiffres.md`. Geste : aucun.
 
@@ -524,6 +526,8 @@ sans la fonction.
 
 - **6 nov. · Statut des colis** : règle d'état datée (`api/_lib/etat-colis.js` : fini prouvé gagne, une lecture plus vieille ne fait pas reculer, « en route » daté après l'arrivée ⇒ à vérifier) ; conversation des e-mails Vinted relus décodée dans le navigateur (À vérifier 34 → 2) ; date estimée par la garde. `docs/passation/2026-11-06-statut-colis.md`. Geste : aucun.
 
+- **6 nov. · Hors réseau + temps réels (v36)** : Colis rouvert sans réseau (par point relais, codes, QR, « En grand »), « Hors connexion — dernier état du … », « J'ai retiré »/« Colis fait » en file ; temps réels anonymes (`src/mesuresTerrain.js`, `compte?mode=mesures`, 1 lot/min), panneau propriétaire, veille +30 % au p75. `docs/passation/2026-11-06-hors-reseau.md`.
+
 - **6 nov. · « Annuler » partout (v36)** : geste interne instantané + pilule 5 s « Annuler » (`src/gesteAnnulable.js`, `PiluleAnnuler`, `gesteVrm`) sur 10 gestes ; refus ⇒ l'écran revient, « Pas enregistré — Réessayer » ; réseau ⇒ « pas encore envoyé » (file d'envoi) ; jamais sur un geste chez un tiers. `docs/passation/2026-11-06-annuler.md`. Geste : Colis → « J'ai retiré » → Annuler.
 
 - **6 nov. · Chargement** : écran de démarrage dans `index.html` (avant le JS, retiré par `src/demarrage.js`) ; chaque écran attend ses données essentielles derrière son squelette (`src/AttenteEcran.jsx`, `ESSENTIELS_ECRAN`, plafond 2,5 s) ; « lecture… », jamais « pas lu », pendant qu'une publication se prépare ; banc `chargement.cjs`. `docs/passation/2026-11-06-chargement.md`.
@@ -533,8 +537,6 @@ sans la fonction.
 - **6 nov. · Accompagnement (v36)** : visite à 4 bulles ; conseils = 1 bulle non modale sur le VRAI bouton (halo, Plus tard, Ne plus montrer), 2/jour, 1/écran, 3 j de repos, sur un chiffre publié par l'écran (`<ChiffreConseil>`, pas su ⇒ rien), « vu » écrit d'abord dans `vrm_accompagnement` (rev) ; `src/accompagnement.js`, `audit-conseils`. `docs/passation/2026-11-06-accompagnement.md`. Geste : aucun.
 
 - **6 nov. · Facture Pro (v36)** : bouton « Envoyer la facture » sur la LIGNE de la vente seulement si l'acheteur est PROUVÉ (même n° de transaction Vinted + e-mail Pro, heure −2/+15 min, montant ; sinon la raison, `src/facturePro/rattachement.js`, relue par le serveur) ; envoi PAR VRM (From « … via VRM », Reply-To et Cc au vendeur, 50/jour) ; « Ma facture » avec aperçu en direct. `docs/passation/2026-11-06-facture-pro.md`. Geste : remplir Ma facture, poser `RELANCES_SMTP_*`.
-
-- **6 nov. · Bancs rouges d'avant (v36)** : Facturation Pro ne plante plus (réponse sans boîte = pas su), « Ajouter » du stream dit pourquoi, Statistiques à l'échelle 28/20/15/13/11, transporteurs 2 × 2 au téléphone ; 15 bancs jugent la règle actuelle. `docs/passation/2026-11-06-bancs-preexistants.md`. Geste : aucun.
 
 - **6 nov. · Onglets D (Annonces, Compta, Statistiques, Paramètres)** : sa base recalculée = l'app (25 mois de CA, 49 en ligne, 19 vendues) ; une vente « à dater » vendue ET lue finalisée la même année compte dans le CA de l'ANNÉE, jamais d'un mois (`src/aDaterAnnee.js` ; seuils, revenus, DAC7, « CA de l'année » de Ventes) ; « Déclarer » en 3 étapes avec « ? » ; Annonces « Prochain geste » ; Paramètres par intention, une phrase par réglage. `docs/passation/2026-11-06-onglets-d.md`. Geste : Compta → Déclarer octobre.
 
@@ -547,14 +549,6 @@ sans la fonction.
 - **6 nov. · Onglets C (E-mails)** : 3 comptes sur 9 muets, tous en relais d'Apple ; « Relier la boîte de <compte> » (pas-à-pas par compte, Yahoo et relais Apple, VÉRIFIÉ sur e-mail lu, `src/relierCompte.js`) depuis E-mails, Comptes liés, Colis, Ma journée (`relierBoiteDe`) ; recherche et « À vérifier » dans la boîte. `docs/passation/2026-11-06-onglets-c.md`. Geste : Transférer à une boîte reliée.
 
 - **6 nov. · Inventaire (v36)** : Stock → « Inventaire » (et Ma journée si en cours) : il tape les N° vus ⇒ « ✓ Attendu » neutre (pas de vert, §7) · ambre en trop / vendu · rouge deux paires sous un N° ; bilan manque / en trop / vendu rangé ; attendu = celui du Stock, pas su ≠ manque, aucun N° changé ; « N° + Entrée » ICI seulement ; ligne `vrm_inventaire` (rev). `docs/passation/2026-11-06-inventaire.md`. Geste : faire le tour des cartons.
-
-- **6 nov. · Vitesse 2** : dressings projetés (`lireDressings`, comptes liés, vide ⇒ motif), achats des comptes liés (`lireAchatsLies` ; la cloche reprend ceux du démarrage), 15 morceaux à la demande (`aLaDemande` = `React.lazy`, leur CSS reste dans App) ; −700 Ko lus par écran, 1er chargement 1 405 → 1 299 Ko gz. `docs/passation/2026-11-06-vitesse2.md`.
-
-- **6 nov. · Onglets A (Ma journée, Ventes, Achats)** : « 0 € aujourd'hui » corrigé (la coque relit ses ventes par sa sonde, `src/sondeVentes.js`, le même « aujourd'hui » partout sans recharger) ; « lecture… » au lieu de « pas lu » pendant la lecture ; « Colis envoyés » jamais 0 sans gestes ; achat suspendu hors « en route » ; un nombre une fois ; « ? » « D'où viennent ces chiffres » (`AIDE_CHIFFRES`). `docs/passation/2026-11-06-onglets-a.md`. Geste : toucher le « ? » de Ventes.
-
-- **6 nov. · Filets anti-bug (v36)** : `verifier.yml` sur chaque PR (build, tous les audits en 3 parts — rouges connus dans `scripts/audits-exceptions.json` —, bancs, WebKit non bloquant), un garde-fou par écran et par feuille (`GardeEcran`), morceau d'un ancien déploiement compté à part (jamais un plantage), veille des plantages au cron du matin (propriétaire seul), `controle-prod.yml` après mise en ligne (lecture seule). `docs/passation/2026-11-06-filets-anti-bug.md`. Geste : rendre le contrôle obligatoire (règle de branche `main`, pas-à-pas dans la passation).
-
-- **6 nov. · Films (motion design)** : la VRAIE app filmée image par image, données inventées (`scripts/films/`, vidéos hors dépôt). `docs/passation/2026-11-06-films.md`. Geste : regarder et publier.
 
 
 

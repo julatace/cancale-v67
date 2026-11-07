@@ -72,10 +72,17 @@ const qrPropre = (q) => {
 // qui ont encore leur code ou leur QR (peut-être encore au relais), comptés à
 // part (`nAVerifier`), JAMAIS dans « à retirer ». `nePasPoster` : nombre de
 // colis eBay dont l'acheteur a demandé l'annulation.
+const cleGeste = (v) => { const t = String(v == null ? '' : v).trim(); return t && t.length <= 200 ? t : ''; };
+const txValide = (v) => (/^\d{1,20}$/.test(String(v == null ? '' : v)) ? String(v) : '');
 const jourValide = (j) => /^\d{4}-\d{2}-\d{2}$/.test(String(j || '').slice(0, 10)) ? String(j).slice(0, 10) : '';
+// (6 nov., v36) `cle` : l'identité du colis pour « J'ai retiré » (`colisKey`, la
+// clé de `vrm_colis_collected`) ; `tx` : le n° de transaction d'un colis vu par
+// Vinted seulement (`vinted_pickup_done`). Absents (photo d'avant) ⇒ le geste
+// est refusé hors réseau, dit — jamais deviné par le titre (§5).
 const ligneRetrait = (r) => ({
   titre: txt(r.titre), lieu: txt(r.lieu, 120), code: txt(r.code, 16), qr: qrPropre(r.qr), compte: txt(r.compte, 40),
   transporteur: txt(r.transporteur, 30), suivi: txt(r.suivi, 40), limite: jourValide(r.limite),
+  ...(cleGeste(r.cle) ? { cle: cleGeste(r.cle) } : {}), ...(txValide(r.tx) ? { tx: txValide(r.tx) } : {}),
 });
 export function construirePhoto({ uid, at, envoyer = [], retirer = [], aVerifier = [], nAVerifier = null, nePasPoster = 0 }) {
   if (!uidValide(uid) || !Number.isFinite(at)) return null;
@@ -83,6 +90,8 @@ export function construirePhoto({ uid, at, envoyer = [], retirer = [], aVerifier
     v: VERSION_PHOTO, uid, at,
     envoyer: envoyer.slice(0, MAX_LIGNES).map((e) => ({
       titre: txt(e.titre), numero: txt(e.numero, 12), compte: txt(e.compte, 40), plateforme: e.plateforme === 'ebay' ? 'ebay' : 'vinted',
+      // (6 nov., v36) La vente Vinted, pour « Colis fait » hors réseau (`vinted_ship_done`).
+      ...(e.plateforme !== 'ebay' && txValide(e.tx) ? { tx: txValide(e.tx) } : {}),
       limite: Number.isFinite(e.jours) ? jourLocal(at, e.jours) : '',
       // (22 oct.) L'HEURE limite lue dans l'email (« avant 10 h ») et l'instant
       // exact, pour que la ligne hors ligne dise la même chose que Colis — et
@@ -178,3 +187,62 @@ export function heurePhoto(at, maintenant = Date.now()) {
 // L'adresse locale d'un QR hébergé : le service worker la sert depuis sa
 // réserve (`CACHE_QR`), remplie pendant que le réseau est là.
 export const adresseQrLocale = (url) => '/hl-qr?u=' + encodeURIComponent(url);
+
+
+// ════════════════════════════════════════════════════════════════════════════
+//  (6 nov., v36) HORS RÉSEAU : COLIS, LA DATE DITE, LES GESTES MIS EN FILE
+// ════════════════════════════════════════════════════════════════════════════
+// « Hors connexion — dernier état du 6 nov. à 17:36 » : le JOUR toujours (une
+// heure seule se lit « aujourd'hui » — un état de la veille passait pour frais).
+export function quandEtat(at) {
+  const d = new Date(at); if (!Number.isFinite(at) || isNaN(d)) return '';
+  return `${d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} à ${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
+}
+// Au-delà, une ligne le dit (un colis a pu être retiré ou arriver depuis).
+export const ETAT_VIEUX_H = 12;
+export function ageEtatH(at, maintenant = Date.now()) {
+  return Number.isFinite(at) ? Math.max(0, (maintenant - at) / 3600e3) : null;
+}
+export const etatVieux = (at, maintenant = Date.now()) => { const h = ageEtatH(at, maintenant); return h == null || h >= ETAT_VIEUX_H; };
+
+// Les colis à retirer rangés PAR POINT RELAIS (« un point = une carte », §5) :
+// le lieu lu, sinon le transporteur (« Point Mondial Relay »), sinon « Point
+// relais » — dans l'ordre de la photo. Un lieu est comparé sans casse ni espace.
+export function pointsDeRetrait(retirer) {
+  const cartes = []; const parCle = new Map();
+  for (const r of Array.isArray(retirer) ? retirer : []) {
+    if (!r) continue;
+    const lieu = txt(r.lieu, 120);
+    const cle = lieu ? 'l:' + lieu.toLowerCase().replace(/\s+/g, ' ') : 't:' + String(r.transporteur || '').toLowerCase();
+    let c = parCle.get(cle);
+    if (!c) { c = { cle, lieu, nom: lieu || (r.transporteur ? `Point ${r.transporteur}` : 'Point relais'), colis: [] }; parCle.set(cle, c); cartes.push(c); }
+    c.colis.push(r);
+  }
+  return cartes;
+}
+
+// Les gestes hors réseau sont des NOTES de l'appareil (rien ne part chez Vinted
+// ni chez un transporteur) : « J'ai retiré », « Colis fait ». Ils passent par la
+// sauvegarde normale de l'app (`save`, donc la file d'envoi, src/fileEnvoi.js) ;
+// ces fonctions rendent seulement la NOUVELLE valeur de la clé, sans toucher à
+// ce qu'elle porte d'autre. Une identité absente ⇒ `null` (rien n'est écrit).
+//   colisRetireApres(liste, dates, cle, iso) → { liste, dates } | null
+export function colisRetireApres(liste, dates, cle, iso) {
+  const k = cleGeste(cle); if (!k || !iso) return null;
+  const l = (Array.isArray(liste) ? liste : []).map(String);
+  return { liste: l.includes(k) ? l : l.concat(k), dates: { ...(dates && typeof dates === 'object' && !Array.isArray(dates) ? dates : {}), [k]: iso } };
+}
+export function colisRetireAnnule(liste, dates, cle) {
+  const k = cleGeste(cle); if (!k) return null;
+  const d = { ...(dates && typeof dates === 'object' && !Array.isArray(dates) ? dates : {}) }; delete d[k];
+  return { liste: (Array.isArray(liste) ? liste : []).map(String).filter((x) => x !== k), dates: d };
+}
+// `vinted_ship_done` / `vinted_pickup_done` : { [tx]: valeur }.
+export function marqueApres(objet, tx, valeur) {
+  const k = txValide(tx); if (!k || valeur == null) return null;
+  return { ...(objet && typeof objet === 'object' && !Array.isArray(objet) ? objet : {}), [k]: valeur };
+}
+export function marqueAnnulee(objet, tx) {
+  const k = txValide(tx); if (!k) return null;
+  const o = { ...(objet && typeof objet === 'object' && !Array.isArray(objet) ? objet : {}) }; delete o[k]; return o;
+}

@@ -24,6 +24,7 @@
 // L'app n'y gagne AUCUNE lecture : tout se passe sur le serveur.
 // ═══════════════════════════════════════════════════════════════════════════
 import { BRUIT, estMorceauPerime } from '../../src/plantages.js';
+import { degradations, jourParis, texteLenteurs, SEUIL_DEGRADATION } from '../../src/mesuresTerrain.js';
 
 export const ID_MEMO_VEILLE = 'veille_plantages';
 export const FENETRE_MAX_MS = 48 * 3600e3;
@@ -162,4 +163,36 @@ export async function passageVeillePlantages({ proprietaire, maintenant = Date.n
   let envoi = null;
   try { envoi = await envoyer({ ...notif, url: '/?tab=settings', tag: 'vrm-veille-plantages' }); } catch (e) { envoi = { erreur: String((e && e.message) || e).slice(0, 120) }; }
   return { fait: true, lus: lignes.length, types: groupes.length, nouveaux: nouveaux.length, envoye: true, texte: notif.body, envoi };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// (6 nov., v36) LA VEILLE DES LENTEURS — dans la même veille du matin.
+// ═══════════════════════════════════════════════════════════════════════════
+// Les temps réels des vendeurs (src/mesuresTerrain.js, api/_lib/mesures-terrain.js)
+// sont rangés en agrégats par jour de Paris. Chaque matin : hier (jour complet)
+// contre avant-hier ; un écran dont le p75 (premier écran utile ou réponse au
+// toucher) monte de plus de 30 %, sur au moins 20 mesures chaque jour, ⇒ UNE
+// notification au PROPRIÉTAIRE de l'installation, une fois par jour (mémo
+// `veille_lenteurs`, écrit AVANT d'envoyer, comme les plantages). Une lecture
+// ratée n'écrit rien et n'envoie rien ; moins de deux jours mesurés ⇒ rien.
+//   lireMemo()        → objet · null (absent) · undefined (pas su)
+//   lireJours(jours)  → { [jour]: histogrammes | null (pas de ligne) } · null (pas su)
+//   ecrireMemo(memo)  → true seulement si la base a confirmé
+export const ID_MEMO_LENTEURS = 'veille_lenteurs';
+export async function passageVeilleLenteurs({ proprietaire, maintenant = Date.now(), lireMemo, lireJours, ecrireMemo, envoyer }) {
+  if (!proprietaire) return { fait: false, raison: 'VRM_OWNER_UID absent : personne à prévenir' };
+  const hier = jourParis(maintenant - 864e5), avant = jourParis(maintenant - 2 * 864e5);
+  const memo = await lireMemo();
+  if (memo === undefined) return { fait: false, raison: 'mémo illisible : rien envoyé' };
+  if (memo && memo.jour === hier) return { fait: true, deja: true, jour: hier };
+  const jours = await lireJours([avant, hier]);
+  if (!jours || typeof jours !== 'object') return { fait: false, raison: 'mesures illisibles : rien envoyé' };
+  if (!jours[hier] || !jours[avant]) return { fait: true, jour: hier, compare: false, raison: 'pas deux jours de mesures' };
+  const liste = degradations(jours[avant], jours[hier], { seuil: SEUIL_DEGRADATION });
+  if (!liste.length) { await ecrireMemo({ jour: hier, n: 0 }); return { fait: true, jour: hier, degradations: 0, envoye: false }; }
+  if (!(await ecrireMemo({ jour: hier, n: liste.length, liste: liste.slice(0, 10) }))) return { fait: false, raison: 'mémo pas écrit : rien envoyé (sinon chaque matin)', degradations: liste.length };
+  const notif = texteLenteurs(liste, nomEcran);
+  let envoi = null;
+  try { envoi = await envoyer({ ...notif, url: '/?tab=settings', tag: 'vrm-veille-lenteurs' }); } catch (e) { envoi = { erreur: String((e && e.message) || e).slice(0, 120) }; }
+  return { fait: true, jour: hier, degradations: liste.length, envoye: true, texte: notif.body, envoi };
 }

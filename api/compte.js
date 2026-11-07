@@ -72,6 +72,7 @@ import {effacerFavorisDe} from './_lib/favoris-confidentialite.js';
 import { traiterAppareils, lireJournal } from './_lib/securite-compte.js';
 import { PROPRIETAIRE_NEUTRE } from './_lib/proprietaire-email.js';
 import { envoyerSignalement, listerSignalements, marquerTraite } from './_lib/signalement.js';
+import { recevoirMesures, listerMesures } from './_lib/mesures-terrain.js';
 import { etatPublic } from './_lib/etat-public.js';
 import { sendPushToAll, pushConfigure } from './_lib/push.js';
 import { contexteVendeur } from './_lib/owner.js';
@@ -1270,6 +1271,23 @@ async function signalement(req, res) {
   return repondre(res, r.code, r.corps);
 }
 
+// ── LES TEMPS RÉELS DES VENDEURS (6 nov., v36, api/_lib/mesures-terrain.js) ──
+// POST : un `sendBeacon` de l'app (corps en texte, jeton DANS le corps — un
+// beacon ne porte pas d'en-tête), au plus une fois par minute ; le jeton est
+// vérifié, jamais rangé. GET : le PROPRIÉTAIRE de l'installation seulement.
+async function mesures(req, res) {
+  if (req.method === 'GET') {
+    const utilisateur = await vendeurExige(req, res);
+    if (!utilisateur) return;
+    const r = await listerMesures({ utilisateur });
+    return repondre(res, r.code, r.corps);
+  }
+  const brut = await corpsBrut(req);
+  const corps = brut || (req.body && typeof req.body === 'object' ? req.body : null);
+  const r = await recevoirMesures({ corps, jetonEntete: jetonDe(req), verifierJeton: (j) => utilisateurDe({ headers: { authorization: 'Bearer ' + j } }) });
+  return repondre(res, r.code, r.corps);
+}
+
 // ── Santé : des OUI/NON (route publique), et l'état de la page /etat ─────────
 // (6 nov.) `etat` : base · e-mails · notifications ('ok' | 'panne' | 'inconnu')
 // et l'heure de la vérification, pour public/etat.html — aucune donnée d'un
@@ -1338,6 +1356,8 @@ export default async function handler(req, res) {
   if (mode === 'fermer') return m === 'POST' ? fermerCompte(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
   // (6 nov.) « Signaler un problème » : envoyer (tous), lire et « Traité » (le propriétaire).
   if (mode === 'signalement') return (m === 'GET' || m === 'POST') ? signalement(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
+  // (6 nov., v36) Les temps réels (anonymes, agrégés) : recevoir un lot, lire les agrégats (propriétaire).
+  if (mode === 'mesures') return (m === 'GET' || m === 'POST') ? mesures(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   // (4 nov.) Paramètres → Mon compte : « Appareils connectés » et « Ce que VRM a fait ».
   if (mode === 'appareils') return (m === 'GET' || m === 'POST') ? appareils(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'journal') return m === 'GET' ? journalVrm(req, res) : repondre(res, 405, { erreur: 'GET seulement' });

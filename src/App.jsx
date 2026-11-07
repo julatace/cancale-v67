@@ -219,6 +219,10 @@ import { estIphoneSafari, estInstallee } from "./guideIphone.js";
 // (6 nov.) VRM ouvert à des clients : le mode exemple (données inventées, en mémoire
 // seulement) et le guide de démarrage (quatre étapes cochées sur une preuve lue).
 import { exempleActif, entrerModeExemple, sortirModeExemple } from "./modeExemple.js";
+// (6 nov., v36) Les temps réels chez les vendeurs, anonymes et agrégés (src/mesuresCollecte.js).
+import { demarrerMesures, mesuresEcran } from "./mesuresCollecte.js";
+import { MesuresTerrain } from "./composants/MesuresTerrain.jsx";
+import { nomEcran as nomEcranVeille } from "../api/_lib/veille-plantages.js";
 import { GuideDemarrage, BandeauExemple } from "./GuideDemarrage.jsx";
 import { etatGuide, preuveExtension, preuveListe, preuveNombre, compterNumeros } from "./guideDemarrage.js";
 import { PHRASES_ECRAN } from "./phrasesEcran.js";
@@ -306,7 +310,7 @@ import { installerLecturesPartagees } from "./lecturesPartagees.js";
 import { rythme } from "./rythmeLectures.js";
 import { comptesARelire } from "./sondeVentes.js";
 import { installerFiltreSupprimes, sansComptesSupprimes, lireSupprimes, CLE_SUPPRIMES } from "./comptesSupprimes.js";
-import { lectureComplete, construirePhoto, ecrirePhoto, lirePhoto, listeDuSoir, joursAvantJour, heurePhoto, adresseQrLocale, CACHE_QR } from "./journeeHorsLigne.js";
+import { lectureComplete, construirePhoto, ecrirePhoto, lirePhoto, listeDuSoir, joursAvantJour, heurePhoto, adresseQrLocale, CACHE_QR, quandEtat, ageEtatH, etatVieux, ETAT_VIEUX_H, pointsDeRetrait, colisRetireApres, colisRetireAnnule, marqueApres, marqueAnnulee } from "./journeeHorsLigne.js";
 import { jetonsStream, demarrerStream, demarrerMontants, photoACacherSelon, poserReglesStream, normaliserRegles, compilerRegle, masquerTexteStream, textePourStream, regleCourante, regleApercu, ligneACacher, CATEGORIES as STREAM_CATEGORIES, LISTES as STREAM_LISTES, nettoyerMots, CLE_STREAM, CLE_STREAM_REGLES, REGLES_DEFAUT as STREAM_DEFAUT } from "./modeStream.js";
 import { DISCORD_ERREURS } from "./communaute/discordErreurs.js";
 import { ecouterPartage } from "./communaute/accompagnement.js";
@@ -1092,6 +1096,9 @@ const onAuthChange = (fn) => { _authListeners.push(fn); return () => { _authList
 const _emitAuth = () => { _authListeners.forEach(fn => { try { fn(AUTH); } catch (_) {} }); };
 
 const readSession = () => { try { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch { return null; } };
+// (6 nov., v36) La session était-elle là au chargement de la page ? Sinon le « premier écran utile »
+// de l'ouverture compterait la saisie du mot de passe : il n'est pas mesuré (src/mesuresCollecte.js).
+const SESSION_AU_CHARGEMENT = (() => { try { return !!(readSession() || {}).access_token; } catch (_) { return false; } })();
 const writeSession = (s) => {
   if (AUTH.user?.id !== s?.user?.id) {
     vuesSession.clear(); try{const garder=!AUTH.user?.id&&s?.user?.id?s.user.id:null; viderParcours(sessionStorage,garder); viderParcours(localStorage,garder);}catch(_){} _prechargeComptes=null;
@@ -18978,6 +18985,22 @@ function LigneHorsLigne({ children, date }) {
     </div>
   );
 }
+// (6 nov., v36) LA LIGNE DU DERNIER ÉTAT : « Hors connexion — dernier état du
+// 6 nov. à 17:36 » — le JOUR toujours (une heure seule se lisait « aujourd'hui »
+// et un état de la veille passait pour frais), une fois, sobre. Au-delà de
+// `ETAT_VIEUX_H` (12 h) une seconde ligne, ambre, dit qu'il a pu changer : jamais
+// une donnée périmée présentée comme fraîche (§5). Les gestes notés ici partent
+// au retour du réseau (la file d'envoi, `EnAttenteEnvoi` dit combien).
+function LigneEtatHorsLigne({ at, maintenant }) {
+  const h = ageEtatH(at, maintenant);
+  return (<>
+    <LigneHorsLigne date={new Date(at).toISOString()}>Hors connexion — dernier état du {quandEtat(at)}. Ce que tu notes ici part au retour du réseau.</LigneHorsLigne>
+    {etatVieux(at, maintenant) ? (
+      <div role="note" data-hors-ligne-vieux={Math.floor(h || 0)} style={{border:`1px solid ${C.warn}66`,background:`${C.warn}12`,borderRadius:12,padding:'10px 14px',margin:'-6px 0 14px',fontSize:13,color:C.text,lineHeight:1.45}}>
+        Ce dernier état a plus {h >= 24 ? 'd’un jour' : `de ${ETAT_VIEUX_H} h`} : un colis a pu être retiré ou arriver depuis — vérifie au comptoir.
+      </div>) : null}
+  </>);
+}
 function QrHorsLigne({ qr, code }) {
   const [etat, setEtat] = React.useState('charge');
   if (!qr) return null;
@@ -18986,49 +19009,149 @@ function QrHorsLigne({ qr, code }) {
   return <img data-hl-qr={etat} src={src} alt="QR de retrait" width={92} height={92} onLoad={() => setEtat('ok')} onError={() => setEtat('ko')}
     style={{flexShrink:0,width:92,height:92,borderRadius:12,background:'#fff',border:`1px solid ${C.border}`,objectFit:'contain'}}/>;
 }
+// (6 nov., v36) LES GESTES HORS RÉSEAU — des NOTES de l'appareil, jamais une
+// action chez Vinted ou un transporteur : « J'ai retiré » (`vrm_colis_collected`
+// par l'identité du colis, ou `vinted_pickup_done` par sa transaction) et
+// « Colis fait » (`vinted_ship_done`). Ils passent par `save` comme en ligne : la
+// FILE D'ENVOI (src/fileEnvoi.js) les garde et les rejoue au retour du réseau
+// (fusion clé par clé, jamais un écrasement). Un colis sans identité gardée
+// (photo d'avant le 6 nov.) n'a pas de geste : refusé et dit, jamais deviné.
+const CLES_GESTES_HL = ['vrm_colis_collected', 'vrm_colis_collected_at', 'vinted_pickup_done', 'vinted_ship_done'];
+function useGestesHorsLigne() {
+  const lire = () => ({ collected: load('vrm_colis_collected', []) || [], collectedAt: load('vrm_colis_collected_at', {}) || {}, pickup: load('vinted_pickup_done', {}) || {}, ship: load('vinted_ship_done', {}) || {} });
+  const [g, setG] = React.useState(lire);
+  React.useEffect(() => {
+    const f = (e) => { if (!e || !e.detail || CLES_GESTES_HL.includes(e.detail.k)) setG(lire()); };
+    const st = (e) => { if (!e || e.key == null || CLES_GESTES_HL.includes(e.key)) setG(lire()); };
+    window.addEventListener('vrm:save', f); window.addEventListener('storage', st);
+    return () => { window.removeEventListener('vrm:save', f); window.removeEventListener('storage', st); };
+  }, []);
+  const attente = (k) => { try { return enFile(k) || !!_saveTimers[k]; } catch (_) { return false; } };
+  const etatRetrait = (r) => {
+    const fait = r.cle ? g.collected.map(String).includes(r.cle) : r.tx ? !!g.pickup[r.tx] : false;
+    if (!fait) return '';
+    return attente(r.cle ? 'vrm_colis_collected' : 'vinted_pickup_done') ? 'attente' : 'note';
+  };
+  const etatFait = (e) => (e.tx && g.ship[e.tx] ? (attente('vinted_ship_done') ? 'attente' : 'note') : '');
+  const ecrire = (k, v) => { save(k, v); };
+  const retirer = (r, oui) => {
+    if (r.cle) {
+      const n = oui ? colisRetireApres(g.collected, g.collectedAt, r.cle, new Date().toISOString()) : colisRetireAnnule(g.collected, g.collectedAt, r.cle);
+      if (!n) return;
+      setG((x) => ({ ...x, collected: n.liste, collectedAt: n.dates }));
+      ecrire('vrm_colis_collected', n.liste); ecrire('vrm_colis_collected_at', n.dates);
+    } else if (r.tx) {
+      const n = oui ? marqueApres(g.pickup, r.tx, new Date().toISOString()) : marqueAnnulee(g.pickup, r.tx);
+      if (!n) return;
+      setG((x) => ({ ...x, pickup: n })); ecrire('vinted_pickup_done', n);
+    }
+  };
+  const faire = (e, oui) => {
+    const n = oui ? marqueApres(g.ship, e.tx, Date.now()) : marqueAnnulee(g.ship, e.tx);
+    if (!n) return;
+    setG((x) => ({ ...x, ship: n })); ecrire('vinted_ship_done', n);
+  };
+  return { etatRetrait, etatFait, retirer, faire };
+}
+// Le bouton d'un geste hors réseau, et ce qu'il est devenu (noté, en attente).
+function GesteHorsLigne({ etat, libelle, fait, peut, onOui, onNon, attrs = {} }) {
+  if (etat) return (
+    <span style={{display:'inline-flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+      <span style={{fontSize:12,fontWeight:600,color:C.text}}>{fait}{etat === 'attente' ? ' · part au retour du réseau' : ''}</span>
+      <Bouton variante="discret" className="vrm-b-petit" data-hl-annuler="" onClick={onNon}>Annuler</Bouton>
+    </span>);
+  if (!peut) return <Bouton variante="secondaire" className="vrm-b-petit" disabled aria-disabled="true" data-hl-geste="" title="Ce colis vient d’un état gardé sans son identité : il faut le réseau" style={{flexShrink:0}}>{libelle}</Bouton>;
+  return <Bouton variante="secondaire" className="vrm-b-petit" data-hl-geste="" data-hl-file="" onClick={onOui} style={{flexShrink:0}} {...attrs}>{libelle}</Bouton>;
+}
 // Une ligne de colis hors ligne (à retirer, ou à vérifier). La raison d'un colis
 // « à vérifier » vient de LA règle (`etatRetrait`) : « délai dépassé le … » si
 // une date limite a été LUE, sinon « plus de N jours au point relais » (la garde
 // de son transporteur) — jamais « hors délai » sans date limite (revue du 23 oct.).
-function LigneRetraitHorsLigne({ r, i, quand, grise, maintenant, verifier = false }) {
+// (6 nov.) `sansLieu` : rangée dans la carte de SON point relais, le lieu est dit
+// par la carte ; « En grand » et « J'ai retiré » marchent sans réseau.
+function LigneRetraitHorsLigne({ r, i, quand, maintenant, verifier = false, sansLieu = false, gestes, onEnGrand }) {
   const jj = (j) => new Date(j + 'T12:00:00').toLocaleDateString('fr-FR', { day:'numeric', month:'short' });
   const reste = !verifier && r.limite ? joursAvantJour(r.limite, maintenant) : null;
   const delai = verifier
     ? (r.raison === 'delai_depasse' ? `délai de retrait dépassé${r.limite ? ` le ${jj(r.limite)}` : ''}`
       : r.raison === 'trop_long' ? `au point relais depuis plus de ${Number.isFinite(r.garde) ? r.garde : GARDE_MAX_J} jours` : 'à vérifier')
     : (reste == null ? '' : reste < 0 ? `délai de retrait passé (${jj(r.limite)})` : reste === 0 ? "à retirer aujourd'hui" : `à retirer avant le ${jj(r.limite)}`);
+  const etat = gestes ? gestes.etatRetrait(r) : '';
   return (
-    <div data-hl-retrait={verifier ? 'a-verifier' : ''} data-hl-raison={verifier ? (r.raison || 'inconnue') : undefined} style={{display:'flex',alignItems:'center',gap:12,padding:'12px 0',borderTop:i ? `1px solid ${C.border}` : 'none'}}>
+    <div data-hl-retrait={verifier ? 'a-verifier' : ''} data-hl-raison={verifier ? (r.raison || 'inconnue') : undefined} data-hl-retire={etat || undefined}
+      style={{display:'flex',alignItems:'center',gap:12,padding:'12px 0',borderTop:i ? `1px solid ${C.border}` : 'none',opacity:etat ? 0.75 : 1}}>
       <div style={{flex:1,minWidth:0}}>
-        <div style={{fontSize:15,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.titre || r.lieu || r.transporteur || 'Colis'}</div>
-        <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.4}}>{[r.titre ? r.lieu : '', (r.titre || r.lieu) ? r.transporteur : '', r.suivi && `n°${r.suivi}`, r.compte, delai].filter(Boolean).join(' · ')}</div>
+        <div style={{fontSize:15,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.titre || (sansLieu ? '' : r.lieu) || (r.transporteur ? `Colis ${r.transporteur}` : 'Colis')}</div>
+        <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.4}}>{[(r.titre && !sansLieu) ? r.lieu : '', (r.titre || r.lieu) ? r.transporteur : '', r.suivi && `n°${r.suivi}`, r.compte, delai].filter(Boolean).join(' · ')}</div>
         {r.code
           ? <div className="vrm-sensible" data-stream-type="code" data-hl-code={r.code} style={{display:'inline-block',marginTop:8,fontSize:20,fontWeight:800,letterSpacing:1.2,color:C.text,background:C.card2 || C.bg,border:`1px solid ${C.border}`,borderRadius:12,padding:'5px 12px'}}>{r.code}</div>
           : !r.qr && <div style={{marginTop:6,fontSize:12,color:C.muted}}>Code pas lu à {quand}.</div>}
-        <div style={{marginTop:8}}><Bouton variante="secondaire" className="vrm-b-petit" disabled aria-disabled="true" data-hl-geste="" title="Hors ligne : rien ne peut être envoyé" style={{flexShrink:0}}>{verifier ? "Je l'ai eu" : "Je l'ai retiré"}</Bouton></div>
+        <div style={{marginTop:8,display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+          {(r.code || r.qr) && onEnGrand ? <Bouton variante="secondaire" className="vrm-b-petit" data-hl-en-grand-ouvrir="" onClick={() => onEnGrand(r)} aria-label="Afficher le code et le QR en grand">En grand</Bouton> : null}
+          <GesteHorsLigne etat={etat} libelle={verifier ? "Je l'ai eu" : "J'ai retiré"} fait="Noté retiré" peut={!!(gestes && (r.cle || r.tx))}
+            onOui={() => gestes.retirer(r, true)} onNon={() => gestes.retirer(r, false)} attrs={{ 'data-hl-retire-btn': '' }}/>
+        </div>
       </div>
       <QrHorsLigne qr={r.qr} code={r.code}/>
     </div>
   );
 }
+// « En grand » SANS réseau (6 nov., v36) : la même feuille lumineuse qu'en ligne
+// (classes `vrm-eg-*`, écran gardé allumé), nourrie par le dernier état — le QR
+// vient de la réserve du service worker (`/hl-qr`) ou de la photo (`data:`) ;
+// jamais un QR fabriqué. La date de l'état y est redite (on est au comptoir).
+function EnGrandHorsLigne({ r, at, onClose }) {
+  const [qrKo, setQrKo] = React.useState(false);
+  const src = !r.qr ? '' : /^data:image\//i.test(r.qr) ? r.qr : adresseQrLocale(r.qr);
+  const avecQr = !!src && !qrKo;
+  const titre = r.titre || (r.transporteur ? `Colis ${r.transporteur}` : 'Colis');
+  const j = r.limite ? joursAvantJour(r.limite) : null;
+  const lim = j == null ? null : j < 0 ? 'Délai de retrait dépassé' : j === 0 ? 'Dernier jour pour le retirer' : j === 1 ? 'À retirer demain au plus tard'
+    : `À retirer avant le ${new Date(r.limite + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}`;
+  return (
+    <SheetShell lumineuse onClose={onClose} titre={titre} sousTitre={r.lieu || null} maxWidth={440} z={Z_CONFIRMATION - 3}
+      className="vrm-eg" aria-label="Code et QR de retrait" data-hl-en-grand="" data-hl-en-grand-code-v={r.code || ''}>
+      <GardeEcranAllume/>
+      <div className="vrm-eg-corps">
+        {avecQr ? <img className="vrm-eg-qr" data-hl-en-grand-qr="" src={src} alt="QR de retrait" onError={() => setQrKo(true)}/> : null}
+        {src && qrKo ? <p className="vrm-eg-mode">QR pas gardé sur cet appareil{r.code ? ' — donne le code.' : '.'}</p> : null}
+        {r.code ? <div className={'vrm-eg-code' + (avecQr ? ' avec-qr' : '')}><span className="vrm-eg-code-l">Code de retrait</span><span className="vrm-eg-code-v vrm-sensible" data-stream-type="code" data-hl-en-grand-code="">{r.code}</span></div> : null}
+        {!r.code && !avecQr && r.suivi ? <div className="vrm-eg-code is-suivi"><span className="vrm-eg-code-l">Numéro de colis</span><span className="vrm-eg-code-v">{r.suivi}</span></div> : null}
+        <ul className="vrm-eg-faits">
+          {lim ? <li className={j <= 1 ? 'is-ambre' : ''}>{lim}</li> : null}
+          {r.suivi && (r.code || avecQr) ? <li>{r.transporteur ? `${r.transporteur} · ` : ''}n° {r.suivi}</li> : null}
+          {r.compte ? <li>{r.compte}</li> : null}
+          <li data-hl-en-grand-date="">Hors connexion — dernier état du {quandEtat(at)}</li>
+        </ul>
+        {avecQr ? <p className="vrm-eg-note">Monte la luminosité au maximum : le lecteur du relais lit mal un écran sombre. L’écran reste allumé tant que cette vue est ouverte.</p> : null}
+      </div>
+    </SheetShell>
+  );
+}
+// Ce qui ne part PAS en file : dit une fois, là où on le chercherait.
+const RefusHorsLigne = () => <p data-hl-refuse="" style={{fontSize:12,color:C.muted,lineHeight:1.45,margin:'-4px 2px 14px'}}>Imprimer un bordereau ou répondre à un acheteur demande le réseau : rien n’est mis en file pour ça.</p>;
+// Les onglets qui montrent COLIS hors réseau (`cat_bord`, et ceux qui y mènent).
+const ONGLETS_COLIS_HL = ['cat_bord', 'retraits', 'cat_achats', 'cat_expedition'];
 function JourneeHorsLigne({ uid, tab }) {
   const [, tic] = React.useReducer((x) => x + 1, 0);
   React.useEffect(() => { const t = setInterval(tic, 60000); return () => clearInterval(t); }, []);
   const photo = React.useMemo(() => { try { return lirePhoto(uid, localStorage); } catch (_) { return null; } }, [uid]);
+  const gestes = useGestesHorsLigne();
+  const [enGrand, setEnGrand] = React.useState(null);
+  const colis = ONGLETS_COLIS_HL.includes(tab);
   // L'en-tête dit déjà « Ma journée » quand c'est l'écran demandé ; sur un autre
   // onglet, le titre dit ce qu'on voit à la place (§7 : un titre par écran).
-  const titre = tab === 'journee' ? null : <h2 style={{fontSize:22,fontWeight:700,color:C.text,margin:'4px 2px 12px',letterSpacing:-0.3}}>Ma journée</h2>;
+  const titre = tab === 'journee' ? null : <h2 data-hl-titre="" style={{fontSize:22,fontWeight:700,color:C.text,margin:'4px 2px 12px',letterSpacing:-0.3}}>{colis ? 'Colis' : 'Ma journée'}</h2>;
   if (!photo) return (
     <div data-hors-ligne="sans-photo" style={{padding:'16px 14px 40px'}}>
       {titre}
-      <LigneHorsLigne>Hors ligne — aucune copie de ta journée n'est gardée sur cet appareil ; elle se fera à ta prochaine ouverture avec du réseau.</LigneHorsLigne>
+      <LigneHorsLigne>Hors connexion — aucune copie {colis ? 'de tes colis' : 'de ta journée'} n'est gardée sur cet appareil ; elle se fera à ta prochaine ouverture avec du réseau.</LigneHorsLigne>
       <BlocCodesHorsLigne/>
     </div>
   );
   const maintenant = Date.now();
   const quand = heurePhoto(photo.at, maintenant);
   const soir = listeDuSoir(photo, maintenant);
-  const grise = { border:`1px solid ${C.border}`, background:C.bg, color:C.muted, borderRadius:12, padding:'8px 12px', fontSize:13, fontWeight:600, minHeight:44, cursor:'not-allowed', fontFamily:'inherit', flexShrink:0, opacity:0.7 };
   const carte = { background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:'6px 14px', marginBottom:14 };
   const tete = (t, n) => <div style={{fontSize:12,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,margin:'4px 2px 8px'}}>{t}{n != null ? ` · ${n}` : ''}</div>;
   const limiteTxt = (e) => {
@@ -19042,10 +19165,65 @@ function JourneeHorsLigne({ uid, tab }) {
     if (j === 1) return 'à poster demain au plus tard';
     return 'à poster avant le ' + new Date(e.limite + 'T12:00:00').toLocaleDateString('fr-FR', { day:'numeric', month:'short' });
   };
+  const blocEnvoyer = (<>
+    {tete('À envoyer', photo.nEnvoyer)}
+    <div data-hl-envoyer={photo.nEnvoyer} style={carte}>
+      {photo.envoyer.length === 0
+        ? <div style={{fontSize:13,color:C.muted,padding:'10px 0'}}>Aucun colis à envoyer à {quand}.</div>
+        : photo.envoyer.map((e, i) => { const ef = gestes.etatFait(e); return (
+          <div key={i} data-hl-colis="" data-hl-fait={ef || undefined} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 0',borderTop:i ? `1px solid ${C.border}` : 'none',flexWrap:'wrap'}}>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:15,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{e.numero ? `N°${e.numero} · ` : ''}{e.titre || '(sans titre)'}</div>
+              <div style={{fontSize:12,color:C.muted,marginTop:2}}>{[e.plateforme === 'ebay' ? 'eBay' : 'Vinted', e.compte, limiteTxt(e)].filter(Boolean).join(' · ')}</div>
+            </div>
+            <GesteHorsLigne etat={ef} libelle="Colis fait" fait="Noté fait" peut={!!e.tx} onOui={() => gestes.faire(e, true)} onNon={() => gestes.faire(e, false)} attrs={{ 'data-hl-fait-btn': '' }}/>
+          </div>); })}
+      {photo.nEnvoyer > photo.envoyer.length && <div style={{fontSize:12,color:C.muted,padding:'6px 0 10px'}}>… et {photo.nEnvoyer - photo.envoyer.length} autres.</div>}
+    </div>
+    <RefusHorsLigne/>
+  </>);
+  const ligneRet = (r, i, extra = {}) => <LigneRetraitHorsLigne key={i} r={r} i={i} quand={quand} maintenant={maintenant} gestes={gestes} onEnGrand={setEnGrand} {...extra}/>;
+  const blocAVerifier = (photo.nAVerifier || 0) > 0 ? (<>
+    {tete('À vérifier', photo.nAVerifier)}
+    <div data-hl-a-verifier={photo.nAVerifier} style={carte}>
+      <div style={{fontSize:12,color:C.muted,padding:'8px 0 4px',lineHeight:1.45}}>Sans doute {photo.nAVerifier > 1 ? 'repartis' : 'reparti'} chez le vendeur — pas comptés dans « à retirer ».{photo.aVerifier.length ? ` ${photo.aVerifier.length > 1 ? 'Ceux-ci ont' : 'Celui-ci a'} encore un code ou un QR : il est peut-être encore au relais.` : ''}</div>
+      {photo.aVerifier.map((r, i) => ligneRet(r, i + 1, { verifier: true }))}
+    </div>
+  </>) : null;
+  const feuille = enGrand ? <EnGrandHorsLigne r={enGrand} at={photo.at} onClose={() => setEnGrand(null)}/> : null;
+  // ── COLIS hors réseau : à retirer d'abord (on est au relais), une carte par
+  //    point (son lieu), puis à vérifier, puis à envoyer.
+  if (colis) {
+    const points = pointsDeRetrait(photo.retirer);
+    return (
+      <div data-hors-ligne="colis" style={{padding:'16px 14px 40px'}}>
+        {titre}
+        <LigneEtatHorsLigne at={photo.at} maintenant={maintenant}/>
+        {tete('À retirer', photo.nRetirer)}
+        <div data-hl-retirer={photo.nRetirer}>
+          {points.length === 0
+            ? <div style={{...carte,fontSize:13,color:C.muted,padding:'12px 14px'}}>Aucun colis à retirer à {quand}.</div>
+            : points.map((p, k) => (
+              <div key={p.cle} data-hl-point={p.lieu || p.nom} style={carte}>
+                <div style={{display:'flex',alignItems:'center',gap:8,padding:'10px 0 4px'}}>
+                  <span aria-hidden="true" style={{display:'flex',color:C.muted}}><Icon name="pin" size={15}/></span>
+                  <span style={{fontSize:14,fontWeight:700,color:C.text,minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.nom}</span>
+                  <span style={{marginLeft:'auto',fontSize:12,color:C.muted,flexShrink:0}}>{p.colis.length} colis</span>
+                </div>
+                {p.colis.map((r, i) => ligneRet(r, i + 1, { sansLieu: !!p.lieu }))}
+              </div>))}
+          {photo.nRetirer > photo.retirer.length && <div style={{fontSize:12,color:C.muted,padding:'0 2px 12px'}}>… et {photo.nRetirer - photo.retirer.length} autres.</div>}
+        </div>
+        {blocAVerifier}
+        {blocEnvoyer}
+        {feuille}
+      </div>
+    );
+  }
   return (
     <div data-hors-ligne="photo" style={{padding:'16px 14px 40px'}}>
       {titre}
-      <LigneHorsLigne date={new Date(photo.at).toISOString()}>Hors ligne — ce que tu vois date de {quand} ; rien ne peut être envoyé.</LigneHorsLigne>
+      <LigneEtatHorsLigne at={photo.at} maintenant={maintenant}/>
       {soir && soir.n > 0 && (
         <div data-hl-soir="" data-hl-soir-n={soir.n} data-hl-soir-retard={soir.enRetard} data-hl-soir-verif={soir.aVerifier} data-hl-soir-demain={soir.demain} style={{...carte,padding:'12px 14px'}}>
           <div style={{fontSize:12,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,marginBottom:4}}>La liste du soir</div>
@@ -19062,21 +19240,7 @@ function JourneeHorsLigne({ uid, tab }) {
           <div style={{fontSize:13,color:C.muted,marginTop:2}}>L'acheteur a demandé l'annulation (à trancher dans eBay quand le réseau revient).</div>
         </div>
       )}
-      {tete('À envoyer', photo.nEnvoyer)}
-      <div data-hl-envoyer={photo.nEnvoyer} style={carte}>
-        {photo.envoyer.length === 0
-          ? <div style={{fontSize:13,color:C.muted,padding:'10px 0'}}>Aucun colis à envoyer à {quand}.</div>
-          : photo.envoyer.map((e, i) => (
-            <div key={i} data-hl-colis="" style={{display:'flex',alignItems:'center',gap:10,padding:'10px 0',borderTop:i ? `1px solid ${C.border}` : 'none'}}>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:15,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{e.numero ? `N°${e.numero} · ` : ''}{e.titre || '(sans titre)'}</div>
-                <div style={{fontSize:12,color:C.muted,marginTop:2}}>{[e.plateforme === 'ebay' ? 'eBay' : 'Vinted', e.compte, limiteTxt(e)].filter(Boolean).join(' · ')}</div>
-              </div>
-              <Bouton variante="secondaire" className="vrm-b-petit" disabled aria-disabled="true" data-hl-geste="" title="Hors ligne : rien ne peut être envoyé" style={{flexShrink:0}}>Colis fait</Bouton>
-            </div>
-          ))}
-        {photo.nEnvoyer > photo.envoyer.length && <div style={{fontSize:12,color:C.muted,padding:'6px 0 10px'}}>… et {photo.nEnvoyer - photo.envoyer.length} autres.</div>}
-      </div>
+      {blocEnvoyer}
       {tete('À retirer', photo.nRetirer)}
       {/* (revue du 23 oct.) Les mêmes colis que la tuile « À retirer » en ligne ;
           la date limite LUE (et elle seule) est dite. Les colis « à vérifier »
@@ -19084,16 +19248,11 @@ function JourneeHorsLigne({ uid, tab }) {
       <div data-hl-retirer={photo.nRetirer} style={carte}>
         {photo.retirer.length === 0
           ? <div style={{fontSize:13,color:C.muted,padding:'10px 0'}}>Aucun colis à retirer à {quand}.</div>
-          : photo.retirer.map((r, i) => <LigneRetraitHorsLigne key={i} r={r} i={i} quand={quand} grise={grise} maintenant={maintenant}/>)}
+          : photo.retirer.map((r, i) => ligneRet(r, i))}
         {photo.nRetirer > photo.retirer.length && <div style={{fontSize:12,color:C.muted,padding:'6px 0 10px'}}>… et {photo.nRetirer - photo.retirer.length} autres.</div>}
       </div>
-      {(photo.nAVerifier || 0) > 0 && (<>
-        {tete('À vérifier', photo.nAVerifier)}
-        <div data-hl-a-verifier={photo.nAVerifier} style={carte}>
-          <div style={{fontSize:12,color:C.muted,padding:'8px 0 4px',lineHeight:1.45}}>Sans doute {photo.nAVerifier > 1 ? 'repartis' : 'reparti'} chez le vendeur — pas comptés dans « à retirer ».{photo.aVerifier.length ? ` ${photo.aVerifier.length > 1 ? 'Ceux-ci ont' : 'Celui-ci a'} encore un code ou un QR : il est peut-être encore au relais.` : ''}</div>
-          {photo.aVerifier.map((r, i) => <LigneRetraitHorsLigne key={i} r={r} i={i + 1} quand={quand} grise={grise} maintenant={maintenant} verifier/>)}
-        </div>
-      </>)}
+      {blocAVerifier}
+      {feuille}
     </div>
   );
 }
@@ -46774,7 +46933,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     return out;
   };
+  // (7 nov., vitesse) Appelée ~15 fois par rendu de Colis / Ma journée pour la même
+  // liste : calculée une fois par calcul synchrone (vidée à la microtâche suivante,
+  // comme `memoRendu`). Les lecteurs ne la modifient pas (filter/map/for seulement).
+  let _expeditionsMemo = null;
   const expeditions = () => {
+    if (_expeditionsMemo) return _expeditionsMemo;
+    const r = expeditionsCalc();
+    _expeditionsMemo = r;
+    queueMicrotask(() => { _expeditionsMemo = null; });
+    return r;
+  };
+  const expeditionsCalc = () => {
     // La table « un bordereau par vente » — la MÊME que `bordsParTxn`, le rappel
     // du matin, le rappel du soir et le widget (`bordsParTransaction`, §11).
     const parTxn = bordsParTransaction(emailBords, isBordHidden);
@@ -47000,7 +47170,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     dup.forEach(d => delete m[d]);
     return m;
   }, [numeros]);
-  const entryKeyByPhoto = (o) => {
+  // (7 nov., vitesse) Mémoire d'UN SEUL RENDU : ces règles d'identité sont
+  // appelées des centaines de fois par rendu pour les mêmes lignes (Colis, Ma
+  // journée : ~0,5 s au téléphone). La mémoire naît à chaque rendu (jamais un
+  // résultat d'un rendu d'avant) : même règle, mêmes valeurs, calculées une fois.
+  // Elle se vide aussitôt le calcul synchrone fini (microtâche) : un effet ou un geste
+  // lancé plus tard recalcule, même si une valeur lue par la règle a bougé entre-temps.
+  const memoRendu = (fn) => { let m = null; return (o) => { if (!o || typeof o !== 'object') return fn(o); if (!m) { m = new WeakMap(); queueMicrotask(() => { m = null; }); } if (m.has(o)) return m.get(o); const r = fn(o); m.set(o, r); return r; }; };
+  const entryKeyByPhoto = memoRendu((o) => {
     const url = o ? orderPhoto(o) : null;
     const pk = photoKey(url);
     let k = (pk && numerosByPhoto[pk]) || null;                  // même fichier = certain
@@ -47011,7 +47188,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // l'histoire.
     if (k && venteApresCoupure(o) && !numeroReprenable((numeros[k] || {}).numero)) return null;
     return k;
-  };
+  });
   // Ids des annonces ENCORE EN LIGNE (wardrobe actif). Une paire en ligne ne peut
   // pas être vendue → on ne lui attribue jamais une vente (sinon un exemplaire
   // identique vendu ferait apparaître « vendue » une paire encore en vente).
@@ -47128,13 +47305,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //   1. l'identifiant d'annonce donné par Vinted (transaction → item_id) ;
   //   2. la photo, qui appartient à une paire et une seule (0 collision mesurée).
   // Le TITRE est volontairement exclu : 22 % des ventes en portent un en double.
-  const identiteAnnonce = (o) => {
+  const identiteAnnonce = memoRendu((o) => {
     if (!o) return null;
     const parVinted = o.transaction_id != null ? txnItem[String(o.transaction_id)] : null;
     if (parVinted) return String(parVinted);
     return entryKeyByPhoto(o) || null;
-  };
-  const resolvedEntry = (o) => {
+  });
+  const resolvedEntry = memoRendu((o) => {
     // Une paire ENCORE EN LIGNE n'est pas vendue : on refuse de l'associer.
     const usable = (key) => (key && numeros[key] && !onlineAnnonceIds.has(String(key))) ? numeros[key] : null;
     // ⚠️ VERROU HÉRITÉ : `vinted_txn_link` est permanent et a longtemps été posé
@@ -47162,7 +47339,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     //    annonces différentes). Un titre ne caractérise donc pas une annonce :
     //    on préfère ne rien attribuer plutôt que désigner la mauvaise boîte.
     return null;
-  };
+  });
   // Corrections MANUELLES par vente (par n° de transaction) : permet d'ajouter un
   // prix d'achat / un N° / un boost DIRECTEMENT sur une vente — même une paire
   // jamais numérotée (orpheline). L'override PRIME sur l'entrée reliée.
@@ -47497,7 +47674,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // pas de paire où écrire, on relie sur la vente elle-même). `AchatRelie` lit
   // `buyFromId`/`buyFrom` — la fusion les fait ressortir (même propriétaire que
   // `choosePick`, §11).
-  const effEntry = (o) => fusionEntreeVente(resolvedEntry(o), (o && o.transaction_id != null) ? saleOv[String(o.transaction_id)] : null, buyByNum);
+  const effEntry = memoRendu((o) => fusionEntreeVente(resolvedEntry(o), (o && o.transaction_id != null) ? saleOv[String(o.transaction_id)] : null, buyByNum));
 
   // ── FIABILITÉ DU NUMÉRO : QUI PORTE PHYSIQUEMENT CE NUMÉRO ? ──────────────
   // Julien : « si le numéro n'est pas le bon, la paire est presque impossible à
@@ -51665,7 +51842,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     try {
       const envoyer = toShip.map((t) => {
         const o = t.o; const tid = String((o && o.transaction_id) ?? ''); const b = bordsParTxn[tid];
-        return { titre: o.title, numero: ((saleOv[tid] || {}).numero) || (b && b.numero) || '', compte: o._acc ? accNameOf(o._acc) : '', jours: t.daysLeft, plateforme: 'vinted', jour: t.jour, heure: t.heure, limiteAt: t.at, estimee: t.limite === 'estimee' };
+        return { titre: o.title, numero: ((saleOv[tid] || {}).numero) || (b && b.numero) || '', compte: o._acc ? accNameOf(o._acc) : '', jours: t.daysLeft, plateforme: 'vinted', jour: t.jour, heure: t.heure, limiteAt: t.at, estimee: t.limite === 'estimee', tx: tid };
       }).concat(colisEb.aPoster.map((x) => ({ titre: x.titre, numero: numDeSkuEbay(x.sku) || '', compte: x.pseudo || '', jours: x.jours, plateforme: 'ebay' })));
       // ⚠️ (revue du 23 oct.) « À RETIRER » = EXACTEMENT ce que la tuile compte
       // en ligne (`pickupUnion.emailList` + `extra`, §11). Les colis « à
@@ -51677,10 +51854,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const ligneEmail = (t) => ({
         titre: t.artTitle || '', lieu: (cleanLieu(t.lieu).nom || '').trim(), code: codeRetrait(t.code), qr: qrImage(t) || '',
         transporteur: t.carrier ? carrierName(t.carrier) : '', suivi: t.suivi || '', limite: t.limite || '', compte: compteDuColisEmail(t) || '',
+        cle: colisKey(t),   // (6 nov., v36) « J'ai retiré » hors réseau : la clé de `vrm_colis_collected`
       });
       const ligneVinted = (o) => {
         const r = relaisDe(o);
-        return { titre: o.title || '', lieu: (r && r.lieu) || '', code: r ? codeRetrait(r.code) : '', qr: r ? (qrImage(r) || '') : '', compte: o._acc ? accNameOf(o._acc) : '' };
+        return { titre: o.title || '', lieu: (r && r.lieu) || '', code: r ? codeRetrait(r.code) : '', qr: r ? (qrImage(r) || '') : '', compte: o._acc ? accNameOf(o._acc) : '', tx: String((o && o.transaction_id) ?? '') };
       };
       const retirer = pickupUnion.emailList.map(ligneEmail).concat(pickupUnion.extra.map(ligneVinted));
       const aVerifier = pickupUnion.aVerifier.filter(aEncoreCode)
@@ -69244,6 +69422,9 @@ function SecuriteSetting() {
         d={!ext ? "Normal sur téléphone. Sur l'ordinateur, ouvre l'app dans le navigateur de l'extension."
           : ext.connecte ? "Elle écrira sous ce compte."
           : `Icône de l'extension ${NAV.dansNu} → Compte VRM → ton e-mail et ton mot de passe.`}/>
+      {/* (6 nov., v36) Les temps réels des vendeurs, anonymes et agrégés (src/composants/MesuresTerrain.jsx) :
+          au propriétaire de l'installation seulement (la route refuse les autres). */}
+      {proprio ? <MesuresTerrain entetes={enTeteSession} Bouton={Bouton} PanneEl={EtatPanne} nomEcran={nomEcranVeille}/> : null}
     </div>
   );
 }
@@ -70702,6 +70883,9 @@ function AppCoeur() {
   const [tab,setTabBrut]=useState(()=>reprise0?reprise0.tab:'journee');
   // (6 nov.) L'écran ouvert et celui d'avant, pour « Signaler un problème ».
   noterEcranVu(tab);
+  // (6 nov., v36) Et pour les temps réels : une visite d'écran par onglet ouvert.
+  mesuresEcran(tab);
+  useEffect(() => { if (!exempleActif()) demarrerMesures({ jeton: () => (exempleActif() ? '' : String((readSession() || {}).access_token || '')), ouverture: SESSION_AU_CHARGEMENT }); }, []);
   // (27 oct., « des effets entre les pages ») Changer d'écran se VOIT : le
   // contenu arrive en fondu, d'un léger glissé (styles-mouvement.css). Rien
   // n'est remonté — on rejoue une classe sur `<main>` — et rien ne bouge si
