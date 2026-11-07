@@ -19,4 +19,22 @@ rouges (ou sautés) des deux côtés, donc (c).
 
 ## Avancement
 
-(mis à jour à chaque lot)
+43 bancs lancés sur 221 (de `fiche-paire` à `widget-multi`, ordre `LC_ALL=C`).
+
+- **verts** (27) : `filtre-compte`, `finition`, `finition-premium`, `fluidite`, `fournisseurs`, `garde-ecrans`, `gestes-annuler`, `glisser-onglet`, `gros-volumes`, `hors-ligne`, `hors-reseau`, `ia`, `imprimante`, `inscription-fiable`, `inventaire`, `iphone-reprise`, `journal-emails`, `journee-chiffres`, `journee-premium`, `journee-widgets`, `lbc-bordereau`, `lbc-comme-vinted`, `lbc-demarrage`, `lbc-identite-privee`, `lbc-rappel-mise-a-jour`, `lbc-repondre`, `lbc-revue-complete`
+- **(c) rouges identiques sur main** (13) : `fiche-paire`, `file-envoi`, `formes-communes`, `garage3d`, `indicateur-pro`, `jetons-coherence`, `journee-coherence`, `journee-mieux`, `journee-photos`, `lbc-messages`, `lbc-pause`, `lbc-publier-app`, `lbc-relier`
+- **DIFF — à trancher / relancer seuls** : `fusion-app`, `lbc-flou-compte`, `lbc-preuve`
+
+### Classement à la main
+
+- **(b) `journee-mieux`** — « un détail raccourci l'est à la fin d'un mot » : `UneLigne`
+  coupait par `split(/\s+/)` puis `join(' ')`, et `\s` attrape l'insécable : « 14 € » perdait
+  son U+00A0 à la coupe (le banc ne retrouvait plus le début dans l'infobulle). Corrigé à la
+  source (`src/UneLigne.jsx`, `ESPACES_SECABLES`) ; relancé : les 12 rouges restants sont ceux
+  de main (titres sur deux lignes, nombres redits).
+- **(c) `lbc-preuve`** — main s'arrête plus tôt (historique git illisible dans l'archive) ;
+  même cause racine des deux côtés : l'écran Leboncoin ne propose rien (« null à publier »),
+  les contrôles qui suivent en découlent.
+- **à relancer seuls** (rouge de transition sous charge, opacité/fond pris en plein
+  mouvement) : `fusion-app` (fond rgba(…, 0,353) d'un bouton secondaire en sombre),
+  `lbc-flou-compte` (opacité 0,31 sur « rien n'est flouté »).
