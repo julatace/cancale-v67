@@ -256,12 +256,13 @@ body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
   :root:root:root body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-grille { gap: var(--d-e-2) !important; }
   /* « Envoyés » : la même rangée — photo · titre et état · frise · « Suivre » / « Pas encore déposé ». */
   :root:root:root body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-grille .vrm-colis-carte.vrm-colis-envoye:has(> .vrm-colis-frise) {
-    display: grid !important; grid-template-columns: minmax(0, 1fr) minmax(260px, 340px) auto; column-gap: var(--d-e-6); align-items: center;
+    display: grid !important; grid-template-columns: minmax(0, 1fr) minmax(260px, 340px) 176px; column-gap: var(--d-e-6); align-items: center;
     padding: var(--d-e-3) var(--d-e-4) !important;
   }
   :root:root:root body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-grille .vrm-colis-carte.vrm-colis-envoye > :first-child { grid-column: 1; }
   :root:root:root body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-grille .vrm-colis-carte.vrm-colis-envoye > .vrm-colis-frise { grid-column: 2; grid-row: 1; margin: 0 !important; }
-  :root:root:root body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-grille .vrm-colis-carte.vrm-colis-envoye > .vrm-colis-actions { grid-column: 3; grid-row: 1; margin: 0 !important; flex-wrap: nowrap !important; }
+  :root:root:root body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-grille .vrm-colis-carte.vrm-colis-envoye > .vrm-colis-actions { grid-column: 3; grid-row: 1; justify-self: end; margin: 0 !important; flex-wrap: nowrap !important; }
+  /* (la 3e colonne est TOUJOURS réservée : les frises de toutes les rangées tombent l'une sous l'autre) */
   /* La carte sombre « Aujourd'hui » : le grand chiffre à gauche, ses cases à droite, sur
      une bande — elle occupait 250 px de haut pour quatre nombres. */
   :root:root body .vrm-app-shell .vrm-main section.vrm-fu-carte.vrm-fu-colis {
@@ -281,4 +282,11 @@ body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
 /* 5.7 « Envoyés » : le titre de la paire sur deux lignes au plus (il était coupé sur une). */
 :root:root body .vrm-app-shell .vrm-main .vrm-colis-envoye .vrm-colis-titre {
   display: -webkit-box !important; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal !important; text-overflow: clip !important; overflow: hidden;
+}
+
+/* 4 bis. Ma journée à l'ordinateur (≥ 1280 px, deux colonnes) : le guide « Démarrer avec VRM »
+   passe SOUS la semaine, dans la colonne de gauche — étiré sur toute la largeur, il laissait un trou
+   de 50 px sous la semaine et des rangées de 1 200 px pour quatre mots. */
+@media (min-width: 1280px) {
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee > :is(.vrm-guide, :has(> .vrm-guide)) { grid-column: 1; grid-row: 3; margin: 0 !important; }
 }
