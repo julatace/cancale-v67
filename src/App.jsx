@@ -321,7 +321,7 @@ import { regrouperRelais, pointsARetirer, lieuCompleteParTransporteur, lieuTrans
 import { registrePointsConnus, completerParPointConnu, lieuLePlusComplet, memePoint, completudeLieu, cleTransporteurLieu } from "./villeRelais.js";
 import { lieuxRelusDansTextes } from "./lieuxRetrait.js";
 import CarteRelaisColis, { ColonneRetirer, villesDesPoints } from "./CarteRelais.jsx";
-import PastilleTransporteur, { LogoTransporteur } from "./PastilleTransporteur.jsx";
+import PastilleTransporteur, { LogoTransporteur, BadgeTransporteur } from "./PastilleTransporteur.jsx";
 import { transporteurDuColis, cleStatTransporteur, cleTransporteur } from "./transporteursVisuels.js";
 import { CarteTournee, TourneePleinEcran } from "./Tournee.jsx";
 // (1er nov.) Julien : « enlève Tournée » — la carte n'est plus sur Ma journée.
@@ -399,6 +399,10 @@ import "./styles-publier-ailleurs.css";
 import "./styles-ios.css";       // (6 nov., v36-visuel) rangées « Réglages » d'iOS, « ⓘ » en feuille
 import "./styles-visuel.css";    // (6 nov., v36-visuel) la direction : photos héros, chiffres, rythme 8 px
 import "./styles-visuel-2.css";  // (6 nov., v36-visuel-2) de « propre » à « beau » : échelle, matière, barre floutée, mouvement
+// (7 nov., design 2026) LES FONDATIONS — jetons (--d-*), surfaces du navigateur, Ma journée et Colis. EN DERNIER :
+// le CSS de l'app arrive dans SON morceau, après celui de main.jsx ; posé là-bas, il perdrait contre les couches
+// ci-dessus. Le système est écrit dans DESIGN.md.
+import "./styles-design-2026.css";
 import { GroupeIos, RangeeIos } from "./composants/Ios.jsx";
 import Illustration, { depuisIcone } from "./composants/Illustration.jsx";   // (6 nov., v36-visuel-2) les dessins des états vides
 import { SITES_PUBLIER, apercuEnvoi, manquesEnvoi, etatsPaire, partoutLeMeme, lienVu, chercherPaires } from "./publierAilleurs.js";
@@ -29882,7 +29886,7 @@ function CarteColisVc({ v, imprime, fait }) {
       </div>
       {/* (3 nov.) LA FRISE D'UN COLIS, comme Vinted : « imprimé » = sa coche (`vrm_vc_imprimes`), « déposé » =
           « Colis fait » ; « en route » / « livré » ne sont pas lus pour Vestiaire ⇒ jamais cochés. */}
-      <Frise etapes={friseColisFusion({ imprime: !!imprime, depose: !!fait }, { geste: j != null && j <= 1 && !fait })} cle={'vc:' + v.id} className="vrm-colis-frise" label="Où en est le colis"/>
+      {imprime || fait ? <Frise etapes={friseColisFusion({ imprime: !!imprime, depose: !!fait }, { geste: j != null && j <= 1 && !fait })} cle={'vc:' + v.id} className="vrm-colis-frise" label="Où en est le colis"/> : null}
       <div className="vrm-colis-actions" style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12, flexWrap: 'wrap' }}>
         {/* (2 nov. au soir) Le transporteur LU dans la puce, À GAUCHE du bouton bordereau, même rangée (comme Vinted). */}
         <div className="vrm-rangee-bord" data-rangee-bord="">
@@ -29910,6 +29914,7 @@ function CarteColisSite({ ident, site, photo, titre, num, sous, sousAmbre = fals
       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
         <div className="vrm-colis-photo" style={{ width: 64, height: 80, borderRadius: 12, background: C.card2 || C.bg, border: `1px solid ${C.border}`, boxSizing: 'border-box', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {photo ? <PhotoVinted src={photo} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : <Icon name="image" size={20} style={{ color: C.muted, opacity: .55 }}/>}
+          <BadgeTransporteur t={transporteur}/>
         </div>
         <div style={{ flex: '1 1 150px', minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
@@ -29923,7 +29928,7 @@ function CarteColisSite({ ident, site, photo, titre, num, sous, sousAmbre = fals
         {gestes ? <button type="button" className="vrm-fu-plus vrm-fu-plus-carte" data-colis-plus={ident} aria-label="Plus d’actions pour ce colis" aria-expanded="false"
           onClick={(ev)=>{ const c = ev.currentTarget.closest('[data-bord-card]'); const o = !c.hasAttribute('data-plus-ouvert'); c.toggleAttribute('data-plus-ouvert', o); ev.currentTarget.setAttribute('aria-expanded', o ? 'true' : 'false'); }}><Icon name="more" size={18}/></button> : null}
       </div>
-      {frise ? <Frise etapes={frise} cle={ident} className="vrm-colis-frise" label="Où en est le colis"/> : null}
+      {Array.isArray(frise) && frise.some((x) => x.fait) ? <Frise etapes={frise} cle={ident} className="vrm-colis-frise" label="Où en est le colis"/> : null}
       <div className="vrm-colis-actions" style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12, flexWrap: 'wrap' }}>
         <div className="vrm-rangee-bord" data-rangee-bord="">
           <PastilleTransporteur t={transporteur} C={C} data-colis-transporteur={ident}/>
@@ -60746,6 +60751,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div style={{display:'flex',gap:12,alignItems:'flex-start'}}>
                       <div className="vrm-colis-photo" style={{width:64,height:80,borderRadius:12,background:C.card2||C.bg,border:`1px solid ${C.border}`,boxSizing:'border-box',flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                         {ph?<PhotoVinted src={ph} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
+                        {/* (7 nov.) Le logo du transporteur LU (`trV`, la règle de la puce), dans le coin de la photo. */}
+                        <BadgeTransporteur t={trV}/>
                       </div>
                       <div style={{flex:'1 1 150px',minWidth:0}}>
                         <div style={{display:'flex',alignItems:'flex-start',gap:10}}>
@@ -60820,7 +60827,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {/* ACTION PRINCIPALE : imprimer si le PDF est là, sinon aller
                         le générer sur Vinted. Le glisser-fichier reste dispo pour
                         celui qui n'a pas branché sa boîte mail. */}
-                    <Frise etapes={fuColis} cle={String(e.txn||e.key)} className="vrm-colis-frise" label="Où en est le colis"/>
+                    {/* (7 nov., design) La frise n'est posée que quand une étape est FAITE : quatre traits gris
+                        sous chaque carte « à envoyer » ne disaient rien (« rien d'imprimé » se lit sur le bouton). */}
+                    {fuColis.some((x) => x.fait) ? <Frise etapes={fuColis} cle={String(e.txn||e.key)} className="vrm-colis-frise" label="Où en est le colis"/> : null}
                     <div className="vrm-colis-actions" style={{display:'flex',gap:8,alignItems:'center',marginTop:12,flexWrap:'wrap'}}>
                       {/* (2 nov. au soir) Julien : « à côté du bouton bordereau, marqué Chronopost avec le
                           logo » — LA RANGÉE : la puce du transporteur LU (n° du bordereau, ligne du
@@ -61039,6 +61048,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         <div style={{display:'flex',gap:12,alignItems:'center'}}>
                           <div className="vrm-colis-photo" style={{width:60,height:60,borderRadius:14,background:C.card2||C.bg,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                             {x.photo && !imgMortes.has(x.photo) ? <PhotoVinted src={x.photo} alt="" loading="lazy" decoding="async" onError={()=>noterImgMorte(x.photo)} style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
+                            <BadgeTransporteur t={x.tr}/>
                           </div>
                           <div style={{flex:'1 1 150px',minWidth:0}}>
                             <div><span className="vrm-colis-titre" title={x.titre} style={{display:'block',fontSize:15,fontWeight:600,lineHeight:1.3,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{x.num ? <><Numero n={x.num} taille="petit"/>{' '}</> : null}{x.titre}</span></div>

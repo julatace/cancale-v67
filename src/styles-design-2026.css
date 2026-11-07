@@ -1,0 +1,284 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   DESIGN 2026 — LES FONDATIONS (7 nov., directeur artistique)
+   Julien : « je veux que tu améliores le visuel de tout le site, du petit
+   message à la structure » — GARDER Apple (blanc, encre, bleu rare, police
+   système) EN BEAUCOUP MIEUX ; l'iPhone et l'ordinateur aussi soignés l'un que
+   l'autre ; un outil pro calme (Réglages, Mail, Wallet).
+
+   Ce fichier ne remplace pas les couches d'avant : il en devient le SOCLE.
+     1. les jetons (--d-*) : une échelle de texte, d'espaces, de rayons,
+        d'ombres, de surfaces et de mouvement — et les anciens noms
+        (--t-*, --vrm-t*, --r-*, --o-*, --fu-ombre) les LISENT, pour qu'il
+        n'y ait plus qu'un endroit où changer une valeur ;
+     2. les surfaces du navigateur (sélection, curseur, barres de
+        défilement, focus clavier, lissage, césure des titres) ;
+     3. Ma journée et Colis, écran par écran (téléphone ET ordinateur).
+   Rien ici ne touche une donnée, une règle ou un chiffre : seulement la forme.
+   Chargé EN DERNIER (dernier import CSS de src/App.jsx : le CSS de l'app vient
+   dans le morceau de l'app, APRÈS celui de main.jsx — importé là-bas, il
+   aurait perdu contre styles-visuel-2.css).
+   Le système est écrit dans DESIGN.md (à la racine) ; passation :
+   docs/passation/2026-11-07-design-fondations.md
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ══ 1. LES JETONS ═════════════════════════════════════════════════════════ */
+:root {
+  /* Texte — l'échelle de Dynamic Type d'iOS (ratio 1,13 à 1,2 entre deux crans).
+     Au-delà de 20 px la police système passe d'elle-même en SF Pro Display. */
+  --d-t-11: 11px;   /* légende 2 : une unité, une pastille */
+  --d-t-12: 12px;   /* légende : sous un chiffre */
+  --d-t-13: 13px;   /* note : la ligne grise d'une rangée */
+  --d-t-15: 15px;   /* sous-titre : le texte courant des cartes */
+  --d-t-17: 17px;   /* corps : le titre d'une rangée, un bouton principal */
+  --d-t-20: 20px;   /* titre 3 : un chiffre de case */
+  --d-t-22: 22px;   /* titre 2 : le titre d'une section */
+  --d-t-28: 28px;   /* titre 1 */
+  --d-t-34: 34px;   /* grand titre d'écran */
+  --d-t-44: 44px;   /* le grand chiffre d'une carte sombre (ordinateur) */
+  /* Interlignes : serré pour les titres, ouvert pour le texte courant. */
+  --d-il-titre: 1.12; --d-il-ligne: 1.3; --d-il-texte: 1.45;
+  /* Approche : négative en grand, nulle en petit (jamais une valeur pour toutes les tailles). */
+  --d-ap-34: -.026em; --d-ap-22: -.022em; --d-ap-17: -.012em; --d-ap-15: -.006em; --d-ap-13: 0em;
+
+  /* Espaces — une grille de 4 px. */
+  --d-e-1: 4px; --d-e-2: 8px; --d-e-3: 12px; --d-e-4: 16px; --d-e-5: 20px; --d-e-6: 24px; --d-e-8: 32px; --d-e-10: 40px;
+
+  /* Rayons — six, pas un de plus. */
+  --d-r-num: 6px; --d-r-ctrl: 12px; --d-r-case: 14px; --d-r-carte: 20px; --d-r-sombre: 24px; --d-r-pilule: 999px;
+
+  /* Surfaces (le « groupé » d'iOS). Le second neutre est la case (#F2F2F7) ; le
+     remplissage translucide sert aux contrôles posés sur une carte comme sur le fond. */
+  --d-fond: #F2F2F7;
+  --d-carte: #FFFFFF;
+  --d-case: #F2F2F7;
+  --d-remplir: rgba(118,118,128,.12);
+  --d-remplir-fort: rgba(118,118,128,.20);
+  --d-filet: rgba(60,60,67,.18);          /* le séparateur d'iOS, .5 px */
+  --d-encre: #1D1D1F;
+  --d-gris: #6E6E73;                      /* 4,5:1 sur le fond, 5:1 sur blanc */
+  --d-accent: var(--vrm-accent, #0071E3);
+  --d-accent-texte: var(--vrm-accent-texte, #0066CC);
+  --d-ambre: var(--vrm-warn, #B25000);
+  --d-point-ambre: #FF9F0A;               /* le point d'un geste (jamais un texte) */
+  --d-defile: rgba(60,60,67,.28);         /* le pouce d'une barre de défilement */
+
+  /* Ombres — toujours un décalage ET un flou ; deux couches (contact + diffusion). */
+  --d-ombre-carte: 0 .5px 1px rgba(0,0,0,.04), 0 4px 18px -6px rgba(0,0,0,.08);
+  --d-ombre-levee: 0 1px 2px rgba(0,0,0,.05), 0 10px 28px -8px rgba(0,0,0,.14);
+  --d-ombre-flottant: 0 6px 16px rgba(0,0,0,.08), 0 24px 56px rgba(0,0,0,.14);
+
+  /* Mouvement — 150 à 250 ms, une sortie franche ; rien de tout ça en mouvement réduit. */
+  --d-sortie: cubic-bezier(.23,1,.32,1);
+  --d-tiroir: cubic-bezier(.32,.72,0,1);
+  --d-m-court: 150ms; --d-m-moyen: 200ms; --d-m-long: 250ms;
+
+  /* Les anciens noms LISENT les jetons (un seul endroit pour une valeur). */
+  --t-11: var(--d-t-11); --t-12: var(--d-t-12); --t-13: var(--d-t-13); --t-15: var(--d-t-15); --t-17: var(--d-t-17);
+  --t-20: var(--d-t-20); --t-22: var(--d-t-22); --t-28: var(--d-t-28); --t-34: var(--d-t-34); --t-44: var(--d-t-44);
+  --vrm-t34: var(--d-t-34); --vrm-t28: var(--d-t-28); --vrm-t22: var(--d-t-22); --vrm-t17: var(--d-t-17); --vrm-t15: var(--d-t-15); --vrm-t13: var(--d-t-13); --vrm-t11: var(--d-t-11);
+  --r-num: var(--d-r-num); --r-ctrl: var(--d-r-ctrl); --r-case: var(--d-r-case); --r-carte: var(--d-r-carte); --r-sombre: var(--d-r-sombre); --r-pilule: var(--d-r-pilule);
+  --fu-r-carte: var(--d-r-carte); --fu-r-sombre: var(--d-r-sombre); --fu-r-photo: var(--d-r-case);
+  --o-carte: var(--d-ombre-carte); --fu-ombre: var(--d-ombre-carte); --vrm-ombre-carte: var(--d-ombre-carte);
+  --o-flottant: var(--d-ombre-flottant);
+  --vrm-sortie: var(--d-sortie); --vrm-ressort: var(--d-tiroir);
+  --fu-remplir: var(--d-remplir); --fu-remplir-fort: var(--d-remplir-fort);
+}
+/* La nuit d'iOS : noir pur, cartes #1C1C1E, cases #2C2C2E ; une ombre ne se voit
+   pas sur du noir — la carte se détache par un liseré à peine plus clair. */
+:root[data-theme="dark"] {
+  --d-fond: #000000;
+  --d-carte: #1C1C1E;
+  --d-case: #2C2C2E;
+  --d-remplir: rgba(118,118,128,.24);
+  --d-remplir-fort: rgba(118,118,128,.32);
+  --d-filet: rgba(84,84,88,.6);
+  --d-encre: #F5F5F7;
+  --d-gris: #98989D;
+  --d-point-ambre: #FF9F0A;
+  --d-defile: rgba(235,235,245,.28);
+  --d-ombre-carte: 0 0 0 .5px rgba(255,255,255,.06);
+  --d-ombre-levee: 0 0 0 .5px rgba(255,255,255,.08), 0 12px 32px -8px rgba(0,0,0,.6);
+  --d-ombre-flottant: 0 0 0 .5px rgba(255,255,255,.08), 0 24px 56px rgba(0,0,0,.6);
+}
+
+/* ══ 2. LES SURFACES DU NAVIGATEUR ═════════════════════════════════════════ */
+/* Le texte des Mac et des iPhone : lissé comme dans les apps d'Apple, crénage actif. */
+html { text-rendering: optimizeLegibility; -webkit-text-size-adjust: 100%; }
+body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; font-kerning: normal; }
+/* Le curseur d'écriture, les cases à cocher et les curseurs natifs prennent le bleu. */
+:root { caret-color: var(--d-accent); accent-color: var(--d-accent); }
+/* La sélection : le bleu à 22 %, le texte reste à l'encre (lisible le jour comme la nuit). */
+:root body ::selection { background: color-mix(in srgb, var(--d-accent) 24%, transparent); color: inherit; }
+:root[data-theme="dark"] body ::selection { background: color-mix(in srgb, #0A84FF 42%, transparent); }
+/* Les barres de défilement : fines, neutres, sans gouttière blanche sur le fond gris
+   (Chrome sous Windows dessinait des barres grises épaisses dans les colonnes). */
+* { scrollbar-color: var(--d-defile) transparent; }
+:where(html, .vrm-main, .vrm-app-shell aside, [role="dialog"], .vrm-feuille) { scrollbar-width: thin; }
+/* Le focus clavier : un anneau bleu de 2 px, décollé de 2 px, sur tout ce qui se
+   touche — seulement au clavier (`:focus-visible`), jamais au doigt ni à la souris. */
+:where(button, a, summary, [role="button"], [role="tab"], [role="link"], [tabindex]:not([tabindex="-1"]), input, select, textarea):focus-visible {
+  outline: 2px solid var(--d-accent); outline-offset: 2px;
+}
+/* Les titres se coupent en lignes équilibrées ; un paragraphe ne laisse pas un mot seul. */
+:where(h1, h2, h3, .vrm-fu-titre-section, .vrm-colis-vide-titre) { text-wrap: balance; }
+:where(p, .vrm-notice-desc, .vrm-colis-vide-sous) { text-wrap: pretty; }
+/* Un contrôle ne se sélectionne pas au doigt appuyé (le libellé d'un bouton n'est pas du
+   contenu) ; un contenu (adresse, code, n° de suivi) reste sélectionnable. */
+:where(.vrm-b, .vrm-seg-btn, .vrm-fu-plus, .vrm-fu-case, .vrm-day-task-ouvrir, nav button) {
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation;
+}
+/* Un nombre s'écrit en chiffres alignés partout où il se compare (colonnes, cases, compteurs). */
+:where(.vrm-seg-n, .vrm-fu-grand, .vrm-fu-case b, .vrm-colis-prix, .vrm-num, .vrm-badge, [data-n]) { font-variant-numeric: tabular-nums; }
+
+/* Transparence réduite : les barres floutées deviennent des aplats (rien ne passe dessous). */
+@media (prefers-reduced-transparency: reduce) {
+  :root body .vrm-app-shell :is(.vrm-barre-haut, .vrm-mobile-nav, .vrm-bottom-nav, nav) { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+}
+/* Contraste renforcé : chaque carte retrouve un cadre net (l'ombre seule ne suffit plus). */
+@media (prefers-contrast: more) {
+  :root:root body .vrm-app-shell .vrm-main :is(.vrm-surface, .vrm-colis-carte, .vrm-day-task-list, .vrm-rpf-point, .vrm-colis-prochain) { box-shadow: 0 0 0 1px var(--d-encre) !important; }
+}
+
+/* ══ 3. LE BOUTON : il répond au doigt ═════════════════════════════════════
+   Il s'enfonce à peine (0,97) dès l'appui, en 120 ms — la réponse vient à la
+   pression, pas au relâché. Le survol n'existe qu'avec une souris. */
+@media (prefers-reduced-motion: no-preference) {
+  :root body .vrm-app-shell :is(.vrm-b, .vrm-seg-btn, .vrm-fu-plus, .vrm-fu-rond.is-pret):not(:disabled) { transition: transform 120ms var(--d-sortie), background-color 120ms ease, color 120ms ease, box-shadow 120ms ease; }
+  :root body .vrm-app-shell :is(.vrm-b, .vrm-fu-plus):not(:disabled):active { transform: scale(.97); }
+}
+
+/* ══ 4. MA JOURNÉE ═════════════════════════════════════════════════════════ */
+/* « À faire » : UN groupe à rangées (Rappels, Réglages) sur l'ordinateur aussi.
+   Cinq cartes empilées avec chacune son ombre faisaient cinq objets ; une liste
+   de gestes est UN objet. Le filet commence après la vignette, comme sur iPhone. */
+@media (min-width: 1024px) {
+  :root:root:root body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task-list {
+    display: flex !important; flex-direction: column !important; gap: 0 !important;
+    background: var(--d-carte) !important; border-radius: var(--d-r-carte) !important;
+    box-shadow: var(--d-ombre-carte) !important; overflow: hidden !important; border: 0 !important;
+  }
+  :root:root:root body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task-list > .vrm-day-task,
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task-list [data-alertes-argent] > .vrm-day-task {
+    position: relative; margin: 0 !important; background: transparent !important; box-shadow: none !important; border: 0 !important; border-radius: 0 !important;
+  }
+  :root:root:root body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task-list .vrm-day-task + .vrm-day-task::before,
+  :root:root:root body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task-list [data-alertes-argent] + .vrm-day-task::before {
+    content: ''; position: absolute; top: 0; left: 82px; right: 0; height: .5px; background: var(--d-filet); pointer-events: none;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    :root:root:root body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task-list > button.vrm-day-task:hover { background: color-mix(in srgb, var(--d-case) 60%, transparent) !important; }
+  }
+}
+/* La nuit, le groupe et le séparateur prennent les jetons (plus de #1c1c1e écrit à la main). */
+:root:root:root[data-theme="dark"] body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task-list { background: var(--d-carte) !important; }
+:root:root:root[data-theme="dark"] body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-day-task-list .vrm-day-task + .vrm-day-task::before { background: var(--d-filet); }
+/* Le titre d'une rangée : 17/600 au téléphone comme à l'ordinateur ; sa note en 13 gris. */
+:root:root body .vrm-app-shell .vrm-day-layout .vrm-day-task-title { letter-spacing: var(--d-ap-17); }
+/* Le guide « Démarrer avec VRM » : une carte comme les autres (rayon 20, ombre douce, pas de
+   cadre gris) — il était le seul bloc encadré de l'écran ; ses filets passent au séparateur d'iOS. */
+:root:root body .vrm-app-shell .vrm-main .vrm-guide { border: 0 !important; border-radius: var(--d-r-carte) !important; box-shadow: var(--d-ombre-carte); background: var(--d-carte) !important; padding: var(--d-e-5) var(--d-e-5) var(--d-e-4) !important; }
+:root:root body .vrm-app-shell .vrm-main .vrm-guide .vrm-guide-etape { border-top-width: .5px; border-top-color: var(--d-filet); }
+:root:root body .vrm-app-shell .vrm-main .vrm-guide .vrm-guide-barre { background: var(--d-remplir-fort); }
+/* L'en-tête « À faire · 5 gestes » : le nombre sur la ligne de base du titre. */
+:root:root body .vrm-app-shell .vrm-day-layout .vrm-fu-titre-section { align-items: baseline !important; }
+
+/* ══ 5. COLIS ══════════════════════════════════════════════════════════════ */
+/* 5.1 Le prochain geste : UNE ligne, un bouton à droite (comme une rangée de Mail).
+   Avant : deux lignes en ambre gras et un bouton gris pleine largeur — le bloc le
+   plus lourd de l'écran pour un geste. L'ambre devient un POINT devant la phrase
+   (un geste à faire, §7) ; la phrase reste à l'encre, lisible. */
+:root:root body .vrm-app-shell .vrm-main .vrm-colis-prochain {
+  flex-wrap: nowrap; gap: var(--d-e-3); margin: 0 0 var(--d-e-3); padding: 6px 6px 6px 16px; min-height: 56px;
+  border-radius: var(--d-r-carte); background: var(--d-carte); box-shadow: var(--d-ombre-carte);
+  font-size: var(--d-t-15); line-height: var(--d-il-ligne); letter-spacing: var(--d-ap-15);
+}
+:root:root body .vrm-app-shell .vrm-main .vrm-colis-prochain-txt { flex: 1 1 auto; font-weight: 600; color: var(--d-encre); }
+:root:root body .vrm-app-shell .vrm-main .vrm-colis-prochain.is-ambre .vrm-colis-prochain-txt { color: var(--d-encre); }
+:root:root body .vrm-app-shell .vrm-main .vrm-colis-prochain.is-ambre .vrm-colis-prochain-txt::before {
+  content: ''; display: inline-block; width: 8px; height: 8px; margin: 0 8px 1px 0; border-radius: 50%; background: var(--d-point-ambre); vertical-align: middle;
+}
+:root:root body .vrm-app-shell .vrm-main .vrm-colis-prochain > button { flex: 0 0 auto !important; min-width: 64px; padding: 0 16px !important; border-radius: var(--d-r-pilule) !important; }
+@media (max-width: 520px) {
+  :root:root body .vrm-app-shell .vrm-main .vrm-colis-prochain { padding: 6px 6px 6px 14px; }
+  :root:root body .vrm-app-shell .vrm-main .vrm-colis-prochain-txt { font-size: var(--d-t-15); }
+}
+
+/* 5.2 La carte d'un colis. Le titre de l'article a DEUX lignes au plus, jamais coupé
+   en « spezial… » sur une ligne : c'est le nom de la paire qu'on cherche des yeux. En 15/600,
+   comme une rangée de « À retirer » : la même paire s'écrit pareil dans les trois onglets
+   (en 17, « New Balance 550 taille 43 » ne tenait pas sur deux lignes à côté de ses gestes). */
+:root:root body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-carte .vrm-colis-titre {
+  -webkit-line-clamp: 2 !important; line-clamp: 2; font-size: var(--d-t-15) !important; font-weight: 600 !important; line-height: 1.3 !important; letter-spacing: var(--d-ap-15) !important;
+  overflow-wrap: break-word !important; hyphens: manual;
+}
+:root:root body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-carte [data-colis-dates] { font-size: var(--d-t-13) !important; font-weight: 500 !important; color: var(--d-gris); }
+:root:root body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-carte [data-colis-limite-texte] { font-weight: 600 !important; }
+/* La vignette : un carré de 60, rayon 14 — et le LOGO DU TRANSPORTEUR posé dans son
+   coin (comme le badge d'une app) quand il est LU ; rien lu, rien posé (jamais deviné). */
+:root:root body .vrm-app-shell .vrm-main .vrm-colis-carte .vrm-colis-photo { position: relative; overflow: visible !important; }
+:root:root body .vrm-app-shell .vrm-main .vrm-colis-carte .vrm-colis-photo > :is(img, picture, svg) { border-radius: inherit; }
+.vrm-colis-logo-transp {
+  position: absolute; right: -5px; bottom: -5px; z-index: 1; display: grid; place-items: center;
+  width: 24px; height: 24px; border-radius: 7px; background: var(--d-carte);
+  box-shadow: 0 0 0 2px var(--d-carte), 0 1px 3px rgba(0,0,0,.18); pointer-events: none;
+}
+.vrm-colis-logo-transp > [data-transporteur-logo] { width: 22px !important; height: 22px !important; border-radius: 6px !important; box-shadow: none !important; }
+.vrm-colis-logo-transp:not(:has([data-transporteur-logo="charge"])) { display: none; }
+/* À retirer : la vignette d'une rangée (48 px) porte le même badge, un cran plus petit. */
+.vrm-rpf-vignette { position: relative; overflow: visible !important; }
+.vrm-rpf-vignette > .vrm-colis-logo-transp { right: -4px; bottom: -4px; width: 20px; height: 20px; border-radius: 6px; }
+.vrm-rpf-vignette > .vrm-colis-logo-transp > [data-transporteur-logo] { width: 18px !important; height: 18px !important; border-radius: 5px !important; }
+.vrm-rpf-vignette > :is(img, picture) { border-radius: inherit; }
+/* La vignette sans photo : un dessin à peine visible, pas un cadre. */
+:root:root body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-carte .vrm-colis-photo:not(:has(img)) { background: var(--d-case) !important; }
+
+/* 5.3 La frise : posée seulement quand une étape est faite (src/App.jsx). Son mot est
+   en 12, le trait en 4 px — elle informe, elle ne pèse pas. */
+:root:root body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-carte > .vrm-colis-frise { margin-top: var(--d-e-3) !important; }
+
+/* 5.4 L'en-tête d'un groupe (« Mondial Relay · 4 colis ») : 17/600, le logo en tuile. */
+:root:root body .vrm-app-shell .vrm-main .vrm-fu-groupe-transp { padding: var(--d-e-5) 4px var(--d-e-1); }
+:root:root body .vrm-app-shell .vrm-main .vrm-fu-groupe-transp h3 { font-weight: 600; letter-spacing: var(--d-ap-17); }
+:root:root body .vrm-app-shell .vrm-main .vrm-fu-groupe-transp .vrm-fu-groupe-tuile { background: var(--d-remplir-fort); }
+
+/* 5.5 L'ordinateur : chaque colis est une RANGÉE (photo · titre et limite · frise ·
+   gestes) au lieu d'une carte étirée sur 1 200 px dont la frise traversait l'écran. */
+@media (min-width: 1024px) {
+  :root:root:root body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-grille .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]):has(> .vrm-colis-frise) {
+    display: grid !important; grid-template-columns: minmax(0, 1fr) minmax(260px, 340px); column-gap: var(--d-e-6); align-items: center;
+    padding: var(--d-e-3) 72px var(--d-e-3) var(--d-e-4) !important;
+  }
+  :root:root:root body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-grille .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]):has(> .vrm-colis-frise) > :first-child { grid-column: 1; padding-right: 0 !important; }
+  :root:root:root body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-grille .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) > .vrm-colis-frise { grid-column: 2; grid-row: 1; margin: 0 !important; }
+  :root:root:root body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-grille .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) > .vrm-colis-actions { grid-column: 1 / -1; margin-top: 0 !important; }
+  :root:root:root body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-grille .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) > .vrm-colis-actions:not(:has(> :not(.vrm-rangee-bord))) { height: 0; }
+  :root:root:root body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-grille .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-colis-actions > .vrm-rangee-bord { top: 50% !important; transform: translateY(-50%); }
+  :root:root:root body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-grille { gap: var(--d-e-2) !important; }
+  /* « Envoyés » : la même rangée — photo · titre et état · frise · « Suivre » / « Pas encore déposé ». */
+  :root:root:root body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-grille .vrm-colis-carte.vrm-colis-envoye:has(> .vrm-colis-frise) {
+    display: grid !important; grid-template-columns: minmax(0, 1fr) minmax(260px, 340px) auto; column-gap: var(--d-e-6); align-items: center;
+    padding: var(--d-e-3) var(--d-e-4) !important;
+  }
+  :root:root:root body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-grille .vrm-colis-carte.vrm-colis-envoye > :first-child { grid-column: 1; }
+  :root:root:root body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-grille .vrm-colis-carte.vrm-colis-envoye > .vrm-colis-frise { grid-column: 2; grid-row: 1; margin: 0 !important; }
+  :root:root:root body .vrm-app-shell .vrm-main:has(.vrm-fu-colis) .vrm-colis-grille .vrm-colis-carte.vrm-colis-envoye > .vrm-colis-actions { grid-column: 3; grid-row: 1; margin: 0 !important; flex-wrap: nowrap !important; }
+  /* La carte sombre « Aujourd'hui » : le grand chiffre à gauche, ses cases à droite, sur
+     une bande — elle occupait 250 px de haut pour quatre nombres. */
+  :root:root body .vrm-app-shell .vrm-main section.vrm-fu-carte.vrm-fu-colis {
+    display: grid !important; grid-template-columns: minmax(180px, 1fr) minmax(0, 2.2fr); align-items: end; column-gap: var(--d-e-6); row-gap: var(--d-e-2);
+  }
+  :root:root body .vrm-app-shell .vrm-main section.vrm-fu-carte.vrm-fu-colis > .vrm-fu-carte-haut { grid-column: 1 / -1; }
+  :root:root body .vrm-app-shell .vrm-main section.vrm-fu-carte.vrm-fu-colis > .vrm-fu-carte-tete { grid-column: 1; }
+  :root:root body .vrm-app-shell .vrm-main section.vrm-fu-carte.vrm-fu-colis > .vrm-fu-cases { grid-column: 2; }
+  :root:root body .vrm-app-shell .vrm-main section.vrm-fu-carte.vrm-fu-colis > :not(.vrm-fu-carte-haut, .vrm-fu-carte-tete, .vrm-fu-cases) { grid-column: 1 / -1; }
+}
+
+/* 5.6 La Tournée (feuille) : le titre de la paire sur deux lignes au plus. */
+:root body .vrm-tournee-colis :is(.vrm-colis-titre, [class*="titre"]) {
+  white-space: normal !important; display: -webkit-box !important; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; text-overflow: clip !important; overflow-wrap: break-word;
+}
+
+/* 5.7 « Envoyés » : le titre de la paire sur deux lignes au plus (il était coupé sur une). */
+:root:root body .vrm-app-shell .vrm-main .vrm-colis-envoye .vrm-colis-titre {
+  display: -webkit-box !important; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal !important; text-overflow: clip !important; overflow: hidden;
+}
