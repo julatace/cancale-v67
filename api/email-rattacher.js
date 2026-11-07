@@ -80,7 +80,7 @@ async function lirePages(requete, compte) {
     let r;
     try {
       if (compte) compte.n++;
-      r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?${requete}&order=id.asc`, {
+      r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?${requete}&order=id.asc,owner.asc`, {
         headers: { ...HEADERS, 'Range-Unit': 'items', Range: `${debut}-${debut + PAGE - 1}` },
       });
     } catch (_) { return null; }

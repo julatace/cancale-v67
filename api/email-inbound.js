@@ -53,6 +53,7 @@ import { modifierCas } from './_lib/suivi-vinted.js';
 import { estEmailVestiaire, lireEmailVenteVc, fusionnerVenteEmailVc } from './_lib/vestiaire-email.js';
 import { lireArriveeAchat, cleArrivee, ligneArrivee, conversationVinted } from './_lib/achat-arrive-relais.js';
 import { estConfirmationTransfert, lireConfirmationTransfert, authentifieGoogle, sansLienConfirmation, idCodeGmail } from './_lib/transfert-gmail.js';
+import { ordreStable } from './_lib/ordre-stable.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
@@ -796,7 +797,7 @@ async function lirePagine(requete) {
   const out = []; const page = 1000;
   for (let from = 0; from < 100000; from += page) {
     let r;
-    try { r = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?${requete}`), { headers: { ...sbCle(SUPABASE_KEY), 'Range-Unit': 'items', Range: `${from}-${from + page - 1}` } }); }
+    try { r = await fetch(await duVendeur(ordreStable(`${SUPABASE_URL}/rest/v1/app_data?${requete}`)), { headers: { ...sbCle(SUPABASE_KEY), 'Range-Unit': 'items', Range: `${from}-${from + page - 1}` } }); }
     catch (_) { return null; }
     if (!r.ok) return null;
     let j; try { j = await r.json(); } catch (_) { return null; }

@@ -4501,10 +4501,15 @@ const lireTout = async (query, opts = {}) => {
   const max = opts.maxPages || 20;
   const out = [];
   let complet = false;
+  // (7 nov., audit « 1 000 vendeurs ») Un ORDRE STABLE sur chaque page : sans
+  // `order=`, Postgres rend les lignes dans l'ordre qui l'arrange et une ligne
+  // peut sauter ou revenir d'une page à l'autre. Une requête qui a déjà son
+  // `order=` le garde (scripts/audit-pagination-ordre.cjs).
+  const requete = /(^|&)order=/.test(String(query)) ? query : `${query}&order=id.asc`;
   for (let p = 0; p < max; p++) {
     const from = p * PAGE_SB;
     // (7 nov.) `opts.memo` : une lecture de MONTAGE peut partager la réponse 60 s (`fetchMemo`).
-    const r = await (opts.memo ? fetchMemo : fetch)(`${SUPABASE_URL}/rest/v1/app_data?${query}`, Object.assign({
+    const r = await (opts.memo ? fetchMemo : fetch)(`${SUPABASE_URL}/rest/v1/app_data?${requete}`, Object.assign({
       headers: sbAuth({ Range: `${from}-${from + PAGE_SB - 1}`, 'Range-Unit': 'items' }),
     }, opts.voirSupprimes ? { vrmVoirSupprimes: true } : {}));
     // ⚠️⚠️ (1er nov., audit « conditions difficiles ») UNE PAGE RATÉE = « PAS SU »,
