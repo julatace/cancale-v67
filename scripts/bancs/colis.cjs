@@ -290,7 +290,9 @@ const attendus=aEnvoyer.filter(o=>parTx[String(o.transaction_id)]).length;
     //    passé en retard, et le banc a crié au loup sur une app intacte.
     //    C'est §6.5 à mes dépens : on lit le NOMBRE devant « prêt(s) à
     //    imprimer », quelle que soit la phrase autour.
-    const lit = (t) => { const m=/((?:au moins )?)(\d+)\s+(?:bordereaux?\s+)?pr[êe]ts?\s+[àa]\s+imprimer/i.exec(t);
+    //    (6 nov., audit des chiffres) « à imprimer » = pas encore imprimés (la case de
+    //    Colis) : « N à imprimer » sans « prêts » est lu aussi.
+    const lit = (t) => { const m=/((?:au moins )?)(\d+)\s+(?:bordereaux?\s+)?(?:pr[êe]ts?\s+)?[àa]\s+imprimer/i.exec(t);
       return m ? { n:+m[2], approx:!!m[1].trim() } : null; };
     const ctx = await b2.newContext({viewport:{width:1512,height:950}});
     const p2 = await ctx.newPage();
@@ -374,8 +376,9 @@ const attendus=aEnvoyer.filter(o=>parTx[String(o.transaction_id)]).length;
     const p3 = await ctx.newPage();
     await brancher(p3, /_label_|email_bord/);
     await p3.goto('http://localhost:'+(Number(process.env.BANC_PORT) || 4403)+'/?tab=cat_bord',{waitUntil:'domcontentloaded'});
-    const lire = (t) => { const l=(t.split('\n').find(x=>/bordereaux? prêts? à imprimer/.test(x))||'');
-      const m=/((?:au moins )?)(\d+) bordereaux? prêts? à imprimer/.exec(l); const a=/(\d+) en attente de bordereau/.exec(l);
+    // (6 nov., audit des chiffres) l'en-tête dit « N bordereaux à imprimer » (pas encore imprimés).
+    const lire = (t) => { const l=(t.split('\n').find(x=>/bordereaux? (?:prêts? )?à imprimer/.test(x))||'');
+      const m=/((?:au moins )?)(\d+) bordereaux? (?:prêts? )?à imprimer/.exec(l); const a=/(\d+) en attente de bordereau/.exec(l);
       return m ? { ligne:l.trim(), n:+m[2], approx:!!m[1].trim(), att:a?+a[1]:0 } : null; };
     const vus = new Map(); const t0 = Date.now();
     while (Date.now() - t0 < 6500) {
