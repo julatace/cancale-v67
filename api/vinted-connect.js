@@ -18,6 +18,7 @@
 import './_lib/sans-bruit.js';
 import { sbCle } from './_lib/cle.js';
 import { vendeurExige } from './_lib/session.js';
+import { repondreSansCleService } from './_lib/cle-service.js';
 // ⚠️⚠️ CETTE ROUTE ÉTAIT PUBLIQUE ET ÉCRIVAIT CHEZ LE PROPRIÉTAIRE DE
 //    L'INSTALLATION (`withOwnerAll` = VRM_OWNER_UID). N'importe qui pouvait
 //    coller un jeton Vinted et faire apparaître SON compte dans la boutique de
@@ -126,6 +127,8 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') { res.status(405).json({ error: 'POST uniquement' }); return; }
   const u = await vendeurExige(req, res);
   if (!u) return;
+  // (7 nov.) Sans clé de service, la clé publique ne voit rien sous RLS : 503 dit, jamais « rien à faire ».
+  if (repondreSansCleService(res)) return;
 
   let { refreshToken, accessToken, anonId, csrfToken, domain } = req.body || {};
   refreshToken = (refreshToken || '').trim();

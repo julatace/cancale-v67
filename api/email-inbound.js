@@ -54,6 +54,7 @@ import { estEmailVestiaire, lireEmailVenteVc, fusionnerVenteEmailVc } from './_l
 import { lireArriveeAchat, cleArrivee, ligneArrivee, conversationVinted } from './_lib/achat-arrive-relais.js';
 import { estConfirmationTransfert, lireConfirmationTransfert, authentifieGoogle, sansLienConfirmation, idCodeGmail } from './_lib/transfert-gmail.js';
 import { ordreStable } from './_lib/ordre-stable.js';
+import { repondreSansCleService } from './_lib/cle-service.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
@@ -1980,6 +1981,8 @@ export default async function handler(req, res) {
   res.setHeader?.('Cache-Control','no-store');
   const preuve=cleValide(req);
   if(preuve!==true){res.status(preuve===null?503:401).json({ok:false,error:preuve===null?'cle-non-configuree':'clé invalide'});return;}
+  // (7 nov.) Sans clé de service : 503 (le service de réception rejoue), jamais un e-mail « rangé » sous la clé publique.
+  if (repondreSansCleService(res)) return;
   const mode = String((req.query && req.query.mode) || '');
   if (mode) return contexteVendeur.run({ owner: process.env.VRM_OWNER_UID || '' }, () => modeScript(mode, req, res));
   return contexteVendeur.run({ owner: '' }, () => traiterEmail(req, res));

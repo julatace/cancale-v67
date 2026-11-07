@@ -17,6 +17,7 @@ import { suiviDeLigne, finDeLigne, finsDesLignes, sortiParSuivis, arriveesDeLign
 import { preuveDeTransp, contredit } from './_lib/etat-colis.js';
 import { ordreStable } from './_lib/ordre-stable.js';
 import { vendeurParIndex, ecrireIndexJeton } from './_lib/jeton-index.js';
+import { repondreSansCleService } from './_lib/cle-service.js';
 // api/widget.js
 // ────────────────────────────────────────────────────────────────────────────
 // DONNÉES DU WIDGET écran d'accueil (app Scriptable sur iPhone).
@@ -663,6 +664,8 @@ export default async function handler(req, res) {
   // adresse. Dès que la clé existe, la route est fermée sans clé valide.
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('Referrer-Policy', 'no-referrer');
+  // (7 nov.) Sans clé de service, la clé publique ne voit rien sous RLS : 503 dit, jamais « rien à faire ».
+  if (repondreSansCleService(res)) return;
   // (6 nov.) LES SMS DE MONDIAL RELAY envoyés par SON automatisation Raccourcis :
   // une autre clé (`vrm_sms_token`, qui ÉCRIT), une autre règle — jamais la clé du
   // widget (lecture seule, et servie sans clé à un vendeur unique en transition).
