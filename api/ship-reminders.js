@@ -38,6 +38,7 @@ import { bordsParTransaction, compterEcheances, heureCourte } from './_lib/limit
 import { withOwnerAll, conflictTarget, contexteVendeur, proprietaireCourant } from './_lib/owner.js';
 import { sbCle } from './_lib/cle.js';
 import { ordreStable } from './_lib/ordre-stable.js';
+import { repondreSansCleService } from './_lib/cle-service.js';
 import { comptesActifs, normaliserRegistre } from './_lib/ebay.js';
 import { colisEbay, resumeColisEbay, lireCommandesEbayServeur } from './_lib/ebay-a-expedier.js';
 // (1er nov., audit A4) Les colis Leboncoin et Vestiaire à poster, et les ventes
@@ -59,8 +60,11 @@ import { purgerHtml } from './_lib/email-html.js';
 // (6 nov., v36) Les temps réels des vendeurs (agrégats journaliers, api/_lib/mesures-terrain.js).
 import { histosDesJours, purgerMesuresAnciennes } from './_lib/mesures-terrain.js';
 import { proprietaireInstallation } from './_lib/signalement.js';
-// Après 240 s de cron, aucun e-mail de l'essai ne COMMENCE (la fonction s'arrête à 300 s).
-const RELANCES_JUSQUA_MS = 240000;
+import { PROPRIETAIRE_NEUTRE } from './_lib/proprietaire-email.js';
+import { passerVendeurs, BUDGET_VENDEURS_MS } from './_lib/cron-lots.js';
+// (7 nov.) Les e-mails de l'essai passent AVANT les vendeurs : après 60 s, aucun
+// ne COMMENCE (le reste part le lendemain ; les vendeurs gardent leur temps).
+const RELANCES_JUSQUA_MS = 60000;
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
@@ -938,6 +942,34 @@ async function veilleDesLenteurs(maintenant = Date.now()) {
   }));
 }
 
+// ── LES LIGNES DU PROPRIÉTAIRE NEUTRE (le curseur du cron) ─────────────────
+// Trois états : objet · `null` (absente) · `undefined` (pas su).
+async function lireNeutre(id) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=eq.${encodeURIComponent(id)}&select=data&limit=1`, { headers: HEADERS });
+    if (!r.ok) return undefined;
+    const j = await r.json();
+    if (!Array.isArray(j)) return undefined;
+    return (j[0] && j[0].data) || null;
+  } catch (_) { return undefined; }
+}
+async function ecrireNeutre(id, data) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
+      method: 'POST',
+      headers: { ...HEADERS, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify([{ owner: PROPRIETAIRE_NEUTRE, id, data, updated_at: new Date().toISOString() }]),
+    });
+    return !!(r && r.ok);
+  } catch (_) { return false; }
+}
+async function retirerNeutre(id) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${PROPRIETAIRE_NEUTRE}&id=eq.${encodeURIComponent(id)}`, { method: 'DELETE', headers: { ...HEADERS, Prefer: 'return=minimal' } });
+    return !!(r && r.ok);
+  } catch (_) { return false; }
+}
+
 export default async function handler(req, res) {
   // CRON_SECRET est obligatoire : un endpoint public ne doit pas déclencher des envois.
   // (Vercel envoie « Authorization: Bearer <CRON_SECRET> » sur les crons).
@@ -946,6 +978,8 @@ export default async function handler(req, res) {
   if (!secret) { res.status(503).json({ok:false,error:'cron-non-configure'});return; }
   const auth = req.headers?.authorization || '';
   if (auth !== `Bearer ${secret}`) { res.status(401).json({error:'clé invalide'});return; }
+  // (7 nov.) Sans clé de service, la clé publique ne voit rien sous RLS : 503 dit, jamais « rien à faire ».
+  if (repondreSansCleService(res)) return;
 
 
   // `?moment=soir` : le rappel de la veille au soir (second cron), rien d'autre
@@ -967,50 +1001,53 @@ export default async function handler(req, res) {
     //    hors contexte : si on ne peut pas énumérer, on ne devine pas.
     const owners = await ownersActifs();
     if (!owners) { res.status(503).json({ ok: false, skipped: 'vendeurs non énumérables (lecture en panne)' }); return; }
-    // ⚠️ À L'ÉCHELLE : un vendeur coûte ~6 lectures. À la queue leu leu, mille
-    //    vendeurs dépassent les 300 s d'une fonction Vercel et les derniers n'ont
-    //    jamais leur rappel. On en traite VENDEURS_EN_PARALLELE à la fois — chacun
-    //    dans SON contexte (AsyncLocalStorage : deux vendeurs simultanés ne
-    //    partagent ni filtre, ni mémo, ni appareils). Ce sont NOS lectures, pas
-    //    des requêtes à Vinted (le garde-fou « une à la fois » du §3 n'est pas ici).
-    // ⚠️ Et un vendeur qui plante n'arrête plus les autres : son bilan porte
-    //    l'erreur, les suivants reçoivent leur rappel, et la réponse est 500 pour
-    //    que l'échec reste visible.
-    const bilans = new Array(owners.length);
-    let suivant = 0, echecs = 0;
-    const ouvrier = async () => {
-      while (suivant < owners.length) {
-        const i = suivant++; const o = owners[i];
-        try {
-          const out = await contexteVendeur.run({ owner: o }, () => traiter());
-          bilans[i] = { owner: o, ...out };
-        } catch (e) { echecs++; bilans[i] = { owner: o, erreur: String((e && e.message) || e).slice(0, 200) }; }
-      }
-    };
-    await Promise.all(Array.from({ length: Math.min(VENDEURS_EN_PARALLELE, owners.length) }, ouvrier));
-    // (5 nov.) Les e-mails de l'essai gratuit (api/_lib/relances-essai.js) : une
-    // passe à part, le MATIN seulement, après les rappels. Sans envoi configuré
-    // elle ne fait rien (et le dit dans la réponse) ; une panne ne fait pas
-    // échouer les rappels déjà partis.
+
+    // ── (7 nov., audit « 1 000 vendeurs ») LES TÂCHES GLOBALES D'ABORD ─────────
+    //    Elles étaient APRÈS la boucle des vendeurs : un jour de grosse charge,
+    //    la fonction était coupée avant elles et elles ne tournaient jamais. Le
+    //    MATIN seulement ; chacune est bornée (les e-mails de l'essai ne
+    //    COMMENCENT plus après `RELANCES_JUSQUA_MS`), et une panne de l'une ne
+    //    fait échouer ni les autres ni les rappels (elle est dite dans la réponse).
+    // (5 nov.) Les e-mails de l'essai gratuit (api/_lib/relances-essai.js). Sans
+    // envoi configuré elle ne fait rien (et le dit dans la réponse).
     let relances = null;
     if (!soir && !reveil) { try { relances = await passageRelances({ jusqua: debutCron + RELANCES_JUSQUA_MS }); } catch (e) { relances = { erreur: String((e && e.message) || e).slice(0, 200) }; } }
-    // (6 nov., filet 4) La veille des plantages, le MATIN seulement ; une panne
-    // ne fait pas échouer les rappels déjà partis (elle est dite dans la réponse).
+    // (6 nov., filet 4) La veille des plantages.
     let veille = null;
     if (!soir && !reveil) { try { veille = await veilleDesPlantages(debutCron); } catch (e) { veille = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; } }
-    // (6 nov.) Le HTML d'origine des e-mails (30 jours), le MATIN seulement : une
-    // purge ratée ne fait échouer rien (elle est dite dans la réponse).
+    // (6 nov.) Le HTML d'origine des e-mails (30 jours) : une purge ratée ne fait
+    // échouer rien (elle est dite dans la réponse).
     let purgeHtml = null;
     if (!soir && !reveil) purgeHtml = await purgerHtml({ url: SUPABASE_URL, headers: HEADERS, maintenant: debutCron });
-    // (6 nov., v36) Les lenteurs, le MATIN seulement ; une panne n'empêche rien d'autre.
+    // (6 nov., v36) Les lenteurs.
     let lenteurs = null;
     if (!soir && !reveil) { try { lenteurs = await veilleDesLenteurs(debutCron); } catch (e) { lenteurs = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; } }
-    // (7 nov.) Les temps réels de plus de 90 jours (`mesures_jour_*` du propriétaire),
-    // le MATIN seulement : lecture projetée, une lecture ratée ne supprime rien, une
-    // purge ratée ne fait échouer rien (elle est dite dans la réponse).
+    // (7 nov.) Les temps réels de plus de 90 jours (`mesures_jour_*` du propriétaire,
+    // éclats compris) : lecture projetée, une lecture ratée ne supprime rien.
     let purgeMesures = null;
     if (!soir && !reveil) { try { purgeMesures = await purgerMesuresAnciennes({ url: SUPABASE_URL, headers: HEADERS, proprietaire: await proprietaireInstallation(), maintenant: debutCron }); } catch (e) { purgeMesures = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; } }
-    res.status(echecs ? 500 : 200).json({ ok: !echecs, ...(soir ? { moment: 'soir' } : reveil ? { moment: 'reveil' } : {}), vendeurs: owners.length, echecs, bilans, ...(relances ? { relances } : {}), ...(veille ? { veille } : {}), ...(purgeHtml ? { purgeHtml } : {}), ...(lenteurs ? { lenteurs } : {}), ...(purgeMesures ? { purgeMesures } : {}) });
+
+    // ── LES VENDEURS, PAR LOTS (api/_lib/cron-lots.js) ─────────────────────────
+    //    UNE passe PAR vendeur, chacun dans SON contexte (AsyncLocalStorage : deux
+    //    vendeurs simultanés ne partagent ni filtre, ni mémo, ni appareils),
+    //    VENDEURS_EN_PARALLELE à la fois — ce sont NOS lectures, pas des requêtes
+    //    à Vinted (le garde-fou « une à la fois » du §3 n'est pas ici). Un vendeur
+    //    qui plante n'arrête pas les autres (500 à la fin, visible).
+    //    Un BUDGET de temps : passé, plus aucun vendeur ne commence et un CURSEUR
+    //    `cron_curseur_{moment}_{jour}` (propriétaire neutre) dit qui est fait —
+    //    relancé, le cron ne refait personne ; le lendemain, les oubliés d'abord.
+    //    L'ordre tourne chaque jour : jamais les mêmes en dernier.
+    const momentCurseur = reveil ? 'reveil' : soir ? 'soir' : 'matin';
+    const budget = Number(process.env.VRM_CRON_BUDGET_MS) > 0 ? Number(process.env.VRM_CRON_BUDGET_MS) : BUDGET_VENDEURS_MS;
+    const lot = await passerVendeurs({
+      owners, moment: momentCurseur, jour: parisDate(0), debut: debutCron, budgetMs: budget, parallele: VENDEURS_EN_PARALLELE,
+      traiter: (o) => contexteVendeur.run({ owner: o }, () => traiter()),
+      lireCurseur: lireNeutre, ecrireCurseur: ecrireNeutre, retirerCurseur: retirerNeutre,
+    });
+    const { bilans, echecs } = lot;
+    res.status(echecs ? 500 : 200).json({ ok: !echecs, ...(soir ? { moment: 'soir' } : reveil ? { moment: 'reveil' } : {}), vendeurs: owners.length, echecs,
+      lot: { traites: lot.traites, dejaFaits: lot.dejaFaits, restants: lot.restants, prioritaires: lot.prioritaires, budgetAtteint: lot.budgetAtteint, curseur: lot.curseur },
+      bilans, ...(relances ? { relances } : {}), ...(veille ? { veille } : {}), ...(purgeHtml ? { purgeHtml } : {}), ...(lenteurs ? { lenteurs } : {}), ...(purgeMesures ? { purgeMesures } : {}) });
   } catch (e) {
     // Une tâche planifiée qui répond 200 sur une panne n'apparaît nulle part :
     // le tableau de bord la compte réussie, et les rappels d'expédition
