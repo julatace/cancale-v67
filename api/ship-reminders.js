@@ -57,7 +57,7 @@ import { passageVeillePlantages, ID_MEMO_VEILLE, passageVeilleLenteurs, ID_MEMO_
 // (6 nov.) La purge à 30 jours du HTML d'origine des e-mails (api/_lib/email-html.js).
 import { purgerHtml } from './_lib/email-html.js';
 // (6 nov., v36) Les temps réels des vendeurs (agrégats journaliers, api/_lib/mesures-terrain.js).
-import { idJour as idJourMesures, purgerMesuresAnciennes } from './_lib/mesures-terrain.js';
+import { histosDesJours, purgerMesuresAnciennes } from './_lib/mesures-terrain.js';
 import { proprietaireInstallation } from './_lib/signalement.js';
 // Après 240 s de cron, aucun e-mail de l'essai ne COMMENCE (la fonction s'arrête à 300 s).
 const RELANCES_JUSQUA_MS = 240000;
@@ -902,19 +902,15 @@ async function veilleDesPlantages(maintenant = Date.now()) {
 }
 
 // (6 nov., v36) LA VEILLE DES LENTEURS : les deux derniers jours d'agrégats du
-// PROPRIÉTAIRE (deux lignes bornées, `h` seul projeté), un p75 qui se dégrade de
+// PROPRIÉTAIRE (deux jours, éclats compris, `h` seul projeté), un p75 qui se dégrade de
 // plus de 30 % ⇒ une notification à lui (api/_lib/veille-plantages.js).
 async function veilleDesLenteurs(maintenant = Date.now()) {
   const proprietaire = process.env.VRM_OWNER_UID || '';
   return contexteVendeur.run({ owner: proprietaire }, () => passageVeilleLenteurs({
     proprietaire, maintenant,
     lireMemo: () => getRow(ID_MEMO_LENTEURS),
-    lireJours: async (jours) => {
-      const rows = await fetchPaginated(`app_data?owner=eq.${proprietaire}&id=in.(${jours.map(idJourMesures).join(',')})&select=id,h:data->h`);
-      if (!Array.isArray(rows)) return null;
-      const out = {}; for (const j of jours) { const r = rows.find((x) => x && x.id === idJourMesures(j)); out[j] = r && r.h && typeof r.h === 'object' ? r.h : null; }
-      return out;
-    },
+    // (7 nov.) Les éclats du jour additionnés (et l'ancienne ligne d'avant les éclats).
+    lireJours: (jours) => histosDesJours({ lire: fetchPaginated, proprio: proprietaire, jours }),
     ecrireMemo: (memo) => ecrireDedup(ID_MEMO_LENTEURS, memo),
     envoyer: (notif) => sendPushToAll(notif),
   }));
