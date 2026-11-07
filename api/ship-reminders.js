@@ -421,6 +421,28 @@ async function rappelsColisRetrait(maintenant = Date.now()) {
 // signal instantané : c'est le cron QUOTIDIEN (le bandeau in-app reste
 // l'instantané). Dédoublé par identité de l'offre (`offer_request_id`).
 const OFFRES_MINI_FILTRE = 'data->payload->conversation->messages=cs.' + encodeURIComponent(JSON.stringify([{ entity_type: 'offer_request_message', entity: { status: 10 } }]));
+// (7 nov., audit « 1 000 vendeurs ») LA LECTURE RÉDUITE. Le filtre `cs` ouvre
+// le JSON de CHAQUE conversation du vendeur (des milliers à l'échelle). Sans
+// migration, on borne ce que la base examine et renvoie par deux filtres :
+//   · la DATE de capture, scalaire déjà copié dans `meta` (déclencheur de la
+//     migration 004) : seules les conversations captées depuis
+//     `OFFRES_MINI_JOURS` jours. Rien n'est perdu : le cron passe chaque jour et
+//     chaque offre est dédoublée par son identité — une offre captée il y a plus
+//     d'une semaine a déjà eu ses passages (et une offre Vinted de cet âge a expiré) ;
+//   · l'ARTICLE : seulement les conversations des annonces qui ont un prix mini
+//     (`item_id=in.(…)`, identifiants numériques seuls), quand il y en a au plus
+//     `OFFRES_MINI_ARTICLES_MAX` (au-delà l'URL serait trop longue : filtre de date seul).
+// Ce qu'une migration apporterait (pas faite ici) : copier dans `meta` l'item et
+// un témoin « offre en attente » des lignes `harvest_*_conv_*` (comme pour les
+// transactions), pour que la base ne décompresse plus aucun `data`.
+const OFFRES_MINI_JOURS = 7;
+const OFFRES_MINI_ARTICLES_MAX = 200;
+export function filtresOffresMini(planchers, maintenant = Date.now()) {
+  const depuis = new Date(maintenant - OFFRES_MINI_JOURS * 86400000).toISOString();
+  const ids = [...planchers.keys()].map(String).filter((x) => /^\d{1,20}$/.test(x));
+  const parArticle = ids.length && ids.length <= OFFRES_MINI_ARTICLES_MAX ? `&data->payload->conversation->transaction->>item_id=in.(${ids.join(',')})` : '';
+  return `meta->>capturedAt=gte.${encodeURIComponent(depuis)}${parArticle}`;
+}
 // Copie FIDÈLE de `offreEnAttenteDe` (src/App.jsx, §11) : le serveur ne peut pas
 // importer App.jsx. `scripts/bancs/offres-mini-push.cjs` EXÉCUTE la règle, et
 // l'audit compare au besoin. Toute dérive = deux chiffres pour une notion.
@@ -450,7 +472,7 @@ async function rappelsOffresMini(maintenant = Date.now()) {
     if (isFinite(v) && v > 0) planchers.set(String(id), v);
   }
   if (!planchers.size) return 'aucun prix mini posé';
-  const rows = await fetchPaginated(scoped(`app_data?id=like.harvest_%25_conv_%25&${OFFRES_MINI_FILTRE}&select=id,opp:data->payload->conversation->opposite_user->>id,item:data->payload->conversation->transaction->>item_id,msgs:data->payload->conversation->messages`));
+  const rows = await fetchPaginated(scoped(`app_data?id=like.harvest_%25_conv_%25&${filtresOffresMini(planchers, maintenant)}&${OFFRES_MINI_FILTRE}&select=id,opp:data->payload->conversation->opposite_user->>id,item:data->payload->conversation->transaction->>item_id,msgs:data->payload->conversation->messages`));
   if (rows === null) return 'conversations illisibles — rien envoyé';       // « pas su » ⇒ rien
   const auMini = [];
   const convDe = new Map();   // offre → sa conversation (l'identité de la LIGNE, harvest_{uid}_conv_{id})
