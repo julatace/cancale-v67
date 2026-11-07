@@ -9647,9 +9647,11 @@ function PhotosBloquees() {
         {/* (7 nov., revue UX) UNE ligne (décision du 6 nov. : le reste en feuille). Six lignes en tête de
             Ma journée, Annonces et Messages poussaient l'écran vers le bas. La cause et le geste complets
             restent dans « ⓘ » ; le seul geste à faire ICI (recharger) reste écrit sur la ligne. */}
+        {/* Un geste à faire (recharger, l'extension, l'ordinateur, le bon Chrome) reste ÉCRIT sur la ligne ;
+            seule l'explication de la cause passe dans « ⓘ ». Rien à faire ⇒ une ligne. */}
         <span>{d.cause === 'horsligne' ? "Pas de connexion : les photos reviendront avec le réseau." : "Les photos de Vinted ne s'affichent pas ici."}
-          {codeGeste === 'muette' ? <> <b>Recharge cette page.</b></> : d.cause === 'horsligne' ? null : " Rien n'est touché."}{' '}
-          <Pourquoi titre="Les photos de Vinted">{cause} {geste}</Pourquoi></span>
+          {['muette', 'muette-ailleurs', 'telephone', 'chrome'].includes(codeGeste) ? <> {geste}</> : d.cause === 'horsligne' ? null : " Rien n'est touché."}{' '}
+          <Pourquoi titre="Les photos de Vinted">{cause} {['muette', 'muette-ailleurs', 'telephone', 'chrome'].includes(codeGeste) ? null : geste}</Pourquoi></span>
       </div>
     </div>
   );
