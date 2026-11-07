@@ -97,8 +97,19 @@ Branche `claude/numero-ecrit` (depuis `origin/main` 2590619c). Extension **5.324
 - `audit-identite`, `audit-numerotation-lecteurs` (jugé réglage éteint : stubs de la
   règle, documentés), `audit-coherence` (capacité `numeroecrit` → `numeroEcritAllume`),
   `audit-etiquette-numero`, `audit-extension-zip` : verts.
-- Banc `scripts/bancs/numero-ecrit.cjs` (390 tactile clair, 1512 sombre) — voir le
-  rapport de session pour le résultat et les captures.
+- `audit-double-vente`, `audit-ebay-deja-vendue`, `audit-lbc-a-retirer` extraient les
+  lecteurs Leboncoin/eBay dans une vm : ils reçoivent `numeroEcritActif = () => false`
+  et `numeroEcritLbc = () => ""` (réglage éteint = la règle d'avant, inchangée).
+- `lancer-audits` : seuls les rouges déjà sur `main` restent (argent-a-venir,
+  export-donnees, journee-coherence, photos-vinted, politique-hotes, registres,
+  chemin-json-guillemets connu).
+- Banc `scripts/bancs/numero-ecrit.cjs` (390 tactile clair, 1512 sombre) : **48/48**
+  (captures regardées : carte éteinte « pas encore lu », bloc « 2 numéros écrits à
+  vérifier » en tête d'Annonces, aperçu « 3 N° lus · 2 sans N° écrit · 1 ambigu sur 6 »).
+  `annonces-coherence` : rouges P (« Prix d'achat 2/6 ») et G identiques sur `main`
+  (même banc sur un build de `origin/main`) ; `chargement` : aucun rouge.
+- Reste à faire (petit) : allumé, « Prochain geste » d'Annonces dit encore « Des annonces
+  n'ont pas de numéro : donne-leur un N° » — il pourrait dire « écris-le dans l'annonce ».
 
 ## Gestes de Julien
 
