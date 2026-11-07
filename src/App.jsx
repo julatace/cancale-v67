@@ -4503,7 +4503,8 @@ const lireTout = async (query, opts = {}) => {
   let complet = false;
   for (let p = 0; p < max; p++) {
     const from = p * PAGE_SB;
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?${query}`, Object.assign({
+    // (7 nov.) `opts.memo` : une lecture de MONTAGE peut partager la réponse 60 s (`fetchMemo`).
+    const r = await (opts.memo ? fetchMemo : fetch)(`${SUPABASE_URL}/rest/v1/app_data?${query}`, Object.assign({
       headers: sbAuth({ Range: `${from}-${from + PAGE_SB - 1}`, 'Range-Unit': 'items' }),
     }, opts.voirSupprimes ? { vrmVoirSupprimes: true } : {}));
     // ⚠️⚠️ (1er nov., audit « conditions difficiles ») UNE PAGE RATÉE = « PAS SU »,
@@ -4558,7 +4559,62 @@ const cachedRow = (cle, chercher) => {
   _rowCache.set(cle, { at: Date.now(), promesse });
   return promesse;
 };
-const viderCacheLignes = () => _rowCache.clear();   // bouton « Synchroniser »
+const viderCacheLignes = () => { _rowCache.clear(); try { viderLecturesMemo(); } catch (_) {} };   // bouton « Synchroniser »
+
+// ── (7 nov., vitesse) LES PETITES LIGNES RELUES À CHAQUE ÉCRAN ─────────────
+// Mesuré au téléphone : chaque changement d'onglet relisait 26 à 44 lignes, presque
+// toujours les mêmes (`panel_*`, dates des annonces, Leboncoin…), parce que l'écran
+// est remonté ; chaque réponse relançait le calcul de tout l'écran. `fetchMemo`
+// garde la RÉPONSE d'une lecture GET 60 s (comme `cachedRow`), par adresse ET par
+// session (en-tête Authorization). Garde-fous :
+//   · toute ÉCRITURE vers la base partie de cette page (POST/PATCH/PUT/DELETE vers
+//     /rest/v1/, d'où qu'elle vienne) vide la mémoire avant de partir ;
+//   · un avis de l'extension (`vrm:ext`, une donnée a changé), le retour au premier
+//     plan, une relecture du nuage et « Synchroniser » la vident aussi ;
+//   · une réponse ratée (pas ok, réseau, JSON illisible) n'est JAMAIS gardée ;
+//   · chaque lecteur reçoit SA copie (structuredClone) : aucun écran ne peut
+//     modifier la valeur d'un autre.
+// Ne s'emploie QUE pour une lecture de montage ; une relecture voulue (« maj »,
+// boucle qui guette un changement) garde `fetch`.
+const _memoLectures = new Map();       // clé -> { at, promesse }
+const viderLecturesMemo = () => _memoLectures.clear();
+const _cloner = (v) => { try { return typeof structuredClone === 'function' ? structuredClone(v) : JSON.parse(JSON.stringify(v)); } catch (_) { return JSON.parse(JSON.stringify(v)); } };
+const fetchMemo = (url, init = {}) => {
+  const m = String((init && init.method) || 'GET').toUpperCase();
+  if (m !== 'GET') return fetch(url, init);
+  const h = (init && init.headers) || {};
+  const cle = String(url) + '|' + String(h.Authorization || h.authorization || '') + '|' + String(h.Range || h.range || '');
+  const e = _memoLectures.get(cle);
+  let promesse;
+  if (e && (Date.now() - e.at) < ROW_TTL_MS) promesse = e.promesse;
+  else {
+    promesse = fetch(url, init).then(async (r) => {
+      if (!r || !r.ok) { _memoLectures.delete(cle); return { ok: false, status: r ? r.status : 0, headers: r ? r.headers : null }; }
+      const texte = await r.text();
+      let v; try { v = texte === '' ? null : JSON.parse(texte); } catch (_) { _memoLectures.delete(cle); return { ok: false, status: r.status, headers: r.headers }; }
+      return { ok: true, status: r.status, headers: r.headers, v };
+    }).catch((err) => { _memoLectures.delete(cle); throw err; });
+    _memoLectures.set(cle, { at: Date.now(), promesse });
+  }
+  return promesse.then((x) => ({ ok: x.ok, status: x.status, headers: x.headers, json: async () => { if (!x.ok) throw new Error('lecture'); return _cloner(x.v); } }));
+};
+try {
+  if (typeof window !== 'undefined' && typeof window.fetch === 'function' && !window.__vrmFetchMemo) {
+    window.__vrmFetchMemo = true;
+    const _fetchBrut = window.fetch.bind(window);
+    window.fetch = (input, init) => {
+      try {
+        const m = String((init && init.method) || (input && typeof input === 'object' && input.method) || 'GET').toUpperCase();
+        const u = typeof input === 'string' ? input : String((input && input.url) || '');
+        if (m !== 'GET' && m !== 'HEAD' && /\/rest\/v1\//.test(u)) viderLecturesMemo();
+      } catch (_) {}
+      return _fetchBrut(input, init);
+    };
+    window.addEventListener('vrm:ext', viderLecturesMemo);
+    window.addEventListener('vrm:nuage-relu', viderLecturesMemo);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') viderLecturesMemo(); });
+  }
+} catch (_) {}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // UNE LIGNE DE RÉGLAGES SE LIT EN TROIS ÉTATS — JAMAIS DEUX
@@ -6345,7 +6401,7 @@ const fetchTxnItemIds = async () => {
     // `meta` : la base y range les petits champs à chaque écriture — lire la
     // transaction ne décompresse plus ses ~30 Ko (2 140 ms → 8 ms, 3 oct.).
     // Paginé : la famille dépasse 800 lignes et Supabase coupe à 1 000 (§4.5).
-    const rows = await lireTout(TXN_META_SELECT);
+    const rows = await lireTout(TXN_META_SELECT, { memo: true });
     if (rows === null) { TXN_ETATS_LU = false; return {}; }
     noterEtatsTxn(rows); TXN_ETATS_LU = true;
     const map = {};
@@ -6365,7 +6421,7 @@ const fetchTxnItemIds = async () => {
 // lignes et Supabase coupe à 1 000 sans le dire (§4.5).
 const fetchVersementsVinted = async () => {
   try {
-    const rows = await lireTout(TXN_META_SELECT);
+    const rows = await lireTout(TXN_META_SELECT, { memo: true });
     if (rows === null) return null;
     noterEtatsTxn(rows);
     const map = {};
@@ -44401,7 +44457,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [listingDatesLu, setListingDatesLu] = useState(undefined);
   useEffect(() => { (async () => {
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_listing_dates&select=data`, {
+      const r = await fetchMemo(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_listing_dates&select=data`, {
         headers: sbAuth(),
       });
       if (!r.ok) { setListingDatesLu(null); return; }
@@ -44464,14 +44520,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   })(); return () => { stop = true; }; }, []);
   useEffect(() => { (async () => {
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_lbc_posted&select=data`, { headers: sbAuth() });
+      const r = await fetchMemo(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_lbc_posted&select=data`, { headers: sbAuth() });
       if (!r.ok) return;
       const rows = await r.json();
       const ids = (rows && rows[0] && rows[0].data && rows[0].data.ids) || [];
       const postedDepuis = (rows && rows[0] && rows[0].data && rows[0].data.updatedAt) || '';
       if (Array.isArray(ids)) setLbcPosted(new Set(ids.map(String)));
       if (!Array.isArray(ids) || !ids.length) return;
-      const vr = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`, { headers: sbAuth() });
+      const vr = await fetchMemo(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`, { headers: sbAuth() });
       if (!vr.ok) return;
       const vrows = await vr.json();
       if (!Array.isArray(vrows)) return;
@@ -44486,7 +44542,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       setLbcItemsAnn(ls.items);
       let preuve = null;
       try {
-        const ra = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_accounts&select=data`, { headers: sbAuth() });
+        const ra = await fetchMemo(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_accounts&select=data`, { headers: sbAuth() });
         if (ra.ok) { const ar = await ra.json(); if (Array.isArray(ar)) { const accs = (ar[0] && ar[0].data && ar[0].data.accounts) || {}; preuve = { lectures: ls.lectures || {}, comptes: new Set([...comptesLbcProuves(ventes, ls.items), ...comptesLbcSession(accs)]), depuis: postedDepuis }; } }
       } catch (_) {}
       setLbcSortisAnn(numerosLbcSortis(ls.items, { ...(load('vrm_lbc_liens', {}) || {}) }, annoncesLbcVendues(ventes), preuve).prouves);
@@ -45315,7 +45371,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [panelAcctOff, setPanelAcctOff] = useState({});
   useEffect(() => { (async () => {
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_accounts_off&select=data`, { headers: sbAuth() });
+      const r = await fetchMemo(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_accounts_off&select=data`, { headers: sbAuth() });
       if (!r.ok) return;
       const j = await r.json();
       const d = (j[0] && j[0].data) || {};
@@ -45814,7 +45870,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     let alive = true;
     (async () => {
       try {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_colis_collected&select=data`, { headers: sbAuth() });
+        const res = await fetchMemo(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_colis_collected&select=data`, { headers: sbAuth() });
         if (!res.ok) return;
         const rows = await res.json();
         const data = (rows && rows[0] && rows[0].data) || {};
@@ -45948,7 +46004,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // qu'après avoir rechargé l'app. Une lecture ratée ne vide rien.
   const relireColisRelais = async () => {
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_colis_relais&select=data`, { headers: sbAuth() });
+      const res = await fetchMemo(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_colis_relais&select=data`, { headers: sbAuth() });
       if (!res.ok) return;
       const rows = await res.json();
       if (!Array.isArray(rows)) return;
@@ -45967,7 +46023,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [aConfirmerData, setAConfirmerData] = useState(undefined);
   const relireAConfirmer = async () => {
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_a_confirmer&select=data`, { headers: sbAuth() });
+      const res = await fetchMemo(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_a_confirmer&select=data`, { headers: sbAuth() });
       if (!res.ok) { setAConfirmerData(v => (v === undefined ? null : v)); return; }
       const rows = await res.json();
       if (!Array.isArray(rows)) { setAConfirmerData(v => (v === undefined ? null : v)); return; }
@@ -46857,7 +46913,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     let alive = true;
     (async () => {
       try {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_bords_done&select=data`, { headers: sbAuth() });
+        const res = await fetchMemo(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_bords_done&select=data`, { headers: sbAuth() });
         if (!res.ok) return;
         const rows = await res.json();
         const data = (rows && rows[0] && rows[0].data) || {};
@@ -47462,8 +47518,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     (async () => {
       try {
         const [rb, rc] = await Promise.all([
-          fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.vinted_brouillon_*&select=id,anc:data->>ancienId,item:data->>itemId`, { headers: sbAuth() }),
-          fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.coffre_*&meta->>recreeDe=not.is.null&select=id,r:meta->>recreeDe`, { headers: sbAuth() }),
+          fetchMemo(`${SUPABASE_URL}/rest/v1/app_data?id=like.vinted_brouillon_*&select=id,anc:data->>ancienId,item:data->>itemId`, { headers: sbAuth() }),
+          fetchMemo(`${SUPABASE_URL}/rest/v1/app_data?id=like.coffre_*&meta->>recreeDe=not.is.null&select=id,r:meta->>recreeDe`, { headers: sbAuth() }),
         ]);
         if (!rb.ok || !rc.ok) { if (vivant) setRecreesNum((v) => (v === undefined ? null : v)); return; }
         const t = tableRecrees(await rb.json(), await rc.json());
@@ -49464,7 +49520,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     let alive = true;
     (async () => {
       try {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_buyprices&select=data`, { headers: sbAuth() });
+        const res = await fetchMemo(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_buyprices&select=data`, { headers: sbAuth() });
         if (!res.ok) return;
         const rows = await res.json();
         const items = (rows && rows[0] && rows[0].data && rows[0].data.items) || {};
