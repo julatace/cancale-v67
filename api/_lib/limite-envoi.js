@@ -37,7 +37,20 @@ const FUSEAU = 'Europe/Paris';
 const J = 86400000;
 
 const _fmt = {};   // le formateur, créé une fois (un objet : aucune réassignation)
+// (7 nov., vitesse) Mémoire à la minute : `formatToParts` coûte cher et Colis
+// l'appelait des milliers de fois par rendu (1,4 s au téléphone).
+// La mémoire vit dans `_fmt` (un seul nom de module, que l'audit des statuts charge).
 function partsParis(ms) {
+  if (!_fmt.memo) _fmt.memo = new Map();
+  const cle = Math.floor(ms / 60000);
+  const vu = _fmt.memo.get(cle);
+  if (vu) return vu;   // date et heure à la minute : même minute ⇒ même résultat
+  const r = partsParisCalc(ms);
+  if (_fmt.memo.size > 20000) _fmt.memo.clear();
+  _fmt.memo.set(cle, r);
+  return r;
+}
+function partsParisCalc(ms) {
   if (!_fmt.paris) _fmt.paris = new Intl.DateTimeFormat('en-GB', { timeZone: FUSEAU, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
   const o = {};
   for (const p of _fmt.paris.formatToParts(new Date(ms))) o[p.type] = p.value;

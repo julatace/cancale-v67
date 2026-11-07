@@ -25,7 +25,7 @@ import {veillesDuFil,MAX_VEILLES_ACTIVES} from './operations/metier.js';
 
 export const RELIRE_MS = 15 * 60 * 1000;
 // Le jour de Paris (le plafond du serveur repart à minuit, heure de Paris).
-export const jourParis = (t = Date.now()) => { try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(t)); } catch (_) { return new Date(t).toISOString().slice(0, 10); } };
+export const jourParis = (t = Date.now()) => { try { return (globalThis.__vrmFmtJourEbay || (globalThis.__vrmFmtJourEbay = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }))).format(new Date(t)); } catch (_) { return new Date(t).toISOString().slice(0, 10); } };
 export const MAX_FIL = MAX_VEILLES_ACTIVES;
 const ENDPOINT_OPS = '/api/compte?mode=operations';
 

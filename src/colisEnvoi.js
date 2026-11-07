@@ -19,9 +19,21 @@
 
 const JOUR = 864e5;
 // Le jour de calendrier à Paris d'un instant (« 2026-11-05 »).
+// (7 nov., vitesse) Le formateur est créé UNE fois : `new Intl.DateTimeFormat`
+// à chaque appel coûtait ~1 ms au téléphone, et le tri de Colis l'appelait
+// des milliers de fois (6 s de gel mesurées au processeur ×4).
+let _fmtJourParis = null;
+const _jourParisMemo = new Map();
 const jourParis = (ms) => {
-  try { return new Intl.DateTimeFormat('fr-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms)); }
-  catch (_) { return new Date(ms).toISOString().slice(0, 10); }
+  const cle = Math.floor(ms / 60000);   // à la minute près : même jour de Paris
+  const vu = _jourParisMemo.get(cle);
+  if (vu) return vu;
+  let r;
+  try { if (!_fmtJourParis) _fmtJourParis = new Intl.DateTimeFormat('fr-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }); r = _fmtJourParis.format(new Date(ms)); }
+  catch (_) { r = new Date(ms).toISOString().slice(0, 10); }
+  if (_jourParisMemo.size > 20000) _jourParisMemo.clear();
+  _jourParisMemo.set(cle, r);
+  return r;
 };
 const msDe = (v) => {
   if (v instanceof Date) return Number.isFinite(v.getTime()) ? v.getTime() : null;
@@ -53,7 +65,8 @@ export function ordrePreparation(items, { jours, attente }) {
   const L = Array.isArray(items) ? items : [];
   const jr = (x) => { const v = jours(x); return v == null || !Number.isFinite(Number(v)) ? 9999 : Number(v); };
   const at = (x) => { const v = attente(x); return v == null || !Number.isFinite(Number(v)) ? -1 : Number(v); };
-  return L.map((x, i) => [x, i]).sort((a, b) => jr(a[0]) - jr(b[0]) || at(b[0]) - at(a[0]) || a[1] - b[1]).map(([x]) => x);
+  // Les clés sont calculées UNE fois par élément (avant : à chaque comparaison du tri).
+  return L.map((x, i) => [x, i, jr(x), at(x)]).sort((a, b) => a[2] - b[2] || b[3] - a[3] || a[1] - b[1]).map(([x]) => x);
 }
 
 // Un sujet d'e-mail n'est pas un nom d'article : vouvoiement, phrase d'annonce.
