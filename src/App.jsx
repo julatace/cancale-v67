@@ -391,6 +391,7 @@ import { EnLigneDeuxFoisDetail } from "./EnLigneDeuxFois.jsx";
 import { carteArgentJournee } from "./journeeArgent.js";
 import { CLE_MODELES, lireModeles } from "./modelesDescription.js";
 import { MesModeles, InsererModele } from "./ModelesDescription.jsx";
+import { CLE_NUMERO_ECRIT, lireReglageNumeroEcrit, lireNumeroTexte, lireNumeroEcrit, apercuNumeroEcrit, decisionEcrite, PHRASE_ETAT as PHRASE_NUMERO_ECRIT, NOM_SOURCE as NOM_SOURCE_NUMERO } from "./numeroEcrit.js";
 import { CLE_REGLAGE_ETIQUETTE, PLACES as PLACES_ETIQUETTE, FORMES as FORMES_ETIQUETTE, QUESTIONS as QUESTIONS_ETIQUETTE, ANNONCE_EXEMPLE, lireReglageEtiquette, etiquetteDe, poserEtiquette, retirerEtiquette, proposition as propositionEtiquette } from "./etiquetteNumero.js";
 // (6 nov., vitesse 2) PrixPartout : à la demande (sa feuille de style est déjà plus haut).
 import SelecteurSites, { LogoSite } from "./SelecteurSites.jsx";
@@ -444,7 +445,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.323.0';
+const EXT_ATTENDUE = '5.324.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -871,7 +872,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ (30 oct., intégration) `transp`, `lbcsupprime` et `lbcstats` arrivent tous
 //    en 5.291.0 : 5.288 (Leboncoin) et 5.290 (colis) étaient des numéros de
 //    branche, jamais servis ; aucune version publiée ne porte ces fonctions.
-const EXT_CAPACITES = { plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0' };
+const EXT_CAPACITES = { plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir:'5.225.0', favorisliste:'5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -2298,6 +2299,9 @@ const SYNC_KEYS = [
   'vrm_stream_regles','vrm_imprimante','vrm_prenom','vrm_num_prefixe',
   // (5 nov.) Où et sous quelle forme le N° s'écrit dans le texte d'une annonce Vinted (src/etiquetteNumero.js).
   'vrm_num_vinted',
+  // (7 nov.) « Je numérote moi-même dans mes annonces » (src/numeroEcrit.js) : { actif, depuis }.
+  // Allumé, VRM ne donne plus aucun N° tout seul ; il lit celui écrit dans l'annonce.
+  'vrm_numero_ecrit',
   // (27 oct.) La présentation d'arrivée a été vue (ou passée) : ne revient pas sur un autre appareil.
   'vrm_bienvenue_vue',
   // (2 nov.) La visite en bulles a été vue (ou passée) : elle ne revient ni après
@@ -5230,7 +5234,10 @@ const fetchDescLens = async (ids) => {
           const ph = photos.length;
           // On garde les URL (petites, pas le texte lourd — §34 vise la description) :
           // l'atelier en a besoin pour l'aperçu et les réglages photo (tranche 2).
-          _descLensParId.set(k, (len || ph) ? { len, ph, photos } : null);
+          // (7 nov.) Le N° écrit à la FIN de la description (src/numeroEcrit.js) : seule la
+          // lecture est gardée (quelques octets), jamais le texte. `d[k]` présent = description sue.
+          const ecrit = d[k] ? lireNumeroTexte(PUB.test(t) ? '' : t, 'description') : null;
+          _descLensParId.set(k, (len || ph || ecrit) ? { len, ph, photos, ecrit } : null);
         }
       }
     } catch (_) { /* réseau : on se passe du complément */ }
@@ -10039,6 +10046,22 @@ const triNum = (a, b) => {
 };
 // Le préfixe choisi pour les NOUVEAUX numéros (Réglages → Tes numéros) : '' =
 // des chiffres, comme toujours. Réglage synchronisé (`vrm_num_prefixe`).
+// (7 nov.) Le vendeur numérote lui-même dans ses annonces (src/numeroEcrit.js) :
+// allumé, aucun N° n'est DONNÉ tout seul nulle part (annonce sans N°, vente à
+// expédier, doublon, Vestiaire) ; VRM lit celui qu'il a écrit. Éteint par défaut.
+const numeroEcritActif = () => { try { return lireReglageNumeroEcrit(load(CLE_NUMERO_ECRIT, null)).actif; } catch (_) { return false; } };
+// L'aperçu « ce que VRM lit » publié par l'écran qui a les annonces (Annonces : Vinted)
+// et lu par Réglages (§11). En mémoire seulement : rien n'est écrit en base.
+const _apercuEcrit = {}; const _ecoutesApercuEcrit = new Set();
+const publierApercuEcrit = (site, v) => { _apercuEcrit[site] = v; _ecoutesApercuEcrit.forEach((f) => { try { f(); } catch (_) {} }); };
+const apercuEcritPublie = (site) => _apercuEcrit[site] || null;
+const ecouterApercuEcrit = (f) => { _ecoutesApercuEcrit.add(f); return () => _ecoutesApercuEcrit.delete(f); };
+// La fiche d'une annonce Vinted dont le N° vient de SON annonce (`decisionEcrite`).
+const ficheEcrite = (cur, it, pk, dec) => ({ ...(cur || {}), numero: dec.numero, title: it.title, photo: it.photo || null, photoK: pk || (cur && cur.photoK) || null, price: it.price ?? null, size: it.size ?? (cur && cur.size) ?? null, accountId: it._acc?.vinted_user_id, numberedAt: (cur && cur.numberedAt) || new Date().toISOString(), auto: false, ...(dec.ecrit ? { ecrit: dec.ecrit, ecritAt: new Date().toISOString() } : {}) });
+// La lecture du N° écrit dans une annonce VINTED : la fin de sa description (lue sur
+// la page, `numEcritDesc`, posée par la liste d'annonces) puis son titre. Vinted ne
+// donne aucun champ de référence chez lui (comptes particuliers, mesuré) : rien d'autre.
+const lectureEcriteVinted = (it) => lireNumeroEcrit({ titre: it && it.title, descriptionLue: it && it.numEcritDesc });
 const prefixeNumeros = () => { const p = String(load('vrm_num_prefixe', '') || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3); return p; };
 // Le clavier d'un champ N° : chiffres tant qu'il numérote en chiffres, lettres
 // dès qu'il a choisi une série (sinon un téléphone ne laisse pas taper « B »).
@@ -10337,6 +10360,9 @@ async function numeroterVestiaire() {
   _numVcEnVol = (async () => {
     try {
       if (!numerotationPermise()) { if (!_numVcRelance) _numVcRelance = setTimeout(() => { _numVcRelance = null; numeroterVestiaire(); }, 4000); return 0; }
+      // (7 nov.) Il numérote lui-même : aucun N° neuf pour une annonce Vestiaire (son N°
+      // se lit dans son titre, `numeroVcIdentite`).
+      if (numeroEcritActif()) return 0;
       const [jl, jv, jr] = await Promise.all([
         lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt`),
         lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_ventes&select=ventes:data->ventes`),
@@ -17014,6 +17040,9 @@ const numeroVcIdentite = (id, it, liens) => {
   const ks = new Set();
   const l = liens ? liens[String(id)] : null; if (l != null && String(l).trim()) ks.add(cleNum(l));
   if (it && it.ref && /VRM/i.test(String(it.ref))) { const k = refVRMDe(it.ref); if (k) ks.add(k); }
+  // (7 nov.) Il numérote lui-même : le N° écrit dans le TITRE de l'annonce Vestiaire
+  // (VRM n'en capte ni la description ni une référence du vendeur). Ambigu ⇒ rien.
+  if (it && numeroEcritActif()) { const l = lireNumeroEcrit({ titre: it.titre || '' }); if (l.etat === 'lu' && numeroReprenable(l.cle)) ks.add(l.cle); }
   const a = numerosVcEffectifs()[String(id)]; if (a) ks.add(cleNum(a));
   ks.delete('');
   return ks.size === 1 ? [...ks][0] : '';
@@ -48635,6 +48664,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ensemble ne lui donneraient pas deux numéros).
   useEffect(() => {
     if (!cloudReady || !numerotationPermise()) return;
+    // (7 nov.) Il numérote lui-même : un doublon n'est jamais réglé par un N° neuf — le
+    // bloc rouge le montre, c'est lui qui corrige le texte de l'annonce.
+    if (numeroEcritActif()) return;
     if (!listings.items || listings.loading || listings.incomplet || listings.error) return;
     if (!sales.items || (Array.isArray(sales.failedUids) && sales.failedUids.length)) return;
     const a = doublonsAReattribuer(conflitsNum, numeros).filter((x) => !DOUBLONS_FAITS.has(x.id + ':' + cleNum(x.ancien)));
@@ -50148,7 +50180,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // sans numéro, dont 6 dont l'annonce EST captée. La fenêtre
         // (`VENTE_NUM_MAX_J`) est ce qui empêche de renuméroter les 140 ventes
         // anciennes — c'est exactement l'inflation de juillet (50 → 120).
-        if (!(cur && cur.numero != null && String(cur.numero).trim() !== '')) {
+        if (!(cur && cur.numero != null && String(cur.numero).trim() !== '') && numeroEcritActif()) {
+          // (7 nov.) Il numérote lui-même : le N° écrit dans le TITRE de la vente (même
+          // règle, src/numeroEcrit.js), jamais un N° neuf. Après la remise à zéro, seulement
+          // pour une vente d'après la coupure (un « 12 » d'avant désigne l'ancienne paire).
+          const lec = lireNumeroEcrit({ titre: o.title || o.item_title || '' });
+          if (lec.etat === 'lu' && numeroReprenable(lec.cle) && (coupureNumerotation() == null || venteApresCoupure(o))) { ovNext[tid] = { ...(cur||{}), numero: lec.cle, autoAssigned: false, ecrit: 'titre' }; changed = true; }
+        } else if (!(cur && cur.numero != null && String(cur.numero).trim() !== '')) {
           const cand = prochainLibre(dejaPris, dejaPrisK, prefNum);
           ovNext[tid] = { ...(cur||{}), numero: String(cand), autoAssigned: true, autoShip: true };
           changed = true;
@@ -50260,6 +50298,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // Combien de photos on a VRAIMENT captées de la page (pour « X/Y captées »).
         if (info.ph) it.captPhotos = info.ph;
         if (info.photos && info.photos.length && !(Array.isArray(it.photos) && it.photos.length)) it.photosDetail = info.photos;
+        if (info.ecrit) it.numEcritDesc = info.ecrit;
       }
     } catch (_) { /* sans ce complément, le critère reste simplement inconnu */ }
     if(!courante())return;
@@ -50966,6 +51005,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // Dans l'ORDRE DE MISE EN LIGNE (1, 2, 3… comme il les reposte), par la même
     // date que celle qui décide si l'annonce se numérote.
     const sorted = [...items].sort((a, b) => (dateMiseEnLigneMs(a, listingDates) || 0) - (dateMiseEnLigneMs(b, listingDates) || 0));
+    const ecritOn = numeroEcritActif();
     for (const it of sorted) {
       const cur = nextNum[it.id];
       const pk = photoKey(it.photo);
@@ -50980,9 +51020,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // Après la remise à zéro : une annonce d'AVANT la coupure (ou sans date)
       // n'est pas numérotée toute seule — seules les annonces republiées le sont.
       if (!annonceNumerotable(it, listingDates)) continue;
+      // (7 nov., `ecritOn` plus bas) IL NUMÉROTE LUI-MÊME DANS SES ANNONCES (src/numeroEcrit.js) : le N° écrit
+      // (fin de la description, titre) est pris pour CETTE annonce ; sinon seules les
+      // identités (vente de la même annonce, même photo) — jamais un N° neuf, jamais le N°
+      // réservé à côté de « Publier ». Deux numéros écrits, un N° d'archive, ou un N° écrit
+      // qui contredit l'identité ⇒ RIEN n'est posé (« à vérifier », son clic choisit).
       let num = numeroReprenable(numVentesParIdentite.parItem[String(it.id)])
              || numeroReprenable(pk && numVentesParIdentite.parPhoto[pk])
              || null;
+      if (ecritOn) {
+        const dec = decisionEcrite({ lecture: lectureEcriteVinted(it), ident: num || numeroReprenable(pk && byPhoto[pk]) || '', reprenable: (k) => !!numeroReprenable(k) });
+        if (!dec) continue;
+        const n = dec.numero;
+        nextNum[it.id] = ficheEcrite(cur, it, pk, dec);
+        { const ep = entreePool(n); if (ep != null) nextUsed.add(ep); }
+        if (pk && !byPhoto[pk]) byPhoto[pk] = n;
+        changed = true;
+        continue;
+      }
       // Le numéro AFFICHÉ À CÔTÉ DU BOUTON « Publier » de Vinted pour CETTE
       // annonce (réservé puis lié par l'extension, par son identifiant) : il
       // l'a écrit sur le carton. Seulement s'il n'est pas déjà sur une autre fiche.
@@ -51038,6 +51093,65 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return () => clearTimeout(t);
   }, [numAttenteBrut, numBorne]);
   const numAttente = numAttenteBrut && !numBorne;
+  // ── (7 nov.) « JE NUMÉROTE MOI-MÊME DANS MES ANNONCES » : CE QUE VRM LIT ─────────
+  // Pour chaque annonce Vinted en ligne : la lecture du N° écrit (src/numeroEcrit.js),
+  // le N° que VRM connaît déjà PAR IDENTITÉ (sa fiche, sinon la vente de la même
+  // annonce), et l'état (lu · rien · ambigu · contredit…). Publié pour Réglages
+  // (`publierApercuEcrit`, §11 : un écran publie, l'autre lit) ; la liste « à vérifier »
+  // et SON choix vivent ici, sous les annonces. Calculé même réglage éteint : l'aperçu
+  // montre ce que VRM lirait AVANT qu'il l'allume.
+  const [ecritOnUi, setEcritOnUi] = useState(() => numeroEcritActif());
+  useEffect(() => { const f = () => setEcritOnUi(numeroEcritActif()); window.addEventListener('vrm-numero-ecrit', f); const off = onCloudReady(f); return () => { window.removeEventListener('vrm-numero-ecrit', f); if (typeof off === 'function') off(); }; }, []);
+  const apercuEcrit = useMemo(() => {
+    if (!Array.isArray(listings.items)) return null;
+    const lignes = listings.items.map((it) => {
+      const f = numeros[it.id] || {};
+      const connu = String(f.numero || '').trim() || numeroReprenable(numVentesParIdentite.parItem[String(it.id)]) || '';
+      return { id: String(it.id), site: 'vinted', titre: it.title || '', compte: it._acc && it._acc.vinted_user_id, lecture: lectureEcriteVinted(it), connu, refuse: f.ecritRefuse || '', numerotable: annonceNumerotable(it, listingDates), presente: true, descSue: !!it.numEcritDesc };
+    });
+    return apercuNumeroEcrit(lignes, { reprenable: (k) => !!numeroReprenable(k) });
+  }, [listings.items, numeros, numVentesParIdentite, listingDates]);
+  useEffect(() => { if (apercuEcrit) publierApercuEcrit('vinted', { ...apercuEcrit, at: Date.now(), incomplet: !!listings.incomplet }); }, [apercuEcrit, listings.incomplet]);
+  // SON clic : « Prendre N°Y » (le N° écrit devient celui de la paire — à écrire sur
+  // le carton) · « Garder N°X » (le N° de VRM reste ; ce N° écrit ne sera plus proposé).
+  const choisirNumeroEcrit = (l, prendre) => {
+    const it = (listings.items || []).find((x) => String(x.id) === String(l.id)); if (!it) return;
+    const now = new Date().toISOString();
+    if (prendre) {
+      if (!numeroReprenable(l.lu)) { toast(`N°${l.lu} est un ancien numéro : il ne se redonne pas.`); return; }
+      updatePair(it, { numero: l.lu, auto: false, manuelAt: now, ecrit: l.lecture && l.lecture.source, ecritAt: now, ecritRefuse: null, reattribue: { de: l.connu, vers: l.lu, at: now } });
+      recordUsed(l.lu);
+      toast(`« ${it.title} » → N°${l.lu} · écris-le sur son carton`);
+    } else {
+      updatePair(it, { ecritRefuse: l.lu });
+      toast(`« ${it.title} » garde le N°${l.connu}. Corrige son annonce pour qu'elle dise « N° ${l.connu} ».`);
+    }
+  };
+  const blocNumeroEcrit = () => {
+    if (!ecritOnUi || !apercuEcrit) return null;
+    const av = apercuEcrit.lignes.filter((l) => l.etat === 'contredit' || l.etat === 'ambigu' || l.etat === 'archive');
+    const sans = apercuEcrit.lignes.filter((l) => l.etat === 'rien');
+    if (!av.length && !sans.length) return null;
+    return (
+      <div data-numero-ecrit-bloc={av.length} data-numero-ecrit-sans={sans.length} style={{marginBottom:12,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'11px 13px'}}>
+        <div style={{fontSize:13,fontWeight:600,color:C.text}}>{av.length > 0 ? `${av.length} numéro${av.length>1?'s':''} écrit${av.length>1?'s':''} à vérifier` : `${sans.length} annonce${sans.length>1?'s':''} sans N° écrit`}</div>
+        <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.5}}>Tu numérotes toi-même : VRM ne change aucun numéro tout seul.</div>
+        {av.slice(0, 40).map((l) => (
+          <div key={l.id} data-numero-ecrit-ligne={l.id} data-numero-ecrit-etat={l.etat} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderTop:`1px solid ${C.border}`,marginTop:6,flexWrap:'wrap'}}>
+            <div style={{flex:'1 1 180px',minWidth:0}}>
+              <div style={{fontSize:13,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{l.titre || 'Annonce'}</div>
+              <div style={{fontSize:12,color:C.muted,marginTop:2}}>{l.etat === 'contredit' ? <>Écrit : <b style={{color:C.text}}>N°{l.lu}</b> · VRM : <b style={{color:C.text}}>N°{l.connu}</b></> : l.etat === 'ambigu' ? (l.lecture && l.lecture.raison) : PHRASE_NUMERO_ECRIT[l.etat]}</div>
+            </div>
+            {l.etat === 'contredit' && <div style={{display:'flex',gap:6,flexShrink:0}}>
+              <Bouton variante="secondaire" data-numero-ecrit-garder={l.id} onClick={() => choisirNumeroEcrit(l, false)}>Garder N°{l.connu}</Bouton>
+              <Bouton variante="secondaire" data-numero-ecrit-prendre={l.id} onClick={() => choisirNumeroEcrit(l, true)}>Prendre N°{l.lu}</Bouton>
+            </div>}
+          </div>
+        ))}
+        {sans.length > 0 && <div data-numero-ecrit-rien={sans.length} style={{fontSize:12,color:C.muted,marginTop:8,lineHeight:1.5}}>{sans.length} annonce{sans.length>1?'s':''} sans N° écrit ni numéro VRM : termine sa description par « N° 123 ».{sans.some((l) => !l.descSue) ? ' Ouvre-la une fois sur vinted.fr pour que VRM lise sa description.' : ''}</div>}
+      </div>
+    );
+  };
 
   const openConversation = async (conv) => {
     if(!conv?._acc || conv.id==null)return;
@@ -58716,6 +58830,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {neufsOuverts && blocNouveaux()}
             </>);
           })()}
+          {blocNumeroEcrit()}
           {aVerifierCarton.length > 0 && (
           <details data-numeros-a-verifier={aVerifierCarton.length} className="vrm-repli" open style={{ background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn || '#B25000'}`, borderRadius: 12, padding: '4px 12px 10px', marginBottom: 12 }}>
             <summary style={{ fontSize: 15, fontWeight: 700, color: C.text }}>
@@ -63163,6 +63278,7 @@ function clesAnnonceLbc(ad, liens) {
   ext(refVRMDe(ad.customRef));
   if (ad.ref) ext(ad.ref);
   const mt = numDeTitreLbc(ad.subject || ad.title); if (mt) ext(mt);
+  { const e = numeroEcritLbc(ad); if (e) ext(e); }
   return ks;
 }
 // ── LE N° D'UNE VENTE LEBONCOIN PAR IDENTITÉ SEULEMENT (bénéfice, 19 oct.) ───
@@ -63179,10 +63295,24 @@ const numeroLbcIdentite = (v, items, liens) => {
   const ad = items && items[iid];
   if (!ad) return '';
   const ks = new Set();
-  for (const r of [refVRMDe(ad.customRef), ad.ref ? cleNum(ad.ref) : '']) { const k = cleNum(r); if (k) ks.add(numeroExterne(k, iid, 'lbcAnnonces')); }
+  for (const r of [refVRMDe(ad.customRef), ad.ref ? cleNum(ad.ref) : '', numeroEcritLbc(ad)]) { const k = cleNum(r); if (k) ks.add(numeroExterne(k, iid, 'lbcAnnonces')); }
   ks.delete('');
   return ks.size === 1 ? [...ks][0] : '';
 };
+// (7 nov.) Il numérote lui-même (src/numeroEcrit.js) : le N° écrit dans l'annonce
+// Leboncoin — sa référence pro (`CustomRef`, le champ natif du tableau de bord pro),
+// la fin de sa description (seulement si VRM l'a EN ENTIER : l'extension n'en range
+// que 400 caractères, une description plus longue n'a pas de fin sue), son titre.
+// Éteint, ou ambigu ⇒ ''. La même lecture pour l'écran et les identités (§11).
+function lectureEcriteLbc(ad) {
+  const body = typeof ad.body === 'string' && ad.body ? ad.body : undefined;
+  return lireNumeroEcrit({ ref: ad.customRef, titre: ad.subject || ad.title || '', description: body, descriptionCoupee: !!body && body.length >= 400 });
+}
+function numeroEcritLbc(ad) {
+  if (!ad || !numeroEcritActif()) return '';
+  const l = lectureEcriteLbc(ad);
+  return l.etat === 'lu' ? l.cle : '';
+}
 
 // ── QUELS COMPTES LEBONCOIN SONT À LUI : CEUX DONT IL A VENDU UNE ANNONCE ────
 // Mesuré le 4 octobre : 58 annonces portent un champ `account`, réparties sur
@@ -63743,7 +63873,11 @@ const numEbayLu = (sku, itemId, dateMs, depuis) => {
   const fiches = fichesPourEbay();
   const lien = id ? lienEbay(id) : null;
   if (lien) { const f = fiches[lien.pairId]; return f && f.numero != null && String(f.numero).trim() ? cleNum(f.numero) : null; }
-  const k = numeroExterne(numDeSkuEbay(sku), itemId, 'ebayAnnonces', dateMs);
+  // (7 nov.) Il numérote lui-même : un SKU qui est SON numéro (« 123 », « B125 »,
+  // « N° 123 ») compte comme « VRM-123 » — avec les mêmes gardes (une seule fiche le
+  // porte, déjà avant la publication). Éteint : le SKU strict « VRM-… » seul.
+  const skuEcrit = () => { if (!numeroEcritActif()) return ''; const l = lireNumeroTexte(sku, 'ref'); return l.etat === 'lu' ? l.cle : ''; };
+  const k = numeroExterne(numDeSkuEbay(sku) || skuEcrit(), itemId, 'ebayAnnonces', dateMs);
   if (!k) return k;
   const porteurs = Object.values(fiches).filter((f) => f && f.numero != null && cleNum(f.numero) === k);
   // Deux fiches sous ce N° : une seule paire si elles portent le même titre (vendue
@@ -66853,7 +66987,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'abonnement-ouvrir', type:'nav', ic:'wallet', lib:'Mon abonnement', desc:'Ton offre, ta carte, tes factures, et l’arrêt si tu veux.', onClick:()=>setVue('abonnement'), data:{ 'data-reglage-abonnement':'' } },
     ]},
     MULTI_USER && { id:'stock', titre:'Stock et rangement', items:[
-      { id:'numeros', type:'panneau', nu:true, ic:'tag', lib:'Numéros de rangement', desc:'Comment s’écrivent les numéros de tes prochaines paires.', val:valNumeros, el:<NumerosSetting nu onStock={()=>setTab('garage')}/> },
+      { id:'numeros', type:'panneau', nu:true, ic:'tag', lib:'Numéros de rangement', desc:'Comment s’écrivent les numéros de tes prochaines paires.', val:valNumeros, el:<NumerosSetting nu onStock={()=>setTab('garage')} onAnnonces={()=>setTab('cat_annonces')}/> },
       // ⛔ Réponse automatique aux messages Vinted retirée (16 oct., sa décision).
       // ⛔ Détourage des photos retiré des Paramètres (17 oct., sa décision) :
       //    il n'existe plus que pour Vestiaire Collective, qui l'exige, sans réglage.
@@ -68620,6 +68754,146 @@ function PrenomSetting() {
   );
 }
 
+// ── « JE NUMÉROTE MOI-MÊME DANS MES ANNONCES » (7 nov.) ──────────────────────
+// Julien, 7 novembre : « la personne met son numéro d'étiquetage à la fin de sa
+// description […] capter ce numéro-là […] et n'attribuer donc pas de numéro
+// automatiquement ». Le réglage (synchronisé, éteint par défaut), le pas-à-pas, et
+// l'APERÇU : ce que VRM lit dans ses annonces actuelles, compté et nommé — Vinted
+// (publié par l'écran Annonces, qui a les annonces), Leboncoin, Vestiaire et eBay
+// (lus ici, projetés). La règle : src/numeroEcrit.js. Rien ne change un numéro ici.
+function resumeApercu(a) {
+  if (!a) return null;
+  const c = a.comptes || {};
+  return { lus: (c['a-poser'] || 0) + (c.accord || 0), rien: (c.rien || 0) + (c['sans-ecrit'] || 0), ambigus: c.ambigu || 0, contredits: c.contredit || 0, autres: (c.archive || 0) + (c.avant || 0), garde: c.garde || 0, total: a.total || 0 };
+}
+function NumeroEcritSetting({ onAnnonces }) {
+  const lire = () => lireReglageNumeroEcrit(load(CLE_NUMERO_ECRIT, null));
+  const [r, setR] = React.useState(lire);
+  const touche = React.useRef(false);
+  React.useEffect(() => onCloudReady(() => { if (!touche.current) setR(lire()); }), []);
+  const basculer = () => {
+    touche.current = true;
+    const n = { actif: !r.actif, depuis: new Date().toISOString() };
+    setR(n); save(CLE_NUMERO_ECRIT, n);
+    try { window.dispatchEvent(new Event('vrm-numero-ecrit')); } catch (_) {}
+    toast(n.actif ? 'C’est noté : VRM ne donne plus de numéro tout seul, il lit le tien.' : 'VRM redonne un numéro aux annonces qui n’en ont pas.');
+  };
+  // Vinted : l'aperçu publié par l'écran Annonces (mis à jour en direct).
+  const [, maj] = React.useReducer((x) => x + 1, 0);
+  React.useEffect(() => ecouterApercuEcrit(maj), []);
+  const vinted = apercuEcritPublie('vinted');
+  // Leboncoin, Vestiaire, eBay : lus une fois à l'ouverture (projetés, §4.4).
+  // `undefined` en cours · `null` pas su · aperçu.
+  const [autres, setAutres] = React.useState(undefined);
+  React.useEffect(() => { let stop = false; (async () => {
+    const out = {};
+    const rep = (k) => !!numeroReprenable(k);
+    try {
+      const [l, jv, ja] = await Promise.all([
+        lbcListingsSession(),
+        lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=v:data->ventes`),
+        lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_accounts&select=a:data->accounts`),
+      ]);
+      if (l && Array.isArray(jv) && Array.isArray(ja)) {
+        const items = l.items || {}, ventes = (jv[0] && jv[0].v) || {};
+        const prouves = new Set([...comptesLbcProuves(ventes, items), ...comptesLbcSession((ja[0] && ja[0].a) || {})]);
+        const vendues = annoncesLbcVendues(ventes); const liens = load('vrm_lbc_liens', {}) || {};
+        const ads = Object.values(items).filter((ad) => ad && ad.id != null && annonceLbcALui(ad, prouves) && annonceLbcEnVente(ad, vendues));
+        out.leboncoin = apercuNumeroEcrit(ads.map((ad) => { const li = liens[String(ad.id)]; return { id: String(ad.id), site: 'leboncoin', titre: ad.subject || '', lecture: lectureEcriteLbc(ad), connu: li != null && String(li).trim() ? cleNum(li) : '', presente: true }; }), { reprenable: rep });
+      } else out.leboncoin = null;
+    } catch (_) { out.leboncoin = null; }
+    try {
+      const jl = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens`);
+      if (Array.isArray(jl)) {
+        const L = jl[0] || {}; const items = L.items && typeof L.items === 'object' ? L.items : {};
+        const donnes = numerosVcEffectifs() || {}; const liensMain = vcCarte('vrm_vc_liens') || {};
+        const connuVc = (id) => { const m = liensMain[id]; const v = (m && typeof m === 'object' ? m.numero : m) || (L.liens || {})[id] || donnes[id] || ''; return cleNum(v); };
+        out.vestiaire = apercuNumeroEcrit(Object.entries(items).filter(([, it]) => it && typeof it === 'object').map(([id, it]) => ({ id: String(id), site: 'vestiaire', titre: it.titre || '', lecture: lireNumeroEcrit({ titre: it.titre || '' }), connu: connuVc(id), presente: true })), { reprenable: rep });
+      } else out.vestiaire = null;
+    } catch (_) { out.vestiaire = null; }
+    try {
+      const e = await lireEbayTous('ebay_listings', SEL_EBAY_ANNONCES, 'items');
+      if (e && !e.illisibles.length) {
+        const fiches = load('vinted_annonce_numeros', {}) || {};
+        out.ebay = apercuNumeroEcrit(e.items.filter((a) => a && a.itemId != null).map((a) => { const lien = lienEbay(a.itemId); const f = lien ? fiches[lien.pairId] : null; return { id: String(a.itemId), site: 'ebay', titre: a.title || '', lecture: lireNumeroEcrit({ ref: a.sku, titre: a.title || '' }), connu: f && f.numero != null ? cleNum(f.numero) : '', presente: true }; }), { reprenable: rep });
+      } else out.ebay = null;
+    } catch (_) { out.ebay = null; }
+    if (!stop) setAutres(out);
+  })(); return () => { stop = true; }; }, []);
+  const sites = [
+    ['vinted', 'Vinted', vinted, 'la fin de la description, puis le titre'],
+    ['leboncoin', 'Leboncoin', autres === undefined ? undefined : autres.leboncoin, 'la référence pro, la fin de la description, le titre'],
+    ['vestiaire', 'Vestiaire Collective', autres === undefined ? undefined : autres.vestiaire, 'le titre'],
+    ['ebay', 'eBay', autres === undefined ? undefined : autres.ebay, 'le SKU, puis le titre'],
+  ];
+  const nomsDe = (a, etat) => (a ? a.lignes.filter((l) => l.etat === etat).map((l) => l.titre || 'Annonce') : []);
+  const liste = (noms) => noms.slice(0, 3).join(' · ') + (noms.length > 3 ? '…' : '');
+  const ligneSite = ([cle, nom, a, ou]) => {
+    const z = resumeApercu(a);
+    const amb = nomsDe(a, 'ambigu'), con = nomsDe(a, 'contredit');
+    return (
+      <div key={cle} data-numero-ecrit-site={cle} data-numero-ecrit-lus={z ? z.lus : undefined} data-numero-ecrit-rien={z ? z.rien : undefined} data-numero-ecrit-ambigus={z ? z.ambigus : undefined} data-numero-ecrit-contredits={z ? z.contredits : undefined}
+        style={{padding:'10px 0',borderTop:`1px solid ${C.border}`}}>
+        <div style={{display:'flex',alignItems:'baseline',gap:8,flexWrap:'wrap'}}>
+          <b style={{fontSize:13,color:C.text}}>{nom}</b>
+          <span style={{fontSize:12,color:C.muted}}>VRM lit {ou}</span>
+        </div>
+        {a === undefined && <div role="status" style={{fontSize:13,color:C.muted,marginTop:4}}>Lecture…</div>}
+        {a === null && (cle === 'vinted'
+          ? <div data-numero-ecrit-passu="vinted" style={{fontSize:13,color:C.muted,marginTop:4,lineHeight:1.5}}>Pas encore lu : ouvre tes annonces une fois, VRM les lira. {onAnnonces && <button type="button" className="vrm-lien-action" data-numero-ecrit-ouvrir-annonces="" onClick={onAnnonces}>Ouvrir mes annonces</button>}</div>
+          : <div data-numero-ecrit-passu={cle} style={{fontSize:13,color:C.muted,marginTop:4}}>— tes annonces n’ont pas pu être lues.</div>)}
+        {z && z.total === 0 && <div style={{fontSize:13,color:C.muted,marginTop:4}}>Aucune annonce en ligne lue.</div>}
+        {z && z.total > 0 && (
+          <div style={{fontSize:13,color:C.text,marginTop:4,lineHeight:1.6,fontVariantNumeric:'tabular-nums'}}>
+            <span data-ne-n="lus"><b>{z.lus}</b> N° lu{z.lus>1?'s':''}</span>{' · '}
+            <span data-ne-n="rien"><b>{z.rien}</b> sans N° écrit</span>
+            {z.ambigus > 0 && <>{' · '}<span data-ne-n="ambigus" style={{color:C.warn}}><b>{z.ambigus}</b> ambigu{z.ambigus>1?'s':''}</span></>}
+            {z.contredits > 0 && <>{' · '}<span data-ne-n="contredits" style={{color:C.warn}}><b>{z.contredits}</b> à vérifier</span></>}
+            {z.autres > 0 && <>{' · '}<span data-ne-n="autres"><b>{z.autres}</b> pas pris</span></>}
+            <span style={{color:C.muted}}> sur {z.total}</span>
+            {a.doublons.length > 0 && <div data-numero-ecrit-doublons={a.doublons.length} style={{color:C.doublon,fontWeight:600}}>{a.doublons.map((d) => `N°${d.cle}`).join(', ')} : sur deux annonces en ligne.</div>}
+            {amb.length > 0 && <div style={{fontSize:12,color:C.muted}}>Deux numéros : {liste(amb)}</div>}
+            {con.length > 0 && <div style={{fontSize:12,color:C.muted}}>N° écrit ≠ N° de VRM : {liste(con)}</div>}
+          </div>
+        )}
+      </div>
+    );
+  };
+  const zv = resumeApercu(vinted);
+  return (
+    <section data-numero-ecrit={r.actif ? 'actif' : 'eteint'} aria-label="Je numérote moi-même dans mes annonces" style={{marginBottom:16,paddingBottom:14,borderBottom:`1px solid ${C.border}`}}>
+      <div style={{display:'flex',alignItems:'center',gap:12}}>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:15,fontWeight:700,color:C.text}}>Je numérote moi-même dans mes annonces</div>
+          <div style={{fontSize:13,color:C.muted,marginTop:3,lineHeight:1.5}}>{r.actif ? 'VRM lit ton numéro dans l’annonce. Il n’en donne plus tout seul.' : 'Éteint : VRM donne un numéro aux annonces qui n’en ont pas.'}</div>
+        </div>
+        <button type="button" role="switch" aria-checked={r.actif} aria-label="Je numérote moi-même dans mes annonces" data-numero-ecrit-bascule={r.actif ? 'on' : 'off'} onClick={basculer}
+          style={{flexShrink:0,width:51,minHeight:44,padding:0,border:'none',background:'transparent',cursor:'pointer',display:'flex',alignItems:'center'}}>
+          <span aria-hidden="true" style={{position:'relative',display:'block',width:51,height:31,borderRadius:999,background:r.actif?C.accent:C.border,transition:'background .2s'}}>
+            <span style={{position:'absolute',top:2,left:r.actif?22:2,width:27,height:27,borderRadius:999,background:'#fff',boxShadow:'0 1px 3px rgba(0,0,0,.25)',transition:'left .2s'}}/>
+          </span>
+        </button>
+      </div>
+      <div data-numero-ecrit-exemple="" style={{marginTop:12,padding:'12px 14px',borderRadius:12,background:C.bg,border:`1px solid ${C.border}`,fontSize:13,color:C.text,lineHeight:1.55}}>
+        <div style={{fontWeight:700}}>Termine ta description par :</div>
+        <div style={{fontFamily:'ui-monospace, SFMono-Regular, Menlo, monospace',fontSize:15,marginTop:6}}>N° 123</div>
+        <div style={{color:C.muted,marginTop:6}}>Ou une seule fois dans le titre. <Pourquoi label="Les formes acceptées">« N° 123 », « N°123 », « No 123 », « Réf 123 », « Ref. 123 », « #123 », ou avec ta lettre : « N° B125 ». Un nombre seul (« 42 ») n’est jamais lu : c’est peut-être la pointure. Deux numéros différents dans la même annonce : VRM ne choisit pas.</Pourquoi></div>
+      </div>
+      <GuideReglage titre="Numéroter dans tes annonces" etapes={[
+        ['Écris le numéro sur la boîte', 'Sur le carton, comme d’habitude.'],
+        ['Écris-le à la fin de la description', '« N° 123 » sur la dernière ligne. Sur Leboncoin, la référence pro marche aussi ; sur eBay, le SKU.'],
+        ['Ouvre tes annonces dans VRM', 'Il lit le numéro et le range avec la paire. Si un numéro ne colle pas, il te demande.'],
+      ]}/>
+      <div data-numero-ecrit-apercu="" style={{marginTop:12}}>
+        <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>Ce que VRM lit dans tes annonces</div>
+        <div style={{fontSize:12,color:C.muted,marginBottom:4}}>{r.actif ? 'Un numéro qui ne colle pas reste tel quel : tu choisis dans Annonces.' : 'Un aperçu, avant d’allumer. Rien n’est changé.'}</div>
+        {sites.map(ligneSite)}
+        {r.actif && zv && zv.contredits + zv.ambigus > 0 && onAnnonces && <div style={{marginTop:8}}><Bouton variante="secondaire" data-numero-ecrit-verifier="" onClick={onAnnonces}>Vérifier dans Annonces</Bouton></div>}
+      </div>
+    </section>
+  );
+}
+
 // ── TES NUMÉROS DE RANGEMENT : CHIFFRES OU SÉRIE À LETTRE ──────────────────
 // Julien, 2 octobre : « toutes les personnes n'utilisent pas les mêmes numéros :
 // des fois elles commencent par B125, C123 ; rends la chose adaptable ».
@@ -68628,7 +68902,7 @@ function PrenomSetting() {
 // porte QUE sur les numéros à venir : un numéro déjà donné est écrit sur un
 // carton, il ne bouge jamais (§5). Et quelle que soit la série choisie, un N°
 // tapé à la main peut toujours être « 125 » ou « C40 ».
-function NumerosSetting({ nu = false, onStock }) {
+function NumerosSetting({ nu = false, onStock, onAnnonces }) {
   const [p, setP] = React.useState(() => prefixeNumeros());
   const [mode, setMode] = React.useState(() => (prefixeNumeros() ? 'lettre' : 'chiffres'));
   const touche = React.useRef(false);
@@ -68670,6 +68944,7 @@ function NumerosSetting({ nu = false, onStock }) {
   return (
     <div data-numeros-reglage={mode} style={nu ? {} : {padding:'13px 16px',borderRadius:12,border:`1px solid ${C.border}`,background:C.card,marginBottom:8}}>
       {!nu && <div style={{fontSize:13,fontWeight:600,color:C.text}}>Tes numéros de rangement</div>}
+      <NumeroEcritSetting onAnnonces={onAnnonces}/>
       <div style={{fontSize:13,color:C.muted,marginTop:nu?0:3,lineHeight:1.5}}>
         Le format des <b>prochains</b> numéros. Ceux déjà donnés ne changent pas.
       </div>

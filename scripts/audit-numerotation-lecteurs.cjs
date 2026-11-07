@@ -170,13 +170,17 @@ function extraire(src, nom) {
 }
 const NOMS = ['cleNum', 'NUM_OK', 'normTitle', 'refVRMDe', 'marqueurNumerotation', 'archiveNumeros', 'coupureNumerotation', 'versionNumerotation',
   'estArchive', 'venteApresCoupure', 'dateMiseEnLigneMs', 'annonceNumerotable', 'numeroReprenable', 'numeroEmailAdmis',
-  'numDeSkuEbay', 'skuEbayDe', 'traductionAnnonce', 'numeroExterne', 'PANNE_NUMEROS', 'ficheAVerifier', 'LIENS_EBAY', '_depuisEbay', '_fichesEbayMemo', 'fichesPourEbay', 'lienEbay', 'numEbayLu', 'numLigneEbay', 'numDeTitreLbc', 'clesAnnonceLbc', 'commandeEbayEngagee', 'doublesVenteEbay'];
+  'numDeSkuEbay', 'skuEbayDe', 'traductionAnnonce', 'numeroExterne', 'PANNE_NUMEROS', 'ficheAVerifier', 'LIENS_EBAY', '_depuisEbay', '_fichesEbayMemo', 'fichesPourEbay', 'lienEbay', 'numEbayLu', 'numLigneEbay', 'numDeTitreLbc', 'clesAnnonceLbc', 'commandeEbayEngagee', 'doublesVenteEbay',
+  // (7 nov.) « Je numérote moi-même » (src/numeroEcrit.js) : ÉTEINT ici (aucun réglage
+  // rangé) — les lecteurs jugés sont ceux d'avant, inchangés ; audit-numero-ecrit juge l'allumé.
+  'numeroEcritActif', 'lectureEcriteLbc', 'numeroEcritLbc'];
 let MARQUEUR = null;
 const charge = () => {
   const ctx = { console };
   vm.createContext(ctx);
   ctx.__lire = () => MARQUEUR;
   const src = 'const load = (k, d) => (k === "vrm_numerotation" ? (__lire() == null ? d : JSON.parse(JSON.stringify(__lire()))) : d);\n'
+    + 'const CLE_NUMERO_ECRIT = "vrm_numero_ecrit"; const lireReglageNumeroEcrit = (o) => ({ actif: !!(o && o.actif === true) }); const lireNumeroEcrit = () => ({ etat: "rien" }); const lireNumeroTexte = () => ({ etat: "rien" });\n'
     + NOMS.map((n) => extraire(APP, n)).join('\n')
     + '\n;this.R = { ' + NOMS.join(', ') + ' };';
   vm.runInContext(src, ctx);
