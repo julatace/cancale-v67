@@ -230,35 +230,67 @@ async function supabaseUpsert(rows) {
 
 // Détection best-effort du compte : on cherche un login/email de compte connu
 // dans le texte brut du mail. (Optionnel : la donnée reste utile sans compte.)
+// ⚠️⚠️ (8 nov., Julien : « je sélectionne le compte Shop, on me met des ventes
+//    d'un autre compte ») QUEL COMPTE VINTED PORTE CET E-MAIL. Avant : (1) la
+//    première adresse de compte trouvée dans le message gagnait — or plusieurs
+//    comptes Vinted écrivent à la MÊME boîte (une adresse pour tous) : le premier
+//    de la liste raflait les e-mails des autres ; (2) sinon le premier pseudo
+//    trouvé N'IMPORTE OÙ dans le texte, même collé dans un autre mot (« shop »
+//    dans « shop_cancale », un pseudo d'acheteur, un titre).
+//    Désormais (`compteDeLEmail`, pur) :
+//      a. le pseudo SALUÉ par Vinted (« Bonjour shop_cancale, »), mot exact,
+//         s'il désigne UN compte lié ;
+//      b. sinon l'adresse de réception, seulement si elle n'appartient qu'à UN
+//         compte ;
+//      c. sinon un pseudo cité en MOT ENTIER, seulement s'il n'y en a qu'un ;
+//      d. sinon AUCUN compte (`uid: ''`) — mieux vaut un blanc qu'un faux (§5).
+export const RE_SALUT = /(?:^|\n|>|\s)(?:bonjour|salut|hello|hi|coucou)\s+([^\s,!:;<>]{2,60}?)\.?\s*[,!:\n]/i;
+const echapperRe = (t) => String(t).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+export function compteDeLEmail(raw, accts, emails) {
+  const low = String(raw || '').toLowerCase();
+  const liste = (Array.isArray(accts) ? accts : []).filter((a) => a && a.vinted_user_id != null);
+  const rendre = (a, source) => ({ uid: String(a.vinted_user_id), login: a.login || '', source });
+  const m = low.match(RE_SALUT);
+  if (m) {
+    const salue = m[1].trim();
+    const ok = liste.filter((a) => a.login && String(a.login).toLowerCase() === salue);
+    if (ok.length === 1) return rendre(ok[0], 'salut');
+  }
+  const map = emails && typeof emails === 'object' ? emails : {};
+  const parAdresse = new Map();
+  for (const uid in map) {
+    const em = String(map[uid] || '').toLowerCase().trim();
+    if (!em) continue;
+    if (!parAdresse.has(em)) parAdresse.set(em, []);
+    parAdresse.get(em).push(String(uid));
+  }
+  const viaAdresse = new Set();
+  for (const [em, uids] of parAdresse) {
+    if (!low.includes(em)) continue;
+    if (uids.length === 1) viaAdresse.add(uids[0]); else uids.forEach((u) => viaAdresse.add('ambigu:' + u));
+  }
+  const nets = [...viaAdresse].filter((u) => !u.startsWith('ambigu:'));
+  if (nets.length === 1 && viaAdresse.size === 1) {
+    const a = liste.find((x) => String(x.vinted_user_id) === nets[0]);
+    return { uid: nets[0], login: (a && a.login) || '', source: 'adresse' };
+  }
+  const cites = liste.filter((a) => a.login && new RegExp('(^|[^a-z0-9_.-])' + echapperRe(String(a.login).toLowerCase()) + '($|[^a-z0-9_.-])').test(low));
+  if (cites.length === 1) return rendre(cites[0], 'pseudo');
+  return { uid: '', login: '', source: cites.length > 1 || viaAdresse.size > 1 ? 'ambigu' : 'inconnu' };
+}
 async function detectAccount(raw) {
   try {
     const headers = { ...sbCle(SUPABASE_KEY) };
-    const low = (raw || '').toLowerCase();
     const res = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=vinted_user_id,login`), { headers });
     const accts = res.ok ? await res.json() : [];
-    // 1) Par EMAIL de compte (renseigné dans l'app : Comptes liés → champ 📧).
-    //    Fiable même avec les adresses masquées iCloud : on cherche l'adresse
-    //    destinataire dans le texte brut du mail (To inclus).
+    let emails = {};
     try {
       const r2 = await fetch(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_account_emails`), { headers });
-      if (r2.ok) {
-        const rows = await r2.json();
-        const map = (rows[0] && rows[0].vinted_account_emails) || {};
-        for (const uid in map) {
-          const em = String(map[uid] || '').toLowerCase().trim();
-          if (em && low.includes(em)) {
-            const a = accts.find(x => String(x.vinted_user_id) === String(uid));
-            return { uid: String(uid), login: (a && a.login) || '' };
-          }
-        }
-      }
+      if (r2.ok) { const rows = await r2.json(); emails = (rows[0] && rows[0].vinted_account_emails) || {}; }
     } catch (_) {}
-    // 2) Par pseudo cité dans le texte du mail.
-    for (const a of accts) {
-      if (a.login && low.includes(String(a.login).toLowerCase())) return { uid: String(a.vinted_user_id), login: a.login };
-    }
+    return compteDeLEmail(raw, accts, emails);
   } catch (_) {}
-  return { uid: '', login: '' };
+  return { uid: '', login: '', source: 'inconnu' };
 }
 
 // La paire d'un email de message, lue dans son SUJET (forme mesurée sur 59 emails :
@@ -2539,7 +2571,7 @@ export async function traiterEmail(req, res) {
       const key = shortHash(`${data.pseudo}|${data.prix}|${(data.designation || '').slice(0, 40)}`);
       { const jn = await numeroDEmail(data.numero, data.designation);
         data.numero = jn.numero; if (jn.numeroTitre) data.numeroTitre = jn.numeroTitre; }
-      await supabaseUpsert([{ id: `email_sale_${key}`, data: { type: 'vente', ...data, account: acc.login || '', uid: acc.uid || '', receivedAt: now } }]);
+      await supabaseUpsert([{ id: `email_sale_${key}`, data: { type: 'vente', ...data, account: acc.login || '', uid: acc.uid || '', compteSource: acc.source || '', receivedAt: now } }]);
       // Notif push : vente en temps réel, même app fermée et ordi éteint.
       try { await pushOnce({ ...texteVendu({ article: data.designation, prix: data.prix, compte: acc.login, verification: !!data.verification }), tag: `sale-${key}`, url: DESTINATIONS.vente({ tx: data.transaction }) }, 'vente'); } catch (_) {}
       await notifierDoubleVente(data.numero, data.designation);
