@@ -20523,7 +20523,7 @@ function EntreePublierAilleurs({ site }) {
 // qu'un faux. Rien ici ne touche à un montant.
 // (1er nov.) `VC_VENTE_ETAPES` vit dans api/_lib/vestiaire-regle.js (importée) : la même
 // règle pour cet écran, le CA, l'anti double vente et la sortie du Stock.
-const VC_PARCOURS = [['a-expedier', 'À expédier'], ['controle', 'Contrôle'], ['livree', 'Livrée'], ['versee', 'Versée']];
+const VC_PARCOURS = [['a-expedier', 'À envoyer'], ['controle', 'Contrôle'], ['livree', 'Livrée'], ['versee', 'Versée']];
 // ⟦→ ecrans/Vestiaire.jsx #10⟧
 // ══════════════════════════════════════════════════════════════════════════════
 // (2 nov., soir) LES VENTES VESTIAIRE COMME CELLES DE VINTED ET LEBONCOIN
@@ -30964,7 +30964,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const moi = String(it.id), cle = cleNum((numeros[moi] || {}).numero);
     return cle ? (porteursNum[cle] || []).filter((p) => !(p.type === 'annonce' && String(p.id) === moi)) : [];
   };
-  const nomPorteur = (p) => p.type === 'garage' ? `la case ${String(p.id)} du stock` : `« ${String(p.titre || '').slice(0, 40)} » (${p.type === 'vente' ? 'à expédier' : p.type === 'annulee' ? 'vente annulée, encore là' : p.masquee ? 'masquée par Vinted, toujours chez toi' : 'en ligne'})`;
+  const nomPorteur = (p) => p.type === 'garage' ? `la case ${String(p.id)} du stock` : `« ${String(p.titre || '').slice(0, 40)} » (${p.type === 'vente' ? 'à envoyer' : p.type === 'annulee' ? 'vente annulée, encore là' : p.masquee ? 'masquée par Vinted, toujours chez toi' : 'en ligne'})`;
   // Donner un numéro NEUF à une paire (jamais un numéro déjà servi) — sur SON clic.
   const donnerNumeroNeuf = async (it, pourquoi) => {
     const f = numeros[String(it.id)] || {};
@@ -42940,7 +42940,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               return (
               <div key={c.numero} data-conflit-num={c.numero} style={{marginTop:8,fontSize:12,color:C.text}}>
                 <b>N°{c.numero}</b> — {c.porteurs.map((p,i)=>(
-                  <span key={i} data-conflit-porteur={p.masquee?'masquee':p.type}>{i>0?' · ':''}{p.type==='annonce'?(p.masquee?'masquée par Vinted, toujours chez toi':'en ligne'):p.type==='vente'?'à expédier':p.type==='annulee'?'vente annulée':'au garage'} « {String(p.titre||'').slice(0,34)} »</span>
+                  <span key={i} data-conflit-porteur={p.masquee?'masquee':p.type}>{i>0?' · ':''}{p.type==='annonce'?(p.masquee?'masquée par Vinted, toujours chez toi':'en ligne'):p.type==='vente'?'à envoyer':p.type==='annulee'?'vente annulée':'au garage'} « {String(p.titre||'').slice(0,34)} »</span>
                 ))}
                 {c.porteurs.filter(p=>p.type==='annonce'&&p.masquee).map((p,_i,l)=>(
                   <div key={'m'+p.id} style={{marginTop:4}}>
@@ -47272,7 +47272,7 @@ function ColisEquipe({ vendeur, de, onPropre }) {
       {(d.bords === null || d.labels === null || d.relais === null || d.tracks === null) && (
         <div data-equipe-partiel="" style={{ marginBottom: 12 }}><LignePanne>Une partie des colis n'a pas pu être lue (bordereaux ou codes) — ce qui manque n'est pas « vide ». <button type="button" onClick={charger} style={{ border: 'none', background: 'transparent', color: C.accentTexte, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>Relire</button></LignePanne></div>
       )}
-      <div style={h3}>À expédier · {ventes.length}</div>
+      <div style={h3}>À envoyer · {ventes.length}</div>
       {!ventes.length && <div data-equipe-vide="ventes" style={{ fontSize: 15, color: C.muted }}>Aucun colis à expédier pour l'instant.</div>}
       {ventes.map((o) => {
         const k = String(o.transaction_id);

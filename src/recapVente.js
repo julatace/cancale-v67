@@ -81,7 +81,7 @@ export function phraseVente({ etat = '', aide = '', etapes = [], aExpedier = fal
   if (cle === 'bordereau') return aExpedier
     ? { gras: 'Bordereau prêt.', suite: 'Imprime-le et dépose le colis.' }
     : { gras: `${etat || 'En cours'}.`, suite: '' };
-  if (aExpedier) return { gras: 'À expédier.', suite: 'Génère le bordereau, puis dépose le colis.' };
+  if (aExpedier) return { gras: 'À envoyer.', suite: 'Génère le bordereau, puis dépose le colis.' };
   return { gras: `${etat || 'En cours'}.`, suite: '' };
 }
 

@@ -1796,7 +1796,7 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
                     {bloc(eur(total), 'total des ventes')}
                     {bloc(eur(payees), 'payées')}
                     {enAttente > 0 && bloc(eur(enAttente), 'en attente de paiement', C.warn)}
-                    {aExpedier > 0 && bloc(String(aExpedier), 'à expédier', C.accent)}
+                    {aExpedier > 0 && bloc(String(aExpedier), 'à envoyer', C.accent)}
                   </div>
                   {/* Liste des ventes : acheteur, montant, état de paiement/expédition. */}
                   <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -1804,7 +1804,7 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
                       const li = (o.lineItems && o.lineItems[0]) || {};
                       const titre = li.title || 'Vente eBay';
                       const acheteur = (o.buyer && o.buyer.username) || '';
-                      const etat = !paye(o) ? { t: 'en attente de paiement', c: C.warn } : !livre(o) ? { t: 'à expédier', c: C.accent } : { t: 'expédiée', c: C.muted };
+                      const etat = !paye(o) ? { t: 'en attente de paiement', c: C.warn } : !livre(o) ? { t: 'à envoyer', c: C.accent } : { t: 'envoyée', c: C.muted };
                       return (
                         <div key={(o._compte || '') + (o.orderId || i)} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', borderTop: `1px solid ${C.border}`, paddingTop: 6 }}>
                           <div style={{ flex: '1 1 150px', minWidth: 0 }}>
