@@ -243,14 +243,15 @@ function rendreAuth(e) {
   // ⚠️⚠️ QUEL MOT DE PASSE ? On arrive ici juste après avoir été sur Vinted, on
   //    voit « Email / Mot de passe »… et on tape son mot de passe VINTED. La
   //    fenêtre le dit, et les placeholders aussi (c'est eux qu'on lit en tapant).
-  const quelCompte = "C'est ton compte <b>VRM</b> — le même email et le même mot de passe que sur vrm.center. Ce n'est pas ton mot de passe Vinted, l'extension n'en a jamais besoin.";
+  // 5.328 : une phrase — ceux de vrm.center, pas ceux de Vinted.
+  const quelCompte = "Ton email et ton mot de passe <b>VRM</b> (ceux de vrm.center) — pas ton mot de passe Vinted.";
   const titre = document.querySelector('h1');
   if (titre) titre.textContent = e && e.connecte ? 'VRM' : 'Connexion à VRM';
   if (e && e.connecte) {
     // Connecté dans la carte : on NOMME le compte (c'est ce qui permet de voir
     // qu'on s'est trompé), et le geste suivant est d'ouvrir VRM.
     poserHtml(box, `<div class="who"><span class="dot"></span><span class="nom">${esc(e.email || 'connecté')}</span></div>
-      <div class="muted" style="margin-top:4px">L’extension est connectée. Les données peuvent être transmises pendant que la plateforme est ouverte ici, sans onglet VRM.</div>
+      <div class="muted" style="margin-top:4px">L’extension est connectée : tes données partent quand tu ouvres Vinted, Leboncoin ou Vestiaire.</div>
       ${(() => { let n = false; try { n = sessionStorage.getItem('vrmOAuthNeuf') === '1'; } catch (_) {} return n ? '<div class="err" data-compte-neuf>Ce compte n’était relié à aucun compte VRM : un compte VRM neuf vient d’être créé. Si tu as déjà un compte VRM, clique « Se déconnecter » et connecte-toi avec son email et son mot de passe.</div>' : ''; })()}
       <div id="transpBox" hidden></div>
       <button id="vrmBtn">Ouvrir VRM</button>
