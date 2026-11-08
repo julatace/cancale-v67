@@ -28,7 +28,7 @@ const MUTATIONS = {
   achat_devine: (s) => s.replace('const p = num(x.prix), ac = num(x.achat);', 'const p = num(x.prix), ac = num(x.achat) ?? (p != null ? p + 1 : null);'),
   lbc_80: (s) => s.replace('lbc: 50, ebay: 80', 'lbc: 80, ebay: 80'),
   vinted_sans_limite: (s) => s.replace(', vinted: 100 }', ' }'),
-  sans_marque: (s) => s.replace("if (x.marque !== undefined && vide(x.marque)) pose('marque', 'Marque absente');", ''),
+  sans_marque: (s) => s.replace("if (!fac && x.marque !== undefined && vide(x.marque)) pose('marque', 'Marque absente');", ''),
   sans_categorie: (s) => s.replace("if (x.categorie !== undefined && vide(x.categorie)) pose('categorie', 'Catégorie absente');", ''),
   non_lu_juge: (s) => s.replace("if (x.taille !== undefined && ", "if (").replace("if (x.nPhotos !== undefined) {", "{"),
   prix_conseille: (s) => s.replace("pose('prix', `Prix ${eur(p)} sous ton prix d’achat ${eur(ac)}`);", "pose('prix', `Prix ${eur(p)} sous ton prix d’achat ${eur(ac)} — mets ${eur(Math.ceil(ac * 1.3))}`);"),

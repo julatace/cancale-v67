@@ -211,3 +211,26 @@ export function phraseNavigateur(nav, ua) {
 // proposée seulement quand l'extension Firefox est PUBLIÉE — sinon installer
 // Firefox ne servirait à rien.
 export const LIEN_FIREFOX_ANDROID = 'https://play.google.com/store/apps/details?id=org.mozilla.firefox';
+
+// ══ OÙ VIT L'EXTENSION, EN MOTS (8 nov., « iPhone seul ») ══════════════════════
+// « sur ton ordinateur » n'est vrai que là où l'extension ne peut PAS vivre ici.
+// Dans Orion sur iPhone ou Firefox sur Android, l'extension s'installe sur CE
+// téléphone : lui dire « ordinateur » enverrait un vendeur sans ordinateur
+// chercher un appareil qu'il n'a pas. Rend la fin de phrase après « installe
+// l'extension » / « l'extension vit ». Règle pure (le code de `mobileIci` et
+// ce qui est publié) : exécutée par scripts/audit-vendeurs-differents.cjs.
+//   'ios-orion'       ⇒ « dans Orion, sur cet iPhone »
+//   'firefox-android' ⇒ « dans Firefox, sur ce téléphone »
+//   'ios' (Safari…)   ⇒ « sur ton ordinateur ou dans Orion sur iPhone » (si une fiche est publiée)
+//   'android'…        ⇒ « sur ton ordinateur ou dans Firefox pour Android » (si publiée)
+//   'autre' (ordinateur) ⇒ « dans ce navigateur »
+export function phraseOuExtension(mobile, { orionPublie = false, firefoxPublie = false } = {}) {
+  if (mobile === 'ios-orion') return 'dans Orion, sur cet iPhone';
+  if (mobile === 'firefox-android') return 'dans Firefox, sur ce téléphone';
+  if (mobile === 'ios') return orionPublie ? 'sur ton ordinateur ou dans Orion sur iPhone' : 'sur ton ordinateur';
+  if (mobile === 'android' || mobile === 'samsung' || mobile === 'duckduckgo') return firefoxPublie ? 'sur ton ordinateur ou dans Firefox pour Android' : 'sur ton ordinateur';
+  return 'dans ce navigateur';
+}
+export function ouExtensionIci(ua) {
+  return phraseOuExtension(mobileIci(ua), { orionPublie: !!boutiqueOrion(), firefoxPublie: !!LIENS_BOUTIQUES.firefox });
+}

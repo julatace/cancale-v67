@@ -513,6 +513,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **8 nov. · Vendeurs différents** : Affichage Simple/Complet (`vrm_affichage`, auto = 1 compte et < 30 ventes/30 j, jamais Julien, pas su ⇒ Complet ; ne cache que des entrées, aucun total) ; « Je vends » (`vrm_je_vends`) : hors sneakers taille/marque facultatives, « article » ; « ordinateur » seulement si vrai (Orion) ; équipe : 016 dite. `src/profilVendeur.js`, `docs/passation/2026-11-08-vendeurs-differents.md`. Geste : 016.
 - **8 nov. · Aide et signalement** : « ? » après la phrase de chaque écran (3 questions, article, « Signaler ») ; signalement enrichi (capture SCHÉMATIQUE en nombres, 30 requêtes par famille, 50 erreurs, montants/pseudos masqués) ; centre d'aide `vrm.center/aide` (généré par `scripts/aide-generer.cjs`) ; alertes de plantage groupées (1/h) au propriétaire. `docs/passation/2026-11-08-aide-signalement.md`. Geste : ouvrir vrm.center/aide.
 
 - **8 nov. · Restes ventes** : une phrase répétée sur ≥ 2 lignes de Ventes (note « vue par e-mail » par compte, refus de facture commun) dite une fois en tête ; widget, rappels et bilan comptent les ventes vues par e-mail avec leur bordereau (`api/_lib/colis-ventes-email.js` importe les règles de l'app) ; Mondial Relay au départ : aucune identité sûre, 3 mesures à faire. `docs/passation/2026-11-08-restes-ventes.md`. Geste : aucun.

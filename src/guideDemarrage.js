@@ -121,6 +121,9 @@ export const CHOIX_NUMEROTATION = [
   { cle: 'vrm', titre: 'VRM numérote mes paires', texte: 'Chaque nouvelle annonce reçoit un numéro à écrire sur sa boîte.' },
   { cle: 'moi', titre: 'Je numérote moi-même', texte: 'Tu termines ta description par «\u00a0N°\u00a0123\u00a0»\u00a0: VRM lit le tien.' },
 ];
+// (8 nov.) Hors sneakers (src/profilVendeur.js) : « mes articles », « sa boîte ou son étiquette ».
+export const choixNumerotation = (vend = 'sneakers') => vend === 'sneakers' ? CHOIX_NUMEROTATION
+  : CHOIX_NUMEROTATION.map((c) => c.cle === 'vrm' ? { ...c, titre: 'VRM numérote mes articles', texte: 'Chaque nouvelle annonce reçoit un numéro à écrire sur sa boîte ou son étiquette.' } : c);
 // Posée seulement si : le réglage n'a jamais été choisi (ni `depuis` ni `choisi`)
 // ET on a LU qu'aucune paire ne porte de N° (`nNum === 0`). Pas su ⇒ on ne demande pas.
 export function numerotationAChoisir(brut, nNum) {
@@ -149,7 +152,11 @@ export function verifierInstallation({ pont = {}, comptes, emails, relu, mainten
   const e = pont.etape;
   if (e === 'demande' || e === undefined) lignes.push({ cle: 'extension', etat: 'encours', titre: 'Extension', detail: 'Je lui pose la question…' });
   else if (e === 'absente' || e == null) {
-    if (pont.telephone) lignes.push({ cle: 'extension', etat: aDesComptes ? 'ok' : 'action', titre: 'Extension', detail: aDesComptes ? 'Elle vit sur ton ordinateur : tes comptes arrivent bien.' : 'Elle s’installe sur ton ordinateur : ouvre vrm.center dans son navigateur.' });
+    // (8 nov., iPhone seul) « ordinateur » n'est dit que s'il est vrai : dans Orion
+    // (iPhone) ou Firefox (Android), l'extension s'installe ICI (`pont.ici`) ; ses
+    // comptes peuvent venir d'un autre navigateur que celui-ci (`pont.ou`, la règle
+    // `phraseOuExtension` de src/navigateurExtension.js).
+    if (pont.telephone && !pont.ici) lignes.push({ cle: 'extension', etat: aDesComptes ? 'ok' : 'action', titre: 'Extension', detail: aDesComptes ? 'Elle vit dans un autre navigateur : tes comptes arrivent bien.' : `Elle s’installe ${pont.ou || 'sur ton ordinateur'} : ouvre vrm.center dans ce navigateur-là.` });
     else lignes.push({ cle: 'extension', etat: 'action', titre: 'Extension', detail: 'Pas trouvée dans ce navigateur.', geste: { cle: 'installer', libelle: 'Installer l’extension' } });
   } else if (e === 'muette') lignes.push({ cle: 'extension', etat: 'passu', titre: 'Extension', detail: 'Elle est là, mais n’a pas répondu. Recharge la page.', geste: { cle: 'reessayer', libelle: 'Réessayer' } });
   else if (pont.enRetard) lignes.push({ cle: 'extension', etat: 'action', titre: 'Extension', detail: `Version ${pont.version || '?'} : une mise à jour est prête.`, geste: { cle: 'maj', libelle: 'Mettre à jour' } });

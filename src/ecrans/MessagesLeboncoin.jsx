@@ -165,7 +165,7 @@ function ConversationsLeboncoin() {
         <div style={{ color: C.muted }}>
           {cap === 'ok' ? <>Ouvre <b>leboncoin.fr</b> une fois, connecté à ton compte : l'extension relèvera combien de messages t'attendent, compte par compte.</>
             : cap === 'retard' ? <>L'extension installée ne relève pas encore les messages : il lui faut la <b>{EXT_CAPACITES.lbcmsg}</b>. Mets-la à jour depuis <b>Paramètres → État des connexions</b>.</>
-            : <>C'est l'extension, sur ton ordinateur, qui relève tes messages Leboncoin quand tu passes sur leboncoin.fr.</>}
+            : <>C'est l'extension, là où elle est installée, qui relève tes messages Leboncoin quand tu passes sur leboncoin.fr.</>}
         </div>
         {ouvrir}
       </div>
@@ -284,7 +284,7 @@ function FavorisLeboncoin() {
         Leboncoin donne le <b>nombre</b> de favoris de chaque annonce, jamais <b>qui</b> les a mis : VRM ne peut donc écrire à personne, et il ne le fait pas.{' '}
         {capStats === 'ok' ? <>Pour qu'une annonce ait son chiffre, ouvre ses <b>statistiques</b> sur Leboncoin (« Mes annonces » → l'annonce → Statistiques) : l'extension le relève toute seule.</>
           : capStats === 'retard' ? <>Pour relever ce chiffre, il faut l'extension <b>{EXT_CAPACITES.lbcstats}</b> : mets-la à jour depuis Paramètres → État des connexions, puis ouvre les <b>statistiques</b> de l'annonce sur Leboncoin.</>
-          : <>C'est l'extension, sur ton ordinateur, qui relève ce chiffre quand tu ouvres les <b>statistiques</b> d'une annonce sur Leboncoin.</>}
+          : <>C'est l'extension, là où elle est installée, qui relève ce chiffre quand tu ouvres les <b>statistiques</b> d'une annonce sur Leboncoin.</>}
       </div>
       {!ads.length ? (
         <div data-favoris-lbc-vide="" style={{ fontSize: 13, color: C.muted }}>Aucune annonce Leboncoin en vente à toi pour l'instant.</div>

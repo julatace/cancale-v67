@@ -12,7 +12,8 @@ import { photoArticle } from '../photosArticles.js';
 import PastilleTransporteur from '../PastilleTransporteur.jsx';
 import { transporteurDuColis, cleStatTransporteur } from '../transporteursVisuels.js';
 import { attrCible } from '../cibleNotif.js';
-import { AUTH, C, Card, ChipsModeles, DEMANDE_LBC_CIBLE, DEMANDE_LBC_FICHE, EXT_ATTENDUE, EXT_CAPACITES, INV_STATUS, Icon, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LignePanne, LigneRelais, NAV, NUM_OK, PhotoVente, PhotoVinted, Pourquoi, QrColis, SEL_EBAY_COMMANDES, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TamponPose, __vmrEtat, __vmrJobs, __vmrNotifier, aRetirerDeLbcEbay, aRetirerDeLbcVinted, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, annotateAndDownloadBordereau, askConfirm, avecNumerosVc, b64ToBytes, bordereauFormatKey, categorieLbcDe, cleNum, clesAnnonceLbc, comptesLbcProuves, comptesLbcSession, descriptionLbcDe, doublesVenteLbc, estTamponAnnule, extSait, extractBrand, familleArticle, gesteVrm, ilYaCourt, jumellesParPhoto, lbcAnnulee, lbcDescription, lbcEuro, lbcExpediee, lbcFinalisee, lbcSortieDe, lbcTitre, libelleRelais, libererOngletPdf, lireBaseRelue, lireDressings, lireEbayTous, lireFichesPage, lireLignesEnLigne, lirePreuvesVenteVinted, lireVentesVestiaire, load, mpChoisi, numeroLbcIdentite, numerosLbcSortis, numerosVendusEbay, numerosVendusVc, onVmrExt, prixAchatDe, raisonExtGlobale, readPdfFirstPageSize, refLbcPresente, relaisVivant, save, toast, triNum, useCompteLbcOuvert, useExtVivante, useSansSouris, useVoixExt, valideAnnonceLbc, verifierAvantPublication, vmrCmd, vmrExtPresent, vmrExtVersion, vmrPdfLbc } from '../App.jsx';
+import { champsFacultatifs } from '../profilVendeur.js';
+import { AUTH, C, Card, ChipsModeles, DEMANDE_LBC_CIBLE, DEMANDE_LBC_FICHE, EXT_ATTENDUE, EXT_CAPACITES, INV_STATUS, Icon, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LignePanne, LigneRelais, NAV, NUM_OK, PhotoVente, PhotoVinted, Pourquoi, QrColis, SEL_EBAY_COMMANDES, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TamponPose, __vmrEtat, __vmrJobs, __vmrNotifier, aRetirerDeLbcEbay, aRetirerDeLbcVinted, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, annotateAndDownloadBordereau, askConfirm, avecNumerosVc, b64ToBytes, bordereauFormatKey, categorieLbcDe, cleNum, clesAnnonceLbc, comptesLbcProuves, comptesLbcSession, descriptionLbcDe, doublesVenteLbc, estTamponAnnule, extSait, extractBrand, familleArticle, gesteVrm, ilYaCourt, jumellesParPhoto, lbcAnnulee, lbcDescription, lbcEuro, lbcExpediee, lbcFinalisee, lbcSortieDe, lbcTitre, libelleRelais, libererOngletPdf, lireBaseRelue, lireDressings, lireEbayTous, lireFichesPage, lireLignesEnLigne, lirePreuvesVenteVinted, lireVentesVestiaire, load, mpChoisi, numeroLbcIdentite, numerosLbcSortis, numerosVendusEbay, numerosVendusVc, onVmrExt, prixAchatDe, raisonExtGlobale, readPdfFirstPageSize, refLbcPresente, relaisVivant, save, toast, triNum, useCompteLbcOuvert, useExtVivante, useSansSouris, useVoixExt, valideAnnonceLbc, verifierAvantPublication, vmrCmd, vmrExtPresent, vmrExtVersion, vmrPdfLbc, vendActuel } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import AnnoncesLeboncoin from '../AnnoncesLeboncoin.jsx';
@@ -212,7 +213,7 @@ function FicheLbc({ q, compteLbc, onClose, onMarquer }) {
     // (3 nov.) Vérifier avant de publier : une ligne par problème, « Publier quand même » possible.
     if (!enCours && !confirme) {
       const fam = familleArticle({ titre, description: desc, taille: q.taille, marque: q.marque }).famille;
-      const ok = await verifierAvantPublication(problemesAnnonce({ titre, taille: q.taille || '', famille: fam, marque: q.marque || '', categorie: categorieLbcDe(titre, desc, q.taille, '', q.marque), nPhotos: photos.length, prix, achat: q.achat }, 'lbc'), { site: 'lbc' });
+      const ok = await verifierAvantPublication(problemesAnnonce({ titre, taille: q.taille || '', famille: fam, marque: q.marque || '', categorie: categorieLbcDe(titre, desc, q.taille, '', q.marque), nPhotos: photos.length, prix, achat: q.achat, facultatifs: champsFacultatifs(vendActuel()) }, 'lbc'), { site: 'lbc' });
       if (!ok) return;
     }
     setRefus(null); setAConfirmer(false); setEnvoi(true);
@@ -2204,9 +2205,9 @@ function LeboncoinScreen() {
                 {liste.length > 40 && <div style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>+ {liste.length - 40} autres…</div>}
               </>);
               return (<>
-                {nues.length > 0 && Groupe({ titre: "Aucune photo", ton: true, liste: nues, note: <>Leboncoin <b>refuse une annonce sans photo</b>. Ouvre l'annonce sur Vinted, sur ton ordinateur : ses photos arrivent ici au passage.</> })}
+                {nues.length > 0 && Groupe({ titre: "Aucune photo", ton: true, liste: nues, note: <>Leboncoin <b>refuse une annonce sans photo</b>. Ouvre l'annonce sur Vinted, là où est l’extension : ses photos arrivent ici au passage.</> })}
                 {pretes.length > 0 && Groupe({ titre: "Prêtes", liste: pretes })}
-                {maigres.length > 0 && Groupe({ titre: "Une seule photo", liste: maigres, note: <>Ouvre l'annonce Vinted une fois sur ton ordinateur : les autres photos arrivent seules. <Pourquoi label="Pourquoi">Une annonce Leboncoin avec une seule photo se vend mal. Vinted ne donne les autres photos que sur la page de l'annonce.</Pourquoi></> })}
+                {maigres.length > 0 && Groupe({ titre: "Une seule photo", liste: maigres, note: <>Ouvre l'annonce Vinted une fois, là où est l’extension : les autres photos arrivent seules. <Pourquoi label="Pourquoi">Une annonce Leboncoin avec une seule photo se vend mal. Vinted ne donne les autres photos que sur la page de l'annonce.</Pourquoi></> })}
               </>);
             })()}
           </>)}
