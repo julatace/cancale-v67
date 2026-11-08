@@ -37,7 +37,7 @@ import { preuveDeLigne, preuveDeTransp, contredit, lectureEnRetard, etatProuve }
 // (retirée, rendue) reste lue, quel que soit son âge — sans elle, un colis
 // RETIRÉ revenait « à vérifier » au 46e jour (rien lu ne redonne jamais l'état
 // d'avant la lecture).
-import { sensDeLigne, SUJET_SORTANT, SUJET_ENTRANT, SELECT_TRANSP_META, ligneTranspDeMeta, codesPostauxDe, CP_SIEGE_MR, heureParis } from './transporteurs.js';
+import { sensDeLigne, SUJET_SORTANT, SUJET_ENTRANT, SELECT_TRANSP_META, ligneTranspDeMeta, codesPostauxDe, CP_SIEGE_MR, heureParis, indexTranspParSuivi } from './transporteurs.js';
 export { sensDeLigne, SUJET_SORTANT, SUJET_ENTRANT, SELECT_TRANSP_META, ligneTranspDeMeta, heureParis };
 
 // ── UNE LIGNE DE SUIVI RELUE AVEC LA RÈGLE D'AUJOURD'HUI (revue du 23 oct., n° 2)
@@ -540,7 +540,8 @@ export function rappelsRetraitDuJour({ lignes = [], collectes = [], envoyes = []
   // (24 oct.) Et le statut lu chez le TRANSPORTEUR (lignes `transp_`, la règle
   // de l'app) : un colis retiré ou reparti chez lui ne reçoit aucun rappel, une
   // lecture « disponible » de moins de 6 h ne fait pas dire « à vérifier ».
-  const tMap = new Map((transp instanceof Map ? [...transp.values()] : (Array.isArray(transp) ? transp : [])).filter((t) => t && t.suivi).map((t) => [normaliserSuivi(t.suivi), t]));
+  // (8 nov., retraits) Deux lignes pour un n° : la préférée (`indexTranspParSuivi`), la règle de l'app.
+  const tMap = indexTranspParSuivi(transp);
   lignes = (Array.isArray(lignes) ? lignes : []).map((l) => relireLigneMeta(l)).map((l) => { const k = suiviDeLigne(l); const t = k ? tMap.get(k) : null; return t ? fusionTransporteur(l, t, maintenant) : l; });
   const envoyesN = new Set((envoyes || []).map(normaliserSuivi).filter(Boolean));
   const cocheN = new Set();
@@ -550,7 +551,7 @@ export function rappelsRetraitDuJour({ lignes = [], collectes = [], envoyes = []
       if (nLignes.has(k) || envoyesN.has(k) || cocheN.has(k)) continue;
       const syn = ligneDuTransporteur(t, maintenant); if (syn) lignes.push(syn);
     } }
-  const fins = finsDesLignes(lignes, { estSortant: (l) => (l.sens != null ? l.sens : l.se) === 'sortant' || envoyesN.has(suiviDeLigne(l)), transp: [...tMap.values()] });
+  const fins = finsDesLignes(lignes, { estSortant: (l) => (l.sens != null ? l.sens : l.se) === 'sortant' || envoyesN.has(suiviDeLigne(l)), transp: Array.isArray(transp) ? transp : [...tMap.values()] });   // les fins : TOUTES les lignes (un « retiré » gagne)
   const coches = new Set((collectes || []).map((c) => String(c || '').trim()));
   const cochesN = new Set((collectes || []).map(normaliserSuivi).filter(Boolean));
   const finisS = new Set((finis || []).map(String));
