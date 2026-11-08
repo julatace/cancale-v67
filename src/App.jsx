@@ -4763,17 +4763,23 @@ const _lireLigneMoissonSeule = async (id, auth) => {
     return Array.isArray(rows) ? rows : null;
   } catch (_) { return null; }
 };
-const _groupeMoisson = creerLectureGroupee(async (ids, auth) => {
+const _groupeMoisson = creerLectureGroupee(async (ids, cle) => {
+  const auth = authDeCleMoisson(cle);
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=in.(${ids.join(',')})&select=${SEL_MOISSON}`, { headers: Object.assign(sbAuth(), auth ? { Authorization: auth } : {}) });
     if (!res.ok) return { ok: false, statut: res.status };
     const rows = await res.json();
     return Array.isArray(rows) ? { ok: true, rows } : { ok: false, statut: 0 };
   } catch (_) { return { ok: false, statut: 0 }; }
-}, _lireLigneMoissonSeule);
+}, (id, cle) => _lireLigneMoissonSeule(id, authDeCleMoisson(cle)));
+// La clé du lot = la session ET la famille (`listings`, `inbox`…) : sur un réseau lent,
+// les boîtes de réception (Messages) n'attendent pas les dressings (mesuré au banc
+// `chargement`, 390 px réseau lent : un seul lot de 337 Ko retardait Messages).
+const authDeCleMoisson = (cle) => String(cle).slice(0, Math.max(0, String(cle).lastIndexOf('|')));
 const lireMoissonGroupee = (id) => {
   const auth = sbAuth().Authorization || '';
-  return idGroupable(id) ? _groupeMoisson.charger(id, auth) : _lireLigneMoissonSeule(id, auth);
+  const famille = String(id).slice(String(id).lastIndexOf('_') + 1);
+  return idGroupable(id) ? _groupeMoisson.charger(id, `${auth}|${famille}`) : _lireLigneMoissonSeule(id, auth);
 };
 const fetchHarvest = async (uid, type, opts = {}) => {
   if (!uid) return null;
