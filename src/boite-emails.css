@@ -472,3 +472,8 @@
 .vrm-boite-cadre-images{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:0 0 10px;font-size:13px;color:var(--bx-doux,inherit)}
 .vrm-boite-cadre-images .vrm-boite-second{min-height:44px;padding:0 14px;border-radius:12px}
 :root[data-theme="dark"] .vrm-boite-cadre-iframe{box-shadow:0 0 0 1px rgba(255,255,255,.08)}
+/* (8 nov.) En sombre, la rubrique choisie suit la règle commune des pastilles
+   (styles-vitrine.css §« En sombre, la pastille choisie n'est PAS une pastille
+   blanche pleine », revue du 16 oct.) : le gris d'iOS (`--seg-actif`) de Annonces,
+   Achats, Messages — elle était la seule pastille blanche pleine de l'app. */
+:root[data-theme="dark"] .vrm-boite .vrm-boite-rubriques button[aria-pressed=true]{background:var(--seg-actif);border-color:transparent;color:var(--seg-actif-texte)}
