@@ -87,4 +87,16 @@ Chaque rouge comparé au même banc sur la branche de départ (`git archive`, m�
   ≥ 200 px à l'ordinateur : la règle (la photo est un carré sur toute la largeur de la fiche)
   est gardée, la mesure suit les cinq colonnes demandées par le brief (« la zone photo vide de
   ~400 px »).
-- Plateformes, coque, bancs transverses et audits : voir la fin de ce fichier.
+- plateformes et coque : vestiaire, ebay-visuel, ebay-lbc-visuel (82), recherche-universelle,
+  coque-mobile (124) verts ; feuilles-coque (25) rouge à l'identique sur la branche de départ.
+- transverses : iphone-reprise (139 OK), fluidite verts ; chargement vert (un premier passage,
+  machine chargée, avait 1 rouge « Ma journée revient sans clignotement » à 390 — relancé seul :
+  vert ; vert aussi sur la branche de départ) ; tous-boutons : 2 défauts, Ma journée à 1512
+  (« écran tombé dès l'ouverture » et un texte), au 50ᵉ écran d'un passage de 40 min — relancé
+  sur Ma journée 1512 seule : aucun défaut, comme la branche de départ (écran non touché ici).
+- audits (`lancer-audits`) : 347 verts ; rouges = ceux déjà rouges sur main (argent-a-venir,
+  export-donnees, journee-coherence, politique-hotes, photos-vinted, registres ; chemin-json
+  connu) ; audit-violet, audit-icones, audit-boutons, audit-fusion, audit-rouge-doublon verts.
+- détecteur `impeccable detect` : deux rayons hors échelle (8 et 10 px) ramenés au rayon de
+  pastille ; plus rien.
+- `git merge origin/main` (vrai merge), build vert.
