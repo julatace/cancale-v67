@@ -13,7 +13,7 @@ const fs = require('fs'), path = require('path'), os = require('os');
 const R = path.join(__dirname, '..');
 const SRC = path.join(R, 'src', 'quiDorment.js');
 const STATS = fs.readFileSync(path.join(R, 'src', 'statsVentes.js'), 'utf8');
-const APP = fs.readFileSync(path.join(R, 'src', 'App.jsx'), 'utf8');
+const APP = require("./_source-app.cjs").sourceAppDe(path.join(R, 'src', 'App.jsx'));
 
 const MUTATIONS = {
   seuil_strict: (s) => s.replace('if (age >= s) liste.push(a);', 'if (age > s) liste.push(a);'),

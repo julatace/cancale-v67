@@ -23,6 +23,7 @@
 //    OK** qu'il faut servir — et c'est ce que fait ce contrôle.
 //
 // Il exécute le VRAI `background.js` dans un `vm`, comme audit-retrait-conv.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), vm = require('vm'), path = require('path');
 const { metaVersData } = require('./bancs/_meta.cjs');
 const racine = path.join(__dirname, '..');

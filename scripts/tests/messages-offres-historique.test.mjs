@@ -1,6 +1,8 @@
 import {etatOffreVinted} from '../../src/offresVinted.js';
 import {lireEntiteVinted,extraitConversation} from '../../src/messagesLisibles.js';
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
+import { createRequire as creerRequireSourceApp } from 'node:module';
+creerRequireSourceApp(import.meta.url)('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const s=fs.readFileSync(new URL('../../src/App.jsx',import.meta.url),'utf8');
 const code=s.slice(s.indexOf('const normalizeConversationMessages ='),s.indexOf("// L'offre d'un ACHETEUR"));
 const normaliser=new Function('extractLinks','lireEntiteVinted','etatOffreVinted',code+';return normalizeConversationMessages;')(()=>[],lireEntiteVinted,etatOffreVinted);

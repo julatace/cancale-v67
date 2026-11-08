@@ -11,6 +11,7 @@
 // jamais été vue. C'est SANS RETOUR : la confirmation est exigée par l'app ET
 // par l'extension. Le VRAI lbc-inject.js (MAIN), le VRAI lbc-relay.js (isolé)
 // et le VRAI background.js sont exécutés (vm), identifiants INVENTÉS.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), vm = require('vm'), path = require('path'), os = require('os');
 const CHEMIN = require(require('path').join(__dirname, '_chemin-json.cjs'));
 const { spawnSync } = require('child_process');

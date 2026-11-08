@@ -46,7 +46,9 @@ import { colisEbay, resumeColisEbay, lireCommandesEbayServeur } from './_lib/eba
 import { resumeColisSites } from './_lib/colis-sites.js';
 import { ventesVcDe, numerosVcAvecLiens } from './_lib/vestiaire-regle.js';
 import { SELECT_DEPART_META, departsParSuivi, txVintedParties } from './_lib/depart-colis.js';
+import { ventesPartiesParPreuve, lirePreuvesDepart } from './_lib/depart-vente.js';
 import { relireCommandesVendeur } from './_lib/ebay-relecture.js';
+import { avecSuiviDuSujet, relireLigneMeta } from './_lib/suivi-colis.js';
 import { rappelsRetraitDuJour, texteRappelRetrait, SELECT_SUIVI_META, txDuColis, liensDesLignes, finDesTransactions, SELECT_TRANSP_META, ligneTranspDeMeta } from './_lib/suivi-colis.js';
 // (24 oct.) Le statut des colis lu chez leur transporteur (C1, C5).
 import { passageTransporteurs, MAX_CRON, BUDGET_CRON_MS, MAX_DEPARTS_CRON } from './_lib/transporteurs-lecture.js';
@@ -221,6 +223,12 @@ async function lireDonneesBilan() {
     fetchPaginated(scoped(`app_data?id=like.depart_*&select=${SELECT_DEPART_META}`)),
   ]);
   const departs = Array.isArray(dep) ? departsParSuivi(dep) : null;
+  // (8 nov., « à envoyer » prouvé) Les bordereaux (leur n° de suivi) et les preuves de départ :
+  // le bilan compte les colis à envoyer avec la règle du widget et de Colis (§11).
+  const [bordsB, preuves] = await Promise.all([
+    fetchPaginated(scoped(`app_data?id=like.email_bord_*&select=${BORD_COLIS}`)),
+    lirePreuvesDepart((p) => fetchPaginated(scoped(p)), (x) => avecSuiviDuSujet(relireLigneMeta(x))),
+  ]);
   const comptes = Array.isArray(comptesL)
     ? comptesL.map((c) => ({ uid: String((c && c.vinted_user_id) || ''), login: String((c && c.login) || '') })).filter((c) => c.uid)
     : null;
@@ -243,7 +251,7 @@ async function lireDonneesBilan() {
     // Les colis Leboncoin et Vestiaire à poster (`txsAExpedier`) : les mêmes lignes.
     lbcVentes: lbcL === undefined ? null : (objet(lbcL && lbcL.ventes) || {}),
     vc: (vcV === undefined || vcL === undefined) ? null : { ventes: (vcV && vcV.ventes) || null, liens: (vcL && vcL.liens) || {}, auto: numerosVcAvecLiens((mm && mm.vrm_vc_numeros) || {}, mm && mm.vrm_vc_liens), fait: (mm && mm.vrm_vc_colis_done) || {}, departs },
-    departs,
+    departs, bords: bordsB, preuves,
     ebay: ebayL,
     versements: versementsDeLignes(txn),
     // `null` = illisible (le bilan le NOMME) ; ligne absente = aucune vente.
@@ -273,8 +281,13 @@ function txsAExpedier(d) {
   const masquees = new Set();   // (29 oct.) une vente ne se masque plus
   // (8 nov.) + parti d'après le transporteur (le n° du bordereau de CETTE
   // transaction pris en charge, api/_lib/depart-colis.js — la règle de Colis).
-  const partisTransp = Array.isArray(d.bords) ? txVintedParties(bordsDuVendeur(d), d.departs) : new Map();
-  const pasPartie = (t) => !shipDone[t] && !bordsShipped[t] && !masquees.has(t) && !partisTransp.has(String(t));
+  // (8 nov., « à envoyer » prouvé) LA RÈGLE DE COLIS (api/_lib/depart-vente.js) : + l'e-mail
+  // du transporteur pour le n° EXACT du bordereau de CETTE transaction et le panneau de
+  // l'extension. Une preuve illisible (`null`) manque, rien d'autre : le colis reste compté.
+  const pr = d.preuves || {};
+  const partisVinted = ventesPartiesParPreuve({ bordsParTx: Array.isArray(d.bords) ? bordsDuVendeur(d) : {}, shipDone, bordsShipped,
+    panelBordsDone: pr.panelBordsDone || {}, lignesEmail: pr.lignesEmail || null, departs: d.departs, entrants: pr.entrants || null });
+  const pasPartie = (t) => !masquees.has(t) && !partisVinted.has(String(t));
   const resume = new Set(); let resumeTrouve = false;
   const parTx = {};
   for (const [uid, l] of Object.entries(d.commandes)) {
@@ -793,8 +806,9 @@ export function texteMatin({ overdue, aVerifier = 0, dueToday, dueTomorrow, ebay
 // bordereaux reçus par email (leur date limite, AVEC l'heure). Chaque source
 // vaut `null` quand sa lecture a échoué (« rien lu » ne vaut pas « rien »).
 const MAIN_COLIS = ['vinted_ship_done', 'vinted_bords_shipped', 'vinted_bords_hidden', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_numeros', 'vrm_vc_liens'];
+const BORD_COLIS = 'dateLimite:data->>dateLimite,transaction:data->>transaction,suivi:data->>suivi,numero:data->>numero,receivedAt:data->>receivedAt,filename:data->>filename';
 async function lireDonneesColis() {
-  const BORD = 'dateLimite:data->>dateLimite,transaction:data->>transaction,suivi:data->>suivi,numero:data->>numero,receivedAt:data->>receivedAt,filename:data->>filename';
+  const BORD = BORD_COLIS;
   const [comptesL, m, lignes, ebay, bords, lbcL, vcV, vcL, dep] = await Promise.all([
     fetchPaginated(scoped('vinted_accounts?select=vinted_user_id,login')),
     getRowProjete('main', MAIN_COLIS),
@@ -809,6 +823,8 @@ async function lireDonneesColis() {
     fetchPaginated(scoped(`app_data?id=like.depart_*&select=${SELECT_DEPART_META}`)),
   ]);
   const departs = Array.isArray(dep) ? departsParSuivi(dep) : null;
+  // (8 nov., « à envoyer » prouvé) Les preuves de départ de la règle de Colis (api/_lib/depart-vente.js).
+  const preuves = await lirePreuvesDepart((p) => fetchPaginated(scoped(p)), (x) => avecSuiviDuSujet(relireLigneMeta(x)));
   const comptes = Array.isArray(comptesL) ? comptesL.map((c) => ({ uid: String((c && c.vinted_user_id) || '') })).filter((c) => c.uid) : null;
   let commandes = null;
   if (Array.isArray(lignes)) {
@@ -818,7 +834,7 @@ async function lireDonneesColis() {
       if (um) commandes[um[1]] = { orders: Array.isArray(l.orders) ? l.orders : [], txns: Array.isArray(l.txns) ? l.txns : null };
     }
   }
-  return { comptes, commandes, main: m === undefined ? null : objet(m), ebay, bords, departs,
+  return { comptes, commandes, main: m === undefined ? null : objet(m), ebay, bords, departs, preuves,
     lbcVentes: lbcL === undefined ? null : (objet(lbcL && lbcL.ventes) || {}),
     vc: (vcV === undefined || vcL === undefined) ? null : { ventes: (vcV && vcV.ventes) || null, liens: (vcL && vcL.liens) || {}, auto: numerosVcAvecLiens((objet(m) && objet(m).vrm_vc_numeros) || {}, objet(m) && objet(m).vrm_vc_liens), fait: (objet(m) && objet(m).vrm_vc_colis_done) || {}, departs } };
 }
@@ -1066,3 +1082,7 @@ export default async function handler(req, res) {
     res.status(500).json({ ok: false, erreur: 'panne', message: String(e) });
   }
 }
+
+// (8 nov., « à envoyer » prouvé) Pour le banc seulement (scripts/audit-a-envoyer-preuves.cjs) : la
+// composition « à expédier » du soir, du bilan et du matin, exécutée sur une fausse base.
+export const _banc = { txsAExpedier, lireDonneesColis, lireDonneesBilan };

@@ -124,7 +124,7 @@ const h = (n) => new Date(NOW - n * 3600e3).toISOString();
     dit(O.etiquetteOffre({ accepte: true, etape: 'incertain', raison: 'je ne sais pas' }, 'accepter').ton === 'muet' && O.etiquetteOffre(null, 'accepter').ton === 'muet' && O.etiquetteOffre({ accepte: true, etape: 'fait' }, 'accepter').ton === 'ok' && O.etiquetteOffre({ accepte: false, raison: 'rien' }, 'contre').ton === 'ko', 'O5 · « fait » seulement sur « fait » ; un doute est dit comme un doute');
   }
   // ── A · le branchement ────────────────────────────────────────────────────
-  const APP = fs.readFileSync(path.join(DIR, 'App.jsx'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  const APP = require("./_source-app.cjs").sourceAppDe(path.join(DIR, 'App.jsx')).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   dit(/<OffresVestiaire etat=\{offresEtat\} recettes=\{d\.recettesOffres\} cap=\{extSait\('vcoffrerepondre'\)\}/.test(APP) && /id=eq\.vc_offres&select=offres:data->offres/.test(APP), 'A1 · Messages · Vestiaire lit `vc_offres` (projeté) et montre les offres, gestes jugés par `vcoffrerepondre`');
   dit(/data-vc-conv-offre=/.test(APP), 'A1 · la conversation d’un article qui a une offre à trancher la montre');
   dit(/<PorteMonnaieCompta accounts=\{accounts\} panelOff=\{panelOff\}\/>/.test(APP) && /id=like\.harvest_\*_billing&select=id,cap:data->>capturedAt,main:/.test(APP) && !/harvest_\*_billing&select=data\b/.test(APP), 'A2 · Compta → Porte-monnaie, lectures projetées (jamais `select=data`)');

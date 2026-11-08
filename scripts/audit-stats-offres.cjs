@@ -22,7 +22,7 @@ let ko = 0, ok = 0;
 const dit = (c, m, d) => { if (c) ok++; else ko++; if (!c || process.env.BAVARD) console.log((c ? '  ✅ ' : '  ❌ ') + m + (d ? ' — ' + d : '')); };
 const lire = (f) => { try { return fs.readFileSync(path.join(R, f), 'utf8'); } catch (_) { return ''; } };
 let MOD = lire('src/statsOffres.js');
-const APP = lire('src/App.jsx');
+const APP = require("./_source-app.cjs").sourceApp();
 const JSX = lire('src/design/CarteOffres.jsx');
 const muter = (avant, apres) => { if (!MOD.includes(avant)) { console.log('❌ mutation impossible : motif absent — ' + avant.slice(0, 90)); process.exit(2); } MOD = MOD.replace(avant, apres); };
 if (MUT === 'contre') muter("if (x.entity_type === 'offer_message' && x.entity && x.entity.user_id != null && String(x.entity.user_id) !== opp) { etat = 'contre'; break; }", '');

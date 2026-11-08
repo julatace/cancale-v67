@@ -22,6 +22,7 @@
 //   T. (revue) la tablette au doigt : jours, flèches, boutons à 44 px ;
 //   D. la pastille : ton, chevron, panneau avec un en-tête et la chaîne des trois
 //      maillons, le geste en bas, dans l'écran.
+require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');

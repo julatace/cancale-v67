@@ -22,6 +22,7 @@
 //   · rien n'est écrit avant son tap ; le registre part dans la ligne `main`.
 // 390 tactile clair, 390 sombre, 1512 clair, 1512 sombre ; captures z-fo-*.png
 // (CAPTURES=dossier pour les ranger ailleurs).
+require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const path = require('path'), fs = require('fs'), http = require('http');
 const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { servir } = require('./_minipgrest.cjs');

@@ -32,6 +32,7 @@
 //     les lignes `transp_*`, sans recharger.
 // `BANC_DIST=/chemin/dist` : rendre un autre build (mutation, §6.1).
 // `BANC_SEUL=A,B` : ne jouer que ces sections.
+require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');

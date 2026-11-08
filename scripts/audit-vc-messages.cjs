@@ -34,6 +34,7 @@
 //  `--src`/`--inject`/`--relais`/`--app` : une autre copie (preuve sur le code
 //  d'avant). `--prouve` : chaque règle réaffaiblie doit faire rougir l'audit.
 // ════════════════════════════════════════════════════════════════════════════
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), vm = require('vm'), os = require('os');
 const { spawnSync } = require('child_process');
 const { faireFond } = require('./_fond-vm.cjs');

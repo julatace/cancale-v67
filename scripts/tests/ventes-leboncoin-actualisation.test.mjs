@@ -1,5 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import vm from 'node:vm';
 import {suivreReceptionLeboncoin} from '../../src/rafraichissementLeboncoin.js';
+import { createRequire as creerRequireSourceApp } from 'node:module';
+creerRequireSourceApp(import.meta.url)('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const s=fs.readFileSync(new URL('../../src/App.jsx',import.meta.url),'utf8'),pause=()=>new Promise(r=>setTimeout(r,20));
 for(const [nom,ancre] of [['ventes et finances', '  const [lbcCoqueLu,setLbcCoqueLu]=useState(undefined);'],['Ma journée', "  // ── LES MESSAGES eBAY SANS RÉPONSE, POUR MA JOURNÉE"]])test(`${nom} : une vente actualisée remplace la lecture ancienne au retour`,async()=>{
  const a=s.indexOf('  useEffect(',s.indexOf(ancre)),b=s.indexOf('  }, []);',a)+'  }, []);'.length;

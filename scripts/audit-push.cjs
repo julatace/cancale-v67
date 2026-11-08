@@ -24,7 +24,7 @@ let ko = 0;
 const ok = (m) => console.log('✅ ' + m);
 const nok = (m, d) => { ko++; console.log('❌ ' + m + (d ? ' — ' + d : '')); };
 
-const app = R('src/App.jsx');
+const app = require("./_source-app.cjs").sourceApp();
 const srv = R('api/_lib/push.js');
 
 // 1) une seule clé publique, des deux côtés

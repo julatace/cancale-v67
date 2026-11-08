@@ -21,6 +21,7 @@
 // `--prouve` : réaffaiblit chaque correction, chacune doit rendre ROUGE.
 // §6.1 : lancé sur l'arbre d'avant (AUDIT_RACINE=<arbre>), il est rouge.
 // Données INVENTÉES (le dépôt est public) : aucun code, n° ni adresse réels.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), vm = require('vm'), os = require('os');
 const { spawnSync } = require('child_process');
 const R = process.env.AUDIT_RACINE || path.join(__dirname, '..');

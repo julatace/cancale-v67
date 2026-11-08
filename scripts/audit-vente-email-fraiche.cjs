@@ -49,7 +49,7 @@ const dit = (c, m, d) => { if (!c) ko++; console.log(`${c ? '✅' : '❌'} ${m}$
 let parser;
 try { parser = require(path.join(__dirname, '..', 'node_modules', '@babel', 'parser')); }
 catch (e) { console.log('❌ analyseur Babel introuvable — ' + e.message); process.exit(1); }
-const SRC_APP = fs.readFileSync(path.join(R, 'src', 'App.jsx'), 'utf8');
+const SRC_APP = require("./_source-app.cjs").sourceAppDe(path.join(R, 'src', 'App.jsx'));
 function charge(noms) {
   const ast = parser.parse(SRC_APP, { sourceType: 'module', plugins: ['jsx'], errorRecovery: true });
   const trouve = {};

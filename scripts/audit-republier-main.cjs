@@ -29,6 +29,7 @@
 //      SYNC_KEYS ; « Mêmes réglages » est dit des deux côtés ; « Modifier prix ou titre »
 //      garde ses réglages à lui ; rien ne part chez Vinted depuis la main.
 // `--prouve` : chaque mutation (une copie qui diverge, une règle affaiblie) doit rougir.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), os = require('os'), vm = require('vm'), url = require('url');
 const RAC = path.join(__dirname, '..');
 const F = {

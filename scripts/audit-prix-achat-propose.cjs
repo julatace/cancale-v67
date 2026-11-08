@@ -20,6 +20,7 @@
 //      ou la confirmation groupée qui liste chaque N° et montant), jamais dans un
 //      calcul ; la clé photo est `photoKey` (fichier exact), jamais `photoDir`.
 // `--mutation=…` réaffaiblit une règle dans une copie : rouge exigé.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), os = require('os');
 const R = process.env.VRM_RACINE || path.join(__dirname, '..');
 const MUT = (process.argv.find((a) => a.startsWith('--mutation=')) || '').split('=')[1] || '';

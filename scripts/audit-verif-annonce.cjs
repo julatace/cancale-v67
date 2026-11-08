@@ -15,6 +15,7 @@
 //      `verifierAvantPublication` avec la règle du BON site AVANT tout envoi, et
 //      la feuille a « Publier quand même » (true) et « Corriger » (false).
 // `--prouve` : chaque règle réaffaiblie doit passer au rouge.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), os = require('os');
 const RAC = path.join(__dirname, '..');
 const SRC = path.join(RAC, 'src', 'verifAnnonce.js');

@@ -8,6 +8,7 @@
 // L'audit EXÉCUTE src/journalSemaine.js avec `semainePassee` (api/_lib/
 // bilan-semaine.js, la borne du bilan hebdomadaire) et les vraies fonctions
 // d'App.jsx (`bilanLignes`, `beneficeDesJours`), sur des ventes INVENTÉES.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 process.env.TZ = 'Europe/Paris';
 const fs = require('fs'), path = require('path'), vm = require('vm'), os = require('os');
 const R = process.env.VRM_RACINE || path.join(__dirname, '..');

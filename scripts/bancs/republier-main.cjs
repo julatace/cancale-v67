@@ -18,6 +18,7 @@
 //      avec la retouche gardée ; « Modifier prix ou titre » reste neutre ;
 //   F. aucun débordement, cibles de 44 px dans la feuille, aucune erreur ; captures.
 // §6.1 : sur le code d'avant, la feuille n'a ni étapes ni « Mêmes réglages » ⇒ rouge.
+require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const path = require('path'), fs = require('fs'), http = require('http'), os = require('os');
 const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');

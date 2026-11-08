@@ -24,6 +24,7 @@
 //       fiches, aucun lecteur qui calcule un N° Vestiaire sans `auto`.
 //  ⚠️ Un audit ne meurt pas, il rapporte : chaque bloc passe par `essaie`.
 // ════════════════════════════════════════════════════════════════════════════
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), vm = require('vm'), os = require('os');
 const { pathToFileURL } = require('url');
 const { spawnSync } = require('child_process');

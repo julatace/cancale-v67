@@ -21,6 +21,7 @@
 //     son lien n'est pas écrit deux fois.
 // On juge les ÉTATS (`data-*`) et les NOMBRES (requêtes reçues par le pont,
 // occurrences d'une phrase) — jamais une formulation seule (§6.5).
+require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');

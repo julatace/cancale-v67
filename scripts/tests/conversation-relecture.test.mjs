@@ -6,6 +6,8 @@ import {
   retourReponseVinted,
   cleReponseVinted,
 } from "../../src/reponseVinted.js";
+import { createRequire as creerRequireSourceApp } from 'node:module';
+creerRequireSourceApp(import.meta.url)('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const s = fs.readFileSync(
   new URL("../../src/App.jsx", import.meta.url),
   "utf8",

@@ -18,7 +18,7 @@ const MUT = (process.argv.find((a) => a.startsWith('--mutation=')) || '').split(
 let ko = 0, ok = 0;
 const dit = (c, m, d) => { if (c) ok++; else ko++; if (!c || process.env.BAVARD) console.log((c ? '  ✅ ' : '  ❌ ') + m + (d ? ' — ' + d : '')); };
 const lire = (f) => { try { return fs.readFileSync(path.join(R, f), 'utf8'); } catch (_) { return ''; } };
-const APP = lire('src/App.jsx');
+const APP = require("./_source-app.cjs").sourceApp();
 let MODULE = lire('src/fraisPlateformes.js');
 const muter = (avant, apres) => { if (!MODULE.includes(avant)) { console.log('❌ mutation impossible : ' + avant.slice(0, 80)); process.exit(2); } MODULE = MODULE.replace(avant, apres); };
 if (MUT === 'couverture') muter('if (du == null || f == null) continue;', 'if (du == null) continue; if (f == null) { S.nLus += 1; S.cBase += c(du); continue; }');

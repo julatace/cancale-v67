@@ -22,6 +22,7 @@
 //  `--mutation` : chaque mutation réaffaiblit une règle ; l'audit doit rougir.
 //  `node scripts/audit-chantier-f.cjs [--mutation]`
 // ════════════════════════════════════════════════════════════════════════════
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), os = require('os');
 const R = path.join(__dirname, '..');
 const NM = [path.join(R, 'node_modules'), path.join(R, '..', '..', '..', 'node_modules')].find((p) => fs.existsSync(path.join(p, 'esbuild')));

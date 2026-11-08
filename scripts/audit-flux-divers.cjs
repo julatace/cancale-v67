@@ -72,7 +72,7 @@ let ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? '✅ ' : '❌ ') + m + (d ? ' — ' + d : '')); };
 const essaie = async (m, f) => { try { await f(); } catch (e) { dit(false, m + ' — le contrôle a pu s’exécuter', String(e && e.message || e).slice(0, 200)); } };
 const importer = (p) => import('file://' + path.join(R, p));
-const APP = lire('src/App.jsx');
+const APP = require("./_source-app.cjs").sourceApp();
 const CODE = sansCommentaires(APP);
 
 // Les déclarations de l'app, extraites telles quelles (Babel) et exécutées.

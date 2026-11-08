@@ -22,6 +22,7 @@
 //     devant, ou relance) — jamais un clic muet ;
 //   · un clic refusé DIT pourquoi (grisé, refus de l'extension) ;
 //   · le bouton annonce les photos captées sur le total de l'annonce.
+require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');

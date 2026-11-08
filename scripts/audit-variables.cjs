@@ -42,7 +42,10 @@ try {
 } catch (_) { /* pas de config vite : rien à ajouter */ }
 
 const fichiers = process.argv.slice(2).length ? process.argv.slice(2)
-  : ['src/App.jsx', 'src/main.jsx'].map(f => path.join(__dirname, '..', f)).filter(fs.existsSync);
+  : ['src/App.jsx', 'src/main.jsx'].map(f => path.join(__dirname, '..', f)).filter(fs.existsSync)
+    // (8 nov., démarrage léger) Les écrans découpés d'App.jsx (src/ecrans/) sont des modules à part :
+    // chacun doit importer TOUT ce qu'il lit (d'App.jsx ou d'ailleurs) — vérifié fichier par fichier.
+    .concat((() => { try { return fs.readdirSync(path.join(__dirname, '..', 'src', 'ecrans')).filter(f => /\.jsx?$/.test(f)).sort().map(f => path.join(__dirname, '..', 'src', 'ecrans', f)); } catch (_) { return []; } })());
 
 let ko = 0;
 for (const f of fichiers) {

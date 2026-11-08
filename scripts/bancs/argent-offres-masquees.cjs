@@ -14,6 +14,7 @@
 //   · Annonces → « Masquées » : par compte, le lien Vinted, « à confirmer » au-delà
 //     de 24 h ; la masquée n'entre pas dans « en ligne ».
 //   · rien ne déborde, cibles de 44 px, aucune erreur d'app.
+require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');

@@ -51,6 +51,7 @@
 // BANC_DIST=… rend un autre build (preuve sur le code d'avant : rouge).
 // BANC_SECTIONS=… ne joue que les sections nommées (expression sur le nom).
 // EXPLORE=dossier : captures.
+require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const path = require('path');
 const fs = require('fs'), http = require('http'), os = require('os'), cp = require('child_process');
 let chromium;

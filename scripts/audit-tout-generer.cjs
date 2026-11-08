@@ -19,6 +19,7 @@
 //  d'une visite (`BORD_MAX_PAR_VISITE`).
 //  Aucune donnée réelle : tout est inventé (le dépôt est public).
 // ════════════════════════════════════════════════════════════════════════════
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path');
 const { faireFond } = require('./_fond-vm.cjs');
 

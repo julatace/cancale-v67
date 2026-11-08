@@ -23,6 +23,7 @@
 //  `--src chemin` exécute une autre copie de background.js (preuve sur le code
 //  d'avant, §6.1). Aucune donnée réelle : tout est inventé (dépôt public).
 // ════════════════════════════════════════════════════════════════════════════
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), vm = require('vm'), path = require('path');
 const iSrc = process.argv.indexOf('--src');
 const SRC_BG = iSrc > 0 ? path.resolve(process.argv[iSrc + 1]) : path.join(__dirname, '..', 'vinted-sync-extension', 'background.js');

@@ -74,7 +74,7 @@ const charger = async (src, nom, tr) => {
     dit(mod.preuvesFriseEbay({ ...o, cancelStatus: { cancelState: 'CANCELED' } }) === null && mod.preuvesFriseEbay({ ...o, orderPaymentStatus: 'FULLY_REFUNDED' }) === null, 'F2 · annulée / remboursée : pas de frise');
   });
   await essaie('F3', () => {
-    const app = (M && M.app ? M.app : (x) => x)(fs.readFileSync(path.join(RACINE, 'src', 'App.jsx'), 'utf8'));
+    const app = (M && M.app ? M.app : (x) => x)(require("./_source-app.cjs").sourceAppDe(path.join(RACINE, 'src', 'App.jsx')));
     dit(/const preuvesVc = preuvesFriseVc\(v, fait\);/.test(app) && /const etapes = etapesVc;/.test(app) && /frise=\{fuVc \? <Frise etapes=\{fuVc\}/.test(app), 'F3 · Vestiaire : la ligne et son récapitulatif ont la MÊME frise prouvée');
     dit(/const pfE = preuvesFriseEbay\(o\);/.test(app) && /<LigneVente gestes=\{gestesEbay\} frise=\{fuE \? <Frise etapes=\{fuE\}/.test(app), 'F3 · eBay : la ligne porte la frise prouvée');
   });

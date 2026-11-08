@@ -24,6 +24,7 @@
 //   E. Colis branche la règle sur ses e-mails (« à retirer » et « à vérifier »).
 //  `--racine chemin` : une autre copie du dépôt (preuve sur l'avant).
 // ════════════════════════════════════════════════════════════════════════════
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path');
 const argv = process.argv;
 const R = argv.includes('--racine') ? path.resolve(argv[argv.indexOf('--racine') + 1]) : path.join(__dirname, '..');

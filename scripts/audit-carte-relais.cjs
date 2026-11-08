@@ -27,6 +27,7 @@
 //        « rebrancher » en croyant réparer un oubli — cf. tiroir `Nav`).
 //
 // ⚠️ Contrôle STATIQUE. Le rendu se vérifie au banc `carte.cjs`. Lecture seule.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path');
 const RACINE = path.join(__dirname, '..');
 const APP = fs.readFileSync(path.join(RACINE, 'src/App.jsx'), 'utf8');

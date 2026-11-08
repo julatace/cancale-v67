@@ -26,6 +26,7 @@
 //      extensions 5.130 à 5.150 retomberaient sinon sur l'interrupteur local).
 //
 // `--src dossier` : lance l'audit sur une autre copie du dépôt (preuve §6.1).
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path');
 let parser;
 try { parser = require(path.join(__dirname, '..', 'node_modules', '@babel', 'parser')); }

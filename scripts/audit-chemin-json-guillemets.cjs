@@ -34,6 +34,21 @@ const lire = (f) => {
   if (PROUVE && f === path.join('vinted-sync-extension', 'background.js')) s = s.replace('select=a:data->items->"${id}"', 'select=a:data->items->${id}');
   return s;
 };
+// Table de constantes `NOM = { a: 'x', … }` : toutes les valeurs commencent par une lettre.
+// Helper `const nom = (id) => 'n' + String(id)` : préfixe d'une lettre (jamais un nombre nu).
+function cleNonNumerique(src, expr) {
+  let m = /^([A-Z_][A-Z0-9_]*)\[\s*\w+\s*\]$/.exec(expr);
+  if (m) {
+    const t = new RegExp('(?:export\\s+)?const\\s+' + m[1] + '\\s*=\\s*\\{([^}]*)\\}').exec(src);
+    if (!t) return false;
+    const vals = [...t[1].matchAll(/:\s*(['"])([^'"]*)\1/g)].map((x) => x[2]);
+    const paires = t[1].split(',').map((x) => x.trim()).filter(Boolean).length;
+    return vals.length > 0 && vals.length === paires && vals.every((v) => /^[A-Za-z_][\w]*$/.test(v));
+  }
+  m = /^([a-zA-Z_]\w*)\(\s*\w+\s*\)$/.exec(expr);
+  if (m) return new RegExp('const\\s+' + m[1] + "\\s*=\\s*\\(\\s*(\\w+)\\s*\\)\\s*=>\\s*'[A-Za-z_]'\\s*\\+\\s*String\\(\\s*\\1\\s*\\)\\s*;").test(src);
+  return false;
+}
 const fautes = [];
 for (const f of fichiers) {
   const s = lire(f);
@@ -42,6 +57,11 @@ for (const f of fichiers) {
     const expr = m[1];
     if (CLES_FIXES.test(expr)) continue;
     if (/'"'\s*\+/.test(expr)) continue;            // guillemets posés DANS l'expression (`encodeURIComponent('"' + id + '"')`)
+    // (8 nov.) Une clé NON NUMÉRIQUE PAR CONSTRUCTION, vérifiée sur sa définition (jamais
+    // admise sur son nom seul) : une table de constantes dont chaque valeur commence par
+    // une lettre, ou un helper qui préfixe une lettre. Si la définition change (valeur
+    // numérique, préfixe retiré), la clé redevient « nue » ⇒ rouge.
+    if (cleNonNumerique(s, expr)) continue;
     const ligne = s.slice(0, m.index).split('\n').length;
     fautes.push(`${f}:${ligne} \`${m[0]}\``);
   }

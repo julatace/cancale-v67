@@ -1,3 +1,4 @@
+require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 require('./_porte-banc.cjs');
 const { ouvrirAvanceCompta } = require('./_compta.cjs');
 // BANC — SIRET → nom de l'entreprise dans l'en-tête, et le MODE STREAM qui

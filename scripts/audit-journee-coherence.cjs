@@ -20,6 +20,7 @@
 //  `--mutation` : chaque règle affaiblie une à une — l'audit DOIT rougir.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), os = require('os');
 const { pathToFileURL } = require('url');
 const R = process.env.VRM_RACINE || path.join(__dirname, '..');
@@ -94,9 +95,23 @@ async function passe(mut) {
   dit(/raison: raisonCourte\(x\)/.test(stats) && /data-carte-raison/.test(mois), 'A3 la carte passe la raison à chaque case, et la case l’écrit (`data-carte-raison`)');
 
   // A4 / A5 / A6 — Ma journée (source, sans commentaires).
+  const BAVARD_A4 = !!process.env.BAVARD;
   const z = (app.split('const libCase = (id, n)')[1] || '').split('Les cases à zéro restent lisibles')[0] || app.split('const libCase = (id, n)')[1] || '';
   // (6 nov., vague 3) + la carte « en ligne deux fois » (`deuxFois`, src/enLigneDeuxFois.js).
-  dit(/const nGestes = cases\.length \+ alertesArgent\.length \+ autres\.length \+ \(urssafJob \? 1 : 0\) \+ \(carteAilleurs \? 1 : 0\) \+ \(sortiesStock\.length \? 1 : 0\) \+ \(deuxFois\.length \? 1 : 0\);/.test(z) && /\{deuxFois\.length \? carteDeuxFois\(\) : null\}/.test(z), 'A4 « N gestes » compte toutes les cartes (dont « Vendus ailleurs », la sortie du Stock et « en ligne deux fois »)');
+  // (8 nov.) La règle, plus une liste figée : CHAQUE carte rendue dans la liste « À faire »
+  // (`{cond ? carteX() : null}`, `{liste.map(…)}`, `{urssafJob ? tache(…) : null}`) a son terme
+  // dans `nGestes` — la carte « Relier la boîte » (6 nov., `comptesARelierJour`) en est une.
+  // Les cartes nommées depuis le 4 nov. restent exigées (dont « en ligne deux fois »).
+  const exprGestes = (/const nGestes = ([^;]+);/.exec(z) || [])[1] || '';
+  const termes = exprGestes.split('+').map((t) => t.trim().replace(/^\((.*)\)$/, '$1'));
+  const compte = (t) => termes.includes(t);
+  const listeAFaire = (z.split('data-barre-jour=""')[1] || '').split('</div>\n')[0];
+  const rendues = [];
+  for (const m of listeAFaire.matchAll(/\{(\w+(?:\.length)?) \? (?:carte\w+\(\)|tache\([^)]*\)|<div[^]*?) : null\}/g)) rendues.push(m[1].endsWith('.length') && /alertesArgent/.test(m[1]) ? m[1] : (m[1].endsWith('.length') ? m[1] + ' ? 1 : 0' : m[1] + ' ? 1 : 0'));
+  for (const m of listeAFaire.matchAll(/\{(\w+)\.map\(/g)) rendues.push(m[1] + '.length');
+  const nonComptees = rendues.filter((t) => !compte(t));
+  const exigees = ['cases.length', 'alertesArgent.length', 'autres.length', 'urssafJob ? 1 : 0', 'carteAilleurs ? 1 : 0', 'sortiesStock.length ? 1 : 0', 'deuxFois.length ? 1 : 0'];
+  dit(exprGestes && rendues.length >= exigees.length && !nonComptees.length && exigees.every(compte) && /\{deuxFois\.length \? carteDeuxFois\(\) : null\}/.test(z), 'A4 « N gestes » compte toutes les cartes (dont « Vendus ailleurs », la sortie du Stock et « en ligne deux fois »)', nonComptees.length ? 'rendues sans être comptées : ' + nonComptees.join(', ') : (BAVARD_A4 ? rendues.join(' · ') : ''));
   dit(/\{carteAilleurs \? carteVendusAilleurs\(\) : null\}/.test(z) && /\{sortiesStock\.length \? carteSortieStock\(\) : null\}/.test(z), 'A4 les deux cartes sont rendues DANS la liste');
   const zoneJournee = (app.split("className=\"vrm-day-layout vrm-fu-ecran vrm-fu-journee\"")[1] || '').split("{!only && (")[0];
   dit(zoneJournee.length > 0 && !/<VendusAilleurs /.test(zoneJournee), 'A4 « Vendus ailleurs » n’est plus un repli posé sous la journée');

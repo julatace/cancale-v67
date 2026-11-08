@@ -1,4 +1,6 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import vm from 'node:vm';
+import { createRequire as creerRequireSourceApp } from 'node:module';
+creerRequireSourceApp(import.meta.url)('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const src=fs.readFileSync(new URL('../../src/App.jsx',import.meta.url),'utf8');
 const code=src.slice(src.indexOf('let _repartCache = null;'),src.indexOf('const nomPays ='))+'\nglobalThis.lire=lireExtrasRepartition;';
 function contexte(gate){let lectures=0;const c={AUTH:{user:{id:'vendeur-A'}},Date,Promise,TXN_META_SELECT:'transactions',SUPABASE_URL:'https://exemple.test',sbAuth:()=>({}),mapWardrobeItem:x=>x};c.lireTout=async q=>{lectures++;if(q.includes('country_code'))return[{tx:'1',cc:c.AUTH.user.id==='vendeur-A'?'FR':'DE'}];if(q.includes('listings'))return[{items:[{id:'annonce-1',brand:'Marque'}]}];return[{tx:'1',item:'annonce-1'}];};c.fetch=async()=>{if(gate)await gate;return{ok:true,json:async()=>[{data:{}}]};};vm.createContext(c);vm.runInContext(code,c);return{c,n:()=>lectures};}

@@ -107,7 +107,7 @@ let parser;
 try { parser = require(path.join(R, 'node_modules', '@babel', 'parser')); }
 catch (e) { console.log('❌ l\'analyseur Babel est disponible — ' + e.message); process.exit(1); }
 const MUT = (process.argv.find((a) => a.startsWith('--mutation=')) || '').split('=')[1] || '';
-let src = fs.readFileSync(path.join(R, 'src', 'App.jsx'), 'utf8');
+let src = require("./_source-app.cjs").sourceAppDe(path.join(R, 'src', 'App.jsx'));
 const muter = (avant, apres) => { if (!src.includes(avant)) { console.log('❌ mutation impossible : motif absent — ' + avant.slice(0, 60)); process.exit(2); } src = src.replace(avant, apres); };
 // Chaque mutation remet un défaut mesuré ou plausible.
 if (MUT === 'connus') muter("if (m && c != null && /\\p{L}/u.test(m[1])) lignes.push(", "if (m && c != null && /^(article|frais de port|.*protection)/i.test(m[1])) lignes.push(");

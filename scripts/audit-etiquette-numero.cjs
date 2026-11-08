@@ -14,6 +14,7 @@
 //     N°58 » (`corrigerCarton`) ne le fait pas ; `reattribueAEcrire` est la même.
 //  `--src <arbre>` : juge une autre copie (preuve sur le code d'avant, §6.1).
 // ════════════════════════════════════════════════════════════════════════════
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path');
 const i = process.argv.indexOf('--src');
 const RACINE = i > 0 ? path.resolve(process.argv[i + 1]) : path.join(__dirname, '..');

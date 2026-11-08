@@ -39,8 +39,35 @@ const versionEtat = () => ({
     this.emitFile({ type: 'asset', fileName: 'etat-version.json', source: JSON.stringify({ extension }) });
   },
 });
+// (8 nov., démarrage léger) Le morceau App (et sa feuille de style) demandé dès la
+// lecture d'index.html quand l'app va s'ouvrir : public/demarrage-app.js pose les
+// `modulepreload` / `preload`. Ici on lui donne les VRAIS noms du build (empreintes),
+// dans les attributs de sa balise — index.html n'est jamais mis en cache, il vise
+// donc toujours les fichiers du déploiement en cours.
+const prechargerApp = () => ({
+  name: 'vrm-precharger-app',
+  apply: 'build',
+  transformIndexHtml: {
+    order: 'post',
+    handler: (html, ctx) => {
+      const bundle = ctx && ctx.bundle;
+      if (!bundle) return html;
+      // (App.jsx exporte ce que les écrans à la demande lui empruntent : son morceau n'a pas
+      // de « façade », on le reconnaît au module qu'il contient.)
+      const app = Object.values(bundle).find((c) => c.type === 'chunk' && (c.moduleIds || Object.keys(c.modules || {})).some((m) => /[\\/]src[\\/]App\.jsx$/.test(m)));
+      if (!app) return html;
+      const base = (f) => '/' + f;
+      // le morceau App et ce qu'il importe statiquement (sauf ce qu'index.html précharge déjà)
+      const deja = new Set([...html.matchAll(/(?:href|src)="\/([^"]+)"/g)].map((m) => m[1]));
+      const js = [app.fileName, ...(app.imports || [])].filter((f) => !deja.has(f));
+      const css = [...((app.viteMetadata && app.viteMetadata.importedCss) || [])];
+      for (const f of app.imports || []) { const c = bundle[f]; if (c && c.viteMetadata) for (const x of c.viteMetadata.importedCss) if (!css.includes(x)) css.push(x); }
+      return [{ tag: 'script', attrs: { src: '/demarrage-app.js', 'data-js': js.map(base).join(','), 'data-css': css.filter((f) => !deja.has(f)).map(base).join(',') }, injectTo: 'head-prepend' }];
+    },
+  },
+});
 export default defineConfig({
-  plugins: [react(), allegerIndex(), versionEtat()],
+  plugins: [react(), allegerIndex(), versionEtat(), prechargerApp()],
   define: { __BUILD__: JSON.stringify(BUILD) },
   build: {
     // Cible moderne : moins de transformations/polyfills → bundle plus léger et

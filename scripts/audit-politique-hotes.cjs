@@ -19,6 +19,7 @@
 // Un couple inconnu ⇒ ROUGE : un nouvel hôte appelé par le navigateur se
 // déclare (politique + cette liste), il ne passe pas en silence.
 // `--prouve` réaffaiblit la politique ou le code : chaque mutation ⇒ ROUGE.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path');
 const R = path.join(__dirname, '..');
 const PROUVE = process.argv.includes('--prouve');
@@ -141,6 +142,27 @@ const COUPLES = {
   'src/prixPartout.js|fr.vestiairecollective.com': ['lien', LIEN + ' — Vestiaire, « À faire sur le site »'],
   'src/communaute/accompagnement.js|vrm.center': ['vrm', 'VRM lui-même (origine par défaut du lien d’invitation)'],
   'src/smsColis.js|vrm.center': ['vrm', 'VRM lui-même (adresse de la route SMS à coller dans Raccourcis)'],
+  // (8 nov.) App.jsx découpé (src/ecrans/*.jsx) : le code a DÉMÉNAGÉ sans changer, chaque
+  // couple ci-dessous a été relu à sa ligne (un <a href>, un `lien` de pied « … ↗ », une
+  // table d'adresses ouverte d'un clic) — aucun n'est contacté tout seul par le navigateur.
+  'src/ecrans/Compta.jsx|www.autoentrepreneur.urssaf.fr': ['lien', LIEN + ' — « Déclarer sur autoentrepreneur.urssaf.fr »'],
+  'src/ecrans/Reglages.jsx|www.autoentrepreneur.urssaf.fr': ['lien', LIEN],
+  'src/ecrans/Ebay.jsx|www.ebay.fr': ['lien', LIEN + ' — Finances eBay'],
+  'src/ecrans/Ebay.jsx|www.vinted.fr': ['lien', LIEN + ' — l’annonce Vinted de la même paire'],
+  'src/ecrans/Leboncoin.jsx|www.leboncoin.fr': ['lien', LIEN + ' — la transaction Leboncoin (générer le bordereau)'],
+  'src/ecrans/Leboncoin.jsx|www.vinted.fr': ['lien', LIEN + ' — l’annonce Vinted d’origine'],
+  'src/ecrans/MessagesLeboncoin.jsx|www.leboncoin.fr': ['lien', LIEN + ' — « Répondre sur Leboncoin ↗ » / « Ouvrir sur Leboncoin ↗ »'],
+  'src/ecrans/Reglages.jsx|www.vinted.fr': ['lien', LIEN + ' — Comptes : « Ouvrir » le site du compte (URL_SITE_COMPTE)'],
+  'src/ecrans/Reglages.jsx|fr.vestiairecollective.com': ['lien', LIEN + ' — Comptes : « Ouvrir » le site du compte'],
+  'src/ecrans/Reglages.jsx|www.leboncoin.fr': ['lien', LIEN + ' — Comptes : « Ouvrir » le site du compte'],
+  'src/ecrans/Reglages.jsx|www.ebay.fr': ['lien', LIEN + ' — Comptes : « Ouvrir » le site du compte'],
+  'src/ecrans/Reglages.jsx|vrm.center': ['vrm', 'VRM lui-même (le lien privé du widget iPhone)'],
+  'src/ecrans/Reglages.jsx|discord.com': ['lien', 'connexion Discord : le navigateur y va sur le clic de la personne'],
+  'src/ecrans/Reglages.jsx|vercel.com': ['lien', LIEN],
+  'src/ecrans/Republier.jsx|www.vinted.fr': ['lien', LIEN + ' — « compléter sur Vinted » (page de modification de l’annonce)'],
+  'src/ecrans/Vestiaire.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir » l’annonce encore en ligne sur Vinted'],
+  'src/ecrans/Vestiaire.jsx|fr.vestiairecollective.com': ['lien', LIEN + ' — « Répondre sur Vestiaire ↗ »'],
+  'src/enLigneLbc.js|www.leboncoin.fr': ['lien', LIEN + ' — « Ouvrir « Mes annonces » sur leboncoin.fr ↗ »'],
   // (24 oct.) Le SERVEUR lit le statut public des colis (api/_lib/transporteurs-lecture.js).
   'api/_lib/transporteurs-lecture.js|ws.chronopost.fr': ['politique', 'transp'],
   'api/_lib/transporteurs-lecture.js|carrier.vintedgo.com': ['politique', 'transp'],

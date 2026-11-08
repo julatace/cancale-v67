@@ -29,6 +29,7 @@
 //   · et ce que dit `origin/main` AUJOURD'HUI, s'il est lisible : sa version, et
 //     si son fond porte `code:` dans l'état et `demanderLiaison`. Une référence
 //     locale peut être en retard (`git fetch` d'abord) : l'audit dit ce qu'il a lu.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), vm = require('vm'), cp = require('child_process');
 const RACINE = path.join(__dirname, '..');
 const APP = fs.readFileSync(path.join(RACINE, 'src/App.jsx'), 'utf8');

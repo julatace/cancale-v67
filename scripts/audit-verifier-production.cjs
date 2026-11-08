@@ -19,6 +19,7 @@
 //      `GITHUB_ACTIONS`.
 // `--prouve` : réaffaiblit le script, une mutation à la fois ⇒ ROUGE exigé.
 'use strict';
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const path = require('path'), fs = require('fs'), http = require('http'), zlib = require('zlib');
 const { spawnSync, spawn } = require('child_process');
 const R = path.join(__dirname, '..');

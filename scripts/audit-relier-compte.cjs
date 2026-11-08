@@ -50,7 +50,7 @@ else {
 let ko = 0, ok = 0;
 const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '✅ ' : '❌ ') + m + (d && !c ? ' — ' + String(d).slice(0, 300) : '')); };
 const essaie = async (m, f) => { try { await f(); } catch (e) { dit(false, m + ' — le contrôle a pu s’exécuter', String(e && e.stack || e).slice(0, 300)); } };
-const APP_BRUT = fs.readFileSync(path.join(R, 'src/App.jsx'), 'utf8');
+const APP_BRUT = require("./_source-app.cjs").sourceAppDe(path.join(R, 'src/App.jsx'));
 function chargeApp(noms, globals = {}) {
   const parser = require(path.join(R, 'node_modules', '@babel', 'parser'));
   const ast = parser.parse(APP_BRUT, { sourceType: 'module', plugins: ['jsx'], errorRecovery: true });

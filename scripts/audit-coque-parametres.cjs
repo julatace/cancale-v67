@@ -23,6 +23,7 @@
 //   node scripts/audit-coque-parametres.cjs --mutation=NOM  une règle réaffaiblie
 //   node scripts/audit-coque-parametres.cjs --prouve        toutes les mutations : chacune doit rougir
 'use strict';
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), os = require('os');
 const { spawnSync } = require('child_process');
 const { pathToFileURL } = require('url');

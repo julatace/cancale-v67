@@ -15,6 +15,7 @@
 //   · bordereau prêt / imprimé / posté, carton du Stock, double, réattribué ;
 //   · trois états : pas su · rien · trouvé.
 // `--prouve` réaffaiblit la règle de six façons : chacune doit passer au ROUGE.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), os = require('os');
 const SRC = path.join(__dirname, '..', 'src', 'rechercheNumero.js');
 const APP = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');

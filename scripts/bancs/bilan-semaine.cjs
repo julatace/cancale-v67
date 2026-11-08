@@ -15,6 +15,7 @@
 //   • une source illisible ⇒ « au moins », et la source NOMMÉE ;
 //   • un jeudi ⇒ aucun bilan.
 // Aucune fixture : tout est inventé ici, rien ne quitte la machine.
+require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const path = require('path'), fs = require('fs'), vm = require('vm');
 const RACINE = path.join(__dirname, '..', '..');
 

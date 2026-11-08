@@ -15,6 +15,7 @@
 // la vraie compatibilité, et les vraies règles de l'app.
 // `--src <dossier>` lance l'audit sur une autre copie du dépôt (preuve sur le
 // code d'avant, §6.1).
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), os = require('os'), vm = require('vm');
 const { execFileSync } = require('child_process');
 const iSrc = process.argv.indexOf('--src');

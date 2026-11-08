@@ -42,6 +42,7 @@
 // `CAPTURES=dossier` : les rendus PNG des PDF tamponnés.
 // `BANC_PDFJS_DIR` : pdf.js 3.11.174 (celui de l'app) ; sinon la pdfjs-dist du
 // dépôt (ESM), comme `vestiaire-parite.cjs`.
+require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const path = require('path'), fs = require('fs'), http = require('http');
 const RACINE = path.join(__dirname, '..', '..');
 const NM = path.join(RACINE, 'node_modules');

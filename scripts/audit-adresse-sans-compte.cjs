@@ -19,6 +19,7 @@
 //      E-mails → Relier ma boîte.
 // Données INVENTÉES.
 'use strict';
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path');
 const R = process.env.AUDIT_RACINE || path.join(__dirname, '..');
 const { prouver, sansCommentaires } = require('./_mutations-audit.cjs');

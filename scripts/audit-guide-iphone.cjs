@@ -147,7 +147,7 @@ const stockage = () => { const m = new Map(); return { getItem: (k) => (m.has(k)
 
   console.log('\n── C. le branchement (src/App.jsx, PushSetting)');
   await essaie('C', async () => {
-    const app = fs.readFileSync(path.join(R, 'src', 'App.jsx'), 'utf8');
+    const app = require("./_source-app.cjs").sourceAppDe(path.join(R, 'src', 'App.jsx'));
     const debut = app.indexOf('function PushSetting(');
     const corps = debut >= 0 ? app.slice(debut, app.indexOf('\nfunction ', debut + 10)) : '';
     dit(/import GuideIphone, \{ useGuideIphone \} from '\.\/GuideIphone\.jsx'/.test(app), 'C1 l’écran importe le guide et sa décision');

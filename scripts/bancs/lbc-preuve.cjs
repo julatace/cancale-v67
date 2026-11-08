@@ -24,6 +24,7 @@
 //      (`data-lbc-croit-vendue`) ; avec une extension à jour, rien de tout ça.
 //      La file de l'extension publiée est EXÉCUTÉE (son background.js, lu dans
 //      l'historique de main — `VRM_GIT` depuis une copie).
+require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const path = require('path'), fs = require('fs'), http = require('http');
 // Une extension ≥ CODE_DANS_ETAT (5.171) porte dans son état la version du CODE
 // qui tourne (\`code\`) : sans lui, l'app la dit « périmée » (chantier connexion du

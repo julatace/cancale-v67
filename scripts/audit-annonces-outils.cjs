@@ -28,7 +28,7 @@ async function controles(racine, silencieux) {
   const dit = (c, msg, d) => { if (c) ok++; else { ko++; rouges.push(msg); } if (!silencieux) console.log((c ? '✅ ' : '❌ ') + msg + (!c && d ? '  → ' + String(d).slice(0, 240) : '')); };
   const essai = async (msg, f) => { try { const r = await f(); dit(r === true, msg, r === true ? '' : JSON.stringify(r)); } catch (e) { dit(false, msg, e && e.message); } };
   const { P, D, H, M, R } = await charger(racine);
-  let APP = ''; try { APP = fs.readFileSync(path.join(racine, 'src', 'App.jsx'), 'utf8'); } catch (_) {}
+  let APP = ''; try { APP = require("./_source-app.cjs").sourceAppDe(path.join(racine, 'src', 'App.jsx')); } catch (_) {}
   dit(typeof P.sitesDuNumero === 'function' && typeof P.appliquerPrix === 'function' && typeof P.envoisPrix === 'function', 'P · src/prixPartout.js se charge', P.__erreur);
   dit(typeof D.dupliquerFiche === 'function', 'D · src/dupliquerFiche.js se charge', D.__erreur);
   dit(typeof H.histoireArticle === 'function', 'H · src/histoireArticle.js se charge', H.__erreur);

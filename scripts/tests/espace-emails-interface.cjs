@@ -1,4 +1,5 @@
 // Vrai EmailsSetting et vrais composants, services remplacés par des données inventées.
+require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require("node:fs"),
   path = require("node:path"),
   assert = require("node:assert/strict");

@@ -19,6 +19,7 @@
 //      lien « Tes emails… » ni de réglage d'imprimante dans Colis.
 //   W  Le branchement : « Tout imprimer » et l'écran rangent par la même règle.
 // ════════════════════════════════════════════════════════════════════════════
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), os = require('os');
 const { pathToFileURL } = require('url');
 const { spawnSync } = require('child_process');

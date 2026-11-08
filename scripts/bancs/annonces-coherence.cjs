@@ -27,6 +27,7 @@
 //      afficher ») ;
 //   F. aucun débordement horizontal, aucune erreur de page.
 // §6.1 : sur `claude/project-review-nsk5su` (git archive, build à part), rouge.
+require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const path = require('path'), fs = require('fs'), http = require('http'), os = require('os');
 const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');

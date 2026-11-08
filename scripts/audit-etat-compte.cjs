@@ -26,6 +26,7 @@
 //  Données inventées. Aucune requête réseau.
 //  Usage : node scripts/audit-etat-compte.cjs [--src f] [--mutation nom]
 // ════════════════════════════════════════════════════════════════════════════
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), os = require('os'), path = require('path');
 const { faireFond, cheminSource } = require('./_fond-vm.cjs');
 

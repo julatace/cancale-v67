@@ -4,6 +4,7 @@
 // « Je veux qu'il n'y ait aucune erreur du côté Chronopost, Mondial Relay,
 //   Vinted GO. » — Julien, 23 août 2026.
 // Fonction pure `detecterTransporteur` (api/email-inbound.js). Aucun réseau.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const path = require('path');
 let ko = 0;
 const ok = (t) => console.log('✅ ' + t);

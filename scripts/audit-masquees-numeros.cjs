@@ -23,6 +23,7 @@
 //     des files Leboncoin/eBay).
 // `--prouve` réaffaiblit la règle de trois façons : chacune doit passer au ROUGE.
 // Un audit ne meurt pas, il rapporte : chaque bloc passe par `essaie()`.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), os = require('os');
 const APP = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
 const RECH = fs.readFileSync(path.join(__dirname, '..', 'src', 'rechercheNumero.js'), 'utf8');

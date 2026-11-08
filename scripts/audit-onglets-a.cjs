@@ -21,6 +21,7 @@
 //  D. Ma journée : « + 34 à vérifier » et « Colis à vérifier · 34 délais dépassés ».
 //  N. Le grand chiffre « 1514,33 € » au-dessus de « 2 122,93 € » (milliers).
 //  A. « ? » de la carte : une phrase par chiffre, rangée avec sa définition.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 process.env.TZ = 'Europe/Paris';
 const fs = require('fs'), path = require('path'), os = require('os');
 const R = process.env.VRM_RACINE || path.join(__dirname, '..');

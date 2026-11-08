@@ -26,6 +26,7 @@
 //      dist/ existe, aucun morceau chargé par index.html ne le contient).
 // `--prouve` réaffaiblit la règle (dix mutations du fond) : chacune doit
 // repasser au ROUGE.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), os = require('os');
 const { execFileSync } = require('child_process');
 const { pathToFileURL } = require('url');
