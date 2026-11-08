@@ -9,7 +9,7 @@ const fs = require("node:fs"),
     "utf8",
   );
   const browser = await chromium.launch({
-    executablePath: "/usr/bin/chromium",
+    executablePath: process.env.VRM_CHROMIUM_PATH || "/usr/bin/chromium",
     args: ["--no-sandbox"],
   });
   let n = 0;

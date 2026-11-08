@@ -79,7 +79,7 @@ const sessionPresente = (pg) => pg.evaluate(() => { try { return !!JSON.parse(lo
 async function main() {
   if (!fs.existsSync(path.join(DIST, 'index.html'))) { console.log('❌ dist/ absent — lance `npm run build` d\'abord'); process.exit(1); }
   await ecouter();
-  const nav = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader'] });
+  const nav = await chromium.launch({ executablePath: process.env.VRM_CHROMIUM_PATH || process.env.CHROMIUM || '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader'] });
   try {
     for (const taille of [390, 1512]) {
       console.log(`\n── ${taille} px`);
