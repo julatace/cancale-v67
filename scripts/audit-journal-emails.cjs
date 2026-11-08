@@ -14,6 +14,7 @@
 //     le TITRE n'ouvre rien ; 50 reçus au même titre ne se confondent pas.
 //  §4.10 : une fonction serverless n'est vérifiée que si on l'EXÉCUTE.
 // ════════════════════════════════════════════════════════════════════════════
+process.env.SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'cle-service-audit';   // (7 nov.) sans elle, les routes serveur répondent 503 (api/_lib/cle-service.js)
 const path = require('path');
 const R = path.join(__dirname, '..');
 let ko = 0, ok = 0;

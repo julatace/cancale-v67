@@ -31,6 +31,7 @@
 //      1 à 3 jours plus tard pour 62 ventes sur 202 (mesuré). Elle est comptée
 //      et dite à part : « à vérifier sur Vinted ».
 // `--src <dossier>` : lance l'audit sur une autre copie du dépôt (preuve §6.1).
+process.env.SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'cle-service-audit';   // (7 nov.) sans elle, les routes serveur répondent 503 (api/_lib/cle-service.js)
 const path = require('path'), fs = require('fs');
 const iSrc = process.argv.indexOf('--src');
 const RACINE = iSrc > 0 ? path.resolve(process.argv[iSrc + 1]) : path.join(__dirname, '..');
@@ -43,7 +44,7 @@ const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '✅ ' : '�
 const essaie = async (m, f) => { try { await f(); } catch (e) { dit(false, m + ' — le contrôle a pu s’exécuter', String((e && e.stack) || e).split('\n').slice(0, 2).join(' ')); } };
 
 process.env.VAPID_PRIVATE_KEY = 'audit-cle-privee-factice';
-delete process.env.SUPABASE_SERVICE_KEY;
+process.env.SUPABASE_SERVICE_KEY = 'cle-service-audit';   // (7 nov.) sans elle le cron répond 503 (api/_lib/cle-service.js)
 process.env.CRON_SECRET = 'cle-audit-colis-heure';
 const webpush = require(path.join(NM, 'web-push'));
 const pushes = [];

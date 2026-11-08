@@ -503,14 +503,22 @@ sans la fonction.
 | `avis` | `capterAvis` | **5.319.0** (4 nov.) | « tes avis Vinted reçus (note, date) » : la 1re page de `user_feedbacks`, compte connecté seulement, budget de LECTURE 20/h, une fois par 24 h, rangée dans `harvest_{uid}_feedbacks` ; forme pas encore mesurée (une forme inconnue n'écrit rien) ; aucun rappel d'évaluation |
 | `ventesfusion` | `fusionnerCommandes` | **5.323.0** (6 nov.) | une lecture partielle des ventes/achats se FUSIONNE par n° de transaction (rien perdu) ; fenêtre inchangée < 1 h ni relue ni réécrite |
 | `releveidentite` | `txDeLigneReleve` | **5.323.0** (6 nov.) | relevé du porte-monnaie (`wallet/invoices/current`) rangé sans rien de personnel, `tx` si la ligne porte la vente ; forme inconnue ⇒ `harvest_{uid}_forme_releve` |
+| `numeroecrit` | `numeroEcritAllume` | **5.324.0** (7 nov.) | réglage « Je numérote moi-même » allumé : aucun N° réservé ni affiché à côté de « Publier » |
 
 ---
 
 ## 9. État actuel et décisions récentes
 
+- **8 nov. · Design 2026, passage 2** : `--d-*` appliqué à Ventes (groupe à rangées, état en mot + point ambre, tiroir groupé), Annonces (5 colonnes, bandes de chiffres), Achats, Messages, E-mails, Compta (statut d'abord), Stats, Stock, Réglages, plateformes, loupe ; DESIGN.md +6 composants. `docs/passation/2026-11-08-design-ecrans.md`. Geste : regarder Ventes et Annonces.
+
+- **7 nov. · Je numérote moi-même (5.324)** : réglage `vrm_numero_ecrit`, éteint par défaut ; allumé, VRM ne DONNE plus aucun N° (annonce, vente à expédier, doublon, Vestiaire, réservation de l'extension) et LIT le sien (`src/numeroEcrit.js` : fin de description, titre, SKU eBay, CustomRef Leboncoin ; jamais un nombre nu ; deux N° = ambigu ; contredit = « à vérifier », son clic). Aperçu des 4 sites dans Réglages → Numéros. `docs/passation/2026-11-07-numero-ecrit.md`. Geste : aucun (Vinted pro à mesurer).
+- **8 nov. · Finition : intégration** : branche `claude/attente-v36-finition-integ` fusionnée avec main ; les 221 bancs restants lancés un à un et chaque rouge relancé sur main : 1 défaut corrigé (`UneLigne` perdait l'insécable de « 14 € » à la coupe), 5 bancs jugés à l'insécable/tournure (`rapport`, `mode-stream`, `stream-photos`, `messagerie`, `pave-vinted`), le reste identique sur main ; insécable avant « : ; ? ! » pas appliquée. `docs/passation/2026-11-07-finition-bancs.md`. Geste : aucun.
 - **6 nov. · Finition (v36)** : espace insécable avant « € » et « % » (`montant()` + 290 textes, `scripts/typo-insecables.cjs`), « e-mail » partout, milliers ; grand texte de l'appareil = échelle de l'app (`src/grandTexte.js`, `src/styles-lisible.css`) ; contrastes AA par les jetons (`onWarn`), axe-core 0 ; banc `finition.cjs`. `docs/passation/2026-11-06-finition.md`. Geste : Taille du texte de l'iPhone plus grande, rouvrir VRM.
 - **7 nov. · Vitesse au téléphone** : Colis 20 → 6-9 s de gel, Ma journée 11,6 → 3,0 s (CPU ×4) — formateurs de dates créés une fois, `UneLigne` mesurée en groupe, règles d'identité mémorisées pour UN calcul (`memoRendu`), index des suivis ; reste : `Comptabilite` remonté à chaque écran (découpage) et `email_track` lu en entier. `docs/passation/2026-11-07-vitesse.md`. Geste : aucun.
 - **7 nov. · Colis sans réseau : intégration** : branche `claude/attente-v36-hors-reseau` fusionnée ; purge à 90 jours des `mesures_jour_*` du propriétaire au cron du matin (`purgerMesuresAnciennes`, lecture `select=id` paginée, jour lu dans l'id, lecture ratée ⇒ rien supprimé ; `audit-purge-mesures` + `--prouve`). `docs/passation/2026-11-06-hors-reseau.md` §Purge. Geste : couper le réseau sur l'iPhone et rouvrir Colis.
+- **7 nov. · Charge 1 000 vendeurs** : pages triées, jeton widget/SMS par index, `mesures_jour_` en 16 éclats, offres mini bornées, 503 sans clé de service, cron par lots (curseur). `docs/passation/2026-11-07-charge-1000.md`. Geste : migration 026.
+
+- **7 nov. · Design 2026** : jetons `--d-*` (src/styles-design-2026.css, dernier CSS d'App.jsx) + DESIGN.md ; Colis : frise seulement si une étape est faite, logo du transporteur LU en badge (`BadgeTransporteur`), rangées à l'ordinateur. `docs/passation/2026-11-07-design-fondations.md`. Geste : aucun.
 
 - **6 nov. · Audit des chiffres** : « à imprimer » = pas encore imprimés partout (`compteAImprimer`), Tournée « à déposer » = avec bordereau, widget sans colis sans n° (15→12) ; banc `chiffres-coherents`. `docs/passation/2026-11-06-audit-chiffres.md`. Geste : aucun.
 
@@ -546,9 +554,6 @@ sans la fonction.
 
 - **6 nov. · Onglets B (Colis, Stock)** : le prochain geste en une ligne en tête de Colis (urgent d'abord, colis comptés seuls, `src/prochainGesteColis.js`) ; « à imprimer » = pas encore imprimés (9→3 mesuré) ; un S10 étranger n'est plus « Chronopost » (« Colis international (pays) », Chronopost = forme XW/ZW…TS/SP) ; comptes muets → Comptes liés ; légende du Stock. `docs/passation/2026-11-06-onglets-b.md`. Geste : supprimer s'il veut les 3 `transp_chronopost_…IE` vides.
 
-- **6 nov. · Onglets C (E-mails)** : 3 comptes sur 9 muets, tous en relais d'Apple ; « Relier la boîte de <compte> » (pas-à-pas par compte, Yahoo et relais Apple, VÉRIFIÉ sur e-mail lu, `src/relierCompte.js`) depuis E-mails, Comptes liés, Colis, Ma journée (`relierBoiteDe`) ; recherche et « À vérifier » dans la boîte. `docs/passation/2026-11-06-onglets-c.md`. Geste : Transférer à une boîte reliée.
-
-- **6 nov. · Inventaire (v36)** : Stock → « Inventaire » (et Ma journée si en cours) : il tape les N° vus ⇒ « ✓ Attendu » neutre (pas de vert, §7) · ambre en trop / vendu · rouge deux paires sous un N° ; bilan manque / en trop / vendu rangé ; attendu = celui du Stock, pas su ≠ manque, aucun N° changé ; « N° + Entrée » ICI seulement ; ligne `vrm_inventaire` (rev). `docs/passation/2026-11-06-inventaire.md`. Geste : faire le tour des cartons.
 
 
 

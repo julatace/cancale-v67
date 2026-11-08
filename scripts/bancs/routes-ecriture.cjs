@@ -25,6 +25,7 @@
 // §6.1 : la preuve que ces contrôles MORDENT se fait en réaffaiblissant la route
 // (persister même sur échec / upsert même sur jeton refusé) — voir le bandeau
 // final. Sur le code sain ils sont verts ; réaffaiblis, ils passent au rouge.
+process.env.SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'cle-service-banc';   // (7 nov.) sans elle, les routes serveur répondent 503 (api/_lib/cle-service.js)
 const path = require('path');
 const RACINE = path.join(__dirname, '..', '..');
 

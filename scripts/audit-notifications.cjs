@@ -22,6 +22,7 @@
 //   F  famille coupée ⇒ rien ; catégories retirées ⇒ rien même allumées avant
 //   V  deux vendeurs : chacun ses appareils, ses clés
 'use strict';
+process.env.SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'cle-service-audit';   // (7 nov.) sans elle, les routes serveur répondent 503 (api/_lib/cle-service.js)
 const path = require('path');
 const R = path.join(__dirname, '..');
 let ok = 0, ko = 0;
@@ -121,7 +122,7 @@ const V_COMMANDE = (titre, phrase, conv) => mail(FROM_V, `Commande mise à jour 
   process.env.VRM_OWNER_UID = J;
   process.env.EMAIL_INBOUND_SECRET = 'cle-banc-notifs';
   process.env.VAPID_PRIVATE_KEY = 'YmFuYy1jbGUtcHJpdmVlLWZhY3RpY2UtMzItb2N0ZXQ';
-  process.env.SUPABASE_SERVICE_KEY = '';
+  process.env.SUPABASE_SERVICE_KEY = 'cle-service-audit';   // (7 nov.) sans elle la route répond 503 (api/_lib/cle-service.js)
   const webpush = require(path.join(R, 'node_modules', 'web-push'));
   webpush.sendNotification = async (sub, body) => { pushes.push({ tel: sub.endpoint, ...JSON.parse(body) }); return { statusCode: 201 }; };
   const route = await import('file://' + path.join(R, 'api', 'email-inbound.js') + '?notifs');

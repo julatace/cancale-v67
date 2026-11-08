@@ -85,7 +85,7 @@ function lancer(APP, dit) {
   const ctx = {};
   vm.createContext(ctx);
   const src = NOMS.map((n) => extraire(APP, n, dit)).join('\n');
-  try { vm.runInContext('const load = (k, d) => d;\n' + src + '\n;this.R = { numerosDejaVendus, doublesVenteEbay, brouillonEncoreAttendu, programmeesConnues, ouVenduesTexte };', ctx); }
+  try { vm.runInContext('const load = (k, d) => d;\n' + '/* (7 nov.) « Je numérote moi-même » ÉTEINT : src/numeroEcrit.js, jugé par audit-numero-ecrit */ const numeroEcritLbc = () => ""; const numeroEcritActif = () => false;\n' + src + '\n;this.R = { numerosDejaVendus, doublesVenteEbay, brouillonEncoreAttendu, programmeesConnues, ouVenduesTexte };', ctx); }
   catch (e) { dit(false, 'les règles se chargent', String(e && e.message)); return null; }
   return ctx.R;
 }

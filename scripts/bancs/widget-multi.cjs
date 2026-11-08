@@ -26,6 +26,7 @@
 // §6.1 : sur le code mono-vendeur (origin/main, lectures non filtrées), les
 // totaux sont identiques pour A et B (A+B) et les lectures ne portent aucun
 // `owner=eq.` → ces exigences TOMBENT.
+process.env.SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'cle-service-banc';   // (7 nov.) sans elle, les routes serveur répondent 503 (api/_lib/cle-service.js)
 const path = require('path');
 const RACINE = path.join(__dirname, '..', '..');
 

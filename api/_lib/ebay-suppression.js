@@ -52,6 +52,7 @@
 // même égalité exacte, une lecture ratée ⇒ 503 (eBay renvoie).
 // ────────────────────────────────────────────────────────────────────────────
 import crypto from 'crypto';
+import { ordreStable } from './ordre-stable.js';
 
 export const MARQUE_SUPPRIME = 'compte eBay supprimé';
 const URL_CLE = 'https://api.ebay.com/commerce/notification/v1/public_key/';
@@ -222,7 +223,7 @@ async function lireToutesLignes(base, cle, sbCle, requete, fetcher) {
   const out = []; const page = 1000;
   for (let from = 0; from < 200000; from += page) {
     let r;
-    try { r = await fetcher(`${base}/rest/v1/app_data?${requete}`, { headers: { ...sbCle(cle), 'Range-Unit': 'items', Range: `${from}-${from + page - 1}` } }); }
+    try { r = await fetcher(ordreStable(`${base}/rest/v1/app_data?${requete}`), { headers: { ...sbCle(cle), 'Range-Unit': 'items', Range: `${from}-${from + page - 1}` } }); }
     catch (_) { return null; }
     if (r.status === 416) {
       const fin = /^\*\/(\d+)$/.exec((r.headers && r.headers.get && r.headers.get('content-range')) || '');

@@ -307,7 +307,10 @@ const projette = (row, sel) => {
           if (vp.width < 600) dit(Math.abs(premier.y-suivant.y)<2 && suivant.x>premier.x+premier.width-1 && premier.width>=150, 'au téléphone, deux fiches par rangée (la photo prend toute la largeur de la fiche)', JSON.stringify({premier,suivant}));
           else dit(Math.abs(premier.y-suivant.y)<2 && suivant.x>premier.x+premier.width-1, 'les annonces sont des fiches côte à côte', JSON.stringify({premier,suivant}));
           const photo=await pg.locator('.vrm-ann-card').nth(0).locator('.vrm-ann-overview > a').boundingBox();
-          const plancher = vp.width < 600 ? 180 : 330;
+          // (8 nov., design passage 2, brief de Julien : « la zone photo vide de ~400 px » à
+          // l'ordinateur) La grille passe à cinq colonnes : la photo reste un CARRÉ sur toute la
+          // largeur de la fiche (la règle), à sa nouvelle mesure (≈ 220 px à 1512).
+          const plancher = vp.width < 600 ? 180 : 200;
           dit(photo && photo.height>=plancher && photo.width>=premier.width-2, `la première photo occupe toute la largeur de la fiche, en grand (≥ ${plancher} px)`, photo && `${Math.round(photo.width)}×${Math.round(photo.height)} (fiche ${Math.round(premier.width)})`);
         }
 

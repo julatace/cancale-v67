@@ -185,7 +185,11 @@ const balayer = async (ctx, pg, x0, x1, y) => {
   }, [x0, x1, y]);
   await pg.waitForTimeout(800);
 };
-const toucher = async (pg, sel) => { const l = pg.locator(sel).first(); if (!(await l.count())) { console.log(`     (absent : ${sel})`); return false; } await l.tap({ timeout: 5000 }).catch(() => {}); await pg.waitForTimeout(800); return true; };
+const toucher = async (pg, sel) => { const l = pg.locator(sel).first(); if (!(await l.count())) { console.log(`     (absent : ${sel})`); return false; } await l.tap({ timeout: 5000 }).catch(() => {}); await pg.waitForTimeout(800);
+  // (8 nov.) L'écran se calcule en tâche interruptible (startTransition) : on attend la fin du calcul
+  // (`data-en-cours` de la barre, 4 s au plus), jamais un délai fixe seul (CLAUDE.md §6.5).
+  await pg.waitForFunction(() => !document.querySelector('.vrm-tabbar[data-en-cours]'), null, { timeout: 4000 }).catch(() => {});
+  return true; };
 const PLUS = '.vrm-tabbar button[aria-label="Plus"]';
 
 // La barre, mesurée.

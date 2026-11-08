@@ -27,6 +27,7 @@
 // sur le serveur, Paris dans l'app : la notification disait « au moins » quand
 // Ma journée ne le disait pas. La section 4 exécute la règle sous TZ=UTC et
 // TZ=Europe/Paris, dans deux processus.
+process.env.SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'cle-service-audit';   // (7 nov.) sans elle, les routes serveur répondent 503 (api/_lib/cle-service.js)
 const fs = require('fs'), path = require('path'), vm = require('vm'), os = require('os');
 const R = path.join(__dirname, '..');
 let parser;
@@ -271,7 +272,7 @@ if (process.argv.includes('--recopie')) {
   // ── 3. Le VRAI cron, un 1er octobre ─────────────────────────────────────────
   console.log('\n── 3. Le vrai cron (api/ship-reminders.js), le 1er octobre, faux Web Push');
   process.env.VAPID_PRIVATE_KEY = 'YmFuYy1jbGUtcHJpdmVlLWZhY3RpY2UtMzItb2N0ZXQ';
-  delete process.env.SUPABASE_SERVICE_KEY;
+  process.env.SUPABASE_SERVICE_KEY = 'cle-service-audit';   // (7 nov.) sans elle le cron répond 503 (api/_lib/cle-service.js)
   process.env.CRON_SECRET = 'cle-audit-urssaf';
   const webpush = require(path.join(R, 'node_modules', 'web-push'));
   const pushes = [];

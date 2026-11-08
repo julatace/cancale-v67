@@ -36,6 +36,42 @@ const ESSAIS = 4;
 const cfg = (env) => ({ url: env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co', service: env.SUPABASE_SERVICE_KEY || '' });
 export const idJour = (jour) => PREFIXE_MESURES + jour;
 
+// ── LES ÉCLATS (7 nov., audit « 1 000 vendeurs ») ──────────────────────────
+// Une seule ligne par jour, écrite par TOUS les appareils de TOUS les vendeurs,
+// c'est un comparer-et-échanger qui se dispute : à 1 000 vendeurs, les lots se
+// devancent sans fin (4 essais, puis 503). Le jour est donc ÉCLATÉ en
+// `ECLATS` lignes `mesures_jour_{jour}_{éclat}` ; l'éclat d'un appareil est tiré
+// de son EMPREINTE du jour (`empreinteJour`, % 16) : le même appareil retombe
+// toujours dans le même éclat ce jour-là, donc l'anti-abus (une fois par minute,
+// `LOTS_MAX_JOUR`) reste juste. Les LECTURES additionnent les éclats d'un jour
+// ET l'ancienne ligne `mesures_jour_{jour}` (celles d'avant le 7 nov. restent
+// lisibles, jamais réécrites) ; la purge à 90 jours couvre les deux formes.
+export const ECLATS = 16;
+export const eclatDe = (empreinte) => (parseInt(String(empreinte || '').slice(0, 2), 16) || 0) % ECLATS;
+export const idEclat = (jour, eclat) => `${PREFIXE_MESURES}${jour}_${Number(eclat).toString(16)}`;
+// Toutes les lignes possibles d'un jour : l'ancienne forme puis ses éclats.
+export const idsDuJour = (jour) => [idJour(jour), ...Array.from({ length: ECLATS }, (_, i) => idEclat(jour, i))];
+const RE_ID_MESURES = /^mesures_jour_(\d{4}-\d{2}-\d{2})(?:_([0-9a-f]))?$/;
+
+// Les lignes lues (`{ id, data }` ou `{ id, h }`) ⇒ UN agrégat par jour :
+// lots et mesures additionnés, histogrammes additionnés case à case, empreintes
+// réunies (un appareil compté une fois). Rend { jour: { lots, mesures, h, contrib } }.
+export function agregerJours(rows) {
+  const out = {};
+  for (const r of Array.isArray(rows) ? rows : []) {
+    const m = RE_ID_MESURES.exec(String((r && r.id) || ''));
+    if (!m) continue;
+    const d = r.data && typeof r.data === 'object' ? r.data : { h: r.h };
+    const a = out[m[1]] || (out[m[1]] = { lots: 0, mesures: 0, h: {}, contrib: {}, lignes: 0 });
+    a.lots += Number(d.lots) || 0;
+    a.mesures += Number(d.mesures) || 0;
+    a.h = fusionnerHisto(a.h, { h: d.h && typeof d.h === 'object' ? d.h : {} });
+    if (d.contrib && typeof d.contrib === 'object') for (const k of Object.keys(d.contrib)) a.contrib[k] = true;
+    a.lignes++;
+  }
+  return out;
+}
+
 // L'empreinte du jour d'un appareil-vendeur : 12 caractères d'un HMAC (secret du
 // serveur) de son identifiant et du jour. Sans le secret, rien à en tirer ; avec
 // lui, rien d'un jour à l'autre (le jour est dedans).
@@ -51,10 +87,10 @@ export function lireCorpsMesures(brut) {
   try { const o = JSON.parse(t); return o && typeof o === 'object' && !Array.isArray(o) ? o : null; } catch (_) { return null; }
 }
 
-async function lireJour(env, fetcher, proprio, jour) {
+async function lireJour(env, fetcher, proprio, id) {
   const { url, service } = cfg(env);
   try {
-    const r = await fetcher(`${url}/rest/v1/app_data?owner=eq.${proprio}&id=eq.${idJour(jour)}&select=data&limit=1`, { headers: sbCle(service) });
+    const r = await fetcher(`${url}/rest/v1/app_data?owner=eq.${proprio}&id=eq.${id}&select=data&limit=1`, { headers: sbCle(service) });
     if (!r.ok) return undefined;
     const j = await r.json().catch(() => null);
     if (!Array.isArray(j)) return undefined;
@@ -91,8 +127,9 @@ export async function recevoirMesures({ corps, jetonEntete = '', verifierJeton, 
   const emp = empreinteJour(u.id, jour, cfg(env).service);
   const minute = Math.floor(maintenant / 60000);
   const { url, service } = cfg(env);
+  const id = idEclat(jour, eclatDe(emp));   // l'éclat de CET appareil ce jour-là
   for (let essai = 0; essai < ESSAIS; essai++) {
-    const avant = await lireJour(env, fetcher, proprio, jour);
+    const avant = await lireJour(env, fetcher, proprio, id);
     if (avant === undefined) return { code: 503, corps: { ok: false, raison: 'base' } };   // lecture ratée : rien n'est écrit
     const r = jourApres(avant ? { ...avant, jour } : { jour }, lot, emp, minute);
     if (r.refus) return { code: 429, corps: { ok: false, raison: r.refus === 'minute' ? 'une-fois-par-minute' : 'plafond-du-jour' } };
@@ -102,8 +139,8 @@ export async function recevoirMesures({ corps, jetonEntete = '', verifierJeton, 
       rep = avant === null
         ? await fetcher(`${url}/rest/v1/app_data?on_conflict=owner,id`, {
           method: 'POST', headers: { ...sbCle(service), 'Content-Type': 'application/json', Prefer: 'resolution=ignore-duplicates,return=representation' },
-          body: JSON.stringify([{ owner: proprio, id: idJour(jour), data: r.data, updated_at: at }]) })
-        : await fetcher(`${url}/rest/v1/app_data?owner=eq.${proprio}&id=eq.${idJour(jour)}&data->>rev=${Number.isSafeInteger(avant.rev) ? 'eq.' + avant.rev : 'is.null'}`, {
+          body: JSON.stringify([{ owner: proprio, id, data: r.data, updated_at: at }]) })
+        : await fetcher(`${url}/rest/v1/app_data?owner=eq.${proprio}&id=eq.${id}&data->>rev=${Number.isSafeInteger(avant.rev) ? 'eq.' + avant.rev : 'is.null'}`, {
           method: 'PATCH', headers: { ...sbCle(service), 'Content-Type': 'application/json', Prefer: 'return=representation' },
           body: JSON.stringify({ data: r.data, updated_at: at }) });
     } catch (_) { return { code: 503, corps: { ok: false, raison: 'base' } }; }
@@ -115,24 +152,55 @@ export async function recevoirMesures({ corps, jetonEntete = '', verifierJeton, 
   return { code: 503, corps: { ok: false, raison: 'concurrence' } };
 }
 
-// Les jours lus ⇒ ce que le panneau montre (aucune empreinte, aucun histogramme).
+// Les lignes lues (anciennes et éclats) ⇒ ce que le panneau montre, UN jour
+// par jour (éclats additionnés) : aucune empreinte, aucun histogramme brut.
 export function joursPourPanneau(rows) {
-  return (Array.isArray(rows) ? rows : []).map((r) => {
-    const jour = String((r && r.id) || '').slice(PREFIXE_MESURES.length);
-    const d = (r && r.data) || {};
-    return { jour, lots: Number(d.lots) || 0, mesures: Number(d.mesures) || 0, appareils: d.contrib && typeof d.contrib === 'object' ? Object.keys(d.contrib).length : 0, lignes: resumeJour(d.h) };
-  }).filter((x) => /^\d{4}-\d{2}-\d{2}$/.test(x.jour)).sort((a, b) => b.jour.localeCompare(a.jour));
+  return Object.entries(agregerJours(rows)).map(([jour, a]) => ({ jour, lots: a.lots, mesures: a.mesures, appareils: Object.keys(a.contrib).length, lignes: resumeJour(a.h) }))
+    .sort((a, b) => b.jour.localeCompare(a.jour));
 }
 
-// Lit les derniers jours (au plus `n`), lignes bornées (des comptes) : `null` = pas su.
+// Lit les derniers jours (au plus `n`) : `null` = pas su. Deux temps, toujours
+// projetés et bornés : (1) les IDENTIFIANTS seuls (`select=id`, paginés), pour
+// trouver les `n` jours les plus récents ; (2) les lignes de ces jours-là
+// seulement (`id=in.(…)`, ancienne forme et éclats).
 export async function lireDerniersJours({ env = process.env, fetcher = fetch, proprio, n = JOURS_LUS }) {
   const { url, service } = cfg(env);
+  const nb = Math.max(1, Math.min(60, n));
   try {
-    const r = await fetcher(`${url}/rest/v1/app_data?owner=eq.${proprio}&id=like.${PREFIXE_MESURES}*&select=id,data&order=id.desc&limit=${Math.max(1, Math.min(60, n))}`, { headers: sbCle(service) });
-    if (!r.ok) return null;
-    const j = await r.json().catch(() => null);
-    return Array.isArray(j) ? j : null;
+    const ids = []; const page = 1000;
+    for (let from = 0; from < 200000; from += page) {
+      const r = await fetcher(`${url}/rest/v1/app_data?owner=eq.${proprio}&id=like.${PREFIXE_MESURES}*&select=id&order=id.desc`, { headers: { ...sbCle(service), 'Range-Unit': 'items', Range: `${from}-${from + page - 1}` } });
+      if (!r.ok) return null;
+      const j = await r.json().catch(() => null);
+      if (!Array.isArray(j)) return null;
+      for (const x of j) if (x && typeof x.id === 'string') ids.push(x.id);
+      if (j.length !== page) break;
+    }
+    const jours = [...new Set(ids.map(jourDeId).filter(Boolean))].sort().reverse().slice(0, nb);
+    if (!jours.length) return [];
+    const voulus = ids.filter((id) => jours.includes(jourDeId(id)));
+    const out = [];
+    for (let i = 0; i < voulus.length; i += 100) {
+      const r = await fetcher(`${url}/rest/v1/app_data?owner=eq.${proprio}&id=in.(${voulus.slice(i, i + 100).join(',')})&select=id,data&order=id.asc`, { headers: sbCle(service) });
+      if (!r.ok) return null;
+      const j = await r.json().catch(() => null);
+      if (!Array.isArray(j)) return null;
+      out.push(...j);
+    }
+    return out;
   } catch (_) { return null; }
+}
+
+// Les histogrammes des `jours` demandés (éclats additionnés), pour la veille
+// des lenteurs. `lire(chemin)` rend la liste paginée ou `null` (pas su).
+// Rend { jour: h | null } ou `null` (pas su).
+export async function histosDesJours({ lire, proprio, jours }) {
+  const rows = await lire(`app_data?owner=eq.${proprio}&id=in.(${jours.flatMap(idsDuJour).join(',')})&select=id,h:data->h`);
+  if (!Array.isArray(rows)) return null;
+  const ag = agregerJours(rows);
+  const out = {};
+  for (const j of jours) out[j] = ag[j] && Object.keys(ag[j].h).length ? ag[j].h : null;
+  return out;
 }
 
 // GET (PROPRIÉTAIRE seulement) : les agrégats des derniers jours.
@@ -159,7 +227,7 @@ export async function listerMesures({ utilisateur, env = process.env, fetcher = 
 //     dont le jour n'est pas une vraie date est GARDÉ. Le jour du seuil est gardé
 //     (« plus de 90 jours » = strictement avant).
 export const JOURS_GARDES = 90;
-const RE_ID_JOUR = /^mesures_jour_(\d{4}-\d{2}-\d{2})$/;
+const RE_ID_JOUR = RE_ID_MESURES;   // l'ancienne forme ET les éclats
 const RE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 // Le jour d'une ligne, lu dans son id ; `null` si ce n'est pas une vraie date.
@@ -178,7 +246,7 @@ export const seuilPurgeMesures = (maintenant = Date.now()) => jourParis(maintena
 export function idsMesuresAPurger(ids, maintenant = Date.now()) {
   const seuil = seuilPurgeMesures(maintenant);
   const out = [];
-  for (const id of Array.isArray(ids) ? ids : []) { const j = jourDeId(id); if (j && j < seuil) out.push(idJour(j)); }
+  for (const id of Array.isArray(ids) ? ids : []) { const j = jourDeId(id); if (j && j < seuil) out.push(String(id)); }
   return [...new Set(out)];
 }
 

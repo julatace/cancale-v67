@@ -19,7 +19,7 @@ export const ETAPES_GUIDE = [
   { cle: 'extension', titre: 'Installer l’extension', pourquoi: 'C’est elle qui lit tes ventes, tes colis et tes bordereaux sur Vinted, depuis ton navigateur.' },
   { cle: 'vinted', titre: 'Ouvrir Vinted pour relier ton compte', pourquoi: 'Passe une fois sur vinted.fr, connecté : tes annonces et tes ventes se rangent sous ton compte.' },
   { cle: 'emails', titre: 'Relier ta boîte e-mail', pourquoi: 'Bordereaux, codes de retrait et suivis arrivent par e-mail : VRM les range avec la bonne vente.' },
-  { cle: 'numeros', titre: 'Numéroter tes paires', pourquoi: 'Un numéro sur chaque boîte : tu retrouves la paire d’un coup d’œil, et il est imprimé sur le bordereau.' },
+  { cle: 'numeros', titre: 'Numéroter tes paires', pourquoi: 'Un numéro sur chaque boîte : tu retrouves la paire d’un coup d’œil, et il est imprimé sur le bordereau. Tu l’écris déjà dans tes annonces ? Réglages → Numéros de rangement : VRM lit le tien.' },
 ];
 
 // L'étape « extension » : `etapePont` est l'état du pont (`useEtapePont`) :

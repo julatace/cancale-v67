@@ -1,6 +1,7 @@
 import './_lib/sans-bruit.js';
 import { sbCle } from './_lib/cle.js';
 import { vendeurExige } from './_lib/session.js';
+import { repondreSansCleService } from './_lib/cle-service.js';
 // api/vinted-refresh.js
 //
 // ⚠️⚠️ CETTE ROUTE ÉTAIT PUBLIQUE, ET ELLE RAFRAÎCHISSAIT TOUS LES COMPTES DE
@@ -106,6 +107,8 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   const u = await vendeurExige(req, res);
   if (!u) return;
+  // (7 nov.) Sans clé de service, la clé publique ne voit rien sous RLS : 503 dit, jamais « rien à faire ».
+  if (repondreSansCleService(res)) return;
   const filtre = `&owner=eq.${encodeURIComponent(u.id)}`;
   try {
     const listRes = await fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=*${filtre}`, {

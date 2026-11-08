@@ -27,6 +27,7 @@
 //   A  un autre email Vestiaire (forme pas apprise) est gardé ENTIER, jamais
 //      pris pour une vente Vinted.
 'use strict';
+process.env.SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'cle-service-audit';   // (7 nov.) sans elle, les routes serveur répondent 503 (api/_lib/cle-service.js)
 const path = require('path');
 const R = path.join(__dirname, '..');
 let ok = 0, ko = 0;
