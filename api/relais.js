@@ -58,7 +58,7 @@ async function transp(req, res, mode) {
       const cp = /^\d{5}$/.test(String(body.cp || '')) ? String(body.cp) : '';
       const r = await passageTransporteurs({ max: MAX_APP, budgetMs: BUDGET_APP_MS, suivi, force: !!suivi, cpPage: cp });
       if (!r.ok) { res.status(503).json({ error: 'pas-su' }); return; }
-      res.status(200).json({ ok: true, lus: r.lus, besoinNavigateur: r.besoinNavigateur, pause: r.pause });
+      res.status(200).json({ ok: true, lus: r.lus, departs: r.departs || [], besoinNavigateur: r.besoinNavigateur, pause: r.pause });
     } catch (e) { res.status(500).json({ error: 'panne' }); }
   });
 }

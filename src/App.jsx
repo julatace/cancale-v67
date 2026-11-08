@@ -235,7 +235,8 @@ import { candidatsVenteSansAnnonce } from "./candidatsVente.js";
 import { fusionnerConversation } from "./conversations.js";
 import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
 import {colisEbay} from '../api/_lib/ebay-a-expedier.js';
-import {annoncesVcEnLigne,stockVestiaire,retraitsVestiaire,VC_VENTE_ETAPES,VC_ANNONCE_ETATS,etapeMotVc,vcVenteAnnulee,vcVentePartie,numVcVente,numVcAnnonce,numerosVcAvecLiens,montantRecuVc,dateVersementVc,dateVenteVc,ventesVcDe,colisVcAPoster,resumeColisVc,etatAnnonceVcBrut} from '../api/_lib/vestiaire-regle.js';
+import {annoncesVcEnLigne,stockVestiaire,retraitsVestiaire,VC_VENTE_ETAPES,VC_ANNONCE_ETATS,etapeMotVc,vcVenteAnnulee,vcVentePartie,numVcVente,numVcAnnonce,numerosVcAvecLiens,montantRecuVc,dateVersementVc,dateVenteVc,ventesVcDe,colisVcAPoster,colisVcPartisLus,departsVc,resumeColisVc,etatAnnonceVcBrut} from '../api/_lib/vestiaire-regle.js';
+import {SELECT_DEPART_META,departsParSuivi,txVintedParties} from '../api/_lib/depart-colis.js';
 import {colisLbcAPoster,lbcColisAPoster,totalColis,colisLbcVendeur} from '../api/_lib/colis-sites.js';
 import {CLE_COMPTES_EXCLUS,excluAutreDe,estExclu,basculerExclu,compteDeVente,exclusNormes} from '../api/_lib/comptes-exclus.js';
 import {PLATEFORMES_COMPTES,etatCompteLie,ageLecture,comptesLbcLies,comptesVcLies,comptesEbayLies,refDeLigneEbay,nomCompteLie,LIBELLE_ETAT} from './comptesLies.js';
@@ -5326,6 +5327,16 @@ const fetchColisMondialRelay = async (opts = {}) => {
   if (opts.force) _rowCache.delete('mr_colis');
   return cachedRow('mr_colis', fetchColisMondialRelayBrut);
 };
+// (8 nov.) LES DÉPARTS PROUVÉS CHEZ LE TRANSPORTEUR (`depart_{transporteur}_{n°}`,
+// écrits par le SERVEUR seul — api/_lib/depart-colis.js). Scalaires, paginés,
+// STRICTS : une page ratée = « pas su » (null) ⇒ rien ne change nulle part. Ces
+// lignes ne nourrissent JAMAIS « à retirer » (elles ne sont pas des `transp_`).
+const fetchDepartsBrut = async () => {
+  try {
+    const rows = await lireTout(`id=like.depart_*&select=${SELECT_DEPART_META}`, { strict: true });
+    return Array.isArray(rows) ? departsParSuivi(rows) : null;
+  } catch (_) { return null; }
+};
 const fetchTranspLignes = async (opts = {}) => {
   if (opts.force) _rowCache.delete('transp');
   return cachedRow('transp', fetchTranspLignesBrut);
@@ -10344,12 +10355,31 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
 function useVcLocal() {
   const [, maj] = React.useReducer((x) => x + 1, 0);
   React.useEffect(() => { _ecoutesVc.add(maj); return () => { _ecoutesVc.delete(maj); }; }, []);
-  return { auto: numerosVcEffectifs(), donnes: carteNumerosVc(vcCarte('vrm_vc_numeros')), liens: vcCarte('vrm_vc_liens'), fait: vcCarte('vrm_vc_colis_done'), imprimes: vcCarte('vrm_vc_imprimes') };
+  React.useEffect(() => { chargerDeparts(false); }, []);
+  return { auto: numerosVcEffectifs(), donnes: carteNumerosVc(vcCarte('vrm_vc_numeros')), liens: vcCarte('vrm_vc_liens'), fait: vcCarte('vrm_vc_colis_done'), imprimes: vcCarte('vrm_vc_imprimes'), departs: departsCarte(), departsCle: departsCle() };
 }
 // Une lecture Vestiaire (`vc_ventes`/`vc_listings` projetés) + les numéros donnés
 // et les « Colis fait » de cet appareil : ce que lisent `ventesVcDe`,
 // `colisVcAPoster`, `annoncesVcEnLigne`, `retraitsVestiaire` (§11, une règle).
-const avecNumerosVc = (d) => (d && typeof d === 'object') ? { ...d, auto: numerosVcEffectifs(), fait: vcCarte('vrm_vc_colis_done') } : d;
+// (8 nov.) Les départs prouvés chez le transporteur (Map n° → ligne `depart_`),
+// lus une fois et relus quand le serveur a relu (`vrm:transp-maj`). `null` = pas
+// su (rien ne change). Tous les écrans les reçoivent par `avecNumerosVc`.
+let _departsCarte = null, _departsAt = 0, _departsLecture = null;
+const departsCarte = () => _departsCarte;
+const departsCle = () => (_departsCarte ? [..._departsCarte.values()].filter((t) => t.priseAt).map((t) => t.suivi + ':' + t.priseAt).sort().join(',') : 'passu');
+function chargerDeparts(force = false) {
+  if (_departsLecture || (!force && Date.now() - _departsAt < 60000)) return _departsLecture;
+  _departsAt = Date.now();
+  _departsLecture = fetchDepartsBrut().then((m) => {
+    _departsLecture = null;
+    if (m === null) return;   // pas su : on garde ce qu'on avait
+    const avant = departsCle(); _departsCarte = m;
+    if (departsCle() !== avant) signalerVc();
+  }).catch(() => { _departsLecture = null; });
+  return _departsLecture;
+}
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') window.addEventListener('vrm:transp-maj', () => { chargerDeparts(true); });
+const avecNumerosVc = (d) => (d && typeof d === 'object') ? { ...d, auto: numerosVcEffectifs(), fait: vcCarte('vrm_vc_colis_done'), departs: departsCarte() } : d;
 // Les numéros que l'écran Vinted ne tient pas dans son état : ceux donnés aux
 // annonces Vestiaire et le pool tel que le navigateur le porte. Ajoutés aux pris
 // de chaque `prochainLibre` automatique (jamais retirés de rien).
@@ -23578,6 +23608,9 @@ function relireTransporteursSiVieux({ force = false } = {}) {
         return { fait: false, raison: st ? `http-${st}` : 'reseau' };
       }
       const change = Array.isArray(j.lus) && j.lus.some((x) => x && x.change);
+      // (8 nov.) Un colis VENDU pris en charge chez le transporteur : Colis, Ma
+      // journée et la cloche relisent les départs (jamais « à retirer »).
+      if (Array.isArray(j.departs) && j.departs.some((x) => x && x.prisEnCharge)) chargerDeparts(true);
       if (change) {
         try { if (window.__vrmLecturesPartagees) window.__vrmLecturesPartagees.invalider(); } catch (_) {}
         try { window.dispatchEvent(new Event('vrm:transp-maj')); } catch (_) {}
@@ -29524,7 +29557,10 @@ function PublierVestiaire({ comptes }) {
 // (1er nov.) `VC_VENTE_ETAPES` vit dans api/_lib/vestiaire-regle.js (importée) : la même
 // règle pour cet écran, le CA, l'anti double vente et la sortie du Stock.
 const VC_PARCOURS = [['a-expedier', 'À expédier'], ['controle', 'Contrôle'], ['livree', 'Livrée'], ['versee', 'Versée']];
-function etapeVenteVc(v) {
+function etapeVenteVc(v, depart = null) {
+  // (8 nov.) Encore « à expédier » chez Vestiaire (pas relu), mais le n° de suivi
+  // EXACT est pris en charge chez le transporteur : partie, la raison dite.
+  if (v && v.aExpedier === true && depart) return { etape: 'en-route', label: `Envoyée — ${depart.phrase}`, rang: 1, departLu: depart };
   if (v && v.aExpedier === true) return { etape: 'a-expedier', label: 'À expédier', rang: 0 };
   const brut = String((v && v.etat) || '').trim();
   const f = brut ? VC_VENTE_ETAPES.find(([, re]) => re.test(brut)) : null;
@@ -29778,12 +29814,13 @@ function VentesVestiaire({ comptes }) {
   else if (d === null) corps = <div data-vc-ventes="pas-su" style={style}>Je n'ai pas pu lire tes ventes Vestiaire — rien n'est perdu, c'est la lecture qui a échoué. <button type="button" className="vrm-lien-action" data-vc-ventes-relire="" onClick={() => { setD(undefined); relire(); }} style={{ background: 'none', border: 'none', color: C.accentTexte, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', minHeight: 44, padding: 0 }}>Réessayer</button></div>;
   else if (!d.ventes) corps = <div data-vc-ventes="jamais" style={style}>Pas encore lues : {geste}{extSait('vcventes') === 'retard' ? <> — mise à jour en <b>{EXT_CAPACITES.vcventes}</b> d'abord</> : ''}. Elle les lit en passant.</div>;
   else {
+    const partisVc = departsVc({ ...d, departs: vcLoc.departs });
     const liste = Object.entries(d.ventes).filter(([, v]) => v && typeof v === 'object').map(([id, v]) => {
       const num = numVcVente(v, d.liens, vcLoc.auto);
-      return { id, ...v, num, ...etapeVenteVc(v) };
+      return { id, ...v, num, ...etapeVenteVc(v, partisVc.get(String(id)) || null) };
     // (31 oct.) Les ventes À EXPÉDIER d'abord (la date limite la plus proche en tête), puis les autres, la plus récente d'abord.
     }).sort((a, z) => (z.aExpedier === true) - (a.aExpedier === true) || (a.aExpedier && z.aExpedier ? String(a.limite || '9999').localeCompare(String(z.limite || '9999')) : 0) || String(z.date || z.premiereVue || '').localeCompare(String(a.date || a.premiereVue || '')));
-    const aExp = liste.filter((v) => v.aExpedier && !vcLoc.fait[v.id]);
+    const aExp = liste.filter((v) => v.aExpedier && !vcLoc.fait[v.id] && !v.departLu);
     const lue = d.lectures && d.lectures['a-expedier'];
     const derniere = [d.lectures && d.lectures.ventes && d.lectures.ventes.at, lue && lue.at].filter(Boolean).sort().pop() || '';
     if (!liste.length) corps = <div data-vc-ventes="vide" style={style}>Aucune vente Vestiaire à la dernière lecture{derniere ? ` (${ageCourtVc(derniere)})` : ''}. Après une vente, {geste} : elle apparaît ici.</div>;
@@ -29895,13 +29932,17 @@ function colisVestiaire(d) {
   const aEnvoyer = d.ventes ? colisVcAPoster(dv) : null;
   // (2 nov., soir) Ceux qu'il a cochés « Colis fait » : encore « à expédier » chez
   // Vestiaire, plus à poster ici — montrés en bas (« Déjà postés »), annulables.
-  const faits = d.ventes ? (colisVcAPoster({ ...dv, fait: {} }) || []).filter((v) => dv.fait && dv.fait[v.id]) : [];
+  const faits = d.ventes ? (colisVcAPoster({ ...dv, fait: {}, departs: null }) || []).filter((v) => dv.fait && dv.fait[v.id]) : [];
+  // (8 nov.) Partis d'après le TRANSPORTEUR (n° de suivi exact pris en charge,
+  // api/_lib/depart-colis.js) — encore « à expédier » chez Vestiaire pas relu.
+  // Un « Colis fait » coché reste dans `faits` (une ligne par colis).
+  const partis = d.ventes ? colisVcPartisLus(dv).filter((v) => !(dv.fait && dv.fait[v.id])) : [];
   const enRoute = d.achats ? Object.entries(d.achats).filter(([, v]) => v && v.suivi && !VC_ACHAT_FINI.test(String(v.etat || ''))).map(([id, v]) => ({
     id, nom: v.nom || '', suivi: v.suivi, transporteur: v.transporteur || '', etat: v.etat || '', date: v.date || '',
   })) : null;
   const nl = nonLusVestiaire(d.compteur, d.compteurs);
   const messages = nl ? nl.n : null;
-  return { aEnvoyer, faits, enRoute, messages };
+  return { aEnvoyer, faits, partis, enRoute, messages };
 }
 // (1er nov.) Les jours avant une date limite Vestiaire, à l'heure de PARIS — la
 // règle du widget et des rappels (`joursAvant`, api/_lib/ebay-a-expedier.js).
@@ -29911,7 +29952,7 @@ function joursAvantVc(iso) { const t = Date.parse(iso || ''); return isFinite(t)
 // attente »), « vendue le … · à envoyer avant … », le transporteur écrit UNE
 // fois avec son n° de suivi (« Chronopost · suivi … » était écrit deux fois),
 // puis Imprimer (tamponné titre + N°) · Imprimé · Colis fait.
-function CarteColisVc({ v, imprime, fait }) {
+function CarteColisVc({ v, imprime, fait, depart = null }) {
   const j = joursAvantVc(v.limite);
   const verse = montantRecuVc(v).eur;
   const titre = v.titre || 'Article Vestiaire';
@@ -29919,7 +29960,8 @@ function CarteColisVc({ v, imprime, fait }) {
   const sec = { flex: '0 1 auto', minHeight: 44, borderRadius: 12, padding: '0 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' };
   return (
     <div data-bord-card="" data-vc-colis={v.id} data-colis-ident={'vc:' + v.id} data-vc-colis-num={v.num || ''} data-vc-colis-limite={v.limite ? v.limite.slice(0, 10) : ''} data-jours={j == null ? '' : String(j)} data-plateforme-colis="vestiaire"
-      className="vrm-colis-carte" style={{ position: 'relative', padding: '14px', border: `1px solid ${j != null && j < 0 ? C.warn + '66' : C.border}`, background: C.card, borderRadius: 12, opacity: fait ? 0.55 : 1 }}>
+      data-colis-depart-lu={depart ? depart.carrier : undefined}
+      className="vrm-colis-carte" style={{ position: 'relative', padding: '14px', border: `1px solid ${j != null && j < 0 && !depart ? C.warn + '66' : C.border}`, background: C.card, borderRadius: 12, opacity: fait || depart ? 0.55 : 1 }}>
       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
         <div className="vrm-colis-photo" style={{ width: 64, height: 80, borderRadius: 12, background: '#fff', border: `1px solid ${C.border}`, boxSizing: 'border-box', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <PhotoVc src={v.photo || ''} style={{ width: '100%', height: '100%' }}/>
@@ -29940,6 +29982,8 @@ function CarteColisVc({ v, imprime, fait }) {
             <span data-colis-dates="">{urg ? <span data-colis-limite-texte="" style={{ color: j != null && j <= 1 ? C.warn : C.muted, fontWeight: j != null && j <= 1 ? 600 : 500 }}>{urg}</span> : null}{v.date && joursAttente(v.date) != null ? <span className="vrm-colis-vendue" data-colis-attente={joursAttente(v.date)} title={`Vendue le ${dateCourteVc(v.date)}`}>{urg ? ' · ' : ''}{texteAttenteVente(joursAttente(v.date))}</span> : null}</span>
             {fait ? <span style={{ color: C.text, fontWeight: 600 }}> · déposé</span> : null}
           </div>
+          {/* (8 nov.) PARTI, LU CHEZ LE TRANSPORTEUR : la raison, de la même ligne que la preuve (api/_lib/depart-colis.js). */}
+          {depart ? <div data-colis-depart-phrase="" style={{ fontSize: 12, color: C.text, fontWeight: 600, marginTop: 4 }}>{depart.phrase}</div> : null}
           {/* Le transporteur est écrit UNE fois : la pastille à côté du bouton bordereau. */}
           {v.suivi ? <div data-vc-colis-transport="" style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>suivi {v.suivi}</div> : null}
         </div>
@@ -29949,7 +29993,7 @@ function CarteColisVc({ v, imprime, fait }) {
       </div>
       {/* (3 nov.) LA FRISE D'UN COLIS, comme Vinted : « imprimé » = sa coche (`vrm_vc_imprimes`), « déposé » =
           « Colis fait » ; « en route » / « livré » ne sont pas lus pour Vestiaire ⇒ jamais cochés. */}
-      {imprime || fait ? <Frise etapes={friseColisFusion({ imprime: !!imprime, depose: !!fait }, { geste: j != null && j <= 1 && !fait })} cle={'vc:' + v.id} className="vrm-colis-frise" label="Où en est le colis"/> : null}
+      {imprime || fait || depart ? <Frise etapes={friseColisFusion({ imprime: !!imprime, depose: !!(fait || depart), enroute: !!depart }, { geste: j != null && j <= 1 && !fait && !depart })} cle={'vc:' + v.id} className="vrm-colis-frise" label="Où en est le colis"/> : null}
       <div className="vrm-colis-actions" style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12, flexWrap: 'wrap' }}>
         {/* (2 nov. au soir) Le transporteur LU dans la puce, À GAUCHE du bouton bordereau, même rangée (comme Vinted). */}
         <div className="vrm-rangee-bord" data-rangee-bord="">
@@ -30007,11 +30051,11 @@ function ColisVestiaireBloc({ vc }) {
   if (vc === undefined || (vc && !vc.aEnvoyer && !vc.enRoute)) return null;
   if (vc === null) return <div data-colis-vestiaire="passu" style={{ marginBottom: 10 }}><LignePanne>Les colis Vestiaire n'ont pas pu être lus pour l'instant. Rien n'est perdu : rouvre Colis dans un moment.</LignePanne></div>;
   // (2 nov.) Les achats en route (`vc.enRoute`) ne sont plus ici : `AchatsVestiaireEnRoute`, sous « À retirer ».
-  const E = vc.aEnvoyer || [], F = vc.faits || [];
-  if (!E.length && !F.length) return null;
+  const E = vc.aEnvoyer || [], F = vc.faits || [], P = vc.partis || [];
+  if (!E.length && !F.length && !P.length) return null;
   const titre = (t, n) => <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.07em', textTransform: 'uppercase', color: C.muted }}>{t} <span style={{ color: C.text, fontVariantNumeric: 'tabular-nums' }}>· {n}</span></span>;
   return (
-    <div data-colis-vestiaire={E.length} data-colis-vestiaire-faits={F.length} style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
+    <div data-colis-vestiaire={E.length} data-colis-vestiaire-faits={F.length} data-colis-vestiaire-partis={P.length} style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
       {E.length > 0 && <>
         {titre('Ventes Vestiaire à envoyer', E.length)}
         <div className="vrm-aide" style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>{E.every((v) => v.bordereau) ? 'Le bordereau est là : imprime (titre et N° tamponnés), colle, dépose. ' : 'Un bordereau qui n’est pas encore là se prend sur Vestiaire : il arrive ici quand tu ouvres la vente sur Vestiaire. '}Ce que VRM lit vient de ta dernière visite sur Vestiaire avec l'extension.</div>
@@ -30019,9 +30063,12 @@ function ColisVestiaireBloc({ vc }) {
           {E.map((v) => <CarteColisVc key={v.id} v={v} imprime={!!loc.imprimes[v.id]} fait={null}/>)}
         </div>
       </>}
-      {F.length > 0 && <>
+      {F.length + P.length > 0 && <>
         <span data-groupe="fait" style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.07em', textTransform: 'uppercase', color: C.muted, marginTop: E.length ? 12 : 0 }}>Vestiaire · déjà postés</span>
+        {/* (8 nov.) Encore « à expédier » chez Vestiaire (pas relu), mais pris en charge chez le transporteur. */}
+        {P.length > 0 ? <div className="vrm-aide" data-colis-vestiaire-partis-aide="" style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>Vestiaire dit encore « à expédier » ; le suivi du transporteur dit qu’il est parti.</div> : null}
         <div className="vrm-colis-grille" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {P.map((v) => <CarteColisVc key={v.id} v={v} imprime={!!loc.imprimes[v.id]} fait={null} depart={v.depart}/>)}
           {F.map((v) => <CarteColisVc key={v.id} v={v} imprime={!!loc.imprimes[v.id]} fait={loc.fait[v.id] || true}/>)}
         </div>
       </>}
@@ -44669,7 +44716,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Une annonce (ou une vente à expédier) Vestiaire sans N° en reçoit un — ici aussi, pour que
   // Colis et Ma journée ne montrent pas « N° en attente » à qui n'ouvre jamais l'écran Vestiaire.
   useNumerotationVestiaire();
-  const vcLocCle = JSON.stringify([vcLoc0.auto, vcLoc0.fait]);
+  const vcLocCle = JSON.stringify([vcLoc0.auto, vcLoc0.fait, vcLoc0.departsCle]);
   // (1er nov., audit A2) Les ventes Vestiaire entrent dans chaque total « toutes
   // plateformes » : comptées si leur argent est sûr, NOMMÉES sinon (§5). Posées
   // ICI, avant tout `useMemo` qui les lit (§4.6, piège TDZ).
@@ -46971,8 +47018,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     for (const t of (tracking || [])) { if (t && t.suivi && t.status && t.status !== 'info') s.add(String(t.suivi).toUpperCase()); }
     return s;
   }, [tracking]);
+  // (8 nov.) PARTI, PROUVÉ CHEZ LE TRANSPORTEUR (api/_lib/depart-colis.js) : le n°
+  // EXACT du bordereau de CETTE transaction, lu chez Chronopost / Vinted Go par le
+  // serveur et pris en charge — la même règle que le widget et les rappels
+  // (`txVintedParties`). Départs pas lus ⇒ Map vide ⇒ rien ne change.
+  const partisTransp = useMemo(() => txVintedParties(bordsParTransaction(emailBords, isBordHidden), vcLoc0.departs, { ventesMs: Object.fromEntries((sales.items || []).filter((o) => o && o.transaction_id != null && tsCommande(o)).map((o) => [String(o.transaction_id), tsCommande(o)])) }),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [emailBords, bordsHidden, vcLoc0.departsCle, sales.items]);
   const bordShipped = (b) => {
     if (b && b.suivi && shippedSuivis.has(String(b.suivi).toUpperCase())) return true; // colis déjà dans le réseau transporteur
+    if (b && b.transaction != null && partisTransp.has(String(b.transaction))) return true; // (8 nov.) pris en charge, lu chez le transporteur
     const o = b && b.transaction != null ? soldByTxn[String(b.transaction)] : null;
     if (!o) return false;                              // vente inconnue : on ne conclut pas
     // ⚠️ LA BONNE QUESTION EST « CETTE VENTE ATTEND-ELLE ENCORE MON ENVOI ? »,
@@ -52007,7 +52062,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     out.sort((a, b) => (a.daysLeft ?? 999) - (b.daysLeft ?? 999));
     return out;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, hiddenSales, hiddenAccts, shipDone, bordsParTxn, tracking, bordsShipped, panelBordsDone]);
+  }, [sales.items, hiddenSales, hiddenAccts, shipDone, bordsParTxn, tracking, bordsShipped, panelBordsDone, partisTransp]);
   // ── « COCHÉ POSTÉ » MAIS JAMAIS VU PARTIR — UN PROPRIÉTAIRE (§11) ─────────
   // La règle vit dans `posteSansDepart` ; la liste se calcule ICI, une fois, et
   // Colis comme Ma journée la LISENT. La capture qui a lu le statut de la vente
@@ -52021,13 +52076,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const b = bordsParTxn[k] || null;
       const lim = limiteExpedition(o, b);
       const cap = o._acc ? _harvestSeen[`${o._acc.vinted_user_id}_orders_sold`] : null;
-      const vu = !!(b && b.suivi && shippedSuivis.has(String(b.suivi).toUpperCase()));
+      const vu = !!(b && b.suivi && shippedSuivis.has(String(b.suivi).toUpperCase())) || partisTransp.has(k);
       const r = posteSansDepart({ o, cocheLe: shipDone[k], captureAt: cap, joursLimite: lim.daysLeft, vuParTransporteur: vu });
       if (r) out.push({ o, ...r });
     }
     out.sort((a, b) => (b.limiteDepassee ? 1 : 0) - (a.limiteDepassee ? 1 : 0) || b.heures - a.heures);
     return out;
-  }, [sales.items, hiddenSales, shipDone, bordsParTxn, shippedSuivis]);
+  }, [sales.items, hiddenSales, shipDone, bordsParTxn, shippedSuivis, partisTransp]);
   // ── « COLIS À POSTER » EST PUBLIÉ, LA CLOCHE LE CONSOMME (§11) ────────────
   // Même motif que `vrm_colis_retirer` : l'écran qui a toutes les sources
   // publie, le centre de notifications lit. Il recalculait de son côté (sans
@@ -53952,7 +54007,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           L.push({ cle: 'v:' + tx, site: 'vinted', suivis: [b.suivi], deja: true, o, b, num: numForBord(b) || (effEntry(o)?.numero || ''), titre: o.title || 'Colis' }); }
       }
       if (voitSite('vestiaire')) { const cv = colisVestiaire(vcEtat) || {}; const faits = vcCarte('vrm_vc_colis_done') || {};
-        for (const v of (cv.faits || [])) L.push({ cle: 'vc:' + v.id, site: 'vestiaire', suivis: v.suivi ? [v.suivi] : [], deja: true, v, num: v.num || '', titre: v.titre || 'Article Vestiaire' });
+        for (const v of [...(cv.faits || []), ...(cv.partis || [])]) L.push({ cle: 'vc:' + v.id, site: 'vestiaire', suivis: v.suivi ? [v.suivi] : [], deja: true, v, num: v.num || '', titre: v.titre || 'Article Vestiaire' });
         for (const v of (cv.aEnvoyer || [])) L.push({ cle: 'vc:' + v.id, site: 'vestiaire', suivis: v.suivi ? [v.suivi] : [], deja: !!faits[v.id], v, num: v.num || '', titre: v.titre || 'Article Vestiaire' }); }
     } catch (_) {}
     return L;
@@ -54365,6 +54420,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         for (const v of ((cv && cv.faits) || [])) out.push({ cle: 'vc:' + v.id, site: 'vestiaire', type: 'vc', v, rang: 0.5,
           photo: v.photo || null, titre: v.titre || 'Article Vestiaire', num: v.num || '', tr: transporteurDuColis({ declare: v.transporteur, suivi: v.suivi }),
           lues: { imprime: !!(imprimes && imprimes[v.id]), depose: true } });
+        // (8 nov.) Partis d'après le transporteur (pris en charge, lu chez lui).
+        for (const v of ((cv && cv.partis) || [])) out.push({ cle: 'vc:' + v.id, site: 'vestiaire', type: 'vc', v, rang: 0.5, depart: v.depart,
+          photo: v.photo || null, titre: v.titre || 'Article Vestiaire', num: v.num || '', tr: transporteurDuColis({ declare: v.transporteur, suivi: v.suivi }),
+          lues: { imprime: !!(imprimes && imprimes[v.id]), depose: true, enroute: true } });
       }
       if (siteColis === 'toutes' && lbcLu) {
         const fait = load('vrm_lbc_colis_done', {}) || {};
@@ -70992,6 +71051,8 @@ function OngletManque({ site, onglet, onNav }) {
 // sont pas écrits : on ne sait pas si c'est le prix ou ce que Vestiaire verse.
 // Une ligne ouvre l'écran de SON site (une vente eBay : sa commande).
 function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVentes, lbcLu, ebayTous, onOuvrir }) {
+  // (8 nov.) Les départs prouvés chez le transporteur : la ligne d'une vente Vestiaire partie se redessine.
+  const vcLocDep = useVcLocal();
   const voit = (s) => !sites || sites.has(s);
   // (5 nov.) Le compte de CHAQUE vente, toutes plateformes (`nomCompteVente`).
   const annLbc = useAnnuaireLbc();
@@ -71057,6 +71118,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
       }
     }
     if (voit('vestiaire') && vc && vc.ventes) {
+      const partisVc = departsVc({ ...vc, departs: departsCarte() });
       for (const [id, v] of Object.entries(vc.ventes)) {
         if (!v) continue;
         // (6 nov., onglets A) Le montant de la ligne = celui que « vendu » compte (`montantRecuVc`, ce que
@@ -71064,14 +71126,14 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
         // dans la carte du haut, aucun montant sur la vente).
         const recuVc = montantRecuVc(v);
         out.push({ cle: 'vestiaire:' + id, site: 'vestiaire', id, titre: v.titre || v.title || 'Vente Vestiaire', t: ts(v.date) ?? ts(v.premiereVue),
-          prix: recuVc && recuVc.eur != null ? recuVc.eur : null, devise: 'EUR', etat: v.aExpedier ? L.aEnvoyer : (v.etat || ''), compte: nomCompteVente('vestiaire', v, {}),
+          prix: recuVc && recuVc.eur != null ? recuVc.eur : null, devise: 'EUR', etat: v.aExpedier ? (partisVc.has(String(id)) ? 'Envoyée' : L.aEnvoyer) : (v.etat || ''), compte: nomCompteVente('vestiaire', v, {}),
           num: numVcVente(v, vc.liens, numerosVcEffectifs()), photo: photoArticle(v) || null, tr: transporteurDuColis({ declare: v.transporteur || '', suivi: v.suivi || '' }) });
       }
     }
     // La plus récente d'abord ; une vente sans date lue va à la fin (jamais datée au hasard).
     return out.sort((a, z) => (z.t ?? -Infinity) - (a.t ?? -Infinity));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sites, ventesVinted, panelOff, lbcVentes, lbcLu, ebayTous, vc, annLbc]);
+  }, [sites, ventesVinted, panelOff, lbcVentes, lbcLu, ebayTous, vc, annLbc, vcLocDep.departsCle]);
   const [n, setN] = React.useState(60);
   const NOM = { vinted: 'Vinted', leboncoin: 'Leboncoin', ebay: 'eBay', vestiaire: 'Vestiaire' };
   // Ce que chaque site a pu lire : dit UNE fois, en tête (jamais un « 0 » inventé).
