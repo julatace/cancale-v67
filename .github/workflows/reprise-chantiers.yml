@@ -63,4 +63,5 @@ jobs:
             node scripts/tests/synchronisation-vinted-interface.cjs
             node scripts/tests/actions-visuelles-interface.cjs
             node scripts/tests/recherche-interactions.cjs
+            node scripts/tests/controles-finitions-interface.cjs
           fi

@@ -1,0 +1,25 @@
+const fs=require('fs'),path=require('path'),assert=require('assert/strict');const{build}=require('esbuild'),{chromium}=require('playwright');
+(async()=>{
+ const root=path.resolve(__dirname,'../..');const js=await build({stdin:{resolveDir:root,loader:'jsx',contents:`
+ import React from'react';import{createRoot}from'react-dom/client';import{BoutonBase,SegmenteBase}from'./src/composants/Bouton.jsx';import*as TH from'./src/themeMineral.js';
+ const sombre=document.documentElement.dataset.theme==='dark',pal=sombre?TH.MINERAL_DARK:TH.MINERAL;for(const[k,v]of Object.entries(TH.variablesTheme(pal,sombre)))document.documentElement.style.setProperty(k,v);document.body.style.background=pal.bg;document.body.style.color=pal.text;
+ window.actions=0;window.choix=0;window.bloque=true;const r=createRoot(document.getElementById('root'));
+ window.afficher=()=>r.render(<div className="vrm-app-shell"><main className="vrm-main">
+ <BoutonBase href="#document" disabled={window.bloque} title="Connexion nécessaire" onClick={()=>window.actions++}>Ouvrir le bordereau</BoutonBase>
+ <BoutonBase href="#article">Voir l’article</BoutonBase><BoutonBase disabled>Préparer</BoutonBase><BoutonBase disabled type="submit">Enregistrer</BoutonBase>
+ <div className="vrm-b-rangee" data-longue=""><BoutonBase>Télécharger les bordereaux sélectionnés</BoutonBase><BoutonBase>Vérifier ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789</BoutonBase></div>
+ <SegmenteBase label="Colis" value="zero" onChange={()=>window.choix++} options={[{v:'zero',l:'À envoyer',n:0},{v:'inconnu',l:'À vérifier',n:null},{v:'pret',l:'Prêts',n:3,disabled:true}]}/>
+ </main></div>);window.afficher();`},bundle:true,write:false,format:'iife',logLevel:'silent'});
+ const browser=await chromium.launch({executablePath:process.env.VRM_CHROMIUM_PATH||(fs.existsSync('/usr/bin/chromium')?'/usr/bin/chromium':undefined),args:['--no-sandbox']});let n=0;const ok=(v,m)=>{assert.ok(v,m);n++;};
+ try{for(const width of[320,390,1512])for(const theme of['light','dark']){
+ const p=await browser.newPage({viewport:{width,height:900}});await p.setContent(`<html data-theme="${theme}"><body><div id="root"></div></body></html>`);
+ const css=['styles-coque.css','styles-boutons.css','styles-composants.css','styles-design-2026.css','styles-parcours-clairs.css'].map(f=>fs.readFileSync(path.join(root,'src',f),'utf8')).join('\n');await p.addStyleTag({content:css+'body{font-family:Arial;margin:12px}.vrm-main{max-width:520px;margin:auto;display:grid;gap:16px}.vrm-b-rangee{display:flex;gap:8px}'});await p.addScriptTag({content:js.outputFiles[0].text});
+ const lien=p.getByRole('link',{name:'Ouvrir le bordereau'});await lien.waitFor();await lien.evaluate(e=>{e.click();e.dispatchEvent(new MouseEvent('auxclick',{button:1,bubbles:true,cancelable:true}));});ok(await p.evaluate(()=>window.actions)===0,'disabled link does not execute an action');ok(await lien.getAttribute('href')===null,'disabled link has no destination');ok(await lien.getAttribute('aria-busy')===null,'disabled is not falsely labelled loading');
+ await p.keyboard.press('Tab');ok(await p.getByRole('link',{name:'Voir l’article'}).evaluate(e=>e===document.activeElement),'keyboard skips unavailable actions');ok(await p.getByRole('button',{name:'Préparer',exact:true}).isDisabled()&&await p.getByRole('button',{name:'Enregistrer',exact:true}).isDisabled(),'native disabled buttons remain disabled');
+ ok(await p.getByRole('button',{name:'À envoyer 0',exact:true}).locator('.vrm-seg-n').innerText()==='0','known zero is visible');ok(await p.getByRole('button',{name:'À vérifier',exact:true}).locator('.vrm-seg-n').count()===0,'unknown count is not turned into zero');
+ await p.getByRole('button',{name:'Prêts 3',exact:true}).evaluate(e=>e.click());ok(await p.evaluate(()=>window.choix)===0,'disabled segment does not change selection');
+ const contenu=await p.locator('[data-longue] button').evaluateAll(es=>es.map(e=>{const b=e.getBoundingClientRect(),r=document.createRange();r.selectNodeContents(e);return{w:b.width,h:b.height,top:b.top,dans:[...r.getClientRects()].every(t=>t.left>=b.left-1&&t.right<=b.right+1&&t.top>=b.top-1&&t.bottom<=b.bottom+1)};}));ok(contenu.every(x=>x.dans),'long text remains inside each button');if(width<768)ok(Math.abs(contenu[0].top-contenu[1].top)<1&&Math.abs(contenu[0].h-contenu[1].h)<1,'adjacent actions have aligned edges '+width+' '+theme+' '+JSON.stringify(contenu));ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'no page overflow');
+ if(process.env.CAPTURE_DIR){fs.mkdirSync(process.env.CAPTURE_DIR,{recursive:true});await p.screenshot({path:path.join(process.env.CAPTURE_DIR,`controles-${width}-${theme}.png`)});}
+ await p.evaluate(()=>{window.bloque=false;window.afficher();});await p.waitForFunction(()=>document.querySelector('a').hasAttribute('href'));await lien.click();ok(await p.evaluate(()=>window.actions)===1,'available link works again after re-enabling');await p.close();
+ }}finally{await browser.close();}console.log(n+' contrôles des petits détails réussis');
+})().catch(e=>{console.error(e);process.exitCode=1});
