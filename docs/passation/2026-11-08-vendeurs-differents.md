@@ -84,7 +84,14 @@ Branche `claude/vendeurs-differents` (depuis `claude/amazing-lovelace-xd7obl`). 
 - `node scripts/audit-vendeurs-differents.cjs --prouve` : 42 contrôles verts, **14/14
   mutations** attrapées ; sur la branche de départ (d7ebe93a, `git archive`) : **13 rouges**.
 - `scripts/bancs/vendeurs-differents.cjs` (l'app rendue, données de `nouveau-vendeur.cjs`
-  réduites à un compte ; `SHOTS=dossier`).
+  réduites à un compte ; `BANC_PORT`, `SHOTS=dossier`, `LARGEURS`, `THEMES`) : **58 verts** à
+  390/1512, clair/sombre ; sur le build de la branche de départ (`BANC_DIST`, 390 clair) :
+  **7 rouges** (pas de Simple, Stock et Republier au menu, « installe l'extension VRM sur ton
+  ordinateur » dans Ventes, « Elle s'installe sur ton ordinateur » dans Vérifier mon
+  installation sur Orion, Équipe muette sur ce qui viendra). Captures regardées : Réglages →
+  Affichage (390 clair), Ma journée Simple (1512 sombre : menu sans Stock/Republier/sites),
+  Orion → Vérifier mon installation (390 sombre : « Installer l'extension » ici), Équipe.
+  ⚠️ A8 (« articles en stock ») ne juge que si `data-stock-resume` est rendu (sinon vide = vert).
 - Audits verts : variables, tdz, identite, statuts, coherence, violet, equipe-sql,
   equipe-ecriture-membre, verif-annonce (`--prouve` 11/11 après mise à jour de la mutation
   `sans_marque`), guide-iphone, accompagnement, conseils, fonctions-api, icones,
