@@ -21,7 +21,7 @@ jobs:
       - run: npm ci
       - name: Vérifier les parcours et changements de propriétaire
         run: |
-          node --test scripts/tests/parcours-clairs.test.mjs
+          node --test scripts/tests/parcours-clairs.test.mjs scripts/tests/periode-libelles.test.mjs
           node scripts/tests/lot-preparation-reprise.cjs
           node scripts/tests/guide-reception-isolation.cjs
       - name: Vérifier les archives portables des extensions
@@ -29,6 +29,7 @@ jobs:
           python3 scripts/tests/paquets-portables.py
           python3 scripts/tests/orion-reference.py
           python3 scripts/tests/orion-base-validee.py
+          python3 scripts/tests/orion-garde-regression.py
       - name: Vérifier les calculs, le handler et les changements de session
         run: |
           node --test scripts/tests/finance-reprise.test.mjs scripts/tests/appareils-route.test.mjs scripts/tests/deconnexion-proprietaire.test.mjs scripts/tests/parcours-quotidien.test.mjs scripts/tests/bordereau-vestiaire-ouverture.test.mjs
@@ -68,4 +69,5 @@ jobs:
             node scripts/tests/recherche-interactions.cjs
             node scripts/tests/controles-finitions-interface.cjs
             node scripts/tests/fenetres-interruptions.cjs
+            node scripts/tests/periode-affichage-focus.cjs
           fi

@@ -20,7 +20,7 @@ import { createPortal } from 'react-dom';
 import './choix-periode.css';
 import './styles-parcours.css';
 import {
-  grilleMois, nomMois, decalerMois, cleJour, libellePlage, nbJours, raccourcisPeriode, raccourciDe,
+  grilleMois, nomMois, decalerMois, cleJour, libellePlage, libellePeriodeAffichee, nbJours, raccourcisPeriode, raccourciDe,
   toucherJour, etatJour, valeurDeSelection, moisDefilants, JOURS_INITIALES, MOIS_LONG,
 } from './periodeCalendrier.js';
 
@@ -32,7 +32,7 @@ const normaliser = (v) => (v ? { ...v, from: versDate(v.from), to: versDate(v.to
 // (30 oct.) `vide` : ce que dit le bouton quand RIEN n'est choisi. « Toute la période »
 // par défaut (Ventes, Achats : la liste montre tout) ; un écran qui n'affiche rien
 // sans période (le CA entre deux dates) dit « Choisir une période ».
-export const libelleValeur = (brut, vide = 'Toute la période') => { const v = normaliser(brut); return (!v || (!v.from && !v.to)) ? vide : majuscule(v.label || libellePlage(v.from, v.to)); };
+export const libelleValeur = (brut, vide = 'Toute la période') => { const v = normaliser(brut); return (!v || (!v.from && !v.to)) ? vide : majuscule(libellePeriodeAffichee(v)); };
 
 function useEtroit() {
   const q = '(max-width: 767px)';
@@ -95,6 +95,7 @@ export default function ChoixPeriode({ owner = '', datation = '', value: brut, o
   const auj = React.useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }, [ouvert]);
   const [vue, setVue] = React.useState(() => decalerMois(auj.getFullYear(), auj.getMonth(), -1));
   const boite = React.useRef(null);
+  const declencheur = React.useRef(null);
   const pop = React.useRef(null);
   const defile = React.useRef(null);
   const raccourcis = listeRaccourcis ? listeRaccourcis(auj) : raccourcisPeriode(auj);
@@ -116,15 +117,15 @@ export default function ChoixPeriode({ owner = '', datation = '', value: brut, o
     try { const r = ev.currentTarget.getBoundingClientRect(); setCote(r.left + large > window.innerWidth - 16 ? 'droite' : 'gauche'); } catch (_) {}
     setOuvert(true);
   };
-  const fermer = () => { setOuvert(false); setSurvol(null); };
+  const fermer = (rendreFocus = true) => { setOuvert(false); setSurvol(null); if(rendreFocus!==false)try{declencheur.current?.focus({preventScroll:true});}catch(_){} };
   const appliquer = (v) => { onChange(v);try{const p=periodeReutilisable(v);if(p)garderParcours(sessionStorage,owner,'periode-recente',p);}catch(_){} fermer(); };
   let recente=null;try{recente=periodeReutilisable(lireParcours(sessionStorage,owner,'periode-recente'));}catch(_){}
 
   // Ordinateur : un clic dehors ou Échap referme (rien n'est appliqué).
   React.useEffect(() => {
     if (!ouvert || etroit) return undefined;
-    const dehors = (ev) => { if (boite.current && !boite.current.contains(ev.target)) fermer(); };
-    const echap = (ev) => { if (ev.key === 'Escape') fermer(); };
+    const dehors = (ev) => { if (boite.current && !boite.current.contains(ev.target)) fermer(false); };
+    const echap = (ev) => { if (ev.key === 'Escape'&&!ev.defaultPrevented&&!ev.isComposing&&ev.keyCode!==229) fermer(); };
     document.addEventListener('mousedown', dehors); document.addEventListener('keydown', echap);
     return () => { document.removeEventListener('mousedown', dehors); document.removeEventListener('keydown', echap); };
   }, [ouvert, etroit]);
@@ -189,7 +190,7 @@ export default function ChoixPeriode({ owner = '', datation = '', value: brut, o
   return (
     <div className="vrm-period vrm-cal" ref={boite} {...data}>
       <div className="vrm-rangee" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-        <button type="button" className="vrm-cal-declencheur" data-periode-ouvrir onClick={(ev) => (ouvert ? fermer() : ouvrir(ev))}
+        <button type="button" className="vrm-cal-declencheur" ref={declencheur} data-periode-ouvrir onClick={(ev) => (ouvert ? fermer() : ouvrir(ev))}
           aria-expanded={ouvert} aria-haspopup="dialog" data-periode-valeur={value && value.from ? `${cleJour(value.from)}..${cleJour(value.to || value.from)}` : ''}>
           {Icon ? <Icon name="calendar" size={15}/> : null}<span data-periode-libelle>{libelle || libelleValeur(value, vide)}</span>
         </button>

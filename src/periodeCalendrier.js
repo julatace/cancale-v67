@@ -198,3 +198,15 @@ export function etiquettePlage(from, to) {
   if (!an && f.getMonth() === t.getMonth()) return `${f.getDate()}–${t.getDate()} ${MOIS_COURT[t.getMonth()]}`;
   return `${f.getDate()} ${MOIS_COURT[f.getMonth()]}${an ? ' ' + f.getFullYear() : ''}–${t.getDate()} ${MOIS_COURT[t.getMonth()]}${an ? ' ' + t.getFullYear() : ''}`;
 }
+
+// Un intitulé relatif mémorisé ne doit pas promettre des dates différentes.
+export function libellePeriodeAffichee(valeur, maintenant = new Date()) {
+  const label=typeof valeur?.label==='string'?valeur.label.trim():'';
+  const exact=()=>libellePlage(valeur?.from,valeur?.to);
+  if(!label)return exact();
+  const cle=s=>s.replace(/’/g,"'").toLocaleLowerCase('fr-FR');
+  const l=cle(label);
+  if(!/^(?:\d+ derniers jours|aujourd'hui|cette semaine|ce mois|mois dernier|ce trimestre|cette année)$/.test(l))return label;
+  const actuels=[...raccourcisPeriode(maintenant),...raccourcisCarte(maintenant)];
+  return actuels.some(r=>(cle(r.nom)===l||cle(r.valeur.label||'')===l)&&memeJour(r.valeur.from,valeur?.from)&&memeJour(r.valeur.to,valeur?.to))?label:exact();
+}
