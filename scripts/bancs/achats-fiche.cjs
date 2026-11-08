@@ -98,7 +98,7 @@ async function ouvrirMenu(pg, tx) {
   const carte = pg.locator(`[data-achat-tx="${tx}"]`);
   await carte.waitFor({timeout:10000});
   if (!(await carte.count())) return false;
-  await carte.locator('button[title="Actions rapides"]').first().click();
+  await carte.locator('button.vrm-buy-more').first().click();
   await pg.waitForTimeout(250);
   return true;
 }

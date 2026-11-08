@@ -56,7 +56,7 @@ export function gestesEmails({ d, quarantaine, preuves }) {
   if (d && Array.isArray(d.adresses)) {
     if (d.adresses.length === 0) g.push({ k: 'adresse', n: 0, phrase: 'Ajoute l’adresse où Vinted t’écrit, pour que ses e-mails te reviennent', bouton: 'Ajouter', vers: 'adresses' });
     const sansCompte = d.adresses.filter((a) => !(Array.isArray(a.comptes) && a.comptes.length === 1));
-    if (sansCompte.length) g.push({ k: 'compte', n: sansCompte.length, phrase: `${pl(sansCompte.length, 'adresse')} sans son compte Vinted associé`, bouton: 'Associer', vers: 'adresses' });
+    if (sansCompte.length) g.push({ k: 'compte', n: sansCompte.length, phrase: `${pl(sansCompte.length, 'adresse')} sans son compte Vinted associé`, bouton: 'Associer un compte', vers: 'adresses' });
     if (preuves && preuves.cloisonnee === true && !preuves.installation && preuves.adresses) {
       const nonConf = d.adresses.filter((a) => a.declaree !== false && (preuves.adresses[String(a.adresse || '').trim().toLowerCase()] || {}).etat !== 'prouvee');
       if (nonConf.length) g.push({ k: 'confirmer', n: nonConf.length, phrase: `${pl(nonConf.length, 'adresse')} pas encore ${nonConf.length > 1 ? 'confirmées' : 'confirmée'} : ${nonConf.length > 1 ? 'leurs' : 'ses'} e-mails sont mis de côté`, bouton: 'Confirmer', vers: 'adresses' });

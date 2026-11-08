@@ -62,8 +62,8 @@ function Carte({ k, annee, blocage, onExport, enCours }) {
         <div className="vrm-d7-note" data-dac7-bloque="0">Informations fiscales : aucun blocage chez Vinted{blocage.at ? ` · lu le ${jour(blocage.at)}` : ''}</div>
       ) : null}
       <div className="vrm-d7-gestes">
-        <button type="button" className="vrm-d7-btn" data-dac7-pdf={id} disabled={!lu || !!enCours} onClick={() => onExport(k, 'pdf')}>{enCours === id + 'pdf' ? '…' : 'PDF'}</button>
-        <button type="button" className="vrm-d7-btn" data-dac7-csv={id} disabled={!lu || !!enCours} onClick={() => onExport(k, 'csv')}>{enCours === id + 'csv' ? '…' : 'Tableur'}</button>
+        <button type="button" className="vrm-d7-btn" data-dac7-pdf={id} aria-label={`Télécharger le relevé DAC7 de ${k.nom} en PDF`} title={`Télécharger le relevé DAC7 de ${k.nom} en PDF`} disabled={!lu || !!enCours} onClick={() => onExport(k, 'pdf')}>{enCours === id + 'pdf' ? '…' : 'PDF'}</button>
+        <button type="button" className="vrm-d7-btn" data-dac7-csv={id} aria-label={`Télécharger le relevé DAC7 de ${k.nom} en tableur`} title={`Télécharger le relevé DAC7 de ${k.nom} en tableur`} disabled={!lu || !!enCours} onClick={() => onExport(k, 'csv')}>{enCours === id + 'csv' ? '…' : 'Tableur'}</button>
       </div>
     </li>
   );

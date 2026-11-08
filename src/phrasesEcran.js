@@ -20,7 +20,7 @@ export const PHRASES_ECRAN = {
   annonces: 'Tes paires en ligne : numéro, prix d’achat, offres.',
   ventes: 'Tes ventes de tous les sites, et l’argent qui arrive.',
   colis: 'Imprime les bordereaux, dépose tes colis, retire tes achats.',
-  messages: 'Tes conversations et les offres reçues : réponds d’ici.',
+  messages: 'Réponds à tes acheteurs et à leurs offres.',
   achats: 'Ce que tu as acheté : en route, reçu, prix payé.',
   emails: 'Les e-mails de tes plateformes, rangés : codes, bordereaux, ventes.',
   compta: 'Ce que tu as gagné, et quoi déclarer à l’URSSAF.',

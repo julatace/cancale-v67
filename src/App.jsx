@@ -40781,7 +40781,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 {peutCode && (
                   <button className="vrm-icon-control vrm-buy-quick" type="button" onClick={()=>openQrView(tk)} title="Code de retrait" aria-label="Code de retrait" style={{color:C.warn}}><Icon name="key" size={16}/></button>
                 )}
-                <button className="vrm-icon-control vrm-buy-more" type="button" onClick={()=>setAchatMenu(m=>m===tid?null:tid)} title="Actions rapides" aria-label="Actions rapides" aria-haspopup="menu" style={{color:achatMenu===tid?C.accent:C.muted,background:achatMenu===tid?`${C.accent}12`:'transparent'}}>⋯</button>
+                <button className="vrm-icon-control vrm-buy-more" type="button" onClick={()=>setAchatMenu(m=>m===tid?null:tid)} title="Code de retrait, suivi, note, reçu d’achat, étiquette" aria-label="Plus d’actions pour cet achat" aria-haspopup="menu" style={{color:achatMenu===tid?C.accent:C.muted,background:achatMenu===tid?`${C.accent}12`:'transparent'}}>⋯</button>
                 {achatMenu===tid && (<>
                   <div onClick={close} style={{position:'fixed',inset:0,zIndex:40}}/>
                   <div role="menu" className="vrm-buy-menu" style={{background:C.card,border:`1px solid ${C.border}`,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.18)'}}>
@@ -42053,7 +42053,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {liste.length} conversation{liste.length>1?'s':''}
                 </div>
                 {/* (5 nov., revue 3.8) Une boîte en panne a SON « Réessayer » : l'icône de relecture se tait à côté. */}
-                {!boitesKO.length && <button type="button" className="vrm-msg-refresh" onClick={()=>loadConvs(true)} aria-label="Relire les conversations" title="Relire"><Icon name="sync" size={17}/></button>}
+                {!boitesKO.length && <button type="button" className="vrm-msg-refresh" onClick={()=>loadConvs(true)} aria-label="Mettre à jour les conversations" title="Mettre à jour les conversations"><Icon name="sync" size={17}/></button>}
               </div>
               {messageFilter==='repondre'&&<p className="vrm-inbox-feedback">{aRepondre.length?`${offresARepondre} offre${offresARepondre>1?'s':''} · ${aRepondre.length-offresARepondre} conversation${aRepondre.length-offresARepondre>1?'s':''} sans offre en attente`:'Aucune conversation confirmée comme étant à répondre.'} · Dernier auteur vérifié uniquement. Les fils non vérifiés restent dans Toutes.</p>}
               {messageFilter==='unread' && tri.length===0 && <p className="vrm-inbox-feedback">Aucune conversation non lue dans cette sélection.</p>}
