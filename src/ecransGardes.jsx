@@ -191,7 +191,9 @@ function Attacheur({ actif, hote, conteneur, vivant, setFige, dejaMontre, evince
     const h = hote.current;
     if (actif) { if (h && conteneur.parentNode !== h) h.appendChild(conteneur); }
     else {
-      if (feuilleOuverte(conteneur)) { evincerRef.current(); return; }   // démonté, sa feuille avec lui
+      // Démonté comme avant : sa feuille avec lui, ou un écran tombé (son garde-fou
+      // `GardeEcran` affiché) — y revenir doit le relancer à neuf (banc garde-ecrans P4).
+      if (feuilleOuverte(conteneur) || conteneur.querySelector('[data-garde-ecran]')) { evincerRef.current(); return; }
       if (conteneur.parentNode) conteneur.parentNode.removeChild(conteneur);
     }
     setFige(!actif);
