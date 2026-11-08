@@ -29,7 +29,7 @@ export async function utilisateurDe(req) {
     const j = await r.json();
     const id = String((j && j.id) || '');
     if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
-    return { id, email: String((j && j.email) || ''), emailConfirme: !!(j && j.email_confirmed_at) };
+    return { id, email: String((j && j.email) || ''), emailConfirme: !!(j && j.email_confirmed_at), created_at: (j && typeof j.created_at === 'string') ? j.created_at : '' };
   } catch (_) { return undefined; }
 }
 

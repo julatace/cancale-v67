@@ -82,6 +82,7 @@ import { sendPushToAll, pushConfigure } from './_lib/push.js';
 import { contexteVendeur } from './_lib/owner.js';
 import { configurationRelances, lireJeton as lireJetonRelance, ecrireChoix as ecrireChoixRelance, lireChoix as lireChoixRelance, lireEnvois as lireEnvoisRelance } from './_lib/relances-essai.js';
 import { corsExtension } from './_lib/cors-extension.js';
+import { codeDe, suiviDe, filleulDe, parrainageOuvert, rattacher, factureFilleulPayee } from './_lib/parrainage.js';
 
 export const config = { api: { bodyParser: false } };
 
@@ -115,7 +116,9 @@ async function accesDe(req) {
     if (!r.ok) return undefined;
     const j = await r.json();
     if (!j || typeof j !== 'object' || typeof j.acces !== 'boolean') return undefined;
-    return { obligatoire: j.obligatoire === true, proprietaire: j.proprietaire === true, acces: j.acces };
+    // `lecture` (migration 027) : la base laisse LIRE quand l'accès est coupé
+    // (lecture seule) — absent tant que la 027 n'est pas passée.
+    return { obligatoire: j.obligatoire === true, proprietaire: j.proprietaire === true, acces: j.acces, lecture: j.lecture === true };
   } catch (_) { return undefined; }
 }
 
@@ -409,6 +412,16 @@ async function webhook(req, res) {
     sub = r.data;
     // Le propriétaire de la session (client_reference_id) fait foi s'il manque.
     if (!(sub.metadata && sub.metadata.owner) && obj.client_reference_id) sub.metadata = { ...(sub.metadata || {}), owner: obj.client_reference_id };
+  } else if (type === 'invoice.paid') {
+    // (8 nov.) LE PARRAINAGE : le premier paiement réel du filleul offre un
+    // mois à chacun (api/_lib/parrainage.js). Le vendeur vient de NOTRE table
+    // (client Stripe → owner), jamais d'un champ de la facture.
+    const client = typeof obj.customer === 'string' ? obj.customer : (obj.customer && obj.customer.id) || '';
+    const owner = await proprietaireDe(null, client);
+    if (!owner) return repondre(res, 200, { recu: true, ignore: 'sans-proprietaire' });
+    const p = await factureFilleulPayee(owner, client, obj, PRIX_CGV.centimes);
+    if (!p.ok) return repondre(res, 503, { erreur: 'parrainage non crédité', reessayer: true });
+    return repondre(res, 200, { recu: true });
   } else {
     // invoice.* : le statut qui compte arrive par customer.subscription.updated.
     return repondre(res, 200, { recu: true, ignore: type });
@@ -490,6 +503,13 @@ async function abonnement(req, res) {
     // `acces` : la base laisse entrer (ce que décide la porte) — LA règle.
     actif: acc.proprietaire || !!(ligne && abonnementActif(ligne.statut)),
     acces: acc.acces,
+    // (8 nov.) La base laisse-t-elle LIRE quand l'accès est coupé ? (027) —
+    // l'app passe alors en lecture seule au lieu de tout fermer.
+    lecture: acc.lecture === true,
+    lectureSeule: acc.acces === false && acc.lecture === true,
+    // La fin de l'ESSAI : pendant « trialing », la période en cours EST l'essai
+    // (Stripe : current_period_end = trial_end). Rien d'autre n'est deviné.
+    finEssai: ligne && ligne.statut === 'trialing' ? (ligne.fin_periode || null) : null,
   });
 }
 
@@ -500,7 +520,9 @@ async function abonnement(req, res) {
 // 27 octobre : prix 16,99 €, et essai gratuit de 7 jours (une seule fois par
 //   adresse e-mail ET par compte Vinted).
 // 31 octobre : prix 16,99 € (sa décision), essai de 7 jours inchangé.
-const CGV_VERSION = '2026-10-31';
+// 8 novembre : fin de l'essai et rappels, lecture seule à l'expiration,
+//   parrainage (article 2), chemins Paramètres → Abonnement.
+const CGV_VERSION = '2026-11-08';
 async function checkout(req, res) {
   const u = await utilisateurDe(req);
   if (!u) return repondre(res, 401, { erreur: 'session' });
@@ -616,6 +638,29 @@ async function portail(req, res) {
   const r = await stripeApi('POST', 'billing_portal/sessions', { customer: ligne.client_stripe, return_url: `${APP_URL}/?tab=settings&vue=abonnement` });
   if (!r.ok || !r.data.url) return repondre(res, 502, { erreur: 'stripe', message: "Stripe n'a pas pu ouvrir la page de gestion. Réessaie dans un instant." });
   return repondre(res, 200, { url: r.data.url });
+}
+
+// ── LE PARRAINAGE (8 nov.) ──────────────────────────────────────────────────
+// GET : SON lien et des NOMBRES (inscrits, payés, mois offerts) — jamais qui.
+// POST { action: 'rattacher', code } : le vendeur connecté devient filleul du
+// code (règles dans api/_lib/parrainage.js). Tout ce qui le concerne vient de
+// SA session (jamais du corps, sauf le code lui-même).
+async function parrainage(req, res) {
+  const u = await utilisateurDe(req);
+  if (!u) return repondre(res, 401, { erreur: 'session' });
+  if (!process.env.SUPABASE_SERVICE_KEY) return repondre(res, 200, { ok: true, installe: false });
+  if (req.method === 'POST') {
+    const corps = await lireCorpsJson(req);
+    if (!corps || corps.action !== 'rattacher') return repondre(res, 400, { ok: false, raison: 'action' });
+    const [ligne, idsVinted] = await Promise.all([ligneDe(req), lireVintedIds(u.id)]);
+    const essaiDeja = await essaiDejaUtilise(u.email, idsVinted);
+    const r = await rattacher(corps.code, { u, ligne, idsVinted, essaiDeja });
+    return repondre(res, r.http || (r.ok ? 200 : 400), { ok: r.ok, raison: r.raison, message: r.message });
+  }
+  const [ouvert, code, suivi, filleul] = await Promise.all([parrainageOuvert(), codeDe(u.id), suiviDe(u.id), filleulDe(u.id)]);
+  // Tables absentes (027 pas passée) ou base muette : on ne promet rien.
+  if (code === undefined || suivi === undefined) return repondre(res, 200, { ok: true, installe: false, ouvert });
+  return repondre(res, 200, { ok: true, installe: true, ouvert, code, suivi, filleul: filleul || null, moisCentimes: PRIX_CGV.centimes });
 }
 
 // ── MES FACTURES ET MA CARTE (onglet « Mon compte », 4 octobre) ─────────────
@@ -1352,6 +1397,7 @@ export default async function handler(req, res) {
   if (mode === 'abonnement') return m === 'GET' ? abonnement(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   if (mode === 'checkout') return m === 'POST' ? checkout(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
   if (mode === 'portail') return m === 'POST' ? portail(req, res) : repondre(res, 405, { erreur: 'POST seulement' });
+  if (mode === 'parrainage') return (m === 'GET' || m === 'POST') ? parrainage(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'factures') return m === 'GET' ? factures(req, res) : repondre(res, 405, { erreur: 'GET seulement' });
   if (mode === 'resilier') return m === 'POST' ? resilier(req, res, false) : repondre(res, 405, { erreur: 'POST seulement' });
   if (mode === 'reprendre') return m === 'POST' ? resilier(req, res, true) : repondre(res, 405, { erreur: 'POST seulement' });

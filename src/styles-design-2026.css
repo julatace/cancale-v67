@@ -742,3 +742,38 @@ body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
 /* Les feuilles du bas : le rayon et l'ombre du système. */
 :root:root body .vrm-feuille-surface { border-radius: var(--d-r-sombre) var(--d-r-sombre) 0 0 !important; box-shadow: var(--d-ombre-flottant) !important; }
 @media (min-width: 768px) { :root:root body .vrm-feuille-surface { border-radius: var(--d-r-sombre) !important; } }
+
+/* ── (8 nov.) L'ABONNEMENT : la ligne de la coque et la page ─────────────────
+   Une ligne discrète (J-3, J-1 de l'essai ; « lecture seule » à l'expiration) :
+   fond de case, texte encre, un seul point ambre quand il y a un geste à faire. */
+.vrm-bandeau-abo { display: flex; align-items: center; gap: var(--d-e-3); margin: var(--d-e-3) var(--d-e-4) 0; padding: 10px 6px 10px var(--d-e-4); min-height: 44px; box-sizing: border-box; border-radius: var(--d-r-case); background: var(--d-carte); box-shadow: var(--d-ombre-carte); color: var(--d-encre); font-size: var(--d-t-13); line-height: 1.38; }
+.vrm-bandeau-abo-point { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 999px; background: var(--d-point-ambre); }
+.vrm-bandeau-abo-texte { flex: 1 1 auto; min-width: 0; }
+.vrm-bandeau-abo-texte b { font-weight: 600; }
+.vrm-bandeau-abo-geste { flex: 0 0 auto; min-height: 44px; padding: 0 10px; white-space: nowrap; font-weight: 600; color: var(--d-accent-texte); background: none; border: 0; cursor: pointer; font: inherit; font-weight: 600; }
+.vrm-bandeau-abo-fermer { flex: 0 0 auto; width: 44px; height: 44px; display: grid; place-items: center; border: 0; background: none; color: var(--d-gris); cursor: pointer; border-radius: var(--d-r-ctrl); }
+@media (max-width: 600px) { .vrm-bandeau-abo { flex-wrap: wrap; row-gap: 0; padding-bottom: 0; } .vrm-bandeau-abo-texte { flex-basis: calc(100% - 24px); } .vrm-bandeau-abo-geste { padding-left: 0; } .vrm-bandeau-abo-point + .vrm-bandeau-abo-texte ~ .vrm-bandeau-abo-geste { margin-left: 20px; } .vrm-bandeau-abo-fermer { margin-left: auto; } }
+.vrm-abo-tete { padding: var(--d-e-5) var(--d-e-4) var(--d-e-4); border-radius: var(--d-r-carte); background: var(--d-carte); box-shadow: var(--d-ombre-carte); }
+.vrm-abo-etat { font-size: var(--d-t-13); font-weight: 600; color: var(--d-gris); }
+.vrm-abo-titre { margin-top: 4px; font-size: var(--d-t-22); font-weight: 700; letter-spacing: -0.022em; line-height: 1.2; color: var(--d-encre); }
+.vrm-abo-phrase { margin-top: 6px; font-size: var(--d-t-15); line-height: 1.45; color: var(--d-gris); }
+.vrm-abo-jauge { margin-top: var(--d-e-4); height: 6px; border-radius: 999px; background: var(--d-remplir); overflow: hidden; }
+.vrm-abo-jauge > span { display: block; height: 100%; border-radius: inherit; background: var(--d-accent); }
+.vrm-abo-actions { display: flex; flex-wrap: wrap; gap: var(--d-e-2); margin-top: var(--d-e-4); }
+.vrm-abo-lien { display: flex; align-items: center; gap: var(--d-e-2); padding: 0 var(--d-e-4); min-height: 44px; border-radius: var(--d-r-ctrl); background: var(--d-remplir); font-size: var(--d-t-15); color: var(--d-encre); font-variant-numeric: tabular-nums; overflow: hidden; }
+.vrm-abo-lien code { flex: 1 1 auto; min-width: 0; font: inherit; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── (8 nov.) SANS ABONNEMENT : l'aperçu ──────────────────────────────────────
+   Un extrait net ; le reste flouté fort sous un voile (jamais lisible, ni
+   sélectionnable) ; une carte nette en verre, au centre en bas. */
+[data-apercu] { padding-bottom: 200px; }
+[data-apercu] [data-apercu-floute] { filter: blur(7px) saturate(.7); opacity: .45; -webkit-user-select: none; user-select: none; pointer-events: none; }
+.vrm-apercu-carte { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 900; box-sizing: border-box; width: min(440px, calc(100vw - 32px)); padding: var(--d-e-5) var(--d-e-5) var(--d-e-4); border-radius: var(--d-r-carte); background: color-mix(in srgb, var(--d-carte) 84%, transparent); -webkit-backdrop-filter: blur(24px) saturate(180%); backdrop-filter: blur(24px) saturate(180%); box-shadow: var(--d-ombre-flottant); text-align: center; color: var(--d-encre); }
+.vrm-apercu-titre { font-size: var(--d-t-17); font-weight: 700; letter-spacing: -0.012em; line-height: 1.3; }
+.vrm-apercu-phrase { margin: 6px 0 var(--d-e-4); font-size: var(--d-t-15); line-height: 1.45; color: var(--d-gris); }
+.vrm-apercu-carte[data-signe] { animation: vrm-apercu-signe 380ms cubic-bezier(.2,.8,.2,1); }
+@keyframes vrm-apercu-signe { 0% { transform: translateX(-50%) scale(1); } 40% { transform: translateX(-50%) scale(1.025); } 100% { transform: translateX(-50%) scale(1); } }
+@media (max-width: 767px) { .vrm-apercu-carte { bottom: calc(88px + env(safe-area-inset-bottom, 0px)); padding: 14px 16px 12px; } .vrm-apercu-titre { font-size: var(--d-t-15); } .vrm-apercu-phrase { font-size: var(--d-t-13); margin: 4px 0 10px; } }
+@media (prefers-reduced-motion: reduce) { .vrm-apercu-carte[data-signe] { animation: none; } }
+@media (prefers-reduced-transparency: reduce) { .vrm-apercu-carte { background: var(--d-carte); -webkit-backdrop-filter: none; backdrop-filter: none; } }
+@media (min-width: 1100px) { .vrm-apercu-carte { left: calc(50% + 118px); } }

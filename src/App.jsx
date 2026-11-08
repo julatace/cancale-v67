@@ -352,6 +352,9 @@ import { lireSuivisSansQr, lireQrDeLigne } from "./suivisSansQr.js";
 import { rythme } from "./rythmeLectures.js";
 import { comptesARelire } from "./sondeVentes.js";
 import { installerFiltreSupprimes, sansComptesSupprimes, lireSupprimes, CLE_SUPPRIMES } from "./comptesSupprimes.js";
+import { etatAbonnement, rappelEssai, publierAbonnement, abonnementPublie, suivreAbonnement, installerGardeEcriture, CLE_PARRAIN, codeParrainDe } from "./abonnement/etatAbonnement.js";
+import { marquerApercu, effacerApercu, bloquerGestes } from "./abonnement/apercu.js";
+import { lectureSeuleActive, EXPORT_FERME } from "./abonnement/etatAbonnement.js";
 import { lectureComplete, construirePhoto, ecrirePhoto, lirePhoto, listeDuSoir, joursAvantJour, heurePhoto, adresseQrLocale, CACHE_QR, quandEtat, ageEtatH, etatVieux, ETAT_VIEUX_H, pointsDeRetrait, colisRetireApres, colisRetireAnnule, marqueApres, marqueAnnulee } from "./journeeHorsLigne.js";
 import { masquerPourEnvoi, jetonsStream, demarrerStream, demarrerMontants, photoACacherSelon, poserReglesStream, normaliserRegles, compilerRegle, masquerTexteStream, textePourStream, regleCourante, regleApercu, ligneACacher, CATEGORIES as STREAM_CATEGORIES, LISTES as STREAM_LISTES, nettoyerMots, CLE_STREAM, CLE_STREAM_REGLES, REGLES_DEFAUT as STREAM_DEFAUT } from "./modeStream.js";
 // ⟦→ ecrans/Reglages.jsx #14⟧
@@ -1100,6 +1103,13 @@ installerLecturesPartagees(SUPABASE_URL);
 // (29 oct.) « Retire tout de ce compte » : aucune ligne d'un compte supprimé
 // pour de bon ne sort d'une lecture (src/comptesSupprimes.js).
 installerFiltreSupprimes(SUPABASE_URL);
+// (8 nov.) Sans abonnement : un aperçu (la base laisse lire, migration 027 ;
+// l'écran floute le reste) et AUCUNE écriture vers la base ne part — elle
+// reçoit un refus lisible (src/abonnement/etatAbonnement.js).
+installerGardeEcriture(SUPABASE_URL);
+// (8 nov.) Le lien de parrainage (`?parrain=CODE`) est gardé jusqu'à ce qu'un
+// compte connecté le présente au serveur (une fois, `BandeauAbonnement`).
+try { const c = codeParrainDe(window.location.search); if (c) localStorage.setItem(CLE_PARRAIN, c); } catch (_) {}
 
 // ════════════════════════════════════════════════════════════════════════════
 //  COMPTES VENDEURS (multi-utilisateurs)
@@ -16103,6 +16113,96 @@ function BandeauConfirmationAdresse({ onVoir }) {
 // connectée, lui adresse SA session (`assurerSessionExtension`). Ce bandeau dit
 // où on en est, UNE fois, sur la coque — et le geste quand ça n'aboutit pas.
 // L'état décidé est porté par `data-liaison` (le banc juge l'état, pas la phrase).
+// ── LA LIGNE DE L'ABONNEMENT, SUR LA COQUE (8 nov.) ─────────────────────────
+// Discrète : une ligne, à J-3 et J-1 de la fin de l'essai (fermable pour la
+// journée). Sans abonnement, c'est la carte de l'aperçu qui parle
+// (`ApercuSansAbonnement`) — jamais un blocage sans explication.
+// Porte aussi, une fois, le code de parrainage gardé depuis le lien.
+const cleRappelEssai = (uid, seuil) => `vrm_rappel_essai_${uid}_${seuil}_${new Date().toISOString().slice(0, 10)}`;
+function voirAbonnement(setTab) {
+  try { localStorage.setItem('vrm_reglages_vue', 'abonnement'); } catch (_) {}
+  try { window.dispatchEvent(new CustomEvent('vrm:voir-abonnement')); } catch (_) {}
+  if (setTab) setTab('settings');
+}
+function BandeauAbonnement({ setTab }) {
+  const [x, setX] = React.useState(() => abonnementPublie());
+  const [ferme, setFerme] = React.useState(0);
+  React.useEffect(() => suivreAbonnement(setX), []);
+  // Le parrainage gardé depuis le lien : présenté UNE fois au serveur (qui
+  // décide tout). Un refus définitif l'efface ; « pas su » (503) le garde.
+  React.useEffect(() => {
+    let code = ''; try { code = localStorage.getItem(CLE_PARRAIN) || ''; } catch (_) {}
+    if (!code || !(AUTH.session && AUTH.session.access_token)) return;
+    fetch('/api/compte?mode=parrainage', { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'rattacher', code }) })
+      .then(async (r) => {
+        const j = await r.json().catch(() => null);
+        if (r.status >= 500 || r.status === 401) return;
+        try { localStorage.removeItem(CLE_PARRAIN); } catch (_) {}
+        if (r.ok && j && j.ok) toast('✓ Parrainage enregistré : un mois offert à ton premier paiement');
+      }).catch(() => {});
+  }, []);
+  const uid = (AUTH.user && AUTH.user.id) || '';
+  const e = etatAbonnement(x === null ? undefined : x);
+  // Sans abonnement : la carte de l'aperçu (`ApercuSansAbonnement`) parle.
+  if (e.lectureSeule) return null;
+  const r = rappelEssai(e);
+  if (!r) return null;
+  let vu = false; try { vu = !!localStorage.getItem(cleRappelEssai(uid, r.seuil)); } catch (_) {}
+  if (vu || ferme) return null;
+  return (
+    <div data-bandeau-abonnement="essai" data-essai-jours={r.jours} data-seuil={r.seuil} role="status" className="vrm-bandeau-abo">
+      <span className="vrm-bandeau-abo-texte">{r.texte}</span>
+      <button type="button" className="vrm-lien-action vrm-bandeau-abo-geste" onClick={() => voirAbonnement(setTab)}>Gérer</button>
+      <button type="button" className="vrm-bandeau-abo-fermer" aria-label="Masquer pour aujourd'hui" onClick={() => { try { localStorage.setItem(cleRappelEssai(uid, r.seuil), '1'); } catch (_) {} setFerme(1); }}>
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="m2.5 2.5 7 7m0-7-7 7"/></svg>
+      </button>
+    </div>
+  );
+}
+// ── SANS ABONNEMENT : UN APERÇU NET, LE RESTE FLOUTÉ (8 nov.) ───────────────
+// Julien : « on lui montre un extrait de ses données, le reste sera flouté tant
+// qu'il ne paie pas ». Sur chaque écran sauf Paramètres (où il se réabonne) :
+// les titres et les 3 premières lignes de chaque liste restent nettes, le reste
+// est flouté, `aria-hidden` et `inert` (src/abonnement/apercu.js) ; tout geste
+// dans l'écran est arrêté et fait signe à la carte. La carte, nette, flotte au
+// centre en bas : « Ton abonnement a pris fin · Tes données sont là, rien n'est
+// supprimé · Reprendre l'abonnement ». Aucune écriture ne part (garde + base).
+function ApercuSansAbonnement({ tab, setTab }) {
+  const [x, setX] = React.useState(() => abonnementPublie());
+  const [signe, setSigne] = React.useState(0);
+  const [occupe, setOccupe] = React.useState(false);
+  React.useEffect(() => suivreAbonnement(setX), []);
+  const e = etatAbonnement(x === null ? undefined : x);
+  const actif = !!e.lectureSeule && tab !== 'settings';
+  React.useEffect(() => {
+    if (!actif) return undefined;
+    let racine = null, obs = null, rendu = 0, defaire = null, mort = false;
+    const marquer = () => { rendu = 0; if (racine && racine.isConnected) marquerApercu(racine); };
+    const prevoir = () => { if (!rendu) rendu = requestAnimationFrame(marquer); };
+    const brancher = () => {
+      if (mort) return;
+      const r = document.querySelector('[data-attente-ecran="' + tab + '"]');
+      if (!r) { setTimeout(brancher, 120); return; }
+      racine = r; marquer();
+      defaire = bloquerGestes(r, () => setSigne((n) => n + 1));
+      obs = new MutationObserver(prevoir);
+      obs.observe(r, { childList: true, subtree: true, characterData: true });
+    };
+    brancher();
+    return () => { mort = true; if (obs) obs.disconnect(); if (rendu) cancelAnimationFrame(rendu); if (defaire) defaire(); if (racine) effacerApercu(racine); };
+  }, [actif, tab]);
+  if (!actif) return null;
+  const reprendre = async () => {
+    if (e.impaye) { setOccupe(true); const m = await ouvrirStripe('portail'); if (m) { toast(m); setOccupe(false); } return; }
+    voirAbonnement(setTab);
+  };
+  return createPortal(
+    <div className="vrm-apercu-carte" role="region" aria-labelledby="vrm-apercu-titre" data-carte-apercu="" data-signe={signe || undefined} key={signe}>
+      <div className="vrm-apercu-titre" id="vrm-apercu-titre">{e.impaye ? "Ton prélèvement n'est pas passé" : 'Ton abonnement a pris fin'}</div>
+      <div className="vrm-apercu-phrase">Tes données sont là, rien n'est supprimé. Voici un aperçu ; {e.impaye ? 'mets ta carte à jour' : "reprends l'abonnement"} pour tout retrouver et agir à nouveau.</div>
+      <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" disabled={occupe} onClick={reprendre} data-apercu-reprendre="">{occupe ? 'Ouverture…' : e.impaye ? 'Mettre à jour ma carte' : "Reprendre l'abonnement"}</button>
+    </div>, document.body);
+}
 function BandeauLiaison() {
   const [, force] = React.useReducer((n) => n + 1, 0);
   React.useEffect(() => { __lierSubs.add(force); return () => { __lierSubs.delete(force); }; }, []);
@@ -16342,6 +16442,9 @@ function EnAttenteEnvoi() {
     window.addEventListener('vrm:file-envoi', f); window.addEventListener('online', f); window.addEventListener('offline', f); window.addEventListener('storage', st);
     return () => { off(); window.removeEventListener('vrm:file-envoi', f); window.removeEventListener('online', f); window.removeEventListener('offline', f); window.removeEventListener('storage', st); };
   }, []);
+  // (8 nov.) Sans abonnement (aperçu) : la base refuse d'écrire, exprès — ce
+  // n'est pas un envoi « en attente » ; la carte de l'aperçu dit pourquoi.
+  if (lectureSeuleActive()) return null;
   let n = 0; try { n = compterEnAttente(localStorage, AUTH.user?.id) || 0; } catch (_) { n = 0; }
   const horsLigneMesure = typeof navigator !== 'undefined' && navigator.onLine === false;
   if (!n || !(horsLigneMesure || _syncInfo.etat === 'error')) return null;
@@ -47197,6 +47300,14 @@ function CaseCgv({ cases, onChange }) {
 //    dernière réponse connue est gardée sur l'appareil pour décider tout de
 //    suite à l'ouverture suivante (sans éclair d'app).
 const cleAbo = (uid) => `vrm_abo_porte_${uid}`;
+// (8 nov.) SANS ABONNEMENT : UN APERÇU, LE RESTE FLOUTÉ (Julien : « on lui
+// montre un extrait de ses données, le reste sera flouté tant qu'il ne paie
+// pas »). Quand la base laisse lire (migration 027, `lecture: true`), l'app
+// s'ouvre en APERÇU (`ApercuSansAbonnement`) : un extrait net, le reste flouté
+// et inerte, aucun geste ; les écritures sont refusées par la base ET par la
+// garde (`installerGardeEcriture`).
+// Sans la 027, la base ferme aussi la lecture : la porte reste (jamais une app
+// vide qui dirait « rien »).
 function PorteAbonnement({ uid, children }) {
   const [bloque, setBloque] = React.useState(() => { try { return localStorage.getItem(cleAbo(uid)) === 'bloque'; } catch (_) { return false; } });
   const [info, setInfo] = React.useState(null);
@@ -47208,7 +47319,8 @@ function PorteAbonnement({ uid, children }) {
       //    ses lignes, ses notifications et son widget. L'écran ne la recalcule
       //    pas : s'il disait « entre » pendant que la base refuse, il ouvrirait
       //    une app vide (§11).
-      const b = x.acces === false;
+      publierAbonnement(x);
+      const b = x.acces === false && x.lecture !== true;
       setBloque(b); setInfo(x);
       try { b ? localStorage.setItem(cleAbo(uid), 'bloque') : localStorage.removeItem(cleAbo(uid)); } catch (_) {}
     });
@@ -51518,6 +51630,8 @@ function AppCoeur() {
         <EnAttenteEnvoi/>
         {horsLigne ? <JourneeHorsLigne tab={tab} uid={(authState.user && authState.user.id) || (MULTI_USER ? '' : 'local')}/> : (<>
         {baseKO && <BaseInjoignable/>}
+        <BandeauAbonnement setTab={setTab}/>
+        <ApercuSansAbonnement tab={tab} setTab={setTab}/>
         <BandeauLiaison/>
         {/* (8 nov.) Un compte qui n'arrive plus alors que l'extension travaille : la ligne ambre (src/ToutVaBien.jsx). */}
         {!baseKO && <Suspense fallback={null}><AlerteCaptureParesseuse onVoir={() => setTab('settings')}/></Suspense>}
@@ -51548,7 +51662,7 @@ function AppCoeur() {
               setNotifEnabled(false); save('vinted_notif_enabled',false);
             }
           }}
-          onExport={async()=>{ try{
+          onExport={async()=>{ if(lectureSeuleActive()){ toast(EXPORT_FERME); return; } try{
             // ⚠️⚠️ « TÉLÉCHARGE TOUT : catalogue, ventes, achats… » — C'ÉTAIT FAUX
             // (4 octobre). Le fichier ne portait que les réglages synchronisés
             // (la ligne `main`) : ni les ventes, ni les achats, ni les messages, ni
