@@ -548,3 +548,17 @@ export function installerStream(racine, lire) {
     },
   };
 }
+
+// (8 nov., « Signaler un problème » et l'alerte de plantage) Un texte qui QUITTE
+// l'appareil vers l'éditeur : caché selon le programme COMPLET (toutes les
+// catégories, quel que soit son réglage du stream, qu'il filme ou non), avec les
+// jetons que les écrans ont publiés (pseudos de ses comptes, des acheteurs, son
+// entreprise). Les montants y passent aussi.
+let _rTout = null, _rToutN = -1;
+export function masquerPourEnvoi(texte) {
+  try {
+    const n = [..._groupes.values()].reduce((a, l) => a + (Array.isArray(l) ? l.length : 0), 0) + _groupes.size * 1000;
+    if (!_rTout || _rToutN !== n) { _rTout = compilerRegle(REGLES_DEFAUT, _groupes); _rToutN = n; }
+    return masquerTexteStream(texte, _rTout);
+  } catch (_) { return String(texte == null ? '' : texte); }
+}

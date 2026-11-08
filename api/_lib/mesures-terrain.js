@@ -28,6 +28,9 @@ import { createHmac } from 'node:crypto';
 import { sbCle } from './cle.js';
 import { proprietaireInstallation } from './signalement.js';
 import { normaliserLot, fusionnerHisto, resumeJour, jourParis, LOTS_MAX_JOUR, totalLot } from '../../src/mesuresTerrain.js';
+// (8 nov.) Les alertes de plantage voyagent avec le lot (`p`) : src/alertesPlantages.js.
+import { normaliserEvenements } from '../../src/alertesPlantages.js';
+import { recevoirAlertesPlantages, listerPlantagesTerrain } from './alertes-plantages.js';
 
 export const PREFIXE_MESURES = 'mesures_jour_';
 export const JOURS_LUS = 14;
@@ -110,14 +113,15 @@ export function jourApres(avant, lot, empreinte, minute) {
 }
 
 // POST : ranger un lot. `verifierJeton(jeton)` → { id } · null (refusé) · undefined (pas su).
-export async function recevoirMesures({ corps, jetonEntete = '', verifierJeton, env = process.env, fetcher = fetch, maintenant = Date.now() }) {
+export async function recevoirMesures({ corps, jetonEntete = '', verifierJeton, env = process.env, fetcher = fetch, maintenant = Date.now(), pousser = null }) {
   if (!cfg(env).service) return { code: 503, corps: { ok: false, raison: 'non-configure' } };
   const c = lireCorpsMesures(corps);
   if (!c) return { code: 400, corps: { ok: false, raison: 'corps' } };
   const jeton = String(jetonEntete || c.jeton || '');
   if (!jeton || jeton.split('.').length !== 3 || jeton.length > 4096) return { code: 401, corps: { ok: false, raison: 'session' } };
   const lot = normaliserLot(c);
-  if (!lot) return { code: 400, corps: { ok: false, raison: 'lot' } };
+  const evts = normaliserEvenements(c.p);
+  if (!lot && !evts.length) return { code: 400, corps: { ok: false, raison: 'lot' } };
   const u = await verifierJeton(jeton);
   if (u === undefined) return { code: 503, corps: { ok: false, raison: 'connexion-injoignable' } };
   if (!u || !u.id) return { code: 401, corps: { ok: false, raison: 'session' } };
@@ -127,12 +131,17 @@ export async function recevoirMesures({ corps, jetonEntete = '', verifierJeton, 
   const emp = empreinteJour(u.id, jour, cfg(env).service);
   const minute = Math.floor(maintenant / 60000);
   const { url, service } = cfg(env);
+  // (8 nov.) Les alertes d'abord : leur ligne est à part, leur sort ne change
+  // rien aux mesures (et l'inverse).
+  const alertes = evts.length ? await recevoirAlertesPlantages({ evenements: evts, empreinte: emp, proprio, env, fetcher, pousser: pousser ? (n) => pousser(n, proprio) : null, maintenant }) : null;
+  const avecAlertes = (o) => (alertes ? { ...o, alertes: { fait: alertes.fait, ...(alertes.fait ? { due: alertes.due } : { raison: alertes.raison }) } } : o);
+  if (!lot) return alertes && alertes.fait ? { code: 200, corps: avecAlertes({ ok: true, jour, mesures: 0 }) } : { code: alertes && alertes.raison === 'plafond-du-jour' ? 429 : 503, corps: avecAlertes({ ok: false, raison: (alertes && alertes.raison) || 'base' }) };
   const id = idEclat(jour, eclatDe(emp));   // l'éclat de CET appareil ce jour-là
   for (let essai = 0; essai < ESSAIS; essai++) {
     const avant = await lireJour(env, fetcher, proprio, id);
     if (avant === undefined) return { code: 503, corps: { ok: false, raison: 'base' } };   // lecture ratée : rien n'est écrit
     const r = jourApres(avant ? { ...avant, jour } : { jour }, lot, emp, minute);
-    if (r.refus) return { code: 429, corps: { ok: false, raison: r.refus === 'minute' ? 'une-fois-par-minute' : 'plafond-du-jour' } };
+    if (r.refus) return { code: 429, corps: avecAlertes({ ok: false, raison: r.refus === 'minute' ? 'une-fois-par-minute' : 'plafond-du-jour' }) };
     const at = new Date(maintenant).toISOString();
     let rep;
     try {
@@ -146,7 +155,7 @@ export async function recevoirMesures({ corps, jetonEntete = '', verifierJeton, 
     } catch (_) { return { code: 503, corps: { ok: false, raison: 'base' } }; }
     if (!rep.ok) return { code: 503, corps: { ok: false, raison: 'base' } };
     const j = await rep.json().catch(() => null);
-    if (Array.isArray(j) && j.length === 1) return { code: 200, corps: { ok: true, jour, mesures: totalLot(lot) } };
+    if (Array.isArray(j) && j.length === 1) return { code: 200, corps: avecAlertes({ ok: true, jour, mesures: totalLot(lot) }) };
     // 0 ligne : devancé (un autre lot vient d'écrire) — relire et rejouer.
   }
   return { code: 503, corps: { ok: false, raison: 'concurrence' } };
@@ -204,11 +213,17 @@ export async function histosDesJours({ lire, proprio, jours }) {
 }
 
 // GET (PROPRIÉTAIRE seulement) : les agrégats des derniers jours.
-export async function listerMesures({ utilisateur, env = process.env, fetcher = fetch }) {
+export async function listerMesures({ utilisateur, quoi = '', env = process.env, fetcher = fetch }) {
   if (!cfg(env).service) return { code: 503, corps: { ok: false, raison: 'non-configure' } };
   const proprio = await proprietaireInstallation({ env, fetcher });
   if (!proprio) return { code: 503, corps: { ok: false, raison: 'destinataire-inconnu' } };
   if (String(utilisateur.id).toLowerCase() !== proprio) return { code: 403, corps: { ok: false, raison: 'proprietaire' } };
+  // (8 nov.) `quoi=plantages` : les alertes de plantage des 7 derniers jours.
+  if (quoi === 'plantages') {
+    const jours = await listerPlantagesTerrain({ proprio, env, fetcher });
+    if (!jours) return { code: 503, corps: { ok: false, raison: 'base' } };
+    return { code: 200, corps: { ok: true, jours } };
+  }
   const rows = await lireDerniersJours({ env, fetcher, proprio });
   if (!rows) return { code: 503, corps: { ok: false, raison: 'base' } };
   return { code: 200, corps: { ok: true, jours: joursPourPanneau(rows) } };

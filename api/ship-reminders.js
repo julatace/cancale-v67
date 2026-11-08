@@ -62,6 +62,8 @@ import { compteEcarte } from './_lib/ventes-regle.js';
 import { comptesARelire, dernieresCaptures, texteComptesARelire, decisionRelecture, CAT_RELECTURE, ID_MEMO_RELECTURE, SELECT_CAPTURES } from './_lib/comptes-a-relire.js';
 // (6 nov., filet 4) La veille des plantages : le propriétaire prévenu d'un type JAMAIS VU (api/_lib/veille-plantages.js).
 import { passageVeillePlantages, ID_MEMO_VEILLE, passageVeilleLenteurs, ID_MEMO_LENTEURS } from './_lib/veille-plantages.js';
+// (8 nov.) Les alertes de plantage restées en attente pendant l'heure de repos : dites ici.
+import { vidangerAlertesPlantages } from './_lib/alertes-plantages.js';
 // (6 nov.) La purge à 30 jours du HTML d'origine des e-mails (api/_lib/email-html.js).
 import { purgerHtml } from './_lib/email-html.js';
 // (6 nov., v36) Les temps réels des vendeurs (agrégats journaliers, api/_lib/mesures-terrain.js).
@@ -1107,6 +1109,12 @@ export default async function handler(req, res) {
     // (6 nov., filet 4) La veille des plantages.
     let veille = null;
     if (!soir && !reveil) { try { veille = await veilleDesPlantages(debutCron); } catch (e) { veille = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; } }
+    // (8 nov.) Les alertes de plantage groupées encore en attente (api/_lib/alertes-plantages.js).
+    let alertesPlantages = null;
+    if (!soir && !reveil && process.env.VRM_OWNER_UID) {
+      const proprio = String(process.env.VRM_OWNER_UID).trim().toLowerCase();
+      try { alertesPlantages = await vidangerAlertesPlantages({ proprio, maintenant: debutCron, pousser: (n) => contexteVendeur.run({ owner: proprio }, () => sendPushToAll(n)) }); } catch (e) { alertesPlantages = { fait: false, erreur: String((e && e.message) || e).slice(0, 200) }; }
+    }
     // (6 nov.) Le HTML d'origine des e-mails (30 jours) : une purge ratée ne fait
     // échouer rien (elle est dite dans la réponse).
     let purgeHtml = null;
@@ -1139,7 +1147,7 @@ export default async function handler(req, res) {
     const { bilans, echecs } = lot;
     res.status(echecs ? 500 : 200).json({ ok: !echecs, ...(soir ? { moment: 'soir' } : reveil ? { moment: 'reveil' } : {}), vendeurs: owners.length, echecs,
       lot: { traites: lot.traites, dejaFaits: lot.dejaFaits, restants: lot.restants, prioritaires: lot.prioritaires, budgetAtteint: lot.budgetAtteint, curseur: lot.curseur },
-      bilans, ...(relances ? { relances } : {}), ...(veille ? { veille } : {}), ...(purgeHtml ? { purgeHtml } : {}), ...(lenteurs ? { lenteurs } : {}), ...(purgeMesures ? { purgeMesures } : {}) });
+      bilans, ...(relances ? { relances } : {}), ...(veille ? { veille } : {}), ...(alertesPlantages ? { alertesPlantages } : {}), ...(purgeHtml ? { purgeHtml } : {}), ...(lenteurs ? { lenteurs } : {}), ...(purgeMesures ? { purgeMesures } : {}) });
   } catch (e) {
     // Une tâche planifiée qui répond 200 sur une panne n'apparaît nulle part :
     // le tableau de bord la compte réussie, et les rappels d'expédition

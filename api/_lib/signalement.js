@@ -33,12 +33,19 @@
 // l'installation) ⇒ regroupées : une seule notification qui se remplace et dit
 // combien.
 import { sbCle } from './cle.js';
+// (8 nov.) Les messages d'erreur passent AUSSI par le nettoyage du journal des
+// plantages (valeur citée, prix, suites de chiffres) : un module sans Node.
+import { nettoyer } from '../../src/plantages.js';
 // ⚠️ Aucun import de module Node ici : l'app importe ce fichier (l'aperçu).
 // La route passe `pousser(notif, proprio)`, qui ouvre le contexte du vendeur.
 
 export const SIGNALEMENTS_PAR_HEURE = 5;
 export const REGROUPER_AU_DELA = 3;
-export const PLANTAGES_MAX = 5;
+// (8 nov., « Signaler un problème » enrichi) les 50 dernières erreurs de CET
+// appareil (src/plantages.js, `erreursRecentes`), pas seulement 5 plantages.
+export const PLANTAGES_MAX = 50;
+export const LECTURES_MAX = 30;
+export const PLAN_MAX = 400;
 export const TEXTE_MAX = 2000;
 export const TEXTE_MIN = 3;
 export const PREFIXE = 'signalement_';
@@ -62,6 +69,10 @@ export function masquer(texte) {
     .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, '{uuid}')
     .replace(/\b[A-Z]{2}\d{2}(?:\s?[A-Z0-9]{4}){3,7}(?:\s?[A-Z0-9]{1,3})?\b/g, '{iban}')
     .replace(/(https?:\/\/[^\s?#)]+)[?#][^\s)]*/g, '$1')
+    // (8 nov.) Un MONTANT ne part jamais (« 87,50 € », « 1 250 € », « 45 euros »,
+    // « 87,50 » tout seul) — comme le mode stream qui les cache à l'écran.
+    .replace(/\d+(?:[ \u00a0\u202f.]\d{3})*(?:[.,]\d{1,2})?[ \u00a0\u202f]?(?:€|eur(?:os?)?\b)/gi, '{montant}')
+    .replace(/(^|[^\w{])\d+,\d{2}(?![\d\w])/g, '$1{montant}')
     .replace(/\d(?:[\s.-]?\d){8,}/g, '{n}');
 }
 
@@ -71,24 +82,83 @@ export function masquer(texte) {
 export const ECRANS = ['ventes', 'annonces', 'messages', 'achats', 'retraits', 'journee', 'collectif', 'plat_vinted', 'plat_leboncoin', 'plat_ebay', 'plat_vestiaire', 'prixmarche', 'dashboard', 'compta', 'comptabilite', 'cat_annonces', 'cat_ventes', 'cat_achats', 'cat_bord', 'cat_msg', 'cat_expedition', 'garage', 'organisation', 'communaute', 'emails', 'invoices', 'masques', 'settings', 'vintedaccounts', 'catalog', 'sales', 'stockvinted', 'leboncoin', 'ebay_annonces', 'ebay_ventes', 'ebay_agent', 'ebay_messages', 'vinted_annonces', 'inventory'];
 // La version de l'app telle que l'app l'écrit (`BUILD_ID` : « 6 novembre à 14:32 »).
 const VERSION_APP = /^(\d{1,2} (janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre) à \d{2}:\d{2}|inconnue)$/;
-const ORIGINES = ['ecran', 'page', 'promesse', 'csp', 'retour'];
+const ORIGINES = ['ecran', 'feuille', 'page', 'promesse', 'csp', 'retour'];
+// (8 nov.) L'appareil, en mots FERMÉS (aucune chaîne libre ne passe).
+export const APPAREILS_SIG = ['telephone', 'tablette', 'ordinateur'];
+export const SYSTEMES = ['iOS', 'iPadOS', 'Android', 'macOS', 'Windows', 'Linux', 'ChromeOS', 'autre'];
+const METHODES = ['GET', 'HEAD', 'POST', 'PATCH', 'PUT', 'DELETE'];
+// Une lecture se nomme par sa FAMILLE (jamais son adresse ni ses paramètres) :
+// « base:app_data », « api:compte:signalement », « auth », « stockage », « autre ».
+const QUOI_LECTURE = /^(base|api|auth|stockage|extension|autre)(:[a-z0-9_-]{1,40}){0,2}$/;
+// Les compteurs de l'état de l'écran (des nombres, jamais un texte).
+export const ETAT_DOM = ['boutons', 'champs', 'feuilles', 'squelettes', 'pannes', 'gardeFou', 'defilement'];
+// Les sortes de rectangles de la capture schématique (src/signalementContexte.js).
+export const SORTES_PLAN = ['bloc', 'texte', 'bouton', 'champ', 'image', 'masque'];
 const court = (v, n) => masquer(String(v == null ? '' : v)).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').slice(0, n);
 const ecranValide = (v) => (ECRANS.includes(String(v || '')) ? String(v) : '');
-const versionApp = (v) => { const s = String(v == null ? '' : v).trim(); return VERSION_APP.test(s) ? s : ''; };
+export const versionApp = (v) => { const s = String(v == null ? '' : v).trim(); return VERSION_APP.test(s) ? s : ''; };
 const versionExt = (v) => (/^\d{1,3}\.\d{1,4}\.\d{1,4}$/.test(String(v || '')) ? String(v) : null);
 const entier = (v) => (Number.isInteger(Number(v)) && Number(v) > 0 && Number(v) < 20000 ? Number(v) : null);
 const dateIso = (v) => { const t = Date.parse(String(v || '')); return Number.isFinite(t) ? new Date(t).toISOString() : null; };
+const borne = (v, max) => (v != null && v !== '' && typeof v !== 'boolean' && Number.isFinite(Number(v)) ? Math.max(0, Math.min(max, Math.round(Number(v)))) : null);
+const ecranDeGarde = (v) => { const s = String(v || ''); return ecranValide(s) || ecranValide(s.split(':')[0]); };
+// La capture schématique : des rectangles [x, y, l, h, sorte] dans le cadre de
+// l'écran — que des NOMBRES ; tout autre forme est jetée.
+function planValide(p) {
+  if (!p || typeof p !== 'object' || Array.isArray(p)) return null;
+  const l = entier(p.l), h = entier(p.h);
+  if (!l || !h || !Array.isArray(p.b)) return null;
+  const b = [];
+  for (const r of p.b.slice(0, PLAN_MAX)) {
+    if (!Array.isArray(r) || r.length !== 5 || !r.every((x) => Number.isFinite(Number(x)))) continue;
+    const k = Math.round(Number(r[4]));
+    if (k < 0 || k >= SORTES_PLAN.length) continue;
+    const x = borne(r[0], l), y = borne(r[1], h), w = borne(r[2], l), hh = borne(r[3], h);
+    if (!w || !hh) continue;
+    b.push([x, y, w, hh, k]);
+  }
+  return b.length ? { l, h, b } : null;
+}
+function etatDomValide(e) {
+  if (!e || typeof e !== 'object' || Array.isArray(e)) return null;
+  const out = {};
+  for (const k of ETAT_DOM) {
+    if (k === 'gardeFou') out[k] = e[k] === true;
+    else if (k === 'defilement') out[k] = borne(e[k], 100);
+    else out[k] = borne(e[k], 9999);
+  }
+  return out;
+}
+const lecturesValides = (l) => (Array.isArray(l) ? l : []).slice(-LECTURES_MAX).filter((x) => x && typeof x === 'object' && !Array.isArray(x)).map((x) => ({
+  m: METHODES.includes(String(x.m || '').toUpperCase()) ? String(x.m).toUpperCase() : 'GET',
+  quoi: QUOI_LECTURE.test(String(x.quoi || '')) ? String(x.quoi) : 'autre',
+  s: Number.isInteger(Number(x.s)) && Number(x.s) >= 0 && Number(x.s) < 600 ? Number(x.s) : 0,
+  ms: borne(x.ms, 600000),
+  at: dateIso(x.at),
+}));
+// (8 nov.) Ce qui a la FORME d'un pseudo dans le message tapé : un mot avec un
+// « _ » ou un point intérieur (marie_dupont, julie.b), ou des lettres suivies de
+// deux chiffres ou plus (julatace3535, lea75). Un pseudo que l'écran ne connaît
+// pas (aucun jeton du mode stream) ne part pas non plus. Seulement le TEXTE tapé :
+// un message d'erreur garde ses noms de code (nettoyés par ailleurs).
+export const masquerPseudos = (t) => String(t == null ? '' : t)
+  .replace(/(^|[^\p{L}\p{N}_{])(?=[\p{L}\p{N}]*[_.][\p{L}\p{N}])[\p{L}\p{N}]+(?:[_.][\p{L}\p{N}]+)+(?![\p{L}\p{N}_])/gu, (m, a) => { const mot = m.slice(a.length); return /^\S+\.(fr|com|net|org|center|io)$/i.test(mot) || !/\p{L}{2,}/u.test(mot) ? m : a + '{pseudo}'; })
+  .replace(/(^|[^\p{L}\p{N}_{])\p{L}{2,}\d{2,}(?![\p{L}\p{N}_])/gu, '$1{pseudo}');
 
 // LE signalement, tel qu'il part ET tel qu'il est rangé. `null` si le texte
 // manque (un signalement vide ne dit rien). Seuls ces champs existent.
-export function normaliserSignalement(c) {
+// `opts.masque(texte)` (l'app seulement) : cache en plus ce que l'écran sait
+// sensible (pseudos de ses comptes, des acheteurs : les jetons du mode stream).
+// Le serveur rejoue la règle sans lui : ce qui a été masqué reste masqué.
+export function normaliserSignalement(c, opts = {}) {
   if (!c || typeof c !== 'object' || Array.isArray(c)) return null;
-  const texte = court(c.texte, TEXTE_MAX).trim();
+  const m2 = typeof opts.masque === 'function' ? (t) => { try { return String(opts.masque(t)); } catch (_) { return t; } } : (t) => t;
+  const texte = masquerPseudos(court(m2(String(c.texte == null ? '' : c.texte)), TEXTE_MAX)).trim();
   if (texte.length < TEXTE_MIN) return null;
   const l = entier(c.ecranTaille && c.ecranTaille.largeur), h = entier(c.ecranTaille && c.ecranTaille.hauteur);
   const plantages = (Array.isArray(c.plantages) ? c.plantages : []).slice(-PLANTAGES_MAX).filter((p) => p && typeof p === 'object').map((p) => ({
-    message: court(p.message, 300),
-    ecran: ecranValide(p.ecran),
+    message: court(nettoyer(m2(String(p.message == null ? '' : p.message))), 300),
+    ecran: ecranDeGarde(p.ecran),
     origine: ORIGINES.includes(String(p.origine || '')) ? String(p.origine) : '',
     version: versionApp(p.version),
     at: dateIso(p.at),
@@ -102,6 +172,13 @@ export function normaliserSignalement(c) {
     navigateur: NAVIGATEURS.includes(c.navigateur) ? c.navigateur : 'inconnu',
     ecranTaille: l && h ? { largeur: l, hauteur: h } : null,
     plantages,
+    appareil: APPAREILS_SIG.includes(c.appareil) ? c.appareil : null,
+    systeme: SYSTEMES.includes(c.systeme) ? c.systeme : null,
+    enLigne: c.enLigne === true ? true : c.enLigne === false ? false : null,
+    theme: c.theme === 'clair' || c.theme === 'sombre' ? c.theme : null,
+    etatEcran: etatDomValide(c.etatEcran),
+    lectures: lecturesValides(c.lectures),
+    plan: planValide(c.plan),
   };
 }
 
@@ -118,7 +195,12 @@ export function lignesApercu(s) {
     ['Version de l’extension', s.extension || 'pas connue ici'],
     ['Navigateur', s.navigateur],
     ['Taille d’écran', s.ecranTaille ? `${s.ecranTaille.largeur} × ${s.ecranTaille.hauteur}` : '—'],
-    ['Plantages de cet appareil', s.plantages.length ? `${s.plantages.length}` : 'aucun noté'],
+    ['Appareil', [{ telephone: 'téléphone', tablette: 'tablette', ordinateur: 'ordinateur' }[s.appareil], s.systeme].filter(Boolean).join(' · ') || '—'],
+    ['Connexion', s.enLigne === true ? 'en ligne' : s.enLigne === false ? 'hors connexion' : '—'],
+    ['Capture de l’écran', s.plan ? `schéma, ${s.plan.b.length} blocs, sans texte` : 'pas prise'],
+    ['État de l’écran', s.etatEcran ? `${s.etatEcran.boutons} boutons · ${s.etatEcran.champs} champs${s.etatEcran.gardeFou ? ' · écran tombé' : ''}${s.etatEcran.squelettes ? ' · en chargement' : ''}` : '—'],
+    ['Requêtes récentes', s.lectures.length ? `${s.lectures.length}${(() => { const n = s.lectures.filter((x) => !(x.s >= 200 && x.s < 400)).length; return n ? `, dont ${n} en échec` : ', toutes réussies'; })()}` : 'aucune notée'],
+    ['Erreurs de cet appareil', s.plantages.length ? `${s.plantages.length}` : 'aucune notée'],
   ];
   return L;
 }
@@ -192,6 +274,17 @@ export function notifSignalement({ id, s, n }) {
   };
 }
 
+export function resumeDe(s) {
+  return { plantages: s.plantages.length, lectures: s.lectures.length, echecs: s.lectures.filter((x) => !(x.s >= 200 && x.s < 400)).length, plan: s.plan ? s.plan.b.length : 0, gardeFou: !!(s.etatEcran && s.etatEcran.gardeFou) };
+}
+const resumeValide = (r) => {
+  const o = r && typeof r === 'object' && !Array.isArray(r) ? r : {};
+  const n = (v) => (Number.isInteger(Number(v)) && Number(v) >= 0 && Number(v) < 10000 ? Number(v) : 0);
+  return { plantages: n(o.plantages), lectures: n(o.lectures), echecs: n(o.echecs), plan: n(o.plan), gardeFou: o.gardeFou === true };
+};
+// Ce que la liste projette : des scalaires et le résumé, jamais `data` entier.
+const SELECT_LISTE = ['id', 'texte:data->>texte', 'ecran:data->>ecran', 'ecranAvant:data->>ecranAvant', 'version:data->>version', 'extension:data->>extension', 'navigateur:data->>navigateur', 'appareil:data->>appareil', 'systeme:data->>systeme', 'largeur:data->ecranTaille->>largeur', 'hauteur:data->ecranTaille->>hauteur', 'de:data->>de', 'at:data->>at', 'traite:data->>traite', 'traiteLe:data->>traiteLe', 'resume:data->resume'].join(',');
+
 // POST (session) : envoyer. `utilisateur` = SA session (api/_lib/session.js).
 export async function envoyerSignalement({ utilisateur, corps, env = process.env, fetcher = fetch, pousser = null, maintenant = Date.now() }) {
   if (!cfg(env).service) return { code: 503, corps: { ok: false, raison: 'non-configure' } };
@@ -200,7 +293,9 @@ export async function envoyerSignalement({ utilisateur, corps, env = process.env
   const proprio = await proprietaireInstallation({ env, fetcher });
   if (!proprio) return { code: 503, corps: { ok: false, raison: 'destinataire-inconnu' } };
   const at = new Date(maintenant).toISOString();
-  const data = { ...s, de: String(utilisateur.id), at, traite: false };
+  // `resume` : les nombres que la LISTE lit (projetée, §4.4) — les champs lourds
+  // (capture, erreurs, lectures) ne se lisent qu'à l'ouverture d'UN signalement.
+  const data = { ...s, de: String(utilisateur.id), at, traite: false, resume: resumeDe(s) };
   const id = await reserver({ env, fetcher, proprio, uid: utilisateur.id, t: maintenant, data });
   if (id === null) return { code: 503, corps: { ok: false, raison: 'base' } };
   if (id === 'plein') return { code: 429, corps: { ok: false, raison: 'trop', max: SIGNALEMENTS_PAR_HEURE, reessayerDans: 60 - new Date(maintenant).getUTCMinutes() } };
@@ -220,16 +315,29 @@ export async function envoyerSignalement({ utilisateur, corps, env = process.env
 
 // GET (session, PROPRIÉTAIRE seulement) : la liste. Les lignes sont légères
 // (un texte borné, 5 plantages au plus) : on lit `data`, projeté champ par champ.
-export async function listerSignalements({ utilisateur, env = process.env, fetcher = fetch }) {
+export async function listerSignalements({ utilisateur, unId = null, env = process.env, fetcher = fetch }) {
   if (!cfg(env).service) return { code: 503, corps: { ok: false, raison: 'non-configure' } };
   const proprio = await proprietaireInstallation({ env, fetcher });
   if (!proprio) return { code: 503, corps: { ok: false, raison: 'destinataire-inconnu' } };
   if (String(utilisateur.id).toLowerCase() !== proprio) return { code: 403, corps: { ok: false, raison: 'proprietaire' } };
-  const rows = await lire(env, fetcher, `app_data?owner=eq.${proprio}&id=like.${PREFIXE}*&select=id,data&order=data->>at.desc&limit=200`);
+  // (8 nov.) UN signalement, en entier (capture, erreurs, lectures) : `?id=`.
+  if (unId) {
+    if (!/^signalement_\d{10}_[0-9a-f]{12}_[1-9]$/.test(String(unId))) return { code: 400, corps: { ok: false, raison: 'id' } };
+    const r1 = await lire(env, fetcher, `app_data?owner=eq.${proprio}&id=eq.${unId}&select=id,data&limit=1`);
+    if (!r1) return { code: 503, corps: { ok: false, raison: 'base' } };
+    if (!r1[0]) return { code: 404, corps: { ok: false, raison: 'absent' } };
+    const d = r1[0].data || {};
+    const s = normaliserSignalement({ ...d, texte: d.texte || '…' });
+    return { code: 200, corps: { ok: true, signalement: { id: r1[0].id, ...s, de: UUID.test(String(d.de)) ? String(d.de) : null, at: dateIso(d.at), traite: d.traite === true, traiteLe: dateIso(d.traiteLe) } } };
+  }
+  // La LISTE : projetée (§4.4) — 200 signalements à 30 Ko chacun ne se lisent pas d'un coup.
+  const rows = await lire(env, fetcher, `app_data?owner=eq.${proprio}&id=like.${PREFIXE}*&select=${SELECT_LISTE}&order=data->>at.desc&limit=200`);
   if (!rows) return { code: 503, corps: { ok: false, raison: 'base' } };
-  const signalements = rows.map(({ id, data }) => {
-    const s = normaliserSignalement(data) || { texte: '', ecran: '', ecranAvant: '', version: '', extension: null, navigateur: 'inconnu', ecranTaille: null, plantages: [] };
-    return { id, ...s, de: UUID.test(String(data && data.de)) ? String(data.de) : null, at: dateIso(data && data.at), traite: !!(data && data.traite === true), traiteLe: dateIso(data && data.traiteLe) };
+  const signalements = rows.map((x) => {
+    const s = normaliserSignalement({ texte: x.texte, ecran: x.ecran, ecranAvant: x.ecranAvant, version: x.version, extension: x.extension, navigateur: x.navigateur, appareil: x.appareil, systeme: x.systeme, ecranTaille: { largeur: x.largeur, hauteur: x.hauteur } })
+      || { texte: '', ecran: '', ecranAvant: '', version: '', extension: null, navigateur: 'inconnu', ecranTaille: null, appareil: null, systeme: null };
+    const { plantages, lectures, plan, etatEcran, enLigne, theme, ...leger } = s;   // eslint-disable-line no-unused-vars
+    return { id: x.id, ...leger, resume: resumeValide(x.resume), de: UUID.test(String(x.de)) ? String(x.de) : null, at: dateIso(x.at), traite: String(x.traite) === 'true', traiteLe: dateIso(x.traiteLe) };
   });
   return { code: 200, corps: { ok: true, signalements, nonTraites: signalements.filter((x) => !x.traite).length } };
 }

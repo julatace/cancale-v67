@@ -1268,7 +1268,7 @@ async function relances(req, res) {
 async function signalement(req, res) {
   const utilisateur = await vendeurExige(req, res);
   if (!utilisateur) return;
-  if (req.method === 'GET') { const r = await listerSignalements({ utilisateur }); return repondre(res, r.code, r.corps); }
+  if (req.method === 'GET') { const r = await listerSignalements({ utilisateur, unId: (req.query && req.query.id) || null }); return repondre(res, r.code, r.corps); }
   const corps = await lireCorpsJson(req);
   if (!corps || typeof corps !== 'object') return repondre(res, 400, { ok: false, raison: 'corps' });
   if (corps.action === 'traite') { const r = await marquerTraite({ utilisateur, corps }); return repondre(res, r.code, r.corps); }
@@ -1284,12 +1284,13 @@ async function mesures(req, res) {
   if (req.method === 'GET') {
     const utilisateur = await vendeurExige(req, res);
     if (!utilisateur) return;
-    const r = await listerMesures({ utilisateur });
+    const r = await listerMesures({ utilisateur, quoi: String((req.query && req.query.quoi) || '') });
     return repondre(res, r.code, r.corps);
   }
   const brut = await corpsBrut(req);
   const corps = brut || (req.body && typeof req.body === 'object' ? req.body : null);
-  const r = await recevoirMesures({ corps, jetonEntete: jetonDe(req), verifierJeton: (j) => utilisateurDe({ headers: { authorization: 'Bearer ' + j } }) });
+  // (8 nov.) Une alerte de plantage groupée part au PROPRIÉTAIRE (ses appareils), jamais au vendeur.
+  const r = await recevoirMesures({ corps, jetonEntete: jetonDe(req), verifierJeton: (j) => utilisateurDe({ headers: { authorization: 'Bearer ' + j } }), pousser: (notif, proprio) => contexteVendeur.run({ owner: proprio }, () => sendPushToAll(notif)) });
   return repondre(res, r.code, r.corps);
 }
 

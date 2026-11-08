@@ -2,6 +2,10 @@
 // est demandé par cet onglet, le stockage et la base deviennent des copies en
 // mémoire (src/modeExemple.js) — rien de l'exemple n'est écrit nulle part.
 import './modeExemple.js';
+// (8 nov.) Les 30 dernières requêtes de la page (famille, code, durée — jamais une
+// adresse ni un contenu), pour « Signaler un problème » (src/lecturesRecentes.js).
+import { installerJournalLectures } from './lecturesRecentes.js';
+installerJournalLectures();
 import { cleVapid, abonnementAJour } from './vapid.js';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
