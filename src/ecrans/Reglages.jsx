@@ -51,6 +51,8 @@ import EspaceEmails from '../EspaceEmails.jsx';
 import { feuillesExport, fichiersExport, zipStocke, nomExport } from "../exportDonnees.js";
 // ⟦← App.jsx #11⟧
 import { MesuresTerrain } from "../composants/MesuresTerrain.jsx";
+import { GroupeIos, RangeeIos } from '../composants/Ios.jsx';
+import { etatAbonnement, lienParrainage } from '../abonnement/etatAbonnement.js';
 import { nomEcran as nomEcranVeille } from "../../api/_lib/veille-plantages.js";
 // ⟦← App.jsx #12⟧
 import { VAPID_PUBLIC_KEY } from "../vapid.js";
@@ -1541,6 +1543,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   const versPlateforme=(p)=>{ if(p==='plat_ebay'&&ebayCompte){ setVueBrute('reglages'); ouvrirSous('ebay'); return; } if(onPlateforme) onPlateforme(p); };
   const fermerSous = () => { const id = sous; setSous(null); setTimeout(() => { try { const l = racine.current && racine.current.querySelector(`[data-sous-ouvrir="${id}"]`); if (l) { l.scrollIntoView({ block: 'center' }); l.focus({preventScroll:true}); } } catch (_) {} }, 0); };
   const setVue = (v) => { setVueBrute(v); setSous(null); try { localStorage.setItem('vrm_reglages_vue', v); } catch (_) {} };
+  // (8 nov.) La ligne de l'abonnement de la coque (J-3, lecture seule) ouvre cet onglet.
+  React.useEffect(() => { const f = () => { setVueBrute('abonnement'); setSous(null); }; window.addEventListener('vrm:voir-abonnement', f); return () => window.removeEventListener('vrm:voir-abonnement', f); }, []);
 
 
   // ── Les valeurs dites à droite des lignes : lues dans LEUR réglage, jamais
@@ -1800,7 +1804,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   ];
   // L'onglet Abonnement : la carte de l'abonnement, d'un bloc (statut, prix,
   // carte, factures, résilier) — le MÊME composant qu'avant (§11).
-  const GROUPES_ABONNEMENT = [{ id:'abonnement', titre:null, brut:true, items:[{ id:'abonnement', type:'el', el:<div key="abonnement" data-onglet-abonnement=""><MonAbonnement/></div> }] }];
+  const GROUPES_ABONNEMENT = [{ id:'abonnement', titre:null, brut:true, items:[{ id:'abonnement', type:'el', el:<div key="abonnement" data-onglet-abonnement=""><MonAbonnement/><Parrainage/></div> }] }];
   const groupes = [...(voirCompte ? GROUPES_COMPTE : []), ...(voirReglages ? GROUPES_REGLAGES : []), ...(voirAbonnement ? GROUPES_ABONNEMENT : [])].filter(Boolean)
     .map((g) => ({ ...g, items: g.items.filter(Boolean) }));
   const panneaux = groupes.flatMap((g) => g.items.filter((it) => it.type === 'panneau'));
@@ -2451,6 +2455,29 @@ function LigneContact() {
   );
 }
 // ⟦← App.jsx #40⟧
+// ── LA PAGE ABONNEMENT (8 nov., « abonnement propre ») ──────────────────────
+// En tête, UNE carte : l'état (essai · abonné · résilié · paiement en échec ·
+// lecture seule · pas d'abonnement), la phrase de ce qui se passe ensuite, et
+// les gestes. Puis des rangées iOS : la carte bancaire et la page de gestion de
+// Stripe (factures, carte, adresse — le PORTAIL CLIENT, `mode=portail`, ouvert
+// sur SON client seul, côté serveur), et « Résilier » : deux clics (la rangée,
+// puis la confirmation), comme l'exige la résiliation en ligne (art. L215-1-1).
+// L'état vient de `etatAbonnement` (src/abonnement/etatAbonnement.js) — la même
+// règle que la ligne de la coque. Les `data-abonnement` d'avant sont gardés
+// (actif · sans · impaye · proprietaire · non-branche · pas-su · chargement),
+// `data-abonnement-etat` dit l'état fin. Le parrainage vit À CÔTÉ (son groupe).
+// L'en-tête de la page : l'état, le titre, la phrase de ce qui suit, les gestes.
+function Tete({ etat, titre, phrase, children, jauge }) {
+  return (
+    <div className="vrm-abo-tete">
+      <div className="vrm-abo-etat">{etat}</div>
+      {titre ? <div className="vrm-abo-titre">{titre}</div> : null}
+      {phrase ? <div className="vrm-abo-phrase">{phrase}</div> : null}
+      {jauge != null ? <div className="vrm-abo-jauge" role="progressbar" aria-label="Jours d'essai écoulés" aria-valuemin={0} aria-valuemax={7} aria-valuenow={7 - jauge}><span style={{ width: `${Math.round(Math.min(7, Math.max(0, 7 - jauge)) / 7 * 100)}%` }}/></div> : null}
+      {children}
+    </div>
+  );
+}
 function MonAbonnement() {
   const [cases, setCases] = React.useState({ cgv: false, acces: false });
   const cgv = casesCgvCochees(cases);
@@ -2480,11 +2507,14 @@ function MonAbonnement() {
     const m = await ouvrirStripe(mode, mode === 'checkout' ? { cgv: true, accesImmediat: true } : null);
     if (m) { setMsg(m); setOccupe(''); }
   };
+  const enEssai = !!(e && e.statut === 'trialing');
   const resilierOuReprendre = async (reprendre) => {
     if (!reprendre) {
       const fin = e && e.finPeriode ? dateLisible(e.finPeriode) : 'la fin du mois payé';
-      const oui = await askConfirm({ title: 'Résilier ton abonnement ?',
-        desc: `Tu gardes VRM jusqu'au ${fin}, et aucun autre prélèvement ne partira. Tes données restent intactes. Tu peux changer d'avis jusqu'à cette date.`,
+      const oui = await askConfirm({ title: enEssai ? 'Résilier ton essai ?' : 'Résilier ton abonnement ?',
+        desc: enEssai
+          ? `Tu gardes VRM jusqu'au ${fin}, et rien ne sera prélevé : aucun autre prélèvement ne partira. Tes données restent intactes. Tu peux changer d'avis jusqu'à cette date.`
+          : `Tu gardes VRM jusqu'au ${fin}, et aucun autre prélèvement ne partira. Tes données restent intactes. Tu peux changer d'avis jusqu'à cette date.`,
         ok: 'Résilier', cancel: 'Garder mon abonnement', danger: true });
       if (!oui) return;
     }
@@ -2495,163 +2525,231 @@ function MonAbonnement() {
     setE((x) => (x ? { ...x, annuleFinPeriode: r.annuleFinPeriode, finPeriode: r.finPeriode || x.finPeriode } : x));
     toast(r.annuleFinPeriode ? `✓ Abonnement résilié — VRM reste ouvert jusqu'au ${dateLisible(r.finPeriode || e.finPeriode)}` : '✓ Abonnement repris — rien ne change pour toi');
   };
-  const carte = { padding: '15px 16px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, marginBottom: 8 };
-  const titre = <div style={{ fontSize: 15, fontWeight: 600, color: C.text }}>Ton abonnement</div>;
-  if (e === undefined) return <div style={carte} data-abonnement="chargement">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3 }}>Je regarde…</div></div>;
-  if (e === null) return <div style={carte} data-abonnement="pas-su">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Abonnement pas lu. Rouvre cet écran dans un instant — rien n'a changé.</div></div>;
-  // ⚠️ LE PRIX CHEZ STRIPE ≠ CELUI DES CGV (11 octobre : 12,99 €, et le prix
-  //    rangé chez Stripe sous `vrm_mensuel` est un réglage de SON tableau de
-  //    bord). Le serveur refuse alors d'ouvrir le paiement ; c'est au
-  //    propriétaire — le seul qui peut le corriger — qu'on le dit, avec le geste.
-  //    « Pas su » (Stripe muet : `prixConforme` null) ne dit rien.
-  //    ⚠️ Le prix de Stripe s'écrit avec le TEXTE DU SERVEUR (`prixStripe.texte`,
-  //    montant + devise + rythme), jamais reformaté ici : `prixLisible` ignore la
-  //    devise et le rythme, et faisait dire « 12,99 € / mois n'est pas
-  //    12,99 € / mois » pour un prix en dollars ou tous les 3 mois — ou
-  //    « 0,00 € » pour un prix sans montant fixe — juste quand il doit voir son
-  //    erreur dans Stripe (revue du 11 octobre).
+  const et = etatAbonnement(e);
+  const pied = <div className="vrm-ios-groupe-pied" style={{ margin: '12px 16px 0' }}>Paiement sécurisé par Stripe — VRM ne voit jamais ta carte.</div>;
+  if (e === undefined) return <div data-abonnement="chargement" data-abonnement-etat="chargement"><Tete etat="Ton abonnement" phrase="Je regarde…"/></div>;
+  if (e === null) return <div data-abonnement="pas-su" data-abonnement-etat="pas-su"><Tete etat="Ton abonnement" phrase="Abonnement pas lu. Rouvre cet écran dans un instant — rien n'a changé."/></div>;
+  // ⚠️ LE PRIX CHEZ STRIPE ≠ CELUI DES CGV (11 octobre) : dit au SEUL
+  //    propriétaire, avec le texte du SERVEUR (`prixStripe.texte` : montant,
+  //    devise, rythme), jamais reformaté ici.
   const prixAcorriger = e.proprietaire && e.prixConforme === false && e.prixStripe;
-  // 22 oct. — les mentions de l'éditeur vides ferment le paiement (api/compte.js,
-  // 503 `mentions-legales`) : la liste de ce qui manque n'arrive qu'au
-  // propriétaire, avec le geste. Pas su (`null`) : dit tel quel, jamais « ok ».
   const mentionsAremplir = e.proprietaire && e.mentionsCompletes === false && Array.isArray(e.mentionsManquantes) && e.mentionsManquantes.length ? e.mentionsManquantes : null;
   const texteStripe = prixAcorriger && typeof e.prixStripe.texte === 'string' && e.prixStripe.texte.trim() ? e.prixStripe.texte : 'un prix différent';
+  const note = { fontSize: 13, color: C.text, marginTop: 10, lineHeight: 1.5 };
   if (e.proprietaire) return (
-    <div style={carte} data-abonnement="proprietaire">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Compte propriétaire de VRM : gratuit, aucun abonnement.</div>
-      {mentionsAremplir && (
-        <div data-mentions-manquantes={mentionsAremplir.length} style={{ fontSize: 13, color: C.text, marginTop: 8, lineHeight: 1.5 }}>
-          Le paiement reste <b>fermé</b> tant que les mentions légales sont incomplètes ({mentionsAremplir.join(', ')}). Elles se remplissent dans <b>public/legal/editeur.js</b>, et l'adresse de contact aussi dans src/contact.js.
-        </div>
-      )}
-      {/* 23 oct. (revue) : « pas pu relire » dit le fichier, l'erreur que le
-          serveur a LUE (`mentionsErreur`, au propriétaire seul) et la cause la
-          plus courante — un geste, pas un constat muet. */}
-      {e.proprietaire && e.mentionsCompletes === null && (
-        <div data-mentions-manquantes="pas-su" style={{ fontSize: 13, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>
-          Je n'ai pas pu relire les mentions légales (<b style={{ color: C.text }}>public/legal/editeur.js</b>{typeof e.mentionsErreur === 'string' && e.mentionsErreur.trim() ? <> : « {e.mentionsErreur.trim().slice(0, 160)} »</> : null}) : le paiement reste fermé tant qu'elles ne sont pas lisibles. Cause la plus courante : une apostrophe dans un texte écrit entre apostrophes (« 'Marie d'Exemple' ») — écris-le entre guillemets droits (« "Marie d'Exemple" »).
-        </div>
-      )}
-      {prixAcorriger && (
-        <div data-prix-stripe="different" style={{ fontSize: 13, color: C.text, marginTop: 8, lineHeight: 1.5 }}>
-          Le prix réglé chez Stripe (<b data-prix-stripe-texte="">{texteStripe}</b>) n'est pas celui des conditions de vente (<b>{PRIX_CGV_LISIBLE}</b>). Le paiement reste <b>fermé</b> : personne ne peut s'abonner tant que ce n'est pas corrigé. Dans Stripe → Produits, ajoute au produit VRM un prix de {PRIX_CGV_LISIBLE.replace(' / ', ' par ')} avec la clé de recherche « vrm_mensuel » (coche « transférer la clé »).
-        </div>
-      )}
-    </div>
-  );
-  if (!e.configure) return <div style={carte} data-abonnement="non-branche">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Le paiement n'est pas encore ouvert : VRM reste gratuit pour l'instant.</div></div>;
-  const test = e.modeTest ? <div data-mode-test="" style={{ fontSize: 12, color: C.muted, marginTop: 6, lineHeight: 1.5 }}>Paiement en <b style={{ color: C.text }}>mode test</b> : aucune vraie carte n'est débitée (carte d'essai 4242 4242 4242 4242).</div> : null;
-  const cb = fx && fx.carte;
-  const ligneCarte = cb ? (
-    <div data-carte="" style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>
-      Carte {cb.marque ? cb.marque.charAt(0).toUpperCase() + cb.marque.slice(1) : ''} •••• {cb.fin}{cb.mois && cb.annee ? ` · expire ${String(cb.mois).padStart(2, '0')}/${String(cb.annee).slice(-2)}` : ''}
-    </div>
-  ) : null;
-  const listeFactures = e.peutGerer ? <FacturesAbonnement fx={fx}/> : null;
-  const actifs = ['active', 'trialing'];
-  if (actifs.includes(e.statut)) {
-    const annule = !!e.annuleFinPeriode;
-    return (<>
-      <div style={carte} data-abonnement="actif" data-resilie={annule ? '' : undefined}>
-        {titre}
-        {/* ⚠️ Le prix de SON abonnement (`prixAbonnement`, lu sur l'article de
-            l'abonnement chez Stripe), jamais celui de l'offre (`prix`) ni celui
-            des CGV : un abonnement garde le prix auquel il a été souscrit
-            (9,99 € avant le 11 octobre). Pas su ⇒ « Abonné » sans montant. */}
-        <div data-prix-abonnement={e.prixAbonnement && e.prixAbonnement.texte ? '' : undefined} style={{ fontSize: 13, color: C.text, marginTop: 4, lineHeight: 1.5 }}>Abonné{e.prixAbonnement && typeof e.prixAbonnement.texte === 'string' && e.prixAbonnement.texte.trim() ? ` · ${e.prixAbonnement.texte}` : ''}</div>
-        {e.finPeriode && (
-          <div style={{ fontSize: 13, color: C.muted, marginTop: 2, lineHeight: 1.5 }}>
-            {annule ? `Résilié : VRM reste ouvert jusqu'au ${dateLisible(e.finPeriode)}, aucun autre prélèvement.` : `Prochain prélèvement le ${dateLisible(e.finPeriode)}.`}
+    <div data-abonnement="proprietaire" data-abonnement-etat="proprietaire">
+      <Tete etat="Ton abonnement" titre="Compte propriétaire" phrase="Compte propriétaire de VRM : gratuit, aucun abonnement.">
+        {mentionsAremplir && (
+          <div data-mentions-manquantes={mentionsAremplir.length} style={note}>
+            Le paiement reste <b>fermé</b> tant que les mentions légales sont incomplètes ({mentionsAremplir.join(', ')}). Elles se remplissent dans <b>public/legal/editeur.js</b>, et l'adresse de contact aussi dans src/contact.js.
           </div>
         )}
-        {ligneCarte}
-        {test}
-        <div className="vrm-b-rangee" style={{ marginTop: 12 }}>
-          {annule
-            ? <button type="button" disabled={!!occupe} onClick={() => resilierOuReprendre(true)} className="vrm-b vrm-b-primaire">{occupe === 'reprendre' ? 'Un instant…' : 'Reprendre mon abonnement'}</button>
-            : <>
-                <button type="button" disabled={!!occupe} onClick={() => agir('portail')} className="vrm-b vrm-b-secondaire">{occupe === 'portail' ? 'Ouverture…' : 'Changer de carte'}</button>
-                <button type="button" disabled={!!occupe} onClick={() => resilierOuReprendre(false)} className="vrm-b vrm-b-discret">{occupe === 'resilier' ? 'Un instant…' : 'Résilier'}</button>
-              </>}
-        </div>
-        {msg && <div style={{ fontSize: 12, color: C.warn, marginTop: 6 }}>{msg}</div>}
-      </div>
-      {listeFactures}
-    </>);
-  }
-  if (e.statut === 'past_due' || e.statut === 'unpaid') {
+        {e.mentionsCompletes === null && (
+          <div data-mentions-manquantes="pas-su" style={{ ...note, color: C.muted }}>
+            Je n'ai pas pu relire les mentions légales (<b style={{ color: C.text }}>public/legal/editeur.js</b>{typeof e.mentionsErreur === 'string' && e.mentionsErreur.trim() ? <> : « {e.mentionsErreur.trim().slice(0, 160)} »</> : null}) : le paiement reste fermé tant qu'elles ne sont pas lisibles. Cause la plus courante : une apostrophe dans un texte écrit entre apostrophes (« 'Marie d'Exemple' ») — écris-le entre guillemets droits (« "Marie d'Exemple" »).
+          </div>
+        )}
+        {prixAcorriger && (
+          <div data-prix-stripe="different" style={note}>
+            Le prix réglé chez Stripe (<b data-prix-stripe-texte="">{texteStripe}</b>) n'est pas celui des conditions de vente (<b>{PRIX_CGV_LISIBLE}</b>). Le paiement reste <b>fermé</b> : personne ne peut s'abonner tant que ce n'est pas corrigé. Dans Stripe → Produits, ajoute au produit VRM un prix de {PRIX_CGV_LISIBLE.replace(' / ', ' par ')} avec la clé de recherche « vrm_mensuel » (coche « transférer la clé »).
+          </div>
+        )}
+      </Tete>
+    </div>
+  );
+  // Stripe pas branché (`STRIPE_SECRET_KEY` absente) : dit calmement, aucun bouton.
+  if (!e.configure && !et.lectureSeule) return <div data-abonnement="non-branche" data-abonnement-etat="non-branche"><Tete etat="Ton abonnement" titre="Paiement pas encore ouvert" phrase="Le paiement n'est pas encore ouvert : VRM reste gratuit pour l'instant. Rien ne t'est demandé."/></div>;
+  const test = e.modeTest ? <div data-mode-test="" className="vrm-ios-groupe-pied" style={{ margin: '8px 16px 0' }}>Paiement en <b style={{ color: C.text }}>mode test</b> : aucune vraie carte n'est débitée (carte d'essai 4242 4242 4242 4242).</div> : null;
+  const cb = fx && fx.carte;
+  const texteCarte = cb ? `${cb.marque ? cb.marque.charAt(0).toUpperCase() + cb.marque.slice(1) : 'Carte'} •••• ${cb.fin}${cb.mois && cb.annee ? ` · expire ${String(cb.mois).padStart(2, '0')}/${String(cb.annee).slice(-2)}` : ''}` : (fx === undefined && e.peutGerer ? 'Je regarde…' : null);
+  const listeFactures = e.peutGerer ? <FacturesAbonnement fx={fx}/> : null;
+  const erreur = msg ? <div role="alert" style={{ fontSize: 13, color: C.warn, margin: '8px 16px 0' }}>{msg}</div> : null;
+  const apresFin = e.lecture === true ? 'Ensuite, tes données restent lisibles : rien n’est supprimé.' : 'Tes données restent intactes : rien n’est supprimé.';
+  // Les rangées « paiement » : la carte (portail) et la page de gestion Stripe.
+  const groupePaiement = (
+    <GroupeIos titre="Paiement">
+      <RangeeIos titre="Changer de carte" detail={texteCarte ? <span data-carte="">{texteCarte}</span> : undefined} onClick={occupe ? undefined : () => agir('portail')} data-rangee-carte=""/>
+      <RangeeIos titre={occupe === 'portail' ? 'Ouverture…' : 'Gérer chez Stripe'} detail="Factures, moyen de paiement, adresse de facturation" onClick={occupe ? undefined : () => agir('portail')} data-rangee-portail=""/>
+    </GroupeIos>
+  );
+  if (et.etat === 'essai' || et.etat === 'essai-resilie' || et.etat === 'actif' || et.etat === 'resilie') {
+    const annule = !!e.annuleFinPeriode;
+    const fin = e.finPeriode ? dateLisible(e.finPeriode) : '';
+    const prix = et.prixAbonnement;
+    let tete;
+    if (et.etat === 'essai') {
+      const j = et.jours;
+      tete = <Tete etat="Essai gratuit" jauge={Number.isInteger(j) ? j : null}
+        titre={j == null ? 'Essai en cours' : j === 0 ? "Dernier jour d'essai" : j === 1 ? "Encore 1 jour d'essai" : `Encore ${j} jours d'essai`}
+        phrase={<span data-essai-phrase="">{fin ? `Le ${fin}, ` : 'À la fin de l’essai, '}ton abonnement démarre{prix ? ` : ${prix} prélevés sur ta carte` : ' et ta carte est débitée'}, sauf si tu résilies avant. Rien n'est prélevé pendant l'essai.</span>}/>;
+    } else if (et.etat === 'essai-resilie') {
+      tete = <Tete etat="Essai gratuit · résilié" titre={fin ? `Fin le ${fin}` : 'Essai résilié'} phrase={`Résilié : VRM reste ouvert jusqu'au ${fin || 'la fin de l’essai'}, et rien ne sera prélevé. ${apresFin}`}/>;
+    } else if (annule) {
+      tete = <Tete etat="Abonnement résilié" titre={fin ? `Fin le ${fin}` : 'Résilié'} phrase={`Résilié : VRM reste ouvert jusqu'au ${fin || 'la fin du mois payé'}, aucun autre prélèvement. ${apresFin}`}/>;
+    } else {
+      tete = <Tete etat="Ton abonnement" titre={<span data-prix-abonnement={prix ? '' : undefined}>Abonné{prix ? ` · ${prix}` : ''}</span>}
+        phrase={fin ? `Prochain prélèvement le ${fin}.` : 'Sans engagement, résiliable à tout moment.'}/>;
+    }
     return (<>
-      <div style={{ ...carte, border: `1px solid ${C.warn}55` }} data-abonnement="impaye">
-        {titre}
-        <div style={{ fontSize: 13, color: C.text, marginTop: 4, lineHeight: 1.5 }}>Le dernier prélèvement n'est pas passé. Mets à jour ta carte : au bout de 14 jours, l'app se met en pause (tes données restent intactes).</div>
-        {ligneCarte}
+      <div data-abonnement="actif" data-abonnement-etat={et.etat} data-resilie={annule ? '' : undefined} data-essai-jours={enEssai && Number.isInteger(et.jours) ? et.jours : undefined}>
+        {tete}
+        {annule && (
+          <div className="vrm-abo-actions" style={{ padding: '0 0' }}>
+            <button type="button" disabled={!!occupe} onClick={() => resilierOuReprendre(true)} className="vrm-b vrm-b-primaire vrm-b-plein" style={{ marginTop: 12 }}>{occupe === 'reprendre' ? 'Un instant…' : 'Reprendre mon abonnement'}</button>
+          </div>
+        )}
+        {groupePaiement}
+        {!annule && (
+          <GroupeIos titre="Résiliation" pied={enEssai
+            ? `Pendant l'essai : rien n'est prélevé, VRM reste ouvert jusqu'au ${fin || 'dernier jour'}. ${apresFin}`
+            : `Effet à la fin de la période payée${fin ? `, le ${fin}` : ''} : aucun autre prélèvement. Tu peux changer d'avis jusque-là.`}>
+            <RangeeIos titre={occupe === 'resilier' ? 'Un instant…' : 'Résilier'} onClick={occupe ? undefined : () => resilierOuReprendre(false)} data-rangee-resilier=""/>
+          </GroupeIos>
+        )}
+        {erreur}
         {test}
-        <button type="button" disabled={!!occupe} onClick={() => agir('portail')} className="vrm-b vrm-b-primaire" style={{ marginTop: 12 }}>{occupe ? 'Ouverture…' : 'Mettre à jour ma carte'}</button>
-        {msg && <div style={{ fontSize: 12, color: C.warn, marginTop: 6 }}>{msg}</div>}
+        {pied}
       </div>
       {listeFactures}
     </>);
   }
-  // Le prix de Stripe n'est pas celui des CGV : le serveur n'ouvrira pas le
-  // paiement (api/compte.js) — aucun bouton qui mènerait à un refus.
-  // ⚠️ Un ANCIEN abonné garde ses factures (sa compta) : cette branche les rend
-  //    comme celle du dessous — elle les perdait (revue du 11 octobre).
-  // 23 oct. (revue) : mentions ILLISIBLES (`null`) = fermé, comme le serveur.
+  const portePaiementFerme = e.prixConforme === false || e.mentionsCompletes !== true || e.configure === false;
+  if (et.etat === 'impaye') {
+    return (<>
+      <div data-abonnement="impaye" data-abonnement-etat="impaye">
+        <Tete etat="Paiement en échec" titre="Le dernier prélèvement n'est pas passé"
+          phrase="Le dernier prélèvement n'est pas passé. Mets à jour ta carte : Stripe réessaie pendant 14 jours, puis l'app passe en lecture seule (tes données restent intactes).">
+          <div className="vrm-abo-actions"><button type="button" disabled={!!occupe} onClick={() => agir('portail')} className="vrm-b vrm-b-primaire vrm-b-plein">{occupe ? 'Ouverture…' : 'Mettre à jour ma carte'}</button></div>
+        </Tete>
+        {texteCarte && <GroupeIos titre="Paiement"><RangeeIos titre="Carte enregistrée" detail={<span data-carte="">{texteCarte}</span>}/></GroupeIos>}
+        {erreur}
+        {test}
+      </div>
+      {listeFactures}
+    </>);
+  }
+  if (et.etat === 'expire') {
+    // LECTURE SEULE : tout reste visible ; s'abonner (ou la carte, pour un
+    // impayé) rouvre les écritures. Paiement fermé ⇒ aucune case ni bouton.
+    return (<>
+      <div data-abonnement="expire" data-abonnement-etat="expire" data-lecture-seule={et.lectureSeule ? '' : undefined}>
+        <Tete etat="Lecture seule" titre={et.impaye ? 'Le prélèvement ne passe plus' : "Ton abonnement n'est plus actif"}
+          phrase={`${e.lecture === true ? 'Tout reste visible et rien n’est supprimé : ventes, compta, factures, numéros.' : 'Tes données sont intactes : rien n’est supprimé.'} Pour enregistrer, publier, imprimer et répondre à nouveau, ${et.impaye ? 'mets ta carte à jour' : `abonne-toi${portePaiementFerme ? '' : ` : ${prixLisible(e.prix)}, sans engagement`}`}.`}>
+          {et.impaye
+            ? <div className="vrm-abo-actions"><button type="button" disabled={!!occupe} onClick={() => agir('portail')} className="vrm-b vrm-b-primaire vrm-b-plein">{occupe ? 'Ouverture…' : 'Mettre à jour ma carte'}</button></div>
+            : portePaiementFerme
+              ? <div className="vrm-abo-phrase" data-paiement-ferme="">Le paiement n'est pas encore ouvert : rien n'a été prélevé. Réessaie un peu plus tard.</div>
+              : <>
+                  <CaseCgv cases={cases} onChange={setCases}/>
+                  <div className="vrm-abo-actions"><button type="button" disabled={!!occupe || !cgv} data-sabonner="" onClick={() => agir('checkout')} className="vrm-b vrm-b-primaire vrm-b-plein" title={cgv ? undefined : 'Coche d’abord les conditions de vente'}>{occupe ? 'Ouverture…' : "S'abonner"}</button></div>
+                </>}
+        </Tete>
+        {erreur}
+        {test}
+        {pied}
+      </div>
+      {listeFactures}
+    </>);
+  }
+  // Le prix de Stripe n'est pas celui des CGV, ou les mentions manquent : le
+  // serveur n'ouvrira pas le paiement — aucun bouton qui mènerait à un refus.
+  // Un ANCIEN abonné garde ses factures (sa compta).
   if (e.prixConforme === false || e.mentionsCompletes !== true) return (<>
-    <div style={carte} data-abonnement="non-branche" data-raison={e.prixConforme === false ? 'prix' : 'mentions'}>{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Le paiement n'est pas encore ouvert : VRM reste gratuit pour l'instant.</div></div>
+    <div data-abonnement="non-branche" data-abonnement-etat="non-branche" data-raison={e.prixConforme === false ? 'prix' : 'mentions'}><Tete etat="Ton abonnement" titre="Paiement pas encore ouvert" phrase="Le paiement n'est pas encore ouvert : VRM reste gratuit pour l'instant."/></div>
     {listeFactures}
   </>);
   return (<>
-    <div style={carte} data-abonnement="sans">
-      {titre}
-      <div style={{ fontSize: 13, color: C.text, marginTop: 4, lineHeight: 1.5 }} data-essai-dispo={e.essaiDispo ? '' : undefined}>
-        {e.essaiDispo
-          ? <><b>{e.essaiJours || 7} jours gratuits</b>, puis {prixLisible(e.prix)}, sans engagement : aucun prélèvement pendant l'essai, résiliable à tout moment.</>
-          : <>{prixLisible(e.prix)}, sans engagement : prélevé chaque mois à la date où tu t'abonnes, résiliable à tout moment.</>}
-        {!e.obligatoire && <span style={{ color: C.muted }}> Pour l'instant VRM reste gratuit pour toi.</span>}
-      </div>
-      {RETOUR_ABONNEMENT === 'merci' && <div style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>Paiement reçu par Stripe — ton abonnement apparaîtra ici dans quelques secondes. Rouvre l'écran si besoin.</div>}
+    <div data-abonnement="sans" data-abonnement-etat="sans">
+      <Tete etat="Pas encore d'abonnement" titre={e.essaiDispo ? `${e.essaiJours || 7} jours gratuits` : prixLisible(e.prix)}
+        phrase={<span data-essai-dispo={e.essaiDispo ? '' : undefined}>
+          {e.essaiDispo
+            ? <>Puis {prixLisible(e.prix)}, sans engagement : aucun prélèvement pendant l'essai, résiliable à tout moment. À la fin de l'essai, sans abonnement, tes données restent là.</>
+            : <>{prixLisible(e.prix)}, sans engagement : prélevé chaque mois à la date où tu t'abonnes, résiliable à tout moment.</>}
+          {!e.obligatoire && <> Pour l'instant VRM reste gratuit pour toi.</>}
+        </span>}>
+        {RETOUR_ABONNEMENT === 'merci' && <div className="vrm-abo-phrase">Paiement reçu par Stripe — ton abonnement apparaîtra ici dans quelques secondes. Rouvre l'écran si besoin.</div>}
+        <CaseCgv cases={cases} onChange={setCases}/>
+        <div className="vrm-abo-actions">
+          <button type="button" disabled={!!occupe || !cgv} data-sabonner="" data-essai={e.essaiDispo ? '' : undefined} onClick={() => agir('checkout')} className="vrm-b vrm-b-primaire vrm-b-plein" title={cgv ? undefined : 'Coche d’abord les conditions de vente'}>{occupe ? 'Ouverture…' : e.essaiDispo ? `Commencer l'essai gratuit de ${e.essaiJours || 7} jours` : "S'abonner"}</button>
+        </div>
+        {e.essaiDispo && <div className="vrm-aide" style={{ fontSize: 12, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>Essai gratuit <b>une seule fois</b> — par adresse e-mail et par compte Vinted. Ta carte n'est débitée qu'après {e.essaiJours || 7} jours ; tu peux résilier avant sans rien payer.</div>}
+      </Tete>
+      {erreur}
       {test}
-      <CaseCgv cases={cases} onChange={setCases}/>
-      <button type="button" disabled={!!occupe || !cgv} data-sabonner="" data-essai={e.essaiDispo ? '' : undefined} onClick={() => agir('checkout')} className="vrm-b vrm-b-primaire" style={{ marginTop: 10 }} title={cgv ? undefined : 'Coche d’abord les conditions de vente'}>{occupe ? 'Ouverture…' : e.essaiDispo ? `Commencer l'essai gratuit de ${e.essaiJours || 7} jours` : "S'abonner"}</button>
-      {e.essaiDispo && <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, marginTop: 6, lineHeight: 1.5 }}>Essai gratuit <b>une seule fois</b> — par adresse e-mail et par compte Vinted. Ta carte n'est débitée qu'après {e.essaiJours || 7} jours ; tu peux résilier avant sans rien payer.</div>}
-      <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>Paiement sécurisé par Stripe — VRM ne voit jamais ta carte.</div>
-      {msg && <div style={{ fontSize: 12, color: C.warn, marginTop: 6 }}>{msg}</div>}
+      {pied}
     </div>
-    {/* Un ancien abonné garde l'accès à ses factures passées (sa compta). */}
     {listeFactures}
   </>);
 }
 
-// La liste des factures, sous la carte d'abonnement. Une ligne par facture :
-// date · montant · statut · le PDF. Rien d'autre (§7).
+// La liste des factures, en rangées iOS. Une rangée par facture : date ·
+// statut · montant · le PDF. « Pas su » n'est JAMAIS « aucune facture ».
 function FacturesAbonnement({ fx }) {
-  const carte = { padding: '13px 16px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, marginBottom: 8 };
-  const titre = <div style={{ fontSize: 15, fontWeight: 600, color: C.text }}>Tes factures</div>;
-  if (fx === undefined) return <div style={carte} data-factures="chargement">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3 }}>Je regarde…</div></div>;
-  if (fx === null) return <div style={carte} data-factures="pas-su">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Factures pas lues chez Stripe. Rouvre cet écran dans un instant — elles sont gardées.</div></div>;
-  if (!fx.factures.length) return <div style={carte} data-factures="vide">{titre}<div style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.5 }}>Aucune facture pour l'instant : la première arrive avec ton premier prélèvement.</div></div>;
+  const vide = (etat, texte) => <GroupeIos titre="Tes factures" data-factures={etat}><RangeeIos titre={texte}/></GroupeIos>;
+  if (fx === undefined) return vide('chargement', 'Je regarde…');
+  if (fx === null) return vide('pas-su', 'Factures pas lues chez Stripe. Rouvre cet écran dans un instant — elles sont gardées.');
+  if (!fx.factures.length) return vide('vide', "Aucune facture pour l'instant : la première arrive avec ton premier prélèvement.");
   return (
-    <div style={carte} data-factures={String(fx.factures.length)}>
-      {titre}
-      <div style={{ marginTop: 6 }}>
-        {fx.factures.map((f, i) => {
-          const lien = lienFacture(f.pdf) || lienFacture(f.page);
-          const st = STATUT_FACTURE[f.statut] || f.statut;
-          return (
-            <div key={f.id || i} data-facture="" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderTop: i ? `1px solid ${C.border}` : 'none' }}>
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ display: 'block', fontSize: 13, color: C.text, fontWeight: 500 }}>{f.date ? dateLisible(f.date) : '—'}</span>
-                <span style={{ display: 'block', fontSize: 11, color: f.statut === 'open' || f.statut === 'uncollectible' ? C.warn : C.muted, marginTop: 1 }}>{st}{f.numero ? ` · n° ${f.numero}` : ''}</span>
-              </span>
-              <span style={{ fontSize: 13, fontWeight: 600, color: C.text, fontVariantNumeric: 'tabular-nums' }}>{montantLisible(f.montant, f.devise)}</span>
-              {lien
-                ? <a href={lien} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, fontWeight: 600, color: C.accentTexte, textDecoration: 'none', minWidth: 44, minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end' }}>{lienFacture(f.pdf) ? 'PDF' : 'Voir'}</a>
-                : <span style={{ minWidth: 34 }}/>}
-            </div>
-          );
-        })}
+    <GroupeIos titre="Tes factures" data-factures={String(fx.factures.length)}>
+      {fx.factures.map((f, i) => {
+        const lien = lienFacture(f.pdf) || lienFacture(f.page);
+        const st = STATUT_FACTURE[f.statut] || f.statut;
+        return (
+          <RangeeIos key={f.id || i} data-facture="" titre={f.date ? dateLisible(f.date) : '—'}
+            detail={<span style={{ color: f.statut === 'open' || f.statut === 'uncollectible' ? C.warn : undefined }}>{st}{f.numero ? ` · n° ${f.numero}` : ''}</span>}
+            valeur={<span style={{ fontVariantNumeric: 'tabular-nums', color: C.text, fontWeight: 600 }}>{montantLisible(f.montant, f.devise)}</span>}
+            apres={lien
+              ? <a href={lien} target="_blank" rel="noopener noreferrer" style={{ fontSize: 15, fontWeight: 600, color: C.accentTexte, textDecoration: 'none', minWidth: 44, minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', paddingRight: 12 }}>{lienFacture(f.pdf) ? 'PDF' : 'Voir'}</a>
+              : <span style={{ minWidth: 44 }}/>}/>
+        );
+      })}
+    </GroupeIos>
+  );
+}
+
+// ── PARRAINAGE (8 nov.) ──────────────────────────────────────────────────────
+// Un lien personnel ; un mois offert à chacun quand l'ami paie son premier
+// mois (règle et anti-abus : api/_lib/parrainage.js, CGV article 2 bis). Le
+// serveur rend des NOMBRES (« 2 amis inscrits, 1 a payé »), jamais qui.
+// Trois états : `undefined` en cours · `null` pas su · l'objet lu. Pas installé
+// (027 pas passée) ou parrainage fermé : on le dit, sans lien à partager.
+async function lireParrainage() {
+  try {
+    const r = await fetch('/api/compte?mode=parrainage', { headers: enTeteSession(), cache: 'no-store' });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return j && j.ok ? j : null;
+  } catch (_) { return null; }
+}
+function Parrainage() {
+  const [p, setP] = React.useState(undefined);
+  const proprio = useEstProprietaire();
+  React.useEffect(() => { let mort = false; lireParrainage().then((x) => { if (!mort) setP(x); }); return () => { mort = true; }; }, []);
+  if (p === undefined) return null;
+  if (p === null) return <GroupeIos titre="Parrainage" data-parrainage="pas-su"><RangeeIos titre="Parrainage pas lu" detail="Rouvre cet écran dans un instant."/></GroupeIos>;
+  if (!p.installe || !p.ouvert) {
+    // Fermé : rien n'est promis au vendeur ; le propriétaire lit le geste.
+    if (!proprio) return null;
+    return <GroupeIos titre="Parrainage" data-parrainage="ferme" pied={!p.installe ? 'À activer : passer la migration 027, puis vrm_reglages.parrainage = 1.' : 'Éteint : vrm_reglages.parrainage = 1 l’ouvre (un mois offert au parrain et au filleul).'}><RangeeIos titre="Parrainage pas encore ouvert"/></GroupeIos>;
+  }
+  const lien = lienParrainage(p.code);
+  const s = p.suivi || { inscrits: 0, payes: 0, moisOfferts: 0, enAttente: 0 };
+  const amis = (n) => `${n} ami${n > 1 ? 's' : ''}`;
+  const copier = async () => {
+    try { if (navigator.share && window.matchMedia('(pointer: coarse)').matches) { await navigator.share({ title: 'VRM', text: 'Essaie VRM : un mois offert à ton premier paiement.', url: lien }); return; } } catch (_) { return; }
+    try { await navigator.clipboard.writeText(lien); toast('✓ Lien copié'); } catch (_) { toast('Copie impossible ici — sélectionne le lien'); }
+  };
+  return (
+    <GroupeIos titre="Parrainage" data-parrainage="ouvert" data-inscrits={s.inscrits} data-payes={s.payes}
+      pied={`Un mois offert à ton ami et à toi quand il paie son premier mois : un crédit d'un mois déduit de la prochaine facture. Une fois par ami, pas pour toi-même ; au plus 12 mois offerts par an.${p.filleul && p.filleul.parraine ? (p.filleul.moisOffert ? ' Ton mois offert de filleul est crédité.' : ' Tu as été parrainé : ton mois offert arrive avec ton premier paiement.') : ''}`}>
+      <div className="vrm-ios-rangee" style={{ padding: '10px 16px', display: 'block' }}>
+        <div className="vrm-abo-lien"><code data-lien-parrainage="">{lien}</code></div>
+        <div className="vrm-abo-actions" style={{ marginTop: 10 }}><button type="button" className="vrm-b vrm-b-secondaire" onClick={copier} data-copier-parrainage="">Partager mon lien</button></div>
       </div>
-    </div>
+      <RangeeIos titre="Amis inscrits" valeur={<span data-chiffre-inscrits="">{s.inscrits}</span>}/>
+      <RangeeIos titre="Ont payé leur premier mois" valeur={<span data-chiffre-payes="">{s.payes}</span>}/>
+      <RangeeIos titre="Mois offerts pour toi" detail={s.enAttente ? `${amis(s.enAttente)} : en attente de ton premier abonnement` : undefined} valeur={<span data-chiffre-mois="">{s.moisOfferts}</span>}/>
+    </GroupeIos>
   );
 }
 // ⟦← App.jsx #41⟧

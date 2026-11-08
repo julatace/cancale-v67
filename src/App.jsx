@@ -345,6 +345,7 @@ import { lireSuivisSansQr, lireQrDeLigne } from "./suivisSansQr.js";
 import { rythme } from "./rythmeLectures.js";
 import { comptesARelire } from "./sondeVentes.js";
 import { installerFiltreSupprimes, sansComptesSupprimes, lireSupprimes, CLE_SUPPRIMES } from "./comptesSupprimes.js";
+import { etatAbonnement, rappelEssai, publierAbonnement, abonnementPublie, suivreAbonnement, installerGardeEcriture, CLE_PARRAIN, codeParrainDe } from "./abonnement/etatAbonnement.js";
 import { lectureComplete, construirePhoto, ecrirePhoto, lirePhoto, listeDuSoir, joursAvantJour, heurePhoto, adresseQrLocale, CACHE_QR, quandEtat, ageEtatH, etatVieux, ETAT_VIEUX_H, pointsDeRetrait, colisRetireApres, colisRetireAnnule, marqueApres, marqueAnnulee } from "./journeeHorsLigne.js";
 import { jetonsStream, demarrerStream, demarrerMontants, photoACacherSelon, poserReglesStream, normaliserRegles, compilerRegle, masquerTexteStream, textePourStream, regleCourante, regleApercu, ligneACacher, CATEGORIES as STREAM_CATEGORIES, LISTES as STREAM_LISTES, nettoyerMots, CLE_STREAM, CLE_STREAM_REGLES, REGLES_DEFAUT as STREAM_DEFAUT } from "./modeStream.js";
 // ⟦→ ecrans/Reglages.jsx #14⟧
@@ -1093,6 +1094,12 @@ installerLecturesPartagees(SUPABASE_URL);
 // (29 oct.) « Retire tout de ce compte » : aucune ligne d'un compte supprimé
 // pour de bon ne sort d'une lecture (src/comptesSupprimes.js).
 installerFiltreSupprimes(SUPABASE_URL);
+// (8 nov.) L'abonnement expiré laisse LIRE (migration 027) : aucune écriture
+// vers la base ne part, elle reçoit un refus lisible (src/abonnement/etatAbonnement.js).
+installerGardeEcriture(SUPABASE_URL);
+// (8 nov.) Le lien de parrainage (`?parrain=CODE`) est gardé jusqu'à ce qu'un
+// compte connecté le présente au serveur (une fois, `BandeauAbonnement`).
+try { const c = codeParrainDe(window.location.search); if (c) localStorage.setItem(CLE_PARRAIN, c); } catch (_) {}
 
 // ════════════════════════════════════════════════════════════════════════════
 //  COMPTES VENDEURS (multi-utilisateurs)
@@ -16053,6 +16060,65 @@ function BandeauConfirmationAdresse({ onVoir }) {
 // connectée, lui adresse SA session (`assurerSessionExtension`). Ce bandeau dit
 // où on en est, UNE fois, sur la coque — et le geste quand ça n'aboutit pas.
 // L'état décidé est porté par `data-liaison` (le banc juge l'état, pas la phrase).
+// ── LA LIGNE DE L'ABONNEMENT, SUR LA COQUE (8 nov.) ─────────────────────────
+// Discrète : une ligne, à J-3 et J-1 de la fin de l'essai (fermable pour la
+// journée) ; et, à l'expiration, « Lecture seule » avec le chemin vers
+// l'abonnement — jamais un blocage sans explication. Rien d'autre.
+// Porte aussi, une fois, le code de parrainage gardé depuis le lien.
+const cleRappelEssai = (uid, seuil) => `vrm_rappel_essai_${uid}_${seuil}_${new Date().toISOString().slice(0, 10)}`;
+function voirAbonnement(setTab) {
+  try { localStorage.setItem('vrm_reglages_vue', 'abonnement'); } catch (_) {}
+  try { window.dispatchEvent(new CustomEvent('vrm:voir-abonnement')); } catch (_) {}
+  if (setTab) setTab('settings');
+}
+function BandeauAbonnement({ setTab }) {
+  const [x, setX] = React.useState(() => abonnementPublie());
+  const [ferme, setFerme] = React.useState(0);
+  const [refus, setRefus] = React.useState(false);
+  React.useEffect(() => suivreAbonnement(setX), []);
+  React.useEffect(() => {
+    const f = () => setRefus(true);
+    window.addEventListener('vrm:lecture-seule', f);
+    return () => window.removeEventListener('vrm:lecture-seule', f);
+  }, []);
+  // Le parrainage gardé depuis le lien : présenté UNE fois au serveur (qui
+  // décide tout). Un refus définitif l'efface ; « pas su » (503) le garde.
+  React.useEffect(() => {
+    let code = ''; try { code = localStorage.getItem(CLE_PARRAIN) || ''; } catch (_) {}
+    if (!code || !(AUTH.session && AUTH.session.access_token)) return;
+    fetch('/api/compte?mode=parrainage', { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'rattacher', code }) })
+      .then(async (r) => {
+        const j = await r.json().catch(() => null);
+        if (r.status >= 500 || r.status === 401) return;
+        try { localStorage.removeItem(CLE_PARRAIN); } catch (_) {}
+        if (r.ok && j && j.ok) toast('✓ Parrainage enregistré : un mois offert à ton premier paiement');
+      }).catch(() => {});
+  }, []);
+  const uid = (AUTH.user && AUTH.user.id) || '';
+  const e = etatAbonnement(x === null ? undefined : x);
+  if (e.lectureSeule) {
+    return (
+      <div data-bandeau-abonnement="lecture-seule" data-refus={refus ? '' : undefined} role="status" className="vrm-bandeau-abo">
+        <span className="vrm-bandeau-abo-point" aria-hidden="true"/>
+        <span className="vrm-bandeau-abo-texte"><b>Lecture seule.</b> {e.etat === 'expire' && e.impaye ? "Ton prélèvement n'est pas passé : " : "Ton abonnement n'est plus actif : "}tout reste visible, rien n'est supprimé ; abonne-toi pour enregistrer et agir à nouveau.</span>
+        <button type="button" className="vrm-lien-action vrm-bandeau-abo-geste" onClick={() => voirAbonnement(setTab)}>{e.impaye ? 'Mettre à jour ma carte' : "Voir l'abonnement"}</button>
+      </div>
+    );
+  }
+  const r = rappelEssai(e);
+  if (!r) return null;
+  let vu = false; try { vu = !!localStorage.getItem(cleRappelEssai(uid, r.seuil)); } catch (_) {}
+  if (vu || ferme) return null;
+  return (
+    <div data-bandeau-abonnement="essai" data-essai-jours={r.jours} data-seuil={r.seuil} role="status" className="vrm-bandeau-abo">
+      <span className="vrm-bandeau-abo-texte">{r.texte}</span>
+      <button type="button" className="vrm-lien-action vrm-bandeau-abo-geste" onClick={() => voirAbonnement(setTab)}>Gérer</button>
+      <button type="button" className="vrm-bandeau-abo-fermer" aria-label="Masquer pour aujourd'hui" onClick={() => { try { localStorage.setItem(cleRappelEssai(uid, r.seuil), '1'); } catch (_) {} setFerme(1); }}>
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="m2.5 2.5 7 7m0-7-7 7"/></svg>
+      </button>
+    </div>
+  );
+}
 function BandeauLiaison() {
   const [, force] = React.useReducer((n) => n + 1, 0);
   React.useEffect(() => { __lierSubs.add(force); return () => { __lierSubs.delete(force); }; }, []);
@@ -47028,6 +47094,12 @@ function CaseCgv({ cases, onChange }) {
 //    dernière réponse connue est gardée sur l'appareil pour décider tout de
 //    suite à l'ouverture suivante (sans éclair d'app).
 const cleAbo = (uid) => `vrm_abo_porte_${uid}`;
+// (8 nov.) LECTURE SEULE À L'EXPIRATION : quand la base laisse LIRE (migration
+// 027, `lecture: true`), un accès coupé n'est plus une porte fermée : l'app
+// s'ouvre, tout est visible, les écritures sont refusées par la base ET par la
+// garde (`installerGardeEcriture`), et la coque le dit (`BandeauAbonnement`).
+// Sans la 027, la base ferme aussi la lecture : la porte reste (jamais une app
+// vide qui dirait « rien »).
 function PorteAbonnement({ uid, children }) {
   const [bloque, setBloque] = React.useState(() => { try { return localStorage.getItem(cleAbo(uid)) === 'bloque'; } catch (_) { return false; } });
   const [info, setInfo] = React.useState(null);
@@ -47039,7 +47111,8 @@ function PorteAbonnement({ uid, children }) {
       //    ses lignes, ses notifications et son widget. L'écran ne la recalcule
       //    pas : s'il disait « entre » pendant que la base refuse, il ouvrirait
       //    une app vide (§11).
-      const b = x.acces === false;
+      publierAbonnement(x);
+      const b = x.acces === false && x.lecture !== true;
       setBloque(b); setInfo(x);
       try { b ? localStorage.setItem(cleAbo(uid), 'bloque') : localStorage.removeItem(cleAbo(uid)); } catch (_) {}
     });
@@ -51348,6 +51421,7 @@ function AppCoeur() {
         <EnAttenteEnvoi/>
         {horsLigne ? <JourneeHorsLigne tab={tab} uid={(authState.user && authState.user.id) || (MULTI_USER ? '' : 'local')}/> : (<>
         {baseKO && <BaseInjoignable/>}
+        <BandeauAbonnement setTab={setTab}/>
         <BandeauLiaison/>
         <BandeauConfirmationAdresse onVoir={() => { ouvrirEmailsRelier('adresses'); setTab('emails'); }}/>
         <DemandeCodeDiscord/>
