@@ -14,7 +14,8 @@ partout. (8 nov., CI verte) La règle jugée est désormais :
   2. l'adaptateur Orion (`compat-orion.js`) identique octet pour octet à la
      référence, et `orion-main.js` celui du dépôt ;
   3. le manifeste Orion identique à celui de la référence, version et description
-     communes exceptées, avec le seul retour OAuth sur les hôtes VRM existants (MV2, identifiant, permissions, hôtes, scripts de démarrage,
+     communes exceptées, avec le seul retour OAuth sur les hôtes VRM existants
+     (MV2, identifiant, permissions, autres scripts de démarrage,
      ressources : la forme que Julien a vue s'installer) ;
   4. chaque autre membre est EXACTEMENT le fichier de `vinted-sync-extension/`
      (popup.html : plus la seule balise compat-orion) — aucun changement propre

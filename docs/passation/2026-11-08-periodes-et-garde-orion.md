@@ -1,6 +1,6 @@
 # 8 novembre — périodes mémorisées, focus et contrôle Orion
 
-Base `8f7639ee`, suite à la recherche de bugs. Le message Brevo envoyé par erreur a été ignoré : aucune configuration de messagerie ni DNS modifiée.
+Base `8f7639ee`, suite à la recherche de bugs.
 
 ## Deux bugs de calendrier
 
