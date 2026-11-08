@@ -157,6 +157,7 @@ const COUPLES = {
   'src/ecrans/Reglages.jsx|www.leboncoin.fr': ['lien', LIEN + ' — Comptes : « Ouvrir » le site du compte'],
   'src/ecrans/Reglages.jsx|www.ebay.fr': ['lien', LIEN + ' — Comptes : « Ouvrir » le site du compte'],
   'src/ecrans/Reglages.jsx|vrm.center': ['vrm', 'VRM lui-même (le lien privé du widget iPhone)'],
+  'src/abonnement/etatAbonnement.js|vrm.center': ['vrm', 'VRM lui-même (le lien de parrainage, 8 nov.)'],
   'src/ecrans/Reglages.jsx|discord.com': ['lien', 'connexion Discord : le navigateur y va sur le clic de la personne'],
   'src/ecrans/Reglages.jsx|vercel.com': ['lien', LIEN],
   'src/ecrans/Republier.jsx|www.vinted.fr': ['lien', LIEN + ' — « compléter sur Vinted » (page de modification de l’annonce)'],

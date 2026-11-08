@@ -40,13 +40,23 @@ export const LIBELLES_TYPE = {
   ebay_retrait: 'Retrait eBay automatique',
   ebay_action: 'Action eBay',
   bordereau: 'Bordereau récupéré',
+  bordereau_demande: 'Bordereau demandé',
+  lbc_publication: 'Annonce Leboncoin publiée',
+  offre_acceptee: 'Offre acceptée',
+  offre_refusee: 'Offre refusée',
+  offre_faite: 'Offre envoyée',
+  message_envoye: 'Message envoyé',
 };
 export const LIBELLES_RESULTAT = { ok: 'Fait', refuse: 'Refusé', pause: 'En pause', verifier: 'À vérifier', en_cours: 'En cours' };
 // Les filtres de type (puces) : regroupés comme Julien les nomme.
 export const FILTRES_TYPE = [
-  ['tous', 'Tout'], ['favoris', 'Favoris'], ['republication', 'Republications'], ['ebay', 'eBay'], ['bordereau', 'Bordereaux'],
+  ['tous', 'Tout'], ['offres', 'Offres et messages'], ['favoris', 'Favoris'], ['republication', 'Republications'], ['ebay', 'eBay'], ['bordereau', 'Bordereaux'], ['leboncoin', 'Leboncoin'],
 ];
-const familleType = (t) => (t === 'favori' || t === 'favori_offre' ? 'favoris' : t === 'ebay_retrait' || t === 'ebay_action' ? 'ebay' : t);
+const familleType = (t) => (t === 'favori' || t === 'favori_offre' ? 'favoris'
+  : t === 'ebay_retrait' || t === 'ebay_action' ? 'ebay'
+  : t === 'bordereau_demande' ? 'bordereau'
+  : t === 'offre_acceptee' || t === 'offre_refusee' || t === 'offre_faite' || t === 'message_envoye' ? 'offres'
+  : t === 'lbc_publication' ? 'leboncoin' : t);
 
 export function filtrerJournal(evts, { compte = '*', type = 'tous' } = {}) {
   return (Array.isArray(evts) ? evts : []).filter((e) => e
@@ -64,9 +74,13 @@ export function ligneJournal(e, { numeroDeItem, nomCompte } = {}) {
   if (!article && c.sku) article = 'SKU ' + c.sku;
   if (!article && c.item) article = 'article ' + c.item;
   if (!article && c.tx) article = 'commande ' + c.tx;
+  if (!article && c.lbc) article = 'annonce Leboncoin ' + c.lbc;
   const compte = e && e.compte ? ((nomCompte && nomCompte(e.compte)) || (e.compte === 'principal' ? 'compte eBay principal' : null)) : null;
   const titre = (e && e.type === 'ebay_action' && e.action) ? e.action : (LIBELLES_TYPE[e && e.type] || 'Action');
-  return { titre, article, compte, resultat: LIBELLES_RESULTAT[e && e.resultat] || '—', aVerifier: !!e && (e.resultat === 'verifier' || e.resultat === 'refuse') };
+  // (8 nov.) La PREUVE : la ligne de sa base qui note ce geste (posée par le
+  // serveur). Absente ⇒ « d'où vient cette ligne : pas su », jamais rien.
+  const preuve = e && typeof e.preuve === 'string' && e.preuve ? e.preuve : null;
+  return { titre, article, compte, preuve, resultat: LIBELLES_RESULTAT[e && e.resultat] || '—', aVerifier: !!e && (e.resultat === 'verifier' || e.resultat === 'refuse') };
 }
 
 // Les comptes présents dans le journal (pour les puces de compte), dans l'ordre

@@ -24,6 +24,8 @@ const termes={
  double:'double verification authentification securite totp',
  'abonnement-ouvrir':'abonnement paiement payer carte facture prix resilier arreter offre',
  push:'notification telephone iphone alerte prevenir',
+ 'tes-donnees':'donnees confidentialite vie privee rgpd stockage acces extension lit fait',
+ statut:'etat panne incident statut fonctionne serveur',
 };
 export const normaliserRechercheReglage=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
 export function filtrerReglages(groupes,recherche){

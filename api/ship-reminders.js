@@ -47,6 +47,7 @@ import { resumeColisSites } from './_lib/colis-sites.js';
 import { ventesVcDe, numerosVcAvecLiens } from './_lib/vestiaire-regle.js';
 import { SELECT_DEPART_META, departsParSuivi, txVintedParties } from './_lib/depart-colis.js';
 import { ventesPartiesParPreuve, lirePreuvesDepart } from './_lib/depart-vente.js';
+import { colisVentesEmailServeur, reqVentesEmail, txsDeCommandes } from './_lib/colis-ventes-email.js';
 import { relireCommandesVendeur } from './_lib/ebay-relecture.js';
 import { avecSuiviDuSujet, relireLigneMeta } from './_lib/suivi-colis.js';
 import { rappelsRetraitDuJour, texteRappelRetrait, SELECT_SUIVI_META, txDuColis, liensDesLignes, finDesTransactions, SELECT_TRANSP_META, ligneTranspDeMeta } from './_lib/suivi-colis.js';
@@ -234,9 +235,11 @@ async function lireDonneesBilan() {
   const departs = Array.isArray(dep) ? departsParSuivi(dep) : null;
   // (8 nov., « à envoyer » prouvé) Les bordereaux (leur n° de suivi) et les preuves de départ :
   // le bilan compte les colis à envoyer avec la règle du widget et de Colis (§11).
-  const [bordsB, preuves] = await Promise.all([
+  const [bordsB, preuves, mailsVentes] = await Promise.all([
     fetchPaginated(scoped(`app_data?id=like.email_bord_*&select=${BORD_COLIS}`)),
     lirePreuvesDepart((p) => fetchPaginated(scoped(p)), (x) => avecSuiviDuSujet(relireLigneMeta(x))),
+    // (8 nov.) Les e-mails de vente récents (scalaires `meta->>`, la requête de l'app).
+    fetchPaginated(scoped(reqVentesEmail(Date.now()))),
   ]);
   const comptes = Array.isArray(comptesL)
     ? comptesL.map((c) => ({ uid: String((c && c.vinted_user_id) || ''), login: String((c && c.login) || '') })).filter((c) => c.uid)
@@ -261,6 +264,7 @@ async function lireDonneesBilan() {
     lbcVentes: lbcL === undefined ? null : (objet(lbcL && lbcL.ventes) || {}),
     vc: (vcV === undefined || vcL === undefined) ? null : { ventes: (vcV && vcV.ventes) || null, liens: (vcL && vcL.liens) || {}, auto: numerosVcAvecLiens((mm && mm.vrm_vc_numeros) || {}, mm && mm.vrm_vc_liens), fait: (mm && mm.vrm_vc_colis_done) || {}, departs },
     departs, bords: bordsB, preuves,
+    mailsVentes: Array.isArray(mailsVentes) ? mailsVentes : null,
     ebay: ebayL,
     versements: versementsDeLignes(txn),
     // `null` = illisible (le bilan le NOMME) ; ligne absente = aucune vente.
@@ -312,7 +316,29 @@ function txsAExpedier(d) {
   // (1er nov., audit A4) Leboncoin et Vestiaire : la règle de Colis
   // (`resumeColisSites`). Illisible ⇒ `null`, nommé par l'appelant.
   const autres = resumeColisSites({ lbc: d.lbcVentes, vc: d.vc, fait: d.main.vrm_lbc_colis_done });
-  return { vinted: new Set(txs.map(String).filter(pasPartie)), ebay: eb, leboncoin: autres.leboncoin, vestiaire: autres.vestiaire };
+  const vinted = new Set(txs.map(String).filter(pasPartie));
+  // (8 nov.) + les ventes vues par e-mail dont le bordereau est là — le nombre de Ma journée et du widget.
+  for (const t of ventesEmailColis(d).txs) vinted.add(String(t));
+  return { vinted, ebay: eb, leboncoin: autres.leboncoin, vestiaire: autres.vestiaire };
+}
+// (8 nov.) LES VENTES VUES PAR E-MAIL DONT LE BORDEREAU EST LÀ (api/_lib/colis-ventes-email.js — les
+// règles de l'app, importées telles quelles). Les listes lues ici sont ENTIÈRES (`orders`) : « n°
+// absent de la liste » se juge sur elles ; leur lecture (`capturedAt`) date chaque compte. Une source
+// illisible (e-mails, comptes, réglages, panneau) ⇒ aucune (pas su), jamais un colis inventé.
+function ventesEmailColis(d) {
+  if (!d || !d.commandes || !d.main || !Array.isArray(d.comptes) || !Array.isArray(d.mailsVentes) || !d.panneau) return { txs: [], ventes: {} };
+  const vivants = new Set(d.comptes.map((c) => c.uid));
+  const connues = [], lectures = {};
+  for (const [uid, l] of Object.entries(d.commandes)) {
+    if (vivants.size && !vivants.has(uid)) continue;
+    connues.push(...txsDeCommandes(l.orders));
+    const c = Date.parse(l.cap || '');
+    if (Number.isFinite(c)) lectures[uid] = Math.max(lectures[uid] || 0, c);
+  }
+  const pr = d.preuves || {};
+  return colisVentesEmailServeur({ mails: d.mailsVentes, comptes: [...vivants], masques: d.main.vinted_accounts_hidden, panneau: d.panneau, connues, lectures,
+    bordsParTx: Array.isArray(d.bords) ? bordsDuVendeur(d) : {}, shipDone: objet(d.main.vinted_ship_done), bordsShipped: objet(d.main.vinted_bords_shipped),
+    panelBordsDone: pr.panelBordsDone || {}, lignesEmail: pr.lignesEmail || null, departs: d.departs, entrants: pr.entrants || null });
 }
 
 // `soir` : le bilan du DIMANCHE SOIR (26 oct.). Il porte la semaine EN COURS
@@ -900,14 +926,14 @@ export function texteMatin({ overdue, aVerifier = 0, dueToday, dueTomorrow, ebay
 // projeté, §4.4), ventes moissonnées (liste + résumé), commandes eBay, et les
 // bordereaux reçus par email (leur date limite, AVEC l'heure). Chaque source
 // vaut `null` quand sa lecture a échoué (« rien lu » ne vaut pas « rien »).
-const MAIN_COLIS = ['vinted_ship_done', 'vinted_bords_shipped', 'vinted_bords_hidden', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_numeros', 'vrm_vc_liens'];
+const MAIN_COLIS = ['vinted_ship_done', 'vinted_bords_shipped', 'vinted_bords_hidden', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_numeros', 'vrm_vc_liens', 'vinted_accounts_hidden'];
 const BORD_COLIS = 'dateLimite:data->>dateLimite,transaction:data->>transaction,suivi:data->>suivi,numero:data->>numero,receivedAt:data->>receivedAt,filename:data->>filename';
 async function lireDonneesColis() {
   const BORD = BORD_COLIS;
-  const [comptesL, m, lignes, ebay, bords, lbcL, vcV, vcL, dep] = await Promise.all([
+  const [comptesL, m, lignes, ebay, bords, lbcL, vcV, vcL, dep, mailsVentes, panneau] = await Promise.all([
     fetchPaginated(scoped('vinted_accounts?select=vinted_user_id,login')),
     getRowProjete('main', MAIN_COLIS),
-    fetchPaginated(scoped('app_data?id=like.harvest_%25_orders_sold&select=id,orders:data->payload->my_orders,txns:data->resume->txns')),
+    fetchPaginated(scoped('app_data?id=like.harvest_%25_orders_sold&select=id,orders:data->payload->my_orders,txns:data->resume->txns,cap:data->>capturedAt')),
     lireCommandesEbay(),
     fetchPaginated(scoped(`app_data?id=like.email_bord_*&select=${BORD}`)),
     // (1er nov., audit A4) Les colis Leboncoin et Vestiaire : leurs seules ventes (§4.4).
@@ -916,6 +942,9 @@ async function lireDonneesColis() {
     getRowProjete('vc_listings', ['liens']),
     // (8 nov.) Les départs prouvés chez le transporteur (api/_lib/depart-colis.js).
     fetchPaginated(scoped(`app_data?id=like.depart_*&select=${SELECT_DEPART_META}`)),
+    // (8 nov.) Les ventes vues par e-mail (scalaires `meta->>`) et le choix « hors des totaux » du panneau.
+    fetchPaginated(scoped(reqVentesEmail(Date.now()))),
+    getRow('panel_accounts_off'),
   ]);
   const departs = Array.isArray(dep) ? departsParSuivi(dep) : null;
   // (8 nov., « à envoyer » prouvé) Les preuves de départ de la règle de Colis (api/_lib/depart-vente.js).
@@ -926,10 +955,11 @@ async function lireDonneesColis() {
     commandes = {};
     for (const l of lignes) {
       const um = String((l && l.id) || '').match(/^harvest_(.+?)_orders_sold$/);
-      if (um) commandes[um[1]] = { orders: Array.isArray(l.orders) ? l.orders : [], txns: Array.isArray(l.txns) ? l.txns : null };
+      if (um) commandes[um[1]] = { orders: Array.isArray(l.orders) ? l.orders : [], txns: Array.isArray(l.txns) ? l.txns : null, cap: l.cap || null };
     }
   }
   return { comptes, commandes, main: m === undefined ? null : objet(m), ebay, bords, departs, preuves,
+    mailsVentes: Array.isArray(mailsVentes) ? mailsVentes : null, panneau: panneau === undefined ? null : objet(panneau),
     lbcVentes: lbcL === undefined ? null : (objet(lbcL && lbcL.ventes) || {}),
     vc: (vcV === undefined || vcL === undefined) ? null : { ventes: (vcV && vcV.ventes) || null, liens: (vcL && vcL.liens) || {}, auto: numerosVcAvecLiens((objet(m) && objet(m).vrm_vc_numeros) || {}, objet(m) && objet(m).vrm_vc_liens), fait: (objet(m) && objet(m).vrm_vc_colis_done) || {}, departs } };
 }
@@ -943,6 +973,8 @@ function ventesParTx(d) {
     if (vivants.size && !vivants.has(uid)) continue;
     for (const o of l.orders) if (o && o.transaction_id != null) out[String(o.transaction_id)] = o;
   }
+  // (8 nov.) La vente vue par e-mail : sa date (l'arrivée de l'e-mail), comme dans l'app.
+  for (const [t, o] of Object.entries(ventesEmailColis(d).ventes)) if (!out[t]) out[t] = o;
   return out;
 }
 // Le bordereau email de chaque transaction — la table de l'écran Colis

@@ -48,6 +48,10 @@
       "destination": "/aide/$1.html"
     },
     {
+      "source": "/statut",
+      "destination": "/statut.html"
+    },
+    {
       "source": "/api/stripe-webhook",
       "destination": "/api/compte?mode=webhook"
     },
